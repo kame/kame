@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.23 2002/05/08 15:53:18 jinmei Exp $	*/
+/*	$KAME: common.h,v 1.24 2002/05/16 05:55:48 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -31,6 +31,8 @@
 #define IN6_IFF_INVALID (IN6_IFF_ANYCAST|IN6_IFF_TENTATIVE|\
 		IN6_IFF_DUPLICATED|IN6_IFF_DETACHED)
 
+#define FNAME __FUNCTION__ ": "
+
 extern int foreground;
 extern int debug_thresh;
 extern char *device;
@@ -59,6 +61,8 @@ extern int dhcp6_set_options __P((struct dhcp6opt *, struct dhcp6opt *,
 extern char *dhcpoptstr __P((int));
 extern char *dhcpmsgstr __P((int));
 extern char *duidstr __P((struct duid *));
+
+extern int duidcmp __P((struct duid *, struct duid *));
 
 /* missing */
 #ifndef HAVE_STRLCAT

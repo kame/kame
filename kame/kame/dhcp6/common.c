@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.50 2002/05/10 05:23:51 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.51 2002/05/16 05:55:48 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -547,6 +547,9 @@ dhcp6_init_options(optinfo)
 	struct dhcp6_optinfo *optinfo;
 {
 	memset(optinfo, 0, sizeof(*optinfo));
+
+	optinfo->pref = DH6OPT_PREF_UNDEF;
+
 	TAILQ_INIT(&optinfo->dnslist);
 	TAILQ_INIT(&optinfo->prefix);
 }
@@ -946,6 +949,30 @@ dhcp6_set_options(bp, ep, optinfo)
 }
 #undef COPY_OPTION
 
+int
+duidcpy(dd, ds)
+	struct duid *dd, *ds;
+{
+	dd->duid_len = ds->duid_len;
+	if ((dd->duid_id = malloc(dd->duid_len)) == NULL) {
+		dprintf(LOG_ERR, "%s" "memory allocation failed", FNAME);
+		return(-1);
+	}
+	memcpy(dd->duid_id, ds->duid_id, dd->duid_len);
+
+	return(0);
+}
+
+int
+duidcmp(d1, d2)
+	struct duid *d1, *d2;
+{
+	if (d1->duid_len == d2->duid_len) {
+		return(memcmp(d1->duid_id, d2->duid_id, d1->duid_len));
+	} else
+		return(-1);
+}
+
 char *
 dhcpoptstr(type)
 	int type;
@@ -988,6 +1015,10 @@ dhcpmsgstr(type)
 	switch(type) {
 	case DH6_SOLICIT:
 		return "solicit";
+	case DH6_ADVERTISE:
+		return "advertise";
+	case DH6_REQUEST:
+		return "request";
 	case DH6_REPLY:
 		return "reply";
 	case DH6_INFORM_REQ:

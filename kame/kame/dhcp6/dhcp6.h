@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.24 2002/05/09 12:36:29 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.25 2002/05/16 05:55:48 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -43,6 +43,8 @@
 
 /* Message type */
 #define DH6_SOLICIT	1
+#define DH6_ADVERTISE	2
+#define DH6_REQUEST	3
 #define DH6_REPLY	7
 #define DH6_INFORM_REQ	11
 
@@ -53,12 +55,17 @@
 #define DH6PORT_UPSTREAM	"547"
 
 /* Protocol constants */
-#define MIN_SOL_DELAY	1000	/* msec */
-#define MAX_SOL_DELAY	5000	/* msec */
-#define SOL_TIMEOUT	500	/* msec */
-#define SOL_MAX_RT	30000	/* msec */
-#define INF_TIMEOUT	500	/* msec */
-#define INF_MAX_RT	30000	/* msec */
+
+/* timer parameters (msec, unless explicitly commented) */
+#define MIN_SOL_DELAY	1000
+#define MAX_SOL_DELAY	5000
+#define SOL_TIMEOUT	500
+#define SOL_MAX_RT	30000
+#define INF_TIMEOUT	500
+#define INF_MAX_RT	30000
+#define REQ_TIMEOUT	250
+#define REQ_MAX_RT	30000
+#define REQ_MAX_RC	10	/* Max Request retry attempts */
 
 #define DHCP6_DURATITION_INFINITE 0xffffffff
 
@@ -96,6 +103,7 @@ struct dhcp6_optinfo {
 	int rapidcommit;	/* bool */
 	struct dnsq dnslist;	/* DNS server list */
 	struct delegated_prefix_list prefix; /* prefix list */
+	int pref;		/* server preference */
 };
 
 /* DHCP6 base packet format */
@@ -130,6 +138,10 @@ struct dhcp6 {
 #define DH6OPT_VENDOR_OPTS 17
 #define DH6OPT_INTERFACE_ID 18
 #define DH6OPT_RECONF_MSG 19
+
+#define DH6OPT_PREF_UNDEF -1
+#define DH6OPT_PREF_MAX 255
+
 /*
  * The option type has not been assigned for the following options.
  * We use type values from 256 temporarily. 

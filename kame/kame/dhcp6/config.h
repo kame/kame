@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.10 2002/05/09 13:41:06 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.11 2002/05/16 05:55:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -33,6 +33,9 @@
 struct dhcp6_if {
 	struct dhcp6_if *next;
 
+	/* timer for the interface */
+	struct dhcp6_timer *timer;
+
 	/* internal status */
 	int state;
 	u_int32_t xid;		/* current transaction ID */
@@ -59,11 +62,25 @@ struct dhcp6_if {
 
 	struct dhcp6_optconf *send_options;
 	struct dhcp6_optconf *request_options;
+
+	struct dhcp6_serverinfo *current_server;
+	struct dhcp6_serverinfo *servers;
+};
+
+struct dhcp6_serverinfo {
+	struct dhcp6_serverinfo *next;
+
+	struct duid id;		/* server's identifier */
+
+	int pref;		/* preference */
+	int active;		/* bool; if this server is active or not */
+	/* TODO: remember available information from the server */
 };
 
 /* client status code */
-enum {DHCP6S_INIT, DHCP6S_SOLICIT, DHCP6S_INFOREQ, DHCP6S_IDLE};
-
+enum {DHCP6S_INIT, DHCP6S_SOLICIT, DHCP6S_INFOREQ, DHCP6S_REQUEST,
+      DHCP6S_IDLE};
+      
 struct dhcp6_ifconf {
 	struct dhcp6_ifconf *next;
 
@@ -131,6 +148,7 @@ enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
       IFPARAM_SLA_ID,
       DHCPOPT_RAPID_COMMIT, DHCPOPT_PREFIX_DELEGATION};
 
+extern struct dhcp6_if *dhcp6_if;
 extern struct dhcp6_ifconf *dhcp6_iflist;
 extern struct prefix_ifconf *prefix_ifconflist;
 
@@ -141,6 +159,7 @@ extern int configure_host __P((struct cf_namelist *));
 extern void configure_cleanup __P((void));
 extern void configure_commit __P((void));
 extern int cfparse __P((char *));
-extern struct dhcp6_if *find_ifconf __P((char *));
+extern struct dhcp6_if *find_ifconfbyname __P((char *));
+extern struct dhcp6_if *find_ifconfbyid __P((unsigned int));
 extern struct prefix_ifconf *find_prefixifconf __P((char *));
 extern struct host_conf *find_hostconf __P((struct duid *));

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.75 2002/05/09 12:40:03 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.76 2002/05/16 05:55:48 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -93,19 +93,21 @@ static struct dnsq dnslist;
 static void usage __P((void));
 static void server6_init __P((void));
 static void server6_mainloop __P((void));
-static ssize_t server6_recv __P((int, struct sockaddr *, int *));
-static void server6_react __P((struct dhcp6_if *, size_t,
-			       struct sockaddr *, int));
-static int server6_react_informreq __P((struct dhcp6_if *, char *, size_t,
-					struct dhcp6_optinfo *,
-					struct sockaddr *, int));
-static int server6_react_solicit __P((struct dhcp6_if *, char *, size_t,
+static int server6_recv __P((int));
+static int server6_react_solicit __P((struct dhcp6_if *, struct dhcp6 *,
 				      struct dhcp6_optinfo *,
 				      struct sockaddr *, int));
-static int server6_send_reply __P((struct dhcp6_if *, struct dhcp6 *,
-				   struct dhcp6_optinfo *,
-				   struct sockaddr *, int,
-				   struct dhcp6_optinfo *));
+static int server6_react_request __P((struct dhcp6_if *,
+				      struct in6_pktinfo *, struct dhcp6 *,
+				      struct dhcp6_optinfo *,
+				      struct sockaddr *, int));
+static int server6_react_informreq __P((struct dhcp6_if *, struct dhcp6 *,
+					struct dhcp6_optinfo *,
+					struct sockaddr *, int));
+static int server6_send __P((int, struct dhcp6_if *, struct dhcp6 *,
+			     struct dhcp6_optinfo *,
+			     struct sockaddr *, int,
+			     struct dhcp6_optinfo *));
 
 int
 main(argc, argv)
@@ -171,7 +173,8 @@ main(argc, argv)
 	ifinit(device);
 
 	if ((cfparse(DHCP6S_CONF)) != 0) {
-		dprintf(LOG_ERR, "failed to parse configuration file");
+		dprintf(LOG_ERR, "%s" "failed to parse configuration file",
+			FNAME);
 		exit(1);
 	}
 
@@ -200,29 +203,29 @@ server6_init()
 	int ifidx;
 	int on = 1;
 	struct ipv6_mreq mreq6;
-	static struct iovec iov[2];
+	static struct iovec iov;
 	static struct sockaddr_in6 sa6_any_downstream_storage;
 
 	ifidx = if_nametoindex(device);
 	if (ifidx == 0) {
-		dprintf(LOG_ERR, "invalid interface %s", device);
+		dprintf(LOG_ERR, "%s" "invalid interface %s", FNAME, device);
 		exit(1);
 	}
 
 	/* get our DUID */
 	if (get_duid(DUID_FILE, &server_duid)) {
-		dprintf(LOG_ERR, "failed to get a DUID");
+		dprintf(LOG_ERR, "%s" "failed to get a DUID", FNAME);
 		exit(1);
 	}
 
 	/* initialize send/receive buffer */
-	iov[0].iov_base = (caddr_t)rdatabuf;
-	iov[0].iov_len = sizeof(rdatabuf);
-	rmh.msg_iov = iov;
+	iov.iov_base = (caddr_t)rdatabuf;
+	iov.iov_len = sizeof(rdatabuf);
+	rmh.msg_iov = &iov;
 	rmh.msg_iovlen = 1;
 	rmsgctllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 	if ((rmsgctlbuf = (char *)malloc(rmsgctllen)) == NULL) {
-		dprintf(LOG_ERR, "memory allocation failed");
+		dprintf(LOG_ERR, "%s" "memory allocation failed", FNAME);
 		exit(1);
 	}
 
@@ -234,28 +237,48 @@ server6_init()
 	hints.ai_flags = AI_PASSIVE;
 	error = getaddrinfo(NULL, DH6PORT_UPSTREAM, &hints, &res);
 	if (error) {
-		dprintf(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+		dprintf(LOG_ERR, "%s" "getaddrinfo: %s",
+			FNAME, gai_strerror(error));
 		exit(1);
 	}
 	insock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (insock < 0) {
-		dprintf(LOG_ERR, "socket(insock): %s", strerror(errno));
+		dprintf(LOG_ERR, "%s" "socket(insock): %s",
+			FNAME, strerror(errno));
 		exit(1);
 	}
-	if (setsockopt(insock, SOL_SOCKET, SO_REUSEPORT,
-		       &on, sizeof(on)) < 0) {
-		dprintf(LOG_ERR, "setsockopt(insock, SO_REUSEPORT): %s",
-			strerror(errno));
+	if (setsockopt(insock, SOL_SOCKET, SO_REUSEPORT, &on,
+		       sizeof(on)) < 0) {
+		dprintf(LOG_ERR, "%s" "setsockopt(insock, SO_REUSEPORT): %s",
+			FNAME, strerror(errno));
 		exit(1);
 	}
-	if (setsockopt(insock, SOL_SOCKET, SO_REUSEADDR,
-		       &on, sizeof(on)) < 0) {
-		dprintf(LOG_ERR, "setsockopt(insock, SO_REUSEADDR): %s",
-			strerror(errno));
+	if (setsockopt(insock, SOL_SOCKET, SO_REUSEADDR, &on,
+		       sizeof(on)) < 0) {
+		dprintf(LOG_ERR, "%s" "setsockopt(insock, SO_REUSEADDR): %s",
+			FNAME, strerror(errno));
 		exit(1);
 	}
+#ifdef IPV6_RECVPKTINFO
+	if (setsockopt(insock, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
+		       sizeof(on)) < 0) {
+		dprintf(LOG_ERR, "%s"
+			"setsockopt(inbound, IPV6_RECVPKTINFO): %s",
+			FNAME, strerror(errno));
+		exit(1);
+	}
+#else
+	if (setsockopt(insock, IPPROTO_IPV6, IPV6_PKTINFO, &on,
+		       sizeof(on)) < 0) {
+		dprintf(LOG_ERR, "%s"
+			"setsockopt(inbound, IPV6_PKTINFO): %s",
+			FNAME, strerror(errno));
+		exit(1);
+	}
+#endif
 	if (bind(insock, res->ai_addr, res->ai_addrlen) < 0) {
-		dprintf(LOG_ERR, "bind(insock): %s", strerror(errno));
+		dprintf(LOG_ERR, "%s" "bind(insock): %s",
+			FNAME, strerror(errno));
 		exit(1);
 	}
 	freeaddrinfo(res);
@@ -263,7 +286,8 @@ server6_init()
 	hints.ai_flags = 0;
 	error = getaddrinfo(DH6ADDR_ALLAGENT, DH6PORT_UPSTREAM, &hints, &res2);
 	if (error) {
-		dprintf(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+		dprintf(LOG_ERR, "%s" "getaddrinfo: %s",
+			FNAME, gai_strerror(error));
 		exit(1);
 	}
 	memset(&mreq6, 0, sizeof(mreq6));
@@ -273,16 +297,18 @@ server6_init()
 	    sizeof(mreq6.ipv6mr_multiaddr));
 	if (setsockopt(insock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 	    &mreq6, sizeof(mreq6))) {
-		dprintf(LOG_ERR, "setsockopt(insock, IPV6_JOIN_GROUP)",
-			strerror(errno));
+		dprintf(LOG_ERR, "%s" "setsockopt(insock, IPV6_JOIN_GROUP)",
+			FNAME, strerror(errno));
 		exit(1);
 	}
 	freeaddrinfo(res2);
 
 	hints.ai_flags = 0;
-	error = getaddrinfo(DH6ADDR_ALLSERVER, DH6PORT_UPSTREAM, &hints, &res2);
+	error = getaddrinfo(DH6ADDR_ALLSERVER, DH6PORT_UPSTREAM,
+			    &hints, &res2);
 	if (error) {
-		dprintf(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+		dprintf(LOG_ERR, "%s" "getaddrinfo: %s",
+			FNAME, gai_strerror(error));
 		exit(1);
 	}
 	memset(&mreq6, 0, sizeof(mreq6));
@@ -292,8 +318,9 @@ server6_init()
 	    sizeof(mreq6.ipv6mr_multiaddr));
 	if (setsockopt(insock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 	    &mreq6, sizeof(mreq6))) {
-		dprintf(LOG_ERR, "setsockopt(insock, IPV6_JOIN_GROUP): %s",
-			strerror(errno));
+		dprintf(LOG_ERR,
+			"%s" "setsockopt(insock, IPV6_JOIN_GROUP): %s",
+			FNAME, strerror(errno));
 		exit(1);
 	}
 	freeaddrinfo(res2);
@@ -301,24 +328,28 @@ server6_init()
 	hints.ai_flags = 0;
 	error = getaddrinfo(NULL, DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
-		dprintf(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+		dprintf(LOG_ERR, "%s" "getaddrinfo: %s",
+			FNAME, gai_strerror(error));
 		exit(1);
 	}
 	outsock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (outsock < 0) {
-		dprintf(LOG_ERR, "socket(outsock): %s", strerror(errno));
+		dprintf(LOG_ERR, "%s" "socket(outsock): %s",
+			FNAME, strerror(errno));
 		exit(1);
 	}
 	/* set outgoing interface of multicast packets for DHCP reconfig */
 	if (setsockopt(outsock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
 	    &ifidx, sizeof(ifidx)) < 0) {
-		dprintf(LOG_ERR, "setsockopt(outsock, IPV6_MULTICAST_IF): %s",
-			strerror(errno));
+		dprintf(LOG_ERR,
+			"%s" "setsockopt(outsock, IPV6_MULTICAST_IF): %s",
+			FNAME, strerror(errno));
 		exit(1);
 	}
 	/* make the socket write-only */
 	if (shutdown(outsock, 0)) {
-		dprintf(LOG_ERR, "shutdown(outbound, 0): %s", strerror(errno));
+		dprintf(LOG_ERR, "%s" "shutdown(outbound, 0): %s",
+			FNAME, strerror(errno));
 		exit(1);
 	}
 	freeaddrinfo(res);
@@ -329,7 +360,8 @@ server6_init()
 	hints.ai_protocol = IPPROTO_UDP;
 	error = getaddrinfo("::", DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
-		dprintf(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+		dprintf(LOG_ERR, "%s" "getaddrinfo: %s",
+			FNAME, gai_strerror(error));
 		exit(1);
 	}
 	memcpy(&sa6_any_downstream_storage, res->ai_addr, res->ai_addrlen);
@@ -344,14 +376,6 @@ server6_mainloop()
 	int ret;
 	fd_set r;
 	ssize_t l;
-	struct sockaddr_storage from;
-	int fromlen;
-	struct dhcp6_if *ifp;	/* XXX: multiple-interface support */
-
-	if ((ifp = find_ifconf(device)) == NULL) {
-		dprintf(LOG_ERR, "interface %s not configured", device);
-		exit(1);
-	}
 
 	while (1) {
 		FD_ZERO(&r);
@@ -360,99 +384,121 @@ server6_mainloop()
 		switch (ret) {
 		case -1:
 		case 0:
-			dprintf(LOG_ERR, "select: %s", strerror(errno));
+			dprintf(LOG_ERR, "%s" "select: %s",
+				FNAME, strerror(errno));
 			exit(1);
 			/* NOTREACHED */
 		default:
 			break;
 		}
-		if (FD_ISSET(insock, &r)) {
-			fromlen = sizeof(from);
-			l = server6_recv(insock, (struct sockaddr *)&from,
-					 &fromlen);
-			if (l > 0) {
-				server6_react(ifp, l, (struct sockaddr *)&from,
-					      fromlen);
-			}
-		}
+		if (FD_ISSET(insock, &r))
+			server6_recv(insock);
 	}
 }
 
-static ssize_t
-server6_recv(s, from, fromlen)
+static int
+server6_recv(s)
 	int s;
-	struct sockaddr *from;
-	int *fromlen;
 {
 	ssize_t len;
-
-	len = recvfrom(s, rdatabuf, sizeof(rdatabuf), 0, from, fromlen);
-	if (len < 0) {
-		dprintf(LOG_WARNING, "recvfrom: %s", strerror(errno));
-		return(-1);	/* should assert? */
-	}
-	dprintf(LOG_DEBUG, "server6_recv: from %s, size %d",
-	    addr2str(from), len); 
-
-	return len;
-}
-
-static void
-server6_react(ifp, siz, from, fromlen)
-	struct dhcp6_if *ifp;
-	size_t siz;
-	struct sockaddr *from;
+	struct sockaddr_storage from;
 	int fromlen;
-{
+	struct msghdr mhdr;
+	struct iovec iov;
+	char cmsgbuf[BUFSIZ];
+	struct cmsghdr *cm;
+	struct in6_pktinfo *pi = NULL;
+	struct dhcp6_if *ifp;
 	struct dhcp6 *dh6;
 	struct dhcp6opt *opt, *eopt;
 	struct dhcp6_optinfo optinfo;
 
-	if (siz < sizeof(*dh6)) {
-		dprintf(LOG_INFO, "server6_react: short packet");
+	memset(&iov, 0, sizeof(iov));
+	memset(&mhdr, 0, sizeof(mhdr));
+
+	iov.iov_base = rdatabuf;
+	iov.iov_len = sizeof(rdatabuf);
+	mhdr.msg_name = &from;
+	mhdr.msg_namelen = sizeof(from);
+	mhdr.msg_iov = &iov;
+	mhdr.msg_iovlen = 1;
+	mhdr.msg_control = (caddr_t)cmsgbuf;
+	mhdr.msg_controllen = sizeof(cmsgbuf);
+
+	if ((len = recvmsg(insock, &mhdr, 0)) < 0) {
+		dprintf(LOG_ERR, "%s" "recvmsg: %s", FNAME, strerror(errno));
+		return -1;
+	}
+
+	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(&mhdr); cm;
+	     cm = (struct cmsghdr *)CMSG_NXTHDR(&mhdr, cm)) {
+		if (cm->cmsg_level == IPPROTO_IPV6 &&
+		    cm->cmsg_type == IPV6_PKTINFO &&
+		    cm->cmsg_len == CMSG_LEN(sizeof(struct in6_pktinfo))) {
+			pi = (struct in6_pktinfo *)(CMSG_DATA(cm));
+		}
+	}
+	if (pi == NULL) {
+		dprintf(LOG_NOTICE, "%s" "failed to get packet info", FNAME);
+		return -1;
+	}
+	if ((ifp = find_ifconfbyid((unsigned int)pi->ipi6_ifindex)) == NULL) {
+		dprintf(LOG_INFO, "%s" "unexpected interface (%d)", FNAME,
+			(unsigned int)pi->ipi6_ifindex);
 		return;
 	}
 
+	if (len < sizeof(*dh6)) {
+		dprintf(LOG_INFO, "%s" "short packet", FNAME);
+		return -1;
+	}
+	
 	dh6 = (struct dhcp6 *)rdatabuf;
 
-	dprintf(LOG_DEBUG, "server6_react: react to %s",
-		dhcpmsgstr(dh6->dh6_msgtype));
+	dprintf(LOG_DEBUG, "%s" "received %s from %s", FNAME,
+		dhcpmsgstr(dh6->dh6_msgtype),
+		addr2str((struct sockaddr *)&from));
 
 	/*
 	 * parse and validate options in the request
 	 */
 	dhcp6_init_options(&optinfo);
-	opt = (struct dhcp6opt *)(dh6 + 1);
-	eopt = (struct dhcp6opt *)(rdatabuf + siz);
-	if (dhcp6_get_options(opt, eopt, &optinfo) < 0) {
-		dprintf(LOG_INFO,
-			"server6_react: failed to parse options");
-		return;
+	if (dhcp6_get_options((struct dhcp6opt *)(dh6 + 1),
+			      (struct dhcp6opt *)(rdatabuf + len),
+			      &optinfo) < 0) {
+		dprintf(LOG_INFO, "%s" "failed to parse options", FNAME);
+		return -1;
 	}
 
 	switch (dh6->dh6_msgtype) {
 	case DH6_SOLICIT:
-		(void)server6_react_solicit(ifp, rdatabuf, siz, &optinfo,
-					    from, fromlen);
+		(void)server6_react_solicit(ifp, dh6, &optinfo,
+					    (struct sockaddr *)&from, fromlen);
+		break;
+	case DH6_REQUEST:
+		(void)server6_react_request(ifp, pi, dh6, &optinfo,
+					    (struct sockaddr *)&from, fromlen);
 		break;
 	case DH6_INFORM_REQ:
-		(void)server6_react_informreq(ifp, rdatabuf, siz, &optinfo,
-					      from, fromlen);
+		(void)server6_react_informreq(ifp, dh6, &optinfo,
+					      (struct sockaddr *)&from,
+					      fromlen);
 		break;
 	default:
-		dprintf(LOG_INFO, "unknown or unsupported msgtype %s",
-			dhcpmsgstr(dh6->dh6_msgtype));
+		dprintf(LOG_INFO, "%s" "unknown or unsupported msgtype %s",
+			FNAME, dhcpmsgstr(dh6->dh6_msgtype));
 		break;
 	}
 
 	dhcp6_clear_options(&optinfo);
+
+	return 0;
 }
 
 static int
-server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
+server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 	struct dhcp6_if *ifp;
-	char *buf;
-	size_t siz;
+	struct dhcp6 *dh6;
 	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
 	int fromlen;
@@ -460,25 +506,24 @@ server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
 	struct dhcp6_optinfo roptinfo;
 	struct host_conf *client_conf;
 	struct dhcp6_optconf *opt;
+	int resptype;
 
 	/*
 	 * Servers MUST discard any Solicit messages that do not include a
 	 * Client Identifier option. [dhcpv6-24 Section 15.2]
 	 */
 	if (optinfo->clientID.duid_len == 0) {
-		dprintf(LOG_INFO,
-			"server6_react_solicit: no client ID option");
+		dprintf(LOG_INFO, "%s" "no client ID option", FNAME);
 		return(-1);
 	} else {
-		dprintf(LOG_DEBUG, "server6_react_solicit: client ID %s",
+		dprintf(LOG_DEBUG, "%s" "client ID %s", FNAME,
 			duidstr(&optinfo->clientID));
 	}
 
 	/* get per-host configuration for the client, if any. */
 	if ((client_conf = find_hostconf(&optinfo->clientID))) {
-		dprintf(LOG_DEBUG, "server6_react_solicit: "
-			"found a host configuration for %s",
-			client_conf->name);
+		dprintf(LOG_DEBUG, "%s" "found a host configuration for %s",
+			FNAME, client_conf->name);
 	}
 
 	/*
@@ -524,23 +569,113 @@ server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
 		/* notyet: create and record the bindings for the client */
 		;
 
-		return(server6_send_reply(ifp, (struct dhcp6 *)buf, optinfo,
-					  from, fromlen, &roptinfo));
-	} else {
-		/* we don't support this case */
-		dprintf(LOG_INFO, "server6_react_solicit: failed to react: "
-			"rapid commit disabled or not requested");
-		return(-1);
-	}
+		resptype = DH6_REPLY;
+	} else
+		resptype = DH6_ADVERTISE;
 
-	return(0);
+	return(server6_send(resptype, ifp, dh6, optinfo, from, fromlen,
+			    &roptinfo));
 }
 
 static int
-server6_react_informreq(ifp, buf, siz, optinfo, from, fromlen)
+server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	struct dhcp6_if *ifp;
-	char *buf;
-	size_t siz;
+	struct in6_pktinfo *pi;
+	struct dhcp6 *dh6;
+	struct dhcp6_optinfo *optinfo;
+	struct sockaddr *from;
+	int fromlen;
+{
+	struct dhcp6_optinfo roptinfo;
+	struct host_conf *client_conf;
+	struct dhcp6_optconf *opt;
+
+	/* message validation according to Section 15.4 of dhcpv6-24 */
+
+	/* the message must include a Server Identifier option */
+	if (optinfo->serverID.duid_len == 0) {
+		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
+		return -1;
+	}
+	/* the contents of the Server Identifier option must match ours */
+	if (duidcmp(&optinfo->serverID, &server_duid)) {
+		dprintf(LOG_INFO, "%s" "server ID mismatch", FNAME);
+		return -1;
+	}
+	/* the message must include a Client Identifier option */
+	if (optinfo->clientID.duid_len == 0) {
+		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
+		return -1;
+	}
+
+	/*
+	 * configure necessary options based on the options in solicit.
+	 */
+	dhcp6_init_options(&roptinfo);
+
+	/* server information option */
+	roptinfo.serverID = server_duid;
+	/* copy client information back */
+	roptinfo.clientID = optinfo->clientID;
+
+	/*
+	 * When the server receives a Request message via unicast from a
+	 * client to which the server has not sent a unicast option, the server
+	 * discards the Request message and responds with a Reply message
+	 * containing a status code option with value UseMulticast and no other
+	 * options.
+	 * [dhcpv6-24 18.2.1]
+	 * (Our current implementation has never sent a unicast option.)
+	 */
+	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
+		dprintf(LOG_INFO, "%s" "unexpected unicast messsage", FNAME);
+
+		return -1;	/* XXX */
+#ifdef notyet
+		return(server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
+				    fromlen, &roptinfo));
+#endif
+	}
+
+	/* get per-host configuration for the client, if any. */
+	if ((client_conf = find_hostconf(&optinfo->clientID))) {
+		dprintf(LOG_DEBUG, "%s" "found a host configuration for %s",
+			FNAME, client_conf->name);
+	}
+
+	/*
+	 * See if we have to make a binding of some configuration information
+	 * for the client.
+	 * (Note that our implementation does not assign addresses (nor will)).
+	 */
+	for (opt = optinfo->requests; opt; opt = opt->next) {
+		switch(opt->type) {
+		case DH6OPT_PREFIX_DELEGATION:
+			if (client_conf &&
+			    !TAILQ_EMPTY(&client_conf->prefix)) {
+				/* create a binding for the prefix. (notyet) */
+				roptinfo.prefix = client_conf->prefix;
+			}
+			break;
+		}
+	}
+
+	/*
+	 * Adds options to the Reply message for any other configuration
+	 * information to be assigned to the client.
+	 */
+	/* DNS server */
+	roptinfo.dnslist = dnslist;
+
+	/* send a reply message. */
+	return(server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
+			    &roptinfo));
+}
+
+static int
+server6_react_informreq(ifp, dh6, optinfo, from, fromlen)
+	struct dhcp6_if *ifp;
+	struct dhcp6 *dh6;
 	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
 	int fromlen;
@@ -549,11 +684,8 @@ server6_react_informreq(ifp, buf, siz, optinfo, from, fromlen)
 
 	/* if a server information is included, it must match ours. */
 	if (optinfo->serverID.duid_len &&
-	    (optinfo->serverID.duid_len != server_duid.duid_len ||
-	     memcmp(optinfo->serverID.duid_id, server_duid.duid_id,
-		    server_duid.duid_len))) {
-		dprintf(LOG_INFO,
-			"server6_react_informreq: server DUID mismatch");
+	    duidcmp(&optinfo->serverID, &server_duid)) {
+		dprintf(LOG_INFO, "%s" "server DUID mismatch", FNAME);
 		return(-1);
 	}
 
@@ -572,12 +704,13 @@ server6_react_informreq(ifp, buf, siz, optinfo, from, fromlen)
 	/* DNS server */
 	roptinfo.dnslist = dnslist;
 
-	return(server6_send_reply(ifp, (struct dhcp6 *)buf, optinfo,
-				  from, fromlen, &roptinfo));
+	return(server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
+			    &roptinfo));
 }
 
 static int
-server6_send_reply(ifp, origmsg, optinfo, from, fromlen, roptinfo)
+server6_send(type, ifp, origmsg, optinfo, from, fromlen, roptinfo)
+	int type;
 	struct dhcp6_if *ifp;
 	struct dhcp6 *origmsg;
 	struct dhcp6_optinfo *optinfo, *roptinfo;
@@ -590,24 +723,23 @@ server6_send_reply(ifp, origmsg, optinfo, from, fromlen, roptinfo)
 	struct dhcp6 *dh6;
 
 	if (sizeof(struct dhcp6) > sizeof(replybuf)) {
-		dprintf(LOG_ERR, "buffer size assumption failed");
-		exit(1);
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "%s" "buffer size assumption failed", FNAME);
+		return(-1);
 	}
 
 	dh6 = (struct dhcp6 *)replybuf;
 	len = sizeof(*dh6);
 	memset(dh6, 0, sizeof(*dh6));
 	dh6->dh6_msgtypexid = origmsg->dh6_msgtypexid;
-	dh6->dh6_msgtype = DH6_REPLY;
+	dh6->dh6_msgtype = (u_int8_t)type;
 
 	/* set options in the reply message */
 	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
 					(struct dhcp6opt *)(replybuf +
 							    sizeof(replybuf)),
 					roptinfo)) < 0) {
-		dprintf(LOG_INFO, "server6_send_reply: "
-			"failed to construct reply options");
+		dprintf(LOG_INFO, "%s" "failed to construct reply options",
+			FNAME);
 		return(-1);
 	}
 	len += optlen;
@@ -618,10 +750,13 @@ server6_send_reply(ifp, origmsg, optinfo, from, fromlen, roptinfo)
 	dst.sin6_scope_id = ((struct sockaddr_in6 *)from)->sin6_scope_id;
 	if (transmit_sa(outsock, (struct sockaddr *)&dst,
 			replybuf, len) != 0) {
-		dprintf(LOG_ERR, "transmit to %s failed",
-			addr2str((struct sockaddr *)&dst));
+		dprintf(LOG_ERR, "%s" "transmit %s to %s failed", FNAME,
+			dhcpmsgstr(type), addr2str((struct sockaddr *)&dst));
 		return(-1);
 	}
+
+	dprintf(LOG_DEBUG, "%s" "transmit %s to %s", FNAME,
+		dhcpmsgstr(type), addr2str((struct sockaddr *)&dst));
 
 	return 0;
 }
