@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.64 2001/02/08 17:23:02 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.65 2001/02/08 18:36:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -607,9 +607,9 @@ rip6_ctloutput(op, so, level, optname, m)
 {
 	int error = 0;
 
-	switch(level) {
+	switch (level) {
 	case IPPROTO_IPV6:
-		switch(optname) {
+		switch (optname) {
 		case MRT6_INIT:
 		case MRT6_DONE:
 		case MRT6_ADD_MIF:
