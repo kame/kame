@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.115 2000/08/15 08:06:36 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.116 2000/08/16 10:28:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2186,6 +2186,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 #include <sys/sysctl.h>
 
 extern int in6_nhash;
+extern int ip6_forward_cache_miss;
 
 /* we lie, but it's rather safe for this temporary purpose... */
 #define IPV6CTL_DEFMTU		4	/* default MTU */
@@ -2216,6 +2217,7 @@ sysctl_ip6_oursalg SYSCTL_HANDLER_ARGS
 		ip6_performance_log[i] = 0;
 		ip6_performance_log2[i] = 0;
 	}
+	ip6_forward_cache_miss = 0;
 	ip6_logentry = 0;
 
 	switch(ip6_ours_check_algorithm) {
