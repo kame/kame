@@ -1,11 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2194 2002/06/30 22:52:11 itojun Exp $
+$KAME: CHANGELOG,v 1.2195 2002/06/30 22:54:17 itojun Exp $
 
 <200206>
 Sun Jun 30 JST 2002  itojun@iijlab.net
 	* rtadvd: deprecate addrs#n and routes#n from rtadvd.conf, as it was
 	  difficult for users to keep consistency between addrs#n and addrN,
 	  and addrs#n were not really needed.
+
+Wed Jun 26 JST 2002  itojun@iijlab.net
+	* libinet6: correct resolver buffer overrun, as documented in
+	  http://www.kb.cert.org/vuls/id/803539
+	  NOTE: bsdi4 resolver (contrib/bind) is NOT fixed yet.
 
 Tue Jun 25 01:26:45 JST 2002  itojun@iijlab.net
 	* faithd.libevent: faithd re-implementation using libevent (by niels
