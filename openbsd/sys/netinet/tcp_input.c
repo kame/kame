@@ -3080,14 +3080,23 @@ tcp_mss(tp, offer)
 			 * for IPv6, path MTU discovery is always turned on,
 			 * or the node must use packet size <= 1280.
 			 */
-			mss = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+			mss = IN6_LINKMTU(ifp) - iphlen - sizeof(struct tcphdr);
 		}
 	}
 #endif /* INET6 */
 
 	/* Calculate the value that we offer in TCPOPT_MAXSEG */
 	if (offer != -1) {
+#ifndef INET6
 		mssopt = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+#else
+		if (is_ipv6)
+			mssopt = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+		else
+			mssopt = IN6_LINKMTU(ifp) - iphlen -
+			    sizeof(struct tcphdr);
+#endif
+
 		mssopt = max(tcp_mssdflt, mssopt);
 	}
 
