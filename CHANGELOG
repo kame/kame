@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.276 1999/11/18 14:36:33 itojun Exp $
+$Id: CHANGELOG,v 1.277 1999/11/19 04:41:38 sumikawa Exp $
 
 <199911>
+Fri Nov 19 13:20:24 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/kame/{pim6dd, pim6sd, rtadvd, rtsold}: in looking up
+	interface information, comparing interface name between IFs which
+	duplicate name partly, such as 'gif1' and 'gif10', fails. It's
+	caused by lack of length comparation.
+
+Tue Nov 16 20:17:22 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/openssh: IPv6-enable openssh.
+	  obtained from fujiwara@rcac.tdi.co.jp
+
 Thu Nov 18 06:45:45 GMT 1999  itojun@iijlab.net
 	* openbsd: upgrade base version to OpenBSD 2.6.
 
