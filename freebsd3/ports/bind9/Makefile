@@ -2,13 +2,13 @@
 # Date created:		Sat Apr 29 18:50:37 JST 2000
 # Whom:			jinmei
 #
-# $Id: Makefile,v 1.8 2000/08/24 08:24:35 sumikawa Exp $
+# $Id: Makefile,v 1.9 2000/09/19 07:54:43 sumikawa Exp $
 #
 
 PORTNAME=	bind
-PORTVERSION=	9.0.0rc4
+PORTVERSION=	9.0.0
 CATEGORIES=	net
-MASTER_SITES=	ftp://ftp.isc.org/isc/bind9/9.0.0rc4/
+MASTER_SITES=	ftp://ftp.isc.org/isc/bind9/9.0.0/
 
 MAINTAINER=	sumikawa@kame.net
 
