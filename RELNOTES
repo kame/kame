@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/02/16 01:00:54 $
+		     $Date: 2000/02/16 01:40:42 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -44,6 +44,8 @@ We hope to improve support coverage sooner.
 	ALTQ 2.1 is merged into:	KAME/FreeBSD228, KAME/FreeBSD3x,
 					KAME/NetBSD, KAME/OpenBSD
 	No ALTQ support in:		KAME/BSDI3, KAME/BSDI4
+
+	For non-i386 architecture, see IMPLEMENTATION section 5.
 - IPsec
 	No KAME IPsec support in:	KAME/OpenBSD26, KAME/BSDI41
 		(you can enjoy OpenBSD IPsec for IPv4)
