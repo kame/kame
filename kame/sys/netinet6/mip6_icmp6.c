@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.12 2001/09/20 07:14:40 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.13 2001/09/20 08:31:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -440,7 +440,6 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 	int off;
 	int icmp6len;
 {
-	struct ifnet *rifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6, *ip6_rep;
 	struct ha_discov_req *hdreq;
 	struct ha_discov_rep *hdrep;
