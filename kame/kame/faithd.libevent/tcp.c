@@ -1,4 +1,4 @@
-/*	$KAME: tcp.c,v 1.1 2002/06/11 04:15:58 itojun Exp $	*/
+/*	$KAME: tcp.c,v 1.2 2002/06/11 04:29:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -60,9 +60,7 @@ struct evarg {
 	ssize_t len;
 	char oob;
 	int hasoob;
-} side[2];
-
-#define otherside(x)	((x) ^ 1)
+};
 
 static void
 except(s, event, arg)
@@ -70,13 +68,22 @@ except(s, event, arg)
 	short event;
 	void *arg;
 {
-	struct evarg *r = &side[(u_long)arg];
-	struct evarg *w = &side[otherside((u_long)arg)];
+	struct evarg *side = (struct evarg *)arg;
+	struct evarg *r, *w;
 	int atmark;
 	char ch;
 	int error;
 	ssize_t l;
 
+	if (side[0].s == s) {
+		r = &side[0];
+		w = &side[1];
+	} else {
+		r = &side[1];
+		w = &side[0];
+	}
+
+	r->hasoob = 0;
 	event_add(&r->except, NULL);
 	error = ioctl(r->s, SIOCATMARK, &atmark);
 	if (error >= 0 && atmark == 1) {
@@ -101,19 +108,30 @@ outbound(s, event, arg)
 	short event;
 	void *arg;
 {
-	struct evarg *w = &side[(u_long)arg];
-	struct evarg *r = &side[otherside((u_long)arg)];
+	struct evarg *side = (struct evarg *)arg;
+	struct evarg *w, *r;
 	ssize_t l;
 
-	if (w->s != s)
-		exit_failure("assumption failed");
+	/* beware - in this case, backwards */
+	if (side[0].s == s) {
+		w = &side[0];
+		r = &side[1];
+	} else {
+		w = &side[1];
+		r = &side[0];
+	}
 
 	if (r->hasoob) {
 	again:
-		if (send(w->s, &r->oob, 1, MSG_OOB) < 0) {
+		l = send(w->s, &r->oob, 1, MSG_OOB);
+		if (l < 0) {
 			if (errno != EAGAIN)
 				exit_failure("sending oob data failed: %s",
 				    strerror(errno));
+			event_add(&w->outbound, NULL);
+		} else if (l == 0) {
+			exit_failure("sending oob data failed: %s",
+			    strerror(errno));
 			event_add(&w->outbound, NULL);
 		} else
 			r->hasoob = 0;
@@ -144,12 +162,17 @@ inbound(s, event, arg)
 	short event;
 	void *arg;
 {
-	struct evarg *r = &side[(u_long)arg];
-	struct evarg *w = &side[otherside((u_long)arg)];
+	struct evarg *side = (struct evarg *)arg;
+	struct evarg *r, *w;
 	ssize_t l;
 
-	if (r->s != s)
-		exit_failure("assumption failed");
+	if (side[0].s == s) {
+		r = &side[0];
+		w = &side[1];
+	} else {
+		r = &side[1];
+		w = &side[0];
+	}
 
 	l = read(r->s, r->buf, sizeof(r->buf));
 	if (l < 0)
@@ -168,6 +191,7 @@ void
 tcp_relay(int s_src, int s_dst, const char *service)
 {
 	int i;
+	struct evarg side[2];
 
 	syslog(LOG_INFO, "starting %s relay", service);
 
@@ -180,11 +204,11 @@ tcp_relay(int s_src, int s_dst, const char *service)
 
 	for (i = 0; i < 2; i++) {
 		event_set(&side[i].inbound, side[i].s, EV_READ, inbound,
-		    (void *)i);
+		    (void *)side);
 		event_set(&side[i].outbound, side[i].s, EV_WRITE, outbound,
-		    (void *)i);
+		    (void *)side);
 		event_set(&side[i].except, side[i].s, EV_EXCEPT, except,
-		    (void *)i);
+		    (void *)side);
 
 		event_add(&side[i].inbound, NULL);
 		event_add(&side[i].except, NULL);
