@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.147 2001/01/21 15:48:23 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.148 2001/01/23 04:42:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1203,6 +1203,10 @@ skip_ipsec2:;
 				m->m_pkthdr.len;
 		}
 #endif
+#ifdef IPSEC
+		/* clean ipsec history once it goes out of the node */
+		ipsec_delaux(m);
+#endif
 #ifdef OLDIP6OUTPUT
 		error = (*ifp->if_output)(ifp, m, (struct sockaddr *)dst,
 					  ro->ro_rt);
@@ -1348,6 +1352,10 @@ sendorfree:
 				ia6->ia_ifa.ifa_data.ifad_outbytes +=
 					m->m_pkthdr.len;
 			}
+#endif
+#ifdef IPSEC
+			/* clean ipsec history once it goes out of the node */
+			ipsec_delaux(m);
 #endif
 #ifdef OLDIP6OUTPUT
 			error = (*ifp->if_output)(ifp, m,

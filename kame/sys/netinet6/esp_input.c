@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.48 2000/12/12 17:29:51 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.49 2001/01/23 04:42:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -411,6 +411,8 @@ noreplaycheck:
 #endif
 
 		key_sa_recordxfer(sav, m);
+		ipsec_addhist(m, IPPROTO_ESP, spi);
+		ipsec_addhist(m, IPPROTO_IPV4, 0);
 
 		s = splimp();
 		if (IF_QFULL(&ipintrq)) {
@@ -448,6 +450,7 @@ noreplaycheck:
 		ip->ip_p = nxt;
 
 		key_sa_recordxfer(sav, m);
+		ipsec_addhist(m, IPPROTO_ESP, spi);
 
 		if (nxt != IPPROTO_DONE)
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);
@@ -823,6 +826,8 @@ noreplaycheck:
 #endif
 
 		key_sa_recordxfer(sav, m);
+		ipsec_addhist(m, IPPROTO_ESP, spi);
+		ipsec_addhist(m, IPPROTO_IPV6, 0);
 
 		s = splimp();
 		if (IF_QFULL(&ip6intrq)) {
@@ -926,6 +931,7 @@ noreplaycheck:
 		ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - stripsiz);
 
 		key_sa_recordxfer(sav, m);
+		ipsec_addhist(m, IPPROTO_ESP, spi);
 	}
 
 	*offp = off;

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.85 2001/01/20 18:57:37 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.86 2001/01/23 04:42:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -231,6 +231,9 @@ static int ipsec4_encapsulate __P((struct mbuf *, struct secasvar *));
 #ifdef INET6
 static int ipsec6_encapsulate __P((struct mbuf *, struct secasvar *));
 #endif
+static struct mbuf *ipsec_addaux __P((struct mbuf *));
+static struct mbuf *ipsec_findaux __P((struct mbuf *));
+static void ipsec_optaux __P((struct mbuf *, struct mbuf *));
 
 /*
  * For OUTBOUND packet having a socket. Searching SPD for packet,
@@ -3360,6 +3363,59 @@ ipsec_copypkt(m)
 	return(NULL);
 }
 
+static struct mbuf *
+ipsec_addaux(m)
+	struct mbuf *m;
+{
+	struct mbuf *n;
+
+	n = m_aux_find(m, AF_INET, IPPROTO_ESP);
+	if (!n) {
+		n = m_aux_add(m, AF_INET, IPPROTO_ESP);
+		n->m_len = sizeof(struct socket *);
+		bzero(mtod(n, void *), n->m_len);
+	}
+	return n;
+}
+
+static struct mbuf *
+ipsec_findaux(m)
+	struct mbuf *m;
+{
+	struct mbuf *n;
+
+	n = m_aux_find(m, AF_INET, IPPROTO_ESP);
+#ifdef DIAGNOSTIC
+	if (n && n->m_len < sizeof(struct socket *))
+		panic("invalid ipsec m_aux");
+#endif
+	return n;
+}
+
+void
+ipsec_delaux(m)
+	struct mbuf *m;
+{
+	struct mbuf *n;
+
+	n = m_aux_find(m, AF_INET, IPPROTO_ESP);
+	if (n)
+		m_aux_delete(m, n);
+}
+
+/* if the aux buffer is unnecessary, nuke it. */
+static void
+ipsec_optaux(m, n)
+	struct mbuf *m;
+	struct mbuf *n;
+{
+
+	if (!n)
+		return;
+	if (n->m_len == sizeof(struct socket *) && !*mtod(n, struct socket **))
+		ipsec_delaux(m);
+}
+
 void
 ipsec_setsocket(m, so)
 	struct mbuf *m;
@@ -3367,20 +3423,14 @@ ipsec_setsocket(m, so)
 {
 	struct mbuf *n;
 
-	n = m_aux_find(m, AF_INET, IPPROTO_ESP);
-	if (so && !n)
-		n = m_aux_add(m, AF_INET, IPPROTO_ESP);
-	if (n) {
-		if (so) {
-			*mtod(n, struct socket **) = so;
-			/*
-			 * XXX think again about it when we put decryption
-			 * histrory into aux mbuf
-			 */
-			n->m_len = sizeof(struct socket *);
-		} else
-			m_aux_delete(m, n);
-	}
+	/* if so == NULL, don't insist on getting the aux mbuf */
+	if (so)
+		n = ipsec_addaux(m);
+	else
+		n = ipsec_findaux(m);
+	if (n && n->m_len >= sizeof(struct socket *))
+		*mtod(n, struct socket **) = so;
+	ipsec_optaux(m, n);
 }
 
 struct socket *
@@ -3389,11 +3439,65 @@ ipsec_getsocket(m)
 {
 	struct mbuf *n;
 
-	n = m_aux_find(m, AF_INET, IPPROTO_ESP);
+	n = ipsec_findaux(m);
 	if (n && n->m_len >= sizeof(struct socket *))
 		return *mtod(n, struct socket **);
 	else
 		return NULL;
+}
+
+void
+ipsec_addhist(m, proto, spi)
+	struct mbuf *m;
+	int proto;
+	u_int32_t spi;
+{
+	struct mbuf *n;
+	struct ipsec_history *p;
+
+	n = ipsec_addaux(m);
+	if (n && M_TRAILINGSPACE(n) > sizeof(*p)) {
+		p = (struct ipsec_history *)(mtod(n, caddr_t) + n->m_len);
+		n->m_len += sizeof(*p);
+		bzero(p, sizeof(*p));
+		p->ih_proto = proto;
+		p->ih_spi = spi;
+	}
+}
+
+struct ipsec_history *
+ipsec_gethist(m, lenp)
+	struct mbuf *m;
+	int *lenp;
+{
+	struct mbuf *n;
+	int l;
+
+	n = ipsec_findaux(m);
+	if (!n)
+		return NULL;
+	l = n->m_len;
+	if (sizeof(struct socket *) > l)
+		return NULL;
+	if ((l - sizeof(struct socket *)) % sizeof(struct ipsec_history))
+		return NULL;
+	/* XXX does it make more sense to divide by sizeof(ipsec_history)? */
+	if (lenp)
+		*lenp = l - sizeof(struct socket *);
+	return (struct ipsec_history *)
+	    (mtod(n, caddr_t) + sizeof(struct socket *));
+}
+
+void
+ipsec_clearhist(m)
+	struct mbuf *m;
+{
+	struct mbuf *n;
+
+	n = ipsec_findaux(m);
+	if ((n) && n->m_len > sizeof(struct socket *))
+		n->m_len = sizeof(struct socket *);
+	ipsec_optaux(m, n);
 }
 
 #ifdef __bsdi__

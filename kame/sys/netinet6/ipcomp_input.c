@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.20 2000/10/23 04:19:10 itojun Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.21 2001/01/23 04:42:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -231,6 +231,7 @@ ipcomp4_input(m, va_alist)
 
 	if (sav) {
 		key_sa_recordxfer(sav, m);
+		ipsec_addhist(m, IPPROTO_IPCOMP, (u_int32_t)cpi);
 		key_freesav(sav);
 		sav = NULL;
 	}
@@ -342,6 +343,7 @@ ipcomp6_input(mp, offp, proto)
 
 	if (sav) {
 		key_sa_recordxfer(sav, m);
+		ipsec_addhist(m, IPPROTO_IPCOMP, (u_int32_t)cpi);
 		key_freesav(sav);
 		sav = NULL;
 	}

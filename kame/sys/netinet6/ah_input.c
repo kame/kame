@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.46 2000/12/12 17:29:51 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.47 2001/01/23 04:42:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -497,6 +497,8 @@ ah4_input(m, va_alist)
 #endif
 
 		key_sa_recordxfer(sav, m);
+		ipsec_addhist(m, IPPROTO_AH, spi);
+		ipsec_addhist(m, IPPROTO_IPV4, 0);
 
 		s = splimp();
 		if (IF_QFULL(&ipintrq)) {
@@ -579,6 +581,7 @@ ah4_input(m, va_alist)
 		/* forget about IP hdr checksum, the check has already been passed */
 
 		key_sa_recordxfer(sav, m);
+		ipsec_addhist(m, IPPROTO_AH, spi);
 
 		if (nxt != IPPROTO_DONE)
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);
@@ -958,6 +961,8 @@ ah6_input(mp, offp, proto)
 #endif
 
 		key_sa_recordxfer(sav, m);
+		ipsec_addhist(m, IPPROTO_AH, spi);
+		ipsec_addhist(m, IPPROTO_IPV6, 0);
 
 		s = splimp();
 		if (IF_QFULL(&ip6intrq)) {
@@ -1036,6 +1041,7 @@ ah6_input(mp, offp, proto)
 		ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - stripsiz);
 
 		key_sa_recordxfer(sav, m);
+		ipsec_addhist(m, IPPROTO_AH, spi);
 	}
 
 	*offp = off;
