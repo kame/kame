@@ -1,5 +1,5 @@
 /*	$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $	*/
-/*	$KAME: ipsec.c,v 1.26 2001/08/05 20:23:10 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.27 2002/03/21 14:00:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -336,9 +336,9 @@ pfkey_stats(off, name)
 #define	p(f, m) if (pfkeystat.f || sflag <= 1) \
     printf(m, (CAST)pfkeystat.f, plural(pfkeystat.f))
 
-	/* kernel -> userland */
-	p(out_total, "\t" LLU " request%s sent to userland\n");
-	p(out_bytes, "\t" LLU " byte%s sent to userland\n");
+	/* userland -> kernel */
+	p(out_total, "\t" LLU " request%s sent from userland\n");
+	p(out_bytes, "\t" LLU " byte%s sent from userland\n");
 	for (first = 1, type = 0;
 	     type < sizeof(pfkeystat.out_msgtype)/sizeof(pfkeystat.out_msgtype[0]);
 	     type++) {
@@ -361,9 +361,9 @@ pfkey_stats(off, name)
 	p(out_invsatype, "\t" LLU " message%s with invalid sa type\n");
 	p(out_invaddr, "\t" LLU " message%s with invalid address extension\n");
 
-	/* userland -> kernel */
-	p(in_total, "\t" LLU " request%s sent from userland\n");
-	p(in_bytes, "\t" LLU " byte%s sent from userland\n");
+	/* kernel -> userland */
+	p(in_total, "\t" LLU " request%s sent to userland\n");
+	p(in_bytes, "\t" LLU " byte%s sent to userland\n");
 	for (first = 1, type = 0;
 	     type < sizeof(pfkeystat.in_msgtype)/sizeof(pfkeystat.in_msgtype[0]);
 	     type++) {
