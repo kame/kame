@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.10 2000/01/02 08:48:08 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.11 2000/01/02 12:54:00 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -232,6 +232,7 @@ isakmp_main(msg, remote, local)
 	msgid_t *msgid = &isakmp->msgid;
 	struct isakmp_conf *cfp = NULL;
 	struct isakmp_ph1 *iph1;
+	int major, minor;
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(msg, remote, local, 0);
@@ -243,22 +244,25 @@ isakmp_main(msg, remote, local)
 	 * I think it may no be here because the version depends
 	 * on exchange status.
 	 */
-	if (isakmp->v_number < ISAKMP_VERSION_NUMBER) {
-
-		if (isakmp->v_major < ISAKMP_MAJOR_VERSION) {
+	if (isakmp->vers < ISAKMP_VERSION_NUMBER) {
+		major = (isakmp->vers & ISAKMP_VERS_MAJOR)
+				>> ISAKMP_VERS_MAJOR_SHIFT;
+		minor = (isakmp->vers & ISAKMP_VERS_MINOR)
+				>> ISAKMP_VERS_MINOR_SHIFT;
+		if (major < ISAKMP_MAJOR_VERSION) {
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog2(remote, LOCATION,
 					"invalid major version %d.\n",
-					isakmp->v_major));
+					major));
 			return -1;
 		}
 
 #if ISAKMP_MINOR_VERSION > 0
-		if (isakmp->v_minor < ISAKMP_MINOR_VERSION) {
+		if (minor < ISAKMP_MINOR_VERSION) {
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog2(remote, LOCATION,
 					"invalid minor version %d.\n",
-					isakmp->v_minor));
+					minor));
 			return -1;
 		}
 #endif
@@ -327,7 +331,7 @@ isakmp_main(msg, remote, local)
 				iph1->cfp = cfp;
 
 				iph1->dir = RESPONDER;
-				iph1->version = isakmp->v_number;
+				iph1->version = isakmp->vers;
 				iph1->etype = isakmp->etype;
 				iph1->flags = 0;
 
@@ -2378,7 +2382,7 @@ set_isakmp_header2(buf, iph2, nptype)
 	memcpy(&isakmp->i_ck, &iph2->ph1->index.i_ck, sizeof(cookie_t));
 	memcpy(&isakmp->r_ck, &iph2->ph1->index.r_ck, sizeof(cookie_t));
 	isakmp->np      = nptype;
-	isakmp->v_number = ISAKMP_VERSION_NUMBER;
+	isakmp->vers    = ISAKMP_VERSION_NUMBER;
 	isakmp->etype   = ISAKMP_ETYPE_QUICK;
 	isakmp->flags   = iph2->ph1->flags;
 	memcpy(&isakmp->msgid, &iph2->msgid, sizeof(isakmp->msgid));
@@ -2405,7 +2409,7 @@ set_isakmp_header(buf, iph1, nptype)
 	memcpy(&isakmp->i_ck, &iph1->index.i_ck, sizeof(cookie_t));
 	memcpy(&isakmp->r_ck, &iph1->index.r_ck, sizeof(cookie_t));
 	isakmp->np      = nptype;
-	isakmp->v_number = ISAKMP_VERSION_NUMBER;
+	isakmp->vers    = ISAKMP_VERSION_NUMBER;
 	isakmp->etype   = iph1->etype;
 	isakmp->flags   = iph1->flags;
 	memcpy(&isakmp->msgid, iph1->msgid, sizeof(isakmp->msgid));

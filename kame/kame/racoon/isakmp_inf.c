@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.7 2000/01/01 06:21:40 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.8 2000/01/02 12:54:02 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -334,7 +334,7 @@ isakmp_info_send_nx(isakmp, remote, local, type, data)
 	isakmp_set_cookie((char *)&iph1->index.r_ck, iph1->local, remote);
 	iph1->status = ISAKMP_STATE_1;
 	iph1->dir = INITIATOR;
-	iph1->version = isakmp->v_number;
+	iph1->version = isakmp->vers;
 	iph1->etype = isakmp->etype;
 	iph1->flags = 0;
 	memcpy(&iph1->msgid, &isakmp->msgid, sizeof(iph1->msgid));
@@ -560,7 +560,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	memcpy(&isakmp->i_ck, &iph1->index.i_ck, sizeof(cookie_t));
 	memcpy(&isakmp->r_ck, &iph1->index.r_ck, sizeof(cookie_t));
 	isakmp->np       = hash == NULL ? (np & 0xff) : ISAKMP_NPTYPE_HASH;
-	isakmp->v_number = iph1->version;
+	isakmp->vers     = iph1->version;
 	isakmp->etype    = ISAKMP_ETYPE_INFO;
 	if ((flags & ISAKMP_FLAG_A) == 0)
 		isakmp->flags = (hash == NULL ? 0 : ISAKMP_FLAG_E);

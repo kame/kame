@@ -61,6 +61,9 @@ for dir in $crypto_dir /usr/local/v6 /usr/local/ssl /usr/local /usr/pkg; do
 	if test -d $dir/lib -a -f $dir/lib/libcrypto.a; then
 		ssleay_lib="$dir/lib"
 	fi
+	if test -d $dir/lib -a -f `echo $dir/lib/libcrypto.so* | head -1`; then
+		ssleay_lib="$dir/lib"
+	fi
 	if test -d $dir/include -a -f $dir/include/md5.h; then
 		ssleay_include="-I$dir/include"
 	else
