@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.133 2001/07/24 09:57:38 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.134 2001/07/24 10:06:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -586,7 +586,8 @@ in6_ifattach_linklocal(ifp, altifp)
 	/*
 	 * Now call in6_update_ifa() to do a bunch of procedures to configure
 	 * a link-local address. We can set NULL to the 3rd argument, because
-	 * we know there's no other link-local address on the interface.
+	 * we know there's no other link-local address on the interface
+	 * and therefore we are adding one (instead of updating one).
 	 */
 	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
 		/*
