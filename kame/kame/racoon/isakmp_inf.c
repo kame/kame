@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.26 2000/04/05 09:10:56 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.27 2000/04/05 09:12:05 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -382,6 +382,7 @@ isakmp_info_send_nx(isakmp, remote, local, type, data)
 		return -1;
 
 	YIPSDEBUG(DEBUG_NOTIFY,
+		h1[0] = s1[0] = h2[0] = s2[0] = '\0';
 		getnameinfo(iph1->local, iph1->local->sa_len,
 		    h1, sizeof(h1), s1, sizeof(s1), niflags);
 		getnameinfo(iph1->remote, iph1->remote->sa_len,
@@ -603,6 +604,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	}
 
 	YIPSDEBUG(DEBUG_NOTIFY,
+		h1[0] = s1[0] = h2[0] = s2[0] = '\0';
 		getnameinfo(iph2->src, iph2->src->sa_len,
 		    h1, sizeof(h1), s1, sizeof(s1), niflags);
 		getnameinfo(iph2->dst, iph2->dst->sa_len,

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.25 2000/04/05 09:10:56 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.26 2000/04/05 09:12:06 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -1405,6 +1405,7 @@ pk_recvacquire(mhp)
 		return -1;
 
 	YIPSDEBUG(DEBUG_NOTIFY,
+		h1[0] = s1[0] = h2[0] = s2[0] = '\0';
 		getnameinfo(iph2->src, iph2->src->sa_len,
 		    h1, sizeof(h1), s1, sizeof(s1), niflags);
 		getnameinfo(iph2->dst, iph2->dst->sa_len,
