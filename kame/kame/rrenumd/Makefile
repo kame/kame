@@ -28,17 +28,19 @@ CFLAGS+= -DINET6 -DIPSEC -I${.OBJDIR}
 .else
 CPPFLAGS+= -DINET6 -DIPSEC -I${.OBJDIR}
 .endif
-LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
-	-L/usr/local/v6/lib -linet6 -lcompat
-DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
-	${.OBJDIR}/../libinet6/obj/libinet6.a \
-	/usr/local/v6/lib/libinet6.a
 LDADD+=	-L${.OBJDIR}/../libipsec -L${.OBJDIR}/../libipsec/obj \
-	-L/usr/local/v6/lib -lipsec
+	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
+	-L/usr/local/v6/lib -lipsec -linet6
 DPADD+=	${.OBJDIR}/../libipsec/libipsec.a \
 	${.OBJDIR}/../libipsec/obj/libipsec.a \
 	/usr/local/v6/lib/libipsec.a
+DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
+	${.OBJDIR}/../libinet6/obj/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
+LDADD+=	-lcompat
+DPADD+=	${LIBCOMPAT}
 LDADD+= -ll -ly
+DPADD+=	${LIBL} ${LIBY}
 
 .if (${OPSYS} != "NetBSD")
 MAN5=	rrenumd.conf.5

@@ -61,12 +61,11 @@ CFLAGS+=-DIPSEC_DEBUG -DINET6 -DYY_NO_UNPUT
 CFLAGS+=-I${.CURDIR}/../libipsec -I${.OBJDIR}
 .endif
 LDADD+= -L${.OBJDIR}/../libipsec -L${.OBJDIR}/../libipsec/obj \
-	-L/usr/local/v6/lib -lipsec
+	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
+	-L/usr/local/v6/lib -lipsec -linet6
 DPADD+=	${.OBJDIR}/../libipsec/libipsec.a \
 	${.OBJDIR}/../libipsec/obj/libipsec.a \
 	/usr/local/v6/lib/libipsec.a
-LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
-	-L/usr/local/v6/lib -linet6
 DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
 	${.OBJDIR}/../libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a

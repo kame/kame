@@ -42,18 +42,18 @@ CPPFLAGS+=-Dss_family=__ss_family -Dss_len=__ss_len
 .endif
 CFLAGS+=-Wall -g
 LDADD+=	-L${.OBJDIR}/../libipsec -L${.OBJDIR}/../libipsec/obj \
-	-L/usr/local/v6/lib -lipsec -lcurses
+	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
+	-L/usr/local/v6/lib -lipsec -linet6
 DPADD+= ${.OBJDIR}/../libipsec/libipsec.a \
 	${.OBJDIR}/../libipsec/obj/libipsec.a \
 	/usr/local/v6/lib/libipsec.a
-LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
-	-L/usr/local/v6/lib -linet6
-.if (${OPSYS} == "BSD/OS")
-LDADD+=-ltermcap
-.endif
 DPADD+= ${.OBJDIR}/../libinet6/libinet6.a \
 	${.OBJDIR}/../libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
+LDADD+=-lcurses
+.if (${OPSYS} == "BSD/OS")
+LDADD+=-ltermcap
+.endif
 
 .if (${OPSYS} != "NetBSD")
 MAN1=	mchat.1
