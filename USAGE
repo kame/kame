@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/05/22 03:24:23 $
+		     $Date: 2000/07/03 04:52:09 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -29,15 +29,16 @@ interface is up.  If you see such situation, please disable the
 interface once and then re-enable it (i.e. do `ifconfig IF down;
 ifconfig IF up').
 
-Pseudo interfaces (like "gif" tunnel device) will borrow IPv6 interface
-identifier (lowermost 64bit of the address) from EUI64/IEEE802 sources,
-like ethernet cards.  Pseudo interfaces will be able to get IPv6 link-local
-address, if you have other "real" interface configured beforehand.
-If you have no EUI64/IEEE802 sources on the node, you may need to configure
-link-local address manually.  Though we have last-resort code in the kernel,
-which generates interface identifier from MD5(hostname), it may not suitable
-for your usage (for example, if you configure same hostname on both sides
-of gif tunnel, you will be doomed).
+Pseudo interfaces (like "gif" tunnel device) will borrow IPv6
+interface identifier (lowermost 64bit of the address) from
+EUI64/IEEE802 sources, like ethernet cards.  Pseudo interfaces will be
+able to get an IPv6 link-local address, if you have other "real"
+interface configured beforehand.  If you have no EUI64/IEEE802 sources
+on the node, you may need to configure link-local address manually.
+Though we have last-resort code in the kernel, which generates
+interface identifier from MD5(hostname), it may not suitable for your
+usage (for example, if you configure same hostname on both sides of
+gif tunnel, you will be doomed).
 
 If you have a router announcing Router Advertisement,
 global addresses will be assigned automatically.  So, neither
@@ -63,11 +64,12 @@ See also "/usr/local/v6/etc/rc.net6".
 
 <<prefix>>
 
-In IPv6 architecture, an IPv6 address of an interface can be generated
-from a prefix assigned to it, and a link-dependent identifier for the
-interface.  So assigning a full IPv6 address by ifconfig is not
-necessary anymore, because user can only take care of prefix, by
-letting system take care of interface identifier.
+In the IPv6 architecture, an IPv6 address of an interface can be
+generated from a prefix assigned to the interface, and a
+link-dependent identifier for the interface.  So assigning a full IPv6
+address by ifconfig is not necessary anymore, because user can only
+take care of prefix, by letting system take care of interface
+identifier.
 
 The newly added "prefix" command enables user to just assign prefixes
 for interfaces, and let your system automatically generate IPv6
@@ -178,7 +180,7 @@ is assumed for "prefixlen" to get along with the aggregatable address.
 
 Note that, in IPv6, a link-local address should be used as gateway
 ("fe80::200:a2ff:fe0e:7543%ed0" in the above). If you use global addresses,
-ICMPv6 redirect will not work properly.  Also note that we use special form
+ICMPv6 redirect will not work properly.  Also note that we use a special form
 of link-local address as gateway. See Section 1.3 of IMPLEMENTATION for
 more details.
 For ease of configuration we recommend you to avoid static routes and run
@@ -198,7 +200,6 @@ PING6(56=40+8+8 bytes) fe80::5254:ff:feda:cb7d --> ff02::1%ed0
 56 bytes from fe80::5254:ff:feda:d161%ed0, icmp_seq=0 hlim=64 time=1.459 ms(DUP!)
 56 bytes from fe80::260:97ff:fec2:80bf%ed0, icmp_seq=0 hlim=64 time=1.538 ms(DUP!)
 56 bytes from 3ffe:501:4819:2000:5054:ff:fedb:aa46, icmp_seq=0 hlim=255 time=1.615 ms(DUP!)
-
 
 <<<ping6 -w>>>
 
@@ -308,7 +309,8 @@ invoke the daemon as follows:
 To see routing table:
 	
 # netstat -nr
-# netstat -nrl (long format with Ref and Use)
+# netstat -nrl (long format with Ref and Use. Note that bsdi4 does not
+  support the -l option. You should use the -O option instead)
 
 
 <<<sysctl>>>
