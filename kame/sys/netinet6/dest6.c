@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.18 2001/01/23 08:23:05 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.19 2001/01/23 09:09:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,11 +77,9 @@ dest6_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	int off = *offp, dstoptlen, optlen;
 	struct ip6_dest *dstopts;
-#ifdef ITOJUNMIP6CN
 	struct mbuf *n;
 	struct ip6_opt_home_address *haopt = NULL;
 	struct ip6aux *ip6a = NULL;
-#endif
 	u_int8_t *opt;
 	struct ip6_hdr *ip6;
 
@@ -123,7 +121,6 @@ dest6_input(mp, offp, proto)
 			}
 			optlen = *(opt + 1) + 2;
 			break;
-#ifdef ITOJUNMIP6CN
 		case IP6OPT_HOME_ADDRESS:
 			if (dstoptlen < sizeof(*haopt)) {
 				ip6stat.ip6s_toosmall++;
@@ -167,13 +164,19 @@ dest6_input(mp, offp, proto)
 			bcopy(&ip6->ip6_src, &ip6a->ip6a_careof, 
 			    sizeof(ip6a->ip6a_careof));
 			ip6a->ip6a_flags |= IP6A_HASEEN;
-			break;
+
+#ifdef MIP6
+			if (mip6_store_dstopt_pre_hook) {
+				if ((*mip6_store_dstopt_pre_hook)(m, opt,
+				    off, dstoptlen) != 0)
+					goto bad;
+			}
 #endif
+			break;
 #ifdef MIP6
 		case IP6OPT_BINDING_UPDATE:
 		case IP6OPT_BINDING_ACK:
 		case IP6OPT_BINDING_REQ:
-		case IP6OPT_HOME_ADDRESS:
 			if (mip6_store_dstopt_pre_hook) {
 				if ((*mip6_store_dstopt_pre_hook)(m, opt,
 				    off, dstoptlen) != 0)
@@ -197,7 +200,6 @@ dest6_input(mp, offp, proto)
 		}
 	}
 
-#ifdef ITOJUNMIP6CN
 	/* if haopt is non-NULL, we are sure we have seen fresh HA option */
 	if (haopt && ip6a &&
 	    (ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) == IP6A_HASEEN) {
@@ -208,7 +210,6 @@ dest6_input(mp, offp, proto)
 		    sizeof(ip6->ip6_src));
 		ip6a->ip6a_flags |= IP6A_SWAP;
 	}
-#endif
 
 #ifdef MIP6
 	if (mip6_rec_ctrl_sig_hook) {

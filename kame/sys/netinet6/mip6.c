@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.32 2001/01/16 14:14:17 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.33 2001/01/23 09:09:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -348,8 +348,10 @@ int         off;    /* Offset (bytes) from beginning of mbuf to start of
 		}
 	}
 
+#if 0
 	if (mip6_inp->optflag & MIP6_DSTOPT_HA)
 		mip6_ha2srcaddr(m_in);
+#endif
 
 #ifdef MIP6_DEBUG
 	mip6_debug("\nMIPv6 Finished processing a control signal (%d)\n",
