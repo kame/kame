@@ -72,7 +72,8 @@
 #endif
 
 #define in6pcb		inpcb	/* for KAME src sync over BSD*'s */
-#define in6p_sp		inp_sp	/* for KAME src sync over BSD*'s */
+#define in6p_sp_in	inp_sp_in	/* for KAME src sync over BSD*'s */
+#define in6p_sp_out	inp_sp_out	/* for KAME src sync over BSD*'s */
 
 /*
  * Common structure pcb for internet protocol implementation.
@@ -187,7 +188,10 @@ struct inpcb {
 #define in6p_fport	inp_fport  /* for KAME src sync over BSD*'s */
 #define in6p_ppcb	inp_ppcb  /* for KAME src sync over BSD*'s */
 #if 1 /*IPSEC*/
-	struct secpolicy *inp_sp;	/* security policy. It may not be
+	struct secpolicy *inp_sp_in;
+	struct secpolicy *inp_sp_out;
+					/*
+					 * security policy. It may not be
 					 * used according to policy selection.
 					 */
 #endif

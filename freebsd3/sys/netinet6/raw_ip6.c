@@ -504,7 +504,10 @@ rip6_attach(struct socket *so, int proto, struct proc *p)
 	inp->in6p_hops = -1;	/* use kernel default */
 	inp->in6p_cksum = -1;
 #ifdef IPSEC
-	error = ipsec_init_policy(&inp->in6p_sp);
+	error = ipsec_init_policy(&inp->in6p_sp_in);
+	if (error)
+		return error;
+	error = ipsec_init_policy(&inp->in6p_sp_out);
 	if (error)
 		return error;
 #endif /*IPSEC*/

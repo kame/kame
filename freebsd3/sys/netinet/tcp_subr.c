@@ -1135,10 +1135,10 @@ ipsec_hdrsiz_tcp(tp, isipv6)
 
 #ifdef INET6
 	if (isipv6)
-		hdrsiz = ipsec6_hdrsiz(m, inp);
+		hdrsiz = ipsec6_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
 	else
 #endif /* INET6 */
-	hdrsiz = ipsec4_hdrsiz(m, inp);
+	hdrsiz = ipsec4_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
 
 	m_free(m);
 	return hdrsiz;

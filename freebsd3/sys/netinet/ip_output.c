@@ -667,9 +667,9 @@ pass:
 #ifdef IPSEC
 	/* get SP for this packet */
 	if (so == NULL)
-		sp = ipsec4_getpolicybyaddr(m, flags, &error);
+		sp = ipsec4_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, flags, &error);
 	else
-		sp = ipsec4_getpolicybysock(m, so, &error);
+		sp = ipsec4_getpolicybysock(m, IPSEC_DIR_OUTBOUND, so, &error);
 
 	if (sp == NULL) {
 		ipsecstat.out_inval++;
@@ -1161,12 +1161,15 @@ ip_ctloutput(so, sopt)
 			break;
 
 #ifdef IPSEC
-		case IP_IPSEC_POLICY:
+		case IP_IPSEC_POLICY_IN:
+		case IP_IPSEC_POLICY_OUT:
 		{
 			caddr_t req;
 			int len;
 			int priv;
 			struct mbuf *m;
+			struct secpolicy **spp;
+			int optname;
 
 			if (error = soopt_getm(sopt, &m)) /* XXX */
 				break;
@@ -1177,9 +1180,16 @@ ip_ctloutput(so, sopt)
 				      &sopt->sopt_p->p_acflag) != 0) ? 0 : 1;
 			req = mtod(m, caddr_t);
 			len = sopt->sopt_valsize;
-			error = ipsec_set_policy(&sotoinpcb(so)->inp_sp,
-			                         sopt->sopt_name, req, len,
-						 priv);
+			optname = sopt->sopt_name;
+			switch (optname) {
+			case IP_IPSEC_POLICY_IN:
+				spp = &inp->inp_sp_in;
+				break;
+			case IP_IPSEC_POLICY_OUT:
+				spp = &inp->inp_sp_out;
+				break;
+			}
+			error = ipsec_set_policy(spp, optname, req, len, priv);
 			m_freem(m);
 			break;
 		}
@@ -1266,11 +1276,21 @@ ip_ctloutput(so, sopt)
 			break;
 
 #ifdef IPSEC
-		case IP_IPSEC_POLICY:
+		case IP_IPSEC_POLICY_IN:
 		{
 			struct mbuf *m;
 
-			error = ipsec_get_policy(sotoinpcb(so)->inp_sp, &m);
+			error = ipsec_get_policy(sotoinpcb(so)->inp_sp_in, &m);
+			if (error == 0)
+				error = soopt_mcopyout(sopt, m); /* XXX */
+			m_freem(m);
+			break;
+		}
+		case IP_IPSEC_POLICY_OUT:
+		{
+			struct mbuf *m;
+
+			error = ipsec_get_policy(sotoinpcb(so)->inp_sp_out, &m);
 			if (error == 0)
 				error = soopt_mcopyout(sopt, m); /* XXX */
 			m_freem(m);

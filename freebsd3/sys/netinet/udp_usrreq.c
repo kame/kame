@@ -761,7 +761,10 @@ udp_attach(struct socket *so, int proto, struct proc *p)
 	inp->inp_vflag |= INP_IPV4;
 	inp->inp_ip_ttl = ip_defttl;
 #ifdef IPSEC
-	error = ipsec_init_policy(&inp->inp_sp);
+	error = ipsec_init_policy(&inp->inp_sp_in);
+	if (error)
+		return error;
+	error = ipsec_init_policy(&inp->inp_sp_out);
 	if (error)
 		return error;
 #endif /*IPSEC*/
