@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.282 2002/06/07 05:57:26 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.283 2002/06/08 00:21:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1173,8 +1173,7 @@ in6_update_ifa(ifp, ifra, ia)
 	 * p2p or loopback (see the check above.) 
 	 */
 	if (dst6.sin6_family == AF_INET6 &&
-	    !IN6_ARE_ADDR_EQUAL(&dst6.sin6_addr,
-				&ia->ia_dstaddr.sin6_addr)) {
+	    !IN6_ARE_ADDR_EQUAL(&dst6.sin6_addr, &ia->ia_dstaddr.sin6_addr)) {
 		int e;
 
 		if ((ia->ia_flags & IFA_ROUTE) != 0 &&
@@ -1508,8 +1507,7 @@ in6_purgeaddr(ifa)
 			    ip6_sprintf(&ia->ia_addr.sin6_addr), if_name(ifp),
 			    e);
 			/* proceed anyway... */
-		}
-		else
+		} else
 			ia->ia_flags &= ~IFA_ROUTE;
 	}
 
@@ -1538,7 +1536,6 @@ in6_unlink_ifa(ia, ifp)
 #else
 	int	s = splnet();
 #endif
-
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	struct ifaddr *ifa;
 #endif
