@@ -328,15 +328,16 @@ nexthdr(char **bufp)
 }
 
 /*
- * Return the (numeric) option id.
+ * Get the (numeric) option id.
  * Numeric options look like
  *	li#80
  * i.e. the option string is separated from the numeric value by
- * a # character.  If the option is not found we return -1.
+ * a # character.  If the option is not found we return -1, otherwide 
+ * return 0.
  * Note that we handle octal numbers beginning with 0.
  */
 int
-tgetnum(const char *id, char *pbuf)
+tgetnum(const char *id, char *pbuf, int *ptr)
 {
 	register long int i;
 	register int base;
@@ -360,7 +361,8 @@ tgetnum(const char *id, char *pbuf)
 		i = 0;
 		while (isdigit(*bp))
 			i *= base, i += *bp++ - '0';
-		return (i);
+		*ptr = i;
+		return (0);
 	}
 }
 

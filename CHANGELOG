@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1875 2001/09/15 02:21:14 jinmei Exp $
+$KAME: CHANGELOG,v 1.1876 2001/09/16 03:47:58 suz Exp $
 
 <200109>
+2001-09-16  suz@sdl.hitachi.co.jp
+	* kame/kame/v6test/testcap.[ch](tgetnum), getconfig.c: fixed a
+	bug that you sometimes cannot specify a value if its MSB is on.
+
 2001-09-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/v6test/getconfig.c (make_rthdr): fixed routing header
 	generation.
