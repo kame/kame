@@ -2091,8 +2091,12 @@ fail:
 		m_freem(m0);
 }
 
+#ifndef HAVE_NRL_INPCB
 /*
  * ICMPv6 socket option processing.
+ *
+ * NOTE: for OSes that use NRL inpcb (bsdi4/openbsd), do not forget to modify
+ * sys/netinet6/raw_ipv6.c:rip6_ctloutput().
  */
 int
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -2239,6 +2243,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 
 	return(error);
 }
+#endif /*NRL inpcb*/
 
 /*
  * Perform rate limit check.
