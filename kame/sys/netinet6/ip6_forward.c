@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.51 2000/08/15 01:57:10 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.52 2000/08/15 04:46:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -100,6 +100,8 @@ extern int ip6_logsize;
 extern unsigned long long ip6_performance_log[];
 extern long long ip6_performance_log2[];
 extern int ip6_ours_check_algorithm;
+
+int ip6_forward_cache_miss;
 
 static unsigned long long ctr_beg, ctr_end;
 
@@ -377,6 +379,7 @@ ip6_forward(m, srcrt)
 				ip6_forward_rt.ro_rt = 0;
 			}
 #ifdef MEASURE_PERFORMANCE
+			ip6_forward_cache_miss++;
 			bzero(dst, sizeof(*dst));
 			dst->sin6_family = AF_INET6;
 			dst->sin6_len = sizeof(*dst);
