@@ -323,6 +323,7 @@ void	 rtredirect __P((struct sockaddr *, struct sockaddr *,
 	    struct sockaddr *, int, struct sockaddr *, struct rtentry **));
 int	 rtrequest __P((int, struct sockaddr *,
 	    struct sockaddr *, struct sockaddr *, int, struct rtentry **));
+void	 rt_add_cache __P((struct rtentry *, void *));
 
 #endif
 #endif /* _ROUTE_H_ */

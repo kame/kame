@@ -998,3 +998,10 @@ rtinit(ifa, cmd, flags)
 	}
 	return (error);
 }
+
+void
+rt_add_cache(rt, func)
+	struct rtentry *rt;
+	void *func;
+{
+}
