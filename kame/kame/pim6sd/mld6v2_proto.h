@@ -65,5 +65,6 @@ extern struct listaddr *check_multicastV2_listener __P((struct uvif * v,
 							source));
 extern int SetTimerV2 __P((int vifi, struct listaddr * g, struct listaddr * s));
 extern void mld_shift_to_v2mode __P((void * ));
-
+extern int SetTimerV1compat __P((mifi_t, struct listaddr *, int));
+extern int DeleteTimerV1compat __P((int));
 #endif

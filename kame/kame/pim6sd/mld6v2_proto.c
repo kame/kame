@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.42 2004/06/14 05:04:13 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.43 2004/06/14 05:34:59 suz Exp $
  */
 
 /*
@@ -93,22 +93,14 @@
 static void Send_GSS_QueryV2 __P((void *arg));
 static void DelVifV2 __P((void *arg));
 
-static int SetTimerV1compat __P((mifi_t, struct listaddr *, int));
-static int DeleteTimerV1compat __P((int));
-
 static void accept_multicast_record(mifi_t, struct mld_group_record_hdr *,
 				    struct sockaddr_in6 *,
 				    struct sockaddr_in6 *,
 				    struct listaddr *);
-static void strip_source_in_multicast_record(mifi_t,
-					     struct mld_group_record_hdr *,
-					     struct sockaddr_in6 *,
-					     struct sockaddr_in6 *);
 
 /*
  * Send general group membership queries on that interface if I am querier.
  */
-
 void
 query_groupsV2(v)
     struct uvif *v;
@@ -525,26 +517,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 	    continue;
 	}
 
-	/* check compat-mode for this group */
-	for (g = v->uv_groups; g != NULL; g = g->al_next) {
-		if (inet6_equal(&group_sa, &g->al_addr))
-			break;
-	}
-	if (g == NULL) {
-		accept_multicast_record(vifi, mard, src, &group_sa, NULL);
-		continue;
-	}
-
-	/* changes behavior depending on the compat-mode flag */
-	switch (g->comp_mode) {
-	case MLDv1:
-		strip_source_in_multicast_record(vifi, mard, src, &group_sa);
-		break;
-	case MLDv2:
-	default:
-		accept_multicast_record(vifi, mard, src, &group_sa, g);
-		break;
-	}
+	accept_multicast_record(vifi, mard, src, &group_sa, g);
     }
 }
 
@@ -699,6 +672,11 @@ accept_multicast_record(vifi, mard, src, grp, uv_group)
 			"for non-existent group");
 	    	return;
 	    }
+	    if (uv_group->comp_mode == MLDv1) {
+	    	log_msg(LOG_DEBUG, 0, "ignores BLOCK msg in MLDv1-compat-mode");
+		return;
+	    }
+
 	    /*
 	     * Unlike RFC2710 section 4 p.7 (Routers in Non-Querier state 
 	     * MUST ignore Done messages), MLDv2 non-querier should 
@@ -757,6 +735,15 @@ accept_multicast_record(vifi, mard, src, grp, uv_group)
 	    break;
 
 	case CHANGE_TO_EXCLUDE_MODE:
+	    /* 
+	     * RFC3810 8.3.2 says "MLDv2 BLOCK messages are ignored, as are 
+	     * source-lists in TO_EX() messages".  But pim6sd does nothing,
+	     * since it always ignores the source-list in a TO_EX message.
+	     */
+	    if (uv_group->comp_mode == MLDv1) {
+	    	log_msg(LOG_DEBUG, 0,
+		    "ignores TO_EX source list in MLDv1-compat-mode");
+	    }
 	    /* just regard as (*,G) but not shift to mldv1-compat-mode */
 	    recv_listener_report(vifi, src, grp, MLDv2);
 	    break;
@@ -767,72 +754,6 @@ accept_multicast_record(vifi, mard, src, grp, uv_group)
 	    break;
 	}
 }
-
-/* handles multicast record in MLDv1-compat-mode */
-static void
-strip_source_in_multicast_record(vifi, mard, src, grp)
-    mifi_t vifi;
-    struct mld_group_record_hdr *mard;
-    struct sockaddr_in6 *src, *grp;
-{
-	int numsrc = ntohs(mard->numsrc);
-
-	switch (mard->record_type) {
-	case MODE_IS_INCLUDE:
-		if (numsrc == 0) {
-			goto regard_as_done;
-		} else {
-			goto regard_as_report;
-		}
-		break;
-
-	case ALLOW_NEW_SOURCES:
-		if (numsrc == 0) {
-			/* do nothing due to a lack of additional sources */
-			log_msg(LOG_DEBUG, 0,
-			    "ignore ALLOW_NEW_SOURCES "
-			    "due a lack of additional sources");
-			break;
-		}
-		goto regard_as_report;
-		break;
-
-	case BLOCK_OLD_SOURCES:
-		log_msg(LOG_NOTICE, 0, "BLOCK record is just ignored");
-		break;
-
-	case MODE_IS_EXCLUDE:
-		goto regard_as_report;
-		break;
-
-	case CHANGE_TO_INCLUDE_MODE:
-		if (numsrc == 0) {
-			goto regard_as_done;
-		} else {
-			goto regard_as_report;
-		}
-		break;
-
-	case CHANGE_TO_EXCLUDE_MODE:
-		goto regard_as_report;
-		break;
-
-	default:
-		log_msg(LOG_NOTICE, 0,
-		    "wrong multicast report type : %d", mard->record_type);
-		return;
-	}
-	return;
-
-regard_as_done:
-	recv_listener_done(vifi, src, grp);
-	return;
-
-regard_as_report:
-	recv_listener_report(vifi, src, grp, MLDv1);
-	return;
-}
-
 
 /*
  * Time out record of a source(s)/group membership on a vif
@@ -994,9 +915,6 @@ mld_shift_to_v2mode(arg)
 		return;	/* impossible */
 	}
 
-	/* dispose of learned group-info for this group */
-	DelVif(cbk);
-
 	g->comp_mode = MLDv2;
 	g->al_comp = 0;
 	free(cbk);
@@ -1005,7 +923,7 @@ mld_shift_to_v2mode(arg)
 	return;
 }
 
-static int
+int
 SetTimerV1compat(mifi, g, interval)
 	mifi_t mifi;
 	struct listaddr *g;
@@ -1019,7 +937,7 @@ SetTimerV1compat(mifi, g, interval)
 	return timer_setTimer(interval, mld_shift_to_v2mode, cbk);
 }
 
-static int
+int
 DeleteTimerV1compat(id)
 	int id;
 {
