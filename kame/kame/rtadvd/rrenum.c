@@ -1,4 +1,4 @@
-/*	$KAME: rrenum.c,v 1.9 2001/01/19 08:09:09 itojun Exp $	*/
+/*	$KAME: rrenum.c,v 1.10 2001/01/21 15:32:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -268,7 +268,7 @@ do_pco(struct icmp6_router_renum *rr, int len, struct rr_pco_match *rpm)
 		 * if ICMP6_RR_FLAGS_FORCEAPPLY(A flag) is 0 and IFF_UP is off,
 		 * the interface is not applied
 		 */
-		if ((rr->rr_flags & ICMP6_RR_FLAGS_ALLIF) == 0 &&
+		if ((rr->rr_flags & ICMP6_RR_FLAGS_FORCEAPPLY) == 0 &&
 		    (iflist[ifindex]->ifm_flags & IFF_UP) == 0)
 			continue;
 		/* TODO: interface scope check */

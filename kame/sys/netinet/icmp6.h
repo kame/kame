@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.30 2001/01/19 08:09:08 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.31 2001/01/21 15:32:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -406,7 +406,7 @@ struct icmp6_router_renum {	/* router renumbering header */
 
 #define ICMP6_RR_FLAGS_TEST		0x80
 #define ICMP6_RR_FLAGS_REQRESULT	0x40
-#define ICMP6_RR_FLAGS_ALLIF		0x20
+#define ICMP6_RR_FLAGS_FORCEAPPLY	0x20
 #define ICMP6_RR_FLAGS_SPECSITE		0x10
 #define ICMP6_RR_FLAGS_PREVDONE		0x08
 
