@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.61 2001/10/19 05:20:55 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.62 2002/01/07 11:39:57 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -395,7 +395,10 @@ noreplaycheck:
 		}
 		ip = mtod(m, struct ip *);
 		/* ECN consideration. */
-		ip_ecn_egress(ip4_ipsec_ecn, &tos, &ip->ip_tos);
+		if (!ip_ecn_egress(ip4_ipsec_ecn, &tos, &ip->ip_tos)) {
+			ipsecstat.in_inval++;
+			goto bad;
+		}
 		if (!key_checktunnelsanity(sav, AF_INET,
 			    (caddr_t)&ip->ip_src, (caddr_t)&ip->ip_dst)) {
 			ipseclog((LOG_ERR, "ipsec tunnel address mismatch "
@@ -817,7 +820,10 @@ noreplaycheck:
 		}
 		ip6 = mtod(m, struct ip6_hdr *);
 		/* ECN consideration. */
-		ip6_ecn_egress(ip6_ipsec_ecn, &flowinfo, &ip6->ip6_flow);
+		if (!ip6_ecn_egress(ip6_ipsec_ecn, &flowinfo, &ip6->ip6_flow)) {
+			ipsec6stat.in_inval++;
+			goto bad;
+		}
 		if (!key_checktunnelsanity(sav, AF_INET6,
 			    (caddr_t)&ip6->ip6_src, (caddr_t)&ip6->ip6_dst)) {
 			ipseclog((LOG_ERR, "ipsec tunnel address mismatch "

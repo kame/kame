@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.88 2001/12/21 03:32:34 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.89 2002/01/07 11:39:57 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -328,10 +328,8 @@ in6_gif_output(ifp, family, m)
 		m_freem(m);
 		return ENETUNREACH;
 	}
-	if (ifp->if_flags & IFF_LINK1)
-		ip_ecn_ingress(ECN_ALLOWED, &otos, &itos);
-	else
-		ip_ecn_ingress(ECN_NOCARE, &otos, &itos);
+	ip_ecn_ingress((ifp->if_flags & IFF_LINK1) ? ECN_ALLOWED : ECN_NOCARE,
+		       &otos, &itos);
 	ip6->ip6_flow &= ~ntohl(0xff00000);
 	ip6->ip6_flow |= htonl((u_int32_t)otos << 20);
 
@@ -429,10 +427,12 @@ int in6_gif_input(mp, offp, proto)
 				return IPPROTO_DONE;
 		}
 		ip = mtod(m, struct ip *);
-		if (gifp->if_flags & IFF_LINK1)
-			ip_ecn_egress(ECN_ALLOWED, &otos8, &ip->ip_tos);
-		else
-			ip_ecn_egress(ECN_NOCARE, &otos8, &ip->ip_tos);
+		if (ip_ecn_egress((gifp->if_flags & IFF_LINK1) ?
+				  ECN_ALLOWED : ECN_NOCARE,
+				  &otos8, &ip->ip_tos) == 0) {
+			m_freem(m);
+			return IPPROTO_DONE;
+		}
 		break;
 	    }
 #endif /* INET */
@@ -447,10 +447,12 @@ int in6_gif_input(mp, offp, proto)
 				return IPPROTO_DONE;
 		}
 		ip6 = mtod(m, struct ip6_hdr *);
-		if (gifp->if_flags & IFF_LINK1)
-			ip6_ecn_egress(ECN_ALLOWED, &otos, &ip6->ip6_flow);
-		else
-			ip6_ecn_egress(ECN_NOCARE, &otos, &ip6->ip6_flow);
+		if (ip6_ecn_egress((gifp->if_flags & IFF_LINK1) ?
+				   ECN_ALLOWED : ECN_NOCARE,
+				   &otos, &ip6->ip6_flow) == 0) {
+			m_freem(m);
+			return IPPROTO_DONE;
+		}
 		break;
 	    }
 #endif

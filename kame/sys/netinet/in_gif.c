@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.80 2001/11/28 11:08:54 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.81 2002/01/07 11:39:56 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -308,10 +308,8 @@ in_gif_output(ifp, family, m)
 	/* version will be set in ip_output() */
 	iphdr.ip_ttl = ip_gif_ttl;
 	iphdr.ip_len = m->m_pkthdr.len + sizeof(struct ip);
-	if (ifp->if_flags & IFF_LINK1)
-		ip_ecn_ingress(ECN_ALLOWED, &iphdr.ip_tos, &tos);
-	else
-		ip_ecn_ingress(ECN_NOCARE, &iphdr.ip_tos, &tos);
+	ip_ecn_ingress((ifp->if_flags & IFF_LINK1) ? ECN_ALLOWED : ECN_NOCARE,
+		       &iphdr.ip_tos, &tos);
 
 	/* prepend new IP header */
 	M_PREPEND(m, sizeof(struct ip), M_DONTWAIT);
@@ -449,19 +447,23 @@ in_gif_input(m, va_alist)
 	switch (proto) {
 #ifdef INET
 	case IPPROTO_IPV4:
-	    {
-		struct ip *ip;
 		af = AF_INET;
-		if (m->m_len < sizeof(*ip)) {
-			m = m_pullup(m, sizeof(*ip));
-			if (!m)
+		if (gifp->if_flags & IFF_LINK1) {
+			/* allow ECN */
+			struct ip *ip;
+
+			if (m->m_len < sizeof(*ip)) {
+				m = m_pullup(m, sizeof(*ip));
+				if (!m)
+					return;
+			}
+			ip = mtod(m, struct ip *);
+			if (ip_ecn_egress((gifp->if_flags & IFF_LINK1) ?
+					  ECN_ALLOWED : ECN_NOCARE,
+					  &otos, &ip->ip_tos) == 0) {
+				m_freem(m);
 				return;
-		}
-		ip = mtod(m, struct ip *);
-		if (gifp->if_flags & IFF_LINK1)
-			ip_ecn_egress(ECN_ALLOWED, &otos, &ip->ip_tos);
-		else
-			ip_ecn_egress(ECN_NOCARE, &otos, &ip->ip_tos);
+			}
 		break;
 	    }
 #endif
@@ -469,7 +471,7 @@ in_gif_input(m, va_alist)
 	case IPPROTO_IPV6:
 	    {
 		struct ip6_hdr *ip6;
-		u_int8_t itos;
+		u_int8_t itos, oitos;
 		af = AF_INET6;
 		if (m->m_len < sizeof(*ip6)) {
 			m = m_pullup(m, sizeof(*ip6));
@@ -477,13 +479,17 @@ in_gif_input(m, va_alist)
 				return;
 		}
 		ip6 = mtod(m, struct ip6_hdr *);
-		itos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
-		if (gifp->if_flags & IFF_LINK1)
-			ip_ecn_egress(ECN_ALLOWED, &otos, &itos);
-		else
-			ip_ecn_egress(ECN_NOCARE, &otos, &itos);
-		ip6->ip6_flow &= ~htonl(0xff << 20);
-		ip6->ip6_flow |= htonl((u_int32_t)itos << 20);
+		itos = oitos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
+		if (ip_ecn_egress((gifp->if_flags & IFF_LINK1) ?
+				  ECN_ALLOWED : ECN_NOCARE,
+				  &otos, &itos) == 0) {
+			m_freem(m);
+			return;
+		}
+		if (itos != oitos) {
+			ip6->ip6_flow &= ~htonl(0xff << 20);
+			ip6->ip6_flow |= htonl((u_int32_t)itos << 20);
+		}
 		break;
 	    }
 #endif /* INET6 */

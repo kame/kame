@@ -247,7 +247,10 @@ ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
     	case 4:
                 ipo = mtod(m, struct ip *);
                 nxt = ipo->ip_p;
-		ip_ecn_egress(ECN_ALLOWED, &otos, &ipo->ip_tos);
+		if (!ip_ecn_egress(ECN_ALLOWED, &otos, &ipo->ip_tos)) {
+			m_freem(m);
+			return;
+		}
                 break;
 #endif /* INET */
 
@@ -256,7 +259,10 @@ ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
                 ip6 = (struct ip6_hdr *) ipo;
                 nxt = ip6->ip6_nxt;
 		itos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
-		ip_ecn_egress(ECN_ALLOWED, &otos, &itos);
+		if (!ip_ecn_egress(ECN_ALLOWED, &otos, &itos)) {
+			m_freem(m);
+			return;
+		}
 		ip6->ip6_flow &= ~htonl(0xff << 20);
 		ip6->ip6_flow |= htonl((u_int32_t) itos << 20);
                 break;
