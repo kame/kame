@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.6 2001/01/27 00:32:14 thorpej Exp $	*/
+/*	$KAME: gssapi.c,v 1.7 2001/01/27 00:39:59 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -134,17 +134,21 @@ gssapi_init(struct ph1handle *iph1)
 
 	maj_stat = gss_canonicalize_name(&min_stat, princ, GSS_C_NO_OID,
 	    &canon_princ);
+	if (GSS_ERROR(maj_stat)) {
+		gssapi_error(maj_stat, LOCATION, "canonicalize name\n");
+		gssapi_free_state(iph1);
+		return -1;
+	}
 
 	maj_stat = gss_export_name(&min_stat, canon_princ, cred);
-
-	plog(LLV_DEBUG, LOCATION, NULL, "will try to acquire '%*s' creds\n",
-	    cred->length, cred->value);
-
 	if (GSS_ERROR(maj_stat)) {
 		gssapi_error(maj_stat, LOCATION, "export name\n");
 		gssapi_free_state(iph1);
 		return -1;
 	}
+
+	plog(LLV_DEBUG, LOCATION, NULL, "will try to acquire '%*s' creds\n",
+	    cred->length, cred->value);
 
 	maj_stat = gss_acquire_cred(&min_stat, princ, GSS_C_INDEFINITE,
 	    GSS_C_NO_OID_SET, GSS_C_BOTH, &gps->gss_cred, NULL, NULL);
