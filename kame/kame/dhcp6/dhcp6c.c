@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.116 2003/04/11 13:02:17 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.117 2003/04/11 13:11:48 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -90,6 +90,7 @@ int rtsock;	/* routing socket */
 
 static const struct sockaddr_in6 *sa6_allagent;
 static struct duid client_duid;
+static char *pid_file = DHCP6C_PIDFILE;
 
 static void usage __P((void));
 static void client6_init __P((void));
@@ -121,10 +122,6 @@ int client6_ifinit __P((struct dhcp6_if *));
 extern void client6_script __P((struct dhcp6_if *, int,
     struct dhcp6_optinfo *));
 
-#define DHCP6C_CONF "/usr/local/v6/etc/dhcp6c.conf"
-#define DHCP6C_PIDFILE "/var/run/dhcp6c.pid"
-#define DUID_FILE "/etc/dhcp6c_duid"
-
 #define MAX_ELAPSED_TIME 0xffff
 
 int
@@ -145,7 +142,7 @@ main(argc, argv)
 	else
 		progname++;
 
-	while ((ch = getopt(argc, argv, "c:dDf")) != -1) {
+	while ((ch = getopt(argc, argv, "c:dDfp:")) != -1) {
 		switch (ch) {
 		case 'c':
 			conffile = optarg;
@@ -158,6 +155,9 @@ main(argc, argv)
 			break;
 		case 'f':
 			foreground++;
+			break;
+		case 'p':
+			pid_file = optarg;
 			break;
 		default:
 			usage();
@@ -205,7 +205,8 @@ static void
 usage()
 {
 
-	fprintf(stderr, "usage: dhcpc [-c configfile] [-dDf] intface\n");
+	fprintf(stderr, "usage: dhcpc [-c configfile] [-dDf] "
+	    "[-p pid-file] interface\n");
 }
 
 /*------------------------------------------------------------*/
