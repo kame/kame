@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.430 2000/01/11 20:31:32 itojun Exp $
+$Id: CHANGELOG,v 1.431 2000/01/12 06:41:14 itojun Exp $
 
 <200001>
+Wed Jan 12 15:40:05 JST 2000  itojun@iijlab.net
+	* {bsdi3,netbsd}/usr.sbin/inetd: allow multiple IPsec policy
+	  string specifier (separated by semicolon).  to be integrated into
+	  other operating systems as well.
+
 Wed Jan 12 05:13:33 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/mrt, netbsd/pkgsrc/net/mrt: Upgrade to 2.1.2a.
 
