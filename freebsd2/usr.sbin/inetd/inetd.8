@@ -407,6 +407,30 @@ causes
 .Nm
 to list TCPMUX services in
 .Pa inetd.conf .
+.Sh IPSEC
+The implementation includes tiny hack to support IPsec policy setting for
+each of the socket.
+A special form of comment line, starting with
+.Dq Li "#@" ,
+will work as policy specifier.
+The content of the above comment line will be treated as IPsec policy string,
+as described in
+.Xr ipsec_set_policy 3 .
+A
+.Li "#@"
+line will affect all the following lines in
+.Pa inetd.conf ,
+so you may want to reset IPsec policy by using a comment line with
+.Li "#@"
+only
+.Pq with no policy string .
+.Pp
+If invalid IPsec policy string appears on
+.Pa inetd.conf ,
+.Nm
+will leave error message using
+.Xr syslog 3 ,
+and terminates itself.
 .Sh "FILES"
 .Bl -tag -width /var/run/inetd.pid -compact
 .It Pa /etc/inetd.conf
@@ -428,6 +452,9 @@ ntalk        dgram   udp   wait   root  /usr/libexec/ntalkd      ntalkd
 tcpmux/+date stream  tcp   nowait guest /bin/date                date
 tcpmux/phonebook stream tcp nowait guest /usr/local/bin/phonebook phonebook
 rstatd/1-3   dgram   rpc/udp wait root  /usr/libexec/rpc.rstatd  rpc.rstatd
+#@ ipsec ah/require
+chargen      stream  tcp   nowait root  internal
+#@
 .Ed
 .Sh "ERROR MESSAGES"
 The
@@ -509,6 +536,7 @@ program attempted to renounce the privileged state associated with a
 socket but was unable to.
 .El
 .Sh SEE ALSO
+.Xr ipsec_set_policy 3 ,
 .Xr login.conf 5 ,
 .Xr passwd 5 ,
 .Xr rpc 5 ,
@@ -534,3 +562,4 @@ based services is modeled after that
 provided by
 .Tn SunOS
 4.1.
+IPsec hack was made by KAME project, in 1999.

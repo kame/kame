@@ -124,9 +124,7 @@ getport(rhost, rport)
 	char *rhost;
 	int rport;
 {
-	struct hostent *hp;
-	struct servent *sp;
-	struct sockaddr_in sin;
+	struct addrinfo hints, *res, *ai;
 	int s, timo = 1, lport = IPPORT_RESERVED - 1;
 	int err;
 
@@ -135,35 +133,27 @@ getport(rhost, rport)
 	 */
 	if (rhost == NULL)
 		fatal("no remote host to connect to");
-	bzero((char *)&sin, sizeof(sin));
-	sin.sin_addr.s_addr = inet_addr(rhost);
-	if (sin.sin_addr.s_addr != INADDR_NONE)
-		sin.sin_family = AF_INET;
-	else {
-		hp = gethostbyname(rhost);
-		if (hp == NULL)
-			fatal("unknown host %s", rhost);
-		bcopy(hp->h_addr, (caddr_t)&sin.sin_addr, hp->h_length);
-		sin.sin_family = hp->h_addrtype;
-	}
-	if (rport == 0) {
-		sp = getservbyname("printer", "tcp");
-		if (sp == NULL)
-			fatal("printer/tcp: unknown service");
-		sin.sin_port = sp->s_port;
-	} else
-		sin.sin_port = htons(rport);
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = 0;
+	err = getaddrinfo(rhost, (rport == 0 ? "printer" : NULL), &hints, &res);
+	if (err)
+		fatal("%s\n", gai_strerror(err));
+	if (rport != 0)
+		((struct sockaddr_in *) res->ai_addr)->sin_port = htons(rport);
 
 	/*
 	 * Try connecting to the server.
 	 */
+	ai = res;
 retry:
 	seteuid(euid);
-	s = rresvport(&lport);
+	s = rresvport_af(&lport, ai->ai_family);
 	seteuid(uid);
 	if (s < 0)
 		return(-1);
-	if (connect(s, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
+	if (connect(s, ai->ai_addr, ai->ai_addrlen) < 0) {
 		err = errno;
 		(void) close(s);
 		errno = err;
@@ -176,8 +166,14 @@ retry:
 			timo *= 2;
 			goto retry;
 		}
+		if (ai->ai_next != NULL) {
+			ai = ai->ai_next;
+			goto retry;
+		}
+		freeaddrinfo(res);
 		return(-1);
 	}
+	freeaddrinfo(res);
 	return(s);
 }
 
@@ -311,7 +307,9 @@ checkremote()
 		/* get the official name of the local host */
 		gethostname(name, sizeof(name));
 		name[sizeof(name) - 1] = '\0';
-		hp = gethostbyname(name);
+		hp = gethostbyname2(name, AF_INET6);
+		if (hp == NULL)
+		    hp = gethostbyname2(name, AF_INET);
 		if (hp == (struct hostent *) NULL) {
 		    (void) snprintf(errbuf, sizeof(errbuf),
 			"unable to get official name for local machine %s",
@@ -320,7 +318,9 @@ checkremote()
 		} else (void) strcpy(name, hp->h_name);
 
 		/* get the official name of RM */
-		hp = gethostbyname(RM);
+		hp = gethostbyname2(RM, AF_INET6);
+		if (hp == NULL)
+		    hp = gethostbyname2(RM, AF_INET);
 		if (hp == (struct hostent *) NULL) {
 		    (void) snprintf(errbuf, sizeof(errbuf),
 			"unable to get official name for remote machine %s",

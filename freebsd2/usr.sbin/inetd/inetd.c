@@ -102,7 +102,15 @@ static const char rcsid[] =
  *	server program arguments	maximum of MAXARGS
  *
  * Comment lines are indicated by a `#' in column 1.
+ *
+ * #ifdef IPSEC
+ * Comment lines that start with "#@" denote IPsec policy string, as described
+ * in ipsec_set_policy(3).  This will affect all the following items in
+ * inetd.conf(8).  To reset the policy, just use "#@" line.  By default,
+ * there's no IPsec policy.
+ * #endif
  */
+
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
@@ -131,6 +139,7 @@ static const char rcsid[] =
 #include <unistd.h>
 #include <libutil.h>
 #include <sysexits.h>
+#include <ctype.h>
 
 #ifdef LOGIN_CAP
 #include <login_cap.h>
@@ -141,6 +150,13 @@ static const char rcsid[] =
 #endif
 
 #include "pathnames.h"
+
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#ifndef IPSEC_POLICY_IPSEC	/* no ipsec support on old ipsec */
+#undef IPSEC
+#endif
+#endif
 
 #ifndef	MAXCHILD
 #define	MAXCHILD	-1		/* maximum number of this service
@@ -190,6 +206,9 @@ struct	servtab {
 	char	*se_server;		/* server program */
 #define	MAXARGV 20
 	char	*se_argv[MAXARGV+1];	/* program arguments */
+#ifdef IPSEC
+	char	*se_policy;		/* IPsec poilcy string */
+#endif
 	int	se_fd;			/* open descriptor */
 	struct	sockaddr_in se_ctrladdr;/* bound address */
 	u_char	se_type;		/* type: normal, mux, or mux+ */
@@ -240,6 +259,9 @@ void		disable __P((struct servtab *));
 void		retry __P((int));
 int		setconfig __P((void));
 void		setup __P((struct servtab *));
+#ifdef IPSEC
+void		ipsecsetup __P((struct servtab *));
+#endif
 char	       *sskip __P((char **));
 char	       *skip __P((char **));
 struct servtab *tcpmux __P((int));
@@ -780,6 +802,10 @@ config(signo)
 			SWAP(sep->se_server, new->se_server);
 			for (i = 0; i < MAXARGV; i++)
 				SWAP(sep->se_argv[i], new->se_argv[i]);
+#ifdef IPSEC
+			SWAP(sep->se_policy, new->se_policy);
+			ipsecsetup(sep);
+#endif
 			sigsetmask(omask);
 			freeconfig(new);
 			if (debug)
@@ -925,6 +951,9 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 		if (setsockopt(sep->se_fd, IPPROTO_TCP, TCP_NOPUSH,
 		    (char *)&on, sizeof (on)) < 0)
 			syslog(LOG_ERR, "setsockopt (TCP_NOPUSH): %m");
+#ifdef IPSEC
+	ipsecsetup(sep);
+#endif
 	if (bind(sep->se_fd, (struct sockaddr *)&sep->se_ctrladdr,
 	    sizeof (sep->se_ctrladdr)) < 0) {
 		if (debug)
@@ -970,6 +999,34 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 			sep->se_server, sep->se_fd);
 	}
 }
+
+#ifdef IPSEC
+void
+ipsecsetup(sep)
+	struct servtab *sep;
+{
+	int len;
+	char *buf;
+	char *policy;
+
+	if (!sep->se_policy || sep->se_policy[0] == '\0')
+		policy = "entrust";
+	else
+		policy = sep->se_policy;
+
+	len = ipsec_get_policylen(policy);
+	if (len >= 0 && (buf = (char *)malloc(len)) != NULL) {
+		ipsec_set_policy(buf, len, policy);
+		if (setsockopt(sep->se_fd, IPPROTO_IP, IP_IPSEC_POLICY,
+				buf, len) < 0) {
+			syslog(LOG_ERR, "setsockopt (IP_IPSEC_POLICY, %s): %m",
+				policy);
+		}
+		free(buf);
+	} else
+		syslog(LOG_ERR, "invalid security policy \"%s\"", policy);
+}
+#endif
 
 /*
  * Finish with a service and its socket.
@@ -1105,10 +1162,38 @@ getconfigent()
 	char *versp;
 	static char TCPMUX_TOKEN[] = "tcpmux/";
 #define MUX_LEN		(sizeof(TCPMUX_TOKEN)-1)
+#ifdef IPSEC
+	char *policy = NULL;
+#endif
 
 more:
-	while ((cp = nextline(fconfig)) && (*cp == '#' || *cp == '\0'))
-		;
+	while ((cp = nextline(fconfig)) != NULL) {
+#ifdef IPSEC
+		/* lines starting with #@ is not a comment, but the policy */
+		if (cp[0] == '#' && cp[1] == '@') {
+			char *p;
+			for (p = cp + 2; p && *p && isspace(*p); p++)
+				;
+			if (*p == '\0') {
+				if (policy)
+					free(policy);
+				policy = NULL;
+			} else if (ipsec_get_policylen(p) >= 0) {
+				if (policy)
+					free(policy);
+				policy = newstr(p);
+			} else {
+				syslog(LOG_ERR,
+					"%s: invalid ipsec policy \"%s\"",
+					CONFIG, p);
+				exit(EX_CONFIG);
+			}
+		}
+#endif
+		if (*cp == '#' || *cp == '\0')
+			continue;
+		break;
+	}
 	if (cp == NULL)
 		return ((struct servtab *)0);
 	/*
@@ -1292,6 +1377,9 @@ more:
 		}
 	while (argc <= MAXARGV)
 		sep->se_argv[argc++] = NULL;
+#ifdef IPSEC
+	sep->se_policy = policy ? newstr(policy) : NULL;
+#endif
 	return (sep);
 }
 
@@ -1320,6 +1408,10 @@ freeconfig(cp)
 	for (i = 0; i < MAXARGV; i++)
 		if (cp->se_argv[i])
 			free(cp->se_argv[i]);
+#ifdef IPSEC
+	if (cp->se_policy)
+		free(cp->se_policy);
+#endif
 }
 
 
@@ -1736,17 +1828,25 @@ print_service(action, sep)
 	struct servtab *sep;
 {
 	fprintf(stderr,
+	    "%s: %s proto=%s accept=%d max=%d user=%s group=%s"
 #ifdef LOGIN_CAP
-	    "%s: %s proto=%s accept=%d max=%d user=%s group=%s class=%s builtin=%p server=%s\n",
-#else
-	    "%s: %s proto=%s accept=%d max=%d user=%s group=%s builtin=%p server=%s\n",
+	    " class=%s"
 #endif
+	    " builtin=%p server=%s"
+#ifdef IPSEC
+	    " policy=\"%s\""
+#endif
+	    "\n",
 	    action, sep->se_service, sep->se_proto,
 	    sep->se_accept, sep->se_maxchild, sep->se_user, sep->se_group,
 #ifdef LOGIN_CAP
 	    sep->se_class,
 #endif
-	    (void *) sep->se_bi, sep->se_server);
+	    (void *) sep->se_bi, sep->se_server
+#ifdef IPSEC
+	    , (sep->se_policy ? sep->se_policy : "")
+#endif
+	    );
 }
 
 /*

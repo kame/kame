@@ -39,7 +39,7 @@
 .Nd line printer spooler daemon
 .Sh SYNOPSIS
 .Nm lpd
-.Op Fl dl
+.Op Fl dl46
 .Op Ar port#
 .Sh DESCRIPTION
 .Nm Lpd
@@ -72,6 +72,12 @@ flag causes
 .Nm
 to log valid requests received from the network. This can be useful
 for debugging purposes.
+.It Fl 4
+Inet only (default).
+.It Fl 6
+Inet6 only.
+.It Fl 46
+Inet and inet6.
 .It Ar "port#"
 The Internet port number used to rendezvous
 with other processes is normally obtained with
