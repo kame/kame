@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.70 2001/01/23 17:56:08 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.71 2001/01/23 18:07:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1689,14 +1689,6 @@ in6_init_address_ltimes(struct nd_prefix *new,
 			lt6->ia6t_expire = time_second;
 			lt6->ia6t_expire += lt6->ia6t_vltime;
 		}
-		/*
-		 * Ensure addr lifetime <= prefix lifetime.
-		 * What's the rationale of this? This makes the
-		 * "zero-lifetime" attack possible...
-		 */
-		if (new->ndpr_expire && lt6->ia6t_expire &&
-		    new->ndpr_expire < lt6->ia6t_expire)
-			lt6->ia6t_expire = new->ndpr_expire;
 	}
 
 	/* init ia6t_preferred */
@@ -1706,10 +1698,6 @@ in6_init_address_ltimes(struct nd_prefix *new,
 		lt6->ia6t_preferred = time_second;
 		lt6->ia6t_preferred += lt6->ia6t_pltime;
 	}
-	/* Ensure addr lifetime <= prefix lifetime. (does it make sense?) */
-	if (new->ndpr_preferred && lt6->ia6t_preferred
-	    && new->ndpr_preferred < lt6->ia6t_preferred)
-		lt6->ia6t_preferred = new->ndpr_preferred;
 }
 
 /*
