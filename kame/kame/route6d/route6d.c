@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.36 2000/10/05 22:20:39 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.37 2000/10/10 13:02:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.36 2000/10/05 22:20:39 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.37 2000/10/10 13:02:30 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -1458,8 +1458,8 @@ rtrecv()
 		exit(-1);
 	}
 	if (len < sizeof(*rtm)) {
-		trace(1, "short read from rtsock: %d (should be > %d)\n",
-			len, sizeof(*rtm));
+		trace(1, "short read from rtsock: %d (should be > %lu)\n",
+			len, (u_long)sizeof(*rtm));
 		return;
 	}
 
@@ -2219,7 +2219,8 @@ krtread(again)
 		}
 	} while (retry < 5 && errmsg != NULL);
 	if (errmsg)
-		fatal("%s (with %d retries, msize=%d)", errmsg, retry, msize);
+		fatal("%s (with %d retries, msize=%lu)", errmsg, retry,
+		    (u_long)msize);
 	else if (1 < retry)
 		syslog(LOG_INFO, "NET_RT_DUMP %d retires", retry);
 
