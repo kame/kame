@@ -607,7 +607,6 @@ file netinet6/ah_output.c		ipsec
 file netinet6/ah_input.c		ipsec
 file netinet6/esp_output.c		ipsec & ipsec_esp
 file netinet6/esp_input.c		ipsec & ipsec_esp
-#file crypto/hmac_md5.c			ipsec
 #file crypto/md5.c			ipsec
 #file crypto/sha1.c			ipsec
 file crypto/des/des_cbc.c		ipsec & ipsec_esp

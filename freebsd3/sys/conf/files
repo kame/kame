@@ -734,7 +734,6 @@ netinet6/ipcomp_core.c	optional ipsec
 netinet6/ipcomp_input.c	optional ipsec
 netinet6/ipcomp_output.c	optional ipsec
 netinet6/ip6_fw.c	optional inet6 ipv6firewall
-#crypto/hmac_md5.c	optional ipsec
 crypto/sha1.c		optional ipsec
 crypto/des/des_cbc.c	optional ipsec
 crypto/des/des_ecb.c	optional ipsec
