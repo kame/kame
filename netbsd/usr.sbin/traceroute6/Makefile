@@ -4,7 +4,7 @@ PROG=	traceroute6
 
 BINMODE=4555
 
-CPPFLAGS+=-DINET6 -DIPSEC -DUSE_RFC2292BIS
+CPPFLAGS+=-DINET6 -DIPSEC -DUSE_RFC2292BIS -DHAVE_GETIPNODEBYNAME
 LDADD+=	-L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
 	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -lipsec -linet6
