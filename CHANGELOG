@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1725 2001/06/14 09:14:11 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1726 2001/06/15 00:25:07 itojun Exp $
 
 <200106>
 Thu Jun 14 18:12:57 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
@@ -7,6 +7,15 @@ Thu Jun 14 18:12:57 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
           - add new types and codes defined in RFC3122(Inverse NDP). they
 	    will be renamed when defined in 2292bis.
 	  - duplicated KAME local types and codes are renumberd.
+
+	  note that, for the following features, we have lost interoperability
+	  between past KAME releases and future KAME releases (because they
+	  use unofficial numbers).  if you play with these features, you must
+	  upgrade all boxes you have.
+	  - mtrace6(8)
+	  - mobile-ip6 home agent discovery
+	  - specific route information on RA, as defined in
+	    draft-ietf-ipngwg-router-preference
 
 Thu Jun 14 17:05:06 JST 2001  itojun@iijlab.net
 	* netbsd/sys/net/if.[ch]: change meaning of ifnet.if_lastchange
