@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.21 2001/02/07 11:51:54 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.22 2001/02/16 08:38:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -246,7 +246,12 @@ udp6_output(in6p, m, addr6, control)
 			goto release;
 		}
 
-		if (!IN6_IS_ADDR_V4MAPPED(faddr)) {
+#ifdef __OpenBSD__
+		if (1)	/* we don't support IPv4 mapped address */
+#else
+		if (!IN6_IS_ADDR_V4MAPPED(faddr))
+#endif
+		{
 			laddr = in6_selectsrc(sin6, in6p->in6p_outputopts,
 					      in6p->in6p_moptions,
 					      &in6p->in6p_route,
@@ -276,7 +281,12 @@ udp6_output(in6p, m, addr6, control)
 		fport = in6p->in6p_fport;
 	}
 
-	if (!IN6_IS_ADDR_V4MAPPED(faddr)) {
+#ifdef __OpenBSD__
+	if (1)	/* we don't support IPv4 mapped address */
+#else
+	if (!IN6_IS_ADDR_V4MAPPED(faddr))
+#endif
+	{
 		af = AF_INET6;
 		hlen = sizeof(struct ip6_hdr);
 	} else {
