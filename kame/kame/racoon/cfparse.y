@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.74 2000/10/11 19:54:07 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.75 2000/10/18 04:13:09 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -373,11 +373,26 @@ timer_stmts
 	|	timer_stmts timer_stmt
 	;
 timer_stmt
-	:	RETRY_COUNTER NUMBER EOS { lcconf->retry_counter = $2; }
-	|	RETRY_INTERVAL NUMBER UNITTYPE EOS { lcconf->retry_interval = $2 * $3; }
-	|	RETRY_PERSEND NUMBER EOS { lcconf->count_persend = $2; }
-	|	RETRY_PHASE1 NUMBER UNITTYPE EOS { lcconf->retry_checkph1 = $2; }
-	|	RETRY_PHASE2 NUMBER UNITTYPE EOS { lcconf->wait_ph2complete = $2; }
+	:	RETRY_COUNTER NUMBER
+		{
+			lcconf->retry_counter = $2;
+		} EOS
+	|	RETRY_INTERVAL NUMBER UNITTYPE
+		{
+			lcconf->retry_interval = $2 * $3;
+		} EOS
+	|	RETRY_PERSEND NUMBER
+		{
+			lcconf->count_persend = $2;
+		} EOS
+	|	RETRY_PHASE1 NUMBER UNITTYPE
+		{
+			lcconf->retry_checkph1 = $2 * $3;
+		} EOS
+	|	RETRY_PHASE2 NUMBER UNITTYPE
+		{
+			lcconf->wait_ph2complete = $2 * $3;
+		} EOS
 	;
 
 	/* algorithm */
