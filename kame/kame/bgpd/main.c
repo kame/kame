@@ -255,6 +255,10 @@ main_listen_accept()
      */
     if (bgpyes &&
 	FD_ISSET(bgpsock, &currentmask)) {
+      /* purge ancillary data on the listening socket */
+      if (read(bgpsock, NULL, 0) < 0)
+	fatal("<main_listen_accept>: read on the listening socket");
+
       /*
        * Accept the BGP connection.
        */
