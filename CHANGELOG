@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.860 2000/05/08 14:25:27 itojun Exp $
+$Id: CHANGELOG,v 1.861 2000/05/09 13:13:05 itojun Exp $
 
 <200005>
+Tue May  9 22:11:56 JST 2000  itojun@iijlab.net
+	* all platforms: correct NetBSD Security Advisory 2000-002, problem (2).
+	  this applies to all BSD-based operating systems.
+
 Mon May  8 23:24:34 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use tcpdump.org 2000/5/8
 	  weekly snap.
