@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.151 2001/08/07 14:29:12 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.152 2001/08/11 09:42:29 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -398,8 +398,6 @@ isakmp_main(msg, remote, local)
 						"malformed cookie.\n");
 					return -1;
 				}
-
-				/* XXX to be acceptable check of version */
 
 				/* it must be responder's 1st exchange. */
 				if (isakmp_ph1begin_r(msg, remote, local,
