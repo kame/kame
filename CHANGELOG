@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1045 2000/06/20 03:52:25 itojun Exp $
+$Id: CHANGELOG,v 1.1045.2.1 2000/06/20 12:36:29 jinmei Exp $
 
 <200006>
+2000-06-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/net/if_gif.c (gif_ioctl): made sure to cast the
+	argument to in6_aliasreq{} for the SIOCSIFPHYADDR_IN6 command.
+	Without this, the validation check would reject correct requests;
+	i.e. you couldn't configure IPv6 physical addresses.
+	In response to a report from FUJIURA Toyonori <toyo@jp.freebsd.org>
+
 Tue Jun 20 12:49:28 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6_proto.c: disable rate limitation for ICMPv6 error,
 	  since (1) it makes no sense to put less-than-10ms value to here
