@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.66 2002/05/01 06:12:09 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.67 2002/05/01 06:12:41 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -601,7 +601,7 @@ client6_send(ifp, s)
 		dh6->dh6_msgtype = DH6_INFORM_REQ;
 		break;
 	}
-	if (ifp->timeouts <= 1) {
+	if (ifp->timeouts == 1) {
 		/*
 		 * A client MUST leave the transaction-ID unchanged in
 		 * retransmissions of a message. [dhcpv6-24 15.1]
