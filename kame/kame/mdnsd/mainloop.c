@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.51 2001/05/02 11:58:45 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.52 2001/05/02 12:44:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -33,18 +33,17 @@
  * multicast DNS resolver, based on draft-ietf-dnsext-mdns-00.txt.
  *
  * TODO:
- * - query timeout
+ * - query timeout - naive code is checked in
  * - cache replies seen, honor TTL
- * - advert cached entries (non-authoritative)
  * - negative cache on explicit failure reply
  * - negative cache on NXRRSET reply on query timeout
  * - attach additional section on reply
  * - random delay before reply
- * - EDNS0 receiver buffer size notification
+ * - EDNS0 receiver buffer size notification (both send and receive)
+ * - as querier, retry by TCP/EDNS0 on truncated response
  * - multiple replies
  *	- how long should we wait for subsequent replies?
  *	- conflict resolution
- * - [phmb]-mode configuration - is it necessary?
  * - spec conformance check
  * - set hoplimit on reply to 255, verify
  *
