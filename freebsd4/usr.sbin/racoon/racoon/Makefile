@@ -14,9 +14,9 @@ CFLAGS+=-I${SRCDIR}/../tcpdump -I${SRCDIR}/../tcpdump/lbl \
 	-DHAVE_PRINT_ISAKMP_C=1
 
 # for debugging malloc/mfree
-.if exists(/usr/local/lib/libefence.a) || exists(/usr/local/lib/libefence.so)
-LDADD+=-L/usr/local/lib -lefence
-.endif
+#.if exists(/usr/local/lib/libefence.a) || exists(/usr/local/lib/libefence.so)
+#LDADD+=-L/usr/local/lib -lefence
+#.endif
 
 MAN5=	racoon.conf.5
 MAN8=	racoon.8
