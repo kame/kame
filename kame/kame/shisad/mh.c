@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.2 2004/12/16 11:58:50 keiichi Exp $  */
+/*      $KAME: mh.c,v 1.3 2004/12/16 12:47:07 keiichi Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -630,6 +630,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	if (mopt.opt_auth && mopt.opt_nonce) {
 #ifdef MIP_CN
 		int cnnonce = 0;
+		u_int16_t cksum;
 		mip6_authenticator_t authenticator;
 		struct mip6_nonces_info *home_nonces, *careof_nonces;
 
@@ -663,6 +664,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		mip6_calculate_kbm(&home_token, (cnnonce) ? &careof_token : NULL, kbm);
 		
 		/* Compare Calculated Authentication Data into Authenticator field */ 
+		cksum = bu->ip6mhbu_hdr.ip6mh_cksum;
 		bu->ip6mhbu_hdr.ip6mh_cksum = 0;
 		
 		/* Calculate authenticator */
@@ -670,6 +672,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 					     (u_int8_t *)mopt.opt_auth + 
 					     sizeof(struct ip6_mh_opt_auth_data) - (u_int8_t *)bu,
 					     MIP6_AUTHENTICATOR_SIZE, &authenticator);
+		bu->ip6mhbu_hdr.ip6mh_cksum = cksum;
 		
 		/* Authentication is failed, silently discard */
 		if (memcmp(&authenticator, 

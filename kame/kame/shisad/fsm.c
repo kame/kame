@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.3 2004/12/16 12:12:28 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.4 2004/12/16 12:47:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2258,6 +2258,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 	struct fsm_message *fsmmsg;
 {
 	mip6_kbm_t kbm;
+	u_int16_t cksum;
 	mip6_authenticator_t authenticator;
 	struct ip6_mh_binding_ack *ip6mhba;
 	u_int16_t seqno;
@@ -2320,16 +2321,29 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 	/* 
 	 * Authenticator check if available. BA is protected by IPsec
 	 * when it is from Home Agent (i.e. Home Flag set to
-	 * BUL. Otherwise, all packets SHOULD have authenticato and
+	 * BUL. Otherwise, all packets SHOULD have authenticator and
 	 * nonce indice option. */
 	if (mopt.opt_auth) {
 		/* verify authenticator. */
+		/*
+		 * RFC3775 Section 6.2.7
+		 */
 		mip6_calculate_kbm(&bul->bul_home_token,
-		    &bul->bul_careof_token, &kbm);
-		mip6_calculate_authenticator(&kbm, fsmmsg->fsmm_dst,
+		    (fsmmsg->fsmm_rtaddr != NULL)
+		    ? &bul->bul_careof_token : NULL, &kbm);
+		/*
+		 * clear the checksum field to calculate a correcet
+		 * authenticator.
+		 */
+		cksum = ip6mhba->ip6mhba_hdr.ip6mh_cksum;
+		ip6mhba->ip6mhba_hdr.ip6mh_cksum = 0;
+		mip6_calculate_authenticator(&kbm,
+		    (fsmmsg->fsmm_rtaddr != NULL)
+		    ? fsmmsg->fsmm_rtaddr : fsmmsg->fsmm_dst,
 		    fsmmsg->fsmm_src, (caddr_t)ip6mhba, ip6mhbalen,
 		    ((caddr_t)mopt.opt_auth - (caddr_t)ip6mhba) + 2,
 		    MIP6_AUTHENTICATOR_SIZE, &authenticator);
+		ip6mhba->ip6mhba_hdr.ip6mh_cksum = cksum;
 		if (memcmp((caddr_t)mopt.opt_auth + 2, &authenticator,
 			MIP6_AUTHENTICATOR_SIZE) != 0) {
 			syslog(LOG_ERR,
