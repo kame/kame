@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.24 2004/03/18 05:14:46 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.25 2004/03/18 05:56:56 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2719,13 +2719,13 @@ match_msf6_per_if(in6m, src, dst)
 			continue;
 
 		/* matching src address found */
-		if (SS_CMP(&i6as->i6as_addr.sin6_addr, ==, src)) {
+		if (SS_CMP(&i6as->i6as_addr, ==, src)) {
 			if (in6ms->i6ms_mode == MCAST_INCLUDE)
 				return 1;
 			return 0;
 		}
 		/* matching src address not found */
-		if (SS_CMP(&i6as->i6as_addr.sin6_addr, >, src)) {
+		if (SS_CMP(&i6as->i6as_addr, >, src)) {
 			if (in6ms->i6ms_mode == MCAST_INCLUDE)
 				return 0;
 			return 1;
@@ -2775,12 +2775,8 @@ match_msf6_per_socket(in6p, src, dst)
 		LIST_FOREACH(msfsrc, msf->msf_head, list) {
 			if (msfsrc->src.ss_family != AF_INET6)
 				continue;
-			if (SS_CMP(SIN6_ADDR(&msfsrc->src), <, src))
-				continue;
-			/* no match is expected by further lookup */
-			if (SS_CMP(SIN6_ADDR(&msfsrc->src), >, src))
-				break;
-			return 1;
+			if (IN6_ARE_ADDR_EQUAL(SIN6_ADDR(&msfsrc->src), src))
+				return 1;
 		}
 
 		/* 2. search_block_list */
@@ -2790,12 +2786,8 @@ match_msf6_per_socket(in6p, src, dst)
 		LIST_FOREACH(msfsrc, msf->msf_blkhead, list) {
 			if (msfsrc->src.ss_family != AF_INET6)
 				continue;
-			if (SS_CMP(&msfsrc->src, <, src))
-				continue;
-			/* no match is expected by further lookup */
-			if (SS_CMP(&msfsrc->src, >, src))
-				break;
-			return 0;
+			if (IN6_ARE_ADDR_EQUAL(SIN6_ADDR(&msfsrc->src), src))
+				return 0;
 		}
 		return 1;
 
