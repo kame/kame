@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.71 2000/03/29 22:48:53 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.72 2000/03/30 03:45:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -521,8 +521,7 @@ in6_control(so, cmd, data, ifp)
 				/* interface ID is not embedded by the user */
 				sa6->sin6_addr.s6_addr16[1] =
 					htons(ifp->if_index);
-			}
-			else if (sa6->sin6_addr.s6_addr16[1] !=
+			} else if (sa6->sin6_addr.s6_addr16[1] !=
 				    htons(ifp->if_index)) {
 				return(EINVAL);	/* ifid is contradict */
 			}
@@ -718,8 +717,7 @@ in6_control(so, cmd, data, ifp)
 				/* interface ID is not embedded by the user */
 				ia->ia_dstaddr.sin6_addr.s6_addr16[1]
 					= htons(ifp->if_index);
-			}
-			else if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] !=
+			} else if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] !=
 				    htons(ifp->if_index)) {
 				ia->ia_dstaddr = oldaddr;
 				return(EINVAL);	/* ifid is contradict */
@@ -1461,8 +1459,7 @@ in6_savemkludge(oia)
 
 		if (mk->mk_head.lh_first != NULL) {
 			LIST_INSERT_HEAD(&in6_mk, mk, mk_entry);
-		}
-		else {
+		} else {
 			FREE(mk, M_IPMADDR);
 		}
 	}
