@@ -271,7 +271,7 @@ soaccept(so, nam)
 		error = (*so->so_proto->pr_usrreq)(so, PRU_ACCEPT,
 		    (struct mbuf *)0, nam, (struct mbuf *)0, (struct proc *)0);
 	else
-		nam->m_len = 0;
+		error = ECONNABORTED;
 	splx(s);
 	return (error);
 }

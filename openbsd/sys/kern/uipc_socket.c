@@ -255,7 +255,7 @@ soaccept(so, nam)
 		error = (*so->so_proto->pr_usrreq)(so, PRU_ACCEPT, NULL,
 		    nam, NULL);
 	else
-		nam->m_len = 0;
+		error = ECONNABORTED;
 	splx(s);
 	return (error);
 }
