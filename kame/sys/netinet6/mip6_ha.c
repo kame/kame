@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.12 2001/01/23 17:43:04 itojun Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.13 2001/01/28 09:44:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -271,7 +271,7 @@ int                   icmp6len;  /* Length of icmp6 message */
 {
 	struct mip6_addr_list     *ap;   /* Address list entry */
 	struct nd_opt_hai         *hai;  /* Home Agent information option */
-	struct nd_opt_advint      *ai;   /* Advertisement Interval option */
+	struct nd_opt_advinterval *ai;   /* Advertisement Interval option */
 	struct nd_opt_prefix_info *pi;   /* Ptr to prefix information */
 	u_int8_t                  *optp; /* Ptr to current option in RA */
 	int       cur_off;               /* Cur offset from start of RA */
@@ -330,10 +330,10 @@ int                   icmp6len;  /* Length of icmp6 message */
 			}
 			cur_off += 4 * 8;
 			continue;
-		} else if (*optp == ND_OPT_ADV_INTERVAL) {
+		} else if (*optp == ND_OPT_ADVINTERVAL) {
 			/* Check the advertisement interval option */
-			ai = (struct nd_opt_advint *)optp;
-			if (ai->nd_opt_int_len != 1) {
+			ai = (struct nd_opt_advinterval *)optp;
+			if (ai->nd_opt_adv_len != 1) {
 				ip6stat.ip6s_badoptions++;
 				return IPPROTO_DONE;
 			}
@@ -341,7 +341,7 @@ int                   icmp6len;  /* Length of icmp6 message */
 			/* XXX. Function call to move detection */
 			cur_off += 8;
 			continue;
-		} else if (*optp == ND_OPT_HA_INFORMATION) {
+		} else if (*optp == ND_OPT_HOMEAGENT_INFO) {
 			/* Check the home agent information option */
 			hai = (struct nd_opt_hai *)optp;
 			if (hai->nd_opt_hai_len != 1) {

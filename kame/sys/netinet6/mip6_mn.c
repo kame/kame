@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mn.c,v 1.19 2001/01/23 17:43:04 itojun Exp $	*/
+/*	$KAME: mip6_mn.c,v 1.20 2001/01/28 09:44:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -947,7 +947,7 @@ int           off;  /* Offset from start of mbuf to start of RA */
 
 	while (cur_off < icmp6len) {
 		opt_ptr = ((caddr_t)icmp6msg + cur_off);
-		if (*opt_ptr == ND_OPT_HA_INFORMATION) {
+		if (*opt_ptr == ND_OPT_HOMEAGENT_INFO) {
 			/* Check the home agent information option */
 			hai = (struct nd_opt_hai *)opt_ptr;
 			if (hai->nd_opt_hai_len != 1) {

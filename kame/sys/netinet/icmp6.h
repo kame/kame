@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.35 2001/01/28 09:05:35 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.36 2001/01/28 09:44:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -258,9 +258,11 @@ struct nd_opt_hdr {		/* Neighbor discovery option header */
 #define ND_OPT_PREFIX_INFORMATION	3
 #define ND_OPT_REDIRECTED_HEADER	4
 #define ND_OPT_MTU			5
+#ifndef _KERNEL	/*for now*/
 #define ND_OPT_ADV_INTERVAL		7	/* KAME local, MIP6 - compat */
-#define ND_OPT_ADVINTERVAL		7	/* 2292bis-02 */
 #define ND_OPT_HA_INFORMATION		8	/* KAME local, MIP6 - compat */
+#endif
+#define ND_OPT_ADVINTERVAL		7	/* 2292bis-02 */
 #define ND_OPT_HOMEAGENT_INFO		8	/* 2292bis-02 */
 
 struct nd_opt_prefix_info {	/* prefix information */
@@ -276,7 +278,9 @@ struct nd_opt_prefix_info {	/* prefix information */
 
 #define ND_OPT_PI_FLAG_ONLINK		0x80
 #define ND_OPT_PI_FLAG_AUTO		0x40
+#ifndef _KERNEL /*for now*/
 #define ND_OPT_PI_FLAG_RTADDR		0x20	/* KAME local - compat*/
+#endif
 #define ND_OPT_PI_FLAG_ROUTER		0x20	/* 2292bis-02 */
 
 struct nd_opt_rd_hdr {		/* redirected header */
@@ -294,19 +298,19 @@ struct nd_opt_mtu {		/* MTU option */
 	u_int32_t	nd_opt_mtu_mtu;
 };
 
-struct nd_opt_advint {		/* Advertisement Interval option (MIPv6) */
-	u_int8_t	nd_opt_int_type;
-	u_int8_t	nd_opt_int_len;
-	u_int16_t	nd_opt_int_reserved;
-	u_int32_t	nd_opt_int_interval;
+struct nd_opt_advinterval {	/* Advertisement interval option */
+	u_int8_t	nd_opt_adv_type;
+	u_int8_t	nd_opt_adv_len;
+	u_int16_t	nd_opt_adv_reserved;
+	u_int32_t	nd_opt_adv_interval;
 };
 
-struct nd_opt_hai {		/* Home Agent Information option (MIPv6) */
-	u_int8_t	nd_opt_hai_type;
-	u_int8_t	nd_opt_hai_len;
-	u_int16_t	nd_opt_hai_reserved;
-	u_int16_t	nd_opt_hai_pref;
-	u_int16_t	nd_opt_hai_lifetime;
+struct nd_opt_homeagent_info {	/* Home Agent info */
+	uint8_t		nd_opt_hai_type;
+	uint8_t		nd_opt_hai_len;
+	uint16_t	nd_opt_hai_reserved;
+	int16_t		nd_opt_hai_preference;
+	uint16_t	nd_opt_hai_lifetime;
 };
 
 /*

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.92 2001/01/23 17:43:05 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.93 2001/01/28 09:44:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -394,7 +394,7 @@ nd6_options(ndopts)
 		case ND_OPT_TARGET_LINKADDR:
 		case ND_OPT_MTU:
 		case ND_OPT_REDIRECTED_HEADER:
-		case ND_OPT_ADV_INTERVAL:
+		case ND_OPT_ADVINTERVAL:
 			if (ndopts->nd_opt_array[nd_opt->nd_opt_type]) {
 				printf("duplicated ND6 option found "
 					"(type=%d)\n", nd_opt->nd_opt_type);
@@ -412,7 +412,7 @@ nd6_options(ndopts)
 			ndopts->nd_opts_pi_end =
 				(struct nd_opt_prefix_info *)nd_opt;
 			break;
-		case ND_OPT_HA_INFORMATION:
+		case ND_OPT_HOMEAGENT_INFO:
 			break;
 		default:
 			/*

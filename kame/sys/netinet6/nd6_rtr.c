@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.72 2001/01/24 03:10:03 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.73 2001/01/28 09:44:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -115,7 +115,7 @@ void (*mip6_prelist_update_hook)(struct nd_prefix *pr,
 void (*mip6_eager_prefix_hook)(struct nd_prefix *pr,
 			       struct nd_defrouter *dr) = NULL;
 void (*mip6_probe_pfxrtrs_hook)(void) = NULL;
-void (*mip6_store_advint_hook)(struct nd_opt_advint *ai,
+void (*mip6_store_advint_hook)(struct nd_opt_advinterval *ai,
 			       struct nd_defrouter *dr) = NULL;
 int (*mip6_get_md_state_hook)(void) = 0;
 void (*mip6_minus_a_case_hook)(struct nd_prefix *) = NULL;

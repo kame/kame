@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.24 2001/01/23 16:45:51 itojun Exp $	*/
+/*	$KAME: mip6_md.c,v 1.25 2001/01/28 09:44:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -1166,7 +1166,7 @@ mip6_probe_pfxrtrs()
  ******************************************************************************
  */
 void
-mip6_store_advint(struct nd_opt_advint *ai,
+mip6_store_advint(struct nd_opt_advinterval *ai,
 		  struct nd_defrouter *dr)
 {
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -1174,12 +1174,12 @@ mip6_store_advint(struct nd_opt_advint *ai,
 #endif
 
 	/* Check the advertisement interval option */
-	if (ai->nd_opt_int_len != 1) {
+	if (ai->nd_opt_adv_len != 1) {
 		log(LOG_INFO, "%s: bad Advertisement Interval Option "
 		    "length\n", __FUNCTION__);
 	}
 	else if (dr) {
-		dr->advint = ntohl(ai->nd_opt_int_interval); /* milliseconds */
+		dr->advint = ntohl(ai->nd_opt_adv_interval); /* milliseconds */
 
 		/* Sorry for delay between reception and this setting */
 		dr->advint_expire = time_second + dr->advint / 1000;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hooks.c,v 1.12 2000/08/03 02:28:48 suz Exp $	*/
+/*	$KAME: mip6_hooks.c,v 1.13 2001/01/28 09:44:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -97,7 +97,7 @@ extern void (*mip6_expired_defrouter_hook)(struct nd_defrouter *);
 extern void (*mip6_eager_prefix_hook)(struct nd_prefix *pr,
 				      struct nd_defrouter *dr);
 extern void (*mip6_probe_pfxrtrs_hook)(void);
-extern void (*mip6_store_advint_hook)(struct nd_opt_advint *,
+extern void (*mip6_store_advint_hook)(struct nd_opt_advinterval *,
 				      struct nd_defrouter *);
 extern int  (*mip6_get_md_state_hook)(void);
 extern int  (*mip6_rec_ba_hook)(struct mbuf *, int);
