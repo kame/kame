@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.199 2001/07/27 07:54:27 itojun Exp $	*/
+/*	$KAME: key.c,v 1.200 2001/07/27 08:42:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -107,7 +107,7 @@
 
 #include <machine/stdarg.h>
 
-#include "gif.h"
+#include "sec.h"
 
 /* randomness */
 #ifdef __NetBSD__
@@ -1154,7 +1154,7 @@ key_delsp(sp)
 			isr->sav = NULL;
 		}
 
-#if NGIF > 0
+#if NSEC > 0
 		if (isr->tunifp) {
 			int s;
 
@@ -1856,7 +1856,7 @@ key_spdadd(so, m, mhp)
 		}
 	}
 
-#if NGIF > 0
+#if NSEC > 0
 	/*
 	 * based on newsp->req, create/configure tunnels.
 	 * TODO: reuse devices
