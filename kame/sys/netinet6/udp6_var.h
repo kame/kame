@@ -80,7 +80,7 @@ struct	udp6stat {
 	u_quad_t udp6s_fullsock;	/* not delivered, input socket full */
 	u_quad_t udp6ps_pcbcachemiss;	/* input packets missing pcb cache */
 				/* output statistics: */
-	u_quad_t udp6s_opackets;		/* total output packets */
+	u_quad_t udp6s_opackets;	/* total output packets */
 };
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
