@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.29 2001/08/16 14:25:41 itojun Exp $	*/
+/*	$KAME: key_debug.c,v 1.30 2002/06/12 01:14:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -474,7 +474,8 @@ kdebug_secpolicy(sp)
 	printf("secpolicy{ refcnt=%u state=%u policy=%u\n",
 		sp->refcnt, sp->state, sp->policy);
 
-	kdebug_secpolicyindex(&sp->spidx);
+	if (sp->spidx)
+		kdebug_secpolicyindex(sp->spidx);
 
 	switch (sp->policy) {
 	case IPSEC_POLICY_DISCARD:
@@ -520,8 +521,8 @@ kdebug_secpolicyindex(spidx)
 	if (spidx == NULL)
 		panic("kdebug_secpolicyindex: NULL pointer was passed.\n");
 
-	printf("secpolicyindex{ dir=%u prefs=%u prefd=%u ul_proto=%u\n",
-		spidx->dir, spidx->prefs, spidx->prefd, spidx->ul_proto);
+	printf("secpolicyindex{ prefs=%u prefd=%u ul_proto=%u\n",
+		spidx->prefs, spidx->prefd, spidx->ul_proto);
 
 	ipsec_hexdump((caddr_t)&spidx->src,
 		((struct sockaddr *)&spidx->src)->sa_len);

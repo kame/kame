@@ -1,4 +1,4 @@
-/*	$KAME: keydb.h,v 1.15 2002/05/22 09:44:49 sakane Exp $	*/
+/*	$KAME: keydb.h,v 1.16 2002/06/12 01:14:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -138,8 +138,12 @@ struct key_cb {
 };
 
 /* secpolicy */
+struct secpolicy;
+struct secpolicyindex;
 extern struct secpolicy *keydb_newsecpolicy __P((void));
 extern void keydb_delsecpolicy __P((struct secpolicy *));
+extern int keydb_setsecpolicyindex
+	__P((struct secpolicy *, struct secpolicyindex *));
 /* secashead */
 extern struct secashead *keydb_newsecashead __P((void));
 extern void keydb_delsecashead __P((struct secashead *));

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.57 2002/06/11 20:01:05 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.58 2002/06/12 01:14:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -60,7 +60,6 @@
  * specifies ICMPv6 type, and the port field in "dst" specifies ICMPv6 code.
  */
 struct secpolicyindex {
-	u_int8_t dir;			/* direction of packet flow, see blow */
 	struct sockaddr_storage src;	/* IP src address for SP */
 	struct sockaddr_storage dst;	/* IP dst address for SP */
 	u_int8_t prefs;			/* prefix length in bits for src */
@@ -78,9 +77,10 @@ struct secpolicyindex {
 struct secpolicy {
 	LIST_ENTRY(secpolicy) chain;
 
+	u_int8_t dir;			/* direction of packet flow */
 	int readonly;			/* write prohibited */
 	int refcnt;			/* reference count */
-	struct secpolicyindex spidx;	/* selector */
+	struct secpolicyindex *spidx;	/* selector - NULL if not valid */
 	u_int32_t id;			/* It's unique number on the system. */
 	u_int state;			/* 0: dead, others: alive */
 #define IPSEC_SPSTATE_DEAD	0
@@ -400,7 +400,7 @@ struct in6pcb;
 extern int ipsec_init_pcbpolicy __P((struct socket *so, struct inpcbpolicy **));
 extern int ipsec_copy_pcbpolicy
 	__P((struct inpcbpolicy *, struct inpcbpolicy *));
-extern u_int ipsec_get_reqlevel __P((struct ipsecrequest *));
+extern u_int ipsec_get_reqlevel __P((struct ipsecrequest *, int));
 
 extern int ipsec4_set_policy __P((struct inpcb *inp, int optname,
 	caddr_t request, size_t len, int priv));

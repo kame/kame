@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.242 2002/06/11 19:38:03 itojun Exp $	*/
+/*	$KAME: key.c,v 1.243 2002/06/12 01:14:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -340,10 +340,9 @@ do { \
  * set parameters into secpolicyindex buffer.
  * Must allocate secpolicyindex buffer passed to this function.
  */
-#define KEY_SETSECSPIDX(_dir, s, d, ps, pd, ulp, idx) \
+#define KEY_SETSECSPIDX(s, d, ps, pd, ulp, idx) \
 do { \
 	bzero((idx), sizeof(struct secpolicyindex));                             \
-	(idx)->dir = (_dir);                                                 \
 	(idx)->prefs = (ps);                                                 \
 	(idx)->prefd = (pd);                                                 \
 	(idx)->ul_proto = (ulp);                                             \
@@ -381,7 +380,7 @@ static struct secasvar *key_allocsa_policy __P((struct secasindex *));
 static void key_freesp_so __P((struct secpolicy **));
 static struct secasvar *key_do_allocsa_policy __P((struct secashead *, u_int));
 static void key_delsp __P((struct secpolicy *));
-static struct secpolicy *key_getsp __P((struct secpolicyindex *));
+static struct secpolicy *key_getsp __P((struct secpolicyindex *, int));
 static struct secpolicy *key_getspbyid __P((u_int32_t));
 static u_int32_t key_newreqid __P((void));
 static struct mbuf *key_gather_mbuf __P((struct mbuf *,
@@ -552,11 +551,11 @@ key_allocsp(spidx, dir)
 	LIST_FOREACH(sp, &sptree[dir], chain) {
 		KEYDEBUG(KEYDEBUG_IPSEC_DATA,
 			printf("*** in SPD\n");
-			kdebug_secpolicyindex(&sp->spidx));
+			kdebug_secpolicyindex(sp->spidx));
 
 		if (sp->state == IPSEC_SPSTATE_DEAD)
 			continue;
-		if (key_cmpspidx_withmask(&sp->spidx, spidx))
+		if (key_cmpspidx_withmask(sp->spidx, spidx))
 			goto found;
 	}
 
@@ -565,7 +564,7 @@ key_allocsp(spidx, dir)
 
 found:
 	/* sanity check */
-	KEY_CHKSPDIR(sp->spidx.dir, dir, "key_allocsp");
+	KEY_CHKSPDIR(sp->dir, dir, "key_allocsp");
 
 	/* found a SPD entry */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -690,7 +689,7 @@ key_checkrequest(isr, saidx)
 	}
 
 	/* get current level */
-	level = ipsec_get_reqlevel(isr);
+	level = ipsec_get_reqlevel(isr, saidx->src.ss_family);
 
 #if 0
 	/*
@@ -1256,8 +1255,9 @@ key_delsp(sp)
  *	others	: found, pointer to a SP.
  */
 static struct secpolicy *
-key_getsp(spidx)
+key_getsp(spidx, dir)
 	struct secpolicyindex *spidx;
+	int dir;
 {
 	struct secpolicy *sp;
 
@@ -1265,10 +1265,10 @@ key_getsp(spidx)
 	if (spidx == NULL)
 		panic("key_getsp: NULL pointer is passed.\n");
 
-	LIST_FOREACH(sp, &sptree[spidx->dir], chain) {
+	LIST_FOREACH(sp, &sptree[dir], chain) {
 		if (sp->state == IPSEC_SPSTATE_DEAD)
 			continue;
-		if (key_cmpspidx_exactly(spidx, &sp->spidx)) {
+		if (key_cmpspidx_exactly(spidx, sp->spidx)) {
 			sp->refcnt++;
 			return sp;
 		}
@@ -1353,7 +1353,7 @@ key_msg2sp(xpl0, len, error)
 		return NULL;
 	}
 
-	newsp->spidx.dir = xpl0->sadb_x_policy_dir;
+	newsp->dir = xpl0->sadb_x_policy_dir;
 	newsp->policy = xpl0->sadb_x_policy_type;
 
 	/* check policy */
@@ -1595,7 +1595,7 @@ key_sp2msg(sp)
 	xpl->sadb_x_policy_len = PFKEY_UNIT64(tlen);
 	xpl->sadb_x_policy_exttype = SADB_X_EXT_POLICY;
 	xpl->sadb_x_policy_type = sp->policy;
-	xpl->sadb_x_policy_dir = sp->spidx.dir;
+	xpl->sadb_x_policy_dir = sp->dir;
 	xpl->sadb_x_policy_id = sp->id;
 	p = (caddr_t)xpl + sizeof(*xpl);
 
@@ -1776,8 +1776,7 @@ key_spdadd(so, m, mhp)
 
 	/* make secindex */
 	/* XXX boundary check against sa_len */
-	KEY_SETSECSPIDX(xpl0->sadb_x_policy_dir,
-	                src0 + 1,
+	KEY_SETSECSPIDX(src0 + 1,
 	                dst0 + 1,
 	                src0->sadb_address_prefixlen,
 	                dst0->sadb_address_prefixlen,
@@ -1817,7 +1816,7 @@ key_spdadd(so, m, mhp)
 	 * If the type is either SPDADD or SPDSETIDX AND a SP is found,
 	 * then error.
 	 */
-	newsp = key_getsp(&spidx);
+	newsp = key_getsp(&spidx, xpl0->sadb_x_policy_dir);
 	if (mhp->msg->sadb_msg_type == SADB_X_SPDUPDATE) {
 		if (newsp) {
 			key_sp_dead(newsp);
@@ -1843,14 +1842,11 @@ key_spdadd(so, m, mhp)
 		return key_senderror(so, m, ENOBUFS);
 	}
 
-	/* XXX boundary check against sa_len */
-	KEY_SETSECSPIDX(xpl0->sadb_x_policy_dir,
-	                src0 + 1,
-	                dst0 + 1,
-	                src0->sadb_address_prefixlen,
-	                dst0->sadb_address_prefixlen,
-	                src0->sadb_address_proto,
-	                &newsp->spidx);
+	error = keydb_setsecpolicyindex(newsp, &spidx);
+	if (error) {
+		keydb_delsecpolicy(newsp);
+		return key_senderror(so, m, error);
+	}
 
 	/* sanity check on addr pair */
 	if (((struct sockaddr *)(src0 + 1))->sa_family !=
@@ -1941,7 +1937,7 @@ key_spdadd(so, m, mhp)
 
 	newsp->refcnt = 1;	/* do not reclaim until I say I do */
 	newsp->state = IPSEC_SPSTATE_ALIVE;
-	LIST_INSERT_TAIL(&sptree[newsp->spidx.dir], newsp, secpolicy, chain);
+	LIST_INSERT_TAIL(&sptree[newsp->dir], newsp, secpolicy, chain);
 
 	/* delete the entry in spacqtree */
 	if (mhp->msg->sadb_msg_type == SADB_X_SPDUPDATE) {
@@ -2083,8 +2079,7 @@ key_spddelete(so, m, mhp)
 
 	/* make secindex */
 	/* XXX boundary check against sa_len */
-	KEY_SETSECSPIDX(xpl0->sadb_x_policy_dir,
-	                src0 + 1,
+	KEY_SETSECSPIDX(src0 + 1,
 	                dst0 + 1,
 	                src0->sadb_address_prefixlen,
 	                dst0->sadb_address_prefixlen,
@@ -2102,7 +2097,7 @@ key_spddelete(so, m, mhp)
 	}
 
 	/* Is there SP in SPD ? */
-	if ((sp = key_getsp(&spidx)) == NULL) {
+	if ((sp = key_getsp(&spidx, xpl0->sadb_x_policy_dir)) == NULL) {
 		ipseclog((LOG_DEBUG, "key_spddelete: no SP found.\n"));
 		return key_senderror(so, m, EINVAL);
 	}
@@ -2318,7 +2313,7 @@ key_spdacquire(sp)
 		panic("key_spdacquire: policy mismathed. IPsec is expected.\n");
 
 	/* get an entry to check whether sent message or not. */
-	if ((newspacq = key_getspacq(&sp->spidx)) != NULL) {
+	if ((newspacq = key_getspacq(sp->spidx)) != NULL) {
 		if (key_blockacq_count < newspacq->count) {
 			/* reset counter and do send message. */
 			newspacq->count = 0;
@@ -2329,7 +2324,7 @@ key_spdacquire(sp)
 		}
 	} else {
 		/* make new entry for blocking to send SADB_ACQUIRE. */
-		if ((newspacq = key_newspacq(&sp->spidx)) == NULL)
+		if ((newspacq = key_newspacq(sp->spidx)) == NULL)
 			return ENOBUFS;
 
 		/* add to acqtree */
@@ -2484,15 +2479,15 @@ key_setdumpsp(sp, type, seq, pid)
 	result = m;
 
 	m = key_setsadbaddr(SADB_EXT_ADDRESS_SRC,
-	    (struct sockaddr *)&sp->spidx.src, sp->spidx.prefs,
-	    sp->spidx.ul_proto);
+	    (struct sockaddr *)&sp->spidx->src, sp->spidx->prefs,
+	    sp->spidx->ul_proto);
 	if (!m)
 		goto fail;
 	m_cat(result, m);
 
 	m = key_setsadbaddr(SADB_EXT_ADDRESS_DST,
-	    (struct sockaddr *)&sp->spidx.dst, sp->spidx.prefd,
-	    sp->spidx.ul_proto);
+	    (struct sockaddr *)&sp->spidx->dst, sp->spidx->prefd,
+	    sp->spidx->ul_proto);
 	if (!m)
 		goto fail;
 	m_cat(result, m);
@@ -2635,8 +2630,8 @@ key_spdexpire(sp)
 
 	/* set sadb_address for source */
 	m = key_setsadbaddr(SADB_EXT_ADDRESS_SRC,
-	    (struct sockaddr *)&sp->spidx.src,
-	    sp->spidx.prefs, sp->spidx.ul_proto);
+	    (struct sockaddr *)&sp->spidx->src,
+	    sp->spidx->prefs, sp->spidx->ul_proto);
 	if (!m) {
 		error = ENOBUFS;
 		goto fail;
@@ -2645,8 +2640,8 @@ key_spdexpire(sp)
 
 	/* set sadb_address for destination */
 	m = key_setsadbaddr(SADB_EXT_ADDRESS_DST,
-	    (struct sockaddr *)&sp->spidx.dst,
-	    sp->spidx.prefd, sp->spidx.ul_proto);
+	    (struct sockaddr *)&sp->spidx->dst,
+	    sp->spidx->prefd, sp->spidx->ul_proto);
 	if (!m) {
 		error = ENOBUFS;
 		goto fail;
@@ -4124,9 +4119,8 @@ key_cmpspidx_exactly(spidx0, spidx1)
 	if (spidx0 == NULL || spidx1 == NULL)
 		return 0;
 
-	if (spidx0->prefs != spidx1->prefs
-	 || spidx0->prefd != spidx1->prefd
-	 || spidx0->ul_proto != spidx1->ul_proto)
+	if (spidx0->prefs != spidx1->prefs || spidx0->prefd != spidx1->prefd ||
+	    spidx0->ul_proto != spidx1->ul_proto)
 		return 0;
 
 	if (key_sockaddrcmp((struct sockaddr *)&spidx0->src,
@@ -6065,7 +6059,7 @@ key_acquire(saidx, sp)
 
 	/* set sadb_x_policy */
 	if (sp) {
-		m = key_setsadbxpolicy(sp->policy, sp->spidx.dir, sp->id);
+		m = key_setsadbxpolicy(sp->policy, sp->dir, sp->id);
 		if (!m) {
 			error = ENOBUFS;
 			goto fail;
@@ -6228,6 +6222,9 @@ key_newspacq(spidx)
 {
 	struct secspacq *acq;
 
+	if (!spidx)
+		return NULL;
+
 	/* get new entry */
 	KMALLOC(acq, struct secspacq *, sizeof(struct secspacq));
 	if (acq == NULL) {
@@ -6253,6 +6250,9 @@ key_getspacq(spidx)
 	struct secpolicyindex *spidx;
 {
 	struct secspacq *acq;
+
+	if (!spidx)
+		return NULL;
 
 	LIST_FOREACH(acq, &spacqtree, chain) {
 		if (key_cmpspidx_exactly(spidx, &acq->spidx))
