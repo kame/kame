@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.25 2000/05/08 08:04:30 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.26 2000/07/15 16:07:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -115,7 +115,7 @@ esp4_input(m, va_alist)
 	struct secasvar *sav = NULL;
 	size_t taillen;
 	u_int16_t nxt;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 	int ivlen;
 	size_t hlen;
 	size_t esplen;
@@ -176,15 +176,14 @@ esp4_input(m, va_alist)
 		ipsecstat.in_badspi++;
 		goto bad;
 	}
-	if (sav->alg_enc == SADB_EALG_NONE) {
+	algo = esp_algorithm_lookup(sav->alg_enc);
+	if (!algo) {
 		ipseclog((LOG_DEBUG, "IPv4 ESP input: "
-		    "unspecified encryption algorithm for spi %u\n",
+		    "unsupported encryption algorithm for spi %u\n",
 		    (u_int32_t)ntohl(spi)));
 		ipsecstat.in_badspi++;
 		goto bad;
 	}
-
-	algo = &esp_algorithms[sav->alg_enc];	/*XXX*/
 
 	/* check if we have proper ivlen information */
 	ivlen = sav->ivlen;
@@ -199,7 +198,8 @@ esp4_input(m, va_alist)
 	 && (sav->alg_auth && sav->key_auth)))
 		goto noreplaycheck;
 
-	if (sav->alg_auth == SADB_AALG_NULL)
+	if (sav->alg_auth == SADB_X_AALG_NULL ||
+	    sav->alg_auth == SADB_AALG_NONE)
 		goto noreplaycheck;
 
 	/*
@@ -219,10 +219,12 @@ esp4_input(m, va_alist)
     {
 	u_char sum0[AH_MAXSUMSIZE];
 	u_char sum[AH_MAXSUMSIZE];
-	struct ah_algorithm *sumalgo;
+	const struct ah_algorithm *sumalgo;
 	size_t siz;
 
-	sumalgo = &ah_algorithms[sav->alg_auth];
+	sumalgo = ah_algorithm_lookup(sav->alg_auth);
+	if (!sumalgo)
+		goto noreplaycheck;
 	siz = (((*sumalgo->sumsiz)(sav) + 3) & ~(4 - 1));
 	if (AH_MAXSUMSIZE < siz) {
 		ipseclog((LOG_DEBUG,
@@ -464,7 +466,7 @@ esp6_input(mp, offp, proto)
 	struct secasvar *sav = NULL;
 	size_t taillen;
 	u_int16_t nxt;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 	int ivlen;
 	size_t esplen;
 	int s;
@@ -518,15 +520,14 @@ esp6_input(mp, offp, proto)
 		ipsec6stat.in_badspi++;
 		goto bad;
 	}
-	if (sav->alg_enc == SADB_EALG_NONE) {
+	algo = esp_algorithm_lookup(sav->alg_enc);
+	if (!algo) {
 		ipseclog((LOG_DEBUG, "IPv6 ESP input: "
-		    "unspecified encryption algorithm for spi %u\n",
+		    "unsupported encryption algorithm for spi %u\n",
 		    (u_int32_t)ntohl(spi)));
 		ipsec6stat.in_badspi++;
 		goto bad;
 	}
-
-	algo = &esp_algorithms[sav->alg_enc];	/*XXX*/
 
 	/* check if we have proper ivlen information */
 	ivlen = sav->ivlen;
@@ -541,7 +542,8 @@ esp6_input(mp, offp, proto)
 	 && (sav->alg_auth && sav->key_auth)))
 		goto noreplaycheck;
 
-	if (sav->alg_auth == SADB_AALG_NULL)
+	if (sav->alg_auth == SADB_X_AALG_NULL ||
+	    sav->alg_auth == SADB_AALG_NONE)
 		goto noreplaycheck;
 
 	/*
@@ -561,10 +563,12 @@ esp6_input(mp, offp, proto)
     {
 	u_char sum0[AH_MAXSUMSIZE];
 	u_char sum[AH_MAXSUMSIZE];
-	struct ah_algorithm *sumalgo;
+	const struct ah_algorithm *sumalgo;
 	size_t siz;
 
-	sumalgo = &ah_algorithms[sav->alg_auth];
+	sumalgo = ah_algorithm_lookup(sav->alg_auth);
+	if (!sumalgo)
+		goto noreplaycheck;
 	siz = (((*sumalgo->sumsiz)(sav) + 3) & ~(4 - 1));
 	if (AH_MAXSUMSIZE < siz) {
 		ipseclog((LOG_DEBUG,

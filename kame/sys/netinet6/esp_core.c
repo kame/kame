@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.15 2000/06/14 10:41:18 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.16 2000/07/15 16:07:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,57 +75,82 @@
 static int esp_null_mature __P((struct secasvar *));
 static int esp_null_ivlen __P((struct secasvar *));
 static int esp_null_decrypt __P((struct mbuf *, size_t,
-	struct secasvar *, struct esp_algorithm *, int));
+	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_null_encrypt __P((struct mbuf *, size_t, size_t,
-	struct secasvar *, struct esp_algorithm *, int));
+	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_descbc_mature __P((struct secasvar *));
 static int esp_descbc_ivlen __P((struct secasvar *));
 static int esp_descbc_decrypt __P((struct mbuf *, size_t,
-	struct secasvar *, struct esp_algorithm *, int));
+	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_descbc_encrypt __P((struct mbuf *, size_t, size_t,
-	struct secasvar *, struct esp_algorithm *, int));
+	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_cbc_mature __P((struct secasvar *));
 static int esp_blowfish_cbc_decrypt __P((struct mbuf *, size_t,
-	struct secasvar *, struct esp_algorithm *, int));
+	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_blowfish_cbc_encrypt __P((struct mbuf *, size_t,
-	size_t, struct secasvar *, struct esp_algorithm *, int));
+	size_t, struct secasvar *, const struct esp_algorithm *, int));
 static int esp_blowfish_cbc_ivlen __P((struct secasvar *));
 static int esp_cast128cbc_ivlen __P((struct secasvar *));
 static int esp_cast128cbc_decrypt __P((struct mbuf *, size_t,
-	struct secasvar *, struct esp_algorithm *, int));
+	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_cast128cbc_encrypt __P((struct mbuf *, size_t, size_t,
-	struct secasvar *, struct esp_algorithm *, int));
+	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_3descbc_ivlen __P((struct secasvar *));
 static int esp_3descbc_decrypt __P((struct mbuf *, size_t,
-	struct secasvar *, struct esp_algorithm *, int));
+	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_3descbc_encrypt __P((struct mbuf *, size_t, size_t,
-	struct secasvar *, struct esp_algorithm *, int));
+	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_rc5cbc_ivlen __P((struct secasvar *));
 static int esp_rc5cbc_decrypt __P((struct mbuf *, size_t,
-	struct secasvar *, struct esp_algorithm *, int));
+	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_rc5cbc_encrypt __P((struct mbuf *, size_t, size_t,
-	struct secasvar *, struct esp_algorithm *, int));
+	struct secasvar *, const struct esp_algorithm *, int));
 static void esp_increment_iv __P((struct secasvar *));
 static caddr_t mbuf_find_offset __P((struct mbuf *, size_t, size_t));
 
-/* NOTE: The order depends on SADB_EALG_x in netkey/keyv2.h */
-struct esp_algorithm esp_algorithms[] = {
-	{ 0, 0, 0, 0, 0, 0, 0, },
-	{ 8, esp_descbc_mature, 64, 64, "des-cbc",
-		esp_descbc_ivlen, esp_descbc_decrypt, esp_descbc_encrypt, },
-	{ 8, esp_cbc_mature, 192, 192, "3des-cbc",
-		esp_3descbc_ivlen, esp_3descbc_decrypt, esp_3descbc_encrypt, },
-	{ 1, esp_null_mature, 0, 2048, "null",
-		esp_null_ivlen, esp_null_decrypt, esp_null_encrypt, },
-	{ 8, esp_cbc_mature, 40, 448, "blowfish-cbc",
-		esp_blowfish_cbc_ivlen, esp_blowfish_cbc_decrypt,
-		esp_blowfish_cbc_encrypt, },
-	{ 8, esp_cbc_mature, 40, 128, "cast128-cbc",
-		esp_cast128cbc_ivlen, esp_cast128cbc_decrypt,
-		esp_cast128cbc_encrypt, },
-	{ 8, esp_cbc_mature, 40, 2040, "rc5-cbc",
-		esp_rc5cbc_ivlen, esp_rc5cbc_decrypt, esp_rc5cbc_encrypt, },
-};
+const struct esp_algorithm *
+esp_algorithm_lookup(idx)
+	int idx;
+{
+	static struct esp_algorithm esp_algorithms[] = {
+		{ 8, esp_descbc_mature, 64, 64, "des-cbc",
+			esp_descbc_ivlen, esp_descbc_decrypt,
+			esp_descbc_encrypt, },
+		{ 8, esp_cbc_mature, 192, 192, "3des-cbc",
+			esp_3descbc_ivlen, esp_3descbc_decrypt,
+			esp_3descbc_encrypt, },
+		{ 1, esp_null_mature, 0, 2048, "null",
+			esp_null_ivlen, esp_null_decrypt, esp_null_encrypt, },
+		{ 8, esp_cbc_mature, 40, 448, "blowfish-cbc",
+			esp_blowfish_cbc_ivlen, esp_blowfish_cbc_decrypt,
+			esp_blowfish_cbc_encrypt, },
+		{ 8, esp_cbc_mature, 40, 128, "cast128-cbc",
+			esp_cast128cbc_ivlen, esp_cast128cbc_decrypt,
+			esp_cast128cbc_encrypt, },
+		{ 8, esp_cbc_mature, 40, 2040, "rc5-cbc",
+			esp_rc5cbc_ivlen, esp_rc5cbc_decrypt,
+			esp_rc5cbc_encrypt, },
+	};
+
+	switch (idx) {
+	case SADB_EALG_DESCBC:
+		return &esp_algorithms[0];
+	case SADB_EALG_3DESCBC:
+		return &esp_algorithms[1];
+	case SADB_EALG_NULL:
+		return &esp_algorithms[2];
+	case SADB_X_EALG_BLOWFISHCBC:
+		return &esp_algorithms[3];
+	case SADB_X_EALG_CAST128CBC:
+		return &esp_algorithms[4];
+#ifdef SADB_X_EALG_RC5CBC
+	case SADB_X_EALG_RC5CBC:
+		return &esp_algorithms[5];
+#endif
+	default:
+		return NULL;
+	}
+}
 
 /*
  * mbuf assumption: foo_encrypt() assumes that IV part is placed in a single
@@ -152,7 +177,7 @@ esp_null_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;		/* offset to ESP header */
 	struct secasvar *sav;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 	int ivlen;
 {
 	return 0; /* do nothing */
@@ -164,7 +189,7 @@ esp_null_encrypt(m, off, plen, sav, algo, ivlen)
 	size_t off;	/* offset to ESP header */
 	size_t plen;	/* payload length (to be encrypted) */
 	struct secasvar *sav;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 	int ivlen;
 {
 	return 0; /* do nothing */
@@ -174,7 +199,7 @@ static int
 esp_descbc_mature(sav)
 	struct secasvar *sav;
 {
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 
 	if (!(sav->flags & SADB_X_EXT_OLD) && (sav->flags & SADB_X_EXT_IV4B)) {
 		ipseclog((LOG_ERR, "esp_cbc_mature: "
@@ -186,7 +211,14 @@ esp_descbc_mature(sav)
 		ipseclog((LOG_ERR, "esp_descbc_mature: no key is given.\n"));
 		return 1;
 	}
-	algo = &esp_algorithms[sav->alg_enc];
+
+	algo = esp_algorithm_lookup(sav->alg_enc);
+	if (!algo) {
+		ipseclog((LOG_ERR,
+		    "esp_descbc_mature: unsupported algorithm.\n"));
+		return 1;
+	}
+
 	if (_KEYBITS(sav->key_enc) < algo->keymin
 	 || algo->keymax < _KEYBITS(sav->key_enc)) {
 		ipseclog((LOG_ERR,
@@ -223,7 +255,7 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;		/* offset to ESP header */
 	struct secasvar *sav;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 	int ivlen;
 {
 	size_t ivoff = 0;
@@ -331,7 +363,7 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	size_t off;	/* offset to ESP header */
 	size_t plen;	/* payload length (to be decrypted) */
 	struct secasvar *sav;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 	int ivlen;
 {
 	size_t ivoff = 0;
@@ -453,7 +485,7 @@ esp_cbc_mature(sav)
 	struct secasvar *sav;
 {
 	int keylen;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
@@ -471,7 +503,14 @@ esp_cbc_mature(sav)
 		    "esp_cbc_mature: no key is given.\n"));
 		return 1;
 	}
-	algo = &esp_algorithms[sav->alg_enc];
+
+	algo = esp_algorithm_lookup(sav->alg_enc);
+	if (!algo) {
+		ipseclog((LOG_ERR,
+		    "esp_cbc_mature: unsupported algorithm.\n"));
+		return 1;
+	}
+
 	keylen = sav->key_enc->sadb_key_bits;
 	if (keylen < algo->keymin || algo->keymax < keylen) {
 		ipseclog((LOG_ERR, "esp_cbc_mature: invalid key length %d.\n",
@@ -489,9 +528,9 @@ esp_cbc_mature(sav)
 			return 1;
 		}
 		break;
-	case SADB_EALG_BLOWFISHCBC:
-	case SADB_EALG_CAST128CBC:
-	case SADB_EALG_RC5CBC:
+	case SADB_X_EALG_BLOWFISHCBC:
+	case SADB_X_EALG_CAST128CBC:
+	case SADB_X_EALG_RC5CBC:
 		break;
 	}
 
@@ -503,7 +542,7 @@ esp_blowfish_cbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;		/* offset to ESP header */
 	struct secasvar *sav;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 	int ivlen;
 {
 	size_t ivoff;
@@ -584,7 +623,7 @@ esp_blowfish_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	size_t off;	/* offset to ESP header */
 	size_t plen;	/* payload length (to be decrypted) */
 	struct secasvar *sav;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 	int ivlen;
 {
 	size_t ivoff;
@@ -674,7 +713,7 @@ esp_cast128cbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;
 	struct secasvar *sav;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 	int ivlen;
 {
 	size_t ivoff;
@@ -753,7 +792,7 @@ esp_cast128cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	size_t off;
 	size_t plen;
 	struct secasvar *sav;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 	int ivlen;
 {
 	size_t ivoff;
@@ -836,7 +875,7 @@ esp_3descbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;
 	struct secasvar *sav;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 	int ivlen;
 {
 	size_t ivoff;
@@ -918,7 +957,7 @@ esp_3descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	size_t off;
 	size_t plen;
 	struct secasvar *sav;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 	int ivlen;
 {
 	size_t ivoff;
@@ -1001,7 +1040,7 @@ esp_rc5cbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;
 	struct secasvar *sav;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 	int ivlen;
 {
 	size_t ivoff;
@@ -1073,7 +1112,7 @@ esp_rc5cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	size_t off;
 	size_t plen;
 	struct secasvar *sav;
-	struct esp_algorithm *algo;
+	const struct esp_algorithm *algo;
 	int ivlen;
 {
 	size_t ivoff;
@@ -1204,7 +1243,7 @@ esp_auth(m0, skip, length, sav, sum)
 	size_t off;
 	struct ah_algorithm_state s;
 	u_char sumbuf[AH_MAXSUMSIZE];
-	struct ah_algorithm *algo;
+	const struct ah_algorithm *algo;
 	size_t siz;
 	int error;
 
@@ -1230,7 +1269,8 @@ esp_auth(m0, skip, length, sav, sum)
 		ipseclog((LOG_DEBUG, "esp_auth: NULL SA passed\n"));
 		return EINVAL;
 	}
-	if (!sav->alg_auth) {
+	algo = ah_algorithm_lookup(sav->alg_auth);
+	if (!algo) {
 		ipseclog((LOG_ERR,
 		    "esp_auth: bad ESP auth algorithm passed: %d\n",
 		    sav->alg_auth));
@@ -1240,7 +1280,6 @@ esp_auth(m0, skip, length, sav, sum)
 	m = m0;
 	off = 0;
 
-	algo = &ah_algorithms[sav->alg_auth];
 	siz = (((*algo->sumsiz)(sav) + 3) & ~(4 - 1));
 	if (sizeof(sumbuf) < siz) {
 		ipseclog((LOG_DEBUG,

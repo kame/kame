@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.62 2000/07/05 16:53:55 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.63 2000/07/15 16:08:01 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -420,14 +420,14 @@ ipsecdoi2pfkey_ealg(t_id)
 		return SADB_EALG_DESCBC;
 	case IPSECDOI_ESP_3DES:
 		return SADB_EALG_3DESCBC;
-#ifdef SADB_EALG_RC5CBC
+#ifdef SADB_X_EALG_RC5CBC
 	case IPSECDOI_ESP_RC5:
-		return SADB_EALG_RC5CBC;
+		return SADB_X_EALG_RC5CBC;
 #endif
 	case IPSECDOI_ESP_CAST:
-		return SADB_EALG_CAST128CBC;
+		return SADB_X_EALG_CAST128CBC;
 	case IPSECDOI_ESP_BLOWFISH:
-		return SADB_EALG_BLOWFISHCBC;
+		return SADB_X_EALG_BLOWFISHCBC;
 	case IPSECDOI_ESP_DES_IV32:	/* flags |= (SADB_X_EXT_OLD|
 							SADB_X_EXT_IV4B)*/
 		return SADB_EALG_DESCBC;
@@ -666,7 +666,7 @@ pfkey_convertfromipsecdoi(proto_id, t_id, hashtype,
 		if (t_id == IPSECDOI_ATTR_AUTH_HMAC_MD5 
 		 && hashtype == IPSECDOI_ATTR_AUTH_KPDK) {
 			/* AH_MD5 + Auth(KPDK) = RFC1826 keyed-MD5 */
-			*a_type = SADB_AALG_MD5;
+			*a_type = SADB_X_AALG_MD5;
 			*flags |= SADB_X_EXT_OLD;
 		}
 		*e_type = SADB_EALG_NONE;

@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.22 2000/07/03 13:23:28 itojun Exp $	*/
+/*	$KAME: ah_output.c,v 1.23 2000/07/15 16:07:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,7 +87,7 @@ size_t
 ah_hdrsiz(isr)
 	struct ipsecrequest *isr;
 {
-	struct ah_algorithm *algo;
+	const struct ah_algorithm *algo;
 	size_t hdrsiz;
 
 	/* sanity check */
@@ -104,7 +104,7 @@ ah_hdrsiz(isr)
 		goto estimate;
 
 	/* we need transport mode AH. */
-	algo = &ah_algorithms[isr->sav->alg_auth];
+	algo = ah_algorithm_lookup(isr->sav->alg_auth);
 	if (!algo)
 		goto estimate;
 
@@ -144,7 +144,7 @@ ah4_output(m, isr)
 	struct ipsecrequest *isr;
 {
 	struct secasvar *sav = isr->sav;
-	struct ah_algorithm *algo;
+	const struct ah_algorithm *algo;
 	u_int32_t spi;
 	u_char *ahdrpos;
 	u_char *ahsumpos = NULL;
@@ -171,7 +171,14 @@ ah4_output(m, isr)
 		return EINVAL;
 	}
 
-	algo = &ah_algorithms[sav->alg_auth];
+	algo = ah_algorithm_lookup(sav->alg_auth);
+	if (!algo) {
+		ipseclog((LOG_ERR, "ah4_output: unsupported algorithm: "
+		    "SPI=%u\n", (u_int32_t)ntohl(sav->spi)));
+		ipsecstat.out_inval++;
+		m_freem(m);
+		return EINVAL;
+	}
 	spi = sav->spi;
 
 	/*
@@ -320,10 +327,12 @@ int
 ah_hdrlen(sav)
 	struct secasvar *sav;
 {
-	struct ah_algorithm *algo;
+	const struct ah_algorithm *algo;
 	int plen, ahlen;
 	
-	algo = &ah_algorithms[sav->alg_auth];
+	algo = ah_algorithm_lookup(sav->alg_auth);
+	if (!algo)
+		return 0;
 	if (sav->flags & SADB_X_EXT_OLD) {
 		/* RFC 1826 */
 		plen = ((*algo->sumsiz)(sav) + 3) & ~(4 - 1);	/*XXX pad to 8byte?*/
@@ -351,7 +360,7 @@ ah6_output(m, nexthdrp, md, isr)
 	struct mbuf *mprev;
 	struct mbuf *mah;
 	struct secasvar *sav = isr->sav;
-	struct ah_algorithm *algo;
+	const struct ah_algorithm *algo;
 	u_int32_t spi;
 	u_char *ahsumpos = NULL;
 	size_t plen;	/*AH payload size in bytes*/
@@ -414,7 +423,14 @@ ah6_output(m, nexthdrp, md, isr)
 		return EINVAL;
 	}
 
-	algo = &ah_algorithms[sav->alg_auth];
+	algo = ah_algorithm_lookup(sav->alg_auth);
+	if (!algo) {
+		ipseclog((LOG_ERR, "ah6_output: unsupported algorithm: "
+		    "SPI=%u\n", (u_int32_t)ntohl(sav->spi)));
+		ipsec6stat.out_inval++;
+		m_freem(m);
+		return EINVAL;
+	}
 	spi = sav->spi;
 
 	/*

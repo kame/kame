@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.29 2000/06/10 14:17:44 sakane Exp $	*/
+/*	$KAME: parse.y,v 1.30 2000/07/15 16:08:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -326,7 +326,7 @@ auth_alg
 auth_key
 	:	/*NOTHING*/
 		{
-			if (p_alg_auth != SADB_AALG_NULL) {
+			if (p_alg_auth != SADB_X_AALG_NULL) {
 				yyerror("no key found.");
 				return -1;
 			}

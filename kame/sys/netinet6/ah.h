@@ -1,4 +1,4 @@
-/*	$KAME: ah.h,v 1.10 2000/07/02 13:23:33 itojun Exp $	*/
+/*	$KAME: ah.h,v 1.11 2000/07/15 16:07:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,7 +80,7 @@ struct ah_algorithm {
 #define	AH_MAXSUMSIZE	16
 
 #ifdef _KERNEL
-extern struct ah_algorithm ah_algorithms[];
+extern const struct ah_algorithm *ah_algorithm_lookup __P((int));
 
 /* cksum routines */
 extern int ah_hdrlen __P((struct secasvar *));
@@ -89,14 +89,14 @@ extern size_t ah_hdrsiz __P((struct ipsecrequest *));
 extern void ah4_input __P((struct mbuf *, ...));
 extern int ah4_output __P((struct mbuf *, struct ipsecrequest *));
 extern int ah4_calccksum __P((struct mbuf *, caddr_t, size_t,
-	struct ah_algorithm *, struct secasvar *));
+	const struct ah_algorithm *, struct secasvar *));
 
 #ifdef INET6
 extern int ah6_input __P((struct mbuf **, int *, int));
 extern int ah6_output __P((struct mbuf *, u_char *, struct mbuf *,
 	struct ipsecrequest *));
 extern int ah6_calccksum __P((struct mbuf *, caddr_t, size_t,
-	struct ah_algorithm *, struct secasvar *));
+	const struct ah_algorithm *, struct secasvar *));
 #endif /* INET6 */
 
 #endif /*_KERNEL*/
