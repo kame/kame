@@ -6,7 +6,7 @@ $hostname =~ s/\n$//;
 $userfqdn = `whoami`;
 $userfqdn =~ s/\n$//;
 $userfqdn .= '@' . $hostname;
-$rcsid = '$Id: sandiego.pl,v 1.8 2000/01/12 07:36:48 itojun Exp $';
+$rcsid = '$Id: sandiego.pl,v 1.9 2000/03/02 03:27:58 itojun Exp $';
 
 print <<EOF;
 # automatically generated from $rcsid
@@ -71,18 +71,19 @@ timer {
 #	"IPsec compression algorithm",
 # Each class can be defined three level; "normal", "high" and "extra_high".
 # Each level can be omited.  If so, it is interpreted that there is no
-# algorithm appropreately for use in its level.  algorithm type may be
-# defined at multiple level.
+# algorithm appropreately for use in its level.
+# NOTE: due to a bug, we can't declare multiple algorithm
+# items into single level.
 algorithm_strength {
 	isakmp_auth_method {
-		extra_high nothing ;	# for clearance.
-		high  dsssig, rsasig, rsaenc, rsarev;
+		extra_high nothing ;	# to clarify.
+		high  dsssig ;
 		normal pre_shared_key ;
 	}
 	isakmp_encryption {
 		extra_high nothing ;
-		high rc5, blowfish ;
-		normal cast128, 3des, des ;
+		high rc5 ;
+		normal cast128 ;
 	}
 	isakmp_hash {
 		extra_high nothing ;
@@ -96,8 +97,8 @@ algorithm_strength {
 	}
 	ipsec_encryption {
 		extra_high nothing ;
-		high rc5, blowfish ;
-		normal cast128, 3des, des ;
+		high rc5 ;
+		normal cast128 ;
 	}
 	ipsec_authentication {
 		extra_high nothing ;
@@ -106,8 +107,8 @@ algorithm_strength {
 	}
 	ipsec_ipcomp {
 		extra_high nothing ;
-		high deflate, lzs ;
-		normal oui, deflate, lzs ;
+		high deflate ;
+		normal deflate ;
 	}
 }
 
