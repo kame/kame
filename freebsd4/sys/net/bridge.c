@@ -279,7 +279,7 @@ add_cluster(u_int16_t cluster_id, struct arpcom *ac)
 	/*
 	 * and finally update pointers in ifp2sc
 	 */
-	for (i = 0 ; i < if_index && i < BDG_MAX_PORTS; i++)
+	for (i = 0 ; i < if_indexlim && i < BDG_MAX_PORTS; i++)
 	    if (ifp2sc[i].cluster != NULL)
 		ifp2sc[i].cluster = c + (ifp2sc[i].cluster - clusters);
 	free(clusters, M_IFADDR);
@@ -391,9 +391,9 @@ reconfigure_bridge(void)
 {
     bridge_off();
     if (do_bridge) {
-	if (if_index >= BDG_MAX_PORTS) {
+	if (if_indexlim >= BDG_MAX_PORTS) {
 	    printf("-- sorry too many interfaces (%d, max is %d),"
-		" disabling bridging\n", if_index, BDG_MAX_PORTS);
+		" disabling bridging\n", if_indexlim, BDG_MAX_PORTS);
 	    do_bridge=0;
 	    return;
 	}
