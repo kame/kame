@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2731 2005/03/02 08:32:27 suz Exp $
+$KAME: CHANGELOG,v 1.2732 2005/03/07 14:04:22 itojun Exp $
 
 <200503>
+Mon Mar  6 2005  itojun@iijlab.net
+	* kame/sys/netinet{,6}/sctp*: new patch from randall
+
 2005-03-02  SUZUKI, Shinsuke <suz@kame.net>
 	* kame/kame/dhcp6/dhcp6.c: fixed a DHCPv6-client 
 	  initialization failure when a node has no IPv6 global address.
