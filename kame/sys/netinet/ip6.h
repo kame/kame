@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.25 2001/11/29 04:38:37 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.26 2002/01/08 02:46:31 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -222,7 +222,7 @@ struct ip6_opt_binding_update {
 #ifdef MIP6_DRAFT13
 	u_int8_t ip6ou_flags;
 	u_int8_t ip6ou_prefixlen;
-	u_int16_t ip6ou_seqno;
+	u_int8_t ip6ou_seqno[2];
 #else
 	u_int8_t ip6ou_flags;
 	u_int8_t ip6ou_reserved[2];
@@ -248,7 +248,7 @@ struct ip6_opt_binding_ack {
 	u_int8_t ip6oa_len;
 	u_int8_t ip6oa_status;
 #ifdef MIP6_DRAFT13
-	u_int16_t ip6oa_seqno;
+	u_int8_t ip6oa_seqno[2];
 #else
 	u_int8_t ip6oa_reserved;
 	u_int8_t ip6oa_seqno;
