@@ -130,5 +130,6 @@
 #define IFT_DUMMY	0x38
 #define IFT_PVC		0x39
 #define IFT_FAITH	0x3a
+#define IFT_STF		0x3b
 
 #endif
