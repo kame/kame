@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.19 2001/07/05 10:46:37 suz Exp $	*/
+/*	$KAME: main.c,v 1.20 2001/07/05 10:49:15 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -326,7 +326,7 @@ main(argc, argv)
 		{
 		    argv++;
 		    argc--;
-		    strncpy(configfilename, *argv, 256);
+		    strncpy(configfilename, *argv, sizeof(configfilename));
 		}
 		else
 		    goto usage;
