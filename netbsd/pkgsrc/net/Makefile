@@ -13,6 +13,7 @@
     SUBDIR += mtr
     SUBDIR += ncftp3
     SUBDIR += newbie
+    SUBDIR += pchar
     SUBDIR += rsync
     SUBDIR += socks64
     SUBDIR += tcptrace
