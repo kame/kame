@@ -267,7 +267,7 @@ extern struct sockaddr_in *in_selectsrc __P((struct sockaddr_in *,
 
 /* INET6 stuff */
 int	in6_pcbnotify __P((struct inpcbtable *, struct sockaddr *,
-			   u_int, struct in6_addr *, u_int, int, void *,
+			   u_int, struct sockaddr *, u_int, int, void *,
 			   void (*)(struct inpcb *, int)));
 #if 1 /*def NEW_STRUCT_ROUTE*/
 struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
