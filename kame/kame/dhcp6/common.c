@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.77 2003/01/27 13:21:52 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.78 2003/02/04 02:47:15 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1641,7 +1641,7 @@ dhcp6_set_timeoparam(ev)
 		ev->max_retrans_cnt = REL_MAX_RC;
 		break;
 	default:
-		dprintf(LOG_INFO, "%s" "unexpected event state %d on %s",
+		dprintf(LOG_ERR, "%s" "unexpected event state %d on %s",
 		    FNAME, ev->state, ev->ifp->ifname);
 		exit(1);
 	}
