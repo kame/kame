@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.25 2001/01/18 05:49:24 itojun Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.26 2001/01/18 05:51:24 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -295,8 +295,9 @@ ne0:\\
 	:rltime#0:
 .Ed
 .Pp
-The following example manually configures prefix to be advertised from
-.Li ef0 .
+The following example manually configures prefixes advertised from
+.Li ef0
+interface.
 The configuration must be used with
 .Fl s
 option to
