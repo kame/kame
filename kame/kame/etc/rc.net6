@@ -35,11 +35,19 @@ mroute6d=/usr/local/v6/sbin/pim6dd
 rtsol=/usr/local/v6/sbin/rtsol
 rtadvd=/usr/local/v6/sbin/rtadvd
 gifconfig=/usr/local/v6/sbin/gifconfig
+route=/usr/local/v6/sbin/route
 if [ -x /usr/local/v6/sbin/sysctl ]; then
 	sysctl=/usr/local/v6/sbin/sysctl
 else
 	sysctl=sysctl
 fi
+
+# just to make sure
+$ifconfig lo0 up
+
+# disallow "internal" addresses to appear on the wire
+$route add -inet6 ::ffff:0.0.0.0 -prefixlen 96 ::1 -reject
+$route add -inet6 ::0.0.0.0 -prefixlen 96 ::1 -reject
 
 if [ X"${ip6router}" = X"YES" ]; then
 	# act as a router
@@ -105,7 +113,7 @@ if [ X"${ip6router}" = X"YES" ]; then
 
 	# mroute6d
 	if [ X"${ip6mrouter}" = X"YES" -a -x $mroute6d ]; then
-	    $mroute6d $mroute6dflags
+		$mroute6d $mroute6dflags
 	fi
 else
 	# act as endhost - automatically configured
