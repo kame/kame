@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.136 2001/01/22 11:59:54 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.137 2001/01/22 12:03:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1645,9 +1645,7 @@ in6_ifinit(ifp, ia, sin6, newhost, newprefix)
 	}
 	splx(s);
 
-	/* xxx
-	 * in(6)_socktrim...why omitted?
-	 */
+	/* we could do in(6)_socktrim here, but just omit it at this moment. */
 
 #if 1
 	/*
