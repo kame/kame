@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1884 2001/09/21 05:24:56 sakane Exp $
+$KAME: CHANGELOG,v 1.1885 2001/09/21 11:12:46 jinmei Exp $
 
 <200109>
+2001-09-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/(various files): fixed integer overflow for
+	valid and preferred lifetimes;
+	- introduced new members in nd_prefix{} and in6_ifaddr{} to record
+	  the timestamp of the latest update
+	- check expiration based on the difference between the current
+	  time and the timestamp, not on the explicit expiration times
+
 Fri Sep 21 14:19:02 JST 2001 sakane@kame.net
 	* kame/sys/netinet6/ipsec.c:
 	When the value of the upper layer of the security policy index (spidx)
