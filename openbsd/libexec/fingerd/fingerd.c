@@ -133,9 +133,10 @@ main(argc, argv)
 			exit(1);
 		}
 		sa = (struct sockaddr *)&ss;
-		if (getnameinfo(sa, sa->sa_len,
-				hostbuf, sizeof(hostbuf), NULL, 0, 0) != 0)
+		if (getnameinfo(sa, sa->sa_len, hostbuf, sizeof(hostbuf),
+		    NULL, 0, 0) != 0) {
 			strncpy(hostbuf, "?", sizeof(hostbuf));
+		}
 		hname = hostbuf;
 	}
 
