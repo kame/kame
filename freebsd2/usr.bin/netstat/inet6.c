@@ -617,7 +617,7 @@ ip6_stats(off, name)
 	printf("\t\t%lu two or more ext mbuf\n", ip6stat.ip6s_mext2m);	
 	p(ip6s_exthdrtoolong, "\t%lu packet%s whose headers are not continuous\n");
 	p(ip6s_nogif, "\t%lu tunneling packet%s that can't find gif\n");
-	p(ip6s_toomanyhdr, "\t%lu packet%s discarded due to too may headers\n");
+	p(ip6s_toomanyhdr, "\t%lu packet%s discarded due to too many headers\n");
 #if 0
 	p(ip6s_pulldown, "\t%lu call%s to m_pulldown\n");
 	p(ip6s_pulldown_alloc, "\t%lu mbuf allocation%s in m_pulldown\n");
