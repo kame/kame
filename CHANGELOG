@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2521 2003/12/18 03:32:35 keiichi Exp $
+$KAME: CHANGELOG,v 1.2522 2003/12/20 08:47:53 jinmei Exp $
 
 <200312>
+2003-12-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (nd6_setdefaultiface): allowed the
+	case of ifindex is 0 for 'ndp -I delete'.
+
 Thu Dec 18 12:30:16 JST 2003	keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6_hacore.c
 	- reject an incorrect binding update which doesn't have any one of
