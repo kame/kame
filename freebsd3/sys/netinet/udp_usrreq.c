@@ -211,6 +211,10 @@ udp_input(m, off, proto)
 	}
 	uh = (struct udphdr *)((caddr_t)ip + iphlen);
 
+	/* destination port of 0 is illegal, based on RFC768. */
+	if (uh->uh_dport == 0)
+		goto bad;
+
 	/*
 	 * Make mbuf data length reflect UDP length.
 	 * If not enough data to reflect UDP length, drop.
