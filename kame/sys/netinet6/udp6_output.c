@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.39 2001/09/05 02:52:43 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.40 2001/09/10 08:14:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -183,7 +183,7 @@ udp6_output(in6p, m, addr6, control)
 	struct udpiphdr *ui;
 #endif
 #endif
-	int flags;
+	int flags = 0;
 	struct sockaddr_in6 tmp;
 
 	priv = 0;
@@ -417,7 +417,6 @@ udp6_output(in6p, m, addr6, control)
 			udp6->uh_sum = 0xffff;
 		}
 
-		flags = 0;
 		if (in6p->in6p_flags & IN6P_MINMTU)
 			flags |= IPV6_MINMTU;
 
@@ -450,12 +449,45 @@ udp6_output(in6p, m, addr6, control)
 #endif
 		ui->ui_pr = IPPROTO_UDP;
 		ui->ui_len = htons(plen);
-		bcopy(&laddr->s6_addr[12], &ui->ui_src, sizeof(ui->ui_src));
 		bcopy(&faddr->s6_addr[12], &ui->ui_dst, sizeof(ui->ui_dst));
 		ui->ui_ulen = ui->ui_len;
 
-		udp6->uh_sum = 0;
-		if ((udp6->uh_sum = in_cksum(m, hlen + plen)) == 0)
+#ifdef  __NetBSD__
+		bcopy(&laddr->s6_addr[12], &ui->ui_src, sizeof(ui->ui_src));
+		udp6->uh_sum = in_cksum(m, hlen + plen)) == 0;
+#elif (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+		flags =
+		    in6p->inp_socket->so_options & (SO_DONTROUTE | SO_BROADCAST);
+
+		if (in6p->inp_flags & INP_ONESBCAST) {
+			struct inhash *ih;
+
+			/*
+			 * If configured for an all-ones broadcast, determine
+			 * if this packet is destined for a subnet broadcast
+			 * address.
+			 */
+			ih = inh_lookup_bcast(ui->ui_dst);
+			if (ih != NULL &&
+			    (ih->inh_flags & (INH_BCAST|INH_LBCAST)) ==
+			    INH_BCAST)
+				flags |= IP_SENDONES;
+		}
+		if (flags & IP_SENDONES) {
+			/* See the comment in udp_output().  */
+			ui->ui_dst.s_addr = INADDR_BROADCAST;
+			udp6->uh_sum = in_cksum(m, ulen);
+			bcopy(&faddr->s6_addr[12], &ui->ui_dst,
+			    sizeof(ui->ui_dst));
+		} else {
+			bcopy(&faddr->s6_addr[12], &ui->ui_dst,
+			    sizeof(ui->ui_dst));
+			udp6->uh_sum = in_cksum(m, ulen);
+		}
+#else
+#error OS not supported
+#endif
+		if (udp6->uh_sum == 0)
 			udp6->uh_sum = 0xffff;
 
 		ip->ip_len = hlen + plen;
@@ -472,7 +504,7 @@ udp6_output(in6p, m, addr6, control)
 		error = ip_output(m, NULL, &in6p->in6p_route, 0 /* XXX */);
 #elif defined(__bsdi__) && _BSDI_VERSION >= 199802
 		error = ip_output(m, NULL, (struct route *)&in6p->in6p_route,
-				  0, NULL);
+				  flags, NULL);
 #else
 #error OS not supported
 #endif /* INET && (freebsd || bsdi4) */
