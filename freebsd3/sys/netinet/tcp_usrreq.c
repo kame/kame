@@ -55,13 +55,15 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
 #include <netinet/in_pcb.h>
-#include <netinet6/in6_pcb.h>
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
+#ifdef INET6
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/in6_pcb.h>
+#include <netinet6/ip6_var.h>
+#endif
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
 #include <netinet/tcp_seq.h>

@@ -83,9 +83,11 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#include <netinet/ip6.h>
 #include <netinet/ip_var.h>
+#ifdef INET6
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#endif
 #include <netinet/in_pcb.h>
 #include <netinet/tcp.h>
 #define	TCPOUTFLAGS
