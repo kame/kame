@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.143 2001/01/22 16:07:23 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.144 2001/01/22 17:07:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -349,8 +349,8 @@ in6_ifremloop(struct ifaddr *ifa)
 			      , 0
 #endif /* __FreeBSD__ */
 			);
-		if (rt != NULL && ((rt->rt_flags & RTF_HOST) != 0 ||
-		    (rt->rt_ifp->if_flags & IFF_LOOPBACK) != 0)) {
+		if (rt != NULL && (rt->rt_flags & RTF_HOST) != 0 &&
+		    (rt->rt_ifp->if_flags & IFF_LOOPBACK) != 0) {
 			rt->rt_refcnt--;
 			in6_ifloop_request(RTM_DELETE, ifa);
 		}
