@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.302 2003/09/07 05:25:20 itojun Exp $	*/
+/*	$KAME: key.c,v 1.303 2003/09/07 07:56:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -7570,6 +7570,7 @@ key_init()
 #endif
 	LIST_INIT(&spacqtree);
 
+	TAILQ_INIT(&satailq);
 	TAILQ_INIT(&sptailq);
 
 	/* system default */
