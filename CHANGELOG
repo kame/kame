@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2633 2004/07/05 04:00:25 jinmei Exp $
+$KAME: CHANGELOG,v 1.2634 2004/07/05 08:09:41 jinmei Exp $
 
 <200407>
+2004-07-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (prelist_update): ignored manually
+	configured addresses to decide whether to autoconfigure a new
+	address from an RA. (This is a clarification in rfc2462bis-02.)
+
 2004-07-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/mld6.c: use as high clock granularity as
 	possible (i.e., per 10 msec) for protocol timers.
