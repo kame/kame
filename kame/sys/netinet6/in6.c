@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.299 2002/09/06 05:43:15 suz Exp $	*/
+/*	$KAME: in6.c,v 1.300 2002/09/06 05:48:41 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3045,64 +3045,64 @@ in6_addmulti(maddr6, ifp, errorp)
 	 * group.
 	 */
 #ifdef MLDV2
-	    for (rti = Head6; rti != 0; rti = rti->rt6i_next) {
+	for (rti = Head6; rti != 0; rti = rti->rt6i_next) {
 		if (rti->rt6i_ifp == in6m->in6m_ifp) {
 		    in6m->in6m_rti = rti;
 		    break;
 		}
-	    }
-	    if (rti == NULL) {
+	}
+	if (rti == NULL) {
 		if ((rti = rt6i_init(in6m->in6m_ifp)) == NULL) {
-		    LIST_REMOVE(in6m, in6m_entry);
-		    free(in6m, M_IPMADDR);
-		    *errorp = ENOBUFS;
-		    splx(s);
-		    return NULL;
-	    	} else
-		    in6m->in6m_rti = rti;
-	    }
+			 LIST_REMOVE(in6m, in6m_entry);
+			 free(in6m, M_IPMADDR);
+			 *errorp = ENOBUFS;
+			 splx(s);
+			 return NULL;
+	    	}
+		in6m->in6m_rti = rti;
+	}
 
-	    in6m->in6m_source = NULL;
-	    if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
+	in6m->in6m_source = NULL;
+	if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
 		splx(s);
 		return in6m;
-	    }
+	}
 
-	    if ((*errorp = in6_addmultisrc(in6m, numsrc, src, mode, init,
-					&newhead, &newmode, &newnumsrc)) != 0) {
+	if ((*errorp = in6_addmultisrc(in6m, numsrc, src, mode, init,
+				       &newhead, &newmode, &newnumsrc)) != 0) {
 		in6_free_all_msf_source_list(in6m);
 		LIST_REMOVE(in6m, in6m_entry);
 		free(in6m, M_IPMADDR);
 		splx(s);
 		return NULL;
-	    }
-	    /* Only newhead was merged in a former function. */
-	    curmode = in6m->in6m_source->i6ms_mode;
-	    in6m->in6m_source->i6ms_mode = newmode;
-	    in6m->in6m_source->i6ms_cur->numsrc = newnumsrc;
+	}
+	/* Only newhead was merged in a former function. */
+	curmode = in6m->in6m_source->i6ms_mode;
+	in6m->in6m_source->i6ms_mode = newmode;
+	in6m->in6m_source->i6ms_cur->numsrc = newnumsrc;
 
-	    /*
-	     * Let MLD know that we have joined a new IPv6 multicast group
-	     * with source list if upstream router is MLDv2 capable.
-	     * If the router doesn't speak MLDv2, then send Report message
-	     * with no source address since it is a first join request.
-	     */
-	    if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
+	/*
+	 * Let MLD know that we have joined a new IPv6 multicast group
+	 * with source list if upstream router is MLDv2 capable.
+	 * If the router doesn't speak MLDv2, then send Report message
+	 * with no source address since it is a first join request.
+	 */
+	if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
 		if (curmode != newmode) {
-		    if (newmode == MCAST_INCLUDE)
-			type = CHANGE_TO_INCLUDE_MODE; /* never happen? */
-		    else
-			type = CHANGE_TO_EXCLUDE_MODE;
+			if (newmode == MCAST_INCLUDE)
+				type = CHANGE_TO_INCLUDE_MODE; /* never happen? */
+			else 
+				type = CHANGE_TO_EXCLUDE_MODE;
 		}
 		mld_send_state_change_report
 				(&m, &buflen, in6m, type, timer_init);
-	    } else {
+	} else {
 		/*
 		 * If MSF's pending records exist, they must be deleted.
 		 */
 		in6_clear_all_pending_report(in6m);
-	    }
-	    *errorp = 0;
+	}
+	*errorp = 0;
 #else	
 	mld6_start_listening(in6m);
 #endif
