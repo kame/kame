@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.59 2001/07/25 02:38:25 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.60 2001/07/25 02:55:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -361,7 +361,8 @@ int in6_gif_input(mp, offp, proto)
 
 	gifp = (struct ifnet *)encap_getarg(m);
 
-	if (gifp == NULL || (gifp->if_flags & IFF_UP) == 0) {
+	if (gifp == NULL || (gifp->if_flags & IFF_UP) == 0 ||
+	    !gif_validate6(ip6, (struct gif_softc *)gifp, m->m_pkthdr.rcvif)) {
 		m_freem(m);
 		ip6stat.ip6s_nogif++;
 		return IPPROTO_DONE;
@@ -513,9 +514,18 @@ int
 in6_gif_attach(sc)
 	struct gif_softc *sc;
 {
+	struct sockaddr_in6 mask6;
 
-	sc->encap_cookie6 = encap_attach_func(AF_INET6, -1,
-	    gif_encapcheck, (struct protosw *)&in6_gif_protosw, sc);
+	bzero(&mask6, sizeof(mask6));
+	mask6.sin6_len = sizeof(struct sockaddr_in6);
+	mask6.sin6_addr.s6_addr32[0] = mask6.sin6_addr.s6_addr32[1] = 
+	    mask6.sin6_addr.s6_addr32[2] = mask6.sin6_addr.s6_addr32[3] = ~0;
+
+	if (!sc->gif_psrc || !sc->gif_pdst)
+		return EINVAL;
+	sc->encap_cookie6 = encap_attach(AF_INET6, -1, sc->gif_psrc,
+	    (struct sockaddr *)&mask6, sc->gif_pdst, (struct sockaddr *)&mask6,
+	    (struct protosw *)&in6_gif_protosw, sc);
 	if (sc->encap_cookie6 == NULL)
 		return EEXIST;
 	return 0;

@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.63 2001/07/25 02:38:24 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.64 2001/07/25 02:55:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -366,7 +366,8 @@ in_gif_input(m, va_alist)
 
 	gifp = (struct ifnet *)encap_getarg(m);
 
-	if (gifp == NULL || (gifp->if_flags & IFF_UP) == 0) {
+	if (gifp == NULL || (gifp->if_flags & IFF_UP) == 0 ||
+	    !gif_validate4(ip, (struct gif_softc *)gifp, m->m_pkthdr.rcvif)) {
 		m_freem(m);
 		ipstat.ips_nogif++;
 		return;
@@ -544,9 +545,17 @@ int
 in_gif_attach(sc)
 	struct gif_softc *sc;
 {
+	struct sockaddr_in mask4;
 
-	sc->encap_cookie4 = encap_attach_func(AF_INET, -1,
-	    gif_encapcheck, &in_gif_protosw, sc);
+	bzero(&mask4, sizeof(mask4));
+	mask4.sin_len = sizeof(struct sockaddr_in);
+	mask4.sin_addr.s_addr = ~0;
+
+	if (!sc->gif_psrc || !sc->gif_pdst)
+		return EINVAL;
+	sc->encap_cookie4 = encap_attach(AF_INET, -1, sc->gif_psrc,
+	    (struct sockaddr *)&mask4, sc->gif_pdst, (struct sockaddr *)&mask4,
+	    (struct protosw *)&in_gif_protosw, sc);
 	if (sc->encap_cookie4 == NULL)
 		return EEXIST;
 	return 0;
