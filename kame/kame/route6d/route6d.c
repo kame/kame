@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.101 2003/08/22 08:23:15 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.102 2003/09/19 06:07:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.101 2003/08/22 08:23:15 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.102 2003/09/19 06:07:26 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -3541,7 +3541,7 @@ setindex2ifc(idx, ifcp)
 	int idx;
 	struct ifc *ifcp;
 {
-	int n;
+	int n, nsize;
 	struct ifc **p;
 
 	if (!index2ifc) {
@@ -3555,17 +3555,18 @@ setindex2ifc(idx, ifcp)
 		memset(index2ifc, 0, sizeof(*index2ifc) * nindex2ifc);
 	}
 	n = nindex2ifc;
-	while (nindex2ifc <= idx)
-		nindex2ifc *= 2;
-	if (n != nindex2ifc) {
+	for (nsize = nindex2ifc; nsize <= idx; nsize *= 2)
+		;
+	if (n != nsize) {
 		p = (struct ifc **)realloc(index2ifc,
-		    sizeof(*index2ifc) * nindex2ifc);
+		    sizeof(*index2ifc) * nsize);
 		if (p == NULL) {
 			fatal("realloc");
 			/*NOTREACHED*/
 		}
 		memset(p + n, 0, sizeof(*index2ifc) * (nindex2ifc - n));
 		index2ifc = p;
+		nindex2ifc = nsize;
 	}
 	index2ifc[idx] = ifcp;
 }
