@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/11/21 17:59:02 $
+			$Date: 1999/11/22 08:53:54 $
 
 1. IPv6
 
@@ -805,8 +805,11 @@ The following table lists the network drivers we have tried so far.
 	ne pci/i386	ok	ok		yes
 	ep pcmcia/i386	ok	ok		-
 	le sbus/sparc	ok	ok		yes
+	bah zbus/amiga	NG(*)
 	(ATM)
 	en pci/i386	ok	ok		-
+
+(*) This may need some fix, but I'm not sure what arcnet interfaces assume...
 
 2.4 FreeBSD 3.x-RELEASE
 
