@@ -564,7 +564,7 @@ age_routes()
 			    < kernel_cache_ptr->sg_count.bytecnt))
 		    {
 			if (mrtentry_rp->incoming == reg_vif_num)
-
+			{
 #ifdef KERNEL_MFC_WC_G
 // TODO (one day :))
 			    if (kernel_cache_ptr->source == IN6ADDR_ANY_N)
@@ -575,9 +575,10 @@ age_routes()
 				continue;
 			    }
 #endif				/* KERNEL_MFC_WC_G */
-			pim6dstat.pim6_trans_spt_rp++;
-			switch_shortest_path(&kernel_cache_ptr->source,
-					     &kernel_cache_ptr->group);
+			    pim6dstat.pim6_trans_spt_rp++;
+			    switch_shortest_path(&kernel_cache_ptr->source,
+						 &kernel_cache_ptr->group);
+			}		    
 		    }
 		}
 	    }
@@ -754,6 +755,7 @@ age_routes()
 				    < kernel_cache_ptr->sg_count.bytecnt))
 			    {
 				if (mrtentry_grp->incoming == reg_vif_num)
+				{
 #ifdef KERNEL_MFC_WC_G
 // TODO
 				    if (kernel_cache_ptr->source
@@ -765,9 +767,10 @@ age_routes()
 					continue;
 				    }
 #endif				/* KERNEL_MFC_WC_G */
-				pim6dstat.pim6_trans_spt_rp++;
-				switch_shortest_path(&kernel_cache_ptr->source,
-						   &kernel_cache_ptr->group);
+				    pim6dstat.pim6_trans_spt_rp++;
+				    switch_shortest_path(&kernel_cache_ptr->source,
+							 &kernel_cache_ptr->group);
+				}
 			    }
 			}
 		    }
