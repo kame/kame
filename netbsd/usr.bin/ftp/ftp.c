@@ -165,6 +165,19 @@ hookup(host, port)
 		 * IPv4 mapped address complicates too many things in FTP
 		 * protocol handling, as FTP protocol is defined differently
 		 * between IPv4 and IPv6.
+		 *
+		 * This may not be the best way to handle this situation,
+		 * since the semantics of IPv4 mapped address is defined in
+		 * the kernel.  There are configurations where we should use
+		 * IPv4 mapped address as native IPv6 address, not as
+		 * "an IPv6 address that embeds IPv4 address" (namely, SIIT).
+		 *
+		 * More complete solution would be to have an additional
+		 * getsockopt to grab "real" peername/sockname.  "real"
+		 * peername/sockname will be AF_INET if IPv4 mapped address
+		 * is used to embed IPv4 address, and will be AF_INET6 if
+		 * we use it as native.  What a mess!
+		 * IPv4 mapped address must die.
 		 */
 		ai_unmapped(res);
 #if 0	/*old behavior*/
