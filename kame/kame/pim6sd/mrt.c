@@ -1,4 +1,4 @@
-/*	$KAME: mrt.c,v 1.18 2003/09/02 09:48:45 suz Exp $	*/
+/*	$KAME: mrt.c,v 1.19 2003/09/04 08:02:06 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -1241,7 +1241,7 @@ delete_single_kernel_cache(mrtentry_ptr, kernel_cache_ptr)
     IF_DEBUG(DEBUG_MFC)
 	log_msg(LOG_DEBUG, 0, "Deleting MFC entry for source %s and group %s",
 	    sa6_fmt(&kernel_cache_ptr->source),
-	    sa6_fmt(&kernel_cache_ptr->source));
+	    sa6_fmt(&kernel_cache_ptr->group));
     k_del_mfc(mld6_socket, &kernel_cache_ptr->source,
 	      &kernel_cache_ptr->group);
     free((char *) kernel_cache_ptr);
