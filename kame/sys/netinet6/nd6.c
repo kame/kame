@@ -112,6 +112,7 @@ int nd6_recalc_reachtm_interval = ND6_RECALC_REACHTM_INTERVAL;
 #if 0
 extern	int ip6_forwarding;
 #endif
+static struct sockaddr_in6 all1_sa;
 
 static void nd6_slowtimo __P((void *));
 
@@ -119,11 +120,18 @@ void
 nd6_init()
 {
 	static int nd6_init_done = 0;
+	int i;
 
 	if (nd6_init_done) {
 		log(LOG_NOTICE, "nd6_init called more than once(ignored)\n");
 		return;
 	}
+
+	all1_sa.sin6_family = AF_INET6;
+	all1_sa.sin6_len = sizeof(struct sockaddr_in6);
+	for (i = 0; i < sizeof(all1_sa.sin6_addr); i++)
+		all1_sa.sin6_addr.s6_addr[i] = 0xff;
+
 	nd6_init_done = 1;
 
 	/* start timer */
@@ -536,10 +544,6 @@ nd6_timer(ignored_arg)
 	}
 	splx(s);
 }
-
-static struct sockaddr_in6 all1_sa = {
-	sizeof(struct sockaddr_in6), AF_INET6, 0, 0,
-	{{{0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff}}}, 0};
 
 struct rtentry *
 nd6_lookup(addr6, create, ifp)

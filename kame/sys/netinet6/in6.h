@@ -114,18 +114,18 @@
  */
 struct in6_addr {
 	union {
-		u_int32_t  __u6_addr32[4];
-		u_int16_t  __u6_addr16[8];
 		u_int8_t   __u6_addr8[16];
+		u_int16_t  __u6_addr16[8];
+		u_int32_t  __u6_addr32[4];
 	} __u6_addr;			/* 128-bit IP6 address */
 };
 
-#if 1	/*XXX nonstandard*/
-#define s6_addr32 __u6_addr.__u6_addr32
-#define s6_addr16 __u6_addr.__u6_addr16
-#define s6_addr8  __u6_addr.__u6_addr8
-#endif
 #define s6_addr   __u6_addr.__u6_addr8
+#ifdef _KERNEL	/*XXX nonstandard*/
+#define s6_addr8  __u6_addr.__u6_addr8
+#define s6_addr16 __u6_addr.__u6_addr16
+#define s6_addr32 __u6_addr.__u6_addr32
+#endif
 
 #define INET6_ADDRSTRLEN	46
 
@@ -147,12 +147,16 @@ struct sockaddr_in6 {
 /*
  * Local definition for masks
  */
-#if 1	/*XXX nonstandard*/
-#define IN6MASK0	{{{ 0, 0, 0, 0 }}}
-#define IN6MASK32	{{{ 0xffffffff, 0, 0, 0 }}}
-#define IN6MASK64	{{{ 0xffffffff, 0xffffffff, 0, 0 }}}
-#define IN6MASK96	{{{ 0xffffffff, 0xffffffff, 0xffffffff, 0 }}}
-#define IN6MASK128	{{{ 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff }}}
+#ifdef _KERNEL	/*XXX nonstandard*/
+#define IN6MASK0	{{{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }}}
+#define IN6MASK32	{{{ 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, \
+			    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }}}
+#define IN6MASK64	{{{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, \
+			    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }}}
+#define IN6MASK96	{{{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, \
+			    0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00 }}}
+#define IN6MASK128	{{{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, \
+			    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }}}
 #endif
 
 #ifdef _KERNEL
@@ -166,7 +170,7 @@ extern const struct in6_addr in6mask128;
 /*
  * Macros started with IPV6_ADDR is KAME local
  */
-#if 1	/*XXX nonstandard*/
+#ifdef _KERNEL	/*XXX nonstandard*/
 #if BYTE_ORDER == BIG_ENDIAN
 #define IPV6_ADDR_INT32_ONE	1
 #define IPV6_ADDR_INT32_TWO	2
@@ -191,14 +195,21 @@ extern const struct in6_addr in6mask128;
 /*
  * Definition of some useful macros to handle IP6 addresses
  */
-#define IN6ADDR_ANY_INIT		{{{ 0, 0, 0, 0 }}}
-#define IN6ADDR_LOOPBACK_INIT		{{{ 0, 0, 0, IPV6_ADDR_INT32_ONE }}}
-#define IN6ADDR_NODELOCAL_ALLNODES_INIT	\
-	{{{ IPV6_ADDR_INT32_MNL, 0, 0, IPV6_ADDR_INT32_ONE }}}
-#define IN6ADDR_LINKLOCAL_ALLNODES_INIT	\
-	{{{ IPV6_ADDR_INT32_MLL, 0, 0, IPV6_ADDR_INT32_ONE }}}
+#define IN6ADDR_ANY_INIT \
+	{{{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }}}
+#define IN6ADDR_LOOPBACK_INIT \
+	{{{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 }}}
+#define IN6ADDR_NODELOCAL_ALLNODES_INIT \
+	{{{ 0xff, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 }}}
+#define IN6ADDR_LINKLOCAL_ALLNODES_INIT \
+	{{{ 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 }}}
 #define IN6ADDR_LINKLOCAL_ALLROUTERS_INIT \
-	{{{ IPV6_ADDR_INT32_MLL, 0, 0, IPV6_ADDR_INT32_TWO }}}
+	{{{ 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02 }}}
 
 extern const struct in6_addr in6addr_any;
 extern const struct in6_addr in6addr_loopback;
@@ -252,12 +263,18 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
  * KAME Scope Values
  */
 
-#if 1	/*XXX nonstandard*/
+#ifdef _KERNEL	/*XXX nonstandard*/
 #define IPV6_ADDR_SCOPE_NODELOCAL	0x01
 #define IPV6_ADDR_SCOPE_LINKLOCAL	0x02
 #define IPV6_ADDR_SCOPE_SITELOCAL	0x05
 #define IPV6_ADDR_SCOPE_ORGLOCAL	0x08	/* just used in this file */
 #define IPV6_ADDR_SCOPE_GLOBAL		0x0e
+#else
+#define __IPV6_ADDR_SCOPE_NODELOCAL	0x01
+#define __IPV6_ADDR_SCOPE_LINKLOCAL	0x02
+#define __IPV6_ADDR_SCOPE_SITELOCAL	0x05
+#define __IPV6_ADDR_SCOPE_ORGLOCAL	0x08	/* just used in this file */
+#define __IPV6_ADDR_SCOPE_GLOBAL	0x0e
 #endif
 
 /*
@@ -274,13 +291,16 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
  */
 #define IN6_IS_ADDR_MULTICAST(a)	((a)->s6_addr[0] == 0xff)
 
-#if 1	/*XXX nonstandard*/
+#ifdef _KERNEL	/*XXX nonstandard*/
 #define IPV6_ADDR_MC_SCOPE(a)		((a)->s6_addr[1] & 0x0f)
+#else
+#define __IPV6_ADDR_MC_SCOPE(a)		((a)->s6_addr[1] & 0x0f)
 #endif
 
 /*
  * Multicast Scope
  */
+#ifdef _KERNEL	/*refers nonstandard items */
 #define IN6_IS_ADDR_MC_NODELOCAL(a)	\
 	(IN6_IS_ADDR_MULTICAST(a) &&	\
 	 (IPV6_ADDR_MC_SCOPE(a) == IPV6_ADDR_SCOPE_NODELOCAL))
@@ -296,6 +316,23 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 #define IN6_IS_ADDR_MC_GLOBAL(a)	\
 	(IN6_IS_ADDR_MULTICAST(a) &&	\
 	 (IPV6_ADDR_MC_SCOPE(a) == IPV6_ADDR_SCOPE_GLOBAL))
+#else
+#define IN6_IS_ADDR_MC_NODELOCAL(a)	\
+	(IN6_IS_ADDR_MULTICAST(a) &&	\
+	 (__IPV6_ADDR_MC_SCOPE(a) == __IPV6_ADDR_SCOPE_NODELOCAL))
+#define IN6_IS_ADDR_MC_LINKLOCAL(a)	\
+	(IN6_IS_ADDR_MULTICAST(a) &&	\
+	 (__IPV6_ADDR_MC_SCOPE(a) == __IPV6_ADDR_SCOPE_LINKLOCAL))
+#define IN6_IS_ADDR_MC_SITELOCAL(a)	\
+	(IN6_IS_ADDR_MULTICAST(a) && 	\
+	 (__IPV6_ADDR_MC_SCOPE(a) == __IPV6_ADDR_SCOPE_SITELOCAL))
+#define IN6_IS_ADDR_MC_ORGLOCAL(a)	\
+	(IN6_IS_ADDR_MULTICAST(a) &&	\
+	 (__IPV6_ADDR_MC_SCOPE(a) == __IPV6_ADDR_SCOPE_ORGLOCAL))
+#define IN6_IS_ADDR_MC_GLOBAL(a)	\
+	(IN6_IS_ADDR_MULTICAST(a) &&	\
+	 (__IPV6_ADDR_MC_SCOPE(a) == __IPV6_ADDR_SCOPE_GLOBAL))
+#endif
 
 /*
  * Wildcard Socket
