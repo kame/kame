@@ -116,6 +116,65 @@ m_pulldown(m, off, len, offp)
 	ip6stat.ip6s_pulldown++;
 #endif
 
+#if defined(PULLDOWN_STAT) && defined(INET6)
+	/* statistics for m_pullup */
+	if (off + len > MHLEN)
+		ip6stat.ip6s_pullup_fail++;
+	else {
+		if ((m->m_flags & M_EXT) != 0) {
+			ip6stat.ip6s_pullup_alloc++;
+			ip6stat.ip6s_pullup_copy++;
+		} else {
+			if (m->m_len >= off + len)
+				;
+			if (m->m_len + M_TRAILINGSPACE(m) >= off + len)
+				ip6stat.ip6s_pullup_copy++;
+			else {
+				ip6stat.ip6s_pullup_alloc++;
+				ip6stat.ip6s_pullup_copy++;
+			}
+		}
+	}
+
+	/* statistics for m_pullup2 */
+	if (off + len > MCLBYTES)
+		ip6stat.ip6s_pullup2_fail++;
+	else {
+		if ((m->m_flags & M_EXT) == 0)
+			sharedcluster = 0;
+		else {
+#ifdef __bsdi__
+			if (m->m_ext.ext_func)
+#else
+			if (m->m_ext.ext_free)
+#endif
+				sharedcluster = 1;
+#ifdef __NetBSD__
+			else if (MCLISREFERENCED(m))
+#else
+			else if (mclrefcnt[mtocl(m->m_ext.ext_buf)] > 1)
+#endif
+				sharedcluster = 1;
+			else
+				sharedcluster = 0;
+		}
+
+		if ((m->m_flags & M_EXT) == 0 || sharedcluster) {
+			ip6stat.ip6s_pullup2_alloc++;
+			ip6stat.ip6s_pullup2_copy++;
+		} else {
+			if (m->m_len >= off + len)
+				;
+			else if (m->m_len + M_TRAILINGSPACE(m) >= off + len)
+				ip6stat.ip6s_pullup2_copy++;
+			else {
+				ip6stat.ip6s_pullup2_alloc++;
+				ip6stat.ip6s_pullup2_copy++;
+			}
+		}
+	}
+#endif
+
 #ifdef PULLDOWN_DEBUG
     {
 	struct mbuf *t;
