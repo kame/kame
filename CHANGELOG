@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1268 2000/09/12 08:53:42 itojun Exp $
+$KAME: CHANGELOG,v 1.1269 2000/09/12 14:51:51 sakane Exp $
 
 <200009>
+Tue Sep 12 23:48:58 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	- Fixed the parameter of ipsecdoi_checkph1proposal() of initiator side.
+	  RFC 2409 says the last byte is not included the padding length.
+	- Fixed to parse the responder's proposal on initiator.  Error happened
+	  that the responder responded second proposal.
+
 Tue Sep 12 17:52:01 JST 2000  itojun@iijlab.net
 	* sys/netinet6/esp_input.c: workaround to recent IPv6 ESP problem
 	  (started early Sep with ESP core crypto engine rewrite).
