@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.22 2004/10/27 07:34:05 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.23 2004/10/27 07:57:49 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -176,10 +176,10 @@ int sctp_sysctl(int *, u_int, void *, size_t *, void *, size_t);
 #ifndef callout_init
 #define callout_init(args)
 #define callout_reset(c, ticks, func, arg) \
-{ \
-	timeout_set(c, func, arg); \
-	timeout_add(c, ticks); \
-}
+do { \
+	timeout_set((c), (func), (arg)); \
+	timeout_add((c), (ticks)); \
+} while (0)
 #define callout_stop(c) timeout_del(c)
 #define callout_pending(c) timeout_pending(c)
 #define callout_active(c) timeout_initialized(c)
