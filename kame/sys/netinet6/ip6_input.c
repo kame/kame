@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.247 2002/01/10 13:46:22 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.248 2002/01/11 06:15:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -563,14 +563,6 @@ ip6_input(m)
 	IP6_EXTHDR_CHECK(m, 0, sizeof(struct ip6_hdr), /* nothing */);
 #endif
 
-#if defined(__OpenBSD__) && NPF > 0 
-	/*
-	 * Packet filter
-	 */
-	if (pf_test6(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
-		goto bad;
-#endif
-
 	if (m->m_len < sizeof(struct ip6_hdr)) {
 		struct ifnet *inifp;
 		inifp = m->m_pkthdr.rcvif;
@@ -588,6 +580,18 @@ ip6_input(m)
 		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_hdrerr);
 		goto bad;
 	}
+
+#if defined(__OpenBSD__) && NPF > 0 
+	/*
+	 * Packet filter
+	 */
+	if (pf_test6(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
+		goto bad;
+	if (m == NULL)
+		return;
+
+	ip6 = mtod(m, struct ip6_hdr *);
+#endif
 
 #if defined(__NetBSD__) && defined(PFIL_HOOKS)
 	/*
