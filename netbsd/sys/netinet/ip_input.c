@@ -1432,7 +1432,7 @@ ip_forward(m, srcrt)
 		if (ipforward_rt.ro_rt) {
 			struct secpolicy *sp;
 			int ipsecerror;
-			int ipsechdr;
+			size_t ipsechdr;
 			struct route *ro;
 
 			sp = ipsec4_getpolicybyaddr(mcopy,
