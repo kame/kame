@@ -69,7 +69,8 @@ char   *pflag;					/* Localport flag */
 int	rflag;					/* Random ports flag */
 char   *sflag;					/* Source Address */
 int	tflag;					/* Telnet Emulation */
-int	uflag;					/* UDP - Default to TCP */
+int	uflag;					/* 1: UDP - Default to TCP */
+						/* 2: DCCP - Default to TCP */
 int	vflag;					/* Verbosity */
 int	xflag;					/* Socks proxy */
 int	zflag;					/* Port Scan Flag */
@@ -115,7 +116,7 @@ main(int argc, char *argv[])
 	endp = NULL;
 	sv = NULL;
 
-	while ((ch = getopt(argc, argv, "46Ddhi:klnp:rSs:tUuvw:X:x:z")) != -1) {
+	while ((ch = getopt(argc, argv, "46cDdhi:klnp:rSs:tUuvw:X:x:z")) != -1) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -165,6 +166,9 @@ main(int argc, char *argv[])
 			break;
 		case 'u':
 			uflag = 1;
+			break;
+		case 'c':
+			uflag = 2;
 			break;
 		case 'v':
 			vflag = 1;
@@ -228,15 +232,27 @@ main(int argc, char *argv[])
 	if (family != AF_UNIX) {
 		memset(&hints, 0, sizeof(struct addrinfo));
 		hints.ai_family = family;
-		hints.ai_socktype = uflag ? SOCK_DGRAM : SOCK_STREAM;
-		hints.ai_protocol = uflag ? IPPROTO_UDP : IPPROTO_TCP;
+		switch (uflag) {
+		case 0:
+			hints.ai_socktype = SOCK_STREAM;
+			hints.ai_protocol = IPPROTO_TCP;
+			break;
+		case 1:
+			hints.ai_socktype = SOCK_DGRAM;
+			hints.ai_protocol = IPPROTO_UDP;
+			break;
+		case 2:
+			hints.ai_socktype = SOCK_DGRAM;
+			hints.ai_protocol = IPPROTO_DCCP;
+			break;
+		}
 		if (nflag)
 			hints.ai_flags |= AI_NUMERICHOST;
 	}
 
 	if (xflag) {
 		if (uflag)
-			errx(1, "no proxy support for UDP mode");
+			errx(1, "proxy support only for TCP mode");
 
 		if (lflag)
 			errx(1, "no proxy support for listen");
@@ -356,11 +372,13 @@ main(int argc, char *argv[])
 				else {
 					sv = getservbyport(
 					    ntohs(atoi(portlist[i])),
-					    uflag ? "udp" : "tcp");
+					    uflag == 2 ? "dccp" :
+					    (uflag == 1 ? "udp" : "tcp"));
 				}
 
 				printf("Connection to %s %s port [%s/%s] succeeded!\n",
-				    host, portlist[i], uflag ? "udp" : "tcp",
+				    host, portlist[i], uflag == 2 ? "dccp" :
+				    (uflag == 1 ? "udp" : "tcp"),
 				    sv ? sv->s_name : "*");
 			}
 			if (!zflag)
@@ -474,8 +492,20 @@ remote_connect(char *host, char *port, struct addrinfo hints)
 
 			memset(&ahints, 0, sizeof(struct addrinfo));
 			ahints.ai_family = res0->ai_family;
-			ahints.ai_socktype = uflag ? SOCK_DGRAM : SOCK_STREAM;
-			ahints.ai_protocol = uflag ? IPPROTO_UDP : IPPROTO_TCP;
+			switch (uflag) {
+			case 0:
+				ahints.ai_socktype = SOCK_STREAM;
+				ahints.ai_protocol = IPPROTO_TCP;
+				break;
+			case 1:
+				ahints.ai_socktype = SOCK_DGRAM;
+				ahints.ai_protocol = IPPROTO_UDP;
+				break;
+			case 2:
+				ahints.ai_socktype = SOCK_DGRAM;
+				ahints.ai_protocol = IPPROTO_DCCP;
+				break;
+			}
 			ahints.ai_flags = AI_PASSIVE;
 			if ((error = getaddrinfo(sflag, pflag, &ahints, &ares)))
 				errx(1, "getaddrinfo: %s", gai_strerror(error));
@@ -500,7 +530,7 @@ remote_connect(char *host, char *port, struct addrinfo hints)
 			break;
 		else if (vflag)
 			warn("connect to %s port %s (%s) failed", host, port,
-			    uflag ? "udp" : "tcp");
+			    uflag == 2 ? "dccp" : (uflag == 1 ? "udp" : "tcp"));
 
 		close(s);
 		s = -1;
