@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.103 2000/12/01 11:38:08 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.104 2000/12/01 14:24:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1904,8 +1904,14 @@ get_pathmtu(mhdr)
 			    (mtuctl->ip6m_addr.sin6_scope_id &&
 			     dst.sin6_scope_id &&
 			     mtuctl->ip6m_addr.sin6_scope_id !=
-			     dst.sin6_scope_id))
+			     dst.sin6_scope_id)) {
+				if ((options & F_VERBOSE) != 0) {
+					printf("path MTU for %s is notified. "
+					       "(ignored)\n",
+					       pr_addr(&mtuctl->ip6m_addr));
+				}
 				return(0);
+			}
 
 			/*
 			 * Ignore an invalid MTU. XXX: can we just believe
