@@ -762,8 +762,9 @@ dump_rp_set(fp)
     grp_mask_t     *grp_mask;
 
     fprintf(fp, "---------------------------RP-Set----------------------------\n");
-    fprintf(fp, "Current BSR address: %s Priority: %d\n",
-	    inet6_fmt(&curr_bsr_address.sin6_addr), curr_bsr_priority);
+    fprintf(fp, "Current BSR address: %s Prio: %d Timeout: %d\n",
+	    inet6_fmt(&curr_bsr_address.sin6_addr), curr_bsr_priority,
+	    pim_bootstrap_timer);
     fprintf(fp, "%-40s %-3s Group prefix     Prio Hold Age\n",
 	    "RP-address", "IN");
 
@@ -787,9 +788,11 @@ dump_rp_set(fp)
 		 rp_grp_entry = rp_grp_entry->rp_grp_next)
 	    {
 		grp_mask = rp_grp_entry->group;
-		fprintf(fp, "%62.14s %6u        %4u\n",
-		     net6name(&grp_mask->group_addr.sin6_addr, &grp_mask->group_mask),
-			rp_grp_entry->priority, rp_grp_entry->holdtime);
+		fprintf(fp, "%59.16s %-4u %-4u %-3u\n",	/* XXX: hardcoding */
+			net6name(&grp_mask->group_addr.sin6_addr,
+				 &grp_mask->group_mask),
+			rp_grp_entry->priority,
+			rp_grp_entry->advholdtime, rp_grp_entry->holdtime);
 	    }
 	}
     }
