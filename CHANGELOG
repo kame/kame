@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.631 2000/02/28 09:28:34 jinmei Exp $
+$Id: CHANGELOG,v 1.632 2000/02/28 10:04:02 itojun Exp $
 
 <200002>
+Mon Feb 28 19:01:44 JST 2000  itojun@iijlab.net
+	* netbsd/usr.sbin/lpr/lpd: fix breakage due to unsynchronized change
+	  between rcmd.c and lpd.c (lpd should be reorganized to not use
+	  __ivaliduser_sa...).
+
 2000-02-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ping6/ping6.c (main): added a new modifier "c" for the
 	-a option, which means target's IPv4 compatible and IPv4 mapped
@@ -15,9 +20,9 @@ $Id: CHANGELOG,v 1.631 2000/02/28 09:28:34 jinmei Exp $
 
 2000-02-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/{advapitest, bgpd, pim6dd, pim6sd, rtsold, rrenumd,
-	traceroute6}: treated CMSG_SPACE() as a function, not a constant
-	macro, and avoided to put it in a definition of a static array as
-	a result.
+	traceroute6, rtadvd}: treated CMSG_SPACE() as a function, not a
+	constant macro, and avoided to put it in a definition of a static
+	array as a result.
 
 Sun Feb 27 18:27:51 JST 2000  itojun@iijlab.net
 	* libinet6/resolv/res_init.c: allow extended scoped IPv6 address format
