@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.130 2004/03/22 05:06:42 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.131 2004/05/13 14:00:10 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -225,7 +225,7 @@ client6_init()
 
 	ifidx = if_nametoindex(device);
 	if (ifidx == 0) {
-		dprintf(LOG_ERR, FNAME, "if_nametoindex(%s)");
+		dprintf(LOG_ERR, FNAME, "if_nametoindex(%s)", device);
 		exit(1);
 	}
 
