@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.68 2001/12/21 08:14:58 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.69 2002/05/30 06:18:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -144,7 +144,8 @@
  *	FreeBSD [34]
  *		time_second
  *	if you need portability, #ifdef out FreeBSD[34], or use microtime(&tv)
- *	then touch tv.tv_sec (note: microtime is an expensive operation).
+ *	then touch tv.tv_sec (note: microtime is an expensive operation, so
+ *	the use of mono_time is preferred).
  *
  * - sysctl
  *	NetBSD, OpenBSD
