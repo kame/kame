@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.223 2004/07/14 02:35:49 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.224 2004/10/27 22:26:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1811,6 +1811,7 @@ ipsec_get_reqlevel(isr, af)
 				level = ah_net_deflev;
 			else
 				level = ah_trans_deflev;
+			break;
 		case IPPROTO_IPCOMP:
 			/*
 			 * we don't really care, as IPcomp document says that
