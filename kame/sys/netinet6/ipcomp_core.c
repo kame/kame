@@ -67,27 +67,12 @@ static int deflate_decompress __P((struct mbuf *, struct mbuf *, size_t *));
 
 static int deflate_policy = Z_DEFAULT_COMPRESSION;
 
-#if 1
 struct ipcomp_algorithm ipcomp_algorithms[] = {
 	{ NULL, NULL, -1 },
 	{ NULL, NULL, -1 },
 	{ deflate_compress, deflate_decompress, 90 },
 	{ NULL, NULL, 90 },
 };
-#else
-struct ipcomp_algorithm ipcomp_algorithms_dummy[] = {
-	{ NULL, NULL, -1 },
-	{ NULL, NULL, -1 },
-	{ deflate_compress, deflate_decompress, 90 },
-	{ NULL, NULL, 90 },
-};
-struct ipcomp_algorithm ipcomp_algorithms[] = {
-	{ NULL, NULL, -1 },
-	{ NULL, NULL, -1 },
-	{ NULL, NULL, -1 },
-	{ NULL, NULL, -1 },
-};
-#endif
 
 static void *
 deflate_alloc(aux, items, siz)

@@ -73,6 +73,8 @@
 #include <netkey/keydb.h>
 #include <netkey/key_debug.h>
 
+#include <net/net_osdep.h>
+
 static int esp_output __P((struct mbuf *, u_char *, struct mbuf *,
 	struct ipsecrequest *, int));
 

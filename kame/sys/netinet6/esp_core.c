@@ -66,6 +66,8 @@
 #include <crypto/cast128/cast128.h>
 #include <crypto/rc5/rc5.h>
 
+#include <net/net_osdep.h>
+
 static int esp_null_mature __P((struct secas *));
 static int esp_null_ivlen __P((struct secas *));
 static int esp_null_decrypt __P((struct mbuf *, size_t,

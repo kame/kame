@@ -77,11 +77,9 @@
 
 #include <machine/stdarg.h>
 
-#define IPLEN_FLIPPED
+#include <net/net_osdep.h>
 
-#ifdef __NetBSD__
-#define ovbcopy	bcopy
-#endif
+#define IPLEN_FLIPPED
 
 #ifdef INET
 extern struct protosw inetsw[];
