@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.41 2003/03/28 15:16:25 jinmei Exp $	*/
+/*	$KAME: name6.c,v 1.42 2004/04/13 15:19:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -169,9 +169,13 @@ do {									\
 	memset((ab)->map_zero, 0, sizeof((ab)->map_zero));		\
 	memset((ab)->map_one, 0xff, sizeof((ab)->map_one));		\
 } while (0)
+#if defined(AI_V4MAPPED) &&  defined(AI_V4MAPPED_CFG)
 #define	MAPADDRENABLED(flags) \
 	(((flags) & AI_V4MAPPED) || \
 	 (((flags) & AI_V4MAPPED_CFG) && _mapped_addr_enabled()))
+#else
+#define	MAPADDRENABLED(flags) 0
+#endif
 
 union inx_addr {
 	struct in_addr	in_addr;
