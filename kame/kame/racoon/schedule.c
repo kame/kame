@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.c,v 1.5 2000/07/04 00:48:34 sakane Exp $ */
+/* YIPS @(#)$Id: schedule.c,v 1.6 2000/08/02 23:32:03 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -40,7 +40,7 @@
 
 #include "schedule.h"
 
-#define FIXY2039PROBLEM
+#define FIXY2038PROBLEM
 
 #ifndef TAILQ_FOREACH
 #define TAILQ_FOREACH(elm, head, field) \
@@ -49,10 +49,10 @@
 
 static struct timeval timeout;
 
-#ifdef FIXY2039PROBLEM
-#define Y2039TIME_T	0x7fffffff
+#ifdef FIXY2038PROBLEM
+#define Y2038TIME_T	0x7fffffff
 static time_t launched;		/* time when the program launched. */
-static time_t deltaY2039;
+static time_t deltaY2038;
 #endif
 
 static TAILQ_HEAD(_schedtree, sched) sctree;
@@ -159,20 +159,20 @@ sched_add(sc)
 }
 
 /* get current time.
- * if defined FIXY2039PROBLEM, base time is the time when called sched_init().
+ * if defined FIXY2038PROBLEM, base time is the time when called sched_init().
  * Otherwise, conform to time(3).
  */
 static time_t
 current_time()
 {
 	time_t n;
-#ifdef FIXY2039PROBLEM
+#ifdef FIXY2038PROBLEM
 	time_t t;
 
 	time(&n);
 	t = n - launched;
 	if (t < 0)
-		t += deltaY2039;
+		t += deltaY2038;
 
 	return t;
 #else
@@ -242,10 +242,10 @@ sched_dump(buf, len)
 void
 sched_init()
 {
-#ifdef FIXY2039PROBLEM
+#ifdef FIXY2038PROBLEM
 	time(&launched);
 
-	deltaY2039 = Y2039TIME_T - launched;
+	deltaY2038 = Y2038TIME_T - launched;
 #endif
 
 	TAILQ_INIT(&sctree);

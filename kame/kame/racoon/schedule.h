@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.h,v 1.7 2000/07/04 00:48:34 sakane Exp $ */
+/* YIPS @(#)$Id: schedule.h,v 1.8 2000/08/02 23:32:03 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -35,7 +35,7 @@
 struct sched {
 	time_t xtime;		/* event time which is as time(3). */
 				/*
-				 * if defined FIXY2039PROBLEM, this time
+				 * if defined FIXY2038PROBLEM, this time
 				 * is from the time when called sched_init().
 				 */
 	void (*func)();		/* call this function when timeout. */
