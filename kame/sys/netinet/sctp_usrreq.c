@@ -228,7 +228,7 @@ sctp_newsctpcb(family, aux)
 	case AF_INET:
 		break;
 	default:
-		return NULL;
+		return NULL;	/*EAFNOSUPPORT*/
 	}
 
 	sp = pool_get(&sctpcb_pool, PR_NOWAIT);
@@ -239,6 +239,8 @@ sctp_newsctpcb(family, aux)
 	switch (family) {
 	case AF_INET:
 		sp->sc_inpcb = (struct inpcb *)aux;
+		sp->sc_inpcb->inp_ip.ip_ttl = ip_defttl;
+		sp->sc_inpcb->inp_ppcb = (caddr_t)sp;
 		break;
 	}
 	return sp;
