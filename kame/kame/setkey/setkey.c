@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.25 2001/08/17 06:33:58 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.26 2002/05/29 10:07:50 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -275,7 +275,7 @@ promisc()
 		}
 		/* adjust base pointer for promisc mode */
 		if (base->sadb_msg_type == SADB_X_PROMISC) {
-			if (sizeof(*base) < l)
+			if ((ssize_t)sizeof(*base) < l)
 				base++;
 			else
 				base = NULL;
