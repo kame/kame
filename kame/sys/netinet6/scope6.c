@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.10 2000/07/24 13:29:31 itojun Exp $	*/
+/*	$KAME: scope6.c,v 1.11 2001/07/24 15:07:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -95,6 +95,7 @@ scope6_ifattach(ifp)
 	 * XXX: IPV6_ADDR_SCOPE_xxx macros are not standard.
 	 * Should we rather hardcode here?
 	 */
+	SID.s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL] = ifp->if_index;
 	SID.s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL] = ifp->if_index;
 #ifdef MULTI_SCOPE
 	/* by default, we don't care about scope boundary for these scopes. */
@@ -268,17 +269,21 @@ scope6_setdefault(ifp)
 	struct ifnet *ifp;	/* note that this might be NULL */
 {
 	/*
-	 * Currently, this function just set the default "link" according to
-	 * the given interface.
+	 * Currently, this function just set the default "interfaces"
+	 * and "links" according to the given interface.
 	 * We might eventually have to separate the notion of "link" from
 	 * "interface" and provide a user interface to set the default.
 	 */
 	if (ifp) {
+		scope6_ids[0].s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL] =
+			ifp->if_index;
 		scope6_ids[0].s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL] =
 			ifp->if_index;
 	}
-	else
+	else {
+		scope6_ids[0].s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL] = 0
 		scope6_ids[0].s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL] = 0;
+	}
 }
 
 int
