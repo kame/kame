@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2561 2004/03/11 02:16:01 jinmei Exp $
+$KAME: CHANGELOG,v 1.2562 2004/03/12 12:10:17 jinmei Exp $
 
 <200403>
+2004-03-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output. (ip6_output): recovered some
+	features related address scope lost for a while:
+	- use scope6_check_id() for the first hop of a routing header in
+	  case the default scope zone is specified and the 1st hop is a
+	  scoped address.
+	- recovered scope zone boundary check in ip6_output().  Without
+	  this, an application can originate a packet that breaks the
+	  scope boundary for the source or destination address.
+
 2004-03-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet/icmp6.h (MLD_LISTENER_REDUCTION): defined
 	as an alias of MLD_LISTENER_DONE to be compliant to RFC3542.
