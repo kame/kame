@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.4 2000/05/30 16:06:11 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.5 2000/05/30 18:00:48 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -75,23 +75,39 @@ must not point to CNAME record.
 Also, it must carry terminating period, like
 .Dq Li ns.ietf.org. .
 .It Fl h Ar hostname
-Specify local hostname that
+.Ar hostname
+specifies local hostname that
 .Nm
-will serve against unicast/multicast queries.
+will serve against incoming unicast/multicast queries.
 If ommitted, result from
 .Xr gethostname 3
 will be used.
 .It Fl i Ar intface
-Specify multicast interface.
+.Ar intface
+specifies outgoing interface for multicast queries.
 The flag is mandatory.
 .It Fl p Ar inport
+.Nm
+listens to UDP port
+.Ar inport
+for incoming DNS multicast/unicast queries, or unicast replies.
+By default,
+.Ar inport
+will be 53.
 .Fl p
-lets you change the listening UDP port.
-.It Fl P Ar outport
-.Fl P
-lets you change the outgoing UDP port, used for multicast queries.
-.Fl P
 is for debugging purposes only.
+.It Fl P Ar outport
+.Nm
+transmits UDP multicast queries to UDP port
+.Ar outport.
+By default,
+.Ar inport
+will be 53.
+.Fl P
+is for debugging purposes only
+.Po
+for running two daemons on a single node for debugging
+.Pc .
 .El
 .\"
 .Sh EXAMPLES
