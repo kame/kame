@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2416 2003/06/26 15:46:14 t-momose Exp $
+$KAME: CHANGELOG,v 1.2417 2003/06/27 02:17:28 itojun Exp $
 
 <200306>
+Fri Jun 27 11:16:32 JST 2003  itojun@iijlab.net
+	* kame/sys/net/pf.c: PF from openbsd-current 2002/6/26.
+	  compilable on openbsd/netbsd.  the goal would be to integrate PF
+	  into KAME IPsec policy lookup engine.
+
 2003-06-26  Tsuyoshi MOMOSE  <t-momose@netlab.nec.co.jp>
 
 	* kame/sys/netinet6/{mip6_cncore.c, dest6.c}: Several bugs related
