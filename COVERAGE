@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.118 2001/09/26 16:41:05 sumikawa Exp $
+$KAME: COVERAGE,v 1.119 2001/10/10 09:38:57 itojun Exp $
 
 
 x: supported/integrated
@@ -34,6 +34,9 @@ getaddrinfo obeys configured resolv order
 
 KAME extended resolver (IPv6 transport, EDNS0, bogus address filtering)
 		x	x	x	x	-	x	x
+
+PULLDOWN_TEST codepath
+		x	x	x	-	-	x	x
 
 CMSG passing in unix domain socket obeys CMSG_xx
 		x	-	-	-	x	-	?
