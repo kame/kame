@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.52 2001/07/24 13:04:20 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.53 2001/07/24 13:06:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -311,9 +311,6 @@ in6_gif_output(ifp, family, m, rt)
 			RTFREE(sc->gif_ro6.ro_rt);
 			sc->gif_ro6.ro_rt = NULL;
 		}
-#if 0
-		sc->gif_if.if_mtu = GIF_MTU;
-#endif
 	}
 
 	if (sc->gif_ro6.ro_rt == NULL) {
