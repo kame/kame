@@ -56,7 +56,7 @@ AC_DEFUN(RACOON_SEARCH_OPENSSL,
 AC_MSG_CHECKING(for openssl include path)
 AC_TRY_CPP([#include <openssl/opensslv.h>],
 	[AC_EGREP_CPP(yes, [#include <openssl/opensslv.h>
-#if OPENSSL_VERSION_NUMBER >= 0x0940
+#if OPENSSL_VERSION_NUMBER >= 0x00904100L
 yes
 #endif], [include_path_openssl=yes])], [
 ac_func_search_save_CPPFLAGS="$CPPFLAGS"
@@ -65,7 +65,7 @@ for i in $1; do
 	CPPFLAGS="-I$i $CPPFLAGS"
 	AC_TRY_CPP([#include <openssl/opensslv.h>],
 		[AC_EGREP_CPP(yes, [#include <openssl/opensslv.h>
-#if OPENSSL_VERSION_NUMBER >= 0x0940
+#if OPENSSL_VERSION_NUMBER >= 0x00904100L
 yes
 #endif], [ac_add_path=$i])])
 	CPPFLAGS="$ac_func_search_save_CPPFLAGS"

@@ -1449,7 +1449,7 @@ if test -z "$ac_err"; then
 #line 1450 "configure"
 #include "confdefs.h"
 #include <openssl/opensslv.h>
-#if OPENSSL_VERSION_NUMBER >= 0x0940
+#if OPENSSL_VERSION_NUMBER >= 0x00904100L
 yes
 #endif
 EOF
@@ -1484,7 +1484,7 @@ if test -z "$ac_err"; then
 #line 1485 "configure"
 #include "confdefs.h"
 #include <openssl/opensslv.h>
-#if OPENSSL_VERSION_NUMBER >= 0x0940
+#if OPENSSL_VERSION_NUMBER >= 0x00904100L
 yes
 #endif
 EOF
@@ -1700,7 +1700,7 @@ if test "x$include_path_openssl" = "x"; then
 #line 1701 "configure"
 #include "confdefs.h"
 #include <opensslv.h>
-#if OPENSSL_VERSION_NUMBER >= 0x0940
+#if OPENSSL_VERSION_NUMBER >= 0x00904100L
 yes
 #endif
 EOF
@@ -1722,7 +1722,7 @@ else
 #line 1723 "configure"
 #include "confdefs.h"
 #include <openssl/opensslv.h>
-#if OPENSSL_VERSION_NUMBER >= 0x0940
+#if OPENSSL_VERSION_NUMBER >= 0x00904100L
 yes
 #endif
 EOF

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.26 2000/02/24 12:17:50 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.27 2000/03/07 09:39:38 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -37,24 +37,16 @@
 #include <string.h>
 
 /* get openssl/ssleay version number */
-#ifdef INCLUDE_PATH_OPENSSL
-# ifdef HAVE_OPENSSL_OPENSSLV_H
-#  include <openssl/opensslv.h>
-#  define SSLVER	OPENSSL_VERSION_NUMBER
-# endif
+#ifdef HAVE_OPENSSL_OPENSSLV_H
+# include <openssl/opensslv.h>
 #else
-# ifdef HAVE_OPENSSLV_H
-#  include <opensslv.h>
-#  define SSLVER	OPENSSL_VERSION_NUMBER
-# else
-#  ifdef HAVE_CVERSION_H
-#   include <cversion.h>
-#   define SSLVER	SSLEAY_VERSION_NUMBER
-#  endif
-# endif
+# error no opensslv.h found.
 #endif
 
-#ifdef INCLUDE_PATH_OPENSSL
+#ifndef OPENSSL_VERSION_NUMBER
+#error OPENSSL_VERSION_NUMBER is not defined. OpenSSL0.9.4 or later required.
+#endif
+
 #ifdef HAVE_OPENSSL_PEM_H
 #include <openssl/pem.h>
 #endif
@@ -79,32 +71,6 @@
 #endif
 #include <openssl/cast.h>
 #include <openssl/err.h>
-#else /* INCLUDE_PATH_OPENSSL */
-#ifdef HAVE_PEM_H
-#include <pem.h>
-#endif
-#ifdef HAVE_EVP_H
-#include <evp.h>
-#endif
-#ifdef HAVE_X509_H
-#include <x509.h>
-#endif
-#include <bn.h>
-#include <dh.h>
-#include <md5.h>
-#include <sha.h>
-#include <des.h>
-#include <crypto.h>
-#ifdef HAVE_IDEA_H
-#include <idea.h>
-#endif
-#include <blowfish.h>
-#ifdef HAVE_RC5_H
-#include <rc5.h>
-#endif
-#include <cast.h>
-#include <err.h>
-#endif /* INCLUDE_PATH_OPENSSL */
 
 #include "var.h"
 #include "vmbuf.h"
@@ -143,7 +109,7 @@ eay_get_x509cert(path)
 	fp = fopen(path, "r");
 	if (fp == NULL)
 		return NULL;
-#if (defined(SSLVER) && SSLVER >= 0x0940)
+#if OPENSSL_VERSION_NUMBER >= 0x00904100L
 	x509 = PEM_read_X509(fp, NULL, NULL, NULL);
 #else
 	x509 = PEM_read_X509(fp, NULL, NULL);
@@ -339,7 +305,7 @@ eay_get_pkcs1privkey(path)
 	if (fp == NULL)
 		return NULL;
 
-#if (defined(SSLVER) && SSLVER >= 0x0940)
+#if OPENSSL_VERSION_NUMBER >= 0x00904100L
 	evp = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
 #else
 	evp = PEM_read_PrivateKey(fp, NULL, NULL);
@@ -393,7 +359,7 @@ eay_get_pkcs1pubkey(path)
 	if (fp == NULL)
 		return NULL;
 
-#if (defined(SSLVER) && SSLVER >= 0x0940)
+#if OPENSSL_VERSION_NUMBER >= 0x00904100L
 	x509 = PEM_read_X509(fp, NULL, NULL, NULL);
 #else
 	x509 = PEM_read_X509(fp, NULL, NULL);
@@ -443,7 +409,7 @@ eay_strerror()
 	int len = 0;
 	unsigned long l;
 	char buf[200];
-#if SSLVER >= 0x0940
+#if OPENSSL_VERSION_NUMBER >= 0x00904100L
 	const char *file, *data;
 #else
 	char *file, *data;

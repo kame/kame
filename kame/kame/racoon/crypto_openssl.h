@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: crypto_openssl.h,v 1.6 2000/02/23 08:06:32 sakane Exp $ */
+/* YIPS @(#)$Id: crypto_openssl.h,v 1.7 2000/03/07 09:39:39 sakane Exp $ */
 
 #ifdef HAVE_SIGNING_C
 /* X509 Certificate */
@@ -102,11 +102,7 @@ extern int eay_dh_compute __P((vchar_t *, u_int32_t, vchar_t *, vchar_t *, vchar
 
 /* misc */
 extern int eay_revbnl __P((vchar_t *));
-#ifdef INCLUDE_PATH_OPENSSL
 #include <openssl/bn.h>
-#else
-#include <bn.h>
-#endif
 extern int eay_v2bn __P((BIGNUM **, vchar_t *));
 extern int eay_bn2v __P((vchar_t **, BIGNUM *));
 

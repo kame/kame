@@ -32,7 +32,7 @@
  * Sun Jan  9 06:23:42 JST 2000
  *    Merged into new racoon with trivial modification.
  */
-/* $Id: signing.c,v 1.11 2000/02/09 05:18:09 sakane Exp $ */
+/* $Id: signing.c,v 1.12 2000/03/07 09:39:39 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -46,24 +46,16 @@
 #include <fcntl.h>
 
 /* get openssl/ssleay version number */
-#ifdef INCLUDE_PATH_OPENSSL
-# ifdef HAVE_OPENSSL_OPENSSLV_H
-#  include <openssl/opensslv.h>
-#  define SSLVER	OPENSSL_VERSION_NUMBER
-# endif
+#ifdef HAVE_OPENSSL_OPENSSLV_H
+# include <openssl/opensslv.h>
 #else
-# ifdef HAVE_OPENSSLV_H
-#  include <opensslv.h>
-#  define SSLVER	OPENSSL_VERSION_NUMBER
-# else
-#  ifdef HAVE_CVERSION_H
-#   include <cversion.h>
-#   define SSLVER	SSLEAY_VERSION_NUMBER
-#  endif
-# endif
+# error no opensslv.h found.
 #endif
 
-#ifdef INCLUDE_PATH_OPENSSL
+#ifndef OPENSSL_VERSION_NUMBER
+#error OPENSSL_VERSION_NUMBER is not defined. OpenSSL0.9.4 or later required.
+#endif
+
 #include <openssl/rsa.h>
 #include <openssl/evp.h>
 #include <openssl/objects.h>
@@ -72,16 +64,6 @@
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
-#else
-#include <rsa.h>
-#include <evp.h>
-#include <objects.h>
-#include <x509.h>
-#include <bio.h>
-#include <err.h>
-#include <pem.h>
-#include <ssl.h>
-#endif
 
 #include "var.h"
 #include "misc.h"
@@ -202,7 +184,7 @@ check(ctx, file)
 			}
 		}
 
-#if (defined(SSLVER) && SSLVER >= 0x0940)
+#if OPENSSL_VERSION_NUMBER >= 0x00904100L
 	x=PEM_read_bio_X509(in,NULL,NULL,NULL);
 #else
 	x=PEM_read_bio_X509(in,NULL,NULL);
