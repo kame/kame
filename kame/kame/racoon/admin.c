@@ -1,4 +1,4 @@
-/*	$KAME: admin.c,v 1.14 2000/09/13 04:50:23 itojun Exp $	*/
+/*	$KAME: admin.c,v 1.15 2000/09/17 05:22:45 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.c,v 1.14 2000/09/13 04:50:23 itojun Exp $ */
+/* YIPS @(#)$Id: admin.c,v 1.15 2000/09/17 05:22:45 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -80,7 +80,8 @@ admin_handler()
 	int fromlen = sizeof(from);
 	struct admin_com com;
 	char *combuf = NULL;
-	int len;
+	pid_t pid = -1;
+	int len, error = -1;
 
 	so2 = accept(lcconf->sock_admin, (struct sockaddr *)&from, &fromlen);
 	if (so2 < 0) {
@@ -97,21 +98,21 @@ admin_handler()
 		plog(logp, LOCATION, NULL,
 			"failed to recv admin command (%s)\n",
 			strerror(errno));
-		return -1;
+		goto end;
 	}
 
 	/* sanity check */
 	if (len < sizeof(com)) {
 		plog(logp, LOCATION, NULL,
 			"Invalid header length of admin command.\n");
-		return -1;
+		goto end;
 	}
 
 	/* get buffer to receive */
 	if ((combuf = malloc(com.ac_len)) == 0) {
 		plog(logp, LOCATION, NULL,
 			"failed to alloc buffer for admin command\n");
-		return -1;
+		goto end;
 	}
 
 	/* get real data */
@@ -121,7 +122,7 @@ admin_handler()
 		plog(logp, LOCATION, NULL,
 			"failed to recv admin command (%s)\n",
 			strerror(errno));
-		return -1;
+		goto end;
 	}
 
 	/* don't fork() because of reloading config. */
@@ -132,33 +133,41 @@ admin_handler()
 
 	/* fork for processing */
 	if (!(debug & DEBUG_ADMIN)) {
-		pid_t pid;
-
 		if ((pid = fork()) < 0) {
 			plog(logp, LOCATION, NULL,
 				"failed to fork for admin processing (%s)\n",
 				strerror(errno));
-			return -1;
+			goto end;
 		}
 
 		/* parant's process. */
-		if (pid != 0)
+		if (pid != 0) {
+			error = 0;
 			goto end;
+		}
 
 		/* child's process */
 		admin_close();
 	}
 
-	admin_process(so2, combuf);
+	/* exit in this function. */
+	error = admin_process(so2, combuf);
 
     end:
 	(void)close(so2);
 	if (combuf)
 		free(combuf);
 
-	return 0;
+	/* exit if child's process. */
+	if (pid == 0 && !(debug & DEBUG_ADMIN))
+		exit(error);
+
+	return error;
 }
 
+/*
+ * main child's process.
+ */
 static int
 admin_process(so2, combuf)
 	int so2;
@@ -361,6 +370,7 @@ admin_process(so2, combuf)
 
 	if (buf != NULL)
 		vfree(buf);
+
 	return 0;
 
     bad:
@@ -434,6 +444,7 @@ admin_init()
 	struct addrinfo hints, *res;
 	char *paddr = "127.0.0.1";	/* XXX */
 	char pbuf[10];
+	const int yes = 1;
 	int error;
 
 	snprintf(pbuf, sizeof(pbuf), "%d", lcconf->port_admin);
@@ -470,6 +481,14 @@ admin_init()
 	if (lcconf->sock_admin < 0) {
 		plog(logp, LOCATION, NULL,
 			"socket (%s)\n", strerror(errno));
+		freeaddrinfo(res);
+		return -1;
+	}
+
+	if (setsockopt(lcconf->sock_admin, SOL_SOCKET, SO_REUSEPORT,
+		       (void *)&yes, sizeof(yes)) < 0) {
+		plog(logp, LOCATION, NULL,
+			"setsockopt (%s)\n", strerror(errno));
 		freeaddrinfo(res);
 		return -1;
 	}
