@@ -520,6 +520,7 @@ in_pcbdetach(inp)
 			printf("DP call free SO=%p from in_pcbdetach\n", so));
 		key_freeso(so);
 	}
+	ipsec4_delete_pcbpolicy(inp);
 #endif /*IPSEC*/
 	inp->inp_gencnt = ++ipi->ipi_gencnt;
 	in_pcbremlists(inp);
