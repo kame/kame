@@ -1,4 +1,4 @@
-/*	$KAME: route6d.h,v 1.5 2001/09/05 03:05:11 itojun Exp $	*/
+/*	$KAME: route6d.h,v 1.6 2003/05/28 08:41:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -50,12 +50,7 @@ struct	rip6 {
 	u_char	rip6_cmd;
 	u_char	rip6_vers;
 	u_char	rip6_res1[2];
-	union {
-		struct	netinfo6	ru6_nets[1];
-		char	ru6_tracefile[1];
-	} rip6un;
-#define	rip6_nets	rip6un.ru6_nets
-#define	rip6_tracefile	rip6un.ru6_tracefile
+	struct	netinfo6	rip6_nets[1];
 };
 
 #define	HOPCNT_INFINITY6	16
