@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.23 2000/07/04 04:08:15 itojun Exp $	*/
+/*	$KAME: key_debug.c,v 1.24 2000/07/07 09:30:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,6 +33,7 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_ipsec.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
