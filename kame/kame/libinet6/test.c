@@ -40,7 +40,7 @@ main(argc, argv)
 		printf("ai%d:\n", i);
 		printf("\tfamily %d\n", res->ai_family);
 		printf("\tsocktype %d\n", res->ai_socktype);
-		printf("\tptorocol %d\n", res->ai_protocol);
+		printf("\tprotocol %d\n", res->ai_protocol);
 		printf("\taddrlen %d\n", res->ai_addrlen);
 		if (res->ai_canonname) printf("\t%s\n", res->ai_canonname);
 		error = getnameinfo(res->ai_addr, res->ai_addr->sa_len,
