@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.294 2002/04/08 11:17:41 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.295 2002/04/08 13:51:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1445,19 +1445,21 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 	if (rt && (rt->rt_flags & RTF_HOST) &&
 	    !(rt->rt_rmx.rmx_locks & RTV_MTU) &&
 	    mtu >= IPV6_MMTU &&	/* this is actually ensured already */
-	    mtu < rt->rt_ifp->if_mtu && mtu < rt->rt_rmx.rmx_mtu) {
-		icmp6stat.icp6s_pmtuchg++;
-		rt->rt_rmx.rmx_mtu = mtu;
+	    mtu < rt->rt_rmx.rmx_mtu) {
+		if (mtu < nd_ifinfo[rt->rt_ifp->if_index].linkmtu) {
+			icmp6stat.icp6s_pmtuchg++;
+			rt->rt_rmx.rmx_mtu = mtu;
 
 #if defined( __FreeBSD__) && __FreeBSD__ >= 4
-		/*
-		 * We intentionally ignore the error case of rt_timer_add(),
-		 * because the only bad effect is that we won't be able to
-		 * re-increase the path MTU.
-		 */
-		if (pmtu_expire) {
-			rt_timer_add(rt, icmp6_mtudisc_timeout,
-				     icmp6_mtudisc_timeout_q);
+			/*
+			 * We intentionally ignore the error case of
+			 * rt_timer_add(), because the only bad effect is that
+			 * we won't be able to re-increase the path MTU.
+			 */
+			if (pmtu_expire) {
+				rt_timer_add(rt, icmp6_mtudisc_timeout,
+					     icmp6_mtudisc_timeout_q);
+			}
 		}
 #endif
 	}
