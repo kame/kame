@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.42 2000/08/15 07:24:23 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.43 2000/11/06 06:46:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -183,8 +183,10 @@ static int stf_encapcheck __P((const struct mbuf *, int, int, void *));
 static struct in6_ifaddr *stf_getsrcifa6 __P((struct ifnet *));
 static int stf_output __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 	struct rtentry *));
-static int stf_checkaddr4 __P((struct in_addr *, struct ifnet *));
-static int stf_checkaddr6 __P((struct in6_addr *, struct ifnet *));
+static int stf_checkaddr4 __P((struct stf_softc *, struct in_addr *,
+	struct ifnet *));
+static int stf_checkaddr6 __P((struct stf_softc *, struct in6_addr *,
+	struct ifnet *));
 #if defined(__bsdi__) && _BSDI_VERSION >= 199802
 static void stf_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 #else
@@ -538,9 +540,10 @@ stf_output(ifp, m, dst, rt)
 }
 
 static int
-stf_checkaddr4(in, ifp)
+stf_checkaddr4(sc, in, inifp)
+	struct stf_softc *sc;
 	struct in_addr *in;
-	struct ifnet *ifp;	/* incoming interface */
+	struct ifnet *inifp;	/* incoming interface */
 {
 	struct in_ifaddr *ia4;
 
@@ -581,7 +584,7 @@ stf_checkaddr4(in, ifp)
 	/*
 	 * perform ingress filter
 	 */
-	if (ifp) {
+	if (sc && (sc->sc_if.if_flags & IFF_LINK2) != 0 && inifp) {
 		struct sockaddr_in sin;
 		struct rtentry *rt;
 
@@ -596,7 +599,7 @@ stf_checkaddr4(in, ifp)
 #endif
 		if (!rt)
 			return -1;
-		if (rt->rt_ifp != ifp) {
+		if (rt->rt_ifp != inifp) {
 			rtfree(rt);
 			return -1;
 		}
@@ -607,15 +610,16 @@ stf_checkaddr4(in, ifp)
 }
 
 static int
-stf_checkaddr6(in6, ifp)
+stf_checkaddr6(sc, in6, inifp)
+	struct stf_softc *sc;
 	struct in6_addr *in6;
-	struct ifnet *ifp;	/* incoming interface */
+	struct ifnet *inifp;	/* incoming interface */
 {
 	/*
 	 * check 6to4 addresses
 	 */
 	if (IN6_IS_ADDR_6TO4(in6))
-		return stf_checkaddr4(GET_V4(in6), ifp);
+		return stf_checkaddr4(sc, GET_V4(in6), inifp);
 
 	/*
 	 * reject anything that look suspicious.  the test is implemented
@@ -672,8 +676,8 @@ in_stf_input(m, va_alist)
 	 * perform sanity check against outer src/dst.
 	 * for source, perform ingress filter as well.
 	 */
-	if (stf_checkaddr4(&ip->ip_dst, NULL) < 0 ||
-	    stf_checkaddr4(&ip->ip_src, m->m_pkthdr.rcvif) < 0) {
+	if (stf_checkaddr4(sc, &ip->ip_dst, NULL) < 0 ||
+	    stf_checkaddr4(sc, &ip->ip_src, m->m_pkthdr.rcvif) < 0) {
 		m_freem(m);
 		return;
 	}
@@ -692,8 +696,8 @@ in_stf_input(m, va_alist)
 	 * perform sanity check against inner src/dst.
 	 * for source, perform ingress filter as well.
 	 */
-	if (stf_checkaddr6(&ip6->ip6_dst, NULL) < 0 ||
-	    stf_checkaddr6(&ip6->ip6_src, m->m_pkthdr.rcvif) < 0) {
+	if (stf_checkaddr6(sc, &ip6->ip6_dst, NULL) < 0 ||
+	    stf_checkaddr6(sc, &ip6->ip6_src, m->m_pkthdr.rcvif) < 0) {
 		m_freem(m);
 		return;
 	}

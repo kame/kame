@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.38 2000/07/24 13:27:22 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.39 2000/11/06 06:46:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -457,7 +457,8 @@ gif_encapcheck6(m, off, proto, arg)
 	/* martian filters on outer source - done in ip6_input */
 
 	/* ingress filters on outer source */
-	if ((m->m_flags & M_PKTHDR) != 0 && m->m_pkthdr.rcvif) {
+	if ((sc->gif_if.if_flags & IFF_LINK2) != 0 &&
+	    (m->m_flags & M_PKTHDR) != 0 && m->m_pkthdr.rcvif) {
 		struct sockaddr_in6 sin6;
 		struct rtentry *rt;
 

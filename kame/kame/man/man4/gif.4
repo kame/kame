@@ -1,4 +1,4 @@
-.\"	$KAME: gif.4,v 1.17 2000/06/30 18:31:27 itojun Exp $
+.\"	$KAME: gif.4,v 1.18 2000/11/06 06:46:30 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -206,6 +206,9 @@ performs martian filter and ingress filter against outer source address,
 on egress.
 Note that martian/ingress filters are no way complete.
 You may want to secure your node by using packet filters.
+Ingress filter is not turned on by default; you can enable it by
+.Dv IFF_LINK2
+bit.
 .Pp
 As mentioned above, multi-destination mode
 .Pq Dv IFF_LINK0
