@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.36 2000/05/19 12:45:25 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.37 2000/05/23 16:25:09 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -309,7 +309,8 @@ pfkey_dump_sadb(satype)
 		bl = buf ? buf->l : 0;
 		buf = vrealloc(buf, bl + ml);
 		if (buf == NULL) {
-			plog(logp, LOCATION, NULL, "vrealloc(%s)\n", strerror(errno));
+			plog(logp, LOCATION, NULL,
+				"failed to reallocate buffer to dump.\n");
 			goto fail;
 		}
 		memcpy(buf->v + bl, msg, ml);
@@ -1343,8 +1344,7 @@ pk_recvacquire(mhp)
 	iph2[n] = newph2();
 	if (iph2[n] == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to allocate phase2 entry. (%s)\n",
-			strerror(errno));
+			"failed to allocate phase2 entry.\n");
 		return -1;
 	}
 	iph2[n]->spid = xpl->sadb_x_policy_id;
@@ -1405,8 +1405,7 @@ pk_recvacquire(mhp)
 	newpp = newsaprop();
 	if (newpp == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to allocate saprop (%s).\n",
-			strerror(errno));
+			"failed to allocate saprop.\n");
 		goto err;
 	}
 	newpp->prop_no = 1;
@@ -1459,8 +1458,7 @@ pk_recvacquire(mhp)
 		newpr = newsaproto();
 		if (newpr == NULL) {
 			plog(logp, LOCATION, NULL,
-				"failed to allocate saproto (%s).\n",
-				strerror(errno));
+				"failed to allocate saproto.\n");
 			goto err;
 		}
 
@@ -1822,8 +1820,11 @@ addnewsp(mhp)
 
 			/* allocate request buffer */
 			*p_isr = newipsecreq();
-			if (*p_isr == NULL)
+			if (*p_isr == NULL) {
+				plog(logp, LOCATION, NULL,
+					"failed to get new ipsecreq.\n");
 				return -1;
+			}
 
 			/* set values */
 			(*p_isr)->next = NULL;

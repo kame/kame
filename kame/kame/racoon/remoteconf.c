@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.c,v 1.6 2000/05/17 11:29:28 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.c,v 1.7 2000/05/23 16:25:09 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -142,11 +142,8 @@ newrmconf()
 	struct remoteconf *new;
 
 	new = CALLOC(sizeof(*new), struct remoteconf *);
-	if (new == NULL) {
-		plog(logp, LOCATION, NULL,
-			"calloc (%s)\n", strerror(errno)); 
+	if (new == NULL)
 		return NULL;
-	}
 
 	new->proposal = NULL;
 
@@ -253,11 +250,8 @@ newisakmpsa()
 	struct isakmpsa *new;
 
 	new = CALLOC(sizeof(*new), struct isakmpsa *);
-	if (new == NULL) {
-		plog(logp, LOCATION, NULL,
-			"calloc (%s)\n", strerror(errno)); 
+	if (new == NULL)
 		return NULL;
-	}
 
 	new->next = NULL;
 	new->rmconf = NULL;

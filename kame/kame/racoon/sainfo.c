@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sainfo.c,v 1.3 2000/05/22 21:07:43 sakane Exp $ */
+/* YIPS @(#)$Id: sainfo.c,v 1.4 2000/05/23 16:25:09 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -107,11 +107,8 @@ newsainfo()
 	struct sainfo *new;
 
 	new = CALLOC(sizeof(*new), struct sainfo *);
-	if (new == NULL) {
-		plog(logp, LOCATION, NULL,
-			"calloc (%s)", strerror(errno));
+	if (new == NULL)
 		return NULL;
-	}
 
 	return new;
 }
@@ -171,11 +168,8 @@ newsainfoalg()
 	struct sainfoalg *new;
 
 	new = CALLOC(sizeof(*new), struct sainfoalg *);
-	if (new == NULL) {
-		plog(logp, LOCATION, NULL,
-			"calloc (%s)", strerror(errno));
+	if (new == NULL)
 		return NULL;
-	}
 
 	return new;
 }

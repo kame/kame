@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.c,v 1.9 2000/05/17 11:29:27 sakane Exp $ */
+/* YIPS @(#)$Id: admin.c,v 1.10 2000/05/23 16:25:07 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -107,8 +107,7 @@ admin_handler()
 	/* get buffer to receive */
 	if ((combuf = malloc(com.ac_len)) == 0) {
 		plog(logp, LOCATION, NULL,
-			"failed to alloc buffer for admin command (%s)\n",
-			strerror(errno));
+			"failed to alloc buffer for admin command\n");
 		return -1;
 	}
 
@@ -182,6 +181,8 @@ admin_process(so2, combuf)
 		if (sched_dump(&p, &len) == -1)
 			com->ac_errno = -1;
 		buf = vmalloc(len);
+		if (buf == NULL)
+			com->ac_errno = -1;
 		memcpy(buf->v, p, len);
 	}
 		break;
@@ -382,8 +383,7 @@ admin_reply(so, combuf, buf)
 	retbuf = CALLOC(tlen, char *);
 	if (retbuf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to allocate admin buffer (%s)\n",
-			strerror(errno));
+			"failed to allocate admin buffer\n");
 		return -1;
 	}
 

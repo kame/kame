@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.16 2000/04/24 21:13:54 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.17 2000/05/23 16:25:08 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -126,7 +126,7 @@ base_i1send(iph1, msg)
 	iph1->sendbuf = vmalloc(tlen);
 	if (iph1->sendbuf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to send.\n");
 		goto end;
 	}
 
@@ -611,7 +611,7 @@ base_r1send(iph1, msg)
 	iph1->sendbuf = vmalloc(tlen);
 	if (iph1->sendbuf == NULL) { 
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to send.\n");
 		goto end;
 	}
 
@@ -871,7 +871,7 @@ base_ir2sendmx(iph1)
 		buf = vmalloc(tlen);
 		if (buf == NULL) {
 			plog(logp, LOCATION, NULL,
-				"vmalloc (%s)\n", strerror(errno));
+				"failed to get buffer to send.\n");
 			goto end;
 		}
 
@@ -910,7 +910,7 @@ base_ir2sendmx(iph1)
 		buf = vmalloc(tlen);
 		if (buf == NULL) {
 			plog(logp, LOCATION, NULL,
-				"vmalloc (%s)\n", strerror(errno));
+				"failed to get buffer to send.\n");
 			goto end;
 		}
 

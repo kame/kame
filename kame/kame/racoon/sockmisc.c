@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.c,v 1.8 2000/05/17 11:29:28 sakane Exp $ */
+/* YIPS @(#)$Id: sockmisc.c,v 1.9 2000/05/23 16:25:09 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -169,7 +169,7 @@ getlocaladdr(remote)
 	/* allocate buffer */
 	if ((local = CALLOC(local_len, struct sockaddr *)) == NULL) {
 		plog(logp, LOCATION, NULL,
-			"calloc (%s)\n", strerror(errno)); 
+			"failed to get address buffer.\n");
 		goto err;
 	}
 	

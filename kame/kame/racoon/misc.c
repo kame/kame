@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.c,v 1.12 2000/02/23 06:56:39 sakane Exp $ */
+/* YIPS @(#)$Id: misc.c,v 1.13 2000/05/23 16:25:09 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -126,7 +126,7 @@ get_newbuf(src, len)
 
 	if ((new = CALLOC(len, caddr_t)) == NULL) {
 		PLOG(logp, LOCATION, NULL,
-			"calloc (%s)\n", strerror(errno));
+			"failed to get buffer.\n", 0);
 		return NULL;
 	}
 	memcpy(new, src, len);

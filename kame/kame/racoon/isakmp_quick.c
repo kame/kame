@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.28 2000/05/17 11:29:28 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.29 2000/05/23 16:25:09 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -217,7 +217,7 @@ quick_i1send(iph2, msg)
 	body = vmalloc(tlen);
 	if (body == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to send.\n");
 		goto end;
 	}
 
@@ -351,7 +351,7 @@ quick_i2recv(iph2, msg0)
 	hbuf = vmalloc(tlen);
 	if (hbuf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get hash buffer.\n");
 		goto end;
 	}
 	p = hbuf->v + iph2->nonce->l;	/* retain the space for Ni_b */
@@ -533,7 +533,7 @@ quick_i2send(iph2, msg0)
 	tmp = vmalloc(iph2->nonce->l + iph2->nonce_p->l);
 	if (tmp == NULL) { 
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get hash buffer.\n");
 		goto end;
 	}
 	memcpy(tmp->v, iph2->nonce->v, iph2->nonce->l);
@@ -552,7 +552,7 @@ quick_i2send(iph2, msg0)
 	buf = vmalloc(tlen);
 	if (buf == NULL) { 
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to send.\n");
 		goto end;
 	}
 
@@ -680,7 +680,7 @@ quick_i3recv(iph2, msg0)
 			notify = vmalloc(pa->len);
 			if (notify == NULL) {
 				plog(logp, LOCATION, NULL,
-					"vmalloc (%s)\n", strerror(errno));
+					"failed to get notify buffer.\n");
 				goto end;
 			}
 			memcpy(notify->v, pa->ptr, notify->l);
@@ -853,7 +853,7 @@ quick_r1recv(iph2, msg0)
 	hbuf = vmalloc(tlen);
 	if (hbuf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get hash buffer.\n");
 		goto end;
 	}
 	p = hbuf->v;
@@ -1164,7 +1164,7 @@ quick_r2send(iph2, msg)
 	body = vmalloc(tlen);
 	if (body == NULL) { 
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to send.\n");
 		goto end;
 	}
 	p = body->v;
@@ -1203,7 +1203,7 @@ quick_r2send(iph2, msg)
 	tmp = vmalloc(iph2->nonce_p->l + body->l);
 	if (tmp == NULL) { 
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get hash buffer.\n");
 		goto end;
 	}
 	memcpy(tmp->v, iph2->nonce_p->v, iph2->nonce_p->l);
@@ -1323,7 +1323,8 @@ quick_r3recv(iph2, msg0)
 
 	tmp = vmalloc(iph2->nonce_p->l + iph2->nonce->l);
 	if (tmp == NULL) { 
-		plog(logp, LOCATION, NULL, "vmalloc (%s)\n", strerror(errno));
+		plog(logp, LOCATION, NULL,
+			"failed to get hash buffer.\n");
 		goto end;
 	}
 	memcpy(tmp->v, iph2->nonce_p->v, iph2->nonce_p->l);
@@ -1396,7 +1397,7 @@ quick_r3send(iph2, msg0)
 	notify = vmalloc(tlen);
 	if (notify == NULL) { 
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get notify buffer.\n");
 		goto end;
 	}
 	n = (struct isakmp_pl_n *)notify->v;
@@ -1419,7 +1420,7 @@ quick_r3send(iph2, msg0)
 	buf = vmalloc(tlen);
 	if (buf == NULL) { 
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to send.\n");
 		goto end;
 	}
 
@@ -1546,7 +1547,7 @@ quick_ir1sendmx(iph2, body)
 	buf = vmalloc(tlen);
 	if (buf == NULL) { 
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to send.\n");
 		goto end;
 	}
 
@@ -1766,8 +1767,7 @@ get_proposal_r(iph2)
 	newpp = newsaprop();
 	if (newpp == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to allocate saprop (%s).\n",
-			strerror(errno));
+			"failed to allocate saprop.\n");
 		goto err;
 	}
 	newpp->prop_no = 1;
@@ -1805,8 +1805,7 @@ get_proposal_r(iph2)
 		newpr = newsaproto();
 		if (newpr == NULL) {
 			plog(logp, LOCATION, NULL,
-				"failed to allocate saproto (%s).\n",
-				strerror(errno));
+				"failed to allocate saproto.\n");
 			goto err;
 		}
 

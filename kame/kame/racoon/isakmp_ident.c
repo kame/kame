@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.24 2000/04/24 21:13:54 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.25 2000/05/23 16:25:08 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -116,7 +116,7 @@ ident_i1send(iph1, msg)
 	iph1->sendbuf = vmalloc(tlen);
 	if (iph1->sendbuf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to send.\n");
 		goto end;
 	}
 
@@ -748,7 +748,7 @@ ident_r1send(iph1, msg)
 	iph1->sendbuf = vmalloc(tlen);
 	if (iph1->sendbuf == NULL) { 
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to send.\n");
 		goto end;
 	}
 
@@ -1198,7 +1198,7 @@ ident_ir2sendmx(iph1)
 	buf = vmalloc(tlen);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to send.\n");
 		goto end;
 	}
 
@@ -1275,7 +1275,7 @@ ident_ir3sendmx(iph1)
 		buf = vmalloc(tlen);
 		if (buf == NULL) {
 			plog(logp, LOCATION, NULL,
-				"vmalloc (%s)\n", strerror(errno));
+				"failed to get buffer to send.\n");
 			goto end;
 		}
 
@@ -1309,7 +1309,7 @@ ident_ir3sendmx(iph1)
 		buf = vmalloc(tlen);
 		if (buf == NULL) {
 			plog(logp, LOCATION, NULL,
-				"vmalloc (%s)\n", strerror(errno));
+				"failed to get buffer to send.\n");
 			goto end;
 		}
 

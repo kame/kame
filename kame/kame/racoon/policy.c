@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.19 2000/05/17 11:29:28 sakane Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.20 2000/05/23 16:25:09 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -264,11 +264,8 @@ newsp()
 	struct secpolicy *new;
 
 	new = CALLOC(sizeof(*new), struct secpolicy *);
-	if (new == NULL) {
-		plog(logp, LOCATION, NULL,
-			"calloc (%s)", strerror(errno));
+	if (new == NULL)
 		return NULL;
-	}
 
 	return new;
 }
@@ -325,11 +322,8 @@ newipsecreq()
 	struct ipsecrequest *new;
 
 	new = CALLOC(sizeof(*new), struct ipsecrequest *);
-	if (new == NULL) {
-		plog(logp, LOCATION, NULL,
-			"calloc (%s)", strerror(errno));
+	if (new == NULL)
 		return NULL;
-	}
 
 	return new;
 }

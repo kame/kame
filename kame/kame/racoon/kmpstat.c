@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.9 2000/02/11 08:20:42 itojun Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.10 2000/05/23 16:25:09 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -320,8 +320,9 @@ com_recv()
 	}
 
 	/* allocate buffer */
-	if ((buf0 = malloc(com->ac_len)) == NULL) {
-		perror("malloc");
+	buf0 = malloc(com->ac_len);
+	if (buf0 == NULL) {
+		fprintf(stderr, "no buffer available.\n");
 		goto bad;
 	}
 

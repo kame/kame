@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.31 2000/04/28 14:29:45 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.32 2000/05/23 16:25:09 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -158,7 +158,7 @@ oakley_dh_compute(dh, pub, priv, pub_p, gxy)
 {
 	if ((*gxy = vmalloc(dh->prime->l)) == 0) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get DH buffer.\n");
 		return -1;
 	}
 
@@ -237,7 +237,7 @@ oakley_setdhgroup(group, dhgrp)
 	*dhgrp = CALLOC(sizeof(struct dhgroup), struct dhgroup *);
 	if (*dhgrp == NULL) {
 		plog(logp, LOCATION, NULL,
-			"calloc (%s)\n", strerror(errno));
+			"failed to get DH buffer.\n");
 		return NULL;
 	}
 	switch (group) {
@@ -428,7 +428,7 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get keymat buffer.\n");
 		goto end;
 	}
 
@@ -497,7 +497,7 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 			seed = vmalloc(prev->l + buf->l);
 			if (seed == NULL) {
 				plog(logp, LOCATION, NULL,
-					"vmalloc (%s)\n", strerror(errno));
+					"failed to get keymat buffer.\n");
 				goto end;
 			}
 
@@ -515,7 +515,8 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 
 				l = res->l;
 				if (!VREALLOC(res, l + this->l)) {
-					perror("vrealloc");
+					plog(logp, LOCATION, NULL,
+						"failed to get keymat buffer.\n");
 					vfree(this);
 					vfree(seed);
 					goto end;
@@ -589,7 +590,7 @@ oakley_compute_hashx(struct ph1handle *iph1, ...)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get hash buffer\n");
 		return NULL;
 	}
 
@@ -637,7 +638,7 @@ oakley_compute_hash3(iph1, msgid, body)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get hash buffer\n");
 		goto end;
 	}
 
@@ -692,7 +693,7 @@ oakley_compute_hash1(iph1, msgid, body)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get hash buffer\n");
 		goto end;
 	}
 
@@ -747,7 +748,7 @@ oakley_ph1hash_common(iph1, sw)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get hash buffer\n");
 		goto end;
 	}
 
@@ -853,7 +854,7 @@ oakley_ph1hash_base_i(iph1, sw)
 		buf = vmalloc(len);
 		if (buf == NULL) {
 			plog(logp, LOCATION, NULL,
-				"vmalloc (%s)\n", strerror(errno));
+				"failed to get hash buffer\n");
 			goto end;
 		}
 		p = buf->v;
@@ -890,7 +891,7 @@ oakley_ph1hash_base_i(iph1, sw)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get hash buffer\n");
 		goto end;
 	}
 	p = buf->v;
@@ -968,7 +969,7 @@ oakley_ph1hash_base_r(iph1, sw)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get hash buffer\n");
 		goto end;
 	}
 	p = buf->v;
@@ -996,7 +997,7 @@ oakley_ph1hash_base_r(iph1, sw)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get hash buffer\n");
 		goto end;
 	}
 	p = buf->v;
@@ -1178,7 +1179,7 @@ oakley_validate_auth(iph1)
 				cert = vmalloc(len);
 				if (cert == NULL) {
 					plog(logp, LOCATION, NULL,
-						"vmalloc (%s)\n", strerror(errno));
+						"failed to get auth buffer\n");
 					return -1;
 				}
 				fp = fopen(path, "r");
@@ -1217,7 +1218,7 @@ oakley_validate_auth(iph1)
 			iph1->cert_p = vmalloc(cert->l + 1);
 			if (iph1->cert_p == NULL) {
 				plog(logp, LOCATION, NULL,
-					"vmalloc (%s)\n", strerror(errno));
+					"failed to get cert buffer\n");
 				free(idstr);
 				vfree(cert);
 				return -1;
@@ -1367,7 +1368,7 @@ oakley_getmycert(iph1)
 		cert = vmalloc(len);
 		if (cert == NULL) {
 			plog(logp, LOCATION, NULL,
-				"vmalloc (%s)\n", strerror(errno));
+				"failed to get cert buffer\n");
 			goto end;
 		}
 		fp = fopen(path, "r");
@@ -1401,7 +1402,8 @@ oakley_getmycert(iph1)
 
 	iph1->cert = vmalloc(cert->l + 1);
 	if (iph1->cert == NULL) {
-		plog(logp, LOCATION, NULL, "vmalloc (%s)\n", strerror(errno));
+		plog(logp, LOCATION, NULL,
+			"failed to get cert buffer\n");
 		goto end;
 	}
 	memcpy(iph1->cert->v + 1, cert->v, cert->l);
@@ -1532,7 +1534,7 @@ oakley_getidstr(id, len)
 	idstr = malloc(idstrlen + 1);
 	if (idstr == NULL) {
 		plog(logp, LOCATION, NULL,
-			"malloc (%s)\n", strerror(errno));
+			"failed to get ID buffer\n");
 		return NULL;
 	}
 	memcpy(idstr, idsrc, idstrlen);
@@ -1669,7 +1671,7 @@ oakley_skeyid(iph1)
 		buf = vmalloc(len);
 		if (buf == NULL) {
 			plog(logp, LOCATION, NULL,
-				"vmalloc (%s)\n", strerror(errno));
+				"failed to get skeyid buffer\n");
 			goto end;
 		}
 		p = buf->v;
@@ -1697,7 +1699,7 @@ oakley_skeyid(iph1)
 		buf = vmalloc(len);
 		if (buf == NULL) {
 			plog(logp, LOCATION, NULL,
-				"vmalloc (%s)\n", strerror(errno));
+				"failed to get nonce buffer\n");
 			goto end;
 		}
 		p = buf->v;
@@ -1772,7 +1774,7 @@ oakley_skeyid_dae(iph1)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get skeyid buffer\n");
 		goto end;
 	}
 	p = buf->v;
@@ -1800,7 +1802,7 @@ oakley_skeyid_dae(iph1)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get skeyid buffer\n");
 		goto end;
 	}
 	p = buf->v;
@@ -1829,7 +1831,7 @@ oakley_skeyid_dae(iph1)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get skeyid buffer\n");
 		goto end;
 	}
 	p = buf->v;
@@ -1919,7 +1921,7 @@ oakley_compute_enckey(iph1)
 	iph1->key = vmalloc(keylen);
 	if (iph1->key == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get key buffer\n");
 		goto end;
 	}
 
@@ -1952,7 +1954,7 @@ oakley_compute_enckey(iph1)
 
 		if ((buf = vmalloc(prflen)) == 0) {
 			plog(logp, LOCATION, NULL,
-				"vmalloc (%s)\n", strerror(errno));
+				"failed to get key buffer\n");
 			goto end;
 		}
 		p = (u_char *)iph1->key->v;
@@ -2037,7 +2039,7 @@ oakley_newiv(iph1)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get iv buffer\n");
 		return -1;
 	}
 
@@ -2055,7 +2057,7 @@ oakley_newiv(iph1)
 	newivm = CALLOC(sizeof(struct isakmp_ivm), struct isakmp_ivm *);
 	if (newivm == NULL) {
 		plog(logp, LOCATION, NULL,
-			"calloc (%s)\n", strerror(errno)); 
+			"failed to get iv buffer\n");
 		vfree(buf);
 		return -1;
 	}
@@ -2115,7 +2117,8 @@ oakley_newiv2(iph1, msgid)
 	len = iph1->ivm->iv->l + sizeof(msgid_t);
 	buf = vmalloc(len);
 	if (buf == NULL) {
-		plog(logp, LOCATION, NULL, "vmalloc (%s)\n", strerror(errno));
+		plog(logp, LOCATION, NULL,
+			"failed to get iv buffer\n");
 		goto end;
 	}
 
@@ -2134,7 +2137,8 @@ oakley_newiv2(iph1, msgid)
 	/* allocate IVm */
 	newivm = CALLOC(sizeof(struct isakmp_ivm), struct isakmp_ivm *);
 	if (newivm == NULL) {
-		plog(logp, LOCATION, NULL, "calloc (%s)\n", strerror(errno)); 
+		plog(logp, LOCATION, NULL,
+			"failed to get iv buffer\n");
 		goto end;
 	}
 
@@ -2216,7 +2220,7 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to decrypt.\n");
 		goto end;
 	}
 	memcpy(buf->v, pl, len);
@@ -2288,7 +2292,7 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to decrypt.\n");
 		goto end;
 	}
 	memcpy(buf->v, msg->v, sizeof(struct isakmp));
@@ -2346,7 +2350,7 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 	buf = vmalloc(len + padlen);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to encrypt.\n");
 		goto end;
 	}
         if (padlen) {
@@ -2405,7 +2409,7 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to encrypt.\n");
 		goto end;
 	}
 	memcpy(buf->v, msg->v, sizeof(struct isakmp));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.19 2000/04/24 07:37:43 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.20 2000/05/23 16:25:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -131,7 +131,7 @@ dumpph1()
 	buf = vmalloc(cnt * sizeof(struct ph1dump));
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc(%s)\n", strerror(errno));
+			"failed to get buffer\n");
 		return NULL;
 	}
 	pd = (struct ph1dump *)buf->v;

@@ -775,7 +775,7 @@ sainfo_id
 
 			$$ = vmalloc(sizeof(*id_b) + $2->l);
 			if ($$ == NULL) {
-				yyerror("vmalloc (%s)\n", strerror(errno));
+				yyerror("failed to allocate identifier");
 				return -1;
 			}
 
@@ -846,8 +846,7 @@ algorithm
 
 			$$ = newsainfoalg();
 			if ($$ == NULL) {
-				yyerror("sainfo's algorithm alocation "
-					"failed (%s)", strerror(errno));
+				yyerror("failed to get algorithm alocation");
 				return -1;
 			}
 
@@ -887,8 +886,10 @@ remote_statement
 			struct proposalspec *prspec;
 
 			new = newrmconf();
-			if (new == NULL)
+			if (new == NULL) {
+				yyerror("failed to get new remoteconf.");
 				return -1;
+			}
 
 			new->remote = $2;
 			cur_rmconf = new;
@@ -1244,7 +1245,7 @@ newprspec()
 
 	new = CALLOC(sizeof(*new), struct proposalspec *);
 	if (new == NULL)
-		yyerror("failed to allocate proposal: %s", strerror(errno));
+		yyerror("failed to allocate proposal");
 
 	return new;
 }
@@ -1286,7 +1287,7 @@ newspspec()
 
 	new = CALLOC(sizeof(*new), struct secprotospec *);
 	if (new == NULL) {
-		yyerror("failed to allocate spproto: %s", strerror(errno));
+		yyerror("failed to allocate spproto");
 		return NULL;
 	}
 

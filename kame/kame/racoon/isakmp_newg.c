@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_newg.c,v 1.2 2000/04/24 21:13:54 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_newg.c,v 1.3 2000/05/23 16:25:09 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -150,8 +150,10 @@ isakmp_newgroup_r(iph1, msg)
 	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "validate HASH\n"));
 
 	len = sizeof(isakmp->msgid) + ntohs(sa->h.len);
-	if ((buf = vmalloc(len)) == 0) {
-		plog(logp, LOCATION, NULL, "vmalloc (%s)\n", strerror(errno));
+	buf = vmalloc(len);
+	if (buf == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to get buffer to send.\n");
 		goto end;
 	}
 	memcpy(buf->v, &isakmp->msgid, sizeof(isakmp->msgid));

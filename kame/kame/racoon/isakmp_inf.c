@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.30 2000/05/23 14:46:22 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.31 2000/05/23 16:25:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -264,8 +264,10 @@ isakmp_info_send_d2_pf(msg)
 	}
 
 	tlen = sizeof(*d) + sizeof(sa->sadb_sa_spi);
-	if ((payload = vmalloc(tlen)) == NULL) {
-		plog(logp, LOCATION, NULL, "vmalloc (%s)\n", strerror(errno));
+	payload = vmalloc(tlen);
+	if (payload == NULL) {
+		plog(logp, LOCATION, NULL, 
+			"failed to get buffer to send.\n");
 		return errno;
 	}
 
@@ -332,8 +334,10 @@ isakmp_info_send_d2_pst(pst)
 		return EINVAL;
 
 	tlen = sizeof(*d) + sizeof(pst->spi);
-	if ((payload = vmalloc(tlen)) == NULL) { 
-		plog(logp, LOCATION, NULL, "vmalloc (%s)\n", strerror(errno));
+	payload = vmalloc(tlen);
+	if (payload == NULL) { 
+		plog(logp, LOCATION, NULL,
+			"failed to get buffer to send.\n");
 		return errno;
 	}
 
@@ -426,7 +430,7 @@ isakmp_info_send_nx(isakmp, remote, local, type, data)
 	payload = vmalloc(tlen);
 	if (payload == NULL) { 
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to send.\n");
 		goto end;
 	}
 
@@ -484,8 +488,10 @@ isakmp_info_send_n1(iph1, type, data)
 	tlen = sizeof(*n) + spisiz;
 	if (data)
 		tlen += data->l;
-	if ((payload = vmalloc(tlen)) == NULL) { 
-		plog(logp, LOCATION, NULL, "vmalloc (%s)\n", strerror(errno));
+	payload = vmalloc(tlen);
+	if (payload == NULL) { 
+		plog(logp, LOCATION, NULL,
+			"failed to get buffer to send.\n");
 		return errno;
 	}
 
@@ -535,8 +541,10 @@ isakmp_info_send_n2(iph2, type, data)
 	tlen = sizeof(*n) + pr->spisize;
 	if (data)
 		tlen += data->l;
-	if ((payload = vmalloc(tlen)) == NULL) { 
-		plog(logp, LOCATION, NULL, "vmalloc (%s)\n", strerror(errno));
+	payload = vmalloc(tlen);
+	if (payload == NULL) { 
+		plog(logp, LOCATION, NULL,
+			"failed to get buffer to send.\n");
 		return errno;
 	}
 
@@ -668,7 +676,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	iph2->sendbuf = vmalloc(tlen);
 	if (iph2->sendbuf == NULL) { 
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer to send.\n");
 		goto err;
 	}
 

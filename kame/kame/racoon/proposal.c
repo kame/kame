@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.1 2000/04/24 07:37:44 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.2 2000/05/23 16:25:09 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -68,11 +68,8 @@ newsaprop()
 	struct saprop *new;
 
 	new = CALLOC(sizeof(*new), struct saprop *);
-	if (new == NULL) {
-		plog(logp, LOCATION, NULL,
-			"calloc (%s)", strerror(errno));
+	if (new == NULL)
 		return NULL;
-	}
 
 	return new;
 }
@@ -83,11 +80,8 @@ newsaproto()
 	struct saproto *new;
 
 	new = CALLOC(sizeof(*new), struct saproto *);
-	if (new == NULL) {
-		plog(logp, LOCATION, NULL,
-			"calloc (%s)", strerror(errno));
+	if (new == NULL)
 		return NULL;
-	}
 
 	return new;
 }
@@ -136,11 +130,8 @@ newsatrns()
 	struct satrns *new;
 
 	new = CALLOC(sizeof(*new), struct satrns *);
-	if (new == NULL) {
-		plog(logp, LOCATION, NULL,
-			"calloc (%s)", strerror(errno));
+	if (new == NULL)
 		return NULL;
-	}
 
 	return new;
 }
@@ -179,8 +170,7 @@ cmpsaprop_alloc(pp1, pp2)
 	newpp = newsaprop();
 	if (newpp == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to allocate saprop (%s).\n",
-			strerror(errno));
+			"failed to allocate saprop.\n");
 		return NULL;
 	}
 	newpp->prop_no = pp1->prop_no;
@@ -216,8 +206,7 @@ cmpsaprop_alloc(pp1, pp2)
 		newpr = newsaproto();
 		if (newpr == NULL) {
 			plog(logp, LOCATION, NULL,
-				"failed to allocate saproto (%s).\n",
-				strerror(errno));
+				"failed to allocate saproto.\n");
 			goto err;
 		}
 		newpr->proto_id = pr1->proto_id;
@@ -229,8 +218,7 @@ cmpsaprop_alloc(pp1, pp2)
 		newtr = newsatrns();
 		if (newtr == NULL) {
 			plog(logp, LOCATION, NULL,
-				"failed to allocate satrns (%s).\n",
-				strerror(errno));
+				"failed to allocate satrns.\n");
 			goto err;
 		}
 		newtr->trns_no = tr1->trns_no;
@@ -327,8 +315,7 @@ set_satrnsbysainfo(pr, sainfo)
 			newtr = newsatrns();
 			if (newtr == NULL) {
 				plog(logp, LOCATION, NULL,
-					"failed to allocate satrns (%s).\n",
-					strerror(errno));
+					"failed to allocate satrns.\n");
 				goto err;
 			}
 
@@ -355,9 +342,7 @@ set_satrnsbysainfo(pr, sainfo)
 				newtr = newsatrns();
 				if (newtr == NULL) {
 					plog(logp, LOCATION, NULL,
-						"failed to allocate "
-						"satrns (%s).\n",
-						strerror(errno));
+						"failed to allocate satrns.\n");
 					goto err;
 				}
 
@@ -390,9 +375,7 @@ set_satrnsbysainfo(pr, sainfo)
 			newtr = newsatrns();
 			if (newtr == NULL) {
 				plog(logp, LOCATION, NULL,
-					"failed to allocate "
-					"satrns (%s).\n",
-					strerror(errno));
+					"failed to allocate satrns.\n");
 				goto err;
 			}
 
@@ -431,8 +414,7 @@ aproppair2saprop(p0)
 	newpp = newsaprop();
 	if (newpp == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to allocate saprop (%s).\n",
-			strerror(errno));
+			"failed to allocate saprop.\n");
 		return NULL;
 	}
 	newpp->prop_no = p0->prop->p_no;
@@ -444,8 +426,7 @@ aproppair2saprop(p0)
 		newpr = newsaproto();
 		if (newpr == NULL) {
 			plog(logp, LOCATION, NULL,
-				"failed to allocate saproto (%s).\n",
-				strerror(errno));
+				"failed to allocate saproto.\n");
 			goto err;
 		}
 
@@ -479,9 +460,7 @@ aproppair2saprop(p0)
 			newtr = newsatrns();
 			if (newtr == NULL) {
 				plog(logp, LOCATION, NULL,
-					"failed to allocate "
-					"satrns (%s).\n",
-					strerror(errno));
+					"failed to allocate satrns.\n");
 				goto err;
 			}
 

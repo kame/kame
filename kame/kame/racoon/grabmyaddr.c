@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.c,v 1.12 2000/05/17 11:29:27 sakane Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.c,v 1.13 2000/05/23 16:25:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -464,8 +464,7 @@ newmyaddr()
 	new = CALLOC(sizeof(*new), struct myaddrs *);
 	if (new == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to allocate buffer for myaddrs (%s)\n",
-			strerror(errno)); 
+			"failed to allocate buffer for myaddrs.\n");
 		return NULL;
 	}
 

@@ -300,7 +300,7 @@ octetstring	{octet}({dot}{octet})+
 
 		yylval.val = vmalloc(yyleng + 1);
 		if (yylval.val == NULL) {
-			yyerror("vmalloc failed: %s\n");
+			yyerror("vmalloc failed");
 			return -1;
 		}
 		memcpy(yylval.val->v, yytext, yylval.val->l);
@@ -403,7 +403,7 @@ hour|hours		{ YYD; yylval.num = CF_UNITTYPE_H; return(UNITTYPE); }
 			YYD; 
 			yylval.val = vmalloc(yyleng + (yyleng & 1) + 1);
 			if (yylval.val == NULL) {
-				yyerror("vmalloc failed: %s\n");
+				yyerror("vmalloc failed");
 				return -1;
 			}
 
@@ -428,7 +428,7 @@ hour|hours		{ YYD; yylval.num = CF_UNITTYPE_H; return(UNITTYPE); }
 
 			yylval.val = vmalloc(yyleng - 1);
 			if (yylval.val == NULL) {
-				yyerror("vmalloc failed: %s\n");
+				yyerror("vmalloc failed");
 				return -1;
 			}
 			memcpy(yylval.val->v, &yytext[1], yylval.val->l);
@@ -441,7 +441,7 @@ hour|hours		{ YYD; yylval.num = CF_UNITTYPE_H; return(UNITTYPE); }
 
 			yylval.val = vmalloc(yyleng + 1);
 			if (yylval.val == NULL) {
-				yyerror("vmalloc failed: %s\n");
+				yyerror("vmalloc failed");
 				return -1;
 			}
 			memcpy(yylval.val->v, yytext, yylval.val->l);

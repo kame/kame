@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.68 2000/05/22 22:37:58 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.69 2000/05/23 16:25:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -221,7 +221,7 @@ found:
 	sa->dhgrp = CALLOC(sizeof(struct dhgroup), struct dhgroup *);
 	if (!sa->dhgrp) {
 		plog(logp, LOCATION, NULL,
-			"calloc (%s)\n", strerror(errno));
+			"failed to get buffer\n");
 		return NULL;
 	}
 	switch (sa->dh_group) {
@@ -751,7 +751,7 @@ get_proppair(sa, mode)
 	pair = CALLOC(MAXPROPPAIRLEN * sizeof(*pair), struct prop_pair **);
 	if (pair == NULL) {
 		plog(logp, LOCATION, NULL,
-			"calloc (%s)\n", strerror(errno));
+			"failed to get buffer.\n");
 		return NULL;
 	}
 	memset(pair, 0, sizeof(pair));
@@ -957,7 +957,7 @@ get_transform(prop, pair, num_p)
 		p = CALLOC(sizeof(*p), struct prop_pair *);
 		if (p == NULL) {
 			plog(logp, LOCATION, NULL,
-				"calloc (%s)\n", strerror(errno));
+				"failed to get buffer.\n");
 			return -1;
 		}
 		p->prop = prop;
@@ -1009,7 +1009,7 @@ get_sabyproppair(pair)
 	newsa = vmalloc(newtlen);
 	if (newsa == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno)); 
+			"failed to get newsa.\n");
 		return NULL;
 	}
 	bp = newsa->v;
@@ -1096,7 +1096,7 @@ get_sabysaprop(pp0, sa0)
 	newsa = vmalloc(newtlen);
 	if (newsa == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno)); 
+			"failed to get newsa.\n");
 		return NULL;
 	}
 	bp = newsa->v;
@@ -1986,8 +1986,7 @@ ipsecdoi_setph1proposal(props)
 	mysa = vmalloc(sablen);
 	if (mysa == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to allocate my sa buffer (%s)\n",
-			strerror(errno)); 
+			"failed to allocate my sa buffer\n");
 		return NULL;
 	}
 
@@ -2354,8 +2353,7 @@ ipsecdoi_setph2proposal(iph2)
 	mysa = vmalloc(sizeof(*sab));
 	if (mysa == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to allocate my sa buffer (%s)\n",
-			strerror(errno)); 
+			"failed to allocate my sa buffer\n");
 		return NULL;
 	}
 
@@ -2613,7 +2611,7 @@ ipsecdoi_setid1(iph1)
 	ret = vmalloc(sizeof(id_b) + ident->l);
 	if (ret == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get ID buffer.\n");
 		goto err;
 	}
 
@@ -2696,7 +2694,7 @@ ipsecdoi_setid2(iph2)
 		iph2->id = vmalloc(sizeof(id_b) + ident->l);
 		if (iph2->id == NULL) {
 			plog(logp, LOCATION, NULL,
-				"vmalloc (%s)\n", strerror(errno));
+				"failed to get ID buffer.\n");
 			return -1;
 		}
 
@@ -2779,7 +2777,7 @@ ipsecdoi_sockaddr2id(saddr, prefixlen, ul_proto)
 	new = vmalloc(sizeof(struct ipsecdoi_id_b) + len1 + len2);
 	if (new == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get ID buffer.\n");
 		return NULL;
 	}
 
@@ -3026,7 +3024,7 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 				ld_buf = vmalloc(sizeof(d->lorv));
 				if (ld_buf == NULL) {
 					plog(logp, LOCATION, NULL,
-					    "vmalloc (%s)\n", strerror(errno));
+					    "failed to get LD buffer.\n");
 					goto end;
 				}
 				memcpy(ld_buf->v, &d->lorv, sizeof(d->lorv));
@@ -3036,7 +3034,7 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 				ld_buf = vmalloc(len);
 				if (ld_buf == NULL) {
 					plog(logp, LOCATION, NULL,
-					    "vmalloc (%s)\n", strerror(errno));
+					    "failed to get LD buffer.\n");
 					goto end;
 				}
 				memcpy(ld_buf->v, d + 1, len);

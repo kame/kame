@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.8 2000/04/28 14:29:45 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.9 2000/05/23 16:25:09 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -64,7 +64,7 @@ initalgstrength()
 	new = CALLOC(MAXALGCLASS * sizeof(*new), struct algorithm_strength **);
 	if (new == NULL) {
 		plog(logp, LOCATION, NULL,
-			"calloc (%s)\n", strerror(errno)); 
+			"failed to get buffer.\n");
 		return NULL;
 	}
 
@@ -72,7 +72,7 @@ initalgstrength()
 		new[i] = CALLOC(sizeof(*new[i]), struct algorithm_strength *);
 		if (new[i] == NULL) {
 			plog(logp, LOCATION, NULL,
-				"calloc (%s)\n", strerror(errno)); 
+				"failed to get buffer.\n");
 			return NULL;
 		}
 	}
@@ -150,7 +150,7 @@ getpsk(id0)
 	id = CALLOC(1 + id0->l - sizeof(struct ipsecdoi_id_b), char *);
 	if (id == NULL) {
 		plog(logp, LOCATION, NULL,
-			"calloc (%s)\n", strerror(errno)); 
+			"failed to get psk buffer.\n");
 		goto end;
 	}
 	memcpy(id, id0->v + sizeof(struct ipsecdoi_id_b),
@@ -179,7 +179,7 @@ getpsk(id0)
 			key = vmalloc(len);
 			if (key == NULL) {
 				plog(logp, LOCATION, NULL,
-					"failed to allocate key buffer.\n");
+					"failed to get psk buffer.\n");
 				goto end;
 			}
 			memcpy(key->v, p, key->l);

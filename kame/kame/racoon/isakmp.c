@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.59 2000/05/23 12:49:27 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.60 2000/05/23 16:25:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -171,8 +171,7 @@ isakmp_handler(so_isakmp)
 	/* read real message */
 	if ((buf = vmalloc(ntohl(isakmp.len))) == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to allocate reading buffer (%s)\n",
-			strerror(errno)); 
+			"failed to allocate reading buffer\n");
 		goto end;
 	}
 
@@ -914,7 +913,7 @@ isakmp_parsewoh(np0, gen, len)
 	result = vmalloc(sizeof(struct isakmp_parse_t) * 5);
 	if (result == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer.\n");
 		return NULL;
 	}
 	p = (struct isakmp_parse_t *)result->v;
@@ -953,7 +952,8 @@ isakmp_parsewoh(np0, gen, len)
 
 			off = p - (struct isakmp_parse_t *)result->v;
 			if (!VREALLOC(result, result->l * 2)) {
-				perror("vrealloc");
+				plog(logp, LOCATION, NULL,
+					"failed to realloc buffer.\n");
 				vfree(result);
 				return NULL;
 			}
@@ -1627,7 +1627,7 @@ isakmp_newcookie(place, remote, local)
 	buf = vmalloc(blen);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get a cookie.\n");
 		goto end;
 	}
 	p = buf->v;
@@ -1679,7 +1679,7 @@ isakmp_p2ph(buf, gen)
 	*buf = vmalloc(ntohs(gen->len) - sizeof(*gen));
 	if (*buf == NULL) {
 		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
+			"failed to get buffer.\n");
 		return -1;
 	}
 	memcpy((*buf)->v, gen + 1, (*buf)->l);
