@@ -913,17 +913,34 @@ plist()
 			printf("  advertised by\n");
 			for (j = 0; j < PR.advrtrs; j++) {
 				struct sockaddr_in6 sin6;
+				struct in6_nbrinfo *nbi;
 
 				bzero(&sin6, sizeof(sin6));
 				sin6.sin6_family = AF_INET6;
 				sin6.sin6_len = sizeof(sin6);
 				sin6.sin6_addr = PR.advrtr[j];
+				sin6.sin6_scope_id = PR.if_index; /* XXX */
 				getnameinfo((struct sockaddr *)&sin6,
 					    sin6.sin6_len, host_buf,
 					    sizeof(host_buf), NULL, 0,
 					    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
+				printf("    %s", host_buf);
 
-				printf("    %s\n", host_buf);
+				nbi = getnbrinfo(&sin6.sin6_addr, PR.if_index);
+				if (nbi) {
+					switch(nbi->state) {
+					 case ND6_LLINFO_REACHABLE:
+					 case ND6_LLINFO_STALE:
+					 case ND6_LLINFO_DELAY:
+					 case ND6_LLINFO_PROBE:
+						 printf(" (reachable)\n");
+						 break;
+					 default:
+						 printf(" (unreachable)\n"); 
+					}
+				}
+				else
+					printf(" (no neighbor state)\n");
 			}
 			if (PR.advrtrs > DRLSTSIZ)
 				printf("    and %d routers\n",
