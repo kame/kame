@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
+#include <sys/ioctl.h>
 
 #include <netinet/in.h>
 #include <netinet/ip6.h>
@@ -60,6 +61,7 @@ main(argc, argv)
 	short port;
 	struct sockaddr_in6 local, remote;
 	struct msghdr rcvmh;
+	struct fd_set allsocks, readsocks;
 	struct iovec iov[2];
 	char recvbuf[1024];	/* xxx hardcoding */
 
@@ -106,19 +108,39 @@ main(argc, argv)
 
 	if (listen(s, 5) < 0)
 		err(1, "listen");
+	sleep(10);
+
+	FD_ZERO(&allsocks);
+	FD_SET(s, &allsocks);
+
+	while(1) {
+		int cc;
+
+		FD_COPY(&readsocks, &allsocks);
+		if (select(s + 1, &readsocks, NULL, NULL, NULL) < 0)
+			err(1, "select");
+
+		if (FD_SET(s, &readsocks)) {
+			/* purge ancillary data on the listening socket */
+			if (ioctl(s, FIONREAD, &cc) < 0)
+				err(1, "ioctl(FIONREAD)");
+			else
+				printf("socket buffer size = %d\n", cc);
+
+			if (cc > 0) {
+				if (read(s, NULL, 0) < 0)
+					err(1, "read");
+				continue;
+			}
+
+			break;
+		}
+	}
 
 	if ((s0 = accept(s, (struct sockaddr *)&remote, &remotelen)) < 0)
 		err(1, "accept");
-	/* purge ancillary data on the listening socket */
-#if 1
-	memset(&rcvmh, 0, sizeof(rcvmh));
-	if (recvmsg(s, &rcvmh, 0) < 0)
-		warn("recvmsg");
-#else
-	if (read(s, NULL, 0) < 0)
-		warn("read");
-#endif
-	close(s);
+
+	/* close(s); */
 
 	s = s0;
 
