@@ -1,47 +1,37 @@
 # New ports collection makefile for:    python
-# Version required:     1.5
+# Version required:     1.5.2
 # Date created:         08 August 1995
 # Whom:                 jkh
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:10:27 itojun Exp $
+# $Id: Makefile,v 1.2 1999/12/27 02:11:01 sumikawa Exp $
+# $FreeBSD: ports/lang/python/Makefile,v 1.55 1999/11/03 09:45:25 tg Exp $
 #
 
-DISTNAME=       pyth151
-PKGNAME=        python-1.5.1
+DISTNAME=       py152
+PKGNAME=        python-1.5.2
 CATEGORIES=	lang python tk80
+# if you use ports-current, enable this line
+#CATEGORIES=	lang python tk82
 MASTER_SITES=	ftp://www.python.org/pub/python/src/ \
-		ftp://ftp.cwi.nl/pub/python/src/ \
-		ftp://ftp.kame.net/pub/kame/misc/ \
-		ftp://ftp.v6.kame.net/pub/kame/misc/
+		ftp://ftp.cwi.nl/pub/python/src/
 EXTRACT_SUFX=	.tgz
-DISTFILES=	${DISTNAME}${EXTRACT_SUFX} ${V6PATCH}
-EXTRACT_ONLY=	${DISTNAME}${EXTRACT_SUFX}
 
-PATCH_SITES=	http://www.python.org/1.5/patches-1.5.1/
-PATCHFILES=	_tkinter.1.txt SocketServer.1.txt bltinmodule.1.txt \
-		bltinmodule.2.txt bltinmodule.3.txt \
-		ceval.1.txt classobject.1.txt fileobject.1.txt \
-		freeze.1.txt \
-		gzip.1.txt imaplib.1.txt imaplib.2.txt imaplib.3.txt \
-		import.1.txt longobject.1.txt object.1.txt \
-		parsermodule.1.txt pcre.1.txt sgmllib.1.txt sgmllib.2.txt \
-		string.1.txt stringobject.1.txt stropmodule.1.txt \
-		timemodule.1.txt urllib.1.txt urllib.2.txt zlibmodule.1.txt
-#		configure.2.txt 
+PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
+PATCHFILES=	python-152-v6-19990420.diff.gz
+PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@kame.net
 
 LIB_DEPENDS=	${TK_DEPENDS}
 
 DIST_SUBDIR=	python
-WRKSRC=		${WRKDIR}/Python-1.5.1
+WRKSRC=		${WRKDIR}/Python-1.5.2
 GNU_CONFIGURE=	yes
-CONFIGURE_ARGS=	--with-fpectl
-#MAKE_FLAGS=	'OPT=${CFLAGS}'
+CONFIGURE_ARGS=	--with-fpectl --with-libs='-lxpg4'
+CONFIGURE_ENV=	OPT="${CFLAGS}"
 INSTALL_TARGET=	install
+PLIST=		${WRKDIR}/PLIST
 MAN1=		python.1
-
-V6PATCH=	python-151-v6-19990417.diff.gz
 
 #
 # The standard setup file
@@ -54,7 +44,10 @@ SETUP_FILE=	Setup
 WITH_TK?=	yes
 .if defined(WITH_TK) && $(WITH_TK) == yes
 TK_DEPENDS=	tk80.1:${PORTSDIR}/x11-toolkits/tk80
+# if you use ports-current, enable this line
+#TK_DEPENDS=	tk82.1:${PORTSDIR}/x11-toolkits/tk82
 SETUP_LOCAL=	Setup.tk
+PLIST_TK=	${PKGDIR}/PLIST.tk
 .endif
 
 #
@@ -65,11 +58,11 @@ SETUP_LOCAL=	Setup.tk
 # This option is enabled by default.
 #
 WITH_THREADS?=	yes
-LIBC_R!=	/sbin/ldconfig -r | grep c_r
+LIBC_R!=	/sbin/ldconfig -r | grep c_r || true
 .if ${LIBC_R} != "" && defined(WITH_THREADS) && ${WITH_THREADS} == yes
 CONFIGURE_ARGS+=	--with-thread
 CFLAGS+=		-D_THREAD_SAFE
-CONFIGURE_ENV=		LDFLAGS="-pthread ${LDFLAGS}"
+CONFIGURE_ENV+=		LDFLAGS="-pthread ${LDFLAGS}"
 .endif
 
 #
@@ -77,14 +70,21 @@ CONFIGURE_ENV=		LDFLAGS="-pthread ${LDFLAGS}"
 #
 .if exists(/usr/src/contrib/libgmp/gmp-impl.h)
 SETUP_LOCAL+=	Setup.gmp
+PLIST_GMP=	${PKGDIR}/PLIST.gmp
+.endif
+
+#
+# Install the Tools by default. It contains scripts ranging from an IDE
+# to a web tree checker, to a collection of simple scripts that are useful
+# while extending or managing Python.
+#
+WITH_TOOLS?=	yes
+.if defined(WITH_TOOLS) && ${WITH_TOOLS} == yes
+PLIST_TOOLS=	${PKGDIR}/PLIST.Tools
 .endif
 
 post-extract:
-	cd ${WRKSRC}/Lib; ${SH} ${FILESDIR}/plat-freebsd2.sh; \
-		${SH} ${FILESDIR}/plat-freebsd3.sh
-
-pre-patch:
-	${GZCAT} ${DISTDIR}/${DIST_SUBDIR}/${V6PATCH} | ${PATCH} -d ${WRKSRC} --forward --quiet -E -p1
+	cd ${WRKSRC}/Lib && ${SH} ${FILESDIR}/plat-freebsd4.sh
 
 post-configure:
 	${CP} ${FILESDIR}/${SETUP_FILE} ${WRKSRC}/Modules/Setup
@@ -94,22 +94,30 @@ post-configure:
 
 .include <bsd.port.pre.mk>
 
-.if ${PORTOBJFORMAT} == elf
-LDFLAGS+=	-rdynamic
-CONFIGURE_ENV?=	LDFLAGS="${LDFLAGS}"
+.if ${OSVERSION} >= 400000
+PLATFORMS=plat-freebsd2 plat-freebsd3
+.elif ${OSVERSION} >= 300000
+PLATFORMS=plat-freebsd2 plat-freebsd4
+.else   
+PLATFORMS=plat-freebsd3 plat-freebsd4
 .endif
 
 pre-install:
-.if ${OSVERSION} < 300000
-	${MKDIR} ${PREFIX}/lib/python1.5/plat-freebsd3
-	${INSTALL_DATA} ${WRKSRC}/Lib/plat-freebsd3/* ${PREFIX}/lib/python1.5/plat-freebsd3
-.else
-	${MKDIR} ${PREFIX}/lib/python1.5/plat-freebsd2
-	${INSTALL_DATA} ${WRKSRC}/Lib/plat-freebsd2/* ${PREFIX}/lib/python1.5/plat-freebsd2
-.endif
+.for platform in ${PLATFORMS}
+	${MKDIR} ${PREFIX}/lib/python1.5/${platform}
+	${INSTALL_DATA} ${WRKSRC}/Lib/${platform}/*                    \
+		${PREFIX}/lib/python1.5/${platform}/
+.endfor
+	@sort -r -o ${PLIST} ${PLIST_TK} ${PLIST_GMP} ${PLIST_TOOLS} ${PKGDIR}/PLIST
 
 post-install:
-	${INSTALL_SCRIPT} ${PREFIX}/lib/python1.5/plat-freebsd2/regen ${PREFIX}/lib/python1.5/plat-freebsd3
 	strip ${PREFIX}/bin/python
+	@${MKDIR} ${PREFIX}/share/doc/python
+	${INSTALL_DATA} ${WRKSRC}/Misc/COPYRIGHT ${PREFIX}/share/doc/python
+	@${MKDIR} ${PREFIX}/lib/python1.5/site-packages
+.if defined(WITH_TOOLS) && ${WITH_TOOLS} == yes
+	@cd ${WRKSRC}; tar cf - Tools | \
+		(cd ${PREFIX}/lib/python1.5; tar xf -)
+.endif
 
 .include <bsd.port.post.mk>

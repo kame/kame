@@ -1,0 +1,11 @@
+--- Lib/tempfile.py.orig	Tue Dec  7 17:48:23 1999
++++ Lib/tempfile.py	Tue Dec  7 17:50:00 1999
+@@ -24,7 +24,7 @@
+         pwd = os.getcwd()
+     except (AttributeError, os.error):
+         pwd = os.curdir
+-    attempdirs = ['/var/tmp', '/tmp', pwd]
++    attempdirs = ['/var/tmp', '/usr/tmp', '/tmp', pwd]
+     if os.name == 'nt':
+         attempdirs.insert(0, 'C:\\TEMP')
+         attempdirs.insert(0, '\\TEMP')
