@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.44 2001/12/05 08:10:00 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.45 2001/12/06 06:53:52 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1654,14 +1654,24 @@ mip6_dad_duplicated(ifa)
 }
 
 struct ifaddr *
-mip6_dad_find(taddr)
+mip6_dad_find(taddr, ifp)
 struct in6_addr *taddr;
+struct ifnet *ifp;
 {
 	struct mip6_bc *mbc;
+	struct in6_ifaddr *ia;
 
-	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, taddr);
-	if (mbc && (mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0)
-		return ((struct ifaddr *)mbc->mbc_dad);
+	for(mbc = LIST_FIRST(&mip6_bc_list);
+	    mbc;
+	    mbc = LIST_NEXT(mbc, mbc_entry)) {
+		if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) == 0)
+			continue;
+		if (mbc->mbc_ifp != ifp)
+			continue;
+		ia = (struct in6_ifaddr *)mbc->mbc_dad;
+		if (IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr, taddr))
+			return ((struct ifaddr *)ia);
+	}
 
 	return (NULL);
 }
