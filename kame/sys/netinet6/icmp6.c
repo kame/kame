@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.98 2000/05/17 14:03:36 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.99 2000/05/22 04:18:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1060,8 +1060,6 @@ icmp6_mtudisc_update(dst, icmp6, m)
  * draft-ietf-ipngwg-icmp-name-lookups-05.
  * 
  * Spec incompatibilities:
- * - IPv6 destination address validation
- *	we ignore it on purpose - see comment below
  * - IPv6 Subject address handling
  * - IPv4 Subject address handling support missing
  * - Proxy reply (answer even if it's not for me)
@@ -1105,39 +1103,37 @@ ni6_input(m, off)
 	/*
 	 * Validate IPv6 destination address.
 	 *
-	 * At this moment, we accept packets with any IPv6 destination address.
+	 * We accept packets with the following IPv6 destination address:
+	 * - Responder's unicast/anycast address,
+	 * - link-local multicast address
 	 * This is a violation to last paragraph in icmp-name-lookups-05
 	 * page 4, which restricts IPv6 destination address of a query to:
 	 * - Responder's unicast/anycast address,
 	 * - NI group address for a name belongs to the Responder, or
 	 * - NI group address for a name for which the Responder is providing
 	 *   proxy service.
+	 * (note: NI group address is a link-local multicast address)
 	 *
-	 * We allow any IPv6 destination address, since "ping6 -w ff02::1" has
-	 * been really useful for us debugging our network.  Also this is
-	 * still questionable if the above restriction buy us security at all,
+	 * We allow any link-local multicast address, since "ping6 -w ff02::1"
+	 * has been really useful for us debugging our network.  Also this is
+	 * still questionable if the restriction in spec buy us security at all,
 	 * since RFC2463 permits echo packet to multicast destination.
 	 * Even if we forbid NI query to ff02::1, we can effectively get the
 	 * same result as "ping6 -w ff02::1" by the following steps:
 	 * - run "ping6 ff02::1", then
 	 * - run "ping6 -w" for all addresses replied.
-	 *
-	 * Maybe conforming to the spec, and additionally allowing
-	 * link-local multicast, is a good compromise...
 	 */
-#if 0
 	bzero(&sin6, sizeof(sin6));
 	sin6.sin6_family = AF_INET6;
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	bcopy(&ip6->ip6_dst, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
 	/* XXX scopeid */
 	if (ifa_ifwithaddr((struct sockaddr *)&sin6))
-		; /*fine*/
-	else if (0 /*NI group check*/)
-		; /*fine*/
+		printf("got unicast/anycast\n"); /*unicast/anycast, fine*/
+	else if (IN6_IS_ADDR_MC_LINKLOCAL(&sin6.sin6_addr))
+		printf("got multicast\n"); /*violates spec slightly, see above*/
 	else
 		goto bad;
-#endif
 
 	/* guess reply length */
 	qtype = ntohs(ni6->ni_qtype);
@@ -1219,10 +1215,19 @@ ni6_input(m, off)
 			m_copydata(m, off + sizeof(struct icmp6_nodeinfo),
 			    subjlen, (caddr_t)&sin6.sin6_addr);
 			/* XXX kame scope hack */
-			if (IN6_IS_SCOPE_LINKLOCAL(&sin6.sin6_addr) &&
-			    (m->m_flags & M_PKTHDR) != 0 && m->m_pkthdr.rcvif) {
-				sin6.sin6_addr.s6_addr16[1] =
-				    htons(m->m_pkthdr.rcvif->if_index);
+			if (IN6_IS_SCOPE_LINKLOCAL(&sin6.sin6_addr)) {
+#ifdef FAKE_LOOPBACK_IF
+				if ((m->m_flags & M_PKTHDR) != 0 &&
+				    m->m_pkthdr.rcvif) {
+					sin6.sin6_addr.s6_addr16[1] =
+					    htons(m->m_pkthdr.rcvif->if_index);
+				}
+#else
+				if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
+					sin6.sin6_addr.s6_addr16[1] =
+					    ip6->ip6_dst.s6_addr16[1];
+				}
+#endif
 			}
 			if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &sin6.sin6_addr))
 				break;
