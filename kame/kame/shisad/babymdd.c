@@ -1,4 +1,4 @@
-/*      $Id: babymdd.c,v 1.2 2005/03/01 02:26:35 ryuji Exp $  */
+/*      $Id: babymdd.c,v 1.3 2005/03/01 17:24:22 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -93,15 +93,16 @@ static int send_rs(struct if_info  *);
 
 struct mdd_info babyinfo;
 
-
-
 void
 baby_usage()
 {
+	fprintf(stderr, "babymdd is a simple movement detecter for a mobile node and a mobile router\n");
         fprintf(stderr, "babymdd [options] -h mipif interfaces..\n");
+	fprintf(stderr, "\t-h mipif      specify your mipxx interface\n");
+	fprintf(stderr, "\tinterfaces    specify interfaces which you want to attach to the Internet. If you don't specify any interfaces, babymdd will use all the available interfaces.\n");
 	fprintf(stderr, "Options\n");
-        fprintf(stderr, "\t-d            Turn on debug mode\n");
-        fprintf(stderr, "\t-D            Turn on verbose debug mode\n");
+        fprintf(stderr, "\t-d            turn on debug mode\n");
+        fprintf(stderr, "\t-D            turn on verbose debug mode\n");
         fprintf(stderr, "\t-p interval   polling link status per interval(sec)\n");
 }
 
@@ -183,10 +184,6 @@ main (argc, argv)
 
         argc -= optind;
         argv += optind;
-	if (argc == 0) {
-		baby_usage();
-                exit(1);
-	}
 
         /* open syslog */
         openlog("shisad(baby)", 0, LOG_DAEMON);
@@ -227,14 +224,34 @@ main (argc, argv)
 	init_hoa(babyinfo.hoa_index);
 
 	/* initilization of interfaces */
-        while (argc--) {
-		ifinfo = init_if(*argv++);
+	if (argc == 0) {
+		/* 
+		 * no interfaces are specified by users, babymdd uses all the
+		 * available interfaces 
+		 */
+		struct ifaddrs *ifa, *ifap;
 
-		/* increment priority, a bigger value indicats less priority */
-		if (ifinfo)
-			ifinfo->priority = priority++;
-	} 
+		if (getifaddrs(&ifap) != 0) {
+			syslog(LOG_ERR, "getifaddrs failed: %s\n", strerror(errno));
+			return;
+		}
 
+		for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+			ifinfo = init_if(ifa->ifa_name);
+			if (ifinfo)
+				ifinfo->priority = priority++;
+		}
+		freeifaddrs(ifap);
+
+	} else {
+		while (argc--) {
+			ifinfo = init_if(*argv++);
+			
+			/* increment priority, a bigger value indicats less priority */
+			if (ifinfo)
+				ifinfo->priority = priority++;
+		} 
+	}
 	/* each interface is initialized here */
 	baby_initif();
 
@@ -801,6 +818,7 @@ init_hoa(u_int16_t hoaindex) {
 			LIST_INSERT_HEAD(&babyinfo.hoainfo_head, hinfo, hoainfo_entry);
 			
 			free(ifmsg);
+			ifmsg = NULL;
 
 		}
 	}
@@ -915,7 +933,7 @@ baby_initif() {
 		
 		if (ifinfo->priority < ifinfo_next->priority) {
 			LIST_REMOVE(ifinfo_next, ifinfo_entry);
-			LIST_INSERT_BEFORE(ifinfo, ifinfo_next, ifinfo_entry);
+			LIST_INSERT_AFTER(ifinfo, ifinfo_next, ifinfo_entry);
 			ifinfo_next = ifinfo;
 		}
 	}
