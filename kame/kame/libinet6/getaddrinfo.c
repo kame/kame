@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.109 2001/07/03 08:47:04 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.110 2001/07/03 12:59:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -687,7 +687,7 @@ reorder(sentinel)
 	struct ai_order *aio;
 	int i, n;
 
-	/* counter the number of addrinfo element for sorting. */
+	/* count the number of addrinfo elements for sorting. */
 	for (n = 0, ai = sentinel->ai_next; ai != NULL; ai = ai->ai_next, n++)
 		;
 
