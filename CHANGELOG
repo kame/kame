@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1526 2001/02/04 02:22:35 itojun Exp $
+$KAME: CHANGELOG,v 1.1527 2001/02/04 05:30:05 jinmei Exp $
 
 <200102>
+2001-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/prefix/prefix.sh (prefix): added as a tiny replacement
+	of original prefix(8), based on recent clarification on the kernel
+	prefix/address manipulation engine.  "Tiny" means that it does NOT
+	provide complete backward compatibility with the original one.  It
+	can just do simple set/delete operations using ifconfig(8) as a
+	backend.  Thus, users are rather recommended not to use the prefix
+	command, but should use ifconfig (8) explicitly.
+
 Sun Feb  4 11:21:15 JST 2001  itojun@iijlab.net
 	* freebsd*: do not remove prefix list on net.inet6.ip6.forwarding
 	  change from 0 to 1.  the behavior is confusing, and not friendly
