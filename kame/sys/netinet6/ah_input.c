@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.57 2001/05/16 03:04:38 jinmei Exp $	*/
+/*	$KAME: ah_input.c,v 1.58 2001/05/16 03:06:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -296,7 +296,6 @@ ah4_input(m, va_alist)
 		goto fail;
 	}
 	
-    {
 	/*
 	 * some of IP header fields are flipped to the host endian.
 	 * convert them back to network endian.  VERY stupid.
@@ -332,7 +331,6 @@ ah4_input(m, va_alist)
 #ifdef WITH_CONVERT_IP_OFF
 	ip->ip_off = ntohs(ip->ip_off);
 #endif
-    }
 
     {
 	caddr_t sumpos = NULL;
