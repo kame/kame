@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.23 1999/11/03 12:48:28 sakane Exp $ */
+/* KAME $Id: key.c,v 1.24 1999/11/03 13:22:15 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -865,8 +865,9 @@ key_newsp()
  * so must be set properly later.
  */
 struct secpolicy *
-key_msg2sp(xpl0)
+key_msg2sp(xpl0, error)
 	struct sadb_x_policy *xpl0;
+	int *error;
 {
 	struct secpolicy *newsp;
 
@@ -874,8 +875,10 @@ key_msg2sp(xpl0)
 	if (xpl0 == NULL)
 		panic("key_msg2sp: NULL pointer was passed.\n");
 
-	if ((newsp = key_newsp()) == NULL)
+	if ((newsp = key_newsp()) == NULL) {
+		*error = ENOBUFS;
 		return NULL;
+	}
 
 	newsp->spidx.dir = xpl0->sadb_x_policy_dir;
 	newsp->policy = xpl0->sadb_x_policy_type;
@@ -899,6 +902,7 @@ key_msg2sp(xpl0)
 		if (PFKEY_EXTLEN(xpl0) <= sizeof(*xpl0)) {
 			printf("key_msg2sp: Invalid msg length.\n");
 			key_freesp(newsp);
+			*error = EINVAL;
 			return NULL;
 		}
 
@@ -912,6 +916,7 @@ key_msg2sp(xpl0)
 				printf("key_msg2sp: "
 					"invalid ipsecrequest length.\n");
 				key_freesp(newsp);
+				*error = EINVAL;
 				return NULL;
 			}
 
@@ -920,6 +925,7 @@ key_msg2sp(xpl0)
 			if ((*p_isr) == NULL) {
 				printf("key_msg2sp: No more memory.\n");
 				key_freesp(newsp);
+				*error = ENOBUFS;
 				return NULL;
 			}
 			bzero(*p_isr, sizeof(**p_isr));
@@ -938,6 +944,7 @@ key_msg2sp(xpl0)
 				printf("key_msg2sp: invalid proto type=%u\n",
 					xisr->sadb_x_ipsecrequest_proto);
 				key_freesp(newsp);
+				*error = EPROTONOSUPPORT;
 				return NULL;
 			}
 			(*p_isr)->saidx.proto = xisr->sadb_x_ipsecrequest_proto;
@@ -951,6 +958,7 @@ key_msg2sp(xpl0)
 				printf("key_msg2sp: invalid mode=%u\n",
 					xisr->sadb_x_ipsecrequest_mode);
 				key_freesp(newsp);
+				*error = EINVAL;
 				return NULL;
 			}
 			(*p_isr)->saidx.mode = xisr->sadb_x_ipsecrequest_mode;
@@ -964,6 +972,7 @@ key_msg2sp(xpl0)
 				printf("key_msg2sp: invalid level=%u\n",
 					xisr->sadb_x_ipsecrequest_level);
 				key_freesp(newsp);
+				*error = EINVAL;
 				return NULL;
 			}
 			(*p_isr)->level = xisr->sadb_x_ipsecrequest_level;
@@ -980,6 +989,7 @@ key_msg2sp(xpl0)
 					printf("key_msg2sp: invalid request "
 						"address length.\n");
 					key_freesp(newsp);
+					*error = EINVAL;
 					return NULL;
 				}
 				bcopy(paddr, &(*p_isr)->saidx.src,
@@ -994,6 +1004,7 @@ key_msg2sp(xpl0)
 					printf("key_msg2sp: invalid request "
 						"address length.\n");
 					key_freesp(newsp);
+					*error = EINVAL;
 					return NULL;
 				}
 				bcopy(paddr, &(*p_isr)->saidx.dst,
@@ -1011,6 +1022,7 @@ key_msg2sp(xpl0)
 			if (tlen < 0) {
 				printf("key_msg2sp: becoming tlen < 0.\n");
 				key_freesp(newsp);
+				*error = EINVAL;
 				return NULL;
 			}
 
@@ -1022,9 +1034,11 @@ key_msg2sp(xpl0)
 	default:
 		printf("key_msg2sp: invalid policy type.\n");
 		key_freesp(newsp);
+		*error = EINVAL;
 		return NULL;
 	}
 
+	*error = 0;
 	return newsp;
 }
 
@@ -1111,6 +1125,7 @@ key_spdadd(mhp)
 	struct sadb_x_policy *xpl0;
 	struct secpolicyindex spidx;
 	struct secpolicy *newsp;
+	int error;
 
 	/* sanity check */
 	if (mhp == NULL || mhp[0] == NULL)
@@ -1169,8 +1184,8 @@ key_spdadd(mhp)
 	}
 
 	/* allocation new SP entry */
-	if ((newsp = key_msg2sp(xpl0)) == NULL) {
-		msg0->sadb_msg_errno = ENOBUFS;
+	if ((newsp = key_msg2sp(xpl0, &error)) == NULL) {
+		msg0->sadb_msg_errno = error;
 		return NULL;
 	}
 

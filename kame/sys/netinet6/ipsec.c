@@ -1208,6 +1208,7 @@ ipsec_set_policy(pcb_sp, optname, request, priv)
 {
 	struct sadb_x_policy *xpl = (struct sadb_x_policy *)request;
 	struct secpolicy *newsp = NULL;
+	int error;
 
 	/* sanity check. */
 	if (pcb_sp == NULL || *pcb_sp == NULL || xpl == NULL)
@@ -1228,8 +1229,8 @@ ipsec_set_policy(pcb_sp, optname, request, priv)
 		return EACCES;
 
 	/* allocation new SP entry */
-	if ((newsp = key_msg2sp(xpl)) == NULL)
-		return EINVAL;	/* maybe ENOBUFS */
+	if ((newsp = key_msg2sp(xpl, &error)) == NULL)
+		return error;
 
 	newsp->state = IPSEC_SPSTATE_ALIVE;
 
