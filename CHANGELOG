@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1024 2000/06/15 04:31:26 sakane Exp $
+$Id: CHANGELOG,v 1.1025 2000/06/15 05:44:39 sakane Exp $
 
 <200006>
+Thu Jun 15 14:44:30 JST 2000 sakane@kame.net
+	* kame/kame/racoon:
+	CR payload is only made if signature authentication method is applied.
+
 Thu Jun 15 13:29:29 JST 2000 sakane@kame.net
 	* kame/kame/racoon/cfparse.y:
 	In racoon.conf, the path of configuration file is complemented by
