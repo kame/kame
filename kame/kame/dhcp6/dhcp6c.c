@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.69 2002/05/01 08:05:07 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.70 2002/05/01 08:09:16 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -583,8 +583,7 @@ static void
 client6_send(ifp, s)
 	struct dhcp_if *ifp;
 {
-	/* char buf[BUFSIZ]; */
-	char buf[sizeof(struct dhcp6) + 22];
+	char buf[BUFSIZ];
 	struct sockaddr_in6 dst;
 	int error;
 	struct dhcp6 *dh6;
