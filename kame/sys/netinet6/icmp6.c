@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.154 2000/10/18 20:01:29 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.155 2000/10/18 22:09:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -148,6 +148,17 @@ static int icmp6errpps_count = 0;
 static struct timeval icmp6errppslim_last;
 extern int icmp6_nodeinfo;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
+/*
+ * List of callbacks to notify when Path MTU changes are made.
+ */
+struct icmp6_mtudisc_callback {
+	LIST_ENTRY(icmp6_mtudisc_callback) mc_list;
+	void (*mc_func) __P((struct in6_addr *));
+};
+
+LIST_HEAD(, icmp6_mtudisc_callback) icmp6_mtudisc_callbacks =
+    LIST_HEAD_INITIALIZER(&icmp6_mtudisc_callbacks);
+
 static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
 extern int pmtu_expire;
 #endif
@@ -156,7 +167,6 @@ static void icmp6_errcount __P((struct icmp6errstat *, int, int));
 #ifndef HAVE_NRL_INPCB
 static int icmp6_rip6_input __P((struct mbuf **, int));
 #endif
-static void icmp6_mtudisc_update __P((struct ip6ctlparam *));
 static int icmp6_ratelimit __P((const struct in6_addr *, const int, const int));
 static const char *icmp6_redirect_diag __P((struct in6_addr *,
 	struct in6_addr *, struct in6_addr *));
@@ -256,6 +266,31 @@ icmp6_errcount(stat, type, code)
 	}
 	stat->icp6errs_unknown++;
 }
+
+#if defined(__NetBSD__)
+/*
+ * Register a Path MTU Discovery callback.
+ */
+void
+icmp6_mtudisc_callback_register(func)
+	void (*func) __P((struct in6_addr *));
+{
+	struct icmp6_mtudisc_callback *mc;
+
+	for (mc = LIST_FIRST(&icmp6_mtudisc_callbacks); mc != NULL;
+	     mc = LIST_NEXT(mc, mc_list)) {
+		if (mc->mc_func == func)
+			return;
+	}
+
+	mc = malloc(sizeof(*mc), M_PCB, M_NOWAIT);
+	if (mc == NULL)
+		panic("icmp6_mtudisc_callback_register");
+
+	mc->mc_func = func;
+	LIST_INSERT_HEAD(&icmp6_mtudisc_callbacks, mc, mc_list);
+}
+#endif
 
 /*
  * Generate an error packet of type error in response to bad IP6 packet.
@@ -902,7 +937,9 @@ icmp6_input(mp, offp, proto)
 			sizeof(struct ip6_hdr);
 		struct ip6ctlparam ip6cp;
 		struct in6_addr *finaldst = NULL;
+#ifndef __NetBSD__
 		int icmp6type = icmp6->icmp6_type;
+#endif
 		struct ip6_frag *fh;
 		struct ip6_rthdr *rth;
 		struct ip6_rthdr0 *rth0;
@@ -1050,8 +1087,10 @@ icmp6_input(mp, offp, proto)
 		ip6cp.ip6c_off = eoff;
 		ip6cp.ip6c_finaldst = finaldst;
 
+#ifndef __NetBSD__
 		if (icmp6type == ICMP6_PACKET_TOO_BIG)
 			icmp6_mtudisc_update(&ip6cp);
+#endif
 		ctlfunc = (void (*) __P((int, struct sockaddr *, void *)))
 			(inet6sw[ip6_protox[nxt]].pr_ctlinput);
 		if (ctlfunc) {
@@ -1082,10 +1121,13 @@ icmp6_input(mp, offp, proto)
 	return IPPROTO_DONE;
 }
 
-static void
+void
 icmp6_mtudisc_update(ip6cp)
 	struct ip6ctlparam *ip6cp;
 {
+#ifdef __NetBSD__
+	struct icmp6_mtudisc_callback *mc;
+#endif
 	struct in6_addr *dst = ip6cp->ip6c_finaldst;
 	struct icmp6_hdr *icmp6 = ip6cp->ip6c_icmp6;
 	struct mbuf *m = ip6cp->ip6c_m;	/* will be necessary for scope issue */
@@ -1147,6 +1189,16 @@ icmp6_mtudisc_update(ip6cp)
 	}
 	if (rt)
 		RTFREE(rt);
+
+#ifdef __NetBSD__
+	/*
+	 * Notify protocols that the MTU for this destination
+	 * has changed.
+	 */
+	for (mc = LIST_FIRST(&icmp6_mtudisc_callbacks); mc != NULL;
+	     mc = LIST_NEXT(mc, mc_list))
+		(*mc->mc_func)(&sin6.sin6_addr);
+#endif
 }
 
 /*

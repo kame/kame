@@ -140,6 +140,7 @@
 #include <netinet6/in6_pcb.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6protosw.h>
+#include <netinet/icmp6.h>
 #endif
 
 #include <netinet/tcp.h>
@@ -1216,7 +1217,7 @@ tcp6_ctlinput(cmd, sa, d)
 		if (m->m_pkthdr.len < off + sizeof(*thp))
 			return;
 
-		bzero(&th, 0, sizeof(th));
+		bzero(&th, sizeof(th));
 #ifdef DIAGNOSTIC
 		if (sizeof(*thp) > sizeof(th))
 			panic("assumption failed in tcp6_ctlinput");
