@@ -628,6 +628,18 @@ rtrequest1(req, info, ret_nrt)
 		if (rn->rn_flags & (RNF_ACTIVE | RNF_ROOT))
 			panic ("rtrequest delete");
 		rt = (struct rtentry *)rn;
+#ifdef RADIX_MPATH
+		/*
+		 * if we got multipath routes, we require users to specify
+		 * a matching RTAX_GATEWAY.
+		 */
+		if (rn_mpath_capable(rnh)) {
+			rt = rt_mpath_matchgate(rt, gateway);
+			rn = (struct radix_node *)rt;
+			if (!rt)
+				senderr(ESRCH);
+		}
+#endif
 		if (rt->rt_gwroute) {
 			rt = rt->rt_gwroute; RTFREE(rt);
 			(rt = (struct rtentry *)rn)->rt_gwroute = NULL;
@@ -686,6 +698,12 @@ rtrequest1(req, info, ret_nrt)
 			rt_maskedcopy(dst, ndst, netmask);
 		} else
 			Bcopy(dst, ndst, dst->sa_len);
+#ifdef RADIX_MPATH
+		/* do not permit exactly the same dst/mask/gw pair */
+		if (rn_mpath_capable(rnh) &&
+		    rt_mpath_conflict(rnh, rt, netmask))
+			senderr(EEXIST);
+#endif
 		rn = rnh->rnh_addaddr((caddr_t)ndst, (caddr_t)netmask,
 					rnh, rt->rt_nodes);
 		if (rn == NULL) {

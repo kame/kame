@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.c,v 1.12 2002/10/28 20:48:50 itojun Exp $	*/
+/*	$KAME: radix_mpath.c,v 1.13 2002/10/28 21:05:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -45,6 +45,9 @@
 #include <net/route.h>
 #ifdef __NetBSD__
 #include <sys/pool.h>
+#endif
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
 #endif
 
 /*

@@ -11,8 +11,11 @@ include	"arch/i386/conf/GENERIC"
 #pseudo-device	dummy	1	# dummy
 #pseudo-device	stf		# 6to4 interface
 
+# routing table hacks - they cannot coexist
 # ART routing table lookup algorithm (inet/inet6)
 #option		RADIX_ART
+# multipath support in radix routing table
+#option		RADIX_MPATH
 
 # ALTQ options (ALTQ is enabled in "sys/conf/GENERIC" but other ALTQ
 #		related options are enabled here)
