@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.61 2001/07/25 09:20:05 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.62 2001/07/25 17:25:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -588,6 +588,7 @@ gif_ioctl(ifp, cmd, data)
 				&(((struct if_laddrreq *)data)->addr);
 			dst = (struct sockaddr *)
 				&(((struct if_laddrreq *)data)->dstaddr);
+			break;
 		default:
 			return EINVAL;
 		}
