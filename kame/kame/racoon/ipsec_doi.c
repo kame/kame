@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.18 2000/01/11 17:01:47 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.19 2000/01/11 19:09:36 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -902,30 +902,38 @@ found:
     }
 
 	if (iph2->side == RESPONDER) {
-		/* XXX record spi? */
-	} else {
-		/* set peer's spi from proposal payload */
-		struct sockaddr *dst;
-		struct ipsecsakeys *k;
-
-		dst = r->dst ? r->dst : iph2->dst; /* XXX cheat */
-		for (k = iph2->keys; k != NULL; k = k->next) {
-			if (r->proto_id == k->proto_id
-			 && r->encmode == k->encmode
-			 && cmpsaddrwop(dst, k->dst) == 0)
-				break;
-		}
-		if (k == NULL) {
+		iph2->approval = r;
+		/* ipsecsa keys from approval */
+		if (ipsecdoi_initsakeys(iph2) < 0) {
 			plog(logp, LOCATION, NULL,
-				"no SPI found for %s/%s\n",
-				s_ipsecdoi_proto(r->proto_id),
-				saddrwop2str(dst));
-			delipsecsa(r);
+				"failed to get variable spece for phase2.\n");
+			delipsecsa(sa);
 			return -1;
 		}
-		memcpy(&k->spi_p, p->prop + 1, sizeof(k->spi_p));
-
 	}
+
+    {
+	/* set peer's spi from proposal payload */
+	struct sockaddr *dst;
+	struct ipsecsakeys *k;
+
+	dst = r->dst ? r->dst : iph2->dst; /* XXX cheat */
+	for (k = iph2->keys; k != NULL; k = k->next) {
+		if (r->proto_id == k->proto_id
+		 && r->encmode == k->encmode
+		 && (cmpsaddrwop(dst, k->dst) == 0))
+			break;
+	}
+	if (k == NULL) {
+		plog(logp, LOCATION, NULL,
+			"no SPI found for %s/%s\n",
+			s_ipsecdoi_proto(r->proto_id),
+			saddrwop2str(dst));
+		delipsecsa(r);
+		return -1;
+	}
+	memcpy(&k->spi_p, p->prop + 1, sizeof(k->spi_p));
+    }
 
 	iph2->approval = r;
 

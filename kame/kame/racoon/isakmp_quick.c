@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.8 2000/01/11 15:56:04 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.9 2000/01/11 19:09:37 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1156,13 +1156,6 @@ quick_r1prep(iph2, msg)
 		goto end;
 	}
 
-	/* ipsecsa keys from approval */
-	if (ipsecdoi_initsakeys(iph2) < 0) {
-		plog(logp, LOCATION, NULL,
-			"failed to get variable spece for phase2.\n");
-		goto end;
-	}
-
 	iph2->status = PHASE2ST_GETSPISENT;
 
 	/* send getspi message */
@@ -1193,6 +1186,7 @@ quick_r2send(iph2, msg)
 	vchar_t *body = NULL;
 	struct isakmp_gen *gen;
 	char *p;
+	vchar_t *sa;
 	int tlen;
 	int error = -1;
 	int pfsgroup;
@@ -1205,6 +1199,13 @@ quick_r2send(iph2, msg)
 			"status mismatched %d.\n", iph2->status);
 		goto end;
 	}
+
+	/* create SA payload for my proposal */
+	sa = ipsecdoi_setph2proposal(iph2->spidx->policy->proposal, iph2->keys);
+	if (sa == NULL)
+		goto end;
+	memmove(sa->v, sa->v + sizeof(*gen), sa->l - sizeof(*gen));
+	sa->l -= sizeof(*gen);
 
 	/* generate NONCE value */
 	iph2->nonce = eay_set_random(iph2->ph1->rmconf->nonce_size);
@@ -1222,7 +1223,7 @@ quick_r2send(iph2, msg)
 	}
 
 	/* create SA;NONCE payload, and KE and ID if need */
-	tlen = sizeof(*gen) + iph2->sa_ret->l
+	tlen = sizeof(*gen) + sa->l
 		+ sizeof(*gen) + iph2->nonce->l;
 	if (iph2->dhpub_p != NULL && pfsgroup != 0)
 		tlen += (sizeof(*gen) + iph2->dhpub->l);
@@ -1239,7 +1240,7 @@ quick_r2send(iph2, msg)
 	p = body->v;
 
 	/* make SA payload */ 
-	p = set_isakmp_payload(body->v, iph2->sa_ret, ISAKMP_NPTYPE_NONCE);
+	p = set_isakmp_payload(body->v, sa, ISAKMP_NPTYPE_NONCE);
 
 	/* add NONCE payload */
 	p = set_isakmp_payload(p, iph2->nonce,
