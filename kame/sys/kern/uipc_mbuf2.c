@@ -161,7 +161,7 @@ m_pulldown(m, off, len, offp)
 		} else {
 			if (m->m_len >= off + len)
 				;
-			if (m->m_len + M_TRAILINGSPACE(m) >= off + len)
+			else if (m->m_len + M_TRAILINGSPACE(m) >= off + len)
 				ip6stat.ip6s_pullup2_copy++;
 			else {
 				ip6stat.ip6s_pullup2_alloc++;
