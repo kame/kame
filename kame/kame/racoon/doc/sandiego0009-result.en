@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.17 2000/09/20 16:19:33 itojun Exp $
+$KAME: sandiego0009-result.en,v 1.18 2000/09/20 19:24:32 itojun Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -73,7 +73,8 @@ vs SSH (IPv6)
 	    ESP blowfish-cbc + AH sha1, transport mode
 	    ESP blowfish-cbc+md5 + AH sha1, transport mode
 	    IPCOMP deflate + ESP blowfish-cbc+md5 + AH sha1, transport mode
-		(negotiation failed due to proposal ordering constraint)
+	    IPCOMP deflate + AH sha1, transport mode
+	    ESP twofish-cbc+sha1, transport mode
 
 	Notes:
 	- both end had issues with ND, if we configure "encrypt all" policy.
@@ -89,7 +90,10 @@ vs SSH (IPv6)
 	  common)
 	- no SADB_ACQUIRE on ipcomp SPD (fixed by making SADB_ACQUIRE processing
 	  violate RFC2367 a little)
+	- SADB_UPDATE when wellknown CPI is negotiated
 	- rekey is working fine.
+	- SSH uses different algorithm number for twofish than the AES draft.
+	- deflate does not look stable enough (memory leak in SSH side).  
 
 vs RapidStream (CONTINUE)
 	phase 1: responder, main
