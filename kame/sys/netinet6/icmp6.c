@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.297 2002/04/09 12:17:53 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.298 2002/04/10 13:09:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3652,7 +3652,7 @@ icmp6_mtudisc_timeout(rt, r)
 	if (rt == NULL)
 		panic("icmp6_mtudisc_timeout: bad route to timeout");
 #ifdef __FreeBSD__
-	if (!(rt->rt_rmx.rmx_locks & RTV_MTU)) /* this should be the case... */
+	if (!(rt->rt_rmx.rmx_locks & RTV_MTU))
 		rt->rt_rmx.rmx_mtu = nd_ifinfo[rt->rt_ifp->if_index].linkmtu;
 #else  /* i.e. netbsd and openbsd */
 	if ((rt->rt_flags & (RTF_DYNAMIC | RTF_HOST)) ==
