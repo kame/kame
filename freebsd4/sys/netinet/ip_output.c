@@ -1181,7 +1181,6 @@ ip_fragment(struct mbuf *m, struct ifnet *ifp, u_long mtu)
 	int len, hlen, off;
 	int mhlen, firstlen;
 	struct mbuf **mnext;
-	int s;
 	int error = 0;
 	int nfrags = 1;
 	int sw_csum;
@@ -1199,6 +1198,8 @@ ip_fragment(struct mbuf *m, struct ifnet *ifp, u_long mtu)
 	 * Loop through length of segment after first fragment,
 	 * make new header and copy data of each part and link onto chain.
 	 */
+	firstlen = len;
+	mnext = &m->m_nextpkt;
 	m0 = m;
 	mhlen = sizeof (struct ip);
 	for (off = hlen + len; off < (u_short)ip->ip_len; off += len) {
