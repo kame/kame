@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.116 2000/05/25 02:03:46 jinmei Exp $	*/
+/*	$KAME: key.c,v 1.117 2000/05/25 02:08:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -107,6 +107,9 @@
 
 #ifndef offsetof
 #define offsetof(type, member)	((size_t)(&((type *)0)->member))
+#endif
+#ifndef satosin
+#define satosin(s) ((struct sockaddr_in *)s)
 #endif
 
 /*
@@ -3801,9 +3804,6 @@ key_cmpspidx_exactly(spidx0, spidx1)
  *	1 : equal
  *	0 : not equal
  */
-#ifndef satosin		/* XXX: bsdi3 does not define satosin in in.h */
-#define satosin(s) ((struct sockaddr_in *)s)
-#endif
 static int
 key_cmpspidx_withmask(spidx0, spidx1)
 	struct secpolicyindex *spidx0, *spidx1;
