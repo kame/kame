@@ -167,14 +167,17 @@ static char *ai_errlist[] = {
 };
 
 #define GET_CANONNAME(ai, str) \
-if (pai->ai_flags & AI_CANONNAME) {\
-	if (((ai)->ai_canonname = (char *)malloc(strlen(str) + 1)) != NULL) {\
-		strcpy((ai)->ai_canonname, (str));\
-	} else {\
-		error = EAI_MEMORY;\
-		goto free;\
-	}\
-}
+do { \
+	if (pai->ai_flags & AI_CANONNAME) {\
+		if (((ai)->ai_canonname = (char *)malloc(strlen(str) + 1)) \
+				!= NULL) {\
+			strcpy((ai)->ai_canonname, (str));\
+		} else {\
+			error = EAI_MEMORY;\
+			goto free;\
+		}\
+	} \
+} while (0)
 
 #ifdef HAVE_SOCKADDR_SA_LEN
 #define COPY_ADDRLEN(ai, afd) (ai)->ai_addr->sa_len = (ai)->ai_addrlen = (afd)->a_socklen
@@ -182,7 +185,8 @@ if (pai->ai_flags & AI_CANONNAME) {\
 #define COPY_ADDRLEN(ai, afd) (ai)->ai_addrlen = (afd)->a_socklen
 #endif
 
-#define GET_AI(ai, afd, addr, port) {\
+#define GET_AI(ai, afd, addr, port) \
+do { \
 	char *p;\
 	if (((ai) = (struct addrinfo *)malloc(sizeof(struct addrinfo) +\
 					      ((afd)->a_socklen)))\
@@ -198,9 +202,13 @@ if (pai->ai_flags & AI_CANONNAME) {\
 	((struct sockinet *)(ai)->ai_addr)->si_port = port;\
 	p = (char *)((ai)->ai_addr);\
 	memcpy(p + (afd)->a_off, (addr), (afd)->a_addrlen);\
-}
+} while (0)
 
-#define ERR(err) { error = (err); goto bad; }
+#define ERR(err) \
+do { \
+	error = (err); \
+	goto bad; \
+} while (0)
 
 char *
 gai_strerror(ecode)

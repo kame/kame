@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.4 1999/09/26 06:43:34 jinmei Exp $ */
+/* $Id: name6.c,v 1.5 1999/09/26 07:21:15 itojun Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -75,14 +75,15 @@
 #define	ADDRLEN(af)	sizeof(struct in_addr)
 #endif
 
-#define	MAPADDR(ab, ina) {						\
+#define	MAPADDR(ab, ina) \
+do {									\
 	memcpy(&(ab)->map_inaddr, ina, sizeof(struct in_addr));		\
 	memset((ab)->map_zero, 0, sizeof((ab)->map_zero));		\
 	memset((ab)->map_one, 0xff, sizeof((ab)->map_one));		\
-}
+} while (0)
 #define	MAPADDRENABLED(flags) \
-	((flags & AI_V4MAPPED) || \
-	 ((flags & AI_V4MAPPED_CFG) && _mapped_addr_enabled()))
+	(((flags) & AI_V4MAPPED) || \
+	 (((flags) & AI_V4MAPPED_CFG) && _mapped_addr_enabled()))
 
 union inx_addr {
 	struct in_addr	in_addr;
