@@ -16,16 +16,18 @@
 .include "${.CURDIR}/../Makefile.opsys"
 .endif
 
-BINDIR=	${PREFIX}/bin
-PROG=	ptrconfig
-SRCS=	main.c ptrconfig.y.c ptrconfig.l.c error.c misc.c show.c yylex.c
-CLEANFILES+= ptrconfig.y.c ptrconfig.l.c ptrconfig.y.h y.output y.tab.c y.tab.h
+.PATH:		${.CURDIR}/../../../sys/netinet6
+
+BINDIR=	${PREFIX}/sbin
+PROG=	natptconfig
+SRCS=	main.c natptconfig.y.c natptconfig.l.c misc.c show.c yylex.c
+CLEANFILES+= natptconfig.y.c natptconfig.l.c natptconfig.y.h y.output y.tab.c y.tab.h
 
 .if (${OPSYS} != "NetBSD")
 CFLAGS+= -Wall
 .endif
 
-CFLAGS+= -DYYDEBUG -DPTR -DreadKMEM
+CFLAGS+= -g -DYYDEBUG -DNATPT -DreadKMEM
 
 LDADD+=	-L${.CURDIR}/../libinet6 -L${.CURDIR}/../libinet6/obj \
 	-L/usr/local/v6/lib -linet6 -lkvm -ly -ll
@@ -33,28 +35,21 @@ DPADD+=	${.CURDIR}/../libinet6/libinet6.a \
 	${.CURDIR}/../libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
-#.if (${OPSYS} != "NetBSD")
-#MAN8=	ptrconfig.8 ptrlog.8
-#.else
-#MAN=	ptrconfig.8 ptrlog.8
-#.endif
+.if (${OPSYS} != "NetBSD")
+MAN8=	natptconfig.8
+.else
+MAN=	natptconfig.8
+.endif
 
-NOMAN=yes
+
+natptconfig.y.c \
+natptconfig.y.h:	natptconfig.y showvar.h
+		$(YACC) ${YFLAGS} natptconfig.y
+		mv y.tab.c natptconfig.y.c
+		mv y.tab.h natptconfig.y.h
+
+natptconfig.l.c:	natptconfig.l
+		$(LEX) -t -L natptconfig.l > natptconfig.l.c
+
 
 .include <bsd.prog.mk>
-
-
-#
-#
-#
-
-               MV = /bin/mv
-
-ptrconfig.y.c \
-ptrconfig.y.h:	ptrconfig.y showvar.h
-		$(YACC) -d ptrconfig.y
-		$(MV) y.tab.c ptrconfig.y.c
-		$(MV) y.tab.h ptrconfig.y.h
-
-ptrconfig.l.c:	ptrconfig.l
-		$(LEX) -t -L ptrconfig.l > ptrconfig.l.c

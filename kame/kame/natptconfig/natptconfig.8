@@ -1,0 +1,181 @@
+.\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"	$Id: natptconfig.8,v 1.1 2000/01/07 14:33:32 fujisawa Exp $
+.\"
+.\" Note: The date here should be updated whenever a non-trivial
+.\" change is made to the manual page.
+.Dd December 25, 1999
+.Dt NATPTCONFIG 8
+.\" Note: Only specify the operating system when the command
+.\" is FreeBSD specific, otherwise use the .Os macro with no
+.\" arguments.
+.Os KAME
+.\"
+.Sh NAME
+.Nm natptconfig
+.Nd configure IPv6-to-IPv4 translator
+.\"
+.Sh SYNOPSIS
+.Nm natptconfig
+.Fl f Ar configfile
+.\"
+.Sh DESCRIPTION
+.Nm Natptconfig
+configures and control the IPv6-to-IPv4 translator implemented in the
+kernel.
+.Pp
+.Nm Natptconfig
+has two format of command line araguments.  First one has the
+following options.
+.Bl -tag -width Fl
+.It Fl f Ar configfile
+Evaluate the content of file specified by configfile, as configuration
+directives.  By specifying
+.Dq Li - ,
+standard inpt can be used.
+.Pp
+.El
+The second form is ...
+(to be written)
+.\"
+.Sh DIRECTIVES
+Each rule processed by translater is added in the kernel internal
+lists if there is no parsing problems.	Rules are added to the end of
+the internal lists using "map" natptconfig directive, matching the
+order in which they apper when given in natptconfig.
+.Pp
+The following directives are available.
+.Bl -tag -width Ds
+.\"
+.It Xo
+.Li ?
+.Xc
+Show abailable actions on each stage.
+.\"
+.It Xo
+.Li interface
+.Ar interfaceName
+.Li {internal|external}
+.Xc
+Mark interface <interfaceName> as external (outside) or internal
+(inside).  External (outside) means that the interface is on the
+Internet side, and internal (inside) means that the interface is on
+the private side.  Only packets arriving on this interface will be
+subject to IPv6-to-IPv4 protocol translation.
+.\"
+.It Xo
+.Li prefix
+.Ar natpt <v6addr> / <prefixlen>
+.Xc
+Set NAT-PT prefix, and packet addressed to this prefix will subject to
+translate.
+.\"
+.It Xo
+.Li map outbound from <v6addr> to <v4addr> port
+.Xc
+Add translate rule into the kernel internal lists.  First outgoing
+packet mathes this rule will subject to translate.  The rules for
+returning packet is not apper in this map list.
+.\"
+.It Xo
+.Li map {enable|disable}
+.Xc
+Enable or disable translation.
+.\"
+.It Xo
+.Li show
+.Xc
+.\"
+.Sh EXAMPLES
+The following is an example of a typical usage
+of the
+.Nm
+command:
+.Pp
+.Dl % natptconfig -f natptconfig.cf
+.Pp
+The following is an example of a content of the
+.Nm
+configuration file.
+.Pp
+.Bd -literal -offset indent
+% cat natptconfig.conf
+interface fxp0 external
+prefix natpt 3ffe:0501:4819:c1ad::/96
+map outbound from 3ffe:0501:4819:6000::/64 to 172.16.196.1 port 28672 - 32767
+map enable
+%
+.Ed
+.Pp
+The following is an example of '?' directive.
+.Bd -literal -offset indent
+% natptconfig ?
+	interface	Mark interface as outside or inside.
+	map		Set translation rule.
+	set		Set  value to in-kernel variable.
+	show		Show setting.
+% natptconfig interface ?
+	<interfaceName> {internal|external}
+%
+.\"
+.Sh FILES
+.Bl -tag -width /dev/kmemxxx -compact
+.It Pa /kernel
+default kernel namelist
+.It Pa /dev/kmem
+default memory file
+.El
+.\"
+.Sh SEE ALSO
+.Xr natptd 8 ,
+.Xr natptlog 8
+.Rs
+.%A George Tsirtsis
+.%T Network Address Translation - Protocol Translation (NAT-PT)
+.%O <draft-ietf-ngtrans-natpt-07.txt>
+.Re
+.El
+.\"
+.Sh DIAGNOSTICS
+(to be written)
+.\"
+.Sh BUGS
+The
+.Nm
+command is now under development.  It's user interface and overall
+functionality are subjects to future improvements and changes.
+.Pp
+This translator will not automatically perform proxy ARP.  Therefore,
+you may need to configure the translator box for proxy ARP, or
+configure alias IP address by using
+.Xr ifconfig 8 .
+.\"
+.Sh HISTORY
+.Nm Natptconfig
+are implemented by Shin-ichi Fujisawa
+.Li <fujisawa@kame.net> .
