@@ -1,6 +1,6 @@
 #! @PERL@
 
-#	$KAME: dynupdate.pl.in,v 1.8 2001/03/15 05:33:57 jinmei Exp $
+#	$KAME: dynupdate.pl.in,v 1.9 2001/03/15 12:10:16 itojun Exp $
 
 # Copyright (C) 2001 WIDE Project.
 # All rights reserved.
@@ -36,9 +36,8 @@
 #
 # issue a DNS dynamic update request using BIND9 nsupdate.
 #
-# "secret": TSIG key (look at BIND9 ARM section on TSIG key generation)
-#	if you don't define $tsigkey, the script will not use TSIG.
-#	in this case your zone becomes very insecure.  we do not recomment that.
+# $tsigkeyfile: TSIG key (look at BIND9 ARM section on TSIG key generation)
+#	if you don't define $tsigkeyfile, the script will not use TSIG.
 # yourhost.dyn.your.domain ($name.$domain): FQDN of your machine
 #
 # TODO: register PTR record for reverse lookup
@@ -47,7 +46,6 @@
 $ifconfig = '@IFCONFIG@';
 $nsupdate = '@NSUPDATE@';
 #$serveraddr = '3ffe:501:4819::42';
-#$tsigkey = 'dyn.your.domain:secret';
 #$tsigkeyfile = '/etc/namedb/tsig/Kfoo.bar.org.+123+4567';
 #$name = 'yourhost';
 #$domain = 'dyn.your.domain';
@@ -80,13 +78,6 @@ while (<ADDRS>) {
 	push(@addrs, (split(/\s+/, $_))[0]);
 }
 
-if (defined($tsigkey) && defined($tsigkeyfile)) {
-	die "tsigkey and tsigkeyfile are exclusive.";
-}
-
-if (defined($tsigkey)) {
-	$update_flags .= "-y $tsigkey";
-}
 if (defined($tsigkeyfile)) {
 	$update_flags .= "-k $tsigkeyfile";
 }
