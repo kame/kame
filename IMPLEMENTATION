@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.247 2001/07/23 07:31:40 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.248 2001/07/23 15:03:51 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -560,13 +560,13 @@ autoconfigure itself by stateless address autoconfiguration.
 This behavior can be controlled by net.inet6.ip6.accept_rtadv
 (host autoconfigures itself if it is set to 1).
 By autoconfiguration, network address prefix for the receiving interface
-(usually global address prefix) is added. The default route is also
+(usually global address prefix) is added.  The default route is also
 configured.
 
 Routers periodically generate Router Advertisement packets.  To
 request an adjacent router to generate RA packet, a host can transmit
 Router Solicitation.  To generate an RS packet at any time, use the
-"rtsol" command. The "rtsold" daemon is also available. "rtsold"
+"rtsol" command.  The "rtsold" daemon is also available. "rtsold"
 generates Router Solicitation whenever necessary, and it works great
 for nomadic usage (notebooks/laptops).  If one wishes to ignore Router
 Advertisements, use sysctl to set net.inet6.ip6.accept_rtadv to 0.
@@ -598,10 +598,10 @@ See 1.2 in the document for relationship between DAD and autoconfiguration.
 
 1.4.3 DHCPv6
 
-We supply a tiny DHCPv6 server/client in kame/dhcp6. However, the
+We supply a tiny DHCPv6 server/client in kame/dhcp6.  However, the
 implementation is premature (for example, this does NOT implement
 address lease/release), and it is not in default compilation tree on
-some platforms. If you want to do some experiment, compile it on your
+some platforms.  If you want to do some experiment, compile it on your
 own.
 
 DHCPv6 and autoconfiguration also needs more work.  "Managed" and "Other"
@@ -661,16 +661,16 @@ For instance, ::1 is selected for ff01::1,
 fe80::200:f8ff:fe01:6317%ne0 for fe80::2a0:24ff:feab:839b%ne0.
 To see how longest-matching works, suppose that
 3ffe:501:808:1:200:f8ff:fe01:6317 and 3ffe:2001:9:124:200:f8ff:fe01:6317
-are given on the outgoing interface. Then the former is chosen as the
-source for the destination 3ffe:501:800::1. Note that even if all
+are given on the outgoing interface.  Then the former is chosen as the
+source for the destination 3ffe:501:800::1.  Note that even if all
 available addresses have smaller scope than the scope of the
-destination, we choose one anyway. For example, if we have link-local
+destination, we choose one anyway.  For example, if we have link-local
 and site-local addresses only, we choose a site-local addresses for a
-global destination. If the packet is going to break a site boundary,
+global destination.  If the packet is going to break a site boundary,
 the boundary router will return an ICMPv6 destination unreachable
 error with code 2 - beyond scope of source address.
 
-The precise desripction of the algorithm is quite complicated. To
+The precise desripction of the algorithm is quite complicated.  To
 describe the algorithm, we introduce the following notation:
 
 For a given destination D,
@@ -687,9 +687,9 @@ For a given set of addresses A,
           manually-configure addresses in A.
 
 Also, the algorithm assumes that the outgoing interface for the
-destination D is determined. We call the interface "I".
+destination D is determined.  We call the interface "I".
 
-The algorithm is as follows. Selection proceeds step by step as
+The algorithm is as follows.  Selection proceeds step by step as
 described; For example, if an address is selected by item 1, item 2 and
 later are not considered at all.
 
@@ -702,7 +702,7 @@ later are not considered at all.
      from I, choose an arbitrary one provided that an address longest
      matching against D is always preferred.
   2. If tmp(largerscope(D)) is not empty,
-     then choose an address that has the smallest scope. If more than one
+     then choose an address that has the smallest scope.  If more than one
      address has the smallest scope, choose an arbitrary one provided
      that addresses on I are always preferred.
   3. If nonDEP(samescope(D)) is not empty,
@@ -716,7 +716,7 @@ later are not considered at all.
      from I, choose an arbitrary one provided that an address longest
      matching against D is always preferred.
   6. If tmp(DEP(largerscope(D))) is not empty,
-     then choose an address that has the smallest scope. If more than
+     then choose an address that has the smallest scope.  If more than
      one address has the smallest scope, choose an arbitrary one provided
      that an address on I is always preferred.
   7. If DEP(samescope(D)) is not empty,
@@ -725,11 +725,11 @@ later are not considered at all.
      then apply the same logic as of 6.
   9. If we do not prefer temporary addresses, go to 11.
      Otherwise, and if tmp(nonDEP(smallerscope(D))) is not empty,
-     then choose an address that has the largest scope. If more than
+     then choose an address that has the largest scope.  If more than
      one address has the largest scope, choose an arbitrary one provided
      that an address on I is always preferred.
  10. If tmp(DEP(smallerscope(D))) is not empty,
-     then choose an address that has the largest scope. If more than
+     then choose an address that has the largest scope.  If more than
      one address has the largest scope, choose an arbitrary one provided
      that an address on I is always preferred.
  11. If nonDEP(smallerscope(D)) is not empty,
@@ -738,9 +738,9 @@ later are not considered at all.
      then apply the same logic as of 10.
 
 There exists a document about source address selection
-(draft-ietf-ipngwg-default-addr-select-xx.txt). KAME's algorithm
+(draft-ietf-ipngwg-default-addr-select-xx.txt).  KAME's algorithm
 described above takes a similar approach to the document, but there
-are some differences. See the document for more details.
+are some differences.  See the document for more details.
 
 There are some cases where we do not use the above rule.  One
 example is connected TCP session, and we use the address kept in TCP
@@ -786,7 +786,7 @@ If KAME kernel receives an IPv6 packet, it checks the frame length of
 the packet and compares it to the length specified in the payload
 length field of the IPv6 header or in the value of the Jumbo Payload
 option, if any.  If the former is shorter than the latter, KAME kernel
-discards the packet and increments the statistics. You can see the
+discards the packet and increments the statistics.  You can see the
 statistics as output of netstat command with `-s -p ip6' option:
 	% netstat -s -p ip6
 	ip6:
@@ -838,8 +838,8 @@ In addition to this, we restrict the number of extension headers
 (including the IPv6 header) in each incoming packet, in order to
 prevent a DoS attack that tries to send packets with a massive number
 of extension headers.  The upper limit can be configured by the sysctl
-value net.inet6.ip6.hdrnestlimit. In particular, if the value is 0,
-the node will allow an arbitrary number of headers. As of writing this
+value net.inet6.ip6.hdrnestlimit.  In particular, if the value is 0,
+the node will allow an arbitrary number of headers.  As of writing this
 document, the default value is 50.
 
 IPv4 part (sys/netinet) remains untouched for compatibility.
@@ -1424,7 +1424,7 @@ libinet6.a has a comple of extensions against libc DNS resolver:
 
 KAME requires three items to be added into the standard drivers:
 
-(1) mbuf clustering requirement. In this stable release, we changed
+(1) mbuf clustering requirement.  In this stable release, we changed
     MINCLSIZE into MHLEN+1 for all the operating systems in order to make
     all the drivers behave as we expect.  
 
@@ -1962,11 +1962,11 @@ IPsec, and/or 2292bis API, needs further study.
 
 6.2 KAME node as home agent/mobile node
 
-KAME mobile-ip6 code is now under reconstruction. The code contributed
+KAME mobile-ip6 code is now under reconstruction.  The code contributed
 by Ericsson integrated before has been removed.
 
-The last snap that includes mobile-ip6 code is 20010604. We at least
-will provide the mobile-ip6 patch for the snap 20010611. The patch is
+The last snap that includes mobile-ip6 code is 20010604.  We at least
+will provide the mobile-ip6 patch for the snap 20010611.  The patch is
 available from the location shown bellow.
 
 	ftp://ftp.kame.net/kame/contrib/mip6/ericsson/
@@ -2084,7 +2084,7 @@ to make the distributed develoment smooth.
 - add the following line to the head of every KAME-derived file:
   /*	(dollar)KAME(dollar)	*/
   where "(dollar)" is the dollar character ($), and around "$" are tabs.
-  (this is for C. For other language, you should use its own comment
+  (this is for C.  For other language, you should use its own comment
   line.)
   Once commited to the CVS repository, this line will contain its
   version number (see, for example, at the top of this file).  This
