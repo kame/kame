@@ -6,7 +6,7 @@ $hostname =~ s/\n$//;
 $userfqdn = `whoami`;
 $userfqdn =~ s/\n$//;
 $userfqdn .= '@' . $hostname;
-$rcsid = '$Id: sandiego.pl,v 1.4 2000/01/11 18:50:54 itojun Exp $';
+$rcsid = '$Id: sandiego.pl,v 1.5 2000/01/11 19:47:41 itojun Exp $';
 
 print <<EOF;
 # automatically generated from $rcsid
@@ -173,7 +173,7 @@ remote 194.100.55.1 [500]
 		authentication_method pre_shared_key ;
 	}
 	proposal {
-		strength high;
+		encryption_algorithm 3des;
 		authentication_method pre_shared_key ;
 
 		# they can be defined individually.
