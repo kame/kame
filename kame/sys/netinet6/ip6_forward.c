@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.130 2004/01/16 04:58:30 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.131 2004/01/16 05:01:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -401,7 +401,8 @@ ip6_forward(m, srcrt)
 		 * packet instead of forwarding the packet.  
 		 */
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-		ip6_output(m, NULL, NULL, IPV6_FORWARDING/*XXX*/, NULL, NULL, NULL);
+		ip6_output(m, NULL, NULL, IPV6_FORWARDING/*XXX*/, NULL, NULL,
+		    NULL);
 #else
 		ip6_output(m, NULL, NULL, IPV6_FORWARDING/*XXX*/, NULL, NULL);
 #endif
