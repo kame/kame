@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.8 2003/06/17 08:26:22 itojun Exp $	*/
+/*	$KAME: config.h,v 1.9 2003/08/06 04:19:40 ono Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -36,9 +36,6 @@ extern void update_prefix __P((struct prefix *));
 extern void make_prefix __P((struct rainfo *, int, struct in6_addr *, int));
 extern void make_packet __P((struct rainfo *));
 extern void get_prefix __P((struct rainfo *));
-#ifdef VRRP
-extern void delete_prefix_from_kernel __P((struct rainfo *));
-#endif
 
 
 /*

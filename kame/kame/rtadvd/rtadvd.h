@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.26 2003/08/05 12:34:23 itojun Exp $	*/
+/*	$KAME: rtadvd.h,v 1.27 2003/08/06 04:19:41 ono Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -107,9 +107,6 @@ struct soliciter {
 	struct soliciter *next;
 	struct sockaddr_in6 addr;
 };
-
-#define VRRP_FLG_VRRPIF 0x1
-#define VRRP_FLG_ACTIVE 0x2
 
 struct	rainfo {
 	/* pointer for list */
