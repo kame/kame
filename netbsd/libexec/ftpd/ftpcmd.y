@@ -349,7 +349,7 @@ cmd
 			hints.ai_socktype = SOCK_STREAM;
 			if (getaddrinfo(result[1], result[2], &hints, &res))
 				goto parsefail;
-			if (sizeof(data_dest) > res->ai_addrlen) {
+			if (sizeof(data_dest) < res->ai_addrlen) {
 				reply(500,
 				    "Illegal EPRT command rejected");
 				return (NULL);
