@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/25 06:15:18 $
+		     $Date: 2000/04/25 07:21:54 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -62,8 +62,6 @@ Many of old ones have been solved.
 	(2) ancillary data: due to RFC2292 and X/Open change in CMSG_xx.  
   You may experience some trouble running non-KAME binaries (like
   those shipped with stock *BSD) on top of KAME kernel.
-
-- With KAME/NetBSD, ipip pseudo interface does not work at all.
 
 - In the past we have shipped IPv6-ready tcpdump/libpcap with KAME
   kit.  To make a single effort in tcpdump.org, we have removed the

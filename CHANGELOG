@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.812 2000/04/25 02:40:11 itojun Exp $
+$Id: CHANGELOG,v 1.813 2000/04/25 07:21:53 itojun Exp $
 
 <200004>
+Tue Apr 25 16:21:24 JST 2000  itojun@iijlab.net
+	* netbsd/sys/netinet/ip_ipip.c: re-enable support for ipip interface.
+	  sync with netbsd-current.
+
 Tue Apr 25 11:39:22 JST 2000  itojun@iijlab.net
 	* netbsd/usr.sbin/lpr: allow lp=port@host. NetBSD PR 9975.
 	* netbsd/usr.sbin/lpr: don't SEGV on rp=numerichost.
