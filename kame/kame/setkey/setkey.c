@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.30 2003/09/08 10:14:56 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.31 2003/09/08 12:31:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -33,6 +33,7 @@
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 #include <err.h>
 #include <net/route.h>
 #include <netinet/in.h>
@@ -50,6 +51,7 @@
 #include <errno.h>
 #include <netdb.h>
 #include <fcntl.h>
+#include <dirent.h>
 
 #include "libpfkey.h"
 
@@ -61,6 +63,7 @@ void promisc __P((void));
 int sendkeymsg __P((char *, size_t));
 int postproc __P((struct sadb_msg *, int));
 int fileproc __P((const char *));
+int dumpkernfs __P((const char *));
 const char *numstr __P((int));
 void shortdump_hdr __P((void));
 void shortdump __P((struct sadb_msg *));
@@ -83,6 +86,7 @@ int f_policy = 0;
 int f_hexdump = 0;
 int f_tflag = 0;
 static time_t thiszone;
+int kernfs = 0;		/* kernfs support */
 
 extern int lineno;
 
@@ -107,6 +111,7 @@ main(argc, argv)
 {
 	FILE *fp = stdin;
 	int c;
+	struct stat sb;
 
 	if (argc == 1) {
 		usage();
@@ -171,6 +176,10 @@ main(argc, argv)
 		exit(0);
 	}
 
+	if (stat("/kern/ipsecsa", &sb) == 0 && S_ISDIR(sb.st_mode) &&
+	    stat("/kern/ipsecsp", &sb) == 0 && S_ISDIR(sb.st_mode))
+		kernfs++;
+
 	so = pfkey_open();
 	if (so < 0) {
 		perror("pfkey_open");
@@ -179,7 +188,10 @@ main(argc, argv)
 
 	switch (f_mode) {
 	case MODE_CMDDUMP:
-		sendkeyshort(f_policy ? SADB_X_SPDDUMP: SADB_DUMP);
+		if (kernfs)
+			dumpkernfs(f_policy ? "/kern/ipsecsp" : "/kern/ipsecsa");
+		else
+			sendkeyshort(f_policy ? SADB_X_SPDDUMP: SADB_DUMP);
 		break;
 	case MODE_CMDFLUSH:
 		sendkeyshort(f_policy ? SADB_X_SPDFLUSH: SADB_FLUSH);
@@ -504,6 +516,28 @@ fileproc(filename)
 	}
 
 	return (0);
+}
+
+int
+dumpkernfs(dir)
+	const char *dir;
+{
+	DIR *p;
+	struct dirent *d;
+	char path[MAXPATHLEN];
+
+	p = opendir(dir);
+	if (!p)
+		return -1;
+
+	while ((d = readdir(p)) != NULL) {
+		if (d->d_type != DT_REG)
+			continue;
+		snprintf(path, sizeof(path), "%s/%s", dir, d->d_name);
+		fileproc(path);
+	}
+
+	closedir(p);
 }
 
 /*------------------------------------------------------------*/
