@@ -518,14 +518,10 @@ main(argc, argv)
 	char buf[16];
 	if ((len = ipsec_set_policy(buf, sizeof(buf), "in bypass")) < 0)
 		errx(1, ipsec_strerror());
-	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
-		       buf, len) < 0)
-		err(1, "Unable to set IPSec policy");
+	(void)setsockopt(rcvsock, IPPROTO_IPV6, IPV6_IPSEC_POLICY, buf, len);
 	if ((len = ipsec_set_policy(buf, sizeof(buf), "out bypass")) < 0)
 		errx(1, ipsec_strerror());
-	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
-		       buf, len) < 0)
-		err(1, "Unable to set IPSec policy");
+	(void)setsockopt(rcvsock, IPPROTO_IPV6, IPV6_IPSEC_POLICY, buf, len);
     }
 #else
     {
@@ -582,14 +578,10 @@ main(argc, argv)
 	char buf[16];
 	if ((len = ipsec_set_policy(buf, sizeof(buf), "in bypass")) < 0)
 		errx(1, ipsec_strerror());
-	if (setsockopt(sndsock, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
-		       buf, len) < 0)
-		err(1, "Unable to set IPSec policy");
+	(void)setsockopt(sndsock, IPPROTO_IPV6, IPV6_IPSEC_POLICY, buf, len);
 	if ((len = ipsec_set_policy(buf, sizeof(buf), "out bypass")) < 0)
 		errx(1, ipsec_strerror());
-	if (setsockopt(sndsock, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
-		       buf, len) < 0)
-		err(1, "Unable to set IPSec policy");
+	(void)setsockopt(sndsock, IPPROTO_IPV6, IPV6_IPSEC_POLICY, buf, len);
     }
 #else
     {
