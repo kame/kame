@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.122 2004/06/12 11:00:59 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.123 2004/06/12 13:12:28 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -694,7 +694,7 @@ static void
 server6_reload()
 {
 	/* reload the configuration file */
-	if ((cfparse(conffile)) != 0) {
+	if (cfparse(conffile) != 0) {
 		dprintf(LOG_WARNING, FNAME,
 		    "failed to reload configuration file");
 		return;
