@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.65 2000/08/06 16:43:25 itojun Exp $
+$KAME: COVERAGE,v 1.66 2000/08/06 16:44:03 itojun Exp $
 
 
 x: supported/integrated
@@ -188,8 +188,8 @@ faithd		x	x	x	x	x	x	x
 syslogd		x	x	-	-	x	-	-
 lpr/lpd		x	x	-	-	x	-	-
 
-racoon		latest	pkgsrc	-	ports	pkgsrc	-	-
-			000730a		000718a	000730a
+racoon		latest	pkgsrc	-	ports
+			000730a		000718a
 
 
 CAVEATS:
