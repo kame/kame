@@ -31,7 +31,7 @@ struct ifinfo {
 	struct ifinfo *next;	/* pointer to the next interface */
 
 	struct sockaddr_dl *sdl; /* link-layer address */
-	char ifname[16];	/* interface name */
+	char ifname[IF_NAMESIZE]; /* interface name */
 	int active;		/* interface status */
 	int probeinterval;	/* interval of probe timer(if necessary) */
 	int probetimer;		/* rest of probe timer */
@@ -41,6 +41,7 @@ struct ifinfo {
 	int dadcount;
 	struct timeval timer;
 	struct timeval expire;
+	int errors;		/* # of errors we've got - detect wedge */
 
 	int racnt;		/* total # of valid RAs it have got */
 

@@ -29,7 +29,9 @@
 
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/socket.h>
 
+#include <net/if.h>
 #include <net/if_dl.h>
 
 #include <netinet/in.h>
@@ -83,6 +85,7 @@ static char *dumpfilename = "/var/run/rtsold.dump"; /* XXX: should be configurab
 static char *pidfilename = "/var/run/rtsold.pid"; /* should be configurable */
 
 static int ifconfig __P((char *ifname));
+static int ifreconfig __P((char *ifname));
 static int make_packet __P((struct ifinfo *ifinfo));
 static struct timeval *rtsol_check_timer __P((void));
 static void TIMEVAL_ADD __P((struct timeval *a, struct timeval *b,
@@ -272,11 +275,13 @@ ifconfig(char *ifname)
 	if (find_ifinfo(sdl->sdl_index)) {
 		warnmsg(LOG_ERR, __FUNCTION__,
 			"interface %s was already cofigured", ifname);
+		free(sdl);
 		return(-1);
 	}
 
 	if ((ifinfo = malloc(sizeof(*ifinfo))) == NULL) {
 		warnmsg(LOG_ERR, __FUNCTION__, "memory allocation failed");
+		free(sdl);
 		return(-1);
 	}
 	memset(ifinfo, 0, sizeof(*ifinfo));
@@ -321,9 +326,34 @@ ifconfig(char *ifname)
 	return(0);
 
   bad:
-	free(ifinfo);
 	free(ifinfo->sdl);
+	free(ifinfo);
 	return(-1);
+}
+
+static int
+ifreconfig(char *ifname)
+{
+	struct ifinfo *ifi, *prev;
+	int rv;
+
+	prev = NULL;
+	for (ifi = iflist; ifi; ifi = ifi->next) {
+		if (strncmp(ifi->ifname, ifname, sizeof(ifi->ifname)) == 0)
+			break;
+		prev = ifi;
+	}
+	prev->next = ifi->next;
+
+	rv = ifconfig(ifname);
+
+	/* reclaim it after ifconfig() in case ifname is pointer inside ifi */
+	if (ifi->rs_data)
+		free(ifi->rs_data);
+	free(ifi->sdl);
+	free(ifi);
+
+	return rv;
 }
 
 struct ifinfo *
