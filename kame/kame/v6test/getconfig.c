@@ -561,7 +561,7 @@ make_rtsol(char *name)
 	}
 
 	rs->nd_rs_type = ND_ROUTER_SOLICIT;
-	MAYHAVE(code, "icmp6_type", 0, icmp6buf);
+	MAYHAVE(code, "rs_code", 0, icmp6buf);
 	rs->nd_rs_code = code;
 	MAYHAVE(rsv, "rs_rsv", 0, icmp6buf);
 	rs->nd_rs_reserved = htonl(rsv);
