@@ -35,9 +35,10 @@
  * - RFC2553 says that we should raise error on short buffer.  X/Open says
  *   we need to truncate the result.  We obey RFC2553 (and X/Open should be
  *   modified).
- */
-/*
- * NI_NOFQDN/NO
+ * - What is "local" in NI_FQDN?
+ * - NI_NAMEREQD and NI_NUMERICHOST conflict with each other.
+ * - (KAME extension) NI_WITHSCOPEID when called with global address,
+ *   and sin6_scope_id filled
  */
 
 #ifdef HAVE_CONFIG_H
