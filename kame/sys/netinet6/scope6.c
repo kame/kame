@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.15 2001/08/15 11:27:09 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.16 2001/08/15 11:28:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -188,7 +188,7 @@ scope6_get(ifp, idlist)
  */
 int
 in6_addrscope(addr)
-struct in6_addr *addr;
+	struct in6_addr *addr;
 {
 	int scope;
 
