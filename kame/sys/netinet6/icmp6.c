@@ -566,9 +566,15 @@ icmp6_input(mp, offp, proto)
 
 	case MLD6_LISTENER_DONE:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_mlddone);
-		if (icmp6len < sizeof(struct mld6_hdr))
+		if (icmp6len < sizeof(struct mld6_hdr))	/* necessary? */
 			goto badlen;
 		break;		/* nothing to be done in kernel */
+
+	case MLD6_MTRACE_RESP:
+	case MLD6_MTRACE:
+		/* XXX: these two are experimental. not officially defind. */
+		/* XXX: per-interface statistics? */
+		break;		/* just pass it to the userland daemon */
 
 	case ICMP6_WRUREQUEST:	/* ICMP6_FQDN_QUERY */
 	    {
