@@ -227,7 +227,7 @@ sendit(s, p, len, sock, ifindex)
 	int ifindex;
 {
 #ifndef ADVAPI
-	sock->sin6_addr.u6_addr.u6_addr16[1] = htons(ifindex);
+	*(u_int16_t *)&sock->sin6_addr.s6_addr[2] = htons(ifindex);
 	return sendto(s, p, len, 0, (struct sockaddr *)sock, sock->sin6_len);
 #else
 	struct msghdr m;
