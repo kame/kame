@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.215 2001/06/20 12:30:32 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.216 2001/06/20 13:02:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2379,6 +2379,12 @@ icmp6_reflect(m, off)
 #ifdef COMPAT_RFC1885
 	ip6_output(m, NULL, &icmp6_reflect_rt, 0, NULL, &outif);
 #else
+	/*
+	 * To avoid a "too big" situation in an intermediate router
+	 * and the path MTU discovery process, specify the IPV6_MINMTU flag.
+	 * Note that only echo and node information replies are affected,
+	 * since the length of ICMP6 errors are limited to the minimum MTU.
+	 */
 	ip6_output(m, NULL, NULL, IPV6_MINMTU, NULL, &outif);
 #endif
 	if (outif)
