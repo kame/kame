@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1185 2000/08/11 04:27:56 jinmei Exp $
+$KAME: CHANGELOG,v 1.1186 2000/08/11 13:32:43 jinmei Exp $
 
 <200007>
+2000-08-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/include/.prepare: was added to ignore ifaddrs.h
+	conflict between the FreeBSD's original version and the KAME's
+	shared version.
+	In response to a report from Tetsuya Isaki
+	<isaki@net.ipc.hiroshima-u.ac.jp>
+
 2000-08-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ping6/ping6.c (pr_pack): printed multple sets of
 	bitmaps for NI supported QTYPEs.
