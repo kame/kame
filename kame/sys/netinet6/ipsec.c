@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.77 2000/09/22 04:58:02 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.78 2000/09/22 05:29:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -696,21 +696,12 @@ ipsec_setspidx_mbuf(spidx, dir, family, m, needport)
 	if (spidx == NULL || m == NULL)
 		panic("ipsec_setspidx_mbuf: NULL pointer was passed.\n");
 
-	KEYDEBUG(KEYDEBUG_IPSEC_DUMP,
-		printf("ipsec_setspidx_mbuf: begin\n"); kdebug_mbuf(m));
-
-	/* initialize */
 	bzero(spidx, sizeof(*spidx));
-
-	spidx->dir = dir;
 
 	error = ipsec_setspidx(m, spidx, needport);
 	if (error)
 		goto bad;
-
-	KEYDEBUG(KEYDEBUG_IPSEC_DUMP,
-		printf("ipsec_setspidx_mbuf: end\n");
-		kdebug_secpolicyindex(spidx));
+	spidx->dir = dir;
 
 	return 0;
 
@@ -824,7 +815,7 @@ ipsec_setspidx(m, spidx, needport)
 	/*
 	 * validate m->m_pkthdr.len.  we see incorrect length if we
 	 * mistakenly call this function with inconsistent mbuf chain
-	 * (like 4.4BSD tcp/udp processing)
+	 * (like 4.4BSD tcp/udp processing).  XXX should we panic here?
 	 */
 	len = 0;
 	for (n = m; n; n = n->m_next)
@@ -897,6 +888,8 @@ ipsec4_get_ulp(m, spidx, needport)
 	struct ip6_ext ip6e;
 	u_int8_t nxt;
 	int off;
+	struct tcphdr th;
+	struct udphdr uh;
 
 	/* sanity check */
 	if (m == NULL)
@@ -925,30 +918,28 @@ ipsec4_get_ulp(m, spidx, needport)
 		case IPPROTO_TCP:
 			spidx->ul_proto = nxt;
 			if (!needport)
-				break;
-			if (off + sizeof(struct tcphdr) <= m->m_pkthdr.len) {
-				struct tcphdr th;
-				m_copydata(m, off, sizeof(th), (caddr_t)&th);
-				((struct sockaddr_in *)&spidx->src)->sin_port =
-				    th.th_sport;
-				((struct sockaddr_in *)&spidx->dst)->sin_port =
-				    th.th_dport;
-			}
+				return;
+			if (off + sizeof(struct tcphdr) > m->m_pkthdr.len)
+				return;
+			m_copydata(m, off, sizeof(th), (caddr_t)&th);
+			((struct sockaddr_in *)&spidx->src)->sin_port =
+			    th.th_sport;
+			((struct sockaddr_in *)&spidx->dst)->sin_port =
+			    th.th_dport;
 			return;
 		case IPPROTO_UDP:
 			spidx->ul_proto = nxt;
 			if (!needport)
-				break;
-			if (off + sizeof(struct udphdr) <= m->m_pkthdr.len) {
-				struct udphdr uh;
-				m_copydata(m, off, sizeof(uh), (caddr_t)&uh);
-				((struct sockaddr_in *)&spidx->src)->sin_port =
-				    uh.uh_sport;
-				((struct sockaddr_in *)&spidx->dst)->sin_port =
-				    uh.uh_dport;
-			}
+				return;
+			if (off + sizeof(struct udphdr) > m->m_pkthdr.len)
+				return;
+			m_copydata(m, off, sizeof(uh), (caddr_t)&uh);
+			((struct sockaddr_in *)&spidx->src)->sin_port =
+			    uh.uh_sport;
+			((struct sockaddr_in *)&spidx->dst)->sin_port =
+			    uh.uh_dport;
 			return;
-		case IPPROTO_ICMPV6:
+		case IPPROTO_ICMP:
 			spidx->ul_proto = nxt;
 			return;
 		case IPPROTO_AH:
@@ -957,6 +948,8 @@ ipsec4_get_ulp(m, spidx, needport)
 			m_copydata(m, off, sizeof(ip6e), (caddr_t)&ip6e);
 			off += (ip6e.ip6e_len + 2) << 2;
 			nxt = ip6e.ip6e_nxt;
+			break;
+		/* XXX other headers to look at? */
 		default:
 			return;
 		}
@@ -1004,6 +997,8 @@ ipsec6_get_ulp(m, spidx, needport)
 	int needport;
 {
 	int off, nxt;
+	struct tcphdr th;
+	struct udphdr uh;
 
 	/* sanity check */
 	if (m == NULL)
@@ -1027,27 +1022,21 @@ ipsec6_get_ulp(m, spidx, needport)
 		spidx->ul_proto = nxt;
 		if (!needport)
 			break;
-		if (off + sizeof(struct tcphdr) <= m->m_pkthdr.len) {
-			struct tcphdr th;
-			m_copydata(m, off, sizeof(th), (caddr_t)&th);
-			((struct sockaddr_in6 *)&spidx->src)->sin6_port =
-			    th.th_sport;
-			((struct sockaddr_in6 *)&spidx->dst)->sin6_port =
-			    th.th_dport;
-		}
+		if (off + sizeof(struct tcphdr) > m->m_pkthdr.len)
+			break;
+		m_copydata(m, off, sizeof(th), (caddr_t)&th);
+		((struct sockaddr_in6 *)&spidx->src)->sin6_port = th.th_sport;
+		((struct sockaddr_in6 *)&spidx->dst)->sin6_port = th.th_dport;
 		break;
 	case IPPROTO_UDP:
 		spidx->ul_proto = nxt;
 		if (!needport)
 			break;
-		if (off + sizeof(struct udphdr) <= m->m_pkthdr.len) {
-			struct udphdr uh;
-			m_copydata(m, off, sizeof(uh), (caddr_t)&uh);
-			((struct sockaddr_in6 *)&spidx->src)->sin6_port =
-			    uh.uh_sport;
-			((struct sockaddr_in6 *)&spidx->dst)->sin6_port =
-			    uh.uh_dport;
-		}
+		if (off + sizeof(struct udphdr) > m->m_pkthdr.len)
+			break;
+		m_copydata(m, off, sizeof(uh), (caddr_t)&uh);
+		((struct sockaddr_in6 *)&spidx->src)->sin6_port = uh.uh_sport;
+		((struct sockaddr_in6 *)&spidx->dst)->sin6_port = uh.uh_dport;
 		break;
 	case IPPROTO_ICMPV6:
 		spidx->ul_proto = nxt;
