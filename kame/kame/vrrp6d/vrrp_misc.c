@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_misc.c,v 1.6 2002/08/23 12:25:47 ono Exp $	*/
+/*	$KAME: vrrp_misc.c,v 1.7 2003/04/01 07:18:04 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -148,16 +148,16 @@ vrrp_misc_get_if_infos(char *if_name, struct ether_addr * ethaddr, struct in6_ad
 				info.rti_addrs = ifam->ifam_addrs;
 				rt_xaddrs((char *)(ifam + 1), ifam->ifam_msglen + (char *)ifam, &info);
 				sin = (struct sockaddr_in6 *) info.rti_info[RTAX_IFA];
-				if (myinterface) {
+				if (myinterface && IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr)) {
 #ifdef __KAME__
 					/* KAME specific hack; removed the embedded id */
 					*(u_int16_t *)&sin->sin6_addr.s6_addr[2] = 0;
 #endif
 					memcpy(&ip_addrs[addrcount], &sin->sin6_addr, sizeof(struct in6_addr));
+					addrcount++;
+					if (*size <= addrcount)
+						break;
 				}
-				addrcount++;
-				if (*size <= addrcount)
-					break;
 				next += nextifm->ifm_msglen;
 			}
 			*size = addrcount;
