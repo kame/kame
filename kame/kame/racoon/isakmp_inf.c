@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.21 2000/01/11 22:26:13 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.22 2000/01/11 22:36:24 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -589,10 +589,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	if (iph2->sendbuf == NULL) { 
 		plog(logp, LOCATION, NULL,
 			"vmalloc (%s)\n", strerror(errno));
-		unbindph12(iph2);
-		remph2(iph2);
-		delph2(iph2);
-		goto end;
+		goto err;
 	}
 
 	/* create isakmp header */
@@ -632,11 +629,8 @@ isakmp_info_send_common(iph1, payload, np, flags)
 		tmp = oakley_do_encrypt(iph2->ph1, iph2->sendbuf, iph2->ivm->ive,
 				iph2->ivm->iv);
 		if (tmp == NULL) {
-			unbindph12(iph2);
-			remph2(iph2);
-			delph2(iph2);
 			vfree(iph2->sendbuf);
-			goto end;
+			goto err;
 		}
 		vfree(iph2->sendbuf);
 		iph2->sendbuf = tmp;
@@ -644,11 +638,8 @@ isakmp_info_send_common(iph1, payload, np, flags)
 
 	/* HDR*, HASH(1), N */
 	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0) {
-		unbindph12(iph2);
-		remph2(iph2);
-		delph2(iph2);
 		vfree(iph2->sendbuf);
-		goto end;
+		goto err;
 	}
 
 	YIPSDEBUG(DEBUG_STAMP,
@@ -660,11 +651,19 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	 * Informational if peer requires the reply of the notify message.
 	 */
 
+	/* XXX If Acknowledged Informational required, don't delete ph2handle */
 	error = 0;
+	vfree(iph2->sendbuf);
+	goto err;	/* XXX */
 
 end:
+	return error;
 
-	return(error);
+err:
+	unbindph12(iph2);
+	remph2(iph2);
+	delph2(iph2);
+	goto end;
 }
 
 /*
