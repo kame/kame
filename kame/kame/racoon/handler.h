@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.19 2000/06/05 15:30:47 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.20 2000/06/07 08:35:12 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -103,9 +103,9 @@ struct ph1handle {
 			/* XXX copy from rmconf due to anonymous configuration.
 			 * If anonymous will be forbidden, we do delete them. */
 
-	struct remoteconf *rmconf;	/* remote configuration */
+	struct remoteconf *rmconf;	/* pointer to remote configuration */
 
-	struct isakmpsa *approval;	/* SA(s) approved. */
+	struct isakmpsa *approval;	/* pointer to SA(s) approved. */
 	vchar_t *authstr;		/* place holder of string for auth. */
 					/* for example pre-shared key */
 
@@ -223,9 +223,6 @@ struct ph2handle {
 			 * socket based SA is required.  So we set a identifier
 			 * number to "seq", and sent kernel by pfkey.
 			 */
-	int inuse;			/* received EXPIRE message */
-					/* 0: init, 1: grace, 2: sa require */
-
 	u_int8_t flags;			/* Flags for phase 2 */
 	u_int32_t msgid;		/* msgid for phase 2 */
 

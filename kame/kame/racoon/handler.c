@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.21 2000/05/24 10:15:04 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.22 2000/06/07 08:35:12 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -51,6 +51,7 @@
 #include "isakmp_var.h"
 #include "isakmp.h"
 #include "oakley.h"
+#include "remoteconf.h"
 #include "handler.h"
 
 static LIST_HEAD(_ph1tree_, ph1handle) ph1tree;
@@ -144,7 +145,6 @@ dumpph1()
 		memcpy(&pd->local, iph1->local, iph1->local->sa_len);
 		pd->version = iph1->version;
 		pd->etype = iph1->etype;
-		pd->inuse = iph1->inuse;
 		pd->created = iph1->created;
 		pd++;
 	}
@@ -177,15 +177,107 @@ void
 delph1(iph1)
 	struct ph1handle *iph1;
 {
-	if (iph1->ivm) {
-		oakley_delivm(iph1->ivm);
-		iph1->ivm = NULL;
+	if (iph1->authstr) {
+		vfree(iph1->authstr);
+		iph1->authstr = NULL;
 	}
+
 	if (iph1->sce)
 		SCHED_KILL(iph1->sce);
 	if (iph1->scr)
 		SCHED_KILL(iph1->scr);
-	/* XXX do more free parameters */
+
+	if (iph1->dhpriv) {
+		vfree(iph1->dhpriv);
+		iph1->dhpriv = NULL;
+	}
+	if (iph1->dhpub) {
+		vfree(iph1->dhpub);
+		iph1->dhpub = NULL;
+	}
+	if (iph1->dhpub_p) {
+		vfree(iph1->dhpub_p);
+		iph1->dhpub_p = NULL;
+	}
+	if (iph1->dhgxy) {
+		vfree(iph1->dhgxy);
+		iph1->dhgxy = NULL;
+	}
+	if (iph1->nonce) {
+		vfree(iph1->nonce);
+		iph1->nonce = NULL;
+	}
+	if (iph1->nonce_p) {
+		vfree(iph1->nonce_p);
+		iph1->nonce_p = NULL;
+	}
+	if (iph1->skeyid) {
+		vfree(iph1->skeyid);
+		iph1->skeyid = NULL;
+	}
+	if (iph1->skeyid_d) {
+		vfree(iph1->skeyid_d);
+		iph1->skeyid_d = NULL;
+	}
+	if (iph1->skeyid_a) {
+		vfree(iph1->skeyid_a);
+		iph1->skeyid_a = NULL;
+	}
+	if (iph1->skeyid_e) {
+		vfree(iph1->skeyid_e);
+		iph1->skeyid_e = NULL;
+	}
+	if (iph1->key) {
+		vfree(iph1->key);
+		iph1->key = NULL;
+	}
+	if (iph1->hash) {
+		vfree(iph1->hash);
+		iph1->hash = NULL;
+	}
+	if (iph1->sig) {
+		vfree(iph1->sig);
+		iph1->sig = NULL;
+	}
+	if (iph1->sig_p) {
+		vfree(iph1->sig_p);
+		iph1->sig_p = NULL;
+	}
+	if (iph1->cert) {
+		vfree(iph1->cert);
+		iph1->cert = NULL;
+	}
+	if (iph1->cert_p) {
+		vfree(iph1->cert_p);
+		iph1->cert_p = NULL;
+	}
+	if (iph1->crl_p) {
+		vfree(iph1->crl_p);
+		iph1->crl_p = NULL;
+	}
+	if (iph1->id) {
+		vfree(iph1->id);
+		iph1->id = NULL;
+	}
+	if (iph1->id_p) {
+		vfree(iph1->id_p);
+		iph1->id_p = NULL;
+	}
+
+	if (iph1->ivm) {
+		oakley_delivm(iph1->ivm);
+		iph1->ivm = NULL;
+	}
+
+	if (iph1->sa) {
+		vfree(iph1->sa);
+		iph1->sa = NULL;
+	}
+	if (iph1->sa_ret) {
+		vfree(iph1->sa_ret);
+		iph1->sa_ret = NULL;
+	}
+
 	free(iph1);
 }
 
@@ -211,8 +303,6 @@ void
 remph1(iph1)
 	struct ph1handle *iph1;
 {
-	/* XXX unbindph2() or remph2() should be called */
-
 	LIST_REMOVE(iph1, chain);
 }
 
@@ -370,6 +460,41 @@ initph2(iph2)
 {
 	/* NOTE: don't initialize src/dst */
 
+	if (iph2->sce)
+		SCHED_KILL(iph2->sce);
+	if (iph2->scr)
+		SCHED_KILL(iph2->scr);
+
+	/* clear spi, keep variables in the proposal */
+	if (iph2->proposal) {
+		struct saproto *pr;
+		for (pr = iph2->proposal->head; pr != NULL; pr = pr->next)
+			pr->spi = 0;
+	}
+
+	/* clear approval */
+	if (iph2->approval) {
+		flushsaprop(iph2->approval);
+		iph2->approval = NULL;
+	}
+
+	if (iph2->pfsgrp) {
+		oakley_dhgrp_free(iph2->pfsgrp);
+		iph2->pfsgrp = NULL;
+	}
+
+	if (iph2->dhpriv) {
+		vfree(iph2->dhpub_p);
+		iph2->dhpub_p = NULL;
+	}
+	if (iph2->dhpub) {
+		vfree(iph2->dhpub_p);
+		iph2->dhpub_p = NULL;
+	}
+	if (iph2->dhgxy) {
+		vfree(iph2->dhgxy);
+		iph2->dhgxy = NULL;
+	}
 	if (iph2->id) {
 		vfree(iph2->id);
 		iph2->id = NULL;
@@ -382,38 +507,20 @@ initph2(iph2)
 		vfree(iph2->nonce_p);
 		iph2->nonce_p = NULL;
 	}
-	if (iph2->dhpub_p) {
-		vfree(iph2->dhpub_p);
-		iph2->dhpub_p = NULL;
-	}
-	if (iph2->dhgxy) {
-		vfree(iph2->dhgxy);
-		iph2->dhgxy = NULL;
-	}
-	if (iph2->ivm) {
-		oakley_delivm(iph2->ivm);
-		iph2->ivm = NULL;
-	}
+
 	if (iph2->sa) {
 		vfree(iph2->sa);
 		iph2->sa = NULL;
 	}
+	if (iph2->sa_ret) {
+		vfree(iph2->sa_ret);
+		iph2->sa_ret = NULL;
+	}
 
-	/* clear spi */
-	if (iph2->proposal) {
-		struct saproto *pr;
-		for (pr = iph2->proposal->head; pr != NULL; pr = pr->next)
-			pr->spi = 0;
+	if (iph2->ivm) {
+		oakley_delivm(iph2->ivm);
+		iph2->ivm = NULL;
 	}
-	if (iph2->approval) {
-		flushsaprop(iph2->approval);
-		iph2->approval = NULL;
-	}
-	if (iph2->sce)
-		SCHED_KILL(iph2->sce);
-	if (iph2->scr)
-		SCHED_KILL(iph2->scr);
-	/* XXX more do it !!! */
 }
 
 /*
@@ -430,12 +537,14 @@ delph2(iph2)
 		iph2->proposal = NULL;
 	}
 
-	if (iph2->approval) {
-		flushsaprop(iph2->approval);
-		iph2->approval = NULL;
+	if (iph2->src) {
+		free(iph2->src);
+		iph2->src = NULL;
 	}
-
-	/* XXX do more free parameters */
+	if (iph2->dst) {
+		free(iph2->dst);
+		iph2->dst = NULL;
+	}
 
 	free(iph2);
 }
