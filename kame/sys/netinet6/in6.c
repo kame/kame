@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.165 2001/02/04 08:48:24 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.166 2001/02/04 10:16:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2483,7 +2483,7 @@ in6_ifawithscope(oifp, dst)
 				goto replace;
 
 			/*
-			 * When we use temporary address described in
+			 * When we use temporary addresses described in
 			 * RFC 3041, we prefer temporary addresses to
 			 * public autoconf addresses.  Again, note the
 			 * invariants from (A) and (B).  Also note that we
@@ -2502,6 +2502,14 @@ in6_ifawithscope(oifp, dst)
 				     (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY))
 				     == (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY)) {
 					goto replace;
+				}
+				if ((ifa_best->ia6_flags &
+				     (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY))
+				    == (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY) &&
+				    (ifat->ia6_flags &
+				     (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY))
+				     == IN6_IFF_AUTOCONF) {
+					continue;
 				}
 			}
 
@@ -2537,15 +2545,15 @@ in6_ifawithscope(oifp, dst)
 			 *   ones on other interfaces if none of above
 			 *   tiebreaks.  In the table below, the column "bI"
 			 *   means if the best_ifa is on the outgoing
-			 *   interface, and the column "oI" means if the ifa
+			 *   interface, and the column "sI" means if the ifa
 			 *   is on the outgoing interface.
 			 * - If there is no other reasons to choose one,
 			 *   longest address match against dst is considered.
 			 *
 			 * The precise decision table is as follows:
-			 * dscopecmp bscopecmp matchcmp  bI oI | replace?
-			 *       N/A     equal     N/A    Y  N |   No (1)
-			 *       N/A     equal     N/A    N  Y |  Yes (2)
+			 * dscopecmp bscopecmp    match  bI oI | replace?
+			 *       N/A     equal      N/A   Y  N |   No (1)
+			 *       N/A     equal      N/A   N  Y |  Yes (2)
 			 *       N/A     equal   larger    N/A |  Yes (3)
 			 *       N/A     equal  !larger    N/A |   No (4)
 			 *    larger    larger      N/A    N/A |   No (5)
