@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.190 2001/06/22 19:26:12 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.191 2001/06/24 05:14:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1940,7 +1940,8 @@ do { \
 #elif defined(__bsdi__) && _BSDI_VERSION >= 199802
 					OPTSET(IN6P_IPV6_V6ONLY);
 #else
-					if (ip6_v6only == optval)
+					if ((ip6_v6only && optval) ||
+					    (!ip6_v6only && !optval))
 						error = 0;
 					else
 						error = EINVAL;
