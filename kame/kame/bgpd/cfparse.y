@@ -1055,11 +1055,11 @@ param_config()
 	else
 		dumpfile = strdup(DUMPFILENAME);
 	if (yy_routerid != -1) {
-		ipv4id.s_addr = bgpIdentifier = htonl((u_int32_t)yy_routerid);
+		ipv4id.s_addr = bgpIdentifier = yy_routerid;
 		cprint("set %s to the BGP Identifier\n", inet_ntoa(ipv4id));
 	}
 	if (yy_clusterid != -1) {
-		ipv4id.s_addr = clusterId = htonl((u_int32_t)yy_clusterid);
+		ipv4id.s_addr = clusterId = yy_clusterid;
 		cprint("set %s to the BGP cluster ID\n", inet_ntoa(ipv4id));
 
 	}
