@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1923 2001/10/19 08:04:34 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1924 2001/10/19 18:13:28 sakane Exp $
 
 <200110>
+Sat Oct 20 03:09:33 JST 2001 sakane@kame.net
+	* freebsd4/sys/netinet/udp_usrreq.c:
+	the data in the ip header should be restored when the extended udp
+	header and data checksum is calculated.  this caused some trouble
+	in the code which the ip header is not modified.  for example,
+	inbound policy lookup failed.
+
 Fri Oct 19 16:57:58 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd4/ports/{ct,v6eval}: upgrade to 1.3.
 
