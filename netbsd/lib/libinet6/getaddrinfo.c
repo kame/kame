@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.33 2001/01/05 04:22:03 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.34 2001/01/05 04:32:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -488,7 +488,7 @@ getaddrinfo(hostname, servname, hints, res)
 			 * XXX errno?
 			 */
 			if (!addrconfig(pai->ai_family))
-				return 0;
+				continue;
 			error = explore_null(pai, servname, &cur->ai_next);
 		} else
 			error = explore_numeric_scope(pai, hostname, servname,
