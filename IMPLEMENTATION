@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.240 2001/07/21 06:09:30 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.241 2001/07/21 06:10:29 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1347,7 +1347,7 @@ libinet6.a has a comple of extensions against libc DNS resolver:
   "options edns0" in /etc/resolv.conf.  See USAGE for details.
 - IPv6 transport support (queries/responses over IPv6).  Most of BSD official
   releases now has it already.
-- Partial A6 chain chasing support (KAME/BSDI4).
+- Partial A6 chain chasing/DNAME/bit string label support (KAME/BSDI4).
 
 2. Network Drivers
 
