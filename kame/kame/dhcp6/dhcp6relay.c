@@ -557,7 +557,7 @@ relay6_react_solicit(buf, siz, dev)
 	}
 
 	/* forward the solict to servers */
-	smh.msg_name = &sa6_all_servers;
+	smh.msg_name = (caddr_t)&sa6_all_servers;
 	smh.msg_namelen = sizeof(sa6_all_servers);
 	iov[0].iov_base = buf;
 	iov[0].iov_len = siz;
