@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.57 2002/09/26 06:45:22 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.58 2002/09/26 14:03:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -65,6 +65,7 @@ typedef u_int8_t mip6_cookie_t[MIP6_COOKIE_SIZE];
 typedef u_int8_t mip6_home_cookie_t[HOME_COOKIE_SIZE];
 typedef u_int8_t mip6_careof_cookie_t[CAREOF_COOKIE_SIZE];
 #define MIP6_KBU_LEN		16
+#define MIP6_AUTHENTICATOR_LEN	12
 
 #define MIP6_MAX_RR_BINDING_LIFE	420
 

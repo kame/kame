@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.57 2002/09/26 09:26:12 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.58 2002/09/26 14:03:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -872,6 +872,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
                  */
 		goto check_mobility_options;
 	}
+
 	if (seqno != mbu->mbu_seqno) {
                 mip6log((LOG_NOTICE,
                          "%s:%d: unmached sequence no "
@@ -1381,7 +1382,7 @@ mip6_ip6mci_create(pktopt_mobility, mbu)
 	return (0);
 }
 
-#define AUTH_SIZE	(sizeof(struct ip6m_opt_authdata) + MIP6_KBU_LEN)
+#define AUTH_SIZE	(sizeof(struct ip6m_opt_authdata) + MIP6_AUTHENTICATOR_LEN)
 
 int
 mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
@@ -1620,7 +1621,7 @@ mip6_hexdump("MN: Auth: ", auth_size - AUTH_SIZE, (u_int8_t *)ip6mu + bu_size + 
 #endif
 		}
 		hmac_result(&hmac_ctx, result);
-		bcopy(result, (u_int8_t *)(mopt_auth + 1), MIP6_KBU_LEN);
+		bcopy(result, (u_int8_t *)(mopt_auth + 1), MIP6_AUTHENTICATOR_LEN);
 #ifdef RR_DBG
 mip6_hexdump("MN: Authdata: ", SHA1_RESULTLEN, (u_int8_t *)(mopt_auth + 1));
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.172 2002/09/26 08:19:20 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.173 2002/09/26 14:03:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2771,7 +2771,7 @@ mip6_hexdump("CN: Auth: ", sizeof(ip6->ip6_dst), &ip6->ip6_dst);
 	hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu,
 		  (u_int8_t *)mopt->mopt_auth + sizeof(struct ip6m_opt_authdata ) - (u_int8_t *)ip6mu);
 #ifdef RR_DBG
-mip6_hexdump("CN: Auth: ", (u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu, ip6mu);
+mip6_hexdump("CN: Auth: ", (u_int8_t *)mopt->mopt_auth + sizeof(struct ip6m_opt_authdata ) - (u_int8_t *)ip6mu, ip6mu);
 #endif
 
 	/* Must exclude authentication option */
