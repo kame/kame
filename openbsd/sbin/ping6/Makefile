@@ -18,4 +18,7 @@ DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
 # kame scopeid hack
 CPPFLAGS+=-DKAME_SCOPEID
 
+# new advanced API
+CPPFLAGS+=-DUSE_RFC2292BIS
+
 .include <bsd.prog.mk>

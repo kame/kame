@@ -19,4 +19,7 @@ DPADD+= ${.OBJDIR}/../../lib/libinet6/libinet6.a \
 # kame scopeid hack
 CFLAGS+=-DKAME_SCOPEID
 
+# new advanced API
+CFLAGS+=-DUSE_RFC2292BIS
+
 .include <bsd.prog.mk>
