@@ -322,9 +322,11 @@ get_32id()
     } else {
 	    id = ((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr.s_addr;
 
-	    /* sanity check */
-	    if (id == INADDR_ANY || ntohl(id) == 0x7f000001) /* 0.0.0.0 || 127.0.0.1 */
+	    /* sanity check for 0.0.0.0 and 127.0.0.1  */
+	    if (id == INADDR_ANY || ntohl(id) == 0x7f000001) {
+		    id == INADDR_ANY;
 		    ifni++;
+	    }
 	    else
 		    break;	/* OK */
     }
