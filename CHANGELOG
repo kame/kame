@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.418 2000/01/07 19:40:02 itojun Exp $
+$Id: CHANGELOG,v 1.419 2000/01/08 15:01:51 sakane Exp $
 
 <200001>
+Sat Jan  8 23:53:23 JST 2000 sakane@ydc.co.jp
+	* kame/sys/netkey/key.c:
+	  - fix kenrel crash when flushing SAD.
+	  - for stability, increment refcnt of SA when key_getsavbyspi() called.
+	  - add some error message
+	  - fix errno at key_update().
+
 Sat Jan  8 04:40:33 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet/{frag6,ip6_input,nd6_nbr}.c:
 	  use arc4random() on openbsd.  it should give better random value
