@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/07 03:00:29 $
+		     $Date: 1999/10/07 07:17:30 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -191,8 +191,8 @@ PING6(56=40+8+8 bytes) fe80::5254:ff:feda:cb7d --> ff02::1
 
 <<<ping6 -w>>>
 
-Name resolution is possible by ICMPv6 who-are-you message.  This is
-very convenient for link-local addresses whose host name cannot be
+Name resolution is possible by ICMPv6 node information query message.
+This is very convenient for link-local addresses whose host name cannot be
 resolved by DNS.  Specify the "-w" option to "ping6".
 
 % ping6 -I ed0 -w ff02::1
