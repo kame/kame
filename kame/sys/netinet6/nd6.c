@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.247 2002/04/22 12:41:23 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.248 2002/04/22 12:43:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -235,9 +235,7 @@ nd6_ifattach(ifp)
 	/*
 	 * Don't initialize if called twice.
 	 * XXX: to detect this, we should choose a member that is never set
-	 * before initialization of the ND structure itself.  We formaly used
-	 * the linkmtu member, which was not suitable because it could be 
-	 * initialized via "ifconfig mtu".
+	 * before initialization of the ND structure itself.
 	 */
 	if (ND.basereachable)
 		return;
