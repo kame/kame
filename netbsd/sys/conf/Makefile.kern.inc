@@ -51,9 +51,9 @@ COPTS?=		${DEFCOPTS}
 DBG=		# might contain unwanted -Ofoo
 DEFWARNINGS?=	yes
 .if (${DEFWARNINGS} == "yes")
-#CWARNFLAGS+=	-Werror
+CWARNFLAGS+=	-Werror
 CWARNFLAGS+=	-Wall -Wno-main -Wno-format-zero-length
-# for gcc 3
+# for gcc 3 - comment out -Werror
 #CWARNFLAGS+=	-Wno-strict-aliasing -Wno-sign-compare
 WEAK_POINTERS?=	no
 .if !(${WEAK_POINTERS} == "yes")
