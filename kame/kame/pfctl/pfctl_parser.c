@@ -214,6 +214,13 @@ const struct pf_timeout pf_timeouts[] = {
 	{ NULL,			0 }
 };
 
+#ifndef UID_MAX
+#define UID_MAX	0xffffffff
+#endif
+#ifndef GID_MAX
+#define GID_MAX	0xffffffff
+#endif
+
 const struct icmptypeent *
 geticmptypebynumber(u_int8_t type, sa_family_t af)
 {

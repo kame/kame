@@ -357,6 +357,12 @@ typedef struct {
 		}						\
 	} while (0)
 
+#ifndef UID_MAX
+#define UID_MAX	0xffffffff
+#endif
+#ifndef GID_MAX
+#define GID_MAX	0xffffffff
+#endif
 %}
 
 %token	PASS BLOCK SCRUB RETURN IN OS OUT LOG LOGALL QUICK ON FROM TO FLAGS
@@ -4472,7 +4478,7 @@ parseicmpspec(char *w, sa_family_t af)
 }
 
 int
-pfctl_load_anchors(int dev, int opts, struct pfr_buffer *trans)
+pfctl_load_anchors(int dev, int opts)
 {
 	struct loadanchors	*la;
 
@@ -4481,7 +4487,7 @@ pfctl_load_anchors(int dev, int opts, struct pfr_buffer *trans)
 			fprintf(stderr, "\nLoading anchor %s:%s from %s\n",
 			    la->anchorname, la->rulesetname, la->filename);
 		if (pfctl_rules(dev, la->filename, opts, la->anchorname,
-		    la->rulesetname, trans) == -1)
+		    la->rulesetname) == -1)
 			return (-1);
 	}
 
