@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.25 2001/11/13 03:09:47 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.26 2001/11/13 07:23:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -416,10 +416,10 @@ scope6_check_id(sin6, defaultok)
 
 	if ((zoneid = sin6->sin6_scope_id) != 0) {
 		/*
-		 * At this moment, we only checks interface-local and
+		 * At this moment, we only check interface-local and
 		 * link-local scope IDs, and use interface indices as the
-		 * IDs assuming a one-to-one mapping between interfaces and
-		 * links.
+		 * zone IDs assuming a one-to-one mapping between interfaces
+		 * and links.
 		 * XXX: in6_embedscope() below does the same check (in case
 		 * of !SCOPEDROUTING).  We should eventually centralize the
 		 * check in this function.
