@@ -1,4 +1,4 @@
-/*	$KAME: in6_cksum.c,v 1.8 2000/09/09 15:27:07 itojun Exp $	*/
+/*	$KAME: in6_cksum.c,v 1.9 2000/09/09 15:33:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -125,6 +125,8 @@ in6_cksum(m, nxt, off, len)
 		panic("in6_cksum: mbuf len (%d) < off+len (%d+%d)\n",
 			m->m_pkthdr.len, off, len);
 	}
+
+	bzero(&uph, sizeof(uph));
 
 	/*
 	 * First create IP6 pseudo header and calculate a summary.
