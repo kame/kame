@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.172 2001/03/25 09:55:56 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.173 2001/03/28 23:28:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1081,7 +1081,7 @@ skip_ipsec2:;
 		 * field of the structure here.
 		 * We rely on the consistency between two scope zone ids
 		 * of source add destination, which should already be assured
-		 * Larger scopes than link will be supported in the near
+		 * larger scopes than link will be supported in the near
 		 * future.
 		 */
 		origifp = NULL;
