@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/07 03:08:03 $
+			$Date: 1999/10/07 06:02:16 $
 
 1. IPv6
 
@@ -845,68 +845,14 @@ to replace it.  IPv6 support for IPsec is, therefore, lacking on KAME/OpenBSD.
 
 4.1 Policy Management
 
-The policy management code is experimental, but this is almostly
-conformed to RFC2401.  You can manage the SPD by both the command
-for administrater and the socket operation.  Security policy has
-direction of packet stream.  The direction is specified like below.
-
-	"out" means to be for outbound packet.
-	"in" means to be for inbound packet.
-
-By the command "setkey", there are three directive as following:
-
-        "discard" means to discard the packet.
-        "none" means not to do IPsec.
-        "ipsec" means to do IPsec.
-
-"ipsec" is followed by some IPsec requests like "protocol/mode/src-dst/level".
-
-	protocol is to be either "ah" or "esp".
-	mode of security proctocol is defined by "transport" or "tunnel".
-	"src" and "dst" between which `-' is put are specified the end of
-	addresses of the Security assocciation in spite of the mode of
-	security protocol.
-	level is to be either "default", "use" or "require".
-
-	"use" means that if a security association is available, use it
-	for outbound packet, request SA to the Key management daemon
-	through PF_KEY v2, and accept any inbound packets.
-	
-	"require" means that if a security association does not exist
-	for outbound traffic, acquire one and discard the packet untill
-	SA is found, and require inbound packets to use security.
-
-	"default" is consulted to system wide default defined "sysctl" MIBs:
-		net.inet.ipsec.esp_trans_deflev
-		net.inet.ipsec.esp_net_deflev
-		net.inet.ipsec.ah_trans_deflev
-		net.inet.ipsec.ah_net_deflev
-		net.inet6.ipsec6.esp_trans_deflev
-		net.inet6.ipsec6.esp_net_deflev
-		net.inet6.ipsec6.ah_trans_deflev
-		net.inet6.ipsec6.ah_net_deflev
-
-		They are 1:use or 2:require.
-
-By the socket operation, there are three directive as following:
-        "ipsec" means to do IPsec, see above.
-        "entrust" means to consult to SPD defined by setkey(8).
-        "bypass" means not to do IPsec. This is for priveleged socket.
-
-If kernel doesn't find out policy entry, then system wide default
-is applied.  You can specify the system wide default as discarding
-packet or not to do IPsec.
-
-	net.inet.ipsec.def_policy
-	net.inet6.ipsec6.def_policy
-
-	They are 0:discard or 1:none.
-
-You can see these values in netinet6/ipsec.h.
+The kernel implements experimental policy management code.  There are two way
+to to manage security policy.  One is to configure per-socket policy using
+setsockopt(3).  The other is to configure kernel packet filter-based policy
+using PF_KEY interface, via setkey(8).  In both cases, IPsec policy must be
+specified with syntax described in ipsec_set_policy(3).
 
 The policy entry is not re-ordered with its
 indexes, so the order of entry when you add is very significant.
-But we think it should be fixed in the future.
 
 4.2 Key Management
 
