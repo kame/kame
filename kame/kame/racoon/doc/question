@@ -1,4 +1,4 @@
-$Id: question,v 1.10 2000/01/18 05:07:14 sakane Exp $
+$Id: question,v 1.11 2000/02/15 14:38:11 sakane Exp $
 
 HOW DO I DO ?
 Q. ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
@@ -89,3 +89,6 @@ Q. Waht's msgid of informational exchange for error notify message during
 	-> then, how can we deduce phase 2 from the notification?
 
 Q. I don't know the situation to initiate acknowledged informational.
+
+Q. How many certificate payload in a packet are sent ?
+   isakmp-test.ssh.fi send both CRL and CERT in a packet.
