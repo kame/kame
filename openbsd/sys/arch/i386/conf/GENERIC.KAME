@@ -18,17 +18,17 @@ include	"arch/i386/conf/GENERIC"
 #option		RADIX_MPATH
 
 # Source-Specific Multicast (SSM)
-#options 	IGMPV3		# IPv4
-#options 	MLDV2		# IPv6
+#option 	IGMPV3		# IPv4
+#option 	MLDV2		# IPv6
 
 # Mobile IPv6
-#options	MIP6
-#options	MIP6_HOME_AGENT
-#options	MIP6_MOBILE_NODE
+#option		MIP6
+#option		MIP6_HOME_AGENT
+#option		MIP6_MOBILE_NODE
 #pseudo-device	hif	1
-#options	MIP6_NOHAIPSEC
-#options	MIP6_DEBUG
+#option		MIP6_NOHAIPSEC
+#option		MIP6_DEBUG
 
 # Datagram Congestion Control Protocol
-#options		DCCP
-#options		DCCP_TFRC
+#option		DCCP
+#option		DCCP_TFRC
