@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.71 2001/07/04 05:02:19 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.72 2001/07/05 07:26:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -47,6 +47,9 @@
  *	- conflict resolution
  * - spec conformance check
  * - set hoplimit on reply to 255, verify
+ * - for -N, we should be using "ping6 -a ag -N -I if0 fqdn", not
+ *   "ping6 -w -I if0 ff02::1".  however, the deployemnt status of the latest
+ *   icmp6 node information query is still low.  not sure what should we do.
  *
  * draft-aboba-dnsext-mdns-00 -> draft-aboba-dnsext-mdns-01 differences:
  * - 01 specification requires us to query names under "lcl.arpa" only.
