@@ -84,6 +84,15 @@ struct in_multi_source {
 #define	IMS_ADD_SOURCE		1	 /* request to add source to list   */
 #define	IMS_DELETE_SOURCE	2	 /* request to delete source to list */
 
+/*
+ * Filter definition of State Change Report, given from the state change of
+ * current filter mode and new filter mode.
+ */
+#define	REPORT_FILTER1		1		/* INCLUDE(A) -> INCLUDE(B) */
+#define	REPORT_FILTER2		2		/* EXCLUDE(A) -> EXCLUDE(B) */
+#define	REPORT_FILTER3		3		/* INCLUDE(A) -> EXCLUDE(B) */
+#define	REPORT_FILTER4		4		/* EXCLUDE(A) -> INCLUDE(B) */
+
 #define IGMP_JOINLEAVE_OPS(optname)				\
 	(((optname) == IP_ADD_SOURCE_MEMBERSHIP) ||		\
 	 ((optname) == IP_DROP_SOURCE_MEMBERSHIP) ||		\

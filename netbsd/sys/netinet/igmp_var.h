@@ -155,15 +155,6 @@ struct igmpstat {
 #define	IGMP_DEF_QUERY		10	/* v1 Max. Response Time (sec.) */
 
 #ifdef _KERNEL
-/*
- * Filter definition of State Change Report, given from the state change of
- * current filter mode and new filter mode.
- */
-#define	REPORT_FILTER1		1		/* INCLUDE(A) -> INCLUDE(B) */
-#define	REPORT_FILTER2		2		/* EXCLUDE(A) -> EXCLUDE(B) */
-#define	REPORT_FILTER3		3		/* INCLUDE(A) -> EXCLUDE(B) */
-#define	REPORT_FILTER4		4		/* EXCLUDE(A) -> INCLUDE(B) */
-
 struct igmpstat igmpstat;
 extern	struct router_info *rti_head;
 
