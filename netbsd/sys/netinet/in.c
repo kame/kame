@@ -931,7 +931,7 @@ in_addprefix(target, flags)
 	struct in_addr prefix, mask, p;
 	int error;
 
-	if (rtinitflags(target))
+	if ((flags & RTF_HOST) != 0)
 		prefix = target->ia_dstaddr.sin_addr;
 	else
 		prefix = target->ia_addr.sin_addr;
@@ -943,7 +943,7 @@ in_addprefix(target, flags)
 		if (mask.s_addr != ia->ia_sockmask.sin_addr.s_addr)
 			continue;
 
-		if (rtinitflags(ia))
+		if (rtinitflags(ia) && ia->ia_dstaddr.sin_family == AF_INET)
 			p = ia->ia_dstaddr.sin_addr;
 		else
 			p = ia->ia_addr.sin_addr;
@@ -979,7 +979,7 @@ in_scrubprefix(target)
 	if ((target->ia_flags & IFA_ROUTE) == 0)
 		return 0;
 
-	if (rtinitflags(target))
+	if (rtinitflags(target) && target->ia_dstaddr.sin_family == AF_INET)
 		prefix = target->ia_dstaddr.sin_addr;
 	else
 		prefix = target->ia_addr.sin_addr;
@@ -991,7 +991,7 @@ in_scrubprefix(target)
 		if (mask.s_addr != ia->ia_sockmask.sin_addr.s_addr)
 			continue;
 
-		if (rtinitflags(target))
+		if (rtinitflags(ia) && ia->ia_dstaddr.sin_family == AF_INET)
 			p = ia->ia_dstaddr.sin_addr;
 		else
 			p = ia->ia_addr.sin_addr;
