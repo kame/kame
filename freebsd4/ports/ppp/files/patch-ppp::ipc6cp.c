@@ -1,5 +1,5 @@
---- ppp/ipv6cp.c.orig	Tue Feb 26 16:22:43 2002
-+++ ppp/ipv6cp.c	Tue Feb 26 16:23:48 2002
+--- ppp/ipv6cp.c.orig	Sat Mar  2 14:32:20 2002
++++ ppp/ipv6cp.c	Tue Mar  5 13:08:22 2002
 @@ -106,17 +106,18 @@
    fsm_NullRecvResetAck
  };
@@ -25,10 +25,10 @@
  {
    struct bundle *bundle = ipv6cp->fsm.bundle;
    struct in6_addr myaddr, hisaddr;
-@@ -137,12 +138,18 @@
-   /* XXX: embed link scope ID to disambiguate the zone. */
-   linkid = htons(bundle->iface->index);
-   memcpy(&myaddr.s6_addr[2], &linkid, sizeof(linkid));
+@@ -133,11 +134,17 @@
+ 
+   myaddr.s6_addr[0] = 0xfe;
+   myaddr.s6_addr[1] = 0x80;
 -  *(u_int32_t *)(myaddr.s6_addr + 12) = htonl(mytok);
 +  memcpy(&myaddr.s6_addr[8], myifid, IPV6CP_IFIDLEN);
 +#if 0
@@ -37,7 +37,6 @@
  
    hisaddr.s6_addr[0] = 0xfe;
    hisaddr.s6_addr[1] = 0x80;
-   memcpy(&hisaddr.s6_addr[2], &linkid, sizeof(linkid));
 -  *(u_int32_t *)(hisaddr.s6_addr + 12) = htonl(histok);
 +  memcpy(&hisaddr.s6_addr[8], hisifid, IPV6CP_IFIDLEN);
 +#if 0
@@ -46,7 +45,7 @@
  
    ncpaddr_setip6(&ipv6cp->myaddr, &myaddr);
    ncpaddr_setip6(&ipv6cp->hisaddr, &hisaddr);
-@@ -192,17 +199,20 @@
+@@ -187,17 +194,20 @@
    ipv6cp->cfg.fsm.maxreq = DEF_FSMTRIES;
    ipv6cp->cfg.fsm.maxtrm = DEF_FSMTRIES;
  
@@ -74,7 +73,7 @@
      }
    }
  
-@@ -301,7 +311,7 @@
+@@ -296,7 +306,7 @@
  int
  ipv6cp_InterfaceUp(struct ipv6cp *ipv6cp)
  {
@@ -83,7 +82,7 @@
      log_Printf(LogERROR, "ipv6cp_InterfaceUp: unable to set ipv6 address\n");
      return 0;
    }
-@@ -480,14 +490,14 @@
+@@ -458,14 +468,14 @@
    /* Send config REQ please */
    struct physical *p = link2physical(fp->link);
    struct ipv6cp *ipv6cp = fsm2ipv6cp(fp);
@@ -101,7 +100,7 @@
    }
  
    fsm_Output(fp, CODE_CONFIGREQ, fp->reqid, buff, (u_char *)o - buff,
-@@ -510,7 +520,7 @@
+@@ -488,7 +498,7 @@
  static const char *
  protoname(int proto)
  {
@@ -110,7 +109,7 @@
  
    if (proto > 0 && proto <= sizeof cftypes / sizeof *cftypes)
      return cftypes[proto - 1];
-@@ -519,22 +529,26 @@
+@@ -497,22 +507,26 @@
  }
  
  static void
@@ -147,7 +146,7 @@
    }
  }
  
-@@ -546,7 +560,8 @@
+@@ -524,7 +538,8 @@
    struct ipv6cp *ipv6cp = fsm2ipv6cp(fp);
    int type, length, n;
    char tbuff[100];
@@ -157,7 +156,7 @@
  
    while (plen >= sizeof(struct fsmconfig)) {
      type = *cp;
-@@ -561,40 +576,50 @@
+@@ -539,40 +554,50 @@
  
      switch (type) {
      case TY_TOKEN:
@@ -225,7 +224,7 @@
              bundle_AdjustFilters(fp->bundle, &ipv6cp->myaddr, NULL);
            }
          }
-@@ -630,7 +655,8 @@
+@@ -608,7 +633,8 @@
           */
          ipv6cp->peer_tokenreq = 1;
        }
