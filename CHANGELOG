@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.760 2000/04/11 10:58:33 jinmei Exp $
+$Id: CHANGELOG,v 1.761 2000/04/11 16:25:27 itojun Exp $
 
 <200003>
+Wed Apr 12 01:24:40 JST 2000  itojun@iijlab.net
+	* sys/netinet6/in6_ifattach.c: cleanup IPv6 interface initialization
+	  in in6_ifattach().  be more persistent about initialization.
+
 2000-04-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/gifconfig/gifconfig.c: supported a new description
 	"gifconfig ifname delete", which removes already specified physical
