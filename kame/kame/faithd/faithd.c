@@ -198,10 +198,10 @@ main(int argc, char *argv[])
 		if (serverargc > MAXARGV)
 			exit_error("too many augments");
 
-		serverpath = malloc(strlen(argv[NUMPRG]));
+		serverpath = malloc(strlen(argv[NUMPRG]) + 1);
 		strcpy(serverpath, argv[NUMPRG]);
 		for (i = 0; i < serverargc; i++) {
-			serverarg[i] = malloc(strlen(argv[i + NUMARG]));
+			serverarg[i] = malloc(strlen(argv[i + NUMARG]) + 1);
 			strcpy(serverarg[i], argv[i + NUMARG]);
 		}
 		serverarg[i] = NULL;
