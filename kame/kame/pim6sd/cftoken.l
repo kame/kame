@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.14 2002/06/19 23:46:51 itojun Exp $	*/
+/*	$KAME: cftoken.l,v 1.15 2002/06/26 10:41:37 itojun Exp $	*/
 
 %{
 /*
@@ -31,6 +31,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
