@@ -341,6 +341,7 @@ res_init()
 		    memset(&hints, 0, sizeof(hints));
 		    hints.ai_flags = AI_NUMERICHOST;
 		    hints.ai_socktype = SOCK_DGRAM;
+		    hints.ai_protocol = IPPROTO_UDP;
 		    snprintf(pbuf, sizeof(pbuf), "%d", NAMESERVER_PORT);
 		    if (getaddrinfo(cp, pbuf, &hints, &res) == 0 &&
 			    res->ai_next == NULL) {
