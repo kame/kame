@@ -18,9 +18,9 @@ while ($i = shift @ARGV) {
 open(IN, "setkey -D |") || die;
 foreach $_ (<IN>) {
 	if (/^[^\t]/) {
-		($src, $dst, $upper, $proxy) = split(/\s+/, $_);
-	} elsif (/^\t(esp|ah) spi=(\d+).*replay=(\d+)/) {
-		($proto, $spi, $replay) = ($1, $2, $3);
+		($src, $dst) = split(/\s+/, $_);
+	} elsif (/^\t(esp|ah) mode=(\S+) spi=(\d+).*replay=(\d+)/) {
+		($proto, $ipsecmode, $spi, $replay) = ($1, $2, $3, $4);
 	} elsif (/^\tE: (\S+) (.*)/) {
 		$ealgo = $1;
 		$ekey = $2;
@@ -32,7 +32,8 @@ foreach $_ (<IN>) {
 		$akey =~ s/\s//g;
 		$akey =~ s/^/0x/g;
 	} elsif (/^\tstate=/) {
-		print "$mode $src $dst $upper $spi $proxy -p $proto";
+		print "$mode $src $dst $proto $spi -m $ipsecmode";
+		print " -r $replay" if $replay;
 		if ($mode eq 'add') {
 			if ($proto eq 'esp') {
 				print " -E $ealgo $ekey" if $ealgo;
@@ -40,7 +41,6 @@ foreach $_ (<IN>) {
 			} elsif ($proto eq 'ah') {
 				print " -A $aalgo $akey" if $aalgo;
 			}
-			print " -r $replay" if $replay;
 		}
 		print ";\n";
 
