@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.12 2000/05/22 22:23:07 itojun Exp $	*/
+/*	$KAME: config.c,v 1.13 2000/09/06 19:53:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -425,7 +425,7 @@ get_prefix(struct rainfo *rai)
 		if ((pp->prefixlen = get_prefixlen(next)) < 0) {
 			syslog(LOG_ERR,
 			       "<%s> failed to get prefixlen "
-			       "or prefixl is invalid",
+			       "or prefix is invalid",
 			       __FUNCTION__);
 			exit(1);
 		}
