@@ -1025,6 +1025,7 @@ send:
 	}
 #ifdef IPSEC
 	if (ipsec_setsocket(m, so) != 0) {
+		m_freem(m);
 		error = ENOBUFS;
 		goto out;
 	}
