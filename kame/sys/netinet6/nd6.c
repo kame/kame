@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.76 2000/11/05 16:53:46 onoe Exp $	*/
+/*	$KAME: nd6.c,v 1.77 2000/11/08 16:51:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -432,6 +432,9 @@ nd6_timer(ignored_arg)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
+	struct ifnet *ifp;
+	struct in6_ifaddr *ia6, *nia6;
+	struct in6_addrlifetime *lt6;
 	
 #ifdef __NetBSD__
 	s = splsoftnet();
@@ -450,7 +453,6 @@ nd6_timer(ignored_arg)
 	/* XXX BSD/OS separates this code -- itojun */
 	while (ln && ln != &llinfo_nd6) {
 		struct rtentry *rt;
-		struct ifnet *ifp;
 		struct sockaddr_in6 *dst;
 		struct llinfo_nd6 *next = ln->ln_next;
 		/* XXX: used for the DELAY case only: */
@@ -545,7 +547,7 @@ nd6_timer(ignored_arg)
 		ln = next;
 	}
 	
-	/* expire */
+	/* expire default router list */
 	dr = TAILQ_FIRST(&nd_defrouter);
 	while (dr) {
 		if (dr->expire && dr->expire < time_second) {
@@ -561,28 +563,31 @@ nd6_timer(ignored_arg)
 			dr = TAILQ_NEXT(dr, dr_entry);
 		}
 	}
+
+	/*
+	 * expire interface addresses.
+	 * in the past the loop was inside prefix expiry processing.
+	 * however, as we can specify address lifetime with ifconfig(8),
+	 * it makes more sense for us to check individual interface addresses
+	 * separately from prefix lists.
+	 */
+	for (ia6 = in6_ifaddr; ia6; ia6 = nia6) {
+		nia6 = ia6->ia_next;
+		/* check address lifetime */
+		lt6 = &ia6->ia6_lifetime;
+		if (lt6->ia6t_preferred && lt6->ia6t_preferred < time_second)
+			ia6->ia6_flags |= IN6_IFF_DEPRECATED;
+		if (lt6->ia6t_expire && lt6->ia6t_expire < time_second) {
+			if (!IN6_IS_ADDR_UNSPECIFIED(&ia6->ia_addr.sin6_addr))
+				in6_ifdel(ia6->ia_ifp,
+				    &ia6->ia_addr.sin6_addr);
+			/* xxx ND_OPT_PI_FLAG_ONLINK processing */
+		}
+	}
+
+	/* expire prefix list */
 	pr = nd_prefix.lh_first;
 	while (pr) {
-		struct in6_ifaddr *ia6;
-		struct in6_addrlifetime *lt6;
-
-		if (IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
-			ia6 = NULL;
-		else
-			ia6 = in6ifa_ifpwithaddr(pr->ndpr_ifp, &pr->ndpr_addr);
-
-		if (ia6) {
-			/* check address lifetime */
-			lt6 = &ia6->ia6_lifetime;
-			if (lt6->ia6t_preferred && lt6->ia6t_preferred < time_second)
-				ia6->ia6_flags |= IN6_IFF_DEPRECATED;
-			if (lt6->ia6t_expire && lt6->ia6t_expire < time_second) {
-				if (!IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
-					in6_ifdel(pr->ndpr_ifp, &pr->ndpr_addr);
-				/* xxx ND_OPT_PI_FLAG_ONLINK processing */
-			}
-		}
-
 		/*
 		 * check prefix lifetime.
 		 * since pltime is just for autoconf, pltime processing for
