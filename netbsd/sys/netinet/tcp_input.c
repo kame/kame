@@ -154,6 +154,7 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/in.h>
 #endif
 #include <netinet/ip6.h>
+#include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_var.h>
@@ -895,11 +896,16 @@ findpcb:
 #ifdef INET6
 	/* save packet options if user wanted */
 	if (in6p && (in6p->in6p_flags & IN6P_CONTROLOPTS)) {
-		if (in6p->in6p_options) {
-			m_freem(in6p->in6p_options);
-			in6p->in6p_options = 0;
+		struct ip6_recvpktopts opts;
+
+		bzero(&opts, sizeof(opts));
+		ip6_savecontrol(in6p, ip6, m, &opts, &in6p->in6p_inputopts);
+		ip6_update_recvpcbopt(&in6p->in6p_inputopts, &opts);
+		if (opts.head) {
+			if (sbappendcontrol(&in6p->in6p_socket->so_rcv,
+					    NULL, opts.head) == 0)
+				m_freem(opts.head);
 		}
-		ip6_savecontrol(in6p, &in6p->in6p_options, ip6, m);
 	}
 #endif
 
@@ -2832,12 +2838,25 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 		struct in6pcb *oin6p = sotoin6pcb(oso);
 		/* inherit socket options from the listening socket */
 		in6p->in6p_flags |= (oin6p->in6p_flags & IN6P_CONTROLOPTS);
-		if (in6p->in6p_flags & IN6P_CONTROLOPTS) {
-			m_freem(in6p->in6p_options);
-			in6p->in6p_options = 0;
+		if ((in6p->in6p_flags & IN6P_CONTROLOPTS)
+		 && m->m_len >= sizeof(struct ip6_hdr)) {
+			struct ip6_recvpktopts newopts;
+			struct ip6_hdr *ip6;
+
+			bzero(&newopts, sizeof(newopts));
+			ip6 = mtod(m, struct ip6_hdr *);
+			ip6_savecontrol(in6p, ip6, m, &newopts,
+			    &in6p->in6p_inputopts);
+			ip6_update_recvpcbopt(&in6p->in6p_inputopts, &newopts);
+			if (newopts.head) {
+				if (sbappendcontrol(&so->so_rcv, NULL,
+						    newopts.head) == 0)
+					m_freem(newopts.head);
+			}
+#if 0
+			in6p->in6p_recvoptions = NULL;
+#endif
 		}
-		ip6_savecontrol(in6p, &in6p->in6p_options,
-			mtod(m, struct ip6_hdr *), m);
 	}
 #endif
 

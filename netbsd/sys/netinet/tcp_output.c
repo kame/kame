@@ -141,8 +141,8 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/in.h>
 #endif
 #include <netinet/ip6.h>
-#include <netinet6/in6_pcb.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/in6_pcb.h>
 #endif
 
 #include <netinet/tcp.h>

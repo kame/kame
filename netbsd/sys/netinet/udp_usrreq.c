@@ -511,9 +511,9 @@ udp6_sendup(m, off, src, so)
 	struct sockaddr *src;
 	struct socket *so;
 {
-	struct mbuf *opts = NULL;
 	struct mbuf *n;
 	struct in6pcb *in6p = NULL;
+	struct ip6_recvpktopts opts;
 
 	if (!so)
 		return;
@@ -530,17 +530,18 @@ udp6_sendup(m, off, src, so)
 #endif /*IPSEC*/
 
 	if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
+		bzero(&opts, sizeof(opts));
 		if (in6p && (in6p->in6p_flags & IN6P_CONTROLOPTS
 			  || in6p->in6p_socket->so_options & SO_TIMESTAMP)) {
 			struct ip6_hdr *ip6 = mtod(n, struct ip6_hdr *);
-			ip6_savecontrol(in6p, &opts, ip6, n);
+			ip6_savecontrol(in6p, ip6, n, &opts, NULL);
 		}
 
 		m_adj(n, off);
-		if (sbappendaddr(&so->so_rcv, src, n, opts) == 0) {
+		if (sbappendaddr(&so->so_rcv, src, n, opts.head) == 0) {
 			m_freem(n);
-			if (opts)
-				m_freem(opts);
+			if (opts.head)
+				m_freem(opts.head);
 			udp6stat.udp6s_fullsock++;
 		} else
 			sorwakeup(so);
