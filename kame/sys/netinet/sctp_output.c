@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.28 2003/09/17 08:37:56 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.29 2003/10/18 07:50:30 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c, v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -1924,9 +1924,13 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 		ip = mtod(m, struct ip *);
 		ip->ip_v = IPVERSION;
 		ip->ip_hl = (sizeof(struct ip) >> 2);
-		if (nofragment_flag)
+		if (nofragment_flag) {
+#ifdef WITH_CONVERT_IP_OFF
 			ip->ip_off = IP_DF;
-		else
+#else
+			ip->ip_off = htons(IP_DF);
+#endif
+		} else
 			ip->ip_off = 0;
 #if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 		ip->ip_id = htons(ip_randomid());
