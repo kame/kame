@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.84 2002/01/08 02:40:59 k-sugyou Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.85 2002/01/11 10:10:18 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,6 +33,7 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
+#include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
