@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.157 2002/05/26 23:12:55 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.158 2002/05/26 23:21:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1181,8 +1181,12 @@ in6_tmpaddrtimer(ignored_arg)
 	bzero(nullbuf, sizeof(nullbuf));
 	for (i = 1; i < if_index + 1; i++) {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
+		if (!ifindex2ifnet(i))
+			continue;
 		ndi = NDI(ifindex2ifnet(i));
 #else
+		if (!ifindex2ifnet[i])
+			continue;
 		ndi = NDI(ifindex2ifnet[i]);
 #endif
 		if (bcmp(ndi->randomid, nullbuf, sizeof(nullbuf)) != 0) {

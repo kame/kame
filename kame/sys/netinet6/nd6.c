@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.253 2002/05/26 23:07:53 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.254 2002/05/26 23:21:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -230,7 +230,7 @@ nd6_ifattach(ifp)
 	 * here.
 	 */
 	nd->flags = (ND6_IFF_PERFORMNUD | ND6_IFF_ACCEPT_RTADV);
-	nd6_setmtu(ifp);
+	nd6_setmtu(ifp, nd);
 
 	return nd;
 }
@@ -244,13 +244,13 @@ nd6_ifdetach(nd)
 }
 
 void
-nd6_setmtu(ifp)
+nd6_setmtu(ifp, ndi)
 	struct ifnet *ifp;
+	struct nd_ifinfo *ndi;
 {
 #ifndef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #endif
-	struct nd_ifinfo *ndi = NDI(ifp);
 
 	switch (ifp->if_type) {
 	case IFT_ARCNET:	/* XXX MTU handling needs more work */
@@ -304,6 +304,7 @@ nd6_option_init(opt, icmp6len, ndopts)
 	int icmp6len;
 	union nd_opts *ndopts;
 {
+
 	bzero(ndopts, sizeof(*ndopts));
 	ndopts->nd_opts_search = (struct nd_opt_hdr *)opt;
 	ndopts->nd_opts_last
@@ -2029,8 +2030,12 @@ nd6_slowtimo(ignored_arg)
 #endif
 	for (i = 1; i < if_index + 1; i++) {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
+		if (!ifindex2ifnet(i))
+			continue;
 		nd6if = NDI(ifindex2ifnet(i));
 #else
+		if (!ifindex2ifnet[i])
+			continue;
 		nd6if = NDI(ifindex2ifnet[i]);
 #endif
 		if (nd6if->basereachable && /* already initialized */
