@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.59 2002/09/11 03:45:31 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.60 2003/01/20 00:55:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -86,7 +86,7 @@ static int esp_descbc_ivlen __P((const struct esp_algorithm *,
 	struct secasvar *));
 static int esp_des_schedule __P((const struct esp_algorithm *,
 	struct secasvar *));
-static int esp_des_schedlen __P((const struct esp_algorithm *));
+static size_t esp_des_schedlen __P((const struct esp_algorithm *));
 static int esp_des_blockdecrypt __P((const struct esp_algorithm *,
 	struct secasvar *, u_int8_t *, u_int8_t *));
 static int esp_des_blockencrypt __P((const struct esp_algorithm *,
@@ -94,21 +94,21 @@ static int esp_des_blockencrypt __P((const struct esp_algorithm *,
 static int esp_cbc_mature __P((struct secasvar *));
 static int esp_blowfish_schedule __P((const struct esp_algorithm *,
 	struct secasvar *));
-static int esp_blowfish_schedlen __P((const struct esp_algorithm *));
+static size_t esp_blowfish_schedlen __P((const struct esp_algorithm *));
 static int esp_blowfish_blockdecrypt __P((const struct esp_algorithm *,
 	struct secasvar *, u_int8_t *, u_int8_t *));
 static int esp_blowfish_blockencrypt __P((const struct esp_algorithm *,
 	struct secasvar *, u_int8_t *, u_int8_t *));
 static int esp_cast128_schedule __P((const struct esp_algorithm *,
 	struct secasvar *));
-static int esp_cast128_schedlen __P((const struct esp_algorithm *));
+static size_t esp_cast128_schedlen __P((const struct esp_algorithm *));
 static int esp_cast128_blockdecrypt __P((const struct esp_algorithm *,
 	struct secasvar *, u_int8_t *, u_int8_t *));
 static int esp_cast128_blockencrypt __P((const struct esp_algorithm *,
 	struct secasvar *, u_int8_t *, u_int8_t *));
 static int esp_3des_schedule __P((const struct esp_algorithm *,
 	struct secasvar *));
-static int esp_3des_schedlen __P((const struct esp_algorithm *));
+static size_t esp_3des_schedlen __P((const struct esp_algorithm *));
 static int esp_3des_blockdecrypt __P((const struct esp_algorithm *,
 	struct secasvar *, u_int8_t *, u_int8_t *));
 static int esp_3des_blockencrypt __P((const struct esp_algorithm *,
@@ -241,8 +241,6 @@ esp_schedule(algo, sav)
 		return 0;
 
 	sav->schedlen = (*algo->schedlen)(algo);
-	if (sav->schedlen < 0)
-		return EINVAL;
 	sav->sched = malloc(sav->schedlen, M_SECA, M_DONTWAIT);
 	if (!sav->sched) {
 		sav->schedlen = 0;
@@ -351,7 +349,7 @@ esp_descbc_ivlen(algo, sav)
 	return 8;
 }
 
-static int
+static size_t
 esp_des_schedlen(algo)
 	const struct esp_algorithm *algo;
 {
@@ -469,7 +467,7 @@ esp_cbc_mature(sav)
 	return 0;
 }
 
-static int
+static size_t
 esp_blowfish_schedlen(algo)
 	const struct esp_algorithm *algo;
 {
@@ -528,7 +526,7 @@ esp_blowfish_blockencrypt(algo, sav, s, d)
 	return 0;
 }
 
-static int
+static size_t
 esp_cast128_schedlen(algo)
 	const struct esp_algorithm *algo;
 {
@@ -577,7 +575,7 @@ esp_cast128_blockencrypt(algo, sav, s, d)
 	return 0;
 }
 
-static int
+static size_t
 esp_3des_schedlen(algo)
 	const struct esp_algorithm *algo;
 {

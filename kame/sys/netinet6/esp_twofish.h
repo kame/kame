@@ -1,4 +1,4 @@
-/*	$KAME: esp_twofish.h,v 1.1 2000/09/20 18:15:23 itojun Exp $	*/
+/*	$KAME: esp_twofish.h,v 1.2 2003/01/20 00:55:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-int esp_twofish_schedlen __P((const struct esp_algorithm *));
+size_t esp_twofish_schedlen __P((const struct esp_algorithm *));
 int esp_twofish_schedule __P((const struct esp_algorithm *,
 	struct secasvar *));
 int esp_twofish_blockdecrypt __P((const struct esp_algorithm *,

@@ -1,4 +1,4 @@
-/*	$KAME: esp_twofish.c,v 1.4 2001/03/02 07:04:57 itojun Exp $	*/
+/*	$KAME: esp_twofish.c,v 1.5 2003/01/20 00:55:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,7 +57,7 @@
  * twofish actually do not use assymetric scheduled keys, however, AES C API
  * suggests assymetric key setup.
  */
-int
+size_t
 esp_twofish_schedlen(algo)
 	const struct esp_algorithm *algo;
 {

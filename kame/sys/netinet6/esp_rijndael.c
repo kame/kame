@@ -1,4 +1,4 @@
-/*	$KAME: esp_rijndael.c,v 1.6 2003/01/08 05:36:55 itojun Exp $	*/
+/*	$KAME: esp_rijndael.c,v 1.7 2003/01/20 00:55:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,7 +55,7 @@
 #include <net/net_osdep.h>
 
 /* as rijndael uses assymetric scheduled keys, we need to do it twice. */
-int
+size_t
 esp_rijndael_schedlen(algo)
 	const struct esp_algorithm *algo;
 {
