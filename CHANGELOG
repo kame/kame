@@ -1,11 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.228 1999/10/27 16:46:19 sakane Exp $
+$Id: CHANGELOG,v 1.229 1999/10/27 17:44:05 sakane Exp $
 
 <199910>
 Thu Oct 28 01:41:00 JST 1999 sakane@ydc.co.jp
 	* kame/kame/netinet6/ipsec.c:
-	Fix mbuf memory leak.  Policy buffer was not freed, when PCB was free.
+	Fix mbuf memory leak.
+	- Policy buffer was not freed when PCB was free.
+	- PF_KEY message buffer was not freed when key_parse() returned zero.
 
 1999-10-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6dd: applied several fixes from sumikawa@hitachi
