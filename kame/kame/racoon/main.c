@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.25 2001/01/31 05:32:56 sakane Exp $	*/
+/*	$KAME: main.c,v 1.26 2001/02/01 17:00:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 
 #include <netinet/in.h>
 
@@ -44,6 +45,7 @@
 #include <unistd.h>
 #endif
 #include <paths.h>
+#include <err.h>
 
 #include "var.h"
 #include "misc.h"
@@ -117,6 +119,13 @@ main(ac, av)
 	char **av;
 {
 	int error;
+
+	/* don't let anyone read files I write */
+	umask(077);
+	if (umask(077) != 077) {
+		errx(1, "could not set umask");
+		/*NOTREACHED*/
+	}
 
 	initlcconf();
 	initrmconf();
