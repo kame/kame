@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.231 2001/10/18 04:23:23 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.232 2001/10/18 08:12:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -357,7 +357,10 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			 * if a routing header exists dest1 must be
 			 * inserted if it exists.
 			 */
-			MAKE_EXTHDR(opt->ip6po_dest1, &exthdrs.ip6e_dest1);
+			if (opt) {
+				MAKE_EXTHDR(opt->ip6po_dest1,
+					    &exthdrs.ip6e_dest1);
+			}
 		}
 		MAKE_EXTHDR(mip6opt.mip6po_haddr, &exthdrs.ip6e_haddr);
 		if (mip6opt.mip6po_dest2) {
