@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.47 2001/06/02 18:50:46 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.48 2001/06/08 04:46:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -76,6 +76,12 @@ static int getinet6sysctl __P((int));
 
 extern struct rainfo *ralist;
 
+#ifdef defined(__FreeBSD__) && __FreeBSD__ <= 3	/* XXX: see PORTABILITY */
+#define LONGLONG "%qd"
+#else
+#define LONGLONG "%lld"
+#endif
+
 void
 getconfig(intface)
 	char *intface;
@@ -84,7 +90,7 @@ getconfig(intface)
 	char tbuf[BUFSIZ];
 	struct rainfo *tmp;
 	long val;
-	long long val64;
+	int64_t val64;
 	char buf[BUFSIZ];
 	char *bp = buf;
 	char *addr;
@@ -92,7 +98,7 @@ getconfig(intface)
 
 #define MUSTHAVE(var, cap)	\
     do {								\
-	long long t;							\
+	int64_t t;							\
 	if ((t = agetnum(cap)) < 0) {					\
 		fprintf(stderr, "rtadvd: need %s for interface %s\n",	\
 			cap, intface);					\
@@ -155,17 +161,18 @@ getconfig(intface)
 	MAYHAVE(val, "maxinterval", DEF_MAXRTRADVINTERVAL);
 	if (val < MIN_MAXINTERVAL || val > MAX_MAXINTERVAL) {
 		syslog(LOG_ERR,
-		       "<%s> maxinterval must be between %e and %u",
-		       __FUNCTION__, MIN_MAXINTERVAL, MAX_MAXINTERVAL);
+		       "<%s> maxinterval (%d) on %s is invalid "
+		       "(must be between %e and %u)", __FUNCTION__, val,
+		       intface, MIN_MAXINTERVAL, MAX_MAXINTERVAL);
 		exit(1);
 	}
 	tmp->maxinterval = (u_int)val;
 	MAYHAVE(val, "mininterval", tmp->maxinterval/3);
 	if (val < MIN_MININTERVAL || val > (tmp->maxinterval * 3) / 4) {
 		syslog(LOG_ERR,
-		       "<%s> mininterval must be between %e and %d",
-		       __FUNCTION__,
-		       MIN_MININTERVAL,
+		       "<%s> mininterval (%d) on %s is invalid "
+		       "(must be between %e and %d)",
+		       __FUNCTION__, val, intface, MIN_MININTERVAL,
 		       (tmp->maxinterval * 3) / 4);
 		exit(1);
 	}
@@ -187,17 +194,17 @@ getconfig(intface)
 #endif
 	tmp->rtpref = val & ND_RA_FLAG_RTPREF_MASK;
 	if (tmp->rtpref == ND_RA_FLAG_RTPREF_RSV) {
-		syslog(LOG_ERR, "<%s> invalid router preference on %s",
-		       __FUNCTION__, intface);
+		syslog(LOG_ERR, "<%s> invalid router preference (%02x) on %s",
+		       __FUNCTION__, tmp->rtpref, intface);
 		exit(1);
 	}
 
 	MAYHAVE(val, "rltime", tmp->maxinterval * 3);
 	if (val && (val < tmp->maxinterval || val > MAXROUTERLIFETIME)) {
 		syslog(LOG_ERR,
-		       "<%s> router lifetime on %s must be 0 or"
-		       " between %d and %d",
-		       __FUNCTION__, intface,
+		       "<%s> router lifetime (%d) on %s is invalid "
+		       "(must be 0 or between %d and %d)",
+		       __FUNCTION__, val, intface, tmp->maxinterval,
 		       tmp->maxinterval, MAXROUTERLIFETIME);
 		exit(1);
 	}
@@ -219,18 +226,20 @@ getconfig(intface)
 	tmp->lifetime = val & 0xffff;
 
 	MAYHAVE(val, "rtime", DEF_ADVREACHABLETIME);
-	if (val > MAXREACHABLETIME) {
+	if (val < 0 || val > MAXREACHABLETIME) {
 		syslog(LOG_ERR,
-		       "<%s> reachable time must be no greater than %d",
-		       __FUNCTION__, MAXREACHABLETIME);
+		       "<%s> reachable time (%ld) on %s is invalid "
+		       "(must be no greater than %d)",
+		       __FUNCTION__, val, intface, MAXREACHABLETIME);
 		exit(1);
 	}
 	tmp->reachabletime = (u_int32_t)val;
 
 	MAYHAVE(val64, "retrans", DEF_ADVRETRANSTIMER);
 	if (val64 < 0 || val64 > 0xffffffff) {
-		syslog(LOG_ERR,
-		       "<%s> retrans time out of range", __FUNCTION__);
+		syslog(LOG_ERR, "<%s> retrans time (" LONGLONG
+			") on %s out of range",
+		       __FUNCTION__, val64, intface);
 		exit(1);
 	}
 	tmp->retranstimer = (u_int32_t)val64;
@@ -252,19 +261,19 @@ getconfig(intface)
 			exit(1);
 		}
 	} else {
-		tmp->hapref = 0;
 		if ((val = agetnum("hapref")) >= 0)
 			tmp->hapref = (int16_t)val;
 		if (tmp->hapref != 0) {
-			tmp->hatime = 0;
 			MUSTHAVE(val, "hatime");
-			tmp->hatime = (u_int16_t)val;
-			if (tmp->hatime <= 0) {
+			if (val <= 0) {
 				syslog(LOG_ERR,
-				       "<%s> home agent lifetime must be greater than 0",
-				       __FUNCTION__);
+				       "<%s> home agent lifetime (%ld) on %s "
+				       "invalid (must be greater than 0)",
+				       __FUNCTION__, val, intface);
 				exit(1);
 			}
+
+			tmp->hatime = (u_int16_t)val;
 		}
 	}
 #endif
@@ -310,12 +319,42 @@ getconfig(intface)
 
 			pfx->origin = PREFIX_FROM_CONFIG;
 
+
+			makeentry(entbuf, i, "addr", added);
+			addr = (char *)agetstr(entbuf, &bp);
+			if (addr == NULL) {
+				syslog(LOG_ERR,
+				       "<%s> need %s as a prefix for "
+				       "interface %s",
+				       __FUNCTION__, entbuf, intface);
+				exit(1);
+			}
+			if (inet_pton(AF_INET6, addr,
+				      &pfx->prefix) != 1) {
+				syslog(LOG_ERR,
+				       "<%s> inet_pton failed for %s",
+				       __FUNCTION__, addr);
+				exit(1);
+			}
+			if (IN6_IS_ADDR_MULTICAST(&pfx->prefix)) {
+				syslog(LOG_ERR,
+				       "<%s> multicast prefix (%s) must "
+				       "not be advertised on %s",
+				       __FUNCTION__, addr, intface);
+				exit(1);
+			}
+			if (IN6_IS_ADDR_LINKLOCAL(&pfx->prefix))
+				syslog(LOG_NOTICE,
+				       "<%s> link-local prefix (%s) will be"
+				       " advertised on %s",
+				       __FUNCTION__, addr, intface);
+
 			makeentry(entbuf, i, "prefixlen", added);
 			MAYHAVE(val, entbuf, 64);
 			if (val < 0 || val > 128) {
-				syslog(LOG_ERR,
-				       "<%s> prefixlen out of range",
-				       __FUNCTION__);
+				syslog(LOG_ERR, "<%s> prefixlen (%ld) for %s "
+				       "on %s out of range",
+				       __FUNCTION__, val, addr, intface);
 				exit(1);
 			}
 			pfx->prefixlen = (int)val;
@@ -342,9 +381,10 @@ getconfig(intface)
 			makeentry(entbuf, i, "vltime", added);
 			MAYHAVE(val64, entbuf, DEF_ADVVALIDLIFETIME);
 			if (val64 < 0 || val64 > 0xffffffff) {
-				syslog(LOG_ERR,
-				       "<%s> vltime out of range",
-				       __FUNCTION__);
+				syslog(LOG_ERR, "<%s> vltime (" LONGLONG
+				       ") for %s/%d on %s is out of range",
+				       __FUNCTION__, val64,
+				       addr, pfx->prefixlen, intface);
 				exit(1);
 			}
 			pfx->validlifetime = (u_int32_t)val64;
@@ -361,8 +401,10 @@ getconfig(intface)
 			MAYHAVE(val64, entbuf, DEF_ADVPREFERREDLIFETIME);
 			if (val64 < 0 || val64 > 0xffffffff) {
 				syslog(LOG_ERR,
-				       "<%s> pltime out of range",
-				       __FUNCTION__);
+				       "<%s> pltime (" LONGLONG
+					") for %s/%d  on %s is out of range",
+				       __FUNCTION__, val64,
+				       addr, pfx->prefixlen, intface);
 				exit(1);
 			}
 			pfx->preflifetime = (u_int32_t)val64;
@@ -374,42 +416,14 @@ getconfig(intface)
 				pfx->pltimeexpire =
 					now.tv_sec + pfx->preflifetime;
 			}
-
-			makeentry(entbuf, i, "addr", added);
-			addr = (char *)agetstr(entbuf, &bp);
-			if (addr == NULL) {
-				syslog(LOG_ERR,
-				       "<%s> need %s as a prefix for "
-				       "interface %s",
-				       __FUNCTION__, entbuf, intface);
-				exit(1);
-			}
-			if (inet_pton(AF_INET6, addr,
-				      &pfx->prefix) != 1) {
-				syslog(LOG_ERR,
-				       "<%s> inet_pton failed for %s",
-				       __FUNCTION__, addr);
-				exit(1);
-			}
-			if (IN6_IS_ADDR_MULTICAST(&pfx->prefix)) {
-				syslog(LOG_ERR,
-				       "<%s> multicast prefix(%s) must "
-				       "not be advertised (IF=%s)",
-				       __FUNCTION__, addr, intface);
-				exit(1);
-			}
-			if (IN6_IS_ADDR_LINKLOCAL(&pfx->prefix))
-				syslog(LOG_NOTICE,
-				       "<%s> link-local prefix(%s) will be"
-				       " advertised on %s",
-				       __FUNCTION__, addr, intface);
 		}
 	}
 
 	MAYHAVE(val, "mtu", 0);
 	if (val < 0 || val > 0xffffffff) {
 		syslog(LOG_ERR,
-		       "<%s> mtu out of range", __FUNCTION__);
+		       "<%s> mtu (%ld) on %s out of range",
+		       __FUNCTION__, val, intface);
 		exit(1);
 	}
 	tmp->linkmtu = (u_int32_t)val;
@@ -422,18 +436,20 @@ getconfig(intface)
 	}
 	else if (tmp->linkmtu < IPV6_MMTU || tmp->linkmtu > tmp->phymtu) {
 		syslog(LOG_ERR,
-		       "<%s> advertised link mtu must be between"
-		       " least MTU and physical link MTU",
-		       __FUNCTION__);
+		       "<%s> advertised link mtu (%ld) on %s is invalid (must "
+		       "be between least MTU (%d) and physical link MTU (%d)",
+		       __FUNCTION__, tmp->linkmtu, intface, IPV6_MMTU,
+		       tmp->phymtu);
 		exit(1);
 	}
 
 	/* route information */
 	MAYHAVE(val, "routes", 0);
 	if (val < 0 || val > 0xffffffff) {
+		/* does this check is realy necessary? (jinmei) */
 		syslog(LOG_ERR,
-		       "<%s> number of route information improper",
-		       __FUNCTION__);
+		       "<%s> number of route (%ld) on %s information improper",
+		       __FUNCTION__, val, intface);
 		exit(1);
 	}
 	tmp->routes = val;
@@ -453,35 +469,6 @@ getconfig(intface)
 
 		/* link into chain */
 		insque(rti, &tmp->route);
-
-		makeentry(entbuf, i, "rtplen", added);
-		MAYHAVE(val, entbuf, 64);
-		if (val < 0 || val > 128) {
-			syslog(LOG_ERR,
-			       "<%s> prefixlen out of range",
-			       __FUNCTION__);
-			exit(1);
-		}
-		rti->prefixlen = (int)val;
-
-		makeentry(entbuf, i, "rtflags", added);
-		MAYHAVE(val, entbuf, 0);
-		rti->rtpref = val & ND_RA_FLAG_RTPREF_MASK;
-		if (rti->rtpref == ND_RA_FLAG_RTPREF_RSV) {
-			syslog(LOG_ERR, "<%s> invalid route preference",
-			       __FUNCTION__);
-			exit(1);
-		}
-
-		makeentry(entbuf, i, "rtltime", added);
-		MUSTHAVE(val64, entbuf);
-		if (val64 < 0 || val64 > 0xffffffff) {
-			syslog(LOG_ERR,
-			       "<%s> route lifetime (%ld) out of range",
-			        __FUNCTION__, (long)val64);
-			exit(1);
-		}
-		rti->ltime = (u_int32_t)val64;
 
 		makeentry(entbuf, i, "rtprefix", added);
 		addr = (char *)agetstr(entbuf, &bp);
@@ -508,18 +495,49 @@ getconfig(intface)
 		if (IN6_IS_ADDR_MULTICAST(&rti->prefix)) {
 			syslog(LOG_ERR,
 			       "<%s> multicast route (%s) must "
-			       "not be advertised (IF=%s)",
+			       "not be advertised on %s",
 			       __FUNCTION__, addr, intface);
 			exit(1);
 		}
 		if (IN6_IS_ADDR_LINKLOCAL(&rti->prefix)) {
 			syslog(LOG_NOTICE,
-			       "<%s> link-local route (%s) must "
-			       "not be advertised on %s",
+			       "<%s> link-local route (%s) will "
+			       "be advertised on %s",
 			       __FUNCTION__, addr, intface);
 			exit(1);
 		}
 #endif
+
+		makeentry(entbuf, i, "rtplen", added);
+		MAYHAVE(val, entbuf, 64);
+		if (val < 0 || val > 128) {
+			syslog(LOG_ERR, "<%s> prefixlen (%ld) for %s on %s "
+			       "out of range",
+			       __FUNCTION__, val, addr, intface);
+			exit(1);
+		}
+		rti->prefixlen = (int)val;
+
+		makeentry(entbuf, i, "rtflags", added);
+		MAYHAVE(val, entbuf, 0);
+		rti->rtpref = val & ND_RA_FLAG_RTPREF_MASK;
+		if (rti->rtpref == ND_RA_FLAG_RTPREF_RSV) {
+			syslog(LOG_ERR, "<%s> invalid route preference (%02x) "
+			       "for %s/%d on %s",
+			       __FUNCTION__, rti->rtpref, addr,
+			       rti->prefixlen, intface);
+			exit(1);
+		}
+
+		makeentry(entbuf, i, "rtltime", added);
+		MUSTHAVE(val64, entbuf);
+		if (val64 < 0 || val64 > 0xffffffff) {
+			syslog(LOG_ERR, "<%s> route lifetime (" LONGLONG
+				") for %s/%d on %s out of range", __FUNCTION__,
+			       (long)val64, addr, rti->prefixlen, intface);
+			exit(1);
+		}
+		rti->ltime = (u_int32_t)val64;
 	}
 
 	/* okey */
@@ -787,8 +805,7 @@ make_packet(struct rainfo *rainfo)
 		if ((lladdroptlen = lladdropt_length(rainfo->sdl)) == 0) {
 			syslog(LOG_INFO,
 			       "<%s> link-layer address option has"
-			       " null length on %s."
-			       " Treat as not included.",
+			       " null length on %s.  Treat as not included.",
 			       __FUNCTION__, rainfo->ifname);
 			rainfo->advlinkopt = 0;
 		}

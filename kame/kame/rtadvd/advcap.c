@@ -1,4 +1,4 @@
-/*	$KAME: advcap.c,v 1.5 2001/02/01 09:12:08 jinmei Exp $	*/
+/*	$KAME: advcap.c,v 1.6 2001/06/08 04:46:19 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1983 The Regents of the University of California.
@@ -95,7 +95,7 @@ int getent __P((char *, char *, char *));
 int tnchktc __P((void));
 int tnamatch __P((char *));
 static char *tskip __P((char *));
-long long tgetnum __P((char *));
+int64_t tgetnum __P((char *));
 int tgetflag __P((char *));
 char *tgetstr __P((char *, char **));
 static char *tdecode __P((char *, char **));
@@ -306,11 +306,11 @@ breakbreak:
  * a # character.  If the option is not found we return -1.
  * Note that we handle octal numbers beginning with 0.
  */
-long long
+int64_t
 tgetnum(id)
 	char *id;
 {
-	register long long i;
+	register int64_t i;
 	register int base;
 	register char *bp = tbuf;
 
