@@ -308,7 +308,7 @@ options 	NEW_STRUCT_ROUTE	# mandatory
 #options 	"IPV6FIREWALL_DEFAULT_TO_ACCEPT"
 
 # ALTQ
-options 	ALTQ		#alternate queueing
+#options 	ALTQ		#alternate queueing
 #options 	ALTQ_CBQ	#class based queueing
 #options 	ALTQ_WFQ	#weighted fair queueing
 #options 	ALTQ_FIFOQ	#fifo queueing
@@ -350,3 +350,7 @@ options 	TCP_ECN		# ECN support in TCP
 #pseudo-device	hif	1		# required for a mobile node
 #options	MIP6_HAIPSEC		# ha-ipsec draft support
 #options 	MIP6_DEBUG
+
+pseudo-device	pf
+pseudo-device	pflog
+pseudo-device	pfsync
