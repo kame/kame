@@ -15,10 +15,8 @@ CFLAGS+=-DINET6
 LDADD+=	-ledit -ltermcap
 DPADD+=	${LIBEDIT} ${LIBTERMCAP}
 LDADD+= -L${.OBJDIR}/../../lib/libinet6 \
-        -L${.OBJDIR}/../../lib/libinet6/obj \
         -L/usr/local/v6/lib -linet6
 DPADD+= ${.OBJDIR}/../../lib/libinet6/libinet6.a \
-        ${.OBJDIR}/../../lib/libinet6/obj/libinet6.a \
         /usr/local/v6/lib/libinet6.a
 
 LINKS=	${BINDIR}/ftp ${BINDIR}/pftp \

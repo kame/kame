@@ -29,12 +29,11 @@ CFLAGS+=	${DEFS} ${INCLS}
 
 LDADD+=	-lz
 DPADD+=	${LIBZ}
-LDADD+=	-L${.CURDIR}/../../lib/libpcap -lpcap
-DPADD+=	${.CURDIR}/../../lib/libpcap/libpcap.a
-LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
+LDADD+=	-L${.OBJDIR}/../../lib/libpcap -lpcap
+DPADD+=	${.OBJDIR}/../../lib/libpcap/libpcap.a
+LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6
-DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
-	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
+DPADD+=	${.OBJDIR}/../../lib/libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
 # crypto support - need SSLeay

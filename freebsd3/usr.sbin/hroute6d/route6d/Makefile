@@ -6,9 +6,8 @@ SRCDIR=	${.CURDIR}/../../../kame/hroute6d/route6d
 
 CFLAGS+=	-I${SRCDIR}/../include -DINET6 -I${.OBJDIR}
 LDADD+=	-L/usr/local/v6/lib -L${.OBJDIR}/../../../lib/libinet6 \
-	-L${.OBJDIR}/../../../lib/libinet6/obj -linet6
-DPADD+=	-L${.OBJDIR}/../../../lib/libinet6/libinet6.a \
-	${.OBJDIR}/../../../lib/libinet6/obj/libinet6.a \
+	-linet6
+DPADD+=	${.OBJDIR}/../../../lib/libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a 
 
 MAN5=	hroute6d.conf.5

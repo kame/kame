@@ -11,16 +11,12 @@ COPTS+= -fno-builtin	# GCC's builtin memcpy doesn't do unaligned copies
 DPADD=	${LIBM}
 LDADD=	-lm
 LDADD+= -L${.OBJDIR}/../../lib/libipsec \
-	-L${.OBJDIR}/../../lib/libipsec/obj \
 	-L/usr/local/v6/lib -lipsec
 DPADD+= ${.OBJDIR}/../../lib/libipsec/libipsec.a \
-	${.OBJDIR}/../../lib/libipsec/obj/libipsec.a \
 	/usr/local/v6/lib/libipsec.a
 LDADD+= -L${.OBJDIR}/../../lib/libinet6 \
-	-L${.OBJDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+= ${.OBJDIR}/../../lib/libinet6/libinet6.a \
-	${.OBJDIR}/../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
 .include <bsd.prog.mk>

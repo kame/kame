@@ -1,5 +1,5 @@
 LIB=		ftpio
-CFLAGS+=	-I${.CURDIR} -Wall -DINET6
+CFLAGS+=	-I${.OBJDIR} -Wall -DINET6
 SRCS=		ftpio.c ftperr.c
 MAN3=		ftpio.3
 CLEANFILES+=	ftperr.c
