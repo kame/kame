@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.49 2001/01/20 23:45:44 sumikawa Exp $	*/
+/*	$KAME: ndp.c,v 1.50 2001/01/22 14:04:21 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -508,11 +508,7 @@ delete(host)
 		if (sdl->sdl_family == AF_LINK &&
 		    (rtm->rtm_flags & RTF_LLINFO) &&
 		    !(rtm->rtm_flags & RTF_GATEWAY)) {
-			switch (sdl->sdl_type) {
-			case IFT_ETHER: case IFT_FDDI: case IFT_ISO88023:
-			case IFT_ISO88024: case IFT_ISO88025:
-				goto delete;
-			}
+			goto delete;
 		}
 		/*
 		 * IPv4 arp command retries with sin_other = SIN_PROXY here.
