@@ -266,6 +266,7 @@ void	 ip_init __P((void));
 int	 ip_optcopy __P((struct ip *, struct ip *));
 u_int	 ip_optlen __P((struct inpcb *));
 int	 ip_output __P((struct mbuf *, ...));
+int	 ip_fragment __P((struct mbuf *, struct ifnet *, u_long));
 int	 ip_pcbopts __P((struct mbuf **, struct mbuf *));
 struct mbuf *
 	 ip_reass __P((struct ipqent *, struct ipq *));

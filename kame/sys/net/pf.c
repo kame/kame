@@ -4472,11 +4472,7 @@ void
 pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
     struct pf_state *s)
 {
-#ifdef __OpenBSD__
 	struct mbuf		*m0, *m1;
-#else
-	struct mbuf		*m0;
-#endif
 	struct route		 iproute;
 	struct route		*ro;
 	struct sockaddr_in	*dst;
@@ -4620,7 +4616,6 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 			goto bad;
 	}
 
-#ifdef __OpenBSD__
 	m1 = m0;
 	error = ip_fragment(m0, ifp, ifp->if_mtu);
 	if (error == EMSGSIZE)
@@ -4638,10 +4633,6 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 
 	if (error == 0)
 		ipstat.ips_fragmented++;
-#else
-	/* we don't have ip_fragment() */
-	goto bad;
-#endif
 
 done:
 	if (r->rt != PF_DUPTO)

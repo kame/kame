@@ -217,11 +217,11 @@ ip_output(m0, va_alist)
 	va_dcl
 #endif
 {
-	struct ip *ip, *mhip;
+	struct ip *ip;
 	struct ifnet *ifp;
 	struct mbuf *m = m0;
 	int hlen = sizeof (struct ip);
-	int len, off, error = 0;
+	int len, error = 0;
 	struct route iproute;
 	struct sockaddr_in *dst;
 	struct in_ifaddr *ia;
@@ -744,17 +744,82 @@ skip_ipsec:
 		ipstat.ips_cantfrag++;
 		goto bad;
 	}
-	len = (mtu - hlen) &~ 7;
-	if (len < 8) {
-		error = EMSGSIZE;
+
+	error = ip_fragment(m, ifp, mtu);
+	if (error == EMSGSIZE)
 		goto bad;
+
+	for (m = m0; m; m = m0) {
+		m0 = m->m_nextpkt;
+		m->m_nextpkt = 0;
+		if (error == 0) {
+#if IFA_STATS
+			/*
+			 * search for the source address structure to
+			 * maintain output statistics.
+			 */
+			INADDR_TO_IA(ip->ip_src, ia);
+			if (ia) {
+				ia->ia_ifa.ifa_data.ifad_outbytes +=
+					ntohs(ip->ip_len);
+			}
+#endif
+#ifdef IPSEC
+			/* clean ipsec history once it goes out of the node */
+			ipsec_delaux(m);
+#endif
+			error = (*ifp->if_output)(ifp, m, sintosa(dst),
+			    ro->ro_rt);
+		} else
+			m_freem(m);
 	}
 
-    {
-	int mhlen, firstlen = len;
-	struct mbuf **mnext = &m->m_nextpkt;
+	if (error == 0)
+		ipstat.ips_fragmented++;
+done:
+	if (ro == &iproute && (flags & IP_ROUTETOIF) == 0 && ro->ro_rt) {
+		RTFREE(ro->ro_rt);
+		ro->ro_rt = 0;
+	}
+
+#ifdef IPSEC
+	if (sp != NULL) {
+		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
+			printf("DP ip_output call free SP:%p\n", sp));
+		key_freesp(sp);
+	}
+#endif /* IPSEC */
+
+	return (error);
+bad:
+	m_freem(m);
+	goto done;
+}
+
+int
+ip_fragment(m, ifp, mtu)
+	struct mbuf *m;
+	struct ifnet *ifp;
+	u_long mtu;
+{
+	struct ip *ip, *mhip;
+	struct mbuf *m0;
+	int len, hlen, off;
+	int mhlen, firstlen;
+	struct mbuf **mnext;
 	int fragments = 0;
 	int s;
+	int error = 0;
+
+	ip = mtod(m, struct ip *);
+	hlen = ip->ip_hl << 2;
+
+	len = (mtu - hlen) &~ 7;
+	if (len < 8)
+		return (EMSGSIZE);
+
+	firstlen = len;
+	mnext = &m->m_nextpkt;
 
 	/*
 	 * Loop through length of segment after first fragment,
@@ -824,52 +889,8 @@ sendorfree:
 	if (ifp->if_snd.ifq_maxlen - ifp->if_snd.ifq_len < fragments)
 		error = ENOBUFS;
 	splx(s);
-	for (m = m0; m; m = m0) {
-		m0 = m->m_nextpkt;
-		m->m_nextpkt = 0;
-		if (error == 0) {
-#if IFA_STATS
-			/*
-			 * search for the source address structure to
-			 * maintain output statistics.
-			 */
-			INADDR_TO_IA(ip->ip_src, ia);
-			if (ia) {
-				ia->ia_ifa.ifa_data.ifad_outbytes +=
-					ntohs(ip->ip_len);
-			}
-#endif
-#ifdef IPSEC
-			/* clean ipsec history once it goes out of the node */
-			ipsec_delaux(m);
-#endif
-			error = (*ifp->if_output)(ifp, m, sintosa(dst),
-			    ro->ro_rt);
-		} else
-			m_freem(m);
-	}
 
-	if (error == 0)
-		ipstat.ips_fragmented++;
-    }
-done:
-	if (ro == &iproute && (flags & IP_ROUTETOIF) == 0 && ro->ro_rt) {
-		RTFREE(ro->ro_rt);
-		ro->ro_rt = 0;
-	}
-
-#ifdef IPSEC
-	if (sp != NULL) {
-		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-			printf("DP ip_output call free SP:%p\n", sp));
-		key_freesp(sp);
-	}
-#endif /* IPSEC */
-
-	return (error);
-bad:
-	m_freem(m);
-	goto done;
+	return (0);
 }
 
 /*
