@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.196 2001/09/14 06:05:11 sumikawa Exp $	*/
+/*	$KAME: nd6.c,v 1.197 2001/09/18 11:34:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -998,11 +998,15 @@ nd6_lookup(addr6, create, ifp)
 					   (ifa->ifa_flags |
 					    RTF_HOST | RTF_LLINFO) &
 					   ~RTF_CLONING,
-					   &rt)) != 0)
+					   &rt)) != 0) {
+#if 0
 				log(LOG_ERR,
 				    "nd6_lookup: failed to add route for a "
 				    "neighbor(%s), errno=%d\n",
 				    ip6_sprintf(addr6), e);
+#else
+				return(NULL);
+			}
 			if (rt == NULL)
 				return(NULL);
 			if (rt->rt_llinfo) {
