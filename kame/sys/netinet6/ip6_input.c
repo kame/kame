@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.79 2000/04/12 03:51:30 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.80 2000/04/12 05:41:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1319,7 +1319,8 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 							  struct cmsghdr *);
 						prevdest1 = (struct ip6_dest *)CMSG_DATA(cm);
 						prevdestlen = (prevdest1->ip6d_len + 1) << 3;
-					}
+					} else
+						prevdestlen = 0;
 
 					/*
 					 * If this is the 1st dst opt header
@@ -1354,7 +1355,9 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 							  struct cmsghdr *);
 						prevdest2 = (struct ip6_dest *)CMSG_DATA(cm);
 						prevdestlen = (prevdest2->ip6d_len + 1) << 3;
-					}
+					} else
+						prevdestlen = 0;
+
 					/* see the above comment */
 					if (ctl->dest2 == NULL &&
 					    (prevdest2 &&
