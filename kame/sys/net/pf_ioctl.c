@@ -205,7 +205,7 @@ pfattach(int num)
 	pf_status.debug = PF_DEBUG_URGENT;
 
 #ifdef __FreeBSD__
-	cdevsw_add(&pf_cdevsw);
+	make_dev(&pf_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, "pf");
 #endif
 }
 
