@@ -1,8 +1,22 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.722 2000/03/22 12:15:58 jinmei Exp $
+$Id: CHANGELOG,v 1.723 2000/03/22 17:35:22 jinmei Exp $
 
 <200003>
+2000-03-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet/udp_usrreq.c (udp6_output): was copied from
+	netinet6/udp6_usrreq.c to separate UDP output routine from that of
+	IPv4, since KAME's UDP6 output had completely different logic from
+	original udp_output.
+
+2000-03-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_src.c (in6_pcbsetport): was moved from
+	in6_src.c for sharing with bsdi4.
+
+2000-03-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd: retained rejected or blackhole routes to prevent
+	accepting or advertising such routes unexpectedly.
+
 2000-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd[23]/sbin/route/route.c (getaddr): use getifaddrs() instead
 	of SIOCGIFCONF to examine all interface addresses.
