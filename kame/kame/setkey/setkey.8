@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: setkey.8,v 1.16 1999/12/22 08:14:33 sakane Exp $
+.\"     $Id: setkey.8,v 1.17 2000/01/13 21:05:07 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt SETKEY 8
@@ -127,7 +127,7 @@ Add a SAD entry.
 .It Xo
 .Li get
 .Ar src Ar dst Ar protocol Ar spi
-.Op Ar mode
+.Op Fl m Ar mode
 .Li ;
 .Xc
 Show a SAD entry.
@@ -135,7 +135,7 @@ Show a SAD entry.
 .It Xo
 .Li delete
 .Ar src Ar dst Ar protocol Ar spi
-.Op Ar mode
+.Op Fl m Ar mode
 .Li ;
 .Xc
 Remove a SAD entry.
