@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2632 2004/07/03 07:15:49 jinmei Exp $
+$KAME: CHANGELOG,v 1.2633 2004/07/05 04:00:25 jinmei Exp $
 
 <200407>
+2004-07-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/mld6.c: use as high clock granularity as
+	possible (i.e., per 10 msec) for protocol timers.
+
+2004-07-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/(many places): revised delay for DAD according
+	to rfc2462bis-02: impose a random delay (when necessary) before
+	sending the corresponding MLD report, while still listening to the
+	multicast group, not just delaying a DAD NS.
+
 2004-07-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput): fixed the use of
 	an uninitialized pointer for the IPV6_IPSEC_POLICY socket option
