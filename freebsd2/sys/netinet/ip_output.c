@@ -543,7 +543,6 @@ sendit:
 		}
 		goto bad;
 	}
-    }
 
 	/* be sure to update variables that are affected by ipsec4_output() */
 	ip = mtod(m, struct ip *);
@@ -561,8 +560,10 @@ sendit:
 		}
 	} else {
 		/* nobody uses ia beyond here */
-		ifp = ro->ro_rt->rt_ifp;
+		if (state.encap)
+			ifp = ro->ro_rt->rt_ifp;
 	}
+    }
 
 	/* make it flipped, again. */
 	ip->ip_len = ntohs((u_short)ip->ip_len);
