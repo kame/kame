@@ -849,16 +849,27 @@ MAYBESTATIC MAYBEINLINE int rip6_usrreq_bind(struct socket *so,
 #else /* __NetBSD__ || __OpenBSD__ || __FreeBSD__ */
    if ((ifnet == 0) ||
 #endif /* __NetBSD__ || __OpenBSD__ || __FreeBSD__ */
-       (addr->sin6_family != AF_INET6) ||    /* I only allow AF_INET6 */
-       (!IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
-        ifa_ifwithaddr((struct sockaddr *)addr) == 0 ) )
-
-          return EADDRNOTAVAIL;
+       (addr->sin6_family != AF_INET6)) {    /* I only allow AF_INET6 */
+	  error = EADDRNOTAVAIL;
+	  break;
+   }
 
 #ifdef ENABLE_DEFAULT_SCOPE
    if (addr->sin6_scope_id == 0) /* do not override if already specified */
      addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
 #endif
+
+   /*
+    * Currently, ifa_ifwithaddr tends to fail for a link-local
+    * address, since it implicitly expects that the link identifier
+    * for the address is embedded in the sin6_addr part.
+    * For now, we'd rather keep this "as is". We'll eventually fix
+    * this in a more natural way.
+    */
+   if (!IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
+        ifa_ifwithaddr((struct sockaddr *)addr) == 0)
+
+          return EADDRNOTAVAIL;
 
    inp->inp_laddr6 = addr->sin6_addr;
    return 0; 
