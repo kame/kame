@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.249 2002/04/23 09:38:21 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.250 2002/04/24 02:30:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -232,13 +232,10 @@ nd6_ifattach(ifp)
 
 #define ND nd_ifinfo[ifp->if_index]
 
-	/*
-	 * Don't initialize if called twice.
-	 * XXX: to detect this, we should choose a member that is never set
-	 * before initialization of the ND structure itself.
-	 */
-	if (ND.basereachable)
+	/* Don't initialize if called twice. */
+	if (ND.initialized)
 		return;
+	ND.initialized = 1;
 
 #ifdef DIAGNOSTIC
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
@@ -253,13 +250,12 @@ nd6_ifattach(ifp)
 	ND.basereachable = REACHABLE_TIME;
 	ND.reachable = ND_COMPUTE_RTIME(ND.basereachable);
 	ND.retrans = RETRANS_TIMER;
-	ND.receivedra = 0;
 	/*
 	 * Note that the default value of ip6_accept_rtadv is 0, which means
 	 * we won't accept RAs by default even if we set ND6_IFF_ACCEPT_RTADV
 	 * here.
 	 */
-	ND.flags = ND6_IFF_PERFORMNUD | ND6_IFF_ACCEPT_RTADV;
+	ND.flags = (ND6_IFF_PERFORMNUD | ND6_IFF_ACCEPT_RTADV);
 	nd6_setmtu(ifp);
 #undef ND
 }
@@ -1679,7 +1675,8 @@ nd6_ioctl(cmd, data, ifp)
 			error = EINVAL;
 			break;
 		}
-		ndi->ndi.linkmtu = nd_ifinfo[ifp->if_index].linkmtu;
+		/* XXX: old ndp(8) assumes a positive value for linkmtu. */
+		ndi->ndi.linkmtu = IN6_LINKMTU(ifp);
 		ndi->ndi.maxmtu = nd_ifinfo[ifp->if_index].maxmtu;
 		ndi->ndi.basereachable =
 		    nd_ifinfo[ifp->if_index].basereachable;
