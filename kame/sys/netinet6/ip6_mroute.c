@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.112 2003/12/04 13:19:33 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.113 2003/12/05 03:14:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -2168,4 +2168,3 @@ pim6_input(mp, offp, proto)
 	rip6_input(&m, offp, proto);
 	return (IPPROTO_DONE);
 }
-
