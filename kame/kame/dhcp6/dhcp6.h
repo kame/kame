@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.43 2003/09/29 04:01:33 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.44 2003/11/06 10:33:20 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -229,23 +229,23 @@ struct dhcp6_relay {
 #ifndef DH6OPT_DNSNAME
 #define DH6OPT_DNSNAME 24
 #endif
+#ifndef DH6OPT_IA_PD
+#define DH6OPT_IA_PD 25
+#endif
+#ifndef DH6OPT_IA_PD_PREFIX
+#define DH6OPT_IA_PD_PREFIX 26
+#endif
 
 /*
- * The option type has not been assigned for the following options.
- * We temporarily adopt values used in the service specification document
- * (200206xx version) by NTT Communications as default values.
- * Note that we'll fix the following definitions when official values are
- * assigned.
+ * The old prefix delegation option used in the service specification document
+ * (200206xx version) by NTT Communications.
  */
 #define DH6OPT_PREFIX_DELEGATION CONF_DH6OPT_PREFIX_DELEGATION
 #define DH6OPT_PREFIX_INFORMATION CONF_DH6OPT_PREFIX_INFORMATION
 #define DH6OPT_PREFIX_REQUEST CONF_DH6OPT_PREFIX_REQUEST
 
+/* The following one is KAME specific. */
 #define DH6OPT_NTP CONF_DH6OPT_NTP
-
-/* The following two are KAME specific. */
-#define DH6OPT_IA_PD CONF_DH6OPT_IA_PD
-#define DH6OPT_IA_PD_PREFIX CONF_DH6OPT_IA_PD_PREFIX
 
 struct dhcp6opt {
 	u_int16_t dh6opt_type;
