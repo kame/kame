@@ -244,10 +244,6 @@ ip6_init2(dummy)
 		in6_ifattach(&loif[i], IN6_IFT_LOOP, NULL, 0);
 #endif
 
-	/* attach pseudo interfaces */
-	if (ret == 0)
-		in6_ifattach_p2p();
-
 	/* nd6_timer_init */
 	timeout(nd6_timer, (caddr_t)0, hz);
 	/* router renumbering prefix list maintenance */

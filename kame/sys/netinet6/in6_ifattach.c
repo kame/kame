@@ -239,48 +239,6 @@ found:
 	}
 }
 
-/*
- * add link-local address to *pseudo* p2p interfaces.
- * get called when the first MAC address is made available in in6_ifattach().
- *
- * XXX I start considering this loop as a bad idea. (itojun)
- */
-void
-in6_ifattach_p2p()
-{
-	struct ifnet *ifp;
-
-	/* prevent infinite loop. just in case. */
-	if (found_first_ifid == 0)
-		return;
-
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifp = ifnet; ifp; ifp = ifp->if_next)
-#else
-	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next)
-#endif
-	{
-		switch (ifp->if_type) {
-		case IFT_GIF:
-			/* pseudo interfaces - safe to initialize here */
-			in6_ifattach(ifp, IN6_IFT_P2P, 0, 0);
-			break;
-		case IFT_DUMMY:
-		case IFT_FAITH:
-			/* this mistakingly becomes IFF_UP */
-			break;
-		case IFT_SLIP:
-			/* IPv6 is not supported */
-			break;
-		case IFT_PPP:
-			/* this is not a pseudo interface, skip it */
-			break;
-		default:
-			break;
-		}
-	}
-}
-
 void
 in6_ifattach(ifp, type, laddr, noloop)
 	struct ifnet *ifp;
@@ -462,10 +420,8 @@ in6_ifattach(ifp, type, laddr, noloop)
 		}
 		/* invert u bit to convert EUI64 to RFC2373 interface ID. */
 		ia->ia_addr.sin6_addr.s6_addr8[8] ^= 0x02;
-		if (found_first_ifid == 0) {
-			if (in6_ifattach_getifid(ifp) == 0)
-				in6_ifattach_p2p();
-		}
+		if (found_first_ifid == 0)
+			in6_ifattach_getifid(ifp);
 		bzero(&ia->ia_dstaddr, sizeof(struct sockaddr_in6));
 		ia->ia_dstaddr.sin6_len = sizeof(struct sockaddr_in6);
 		ia->ia_dstaddr.sin6_family = AF_INET6;
