@@ -293,7 +293,7 @@ in_len2mask(mask, len)
 int	in_interfaces;		/* number of external internet interfaces */
 
 #ifdef NATPT
-void	in4_len2mask(struct in_addr *, int);
+void	in4_len2mask __P((struct in_addr *, int));
 
 void
 in4_len2mask(struct in_addr *mask, int len)
