@@ -82,7 +82,7 @@ struct	pkthdr {
 	int	len;			/* total packet length */
 	void	*tdbi;			/* pointer to struct tdb_ident */
 					/* XXX - pull in ip_ipsp.h */ 
-	void	*aux;			/* extra data buffer; ip6/others */
+	struct mbuf *aux;		/* extra data buffer; ip6/others */
 };
 
 /* description of external storage mapped into mbuf, valid if M_EXT set */
@@ -378,6 +378,14 @@ struct mbstat {
 	u_short	m_mtypes[256];	/* type specific mbuf allocations */
 };
 
+/*
+ * pkthdr.aux type tags.
+ */
+struct mauxtag {
+	int af;
+	int type;
+};
+
 #ifdef	_KERNEL
 extern	struct mbuf *mbutl;		/* virtual address of mclusters */
 extern	char *mclrefcnt;		/* cluster reference counts */
@@ -418,6 +426,10 @@ struct mbuf *m_devget __P((char *, int, int, struct ifnet *,
 void	m_zero __P((struct mbuf *));
 int	m_apply __P((struct mbuf *, int, int,
 			int (*)(caddr_t, caddr_t, unsigned int), caddr_t));
+
+struct mbuf *m_aux_add __P((struct mbuf *, int, int));
+struct mbuf *m_aux_find __P((struct mbuf *, int, int));
+void m_aux_delete __P((struct mbuf *, struct mbuf *));
 
 #ifdef MBTYPES
 int mbtypes[] = {				/* XXX */
