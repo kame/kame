@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.2 1999/08/16 03:23:44 jinmei Exp $ */
+/* $Id: name6.c,v 1.3 1999/08/17 08:13:43 itojun Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -9,7 +9,11 @@
  *	rewrite resolvers to be thread safe
  */
 
-#define	MAPPED_ADDR_ENABLED	/* XXX: for __KAME__ */
+#ifdef __KAME__
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#define	MAPPED_ADDR_ENABLED
+#endif
+#endif
 
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -223,7 +227,8 @@ _mapped_addr_enabled(void)
 	/* implementation dependent check */
 #if defined(__KAME__) && defined(IPV6CTL_MAPPED_ADDR)
 	int mib[4];
-	int len, val;
+	size_t len;
+	int val;
 
 	mib[0] = CTL_NET;
 	mib[1] = PF_INET6;
