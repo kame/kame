@@ -3,7 +3,7 @@
 # Date created:		1 Oct 1997
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.1 1999/08/08 23:59:22 itojun Exp $
+# $Id: Makefile,v 1.2 1999/10/12 05:29:08 itojun Exp $
 #
 
 DISTNAME=	sendmail.${SENDMAILVER}
@@ -12,28 +12,36 @@ CATEGORIES=	mail
 MASTER_SITES=	ftp://ftp.kyoto.wide.ad.jp/pub/mail/smtpfeed/ \
 		ftp://ftp.kyoto.wide.ad.jp/pub/mail/sendmail/ \
 		ftp://ftp.sendmail.org/pub/sendmail/
+DISTFILES=	${DISTNAME}${EXTRACT_SUFX}
+EXTRACT_ONLY=	${DISTNAME}${EXTRACT_SUFX}
 
 PATCH_SITES=	${MASTER_SITES}
-PATCHFILES=	sendmail.${SENDMAILVER}${PATCHVER}.patch \
-		sendmail${WIDEPATCHVER}.patch.gz
+#PATCHFILES+=	sendmail.${SENDMAILVER}${PATCHVER}.patch
+PATCHFILES+=	sendmail${WIDEPATCHVER}.patch.gz
+
+# ipsec hack
+MASTER_SITES+=	ftp://ftp.kame.net/pub/kame/misc/
+IPSECHACK=	sendmail.893+W3.2.kame-ipsec.19990521.diff.gz
+DISTFILES+=	${IPSECHACK}
 
 MAINTAINER=	itojun@itojun.org
 
-SENDMAILVER=	8.9.1
-PATCHVER=	a
-WIDEPATCHVER=	891+3.1W
+SENDMAILVER=	8.9.3
+#PATCHVER=	a
+WIDEPATCHVER=	893+3.2W
 
 WRKSRC=		${WRKDIR}/sendmail-${SENDMAILVER}/src
 
 post-patch:
 	${CAT} ${FILESDIR}/site.config.m4 >> ${WRKSRC}/site.config-v6.kame
+	@(cd ${WRKSRC}/..; ${GUNZIP_CMD} -c ${DISTDIR}/${IPSECHACK} | ${PATCH} -p1 -f --quiet)
 
 do-build:
 	@(cd ${WRKSRC}; ./Build -f site.config-v6.kame)
 
 do-install:
-	${INSTALL} -c -o root -g kmem -m 6555 ${WRKSRC}/obj.FreeBSD.*/sendmail \
-		/usr/sbin/sendmail6
+	${INSTALL} -c -o root -g kmem -m 6555 ${WRKSRC}/obj.NetBSD.*/sendmail \
+		${PREFIX}/sbin/sendmail6
 	${MKDIR} ${PREFIX}/share/doc/sendmail${SENDMAILVER}
 	for i in FAQ LICENSE README; do \
 		${INSTALL_DATA} ${WRKSRC}/../$$i \
@@ -44,4 +52,4 @@ do-install:
 			${PREFIX}/share/doc/sendmail${SENDMAILVER}; \
 	done
 
-.include <bsd.port.mk>
+.include "../../mk/bsd.pkg.mk"
