@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.90 2005/04/01 06:04:37 suz Exp $	*/
+/*	$KAME: rtadvd.c,v 1.91 2005/04/01 07:48:39 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -39,7 +39,9 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <net/if_dl.h>
+#ifdef __FreeBSD__
 #include <net/if_var.h>
+#endif
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 #include <netinet6/in6_var.h>
