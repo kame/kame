@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.269 2001/08/28 12:18:11 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.270 2001/08/28 14:56:07 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -670,11 +670,22 @@ sent from a user application as follows:
    draft-ietf-ipngwg-default-addr-select-xx.txt .  This draft allows
    an implementation to add implementation-specific rules with higher
    precedence than the rule "Use longest matching prefix."  KAME's
-   implementation has the following additional rule:
+   implementation has the following additional rules (applied in the
+   appeared order):
+
    - prefer addresses on alive interfaces, that is, interfaces with
      the UP flag being on.  This rule is particularly useful for
      routers, since some routing daemons stop advertising prefixes
     (addresses) on interfaces that have become down.
+
+   - prefer addresses on "preferred" interfaces.  "Preferred"
+     interfaces can be specified by the ndp(8) command.  By default,
+     no interface is preferred, that is, this rule is not applied.
+     Again, this rule is particularly useful for routers, since there
+     is a convention, among router administrators, of assigning
+     "stable" addresses on a particular interface (typically a
+     loopback interface).
+
    In any case, addresses that break the scope zone of the
    destination, or addresses whose zone do not contain the outgoing
    interface are never chosen.
