@@ -594,6 +594,8 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 #endif
 
 		if (do_rtchange) {
+			struct sockaddr_in6 *dst6;
+
 			/*
 			 * Since a non-connected PCB might have a cached route,
 			 * we always call in_rtchange without matching
@@ -601,7 +603,8 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 			 *
 			 * XXX: we assume in_rtchange does not free the PCB.
 			 */
-			if (IN6_ARE_ADDR_EQUAL(&inp->inp_route6.ro_dst.sin6_addr, faddr))
+			dst6 = (struct sockaddr_in6 *)&inp->inp_route6.ro_dst;
+			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr, faddr))
 				in_rtchange(inp, errno);
 
 			if (notify == in_rtchange)
