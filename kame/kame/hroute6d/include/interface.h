@@ -1,5 +1,5 @@
 /* 
- * $Id: interface.h,v 1.1 1999/08/08 23:29:40 itojun Exp $
+ * $Id: interface.h,v 1.2 2001/02/01 06:03:34 suz Exp $
  */
 
 /*
@@ -38,8 +38,9 @@
 /*
  * Contol infomation for sending a packet through an interface.
  */
+#define	CBUFSIZ	256
 struct ctlinfo {
-	char cbuf[CMSG_SPACE(sizeof(struct in6_pktinfo))];
+	char cbuf[CBUFSIZ];
 };
 #define ci_cmsg(x) (*(struct cmsghdr *)(x).cbuf)
 #define ci_info(x) (*(struct in6_pktinfo *)CMSG_DATA((struct cmsghdr *)(x).cbuf))

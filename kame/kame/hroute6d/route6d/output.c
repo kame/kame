@@ -1,5 +1,5 @@
 /* 
- * $Id: output.c,v 1.1 1999/08/08 23:29:47 itojun Exp $
+ * $Id: output.c,v 1.2 2001/02/01 06:03:34 suz Exp $
  */
 
 /*
@@ -187,7 +187,7 @@ send_request(void)
 			continue;
 
 		mh->msg_control = (char *)&(ifp->if_cinfo);
-		mh->msg_controllen = sizeof(struct ctlinfo);
+		mh->msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 
 		if (rt6_trace)
 			trace_packet("Tx", ifp, mh, 1, 0);
@@ -346,7 +346,7 @@ send_message(struct msghdr *mh, struct interface *ifp, unsigned int force)
 		return;		/* doesn't have any linklocal */
 
 	mh->msg_control = (void *)&(ifp->if_cinfo);
-	mh->msg_controllen = sizeof(struct ctlinfo);
+	mh->msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 
 	/* SPECIAL CASE */
 	/* AGGREGATE overrides NOOUT */

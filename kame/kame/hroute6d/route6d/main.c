@@ -1,5 +1,5 @@
 /* 
- * $Id: main.c,v 1.2 1999/08/19 12:03:53 itojun Exp $
+ * $Id: main.c,v 1.3 2001/02/01 06:03:34 suz Exp $
  */
 
 /*
@@ -53,7 +53,7 @@ int
 main(int argc, char **argv)
 {
 	int result, nfd, len, n;
-	char cbuf[CMSG_SPACE(sizeof(struct in6_pktinfo))];
+	char cbuf[CBUFSIZ];
 	fd_set fdvec;
 	struct timeval timeout, *tptr;
 	struct msghdr *mh;
