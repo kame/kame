@@ -1,12 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1319 2000/10/04 22:43:03 itojun Exp $
+$KAME: CHANGELOG,v 1.1320 2000/10/05 03:32:44 itojun Exp $
 
 <200010>
+Thu Oct  5 12:31:12 JST 2000  itojun@iijlab.net
+	* sys/netkey/key.c: get rid of all uses of random() in IPsec code,
+	  where possible (netbsd/freebsd4).  for other operating systems, we
+	  have no good random number source like rnd(4), and random() will
+	  be used.  you will see one-line warning when you start using IPsec.
+
 Thu Oct  5 07:41:18 JST 2000  itojun@iijlab.net
 	* *bsd*/sys/net/if.c: make sure we have root privilege on SIOCSPHY*
 	  operation.  from: thorpej@netbsd.org
-	  ROGUE LOCAL USER MAY BE ABLE TO DO BAD THING, SO UPGRADE IS SUGGESTED
 
 Wed Oct  4 20:39:16 JST 2000  itojun@iijlab.net
 	* sys/netkey/key.c: supply two sysctl variables,
