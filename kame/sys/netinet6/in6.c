@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.72 2000/03/30 03:45:26 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.73 2000/04/06 08:06:35 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -376,7 +376,7 @@ in6_control(so, cmd, data, ifp)
 	struct	in6_aliasreq *ifra = (struct in6_aliasreq *)data;
 	struct	sockaddr_in6 oldaddr;
 #ifdef COMPAT_IN6IFIOCTL
-	struct sockaddr_in6 net;
+	struct	sockaddr_in6 net;
 #endif
 	int error = 0, hostIsNew, prefixIsNew;
 	int newifaddr;
