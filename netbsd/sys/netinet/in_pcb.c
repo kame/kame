@@ -507,11 +507,6 @@ in_pcbdetach(v)
 	int s;
 
 #ifdef IPSEC
-	if (so->so_pcb) {
-		KEYDEBUG(KEYDEBUG_KEY_STAMP,
-			printf("DP call free SO=%p from in_pcbdetach\n", so));
-		key_freeso(so);
-	}
 	ipsec4_delete_pcbpolicy(inp);
 #endif /*IPSEC*/
 	so->so_pcb = 0;
