@@ -209,26 +209,6 @@ void	in6_setpeeraddr __P((struct in6pcb *, struct mbuf *));
 void	in6_setsockaddr __P((struct in6pcb *, struct mbuf *));
 
 /* in in6_src.c */
-#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__) || defined(__FreeBSD__)
-struct 	sockaddr_in6 *in6_selectsrc __P((struct sockaddr_in6 *,
-					 struct ip6_pktopts *,
-					 struct ip6_moptions *,
-					 struct route *, struct sockaddr_in6 *,
-					 struct ifnet **, int *));
-int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
-			 struct ip6_moptions *, struct route *,
-			 struct ifnet **, struct rtentry **, int));
-#else
-struct 	sockaddr_in6 *in6_selectsrc __P((struct sockaddr_in6 *,
-					 struct ip6_pktopts *,
-					 struct ip6_moptions *,
-					 struct route_in6 *,
-					 struct sockaddr_in6 *,
-					 struct ifnet **, int *));
-int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
-			 struct ip6_moptions *, struct route_in6 *,
-			 struct ifnet **, struct rtentry **, int));
-#endif
 int	in6_selecthlim __P((struct in6pcb *, struct ifnet *));
 int	in6_pcbsetport __P((struct sockaddr_in6 *, struct in6pcb *));
 #ifndef TCP6
