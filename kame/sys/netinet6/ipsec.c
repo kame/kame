@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.123 2001/08/05 06:37:56 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.124 2001/08/05 07:03:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -367,7 +367,7 @@ ipsec_invalpcbcache(pcbsp, dir)
 	int i;
 
 	for (i = IPSEC_DIR_INBOUND; i <= IPSEC_DIR_OUTBOUND; i++) {
-		if (dir && i != dir)
+		if (dir != IPSEC_DIR_ANY && i != dir)
 			continue;
 		if (pcbsp->cache[i])
 			key_freesp(pcbsp->cache[i]);
@@ -384,7 +384,7 @@ ipsec_pcbconn(pcbsp)
 {
 
 	pcbsp->cacheflags |= IPSEC_PCBSP_CONNECTED;
-	ipsec_invalpcbcache(pcbsp, 0);
+	ipsec_invalpcbcache(pcbsp, IPSEC_DIR_ANY);
 	return 0;
 }
 
@@ -394,7 +394,7 @@ ipsec_pcbdisconn(pcbsp)
 {
 
 	pcbsp->cacheflags &= ~IPSEC_PCBSP_CONNECTED;
-	ipsec_invalpcbcache(pcbsp, 0);
+	ipsec_invalpcbcache(pcbsp, IPSEC_DIR_ANY);
 	return 0;
 }
 
@@ -1576,7 +1576,7 @@ ipsec4_set_policy(inp, optname, request, len, priv)
 		return EINVAL;
 	}
 
-	ipsec_invalpcbcache(inp->inp_sp, 0);
+	ipsec_invalpcbcache(inp->inp_sp, IPSEC_DIR_ANY);
 	return ipsec_set_policy(pcb_sp, optname, request, len, priv);
 }
 
@@ -1638,7 +1638,7 @@ ipsec4_delete_pcbpolicy(inp)
 		inp->inp_sp->sp_out = NULL;
 	}
 
-	ipsec_invalpcbcache(inp->inp_sp, 0);
+	ipsec_invalpcbcache(inp->inp_sp, IPSEC_DIR_ANY);
 
 	ipsec_delpcbpolicy(inp->inp_sp);
 	inp->inp_sp = NULL;
@@ -1679,7 +1679,7 @@ ipsec6_set_policy(in6p, optname, request, len, priv)
 		return EINVAL;
 	}
 
-	ipsec_invalpcbcache(in6p->in6p_sp, 0);
+	ipsec_invalpcbcache(in6p->in6p_sp, IPSEC_DIR_ANY);
 	return ipsec_set_policy(pcb_sp, optname, request, len, priv);
 }
 
@@ -1740,7 +1740,7 @@ ipsec6_delete_pcbpolicy(in6p)
 		in6p->in6p_sp->sp_out = NULL;
 	}
 
-	ipsec_invalpcbcache(in6p->in6p_sp, 0);
+	ipsec_invalpcbcache(in6p->in6p_sp, IPSEC_DIR_ANY);
 
 	ipsec_delpcbpolicy(in6p->in6p_sp);
 	in6p->in6p_sp = NULL;
