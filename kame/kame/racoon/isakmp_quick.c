@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.42 2000/07/14 11:21:26 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.43 2000/07/18 05:24:58 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1002,9 +1002,6 @@ quick_r1recv(iph2, msg0)
 	vfree(my_hash);
 
 	if (result) {
-#if 0	/* XXX can't get SA's values because before checking SA */
-		error = ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
-#endif
 		plog(logp, LOCATION, iph2->ph1->remote, "HASH(1) mismatch.\n");
 		error = ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
 		goto end;
