@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.199 2004/08/11 10:20:48 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.200 2004/08/12 02:03:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -116,7 +116,6 @@ static int get_hostid_ifid __P((struct ifnet *, struct in6_addr *));
 #endif
 static int get_rand_ifid __P((struct ifnet *, struct in6_addr *));
 static int generate_tmp_ifid __P((u_int8_t *, const u_int8_t *, u_int8_t *));
-static int get_hw_ifid __P((struct ifnet *, struct in6_addr *));
 #ifndef MIP6
 static int get_ifid __P((struct ifnet *, struct ifnet *, struct in6_addr *));
 #endif /* !MIP6 */
