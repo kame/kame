@@ -3188,7 +3188,7 @@ syn_cache_respond(sc, m)
 	struct syn_cache *sc;
 	struct mbuf *m;
 {
-	struct route *ro = &sc->sc_route4;
+	struct route *ro;
 	struct rtentry *rt;
 	u_int8_t *optp;
 	int optlen, error;
@@ -3203,10 +3203,12 @@ syn_cache_respond(sc, m)
 	switch (sc->sc_src.sa.sa_family) {
 	case AF_INET:
 		hlen = sizeof(struct ip);
+		ro = &sc->sc_route4;
 		break;
 #ifdef INET6
 	case AF_INET6:
 		hlen = sizeof(struct ip6_hdr);
+		ro = (struct route *)&sc->sc_route6;
 		break;
 #endif
 	default:
@@ -3347,7 +3349,7 @@ syn_cache_respond(sc, m)
 	case AF_INET6:
 		ip6->ip6_vfc = IPV6_VERSION;
 		ip6->ip6_plen = htons(tlen - hlen);
-		ip6->ip6_hlim = ip6_defhlim;
+		/* ip6_hlim will be initialized afterwards */
 		/* XXX flowlabel? */
 		break;
 #endif
@@ -3392,6 +3394,9 @@ syn_cache_respond(sc, m)
 		break;
 #ifdef INET6
 	case AF_INET6:
+		ip6->ip6_hlim = in6_selecthlim(NULL,
+				ro->ro_rt ? ro->ro_rt->rt_ifp : NULL);
+
 		error = ip6_output(m, NULL /*XXX*/, (struct route_in6 *)ro,
 			0, NULL, NULL);
 		break;

@@ -963,8 +963,16 @@ send:
 #ifdef INET6
 	case AF_INET6:
 		ip6->ip6_nxt = IPPROTO_TCP;
-		if (tp->t_in6pcb)
-			ip6->ip6_hlim = tp->t_in6pcb->in6p_ip6.ip6_hlim;
+		if (tp->t_in6pcb) {
+			/*
+			 * we separately set hoplimit for every segment, since
+			 * the user might want to change the value via
+			 * setsockopt. Also, desired default hop limit might
+			 * be changed via Neighbor Discovery.
+			 */
+			ip6->ip6_hlim = in6_selecthlim(tp->t_in6pcb,
+				ro->ro_rt ? ro->ro_rt->rt_ifp : NULL);
+		}
 		/* ip6->ip6_flow = ??? */
 		/* ip6_plen will be filled in ip6_output(). */
 		break;

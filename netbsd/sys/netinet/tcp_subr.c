@@ -538,7 +538,13 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		th->th_sum = in6_cksum(m, IPPROTO_TCP, sizeof(struct ip6_hdr),
 				tlen);
 		ip6->ip6_plen = ntohs(tlen);
-		ip6->ip6_hlim = ip6_defhlim;
+		if (tp && tp->t_in6pcb) {
+			struct ifnet *oifp;
+			ro = (struct route *)&tp->t_in6pcb->in6p_route;
+			oifp = ro->ro_rt ? ro->ro_rt->rt_ifp : NULL;
+			ip6->ip6_hlim = in6_selecthlim(tp->t_in6pcb, oifp);
+		} else
+			ip6->ip6_hlim = ip6_defhlim;
 		ip6->ip6_flow &= ~IPV6_FLOWINFO_MASK;
 		if (ip6_auto_flowlabel) {
 			ip6->ip6_flow |= 
@@ -748,7 +754,9 @@ tcp_newtcpcb(family, aux)
 #ifdef INET6
 	else if (family == AF_INET6) {
 		struct in6pcb *in6p = (struct in6pcb *)aux;
-		in6p->in6p_ip6.ip6_hlim = ip6_defhlim;
+		in6p->in6p_ip6.ip6_hlim = in6_selecthlim(in6p,
+			in6p->in6p_route.ro_rt ? in6p->in6p_route.ro_rt->rt_ifp
+					       : NULL);
 		in6p->in6p_ppcb = (caddr_t)tp;
 	}
 #endif
