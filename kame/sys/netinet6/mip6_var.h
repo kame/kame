@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.112 2004/01/09 11:05:26 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.113 2004/01/20 07:51:19 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -127,7 +127,7 @@ LIST_HEAD(mip6_bc_list, mip6_bc);
 #define MIP6_REFRESH_LIFETIME_RATE 50
 
 /* return routability parameters. */
-#define MIP6_COOKIE_MAX_LIFE	240
+#define MIP6_MAX_NONCE_LIFE	240
 #define MIP6_COOKIE_SIZE	8
 #define MIP6_HOME_TOKEN_SIZE	8
 #define MIP6_CAREOF_TOKEN_SIZE	8

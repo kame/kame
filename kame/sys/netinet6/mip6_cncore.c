@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.57 2004/01/09 11:05:26 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.58 2004/01/20 07:51:19 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -157,7 +157,7 @@ struct timeout mip6_bc_ch;
 struct mip6_bc *mip6_bc_hash[MIP6_BC_HASH_SIZE];
 
 #define HMACSIZE 16
-#define NONCE_UPDATE_PERIOD	(MIP6_COOKIE_MAX_LIFE / MIP6_NONCE_HISTORY)
+#define NONCE_UPDATE_PERIOD	(MIP6_MAX_NONCE_LIFE / MIP6_NONCE_HISTORY)
 mip6_nonce_t mip6_nonce[MIP6_NONCE_HISTORY];
 mip6_nodekey_t mip6_nodekey[MIP6_NONCE_HISTORY];	/* this is described as 'Kcn' in the spec */
 u_int16_t nonce_index;		/* the idx value pointed by nonce_head */
@@ -1389,7 +1389,7 @@ mip6_get_nonce(index, nonce)
 		offset = offset - 0xffff;
 	}
 
-	if (offset < -MIP6_NONCE_HISTORY) {
+	if (offset <= -MIP6_NONCE_HISTORY) {
 		/* too old index. */
 		return (-1);
 	}
