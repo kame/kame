@@ -325,6 +325,7 @@ dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 	}
 }
 
+#if notused
 static void
 dump_exports(FILE *fp, struct rtproto *base)
 {
@@ -370,6 +371,7 @@ dump_exports(FILE *fp, struct rtproto *base)
 			break;
 	}
 }
+#endif
 
 static void
 print_ifrt_dump(FILE *fp)
@@ -634,6 +636,68 @@ print_bgp_routes(fp)
 }
 
 static void
+show_bgp_peer(FILE *fp, struct rpcb *bnp, char *indent)
+{
+	char inetaddrstr[INET_ADDRSTRLEN];
+	static char *bgpstate[] = {"", /* dummy */
+				   "IDLE", "CONNECT", "ACTIVE",
+				   "OPENSENT", "OPENCONFERM",
+				   "ESTABLISHED"};
+
+	fprintf(fp, "%sAS: %d, ", indent, bnp->rp_as);
+	fprintf(fp, "Router Id: %s, ",
+		inet_ntop(AF_INET, &bnp->rp_id,
+			  inetaddrstr, INET_ADDRSTRLEN));
+	fprintf(fp, "state: %s, ", bgpstate[bnp->rp_state]);
+	fprintf(fp, "localpref: %d\n", (int)ntohl(bnp->rp_prefer));
+
+	fprintf(fp, "%sMode:", indent);
+	if (bnp->rp_mode & BGPO_PASSIVE) fprintf(fp, " PASSIVE");
+	if (bnp->rp_mode & BGPO_IFSTATIC) fprintf(fp, " IFSTATIC");
+	if (bnp->rp_mode & BGPO_IGP)
+		fprintf(fp, " IBGP");
+	else
+		fprintf(fp, " EBGP");
+	if (bnp->rp_mode & BGPO_RRCLIENT) fprintf(fp, " RRCLIENT");
+	if (bnp->rp_mode & BGPO_ONLINK) fprintf(fp, " ONLINK");
+	if (bnp->rp_mode & BGPO_IDSTATIC) fprintf(fp, " IDSTATIC");
+	if (bnp->rp_mode & BGPO_NOSYNC) fprintf(fp, " NOSYNC");
+	if (bnp->rp_mode & BGPO_NEXTHOPSELF) fprintf(fp, " NEXTHOPSELF");
+	fputc('\n', fp);
+
+	fprintf(fp, "%sHis global addr: %s\n", indent, bgp_peerstr(bnp));
+	fprintf(fp, "%sHis local addr: %s\n", indent, bgp_peerstr(bnp));
+	fprintf(fp, "%sOur addr: %s\n", indent,
+		ip6str(&bnp->rp_myaddr.sin6_addr, 0));
+	fprintf(fp, "%sTimers:", indent);
+	if (bnp->rp_connect_timer)
+		fprintf(fp, " connect=%d:%d",
+			(int)(bnp->rp_connect_timer->tsk_timeval.tv_sec/60),
+			(int)(bnp->rp_connect_timer->tsk_timeval.tv_sec%60));
+	if (bnp->rp_hold_timer)
+		fprintf(fp, " hold=%d:%d",
+			(int)(bnp->rp_hold_timer->tsk_timeval.tv_sec/60),
+			(int)(bnp->rp_hold_timer->tsk_timeval.tv_sec%60));
+	if (bnp->rp_keepalive_timer)
+		fprintf(fp, " keepalive=%d:%d",
+			(int)(bnp->rp_keepalive_timer->tsk_timeval.tv_sec/60),
+			(int)(bnp->rp_keepalive_timer->tsk_timeval.tv_sec%60));
+	fputc('\n', fp);
+	if (bnp->rp_ebgp_as_prepends)
+		fprintf(fp, "%sour own AS number will be prepended "
+			"to each advertised AS path %d time%s\n", indent,
+			bnp->rp_ebgp_as_prepends,
+			(bnp->rp_ebgp_as_prepends == 1) ? "" : "s");
+#if 0
+	fprintf(fp, "  Imported routes from the peer:\n");
+	dump_bgp_rtable(fp, bnp->rp_adj_ribs_in);
+
+	fprintf(fp, "  Exported routes to the peer:\n");
+	dump_exports(fp, bnp->rp_adj_ribs_out);
+#endif
+}
+
+static void
 print_bgp_dump(FILE *fp)
 {
 	struct rpcb *bnp;
@@ -644,11 +708,6 @@ print_bgp_dump(FILE *fp)
 	extern u_int32_t    clusterId;
 	extern u_int16_t    bgpHoldtime;
 	extern byte         IamRR;
-
-	static char *bgpstate[] = {"", /* dummy */
-				   "IDLE", "CONNECT", "ACTIVE",
-				   "OPENSENT", "OPENCONFERM",
-				   "ESTABLISHED"};
 
 	bnp = bgb;
 	if (bnp) {
@@ -665,66 +724,35 @@ print_bgp_dump(FILE *fp)
 			fprintf(fp, ", Reflector");
 		fputc('\n', fp);
 
-		fprintf(fp, "\n=== BGP routing information ===\n");
-		print_bgp_routes(fp);
-
 		fprintf(fp, "\n=== BGP per peer information ===\n");
 	}
+	/* show established peer first */
 	while(bnp) {
-		fprintf(fp, "  AS: %d, ", bnp->rp_as);
-		fprintf(fp, "Router Id: %s, ",
-			inet_ntop(AF_INET, &bnp->rp_id,
-				  inetaddrstr, INET_ADDRSTRLEN));
-		fprintf(fp, "state: %s, ", bgpstate[bnp->rp_state]);
-		fprintf(fp, "localpref: %d\n", (int)ntohl(bnp->rp_prefer));
-
-		fprintf(fp, "  Mode:");
-		if (bnp->rp_mode & BGPO_PASSIVE) fprintf(fp, " PASSIVE");
-		if (bnp->rp_mode & BGPO_IFSTATIC) fprintf(fp, " IFSTATIC");
-		if (bnp->rp_mode & BGPO_IGP)
-			fprintf(fp, " IBGP");
-		else
-			fprintf(fp, " EBGP");
-		if (bnp->rp_mode & BGPO_RRCLIENT) fprintf(fp, " RRCLIENT");
-		if (bnp->rp_mode & BGPO_ONLINK) fprintf(fp, " ONLINK");
-		if (bnp->rp_mode & BGPO_IDSTATIC) fprintf(fp, " IDSTATIC");
-		if (bnp->rp_mode & BGPO_NOSYNC) fprintf(fp, " NOSYNC");
-		if (bnp->rp_mode & BGPO_NEXTHOPSELF) fprintf(fp, " NEXTHOPSELF");
-		fputc('\n', fp);
-
-		fprintf(fp, "  His global addr: %s\n", bgp_peerstr(bnp));
-		fprintf(fp, "  His local addr: %s\n", bgp_peerstr(bnp));
-		fprintf(fp, "  Our addr: %s\n",
-			ip6str(&bnp->rp_myaddr.sin6_addr, 0));
-		fprintf(fp, "  Timers:");
-		if (bnp->rp_connect_timer)
-			fprintf(fp, " connect=%d:%d",
-				(int)(bnp->rp_connect_timer->tsk_timeval.tv_sec/60),
-				(int)(bnp->rp_connect_timer->tsk_timeval.tv_sec%60));
-		if (bnp->rp_hold_timer)
-			fprintf(fp, " hold=%d:%d",
-				(int)(bnp->rp_hold_timer->tsk_timeval.tv_sec/60),
-				(int)(bnp->rp_hold_timer->tsk_timeval.tv_sec%60));
-		if (bnp->rp_keepalive_timer)
-			fprintf(fp, " keepalive=%d:%d",
-				(int)(bnp->rp_keepalive_timer->tsk_timeval.tv_sec/60),
-				(int)(bnp->rp_keepalive_timer->tsk_timeval.tv_sec%60));
-		fputc('\n', fp);
-		if (bnp->rp_ebgp_as_prepends)
-			fprintf(fp, "  our own AS number will be prepended "
-				"to each advertised AS path %d time%s\n",
-				bnp->rp_ebgp_as_prepends,
-				(bnp->rp_ebgp_as_prepends == 1) ? "" : "s");
-
-		fprintf(fp, "  Imported routes from the peer:\n");
-		dump_bgp_rtable(fp, bnp->rp_adj_ribs_in);
-
-		fprintf(fp, "  Exported routes to the peer:\n");
-		dump_exports(fp, bnp->rp_adj_ribs_out);
+		if (bnp->rp_state == BGPSTATE_ESTABLISHED)
+			show_bgp_peer(fp, bnp, "  ");
 
 		if ((bnp = bnp->rp_next) == bgb)
 			break;
 	}
+	/*
+	 * Then show non-established peers, skipping established passive-opend
+	 * peers.
+	 */
+	bnp = bgb;
+	while(bnp) {
+		if (bnp->rp_state != BGPSTATE_ESTABLISHED &&
+		    find_epeer_by_rpcb(bnp) == NULL)
+			show_bgp_peer(fp, bnp, "  ");
+
+		if ((bnp = bnp->rp_next) == bgb)
+			break;
+	}
+
+	if (bnp) {
+		fprintf(fp, "\n=== BGP routing information ===\n");
+		print_bgp_routes(fp);
+	}
+
 }
 
 void
