@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.295 1999/11/25 09:11:26 sumikawa Exp $
+$Id: CHANGELOG,v 1.296 1999/11/25 09:38:48 itojun Exp $
 
 <199911>
+Thu Nov 25 18:37:59 JST 1999  itojun@iijlab.net
+	* kame/sys/netinet6/in6_cksum.c: changed length-related argument
+	  type from int to u_int32_t, for (future) jumbogram support.
+
 Thu Nov 25 18:08:36 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/ipv6socket_scrub: a new port directory for
 	  IPv6 socket scrubber (IPv6-readiness checking tool for source
