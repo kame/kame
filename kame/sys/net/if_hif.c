@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.6 2001/09/20 10:14:08 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.7 2001/09/20 10:22:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -213,12 +213,11 @@ hifattach(dummy)
 		sc->hif_location = HIF_LOCATION_UNKNOWN;
 
 		/* Initialize home prefix list, HA list, BU list */
-#ifdef HIFHR
-		LIST_INIT(&sc->hif_hr_list);
-#endif /* HIFHR */
+#ifdef MIP6_OLD
 		LIST_INIT(&sc->hif_pfx_list);
-		LIST_INIT(&sc->hif_bu_list);
 		LIST_INIT(&sc->hif_ha_list);
+#endif
+		LIST_INIT(&sc->hif_bu_list);
 
 		TAILQ_INIT(&sc->hif_hs_list_home);
 		TAILQ_INIT(&sc->hif_hs_list_foreign);
@@ -517,55 +516,6 @@ hif_subnet_list_find_withhaaddr(hs_list, haaddr)
 	return (NULL);
 }
 
-#ifdef HIFHR
-struct hif_hr *
-hif_hr_create(hha_list)
-     struct hif_ha_list *hha_list;
-{
-	struct hif_hr *hhr;
-
-	hhr = malloc(sizeof(struct hif_hr), M_TEMP, M_NOWAIT);
-	if (hhr == NULL) {
-		mip6log((LOG_ERR, "%s: memory allocation failed\n",
-			 __FUNCTION__));
-	}
-	if (hhr) {
-		bzero(hhr, sizeof(struct hif_hr));
-		hhr->hhr_state = HIF_HR_STATE_NOTREG;
-		hhr->hhr_hha_list = hha_list;
-	}
-
-	return (hhr);
-}
-
-int
-hif_hr_list_insert(hhr_list, hhr)
-     struct hif_hr_list *hhr_list;
-     struct hif_hr *hhr;
-{
-	LIST_INSERT_HEAD(hhr_list, hhr, hhr_entry);
-
-	return (0);
-}
-
-int
-hif_hr_list_remove(hhr_list, hhr)
-     struct hif_hr_list *hhr_list;
-     struct hif_hr *hhr;
-{
-	if (hhr_ep) {
-		encap_detach(hhr_ep);
-		hhr_ep = NULL;
-	}
-
-	LIST_REMOVE(hhr, hhr_entry);
-	free(hhr, M_TEMP);
-
-	return (0);
-}     
-
-#endif /* HIFHR */
-
 struct hif_coa *
 hif_coa_create(ifp)
      struct ifnet *ifp;
@@ -622,8 +572,9 @@ hif_coa_get_ifaddr(hcoa)
 
 		if (ia6->ia6_flags &
 		    (IN6_IFF_ANYCAST
-		     /* XXX | IN6_IFF_TENTATIVE */
-		     | IN6_IFF_DUPLICATED | IN6_IFF_DETACHED
+		     /* XXX should not use DEATCHed addr */
+		     /* | IN6_IFF_TENTATIVE | IN6_IFF_DETACHED*/
+		     | IN6_IFF_DUPLICATED
 		     | IN6_IFF_DEPRECATED))
 			continue;
 		if (IN6_IS_ADDR_UNSPECIFIED(&ia6->ia_addr.sin6_addr))
@@ -690,6 +641,7 @@ hif_coa_list_find_withifp(hcoa_list, ifp)
 	return (hcoa);
 }
 
+#ifdef MIP6_OLD
 struct hif_ha *
 hif_ha_create(onhomelink, mha)
      u_int8_t onhomelink;
@@ -812,6 +764,7 @@ hif_ha_list_find_withaddr(hha_list, rtaddr)
 
 	return (hha);
 }
+#endif /* MIP6_OLD */
 
 static int
 hif_ha_list_update_withioctl(sc, data)

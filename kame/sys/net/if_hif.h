@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.2 2001/09/20 06:00:46 itojun Exp $	*/
+/*	$KAME: if_hif.h,v 1.3 2001/09/20 10:22:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -153,12 +153,11 @@ struct hif_softc {
 	int                    hif_location;             /* cur location */
 	int                    hif_location_prev; /* XXX */
 
-#ifdef HIFHR
-	LIST_HEAD(hif_hr_list, hif_hr) hif_hr_list;
-#endif /* HIFHR */
+#ifdef MIP6_OLD
 	LIST_HEAD(mip6_pfx_list, mip6_pfx) hif_pfx_list; /* list of pfxes */
-	LIST_HEAD(mip6_bu_list, mip6_bu) hif_bu_list;    /* list of BUs */
 	LIST_HEAD(hif_ha_list, hif_ha) hif_ha_list;      /* list of HAs */
+#endif
+	LIST_HEAD(mip6_bu_list, mip6_bu) hif_bu_list;    /* list of BUs */
 	struct hif_subnet_list hif_hs_list_home;
 	struct hif_subnet_list hif_hs_list_foreign;
 	struct hif_subnet      *hif_hs_current;
@@ -171,28 +170,13 @@ struct hif_coa {
 	struct ifnet         *hcoa_ifp;
 };
 
+#ifdef MIP6_OLD
 struct hif_ha {
 	LIST_ENTRY(hif_ha) hha_entry;
 	u_int8_t           hha_onhomelink;
 	struct mip6_ha     *hha_mha;
 };
-
-#ifdef HIFHR
-struct hif_hr {
-	LIST_ENTRY(hif_hr)    hhr_entry;
-	struct in6_addr       hhr_ifid;
-	u_int8_t              hhr_prefixlen;
-	u_int8_t              hhr_state;
-	struct hif_ha_list    *hhr_hha_list;
-	const struct encaptab *hhr_ep;       /* encapsulation to HA */
-};
-#define hhr_haddr hhr_ifid
-
-#define HIF_HR_STATE_NOTREG       0
-#define HIF_HR_STATE_REGWAITACK   1
-#define HIF_HR_STATE_REG          2
-#define HIF_HR_STATE_UNREGWAITACK 3
-#endif /* HIFHR */
+#endif
 
 #if defined(__FreeBSD__) && __FreeBSD__ < 3
 int hif_ioctl				__P((struct ifnet *, int, caddr_t));
@@ -232,6 +216,7 @@ struct hif_softc *hif_list_find_withhaddr __P((struct in6_addr *));
 
 struct hif_ha *hif_ha_create __P((u_int8_t, struct mip6_ha *));
 
+#if 0
 int hif_ha_list_insert __P((struct hif_ha_list *, struct hif_ha *hha));
 int hif_ha_list_remove_withmha __P((struct hif_ha_list *, struct mip6_ha *));
 int hif_ha_list_isonhomelink __P((struct hif_ha_list *, struct in6_addr *));
@@ -239,6 +224,7 @@ struct hif_ha *hif_ha_list_find_onhomelink __P((struct hif_ha_list *));
 struct hif_ha *hif_ha_list_find_preferable __P((struct hif_ha_list *));
 struct hif_ha *hif_ha_list_find_withaddr __P((struct hif_ha_list *,
 					      struct in6_addr *));
+#endif
 
 #endif /* _KERNEL */
 
