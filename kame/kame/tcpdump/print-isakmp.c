@@ -30,7 +30,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.8 2000/01/11 03:11:34 sakane Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.9 2000/01/11 03:30:54 sakane Exp $ (LBL)";
 #endif
 
 #include <string.h>
@@ -476,7 +476,7 @@ static char *isakmp_p_map[] = {
 };
 
 static char *ah_p_map[] = {
-	NULL, "md5", "sha", "1des",
+	NULL, "(reserved)", "md5", "sha", "1des",
 };
 
 static char *esp_p_map[] = {
