@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.34 2000/06/21 08:07:44 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.35 2000/06/21 18:35:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -314,7 +314,7 @@ rip6_output(m, va_alist)
 	struct in6pcb *in6p;
 	u_int	plen = m->m_pkthdr.len;
 	int error = 0;
-	struct ip6_pktopts opt, *optp = NULL;
+	struct ip6_pktopts opt, *optp = NULL, *origoptp;
 	struct ifnet *oifp = NULL;
 	int type, code;		/* for ICMPv6 output statistics only */
 	int priv = 0;
@@ -373,10 +373,13 @@ rip6_output(m, va_alist)
 	ip6->ip6_dst = *dst;
 
 	/* KAME hack: embed scopeid */
+	origoptp = in6p->in6p_outputopts;
+	in6p->in6p_outputopts = optp;
 	if (in6_embedscope(&ip6->ip6_dst, dstsock, in6p, &oifp) != 0) {
 		error = EINVAL;
 		goto bad;
 	}
+	in6p->in6p_outputopts = origoptp;
 
 	/*
 	 * Source address selection.
