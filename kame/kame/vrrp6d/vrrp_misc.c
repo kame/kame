@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vrrp_misc.c,v 1.2 2002/07/09 07:29:00 ono Exp $
+ * $Id: vrrp_misc.c,v 1.3 2002/07/09 08:05:39 ono Exp $
  */
 
 #include "vrrp_misc.h"
@@ -366,7 +366,7 @@ vrrp_misc_log(int priority, const char *message, ...)
 	} else {
 		strncpy(buf2, message, sizeof buf2);
 	}
-	va_start(arg, buf2);
+	va_start(arg, message);
 	vsnprintf(buf, sizeof buf2, buf2, arg);
 	va_end(arg);
 
