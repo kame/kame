@@ -125,8 +125,10 @@ in6_pcballoc(so, head)
 	/* XXX: we should allocate inputopts only when we need it. */
 	MALLOC(in6p->in6p_inputopts, struct ip6_recvpktopts *,
 	       sizeof(struct ip6_recvpktopts), M_IP6OPT, M_NOWAIT);
-	if (in6p->in6p_inputopts == NULL)
+	if (in6p->in6p_inputopts == NULL) {
+		FREE(in6p, M_PCB);
 		return(ENOBUFS); /* XXX */
+	}
 	bzero(in6p->in6p_inputopts, sizeof(struct ip6_recvpktopts));
 #if 0
 	insque(in6p, head);
