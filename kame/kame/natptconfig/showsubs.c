@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: showsubs.c,v 1.2 2000/03/09 02:59:54 fujisawa Exp $
+ *	$Id: showsubs.c,v 1.3 2000/04/19 08:09:01 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -95,6 +95,7 @@ composeCSlotEntry(struct _cSlot *slt)
       case NATPT_UNSPEC:	concat(lmsg, "unspec");		break;
       case NATPT_INBOUND:	concat(lmsg, "inbound");	break;
       case NATPT_OUTBOUND:	concat(lmsg, "outbound");	break;
+      case NATPT_BIDIRECTIONAL:	concat(lmsg, "bidir");		break;
       default:			concat(lmsg, "unknown");	break;
 	break;
     }
@@ -132,14 +133,16 @@ composeTSlotEntry(struct _tSlot *slot, struct _tcpstate *ts, int type)
 
     switch (slot->ip_payload)
     {
-      case IPPROTO_ICMP:	concat(lmsg, "icmp ");	break;
-      case IPPROTO_TCP:		concat(lmsg, "tcp  ");	break;
-      case IPPROTO_UDP:		concat(lmsg, "udp  ");	break;
-      default:			concat(lmsg, "unk  ");	break;
+      case IPPROTO_ICMP:	concat(lmsg, "icmp  ");	break;
+      case IPPROTO_TCP:		concat(lmsg, "tcp   ");	break;
+      case IPPROTO_UDP:		concat(lmsg, "udp   ");	break;
+      default:			concat(lmsg, "unk   ");	break;
     }
 
     _composeAddrPortXL(lmsg, &slot->local,  type);
     _composeAddrPortXL(lmsg, &slot->remote, type);
+
+    concat(lmsg, "%6d%6d ", slot->inbound, slot->outbound);
 
     rv = gettimeofday(&tp, &tzp);
     idle = tp.tv_sec - slot->tstamp;
@@ -148,14 +151,14 @@ composeTSlotEntry(struct _tSlot *slot, struct _tcpstate *ts, int type)
     switch (slot->ip_payload)
     {
       case IPPROTO_ICMP:
-	concat(lmsg, " %5d/%-5d", slot->suit.ih_idseq.icd_id, slot->suit.ih_idseq.icd_seq);
+	concat(lmsg, "%5d/%-5d ", slot->suit.ih_idseq.icd_id, slot->suit.ih_idseq.icd_seq);
 	break;
 
       case IPPROTO_TCP:
 	if ((ts->_state >= 0) && (ts->_state < TCP_NSTATES))
-	    concat(lmsg, " %s ", tcpstates[ts->_state]);
+	    concat(lmsg, "%s ", tcpstates[ts->_state]);
 	else
-	    concat(lmsg, " %d ", ts->_state);
+	    concat(lmsg, "%d ", ts->_state);
 	break;
     }
 

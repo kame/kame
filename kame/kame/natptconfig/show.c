@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: show.c,v 1.9 2000/03/21 04:47:40 itojun Exp $
+ *	$Id: show.c,v 1.10 2000/04/19 08:09:01 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -173,7 +173,7 @@ showRule(int type)
 	    struct _cSlot	acs;
 
 	    readKvm((void *)&acs, sizeof(struct _cSlot), (u_long)cons.car);
-	    switch (acs.flags)
+	    switch (acs.type)
 	    {
 	      case NATPT_STATIC:	_showRuleStatic(num, &acs);	break;
 	      case NATPT_DYNAMIC:	_showRuleDynamic(num, &acs);	break;
@@ -333,10 +333,10 @@ _showXlate(int type, u_long pos)
 static void
 _writeXlateHeader()
 {
-    printf("%-5s",  "Proto");
-    printf("%-21s", "Local Address (src)");
+    printf("%-6s",  "Proto");
+    printf("%-22s", "Local Address (src)");
     printf("%-22s", "Local Address (dst)");
-    printf("%-21s", "Remote Address (src)");
+    printf("%-22s", "Remote Address (src)");
     printf("%-22s", "Remote Address (dst)");
     printf("%6s",  "Ipkts");
     printf("%6s",  "Opkts");

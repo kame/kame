@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: misc.c,v 1.7 2000/02/23 12:53:19 fujisawa Exp $
+ *	$Id: misc.c,v 1.8 2000/04/19 08:09:01 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -126,8 +126,8 @@ setRule(int dir, int proto, struct pAddr *from, struct pAddr *to)
     mBox.freight = (caddr_t)(freight = (struct _cSlot *)malloc(mBox.size));
 
     bzero(freight, mBox.size);
-    freight->flags = NATPT_STATIC;
-    freight->dir   = dir;
+    freight->type = NATPT_STATIC;
+    freight->dir  = dir;
     freight->proto = proto;
 
     freight->prefix  = from->ad.prefix;
@@ -161,8 +161,10 @@ setFromAnyRule(int dir, int proto, int any, u_short *port, struct pAddr *to)
     struct pAddr	 from;
     struct pAddr	*local, *remote;
 
+#if 0
     if ((*(port+0) != 0) && (*(port+1) != 0))
 	errx(1, "port range specified at \"from\" address.");
+#endif
 
     bzero(&mBox, sizeof(struct natpt_msgBox));
     mBox.flags = NATPT_STATIC;
@@ -170,14 +172,18 @@ setFromAnyRule(int dir, int proto, int any, u_short *port, struct pAddr *to)
     mBox.freight = (caddr_t)(freight = (struct _cSlot *)malloc(mBox.size));
 
     bzero(freight, mBox.size);
-    freight->flags = NATPT_STATIC;
-    freight->dir   = dir;
+    freight->type = NATPT_STATIC;
+    freight->dir  = dir;
     freight->proto = proto;
 
     bzero(&from, sizeof(struct pAddr));
     from.sa_family = (any == SANY4) ? AF_INET : AF_INET6;
     from.ad.type = ADDR_ANY;
-    from._sport  = *(port+0);
+    if (port)
+    {
+	from._sport = *(port+0);
+	from._dport = *(port+1);
+    }
 
     local = &from, remote = to;
     if (dir == NATPT_INBOUND)
@@ -213,8 +219,8 @@ setFaithRule(struct pAddr *from)
 	= (caddr_t)(freight = (struct _cSlot *)malloc(mBox.size));
 
     bzero(freight, mBox.size);
-    freight->flags = NATPT_FAITH;
-    freight->dir   = NATPT_OUTBOUND;
+    freight->type = NATPT_FAITH;
+    freight->dir  = NATPT_OUTBOUND;
 
     if (from == NULL)
     {

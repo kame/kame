@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: cfparse.y,v 1.6 2000/03/09 02:59:54 fujisawa Exp $
+ *	$Id: cfparse.y,v 1.7 2000/04/19 08:09:01 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -94,6 +94,7 @@ yyerror(char *msg, ...)
 /*  Keyword								*/
 %token		SANY4
 %token		SANY6
+%token		SBIDIR
 %token		SBREAK
 %token		SDISABLE
 %token		SDYNAMIC
@@ -271,6 +272,8 @@ dir
 		    { $$ = NATPT_OUTBOUND; }
 		| SOUTGOING
 		    { $$ = NATPT_OUTBOUND; }
+		| SBIDIR
+		    { $$ = NATPT_BIDIRECTIONAL; }
 		;
 
 

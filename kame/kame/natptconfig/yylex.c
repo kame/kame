@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: yylex.c,v 1.4 2000/03/09 02:59:55 fujisawa Exp $
+ *	$Id: yylex.c,v 1.5 2000/04/19 08:09:01 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -54,6 +54,7 @@ struct
 {
     { "any4",		SANY4,		"SANY4",	},
     { "any6",		SANY6,		"SANY6",	},
+    { "bidir",		SBIDIR,		"SBIDIR",	},
     { "break",		SBREAK,		"SBREAK",	},
     { "disable",	SDISABLE,	"SDISABLE",	},
     { "dynamic",	SDYNAMIC,	"SDYNAMIC",	},
