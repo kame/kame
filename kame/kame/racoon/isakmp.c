@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.99 2000/09/13 04:50:25 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.100 2000/09/18 19:24:05 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.99 2000/09/13 04:50:25 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.100 2000/09/18 19:24:05 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2086,7 +2086,7 @@ isakmp_printpacket(msg, from, my, decoded)
 	vchar_t *buf;
 #endif
 
-	YIPSDEBUG(DEBUG_SVERB, goto doit);
+	YIPSDEBUG(DEBUG_DNET, goto doit);
 	return;
 
 #ifdef YIPS_DEBUG
