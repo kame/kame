@@ -176,6 +176,8 @@ main(argc, argv)
 		event_add(&event[i], NULL);
 	}
 	event_dispatch();
+
+	exit(0);
 }
 
 static void
