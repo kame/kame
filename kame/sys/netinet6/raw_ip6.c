@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.91 2001/08/07 09:58:21 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.92 2001/09/01 06:10:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -345,8 +345,10 @@ rip6_ctlinput(cmd, sa, d)
 	else if (cmd == PRC_HOSTDEAD)
 		d = NULL;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-	else if (cmd == PRC_MSGSIZE)
-		; /* special code is present, see below */
+	else if (cmd == PRC_MSGSIZE) {
+		/* special code is present, see below */
+		notify = in6_rtchange;
+	}
 #endif
 	else if (inet6ctlerrmap[cmd] == 0)
 		return;

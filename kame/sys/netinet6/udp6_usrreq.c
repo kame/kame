@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.94 2001/08/30 11:19:52 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.95 2001/09/01 06:10:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -522,8 +522,10 @@ udp6_ctlinput(cmd, sa, d)
 	else if (cmd == PRC_HOSTDEAD)
 		d = NULL;
 #ifdef __NetBSD__
-	else if (cmd == PRC_MSGSIZE)
-		; /* special code is present, see below */
+	else if (cmd == PRC_MSGSIZE) {
+		/* special code is present, see below */
+		notify = in6_rtchange;
+	}
 #endif
 	else if (inet6ctlerrmap[cmd] == 0)
 		return;
