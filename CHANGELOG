@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1651 2001/04/19 09:31:22 sakane Exp $
+$KAME: CHANGELOG,v 1.1652 2001/04/20 15:01:08 itojun Exp $
 
 <200104>
+Fri Apr 20 23:59:21 JST 2001  itojun@iijlab.net
+	* sys/netinet6/in6_pcb.c: (netbsd): fix #if clause with NOIPPRIVPORTS.
+	  the old code mistakenly allowed bind(2) from non-privileged user
+	  onto privilege ports (netbsd integrated trees, like plain NetBSD 1.5
+	  are not affected).  from k-sugyou.
+	  
 Thu Apr 19 18:26:49 JST 2001 sakane@ydc.co.jp
 	* sys/netinet6/ah_input.c:
 	Fixed to mismatch AH checksum on FreeBSD4.  ip->ip_id was reversed
