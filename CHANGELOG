@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1663 2001/05/02 07:34:30 sakane Exp $
+$KAME: CHANGELOG,v 1.1664 2001/05/05 11:51:56 fujisawa Exp $
 
 <200105>
+2001-05-05  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* sys/netinet6/natpt_*.[ch]
+	* kame/natptconfig/*.[chly]
+	- Remove the code which considered FAITH.
+	  This facility is not thought about well.  If there is need, we had
+	  better reconsider this.
+
 Wed May  2 16:30:34 JST 2001 sakane@ydc.co.jp
 	* kame/racoon:
 	- logged the openssl version when racoon starts.
