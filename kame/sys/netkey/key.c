@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.80 2000/05/05 13:27:15 sumikawa Exp $	*/
+/*	$KAME: key.c,v 1.81 2000/05/07 03:12:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -283,114 +283,110 @@ struct _keystat {
 	u_long getspi_count; /* the avarage of count to try to get new SPI */
 } keystat;
 
-static struct secasvar *key_allocsa_policy __P((struct secasindex *saidx));
-static void key_freesp_so __P((struct secpolicy **sp));
-static struct secasvar *key_do_allocsa_policy __P((struct secashead *sah,
-						u_int state));
-static void key_delsp __P((struct secpolicy *sp));
-static struct secpolicy *key_getsp __P((struct secpolicyindex *spidx));
-static struct secpolicy *key_getspbyid __P((u_int32_t id));
+static struct secasvar *key_allocsa_policy __P((struct secasindex *));
+static void key_freesp_so __P((struct secpolicy **));
+static struct secasvar *key_do_allocsa_policy __P((struct secashead *, u_int));
+static void key_delsp __P((struct secpolicy *));
+static struct secpolicy *key_getsp __P((struct secpolicyindex *));
+static struct secpolicy *key_getspbyid __P((u_int32_t));
 static u_int32_t key_newreqid __P((void));
-static struct sadb_msg *key_spdadd __P((caddr_t *mhp));
+static struct sadb_msg *key_spdadd __P((caddr_t *));
 static u_int32_t key_getnewspid __P((void));
-static struct sadb_msg *key_spddelete __P((caddr_t *mhp));
-static struct sadb_msg *key_spddelete2 __P((caddr_t *mhp));
-static int key_spdget __P((caddr_t *mhp, struct socket *so, int target));
-static struct sadb_msg *key_spdflush __P((caddr_t *mhp));
-static int key_spddump __P((caddr_t *mhp, struct socket *so, int target));
-static struct mbuf *key_setdumpsp __P((struct secpolicy *sp,
-				u_int8_t type, u_int32_t seq, u_int32_t pid));
-static u_int key_getspmsglen __P((struct secpolicy *sp));
-static u_int key_getspreqmsglen __P((struct secpolicy *sp));
-static struct secashead *key_newsah __P((struct secasindex *saidx));
-static void key_delsah __P((struct secashead *sah));
-static struct secasvar *key_newsav __P((caddr_t *mhp, struct secashead *sah));
-static void key_delsav __P((struct secasvar *sav));
-static struct secashead *key_getsah __P((struct secasindex *saidx));
-static struct secasvar *key_checkspidup __P((struct secasindex *saidx,
-						u_int32_t spi));
-static struct secasvar *key_getsavbyspi __P((struct secashead *sah,
-						u_int32_t spi));
-static int key_setsaval __P((struct secasvar *sav, caddr_t *mhp));
-static u_int key_getmsglen __P((struct secasvar *sav));
-static int key_mature __P((struct secasvar *sav));
-static u_int key_setdumpsa __P((struct sadb_msg *newmsg, struct secasvar *sav,
-				u_int8_t type, u_int8_t satype,
-				u_int32_t seq, u_int32_t pid));
+static struct sadb_msg *key_spddelete __P((caddr_t *));
+static struct sadb_msg *key_spddelete2 __P((caddr_t *));
+static int key_spdget __P((caddr_t *, struct socket *, int));
+static struct sadb_msg *key_spdflush __P((caddr_t *));
+static int key_spddump __P((caddr_t *mhp, struct socket *, int));
+static struct mbuf *key_setdumpsp __P((struct secpolicy *,
+				u_int8_t, u_int32_t, u_int32_t));
+static u_int key_getspmsglen __P((struct secpolicy *));
+static u_int key_getspreqmsglen __P((struct secpolicy *));
+static struct secashead *key_newsah __P((struct secasindex *));
+static void key_delsah __P((struct secashead *));
+static struct secasvar *key_newsav __P((caddr_t *, struct secashead *));
+static void key_delsav __P((struct secasvar *));
+static struct secashead *key_getsah __P((struct secasindex *));
+static struct secasvar *key_checkspidup __P((struct secasindex *, u_int32_t));
+static struct secasvar *key_getsavbyspi __P((struct secashead *, u_int32_t));
+static int key_setsaval __P((struct secasvar *, caddr_t *));
+static u_int key_getmsglen __P((struct secasvar *));
+static int key_mature __P((struct secasvar *));
+static u_int key_setdumpsa __P((struct sadb_msg *, struct secasvar *,
+				u_int8_t, u_int8_t,
+				u_int32_t, u_int32_t));
 #if 1
-static int key_setsadbmsg_m __P((struct mbuf *, u_int8_t type, int tlen,
-				u_int8_t satype, u_int32_t seq, pid_t pid,
-				u_int8_t mode, u_int32_t reqid,
-				u_int8_t reserved1, u_int32_t reserved2));
+static int key_setsadbmsg_m __P((struct mbuf *, u_int8_t, int,
+				u_int8_t, u_int32_t, pid_t,
+				u_int8_t, u_int32_t,
+				u_int8_t, u_int32_t));
 #endif
-static caddr_t key_setsadbmsg __P((caddr_t buf, u_int8_t type, int tlen,
-				u_int8_t satype, u_int32_t seq, pid_t pid,
-				u_int8_t mode, u_int32_t reqid,
-				u_int8_t reserved1, u_int32_t reserved2));
-static caddr_t key_setsadbsa __P((caddr_t buf, struct secasvar *sav));
+static caddr_t key_setsadbmsg __P((caddr_t, u_int8_t, int,
+				u_int8_t, u_int32_t, pid_t,
+				u_int8_t, u_int32_t,
+				u_int8_t, u_int32_t));
+static caddr_t key_setsadbsa __P((caddr_t, struct secasvar *));
 #if 1
-static int key_setsadbaddr_m __P((struct mbuf *m, u_int16_t exttype,
-	struct sockaddr *saddr, u_int8_t prefixlen, u_int16_t ul_proto));
+static int key_setsadbaddr_m __P((struct mbuf *, u_int16_t,
+	struct sockaddr *, u_int8_t, u_int16_t));
 #endif
-static caddr_t key_setsadbaddr __P((caddr_t buf, u_int16_t exttype,
-	struct sockaddr *saddr, u_int8_t prefixlen, u_int16_t ul_proto));
+static caddr_t key_setsadbaddr __P((caddr_t, u_int16_t,
+	struct sockaddr *, u_int8_t, u_int16_t));
 static caddr_t key_setsadbident
-	__P((caddr_t buf, u_int16_t exttype, u_int16_t idtype,
-		caddr_t string, int stringlen, u_int64_t id));
+	__P((caddr_t, u_int16_t, u_int16_t,
+		caddr_t, int, u_int64_t));
 static caddr_t key_setsadbxpolicy
-	__P((caddr_t buf, u_int16_t type, u_int8_t dir, u_int32_t id));
-static caddr_t key_setsadbext __P((caddr_t p, caddr_t ext));
-static void *key_newbuf __P((void *src, u_int len));
+	__P((caddr_t, u_int16_t, u_int8_t, u_int32_t));
+static caddr_t key_setsadbext __P((caddr_t, caddr_t));
+static void *key_newbuf __P((void *, u_int));
 #ifdef INET6
-static int key_ismyaddr6 __P((caddr_t addr));
+static int key_ismyaddr6 __P((caddr_t));
 #endif
 #if 0
-static int key_isloopback __P((u_int family, caddr_t addr));
+static int key_isloopback __P((u_int, caddr_t));
 #endif
 static int key_cmpsaidx_exactly
-	__P((struct secasindex *saidx0, struct secasindex *saidx1));
+	__P((struct secasindex *, struct secasindex *));
 static int key_cmpsaidx_withmode
-	__P((struct secasindex *saidx0, struct secasindex *saidx1));
+	__P((struct secasindex *, struct secasindex *));
 static int key_cmpspidx_exactly
-	__P((struct secpolicyindex *spidx0, struct secpolicyindex *spidx1));
+	__P((struct secpolicyindex *, struct secpolicyindex *));
 static int key_cmpspidx_withmask
-	__P((struct secpolicyindex *spidx0, struct secpolicyindex *spidx1));
-static int key_bbcmp __P((caddr_t p1, caddr_t p2, u_int bits));
-static u_int16_t key_satype2proto __P((u_int8_t satype));
-static u_int8_t key_proto2satype __P((u_int16_t proto));
+	__P((struct secpolicyindex *, struct secpolicyindex *));
+static int key_bbcmp __P((caddr_t, caddr_t, u_int));
+static u_int16_t key_satype2proto __P((u_int8_t));
+static u_int8_t key_proto2satype __P((u_int16_t));
 
-static struct sadb_msg *key_getspi __P((caddr_t *mhp));
-static u_int32_t key_do_getnewspi __P((struct sadb_spirange *spirange,
-					struct secasindex *saidx));
-static struct sadb_msg *key_update __P((caddr_t *mhp));
+static struct sadb_msg *key_getspi __P((caddr_t *));
+static u_int32_t key_do_getnewspi __P((struct sadb_spirange *,
+					struct secasindex *));
+static struct sadb_msg *key_update __P((caddr_t *));
 #ifdef IPSEC_DOSEQCHECK
-static struct secasvar *key_getsavbyseq __P((struct secashead *sah,
-						u_int32_t seq));
+static struct secasvar *key_getsavbyseq __P((struct secashead *, u_int32_t));
 #endif
-static struct sadb_msg *key_add __P((caddr_t *mhp));
-static int key_setident __P((struct secashead *sah, caddr_t *mhp));
-static struct sadb_msg *key_getmsgbuf_x1 __P((caddr_t *mhp));
-static struct sadb_msg *key_delete __P((caddr_t *mhp));
-static struct sadb_msg *key_get __P((caddr_t *mhp));
+static struct sadb_msg *key_add __P((caddr_t *));
+static int key_setident __P((struct secashead *, caddr_t *));
+static struct sadb_msg *key_getmsgbuf_x1 __P((caddr_t *));
+static struct sadb_msg *key_delete __P((caddr_t *));
+static struct sadb_msg *key_get __P((caddr_t *));
 static int key_acquire __P((struct secasindex *, struct secpolicy *));
-static struct secacq *key_newacq __P((struct secasindex *saidx));
-static struct secacq *key_getacq __P((struct secasindex *saidx));
-static struct secacq *key_getacqbyseq __P((u_int32_t seq));
-static struct secspacq *key_newspacq __P((struct secpolicyindex *spidx));
-static struct secspacq *key_getspacq __P((struct secpolicyindex *spidx));
-static struct sadb_msg *key_acquire2 __P((caddr_t *mhp));
-static struct sadb_msg *key_register __P((caddr_t *mhp, struct socket *so));
-static int key_expire __P((struct secasvar *sav));
-static struct sadb_msg *key_flush __P((caddr_t *mhp));
-static int key_dump __P((caddr_t *mhp, struct socket *so, int target));
-static void key_promisc __P((caddr_t *mhp, struct socket *so));
-static int key_sendall __P((struct sadb_msg *msg, u_int len));
-static int key_align __P((struct sadb_msg *msg, caddr_t *mhp));
+static struct secacq *key_newacq __P((struct secasindex *));
+static struct secacq *key_getacq __P((struct secasindex *));
+static struct secacq *key_getacqbyseq __P((u_int32_t));
+static struct secspacq *key_newspacq __P((struct secpolicyindex *));
+static struct secspacq *key_getspacq __P((struct secpolicyindex *));
+static struct sadb_msg *key_acquire2 __P((caddr_t *));
+static struct sadb_msg *key_register __P((caddr_t *, struct socket *));
+static int key_expire __P((struct secasvar *));
+static struct sadb_msg *key_flush __P((caddr_t *));
+static int key_dump __P((caddr_t *, struct socket *, int));
+static void key_promisc __P((caddr_t *, struct socket *));
+static int key_sendall __P((struct sadb_msg *, u_int));
+static int key_align __P((struct sadb_msg *, caddr_t *));
 #if 0
 static const char *key_getfqdn __P((void));
 static const char *key_getuserfqdn __P((void));
 #endif
-static void key_sa_chgstate __P((struct secasvar *sav, u_int8_t state));
+static void key_sa_chgstate __P((struct secasvar *, u_int8_t));
 static caddr_t key_appendmbuf __P((struct mbuf *, int));
 
 /* %%% IPsec policy management */
