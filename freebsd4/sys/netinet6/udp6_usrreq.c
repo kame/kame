@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.2 2000/07/15 07:14:38 kris Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.18 2000/11/01 08:13:54 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.19 2000/11/05 18:25:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -407,13 +407,16 @@ udp6_ctlinput(cmd, sa, d)
 	struct sockaddr *sa;
 	void *d;
 {
-	register struct udphdr *uhp;
 	struct udphdr uh;
 	struct sockaddr_in6 sa6;
 	struct ip6_hdr *ip6;
 	struct mbuf *m;
 	int off = 0;
 	void (*notify) __P((struct inpcb *, int)) = udp_notify;
+	struct udp_portonly {
+		u_int16_t uh_sport;
+		u_int16_t uh_dport;
+	} *uhp;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
@@ -457,21 +460,15 @@ udp6_ctlinput(cmd, sa, d)
 			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 
 		/* check if we can safely examine src and dst ports */
-		if (m->m_pkthdr.len < off + sizeof(uh))
+		if (m->m_pkthdr.len < off + sizeof(*uhp))
 			return;
 
-		if (m->m_len < off + sizeof(uh)) {
-			/*
-			 * this should be rare case,
-			 * so we compromise on this copy...
-			 */
-			m_copydata(m, off, sizeof(uh), (caddr_t)&uh);
-			uhp = &uh;
-		} else
-			uhp = (struct udphdr *)(mtod(m, caddr_t) + off);
+		bzero(&uh, sizeof(uh));
+		m_copydata(m, off, sizeof(*uhp), (caddr_t)&uh);
+
 		(void) in6_pcbnotify(&udb, (struct sockaddr *)&sa6,
-				     uhp->uh_dport, &s,
-				     uhp->uh_sport, cmd, notify);
+				     uh.uh_dport, &s,
+				     uh.uh_sport, cmd, notify);
 	} else
 		(void) in6_pcbnotify(&udb, (struct sockaddr *)&sa6, 0,
 				     &zeroin6_addr, 0, cmd, notify);

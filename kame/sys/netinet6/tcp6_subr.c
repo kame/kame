@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.26 2000/11/05 02:39:00 itojun Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.27 2000/11/05 18:30:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -555,7 +555,6 @@ tcp6_ctlinput(cmd, sa, d)
 	struct sockaddr *sa;
 	void *d;
 {
-	register struct tcp6hdr *thp;
 	struct tcp6hdr th;
 	void (*notify) __P((struct in6pcb *, int)) = tcp6_notify;
 	int nmatch;
@@ -563,6 +562,10 @@ tcp6_ctlinput(cmd, sa, d)
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
 	int off;
+	struct tcp_portonly {
+		u_int16_t th_sport;
+		u_int16_t th_dport;
+	} *thp;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
@@ -607,21 +610,15 @@ tcp6_ctlinput(cmd, sa, d)
 				htons(m->m_pkthdr.rcvif->if_index);
 
 		/* check if we can safely examine src and dst ports */
-		if (m->m_pkthdr.len < off + sizeof(th))
+		if (m->m_pkthdr.len < off + sizeof(*thp))
 			return;
 
-		if (m->m_len < off + sizeof(th)) {
-			/*
-			 * this should be rare case,
-			 * so we compromise on this copy...
-			 */
-			m_copydata(m, off, sizeof(th), (caddr_t)&th);
-			thp = &th;
-		} else
-			thp = (struct tcp6hdr *)(mtod(m, caddr_t) + off);
+		bzero(&th, sizeof(th));
+		m_copydata(m, off, sizeof(*thp), (caddr_t)&th);
+
 		nmatch = in6_pcbnotify(&tcb6, (struct sockaddr *)&sa6,
-				       thp->th_dport, &ip6_tmp.ip6_src,
-				       thp->th_sport, cmd, notify);
+				       th.th_dport, &ip6_tmp.ip6_src,
+				       th.th_sport, cmd, notify);
 		if (nmatch == 0 && syn_cache_count6 &&
 		    (inet6ctlerrmap[cmd] == EHOSTUNREACH ||
 		     inet6ctlerrmap[cmd] == ENETUNREACH ||

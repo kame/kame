@@ -976,13 +976,16 @@ tcp6_ctlinput(cmd, sa, d)
 	struct sockaddr *sa;
 	void *d;
 {
-	register struct tcphdr *thp;
 	struct tcphdr th;
 	void (*notify) __P((struct inpcb *, int)) = tcp_notify;
 	struct sockaddr_in6 sa6;
 	struct ip6_hdr *ip6;
 	struct mbuf *m;
 	int off;
+	struct tcp_portonly {
+		u_int16_t th_sport;
+		u_int16_t th_dport;
+	} *thp;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
@@ -1030,21 +1033,14 @@ tcp6_ctlinput(cmd, sa, d)
 			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 
 		/* check if we can safely examine src and dst ports */
-		if (m->m_pkthdr.len < off + sizeof(th))
+		if (m->m_pkthdr.len < off + sizeof(*thp))
 			return;
 
-		if (m->m_len < off + sizeof(th)) {
-			/*
-			 * this should be rare case
-			 * because now MINCLSIZE is "(MHLEN + 1)",
-			 * so we compromise on this copy...
-			 */
-			m_copydata(m, off, sizeof(th), (caddr_t)&th);
-			thp = &th;
-		} else
-			thp = (struct tcphdr *)(mtod(m, caddr_t) + off);
-		in6_pcbnotify(&tcb, (struct sockaddr *)&sa6, thp->th_dport,
-			      &s, thp->th_sport, cmd, notify);
+		bzero(&th, sizeof(th));
+		m_copydata(m, off, sizeof(*thp), (caddr_t)&th);
+
+		in6_pcbnotify(&tcb, (struct sockaddr *)&sa6, th.th_dport,
+			      &s, th.th_sport, cmd, notify);
 	} else
 		in6_pcbnotify(&tcb, (struct sockaddr *)&sa6, 0, &zeroin6_addr,
 			      0, cmd, notify);

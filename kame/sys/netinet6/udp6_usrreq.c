@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.63 2000/11/01 08:13:53 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.64 2000/11/05 18:30:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -498,7 +498,6 @@ udp6_ctlinput(cmd, sa, d)
 	struct sockaddr *sa;
 	void *d;
 {
-	register struct udphdr *uhp;
 	struct udphdr uh;
 	struct sockaddr_in6 sa6;
 	register struct ip6_hdr *ip6;
@@ -507,6 +506,10 @@ udp6_ctlinput(cmd, sa, d)
 	struct in6_addr s;
 	struct in6_addr finaldst;
 	void (*notify) __P((struct in6pcb *, int)) = udp6_notify;
+	struct udp_portonly {
+		u_int16_t uh_sport;
+		u_int16_t uh_dport;
+	} *uhp;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
@@ -558,18 +561,11 @@ udp6_ctlinput(cmd, sa, d)
 		 */
 
 		/* check if we can safely examine src and dst ports */
-		if (m->m_pkthdr.len < off + sizeof(uh))
+		if (m->m_pkthdr.len < off + sizeof(*uhp))
 			return;
 
-		if (m->m_len < off + sizeof(uh)) {
-			/*
-			 * this should be rare case,
-			 * so we compromise on this copy...
-			 */
-			m_copydata(m, off, sizeof(uh), (caddr_t)&uh);
-			uhp = &uh;
-		} else
-			uhp = (struct udphdr *)(mtod(m, caddr_t) + off);
+		bzero(&uh, sizeof(uh));
+		m_copydata(m, off, sizeof(*uhp), (caddr_t)&uh);
 
 #ifdef __NetBSD__
 		if (cmd == PRC_MSGSIZE) {
@@ -579,7 +575,7 @@ udp6_ctlinput(cmd, sa, d)
 			 * payload.
 			 */
 			if (in6_pcblookup_connect(&udb6, &finaldst,
-			    uhp->uh_dport, &s, uhp->uh_sport, 0))
+			    uh.uh_dport, &s, uh.uh_sport, 0))
 				;
 #if 0
 			/*
@@ -590,7 +586,7 @@ udp6_ctlinput(cmd, sa, d)
 			 * is really ours.
 			 */
 			else if (in6_pcblookup_bind(&udb6, &finaldst,
-			    uhp->uh_dport, 0))
+			    uh.uh_dport, 0))
 				;
 #endif
 			else
@@ -609,8 +605,8 @@ udp6_ctlinput(cmd, sa, d)
 #endif
 
 		(void) in6_pcbnotify(&udb6, (struct sockaddr *)&sa6,
-					uhp->uh_dport, &s,
-					uhp->uh_sport, cmd, notify);
+					uh.uh_dport, &s,
+					uh.uh_sport, cmd, notify);
 	} else {
 		(void) in6_pcbnotify(&udb6, (struct sockaddr *)&sa6, 0,
 					&zeroin6_addr, 0, cmd, notify);
