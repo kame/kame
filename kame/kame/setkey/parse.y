@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.54 2001/08/16 21:08:28 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.55 2001/08/17 05:29:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -539,7 +539,11 @@ portstr
 		}
 	|	PORT
 		{
-			$$ = $1;
+			if (strcmp($$.buf, "any") == 0) {
+				$$.buf = strdup("0");
+				$$.len = strlen($$.buf);
+			} else
+				$$ = $1;
 		}
 	;
 
@@ -680,7 +684,7 @@ setkeymsg_spdaddr(type, upper, policy, srcs, splen, dsts, dplen)
 			    sizeof(m_addr), (caddr_t)sa, salen);
 
 			/* set dst */
-			sa = s->ai_addr;
+			sa = d->ai_addr;
 			salen = d->ai_addr->sa_len;
 			m_addr.sadb_address_len = PFKEY_UNIT64(sizeof(m_addr) +
 			    PFKEY_ALIGN8(salen));
@@ -799,7 +803,7 @@ setkeymsg_addr(type, satype, srcs, dsts, no_spi)
 			    sizeof(m_addr), (caddr_t)sa, salen);
 
 			/* set dst */
-			sa = s->ai_addr;
+			sa = d->ai_addr;
 			salen = d->ai_addr->sa_len;
 			m_addr.sadb_address_len = PFKEY_UNIT64(sizeof(m_addr) +
 			    PFKEY_ALIGN8(salen));
