@@ -1,4 +1,4 @@
-/*	$KAME: libpfkey.h,v 1.3 2000/08/31 07:48:10 sakane Exp $	*/
+/*	$KAME: libpfkey.h,v 1.4 2000/12/27 11:38:10 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -60,8 +60,14 @@ int pfkey_send_dump __P((int, u_int));
 int pfkey_send_promisc_toggle __P((int, int));
 int pfkey_send_spdadd __P((int, struct sockaddr *, u_int,
 	struct sockaddr *, u_int, u_int, caddr_t, int, u_int32_t));
+int pfkey_send_spdadd2 __P((int, struct sockaddr *, u_int,
+	struct sockaddr *, u_int, u_int, u_int64_t, u_int64_t,
+	caddr_t, int, u_int32_t));
 int pfkey_send_spdupdate __P((int, struct sockaddr *, u_int,
 	struct sockaddr *, u_int, u_int, caddr_t, int, u_int32_t));
+int pfkey_send_spdupdate2 __P((int, struct sockaddr *, u_int,
+	struct sockaddr *, u_int, u_int, u_int64_t, u_int64_t,
+	caddr_t, int, u_int32_t));
 int pfkey_send_spddelete __P((int, struct sockaddr *, u_int,
 	struct sockaddr *, u_int, u_int, caddr_t, int, u_int32_t));
 int pfkey_send_spddelete2 __P((int, u_int32_t));

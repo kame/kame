@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.37 2000/12/05 09:05:08 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.38 2000/12/27 11:38:10 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -59,7 +59,8 @@ static int pfkey_send_x2 __P((int, u_int, u_int, u_int,
 	struct sockaddr *, struct sockaddr *, u_int32_t));
 static int pfkey_send_x3 __P((int, u_int, u_int));
 static int pfkey_send_x4 __P((int, u_int, struct sockaddr *, u_int,
-	struct sockaddr *, u_int, u_int, char *, int, u_int32_t));
+	struct sockaddr *, u_int, u_int, u_int64_t, u_int64_t,
+	char *, int, u_int32_t));
 static int pfkey_send_x5 __P((int, u_int, u_int32_t));
 
 static caddr_t pfkey_setsadbmsg __P((caddr_t, caddr_t, u_int, u_int,
@@ -785,6 +786,35 @@ pfkey_send_spdadd(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
 
 	if ((len = pfkey_send_x4(so, SADB_X_SPDADD,
 				src, prefs, dst, prefd, proto,
+				0, 0,
+				policy, policylen, seq)) < 0)
+		return -1;
+
+	return len;
+}
+
+/*
+ * sending SADB_X_SPDADD message to the kernel.
+ * OUT:
+ *	positive: success and return length sent.
+ *	-1	: error occured, and set errno.
+ */
+int
+pfkey_send_spdadd2(so, src, prefs, dst, prefd, proto, ltime, vtime,
+		policy, policylen, seq)
+	int so;
+	struct sockaddr *src, *dst;
+	u_int prefs, prefd, proto;
+	u_int64_t ltime, vtime;
+	caddr_t policy;
+	int policylen;
+	u_int32_t seq;
+{
+	int len;
+
+	if ((len = pfkey_send_x4(so, SADB_X_SPDADD,
+				src, prefs, dst, prefd, proto,
+				ltime, vtime,
 				policy, policylen, seq)) < 0)
 		return -1;
 
@@ -810,6 +840,35 @@ pfkey_send_spdupdate(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
 
 	if ((len = pfkey_send_x4(so, SADB_X_SPDUPDATE,
 				src, prefs, dst, prefd, proto,
+				0, 0,
+				policy, policylen, seq)) < 0)
+		return -1;
+
+	return len;
+}
+
+/*
+ * sending SADB_X_SPDUPDATE message to the kernel.
+ * OUT:
+ *	positive: success and return length sent.
+ *	-1	: error occured, and set errno.
+ */
+int
+pfkey_send_spdupdate2(so, src, prefs, dst, prefd, proto, ltime, vtime,
+		policy, policylen, seq)
+	int so;
+	struct sockaddr *src, *dst;
+	u_int prefs, prefd, proto;
+	u_int64_t ltime, vtime;
+	caddr_t policy;
+	int policylen;
+	u_int32_t seq;
+{
+	int len;
+
+	if ((len = pfkey_send_x4(so, SADB_X_SPDUPDATE,
+				src, prefs, dst, prefd, proto,
+				ltime, vtime,
 				policy, policylen, seq)) < 0)
 		return -1;
 
@@ -840,6 +899,7 @@ pfkey_send_spddelete(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
 
 	if ((len = pfkey_send_x4(so, SADB_X_SPDDELETE,
 				src, prefs, dst, prefd, proto,
+				0, 0,
 				policy, policylen, seq)) < 0)
 		return -1;
 
@@ -908,6 +968,7 @@ pfkey_send_spdsetidx(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
 
 	if ((len = pfkey_send_x4(so, SADB_X_SPDSETIDX,
 				src, prefs, dst, prefd, proto,
+				0, 0,
 				policy, policylen, seq)) < 0)
 		return -1;
 
@@ -1264,10 +1325,12 @@ pfkey_send_x3(so, type, satype)
 
 /* sending SADB_X_SPDADD message to the kernel */
 static int
-pfkey_send_x4(so, type, src, prefs, dst, prefd, proto, policy, policylen, seq)
+pfkey_send_x4(so, type, src, prefs, dst, prefd, proto,
+		ltime, vtime, policy, policylen, seq)
 	int so;
 	struct sockaddr *src, *dst;
 	u_int type, prefs, prefd, proto;
+	u_int64_t ltime, vtime;
 	char *policy;
 	int policylen;
 	u_int32_t seq;
@@ -1310,6 +1373,7 @@ pfkey_send_x4(so, type, src, prefs, dst, prefd, proto, policy, policylen, seq)
 		+ PFKEY_ALIGN8(src->sa_len)
 		+ sizeof(struct sadb_address)
 		+ PFKEY_ALIGN8(src->sa_len)
+		+ sizeof(struct sadb_lifetime)
 		+ policylen;
 
 	if ((newmsg = CALLOC(len, struct sadb_msg *)) == NULL) {
@@ -1330,6 +1394,12 @@ pfkey_send_x4(so, type, src, prefs, dst, prefd, proto, policy, policylen, seq)
 		return -1;
 	}
 	p = pfkey_setsadbaddr(p, ep, SADB_EXT_ADDRESS_DST, dst, prefd, proto);
+	if (!p) {
+		free(newmsg);
+		return -1;
+	}
+	p = pfkey_setsadblifetime(p, ep, SADB_EXT_LIFETIME_HARD,
+			0, 0, ltime, vtime);
 	if (!p || p + policylen != ep) {
 		free(newmsg);
 		return -1;

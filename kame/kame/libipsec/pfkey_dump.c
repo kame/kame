@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.24 2000/10/16 08:05:44 itojun Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.25 2000/12/27 11:38:10 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -358,6 +358,7 @@ pfkey_spdump(m)
 	caddr_t mhp[SADB_EXT_MAX + 1];
 	struct sadb_address *m_saddr, *m_daddr;
 	struct sadb_x_policy *m_xpl;
+	struct sadb_lifetime *m_lft = NULL;
 	struct sockaddr *sa;
 	u_int16_t port;
 
@@ -374,6 +375,7 @@ pfkey_spdump(m)
 	m_saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
 	m_daddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
 	m_xpl = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
+	m_lft = (struct sadb_lifetime *)mhp[SADB_EXT_LIFETIME_HARD];
 
 	/* source address */
 	if (m_saddr == NULL) {
@@ -445,6 +447,13 @@ pfkey_spdump(m)
 	printf("\n\t%s\n", d_xpl);
 	free(d_xpl);
     }
+
+	/* lifetime */
+	if (m_lft) {
+		printf("\tlifetime:%lu validtime:%lu\n",
+			(u_long)m_lft->sadb_lifetime_addtime,
+			(u_long)m_lft->sadb_lifetime_usetime);
+	}
 
 	printf("\tspid=%ld seq=%ld pid=%ld\n",
 		(u_long)m_xpl->sadb_x_policy_id,
