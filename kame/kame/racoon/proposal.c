@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.43 2001/10/26 01:06:22 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.44 2001/11/07 01:48:51 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1028,9 +1028,9 @@ int
 set_proposal_from_proposal(iph2)
 	struct ph2handle *iph2;
 {
+        struct saprop *newpp = NULL, *pp0, *pp_peer;
+	struct saproto *newpr = NULL, *pr;
 	struct prop_pair **pair;
-	struct saprop *pp;
-	struct saproto *pr;
 	int error = -1;
 	int i;
 
@@ -1039,39 +1039,72 @@ set_proposal_from_proposal(iph2)
 	if (pair == NULL)
 		goto end;
 
-	/* choice the first proposal */
-	for (i = 0; i < MAXPROPPAIRLEN; i++) {
-		if (pair[i] != NULL)
-			break;
+	/*
+	 * make my proposal according as the client proposal.
+	 * XXX assumed there is only one proposal even if it's the SA bundle.
+	 */
+        for (i = 0; i < MAXPROPPAIRLEN; i++) {
+                if (pair[i] == NULL)
+                        continue;
+		pp_peer = aproppair2saprop(pair[i]);
+		if (pp_peer == NULL)
+			goto end;
+
+		pp0 = newsaprop();
+		if (pp0 == NULL) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"failed to allocate saprop.\n");
+			goto end;
+		}
+		pp0->prop_no = 1;
+		pp0->lifetime = iph2->sainfo->lifetime;
+		pp0->lifebyte = iph2->sainfo->lifebyte;
+		pp0->pfs_group = iph2->sainfo->pfs_group;
+
+		if (pp_peer->next != NULL) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"pp_peer is inconsistency, ignore it.\n");
+			/*FALLTHROUGH*/
+		}
+
+		for (pr = pp_peer->head; pr; pr = pr->next) { 
+
+			newpr = newsaproto();
+			if (newpr == NULL) {
+				plog(LLV_ERROR, LOCATION, NULL,
+				    "failed to allocate saproto.\n");
+				goto end;
+			}
+			newpr->proto_id = pr->proto_id;
+			newpr->spisize = pr->spisize;
+			newpr->encmode = pr->encmode;
+			newpr->spi = 0;
+			newpr->spi_p = pr->spi;	/* copy peer's SPI */
+			newpr->reqid_in = 0;
+			newpr->reqid_out = 0;
+		}
+
+		if (set_satrnsbysainfo(newpr, iph2->sainfo) < 0) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"failed to get algorithms.\n");
+			goto end;
+		}
+
+		inssaproto(pp0, newpr);
+		inssaprop(&newpp, pp0);
 	}
 
-	if (i == MAXPROPPAIRLEN)
-		goto end;
+	plog(LLV_DEBUG, LOCATION, NULL, "make a proposal from peer's:\n");
+	printsaprop0(LLV_DEBUG, newpp);  
 
-	pp = aproppair2saprop(pair[i]);
-	if (!pp)
-		goto end;
-
-	/* reverse SPI */
-	for (pr = pp->head; pr; pr = pr->next) {
-		pr->spi_p = pr->spi;	/* copy peer's SPI */
-		pr->spi = 0;		/* initialize */
-	}
-
-	plog(LLV_DEBUG, LOCATION, NULL, "choice a proposal from peer's:\n");
-	printsaprop0(LLV_DEBUG, pp);  
-
-	iph2->approval = pp;
-
-	/* make a SA to be replayed. */ 
-	/* SPI must be updated later. */
-	iph2->sa_ret = get_sabyproppair(pair[i], iph2->ph1);
-	if (iph2->sa_ret == NULL)
-		goto end;
+	iph2->proposal = newpp;
 
 	error = 0;
 
 end:
+	if (error && newpp)
+		flushsaprop(newpp);
+
 	free_proppair(pair);
 	return error;
 }

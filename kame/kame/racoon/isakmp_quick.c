@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.84 2001/10/16 14:55:56 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.85 2001/11/07 01:48:50 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1024,25 +1024,20 @@ quick_r1recv(iph2, msg0)
 	/* check the existence of ID payload and create responder's proposal */
 	error = get_proposal_r(iph2);
 	switch (error) {
+	case -2:
+		/* generate a policy template from peer's proposal */
+		if (set_proposal_from_proposal(iph2)) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"failed to generate a proposal template "
+				"from client's proposal.\n");
+			return ISAKMP_INTERNAL_ERROR;
+		}
+		/*FALLTHROUGH*/
 	case 0:
 		/* select single proposal or reject it. */
 		if (ipsecdoi_selectph2proposal(iph2) < 0) {
 			error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
 			goto end;
-		}
-		break;
-	case -2:
-		/*
-		 * generate a policy from peer's proposal.
-		 * if there is no suitable policy in SPD and 
-		 */
-		error = set_proposal_from_proposal(iph2);
-		if (error) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"failed to generate saprop "
-				"from client's proposal.\n");
-
-			return ISAKMP_INTERNAL_ERROR;
 		}
 		break;
 	default:
