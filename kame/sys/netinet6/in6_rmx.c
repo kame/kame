@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.15 2002/04/22 12:03:02 jinmei Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.16 2002/05/10 15:22:39 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -416,7 +416,11 @@ in6_rtqtimo(void *rock)
 	}
 
 	atv.tv_usec = 0;
-	atv.tv_sec = arg.nextstop;
+	atv.tv_sec = arg.nextstop - time_second;
+	if (atv.tv_sec < 0) {
+		printf("invalid rtq expiration time on routing table\n");
+		atv.tv_sec = 30;		/*last resort*/
+	}
 	timeout(in6_rtqtimo, rock, tvtohz(&atv));
 }
 
@@ -467,10 +471,10 @@ in6_mtutimo(void *rock)
 	splx(s);
 
 	atv.tv_usec = 0;
-	atv.tv_sec = arg.nextstop;
-	if (atv.tv_sec < time_second) {
+ 	atv.tv_sec = arg.nextstop - time_second;
+ 	if (atv.tv_sec < 0) {
 		printf("invalid mtu expiration time on routing table\n");
-		arg.nextstop = time_second + 30;	/* last resort */
+ 		atv.tv_sec = 30;		/*last resort*/
 	}
 	timeout(in6_mtutimo, rock, tvtohz(&atv));
 }
