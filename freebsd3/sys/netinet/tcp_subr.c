@@ -983,10 +983,10 @@ tcp6_ctlinput(cmd, sa, d)
 		m_copydata(m, off, sizeof(*thp), (caddr_t)&th);
 		
 		in6_pcbnotify(&tcb, (struct sockaddr *)&sa6, th.th_dport,
-			      &s, th.th_sport, cmd, notify);
+			      &s, th.th_sport, cmd, NULL, notify);
 	} else
 		in6_pcbnotify(&tcb, (struct sockaddr *)&sa6, 0, &zeroin6_addr,
-			      0, cmd, notify);
+			      0, cmd, NULL, notify);
 }
 #endif /* INET6 */
 
