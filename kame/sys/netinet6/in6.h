@@ -416,7 +416,7 @@ struct route_in6 {
 
 #define IPV6_RECVPKTINFO	36 /* bool; recv if, dst addr */
 #define IPV6_RECVHOPLIMIT	37 /* bool; recv hop limit */
-#define IPV6_RECVRTHDR		38 /* bool; send routing header */
+#define IPV6_RECVRTHDR		38 /* bool; recv routing header */
 #define IPV6_RECVHOPOPTS	39 /* bool; recv hop-by-hop option */
 #define IPV6_RECVDSTOPTS	40 /* bool; recv dst option befor rthdr */
 #define IPV6_RECVRTHDRDSTOPTS	41 /* bool; recv dst option after rthdr */
