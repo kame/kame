@@ -1,4 +1,4 @@
-/*	$KAME: esp.h,v 1.7 2000/06/14 10:41:17 itojun Exp $	*/
+/*	$KAME: esp.h,v 1.8 2000/07/02 13:23:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -42,7 +42,7 @@
 #endif
 #endif
 
-#include <netkey/keydb.h>		/* for struct secas */
+struct secasvar;
 
 struct esp {
 	u_int32_t	esp_spi;	/* ESP */
@@ -106,7 +106,6 @@ extern int esp6_input __P((struct mbuf **, int *, int));
 #endif /* INET6 */
 #endif /*_KERNEL*/
 
-struct secasvar;
 extern int esp_auth __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, u_char *));
 

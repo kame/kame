@@ -1,4 +1,4 @@
-/*	$KAME: ah.h,v 1.9 2000/06/14 11:14:03 itojun Exp $	*/
+/*	$KAME: ah.h,v 1.10 2000/07/02 13:23:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -42,7 +42,7 @@
 #endif
 #endif
 
-#include <netkey/keydb.h>		/* for struct secasvar */
+struct secasvar;
 
 struct ah {
 	u_int8_t	ah_nxt;		/* Next Header */
@@ -81,11 +81,6 @@ struct ah_algorithm {
 
 #ifdef _KERNEL
 extern struct ah_algorithm ah_algorithms[];
-
-struct inpcb;
-#ifdef INET6
-struct in6pcb;
-#endif
 
 /* cksum routines */
 extern int ah_hdrlen __P((struct secasvar *));
