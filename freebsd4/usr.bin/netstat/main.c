@@ -42,7 +42,7 @@ char const copyright[] =
 static char sccsid[] = "@(#)main.c	8.4 (Berkeley) 3/1/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/main.c,v 1.34 2000/03/11 20:14:08 shin Exp $";
+  "$FreeBSD: src/usr.bin/netstat/main.c,v 1.34.2.2 2000/07/15 07:29:30 kris Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -143,6 +143,8 @@ static struct nlist nl[] = {
 	{ "_mf6ctable" },
 #define N_MIF6TABLE	36
 	{ "_mif6table" },
+#define N_PFKEYSTAT	37
+	{ "_pfkeystat" },
 	{ "" },
 };
 
@@ -203,6 +205,15 @@ struct protox ip6protox[] = {
 };
 #endif /*INET6*/
 
+#ifdef IPSEC
+struct protox pfkeyprotox[] = {
+	{ -1,		N_PFKEYSTAT,	1,	0,
+	  pfkey_stats,	NULL,		"pfkey", 0 },
+	{ -1,		-1,		0,	0,
+	  0,		NULL,		0,	0 }
+};
+#endif
+
 struct protox atalkprotox[] = {
 	{ N_DDPCB,	N_DDPSTAT,	1,	atalkprotopr,
 	  ddp_stats,	NULL,		"ddp" },
@@ -261,6 +272,9 @@ struct protox *protoprotox[] = {
 #ifdef INET6
 					 ip6protox,
 #endif
+#ifdef IPSEC
+					 pfkeyprotox,
+#endif
 					 ipxprotox, atalkprotox,
 #ifdef NS
 					 nsprotox, 
@@ -315,6 +329,10 @@ main(argc, argv)
 #ifdef INET6
 			else if (strcmp(optarg, "inet6") == 0)
 				af = AF_INET6;
+#endif /*INET6*/
+#ifdef INET6
+			else if (strcmp(optarg, "pfkey") == 0)
+				af = PF_KEY;
 #endif /*INET6*/
 			else if (strcmp(optarg, "unix") == 0)
 				af = AF_UNIX;
@@ -505,6 +523,11 @@ main(argc, argv)
 		for (tp = ip6protox; tp->pr_name; tp++)
 			printproto(tp, tp->pr_name);
 #endif /*INET6*/
+#ifdef IPSEC
+	if (af == PF_KEY || af == AF_UNSPEC)
+		for (tp = pfkeyprotox; tp->pr_name; tp++)
+			printproto(tp, tp->pr_name);
+#endif /*IPSEC*/
 	if (af == AF_IPX || af == AF_UNSPEC) {
 		kread(0, 0, 0);
 		for (tp = ipxprotox; tp->pr_name; tp++)
@@ -673,7 +696,7 @@ static void
 usage()
 {
 	(void)fprintf(stderr, "%s\n%s\n%s\n%s\n",
-"usage: netstat [-Aaln] [-f address_family] [-M core] [-N system]",
+"usage: netstat [-AaLln] [-f address_family] [-M core] [-N system]",
 "       netstat [-abdghilmnrs] [-f address_family] [-M core] [-N system]",
 "       netstat [-bdn] [-I interface] [-M core] [-N system] [-w wait]",
 "       netstat [-M core] [-N system] [-p protocol]");

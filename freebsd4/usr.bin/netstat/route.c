@@ -36,7 +36,7 @@
 static char sccsid[] = "From: @(#)route.c	8.6 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.41 2000/01/07 19:56:57 rgrimes Exp $";
+  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.41.2.3 2000/07/15 07:29:30 kris Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -72,6 +72,12 @@ static const char rcsid[] =
 #include "netstat.h"
 
 #define kget(p, d) (kread((u_long)(p), (char *)&(d), sizeof (d)))
+
+
+/* alignment constraint for routing socket */
+#define ROUNDUP(a) \
+       ((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+#define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 
 /*
  * Definitions for showing gateway flags.
@@ -222,44 +228,35 @@ pr_family(af)
 }
 
 /* column widths; each followed by one space */
-#define	WID_DST 	18	/* width of destination column */
-#define	WID_GW		18	/* width of gateway column */
-#ifdef INET6
-#define	WID_DST6 (lflag ? 39 : (nflag ? 33: 18)) /* width of dest column */
-#define	WID_GW6	(lflag ? 31 : (nflag ? 29 : 18)) /* width of gateway column */
+#ifndef INET6
+#define	WID_DST(af) 	18	/* width of destination column */
+#define	WID_GW(af)	18	/* width of gateway column */
+#else
+#define	WID_DST(af) \
+	((af) == AF_INET6 ? (lflag ? 39 : (nflag ? 33: 18)) : 18)
+#define	WID_GW(af) \
+	((af) == AF_INET6 ? (lflag ? 31 : (nflag ? 29 : 18)) : 18)
 #endif /*INET6*/
 
 /*
  * Print header for routing table columns.
  */
 void
-pr_rthdr(wid_af)
-	int wid_af;
+pr_rthdr(af)
+	int af;
 {
-	int wid_dst, wid_gw;
-
-	wid_dst =
-#ifdef INET6
-		wid_af == AF_INET6 ? WID_DST6 :
-#endif
-		WID_DST;
-	wid_gw =
-#ifdef INET6
-		wid_af == AF_INET6 ? WID_GW6 :
-#endif
-		WID_GW;
 
 	if (Aflag)
 		printf("%-8.8s ","Address");
 	if (lflag)
 		printf("%-*.*s %-*.*s %-6.6s  %6.6s%8.8s  %8.8s %6s\n",
-			wid_dst, wid_dst, "Destination",
-			wid_gw, wid_gw, "Gateway",
+			WID_DST(af), WID_DST(af), "Destination",
+			WID_GW(af), WID_GW(af), "Gateway",
 			"Flags", "Refs", "Use", "Netif", "Expire");
 	else
 		printf("%-*.*s %-*.*s %-6.6s  %8.8s %6s\n",
-			wid_dst, wid_dst, "Destination",
-			wid_gw, wid_gw, "Gateway",
+			WID_DST(af), WID_DST(af), "Destination",
+			WID_GW(af), WID_GW(af), "Gateway",
 			"Flags", "Netif", "Expire");
 }
 
@@ -281,7 +278,7 @@ p_tree(rn)
 
 again:
 	kget(rn, rnode);
-	if (rnode.rn_b < 0) {
+	if (rnode.rn_bit < 0) {
 		if (Aflag)
 			printf("%-8.8lx ", (u_long)rn);
 		if (rnode.rn_flags & RNF_ROOT) {
@@ -305,8 +302,8 @@ again:
 			printf("%-8.8lx ", (u_long)rn);
 			p_rtnode();
 		}
-		rn = rnode.rn_r;
-		p_tree(rnode.rn_l);
+		rn = rnode.rn_right;
+		p_tree(rnode.rn_left);
 		p_tree(rn);
 	}
 }
@@ -318,7 +315,7 @@ p_rtnode()
 {
 	struct radix_mask *rm = rnode.rn_mklist;
 
-	if (rnode.rn_b < 0) {
+	if (rnode.rn_bit < 0) {
 		if (rnode.rn_mask) {
 			printf("\t  mask ");
 			p_sockaddr(kgetsa((struct sockaddr *)rnode.rn_mask),
@@ -326,14 +323,14 @@ p_rtnode()
 		} else if (rm == 0)
 			return;
 	} else {
-		sprintf(nbuf, "(%d)", rnode.rn_b);
-		printf("%6.6s %8.8lx : %8.8lx", nbuf, (u_long)rnode.rn_l, (u_long)rnode.rn_r);
+		sprintf(nbuf, "(%d)", rnode.rn_bit);
+		printf("%6.6s %8.8lx : %8.8lx", nbuf, (u_long)rnode.rn_left, (u_long)rnode.rn_right);
 	}
 	while (rm) {
 		kget(rm, rmask);
 		sprintf(nbuf, " %d refs, ", rmask.rm_refs);
 		printf(" mk = %8.8lx {(%d),%s",
-			(u_long)rm, -1 - rmask.rm_b, rmask.rm_refs ? nbuf : " ");
+			(u_long)rm, -1 - rmask.rm_bit, rmask.rm_refs ? nbuf : " ");
 		if (rmask.rm_flags & RNF_NORMAL) {
 			struct radix_node rnode_aux;
 			printf(" <normal>, ");
@@ -414,7 +411,7 @@ np_rtentry(rtm)
 		p_sockaddr(sa, NULL, 0, 36);
 	else {
 		p_sockaddr(sa, NULL, rtm->rtm_flags, 16);
-		sa = (struct sockaddr *)(sa->sa_len + (char *)sa);
+		sa = (struct sockaddr *)(ROUNDUP(sa->sa_len) + (char *)sa);
 		p_sockaddr(sa, NULL, 0, 18);
 	}
 	p_flags(rtm->rtm_flags & interesting, "%-6.6s ");
@@ -602,17 +599,11 @@ p_rtentry(rt)
 	if (rt_mask(rt) && (sa = kgetsa(rt_mask(rt))))
 		bcopy(sa, &mask, sa->sa_len);
 	p_sockaddr(&addr.u_sa, &mask.u_sa, rt->rt_flags,
-#ifdef INET6
-		   addr.u_sa.sa_family == AF_INET6 ? WID_DST6 :
-#endif
-		   WID_DST);
+	    WID_DST(addr.u_sa.sa_family));
 	p_sockaddr(kgetsa(rt->rt_gateway), NULL, RTF_HOST,
-#ifdef INET6
-		   addr.u_sa.sa_family == AF_INET6 ? WID_GW6 :
-#endif
-		   WID_GW);
+	    WID_GW(addr.u_sa.sa_family));
 	p_flags(rt->rt_flags, "%-6.6s ");
-	if (lflag)
+	if (addr.u_sa.sa_family == AF_INET || lflag)
 		printf("%6ld %8ld ", rt->rt_refcnt, rt->rt_use);
 	if (rt->rt_ifp) {
 		if (rt->rt_ifp != lastif) {
@@ -765,18 +756,14 @@ netname6(sa6, mask)
 	static char line[MAXHOSTNAMELEN + 1];
 	u_char *p = (u_char *)mask;
 	u_char *lim;
-	int masklen, illegal = 0;
-	int flag = NI_WITHSCOPEID;
+	int masklen, illegal = 0, flag = NI_WITHSCOPEID;
 
 	if (mask) {
 		for (masklen = 0, lim = p + 16; p < lim; p++) {
-			if (*p == 0xff)
-				masklen += 8;
-			else
-				break;
-		}
-		if (p < lim) {
 			switch (*p) {
+			 case 0xff:
+				 masklen += 8;
+				 break;
 			 case 0xfe:
 				 masklen += 7;
 				 break;
@@ -831,12 +818,17 @@ routename6(sa6)
 {
 	static char line[MAXHOSTNAMELEN + 1];
 	int flag = NI_WITHSCOPEID;
+	/* use local variable for safety */
+	struct sockaddr_in6 sa6_local = {AF_INET6, sizeof(sa6_local),};
+
+	sa6_local.sin6_addr = sa6->sin6_addr;
+	sa6_local.sin6_scope_id = sa6->sin6_scope_id;
 
 	if (nflag)
 		flag |= NI_NUMERICHOST;
 
-	getnameinfo((struct sockaddr *)sa6, sa6->sin6_len, line, sizeof(line),
-		    NULL, 0, flag);
+	getnameinfo((struct sockaddr *)&sa6_local, sa6_local.sin6_len,
+		    line, sizeof(line), NULL, 0, flag);
 
 	return line;
 }
