@@ -33,6 +33,13 @@
  * - Return values.  There are nonstandard return values defined and used
  *   in the source code.  This is because RFC2553 is silent about which error
  *   code must be returned for which situation.
+ * - IPv4 shortened form.  RFC2553 is silent about it.  XNET 5.2 says to
+ *   use inet_aton() to convert IPv4 numeric to binary (alows shortened form
+ *   as a result).
+ *   current code - disallow shortened form (due to use of inet_pton).
+ * - freeaddrinfo(NULL).  RFC2553 is silent about it.  XNET 5.2 says it is
+ *   invalid.
+ *   current code - SEGV on freeaddrinfo(NULL)
  * Note:
  * - We use getipnodebyname() just for thread-safeness.  There's no intent
  *   to let it do PF_UNSPEC (actually we never pass PF_UNSPEC to
