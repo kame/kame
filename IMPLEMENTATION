@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.238 2001/07/21 05:57:58 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.239 2001/07/21 06:07:14 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1923,7 +1923,7 @@ RADIX_ART kernel compilation option conflicts with RADIX_MPATH.
 
 7.2 Multipath routing support
 
-KAME/NetBSD includes kernel support for multipath routing support.  Users can
+KAME/NetBSD includes kernel extension for multipath routing support.  Users can
 install multiple routing entries toward the same destination address prefix
 (rt_key).  If combined with routing daemons support, it can provide equal
 cost multipath routing, as described in the following two RFCs:
