@@ -85,14 +85,18 @@ autobuild:
 	(cd ${.CURDIR}/${TARGET}; ${MAKE})
 	case ${TARGET} in \
 	bsdi*|freebsd*) \
-		(cd ${.CURDIR}/${TARGET}/sys/compile; /bin/rm -fr ${KERNCONF}); \
-		(cd ${.CURDIR}/${TARGET}/sys/${ARCH}/conf; config ${KERNCONF}); \
-		(cd ${.CURDIR}/${TARGET}/sys/compile/${KERNCONF}; ${MAKE} depend; ${MAKE}); \
+		for i in ${KERNCONF}; do \
+			(cd ${.CURDIR}/${TARGET}/sys/compile; /bin/rm -fr $$i); \
+			(cd ${.CURDIR}/${TARGET}/sys/${ARCH}/conf; config $$i); \
+			(cd ${.CURDIR}/${TARGET}/sys/compile/$$i; ${MAKE} depend; ${MAKE}); \
+		done; \
 		;; \
 	netbsd*|openbsd*) \
-		(cd ${.CURDIR}/${TARGET}/sys/arch/${ARCH}/compile; /bin/rm -fr ${KERNCONF}); \
-		(cd ${.CURDIR}/${TARGET}/sys/arch/${ARCH}/conf; config ${KERNCONF}); \
-		(cd ${.CURDIR}/${TARGET}/sys/arch/${ARCH}/compile/${KERNCONF}; ${MAKE} depend; ${MAKE}); \
+		for i in ${KERNCONF}; do \
+			(cd ${.CURDIR}/${TARGET}/sys/arch/${ARCH}/compile; /bin/rm -fr $$i); \
+			(cd ${.CURDIR}/${TARGET}/sys/arch/${ARCH}/conf; config $$i); \
+			(cd ${.CURDIR}/${TARGET}/sys/arch/${ARCH}/compile/$$i; ${MAKE} depend; ${MAKE}); \
+		done; \
 		;; \
 	esac
 	@echo -n '${.TARGET} done at '
