@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.73 1999/08/26 12:40:01 jinmei Exp $
+$Id: CHANGELOG,v 1.74 1999/08/26 13:35:59 itojun Exp $
 
 <199908>
+Thu Aug 26 22:36:07 JST 1999  itojun@iijlab.net
+	* kame/tcpdump/print-ip.c: fix length printer for IPv4 first framgnet.
+	  variable was broken during onion peeling and garbled value was
+	  printed.
+
 1999-08-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd/vif.c: changed the type of return value of
 	vif_forwarder() from if_set * to int.
