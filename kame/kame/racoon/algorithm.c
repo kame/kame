@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: algorithm.c,v 1.2 2000/01/12 17:20:23 itojun Exp $ */
+/* YIPS @(#)$Id: algorithm.c,v 1.3 2000/05/31 15:54:38 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -311,3 +311,40 @@ algclass2doi(class)
 	return -1;
 }
 
+struct algorithm_strength **
+initalgstrength()
+{
+	struct algorithm_strength **new;
+	int i;
+
+	new = CALLOC(MAXALGCLASS * sizeof(*new), struct algorithm_strength **);
+	if (new == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to get buffer.\n");
+		return NULL;
+	}
+
+	for (i = 0; i < MAXALGCLASS; i++) {
+		new[i] = CALLOC(sizeof(*new[i]), struct algorithm_strength *);
+		if (new[i] == NULL) {
+			plog(logp, LOCATION, NULL,
+				"failed to get buffer.\n");
+			return NULL;
+		}
+	}
+
+	return new;
+}
+
+void
+flushalgstrength(head)
+	struct algorithm_strength **head;
+{
+	int i;
+
+	for (i = 0; i < MAXALGCLASS; i++)
+		if (head[i])
+			free(head[i]);
+
+	free(head);
+}

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.11 2000/05/24 09:39:18 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.12 2000/05/31 15:54:39 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -49,47 +49,24 @@
 #include "isakmp.h"
 #include "ipsec_doi.h"
 #include "admin_var.h"
+#include "grabmyaddr.h"
 #include "vendorid.h"
 #include "str2val.h"
 
 struct localconf *lcconf;
 
-static struct algorithm_strength **initalgstrength __P((void));
+static void setdefault __P((void));
 static vchar_t *getpsk __P((const char *str, const int len));
-
-static struct algorithm_strength **
-initalgstrength()
-{
-	struct algorithm_strength **new;
-	int i;
-
-	new = CALLOC(MAXALGCLASS * sizeof(*new), struct algorithm_strength **);
-	if (new == NULL) {
-		plog(logp, LOCATION, NULL,
-			"failed to get buffer.\n");
-		return NULL;
-	}
-
-	for (i = 0; i < MAXALGCLASS; i++) {
-		new[i] = CALLOC(sizeof(*new[i]), struct algorithm_strength *);
-		if (new[i] == NULL) {
-			plog(logp, LOCATION, NULL,
-				"failed to get buffer.\n");
-			return NULL;
-		}
-	}
-
-	return new;
-}
 
 void
 initlcconf()
 {
-	static struct localconf localconf;
-
-	memset(&localconf, 0, sizeof(localconf));
-
-	lcconf = &localconf;
+	lcconf = CALLOC(sizeof(*lcconf), struct localconf *);
+	if (lcconf == NULL) {
+		fprintf(stderr, "failed to allocate local conf\n");
+		exit(1);
+		/*NOTREACHED*/
+	}
 
 	lcconf->algstrength = initalgstrength();
 	if (lcconf->algstrength == NULL) {
@@ -98,7 +75,31 @@ initlcconf()
 		/*NOTREACHED*/
 	}
 
+	setdefault();
+
 	lcconf->racoon_conf = LC_DEFAULT_CF;
+
+	/* set hashed vendor id */
+	lcconf->vendorid = set_vendorid();
+	if (lcconf->vendorid == NULL) {
+		fprintf(stderr, "failed to set vendorid.\n");
+		exit(1);
+	}
+}
+
+void
+flushlcconf()
+{
+	setdefault();
+	clear_myaddr(&lcconf->myaddrs);
+	free(lcconf->pathinfo);
+	free(lcconf->ident);
+	flushalgstrength(lcconf->algstrength);
+}
+
+static void
+setdefault()
+{
 	lcconf->autograbaddr = 1;
 	lcconf->port_isakmp = PORT_ISAKMP;
 	lcconf->port_admin = PORT_ADMIN;
@@ -114,13 +115,6 @@ initlcconf()
 	lcconf->retry_checkph1 = LC_DEFAULT_RETRY_CHECKPH1;
 	lcconf->wait_ph2complete = LC_DEFAULT_WAIT_PH2COMPLETE;
 	lcconf->strict_address = FALSE;
-
-	/* set hashed vendor id */
-	lcconf->vendorid = set_vendorid();
-	if (lcconf->vendorid == NULL) {
-		fprintf(stderr, "failed to set vendorid.\n");
-		exit(1);
-	}
 }
 
 /*
