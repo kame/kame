@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.25 2001/06/28 05:28:11 sumikawa Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.26 2001/07/06 10:52:04 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -293,11 +293,11 @@ ip6opts_match(struct ip6_hdr **pip6, struct ip6_fw *f, struct mbuf **m,
 
 		switch(*nxt) {
 		case IPPROTO_FRAGMENT:
-			if ((*m)->m_len < *off + sizeof(struct ip6_frag)) {
+			if ((*m)->m_len >= *off + sizeof(struct ip6_frag)) {
 				struct ip6_frag *ip6f;
 
 				ip6f = (struct ip6_frag *) ((caddr_t)ip6 + *off);
-				*offset = ip6f->ip6f_offlg | IP6F_OFF_MASK;
+				*offset = ip6f->ip6f_offlg & IP6F_OFF_MASK;
 			}
 			opts &= ~IPV6_FW_IP6OPT_FRAG;
 			nopts &= ~IPV6_FW_IP6OPT_FRAG;
