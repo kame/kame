@@ -1,4 +1,4 @@
-.\"	$KAME: if_indextoname.3,v 1.9 2000/11/10 12:12:10 itojun Exp $
+.\"	$KAME: if_indextoname.3,v 1.10 2000/11/24 08:13:51 itojun Exp $
 .\"	BSDI	Id: if_indextoname.3,v 2.2 2000/04/17 22:38:05 dab Exp
 .\"
 .\" Copyright (c) 1997, 2000
@@ -92,7 +92,11 @@ allocated by
 Upon successful completion,
 .Fn if_nametoindex
 returns the index number of the interface.
-A value of 0 is returned if the interface is not found or an error
+If the interface is not found, a value of 0 is returned and
+.Va errno
+is set to
+.Er ENXIO .
+A value of 0 is also returned if an error
 occurs while retrieving the list of interfaces via
 .Xr getifaddrs 3 .
 .Pp
@@ -100,7 +104,11 @@ Upon successful completion,
 .Fn if_indextoname
 returns
 .Ar ifname .
-A NULL pointer is returned if the interface is not found or an error
+If the interface is not found, a NULL pointer is returned and
+.Va errno
+is set to
+.Er ENXIO .
+A NULL pointer is also returned if an error
 occurs while retrieving the list of interfaces via
 .Xr getifaddrs 3 .
 .Pp
