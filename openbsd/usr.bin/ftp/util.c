@@ -112,7 +112,7 @@ setpeer(argc, argv)
 	}
 #else
 	if (argc > 2)
-		port = strdup(argv[2]);
+		port = argv[2];
 #endif
 
 	if (gatemode) {
