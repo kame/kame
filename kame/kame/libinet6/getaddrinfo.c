@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.185 2004/05/16 05:52:00 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.186 2004/05/16 06:17:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,7 +31,8 @@
 
 /*
  * Issues to be discussed:
- * - Thread safe-ness must be checked.
+ * - Thread safe-ness
+ *	+ 
  * - Return values.  There are nonstandard return values defined and used
  *   in the source code.  This is because RFC2553 is silent about which error
  *   code must be returned for which situation.
@@ -2658,9 +2659,7 @@ static int res_querydomainN __P((const char *, const char *,
 static struct addrinfo *_dns_getaddrinfo __P((const char *,
 	const struct addrinfo *));
 
-#ifdef __OpenBSD__
 _THREAD_PRIVATE_MUTEX(getaddrinfo_explore_fqdn);
-#endif
 
 /*
  * FQDN hostname, DNS lookup
@@ -2678,9 +2677,7 @@ explore_fqdn(pai, hostname, servname, res)
 	char lookups[MAXDNSLUS];
 	int i;
 
-#ifdef __OpenBSD__
 	_THREAD_PRIVATE_MUTEX_LOCK(getaddrinfo_explore_fqdn);
-#endif
 
 	result = NULL;
 
@@ -2688,9 +2685,7 @@ explore_fqdn(pai, hostname, servname, res)
 	 * if the servname does not match socktype/protocol, ignore it.
 	 */
 	if (get_portmatch(pai, servname) != 0) {
-#ifdef __OpenBSD__
 		_THREAD_PRIVATE_MUTEX_UNLOCK(getaddrinfo_explore_fqdn);
-#endif
 		return 0;
 	}
 
@@ -2723,9 +2718,7 @@ explore_fqdn(pai, hostname, servname, res)
 			/* canonname should already be filled. */
 		}
 		*res = result;
-#ifdef __OpenBSD__
 		_THREAD_PRIVATE_MUTEX_UNLOCK(getaddrinfo_explore_fqdn);
-#endif
 		return 0;
 	} else {
 		/* translate error code */
@@ -2757,9 +2750,9 @@ explore_fqdn(pai, hostname, servname, res)
 free:
 	if (result)
 		freeaddrinfo(result);
-#ifdef __OpenBSD__
+
 	_THREAD_PRIVATE_MUTEX_UNLOCK(getaddrinfo_explore_fqdn);
-#endif
+
 	return error;
 }
 
