@@ -2,7 +2,7 @@ SRCDIR=	${.CURDIR}/../../kame/mcastread
 
 PROG=	mcastread
 
-CFLAGS+=-DINET6
+CFLAGS+=-DINET6 -DMLDV2
 LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6
 DPADD+= ${.OBJDIR}/../../lib/libinet6/libinet6.a \
