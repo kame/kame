@@ -4,10 +4,10 @@ had_program='/usr/local/v6/sbin/had'
 had_interfaces='fxp0'
 
 case "$1" in
-'')
-	${had_program} ${had_interfaces}
-	;;
 stop)
+	;;
+*)
+	${had_program} ${had_interfaces}
 	;;
 esac
 
