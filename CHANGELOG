@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1719 2001/06/13 09:46:22 jinmei Exp $
+$KAME: CHANGELOG,v 1.1720 2001/06/13 13:34:48 itojun Exp $
 
 <200106>
+Wed Jun 13 22:31:49 JST 2001  itojun@iijlab.net
+	* *bsd*/sys/net/if_ethersubr.c: in ether_input(), drop multicast packet
+	  from myself, if the interface is !IFF_SIMPLEX.  multicast packets
+	  are explicitly copied via loopback interface in ip_output() and
+	  ip6_output(), so the old codepath caused a duplicate.  also the
+	  old codepath affected IPv6 DAD.  KAME PR 360
+
 Wed Jun 13 17:29:56 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/sys/net/if_gif.c: suppressed update of if_lastchange when
 	processing packets on BSD/OS and FreeBSD for SNMP requirements.
