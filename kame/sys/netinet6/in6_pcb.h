@@ -165,6 +165,7 @@ struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 				     struct ip6_moptions *,
 				     struct route_in6 *,
 				     struct in6_addr *, int *));
+int	in6_selecthlim __P((struct in6pcb *, struct ifnet *));
 
 #ifndef TCP6
 extern struct rtentry *

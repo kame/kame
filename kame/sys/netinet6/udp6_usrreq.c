@@ -627,7 +627,9 @@ udp6_output(in6p, m, addr6, control)
 	ip6->ip6_plen	= htons((u_short)plen);
 #endif
 	ip6->ip6_nxt	= IPPROTO_UDP;
-	ip6->ip6_hlim	= in6p->in6p_ip6.ip6_hlim; /* XXX */
+	ip6->ip6_hlim	= in6_selecthlim(in6p,
+					 in6p->in6p_route.ro_rt ?
+					 in6p->in6p_route.ro_rt->rt_ifp : NULL);
 	ip6->ip6_src	= *laddr;
 	ip6->ip6_dst	= *faddr;
 
@@ -731,7 +733,6 @@ udp6_usrreq(so, req, m, addr6, control)
 		if (error)
 			break;
 		in6p = sotoin6pcb(so);
-		in6p->in6p_ip6.ip6_hlim = ip6_defhlim;
 		in6p->in6p_cksum = -1;	/* just to be sure */
 #ifdef IPSEC
 		error = ipsec_init_policy(&in6p->in6p_sp);

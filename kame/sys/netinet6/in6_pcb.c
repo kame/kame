@@ -441,19 +441,7 @@ in6_pcbconnect(in6p, nam)
 	if (in6p->in6p_route.ro_rt)
 		ifp = in6p->in6p_route.ro_rt->rt_ifp;
 
-	/*
-	 * Default hop limit selection. If a hoplimit was specified via ioctl,
-	 * use it. Else if the outgoing interface is detected and the current
-	 * hop limit of the interface was specified by router advertisement,
-	 * use the value.
-	 * Otherwise, use the system default hoplimit.
-	 */
-	if (in6p->in6p_hops >= 0)
-		in6p->in6p_ip6.ip6_hlim = (u_int8_t)in6p->in6p_hops;
-	else if (ifp)
-		in6p->in6p_ip6.ip6_hlim = nd_ifinfo[ifp->if_index].chlim;
-	else
-		in6p->in6p_ip6.ip6_hlim = ip6_defhlim;
+	in6p->in6p_ip6.ip6_hlim = (u_int8_t)in6_selecthlim(in6p, ifp);
 
 	if (in6_pcblookup(in6p->in6p_head,
 			 &sin6->sin6_addr,
@@ -695,6 +683,29 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 
 	*errorp = EADDRNOTAVAIL;
 	return(0);
+}
+
+/*
+ * Default hop limit selection. The precedence is as follows:
+ * 1. The hop limit field of the template header.
+ * 2. Hoplimit valued specified via ioctl.
+ * 3. (If the outgoing interface is detected) the current
+ *     hop limit of the interface specified by router advertisement.
+ * 4. The system default hoplimit.
+*/
+int
+in6_selecthlim(in6p, ifp)
+	struct in6pcb *in6p;
+	struct ifnet *ifp;
+{
+	if (in6p->in6p_ip6.ip6_hlim)
+		return(in6p->in6p_ip6.ip6_hlim);
+	else if (in6p->in6p_hops >= 0)
+		return(in6p->in6p_hops);
+	else if (ifp)
+		return(nd_ifinfo[ifp->if_index].chlim);
+	else
+		return(ip6_defhlim);
 }
 
 void

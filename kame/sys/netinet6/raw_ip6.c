@@ -359,10 +359,7 @@ rip6_output(m, va_alist)
 	ip6->ip6_plen  = htons((u_short)plen);
 #endif
 	ip6->ip6_nxt   = in6p->in6p_ip6.ip6_nxt;
-	if (oifp)
-		ip6->ip6_hlim = nd_ifinfo[oifp->if_index].chlim;
-	else
-		ip6->ip6_hlim = in6p->in6p_ip6.ip6_hlim;
+	ip6->ip6_hlim = in6_selecthlim(in6p, oifp);
 
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6 ||
 	    in6p->in6p_cksum != -1) {
@@ -524,7 +521,6 @@ rip6_usrreq(so, req, m, nam, control, p)
 		splx(s);
 		in6p = sotoin6pcb(so);
 		in6p->in6p_ip6.ip6_nxt = (long)nam;
-		in6p->in6p_ip6.ip6_hlim = ip6_defhlim;
 		in6p->in6p_cksum = -1;
 #ifdef IPSEC
 		if ((error = ipsec_init_policy(&in6p->in6p_sp)) != 0)
