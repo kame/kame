@@ -192,7 +192,8 @@ int igmp_create_group_record __P((struct mbuf *, int *, struct in_multi *,
 				u_int16_t, u_int16_t *, u_int8_t));
 void igmp_cancel_pending_response __P((struct ifnet *, struct router_info *));
 static int rti_fill __P((struct in_multi *));
-static struct router_info * rti_find __P((struct ifnet *));
+static struct router_info *rti_find __P((struct ifnet *));
+static void rti_delete(struct ifnet *);
 
 void
 igmp_init()
@@ -287,6 +288,23 @@ rti_find(ifp)
 		return NULL;
 	else
 		return (rti);
+}
+
+static void
+rti_delete(ifp)
+	struct ifnet *ifp;
+{
+	struct router_info *rti, *next, **rtip;
+
+	rtip = &rti_head;
+	for (rti = rti_head; rti; rti = next) {
+		next = rti->rti_next;
+		if (rti->rti_ifp == ifp) {
+			*rtip = next;
+			free(rti, M_MRTABLE);
+		} else
+			rtip = &rti->rti_next;
+	}
 }
 
 /*
@@ -2047,4 +2065,12 @@ igmp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		break;
 	}
 	return error;
+}
+
+void
+igmp_purgeif(ifp)
+	struct ifnet *ifp;
+{
+
+	rti_delete(ifp);
 }

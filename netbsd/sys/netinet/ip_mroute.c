@@ -537,6 +537,37 @@ ip_mrouter_done()
 	return (0);
 }
 
+void
+ip_mrouter_detach(ifp)
+	struct ifnet *ifp;
+{
+	int vifi, i;
+	struct vif *vifp;
+	struct mfc *rt, *nrt;
+	struct rtdetq *rte, *nrte, **prte;
+
+	/* XXX not sure about sideeffect to userland routing daemon */
+	for (vifi = 0; vifi < numvifs; vifi++) {
+		vifp = &viftable[vifi];
+		if (vifp->v_ifp == ifp)
+			reset_vif(vifp);
+	}
+	for (i = 0; i < MFCTBLSIZ; i++) {
+		for (rt = LIST_FIRST(&mfchashtbl[i]); rt; rt = nrt) {
+			prte = &rt->mfc_stall;
+			for (rte = *prte; rte; rte = nrte) {
+				nrte = rte->next;
+				if (rte->ifp == ifp) {
+					m_freem(rte->m);
+					free(rte, M_MRTABLE);
+					*prte = nrte;
+				} else
+					prte = &rte->next;
+			}
+		}
+	}
+}
+
 static int
 get_version(m)
 	struct mbuf *m;

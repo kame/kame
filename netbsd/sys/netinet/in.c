@@ -642,6 +642,11 @@ in_purgeif(ifp)
 		in_purgeaddr(ifa, ifp);
 	}
 	in_purgemkludge(ifp);
+
+	igmp_purgeif(ifp);
+#ifdef MROUTING
+	ip_mrouter_detach(ifp);
+#endif
 }
 
 /*

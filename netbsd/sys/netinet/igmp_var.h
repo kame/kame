@@ -176,6 +176,7 @@ int	igmp_get_router_alert __P((struct mbuf *));
 void	igmp_send_state_change_report __P((struct mbuf **, int *,
 				struct in_multi *, u_int8_t, int));
 int	igmp_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
+extern void igmp_purgeif __P((struct ifnet *));
 #endif /* _KERNEL */
 
 #endif /* _NETINET_IGMP_VAR_H_ */
