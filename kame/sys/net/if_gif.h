@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.14 2000/07/12 12:59:05 jinmei Exp $	*/
+/*	$KAME: if_gif.h,v 1.15 2000/08/15 07:42:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,7 +55,7 @@ struct gif_softc {
 	union {
 		struct route  gifscr_ro;    /* xxx */
 #ifdef INET6
-#ifdef NEW_STRUCT_ROUTE
+#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__)
 		struct route gifscr_ro6; /* xxx */
 #else
 		struct route_in6 gifscr_ro6; /* xxx */

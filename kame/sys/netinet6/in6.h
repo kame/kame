@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.54 2000/07/24 11:01:00 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.55 2000/08/15 07:42:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -363,6 +363,7 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 /*
  * IP6 route structure
  */
+#ifndef __NetBSD__
 #ifndef _XOPEN_SOURCE
 #ifndef NEW_STRUCT_ROUTE
 struct route_in6 {
@@ -370,6 +371,7 @@ struct route_in6 {
 	struct	sockaddr_in6 ro_dst;
 };
 #endif /* !NEW_STRUCT_ROUTE */
+#endif
 #endif
 
 /*

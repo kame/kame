@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.37 2000/07/19 12:59:55 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.38 2000/08/15 07:42:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -121,7 +121,7 @@ struct	ip6_moptions {
 /* Routing header related info */
 struct	ip6po_rhinfo {
 	struct	ip6_rthdr *ip6po_rhi_rthdr; /* Routing header */
-#ifdef NEW_STRUCT_ROUTE
+#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__)
 	struct	route ip6po_rhi_route; /* Route to the 1st hop */
 #else
 	struct	route_in6 ip6po_rhi_route; /* Route to the 1st hop */

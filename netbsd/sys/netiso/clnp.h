@@ -466,7 +466,7 @@ struct clnp_optidx;
 struct isopcb;
 struct snpa_hdr;
 struct iso_ifaddr;
-#ifdef NEW_STRUCT_ROUTE
+#if 1 /*def NEW_STRUCT_ROUTE*/
 #ifndef route_iso
 #define route_iso	route
 #endif

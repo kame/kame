@@ -341,7 +341,7 @@ struct syn_cache {
 	union {					/* cached route */
 		struct route route4;
 #ifdef INET6
-#ifdef NEW_STRUCT_ROUTE
+#if 1 /*def NEW_STRUCT_ROUTE*/
 		struct route route6;
 #else
 		struct route_in6 route6;

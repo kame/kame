@@ -74,7 +74,7 @@ struct isopcb {
 	struct socket  *isop_socket;	/* back pointer to socket */
 	struct sockaddr_iso *isop_laddr;
 	struct sockaddr_iso *isop_faddr;
-#ifndef NEW_STRUCT_ROUTE
+#if 0 /*ndef NEW_STRUCT_ROUTE*/
 	struct route_iso {
 		struct rtentry *ro_rt;
 		struct sockaddr_iso ro_dst;
