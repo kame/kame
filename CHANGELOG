@@ -1,12 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.977 2000/06/06 08:22:21 jinmei Exp $
+$Id: CHANGELOG,v 1.978 2000/06/06 08:25:50 jinmei Exp $
 
 <200006>
 2000-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd3/ports/bind9: upgraded to bind-9.0.0b3. KAME users are
 	recommended to use this port, because the original version has an
 	API compatibility issue in a multi-address environment.
+
+2000-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi3/sbin/sysctl/sysctl.c:
+	* {netbsd, openbsd}/usr.sbin/sysctl/sysctl.c:
+	synch with the change below. (Fortunately, there is no binary
+	compatibility issues).
 
 2000-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/pim6_var.h: renamed macro definitions about
