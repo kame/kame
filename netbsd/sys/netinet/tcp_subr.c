@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_subr.c,v 1.66 1999/02/28 13:41:24 explorer Exp $	*/
+/*	$NetBSD: tcp_subr.c,v 1.91.4.3 2000/10/17 00:48:30 tv Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -237,12 +237,12 @@ struct mbuf *
 tcp_template(tp)
 	struct tcpcb *tp;
 {
-	register struct inpcb *inp = tp->t_inpcb;
+	struct inpcb *inp = tp->t_inpcb;
 #ifdef INET6
-	register struct in6pcb *in6p = tp->t_in6pcb;
+	struct in6pcb *in6p = tp->t_in6pcb;
 #endif
-	register struct tcphdr *n;
-	register struct mbuf *m;
+	struct tcphdr *n;
+	struct mbuf *m;
 	int hlen;
 
 	switch (tp->t_family) {
@@ -380,7 +380,7 @@ int
 tcp_respond(tp, template, m, th0, ack, seq, flags)
 	struct tcpcb *tp;
 	struct mbuf *template;
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct tcphdr *th0;
 	tcp_seq ack, seq;
 	int flags;
@@ -746,7 +746,7 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		error = ip6_output(m, NULL, ro, 0, NULL, NULL);
 #else
 		error = ip6_output(m, NULL, (struct route_in6 *)ro, 0, NULL,
-				   NULL);
+			NULL);
 #endif
 		break;
 #endif
@@ -773,7 +773,7 @@ tcp_newtcpcb(family, aux)
 	int family;	/* selects inpcb, or in6pcb */
 	void *aux;
 {
-	register struct tcpcb *tp;
+	struct tcpcb *tp;
 
 	switch (family) {
 	case PF_INET:
@@ -854,7 +854,7 @@ tcp_newtcpcb(family, aux)
  */
 struct tcpcb *
 tcp_drop(tp, errno)
-	register struct tcpcb *tp;
+	struct tcpcb *tp;
 	int errno;
 {
 	struct socket *so;
@@ -888,7 +888,7 @@ tcp_drop(tp, errno)
  */
 struct tcpcb *
 tcp_close(tp)
-	register struct tcpcb *tp;
+	struct tcpcb *tp;
 {
 	struct inpcb *inp;
 #ifdef INET6
@@ -896,7 +896,7 @@ tcp_close(tp)
 #endif
 	struct socket *so;
 #ifdef RTV_RTT
-	register struct rtentry *rt;
+	struct rtentry *rt;
 #endif
 	struct route *ro;
 
@@ -933,7 +933,7 @@ tcp_close(tp)
 	if (SEQ_LT(tp->iss + so->so_snd.sb_hiwat * 16, tp->snd_max) &&
 	    ro && (rt = ro->ro_rt) &&
 	    !in_nullhost(satosin(rt_key(rt))->sin_addr)) {
-		register u_long i = 0;
+		u_long i = 0;
 
 		if ((rt->rt_rmx.rmx_locks & RTV_RTT) == 0) {
 			i = tp->t_srtt *
@@ -1018,7 +1018,7 @@ int
 tcp_freeq(tp)
 	struct tcpcb *tp;
 {
-	register struct ipqent *qe;
+	struct ipqent *qe;
 	int rv = 0;
 #ifdef TCPREASS_DEBUG
 	int i = 0;
@@ -1047,8 +1047,8 @@ tcp_freeq(tp)
 void
 tcp_drain()
 {
-	register struct inpcb *inp;
-	register struct tcpcb *tp;
+	struct inpcb *inp;
+	struct tcpcb *tp;
 
 	/*
 	 * Free the sequence queue of all TCP connections.
@@ -1082,8 +1082,8 @@ tcp_notify(inp, error)
 	struct inpcb *inp;
 	int error;
 {
-	register struct tcpcb *tp = (struct tcpcb *)inp->inp_ppcb;
-	register struct socket *so = inp->inp_socket;
+	struct tcpcb *tp = (struct tcpcb *)inp->inp_ppcb;
+	struct socket *so = inp->inp_socket;
 
 	/*
 	 * Ignore some errors if we are hooked up.
@@ -1112,8 +1112,8 @@ tcp6_notify(in6p, error)
 	struct in6pcb *in6p;
 	int error;
 {
-	register struct tcpcb *tp = (struct tcpcb *)in6p->in6p_ppcb;
-	register struct socket *so = in6p->in6p_socket;
+	struct tcpcb *tp = (struct tcpcb *)in6p->in6p_ppcb;
+	struct socket *so = in6p->in6p_socket;
 
 	/*
 	 * Ignore some errors if we are hooked up.
@@ -1246,10 +1246,10 @@ void *
 tcp_ctlinput(cmd, sa, v)
 	int cmd;
 	struct sockaddr *sa;
-	register void *v;
+	void *v;
 {
-	register struct ip *ip = v;
-	register struct tcphdr *th;
+	struct ip *ip = v;
+	struct tcphdr *th;
 	extern int inetctlerrmap[];
 	void (*notify) __P((struct inpcb *, int)) = tcp_notify;
 	int errno;
@@ -1434,7 +1434,7 @@ tcp6_mtudisc(in6p, errno)
 		tcp_output(tp);
 	}
 }
-#endif /* INET6 */
+#endif
 
 /*
  * Compute the MSS to advertise to the peer.  Called only during

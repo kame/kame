@@ -1,4 +1,4 @@
-/*	$NetBSD: in.h,v 1.39 1998/09/14 21:15:56 hwr Exp $	*/
+/*	$NetBSD: in.h,v 1.47.4.1 2000/08/26 16:38:32 tron Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1990, 1993
@@ -123,7 +123,7 @@
  */
 struct in_addr {
 	u_int32_t s_addr;
-};
+} __attribute__((__packed__));
 
 /*
  * Definitions of bits in internet address integers.
@@ -344,8 +344,11 @@ struct ip_mreq {
 #define	IPCTL_ANONPORTMAX      11	/* maximum ephemeral port */
 #define	IPCTL_MTUDISCTIMEOUT   12	/* allow path MTU discovery */
 #define	IPCTL_MAXFLOWS         13	/* maximum ip flows allowed */
-#define IPCTL_GIF_TTL 	       14	/* default TTL for gif encap packet */
-#define	IPCTL_MAXID	       15
+#define	IPCTL_HOSTZEROBROADCAST 14	/* is host zero a broadcast addr? */
+#define IPCTL_GIF_TTL 	       15	/* default TTL for gif encap packet */
+#define IPCTL_LOWPORTMIN       16	/* minimum reserved port */
+#define IPCTL_LOWPORTMAX       17	/* maximum reserved port */
+#define	IPCTL_MAXID	       18
 
 #define	IPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -362,7 +365,10 @@ struct ip_mreq {
 	{ "anonportmax", CTLTYPE_INT }, \
 	{ "mtudisctimeout", CTLTYPE_INT }, \
 	{ "maxflows", CTLTYPE_INT }, \
+	{ "hostzerobroadcast", CTLTYPE_INT }, \
 	{ "gifttl", CTLTYPE_INT }, \
+	{ "lowportmin", CTLTYPE_INT }, \
+	{ "lowportmax", CTLTYPE_INT }, \
 }
 #endif /* !_XOPEN_SOURCE */
 
@@ -373,6 +379,7 @@ struct ip_mreq {
 
 #ifdef _KERNEL
 extern	struct in_addr zeroin_addr;
+extern	u_char	ip_protox[];
 
 int	in_broadcast __P((struct in_addr, struct ifnet *));
 int	in_canforward __P((struct in_addr));

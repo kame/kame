@@ -1,4 +1,4 @@
-/*	$NetBSD: if_strip.c,v 1.16 1998/07/07 03:22:03 thorpej Exp $	*/
+/*	$NetBSD: if_strip.c,v 1.19 2000/03/30 09:45:37 augustss Exp $	*/
 /*	from: NetBSD: if_sl.c,v 1.38 1996/02/13 22:00:23 christos Exp $	*/
 
 /*
@@ -109,9 +109,9 @@
 #include <sys/file.h>
 #include <sys/tty.h>
 #include <sys/kernel.h>
-#include <sys/conf.h>
 #if __NetBSD__
 #include <sys/systm.h>
+#include <sys/callout.h>
 #endif
 #include <sys/syslog.h>
 
@@ -272,7 +272,7 @@ void	strip_sendbody __P((struct strip_softc *sc, struct mbuf *m));
 int	strip_newpacket __P((struct strip_softc *sc, u_char *ptr, u_char *end));
 struct mbuf * strip_send __P((struct strip_softc *sc, struct mbuf *m0));
 
-static void strip_timeout __P((void *x));
+void	strip_timeout __P((void *x));
 
 
 
@@ -342,12 +342,13 @@ void
 stripattach(n)
 	int n;
 {
-	register struct strip_softc *sc;
-	register int i = 0;
+	struct strip_softc *sc;
+	int i = 0;
 
 	for (sc = strip_softc; i < NSTRIP; sc++) {
 		sc->sc_unit = i;		/* XXX */
 		sprintf(sc->sc_if.if_xname, "strip%d", i++);
+		callout_init(&sc->sc_timo_ch);
 		sc->sc_if.if_softc = sc;
 		sc->sc_if.if_mtu = SLMTU;
 		sc->sc_if.if_flags = 0;
@@ -372,9 +373,9 @@ stripattach(n)
 
 static int
 stripinit(sc)
-	register struct strip_softc *sc;
+	struct strip_softc *sc;
 {
-	register u_char *p;
+	u_char *p;
 
 	if (sc->sc_ep == NULL) {
 		/*
@@ -437,11 +438,11 @@ stripinit(sc)
 int
 stripopen(dev, tp)
 	dev_t dev;
-	register struct tty *tp;
+	struct tty *tp;
 {
 	struct proc *p = curproc;		/* XXX */
-	register struct strip_softc *sc;
-	register int nstrip;
+	struct strip_softc *sc;
+	int nstrip;
 	int error;
 #ifdef __NetBSD__
 	int s;
@@ -509,7 +510,7 @@ void
 stripclose(tp)
 	struct tty *tp;
 {
-	register struct strip_softc *sc;
+	struct strip_softc *sc;
 	int s;
 
 	ttywflush(tp);
@@ -539,7 +540,7 @@ stripclose(tp)
 		sc->sc_txbuf = 0;
 
 		if (sc->sc_flags & SC_TIMEOUT) {
-			untimeout(strip_timeout, (void *) sc);
+			callout_stop(&sc->sc_timo_ch);
 			sc->sc_flags &= ~SC_TIMEOUT;
 		}
 	}
@@ -587,10 +588,10 @@ strip_sendbody(sc, m)
 	struct strip_softc  *sc;
 	struct mbuf *m;
 {
-	register struct tty *tp = sc->sc_ttyp;
-	register u_char *dp = sc->sc_txbuf;
+	struct tty *tp = sc->sc_ttyp;
+	u_char *dp = sc->sc_txbuf;
 	struct mbuf *m2;
-	register int len;
+	int len;
 	u_char	*rllstate_ptr = NULL;
 
 	while (m) {
@@ -641,7 +642,7 @@ strip_send(sc, m0)
     struct strip_softc *sc;
     struct mbuf *m0;
 {
-	register struct tty *tp = sc->sc_ttyp;
+	struct tty *tp = sc->sc_ttyp;
 	struct st_header *hdr;
 
 	/*
@@ -673,7 +674,7 @@ strip_send(sc, m0)
 	 * Discard it.
 	 */
 	if (m0->m_len == 0) {
-		register struct mbuf *m;
+		struct mbuf *m;
 		MFREE(m0, m);
 		m0 = m;
 	}
@@ -718,15 +719,15 @@ strip_send(sc, m0)
 int
 stripoutput(ifp, m, dst, rt)
 	struct ifnet *ifp;
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct sockaddr *dst;
 	struct rtentry *rt;
 {
-	register struct strip_softc *sc = ifp->if_softc;
-	register struct ip *ip;
-	register struct ifqueue *ifq;
-	register struct st_header *shp;
-	register const u_char *dldst;		/* link-level next-hop */
+	struct strip_softc *sc = ifp->if_softc;
+	struct ip *ip;
+	struct ifqueue *ifq;
+	struct st_header *shp;
+	const u_char *dldst;		/* link-level next-hop */
 	int s, error;
 	u_char dl_addrbuf[STARMODE_ADDR_LEN+1];
 #ifdef ALTQ
@@ -907,15 +908,15 @@ stripoutput(ifp, m, dst, rt)
  */
 void
 stripstart(tp)
-	register struct tty *tp;
+	struct tty *tp;
 {
-	register struct strip_softc *sc = (struct strip_softc *)tp->t_sc;
-	register struct mbuf *m;
-	register struct ip *ip;
+	struct strip_softc *sc = (struct strip_softc *)tp->t_sc;
+	struct mbuf *m;
+	struct ip *ip;
 	int s;
 #if NBPFILTER > 0
 	u_char bpfbuf[SLMTU + SLIP_HDRLEN];
-	register int len = 0;
+	int len = 0;
 #endif
 #ifndef __NetBSD__					/* XXX - cgd */
 	extern int cfreecount;
@@ -993,12 +994,12 @@ stripstart(tp)
 			 * and/or the copy should be negligible cost compared
 			 * to the packet transmission time).
 			 */
-			register struct mbuf *m1 = m;
-			register u_char *cp = bpfbuf + SLIP_HDRLEN;
+			struct mbuf *m1 = m;
+			u_char *cp = bpfbuf + SLIP_HDRLEN;
 
 			len = 0;
 			do {
-				register int mlen = m1->m_len;
+				int mlen = m1->m_len;
 
 				bcopy(mtod(m1, caddr_t), cp, mlen);
 				cp += mlen;
@@ -1013,7 +1014,7 @@ stripstart(tp)
 		}
 #if NBPFILTER > 0
 		if (sc->sc_bpf) {
-			register u_char *cp = bpfbuf + STRIP_HDRLEN;
+			u_char *cp = bpfbuf + STRIP_HDRLEN;
 			/*
 			 * Put the SLIP pseudo-"link header" in place.  The
 			 * compressed header is now at the beginning of the
@@ -1049,7 +1050,7 @@ stripstart(tp)
 #if 0
 	/* schedule timeout to start output */
 	if ((sc->sc_flags & SC_TIMEOUT) == 0) {
-		timeout(strip_timeout, (void *) sc, HZ);
+		callout_reset(&sc->sc_timo_ch, hz, strip_timeout, sc);
 		sc->sc_flags |= SC_TIMEOUT;
 	}
 #endif
@@ -1061,7 +1062,7 @@ stripstart(tp)
 	 * after it has drained the t_outq.
 	 */
 	if ((sc->sc_flags & SC_TIMEOUT) == 0) {
-		timeout(strip_timeout, (void *) sc, HZ);
+		callout_reset(&sc->sc_timo_ch, hz, strip_timeout, sc);
 		sc->sc_flags |= SC_TIMEOUT;
 	}
 #endif
@@ -1086,11 +1087,11 @@ stripstart(tp)
  */
 static struct mbuf *
 strip_btom(sc, len)
-	register struct strip_softc *sc;
-	register int len;
+	struct strip_softc *sc;
+	int len;
 {
-	register struct mbuf *m;
-	register u_char *p;
+	struct mbuf *m;
+	u_char *p;
 
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (m == NULL)
@@ -1140,12 +1141,12 @@ strip_btom(sc, len)
 */
 void
 stripinput(c, tp)
-	register int c;
-	register struct tty *tp;
+	int c;
+	struct tty *tp;
 {
-	register struct strip_softc *sc;
-	register struct mbuf *m;
-	register int len;
+	struct strip_softc *sc;
+	struct mbuf *m;
+	int len;
 	int s;
 #if NBPFILTER > 0
 	u_char chdr[CHDR_LEN];
@@ -1276,7 +1277,7 @@ stripinput(c, tp)
 		 * decompression probably moved the buffer
 		 * pointer.  Then, invoke BPF.
 		 */
-		register u_char *hp = sc->sc_buf - SLIP_HDRLEN;
+		u_char *hp = sc->sc_buf - SLIP_HDRLEN;
 
 		hp[SLX_DIR] = SLIPDIR_IN;
 		bcopy(chdr, &hp[SLX_CHDR], CHDR_LEN);
@@ -1316,13 +1317,13 @@ newpack:
  */
 int
 stripioctl(ifp, cmd, data)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	u_long cmd;
 	caddr_t data;
 {
-	register struct ifaddr *ifa = (struct ifaddr *)data;
-	register struct ifreq *ifr;
-	register int s, error = 0;
+	struct ifaddr *ifa = (struct ifaddr *)data;
+	struct ifreq *ifr;
+	int s, error = 0;
 
 	s = splimp();
 
@@ -1388,7 +1389,7 @@ strip_resetradio(sc, tp)
 	static ttychar_t InitString[] =
 		"\r\rat\r\r\rate0q1dt**starmode\r**\r";
 #endif
-	register int i;
+	int i;
 
 	/*
 	 * XXX Perhaps flush  tty output queue?
@@ -1428,8 +1429,8 @@ strip_resetradio(sc, tp)
  */
 void
 strip_proberadio(sc, tp)
-	register struct strip_softc *sc;
-	register struct tty *tp;
+	struct strip_softc *sc;
+	struct tty *tp;
 {
 
 	int overflow;
@@ -1466,7 +1467,7 @@ static char *strip_statenames[] = {
  * Timeout routine -- try to start more output.
  * Will be needed to make strip work on ptys.
  */
-static void
+void
 strip_timeout(x)
     void *x;
 {
@@ -1506,7 +1507,7 @@ void
 strip_watchdog(ifp)
 	struct ifnet *ifp;
 {
-	register struct strip_softc *sc = ifp->if_softc;
+	struct strip_softc *sc = ifp->if_softc;
 	struct tty *tp =  sc->sc_ttyp;
 
 	/*
@@ -1599,10 +1600,10 @@ strip_watchdog(ifp)
 int
 strip_newpacket(sc, ptr, end)
 	struct strip_softc *sc;
-	register u_char *ptr, *end;
+	u_char *ptr, *end;
 {
-	register int len = ptr - end;
-	register u_char *name, *name_end;
+	int len = ptr - end;
+	u_char *name, *name_end;
 	u_int packetlen;
 
 	/* Ignore empty lines */

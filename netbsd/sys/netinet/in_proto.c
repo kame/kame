@@ -1,4 +1,4 @@
-/*	$NetBSD: in_proto.c,v 1.29.2.1 1999/04/29 14:44:48 perry Exp $	*/
+/*	$NetBSD: in_proto.c,v 1.39.4.1 2000/08/16 01:22:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -171,7 +171,7 @@ struct protosw inetsw[] = {
   udp_usrreq,
   udp_init,	0,		0,		0,		udp_sysctl
 },
-{ SOCK_STREAM,	&inetdomain,	IPPROTO_TCP,	PR_CONNREQUIRED|PR_WANTRCVD,
+{ SOCK_STREAM,	&inetdomain,	IPPROTO_TCP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN,
   tcp_input,	0,		tcp_ctlinput,	tcp_ctloutput,
   tcp_usrreq,
   tcp_init,	tcp_fasttimo,	tcp_slowtimo,	tcp_drain,	tcp_sysctl
@@ -235,7 +235,7 @@ struct protosw inetsw[] = {
   igmp_init,	igmp_fasttimo,	igmp_slowtimo,	0,
 },
 #ifdef TPIP
-{ SOCK_SEQPACKET,&inetdomain,	IPPROTO_TP,	PR_CONNREQUIRED|PR_WANTRCVD,
+{ SOCK_SEQPACKET,&inetdomain,	IPPROTO_TP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN,
   tpip_input,	0,		tpip_ctlinput,	tp_ctloutput,
   tp_usrreq,
   tp_init,	0,		tp_slowtimo,	tp_drain,
@@ -303,6 +303,8 @@ struct domain inetdomain =
       inetsw, &inetsw[sizeof(inetsw)/sizeof(inetsw[0])], 0,
       rn_inithead, 32, sizeof(struct sockaddr_in) };
 
+u_char	ip_protox[IPPROTO_MAX];
+
 #define	TCP_SYN_HASH_SIZE	293
 #define	TCP_SYN_BUCKET_SIZE	35
 
@@ -311,3 +313,7 @@ int	tcp_syn_cache_limit = TCP_SYN_HASH_SIZE*TCP_SYN_BUCKET_SIZE;
 int	tcp_syn_bucket_limit = 3*TCP_SYN_BUCKET_SIZE;
 struct	syn_cache_head tcp_syn_cache[TCP_SYN_HASH_SIZE];
 int	tcp_syn_cache_interval = 1;	/* runs timer twice a second */
+
+int tcp_rst_ppslim = 100;			/* 100pps */
+
+int icmperrppslim = 100;			/* 100pps */

@@ -1,4 +1,4 @@
-/*	$NetBSD: in_pcb.c,v 1.58 1999/03/23 10:45:37 lukem Exp $	*/
+/*	$NetBSD: in_pcb.c,v 1.65.4.1 2000/08/26 16:38:32 tron Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -147,6 +147,8 @@ struct inpcb *
 
 int	anonportmin = IPPORT_ANONMIN;
 int	anonportmax = IPPORT_ANONMAX;
+int	lowportmin  = IPPORT_RESERVEDMIN;
+int	lowportmax  = IPPORT_RESERVEDMAX;
 
 struct pool inpcb_pool;
 
@@ -178,7 +180,7 @@ in_pcballoc(so, v)
 	void *v;
 {
 	struct inpcbtable *table = v;
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	int s;
 
 	inp = pool_get(&inpcb_pool, PR_NOWAIT);
@@ -202,10 +204,10 @@ in_pcbbind(v, nam, p)
 	struct mbuf *nam;
 	struct proc *p;
 {
-	register struct inpcb *inp = v;
-	register struct socket *so = inp->inp_socket;
-	register struct inpcbtable *table = inp->inp_table;
-	register struct sockaddr_in *sin;
+	struct inpcb *inp = v;
+	struct socket *so = inp->inp_socket;
+	struct inpcbtable *table = inp->inp_table;
+	struct sockaddr_in *sin;
 	u_int16_t lport = 0;
 	int wild = 0, reuseport = (so->so_options & SO_REUSEPORT);
 #ifndef IPNOPRIVPORTS
@@ -287,8 +289,8 @@ noname:
 			if (p == 0 || (error = suser(p->p_ucred, &p->p_acflag)))
 				return (EACCES);
 #endif
-			min = IPPORT_RESERVEDMIN;
-			max = IPPORT_RESERVEDMAX;
+			min = lowportmin;
+			max = lowportmax;
 			lastport = &table->inpt_lastlow;
 		} else {
 			min = anonportmin;
@@ -332,13 +334,13 @@ noname:
  */
 int
 in_pcbconnect(v, nam)
-	register void *v;
+	void *v;
 	struct mbuf *nam;
 {
-	register struct inpcb *inp = v;
+	struct inpcb *inp = v;
 	struct in_ifaddr *ia;
 	struct sockaddr_in *ifaddr = NULL;
-	register struct sockaddr_in *sin = mtod(nam, struct sockaddr_in *);
+	struct sockaddr_in *sin = mtod(nam, struct sockaddr_in *);
 	int error;
 
 	if (nam->m_len != sizeof (*sin))
@@ -380,7 +382,7 @@ in_pcbconnect(v, nam)
 	 */
 	if (in_nullhost(inp->inp_laddr)) {
 #if 0
-		register struct route *ro;
+		struct route *ro;
 
 		ia = (struct in_ifaddr *)0;
 		/* 
@@ -414,20 +416,23 @@ in_pcbconnect(v, nam)
 		 */
 		if (ro->ro_rt && !(ro->ro_rt->rt_ifp->if_flags & IFF_LOOPBACK))
 			ia = ifatoia(ro->ro_rt->rt_ifa);
-		if (ia == 0) {
-		    u_int16_t fport = sin->sin_port;
+		if (ia == NULL) {
+			u_int16_t fport = sin->sin_port;
 
-		    sin->sin_port = 0;
-		    ia = ifatoia(ifa_ifwithladdr(sintosa(sin)));
-		    sin->sin_port = fport;
-		    if (ia == 0)
-			/* Find 1st non-loopback AF_INET address */
-			for (ia = in_ifaddr.tqh_first ; ia != NULL ;
-				ia = ia->ia_list.tqe_next)
-			    if (!(ia->ia_ifp->if_flags & IFF_LOOPBACK))
-				break;
-		    if (ia == 0)
-			return (EADDRNOTAVAIL);
+			sin->sin_port = 0;
+			ia = ifatoia(ifa_ifwithladdr(sintosa(sin)));
+			sin->sin_port = fport;
+			if (ia == 0) {
+				/* Find 1st non-loopback AF_INET address */
+				for (ia = in_ifaddr.tqh_first ; ia != NULL;
+				     ia = ia->ia_list.tqe_next) {
+					if ((ia->ia_ifp->if_flags &
+					     IFF_LOOPBACK) == 0)
+						break;
+				}
+			}
+			if (ia == NULL)
+				return (EADDRNOTAVAIL);
 		}
 		/*
 		 * If the destination address is multicast and an outgoing
@@ -524,10 +529,10 @@ in_pcbdetach(v)
 
 void
 in_setsockaddr(inp, nam)
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	struct mbuf *nam;
 {
-	register struct sockaddr_in *sin;
+	struct sockaddr_in *sin;
 	
 	nam->m_len = sizeof (*sin);
 	sin = mtod(nam, struct sockaddr_in *);
@@ -543,7 +548,7 @@ in_setpeeraddr(inp, nam)
 	struct inpcb *inp;
 	struct mbuf *nam;
 {
-	register struct sockaddr_in *sin;
+	struct sockaddr_in *sin;
 	
 	nam->m_len = sizeof (*sin);
 	sin = mtod(nam, struct sockaddr_in *);
@@ -574,7 +579,7 @@ in_pcbnotify(table, faddr, fport_arg, laddr, lport_arg, errno, notify)
 	void (*notify) __P((struct inpcb *, int));
 {
 	struct inpcbhead *head;
-	register struct inpcb *inp, *ninp;
+	struct inpcb *inp, *ninp;
 	u_int16_t fport = fport_arg, lport = lport_arg;
 	int nmatch;
 
@@ -603,7 +608,7 @@ in_pcbnotifyall(table, faddr, errno, notify)
 	int errno;
 	void (*notify) __P((struct inpcb *, int));
 {
-	register struct inpcb *inp, *ninp;
+	struct inpcb *inp, *ninp;
 
 	if (in_nullhost(faddr) || notify == 0)
 		return;
@@ -617,6 +622,49 @@ in_pcbnotifyall(table, faddr, errno, notify)
 	}
 }
 
+void
+in_pcbpurgeif(table, ifp)
+	struct inpcbtable *table;
+	struct ifnet *ifp;
+{
+	struct inpcb *inp, *ninp;
+	struct ip_moptions *imo;
+	int i, gap;
+
+	for (inp = table->inpt_queue.cqh_first;
+	    inp != (struct inpcb *)&table->inpt_queue;
+	    inp = ninp) {
+		ninp = inp->inp_queue.cqe_next;
+		if (inp->inp_route.ro_rt != NULL &&
+		    inp->inp_route.ro_rt->rt_ifp == ifp)
+			in_rtchange(inp, 0);
+		imo = inp->inp_moptions;
+		if (imo != NULL) {
+			/*
+			 * Unselect the outgoing interface if it is being
+			 * detached.
+			 */
+			if (imo->imo_multicast_ifp == ifp)
+				imo->imo_multicast_ifp = NULL;
+
+			/*
+			 * Drop multicast group membership if we joined
+			 * through the interface being detached.
+			 */
+			for (i = 0, gap = 0; i < imo->imo_num_memberships;
+			    i++) {
+				if (imo->imo_membership[i]->inm_ifp == ifp) {
+					in_delmulti(imo->imo_membership[i]);
+					gap++;
+				} else if (gap != 0)
+					imo->imo_membership[i - gap] =
+					    imo->imo_membership[i];
+			}
+			imo->imo_num_memberships -= gap;
+		}
+	}
+}
+
 /*
  * Check for alternatives when higher level complains
  * about service problems.  For now, invalidate cached
@@ -627,7 +675,7 @@ void
 in_losing(inp)
 	struct inpcb *inp;
 {
-	register struct rtentry *rt;
+	struct rtentry *rt;
 	struct rt_addrinfo info;
 
 	if ((rt = inp->inp_route.ro_rt)) {
@@ -656,7 +704,7 @@ in_losing(inp)
  */
 void
 in_rtchange(inp, errno)
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	int errno;
 {
 
@@ -678,7 +726,7 @@ in_pcblookup_port(table, laddr, lport_arg, lookup_wildcard)
 	u_int lport_arg;
 	int lookup_wildcard;
 {
-	register struct inpcb *inp, *match = 0;
+	struct inpcb *inp, *match = 0;
 	int matchwild = 3, wildcard;
 	u_int16_t lport = lport_arg;
 
@@ -724,7 +772,7 @@ in_pcblookup_connect(table, faddr, fport_arg, laddr, lport_arg)
 	u_int fport_arg, lport_arg;
 {
 	struct inpcbhead *head;
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	u_int16_t fport = fport_arg, lport = lport_arg;
 
 	head = INPCBHASH_CONNECT(table, faddr, fport, laddr, lport);
@@ -760,7 +808,7 @@ in_pcblookup_bind(table, laddr, lport_arg)
 	u_int lport_arg;
 {
 	struct inpcbhead *head;
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	u_int16_t lport = lport_arg;
 
 	head = INPCBHASH_BIND(table, laddr, lport);
@@ -878,7 +926,7 @@ in_selectsrc(sin, ro, soopts, mopts, errorp)
 	 */
 	if (ro->ro_rt && !(ro->ro_rt->rt_ifp->if_flags & IFF_LOOPBACK))
 		ia = ifatoia(ro->ro_rt->rt_ifa);
-	if (ia == 0) {
+	if (ia == NULL) {
 		u_int16_t fport = sin->sin_port;
 
 		sin->sin_port = 0;
@@ -888,11 +936,12 @@ in_selectsrc(sin, ro, soopts, mopts, errorp)
 			/* Find 1st non-loopback AF_INET address */
 			for (ia = in_ifaddr.tqh_first;
 			     ia != NULL;
-			     ia = ia->ia_list.tqe_next)
+			     ia = ia->ia_list.tqe_next) {
 				if (!(ia->ia_ifp->if_flags & IFF_LOOPBACK))
 					break;
+			}
 		}
-		if (ia == 0) {
+		if (ia == NULL) {
 			*errorp = EADDRNOTAVAIL;
 			return NULL;
 		}

@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_output.c,v 1.58.2.2 1999/12/20 15:48:26 he Exp $	*/
+/*	$NetBSD: ip_output.c,v 1.74 2000/05/10 03:31:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -128,6 +128,10 @@
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
 
+#ifdef MROUTING
+#include <netinet/ip_mroute.h>
+#endif
+
 #ifdef __vax__
 #include <machine/mtpr.h>
 #endif
@@ -159,10 +163,10 @@ ip_output(m0, va_alist)
 	va_dcl
 #endif
 {
-	register struct ip *ip, *mhip;
-	register struct ifnet *ifp;
-	register struct mbuf *m = m0;
-	register int hlen = sizeof (struct ip);
+	struct ip *ip, *mhip;
+	struct ifnet *ifp;
+	struct mbuf *m = m0;
+	int hlen = sizeof (struct ip);
 	int len, off, error = 0;
 	struct route iproute;
 	struct sockaddr_in *dst;
@@ -276,10 +280,12 @@ ip_output(m0, va_alist)
 		if (ro->ro_rt->rt_flags & RTF_GATEWAY)
 			dst = satosin(ro->ro_rt->rt_gateway);
 	}
-	if (IN_MULTICAST(ip->ip_dst.s_addr)) {
+	if (IN_MULTICAST(ip->ip_dst.s_addr) ||
+	    (ip->ip_dst.s_addr == INADDR_BROADCAST)) {
 		struct in_multi *inm;
 
-		m->m_flags |= M_MCAST;
+		m->m_flags |= (ip->ip_dst.s_addr == INADDR_BROADCAST) ?
+			M_BCAST : M_MCAST;
 		/*
 		 * IP destination address is multicast.  Make sure "dst"
 		 * still points to the address in "ro".  (It may have been
@@ -300,7 +306,10 @@ ip_output(m0, va_alist)
 		/*
 		 * Confirm that the outgoing interface supports multicast.
 		 */
-		if ((ifp->if_flags & IFF_MULTICAST) == 0) {
+		if (((m->m_flags & M_MCAST) &&
+		     (ifp->if_flags & IFF_MULTICAST) == 0) ||
+		    ((m->m_flags & M_BCAST) && 
+		     (ifp->if_flags & IFF_BROADCAST) == 0))  {
 			ipstat.ips_noroute++;
 			error = ENETUNREACH;
 			goto bad;
@@ -310,7 +319,7 @@ ip_output(m0, va_alist)
 		 * of outgoing interface.
 		 */
 		if (in_nullhost(ip->ip_src)) {
-			register struct in_ifaddr *ia;
+			struct in_ifaddr *ia;
 
 			IFP_TO_IA(ifp, ia);
 			ip->ip_src = ia->ia_addr.sin_addr;
@@ -373,6 +382,17 @@ ip_output(m0, va_alist)
 	if (in_nullhost(ip->ip_src))
 		ip->ip_src = ia->ia_addr.sin_addr;
 #endif
+
+	/*
+	 * packets with Class-D address as source are not valid per 
+	 * RFC 1112
+	 */
+	if (IN_MULTICAST(ip->ip_src.s_addr)) {
+		ipstat.ips_odropped++;
+		error = EADDRNOTAVAIL;
+		goto bad;
+	}
+
 	/*
 	 * Look for broadcast address and
 	 * and verify user is allowed to send
@@ -402,7 +422,8 @@ sendit:
 	 * Run through list of hooks for output packets.
 	 */
 	m1 = m;
-	for (pfh = pfil_hook_get(PFIL_OUT); pfh; pfh = pfh->pfil_link.tqe_next)
+	pfh = pfil_hook_get(PFIL_OUT, &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
+	for (; pfh; pfh = pfh->pfil_link.tqe_next)
 		if (pfh->pfil_func) {
 		    	rv = pfh->pfil_func(ip, hlen, ifp, 1, &m1);
 			if (rv) {
@@ -563,6 +584,16 @@ skip_ipsec:
 	 * Too large for interface; fragment if possible.
 	 * Must be able to put at least 8 bytes per fragment.
 	 */
+#if 0
+	/*
+	 * If IPsec packet is too big for the interface, try fragment it.
+	 * XXX This really is a quickhack.  May be inappropriate.
+	 * XXX fails if somebody is sending AH'ed packet, with:
+	 *	sizeof(packet without AH) < mtu < sizeof(packet with AH)
+	 */
+	if (sab && ip->ip_p != IPPROTO_AH && (flags & IP_FORWARDING) == 0)
+		ip->ip_off &= ~IP_DF;
+#endif /*IPSEC*/
 	if (ip->ip_off & IP_DF) {
 		if (flags & IP_RETURNMTU)
 			*mtu_p = mtu;
@@ -600,6 +631,8 @@ skip_ipsec:
 		m->m_data += max_linkhdr;
 		mhip = mtod(m, struct ip *);
 		*mhip = *ip;
+		/* we must inherit MCAST and BCAST flags */
+		m->m_flags |= m0->m_flags & (M_MCAST|M_BCAST);
 		if (hlen > sizeof (struct ip)) {
 			mhlen = ip_optcopy(ip, mhip) + sizeof (struct ip);
 			mhip->ip_hl = mhlen >> 2;
@@ -721,13 +754,13 @@ ip_optlen(inp)
  */
 static struct mbuf *
 ip_insertoptions(m, opt, phlen)
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct mbuf *opt;
 	int *phlen;
 {
-	register struct ipoption *p = mtod(opt, struct ipoption *);
+	struct ipoption *p = mtod(opt, struct ipoption *);
 	struct mbuf *n;
-	register struct ip *ip = mtod(m, struct ip *);
+	struct ip *ip = mtod(m, struct ip *);
 	unsigned optlen;
 
 	optlen = opt->m_len - sizeof(p->ipopt_dst);
@@ -768,7 +801,7 @@ int
 ip_optcopy(ip, jp)
 	struct ip *ip, *jp;
 {
-	register u_char *cp, *dp;
+	u_char *cp, *dp;
 	int opt, optlen, cnt;
 
 	cp = (u_char *)(ip + 1);
@@ -816,9 +849,9 @@ ip_ctloutput(op, so, level, optname, mp)
 	int level, optname;
 	struct mbuf **mp;
 {
-	register struct inpcb *inp = sotoinpcb(so);
-	register struct mbuf *m = *mp;
-	register int optval = 0;
+	struct inpcb *inp = sotoinpcb(so);
+	struct mbuf *m = *mp;
+	int optval = 0;
 	int error = 0;
 #ifdef IPSEC
 #ifdef __NetBSD__
@@ -925,6 +958,7 @@ ip_ctloutput(op, so, level, optname, mp)
 			caddr_t req = NULL;
 			size_t len = 0;
 			int priv = 0;
+
 #ifdef __NetBSD__
 			if (p == 0 || suser(p->p_ucred, &p->p_acflag))
 				priv = 0;
@@ -1064,10 +1098,10 @@ ip_pcbopts(optname, pcbopt, m)
 ip_pcbopts(pcbopt, m)
 #endif
 	struct mbuf **pcbopt;
-	register struct mbuf *m;
+	struct mbuf *m;
 {
-	register int cnt, optlen;
-	register u_char *cp;
+	int cnt, optlen;
+	u_char *cp;
 	u_char opt;
 
 	/* turn off any old options */
@@ -1168,15 +1202,15 @@ ip_setmoptions(optname, imop, m)
 	struct ip_moptions **imop;
 	struct mbuf *m;
 {
-	register int error = 0;
+	int error = 0;
 	u_char loop;
-	register int i;
+	int i;
 	struct in_addr addr;
-	register struct ip_mreq *mreq;
-	register struct ifnet *ifp;
-	register struct ip_moptions *imo = *imop;
+	struct ip_mreq *mreq;
+	struct ifnet *ifp;
+	struct ip_moptions *imo = *imop;
 	struct route ro;
-	register struct sockaddr_in *dst;
+	struct sockaddr_in *dst;
 
 	if (imo == NULL) {
 		/*
@@ -1404,8 +1438,8 @@ ip_setmoptions(optname, imop, m)
 int
 ip_getmoptions(optname, imo, mp)
 	int optname;
-	register struct ip_moptions *imo;
-	register struct mbuf **mp;
+	struct ip_moptions *imo;
+	struct mbuf **mp;
 {
 	u_char *ttl;
 	u_char *loop;
@@ -1451,9 +1485,9 @@ ip_getmoptions(optname, imo, mp)
  */
 void
 ip_freemoptions(imo)
-	register struct ip_moptions *imo;
+	struct ip_moptions *imo;
 {
-	register int i;
+	int i;
 
 	if (imo != NULL) {
 		for (i = 0; i < imo->imo_num_memberships; ++i)
@@ -1471,10 +1505,10 @@ ip_freemoptions(imo)
 static void
 ip_mloopback(ifp, m, dst)
 	struct ifnet *ifp;
-	register struct mbuf *m;
-	register struct sockaddr_in *dst;
+	struct mbuf *m;
+	struct sockaddr_in *dst;
 {
-	register struct ip *ip;
+	struct ip *ip;
 	struct mbuf *copym;
 
 	copym = m_copy(m, 0, M_COPYALL);

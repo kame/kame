@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.81 2000/12/01 16:09:50 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.82 2000/12/02 07:30:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -47,6 +47,9 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#ifdef __NetBSD__
+#include <sys/callout.h>
+#endif
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
@@ -142,6 +145,9 @@ static void nd6_slowtimo __P((void *));
 void (*mip6_expired_defrouter_hook)(struct nd_defrouter *dr) = 0;
 #endif
 
+struct callout nd6_slowtimo_ch;
+struct callout nd6_timer_ch;
+
 void
 nd6_init()
 {
@@ -164,7 +170,12 @@ nd6_init()
 	nd6_init_done = 1;
 
 	/* start timer */
+#ifdef __NetBSD__
+	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
+	    nd6_slowtimo, NULL);
+#else
 	timeout(nd6_slowtimo, (caddr_t)0, ND6_SLOWTIMER_INTERVAL * hz);
+#endif
 }
 
 void
@@ -449,7 +460,12 @@ nd6_timer(ignored_arg)
 			nd6_prune * hz / MIP6_EAGER_FREQ);
 	else
 #endif
+#ifdef __NetBSD__
+	callout_reset(&nd6_timer_ch, nd6_prune * hz,
+	    nd6_timer, NULL);
+#else
 	timeout(nd6_timer, (caddr_t)0, nd6_prune * hz);
+#endif
 
 	ln = llinfo_nd6.ln_next;
 	/* XXX BSD/OS separates this code -- itojun */
@@ -1870,7 +1886,12 @@ nd6_slowtimo(ignored_arg)
 	register int i;
 	register struct nd_ifinfo *nd6if;
 
+#ifdef __NetBSD__
+	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
+	    nd6_slowtimo, NULL);
+#else
 	timeout(nd6_slowtimo, (caddr_t)0, ND6_SLOWTIMER_INTERVAL * hz);
+#endif
 	for (i = 1; i < if_index + 1; i++) {
 		if (!nd_ifinfo || i >= nd_ifinfo_indexlim)
 			continue;

@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_debug.c,v 1.13 1996/10/13 17:31:23 christos Exp $	*/
+/*	$NetBSD: tcp_debug.c,v 1.14 1999/07/01 08:12:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

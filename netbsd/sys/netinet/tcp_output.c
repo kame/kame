@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_output.c,v 1.47 1999/01/20 03:39:54 thorpej Exp $	*/
+/*	$NetBSD: tcp_output.c,v 1.56.4.3 2000/11/10 00:12:43 tv Exp $	*/
 
 /*
 %%% portions-copyright-nrl-95
@@ -296,19 +296,19 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
  */
 int
 tcp_output(tp)
-	register struct tcpcb *tp;
+	struct tcpcb *tp;
 {
 	struct socket *so;
 	struct route *ro;
 	struct rtentry *rt;
 	long len, win;
 	int off, flags, error;
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct ip *ip;
 #ifdef INET6
 	struct ip6_hdr *ip6;
 #endif
-	register struct tcphdr *th;
+	struct tcphdr *th;
 	u_char opt[MAX_TCPOPTLEN];
 	unsigned optlen, hdrlen;
 	int idle, sendalot, txsegsize, rxsegsize;
@@ -1059,10 +1059,10 @@ send:
 			opts = NULL;
 #ifdef NEW_STRUCT_ROUTE
 		error = ip6_output(m, opts, ro, so->so_options & SO_DONTROUTE,
-				   0, NULL);
+			0, NULL);
 #else
 		error = ip6_output(m, opts, (struct route_in6 *)ro,
-				   so->so_options & SO_DONTROUTE, 0, NULL);
+			so->so_options & SO_DONTROUTE, 0, NULL);
 #endif
 		break;
 	    }
@@ -1115,9 +1115,9 @@ out:
 
 void
 tcp_setpersist(tp)
-	register struct tcpcb *tp;
+	struct tcpcb *tp;
 {
-	register int t = ((tp->t_srtt >> 2) + tp->t_rttvar) >> (1 + 2);
+	int t = ((tp->t_srtt >> 2) + tp->t_rttvar) >> (1 + 2);
 	int nticks;
 
 	if (TCP_TIMER_ISARMED(tp, TCPT_REXMT))

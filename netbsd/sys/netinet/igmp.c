@@ -1,4 +1,4 @@
-/*	$NetBSD: igmp.c,v 1.19.2.1 1999/04/26 15:45:02 perry Exp $	*/
+/*	$NetBSD: igmp.c,v 1.25 2000/06/16 20:21:26 matt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,7 +62,7 @@
 
 #define IP_MULTICASTOPTS	0
 
-int		igmp_timers_are_running;
+int igmp_timers_are_running;
 static struct router_info *rti_head;
 
 void igmp_sendpkt __P((struct in_multi *, int));
@@ -84,7 +84,7 @@ static int
 rti_fill(inm)
 	struct in_multi *inm;
 {
-	register struct router_info *rti;
+	struct router_info *rti;
 
 	for (rti = rti_head; rti != 0; rti = rti->rti_next) {
 		if (rti->rti_ifp == inm->inm_ifp) {
@@ -110,7 +110,7 @@ static struct router_info *
 rti_find(ifp)
 	struct ifnet *ifp;
 {
-	register struct router_info *rti;
+	struct router_info *rti;
 
 	for (rti = rti_head; rti != 0; rti = rti->rti_next) {
 		if (rti->rti_ifp == ifp)
@@ -136,15 +136,15 @@ igmp_input(m, va_alist)
 #endif
 {
 	int proto;
-	register int iphlen;
-	register struct ifnet *ifp = m->m_pkthdr.rcvif;
-	register struct ip *ip = mtod(m, struct ip *);
-	register struct igmp *igmp;
-	register int minlen;
+	int iphlen;
+	struct ifnet *ifp = m->m_pkthdr.rcvif;
+	struct ip *ip = mtod(m, struct ip *);
+	struct igmp *igmp;
+	int minlen;
 	struct in_multi *inm;
 	struct in_multistep step;
 	struct router_info *rti;
-	register struct in_ifaddr *ia;
+	struct in_ifaddr *ia;
 	int timer;
 	va_list ap;
 
@@ -164,10 +164,13 @@ igmp_input(m, va_alist)
 		m_freem(m);
 		return;
 	}
-	if ((m->m_flags & M_EXT || m->m_len < minlen) &&
-	    (m = m_pullup(m, minlen)) == 0) {
-		++igmpstat.igps_rcv_tooshort;
-		return;
+	if (((m->m_flags & M_EXT) && (ip->ip_src.s_addr & IN_CLASSA_NET) == 0)
+	    || m->m_len < minlen) {
+		if ((m = m_pullup(m, minlen)) == 0) {
+			++igmpstat.igps_rcv_tooshort;
+			return;
+		}
+		ip = mtod(m, struct ip *);
 	}
 
 	/*
@@ -183,7 +186,6 @@ igmp_input(m, va_alist)
 	}
 	m->m_data -= iphlen;
 	m->m_len += iphlen;
-	ip = mtod(m, struct ip *);
 
 	switch (igmp->igmp_type) {
 
@@ -445,7 +447,7 @@ igmp_leavegroup(inm)
 void
 igmp_fasttimo()
 {
-	register struct in_multi *inm;
+	struct in_multi *inm;
 	struct in_multistep step;
 	int s;
 
@@ -483,7 +485,7 @@ igmp_fasttimo()
 void
 igmp_slowtimo()
 {
-	register struct router_info *rti;
+	struct router_info *rti;
 	int s;
 
 	s = splsoftnet();

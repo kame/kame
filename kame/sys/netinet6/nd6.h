@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.24 2000/07/11 03:23:10 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.25 2000/12/02 07:30:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -38,6 +38,9 @@
 #endif
 
 #include <sys/queue.h>
+#ifdef __NetBSD__
+#include <sys/callout.h>
+#endif
 
 struct	llinfo_nd6 {
 	struct	llinfo_nd6 *ln_next;
@@ -251,6 +254,8 @@ extern struct llinfo_nd6 llinfo_nd6;
 extern struct nd_ifinfo *nd_ifinfo;
 extern struct nd_drhead nd_defrouter;
 extern struct nd_prhead nd_prefix;
+
+extern struct callout nd6_timer_ch;
 
 /* nd6_rtr.c */
 extern struct ifnet *nd6_defifp;  /* XXXYYY */

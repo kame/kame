@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_input.c,v 1.82.2.5 2000/03/02 10:24:18 he Exp $	*/
+/*	$NetBSD: ip_input.c,v 1.114.4.3 2000/10/17 00:59:49 tv Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -139,6 +139,10 @@
 #include <netinet/in_gif.h>
 #include "gif.h"
 
+#ifdef MROUTING
+#include <netinet/ip_mroute.h>
+#endif
+
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
@@ -193,15 +197,12 @@ int	ipprintfs = 0;
 struct rttimer_queue *ip_mtudisc_timeout_q = NULL;
 
 extern	struct domain inetdomain;
-extern	struct protosw inetsw[];
-u_char	ip_protox[IPPROTO_MAX];
 int	ipqmaxlen = IFQ_MAXLEN;
 struct	in_ifaddrhead in_ifaddr;
 struct	in_ifaddrhashhead *in_ifaddrhashtbl;
 struct	ifqueue ipintrq;
 struct	ipstat	ipstat;
 u_int16_t	ip_id;
-int	ip_defttl;
 
 struct ipqhead ipq;
 int	ipq_locked;
@@ -289,8 +290,8 @@ void	ip6_forward	__P((struct mbuf *, int));
 void
 ip_init()
 {
-	register struct protosw *pr;
-	register int i;
+	struct protosw *pr;
+	int i;
 
 	pool_init(&ipqent_pool, sizeof(struct ipqent), 0, 0, 0, "ipqepl",
 	    0, NULL, NULL, M_IPQ);
@@ -348,12 +349,13 @@ ipintr()
 void
 ip_input(struct mbuf *m)
 {
-	register struct ip *ip = NULL;
-	register struct ipq *fp;
-	register struct in_ifaddr *ia;
-	register struct ifaddr *ifa;
+	struct ip *ip = NULL;
+	struct ipq *fp;
+	struct in_ifaddr *ia;
+	struct ifaddr *ifa;
 	struct ipqent *ipqe;
 	int hlen = 0, mff, len;
+	int downmatch;
 #ifdef PFIL_HOOKS
 	struct packet_filter_hook *pfh;
 	struct mbuf *m0;
@@ -433,8 +435,7 @@ ip_input(struct mbuf *m)
 	/*
 	 * Check for additional length bogosity
 	 */
-	if (len < hlen)
-	{
+	if (len < hlen) {
 	 	ipstat.ips_badlen++;
 		goto bad;
 	}
@@ -477,9 +478,11 @@ ip_input(struct mbuf *m)
 	 * in the list may have previously cleared it.
 	 */
 	m0 = m;
-	for (pfh = pfil_hook_get(PFIL_IN); pfh; pfh = pfh->pfil_link.tqe_next)
+	pfh = pfil_hook_get(PFIL_IN, &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
+	for (; pfh; pfh = pfh->pfil_link.tqe_next)
 		if (pfh->pfil_func) {
-			rv = pfh->pfil_func(ip, hlen, m->m_pkthdr.rcvif, 0, &m0);
+			rv = pfh->pfil_func(ip, hlen,
+					    m->m_pkthdr.rcvif, 0, &m0);
 			if (rv)
 				return;
 			m = m0;
@@ -525,18 +528,20 @@ ip_input(struct mbuf *m)
 
 	/*
 	 * Check our list of addresses, to see if the packet is for us.
+	 *
+	 * Traditional 4.4BSD did not consult IFF_UP at all.
+	 * The behavior here is to treat addresses on !IFF_UP interface
+	 * as not mine.
 	 */
+	downmatch = 0;
 	for (ia = IN_IFADDR_HASH(ip->ip_dst.s_addr).lh_first;
 	     ia != NULL;
 	     ia = ia->ia_hash.le_next) {
 		if (in_hosteq(ia->ia_addr.sin_addr, ip->ip_dst)) {
 			if ((ia->ia_ifp->if_flags & IFF_UP) != 0)
 				break;
-			else {
-				icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_HOST,
-				    0, m->m_pkthdr.rcvif);
-				return;
-			}
+			else
+				downmatch++;
 		}
 	}
 	if (ia != NULL)
@@ -627,8 +632,20 @@ ip_input(struct mbuf *m)
 	if (ipforwarding == 0) {
 		ipstat.ips_cantforward++;
 		m_freem(m);
-	} else
+	} else {
+		/*
+		 * If ip_dst matched any of my address on !IFF_UP interface,
+		 * and there's no IFF_UP interface that matches ip_dst,
+		 * send icmp unreach.  Forwarding it will result in in-kernel
+		 * forwarding loop till TTL goes to 0.
+		 */
+		if (downmatch) {
+			icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_HOST, 0, 0);
+			ipstat.ips_cantforward++;
+			return;
+		}
 		ip_forward(m, 0);
+	}
 	return;
 
 ours:
@@ -730,11 +747,11 @@ bad:
  */
 struct mbuf *
 ip_reass(ipqe, fp)
-	register struct ipqent *ipqe;
-	register struct ipq *fp;
+	struct ipqent *ipqe;
+	struct ipq *fp;
 {
-	register struct mbuf *m = ipqe->ipqe_m;
-	register struct ipqent *nq, *p, *q;
+	struct mbuf *m = ipqe->ipqe_m;
+	struct ipqent *nq, *p, *q;
 	struct ip *ip;
 	struct mbuf *t;
 	int hlen = ipqe->ipqe_ip->ip_hl << 2;
@@ -872,7 +889,7 @@ insert:
 	m->m_data -= (ip->ip_hl << 2);
 	/* some debugging cruft by sklower, below, will go away soon */
 	if (m->m_flags & M_PKTHDR) { /* XXX this should be done elsewhere */
-		register int plen = 0;
+		int plen = 0;
 		for (t = m; t; t = t->m_next)
 			plen += t->m_len;
 		m->m_pkthdr.len = plen;
@@ -894,7 +911,7 @@ void
 ip_freef(fp)
 	struct ipq *fp;
 {
-	register struct ipqent *q, *p;
+	struct ipqent *q, *p;
 
 	IPQ_LOCK_CHECK();
 
@@ -916,7 +933,7 @@ ip_freef(fp)
 void
 ip_slowtimo()
 {
-	register struct ipq *fp, *nfp;
+	struct ipq *fp, *nfp;
 	int s = splsoftnet();
 
 	IPQ_LOCK();
@@ -967,10 +984,10 @@ int
 ip_dooptions(m)
 	struct mbuf *m;
 {
-	register struct ip *ip = mtod(m, struct ip *);
-	register u_char *cp, *cp0;
-	register struct ip_timestamp *ipt;
-	register struct in_ifaddr *ia;
+	struct ip *ip = mtod(m, struct ip *);
+	u_char *cp, *cp0;
+	struct ip_timestamp *ipt;
+	struct in_ifaddr *ia;
 	int opt, optlen, cnt, off, code, type = ICMP_PARAMPROB, forward = 0;
 	struct in_addr dst;
 	n_time ntime;
@@ -1051,11 +1068,9 @@ ip_dooptions(m)
 			 */
 			bcopy((caddr_t)(cp + off), (caddr_t)&ipaddr.sin_addr,
 			    sizeof(ipaddr.sin_addr));
-			if (opt == IPOPT_SSRR) {
-#define	INA	struct in_ifaddr *
-#define	SA	struct sockaddr *
-			    ia = (INA)ifa_ifwithladdr((SA)&ipaddr);
-			} else
+			if (opt == IPOPT_SSRR)
+				ia = ifatoia(ifa_ifwithaddr(sintosa(&ipaddr)));
+			else
 				ia = ip_rtaddr(ipaddr.sin_addr);
 			if (ia == 0) {
 				type = ICMP_UNREACH;
@@ -1093,8 +1108,9 @@ ip_dooptions(m)
 			 * locate outgoing interface; if we're the destination,
 			 * use the incoming interface (should be same).
 			 */
-			if ((ia = (INA)ifa_ifwithaddr((SA)&ipaddr)) == 0 &&
-			    (ia = ip_rtaddr(ipaddr.sin_addr)) == 0) {
+			if ((ia = ifatoia(ifa_ifwithaddr(sintosa(&ipaddr))))
+			    == NULL &&
+			    (ia = ip_rtaddr(ipaddr.sin_addr)) == NULL) {
 				type = ICMP_UNREACH;
 				code = ICMP_UNREACH_HOST;
 				goto bad;
@@ -1137,8 +1153,8 @@ ip_dooptions(m)
 					goto bad;
 				}
 				ipaddr.sin_addr = dst;
-				ia = (INA)ifaof_ifpforaddr((SA)&ipaddr,
-							    m->m_pkthdr.rcvif);
+				ia = ifatoia(ifaof_ifpforaddr(sintosa(&ipaddr),
+				    m->m_pkthdr.rcvif));
 				if (ia == 0)
 					continue;
 				bcopy(&ia->ia_addr.sin_addr,
@@ -1155,7 +1171,8 @@ ip_dooptions(m)
 				}
 				bcopy(cp0, &ipaddr.sin_addr,
 				    sizeof(struct in_addr));
-				if (ifa_ifwithaddr((SA)&ipaddr) == 0)
+				if (ifatoia(ifa_ifwithaddr(sintosa(&ipaddr)))
+				    == NULL)
 					continue;
 				ipt->ipt_ptr += sizeof(struct in_addr);
 				break;
@@ -1167,7 +1184,7 @@ ip_dooptions(m)
 				goto bad;
 			}
 			ntime = iptime();
-			cp0 = (u_char *) &ntime;	/* XXX GCC BUG */
+			cp0 = (u_char *) &ntime; /* XXX grumble, GCC... */
 			bcopy(cp0, (caddr_t)cp + ipt->ipt_ptr - 1,
 			    sizeof(n_time));
 			ipt->ipt_ptr += sizeof(n_time);
@@ -1197,7 +1214,7 @@ struct in_ifaddr *
 ip_rtaddr(dst)
 	 struct in_addr dst;
 {
-	register struct sockaddr_in *sin;
+	struct sockaddr_in *sin;
 
 	sin = satosin(&ipforward_rt.ro_dst);
 
@@ -1248,8 +1265,8 @@ save_rte(option, dst)
 struct mbuf *
 ip_srcroute()
 {
-	register struct in_addr *p, *q;
-	register struct mbuf *m;
+	struct in_addr *p, *q;
+	struct mbuf *m;
 
 	if (ip_nhops == 0)
 		return ((struct mbuf *)0);
@@ -1318,12 +1335,12 @@ ip_srcroute()
  */
 void
 ip_stripoptions(m, mopt)
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct mbuf *mopt;
 {
-	register int i;
+	int i;
 	struct ip *ip = mtod(m, struct ip *);
-	register caddr_t opts;
+	caddr_t opts;
 	int olen;
 
 	olen = (ip->ip_hl << 2) - sizeof (struct ip);
@@ -1365,9 +1382,9 @@ ip_forward(m, srcrt)
 	struct mbuf *m;
 	int srcrt;
 {
-	register struct ip *ip = mtod(m, struct ip *);
-	register struct sockaddr_in *sin;
-	register struct rtentry *rt;
+	struct ip *ip = mtod(m, struct ip *);
+	struct sockaddr_in *sin;
+	struct rtentry *rt;
 	int error, type = 0, code = 0;
 	struct mbuf *mcopy;
 	n_long dest;
@@ -1458,7 +1475,7 @@ ip_forward(m, srcrt)
 #ifdef IPSEC
 	/* Don't lookup socket in forwading case */
 	ipsec_setsocket(m, NULL);
-#endif /*IPSEC*/
+#endif
 	error = ip_output(m, (struct mbuf *)0, &ipforward_rt,
 	    (IP_FORWARDING | (ip_directedbcast ? IP_ALLOWBROADCAST : 0)), 0);
 	if (error)
@@ -1568,10 +1585,10 @@ ip_forward(m, srcrt)
 
 void
 ip_savecontrol(inp, mp, ip, m)
-	register struct inpcb *inp;
-	register struct mbuf **mp;
-	register struct ip *ip;
-	register struct mbuf *m;
+	struct inpcb *inp;
+	struct mbuf **mp;
+	struct ip *ip;
+	struct mbuf *m;
 {
 
 	if (inp->inp_socket->so_options & SO_TIMESTAMP) {
@@ -1635,7 +1652,7 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	void *newp;
 	size_t newlen;
 {
-	extern int subnetsarelocal;
+	extern int subnetsarelocal, hostzeroisbroadcast;
 
 	int error, old;
 
@@ -1686,7 +1703,8 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPCTL_ANONPORTMIN:
 		old = anonportmin;
 		error = sysctl_int(oldp, oldlenp, newp, newlen, &anonportmin);
-		if (anonportmin >= anonportmax || anonportmin > 65535
+		if (anonportmin >= anonportmax || anonportmin < 0
+		    || anonportmin > 65535
 #ifndef IPNOPRIVPORTS
 		    || anonportmin < IPPORT_RESERVED
 #endif
@@ -1698,7 +1716,8 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPCTL_ANONPORTMAX:
 		old = anonportmax;
 		error = sysctl_int(oldp, oldlenp, newp, newlen, &anonportmax);
-		if (anonportmin >= anonportmax || anonportmax > 65535
+		if (anonportmin >= anonportmax || anonportmax < 0
+		    || anonportmax > 65535
 #ifndef IPNOPRIVPORTS
 		    || anonportmax < IPPORT_RESERVED
 #endif
@@ -1727,11 +1746,40 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return (error);
 	    }
 #endif
+	case IPCTL_HOSTZEROBROADCAST:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &hostzeroisbroadcast));
 #if NGIF > 0
 	case IPCTL_GIF_TTL:
 		return(sysctl_int(oldp, oldlenp, newp, newlen,
 				  &ip_gif_ttl));
 #endif
+
+#ifndef IPNOPRIVPORTS
+	case IPCTL_LOWPORTMIN:
+		old = lowportmin;
+		error = sysctl_int(oldp, oldlenp, newp, newlen, &lowportmin);
+		if (lowportmin >= lowportmax
+		    || lowportmin > IPPORT_RESERVEDMAX
+		    || lowportmin < IPPORT_RESERVEDMIN
+		    ) {
+			lowportmin = old;
+			return (EINVAL);
+		}
+		return (error);
+	case IPCTL_LOWPORTMAX:
+		old = lowportmax;
+		error = sysctl_int(oldp, oldlenp, newp, newlen, &lowportmax);
+		if (lowportmin >= lowportmax
+		    || lowportmax > IPPORT_RESERVEDMAX
+		    || lowportmax < IPPORT_RESERVEDMIN
+		    ) {
+			lowportmax = old;
+			return (EINVAL);
+		}
+		return (error);
+#endif
+
 	default:
 		return (EOPNOTSUPP);
 	}

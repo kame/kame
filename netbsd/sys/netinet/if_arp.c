@@ -1,4 +1,4 @@
-/*	$NetBSD: if_arp.c,v 1.56.2.3 1999/06/20 19:20:33 perry Exp $	*/
+/*	$NetBSD: if_arp.c,v 1.69 2000/05/20 03:08:42 jhawk Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -85,6 +85,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
@@ -94,6 +95,8 @@
 #include <sys/ioctl.h>
 #include <sys/syslog.h>
 #include <sys/proc.h>
+#include <sys/protosw.h>
+#include <sys/domain.h>
 
 #include <net/ethertypes.h>
 #include <net/if.h>
@@ -102,6 +105,7 @@
 #include <net/if_types.h>
 #include <net/route.h>
 
+
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
@@ -109,6 +113,15 @@
 #include <netinet/if_inarp.h>
 
 #include "loop.h"
+#include "arc.h"
+#if NARC > 0
+#include <net/if_arc.h>
+#endif
+#include "fddi.h"
+#if NFDDI > 0
+#include <net/if_fddi.h>
+#endif
+#include "token.h"
 #include "token.h"
 
 #define SIN(s) ((struct sockaddr_in *)s)
@@ -143,6 +156,8 @@ int	arp_inuse, arp_allocated, arp_intimer;
 int	arp_maxtries = 5;
 int	useloopback = 1;	/* use loopback interface for local traffic */
 int	arpinit_done = 0;
+
+struct	callout arptimer_ch;
 
 /* revarp state */
 static struct	in_addr myip, srv_ip;
@@ -193,6 +208,118 @@ lla_snprintf(adrp, len)
 	return buf;
 }
 
+struct protosw arpsw[] = {
+	{ 0, 0, 0, 0,
+	  0, 0, 0, 0,
+	  0,
+	  0, 0, 0, arp_drain,
+	}
+};
+
+
+struct domain arpdomain = 
+{ 	PF_ARP,  "arp", 0, 0, 0,
+	arpsw, &arpsw[sizeof(arpsw)/sizeof(arpsw[0])] 
+};
+
+/*
+ * ARP table locking.
+ *
+ * to prevent lossage vs. the arp_drain routine (which may be called at
+ * any time, including in a device driver context), we do two things:
+ *
+ * 1) manipulation of la->la_hold is done at splimp() (for all of
+ * about two instructions).
+ *
+ * 2) manipulation of the arp table's linked list is done under the
+ * protection of the ARP_LOCK; if arp_drain() or arptimer is called
+ * while the arp table is locked, we punt and try again later.
+ */
+
+int	arp_locked;
+
+static __inline int arp_lock_try __P((int));
+static __inline void arp_unlock __P((void));
+
+static __inline int
+arp_lock_try(int recurse)
+{
+	int s;
+
+	s = splimp();
+	if (!recurse && arp_locked) {
+		splx(s);
+		return (0);
+	}
+	arp_locked++;
+	splx(s);
+	return (1);
+}
+
+static __inline void
+arp_unlock()
+{
+	int s;
+
+	s = splimp();
+	arp_locked--;
+	splx(s);
+}
+
+#ifdef DIAGNOSTIC
+#define	ARP_LOCK(recurse)						\
+do {									\
+	if (arp_lock_try(recurse) == 0) {				\
+		printf("%s:%d: arp already locked\n", __FILE__, __LINE__); \
+		panic("arp_lock");					\
+	}								\
+} while (0)
+#define	ARP_LOCK_CHECK()						\
+do {									\
+	if (arp_locked == 0) {						\
+		printf("%s:%d: arp lock not held\n", __FILE__, __LINE__); \
+		panic("arp lock check");				\
+	}								\
+} while (0)
+#else
+#define	ARP_LOCK(x)		(void) arp_lock_try(x)
+#define	ARP_LOCK_CHECK()	/* nothing */
+#endif
+
+#define	ARP_UNLOCK()		arp_unlock()
+
+/*
+ * ARP protocol drain routine.  Called when memory is in short supply.
+ * Called at splimp();
+ */
+
+void
+arp_drain()
+{
+	struct llinfo_arp *la, *nla;
+	int count = 0;
+	struct mbuf *mold;
+	
+	if (arp_lock_try(0) == 0) {
+		printf("arp_drain: locked; punting\n");
+		return;
+	}
+	
+	for (la = llinfo_arp.lh_first; la != 0; la = nla) {
+		nla = la->la_list.le_next;
+
+		mold = la->la_hold;
+		la->la_hold = 0;
+
+		if (mold) {
+			m_freem(mold);
+			count++;
+		}
+	}
+	ARP_UNLOCK();
+}
+
+
 /*
  * Timeout routine.  Age arp_tab entries periodically.
  */
@@ -202,17 +329,27 @@ arptimer(arg)
 	void *arg;
 {
 	int s;
-	register struct llinfo_arp *la, *nla;
+	struct llinfo_arp *la, *nla;
 
 	s = splsoftnet();
-	timeout(arptimer, NULL, arpt_prune * hz);
+
+	if (arp_lock_try(0) == 0) {
+		/* get it later.. */
+		splx(s);
+		return;
+	}
+
+	callout_reset(&arptimer_ch, arpt_prune * hz, arptimer, NULL);
 	for (la = llinfo_arp.lh_first; la != 0; la = nla) {
-		register struct rtentry *rt = la->la_rt;
+		struct rtentry *rt = la->la_rt;
 
 		nla = la->la_list.le_next;
 		if (rt->rt_expire && rt->rt_expire <= time.tv_sec)
 			arptfree(la); /* timer has expired; clear */
 	}
+
+	ARP_UNLOCK();
+	
 	splx(s);
 }
 
@@ -222,13 +359,15 @@ arptimer(arg)
 void
 arp_rtrequest(req, rt, sa)
 	int req;
-	register struct rtentry *rt;
+	struct rtentry *rt;
 	struct sockaddr *sa;
 {
-	register struct sockaddr *gate = rt->rt_gateway;
-	register struct llinfo_arp *la = (struct llinfo_arp *)rt->rt_llinfo;
+	struct sockaddr *gate = rt->rt_gateway;
+	struct llinfo_arp *la = (struct llinfo_arp *)rt->rt_llinfo;
 	static struct sockaddr_dl null_sdl = {sizeof(null_sdl), AF_LINK};
 	size_t allocsize;
+	struct mbuf *mold;
+	int s;
 
 	if (!arpinit_done) {
 		arpinit_done = 1;
@@ -239,10 +378,14 @@ arp_rtrequest(req, rt, sa)
 		if (time.tv_sec == 0) {
 			time.tv_sec++;
 		}
-		timeout(arptimer, (caddr_t)0, hz);
+		callout_init(&arptimer_ch);
+		callout_reset(&arptimer_ch, hz, arptimer, NULL);
 	}
 	if (rt->rt_flags & RTF_GATEWAY)
 		return;
+
+	ARP_LOCK(1);		/* we may already be locked here. */
+
 	switch (req) {
 
 	case RTM_ADD:
@@ -269,6 +412,30 @@ arp_rtrequest(req, rt, sa)
 			 * from it do not need their expiration time set.
 			 */
 			rt->rt_expire = time.tv_sec;
+#if NFDDI > 0
+			if (rt->rt_ifp->if_type == IFT_FDDI
+			    && (rt->rt_rmx.rmx_mtu > FDDIIPMTU
+				|| (rt->rt_rmx.rmx_mtu == 0
+				    && rt->rt_ifp->if_mtu > FDDIIPMTU))) {
+				rt->rt_rmx.rmx_mtu = FDDIIPMTU;
+			}
+#endif
+#if NARC > 0
+			if (rt->rt_ifp->if_type == IFT_ARCNET) {
+				int arcipifmtu;
+
+				if (rt->rt_ifp->if_flags & IFF_LINK0)
+					arcipifmtu = arc_ipmtu;
+				else
+					arcipifmtu = ARCMTU;
+
+			    	if (rt->rt_rmx.rmx_mtu > arcipifmtu ||
+				    (rt->rt_rmx.rmx_mtu == 0 &&
+				     rt->rt_ifp->if_mtu > arcipifmtu))
+
+					rt->rt_rmx.rmx_mtu = arcipifmtu;
+			}
+#endif
 			break;
 		}
 		/* Announce a new entry if requested. */
@@ -344,10 +511,18 @@ arp_rtrequest(req, rt, sa)
 		LIST_REMOVE(la, la_list);
 		rt->rt_llinfo = 0;
 		rt->rt_flags &= ~RTF_LLINFO;
-		if (la->la_hold)
-			m_freem(la->la_hold);
+
+		s = splimp();
+		mold = la->la_hold;
+		la->la_hold = 0;
+		splx(s);
+		
+		if (mold)
+			m_freem(mold);
+
 		Free((caddr_t)la);
 	}
+	ARP_UNLOCK();
 }
 
 /*
@@ -358,11 +533,11 @@ arp_rtrequest(req, rt, sa)
  */
 static void
 arprequest(ifp, sip, tip, enaddr)
-	register struct ifnet *ifp;
-	register struct in_addr *sip, *tip;
-	register u_int8_t *enaddr;
+	struct ifnet *ifp;
+	struct in_addr *sip, *tip;
+	u_int8_t *enaddr;
 {
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct arphdr *ah;
 	struct sockaddr sa;
 
@@ -399,15 +574,17 @@ arprequest(ifp, sip, tip, enaddr)
  */
 int
 arpresolve(ifp, rt, m, dst, desten)
-	register struct ifnet *ifp;
-	register struct rtentry *rt;
+	struct ifnet *ifp;
+	struct rtentry *rt;
 	struct mbuf *m;
-	register struct sockaddr *dst;
-	register u_char *desten;
+	struct sockaddr *dst;
+	u_char *desten;
 {
-	register struct llinfo_arp *la;
+	struct llinfo_arp *la;
 	struct sockaddr_dl *sdl;
-
+	struct mbuf *mold;
+	int s;
+	
 	if (rt)
 		la = (struct llinfo_arp *)rt->rt_llinfo;
 	else {
@@ -435,9 +612,16 @@ arpresolve(ifp, rt, m, dst, desten)
 	 * response yet.  Replace the held mbuf with this
 	 * latest one.
 	 */
-	if (la->la_hold)
-		m_freem(la->la_hold);
+
+	s = splimp();
+	mold = la->la_hold;
 	la->la_hold = m;
+	splx(s);
+
+	if (mold)
+		m_freem(mold);
+
+	
 	/*
 	 * Re-send the ARP request when appropriate.
 	 */
@@ -475,8 +659,8 @@ arpresolve(ifp, rt, m, dst, desten)
 void
 arpintr()
 {
-	register struct mbuf *m;
-	register struct arphdr *ar;
+	struct mbuf *m;
+	struct arphdr *ar;
 	int s;
 
 	while (arpintrq.ifq_head) {
@@ -521,14 +705,17 @@ in_arpinput(m)
 	struct mbuf *m;
 {
 	struct arphdr *ah;
-	register struct ifnet *ifp = m->m_pkthdr.rcvif;
-	register struct llinfo_arp *la = 0;
-	register struct rtentry *rt;
+	struct ifnet *ifp = m->m_pkthdr.rcvif;
+	struct llinfo_arp *la = 0;
+	struct rtentry  *rt;
 	struct in_ifaddr *ia;
 	struct sockaddr_dl *sdl;
 	struct sockaddr sa;
 	struct in_addr isaddr, itaddr, myaddr;
 	int op;
+	struct mbuf *mold;
+	int s;
+	
 
 	ah = mtod(m, struct arphdr *);
 	op = ntohs(ah->ar_op);
@@ -639,22 +826,28 @@ in_arpinput(m)
 		}
 #if NTOKEN > 0
 		/*
-		 * XXX uses m_pktdat and assumes the complete answer including
+		 * XXX uses m_data and assumes the complete answer including
 		 * XXX token-ring headers is in the same buf
 		 */
-		if (ifp->if_type == IFT_ISO88025 &&
-			m->m_pktdat[8] & TOKEN_RI_PRESENT) {
-			struct token_rif	*rif;
-			size_t	riflen;
+		if (ifp->if_type == IFT_ISO88025) {
+			struct token_header *trh;
 
-			rif = TOKEN_RIF((struct token_header *) m->m_pktdat);
-			riflen = (ntohs(rif->tr_rcf) & TOKEN_RCF_LEN_MASK) >> 8;
+			trh = (struct token_header *)M_TRHSTART(m);
+			if (trh->token_shost[0] & TOKEN_RI_PRESENT) {
+				struct token_rif	*rif;
+				size_t	riflen;
 
-			if (riflen > 2 && riflen < sizeof(struct token_rif) &&
-				(riflen & 1) == 0) {
-				rif->tr_rcf ^= htons(TOKEN_RCF_DIRECTION);
-				rif->tr_rcf &= htons(~TOKEN_RCF_BROADCAST_MASK);
-				bcopy(rif, TOKEN_RIF(la), riflen);
+				rif = TOKEN_RIF(trh);
+				riflen = (ntohs(rif->tr_rcf) &
+				    TOKEN_RCF_LEN_MASK) >> 8;
+
+				if (riflen > 2 &&
+				    riflen < sizeof(struct token_rif) &&
+				    (riflen & 1) == 0) {
+					rif->tr_rcf ^= htons(TOKEN_RCF_DIRECTION);
+					rif->tr_rcf &= htons(~TOKEN_RCF_BROADCAST_MASK);
+					bcopy(rif, TOKEN_RIF(la), riflen);
+				}
 			}
 		}
 #endif /* NTOKEN > 0 */
@@ -664,11 +857,14 @@ in_arpinput(m)
 			rt->rt_expire = time.tv_sec + arpt_keep;
 		rt->rt_flags &= ~RTF_REJECT;
 		la->la_asked = 0;
-		if (la->la_hold) {
-			(*ifp->if_output)(ifp, la->la_hold,
-				rt_key(rt), rt);
-			la->la_hold = 0;
-		}
+
+		s = splimp();
+		mold = la->la_hold;
+		la->la_hold = 0;
+		splx(s);
+
+		if (mold)
+			(*ifp->if_output)(ifp, mold, rt_key(rt), rt);
 	}
 reply:
 	if (op != ARPOP_REQUEST) {
@@ -708,10 +904,12 @@ reply:
  */
 static void
 arptfree(la)
-	register struct llinfo_arp *la;
+	struct llinfo_arp *la;
 {
-	register struct rtentry *rt = la->la_rt;
-	register struct sockaddr_dl *sdl;
+	struct rtentry *rt = la->la_rt;
+	struct sockaddr_dl *sdl;
+
+	ARP_LOCK_CHECK();
 
 	if (rt == 0)
 		panic("arptfree");
@@ -734,7 +932,7 @@ arplookup(addr, create, proxy)
 	struct in_addr *addr;
 	int create, proxy;
 {
-	register struct rtentry *rt;
+	struct rtentry *rt;
 	static struct sockaddr_inarp sin;
 	const char *why = 0;
 
@@ -1043,20 +1241,25 @@ db_show_radix_node(rn, w)
 }
 /*
  * Function to print all the route trees.
- * Use this from ddb:  "call db_show_arptab"
+ * Use this from ddb:  "show arptab"
  */
-int
-db_show_arptab()
+void
+db_show_arptab(addr, have_addr, count, modif)
+	db_expr_t	addr;
+	int		have_addr;
+	db_expr_t	count;
+	char *		modif;
 {
 	struct radix_node_head *rnh;
 	rnh = rt_tables[AF_INET];
 	db_printf("Route tree for AF_INET\n");
 	if (rnh == NULL) {
 		db_printf(" (not initialized)\n");
-		return (0);
+		return;
 	}
 	rn_walktree(rnh, db_show_radix_node, NULL);
-	return (0);
+	return;
 }
 #endif
 #endif /* INET */
+

@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_var.h,v 1.58.2.1 1999/04/29 14:52:59 perry Exp $	*/
+/*	$NetBSD: tcp_var.h,v 1.72.4.1 2000/08/16 01:22:24 itojun Exp $	*/
 
 /*
 %%% portions-copyright-nrl-98
@@ -437,80 +437,80 @@ struct syn_cache_head {
  * but that's inconvenient at the moment.
  */
 struct	tcpstat {
-	u_long	tcps_connattempt;	/* connections initiated */
-	u_long	tcps_accepts;		/* connections accepted */
-	u_long	tcps_connects;		/* connections established */
-	u_long	tcps_drops;		/* connections dropped */
-	u_long	tcps_conndrops;		/* embryonic connections dropped */
-	u_long	tcps_closed;		/* conn. closed (includes drops) */
-	u_long	tcps_segstimed;		/* segs where we tried to get rtt */
-	u_long	tcps_rttupdated;	/* times we succeeded */
-	u_long	tcps_delack;		/* delayed acks sent */
-	u_long	tcps_timeoutdrop;	/* conn. dropped in rxmt timeout */
-	u_long	tcps_rexmttimeo;	/* retransmit timeouts */
-	u_long	tcps_persisttimeo;	/* persist timeouts */
-	u_long	tcps_keeptimeo;		/* keepalive timeouts */
-	u_long	tcps_keepprobe;		/* keepalive probes sent */
-	u_long	tcps_keepdrops;		/* connections dropped in keepalive */
-	u_long	tcps_persistdrops;	/* connections dropped in persist */
-	u_long	tcps_connsdrained;	/* connections drained due to memory
+	u_quad_t tcps_connattempt;	/* connections initiated */
+	u_quad_t tcps_accepts;		/* connections accepted */
+	u_quad_t tcps_connects;		/* connections established */
+	u_quad_t tcps_drops;		/* connections dropped */
+	u_quad_t tcps_conndrops;	/* embryonic connections dropped */
+	u_quad_t tcps_closed;		/* conn. closed (includes drops) */
+	u_quad_t tcps_segstimed;	/* segs where we tried to get rtt */
+	u_quad_t tcps_rttupdated;	/* times we succeeded */
+	u_quad_t tcps_delack;		/* delayed acks sent */
+	u_quad_t tcps_timeoutdrop;	/* conn. dropped in rxmt timeout */
+	u_quad_t tcps_rexmttimeo;	/* retransmit timeouts */
+	u_quad_t tcps_persisttimeo;	/* persist timeouts */
+	u_quad_t tcps_keeptimeo;	/* keepalive timeouts */
+	u_quad_t tcps_keepprobe;	/* keepalive probes sent */
+	u_quad_t tcps_keepdrops;	/* connections dropped in keepalive */
+	u_quad_t tcps_persistdrops;	/* connections dropped in persist */
+	u_quad_t tcps_connsdrained;	/* connections drained due to memory
 					   shortage */
 
-	u_long	tcps_sndtotal;		/* total packets sent */
-	u_long	tcps_sndpack;		/* data packets sent */
-	u_long	tcps_sndbyte;		/* data bytes sent */
-	u_long	tcps_sndrexmitpack;	/* data packets retransmitted */
-	u_long	tcps_sndrexmitbyte;	/* data bytes retransmitted */
-	u_long	tcps_sndacks;		/* ack-only packets sent */
-	u_long	tcps_sndprobe;		/* window probes sent */
-	u_long	tcps_sndurg;		/* packets sent with URG only */
-	u_long	tcps_sndwinup;		/* window update-only packets sent */
-	u_long	tcps_sndctrl;		/* control (SYN|FIN|RST) packets sent */
+	u_quad_t tcps_sndtotal;		/* total packets sent */
+	u_quad_t tcps_sndpack;		/* data packets sent */
+	u_quad_t tcps_sndbyte;		/* data bytes sent */
+	u_quad_t tcps_sndrexmitpack;	/* data packets retransmitted */
+	u_quad_t tcps_sndrexmitbyte;	/* data bytes retransmitted */
+	u_quad_t tcps_sndacks;		/* ack-only packets sent */
+	u_quad_t tcps_sndprobe;		/* window probes sent */
+	u_quad_t tcps_sndurg;		/* packets sent with URG only */
+	u_quad_t tcps_sndwinup;		/* window update-only packets sent */
+	u_quad_t tcps_sndctrl;		/* control (SYN|FIN|RST) packets sent */
 
-	u_long	tcps_rcvtotal;		/* total packets received */
-	u_long	tcps_rcvpack;		/* packets received in sequence */
-	u_long	tcps_rcvbyte;		/* bytes received in sequence */
-	u_long	tcps_rcvbadsum;		/* packets received with ccksum errs */
-	u_long	tcps_rcvbadoff;		/* packets received with bad offset */
-	u_long	tcps_rcvmemdrop;	/* packets dropped for lack of memory */
-	u_long	tcps_rcvshort;		/* packets received too short */
-	u_long	tcps_rcvduppack;	/* duplicate-only packets received */
-	u_long	tcps_rcvdupbyte;	/* duplicate-only bytes received */
-	u_long	tcps_rcvpartduppack;	/* packets with some duplicate data */
-	u_long	tcps_rcvpartdupbyte;	/* dup. bytes in part-dup. packets */
-	u_long	tcps_rcvoopack;		/* out-of-order packets received */
-	u_long	tcps_rcvoobyte;		/* out-of-order bytes received */
-	u_long	tcps_rcvpackafterwin;	/* packets with data after window */
-	u_long	tcps_rcvbyteafterwin;	/* bytes rcvd after window */
-	u_long	tcps_rcvafterclose;	/* packets rcvd after "close" */
-	u_long	tcps_rcvwinprobe;	/* rcvd window probe packets */
-	u_long	tcps_rcvdupack;		/* rcvd duplicate acks */
-	u_long	tcps_rcvacktoomuch;	/* rcvd acks for unsent data */
-	u_long	tcps_rcvackpack;	/* rcvd ack packets */
-	u_long	tcps_rcvackbyte;	/* bytes acked by rcvd acks */
-	u_long	tcps_rcvwinupd;		/* rcvd window update packets */
-	u_long	tcps_pawsdrop;		/* segments dropped due to PAWS */
-	u_long	tcps_predack;		/* times hdr predict ok for acks */
-	u_long	tcps_preddat;		/* times hdr predict ok for data pkts */
+	u_quad_t tcps_rcvtotal;		/* total packets received */
+	u_quad_t tcps_rcvpack;		/* packets received in sequence */
+	u_quad_t tcps_rcvbyte;		/* bytes received in sequence */
+	u_quad_t tcps_rcvbadsum;	/* packets received with ccksum errs */
+	u_quad_t tcps_rcvbadoff;	/* packets received with bad offset */
+	u_quad_t tcps_rcvmemdrop;	/* packets dropped for lack of memory */
+	u_quad_t tcps_rcvshort;		/* packets received too short */
+	u_quad_t tcps_rcvduppack;	/* duplicate-only packets received */
+	u_quad_t tcps_rcvdupbyte;	/* duplicate-only bytes received */
+	u_quad_t tcps_rcvpartduppack;	/* packets with some duplicate data */
+	u_quad_t tcps_rcvpartdupbyte;	/* dup. bytes in part-dup. packets */
+	u_quad_t tcps_rcvoopack;	/* out-of-order packets received */
+	u_quad_t tcps_rcvoobyte;	/* out-of-order bytes received */
+	u_quad_t tcps_rcvpackafterwin;	/* packets with data after window */
+	u_quad_t tcps_rcvbyteafterwin;	/* bytes rcvd after window */
+	u_quad_t tcps_rcvafterclose;	/* packets rcvd after "close" */
+	u_quad_t tcps_rcvwinprobe;	/* rcvd window probe packets */
+	u_quad_t tcps_rcvdupack;	/* rcvd duplicate acks */
+	u_quad_t tcps_rcvacktoomuch;	/* rcvd acks for unsent data */
+	u_quad_t tcps_rcvackpack;	/* rcvd ack packets */
+	u_quad_t tcps_rcvackbyte;	/* bytes acked by rcvd acks */
+	u_quad_t tcps_rcvwinupd;	/* rcvd window update packets */
+	u_quad_t tcps_pawsdrop;		/* segments dropped due to PAWS */
+	u_quad_t tcps_predack;		/* times hdr predict ok for acks */
+	u_quad_t tcps_preddat;		/* times hdr predict ok for data pkts */
 
-	u_long	tcps_pcbhashmiss;	/* input packets missing pcb hash */
-	u_long	tcps_noport;		/* no socket on port */
-	u_long	tcps_badsyn;		/* received ack for which we have
+	u_quad_t tcps_pcbhashmiss;	/* input packets missing pcb hash */
+	u_quad_t tcps_noport;		/* no socket on port */
+	u_quad_t tcps_badsyn;		/* received ack for which we have
 					   no SYN in compressed state */
 
 	/* These statistics deal with the SYN cache. */
-	u_long	tcps_sc_added;		/* # of entries added */
-	u_long	tcps_sc_completed;	/* # of connections completed */
-	u_long	tcps_sc_timed_out;	/* # of entries timed out */
-	u_long	tcps_sc_overflowed;	/* # dropped due to overflow */
-	u_long	tcps_sc_reset;		/* # dropped due to RST */
-	u_long	tcps_sc_unreach;	/* # dropped due to ICMP unreach */
-	u_long	tcps_sc_bucketoverflow;	/* # dropped due to bucket overflow */
-	u_long	tcps_sc_aborted;	/* # of entries aborted (no mem) */
-	u_long	tcps_sc_dupesyn;	/* # of duplicate SYNs received */
-	u_long	tcps_sc_dropped;	/* # of SYNs dropped (no route/mem) */
-	u_long	tcps_sc_collisions;	/* # of hash collisions */
-	u_long	tcps_sc_retransmitted;	/* # of retransmissions */
+	u_quad_t tcps_sc_added;		/* # of entries added */
+	u_quad_t tcps_sc_completed;	/* # of connections completed */
+	u_quad_t tcps_sc_timed_out;	/* # of entries timed out */
+	u_quad_t tcps_sc_overflowed;	/* # dropped due to overflow */
+	u_quad_t tcps_sc_reset;		/* # dropped due to RST */
+	u_quad_t tcps_sc_unreach;	/* # dropped due to ICMP unreach */
+	u_quad_t tcps_sc_bucketoverflow;/* # dropped due to bucket overflow */
+	u_quad_t tcps_sc_aborted;	/* # of entries aborted (no mem) */
+	u_quad_t tcps_sc_dupesyn;	/* # of duplicate SYNs received */
+	u_quad_t tcps_sc_dropped;	/* # of SYNs dropped (no route/mem) */
+	u_quad_t tcps_sc_collisions;	/* # of hash collisions */
+	u_quad_t tcps_sc_retransmitted;	/* # of retransmissions */
 };
 
 /*
@@ -537,7 +537,12 @@ struct	tcpstat {
 #define	TCPCTL_KEEPCNT		19	/* keepalive count */
 #define	TCPCTL_SLOWHZ		20	/* PR_SLOWHZ (read-only) */
 #define	TCPCTL_NEWRENO		21	/* NewReno Congestion Control */
-#define	TCPCTL_MAXID		22
+#define TCPCTL_LOG_REFUSED	22	/* Log refused connections */
+#if 0	/*obsoleted*/
+#define	TCPCTL_RSTRATELIMIT	23	/* RST rate limit */
+#endif
+#define	TCPCTL_RSTPPSLIMIT	24	/* RST pps limit */
+#define	TCPCTL_MAXID		25
 
 #define	TCPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -562,6 +567,9 @@ struct	tcpstat {
 	{ "keepcnt",	CTLTYPE_INT }, \
 	{ "slowhz",	CTLTYPE_INT }, \
 	{ "newreno",	CTLTYPE_INT }, \
+	{ "log_refused",CTLTYPE_INT }, \
+	{ 0, 0 }, \
+	{ "rstppslimit", CTLTYPE_INT }, \
 }
 
 #ifdef _KERNEL
@@ -586,6 +594,9 @@ extern	int tcp_ack_on_push;	/* ACK immediately on PUSH */
 extern	int tcp_syn_cache_limit; /* max entries for compressed state engine */
 extern	int tcp_syn_bucket_limit;/* max entries per hash bucket */
 extern	int tcp_syn_cache_interval; /* compressed state timer */
+extern	int tcp_log_refused;	/* log refused connections */
+
+extern	int tcp_rst_ppslim;
 
 extern	int tcp_syn_cache_size;
 extern	struct syn_cache_head tcp_syn_cache[];
@@ -614,6 +625,9 @@ extern	u_long syn_cache_count;
 	{ 1, 0, &tcp_keepcnt },			\
 	{ 1, 1, 0, PR_SLOWHZ },			\
 	{ 1, 0, &tcp_do_newreno },		\
+	{ 1, 0, &tcp_log_refused },		\
+	{ 0 },					\
+	{ 1, 0, &tcp_rst_ppslim },		\
 }
 
 int	 tcp_attach __P((struct socket *));

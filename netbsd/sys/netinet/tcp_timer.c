@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_timer.c,v 1.43 1998/09/10 10:47:00 mouse Exp $	*/
+/*	$NetBSD: tcp_timer.c,v 1.46 2000/03/30 13:25:10 augustss Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -151,7 +151,7 @@ struct tcp_delack_head tcp_delacks;
 void
 tcp_fasttimo()
 {
-	register struct tcpcb *tp, *ntp;
+	struct tcpcb *tp, *ntp;
 	int s;
 
 	s = splsoftnet();
@@ -176,13 +176,13 @@ tcp_fasttimo()
 void
 tcp_slowtimo()
 {
-	register struct inpcb *inp, *ninp;
-	register struct tcpcb *tp;
+	struct inpcb *inp, *ninp;
+	struct tcpcb *tp;
 #ifdef INET6
-	register struct in6pcb *in6p, *nin6p;
+	struct in6pcb *in6p, *nin6p;
 #endif
 	int s;
-	register long i;
+	long i;
 	static int syn_cache_last = 0;
 	int skip, mask;
 
@@ -279,7 +279,7 @@ void
 tcp_canceltimers(tp)
 	struct tcpcb *tp;
 {
-	register int i;
+	int i;
 
 	for (i = 0; i < TCPT_NTIMERS; i++)
 		TCP_TIMER_DISARM(tp, i);
@@ -295,7 +295,7 @@ int	tcp_totbackoff = 511;	/* sum of tcp_backoff[] */
  */
 struct tcpcb *
 tcp_timers(tp, timer)
-	register struct tcpcb *tp;
+	struct tcpcb *tp;
 	int timer;
 {
 	short	rto;

@@ -1,4 +1,4 @@
-/*	$NetBSD: raw_ip.c,v 1.42 1999/01/30 21:43:16 thorpej Exp $	*/
+/*	$NetBSD: raw_ip.c,v 1.53 2000/03/30 13:25:04 augustss Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,6 +85,7 @@
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #include <netinet/ip_mroute.h>
+#include <netinet/ip_icmp.h>
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
 
@@ -137,8 +138,8 @@ rip_input(m, va_alist)
 #endif
 {
 	int off, proto;
-	register struct ip *ip = mtod(m, struct ip *);
-	register struct inpcb *inp;
+	struct ip *ip = mtod(m, struct ip *);
+	struct inpcb *inp;
 	struct inpcb *last = 0;
 	struct mbuf *opts = 0;
 	struct sockaddr_in ripsrc;
@@ -203,9 +204,13 @@ rip_input(m, va_alist)
 		} else
 			sorwakeup(last->inp_socket);
 	} else {
-		m_freem(m);
-		ipstat.ips_noproto++;
-		ipstat.ips_delivered--;
+		if (inetsw[ip_protox[ip->ip_p]].pr_input == rip_input) {
+			icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PROTOCOL,
+			    0, 0);
+			ipstat.ips_noproto++;
+			ipstat.ips_delivered--;
+		} else
+			m_freem(m);
 	}
 	return;
 }
@@ -223,8 +228,8 @@ rip_output(m, va_alist)
 	va_dcl
 #endif
 {
-	register struct inpcb *inp;
-	register struct ip *ip;
+	struct inpcb *inp;
+	struct ip *ip;
 	struct mbuf *opts;
 	int flags;
 	va_list ap;
@@ -289,7 +294,7 @@ rip_ctloutput(op, so, level, optname, m)
 	int level, optname;
 	struct mbuf **m;
 {
-	register struct inpcb *inp = sotoinpcb(so);
+	struct inpcb *inp = sotoinpcb(so);
 	int error = 0;
 
 	if (level != IPPROTO_IP) {
@@ -408,14 +413,14 @@ u_long	rip_recvspace = RIPRCVQ;
 /*ARGSUSED*/
 int
 rip_usrreq(so, req, m, nam, control, p)
-	register struct socket *so;
+	struct socket *so;
 	int req;
 	struct mbuf *m, *nam, *control;
 	struct proc *p;
 {
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	int s;
-	register int error = 0;
+	int error = 0;
 #ifdef MROUTING
 	extern struct socket *ip_mrouter;
 #endif
@@ -423,6 +428,12 @@ rip_usrreq(so, req, m, nam, control, p)
 	if (req == PRU_CONTROL)
 		return (in_control(so, (long)m, (caddr_t)nam,
 		    (struct ifnet *)control, p));
+
+	if (req == PRU_PURGEIF) {
+		in_purgeif((struct ifnet *)control);
+		in_pcbpurgeif(&rawcbtable, (struct ifnet *)control);
+		return (0);
+	}
 
 	s = splsoftnet();
 	inp = sotoinpcb(so);

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_fddisubr.c,v 1.25 1998/12/10 15:51:48 christos Exp $	*/
+/*	$NetBSD: if_fddisubr.c,v 1.33 2000/06/14 05:10:28 mycroft Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -188,14 +188,18 @@ extern struct ifqueue pkintrq;
 #define	FDDIADDR(ifp)		(FDDICOM(ifp)->ac_enaddr)
 #endif
 
+static	int fddi_output __P((struct ifnet *, struct mbuf *,
+	    struct sockaddr *, struct rtentry *)); 
+static	void fddi_input __P((struct ifnet *, struct mbuf *));
+
 /*
  * FDDI output routine.
  * Encapsulate a packet of type family for the local net.
  * Assumes that ifp is actually pointer to ethercom structure.
  */
-int
+static int
 fddi_output(ifp, m0, dst, rt0)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	struct mbuf *m0;
 	struct sockaddr *dst;
 	struct rtentry *rt0;
@@ -203,9 +207,9 @@ fddi_output(ifp, m0, dst, rt0)
 	u_int16_t etype;
 	int s, error = 0, hdrcmplt = 0;
  	u_char esrc[6], edst[6];
-	register struct mbuf *m = m0;
-	register struct rtentry *rt;
-	register struct fddi_header *fh;
+	struct mbuf *m = m0;
+	struct rtentry *rt;
+	struct fddi_header *fh;
 	struct mbuf *mcopy = (struct mbuf *)0;
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
@@ -342,7 +346,7 @@ fddi_output(ifp, m0, dst, rt0)
 		if (aa->aa_flags & AFA_PHASE2) {
 			struct llc llc;
 
-			M_PREPEND(m, sizeof(struct llc), M_WAIT);
+			M_PREPEND(m, sizeof(struct llc), M_NOWAIT);
 			if (m == 0)
 				senderr(ENOBUFS);
 			llc.llc_dsap = llc.llc_ssap = LLC_SNAP_LSAP;
@@ -374,7 +378,7 @@ fddi_output(ifp, m0, dst, rt0)
 	case AF_ISO: {
 		int	snpalen;
 		struct	llc *l;
-		register struct sockaddr_dl *sdl;
+		struct sockaddr_dl *sdl;
 
 		if (rt && (sdl = (struct sockaddr_dl *)rt->rt_gateway) &&
 		    sdl->sdl_family == AF_LINK && sdl->sdl_alen > 0) {
@@ -418,7 +422,7 @@ fddi_output(ifp, m0, dst, rt0)
 #ifdef	LLC
 /*	case AF_NSAP: */
 	case AF_CCITT: {
-		register struct sockaddr_dl *sdl = 
+		struct sockaddr_dl *sdl = 
 			(struct sockaddr_dl *) rt->rt_gateway;
 
 		if (sdl && sdl->sdl_family == AF_LINK
@@ -442,7 +446,7 @@ fddi_output(ifp, m0, dst, rt0)
 #ifdef LLC_DEBUG
 		{
 			int i;
-			register struct llc *l = mtod(m, struct llc *);
+			struct llc *l = mtod(m, struct llc *);
 
 			printf("fddi_output: sending LLC2 pkt to: ");
 			for (i=0; i<6; i++)
@@ -458,11 +462,20 @@ fddi_output(ifp, m0, dst, rt0)
 
 	case pseudo_AF_HDRCMPLT:
 	{
-		struct ether_header *eh;
+		struct fddi_header *fh = (struct fddi_header *)dst->sa_data;
 		hdrcmplt = 1;
-		eh = (struct ether_header *)dst->sa_data;
-		bcopy((caddr_t)eh->ether_shost, (caddr_t)esrc, sizeof (esrc));
-		/* FALLTHROUGH */
+		bcopy((caddr_t)fh->fddi_shost, (caddr_t)esrc, sizeof (esrc));
+		/*FALLTHROUGH*/
+	}
+
+	case AF_LINK:
+	{
+		struct fddi_header *fh = (struct fddi_header *)dst->sa_data;
+ 		bcopy((caddr_t)fh->fddi_dhost, (caddr_t)edst, sizeof (edst));
+		if (*edst & 1)
+			m->m_flags |= (M_BCAST|M_MCAST);
+		etype = 0;
+		break;
 	}
 
 	case AF_UNSPEC:
@@ -526,7 +539,7 @@ fddi_output(ifp, m0, dst, rt0)
 	if (mcopy)
 		(void) looutput(ifp, mcopy, dst, rt);
 	if (etype != 0) {
-		register struct llc *l;
+		struct llc *l;
 		M_PREPEND(m, sizeof (struct llc), M_DONTWAIT);
 		if (m == 0)
 			senderr(ENOBUFS);
@@ -567,12 +580,12 @@ fddi_output(ifp, m0, dst, rt0)
 		senderr(ENOBUFS);
 	}
 	ifp->if_obytes += m->m_pkthdr.len;
+	if (m->m_flags & M_MCAST)
+		ifp->if_omcasts++;
 	IF_ENQUEUE(&ifp->if_snd, m);
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
-	if (m->m_flags & M_MCAST)
-		ifp->if_omcasts++;
 	return (error);
 
 bad:
@@ -583,25 +596,28 @@ bad:
 
 /*
  * Process a received FDDI packet;
- * the packet is in the mbuf chain m without
- * the fddi header, which is provided separately.
+ * the packet is in the mbuf chain m with
+ * the fddi header.
  */
-void
-fddi_input(ifp, fh, m)
+static void
+fddi_input(ifp, m)
 	struct ifnet *ifp;
-	register struct fddi_header *fh;
 	struct mbuf *m;
 {
-	register struct ifqueue *inq;
-	register struct llc *l;
+	struct ifqueue *inq;
+	struct llc *l;
+	struct fddi_header *fh;
 	int s;
 
 	if ((ifp->if_flags & IFF_UP) == 0) {
 		m_freem(m);
 		return;
 	}
+
+	fh = mtod(m, struct fddi_header *);
+
 	ifp->if_lastchange = time;
-	ifp->if_ibytes += m->m_pkthdr.len + sizeof (*fh);
+	ifp->if_ibytes += m->m_pkthdr.len;
 	if (fh->fddi_dhost[0] & 1) {
 		if (bcmp((caddr_t)fddibroadcastaddr, (caddr_t)fh->fddi_dhost,
 		    sizeof(fddibroadcastaddr)) == 0)
@@ -625,6 +641,9 @@ fddi_input(ifp, fh, m)
 	if ((fh->fddi_fc & FDDIFC_LLC_PRIO7) == FDDIFC_LLC_PRIO0)
 		m->m_flags |= M_LINK0;
 #endif
+
+	/* Strip off the FDDI header. */
+	m_adj(m, sizeof(struct fddi_header));
 
 	l = mtod(m, struct llc *);
 	switch (l->llc_dsap) {
@@ -758,7 +777,7 @@ fddi_input(ifp, fh, m)
 		case LLC_TEST_P:
 		{
 			struct sockaddr sa;
-			register struct ether_header *eh;
+			struct ether_header *eh;
 			int i;
 			u_char c = l->llc_dsap;
 
@@ -825,24 +844,26 @@ fddi_input(ifp, fh, m)
 #if defined(__NetBSD__)
 void
 fddi_ifattach(ifp, lla)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	caddr_t lla;
 #else
 void
 fddi_ifattach(ifp)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 #endif
 {
 #if !defined(__NetBSD__)
-	register struct ifaddr *ifa;
+	struct ifaddr *ifa;
 #endif
-	register struct sockaddr_dl *sdl;
+	struct sockaddr_dl *sdl;
 
 	ifp->if_type = IFT_FDDI;
 	ifp->if_addrlen = 6;
 	ifp->if_hdrlen = 21;
 	ifp->if_mtu = FDDIMTU;
-	ifp->if_baudrate = 100000000;
+	ifp->if_output = fddi_output;
+	ifp->if_input = fddi_input;
+	ifp->if_baudrate = IF_Mbps(100);
 #ifdef IFF_NOTRAILERS
 	ifp->if_flags |= IFF_NOTRAILERS;
 #endif

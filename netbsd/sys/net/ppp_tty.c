@@ -123,13 +123,9 @@ int	ppptioctl __P((struct tty *tp, u_long cmd, caddr_t data, int flag,
 int	pppinput __P((int c, struct tty *tp));
 int	pppstart __P((struct tty *tp));
 
-#ifdef TIOCRCVFRAME
 static void	ppprcvframe __P((struct ppp_softc *sc, struct mbuf *m));
-#endif
 static u_int16_t pppfcs __P((u_int16_t fcs, u_char *cp, int len));
-#ifdef SC_SYNC
 static void	pppsyncstart __P((struct ppp_softc *sc));
-#endif
 static void	pppasyncstart __P((struct ppp_softc *));
 static void	pppasyncctlp __P((struct ppp_softc *));
 static void	pppasyncrelinq __P((struct ppp_softc *));
@@ -137,10 +133,8 @@ static void	ppp_timeout __P((void *));
 static void	pppgetm __P((struct ppp_softc *sc));
 static void	pppdumpb __P((u_char *b, int l));
 static void	ppplogchar __P((struct ppp_softc *, int));
-#ifdef TIOCRCVFRAME
 static void	pppdumpframe __P((struct ppp_softc *sc, struct mbuf* m,
     int xmit));
-#endif
 
 /*
  * Some useful mbuf macros not in mbuf.h.
@@ -206,7 +200,7 @@ pppopen(dev, tp)
     if (sc->sc_relinq)
 	(*sc->sc_relinq)(sc);	/* get previous owner to relinquish the unit */
 
-#if 0 && NBPFILTER > 0
+#if NBPFILTER > 0
     /* Switch DLT to PPP-over-serial. */
     bpf_change_type(&sc->sc_bpf, DLT_PPP_SERIAL, PPP_HDRLEN);
 #endif
@@ -271,7 +265,7 @@ pppasyncrelinq(sc)
 {
     int s;
 
-#if 0 && NBPFILTER > 0
+#if NBPFILTER > 0
     /* Change DLT to back none. */
     bpf_change_type(&sc->sc_bpf, DLT_NULL, 0);
 #endif
@@ -286,7 +280,7 @@ pppasyncrelinq(sc)
 	sc->sc_m = NULL;
     }
     if (sc->sc_flags & SC_TIMEOUT) {
-	untimeout(ppp_timeout, (void *) sc);
+	callout_stop(&sc->sc_timo_ch);
 	sc->sc_flags &= ~SC_TIMEOUT;
     }
     splx(s);
@@ -420,11 +414,9 @@ ppptioctl(tp, cmd, data, flag, p)
 
     error = 0;
     switch (cmd) {
-#ifdef TIOCRCVFRAME
     case TIOCRCVFRAME:
     	ppprcvframe(sc,*((struct mbuf **)data));
 	break;
-#endif
 	
     case PPPIOCSASYNCMAP:
 	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
@@ -470,7 +462,6 @@ ppptioctl(tp, cmd, data, flag, p)
     return error;
 }
 
-#ifdef TIOCRCVFRAME
 /* receive a complete ppp frame from device in synchronous
  * hdlc mode. caller gives up ownership of mbuf
  */
@@ -579,7 +570,6 @@ bail:
 	m_freem(m);
 	splx(s);
 }
-#endif
 
 /*
  * FCS lookup table as calculated by genfcstab.
@@ -633,7 +623,6 @@ pppfcs(fcs, cp, len)
     return (fcs);
 }
 
-#ifdef SC_SYNC
 /* This gets called at splsoftnet from pppasyncstart at various times
  * when there is data ready to be sent.
  */
@@ -668,7 +657,6 @@ pppsyncstart(sc)
 		sc->sc_stats.ppp_obytes += len;
 	}
 }
-#endif
 
 /*
  * This gets called at splsoftnet from if_ppp.c at various times
@@ -686,12 +674,10 @@ pppasyncstart(sc)
     struct mbuf *m2;
     int s;
 
-#ifdef SC_SYNC
     if (sc->sc_flags & SC_SYNC){
 	pppsyncstart(sc);
 	return;
     }
-#endif
     
     idle = 0;
     while (CCOUNT(&tp->t_outq) < PPP_HIWAT) {
@@ -855,7 +841,7 @@ pppasyncstart(sc)
      * drained the t_outq.
      */
     if (!idle && (sc->sc_flags & SC_TIMEOUT) == 0) {
-	timeout(ppp_timeout, (void *) sc, 1);
+	callout_reset(&sc->sc_timo_ch, 1, ppp_timeout, sc);
 	sc->sc_flags |= SC_TIMEOUT;
     }
 
@@ -1249,7 +1235,6 @@ pppdumpb(b, l)
     printf("%s\n", buf);
 }
 
-#ifdef TIOCRCVFRAME
 static void
 pppdumpframe(sc, m, xmit)
 	struct ppp_softc *sc;
@@ -1293,6 +1278,5 @@ pppdumpframe(sc, m, xmit)
 		printf("\n");
 	}
 }
-#endif
 
 #endif	/* NPPP > 0 */

@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_usrreq.c,v 1.39 1998/09/10 19:53:28 tv Exp $	*/
+/*	$NetBSD: tcp_usrreq.c,v 1.51.2.2 2000/10/09 02:25:26 enami Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -173,11 +173,11 @@ tcp_usrreq(so, req, m, nam, control, p)
 	struct mbuf *m, *nam, *control;
 	struct proc *p;
 {
-	register struct inpcb *inp;
+	struct inpcb *inp;
 #ifdef INET6
-	register struct in6pcb *in6p;
+	struct in6pcb *in6p;
 #endif
-	register struct tcpcb *tp = NULL;
+	struct tcpcb *tp = NULL;
 	int s;
 	int error = 0;
 	int ostate;
@@ -198,6 +198,24 @@ tcp_usrreq(so, req, m, nam, control, p)
 		default:
 			return EAFNOSUPPORT;
 		}
+	}
+
+	if (req == PRU_PURGEIF) {
+		switch (family) {
+		case PF_INET:
+			in_purgeif((struct ifnet *)control);
+			in_pcbpurgeif(&tcbtable, (struct ifnet *)control);
+			break;
+#ifdef INET6
+		case PF_INET6:
+			in6_purgeif((struct ifnet *)control);
+			in6_pcbpurgeif(&tcb6, (struct ifnet *)control);
+			break;
+#endif
+		default:
+			return (EAFNOSUPPORT);
+		}
+		return (0);
 	}
 
 	s = splsoftnet();
@@ -569,11 +587,11 @@ tcp_ctloutput(op, so, level, optname, mp)
 	int error = 0, s;
 	struct inpcb *inp;
 #ifdef INET6
-	register struct in6pcb *in6p;
+	struct in6pcb *in6p;
 #endif
-	register struct tcpcb *tp;
-	register struct mbuf *m;
-	register int i;
+	struct tcpcb *tp;
+	struct mbuf *m;
+	int i;
 	int family;	/* family of the socket */
 
 	family = so->so_proto->pr_domain->dom_family;
@@ -700,7 +718,7 @@ int
 tcp_attach(so)
 	struct socket *so;
 {
-	register struct tcpcb *tp;
+	struct tcpcb *tp;
 	struct inpcb *inp;
 #ifdef INET6
 	struct in6pcb *in6p;
@@ -791,7 +809,7 @@ tcp_attach(so)
  */
 struct tcpcb *
 tcp_disconnect(tp)
-	register struct tcpcb *tp;
+	struct tcpcb *tp;
 {
 	struct socket *so;
 
@@ -830,7 +848,7 @@ tcp_disconnect(tp)
  */
 struct tcpcb *
 tcp_usrclosed(tp)
-	register struct tcpcb *tp;
+	struct tcpcb *tp;
 {
 
 	switch (tp->t_state) {
@@ -894,6 +912,7 @@ tcp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	void *newp;
 	size_t newlen;
 {
+
 	/* All sysctl names at this level are terminal. */
 	if (namelen != 1)
 		return (ENOTDIR);

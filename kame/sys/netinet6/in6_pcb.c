@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.76 2000/12/01 05:35:00 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.77 2000/12/01 12:06:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -634,6 +634,21 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		nmatch++;
 	}
 	return nmatch;
+}
+
+void
+in6_pcbpurgeif(head, ifp)
+	struct in6pcb *head;
+	struct ifnet *ifp;
+{
+	struct in6pcb *in6p, *nin6p;
+
+	for (in6p = head->in6p_next; in6p != head; in6p = nin6p) {
+		nin6p = in6p->in6p_next;
+		if (in6p->in6p_route.ro_rt != NULL &&
+		    in6p->in6p_route.ro_rt->rt_ifp == ifp)
+			in6_rtchange(in6p, 0);
+	}
 }
 
 /*

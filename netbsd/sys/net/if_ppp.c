@@ -110,6 +110,12 @@
 #include <netinet/in_var.h>
 #ifdef INET
 #include <netinet/ip.h>
+#else
+#ifdef _KERNEL
+#ifdef VJC
+#error ppp device with VJC assumes INET
+#endif
+#endif
 #endif
 
 #include "bpfilter.h"
@@ -198,6 +204,7 @@ pppattach()
     for (sc = ppp_softc; i < NPPP; sc++) {
 	sc->sc_unit = i;	/* XXX */
 	sprintf(sc->sc_if.if_xname, "ppp%d", i++);
+	callout_init(&sc->sc_timo_ch);
 	sc->sc_if.if_softc = sc;
 	sc->sc_if.if_mtu = PPP_MTU;
 	sc->sc_if.if_flags = IFF_POINTOPOINT | IFF_MULTICAST;
@@ -212,7 +219,7 @@ pppattach()
 	IFQ_SET_READY(&sc->sc_if.if_snd);
 	if_attach(&sc->sc_if);
 #if NBPFILTER > 0
-	bpfattach(&sc->sc_bpf, &sc->sc_if, DLT_PPP, PPP_HDRLEN);
+	bpfattach(&sc->sc_bpf, &sc->sc_if, DLT_NULL, 0);
 #endif
     }
 }

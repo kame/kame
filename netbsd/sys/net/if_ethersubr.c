@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ethersubr.c,v 1.41.2.1 1999/06/24 16:21:13 perry Exp $	*/
+/*	$NetBSD: if_ethersubr.c,v 1.58 2000/06/17 20:57:20 matt Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,7 +106,6 @@
 #endif
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
-#include <netinet6/in6_ifattach.h>
 #endif
 
 #ifdef NS
@@ -152,19 +151,20 @@ u_char	etherbroadcastaddr[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 #define SIN(x) ((struct sockaddr_in *)x)
 
+static	int ether_output __P((struct ifnet *, struct mbuf *,
+	    struct sockaddr *, struct rtentry *));
+static	void ether_input __P((struct ifnet *, struct mbuf *));
+
 /*
  * Ethernet output routine.
  * Encapsulate a packet of type family for the local net.
  * Assumes that ifp is actually pointer to ethercom structure.
  */
-int
-ether_output(ifp, m0, dst, rt0)
-	struct ifnet *ifp;
-	struct mbuf *m0;
-	struct sockaddr *dst;
-	struct rtentry *rt0;
+static int
+ether_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
+	struct rtentry *rt0)
 {
-	u_int16_t etype;
+	u_int16_t etype = 0;
 	int s, len, error = 0, hdrcmplt = 0;
  	u_char esrc[6], edst[6];
 	struct mbuf *m = m0;
@@ -315,7 +315,6 @@ ether_output(ifp, m0, dst, rt0)
 			    sizeof(llc.llc_snap_org_code));
 			llc.llc_snap_ether_type = htons(ETHERTYPE_ATALK);
 			bcopy(&llc, mtod(m, caddr_t), sizeof(struct llc));
-			etype = htons(m->m_pkthdr.len);
 		} else {
 			etype = htons(ETHERTYPE_ATALK);
 		}
@@ -375,7 +374,6 @@ ether_output(ifp, m0, dst, rt0)
 		M_PREPEND(m, 3, M_DONTWAIT);
 		if (m == NULL)
 			return (0);
-		etype = htons(m->m_pkthdr.len);
 		l = mtod(m, struct llc *);
 		l->llc_dsap = l->llc_ssap = LLC_ISO_LSAP;
 		l->llc_control = LLC_UI;
@@ -412,7 +410,6 @@ ether_output(ifp, m0, dst, rt0)
 				      (caddr_t)eh->ether_shost, sizeof (edst));
 			}
 		}
-		etype = htons(m->m_pkthdr.len);
 #ifdef LLC_DEBUG
 		{
 			int i;
@@ -452,6 +449,10 @@ ether_output(ifp, m0, dst, rt0)
 	if (mcopy)
 		(void) looutput(ifp, mcopy, dst, rt);
 
+	/* If no ether type is set, this must be a 802.2 formatted packet.
+	 */
+	if (etype == 0)
+		etype = htons(m->m_pkthdr.len);
 	/*
 	 * Add local net header.  If no space in first mbuf,
 	 * allocate another.
@@ -486,9 +487,10 @@ ether_output(ifp, m0, dst, rt0)
 		splx(s);
 		return (error);
 	}
-	ifp->if_obytes += len + sizeof (struct ether_header);
-	if (mflags & M_MCAST)
+	ifp->if_obytes += m->m_pkthdr.len;
+	if (m->m_flags & M_MCAST)
 		ifp->if_omcasts++;
+	IF_ENQUEUE(&ifp->if_snd, m);
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
@@ -502,18 +504,16 @@ bad:
 
 /*
  * Process a received Ethernet packet;
- * the packet is in the mbuf chain m without
- * the ether header, which is provided separately.
+ * the packet is in the mbuf chain m with
+ * the ether header.
  */
-void
-ether_input(ifp, eh, m)
-	struct ifnet *ifp;
-	struct ether_header *eh;
-	struct mbuf *m;
+static void
+ether_input(struct ifnet *ifp, struct mbuf *m)
 {
 	struct ifqueue *inq;
 	u_int16_t etype;
 	int s;
+	struct ether_header *eh;
 #if defined (ISO) || defined (LLC) || defined(NETATALK)
 	struct llc *l;
 #endif
@@ -522,8 +522,11 @@ ether_input(ifp, eh, m)
 		m_freem(m);
 		return;
 	}
+
+	eh = mtod(m, struct ether_header *);
+
 	ifp->if_lastchange = time;
-	ifp->if_ibytes += m->m_pkthdr.len + sizeof (*eh);
+	ifp->if_ibytes += m->m_pkthdr.len;
 	if (eh->ether_dhost[0] & 1) {
 		if (bcmp((caddr_t)etherbroadcastaddr, (caddr_t)eh->ether_dhost,
 		    sizeof(etherbroadcastaddr)) == 0)
@@ -535,6 +538,14 @@ ether_input(ifp, eh, m)
 		ifp->if_imcasts++;
 
 	etype = ntohs(eh->ether_type);
+
+	/* Strip off the Ethernet header. */
+	m_adj(m, sizeof(struct ether_header));
+
+	/* If the CRC is still on the packet, trim it off. */
+	if (m->m_flags & M_HASFCS)
+		m_adj(m, -ETHER_CRC_LEN);
+
 	switch (etype) {
 #ifdef INET
 	case ETHERTYPE_IP:
@@ -738,8 +749,7 @@ ether_input(ifp, eh, m)
  */
 static char digits[] = "0123456789abcdef";
 char *
-ether_sprintf(ap)
-	const u_char *ap;
+ether_sprintf(const u_char *ap)
 {
 	static char etherbuf[18];
 	char *cp = etherbuf;
@@ -758,9 +768,7 @@ ether_sprintf(ap)
  * Perform common duties while attaching to interface list
  */
 void
-ether_ifattach(ifp, lla)
-	struct ifnet *ifp;
-	const u_int8_t *lla;
+ether_ifattach(struct ifnet *ifp, const u_int8_t *lla)
 {
 	struct sockaddr_dl *sdl;
 
@@ -769,6 +777,9 @@ ether_ifattach(ifp, lla)
 	ifp->if_hdrlen = 14;
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_output = ether_output;
+	ifp->if_input = ether_input;
+	if (ifp->if_baudrate == 0)
+		ifp->if_baudrate = IF_Mbps(10);		/* just a default */
 	if ((sdl = ifp->if_sadl) &&
 	    sdl->sdl_family == AF_LINK) {
 		sdl->sdl_type = IFT_ETHER;
@@ -779,8 +790,91 @@ ether_ifattach(ifp, lla)
 	ifp->if_broadcastaddr = etherbroadcastaddr;
 }
 
+void
+ether_ifdetach(struct ifnet *ifp)
+{
+
+	/* Nothing. */
+}
+
+#if 0
+/*
+ * This is for reference.  We have a table-driven version
+ * of the little-endian crc32 generator, which is faster
+ * than the double-loop.
+ */
+u_int32_t
+ether_crc32_le(const u_int8_t *buf, size_t len)
+{
+	u_int32_t c, crc, carry;
+	size_t i, j;
+
+	crc = 0xffffffffU;	/* initial value */
+
+	for (i = 0; i < len; i++) {
+		c = buf[i];
+		for (j = 0; j < 8; j++) {
+			carry = ((crc & 0x01) ? 1 : 0) ^ (c & 0x01);
+			crc >>= 1;
+			c >>= 1;
+			if (carry)
+				crc = (crc ^ ETHER_CRC_POLY_LE);
+		}
+	}
+
+	return (crc);
+}
+#else
+u_int32_t
+ether_crc32_le(const u_int8_t *buf, size_t len)
+{
+	static const u_int32_t crctab[] = {
+		0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
+		0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
+		0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
+		0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
+	};
+	u_int32_t crc;
+	int i;
+
+	crc = 0xffffffffU;	/* initial value */
+
+	for (i = 0; i < len; i++) {
+		crc ^= buf[i];
+		crc = (crc >> 4) ^ crctab[crc & 0xf];
+		crc = (crc >> 4) ^ crctab[crc & 0xf];
+	}
+
+	return (crc);
+}
+#endif
+
+u_int32_t
+ether_crc32_be(const u_int8_t *buf, size_t len)
+{
+	u_int32_t c, crc, carry;
+	size_t i, j;
+
+	crc = 0xffffffffU;	/* initial value */
+
+	for (i = 0; i < len; i++) {
+		c = buf[i];
+		for (j = 0; j < 8; j++) {
+			carry = ((crc & 0x80000000U) ? 1 : 0) ^ (c & 0x01);
+			crc <<= 1;
+			c >>= 1;
+			if (carry)
+				crc = (crc ^ ETHER_CRC_POLY_BE) | carry;
+		}
+	}
+
+	return (crc);
+}
+
+#ifdef INET
 u_char	ether_ipmulticast_min[6] = { 0x01, 0x00, 0x5e, 0x00, 0x00, 0x00 };
 u_char	ether_ipmulticast_max[6] = { 0x01, 0x00, 0x5e, 0x7f, 0xff, 0xff };
+#endif
 #ifdef INET6
 u_char	ether_ip6multicast_min[6] = { 0x33, 0x33, 0x00, 0x00, 0x00, 0x00 };
 u_char	ether_ip6multicast_max[6] = { 0x33, 0x33, 0xff, 0xff, 0xff, 0xff };
@@ -790,9 +884,7 @@ u_char	ether_ip6multicast_max[6] = { 0x33, 0x33, 0xff, 0xff, 0xff, 0xff };
  * given interface.
  */
 int
-ether_addmulti(ifr, ec)
-	struct ifreq *ifr;
-	struct ethercom *ec;
+ether_addmulti(struct ifreq *ifr, struct ethercom *ec)
 {
 	struct ether_multi *enm;
 #ifdef INET
@@ -842,6 +934,9 @@ ether_addmulti(ifr, ec)
 			 */
 			bcopy(ether_ip6multicast_min, addrlo, ETHER_ADDR_LEN);
 			bcopy(ether_ip6multicast_max, addrhi, ETHER_ADDR_LEN);
+#if 0
+			set_allmulti = 1;
+#endif
 		} else {
 			ETHER_MAP_IPV6_MULTICAST(&sin6->sin6_addr, addrlo);
 			bcopy(addrlo, addrhi, ETHER_ADDR_LEN);
@@ -900,9 +995,7 @@ ether_addmulti(ifr, ec)
  * Delete a multicast address record.
  */
 int
-ether_delmulti(ifr, ec)
-	struct ifreq *ifr;
-	struct ethercom *ec;
+ether_delmulti(struct ifreq *ifr, struct ethercom *ec)
 {
 	struct ether_multi *enm;
 #ifdef INET

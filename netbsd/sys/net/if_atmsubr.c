@@ -1,4 +1,4 @@
-/*      $NetBSD: if_atmsubr.c,v 1.18 1998/07/05 22:48:07 jonathan Exp $       */
+/*      $NetBSD: if_atmsubr.c,v 1.22 2000/03/30 09:45:35 augustss Exp $       */
 
 /*
  *
@@ -89,7 +89,7 @@
 
 int
 atm_output(ifp, m0, dst, rt0)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	struct mbuf *m0;
 	struct sockaddr *dst;
 	struct rtentry *rt0;
@@ -97,8 +97,8 @@ atm_output(ifp, m0, dst, rt0)
 	u_int16_t etype = 0;			/* if using LLC/SNAP */
 	int s, error = 0, sz, len;
 	struct atm_pseudohdr atmdst, *ad;
-	register struct mbuf *m = m0;
-	register struct rtentry *rt;
+	struct mbuf *m = m0;
+	struct rtentry *rt;
 	struct atmllc *atmllc;
 	struct atmllc *llc_hdr = NULL;
 	u_int32_t atm_flags;
@@ -188,7 +188,7 @@ atm_output(ifp, m0, dst, rt0)
 			bcopy(dst->sa_data, &atmdst, sizeof(atmdst));
 			llc_hdr = (struct atmllc *)(dst->sa_data + sizeof(atmdst));
 			break;
-
+			
 		default:
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 			printf("%s: can't handle af%d\n", ifp->if_xname, 
@@ -253,11 +253,11 @@ bad:
 void
 atm_input(ifp, ah, m, rxhand)
 	struct ifnet *ifp;
-	register struct atm_pseudohdr *ah;
+	struct atm_pseudohdr *ah;
 	struct mbuf *m;
 	void *rxhand;
 {
-	register struct ifqueue *inq;
+	struct ifqueue *inq;
 	u_int16_t etype = ETHERTYPE_IP; /* default */
 	int s;
 
@@ -306,7 +306,7 @@ atm_input(ifp, ah, m, rxhand)
 	    m_adj(m, sizeof(*alc));
 	  }
 
-#ifdef ATM_PVCEXT
+#if 0 /*def ATM_PVCEXT*/
 	/* atm bridging support */
 	if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LINK2)) ==
 		(IFF_POINTOPOINT|IFF_LINK2)) {
@@ -370,16 +370,19 @@ atm_input(ifp, ah, m, rxhand)
  */
 void
 atm_ifattach(ifp)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 {
-	register struct ifaddr *ifa;
-	register struct sockaddr_dl *sdl;
+	struct ifaddr *ifa;
+	struct sockaddr_dl *sdl;
 
 	ifp->if_type = IFT_ATM;
 	ifp->if_addrlen = 0;
 	ifp->if_hdrlen = 0;
 	ifp->if_mtu = ATMMTU;
 	ifp->if_output = atm_output;
+#if 0 /* XXX XXX XXX */
+	ifp->if_input = atm_input;
+#endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
@@ -433,60 +436,5 @@ pvcsif_alloc()
 	pvcsif->sif_if.if_unit = pvc_number++;
 #endif
 	return (&pvcsif->sif_if);
-}
-
-/*
- * pvc bridging support:
- * add or delete brigding between 2 pvc interfaces.
- */
-int
-pvc_set_fwd(if_name, if_name2, op)
-	char *if_name, *if_name2;
-	int op;		/* 0:delete 1:add 2:get */
-{
-	struct ifnet *ifp, *ifp2;
-	struct pvcsif *pvcsif, *pvcsif2;
-
-	if (strncmp(if_name, "pvc", 3) != 0
-	    || (ifp = ifunit(if_name)) == NULL)
-		return (EINVAL);
-	pvcsif = (struct pvcsif *)ifp;
-
-	if (op == 2) {
-		/* get bridging info */
-		if ((ifp2 = pvcsif->sif_fwdifp) == NULL)
-			*if_name2 = '\0';
-		else
-#ifdef __NetBSD__
-			sprintf(if_name2, "%s", ifp2->if_xname);
-#else
-			sprintf(if_name2, "%s%d",
-				ifp2->if_name, ifp2->if_unit);
-#endif
-		return (0);
-	}
-
-	if (strncmp(if_name2, "pvc", 3) != 0
-	    || (ifp2 = ifunit(if_name2)) == NULL)
-		return (EINVAL);
-	pvcsif2 = (struct pvcsif *)ifp2;
-
-	if (op) {
-		/* set up bridging */
-		pvcsif->sif_fwdifp = ifp2;
-		pvcsif2->sif_fwdifp = ifp;
-		ifp->if_flags |= IFF_LINK2;	/* use IFF_LINK2 to show */
-		ifp2->if_flags |= IFF_LINK2;	/* bridging is enabled   */
-	}
-	else {
-		/* delete bridging */
-		if (pvcsif->sif_fwdifp != ifp2 || pvcsif2->sif_fwdifp != ifp)
-			return (EINVAL);
-		pvcsif->sif_fwdifp = NULL;
-		pvcsif2->sif_fwdifp = NULL;
-		ifp->if_flags &= ~IFF_LINK2;
-		ifp2->if_flags &= ~IFF_LINK2;
-	}
-	return (0);
 }
 #endif /* ATM_PVCEXT */

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_types.h,v 1.13 1999/01/18 06:31:13 msaitoh Exp $	*/
+/*	$NetBSD: if_types.h,v 1.16 2000/04/19 06:30:53 itojun Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993, 1994
@@ -179,11 +179,9 @@
 
 #define IFT_IEEE1394		   0x90	/* IEEE1394 High Performance SerialBus*/
 
-/* private usage... how should we define these? */
+/* not based on IANA assignments - how should we treat these? */
 #define IFT_GIF		0xf0
-#define IFT_DUMMY	0xf1
-#define IFT_PVC		0xf2
-#define IFT_FAITH	0xf3
-#define IFT_STF		0xf4
-
+#define IFT_PVC		0xf1
+#define IFT_FAITH	0xf2
+#define IFT_STF		0xf3
 #endif /* _NET_IF_TYPES_H_ */

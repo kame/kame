@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.114 2000/12/01 16:09:49 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.115 2000/12/02 07:30:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1019,7 +1019,9 @@ in6_update_ifa(ifp, ifra, ia)
 			nd6_dad_start((struct ifaddr *)ia, NULL);
 		}
 		break;
+#ifdef IFT_DUMMY
 	case IFT_DUMMY:
+#endif
 	case IFT_FAITH:
 	case IFT_GIF:
 	case IFT_LOOP:
@@ -1141,6 +1143,22 @@ in6_unlink_ifa(ia, ifp)
 	IFAFREE(&oia->ia_ifa);
 
 	splx(s);
+}
+
+void
+in6_purgeif(ifp)
+	struct ifnet *ifp;
+{
+	struct ifaddr *ifa, *nifa;
+
+	for (ifa = TAILQ_FIRST(&ifp->if_addrlist); ifa != NULL; ifa = nifa) {
+		nifa = TAILQ_NEXT(ifa, ifa_list);
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+		in6_purgeaddr(ifa, ifp);
+	}
+
+	in6_ifdetach(ifp);
 }
 
 /*

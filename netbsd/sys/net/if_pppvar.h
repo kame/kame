@@ -46,6 +46,8 @@
 #ifndef _NET_IF_PPPVAR_H_
 #define _NET_IF_PPPVAR_H_
 
+#include <sys/callout.h>
+
 /*
  * Supported network protocols.  These values are used for
  * indexing sc_npmode.
@@ -65,6 +67,7 @@ struct ppp_softc {
 	void	(*sc_start) __P((struct ppp_softc *));	/* start output proc */
 	void	(*sc_ctlp) __P((struct ppp_softc *)); /* rcvd control pkt */
 	void	(*sc_relinq) __P((struct ppp_softc *)); /* relinquish ifunit */
+	struct	callout sc_timo_ch;	/* timeout callout */
 	u_int16_t sc_mru;		/* max receive unit */
 	pid_t	sc_xfer;		/* used in transferring unit */
 	struct	ifqueue sc_rawq;	/* received packets */

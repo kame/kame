@@ -1,4 +1,4 @@
-/*	$NetBSD: if_loop.c,v 1.25 1998/07/05 06:49:17 jonathan Exp $	*/
+/*	$NetBSD: if_loop.c,v 1.30 2000/03/30 09:45:36 augustss Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -147,8 +147,8 @@ void
 loopattach(n)
 	int n;
 {
-	register int i;
-	register struct ifnet *ifp;
+	int i;
+	struct ifnet *ifp;
 
 	for (i = 0; i < NLOOP; i++) {
 		ifp = &loif[i];
@@ -175,15 +175,12 @@ loopattach(n)
 int
 looutput(ifp, m, dst, rt)
 	struct ifnet *ifp;
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct sockaddr *dst;
-	register struct rtentry *rt;
+	struct rtentry *rt;
 {
 	int s, isr;
-	register struct ifqueue *ifq = 0;
-#if 0 /*def PULLDOWN_TEST*/
-	struct mbuf *n, *prev;
-#endif
+	struct ifqueue *ifq = 0;
 
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("looutput: no header mbuf");
@@ -263,27 +260,6 @@ looutput(ifp, m, dst, rt)
 		printf("loop: not contiguous...\n");
 		m_freem(m);
 		return ENOBUFS;
-	}
-#endif
-#else
-#if 0
-	/*
-	 * remove zero-length mbuf in the chain, this does not make sense to
-	 * keep them.
-	 */
-	prev = m;
-	n = m->m_next;
-	while (prev && n) {
-		if (n->m_len == 0) {
-			prev->m_next = n->m_next;
-			n->m_next = NULL;
-			m_free(n);
-			n = prev->m_next;
-			continue;
-		}
-
-		prev = n;
-		n = n->m_next;
 	}
 #endif
 #endif
@@ -480,13 +456,13 @@ lortrequest(cmd, rt, sa)
 /* ARGSUSED */
 int
 loioctl(ifp, cmd, data)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	u_long cmd;
 	caddr_t data;
 {
-	register struct ifaddr *ifa;
-	register struct ifreq *ifr;
-	register int error = 0;
+	struct ifaddr *ifa;
+	struct ifreq *ifr;
+	int error = 0;
 
 	switch (cmd) {
 

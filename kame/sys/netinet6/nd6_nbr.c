@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.43 2000/12/01 16:09:51 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.44 2000/12/02 07:30:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -53,6 +53,9 @@
 #endif
 #include <sys/syslog.h>
 #include <sys/queue.h>
+#ifdef __NetBSD__
+#include <sys/callout.h>
+#endif
 #ifdef __OpenBSD__
 #include <dev/rndvar.h>
 #endif
@@ -989,7 +992,9 @@ struct dadq {
 	int dad_ns_ocount;	/* NS sent so far */
 	int dad_ns_icount;
 	int dad_na_icount;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __NetBSD__
+	struct callout dad_timer_ch;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
 	struct callout_handle dad_timer;
 #endif
 };
@@ -1086,11 +1091,17 @@ nd6_dad_start(ifa, tick)
 	dp->dad_ns_ocount = dp->dad_ns_tcount = 0;
 	if (!tick) {
 		nd6_dad_ns_output(dp, ifa);
+#ifdef __NetBSD__
+		callout_reset(&dp->dad_timer_ch,
+		    nd_ifinfo[ifa->ifa_ifp->if_index].retrans * hz / 1000,
+		    (void (*) __P((void *)))nd6_dad_timer, ifa);
+#else
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 		dp->dad_timer =
 #endif
 		timeout((void (*) __P((void *)))nd6_dad_timer, (void *)ifa,
 			nd_ifinfo[ifa->ifa_ifp->if_index].retrans * hz / 1000);
+#endif
 	} else {
 		int ntick;
 
@@ -1105,11 +1116,16 @@ nd6_dad_start(ifa, tick)
 #undef random
 #endif
 		*tick = ntick;
+#ifdef __NetBSD__
+		callout_reset(&dp->dad_timer_ch, ntick,
+		    (void (*) __P((void *)))nd6_dad_timer, ifa);
+#else
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 		dp->dad_timer =
 #endif
 		timeout((void (*) __P((void *)))nd6_dad_timer, (void *)ifa,
 			ntick);
+#endif
 	}
 }
 
@@ -1170,11 +1186,17 @@ nd6_dad_timer(ifa)
 		 * We have more NS to go.  Send NS packet for DAD.
 		 */
 		nd6_dad_ns_output(dp, ifa);
+#ifdef __NetBSD__
+		callout_reset(&dp->dad_timer_ch,
+		    nd_ifinfo[ifa->ifa_ifp->if_index].retrans * hz / 1000,
+		    (void (*) __P((void *)))nd6_dad_timer, ifa);
+#else
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 		dp->dad_timer =
 #endif
 		timeout((void (*) __P((void *)))nd6_dad_timer, (void *)ifa,
 			nd_ifinfo[ifa->ifa_ifp->if_index].retrans * hz / 1000);
+#endif
 	} else {
 		/*
 		 * We have transmitted sufficient number of DAD packets.
@@ -1273,11 +1295,15 @@ nd6_dad_duplicated(ifa)
 	ia->ia6_flags |= IN6_IFF_DUPLICATED;
 
 	/* We are done with DAD, with duplicated address found. (failure) */
+#ifdef __NetBSD__
+	callout_stop(&dp->dad_timer_ch);
+#else
 	untimeout((void (*) __P((void *)))nd6_dad_timer, (void *)ifa
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 		, dp->dad_timer
 #endif
 		);
+#endif
 
 	log(LOG_ERR, "%s: DAD complete for %s - duplicate found\n",
 	    if_name(ifa->ifa_ifp), ip6_sprintf(&ia->ia_addr.sin6_addr));

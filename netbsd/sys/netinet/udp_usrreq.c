@@ -1,4 +1,4 @@
-/*	$NetBSD: udp_usrreq.c,v 1.47 1999/01/19 23:03:22 mycroft Exp $	*/
+/*	$NetBSD: udp_usrreq.c,v 1.66.4.1 2000/07/28 16:58:10 sommerfeld Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,8 +65,7 @@
  */
 
 #include "opt_ipsec.h"
-
-#include "ipkdb.h"
+#include "opt_ipkdb.h"
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -123,6 +122,10 @@
 #include <netkey/key.h>
 #endif /*IPSEC*/
 
+#ifdef IPKDB
+#include <ipkdb/ipkdb.h>
+#endif
+
 /*
  * UDP protocol implementation.
  * Per RFC 768, August, 1980.
@@ -159,6 +162,7 @@ udp_init()
 	in_pcbinit(&udbtable, udbhashsize, udbhashsize);
 }
 
+#if 1 /*!UDP6*/
 void
 #if __STDC__
 udp_input(struct mbuf *m, ...)
@@ -232,7 +236,7 @@ udp_input(m, va_alist)
 	 */
 	len = ntohs((u_int16_t)uh->uh_ulen);
 	if (ip->ip_len != iphlen + len) {
-		if (ip->ip_len < iphlen + len) {
+		if (ip->ip_len < iphlen + len || len < sizeof(struct udphdr)) {
 			udpstat.udps_badlen++;
 			goto bad;
 		}
@@ -292,7 +296,7 @@ udp_input(m, va_alist)
 			goto bad;
 		}
 		udpstat.udps_noport++;
-#if NIPKDB > 0
+#ifdef IPKDB
 		if (checkipkdb(&ip->ip_src, uh->uh_sport, uh->uh_dport,
 				m, iphlen + sizeof(struct udphdr),
 				m->m_pkthdr.len - iphlen - sizeof(struct udphdr))) {
@@ -661,7 +665,7 @@ bad:
 static int
 in6_mcmatch(in6p, ia6, ifp)
 	struct in6pcb *in6p;
-	register struct in6_addr *ia6;
+	struct in6_addr *ia6;
 	struct ifnet *ifp;
 {
 	struct ip6_moptions *im6o = in6p->in6p_moptions;
@@ -850,7 +854,8 @@ bad:
 }
 #endif
 
-#if 0
+#else /*UDP6*/
+
 void
 #if __STDC__
 udp_input(struct mbuf *m, ...)
@@ -861,9 +866,9 @@ udp_input(m, va_alist)
 #endif
 {
 	int proto;
-	register struct ip *ip;
-	register struct udphdr *uh;
-	register struct inpcb *inp;
+	struct ip *ip;
+	struct udphdr *uh;
+	struct inpcb *inp;
 	struct mbuf *opts = 0;
 	int len;
 	struct ip save_ip;
@@ -913,7 +918,7 @@ udp_input(m, va_alist)
 	 */
 	len = ntohs((u_int16_t)uh->uh_ulen);
 	if (ip->ip_len != iphlen + len) {
-		if (ip->ip_len < iphlen + len) {
+		if (ip->ip_len < iphlen + len || len < sizeof(struct udphdr)) {
 			udpstat.udps_badlen++;
 			goto bad;
 		}
@@ -1081,7 +1086,7 @@ udp_input(m, va_alist)
 			}
 			udpstat.udps_noport++;
 			*ip = save_ip;
-#if NIPKDB > 0
+#ifdef IPKDB
 			if (checkipkdb(&ip->ip_src,
 				       uh->uh_sport,
 				       uh->uh_dport,
@@ -1124,7 +1129,7 @@ bad:
 	if (opts)
 		m_freem(opts);
 }
-#endif
+#endif /*UDP6*/
 
 /*
  * Notify a udp user of an asynchronous error;
@@ -1132,7 +1137,7 @@ bad:
  */
 static void
 udp_notify(inp, errno)
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	int errno;
 {
 
@@ -1147,9 +1152,8 @@ udp_ctlinput(cmd, sa, v)
 	struct sockaddr *sa;
 	void *v;
 {
-	register struct ip *ip = v;
-	register struct udphdr *uh;
-	extern int inetctlerrmap[];
+	struct ip *ip = v;
+	struct udphdr *uh;
 	void (*notify) __P((struct inpcb *, int)) = udp_notify;
 	int errno;
 
@@ -1186,9 +1190,9 @@ udp_output(m, va_alist)
 	va_dcl
 #endif
 {
-	register struct inpcb *inp;
-	register struct udpiphdr *ui;
-	register int len = m->m_pkthdr.len;
+	struct inpcb *inp;
+	struct udpiphdr *ui;
+	int len = m->m_pkthdr.len;
 	int error = 0;
 	va_list ap;
 
@@ -1267,13 +1271,19 @@ udp_usrreq(so, req, m, nam, control, p)
 	struct mbuf *m, *nam, *control;
 	struct proc *p;
 {
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	int s;
-	register int error = 0;
+	int error = 0;
 
 	if (req == PRU_CONTROL)
 		return (in_control(so, (long)m, (caddr_t)nam,
 		    (struct ifnet *)control, p));
+
+	if (req == PRU_PURGEIF) {
+		in_purgeif((struct ifnet *)control);
+		in_pcbpurgeif(&udbtable, (struct ifnet *)control);
+		return (0);
+	}
 
 	s = splsoftnet();
 	inp = sotoinpcb(so);

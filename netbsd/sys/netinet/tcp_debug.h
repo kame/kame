@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_debug.h,v 1.6 1998/02/10 01:27:11 perry Exp $	*/
+/*	$NetBSD: tcp_debug.h,v 1.9 1999/07/31 18:41:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
