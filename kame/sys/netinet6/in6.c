@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.69 2000/03/29 17:27:16 sumikawa Exp $	*/
+/*	$KAME: in6.c,v 1.70 2000/03/29 17:31:46 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2035,7 +2035,7 @@ in6_ifawithscope(oifp, dst)
 	register struct ifnet *oifp;
 	register struct in6_addr *dst;
 {
-	int dst_scope =	in6_addrscope(dst), src_scope, best_scope;
+	int dst_scope =	in6_addrscope(dst), src_scope, best_scope = 0;
 	int blen = -1;
 	struct ifaddr *ifa;
 	struct ifnet *ifp;
