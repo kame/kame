@@ -29,3 +29,6 @@ include	"arch/i386/conf/GENERIC"
 #options	MIP6_NOHAIPSEC
 #options	MIP6_DEBUG
 
+# Datagram Congestion Control Protocol
+#options		DCCP
+#options		DCCP_TFRC
