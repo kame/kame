@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.78 2001/04/06 14:23:48 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.79 2001/04/10 15:50:00 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1253,8 +1253,10 @@ quick_r2send(iph2, msg)
 		for (pr = pp->head; pr; pr = pr->next) {
 			body = isakmp_add_pl_n(body, &np_p,
 					ISAKMP_NTYPE_RESPONDER_LIFETIME, pr, data);
-			if (!body)
+			if (!body) {
+				vfree(data);
 				return error;	/* XXX */
+			}
 		}
 		vfree(data);
 	}
