@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.78 2001/08/28 13:05:09 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.79 2001/09/21 09:44:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1179,11 +1179,11 @@ plist()
 		if (p->vltime == ND6_INFINITE_LIFETIME)
 			printf(" vltime=infinity");
 		else
-			printf(" vltime=%ld", (long)p->vltime);
+			printf(" vltime=%lu", p->vltime);
 		if (p->pltime == ND6_INFINITE_LIFETIME)
 			printf(", pltime=infinity");
 		else
-			printf(", pltime=%ld", (long)p->pltime);
+			printf(", pltime=%lu", p->pltime);
 		if (p->expire == 0)
 			printf(", expire=Never");
 		else if (p->expire >= time.tv_sec)
@@ -1322,11 +1322,11 @@ plist()
 		if (PR.vltime == ND6_INFINITE_LIFETIME)
 			printf(" vltime=infinity");
 		else
-			printf(" vltime=%ld", (long)PR.vltime);
+			printf(" vltime=%lu", PR.vltime);
 		if (PR.pltime == ND6_INFINITE_LIFETIME)
 			printf(", pltime=infinity");
 		else
-			printf(", pltime=%ld", (long)PR.pltime);
+			printf(", pltime=%lu", PR.pltime);
 		if (PR.expire == 0)
 			printf(", expire=Never");
 		else if (PR.expire >= time.tv_sec)
