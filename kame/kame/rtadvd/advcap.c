@@ -1,4 +1,4 @@
-/*	$KAME: advcap.c,v 1.10 2002/06/10 19:59:46 itojun Exp $	*/
+/*	$KAME: advcap.c,v 1.11 2003/05/19 09:46:50 keiichi Exp $	*/
 
 /*
  * Copyright (c) 1983 The Regents of the University of California.
@@ -96,6 +96,9 @@ int tnchktc __P((void));
 int tnamatch __P((char *));
 static char *tskip __P((char *));
 int64_t tgetnum __P((char *));
+#ifdef MIP6
+int64_t agetusec __P((char *));
+#endif
 int tgetflag __P((char *));
 char *tgetstr __P((char *, char **));
 static char *tdecode __P((char *, char **));
@@ -335,6 +338,51 @@ tgetnum(id)
 		return (i);
 	}
 }
+
+#ifdef MIP6
+/*
+ * return the fraction option id.
+ * fraction option looks like:
+ *	id#12.345
+ * this function take only three places.  hence, the following two
+ * are same.
+ *	id#12.345
+ *	id#12.3456
+ */
+int64_t
+agetusec(id)
+	char *id;
+{
+	int64_t i;
+	int64_t j, place;
+	char *bp = tbuf;
+
+	for (;;) {
+		bp = tskip(bp);
+		if (*bp == 0)
+			return (-1);
+		if (strncmp(bp, id, strlen(id)) != 0)
+			continue;
+		bp += strlen(id);
+		if (*bp == '@')
+			return (-1);
+		if (*bp != '#')
+			continue;
+		bp++;
+		i = 0;
+		j = 0;
+		while (isdigit(*bp))
+			i *= 10, i += *bp++ - '0';
+		if (*bp == '.') {
+			bp++;
+			place = 1000;
+			while (isdigit(*bp) && place > 1)
+				place /= 10, j += (*bp++ - '0') * place;
+		}
+		return (i * 1000 + j);
+	}
+}
+#endif
 
 /*
  * Handle a flag option.

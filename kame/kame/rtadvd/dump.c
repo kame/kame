@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.31 2002/06/10 19:59:46 itojun Exp $	*/
+/*	$KAME: dump.c,v 1.32 2003/05/19 09:46:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -149,9 +149,15 @@ if_dump()
 		fprintf(fp, "  MTU: %d\n", rai->phymtu);
 
 		/* Router configuration variables */
+#ifdef MIP6
+		fprintf(fp, "  DefaultLifetime: %d sec, "
+		    "MaxAdvInterval: %d usec, MinAdvInterval: %d usec\n",
+		    rai->lifetime, rai->maxuinterval, rai->minuinterval);
+#else
 		fprintf(fp, "  DefaultLifetime: %d, MaxAdvInterval: %d, "
 		    "MinAdvInterval: %d\n", rai->lifetime, rai->maxinterval,
 		    rai->mininterval);
+#endif
 		fprintf(fp, "  Flags: %s%s%s, ",
 		    rai->managedflg ? "M" : "", rai->otherflg ? "O" : "",
 #ifdef MIP6

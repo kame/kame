@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.23 2003/02/24 11:29:11 ono Exp $	*/
+/*	$KAME: rtadvd.h,v 1.24 2003/05/19 09:46:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -44,20 +44,20 @@
 #define DEF_ADVVALIDLIFETIME 2592000
 #define DEF_ADVPREFERREDLIFETIME 604800
 
-/*XXX int-to-double comparison for INTERVAL items */
-#ifndef MIP6
-#define mobileip6 0
-#endif
-
 #define MAXROUTERLIFETIME 9000
-#define MIN_MAXINTERVAL (mobileip6 ? 1.5 : 4.0)
+#ifdef MIP6
+#define MIN_MAXUINTERVAL 70
+#define MAX_MAXUINTERVAL 1800000
+#else
+#define MIN_MAXINTERVAL 4
 #define MAX_MAXINTERVAL 1800
-#define MIN_MININTERVAL	(mobileip6 ? 0.05 : 3.0)
-#define MAXREACHABLETIME 3600000
-
-#ifndef MIP6
-#undef miobileip6
 #endif
+#ifdef MIP6
+#define MIN_MINUINTERVAL 30
+#else
+#define MIN_MININTERVAL 3
+#endif
+#define MAXREACHABLETIME 3600000
 
 #define MAX_INITIAL_RTR_ADVERT_INTERVAL  16
 #define MAX_INITIAL_RTR_ADVERTISEMENTS    3
@@ -132,8 +132,14 @@ struct	rainfo {
 
 	/* Router configuration variables */
 	u_short lifetime;	/* AdvDefaultLifetime */
+#ifdef MIP6
+	u_int	maxuinterval;	/* MaxRtrAdvInterval (unit usec) */
+	u_int	minuinterval;	/* MinRtrAdvInterval (unit usec) */
+	u_int	delaybetweenras;
+#else
 	u_int	maxinterval;	/* MaxRtrAdvInterval */
 	u_int	mininterval;	/* MinRtrAdvInterval */
+#endif
 	int 	managedflg;	/* AdvManagedFlag */
 	int	otherflg;	/* AdvOtherConfigFlag */
 

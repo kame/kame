@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.80 2003/04/16 11:02:21 ono Exp $	*/
+/*	$KAME: rtadvd.c,v 1.81 2003/05/19 09:46:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -987,8 +987,13 @@ set_short_delay(rai)
 	 */
 	gettimeofday(&now, NULL);
 	TIMEVAL_SUB(&now, &rai->lastsent, &tm_tmp);
+#ifdef MIP6
+	min_delay.tv_sec = rai->delaybetweenras / 1000;
+	min_delay.tv_usec = rai->delaybetweenras % 1000;
+#else
 	min_delay.tv_sec = MIN_DELAY_BETWEEN_RAS;
 	min_delay.tv_usec = 0;
+#endif
 	if (TIMEVAL_LT(tm_tmp, min_delay)) {
 		TIMEVAL_SUB(&min_delay, &tm_tmp, &min_delay);
 		TIMEVAL_ADD(&min_delay, &interval, &interval);
@@ -1778,11 +1783,20 @@ ra_timer_update(void *data, struct timeval *tm)
 	 * between the interface's configured MinRtrAdvInterval and
 	 * MaxRtrAdvInterval (RFC2461 6.2.4).
 	 */
+#ifdef MIP6
+	interval = rai->minuinterval; 
+#ifdef HAVE_ARC4RANDOM
+	interval += arc4random() % (rai->maxuinterval - rai->minuinterval);
+#else
+	interval += random() % (rai->maxuinterval - rai->minuinterval);
+#endif
+#else
 	interval = rai->mininterval; 
 #ifdef HAVE_ARC4RANDOM
 	interval += arc4random() % (rai->maxinterval - rai->mininterval);
 #else
 	interval += random() % (rai->maxinterval - rai->mininterval);
+#endif
 #endif
 
 	/*
@@ -1792,12 +1806,23 @@ ra_timer_update(void *data, struct timeval *tm)
 	 * SHOULD be set to MAX_INITIAL_RTR_ADVERT_INTERVAL instead.
 	 * (RFC-2461 6.2.4)
 	 */
+#ifdef MIP6
+	if (rai->initcounter < MAX_INITIAL_RTR_ADVERTISEMENTS &&
+	    interval > MAX_INITIAL_RTR_ADVERT_INTERVAL * 1000)
+		interval = MAX_INITIAL_RTR_ADVERT_INTERVAL * 1000;
+#else
 	if (rai->initcounter < MAX_INITIAL_RTR_ADVERTISEMENTS &&
 	    interval > MAX_INITIAL_RTR_ADVERT_INTERVAL)
 		interval = MAX_INITIAL_RTR_ADVERT_INTERVAL;
+#endif
 
+#ifdef MIP6
+	tm->tv_sec = interval / 1000;
+	tm->tv_usec = interval % 1000;
+#else
 	tm->tv_sec = interval;
 	tm->tv_usec = 0;
+#endif
 
 	syslog(LOG_DEBUG,
 	       "<%s> RA timer on %s is set to %ld:%ld",
