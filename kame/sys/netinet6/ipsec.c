@@ -1165,7 +1165,7 @@ ipsec4_set_policy(inp, optname, request, priv)
 	case IPSEC_DIR_INBOUND:
 		pcb_sp = &inp->inp_sp_in;
 		break;
-	case IPSEC_DIR_OUTBOUND:;
+	case IPSEC_DIR_OUTBOUND:
 		pcb_sp = &inp->inp_sp_out;
 		break;
 	default:
@@ -1195,7 +1195,7 @@ ipsec4_get_policy(inp, request, mp)
 	case IPSEC_DIR_INBOUND:
 		pcb_sp = inp->inp_sp_in;
 		break;
-	case IPSEC_DIR_OUTBOUND:;
+	case IPSEC_DIR_OUTBOUND:
 		pcb_sp = inp->inp_sp_out;
 		break;
 	default:
@@ -1249,7 +1249,7 @@ ipsec6_set_policy(in6p, optname, request, priv)
 	case IPSEC_DIR_INBOUND:
 		pcb_sp = &in6p->in6p_sp_in;
 		break;
-	case IPSEC_DIR_OUTBOUND:;
+	case IPSEC_DIR_OUTBOUND:
 		pcb_sp = &in6p->in6p_sp_out;
 		break;
 	default:
@@ -1279,7 +1279,7 @@ ipsec6_get_policy(in6p, request, mp)
 	case IPSEC_DIR_INBOUND:
 		pcb_sp = in6p->in6p_sp_in;
 		break;
-	case IPSEC_DIR_OUTBOUND:;
+	case IPSEC_DIR_OUTBOUND:
 		pcb_sp = in6p->in6p_sp_out;
 		break;
 	default:
