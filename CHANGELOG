@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2490 2003/10/15 00:17:58 jinmei Exp $
+$KAME: CHANGELOG,v 1.2491 2003/10/15 00:22:01 jinmei Exp $
 
 <200310>
+2003-10-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_var.h: defined the prf_ra structure
+	outside of the in6_prflags structure to be friendly with C++.
+	Pointed out by: Pavlin Radoslavov <pavlin@icir.org>
+
 2003-10-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_ifinit): tried rtinit() to a p2p
 	(or loopback) destination only when the route is not installed.
