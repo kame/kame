@@ -570,7 +570,7 @@ main(int argc, char *argv[])
 	buf = ipsec_set_policy("out bypass", strlen("out bypass"));
 	if (buf == NULL)
 		errx(1, ipsec_strerror());
-	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY,
+	if (setsockopt(sloop, IPPROTO_IP, IP_IPSEC_POLICY,
 			buf, ipsec_get_policylen(buf)) < 0) {
 #if 0
 		warnx("ipsec is not configured");
