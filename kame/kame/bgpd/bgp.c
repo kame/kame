@@ -1282,9 +1282,11 @@ bgp_process_update(struct rpcb *bnp)
 	i += poctets;
 
 #ifdef DEBUG_BGP
-	syslog(LOG_NOTICE, "BGP+ RECV\t\t%s/%d from %s",
+	syslog(LOG_NOTICE, "BGP+ RECV\t\t%s/%d(nxthop=%s and %s) from %s",
 	       ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 	       rte->rt_ripinfo.rip6_plen,
+	       ip6str(&gnhaddr, 0),
+	       IN6_IS_ADDR_UNSPECIFIED(&lnhaddr) ? "none" : ip6str(&lnhaddr, 0),
 	       bgp_peerstr(bnp));
 #endif
 
