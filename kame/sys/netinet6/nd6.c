@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.163 2001/07/18 12:36:20 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.164 2001/07/18 17:06:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1053,9 +1053,6 @@ nd6_free(rt, gc)
 	struct llinfo_nd6 *ln = (struct llinfo_nd6 *)rt->rt_llinfo, *next;
 	struct in6_addr in6 = ((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
 	struct nd_defrouter *dr;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
 
 	/*
 	 * we used to have pfctlinput(PRC_HOSTDEAD) here. 
