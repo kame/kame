@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) 1997 and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -134,7 +163,7 @@ int debug = 0;
 int keepalive = 1;
 char *altlogin;
 
-void doit __P((struct sockaddr_in *));
+void doit __P((struct sockaddr *));
 int terminaltypeok __P((char *));
 void startslave __P((char *, int, char *));
 extern void usage P((void));
@@ -146,6 +175,7 @@ extern void usage P((void));
  */
 char valid_opts[] = {
 	'd', ':', 'h', 'k', 'n', 'p', ':', 'S', ':', 'u', ':', 'U',
+	'4', '6',
 #ifdef	AUTHENTICATION
 	'a', ':', 'X', ':',
 #endif
@@ -170,11 +200,13 @@ char valid_opts[] = {
 	'\0'
 };
 
-	int
+int family = AF_INET;
+
+int
 main(argc, argv)
 	char *argv[];
 {
-	struct sockaddr_in from;
+	struct sockaddr_storage from;
 	int on = 1, fromlen;
 	register int ch;
 #if	defined(IPPROTO_IP) && defined(IP_TOS)
@@ -374,6 +406,14 @@ main(argc, argv)
 			break;
 #endif	/* AUTHENTICATION */
 
+		case '4':
+			family = AF_INET;
+			break;
+			
+		case '6':
+			family = AF_INET6;
+			break;
+			
 		default:
 			warnx("%c: unknown option", ch);
 			/* FALLTHROUGH */
@@ -387,43 +427,39 @@ main(argc, argv)
 	argv += optind;
 
 	if (debug) {
-	    int s, ns, foo;
-	    struct servent *sp;
-	    static struct sockaddr_in sin = { AF_INET };
+	    int s, ns, foo, error;
+	    char *service = "telnet";
+	    struct addrinfo hints, *res;
 
 	    if (argc > 1) {
 		usage();
 		/* NOT REACHED */
-	    } else if (argc == 1) {
-		    if ((sp = getservbyname(*argv, "tcp"))) {
-			sin.sin_port = sp->s_port;
-		    } else {
-			sin.sin_port = atoi(*argv);
-			if ((int)sin.sin_port <= 0) {
-			    warnx("%s: bad port #", *argv);
-			    usage();
-			    /* NOT REACHED */
-			}
-			sin.sin_port = htons((u_short)sin.sin_port);
-		   }
-	    } else {
-		sp = getservbyname("telnet", "tcp");
-		if (sp == 0)
-		    errx(1, "tcp/telnet: unknown service");
-		sin.sin_port = sp->s_port;
+	    } else if (argc == 1)
+		service = *argv;
+
+	    memset(&hints, 0, sizeof(hints));
+	    hints.ai_flags = AI_PASSIVE;
+	    hints.ai_family = family;
+	    hints.ai_socktype = SOCK_STREAM;
+	    hints.ai_protocol = 0;
+	    error = getaddrinfo(NULL, service, &hints, &res);
+
+	    if (error) {
+		errx(1, "tcp/%s: %s\n", service, gai_strerror(error));
+		usage();
 	    }
 
-	    s = socket(AF_INET, SOCK_STREAM, 0);
+	    s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	    if (s < 0)
 		    err(1, "socket");
 	    (void) setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
 				(char *)&on, sizeof(on));
-	    if (bind(s, (struct sockaddr *)&sin, sizeof sin) < 0)
+	    if (bind(s, res->ai_addr, res->ai_addrlen) < 0)
 		err(1, "bind");
 	    if (listen(s, 1) < 0)
 		err(1, "listen");
-	    foo = sizeof sin;
-	    ns = accept(s, (struct sockaddr *)&sin, &foo);
+	    foo = res->ai_addrlen;
+	    ns = accept(s, res->ai_addr, &foo);
 	    if (ns < 0)
 		err(1, "accept");
 	    (void) dup2(ns, 0);
@@ -505,7 +541,7 @@ main(argc, argv)
 	}
 
 #if	defined(IPPROTO_IP) && defined(IP_TOS)
-	{
+	if (from.__ss_family == AF_INET) {
 # if	defined(HAS_GETTOS)
 		struct tosent *tp;
 		if (tos < 0 && (tp = gettosbyname("telnet", "tcp")))
@@ -520,8 +556,9 @@ main(argc, argv)
 			syslog(LOG_WARNING, "setsockopt (IP_TOS): %m");
 	}
 #endif	/* defined(IPPROTO_IP) && defined(IP_TOS) */
+
 	net = 0;
-	doit(&from);
+	doit((struct sockaddr *)&from);
 	/* NOTREACHED */
 	return(0);
 }  /* end of main */
@@ -767,12 +804,12 @@ char user_name[256];
  */
 	void
 doit(who)
-	struct sockaddr_in *who;
+	struct sockaddr *who;
 {
-	char *host = NULL;
-	struct hostent *hp;
+	char *host;
+	int t, error;
 	int ptynum;
-
+	
 	/*
 	 * Find an available pty to use.
 	 */
@@ -813,23 +850,16 @@ doit(who)
 #endif	/* _SC_CRAY_SECURE_SYS */
 
 	/* get name of connected client */
-	hp = gethostbyaddr((char *)&who->sin_addr, sizeof (struct in_addr),
-		who->sin_family);
+	error = getnameinfo(who, who->sa_len, remote_host_name, 
+			    sizeof(remote_host_name), NULL, 0, 0);
 
-	if (hp == NULL && registerd_host_only) {
-		fatal(net, "Couldn't resolve your address into a host name.\r\n\
+#if 0
+	if (error) {
+	    fatal(net, "Couldn't resolve your address into a host name.\r\n\
          Please contact your net administrator");
-	} else if (hp &&
-	    (strlen(hp->h_name) <= ((utmp_len < 0) ? -utmp_len : utmp_len))) {
-		host = hp->h_name;
-	} else {
-		host = inet_ntoa(who->sin_addr);
 	}
-	/*
-	 * We must make a copy because Kerberos is probably going
-	 * to also do a gethost* and overwrite the static data...
-	 */
-	strncpy(remote_host_name, host, sizeof(remote_host_name)-1);
+#endif
+
 	remote_host_name[sizeof(remote_host_name)-1] = 0;
 	host = remote_host_name;
 

@@ -86,7 +86,7 @@ int	maxtimeout = 5*TIMEOUT;
 #define	PKTSIZE	SEGSIZE+4
 char	buf[PKTSIZE];
 char	ackbuf[PKTSIZE];
-struct	sockaddr_in from;
+struct sockaddr_storage from;
 int	fromlen;
 
 void	tftp __P((struct tftphdr *, int));
@@ -108,7 +108,7 @@ static int	logging;
 
 static char *errtomsg __P((int));
 static void  nak __P((int));
-static char *verifyhost __P((struct sockaddr_in *));
+static char *verifyhost __P((struct sockaddr *));
 
 int
 main(argc, argv)
@@ -118,7 +118,7 @@ main(argc, argv)
 	register struct tftphdr *tp;
 	register int n;
 	int ch, on;
-	struct sockaddr_in sin;
+	struct sockaddr_storage ss;
 	char *chroot_dir = NULL;
 	struct passwd *nobody;
 
@@ -238,22 +238,22 @@ main(argc, argv)
 		setuid(nobody->pw_uid);
 	}
 
-	from.sin_family = AF_INET;
 	alarm(0);
 	close(0);
 	close(1);
-	peer = socket(AF_INET, SOCK_DGRAM, 0);
+	peer = socket(from.__ss_family, SOCK_DGRAM, 0);
 	if (peer < 0) {
 		syslog(LOG_ERR, "socket: %m");
 		exit(1);
 	}
-	memset(&sin, 0, sizeof(sin));
-	sin.sin_family = AF_INET;
-	if (bind(peer, (struct sockaddr *)&sin, sizeof (sin)) < 0) {
+	memset(&ss, 0, sizeof(ss));
+	ss.__ss_family = from.__ss_family;
+	ss.__ss_len = from.__ss_len;
+	if (bind(peer, (struct sockaddr *)&ss, ss.__ss_len) < 0) {
 		syslog(LOG_ERR, "bind: %m");
 		exit(1);
 	}
-	if (connect(peer, (struct sockaddr *)&from, sizeof(from)) < 0) {
+	if (connect(peer, (struct sockaddr *)&from, from.__ss_len) < 0) {
 		syslog(LOG_ERR, "connect: %m");
 		exit(1);
 	}
@@ -326,7 +326,7 @@ again:
 	ecode = (*pf->f_validate)(&filename, tp->th_opcode);
 	if (logging) {
 		syslog(LOG_INFO, "%s: %s request for %s: %s",
-			verifyhost(&from),
+			verifyhost((struct sockaddr *)&from),
 			tp->th_opcode == WRQ ? "write" : "read",
 			filename, errtomsg(ecode));
 	}
@@ -673,14 +673,15 @@ nak(error)
 
 static char *
 verifyhost(fromp)
-	struct sockaddr_in *fromp;
+	struct sockaddr *fromp;
 {
-	struct hostent *hp;
+	static char name[MAXHOSTNAMELEN];
+	int error;
 
-	hp = gethostbyaddr((char *)&fromp->sin_addr, sizeof (fromp->sin_addr),
-			    fromp->sin_family);
-	if (hp)
-		return hp->h_name;
+	error = getnameinfo(fromp, fromp->sa_len, name, sizeof(name), NULL, 0,
+		0);
+	if (error)
+		return "(invalid host)";	/*XXX*/
 	else
-		return inet_ntoa(fromp->sin_addr);
+		return name;
 }

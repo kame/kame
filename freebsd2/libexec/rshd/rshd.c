@@ -1,3 +1,32 @@
+/*
+ * Copyright (C) 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 /*-
  * Copyright (c) 1988, 1989, 1992, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -83,7 +112,20 @@ int	check_all;
 int	log_success;		/* If TRUE, log all successful accesses */
 int	sent_null;
 
-void	 doit __P((struct sockaddr_in *));
+union sockunion {
+	struct sockinet {
+		u_char si_len;
+		u_char si_family;
+		u_short si_port;
+	} su_si;
+	struct sockaddr_in  su_sin;
+	struct sockaddr_in6 su_sin6;
+};
+#define su_len		su_si.si_len
+#define su_family	su_si.si_family
+#define su_port		su_si.si_port
+
+void	 doit __P((union sockunion *));
 void	 error __P((const char *, ...));
 void	 getstr __P((char *, int, char *));
 int	 local_domain __P((char *));
@@ -104,6 +146,8 @@ Key_schedule	schedule;
 #define	OPTIONS	"alnL"
 #endif
 
+char nameinfo[INET6_ADDRSTRLEN];
+
 int
 main(argc, argv)
 	int argc;
@@ -112,7 +156,7 @@ main(argc, argv)
 	extern int __check_rhosts_file;
 	struct linger linger;
 	int ch, on = 1, fromlen;
-	struct sockaddr_in from;
+	union sockunion from;
 
 	openlog("rshd", LOG_PID | LOG_ODELAY, LOG_DAEMON);
 
@@ -168,7 +212,7 @@ main(argc, argv)
 #endif
 #endif
 
-	fromlen = sizeof (from);
+	fromlen = sizeof (from);  /* xxx */
 	if (getpeername(0, (struct sockaddr *)&from, &fromlen) < 0) {
 		syslog(LOG_ERR, "getpeername: %m");
 		exit(1);
@@ -197,7 +241,7 @@ char	**environ;
 
 void
 doit(fromp)
-	struct sockaddr_in *fromp;
+	union sockunion *fromp;
 {
 	extern char *__rcmd_errstr;	/* syslog hook from libc/net/rcmd.c. */
 	struct hostent *hp;
@@ -211,6 +255,8 @@ doit(fromp)
 	char cmdbuf[NCARGS+1], locuser[16], remuser[16];
 	char remotehost[2 * MAXHOSTNAMELEN + 1];
 	char fromhost[2 * MAXHOSTNAMELEN + 1];
+	int af = fromp->su_family, alen;
+	char *addr;
 #ifdef	LOGIN_CAP
 	login_cap_t *lc;
 #endif
@@ -226,6 +272,9 @@ doit(fromp)
 	fd_set		wready, writeto;
 
 	fromaddr = *fromp;
+
+	if (af != AF_INET)	/* xxx */
+		use_kerberos = 0;
 #endif
 
 	(void) signal(SIGINT, SIG_DFL);
@@ -239,12 +288,23 @@ doit(fromp)
 	  }
 	}
 #endif
-	fromp->sin_port = ntohs((u_short)fromp->sin_port);
-	if (fromp->sin_family != AF_INET) {
-		syslog(LOG_ERR, "malformed \"from\" address (af %d)",
-		    fromp->sin_family);
+	fromp->su_port = ntohs((u_short)fromp->su_port);
+	switch (af) {
+	case AF_INET:
+		alen = sizeof(struct in_addr);
+		addr = (char *)&fromp->su_sin.sin_addr;
+		break;
+	case AF_INET6:
+		alen = sizeof(struct in6_addr);		
+		addr = (char *)&fromp->su_sin6.sin6_addr;
+		break;
+	default:
+		syslog(LOG_ERR, "malformed \"from\" address (af %d)\n", af);
 		exit(1);
 	}
+	getnameinfo((struct sockaddr *)fromp, fromp->su_len,
+		    nameinfo, sizeof(nameinfo), NULL, 0, NI_NUMERICHOST);
+#if 0 /* xxx */
 #ifdef IP_OPTIONS
       {
 	u_char optbuf[BUFSIZ/3];
@@ -262,7 +322,7 @@ doit(fromp)
 			if (c == IPOPT_LSRR || c == IPOPT_SSRR) {
 				syslog(LOG_NOTICE,
 					"connection refused from %s with IP option %s",
-					inet_ntoa(fromp->sin_addr),
+					inet_ntoa(fromp->su_sin.sin_addr),
 					c == IPOPT_LSRR ? "LSRR" : "SSRR");
 				exit(1);
 			}
@@ -273,16 +333,17 @@ doit(fromp)
 	}
       }
 #endif
+#endif /* 0 */ /* xxx */
 
 #ifdef	KERBEROS
 	if (!use_kerberos)
 #endif
-		if (fromp->sin_port >= IPPORT_RESERVED ||
-		    fromp->sin_port < IPPORT_RESERVED/2) {
+		if (fromp->su_port >= IPPORT_RESERVED ||
+		    fromp->su_port < IPPORT_RESERVED/2) {
 			syslog(LOG_NOTICE|LOG_AUTH,
 			    "connection from %s on illegal port %u",
-			    inet_ntoa(fromp->sin_addr),
-			    fromp->sin_port);
+			    nameinfo,
+			    fromp->su_port);
 			exit(1);
 		}
 
@@ -304,7 +365,7 @@ doit(fromp)
 	(void) alarm(0);
 	if (port != 0) {
 		int lport = IPPORT_RESERVED - 1;
-		s = rresvport(&lport);
+		s = rresvport_af(&lport, af);
 		if (s < 0) {
 			syslog(LOG_ERR, "can't get stderr port: %m");
 			exit(1);
@@ -316,11 +377,11 @@ doit(fromp)
 			    port < IPPORT_RESERVED/2) {
 				syslog(LOG_NOTICE|LOG_AUTH,
 				    "2nd socket from %s on unreserved port %u",
-				    inet_ntoa(fromp->sin_addr),
+				    nameinfo,
 				    port);
 				exit(1);
 			}
-		fromp->sin_port = htons(port);
+		fromp->su_port = htons(port);
 		if (connect(s, (struct sockaddr *)fromp, sizeof (*fromp)) < 0) {
 			syslog(LOG_INFO, "connect second port %d: %m", port);
 			exit(1);
@@ -341,8 +402,7 @@ doit(fromp)
 	dup2(f, 2);
 #endif
 	errorstr = NULL;
-	hp = gethostbyaddr((char *)&fromp->sin_addr, sizeof (struct in_addr),
-		fromp->sin_family);
+	hp = gethostbyaddr(addr, alen, af);
 	if (hp) {
 		/*
 		 * If name returned by gethostbyaddr is in our domain,
@@ -360,42 +420,38 @@ doit(fromp)
 			strncpy(remotehost, hp->h_name, sizeof(remotehost) - 1);
 			remotehost[sizeof(remotehost) - 1] = 0;
 			errorhost = remotehost;
-			hp = gethostbyname(remotehost);
+			hp = gethostbyname2(remotehost, af);
 			if (hp == NULL) {
 				syslog(LOG_INFO,
 				    "couldn't look up address for %s",
 				    remotehost);
 				errorstr =
 				"Couldn't look up address for your host (%s)\n";
-				strncpy(fromhost, inet_ntoa(fromp->sin_addr),
-					sizeof(fromhost) - 1);
+				strncpy(fromhost, nameinfo, sizeof(fromhost) - 1);
 				fromhost[sizeof(fromhost) - 1] = 0;
 				hostname = fromhost;
 			} else for (; ; hp->h_addr_list++) {
 				if (hp->h_addr_list[0] == NULL) {
 					syslog(LOG_NOTICE,
 					  "host addr %s not listed for host %s",
-					    inet_ntoa(fromp->sin_addr),
+					    nameinfo,
 					    hp->h_name);
 					errorstr =
 					    "Host address mismatch for %s\n";
-					strncpy(fromhost, inet_ntoa(fromp->sin_addr),
+					strncpy(fromhost, nameinfo,
 						sizeof(fromhost) - 1);
 					fromhost[sizeof(fromhost) - 1] = 0;
 					hostname = fromhost;
 					break;
 				}
-				if (!bcmp(hp->h_addr_list[0],
-				    (caddr_t)&fromp->sin_addr,
-				    sizeof(fromp->sin_addr))) {
+				if (!bcmp(hp->h_addr_list[0], addr, alen)) {
 					hostname = remotehost;
 					break;
 				}
 			}
 		}
 	} else {
-		strncpy(fromhost, inet_ntoa(fromp->sin_addr),
-			sizeof(fromhost) - 1);
+		strncpy(fromhost, nameinfo, sizeof(fromhost) - 1);
 		fromhost[sizeof(fromhost) - 1] = 0;
 		errorhost = hostname = fromhost;
 	}
@@ -444,8 +500,8 @@ doit(fromp)
 	pwd = getpwnam(locuser);
 	if (pwd == NULL) {
 		syslog(LOG_INFO|LOG_AUTH,
-		    "%s@%s as %s: unknown login. cmd='%.80s'",
-		    remuser, hostname, locuser, cmdbuf);
+		       "%s@%s as %s: unknown login. cmd='%.80s'",
+		       remuser, hostname, locuser, cmdbuf);
 		if (errorstr == NULL)
 			errorstr = "Login incorrect.\n";
 		goto fail;
@@ -493,8 +549,10 @@ doit(fromp)
 		if (errorstr ||
 		    (pwd->pw_expire && time(NULL) >= pwd->pw_expire) ||
 		    (pwd->pw_passwd != 0 && *pwd->pw_passwd != '\0' &&
-		    iruserok(fromp->sin_addr.s_addr, pwd->pw_uid == 0,
-		    remuser, locuser) < 0)) {
+		    iruserok_af((fromp->su_family == AF_INET6)
+				? &fromp->su_sin6.sin6_addr
+				: &fromp->su_sin.sin_addr, pwd->pw_uid == 0,
+		    remuser, locuser, af) < 0)) {
 			if (__rcmd_errstr)
 				syslog(LOG_INFO|LOG_AUTH,
 			    "%s@%s as %s: permission denied (%s). cmd='%.80s'",
@@ -516,10 +574,10 @@ fail:
 		exit(1);
 	}
 #ifdef	LOGIN_CAP
-	if (lc != NULL) {
+	if (lc != NULL && fromp->su_family == AF_INET) {	/*XXX*/
 		char	remote_ip[MAXHOSTNAMELEN];
 
-		strncpy(remote_ip, inet_ntoa(fromp->sin_addr),
+		strncpy(remote_ip, inet_ntoa(fromp->su_sin.sin_addr),
 			sizeof(remote_ip) - 1);
 		remote_ip[sizeof(remote_ip) - 1] = 0;
 		if (!auth_hostok(lc, fromhost, remote_ip)) {

@@ -47,6 +47,7 @@ static const char rcsid[] =
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/param.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
@@ -70,8 +71,8 @@ main(argc, argv)
 	register FILE *fp;
 	register int ch;
 	register char *lp;
-	struct hostent *hp;
-	struct sockaddr_in sin;
+	char hbuf[MAXHOSTNAMELEN];
+	struct sockaddr_storage ss;
 	int p[2], logging, secure, sval;
 #define	ENTRIES	50
 	char **ap, *av[ENTRIES + 1], **comp, line[1024], *prog;
@@ -101,7 +102,13 @@ main(argc, argv)
 	 */
 	{
 		int one = 1;
-		if (setsockopt(STDOUT_FILENO, IPPROTO_TCP, TCP_NOPUSH, &one, 
+		int proto = 0;
+
+		sval = sizeof(ss);
+		if (getsockname(0, (struct sockaddr *)&ss, &sval) < 0)
+			logerr("getpeername: %s", strerror(errno));
+		if (ss.__ss_family == AF_INET	/*XXX*/
+		 && setsockopt(STDOUT_FILENO, IPPROTO_TCP, TCP_NOPUSH, &one, 
 			       sizeof one) < 0) {
 			logerr("setsockopt(TCP_NOPUSH) failed: %m");
 		}
@@ -125,15 +132,15 @@ main(argc, argv)
 		for (end = t; *end; end++)
 			if (*end == '\n' || *end == '\r')
 				*end = ' ';
-		sval = sizeof(sin);
-		if (getpeername(0, (struct sockaddr *)&sin, &sval) < 0)
+		sval = sizeof(ss);
+		if (getpeername(0, (struct sockaddr *)&ss, &sval) < 0)
 			logerr("getpeername: %s", strerror(errno));
-		if (hp = gethostbyaddr((char *)&sin.sin_addr.s_addr,
-		    sizeof(sin.sin_addr.s_addr), AF_INET))
-			lp = hp->h_name;
-		else
-			lp = inet_ntoa(sin.sin_addr);
-		syslog(LOG_NOTICE, "query from %s: `%s'", lp, t);
+		if (getnameinfo((struct sockaddr *)&ss, ss.__ss_len,
+				hbuf, sizeof(hbuf), NULL, 0, 0) == 0) {
+			(void)getnameinfo((struct sockaddr *)&ss, ss.__ss_len,
+				hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST);
+		}
+		syslog(LOG_NOTICE, "query from %s: `%s'", hbuf, t);
 	}
 
 	comp = &av[1];

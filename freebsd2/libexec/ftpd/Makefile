@@ -5,10 +5,21 @@ PROG=	ftpd
 MAN8=	ftpd.8
 SRCS=	ftpd.c ftpcmd.c logwtmp.c popen.c skey-stuff.c
 
-CFLAGS+=-DSETPROCTITLE -DSKEY -DLOGIN_CAP -DVIRTUAL_HOSTING -Wall
+#CFLAGS+=-DSETPROCTITLE -DSKEY -DLOGIN_CAP -DVIRTUAL_HOSTING -Wall
+CFLAGS+=-DSETPROCTITLE -DSKEY -DLOGIN_CAP -DVIRTUAL_HOSTING
+CFLAGS+=-DINET6
 
-LDADD=	-lskey -lmd -lcrypt -lutil
+LDADD=	-L${.CURDIR}/../../lib/libskey \
+	-L${.CURDIR}/../../lib/libskey/obj \
+	-L/usr/local/v6/lib
+LDADD+=	-lskey -lmd -lcrypt -lutil
+LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
+	-L${.CURDIR}/../../lib/libinet6/obj \
+	-L/usr/local/v6/lib -linet6
 DPADD=	${LIBSKEY} ${LIBMD} ${LIBCRYPT} ${LIBUTIL}
+DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
+	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
 
 CLEANFILES+=ftpcmd.c y.tab.h
 
