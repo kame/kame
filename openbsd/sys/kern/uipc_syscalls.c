@@ -717,12 +717,25 @@ recvit(p, s, mp, namelenp, retsize)
 		if (len <= 0 || control == 0)
 			len = 0;
 		else {
-			if (len >= control->m_len)
-				len = control->m_len;
-			else
-				mp->msg_flags |= MSG_CTRUNC;
-			error = copyout((caddr_t)mtod(control, caddr_t),
-			    (caddr_t)mp->msg_control, (unsigned)len);
+			struct mbuf *m = control;
+			caddr_t p = (caddr_t)mp->msg_control;
+
+			do {
+				i = m->m_len;
+				if (len < i) {
+					mp->msg_flags |= MSG_CTRUNC;
+					i = len;
+				}
+				error = copyout(mtod(m, caddr_t), p,
+				    (unsigned)i);
+				if (m->m_next)
+					i = ALIGN(i);
+				p += i;
+				len -= i;
+				if (error != 0 || len <= 0)
+					break;
+			} while ((m = m->m_next) != NULL);
+			len = p - (caddr_t)mp->msg_control;
 		}
 		mp->msg_controllen = len;
 	}
