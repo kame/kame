@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.91 2001/01/09 05:15:06 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.92 2001/01/09 05:19:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -192,6 +192,14 @@ static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
 /* functions in OS dependent portion */
 static int explore_fqdn __P((const struct addrinfo *, const char *,
 	const char *, struct addrinfo **));
+
+/* identify behavior of OS dependent portion */
+#ifdef __NetBSD__
+#define USE_FQDN_UNSPEC_LOOKUP	1
+#undef USE_GETIPNODEBY
+#else
+#undef USE_FQDN_UNSPEC_LOOKUP
+#endif
 
 static char *ai_errlist[] = {
 	"Success",
@@ -461,7 +469,7 @@ getaddrinfo(hostname, servname, hints, res)
 	 * hostname as alphabetical name.
 	 * first, try to query DNS for all possible address families.
 	 */
-#ifdef __NetBSD__
+#ifdef USE_FQDN_UNSPEC_LOOKUP
 	/*
 	 * the operating systems support PF_UNSPEC lookup in explore_fqdn().
 	 */
@@ -998,7 +1006,7 @@ static int
 addrconfig(af)
 	int af;
 {
-#if !defined(__NetBSD__) && defined(USE_GETIPNODEBY)
+#ifdef USE_GETIPNODEBY
 	return 1;
 #else
 	int s;
