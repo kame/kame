@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1914 2001/10/16 10:30:46 jinmei Exp $
+$KAME: CHANGELOG,v 1.1915 2001/10/16 10:32:00 jinmei Exp $
 
 <200110>
 Tue Oct 16 19:22:52 JST 2001 keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6_binding.c
-	fix the bug of the validation routine of a incoming tunneled
+	fix the bug of the validation routine of an incoming tunneled
 	packet from a homeagent to a mobile node.
 
 Tue Oct 16 16:09:22 JST 2001  itojun@iijlab.net
