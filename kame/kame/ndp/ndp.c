@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.51 2001/01/30 14:08:00 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.52 2001/02/05 01:52:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -867,6 +867,7 @@ ifinfo(argc, argv)
 	int i, s;
 	char *ifname = argv[0];
 	u_int32_t newflags;
+	u_int8_t nullbuf[8];
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
 		perror("ndp: socket");
@@ -914,6 +915,30 @@ ifinfo(argc, argv)
 	       ND.basereachable / 1000, ND.basereachable % 1000);
 	printf(", reachable=%ds", ND.reachable);
 	printf(", retrans=%ds%dms", ND.retrans / 1000, ND.retrans % 1000);
+	memset(nullbuf, 0, sizeof(nullbuf));
+	if (memcmp(nullbuf, ND.randomid, sizeof(nullbuf)) != 0) {
+		int j;
+		u_int8_t *rbuf;
+
+		for (i = 0; i < 3; i++) {
+			switch(i) {
+			case 0:
+				printf("\nRandom seed(0): ");
+				rbuf = ND.randomseed0;
+				break;
+			case 1:
+				printf("\nRandom seed(1): ");
+				rbuf = ND.randomseed1;
+				break;
+			case 2:
+				printf("\nRandom ID:      ");
+				rbuf = ND.randomid;
+				break;
+			}
+			for (j = 0; j < 8; j++)
+				printf("%02x", rbuf[j]);
+		}
+	}
 	if (ND.flags) {
 		printf("\nFlags: ");
 		if ((ND.flags & ND6_IFF_PERFORMNUD) != 0)
