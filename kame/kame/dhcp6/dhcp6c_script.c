@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_script.c,v 1.3 2003/04/11 13:04:03 jinmei Exp $	*/
+/*	$KAME: dhcp6c_script.c,v 1.4 2003/05/16 20:04:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -117,19 +117,15 @@ client6_script(ifp, state, optinfo)
 			goto clean;
 		}
 		memset(s, 0, elen);
-		strcpy(s, dnsserver_str);
-		s += strlen(dnsserver_str);
-		*s++ = '=';
+		snprintf(s, elen, "%s=", dnsserver_str);
 		for (v = TAILQ_FIRST(&optinfo->dns_list); v;
 		    v = TAILQ_NEXT(v, link)) {
 			char *addr;
 
 			addr = in6addr2str(&v->val_addr6, 0);
-			strcpy(s, addr);
-			s += strlen(addr);
-			*s++ = ' ';
+			strlcat(s, addr, elen);
+			strlcat(s, " ", elen);
 		}
-		*s = '\0';
 	}
 
 	/* launch the script */

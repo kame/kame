@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.80 2003/04/16 09:42:34 itojun Exp $	*/
+/*	$KAME: common.c,v 1.81 2003/05/16 20:04:36 itojun Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1801,7 +1801,7 @@ dhcp6msgstr(type)
 	case DH6_INFORM_REQ:
 		return ("information request");
 	default:
-		sprintf(genstr, "msg%d", type);
+		snprintf(genstr, sizeof(genstr), "msg%d", type);
 		return (genstr);
 	}
 }
@@ -1831,7 +1831,7 @@ dhcp6_stcodestr(code)
 	case DH6OPT_STCODE_NOPREFIXAVAIL:
 		return ("no prefixes");
 	default:
-		sprintf(genstr, "code%d", code);
+		snprintf(genstr, sizeof(genstr), "code%d", code);
 		return (genstr);
 	}
 }
@@ -1840,17 +1840,21 @@ char *
 duidstr(duid)
 	struct duid *duid;
 {
-	int i;
-	char *cp;
+	int i, n;
+	char *cp, *ep;
 	static char duidstr[sizeof("xx:") * 128 + sizeof("...")];
 
 	cp = duidstr;
+	ep = duidstr + sizeof(duidstr);
 	for (i = 0; i < duid->duid_len && i <= 128; i++) {
-		cp += sprintf(cp, "%s%02x", i == 0 ? "" : ":",
-			      duid->duid_id[i] & 0xff);
+		n = snprintf(cp, ep - cp, "%s%02x", i == 0 ? "" : ":",
+		    duid->duid_id[i] & 0xff);
+		if (n < 0)
+			return NULL;
+		cp += n;
 	}
 	if (i < duid->duid_len)
-		sprintf(cp, "%s", "...");
+		snprintf(cp, ep - cp, "%s", "...");
 
 	return (duidstr);
 }
