@@ -235,7 +235,7 @@ struct addrinfo {
 /*
  * Scope delimit character
  */
-#define SCOPE_DELIMITER '@'
+#define SCOPE_DELIMITER '%'
 #endif /* !_XOPEN_SOURCE */
 
 __BEGIN_DECLS
