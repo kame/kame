@@ -1,4 +1,4 @@
-$Id: TODO,v 1.33 2000/09/23 15:24:22 itojun Exp $
+$Id: TODO,v 1.34 2000/09/23 15:31:53 itojun Exp $
 
 Please send any questions or bug reports to snap-users@kame.net.
 
@@ -91,37 +91,6 @@ o consistency of function name.
 o deep copy configuration entry to hander.  It's easy to reload configuration.
 o don't keep to hold keymat values, do it ?
 o local address's field in isakmpsa handler must be kicked out to rmconf.
-o configuration should be made easier. 
-  one idea is to allow user to "define" certain set of directives, like:
-	TRANS_3DES = protocol esp {
-			level require;
-			mode transport;
-			encryption_algorithm 3des;
-			authentication_algorithm hmac_sha1;
-		};
-	TRANS_SHA1 = protocol ah {
-			level require;
-			mode transport;
-			authentication_algorithm hmac_sha1;
-		};
-
-	policy foo baa
-	{
-		pfs_group modp1024;
-		proposal {
-			TRANS_3DES;
-		}
-	}
-	policy foo baz
-	{
-		pfs_group modp1024;
-		proposal {
-			TRANS_3DES;
-			TRANS_SHA1;
-		}
-	}
-  may be too complex, use pre-processor like cpp?
-
 o responder policy and initiator policy should be separated.
 o for lifetime and key length, something like this should be useful.
   - propose N
