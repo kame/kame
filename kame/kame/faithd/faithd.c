@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.55 2002/06/24 10:33:05 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.56 2002/06/25 07:13:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -215,9 +215,6 @@ daemon_main(int argc, char **argv)
 	int s_wld, error, i, serverargc, on = 1;
 	int family = AF_INET6;
 	int c;
-#ifdef FAITH_NS
-	char *ns;
-#endif /* FAITH_NS */
 
 	while ((c = getopt(argc, argv, "df:p")) != -1) {
 		switch (c) {
@@ -243,23 +240,6 @@ daemon_main(int argc, char **argv)
 		/*NOTREACHED*/
 	}
 
-#ifdef FAITH_NS
-	if ((ns = getenv(FAITH_NS)) != NULL) {
-		struct sockaddr_storage ss;
-		struct addrinfo hints, *res;
-		char serv[NI_MAXSERV];
-
-		memset(&ss, 0, sizeof(ss));
-		memset(&hints, 0, sizeof(hints));
-		snprintf(serv, sizeof(serv), "%u", NAMESERVER_PORT);
-		hints.ai_flags = AI_NUMERICHOST;
-		if (getaddrinfo(ns, serv, &hints, &res) ==  0) {
-			res_init();
-			memcpy(&_res_ext.nsaddr, res->ai_addr, res->ai_addrlen);
-			_res.nscount = 1;
-		}
-	}
-#endif /* FAITH_NS */
 
 #ifdef USE_ROUTE
 	grab_myaddrs();
