@@ -1,0 +1,44 @@
+--- makefiles/Makefile.nbs.orig	Fri Jul  3 10:03:20 1998
++++ makefiles/Makefile.nbs	Sat Jan  9 12:36:08 1999
+@@ -2,9 +2,10 @@
+ # Makefile for NetBSD 1.2
+ # $Id: patch-an,v 1.1.1.1 1999/08/10 09:14:48 itojun Exp $
+ #
+-BINDIR=		/usr/local/bin
+-ETCDIR=		/usr/local/libexec
+-MANDIR=		/usr/local/man
++BINDIR=		${PREFIX}/bin
++ETCDIR=		${PREFIX}/etc
++LIBEXECDIR=	${PREFIX}/libexec
++MANDIR=		${PREFIX}/man
+ MANEXT=		8
+ INSTALL=	install
+ 
+@@ -15,10 +16,18 @@
+ install: bin/ftpd bin/ftpcount bin/ftpshut
+ 	-mv -f ${ETCDIR}/ftpd ${ETCDIR}/ftpd-old
+ 	@echo installing binaries.
+-	${INSTALL} -c -o bin -g bin -m 755 bin/ftpd ${ETCDIR}/ftpd
++	${INSTALL} -c -o bin -g bin -m 755 bin/ftpd ${LIBEXECDIR}/ftpd
+ 	${INSTALL} -c -o bin -g bin -m 755 bin/ftpshut ${BINDIR}/ftpshut
+ 	${INSTALL} -c -o bin -g bin -m 755 bin/ftpcount ${BINDIR}/ftpcount
+ 	${INSTALL} -c -o bin -g bin -m 755 bin/ftpwho ${BINDIR}/ftpwho
++	install -c -o bin -g bin -m 755 bin/ckconfig ${BINDIR}/ftpckconfig
++	@echo Installing basic configuration
++	install -c -o root -g bin -m 644 doc/examples/ftpaccess \
++		${ETCDIR}/ftpaccess.example
++	install -c -o root -g bin -m 644 doc/examples/ftpusers \
++		${ETCDIR}/ftpusers.example
++	install -c -o root -g bin -m 644 doc/examples/ftpconversions \
++		${ETCDIR}/ftpconversions.example
+ 	@echo installing manpages.
+ 	${INSTALL} -c -o bin -g bin -m 644 doc/ftpd.8 ${MANDIR}/man8/ftpd.8
+ 	${INSTALL} -c -o bin -g bin -m 644 doc/ftpcount.1 ${MANDIR}/man1/ftpcount.1
+@@ -28,7 +37,3 @@
+ 	${INSTALL} -c -o bin -g bin -m 644 doc/ftphosts.5 ${MANDIR}/man5/ftphosts.5
+ 	${INSTALL} -c -o bin -g bin -m 644 doc/ftpconversions.5 ${MANDIR}/man5/ftpconversions.5
+ 	${INSTALL} -c -o bin -g bin -m 644 doc/xferlog.5 ${MANDIR}/man5/xferlog.5
+-
+-
+-
+-

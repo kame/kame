@@ -1,3 +1,4 @@
-$NetBSD: md5,v 1.6 1998/08/07 13:27:41 agc Exp $
+$NetBSD$
 
-MD5 (lynx2-8.tar.gz) = f528bca494d9aea195f284acc19f602d
+MD5 (lynx2.8.1rel.1.tar.gz) = c60c913f33afb99923b6598be7a0cf2c
+MD5 (lynx-281-v6-19990520.diff.gz) = 867c11eac3a2d9da193503af85bc4ebf

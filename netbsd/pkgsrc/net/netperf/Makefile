@@ -3,7 +3,7 @@
 # Date created:		19 July 1996
 # Whom:			koshy
 #
-# $Id: Makefile,v 1.1.1.1 1999/08/08 23:59:26 itojun Exp $
+# $Id: Makefile,v 1.1.1.2 1999/08/10 09:14:41 itojun Exp $
 #
 
 DISTNAME=	netperf-2.1pl3
@@ -32,4 +32,4 @@ post-install:
 	gzip -9nf ${PREFIX}/share/doc/netperf/netperf.ps
 .endif
 
-.include <bsd.port.mk>
+.include "../../mk/bsd.pkg.mk"

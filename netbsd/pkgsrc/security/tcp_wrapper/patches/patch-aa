@@ -1,5 +1,5 @@
---- Makefile.orig	Tue May  4 14:47:42 1999
-+++ Makefile	Tue May  4 14:47:42 1999
+--- Makefile.orig	Thu Jul 29 23:52:37 1999
++++ Makefile	Thu Jul 29 23:54:32 1999
 @@ -47,7 +47,7 @@
  #REAL_DAEMON_DIR=/usr/sbin
  #
@@ -9,7 +9,19 @@
  #
  # HP-UX SCO Unicos
  #REAL_DAEMON_DIR=/etc
-@@ -494,7 +494,7 @@
+@@ -133,8 +133,9 @@
+ # Freebsd and linux by default have no NIS.
+ 386bsd netbsd bsdos:
+ 	@make REAL_DAEMON_DIR=$(REAL_DAEMON_DIR) STYLE=$(STYLE) \
+-	LIBS= RANLIB=ranlib ARFLAGS=rv AUX_OBJ= NETGROUP= TLI= \
+-	EXTRA_CFLAGS=-DSYS_ERRLIST_DEFINED VSYSLOG= all
++	LIBS="-L/usr/local/v6/lib -linet6" \
++	RANLIB=ranlib ARFLAGS=rv AUX_OBJ= NETGROUP= TLI= \
++	EXTRA_CFLAGS="-DSYS_ERRLIST_DEFINED -DINET6=1" VSYSLOG= all
+ 
+ freebsd:
+ 	@make REAL_DAEMON_DIR=$(REAL_DAEMON_DIR) STYLE=$(STYLE) \
+@@ -494,7 +495,7 @@
  # Uncomment the next definition to turn on the language extensions
  # (examples: allow, deny, banners, twist and spawn).
  # 
@@ -18,7 +30,7 @@
  
  ################################################################
  # Optional: Changing the default disposition of logfile records
-@@ -517,7 +517,8 @@
+@@ -517,7 +518,8 @@
  #
  # The LOG_XXX names below are taken from the /usr/include/syslog.h file.
  
@@ -28,7 +40,7 @@
  
  # The syslog priority at which successful connections are logged.
  
-@@ -593,7 +594,7 @@
+@@ -593,7 +595,7 @@
  # look for access control information. Watch out for the quotes and
  # backslashes when you make changes.
  
@@ -37,7 +49,7 @@
  
  ####################################################
  # Optional: dealing with host name/address conflicts
-@@ -613,7 +614,7 @@
+@@ -613,7 +615,7 @@
  # Paranoid mode implies hostname lookup. In order to disable hostname
  # lookups altogether, see the next section.
  
@@ -46,19 +58,19 @@
  
  ########################################
  # Optional: turning off hostname lookups
-@@ -660,9 +661,9 @@
+@@ -660,9 +662,9 @@
  # Protection against weird shells or weird make programs.
  
  SHELL	= /bin/sh
 -.c.o:;	$(CC) $(CFLAGS) -c $*.c
-+PREFIX ?= /usr/local
++PREFIX ?= /usr/pkg
  
 -CFLAGS	= -O -DFACILITY=$(FACILITY) $(ACCESS) $(PARANOID) $(NETGROUP) \
 +CFLAGS  += -DFACILITY=$(FACILITY) $(ACCESS) $(PARANOID) $(NETGROUP) \
  	$(BUGS) $(SYSTYPE) $(AUTH) $(UMASK) \
  	-DREAL_DAEMON_DIR=\"$(REAL_DAEMON_DIR)\" $(STYLE) $(KILL_OPT) \
  	-DSEVERITY=$(SEVERITY) -DRFC931_TIMEOUT=$(RFC931_TIMEOUT) \
-@@ -690,6 +691,26 @@
+@@ -690,6 +692,26 @@
  LIB	= libwrap.a
  
  all other: config-check tcpd tcpdmatch try-from safe_finger tcpdchk

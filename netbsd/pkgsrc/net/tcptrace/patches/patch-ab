@@ -1,0 +1,11 @@
+--- Makefile.in.orig	Tue Jan 19 19:56:52 1999
++++ Makefile.in	Tue Jan 19 19:57:28 1999
+@@ -169,7 +169,7 @@
+ # easily.
+ #
+ filt_parser.c: filt_parser.y filter.h
+-	bison -vd -p filtyy filt_parser.y -o filt_parser.c
++	yacc -vd -p filtyy -o filt_parser.c filt_parser.y
+ 	cp filt_parser.c flex_bison
+ 	cp filt_parser.h flex_bison
+ filt_scanner.c: filt_scanner.l filter.h filt_parser.h

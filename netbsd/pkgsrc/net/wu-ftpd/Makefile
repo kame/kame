@@ -3,7 +3,7 @@
 # Date created:		18 Oct 1994
 # Whom:			torstenb
 #
-# $Id: Makefile,v 1.1.1.1 1999/08/08 23:59:31 itojun Exp $
+# $Id: Makefile,v 1.1.1.2 1999/08/10 09:14:47 itojun Exp $
 #
 # REMINDER: to use ftpaccess(5) you need to specify -a in command line,
 # it is changed from previous versions
@@ -15,17 +15,18 @@ CATEGORIES=	net
 MASTER_SITES=   ftp://ftp.academ.com/pub/wu-ftpd/private/
 EXTRACT_SUFX=   .tar.Z
 
-PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
+PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
+		ftp://ftp.v6.kame.net/pub/kame/misc/
 PATCHFILES=	wu-ftpd-242b18-v6-980924.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=     ache@FreeBSD.org
 
 do-build:
-	cd ${WRKSRC} && ./build fbs
+	cd ${WRKSRC} && ./build nbs
 
 MAN1=		ftpcount.1 ftpwho.1
 MAN5=		ftpaccess.5 ftphosts.5 ftpconversions.5 xferlog.5
 MAN8=		ftpd.8 ftpshut.8
 
-.include <bsd.port.mk>
+.include "../../mk/bsd.pkg.mk"

@@ -2,11 +2,15 @@
 # FreeBSD Id: Makefile,v 1.47 1997/11/10 22:04:42 dima Exp
 #
 
-DISTNAME=		ssh-1.2.26
+DISTNAME=		ssh-1.2.27
 CATEGORIES=		security net
 MASTER_SITES=		ftp://ftp.cs.hut.fi/pub/ssh/ \
 			ftp://ftp.funet.fi/pub/unix/security/login/ssh/ \
 			ftp://ftp.cert.dfn.de/pub/tools/net/ssh/
+
+PATCH_SITES=	ftp://ftp.kyoto.wide.ad.jp/IPv6/ssh/
+PATCHFILES=	ssh-1.2.27-IPv6-1.5-patch.gz
+PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=		tron@netbsd.org
 HOMEPAGE=		http://www.cs.hut.fi/ssh/

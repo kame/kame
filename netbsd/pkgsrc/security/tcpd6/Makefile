@@ -3,7 +3,7 @@
 # Date created:         28 Jan 1998
 # Whom:                 itojun@itojun.org
 #
-# $Id: Makefile,v 1.1.1.1 1999/08/08 23:59:34 itojun Exp $
+# $Id: Makefile,v 1.1.1.2 1999/08/10 09:14:58 itojun Exp $
 #
 
 DISTNAME=       tcpd-v6-0.0-980106
@@ -21,4 +21,4 @@ pre-install:
 	${MKDIR} ${PREFIX}/v6/lib
 	${MKDIR} ${PREFIX}/v6/libexec
 
-.include <bsd.port.mk>
+.include "../../mk/bsd.pkg.mk"

@@ -20,22 +20,23 @@ include/bind/resolv.h
 include/bind/sys/bitypes.h
 lib/libbind.a
 libexec/named-xfer
-man/man1/dig.1.gz
-man/man1/dnsquery.1.gz
-man/man1/host.1.gz
-man/man3/gethostbyname.3.gz
-man/man3/getnetent.3.gz
-man/man3/resolver.3.gz
-man/man5/irs.conf.5.gz
-man/man5/resolver.5.gz
-man/man7/hostname.7.gz
-man/man7/mailaddr.7.gz
-man/man8/named-xfer.8.gz
-man/man8/named.8.gz
-man/man8/ndc.8.gz
-man/man8/nslookup.8.gz
+man/man1/dig.1
+man/man1/dnsquery.1
+man/man1/host.1
+man/man3/gethostbyname.3
+man/man3/getnetent.3
+man/man3/resolver.3
+man/man5/irs.conf.5
+man/man5/resolver.5
+man/man7/hostname.7
+man/man7/mailaddr.7
+man/man8/named-xfer.8
+man/man8/named.8
+man/man8/ndc.8
+man/man8/nslookup.8
 sbin/named
 share/misc/nslookup.help
+etc/rc.d/named.sh.sample
 @dirrm include/bind/arpa
 @dirrm include/bind/isc
 @dirrm include/bind/sys

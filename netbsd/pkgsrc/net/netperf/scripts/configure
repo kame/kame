@@ -12,6 +12,6 @@ fi
 
 cd $WRKSRC
 echo "Setting CFLAGS to \"$CFLAGS\""
-sed -e "s/%CFLAGS%/${CFLAGS}/" makefile >makefile.new
+sed -e "s/%CFLAGS%/${CFLAGS}/" makefile | sed -e "s#/usr/local#${PREFIX}#" | sed -e "s#${PREFIX}/v6/lib#/usr/local/v6/lib#" >makefile.new
 mv  -f makefile makefile.orig2
 mv  -f makefile.new makefile

@@ -1,0 +1,13 @@
+--- lib/kernel/bsd.c-	Fri Jan  8 07:47:30 1999
++++ lib/kernel/bsd.c	Fri Jan  8 07:47:58 1999
+@@ -463,6 +463,10 @@
+ #ifndef HAVE_IPV6
+ #	define RTF_PRCLONING RTF_CLONING
+ #endif /* !HAVE_IPV6*/
++#ifndef RTF_PRCLONING
++/* NetBSD workaround - is it correct? */
++# define RTF_PRCLONING	0
++#endif
+ 	    if (BIT_TEST (rtm->rtm_flags, 
+ 		    ~(RTF_UP|RTF_GATEWAY|RTF_HOST|RTF_STATIC|
+ 			RTF_REJECT|RTF_BLACKHOLE|RTF_PRCLONING)))

@@ -1,0 +1,13 @@
+$NetBSD: patch-ac,v 1.4 1999/02/02 14:12:26 frueauf Exp $
+
+--- configure.in.orig	Sun Jan 31 01:17:37 1999
++++ configure.in	Tue Feb  2 14:40:01 1999
+@@ -398,7 +398,7 @@
+     LDEFLAGS="$LDEFLAGS -L$with_hesiod/lib"
+     LIBS="$LIBS -lhesiod"
+ else
+-    for dir in /usr/athena /usr /usr/local
++    for dir in /usr/athena /usr/local
+     do
+       if test -f "$dir/include/hesiod.h"
+       then

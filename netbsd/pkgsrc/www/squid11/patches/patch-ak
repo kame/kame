@@ -1,0 +1,13 @@
+--- scripts/Makefile.in.orig	Tue Feb 23 15:52:24 1999
++++ scripts/Makefile.in	Tue Feb 23 15:52:32 1999
+@@ -29,8 +29,8 @@
+ 		echo "mkdir $(bindir)"; \
+ 		mkdir $(bindir); \
+ 	fi
+-	$(INSTALL_BIN) RunCache $(bindir)
+-	$(INSTALL_BIN) RunAccel $(bindir)
++	$(INSTALL_BIN:S/-s//) RunCache $(bindir)
++	$(INSTALL_BIN:S/-s//) RunAccel $(bindir)
+ 
+ clean:
+ 

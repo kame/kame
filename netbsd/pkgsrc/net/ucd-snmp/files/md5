@@ -1,2 +1,4 @@
-MD5 (ucd-snmp-3.5.3.tar.gz) = af2e8d7a4975d9ef207d9342391249a6
-MD5 (ucd-snmp-3.5.3-v6-981231.diff.gz) = b7cab1ab8bccac06b1da739c75c6b2a9
+$NetBSD$
+
+MD5 (ucd-snmp-3.6.1.tar.gz) = 4ebb94d59c086cef4dbb27396f9b77cb
+MD5 (ucd-snmp-3.6.1-v6-19990406.diff.gz) = 0ad1cb998654c9d5dd7e77ebfe069acb
