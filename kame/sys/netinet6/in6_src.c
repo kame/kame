@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.65 2001/09/05 09:25:06 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.66 2001/09/05 12:17:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -338,7 +338,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		 * 1. how to select a home address when we have many
 		 * home addresses for different home links?
 		 * 
-		 * 2. how to handle the home address that have not
+		 * 2. how to handle the home address that has not
 		 * been registered yet.  such an address should not be
 		 * selected ?
 		 */
