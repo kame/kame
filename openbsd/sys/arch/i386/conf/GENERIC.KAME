@@ -7,3 +7,21 @@ include	"arch/i386/conf/GENERIC"
 
 # ART routing table lookup algorithm (inet/inet6)
 #option		RADIX_ART
+
+# ALTQ options (ALTQ is enabled in "sys/conf/GENERIC" but other ALTQ
+#		related options are enabled here)
+options 	ALTQ_CBQ	#class based queueing
+options 	ALTQ_WFQ	#weighted fair queueing
+options 	ALTQ_FIFOQ	#fifo queueing
+options 	ALTQ_RED	#random early detection
+#options 	ALTQ_FLOWVALVE	#flowvalve for RED (needs RED)
+options 	ALTQ_RIO	#triple red for diffserv (needs RED)
+#options 	ALTQ_LOCALQ	#local use
+options 	ALTQ_HFSC	#hierarchical fair service curve
+#options 	ALTQ_ECN	#ecn extention to tcp (needs RED)
+#options 	ALTQ_IPSEC	#check ipsec in IPv4
+options 	ALTQ_CDNR	#diffserv traffic conditioner
+#options 	ALTQ_BLUE	#blue by wu-chang feng
+options 	ALTQ_PRIQ	#priority queue
+#options 	ALTQ_NOPCC	#don't use processor cycle counter
+#options 	ALTQ_DEBUG	#for debugging

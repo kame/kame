@@ -198,7 +198,7 @@ struct cdevsw	cdevsw[] =
 #else
 	cdev_notdef(),
 #endif
-	cdev_notdef(),			/* 52: ALTQ */
+	cdev_altq_init(NALTQ, altq),	/* 53: ALTQ control interface */
 	cdev_iop_init(NIOP, iop),	/* 54: I2O IOP control interface */
 };
 int	nchrdev = sizeof (cdevsw) / sizeof (cdevsw[0]);
