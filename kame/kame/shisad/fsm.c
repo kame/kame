@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.19 2005/03/03 01:31:13 ryuji Exp $	*/
+/*	$KAME: fsm.c,v 1.20 2005/03/03 06:25:35 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2600,6 +2600,7 @@ bul_fsm_try_other_home_agent(bul)
 	struct home_agent_list *hal;
 	struct mip6_hpfxl *hpfx;
 	struct mip6_mipif *mif;
+	struct binding_update_list *tmpbul;
 	int error;
 
 	/*
@@ -2612,12 +2613,37 @@ bul_fsm_try_other_home_agent(bul)
 
 	/* 
 	 * pick an address of one of our home agent from the home
-	 * agent list.
+	 * agent list and update all binding update entries which have
+	 * an unavailable home agent address.
 	 */
 	hal = mip6_find_hal(bul->bul_hoainfo);
 	if (hal) {
-		bul->bul_peeraddr = hal->hal_ip6addr;
-		goto send_bu;
+		LIST_FOREACH(tmpbul, &bul->bul_hoainfo->hinfo_bul_head,
+		    bul_entry) {
+			if ((tmpbul->bul_flags & IP6_MH_BU_HOME) == 0)
+				continue;
+			tmpbul->bul_peeraddr = hal->hal_ip6addr;
+
+			error = send_bu(tmpbul);
+			if (error) {
+				syslog(LOG_ERR,
+				    "sending a home registration "
+				    "failed. (%d)\n", error);
+				/* continue and try again. */
+			}
+
+			tmpbul->bul_retrans_time
+			    = initial_bindack_timeout_first_reg;
+			bul_set_retrans_timer(tmpbul,
+			    tmpbul->bul_retrans_time);
+
+			bul_set_expire_timer(tmpbul,
+			    tmpbul->bul_lifetime << 2);
+
+			tmpbul->bul_reg_fsm_state
+			    = MIP6_BUL_REG_FSM_STATE_WAITA;
+		}
+		return;
 	}
 					
 	/* keep current state if we haven't been assigned a valid CoA */
@@ -2642,22 +2668,6 @@ bul_fsm_try_other_home_agent(bul)
 	bul->bul_reg_fsm_state = MIP6_BUL_REG_FSM_STATE_DHAAD;
 	return;
 
-send_bu:
-	error = send_bu(bul);
-	if (error) {
-		syslog(LOG_ERR,
-		    "sending a home registration failed. (%d)\n", error);
-		/* continue and try again. */
-	}
-
-	bul->bul_retrans_time = initial_bindack_timeout_first_reg;
-	bul_set_retrans_timer(bul, bul->bul_retrans_time);
-
-	bul_set_expire_timer(bul, bul->bul_lifetime << 2);
-
-	bul->bul_reg_fsm_state = MIP6_BUL_REG_FSM_STATE_WAITA;
-
-	return;
 }
 
 static void
