@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.16 2000/09/07 04:44:53 itojun Exp $	*/
+/*	$KAME: config.c,v 1.17 2000/09/07 05:01:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -509,7 +509,8 @@ get_prefix(struct rainfo *rai)
 		while (p < ep)
 			*p++ = 0x00;
 
-	        if (!inet_ntop(AF_INET6, a, ntopbuf, sizeof(ntopbuf))) {
+	        if (!inet_ntop(AF_INET6, &pp->prefix, ntopbuf,
+	            sizeof(ntopbuf))) {
 			syslog(LOG_ERR, "<%s> inet_ntop failed", __FUNCTION__);
 			exit(1);
 		}
