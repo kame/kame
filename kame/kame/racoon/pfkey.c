@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.14 2000/01/13 06:05:08 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.15 2000/01/13 07:27:47 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -1165,7 +1165,7 @@ pk_sendadd(iph2)
 
 		YIPSDEBUG(DEBUG_PFKEY,
 			plog(logp, LOCATION, NULL, "call pfkey_send_add(%u)\n",
-			k->spi_p););
+				k->spi_p););
 		if (pfkey_send_add(
 				lcconf->sock_pfkey,
 				satype,
