@@ -177,11 +177,18 @@ udp6_input(mp, offp, proto)
 #endif
 	udp6stat.udp6s_ipackets++;
 
-	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
-	
 	ip6 = mtod(m, struct ip6_hdr *);
 	plen = ntohs(ip6->ip6_plen) - off + sizeof(*ip6);
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
 	uh = (struct udphdr *)((caddr_t)ip6 + off);
+#else
+	IP6_EXTHDR_GET(uh, struct udphdr *, m, off, sizeof(struct udhpdr));
+	if (uh == NULL) {
+		udp6stat.udp6s_hdrops++;
+		return IPPROTO_DONE;
+	}
+#endif
 	ulen = ntohs((u_short)uh->uh_ulen);
 	
 	if (plen != ulen) {

@@ -531,10 +531,20 @@ ah6_input(mp, offp, proto)
 	u_int16_t nxt;
 	int s;
 
+	ip6 = mtod(m, struct ip6_hdr *);
+#ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct ah), IPPROTO_DONE);
 
-	ip6 = mtod(m, struct ip6_hdr *);
 	ah = (struct ah *)(((caddr_t)ip6) + off);
+#else
+	IP6_EXTHDR_GET(ah, struct ah *, m, off, sizeof(struct newah));
+	if (ah == NULL) {
+		printf("IPv6 AH input: can't pullup;"
+			"dropping the packet for simplicity\n");
+		ipsecstat.in_inval++;
+		return IPPROTO_DONE;
+	}
+#endif
 
 	nxt = ah->ah_nxt;
 
@@ -596,7 +606,18 @@ ah6_input(mp, offp, proto)
 		ipsec6stat.in_inval++;
 		goto fail;
 	}
+#ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct ah) + sizoff + siz1, IPPROTO_DONE);
+#else
+	IP6_EXTHDR_GET(ah, struct ah *, m, off,
+		sizeof(struct ah) + sizoff + siz1);
+	if (ah == NULL) {
+		log(LOG_NOTICE, "couldn't pullup gather IPv6 AH checksum part");
+		ipsecstat.in_inval++;
+		m = NULL;
+		goto fail;
+	}
+#endif
     }
 
 	/*
@@ -789,6 +810,7 @@ ah6_input(mp, offp, proto)
 		 * the packet is placed in a single mbuf.
 		 */
 		size_t stripsiz = 0;
+#ifndef PULLDOWN_TEST
 		char *prvnxtp;
 
 		/*
@@ -798,6 +820,7 @@ ah6_input(mp, offp, proto)
 		 */
 		prvnxtp = ip6_get_prevhdr(m, off); /* XXX */
 		*prvnxtp = nxt;
+#endif
 
 		if (sav->flags & SADB_X_EXT_OLD) {
 			/* RFC 1826 */
@@ -807,6 +830,7 @@ ah6_input(mp, offp, proto)
 			stripsiz = sizeof(struct newah) + siz1;
 		}
 
+#ifndef PULLDOWN_TEST
 		ip6 = mtod(m, struct ip6_hdr *);
 		ovbcopy((caddr_t)ip6, (caddr_t)(((u_char *)ip6) + stripsiz),
 			off);
@@ -816,6 +840,9 @@ ah6_input(mp, offp, proto)
 
 		ip6 = mtod(m, struct ip6_hdr *);
 		ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - stripsiz);
+#else
+		off += stripsiz;
+#endif
 
 		key_sa_recordxfer(sav, m);
 	}

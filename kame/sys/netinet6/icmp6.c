@@ -439,7 +439,7 @@ icmp6_input(mp, offp, proto)
 			icmp6stat.icp6s_tooshort++;
 			goto freeit;
 		}
-#ifndef PULLUP_TEST
+#ifndef PULLDOWN_TEST
 		IP6_EXTHDR_CHECK(m, off,
 			sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr),
 			IPPROTO_DONE);
@@ -749,7 +749,7 @@ icmp6_input(mp, offp, proto)
 			icmp6stat.icp6s_tooshort++;
 			goto freeit;
 		}
-#ifndef PULLUP_TEST
+#ifndef PULLDOWN_TEST
 		IP6_EXTHDR_CHECK(m, off,
 			sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr),
 			IPPROTO_DONE);
@@ -788,7 +788,7 @@ icmp6_input(mp, offp, proto)
 			case IPPROTO_ROUTING:
 			case IPPROTO_AH:
 			case IPPROTO_FRAGMENT:
-#ifndef PULLUP_TEST
+#ifndef PULLDOWN_TEST
 				IP6_EXTHDR_CHECK(m, 0, eoff +
 						 sizeof(struct ip6_ext),
 						 IPPROTO_DONE);
@@ -815,7 +815,7 @@ icmp6_input(mp, offp, proto)
 			}
 		}
 	    notify:
-#ifndef PULLUP_TEST
+#ifndef PULLDOWN_TEST
 		icmp6 = (struct icmp6_hdr *)(mtod(m, caddr_t) + off);
 #else
 		IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, off,

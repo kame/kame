@@ -114,10 +114,15 @@ frag6_input(mp, offp, proto)
 	struct sockaddr_in6 *dst;
 #endif
 
-	IP6_EXTHDR_CHECK(m, offset, sizeof(struct ip6_frag), IPPROTO_DONE);
-
 	ip6 = mtod(m, struct ip6_hdr *);
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, offset, sizeof(struct ip6_frag), IPPROTO_DONE);
 	ip6f = (struct ip6_frag *)((caddr_t)ip6 + offset);
+#else
+	IP6_EXTHDR_GET(ip6f, struct ip6_frag *, m, offset, sizeof(*ip6f));
+	if (ip6f == NULL)
+		return IPPROTO_DONE;
+#endif
 
 	dstifp = NULL;
 #ifdef IN6_IFSTAT_STRICT
