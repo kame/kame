@@ -76,6 +76,7 @@
 #include <sys/socketvar.h>
 #include <sys/errno.h>
 #include <sys/systm.h>
+#include <sys/syslog.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -672,14 +673,28 @@ rip6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 			m_freem(m);
 			return ENOTCONN;
 		}
-		if (nam->sa_len != sizeof(struct sockaddr_in6))
+		if (nam->sa_len != sizeof(struct sockaddr_in6)) {
+			m_freem(m);
 			return(EINVAL);
+		}
 		tmp = *(struct sockaddr_in6 *)nam;
 		dst = &tmp;
-		if (dst->sin6_family != AF_INET6)
+		if (dst->sin6_family == AF_UNSPEC) {
+			/*
+			 * XXX: we allow this case for backward
+			 * compatibility to buggy applications that
+			 * rely on old (and wrong) kernel behavior.
+			 */
+			log(LOG_INFO,
+			    "rip6 SEND: address family is unspec\n");
+		} else if (dst->sin6_family != AF_INET6) {
+			m_freem(m);
 			return(EAFNOSUPPORT);
-		if ((error = scope6_check_id(dst, ip6_use_defzone)) != 0)
+		}
+		if ((error = scope6_check_id(dst, ip6_use_defzone)) != 0) {
+			m_freem(m);
 			return(error);
+		}
 	}
 	return rip6_output(m, so, dst, control);
 }
