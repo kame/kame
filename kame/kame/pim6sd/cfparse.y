@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.22 2002/09/17 09:57:19 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.23 2002/10/04 11:09:10 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -116,7 +116,7 @@ extern int yylex __P((void));
 %token ROBUST QUERY_INT QUERY_INT_RESP MLD_VERSION LLQI
 %token GRPPFX
 %token CANDRP CANDBSR TIME PRIORITY MASKLEN
-%token NUMBER STRING SLASH
+%token NUMBER STRING SLASH ANY
 %token REGTHRES DATATHRES RATE INTERVAL
 %token SRCMETRIC SRCPREF HELLOPERIOD GRANULARITY JPPERIOD
 %token DATATIME REGSUPTIME PROBETIME ASSERTTIME
@@ -242,6 +242,12 @@ if_attributes:
 	|	if_attributes MLD_VERSION NUMBER
 		{
 			if (($$ = add_attribute_num($1, IFA_MLD_VERSION, $3))
+			    == NULL)
+				return(-1);
+		}
+	|	if_attributes MLD_VERSION ANY
+		{
+			if (($$ = add_attribute_num($1, IFA_MLD_VERSION, MLDv1|MLDv2))
 			    == NULL)
 				return(-1);
 		}
@@ -695,19 +701,19 @@ phyint_config()
 				}
 				break;
 			case IFA_MLD_VERSION:
-				if (al->attru.number != 1 && 
-				    al->attru.number != 2)
+				if (((int)al->attru.number & MLDv1) == 0 && 
+				    ((int)al->attru.number & MLDv2) == 0) {
 					yywarn("invalid mld version(%d)",
 					       (int) al->attru.number);
-				else {
-					v->uv_mld_version = al->attru.number;
-					IF_DEBUG(DEBUG_MLD)
-						log(LOG_DEBUG, 0,
-						    "mld version for %s "
-						    "is %d",
-						    v->uv_name,
-						    v->uv_mld_version);
+					break;
 				}
+				v->uv_mld_version = al->attru.number;
+				IF_DEBUG(DEBUG_MLD)
+					log(LOG_DEBUG, 0,
+					    "mld version for %s is %s %s",
+					    v->uv_name,
+					    v->uv_mld_version & MLDv1 ? "v1" : "",
+					    v->uv_mld_version & MLDv2 ? "v2" : "");
 				break;
 			case IFA_QUERY_INT:
 #ifdef MLDV2_LISTENER_REPORT

@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.15 2002/06/26 10:41:37 itojun Exp $	*/
+/*	$KAME: cftoken.l,v 1.16 2002/10/04 11:09:10 suz Exp $	*/
 
 %{
 /*
@@ -540,6 +540,7 @@ slash		\/
 <S_IFCONF>llqi { YYD_ECHO; return(LLQI); }
 <S_IFCONF>mld_version { YYD_ECHO; return(MLD_VERSION); }
 <S_IFCONF>nolistener { YYD_ECHO; return(NOLISTENER); }
+<S_IFCONF>any { YYD_ECHO; return(ANY); }
 <S_IFCONF>{semi} { DP("end phyint"); BEGIN S_CNF; return(EOS); }
 
 	/* cand_rp */
