@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.121 2003/12/12 02:56:44 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.122 2004/02/01 15:08:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1470,7 +1470,7 @@ ip6_mforward(ip6, ifp, m)
 
 /*
  * Clean up cache entries if upcalls are not serviced
- * Call from the Slow Timeout mechanism, every half second.
+ * Call from the Slow Timeout mechanism, every 0.25 seconds.
  */
 static void
 expire_upcalls(unused)
