@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.175 2001/01/26 08:23:16 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.176 2001/01/26 08:23:59 itojun Exp $
 
 1. IPv6
 
@@ -1753,7 +1753,7 @@ to make the distribute develoment smooth.
 - keep a single open/close bracket in a comment such as the following
   line:
 	putchar('(');	/* ) */
-  with this, some vi users would have a hard time to match a pair of
+  without this, some vi users would have a hard time to match a pair of
   brackets.  Although this type of bracket seems clumsy and is even
   harmful for some other type of vi users and Emacs users, the
   agreement in the KAME developers is to allow it.
