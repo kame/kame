@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/24 16:18:01 $
+			$Date: 1999/10/24 16:22:00 $
 
 1. IPv6
 
@@ -276,8 +276,8 @@ cases are left unspecified:
 - Hosts have single network interface (except loopback)
 Therefore, this is unwise to enable net.inet6.ip6.accept_rtadv on routers,
 or multi-interface host.  A misconfigured node can behave strange
-(KAME code does not prohibit nonconforming configuration, for those who
-would like to do some experiments).
+(KAME code allows nonconforming configuration, for those who would like
+to do some experiments).
 
 RFC2462 has validation rule against incoming RA prefix information option,
 in 5.5.3 (e).  This is to protect hosts from malicious (or misconfigured)
