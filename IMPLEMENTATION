@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.362 2003/12/19 14:54:00 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.363 2004/01/09 09:20:18 t-momose Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -219,8 +219,13 @@ RFC3633: IPv6 Prefix Options for Dynamic Host Configuration Protocol (DHCP)
 RFC3646: DNS Configuration options for Dynamic Host Configuration Protocol for
          IPv6 (DHCPv6)
 draft-ietf-ipngwg-icmp-name-lookups-09: IPv6 Name Lookups Through ICMP
-draft-ietf-mobileip-ipv6-21.txt: Mobility Support in IPv6
-    * See section 6.
+draft-ietf-mobileip-ipv6-24.txt: Mobility Support in IPv6
+draft-ietf-mobileip-mipv6-ha-ipsec-06.txt: 
+	Using IPsec to Protect Mobile IPv6 Signaling between Mobile 
+	Nodes and Home Agents
+draft-chakrabarti-mobileip-mipext-advapi-02.txt:
+	Extension to Sockets API for Mobile IPv6
+    * See section 6 about these MIP6 related issues.
 draft-ietf-ipngwg-router-selection-01.txt:
 	Default Router Preferences and More-Specific Routes
     * router-side: both router preference and specific routes are supported.
@@ -2161,7 +2166,7 @@ correspondent/mobile/home agent.
 
 6.2 KAME node as a home agent/mobile node
 
-Currently, the draft-19 based Mobile IPv6 code is under developping.
+Currently, the draft-24 based Mobile IPv6 code is under developping.
 For more detail, please look into TODO.mobile-ip6 and the latest
 KAME newsletter about the KAME Mobile IPv6.
 
