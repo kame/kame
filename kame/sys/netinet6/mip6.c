@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.97 2001/12/27 02:21:21 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.98 2001/12/27 03:05:04 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -130,12 +130,12 @@ static int mip6_babr_destopt_create __P((struct ip6_dest **,
 static void mip6_find_offset __P((struct mip6_buffer *));
 static void mip6_align_destopt __P((struct mip6_buffer *));
 static caddr_t mip6_add_opt2dh __P((caddr_t, struct mip6_buffer *));
+#if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
-#ifndef __OpenBSD__
 static caddr_t mip6_add_subopt2dh __P((u_int8_t *, u_int8_t *,
 				       struct mip6_buffer *));
-#endif /* !__OpenBSD__ */
 #endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
@@ -2435,8 +2435,8 @@ mip6_add_opt2dh(opt, dh)
 	return pos;
 }
 
+#if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
-#ifndef __OpenBSD__
 static caddr_t
 mip6_add_subopt2dh(subopt, opt, dh)
 	u_int8_t *subopt; /* MIP6 sub-options */
@@ -2505,8 +2505,8 @@ mip6_add_subopt2dh(subopt, opt, dh)
 
 	return (subopt_pos);
 }
-#endif /* !__OpenBSD__ */
 #endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 
 /*
  ******************************************************************************
