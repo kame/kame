@@ -45,6 +45,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <err.h>
 #include <errno.h>
 #include <string.h>
@@ -58,8 +59,10 @@
 #include "config.h"
 
 struct msghdr rcvmhdr;
-static u_char rcvcmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-			CMSG_SPACE(sizeof(int))];
+static u_char *rcvcmsgbuf;
+static size_t rcvcmsgbuflen;
+static u_char *sndcmsgbuf = NULL;
+static size_t sndcmsgbuflen;
 struct msghdr sndmhdr;
 struct iovec rcviov[2];
 struct iovec sndiov[2];
@@ -465,7 +468,7 @@ rtadvd_input()
 	 * be modified if we had received a message before setting
 	 * receive options.
 	 */
-	rcvmhdr.msg_controllen = sizeof(rcvcmsgbuf);
+	rcvmhdr.msg_controllen = rcvcmsgbuflen;
 	if ((i = recvmsg(sock, &rcvmhdr, 0)) < 0)
 		return;
 
@@ -1078,8 +1081,22 @@ sock_open()
 	int on;
 	/* XXX: should be max MTU attached to the node */
 	static u_char answer[1500];
-	static u_char sndcmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
-				CMSG_SPACE(sizeof(int))];
+
+	rcvcmsgbuflen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
+				CMSG_SPACE(sizeof(int));
+	rcvcmsgbuf = (u_char *)malloc(rcvcmsgbuflen);
+	if (rcvcmsgbuf == NULL) {
+		syslog(LOG_ERR, "<%s> not enough core", __FUNCTION__);
+		exit(1);
+	}
+
+	sndcmsgbuflen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
+				CMSG_SPACE(sizeof(int));
+	sndcmsgbuf = (u_char *)malloc(sndcmsgbuflen);
+	if (sndcmsgbuf == NULL) {
+		syslog(LOG_ERR, "<%s> not enough core", __FUNCTION__);
+		exit(1);
+	}
 
 	if ((sock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0) {
 		syslog(LOG_ERR, "<%s> socket: %s", __FUNCTION__,
@@ -1164,14 +1181,14 @@ sock_open()
 	rcvmhdr.msg_iov = rcviov;
 	rcvmhdr.msg_iovlen = 1;
 	rcvmhdr.msg_control = (caddr_t) rcvcmsgbuf;
-	rcvmhdr.msg_controllen = sizeof(rcvcmsgbuf);
+	rcvmhdr.msg_controllen = rcvcmsgbuflen;
 
 	/* initialize msghdr for sending packets */
 	sndmhdr.msg_namelen = sizeof(struct sockaddr_in6);
 	sndmhdr.msg_iov = sndiov;
 	sndmhdr.msg_iovlen = 1;
 	sndmhdr.msg_control = (caddr_t)sndcmsgbuf;
-	sndmhdr.msg_controllen = sizeof(sndcmsgbuf);
+	sndmhdr.msg_controllen = sndcmsgbuflen;
 	
 	return;
 }
