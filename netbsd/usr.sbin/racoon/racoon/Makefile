@@ -57,5 +57,5 @@ CPPFLAGS+=-DHAVE_SIGNING_C=1 -DHAVE_OPENSSL_PEM_H=1 -DHAVE_OPENSSL_X509_H=1
 
 .include <bsd.prog.mk>
 
-.PATH:	${RACOONSRCDIR} ${TCPDUMPSRCDIR} ${RACOONSRCDIR}/missing/crypto/rijndael ${RACOONSRCDIR}/missing/crypto/sha2
+.PATH:	${RACOONSRCDIR} ${TCPDUMPSRCDIR} ${RACOONSRCDIR}/missing/crypto/rijndael ${RACOONSRCDIR}/missing/crypto/sha2 ${RACOONSRCDIR}/missing
 CLEANFILES+=	y.tab.h cfparse.c cftoken.c
