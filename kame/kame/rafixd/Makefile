@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.1 2003/03/12 15:59:09 jinmei Exp $
+#	$KAME: Makefile,v 1.1.1.1 2003/03/12 15:59:09 jinmei Exp $
 # Copyright (c) 2003 WIDE Project. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
