@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.9 2002/04/28 05:40:27 suz Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.55 2002/10/02 05:04:01 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.56 2002/10/02 06:15:59 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -485,8 +485,9 @@ udp6_input(mp, offp, proto)
 			if ((last->in6p_socket->so_options &
 			     (SO_REUSEPORT|SO_REUSEADDR)) == 0)
 				break;
-		next_inp:
-
+#ifdef MLDV2
+		next_inp:;
+#endif
 		}
 
 		if (last == NULL) {
