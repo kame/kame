@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.99 2001/03/27 16:05:00 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.100 2001/04/02 11:47:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3234,6 +3234,27 @@ ipsec4_tunnel_validate(m, off, nxt0, sav)
 	m_copydata(m, off + offsetof(struct ip, ip_dst), sizeof(idst.sin_addr),
 	    (caddr_t)&idst.sin_addr);
 
+	/*
+	 * RFC2401 5.2.1 (b): (assume that we are using tunnel mode)
+	 * - if the inner destination is multicast address, there can be
+	 *   multiple permissible inner source address.  implementation
+	 *   may want to skip verification of inner source address against
+	 *   SPD selector.
+	 * - if the inner protocol is ICMP, the packet may be an error report
+	 *   from routers on the other side of the VPN cloud (R in the
+	 *   following diagram).  in this case, we cannot verify inner source
+	 *   address against SPD selector.
+	 *	me -- gw === gw -- R -- you
+	 *
+	 * we consider the first bullet to be users responsibility on SPD entry
+	 * configuration (if you need to encrypt multicast traffic, set
+	 * the source range of SPD selector to 0.0.0.0/0, or have explicit
+	 * address ranges for possible senders).
+	 * the second bullet is not taken care of (yet).
+	 *
+	 * therefore, we do not do anything special about inner source.
+	 */
+
 	sp = key_gettunnel((struct sockaddr *)&osrc, (struct sockaddr *)&odst,
 	    (struct sockaddr *)&isrc, (struct sockaddr *)&idst);
 	if (!sp)
@@ -3293,6 +3314,11 @@ ipsec6_tunnel_validate(m, off, nxt0, sav)
 	    sizeof(isrc.sin6_addr), (caddr_t)&isrc.sin6_addr);
 	m_copydata(m, off + offsetof(struct ip6_hdr, ip6_dst),
 	    sizeof(idst.sin6_addr), (caddr_t)&idst.sin6_addr);
+
+	/*
+	 * regarding to inner source address validation, see a long comment
+	 * in ipsec4_tunnel_validate.
+	 */
 
 	sp = key_gettunnel((struct sockaddr *)&osrc, (struct sockaddr *)&odst,
 	    (struct sockaddr *)&isrc, (struct sockaddr *)&idst);
