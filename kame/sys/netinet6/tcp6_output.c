@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_output.c,v 1.17 2001/12/25 01:22:38 jinmei Exp $	*/
+/*	$KAME: tcp6_output.c,v 1.18 2002/02/02 08:27:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -659,6 +659,13 @@ send:
 		ip6oflags |= IPV6_MINMTU;
 	}
 	ip6oflags |= (so->so_options & SO_DONTROUTE);
+
+	if (!ip6_setpktaddrs(m, &t6p->t_in6pcb->in6p_lsa,
+			     &t6p->t_in6pcb->in6p_fsa)) {
+		m_freem(m);
+		error = ENOBUFS;
+		goto out;
+	}
 
 	error = ip6_output(m, t6p->t_in6pcb->in6p_outputopts,
 			   &t6p->t_in6pcb->in6p_route, ip6oflags, 0, NULL);

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.38 2002/02/02 07:06:14 jinmei Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.39 2002/02/02 08:27:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -238,6 +238,7 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 #endif
 	struct in6pcb *in6p = NULL;
 	struct ifnet *oifp = NULL;
+	struct sockaddr_in6 nsrc6, ndst6, *src6, *dst6;
 	int ip6oflags;
 
 	if (t6p) {
@@ -262,6 +263,9 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 		nth = (struct tcp6hdr *)(nip6 + 1);
 		*nth = *th;
 		flags = TH_ACK;
+
+		src6 = &tp->t_in6pcb->in6p_lsa;
+		dst6 = &tp->t_in6pcb->in6p_fsa;
 	} else {
 		m_freem(m->m_next);
 		m->m_next = 0;
@@ -270,6 +274,10 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 		nip6 = ip6;
 		nth = (struct tcp6hdr *)(nip6 + 1);
 		tlen = 0;
+		nsrc6 = *dst6;
+		ndst6 = *src6;
+		src6 = &nsrc6;
+		dst6 = &ndst6;
 #define xchg(a,b,type) { type t; t=a; a=b; b=t; }
 		xchg(ip6->ip6_dst, ip6->ip6_src, struct in6_addr);
 		if (th != nth) {
@@ -318,6 +326,10 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 	if (t6p && t6p->t_in6pcb->in6p_outputopts &&
 	    (t6p->t_in6pcb->in6p_outputopts->ip6po_flags & IP6PO_MINMTU)) {
 		ip6oflags |= IPV6_MINMTU;
+	}
+	if (!ip6_setpktaddrs(m, src6, dst6)) {
+		m_freem(m);
+		return ENOBUFS;
 	}
 	return(ip6_output(m, NULL, ro, ip6oflags, NULL, NULL));
 }
@@ -623,7 +635,8 @@ tcp6_ctlinput(cmd, sa, d)
 		    (inet6ctlerrmap[cmd] == EHOSTUNREACH ||
 		     inet6ctlerrmap[cmd] == ENETUNREACH ||
 		     inet6ctlerrmap[cmd] == EHOSTDOWN))
-			syn_cache_unreach6(&ip6_tmp, &th);
+			syn_cache_unreach6(&ip6_tmp, &th,
+					   (struct sockaddr_in6 *)sa, sa6_src);
 	} else {
 		(void) in6_pcbnotify(&tcb6, sa, 0, (struct sockaddr *)sa6_src,
 		    0, cmd, NULL, notify);
@@ -812,7 +825,10 @@ ipsec6_hdrsiz_tcp(t6p)
 	m->m_pkthdr.len = m->m_len = sizeof(struct ip6tcp);
 	bcopy(t6p->t_template, mtod(m, u_char *), sizeof(struct ip6tcp));
 
-	hdrsiz = ipsec6_hdrsiz(m, IPSEC_DIR_OUTBOUND, in6p);	/* XXX dir !!*/
+	if (!ip6_setpktaddrs(m, &in6p->in6p_lsa, &in6p->in6p_fsa))
+		hdrsiz = 0; /* XXX */
+	else 
+		hdrsiz = ipsec6_hdrsiz(m, IPSEC_DIR_OUTBOUND, in6p);
 
 	m_free(m);
 	return hdrsiz;

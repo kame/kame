@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.100 2002/02/02 07:06:14 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.101 2002/02/02 08:27:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -142,8 +142,8 @@ udp6_input(mp, offp, proto)
 	struct in6pcb *in6p;
 	int off = *offp;
 	u_int32_t plen, ulen;
-	struct sockaddr_in6 udp_in6;
 	struct ip6_recvpktopts opts;
+	struct sockaddr_in6 *src, *dst, src_storage, dst_storage, fromsa;
 
 	bzero(&opts, sizeof(opts));
 	ip6 = mtod(m, struct ip6_hdr *);
@@ -170,6 +170,31 @@ udp6_input(mp, offp, proto)
 		return IPPROTO_DONE;
 	}
 #endif
+
+	/*
+	 * extract full sockaddr structures for the src/dst addresses,
+	 * and make local copies of them.  The copies are necessary
+	 * because the memory that stores src and dst may be freed during
+	 * the process below.
+	 */
+	if (ip6_getpktaddrs(m, &src, &dst)) {
+		m_freem(m);
+		goto bad;
+	}
+	src_storage = *src;
+	dst_storage = *dst;
+	src = &src_storage;
+	dst = &dst_storage;
+
+	/*
+	 * XXX: the address may have embedded scope zone ID, which should be
+	 * hidden from applications.
+	 */
+	fromsa = *src;
+#ifndef SCOPEDROUTING
+	in6_clearscope(&fromsa.sin6_addr);
+#endif
+
 	ulen = ntohs((u_short)uh->uh_ulen);
 	/*
 	 * RFC2675 section 4: jumbograms will have 0 in the UDP header field,
@@ -263,14 +288,13 @@ udp6_input(mp, offp, proto)
 			if (in6p->in6p_lport != uh->uh_dport)
 				continue;
 			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
-				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa,
-							&ip6->ip6_dst))
+				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
 					continue;
 			}
 			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
-				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
-							&ip6->ip6_src) ||
-				   in6p->in6p_fport != uh->uh_sport)
+				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa,
+							src) ||
+				    in6p->in6p_fport != uh->uh_sport)
 					continue;
 			}
 
@@ -315,6 +339,13 @@ udp6_input(mp, offp, proto)
 						sorwakeup(last->in6p_socket);
 					bzero(&opts, sizeof(opts));
 				}
+				/*
+				 * XXX: m_copy above removes m_aux that
+				 * contains the packet addresses, while we
+				 * still need them for IPsec.
+				 */
+				if (!ip6_setpktaddrs(m, src, dst))
+					goto bad; /* XXX */
 			}
 			last = in6p;
 			/*
@@ -373,12 +404,10 @@ udp6_input(mp, offp, proto)
 	in6p = udp6_last_in6pcb;
 	if (in6p->in6p_lport != uh->uh_dport ||
 	   in6p->in6p_fport != uh->uh_sport ||
-	   !IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &ip6->ip6_src) ||
-	   !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &ip6->ip6_dst)) {
-		in6p = in6_pcblookup(&udb6,
-				     &ip6->ip6_src, uh->uh_sport,
-				     &ip6->ip6_dst, uh->uh_dport,
-				     IN6PLOOKUP_WILDCARD);
+	   !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, src) ||
+	   !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst)) {
+		in6p = in6_pcblookup(&udb6, src, uh->uh_sport,
+				     dst, uh->uh_dport, IN6PLOOKUP_WILDCARD);
 		if (in6p)
 			udp6_last_in6pcb = in6p;
 		udp6stat.udp6ps_pcbcachemiss++;
@@ -417,12 +446,7 @@ udp6_input(mp, offp, proto)
 	 * Construct sockaddr format source address.
 	 * Stuff source address and datagram in user buffer.
 	 */
-	bzero(&udp_in6, sizeof(udp_in6));
-	udp_in6.sin6_len = sizeof(struct sockaddr_in6);
-	udp_in6.sin6_family = AF_INET6;
-	udp_in6.sin6_port = uh->uh_sport;
-	/* KAME hack: recover scopeid */
-	(void)in6_recoverscope(&udp_in6, &ip6->ip6_src, m->m_pkthdr.rcvif);
+	fromsa.sin6_port = uh->uh_sport;
 	if (in6p->in6p_flags & IN6P_CONTROLOPTS
 #ifdef SO_TIMESTAMP
 	 || in6p->in6p_socket->so_options & SO_TIMESTAMP
@@ -433,7 +457,7 @@ udp6_input(mp, offp, proto)
 
 	m_adj(m, off + sizeof(struct udphdr));
 	if (sbappendaddr(&in6p->in6p_socket->so_rcv,
-			(struct sockaddr *)&udp_in6,
+			(struct sockaddr *)&fromsa,
 			m, opts.head) == 0) {
 		udp6stat.udp6s_fullsock++;
 		goto bad;
