@@ -141,7 +141,7 @@ main(argc, argv)
 	openlog(*argv, LOG_NDELAY|LOG_PID, LOG_DAEMON);
 
 	/* get command line options and arguments */
-	while ((ch = getopt(argc, argv, "c:dDfRs")) != -1) {
+	while ((ch = getopt(argc, argv, "c:dDfmRs")) != -1) {
 		switch(ch) {
 		 case 'c':
 			 conffile = optarg;
