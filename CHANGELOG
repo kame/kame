@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.279 1999/11/20 12:45:10 itojun Exp $
+$Id: CHANGELOG,v 1.280 1999/11/20 20:50:34 itojun Exp $
 
 <199911>
+Sun Nov 21 05:49:14 JST 1999  itojun@iijlab.net
+	* openbsd/sys/dev/ic/am7990.c: for inbound packets, allocate mbuf
+	  cluster whenever desired.  this is to make "le" driver conform to
+	  KAME mbuf chain requirement.
+
 Sat Nov 20 21:43:26 JST 1999  itojun@iijlab.net
 	* openbsd/sys/netinet/udp_usrreq.c: fix panic on interface down
 	  in udp6_ctlinput().  fixes KAME PR 175.
