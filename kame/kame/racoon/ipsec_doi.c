@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.130 2001/04/03 15:51:55 thorpej Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.131 2001/04/04 02:06:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3421,8 +3421,8 @@ ipsecdoi_sockaddr2id(saddr, prefixlen, ul_proto)
 }
 
 /*
- * create sockaddr structure from ID payload.
- * buffer must be allocated.
+ * create sockaddr structure from ID payload (buf).
+ * buffers (saddr, prefixlen, ul_proto) must be allocated.
  * see, RFC2407 4.6.2.1
  */
 int

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.74 2001/03/21 16:21:02 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.75 2001/04/04 02:06:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,6 +87,7 @@
 static vchar_t *quick_ir1sendmx __P((struct ph2handle *, vchar_t *));
 static int get_sainfo_r __P((struct ph2handle *));
 static int get_proposal_r __P((struct ph2handle *));
+static u_int32_t setscopeid __P((struct sockaddr *, struct sockaddr *));
 
 /* %%%
  * Quick Mode
@@ -1753,7 +1754,10 @@ get_proposal_r(iph2)
 	spidx.dir = IPSEC_DIR_INBOUND;
 	spidx.ul_proto = 0;
 
-	/* make src/dst index from ID payload or phase 1 addresses. */
+	/*
+	 * make destination address in spidx from either ID payload
+	 * or phase 1 address into a address in spidx.
+	 */
 	if (iph2->id != NULL
 	 && (_XIDT(iph2->id) == IPSECDOI_ID_IPV4_ADDR
 	  || _XIDT(iph2->id) == IPSECDOI_ID_IPV6_ADDR
@@ -1766,9 +1770,25 @@ get_proposal_r(iph2)
 		if (error)
 			return error;
 
+#ifdef INET6
+		/*
+		 * get scopeid from the SA address.
+		 * note that the phase 1 source address is used as
+		 * a destination address to search for a inbound policy entry
+		 * because rcoon is responder.
+		 */
+		if (_XIDT(iph2->id) == IPSECDOI_ID_IPV6_ADDR) {
+			error = setscopeid((struct sockaddr *)&spidx.dst,
+			                    iph2->src);
+			if (error)
+				return error;
+		}
+#endif
+
 		if (_XIDT(iph2->id) == IPSECDOI_ID_IPV4_ADDR
 		 || _XIDT(iph2->id) == IPSECDOI_ID_IPV6_ADDR)
 			idi2type = _XIDT(iph2->id);
+
 	} else {
 
 		plog(LLV_DEBUG, LOCATION, NULL,
@@ -1798,7 +1818,7 @@ get_proposal_r(iph2)
 		}
 	}
 
-	/* set source address */
+	/* make source address in spidx */
 	if (iph2->id_p != NULL
 	 && (_XIDT(iph2->id_p) == IPSECDOI_ID_IPV4_ADDR
 	  || _XIDT(iph2->id_p) == IPSECDOI_ID_IPV6_ADDR
@@ -1811,12 +1831,26 @@ get_proposal_r(iph2)
 		if (error)
 			return error;
 
+#ifdef INET6
+		/*
+		 * get scopeid from the SA address.
+		 * for more detail, see above of this function.
+		 */
+		if (_XIDT(iph2->id_p) == IPSECDOI_ID_IPV6_ADDR) {
+			error = setscopeid((struct sockaddr *)&spidx.src,
+			                    iph2->dst);
+			if (error)
+				return error;
+		}
+#endif
+
 		/* make id[src,dst] if both ID types are IP address and same */
 		if (_XIDT(iph2->id_p) == idi2type
 		 && spidx.dst.ss_family == spidx.src.ss_family) {
 			iph2->src_id = dupsaddr((struct sockaddr *)&spidx.dst);
 			iph2->dst_id = dupsaddr((struct sockaddr *)&spidx.src);
 		}
+
 	} else {
 		plog(LLV_DEBUG, LOCATION, NULL,
 			"get a source address of SP index "
@@ -1905,3 +1939,37 @@ get_proposal_r(iph2)
 
 	return 0;
 }
+
+#ifdef INET6
+static u_int32_t
+setscopeid(sp_addr0, sa_addr0)
+	struct sockaddr *sp_addr0, *sa_addr0;
+{
+	struct sockaddr_in6 *sp_addr, *sa_addr;
+    
+	sp_addr = (struct sockaddr_in6 *)sp_addr0;
+	sa_addr = (struct sockaddr_in6 *)sa_addr0;
+
+	/* sanity */
+	if (sa_addr->sin6_family != AF_INET6) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"can't get scope ID: family mismatch\n");
+		return -1;
+	}
+
+	/* this check should not be here ? */
+	if (sa_addr->sin6_scope_id
+	 && !IN6_IS_ADDR_LINKLOCAL(&sa_addr->sin6_addr)
+	 && !IN6_IS_ADDR_SITELOCAL(&sa_addr->sin6_addr)
+	 && !IN6_IS_ADDR_MULTICAST(&sa_addr->sin6_addr)) {
+		plog(LLV_WARNING, LOCATION, NULL,
+			"why a scopeid is used as such a SA address, %s ? "
+			"anyway continue.\n", saddr2str(sa_addr0));
+	}
+    
+	sp_addr->sin6_scope_id = sa_addr->sin6_scope_id;
+
+	return 0;
+}
+#endif
+
