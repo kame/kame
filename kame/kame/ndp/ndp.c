@@ -546,6 +546,15 @@ again:;
 			continue;
 		}
 
+		if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr) ||
+		    IN6_IS_ADDR_MC_LINKLOCAL(&sin->sin6_addr)) {
+			/* XXX: should scope id be filled in the kernel? */
+			if (sin->sin6_scope_id == 0)
+				sin->sin6_scope_id = sdl->sdl_index;
+
+			/* XXX: KAME specific hack; removed the embedded id */
+			*(u_int16_t *)&sin->sin6_addr.s6_addr[2] = 0;
+		}
 		getnameinfo((struct sockaddr *)sin, sin->sin6_len, host_buf,
 			    sizeof(host_buf), NULL, 0,
 			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
