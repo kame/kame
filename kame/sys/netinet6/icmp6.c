@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.105 2000/05/27 05:05:15 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.106 2000/05/27 10:12:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -136,6 +136,8 @@ extern struct in6pcb rawin6pcb;
 extern struct inpcbhead ripcb;
 #endif
 extern struct timeval icmp6errratelim;
+extern int icmp6errppslim;
+static int icmp6errppscount = 0;
 extern int icmp6_nodeinfo;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
@@ -150,6 +152,9 @@ static void icmp6_mtudisc_update __P((struct in6_addr *, struct icmp6_hdr *,
 static int icmp6_ratelimit __P((const struct in6_addr *, const int, const int));
 static const char *icmp6_redirect_diag __P((struct in6_addr *,
 	struct in6_addr *, struct in6_addr *));
+#ifndef HAVE_RATECHECK
+static int ratecheck __P((struct timeval *, struct timeval *));
+#endif
 static struct mbuf *ni6_input __P((struct mbuf *, int));
 static struct mbuf *ni6_nametodns __P((const char *, int, int));
 static int ni6_dnsmatch __P((const char *, int, const char *, int));
@@ -2015,7 +2020,11 @@ icmp6_reflect(m, off)
 void
 icmp6_fasttimo()
 {
+
 	mld6_fasttimeo();
+
+	/* reset ICMPv6 pps limit */
+	icmp6errppscount = 0;
 }
 
 static const char *
@@ -2662,22 +2671,16 @@ icmp6_ctloutput(op, so, level, optname, mp)
 }
 #endif /*NRL inpcb*/
 
+#ifndef HAVE_RATECHECK
 /*
- * Perform rate limit check.
- * Returns 0 if it is okay to send the icmp6 packet.
- * Returns 1 if the router SHOULD NOT send this icmp6 packet due to rate
- * limitation.
- *
- * XXX per-destination/type check necessary?
+ * ratecheck() returns true if it is okay to send.  We return
+ * true if it is not okay to send.
  */
 static int
-icmp6_ratelimit(dst, type, code)
-	const struct in6_addr *dst;	/* not used at this moment */
-	const int type;			/* not used at this moment */
-	const int code;			/* not used at this moment */
+ratecheck(last, limit)
+	struct timeval *last;
+	struct timeval *limit;
 {
-#ifndef HAVE_RATECHECK
-	static struct timeval icmp6errratelim_last;
 	struct timeval tp;
 	struct timeval nextsend;
 
@@ -2688,40 +2691,68 @@ icmp6_ratelimit(dst, type, code)
 	tp = time;
 #endif
 
-	/* always okay to send the first packet */
-	if (icmp6errratelim_last.tv_sec == 0 &&
-	    icmp6errratelim_last.tv_usec == 0) {
-		goto okaytosend;
+	/* rate limit */
+	if (last->tv_sec != 0 || last->tv_usec != 0) {
+		nextsend.tv_sec = last->tv_sec + limit->tv_sec;
+		nextsend.tv_usec = last->tv_usec + limit->tv_usec;
+		nextsend.tv_sec += (nextsend.tv_usec / 1000000);
+		nextsend.tv_usec %= 1000000;
+
+		if (nextsend.tv_sec <= tp.tv_sec)
+			;
+		else if (nextsend.tv_sec == tp.tv_sec && nextsend.tv_usec <= tp.tv_usec)
+			;
+		else {
+			/* The packet is subject to rate limit */
+			return 0;
+		}
 	}
 
-	nextsend.tv_sec = icmp6errratelim_last.tv_sec + icmp6errratelim.tv_sec;
-	nextsend.tv_usec = icmp6errratelim_last.tv_usec +
-	    icmp6errratelim.tv_usec;
-	nextsend.tv_sec += (nextsend.tv_usec / 1000000);
-	nextsend.tv_usec %= 1000000;
-
-	if (nextsend.tv_sec <= tp.tv_sec)
-		goto okaytosend;
-	else if (nextsend.tv_sec == tp.tv_sec && nextsend.tv_usec <= tp.tv_usec)
-		goto okaytosend;
-
-	/* The packet is subject to rate limit */
-	icmp6errratelim_last = tp;
+	*last = tp;
 	return 1;
-
-okaytosend:
-	/* it is okay to send this */
-	icmp6errratelim_last = tp;
-	return 0;
-#else
-	static struct timeval icmp6errratelim_last;
-
-	/*
-	 * ratecheck() returns true if it is okay to send.  We return
-	 * true if it is not okay to send.
-	 */
-	return (ratecheck(&icmp6errratelim_last, &icmp6errratelim) == 0);
+}
 #endif
+
+/*
+ * Perform rate limit check.
+ * Returns 0 if it is okay to send the icmp6 packet.
+ * Returns 1 if the router SHOULD NOT send this icmp6 packet due to rate
+ * limitation.
+ *
+ * There are two limitations defined:
+ * - pps limit: ICMPv6 error packet cannot exceed defined packet-per-second.
+ *   we measure it every 0.2 second, since fasttimo works every 0.2 second.
+ * - rate limit: ICMPv6 error packet cannot appear more than once per
+ *   defined interval.
+ * In any case, if we perform rate limitation, we'll see jitter in the ICMPv6
+ * error packets.
+ *
+ * XXX per-destination/type check necessary?
+ */
+static int
+icmp6_ratelimit(dst, type, code)
+	const struct in6_addr *dst;	/* not used at this moment */
+	const int type;			/* not used at this moment */
+	const int code;			/* not used at this moment */
+{
+	static struct timeval icmp6errratelim_last;
+	int ret;
+
+	ret = 0;	/*okay to send*/
+
+	/* PPS limit */
+	icmp6errppscount++;
+	if (icmp6errppslim && icmp6errppscount > icmp6errppslim / 5) {
+		/* The packet is subject to pps limit */
+		ret++;
+	}
+
+	if (!ratecheck(&icmp6errratelim_last, &icmp6errratelim)) {
+		/* The packet is subject to rate limit */
+		ret++;
+	}
+
+	return ret;
 }
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -2909,6 +2940,8 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 				&nd6_useloopback);
 	case ICMPV6CTL_NODEINFO:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &icmp6_nodeinfo);
+	case ICMPV6CTL_ERRPPSLIMIT:
+		return sysctl_int(oldp, oldlenp, newp, newlen, &icmp6errppslim);
 	default:
 		return ENOPROTOOPT;
 	}

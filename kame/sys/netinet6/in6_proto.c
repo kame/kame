@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.56 2000/05/22 15:24:07 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.57 2000/05/27 10:12:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -531,6 +531,7 @@ u_long	rip6_recvspace = RIPV6RCVQ;
 int	icmp6_rediraccept = 1;		/* accept and process redirects */
 int	icmp6_redirtimeout = 10 * 60;	/* 10 minutes */
 struct timeval icmp6errratelim = { 0, 1000 };	/* 1000usec = 1msec */
+int	icmp6errppslim = 0;		/* no pps limit */
 int	icmp6_nodeinfo = 1;		/* enable/disable NI response */
 
 #ifdef TCP6
@@ -756,6 +757,8 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_USELOOPBACK,
 	nd6_useloopback, CTLFLAG_RW,	&nd6_useloopback, 0, "");
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_NODEINFO,
 	nodeinfo, CTLFLAG_RW,	&icmp6_nodeinfo,	0, "");
+SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ERRPPSLIMIT,
+	errppslimit, CTLFLAG_RW,	&icmp6errppslim,	0, "");
 
 #if __FreeBSD__ < 3
 /* net.inet6.udp6 */

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.13 2000/05/22 13:57:03 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.14 2000/05/27 10:12:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -573,7 +573,8 @@ struct icmp6stat {
 #define ICMPV6CTL_ND6_USELOOPBACK	11
 /*#define ICMPV6CTL_ND6_PROXYALL	12	obsoleted, do not reuse here */
 #define ICMPV6CTL_NODEINFO	13
-#define ICMPV6CTL_MAXID		14
+#define ICMPV6CTL_ERRPPSLIMIT	14	/* ICMPv6 error pps limitation */
+#define ICMPV6CTL_MAXID		15
 
 #define ICMPV6CTL_NAMES { \
 	{ 0, 0 }, \
@@ -590,6 +591,7 @@ struct icmp6stat {
 	{ "nd6_useloopback", CTLTYPE_INT }, \
 	{ 0, 0 }, \
 	{ "nodeinfo", CTLTYPE_INT }, \
+	{ "errppslimit", CTLTYPE_INT }, \
 }
 
 #ifdef __bsdi__
@@ -609,6 +611,7 @@ struct icmp6stat {
 	&nd6_useloopback, \
 	0, \
 	&icmp6_nodeinfo, \
+	&icmp6errppslim, \
 }
 #endif
 
