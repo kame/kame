@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1016 2000/06/14 15:33:16 itojun Exp $
+$Id: CHANGELOG,v 1.1017 2000/06/14 17:09:39 itojun Exp $
 <200006>
+Thu Jun 15 02:07:53 JST 2000  itojun@iijlab.net
+	* kame/man/man4/inet6.4, *bsd*/usr.sbin/inetd/inetd.8:
+	  update wording on IPv4 mapped address and tcp4/tcp6 interaction.
+
 Wed Jun 14 23:35:03 JST 2000  itojun@iijlab.net
 	* {netbsd,openbsd}/libexec/ftpd: correct STAT command output for LPSV.
 	* libinet6/resolv/res_query.c: change member name for struct res_target.
