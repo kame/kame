@@ -198,17 +198,17 @@ intpr(interval, ifnetaddr, pfunc)
 				 */
 				in = inet_makeaddr(ifaddr.in.ia_subnet,
 					INADDR_ANY);
-				printf("%-13.13s ", netname(in.s_addr,
-				    ifaddr.in.ia_subnetmask));
+				cp = netname(in.s_addr,
+				    ifaddr.in.ia_subnetmask);
 #else
 				cp = netname(ifaddr.in.ia_subnet,
 				    ifaddr.in.ia_subnetmask);
+#endif
 				if (vflag)
 					n = strlen(cp) < 13 ? 13 : strlen(cp);
 				else
 					n = 13;
 				printf("%-*.*s ", n, n, cp);
-#endif
 				cp = routename(sin->sin_addr.s_addr);
 				if (vflag)
 					n = strlen(cp) < 17 ? 17 : strlen(cp);
