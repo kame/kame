@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.164 2001/07/18 17:06:36 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.165 2001/07/20 19:48:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2095,10 +2095,11 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 				goto lookup;
 			if (((rt = rt->rt_gwroute)->rt_flags & RTF_UP) == 0) {
 				rtfree(rt); rt = rt0;
+			lookup:
 #ifdef __FreeBSD__
-			lookup: rt->rt_gwroute = rtalloc1(rt->rt_gateway, 1, 0UL);
+				rt->rt_gwroute = rtalloc1(rt->rt_gateway, 1, 0UL);
 #else
-			lookup: rt->rt_gwroute = rtalloc1(rt->rt_gateway, 1);
+				rt->rt_gwroute = rtalloc1(rt->rt_gateway, 1);
 #endif
 				if ((rt = rt->rt_gwroute) == 0)
 					senderr(EHOSTUNREACH);
