@@ -94,7 +94,7 @@ ip6_forward(m, srcrt)
 	register struct sockaddr_in6 *dst;
 	register struct rtentry *rt;
 	int error, type = 0, code = 0;
-	struct mbuf *mcopy;
+	struct mbuf *mcopy = NULL;
 #ifdef IPSEC_IPV6FWD
 	struct secpolicy *sp = NULL;
 #endif
@@ -145,17 +145,31 @@ ip6_forward(m, srcrt)
 	}
 	ip6->ip6_hlim -= IPV6_HLIMDEC;
 
+	/*
+	 * Save at most ICMPV6_PLD_MAXLEN (= the min IPv6 MTU -
+	 * size of IPv6 + ICMPv6 headers) bytes of the packet in case
+	 * we need to generate an ICMP6 message to the src.
+	 * Thanks to M_EXT, in most cases copy will not occur.
+	 *
+	 * It is important to save it before IPsec processing as IPsec
+	 * processing may modify the mbuf.
+	 */
+	mcopy = m_copy(m, 0, imin(m->m_pkthdr.len, ICMPV6_PLD_MAXLEN));
+
 #ifdef IPSEC_IPV6FWD
 	/* get a security policy for this packet */
 	sp = ipsec6_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, 0, &error);
 	if (sp == NULL) {
 		ipsec6stat.out_inval++;
 		ip6stat.ip6s_cantforward++;
+		if (mcopy) {
 #if 0
-		/* XXX: what icmp ? */
+			/* XXX: what icmp ? */
 #else
-		m_freem(m);
+			m_freem(mcopy);
 #endif
+		}
+		m_freem(m);
 		return;
 	}
 
@@ -170,11 +184,14 @@ ip6_forward(m, srcrt)
 		ipsec6stat.out_polvio++;
 		ip6stat.ip6s_cantforward++;
 		key_freesp(sp);
+		if (mcopy) {
 #if 0
-		/* XXX: what icmp ? */
+			/* XXX: what icmp ? */
 #else
-		m_freem(m);
+			m_freem(mcopy);
 #endif
+		}
+		m_freem(m);
 		return;
 
 	case IPSEC_POLICY_BYPASS:
@@ -189,11 +206,14 @@ ip6_forward(m, srcrt)
 			printf("ip6_forward: No IPsec request specified.\n");
 			ip6stat.ip6s_cantforward++;
 			key_freesp(sp);
+			if (mcopy) {
 #if 0
-			/* XXX: what icmp ? */
+				/* XXX: what icmp ? */
 #else
-			m_freem(m);
+				m_freem(mcopy);
 #endif
+			}
+			m_freem(m);
 			return;
 		}
 		/* do IPsec */
@@ -249,11 +269,14 @@ ip6_forward(m, srcrt)
 			break;
 		}
 		ip6stat.ip6s_cantforward++;
+		if (mcopy) {
 #if 0
-		/* XXX: what icmp ? */
+			/* XXX: what icmp ? */
 #else
-		m_freem(m);
+			m_freem(mcopy);
 #endif
+		}
+		m_freem(m);
 		return;
 	}
     }
@@ -283,8 +306,11 @@ ip6_forward(m, srcrt)
 		if (ip6_forward_rt.ro_rt == 0) {
 			ip6stat.ip6s_noroute++;
 			/* XXX in6_ifstat_inc(rt->rt_ifp, ifs6_in_noroute) */
-			icmp6_error(m, ICMP6_DST_UNREACH,
-				    ICMP6_DST_UNREACH_NOROUTE, 0);
+			if (mcopy) {
+				icmp6_error(mcopy, ICMP6_DST_UNREACH,
+					    ICMP6_DST_UNREACH_NOROUTE, 0);
+			}
+			m_freem(m);
 			return;
 		}
 	} else if ((rt = ip6_forward_rt.ro_rt) == 0 ||
@@ -306,27 +332,33 @@ ip6_forward(m, srcrt)
 		if (ip6_forward_rt.ro_rt == 0) {
 			ip6stat.ip6s_noroute++;
 			/* XXX in6_ifstat_inc(rt->rt_ifp, ifs6_in_noroute) */
-			icmp6_error(m, ICMP6_DST_UNREACH,
-				    ICMP6_DST_UNREACH_NOROUTE, 0);
+			if (mcopy) {
+				icmp6_error(mcopy, ICMP6_DST_UNREACH,
+					    ICMP6_DST_UNREACH_NOROUTE, 0);
+			}
+			m_freem(m);
 			return;
 		}
 	}
 	rt = ip6_forward_rt.ro_rt;
 	if (m->m_pkthdr.len > rt->rt_ifp->if_mtu){
 		in6_ifstat_inc(rt->rt_ifp, ifs6_in_toobig);
- 		icmp6_error(m, ICMP6_PACKET_TOO_BIG, 0, rt->rt_ifp->if_mtu);
+		if (mcopy) {
+			/*
+			 * XXX
+			 * When we do IPsec tunnel ingress, we need to play
+			 * with if_mtu value (decrement IPsec header size
+			 * from mtu value).  see ip_input().
+			 */
+			icmp6_error(mcopy, ICMP6_PACKET_TOO_BIG, 0,
+				rt->rt_ifp->if_mtu);
+		}
+		m_freem(m);
 		return;
  	}
 
 	if (rt->rt_flags & RTF_GATEWAY)
 		dst = (struct sockaddr_in6 *)rt->rt_gateway;
-	/*
-	 * Save at most ICMPV6_PLD_MAXLEN (= the min IPv6 MTU -
-	 * size of IPv6 + ICMPv6 headers) bytes of the packet in case
-	 * we need to generate an ICMP6 message to the src.
-	 * Thanks to M_EXT, in most cases copy will not occur.
-	 */
-	mcopy = m_copy(m, 0, imin(m->m_pkthdr.len, ICMPV6_PLD_MAXLEN));
 
 	/*
 	 * If we are to forward the packet using the same interface
