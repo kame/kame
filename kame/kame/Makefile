@@ -22,10 +22,6 @@ SUBDIR+=cksum6 gifconfig icmp6dump inet6d mld6query ping6 advapitest \
 	prefix route6d ifmcstat rip6query rrenumd rtadvd rtsol rtsold faith faithd \
 	traceroute6 pim6dd pim6sd send-pr mcastread mcastsend v6p mchat ip6fw
 SUBDIR+=	hroute6d
-# pma: just for KAME/BSDI and KAME/FreeBSD
-.if ${OPSYS} == "BSD/OS" || ${OPSYS} == "FreeBSD"
-SUBDIR+=	pma
-.endif
 
 CONFIGURE_SUBDIR=	v6test bgpd libpcap tcpdump traceroute
 
