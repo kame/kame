@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2447 2003/07/29 08:13:56 keiichi Exp $
+$KAME: CHANGELOG,v 1.2448 2003/07/31 10:25:19 keiichi Exp $
 
 <200307>
+Thu Jul 31 19:19:48 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/netinet6/mip6_mncore.c,mip6_cncore.c
+	sending/receiving a binding refresh request message is supported.
+
 Tue Jul 29 17:09:15 JST 2003	keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6_mncore.[hc]
 	select a CoA using the source address selection like algorithm.
