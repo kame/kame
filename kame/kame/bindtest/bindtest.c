@@ -1,5 +1,5 @@
 /*	$USAGI: bindtest.c,v 1.12 2001/11/15 15:37:16 yoshfuji Exp $	*/
-/*	$KAME: bindtest.c,v 1.55 2003/04/15 07:38:41 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.56 2004/06/14 05:15:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000,2001 USAGI/WIDE Project.
@@ -75,11 +75,7 @@
 #include <netinet/in.h>
 #include <net/if.h>
 
-/* portability */
-#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-#define socklen_t	int
-#endif
-
+/* too ugly... */
 #ifdef _USAGI
 #ifndef IPV6_V6ONLY
 #define IPV6_V6ONLY	26
@@ -131,7 +127,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.55 2003/04/15 07:38:41 itojun Exp $"
+static char *versionstr = "$KAME: bindtest.c,v 1.56 2004/06/14 05:15:48 itojun Exp $"
 			  "\n"
 			  "$USAGI: bindtest.c,v 1.12 2001/11/15 15:37:16 yoshfuji Exp $";
 static char *port = NULL;
