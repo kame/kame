@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.119 2001/07/02 08:56:38 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.120 2001/07/02 11:23:39 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -991,7 +991,7 @@ in6_ifdetach(ifp)
 	short rtflags;
 	struct sockaddr_in6 sin6;
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	struct in6_multi *in6m_next;
+	struct in6_multi *in6m, *in6m_next;
 #endif
 	struct in6_multi_mship *imm;
 
