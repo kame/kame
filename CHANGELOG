@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1804 2001/07/23 18:27:53 itojun Exp $
+$KAME: CHANGELOG,v 1.1805 2001/07/23 18:55:39 itojun Exp $
 
 <200107>
+Tue Jul 24 03:54:24 JST 2001  itojun@iijlab.net
+	* sys/netinet6/nd6.c: repair ndp -R.
+	* ndp: do not print uninitialized interface on ndp -i.
+
 Mon Jul 23 15:10:08 JST 2001  itojun@iijlab.net
 	* sys/netinet6/in6.c: now ff01::/16 prefix means "interface local
 	  multicast", not "node local multicast".  therefore, we now
