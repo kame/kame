@@ -750,7 +750,8 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 #ifdef INET6
 	case AF_INET6:
 		ip6oflags = 0;
-		if (tp->t_in6pcb && (tp->t_in6pcb->in6p_flags & IN6P_MINMTU))
+		if (tp && tp->t_in6pcb &&
+		    (tp->t_in6pcb->in6p_flags & IN6P_MINMTU))
 			ip6oflags |= IPV6_MINMTU;
 #ifdef NEW_STRUCT_ROUTE
 		error = ip6_output(m, NULL, ro, ip6oflags, NULL, NULL);
