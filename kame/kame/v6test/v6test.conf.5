@@ -1,4 +1,4 @@
-.\"	$KAME: v6test.conf.5,v 1.4 2001/06/27 09:43:57 suz Exp $
+.\"	$KAME: v6test.conf.5,v 1.5 2001/06/27 10:08:44 suz Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -153,7 +153,6 @@ Specifies padding length. if not specified, values in
 .Cm \&padoptlen
 is used.
 .El
-.El
 .It Cm \&jumbo \fI(entry)\fR
 jumbo-packet hop-by-hop option.  Following entry should be specified.
 .Bl -tag -width indent -compact
@@ -173,6 +172,7 @@ unknown option. Following entries should be specified.
 option type
 .It Cm \&optlen \fI(num)\fR
 option length
+.El
 .El
 .El
 
