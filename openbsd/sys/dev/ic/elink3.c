@@ -1237,9 +1237,13 @@ epget(sc, totlen)
 	}
 	m->m_pkthdr.rcvif = ifp;
 	m->m_pkthdr.len = totlen;
+#if old
 	pad = ALIGN(sizeof(struct ether_header)) - sizeof(struct ether_header);
 	m->m_data += pad;
 	len = MHLEN - pad;
+#else
+	len = MHLEN;
+#endif
 	top = 0;
 	mp = &top;
 
@@ -1266,10 +1270,21 @@ epget(sc, totlen)
 			}
 			len = MLEN;
 		}
-		if (top && totlen >= MINCLSIZE) {
+		if (totlen >= MINCLSIZE) {
 			MCLGET(m, M_DONTWAIT);
-			if (m->m_flags & M_EXT)
-				len = MCLBYTES;
+			if ((m->m_flags & M_EXT) == 0) {
+				m_free(m);
+				m_freem(top);
+				splx(sh);
+				return 0;
+			}
+			len = MCLBYTES;
+		}
+		if (top == 0) {
+			pad = ALIGN(sizeof(struct ether_header)) -
+				sizeof(struct ether_header);
+			len -= pad;
+			m->m_data += pad;
 		}
 		len = min(totlen, len);
 		if (EP_IS_BUS_32(sc->bustype)) {
