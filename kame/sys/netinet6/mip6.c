@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.143 2002/07/16 07:30:06 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.144 2002/07/16 17:04:30 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2613,16 +2613,28 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
 	int restlen;
 
 	/* Nonce index & Auth. data mobility options are required */
-	if ((mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) == 0)
+	if ((mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) == 0) {
+		mip6log((LOG_ERR,
+			 "%s:%d: Nonce or Authdata is missed. (%02x)\n",
+			 __FILE__, __LINE__, mopt->valid_options));
 		return (EINVAL);
+	}
 
 	if ((mip6_get_nonce(mopt->mopt_ho_nonce_idx, &home_nonce) != 0) ||
-	    (mip6_get_nonce(mopt->mopt_co_nonce_idx, &careof_nonce) != 0))
+	    (mip6_get_nonce(mopt->mopt_co_nonce_idx, &careof_nonce) != 0)) {
+		mip6log((LOG_ERR,
+			 "%s:%d: home or care-of Nonce cannot be acquired.\n",
+			 __FILE__, __LINE__));
 		return (EINVAL);
+	}
 
 	if ((mip6_get_nodekey(mopt->mopt_ho_nonce_idx, &home_nodekey) != 0) ||
-	    (mip6_get_nodekey(mopt->mopt_co_nonce_idx, &coa_nodekey) != 0))
+	    (mip6_get_nodekey(mopt->mopt_co_nonce_idx, &coa_nodekey) != 0)) {
+		mip6log((LOG_ERR,
+			 "%s:%d: home or care-of node key cannot be acquired.\n",
+			 __FILE__, __LINE__));
 		return (EINVAL);
+	}
 
 	/* Calculate home cookie */
 	mip6_create_cookie(&ip6mu->ip6mu_addr,

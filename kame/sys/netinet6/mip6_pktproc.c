@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.23 2002/07/16 07:40:55 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.24 2002/07/16 17:04:30 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -81,7 +81,7 @@
 
 /* xn + y; x must be 2^m */
 #define PADLEN(cur_offset, x, y)	\
-	(y) - ((cur_offset) % (x))
+	((x + y) - ((cur_offset) % (x))) % (x)
 
 extern struct mip6_bc_list mip6_bc_list;
 extern struct mip6_prefix_list mip6_prefix_list;
@@ -575,8 +575,9 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		m_freem(m);
 		return (error);
 	}
-	mip6log((LOG_INFO, "%s:%d: Mobility options: %04x\n", 
-			 __FILE__, __LINE__, mopt.valid_options));
+	mip6log((LOG_INFO, "%s:%d: Mobility options: %b\n", 
+			 __FILE__, __LINE__, mopt.valid_options,
+		 "\20\4AUTH\3NONCE\2ALTCOA\1UID\n"));
 
 	/* ip6_src and HAO has been already swapped at this point. */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &hoa_sa);
@@ -1371,6 +1372,8 @@ mip6_ip6mci_create(pktopt_mobility, mbu)
 	return (0);
 }
 
+#define AUTH_SIZE	sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN
+
 int
 mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	struct ip6_mobility **pktopt_mobility;
@@ -1446,7 +1449,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		bu_size += PADLEN(bu_size, 2, 0);
 		nonce_size = sizeof(struct ip6m_opt_nonce);
 		nonce_size += PADLEN(bu_size + nonce_size, 4, 2);
-		auth_size = sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN;
+		auth_size = AUTH_SIZE;
 		auth_size += PADLEN(bu_size + nonce_size + auth_size, 8, 0);
 	} else {
 		bu_size += PADLEN(bu_size, 8, 0);
@@ -1537,7 +1540,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 
 		/* Auth. data */
 		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
-		mopt_auth->ip6moau_len = sizeof(struct ip6m_opt_authdata);
+		mopt_auth->ip6moau_len = AUT_SIZE;
 
 		/* Calculate K_bu */
 		SHA1Init(&sha1_ctx);
@@ -1547,19 +1550,20 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 			   sizeof(mbu->mbu_careof_cookie));
 		SHA1Final(key_bu, &sha1_ctx);
 
-		/* Calculate authenticator */
+		/* Calculate authenticator (5.5.6) */
+		/* MAC_Kbu(coa, | cn | BU) */
 		hmac_init(&hmac_ctx, key_bu, sizeof(key_bu), HMAC_SHA1);
 		hmac_loop(&hmac_ctx, (u_int8_t *)&src->sin6_addr,
 			  sizeof(src->sin6_addr));
 		hmac_loop(&hmac_ctx, (u_int8_t *)&dst->sin6_addr,
 			  sizeof(dst->sin6_addr));
 		hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu, bu_size + nonce_size);
-		if (auth_size - (sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN)) {
+		/* Eliminate authdata mobility option to calculate authdata 
+		   But it should be included padding area */
+		if (auth_size > AUTH_SIZE) {
 			hmac_loop(&hmac_ctx,
 				  (u_int8_t *)ip6mu + bu_size + nonce_size
-				  + sizeof(struct ip6m_opt_authdata),
-				  auth_size -
-				  (sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN));
+				  + AUTH_SIZE, auth_size - AUTH_SIZE);
 		}
 		hmac_result(&hmac_ctx, (u_int8_t *)(mopt_auth + 1));
 	}
