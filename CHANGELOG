@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.778 2000/04/17 06:52:38 itojun Exp $
+$Id: CHANGELOG,v 1.779 2000/04/17 12:07:06 itojun Exp $
 
 <200003>
+Mon Apr 17 21:05:48 JST 2000  itojun@iijlab.net
+	* sys/netinet/ip_encap.c: support priority between attached
+	  interfaces.  see comments for more detail.
+	* sys/net/if_gif.c: gif prioritized match support (between LINK0 and
+	  !LINK0 - LINK0 is less preferred) is now recovered.
+
 Mon Apr 17 15:52:19 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/ethereal: upgrade to 0.8.7.
 
