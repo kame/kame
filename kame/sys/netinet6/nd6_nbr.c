@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.98 2002/03/17 01:57:35 suz Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.99 2002/04/01 13:46:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -810,7 +810,8 @@ nd6_na_input(m, off, icmp6len)
 	}
 
 	/*
-	 * If no neighbor cache entry is found, NA SHOULD silently be discarded.
+	 * If no neighbor cache entry is found, NA SHOULD silently be
+	 * discarded.
 	 */
 	rt = nd6_lookup(&taddr6, 0, ifp);
 	if ((rt == NULL) ||
