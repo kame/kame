@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.4 2002/05/31 11:32:26 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.5 2003/01/06 06:02:41 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -60,6 +60,27 @@ Interfaces are specified in the form of "name unit", such as
 and
 .Ar gif1.
 .\"
+.Sh DHCPv6 options
+Some configuration statements take the description of a DHCPv6 option
+as an argument.
+The followings are the format and description of available DHCPv6
+options.
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic dns
+.Xc
+means a Domain Name Server option.
+.It Ic ia-pd Ar ID
+means an IA_PD
+.Pq Identity Association for Prefix Delegation
+option.
+.Ar ID
+is a decimal number of the IAID
+.Pq see below about identity associations .
+.It Ic rapid-commit
+means a rapid-commit option.
+.El
+.\"
 .Sh Interface statement
 An interface statement specifies configuration parameters on the
 interface.
@@ -84,17 +105,34 @@ Some options can only appear in particular messages according to the
 specification,
 in which case the appearance of the options is limited to be compliant
 with the specification.
-Currently only
-.Ar rapid-commit
-can be specified in a send statement, which specifies to include
-a rapid-commit option in solicit messages.
+.Ic rapid-commit
+and
+.Ic ia-pd
+options can be specified in a send statement.
+When
+.Ic rapid-commit
+is specified,
+.Nm dhcp6c
+will include a rapid-commit option in solicit messages and wait for
+an immediate reply instead of advertisements.
+When
+.Ic ia-pd
+is specified,
+.Nm dhcp6c
+will initiate prefix delegation as a requesting router by 
+including an IA_PD option with the specified
+.Ar ID
+in solicit messages.
+In this case, a corresponding identity association statement
+must exist with the same
+.Ar ID .
 .It Ic request Ar request-options ;
 This statement specifies DHCPv6 options to be included in an
 option-request option.
 Currently only
-.Ar prefix-delegation
-can be specified in a request statement, which requests the server to
-delegate IPv6 prefixes.
+.Ic dns
+can be specified in a request statement,
+which requests a list of Domain Name Server addresses.
 .It Ic information-only ;
 This statement specifies
 .Nm dhcp6c
@@ -105,9 +143,49 @@ configuration parameters such as IPv6 addresses or prefixes.
 .El
 .El
 .\"
+.Sh Identity association statement
+Identity association
+.Pq IA
+is a key notion of DHCPv6.
+An IA is uniquely identified in a client by a pair of IA type and
+IA identifier
+.Pq IAID .
+An IA is associated with configuration information dependent on the IA type.
+.Pp
+An identity association statement defines a single IA with some
+client-side configuration parameters.
+Its format is as follows:
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic id-assoc Ar type Op Ar ID
+{
+.Ar substatements
+};
+.Xc
+.Ar type
+is a string for the type of this IA.
+The current implementation only supports
+.Ic pd
+as the type, which means prefix delegation.
+.Ar ID
+is a decimal number of IAID.
+If omitted, the value 0 will be used by default.
+.Ar substatements
+is a sequence of statements that specifies configuration parameters
+for this IA.
+Each statement may or may not be specific to the type of IA.
+Currently only prefix interface statements
+.Pq see below
+are available for an IA of type
+.Ic pd .
+.El
+.\"
 .Sh Prefix interface statement
 A prefix interface statement specifies configuration parameters of
 prefixes on local interfaces that are derived from delegated prefixes.
+A prefix interface statement can only appear as a substatement of
+an identity association statement with the type
+.Ic pd .
 The generic format of an interface statement is as follows:
 .Bl -tag -width Ds -compact
 .It Xo
@@ -120,7 +198,7 @@ When an IPv6 prefix is delegated from a DHCPv6 server,
 .Nm dhcp6c
 will assign a prefix on the
 .Ar interface
-.Pq unless the interface received the DHCPv6 message containing the prefix
+.Pq unless the interface receives the DHCPv6 message that contains the prefix
 with the delegated prefix and the parameters provided in
 .Ar substatements .
 Possible substatements are as follows.
@@ -161,21 +239,27 @@ The followings are a sample configuration to be delegated an IPv6
 prefix from an upstream service provider.
 With this configuration
 .Nm dhcp6c
-will send solicit messages containing a prefix delegation option in an
-option request option on an upstream PPP link,
+will send solicit messages containing an IA_PD option,
+with an IAID 0,
+on to an upstream PPP link,
 .Ar ppp0 .
 After receiving some prefixes from a server,
 .Nm dhcp6c
 will then configure derived IPv6 prefixes with the SLA ID 1 on a
 local ethernet interface,
 .Ar ne0 .
+Note that the IAID for the
+.Ic id-assoc
+statement is 0 according to the default.
 .Bd -literal -offset
 interface ppp0 {
-        request prefix-delegation;
+        send ia-pd 0;
 };
 
-prefix-interface ne0 {
-        sla-id 1;
+id-assoc pd {
+	prefix-interface ne0 {
+		sla-id 1;
+	};
 };
 .Ed
 .Sh SEE ALSO
