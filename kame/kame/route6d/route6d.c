@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.26 2000/05/29 03:00:05 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.27 2000/05/29 03:20:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.26 2000/05/29 03:00:05 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.27 2000/05/29 03:20:46 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -312,7 +312,7 @@ main(argc, argv)
 				/*NOTREACHED*/
 			}
 			break;
-#define	FLAG(c, flag, n)	case c: flag = n; break
+#define	FLAG(c, flag, n)	case c: do { flag = n; break; } while(0)
 		FLAG('a', aflag, 1);
 		FLAG('d', dflag, 1);
 		FLAG('D', dflag, 2);
@@ -588,7 +588,8 @@ init()
 		rtsock = -1;	/*just for safety */
 }
 
-#define	RIPSIZE(n)	(sizeof(struct rip6) + (n-1) * sizeof(struct netinfo6))
+#define	RIPSIZE(n) \
+	(sizeof(struct rip6) + ((n)-1) * sizeof(struct netinfo6))
 
 /*
  * ripflush flushes the rip datagram stored in the rip buffer
@@ -2106,7 +2107,11 @@ const char *
 rttypes(rtm)
 	struct rt_msghdr *rtm;
 {
-#define	RTTYPE(s, f)	if (rtm->rtm_type == (f)) return (s)
+#define	RTTYPE(s, f) \
+do { \
+	if (rtm->rtm_type == (f)) \
+		return (s); \
+} while (0)
 	RTTYPE("ADD", RTM_ADD);
 	RTTYPE("DELETE", RTM_DELETE);
 	RTTYPE("CHANGE", RTM_CHANGE);
@@ -2132,7 +2137,11 @@ rtflags(rtm)
 	static char buf[BUFSIZ];
 
 	strcpy(buf, "");
-#define	RTFLAG(s, f)	if (rtm->rtm_flags & (f)) strcat(buf, (s))
+#define	RTFLAG(s, f) \
+do { \
+	if (rtm->rtm_flags & (f)) \
+		strcat(buf, (s)); \
+} while (0)
 	RTFLAG("U", RTF_UP);
 	RTFLAG("G", RTF_GATEWAY);
 	RTFLAG("H", RTF_HOST);
@@ -2161,8 +2170,14 @@ ifflags(flags)
 	static char buf[BUFSIZ];
 
 	strcpy(buf, "");
-#define	IFFLAG(s, f)	\
-	if (flags & f) { if (buf[0]) strcat(buf, ","); strcat(buf, s); }
+#define	IFFLAG(s, f) \
+do { \
+	if (flags & f) { \
+		if (buf[0]) \
+			strcat(buf, ","); \
+		strcat(buf, s); \
+	} \
+} while (0)
 	IFFLAG("UP", IFF_UP);
 	IFFLAG("BROADCAST", IFF_BROADCAST);
 	IFFLAG("DEBUG", IFF_DEBUG);
@@ -2867,7 +2882,7 @@ mask2len(addr, lenlim)
 	}
 	if (j < lenlim) {
 		switch (*p) {
-#define	MASKLEN(m, l)	case m: i += l; break
+#define	MASKLEN(m, l)	case m: do { i += l; break; } while (0)
 		MASKLEN(0xfe, 7);
 		MASKLEN(0xfc, 6);
 		MASKLEN(0xf8, 5);
