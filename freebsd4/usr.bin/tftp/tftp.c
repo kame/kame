@@ -98,14 +98,14 @@ xmitfile(fd, name, mode)
 	register struct tftphdr *ap;	   /* data and ack packets */
 	struct tftphdr *r_init(), *dp;
 	register int n;
- 	volatile unsigned int block;
- 	volatile int size, convert;
+	volatile unsigned int block;
+	volatile int size, convert;
 	volatile unsigned long amount;
- 	struct sockaddr_storage from;
+	struct sockaddr_storage from;
 	int fromlen;
 	FILE *file;
- 	struct sockaddr_storage peer;
- 	struct sockaddr_storage serv;	/* valid server port number */
+	struct sockaddr_storage peer;
+	struct sockaddr_storage serv;	/* valid server port number */
 
 	startclock();		/* start stat's clock */
 	dp = r_init();		/* reset fillbuf/read-ahead code */
@@ -215,15 +215,15 @@ recvfile(fd, name, mode)
 	register struct tftphdr *ap;
 	struct tftphdr *dp, *w_init();
 	register int n;
- 	volatile unsigned int block;
- 	volatile int size, firsttrip;
+	volatile unsigned int block;
+	volatile int size, firsttrip;
 	volatile unsigned long amount;
- 	struct sockaddr_storage from;
+	struct sockaddr_storage from;
 	int fromlen;
 	FILE *file;
 	volatile int convert;		/* true if converting crlf -> lf */
- 	struct sockaddr_storage peer;
- 	struct sockaddr_storage serv;	/* valid server port number */
+	struct sockaddr_storage peer;
+	struct sockaddr_storage serv;	/* valid server port number */
 
 	startclock();
 	dp = w_init();
@@ -371,7 +371,7 @@ struct errmsg {
 static void
 nak(error, peer)
 	int error;
- 	struct sockaddr *peer;
+	struct sockaddr *peer;
 {
 	register struct errmsg *pe;
 	register struct tftphdr *tp;
