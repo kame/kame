@@ -1,4 +1,4 @@
-/*	$KAME: dns6conv.c,v 1.6 2001/08/20 07:04:40 itojun Exp $ */
+/*	$KAME: dns6conv.c,v 1.7 2001/09/05 03:31:47 jinmei Exp $ */
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -250,7 +250,7 @@ print_bitstring(cp, blen)
 	return;
 
 fail:
-	printf("?\n", pbuf);
+	printf("?\n");
 }
 
 static void
