@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.82 2000/06/12 12:47:57 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.83 2000/06/19 07:44:58 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2540,8 +2540,36 @@ setph2proposal0(iph2, pp, pr)
 		attrlen += sizeof(struct isakmp_data);	/* enc mode */
 		if (tr->encklen)
 			attrlen += sizeof(struct isakmp_data);
-		if (tr->authtype)
+
+		if ((pr->proto_id == IPSECDOI_PROTO_IPSEC_ESP && tr->authtype != IPSECDOI_ATTR_AUTH_NONE)
+		 || pr->proto_id == IPSECDOI_PROTO_IPSEC_AH)
 			attrlen += sizeof(struct isakmp_data);
+		else
+
+		switch (pr->proto_id) {
+		case IPSECDOI_PROTO_IPSEC_ESP:
+			/* non authentication mode ? */
+			if (tr->authtype != IPSECDOI_ATTR_AUTH_NONE)
+				attrlen += sizeof(struct isakmp_data);
+			break;
+		case IPSECDOI_PROTO_IPSEC_AH:
+			if (tr->authtype == IPSECDOI_ATTR_AUTH_NONE) {
+				plog(logp, LOCATION, NULL,
+					"no authentication algorithm found "
+					"but protocol is AH.\n");
+				vfree(p);
+				return NULL;
+			}
+			attrlen += sizeof(struct isakmp_data);
+			break;
+		case IPSECDOI_PROTO_IPCOMP:
+			break;
+		default:
+			plog(logp, LOCATION, NULL,
+				"invalid protocol: %d\n", pr->proto_id);
+			vfree(p);
+			return NULL;
+		}
 
 		switch (iph2->sainfo->pfs_group) {
 		case OAKLEY_ATTR_GRP_DESC_MODP768:
@@ -2599,7 +2627,8 @@ setph2proposal0(iph2, pp, pr)
 		if (tr->encklen)
 			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_KEY_LENGTH, tr->encklen);
 
-		if ((pr->proto_id == IPSECDOI_PROTO_IPSEC_ESP && tr->authtype)
+		/* mandatory check has done above. */
+		if ((pr->proto_id == IPSECDOI_PROTO_IPSEC_ESP && tr->authtype != IPSECDOI_ATTR_AUTH_NONE)
 		 || pr->proto_id == IPSECDOI_PROTO_IPSEC_AH)
 			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_AUTH, tr->authtype);
 
@@ -3281,6 +3310,7 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 	life_t = IPSECDOI_ATTR_SA_LD_TYPE_DEFAULT;
 	pp->lifetime = IPSECDOI_ATTR_SA_LD_SEC_DEFAULT;
 	pp->lifebyte = 0;
+	tr->authtype = IPSECDOI_ATTR_AUTH_NONE;
 
 	while (tlen > 0) {
 
@@ -3411,7 +3441,7 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 			break;
 
 		case IPSECDOI_ATTR_ENC_MODE:
-			if (pr->encmode != 0
+			if (pr->encmode
 			 && pr->encmode != (u_int8_t)ntohs(d->lorv)) {
 				plog(logp, LOCATION, NULL,
 					"multiple encmode exist "
@@ -3422,7 +3452,7 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 			break;
 
 		case IPSECDOI_ATTR_AUTH:
-			if (tr->authtype != 0) {
+			if (tr->authtype != IPSECDOI_ATTR_AUTH_NONE) {
 				plog(logp, LOCATION, NULL,
 					"multiple authtype exist "
 					"in a transform.\n");

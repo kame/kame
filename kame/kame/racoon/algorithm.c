@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: algorithm.c,v 1.3 2000/05/31 15:54:38 sakane Exp $ */
+/* YIPS @(#)$Id: algorithm.c,v 1.4 2000/06/19 07:44:58 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -63,6 +63,7 @@ static int ipsecauth2doi[] = {
 	IPSECDOI_ATTR_AUTH_HMAC_SHA1,
 	IPSECDOI_ATTR_AUTH_DES_MAC,
 	IPSECDOI_ATTR_AUTH_KPDK,
+	IPSECDOI_ATTR_AUTH_NONE,
 };
 static int ipseccomp2doi[] = {
 	ALGTYPE_NOTHING,

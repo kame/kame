@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.3 2000/05/31 15:10:33 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.4 2000/06/19 07:44:59 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -348,13 +348,9 @@ set_satrnsbysainfo(pr, sainfo)
 				newtr->trns_no = t++;
 				newtr->trns_id = a->alg;
 				newtr->encklen = a->encklen;
-				newtr->authtype = b ? b->alg : 0;
+				newtr->authtype = b->alg;
 
 				inssatrns(pr, newtr);
-
-				/* if no auth algorithm is needed */
-				if (b == NULL)
-					break;
 			}
 		}
 		break;
@@ -385,6 +381,12 @@ set_satrnsbysainfo(pr, sainfo)
 		plog(logp, LOCATION, NULL,
 			"unknown proto_id (%d).\n", pr->proto_id);
 		goto err;
+	}
+
+	/* no proposal found */
+	if (pr->head == NULL) {
+		plog(logp, LOCATION, NULL, "no algorithms found.\n");
+		return -1;
 	}
 
 	return 0;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.50 2000/06/14 20:45:23 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.51 2000/06/19 07:44:58 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1530,8 +1530,11 @@ pk_recvacquire(mhp)
 		newpr->encmode = pfkey2ipsecdoi_mode(req->saidx.mode);
 		newpr->reqid = req->saidx.reqid;
 
-		if (set_satrnsbysainfo(newpr, iph2[n]->sainfo) < 0)
+		if (set_satrnsbysainfo(newpr, iph2[n]->sainfo) < 0) {
+			plog(logp, LOCATION, NULL,
+				"failed to get algorithms.\n");
 			goto err;
+		}
 
 		/* set new saproto */
 		inssaproto(newpp, newpr);

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: algorithm.h,v 1.6 2000/06/08 06:43:50 sakane Exp $ */
+/* YIPS @(#)$Id: algorithm.h,v 1.7 2000/06/19 07:44:58 sakane Exp $ */
 
 /* algorithm strength */
 enum {
@@ -71,33 +71,33 @@ enum {
 
 enum {
 	/* ipsec auth */
-	/* algtype_nothing = 0 */
-	algtype_non_auth = 0,
+	/* 0 is defined as algtype_nothing above. */
 	algtype_hmac_md5 = 1, algtype_hmac_sha1, algtype_des_mac, algtype_kpdk,
+	algtype_non_auth,
 };
 
 enum {
 	/* ipcomp */
-	/* algtype_nothing = 0 */
+	/* 0 is defined as algtype_nothing above. */
 	algtype_oui = 1, algtype_deflate, algtype_lzs,
 };
 
 enum {
 	/* hash */
-	/* algtype_nothing = 0 */
+	/* 0 is defined as algtype_nothing above. */
 	algtype_md5 = 1, algtype_sha1, algtype_tiger,
 };
 
 enum {
 	/* dh_group */
-	/* algtype_nothing = 0 */
+	/* 0 is defined as algtype_nothing above. */
 	algtype_modp768 = 1, algtype_modp1024, algtype_modp1536,
 	algtype_ec2n155, algtype_ec2n185,
 };
 
 enum {
 	/* authentication method. */
-	/* algtype_nothing = 0 */
+	/* 0 is defined as algtype_nothing above. */
 	algtype_psk = 1, algtype_dsssig, algtype_rsasig,
 	algtype_rsaenc, algtype_rsarev,
 };
