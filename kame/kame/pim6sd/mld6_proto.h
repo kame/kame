@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.h,v 1.5 2001/07/11 09:13:26 suz Exp $	*/
+/*	$KAME: mld6_proto.h,v 1.6 2001/07/11 09:35:39 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -52,7 +52,7 @@
 /* structure used to send multicast group/source specific queries */
 typedef struct
 {
-	vifi_t vifi;
+	mifi_t mifi;
 	struct listaddr *g;
 	struct listaddr *s;
 	int q_time;
