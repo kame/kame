@@ -438,16 +438,14 @@ addroute(rte, gw, ife)
 	memset(buf,    0, BUFSIZ);
 
 	np = &rte->rt_ripinfo;
+        memset(buf, 0, sizeof(buf));
         rtm = (struct rt_msghdr *)buf;
-        len = sizeof(struct rt_msghdr) + 4 * sizeof(struct sockaddr_in6);
-        memset(rtm, 0, len);
         rtm->rtm_type = RTM_ADD;
         rtm->rtm_version = RTM_VERSION;
         rtm->rtm_seq = seq++;
         rtm->rtm_pid = pid;
         rtm->rtm_flags = rte->rt_flags & RTF_ROUTE_H;
         rtm->rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFA;
-        rtm->rtm_msglen = len;
 	switch (rte->rt_proto.rtp_type) {
 	case RTPROTO_RIP: case RTPROTO_OSPF: case RTPROTO_IF:
 	  rtm->rtm_rmx.rmx_hopcount = np->rip6_metric;
@@ -484,6 +482,11 @@ addroute(rte, gw, ife)
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
         sin->sin6_addr = ife->ifi_laddr;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
+
+        len = (char *)sin - (char *)buf;
+        rtm->rtm_msglen = len;
+
 	errno = 0;
         if ((wlen = write(rtsock, buf, len)) == len) {
 #ifdef DEBUG
@@ -564,9 +567,8 @@ delroute(rte, gw)
 	memset(gw6txt, 0, INET6_ADDRSTRLEN);
 
 	rp = &rte->rt_ripinfo;
+        bzero(buf, sizeof(buf));
         rtm = (struct rt_msghdr *)buf;
-        len = sizeof(struct rt_msghdr) + 4 * sizeof(struct sockaddr_in6);
-        bzero(rtm, len);
         rtm->rtm_type = RTM_DELETE;
         rtm->rtm_version = RTM_VERSION;
         rtm->rtm_seq = seq++;
@@ -575,7 +577,6 @@ delroute(rte, gw)
         rtm->rtm_flags |= RTF_UP | RTF_GATEWAY;
 /*       rtm->rtm_flags = RTF_UP | RTF_GATEWAY; */
         rtm->rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK;
-        rtm->rtm_msglen = len;
         sin = (struct sockaddr_in6 *)&buf[sizeof(struct rt_msghdr)];
         /* Destination */
         sin->sin6_len = sizeof(struct sockaddr_in6);
@@ -591,8 +592,11 @@ delroute(rte, gw)
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
         mask_nset(&sin->sin6_addr, rp->rip6_plen);
-
 	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
+
+        len = (char *)sin - (char *)buf;
+        rtm->rtm_msglen = len;
+
 	errno = 0;
         if (write(rtsock, buf, len) == len) {
 #ifdef DEBUG
@@ -656,16 +660,14 @@ chroute(rte, gw, ife)
 	memset(buf,    0, BUFSIZ);
 
 	np = &rte->rt_ripinfo;
+        memset(buf, 0, sizeof(buf));
         rtm = (struct rt_msghdr *)buf;
-        len = sizeof(struct rt_msghdr) + 4 * sizeof(struct sockaddr_in6);
-        memset(rtm, 0, len);
         rtm->rtm_type = RTM_CHANGE;
         rtm->rtm_version = RTM_VERSION;
         rtm->rtm_seq = seq++;
         rtm->rtm_pid = pid;
         rtm->rtm_flags = rte->rt_flags & RTF_ROUTE_H;
         rtm->rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFA;
-        rtm->rtm_msglen = len;
 	switch (rte->rt_proto.rtp_type) {
 	case RTPROTO_RIP:
 	  rtm->rtm_rmx.rmx_hopcount = np->rip6_metric;
@@ -702,6 +704,10 @@ chroute(rte, gw, ife)
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
         sin->sin6_addr = ife->ifi_laddr;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
+
+        len = (char *)sin - (char *)buf;
+        rtm->rtm_msglen = len;
 
         if ((wlen = write(rtsock, buf, len)) == len) {
 #ifdef DEBUG
