@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.81 2002/01/07 11:39:56 kjc Exp $	*/
+/*	$KAME: in_gif.c,v 1.82 2002/02/22 03:02:26 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -464,8 +464,8 @@ in_gif_input(m, va_alist)
 				m_freem(m);
 				return;
 			}
+		}
 		break;
-	    }
 #endif
 #ifdef INET6
 	case IPPROTO_IPV6:
