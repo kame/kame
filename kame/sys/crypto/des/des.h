@@ -1,4 +1,4 @@
-/*	$KAME: des.h,v 1.5 2000/08/31 07:27:26 itojun Exp $	*/
+/*	$KAME: des.h,v 1.6 2000/08/31 14:52:59 itojun Exp $	*/
 
 /* lib/des/des.h */
 /* Copyright (C) 1995-1996 Eric Young (eay@mincom.oz.au)
@@ -81,9 +81,6 @@ typedef struct des_ks_struct
 
 extern int des_check_key;	/* defaults to false */
 
-/* The next line is used to disable full ANSI prototypes, if your
- * compiler has problems with the prototypes, make sure this line always
- * evaluates to true :-) */
 char *des_options __P((void));
 struct mbuf;
 int des_cbc_encrypt __P((struct mbuf *, size_t, size_t,
