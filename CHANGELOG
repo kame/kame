@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1455 2000/12/27 11:51:57 sakane Exp $
+$KAME: CHANGELOG,v 1.1456 2000/12/27 23:53:25 sumikawa Exp $
 
 <200012>
+Thu Dec 28 08:48:12 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd4/sys/miscfs/procfs/procfs_ctl.c:
+	  FreeBSD Security Advisory: FreeBSD-SA-00:77.procfs fix
+
 Wed Dec 27 20:52:26 JST 2000 sakane@ydc.co.jp
 	* netkey/key.c:
 	Added lifetime handler of the policy.  There are two timer
