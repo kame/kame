@@ -141,12 +141,6 @@ udp6_input(mp, offp, proto)
 	int off = *offp;
 	int plen, ulen;
 	struct sockaddr_in6 fromsa;
-#ifdef MLDV2
-	struct sock_msf *msf;
-	struct ip6_moptions *im6o;
-	struct in6_multi_mship *imm;
-	struct sock_msf_source *msfsrc;
-#endif	
 
 	opts = NULL;
 
