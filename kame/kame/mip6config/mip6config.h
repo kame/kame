@@ -4,14 +4,18 @@
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
  *
- * $Id: mip6config.h,v 1.2 2000/02/07 17:48:25 itojun Exp $
+ * $Id: mip6config.h,v 1.3 2000/02/09 14:34:02 itojun Exp $
  *
  */
 
 #define PROGNAME "mip6config" /* name of the program */
 
 struct config_tmpl {
-    unsigned char *comstring;
-    int (*parse)(char *, int);
+    char *comstring;
+    int (*parse) __P((char *, int));
+#if defined(__FreeBSD__) && __FreeBSD__ < 3
     int command;
+#else
+    u_long command;
+#endif
 };
