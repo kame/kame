@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.54 2001/02/20 07:59:27 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.55 2001/04/27 08:48:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -390,6 +390,7 @@ stf_output(ifp, m, dst, rt)
 #ifdef __OpenBSD__
 	struct stf_softc *sc;
 	struct sockaddr_in6 *dst6;
+	struct in_addr *in4;
 	struct tdb tdb;
 	struct xformsw xfs;
 	int error;
@@ -426,6 +427,21 @@ stf_output(ifp, m, dst, rt)
 	}
 	ip6 = mtod(m, struct ip6_hdr *);
 
+	/*
+	 * Pickup the right dst addr from the list of candidates.  We have the
+	 * check for the gateway address (dst6) since we can have a routing
+	 * table configurations like this:
+	 * # route add -inet6 2002:: -prefixlen 16 ::1 -ifp stf0
+	 */
+	if (IN6_IS_ADDR_6TO4(&dst6->sin6_addr))
+		in4 = GET_V4(&dst6->sin6_addr);
+	else if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst))
+		in4 = GET_V4(&ip6->ip6_dst);
+	else {
+		m_freem(m);
+		return ENETUNREACH;
+	}
+
 	/* setup dummy tdb.  it highly depends on ipipoutput() code. */
 	bzero(&tdb, sizeof(tdb));
 	bzero(&xfs, sizeof(xfs));
@@ -435,8 +451,7 @@ stf_output(ifp, m, dst, rt)
 	    &tdb.tdb_src.sin.sin_addr, sizeof(tdb.tdb_src.sin.sin_addr));
 	tdb.tdb_dst.sin.sin_family = AF_INET;
 	tdb.tdb_dst.sin.sin_len = sizeof(struct sockaddr_in);
-	bcopy(GET_V4(&dst6->sin6_addr), &tdb.tdb_dst.sin.sin_addr,
-	    sizeof(tdb.tdb_dst.sin.sin_addr));
+	bcopy(in4, &tdb.tdb_dst.sin.sin_addr, sizeof(tdb.tdb_dst.sin.sin_addr));
 	tdb.tdb_xform = &xfs;
 	xfs.xf_type = -1;	/* not XF_IP4 */
 
@@ -464,6 +479,7 @@ stf_output(ifp, m, dst, rt)
 #else
 	struct stf_softc *sc;
 	struct sockaddr_in6 *dst6;
+	struct in_addr *in4;
 	struct sockaddr_in *dst4;
 	u_int8_t tos;
 	struct ip *ip;
@@ -498,6 +514,21 @@ stf_output(ifp, m, dst, rt)
 	ip6 = mtod(m, struct ip6_hdr *);
 	tos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
 
+	/*
+	 * Pickup the right dst addr from the list of candidates.  We have the
+	 * check for the gateway address (dst6) since we can have a routing
+	 * table configurations like this:
+	 * # route add -inet6 2002:: -prefixlen 16 ::1 -ifp stf0
+	 */
+	if (IN6_IS_ADDR_6TO4(&dst6->sin6_addr))
+		in4 = GET_V4(&dst6->sin6_addr);
+	else if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst))
+		in4 = GET_V4(&ip6->ip6_dst);
+	else {
+		m_freem(m);
+		return ENETUNREACH;
+	}
+
 	M_PREPEND(m, sizeof(struct ip), M_DONTWAIT);
 	if (m && m->m_len < sizeof(struct ip))
 		m = m_pullup(m, sizeof(struct ip));
@@ -509,7 +540,7 @@ stf_output(ifp, m, dst, rt)
 
 	bcopy(GET_V4(&((struct sockaddr_in6 *)&ia6->ia_addr)->sin6_addr),
 	    &ip->ip_src, sizeof(ip->ip_src));
-	bcopy(GET_V4(&dst6->sin6_addr), &ip->ip_dst, sizeof(ip->ip_dst));
+	bcopy(in4, &ip->ip_dst, sizeof(ip->ip_dst));
 	ip->ip_p = IPPROTO_IPV6;
 	ip->ip_ttl = ip_gif_ttl;	/*XXX*/
 	ip->ip_len = m->m_pkthdr.len;	/*host order*/
