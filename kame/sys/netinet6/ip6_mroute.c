@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.94 2003/05/15 03:27:37 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.95 2003/05/15 13:47:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1934,6 +1934,18 @@ pim6_input(mp, offp, proto)
 	}
 #endif
 
+	/* PIM version check */
+	if (pim->pim_ver != PIM_VERSION) {
+		++pim6stat.pim6s_rcv_badversion;
+#ifdef MRT6DEBUG
+		log(LOG_ERR,
+		    "pim6_input: incorrect version %d, expecting %d\n",
+		    pim->pim_ver, PIM_VERSION);
+#endif
+		m_freem(m);
+		return (IPPROTO_DONE);
+	}
+
 #define PIM6_CHECKSUM
 #ifdef PIM6_CHECKSUM
 	{
@@ -1960,18 +1972,6 @@ pim6_input(mp, offp, proto)
 		}
 	}
 #endif /* PIM_CHECKSUM */
-
-	/* PIM version check */
-	if (pim->pim_ver != PIM_VERSION) {
-		++pim6stat.pim6s_rcv_badversion;
-#ifdef MRT6DEBUG
-		log(LOG_ERR,
-		    "pim6_input: incorrect version %d, expecting %d\n",
-		    pim->pim_ver, PIM_VERSION);
-#endif
-		m_freem(m);
-		return (IPPROTO_DONE);
-	}
 
 	if (pim->pim_type == PIM_REGISTER) {
 		/*
