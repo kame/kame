@@ -719,6 +719,8 @@ in6_setpeeraddr(inp, nam)
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	sin6->sin6_port = inp->inp_fport;
 	sin6->sin6_addr = inp->inp_faddr6;
+	/* KAME hack: recover scopeid */
+	(void)in6_recoverscope(sin6, &inp->inp_faddr6, NULL);
 
 	return 0;
 }
