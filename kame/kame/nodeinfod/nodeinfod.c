@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.6 2001/10/19 07:59:19 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.7 2001/10/19 08:00:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -407,7 +407,7 @@ ni6_input_code0(from, fromlen, buf, l)
 		return -1;	/* truncated */
 
 	if (wrumode == WRU) {
-		if (sizeof(reply) > l)
+		if (l > sizeof(reply))
 			return -1;
 		memcpy(reply, buf, l);
 		icmp6 = (struct icmp6_hdr *)reply;
