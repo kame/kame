@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.86 2000/05/07 15:08:28 itojun Exp $	*/
+/*	$KAME: key.c,v 1.87 2000/05/07 16:41:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -739,20 +739,20 @@ key_allocsa(family, src, dst, proto, spi)
 	s = splnet();	/*called from softclock()*/
 #endif
 	LIST_FOREACH(sah, &sahtree, chain) {
-
 		/* search valid state */
 		for (stateidx = 0;
 		     stateidx < _ARRAYLEN(saorder_state_valid);
 		     stateidx++) {
-
 			state = saorder_state_valid[stateidx];
 			LIST_FOREACH(sav, &sah->savtree[state], chain) {
-
 				/* sanity check */
 				KEY_CHKSASTATE(sav->state, state, "key_allocsav");
 				if (proto != sav->sah->saidx.proto)
 					continue;
 				if (spi != sav->spi)
+					continue;
+				if (family != sav->sah->saidx.src.ss_family ||
+				    family != sav->sah->saidx.dst.ss_family)
 					continue;
 
 #if 0	/* don't check src */
