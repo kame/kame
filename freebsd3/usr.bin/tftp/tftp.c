@@ -59,6 +59,7 @@ static const char rcsid[] =
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <netdb.h>
 
 #include "extern.h"
 #include "tftpsubs.h"
@@ -73,6 +74,7 @@ extern  int     maxtimeout;
 #define PKTSIZE    SEGSIZE+4
 char    ackbuf[PKTSIZE];
 int	timeout;
+u_short peerport = 0;
 jmp_buf	toplevel;
 jmp_buf	timeoutbuf;
 static struct sockaddr_storage tpeer;
@@ -84,6 +86,7 @@ static void startclock __P((void));
 static void stopclock __P((void));
 static void timer __P((int));
 static void tpacket __P((const char *, struct tftphdr *, int));
+static u_short getport __P((struct sockaddr *));
 
 /*
  * Send the requested file.
@@ -110,6 +113,7 @@ xmitfile(fd, name, mode)
 	convert = !strcmp(mode, "netascii");
 	block = 0;
 	amount = 0;
+	peerport = 0;
 	tpeer = peeraddr;
 
 	signal(SIGALRM, timer);
@@ -132,7 +136,7 @@ send_data:
 		if (trace)
 			tpacket("sent", dp, size + 4);
 		n = sendto(f, dp, size + 4, 0,
-		    (struct sockaddr *)&tpeer, tpeer.ss_len);
+			   (struct sockaddr *)&tpeer, tpeer.ss_len);
 		if (n != size + 4) {
 			warn("sendto");
 			goto abort;
@@ -150,18 +154,29 @@ send_data:
 				warn("recvfrom");
 				goto abort;
 			}
-			switch (from.ss_family) {
-			case AF_INET:
-				((struct sockaddr_in *)&tpeer)->sin_port
-					= ((struct sockaddr_in *)&from)->sin_port;
-				break;
-#ifdef INET6
-			case AF_INET6:
-				((struct sockaddr_in6 *)&tpeer)->sin6_port
-					= ((struct sockaddr_in6 *)&from)->sin6_port;
-				break;
-#endif
+			/* check consistency of the peer port */
+			if (peerport &&
+			    peerport != getport((struct sockaddr *)&from)) {
+				warn("server port mismatch(ignored)");
+				continue;
 			}
+			else if (peerport == 0) {
+				/*
+				 * This is the first response from the server.
+				 * Note that our kernel does not allow UDP
+				 * port 0.
+				 */
+				peerport = getport((struct sockaddr *)&from);
+			}
+
+			/*
+			 * Copy the whole socket address for the next
+			 * sendto(). This is actually not required by
+			 * the spec, but it would be safer in case
+			 * that our server has bound its local address.
+			 */
+			tpeer = from;
+
 			if (trace)
 				tpacket("received", ap, n);
 			/* should verify packet came from server */
@@ -229,6 +244,7 @@ recvfile(fd, name, mode)
 	block = 1;
 	firsttrip = 1;
 	amount = 0;
+	peerport = 0;
 	tpeer = peeraddr;
 
 	signal(SIGALRM, timer);
@@ -248,7 +264,7 @@ send_ack:
 		if (trace)
 			tpacket("sent", ap, size);
 		if (sendto(f, ackbuf, size, 0, (struct sockaddr *)&tpeer,
-		    tpeer.ss_len) != size) {
+			   tpeer.ss_len) != size) {
 			alarm(0);
 			warn("sendto");
 			goto abort;
@@ -266,18 +282,29 @@ send_ack:
 				warn("recvfrom");
 				goto abort;
 			}
-			switch (from.ss_family) {
-			case AF_INET:
-				((struct sockaddr_in *)&tpeer)->sin_port
-					= ((struct sockaddr_in *)&from)->sin_port;
-				break;
-#ifdef INET6
-			case AF_INET6:
-				((struct sockaddr_in6 *)&tpeer)->sin6_port
-					= ((struct sockaddr_in6 *)&from)->sin6_port;
-				break;
-#endif
+			/* check consistency of the peer port */
+			if (peerport &&
+			    peerport != getport((struct sockaddr *)&from)) {
+				warn("server port mismatch(ignored)");
+				continue;
 			}
+			else if (peerport == 0) {
+				/*
+				 * This is the first response from the server.
+				 * Note that our kernel does not allow UDP
+				 * port 0.
+				 */
+				peerport = getport((struct sockaddr *)&from);
+			}
+
+			/*
+			 * Copy the whole socket address for the next
+			 * sendto(). This is actually not required by
+			 * the spec, but it would be safer in case
+			 * that our server has bound its local address.
+			 */
+			tpeer = from;
+
 			if (trace)
 				tpacket("received", dp, n);
 			/* should verify client address */
@@ -479,4 +506,32 @@ timer(sig)
 		longjmp(toplevel, -1);
 	}
 	longjmp(timeoutbuf, 1);
+}
+
+static u_short
+getport(sa)
+	struct sockaddr *sa;
+{
+	char hostbuf[NI_MAXHOST];
+	char servbuf[NI_MAXSERV];
+	int flags = NI_NUMERICHOST|NI_NUMERICSERV;
+	char *ep;
+	u_short port;
+
+#ifdef NI_NUMERICSCOPE
+	flags |= NI_NUMERICSCOPE;
+#endif
+
+	if (getnameinfo(sa, sa->sa_len, hostbuf, sizeof(hostbuf),
+			servbuf, sizeof(servbuf), flags)) {
+		errx(1, "getnameinfo failed");
+	}
+
+	port = (u_short)strtoul(servbuf, &ep, 10);
+	if (*ep == '\0')
+		return(port);
+	else {
+		errx(1, "invalid port: %s", servbuf);
+		/* NOTREACHED */
+	}
 }
