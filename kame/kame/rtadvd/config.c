@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.84 2003/08/05 12:34:23 itojun Exp $	*/
+/*	$KAME: config.c,v 1.85 2003/10/09 04:09:08 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -427,6 +427,10 @@ getconfig(intface)
 				val |= ND_OPT_PI_FLAG_ONLINK;
 			if (strchr(flagstr, 'a'))
 				val |= ND_OPT_PI_FLAG_AUTO;
+#ifdef MIP6
+			if (strchr(flagstr, 'r'))
+				val |= ND_OPT_PI_FLAG_ROUTER;
+#endif
 		} else {
 			MAYHAVE(val, entbuf,
 			    (ND_OPT_PI_FLAG_ONLINK|ND_OPT_PI_FLAG_AUTO));
