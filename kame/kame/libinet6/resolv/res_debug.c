@@ -77,7 +77,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_debug.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_debug.c,v 1.5 2000/04/26 03:13:11 itojun Exp $";
+static char rcsid[] = "$Id: res_debug.c,v 1.6 2000/07/08 03:21:08 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/param.h>
@@ -214,7 +214,7 @@ do_rrset(msg, len, cp, cnt, pflag, file, hs)
 	if ((n = ntohs(cnt)) != 0) {
 		if ((!_res.pfcode) ||
 		    ((sflag) && (_res.pfcode & RES_PRF_HEAD1)))
-			fprintf(file, hs);
+			fprintf(file, "%s", hs);
 		while (--n >= 0) {
 			if ((!_res.pfcode) || sflag) {
 				cp = p_rr(cp, msg, file);
