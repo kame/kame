@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.62 2001/12/12 15:29:13 sakane Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.63 2001/12/12 17:57:26 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1478,6 +1478,8 @@ end:
 		vfree(buf);
 		buf = NULL;
 	}
+	if (cr)
+		vfree(cr);
 #ifdef HAVE_GSSAPI
 	if (gsstoken)
 		vfree(gsstoken);
