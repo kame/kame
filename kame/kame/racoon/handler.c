@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.6 1999/12/01 11:16:55 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.7 1999/12/21 12:17:15 jinmei Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -338,13 +338,13 @@ isakmp_open()
 #ifdef INET6
 		case AF_INET6:
 #ifdef ADVAPI
-#ifdef IPV6_INRIA_VERSION
+#ifdef IPV6_RECVPKTINFO
 			if (setsockopt(p->sock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
 					(void *)&tmp, sizeof(tmp)) < 0)
-#else
+#else  /* old adv. API */
 			if (setsockopt(p->sock, IPPROTO_IPV6, IPV6_PKTINFO,
 					(void *)&tmp, sizeof(tmp)) < 0)
-#endif
+#endif /* IPV6_RECVPKTINFO */
 #else
 			if (setsockopt(p->sock, IPPROTO_IPV6, IPV6_RECVDSTADDR,
 					(void *)&tmp, sizeof(tmp)) < 0)
