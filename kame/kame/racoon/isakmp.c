@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.110 2000/11/09 06:28:03 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.111 2000/12/10 09:16:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -172,7 +172,21 @@ isakmp_handler(so_isakmp)
 	/* check isakmp header length */
 	if (len < sizeof(isakmp)) {
 		plog(logp, LOCATION, (struct sockaddr *)&remote,
-			"received invalid header length.\n");
+			"packet shorter than isakmp header size.\n");
+		/* dummy receive */
+		if ((len = recvfrom(so_isakmp, (char *)&isakmp, sizeof(isakmp),
+			    0, (struct sockaddr *)&remote, &remote_len)) < 0) {
+			plog(logp, LOCATION, NULL,
+				"failed to receive isakmp packet\n");
+		}
+		goto end;
+	}
+
+	/* check bogus length */
+	if (ntohl(isakmp.len) > len) {
+		plog(logp, LOCATION, (struct sockaddr *)&remote,
+			"packet shorter than isakmp header length field.\n");
+		/* dummy receive */
 		if ((len = recvfrom(so_isakmp, (char *)&isakmp, sizeof(isakmp),
 			    0, (struct sockaddr *)&remote, &remote_len)) < 0) {
 			plog(logp, LOCATION, NULL,
@@ -185,6 +199,12 @@ isakmp_handler(so_isakmp)
 	if ((buf = vmalloc(ntohl(isakmp.len))) == NULL) {
 		plog(logp, LOCATION, NULL,
 			"failed to allocate reading buffer\n");
+		/* dummy receive */
+		if ((len = recvfrom(so_isakmp, (char *)&isakmp, sizeof(isakmp),
+			    0, (struct sockaddr *)&remote, &remote_len)) < 0) {
+			plog(logp, LOCATION, NULL,
+				"failed to receive isakmp packet\n");
+		}
 		goto end;
 	}
 
