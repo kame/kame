@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.125 2001/09/12 23:01:16 sakane Exp $	*/
+/*	$KAME: ipsec.c,v 1.126 2001/09/21 05:12:52 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1218,6 +1218,7 @@ ipsec6_get_ulp(m, spidx, needport)
 	int off, nxt;
 	struct tcphdr th;
 	struct udphdr uh;
+	struct icmp6_hdr ih;
 
 	/* sanity check */
 	if (m == NULL)
@@ -1258,6 +1259,15 @@ ipsec6_get_ulp(m, spidx, needport)
 		((struct sockaddr_in6 *)&spidx->dst)->sin6_port = uh.uh_dport;
 		break;
 	case IPPROTO_ICMPV6:
+		spidx->ul_proto = nxt;
+		if (off + sizeof(struct udphdr) > m->m_pkthdr.len)
+			break;
+		m_copydata(m, off, sizeof(ih), (caddr_t)&ih);
+		((struct sockaddr_in6 *)&spidx->src)->sin6_port =
+			htons((u_short)ih.icmp6_type);
+		((struct sockaddr_in6 *)&spidx->dst)->sin6_port =
+			htons((u_short)ih.icmp6_code);
+		break;
 	default:
 		/* XXX intermediate headers??? */
 		spidx->ul_proto = nxt;

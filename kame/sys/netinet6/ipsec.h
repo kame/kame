@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.51 2001/08/05 04:52:58 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.52 2001/09/21 05:12:53 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,10 +55,9 @@
 
 /*
  * Security Policy Index
- * NOTE: Ensure to be same address family and upper layer protocol.
- * NOTE: ul_proto, port number, uid, gid:
- *	ANY: reserved for waldcard.
- *	0 to (~0 - 1): is one of the number of each value.
+ * Ensure that both address families in the "src" and "dst" are same.
+ * When the value of the ul_proto is ICMPv6, the port field in "src"
+ * specifies ICMPv6 type, and the port field in "dst" specifies ICMPv6 code.
  */
 struct secpolicyindex {
 	u_int8_t dir;			/* direction of packet flow, see blow */
