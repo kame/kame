@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.74 2001/07/29 09:23:07 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.75 2001/07/29 10:52:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -869,7 +869,6 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	int icmp6len;
 	int maxlen;
 	caddr_t mac;
-	struct ifnet *outif = NULL;
 
 	/* estimate the size of message */
 	maxlen = sizeof(*ip6) + sizeof(*nd_na);
@@ -989,11 +988,10 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	/* Don't lookup socket */
 	(void)ipsec_setsocket(m, NULL);
 #endif
-	ip6_output(m, NULL, NULL, 0, &im6o, &outif);
-	if (outif) {
-		icmp6_ifstat_inc(outif, ifs6_out_msg);
-		icmp6_ifstat_inc(outif, ifs6_out_neighboradvert);
-	}
+	ip6_output(m, NULL, NULL, 0, &im6o, NULL);
+
+	icmp6_ifstat_inc(ifp, ifs6_out_msg);
+	icmp6_ifstat_inc(ifp, ifs6_out_neighboradvert);
 	icmp6stat.icp6s_outhist[ND_NEIGHBOR_ADVERT]++;
 }
 
