@@ -1036,7 +1036,7 @@ icmp6_stats(off, name)
 	p(icp6s_canterror,
 	    "\t%qu error%s not generated because old message was icmp6 error or so\n");
 	p(icp6s_toofreq,
-	  "\t%qu error%s not generated because rate limitation\n");
+	  "\t%qu error%s not generated because of rate limitation\n");
 	for (first = 1, i = 0; i < 256; i++)
 		if (icmp6stat.icp6s_outhist[i] != 0) {
 			if (first) {
