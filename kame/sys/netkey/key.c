@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.324 2004/01/14 04:10:24 itojun Exp $	*/
+/*	$KAME: key.c,v 1.325 2004/02/03 07:25:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1008,6 +1008,7 @@ key_allocsa(family, src, dst, proto, spi)
 	struct secasvar *sav, *match;
 	u_int stateidx, state, tmpidx, matchidx;
 	struct sockaddr_in sin;
+	struct sockaddr_in6 sin6;
 	int s;
 	const u_int *saorder_state_valid;
 	int arraysize;
@@ -1015,11 +1016,6 @@ key_allocsa(family, src, dst, proto, spi)
 	/* sanity check */
 	if (src == NULL || dst == NULL)
 		panic("key_allocsa: NULL pointer is passed.");
-	if (family == AF_INET6 &&
-	    (((struct sockaddr *)src)->sa_family != AF_INET6 ||
-	     ((struct sockaddr *)dst)->sa_family != AF_INET6)) {
-		panic("key_allocsa: src/dst family is inconsistent");
-	}
 
 	/*
 	 * when both systems employ similar strategy to use a SA.
@@ -1032,6 +1028,13 @@ key_allocsa(family, src, dst, proto, spi)
 		saorder_state_valid = saorder_state_valid_prefer_new;
 		arraysize = _ARRAYLEN(saorder_state_valid_prefer_new);
 	}
+
+	bzero(&sin, sizeof(sin));
+	sin.sin_family = AF_INET;
+	sin.sin_len = sizeof(sin);
+	bzero(&sin6, sizeof(sin6));
+	sin6.sin6_family = AF_INET6;
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
 
 	/*
 	 * searching SAD.
@@ -1073,18 +1076,17 @@ key_allocsa(family, src, dst, proto, spi)
 		/* check src address */
 		switch (family) {
 		case AF_INET:
-			bzero(&sin, sizeof(sin));
-			sin.sin_family = AF_INET;
-			sin.sin_len = sizeof(sin);
-			bcopy(src, &sin.sin_addr,
-			    sizeof(sin.sin_addr));
+			bcopy(src, &sin.sin_addr, sizeof(sin.sin_addr));
 			if (key_sockaddrcmp((struct sockaddr*)&sin,
 			    (struct sockaddr *)&sav->sah->saidx.src, 0) != 0)
 				continue;
 
 			break;
 		case AF_INET6:
-			if (key_sockaddrcmp((struct sockaddr *)src,
+			if (in6_recoverscope(&sin6, (struct in6_addr *)src,
+			    NULL) != 0)
+				continue;
+			if (key_sockaddrcmp((struct sockaddr *)&sin6,
 			    (struct sockaddr *)&sav->sah->saidx.src, 0) != 0)
 				continue;
 			break;
@@ -1099,18 +1101,17 @@ key_allocsa(family, src, dst, proto, spi)
 		/* check dst address */
 		switch (family) {
 		case AF_INET:
-			bzero(&sin, sizeof(sin));
-			sin.sin_family = AF_INET;
-			sin.sin_len = sizeof(sin);
-			bcopy(dst, &sin.sin_addr,
-			    sizeof(sin.sin_addr));
+			bcopy(dst, &sin.sin_addr, sizeof(sin.sin_addr));
 			if (key_sockaddrcmp((struct sockaddr*)&sin,
 			    (struct sockaddr *)&sav->sah->saidx.dst, 0) != 0)
 				continue;
 
 			break;
 		case AF_INET6:
-			if (key_sockaddrcmp((struct sockaddr *)dst,
+			if (in6_recoverscope(&sin6, (struct in6_addr *)dst,
+			    NULL) != 0)
+				continue;
+			if (key_sockaddrcmp((struct sockaddr *)&sin6,
 			    (struct sockaddr *)&sav->sah->saidx.dst, 0) != 0)
 				continue;
 			break;
@@ -1721,9 +1722,8 @@ key_sp2msg(sp)
 			p += isr->saidx.src.ss_len;
 
 			xisr->sadb_x_ipsecrequest_len =
-				PFKEY_ALIGN8(sizeof(*xisr)
-					+ isr->saidx.src.ss_len
-					+ isr->saidx.dst.ss_len);
+			    PFKEY_ALIGN8(sizeof(*xisr) +
+			    isr->saidx.src.ss_len + isr->saidx.dst.ss_len);
 		}
 	}
 
@@ -2092,9 +2092,9 @@ key_spdadd(so, m, mhp)
 	newsp->lifetime = lft ? lft->sadb_lifetime_addtime : 0;
 	newsp->validtime = lft ? lft->sadb_lifetime_usetime : 0;
 
-	newsp->refcnt = 1;	/* do not reclaim until I say I do */
 	newsp->state = IPSEC_SPSTATE_ALIVE;
 	LIST_INSERT_TAIL(&sptree[newsp->dir], newsp, secpolicy, chain);
+	/* refcnt == 1 for the link from sptree[] */
 
 	/* delete the entry in spacqtree */
 	if (mhp->msg->sadb_msg_type == SADB_X_SPDUPDATE &&
@@ -2155,6 +2155,7 @@ key_spdadd(so, m, mhp)
 	}
 	xpl->sadb_x_policy_id = newsp->id;
 
+	newsp = NULL;
 	m_freem(m);
 	return key_sendup_mbuf(so, n, KEY_SENDUP_ALL);
     }
@@ -4221,6 +4222,10 @@ key_ismyaddr6(sin6)
 {
 	struct in6_ifaddr *ia;
 	struct in6_multi *in6m;
+	struct in6_addr in6;
+
+	if (in6_embedscope(&in6, sin6) != 0)
+		return 0;
 
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 		if (key_sockaddrcmp((struct sockaddr *)&sin6,
@@ -4238,7 +4243,7 @@ key_ismyaddr6(sin6)
 #else
 		for ((in6m) = ia->ia6_multiaddrs.lh_first;
 		     (in6m) != NULL &&
-		     !SA6_ARE_ADDR_EQUAL(&(in6m)->in6m_sa, sin6);
+		     !IN6_ARE_ADDR_EQUAL(&(in6m)->in6m_addr, &in6);
 		     (in6m) = in6m->in6m_entry.le_next)
 			continue;
 #endif
@@ -8080,9 +8085,10 @@ key_sp_unlink(sp)
 {
 
 	/* remove from SP index */
-	if (__LIST_CHAINED(sp))
+	if (__LIST_CHAINED(sp)) {
 		LIST_REMOVE(sp, chain);
-	key_freesp(sp);
+		key_freesp(sp);
+	}
 }
 
 /* XXX too much? */

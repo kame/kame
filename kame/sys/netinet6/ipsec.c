@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.207 2004/01/13 03:30:42 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.208 2004/02/03 07:25:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1229,9 +1229,27 @@ ipsec6_setspidx_ipaddr(m, spidx)
 	struct mbuf *m;
 	struct secpolicyindex *spidx;
 {
-	/* extract full sockaddr structures for the src/dst addresses */
-	if (ip6_getpktaddrs(m, (struct sockaddr_in6 *)&spidx->src,
-	    (struct sockaddr_in6 *)&spidx->dst)) {
+	struct sockaddr_in6 *sin6;
+	struct ip6_hdr *ip6;
+
+#ifdef DIAGNOSTIC
+	if (m->m_len < sizeof(*ip6))
+		panic("too short mbuf on ipsec6_tunnel_validate");
+#endif
+	ip6 = mtod(m, struct ip6_hdr *);
+
+	sin6 = (struct sockaddr_in6 *)&spidx->src;
+	bzero(sin6, sizeof(*sin6));
+	sin6->sin6_family = AF_INET6;
+	sin6->sin6_len = sizeof(struct sockaddr_in6);
+	sin6 = (struct sockaddr_in6 *)&spidx->dst;
+	bzero(sin6, sizeof(*sin6));
+	sin6->sin6_family = AF_INET6;
+	sin6->sin6_len = sizeof(struct sockaddr_in6);
+	if (in6_recoverscope((struct sockaddr_in6 *)&spidx->src, &ip6->ip6_src,
+	    NULL) ||
+	    in6_recoverscope((struct sockaddr_in6 *)&spidx->dst, &ip6->ip6_dst,
+	    NULL)) {
 		/* this should be a bug.  we intentionally bark here. */
 		log(LOG_ERR, "ipsec6_setspidx_ipaddr: "
 		    "packet does not have addresses\n");
@@ -2316,6 +2334,7 @@ ipsec6_encapsulate(m, sav)
 	struct ip6_hdr *ip6;
 	size_t plen;
 	size_t encap_hdr_len;
+	int error;
 
 	/* can't tunnel between different AFs */
 	if (((struct sockaddr *)&sav->sah->saidx.src)->sa_family
@@ -2503,10 +2522,14 @@ ipsec6_encapsulate(m, sav)
 	ip6->ip6_hlim = IPV6_DEFHLIM;
 
 	/* updated the recorded packet addresses */
-	if (!ip6_setpktaddrs(m, (struct sockaddr_in6 *)&sav->sah->saidx.src,
-			     (struct sockaddr_in6 *)&sav->sah->saidx.dst)) {
-		return (ENOBUFS);
-	}
+	error = in6_embedscope(&ip6->ip6_src,
+	    (struct sockaddr_in6 *)&sav->sah->saidx.src);
+	if (error)
+		return (error);
+	error = in6_embedscope(&ip6->ip6_dst,
+	    (struct sockaddr_in6 *)&sav->sah->saidx.dst);
+	if (error)
+		return (error);
 
 	/* XXX Should ip6_src be updated later ? */
 
@@ -2848,19 +2871,19 @@ ipsec4_checksa(isr, state)
 	saidx.reqid = isr->saidx.reqid;
 	sin = (struct sockaddr_in *)&saidx.src;
 	if (sin->sin_len == 0) {
+		bzero(sin, sizeof(*sin));
 		sin->sin_len = sizeof(*sin);
 		sin->sin_family = AF_INET;
 		sin->sin_port = IPSEC_PORT_ANY;
-		bcopy(&ip->ip_src, &sin->sin_addr,
-			sizeof(sin->sin_addr));
+		bcopy(&ip->ip_src, &sin->sin_addr, sizeof(sin->sin_addr));
 	}
 	sin = (struct sockaddr_in *)&saidx.dst;
 	if (sin->sin_len == 0) {
+		bzero(sin, sizeof(*sin));
 		sin->sin_len = sizeof(*sin);
 		sin->sin_family = AF_INET;
 		sin->sin_port = IPSEC_PORT_ANY;
-		bcopy(&ip->ip_dst, &sin->sin_addr,
-			sizeof(sin->sin_addr));
+		bcopy(&ip->ip_dst, &sin->sin_addr, sizeof(sin->sin_addr));
 	}
 
 	return key_checkrequest(isr, &saidx);
@@ -3079,7 +3102,8 @@ ipsec6_checksa(isr, state, tunnel)
 {
 	struct ip6_hdr *ip6;
 	struct secasindex saidx;
-	struct sockaddr_in6 *sin6, src_sa, dst_sa;
+	struct sockaddr_in6 *sin6;
+	int error;
 
 	if (isr->saidx.mode == IPSEC_MODE_TUNNEL) {
 #ifdef DIAGNOSTIC
@@ -3089,9 +3113,6 @@ ipsec6_checksa(isr, state, tunnel)
 		/* When tunnel mode, SA peers must be specified. */
 		return key_checkrequest(isr, &isr->saidx);
 	}
-
-	if (ip6_getpktaddrs(state->m, &src_sa, &dst_sa))
-		return EIO;
 
 	/* make SA index for search proper SA */
 	ip6 = mtod(state->m, struct ip6_hdr *);
@@ -3104,13 +3125,21 @@ ipsec6_checksa(isr, state, tunnel)
 	saidx.reqid = isr->saidx.reqid;
 	sin6 = (struct sockaddr_in6 *)&saidx.src;
 	if (sin6->sin6_len == 0) {
-		*sin6 = src_sa;
+		bzero(sin6, sizeof(*sin6));
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_len = sizeof(struct sockaddr_in6);
+		if ((error = in6_recoverscope(sin6, &ip6->ip6_src, NULL)) != 0)
+			return (error);
 		if (tunnel)
 			sin6->sin6_port = IPSEC_PORT_ANY;
 	}
 	sin6 = (struct sockaddr_in6 *)&saidx.dst;
 	if (sin6->sin6_len == 0) {
-		*sin6 = dst_sa;
+		bzero(sin6, sizeof(*sin6));
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_len = sizeof(struct sockaddr_in6);
+		if ((error = in6_recoverscope(sin6, &ip6->ip6_dst, NULL)) != 0)
+			return (error);
 		if (tunnel)
 			sin6->sin6_port = IPSEC_PORT_ANY;
 	}
@@ -3277,7 +3306,7 @@ ipsec6_output_tunnel(state, sp, flags)
 	struct ipsecrequest *isr = NULL;
 	int error = 0;
 	int plen;
-	struct sockaddr_in6 *dst6, sa_dst;
+	struct sockaddr_in6 *dst6;
 	int s;
 #if defined(MIP6) && defined(MIP6_NOHAIPSEC)
 	u_char *nxt;
@@ -3387,31 +3416,20 @@ ipsec6_output_tunnel(state, sp, flags)
 				goto bad;
 			}
 			ip6 = mtod(state->m, struct ip6_hdr *);
-			if (ip6_getpktaddrs(state->m, NULL, &sa_dst)) {
-				error = EIO;	/* XXX: should be impossible */
-				goto bad;
-			}
 
 			state->ro = &isr->sav->sah->sa_route;
 			state->dst = (struct sockaddr *)&state->ro->ro_dst;
 			dst6 = (struct sockaddr_in6 *)state->dst;
 			if (state->ro->ro_rt &&
 			    (!(state->ro->ro_rt->rt_flags & RTF_UP) ||
-#ifdef SCOPEDROUTING
-			     !SA6_ARE_ADDR_EQUAL(dst6, &sa_dst)
-#else
 			     !IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr,
-						 &ip6->ip6_dst)
-#endif
-				    )) {
+			     &ip6->ip6_dst))) {
 				RTFREE(state->ro->ro_rt);
 				state->ro->ro_rt = NULL;
 			}
 			if (state->ro->ro_rt == 0) {
-				*dst6 = sa_dst;
-#ifndef SCOPEDROUTING
+				dst6->sin6_addr = ip6->ip6_dst;
 				dst6->sin6_scope_id = 0; /* XXX */
-#endif
 				rtalloc(state->ro);
 			}
 			if (state->ro->ro_rt == 0) {
@@ -3555,21 +3573,14 @@ ipsec6_output_tunnel(state, sp, flags)
 			dst6 = (struct sockaddr_in6 *)state->dst;
 			if (state->ro->ro_rt &&
 			    (!(state->ro->ro_rt->rt_flags & RTF_UP) ||
-#ifdef SCOPEDROUTING
-			     !SA6_ARE_ADDR_EQUAL(dst6, &sa_dst)
-#else
 			     !IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr,
-						 &ip6->ip6_dst)
-#endif
-				    )) {
+			     &ip6->ip6_dst))) {
 				RTFREE(state->ro->ro_rt);
 				state->ro->ro_rt = NULL;
 			}
 			if (state->ro->ro_rt == 0) {
-				*dst6 = sa_dst;
-#ifndef SCOPEDROUTING
+				dst6->sin6_addr = ip6->ip6_dst;
 				dst6->sin6_scope_id = 0; /* XXX */
-#endif
 				rtalloc(state->ro);
 			}
 			if (state->ro->ro_rt == 0) {
@@ -3802,8 +3813,12 @@ ipsec6_tunnel_validate(m, off, nxt0, sav)
 		return 0;
 
 	oip6 = mtod(m, struct ip6_hdr *);
-	/* extract full sockaddr structures for the src/dst addresses */
-	if (ip6_getpktaddrs(m, &osrc, &odst)) {
+	bzero(&osrc, sizeof(osrc));
+	bzero(&odst, sizeof(odst));
+	osrc.sin6_family = odst.sin6_family = AF_INET6;
+	osrc.sin6_len = odst.sin6_len = sizeof(struct sockaddr_in6);
+	if (in6_recoverscope(&osrc, &oip6->ip6_src, NULL) != 0 ||
+	    in6_recoverscope(&odst, &oip6->ip6_dst, NULL) != 0) {
 		/*
 		 * XXX: this should not happen.  It should be better to return
 		 * an error in this case, but the caller of this function
@@ -3817,7 +3832,8 @@ ipsec6_tunnel_validate(m, off, nxt0, sav)
 	sin6 = (struct sockaddr_in6 *)&sav->sah->saidx.dst;
 	if (sin6->sin6_family != AF_INET6)
 		return 0;
-	if (!SA6_ARE_ADDR_EQUAL(&odst, sin6))
+	if (!IN6_ARE_ADDR_EQUAL(&odst.sin6_addr, &sin6->sin6_addr) ||
+	    odst.sin6_scope_id != sin6->sin6_scope_id)
 		return 0;
 
 	/* XXX slow */

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.416 2004/02/02 13:16:19 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.417 2004/02/03 07:25:22 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -254,10 +254,10 @@ static int ip6_insert_jumboopt __P((struct ip6_exthdrs *, u_int32_t));
 static int ip6_splithdr __P((struct mbuf *, struct ip6_exthdrs *));
 #ifdef NEW_STRUCT_ROUTE
 static int ip6_getpmtu __P((struct route *, struct route *, struct ifnet *,
-	struct sockaddr_in6 *, u_long *, int *));
+	struct in6_addr *, u_long *, int *));
 #else
 static int ip6_getpmtu __P((struct route_in6 *, struct route_in6 *, struct ifnet *,
-	struct sockaddr_in6 *, u_long *, int *));
+	struct in6_addr *, u_long *, int *));
 #endif
 static int copypktopts __P((struct ip6_pktopts *, struct ip6_pktopts *, int));
 
@@ -315,7 +315,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #endif
 	struct rtentry *rt = NULL;
 	struct sockaddr_in6 *dst;
-	struct sockaddr_in6 src_sa, dst_sa, finaldst_sa;
+	struct in6_addr finaldst;
 	int error = 0;
 	struct in6_ifaddr *ia = NULL;
 	u_long mtu;
@@ -323,7 +323,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	u_int32_t optlen = 0, plen = 0, unfragpartlen = 0;
 	struct ip6_exthdrs exthdrs;
 	int clone = 0;
+#if 0
 	u_int32_t zone;
+#endif
 #ifdef NEW_STRUCT_ROUTE
 	struct route *ro_pmtu = NULL;
 #else
@@ -367,7 +369,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #endif /* IPSEC */
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	bzero(&finaldst_sa, sizeof(finaldst_sa));
+	finaldst = ip6->ip6_dst;
 
 #define MAKE_EXTHDR(hp, mp)						\
     do {								\
@@ -863,8 +865,6 @@ skip_ipsec2:;
 		struct ip6_rthdr *rh;
 		struct ip6_rthdr0 *rh0;
 		struct in6_addr *addr;
-		struct sockaddr_in6 sa;
-		struct in6_addr finaldst;
 
 		if (exthdrs.ip6e_rthdr)
 			rh = (struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr,
@@ -883,33 +883,9 @@ skip_ipsec2:;
 		case IPV6_RTHDR_TYPE_0:
 			 rh0 = (struct ip6_rthdr0 *)rh;
 			 addr = (struct in6_addr *)(rh0 + 1);
-
-			 /* extract the final destination from the packet */
-			 if (ip6_getpktaddrs(m, NULL, &dst_sa))
-				 goto bad; /* XXX: impossible */
-			 finaldst_sa = dst_sa;
-
-			 /*
-			  * construct a sockaddr_in6 form of the first hop.
-			  * XXX: we may not have enough information about
-			  * its scope zone; there is no standard API to pass
-			  * the information from the application.
-			  */
-			 bzero(&sa, sizeof(sa));
-			 sa.sin6_family = AF_INET6;
-			 sa.sin6_len = sizeof(sa);
-			 sa.sin6_addr = *addr;
-			 if ((error = scope6_check_id(&sa, ip6_use_defzone))
-			     != 0) {
-				 goto bad;
-			 }
-			 if (!ip6_setpktaddrs(m, NULL, &sa)) {
-				 error = ENOBUFS;
-				 goto bad;
-			 }
-			 ip6->ip6_dst = sa.sin6_addr;
-			 bcopy(&addr[1], &addr[0],
-			     sizeof(struct in6_addr) * (rh0->ip6r0_segleft - 1));
+			 ip6->ip6_dst = addr[0];
+			 bcopy(&addr[1], &addr[0], sizeof(struct in6_addr) *
+			     (rh0->ip6r0_segleft - 1));
 			 addr[rh0->ip6r0_segleft - 1] = finaldst;
 			 /* XXX */
 			 in6_clearscope(addr + rh0->ip6r0_segleft - 1);
@@ -943,24 +919,6 @@ skip_ipsec2:;
 	/*
 	 * Route packet.
 	 */
-
-	/*
-	 * first extract sockaddr_in6 structures for the source and destination
-	 * addresses attached to the packet.  when source-routing, the
-	 * destination address should specify the first hop.
-	 */
-	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
-		/*
-		 * we dare to dump the fact here because this should be an
-		 * internal bug.
-		 */
-		printf("ip6_output: can't find src/dst addresses\n");
-		error = EIO;	/* XXX */
-		goto bad;
-	}
-	if (finaldst_sa.sin6_family == AF_UNSPEC)
-		finaldst_sa = dst_sa;
-
 	/* initialize cached route */
 	if (ro == 0) {
 		ro = &ip6route;
@@ -1105,16 +1063,6 @@ skip_ipsec2:;
 			}
 			goto bad;
 		}
-		/*
-		 * since ipsec6_output_tunnel() may update address
-		 * information of mbuf, we must update src_sa and
-		 * dst_sa here.
-		 */
-		if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
-			printf("ip6_output: can't find src/dst addresses\n");
-			error = EIO;	/* XXX */
-			goto bad;
-		}
 
 		exthdrs.ip6e_ip6 = m;
 	}
@@ -1129,8 +1077,8 @@ skip_ipsec2:;
 		clone = 1;
 #endif
 
-	if ((error = in6_selectroute(&dst_sa, opt, im6o, ro,
-				     &ifp, &rt, clone)) != 0) {
+	if ((error = in6_selectroute(&ip6->ip6_dst, opt, im6o, ro,
+	    &ifp, &rt, clone)) != 0) {
 		switch (error) {
 		case EHOSTUNREACH:
 			ip6stat.ip6s_noroute++;
@@ -1144,11 +1092,10 @@ skip_ipsec2:;
 		goto bad;
 	}
 	if (rt == NULL) {
-		/*
-		 * If in6_selectroute() does not return a route entry,
-		 * dst may not have been updated.
-		 */
-		*dst = dst_sa;	/* XXX */
+		/* XXX */
+		ip6stat.ip6s_noroute++;
+		error = EHOSTUNREACH;
+		goto bad;
 	}
 
 	/*
@@ -1176,6 +1123,7 @@ skip_ipsec2:;
 		origifp = ia->ia_ifp;
 	else
 		origifp = ifp;
+#if 0
 	if (in6_addr2zoneid(origifp, &src_sa.sin6_addr, &zone) ||
 	    zone != src_sa.sin6_scope_id) {
 #ifdef SCOPEDEBUG		/* will be removed shortly */
@@ -1196,11 +1144,14 @@ skip_ipsec2:;
 #endif
 		goto badscope;
 	}
+#endif
 
 	/* scope check is done. */
 	goto routefound;
 
+#if 0
   badscope:
+#endif
 	ip6stat.ip6s_badscope++;
 	in6_ifstat_inc(origifp, ifs6_out_discard);
 	if (error == 0)
@@ -1225,7 +1176,6 @@ skip_ipsec2:;
 		m->m_flags &= ~(M_BCAST | M_MCAST); /* just in case */
 	} else {
 		struct	in6_multi *in6m;
-		struct	sockaddr_in6 dst0; /* XXX dst_sa w/o embedded scope */
 
 		m->m_flags = (m->m_flags & ~M_BCAST) | M_MCAST;
 
@@ -1240,9 +1190,7 @@ skip_ipsec2:;
 			error = ENETUNREACH;
 			goto bad;
 		}
-		dst0 = dst_sa;
-		in6_clearscope(&dst0.sin6_addr);
-		IN6_LOOKUP_MULTI(&dst0, ifp, in6m);
+		IN6_LOOKUP_MULTI(ip6->ip6_dst, ifp, in6m);
 		if (in6m != NULL &&
 		   (im6o == NULL || im6o->im6o_multicast_loop)) {
 			/*
@@ -1250,7 +1198,7 @@ skip_ipsec2:;
 			 * on the outgoing interface, and the caller did not
 			 * forbid loopback, loop back a copy.
 			 */
-			ip6_mloopback(ifp, m, &dst0);
+			ip6_mloopback(ifp, m, dst);
 		} else {
 			/*
 			 * If we are acting as a multicast router, perform
@@ -1302,7 +1250,7 @@ skip_ipsec2:;
 		*ifpp = origifp;
 
 	/* Determine path MTU. */
-	if ((error = ip6_getpmtu(ro_pmtu, ro, ifp, &finaldst_sa, &mtu,
+	if ((error = ip6_getpmtu(ro_pmtu, ro, ifp, &finaldst, &mtu,
 	    &alwaysfrag)) != 0)
 		goto bad;
 
@@ -1494,7 +1442,7 @@ skip_ipsec2:;
 		/* clean ipsec history once it goes out of the node */
 		ipsec_delaux(m);
 #endif
-		error = nd6_output(ifp, origifp, m, dst, rt);
+		error = nd6_output(ifp, origifp, m, &dst->sin6_addr, rt);
 		goto done;
 	}
 
@@ -1595,11 +1543,6 @@ skip_ipsec2:;
 			m->m_data += max_linkhdr;
 			mhip6 = mtod(m, struct ip6_hdr *);
 			*mhip6 = *ip6;
-			if (!ip6_setpktaddrs(m, &src_sa, &dst_sa)) {
-				error = ENOBUFS;
-				ip6stat.ip6s_odropped++;
-				goto sendorfree;
-			}
 			m->m_len = sizeof(*mhip6);
 			error = ip6_insertfraghdr(m0, m, hlen, &ip6f);
 			if (error) {
@@ -1667,7 +1610,8 @@ sendorfree:
 			/* clean ipsec history once it goes out of the node */
 			ipsec_delaux(m);
 #endif
-			error = nd6_output(ifp, origifp, m, dst, rt);
+			error = nd6_output(ifp, origifp, m,
+			    &dst->sin6_addr, rt);
 		} else
 			m_freem(m);
 	}
@@ -1890,7 +1834,7 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 	struct route_in6 *ro_pmtu, *ro;
 #endif
 	struct ifnet *ifp;
-	struct sockaddr_in6 *dst;
+	struct in6_addr *dst;
 	u_long *mtup;
 	int *alwaysfragp;
 {
@@ -1904,21 +1848,15 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 		    (struct sockaddr_in6 *)&ro_pmtu->ro_dst;
 		if (ro_pmtu->ro_rt &&
 		    ((ro_pmtu->ro_rt->rt_flags & RTF_UP) == 0 ||
-#ifdef SCOPEDROUTING
-		      !SA6_ARE_ADDR_EQUAL(sa6_dst, dst)
-#else
-		      !IN6_ARE_ADDR_EQUAL(&sa6_dst->sin6_addr, &dst->sin6_addr)
-#endif
-			    )) {
+		      !IN6_ARE_ADDR_EQUAL(&sa6_dst->sin6_addr, dst))) {
 			RTFREE(ro_pmtu->ro_rt);
 			ro_pmtu->ro_rt = (struct rtentry *)NULL;
 		}
 		if (ro_pmtu->ro_rt == NULL) {
 			bzero(sa6_dst, sizeof(*sa6_dst)); /* for safety */
-			*sa6_dst = *dst;
-#ifndef SCOPEDROUTING
-			sa6_dst->sin6_scope_id = 0; /* XXX */
-#endif
+			sa6_dst->sin6_family = AF_INET6;
+			sa6_dst->sin6_len = sizeof(struct sockaddr_in6);
+			sa6_dst->sin6_addr = *dst;
 
 #ifdef __bsdi__			/* bsdi needs rtcalloc to clone a route. */
 			rtcalloc((struct route *)ro_pmtu);
@@ -2250,7 +2188,7 @@ do { \
 					 * see ipng mailing list, Jun 22 2001.
 					 */
 					if (in6p->in6p_lport ||
-					    !SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
+					    !IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
 						error = EINVAL;
 						break;
 					}
@@ -2836,7 +2774,7 @@ do { \
 				 * the outgoing interface.
 				 */
 				error = ip6_getpmtu(ro, NULL, NULL,
-				    &in6p->in6p_fsa, &pmtu, NULL);
+				    &in6p->in6p_faddr, &pmtu, NULL);
 				if (error)
 					break;
 				if (pmtu > IPV6_MAXPACKET)
@@ -3743,9 +3681,7 @@ ip6_setmoptions(optname, im6op, m)
 			ro.ro_rt = NULL;
 			dst = (struct sockaddr_in6 *)&ro.ro_dst;
 			*dst = sa6_mc;
-#ifndef SCOPEDROUTING	/* XXX this is actually unnecessary here */
 			dst->sin6_scope_id = 0;
-#endif
 			rtalloc((struct route *)&ro);
 			if (ro.ro_rt == NULL) {
 				error = EADDRNOTAVAIL;
@@ -3772,11 +3708,10 @@ ip6_setmoptions(optname, im6op, m)
 
 		/* Fill in the scope zone ID */
 		if (in6_addr2zoneid(ifp, &sa6_mc.sin6_addr,
-				    &sa6_mc.sin6_scope_id)) {
+		    &sa6_mc.sin6_scope_id)) {
 			error = EADDRNOTAVAIL; /* XXX: should not happen */
 			break;
 		}
-		in6_clearscope(&sa6_mc.sin6_addr);
 
 		/*
 		 * See if the membership already exists.
@@ -3784,8 +3719,8 @@ ip6_setmoptions(optname, im6op, m)
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next)
 			if (imm->i6mm_maddr->in6m_ifp == ifp &&
-			    SA6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_sa,
-					       &sa6_mc))
+			    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
+			    &sa6_mc.sin6_addr))
 				break;
 		if (imm != NULL) {
 			error = EADDRINUSE;
@@ -3799,7 +3734,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * Even this request doesn't add any source filter, create
 		 * msf entry list. This is needed to indicate current msf state.
 		 */
-		imm = in6_joingroup(ifp, &sa6_mc, &error);
+		imm = in6_joingroup(ifp, &sa6_mc.sin6_addr, &error);
 		if (imm == NULL)
 			break;
 #ifdef MLDV2
@@ -3887,8 +3822,8 @@ ip6_setmoptions(optname, im6op, m)
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-			    SA6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_sa,
-			    &sa6_mc))
+			    IN6_ARE_ADDR_EQUAL(&imm->i6mm_maddr->in6m_addr,
+			    &sa6_mc.sin6_addr))
 				break;
 		}
 		if (imm == NULL) {
@@ -3913,7 +3848,7 @@ ip6_setmoptions(optname, im6op, m)
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-			    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, &ss_grp))
+			    SS_CMP(&imm->i6mm_maddr->in6m_addr, ==, &ss_grp))
 				break;
 		}
 		if (imm != NULL) {
@@ -3946,7 +3881,7 @@ ip6_setmoptions(optname, im6op, m)
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-			    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, &ss_grp))
+			    SS_CMP(&imm->i6mm_maddr->in6m_addr, ==, &ss_grp))
 				break;
 		}
 		if (imm == NULL) {
@@ -3970,7 +3905,7 @@ ip6_setmoptions(optname, im6op, m)
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-			    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, &ss_grp))
+			    SS_CMP(&imm->i6mm_maddr->in6m_addr, ==, &ss_grp))
 				break;
 		}
 
@@ -4072,7 +4007,7 @@ ip6_setmoptions(optname, im6op, m)
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-			    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, &ss_grp))
+			    SS_CMP(&imm->i6mm_maddr->in6m_addr, ==, &ss_grp))
 				break;
 		}
 		if (imm == NULL) {
@@ -4136,7 +4071,7 @@ ip6_setmoptions(optname, im6op, m)
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-			    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, &ss_grp))
+			    SS_CMP(&imm->i6mm_maddr->in6m_addr, ==, &ss_grp))
 				break;
 		}
 
@@ -4221,7 +4156,7 @@ ip6_setmoptions(optname, im6op, m)
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
 			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-			    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, &ss_grp))
+			    SS_CMP(&imm->i6mm_maddr->in6m_addr, ==, &ss_grp))
 				break;
 		}		
 		if (imm == NULL) {
@@ -4599,7 +4534,7 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 			if (sa6->sin6_len != sizeof(struct sockaddr_in6))
 				return (EINVAL);
 
-			if (SA6_IS_ADDR_UNSPECIFIED(sa6) ||
+			if (IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr) ||
 			    IN6_IS_ADDR_MULTICAST(&sa6->sin6_addr)) {
 				return (EINVAL);
 			}

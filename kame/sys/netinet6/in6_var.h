@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.91 2003/10/15 06:48:14 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.92 2004/02/03 07:25:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -565,7 +565,7 @@ struct router6_info {
 
 struct	in6_multi {
 	LIST_ENTRY(in6_multi) in6m_entry; /* list glue */
-	struct	sockaddr_in6 in6m_sa;	/* IP6 multicast address */
+	struct	in6_addr in6m_addr;	/* IP6 multicast address */
 	struct	ifnet *in6m_ifp;	/* back pointer to ifnet */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct	in6_ifaddr *in6m_ia;	/* back pointer to in6_ifaddr */
@@ -610,15 +610,15 @@ do { \
 	struct ifmultiaddr *ifma; \
 	TAILQ_FOREACH(ifma, &(ifp)->if_multiaddrs, ifma_link) { \
 		if (ifma->ifma_addr->sa_family == AF_INET6 \
-		    && SA6_ARE_ADDR_EQUAL(((struct sockaddr_in6 *)ifma->ifma_addr), \
-					  (addr))) \
+		    && IN6_ARE_ADDR_EQUAL(&(((struct sockaddr_in6 *)ifma->ifma_addr)->sin6_addr, \
+					  &(addr))) \
 			break; \
 	} \
 	(in6m) = (struct in6_multi *)(ifma ? ifma->ifma_protospec : 0); \
 } while(0)
 #else
 #define IN6_LOOKUP_MULTI(addr, ifp, in6m)			\
-/* struct sockaddr_in6 *addr; */					\
+/* struct in6_addr addr; */					\
 /* struct ifnet *ifp; */					\
 /* struct in6_multi *in6m; */					\
 do { \
@@ -626,8 +626,8 @@ do { \
 	for (ifma = (ifp)->if_multiaddrs.lh_first; ifma; \
 	     ifma = ifma->ifma_link.le_next) { \
 		if (ifma->ifma_addr->sa_family == AF_INET6 \
-		    && SA6_ARE_ADDR_EQUAL((struct sockaddr_in6 *)ifma->ifma_addr, \
-					  (addr))) \
+		    && IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6 *)ifma->ifma_addr)->sin6_addr, \
+					  &(addr))) \
 			break; \
 	} \
 	(in6m) = (struct in6_multi *)(ifma ? ifma->ifma_protospec : 0); \
@@ -660,7 +660,7 @@ do { \
 #else /* not FreeBSD3 */
 
 #define IN6_LOOKUP_MULTI(addr, ifp, in6m)			\
-/* struct sockaddr_in6 *addr; */				\
+/* struct in6_addr addr; */					\
 /* struct ifnet *ifp; */					\
 /* struct in6_multi *in6m; */					\
 do {								\
@@ -672,7 +672,7 @@ do {								\
 	else							\
 		for ((in6m) = ia->ia6_multiaddrs.lh_first;	\
 		     (in6m) != NULL &&				\
-		     !SA6_ARE_ADDR_EQUAL(&(in6m)->in6m_sa, (addr));	\
+		     !IN6_ARE_ADDR_EQUAL(&(in6m)->in6m_addr, &(addr));	\
 		     (in6m) = in6m->in6m_entry.le_next)		\
 			continue;				\
 } while (/*CONSTCOND*/ 0)
@@ -713,24 +713,20 @@ do {						\
 #endif /* not FreeBSD3 */
 
 #ifdef MLDV2
-struct	in6_multi * in6_addmulti(struct sockaddr_in6 *, struct ifnet *,
-				 int *, u_int16_t, struct sockaddr_storage *,
-				 u_int, int);
-void	in6_delmulti(struct in6_multi *, int *,
-		     u_int16_t, struct sockaddr_storage *,
-		     u_int, int);
-struct	in6_multi * in6_modmulti(struct sockaddr_in6 *, struct ifnet *,
-				 int *, u_int16_t,
-				 struct sockaddr_storage *, u_int, u_int16_t,
-				 struct sockaddr_storage *, u_int, int, u_int);
+struct	in6_multi *in6_addmulti(struct in6_addr *, struct ifnet *,
+	int *, u_int16_t, struct sockaddr_storage *, u_int, int);
+void	in6_delmulti(struct in6_multi *, int *, u_int16_t,
+	struct sockaddr_storage *, u_int, int);
+struct	in6_multi *in6_modmulti(struct in6_addr *, struct ifnet *,
+	int *, u_int16_t, struct sockaddr_storage *, u_int, u_int16_t,
+	struct sockaddr_storage *, u_int, int, u_int);
 #else
-struct	in6_multi *in6_addmulti __P((struct sockaddr_in6 *, struct ifnet *,
-	int *));
+struct	in6_multi *in6_addmulti __P((struct in6_addr *, struct ifnet *, int *));
 void	in6_delmulti __P((struct in6_multi *));
 #endif
 
 struct in6_multi_mship *in6_joingroup __P((struct ifnet *,
-	struct sockaddr_in6 *, int *));
+	struct in6_addr *, int *));
 int	in6_leavegroup __P((struct in6_multi_mship *));
 int	in6_mask2len __P((struct in6_addr *, u_char *));
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000

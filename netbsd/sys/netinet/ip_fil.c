@@ -1979,8 +1979,8 @@ frdest_t *fdp;
 		ro->ro_rt->rt_use++;
 
 		if (m0->m_pkthdr.len <= ND_IFINFO(ifp)->linkmtu)
-			error = nd6_output(ifp, fin->fin_ifp, m0, dst6,
-					   ro->ro_rt);
+			error = nd6_output(ifp, fin->fin_ifp, m0,
+			    &dst6->sin6_addr, ro->ro_rt);
 		else
 			error = EMSGSIZE;
 	}

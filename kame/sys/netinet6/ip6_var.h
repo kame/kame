@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.122 2003/12/05 01:35:17 keiichi Exp $	*/
+/*	$KAME: ip6_var.h,v 1.123 2004/02/03 07:25:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -81,7 +81,7 @@ struct	ip6q {
 	u_int32_t	ip6q_ident;
 	u_int8_t	ip6q_arrive;
 	u_int8_t	ip6q_ttl;
-	struct sockaddr_in6 ip6q_src, ip6q_dst;
+	struct in6_addr ip6q_src, ip6q_dst;
 	struct ip6q	*ip6q_next;
 	struct ip6q	*ip6q_prev;
 	int		ip6q_unfrglen;	/* len of unfragmentable part */
@@ -274,11 +274,9 @@ struct ip6aux {
 #define IP6A_TEMP_PROXYND_DEL	0x40	/* Marking for resuming proxy nd entry after sending sepcial BA */
 
 	/* ip6.ip6_src */
-	struct sockaddr_in6 ip6a_src;	/* source address in the IPv6 header */
 	struct in6_addr ip6a_coa;	/* care of address of the peer */
 
 	/* ip6.ip6_dst */
-	struct sockaddr_in6 ip6a_dst;	/* dst address in the IPv6 header */
 	struct in6_ifaddr *ip6a_dstia6;	/* my ifaddr that matches ip6_dst */
 
 	/* rtalert */
@@ -379,11 +377,7 @@ int	ip6_lasthdr __P((struct mbuf *, int, int, int *));
 struct m_tag *ip6_addaux __P((struct mbuf *));
 struct m_tag *ip6_findaux __P((struct mbuf *));
 void	ip6_delaux __P((struct mbuf *));
-struct m_tag *ip6_setpktaddrs __P((struct mbuf *, struct sockaddr_in6 *,
-				  struct sockaddr_in6 *));
 
-int	ip6_getpktaddrs __P((struct mbuf *, struct sockaddr_in6 *,
-			     struct sockaddr_in6 *));
 int	ip6_mforward __P((struct ip6_hdr *, struct ifnet *, struct mbuf *));
 int	ip6_process_hopopts __P((struct mbuf *, u_int8_t *, int, u_int32_t *,
 				 u_int32_t *));
@@ -484,17 +478,17 @@ int	mobility6_send_be __P((struct sockaddr_in6 *, struct sockaddr_in6 *,
 				u_int8_t, struct sockaddr_in6 *));
 
 #ifdef NEW_STRUCT_ROUTE
-struct sockaddr_in6 *in6_selectsrc __P((struct sockaddr_in6 *,
+struct in6_addr *in6_selectsrc __P((struct in6_addr *,
 	struct ip6_pktopts *, struct ip6_moptions *, struct route *,
-	struct sockaddr_in6 *, struct ifnet **, int *));
-int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
+	struct in6_addr *, struct ifnet **, int *));
+int in6_selectroute __P((struct in6_addr *, struct ip6_pktopts *,
 	struct ip6_moptions *, struct route *, struct ifnet **,
 	struct rtentry **, int));
 #else
-struct sockaddr_in6 *in6_selectsrc __P((struct sockaddr_in6 *,
+struct in6_addr *in6_selectsrc __P((struct in6_addr *,
 	struct ip6_pktopts *, struct ip6_moptions *, struct route_in6 *,
-	struct sockaddr_in6 *, struct ifnet **, int *));
-int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
+	struct in6_addr *, struct ifnet **, int *));
+int in6_selectroute __P((struct in6_addr *, struct ip6_pktopts *,
 	struct ip6_moptions *, struct route_in6 *, struct ifnet **,
 	struct rtentry **, int));
 #endif

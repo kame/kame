@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.90 2004/01/06 08:04:40 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.91 2004/02/03 07:25:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -160,9 +160,7 @@ static struct encaptab *encap4_lookup __P((struct mbuf *, int, int,
 #endif
 #ifdef INET6
 static struct encaptab *encap6_lookup __P((struct mbuf *, int, int,
-					   struct sockaddr_in6 *,
-					   struct sockaddr_in6 *,
-					   enum direction));
+	enum direction));
 #endif
 static int encap_add __P((struct encaptab *));
 static int encap_remove __P((struct encaptab *));
@@ -420,13 +418,13 @@ encap4_input(m, va_alist)
 
 #ifdef INET6
 static struct encaptab *
-encap6_lookup(m, off, proto, src, dst, dir)
+encap6_lookup(m, off, proto, dir)
 	struct mbuf *m;
 	int off;
 	int proto;
-	struct sockaddr_in6 *src, *dst;
 	enum direction dir;
 {
+	struct ip6_hdr *ip6;
 	struct pack6 pack;
 	int prio, matchprio;
 	struct encaptab *ep, *match;
@@ -439,17 +437,18 @@ encap6_lookup(m, off, proto, src, dst, dir)
 	if (m->m_len < sizeof(struct ip6_hdr))
 		panic("encap6_lookup");
 #endif
+	ip6 = mtod(m, struct ip6_hdr *);
 
 	bzero(&pack, sizeof(pack));
 	pack.p.sp_len = sizeof(pack);
 	pack.mine.sin6_family = pack.yours.sin6_family = AF_INET6;
 	pack.mine.sin6_len = pack.yours.sin6_len = sizeof(struct sockaddr_in6);
 	if (dir == INBOUND) {
-		sa6_copy_addr(dst, &pack.mine);
-		sa6_copy_addr(src, &pack.yours);
+		pack.mine.sin6_addr = ip6->ip6_dst;
+		pack.yours.sin6_addr = ip6->ip6_src;
 	} else {
-		sa6_copy_addr(src, &pack.mine);
-		sa6_copy_addr(dst, &pack.yours);
+		pack.mine.sin6_addr = ip6->ip6_src;
+		pack.yours.sin6_addr = ip6->ip6_dst;
 	}
 
 	match = NULL;
@@ -503,15 +502,8 @@ encap6_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	const struct ip6protosw *psw;
 	struct encaptab *match;
-	struct sockaddr_in6 src, dst;
 
-	if (ip6_getpktaddrs(m, &src, &dst)) {
-		/* XXX: impossible */
-		m_freem(m);
-		return IPPROTO_DONE;
-	}
-
-	match = encap6_lookup(m, *offp, proto, &src, &dst, INBOUND);
+	match = encap6_lookup(m, *offp, proto, INBOUND);
 
 	if (match) {
 		/* found a match */
@@ -890,9 +882,7 @@ encap6_ctlinput(cmd, sa, d0)
 		 * and sa).  does not work for function-based lookup (which
 		 * uses m).
 		 */
-		match = encap6_lookup(m, off, nxt,
-		    (struct sockaddr_in6 *)sa6_src, (struct sockaddr_in6 *)sa,
-		    OUTBOUND);
+		match = encap6_lookup(m, off, nxt, OUTBOUND);
 
 		if (match)
 			valid++;

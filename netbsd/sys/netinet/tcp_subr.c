@@ -490,12 +490,6 @@ tcp_template(tp)
 		ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
 		ip6->ip6_vfc |= IPV6_VERSION;
 
-		if (!ip6_setpktaddrs(m, &in6p->in6p_lsa, &in6p->in6p_fsa)) {
-			m_freem(m);
-			tp->t_template = NULL;
-			return(NULL); /* ENOBUFS */
-		}
-
 		/*
 		 * Compute the pseudo-header portion of the checksum
 		 * now.  We incrementally add in the TCP option and
@@ -552,9 +546,6 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 	tcp_seq ack, seq;
 	int flags;
 {
-#ifdef INET6
-	struct sockaddr_in6 nsrc6, ndst6, src6, dst6;
-#endif
 	struct route *ro;
 	int error, tlen, win = 0;
 	int hlen;
@@ -599,8 +590,6 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		case 6:
 			family = AF_INET6;
 			hlen = sizeof(struct ip6_hdr);
-			src6 = tp->t_in6pcb->in6p_lsa;
-			dst6 = tp->t_in6pcb->in6p_fsa;
 			break;
 #endif
 		default:
@@ -671,12 +660,6 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			family = AF_INET6;
 			hlen = sizeof(struct ip6_hdr);
 			ip6 = mtod(m, struct ip6_hdr *);
-			if (ip6_getpktaddrs(m, &src6, &dst6)) {
-				m_freem(m);
-				return EINVAL; /* XXX */
-			}
-			nsrc6 = src6;
-			ndst6 = dst6;
 			break;
 #endif
 		default:
@@ -741,8 +724,6 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			ip6->ip6_nxt = IPPROTO_TCP;
 			xchg(ip6->ip6_dst, ip6->ip6_src, struct in6_addr);
 			ip6->ip6_nxt = IPPROTO_TCP;
-			src6 = nsrc6;
-			dst6 = ndst6;
 			break;
 #endif
 #if 0
@@ -882,10 +863,6 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		    (tp->t_in6pcb->in6p_outputopts->ip6po_minmtu ==
 		     IP6PO_MINMTU_ALL)) {
 			ip6oflags |= IPV6_MINMTU;
-		}
-		if (!ip6_setpktaddrs(m, &src6, &dst6)) {
-			m_freem(m);
-			return ENOBUFS;	/* XXX */
 		}
 #ifdef NEW_STRUCT_ROUTE
 		error = ip6_output(m, NULL, ro, ip6oflags, NULL, NULL);
@@ -1400,8 +1377,9 @@ tcp6_ctlinput(cmd, sa, d)
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (in6_pcblookup_connect(&tcb6, sa6, th.th_dport,
-			    (struct sockaddr_in6 *)sa6_src, th.th_sport, 0))
+			if (in6_pcblookup_connect(&tcb6, &sa6->sin6_addr,
+			    th.th_dport, (struct in6_addr *)&sa6_src->sin6_addr,
+			    th.th_sport, 0))
 				valid++;
 
 			/*
@@ -1412,7 +1390,7 @@ tcp6_ctlinput(cmd, sa, d)
 			 * - ignore the MTU change notification.
 			 */
 			icmp6_mtudisc_update((struct ip6ctlparam *)d,
-					     (struct sockaddr_in6 *)sa, valid);
+			    (struct sockaddr_in6 *)sa, valid);
 
 			/*
 			 * no need to call in6_pcbnotify, it should have been
@@ -1452,7 +1430,7 @@ tcp_ctlinput(cmd, sa, v)
 	int errno;
 	int nmatch;
 #ifdef INET6
-	struct sockaddr_in6 src6, dst6;
+	struct in6_addr src6, dst6;
 #endif
 
 	if (sa->sa_family != AF_INET ||
@@ -1477,14 +1455,9 @@ tcp_ctlinput(cmd, sa, v)
 #ifdef INET6
 		memset(&src6, 0, sizeof(src6));
 		memset(&dst6, 0, sizeof(dst6));
-		src6.sin6_family = dst6.sin6_family = AF_INET6;
-		src6.sin6_len = dst6.sin6_len = sizeof(struct sockaddr_in6);
-		src6.sin6_addr.s6_addr16[5] = dst6.sin6_addr.s6_addr16[5] =
-		    0xffff;
-		memcpy(&src6.sin6_addr.s6_addr32[3], &ip->ip_src,
-		    sizeof(struct in_addr));
-		memcpy(&dst6.sin6_addr.s6_addr32[3], &ip->ip_dst,
-		    sizeof(struct in_addr));
+		src6.s6_addr16[5] = dst6.s6_addr16[5] = 0xffff;
+		memcpy(&src6.s6_addr32[3], &ip->ip_src, sizeof(struct in_addr));
+		memcpy(&dst6.s6_addr32[3], &ip->ip_dst, sizeof(struct in_addr));
 #endif
 		if (in_pcblookup_connect(&tcbtable, ip->ip_dst, th->th_dport,
 		    ip->ip_src, th->th_sport) != NULL)

@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.83 2003/08/06 14:45:30 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.84 2004/02/03 07:25:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -175,9 +175,8 @@ ah4_input(m, va_alist)
 	/* find the sassoc. */
 	spi = ah->ah_spi;
 
-	if ((sav = key_allocsa(AF_INET,
-	                      (caddr_t)&ip->ip_src, (caddr_t)&ip->ip_dst,
-	                      IPPROTO_AH, spi)) == 0) {
+	if ((sav = key_allocsa(AF_INET, (caddr_t)&ip->ip_src,
+	    (caddr_t)&ip->ip_dst, IPPROTO_AH, spi)) == 0) {
 		ipseclog((LOG_WARNING,
 		    "IPv4 AH input: no key association found for spi %u\n",
 		    (u_int32_t)ntohl(spi)));
@@ -646,10 +645,8 @@ ah4_ctlinput(cmd, sa, v)
 		 * the address in the ICMP message payload.
 		 */
 		ah = (struct ah *)((caddr_t)ip + (ip->ip_hl << 2));
-		if ((sav = key_allocsa(AF_INET,
-				       (caddr_t) &ip->ip_src,
-				       (caddr_t) &ip->ip_dst,
-				       IPPROTO_AH, ah->ah_spi)) == NULL)
+		if ((sav = key_allocsa(AF_INET, (caddr_t) &ip->ip_src,
+		    (caddr_t) &ip->ip_dst, IPPROTO_AH, ah->ah_spi)) == NULL)
 			return NULL;
 		if (sav->state != SADB_SASTATE_MATURE &&
 		    sav->state != SADB_SASTATE_DYING) {
@@ -716,10 +713,6 @@ ah6_input(mp, offp, proto)
 	ip6 = mtod(m, struct ip6_hdr *);
 	nxt = ah->ah_nxt;
 
-	/* extract full sockaddr structures for the src/dst addresses */
-	if (ip6_getpktaddrs(m, &src_sa, &dst_sa))
-		goto fail;
-
 	/* find the sassoc. */
 	spi = ah->ah_spi;
 
@@ -730,8 +723,8 @@ ah6_input(mp, offp, proto)
 		goto fail;
 	}
 
-	if ((sav = key_allocsa(AF_INET6, (caddr_t)&src_sa, (caddr_t)&dst_sa,
-			       IPPROTO_AH, spi)) == 0) {
+	if ((sav = key_allocsa(AF_INET6, (caddr_t)&ip6->ip6_src,
+	    (caddr_t)&ip6->ip6_dst, IPPROTO_AH, spi)) == 0) {
 		ipseclog((LOG_WARNING,
 		    "IPv6 AH input: no key association found for spi %u\n",
 		    (u_int32_t)ntohl(spi)));
@@ -1096,6 +1089,7 @@ ah6_ctlinput(cmd, sa, d)
 	struct mbuf *m;
 	struct ip6ctlparam *ip6cp = NULL;
 	int off;
+	struct in6_addr ip6c_srcin, in6;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
@@ -1142,10 +1136,11 @@ ah6_ctlinput(cmd, sa, d)
 			 * Check to see if we have a valid SA corresponding to
 			 * the address in the ICMP message payload.
 			 */
-			sav = key_allocsa(AF_INET6,
-					  (caddr_t)ip6cp->ip6c_src,
-					  (caddr_t)sa,
-					  IPPROTO_AH, ahp->ah_spi);
+			if (in6_embedscope(&ip6c_srcin, ip6cp->ip6c_src) ||
+			    in6_embedscope(&in6, (struct sockaddr_in6 *)sa))
+				return;
+			sav = key_allocsa(AF_INET6, (caddr_t)&ip6c_srcin,
+			    (caddr_t)&in6, IPPROTO_AH, ahp->ah_spi);
 			if (sav) {
 				if (sav->state == SADB_SASTATE_MATURE ||
 				    sav->state == SADB_SASTATE_DYING)

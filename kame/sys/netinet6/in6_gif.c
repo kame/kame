@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.107 2003/09/05 23:17:04 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.108 2004/02/03 07:25:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -220,27 +220,15 @@ in6_gif_output(ifp, family, m)
 		sc->gif_ro6.ro_rt = NULL;
 	}
 
-	if (!ip6_setpktaddrs(m, sin6_src, sin6_dst)) {
-		m_freem(m);
-		return (ENOBUFS);
-	}
 #ifdef IPV6_MINMTU
 	/*
 	 * force fragmentation to minimum MTU, to avoid path MTU discovery.
 	 * it is too painful to ask for resend of inner packet, to achieve
 	 * path MTU discovery for encapsulated packets.
 	 */
-	error = ip6_output(m, 0, &sc->gif_ro6, IPV6_MINMTU, 0, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-			   , NULL
-#endif
-			  );
+	error = ip6_output(m, 0, &sc->gif_ro6, IPV6_MINMTU, 0, NULL);
 #else
-	error = ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-			   , NULL
-#endif
-			  );
+	error = ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL);
 #endif
 
 	if (sc->gif_ro6.ro_rt && mono_time.tv_sec >= sc->rtcache_expire)
@@ -331,14 +319,14 @@ in6_gif_output(ifp, family, m)
 	ip6->ip6_hlim	= ip6_gif_hlim;
 	ip6->ip6_src	= sin6_src->sin6_addr;
 	/* bidirectional configured tunnel mode */
-	if (!SA6_IS_ADDR_UNSPECIFIED(sin6_dst))
+	if (!IN6_IS_ADDR_UNSPECIFIED(&sin6_dst->sin6_addr))
 		ip6->ip6_dst = sin6_dst->sin6_addr;
 	else  {
 		m_freem(m);
 		return ENETUNREACH;
 	}
 	ip_ecn_ingress((ifp->if_flags & IFF_LINK1) ? ECN_ALLOWED : ECN_NOCARE,
-		       &otos, &itos);
+	    &otos, &itos);
 	ip6->ip6_flow &= ~htonl(0xff << 20);
 	ip6->ip6_flow |= htonl((u_int32_t)otos << 20);
 
@@ -360,10 +348,6 @@ in6_gif_output(ifp, family, m)
 		sc->gif_ro6.ro_rt = NULL;
 	}
 
-	if (!ip6_setpktaddrs(m, sin6_src, sin6_dst)) {
-		m_freem(m);
-		return (ENOBUFS);
-	}
 #ifdef IPV6_MINMTU
 	/*
 	 * force fragmentation to minimum MTU, to avoid path MTU discovery.
@@ -502,10 +486,10 @@ gif_validate6(m, sc, ifp)
 	struct gif_softc *sc;
 	struct ifnet *ifp;
 {
-	struct sockaddr_in6 *gsrc, *gdst, psrc, pdst;
+	struct sockaddr_in6 *gsrc, *gdst;
+	struct ip6_hdr *ip6;
 
-	if (ip6_getpktaddrs((struct mbuf *)m, &psrc, &pdst))
-		return 0;
+	ip6 = mtod(m, struct ip6_hdr *);
 
 	gsrc = (struct sockaddr_in6 *)sc->gif_psrc;
 	gdst = (struct sockaddr_in6 *)sc->gif_pdst;
@@ -515,8 +499,8 @@ gif_validate6(m, sc, ifp)
 	 * packet.  We should compare the *source* address in our configuration
 	 * and the *destination* address of the packet, and vice versa.
 	 */
-	if (!SA6_ARE_ADDR_EQUAL(gsrc, &pdst) ||
-	    !SA6_ARE_ADDR_EQUAL(gdst, &psrc))
+	if (!IN6_ARE_ADDR_EQUAL(&gsrc->sin6_addr, &ip6->ip6_dst) ||
+	    !IN6_ARE_ADDR_EQUAL(&gdst->sin6_addr, &ip6->ip6_src))
 		return 0;
 
 	/* martian filters on outer source - done in ip6_input */
@@ -529,10 +513,7 @@ gif_validate6(m, sc, ifp)
 		bzero(&sin6, sizeof(sin6));
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_len = sizeof(struct sockaddr_in6);
-		sa6_copy_addr(&psrc, &sin6);
-#ifndef SCOPEDROUTING
-		sin6.sin6_scope_id = 0; /* XXX */
-#endif
+		sin6.sin6_addr = ip6->ip6_src;
 
 #ifdef __FreeBSD__
 		rt = rtalloc1((struct sockaddr *)&sin6, 0, 0UL);

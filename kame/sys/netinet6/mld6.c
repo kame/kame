@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.91 2004/02/01 06:52:04 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.92 2004/02/03 07:25:23 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -230,10 +230,10 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_MLD_ALWAYSV2, mld_alwaysv2, CTLFLAG_RW,
 	} \
 }
 
-static void mld6_sendpkt(struct in6_multi *, int, const struct sockaddr_in6 *);
+static void mld6_sendpkt(struct in6_multi *, int, const struct in6_addr *);
 
 static struct mld_hdr * mld_allocbuf(struct mbuf **, int, struct in6_multi *,
-				     int);
+	int);
 #ifdef MLDV2
 static struct router6_info *find_rt6i(struct ifnet *);
 void mld_sendbuf(struct mbuf *, struct ifnet *);
@@ -389,29 +389,34 @@ mld6_start_listening(in6m)
 		in6m->in6m_timer = 0;
 		in6m->in6m_state = MLD_OTHERLISTENER;
 	}
-	if (SA6_ARE_ADDR_EQUAL(&in6m->in6m_sa, &all_sa) ||
-	    IPV6_ADDR_MC_SCOPE(&in6m->in6m_sa.sin6_addr) <
+	if (in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
+		/* XXX: this should not happen! */
+		panic("mld6_start_listening: should not happen");
+	}
+	if (IN6_ARE_ADDR_EQUAL(&in6m->in6m_addr, &all_sa.sin6_addr) ||
+	    IPV6_ADDR_MC_SCOPE(&in6m->in6m_addr) <
 	    IPV6_ADDR_SCOPE_LINKLOCAL) {
-		mldlog((LOG_DEBUG, "mld_start_listening: not send report for %s\n",
-			ip6_sprintf(&in6m->in6m_sa.sin6_addr)));
+		mldlog((LOG_DEBUG,
+		    "mld_start_listening: not send report for %s\n",
+		    ip6_sprintf(&in6m->in6m_addr)));
 		in6m->in6m_timer = 0;
 		in6m->in6m_state = MLD_OTHERLISTENER;
 	} else {
 #ifdef MLDV2
 		if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
 			mldlog((LOG_DEBUG, "mld_start_listening: send v2 report for %s\n",
-				ip6_sprintf(&in6m->in6m_sa.sin6_addr)));
+			    ip6_sprintf(&in6m->in6m_addr)));
 			mld_send_state_change_report(&m, &buflen, in6m,
-						     type, timer_init);
+			    type, timer_init);
 		} else
 #endif
 		{
 			mldlog((LOG_DEBUG, "mld_start_listening: send v1 report for %s\n",
-				ip6_sprintf(&in6m->in6m_sa.sin6_addr)));
+			    ip6_sprintf(&in6m->in6m_addr)));
 			mld6_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
 			in6m->in6m_timer =
-				MLD_RANDOM_DELAY(MLD_UNSOLICITED_REPORT_INTERVAL *
-						 PR_FASTHZ);
+			    MLD_RANDOM_DELAY(MLD_UNSOLICITED_REPORT_INTERVAL *
+			    PR_FASTHZ);
 			in6m->in6m_state = MLD_IREPORTEDLAST;
 			mld_group_timers_are_running = 1;
 		}
@@ -423,25 +428,26 @@ void
 mld6_stop_listening(in6m)
 	struct in6_multi *in6m;
 {
-	struct sockaddr_in6 all_sa, allrouter_sa;
+	struct in6_addr allnode, allrouter;
+	struct sockaddr_in6 sa6;
 
-	all_sa = *all_nodes_linklocal;
-	if (in6_addr2zoneid(in6m->in6m_ifp, &all_sa.sin6_addr,
-	    &all_sa.sin6_scope_id)) {
+	sa6 = *all_nodes_linklocal;
+	if (in6_addr2zoneid(in6m->in6m_ifp, &sa6.sin6_addr,
+	    &sa6.sin6_scope_id) || in6_embedscope(&allrouter, &sa6)) {
 		/* XXX: this should not happen! */
 		return;
 	}
-	allrouter_sa = *all_routers_linklocal;
-	if (in6_addr2zoneid(in6m->in6m_ifp, &allrouter_sa.sin6_addr,
-	    &allrouter_sa.sin6_scope_id)) {
+	sa6 = *all_routers_linklocal;
+	if (in6_addr2zoneid(in6m->in6m_ifp, &sa6.sin6_addr,
+	    &sa6.sin6_scope_id) || in6_embedscope(&allrouter, &sa6)) {
 		/* XXX impossible */
 		return;
 	}
 	if (in6m->in6m_state == MLD_IREPORTEDLAST &&
-	    !SA6_ARE_ADDR_EQUAL(&in6m->in6m_sa, &all_sa) &&
-	    IPV6_ADDR_MC_SCOPE(&in6m->in6m_sa.sin6_addr) >
+	    !IN6_ARE_ADDR_EQUAL(&in6m->in6m_addr, &allnode) &&
+	    IPV6_ADDR_MC_SCOPE(&in6m->in6m_addr) >
 	    IPV6_ADDR_SCOPE_INTFACELOCAL) {
-		mld6_sendpkt(in6m, MLD_LISTENER_DONE, &allrouter_sa);
+		mld6_sendpkt(in6m, MLD_LISTENER_DONE, &allrouter);
 	}
 }
 
@@ -523,6 +529,11 @@ mld6_input(m, off)
 		m_freem(m);
 		return;
 	}
+	if (in6_embedscope(&mc_sa.sin6_addr, &mc_sa)) {
+		/* XXX: this should not happen! */
+		m_freem(m);
+		return;
+	}
 
 #ifdef MLDV2
 	rt6i = find_rt6i(ifp);
@@ -556,6 +567,10 @@ mld6_input(m, off)
 		all_sa = *all_nodes_linklocal;
 		if (in6_addr2zoneid(ifp, &all_sa.sin6_addr,
 		    &all_sa.sin6_scope_id)) {
+			/* XXX: this should not happen! */
+			break;
+		}
+		if (in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
 			/* XXX: this should not happen! */
 			break;
 		}
@@ -630,14 +645,15 @@ mldv1_query:
 			in6m = (struct in6_multi *)ifma->ifma_protospec;
 #endif
 
-			if (SA6_ARE_ADDR_EQUAL(&in6m->in6m_sa, &all_sa) ||
-			    IPV6_ADDR_MC_SCOPE(&in6m->in6m_sa.sin6_addr) <
+			if (IN6_ARE_ADDR_EQUAL(&in6m->in6m_addr,
+			    &all_sa.sin6_addr) ||
+			    IPV6_ADDR_MC_SCOPE(&in6m->in6m_addr) <
 			    IPV6_ADDR_SCOPE_LINKLOCAL)
 				continue;
 
 			if (!IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
 			    !IN6_ARE_ADDR_EQUAL(&mldh->mld_addr,
-						&in6m->in6m_sa.sin6_addr))
+			    &in6m->in6m_addr))
 				continue;
 
 			if (timer == 0) {
@@ -724,7 +740,7 @@ mldv2_query:
 		 * If we belong to the group being reported, stop
 		 * our timer for that group.
 		 */
-		IN6_LOOKUP_MULTI(&mc_sa, ifp, in6m);
+		IN6_LOOKUP_MULTI(mc_sa.sin6_addr, ifp, in6m);
 		if (in6m) {
 			in6m->in6m_timer = 0; /* transit to idle state */
 			in6m->in6m_state = MLD_OTHERLISTENER; /* clear flag */
@@ -850,7 +866,7 @@ mld6_fasttimeo()
 
 	bypass_state_transition:
 #ifdef MLDV2
-		if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa.sin6_addr))
+		if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr))
 			goto next_in6m; /* skip */
 
 		if (in6m->in6m_source == NULL)
@@ -939,7 +955,7 @@ static void
 mld6_sendpkt(in6m, type, dst)
 	struct in6_multi *in6m;
 	int type;
-	const struct sockaddr_in6 *dst;
+	const struct in6_addr *dst;
 {
 	struct mbuf *mh;
 	struct mld_hdr *mldh;
@@ -947,7 +963,6 @@ mld6_sendpkt(in6m, type, dst)
 	struct ip6_moptions im6o;
 	struct ifnet *ifp = in6m->in6m_ifp;
 	struct in6_ifaddr *ia = NULL;
-	struct sockaddr_in6 src_sa, dst_sa;
 
 	/*
 	 * At first, find a link local address on the outgoing interface
@@ -968,35 +983,13 @@ mld6_sendpkt(in6m, type, dst)
 	/* fill src/dst here */
 	ip6 = mtod(mh, struct ip6_hdr *);
 	ip6->ip6_src = ia ? ia->ia_addr.sin6_addr : in6addr_any;
-	ip6->ip6_dst = dst ? dst->sin6_addr : in6m->in6m_sa.sin6_addr;
+	ip6->ip6_dst = dst ? *dst : in6m->in6m_addr;
 
-	/* set packet addresses in a full sockaddr_in6 form */
-	bzero(&src_sa, sizeof(src_sa));
-	bzero(&dst_sa, sizeof(dst_sa));
-	src_sa.sin6_family = dst_sa.sin6_family = AF_INET6;
-	src_sa.sin6_len = dst_sa.sin6_len = sizeof(struct sockaddr_in6);
-	src_sa.sin6_addr = ip6->ip6_src;
-	dst_sa.sin6_addr = ip6->ip6_dst;
-	/* 
-	 * in6_addr2zoneid() and ip6_setpktaddrs() are called at actual
-	 * advertisement time 
-	 */
-	if (in6_addr2zoneid(ifp, &src_sa.sin6_addr, &src_sa.sin6_scope_id) ||
-	    in6_addr2zoneid(ifp, &dst_sa.sin6_addr, &dst_sa.sin6_scope_id)) {
-		/* XXX: impossible */
-		m_free(mh);
-		return;
-	}
-	if (!ip6_setpktaddrs(mh, &src_sa, &dst_sa)) {
-		m_free(mh);
-		return;
-	}
-
-	mldh->mld_addr = in6m->in6m_sa.sin6_addr;
+	mldh->mld_addr = in6m->in6m_addr;
 	in6_clearscope(&mldh->mld_addr); /* XXX */
 
 	mldh->mld_cksum = in6_cksum(mh, IPPROTO_ICMPV6, sizeof(struct ip6_hdr),
-				    MLD_MINLEN);
+	    MLD_MINLEN);
 
 	/* construct multicast option */
 	bzero(&im6o, sizeof(im6o));
@@ -1265,7 +1258,8 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 
 	IN6_FIRST_MULTI(step, in6m);
 	while (in6m != NULL) {
-		if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa) || in6m->in6m_ifp != ifp)
+		if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr) ||
+		    in6m->in6m_ifp != ifp)
 			goto next_multi;
 
 		if ((in6mm_src->i6ms_grpjoin == 0) &&
@@ -1283,13 +1277,15 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 				goto next_multi;
 			if (in6m->in6m_timer <= rti->rt6i_timer2)
 				goto next_multi;
-			mldlog((LOG_DEBUG, "mld_set_timer: clears pending response\n"));
+			mldlog((LOG_DEBUG,
+			    "mld_set_timer: clears pending response\n"));
 			in6m->in6m_state = MLD_OTHERLISTENER;
 			in6m->in6m_timer = 0;
 			in6_free_msf_source_list(in6mm_src->i6ms_rec->head);
 			in6mm_src->i6ms_rec->numsrc = 0;
 			goto next_multi;
-		} else if (!IN6_ARE_ADDR_EQUAL(&in6m->in6m_sa.sin6_addr, &mldh->mld_addr))
+		} else if (!IN6_ARE_ADDR_EQUAL(&in6m->in6m_addr,
+		    &mldh->mld_addr))
 			goto next_multi;
 
 		/*
@@ -1527,7 +1523,8 @@ mld_send_all_current_state_report(ifp)
 
 	IN6_FIRST_MULTI(step, in6m);
 	while (in6m != NULL) {
-		if (in6m->in6m_ifp != ifp || SS_IS_LOCAL_GROUP(&in6m->in6m_sa))
+		if (in6m->in6m_ifp != ifp ||
+		    SS_IS_LOCAL_GROUP(&in6m->in6m_addr))
 			goto next_multi;
 
 		if (mld_send_current_state_report(&m, &buflen, in6m) != 0)
@@ -1556,7 +1553,7 @@ mld_send_current_state_report(m0, buflenp, in6m)
 	u_int8_t type = 0;
 	struct mld_hdr *mldh;
 
-	if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa) ||
+	if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr) ||
 		(in6m->in6m_ifp->if_flags & IFF_LOOPBACK) != 0)
 	    return 0;
 
@@ -1694,7 +1691,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 	u_int16_t numsrc = 0, src_once, src_done = 0;
 	struct mld_hdr *mldh;
 
-	if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa) ||
+	if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr) ||
 		(in6m->in6m_ifp->if_flags & IFF_LOOPBACK) != 0)
 		return;
 
@@ -1997,7 +1994,7 @@ mld_create_group_record(mh, buflenp, in6m, numsrc, done, type)
 	mld_ghdr->record_type = type;
 	mld_ghdr->auxlen = 0;
 	mld_ghdr->numsrc = 0;
-	bcopy(&in6m->in6m_sa.sin6_addr, &mld_ghdr->group, sizeof(mld_ghdr->group));
+	bcopy(&in6m->in6m_addr, &mld_ghdr->group, sizeof(mld_ghdr->group));
 	in6_clearscope(&mld_ghdr->group); /* XXX */
 	*buflenp += ghdrlen;
 	md->m_len += ghdrlen;
@@ -2051,7 +2048,7 @@ mld_cancel_pending_response(ifp, rti)
 	while (in6m != NULL) {
 		if (in6m->in6m_ifp != ifp)
 			goto next_multi;
-		if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa))
+		if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr))
 			goto next_multi;
 		if (in6mm_src == NULL)
 			goto next_multi;

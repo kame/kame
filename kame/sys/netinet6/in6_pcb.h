@@ -84,18 +84,10 @@ struct	in6pcb {
 					/* pointers to other pcb's */
 	struct	in6pcb *in6p_head;	/* pointer back to chain of
 					   in6pcb's for this protocol */
-	struct	sockaddr_in6 in6p_fsa; /* foreign socket address */
-	struct	sockaddr_in6 in6p_lsa; /* local socket address */
-#define in6p_faddr in6p_fsa.sin6_addr
-#define in6p_fport in6p_fsa.sin6_port
-#define in6p_laddr in6p_lsa.sin6_addr
-#define in6p_lport in6p_lsa.sin6_port
-#if 0
-	struct	in6_addr in6p_faddr;	/* foreign host table entry */
+	struct	in6_addr in6p_faddr; /* foreign socket address */
 	u_int16_t in6p_fport;		/* foreign port */
-	struct	in6_addr in6p_laddr;	/* local host table entry */
+	struct	in6_addr in6p_laddr;	/* local socket address */
 	u_int16_t in6p_lport;		/* local port */
-#endif
 	u_int32_t in6p_flowinfo;	/* priority and flowlabel */
 	struct	socket *in6p_socket;	/* back pointer to socket */
 	caddr_t	in6p_ppcb;		/* pointer to per-protocol pcb */
@@ -187,9 +179,8 @@ int	in6_pcbconnect __P((struct in6pcb *, struct mbuf *));
 void	in6_pcbdetach __P((struct in6pcb *));
 void	in6_pcbdisconnect __P((struct in6pcb *));
 struct	in6pcb *
-	in6_pcblookup __P((struct in6pcb *,
-			   struct sockaddr_in6 *, u_int, struct sockaddr_in6 *,
-			   u_int, int));
+	in6_pcblookup __P((struct in6pcb *, struct in6_addr *, u_int,
+	struct in6_addr *, u_int, int));
 int	in6_pcbnotify __P((struct in6pcb *, struct sockaddr *,
 			   u_int, struct sockaddr *, u_int, int, void *,
 			   void (*)(struct in6pcb *, int)));
@@ -201,19 +192,14 @@ void	in6_setsockaddr __P((struct in6pcb *, struct mbuf *));
 
 /* in in6_src.c */
 int	in6_selecthlim __P((struct in6pcb *, struct ifnet *));
-int	in6_pcbsetport __P((struct sockaddr_in6 *, struct in6pcb *,
-	    struct proc *));
+int	in6_pcbsetport __P((struct in6_addr *, struct in6pcb *, struct proc *));
 #ifndef TCP6
 extern struct rtentry *
 	in6_pcbrtentry __P((struct in6pcb *));
 extern struct in6pcb *in6_pcblookup_connect __P((struct in6pcb *,
-						 struct sockaddr_in6 *,
-						 u_int,
-						 struct sockaddr_in6 *,
-						 u_int, int));
+	struct in6_addr *, u_int, struct in6_addr *, u_int, int));
 extern struct in6pcb *in6_pcblookup_bind __P((struct in6pcb *,
-					      struct sockaddr_in6 *,
-					      u_int, int));
+	struct in6_addr *, u_int, int));
 #endif
 #endif /* _KERNEL */
 

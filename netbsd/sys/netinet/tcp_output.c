@@ -1234,12 +1234,6 @@ send:
 			opts = tp->t_in6pcb->in6p_outputopts;
 		else
 			opts = NULL;
-		if (!ip6_setpktaddrs(m, &tp->t_in6pcb->in6p_lsa,
-		    &tp->t_in6pcb->in6p_fsa)) {
-			m_freem(m);
-			error = ENOBUFS;
-			goto out;
-		}
 #ifdef NEW_STRUCT_ROUTE
 		error = ip6_output(m, opts, ro, ip6oflags, 0, NULL);
 #else

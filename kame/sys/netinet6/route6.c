@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.46 2003/08/26 04:42:28 keiichi Exp $	*/
+/*	$KAME: route6.c,v 1.47 2004/02/03 07:25:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -277,8 +277,6 @@ ip6_rthdr0(m, ip6, rh0)
 		ip6stat.ip6s_badscope++;
 		goto bad;
 	}
-	if (!ip6_setpktaddrs(m, NULL, &next_sa))
-		goto bad;
 
 	/*
 	 * Swap the IPv6 destination address and nextaddr. Forward the packet.

@@ -424,7 +424,7 @@ udp6_input(mp, offp, proto)
 {
 	struct mbuf *m = *mp;
 	int off = *offp;
-	struct sockaddr_in6 src, dst, fromsa, tosa;
+	struct sockaddr_in6 src, dst;
 	struct ip6_hdr *ip6;
 	struct udphdr *uh;
 	u_int32_t plen, ulen;
@@ -456,12 +456,6 @@ udp6_input(mp, offp, proto)
 	}
 #endif
 	ulen = ntohs((u_short)uh->uh_ulen);
-
-	/* extract full sockaddr structures for the src/dst addresses */
-	if (ip6_getpktaddrs(m, &src, &dst)) {
-		m_freem(m);
-		return IPPROTO_DONE;
-	}
 
 	/*
 	 * RFC2675 section 4: jumbograms will have 0 in the UDP header field,
@@ -497,21 +491,17 @@ udp6_input(mp, offp, proto)
 	}
 
 	/* Construct source and dst sockaddrs. */
+	bzero(&src, sizeof(src));
+	bzero(&dst, sizeof(dst));
+	src.sin6_family = dst.sin6_family = AF_INET6;
+	src.sin6_len = dst.sin6_len = sizeof(struct sockaddr_in6);
+	if (in6_recoverscope(&src, &ip6->ip6_src, m->m_pkthdr.rcvif) ||
+	    in6_recoverscope(&dst, &ip6->ip6_dst, m->m_pkthdr.rcvif))
+		goto bad;
 	src.sin6_port = uh->uh_sport;
 	dst.sin6_port = uh->uh_dport;
 
-	/*
-	 * XXX: the address may have embedded scope zone ID, which should be
-	 * hidden from applications.
-	 */
-	fromsa = src;
-	tosa = dst;
-#ifndef SCOPEDROUTING
-	in6_clearscope(&fromsa.sin6_addr);
-	in6_clearscope(&tosa.sin6_addr);
-#endif
-
-	if (udp6_realinput(AF_INET6, &fromsa, &tosa, m, off) == 0) {
+	if (udp6_realinput(AF_INET6, &src, &dst, m, off) == 0) {
 		if (m->m_flags & M_MCAST) {
 			udp6stat.udp6s_noportmcast++;
 			goto bad;
@@ -616,15 +606,6 @@ udp6_sendup(m, off, src, so)
 		return;
 	}
 #endif /*IPSEC*/
-
-	/*
-	 * XXX: the address may have embedded scope zone ID, which should be
-	 * hidden from applications.
-	 */
-	fromsa = *(struct sockaddr_in6 *)src;
-#ifndef SCOPEDROUTING
-	in6_clearscope(&fromsa.sin6_addr);
-#endif
 
 	if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
 		if (in6p && (in6p->in6p_flags & IN6P_CONTROLOPTS ||
@@ -848,6 +829,7 @@ udp6_realinput(af, src, dst, m, off)
 {
 	u_int16_t sport, dport;
 	int rcvcnt;
+	struct in6_addr src6, dst6;
 	const struct in_addr *dst4;
 	struct in6pcb *in6p;
 #ifdef MLDV2
@@ -864,6 +846,8 @@ udp6_realinput(af, src, dst, m, off)
 	if (src->sin6_family != AF_INET6 || dst->sin6_family != AF_INET6)
 		goto bad;
 
+	if (in6_embedscope(&src6, src) || in6_embedscope(&dst6, dst))
+		goto bad;
 	sport = src->sin6_port;
 	dport = dst->sin6_port;
 	dst4 = (struct in_addr *)&dst->sin6_addr.s6_addr[12];
@@ -871,16 +855,6 @@ udp6_realinput(af, src, dst, m, off)
 	if (IN6_IS_ADDR_MULTICAST(&dst->sin6_addr) ||
 	    (af == AF_INET && IN_MULTICAST(dst4->s_addr))) {
 		struct in6pcb *last;
-		struct sockaddr_in6 src2, dst2; /* only with addr info */
-		
-		bzero(&src2, sizeof(src2));
-		bzero(&dst2, sizeof(dst2));
-		src2.sin6_family = dst2.sin6_family = AF_INET6;
-		src2.sin6_len = dst2.sin6_len = sizeof(struct sockaddr_in6);
-		src2.sin6_addr = src->sin6_addr;
-		dst2.sin6_addr = dst->sin6_addr;
-		src2.sin6_scope_id = src->sin6_scope_id;
-		dst2.sin6_scope_id = dst->sin6_scope_id;
 
 		/*
 		 * Deliver a multicast or broadcast datagram to *all* sockets
@@ -909,17 +883,18 @@ udp6_realinput(af, src, dst, m, off)
 		     in6p = in6p->in6p_next) {
 			if (in6p->in6p_lport != dport)
 				continue;
-			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
-				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
+			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
+				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr,
+				    &dst6))
 					continue;
 			} else {
 				if (IN6_IS_ADDR_V4MAPPED(&dst->sin6_addr) &&
 				    (in6p->in6p_flags & IN6P_IPV6_V6ONLY))
 					continue;
 			}
-			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
-				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, src) ||
-				    in6p->in6p_fport != sport) {
+			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
+				    &src6) || in6p->in6p_fport != sport) {
 					continue;
 				}
 			} else {
@@ -1022,15 +997,6 @@ udp6_realinput(af, src, dst, m, off)
 				in6p->in6p_socket);
 #endif /* MLDv2 */
 
-			/*
-			 * XXX: m_copy in udp6_sendup() may remove m_aux that
-			 * contains the packet addresses, while we
-			 * still need them for IPsec.
-			 */
-			if (!ip6_setpktaddrs(m, src, dst)) {
-				m_freem(m);
-				goto bad; /* XXX */
-			}
 			rcvcnt++;
 
 			/*
@@ -1052,10 +1018,11 @@ udp6_realinput(af, src, dst, m, off)
 		/*
 		 * Locate pcb for datagram.
 		 */
-		in6p = in6_pcblookup_connect(&udb6, src, sport, dst, dport, 0);
+		in6p = in6_pcblookup_connect(&udb6, &src6, sport, &dst6,
+		    dport, 0);
 		if (in6p == 0) {
 			++udpstat.udps_pcbhashmiss;
-			in6p = in6_pcblookup_bind(&udb6, dst, dport, 0);
+			in6p = in6_pcblookup_bind(&udb6, &dst6, dport, 0);
 			if (in6p == 0)
 				return rcvcnt;
 		}

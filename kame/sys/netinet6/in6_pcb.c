@@ -135,9 +135,6 @@ in6_pcballoc(so, head)
 	in6p->in6p_socket = so;
 	in6p->in6p_hops = -1;	/* use kernel default */
 	in6p->in6p_icmp6filt = NULL;
-	in6p->in6p_fsa.sin6_family = in6p->in6p_lsa.sin6_family = AF_INET6;
-	in6p->in6p_fsa.sin6_len =
-		in6p->in6p_lsa.sin6_len = sizeof(struct sockaddr_in6);
 #ifdef IPSEC
 	error = ipsec_init_pcbpolicy(so, &in6p->in6p_sp);
 	if (error != 0) {
@@ -184,9 +181,8 @@ in6_pcbbind(in6p, nam)
 #endif
 	u_int16_t lport = 0;
 	int wild = 0, reuseport = (so->so_options & SO_REUSEPORT);
-	int error;
 
-	if (in6p->in6p_lport || !SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa))
+	if (in6p->in6p_lport || !IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
 		return (EINVAL);
 	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
 	   ((so->so_proto->pr_flags & PR_CONNREQUIRED) == 0 ||
@@ -213,8 +209,11 @@ in6_pcbbind(in6p, nam)
 		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
 			return (EADDRNOTAVAIL);
 #endif
-		if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
-			return (error);
+
+		if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
+			return EINVAL;
+		/* this must be cleared for ifa_ifwithaddr() */
+		sin6->sin6_scope_id = 0;
 
 		lport = sin6->sin6_port;
 		if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
@@ -309,24 +308,22 @@ in6_pcbbind(in6p, nam)
 				struct in6pcb *t;
 
 				t = in6_pcblookup(head,
-						  (struct sockaddr_in6 *)&sa6_any,
-						  0, sin6, lport, wild);
+				    (struct in6_addr *)&in6addr_any, 0,
+				    &sin6->sin6_addr, lport, wild);
 				if (t &&
 				    (reuseport & t->in6p_socket->so_options)
-				    == 0) {
+				    == 0)
 					return (EADDRINUSE);
-				}
 			}
 		}
-		sa6_copy_addr(sin6, &in6p->in6p_lsa);
+		in6p->in6p_laddr = sin6->sin6_addr;
 	}
 
 	if (lport == 0) {
 		int e;
-		if ((e = in6_pcbsetport(&in6p->in6p_lsa, in6p, p)) != 0)
+		if ((e = in6_pcbsetport(&in6p->in6p_laddr, in6p, p)) != 0)
 			return (e);
-	}
-	else
+	} else
 		in6p->in6p_lport = lport;
 
 #if 0
@@ -347,14 +344,11 @@ in6_pcbconnect(in6p, nam)
 	struct mbuf *nam;
 {
 	struct sockaddr_in6 *sin6 = mtod(nam, struct sockaddr_in6 *);
-	struct sockaddr_in6 *src6;
-#ifndef SCOPEDROUTING
-	struct sockaddr_in6 src6_storage;
-#endif
+	struct in6_addr *src6;
 	struct ifnet *ifp = NULL;	/* outgoing interface */
 	int error = 0;
 #ifdef INET
-	struct sockaddr_in6 mapped_sa;
+	struct in6_addr mapped;
 #endif
 	struct sockaddr_in6 tmp;
 
@@ -370,7 +364,7 @@ in6_pcbconnect(in6p, nam)
 	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
 		if ((in6p->in6p_flags & IN6P_IPV6_V6ONLY) != 0)
 			return EINVAL;
-		if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa))
+		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
 			in6p->in6p_laddr.s6_addr16[5] = htons(0xffff);
 		if (!IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr))
 			return EINVAL;
@@ -385,13 +379,13 @@ in6_pcbconnect(in6p, nam)
 	tmp = *sin6;
 	sin6 = &tmp;
 
-	if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
-		return (error);
+	if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
+		return EINVAL;
 
 	/* Source address selection. */
 #ifndef TCP6
-	if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)
-	 && in6p->in6p_laddr.s6_addr32[3] == 0) {
+	if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr) &&
+	    in6p->in6p_laddr.s6_addr32[3] == 0) {
 #ifdef INET
 		struct sockaddr_in sin, *sinp;
 
@@ -407,61 +401,41 @@ in6_pcbconnect(in6p, nam)
 				error = EADDRNOTAVAIL;
 			return (error);
 		}
-		bzero(&mapped_sa, sizeof(mapped_sa));
-		mapped_sa.sin6_family = AF_INET6;
-		mapped_sa.sin6_len = sizeof(mapped_sa);
-		mapped_sa.sin6_addr.s6_addr16[5] = htons(0xffff);
-		bcopy(&sinp->sin_addr, &mapped_sa.sin6_addr.s6_addr32[3],
-		      sizeof(sinp->sin_addr));
-		src6 = &mapped_sa;
+		bzero(&mapped, sizeof(mapped));
+		mapped.s6_addr16[5] = htons(0xffff);
+		bcopy(&sinp->sin_addr, &mapped.s6_addr32[3],
+		    sizeof(sinp->sin_addr));
+		src6 = &mapped;
 #else
 		return EADDRNOTAVAIL;
 #endif
 	} else
 #endif
 	{
-		src6 = in6_selectsrc(sin6, in6p->in6p_outputopts,
-				     in6p->in6p_moptions,
-				     &in6p->in6p_route,
-				     &in6p->in6p_lsa, &ifp, &error);
+		src6 = in6_selectsrc(&sin6->sin6_addr, in6p->in6p_outputopts,
+		    in6p->in6p_moptions, &in6p->in6p_route, &in6p->in6p_laddr,
+		    &ifp, &error);
 		if (src6 == NULL) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
 			return (error);
 		}
-		if (ifp && sin6->sin6_scope_id == 0 &&
-		    (error = scope6_setzoneid(ifp, sin6)) != 0) { /* XXX */
-			return (error);
-		}
-#ifndef SCOPEDROUTING	 /* XXX: addr6 may not have a valid zone id */
-		src6_storage = *src6;
-		if ((error = in6_recoverscope(&src6_storage,
-					      &src6->sin6_addr, NULL)) != 0) {
-			return (error);
-		}
-		/* XXX: also recover the embedded zone ID */
-		src6_storage.sin6_addr = src6->sin6_addr;
-		src6 = &src6_storage;
-#endif
 	}
 	if (in6p->in6p_route.ro_rt)
 		ifp = in6p->in6p_route.ro_rt->rt_ifp;
 
 	in6p->in6p_ip6.ip6_hlim = (u_int8_t)in6_selecthlim(in6p, ifp);
 
-	if (in6_pcblookup(in6p->in6p_head, sin6, sin6->sin6_port,
-			  SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa) ?
-			  src6 : &in6p->in6p_lsa,
-			  in6p->in6p_lport,
-			  0)) {
+	if (in6_pcblookup(in6p->in6p_head, &sin6->sin6_addr, sin6->sin6_port,
+	    IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr) ?
+	    src6 : &in6p->in6p_laddr, in6p->in6p_lport, 0))
 		return (EADDRINUSE);
-	}
 #ifndef TCP6
-	if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)
-	 || (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)
-	  && in6p->in6p_laddr.s6_addr32[3] == 0))
+	if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr) ||
+	    (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr) &&
+	     in6p->in6p_laddr.s6_addr32[3] == 0))
 #else
-	if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa))
+	if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
 #endif
 	{
 		/*
@@ -478,9 +452,9 @@ in6_pcbconnect(in6p, nam)
 			(void)in6_pcbbind(in6p, (struct mbuf *)0);
 #endif
 		}
-		sa6_copy_addr(src6, &in6p->in6p_lsa);
+		in6p->in6p_laddr = *src6;
 	}
-	sa6_copy_addr(sin6, &in6p->in6p_fsa);
+	in6p->in6p_faddr = sin6->sin6_addr;
 	in6p->in6p_fport = sin6->sin6_port;
 	/* update flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
 	in6p->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
@@ -498,7 +472,7 @@ void
 in6_pcbdisconnect(in6p)
 	struct in6pcb *in6p;
 {
-	sa6_copy_addr(&sa6_any, &in6p->in6p_fsa);
+	bzero(&in6p->in6p_faddr, sizeof(in6p->in6p_faddr));
 	in6p->in6p_fport = 0;
 	/* clear flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
 	in6p->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
@@ -556,10 +530,7 @@ in6_setsockaddr(in6p, nam)
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	sin6->sin6_port = in6p->in6p_lport;
-	sa6_copy_addr(&in6p->in6p_lsa, sin6);
-#ifndef SCOPEDROUTING
-	in6_clearscope(&sin6->sin6_addr);
-#endif
+	(void)in6_recoverscope(sin6, &in6p->in6p_laddr, NULL);
 }
 
 void
@@ -575,10 +546,7 @@ in6_setpeeraddr(in6p, nam)
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	sin6->sin6_port = in6p->in6p_fport;
-	sa6_copy_addr(&in6p->in6p_fsa, sin6);
-#ifndef SCOPEDROUTING
-	in6_clearscope(&sin6->sin6_addr);
-#endif
+	(void)in6_recoverscope(sin6, &in6p->in6p_faddr, NULL);
 }
 
 /*
@@ -655,10 +623,11 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		 * XXX: should we avoid to notify the value to TCP sockets?
 		 */
 		if (cmd == PRC_MSGSIZE && (in6p->in6p_flags & IN6P_MTU) != 0 &&
-		    (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa) ||
-		     SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, sa6_dst))) {
+		    (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr) ||
+		     IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
+		     &sa6_dst->sin6_addr))) {
 			ip6_notify_pmtu(in6p, (struct sockaddr_in6 *)dst,
-					(u_int32_t *)cmdarg);
+			    (u_int32_t *)cmdarg);
 		}
 
 		/*
@@ -693,18 +662,14 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		 *   icmp6_mtudisc_update().
 		 */
 		if ((PRC_IS_REDIRECT(cmd) || cmd == PRC_HOSTDEAD) &&
-		    SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa) &&
+		    IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr) &&
 		    in6p->in6p_route.ro_rt &&
 		    !(in6p->in6p_route.ro_rt->rt_flags & RTF_HOST)) {
 			struct sockaddr_in6 *dst6;
 
 			dst6 = (struct sockaddr_in6 *)&in6p->in6p_route.ro_dst;
-#ifdef SCOPEDROUTING		/* XXX */
-			if (SA6_ARE_ADDR_EQUAL(dst6, sa6_dst))
-#else
 			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr,
 			    &sa6_dst->sin6_addr))
-#endif
 				goto do_notify;
 		}
 
@@ -719,14 +684,15 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		if (lport == 0 && fport == 0 && flowinfo &&
 		    in6p->in6p_socket != NULL &&
 		    flowinfo == (in6p->in6p_flowinfo & IPV6_FLOWLABEL_MASK) &&
-		    SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &sa6_src))
+		    IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &sa6_src.sin6_addr))
 			goto do_notify;
-		else if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, sa6_dst) ||
-			 in6p->in6p_socket == 0 ||
-			 (lport && in6p->in6p_lport != lport) ||
-			 (!SA6_IS_ADDR_UNSPECIFIED(&sa6_src) &&
-			  !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &sa6_src)) ||
-			 (fport && in6p->in6p_fport != fport))
+		else if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
+		    &sa6_dst->sin6_addr) ||
+		    in6p->in6p_socket == 0 ||
+		    (lport && in6p->in6p_lport != lport) ||
+		    (!IN6_IS_ADDR_UNSPECIFIED(&sa6_src.sin6_addr) &&
+		     !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &sa6_src.sin6_addr)) ||
+		    (fport && in6p->in6p_fport != fport))
 			continue;
 
 	  do_notify:
@@ -847,7 +813,7 @@ in6_rtchange(in6p, errno)
 struct in6pcb *
 in6_pcblookup(head, faddr6, fport_arg, laddr6, lport_arg, flags)
 	struct in6pcb *head;
-	struct sockaddr_in6 *faddr6, *laddr6;
+	struct in6_addr *faddr6, *laddr6;
 	u_int fport_arg, lport_arg;
 	int flags;
 {
@@ -859,25 +825,25 @@ in6_pcblookup(head, faddr6, fport_arg, laddr6, lport_arg, flags)
 		if (in6p->in6p_lport != lport)
 			continue;
 		wildcard = 0;
-		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
-			if (SA6_IS_ADDR_UNSPECIFIED(laddr6))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
+			if (IN6_IS_ADDR_UNSPECIFIED(laddr6))
 				wildcard++;
-			else if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, laddr6))
+			else if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, laddr6))
 				continue;
 		}
 #ifndef TCP6
-		else if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)
-			&& in6p->in6p_laddr.s6_addr32[3] == 0) {
-			if (!IN6_IS_ADDR_V4MAPPED(&laddr6->sin6_addr))
+		else if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr) &&
+		    in6p->in6p_laddr.s6_addr32[3] == 0) {
+			if (!IN6_IS_ADDR_V4MAPPED(laddr6))
 				continue;
-			if (laddr6->sin6_addr.s6_addr32[3] == 0)
+			if (laddr6->s6_addr32[3] == 0)
 				;
 			else
 				wildcard++;
 		}
 #endif
 		else {
-			if (IN6_IS_ADDR_V4MAPPED(&laddr6->sin6_addr)) {
+			if (IN6_IS_ADDR_V4MAPPED(laddr6)) {
 #ifndef TCP6
 				if (in6p->in6p_flags & IN6P_IPV6_V6ONLY)
 					continue;
@@ -886,29 +852,29 @@ in6_pcblookup(head, faddr6, fport_arg, laddr6, lport_arg, flags)
 #else
 				continue;
 #endif
-			} else if (!SA6_IS_ADDR_UNSPECIFIED(laddr6))
+			} else if (!IN6_IS_ADDR_UNSPECIFIED(laddr6))
 				wildcard++;
 		}
-		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
-			if (SA6_IS_ADDR_UNSPECIFIED(faddr6))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+			if (IN6_IS_ADDR_UNSPECIFIED(faddr6))
 				wildcard++;
-			else if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, faddr6)
-			      || in6p->in6p_fport != fport)
+			else if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
+			    faddr6) || in6p->in6p_fport != fport)
 				continue;
 		}
 #ifndef TCP6
-		else if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_faddr)
-			&& in6p->in6p_faddr.s6_addr32[3] == 0) {
-			if (!IN6_IS_ADDR_V4MAPPED(&faddr6->sin6_addr))
+		else if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_faddr) &&
+		    in6p->in6p_faddr.s6_addr32[3] == 0) {
+			if (!IN6_IS_ADDR_V4MAPPED(faddr6))
 				continue;
-			if (faddr6->sin6_addr.s6_addr32[3] == 0)
+			if (faddr6->s6_addr32[3] == 0)
 				;
 			else
 				wildcard++;
 		}
 #endif
 		else {
-			if (IN6_IS_ADDR_V4MAPPED(&faddr6->sin6_addr)) {
+			if (IN6_IS_ADDR_V4MAPPED(faddr6)) {
 #ifndef TCP6
 				if (in6p->in6p_flags & IN6P_IPV6_V6ONLY)
 					continue;
@@ -917,7 +883,7 @@ in6_pcblookup(head, faddr6, fport_arg, laddr6, lport_arg, flags)
 #else
 				continue;
 #endif
-			} else if (!SA6_IS_ADDR_UNSPECIFIED(faddr6))
+			} else if (!IN6_IS_ADDR_UNSPECIFIED(faddr6))
 				wildcard++;
 		}
 
@@ -953,13 +919,13 @@ in6_pcbrtentry(in6p)
 	dst6 = (struct sockaddr_in6 *)&ro->ro_dst;
 
 	if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
-	    !SA6_ARE_ADDR_EQUAL(dst6, &in6p->in6p_fsa))) {
+	    !IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr, &in6p->in6p_faddr))) {
 		RTFREE(ro->ro_rt);
 		ro->ro_rt = (struct rtentry *)NULL;
 	}
 #if defined(__NetBSD__) && defined(INET)
 	if (ro->ro_rt == (struct rtentry *)NULL &&
-	    IN6_IS_ADDR_V4MAPPED(&in6p->in6p_fsa.sin6_addr)) {
+	    IN6_IS_ADDR_V4MAPPED(&in6p->in6p_faddr)) {
 		struct sockaddr_in *dst = (struct sockaddr_in *)&ro->ro_dst;
 
 		bzero(dst, sizeof(*dst));
@@ -971,7 +937,7 @@ in6_pcbrtentry(in6p)
 	} else
 #endif
 	if (ro->ro_rt == (struct rtentry *)NULL &&
-	    !SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
+	    !IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 		bzero(dst6, sizeof(*dst6));
 		dst6->sin6_family = AF_INET6;
 		dst6->sin6_len = sizeof(struct sockaddr_in6);
@@ -987,7 +953,7 @@ in6_pcbrtentry(in6p)
 struct in6pcb *
 in6_pcblookup_connect(head, faddr6, fport_arg, laddr6, lport_arg, faith)
 	struct in6pcb *head;
-	struct sockaddr_in6 *faddr6, *laddr6;
+	struct in6_addr *faddr6, *laddr6;
 	u_int fport_arg, lport_arg;
 	int faith;
 {
@@ -1000,16 +966,16 @@ in6_pcblookup_connect(head, faddr6, fport_arg, laddr6, lport_arg, faith)
 			continue;
 		if (in6p->in6p_lport != lport)
 			continue;
-		if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa))
+		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr))
 			continue;
-		if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, faddr6))
+		if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, faddr6))
 			continue;
-		if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa))
+		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
 			continue;
-		if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, laddr6))
+		if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, laddr6))
 			continue;
-		if ((IN6_IS_ADDR_V4MAPPED(&laddr6->sin6_addr) ||
-		     IN6_IS_ADDR_V4MAPPED(&faddr6->sin6_addr)) &&
+		if ((IN6_IS_ADDR_V4MAPPED(laddr6) ||
+		     IN6_IS_ADDR_V4MAPPED(faddr6)) &&
 		    (in6p->in6p_flags & IN6P_IPV6_V6ONLY))
 			continue;
 		return in6p;
@@ -1020,7 +986,7 @@ in6_pcblookup_connect(head, faddr6, fport_arg, laddr6, lport_arg, faith)
 struct in6pcb *
 in6_pcblookup_bind(head, laddr6, lport_arg, faith)
 	struct in6pcb *head;
-	struct sockaddr_in6 *laddr6;
+	struct in6_addr *laddr6;
 	u_int lport_arg;
 	int faith;
 {
@@ -1039,9 +1005,9 @@ in6_pcblookup_bind(head, laddr6, lport_arg, faith)
 			continue;
 		if (in6p->in6p_lport != lport)
 			continue;
-		if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
 #ifndef TCP6
-			if (IN6_IS_ADDR_V4MAPPED(&laddr6->sin6_addr)) {
+			if (IN6_IS_ADDR_V4MAPPED(laddr6)) {
 				if ((in6p->in6p_flags & IN6P_IPV6_V6ONLY))
 					continue;
 				else
@@ -1054,12 +1020,12 @@ in6_pcblookup_bind(head, laddr6, lport_arg, faith)
 		else if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr) &&
 			 !(in6p->in6p_flags & IN6P_IPV6_V6ONLY) &&
 			 in6p->in6p_laddr.s6_addr32[3] == 0) {
-			if (IN6_IS_ADDR_V4MAPPED(&laddr6->sin6_addr) &&
-			    laddr6->sin6_addr.s6_addr32[3] != 0)
+			if (IN6_IS_ADDR_V4MAPPED(laddr6) &&
+			    laddr6->s6_addr32[3] != 0)
 				match = in6p;
 		}
 #endif
-		else if (SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, laddr6))
+		else if (IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, laddr6))
 			return in6p;
 	}
 	return match;

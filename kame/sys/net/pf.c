@@ -2118,41 +2118,34 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 		break;
 #ifdef INET6
 	case AF_INET6:
-	{
-		struct sockaddr_in6 s, d;
-
-		bzero(&s, sizeof(s));
-		bzero(&d, sizeof(d));
-		s.sin6_len = d.sin6_len = sizeof(struct sockaddr_in6);
-		s.sin6_family = d.sin6_family = AF_INET6;
-		in6_recoverscope(&s, &saddr->v6, NULL);
-		in6_recoverscope(&d, &daddr->v6, NULL);
 #ifdef __OpenBSD__
-		inp = in6_pcbhashlookup(tb, &s, sport, &d, dport);
+		inp = in6_pcbhashlookup(tb, &saddr->v6, sport, &daddr->v6,
+		    dport);
 		if (inp == NULL) {
-			inp = in_pcblookup(tb, &s, sport, &d,
+			inp = in_pcblookup(tb, &saddr->v6, sport, &daddr->v6,
 			    dport, INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
 			if (inp == NULL)
 				return (0);
 		}
 #elif defined(__NetBSD__)
-		in6p = in6_pcblookup_connect(tb6, &s, sport, &d, dport, 0);
+		in6p = in6_pcblookup_connect(tb6, &saddr->v6, sport, &daddr->v6,
+		    dport, 0);
 		if (in6p == NULL) {
-			in6p = in6_pcblookup_bind(tb6, &d, dport, 0);
+			in6p = in6_pcblookup_bind(tb6, &daddr->v6, dport, 0);
 			if (in6p == NULL)
 				return (0);
 		}
 #elif defined(__FreeBSD__)
-		inp = in6_pcblookup_hash(tb, &s, sport, &d, dport, 0, NULL);
+		inp = in6_pcblookup_hash(tb, &saddr->v6, sport, &daddr->v6,
+		    dport, 0, NULL);
 		if (inp == NULL) {
-			inp = in6_pcblookup_hash(tb, &s, sport, &d, dport,
+			inp = in6_pcblookup_hash(tb, &saddr->v6, sport, &daddr->v6, dport,
 			    1, NULL);
 			if (inp == NULL)
 				return (0);
 		}
 #endif
 		break;
-	}
 #endif /* INET6 */
 
 	default:
@@ -5031,7 +5024,7 @@ pf_route6(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 	if (IN6_IS_ADDR_LINKLOCAL(&dst->sin6_addr))
 		dst->sin6_addr.s6_addr16[1] = htons(ifp->if_index);
 	if ((u_long)m0->m_pkthdr.len <= ifp->if_mtu) {
-		error = nd6_output(ifp, ifp, m0, dst, NULL);
+		error = nd6_output(ifp, ifp, m0, &dst->sin6_addr, NULL);
 	} else {
 		in6_ifstat_inc(ifp, ifs6_in_toobig);
 		if (r->rt != PF_DUPTO)

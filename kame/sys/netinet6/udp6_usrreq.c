@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.118 2003/11/03 00:52:30 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.119 2004/02/03 07:25:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -142,7 +142,6 @@ udp6_input(mp, offp, proto)
 	struct in6pcb *in6p;
 	int off = *offp;
 	u_int32_t plen, ulen;
-	struct sockaddr_in6 src, dst, fromsa;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 
@@ -168,15 +167,6 @@ udp6_input(mp, offp, proto)
 		return IPPROTO_DONE;
 	}
 #endif
-
-	/*
-	 * extract full sockaddr structures for the src/dst addresses,
-	 * and make local copies of them.
-	 */
-	if (ip6_getpktaddrs(m, &src, &dst)) {
-		m_freem(m);
-		goto bad;
-	}
 
 	/*
 	 * XXX: the address may have embedded scope zone ID, which should be
@@ -270,12 +260,14 @@ udp6_input(mp, offp, proto)
 		     in6p = in6p->in6p_next) {
 			if (in6p->in6p_lport != uh->uh_dport)
 				continue;
-			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
-				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &dst))
+			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
+				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr,
+				    &ip6->ip6_dst))
 					continue;
 			}
-			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
-				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, &src) ||
+			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
+				    &ip6->ip6_src) ||
 				    in6p->in6p_fport != uh->uh_sport)
 					continue;
 			}
@@ -539,8 +531,10 @@ udp6_ctlinput(cmd, sa, d)
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (in6_pcblookup_connect(&udb6, sa6, uh.uh_dport,
-			    (struct sockaddr_in6 *)sa6_src, uh.uh_sport, 0))
+			if (in6_pcblookup_connect(&udb6, &sa6->sin6_addr,
+			    uh.uh_dport,
+			    (struct in6_addr *)&sa6_src->sin6_addr,
+			    uh.uh_sport, 0))
 				valid++;
 #if 0
 			/*
@@ -550,7 +544,8 @@ udp6_ctlinput(cmd, sa, d)
 			 * We should at least check if the local address (= s)
 			 * is really ours.
 			 */
-			else if (in6_pcblookup_bind(&udb6, sa6, uh.uh_dport, 0))
+			else if (in6_pcblookup_bind(&udb6, &sa6->sin6_addr,
+			    uh.uh_dport, 0))
 				valid++;
 #endif
 
@@ -683,7 +678,7 @@ udp6_usrreq(so, req, m, addr6, control)
 		break;
 
 	case PRU_CONNECT:
-		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 			error = EISCONN;
 			break;
 		}
@@ -707,7 +702,7 @@ udp6_usrreq(so, req, m, addr6, control)
 		break;
 
 	case PRU_DISCONNECT:
-		if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 			error = ENOTCONN;
 			break;
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.132 2004/01/29 12:56:53 keiichi Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.133 2004/02/03 07:25:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -151,8 +151,8 @@ ip6_forward(m, srcrt)
 	int error, type = 0, code = 0;
 	struct mbuf *mcopy = NULL;
 	struct ifnet *origifp;	/* maybe unnecessary */
-	struct sockaddr_in6 sa6_src, sa6_dst;
 	u_int32_t dstzone;
+	struct sockaddr_in6 sin6;
 #ifdef IPSEC
 	struct secpolicy *sp = NULL;
 	int ipsecrt = 0;
@@ -164,17 +164,6 @@ ip6_forward(m, srcrt)
 	long time_second = time.tv_sec;
 #endif
 
-	/* get source and destination addresses with full scope information. */
-	if (ip6_getpktaddrs(m, &sa6_src, &sa6_dst)) {
-		/*
-		 * we dare to log the fact here because this should be an
-		 * internal bug.
-		 */
-		log(LOG_ERR, "ip6_forward: can't find src/dst addresses\n");
-		m_freem(m);
-		return;
-	}
-
 #ifdef IPSEC
 #ifdef MIP6
 	/* XXX skip integrity check if the next hop is me. */
@@ -183,8 +172,7 @@ ip6_forward(m, srcrt)
 
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 		if ((ia->ia6_flags & IN6_IFF_NOTREADY) == 0 &&
-		    IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
-			&sa6_dst.sin6_addr))
+		    IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr, &ip6->ip6_dst))
 			goto skip_ipsec6_in_reject;
 	}
     }
@@ -410,10 +398,6 @@ ip6_forward(m, srcrt)
 	}
 
 	/* adjust pointer */
-	if (ip6_getpktaddrs(m, &sa6_src, &sa6_dst)) {
-		m_freem(m);
-		return;
-	}
 	dst = (struct sockaddr_in6 *)state.dst;
 	rt = state.ro ? state.ro->ro_rt : NULL;
 	if (dst != NULL && rt != NULL)
@@ -521,20 +505,13 @@ ip6_forward(m, srcrt)
 		}
 	} else if ((rt = ip6_forward_rt.ro_rt) == 0 ||
 		    !(ip6_forward_rt.ro_rt->rt_flags & RTF_UP) ||
-#ifdef SCOPEDROUTING
-		   !SA6_ARE_ADDR_EQUAL(&sa6_dst, dst)
-#else
-		   !IN6_ARE_ADDR_EQUAL(&sa6_dst.sin6_addr, &dst->sin6_addr)
-#endif
-		) {
+		   !IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &dst->sin6_addr)) {
 		if (ip6_forward_rt.ro_rt) {
 			RTFREE(ip6_forward_rt.ro_rt);
 			ip6_forward_rt.ro_rt = 0;
 		}
-		*dst = sa6_dst;
-#ifndef SCOPEDROUTING
+		dst->sin6_addr = ip6->ip6_dst;
 		dst->sin6_scope_id = 0;	/* XXX */
-#endif
 #ifdef __FreeBSD__
 		rtalloc_ign((struct route *)&ip6_forward_rt, RTF_PRCLONING);
 #else
@@ -545,7 +522,7 @@ ip6_forward(m, srcrt)
 			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_noroute);
 			if (mcopy) {
 				icmp6_error(mcopy, ICMP6_DST_UNREACH,
-					    ICMP6_DST_UNREACH_NOROUTE, 0);
+				    ICMP6_DST_UNREACH_NOROUTE, 0);
 			}
 			m_freem(m);
 			return;
@@ -571,7 +548,17 @@ ip6_forward(m, srcrt)
 		m_freem(m);
 		return;
 	}
-	if (sa6_src.sin6_scope_id != dstzone
+	bzero(&sin6, sizeof(sin6));
+	sin6.sin6_family = AF_INET6;
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
+	if (in6_recoverscope(&sin6, &ip6->ip6_src, m->m_pkthdr.rcvif) != 0) {
+		/* XXX: this should not happen */
+		ip6stat.ip6s_cantforward++;
+		ip6stat.ip6s_badscope++;
+		m_freem(m);
+		return;
+	}
+	if (sin6.sin6_scope_id != dstzone
 #ifdef IPSEC
 	    && !ipsecrt
 #endif
@@ -604,6 +591,7 @@ ip6_forward(m, srcrt)
 	 * we need an explicit check because we may mistakenly forward the
 	 * packet to a different zone by (e.g.) a default route.
 	 */
+#if 0 /*XXX*/
 	if (in6_addr2zoneid(rt->rt_ifp, &ip6->ip6_dst, &dstzone) ||
 	    sa6_dst.sin6_scope_id != dstzone) {
 		ip6stat.ip6s_cantforward++;
@@ -611,6 +599,7 @@ ip6_forward(m, srcrt)
 		m_freem(m);
 		return;
 	}
+#endif
 
 	if (m->m_pkthdr.len > IN6_LINKMTU(rt->rt_ifp)) {
 		in6_ifstat_inc(rt->rt_ifp, ifs6_in_toobig);
@@ -674,7 +663,7 @@ ip6_forward(m, srcrt)
 #endif
 	    (rt->rt_flags & (RTF_DYNAMIC|RTF_MODIFIED)) == 0) {
 		if ((rt->rt_ifp->if_flags & IFF_POINTOPOINT) &&
-		    nd6_is_addr_neighbor(&sa6_dst, rt->rt_ifp)) {
+		    nd6_is_addr_neighbor(&ip6->ip6_dst, rt->rt_ifp)) {
 			/*
 			 * If the incoming interface is equal to the outgoing
 			 * one, the link attached to the interface is
@@ -804,7 +793,7 @@ ip6_forward(m, srcrt)
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif
 
-	error = nd6_output(rt->rt_ifp, origifp, m, dst, rt);
+	error = nd6_output(rt->rt_ifp, origifp, m, &dst->sin6_addr, rt);
 	if (error) {
 		in6_ifstat_inc(rt->rt_ifp, ifs6_out_discard);
 		ip6stat.ip6s_cantforward++;

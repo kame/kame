@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.33 2003/07/02 13:54:44 itojun Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.34 2004/02/03 07:25:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -157,10 +157,10 @@ ipcomp4_input(m, va_alist)
 
 	if (cpi >= IPCOMP_CPI_NEGOTIATE_MIN) {
 		sav = key_allocsa(AF_INET, (caddr_t)&ip->ip_src,
-			(caddr_t)&ip->ip_dst, IPPROTO_IPCOMP, htonl(cpi));
-		if (sav != NULL
-		 && (sav->state == SADB_SASTATE_MATURE
-		  || sav->state == SADB_SASTATE_DYING)) {
+		    (caddr_t)&ip->ip_dst, IPPROTO_IPCOMP, htonl(cpi));
+		if (sav != NULL &&
+		    (sav->state == SADB_SASTATE_MATURE ||
+		     sav->state == SADB_SASTATE_DYING)) {
 			cpi = sav->alg_enc;	/* XXX */
 			/* other parameters to look at? */
 		}
@@ -168,7 +168,7 @@ ipcomp4_input(m, va_alist)
 	algo = ipcomp_algorithm_lookup(cpi);
 	if (!algo) {
 		ipseclog((LOG_WARNING, "IPv4 IPComp input: unknown cpi %u\n",
-			cpi));
+		    cpi));
 		ipsecstat.in_nosa++;
 		goto fail;
 	}
@@ -277,7 +277,6 @@ ipcomp6_input(mp, offp, proto)
 	struct mbuf *m, *md;
 	int off;
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 src_sa, dst_sa;
 	struct ipcomp *ipcomp;
 	const struct ipcomp_algorithm *algo;
 	u_int16_t cpi;	/* host order */
@@ -302,26 +301,22 @@ ipcomp6_input(mp, offp, proto)
 	ip6 = mtod(m, struct ip6_hdr *);
 	nxt = ipcomp->comp_nxt;
 
-	/* extract full sockaddr structures for the src/dst addresses */
-	if (ip6_getpktaddrs(m, &src_sa, &dst_sa))
-		goto fail;
-
 	cpi = ntohs(ipcomp->comp_cpi);
 
 	if (cpi >= IPCOMP_CPI_NEGOTIATE_MIN) {
-		sav = key_allocsa(AF_INET6, (caddr_t)&src_sa, (caddr_t)&dst_sa,
-				  IPPROTO_IPCOMP, htonl(cpi));
-		if (sav != NULL
-		 && (sav->state == SADB_SASTATE_MATURE
-		  || sav->state == SADB_SASTATE_DYING)) {
+		sav = key_allocsa(AF_INET6, (caddr_t)&ip6->ip6_src,
+		    (caddr_t)&ip6->ip6_dst, IPPROTO_IPCOMP, htonl(cpi));
+		if (sav != NULL &&
+		    (sav->state == SADB_SASTATE_MATURE ||
+		     sav->state == SADB_SASTATE_DYING)) {
 			cpi = sav->alg_enc;	/* XXX */
 			/* other parameters to look at? */
 		}
 	}
 	algo = ipcomp_algorithm_lookup(cpi);
 	if (!algo) {
-		ipseclog((LOG_WARNING, "IPv6 IPComp input: unknown cpi %u; "
-			"dropping the packet for simplicity\n", cpi));
+		ipseclog((LOG_WARNING, "IPv6 IPComp input: unknown cpi %u\n",
+		    cpi));
 		ipsec6stat.in_nosa++;
 		goto fail;
 	}

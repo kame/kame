@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.357 2004/01/13 11:24:04 suz Exp $	*/
+/*	$KAME: in6.c,v 1.358 2004/02/03 07:25:21 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -202,8 +202,8 @@ const struct in6_addr in6mask64 = IN6MASK64;
 const struct in6_addr in6mask96 = IN6MASK96;
 const struct in6_addr in6mask128 = IN6MASK128;
 
-const struct sockaddr_in6 sa6_any = {sizeof(sa6_any), AF_INET6,
-				     0, 0, IN6ADDR_ANY_INIT, 0};
+const struct sockaddr_in6 sa6_any =
+	{ sizeof(sa6_any), AF_INET6, 0, 0, IN6ADDR_ANY_INIT, 0};
 
 #ifdef MLDV2
 extern int	mld_sendbuf(struct mbuf *, struct ifnet *);
@@ -881,10 +881,10 @@ in6_control(so, cmd, data, ifp)
 #endif /* MIP6 && MIP6_MOBILE_NODE */
 			break;	/* we don't need to install a host route. */
 		}
-		pr0.ndpr_prefix = ifra->ifra_addr;
+		pr0.ndpr_prefix = ifra->ifra_addr.sin6_addr;
 		/* apply the mask for safety. */
 		for (i = 0; i < 4; i++) {
-			pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
+			pr0.ndpr_prefix.s6_addr32[i] &=
 			    ifra->ifra_prefixmask.sin6_addr.s6_addr32[i];
 		}
 		/*
@@ -1287,7 +1287,7 @@ in6_update_ifa(ifp, ifra, ia)
 
 			bzero(&llsol, sizeof(llsol));
 			llsol.sin6_family = AF_INET6;
-			llsol.sin6_len = sizeof(llsol);
+			llsol.sin6_len = sizeof(struct sockaddr_in6);
 			llsol.sin6_addr.s6_addr32[0] = htonl(0xff020000);
 			llsol.sin6_addr.s6_addr32[1] = 0;
 			llsol.sin6_addr.s6_addr32[2] = htonl(1);
@@ -1301,7 +1301,8 @@ in6_update_ifa(ifp, ifra, ia)
 				    "in6_addr2zoneid failed\n");
 				goto cleanup;
 			}
-			imm = in6_joingroup(ifp, &llsol, &error);
+			in6_embedscope(&llsol.sin6_addr, &llsol);
+			imm = in6_joingroup(ifp, &llsol.sin6_addr, &error);
 			if (imm) {
 				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
 				    i6mm_chain);
@@ -1332,10 +1333,8 @@ in6_update_ifa(ifp, ifra, ia)
 		}
 		/* necessary to fake unicast routing table */
 		in6_embedscope(&mltaddr.sin6_addr, &mltaddr);
-#ifndef SCOPEDROUTING		/* XXX */
 		zoneid = mltaddr.sin6_scope_id;
 		mltaddr.sin6_scope_id = 0;
-#endif
 
 		/*
 		 * XXX: do we really need this automatic routes?
@@ -1386,11 +1385,7 @@ in6_update_ifa(ifp, ifra, ia)
 		} else {
 			RTFREE(rt);
 		}
-#ifndef SCOPEDROUTING
-		mltaddr.sin6_scope_id = zoneid;	/* XXX */
-#endif
-		in6_clearscope(&mltaddr.sin6_addr);
-		imm = in6_joingroup(ifp, &mltaddr, &error);
+		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
 		if (imm) {
 			LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
 			    i6mm_chain);
@@ -1410,7 +1405,7 @@ in6_update_ifa(ifp, ifra, ia)
 #define hostnamelen	strlen(hostname)
 #endif
 		if (in6_nigroup(ifp, hostname, hostnamelen, &mltaddr) == 0) {
-			imm = in6_joingroup(ifp, &mltaddr, &error);
+			imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
 			if (imm) {
 				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
 				    i6mm_chain);
@@ -1437,10 +1432,8 @@ in6_update_ifa(ifp, ifra, ia)
 		}
 		/* necessary to fake unicast routing table */
 		in6_embedscope(&mltaddr.sin6_addr, &mltaddr);
-#ifndef SCOPEDROUTING		/* XXX */
 		zoneid = mltaddr.sin6_scope_id;
 		mltaddr.sin6_scope_id = 0;
-#endif
 
 		/* XXX: again, do we really need the route? */
 #ifdef __FreeBSD__
@@ -1482,11 +1475,7 @@ in6_update_ifa(ifp, ifra, ia)
 		} else {
 			RTFREE(rt);
 		}
-#ifndef SCOPEDROUTING
-		mltaddr.sin6_scope_id = zoneid;	/* XXX */
-#endif
-		in6_clearscope(&mltaddr.sin6_addr);
-		imm = in6_joingroup(ifp, &mltaddr, &error);
+		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
 		if (imm) {
 			LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
 			    i6mm_chain);
@@ -1654,7 +1643,8 @@ in6_unlink_ifa(ia, ifp)
 			    LIST_FIRST(&oia->ia6_multiaddrs)) != NULL) {
 #ifdef MLDV2
 				int error;
-				in6_delmulti(in6m, &error, 0, NULL, MCAST_EXCLUDE, 1);
+				in6_delmulti(in6m, &error, 0, NULL,
+				    MCAST_EXCLUDE, 1);
 #else
 				in6_delmulti(in6m);
 #endif
@@ -2253,7 +2243,7 @@ in6_addmulti(maddr6, ifp, errorp, numsrc, src, mode, init)
 #else
 in6_addmulti(maddr6, ifp, errorp)
 #endif
-	struct sockaddr_in6 *maddr6;
+	struct in6_addr *maddr6;
 	struct ifnet *ifp;
 	int *errorp;
 #ifdef MLDV2
@@ -2300,10 +2290,10 @@ in6_addmulti(maddr6, ifp, errorp)
 	/*
 	 * See if address already in list.
 	 */
-	IN6_LOOKUP_MULTI(maddr6, ifp, in6m);
+	IN6_LOOKUP_MULTI(*maddr6, ifp, in6m);
 	if (in6m != NULL) {
 #ifdef MLDV2
-		if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa.sin6_addr)) {
+		if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
 			++in6m->in6m_refcount;
 			splx(s);
 			return in6m;
@@ -2320,7 +2310,7 @@ in6_addmulti(maddr6, ifp, errorp)
 		 * filter mode and its calculated source list.
 		 */
 		if ((*errorp = in6_addmultisrc(in6m, numsrc, src, mode, init,
-					&newhead, &newmode, &newnumsrc)) != 0) {
+		    &newhead, &newmode, &newnumsrc)) != 0) {
 			splx(s);
 			return NULL;
 		}
@@ -2329,8 +2319,8 @@ in6_addmulti(maddr6, ifp, errorp)
 			 * Merge new source list to current pending report's
 			 * source list.
 			 */
-			if ((*errorp = in6_merge_msf_state
-				(in6m, newhead, newmode, newnumsrc)) > 0) {
+			if ((*errorp = in6_merge_msf_state(in6m, newhead,
+			    newmode, newnumsrc)) > 0) {
 				/* State-Change Report will not be sent.
 				 * Just return immediately. */
 				/* Each ias linked from newhead is used by new
@@ -2396,7 +2386,7 @@ in6_addmulti(maddr6, ifp, errorp)
 		}
 
 		bzero(in6m, sizeof(*in6m));
-		in6m->in6m_sa = *maddr6;
+		in6m->in6m_addr = *maddr6;
 		in6m->in6m_ifp = ifp;
 		in6m->in6m_refcount = 1;
 		IFP_TO_IA6(ifp, ia);
@@ -2415,7 +2405,9 @@ in6_addmulti(maddr6, ifp, errorp)
 		 * filter appropriately for the new address.
 		 */
 		bzero(&ifr.ifr_addr, sizeof(struct sockaddr_in6));
-		ifr.ifr_addr = *maddr6;
+		ifr.ifr_addr.sin6_family = AF_INET6;
+		ifr.ifr_addr.sin6_len = sizeof(struct sockaddr_in6);
+		ifr.ifr_addr.sin6_addr = *maddr6;
 		if (ifp->if_ioctl == NULL)
 			*errorp = ENXIO; /* XXX: appropriate? */
 		else
@@ -2451,13 +2443,13 @@ in6_addmulti(maddr6, ifp, errorp)
 		}
 
 		in6m->in6m_source = NULL;
-		if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa.sin6_addr)) {
+		if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
 			splx(s);
 			return in6m;
 		}
 
 		if ((*errorp = in6_addmultisrc(in6m, numsrc, src, mode, init,
-					&newhead, &newmode, &newnumsrc)) != 0) {
+		    &newhead, &newmode, &newnumsrc)) != 0) {
 			in6_free_all_msf_source_list(in6m);
 			LIST_REMOVE(in6m, in6m_entry);
 			free(in6m, M_IPMADDR);
@@ -2544,7 +2536,7 @@ in6_delmulti(in6m)
 		return;
 	}
 
-	if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa.sin6_addr)) {
+	if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
 		if (--in6m->in6m_refcount == 0) {
 			/*
 			 * Unlink from list.
@@ -2559,9 +2551,11 @@ in6_delmulti(in6m)
 			 * reception filter.
 			 */
 			bzero(&ifr.ifr_addr, sizeof(struct sockaddr_in6));
-			ifr.ifr_addr = in6m->in6m_sa;
+			ifr.ifr_addr.sin6_family = AF_INET6;
+			ifr.ifr_addr.sin6_len = sizeof(struct sockaddr_in6);
+			ifr.ifr_addr.sin6_addr = in6m->in6m_addr;
 			(*in6m->in6m_ifp->if_ioctl)(in6m->in6m_ifp,
-						SIOCDELMULTI, (caddr_t)&ifr);
+			    SIOCDELMULTI, (caddr_t)&ifr);
 			free(in6m, M_IPMADDR);
 		}
 		splx(s);
@@ -2576,7 +2570,7 @@ in6_delmulti(in6m)
 	 * Report if needed.
 	 */
 	if ((*errorp = in6_delmultisrc(in6m, numsrc, src, mode, final,
-				&newhead, &newmode, &newnumsrc)) != 0) {
+	    &newhead, &newmode, &newnumsrc)) != 0) {
 		splx(s);
 		return;
 	}
@@ -2647,9 +2641,10 @@ in6_delmulti(in6m)
 			IFAFREE(&in6m->in6m_ia->ia_ifa);
 		}
 		bzero(&ifr.ifr_addr, sizeof(struct sockaddr_in6));
-		ifr.ifr_addr.sin6_len = in6m->in6m_sa.sin6_len;
+		ifr.ifr_addr.sin6_family = AF_INET6;
+		ifr.ifr_addr.sin6_len = sizeof(struct sockaddr_in6);
 		(*in6m->in6m_ifp->if_ioctl)(in6m->in6m_ifp,
-					    SIOCDELMULTI, (caddr_t)&ifr);
+		    SIOCDELMULTI, (caddr_t)&ifr);
 		free(in6m, M_IPMADDR);
 	}
 	*errorp = 0;
@@ -2676,9 +2671,11 @@ in6_delmulti(in6m)
 		 * reception filter.
 		 */
 		bzero(&ifr.ifr_addr, sizeof(struct sockaddr_in6));
-		ifr.ifr_addr = in6m->in6m_sa;
+		ifr.ifr_addr.sin6_family = AF_INET6;
+		ifr.ifr_addr.sin6_len = sizeof(struct sockaddr_in6);
+		ifr.ifr_addr.sin6_addr = in6m->in6m_addr;
 		(*in6m->in6m_ifp->if_ioctl)(in6m->in6m_ifp,
-					    SIOCDELMULTI, (caddr_t)&ifr);
+		    SIOCDELMULTI, (caddr_t)&ifr);
 		free(in6m, M_IPMADDR);
 	}
 #endif
@@ -2692,9 +2689,9 @@ in6_delmulti(in6m)
  * and the number of source is not 0.
  */
 struct in6_multi *
-in6_modmulti(ap, ifp, error, numsrc, src, mode,
-		old_num, old_src, old_mode, init, grpjoin)
-	struct sockaddr_in6 *ap;
+in6_modmulti(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
+    init, grpjoin)
+	struct in6_addr *ap;
 	struct ifnet *ifp;
 	int *error;			/* return code of each sub routine */
 	u_int16_t numsrc, old_num;
@@ -2742,11 +2739,11 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 		* If requested multicast address is local address, update
 		* the condition, join or leave, based on a requested filter.
 		*/
-		if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
+		if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
 			if (numsrc != 0) {
 				mldlog((LOG_DEBUG,
 				    "in6_modmulti: source filter not supported for %s\n",
-				   ip6_sprintf(&in6m->in6m_sa.sin6_addr)));
+				   ip6_sprintf(&in6m->in6m_addr)));
 				splx(s);
 				*error = EINVAL;
 				return NULL;
@@ -2766,8 +2763,12 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 					 * Notify the network driver to update
 					 * its multicast reception filter.
 					 */
-					bcopy(&in6m->in6m_sa, &ifr.ifr_addr,
-					    in6m->in6m_sa.sin6_len);
+					ifr.ifr_addr.sin6_family = AF_INET6;
+					ifr.ifr_addr.sin6_len =
+					    sizeof(struct sockaddr_in6);
+					bcopy(&in6m->in6m_addr,
+					    &ifr.ifr_addr.sin6_addr,
+					    sizeof(ifr.ifr_addr.sin6_addr));
 					(*in6m->in6m_ifp->if_ioctl)(in6m->in6m_ifp,
 					    SIOCDELMULTI, (caddr_t)&ifr);
 					free(in6m, M_IPMADDR);
@@ -2865,7 +2866,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 		}
 
 		bzero(in6m, sizeof(*in6m));
-		in6m->in6m_sa = *ap;
+		in6m->in6m_addr = *ap;
 		in6m->in6m_ifp = ifp;
 		in6m->in6m_refcount = 1;
 		in6m->in6m_timer = 0;
@@ -2911,7 +2912,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 		}
 
 		in6m->in6m_source = NULL;
-		if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
+		if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
 			splx(s);
 			return in6m;
 		}
@@ -2946,7 +2947,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 			 * If MSF's pending records exist, they must be deleted.
 			 */
 			in6_clear_all_pending_report(in6m);
-			imm = in6_joingroup(in6m->in6m_ifp, &in6m->in6m_sa,
+			imm = in6_joingroup(in6m->in6m_ifp, &in6m->in6m_addr,
 			    error);
 			if (imm) {
 				LIST_INSERT_HEAD(&ia->ia6_multiaddrs, in6m,
@@ -2955,7 +2956,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 				nd6log((LOG_WARNING,
 				    "in6_modmulti: addmulti failed for "
 				    "%s on %s (errno=%d)\n",
-				    ip6_sprintf(&in6m->in6m_sa.sin6_addr),
+				    ip6_sprintf(&in6m->in6m_addr),
 				    if_name(in6m->in6m_ifp), *error));
 			}
 		}
@@ -2982,7 +2983,7 @@ in6_addmulti(maddr6, ifp, errorp, numsrc, src, mode, init)
 #else
 in6_addmulti(maddr6, ifp, errorp)
 #endif
-	struct sockaddr_in6 *maddr6;
+	struct in6_addr *maddr6;
 	struct ifnet *ifp;
 	int *errorp;
 #ifdef MLDV2
@@ -2992,8 +2993,9 @@ in6_addmulti(maddr6, ifp, errorp)
 	int init;			/* indicate initial join by socket */
 #endif
 {
-	struct	in6_multi *in6m;
+	struct in6_multi *in6m;
 	struct ifmultiaddr *ifma;
+	struct sockaddr_in6 sa6;
 #ifdef MLDV2
 	struct mbuf *m = NULL;
 	struct i6as_head *newhead = NULL;/* this may become new ims_cur->head */
@@ -3025,7 +3027,11 @@ in6_addmulti(maddr6, ifp, errorp)
 	 * refcount.  It wants addresses in the form of a sockaddr,
 	 * so we build one here (being careful to zero the unused bytes).
 	 */
-	*errorp = if_addmulti(ifp, (struct sockaddr *)maddr6, &ifma);
+	bzero(&sa6, sizeof(sa6));
+	sa6.sin6_family = AF_INET6;
+	sa6.sin6_len = sizeof(struct sockaddr_in6);
+	sa6.sin6_addr = maddr6;
+	*errorp = if_addmulti(ifp, (struct sockaddr *)&sa6, &ifma);
 	if (*errorp) {
 		splx(s);
 		return 0;
@@ -3045,7 +3051,7 @@ in6_addmulti(maddr6, ifp, errorp)
 		 * MLDv2 (i.e. ffx1::/16, ff02::1).  (ifma_refcount is already
 		 * counted up in if_addmulti())
 		 */
-		if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
+		if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
 			splx(s);
 			return in6m;
 		}
@@ -3135,7 +3141,7 @@ in6_addmulti(maddr6, ifp, errorp)
 	}
 
 	bzero(in6m, sizeof *in6m);
-	in6m->in6m_sa = *maddr6;
+	in6m->in6m_addr = maddr6;
 	in6m->in6m_ifp = ifp;
 	in6m->in6m_refcount = 1;
 	in6m->in6m_ifma = ifma;
@@ -3165,13 +3171,13 @@ in6_addmulti(maddr6, ifp, errorp)
 	}
 
 	in6m->in6m_source = NULL;
-	if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
+	if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
 		splx(s);
 		return in6m;
 	}
 
 	if ((*errorp = in6_addmultisrc(in6m, numsrc, src, mode, init,
-				       &newhead, &newmode, &newnumsrc)) != 0) {
+	    &newhead, &newmode, &newnumsrc)) != 0) {
 		in6_free_all_msf_source_list(in6m);
 		LIST_REMOVE(in6m, in6m_entry);
 		free(in6m, M_IPMADDR);
@@ -3258,7 +3264,7 @@ in6_delmulti(in6m)
 		splx(s);
 		return;
 	}
-	if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
+	if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
 		if (ifma->ifma_refcount == 1) {
 			ifma->ifma_protospec = 0;
 			LIST_REMOVE(in6m, in6m_entry);
@@ -3379,7 +3385,7 @@ in6_delmulti(in6m)
 struct in6_multi *
 in6_modmulti(ap, ifp, error, numsrc, src, mode,
 		old_num, old_src, old_mode, init, grpjoin)
-	struct sockaddr_in6 *ap;
+	struct in6_addr *ap;
 	struct ifnet *ifp;
 	int *error;			/* return code of each sub routine */
 	u_int16_t numsrc, old_num;
@@ -3423,11 +3429,11 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 		 * If requested multicast address is local address, update
 		 * the condition, join or leave, based on a requested filter.
 		 */
-		if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
+		if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
 			if (numsrc != 0) {
 				mldlog((LOG_DEBUG,
 				    "in6_modmulti: source filter not supported for %s\n",
-				    ip6_sprintf(&in6m->in6m_sa.sin6_addr)));
+				    ip6_sprintf(&in6m->in6m_addr)));
 				splx(s);
 				*error = EINVAL;
 				return NULL;
@@ -3446,8 +3452,12 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 					 * Notify the network driver to update
 					 * its multicast reception filter.
 					 */
-					bcopy(&in6m->in6m_sa, &ifr.ifr_addr,
-					    in6m->in6m_sa.sin6_len);
+					ifr.ifr_addr.sin6_family = AF_INET6;
+					ifr.ifr_addr.sin6_len =
+					    sizeof(struct sockaddr_in6);
+					bcopy(&in6m->in6m_addr,
+					    &ifr.ifr_addr.sin6_addr,
+					    sizeof(ifr.ifr_addr.sin6_addr));
 					(*in6m->in6m_ifp->if_ioctl)(in6m->in6m_ifp,
 					    SIOCDELMULTI, (caddr_t)&ifr);
 					free(in6m, M_IPMADDR);
@@ -3559,7 +3569,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 		}
 
 		bzero(in6m, sizeof(*in6m));
-		bcopy(ap, &in6m->in6m_sa, ap->sin6_len);
+		in6m->in6m_addr = *ap;
 		in6m->in6m_ifp = ifp;
 		in6m->in6m_ifma = ifma;
 		ifma->ifma_protospec = in6m;
@@ -3583,7 +3593,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 		}
 
 		in6m->in6m_source = NULL;
-		if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
+		if (SS_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
 			splx(s);
 			return in6m;
 		}
@@ -3617,7 +3627,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 			 * If MSF's pending records exist, they must be deleted.
 			 */
 			in6_clear_all_pending_report(in6m);
-			in6_joingroup(in6m->in6m_ifp, &in6m->in6m_sa, error);
+			in6_joingroup(in6m->in6m_ifp, &in6m->in6m_addr, error);
 #if 0
 			if (imm) {
 				LIST_INSERT_HEAD(in6m->, imm,
@@ -3626,7 +3636,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 				nd6log((LOG_WARNING,
 				"in6_modmulti: addmulti failed for "
 				"%s on %s (errno=%d)\n",
-				ip6_sprintf(&in6m->in6m_sa.sin6_addr),
+				ip6_sprintf(&in6m->in6m_addr),
 				if_name(in6m->in6m_ifp), *error));
 			}
 #endif
@@ -3645,7 +3655,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 struct in6_multi_mship *
 in6_joingroup(ifp, addr, errorp)
 	struct ifnet *ifp;
-	struct sockaddr_in6 *addr;
+	struct in6_addr *addr;
 	int *errorp;
 {
 	struct in6_multi_mship *imm;
@@ -3666,7 +3676,8 @@ in6_joingroup(ifp, addr, errorp)
 		*errorp = error;
 		return NULL;
 	}
-	imm->i6mm_maddr = in6_addmulti(addr, ifp, errorp, 0, NULL, MCAST_EXCLUDE, 1);
+	imm->i6mm_maddr = in6_addmulti(addr, ifp, errorp, 0, NULL,
+	    MCAST_EXCLUDE, 1);
 	imm->i6mm_msf->msf_grpjoin++;
 	if (*errorp != 0) {
 		IMO_MSF_FREE(imm->i6mm_msf);

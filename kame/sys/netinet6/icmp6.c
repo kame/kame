@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.367 2003/12/16 10:50:54 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.368 2004/02/03 07:25:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -211,12 +211,10 @@ extern int pmtu_expire;
 #endif
 
 static void icmp6_errcount __P((struct icmp6errstat *, int, int));
-static int icmp6_rip6_input __P((struct mbuf **, int, struct sockaddr_in6 *,
-				 struct sockaddr_in6 *));
+static int icmp6_rip6_input __P((struct mbuf **, int));
 static int icmp6_ratelimit __P((const struct in6_addr *, const int, const int));
-static const char *icmp6_redirect_diag __P((struct sockaddr_in6 *,
-					    struct sockaddr_in6 *,
-					    struct sockaddr_in6 *));
+static const char *icmp6_redirect_diag __P((struct in6_addr *,
+	struct in6_addr *, struct in6_addr *));
 static struct mbuf *ni6_input __P((struct mbuf *, int));
 static struct mbuf *ni6_nametodns __P((const char *, int, int));
 static int ni6_dnsmatch __P((const char *, int, const char *, int));
@@ -341,7 +339,6 @@ icmp6_error(m, type, code, param)
 	struct icmp6_hdr *icmp6, icp;
 	struct m_tag *mtag;
 	struct ip6aux *ip6a;
-	struct sockaddr_in6 src_sa, dst_sa;
 	u_int preplen;
 	int off;
 	int nxt;
@@ -368,9 +365,6 @@ icmp6_error(m, type, code, param)
 	}
 #endif
 	oip6 = mtod(m, struct ip6_hdr *);
-	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
-		goto freeit;
-	}
 
 	/*
 	 * If the destination address of the erroneous packet is a multicast
@@ -394,8 +388,8 @@ icmp6_error(m, type, code, param)
 	 * RFC 2463, 2.4 (e.5): source address check.
 	 * XXX: the case of anycast source?
 	 */
-	if (SA6_IS_ADDR_UNSPECIFIED(&src_sa) ||
-	    IN6_IS_ADDR_MULTICAST(&src_sa.sin6_addr))
+	if (IN6_IS_ADDR_UNSPECIFIED(&oip6->ip6_src) ||
+	    IN6_IS_ADDR_MULTICAST(&oip6->ip6_src))
 		goto freeit;
 
 	/*
@@ -438,12 +432,9 @@ icmp6_error(m, type, code, param)
 	}
 
 	oip6 = mtod(m, struct ip6_hdr *); /* adjust pointer */
-	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
-		goto freeit;
-	}
 
 	/* Finally, do rate limitation check. */
-	if (icmp6_ratelimit(&src_sa.sin6_addr, type, code)) {
+	if (icmp6_ratelimit(&oip6->ip6_src, type, code)) {
 		icmp6stat.icp6s_toofreq++;
 		goto freeit;
 	}
@@ -472,10 +463,6 @@ icmp6_error(m, type, code, param)
 				return;
 			}
 			oip6 = mtod(m, struct ip6_hdr *); /* adjust pointer */
-			/* ip6_src is changed in icmp6_recover_src(). */
-			if (ip6_getpktaddrs(m, &src_sa, NULL)) {
-				goto freeit;
-			}
 		}
 #ifdef MIP6
 		ip6a->ip6a_flags |= IP6A_NOTUSEBC;
@@ -495,8 +482,8 @@ icmp6_error(m, type, code, param)
 	}
 
 	nip6 = mtod(m, struct ip6_hdr *);
-	nip6->ip6_src  = src_sa.sin6_addr;
-	nip6->ip6_dst  = dst_sa.sin6_addr;
+	nip6->ip6_src  = oip6->ip6_src;
+	nip6->ip6_dst  = oip6->ip6_dst;
 
 	in6_clearscope(&oip6->ip6_src);
 	in6_clearscope(&oip6->ip6_dst);
@@ -538,7 +525,6 @@ icmp6_input(mp, offp, proto)
 	struct mbuf *m = *mp, *n;
 	struct ip6_hdr *ip6, *nip6;
 	struct icmp6_hdr *icmp6, *nicmp6;
-	struct sockaddr_in6 src0, dst0, src, dst;
 	int off = *offp;
 	int icmp6len = m->m_pkthdr.len - *offp;
 	int code, sum, noff;
@@ -611,17 +597,6 @@ icmp6_input(mp, offp, proto)
 #endif
 
 	icmp6stat.icp6s_inhist[icmp6->icmp6_type]++;
-
-	/*
-	 * extract full sockaddr structures for the src/dst addresses,
-	 * and make local copies of the addresses to pass them to applications.
-	 */
-	if (ip6_getpktaddrs(m, &src0, &dst0)) {
-		m_freem(m);
-		return (IPPROTO_DONE);
-	}
-	src = src0;
-	dst = dst0;
 
 #if defined(MIP6) && defined(MIP6_HOME_AGENT)
 	if (mip6_icmp6_tunnel_input(m, off, icmp6len)) {
@@ -1102,7 +1077,7 @@ icmp6_input(mp, offp, proto)
 	}
 
 	/* deliver the packet to appropriate sockets */
-	icmp6_rip6_input(&m, *offp, &src, &dst);
+	icmp6_rip6_input(&m, *offp);
 
 	return IPPROTO_DONE;
 
@@ -1540,7 +1515,6 @@ ni6_input(m, off)
 	int addrs;		/* for NI_QTYPE_NODEADDR */
 	struct ifnet *ifp = NULL; /* for NI_QTYPE_NODEADDR */
 	struct sockaddr_in6 sin6_sbj; /* subject address */
-	struct sockaddr_in6 sin6_d;
 	struct ip6_hdr *ip6;
 	int oldfqdn = 0;	/* if 1, return pascal string (03 draft) */
 	char *subj = NULL;
@@ -1556,9 +1530,6 @@ ni6_input(m, off)
 		return (NULL);
 	}
 #endif
-
-	if (ip6_getpktaddrs(m, NULL, &sin6_d))
-		goto bad;
 
 	/*
 	 * Validate IPv6 destination address.
@@ -1648,7 +1619,8 @@ ni6_input(m, off)
 				goto bad; /* XXX should not happen */
 
 			subj = (char *)&sin6_sbj;
-			if (SA6_ARE_ADDR_EQUAL(&sin6_sbj, &sin6_d))
+			if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
+			    &sin6_sbj.sin6_addr))
 				break;
 
 			/*
@@ -2295,21 +2267,19 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
  * XXX almost dup'ed code with rip6_input.
  */
 static int
-icmp6_rip6_input(mp, off, src, dst)
+icmp6_rip6_input(mp, off)
 	struct mbuf **mp;
 	int off;
-	struct sockaddr_in6 *src, *dst;
 {
 	struct mbuf *m = *mp;
-#ifndef PULLDOWN_TEST
-	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-#endif
+	struct ip6_hdr *ip6;
 	struct in6pcb *in6p;
 	struct in6pcb *last = NULL;
 	struct sockaddr_in6 fromsa;
 	struct icmp6_hdr *icmp6;
 	struct mbuf *opts = NULL;
 
+	ip6 = mtod(m, struct ip6_hdr *);
 #ifndef PULLDOWN_TEST
 	/* this is assumed to be safe. */
 	icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
@@ -2325,10 +2295,13 @@ icmp6_rip6_input(mp, off, src, dst)
 	 * XXX: the address may have embedded scope zone ID, which should be
 	 * hidden from applications.
 	 */
-	fromsa = *src;
-#ifndef SCOPEDROUTING
-	in6_clearscope(&fromsa.sin6_addr);
-#endif
+	bzero(&fromsa, sizeof(fromsa));
+	fromsa.sin6_family = AF_INET6;
+	fromsa.sin6_len = sizeof(struct sockaddr_in6);
+	if (in6_recoverscope(&fromsa, &ip6->ip6_src, m->m_pkthdr.rcvif) != 0) {
+		m_freem(m);
+		return (IPPROTO_DONE);
+	}
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	LIST_FOREACH(in6p, &ripcb, inp_list)
@@ -2357,11 +2330,11 @@ icmp6_rip6_input(mp, off, src, dst)
 		if (in6p->in6p_ip6.ip6_nxt != IPPROTO_ICMPV6)
 #endif
 			continue;
-		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa) &&
-		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr) &&
+		    !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &ip6->ip6_dst))
 			continue;
-		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa) &&
-		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, src))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr) &&
+		    !IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &ip6->ip6_src))
 			continue;
 		if (in6p->in6p_icmp6filt &&
 		    ICMP6_FILTER_WILLBLOCK(icmp6->icmp6_type,
@@ -2490,10 +2463,8 @@ icmp6_reflect(m, off)
 	int plen;
 	int type, code;
 	struct ifnet *outif = NULL;
-	struct sockaddr_in6 *src = NULL, dst, osrc, odst;
-#ifndef SCOPEDROUTING
-	struct sockaddr_in6 src_storage;
-#endif
+	struct in6_addr t, *src = NULL;
+
 	/* too short to reflect */
 	if (off < sizeof(struct ip6_hdr)) {
 		nd6log((LOG_DEBUG,
@@ -2532,14 +2503,19 @@ icmp6_reflect(m, off)
 				return;
 		}
 	}
-	if (ip6_getpktaddrs(m, &osrc, &odst))
-		goto bad;
 	plen = m->m_pkthdr.len - sizeof(struct ip6_hdr);
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	icmp6 = (struct icmp6_hdr *)(ip6 + 1);
 	type = icmp6->icmp6_type; /* keep type for statistics */
 	code = icmp6->icmp6_code; /* ditto. */
+
+	t = ip6->ip6_dst;
+	/*
+	 * ip6_input() drops a packet if its src is multicast.
+	 * So, the src is never multicast.
+	 */
+	ip6->ip6_dst = ip6->ip6_src;
 
 	/*
 	 * If the incoming packet was addressed directly to us (i.e. unicast),
@@ -2551,29 +2527,20 @@ icmp6_reflect(m, off)
 	 * procedure of an outgoing packet of our own, in which case we need
 	 * to search in the ifaddr list.
 	 */
-	if (!IN6_IS_ADDR_MULTICAST(&odst.sin6_addr)) {
+	if (!IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {	/* just to be sure */
 		if ((ia = ip6_getdstifaddr(m))) {
 			if (!(ia->ia6_flags &
 			    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY)))
-				src = &ia->ia_addr;
-		} else {
-#ifndef SCOPEDROUTING		/* XXX: ifa_ifwithaddr expects 0 */
-			struct sockaddr_in6 d = odst;
-
-			d.sin6_scope_id = 0;
-			ia = (struct in6_ifaddr *)
-			    ifa_ifwithaddr((struct sockaddr *)&d);
-#else
-			ia = (struct in6_ifaddr *)
-			    ifa_ifwithaddr((struct sockaddr *)&odst);
-#endif
-			if (ia &&
-			    !(ia->ia6_flags &
-			      (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY))) {
-				src = &ia->ia_addr;
-			}
+				src = &ia->ia_addr.sin6_addr;
+		} else if (IN6_IS_ADDR_LINKLOCAL(&t) && (m->m_flags & M_LOOP)) {
+			/*
+			 * This is the case if the dst is our link-local address
+			 * and the sender is also ourselves.
+			 */
+			src = &t;
 		}
 	}
+
 	if (src == NULL) {
 		int e;
 #ifdef NEW_STRUCT_ROUTE
@@ -2588,7 +2555,8 @@ icmp6_reflect(m, off)
 		 * source address of the erroneous packet.
 		 */
 		bzero(&ro, sizeof(ro));
-		src = in6_selectsrc(&osrc, NULL, NULL, &ro, NULL, &outif, &e);
+		src = in6_selectsrc(&ip6->ip6_dst, NULL, NULL, &ro, NULL,
+		    &outif, &e);
 		if (ro.ro_rt) { /* XXX: see comments in icmp6_mtudisc_update */
 			RTFREE(ro.ro_rt); /* XXX: we could use this */
 		}
@@ -2596,23 +2564,10 @@ icmp6_reflect(m, off)
 			nd6log((LOG_DEBUG,
 			    "icmp6_reflect: source can't be determined: "
 			    "dst=%s, error=%d\n",
-			    ip6_sprintf(&osrc.sin6_addr), e));
+			    ip6_sprintf(&ip6->ip6_dst), e));
 			goto bad;
 		}
 	}
-#ifndef SCOPEDROUTING
-	/*
-	 * XXX: src may not have a valid sin6_scope_id in
-	 * the non-SCOPEDROUTING case.
-	 */
-	bzero(&src_storage, sizeof(src_storage));
-	src_storage.sin6_family = AF_INET6;
-	src_storage.sin6_len = sizeof(src_storage);
-	if ((in6_recoverscope(&src_storage, &src->sin6_addr, NULL)) != 0)
-		goto bad;
-	src_storage.sin6_addr = src->sin6_addr;	/* XXX */
-	src = &src_storage;
-#endif
 
 	/*
 	 * ip6_input() drops a packet if its src is multicast.
@@ -2621,14 +2576,7 @@ icmp6_reflect(m, off)
 	 * We should make a copy of osrc because we're going to update
 	 * the content of the pointer in ip6_setpktaddrs().
 	 */
-	dst = osrc;
-	ip6->ip6_src = src->sin6_addr;
-	ip6->ip6_dst = dst.sin6_addr;
-
-	/* update the record address information */
-	if (!ip6_setpktaddrs(m, src, &dst))
-		goto bad;
-
+	ip6->ip6_src = *src;
 	ip6->ip6_flow = 0;
 	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
 	ip6->ip6_vfc |= IPV6_VERSION;
@@ -2696,17 +2644,15 @@ icmp6_slowtimo()
 
 static const char *
 icmp6_redirect_diag(src6, dst6, tgt6)
-	struct sockaddr_in6 *src6, *dst6, *tgt6;
+	struct in6_addr *src6, *dst6, *tgt6;
 {
 	static char buf[1024];
 #ifndef __bsdi__
 	snprintf(buf, sizeof(buf), "(src=%s dst=%s tgt=%s)",
-	    ip6_sprintf(&src6->sin6_addr), ip6_sprintf(&dst6->sin6_addr),
-	    ip6_sprintf(&tgt6->sin6_addr));
+	    ip6_sprintf(src6), ip6_sprintf(dst6), ip6_sprintf(tgt6));
 #else
 	sprintf(buf, "(src=%s dst=%s tgt=%s)",
-	    ip6_sprintf(&src6->sin6_addr), ip6_sprintf(&dst6->sin6_addr),
-	    ip6_sprintf(&tgt6->sin6_addr));
+	    ip6_sprintf(src6), ip6_sprintf(dst6), ip6_sprintf(tgt6));
 #endif
 	return buf;
 }
@@ -2727,8 +2673,11 @@ icmp6_redirect_input(m, off)
 	struct rtentry *rt = NULL;
 	int is_router;
 	int is_onlink;
-	struct sockaddr_in6 src_sa, reddst6, redtgt6, rodst;
+	struct in6_addr src6;
+	struct in6_addr reddst6, redtgt6;
+	struct sockaddr_in6 rodst, sin6;
 	union nd_opts ndopts;
+	u_int32_t zone;
 
 	if (!ifp)
 		return;
@@ -2738,6 +2687,8 @@ icmp6_redirect_input(m, off)
 		goto freeit;
 	if (!icmp6_rediraccept)
 		goto freeit;
+
+	src6 = ip6->ip6_src;
 
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, icmp6len,);
@@ -2750,91 +2701,72 @@ icmp6_redirect_input(m, off)
 	}
 #endif
 
-	/*
-	 * extract address parameters from the packet and convert them to a
-	 * sockaddr_in6 form.
-	 */
-	if (ip6_getpktaddrs(m, &src_sa, NULL))
+	redtgt6 = nd_rd->nd_rd_target;
+	reddst6 = nd_rd->nd_rd_dst;
+	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &redtgt6, &zone) != 0)
 		goto freeit;
-	bzero(&redtgt6, sizeof(redtgt6));
-	bzero(&reddst6, sizeof(reddst6));
-	redtgt6.sin6_family = reddst6.sin6_family = AF_INET6;
-	redtgt6.sin6_len = reddst6.sin6_len = sizeof(struct sockaddr_in6);
-	redtgt6.sin6_addr = nd_rd->nd_rd_target;
-	reddst6.sin6_addr = nd_rd->nd_rd_dst;
-	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &redtgt6.sin6_addr,
-	    &redtgt6.sin6_scope_id) ||
-	    in6_addr2zoneid(m->m_pkthdr.rcvif, &reddst6.sin6_addr,
-	    &reddst6.sin6_scope_id)) {
-		goto freeit;	/* XXX impossible */
-	}
-	if (in6_embedscope(&redtgt6.sin6_addr, &redtgt6) ||
-	    in6_embedscope(&reddst6.sin6_addr, &reddst6)) {
-		goto freeit;	/* XXX impossible */
-	}
+	if (IN6_IS_ADDR_LINKLOCAL(&redtgt6))
+		redtgt6.s6_addr16[1] = htons(zone);
+	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &reddst6, &zone) != 0)
+		goto freeit;
+	if (IN6_IS_ADDR_LINKLOCAL(&reddst6))
+		reddst6.s6_addr16[1] = htons(zone);
 
 	/* validation */
-	if (!IN6_IS_ADDR_LINKLOCAL(&src_sa.sin6_addr)) {
+	if (!IN6_IS_ADDR_LINKLOCAL(&src6)) {
 		nd6log((LOG_ERR,
 		    "ICMP6 redirect sent from %s rejected; "
 		    "must be from linklocal\n",
-		    ip6_sprintf(&src_sa.sin6_addr)));
+		    ip6_sprintf(&src6)));
 		goto bad;
 	}
 	if (ip6->ip6_hlim != 255) {
 		nd6log((LOG_ERR,
 		    "ICMP6 redirect sent from %s rejected; "
 		    "hlim=%d (must be 255)\n",
-		    ip6_sprintf(&src_sa.sin6_addr), ip6->ip6_hlim));
+		    ip6_sprintf(&src6), ip6->ip6_hlim));
 		goto bad;
 	}
 
-	if (IN6_IS_ADDR_MULTICAST(&reddst6.sin6_addr)) {
+	if (IN6_IS_ADDR_MULTICAST(&reddst6)) {
 		nd6log((LOG_ERR,
 		    "ICMP6 redirect rejected; "
 		    "redirect dst must be unicast: %s\n",
-		    icmp6_redirect_diag(&src_sa, &reddst6, &redtgt6)));
+		    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
 		goto bad;
 	}
 
 	/* ip6->ip6_src must be equal to gw for icmp6->icmp6_reddst */
-	rodst = reddst6; /* XXX: we don't need rodst if SCOPEDROUTING */
-#ifndef SCOPEDROUTING
-	rodst.sin6_scope_id = 0;
-#endif
+	bzero(&rodst, sizeof(rodst));
+	rodst.sin6_family = AF_INET6;
+	rodst.sin6_len = sizeof(struct sockaddr_in6);
+	rodst.sin6_addr = reddst6;
 #ifndef __FreeBSD__
 	rt = rtalloc1((struct sockaddr *)&rodst, 0);
 #else
 	rt = rtalloc1((struct sockaddr *)&rodst, 0, 0UL);
 #endif
 	if (rt) {
-		struct sockaddr_in6 *gw6;
+		struct in6_addr *gw6;
 
 		if (rt->rt_gateway == NULL ||
 		    rt->rt_gateway->sa_family != AF_INET6) {
 			nd6log((LOG_ERR,
 			    "ICMP6 redirect rejected; no route "
 			    "with inet6 gateway found for redirect dst: %s\n",
-			    icmp6_redirect_diag(&src_sa, &reddst6, &redtgt6)));
+			    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
 			RTFREE(rt);
 			goto bad;
 		}
 
-		gw6 = (struct sockaddr_in6 *)rt->rt_gateway;
-		if (
-#ifdef SCOPEDROUTING
-			!SA6_ARE_ADDR_EQUAL(gw6, &src_sa)
-#else
-			!IN6_ARE_ADDR_EQUAL(&gw6->sin6_addr,
-					    &src_sa.sin6_addr)
-#endif
-			) {
+		gw6 = &((struct sockaddr_in6 *)rt->rt_gateway)->sin6_addr;
+		if (!IN6_ARE_ADDR_EQUAL(gw6, &src6)) {
 			nd6log((LOG_ERR,
 			    "ICMP6 redirect rejected; "
 			    "not equal to gw-for-src=%s (must be same): "
 			    "%s\n",
-			    ip6_sprintf(&gw6->sin6_addr),
-			    icmp6_redirect_diag(&src_sa, &reddst6, &redtgt6)));
+			    ip6_sprintf(gw6),
+			    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
 			RTFREE(rt);
 			goto bad;
 		}
@@ -2842,22 +2774,22 @@ icmp6_redirect_input(m, off)
 		nd6log((LOG_ERR,
 		    "ICMP6 redirect rejected; "
 		    "no route found for redirect dst: %s\n",
-		    icmp6_redirect_diag(&src_sa, &reddst6, &redtgt6)));
+		    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
 		goto bad;
 	}
 	RTFREE(rt);
 	rt = NULL;
 
 	is_router = is_onlink = 0;
-	if (IN6_IS_ADDR_LINKLOCAL(&redtgt6.sin6_addr))
+	if (IN6_IS_ADDR_LINKLOCAL(&redtgt6))
 		is_router = 1;	/* router case */
-	if (SA6_ARE_ADDR_EQUAL(&redtgt6, &reddst6))
+	if (IN6_ARE_ADDR_EQUAL(&redtgt6, &reddst6))
 		is_onlink = 1;	/* on-link destination case */
 	if (!is_router && !is_onlink) {
 		nd6log((LOG_ERR,
 		    "ICMP6 redirect rejected; "
 		    "neither router case nor onlink case: %s\n",
-		    icmp6_redirect_diag(&src_sa, &reddst6, &redtgt6)));
+		    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
 		goto bad;
 	}
 	/* validation passed */
@@ -2867,7 +2799,7 @@ icmp6_redirect_input(m, off)
 	if (nd6_options(&ndopts) < 0) {
 		nd6log((LOG_INFO, "icmp6_redirect_input: "
 		    "invalid ND option, rejected: %s\n",
-		    icmp6_redirect_diag(&src_sa, &reddst6, &redtgt6)));
+		    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
 		/* nd6_options have incremented stats */
 		goto freeit;
 	}
@@ -2886,9 +2818,8 @@ icmp6_redirect_input(m, off)
 		nd6log((LOG_INFO,
 		    "icmp6_redirect_input: lladdrlen mismatch for %s "
 		    "(if %d, icmp6 packet %d): %s\n",
-		    ip6_sprintf(&redtgt6.sin6_addr),
-		    ifp->if_addrlen, lladdrlen - 2,
-		    icmp6_redirect_diag(&src_sa, &reddst6, &redtgt6)));
+		    ip6_sprintf(&redtgt6), ifp->if_addrlen, lladdrlen - 2,
+		    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
 		goto bad;
 	}
 
@@ -2929,13 +2860,16 @@ icmp6_redirect_input(m, off)
 		}
 #endif
 
-		sgw = redtgt6;
-		sdst = reddst6;
-		ssrc = src_sa;
-#ifndef SCOPEDROUTING		/* XXX */
-		sgw.sin6_scope_id = sdst.sin6_scope_id =
-		    ssrc.sin6_scope_id = 0;
-#endif
+		bzero(&sgw, sizeof(sgw));
+		bzero(&sdst, sizeof(sdst));
+		bzero(&ssrc, sizeof(ssrc));
+		sgw.sin6_family = sdst.sin6_family = ssrc.sin6_family =
+		    AF_INET6;
+		sgw.sin6_len = sdst.sin6_len = ssrc.sin6_len =
+		    sizeof(struct sockaddr_in6);
+		sgw.sin6_addr = redtgt6;
+		sdst.sin6_addr = reddst6;
+		ssrc.sin6_addr = src6;
 
 		rtredirect((struct sockaddr *)&sdst, (struct sockaddr *)&sgw,
 		    (struct sockaddr *)NULL, RTF_GATEWAY | RTF_HOST,
@@ -2957,10 +2891,15 @@ icmp6_redirect_input(m, off)
 		}
 #endif
 	}
+
 	/* finally update cached route in each socket via pfctlinput */
-	pfctlinput(PRC_REDIRECT_HOST, (struct sockaddr *)&reddst6);
+	bzero(&sin6, sizeof(sin6));
+	sin6.sin6_family = AF_INET6;
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
+	sin6.sin6_addr = reddst6;
+	pfctlinput(PRC_REDIRECT_HOST, (struct sockaddr *)&sin6);
 #ifdef IPSEC
-	key_sa_routechange((struct sockaddr *)&reddst6);
+	key_sa_routechange((struct sockaddr *)&sin6);
 #endif
 
  freeit:
@@ -2978,10 +2917,7 @@ icmp6_redirect_output(m0, rt)
 	struct rtentry *rt;
 {
 	struct ifnet *ifp;	/* my outgoing interface */
-	struct sockaddr_in6 src_sa, dst_sa, *nexthop, *ifp_ll6;
-#ifndef SCOPEDROUTING
-	struct sockaddr_in6 ifp_ll6_storage;
-#endif
+	struct in6_addr *nexthop, *ifp_ll6;
 	struct ip6_hdr *sip6;	/* m0 as struct ip6_hdr */
 	struct mbuf *m = NULL;	/* newly allocated one */
 	struct ip6_hdr *ip6;	/* m as struct ip6_hdr */
@@ -3007,15 +2943,13 @@ icmp6_redirect_output(m0, rt)
 	 *  [RFC 2461, sec 8.2]
 	 */
 	sip6 = mtod(m0, struct ip6_hdr *);
-	if (ip6_getpktaddrs(m0, &src_sa, &dst_sa))
+	if (nd6_is_addr_neighbor(&sip6->ip6_src, ifp) == 0)
 		goto fail;
-	if (nd6_is_addr_neighbor(&src_sa, ifp) == 0)
-		goto fail;
-	if (IN6_IS_ADDR_MULTICAST(&dst_sa.sin6_addr))
+	if (IN6_IS_ADDR_MULTICAST(&sip6->ip6_dst))
 		goto fail;
 
 	/* rate limit */
-	if (icmp6_ratelimit(&src_sa.sin6_addr, ND_REDIRECT, 0))
+	if (icmp6_ratelimit(&sip6->ip6_src, ND_REDIRECT, 0))
 		goto fail;
 
 	/*
@@ -3046,24 +2980,12 @@ icmp6_redirect_output(m0, rt)
 	    IN6_IFF_NOTREADY | IN6_IFF_ANYCAST)) == NULL) {
 		goto fail;
 	}
-	ifp_ll6 = &ia->ia_addr;
-#ifndef SCOPEDROUTING
-	/*
-	 * XXX: ifp_ll6 may not have a valid sin6_scope_id in
-	 * the non-SCOPEDROUTING case.
-	 */
-	ifp_ll6_storage = *ifp_ll6;
-	if (in6_addr2zoneid(ifp, &ifp_ll6_storage.sin6_addr,
-			    &ifp_ll6_storage.sin6_scope_id)) {
-			goto fail;
-	}
-	ifp_ll6 = &ifp_ll6_storage;
-#endif
+	ifp_ll6 = &ia->ia_addr.sin6_addr;
 
 	/* get ip6 linklocal address for the router. */
 	if (rt->rt_gateway && (rt->rt_flags & RTF_GATEWAY)) {
-		nexthop = (struct sockaddr_in6 *)rt->rt_gateway;
-		if (!IN6_IS_ADDR_LINKLOCAL(&nexthop->sin6_addr))
+		nexthop = &((struct sockaddr_in6 *)rt->rt_gateway)->sin6_addr;
+		if (!IN6_IS_ADDR_LINKLOCAL(nexthop))
 			nexthop = NULL;
 	} else
 		nexthop = NULL;
@@ -3077,11 +2999,8 @@ icmp6_redirect_output(m0, rt)
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	ip6->ip6_hlim = 255;
 	/* ip6->ip6_src must be linklocal addr for my outgoing if. */
-	bcopy(&ifp_ll6->sin6_addr, &ip6->ip6_src, sizeof(struct in6_addr));
-	bcopy(&src_sa.sin6_addr, &ip6->ip6_dst, sizeof(struct in6_addr));
-	/* set the packet addresses in a sockaddr_in6 form */
-	if (!ip6_setpktaddrs(m, ifp_ll6, &src_sa))
-		goto fail;
+	bcopy(&ifp_ll6, &ip6->ip6_src, sizeof(struct in6_addr));
+	bcopy(&sip6->ip6_src, &ip6->ip6_dst, sizeof(struct in6_addr));
 
 	/* ND Redirect */
 	nd_rd = (struct nd_redirect *)(ip6 + 1);
@@ -3095,16 +3014,16 @@ icmp6_redirect_output(m0, rt)
 		 */
 		if (!nexthop)
 			goto fail;
-		bcopy(&nexthop->sin6_addr, &nd_rd->nd_rd_target,
+		bcopy(&nexthop, &nd_rd->nd_rd_target,
 		    sizeof(nd_rd->nd_rd_target));
-		bcopy(&dst_sa.sin6_addr, &nd_rd->nd_rd_dst,
+		bcopy(&sip6->ip6_dst, &nd_rd->nd_rd_dst,
 		    sizeof(nd_rd->nd_rd_dst));
 	} else {
 		/* make sure redtgt == reddst */
-		nexthop = &dst_sa;
-		bcopy(&dst_sa.sin6_addr, &nd_rd->nd_rd_target,
+		nexthop = &sip6->ip6_dst;
+		bcopy(&sip6->ip6_dst, &nd_rd->nd_rd_target,
 		    sizeof(nd_rd->nd_rd_target));
-		bcopy(&dst_sa.sin6_addr, &nd_rd->nd_rd_dst,
+		bcopy(&sip6->ip6_dst, &nd_rd->nd_rd_dst,
 		    sizeof(nd_rd->nd_rd_dst));
 	}
 
@@ -3423,7 +3342,6 @@ icmp6_recover_src(m)
 {
 	int off, nxt, finished = 0;
 	struct ip6_hdr *oip6;
-	struct sockaddr_in6 src_sa;
 	struct ip6_ext *exts;
 	struct ip6_dest *dstopts;
 	int dstoptlen;
@@ -3443,10 +3361,6 @@ icmp6_recover_src(m)
 		goto bad;
 	}
 #endif
-	if (ip6_getpktaddrs(m, &src_sa, NULL)) {
-		error = EINVAL; /* XXX ? */
-		goto bad;
-	}
 
 	off = sizeof(struct ip6_hdr);
 	nxt = oip6->ip6_nxt;
@@ -3509,15 +3423,11 @@ icmp6_recover_src(m)
 					/* swap */
 					bcopy(haopt->ip6oh_addr, &t,
 					      sizeof(haopt->ip6oh_addr));
-					bcopy(&src_sa.sin6_addr,
+					bcopy(&oip6->ip6_src,
 					      haopt->ip6oh_addr,
-					      sizeof(src_sa.sin6_addr));
-					bcopy(&t, &src_sa.sin6_addr,
-					      sizeof(t));
+					      sizeof(oip6->ip6_src));
 					bcopy(&t, &oip6->ip6_src,
 					      sizeof(t));
-					if(!ip6_setpktaddrs(m, &src_sa, NULL))
-						goto bad;
 					finished = 1;
 					break;
 				default:
