@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2282 2002/11/17 16:31:56 itojun Exp $
+$KAME: CHANGELOG,v 1.2283 2002/12/01 15:52:45 fujisawa Exp $
 
 <200211>
+2002-11-29  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_dispatch.c: Changed a way of cv6->plen
+	  calculation.  There is a case m->m_len is greater than real
+	  packet size calculated from ipv6 header.
+	* kame/sys/netinet6/natpt_trans.c: Support FTP connection from v4
+	  client to v6 server with passive mode.
+
 Mon Nov 18 01:31:07 JST 2002  itojun@iijlab.net
 	* sys/net/if_stf.c: more strict sanity check based on suggestions in
 	  draft-savola-v6ops-6to4-security-00.txt.
