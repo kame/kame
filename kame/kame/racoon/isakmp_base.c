@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.2 2000/01/09 22:59:35 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.3 2000/01/09 23:52:30 itojun Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -69,7 +69,6 @@
 #include "isakmp_inf.h"
 
 static vchar_t *base_ir2sendmx __P((struct ph1handle *));
-static vchar_t *base_ir3sendmx __P((struct ph1handle *));
 
 /* %%%
  * begin Identity Protection Mode as initiator.
