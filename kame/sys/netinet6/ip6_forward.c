@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.124 2003/08/07 08:45:43 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.125 2003/10/02 12:11:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -463,8 +463,10 @@ ip6_forward(m, srcrt)
 #endif /* MIP6 && MIP6_HOME_AGENT */
 
 #ifdef IPSEC
-    if (!ipsecrt) {
+	if (ipsecrt)
+		goto skip_routing;
 #endif
+
 	dst = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
 	if (!srcrt) {
 		/* ip6_forward_rt.ro_dst.sin6_addr is equal to ip6->ip6_dst */
@@ -529,7 +531,7 @@ ip6_forward(m, srcrt)
 	}
 	rt = ip6_forward_rt.ro_rt;
 #ifdef IPSEC
-    }
+    skip_routing:;
 #endif
 
 	/*
