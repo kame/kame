@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.69 2002/05/14 11:16:10 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.70 2002/05/29 10:06:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1119,7 +1119,7 @@ fix_portstr(spec, sport, dport)
 	vchar_t *spec, *sport, *dport;
 {
 	char *p, *p2;
-	int l;
+	u_int l;
 
 	l = 0;
 	for (p = spec->buf; *p != ',' && *p != '\0' && l < spec->len; p++, l++)
