@@ -32,11 +32,6 @@
 BINDIR=	${PREFIX}/bin
 PROG=	mcastread
 
-.if (${OPSYS} != "NetBSD")
-CFLAGS+=-DINET6
-.else
-CPPFLAGS+=-DINET6
-.endif
 CFLAGS+=-Wall
 .if exists(/usr/local/v6/lib/libinet6.a)
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
