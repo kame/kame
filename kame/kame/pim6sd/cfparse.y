@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.16 2001/07/31 13:36:41 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.17 2001/07/31 13:57:30 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -1171,8 +1171,6 @@ cf_init(s, d)
 
 	strict = s;
 	debugonly = d;
-
-	debug = 0;
 
 	rp_attr = bsr_attr = grp_prefix = regthres_attr	= datathres_attr = NULL;
 

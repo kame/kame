@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1824 2001/07/29 14:25:10 itojun Exp $
+$KAME: CHANGELOG,v 1.1825 2001/07/31 13:57:28 suz Exp $
 
 <200107>
+Tue Jul 31 22:54:57 JST 2001	suz@sdl.hitachi.co.jp
+	* kame/kame/pim6sd/cfparse.y: command-line debug-option works now.
+
 2001-07-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/(several files): several improvements on the
 	IPv6 output routine:
