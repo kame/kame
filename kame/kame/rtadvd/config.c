@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.22 2000/11/08 12:00:58 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.23 2000/11/11 06:57:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -233,6 +233,15 @@ getconfig(intface)
 #endif
 
 	/* prefix information */
+
+	/*
+	 * This is an implementation specific parameter to consinder
+	 * link propagation delays and poorly synchronized clocks when
+	 * checking consistency of advertised lifetimes.
+	 */
+	MAYHAVE(val, "clockskew", 0);
+	tmp->clockskew = val;
+
 	if ((pfxs = agetnum("addrs")) < 0) {
 		/* auto configure prefix information */
 		if (agetstr("addr", &bp) || agetstr("addr1", &bp)) {

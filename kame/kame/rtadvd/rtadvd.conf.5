@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.15 2000/11/11 03:54:51 itojun Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.16 2000/11/11 06:57:22 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -138,6 +138,15 @@ These items can be omitted, then
 will automatically get appropriate prefixes from the kernel's routing table,
 and advertise the prefixes with the default parameters.
 .Bl -tag -width indent
+.It Cm \&clockskew
+(num) Time skew to adjust link propagation delays and clock skews
+betwen routers on the link
+.Pq unit: seconds .
+This value is used in consistency check for locally-configured and
+advertised prefix lifetimes, and has its meaning when the local router
+configures a prefix on the link with a lifetime that decrements in
+real time. If the value is 0, it means the consistency check will be skipped
+for such prefixes. The default value is 0.
 .It Cm \&addrs
 (num) Number of prefixes.
 Its default is 0, so it must explicitly be set to positve values

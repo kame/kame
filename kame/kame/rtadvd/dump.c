@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.14 2000/11/09 15:44:36 itojun Exp $	*/
+/*	$KAME: dump.c,v 1.15 2000/11/11 06:57:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -157,6 +157,9 @@ if_dump()
 			rai->hapref, rai->hatime);
 #endif 
 
+		if (rai->clockskew)
+			fprintf(fp, "  Clock skew: %ldsec\n",
+				rai->clockskew);  
 		for (first = 1, pfx = rai->prefix.next; pfx != &rai->prefix;
 		     pfx = pfx->next) {
 			if (first) {

@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.43 2000/11/09 15:44:36 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.44 2000/11/11 06:57:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -73,6 +73,7 @@ struct iovec rcviov[2];
 struct iovec sndiov[2];
 struct sockaddr_in6 from;
 struct sockaddr_in6 sin6_allnodes = {sizeof(sin6_allnodes), AF_INET6};
+struct in6_addr in6a_site_allrouters;
 static char *dumpfilename = "/var/run/rtadvd.dump"; /* XXX: should be configurable */
 static char *pidfilename = "/var/run/rtadvd.pid"; /* should be configurable */
 static char *mcastif;
@@ -908,7 +909,7 @@ ra_input(int len, struct nd_router_advert *ra,
 	/* Cur Hop Limit value */
 	if (ra->nd_ra_curhoplimit && rai->hoplimit &&
 	    ra->nd_ra_curhoplimit != rai->hoplimit) {
-		syslog(LOG_WARNING,
+		syslog(LOG_INFO,
 		       "<%s> CurHopLimit inconsistent on %s:"
 		       " %d from %s, %d from us",
 		       __FUNCTION__,
@@ -922,7 +923,7 @@ ra_input(int len, struct nd_router_advert *ra,
 	/* M flag */
 	if ((ra->nd_ra_flags_reserved & ND_RA_FLAG_MANAGED) !=
 	    rai->managedflg) {
-		syslog(LOG_WARNING,
+		syslog(LOG_INFO,
 		       "<%s> M flag inconsistent on %s:"
 		       " %s from %s, %s from us",
 		       __FUNCTION__,
@@ -936,7 +937,7 @@ ra_input(int len, struct nd_router_advert *ra,
 	/* O flag */
 	if ((ra->nd_ra_flags_reserved & ND_RA_FLAG_OTHER) !=
 	    rai->otherflg) {
-		syslog(LOG_WARNING,
+		syslog(LOG_INFO,
 		       "<%s> O flag inconsistent on %s:"
 		       " %s from %s, %s from us",
 		       __FUNCTION__,
@@ -951,7 +952,7 @@ ra_input(int len, struct nd_router_advert *ra,
 	reachabletime = ntohl(ra->nd_ra_reachable);
 	if (reachabletime && rai->reachabletime &&
 	    reachabletime != rai->reachabletime) {
-		syslog(LOG_WARNING,
+		syslog(LOG_INFO,
 		       "<%s> ReachableTime inconsistent on %s:"
 		       " %d from %s, %d from us",
 		       __FUNCTION__,
@@ -966,7 +967,7 @@ ra_input(int len, struct nd_router_advert *ra,
 	retranstimer = ntohl(ra->nd_ra_retransmit);
 	if (retranstimer && rai->retranstimer &&
 	    retranstimer != rai->retranstimer) {
-		syslog(LOG_WARNING,
+		syslog(LOG_INFO,
 		       "<%s> RetranceTimer inconsistent on %s:"
 		       " %d from %s, %d from us",
 		       __FUNCTION__,
@@ -981,7 +982,7 @@ ra_input(int len, struct nd_router_advert *ra,
 	if (ndopts.nd_opts_mtu) {
 		mtu = ntohl(ndopts.nd_opts_mtu->nd_opt_mtu_mtu);
 		if (mtu && rai->linkmtu && mtu != rai->linkmtu) {
-			syslog(LOG_WARNING,
+			syslog(LOG_INFO,
 			       "<%s> MTU option value inconsistent on %s:"
 			       " %d from %s, %d from us",
 			       __FUNCTION__,
@@ -995,7 +996,7 @@ ra_input(int len, struct nd_router_advert *ra,
 	/* Preferred and Valid Lifetimes for prefixes */
 	{
 		struct nd_optlist *optp = ndopts.nd_opts_list;
-		
+
 		if (ndopts.nd_opts_pi) {
 			if (prefix_check(ndopts.nd_opts_pi, rai, from))
 				inconsistent++;
@@ -1008,10 +1009,8 @@ ra_input(int len, struct nd_router_advert *ra,
 		}
 	}
 
-	if (inconsistent) {
-		printf("RA input %d inconsistents\n", inconsistent);
+	if (inconsistent)
 		rai->rainconsistent++;
-	}
 	
   done:
 	free_ndopts(&ndopts);
@@ -1027,6 +1026,7 @@ prefix_check(struct nd_opt_prefix_info *pinfo,
 	struct prefix *pp;
 	int inconsistent = 0;
 	u_char ntopbuf[INET6_ADDRSTRLEN], prefixbuf[INET6_ADDRSTRLEN];
+	struct timeval now;
 
 #if 0				/* impossible */
 	if (pinfo->nd_opt_pi_type != ND_OPT_PREFIX_INFORMATION)
@@ -1064,8 +1064,36 @@ prefix_check(struct nd_opt_prefix_info *pinfo,
 	}
 
 	preferred_time = ntohl(pinfo->nd_opt_pi_preferred_time);
-	if (preferred_time != pp->preflifetime) {
-		syslog(LOG_WARNING,
+	if (pp->pltimeexpire) {
+		/*
+		 * The lifetime is decremented in real time, so we should
+		 * compare the expiration time.
+		 * (RFC 2461 Section 6.2.7.)
+		 * XXX: can we really expect that all routers on the link
+		 * have synchronized clocks?
+		 */
+		gettimeofday(&now, NULL);
+		preferred_time += now.tv_sec;
+
+		if (rai->clockskew &&
+		    abs(preferred_time - pp->pltimeexpire) > rai->clockskew) {
+			syslog(LOG_INFO,
+			       "<%s> prefeerred lifetime for %s/%d"
+			       " (decr. in real time) inconsistent on %s:"
+			       " %d from %s, %d from us",
+			       __FUNCTION__,
+			       inet_ntop(AF_INET6, &pinfo->nd_opt_pi_prefix,
+					 prefixbuf, INET6_ADDRSTRLEN),
+			       pinfo->nd_opt_pi_prefix_len,
+			       rai->ifname, preferred_time,
+			       inet_ntop(AF_INET6, &from->sin6_addr,
+					 ntopbuf, INET6_ADDRSTRLEN),
+			       pp->pltimeexpire);
+			inconsistent++;
+		}
+	}
+	else if (preferred_time != pp->preflifetime) {
+		syslog(LOG_INFO,
 		       "<%s> prefeerred lifetime for %s/%d"
 		       " inconsistent on %s:"
 		       " %d from %s, %d from us",
@@ -1077,12 +1105,32 @@ prefix_check(struct nd_opt_prefix_info *pinfo,
 		       inet_ntop(AF_INET6, &from->sin6_addr,
 				 ntopbuf, INET6_ADDRSTRLEN),
 		       pp->preflifetime);
-		inconsistent++;
 	}
 
 	valid_time = ntohl(pinfo->nd_opt_pi_valid_time);
-	if (valid_time != pp->validlifetime) {
-		syslog(LOG_WARNING,
+	if (pp->vltimeexpire) {
+		gettimeofday(&now, NULL);
+		valid_time += now.tv_sec;
+
+		if (rai->clockskew &&
+		    abs(valid_time - pp->vltimeexpire) > rai->clockskew) {
+			syslog(LOG_INFO,
+			       "<%s> valid lifetime for %s/%d"
+			       " (decr. in real time) inconsistent on %s:"
+			       " %d from %s, %d from us",
+			       __FUNCTION__,
+			       inet_ntop(AF_INET6, &pinfo->nd_opt_pi_prefix,
+					 prefixbuf, INET6_ADDRSTRLEN),
+			       pinfo->nd_opt_pi_prefix_len,
+			       rai->ifname, preferred_time,
+			       inet_ntop(AF_INET6, &from->sin6_addr,
+					 ntopbuf, INET6_ADDRSTRLEN),
+			       pp->vltimeexpire);
+			inconsistent++;
+		}
+	}
+	else if (valid_time != pp->validlifetime) {
+		syslog(LOG_INFO,
 		       "<%s> valid lifetime for %s/%d"
 		       " inconsistent on %s:"
 		       " %d from %s, %d from us",
@@ -1337,14 +1385,14 @@ sock_open()
 	/*
 	 * When attending router renumbering, join all-sites multicast group. 
 	 */
-	if (inet_pton(AF_INET6, ALLROUTERS_SITE,
-		      &mreq.ipv6mr_multiaddr.s6_addr)
-	    != 1) {
-		syslog(LOG_ERR, "<%s> inet_pton failed(library bug?)",
-		       __FUNCTION__);
-		exit(1);
-	}
 	if (accept_rr) {
+		if (inet_pton(AF_INET6, ALLROUTERS_SITE,
+			      &in6a_site_allrouters) != 1) {
+			syslog(LOG_ERR, "<%s> inet_pton failed(library bug?)",
+			       __FUNCTION__);
+			exit(1);
+		}
+		mreq.ipv6mr_multiaddr = in6a_site_allrouters;
 		if (mcastif) {
 			if ((mreq.ipv6mr_interface = if_nametoindex(mcastif))
 			    == 0) {

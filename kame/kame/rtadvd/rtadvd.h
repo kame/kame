@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.13 2000/11/08 07:08:46 jinmei Exp $	*/
+/*	$KAME: rtadvd.h,v 1.14 2000/11/11 06:57:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -124,6 +124,7 @@ struct	rainfo {
 	u_int	hoplimit;	/* AdvCurHopLimit */
 	struct prefix prefix;	/* AdvPrefixList(link head) */
 	int	pfxs;		/* number of prefixes */
+	long	clockskew;	/* used for consisitency check of lifetimes */
 
 #ifdef MIP6
 	u_short	hapref;		/* Home Agent Preference */
@@ -150,6 +151,7 @@ void ra_timer_update __P((void *, struct timeval *));
 int prefix_match __P((struct in6_addr *, int, struct in6_addr *, int));
 struct rainfo *if_indextorainfo __P((int));
 
+extern struct in6_addr in6a_site_allrouters;
 #ifdef MIP6
 extern int mobileip6;
 #endif
