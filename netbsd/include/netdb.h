@@ -231,8 +231,7 @@ struct addrinfo {
 #define	AI_NUMERICSERV	0x00000008 /* prevent service name resolution */
 /* valid flags for addrinfo */
 #define	AI_MASK \
-    (AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST | AI_NUMERICSERV | \
-     AI_ADDRCONFIG)
+    (AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST | AI_NUMERICSERV)
 #endif
 
 #if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 520
