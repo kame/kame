@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.124 2002/02/07 13:30:30 sumikawa Exp $
+$KAME: COVERAGE,v 1.125 2002/04/05 12:05:52 jinmei Exp $
 
 
 x: supported/integrated
@@ -45,7 +45,7 @@ faithd support in inetd
 		x	-	-	-	-	x	-
 
 IPv6 PMTUD DoS prevention
-		(*1)	(*1)	-	-	-	(*2)	(*2)
+		(*1)	(*1)	-	-	(*2)	(*2)	(*2)
     (*1) validates ICMPv6 too big by using TCP/connected UDP/ESP/AH connection
 	 table.  PMTUD does not work for other random protocols like ping6.
     (*2) validates ICMPv6 too big by presense of cloned route.  subject to
