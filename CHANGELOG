@@ -1,10 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.894 2000/05/17 14:58:47 itojun Exp $
+$Id: CHANGELOG,v 1.895 2000/05/17 17:18:22 sumikawa Exp $
 
 <200005>
 Wed May 17 23:58:14 JST 2000  itojun@iijlab.net
-	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 5/15 weekly snap.
+	* {netbsd/pkgsrc, freebsd3/ports}/net/{libpcap,tcpdump}: use 5/15
+	  weekly snap.
 
 Wed May 17 21:50:27 JST 2000 sakane@ydc.co.jp
 	* {freebsd[234],netbsd}/sys/netinet/ip_output.c:
