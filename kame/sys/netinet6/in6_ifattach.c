@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.156 2002/05/26 23:07:53 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.157 2002/05/26 23:12:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -851,7 +851,6 @@ in6_ifattach(ifp, altifp)
 	struct ifnet *ifp;
 	struct ifnet *altifp;	/* secondary EUI64 source */
 {
-	static size_t if_indexlim = 8;
 	struct in6_ifaddr *ia;
 	struct in6_addr in6;
 

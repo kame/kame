@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.5 2002/05/24 07:40:23 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.6 2002/05/26 23:12:55 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c,v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -2149,9 +2149,9 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 					sctp_mtu_size_reset(&tcb->asoc,rtp->ro_rt->rt_rmx.rmx_mtu);
 				}
 			} else if (ifp) {
-				if (nd_ifinfo[ifp->if_index].linkmtu && 
-				    (tcb->asoc.smallest_mtu > nd_ifinfo[ifp->if_index].linkmtu)){
-					sctp_mtu_size_reset(&tcb->asoc,nd_ifinfo[ifp->if_index].linkmtu);
+				if (NDI(ifp)->linkmtu && 
+				    (tcb->asoc.smallest_mtu > NDI(ifp)->linkmtu)){
+					sctp_mtu_size_reset(&tcb->asoc, NDI(ifp)->linkmtu);
 				}
 			}
 		}
