@@ -33,7 +33,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: defs.h,v 1.8 2000/07/20 10:09:59 itojun Exp $
+ *  $Id: defs.h,v 1.9 2000/10/05 22:20:38 itojun Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -322,7 +322,8 @@ extern void config_vifs_from_file   __P((void));
 /* debug.c */
 extern char     *packet_kind __P((u_int proto, u_int type, u_int code));
 extern int      debug_kind   __P((u_int proto, u_int type, u_int code));
-extern void     log          __P((int, int, char *, ...));
+extern void     log          __P((int, int, char *, ...))
+	__attribute__((__format__(__printf__, 3, 4)));
 extern void	dump_mldqueriers __P((FILE *));
 extern int      log_level    __P((u_int proto, u_int type, u_int code));
 extern void     dump         __P((int i));

@@ -55,6 +55,13 @@ static void cfdebug_print __P((char *, char *, int));
 #endif
 
 extern int yylex __P((void));
+
+static void yyerror0(char *s, va_list ap)
+	__attribute__((__format__(__printf__, 1, 0)));
+void yyerror(char *s, ...)
+	__attribute__((__format__(__printf__, 1, 2)));
+void yywarn(char *s, ...)
+	__attribute__((__format__(__printf__, 1, 2)));
 %}
 
 /* common seciton */

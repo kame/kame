@@ -34,7 +34,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: debug.c,v 1.8 2000/05/18 12:47:59 itojun Exp $
+ *  $Id: debug.c,v 1.9 2000/10/05 22:20:38 itojun Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -67,7 +67,7 @@ static char dumpfilename[] = _PATH_PIM6D_DUMP;
 static char cachefilename[] = _PATH_PIM6D_CACHE; /* TODO: notused */
 
 static char *sec2str __P((time_t));
-
+	
 static char *
 sec2str(total)
 	time_t total;
