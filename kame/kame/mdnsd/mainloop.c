@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.23 2000/05/31 12:14:21 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.24 2000/05/31 12:16:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -225,9 +225,11 @@ conf_mediator(i)
 		return -1;
 
 	if (msg->lifetime == 0xffffffff)
-		(void)addserv(msg->serveraddr, -1);
-	else
-		(void)addserv(msg->serveraddr, ntohl(msg->lifetime));
+		(void)addserv(msg->serveraddr, -1, "mediator conf");
+	else {
+		(void)addserv(msg->serveraddr, ntohl(msg->lifetime),
+		    "mediator conf");
+	}
 	return 0;
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.15 2000/05/31 12:10:12 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.16 2000/05/31 12:16:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -142,7 +142,7 @@ main(argc, argv)
 		/*NOTREACHED*/
 	}
 	while (argc-- > 0) {
-		if (addserv(*argv, -1) != 0) {
+		if (addserv(*argv, -1, "arg") != 0) {
 			errx(1, "%s: failed to add it to db", *argv);
 			/*NOTREACHED*/
 		}
@@ -208,9 +208,9 @@ main(argc, argv)
 	}
 
 	if (ready4)
-		(void)addserv(MDNS_GROUP4, -1);
+		(void)addserv(MDNS_GROUP4, -1, "mcast");
 	if (ready6)
-		(void)addserv(MDNS_GROUP6, -1);
+		(void)addserv(MDNS_GROUP6, -1, "mcast");
 
 	if (LIST_FIRST(&nsdb) == NULL) {
 		errx(1, "no DNS server to contact");
@@ -470,9 +470,10 @@ iscanon(n)
 }
 
 int
-addserv(n, ttl)
+addserv(n, ttl, comment)
 	const char *n;
 	int ttl;
+	const char *comment;
 {
 	struct addrinfo hints, *res;
 	struct sockaddr_in *sin;
@@ -509,7 +510,7 @@ addserv(n, ttl)
 		flags = 0;
 		break;
 	}
-	ns = newnsdb(res->ai_addr, n, flags);
+	ns = newnsdb(res->ai_addr, comment, flags);
 	if (ns == NULL) {
 		freeaddrinfo(res);
 		return -1;
