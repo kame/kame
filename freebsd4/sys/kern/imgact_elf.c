@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/imgact_elf.c,v 1.73.2.9 2001/12/16 18:26:16 mp Exp $
+ * $FreeBSD: src/sys/kern/imgact_elf.c,v 1.73.2.11 2002/09/09 17:38:47 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -462,8 +462,9 @@ exec_elf_imgact(struct image_params *imgp)
 	Elf_Auxargs *elf_auxargs = NULL;
 	struct vmspace *vmspace;
 	vm_prot_t prot;
-	u_long text_size = 0, data_size = 0;
+	u_long text_size = 0, data_size = 0, total_size = 0;
 	u_long text_addr = 0, data_addr = 0;
+	u_long seg_size, seg_addr;
 	u_long addr, entry = 0, proghdr = 0;
 	int error, i;
 	const char *interp = NULL;
@@ -529,23 +530,49 @@ exec_elf_imgact(struct image_params *imgp)
   						     phdr[i].p_filesz, prot)) != 0)
   				goto fail;
 
+			seg_addr = trunc_page(phdr[i].p_vaddr);
+			seg_size = round_page(phdr[i].p_memsz +
+				phdr[i].p_vaddr - seg_addr);
+
 			/*
-			 * Is this .text or .data ??
+			 * Is this .text or .data?  We can't use
+			 * VM_PROT_WRITE or VM_PROT_EXEC, it breaks the
+			 * alpha terribly and possibly does other bad
+			 * things so we stick to the old way of figuring
+			 * it out:  If the segment contains the program
+			 * entry point, it's a text segment, otherwise it
+			 * is a data segment.
 			 *
-			 * We only handle one each of those yet XXX
+			 * Note that obreak() assumes that data_addr + 
+			 * data_size == end of data load area, and the ELF
+			 * file format expects segments to be sorted by
+			 * address.  If multiple data segments exist, the
+			 * last one will be used.
 			 */
 			if (hdr->e_entry >= phdr[i].p_vaddr &&
-			hdr->e_entry <(phdr[i].p_vaddr+phdr[i].p_memsz)) {
-  				text_addr = trunc_page(phdr[i].p_vaddr);
-  				text_size = round_page(phdr[i].p_memsz +
-						       phdr[i].p_vaddr -
-						       text_addr);
+			    hdr->e_entry < (phdr[i].p_vaddr +
+			    phdr[i].p_memsz)) {
+				text_size = seg_size;
+				text_addr = seg_addr;
 				entry = (u_long)hdr->e_entry;
 			} else {
-  				data_addr = trunc_page(phdr[i].p_vaddr);
-  				data_size = round_page(phdr[i].p_memsz +
-						       phdr[i].p_vaddr -
-						       data_addr);
+				data_size = seg_size;
+				data_addr = seg_addr;
+			}
+			total_size += seg_size;
+
+			/*
+			 * Check limits.  It should be safe to check the
+			 * limits after loading the segment since we do
+			 * not actually fault in all the segment's pages.
+			 */
+			if (data_size >
+			    imgp->proc->p_rlimit[RLIMIT_DATA].rlim_cur ||
+			    text_size > maxtsiz ||
+			    total_size >
+			    imgp->proc->p_rlimit[RLIMIT_VMEM].rlim_cur) {
+				error = ENOMEM;
+				goto fail;
 			}
 			break;
 	  	case PT_INTERP:	/* Path to interpreter */

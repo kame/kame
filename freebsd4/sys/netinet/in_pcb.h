@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.32.2.5 2001/12/14 20:21:12 jlemon Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.32.2.6 2002/07/29 18:56:37 ume Exp $
  */
 
 #ifndef _NETINET_IN_PCB_H_
@@ -272,7 +272,6 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define	IN6P_RTHDR		0x100000 /* receive routing header */
 #define	IN6P_RTHDRDSTOPTS	0x200000 /* receive dstoptions before rthdr */
 #define IN6P_AUTOFLOWLABEL	0x800000 /* attach flowlabel automatically */
-#define	IN6P_BINDV6ONLY		0x10000000 /* do not grab IPv4 traffic */
 
 #define	INP_CONTROLOPTS		(INP_RECVOPTS|INP_RECVRETOPTS|INP_RECVDSTADDR|\
 					INP_RECVIF|\

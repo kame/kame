@@ -4,12 +4,13 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * @(#)ipl.h	1.21 6/5/96
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ipl.h,v 1.14.2.3 2002/04/27 17:37:12 darrenr Exp $
+ * $Id: ipl.h,v 2.15.2.35 2002/08/28 13:00:50 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ipl.h,v 1.14.2.4 2002/08/31 16:24:52 darrenr Exp $
  */
 
 #ifndef	__IPL_H__
 #define	__IPL_H__
 
-#define	IPL_VERSION	"IP Filter: v3.4.27"
+#define	IPL_VERSION	"IP Filter: v3.4.29"
 
 #endif

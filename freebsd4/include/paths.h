@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)paths.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/include/paths.h,v 1.9.6.2 2001/08/01 05:02:00 obrien Exp $
+ * $FreeBSD: src/include/paths.h,v 1.9.6.4 2002/07/19 07:53:41 jmallett Exp $
  */
 
 #ifndef _PATHS_H_
@@ -45,26 +45,33 @@
 #define	_PATH_STDPATH \
 	"/usr/bin:/bin:/usr/sbin:/sbin:"
 
-#define _PATH_AUTHCONF  "/etc/auth.conf"
+#define	_PATH_AUTHCONF	"/etc/auth.conf"
 #define	_PATH_BSHELL	"/bin/sh"
 #define	_PATH_CONSOLE	"/dev/console"
+#define	_PATH_CP	"/bin/cp"
 #define	_PATH_CSHELL	"/bin/csh"
 #define	_PATH_DEFTAPE	"/dev/sa0"
 #define	_PATH_DEVDB	"/var/run/dev.db"
 #define	_PATH_DEVNULL	"/dev/null"
 #define	_PATH_DEVZERO	"/dev/zero"
 #define	_PATH_DRUM	"/dev/drum"
+#define	_PATH_ETC	"/etc"
 #define	_PATH_FTPUSERS	"/etc/ftpusers"
 #define	_PATH_KMEM	"/dev/kmem"
+#define	_PATH_LOGIN	"/usr/bin/login"
 #define	_PATH_MAILDIR	"/var/mail"
 #define	_PATH_MAN	"/usr/share/man"
 #define	_PATH_MEM	"/dev/mem"
 #define	_PATH_NOLOGIN	"/var/run/nologin"
+#define	_PATH_RCP	"/bin/rcp"
+#define	_PATH_RLOGIN	"/usr/bin/rlogin"
+#define	_PATH_RSH	"/usr/bin/rsh"
 #define	_PATH_SENDMAIL	"/usr/sbin/sendmail"
 #define	_PATH_SHELLS	"/etc/shells"
 #define	_PATH_TTY	"/dev/tty"
 #define	_PATH_UNIX	"don't use _PATH_UNIX"
 #define	_PATH_VI	"/usr/bin/vi"
+#define	_PATH_WALL	"/usr/bin/wall"
 
 /* Provide trailing slash, since mostly used for building pathnames. */
 #define	_PATH_DEV	"/dev/"
@@ -77,7 +84,7 @@
 
 /* How to get the correct name of the kernel. */
 __BEGIN_DECLS
-const char *getbootfile __P((void));
+const char *getbootfile(void);
 __END_DECLS
 
 #endif /* !_PATHS_H_ */

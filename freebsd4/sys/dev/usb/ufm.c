@@ -28,7 +28,7 @@
  * its contributors.
  */
 
-/* $FreeBSD: src/sys/dev/usb/ufm.c,v 1.1.2.1 2002/03/04 04:01:35 alfred Exp $ */
+/* $FreeBSD: src/sys/dev/usb/ufm.c,v 1.1.2.2 2002/08/12 14:19:48 joe Exp $ */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -55,6 +55,7 @@
 #endif
 #include <sys/vnode.h>
 #include <sys/poll.h>
+#include <sys/sysctl.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -63,10 +64,13 @@
 #include <dev/usb/usbdevs.h>
 #include <dev/usb/dsbr100io.h>
 
-#ifdef UFM_DEBUG
+#ifdef USB_DEBUG
 #define DPRINTF(x)	if (ufmdebug) logprintf x
 #define DPRINTFN(n,x)	if (ufmdebug>(n)) logprintf x
-int	ufmdebug = 100;
+int	ufmdebug = 0;
+SYSCTL_NODE(_hw_usb, OID_AUTO, ufm, CTLFLAG_RW, 0, "USB ufm");
+SYSCTL_INT(_hw_usb_ufm, OID_AUTO, debug, CTLFLAG_RW,
+	   &ufmdebug, 0, "ufm debug level");
 #else
 #define DPRINTF(x)
 #define DPRINTFN(n,x)

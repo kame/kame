@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.pc98,v 1.103.2.15 2002/04/28 23:01:29 dwmalone Exp $
+# $FreeBSD: src/sys/conf/options.pc98,v 1.103.2.16 2002/07/07 10:08:20 nyan Exp $
 
 DISABLE_PSE
 IDE_DELAY
@@ -40,6 +40,7 @@ CLK_CALIBRATION_LOOP		opt_clock.h
 CLK_USE_I8254_CALIBRATION	opt_clock.h
 CLK_USE_TSC_CALIBRATION		opt_clock.h
 TIMER_FREQ			opt_clock.h
+KERN_TIMESTAMP			opt_global.h
 
 NO_F00F_HACK			opt_cpu.h
 CPU_BLUELIGHTNING_FPU_OP_CACHE	opt_cpu.h

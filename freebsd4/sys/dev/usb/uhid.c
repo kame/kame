@@ -1,5 +1,5 @@
 /*	$NetBSD: uhid.c,v 1.38 2000/04/27 15:26:48 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uhid.c,v 1.27.2.8 2002/02/24 14:23:14 alfred Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhid.c,v 1.27.2.9 2002/08/12 14:19:48 joe Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -64,6 +64,7 @@
 #include <sys/proc.h>
 #include <sys/vnode.h>
 #include <sys/poll.h>
+#include <sys/sysctl.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbhid.h>
@@ -76,10 +77,13 @@
 #include <i386/isa/intr_machdep.h>
 #endif
 
-#ifdef UHID_DEBUG
+#ifdef USB_DEBUG
 #define DPRINTF(x)	if (uhiddebug) logprintf x
 #define DPRINTFN(n,x)	if (uhiddebug>(n)) logprintf x
 int	uhiddebug = 0;
+SYSCTL_NODE(_hw_usb, OID_AUTO, uhid, CTLFLAG_RW, 0, "USB uhid");
+SYSCTL_INT(_hw_usb_uhid, OID_AUTO, debug, CTLFLAG_RW,
+	   &uhiddebug, 0, "uhid debug level");
 #else
 #define DPRINTF(x)
 #define DPRINTFN(n,x)
@@ -332,7 +336,7 @@ uhid_intr(xfer, addr, status)
 {
 	struct uhid_softc *sc = addr;
 
-#ifdef UHID_DEBUG
+#ifdef USB_DEBUG
 	if (uhiddebug > 5) {
 		u_int32_t cc, i;
 		

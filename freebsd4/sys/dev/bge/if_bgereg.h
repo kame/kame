@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/bge/if_bgereg.h,v 1.1.2.3 2002/04/04 06:12:48 wpaul Exp $
+ * $FreeBSD: src/sys/dev/bge/if_bgereg.h,v 1.1.2.5 2002/07/27 17:00:41 jdp Exp $
  */
 
 /*
@@ -1811,6 +1811,7 @@ struct bge_status_block {
  */
 #define ALTIMA_VENDORID			0x173b
 #define ALTIMA_DEVICE_AC1000		0x03e8
+#define ALTIMA_DEVICE_AC9100	 	0x03ea			
 
 /*
  * Offset of MAC address inside EEPROM.
@@ -2136,6 +2137,7 @@ struct bge_softc {
 	u_int8_t		bge_unit;	/* interface number */
 	u_int8_t		bge_extram;	/* has external SSRAM */
 	u_int8_t		bge_tbi;
+	u_int8_t		bge_rx_alignment_bug;
 	u_int32_t		bge_asicrev;
 	struct bge_ring_data	*bge_rdata;	/* rings */
 	struct bge_chain_data	bge_cdata;	/* mbufs */

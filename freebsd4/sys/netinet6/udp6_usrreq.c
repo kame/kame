@@ -1,5 +1,5 @@
-/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.9 2002/04/28 05:40:27 suz Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.1.1.6 2002/06/21 01:22:04 suz Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.12 2002/09/03 19:53:04 jmallett Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.1.1.7 2002/10/24 05:37:03 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -343,7 +343,7 @@ udp6_input(mp, offp, proto)
 
 			strcpy(buf, ip6_sprintf(&ip6->ip6_dst));
 			log(LOG_INFO,
-			    "Connection attempt to UDP %s:%d from %s:%d\n",
+			    "Connection attempt to UDP [%s]:%d from [%s]:%d\n",
 			    buf, ntohs(uh->uh_dport),
 			    ip6_sprintf(&ip6->ip6_src), ntohs(uh->uh_sport));
 		}
@@ -534,6 +534,8 @@ udp6_attach(struct socket *so, int proto, struct proc *p)
 		return error;
 	inp = (struct inpcb *)so->so_pcb;
 	inp->inp_vflag |= INP_IPV6;
+	if (!ip6_v6only)
+		inp->inp_vflag |= INP_IPV4;
 	inp->in6p_hops = -1;	/* use kernel default */
 	inp->in6p_cksum = -1;	/* just to be sure */
 	/*
@@ -621,7 +623,7 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	error = in6_pcbconnect(inp, nam, p);
 	splx(s);
 	if (error == 0) {
-		if (ip6_mapped_addr_on) { /* should be non mapped addr */
+		if (!ip6_v6only) { /* should be non mapped addr */
 			inp->inp_vflag &= ~INP_IPV4;
 			inp->inp_vflag |= INP_IPV6;
 		}
@@ -697,7 +699,7 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		}
 	}
 
-	if (ip6_mapped_addr_on) {
+	if (!ip6_v6only) {
 		int hasv4addr;
 		struct sockaddr_in6 *sin6 = 0;
 

@@ -1,6 +1,6 @@
-# $Id: Makefile,v 1.1.1.3 2002/06/21 01:21:01 suz Exp $
+# $Id: Makefile,v 1.1.1.4 2002/10/24 05:34:31 suz Exp $
 #
-# $FreeBSD: src/sys/dev/aic7xxx/aicasm/Makefile,v 1.8.2.3 2002/04/29 19:36:36 gibbs Exp $
+# $FreeBSD: src/sys/dev/aic7xxx/aicasm/Makefile,v 1.8.2.5 2002/09/27 15:46:28 gibbs Exp $
 
 PROG=	aicasm
 
@@ -22,7 +22,10 @@ LDADD+=	-ll
 DEPENDFILE=
 .endif
 
-CFLAGS+= -I/usr/include -I.
+CFLAGS+= -nostdinc -I/usr/include -I.
+.ifdef MAKESRCPATH
+CFLAGS+= -I${MAKESRCPATH}
+.endif
 NOMAN=	noman
 YFLAGS= -b ${.TARGET:R} ${.TARGET:M*macro*:S/$(.TARGET)/-p mm/} -d
 LFLAGS+= ${.TARGET:M*macro*:S/$(.TARGET)/-Pmm/}

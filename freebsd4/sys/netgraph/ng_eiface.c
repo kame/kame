@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  * 	$Id: ng_eiface.c,v 1.14 2000/03/15 12:28:44 vitaly Exp $
- * $FreeBSD: src/sys/netgraph/ng_eiface.c,v 1.4.2.1 2002/04/15 00:16:02 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_eiface.c,v 1.4.2.2 2002/07/02 23:44:02 archie Exp $
  */
 
 #include <sys/param.h>
@@ -55,6 +55,8 @@
 #include <net/ethernet.h>
 #include <net/if_arp.h>
 
+static const struct ng_parse_struct_field ng_eiface_par_fields[]
+	= NG_EIFACE_PAR_FIELDS;
 
 /* Node private data */
 struct ng_eiface_private {

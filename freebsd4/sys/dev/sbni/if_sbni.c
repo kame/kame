@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sbni/if_sbni.c,v 1.1.2.1 2001/12/19 20:59:28 fjoe Exp $
+ * $FreeBSD: src/sys/dev/sbni/if_sbni.c,v 1.1.2.4 2002/08/11 09:32:00 fjoe Exp $
  */
 
 /*
@@ -68,6 +68,11 @@
 #include <sys/proc.h>
 #include <sys/callout.h>
 #include <sys/syslog.h>
+#include <sys/random.h>
+
+#include <machine/bus.h>
+#include <sys/rman.h>
+#include <machine/resource.h>
 
 #include <net/if.h>
 #include <net/ethernet.h>
@@ -116,7 +121,7 @@ static __inline void	sbni_outsb(struct sbni_softc *, u_char *, u_int);
 static u_int32_t crc32tab[];
 
 #ifdef SBNI_DUAL_COMPOUND
-struct sbni_softc *headlist;
+struct sbni_softc *sbni_headlist;
 #endif
 
 u_int32_t next_sbni_unit;
@@ -126,25 +131,37 @@ u_int32_t next_sbni_unit;
 static __inline u_char
 sbni_inb(struct sbni_softc *sc, enum sbni_reg reg)
 {
-	return (inb(sc->base_addr + reg));
+	return bus_space_read_1(
+	    rman_get_bustag(sc->io_res),
+	    rman_get_bushandle(sc->io_res),
+	    sc->io_off + reg);
 }
 
 static __inline void
 sbni_outb(struct sbni_softc *sc, enum sbni_reg reg, u_char value)
 {
-	outb(sc->base_addr + reg, value);
+	bus_space_write_1(
+	    rman_get_bustag(sc->io_res),
+	    rman_get_bushandle(sc->io_res),
+	    sc->io_off + reg, value);
 }
 
 static __inline void
 sbni_insb(struct sbni_softc *sc, u_char *to, u_int len)
 {
-	insb(sc->base_addr + DAT, to, len);
+	bus_space_read_multi_1(
+	    rman_get_bustag(sc->io_res),
+	    rman_get_bushandle(sc->io_res),
+	    sc->io_off + DAT, to, len);
 }
 
 static __inline void
 sbni_outsb(struct sbni_softc *sc, u_char *from, u_int len)
 {
-	outsb(sc->base_addr + DAT, from, len);
+	bus_space_write_multi_1(
+	    rman_get_bustag(sc->io_res),
+	    rman_get_bushandle(sc->io_res),
+	    sc->io_off + DAT, from, len);
 }
 
 
@@ -329,8 +346,8 @@ sbni_intr(void *arg)
 			handle_channel(sc);
 			repeat = 1;
 		}
-		if (sc->slave_sc 	/* second channel present */
-		    && (sbni_inb(sc->slave_sc, CSR0) & (RC_RDY | TR_RDY))) {
+		if (sc->slave_sc && 	/* second channel present */
+		    (sbni_inb(sc->slave_sc, CSR0) & (RC_RDY | TR_RDY))) {
 			handle_channel(sc->slave_sc);
 			repeat = 1;
 		}
@@ -368,9 +385,10 @@ handle_channel(struct sbni_softc *sc)
 		/* if state & FL_NEED_RESEND != 0 then tx_frameno != 0 */
 		if (req_ans || sc->tx_frameno != 0)
 			send_frame(sc);
-		else
+		else {
 			/* send the marker without any data */
 			sbni_outb(sc, CSR0, sbni_inb(sc, CSR0) & ~TR_REQ);
+		}
 	}
 
 	sbni_outb(sc, CSR0, sbni_inb(sc, CSR0) | EN_INT);
@@ -391,9 +409,9 @@ recv_frame(struct sbni_softc *sc)
 
 	crc = CRC32_INITIAL;
 	if (check_fhdr(sc, &framelen, &frameno, &ack, &is_first, &crc)) {
-		frame_ok = framelen > 4
-			   ? upload_data(sc, framelen, frameno, is_first, crc)
-			   : skip_tail(sc, framelen, crc);
+		frame_ok = framelen > 4 ?
+		    upload_data(sc, framelen, frameno, is_first, crc) :
+		    skip_tail(sc, framelen, crc);
 		if (frame_ok)
 			interpret_ack(sc, ack);
 	} else
@@ -498,8 +516,9 @@ do_copy:
 			if (data_len -= slice)
 				data_p += slice;
 			else {
-				do	m = m->m_next;
-				while (m != NULL && m->m_len == 0);
+				do {
+					m = m->m_next;
+				} while (m != NULL && m->m_len == 0);
 
 				if (m) {
 					data_len = m->m_len;
@@ -582,10 +601,10 @@ interpret_ack(struct sbni_softc *sc, u_int ack)
 		if (sc->state & FL_WAIT_ACK) {
 			sc->outpos += sc->framelen;
 
-			if (--sc->tx_frameno)
-				sc->framelen = min(sc->maxframe,
-						   sc->pktlen - sc->outpos);
-			else {
+			if (--sc->tx_frameno) {
+				sc->framelen = min(
+				    sc->maxframe, sc->pktlen - sc->outpos);
+			} else {
 				send_complete(sc);
 				prepare_to_send(sc);
 			}
@@ -945,43 +964,33 @@ set_initial_values(struct sbni_softc *sc, struct sbni_flags flags)
 	/*
 	 * generate Ethernet address (0x00ff01xxxxxx)
 	 */
-	*(u_int16_t*)sc->arpcom.ac_enaddr = htons(0x00ff);
-	if (flags.mac_addr)
-		*(u_int32_t*)(sc->arpcom.ac_enaddr+2) =
-			htonl(flags.mac_addr | 0x01000000);
-	else {
-		/* reading timer value */
-		outb(0x43, 0);
-		insb(0x40, sc->arpcom.ac_enaddr + 3, 4);
-		*(u_char*)(sc->arpcom.ac_enaddr + 2) = 0x01;
+	*(u_int16_t *) sc->arpcom.ac_enaddr = htons(0x00ff);
+	if (flags.mac_addr) {
+		*(u_int32_t *) (sc->arpcom.ac_enaddr + 2) =
+		    htonl(flags.mac_addr | 0x01000000);
+	} else {
+		*(u_char *) (sc->arpcom.ac_enaddr + 2) = 0x01;
+		read_random_unlimited(sc->arpcom.ac_enaddr + 3, 3);
 	}
 }
 
 
 #ifdef SBNI_DUAL_COMPOUND
 
-#ifndef offsetof
-#define offsetof(type, member)		((u_int32_t)(&((type *)0)->member))
-#endif
-
-
 struct sbni_softc *
 connect_to_master(struct sbni_softc *sc)
 {
-	struct sbni_softc *p;
+	struct sbni_softc *p, *p_prev;
 
-	p = (struct sbni_softc *)(((char *)&headlist)
-	    - offsetof(struct sbni_softc, link));
-
-	for (; p->link; p = p->link) {
-		if (p->link->irq == sc->irq
-		    && (p->link->base_addr == sc->base_addr + 4
-			|| p->link->base_addr == sc->base_addr - 4)) {
-
-			struct sbni_softc  *t = p->link;
-			t->slave_sc = sc;
-			p->link = p->link->link;
-			return (t);
+	for (p = sbni_headlist, p_prev = NULL; p; p_prev = p, p = p->link) {
+		if (rman_get_start(p->io_res) == rman_get_start(sc->io_res) + 4 ||
+		    rman_get_start(p->io_res) == rman_get_start(sc->io_res) - 4) {
+			p->slave_sc = sc;
+			if (p_prev)
+				p_prev->link = p->link;
+			else
+				sbni_headlist = p->link;
+			return p;
 		}
 	}
 
@@ -1057,8 +1066,8 @@ sbni_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	switch (command) {
 	case SIOCSIFADDR:
 	case SIOCGIFADDR:
-			ether_ioctl(ifp, command, data);
-			break;
+		ether_ioctl(ifp, command, data);
+		break;
 
 	case SIOCSIFFLAGS:
 		/*

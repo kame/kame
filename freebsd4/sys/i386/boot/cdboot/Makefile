@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/i386/boot/cdboot/Makefile,v 1.7 1999/12/23 17:48:52 bde Exp $
+# $FreeBSD: src/sys/i386/boot/cdboot/Makefile,v 1.7.2.1 2002/08/07 16:31:55 ru Exp $
 #
 
 PROG=	boot
@@ -75,7 +75,7 @@ boot.img:	boot.nohdr
 all:		boot.img
 
 install:
-	${INSTALL} ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE}\
+	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE}\
 		boot.img ${DESTDIR}${BINDIR}/cdboot
 
 .include <bsd.kern.mk>

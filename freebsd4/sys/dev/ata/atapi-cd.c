@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-cd.c,v 1.48.2.16 2002/03/27 19:48:37 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-cd.c,v 1.48.2.18 2002/09/16 19:38:37 sos Exp $
  */
 
 #include "opt_ata.h"
@@ -73,6 +73,7 @@ static struct cdevsw acd_cdevsw = {
 /* prototypes */
 static struct acd_softc *acd_init_lun(struct ata_device *);
 static void acd_make_dev(struct acd_softc *);
+static void acd_set_ioparm(struct acd_softc *);
 static void acd_describe(struct acd_softc *);
 static void lba2msf(u_int32_t, u_int8_t *, u_int8_t *, u_int8_t *);
 static u_int32_t msf2lba(u_int8_t, u_int8_t, u_int8_t);
@@ -266,10 +267,16 @@ acd_make_dev(struct acd_softc *cdp)
     dev = make_dev(&acd_cdevsw, dkmakeminor(cdp->lun, 0, 0),
 		   UID_ROOT, GID_OPERATOR, 0644, "acd%d", cdp->lun);
     dev->si_drv1 = cdp;
-    dev->si_iosize_max = 252 * DEV_BSIZE;
-    dev->si_bsize_phys = 2048; /* XXX SOS */
     cdp->dev = dev;
     cdp->device->flags |= ATA_D_MEDIA_CHANGED;
+    acd_set_ioparm(cdp);
+}
+
+static void
+acd_set_ioparm(struct acd_softc *cdp)
+{
+     cdp->dev->si_iosize_max = ((256*DEV_BSIZE)/cdp->block_size)*cdp->block_size;
+     cdp->dev->si_bsize_phys = cdp->block_size;
 }
 
 static void 
@@ -483,6 +490,7 @@ static int
 acdopen(dev_t dev, int flags, int fmt, struct proc *p)
 {
     struct acd_softc *cdp = dev->si_drv1;
+    int timeout = 60;
     
     if (!cdp)
 	return ENXIO;
@@ -491,6 +499,19 @@ acdopen(dev_t dev, int flags, int fmt, struct proc *p)
 	if (count_dev(dev) > 1)
 	    return EBUSY;
     }
+
+    /* wait if drive is not finished loading the medium */
+    while (timeout--) {
+	struct atapi_reqsense *sense = cdp->device->result;
+
+	if (!atapi_test_ready(cdp->device))
+	    break;
+	if (sense->sense_key == 2  && sense->asc == 4 && sense->ascq == 1)
+	    tsleep(&timeout, PRIBIO, "acdld", hz / 2);
+	else
+	    break;
+    }
+
     if (count_dev(dev) == 1) {
 	if (cdp->changer_info && cdp->slot != cdp->changer_info->current_slot) {
 	    acd_select_slot(cdp);
@@ -994,6 +1015,7 @@ acdioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
     case CDRIOCSETBLOCKSIZE:
 	cdp->block_size = *(int *)addr;
+	acd_set_ioparm(cdp);
 	break;
 
     case CDRIOCGETPROGRESS:
@@ -1256,6 +1278,7 @@ acd_read_toc(struct acd_softc *cdp)
     cdp->toc.hdr.len = ntohs(cdp->toc.hdr.len);
 
     cdp->block_size = (cdp->toc.tab[0].control & 4) ? 2048 : 2352;
+    acd_set_ioparm(cdp);
     bzero(ccb, sizeof(ccb));
     ccb[0] = ATAPI_READ_CAPACITY;
     if (atapi_queue_cmd(cdp->device, ccb, (caddr_t)sizes, sizeof(sizes),
@@ -1516,7 +1539,7 @@ acd_init_track(struct acd_softc *cdp, struct cdr_track *track)
 	param.session_format = CDR_SESS_CDROM_XA;
 	break;
     }
-
+    acd_set_ioparm(cdp);
     return acd_mode_select(cdp, (caddr_t)&param, param.page_length + 10);
 }
 

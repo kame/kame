@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_synch.c	8.9 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/kern/kern_synch.c,v 1.87.2.4 2001/11/14 17:22:49 iedowse Exp $
+ * $FreeBSD: src/sys/kern/kern_synch.c,v 1.87.2.5 2002/06/28 00:21:44 dillon Exp $
  */
 
 #include "opt_ktrace.h"
@@ -722,12 +722,14 @@ wakeup(ident)
 {
 	register struct slpquehead *qp;
 	register struct proc *p;
+	struct proc *np;
 	int s;
 
 	s = splhigh();
 	qp = &slpque[LOOKUP(ident)];
 restart:
-	TAILQ_FOREACH(p, qp, p_procq) {
+	for (p = TAILQ_FIRST(qp); p != NULL; p = np) {
+		np = TAILQ_NEXT(p, p_procq);
 		if (p->p_wchan == ident) {
 			TAILQ_REMOVE(qp, p, p_procq);
 			p->p_wchan = 0;
@@ -763,12 +765,15 @@ wakeup_one(ident)
 {
 	register struct slpquehead *qp;
 	register struct proc *p;
+	struct proc *np;
 	int s;
 
 	s = splhigh();
 	qp = &slpque[LOOKUP(ident)];
 
-	TAILQ_FOREACH(p, qp, p_procq) {
+restart:
+	for (p = TAILQ_FIRST(qp); p != NULL; p = np) {
+		np = TAILQ_NEXT(p, p_procq);
 		if (p->p_wchan == ident) {
 			TAILQ_REMOVE(qp, p, p_procq);
 			p->p_wchan = 0;
@@ -787,6 +792,7 @@ wakeup_one(ident)
 					wakeup((caddr_t)&proc0);
 				}
 				/* END INLINE EXPANSION */
+				goto restart;
 			}
 		}
 	}

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_misc.c,v 1.85.2.8 2002/02/03 20:25:13 gallatin Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_misc.c,v 1.85.2.9 2002/09/24 08:11:41 mdodd Exp $
  */
 
 #include "opt_compat.h"
@@ -599,6 +599,10 @@ linux_mremap(struct proc *p, struct linux_mremap_args *args)
 	return error;
 }
 
+#define	LINUX_MS_ASYNC		0x0001
+#define	LINUX_MS_INVALIDATE	0x0002
+#define	LINUX_MS_SYNC		0x0004
+
 int
 linux_msync(struct proc *p, struct linux_msync_args *args)
 {
@@ -606,7 +610,7 @@ linux_msync(struct proc *p, struct linux_msync_args *args)
 
 	bsd_args.addr = (caddr_t)args->addr;
 	bsd_args.len = args->len;
-	bsd_args.flags = 0;	/* XXX ignore */
+	bsd_args.flags = args->fl & ~LINUX_MS_SYNC;
 
 	return msync(p, &bsd_args);
 }

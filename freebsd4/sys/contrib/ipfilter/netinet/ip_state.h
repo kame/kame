@@ -4,8 +4,8 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * @(#)ip_state.h	1.3 1/12/96 (C) 1995 Darren Reed
- * $Id: ip_state.h,v 2.13.2.1 2000/07/08 02:15:35 darrenr Exp $
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_state.h,v 1.10.2.3 2002/04/27 17:37:12 darrenr Exp $
+ * $Id: ip_state.h,v 2.13.2.13 2002/06/27 14:40:29 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_state.h,v 1.10.2.4 2002/08/31 16:24:52 darrenr Exp $
  */
 #ifndef	__IP_STATE_H__
 #define	__IP_STATE_H__
@@ -87,6 +87,7 @@ typedef struct ipstate {
 		tcpstate_t	is_ts;
 		udpstate_t	is_us;
 	} is_ps;
+	u_32_t	is_group;
 	char	is_ifname[4][IFNAMSIZ];
 #if SOLARIS || defined(__sgi)
 	kmutex_t	is_lock;
@@ -148,6 +149,8 @@ typedef	struct	ipslog	{
 	u_char	isl_p;
 	u_char	isl_flags;
 	u_char	isl_state[2];
+	u_32_t	isl_rulen;
+	u_32_t	isl_group;
 } ipslog_t;
 
 #define	isl_sport	isl_ps.isl_ports[0]

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-fd.h,v 1.10.2.4 2002/03/18 08:37:34 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-fd.h,v 1.10.2.5 2002/07/31 11:19:26 sos Exp $
  */
 
 /* ATAPI Rewriteable drive Capabilities and Mechanical Status Page */
@@ -71,7 +71,6 @@ struct afd_cappage {
 struct afd_softc {
     struct ata_device		*device;	/* device softc */
     int				lun;		/* logical device unit */
-    int				transfersize;	/* max size of each transfer */
     struct buf_queue_head	queue;		/* queue of i/o requests */
     struct afd_cappage		cap;		/* capabilities page info */
     struct disk			disk;		/* virtual drives */

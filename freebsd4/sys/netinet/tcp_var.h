@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_var.h	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.56.2.10 2001/12/14 20:21:12 jlemon Exp $
+ * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.56.2.12 2002/08/24 18:40:26 dillon Exp $
  */
 
 #ifndef _NETINET_TCP_VAR_H_
@@ -123,10 +123,12 @@ struct tcpcb {
 
 	u_long	snd_wnd;		/* send window */
 	u_long	snd_cwnd;		/* congestion-controlled window */
+	u_long	snd_bwnd;		/* bandwidth-controlled window */
 	u_long	snd_ssthresh;		/* snd_cwnd size threshold for
 					 * for slow start exponential to
 					 * linear switch
 					 */
+	u_long	snd_bandwidth;		/* calculated bandwidth or 0 */
 	tcp_seq	snd_recover;		/* for use in fast recovery */
 
 	u_int	t_maxopd;		/* mss plus options */
@@ -136,6 +138,9 @@ struct tcpcb {
 	int	t_rtttime;		/* round trip time */
 	tcp_seq	t_rtseq;		/* sequence number being timed */
 
+	int	t_bw_rtttime;		/* used for bandwidth calculation */
+	tcp_seq	t_bw_rtseq;		/* used for bandwidth calculation */
+
 	int	t_rxtcur;		/* current retransmit value (ticks) */
 	u_int	t_maxseg;		/* maximum segment size */
 	int	t_srtt;			/* smoothed round-trip time */
@@ -143,6 +148,7 @@ struct tcpcb {
 
 	int	t_rxtshift;		/* log(2) of rexmt exp. backoff */
 	u_int	t_rttmin;		/* minimum rtt allowed */
+	u_int	t_rttbest;		/* best rtt we've seen */
 	u_long	t_rttupdated;		/* number of times rtt sampled */
 	u_long	max_sndwnd;		/* largest window peer has offered */
 
@@ -431,6 +437,7 @@ extern	struct tcpstat tcpstat;	/* tcp statistics */
 extern	int tcp_mssdflt;	/* XXX */
 extern	int tcp_delack_enabled;
 extern	int tcp_do_newreno;
+extern	int path_mtu_discovery;
 extern	int ss_fltsz;
 extern	int ss_fltsz_local;
 
@@ -468,6 +475,7 @@ struct tcpcb *
 	 tcp_timers __P((struct tcpcb *, int));
 void	 tcp_trace __P((int, int, struct tcpcb *, void *, struct tcphdr *,
 			int));
+void	 tcp_xmit_bandwidth_limit(struct tcpcb *tp, tcp_seq ack_seq);
 void	 syncache_init(void);
 void	 syncache_unreach(struct in_conninfo *, struct tcphdr *);
 int	 syncache_expand(struct in_conninfo *, struct tcphdr *,

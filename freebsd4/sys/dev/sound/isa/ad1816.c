@@ -31,7 +31,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ad1816.c,v 1.7.2.7 2002/04/22 15:49:30 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ad1816.c,v 1.7.2.8 2002/07/07 11:49:03 robert Exp $");
 
 struct ad1816_info;
 
@@ -368,7 +368,8 @@ ad1816chan_setformat(kobj_t obj, void *data, u_int32_t format)
     	if (format & AFMT_STEREO) fmt |= AD1816_STEREO;
     	io_wr(ad1816, reg, fmt);
 	ad1816_unlock(ad1816);
-    	return format;
+
+	return (0);
 }
 
 static int

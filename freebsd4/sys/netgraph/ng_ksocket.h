@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ksocket.h,v 1.2.2.4 2002/04/14 23:31:08 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ksocket.h,v 1.2.2.5 2002/07/02 23:44:02 archie Exp $
  * $Whistle: ng_ksocket.h,v 1.1 1999/11/16 20:04:40 archie Exp $
  */
 
@@ -63,12 +63,10 @@ struct ng_ksocket_sockopt {
 
 /* Keep this in sync with the above structure definition */
 #define NG_KSOCKET_SOCKOPT_INFO(svtype)	{			\
-	{							\
 	  { "level",		&ng_parse_int32_type	},	\
 	  { "name",		&ng_parse_int32_type	},	\
 	  { "value",		(svtype)		},	\
-	  { NULL },						\
-	}							\
+	  { NULL }						\
 }
 
 /* For NGM_KSOCKET_ACCEPT control message responses */
@@ -79,11 +77,9 @@ struct ng_ksocket_accept {
 
 /* Keep this in sync with the above structure definition */
 #define	NGM_KSOCKET_ACCEPT_INFO {					\
-	{								\
 	  { "nodeid",		&ng_parse_hint32_type		  },	\
 	  { "addr",		&ng_ksocket_generic_sockaddr_type },	\
 	  { NULL }							\
-	}								\
 }
 
 /* Netgraph commands */

@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_cisco.h,v 1.2.2.3 2000/10/24 18:36:44 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_cisco.h,v 1.2.2.4 2002/07/02 23:44:02 archie Exp $
  * $Whistle: ng_cisco.h,v 1.6 1999/01/25 01:21:48 archie Exp $
  */
 
@@ -69,11 +69,9 @@ struct ng_cisco_ipaddr {
 
 /* Keep this in sync with the above structure definition */
 #define NG_CISCO_IPADDR_TYPE_INFO	{			\
-	{							\
 	  { "ipaddr",		&ng_parse_ipaddr_type	},	\
 	  { "netmask",		&ng_parse_ipaddr_type	},	\
-	  { NULL },						\
-	}							\
+	  { NULL }						\
 }
 
 struct ng_cisco_stats {
@@ -83,11 +81,9 @@ struct ng_cisco_stats {
 
 /* Keep this in sync with the above structure definition */
 #define NG_CISCO_STATS_TYPE_INFO	{			\
-	{							\
 	  { "seqRetries",	&ng_parse_uint32_type	},	\
 	  { "keepAlivePeriod",	&ng_parse_uint32_type	},	\
-	  { NULL },						\
-	}							\
+	  { NULL }						\
 }
 
 #endif /* _NETGRAPH_CISCO_H_ */

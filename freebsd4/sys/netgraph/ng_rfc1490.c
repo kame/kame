@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_rfc1490.c,v 1.6.2.3 2001/01/09 00:52:45 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_rfc1490.c,v 1.6.2.4 2002/07/02 22:17:18 archie Exp $
  * $Whistle: ng_rfc1490.c,v 1.22 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -222,12 +222,13 @@ ng_rfc1490_rcvdata(hook_p hook, struct mbuf *m, meta_p meta)
 	int error = 0;
 
 	if (hook == priv->downlink) {
-		u_char *start, *ptr;
+		const u_char *start;
+		const u_char *ptr;
 
 		if (!m || (m->m_len < MAX_ENCAPS_HDR
 		    && !(m = m_pullup(m, MAX_ENCAPS_HDR))))
 			ERROUT(ENOBUFS);
-		ptr = start = mtod(m, u_char *);
+		ptr = start = mtod(m, const u_char *);
 
 		/* Must be UI frame */
 		if (*ptr++ != HDLC_UI)
@@ -244,7 +245,7 @@ ng_rfc1490_rcvdata(hook_p hook, struct mbuf *m, meta_p meta)
 				u_int16_t etype;
 
 				ptr += 3;
-				etype = ntohs(*((u_int16_t *) ptr));
+				etype = ntohs(*((const u_int16_t *)ptr));
 				ptr += 2;
 				m_adj(m, ptr - start);
 				switch (etype) {

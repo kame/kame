@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/ispmbox.h,v 1.20.2.11 2002/04/16 21:41:22 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/ispmbox.h,v 1.20.2.12 2002/07/29 04:25:02 mjacob Exp $ */
 /*
  * Mailbox and Queue Entry Definitions for for Qlogic ISP SCSI adapters.
  *
@@ -140,6 +140,9 @@
 #define	MBOX_SEND_CHANGE_REQUEST	0x0070
 #define	MBOX_FABRIC_LOGOUT		0x0071
 #define	MBOX_INIT_LIP_LOGIN		0x0072
+
+#define	MBOX_DRIVER_HEARTBEAT		0x005B
+#define	MBOX_FW_HEARTBEAT		0x005C
 
 #define	MBOX_GET_SET_DATA_RATE		0x005D	/* 23XX only */
 #define		MBGSD_GET_RATE	0
@@ -800,6 +803,7 @@ typedef struct {
 
 #define	FC4_IP		5 /* ISO/EEC 8802-2 LLC/SNAP "Out of Order Delivery" */
 #define	FC4_SCSI	8 /* SCSI-3 via Fivre Channel Protocol (FCP) */
+#define	FC4_FC_SVC	0x20	/* Fibre Channel Services */
 
 #define	SNS_GA_NXT	0x100
 #define	SNS_GPN_ID	0x112

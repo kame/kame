@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/sio.c,v 1.124.2.17 2002/04/25 13:24:43 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/sio.c,v 1.124.2.18 2002/08/13 11:58:14 nyan Exp $
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
  *	from: i386/isa sio.c,v 1.234
  */
@@ -978,6 +978,7 @@ static struct pci_ids pci_ids[] = {
 	{ 0x95211415, "Oxford Semiconductor PCI Dual Port Serial", 0x10 },
 	{ 0x7101135e, "SeaLevel Ultra 530.PCI Single Port Serial", 0x18 },
 	{ 0x0000151f, "SmartLink 5634PCV SurfRider", 0x10 },
+	{ 0x98459710, "Netmos Nm9845 PCI Bridge with Dual UART", 0x10 },
 	{ 0x00000000, NULL, 0 }
 };
 

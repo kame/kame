@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/svr4/svr4_sysvec.c,v 1.10.2.1 2001/02/22 05:15:12 marcel Exp $
+ * $FreeBSD: src/sys/svr4/svr4_sysvec.c,v 1.10.2.2 2002/07/09 14:12:43 robert Exp $
  */
 
 /* XXX we use functions that might not exist. */
@@ -185,6 +185,7 @@ struct sysentvec svr4_sysvec = {
 };
 
 Elf32_Brandinfo svr4_brand = {
+  ELFOSABI_SYSV,
   "SVR4",
   "/compat/svr4",
   "/lib/libc.so.1",

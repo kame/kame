@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.31 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.117.2.9 2002/04/08 09:39:30 bde Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.117.2.10 2002/06/23 22:34:52 iedowse Exp $
  */
 
 #include "opt_quota.h"
@@ -758,6 +758,9 @@ ffs_mountfs(devvp, mp, p, malloctype)
 
 	ump->um_savedmaxfilesize = fs->fs_maxfilesize;		/* XXX */
 	maxfilesize = (u_int64_t)0x40000000 * fs->fs_bsize - 1;	/* XXX */
+	/* Enforce limit caused by vm object backing (32 bits vm_pindex_t). */
+	if (maxfilesize > (u_int64_t)0x80000000u * PAGE_SIZE - 1)
+		maxfilesize = (u_int64_t)0x80000000u * PAGE_SIZE - 1;
 	if (fs->fs_maxfilesize > maxfilesize)			/* XXX */
 		fs->fs_maxfilesize = maxfilesize;		/* XXX */
 	if (ronly == 0) {

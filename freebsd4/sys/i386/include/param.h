@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)param.h	5.8 (Berkeley) 6/28/91
- * $FreeBSD: src/sys/i386/include/param.h,v 1.54.2.6 2001/09/25 06:14:07 dillon Exp $
+ * $FreeBSD: src/sys/i386/include/param.h,v 1.54.2.8 2002/08/31 21:15:55 dillon Exp $
  */
 
 /*
@@ -113,15 +113,17 @@
 #define UPAGES	3		/* pages of u-area */
 
 /*
- * Ceiling on amount of swblock kva space.
+ * Ceiling on amount of swblock kva space, can be changed via
+ * kern.maxswzone /boot/loader.conf variable.
  */
 #ifndef VM_SWZONE_SIZE_MAX
-#define VM_SWZONE_SIZE_MAX	(70 * 1024 * 1024)
+#define VM_SWZONE_SIZE_MAX	(32 * 1024 * 1024)
 #endif
 
 /*
  * Ceiling on size of buffer cache (really only effects write queueing,
- * the VM page cache is not effected).
+ * the VM page cache is not effected), can be changed via
+ * kern.maxbcache /boot/loader.conf variable.
  */
 #ifndef VM_BCACHE_SIZE_MAX
 #define VM_BCACHE_SIZE_MAX	(200 * 1024 * 1024)
@@ -184,6 +186,41 @@
 #define i386_ptob(x)		((unsigned)(x) << PAGE_SHIFT)
 
 #define	pgtok(x)		((x) * (PAGE_SIZE / 1024))
+
+#ifdef _KERNEL
+
+/*
+ * We put here the definition of two debugging macros/function which
+ * are very convenient to have available.
+ * The macro is called TSTMP() and is used to timestamp events in the
+ * kernel using the TSC register, and export them to userland through
+ * the sysctl variable debug.timestamp, which is a circular buffer
+ * holding pairs of u_int32_t variables <timestamp, argument> .
+ * They can be retrieved with something like
+ *
+ *	sysctl -b debug.timestamp | hexdump -e '"%15u %15u\n"'
+ *
+ * The function _TSTMP() is defined in i386/isa/clock.c. It does not
+ * try to grab any locks or block interrupts or identify which CPU it
+ * is running on. You are supposed to know what to do if you use it.
+ *
+ * The macros must be enabled with "options KERN_TIMESTAMP" in the kernel
+ * config file, otherwise they default to an empty block.
+ */
+
+#ifdef KERN_TIMESTAMP
+extern void _TSTMP(u_int32_t argument);
+#define TSTMP(class, unit, event, par)	_TSTMP(	\
+	(((class) &   0x0f) << 28 ) |		\
+	(((unit)  &   0x0f) << 24 ) |		\
+	(((event) &   0xff) << 16 ) |		\
+	(((par)   & 0xffff)       )   )
+
+#else /* !KERN_TIMESTAMP */
+#define        _TSTMP(x)                       {}
+#define        TSTMP(class, unit, event, par)  _TSTMP(0)
+#endif /* !KERN_TIMESTAMP */
+#endif /* _KERNEL */
 
 #endif /* !_MACHINE_PARAM_H_ */
 #endif /* !_NO_NAMESPACE_POLLUTION */

@@ -1,17 +1,19 @@
 # $Whistle: Makefile,v 1.5 1999/01/24 06:48:37 archie Exp $
-# $FreeBSD: src/sys/modules/netgraph/Makefile,v 1.8.2.6 2002/04/09 21:30:13 julian Exp $
+# $FreeBSD: src/sys/modules/netgraph/Makefile,v 1.8.2.8 2002/08/20 23:48:15 archie Exp $
 
-SUBDIR=	async \
+SUBDIR=	UI \
+	async \
 	bpf \
 	bridge \
 	cisco \
 	echo \
-	ether \
 	etf \
+	ether \
 	frame_relay \
 	hole \
 	iface \
 	ksocket \
+	l2tp \
 	lmi \
 	netgraph \
 	one2many \
@@ -20,9 +22,10 @@ SUBDIR=	async \
 	pptpgre \
 	rfc1490 \
 	socket \
+	sync_ar \
+	sync_sr \
 	tee \
 	tty \
-	UI \
 	vjc
 
 .if !defined(NOCRYPT) && exists(${.CURDIR}/../../crypto/rc4/rc4.c)

@@ -33,7 +33,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/i82365.h,v 1.10.2.7 2001/11/12 05:29:21 imp Exp $
+ * $FreeBSD: src/sys/pccard/i82365.h,v 1.10.2.9 2002/09/22 20:26:58 imp Exp $
  */
 
 #define	PCIC_I82365	0		/* Intel i82365SL-A/B or clone */
@@ -104,6 +104,13 @@
 #define	PCIC_TIME_CMD1		0x3e
 #define	PCIC_TIME_RECOV1	0x3f
 
+/* Yenta only registers */
+#define PCIC_MEMORY_HIGH0	0x40	/* A31..A25 of mapping addres for */
+#define PCIC_MEMORY_HIGH1	0x41	/* the memory windows. */
+#define PCIC_MEMORY_HIGH2	0x42
+#define PCIC_MEMORY_HIGH3	0x43
+
+
 #define	PCIC_SLOT_SIZE	0x40	/* Size of register set for one slot */
 
 /* Now register bits, ordered by reg # */
@@ -118,7 +125,8 @@
 #define PCIC_IBM3	0x8a	/* IBM KING PCIC clone; Both Memory and I/O */
 
 /* For Interface Status register (PCIC_STATUS) */
-#define PCIC_VPPV	0x80	/* Vpp_valid */
+#define PCIC_VPPV	0x80	/* Vpp_valid or reserved*/
+#define PCIC_RICOH_5VCARD 0x80	/* 5V card detected */
 #define PCIC_POW	0x40	/* PC Card power active */
 #define PCIC_READY	0x20	/* Ready/~Busy */
 #define PCIC_MWP	0x10	/* Memory Write Protect */
@@ -260,6 +268,15 @@
 #define PCIC_VS2A	0x02
 #define PCIC_VS1B	0x04
 #define PCIC_VS2B	0x08
+
+/* Cirrus Logic: Extended register Extension Control 1 */
+#define PCIC_EXTCTRL1	0x03
+#define PCIC_EC1_VCC_LOCK 0x1		/* Vcc Power locked to s/w change */
+#define PCIC_EC1_AUTO_POWER_CLEAR 0x2	/* Vcc power cleared on eject? */
+#define PCIC_EC1_LED_ENABLE 0x4		/* LED activity enable */
+#define PCIC_EC1_CARD_IRQ_INV 0x8	/* Card IRQ level inverted for pci? */
+#define PCIC_EC1_CSC_IRQ_INV 0x10	/* CSC IRQ level inverted for pci? */
+#define PCIC_EC1_PULLUP 0x20		/* Dis pullup when 1. */
 
 /* Vadem: Card Voltage Select register (PCIC_CVSR) */
 #define PCIC_CVSR_VS	0x03		/* Voltage select */

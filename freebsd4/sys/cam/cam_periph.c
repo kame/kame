@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_periph.c,v 1.24.2.1 2000/09/11 05:37:00 ken Exp $
+ * $FreeBSD: src/sys/cam/cam_periph.c,v 1.24.2.2 2002/09/22 07:15:32 peter Exp $
  */
 
 #include <sys/param.h>
@@ -330,12 +330,11 @@ camperiphunit(struct periph_driver *p_drv, path_id_t pathid,
 	char	pathbuf[32], *strval, *periph_name;
 
 	unit = 0;
-	hit = 0;
 
 	periph_name = p_drv->driver_name;
 	snprintf(pathbuf, sizeof(pathbuf), "scbus%d", pathid);
 	i = -1;
-	while ((i = resource_locate(i, periph_name)) != -1) {
+	for (hit = 0; (i = resource_locate(i, periph_name)) != -1; hit = 0) {
 		dname = resource_query_name(i);
 		dunit = resource_query_unit(i);
 		if (resource_string_value(dname, dunit, "at", &strval) == 0) {

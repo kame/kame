@@ -1,5 +1,5 @@
 /*	$NetBSD: uscanner.c,v 1.26 2001/12/31 12:15:22 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.2.2.7 2002/02/14 02:52:50 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.2.2.8 2002/08/12 14:19:49 joe Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -60,6 +60,7 @@
 #include <sys/vnode.h>
 #include <sys/poll.h>
 #include <sys/conf.h>
+#include <sys/sysctl.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -67,10 +68,13 @@
 
 #include <dev/usb/usbdevs.h>
 
-#ifdef USCANNER_DEBUG
+#ifdef USB_DEBUG
 #define DPRINTF(x)	if (uscannerdebug) logprintf x
 #define DPRINTFN(n,x)	if (uscannerdebug>(n)) logprintf x
 int	uscannerdebug = 0;
+SYSCTL_NODE(_hw_usb, OID_AUTO, uscanner, CTLFLAG_RW, 0, "USB uscanner");
+SYSCTL_INT(_hw_usb_uscanner, OID_AUTO, debug, CTLFLAG_RW,
+	   &uscannerdebug, 0, "uscanner debug level");
 #else
 #define DPRINTF(x)
 #define DPRINTFN(n,x)

@@ -17,7 +17,7 @@
  *
  * From: Version 2.4, Thu Apr 30 17:17:21 MSD 1997
  *
- * $FreeBSD: src/sys/net/if_spppsubr.c,v 1.59.2.12 2002/05/13 12:51:57 joerg Exp $
+ * $FreeBSD: src/sys/net/if_spppsubr.c,v 1.59.2.13 2002/07/03 15:44:41 joerg Exp $
  */
 
 #include <sys/param.h>
@@ -2382,17 +2382,21 @@ sppp_lcp_RCR(struct sppp *sp, struct lcp_header *h, int len)
 			break;
 
 		case LCP_OPT_ASYNC_MAP:
-			/* Async control character map -- check to be zero. */
-			if (! p[2] && ! p[3] && ! p[4] && ! p[5]) {
-				if (debug)
-					addlog("[empty] ");
-				continue;
-			}
-			if (debug)
-				addlog("[non-empty] ");
-			/* suggest a zero one */
-			p[2] = p[3] = p[4] = p[5] = 0;
-			break;
+			/*
+			 * Async control character map -- just ignore it.
+			 *
+			 * Quote from RFC 1662, chapter 6:
+			 * To enable this functionality, synchronous PPP
+			 * implementations MUST always respond to the
+			 * Async-Control-Character-Map Configuration
+			 * Option with the LCP Configure-Ack.  However,
+			 * acceptance of the Configuration Option does
+			 * not imply that the synchronous implementation
+			 * will do any ACCM mapping.  Instead, all such
+			 * octet mapping will be performed by the
+			 * asynchronous-to-synchronous converter.
+			 */
+			continue;
 
 		case LCP_OPT_MRU:
 			/*

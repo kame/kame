@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_sample.c,v 1.7.2.2 2000/10/24 18:36:46 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_sample.c,v 1.7.2.3 2002/07/02 23:44:03 archie Exp $
  * $Whistle: ng_sample.c,v 1.13 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -69,11 +69,11 @@ static ng_rcvdata_t	ng_xxx_rcvdataq; /* note these are both ng_rcvdata_t */
 static ng_disconnect_t	ng_xxx_disconnect;
 
 /* Parse type for struct ngxxxstat */
-static const struct ng_parse_struct_info
-	ng_xxx_stat_type_info = NG_XXX_STATS_TYPE_INFO;
+static const struct ng_parse_struct_field ng_xxx_stat_type_fields[]
+	= NG_XXX_STATS_TYPE_INFO;
 static const struct ng_parse_type ng_xxx_stat_type = {
 	&ng_parse_struct_type,
-	&ng_xxx_stat_type_info
+	&ng_xxx_stat_type_fields
 };
 
 /* List of commands and how to convert arguments to/from ASCII */

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-raid.c,v 1.3.2.17 2002/04/18 19:14:07 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-raid.c,v 1.3.2.18 2002/10/02 14:13:38 sos Exp $
  */
 
 #include "opt_ata.h"
@@ -121,6 +121,7 @@ ata_raiddisk_attach(struct ad_softc *adp)
     case 0x4d33105a: case 0x4d38105a: case 0x4d30105a:
     case 0x0d30105a: case 0x4d68105a: case 0x6268105a:
     case 0x4d69105a: case 0x5275105a: case 0x6269105a:
+    case 0x7275105a:
 	/* test RAID bit in PCI reg XXX */
 	return (ar_promise_read_conf(adp, ar_table, 0));
 

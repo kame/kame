@@ -37,7 +37,7 @@
  * Authors: Julian Elischer <julian@freebsd.org>
  *          Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.11.2.16 2001/12/08 19:07:51 jdp Exp $
+ * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.11.2.17 2002/07/02 23:44:02 archie Exp $
  * $Whistle: ng_base.c,v 1.39 1999/01/28 23:54:53 julian Exp $
  */
 
@@ -120,11 +120,11 @@ static	ng_ID_t nextID = 1;
 
 /* Handy structure parse type defining macro */
 #define DEFINE_PARSE_STRUCT_TYPE(lo, up, args)				\
-static const struct ng_parse_struct_info				\
-	ng_ ## lo ## _type_info = NG_GENERIC_ ## up ## _INFO args;	\
+static const struct ng_parse_struct_field				\
+	ng_ ## lo ## _type_fields[] = NG_GENERIC_ ## up ## _INFO args;	\
 static const struct ng_parse_type ng_generic_ ## lo ## _type = {	\
 	&ng_parse_struct_type,						\
-	&ng_ ## lo ## _type_info					\
+	&ng_ ## lo ## _type_fields					\
 }
 
 DEFINE_PARSE_STRUCT_TYPE(mkpeer, MKPEER, ());

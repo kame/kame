@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_vjc.h,v 1.4.4.2 2000/10/24 18:36:46 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_vjc.h,v 1.4.4.3 2002/07/02 23:44:03 archie Exp $
  * $Whistle: ng_vjc.h,v 1.6 1999/01/25 02:40:22 archie Exp $
  */
 
@@ -67,13 +67,11 @@ struct ngm_vjc_config {
 
 /* Keep this in sync with the above structure definition */
 #define NG_VJC_CONFIG_TYPE_INFO	{				\
-	{							\
 	  { "enableComp",	&ng_parse_uint8_type	},	\
 	  { "enableDecomp",	&ng_parse_uint8_type	},	\
 	  { "maxChannel",	&ng_parse_uint8_type	},	\
 	  { "compressCID",	&ng_parse_uint8_type	},	\
-	  { NULL },						\
-	}							\
+	  { NULL }						\
 }
 
  /* Netgraph commands */

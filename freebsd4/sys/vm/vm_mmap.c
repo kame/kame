@@ -38,7 +38,7 @@
  * from: Utah $Hdr: vm_mmap.c 1.6 91/10/21$
  *
  *	@(#)vm_mmap.c	8.4 (Berkeley) 1/12/94
- * $FreeBSD: src/sys/vm/vm_mmap.c,v 1.108.2.5 2001/11/03 01:41:10 ps Exp $
+ * $FreeBSD: src/sys/vm/vm_mmap.c,v 1.108.2.6 2002/07/02 20:06:19 dillon Exp $
  */
 
 /*
@@ -53,6 +53,8 @@
 #include <sys/sysproto.h>
 #include <sys/filedesc.h>
 #include <sys/proc.h>
+#include <sys/resource.h>
+#include <sys/resourcevar.h>
 #include <sys/vnode.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
@@ -1055,6 +1057,11 @@ vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
 		return (0);
 
 	objsize = size = round_page(size);
+
+	if (p->p_vmspace->vm_map.size + size >
+	    p->p_rlimit[RLIMIT_VMEM].rlim_cur) {
+		return(ENOMEM);
+	}
 
 	/*
 	 * We currently can only deal with page aligned file offsets.

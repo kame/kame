@@ -13,7 +13,7 @@
  * bad that happens because of using this software isn't the responsibility
  * of the author.  This software is distributed AS-IS.
  *
- * $FreeBSD: src/sys/sys/aio.h,v 1.13.2.6 2001/08/30 06:17:09 alc Exp $
+ * $FreeBSD: src/sys/sys/aio.h,v 1.13.2.8 2002/08/31 03:18:23 alc Exp $
  */
 
 #ifndef _SYS_AIO_H_
@@ -127,9 +127,7 @@ __END_DECLS
  * Job queue item
  */
 
-#define AIOCBLIST_CANCELLED     0x1
 #define AIOCBLIST_RUNDOWN       0x4
-#define AIOCBLIST_ASYNCFREE     0x8
 #define AIOCBLIST_DONE          0x10
 
 struct aiocblist {
@@ -142,7 +140,6 @@ struct aiocblist {
         struct	buf *bp;		/* Buffer pointer */
         struct	proc *userproc;		/* User process */
         struct	file *fd_file;		/* Pointer to file structure */ 
-	struct	aioproclist *jobaioproc;/* AIO process descriptor */
         struct	aio_liojob *lio;	/* Optional lio job */
         struct	aiocb *uuaiocb;		/* Pointer in userspace of aiocb */
 	struct	klist klist;		/* list of knotes */

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/svr4/Makefile,v 1.13.2.3 2002/02/20 15:51:33 ru Exp $
+# $FreeBSD: src/sys/modules/svr4/Makefile,v 1.13.2.5 2002/08/07 16:32:00 ru Exp $
 
 MAINTAINER=	newton@FreeBSD.org
 
@@ -38,7 +38,7 @@ opt_svr4.h:
 .endif
 
 afterinstall:
-	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
 		${.CURDIR}/svr4.sh ${DESTDIR}/usr/sbin/svr4
 
 .include <bsd.kmod.mk>

@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pptpgre.h,v 1.1.4.3 2000/10/24 18:36:46 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pptpgre.h,v 1.1.4.4 2002/07/02 23:44:03 archie Exp $
  * $Whistle: ng_pptpgre.h,v 1.3 1999/12/08 00:11:36 archie Exp $
  */
 
@@ -65,7 +65,6 @@ struct ng_pptpgre_conf {
 
 /* Keep this in sync with the above structure definition */
 #define NG_PPTPGRE_CONF_TYPE_INFO	{			\
-	{							\
 	  { "enabled",		&ng_parse_uint8_type	},	\
 	  { "enableDelayedAck",	&ng_parse_uint8_type	},	\
 	  { "enableAlwaysAck",	&ng_parse_uint8_type	},	\
@@ -73,8 +72,7 @@ struct ng_pptpgre_conf {
 	  { "peerCid",		&ng_parse_hint16_type	},	\
 	  { "recvWin",		&ng_parse_uint16_type	},	\
 	  { "peerPpd",		&ng_parse_uint16_type	},	\
-	  { NULL },						\
-	}							\
+	  { NULL }						\
 }
 
 /* Statistics struct */
@@ -99,7 +97,6 @@ struct ng_pptpgre_stats {
 
 /* Keep this in sync with the above structure definition */
 #define NG_PPTPGRE_STATS_TYPE_INFO	{			\
-	{							\
 	  { "xmitPackets",	&ng_parse_uint32_type	},	\
 	  { "xmitOctets",	&ng_parse_uint32_type	},	\
 	  { "xmitLoneAcks",	&ng_parse_uint32_type	},	\
@@ -117,7 +114,6 @@ struct ng_pptpgre_stats {
 	  { "recvAckTimeouts",	&ng_parse_uint32_type	},	\
 	  { "memoryFailures",	&ng_parse_uint32_type	},	\
 	  { NULL }						\
-	}							\
 }
 
 /* Netgraph commands */

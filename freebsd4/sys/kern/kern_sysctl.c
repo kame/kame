@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sysctl.c	8.4 (Berkeley) 4/14/94
- * $FreeBSD: src/sys/kern/kern_sysctl.c,v 1.92.2.7 2002/03/06 05:43:51 obrien Exp $
+ * $FreeBSD: src/sys/kern/kern_sysctl.c,v 1.92.2.8 2002/09/09 19:27:58 sam Exp $
  */
 
 #include "opt_compat.h"
@@ -909,6 +909,28 @@ kernel_sysctl(struct proc *p, int *name, u_int namelen, void *old, size_t *oldle
 		else
 			*retval = req.oldidx;
 	}
+	return (error);
+}
+
+int
+kernel_sysctlbyname(struct proc *p, char *name, void *old, size_t *oldlenp,
+    void *new, size_t newlen, size_t *retval)
+{
+        int oid[CTL_MAXNAME];
+        size_t oidlen, plen;
+	int error;
+
+	oid[0] = 0;		/* sysctl internal magic */
+	oid[1] = 3;		/* name2oid */
+	oidlen = sizeof(oid);
+
+	error = kernel_sysctl(p, oid, 2, oid, &oidlen,
+	    (void *)name, strlen(name), &plen);
+	if (error)
+		return (error);
+
+	error = kernel_sysctl(p, oid, plen / sizeof(int), old, oldlenp,
+	    new, newlen, retval);
 	return (error);
 }
 

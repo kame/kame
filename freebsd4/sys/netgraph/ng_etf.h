@@ -28,7 +28,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_etf.h,v 1.1.2.1 2002/04/09 20:05:47 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_etf.h,v 1.1.2.2 2002/07/02 23:44:02 archie Exp $
  */
 
 #ifndef _NETGRAPH_ETHERTYPE_FILTER_H_
@@ -65,11 +65,9 @@ struct ng_etfstat {
  * This needs to be kept in sync with the above structure definition
  */
 #define NG_ETF_STATS_TYPE_INFO	{				\
-	{							\
 	  { "packets_in",	&ng_parse_uint32_type	},	\
 	  { "packets_out",	&ng_parse_uint32_type	},	\
-	  { NULL },						\
-	}							\
+	  { NULL }						\
 }
 
 /* This structure is returned by the NGM_ETF_GET_STATUS command */
@@ -82,11 +80,9 @@ struct ng_etffilter {
  * This needs to be kept in sync with the above structure definition
  */
 #define NG_ETF_FILTER_TYPE_INFO	{				\
-	{							\
           { "matchhook",	&ng_parse_hookbuf_type  },	\
 	  { "ethertype",	&ng_parse_uint16_type   },	\
-	  { NULL },						\
-	}							\
+	  { NULL }						\
 }
 
 #endif /* _NETGRAPH_ETHERTYPE_FILTER_H_ */

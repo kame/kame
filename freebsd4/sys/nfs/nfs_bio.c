@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_bio.c	8.9 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfs/nfs_bio.c,v 1.83.2.2 2001/12/20 19:56:28 dillon Exp $
+ * $FreeBSD: src/sys/nfs/nfs_bio.c,v 1.83.2.3 2002/07/19 17:12:37 dillon Exp $
  */
 
 
@@ -996,8 +996,10 @@ again:
 
 		if (bp->b_dirtyend > 0 &&
 		    (on > bp->b_dirtyend || (on + n) < bp->b_dirtyoff)) {
-			if (VOP_BWRITE(bp->b_vp, bp) == EINTR)
-				return (EINTR);
+			if (VOP_BWRITE(bp->b_vp, bp) == EINTR) {
+				error = EINTR;
+				break;
+			}
 			goto again;
 		}
 

@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/in_rmx.c,v 1.37.2.2 2001/12/14 20:10:17 jlemon Exp $
+ * $FreeBSD: src/sys/netinet/in_rmx.c,v 1.37.2.3 2002/08/09 14:49:23 ru Exp $
  */
 
 /*
@@ -54,6 +54,7 @@
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
+#include <netinet/ip_var.h>
 
 extern int	in_inithead __P((void **head, int off));
 
@@ -135,6 +136,17 @@ in_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 			RTFREE(rt2);
 		}
 	}
+
+	/*
+	 * If the new route created successfully, and we are forwarding,
+	 * and there is a cached route, free it.  Otherwise, we may end
+	 * up using the wrong route.
+	 */
+	if (ret != NULL && ipforwarding && ipforward_rt.ro_rt) {
+		RTFREE(ipforward_rt.ro_rt);
+		ipforward_rt.ro_rt = 0;
+	}
+
 	return ret;
 }
 

@@ -38,7 +38,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumrequest.c,v 1.30 2001/01/09 04:20:55 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumrequest.c,v 1.44.2.4 2002/02/03 07:10:26 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumrequest.c,v 1.44.2.5 2002/08/28 04:30:56 grog Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -304,6 +304,7 @@ launch_requests(struct request *rq, int reviveok)
     struct rqelement *rqe;				    /* current element */
     struct drive *drive;
     int rcount;						    /* request count */
+    int s;
 
     /*
      * First find out whether we're reviving, and the
@@ -391,6 +392,7 @@ launch_requests(struct request *rq, int reviveok)
      * bottom half could be completing requests
      * before we finish, so we need splbio() protection.
      */
+    s = splbio ();
     for (rqg = rq->rqg; rqg != NULL;) {			    /* through the whole request chain */
 	if (rqg->lockbase >= 0)				    /* this rqg needs a lock first */
 	    rqg->lock = lockrange(rqg->lockbase, rqg->rq->bp, &PLEX[rqg->plexno]);
@@ -432,6 +434,7 @@ launch_requests(struct request *rq, int reviveok)
 	    }
 	}
     }
+    splx (s);
     return 0;
 }
 

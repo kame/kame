@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.13 2002/03/08 17:22:20 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.15 2002/09/26 17:32:01 mdodd Exp $
  */
 
 /*
@@ -1775,14 +1775,17 @@ vm_map_clean(map, start, end, syncio, invalidate)
 			    OFF_TO_IDX(offset),
 			    OFF_TO_IDX(offset + size + PAGE_MASK),
 			    flags);
-			if (invalidate) {
-				/*vm_object_pip_wait(object, "objmcl");*/
-				vm_object_page_remove(object,
-				    OFF_TO_IDX(offset),
-				    OFF_TO_IDX(offset + size + PAGE_MASK),
-				    FALSE);
-			}
 			VOP_UNLOCK(object->handle, 0, curproc);
+			vm_object_deallocate(object);
+		}
+		if (object && invalidate &&
+		   ((object->type == OBJT_VNODE) ||
+		    (object->type == OBJT_DEVICE))) {
+			vm_object_reference(object);
+			vm_object_page_remove(object,
+			    OFF_TO_IDX(offset),
+			    OFF_TO_IDX(offset + size + PAGE_MASK),
+			    FALSE);
 			vm_object_deallocate(object);
 		}
 		start += size;
@@ -2312,6 +2315,13 @@ vm_map_stack (vm_map_t map, vm_offset_t addrbos, vm_size_t max_ssize,
 		return (KERN_NO_SPACE);
 	}
 
+	/* If we would blow our VMEM resource limit, no go */
+	if (map->size + init_ssize >
+	    curproc->p_rlimit[RLIMIT_VMEM].rlim_cur) {
+		vm_map_unlock(map);
+		return (KERN_NO_SPACE);
+	}
+
 	/* If we can't accomodate max_ssize in the current mapping,
 	 * no go.  However, we need to be aware that subsequent user
 	 * mappings might map into the space we have reserved for
@@ -2450,6 +2460,13 @@ Retry:
 	                     p->p_rlimit[RLIMIT_STACK].rlim_cur)) {
 		grow_amount = p->p_rlimit[RLIMIT_STACK].rlim_cur -
 		              ctob(vm->vm_ssize);
+	}
+
+	/* If we would blow our VMEM resource limit, no go */
+	if (map->size + grow_amount >
+	    curproc->p_rlimit[RLIMIT_VMEM].rlim_cur) {
+		vm_map_unlock_read(map);
+		return (KERN_NO_SPACE);
 	}
 
 	if (vm_map_lock_upgrade(map))

@@ -32,7 +32,7 @@
  *
  *	@(#)stddef.h	8.1 (Berkeley) 6/2/93
  *
- * $FreeBSD: src/include/stddef.h,v 1.2.8.3 2001/05/24 19:32:09 obrien Exp $
+ * $FreeBSD: src/include/stddef.h,v 1.2.8.4 2002/08/07 15:49:32 imp Exp $
  */
 
 #ifndef _STDDEF_H_
@@ -54,9 +54,11 @@ typedef	_BSD_SIZE_T_	size_t;
 #undef	_BSD_SIZE_T_
 #endif
 
+#ifndef	__cplusplus
 #ifdef	_BSD_WCHAR_T_
 typedef	_BSD_WCHAR_T_	wchar_t;
 #undef	_BSD_WCHAR_T_
+#endif
 #endif
 
 #ifndef	NULL

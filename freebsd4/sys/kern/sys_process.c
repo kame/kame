@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/sys_process.c,v 1.51.2.3 2002/01/22 17:22:59 nectar Exp $
+ * $FreeBSD: src/sys/kern/sys_process.c,v 1.51.2.4 2002/06/17 19:23:41 alfred Exp $
  */
 
 #include <sys/param.h>
@@ -203,7 +203,7 @@ ptrace(curp, uap)
 	struct proc *curp;
 	struct ptrace_args *uap;
 {
-	struct proc *p;
+	struct proc *p, *pp;
 	struct iovec iov;
 	struct uio uio;
 	int error = 0;
@@ -240,6 +240,12 @@ ptrace(curp, uap)
 		/* Already traced */
 		if (p->p_flag & P_TRACED)
 			return EBUSY;
+
+		if (curp->p_flag & P_TRACED)
+			for (pp = curp->p_pptr; pp != NULL; pp = pp->p_pptr)
+				if (pp == p)
+					return (EINVAL);
+		  
 
 		/* not owned by you, has done setuid (unless you're root) */
 		if ((p->p_cred->p_ruid != curp->p_cred->p_ruid) ||

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agpreg.h,v 1.3.2.3 2002/04/12 16:57:54 cokane Exp $
+ *	$FreeBSD: src/sys/pci/agpreg.h,v 1.3.2.4 2002/09/13 18:16:12 anholt Exp $
  */
 
 #ifndef _PCI_AGPREG_H_
@@ -160,5 +160,20 @@
 #define AGP_I810_DRT_UNPOPULATED 0x00
 #define AGP_I810_DRT_POPULATED	0x01
 #define AGP_I810_GTT		0x10000
+ 
+/*
+ * Config registers for i830MG device 0
+ */
+#define AGP_I830_GCC1			0x52
+#define AGP_I830_GCC1_DEV2		0x08
+#define AGP_I830_GCC1_DEV2_ENABLED	0x00
+#define AGP_I830_GCC1_DEV2_DISABLED	0x08
+#define AGP_I830_GCC1_GMS		0x70
+#define AGP_I830_GCC1_GMS_STOLEN_512	0x20
+#define AGP_I830_GCC1_GMS_STOLEN_1024	0x30
+#define AGP_I830_GCC1_GMS_STOLEN_8192	0x40
+#define AGP_I830_GCC1_GMASIZE		0x01
+#define AGP_I830_GCC1_GMASIZE_64	0x01
+#define AGP_I830_GCC1_GMASIZE_128	0x00
 
 #endif /* !_PCI_AGPREG_H_ */

@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.8 (Berkeley) 4/18/94
- *	$FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.63.2.6 2002/04/08 09:39:29 bde Exp $
+ *	$FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.63.2.7 2002/07/01 00:18:51 iedowse Exp $
  */
 
 #include "opt_quota.h"
@@ -1150,7 +1150,7 @@ ext2_fhtovp(mp, fhp, vpp)
 	ufhp = (struct ufid *)fhp;
 	fs = VFSTOUFS(mp)->um_e2fs;
 	if (ufhp->ufid_ino < ROOTINO ||
-	    ufhp->ufid_ino >= fs->s_groups_count * fs->s_es->s_inodes_per_group)
+	    ufhp->ufid_ino > fs->s_groups_count * fs->s_es->s_inodes_per_group)
 		return (ESTALE);
 	return (ufs_fhtovp(mp, ufhp, vpp));
 }

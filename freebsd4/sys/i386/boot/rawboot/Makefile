@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/i386/boot/rawboot/Makefile,v 1.13 1999/08/28 00:43:30 peter Exp $
+# $FreeBSD: src/sys/i386/boot/rawboot/Makefile,v 1.13.2.1 2002/08/07 16:31:56 ru Exp $
 #
 
 PROG=	boot
@@ -75,7 +75,7 @@ rawboot:	boot.nohdr
 all:		rawboot
 
 install:
-	${INSTALL} ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE}\
+	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE}\
 		rawboot ${DESTDIR}${BINDIR}/rawboot
 
 .include <bsd.kern.mk>

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-tape.c,v 1.36.2.11 2002/03/26 09:36:43 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-tape.c,v 1.36.2.12 2002/07/31 11:19:26 sos Exp $
  */
 
 #include "opt_ata.h"
@@ -131,12 +131,12 @@ astattach(struct ata_device *atadev)
     dev = make_dev(&ast_cdevsw, dkmakeminor(stp->lun, 0, 0),
 		   UID_ROOT, GID_OPERATOR, 0640, "ast%d", stp->lun);
     dev->si_drv1 = stp;
-    dev->si_iosize_max = 252 * DEV_BSIZE;
+    dev->si_iosize_max = 256 * DEV_BSIZE;
     stp->dev1 = dev;
     dev = make_dev(&ast_cdevsw, dkmakeminor(stp->lun, 0, 1),
 		   UID_ROOT, GID_OPERATOR, 0640, "nast%d", stp->lun);
     dev->si_drv1 = stp;
-    dev->si_iosize_max = 252 * DEV_BSIZE;
+    dev->si_iosize_max = 256 * DEV_BSIZE;
     stp->dev2 = dev;
     stp->device->flags |= ATA_D_MEDIA_CHANGED;
     ast_describe(stp);

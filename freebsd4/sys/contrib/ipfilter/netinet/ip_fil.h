@@ -4,8 +4,8 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * @(#)ip_fil.h	1.35 6/5/96
- * $Id: ip_fil.h,v 2.29.2.3 2000/06/05 13:12:42 darrenr Exp $
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_fil.h,v 1.18.2.3 2002/04/27 17:37:12 darrenr Exp $
+ * $Id: ip_fil.h,v 2.29.2.33 2002/06/04 14:46:28 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_fil.h,v 1.18.2.4 2002/08/31 16:24:52 darrenr Exp $
  */
 
 #ifndef	__IP_FIL_H__
@@ -510,6 +510,7 @@ extern	int	send_reset __P((ip_t *, fr_info_t *));
 extern	int	send_icmp_err __P((ip_t *, int, fr_info_t *, int));
 extern	int	ipf_log __P((void));
 extern	struct	ifnet *get_unit __P((char *, int));
+extern	int	mbuflen __P((mb_t *));
 # if defined(__NetBSD__) || defined(__OpenBSD__) || \
 	  (_BSDI_VERSION >= 199701) || (__FreeBSD_version >= 300000)
 extern	int	iplioctl __P((dev_t, u_long, caddr_t, int));

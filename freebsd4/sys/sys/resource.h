@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)resource.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/resource.h,v 1.12 1999/12/29 04:24:46 peter Exp $
+ * $FreeBSD: src/sys/sys/resource.h,v 1.12.2.2 2002/08/20 18:42:20 dillon Exp $
  */
 
 #ifndef _SYS_RESOURCE_H_
@@ -88,8 +88,9 @@ struct	rusage {
 #define	RLIMIT_NPROC	7		/* number of processes */
 #define	RLIMIT_NOFILE	8		/* number of open files */
 #define	RLIMIT_SBSIZE	9		/* maximum size of all socket buffers */
+#define	RLIMIT_VMEM	10		/* virtual process size (inclusive of mmap) */
 
-#define	RLIM_NLIMITS	10		/* number of resource limits */
+#define	RLIM_NLIMITS	11		/* number of resource limits */
 
 #define	RLIM_INFINITY	((rlim_t)(((u_quad_t)1 << 63) - 1))
 
@@ -110,6 +111,7 @@ static char *rlimit_ident[] = {
 	"nproc",
 	"nofile",
 	"sbsize",
+	"vmem",
 };
 #endif
 

@@ -31,13 +31,15 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if.h,v 1.58.2.7 2002/02/09 23:02:39 luigi Exp $
+ * $FreeBSD: src/sys/net/if.h,v 1.58.2.9 2002/08/30 14:23:38 sobomax Exp $
  */
 
 #ifndef _NET_IF_H_
 #define	_NET_IF_H_
 
+#ifdef _KERNEL
 #include <sys/queue.h>
+#endif
 
 /*
  * <net/if.h> does not depend on <sys/time.h> on most other systems.  This
@@ -56,6 +58,7 @@ struct ifnet;
 #define		IFNAMSIZ	16
 #define		IF_NAMESIZE	IFNAMSIZ
 
+#ifdef _KERNEL
 /*
  * Structure describing a `cloning' interface.
  */
@@ -70,6 +73,7 @@ struct if_clone {
 
 #define IF_CLONE_INITIALIZER(name, create, destroy)			\
 	{ { 0 }, name, sizeof(name) - 1, create, destroy }
+#endif
 
 /*
  * Structure used to query names of interface cloners.
@@ -139,11 +143,12 @@ struct if_data {
  * IFF flags, so we have an easier time when we want to merge them.
  */
 #define	IFF_POLLING	0x10000		/* Interface is in polling mode. */
+#define	IFF_PPROMISC	0x20000		/* user-requested promisc mode */
 
 /* flags set internally only: */
 #define	IFF_CANTCHANGE \
 	(IFF_BROADCAST|IFF_POINTOPOINT|IFF_RUNNING|IFF_OACTIVE|\
-	    IFF_SIMPLEX|IFF_MULTICAST|IFF_ALLMULTI|IFF_SMART)
+	    IFF_SIMPLEX|IFF_MULTICAST|IFF_ALLMULTI|IFF_SMART|IFF_POLLING)
 
 /* Capabilities that interfaces can advertise. */
 #define IFCAP_RXCSUM		0x0001  /* can offload checksum on RX */
@@ -234,8 +239,8 @@ struct	ifreq {
 #define	ifr_addr	ifr_ifru.ifru_addr	/* address */
 #define	ifr_dstaddr	ifr_ifru.ifru_dstaddr	/* other end of p-to-p link */
 #define	ifr_broadaddr	ifr_ifru.ifru_broadaddr	/* broadcast address */
-#define	ifr_flags	ifr_ifru.ifru_flags[0]	/* flags */
-#define	ifr_prevflags	ifr_ifru.ifru_flags[1]	/* flags */
+#define	ifr_flags	ifr_ifru.ifru_flags[0]	/* flags (low 16 bits) */
+#define	ifr_flagshigh	ifr_ifru.ifru_flags[1]	/* flags (high 16 bits) */
 #define	ifr_metric	ifr_ifru.ifru_metric	/* metric */
 #define	ifr_mtu		ifr_ifru.ifru_mtu	/* mtu */
 #define ifr_phys	ifr_ifru.ifru_phys	/* physical wire */

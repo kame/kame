@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/alpha/common/Makefile.common,v 1.4.2.4 2001/05/28 05:16:26 obrien Exp $
+# $FreeBSD: src/sys/boot/alpha/common/Makefile.common,v 1.4.2.5 2002/07/17 12:34:16 ru Exp $
 #
 # Common Alpha loader build rules
 
@@ -39,6 +39,7 @@ CFLAGS+=	-I${.CURDIR}/..
 CRT=		start.o
 STRIP=
 BINDIR?=	/boot
+INSTALLFLAGS?=	-b
 
 all: ${BASE}
 
@@ -60,9 +61,6 @@ ${BASE}.help: help.common help.alpha
 	cat ${.ALLSRC} | awk -f ${.CURDIR}/../../common/merge_help.awk > ${.TARGET}
 
 beforeinstall:
-.if exists(${DESTDIR}/boot/${BASE})
-	mv ${DESTDIR}/boot/${BASE} ${DESTDIR}/boot/${BASE}.old
-.endif
 .ifdef INSTALL_HELP
 .if exists(${.OBJDIR}/${BASE}.help)
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/net/zlib.h,v 1.7 1999/12/29 04:38:38 peter Exp $	*/
+/* $FreeBSD: src/sys/net/zlib.h,v 1.7.2.1 2002/07/31 14:13:05 rwatson Exp $	*/
 
 /*
  * This file is derived from zlib.h and zconf.h from the zlib-1.0.4
@@ -88,8 +88,10 @@ extern "C" {
 #  define compress	z_compress
 #  define uncompress	z_uncompress
 #  define adler32	z_adler32
+#if 0
 #  define crc32		z_crc32
 #  define get_crc_table z_get_crc_table
+#endif
 
 #  define Byte		z_Byte
 #  define uInt		z_uInt
@@ -958,6 +960,7 @@ extern uLong EXPORT adler32 OF((uLong adler, const Bytef *buf, uInt len));
      if (adler != original_adler) error();
 */
 
+#if 0
 extern uLong EXPORT crc32   OF((uLong crc, const Bytef *buf, uInt len));
 /*
      Update a running crc with the bytes buf[0..len-1] and return the updated
@@ -973,6 +976,7 @@ extern uLong EXPORT crc32   OF((uLong crc, const Bytef *buf, uInt len));
      }
      if (crc != original_crc) error();
 */
+#endif
 
 
                         /* various hacks, don't look :) */

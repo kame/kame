@@ -28,9 +28,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ahc_pci.c,v 1.1.1.5 2002/06/21 01:20:59 suz Exp $
+ * $Id: ahc_pci.c,v 1.1.1.6 2002/10/24 05:34:26 suz Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/ahc_pci.c,v 1.29.2.9 2002/04/29 19:36:26 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/ahc_pci.c,v 1.29.2.12 2002/09/27 16:28:33 gibbs Exp $
  */
 
 #include <dev/aic7xxx/aic7xxx_osm.h>
@@ -55,10 +55,8 @@ static driver_t ahc_pci_driver = {
 	sizeof(struct ahc_softc)
 };
 
-static devclass_t ahc_devclass;
-
-DRIVER_MODULE(ahc, pci, ahc_pci_driver, ahc_devclass, 0, 0);
-DRIVER_MODULE(ahc, cardbus, ahc_pci_driver, ahc_devclass, 0, 0);
+DRIVER_MODULE(ahc_pci, pci, ahc_pci_driver, ahc_devclass, 0, 0);
+DRIVER_MODULE(ahc_pci, cardbus, ahc_pci_driver, ahc_devclass, 0, 0);
 MODULE_DEPEND(ahc_pci, ahc, 1, 1, 1);
 MODULE_VERSION(ahc_pci, 1);
 
@@ -219,8 +217,11 @@ ahc_pci_map_int(struct ahc_softc *ahc)
 	ahc->platform_data->irq =
 	    bus_alloc_resource(ahc->dev_softc, SYS_RES_IRQ, &zero,
 			       0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
-	if (ahc->platform_data->irq == NULL)
+	if (ahc->platform_data->irq == NULL) {
+		device_printf(ahc->dev_softc,
+			      "bus_alloc_resource() failed to allocate IRQ\n");
 		return (ENOMEM);
+	}
 	ahc->platform_data->irq_res_type = SYS_RES_IRQ;
 	return (ahc_map_int(ahc));
 }

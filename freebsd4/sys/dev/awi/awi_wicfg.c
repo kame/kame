@@ -1,5 +1,5 @@
 /*	$NetBSD: awi_wicfg.c,v 1.3 2000/07/06 17:22:25 onoe Exp $	*/
-/* $FreeBSD: src/sys/dev/awi/awi_wicfg.c,v 1.3.2.1 2000/12/07 04:09:39 imp Exp $ */
+/* $FreeBSD: src/sys/dev/awi/awi_wicfg.c,v 1.3.2.2 2002/06/18 08:06:15 jhay Exp $ */
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -86,7 +86,7 @@
 #include <dev/awi/am79c930var.h>
 
 #undef	_KERNEL		/* XXX */
-#include <i386/include/if_wavelan_ieee.h>	/* XXX */
+#include <dev/wi/if_wavelan_ieee.h>	/* XXX */
 #define	_KERNEL		/* XXX */
 #include <dev/awi/awireg.h>
 #include <dev/awi/awivar.h>

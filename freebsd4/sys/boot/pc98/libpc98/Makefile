@@ -1,10 +1,7 @@
-# $FreeBSD: src/sys/boot/pc98/libpc98/Makefile,v 1.3.2.4 2001/12/22 15:08:07 nyan Exp $
+# $FreeBSD: src/sys/boot/pc98/libpc98/Makefile,v 1.3.2.5 2002/07/19 18:46:29 ru Exp $
 #
 LIB=			pc98
-NOPIC=
-NOPROFILE=
 INTERNALLIB=		true
-INTERNALSTATICLIB=	true
 
 SRCS=	aout_freebsd.c bioscd.c biosdisk.c biosmem.c biospnp.c biospci.c \
 	bootinfo.c comconsole.c devicename.c elf_freebsd.c gatea20.c \

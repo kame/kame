@@ -22,11 +22,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pccard_nbk.h,v 1.4.2.1 2001/06/05 19:16:37 imp Exp $
+ * $FreeBSD: src/sys/pccard/pccard_nbk.h,v 1.4.2.2 2002/09/22 20:26:58 imp Exp $
  */
 
 #ifndef PCCARD_PCCARD_NBK_H
 #define PCCARD_PCCARD_NBK_H
+
+SYSCTL_DECL(_machdep_pccard);
 
 struct pccard_device;
 extern devclass_t pccard_devclass;

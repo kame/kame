@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_socket.c	8.5 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfs/nfs_socket.c,v 1.60.2.3 2002/04/26 00:46:07 iedowse Exp $
+ * $FreeBSD: src/sys/nfs/nfs_socket.c,v 1.60.2.5 2002/07/19 17:19:53 dillon Exp $
  */
 
 /*
@@ -706,12 +706,13 @@ errout:
 				    error,
 				 rep->r_nmp->nm_mountp->mnt_stat.f_mntfromname);
 			error = nfs_sndlock(rep);
-			if (!error)
+			if (!error) {
 				error = nfs_reconnect(rep);
-			if (!error)
-				goto tryagain;
-			else
-				nfs_sndunlock(rep);
+				if (!error)
+					goto tryagain;
+				else
+					nfs_sndunlock(rep);
+			}
 		}
 	} else {
 		if ((so = rep->r_nmp->nm_so) == NULL)
@@ -2154,7 +2155,7 @@ nfsrv_getstream(slp, waitflag)
 	register struct mbuf *m, **mpp;
 	register char *cp1, *cp2;
 	register int len;
-	struct mbuf *om, *m2, *recm = NULL;
+	struct mbuf *om, *m2, *recm;
 	u_int32_t recmark;
 
 	if (slp->ns_flag & SLP_GETSTREAM)
@@ -2199,7 +2200,11 @@ nfsrv_getstream(slp, waitflag)
 
 	    /*
 	     * Now get the record part.
+	     *
+	     * Note that slp->ns_reclen may be 0.  Linux sometimes
+	     * generates 0-length RPCs
 	     */
+	    recm = NULL;
 	    if (slp->ns_cc == slp->ns_reclen) {
 		recm = slp->ns_raw;
 		slp->ns_raw = slp->ns_rawend = (struct mbuf *)0;
@@ -2208,6 +2213,7 @@ nfsrv_getstream(slp, waitflag)
 		len = 0;
 		m = slp->ns_raw;
 		om = (struct mbuf *)0;
+
 		while (len < slp->ns_reclen) {
 			if ((len + m->m_len) > slp->ns_reclen) {
 				m2 = m_copym(m, 0, slp->ns_reclen - len,

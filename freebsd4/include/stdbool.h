@@ -23,13 +23,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/stdbool.h,v 1.4.2.1 2001/11/15 21:06:50 asmodai Exp $
+ * $FreeBSD: src/include/stdbool.h,v 1.4.2.2 2002/06/19 06:05:26 obrien Exp $
  */
 
 #ifndef _STDBOOL_H_
 #define	_STDBOOL_H_	
 
 #define	__bool_true_false_are_defined	1
+
+#ifndef __cplusplus
 
 #define	false	0
 #define	true	1
@@ -38,5 +40,7 @@
 #if __STDC_VERSION__ < 199901L
 typedef	int	_Bool;
 #endif
+
+#endif /* !__cplusplus */
 
 #endif /* !_STDBOOL_H_ */

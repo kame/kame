@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/loader/Makefile,v 1.41.2.7 2001/10/18 11:35:54 sobomax Exp $
+# $FreeBSD: src/sys/boot/i386/loader/Makefile,v 1.41.2.8 2002/07/17 12:34:16 ru Exp $
 
 BASE=		loader
 PROG=		${BASE}
@@ -6,6 +6,7 @@ PROG=		${BASE}
 STRIP=
 NEWVERSWHAT=	"bootstrap loader" i386
 BINDIR?=	/boot
+INSTALLFLAGS=	-b
 
 # architecture-specific loader code
 SRCS=		main.c conf.c
@@ -104,9 +105,6 @@ ${BASE}.help: help.common help.i386
 	cat ${.ALLSRC} | awk -f ${.CURDIR}/../../common/merge_help.awk > ${.TARGET}
 
 beforeinstall:
-.if exists(${DESTDIR}/boot/loader)
-	mv ${DESTDIR}/boot/loader ${DESTDIR}/boot/loader.old
-.endif
 .if exists(${.OBJDIR}/loader.help)
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \
 		${.OBJDIR}/${BASE}.help ${DESTDIR}/boot

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sbni/if_sbnivar.h,v 1.1.2.1 2001/12/19 20:59:28 fjoe Exp $
+ * $FreeBSD: src/sys/dev/sbni/if_sbnivar.h,v 1.1.2.3 2002/08/11 09:32:00 fjoe Exp $
  */
 
 /*
@@ -69,11 +69,11 @@ struct sbni_flags {
 struct sbni_softc {
 	struct	arpcom arpcom;		/* ethernet common */
 
-	int	base_addr;
-	int	irq;
 	int	io_rid;
-	int	irq_rid;
 	struct	resource *io_res;
+	int	io_off;
+
+	int	irq_rid;
 	struct	resource *irq_res;
 	void	*irq_handle;
 
@@ -126,7 +126,7 @@ void	sbni_attach(struct sbni_softc *, int, struct sbni_flags);
 extern u_int32_t next_sbni_unit;
 
 #ifdef SBNI_DUAL_COMPOUND
-extern struct sbni_softc *headlist;
+extern struct sbni_softc *sbni_headlist;
 
 struct sbni_softc	*connect_to_master(struct sbni_softc *);
 #endif

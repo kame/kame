@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/sysarch.h,v 1.13.2.1 2000/10/21 01:42:52 bsd Exp $
+ * $FreeBSD: src/sys/i386/include/sysarch.h,v 1.13.2.1.10.1 2002/10/07 17:36:04 jhb Exp $
  */
 
 /*
@@ -48,9 +48,9 @@
 #define I386_VM86	6
 
 struct i386_ldt_args {
-	int	start;
+	unsigned int start;
 	union	descriptor *descs;
-	int	num;
+	unsigned int num;
 }; 
 
 struct i386_ioperm_args {

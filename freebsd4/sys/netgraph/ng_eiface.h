@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  * 	$Id: ng_eiface.h,v 1.4 2000/03/06 09:46:14 vitaly Exp $
- * $FreeBSD: src/sys/netgraph/ng_eiface.h,v 1.2.2.1 2002/04/15 00:16:02 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_eiface.h,v 1.2.2.2 2002/07/02 23:44:02 archie Exp $
  */
 
 #ifndef _NETGRAPH_EIFACE_H_
@@ -69,18 +69,16 @@ struct ng_eiface_par {
     u_char oct5;
 };
 
-static const struct ng_parse_struct_info ng_eiface_par_fields = {
-  {
-    { "oct0",		&ng_parse_int8_type	},
-    { "oct1",		&ng_parse_int8_type	},
-    { "oct2",		&ng_parse_int8_type	},
-    { "oct3",		&ng_parse_int8_type	},
-    { "oct4",		&ng_parse_int8_type	},
-    { "oct5",		&ng_parse_int8_type	},
-    { NULL },
-  }
-};
-
+/* Keep this in sync with the above structure definition */
+#define NG_EIFACE_PAR_FIELDS	{				\
+    { "oct0",		&ng_parse_int8_type	},		\
+    { "oct1",		&ng_parse_int8_type	},		\
+    { "oct2",		&ng_parse_int8_type	},		\
+    { "oct3",		&ng_parse_int8_type	},		\
+    { "oct4",		&ng_parse_int8_type	},		\
+    { "oct5",		&ng_parse_int8_type	},		\
+    { NULL }							\
+}
 static const struct ng_parse_type ng_eiface_par_type = {
 	&ng_parse_struct_type,
 	&ng_eiface_par_fields

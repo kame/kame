@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_iface.c,v 1.7.2.4 2001/01/10 07:16:09 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_iface.c,v 1.7.2.5 2002/07/02 23:44:02 archie Exp $
  * $Whistle: ng_iface.c,v 1.33 1999/11/01 09:24:51 julian Exp $
  */
 
@@ -139,11 +139,11 @@ static const struct ng_parse_type ng_iface_ifname_type = {
 };
 
 /* Parse type for struct ng_cisco_ipaddr */
-static const struct ng_parse_struct_info
-	ng_cisco_ipaddr_type_info = NG_CISCO_IPADDR_TYPE_INFO;
+static const struct ng_parse_struct_field ng_cisco_ipaddr_type_fields[]
+	= NG_CISCO_IPADDR_TYPE_INFO;
 static const struct ng_parse_type ng_cisco_ipaddr_type = {
 	&ng_parse_struct_type,
-	&ng_cisco_ipaddr_type_info
+	&ng_cisco_ipaddr_type_fields
 };
 
 /* List of commands and how to convert arguments to/from ASCII */

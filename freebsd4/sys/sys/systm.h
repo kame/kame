@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
- * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.14 2002/04/27 00:57:39 mux Exp $
+ * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.17 2002/07/31 17:30:48 imp Exp $
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -112,6 +112,8 @@ void	*phashinit __P((int count, struct malloc_type *type, u_long *nentries));
 
 void	cpu_boot __P((int));
 void	cpu_rootconf __P((void));
+extern uint32_t crc32_tab[];
+uint32_t crc32(const void *buf, size_t size);
 void	init_param1 __P((void));
 void	init_param2 __P((int physpages));
 void	tablefull __P((const char *));

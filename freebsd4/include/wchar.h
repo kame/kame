@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/wchar.h,v 1.3.2.1 2001/07/11 23:48:38 obrien Exp $
+ * $FreeBSD: src/include/wchar.h,v 1.3.2.2 2002/08/08 02:42:29 imp Exp $
  */
 
 /*-
@@ -73,9 +73,11 @@
 #define NULL	0
 #endif
 
+#ifndef __cplusplus
 #ifdef	_BSD_WCHAR_T_
 typedef	_BSD_WCHAR_T_	wchar_t;
 #undef	_BSD_WCHAR_T_
+#endif
 #endif
 
 #ifdef	_BSD_MBSTATE_T_

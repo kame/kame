@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)subr_prf.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/subr_prf.c,v 1.61.2.4 2002/05/14 20:43:44 dwmalone Exp $
+ * $FreeBSD: src/sys/kern/subr_prf.c,v 1.61.2.5 2002/08/31 18:22:08 dwmalone Exp $
  */
 
 #include <sys/param.h>
@@ -93,6 +93,7 @@ static int msgbufmapped;		/* Set when safe to use msgbuf */
 int msgbuftrigger;
 
 static int      log_console_output = 1;
+TUNABLE_INT("kern.log_console_output", &log_console_output);
 SYSCTL_INT(_kern, OID_AUTO, log_console_output, CTLFLAG_RW,
     &log_console_output, 0, "");
 

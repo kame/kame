@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pppoe.c,v 1.23.2.11 2002/03/26 11:40:20 brian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pppoe.c,v 1.23.2.17 2002/07/02 22:17:18 archie Exp $
  * $Whistle: ng_pppoe.c,v 1.10 1999/11/01 09:24:52 julian Exp $
  */
 #if 0
@@ -123,7 +123,7 @@ struct sess_neg {
 	struct callout_handle	timeout_handle;   /* see timeout(9) */
 	u_int			timeout; /* 0,1,2,4,8,16 etc. seconds */
 	u_int			numtags;
-	struct pppoe_tag	*tags[NUMTAGS];
+	const struct pppoe_tag	*tags[NUMTAGS];
 	u_int			service_len;
 	u_int			ac_name_len;
 
@@ -198,7 +198,8 @@ union uniq {
 static void	pppoe_start(sessp sp);
 static void	sendpacket(sessp sp);
 static void	pppoe_ticker(void *arg);
-static struct pppoe_tag* scan_tags(sessp	sp, struct pppoe_hdr* ph);
+static const	struct pppoe_tag *scan_tags(sessp sp,
+			const struct pppoe_hdr* ph);
 static	int	pppoe_send_event(sessp sp, enum cmd cmdid);
 
 /*************************************************************************
@@ -249,10 +250,11 @@ restart:
 /*
  * Return the location where the next tag can be put 
  */
-static __inline struct pppoe_tag*
-next_tag(struct pppoe_hdr* ph)
+static __inline const struct pppoe_tag*
+next_tag(const struct pppoe_hdr* ph)
 {
-	return (struct pppoe_tag*)(((char*)&ph->tag[0]) + ntohs(ph->length));
+	return (const struct pppoe_tag*)(((const char*)&ph->tag[0])
+	    + ntohs(ph->length));
 }
 
 /*
@@ -260,28 +262,28 @@ next_tag(struct pppoe_hdr* ph)
  * Don't trust any length the other end says.
  * but assume we already sanity checked ph->length.
  */
-static struct pppoe_tag*
-get_tag(struct pppoe_hdr* ph, u_int16_t idx)
+static const struct pppoe_tag*
+get_tag(const struct pppoe_hdr* ph, u_int16_t idx)
 {
-	char *end = (char *)next_tag(ph);
-	char *ptn;
-	struct pppoe_tag *pt = &ph->tag[0];
+	const char *const end = (const char *)next_tag(ph);
+	const char *ptn;
+	const struct pppoe_tag *pt = &ph->tag[0];
 	/*
 	 * Keep processing tags while a tag header will still fit.
 	 */
 AAA
-	while((char*)(pt + 1) <= end) {
+	while((const char*)(pt + 1) <= end) {
 	    /*
 	     * If the tag data would go past the end of the packet, abort.
 	     */
-	    ptn = (((char *)(pt + 1)) + ntohs(pt->tag_len));
+	    ptn = (((const char *)(pt + 1)) + ntohs(pt->tag_len));
 	    if(ptn > end)
 		return NULL;
 
 	    if(pt->tag_type == idx)
 		return pt;
 
-	    pt = (struct pppoe_tag*)ptn;
+	    pt = (const struct pppoe_tag*)ptn;
 	}
 	return NULL;
 }
@@ -304,7 +306,7 @@ AAA
 }
 
 static void
-insert_tag(sessp sp, struct pppoe_tag *tp)
+insert_tag(sessp sp, const struct pppoe_tag *tp)
 {
 	int	i;
 	negp neg;
@@ -333,7 +335,7 @@ AAA
 static void
 make_packet(sessp sp) {
 	struct pppoe_full_hdr *wh = &sp->neg->pkt->pkt_header;
-	struct pppoe_tag **tag;
+	const struct pppoe_tag **tag;
 	char *dp;
 	int count;
 	int tlen;
@@ -353,7 +355,7 @@ AAA
 			sp->neg->numtags = count;
 			break;	/* XXX chop off what's too long */
 		}
-		bcopy((char *)*tag, (char *)dp, tlen);
+		bcopy(*tag, (char *)dp, tlen);
 		length += tlen;
 		dp += tlen;
 	}
@@ -377,7 +379,7 @@ AAA
 #define NG_MATCH_ANY	2
 
 static hook_p
-pppoe_match_svc(node_p node, char *svc_name, int svc_len, int match)
+pppoe_match_svc(node_p node, const char *svc_name, int svc_len, int match)
 {
 	sessp	sp	= NULL;
 	negp	neg	= NULL;
@@ -424,7 +426,7 @@ AAA
  * Routine to find a particular session that matches an incoming packet	  *
  **************************************************************************/
 static hook_p
-pppoe_findsession(node_p node, struct pppoe_full_hdr *wh)
+pppoe_findsession(node_p node, const struct pppoe_full_hdr *wh)
 {
 	sessp	sp = NULL;
 	hook_p hook = NULL;
@@ -455,7 +457,7 @@ AAA
 }
 
 static hook_p
-pppoe_finduniq(node_p node, struct pppoe_tag *tag)
+pppoe_finduniq(node_p node, const struct pppoe_tag *tag)
 {
 	hook_p hook = NULL;
 	priv_p	privp = node->private;
@@ -819,9 +821,9 @@ AAA
 }
 
 static int
-send_acname(sessp sp, struct pppoe_tag *tag)
+send_acname(sessp sp, const struct pppoe_tag *tag)
 {
-	int error;
+	int error, tlen;
 	struct ng_mesg *msg;
 	struct ngpppoe_sts *sts;
 
@@ -831,8 +833,26 @@ send_acname(sessp sp, struct pppoe_tag *tag)
 		return (ENOMEM);
 
 	sts = (struct ngpppoe_sts *)msg->data;
-	strncpy(sts->hook, tag->tag_data,
-	    min(NG_HOOKLEN + 1, ntohs(tag->tag_len)));
+	tlen = min(NG_HOOKLEN, ntohs(tag->tag_len));
+	strncpy(sts->hook, tag->tag_data, tlen);
+	sts->hook[tlen] = '\0';
+	error = ng_send_msg(sp->hook->node, msg, sp->creator, NULL);
+
+	return (error);
+}
+
+static int
+send_sessionid(sessp sp)
+{
+	int error;
+	struct ng_mesg *msg;
+
+	NG_MKMESSAGE(msg, NGM_PPPOE_COOKIE, NGM_PPPOE_SESSIONID,
+	    sizeof(u_int16_t), M_NOWAIT);
+	if (msg == NULL)
+		return (ENOMEM);
+
+	*(u_int16_t *)msg->data = sp->Session_ID;
 	error = ng_send_msg(sp->hook->node, msg, sp->creator, NULL);
 
 	return (error);
@@ -849,13 +869,13 @@ ng_pppoe_rcvdata(hook_p hook, struct mbuf *m, meta_p meta)
 	node_p			node = hook->node;
 	const priv_p		privp = node->private;
 	sessp			sp = hook->private;
-	struct pppoe_full_hdr	*wh;
-	struct pppoe_hdr	*ph;
+	const struct pppoe_full_hdr *wh;
+	const struct pppoe_hdr	*ph;
 	int			error = 0;
 	u_int16_t		session;
 	u_int16_t		length;
 	u_int8_t		code;
-	struct pppoe_tag	*utag = NULL, *tag = NULL;
+	const struct pppoe_tag	*utag = NULL, *tag = NULL;
 	hook_p 			sendhook;
 	struct {
 		struct pppoe_tag hdr;
@@ -1052,6 +1072,7 @@ AAA
 					neg->pkt->pkt_header.ph.sid =
 					    htons(sp->Session_ID
 						= get_new_sid(node));
+				send_sessionid(sp);
 				neg->timeout = 0;
 				/*
 				 * start working out the tags to respond with.
@@ -1119,6 +1140,7 @@ AAA
 				    neg->timeout_handle);
 				neg->pkt->pkt_header.ph.sid = wh->ph.sid;
 				sp->Session_ID = ntohs(wh->ph.sid);
+				send_sessionid(sp);
 				neg->timeout = 0;
 				sp->state = PPPOE_CONNECTED;
 				/*
@@ -1578,21 +1600,21 @@ AAA
  * output packet. Don't do any tags that have been handled in the main
  * state machine.
  */
-static struct pppoe_tag* 
-scan_tags(sessp	sp, struct pppoe_hdr* ph)
+static const struct pppoe_tag* 
+scan_tags(sessp	sp, const struct pppoe_hdr* ph)
 {
-	char *end = (char *)next_tag(ph);
-	char *ptn;
-	struct pppoe_tag *pt = &ph->tag[0];
+	const char *const end = (const char *)next_tag(ph);
+	const char *ptn;
+	const struct pppoe_tag *pt = &ph->tag[0];
 	/*
 	 * Keep processing tags while a tag header will still fit.
 	 */
 AAA
-	while((char*)(pt + 1) <= end) {
+	while((const char*)(pt + 1) <= end) {
 		/*
 		 * If the tag data would go past the end of the packet, abort.
 		 */
-		ptn = (((char *)(pt + 1)) + ntohs(pt->tag_len));
+		ptn = (((const char *)(pt + 1)) + ntohs(pt->tag_len));
 		if(ptn > end)
 			return NULL;
 
@@ -1612,7 +1634,7 @@ AAA
 		case	PTT_GEN_ERR:
 			break;
 		}
-		pt = (struct pppoe_tag*)ptn;
+		pt = (const struct pppoe_tag*)ptn;
 	}
 	return NULL;
 }

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-pci.c,v 1.32.2.8 2002/04/29 18:21:18 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-pci.c,v 1.32.2.12 2002/10/02 14:13:38 sos Exp $
  */
 
 #include <sys/param.h>
@@ -146,6 +146,9 @@ ata_pci_match(device_t dev)
     case 0x248b8086:
 	return "Intel ICH3 ATA100 controller";
 
+    case 0x24cb8086:
+	return "Intel ICH4 ATA100 controller";
+
     case 0x522910b9:
 	if (pci_get_revid(dev) >= 0xc4)
 	    return "AcerLabs Aladdin ATA100 controller";
@@ -178,6 +181,8 @@ ata_pci_match(device_t dev)
 	    return "VIA 8233 ATA100 controller";
 	if (ata_find_dev(dev, 0x31471106, 0))
 	    return "VIA 8233 ATA133 controller";
+	if (ata_find_dev(dev, 0x31771106, 0))
+	    return "VIA 8235 ATA133 controller";
 	return "VIA Apollo ATA controller";
 
     case 0x55131039:
@@ -201,6 +206,9 @@ ata_pci_match(device_t dev)
 	    return "SiS 5591 ATA66 controller";
 	else
 	    return "SiS 5591 ATA33 controller";
+
+    case 0x06801095:
+	return "Sil 0680 ATA133 controller";
 
     case 0x06491095:
 	return "CMD 649 ATA100 controller";
@@ -243,6 +251,7 @@ ata_pci_match(device_t dev)
     case 0x4d33105a:
 	return "Promise ATA33 controller";
 
+    case 0x0d38105a:
     case 0x4d38105a:
 	return "Promise ATA66 controller";
 
@@ -274,6 +283,7 @@ ata_pci_match(device_t dev)
     case 0x4d69105a:
     case 0x5275105a:
     case 0x6269105a: 
+    case 0x7275105a: 
 	return "Promise TX2 ATA133 controller";
 
     case 0x00041103:
@@ -491,6 +501,14 @@ ata_pci_attach(device_t dev)
 			 (pci_get_revid(dev) >= 0x92) ? 0x03 : 0x02, 1);
 	break;
 
+    case 0x06801095: /* Sil 0680 set ATA reference clock speed */
+	if ((pci_read_config(dev, 0x8a, 1) & 0x30) != 0x10)
+	    pci_write_config(dev, 0x8a, 
+			     (pci_read_config(dev, 0x8a, 1) & 0x0F) | 0x10, 1);
+	if ((pci_read_config(dev, 0x8a, 1) & 0x30) != 0x10)
+	    device_printf(dev, "Sil 0680 could not set clock\n");
+	break;
+
     case 0x06461095: /* CMD 646 enable interrupts, set DMA read mode */
 	pci_write_config(dev, 0x71, 0x01, 1);
 	break;
@@ -556,9 +574,10 @@ ata_pci_intr(struct ata_channel *ch)
 	break;
 
     case 0x4d33105a:	/* Promise Ultra/Fasttrak 33 */
+    case 0x0d38105a:	/* Promise Fasttrak 66 */
     case 0x4d38105a:	/* Promise Ultra/Fasttrak 66 */
-    case 0x4d30105a:	/* Promise Ultra/Fasttrak 100 */
     case 0x0d30105a:	/* Promise OEM ATA100 */
+    case 0x4d30105a:	/* Promise Ultra/Fasttrak 100 */
 	if (!(ATA_INL(ch->r_bmio, (ch->unit ? 0x14 : 0x1c)) &
 	      (ch->unit ? 0x00004000 : 0x00000400)))
 	    return 1;
@@ -569,6 +588,7 @@ ata_pci_intr(struct ata_channel *ch)
     case 0x4d69105a:	/* Promise TX2 ATA133 */
     case 0x5275105a:	/* Promise TX2 ATA133 */
     case 0x6269105a:	/* Promise TX2 ATA133 */
+    case 0x7275105a:	/* Promise TX2 ATA133 */
 	ATA_OUTB(ch->r_bmio, ATA_BMDEVSPEC_0, 0x0b);
 	if (!(ATA_INB(ch->r_bmio, ATA_BMDEVSPEC_1) & 0x20))
 	    return 1;

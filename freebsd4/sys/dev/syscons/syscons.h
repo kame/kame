@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/syscons.h,v 1.60.2.5 2001/08/01 10:42:32 yokota Exp $
+ * $FreeBSD: src/sys/dev/syscons/syscons.h,v 1.60.2.6 2002/09/15 22:30:45 dd Exp $
  */
 
 #ifndef _DEV_SYSCONS_SYSCONS_H_
@@ -178,6 +178,7 @@ typedef struct sc_softc {
 #define	SC_SCRN_IDLE	(1 << 5)
 #define	SC_SCRN_BLANKED	(1 << 6)
 #define	SC_SAVER_FAILED	(1 << 7)
+#define	SC_SCRN_VTYLOCK	(1 << 8)
 
 #define	SC_INIT_DONE	(1 << 16)
 #define	SC_SPLASH_SCRN	(1 << 17)

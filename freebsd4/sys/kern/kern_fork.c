@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_fork.c	8.6 (Berkeley) 4/8/94
- * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.10 2002/02/26 05:32:43 silby Exp $
+ * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.11 2002/07/30 19:05:00 silby Exp $
  */
 
 #include "opt_ktrace.h"
@@ -226,7 +226,7 @@ fork1(p1, flags, procp)
 	/*
 	 * Although process entries are dynamically created, we still keep
 	 * a global limit on the maximum number we will create.  Don't allow
-	 * a nonprivileged user to use the last process; don't let root
+	 * a nonprivileged user to use the last ten processes; don't let root
 	 * exceed the limit. The variable nprocs is the current number of
 	 * processes, maxproc is the limit.
 	 */

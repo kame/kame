@@ -64,7 +64,7 @@
  *
  *	@(#)swap_pager.c	8.9 (Berkeley) 3/21/94
  *
- * $FreeBSD: src/sys/vm/swap_pager.c,v 1.130.2.11 2001/10/03 05:31:51 dillon Exp $
+ * $FreeBSD: src/sys/vm/swap_pager.c,v 1.130.2.12 2002/08/31 21:15:55 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -301,9 +301,9 @@ swap_pager_swap_init()
 	 * Initialize our zone.  Right now I'm just guessing on the number
 	 * we need based on the number of pages in the system.  Each swblock
 	 * can hold 16 pages, so this is probably overkill.  This reservation
-	 * is typically limited to around 70MB by default.
+	 * is typically limited to around 32MB by default.
 	 */
-	n = cnt.v_page_count;
+	n = cnt.v_page_count / 2;
 	if (maxswzone && n > maxswzone / sizeof(struct swblock))
 		n = maxswzone / sizeof(struct swblock);
 	n2 = n;

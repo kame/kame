@@ -1,5 +1,5 @@
 /*	$NetBSD: pcmciavar.h,v 1.9 1998/12/29 09:00:28 marc Exp $	*/
-/* $FreeBSD: src/sys/dev/pccard/pccardvar.h,v 1.6.2.2 2001/06/21 05:32:36 imp Exp $ */
+/* $FreeBSD: src/sys/dev/pccard/pccardvar.h,v 1.6.2.3 2002/09/01 05:45:51 imp Exp $ */
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -275,6 +275,15 @@ void	pccard_io_unmap(struct pccard_function *, int);
 /* ivar interface */
 enum {
 	PCCARD_IVAR_ETHADDR,	/* read ethernet address from CIS tupple */
+	PCCARD_IVAR_VENDOR,
+	PCCARD_IVAR_PRODUCT,
+	PCCARD_IVAR_PRODEXT,
+	PCCARD_IVAR_FUNCTION_NUMBER,
+	PCCARD_IVAR_VENDOR_STR,	/* CIS string for "Manufacturer" */
+	PCCARD_IVAR_PRODUCT_STR,/* CIS strnig for "Product" */
+	PCCARD_IVAR_CIS3_STR,
+	PCCARD_IVAR_CIS4_STR,
+	PCCARD_IVAR_FUNCTION
 };
 
 /* read ethernet address from CIS tupple */

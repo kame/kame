@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/linux/Makefile,v 1.34.2.9 2001/11/05 19:08:24 marcel Exp $
+# $FreeBSD: src/sys/modules/linux/Makefile,v 1.34.2.11 2002/08/07 16:32:00 ru Exp $
 
 MAINTAINER=	marcel@FreeBSD.org
 
@@ -35,7 +35,7 @@ opt_compat.h:
 	echo "#define COMPAT_43 1" > opt_compat.h
 
 afterinstall:
-	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
 		${.CURDIR}/linux.sh ${DESTDIR}/usr/sbin/linux
 
 .include <bsd.kmod.mk>

@@ -27,7 +27,7 @@
  *	i4b_ing.c - isdn4bsd B-channel to netgraph driver
  *	-------------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/driver/i4b_ing.c,v 1.10.2.3 2002/01/01 09:49:50 hm Exp $
+ * $FreeBSD: src/sys/i4b/driver/i4b_ing.c,v 1.10.2.4 2002/07/02 23:44:02 archie Exp $
  *
  *	last edit-date: [Tue Jan  1 10:43:58 2002]
  *
@@ -154,11 +154,9 @@ struct ngingstat {
  * This needs to be kept in sync with the above structure definition
  */
 #define NG_ING_STATS_TYPE_INFO	{				\
-	{							\
 	  { "packets_in",	&ng_parse_int32_type	},	\
 	  { "packets_out",	&ng_parse_int32_type	},	\
 	  { NULL },						\
-	}							\
 }
 
 /*
@@ -176,11 +174,12 @@ static ng_disconnect_t	ng_ing_disconnect;
 
 /* Parse type for struct ngingstat */
 static const struct
-	ng_parse_struct_info ng_ing_stat_type_info = NG_ING_STATS_TYPE_INFO;
+	ng_parse_struct_field ng_ing_stat_type_fields[] =
+	NG_ING_STATS_TYPE_INFO;
 
 static const struct ng_parse_type ng_ing_stat_type = {
 	&ng_parse_struct_type,
-	&ng_ing_stat_type_info
+	&ng_ing_stat_type_fields
 };
 
 /* List of commands and how to convert arguments to/from ASCII */

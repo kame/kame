@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_mbuf.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.51.2.13 2002/05/06 20:07:13 silby Exp $
+ * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.51.2.20 2002/08/12 22:09:12 luigi Exp $
  */
 
 #include "opt_param.h"
@@ -545,6 +545,58 @@ m_getclr(how, type)
 }
 
 /*
+ * m_getcl() returns an mbuf with an attached cluster.
+ * Because many network drivers use this kind of buffers a lot, it is
+ * convenient to keep a small pool of free buffers of this kind.
+ * Even a small size such as 10 gives about 10% improvement in the
+ * forwarding rate in a bridge or router.
+ * The size of this free list is controlled by the sysctl variable
+ * mcl_pool_max. The list is populated on m_freem(), and used in
+ * m_getcl() if elements are available.
+ */
+static struct mbuf *mcl_pool;
+static int mcl_pool_now;
+static int mcl_pool_max = 0;
+ 
+SYSCTL_INT(_kern_ipc, OID_AUTO, mcl_pool_max, CTLFLAG_RW, &mcl_pool_max, 0,
+           "Maximum number of mbufs+cluster in free list");
+SYSCTL_INT(_kern_ipc, OID_AUTO, mcl_pool_now, CTLFLAG_RD, &mcl_pool_now, 0,
+           "Current number of mbufs+cluster in free list");
+
+struct mbuf *
+m_getcl(int how, short type, int flags)
+{
+	int s = splimp();
+	struct mbuf *mp;
+
+	if (flags & M_PKTHDR) {
+		if (type == MT_DATA && mcl_pool) {
+			mp = mcl_pool;
+			mcl_pool = mp->m_nextpkt;
+			mcl_pool_now--;
+			splx(s);
+			mp->m_nextpkt = NULL;
+			mp->m_data = mp->m_ext.ext_buf;
+			mp->m_flags = M_PKTHDR|M_EXT;
+			mp->m_pkthdr.rcvif = NULL;
+			mp->m_pkthdr.csum_flags = 0;
+			return mp;
+		} else
+			MGETHDR(mp, how, type);
+	} else
+		MGET(mp, how, type);
+	if (mp) {
+		MCLGET(mp, how);
+		if ( (mp->m_flags & M_EXT) == 0) {
+			m_free(mp);
+			mp = NULL;
+		}
+	}
+	splx(s);
+	return mp;
+}
+
+/*
  * struct mbuf *
  * m_getm(m, len, how, type)
  *
@@ -652,9 +704,33 @@ void
 m_freem(m)
 	struct mbuf *m;
 {
-	while (m) {
-		m = m_free(m);
+	int s = splimp();
+
+	/*
+	 * Try to keep a small pool of mbuf+cluster for quick use in
+	 * device drivers. A good candidate is a M_PKTHDR buffer with
+	 * only one cluster attached. Other mbufs, or those exceeding
+	 * the pool size, are just m_free'd in the usual way.
+	 * The following code makes sure that m_next, m_type,
+	 * m_pkthdr.aux and m_ext.* are properly initialized.
+	 * Other fields in the mbuf are initialized in m_getcl()
+	 * upon allocation.
+	 */
+        if (mcl_pool_now < mcl_pool_max && m && m->m_next == NULL &&
+            (m->m_flags & (M_PKTHDR|M_EXT)) == (M_PKTHDR|M_EXT) &&
+            m->m_type == MT_DATA && M_EXT_WRITABLE(m) ) {
+		if (m->m_pkthdr.aux) {
+			m_freem(m->m_pkthdr.aux);
+			m->m_pkthdr.aux = NULL;
+		}
+                m->m_nextpkt = mcl_pool;
+                mcl_pool = m;
+                mcl_pool_now++;
+        } else {
+		while (m)
+			m = m_free(m);
 	}
+	splx(s);
 }
 
 /*
@@ -744,11 +820,16 @@ m_copym(m, off0, len, wait)
 		n->m_len = min(len, m->m_len - off);
 		if (m->m_flags & M_EXT) {
 			n->m_data = m->m_data + off;
-			if(!m->m_ext.ext_ref)
-				mclrefcnt[mtocl(m->m_ext.ext_buf)]++;
-			else
-				(*(m->m_ext.ext_ref))(m->m_ext.ext_buf,
-							m->m_ext.ext_size);
+			if (m->m_ext.ext_ref == NULL) {
+				atomic_add_char(
+				    &mclrefcnt[mtocl(m->m_ext.ext_buf)], 1);
+			} else {
+				int s = splimp();
+
+				(*m->m_ext.ext_ref)(m->m_ext.ext_buf,
+				    m->m_ext.ext_size);
+				splx(s);
+			}
 			n->m_ext = m->m_ext;
 			n->m_flags |= M_EXT;
 		} else
@@ -794,11 +875,15 @@ m_copypacket(m, how)
 	n->m_len = m->m_len;
 	if (m->m_flags & M_EXT) {
 		n->m_data = m->m_data;
-		if(!m->m_ext.ext_ref)
-			mclrefcnt[mtocl(m->m_ext.ext_buf)]++;
-		else
-			(*(m->m_ext.ext_ref))(m->m_ext.ext_buf,
-						m->m_ext.ext_size);
+		if (m->m_ext.ext_ref == NULL)
+			atomic_add_char(&mclrefcnt[mtocl(m->m_ext.ext_buf)], 1);
+		else {
+			int s = splimp();
+
+			(*m->m_ext.ext_ref)(m->m_ext.ext_buf,
+			    m->m_ext.ext_size);
+			splx(s);
+		}
 		n->m_ext = m->m_ext;
 		n->m_flags |= M_EXT;
 	} else {
@@ -818,11 +903,16 @@ m_copypacket(m, how)
 		n->m_len = m->m_len;
 		if (m->m_flags & M_EXT) {
 			n->m_data = m->m_data;
-			if(!m->m_ext.ext_ref)
-				mclrefcnt[mtocl(m->m_ext.ext_buf)]++;
-			else
-				(*(m->m_ext.ext_ref))(m->m_ext.ext_buf,
-							m->m_ext.ext_size);
+			if (m->m_ext.ext_ref == NULL) {
+				atomic_add_char(
+				    &mclrefcnt[mtocl(m->m_ext.ext_buf)], 1);
+			} else {
+				int s = splimp();
+
+				(*m->m_ext.ext_ref)(m->m_ext.ext_buf,
+				    m->m_ext.ext_size);
+				splx(s);
+			}
 			n->m_ext = m->m_ext;
 			n->m_flags |= M_EXT;
 		} else {
@@ -1118,6 +1208,11 @@ bad:
  * Partition an mbuf chain in two pieces, returning the tail --
  * all but the first len0 bytes.  In case of failure, it returns NULL and
  * attempts to restore the chain to its original state.
+ *
+ * Note that the resulting mbufs might be read-only, because the new
+ * mbuf can end up sharing an mbuf cluster with the original mbuf if
+ * the "breaking point" happens to lie within a cluster mbuf. Use the
+ * M_WRITABLE() macro to check for this case.
  */
 struct mbuf *
 m_split(m0, len0, wait)
@@ -1168,12 +1263,15 @@ extpacket:
 	if (m->m_flags & M_EXT) {
 		n->m_flags |= M_EXT;
 		n->m_ext = m->m_ext;
-		if(!m->m_ext.ext_ref)
-			mclrefcnt[mtocl(m->m_ext.ext_buf)]++;
-		else
-			(*(m->m_ext.ext_ref))(m->m_ext.ext_buf,
-						m->m_ext.ext_size);
-		m->m_ext.ext_size = 0; /* For Accounting XXXXXX danger */
+		if (m->m_ext.ext_ref == NULL)
+			atomic_add_char(&mclrefcnt[mtocl(m->m_ext.ext_buf)], 1);
+		else {
+			int s = splimp();
+
+			(*m->m_ext.ext_ref)(m->m_ext.ext_buf,
+			    m->m_ext.ext_size);
+			splx(s);
+		}
 		n->m_data = m->m_data + len;
 	} else {
 		bcopy(mtod(m, caddr_t) + len, mtod(n, caddr_t), remain);

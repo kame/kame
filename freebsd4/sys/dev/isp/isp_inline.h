@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_inline.h,v 1.6.2.11 2002/04/16 21:41:22 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp_inline.h,v 1.6.2.12 2002/07/29 04:20:46 mjacob Exp $ */
 /*
  * Qlogic Host Adapter Inline Functions
  *
@@ -209,7 +209,7 @@ isp_fc_runstate(struct ispsoftc *isp, int tval)
 	fcparam *fcp;
 	int *tptr;
 
-	if (IS_SCSI(isp) || isp->isp_role == ISP_ROLE_NONE)
+	if (IS_SCSI(isp))
 		return (0);
 
 	tptr = tval? &tval : NULL;

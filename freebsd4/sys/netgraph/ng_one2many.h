@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@FreeBSD.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_one2many.h,v 1.1.2.2 2000/12/15 17:56:03 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_one2many.h,v 1.1.2.3 2002/07/02 23:44:02 archie Exp $
  */
 
 #ifndef _NETGRAPH_NG_ONE2MANY_H_
@@ -72,12 +72,10 @@ struct ng_one2many_config {
 
 /* Keep this in sync with the above structure definition */
 #define NG_ONE2MANY_CONFIG_TYPE_INFO(atype)	{		\
-	{							\
 	  { "xmitAlg",		&ng_parse_uint32_type	},	\
 	  { "failAlg",		&ng_parse_uint32_type	},	\
 	  { "enabledLinks",	(atype)			},	\
 	  { NULL }						\
-	}							\
 }
 
 /* Statistics structure (one for each link) */
@@ -90,13 +88,11 @@ struct ng_one2many_link_stats {
 
 /* Keep this in sync with the above structure definition */
 #define NG_ONE2MANY_LINK_STATS_TYPE_INFO	{		\
-	{							\
 	  { "recvOctets",	&ng_parse_uint64_type	},	\
 	  { "recvPackets",	&ng_parse_uint64_type	},	\
 	  { "xmitOctets",	&ng_parse_uint64_type	},	\
 	  { "xmitPackets",	&ng_parse_uint64_type	},	\
 	  { NULL }						\
-	}							\
 }
 
 /* Netgraph control messages */

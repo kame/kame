@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)stdio.h	8.5 (Berkeley) 4/29/95
- * $FreeBSD: src/include/stdio.h,v 1.24.2.2 2001/12/05 20:48:07 obrien Exp $
+ * $FreeBSD: src/include/stdio.h,v 1.24.2.3 2002/08/22 22:08:38 archie Exp $
  */
 
 #ifndef	_STDIO_H_
@@ -415,10 +415,10 @@ void	_flockfile_debug __P((FILE *, char *, int));
 #else
 #define _FLOCKFILE(x)	flockfile(x)
 #endif
+extern int __isthreaded;
 static __inline int			\
 __getc_locked(FILE *_fp)		\
 {					\
-	extern int __isthreaded;	\
 	int _ret;			\
 	if (__isthreaded)		\
 		_FLOCKFILE(_fp);	\
@@ -430,7 +430,6 @@ __getc_locked(FILE *_fp)		\
 static __inline int			\
 __putc_locked(int _x, FILE *_fp)	\
 {					\
-	extern int __isthreaded;	\
 	int _ret;			\
 	if (__isthreaded)		\
 		_FLOCKFILE(_fp);	\

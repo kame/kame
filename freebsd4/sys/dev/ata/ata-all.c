@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-all.c,v 1.50.2.36 2002/04/07 09:54:12 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-all.c,v 1.50.2.40 2002/09/16 19:35:30 sos Exp $
  */
 
 #include "opt_ata.h"
@@ -517,6 +517,9 @@ ata_getparam(struct ata_device *atadev, u_int8_t command)
     bswap(ata_parm->revision, sizeof(ata_parm->revision));
     btrim(ata_parm->revision, sizeof(ata_parm->revision));
     bpack(ata_parm->revision, ata_parm->revision, sizeof(ata_parm->revision));
+    bswap(ata_parm->serial, sizeof(ata_parm->serial));
+    btrim(ata_parm->serial, sizeof(ata_parm->serial));
+    bpack(ata_parm->serial, ata_parm->serial, sizeof(ata_parm->serial));
     atadev->param = ata_parm;
     return 0;
 }
@@ -710,8 +713,8 @@ ata_start(struct ata_channel *ch)
 	}
     }
 #endif
-    splx(s);
     ATA_UNLOCK_CH(ch);
+    splx(s);
 }
 
 void
@@ -765,11 +768,12 @@ ata_reset(struct ata_channel *ch)
 	if (stat0 & ATA_S_BUSY) {
 	    ATA_OUTB(ch->r_io, ATA_DRIVE, ATA_D_IBM | ATA_MASTER);
 	    DELAY(10);
+
+	    /* check for ATAPI signature while its still there */
+	    lsb = ATA_INB(ch->r_io, ATA_CYL_LSB);
+	    msb = ATA_INB(ch->r_io, ATA_CYL_MSB);
 	    stat0 = ATA_INB(ch->r_io, ATA_STATUS);
 	    if (!(stat0 & ATA_S_BUSY)) {
-		/* check for ATAPI signature while its still there */
-		lsb = ATA_INB(ch->r_io, ATA_CYL_LSB);
-		msb = ATA_INB(ch->r_io, ATA_CYL_MSB);
 		if (bootverbose)
 		    ata_printf(ch, ATA_MASTER, "ATAPI %02x %02x\n", lsb, msb);
 		if (lsb == ATAPI_MAGIC_LSB && msb == ATAPI_MAGIC_MSB)
@@ -779,11 +783,12 @@ ata_reset(struct ata_channel *ch)
 	if (stat1 & ATA_S_BUSY) {
 	    ATA_OUTB(ch->r_io, ATA_DRIVE, ATA_D_IBM | ATA_SLAVE);
 	    DELAY(10);
+
+	    /* check for ATAPI signature while its still there */
+	    lsb = ATA_INB(ch->r_io, ATA_CYL_LSB);
+	    msb = ATA_INB(ch->r_io, ATA_CYL_MSB);
 	    stat1 = ATA_INB(ch->r_io, ATA_STATUS);
 	    if (!(stat1 & ATA_S_BUSY)) {
-		/* check for ATAPI signature while its still there */
-		lsb = ATA_INB(ch->r_io, ATA_CYL_LSB);
-		msb = ATA_INB(ch->r_io, ATA_CYL_MSB);
 		if (bootverbose)
 		    ata_printf(ch, ATA_SLAVE, "ATAPI %02x %02x\n", lsb, msb);
 		if (lsb == ATAPI_MAGIC_LSB && msb == ATAPI_MAGIC_MSB)
@@ -1043,7 +1048,7 @@ ata_command(struct ata_device *atadev, u_int8_t command,
 	ATA_OUTB(atadev->channel->r_io, ATA_COUNT, count & 0xff);
 	ATA_OUTB(atadev->channel->r_io, ATA_SECTOR, (lba>>24) & 0xff);
 	ATA_OUTB(atadev->channel->r_io, ATA_SECTOR, lba & 0xff);
-	ATA_OUTB(atadev->channel->r_io, ATA_CYL_LSB, (lba<<32) & 0xff);
+	ATA_OUTB(atadev->channel->r_io, ATA_CYL_LSB, (lba>>32) & 0xff);
 	ATA_OUTB(atadev->channel->r_io, ATA_CYL_LSB, (lba>>8) & 0xff);
 	ATA_OUTB(atadev->channel->r_io, ATA_CYL_MSB, (lba>>40) & 0xff);
 	ATA_OUTB(atadev->channel->r_io, ATA_CYL_MSB, (lba>>16) & 0xff);

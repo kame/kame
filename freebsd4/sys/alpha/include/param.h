@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/param.h,v 1.17.2.4 2001/09/21 19:08:03 dillon Exp $ */
+/* $FreeBSD: src/sys/alpha/include/param.h,v 1.17.2.5 2002/08/31 21:15:55 dillon Exp $ */
 /* From: NetBSD: param.h,v 1.20 1997/09/19 13:52:53 leo Exp */
 
 /*
@@ -136,7 +136,7 @@
  * Ceiling on amount of swblock kva space.
  */
 #ifndef VM_SWZONE_SIZE_MAX
-#define VM_SWZONE_SIZE_MAX     (70 * 1024 * 1024)
+#define VM_SWZONE_SIZE_MAX     (32 * 1024 * 1024)
 #endif
 
 /*

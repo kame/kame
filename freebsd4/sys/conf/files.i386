@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/conf/files.i386,v 1.307.2.29 2002/04/28 20:20:30 imp Exp $
+# $FreeBSD: src/sys/conf/files.i386,v 1.307.2.35 2002/10/05 18:31:47 scottl Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -83,6 +83,7 @@ crypto/des/arch/i386/des_enc.S		optional	netsmbcrypto
 crypto/des/des_setkey.c			optional	netsmbcrypto
 dev/advansys/adv_isa.c		optional	adv isa
 dev/aic/aic_isa.c		optional	aic isa
+dev/ar/if_ar_isa.c		optional	ar isa
 dev/dgb/dgm.c			optional	dgm
 dev/cm/if_cm_isa.c		optional	cm isa
 dev/ed/if_ed.c			optional	ed
@@ -90,8 +91,7 @@ dev/ed/if_ed_isa.c		optional	ed isa
 dev/ed/if_ed_pccard.c		optional	ed card
 dev/eisa/eisaconf.c		optional	eisa
 dev/em/if_em.c			optional	em
-dev/em/if_em_fxhw.c		optional	em
-dev/em/if_em_phy.c		optional	em
+dev/em/if_em_hw.c		optional	em
 dev/fb/fb.c			optional	fb
 dev/fb/fb.c			optional	vga
 dev/fb/splash.c			optional	splash
@@ -104,10 +104,14 @@ dev/kbd/kbd.c			optional	kbd
 dev/kbd/kbd.c			optional	sc
 dev/kbd/kbd.c			optional	ukbd
 dev/kbd/kbd.c			optional	vt
+dev/pst/pst-pci.c		optional	pst pci
+dev/pst/pst-iop.c		optional	pst
+dev/pst/pst-raid.c		optional	pst
 dev/puc/puc.c			optional	puc
 dev/puc/pucdata.c		optional	puc
 dev/sbni/if_sbni.c		optional	sbni
 dev/sbni/if_sbni_isa.c		optional	sbni isa
+dev/sr/if_sr_isa.c		optional	sr isa
 dev/syscons/schistory.c		optional	sc
 dev/syscons/scmouse.c		optional	sc
 dev/syscons/scterm.c		optional	sc
@@ -168,6 +172,7 @@ i386/i386/busdma_machdep.c	standard
 i386/i386/db_disasm.c		optional	ddb
 i386/i386/db_interface.c	optional	ddb
 i386/i386/db_trace.c		optional	ddb
+i386/i386/elan-mmcr.c		optional	cpu_elan
 i386/i386/elf_machdep.c		standard
 i386/i386/exception.s		standard
 i386/i386/globals.s		standard
@@ -233,13 +238,11 @@ i386/isa/elink.c		optional	ie
 isa/fd.c			optional	fd
 i386/isa/gpib.c			optional	gp
 i386/isa/gsc.c			optional	gsc
-i386/isa/if_ar.c		optional	ar
 i386/isa/if_cx.c		optional	cx
 i386/isa/if_el.c		optional	el
 i386/isa/if_le.c		optional	le
 i386/isa/if_lnc.c		optional	lnc
 i386/isa/if_rdp.c		optional	rdp
-i386/isa/if_sr.c		optional	sr
 i386/isa/if_wl.c		optional	wl
 i386/isa/if_wlp.c		optional	wlp
 i386/isa/intr_machdep.c		standard
@@ -251,7 +254,6 @@ i386/isa/isa_dma.c		optional	isa
 i386/isa/istallion.c		optional	stli
 i386/isa/labpc.c		optional	labpc
 i386/isa/loran.c		optional	loran
-i386/isa/matcd/matcd.c		optional	matcd
 i386/isa/mca_machdep.c		optional	mca
 i386/isa/mcd.c			optional	mcd
 i386/isa/mse.c			optional	mse

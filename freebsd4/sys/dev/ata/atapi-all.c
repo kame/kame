@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-all.c,v 1.46.2.13 2002/03/26 09:36:43 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-all.c,v 1.46.2.17 2002/09/16 19:37:53 sos Exp $
  */
 
 #include "opt_ata.h"
@@ -184,6 +184,7 @@ atapi_queue_cmd(struct ata_device *atadev, int8_t *ccb, caddr_t data,
     request->data = data;
     request->bytecount = count;
     request->flags = flags;
+    request->error = EINPROGRESS;
     request->timeout = timeout * hz;
     request->ccbsize = atadev->param->packet_size ? 16 : 12;
     bcopy(ccb, request->ccb, request->ccbsize);
@@ -206,15 +207,18 @@ atapi_queue_cmd(struct ata_device *atadev, int8_t *ccb, caddr_t data,
 	TAILQ_INSERT_HEAD(&atadev->channel->atapi_queue, request, chain);
     else
 	TAILQ_INSERT_TAIL(&atadev->channel->atapi_queue, request, chain);
-    splx(s);
     ata_start(atadev->channel);
 
     /* if callback used, then just return, gets called from interrupt context */
-    if (callback)
+    if (callback) {
+	splx(s);
 	return 0;
+    }
 
-    /* wait for request to complete */
-    tsleep((caddr_t)request, PRIBIO, "atprq", 0);
+    /* only sleep when command is in progress */
+    if (request->error == EINPROGRESS)
+	tsleep((caddr_t)request, PRIBIO, "atprq", 0);
+    splx(s);
     error = request->error;
     if (error)
 	 bcopy(&request->sense, atadev->result, sizeof(struct atapi_reqsense));
@@ -281,7 +285,9 @@ atapi_transfer(struct atapi_request *request)
     /* if DMA enabled setup DMA hardware */
     request->flags &= ~ATPR_F_DMA_USED; 
     if ((atadev->mode >= ATA_DMA) &&
-	(request->ccb[0] == ATAPI_READ || request->ccb[0] == ATAPI_READ_BIG ||
+	(request->ccb[0] == ATAPI_READ || 
+	 request->ccb[0] == ATAPI_READ_BIG ||
+	 request->ccb[0] == ATAPI_READ_CD ||
 	 ((request->ccb[0] == ATAPI_WRITE ||
 	   request->ccb[0] == ATAPI_WRITE_BIG) &&
 	  !(atadev->channel->flags & ATA_ATAPI_DMA_RO))) &&
@@ -291,7 +297,8 @@ atapi_transfer(struct atapi_request *request)
     }
 
     /* start ATAPI operation */
-    if (ata_command(atadev, ATA_C_PACKET_CMD, (request->bytecount << 8), 0,
+    if (ata_command(atadev, ATA_C_PACKET_CMD, 
+		    min(request->bytecount, 65534) << 8, 0,
 		    (request->flags & ATPR_F_DMA_USED) ? ATA_F_DMA : 0,
 		    ATA_IMMEDIATE))
 	ata_prtdev(atadev, "failure to send ATAPI packet command\n");
@@ -707,7 +714,7 @@ atapi_cmd2str(u_int8_t cmd)
     case 0xbe: return ("READ_CD");
     case 0xff: return ("POLL_DSC");
     default: {
-	static char buffer[16];
+	static char buffer[20];
 	sprintf(buffer, "unknown CMD (0x%02x)", cmd);
 	return buffer;
 	}

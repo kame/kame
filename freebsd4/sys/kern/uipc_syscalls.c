@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_syscalls.c	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.65.2.9 2001/07/31 10:49:39 dwmalone Exp $
+ * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.65.2.15 2002/08/31 22:11:56 archie Exp $
  */
 
 #include "opt_compat.h"
@@ -71,15 +71,14 @@
 
 static void sf_buf_init(void *arg);
 SYSINIT(sock_sf, SI_SUB_MBUF, SI_ORDER_ANY, sf_buf_init, NULL)
-static struct sf_buf *sf_buf_alloc(void);
-static void sf_buf_ref(caddr_t addr, u_int size);
-static void sf_buf_free(caddr_t addr, u_int size);
 
 static int sendit __P((struct proc *p, int s, struct msghdr *mp, int flags));
 static int recvit __P((struct proc *p, int s, struct msghdr *mp,
 		       caddr_t namelenp));
   
 static int accept1 __P((struct proc *p, struct accept_args *uap, int compat));
+static int do_sendfile __P((struct proc *p, struct sendfile_args *uap,
+			    int compat));
 static int getsockname1 __P((struct proc *p, struct getsockname_args *uap,
 			     int compat));
 static int getpeername1 __P((struct proc *p, struct getpeername_args *uap,
@@ -206,6 +205,8 @@ accept1(p, uap, compat)
 			sizeof (namelen));
 		if(error)
 			return (error);
+		if (namelen < 0)
+			return (EINVAL);
 	}
 	error = holdsock(fdp, uap->s, &lfp);
 	if (error)
@@ -217,14 +218,13 @@ accept1(p, uap, compat)
 		error = EINVAL;
 		goto done;
 	}
-	if ((head->so_state & SS_NBIO) && TAILQ_EMPTY(&head->so_comp)) {
-		splx(s);
-		error = EWOULDBLOCK;
-		goto done;
-	}
 	while (TAILQ_EMPTY(&head->so_comp) && head->so_error == 0) {
 		if (head->so_state & SS_CANTRCVMORE) {
 			head->so_error = ECONNABORTED;
+			break;
+		}
+		if ((head->so_state & SS_NBIO) != 0) {
+			head->so_error = EWOULDBLOCK;
 			break;
 		}
 		error = tsleep((caddr_t)&head->so_timeo, PSOCK | PCATCH,
@@ -1193,6 +1193,10 @@ getsockname1(p, uap, compat)
 		fdrop(fp, p);
 		return (error);
 	}
+	if (len < 0) {
+		fdrop(fp, p);
+		return (EINVAL);
+	}
 	so = (struct socket *)fp->f_data;
 	sa = 0;
 	error = (*so->so_proto->pr_usrreqs->pru_sockaddr)(so, &sa);
@@ -1271,6 +1275,10 @@ getpeername1(p, uap, compat)
 	if (error) {
 		fdrop(fp, p);
 		return (error);
+	}
+	if (len < 0) {
+		fdrop(fp, p);
+		return (EINVAL);
 	}
 	sa = 0;
 	error = (*so->so_proto->pr_usrreqs->pru_peeraddr)(so, &sa);
@@ -1414,9 +1422,6 @@ holdsock(fdp, fdes, fpp)
 
 /*
  * Allocate a pool of sf_bufs (sendfile(2) or "super-fast" if you prefer. :-))
- * XXX - The sf_buf functions are currently private to sendfile(2), so have
- * been made static, but may be useful in the future for doing zero-copy in
- * other parts of the networking code. 
  */
 static void
 sf_buf_init(void *arg)
@@ -1436,7 +1441,7 @@ sf_buf_init(void *arg)
 /*
  * Get an sf_buf from the freelist. Will block if none are available.
  */
-static struct sf_buf *
+struct sf_buf *
 sf_buf_alloc()
 {
 	struct sf_buf *sf;
@@ -1459,7 +1464,7 @@ sf_buf_alloc()
 }
 
 #define dtosf(x)	(&sf_bufs[((uintptr_t)(x) - (uintptr_t)sf_base) >> PAGE_SHIFT])
-static void
+void
 sf_buf_ref(caddr_t addr, u_int size)
 {
 	struct sf_buf *sf;
@@ -1476,7 +1481,7 @@ sf_buf_ref(caddr_t addr, u_int size)
  *
  * Must be called at splimp.
  */
-static void
+void
 sf_buf_free(caddr_t addr, u_int size)
 {
 	struct sf_buf *sf;
@@ -1522,6 +1527,31 @@ sf_buf_free(caddr_t addr, u_int size)
 int
 sendfile(struct proc *p, struct sendfile_args *uap)
 {
+
+	return (do_sendfile(p, uap, 0));
+}
+
+#ifdef COMPAT_43
+int
+osendfile(struct proc *p, struct osendfile_args *uap)
+{
+	struct sendfile_args args;
+
+	args.fd = uap->fd;
+	args.s = uap->s;
+	args.offset = uap->offset;
+	args.nbytes = uap->nbytes;
+	args.hdtr = uap->hdtr;
+	args.sbytes = uap->sbytes;
+	args.flags = uap->flags;
+
+	return (do_sendfile(p, &args, 1));
+}
+#endif
+
+int
+do_sendfile(struct proc *p, struct sendfile_args *uap, int compat)
+{
 	struct file *fp;
 	struct filedesc *fdp = p->p_fd;
 	struct vnode *vp;
@@ -1532,10 +1562,11 @@ sendfile(struct proc *p, struct sendfile_args *uap)
 	struct vm_page *pg;
 	struct writev_args nuap;
 	struct sf_hdtr hdtr;
-	off_t off, xfsize, sbytes = 0;
+	off_t off, xfsize, hdtr_size, sbytes = 0;
 	int error = 0, s;
 
 	vp = NULL;
+	hdtr_size = 0;
 	/*
 	 * Do argument checking. Must be a regular file in, stream
 	 * type and connected socket out, positive offset.
@@ -1591,7 +1622,10 @@ sendfile(struct proc *p, struct sendfile_args *uap)
 			error = writev(p, &nuap);
 			if (error)
 				goto done;
-			sbytes += p->p_retval[0];
+			if (compat)
+				sbytes += p->p_retval[0];
+			else
+				hdtr_size += p->p_retval[0];
 		}
 	}
 
@@ -1831,11 +1865,16 @@ retry_space:
 			error = writev(p, &nuap);
 			if (error)
 				goto done;
-			sbytes += p->p_retval[0];
+			if (compat)
+				sbytes += p->p_retval[0];
+			else
+				hdtr_size += p->p_retval[0];
 	}
 
 done:
 	if (uap->sbytes != NULL) {
+		if (compat == 0)
+			sbytes += hdtr_size;
 		copyout(&sbytes, uap->sbytes, sizeof(off_t));
 	}
 	if (vp)

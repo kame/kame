@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.i386,v 1.132.2.15 2002/04/28 23:01:29 dwmalone Exp $
+# $FreeBSD: src/sys/conf/options.i386,v 1.132.2.17 2002/09/17 22:39:45 sam Exp $
 
 DISABLE_PSE
 IDE_DELAY
@@ -40,6 +40,7 @@ CLK_CALIBRATION_LOOP		opt_clock.h
 CLK_USE_I8254_CALIBRATION	opt_clock.h
 CLK_USE_TSC_CALIBRATION		opt_clock.h
 TIMER_FREQ			opt_clock.h
+KERN_TIMESTAMP			opt_global.h
 
 NO_F00F_HACK			opt_cpu.h
 CPU_BLUELIGHTNING_FPU_OP_CACHE	opt_cpu.h
@@ -48,6 +49,7 @@ CPU_BTB_EN			opt_cpu.h
 CPU_CYRIX_NO_LOCK		opt_cpu.h
 CPU_DIRECT_MAPPED_CACHE		opt_cpu.h
 CPU_DISABLE_5X86_LSSER		opt_cpu.h
+CPU_ELAN			opt_cpu.h
 CPU_FASTER_5X86_FPU		opt_cpu.h
 CPU_I486_ON_386			opt_cpu.h
 CPU_IORT			opt_cpu.h

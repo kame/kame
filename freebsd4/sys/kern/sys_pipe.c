@@ -16,7 +16,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/kern/sys_pipe.c,v 1.60.2.12 2002/04/16 02:08:13 tanimura Exp $
+ * $FreeBSD: src/sys/kern/sys_pipe.c,v 1.60.2.13 2002/08/05 15:05:15 des Exp $
  */
 
 /*
@@ -1237,6 +1237,9 @@ pipe_kqfilter(struct file *fp, struct knote *kn)
 	case EVFILT_WRITE:
 		kn->kn_fop = &pipe_wfiltops;
 		cpipe = cpipe->pipe_peer;
+		if (cpipe == NULL)
+			/* other end of pipe has been closed */
+			return (EBADF);
 		break;
 	default:
 		return (1);

@@ -23,18 +23,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/isa_compat.h,v 1.13.2.11 2001/10/08 03:35:53 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/isa_compat.h,v 1.13.2.13 2002/10/05 18:31:49 scottl Exp $
  */
 
 #include "vt.h"
 #include "wdc.h"
-#include "ar.h"
 #include "cx.h"
 #include "el.h"
 #include "le.h"
 #include "lnc.h"
 #include "rdp.h"
-#include "sr.h"
 #include "wl.h"
 #include "pcm.h"
 #include "pas.h"
@@ -53,7 +51,6 @@
 #include "nss.h"
 #include "mcd.h"
 #include "scd.h"
-#include "matcd.h"
 #include "wt.h"
 #include "ctx.h"
 #include "spigot.h"
@@ -81,13 +78,11 @@ struct old_isa_driver {
 
 extern struct isa_driver  vtdriver;
 extern struct isa_driver wdcdriver;
-extern struct isa_driver  ardriver;
 extern struct isa_driver  cxdriver;
 extern struct isa_driver  eldriver;
 extern struct isa_driver  ledriver;
 extern struct isa_driver lncdriver;
 extern struct isa_driver rdpdriver;
-extern struct isa_driver  srdriver;
 extern struct isa_driver  wldriver;
 extern struct isa_driver pasdriver;
 extern struct isa_driver  sbdriver;
@@ -106,7 +101,6 @@ extern struct isa_driver uartdriver;
 extern struct isa_driver nssdriver;
 extern struct isa_driver mcddriver;
 extern struct isa_driver scddriver;
-extern struct isa_driver matcddriver;
 extern struct isa_driver  wtdriver;
 extern struct isa_driver ctxdriver;
 extern struct isa_driver spigotdriver;
@@ -193,9 +187,6 @@ static struct old_isa_driver old_drivers[] = {
 #if NSCD > 0
 	{ INTR_TYPE_BIO, &scddriver },
 #endif
-#if NMATCD > 0
-	{ INTR_TYPE_BIO, &matcddriver },
-#endif
 #if NWT > 0
 	{ INTR_TYPE_BIO, &wtdriver },
 #endif
@@ -208,17 +199,11 @@ static struct old_isa_driver old_drivers[] = {
 #if NLNC > 0
 	{ INTR_TYPE_NET, &lncdriver },
 #endif
-#if NAR > 0
-	{ INTR_TYPE_NET, &ardriver },
-#endif
 #if NCX > 0
 	{ INTR_TYPE_NET, &cxdriver },
 #endif
 #if NEL > 0
 	{ INTR_TYPE_NET, &eldriver },
-#endif
-#if NSR > 0
-	{ INTR_TYPE_NET, &srdriver },
 #endif
 #if NWL > 0
 	{ INTR_TYPE_NET, &wldriver },

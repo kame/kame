@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.2.2.5 2002/04/29 17:00:33 jhay Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.2.2.8 2002/08/22 10:50:58 jhay Exp $");
 
 /*
  * PCI "universal" communications card driver configuration data (used to
@@ -48,6 +48,121 @@ __FBSDID("$FreeBSD: src/sys/dev/puc/pucdata.c,v 1.2.2.5 2002/04/29 17:00:33 jhay
 #define COM_FREQ	DEFAULT_RCLK
 
 const struct puc_device_description puc_devices[] = {
+
+	{   "Comtrol RocketPort 550/4 RJ45",
+	    {	0x11fe,	0x8014,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ * 4 },
+	    },
+	},
+
+	{   "Comtrol RocketPort 550/Quad",
+	    {	0x11fe,	0x8015,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ * 4 },
+	    },
+	},
+
+	{   "Comtrol RocketPort 550/8 RJ11 part A",
+	    {	0x11fe,	0x8010,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ * 4 },
+	    },
+	},
+	{   "Comtrol RocketPort 550/8 RJ11 part B",
+	    {	0x11fe,	0x8011,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ * 4 },
+	    },
+	},
+
+	{   "Comtrol RocketPort 550/8 Octa part A",
+	    {	0x11fe,	0x8012,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ * 4 },
+	    },
+	},
+	{   "Comtrol RocketPort 550/8 Octa part B",
+	    {	0x11fe,	0x8013,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ * 4 },
+	    },
+	},
+
+	{   "Comtrol RocketPort 550/8 part A",
+	    {	0x11fe,	0x8018,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ * 4 },
+	    },
+	},
+	{   "Comtrol RocketPort 550/8 part B",
+	    {	0x11fe,	0x8019,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ * 4 },
+	    },
+	},
+
+	{   "Comtrol RocketPort 550/16 part A",
+	    {	0x11fe,	0x8016,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ * 4 },
+	    },
+	},
+	{   "Comtrol RocketPort 550/16 part B",
+	    {	0x11fe,	0x8017,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x20, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x28, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x30, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x38, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x40, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x48, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x50, COM_FREQ * 4 },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x58, COM_FREQ * 4 },
+	    },
+	},
+
 	/*
 	 * XXX no entry because I have no data:
 	 * XXX Dolphin Peripherals 4006 (single parallel)
@@ -508,6 +623,16 @@ const struct puc_device_description puc_devices[] = {
 	    },
 	},
 
+	/* VScom PCI-200L: 2S */
+	{   "VScom PCI-200L",
+	    {	0x14d2, 0x8020,	0, 0	},
+	    {	0xffff, 0xffff,	0, 0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8},
+	    },
+	},
+
 	/* VScom PCI-400: 4S */
 	{   "VScom PCI-400",
 	    {	0x10b5,	0x1077,	0x10b5,	0x1077	},
@@ -758,6 +883,18 @@ const struct puc_device_description puc_devices[] = {
 	    {
 		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
+	    },
+	},
+
+	/* Avlab Technology, Inc. Low Profile PCI 4 Serial: 4S */
+	{   "Avlab Low Profile PCI 4 Serial",
+	    {	0x14db,	0x2150,	0,	0	},
+	    {	0xffff,	0xffff,	0,	0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x1c, 0x00, COM_FREQ },
 	    },
 	},
 

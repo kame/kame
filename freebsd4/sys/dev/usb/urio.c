@@ -28,7 +28,7 @@
  * its contributors.
  */
 
-/* $FreeBSD: src/sys/dev/usb/urio.c,v 1.11.2.1 2001/09/27 17:43:05 alfred Exp $ */
+/* $FreeBSD: src/sys/dev/usb/urio.c,v 1.11.2.2 2002/08/12 14:19:49 joe Exp $ */
 
 /*
  * 2000/3/24  added NetBSD/OpenBSD support (from Alex Nemirovsky)
@@ -67,6 +67,7 @@
 #endif
 #include <sys/vnode.h>
 #include <sys/poll.h>
+#include <sys/sysctl.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -75,10 +76,13 @@
 #include <dev/usb/usbdevs.h>
 #include <dev/usb/rio500_usb.h>
 
-#ifdef URIO_DEBUG
+#ifdef USB_DEBUG
 #define DPRINTF(x)	if (uriodebug) logprintf x
 #define DPRINTFN(n,x)	if (uriodebug>(n)) logprintf x
-int	uriodebug = 100;
+int	uriodebug = 0;
+SYSCTL_NODE(_hw_usb, OID_AUTO, urio, CTLFLAG_RW, 0, "USB urio");
+SYSCTL_INT(_hw_usb_urio, OID_AUTO, debug, CTLFLAG_RW,
+	   &uriodebug, 0, "urio debug level");
 #else
 #define DPRINTF(x)
 #define DPRINTFN(n,x)

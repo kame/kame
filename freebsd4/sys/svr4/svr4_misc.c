@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/svr4/svr4_misc.c,v 1.13.2.2 2001/11/03 01:41:09 ps Exp $
+ * $FreeBSD: src/sys/svr4/svr4_misc.c,v 1.13.2.5 2002/09/02 21:22:54 dillon Exp $
  */
 
 /*
@@ -805,10 +805,9 @@ svr4_sys_break(p, uap)
 
 	if (new > old) {
 		vm_size_t diff;
-		if (swap_pager_full) {
-			return (ENOMEM);
-		}
 		diff = new - old;
+		if (vm->vm_map.size + diff > p->p_rlimit[RLIMIT_VMEM].rlim_cur)
+			return(ENOMEM);
 		rv = vm_map_find(&vm->vm_map, NULL, 0, &old, diff, FALSE,
 			VM_PROT_ALL, VM_PROT_ALL, 0);
 		if (rv != KERN_SUCCESS) {
@@ -1261,7 +1260,7 @@ loop:
 			/*
 			 * Decrement the count of procs running with this uid.
 			 */
-			(void)chgproccnt(q->p_cred->p_ruid, -1, 0);
+			(void)chgproccnt(q->p_ucred->cr_uidinfo, -1, 0);
 
 			/*
 			 * Free up credentials.

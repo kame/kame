@@ -1,7 +1,7 @@
 /*
  * Memory range attribute operations, peformed on /dev/mem
  *
- * $FreeBSD: src/sys/sys/memrange.h,v 1.4.2.1 2002/04/28 22:57:52 dwmalone Exp $
+ * $FreeBSD: src/sys/sys/memrange.h,v 1.4.2.2 2002/09/16 21:58:37 dwmalone Exp $
  */
 
 /* Memory range attributes */
@@ -20,6 +20,7 @@
 #define MDF_BOGUS		(1<<28)	/* we don't like it */
 #define MDF_FIXACTIVE		(1<<29)	/* can't be turned off */
 #define MDF_BUSY		(1<<30)	/* range is in use */
+#define MDF_FORCE		(1<<31)	/* force risky changes */
 
 struct mem_range_desc
 {

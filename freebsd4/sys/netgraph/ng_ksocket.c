@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.5.2.11 2002/04/14 23:31:08 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.5.2.12 2002/07/02 23:44:02 archie Exp $
  * $Whistle: ng_ksocket.c,v 1.1 1999/11/16 20:04:40 archie Exp $
  */
 
@@ -182,17 +182,16 @@ static const struct ng_parse_type ng_ksocket_generic_sockdata_type = {
 };
 
 /* Type for a generic struct sockaddr */
-static const struct ng_parse_struct_info ng_parse_generic_sockaddr_type_info = {
-	{
+static const struct ng_parse_struct_field
+    ng_parse_generic_sockaddr_type_fields[] = {
 	  { "len",	&ng_parse_uint8_type			},
 	  { "family",	&ng_parse_uint8_type			},
 	  { "data",	&ng_ksocket_generic_sockdata_type	},
 	  { NULL }
-	}
 };
 static const struct ng_parse_type ng_ksocket_generic_sockaddr_type = {
 	&ng_parse_struct_type,
-	&ng_parse_generic_sockaddr_type_info
+	&ng_parse_generic_sockaddr_type_fields
 };
 
 /* Convert a struct sockaddr from ASCII to binary.  If its a protocol
@@ -413,19 +412,19 @@ static const struct ng_parse_type ng_ksocket_sockoptval_type = {
 };
 
 /* Parse type for struct ng_ksocket_sockopt */
-static const struct ng_parse_struct_info ng_ksocket_sockopt_type_info
+static const struct ng_parse_struct_field ng_ksocket_sockopt_type_fields[]
 	= NG_KSOCKET_SOCKOPT_INFO(&ng_ksocket_sockoptval_type);
 static const struct ng_parse_type ng_ksocket_sockopt_type = {
 	&ng_parse_struct_type,
-	&ng_ksocket_sockopt_type_info,
+	&ng_ksocket_sockopt_type_fields
 };
 
 /* Parse type for struct ng_ksocket_accept */
-static const struct ng_parse_struct_info ng_ksocket_accept_type_info
+static const struct ng_parse_struct_field ng_ksocket_accept_type_fields[]
 	= NGM_KSOCKET_ACCEPT_INFO;
 static const struct ng_parse_type ng_ksocket_accept_type = {
 	&ng_parse_struct_type,
-	&ng_ksocket_accept_type_info
+	&ng_ksocket_accept_type_fields
 };
 
 /* List of commands and how to convert arguments to/from ASCII */

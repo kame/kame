@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pptpgre.c,v 1.2.2.10 2002/04/21 18:35:23 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pptpgre.c,v 1.2.2.12 2002/07/02 23:44:03 archie Exp $
  * $Whistle: ng_pptpgre.c,v 1.7 1999/12/08 00:10:06 archie Exp $
  */
 
@@ -192,19 +192,19 @@ static void	ng_pptpgre_reset(node_p node);
 static pptptime_t ng_pptpgre_time(node_p node);
 
 /* Parse type for struct ng_pptpgre_conf */
-static const struct ng_parse_struct_info
-	ng_pptpgre_conf_type_info = NG_PPTPGRE_CONF_TYPE_INFO;
+static const struct ng_parse_struct_field ng_pptpgre_conf_type_fields[]
+	= NG_PPTPGRE_CONF_TYPE_INFO;
 static const struct ng_parse_type ng_pptpgre_conf_type = {
 	&ng_parse_struct_type,
-	&ng_pptpgre_conf_type_info,
+	&ng_pptpgre_conf_type_fields,
 };
 
 /* Parse type for struct ng_pptpgre_stats */
-static const struct ng_parse_struct_info
-	ng_pptpgre_stats_type_info = NG_PPTPGRE_STATS_TYPE_INFO;
+static const struct ng_parse_struct_field ng_pptpgre_stats_type_fields[]
+	= NG_PPTPGRE_STATS_TYPE_INFO;
 static const struct ng_parse_type ng_pptp_stats_type = {
 	&ng_parse_struct_type,
-	&ng_pptpgre_stats_type_info
+	&ng_pptpgre_stats_type_fields
 };
 
 /* List of commands and how to convert arguments to/from ASCII */
@@ -568,8 +568,8 @@ ng_pptpgre_recv(node_p node, struct mbuf *m, meta_p meta)
 {
 	const priv_p priv = node->private;
 	int iphlen, grelen, extralen;
-	struct greheader *gre;
-	struct ip *ip;
+	const struct greheader *gre;
+	const struct ip *ip;
 	int error = 0;
 
 	/* Update stats */
@@ -591,7 +591,7 @@ bad:
 		NG_FREE_META(meta);
 		return (ENOBUFS);
 	}
-	ip = mtod(m, struct ip *);
+	ip = mtod(m, const struct ip *);
 	iphlen = ip->ip_hl << 2;
 	if (m->m_len < iphlen + sizeof(*gre)) {
 		if ((m = m_pullup(m, iphlen + sizeof(*gre))) == NULL) {
@@ -599,9 +599,9 @@ bad:
 			NG_FREE_META(meta);
 			return (ENOBUFS);
 		}
-		ip = mtod(m, struct ip *);
+		ip = mtod(m, const struct ip *);
 	}
-	gre = (struct greheader *)((u_char *)ip + iphlen);
+	gre = (const struct greheader *)((const u_char *)ip + iphlen);
 	grelen = sizeof(*gre) + sizeof(u_int32_t) * (gre->hasSeq + gre->hasAck);
 	if (m->m_pkthdr.len < iphlen + grelen) {
 		priv->stats.recvRunts++;
@@ -613,8 +613,8 @@ bad:
 			NG_FREE_META(meta);
 			return (ENOBUFS);
 		}
-		ip = mtod(m, struct ip *);
-		gre = (struct greheader *)((u_char *)ip + iphlen);
+		ip = mtod(m, const struct ip *);
+		gre = (const struct greheader *)((const u_char *)ip + iphlen);
 	}
 
 	/* Sanity check packet length and GRE header bits */
@@ -624,7 +624,8 @@ bad:
 		priv->stats.recvBadGRE++;
 		goto bad;
 	}
-	if ((ntohl(*((u_int32_t *)gre)) & PPTP_INIT_MASK) != PPTP_INIT_VALUE) {
+	if ((ntohl(*((const u_int32_t *)gre)) & PPTP_INIT_MASK)
+	    != PPTP_INIT_VALUE) {
 		priv->stats.recvBadGRE++;
 		goto bad;
 	}

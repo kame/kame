@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wi/if_wavelan_ieee.h,v 1.12.2.1 2002/04/28 20:20:32 imp Exp $
+ * $FreeBSD: src/sys/dev/wi/if_wavelan_ieee.h,v 1.12.2.2 2002/08/02 07:11:34 imp Exp $
  */
 
 #ifndef _IF_WAVELAN_IEEE_H
@@ -219,6 +219,7 @@ struct wi_counters {
 #define WI_RID_WEP_MAPTABLE	0xFC29
 #define WI_RID_CNFAUTHMODE	0xFC2A
 #define WI_RID_ROAMING_MODE	0xFC2D
+#define WI_RID_CNF_DBM_ADJUST	0xFC46
 #define WI_RID_BASIC_RATE	0xFCB3
 #define WI_RID_SUPPORT_RATE	0xFCB4
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_ktrace.c	8.2 (Berkeley) 9/23/93
- * $FreeBSD: src/sys/kern/kern_ktrace.c,v 1.35.2.5 2001/10/24 19:14:51 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_ktrace.c,v 1.35.2.6 2002/07/05 22:36:38 darrenr Exp $
  */
 
 #include "opt_ktrace.h"
@@ -571,7 +571,8 @@ ktrcanset(callp, targetp)
 	     target->p_ruid == target->p_svuid &&
 	     caller->p_rgid == target->p_rgid &&	/* XXX */
 	     target->p_rgid == target->p_svgid &&
-	     (targetp->p_traceflag & KTRFAC_ROOT) == 0) ||
+	     (targetp->p_traceflag & KTRFAC_ROOT) == 0 &&
+	     (targetp->p_flag & P_SUGID) == 0) ||
 	     caller->pc_ucred->cr_uid == 0)
 		return (1);
 

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/pc98/boot2/Makefile,v 1.4.2.1 2001/10/07 13:22:38 nyan Exp $
+# $FreeBSD: src/sys/boot/pc98/boot2/Makefile,v 1.4.2.2 2002/08/07 16:31:53 ru Exp $
 #
 
 PROG=	boot
@@ -85,7 +85,7 @@ boot2:		boot.nohdr
 all:		boot1 boot2
 
 install:
-	${INSTALL} ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
 		boot1 boot2 ${DESTDIR}${BINDIR}
 
 .include <bsd.kern.mk>

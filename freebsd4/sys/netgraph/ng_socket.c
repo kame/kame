@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.11.2.5 2001/10/15 23:05:15 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.11.2.6 2002/07/02 22:17:18 archie Exp $
  * $Whistle: ng_socket.c,v 1.28 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -543,7 +543,7 @@ static int
 ng_internalize(struct mbuf *control, struct proc *p)
 {
 	struct filedesc *fdp = p->p_fd;
-	struct cmsghdr *cm = mtod(control, struct cmsghdr *);
+	const struct cmsghdr *cm = mtod(control, const struct cmsghdr *);
 	struct file *fp;
 	struct vnode *vn;
 	int oldfds;

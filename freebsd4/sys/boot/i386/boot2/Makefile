@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/boot2/Makefile,v 1.16.2.4 2001/08/14 22:55:29 jhb Exp $
+# $FreeBSD: src/sys/boot/i386/boot2/Makefile,v 1.16.2.5 2002/08/07 16:31:53 ru Exp $
 
 PROG=		boot2
 NOMAN=
@@ -79,9 +79,9 @@ sio.o: sio.s
 		${.IMPSRC} -o ${.TARGET}
 
 install:
-	${INSTALL} ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
 		boot1 ${DESTDIR}${BINDIR}/boot1
-	${INSTALL} ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
 		boot2 ${DESTDIR}${BINDIR}/boot2
 
 .include <bsd.prog.mk>

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)route.c	8.3 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/net/route.c,v 1.59.2.7 2001/12/20 10:30:17 ru Exp $
+ * $FreeBSD: src/sys/net/route.c,v 1.59.2.8 2002/06/29 01:59:41 silby Exp $
  */
 
 #include "opt_inet.h"
@@ -740,6 +740,7 @@ rtrequest1(req, info, ret_nrt)
 		 */
 		if (req == RTM_RESOLVE) {
 			rt->rt_rmx = (*ret_nrt)->rt_rmx; /* copy metrics */
+			rt->rt_rmx.rmx_pksent = 0; /* reset packet counter */
 			if ((*ret_nrt)->rt_flags & (RTF_CLONING | RTF_PRCLONING)) {
 				rt->rt_parent = (*ret_nrt);
 				(*ret_nrt)->rt_refcnt++;

@@ -37,11 +37,11 @@
  *
  * Ancestors:
  *	@(#)lofs_vnops.c	1.2 (Berkeley) 6/18/92
- * $FreeBSD: src/sys/miscfs/nullfs/null_vnops.c,v 1.38.2.5 2001/06/26 04:20:10 bp Exp $
+ * $FreeBSD: src/sys/miscfs/nullfs/null_vnops.c,v 1.38.2.6 2002/07/31 00:32:28 semenu Exp $
  *	...and...
  *	@(#)null_vnodeops.c 1.20 92/07/07 UCLA Ficus project
  *
- * $FreeBSD: src/sys/miscfs/nullfs/null_vnops.c,v 1.38.2.5 2001/06/26 04:20:10 bp Exp $
+ * $FreeBSD: src/sys/miscfs/nullfs/null_vnops.c,v 1.38.2.6 2002/07/31 00:32:28 semenu Exp $
  */
 
 /*
@@ -585,8 +585,12 @@ null_lock(ap)
 	int error;
 
 	if (flags & LK_THISLAYER) {
-		if (vp->v_vnlock != NULL)
-			return 0;	/* lock is shared across layers */
+		if (vp->v_vnlock != NULL) {
+			/* lock is shared across layers */
+			if (flags & LK_INTERLOCK)
+				simple_unlock(&vp->v_interlock);
+			return 0;
+		}
 		error = lockmgr(&np->null_lock, flags & ~LK_THISLAYER,
 		    &vp->v_interlock, p);
 		return (error);

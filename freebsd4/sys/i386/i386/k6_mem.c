@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/k6_mem.c,v 1.4.2.1 2000/03/19 19:30:46 green Exp $
+ * $FreeBSD: src/sys/i386/i386/k6_mem.c,v 1.4.2.2 2002/09/16 21:58:41 dwmalone Exp $
  *
  */
 
@@ -86,7 +86,7 @@ k6_mrmake(struct mem_range_desc *desc, u_int32_t *mtrr) {
 		return EINVAL;
 	if (desc->mr_len < 131072 || !powerof2(desc->mr_len))
 		return EINVAL;
-	if (desc->mr_flags &~ (MDF_WRITECOMBINE|MDF_UNCACHEABLE))
+	if (desc->mr_flags &~ (MDF_WRITECOMBINE|MDF_UNCACHEABLE|MDF_FORCE))
 		return EOPNOTSUPP;
 
 	for (bit = ffs(desc->mr_len >> 17) - 1; bit < 15; bit++)

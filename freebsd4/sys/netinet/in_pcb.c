@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.23 2002/05/02 02:36:50 silby Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.24 2002/08/08 16:44:57 ume Exp $
  */
 
 #include "opt_ipsec.h"
@@ -159,7 +159,7 @@ in_pcballoc(so, pcbinfo, p)
 	}
 #endif /*IPSEC*/
 #if defined(INET6)
-	if (INP_SOCKAF(so) == AF_INET6 && !ip6_mapped_addr_on)
+	if (INP_SOCKAF(so) == AF_INET6 && ip6_v6only)
 		inp->inp_flags |= IN6P_IPV6_V6ONLY;
 #endif
 	LIST_INSERT_HEAD(pcbinfo->listhead, inp, inp_list);

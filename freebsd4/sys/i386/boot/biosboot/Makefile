@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/i386/boot/biosboot/Makefile,v 1.70 1999/12/23 17:48:51 bde Exp $
+# $FreeBSD: src/sys/i386/boot/biosboot/Makefile,v 1.70.2.2 2002/08/07 16:31:55 ru Exp $
 #
 
 PROG=	boot
@@ -79,11 +79,11 @@ boot2:		boot.nohdr
 all:		boot1 boot2
 
 install:
-	${INSTALL} ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
 		boot1 boot2 ${DESTDIR}${BINDIR}/
 
 install-boothelp:
-	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m ${NOBINMODE} \
+	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m ${NOBINMODE} \
 		${.CURDIR}/boot.help ${DESTDIR}/
 
 .include <bsd.kern.mk>

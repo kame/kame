@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/i686_mem.c,v 1.8.2.2 2002/04/28 22:57:59 dwmalone Exp $
+ * $FreeBSD: src/sys/i386/i386/i686_mem.c,v 1.8.2.4 2002/09/24 08:12:51 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -395,6 +395,13 @@ i686_mrsetlow(struct mem_range_softc *sc, struct mem_range_desc *mrd, int *arg)
 	((last_md = i686_mtrrfixsearch(sc, mrd->mr_base + mrd->mr_len - 1)) == NULL))
 	return(EINVAL);
 
+    /* check we aren't doing something risky */
+    if (!(mrd->mr_flags & MDF_FORCE))
+	for (curr_md = first_md; curr_md <= last_md; curr_md++) {
+	    if ((curr_md->mr_flags & MDF_ATTRMASK) == MDF_UNKNOWN)
+		return (EACCES);
+	}
+
     /* set flags, clear set-by-firmware flag */
     for (curr_md = first_md; curr_md <= last_md; curr_md++) {
 	curr_md->mr_flags = mrcopyflags(curr_md->mr_flags & ~MDF_FIRMWARE, mrd->mr_flags);
@@ -434,6 +441,10 @@ i686_mrsetvariable(struct mem_range_softc *sc, struct mem_range_desc *mrd, int *
 		/* whoops, owned by someone */
 		if (curr_md->mr_flags & MDF_BUSY)
 		    return(EBUSY);
+		/* check we aren't doing something risky */
+		if (!(mrd->mr_flags & MDF_FORCE) &&
+		  ((curr_md->mr_flags & MDF_ATTRMASK) == MDF_UNKNOWN))
+		    return (EACCES);
 		/* Ok, just hijack this entry */
 		free_md = curr_md;
 		break;
@@ -595,7 +606,7 @@ i686_mem_drvinit(void *unused)
 {
     /* Try for i686 MTRRs */
     if ((cpu_feature & CPUID_MTRR) &&
-	((cpu_id & 0xf00) == 0x600) &&
+	((cpu_id & 0xf00) == 0x600 || (cpu_id & 0xf00) == 0xf00) &&
 	((strcmp(cpu_vendor, "GenuineIntel") == 0) ||
 	(strcmp(cpu_vendor, "AuthenticAMD") == 0))) {
 	mem_range_softc.mr_op = &i686_mrops;

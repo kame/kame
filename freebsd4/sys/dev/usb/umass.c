@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/usb/umass.c,v 1.11.2.8 2001/12/06 18:09:21 iedowse Exp $
+ *	$FreeBSD: src/sys/dev/usb/umass.c,v 1.11.2.10 2002/09/06 06:51:41 guido Exp $
  *	$NetBSD: umass.c,v 1.28 2000/04/02 23:46:53 augustss Exp $
  */
 
@@ -100,6 +100,7 @@
 #include <sys/kernel.h>
 #include <sys/module.h>
 #include <sys/bus.h>
+#include <sys/sysctl.h>
 #include <machine/clock.h>
 
 #include <dev/usb/usb.h>
@@ -117,7 +118,7 @@
 #include <sys/devicestat.h>
 #include <cam/cam_periph.h>
 
-#ifdef UMASS_DEBUG
+#ifdef USB_DEBUG
 #define DIF(m, x)	if (umassdebug & (m)) do { x ; } while (0)
 #define	DPRINTF(m, x)	if (umassdebug & (m)) logprintf x
 #define UDMASS_GEN	0x00010000	/* general */
@@ -130,7 +131,10 @@
 #define UDMASS_CBI	0x00400000	/* CBI transfers */
 #define UDMASS_WIRE	(UDMASS_BBB|UDMASS_CBI)
 #define UDMASS_ALL	0xffff0000	/* all of the above */
-int umassdebug = UDMASS_ALL;
+int umassdebug = 0;
+SYSCTL_NODE(_hw_usb, OID_AUTO, umass, CTLFLAG_RW, 0, "USB umass");
+SYSCTL_INT(_hw_usb_umass, OID_AUTO, debug, CTLFLAG_RW,
+	   &umassdebug, 0, "umass debug level");
 #else
 #define DIF(m, x)	/* nop */
 #define	DPRINTF(m, x)	/* nop */
@@ -167,7 +171,7 @@ int umassdebug = UDMASS_ALL;
  * The SIM is the highest target number. This makes sure that umass0 corresponds
  * to target 0 on the USB SCSI bus.
  */
-#ifndef UMASS_DEBUG
+#ifndef USB_DEBUG
 #define UMASS_SCSIID_MAX	32	/* maximum number of drives expected */
 #else
 /* while debugging avoid unnecessary clutter in the output at umass_cam_rescan
@@ -410,13 +414,15 @@ struct umass_softc {
 
 	/* SCSI/CAM specific variables */
 	unsigned char 		cam_scsi_command[CAM_MAX_CDBLEN];
+	unsigned char 		cam_scsi_command2[CAM_MAX_CDBLEN];
 	struct scsi_sense	cam_scsi_sense;
+	struct scsi_sense	cam_scsi_test_unit_ready;
 
 	int			transfer_speed;		/* in kb/s */
 	int			maxlun;			/* maximum LUN number */
 };
 
-#ifdef UMASS_DEBUG
+#ifdef USB_DEBUG
 char *states[TSTATE_STATES+1] = {
 	/* should be kept in sync with the list at transfer_state */
 	"Idle",
@@ -501,6 +507,8 @@ Static void umass_cam_cb	(struct umass_softc *sc, void *priv,
 				int residue, int status);
 Static void umass_cam_sense_cb	(struct umass_softc *sc, void *priv,
 				int residue, int status);
+Static void umass_cam_quirk_cb	(struct umass_softc *sc, void *priv,
+				int residue, int status);
 
 Static void umass_cam_rescan_callback
 				(struct cam_periph *periph,union ccb *ccb);
@@ -534,7 +542,7 @@ Static int umass_rbc_transform	__P((struct umass_softc *sc,
 				unsigned char *cmd, int cmdlen,
 		     		unsigned char **rcmd, int *rcmdlen));
 
-#ifdef UMASS_DEBUG
+#ifdef USB_DEBUG
 /* General debugging functions */
 Static void umass_bbb_dump_cbw	(struct umass_softc *sc,
 				umass_bbb_cbw_t *cbw);
@@ -578,7 +586,6 @@ umass_match_proto(struct umass_softc *sc, usbd_interface_handle iface,
 
 	dd = usbd_get_device_descriptor(udev);
 
-#if 0
 	/* XXX ATAPI support is untested. Don't use it for the moment */
 	if (UGETW(dd->idVendor) == USB_VENDOR_SHUTTLE
 	    && UGETW(dd->idProduct) == USB_PRODUCT_SHUTTLE_EUSB) {
@@ -599,7 +606,11 @@ umass_match_proto(struct umass_softc *sc, usbd_interface_handle iface,
 		sc->quirks |= NO_TEST_UNIT_READY | NO_START_STOP;
 		return(UMATCH_VENDOR_PRODUCT);
 	}
-#endif
+
+	if (UGETW(dd->idVendor) == USB_VENDOR_FUJIPHOTO
+	    && UGETW(dd->idProduct) == USB_PRODUCT_FUJIPHOTO_MASS0100) {
+		sc->quirks |= RS_NO_CLEAR_UA;
+	}
 
 	if (UGETW(dd->idVendor) == USB_VENDOR_YEDATA
 	    && UGETW(dd->idProduct) == USB_PRODUCT_YEDATA_FLASHBUSTERU) {
@@ -668,11 +679,9 @@ umass_match_proto(struct umass_softc *sc, usbd_interface_handle iface,
 		break;
 	case USUBCLASS_SFF8020I:
 	case USUBCLASS_SFF8070I:
-#if 0
 		/* XXX ATAPI support is untested. Don't use it for the moment */
 		sc->proto |= PROTO_ATAPI;
 		break;
-#endif
 	default:
 		DPRINTF(UDMASS_GEN, ("%s: Unsupported command protocol %d\n",
 			USBDEVNAME(sc->sc_dev), id->bInterfaceSubClass));
@@ -746,7 +755,7 @@ USB_ATTACH(umass)
 
 	id = usbd_get_interface_descriptor(sc->iface);
 	printf("%s: %s", USBDEVNAME(sc->sc_dev), devinfo);
-#ifdef UMASS_DEBUG
+#ifdef USB_DEBUG
 	printf(", ");
 	switch (sc->proto&PROTO_COMMAND) {
 	case PROTO_SCSI:
@@ -821,7 +830,7 @@ USB_ATTACH(umass)
 		    && UE_GET_DIR(ed->bEndpointAddress) == UE_DIR_IN
 		    && (ed->bmAttributes & UE_XFERTYPE) == UE_INTERRUPT) {
 			sc->intrin = ed->bEndpointAddress;
-#ifdef UMASS_DEBUG
+#ifdef USB_DEBUG
 			if (UGETW(ed->wMaxPacketSize) > 2) {
 				DPRINTF(UDMASS_CBI, ("%s: intr size is %d\n",
 					USBDEVNAME(sc->sc_dev),
@@ -903,7 +912,7 @@ USB_ATTACH(umass)
 		sc->reset = umass_cbi_reset;
 		sc->transfer = umass_cbi_transfer;
 		sc->state = umass_cbi_state;
-#ifdef UMASS_DEBUG
+#ifdef USB_DEBUG
 	} else {
 		panic("%s:%d: Unknown proto 0x%02x\n",
 		      __FILE__, __LINE__, sc->proto);
@@ -918,7 +927,7 @@ USB_ATTACH(umass)
 		sc->transform = umass_atapi_transform;
 	else if (sc->proto & PROTO_RBC)
 		sc->transform = umass_rbc_transform;
-#ifdef UMASS_DEBUG
+#ifdef USB_DEBUG
 	else
 		panic("No transformation defined for command proto 0x%02x\n",
 		      sc->proto & PROTO_COMMAND);
@@ -942,6 +951,7 @@ USB_ATTACH(umass)
 	    (sc->proto & PROTO_RBC)) {
 		/* Prepare the SCSI command block */
 		sc->cam_scsi_sense.opcode = REQUEST_SENSE;
+		sc->cam_scsi_test_unit_ready.opcode = TEST_UNIT_READY;
 
 		/* If this is the first device register the SIM */
 		if (umass_sim == NULL) {
@@ -1909,7 +1919,7 @@ umass_cbi_state(usbd_xfer_handle xfer, usbd_private_handle priv,
 
 				sc->transfer_state = TSTATE_IDLE;
 				sc->transfer_cb(sc, sc->transfer_priv,
-						sc->transfer_datalen,
+						sc->transfer_datalen - sc->transfer_actlen,
 						err);
 			}
 		}
@@ -2023,7 +2033,7 @@ umass_cam_attach_sim()
 Static void
 umass_cam_rescan_callback(struct cam_periph *periph, union ccb *ccb)
 {
-#ifdef UMASS_DEBUG
+#ifdef USB_DEBUG
 	if (ccb->ccb_h.status != CAM_REQ_CMP) {
 		DPRINTF(UDMASS_SCSI, ("scbus%d: Rescan failed, 0x%04x\n",
 			cam_sim_path(umass_sim),
@@ -2082,7 +2092,7 @@ umass_cam_attach(struct umass_softc *sc)
 		return(1);
 	}
 
-#ifndef UMASS_DEBUG
+#ifndef USB_DEBUG
 	if (bootverbose)
 #endif
 		printf("%s:%d:%d:%d: Attached to scbus%d as device %d\n",
@@ -2440,7 +2450,7 @@ umass_cam_action(struct cam_sim *sim, union ccb *ccb)
 Static void
 umass_cam_poll(struct cam_sim *sim)
 {
-#ifdef UMASS_DEBUG
+#ifdef USB_DEBUG
 	struct umass_softc *sc = (struct umass_softc *) sim->softc;
 
 	DPRINTF(UDMASS_SCSI, ("%s: CAM poll\n",
@@ -2478,12 +2488,12 @@ umass_cam_cb(struct umass_softc *sc, void *priv, int residue, int status)
 			int rcmdlen;
 
 			/* fetch sense data */
+			/* the rest of the command was filled in at attach */
+			sc->cam_scsi_sense.length = csio->sense_len;
+
 			DPRINTF(UDMASS_SCSI,("%s: Fetching %db sense data\n",
 				USBDEVNAME(sc->sc_dev),
 				sc->cam_scsi_sense.length));
-
-			/* the rest of the command was filled in at attach */
-			sc->cam_scsi_sense.length = csio->sense_len;
 
 			rcmd = (unsigned char *) &sc->cam_scsi_command;
 			rcmdlen = sizeof(sc->cam_scsi_command);
@@ -2533,6 +2543,8 @@ umass_cam_sense_cb(struct umass_softc *sc, void *priv, int residue, int status)
 {
 	union ccb *ccb = (union ccb *) priv;
 	struct ccb_scsiio *csio = &ccb->csio;		/* deref union */
+	unsigned char *rcmd;
+	int rcmdlen;
 
 	switch (status) {
 	case STATUS_CMD_OK:
@@ -2557,6 +2569,40 @@ umass_cam_sense_cb(struct umass_softc *sc, void *priv, int residue, int status)
 			 * CCI)
 			 */
 			ccb->ccb_h.status = CAM_REQ_CMP;
+		} else if ((sc->quirks & RS_NO_CLEAR_UA) && /* XXX */
+			   (csio->cdb_io.cdb_bytes[0] == READ_CAPACITY) &&
+			   ((csio->sense_data.flags & SSD_KEY)
+			    == SSD_KEY_UNIT_ATTENTION)) {
+			/* Ignore unit attention errors in the case where
+			* the Unit Attention state is not cleared on  
+			* REQUEST SENSE. They will appear again at the next
+			* command.
+			*/
+			ccb->ccb_h.status = CAM_SCSI_STATUS_ERROR
+					    | CAM_AUTOSNS_VALID;
+			csio->scsi_status = SCSI_STATUS_CHECK_COND;
+
+			DPRINTF(UDMASS_SCSI,("%s: Doing a sneaky TEST_UNIT_READY\n",
+				USBDEVNAME(sc->sc_dev)));
+
+			/* the rest of the command was filled in at attach */
+
+			rcmd = (unsigned char *) &sc->cam_scsi_command2;
+			rcmdlen = sizeof(sc->cam_scsi_command2);
+
+			if (sc->transform(sc,
+					(unsigned char *)
+					&sc->cam_scsi_test_unit_ready,
+					sizeof(sc->cam_scsi_test_unit_ready),
+					&rcmd, &rcmdlen)) {
+				sc->transfer(sc, ccb->ccb_h.target_lun,
+					     rcmd, rcmdlen,
+					     NULL, 0, DIR_NONE,
+					     umass_cam_quirk_cb, (void *) ccb);
+			} else {
+				panic("transform(TEST_UNIT_READY) failed\n");
+			}
+			break;
 		} else {
 			ccb->ccb_h.status = CAM_SCSI_STATUS_ERROR
 					    | CAM_AUTOSNS_VALID;
@@ -2573,6 +2619,16 @@ umass_cam_sense_cb(struct umass_softc *sc, void *priv, int residue, int status)
 	}
 }
 
+Static void
+umass_cam_quirk_cb(struct umass_softc *sc, void *priv, int residue, int status)
+{
+	union ccb *ccb = (union ccb *) priv;
+
+	DPRINTF(UDMASS_SCSI, ("%s: Test unit ready returned status %d\n",
+	USBDEVNAME(sc->sc_dev), status));
+	ccb->ccb_h.status = CAM_AUTOSENSE_FAIL;
+	xpt_done(ccb);
+}
 
 Static int
 umass_driver_load(module_t mod, int what, void *arg)
@@ -2751,6 +2807,18 @@ umass_atapi_transform(struct umass_softc *sc, unsigned char *cmd, int cmdlen,
 	switch (cmd[0]) {
 	/* Commands of which the format has been verified. They should work. */
 	case TEST_UNIT_READY:
+		if (sc->quirks & NO_TEST_UNIT_READY) {
+			KASSERT(*rcmdlen >= sizeof(struct scsi_start_stop_unit),
+				("rcmdlen = %d < %d, buffer too small",
+				 *rcmdlen, sizeof(struct scsi_start_stop_unit)));
+			DPRINTF(UDMASS_SCSI, ("%s: Converted TEST_UNIT_READY "
+				"to START_UNIT\n", USBDEVNAME(sc->sc_dev)));
+			memset(*rcmd, 0, *rcmdlen);
+			(*rcmd)[0] = START_STOP_UNIT;
+			(*rcmd)[4] = SSS_START;
+			return 1;
+		}
+		/* fallthrough */
 	case REZERO_UNIT:
 	case REQUEST_SENSE:
 	case INQUIRY:
@@ -2794,7 +2862,7 @@ DRIVER_MODULE(umass, uhub, umass_driver, umass_devclass, umass_driver_load, 0);
 
 
 
-#ifdef UMASS_DEBUG
+#ifdef USB_DEBUG
 Static void
 umass_bbb_dump_cbw(struct umass_softc *sc, umass_bbb_cbw_t *cbw)
 {

@@ -38,7 +38,7 @@
  * from: Utah $Hdr: vm_unix.c 1.1 89/11/07$
  *
  *	@(#)vm_unix.c	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/vm/vm_unix.c,v 1.24.2.1 2001/02/02 21:26:38 dwmalone Exp $
+ * $FreeBSD: src/sys/vm/vm_unix.c,v 1.24.2.2 2002/07/02 20:06:19 dillon Exp $
  */
 
 /*
@@ -97,6 +97,8 @@ obreak(p, uap)
 		vm_size_t diff;
 
 		diff = new - old;
+		if (vm->vm_map.size + diff > p->p_rlimit[RLIMIT_VMEM].rlim_cur)
+			return(ENOMEM);
 		rv = vm_map_find(&vm->vm_map, NULL, 0, &old, diff, FALSE,
 			VM_PROT_ALL, VM_PROT_ALL, 0);
 		if (rv != KERN_SUCCESS) {

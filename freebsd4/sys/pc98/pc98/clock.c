@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)clock.c	7.2 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/pc98/pc98/clock.c,v 1.81.2.2 2000/10/21 07:44:26 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/clock.c,v 1.81.2.3 2002/06/29 17:19:29 mp Exp $
  */
 
 /*
@@ -1507,7 +1507,7 @@ sysctl_machdep_i8254_freq(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_machdep, OID_AUTO, i8254_freq, CTLTYPE_INT | CTLFLAG_RW,
-    0, sizeof(u_int), sysctl_machdep_i8254_freq, "I", "");
+    0, sizeof(u_int), sysctl_machdep_i8254_freq, "IU", "");
 
 static int
 sysctl_machdep_tsc_freq(SYSCTL_HANDLER_ARGS)
@@ -1528,7 +1528,7 @@ sysctl_machdep_tsc_freq(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_machdep, OID_AUTO, tsc_freq, CTLTYPE_INT | CTLFLAG_RW,
-    0, sizeof(u_int), sysctl_machdep_tsc_freq, "I", "");
+    0, sizeof(u_int), sysctl_machdep_tsc_freq, "IU", "");
 
 static unsigned
 i8254_get_timecount(struct timecounter *tc)

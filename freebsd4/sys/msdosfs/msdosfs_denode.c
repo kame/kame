@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/msdosfs/msdosfs_denode.c,v 1.47.2.2 2001/12/25 01:44:45 dillon Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfs_denode.c,v 1.47.2.3 2002/08/22 16:20:15 trhodes Exp $ */
 /*	$NetBSD: msdosfs_denode.c,v 1.28 1998/02/10 14:10:00 mrg Exp $	*/
 
 /*-
@@ -355,6 +355,17 @@ deget(pmp, dirclust, diroffset, depp)
 		 * the denode structure.
 		 */
 		u_long size;
+
+		/*
+		 * XXX Sometimes, these arrives that . entry have cluster
+		 * number 0, when it shouldn't.  Use real cluster number
+		 * instead of what is written in directory entry.
+		 */
+		if ((diroffset == 0) && (ldep->de_StartCluster != dirclust)) {
+			printf("deget(): . entry at clust %ld != %ld\n",
+					dirclust, ldep->de_StartCluster);
+			ldep->de_StartCluster = dirclust;
+		}
 
 		nvp->v_type = VDIR;
 		if (ldep->de_StartCluster != MSDOSFSROOT) {

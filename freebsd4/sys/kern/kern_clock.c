@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_clock.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_clock.c,v 1.105.2.8 2002/02/09 23:02:37 luigi Exp $
+ * $FreeBSD: src/sys/kern/kern_clock.c,v 1.105.2.9 2002/09/17 22:39:57 sam Exp $
  */
 
 #include "opt_ntp.h"
@@ -666,7 +666,16 @@ init_timecounter(struct timecounter *tc)
 {
 	struct timespec ts1;
 	struct timecounter *t1, *t2, *t3;
+	unsigned u;
 	int i;
+
+	u = tc->tc_frequency / tc->tc_counter_mask;
+	if (u > hz) {
+		printf("Timecounter \"%s\" frequency %lu Hz"
+		       " -- Insufficient hz, needs at least %u\n",
+		       tc->tc_name, (u_long) tc->tc_frequency, u);
+		return;
+	}
 
 	tc->tc_adjustment = 0;
 	tc->tc_tweak = tc;

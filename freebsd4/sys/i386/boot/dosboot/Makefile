@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/i386/boot/dosboot/Makefile,v 1.6 1999/08/28 00:43:19 peter Exp $
+# $FreeBSD: src/sys/i386/boot/dosboot/Makefile,v 1.6.2.1 2002/08/07 16:31:56 ru Exp $
 #
 
 MPROG=	fbsdboot.exe
@@ -10,7 +10,7 @@ STRIP=
 all:	${MPROG}
 
 install:	${MPROG}
-	${INSTALL} ${COPY} ${STRIP} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+	${INSTALL} ${STRIP} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
 	    ${INSTALLFLAGS} ${MPROG} ${DESTDIR}${BINDIR}
 
 

@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.385.2.23 2002/03/16 15:49:04 luigi Exp $
+ * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.385.2.25 2002/09/24 08:12:21 mdodd Exp $
  */
 
 #include "apm.h"
@@ -997,6 +997,37 @@ cpu_halt(void)
 }
 
 /*
+ * Hook to idle the CPU when possible.   This is disabled by default for
+ * the SMP case as there is a small window of opportunity whereby a ready
+ * process is delayed to the next clock tick.  It should be safe to enable
+ * for SMP if power is a concern.
+ *
+ * On -stable, cpu_idle() is called with interrupts disabled and must
+ * return with them enabled.
+ */
+#ifdef SMP
+static int	cpu_idle_hlt = 0;
+#else
+static int	cpu_idle_hlt = 1;
+#endif
+SYSCTL_INT(_machdep, OID_AUTO, cpu_idle_hlt, CTLFLAG_RW,
+    &cpu_idle_hlt, 0, "Idle loop HLT enable");
+
+void
+cpu_idle(void)
+{
+	if (cpu_idle_hlt) {
+		/*
+		 * We must guarentee that hlt is exactly the instruction
+		 * following the sti.
+		 */
+		__asm __volatile("sti; hlt");
+	} else {
+		__asm __volatile("sti");
+	}
+}
+
+/*
  * Clear registers on exec
  */
 void
@@ -1008,6 +1039,10 @@ setregs(p, entry, stack, ps_strings)
 {
 	struct trapframe *regs = p->p_md.md_regs;
 	struct pcb *pcb = &p->p_addr->u_pcb;
+
+	/* Reset pc->pcb_gs and %gs before possibly invalidating it. */
+	pcb->pcb_gs = _udatasel;
+	load_gs(_udatasel);
 
 #ifdef USER_LDT
 	/* was i386_user_cleanup() in NetBSD */
@@ -1026,12 +1061,6 @@ setregs(p, entry, stack, ps_strings)
 
 	/* PS_STRINGS value for BSD/OS binaries.  It is 0 for non-BSD/OS. */
 	regs->tf_ebx = ps_strings;
-
-	/* reset %gs as well */
-	if (pcb == curpcb)
-		load_gs(_udatasel);
-	else
-		pcb->pcb_gs = _udatasel;
 
         /*
          * Reset the hardware debug registers if they were in use.

@@ -61,7 +61,7 @@
 #include <gnu/dev/sound/pci/maestro3_reg.h>
 #include <gnu/dev/sound/pci/maestro3_dsp.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/maestro3.c,v 1.2.2.7 2002/04/22 15:49:32 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/maestro3.c,v 1.2.2.11 2002/09/16 19:52:33 scottl Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -1044,8 +1044,6 @@ m3_init(struct sc_info *sc)
 		m3_wr_assp_data(sc, i, 0); /* zero entire dac/adc area */
 	}
 
-	m3_enable_ints(sc);
-
 	/* [m3_assp_continue] */
 	m3_wr_1(sc, DSP_PORT_CONTROL_REG_B, reset_state | REGB_ENABLE_RESET);
 
@@ -1172,6 +1170,8 @@ m3_pci_attach(device_t dev)
 		goto bad;
 	}
 
+	m3_enable_ints(sc);
+
 	if (pcm_register(dev, sc, M3_PCHANS, M3_RCHANS)) {
 		device_printf(dev, "pcm_register error\n");
 		goto bad;
@@ -1281,9 +1281,9 @@ m3_pci_suspend(device_t dev)
 
 	/* Save the state of the ASSP */
 	for (i = REV_B_CODE_MEMORY_BEGIN; i <= REV_B_CODE_MEMORY_END; i++)
-		sc->savemem[++index] = m3_rd_assp_code(sc, i);
+		sc->savemem[index++] = m3_rd_assp_code(sc, i);
 	for (i = REV_B_DATA_MEMORY_BEGIN; i <= REV_B_DATA_MEMORY_END; i++)
-		sc->savemem[++index] = m3_rd_assp_data(sc, i);
+		sc->savemem[index++] = m3_rd_assp_data(sc, i);
 
 	/* Power down the card to D3 state */
 	m3_power(sc, 3);
@@ -1311,9 +1311,9 @@ m3_pci_resume(device_t dev)
 
 	/* Restore the ASSP state */
 	for (i = REV_B_CODE_MEMORY_BEGIN; i <= REV_B_CODE_MEMORY_END; i++)
-		m3_wr_assp_code(sc, i, sc->savemem[++index]);
+		m3_wr_assp_code(sc, i, sc->savemem[index++]);
 	for (i = REV_B_DATA_MEMORY_BEGIN; i <= REV_B_DATA_MEMORY_END; i++)
-		m3_wr_assp_data(sc, i, sc->savemem[++index]);
+		m3_wr_assp_data(sc, i, sc->savemem[index++]);
 
 	/* Restart the DMA engine */
 	m3_wr_assp_data(sc, KDATA_DMA_ACTIVE, 0);
@@ -1321,9 +1321,9 @@ m3_pci_resume(device_t dev)
 	/* [m3_assp_continue] */
 	m3_wr_1(sc, DSP_PORT_CONTROL_REG_B, reset_state | REGB_ENABLE_RESET);
 
-	m3_enable_ints(sc);
-
 	m3_amp_enable(sc);
+
+	m3_enable_ints(sc);
 
 	if (mixer_reinit(dev) == -1) {
 		device_printf(dev, "unable to reinitialize the mixer\n");
@@ -1390,7 +1390,7 @@ m3_config(struct sc_info *sc)
 		hv_cfg = HV_BUTTON_FROM_GD;
 
 	data = pci_read_config(sc->dev, PCI_ALLEGRO_CONFIG, 4);
-	data &= HV_BUTTON_FROM_GD;
+	data &= ~HV_BUTTON_FROM_GD;
 	data |= REDUCED_DEBOUNCE | HV_CTRL_ENABLE | hv_cfg;
 	data |= PM_CTRL_ENABLE | CLK_DIV_BY_49 | USE_PCI_TIMING;
 	pci_write_config(sc->dev, PCI_ALLEGRO_CONFIG, data, 4);

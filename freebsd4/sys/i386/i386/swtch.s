@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/swtch.s,v 1.89.2.7 2002/02/09 23:02:38 luigi Exp $
+ * $FreeBSD: src/sys/i386/i386/swtch.s,v 1.89.2.8 2002/07/16 17:58:21 dillon Exp $
  */
 
 #include "npx.h"
@@ -61,7 +61,7 @@
 	.data
 
 	.globl	_hlt_vector
-_hlt_vector:	.long	_default_halt	/* pointer to halt routine */
+_hlt_vector:	.long	_cpu_idle	/* pointer to halt routine */
 
 	.globl	_panic
 
@@ -260,12 +260,16 @@ idle_loop:
 
 CROSSJUMPTARGET(_idle)
 
+#if 0
+
 ENTRY(default_halt)
 	sti
 #ifndef SMP
 	hlt					/* XXX:	 until a wakeup IPI */
 #endif
 	ret
+
+#endif
 
 /*
  * cpu_switch()

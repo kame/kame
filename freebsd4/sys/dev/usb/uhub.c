@@ -1,5 +1,5 @@
 /*	$NetBSD: uhub.c,v 1.47 2000/09/24 02:08:38 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uhub.c,v 1.21.2.5 2001/01/18 00:25:11 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhub.c,v 1.21.2.6 2002/08/12 14:19:48 joe Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -53,6 +53,7 @@
 #include <sys/module.h>
 #include <sys/bus.h>
 #include "bus_if.h"
+#include <sys/sysctl.h>
 #endif
 
 #include <machine/bus.h>
@@ -64,10 +65,13 @@
 
 #define UHUB_INTR_INTERVAL 255	/* ms */
 
-#ifdef UHUB_DEBUG
+#ifdef USB_DEBUG
 #define DPRINTF(x)	if (uhubdebug) logprintf x
 #define DPRINTFN(n,x)	if (uhubdebug>(n)) logprintf x
-int	uhubdebug;
+static int	uhubdebug = 0;
+SYSCTL_NODE(_hw_usb, OID_AUTO, uhub, CTLFLAG_RW, 0, "USB uhub");
+SYSCTL_INT(_hw_usb_uhub, OID_AUTO, debug, CTLFLAG_RW,
+	&uhubdebug, 0, "uhub debug level");
 #else
 #define DPRINTF(x)
 #define DPRINTFN(n,x)

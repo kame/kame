@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_bpf.c,v 1.2.4.3 2000/10/24 18:36:44 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_bpf.c,v 1.2.4.4 2002/07/02 23:44:02 archie Exp $
  * $Whistle: ng_bpf.c,v 1.3 1999/12/03 20:30:23 archie Exp $
  */
 
@@ -92,18 +92,16 @@ static ng_disconnect_t	ng_bpf_disconnect;
 static int	ng_bpf_setprog(hook_p hook, const struct ng_bpf_hookprog *hp);
 
 /* Parse type for one struct bfp_insn */
-static const struct ng_parse_struct_info ng_bpf_insn_type_info = {
-    {
+static const struct ng_parse_struct_field ng_bpf_insn_type_fields[] = {
 	{ "code",	&ng_parse_hint16_type	},
 	{ "jt",		&ng_parse_uint8_type	},
 	{ "jf",		&ng_parse_uint8_type	},
 	{ "k",		&ng_parse_uint32_type	},
 	{ NULL }
-    }
 };
 static const struct ng_parse_type ng_bpf_insn_type = {
 	&ng_parse_struct_type,
-	&ng_bpf_insn_type_info
+	&ng_bpf_insn_type_fields
 };
 
 /* Parse type for the field 'bpf_prog' in struct ng_bpf_hookprog */
@@ -129,19 +127,19 @@ static const struct ng_parse_type ng_bpf_hookprogary_type = {
 };
 
 /* Parse type for struct ng_bpf_hookprog */
-static const struct ng_parse_struct_info ng_bpf_hookprog_type_info
+static const struct ng_parse_struct_field ng_bpf_hookprog_type_fields[]
 	= NG_BPF_HOOKPROG_TYPE_INFO(&ng_bpf_hookprogary_type);
 static const struct ng_parse_type ng_bpf_hookprog_type = {
 	&ng_parse_struct_type,
-	&ng_bpf_hookprog_type_info
+	&ng_bpf_hookprog_type_fields
 };
 
 /* Parse type for struct ng_bpf_hookstat */
-static const struct ng_parse_struct_info
-	ng_bpf_hookstat_type_info = NG_BPF_HOOKSTAT_TYPE_INFO;
+static const struct ng_parse_struct_field ng_bpf_hookstat_type_fields[]
+	= NG_BPF_HOOKSTAT_TYPE_INFO;
 static const struct ng_parse_type ng_bpf_hookstat_type = {
 	&ng_parse_struct_type,
-	&ng_bpf_hookstat_type_info
+	&ng_bpf_hookstat_type_fields
 };
 
 /* List of commands and how to convert arguments to/from ASCII */

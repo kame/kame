@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/sio.c,v 1.291.2.31 2002/04/15 15:29:35 jhb Exp $
+ * $FreeBSD: src/sys/isa/sio.c,v 1.291.2.33 2002/08/12 11:57:09 sobomax Exp $
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
  *	from: i386/isa sio.c,v 1.234
  */
@@ -602,6 +602,7 @@ static struct pci_ids pci_ids[] = {
 	{ 0x95211415, "Oxford Semiconductor PCI Dual Port Serial", 0x10 },
 	{ 0x7101135e, "SeaLevel Ultra 530.PCI Single Port Serial", 0x18 },
 	{ 0x0000151f, "SmartLink 5634PCV SurfRider", 0x10 },
+	{ 0x98459710, "Netmos Nm9845 PCI Bridge with Dual UART", 0x10 },
 	{ 0x00000000, NULL, 0 }
 };
 
@@ -705,6 +706,7 @@ static struct isa_pnp_id sio_ids[] = {
 	{0x12206804, NULL},     /* ACH2012 - 5634BTS 56K Video Ready Modem */
 	{0x7602a904, NULL},	/* AEI0276 - 56K v.90 Fax Modem (LKT) */
 	{0x00007905, NULL},	/* AKY0000 - 56K Plug&Play Modem */
+	{0x21107905, NULL},	/* AKY1021 - 56K Plug&Play Modem */
 	{0x01405407, NULL},	/* AZT4001 - AZT3000 PnP SOUND DEVICE, MODEM */
 	{0x56039008, NULL},	/* BDP0356 - Best Data 56x2 */
 	{0x56159008, NULL},	/* BDP1556 - B.D. Smart One 56SPS,Voice Modem*/

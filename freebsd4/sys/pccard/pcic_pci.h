@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcic_pci.h,v 1.23.2.9 2001/11/12 05:29:22 imp Exp $
+ * $FreeBSD: src/sys/pccard/pcic_pci.h,v 1.23.2.11 2002/09/22 20:26:58 imp Exp $
  */
 
 /* Share the devid database with NEWCARD */
@@ -43,6 +43,7 @@
 /* Texas Instruments PCI-1130/1131 CardBus Controller */
 #define TI113X_PCI_SYSTEM_CONTROL	0x80	/* System Control */
 #define TI12XX_PCI_MULTIMEDIA_CONTROL	0x84	/* Zoom Video */
+#define TI12XX_PCI_MFUNC		0x8c	/* multifunction pins */
 #define TI113X_PCI_RETRY_STATUS		0x90	/* Retry Status */
 #define TI113X_PCI_CARD_CONTROL		0x91	/* Card Control */
 #define TI113X_PCI_DEVICE_CONTROL	0x92	/* Device Control */
@@ -59,6 +60,17 @@
 #define	TI113X_SYSCNTL_PWRSAVINGS	0x00000040u
 #define TI113X_SYSCNTL_KEEP_CLK		0x00000002u
 #define TI113X_SYSCNTL_CLKRUN_ENA	0x00000001u
+
+/* MFUNC register (TI12XX_MFUNC == 0x8c) */
+#define TI12XX_MFUNC_PIN0		0x0000000fu
+#define   TI12XX_MFUNC_PIN0_INTA	0x2
+#define TI12XX_MFUNC_PIN1		0x000000f0u
+#define   TI12XX_MFUNC_PIN1_INTB	0x20
+#define TI12XX_MFUNC_PIN2		0x00000f00u
+#define TI12XX_MFUNC_PIN3		0x0000f000u
+#define TI12XX_MFUNC_PIN4		0x000f0000u
+#define TI12XX_MFUNC_PIN5		0x00f00000u
+#define TI12XX_MFUNC_PIN6		0x0f000000u
 
 /* Card control register (TI113X_CARD_CONTROL == 0x91) */
 #define TI113X_CARDCNTL_RING_ENA	0x80u
@@ -201,6 +213,7 @@
 #define CB_SM_CD		0x6	/* Socket MASK Card detect */
 #define CB_SM_POWER		0x8
 
+/* Socket State Register */
 #define CB_SS_CARDSTS		0x00000001 /* Card Status Change */
 #define CB_SS_CD1		0x00000002 /* Card Detect 1 */
 #define CB_SS_CD2		0x00000004 /* Card Detect 2 */
@@ -216,20 +229,41 @@
 #define CB_SS_3VCARD		0x00000800 /* 3.3 V Card */
 #define CB_SS_XVCARD		0x00001000 /* X.X V Card */
 #define CB_SS_YVCARD		0x00002000 /* Y.Y V Card */
+#define CB_SS_CARD_MASK		0x00003c00 /* *VCARD signal */
 #define CB_SS_5VSOCK		0x10000000 /* 5 V Socket */
 #define CB_SS_3VSOCK		0x20000000 /* 3.3 V Socket */
 #define CB_SS_XVSOCK		0x40000000 /* X.X V Socket */
 #define CB_SS_YVSOCK		0x80000000 /* Y.Y V Socket */
 
+/* Socket power register */
 #define CB_SP_CLKSTOP		0x80	/* Cardbus clock stop protocol */
+#define CB_SP_VCC_MASK		0x70
 #define CB_SP_VCC_0V		0x00
+					/* 0x10 is reserved 12V in VPP */
 #define CB_SP_VCC_5V		0x20
 #define CB_SP_VCC_3V		0x30
 #define CB_SP_VCC_XV		0x40
 #define CB_SP_VCC_YV		0x50
+					/* 0x60 and 0x70 are reserved */
+#define CB_SP_VPP_MASK		0x07
 #define CB_SP_VPP_0V		0x00
 #define CB_SP_VPP_12V		0x01
 #define CB_SP_VPP_5V		0x02
 #define CB_SP_VPP_3V		0x03
 #define CB_SP_VPP_XV		0x04
 #define CB_SP_VPP_YV		0x05
+
+/* Socket force register */
+#define CB_SF_INTCVS		(1 << 14)	/* Interregate CVS/CCD pins */
+#define CB_SF_5VCARD		(1 << 11)
+#define CB_SF_3VCARD		(1 << 10)
+#define CB_SF_BADVCC		(1 << 9)
+#define CB_SF_DATALOST		(1 << 8)
+#define CB_SF_NOTACARD		(1 << 7)
+#define CB_SF_CBCARD		(1 << 5)
+#define CB_SF_16CARD		(1 << 4)
+#define CB_SF_POWERCYCLE	(1 << 3)
+#define CB_SF_CCD2		(1 << 2)
+#define CB_SF_CCD1		(1 << 1)
+#define CB_SF_CSTCHG		(1 << 0)
+					/* 0x6 and 0x7 are reserved */

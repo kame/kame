@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sbni/if_sbni_isa.c,v 1.1.2.1 2001/12/19 20:59:28 fjoe Exp $
+ * $FreeBSD: src/sys/dev/sbni/if_sbni_isa.c,v 1.1.2.5 2002/08/11 09:32:00 fjoe Exp $
  */
 
 
@@ -70,7 +70,7 @@ static struct isa_pnp_id  sbni_ids[] = {
 	{ 0, NULL }	/* we have no pnp sbni cards atm.  */
 };
 
-DRIVER_MODULE(sbni, isa, sbni_isa_driver, sbni_isa_devclass, 0, 0);
+DRIVER_MODULE(if_sbni, isa, sbni_isa_driver, sbni_isa_devclass, 0, 0);
 
 
 static int
@@ -93,7 +93,6 @@ sbni_probe_isa(device_t dev)
 		return (ENOENT);
 	}
 
-	sc->base_addr = rman_get_start(sc->io_res);
 	if (sbni_probe(sc) != 0) {
 		bus_release_resource(dev, SYS_RES_IOPORT,
 				     sc->io_rid, sc->io_res);
@@ -114,19 +113,22 @@ sbni_attach_isa(device_t dev)
    
 	sc = device_get_softc(dev);
 
-	printf("sbni%d: <Granch SBNI12/ISA adapter> port 0x%x",
-	       next_sbni_unit, sc->base_addr);
-	sc->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid,
-					 0ul, ~0ul, 1, RF_ACTIVE);
+	printf("sbni%d: <Granch SBNI12/ISA adapter> port 0x%lx",
+	       next_sbni_unit, rman_get_start(sc->io_res));
+	sc->irq_res = bus_alloc_resource(
+	    dev, SYS_RES_IRQ, &sc->irq_rid, 0ul, ~0ul, 1, RF_ACTIVE);
 
 	if (sc->irq_res) {
 		printf(" irq %ld\n", rman_get_start(sc->irq_res));
-		error = bus_setup_intr(dev, sc->irq_res, INTR_TYPE_NET,
-				       sbni_intr, sc, &sc->irq_handle);
+		error = bus_setup_intr(
+		    dev, sc->irq_res, INTR_TYPE_NET,
+		    sbni_intr, sc, &sc->irq_handle);
 		if (error) {
 			printf("sbni%d: bus_setup_intr\n", next_sbni_unit);
-			bus_release_resource(dev, SYS_RES_IOPORT,
-					     sc->io_rid, sc->io_res);
+			bus_release_resource(
+			    dev, SYS_RES_IOPORT, sc->io_rid, sc->io_res);
+			bus_release_resource(
+			    dev, SYS_RES_IRQ, sc->irq_rid, sc->irq_res);
 			return (error);
 		}
 
@@ -141,20 +143,21 @@ sbni_attach_isa(device_t dev)
 
 #else	/* SBNI_DUAL_COMPOUND */
 
-		sc->link = headlist;
-		headlist = sc;
+		sc->link = sbni_headlist;
+		sbni_headlist = sc;
 	} else {
 		struct sbni_softc  *master;
 
 		if ((master = connect_to_master(sc)) == 0) {
 			printf("\nsbni%d: failed to alloc irq\n",
 			       next_sbni_unit);
-			bus_release_resource(dev, SYS_RES_IOPORT,
-					     sc->io_rid, sc->io_res);
+			bus_release_resource(
+			    dev, SYS_RES_IOPORT, sc->io_rid, sc->io_res);
 			return (ENXIO);
-		} else
+		} else {
 			printf(" shared irq with sbni%d\n",
 			       master->arpcom.ac_if.if_unit);
+		}
 	} 
 #endif	/* SBNI_DUAL_COMPOUND */
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)stdlib.h	8.5 (Berkeley) 5/19/95
- * $FreeBSD: src/include/stdlib.h,v 1.16.2.3 2001/12/27 20:35:34 mike Exp $
+ * $FreeBSD: src/include/stdlib.h,v 1.16.2.4 2002/08/07 15:49:32 imp Exp $
  */
 
 #ifndef _STDLIB_H_
@@ -53,9 +53,11 @@ typedef	_BSD_SIZE_T_	size_t;
 #undef	_BSD_SIZE_T_
 #endif
 
+#ifndef	__cplusplus
 #ifdef	_BSD_WCHAR_T_
 typedef	_BSD_WCHAR_T_	wchar_t;
 #undef	_BSD_WCHAR_T_
+#endif
 #endif
 
 typedef struct {

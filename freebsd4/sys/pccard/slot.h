@@ -32,7 +32,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/slot.h,v 1.25.2.4 2001/07/30 00:11:29 imp Exp $
+ * $FreeBSD: src/sys/pccard/slot.h,v 1.25.2.5 2002/09/22 20:26:58 imp Exp $
  */
 
 #ifndef _PCCARD_SLOT_H
@@ -86,11 +86,15 @@ struct slot_ctrl {
  *	devices together.
  */
 struct pccard_devinfo {
-	u_char	name[128];
-	int running;			/* Current state of driver */
-	u_char	misc[128];		/* For any random info */
-	struct slot *slt;		/* Back pointer to slot */
-
+	uint8_t		name[128];
+	int		running;	/* Current state of driver */
+	uint8_t		misc[DEV_MISC_LEN]; /* For any random info */
+	uint8_t		manufstr[DEV_MAX_CIS_LEN];
+	uint8_t		versstr[DEV_MAX_CIS_LEN];
+	uint32_t	manufacturer;	/* Manufacturer ID */
+	uint32_t	product;	/* Product ID */
+	uint32_t	prodext;	/* Product ID (extended) */
+	struct slot	*slt;		/* Back pointer to slot */
 	struct resource_list resources;
 };
 

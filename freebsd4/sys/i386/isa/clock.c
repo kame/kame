@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)clock.c	7.2 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/i386/isa/clock.c,v 1.149.2.3 2001/04/18 23:17:41 obrien Exp $
+ * $FreeBSD: src/sys/i386/isa/clock.c,v 1.149.2.5 2002/06/30 07:56:49 luigi Exp $
  */
 
 /*
@@ -1163,7 +1163,7 @@ sysctl_machdep_i8254_freq(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_machdep, OID_AUTO, i8254_freq, CTLTYPE_INT | CTLFLAG_RW,
-    0, sizeof(u_int), sysctl_machdep_i8254_freq, "I", "");
+    0, sizeof(u_int), sysctl_machdep_i8254_freq, "IU", "");
 
 static int
 sysctl_machdep_tsc_freq(SYSCTL_HANDLER_ARGS)
@@ -1184,7 +1184,7 @@ sysctl_machdep_tsc_freq(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_machdep, OID_AUTO, tsc_freq, CTLTYPE_INT | CTLFLAG_RW,
-    0, sizeof(u_int), sysctl_machdep_tsc_freq, "I", "");
+    0, sizeof(u_int), sysctl_machdep_tsc_freq, "IU", "");
 
 static unsigned
 i8254_get_timecount(struct timecounter *tc)
@@ -1228,3 +1228,23 @@ tsc_get_timecount(struct timecounter *tc)
 {
 	return (rdtsc());
 }
+
+#ifdef KERN_TIMESTAMP
+#define KERN_TIMESTAMP_SIZE 16384
+static u_long tsc[KERN_TIMESTAMP_SIZE] ;
+SYSCTL_OPAQUE(_debug, OID_AUTO, timestamp, CTLFLAG_RD, tsc,
+	sizeof(tsc), "LU", "Kernel timestamps");
+void  
+_TSTMP(u_int32_t x)
+{
+	static int i;
+
+	tsc[i] = (u_int32_t)rdtsc();
+	tsc[i+1] = x;
+	i = i + 2;
+	if (i >= KERN_TIMESTAMP_SIZE)
+		i = 0;
+	tsc[i] = 0; /* mark last entry */
+}
+#endif KERN_TIMESTAMP
+

@@ -11,7 +11,7 @@
  * 2. Absolutely no warranty of function or purpose is made by the author
  *	John S. Dyson.
  *
- * $FreeBSD: src/sys/vm/vm_zone.c,v 1.30.2.4 2001/12/14 19:08:55 jlemon Exp $
+ * $FreeBSD: src/sys/vm/vm_zone.c,v 1.30.2.5 2002/08/12 23:39:08 iedowse Exp $
  */
 
 #include <sys/param.h>
@@ -145,12 +145,8 @@ zinitna(vm_zone_t z, vm_object_t obj, char *name, int size,
 		z->znalloc = 0;
 		z->zitems = NULL;
 
-		if (zlist == 0) {
-			zlist = z;
-		} else {
-			z->znext = zlist;
-			zlist = z;
-		}
+		z->znext = zlist;
+		zlist = z;
 	}
 
 	z->zflags |= flags;
@@ -165,8 +161,10 @@ zinitna(vm_zone_t z, vm_object_t obj, char *name, int size,
 		zone_kmem_kvaspace += totsize;
 
 		z->zkva = kmem_alloc_pageable(kernel_map, totsize);
-		if (z->zkva == 0)
+		if (z->zkva == 0) {
+			zlist = z->znext;
 			return 0;
+		}
 
 		z->zpagemax = totsize / PAGE_SIZE;
 		if (obj == NULL) {

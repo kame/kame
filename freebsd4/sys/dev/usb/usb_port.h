@@ -1,5 +1,5 @@
 /*	$NetBSD: usb_port.h,v 1.15 1999/11/16 12:04:28 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.25.2.6 2002/02/14 02:32:16 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.25.2.7 2002/08/12 14:19:49 joe Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -49,16 +49,6 @@
  */
 
 #include "opt_usbverbose.h"
-
-#ifdef USB_DEBUG
-#define UHID_DEBUG 1
-#define OHCI_DEBUG 1
-#define UGEN_DEBUG 1
-#define UHCI_DEBUG 1
-#define UHUB_DEBUG 1
-#define ULPT_DEBUG 1
-#define UAUDIO_DEBUG 1
-#endif
 
 #define Static static
 
@@ -156,15 +146,6 @@ __CONCAT(dname,_detach)(self, flags) \
 /*
  * OpenBSD
  */
-#ifdef USB_DEBUG
-#define UHID_DEBUG 1
-#define OHCI_DEBUG 1
-#define UGEN_DEBUG 1
-#define UHCI_DEBUG 1
-#define UHUB_DEBUG 1
-#define ULPT_DEBUG 1
-#endif
-
 #define Static static
 
 typedef struct proc *usb_proc_ptr;
@@ -398,5 +379,9 @@ __CONCAT(dname,_detach)(device_t self)
 #define logprintf(args...)	log(LOG_DEBUG, args)
 */
 #define logprintf		printf
+
+#ifdef SYSCTL_DECL
+SYSCTL_DECL(_hw_usb);
+#endif
 
 #endif /* __FreeBSD__ */

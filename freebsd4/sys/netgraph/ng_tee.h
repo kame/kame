@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_tee.h,v 1.3.2.2 2000/10/24 18:36:46 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_tee.h,v 1.3.2.3 2002/07/02 23:44:03 archie Exp $
  * $Whistle: ng_tee.h,v 1.2 1999/01/20 00:22:14 archie Exp $
  */
 
@@ -63,13 +63,11 @@ struct ng_tee_hookstat {
 
 /* Keep this in sync with the above structure definition */
 #define NG_TEE_HOOKSTAT_INFO	{				\
-	{							\
 	  { "inOctets",		&ng_parse_uint64_type	},	\
 	  { "inFrames",		&ng_parse_uint64_type	},	\
 	  { "outOctets",	&ng_parse_uint64_type	},	\
 	  { "outFrames",	&ng_parse_uint64_type	},	\
-	  { NULL },						\
-	}							\
+	  { NULL }						\
 }
 
 /* Statistics structure returned by NGM_TEE_GET_STATS */
@@ -82,13 +80,11 @@ struct ng_tee_stats {
 
 /* Keep this in sync with the above structure definition */
 #define NG_TEE_STATS_INFO(hstype)	{			\
-	{							\
 	  { "right",		(hstype)		},	\
 	  { "left",		(hstype)		},	\
 	  { "right2left",	(hstype)		},	\
 	  { "left2right",	(hstype)		},	\
-	  { NULL },						\
-	}							\
+	  { NULL }						\
 }
 
 /* Netgraph commands */

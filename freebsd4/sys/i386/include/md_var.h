@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/md_var.h,v 1.35.2.2 2001/08/15 01:23:52 peter Exp $
+ * $FreeBSD: src/sys/i386/include/md_var.h,v 1.35.2.3 2002/09/17 22:39:54 sam Exp $
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -91,6 +91,7 @@ void	i586_bzero __P((void *buf, size_t len));
 int	i586_copyin __P((const void *udaddr, void *kaddr, size_t len));
 int	i586_copyout __P((const void *kaddr, void *udaddr, size_t len));
 void	i686_pagezero __P((void *addr));
+void	init_AMD_Elan_sc520(void);
 int	is_physical_memory __P((vm_offset_t addr));
 u_long	kvtop __P((void *addr));
 void	setidt __P((int idx, alias_for_inthand_t *func, int typ, int dpl,

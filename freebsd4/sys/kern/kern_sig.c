@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sig.c	8.7 (Berkeley) 4/18/94
- * $FreeBSD: src/sys/kern/kern_sig.c,v 1.72.2.14 2001/12/14 03:05:32 rwatson Exp $
+ * $FreeBSD: src/sys/kern/kern_sig.c,v 1.72.2.16 2002/07/03 14:43:27 jlemon Exp $
  */
 
 #include "opt_compat.h"
@@ -235,11 +235,11 @@ do_sigaction(p, sig, act, oact, old)
 		ps->ps_catchmask[_SIG_IDX(sig)] = act->sa_mask;
 		SIG_CANTMASK(ps->ps_catchmask[_SIG_IDX(sig)]);
 		if (act->sa_flags & SA_SIGINFO) {
-			ps->ps_sigact[_SIG_IDX(sig)] = act->sa_handler;
-			SIGADDSET(ps->ps_siginfo, sig);
-		} else {
 			ps->ps_sigact[_SIG_IDX(sig)] =
 			    (__sighandler_t *)act->sa_sigaction;
+			SIGADDSET(ps->ps_siginfo, sig);
+		} else {
+			ps->ps_sigact[_SIG_IDX(sig)] = act->sa_handler;
 			SIGDELSET(ps->ps_siginfo, sig);
 		}
 		if (!(act->sa_flags & SA_RESTART))
@@ -1011,7 +1011,9 @@ psignal(p, sig)
 		panic("psignal signal number");
 	}
 
+	s = splhigh();
 	KNOTE(&p->p_klist, NOTE_SIGNAL | sig);
+	splx(s);
 
 	prop = sigprop(sig);
 

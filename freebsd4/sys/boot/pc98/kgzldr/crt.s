@@ -24,7 +24,7 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 #	From: btx.s 1.10 1999/02/25 16:27:41 rnordier
-# $FreeBSD: src/sys/boot/pc98/kgzldr/crt.s,v 1.1.2.1 2002/02/03 11:37:20 nyan Exp $
+# $FreeBSD: src/sys/boot/pc98/kgzldr/crt.s,v 1.1.2.2 2002/06/19 13:45:19 nyan Exp $
 #
 
 # Screen defaults and assumptions.
@@ -72,14 +72,14 @@ crt_putchr.1:	cmpb $0xa,%al			# New line?
 		addl $0x2000,%ecx
 		movb %ah,(%edi,%ecx,1)		# Write attr
 		addw $0x02,%dx
-		jmp putchr.3
-putchr.2:	movw %dx,%ax
+		jmp crt_putchr.3
+crt_putchr.2:	movw %dx,%ax
 		movb $SCR_COL*2,%dl
 		div %dl
 		incb %al
 		mul %dl
 		movw %ax,%dx
-putchr.3:	cmpw $SCR_ROW*SCR_COL*2,%dx
+crt_putchr.3:	cmpw $SCR_ROW*SCR_COL*2,%dx
 .else
 		xchgl %eax,%ecx 		# Save char
 		movb $SCR_COL,%al		# Columns per row

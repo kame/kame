@@ -46,7 +46,7 @@
  ** (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  ** THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **
- ** $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.9 2002/05/20 04:33:33 jhb Exp $
+ ** $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.10 2002/10/05 18:31:48 scottl Exp $
  **/
 
 /**
@@ -344,7 +344,6 @@ static DEV_INFO device_info[] = {
 {"fdc",         "Floppy disk controller",		FLG_FIXED,	CLS_STORAGE},
 {"mcd",         "Mitsumi CD-ROM",			0,		CLS_STORAGE},
 {"scd",         "Sony CD-ROM",				0,		CLS_STORAGE},
-{"matcd",       "Matsushita/Panasonic/Creative CDROM",	0,		CLS_STORAGE},
 {"wt",          "Wangtek/Archive QIC-02 Tape drive",	0,		CLS_STORAGE},
 {"wd",		"IDE or ST506 compatible storage device", FLG_INVISIBLE, CLS_STORAGE},
 {"ad",		"ATA/ATAPI compatible storage device",	FLG_INVISIBLE,	CLS_STORAGE},	
@@ -2425,7 +2424,7 @@ visuserconfig(void)
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.9 2002/05/20 04:33:33 jhb Exp $
+ * $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.10 2002/10/05 18:31:48 scottl Exp $
  */
 
 #include "scbus.h"

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/msdosfs/msdosfs_vfsops.c,v 1.60.2.5 2001/11/04 18:57:51 dillon Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfs_vfsops.c,v 1.60.2.6 2002/09/12 21:33:38 trhodes Exp $ */
 /*	$NetBSD: msdosfs_vfsops.c,v 1.51 1997/11/17 15:36:58 ws Exp $	*/
 
 /*-
@@ -680,8 +680,15 @@ mountmsdosfs(devvp, mp, p, argp)
 	}
 
 	/*
-	 * Check and validate (or perhaps invalidate?) the fsinfo structure?		XXX
+	 * Check and validate (or perhaps invalidate?) the fsinfo structure?
 	 */
+	if (pmp->pm_fsinfo && pmp->pm_nxtfree > pmp->pm_maxcluster) {
+		printf(
+		"Next free cluster in FSInfo (%lu) exceeds maxcluster (%lu)\n",
+		    pmp->pm_nxtfree, pmp->pm_maxcluster);
+		error = EINVAL;
+		goto error_exit;
+	}
 
 	/*
 	 * Allocate memory for the bitmap of allocated clusters, and then

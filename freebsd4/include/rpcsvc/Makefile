@@ -1,5 +1,5 @@
 #	from: @(#)Makefile	2.3 88/08/11 4.0 RPCSRC
-# $FreeBSD: src/include/rpcsvc/Makefile,v 1.24 1999/08/27 23:45:07 peter Exp $
+# $FreeBSD: src/include/rpcsvc/Makefile,v 1.24.2.1 2002/07/22 14:21:46 ru Exp $
 
 .SUFFIXES: .x
 
@@ -17,16 +17,11 @@ HFILES= yp_prot.h ypclnt.h nis_db.h nis_tags.h nislib.h
 
 CLEANFILES+= ${HDRS}
 
-all: ${HDRS}
-
-beforeinstall:
-	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \
-		${HFILES:S;^;${.CURDIR}/;} \
-		${XFILES:S;^;${.CURDIR}/;} \
-		${HDRS} \
-		${DESTDIR}/usr/include/rpcsvc
-	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 key_prot.h \
-		${DESTDIR}/usr/include/rpc
+INCSGROUPS=	INCS RPCHDRS
+INCS=		${HFILES} ${XFILES} ${HDRS}
+INCSDIR=	${INCLUDEDIR}/rpcsvc
+RPCHDRS=	key_prot.h
+RPCHDRSDIR=	${INCLUDEDIR}/rpc
 
 .x.h:
 	${RPCCOM} -h -DWANT_NFS3 ${.IMPSRC} -o ${.TARGET}

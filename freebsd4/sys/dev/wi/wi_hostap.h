@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wi/wi_hostap.h,v 1.3.2.2 2002/05/24 15:25:54 imp Exp $
+ * $FreeBSD: src/sys/dev/wi/wi_hostap.h,v 1.3.2.3 2002/08/02 07:11:34 imp Exp $
  */
 
 #ifndef __WI_HOSTAP_H__
@@ -49,6 +49,7 @@ struct hostap_sta {
 #define HOSTAP_FLAGS_AUTHEN	0x0001
 #define HOSTAP_FLAGS_ASSOC	0x0002
 #define HOSTAP_FLAGS_PERM	0x0004
+#define	HOSTAP_FLAGS_BITS	"\20\01ASSOC\02AUTH\03PERM"
 
 #define SIOCHOSTAP_GET 		_IOWR('i', 210, struct ifreq)
 #define SIOCHOSTAP_ADD 		_IOWR('i', 211, struct ifreq)
@@ -118,7 +119,7 @@ struct wihap_info {
 };
 
 #define WIHAP_INTERVAL			5
-#define WIHAP_DFLT_INACTIVITY_TIME	120 /* 2 minutes */
+#define WIHAP_DFLT_INACTIVITY_TIME	120	/* 2 minutes */
 
 struct wi_softc;
 struct wi_frame;

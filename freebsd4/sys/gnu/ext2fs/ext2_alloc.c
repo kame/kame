@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ext2_alloc.c	8.8 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_alloc.c,v 1.28.2.1 2000/08/03 00:52:57 peter Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_alloc.c,v 1.28.2.2 2002/07/01 00:18:51 iedowse Exp $
  */
 
 #include "opt_quota.h"
@@ -519,7 +519,7 @@ ext2_vfree(pvp, ino, mode)
 
 	pip = VTOI(pvp);
 	fs = pip->i_e2fs;
-	if ((u_int)ino >= fs->s_inodes_per_group * fs->s_groups_count)
+	if ((u_int)ino > fs->s_inodes_per_group * fs->s_groups_count)
 		panic("ext2_vfree: range: dev = (%d, %d), ino = %d, fs = %s",
 		    major(pip->i_dev), minor(pip->i_dev), ino, fs->fs_fsmnt);
 

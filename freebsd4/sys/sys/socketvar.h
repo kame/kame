@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)socketvar.h	8.3 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/socketvar.h,v 1.46.2.8 2002/05/01 03:26:32 silby Exp $
+ * $FreeBSD: src/sys/sys/socketvar.h,v 1.46.2.9 2002/08/14 22:23:10 dg Exp $
  */
 
 #ifndef _SYS_SOCKETVAR_H_
@@ -349,6 +349,10 @@ int	sbreserve __P((struct sockbuf *sb, u_long cc, struct socket *so,
 void	sbtoxsockbuf __P((struct sockbuf *sb, struct xsockbuf *xsb));
 int	sbwait __P((struct sockbuf *sb));
 int	sb_lock __P((struct sockbuf *sb));
+struct sf_buf *
+	sf_buf_alloc(void);
+void	sf_buf_free(caddr_t addr, u_int size);
+void	sf_buf_ref(caddr_t addr, u_int size);
 int	soabort __P((struct socket *so));
 int	soaccept __P((struct socket *so, struct sockaddr **nam));
 struct	socket *soalloc __P((int waitok));

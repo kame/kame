@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/iso88025.h,v 1.3.2.1 2000/10/14 20:01:06 lile Exp $
+ * $FreeBSD: src/sys/net/iso88025.h,v 1.3.2.2 2002/06/18 00:15:31 kbyanc Exp $
  *
  * Information gathered from tokenring@freebsd, /sys/net/ethernet.h and
  * the Mach token ring driver.
@@ -101,6 +101,17 @@ struct iso88025_sockaddr_data {
 	u_char ac;
 	u_char fc;
 };
+
+struct iso88025_sockaddr_dl_data {
+	u_short	 trld_rcf;
+	u_short	*trld_route[RIF_MAX_LEN];
+};
+
+#define ISO88025_MAX(a, b)	(((a)>(b))?(a):(b))
+#define SDL_ISO88025(s)		((struct iso88025_sockaddr_dl_data *)	\
+				 ((s)->sdl_data + \
+				  ISO88025_MAX((s)->sdl_nlen + (s)->sdl_alen + \
+					       (s)->sdl_slen, 12)))
 
 /*
  * Structure of a 48-bit iso 802.5 address.

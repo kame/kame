@@ -38,9 +38,9 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: aic7xxx_93cx6.h,v 1.1.1.3 2002/06/21 01:20:59 suz Exp $
+ * $Id: aic7xxx_93cx6.h,v 1.1.1.4 2002/10/24 05:34:28 suz Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_93cx6.h,v 1.7.2.3 2002/04/29 19:36:31 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_93cx6.h,v 1.7.2.4 2002/08/31 07:25:53 gibbs Exp $
  */
 #ifndef _AIC7XXX_93CX6_H_
 #define _AIC7XXX_93CX6_H_

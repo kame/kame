@@ -71,7 +71,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/wi/if_wi_pccard.c,v 1.8.2.1 2002/04/28 20:20:32 imp Exp $";
+  "$FreeBSD: src/sys/dev/wi/if_wi_pccard.c,v 1.8.2.2 2002/08/02 07:11:34 imp Exp $";
 #endif
 
 static int wi_pccard_probe(device_t);
@@ -130,6 +130,7 @@ static const struct pccard_product wi_pccard_products[] = {
 	PCMCIA_CARD(COREGA, WIRELESS_LAN_PCCA_11, 0),
 	PCMCIA_CARD(COREGA, WIRELESS_LAN_PCCB_11, 0),
 	PCMCIA_CARD(ELSA, XI300_IEEE, 0),
+	PCMCIA_CARD(ELSA, XI325_IEEE, 0),
 	PCMCIA_CARD(ELSA, XI800_IEEE, 0),
 	PCMCIA_CARD(EMTAC, WLAN, 0),
 	PCMCIA_CARD(ERICSSON, WIRELESSLAN, 0),
@@ -147,6 +148,8 @@ static const struct pccard_product wi_pccard_products[] = {
 	PCMCIA_CARD2(LUCENT, WAVELAN_IEEE, SMC_2632W, 0),
 	/* Must be after other LUCENT ones because it is less specific */
 	PCMCIA_CARD(LUCENT, WAVELAN_IEEE, 0),
+	PCMCIA_CARD(NETGEAR2, MA401RA, 0),
+	PCMCIA_CARD(NOKIA, C110_WLAN, 0),
 	PCMCIA_CARD(PROXIM, RANGELANDS_8430, 0),
 	PCMCIA_CARD(SAMSUNG, SWL_2000N, 0),
 	PCMCIA_CARD(SIMPLETECH, SPECTRUM24_ALT, 0),

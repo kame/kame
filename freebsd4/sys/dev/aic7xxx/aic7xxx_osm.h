@@ -29,26 +29,32 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id$
+ * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aic7xxx_osm.h#11 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_osm.h,v 1.14.2.1 2002/04/29 19:36:31 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_osm.h,v 1.14.2.4 2002/09/27 16:29:06 gibbs Exp $
  */
 
 #ifndef _AIC7XXX_FREEBSD_H_
 #define _AIC7XXX_FREEBSD_H_
 
 #include <opt_aic7xxx.h>	/* for config options */
-#ifndef NPCI
-#include <pci.h>
-#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>		/* For device_t */
+#if __FreeBSD_version >= 500000
+#include <sys/endian.h>
+#endif
 #include <sys/eventhandler.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/queue.h>
+
+#if __FreeBSD_version < 500000
+#include <pci.h>
+#else
+#define NPCI 1
+#endif
 
 #if NPCI > 0
 #define AHC_PCI_CONFIG 1
@@ -81,6 +87,9 @@
 #ifdef CAM_NEW_TRAN_CODE
 #define AHC_NEW_TRAN_SETTINGS
 #endif /* CAM_NEW_TRAN_CODE */
+
+/*************************** Attachment Bookkeeping ***************************/
+extern devclass_t ahc_devclass;
 
 /****************************** Platform Macros *******************************/
 #define	SIM_IS_SCSIBUS_B(ahc, sim)	\
@@ -184,7 +193,7 @@ struct scb_platform_data {
 };
 
 /********************************* Byte Order *********************************/
-#if HAVE_BSWAP_MACROS
+#if __FreeBSD_version >= 500000
 #define ahc_htobe16(x) htobe16(x)
 #define ahc_htobe32(x) htobe32(x)
 #define ahc_htobe64(x) htobe64(x)
@@ -198,23 +207,28 @@ struct scb_platform_data {
 #define ahc_le16toh(x) le16toh(x)
 #define ahc_le32toh(x) le32toh(x)
 #define ahc_le64toh(x) le64toh(x)
-#else /* !HAVE_BSWAP_MACROS */
-#define ahc_htobe16(x) x
-#define ahc_htobe32(x) x
-#define ahc_htobe64(x) x
-#define ahc_htole16(x) x
-#define ahc_htole32(x) x
-#define ahc_htole64(x) x
+#else
+#define ahc_htobe16(x) (x)
+#define ahc_htobe32(x) (x)
+#define ahc_htobe64(x) (x)
+#define ahc_htole16(x) (x)
+#define ahc_htole32(x) (x)
+#define ahc_htole64(x) (x)
 
-#define ahc_be16toh(x) x
-#define ahc_be32toh(x) x
-#define ahc_be64toh(x) x
-#define ahc_le16toh(x) x
-#define ahc_le32toh(x) x
-#define ahc_le64toh(x) x
-#endif /* !HAVE_BSWAP_MACROS */
+#define ahc_be16toh(x) (x)
+#define ahc_be32toh(x) (x)
+#define ahc_be64toh(x) (x)
+#define ahc_le16toh(x) (x)
+#define ahc_le32toh(x) (x)
+#define ahc_le64toh(x) (x)
+#endif
 
 /***************************** Core Includes **********************************/
+#if AHC_REG_PRETTY_PRINT
+#define AIC_DEBUG_REGISTERS 1
+#else
+#define AIC_DEBUG_REGISTERS 0
+#endif
 #include <dev/aic7xxx/aic7xxx.h>
 
 /*************************** Device Access ************************************/
@@ -250,6 +264,11 @@ static __inline void ahc_done_lockinit(struct ahc_softc *);
 static __inline void ahc_done_lock(struct ahc_softc *, unsigned long *flags);
 static __inline void ahc_done_unlock(struct ahc_softc *, unsigned long *flags);
 
+/* Lock held during ahc_list manipulation and ahc softc frees */
+static __inline void ahc_list_lockinit(void);
+static __inline void ahc_list_lock(unsigned long *flags);
+static __inline void ahc_list_unlock(unsigned long *flags);
+
 static __inline void
 ahc_lockinit(struct ahc_softc *ahc)
 {
@@ -283,6 +302,21 @@ ahc_done_unlock(struct ahc_softc *ahc, unsigned long *flags)
 {
 }
 
+/* Lock held during ahc_list manipulation and ahc softc frees */
+static __inline void
+ahc_list_lockinit()
+{
+}
+
+static __inline void
+ahc_list_lock(unsigned long *flags)
+{
+}
+
+static __inline void
+ahc_list_unlock(unsigned long *flags)
+{
+}
 /****************************** OS Primitives *********************************/
 #define ahc_delay DELAY
 

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sysctl.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/sysctl.h,v 1.81.2.8 2002/03/17 11:08:38 alfred Exp $
+ * $FreeBSD: src/sys/sys/sysctl.h,v 1.81.2.9 2002/09/09 19:27:54 sam Exp $
  */
 
 #ifndef _SYS_SYSCTL_H_
@@ -585,6 +585,9 @@ void	sysctl_unregister_set(struct linker_set *lsp);
 int	kernel_sysctl(struct proc *p, int *name, u_int namelen, void *old,
 		      size_t *oldlenp, void *new, size_t newlen,
 		      size_t *retval);
+int	kernel_sysctlbyname(struct proc *p, char *name,
+		void *old, size_t *oldlenp, void *new, size_t newlen,
+		size_t *retval);
 int	userland_sysctl(struct proc *p, int *name, u_int namelen, void *old,
 			size_t *oldlenp, int inkernel, void *new, size_t newlen,
 			size_t *retval);

@@ -22,7 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/elf_machdep.c,v 1.7.2.1 2000/07/03 19:59:44 mjacob Exp $
+ * $FreeBSD: src/sys/alpha/alpha/elf_machdep.c,v 1.7.2.2 2002/09/19 15:37:08 gallatin Exp $
  */
 
 #include <sys/param.h>
@@ -101,7 +101,7 @@ elf_reloc(linker_file_t lf, const void *data, int type, const char *sym)
 			break;
 
 		case R_ALPHA_RELATIVE:
-			addr = relocbase + addend + *where;
+			addr = relocbase + addend;
 			if (*where != addr)
 				*where = addr;
 			break;

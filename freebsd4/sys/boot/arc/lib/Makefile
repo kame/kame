@@ -1,14 +1,12 @@
-# $FreeBSD: src/sys/boot/arc/lib/Makefile,v 1.4 1999/11/14 13:54:40 marcel Exp $
+# $FreeBSD: src/sys/boot/arc/lib/Makefile,v 1.4.2.1 2002/07/19 18:46:28 ru Exp $
 
 LIB=		arc
-NOPIC=		true
-NOPROFILE=	true
 INTERNALLIB=	true
 
 .PATH:		${.CURDIR}/arch/${MACHINE_ARCH}
 # XXX hack to pick up stand.h
 LIBSTANDDIR=	${.CURDIR}/../../../../lib/libstand
-CFLAGS=		-I${LIBSTANDDIR}
+CFLAGS+=	-I${LIBSTANDDIR}
 CFLAGS+=	-DDEBUG
 
 # Pick up the bootstrap header for some interface items
@@ -25,8 +23,6 @@ SRCS=	delay.c time.c abort.c setjmperr.c copy.c devicename.c module.c \
 .if ${MACHINE_ARCH} == "alpha"
 SRCS+=	rpb.c
 .endif
-
-all: libarc.a
 
 CLEANFILES+= machine
 

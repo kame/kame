@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)trap.c	7.4 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/trap.c,v 1.147.2.9 2002/02/09 23:02:38 luigi Exp $
+ * $FreeBSD: src/sys/i386/i386/trap.c,v 1.147.2.10 2002/06/24 10:46:05 bde Exp $
  */
 
 /*
@@ -231,6 +231,14 @@ trap(frame)
 	u_quad_t sticks = 0;
 	int i = 0, ucode = 0, type, code;
 	vm_offset_t eva;
+
+#ifdef DDB
+	if (db_active) {
+		eva = (frame.tf_trapno == T_PAGEFLT ? rcr2() : 0);
+		trap_fatal(&frame, eva);
+		return;
+	}
+#endif
 
 	if (!(frame.tf_eflags & PSL_I)) {
 		/*

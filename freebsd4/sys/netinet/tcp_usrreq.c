@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)tcp_usrreq.c	8.2 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.51.2.12.2.1 2002/06/07 20:54:02 obrien Exp $
+ * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.51.2.16 2002/08/24 18:40:26 dillon Exp $
  */
 
 #include "opt_ipsec.h"
@@ -238,7 +238,7 @@ tcp6_usr_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 	}
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
-	if (ip6_mapped_addr_on && (inp->inp_flags & IN6P_IPV6_V6ONLY) == 0) {
+	if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0) {
 		if (IN6_IS_ADDR_UNSPECIFIED(&sin6p->sin6_addr))
 			inp->inp_vflag |= INP_IPV4;
 		else if (IN6_IS_ADDR_V4MAPPED(&sin6p->sin6_addr)) {
@@ -289,8 +289,7 @@ tcp6_usr_listen(struct socket *so, struct proc *p)
 	COMMON_START();
 	if (inp->inp_lport == 0) {
 		inp->inp_vflag &= ~INP_IPV4;
-		if (ip6_mapped_addr_on &&
-		    (inp->inp_flags & IN6P_IPV6_V6ONLY) == 0)
+		if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0)
 			inp->inp_vflag |= INP_IPV4;
 		error = in6_pcbbind(inp, (struct sockaddr *)0, p);
 	}
@@ -361,8 +360,7 @@ tcp6_usr_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	if (IN6_IS_ADDR_V4MAPPED(&sin6p->sin6_addr)) {
 		struct sockaddr_in sin;
 
-		if (!ip6_mapped_addr_on ||
-		    (inp->inp_flags & IN6P_IPV6_V6ONLY))
+		if ((inp->inp_flags & IN6P_IPV6_V6ONLY) != 0)
 			return(EINVAL);
 
 		in6_sin6_2_sin(&sin, sin6p);
@@ -757,6 +755,7 @@ tcp_connect(tp, nam, p)
 	tp->t_state = TCPS_SYN_SENT;
 	callout_reset(tp->tt_keep, tcp_keepinit, tcp_timer_keep, tp);
 	tp->iss = tcp_new_isn(tp);
+	tp->t_bw_rtseq = tp->iss;
 	tcp_sendseqinit(tp);
 
 	/*
@@ -843,6 +842,7 @@ tcp6_connect(tp, nam, p)
 	tp->t_state = TCPS_SYN_SENT;
 	callout_reset(tp->tt_keep, tcp_keepinit, tcp_timer_keep, tp);
 	tp->iss = tcp_new_isn(tp);
+	tp->t_bw_rtseq = tp->iss;
 	tcp_sendseqinit(tp);
 
 	/*

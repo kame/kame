@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/osf1/Makefile,v 1.1.2.1 2001/04/25 11:24:15 ru Exp $
+# $FreeBSD: src/sys/modules/osf1/Makefile,v 1.1.2.3 2002/08/07 16:32:00 ru Exp $
 
 MAINTAINER=	gallatin@FreeBSD.org
 
@@ -20,7 +20,7 @@ opt_osf1.h opt_simos.h opt_nfs.h:
 	touch ${.TARGET}
 
 afterinstall:
-	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+	${INSTALL} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
 		${.CURDIR}/osf1.sh ${DESTDIR}/usr/bin/osf1
 
 .include <bsd.kmod.mk>

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wi/if_wireg.h,v 1.31.2.1 2002/04/28 20:20:32 imp Exp $
+ * $FreeBSD: src/sys/dev/wi/if_wireg.h,v 1.31.2.2 2002/08/02 07:11:34 imp Exp $
  */
 
 #define WI_DELAY	5
@@ -497,10 +497,10 @@ struct wi_ltv_pcf {
  *	(Only PRISM2; not 802.11 compliant mode, testing use only)
  * 6 == HOST AP (Only PRISM2)
  */
-#define WI_PORTTYPE_IBSS	0x0
 #define WI_PORTTYPE_BSS		0x1
 #define WI_PORTTYPE_WDS		0x2
 #define WI_PORTTYPE_ADHOC	0x3
+#define WI_PORTTYPE_IBSS	0x4
 #define WI_PORTTYPE_AP		0x6
 
 /*
@@ -547,6 +547,7 @@ struct wi_ltv_mcast {
 #define WI_SUPPRATES_2M		0x0002
 #define WI_SUPPRATES_5M		0x0004
 #define WI_SUPPRATES_11M	0x0008
+#define	WI_RATES_BITS	"\20\0011M\0022M\0035.5M\00411M"
 
 /*
  * Information frame types.

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.1.2.4 2000/12/22 22:24:32 msmith Exp $
+ *	$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.1.2.5 2002/08/30 18:28:54 gibbs Exp $
  */
 
 #include <sys/param.h>
@@ -95,8 +95,10 @@ static struct
 } amr_device_ids[] = {
     {0x101e, 0x9010, 0},
     {0x101e, 0x9060, 0},
-    {0x8086, 0x1960, PROBE_SIGNATURE},	/* generic i960RD, check for signature */
+    {0x8086, 0x1960, PROBE_SIGNATURE},/* generic i960RD, check for signature */
     {0x101e, 0x1960, 0},
+    {0x1000, 0x1960, 0}, 
+    {0x1000, 0x0407, 0},
     {0, 0, 0}
 };
     

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_output.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.39.2.14 2001/12/17 22:58:52 silby Exp $
+ * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.39.2.16 2002/08/24 18:40:26 dillon Exp $
  */
 
 #include "opt_inet6.h"
@@ -81,7 +81,7 @@
 extern struct mbuf *m_copypack();
 #endif
 
-static int path_mtu_discovery = 1;
+int path_mtu_discovery = 1;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, path_mtu_discovery, CTLFLAG_RW,
 	&path_mtu_discovery, 1, "Enable Path MTU Discovery");
 
@@ -170,6 +170,7 @@ again:
 	sendalot = 0;
 	off = tp->snd_nxt - tp->snd_una;
 	win = min(tp->snd_wnd, tp->snd_cwnd);
+	win = min(win, tp->snd_bwnd);
 
 	flags = tcp_outflags[tp->t_state];
 	/*

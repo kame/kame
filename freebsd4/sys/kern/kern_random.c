@@ -1,7 +1,7 @@
 /*
  * kern_random.c -- A strong random number generator
  *
- * $FreeBSD: src/sys/kern/kern_random.c,v 1.36.2.3 2002/02/21 22:23:33 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_random.c,v 1.36.2.4 2002/09/17 17:11:57 sam Exp $
  *
  * Version 0.95, last modified 18-Oct-95
  * 
@@ -371,6 +371,16 @@ write_random(const char *buf, u_int nbytes)
 	return nbytes;
 }
 #endif /* notused */
+
+void
+add_true_randomness(int val)
+{
+	add_entropy_word(&random_state, val);
+	random_state.entropy_count += 8*sizeof (val);
+	if (random_state.entropy_count > POOLBITS)
+		random_state.entropy_count = POOLBITS;
+	selwakeup(&random_state.rsel);
+}
 
 int
 random_poll(dev_t dev, int events, struct proc *p)

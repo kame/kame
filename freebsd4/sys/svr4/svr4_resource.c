@@ -39,7 +39,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/svr4/svr4_resource.c,v 1.4 1999/12/08 10:51:17 newton Exp $
+ * $FreeBSD: src/sys/svr4/svr4_resource.c,v 1.4.2.1 2002/09/02 21:22:54 dillon Exp $
  */
 
 /*
@@ -106,7 +106,7 @@ svr4_to_native_rl(rl)
 	case SVR4_RLIMIT_NOFILE:
 		return RLIMIT_NOFILE;
 	case SVR4_RLIMIT_VMEM:
-		return RLIMIT_RSS;
+		return RLIMIT_VMEM;
 	default:
 		return -1;
 	}

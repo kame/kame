@@ -35,7 +35,7 @@
  *
  *	@(#)fdesc_vfsops.c	8.4 (Berkeley) 1/21/94
  *
- * $FreeBSD: src/sys/miscfs/fdesc/fdesc_vfsops.c,v 1.22.2.2 2001/10/22 22:49:26 chris Exp $
+ * $FreeBSD: src/sys/miscfs/fdesc/fdesc_vfsops.c,v 1.22.2.3 2002/08/23 17:42:39 njl Exp $
  */
 
 /*
@@ -79,6 +79,10 @@ fdesc_mount(mp, path, data, ndp, p)
 	int error = 0;
 	struct fdescmount *fmp;
 	struct vnode *rvp;
+	size_t size;
+
+	if (path == NULL)
+		panic("fdesc_mount: cannot mount as root");
 
 	/*
 	 * Update is a no-op
@@ -100,6 +104,8 @@ fdesc_mount(mp, path, data, ndp, p)
 	mp->mnt_data = (qaddr_t) fmp;
 	vfs_getnewfsid(mp);
 
+	(void) copyinstr(path, mp->mnt_stat.f_mntonname, MNAMELEN - 1, &size);
+	bzero(mp->mnt_stat.f_mntonname + size, MNAMELEN - size);
 	bzero(mp->mnt_stat.f_mntfromname, MNAMELEN);
 	bcopy("fdesc", mp->mnt_stat.f_mntfromname, sizeof("fdesc"));
 	(void)fdesc_statfs(mp, &mp->mnt_stat, p);

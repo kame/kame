@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/vesa.c,v 1.32 2000/01/29 15:08:40 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/vesa.c,v 1.32.2.1 2002/08/13 02:42:33 rwatson Exp $
  */
 
 #include "opt_vga.h"
@@ -1317,7 +1317,9 @@ get_palette(video_adapter_t *adp, int base, int count,
 	int bits;
 	int error;
 
-	if ((base < 0) || (base >= 256) || (base + count > 256))
+	if ((base < 0) || (base >= 256) || (count < 0) || (count > 256))
+		return 1;
+	if (base + count > 256)
 		return 1;
 	if (!(vesa_adp_info->v_flags & V_DAC8) || !VESA_MODE(adp->va_mode))
 		return 1;

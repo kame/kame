@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed_isa.c,v 1.5.2.1 2000/09/10 08:45:11 nyan Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed_isa.c,v 1.5.2.2 2002/07/29 07:52:57 takawata Exp $
  */
 
 #include <sys/param.h>
@@ -58,6 +58,7 @@ static struct isa_pnp_id ed_ids[] = {
 	{ 0x19808c4a,	NULL },		/* RTL8019 */
 	{ 0x0090252a,	NULL },		/* JQE9000 */
 	{ 0x0020832e,	NULL },		/* KTC2000 */
+	{ 0x4cf48906,	NULL },		/* ATIf44c */
 	{ 0,		NULL }
 };
 

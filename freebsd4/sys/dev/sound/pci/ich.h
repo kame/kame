@@ -24,11 +24,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/ich.h,v 1.1.2.2 2002/04/22 15:49:32 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/ich.h,v 1.1.2.3 2002/08/22 16:38:21 orion Exp $
  */
 
 #define PCIR_NAMBAR 0x10
 #define PCIR_NABMBAR 0x14
+
+#define PCIR_ICH_LEGACY 0x41
+#define ICH_LEGACY_ENABLE	0x01
 
 /* Native Audio Bus Master Control Registers */
 #define ICH_REG_X_BDBAR 0x00
