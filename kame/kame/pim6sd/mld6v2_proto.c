@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.7 2001/12/18 03:10:43 jinmei Exp $
+ * $KAME: mld6v2_proto.c,v 1.8 2002/01/21 02:44:32 suz Exp $
  */
 
 /*
@@ -760,11 +760,10 @@ SetTimerV2(vifi, g, s)
 /*
  * Checks for MLDv2 listeners: returns a pointer on the source/group if there
  * is a receiver for the group on the given uvif, or returns NULL otherwise.
- * if the group exist but not the source, *g is updated
- * if the group does not exist *g is NULL else it point to the group int
- * the group list
+ *
+ * *g points the group if it exists on the given uvif. if the group does not 
+ * exist, *g is NULL.
  */
-
 struct listaddr *
 check_multicastV2_listener(v, group, g, source)
     struct uvif    *v;
@@ -772,26 +771,21 @@ check_multicastV2_listener(v, group, g, source)
     struct listaddr **g;
     struct sockaddr_in6 *source;
 {
-    register struct listaddr *s;
+    struct listaddr *s;
 
     /*
      * Look for the source/group in our listener list;
      */
+    for (*g = v->uv_groups; *g != NULL; *g = (*g)->al_next) {
+	if (inet6_equal(group, &(*g)->al_addr) == 0)
+	    continue;
 
-    for (s = (*g)->sources; s != NULL; s = s->al_next)
-    {
-	if (inet6_equal(group, &(*g)->al_addr))
-	{
-	    if (source == NULL)
-		return NULL;
-
-	    for (s = (*g)->sources; s != NULL; s = s->al_next)
-	    {
-		if (inet6_equal(source, &s->al_addr))
-		    return s;	/* case : group found,source found */
-	    }
-	    return NULL;	/* case : group found,source not found */
+	for (s = (*g)->sources; s != NULL; s = s->al_next) {
+	    if (inet6_equal(source, &s->al_addr))
+		return s;	/* group found, source found */
 	}
+	return NULL;	/* group found, source not found */
     }
-    return NULL;		/* case : group not found , source not found */
+
+    return NULL;	/* group not found, source not found */
 }

@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2052 2002/01/20 11:39:30 jinmei Exp $
+$KAME: CHANGELOG,v 1.2053 2002/01/21 02:44:31 suz Exp $
 
 <200201>
+2002-01-21 SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
+	* kame/kame/pim6sd/mldv2_proto.c:
+	- fixed a bug that MLDv2 Report crashes pim6sd.
+
 2002-01-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	improved the support of IPv6 scoped addresses:
 	* kame/sys/netinet6/ip6_var.h: added sockaddr_in6 structures to
