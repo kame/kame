@@ -1353,6 +1353,9 @@ ipsec4_delete_pcbpolicy(inp)
 		inp->inp_sp->sp_out = NULL;
 	}
 
+	KFREE(inp->inp_sp);
+	inp->inp_sp = NULL;
+
 	return 0;
 }
 
@@ -1435,6 +1438,9 @@ ipsec6_delete_pcbpolicy(in6p)
 		key_freesp(in6p->in6p_sp->sp_out);
 		in6p->in6p_sp->sp_out = NULL;
 	}
+
+	KFREE(in6p->in6p_sp);
+	in6p->in6p_sp = NULL;
 
 	return 0;
 }

@@ -54,9 +54,13 @@ struct secashead {
 	LIST_ENTRY(secashead) chain;
 
 	struct secasindex saidx;
+	struct secpolicyindex *owner;	/* Indicate it who owned its SA. */
+					/* If NULL then it's shared SA */
 
 	u_int8_t state;			/* MATURE or DEAD. */
-	LIST_HEAD(_satree, secasvar) savtree[SADB_SASTATE_MAX+1]; /* SA chain */
+	LIST_HEAD(_satree, secasvar) savtree[SADB_SASTATE_MAX+1];
+					/* SA chain */
+					/* The first of this list is newer SA */
 
 	struct route sa_route;		/* XXX */
 };

@@ -727,8 +727,6 @@ in6_pcbdetach(in6p)
 	struct socket *so = in6p->in6p_socket;
 
 #ifdef IPSEC
-	if (sotoin6pcb(so) != 0)
-		key_freeso(so);
 	ipsec6_delete_pcbpolicy(in6p);
 #endif /* IPSEC */
 	sotoin6pcb(so) = 0;

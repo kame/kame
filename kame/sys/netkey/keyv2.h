@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: keyv2.h,v 1.7 1999/10/19 21:37:41 sakane Exp $ */
+/* $Id: keyv2.h,v 1.8 1999/10/27 16:33:19 sakane Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -138,6 +138,7 @@ struct sadb_ident {
   u_int16_t sadb_ident_reserved;
   u_int64_t sadb_ident_id;
 };
+/* in order to use to divide sadb_ident.sadb_ident_id */
 union sadb_x_ident_id {
   u_int64_t sadb_x_ident_id;
   struct _sadb_x_ident_id_addr {
