@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.267 1999/11/16 09:17:27 jinmei Exp $
+$Id: CHANGELOG,v 1.268 1999/11/16 12:51:44 jinmei Exp $
 
 <199911>
+1999-11-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ndp/ndp.c (plist): improved information about
+	adveritising routers:
+	- show each router's reachability.
+	- show each router in the new scopedaddr format.
+
 1999-11-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/bgpd/dump.c (dump_if_rtable): was added to dump
 	more information about each inteface including local addresses.
