@@ -27,8 +27,6 @@
  * SUCH DAMAGE.
  */
 
-extern int debug;
-#define dprintf(x)	{ if (debug) fprintf x; }
 extern char *device;
 
 /* common.c */

@@ -63,9 +63,11 @@ struct servtab {
 	struct in6_addr serv;
 };
 
-int debug = 0;
+static int debug = 0;
 #define dprintf(x)	do { if (debug) fprintf x; } while (0)
+
 char *device = NULL;
+
 #if 0
 char *dnsserv = "3ffe:501:4819::42";
 char *dnsdom = "kame.net."

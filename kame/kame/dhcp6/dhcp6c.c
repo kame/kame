@@ -64,8 +64,9 @@ struct servtab {
 	u_int16_t st_xid;
 };
 
-int debug = 0;
+static int debug = 0;
 #define dprintf(x)	do { if (debug) fprintf x; } while (0)
+
 char *device = NULL;
 
 int insock;	/* inbound udp port */
