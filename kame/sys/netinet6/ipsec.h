@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.59 2002/06/12 17:55:32 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.60 2002/07/08 07:03:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -303,7 +303,7 @@ struct ipsecstat {
 #define IPSECCTL_VARS { \
 	0, \
 	0, \
-	&ip4_def_policy.policy, \
+	0, \
 	&ip4_esp_trans_deflev, \
 	&ip4_esp_net_deflev, \
 	&ip4_ah_trans_deflev, \
@@ -320,7 +320,7 @@ struct ipsecstat {
 #define IPSEC6CTL_VARS { \
 	0, \
 	0, \
-	&ip6_def_policy.policy, \
+	0, \
 	&ip6_esp_trans_deflev, \
 	&ip6_esp_net_deflev, \
 	&ip6_ah_trans_deflev, \

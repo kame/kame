@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.161 2002/06/28 14:14:22 keiichi Exp $	*/
+/*	$KAME: ipsec.c,v 1.162 2002/07/08 07:03:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4050,23 +4050,8 @@ ipsec_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	if (name[0] >= IPSECCTL_MAXID)
 		return (EOPNOTSUPP);
 
+	/* common sanity checks */
 	switch (name[0]) {
-	case IPSECCTL_STATS:
-		return sysctl_rdtrunc(oldp, oldlenp, newp, &ipsecstat,
-		    sizeof(ipsecstat));
-	case IPSECCTL_DEF_POLICY:
-		if (newp != NULL && newlen == sizeof(int)) {
-			switch (*(int *)newp) {
-			case IPSEC_POLICY_DISCARD:
-			case IPSEC_POLICY_NONE:
-				break;
-			default:
-				return EINVAL;
-			}
-			ipsec_invalpcbcacheall();
-		}
-		return (sysctl_int_arr(ipsec_sysvars, name, namelen,
-		    oldp, oldlenp, newp, newlen));
 	case IPSECCTL_DEF_ESP_TRANSLEV:
 	case IPSECCTL_DEF_ESP_NETLEV:
 	case IPSECCTL_DEF_AH_TRANSLEV:
@@ -4079,8 +4064,35 @@ ipsec_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 			default:
 				return EINVAL;
 			}
+		}
+		break;
+	case IPSECCTL_DEF_POLICY:
+		if (newp != NULL && newlen == sizeof(int)) {
+			switch (*(int *)newp) {
+			case IPSEC_POLICY_DISCARD:
+			case IPSEC_POLICY_NONE:
+				break;
+			default:
+				return EINVAL;
+			}
 			ipsec_invalpcbcacheall();
 		}
+		break;
+	}
+
+	switch (name[0]) {
+	case IPSECCTL_STATS:
+		return sysctl_rdtrunc(oldp, oldlenp, newp, &ipsecstat,
+		    sizeof(ipsecstat));
+	case IPSECCTL_DEF_POLICY:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ip4_def_policy->policy);
+	case IPSECCTL_DEF_ESP_TRANSLEV:
+	case IPSECCTL_DEF_ESP_NETLEV:
+	case IPSECCTL_DEF_AH_TRANSLEV:
+	case IPSECCTL_DEF_AH_NETLEV:
+		if (newp != NULL)
+			ipsec_invalpcbcacheall();
 		return (sysctl_int_arr(ipsec_sysvars, name, namelen,
 		    oldp, oldlenp, newp, newlen));
 	default:
@@ -4113,26 +4125,12 @@ ipsec6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	void	*newp;
 	size_t	newlen;
 {
+
 	if (name[0] >= IPSECCTL_MAXID)	/* xxx no 6 in this definition */
 		return (EOPNOTSUPP);
 
+	/* common sanity checks */
 	switch (name[0]) {
-	case IPSECCTL_STATS:	/* xxx no 6 in this definition */
-		return sysctl_rdtrunc(oldp, oldlenp, newp, &ipsec6stat,
-		    sizeof(ipsec6stat));
-	case IPSECCTL_DEF_POLICY:
-		if (newp != NULL && newlen == sizeof(int)) {
-			switch (*(int *)newp) {
-			case IPSEC_POLICY_DISCARD:
-			case IPSEC_POLICY_NONE:
-				break;
-			default:
-				return EINVAL;
-			}
-			ipsec_invalpcbcacheall();
-		}
-		return (sysctl_int_arr(ipsec6_sysvars, name, namelen,
-		    oldp, oldlenp, newp, newlen));
 	case IPSECCTL_DEF_ESP_TRANSLEV:
 	case IPSECCTL_DEF_ESP_NETLEV:
 	case IPSECCTL_DEF_AH_TRANSLEV:
@@ -4145,8 +4143,35 @@ ipsec6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 			default:
 				return EINVAL;
 			}
+		}
+		break;
+	case IPSECCTL_DEF_POLICY:
+		if (newp != NULL && newlen == sizeof(int)) {
+			switch (*(int *)newp) {
+			case IPSEC_POLICY_DISCARD:
+			case IPSEC_POLICY_NONE:
+				break;
+			default:
+				return EINVAL;
+			}
 			ipsec_invalpcbcacheall();
 		}
+		break;
+	}
+
+	switch (name[0]) {
+	case IPSECCTL_STATS:	/* xxx no 6 in this definition */
+		return sysctl_rdtrunc(oldp, oldlenp, newp, &ipsec6stat,
+		    sizeof(ipsec6stat));
+	case IPSECCTL_DEF_POLICY:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ip6_def_policy->policy);
+	case IPSECCTL_DEF_ESP_TRANSLEV:
+	case IPSECCTL_DEF_ESP_NETLEV:
+	case IPSECCTL_DEF_AH_TRANSLEV:
+	case IPSECCTL_DEF_AH_NETLEV:
+		if (newp != NULL)
+			ipsec_invalpcbcacheall();
 		return (sysctl_int_arr(ipsec6_sysvars, name, namelen,
 		    oldp, oldlenp, newp, newlen));
 	default:
