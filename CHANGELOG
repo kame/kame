@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.7 1999/08/12 15:43:31 itojun Exp $
+$Id: CHANGELOG,v 1.8 1999/08/13 02:40:28 itojun Exp $
 
 <199908>
+Fri Aug 13 11:40:55 JST 1999  itojun@iijlab.net
+	* freebsd2/ports/{ct,v6eval}: upgrade to 0.3.  from ftp.tahi.org.
+
 Fri Aug 13 00:41:12 JST 1999  itojun@iijlab.net
 	* netbsd/usr.sbin/{tcpdmatch,tcpdchk}: made libwrap utilities
 	  IPv6 ready.
