@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.17 2000/02/16 05:54:17 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.18 2000/02/16 06:04:57 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1267,7 +1267,7 @@ oakley_getmycert(iph1)
 	memcpy(iph1->cert->v + 1, cert->v, cert->l);
 	iph1->cert->v[0] = iph1->rmconf->certtype;
 
-	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL, "get CERT:"));
+	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL, "get CERT:\n"));
 	YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert));
 
 	error = 0;
