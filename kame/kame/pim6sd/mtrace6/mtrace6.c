@@ -53,13 +53,32 @@
 
 #include "trace.h"
 
-static void usage(), open_socket(), make_packet(), mtrace_loop(), show_result();
-
 static char *gateway, *intface, *source, *group, *receiver, *destination;
 static int mldsoc, hops = 64, maxhops = 127, waittime = 3, querylen, opt_n;
 static struct sockaddr *gw_sock, *src_sock, *grp_sock, *dst_sock, *rcv_sock; 
 static char *querypacket;
 static char frombuf[1024];	/* XXX: enough size? */
+
+int main __P((int, char *[]));
+static char *proto_type __P((u_int));
+static char *pr_addr __P((struct sockaddr *, int));
+static void setqid __P((int, char *));
+static void mtrace_loop __P((void));
+static char *str_rflags __P((int));
+static void show_ip6_result __P((struct sockaddr_in6 *, int));
+static void show_result __P((struct sockaddr *, int));
+static void set_sockaddr __P((char *, struct addrinfo *, struct sockaddr *));
+static int is_multicast __P((struct sockaddr *));
+static char *all_routers_str __P((int));
+static int ip6_validaddr __P((char *, struct sockaddr_in6 *));
+static int get_my_sockaddr __P((int, struct sockaddr *));
+static void set_hlim __P((int, struct sockaddr *, int));
+static void set_join __P((int, char *, struct sockaddr *));
+static void set_filter __P((int, int));
+static void open_socket __P((void));
+static void make_ip6_packet __P((void));
+static void make_packet __P((void));
+static void usage __P((void));
 
 int
 main(argc, argv)
@@ -124,6 +143,8 @@ main(argc, argv)
 	make_packet();
 
 	mtrace_loop();
+	exit(0);
+	/*NOTREACHED*/
 }
 
 static char *
@@ -157,7 +178,7 @@ proto_type(type)
 
 static char *
 pr_addr(addr, numeric)
-	struct sockaddr_in6 *addr;
+	struct sockaddr *addr;
 	int numeric;
 {
 	static char buf[MAXHOSTNAMELEN];
@@ -167,8 +188,7 @@ pr_addr(addr, numeric)
 		flag |= NI_NUMERICHOST;
 	flag |= NI_WITHSCOPEID;
 
-	getnameinfo((struct sockaddr *)addr, addr->sin6_len, buf, sizeof(buf),
-		    NULL, 0, flag);
+	getnameinfo(addr, addr->sa_len, buf, sizeof(buf), NULL, 0, flag);
 
 	return (buf);
 }
@@ -313,7 +333,7 @@ show_ip6_result(from6, datalen)
 			/* router address and incoming/outgoing interface */
 			printf("%s", pr_addr((struct sockaddr *)&sa_resp, opt_n));
 			printf("(%s/%d->%d) ",
-			       pr_addr((struct sckaddr *)&sa_upstream),
+			       pr_addr((struct sockaddr *)&sa_upstream, 1),
 			       ntohl(rp->tr_inifid), ntohl(rp->tr_outifid));
 			/* multicast routing protocol type */
 			printf("%s ", proto_type(rp->tr_rproto));
@@ -392,7 +412,7 @@ all_routers_str(family)
 	}
 }
 
-int
+static int
 ip6_validaddr(ifname, addr)
 	char *ifname;
 	struct sockaddr_in6 *addr;
@@ -424,7 +444,7 @@ ip6_validaddr(ifname, addr)
 	return(1);
 }
 
-int
+static int
 get_my_sockaddr(family, addrp)
 	int family;
 	struct sockaddr *addrp;
@@ -520,6 +540,7 @@ set_join(s, ifname, group)
 
 static void
 set_filter(s, family)
+	int s, family;
 {
 	struct icmp6_filter filter6;
 
