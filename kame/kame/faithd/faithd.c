@@ -33,6 +33,7 @@
  * Usage: faithd [<port> <progpath> <arg1(progname)> <arg2> ...]
  *   e.g. faithd telnet /usr/local/v6/sbin/telnetd telnetd
  */
+#define HAVE_GETIFADDRS
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -68,6 +69,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#ifdef HAVE_GETIFADDRS
+#include <ifaddrs.h>
+#endif
 
 #ifdef FAITH4
 #include <resolv.h>
@@ -693,6 +697,59 @@ if_maxindex()
 static void
 grab_myaddrs()
 {
+#ifdef HAVE_GETIFADDRS
+	struct ifaddrs *ifap, *ifa;
+	struct myaddrs *p;
+	struct sockaddr_in6 *sin6;
+
+	if (getifaddrs(&ifap) != 0) {
+		exit_failure("getifaddrs");
+		/*NOTREACHED*/
+	}
+
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		switch (ifa->ifa_addr->sa_family) {
+		case AF_INET:
+		case AF_INET6:
+			break;
+		default:
+			continue;
+		}
+
+		p = (struct myaddrs *)malloc(sizeof(struct myaddrs) +
+		    ifa->ifa_addr->sa_len);
+		if (!p) {
+			exit_failure("not enough core");
+			/*NOTREACHED*/
+		}
+		memcpy(p + 1, ifa->ifa_addr, ifa->ifa_addr->sa_len);
+		p->next = myaddrs;
+		p->addr = (struct sockaddr *)(p + 1);
+#ifdef __KAME__
+		if (ifa->ifa_addr->sa_family == AF_INET6) {
+			sin6 = (struct sockaddr_in6 *)p->addr;
+			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)
+			 || IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
+				sin6->sin6_scope_id =
+					ntohs(*(u_int16_t *)&sin6->sin6_addr.s6_addr[2]);
+				sin6->sin6_addr.s6_addr[2] = 0;
+				sin6->sin6_addr.s6_addr[3] = 0;
+			}
+		}
+#endif
+		myaddrs = p;
+		if (dflag) {
+			char hbuf[NI_MAXHOST];
+			getnameinfo(p->addr, p->addr->sa_len,
+				hbuf, sizeof(hbuf), NULL, 0,
+				NI_NUMERICHOST);
+			syslog(LOG_INFO, "my interface: %s %s", hbuf,
+			    ifa->ifa_name);
+		}
+	}
+
+	free(ifa);
+#else
 	int s;
 	unsigned int maxif;
 	struct ifreq *iflist;
@@ -779,6 +836,7 @@ grab_myaddrs()
 	}
 
 	free(iflist);
+#endif
 }
 
 static void
