@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.93 2000/10/12 10:27:00 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.94 2000/10/16 12:08:55 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1530,8 +1530,8 @@ pr_ip6opt(void *extbuf)
 
 	ext = (struct ip6_hbh *)extbuf;
 	extlen = (ext->ip6h_len + 1) * 8;
-	printf("nxt %u, len %u (%d bytes)\n", ext->ip6h_nxt,
-	       ext->ip6h_len, extlen);
+	printf("nxt %u, len %u (%lu bytes)\n", ext->ip6h_nxt,
+	       (unsigned int)ext->ip6h_len, (unsigned long)extlen);
 
 	currentlen = 0;
 	while (1) {
@@ -1559,7 +1559,8 @@ pr_ip6opt(void *extbuf)
 			       ntohs(value2));
 			break;
 		default:
-			printf("    Received Opt %u len %u\n", type, len);
+			printf("    Received Opt %u len %lu\n",
+			       type, (unsigned long)len);
 			break;
 		}
 	}
