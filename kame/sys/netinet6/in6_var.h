@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.101 2004/07/05 06:28:17 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.102 2004/07/05 07:27:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,12 +66,6 @@
 
 #ifndef _NETINET6_IN6_VAR_H_
 #define _NETINET6_IN6_VAR_H_
-
-#ifdef __OpenBSD__
-#include <sys/timeout.h>
-#else
-#include <sys/callout.h>
-#endif
 
 /*
  * Interface address, Internet version.  One of these structures
@@ -550,6 +544,12 @@ struct router6_info {
 	struct router6_info *rt6i_next;
 };
 
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+struct callout;
+#elif defined(__OpenBSD__)
+struct timeout;
+#endif
+
 struct	in6_multi {
 	LIST_ENTRY(in6_multi) in6m_entry; /* list glue */
 	struct	in6_addr in6m_addr;	/* IP6 multicast address */
@@ -572,9 +572,9 @@ struct	in6_multi {
 	int	in6m_timer;		/* delay to send the 1st report */
 	struct timeval in6m_timer_expire; /* when the timer expires */
 #if defined(__NetBSD__) || defined(__FreeBSD__)
-	struct callout in6m_timer_ch;
+	struct callout *in6m_timer_ch;
 #elif defined(__OpenBSD__)
-	struct timeout in6m_timer_ch;
+	struct timeout *in6m_timer_ch;
 #endif
 #endif
 };

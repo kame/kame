@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.105 2004/07/05 06:23:54 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.106 2004/07/05 07:27:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -88,6 +88,11 @@
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
 #include <sys/kernel.h>
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+#include <sys/callout.h>
+#elif defined(__OpenBSD__)
+#include <sys/timeout.h>
+#endif
 #ifdef __FreeBSD__
 #include <sys/malloc.h>
 #endif
@@ -229,12 +234,12 @@ mld_starttimer(in6m)
 
 	/* start or restart the timer */
 #if defined(__NetBSD__) || defined(__FreeBSD__)
-	callout_reset(&in6m->in6m_timer_ch, in6m->in6m_timer,
+	callout_reset(in6m->in6m_timer_ch, in6m->in6m_timer,
 	    (void (*) __P((void *)))mld_timeo, in6m);
 #else
-	timeout_set(&in6m->in6m_timer_ch,
+	timeout_set(in6m->in6m_timer_ch,
 	    (void (*) __P((void *)))mld_timeo, in6m);
-	timeout_add(&in6m->in6m_timer_ch, in6m->timer);
+	timeout_add(in6m->in6m_timer_ch, in6m->timer);
 #endif
 }
 
@@ -246,9 +251,9 @@ mld_stoptimer(in6m)
 		return;
 
 #if defined(__NetBSD__) || defined(__FreeBSD__)
-	callout_stop(&in6m->in6m_timer_ch);
+	callout_stop(in6m->in6m_timer_ch);
 #elif defined(__OpenBSD__)
-	timeout_del(&in6m->in6m_timer_ch);
+	timeout_del(in6m->in6m_timer_ch);
 #endif
 
 	in6m->in6m_timer = IN6M_TIMER_UNDEF;
@@ -267,9 +272,9 @@ mld_timeo(in6m)
 	in6m->in6m_timer = IN6M_TIMER_UNDEF;
 
 #if defined(__NetBSD__) || defined(__FreeBSD__)
-	callout_stop(&in6m->in6m_timer_ch);
+	callout_stop(in6m->in6m_timer_ch);
 #elif defined(__OpenBSD__)
-	timeout_del(&in6m->in6m_timer_ch);
+	timeout_del(in6m->in6m_timer_ch);
 #endif
 
 	switch (in6m->in6m_state) {
@@ -784,6 +789,13 @@ in6_addmulti(maddr6, ifp, errorp, delay)
 		in6m->in6m_ifp = ifp;
 		in6m->in6m_refcount = 1;
 		in6m->in6m_timer = IN6M_TIMER_UNDEF;
+		in6m->in6m_timer_ch =
+		    malloc(sizeof(*in6m->in6m_timer_ch), M_IPMADDR, M_NOWAIT);
+		if (in6m->in6m_timer_ch == NULL) {
+			free(in6m, M_IPMADDR);
+			splx(s);
+			return (NULL);
+		}
 		IFP_TO_IA6(ifp, ia);
 		if (ia == NULL) {
 			free(in6m, M_IPMADDR);
@@ -817,9 +829,9 @@ in6_addmulti(maddr6, ifp, errorp, delay)
 		}
 
 #ifdef __NetBSD__
-		callout_init(&in6m->in6m_timer_ch);
+		callout_init(in6m->in6m_timer_ch);
 #elif defined(__OpenBSD__)
-		bzero(&in6m->in6m_timer_ch, sizeof(in6m->in6m_timer_ch));
+		bzero(in6m->in6m_timer_ch, sizeof(*in6m->in6m_timer_ch));
 #endif
 		in6m->in6m_timer = delay;
 		if (in6m->in6m_timer > 0) {
@@ -895,6 +907,7 @@ in6_delmulti(in6m)
 		ifr.ifr_addr.sin6_addr = in6m->in6m_addr;
 		(*in6m->in6m_ifp->if_ioctl)(in6m->in6m_ifp,
 		    SIOCDELMULTI, (caddr_t)&ifr);
+		free(in6m->in6m_timer_ch, M_IPMADDR);
 		free(in6m, M_IPMADDR);
 	}
 	splx(s);
@@ -959,12 +972,19 @@ in6_addmulti(maddr6, ifp, errorp, delay)
 	in6m->in6m_ifma = ifma;
 	in6m->in6m_timer = IN6M_TIMER_UNDEF;
 	ifma->ifma_protospec = in6m;
+	in6m->in6m_timer_ch = malloc(sizeof(*in6m->in6m_timer_ch), M_IPMADDR,
+	    M_NOWAIT);
+	if (in6m->in6m_timer_ch == NULL) {
+		free(in6m, M_IPMADDR);
+		splx(s);
+		return (NULL);
+	}
 	LIST_INSERT_HEAD(&in6_multihead, in6m, in6m_entry);
 
 #if __FreeBSD_version >= 500000
-	callout_init(&in6m->in6m_timer_ch, 0);
+	callout_init(in6m->in6m_timer_ch, 0);
 #else
-	callout_init(&in6m->in6m_timer_ch);
+	callout_init(in6m->in6m_timer_ch);
 #endif
 	in6m->in6m_timer = delay;
 	if (in6m->in6m_timer > 0) {
@@ -1003,6 +1023,7 @@ in6_delmulti(in6m)
 		mld_stop_listening(in6m);
 		ifma->ifma_protospec = 0;
 		LIST_REMOVE(in6m, in6m_entry);
+		free(in6m->in6m_timer_ch, M_IPMADDR);
 		free(in6m, M_IPMADDR);
 	}
 	/* XXX - should be separate API for when we have an ifma? */
