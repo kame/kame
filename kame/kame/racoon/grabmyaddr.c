@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.c,v 1.11 2000/04/29 19:54:34 sakane Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.c,v 1.12 2000/05/17 11:29:27 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -156,7 +156,10 @@ grab_myaddrs()
 	for (ifap = ifa0; ifap; ifap = ifap->ifa_next) {
 
 		if (ifap->ifa_addr->sa_family != AF_INET
-		 && ifap->ifa_addr->sa_family != AF_INET6)
+#ifdef INET6
+		 && ifap->ifa_addr->sa_family != AF_INET6
+#endif
+		)
 			continue;
 
 		p = newmyaddr();
@@ -432,9 +435,22 @@ getmyaddrsport(local)
 	for (p = lcconf->myaddrs; p; p = p->next) {
 		if (!p->addr)
 			continue;
-		if (!cmpsaddrwop(local, p->addr))
-			return _INPORTBYSA(p->addr);
-			continue;
+		if (!cmpsaddrwop(local, p->addr)) {
+			switch (p->addr->sa_family) {
+			case AF_INET:
+				return ((struct sockaddr_in *)p->addr)->sin_port;
+#ifdef INET6
+			case AF_INET6:
+				return ((struct sockaddr_in6 *)p->addr)->sin6_port;
+#endif
+			default:
+				plog(logp, LOCATION, NULL,
+					"invalid family: %d\n",
+					p->addr->sa_family);
+				return -1;
+			}
+		}
+		continue;
 	}
 
 	return htons(PORT_ISAKMP);

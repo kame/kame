@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.27 2000/04/26 21:46:41 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.28 2000/05/17 11:29:28 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1644,12 +1644,35 @@ get_proposal_r(iph2)
 	struct secpolicy *sp;
 	struct ipsecrequest *req;
 	struct saprop *newpp = NULL;
+	u_int8_t prefixlen;
 
 	/* check */
 	if ((iph2->id_p != NULL && iph2->id == NULL)
 	 || (iph2->id_p == NULL && iph2->id != NULL)) {
 		plog(logp, LOCATION, NULL,
 			"Both ID wasn't found in payload.\n");
+		return -1;
+	}
+
+	if (iph2->src->sa_family != iph2->dst->sa_family) {
+		plog(logp, LOCATION, NULL,
+			"family mismatch, src:%d dst:%d\n",
+				iph2->src->sa_family,
+				iph2->src->sa_family);
+		return -1;
+	}
+	switch (iph2->src->sa_family) {
+	case AF_INET:
+		prefixlen = sizeof(struct in_addr) << 3;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		prefixlen = sizeof(struct in6_addr) << 3;
+		break;
+#endif
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid family: %d\n", iph2->src->sa_family);
 		return -1;
 	}
 
@@ -1690,8 +1713,8 @@ get_proposal_r(iph2)
 				spidx.prefd, spidx.ul_proto));
 
 		spidx.dir = IPSEC_DIR_INBOUND;
-		spidx.prefs = _INALENBYAF(iph2->src->sa_family) << 3;
-		spidx.prefd = _INALENBYAF(iph2->dst->sa_family) << 3;
+		spidx.prefs = prefixlen;
+		spidx.prefd = prefixlen;
 		spidx.ul_proto = IPSEC_ULPROTO_ANY;
 	} else if (iph2->id_p == NULL && iph2->id == NULL) {
 		YIPSDEBUG(DEBUG_MISC,
@@ -1701,8 +1724,8 @@ get_proposal_r(iph2)
 		KEY_SETSECSPIDX(IPSEC_DIR_INBOUND,
 				iph2->src,
 				iph2->dst,
-				_INALENBYAF(iph2->src->sa_family) << 3,
-				_INALENBYAF(iph2->dst->sa_family) << 3,
+				prefixlen,
+				prefixlen,
 				IPSEC_ULPROTO_ANY,
 				&spidx);
 	} else {
@@ -1713,8 +1736,8 @@ get_proposal_r(iph2)
 		KEY_SETSECSPIDX(IPSEC_DIR_INBOUND,
 				iph2->src,
 				iph2->dst,
-				_INALENBYAF(iph2->src->sa_family) << 3,
-				_INALENBYAF(iph2->dst->sa_family) << 3,
+				prefixlen,
+				prefixlen,
 				IPSEC_ULPROTO_ANY,
 				&spidx);
 	}

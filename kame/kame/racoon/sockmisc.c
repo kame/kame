@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.c,v 1.7 2000/01/13 05:46:33 itojun Exp $ */
+/* YIPS @(#)$Id: sockmisc.c,v 1.8 2000/05/17 11:29:28 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -72,6 +72,8 @@ cmpsaddrwop(addr1, addr2)
 	struct sockaddr *addr1;
 	struct sockaddr *addr2;
 {
+	caddr_t sa1, sa2;
+
 	if (addr1 == 0 && addr2 == 0)
 		return 0;
 	if (addr1 == 0 || addr2 == 0)
@@ -81,9 +83,24 @@ cmpsaddrwop(addr1, addr2)
 	 || addr1->sa_family != addr2->sa_family)
 		return 1;
 
-	if (memcmp(_INADDRBYSA(addr1), _INADDRBYSA(addr2),
-		_INALENBYAF(addr2->sa_family)) != 0)
+	switch (addr1->sa_family) {
+	case AF_INET:
+		sa1 = (caddr_t)&((struct sockaddr_in *)addr1)->sin_addr;
+		sa2 = (caddr_t)&((struct sockaddr_in *)addr2)->sin_addr;
+		if (memcmp(sa1, sa2, sizeof(struct in_addr)) != 0)
+			return 1;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		sa1 = (caddr_t)&((struct sockaddr_in6 *)addr1)->sin6_addr;
+		sa2 = (caddr_t)&((struct sockaddr_in6 *)addr2)->sin6_addr;
+		if (memcmp(sa1, sa2, sizeof(struct in6_addr)) != 0)
+			return 1;
+		break;
+#endif
+	default:
 		return 1;
+	}
 
 	return 0;
 }
@@ -98,6 +115,9 @@ cmpsaddr(addr1, addr2)
 	struct sockaddr *addr1;
 	struct sockaddr *addr2;
 {
+	caddr_t sa1, sa2;
+	u_short port1, port2;
+
 	if (addr1 == 0 && addr2 == 0)
 		return 0;
 	if (addr1 == 0 || addr2 == 0)
@@ -107,13 +127,32 @@ cmpsaddr(addr1, addr2)
 	 || addr1->sa_family != addr2->sa_family)
 		return 1;
 
-	if (!(_INPORTBYSA(addr1) == 0 || _INPORTBYSA(addr2) == 0 ||
-	      _INPORTBYSA(addr1) == _INPORTBYSA(addr2)))
+	switch (addr1->sa_family) {
+	case AF_INET:
+		sa1 = (caddr_t)&((struct sockaddr_in *)addr1)->sin_addr;
+		sa2 = (caddr_t)&((struct sockaddr_in *)addr2)->sin_addr;
+		port1 = ((struct sockaddr_in *)addr1)->sin_port;
+		port2 = ((struct sockaddr_in *)addr2)->sin_port;
+		if (!(port1 == 0 || port2 == 0 || port1 == port2))
+			return 1;
+		if (memcmp(sa1, sa2, sizeof(struct in_addr)) != 0)
+			return 1;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		sa1 = (caddr_t)&((struct sockaddr_in6 *)addr1)->sin6_addr;
+		sa2 = (caddr_t)&((struct sockaddr_in6 *)addr2)->sin6_addr;
+		port1 = ((struct sockaddr_in6 *)addr1)->sin6_port;
+		port2 = ((struct sockaddr_in6 *)addr2)->sin6_port;
+		if (!(port1 == 0 || port2 == 0 || port1 == port2))
+			return 1;
+		if (memcmp(sa1, sa2, sizeof(struct in6_addr)) != 0)
+			return 1;
+		break;
+#endif
+	default:
 		return 1;
-
-	if (memcmp(_INADDRBYSA(addr1), _INADDRBYSA(addr2),
-		_INALENBYAF(addr2->sa_family)) != 0)
-		return 1;
+	}
 
 	return 0;
 }
@@ -589,17 +628,33 @@ mask_sockaddr(a, b, l)
 	size_t l;
 {
 	size_t i;
-	u_int8_t *p;
+	u_int8_t *p, alen;
 
-	if (_INALENBYAF(b->sa_family) * 8 < l) {
+	switch (b->sa_family) {
+	case AF_INET:
+		alen = sizeof(struct in_addr);
+		p = (u_int8_t *)&((struct sockaddr_in *)a)->sin_addr;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		alen = sizeof(struct in6_addr);
+		p = (u_int8_t *)&((struct sockaddr_in6 *)a)->sin6_addr;
+		break;
+#endif
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid family: %d\n", b->sa_family);
+		exit(1);
+	}
+
+	if ((alen << 3) < l) {
 		plog(logp, LOCATION, NULL,
 			"unexpected inconsistency: %d %d\n", b->sa_family, l);
 		exit(1);
 	}
 
 	memcpy(a, b, b->sa_len);
-	p = (u_int8_t *)_INADDRBYSA(a);
 	p[l / 8] &= (0xff00 >> (l % 8)) & 0xff;
-	for (i = l / 8 + 1; i < _INALENBYAF(a->sa_family); i++)
+	for (i = l / 8 + 1; i < alen; i++)
 		p[i] = 0x00;
 }

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.64 2000/05/11 09:13:06 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.65 2000/05/17 11:29:28 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2505,8 +2505,25 @@ ipsecdoi_checkid1(iph1)
 		if (id_b->proto_id == 0 && ntohs(id_b->port) == 0)
 			return 0;
 		if (id_b->proto_id == IPPROTO_UDP) {
-			if (ntohs(id_b->port) == _INPORTBYSA(iph1->remote))
-				return 0;
+			switch (iph1->remote->sa_family) {
+			case AF_INET:
+				if (ntohs(id_b->port)
+				 == ((struct sockaddr_in *)iph1->remote)->sin_port)
+					return 0;
+				break;
+#ifdef INET6
+			case AF_INET6:
+				if (ntohs(id_b->port)
+				 == ((struct sockaddr_in6 *)iph1->remote)->sin6_port)
+					return 0;
+				break;
+#endif
+			default:
+				plog(logp, LOCATION, NULL,
+					"invalid family: %d\n",
+					iph1->remote->sa_family);
+				goto err;
+			}
 #if 1
 			/* allow hardcoded "500" for now */
 			if (ntohs(id_b->port) == 500)
@@ -2573,10 +2590,16 @@ ipsecdoi_setid1(iph1)
 		switch (iph1->local->sa_family) {
 		case AF_INET:
 			id_b.type = IPSECDOI_ID_IPV4_ADDR;
+			id_b.port = ((struct sockaddr_in *)iph1->local)->sin_port;
+			idtmp.l = sizeof(struct sockaddr_in);
+			idtmp.v = (caddr_t)&((struct sockaddr_in *)iph1->local)->sin_addr;
 			break;
 #ifdef INET6
 		case AF_INET6:
 			id_b.type = IPSECDOI_ID_IPV6_ADDR;
+			id_b.port = ((struct sockaddr_in6 *)iph1->local)->sin6_port;
+			idtmp.l = sizeof(struct sockaddr_in6);
+			idtmp.v = (caddr_t)&((struct sockaddr_in6 *)iph1->local)->sin6_addr;
 			break;
 #endif
 		default:
@@ -2586,13 +2609,6 @@ ipsecdoi_setid1(iph1)
 		}
 
 		id_b.proto_id = IPPROTO_UDP;
-#if 0	/* XXX should be configurable ? */
-		id_b.port = htons(PORT_ISAKMP);
-#else
-		id_b.port = _INPORTBYSA(iph1->local);
-#endif
-		idtmp.v = _INADDRBYSA(iph1->local);
-		idtmp.l = _INALENBYAF(iph1->local->sa_family);
 		ident = &idtmp;
 	}
 
@@ -2720,10 +2736,9 @@ ipsecdoi_sockaddr2id(saddr, prefixlen, ul_proto)
 	u_int ul_proto;
 {
 	vchar_t *new;
-	int type, len, len2;
-
-	/* get default ID length */
-	len = sizeof(struct ipsecdoi_id_b) + _INALENBYAF(saddr->sa_family);
+	int type, len1, len2;
+	caddr_t sa;
+	u_short port;
 
 	/*
 	 * XXXX:
@@ -2731,32 +2746,39 @@ ipsecdoi_sockaddr2id(saddr, prefixlen, ul_proto)
 	 */
 	switch (saddr->sa_family) {
 	case AF_INET:
-		if (prefixlen == (_INALENBYAF(saddr->sa_family) << 3)) {
+		len1 = sizeof(struct ipsecdoi_id_b) + sizeof(struct in_addr);
+		if (prefixlen == (sizeof(struct in_addr) << 3)) {
 			type = IPSECDOI_ID_IPV4_ADDR;
 			len2 = 0;
 		} else {
 			type = IPSECDOI_ID_IPV4_ADDR_SUBNET;
-			len2 = _INALENBYAF(saddr->sa_family); /* acutually 4 */
+			len2 = sizeof(struct in_addr);
 		}
+		sa = (caddr_t)&((struct sockaddr_in *)(saddr))->sin_addr;
+		port = ((struct sockaddr_in *)(saddr))->sin_port;
 		break;
 #ifdef INET6
 	case AF_INET6:
-		if (prefixlen == (_INALENBYAF(saddr->sa_family) << 3)) {
+		len1 = sizeof(struct in6_addr);
+		if (prefixlen == (sizeof(struct in6_addr) << 3)) {
 			type = IPSECDOI_ID_IPV6_ADDR;
 			len2 = 0;
 		} else {
 			type = IPSECDOI_ID_IPV6_ADDR_SUBNET;
-			len2 = _INALENBYAF(saddr->sa_family); /* acutually 16 */
+			len2 = sizeof(struct in6_addr);
 		}
+		sa = (caddr_t)&((struct sockaddr_in6 *)(saddr))->sin6_addr;
+		port = ((struct sockaddr_in6 *)(saddr))->sin6_port;
 		break;
 #endif
 	default:
-		plog(logp, LOCATION, NULL, "invalid address family.\n");
+		plog(logp, LOCATION, NULL,
+			"invalid family: %d.\n", saddr->sa_family);
 		return NULL;
 	}
 
 	/* get ID buffer */
-	new = vmalloc(len + len2);
+	new = vmalloc(sizeof(struct ipsecdoi_id_b) + len1 + len2);
 	if (new == NULL) {
 		plog(logp, LOCATION, NULL,
 			"vmalloc (%s)\n", strerror(errno));
@@ -2774,19 +2796,16 @@ ipsecdoi_sockaddr2id(saddr, prefixlen, ul_proto)
 	 * because 0 means port number of 0.  Instead of 0, we use IPSEC_*_ANY.
 	 */
 	((struct ipsecdoi_id_b *)new->v)->proto_id =
-			ul_proto == IPSEC_ULPROTO_ANY
-					? 0 : ul_proto;
+		ul_proto == IPSEC_ULPROTO_ANY ? 0 : ul_proto;
 	((struct ipsecdoi_id_b *)new->v)->port =
-			_INPORTBYSA(saddr) == IPSEC_PORT_ANY
-					? 0 : _INPORTBYSA(saddr);
+		port == IPSEC_PORT_ANY ? 0 : port;
+	memcpy(new->v + sizeof(struct ipsecdoi_id_b), sa, len1);
 
 	/* set address */
-	memcpy(new->v + sizeof(struct ipsecdoi_id_b),
-		_INADDRBYSA(saddr), _INALENBYAF(saddr->sa_family));
 
 	/* set prefix */
 	if (len2 != 0) {
-		u_char *p = new->v + len;
+		u_char *p = new->v + sizeof(struct ipsecdoi_id_b) + len1;
 		u_int bits = prefixlen;
 
 		while (bits >= 8) {
@@ -2814,17 +2833,31 @@ ipsecdoi_id2sockaddr(
 	u_int16_t *ul_proto)
 {
 	struct ipsecdoi_id_b *id_b = (struct ipsecdoi_id_b *)buf->v;
-	u_int family, plen = 0;
+	u_int plen = 0;
 
 	switch (id_b->type) {
 	case IPSECDOI_ID_IPV4_ADDR:
 	case IPSECDOI_ID_IPV4_ADDR_SUBNET:
-		family = AF_INET;
+		saddr->sa_len = sizeof(struct sockaddr_in);
+		saddr->sa_family = AF_INET;
+		((struct sockaddr_in *)saddr)->sin_port =
+			(id_b->port == 0
+				? IPSEC_PORT_ANY
+				: id_b->port);		/* see sockaddr2id() */
+		memcpy(&((struct sockaddr_in *)saddr)->sin_addr,
+			buf->v + sizeof(*id_b), sizeof(struct in_addr));
 		break;
 #ifdef INET6
 	case IPSECDOI_ID_IPV6_ADDR:
 	case IPSECDOI_ID_IPV6_ADDR_SUBNET:
-		family = AF_INET6;
+		saddr->sa_len = sizeof(struct sockaddr_in6);
+		saddr->sa_family = AF_INET6;
+		((struct sockaddr_in6 *)saddr)->sin6_port =
+			(id_b->port == 0
+				? IPSEC_PORT_ANY
+				: id_b->port);		/* see sockaddr2id() */
+		memcpy(&((struct sockaddr_in6 *)saddr)->sin6_addr,
+			buf->v + sizeof(*id_b), sizeof(struct in6_addr));
 		break;
 #endif
 	default:
@@ -2836,26 +2869,24 @@ ipsecdoi_id2sockaddr(
 	/* get prefix length */
 	switch (id_b->type) {
 	case IPSECDOI_ID_IPV4_ADDR:
-	case IPSECDOI_ID_IPV6_ADDR:
-		plen = _INALENBYAF(family) << 3;
+		plen = sizeof(struct in_addr) << 3;
 		break;
 	case IPSECDOI_ID_IPV4_ADDR_SUBNET:
-	case IPSECDOI_ID_IPV6_ADDR_SUBNET:
 	    {
 		u_char *p;
 		u_int max;
 
 		/* sanity check */
-		if (buf->l < _INALENBYAF(family))
+		if (buf->l < (sizeof(struct in_addr) <<3))
 			return -1;
 
 		/* get subnet mask length */
 		plen = 0;
-		max = (_INALENBYAF(family) << 3);
+		max = sizeof(struct in_addr) <<3;
 
 		p = buf->v
 			+ sizeof(struct ipsecdoi_id_b)
-			+ _INALENBYAF(family);
+			+ sizeof(struct in_addr);
 
 		for (; *p == 0xff; p++) {
 			if (plen >= max)
@@ -2877,17 +2908,50 @@ ipsecdoi_id2sockaddr(
 		}
 	    }
 		break;
-	default:
-		plog(logp, LOCATION, NULL, "unsupported ID type.\n");
-		return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
+#ifdef INET6
+	case IPSECDOI_ID_IPV6_ADDR:
+		plen = sizeof(struct in_addr) << 3;
+		break;
+	case IPSECDOI_ID_IPV6_ADDR_SUBNET:
+	    {
+		u_char *p;
+		u_int max;
+
+		/* sanity check */
+		if (buf->l < (sizeof(struct in6_addr) <<3))
+			return -1;
+
+		/* get subnet mask length */
+		plen = 0;
+		max = sizeof(struct in6_addr) <<3;
+
+		p = buf->v
+			+ sizeof(struct ipsecdoi_id_b)
+			+ sizeof(struct in6_addr);
+
+		for (; *p == 0xff; p++) {
+			if (plen >= max)
+				break;
+			plen += 8;
+		}
+
+		if (plen < max) {
+			u_int l = 0;
+			u_char b = ~(*p);
+
+			while (b) {
+				b >>= 1;
+				l++;
+			}
+
+			l = 8 - l;
+			plen += l;
+		}
+	    }
+		break;
+#endif
 	}
 
-	saddr->sa_len = _SALENBYAF(family);
-	saddr->sa_family = family;
-	_INPORTBYSA(saddr) = id_b->port == 0
-				? IPSEC_PORT_ANY
-				: id_b->port;		/* see sockaddr2id() */
-	memcpy(_INADDRBYSA(saddr), buf->v + sizeof(*id_b), _INALENBYAF(family));
 	*prefixlen = plen;
 	*ul_proto = id_b->proto_id == 0
 				? IPSEC_ULPROTO_ANY

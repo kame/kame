@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.c,v 1.5 2000/04/26 21:03:58 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.c,v 1.6 2000/05/17 11:29:28 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -79,12 +79,28 @@ getrmconf(remote)
 {
 	struct remoteconf *p;
 	struct remoteconf *anon = NULL;
-	int withport = 0;
+	int withport;
 	char buf[NI_MAXHOST + NI_MAXSERV + 10];
 	char addr[NI_MAXHOST], port[NI_MAXSERV];
 
-	if (_INPORTBYSA(remote) != IPSEC_PORT_ANY)
-		withport = 1;
+	withport = 0;
+
+	switch (remote->sa_family) {
+	case AF_INET:
+		if (((struct sockaddr_in *)remote)->sin_port != IPSEC_PORT_ANY)
+			withport = 1;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		if (((struct sockaddr_in6 *)remote)->sin6_port != IPSEC_PORT_ANY)
+			withport = 1;
+		break;
+#endif
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid family: %d\n", remote->sa_family);
+		exit(1);
+	}
 
 	GETNAMEINFO(remote, addr, port);
 	snprintf(buf, sizeof(buf), "%s%s%s%s", addr,

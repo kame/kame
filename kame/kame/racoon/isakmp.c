@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.56 2000/04/24 07:37:43 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.57 2000/05/17 11:29:28 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -141,6 +141,7 @@ isakmp_handler(so_isakmp)
 	int remote_len = sizeof(remote);
 	int local_len = sizeof(local);
 	int len;
+	u_short port;
 	vchar_t *buf = NULL;
 	int error = -1;
 
@@ -199,7 +200,21 @@ isakmp_handler(so_isakmp)
 	YIPSDEBUG(DEBUG_DNET, PVDUMP(buf));
 
 	/* avoid packets with malicious port/address */
-	if (_INPORTBYSA((struct sockaddr *)&remote) == 0) {
+	switch (remote.ss_family) {
+	case AF_INET:
+		port = ((struct sockaddr_in *)&remote)->sin_port;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		port = ((struct sockaddr_in6 *)&remote)->sin6_port;
+		break;
+#endif
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid family: %d\n", remote.ss_family);
+		goto end;
+	}
+	if (port == 0) {
 		plog(logp, LOCATION, (struct sockaddr *)&remote,
 			"possible attack: src port == 0 "
 			"(valid as UDP but not with IKE)\n");
@@ -790,14 +805,42 @@ isakmp_ph2begin_r(iph1, msg)
 		delph2(iph2);
 		return -1;
 	}
-	_INPORTBYSA(iph2->dst) = 0;
+	switch (iph2->dst->sa_family) {
+	case AF_INET:
+		((struct sockaddr_in *)iph2->dst)->sin_port = 0;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		((struct sockaddr_in6 *)iph2->dst)->sin6_port = 0;
+		break;
+#endif
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid family: %d\n", iph2->dst->sa_family);
+		delph2(iph2);
+		return -1;
+	}
 
 	iph2->src = dupsaddr(iph1->local);	/* XXX should be considered */
 	if (iph2->src == NULL) {
 		delph2(iph2);
 		return -1;
 	}
-	_INPORTBYSA(iph2->src) = 0;
+	switch (iph2->src->sa_family) {
+	case AF_INET:
+		((struct sockaddr_in *)iph2->src)->sin_port = 0;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		((struct sockaddr_in6 *)iph2->src)->sin6_port = 0;
+		break;
+#endif
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid family: %d\n", iph2->src->sa_family);
+		delph2(iph2);
+		return -1;
+	}
 
 	YIPSDEBUG(DEBUG_NOTIFY,
 		h1[0] = s1[0] = h2[0] = s2[0] = '\0';
@@ -1549,12 +1592,37 @@ isakmp_newcookie(place, remote, local)
 	vchar_t *buf, *buf2;
 	char *p;
 	int blen;
+	int alen;
+	caddr_t sa1, sa2;
 	time_t t;
 	int error = -1;
 	u_short port;
 
-	blen = _INALENBYAF(remote->sa_family) + sizeof(u_short)
-		+ _INALENBYAF(local->sa_family) + sizeof(u_short)
+	if (remote->sa_family != local->sa_family) {
+		plog(logp, LOCATION, NULL,
+			"address family mismatch, remote:%d local:%d\n",
+			remote->sa_family, local->sa_family);
+		goto end;
+	}
+	switch (remote->sa_family) {
+	case AF_INET:
+		alen = sizeof(struct in_addr);
+		sa1 = (caddr_t)&((struct sockaddr_in *)remote)->sin_addr;
+		sa2 = (caddr_t)&((struct sockaddr_in *)local)->sin_addr;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		alen = sizeof(struct in_addr);
+		sa1 = (caddr_t)&((struct sockaddr_in6 *)remote)->sin6_addr;
+		sa2 = (caddr_t)&((struct sockaddr_in6 *)local)->sin6_addr;
+		break;
+#endif
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid family: %d\n", remote->sa_family);
+		goto end;
+	}
+	blen = (alen + sizeof(u_short)) * 2
 		+ sizeof(time_t) + lcconf->secret_size;
 	buf = vmalloc(blen);
 	if (buf == NULL) {
@@ -1565,17 +1633,16 @@ isakmp_newcookie(place, remote, local)
 	p = buf->v;
 
 	/* copy my address */
-	memcpy(p, _INADDRBYSA(remote),
-		_INALENBYAF(remote->sa_family));
-	p += _INALENBYAF(remote->sa_family);
-	port = _INPORTBYSA(remote);
+	memcpy(p, sa1, alen);
+	p += alen;
+	port = ((struct sockaddr_in *)remote)->sin_port;
 	memcpy(p, &port, sizeof(u_short));
 	p += sizeof(u_short);
 
 	/* copy target address */
-	memcpy(p, _INADDRBYSA(local), _INALENBYAF(local->sa_family));
-	p += _INALENBYAF(local->sa_family);
-	port = _INPORTBYSA(local);
+	memcpy(p, sa2, alen);
+	p += alen;
+	port = ((struct sockaddr_in *)local)->sin_port;
 	memcpy(p, &port, sizeof(u_short));
 	p += sizeof(u_short);
 
@@ -1904,6 +1971,8 @@ copy_ph1addresses(iph1, rmconf, remote)
 	struct remoteconf *rmconf;
 	struct sockaddr *remote;
 {
+	u_short port = 0;
+
 	/* address portion must be grabbed from real remote address "remote" */
 	iph1->remote = dupsaddr(remote);
 	if (iph1->remote == NULL) {
@@ -1918,18 +1987,55 @@ copy_ph1addresses(iph1, rmconf, remote)
 	 * if remote has port # (in case of responder - from recvfrom(2))
 	 * respect content of "remote".
 	 */
-	if (!_INPORTBYSA(iph1->remote)) {
-		if (_INPORTBYSA(rmconf->remote))
-			_INPORTBYSA(iph1->remote) = _INPORTBYSA(rmconf->remote);
-		else
-			_INPORTBYSA(iph1->remote) = htons(PORT_ISAKMP);
+	switch (iph1->remote->sa_family) {
+	case AF_INET:
+		port = ((struct sockaddr_in *)iph1->remote)->sin_port;
+		if (port)
+			break;
+		port = ((struct sockaddr_in *)rmconf->remote)->sin_port;
+		if (port)
+			break;
+		port = htons(PORT_ISAKMP);
+		break;
+#ifdef INET6
+	case AF_INET6:
+		port = ((struct sockaddr_in6 *)iph1->remote)->sin6_port;
+		if (port)
+			break;
+		port = ((struct sockaddr_in6 *)rmconf->remote)->sin6_port;
+		if (port)
+			break;
+		port = htons(PORT_ISAKMP);
+		break;
+#endif
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid family: %d\n", iph1->remote->sa_family);
+		return -1;
 	}
+
 	iph1->local = getlocaladdr(iph1->remote);
 	if (iph1->local == NULL) {
 		delph1(iph1);
 		return -1;
 	}
-	_INPORTBYSA(iph1->local) = getmyaddrsport(iph1->local);
+	switch (iph1->local->sa_family) {
+	case AF_INET:
+		((struct sockaddr_in *)iph1->local)->sin_port
+			= getmyaddrsport(iph1->local);
+		break;
+#ifdef INET6
+	case AF_INET6:
+		((struct sockaddr_in6 *)iph1->local)->sin6_port
+			= getmyaddrsport(iph1->local);
+		break;
+#endif
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid family: %d\n", iph1->remote->sa_family);
+		delph1(iph1);
+		return -1;
+	}
 
 	return 0;
 }

@@ -729,15 +729,31 @@ sainfo_id
 			if (!res)
 				return -1;
 
-			if ((res->ai_family == AF_INET6 && $5 == IPPROTO_ICMP)
-			 || (res->ai_family == AF_INET && $5 == IPPROTO_ICMPV6)) {
-				yyerror("upper layer protocol mismatched.\n");
-				freeaddrinfo(res);
-				return -1;
+			switch (res->ai_family) {
+			case AF_INET:
+				if ($5 == IPPROTO_ICMPV6) {
+					yyerror("upper layer protocol mismatched.\n");
+					freeaddrinfo(res);
+					return -1;
+				}
+				$$ = ipsecdoi_sockaddr2id(res->ai_addr,
+					sizeof(struct in_addr) << 3, $5);
+				break;
+#ifdef INET6
+			case AF_INET6:
+				if ($5 == IPPROTO_ICMP) {
+					yyerror("upper layer protocol mismatched.\n");
+					freeaddrinfo(res);
+					return -1;
+				}
+				$$ = ipsecdoi_sockaddr2id(res->ai_addr,
+					sizeof(struct in6_addr) << 3, $5);
+				break;
+#endif
+			default:
+				yyerror("invalid family: %d", res->ai_family);
+				break;
 			}
-
-			$$ = ipsecdoi_sockaddr2id(res->ai_addr,
-					_INALENBYAF(res->ai_family) << 3, $5);
 			freeaddrinfo(res);
 			if ($$ == NULL)
 				return -1;
@@ -1160,10 +1176,25 @@ parse_spidx(src, prefs, ports, dst, prefd, portd, ul_proto, dir)
 		delspidx(spidx);
 		return NULL;
 	}
+	switch (res->ai_family) {
+	case AF_INET:
+		spidx->prefs = prefs == ~0
+			? (sizeof(struct in_addr) << 3)
+			: prefs;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		spidx->prefs = prefs == ~0
+			? (sizeof(struct in6_addr) << 3)
+			: prefs;
+		break;
+#endif
+	default:
+		yyerror("invalid family: %d", res->ai_family);
+		return NULL;
+		break;
+	}
 	memcpy(&spidx->src, res->ai_addr, res->ai_addrlen);
-	spidx->prefs = prefs == ~0
-		? (_INALENBYAF(res->ai_family) << 3)
-		: prefs;
 	freeaddrinfo(res);
 
 	snprintf(portbuf, sizeof(portbuf), "%d", portd);
@@ -1172,10 +1203,25 @@ parse_spidx(src, prefs, ports, dst, prefd, portd, ul_proto, dir)
 		delspidx(spidx);
 		return NULL;
 	}
+	switch (res->ai_family) {
+	case AF_INET:
+		spidx->prefd = prefd == ~0
+			? (sizeof(struct in_addr) << 3)
+			: prefd;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		spidx->prefd = prefd == ~0
+			? (sizeof(struct in6_addr) << 3)
+			: prefd;
+		break;
+#endif
+	default:
+		yyerror("invalid family: %d", res->ai_family);
+		return NULL;
+		break;
+	}
 	memcpy(&spidx->dst, res->ai_addr, res->ai_addrlen);
-	spidx->prefd = prefd == ~0
-		? (_INALENBYAF(res->ai_family) << 3)
-		: prefd;
 	freeaddrinfo(res);
 
 	return spidx;

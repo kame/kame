@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.c,v 1.8 2000/05/12 19:50:19 sakane Exp $ */
+/* YIPS @(#)$Id: admin.c,v 1.9 2000/05/17 11:29:27 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -280,7 +280,23 @@ admin_process(so2, combuf)
 				com->ac_errno = -1;
 				break;
 			}
-			_INPORTBYSA(remote) = _INPORTBYSA(rmconf->remote);
+			switch (remote->sa_family) {
+			case AF_INET:
+				((struct sockaddr_in *)remote)->sin_port =
+					((struct sockaddr_in *)rmconf->remote)->sin_port;
+				break;
+#ifdef INET6
+			case AF_INET6:
+				((struct sockaddr_in6 *)remote)->sin6_port =
+					((struct sockaddr_in6 *)rmconf->remote)->sin6_port;
+				break;
+#endif
+			default:
+				plog(logp, LOCATION, dst,
+					"invalid family: %d\n", remote->sa_family);
+				com->ac_errno = -1;
+				break;
+			}
 
 			/* get local address */
 			local = dupsaddr(src);
@@ -288,7 +304,24 @@ admin_process(so2, combuf)
 				com->ac_errno = -1;
 				break;
 			}
-			_INPORTBYSA(local) = getmyaddrsport(local);
+			switch (local->sa_family) {
+			case AF_INET:
+				((struct sockaddr_in *)local)->sin_port =
+					getmyaddrsport(local);
+				break;
+#ifdef INET6
+			case AF_INET6:
+				((struct sockaddr_in6 *)local)->sin6_port =
+					getmyaddrsport(local);
+				break;
+#endif
+			default:
+				plog(logp, LOCATION, dst,
+					"invalid family: %d\n", local->sa_family);
+				com->ac_errno = -1;
+				break;
+			}
+
 
 			YIPSDEBUG(DEBUG_INFO,
 				plog(logp, LOCATION, local,
@@ -407,9 +440,11 @@ admin_init()
 	case 4:
 		hints.ai_family = PF_INET;
 		break;
+#ifdef INET6
 	case 6:
 		hints.ai_family = PF_INET6;
 		break;
+#endif
 	default:
 		hints.ai_family = PF_UNSPEC;
 		break;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.28 2000/04/24 07:37:43 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.29 2000/05/17 11:29:28 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -198,12 +198,12 @@ isakmp_info_send_d2_pf(msg)
 	struct ph1handle *iph1 = NULL;
 	caddr_t mhp[SADB_EXT_MAX + 1];
 	struct sadb_sa *sa;
-	struct sadb_address *src, *dst;
+	struct sockaddr *src, *dst;
 	vchar_t *payload = NULL;
 	int tlen;
+	u_int8_t prefixlen;
 	int error = 0;
 	struct isakmp_pl_d *d;
-	struct sockaddr *saddr;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -224,26 +224,37 @@ isakmp_info_send_d2_pf(msg)
 		return EINVAL;
 	}
 	sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
-	src = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
-	dst = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
+	src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
+	dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
 
-	/* first try me -> other guy */
-	if (dst) {
-		saddr = (struct sockaddr *)(dst + 1);
-		if (dst->sadb_address_prefixlen ==
-				_INALENBYAF(saddr->sa_family) << 3) {
-			iph1 = getph1byaddr(saddr);
-		}
+	if (src == NULL || dst == NULL) {
+		plog(logp, LOCATION, NULL,
+			"few pfkey delete message.\n");
+		return EINVAL;
 	}
+
+	switch (src->sa_family) {
+	case AF_INET:
+		prefixlen = sizeof(struct in_addr) << 3;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		prefixlen = sizeof(struct in6_addr) << 3;
+		break;
+#endif
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid family: %d\n", src->sa_family);
+		return EINVAL;
+	}
+	/* first try me -> other guy */
+	if (PFKEY_ADDR_PREFIX(mhp[SADB_EXT_ADDRESS_DST]) == prefixlen)
+		iph1 = getph1byaddr(dst);
+
 	/* other guy -> me */
 	if (!iph1) {
-		if (src) {
-			saddr = (struct sockaddr *)(src + 1);
-			if (src->sadb_address_prefixlen ==
-					_INALENBYAF(saddr->sa_family) << 3) {
-				iph1 = getph1byaddr(saddr);
-			}
-		}
+		if (PFKEY_ADDR_PREFIX(mhp[SADB_EXT_ADDRESS_SRC]) == prefixlen)
+			iph1 = getph1byaddr(src);
 	}
 
 	if (!iph1) {
@@ -287,6 +298,7 @@ isakmp_info_send_d2_pst(pst)
 	struct ph1handle *iph1 = NULL;
 	vchar_t *payload = NULL;
 	int tlen;
+	u_int8_t prefixlen;
 	int error = 0;
 	struct isakmp_pl_d *d;
 
@@ -296,8 +308,23 @@ isakmp_info_send_d2_pst(pst)
 		plog(logp, LOCATION, pst->src, "\n");
 		plog(logp, LOCATION, pst->dst, "\n");
 		);
+
+	switch (saddr->sa_family) {
+	case AF_INET:
+		prefixlen = sizeof(struct in_addr) << 3;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		prefixlen = sizeof(struct in6_addr) << 3;
+		break;
+#endif
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid family: %d\n", saddr->sa_family);
+		return EINVAL;
+	}
 	if (pst->dst) {
-		if (pst->prefd != _INALENBYAF(pst->dst->sa_family) << 3)
+		if (pst->prefd != prefixlen)
 			return EINVAL;
 		iph1 = getph1byaddr(pst->dst);
 	}
@@ -569,9 +596,24 @@ isakmp_info_send_common(iph1, payload, np, flags)
 		goto end;
 
 	iph2->dst = dupsaddr(iph1->remote);
-	_INPORTBYSA(iph2->dst) = 0;
 	iph2->src = dupsaddr(iph1->local);
-	_INPORTBYSA(iph2->src) = 0;
+	switch (iph1->remote->sa_family) {
+	case AF_INET:
+		((struct sockaddr_in *)iph2->dst)->sin_port = 0;
+		((struct sockaddr_in *)iph2->src)->sin_port = 0;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		((struct sockaddr_in6 *)iph2->dst)->sin6_port = 0;
+		((struct sockaddr_in6 *)iph2->src)->sin6_port = 0;
+		break;
+#endif
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid family: %d\n", iph1->remote->sa_family);
+		delph2(iph2);
+		goto end;
+	}
 	iph2->ph1 = iph1;
 	iph2->side = INITIATOR;
 	iph2->status = PHASE2ST_START;
