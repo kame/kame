@@ -1155,6 +1155,10 @@ initconn()
 	u_int af, hal, pal;
 	char *pasvcmd = NULL;
 
+	if (IN6_IS_ADDR_LINKLOCAL(&myctladdr.su_sin6.sin6_addr)
+	 || IN6_IS_ADDR_SITELOCAL(&myctladdr.su_sin6.sin6_addr)) {
+		warnx("use of scoped address can be troublesome");
+	}
 reinit:
 	if (passivemode) {
 		data_addr = myctladdr;
