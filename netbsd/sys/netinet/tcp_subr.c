@@ -330,7 +330,7 @@ tcp_template(tp)
 		ip6->ip6_src = in6p->in6p_laddr;
 		ip6->ip6_dst = in6p->in6p_faddr;
 		ip6->ip6_flow = in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK;
-		if (ip6_auto_flowlabel) {
+		if (in6p->in6p_flags & IN6P_AUTOFLOWLABEL) {
 			ip6->ip6_flow &= ~IPV6_FLOWLABEL_MASK;
 			ip6->ip6_flow |= 
 				(htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
@@ -626,7 +626,7 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		} else
 			ip6->ip6_hlim = ip6_defhlim;
 		ip6->ip6_flow &= ~IPV6_FLOWINFO_MASK;
-		if (ip6_auto_flowlabel) {
+		if (tp->t_in6pcb->in6p_flags & IN6P_AUTOFLOWLABEL) {
 			ip6->ip6_flow |= 
 				(htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 		}

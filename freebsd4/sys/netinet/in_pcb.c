@@ -159,6 +159,10 @@ in_pcballoc(so, pcbinfo, p)
 	LIST_INSERT_HEAD(pcbinfo->listhead, inp, inp_list);
 	pcbinfo->ipi_count++;
 	so->so_pcb = (caddr_t)inp;
+#ifdef INET6
+	if (ip6_auto_flowlabel)
+		inp->inp_flags |= IN6P_AUTOFLOWLABEL;
+#endif
 	return (0);
 }
 

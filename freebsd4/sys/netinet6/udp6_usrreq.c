@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.2 2000/07/15 07:14:38 kris Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.17 2000/10/13 17:46:21 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.18 2000/11/01 08:13:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -647,7 +647,7 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		return EISCONN;
 	s = splnet();
 	error = in6_pcbconnect(inp, nam, p);
-	if (ip6_auto_flowlabel) {
+	if (inp->inp_flags & IN6P_AUTOFLOWLABEL) {
 		inp->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
 		inp->in6p_flowinfo |= 
 			(htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);

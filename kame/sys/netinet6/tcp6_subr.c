@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.24 2000/10/13 17:46:20 itojun Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.25 2000/11/01 08:13:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -178,7 +178,7 @@ tcp6_template(t6p)
 			return (NULL);
 	}
 	n->i6t_i.ip6_flow = in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK;
-	if (ip6_auto_flowlabel) {
+	if (in6p->in6p_flags & IN6P_AUTOFLOWLABEL) {
 		n->i6t_i.ip6_flow &= ~IPV6_FLOWLABEL_MASK;
 		n->i6t_i.ip6_flow |=
 			(htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
@@ -303,7 +303,7 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 	nip6->ip6_nxt = IPPROTO_TCP;
 	nip6->ip6_hlim = in6_selecthlim(in6p, oifp);
 	nip6->ip6_flow &= ~IPV6_FLOWLABEL_MASK;
-	if (ip6_auto_flowlabel)
+	if (in6p->in6p_flags & IN6P_AUTOFLOWLABEL)
 		nip6->ip6_flow |= (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 	nth->th_flags = flags;
 	nth->th_urp = 0;

@@ -246,7 +246,7 @@ tcp_template(tp)
 	n->tt_urp = 0;
 #ifdef INET6
 	n->tt_flow = inp->inp_flow & IPV6_FLOWINFO_MASK;
-	if (ip6_auto_flowlabel) {
+	if (inp->inp_flags & IN6P_AUTOFLOWLABEL) {
 		n->tt_flow &= ~IPV6_FLOWLABEL_MASK;
 		n->tt_flow |= (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 	}
@@ -418,7 +418,7 @@ tcp_respond(tp, iph, th, m, ack, seq, flags, isipv6)
 		nth->th_sum = in6_cksum(m, IPPROTO_TCP,
 					 sizeof(struct ip6_hdr), tlen);
 		ip6->ip6_flow &= ~IPV6_FLOWLABEL_MASK;
-		if (ip6_auto_flowlabel) {
+		if (tp->t_inpcb->inp_flags & IN6P_AUTOFLOWLABEL) {
 			ip6->ip6_flow |=
 				(htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.64 2000/10/01 12:37:20 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.65 2000/10/22 14:09:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -146,6 +146,8 @@ in6_pcballoc(so, head)
 #else
 	in6p->in6p_flags |= IN6P_BINDV6ONLY;	/*just for safety*/
 #endif
+	if (ip6_auto_flowlabel)
+		in6p->in6p_flags |= IN6P_AUTOFLOWLABEL;
 	so->so_pcb = (caddr_t)in6p;
 	return(0);
 }

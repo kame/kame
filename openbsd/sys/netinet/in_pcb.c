@@ -179,8 +179,11 @@ in_pcballoc(so, v)
 	 * outside pcb-specific routines don't need to use sotopf(), and all
 	 * of it's pointer chasing, later.
 	 */
-	if (sotopf(so) == PF_INET6)
+	if (sotopf(so) == PF_INET6) {
 		inp->inp_flags = INP_IPV6;
+		if (ip6_auto_flowlabel)
+			inp->inp_flags |= IN6P_AUTOFLOWLABEL;
+	}
 	inp->inp_csumoffset = -1;
 #endif /* INET6 */
 	return (0);

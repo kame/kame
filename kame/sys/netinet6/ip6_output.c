@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.129 2000/10/31 04:36:17 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.130 2000/11/01 08:13:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1492,6 +1492,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_BINDV6ONLY:
 #endif
 			case IPV6_RECVTCLASS:
+			case IPV6_AUTOFLOWLABEL:
 				if (optlen != sizeof(int)) {
 					error = EINVAL;
 					break;
@@ -1680,6 +1681,9 @@ do { \
 						break;
 					}
 					OPTSET(IN6P_TCLASS);
+					break;
+				case IPV6_AUTOFLOWLABEL:
+					OPTSET(IN6P_AUTOFLOWLABEL);
 					break;
 				}
 				break;
@@ -2008,6 +2012,7 @@ do { \
 			case IPV6_PORTRANGE:
 #endif
 			case IPV6_RECVTCLASS:
+			case IPV6_AUTOFLOWLABEL:
 				switch (optname) {
 
 				case IPV6_UNICAST_HOPS:
@@ -2080,6 +2085,9 @@ do { \
 #endif
 				case IPV6_RECVTCLASS:
 					optval = OPTBIT(IN6P_TCLASS);
+					break;
+				case IPV6_AUTOFLOWLABEL:
+					optval = OPTBIT(IN6P_AUTOFLOWLABEL);
 					break;
 				}
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
