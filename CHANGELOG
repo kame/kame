@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2587 2004/04/08 05:43:38 sakane Exp $
+$KAME: CHANGELOG,v 1.2588 2004/04/09 16:34:02 jinmei Exp $
 
 <200404>
+2004-04-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c (reorder): made sure to call
+	set_source() to set the source address information for each
+	candidate of destination.  This was lost by accident in April
+	2003, and the destination address ordering has been incomplete
+	since then.
+
 Thu Apr  8 14:41:22 JST 2004 sakane@kame.net
 	* kame/kame/racoon/proposal.c:
 	fixed the EXACT mode to compare the proposals.  the lifetime in phase2
