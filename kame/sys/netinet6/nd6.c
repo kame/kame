@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.235 2002/04/01 05:20:50 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.236 2002/04/05 14:11:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -143,6 +143,9 @@ static struct sockaddr_in6 all1_sa;
 
 static void nd6_slowtimo __P((void *));
 static int regen_tmpaddr __P((struct in6_ifaddr *));
+#if defined(__FreeBSD__) && defined (RTF_CACHE)
+static void nd6_rtdrain __P((struct rtentry *, struct rttimer *));
+#endif
 static struct llinfo_nd6 *nd6_free __P((struct rtentry *, int));
 
 #ifdef __NetBSD__
@@ -1269,6 +1272,7 @@ nd6_rtrequest(req, rt, sa)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
+	int mine = 0;
 
 	if ((rt->rt_flags & RTF_GATEWAY))
 		return;
@@ -1435,6 +1439,7 @@ nd6_rtrequest(req, rt, sa)
 			ln->ln_expire = 0;
 			ln->ln_state = ND6_LLINFO_REACHABLE;
 			ln->ln_byhint = 0;
+			mine = 1;
 			if (macp) {
 				Bcopy(macp, LLADDR(SDL(gate)), ifp->if_addrlen);
 				SDL(gate)->sdl_alen = ifp->if_addrlen;
@@ -1498,6 +1503,15 @@ nd6_rtrequest(req, rt, sa)
 				}
 			}
 		}
+
+		/*
+		 * if this is a cached route, which is very likely,
+		 * put it in the timer queue.
+		 */
+#if defined(__FreeBSD__) && defined (RTF_CACHE)
+		if (!(rt->rt_flags & (RTF_STATIC | RTF_ANNOUNCE)) && !mine)
+			rt_add_cache(rt, nd6_rtdrain);
+#endif /* freebsd and rtf_cache */
 		break;
 
 	case RTM_DELETE:
@@ -1534,6 +1548,41 @@ nd6_rtrequest(req, rt, sa)
 		Free((caddr_t)ln);
 	}
 }
+
+#if defined(__FreeBSD__) && defined (RTF_CACHE)
+static void
+nd6_rtdrain(rt, rtt)
+	struct rtentry *rt;
+	struct rttimer *rtt;
+{
+	struct llinfo_nd6 *ln, *ln_next;
+
+	if ((ln = (struct llinfo_nd6 *)rt->rt_llinfo) == NULL)
+		panic("nd6_rtdrain: not an ND entry");
+
+	/* if this entry is still used actively, just keep it. */
+	switch(ln->ln_state) {
+	case ND6_LLINFO_REACHABLE:
+	case ND6_LLINFO_DELAY:
+	case ND6_LLINFO_PROBE:
+		rt_add_cache(rt, nd6_rtdrain);
+		return;
+	}
+
+	ln_next = nd6_free(rt, 1); /* this function should never return NULL */
+
+	if (ln_next->ln_prev->ln_rt == rt) {
+		/*
+		 * nd6_free kept the entry for some reasons.
+		 * attach the entry to the timer queue again.
+		 * XXX: we should move the routine in nd6_free here.
+		 */
+		rt_add_cache(rt, nd6_rtdrain);
+	}
+
+	return;			/* the caller will free rtt */
+}
+#endif
 
 int
 nd6_ioctl(cmd, data, ifp)
