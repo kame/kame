@@ -1,0 +1,11 @@
+--- makefile.ORIG	Sat Jun 17 17:08:24 2000
++++ makefile	Sat Jun 17 17:09:43 2000
+@@ -101,7 +101,7 @@
+ # -lm                   - required for ALL platforms
+ # -lxti                 - required for -DDO_XTI on HP_UX 10.X
+ 
+-LIBS= -lm
++LIBS= -lm -L/usr/local/v6/lib -linet6
+ 
+ # ---------------------------------------------------------------
+ # it should not be the case that anything below this line needs to

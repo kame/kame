@@ -1,0 +1,12 @@
+--- netserver.c.ORIG	Sat Jun 17 17:10:05 2000
++++ netserver.c	Sat Jun 17 17:11:08 2000
+@@ -81,9 +81,6 @@
+ #include <sys/socket.h>
+ #include <sys/stat.h>
+ #include <netinet/in.h>
+-#ifdef DO_IPV6
+-#include <netinet6/in6.h>
+-#endif
+ #include <netdb.h>
+ #include <unistd.h>
+ #ifndef DONT_WAIT
