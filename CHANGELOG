@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.629 2000/02/28 00:53:48 itojun Exp $
+$Id: CHANGELOG,v 1.630 2000/02/28 06:13:46 jinmei Exp $
 
 <200002>
+2000-02-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/{advapitest, bgpd, pim6dd, pim6sd, rtsold, rrenumd,
+	traceroute6}: treated CMSG_SPACE() as a function, not a constant
+	macro, and avoided to put it in a definition of a static array as
+	a result.
+
 Sun Feb 27 18:27:51 JST 2000  itojun@iijlab.net
 	* libinet6/resolv/res_init.c: allow extended scoped IPv6 address format
 	  into "nameserver" line in /etc/resolv.conf.
