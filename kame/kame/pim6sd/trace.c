@@ -62,7 +62,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: trace.c,v 1.3 1999/09/09 15:47:11 jinmei Exp $
+ *  $Id: trace.c,v 1.4 1999/09/10 16:26:48 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -530,9 +530,9 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 			    resptype == MLD6_MTRACE_RESP ?
 			    "reply" : "request on",
 			    inet6_fmt(dst),
-			    src ? inet6_fmt(&src->sin6_addr) : "unspecified");
+			    sa6 ? inet6_fmt(&sa6->sin6_addr) : "unspecified");
 	
-		send_mld6(resptype, no, src, &resp_sa6, group, ifindex,
+		send_mld6(resptype, no, sa6, &resp_sa6, group, ifindex,
 			  0, datalen, 0);
 	}
 	return;
