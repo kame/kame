@@ -108,11 +108,11 @@ includes:
 			${INSTALL} ${INSTALL_COPY} -m 444 $$j ${DESTDIR}/usr/include/$$i/$$j; \
 		done; \
 	done
-	@rm -rf ${DESTDIR}/usr/include/openssl ${DESTDIR}/usr/include/ssl \
-		${DESTDIR}/usr/libdata/perl5/site_perl/${MACHINE_ARCH}-openbsd/ssl \
-		${DESTDIR}/usr/libdata/perl5/site_perl/${MACHINE_ARCH}-openbsd/openssl
-	@mkdir ${DESTDIR}/usr/include/openssl
-	@ln -sf openssl ${DESTDIR}/usr/include/ssl
+#	@rm -rf ${DESTDIR}/usr/include/openssl ${DESTDIR}/usr/include/ssl \
+#		${DESTDIR}/usr/libdata/perl5/site_perl/${MACHINE_ARCH}-openbsd/ssl \
+#		${DESTDIR}/usr/libdata/perl5/site_perl/${MACHINE_ARCH}-openbsd/openssl
+#	@mkdir ${DESTDIR}/usr/include/openssl
+#	@ln -sf openssl ${DESTDIR}/usr/include/ssl
 	@echo installing ${LFILES}
 	@for i in ${LFILES}; do \
 		rm -f ${DESTDIR}/usr/include/$$i && \
