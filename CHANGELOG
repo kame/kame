@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1402 2000/11/25 17:56:25 kawa Exp $
+$KAME: CHANGELOG,v 1.1403 2000/11/26 16:58:14 kawa Exp $
 
 <200011>
+2000-11-27  Koji Kawano <K.Kawano@rdmg.mgcs.mei.co.jp>
+	* /kame/freebsd[3,4]/ifconfig
+	1. add vltime & pltime parameter setting
+	2. add default thier value setting (tentative bug fixing)
+	2 is coz that not to add addresses.
+
 2000-11-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd/route.c (add_leaf): just ignored an MLD report
 	if the node is not the DR for the corresponding subnet.
