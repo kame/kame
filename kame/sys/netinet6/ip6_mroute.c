@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.120 2003/12/10 09:23:20 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.121 2003/12/12 02:56:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -970,7 +970,6 @@ add_m6fc(mfccp)
 	struct mf6c *rt;
 	u_long hash;
 	struct rtdetq *rte;
-	u_short nstl;
 	int s;
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -1002,21 +1001,12 @@ add_m6fc(mfccp)
 	 */
 	hash = MF6CHASH(mfccp->mf6cc_origin.sin6_addr,
 			mfccp->mf6cc_mcastgrp.sin6_addr);
-	for (rt = mf6ctable[hash], nstl = 0; rt; rt = rt->mf6c_next) {
+	for (rt = mf6ctable[hash]; rt; rt = rt->mf6c_next) {
 		if (IN6_ARE_ADDR_EQUAL(&rt->mf6c_origin.sin6_addr,
 				       &mfccp->mf6cc_origin.sin6_addr) &&
 		    IN6_ARE_ADDR_EQUAL(&rt->mf6c_mcastgrp.sin6_addr,
 				       &mfccp->mf6cc_mcastgrp.sin6_addr) &&
 		    (rt->mf6c_stall != NULL)) {
-
-			if (nstl++)
-				log(LOG_ERR,
-				    "add_m6fc: %s o %s g %s p %x dbx %p\n",
-				    "multiple kernel entries",
-				    ip6_sprintf(&mfccp->mf6cc_origin.sin6_addr),
-				    ip6_sprintf(&mfccp->mf6cc_mcastgrp.sin6_addr),
-				    mfccp->mf6cc_parent, rt->mf6c_stall);
-
 #ifdef MRT6DEBUG
 			if (mrt6debug & DEBUG_MFC)
 				log(LOG_DEBUG,
@@ -1052,13 +1042,15 @@ add_m6fc(mfccp)
 				rte = n;
 			}
 			rt->mf6c_stall = NULL;
+
+			break;
 		}
 	}
 
 	/*
 	 * It is possible that an entry is being inserted without an upcall
 	 */
-	if (nstl == 0) {
+	if (rt == NULL) {
 #ifdef MRT6DEBUG
 		if (mrt6debug & DEBUG_MFC)
 			log(LOG_DEBUG,
@@ -1068,53 +1060,28 @@ add_m6fc(mfccp)
 			    ip6_sprintf(&mfccp->mf6cc_mcastgrp.sin6_addr),
 			    mfccp->mf6cc_parent);
 #endif
-
-		for (rt = mf6ctable[hash]; rt; rt = rt->mf6c_next) {
-
-			if (IN6_ARE_ADDR_EQUAL(&rt->mf6c_origin.sin6_addr,
-					       &mfccp->mf6cc_origin.sin6_addr)&&
-			    IN6_ARE_ADDR_EQUAL(&rt->mf6c_mcastgrp.sin6_addr,
-					       &mfccp->mf6cc_mcastgrp.sin6_addr)) {
-
-				rt->mf6c_origin     = mfccp->mf6cc_origin;
-				rt->mf6c_mcastgrp   = mfccp->mf6cc_mcastgrp;
-				rt->mf6c_parent     = mfccp->mf6cc_parent;
-				rt->mf6c_ifset	    = mfccp->mf6cc_ifset;
-				/* initialize pkt counters per src-grp */
-				rt->mf6c_pkt_cnt    = 0;
-				rt->mf6c_byte_cnt   = 0;
-				rt->mf6c_wrong_if   = 0;
-
-				if (rt->mf6c_expire)
-					n6expire[hash]--;
-				rt->mf6c_expire	   = 0;
-			}
-		}
+		/* no upcall, so make a new entry */
+		rt = (struct mf6c *)malloc(sizeof(*rt), M_MRTABLE, M_NOWAIT);
 		if (rt == NULL) {
-			/* no upcall, so make a new entry */
-			rt = (struct mf6c *)malloc(sizeof(*rt), M_MRTABLE,
-						  M_NOWAIT);
-			if (rt == NULL) {
-				splx(s);
-				return (ENOBUFS);
-			}
-
-			/* insert new entry at head of hash chain */
-			rt->mf6c_origin     = mfccp->mf6cc_origin;
-			rt->mf6c_mcastgrp   = mfccp->mf6cc_mcastgrp;
-			rt->mf6c_parent     = mfccp->mf6cc_parent;
-			rt->mf6c_ifset	    = mfccp->mf6cc_ifset;
-			/* initialize pkt counters per src-grp */
-			rt->mf6c_pkt_cnt    = 0;
-			rt->mf6c_byte_cnt   = 0;
-			rt->mf6c_wrong_if   = 0;
-			rt->mf6c_expire     = 0;
-			rt->mf6c_stall = NULL;
-
-			/* link into table */
-			rt->mf6c_next  = mf6ctable[hash];
-			mf6ctable[hash] = rt;
+			splx(s);
+			return (ENOBUFS);
 		}
+
+		/* insert new entry at head of hash chain */
+		rt->mf6c_origin     = mfccp->mf6cc_origin;
+		rt->mf6c_mcastgrp   = mfccp->mf6cc_mcastgrp;
+		rt->mf6c_parent     = mfccp->mf6cc_parent;
+		rt->mf6c_ifset	    = mfccp->mf6cc_ifset;
+		/* initialize pkt counters per src-grp */
+		rt->mf6c_pkt_cnt    = 0;
+		rt->mf6c_byte_cnt   = 0;
+		rt->mf6c_wrong_if   = 0;
+		rt->mf6c_expire     = 0;
+		rt->mf6c_stall = NULL;
+
+		/* link into table */
+		rt->mf6c_next  = mf6ctable[hash];
+		mf6ctable[hash] = rt;
 	}
 	splx(s);
 	return (0);
