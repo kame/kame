@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.138 2001/07/29 09:23:04 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.139 2001/08/03 10:40:20 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,6 +28,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include "opt_mip6.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -106,7 +108,9 @@ static int get_hostid_ifid __P((struct ifnet *, struct in6_addr *));
 static int get_rand_ifid __P((struct ifnet *, struct in6_addr *));
 static int generate_tmp_ifid __P((u_int8_t *, const u_int8_t *, u_int8_t *));
 static int get_hw_ifid __P((struct ifnet *, struct in6_addr *));
+#ifndef MIP6
 static int get_ifid __P((struct ifnet *, struct ifnet *, struct in6_addr *));
+#endif /* !MIP6 */
 static int in6_ifattach_linklocal __P((struct ifnet *, struct ifnet *));
 static int in6_ifattach_loopback __P((struct ifnet *));
 
@@ -442,7 +446,11 @@ found:
  * available on ifp0, borrow interface identifier from other information
  * sources.
  */
+#ifdef MIP6
+int
+#else /* MIP6 */
 static int
+#endif /* MIP6 */
 get_ifid(ifp0, altifp, in6)
 	struct ifnet *ifp0;
 	struct ifnet *altifp;	/* secondary EUI64 source */

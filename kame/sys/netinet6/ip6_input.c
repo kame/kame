@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.211 2001/08/01 04:29:57 sumikawa Exp $	*/
+/*	$KAME: ip6_input.c,v 1.212 2001/08/03 10:40:20 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -71,11 +71,13 @@
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
 #include "opt_natpt.h"
+#include "opt_mip6.h"
 #endif
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -328,6 +330,10 @@ ip6_init()
 #ifndef __FreeBSD__
 	ip6_init2((void *)0);
 #endif
+
+#ifdef MIP6
+	mip6_init();
+#endif /* MIP6 */
 
 #ifdef MEASURE_PERFORMANCE
 	in6h_hashinit();
@@ -1237,7 +1243,20 @@ ip6_input(m)
 			goto bad;
 		}
 #endif
-		
+#ifdef MIP6
+		/*
+		 * XXX
+		 * check if the packet was tunneled after all extion
+		 * headers have been processed.  get from Ericsson
+		 * code.  need more consideration.
+		 */
+		if ((nxt != IPPROTO_HOPOPTS) && (nxt != IPPROTO_DSTOPTS) &&
+		    (nxt != IPPROTO_ROUTING) && (nxt != IPPROTO_FRAGMENT) &&
+		    (nxt != IPPROTO_ESP) && (nxt != IPPROTO_AH)) {
+			if (mip6_route_optimize(m))
+				goto bad;
+		}
+#endif /* MIP6 */		
 		nxt = (*inet6sw[ip6_protox[nxt]].pr_input)(&m, &off, nxt);
 	}
 	return;

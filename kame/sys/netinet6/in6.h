@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.95 2001/07/26 06:53:16 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.96 2001/08/03 10:40:20 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -811,6 +811,7 @@ struct ip6_mtuinfo {
 #define	M_DECRYPTED	M_PROTO3
 #define	M_LOOP		M_PROTO4
 #define	M_AUTHIPDGM	M_PROTO5
+#define M_MIP6TUNNEL    M_PROTO6
 #endif
 
 #ifdef _KERNEL

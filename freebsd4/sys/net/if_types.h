@@ -108,5 +108,6 @@
 #define	IFT_FAITH	0xf2
 #define	IFT_STF		0xf3
 #define IFT_DUMMY       0xf4
+#define IFT_HIF         0xf5
 
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.65 2001/07/26 06:53:19 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.66 2001/08/03 10:40:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -249,6 +249,7 @@ struct nd_prefix {
 #define ndpr_raf		ndpr_flags
 #define ndpr_raf_onlink		ndpr_flags.onlink
 #define ndpr_raf_auto		ndpr_flags.autonomous
+#define ndpr_raf_router		ndpr_flags.router
 
 /*
  * Message format for use in obtaining information about prefixes

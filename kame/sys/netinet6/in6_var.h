@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.63 2001/07/29 09:23:05 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.64 2001/08/03 10:40:20 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -288,7 +288,8 @@ struct in6_prflags {
 	struct prf_ra {
 		u_char onlink : 1;
 		u_char autonomous : 1;
-		u_char reserved : 6;
+		u_char router : 1;
+		u_char reserved : 5;
 	} prf_ra;
 	u_char prf_reserved1;
 	u_short prf_reserved2;

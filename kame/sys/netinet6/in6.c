@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.223 2001/07/29 09:23:04 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.224 2001/08/03 10:40:20 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,9 +67,11 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -121,6 +123,10 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #endif
+
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif /* MIP6 */
 
 #include "gif.h"
 #if NGIF > 0
@@ -453,6 +459,18 @@ in6_control(so, cmd, data, ifp)
 	case SIOCGETMIFCNT_IN6:
 		return (mrt6_ioctl(cmd, data));
 	}
+
+#ifdef MIP6
+	switch (cmd) {
+	case SIOCENABLEMN:
+	case SIOCENABLEHA:
+		if (!privileged)
+			return(EPERM);
+		return(mip6_ioctl(cmd, data));
+	case SIOCGBC:
+		return(mip6_ioctl(cmd, data));
+	}
+#endif /* MIP6 */
 
 	if (ifp == NULL)
 		return(EOPNOTSUPP);
@@ -1130,7 +1148,11 @@ in6_update_ifa(ifp, ifra, ia)
 #if 0				/* MIP6 is now temporarily removed */
 	ia->ia6_flags &= ~IN6_IFF_NODAD;	/* Mobile IPv6 */
 #endif
+#ifdef MIP6
+	if (hostIsNew && in6if_do_dad(ifp) && mip6_ifa_need_dad(ia))
+#else /* MIP6 */
 	if (hostIsNew && in6if_do_dad(ifp))
+#endif /* MIP6 */
 		ia->ia6_flags |= IN6_IFF_TENTATIVE;
 
 	/*
@@ -1331,7 +1353,11 @@ in6_update_ifa(ifp, ifra, ia)
 	 * XXX It may be of use, if we can administratively
 	 * disable DAD.
 	 */
+#ifdef MIP6
+	if (hostIsNew && in6if_do_dad(ifp) && mip6_ifa_need_dad(ia) &&
+#else /* MIP6 */
 	if (hostIsNew && in6if_do_dad(ifp) &&
+#endif /* MIP6 */
 	    (ifra->ifra_flags & IN6_IFF_NODAD) == 0) {
 		nd6_dad_start((struct ifaddr *)ia, NULL);
 	}

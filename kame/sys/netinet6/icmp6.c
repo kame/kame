@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.236 2001/08/02 11:18:40 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.237 2001/08/03 10:40:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,10 +68,12 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
+#include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -126,6 +128,8 @@
 #if defined(NFAITH) && 0 < NFAITH
 #include <net/if_faith.h>
 #endif
+
+#include <netinet6/mip6.h>
 
 #include <net/net_osdep.h>
 
@@ -559,9 +563,18 @@ icmp6_input(mp, offp, proto)
 	if (icmp6->icmp6_type < ICMP6_INFOMSG_MASK)
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_error);
 
+#ifdef MIP6
+	if (mip6_icmp6_tunnel_input(m, off, icmp6len)) {
+		goto freeit;
+	}
+#endif /* MIP6 */
 	switch (icmp6->icmp6_type) {
 	case ICMP6_DST_UNREACH:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_dstunreach);
+#ifdef MIP6
+		if (mip6_icmp6_input(m, off, icmp6len))
+			goto freeit;
+#endif /* MIP6 */
 		switch (code) {
 		case ICMP6_DST_UNREACH_NOROUTE:
 			code = PRC_UNREACH_NET;
@@ -629,6 +642,10 @@ icmp6_input(mp, offp, proto)
 			break;
 		case ICMP6_PARAMPROB_HEADER:
 		case ICMP6_PARAMPROB_OPTION:
+#ifdef MIP6
+			if (mip6_icmp6_input(m, off, icmp6len))
+				goto freeit;
+#endif /* MIP6 */
 			code = PRC_PARAMPROB;
 			break;
 		default:
@@ -728,6 +745,15 @@ icmp6_input(mp, offp, proto)
 		if (code != 0)
 			goto badcode;
 		break;
+
+#ifdef MIP6
+	case ICMP6_HADISCOV_REPLY:
+		if (code != 0)
+			goto badcode;
+		if (mip6_icmp6_input(m, off, icmp6len))
+			goto freeit;
+		break;
+#endif /* MIP6 */
 
 	case MLD6_LISTENER_QUERY:
 	case MLD6_LISTENER_REPORT:

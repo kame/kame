@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.78 2001/08/01 04:29:57 sumikawa Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.79 2001/08/03 10:40:20 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,10 +35,12 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
+#include "opt_mip6.h"
 #endif
 #endif
 #ifdef __NetBSD__
 #include "opt_ipsec.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -89,6 +91,11 @@
 #if defined(__NetBSD__) && defined(PFIL_HOOKS)
 #include <net/pfil.h>
 #endif
+
+#ifdef MIP6
+#include <netinet6/mip6.h>
+extern struct mip6_bc_list mip6_bc_list;
+#endif /* MIP6 */
 
 #include <net/net_osdep.h>
 
@@ -346,6 +353,28 @@ ip6_forward(m, srcrt)
     }
     skip_ipsec:
 #endif /* IPSEC */
+
+#ifdef MIP6
+	{
+		/*
+		 * intercept and tunnel packets for home addresses
+		 * which we are acting as a home agent for.
+		 */
+		struct mip6_bc *mbc;
+
+		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
+						   &ip6->ip6_dst);
+		if ((mbc) && (mbc->mbc_flags & IP6_BUF_HOME)) {
+			/* we are acting as a home agent for ip6_dst. */
+			if (mip6_tunnel_output(&m, mbc) != 0) {
+				ip6stat.ip6s_cantforward++;
+				if (mcopy)
+					m_freem(mcopy);
+			}
+			return;
+		}
+	}
+#endif /* MIP6 */
 
 	dst = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
 	if (!srcrt) {

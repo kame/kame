@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.49 2001/08/01 16:50:19 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.50 2001/08/03 10:40:20 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,9 +67,11 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -104,6 +106,10 @@
 #ifdef ENABLE_DEFAULT_SCOPE
 #include <netinet6/scope6_var.h> 
 #endif
+
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif /* MIP6 */
 
 #include <net/net_osdep.h>
 
@@ -155,6 +161,59 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	if (laddr && !IN6_IS_ADDR_UNSPECIFIED(laddr))
 		return(laddr);
 
+#ifdef MIP6
+	/*
+	 * XXX
+	 * how to select a src address when we want to use home
+	 * address when we are out and using mobile ip functionality.
+	 */
+	{
+		struct hif_softc *sc;
+		struct hif_subnet *hs;
+		struct mip6_subnet *ms;
+		struct mip6_subnet_prefix *mspfx;
+		struct mip6_prefix *mpfx;
+		struct mip6_bu *mbu;
+		
+		/* find the address that is currently at home. */
+		TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+			if (sc->hif_location != HIF_LOCATION_HOME)
+				continue;
+
+			hs = TAILQ_FIRST(&sc->hif_hs_list_home);
+			if ((hs == NULL) || ((ms = hs->hs_ms) == NULL)) {
+				/* must not happen. */
+				continue;
+			}
+			mspfx = TAILQ_FIRST(&ms->ms_mspfx_list);
+			if ((mspfx == NULL)
+			    || ((mpfx = mspfx->mspfx_mpfx) == NULL)) {
+				/* must not happen. */
+				continue;
+			}
+			/*
+			 * found a home address that is currently at home.
+			 */
+			return (&mpfx->mpfx_haddr);
+		}
+
+		/*
+		 * find a home address that has been registered to its
+		 * home agent.
+		 */
+		TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+			LIST_FOREACH(mbu, &sc->hif_bu_list, mbu_entry) {
+				if (mbu->mbu_reg_state
+				    == MIP6_BU_REG_STATE_REG) {
+					return (&mbu->mbu_haddr);
+				}
+			}
+		}
+		/*
+		 * there is no home address suitable. fall through...
+		 */
+	}
+#endif /* MIP6 */
 	/*
 	 * If the address is not specified, choose the best one based on
 	 * the outgoing interface and the destination address.

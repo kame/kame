@@ -95,6 +95,14 @@ crypto/rijndael/rijndael-api-fst.c	optional ipsec_esp
 crypto/sha2/sha2.c		optional ipsec
 crypto/twofish/twofish2.c	optional ipsec_esp
 
+net/if_hif.c		optional hif mip6
+netinet6/mip6.c		optional mip6
+netinet6/mip6_subnet.c	optional mip6
+netinet6/mip6_prefix.c	optional mip6
+netinet6/mip6_ha.c	optional mip6
+netinet6/mip6_binding.c	optional mip6
+netinet6/mip6_icmp6.c	optional mip6
+
 ddb/db_access.c		optional ddb
 ddb/db_kld.c		optional ddb
 ddb/db_break.c		optional ddb

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.208 2001/08/01 16:50:20 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.209 2001/08/03 10:40:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,11 +70,13 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
+#include "opt_mip6.h"
 #endif
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -145,6 +147,10 @@ extern int ipsec_esp_network_default_level;
 #include <netinet6/ip6_fw.h>
 #endif
 
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif /* MIP6 */
+
 #include <net/net_osdep.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -156,6 +162,7 @@ struct ip6_exthdrs {
 	struct mbuf *ip6e_hbh;
 	struct mbuf *ip6e_dest1;
 	struct mbuf *ip6e_rthdr;
+	struct mbuf *ip6e_haddr; /* for MIP6 */
 	struct mbuf *ip6e_dest2;
 };
 
@@ -247,6 +254,10 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
 #endif
+#ifdef MIP6
+	struct ip6_dest *pktopt_haddr, *pktopt_mip6dest2;
+	struct ip6_rthdr *pktopt_mip6rthdr;
+#endif /* MIP6 */
 #ifdef IPSEC
 #ifdef __OpenBSD__
 	union sockaddr_union sdst;
@@ -282,7 +293,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
     } while (0)
 	
 	bzero(&exthdrs, sizeof(exthdrs));
-	
+
 	if (opt) {
 		/* Hop-by-Hop options header */
 		MAKE_EXTHDR(opt->ip6po_hbh, &exthdrs.ip6e_hbh);
@@ -306,6 +317,30 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		/* Destination options header(2nd part) */
 		MAKE_EXTHDR(opt->ip6po_dest2, &exthdrs.ip6e_dest2);
 	}
+#ifdef MIP6
+	/*
+	 * MIP6 extention headers handling.
+	 * insert HA, BU, BA, BR options if necessary.
+	 */
+	/* XXX TODO */
+	if (mip6_exthdr_create(m, opt, &pktopt_mip6rthdr, &pktopt_haddr,
+			       &pktopt_mip6dest2))
+		goto freehdrs;
+	if (pktopt_mip6rthdr) {
+		/*
+		 * pktopt_mip6rthdr will be only allocated when we
+		 * have no rthdr passed by the pktopt from the upper
+		 * layer. so, we don't care about the duplicate
+		 * allocation of ip6e_rthdr.
+		 */
+		MAKE_EXTHDR(pktopt_mip6rthdr, &exthdrs.ip6e_rthdr);
+	}
+	MAKE_EXTHDR(pktopt_haddr, &exthdrs.ip6e_haddr);
+	if (pktopt_mip6dest2) {
+		m_freem(exthdrs.ip6e_dest2);
+		MAKE_EXTHDR(pktopt_mip6dest2, &exthdrs.ip6e_dest2);
+	}
+#endif /* MIP6 */
 
 #ifdef IPSEC
 #ifdef __OpenBSD__
@@ -383,6 +418,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #if 1 /* XXX */
 		/* if we have any extension header, we cannot perform IPsec */
 		if (exthdrs.ip6e_hbh || exthdrs.ip6e_dest1 ||
+#ifdef MIP6
+		    exthdrs.ip6e_haddr ||
+#endif /* MIP6 */
 		    exthdrs.ip6e_rthdr || exthdrs.ip6e_dest2) {
 			error = EHOSTUNREACH;
 			goto freehdrs;
@@ -445,6 +483,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	if (exthdrs.ip6e_hbh) optlen += exthdrs.ip6e_hbh->m_len;
 	if (exthdrs.ip6e_dest1) optlen += exthdrs.ip6e_dest1->m_len;
 	if (exthdrs.ip6e_rthdr) optlen += exthdrs.ip6e_rthdr->m_len;
+#ifdef MIP6
+	if (exthdrs.ip6e_haddr) optlen += exthdrs.ip6e_haddr->m_len;
+#endif /* MIP6 */
 	unfragpartlen = optlen + sizeof(struct ip6_hdr);
 	/* NOTE: we don't add AH/ESP length here. do that later. */
 	if (exthdrs.ip6e_dest2) optlen += exthdrs.ip6e_dest2->m_len;
@@ -547,6 +588,17 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			   nexthdrp, IPPROTO_DSTOPTS);
 		MAKE_CHAIN(exthdrs.ip6e_rthdr, mprev,
 			   nexthdrp, IPPROTO_ROUTING);
+#ifdef MIP6
+		/*
+		 * XXX
+		 * MIP6 homeaddress destination option must reside
+		 * after rthdr and before ah/esp/frag hdr.
+		 * this order is not recommended in the ipv6 spec of course.
+		 * result: IPv6 hbh dest1 rthdr ha dest2 payload.
+		 */
+		MAKE_CHAIN(exthdrs.ip6e_haddr, mprev,
+			   nexthdrp, IPPROTO_DSTOPTS);
+#endif /* MIP6 */
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 		if (!needipsec)
@@ -603,6 +655,15 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 skip_ipsec2:;
 #endif
 	}
+
+#ifdef MIP6
+	/*
+	 * After the IPsec processing the IPv6 header source address
+	 * and the address currently stored in the Home Address option
+	 * field must be exchanged
+	 */
+	mip6_addr_exchange(m, exthdrs.ip6e_haddr);
+#endif /* MIP6 */
 
 	/*
 	 * If there is a routing header, replace destination address field
@@ -736,7 +797,7 @@ skip_ipsec2:;
 		m->m_flags &= ~(M_BCAST | M_MCAST);	/* just in case */
 
 		/* Callee frees mbuf */
-		error = ipsp_process_packet(m, tdb, AF_INET6, 0, NULL);
+		error = ipsp_process_packet(m, tdb, AF_INET6);
 		splx(s);
 
 		return error;  /* Nothing more to be done */
@@ -1277,6 +1338,12 @@ skip_ipsec2:;
 		 * Change the next header field of the last header in the
 		 * unfragmentable part.
 		 */
+#ifdef MIP6
+		if (exthdrs.ip6e_haddr) {
+			nextproto = *mtod(exthdrs.ip6e_haddr, u_char *);
+			*mtod(exthdrs.ip6e_haddr, u_char *) = IPPROTO_FRAGMENT;
+		} else
+#endif /* MIP6 */
 		if (exthdrs.ip6e_rthdr) {
 			nextproto = *mtod(exthdrs.ip6e_rthdr, u_char *);
 			*mtod(exthdrs.ip6e_rthdr, u_char *) = IPPROTO_FRAGMENT;
@@ -1397,9 +1464,16 @@ done:
 	return(error);
 
 freehdrs:
+#ifdef MIP6
+	mip6_destopt_discard(pktopt_mip6rthdr, pktopt_haddr,
+			     pktopt_mip6dest2);
+#endif /* MIP6 */
 	m_freem(exthdrs.ip6e_hbh);	/* m_freem will check if mbuf is 0 */
 	m_freem(exthdrs.ip6e_dest1);
 	m_freem(exthdrs.ip6e_rthdr);
+#ifdef MIP6
+	m_freem(exthdrs.ip6e_haddr);
+#endif /* MIP6 */
 	m_freem(exthdrs.ip6e_dest2);
 	/* fall through */
 bad:

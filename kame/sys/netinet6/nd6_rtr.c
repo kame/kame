@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.156 2001/07/27 07:50:32 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.157 2001/08/03 10:40:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -32,9 +32,11 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -69,6 +71,10 @@
 #include <netinet6/nd6.h>
 #include <netinet/icmp6.h>
 #include <netinet6/scope6_var.h>
+
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif /* MIP6 */
 
 #include <net/net_osdep.h>
 
@@ -369,6 +375,10 @@ nd6_ra_input(m, off, icmp6len)
 					      ND_OPT_PI_FLAG_ONLINK) ? 1 : 0;
 			pr.ndpr_raf_auto = (pi->nd_opt_pi_flags_reserved &
 					    ND_OPT_PI_FLAG_AUTO) ? 1 : 0;
+#ifdef MIP6
+			pr.ndpr_raf_router = (pi->nd_opt_pi_flags_reserved &
+					      ND_OPT_PI_FLAG_ROUTER) ? 1 : 0;
+#endif /* MIP6 */
 			pr.ndpr_plen = pi->nd_opt_pi_prefix_len;
 			pr.ndpr_vltime = ntohl(pi->nd_opt_pi_valid_time);
 			pr.ndpr_pltime =
@@ -376,10 +386,31 @@ nd6_ra_input(m, off, icmp6len)
 
 			if (in6_init_prefix_ltimes(&pr))
 				continue; /* prefix lifetime init failed */
-
+#ifdef MIP6
+			if (MIP6_IS_MN) {
+				(void)mip6_process_nd_prefix(&saddr6, &pr,
+							     dr, m);
+			} else {
+				(void)prelist_update(&pr, dr, m);
+				
+			}
+#else /* MIP6 */
 			(void)prelist_update(&pr, dr, m);
+#endif /* MIP6 */
 		}
 	}
+
+#ifdef MIP6
+	/* update HA list */
+	if ((MIP6_IS_MN || MIP6_IS_HA)
+	    && (dr->flags & ND_RA_FLAG_HOME_AGENT)) {
+		if (mip6_ha_list_update_hainfo(&mip6_ha_list,
+					       dr, ndopts.nd_opts_hai)) {
+			mip6log((LOG_ERR, "%s: global HA list update failed\n",
+				 __FUNCTION__));
+		}
+	}
+#endif /* MIP6 */
 
 	/*
 	 * MTU
@@ -793,6 +824,11 @@ defrouter_select()
 	 * If default router list is empty, we should probably install
 	 * an interface route and assume that all destinations are on-link.
 	 */
+#ifdef MIP6
+	if (MIP6_IS_MN)
+		(void)mip6_process_defrouter_change(TAILQ_FIRST(&nd_defrouter));
+#endif /* MIP6 */
+
 	if (!TAILQ_FIRST(&nd_defrouter)) {
 		/*
 		 * XXX: The specification does not say this mechanism should

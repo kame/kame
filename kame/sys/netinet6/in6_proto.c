@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.100 2001/07/26 06:53:16 jinmei Exp $	*/
+/*	$KAME: in6_proto.c,v 1.101 2001/08/03 10:40:20 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,11 +68,13 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
+#include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 #include "opt_iso.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -180,6 +182,10 @@
 #if NGIF > 0
 #include <netinet6/in6_gif.h>
 #endif
+
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif /* MIP6 */
 
 #include <net/net_osdep.h>
 
@@ -458,7 +464,23 @@ struct ip6protosw in6_gif_protosw =
   &rip6_usrreqs
 #endif
 };
-#endif /* NGIF */
+#endif /*NGIF*/
+
+#ifdef MIP6
+struct ip6protosw mip6_tunnel_protosw =
+{ SOCK_RAW,	&inet6domain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
+  mip6_tunnel_input, rip6_output,	0,		rip6_ctloutput,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
+  rip6_usrreq,
+#endif
+  0,            0,              0,              0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &rip6_usrreqs
+#endif
+};
+#endif /* MIP6 */
 
 #ifdef __FreeBSD__
 extern int in6_inithead __P((void **, int));
