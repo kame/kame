@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.250 2001/12/01 08:51:05 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.251 2001/12/04 10:25:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1210,9 +1210,6 @@ in6_update_ifa(ifp, ifra, ia)
 	 */
 	ia->ia6_flags = ifra->ifra_flags;
 	ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/* safety */
-#if 0				/* MIP6 is now temporarily removed */
-	ia->ia6_flags &= ~IN6_IFF_NODAD;	/* Mobile IPv6 */
-#endif
 #ifdef MIP6
 	if (hostIsNew && in6if_do_dad(ifp) && mip6_ifa_need_dad(ia))
 #else /* MIP6 */
