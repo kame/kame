@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.53 2002/06/07 00:16:37 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.54 2002/06/24 10:30:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -326,6 +326,12 @@ daemon_main(int argc, char **argv)
 	error = setsockopt(s_wld, SOL_SOCKET, SO_OOBINLINE, &on, sizeof(on));
 	if (error == -1)
 		exit_failure("setsockopt(SO_OOBINLINE): %s", strerror(errno));
+
+#ifdef IPV6_V6ONLY
+	error = setsockopt(s_wld, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on));
+	if (error == -1)
+		exit_failure("setsockopt(IPV6_V6ONLY): %s", strerror(errno));
+#endif
 
 	error = bind(s_wld, (struct sockaddr *)res->ai_addr, res->ai_addrlen);
 	if (error == -1)
