@@ -1,6 +1,6 @@
 Installation procedure - preparation of the tree
 KAME project
-$Id: INSTALL,v 1.7 1999/10/04 03:10:54 itojun Exp $
+$Id: INSTALL,v 1.8 1999/10/05 08:25:55 itojun Exp $
 
 
 KAME build tree shares part of the tree among operating system
@@ -44,8 +44,18 @@ ready to tackle those troubles.
 	usr.bin/racoon:
 		Compiles only if SSLeay or OpenSSL is installed beforehand.
    Please install those libraries before building KAME tree.
-   If you are using {Net,Free,Open}BSD, ports/packages may help you build
-   and install them.
+
+   We support the following installations in build tree:
+   - you installed SSLeay, with default installation path
+   - you installed OpenSSL, with default installation path
+	This means that you have given no option to "./configure".
+   - you installed SSLeay, via FreeBSD ports/NetBSD pkgsrc system
+   - you installed OpenSSL, via FreeBSD ports/NetBSD pkgsrc system.
+	Note that we do not support ports-current/pkgsrc-current.  Please
+	stick to the ports/pkgsrc came the FreeBSD/NetBSD you are using.
+   If you install SSLeay/OpenSSL with some other ways, KAME build tree
+   may fail to find SSLeay/OpenSSL and omit compilation of, for example,
+   usr.sbin/racoon.
 
 5. Go down to the target operating system you have specified, and read
    document named "INSTALL".  Good luck!
