@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.66 2000/05/17 12:37:23 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.67 2000/05/22 21:10:28 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2883,7 +2883,7 @@ ipsecdoi_id2sockaddr(
 	    {
 		u_char *p;
 		u_int max;
-		int alen;
+		int alen = sizeof(struct in_addr);
 
 		switch (id_b->type) {
 		case IPSECDOI_ID_IPV4_ADDR_SUBNET:
