@@ -119,6 +119,7 @@ ipcp_SetIPv6address(struct ipv6cp *ipv6cp, u_int32_t mytok, u_int32_t histok)
   struct ncprange myrange;
   struct sockaddr_storage ssdst, ssgw, ssmask;
   struct sockaddr *sadst, *sagw, *samask;
+  u_int16_t linkid;
 
   sadst = (struct sockaddr *)&ssdst;
   sagw = (struct sockaddr *)&ssgw;
@@ -129,10 +130,14 @@ ipcp_SetIPv6address(struct ipv6cp *ipv6cp, u_int32_t mytok, u_int32_t histok)
 
   myaddr.s6_addr[0] = 0xfe;
   myaddr.s6_addr[1] = 0x80;
+  /* XXX: embed link scope ID to disambiguate the zone. */
+  linkid = htons(bundle->iface->index);
+  memcpy(&myaddr.s6_addr[2], &linkid, sizeof(linkid));
   *(u_int32_t *)(myaddr.s6_addr + 12) = htonl(mytok);
 
   hisaddr.s6_addr[0] = 0xfe;
   hisaddr.s6_addr[1] = 0x80;
+  memcpy(&hisaddr.s6_addr[2], &linkid, sizeof(linkid));
   *(u_int32_t *)(hisaddr.s6_addr + 12) = htonl(histok);
 
   ncpaddr_setip6(&ipv6cp->myaddr, &myaddr);
@@ -377,7 +382,15 @@ ipv6cp_LayerUp(struct fsm *fp)
   log_Printf(LogIPV6CP, "myaddr %s hisaddr = %s\n",
              tbuff, ncpaddr_ntoa(&ipv6cp->hisaddr));
 
-  /* XXX: Call radius_Account() and system_Select() */
+  /* XXX: Call radius_Account() */
+  if (system_Select(fp->bundle, tbuff, LINKUPFILE, NULL, NULL) < 0) {
+    if (bundle_GetLabel(fp->bundle)) {
+      if (system_Select(fp->bundle, bundle_GetLabel(fp->bundle),
+                       LINKUPFILE, NULL, NULL) < 0)
+        system_Select(fp->bundle, "MYADDR6", LINKUPFILE, NULL, NULL);
+    } else
+      system_Select(fp->bundle, "MYADDR6", LINKUPFILE, NULL, NULL);
+  }
 
   fp->more.reqs = fp->more.naks = fp->more.rejs = ipv6cp->cfg.fsm.maxreq * 3;
   log_DisplayPrompts();
@@ -397,7 +410,16 @@ ipv6cp_LayerDown(struct fsm *fp)
     snprintf(addr, sizeof addr, "%s", ncpaddr_ntoa(&ipv6cp->myaddr));
     log_Printf(LogIPV6CP, "%s: LayerDown: %s\n", fp->link->name, addr);
 
-    /* XXX: Call radius_Account() and system_Select() */
+    /* XXX: Call radius_Account() */
+
+    if (system_Select(fp->bundle, addr, LINKDOWNFILE, NULL, NULL) < 0) {
+      if (bundle_GetLabel(fp->bundle)) {
+         if (system_Select(fp->bundle, bundle_GetLabel(fp->bundle),
+                          LINKDOWNFILE, NULL, NULL) < 0)
+         system_Select(fp->bundle, "MYADDR6", LINKDOWNFILE, NULL, NULL);
+      } else
+        system_Select(fp->bundle, "MYADDR6", LINKDOWNFILE, NULL, NULL);
+    }
 
     ipv6cp_Setup(ipv6cp);
   }
