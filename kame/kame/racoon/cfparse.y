@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.104 2001/08/13 13:30:09 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.105 2001/08/14 05:54:51 itojun Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -105,7 +105,9 @@ static void clean_tmpalgtype __P((void));
 static int expand_isakmpspec __P((int, int, int *,
 	int, int, time_t, int, int, int, char *, struct remoteconf *));
 
+#if 0
 static int fix_lifebyte __P((u_long));
+#endif
 %}
 
 %union {
@@ -518,9 +520,14 @@ ipsecproposal_spec
 		EOS
 	|	LIFETIME LIFETYPE_BYTE NUMBER unittype_byte
 		{
+#if 1
+			yyerror("byte lifetime support is deprecated");
+			return -1;
+#else
 			prhead->lifebyte = fix_lifebyte($3 * $4);
 			if (prhead->lifebyte == 0)
 				return -1;
+#endif
 		}
 		EOS
 	|	PROTOCOL secproto
@@ -792,9 +799,14 @@ sainfo_spec
 		EOS
 	|	LIFETIME LIFETYPE_BYTE NUMBER unittype_byte
 		{
+#if 1
+			yyerror("byte lifetime support is deprecated");
+			return -1;
+#else
 			cur_sainfo->lifebyte = fix_lifebyte($3 * $4);
 			if (cur_sainfo->lifebyte == 0)
 				return -1;
+#endif
 		}
 		EOS
 	|	ALGORITHM_CLASS {
@@ -1062,11 +1074,16 @@ remote_spec
 		EOS
 	|	LIFETIME LIFETYPE_BYTE NUMBER unittype_byte
 		{
+#if 1
+			yyerror("byte lifetime support is deprecated");
+			return -1;
+#else
 			yywarn("the lifetime of bytes in phase 1 "
 				"will be ignored at the moment.");
 			prhead->lifebyte = fix_lifebyte($3 * $4);
 			if (prhead->lifebyte == 0)
 				return -1;
+#endif
 		}
 		EOS
 	|	PROPOSAL
@@ -1159,9 +1176,14 @@ isakmpproposal_spec
 		EOS
 	|	LIFETIME LIFETYPE_BYTE NUMBER unittype_byte
 		{
+#if 1
+			yyerror("byte lifetime support is deprecated");
+			return -1;
+#else
 			prhead->spspec->lifebyte = fix_lifebyte($3 * $4);
 			if (prhead->spspec->lifebyte == 0)
 				return -1;
+#endif
 		}
 		EOS
 	|	DH_GROUP dh_group_num
@@ -1534,6 +1556,7 @@ expand_isakmpspec(prop_no, trns_no, types,
 	return trns_no;
 }
 
+#if 0
 /*
  * fix lifebyte.
  * Must be more than 1024B because its unit is kilobytes.
@@ -1550,6 +1573,7 @@ fix_lifebyte(t)
 
 	return(t / 1024);
 }
+#endif
 
 int
 cfparse()
