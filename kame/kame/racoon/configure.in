@@ -399,7 +399,9 @@ fi
 if test "$ipv6" = "yes"; then
 	AC_MSG_CHECKING(for advanced API support)
 	AC_CACHE_VAL(racoon_cv_advapi, [dnl
-	AC_TRY_COMPILE([#define INET6
+	AC_TRY_COMPILE([#ifndef INET6
+#define INET6
+#endif
 #include <sys/types.h>
 #include <netinet/in.h>],
 		[struct in6_pktinfo a;],
