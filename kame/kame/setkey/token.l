@@ -69,7 +69,8 @@ extern u_int m_len;
 extern int f_debug;
 
 int yylex __P((void));
-void yyerror __P((char *s));
+void yyfatal __P((const char *s));
+void yyerror __P((const char *s));
 extern void parse_init __P((void));
 int parse __P((FILE **));
 int yyparse __P((void));
@@ -240,7 +241,7 @@ any		{ PREPROC; return(ANY); }
 
 			return(IP6_ADDRESS);
 #else
-			yyerror("IPv6 address not supported");
+			yyfatal("IPv6 address not supported");
 #endif
 		}
 
@@ -292,12 +293,24 @@ any		{ PREPROC; return(ANY); }
 			return(QUOTEDSTRING);
 		}
 
-.		{ yyerror("Syntax error"); }
+.		{
+			yyfatal("Syntax error");
+			/*NOTREACHED*/
+		}
 
 %%
 
 void
-yyerror(char *s)
+yyfatal(s)
+	const char *s;
+{
+	yyerror(s);
+	exit(1);
+}
+
+void
+yyerror(s)
+	const char *s;
 {
 	printf("line %d: %s at [%s]\n", lineno, s, yytext);
 }
@@ -317,4 +330,3 @@ parse(fp)
 
 	return(0);
 }
-

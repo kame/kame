@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.20 2000/05/23 14:27:16 itojun Exp $ */
+/* KAME $Id: parse.y,v 1.21 2000/05/23 14:58:02 itojun Exp $ */
 
 %{
 #include <sys/types.h>
@@ -84,7 +84,8 @@ extern int setkeymsg __P((void));
 extern int sendkeymsg __P((void));
 
 extern int yylex __P((void));
-extern void yyerror __P((char *));
+extern void yyfatal __P((const char *));
+extern void yyerror __P((const char *));
 %}
 
 %union {
@@ -365,7 +366,7 @@ extension_spec
 
 extension
 	:	F_EXT EXTENSION { p_ext |= $2; }
-	|	F_EXT NOCYCLICSEQ { p_ext ^= SADB_X_EXT_CYCSEQ; }
+	|	F_EXT NOCYCLICSEQ { p_ext &= ~SADB_X_EXT_CYCSEQ; }
 	|	F_MODE MODE { p_mode = $2; }
 	|	F_MODE ANY { p_mode = IPSEC_MODE_ANY; }
 	|	F_REQID DECSTRING { p_reqid = $2; }
