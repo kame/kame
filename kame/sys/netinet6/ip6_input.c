@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.334 2004/02/03 07:25:22 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.335 2004/02/06 07:29:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -785,7 +785,7 @@ ip6_input(m)
 		/* in6ms is NULL only in case of ff02::1 and ff0{0,1}:: */
 		if (in6ms == NULL) {
 			/* assumes ff0{0,1} case has already been eliminated */
-			if (SS_IS_LOCAL_GROUP(&ip6->ip6_dst)) {
+			if (IN6_IS_LOCAL_GROUP(&ip6->ip6_dst)) {
 				ours = 1;	
 				goto matched;
 			}

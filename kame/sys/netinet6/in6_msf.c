@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.21 2004/02/05 10:09:23 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.22 2004/02/06 07:29:07 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -222,7 +222,7 @@ in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 	if (IN6M_SOURCE_LIST(mode) == NULL ||
 	    LIST_EMPTY(IN6M_SOURCE_LIST(mode)->head)) {
 		for (; i < numsrc; i++) {
-			if (SA6_IS_ADDR_UNSPECIFIED(SIN6(&ss[0])))
+			if (IN6_IS_ADDR_UNSPECIFIED(&SIN6(&ss[0])->sin6_addr))
 				continue;
 			MALLOC(ias, struct in6_addr_source *, sizeof(*ias),
 				M_MSFILTER, M_NOWAIT);
@@ -2056,14 +2056,13 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: the number of sources is reached to max count.\n"));
 		return EINVAL;
 	}
-	if (grpf->gf_group.ss_family != AF_INET &&
-	    grpf->gf_group.ss_family != AF_INET6)
+	if (grpf->gf_group.ss_family != AF_INET6)
 		return EPFNOSUPPORT;
 
 	sa_grp = (struct sockaddr *) &grpf->gf_group;
-	if (!SS_IS_ADDR_MULTICAST(sa_grp))
+	if (!IN6_IS_ADDR_MULTICAST(SIN6_ADDR(sa_grp)))
 		return EINVAL;
-	if ((grpf->gf_numsrc != 0) && SS_IS_LOCAL_GROUP(sa_grp))
+	if (grpf->gf_numsrc != 0 && IN6_IS_LOCAL_GROUP(SIN6_ADDR(sa_grp)))
 		return EINVAL;
 
 	/*
@@ -2130,11 +2129,11 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	for (imm = imop->im6o_memberships.lh_first;
 	     imm != NULL; imm = imm->i6mm_chain.le_next) {
 		/* sanity check */
-		if (imm->i6mm_maddr->in6m_sa.sin6_family != sa_grp->sa_family)
+		if (sa_grp->sa_family != AF_INET6)
 			continue;
 
 		if (imm->i6mm_maddr->in6m_ifp == ifp &&
-		    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, sa_grp))
+		    SS_CMP(&imm->i6mm_maddr, ==, &SIN6(sa_grp)->sin6_addr))
 			break;
 	}
 	if (imm != NULL) {
@@ -2212,10 +2211,6 @@ sock6_setmopt_srcfilter(sop, grpfp)
 					break;
 				}
 			} else if (ss->ss_family == AF_INET6) {
-#if 0
-				IN6_SG_ADDR_SCOPE_CHECK(SIN6_ADDR(sa_grp),
-							SIN6_ADDR(ss));
-#endif
 				if (error != 0)
 					break;
 			} else {
@@ -2372,12 +2367,14 @@ sock6_setmopt_srcfilter(sop, grpfp)
 				(grpf->gf_numsrc == 0)) {
 		if (old_num > 0) {
 			imm->i6mm_maddr = 
-				in6_modmulti2(SIN6(sa_grp), ifp, &error,
+				in6_modmulti2(&SIN6(sa_grp)->sin6_addr,
+					      ifp, &error,
 					      0, NULL, MCAST_EXCLUDE, old_num,
 					      old_ss, old_mode, init, 0);
 		} else {
 			imm->i6mm_maddr =
-				in6_addmulti2(SIN6(sa_grp), ifp, &error,
+				in6_addmulti2(&SIN6(sa_grp)->sin6_addr,
+					      ifp, &error,
 					      0, NULL, MCAST_EXCLUDE, init);
 		}
 		if (error != 0) {
@@ -2413,7 +2410,8 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			}
 		} else {
 			imm->i6mm_maddr =
-				in6_modmulti2(SIN6(sa_grp), ifp, &error,
+				in6_modmulti2(&SIN6(sa_grp)->sin6_addr,
+					      ifp, &error,
 					      grpf->gf_numsrc, ss_src,
 					      grpf->gf_fmode, old_num,
 					      old_ss, old_mode, init,
@@ -2558,9 +2556,9 @@ sock6_getmopt_srcfilter(sop, grpfp)
 		return EINVAL;
 
 	sa_grp = (struct sockaddr *) &grpf->gf_group;
-	if (sa_grp->sa_family != AF_INET && sa_grp->sa_family != AF_INET6)
+	if (sa_grp->sa_family != AF_INET6)
 		return EPFNOSUPPORT;
-	if (!SS_IS_ADDR_MULTICAST(sa_grp))
+	if (!IN6_IS_ADDR_MULTICAST(&SIN6(sa_grp)->sin6_addr))
 		return EINVAL;
 
 	/*
@@ -2569,11 +2567,11 @@ sock6_getmopt_srcfilter(sop, grpfp)
 	for (imm = imop->im6o_memberships.lh_first;
 	     imm != NULL; imm = imm->i6mm_chain.le_next) {
 		/* sanity check */
-		if (imm->i6mm_maddr->in6m_sa.sin6_family != sa_grp->sa_family)
+		if (sa_grp->sa_family != AF_INET6)
 			continue;
 
 		if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
-		    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, sa_grp))
+		    SS_CMP(&imm->i6mm_maddr->in6m_addr, ==, &SIN6(sa_grp)->sin6_addr))
 			break;
 	}
 

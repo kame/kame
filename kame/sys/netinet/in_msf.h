@@ -1,4 +1,4 @@
-/* $KAME: in_msf.h,v 1.9 2003/05/09 08:30:34 suz Exp $	*/
+/* $KAME: in_msf.h,v 1.10 2004/02/06 07:29:07 suz Exp $	*/
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
@@ -225,13 +225,16 @@ struct in_multi_source {
 	    IN6_IS_ADDR_UNSPECIFIED(SIN6_ADDR(x)) :			\
 	  0)
 
-#define	SS_IS_LOCAL_GROUP(x)						\
+#define	IN_IS_LOCAL_GROUP(x)	/* struct in_addr x */			\
+	((ntohl((x).sin_addr.s_addr) & 0xffffff00) == 0xe0000000)
+#define	IN6_IS_LOCAL_GROUP(x)	/* struct in6_addr *x */		\
+	    (IPV6_ADDR_MC_SCOPE(x) < IPV6_ADDR_SCOPE_LINKLOCAL || 	\
+	     IN6_ARE_ADDR_EQUAL((x), &in6addr_linklocal_allnodes))
+#define	SS_IS_LOCAL_GROUP(x)	/* struct sockaddr *x */		\
 	(((struct sockaddr *)(x))->sa_family == AF_INET ?		\
-	    ((ntohl(SIN_ADDR(x)) & 0xffffff00) == 0xe0000000) :		\
+	    IN_IS_LOCAL_GROUP(SIN(x)->sin_addr) :			\
 	 ((struct sockaddr *)(x))->sa_family == AF_INET6 ?		\
-	    ((IPV6_ADDR_MC_SCOPE(SIN6_ADDR(x)) < IPV6_ADDR_SCOPE_LINKLOCAL) || \
-	     (IN6_ARE_ADDR_EQUAL(SIN6_ADDR(x), &in6addr_linklocal_allnodes)) \
-	  ) : 0)
+	    IN6_IS_LOCAL_GROUP(SIN6_ADDR(x)) : 0)
 
 #define SS_CMP(a, op, b) \
 	(sa_cmp((struct sockaddr *)(a), (struct sockaddr *)(b)) op 0)

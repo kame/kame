@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.421 2004/02/05 10:09:23 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.422 2004/02/06 07:29:07 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3863,7 +3863,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * address list for the given interface.
 		 */
 		init = 1;
-		imm = in6_joingroup(ifp, SIN6(&ss_grp), &error);
+		imm = in6_joingroup(ifp, &SIN6(&ss_grp)->sin6_addr, &error);
 		if (error != 0)
 			break;
 		msf = imm->i6mm_msf;
@@ -3980,7 +3980,8 @@ ip6_setmoptions(optname, im6op, m)
 		 * But if some error occurs when source list is added to
 		 * the list, undo added msf list from the socket.
 		 */
-		imm->i6mm_maddr = in6_addmulti2(SIN6(&ss_grp), ifp, &error, 1,
+		imm->i6mm_maddr = in6_addmulti2(&SIN6(&ss_grp)->sin6_addr,
+						ifp, &error, 1,
 						&ss_src, MCAST_INCLUDE, init);
 		if (error != 0) {
 			if (init) {
@@ -4119,7 +4120,8 @@ ip6_setmoptions(optname, im6op, m)
 			 * IN{NULL}->EX{non NULL} is prohibited
 			 */
 			imm->i6mm_maddr = 
-				in6_addmulti2(SIN6(&ss_grp), ifp, &error, 1,
+				in6_addmulti2(&SIN6(&ss_grp)->sin6_addr,
+					      ifp, &error, 1,
 					      &ss_src, MCAST_EXCLUDE, 0);
 			if (error != 0) {
 				in6_undomopt_source_addr(msf, optname);
@@ -4134,10 +4136,11 @@ ip6_setmoptions(optname, im6op, m)
 			 *  msf->msf_grpjoin is greater than 0)
 			 */
 			imm->i6mm_maddr =
-				in6_modmulti2(SIN6(&ss_grp), ifp, &error, 1,
-					     &ss_src, MCAST_EXCLUDE,
-					     0, NULL, MCAST_EXCLUDE, 0,
-					     msf->msf_grpjoin);
+				in6_modmulti2(&SIN6(&ss_grp)->sin6_addr,
+					      ifp, &error, 1,
+					      &ss_src, MCAST_EXCLUDE,
+					      0, NULL, MCAST_EXCLUDE, 0,
+					      msf->msf_grpjoin);
 			if (imm->i6mm_maddr == NULL) {
 				in6_undomopt_source_addr(msf, optname);
 				break;
@@ -5045,8 +5048,8 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		sin6_grp->sin6_family = AF_INET6;
 		sin6_grp->sin6_scope_id =SIN6(&gsreq->gsr_group)->sin6_scope_id;
 
-		if (!SS_IS_ADDR_MULTICAST(ss_grp) ||
-		    SS_IS_LOCAL_GROUP(ss_grp)) {
+		if (!IN6_IS_ADDR_MULTICAST(SIN6_ADDR(ss_grp)) ||
+		    IN6_IS_LOCAL_GROUP(SIN6_ADDR(ss_grp))) {
 #ifdef MLDV2_DEBUG
 			printf("invalid group %s specified\n",
 			       ip6_sprintf(&sin6_grp->sin6_addr));
