@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.33 2004/11/28 10:48:38 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.34 2004/11/28 11:03:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -236,6 +236,15 @@ option_statement:
 					 * but check it for safety.
 					 */
 					yyerror("refresh time is out of range");
+				}
+				if (cf_refreshtime < DHCP6_IRT_MINIMUM) {
+					/*
+					 * the value MUST NOT be smaller than
+					 * IRT_MINIMUM.
+					 */
+					yyerror("refresh time is too small "
+					    "(must not be smaller than %d)",
+					    DHCP6_IRT_MINIMUM);
 				}
 			} else {
 				yywarn("multiple refresh times (ignored)");

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.51 2004/11/28 10:48:38 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.52 2004/11/28 11:03:15 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -82,6 +82,8 @@
 
 #define DHCP6_RELAY_MULTICAST_HOPS 32
 #define DHCP6_RELAY_HOP_COUNT_LIMIT 32
+
+#define DHCP6_IRT_MINIMUM 600
 
 /* DUID: DHCP unique Identifier */
 struct duid {
