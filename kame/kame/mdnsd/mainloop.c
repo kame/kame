@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.55 2001/06/22 22:11:30 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.56 2001/06/22 22:21:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -133,6 +133,8 @@ static int serve __P((struct sockdb *, char *, int, struct sockaddr *));
 #define T_OPT	41	/* OPT pseudo-RR, RFC2761 */
 #endif
 
+#define RECVBUFSIZ	(8 * 1024)
+
 void
 mainloop()
 {
@@ -200,7 +202,7 @@ mainloop0(sd)
 {
 	struct sockaddr_storage from;
 	int fromlen;
-	char buf[8 * 1024];
+	char buf[RECVBUFSIZ];
 	ssize_t l;
 	struct nsdb *ns;
 	u_int16_t vclen;
@@ -282,7 +284,7 @@ conf_mediator(sd)
 {
 	struct sockaddr_storage from;
 	int fromlen;
-	char buf[8 * 1024];
+	char buf[RECVBUFSIZ];
 	ssize_t l;
 	struct mediator_control_msg *msg;
 	char *p;
@@ -1068,6 +1070,7 @@ relay(sd, buf, len, from)
 	const char *d;
 	enum sdtype servtype;	/* type of server we want to relay to */
 	size_t rbuflen = PACKETSZ;
+	int edns0len = -1;
 
 	if (sizeof(*hp) > len)
 		return -1;
@@ -1084,13 +1087,25 @@ relay(sd, buf, len, from)
 	/* XXX should drop assumption on packet format */
 	if (ntohs(hp->qdcount) == 1 && ntohs(hp->ancount) == 0 &&
 	    ntohs(hp->nscount) == 0) {
-		int edns0len;
 		edns0len = decode_edns0(hp, &d, len - (d - buf));
 		if (edns0len > rbuflen) {
 			if (dflag)
 				printf("EDNS0: %d\n", edns0len);
 			rbuflen = edns0len;
+		} else {
+			/* invalid, too small */
+			edns0len = -1;
 		}
+	}
+
+	if (rbuflen > RECVBUFSIZ) {
+		/*
+		 * we can't relay this, until we have a code to
+		 * re-construct EDNS0.  EDNS0 is a hop-by-hop payload...
+		 */
+		/* LINTED const cast */
+		free((char *)n);
+		return -1;
 	}
 
 	if (islocalname(n)) {
@@ -1133,7 +1148,8 @@ relay(sd, buf, len, from)
 				break;
 			}
 
-			if (len > PACKETSZ) {
+			if (0 > edns0len && len > PACKETSZ) {
+				/* no EDNS0 on big message -> use TCP */
 				if (multicast)
 					continue;
 				servtype = S_TCP;
@@ -1198,7 +1214,7 @@ serve(sd, buf, len, from)
 	u_int16_t type, class;
 	const char *d;
 	char *p, *q;
-	char replybuf[8 * 1024];
+	char replybuf[RECVBUFSIZ];
 	int l;
 	int count;
 	int scoped, loopback;
