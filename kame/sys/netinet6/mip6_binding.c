@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.33 2001/11/15 10:09:44 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.34 2001/11/15 10:56:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -133,6 +133,9 @@ static int mip6_tunnel_control __P((int, void *,
 				    const struct encaptab **));
 static int mip6_are_ifid_equal __P((struct in6_addr *, struct in6_addr *,
 				    u_int8_t));
+static int mip6_verify_authdata __P((struct mbuf *,
+				     struct ip6_opt_binding_update *,
+				     struct mip6_subopt_authdata *));
 
 
 #ifdef MIP6_DEBUG
