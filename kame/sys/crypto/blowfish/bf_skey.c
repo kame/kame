@@ -1,4 +1,5 @@
-/*	$KAME: bf_skey.c,v 1.5 2000/11/06 13:58:08 itojun Exp $	*/
+/*	$KAME: bf_skey.c,v 1.6 2001/09/10 04:03:56 itojun Exp $	*/
+/*	$NetBSD: bf_skey.c,v 1.2 2000/11/06 14:11:40 itojun Exp $	*/
 
 /* crypto/bf/bf_skey.c */
 /* Copyright (C) 1995-1997 Eric Young (eay@mincom.oz.au)

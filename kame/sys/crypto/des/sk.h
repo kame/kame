@@ -1,4 +1,5 @@
-/*	$KAME: sk.h,v 1.3 2000/03/27 04:36:34 sumikawa Exp $	*/
+/*	$KAME: sk.h,v 1.4 2001/09/10 04:03:58 itojun Exp $	*/
+/*	$NetBSD: sk.h,v 1.1 2000/06/14 19:45:36 thorpej Exp $	*/
 
 /* crypto/des/sk.h */
 /* Copyright (C) 1995-1996 Eric Young (eay@mincom.oz.au)

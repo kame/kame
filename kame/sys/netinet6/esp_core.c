@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.51 2001/07/26 06:53:15 jinmei Exp $	*/
+/*	$KAME: esp_core.c,v 1.52 2001/09/10 04:04:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -598,9 +598,8 @@ esp_3des_blockdecrypt(algo, sav, s, d)
 	/* assumption: d has a good alignment */
 	p = (des_key_schedule *)sav->sched;
 	bcopy(s, d, sizeof(DES_LONG) * 2);
-	des_ecb_encrypt((des_cblock *)d, (des_cblock *)d, p[2], DES_DECRYPT);
-	des_ecb_encrypt((des_cblock *)d, (des_cblock *)d, p[1], DES_ENCRYPT);
-	des_ecb_encrypt((des_cblock *)d, (des_cblock *)d, p[0], DES_DECRYPT);
+	des_ecb3_encrypt((des_cblock *)d, (des_cblock *)d, 
+			 p[0], p[1], p[2], DES_DECRYPT);
 	return 0;
 }
 
@@ -616,9 +615,8 @@ esp_3des_blockencrypt(algo, sav, s, d)
 	/* assumption: d has a good alignment */
 	p = (des_key_schedule *)sav->sched;
 	bcopy(s, d, sizeof(DES_LONG) * 2);
-	des_ecb_encrypt((des_cblock *)d, (des_cblock *)d, p[0], DES_ENCRYPT);
-	des_ecb_encrypt((des_cblock *)d, (des_cblock *)d, p[1], DES_DECRYPT);
-	des_ecb_encrypt((des_cblock *)d, (des_cblock *)d, p[2], DES_ENCRYPT);
+	des_ecb3_encrypt((des_cblock *)d, (des_cblock *)d, 
+			 p[0], p[1], p[2], DES_ENCRYPT);
 	return 0;
 }
 
