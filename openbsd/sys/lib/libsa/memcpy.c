@@ -1,4 +1,4 @@
-/*	$OpenBSD: memcpy.c,v 1.3 1996/10/16 11:32:07 mickey Exp $	*/
+/*	$OpenBSD: memcpy.c,v 1.5 2003/08/08 03:36:07 deraadt Exp $	*/
 /*	$NetBSD: bcopy.c,v 1.5 1995/04/22 13:46:50 cgd Exp $	*/
 
 /*-
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -43,13 +39,10 @@
  * This is designed to be small, not fast.
  */
 void *
-memcpy(s1, s2, n)
-	void *s1;
-	const void *s2;
-	size_t n;
+memcpy(void *s1, const void *s2, size_t n)
 {
-	register const char *f = s2;
-	register char *t = s1;
+	const char *f = s2;
+	char *t = s1;
 
 	if (f < t) {
 		f += n;

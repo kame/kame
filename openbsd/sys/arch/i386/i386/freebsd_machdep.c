@@ -1,4 +1,4 @@
-/*	$OpenBSD: freebsd_machdep.c,v 1.14 2003/01/16 04:15:17 art Exp $	*/
+/*	$OpenBSD: freebsd_machdep.c,v 1.17 2003/06/02 23:27:47 millert Exp $	*/
 /*	$NetBSD: freebsd_machdep.c,v 1.10 1996/05/03 19:42:05 christos Exp $	*/
 
 /*-
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -85,6 +81,7 @@ freebsd_sendsig(catcher, sig, mask, code, type, val)
 	union sigval val;
 {
 	register struct proc *p = curproc;
+	struct pmap *pmap = vm_map_pmap(&p->p_vmspace->vm_map);
 	register struct trapframe *tf;
 	struct freebsd_sigframe *fp, frame;
 	struct sigacts *psp = p->p_sigacts;
@@ -160,7 +157,8 @@ freebsd_sendsig(catcher, sig, mask, code, type, val)
 	tf->tf_es = GSEL(GUDATA_SEL, SEL_UPL);
 	tf->tf_ds = GSEL(GUDATA_SEL, SEL_UPL);
 	tf->tf_eip = p->p_sigcode;
-	tf->tf_cs = GSEL(GUCODE_SEL, SEL_UPL);
+	tf->tf_cs = pmap->pm_hiexec > I386_MAX_EXE_ADDR ? 
+	    GSEL(GUCODE1_SEL, SEL_UPL) : GSEL(GUCODE_SEL, SEL_UPL);
 	tf->tf_eflags &= ~(PSL_T|PSL_VM|PSL_AC);
 	tf->tf_esp = (int)fp;
 	tf->tf_ss = GSEL(GUDATA_SEL, SEL_UPL);

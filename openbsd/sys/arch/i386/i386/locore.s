@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.68 2003/01/09 22:27:09 miod Exp $	*/
+/*	$OpenBSD: locore.s,v 1.73 2003/07/29 18:24:36 mickey Exp $	*/
 /*	$NetBSD: locore.s,v 1.145 1996/05/03 19:41:19 christos Exp $	*/
 
 /*-
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -70,9 +66,10 @@
 /*
  * override user-land alignment before including asm.h
  */
-#define	ALIGN_DATA	.align	2
-#define	ALIGN_TEXT	.align	2,0x90	/* 4-byte boundaries, NOP-filled */
-#define	SUPERALIGN_TEXT	.align	4,0x90	/* 16-byte boundaries better for 486 */
+
+#define	ALIGN_DATA	.align  4
+#define	ALIGN_TEXT	.align  4,0x90	/* 4-byte boundaries, NOP-filled */
+#define	SUPERALIGN_TEXT	.align  16,0x90	/* 16-byte boundaries better for 486 */
 #define _ALIGN_TEXT	ALIGN_TEXT
 #include <machine/asm.h>
 
@@ -100,8 +97,8 @@
 	pushl	%ds		; \
 	pushl	%es		; \
 	movl	$GSEL(GDATA_SEL, SEL_KPL),%eax	; \
-	movl	%ax,%ds		; \
-	movl	%ax,%es
+	movw	%ax,%ds		; \
+	movw	%ax,%es
 #define	INTRFASTEXIT \
 	popl	%es		; \
 	popl	%ds		; \
@@ -141,7 +138,8 @@
 	.data
 
 	.globl	_C_LABEL(cpu), _C_LABEL(cpu_id), _C_LABEL(cpu_vendor)
-	.globl	_C_LABEL(cpuid_level), _C_LABEL(cpu_feature)
+	.globl	_C_LABEL(cpuid_level)
+	.globl	_C_LABEL(cpu_feature), _C_LABEL(cpu_ecxfeature)
 	.globl	_C_LABEL(cpu_cache_eax), _C_LABEL(cpu_cache_ebx)
 	.globl	_C_LABEL(cpu_cache_ecx), _C_LABEL(cpu_cache_edx)
 	.globl	_C_LABEL(cold), _C_LABEL(esym)
@@ -153,6 +151,7 @@
 _C_LABEL(cpu):		.long	0	# are we 386, 386sx, 486, 586 or 686
 _C_LABEL(cpu_id):	.long	0	# saved from 'cpuid' instruction
 _C_LABEL(cpu_feature):	.long	0	# feature flags from 'cpuid' instruction
+_C_LABEL(cpu_ecxfeature):.long	0	# extended feature flags from 'cpuid'
 _C_LABEL(cpuid_level):	.long	-1	# max. lvl accepted by 'cpuid' insn
 _C_LABEL(cpu_cache_eax):.long	0
 _C_LABEL(cpu_cache_ebx):.long	0
@@ -376,6 +375,7 @@ try586:	/* Use the `cpuid' instruction. */
 	cpuid
 	movl	%eax,RELOC(_C_LABEL(cpu_id))	# store cpu_id and features
 	movl	%edx,RELOC(_C_LABEL(cpu_feature))
+	movl	%ecx,RELOC(_C_LABEL(cpu_ecxfeature))
 
 	movl	$RELOC(_C_LABEL(cpuid_level)),%eax
 	cmp	$2,%eax
@@ -591,14 +591,14 @@ begin:
 
 	/* Clear segment registers; always null in proc0. */
 	xorl	%ecx,%ecx
-	movl	%cx,%fs
-	movl	%cx,%gs
+	movw	%cx,%fs
+	movw	%cx,%gs
 
 	call	_C_LABEL(main)
 
 NENTRY(proc_trampoline)
 	pushl	%ebx
-	call	%esi
+	call	*%esi
 	addl	$4,%esp
 	INTRFASTEXIT
 	/* NOTREACHED */
@@ -609,7 +609,7 @@ NENTRY(proc_trampoline)
  * Signal trampoline; copied to top of user stack.
  */
 NENTRY(sigcode)
-	call	SIGF_HANDLER(%esp)
+	call	*SIGF_HANDLER(%esp)
 	leal	SIGF_SC(%esp),%eax	# scp (the call may have clobbered the
 					# copy at SIGF_SCP(%esp))
 #ifdef VM86
@@ -618,8 +618,8 @@ NENTRY(sigcode)
 #endif
 	movl	SC_FS(%eax),%ecx
 	movl	SC_GS(%eax),%edx
-	movl	%cx,%fs
-	movl	%dx,%gs
+	movw	%cx,%fs
+	movw	%dx,%gs
 1:	pushl	%eax
 	pushl	%eax			# junk to fake return address
 	movl	$SYS_sigreturn,%eax
@@ -633,7 +633,7 @@ _C_LABEL(esigcode):
 
 #ifdef COMPAT_SVR4
 NENTRY(svr4_sigcode)
-	call	SVR4_SIGF_HANDLER(%esp)
+	call	*SVR4_SIGF_HANDLER(%esp)
 	leal	SVR4_SIGF_UC(%esp),%eax	# ucp (the call may have clobbered the
 					# copy at SIGF_UCP(%esp))
 #ifdef VM86
@@ -642,8 +642,8 @@ NENTRY(svr4_sigcode)
 #endif
 	movl	SVR4_UC_FS(%eax),%ecx
 	movl	SVR4_UC_GS(%eax),%edx
-	movl	%cx,%fs
-	movl	%dx,%gs
+	movw	%cx,%fs
+	movw	%dx,%gs
 1:	pushl	%eax
 	pushl	$1			# setcontext(p) == syscontext(1, p)
 	pushl	%eax			# junk to fake return address
@@ -662,7 +662,7 @@ _C_LABEL(svr4_esigcode):
  * Signal trampoline; copied to top of user stack.
  */
 NENTRY(linux_sigcode)
-	call	LINUX_SIGF_HANDLER(%esp)
+	call	*LINUX_SIGF_HANDLER(%esp)
 	leal	LINUX_SIGF_SC(%esp),%ebx # scp (the call may have clobbered the
 					# copy at SIGF_SCP(%esp))
 #ifdef VM86
@@ -671,8 +671,8 @@ NENTRY(linux_sigcode)
 #endif
 	movl	LINUX_SC_FS(%ebx),%ecx
 	movl	LINUX_SC_GS(%ebx),%edx
-	movl	%cx,%fs
-	movl	%dx,%gs
+	movw	%cx,%fs
+	movw	%dx,%gs
 1:	pushl	%eax			# junk to fake return address
 	movl	$LINUX_SYS_sigreturn,%eax
 	int	$0x80			# enter kernel with args on stack
@@ -689,7 +689,7 @@ _C_LABEL(linux_esigcode):
  * Signal trampoline; copied to top of user stack.
  */
 NENTRY(freebsd_sigcode)
-	call	FREEBSD_SIGF_HANDLER(%esp)
+	call	*FREEBSD_SIGF_HANDLER(%esp)
 	leal	FREEBSD_SIGF_SC(%esp),%eax # scp (the call may have clobbered
 					# the copy at SIGF_SCP(%esp))
 	pushl	%eax
@@ -902,6 +902,9 @@ ENTRY(copyout)
 	/* Compute PTE offset for start address. */
 	shrl	$PGSHIFT,%edi
 
+	movl	_C_LABEL(curpcb), %edx
+	movl	$2f, PCB_ONFAULT(%edx)
+
 1:	/* Check PTE for each page. */
 	testb	$PG_RW,_C_LABEL(PTmap)(,%edi,4)
 	jz	2f
@@ -910,11 +913,11 @@ ENTRY(copyout)
 	decl	%ecx
 	jns	1b
 
-	movl	16(%esp),%edi
+	movl	20(%esp),%edi
+	movl	24(%esp),%eax
 	jmp	3f
 
 2:	/* Simulate a trap. */
-	pushl	%eax
 	pushl	%ecx
 	movl	%edi,%eax
 	shll	$PGSHIFT,%eax
@@ -923,7 +926,6 @@ ENTRY(copyout)
 	addl	$4,%esp			# pop argument
 	popl	%ecx
 	testl	%eax,%eax		# if not ok, return EFAULT
-	popl	%eax
 	jz	4b
 	jmp	_C_LABEL(copy_fault)
 #endif /* I386_CPU */
@@ -937,8 +939,8 @@ ENTRY(copyout)
 	shrl	$2,%ecx
 	rep
 	movsl
-	movb	%al,%cl
-	andb	$3,%cl
+	movl	%eax,%ecx
+	andl	$3,%ecx
 	rep
 	movsb
 
@@ -1010,8 +1012,6 @@ ENTRY(copy_fault)
 ENTRY(copyoutstr)
 	pushl	%esi
 	pushl	%edi
-	movl	_C_LABEL(curpcb),%ecx
-	movl	$_C_LABEL(copystr_fault),PCB_ONFAULT(%ecx)
 
 	movl	12(%esp),%esi		# esi = from
 	movl	16(%esp),%edi		# edi = to
@@ -1029,9 +1029,8 @@ ENTRY(copyoutstr)
 	movl	$NBPG,%ecx
 	subl	%eax,%ecx		# ecx = NBPG - (src % NBPG)
 
-	/* Compute PTE offset for start address. */
-	movl	%edi,%eax
-	shrl	$PGSHIFT,%eax		# calculate pte address
+	movl	_C_LABEL(curpcb), %eax
+	movl	$6f, PCB_ONFAULT(%eax)
 
 1:	/*
 	 * Once per page, check that we are still within the bounds of user
@@ -1040,27 +1039,28 @@ ENTRY(copyoutstr)
 	cmpl	$VM_MAXUSER_ADDRESS,%edi
 	jae	_C_LABEL(copystr_fault)
 
+	/* Compute PTE offset for start address. */
+	movl	%edi,%eax
+	shrl	$PGSHIFT,%eax		# calculate pte address
+
 	testb	$PG_RW,_C_LABEL(PTmap)(,%eax,4)
 	jnz	2f
 
-	/* Simulate a trap. */
-	pushl	%eax
+6:	/* Simulate a trap. */
 	pushl	%edx
 	pushl	%edi
 	call	_C_LABEL(trapwrite)	# trapwrite(addr)
 	addl	$4,%esp			# clear argument from stack
 	popl	%edx
 	testl	%eax,%eax
-	popl	%eax
 	jnz	_C_LABEL(copystr_fault)
 
 2:	/* Copy up to end of this page. */
 	subl	%ecx,%edx		# predecrement total count
-	jnc	6f
+	jnc	3f
 	addl	%edx,%ecx		# ecx += (edx - ecx) = edx
 	xorl	%edx,%edx
 
-6:	pushl	%eax			# save PT index
 3:	decl	%ecx
 	js	4f
 	lodsb
@@ -1069,15 +1069,12 @@ ENTRY(copyoutstr)
 	jnz	3b
 
 	/* Success -- 0 byte reached. */
-	addl	$4,%esp			# discard PT index
 	addl	%ecx,%edx		# add back residual for this page
 	xorl	%eax,%eax
 	jmp	copystr_return
 
 4:	/* Go to next page, if any. */
-	popl	%eax			# restore PT index
 	movl	$NBPG,%ecx
-	incl	%eax
 	testl	%edx,%edx
 	jnz	1b
 
@@ -1087,7 +1084,9 @@ ENTRY(copyoutstr)
 #endif /* I386_CPU */
 
 #if defined(I486_CPU) || defined(I586_CPU) || defined(I686_CPU)
-5:	/*
+5:	movl	_C_LABEL(curpcb), %eax
+	movl	$_C_LABEL(copystr_fault),PCB_ONFAULT(%eax)
+	/*
 	 * Get min(%edx, VM_MAXUSER_ADDRESS-%edi).
 	 */
 	movl	$VM_MAXUSER_ADDRESS,%eax
@@ -1228,36 +1227,6 @@ ENTRY(copystr)
 	popl	%esi
 	ret
 
-/*
- * fuword(caddr_t uaddr);
- * Fetch an int from the user's address space.
- * Not used outside locore anymore.
- */
-ASENTRY(fuword)
-	movl	4(%esp),%edx
-	cmpl	$VM_MAXUSER_ADDRESS-4,%edx
-	ja	_ASM_LABEL(fusuaddrfault)
-	movl	_C_LABEL(curpcb),%ecx
-	movl	$_ASM_LABEL(fusufault),PCB_ONFAULT(%ecx)
-	movl	(%edx),%eax
-	movl	$0,PCB_ONFAULT(%ecx)
-	ret
-
-/*
- * Handle faults from fuword.  Clean up and return -1.
- */
-ASENTRY(fusufault)
-	movl	$0,PCB_ONFAULT(%ecx)
-	movl	$-1,%eax
-	ret
-
-/*
- * Handle earlier faults from fuword, due to our of range addresses.
- */
-ASENTRY(fusuaddrfault)
-	movl	$-1,%eax
-	ret
-
 /*****************************************************************************/
 
 /*
@@ -1277,9 +1246,9 @@ NENTRY(lgdt)
 	nop
 1:	/* Reload "stale" selectors. */
 	movl	$GSEL(GDATA_SEL, SEL_KPL),%eax
-	movl	%ax,%ds
-	movl	%ax,%es
-	movl	%ax,%ss
+	movw	%ax,%ds
+	movw	%ax,%es
+	movw	%ax,%ss
 	/* Reload code selector by doing intersegment return. */
 	popl	%eax
 	pushl	$GSEL(GCODE_SEL, SEL_KPL)
@@ -1527,8 +1496,8 @@ sw1:	bsfl	%ecx,%ebx		# find a full q
 	xorl	%eax, %eax
 	xorl	%ecx, %ecx
 #endif
-	movl	%fs,%ax
-	movl	%gs,%cx
+	movw	%fs,%ax
+	movw	%gs,%cx
 	movl	%eax,PCB_FS(%esi)
 	movl	%ecx,PCB_GS(%esi)
 
@@ -1587,8 +1556,8 @@ switch_exited:
 	/* Restore segment registers. */
 	movl	PCB_FS(%esi),%eax
 	movl	PCB_GS(%esi),%ecx
-	movl	%ax,%fs
-	movl	%cx,%gs
+	movw	%ax,%fs
+	movw	%cx,%gs
 
 switch_restored:
 	/* Restore cr0 (including FPU state). */
@@ -1651,8 +1620,8 @@ ENTRY(switch_exit)
 
 	/* Clear segment registers; always null in proc0. */
 	xorl	%ecx,%ecx
-	movl	%cx,%fs
-	movl	%cx,%gs
+	movw	%cx,%fs
+	movw	%cx,%gs
 
 	/* Restore cr0 (including FPU state). */
 	movl	PCB_CR0(%esi),%ecx
@@ -1688,8 +1657,8 @@ ENTRY(savectx)
 	xorl	%eax, %eax
 	xorl	%ecx, %ecx
 #endif
-	movl	%fs,%ax
-	movl	%gs,%cx
+	movw	%fs,%ax
+	movw	%gs,%cx
 	movl	%eax,PCB_FS(%edx)
 	movl	%ecx,PCB_GS(%edx)
 
@@ -1714,7 +1683,7 @@ ENTRY(savectx)
  * XXX - debugger traps are now interrupt gates so at least bdb doesn't lose
  * control.  The sti's give the standard losing behaviour for ddb and kgdb.
  */
-#define	IDTVEC(name)	ALIGN_TEXT; .globl _X/**/name; _X/**/name:
+#define	IDTVEC(name)	ALIGN_TEXT; .globl X/**/name; X/**/name:
 
 #define	TRAP(a)		pushl $(a) ; jmp _C_LABEL(alltraps)
 #define	ZTRAP(a)	pushl $0 ; TRAP(a)
@@ -1820,7 +1789,7 @@ NENTRY(resume_iret)
 	ZTRAP(T_PROTFLT)
 NENTRY(resume_pop_ds)
 	movl	$GSEL(GDATA_SEL, SEL_KPL),%eax
-	movl	%ax,%es
+	movw	%ax,%es
 NENTRY(resume_pop_es)
 	movl	$T_PROTFLT,TF_TRAPNO(%esp)
 	jmp	calltrap
@@ -1888,10 +1857,6 @@ IDTVEC(syscall)
 syscall1:
 	pushl	$T_ASTFLT	# trap # for doing ASTs
 	INTRENTRY
-#ifdef DIAGNOSTIC
-	movl	_C_LABEL(cpl),%ebx
-	movl	TF_EAX(%esp),%esi	# syscall no
-#endif /* DIAGNOSTIC */
 	call	_C_LABEL(syscall)
 2:	/* Check for ASTs on exit to user mode. */
 	cli
@@ -1903,53 +1868,7 @@ syscall1:
 	/* Pushed T_ASTFLT into tf_trapno on entry. */
 	call	_C_LABEL(trap)
 	jmp	2b
-#ifndef DIAGNOSTIC
 1:	INTRFASTEXIT
-#else /* DIAGNOSTIC */
-1:	cmpl	_C_LABEL(cpl),%ebx
-	jne	3f
-	INTRFASTEXIT
-3:	sti
-	movl	TF_ESP(%esp),%edi	# user stack pointer
-	leal	4(%edi),%edi		# parameters (in userspace)
-	cmpl	$SYS_syscall,%esi
-	jne	5f
-	pushl	%edi
-	CALL	_ASM_LABEL(fuword)
-	movl	%eax,%esi		# indirect syscall no for SYS_syscall
-	leal	4(%edi),%edi		# shift parameters
-	jmp	6f
-5:	
-	cmpl	$SYS___syscall,%esi
-	jne	6f
-	pushl	%edi
-	CALL	_ASM_LABEL(fuword)
-	movl	%eax,%esi		# indirect syscall no for SYS___syscall
-	leal	8(%edi),%edi		# shift parameters (quad alignment)
-6:
-	leal	8(%edi),%ecx
-	pushl	%ecx
-	call	_ASM_LABEL(fuword)
-	movl	%eax,(%esp)		# 3rd syscall arg
-	leal	4(%edi),%ecx
-	pushl	%ecx
-	call	_ASM_LABEL(fuword)
-	movl	%eax,(%esp)		# 2nd syscall arg
-	pushl	%edi
-	call	_ASM_LABEL(fuword)
-	movl	%eax,(%esp)		# 1st syscall arg
-	pushl	%esi			# syscall no
-	pushl	_C_LABEL(cpl)		# current spl
-	pushl	$4f			# format string
-	call	_C_LABEL(printf)
-	addl	$24,%esp
-#if defined(DDB) && 0
-	int	$3
-#endif /* DDB */
-	movl	%ebx,_C_LABEL(cpl)
-	jmp	2b
-4:	.asciz	"WARNING: SPL (0x%x) NOT LOWERED ON syscall(0x%x, 0x%x, 0x%x, 0x%x...) EXIT\n"
-#endif /* DIAGNOSTIC */
 
 #include <i386/isa/vector.s>
 #include <i386/isa/icu.s>

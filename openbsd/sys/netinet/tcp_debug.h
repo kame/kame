@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_debug.h,v 1.5 2001/06/09 07:03:43 angelos Exp $	*/
+/*	$OpenBSD: tcp_debug.h,v 1.7 2003/06/02 23:28:14 millert Exp $	*/
 /*	$NetBSD: tcp_debug.h,v 1.5 1994/06/29 06:38:38 cgd Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -64,6 +60,6 @@ char	*tanames[] =
 #endif /* TANAMES */
 
 #define	TCP_NDEBUG 100
-struct	tcp_debug tcp_debug[TCP_NDEBUG];
-int	tcp_debx;
+extern struct	tcp_debug tcp_debug[];
+extern int	tcp_debx;
 #endif /* _NETINET_TCP_DEBUG_H_ */

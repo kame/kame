@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.35 2002/12/05 02:49:55 kjc Exp $	*/
+/*	$OpenBSD: conf.c,v 1.38 2003/06/02 23:27:55 millert Exp $	*/
 /*	$NetBSD: conf.c,v 1.40 1996/04/11 19:20:03 thorpej Exp $ */
 
 /*
@@ -22,11 +22,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -70,6 +66,7 @@
 #include "st.h"
 #include "cd.h"
 #include "rd.h"
+#include "presto.h"
 
 #include "zstty.h"
 
@@ -123,6 +120,7 @@ struct bdevsw	bdevsw[] =
 	bdev_lkm_dummy(),		/* 23 */
 	bdev_lkm_dummy(),		/* 24 */
 	bdev_disk_init(NRAID,raid),	/* 25: RAIDframe disk driver */
+	bdev_disk_init(NPRESTO,presto),	/* 26: Prestoserve NVRAM */
 };
 int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 
@@ -157,7 +155,7 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 22: was /dev/fb */
 	cdev_disk_init(NCCD,ccd),	/* 23: concatenated disk driver */
 	cdev_fd_init(1,filedesc),	/* 24: file descriptor pseudo-device */
-	cdev_notdef(),			/* 25 */
+	cdev_disk_init(NPRESTO,presto),	/* 25: Prestoserve NVRAM */
 	cdev_notdef(),			/* 26 */
 	cdev_notdef(),			/* 27: was /dev/bwtwo */
 	cdev_notdef(),			/* 28 */
@@ -304,7 +302,7 @@ getnulldev()
 	return makedev(mem_no, 2);
 }
 
-static int chrtoblktbl[] = {
+int chrtoblktbl[] = {
 	/* XXXX This needs to be dynamic for LKMs. */
 	/*VCHR*/	/*VBLK*/
 	/*  0 */	NODEV,
@@ -332,7 +330,7 @@ static int chrtoblktbl[] = {
 	/* 22 */	NODEV,
 	/* 23 */	9,
 	/* 24 */	NODEV,
-	/* 25 */	NODEV,
+	/* 25 */	26,
 	/* 26 */	NODEV,
 	/* 27 */	NODEV,
 	/* 28 */	NODEV,
@@ -432,39 +430,4 @@ static int chrtoblktbl[] = {
 	/*122 */	NODEV,
 	/*123 */	25,
 };
-
-/*
- * Routine to convert from character to block device number.
- */
-int
-chrtoblk(dev)
-	dev_t dev;
-{
-	int blkmaj;
-
-	if (major(dev) >= nchrdev ||
-	    major(dev) > sizeof(chrtoblktbl)/sizeof(chrtoblktbl[0]))
-		return (NODEV);
-	blkmaj = chrtoblktbl[major(dev)];
-	if (blkmaj == NODEV)
-		return (NODEV);
-	return (makedev(blkmaj, minor(dev)));
-}
-
-/*
- * Convert a character device number to a block device number.
- */
-dev_t
-blktochr(dev)
-	dev_t dev;
-{
-	int blkmaj = major(dev);
-	int i;
-
-	if (blkmaj >= nblkdev)
-		return (NODEV);
-	for (i = 0; i < sizeof(chrtoblktbl)/sizeof(chrtoblktbl[0]); i++)
-		if (blkmaj == chrtoblktbl[i])
-			return (makedev(i, minor(dev)));
-	return (NODEV);
-}
+int nchrtoblktbl = sizeof(chrtoblktbl) / sizeof(chrtoblktbl[0]);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: smc93cx6var.h,v 1.12 2002/06/30 19:36:59 smurph Exp $	*/
+/*	$OpenBSD: smc93cx6var.h,v 1.16 2003/08/15 23:41:47 fgsch Exp $	*/
 /* $FreeBSD: sys/dev/aic7xxx/93cx6.h,v 1.3 1999/12/29 04:35:33 peter Exp $ */
 /*
  * Interface to the 93C46 serial EEPROM that is used to store BIOS
@@ -40,9 +40,6 @@
 #define _SMC93CX6VAR_H_
 
 #include <sys/param.h>
-#if !(defined(__NetBSD__) || defined(__OpenBSD__))
-#include <sys/systm.h>
-#endif
 
 #ifdef _KERNEL
 
@@ -52,7 +49,9 @@ typedef enum {
 } seeprom_chip_t;
 
 struct seeprom_descriptor {
-	struct ahc_softc *sd_ahc;
+	bus_space_tag_t sd_tag;
+	bus_space_handle_t sd_bsh;
+	bus_size_t sd_regsize;
 	bus_size_t sd_control_offset;
 	bus_size_t sd_status_offset;
 	bus_size_t sd_dataout_offset;
@@ -82,23 +81,38 @@ struct seeprom_descriptor {
  */
 
 #define	SEEPROM_INB(sd) \
-	ahc_inb(sd->sd_ahc, sd->sd_control_offset)
+	(((sd)->sd_regsize == 4) \
+	    ? bus_space_read_4((sd)->sd_tag, (sd)->sd_bsh, \
+	          (sd)->sd_control_offset) \
+	    : bus_space_read_1((sd)->sd_tag, (sd)->sd_bsh, \
+	          (sd)->sd_control_offset))
+
 #define	SEEPROM_OUTB(sd, value) \
-do {								\
-	ahc_outb(sd->sd_ahc, sd->sd_control_offset, value);	\
-	ahc_flush_device_writes(sd->sd_ahc);			\
+do { \
+	if ((sd)->sd_regsize == 4) \
+		bus_space_write_4((sd)->sd_tag, (sd)->sd_bsh, \
+		    (sd)->sd_control_offset, (value)); \
+	else \
+		bus_space_write_1((sd)->sd_tag, (sd)->sd_bsh, \
+		    (sd)->sd_control_offset, (u_int8_t) (value)); \
 } while(0)
 
 #define	SEEPROM_STATUS_INB(sd) \
-	ahc_inb(sd->sd_ahc, sd->sd_status_offset)
-#define	SEEPROM_DATA_INB(sd) \
-	ahc_inb(sd->sd_ahc, sd->sd_dataout_offset)
+	(((sd)->sd_regsize == 4) \
+	    ? bus_space_read_4((sd)->sd_tag, (sd)->sd_bsh, \
+	          (sd)->sd_status_offset) \
+	    : bus_space_read_1((sd)->sd_tag, (sd)->sd_bsh, \
+	          (sd)->sd_status_offset))
 
-int read_seeprom(struct seeprom_descriptor *sd, u_int16_t *buf,
-		 bus_size_t start_addr, bus_size_t count);
-int write_seeprom(struct seeprom_descriptor *sd, u_int16_t *buf,
-		  bus_size_t start_addr, bus_size_t count);
-int verify_cksum(struct seeprom_config *sc);
+#define	SEEPROM_DATA_INB(sd) \
+	(((sd)->sd_regsize == 4) \
+	    ? bus_space_read_4((sd)->sd_tag, (sd)->sd_bsh, \
+	          (sd)->sd_dataout_offset) \
+	    : bus_space_read_1((sd)->sd_tag, (sd)->sd_bsh, \
+	          (sd)->sd_dataout_offset))
+
+int	read_seeprom(struct seeprom_descriptor *, u_int16_t *,
+	     bus_size_t, bus_size_t);
 
 #endif /* _KERNEL */
-#endif /* SMC93CX6VAR_H_ */
+#endif /* _SMC93CX6VAR_H_ */

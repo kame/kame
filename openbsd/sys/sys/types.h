@@ -1,4 +1,4 @@
-/*	$OpenBSD: types.h,v 1.18 2002/03/14 01:27:14 millert Exp $	*/
+/*	$OpenBSD: types.h,v 1.21 2003/08/19 23:42:46 millert Exp $	*/
 /*	$NetBSD: types.h,v 1.29 1996/11/15 22:48:25 jtc Exp $	*/
 
 /*-
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -86,7 +82,7 @@ typedef	int32_t		suseconds_t;	/* microseconds (signed) */
 /*
  * XPG4.2 states that inclusion of <netinet/in.h> must pull these
  * in and that inclusion of <sys/socket.h> must pull in sa_family_t.
- * We put there here because there are other headers that require
+ * We put these here because there are other headers that require
  * these types and <sys/socket.h> and <netinet/in.h> will indirectly
  * include <sys/types.h>.  Thus we are compliant without too many hoops.
  */
@@ -163,7 +159,7 @@ __END_DECLS
  * be enough for most uses.
  */
 #ifndef	FD_SETSIZE
-#define	FD_SETSIZE	256
+#define	FD_SETSIZE	1024
 #endif
 
 typedef int32_t	fd_mask;

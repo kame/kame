@@ -1,4 +1,4 @@
-/*      $OpenBSD: criov.c,v 1.11 2002/06/10 19:36:43 espie Exp $	*/
+/*      $OpenBSD: criov.c,v 1.14 2003/08/14 15:18:05 jason Exp $	*/
 
 /*
  * Copyright (c) 1999 Theo de Raadt
@@ -12,8 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *   notice, this list of conditions and the following disclaimer in the
  *   documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *   derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -40,10 +38,7 @@
 #include <crypto/cryptodev.h>
 
 void
-cuio_copydata(uio, off, len, cp)
-	struct uio *uio;
-	int off, len;
-	caddr_t cp;
+cuio_copydata(struct uio *uio, int off, int len, caddr_t cp)
 {
 	struct iovec *iov = uio->uio_iov;
 	int iol = uio->uio_iovcnt;
@@ -76,10 +71,7 @@ cuio_copydata(uio, off, len, cp)
 }
 
 void
-cuio_copyback(uio, off, len, cp)
-	struct uio *uio;
-	int off, len;
-	caddr_t cp;
+cuio_copyback(struct uio *uio, int off, int len, const void *cp)
 {
 	struct iovec *iov = uio->uio_iov;
 	int iol = uio->uio_iovcnt;
@@ -144,14 +136,15 @@ cuio_apply(struct uio *uio, int off, int len,
 	unsigned int count;
 
 	if (len < 0)
-		panic("%s: len %d < 0", __func__, len);
+		panic("cuio_apply: len %d < 0", len);
 	if (off < 0)
-		panic("%s: off %d < 0", __func__, off);
+		panic("cuio_apply: off %d < 0", off);
 	
 	ind = 0;
 	while (off > 0) {
 		if (ind >= uio->uio_iovcnt)
-			panic("m_apply: null mbuf in skip");
+			panic("cui_apply: ind %d >= uio_iovcnt %d for off",
+			    ind, uio->uio_iovcnt);
 		uiolen = uio->uio_iov[ind].iov_len;
 		if (off < uiolen)
 			break;
@@ -160,7 +153,8 @@ cuio_apply(struct uio *uio, int off, int len,
 	}
 	while (len > 0) {
 		if (ind >= uio->uio_iovcnt)
-			panic("m_apply: null mbuf");
+			panic("cui_apply: ind %d >= uio_iovcnt %d for len",
+			    ind, uio->uio_iovcnt);
 		count = min(uio->uio_iov[ind].iov_len - off, len);
 
 		rval = f(fstate, uio->uio_iov[ind].iov_base + off, count);

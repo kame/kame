@@ -1,4 +1,4 @@
-/*	$OpenBSD: sys_process.c,v 1.24 2003/03/09 01:33:59 millert Exp $	*/
+/*	$OpenBSD: sys_process.c,v 1.26 2003/08/15 20:32:18 tedu Exp $	*/
 /*	$NetBSD: sys_process.c,v 1.55 1996/05/15 06:17:47 tls Exp $	*/
 
 /*-
@@ -19,11 +19,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -146,7 +142,7 @@ sys_ptrace(p, v, retval)
 		if ((t->p_cred->p_ruid != p->p_cred->p_ruid ||
 		    ISSET(t->p_flag, P_SUGIDEXEC) ||
 		    ISSET(t->p_flag, P_SUGID)) &&
-		    (error = suser(p->p_ucred, &p->p_acflag)) != 0)
+		    (error = suser(p, 0)) != 0)
 			return (error);
 
 		/*

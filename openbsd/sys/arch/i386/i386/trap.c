@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.53 2003/01/16 04:15:17 art Exp $	*/
+/*	$OpenBSD: trap.c,v 1.61 2003/07/29 18:24:36 mickey Exp $	*/
 /*	$NetBSD: trap.c,v 1.95 1996/05/05 06:50:02 mycroft Exp $	*/
 
 /*-
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -90,6 +86,9 @@ extern struct emul emul_aout_freebsd, emul_elf_freebsd;
 #endif
 #ifdef COMPAT_BSDOS
 extern struct emul emul_bsdos;
+#endif
+#ifdef COMPAT_AOUT
+extern struct emul emul_aout;
 #endif
 
 #include "npx.h"
@@ -325,7 +324,12 @@ trap(frame)
 			goto out;
 		}
 #endif
-		sv.sival_int = rcr2();
+		/* If pmap_exec_fixup does something, let's retry the trap. */
+		if (pmap_exec_fixup(&p->p_vmspace->vm_map, &frame,
+		    &p->p_addr->u_pcb))
+			goto out;
+
+		sv.sival_int = frame.tf_eip;
 		trapsignal(p, SIGSEGV, vftype, SEGV_MAPERR, sv);
 		goto out;
 
@@ -364,7 +368,7 @@ trap(frame)
 		goto out;
 
 	case T_DNA|T_USER: {
-#if defined(MATH_EMULATE) || defined(GPL_MATH_EMULATE)
+#if defined(GPL_MATH_EMULATE)
 		int rv;
 		if ((rv = math_emulate(&frame)) == 0) {
 			if (frame.tf_eflags & PSL_T)
@@ -411,7 +415,6 @@ trap(frame)
 			goto we_re_toast;
 #endif
 		/* FALLTHROUGH */
-
 	case T_PAGEFLT|T_USER: {	/* page fault */
 		vaddr_t va, fa;
 		struct vmspace *vm = p->p_vmspace;
@@ -500,7 +503,7 @@ trap(frame)
 		trapsignal(p, SIGTRAP, type &~ T_USER, TRAP_BRKPT, sv);
 		break;
 	case T_TRCTRAP|T_USER:		/* trace trap */
-#if defined(MATH_EMULATE) || defined(GPL_MATH_EMULATE)
+#if defined(GPL_MATH_EMULATE)
 	trace:
 #endif
 		sv.sival_int = rcr2();
@@ -587,6 +590,9 @@ syscall(frame)
 	size_t argsize;
 	register_t code, args[8], rval[2];
 	u_quad_t sticks;
+#ifdef DIAGNOSTIC
+	int ocpl = cpl;
+#endif
 
 	uvmexp.syscalls++;
 #ifdef DIAGNOSTIC
@@ -643,6 +649,9 @@ syscall(frame)
 #ifdef COMPAT_FREEBSD
 		    && p->p_emul != &emul_aout_freebsd
 		    && p->p_emul != &emul_elf_freebsd
+#endif
+#ifdef COMPAT_AOUT
+		    && p->p_emul != &emul_aout
 #endif
 #ifdef COMPAT_BSDOS
 		    && p->p_emul != &emul_bsdos
@@ -751,6 +760,14 @@ syscall(frame)
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
 		ktrsysret(p, code, orig_error, rval[0]);
+#endif
+#ifdef DIAGNOSTIC
+	if (cpl != ocpl) {
+		printf("WARNING: SPL (0x%x) NOT LOWERED ON "
+		    "syscall(0x%x, 0x%x, 0x%x, 0x%x...) EXIT, PID %d\n",
+		    cpl, code, args[0], args[1], args[2], p->p_pid);
+		cpl = ocpl;
+	}
 #endif
 }
 

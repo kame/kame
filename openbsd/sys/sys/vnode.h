@@ -1,4 +1,4 @@
-/*	$OpenBSD: vnode.h,v 1.52 2003/02/24 02:17:22 deraadt Exp $	*/
+/*	$OpenBSD: vnode.h,v 1.56 2003/08/05 21:27:15 tedu Exp $	*/
 /*	$NetBSD: vnode.h,v 1.38 1996/02/29 20:59:05 cgd Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -69,7 +65,7 @@ enum vtype	{ VNON, VREG, VDIR, VBLK, VCHR, VLNK, VSOCK, VFIFO, VBAD };
 enum vtagtype	{
 	VT_NON, VT_UFS, VT_NFS, VT_MFS, VT_MSDOSFS, VT_LFS, VT_LOFS, VT_FDESC,
 	VT_PORTAL, VT_NULL, VT_UMAP, VT_KERNFS, VT_PROCFS, VT_AFS, VT_ISOFS,
-	VT_UNION, VT_ADOSFS, VT_EXT2FS, VT_NCPFS, VT_VFS, VT_XFS
+	VT_UNION, VT_ADOSFS, VT_EXT2FS, VT_NCPFS, VT_VFS, VT_XFS, VT_NTFS
 };
 
 /*
@@ -93,7 +89,7 @@ struct vnode {
 	u_int	v_flag;				/* vnode flags (see below) */
 	u_int   v_usecount;			/* reference count of users */
 	/* reference count of writers */
-	u_int   v_writecount;			
+	u_int   v_writecount;
 	/* Flags that can be read/written in interrupts */
 	u_int   v_bioflag;
 	u_int   v_holdcnt;			/* buffer references */
@@ -113,9 +109,10 @@ struct vnode {
 	} v_un;
 
 	struct  simplelock v_interlock;		/* lock on usecount and flag */
+	struct	lock v_lock;
 	struct  lock *v_vnlock;			/* used for non-locking fs's */
 	enum	vtagtype v_tag;			/* type of underlying data */
-	void 	*v_data;			/* private data for fs */
+	void	*v_data;			/* private data for fs */
 	struct {
 		struct	simplelock vsi_lock;	/* lock to protect below */
 		struct	selinfo vsi_selinfo;	/* identity of poller(s) */
@@ -136,6 +133,7 @@ struct vnode {
 #define	VXLOCK		0x0100	/* vnode is locked to change underlying type */
 #define	VXWANT		0x0200	/* process is waiting for vnode */
 #define	VALIASED	0x0800	/* vnode has an alias */
+#define VLAYER		0x2000	/* vnode is on a layer file system */
 #define VLOCKSWORK	0x4000	/* FS supports locking discipline */
 
 /*
@@ -206,7 +204,7 @@ struct vattr {
 struct e_vnode {
 	struct vnode *vptr;
 	struct vnode vnode;
-};	
+};
 
 #ifdef _KERNEL
 /*
@@ -286,12 +284,20 @@ extern	struct vattr va_null;		/* predefined null vattr structure */
  */
 #define VDESC_MAX_VPS		16
 /* Low order 16 flag bits are reserved for willrele flags for vp arguments. */
-#define VDESC_VP0_WILLRELE	0x0001
-#define VDESC_VP1_WILLRELE	0x0002
-#define VDESC_VP2_WILLRELE	0x0004
-#define VDESC_VP3_WILLRELE	0x0008
-#define VDESC_NOMAP_VPP		0x0100
-#define VDESC_VPP_WILLRELE	0x0200
+#define VDESC_VP0_WILLRELE      0x00000001
+#define VDESC_VP1_WILLRELE      0x00000002
+#define VDESC_VP2_WILLRELE      0x00000004
+#define VDESC_VP3_WILLRELE      0x00000008
+#define VDESC_VP0_WILLUNLOCK    0x00000100
+#define VDESC_VP1_WILLUNLOCK    0x00000200
+#define VDESC_VP2_WILLUNLOCK    0x00000400
+#define VDESC_VP3_WILLUNLOCK    0x00000800
+#define VDESC_VP0_WILLPUT       0x00000101
+#define VDESC_VP1_WILLPUT       0x00000202
+#define VDESC_VP2_WILLPUT       0x00000404
+#define VDESC_VP3_WILLPUT       0x00000808
+#define VDESC_NOMAP_VPP         0x00010000
+#define VDESC_VPP_WILLRELE      0x00020000
 
 /*
  * VDESC_NO_OFFSET is used to identify the end of the offset list
@@ -413,14 +419,14 @@ struct uio;
 struct vattr;
 struct vnode;
 
-int 	bdevvp(dev_t dev, struct vnode **vpp);
-int 	cdevvp(dev_t dev, struct vnode **vpp);
-int 	getnewvnode(enum vtagtype tag, struct mount *mp,
+int	bdevvp(dev_t dev, struct vnode **vpp);
+int	cdevvp(dev_t dev, struct vnode **vpp);
+int	getnewvnode(enum vtagtype tag, struct mount *mp,
 	    int (**vops)(void *), struct vnode **vpp);
 int	getvnode(struct filedesc *fdp, int fd, struct file **fpp);
 void	getnewfsid(struct mount *, int);
-void 	vattr_null(struct vattr *vap);
-int 	vcount(struct vnode *vp);
+void	vattr_null(struct vattr *vap);
+int	vcount(struct vnode *vp);
 int	vfinddev(dev_t, enum vtype, struct vnode **);
 void	vflushbuf(struct vnode *vp, int sync);
 int	vflush(struct mount *mp, struct vnode *vp, int flags);
@@ -429,20 +435,20 @@ void    vn_initialize_syncerd(void);
 int	vwaitforio(struct vnode *, int, char *, int);
 void	vwakeup(struct vnode *);
 void	vdevgone(int, int, int, enum vtype);
-int 	vget(struct vnode *vp, int lockflag, struct proc *p);
-void 	vgone(struct vnode *vp);
+int	vget(struct vnode *vp, int lockflag, struct proc *p);
+void	vgone(struct vnode *vp);
 void    vgonel(struct vnode *, struct proc *);
 int	vinvalbuf(struct vnode *vp, int save, struct ucred *cred,
 	    struct proc *p, int slpflag, int slptimeo);
 void	vprint(char *label, struct vnode *vp);
 int	vop_generic_bwrite(void *ap);
 void	vn_update(void);
-int 	vn_close(struct vnode *vp,
+int	vn_close(struct vnode *vp,
 	    int flags, struct ucred *cred, struct proc *p);
-int 	vn_open(struct nameidata *ndp, int fmode, int cmode);
+int	vn_open(struct nameidata *ndp, int fmode, int cmode);
 int	vrecycle(struct vnode *vp, struct simplelock *inter_lkp,
 	    struct proc *p);
-int 	vn_rdwr(enum uio_rw rw, struct vnode *vp, caddr_t base,
+int	vn_rdwr(enum uio_rw rw, struct vnode *vp, caddr_t base,
 	    int len, off_t offset, enum uio_seg segflg, int ioflg,
 	    struct ucred *cred, size_t *aresid, struct proc *p);
 int	vn_lock(struct vnode *vp, int flags, struct proc *p);
@@ -463,8 +469,8 @@ void    sched_sync(struct proc *);
 
 struct vnode *
 	checkalias(struct vnode *vp, dev_t nvp_rdev, struct mount *mp);
-void 	vput(struct vnode *vp);
-void 	vrele(struct vnode *vp);
+void	vput(struct vnode *vp);
+void	vrele(struct vnode *vp);
 int	vaccess(mode_t file_mode, uid_t uid, gid_t gid,
 	    mode_t acc_mode, struct ucred *cred);
 

@@ -1,4 +1,4 @@
-/* $OpenBSD: tga.c,v 1.19 2002/11/09 22:51:48 miod Exp $ */
+/* $OpenBSD: tga.c,v 1.21 2003/08/31 17:09:12 matthieu Exp $ */
 /* $NetBSD: tga.c,v 1.40 2002/03/13 15:05:18 ad Exp $ */
 
 /*
@@ -173,24 +173,21 @@ int tgadebug = 0;
 #define DPRINTFN(n,...)
 #endif
 
+const struct pci_matchid tga_devices[] = {
+	{ PCI_VENDOR_DEC, PCI_PRODUCT_DEC_21030 },
+	{ PCI_VENDOR_DEC, PCI_PRODUCT_DEC_PBXGB },
+};
+
 int
 tgamatch(parent, match, aux)
 	struct device *parent;
 	struct cfdata *match;
 	void *aux;
 {
-	struct pci_attach_args *pa = aux;
+	if (pci_matchbyid((struct pci_attach_args *)aux, tga_devices,
+	    sizeof(tga_devices) / sizeof(tga_devices[0])))
+		return (10);	/* need to return more than vga_pci here! */
 
-	if (PCI_VENDOR(pa->pa_id) != PCI_VENDOR_DEC)
-		return (0);
-
-	switch (PCI_PRODUCT(pa->pa_id)) {
-	case PCI_PRODUCT_DEC_21030:
-	case PCI_PRODUCT_DEC_PBXGB:
-		return 10;
-	default:
-		return 0;
-	}
 	return (0);
 }
 
@@ -205,7 +202,7 @@ tga_getdevconfig(memt, pc, tag, dc)
 	struct rasops_info *rip;
 	int cookie;
 	bus_size_t pcisize;
-	int i, cacheable;
+	int i;
 
 	dc->dc_memt = memt;
 
@@ -215,10 +212,8 @@ tga_getdevconfig(memt, pc, tag, dc)
 	/* XXX magic number */
 	if (pci_mapreg_info(pc, tag, 0x10,
 	    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT,
-	    &dc->dc_pcipaddr, &pcisize, &cacheable))
+	    &dc->dc_pcipaddr, &pcisize, NULL))
 		return;
-	if (!cacheable)
-		panic("tga memory not cacheable");
 
 	DPRINTF("tga_getdevconfig: preparing to map\n");
 #ifdef __OpenBSD__

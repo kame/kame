@@ -3,9 +3,9 @@
  * (Modifications made here may easily be lost!)
  *
  * Created from the file:
- *	OpenBSD: vnode_if.src,v 1.19 2002/02/22 20:37:45 drahn Exp 
+ *	OpenBSD: vnode_if.src,v 1.22 2003/07/21 22:44:50 tedu Exp 
  * by the script:
- *	OpenBSD: vnode_if.sh,v 1.8 2001/02/26 17:34:18 art Exp 
+ *	OpenBSD: vnode_if.sh,v 1.13 2003/06/02 23:28:07 millert Exp 
  */
 
 /*
@@ -20,11 +20,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -119,7 +115,7 @@ int vop_create_vp_offsets[] = {
 struct vnodeop_desc vop_create_desc = {
 	0,
 	"vop_create",
-	0 | VDESC_VP0_WILLRELE,
+	0 | VDESC_VP0_WILLPUT,
 	vop_create_vp_offsets,
 	VOPARG_OFFSETOF(struct vop_create_args, a_vpp),
 	VDESC_NO_OFFSET,
@@ -154,7 +150,7 @@ int vop_mknod_vp_offsets[] = {
 struct vnodeop_desc vop_mknod_desc = {
 	0,
 	"vop_mknod",
-	0 | VDESC_VP0_WILLRELE | VDESC_VPP_WILLRELE,
+	0 | VDESC_VP0_WILLPUT | VDESC_VPP_WILLRELE,
 	vop_mknod_vp_offsets,
 	VOPARG_OFFSETOF(struct vop_mknod_args, a_vpp),
 	VDESC_NO_OFFSET,
@@ -465,7 +461,7 @@ struct vnodeop_desc vop_ioctl_desc = {
 int VOP_IOCTL(vp, command, data, fflag, cred, p)
 	struct vnode *vp;
 	u_long command;
-	caddr_t data;
+	void *data;
 	int fflag;
 	struct ucred *cred;
 	struct proc *p;
@@ -611,7 +607,7 @@ int vop_remove_vp_offsets[] = {
 struct vnodeop_desc vop_remove_desc = {
 	0,
 	"vop_remove",
-	0 | VDESC_VP0_WILLRELE | VDESC_VP1_WILLRELE,
+	0 | VDESC_VP0_WILLPUT | VDESC_VP1_WILLPUT,
 	vop_remove_vp_offsets,
 	VDESC_NO_OFFSET,
 	VDESC_NO_OFFSET,
@@ -649,7 +645,7 @@ int vop_link_vp_offsets[] = {
 struct vnodeop_desc vop_link_desc = {
 	0,
 	"vop_link",
-	0 | VDESC_VP0_WILLRELE,
+	0 | VDESC_VP0_WILLPUT,
 	vop_link_vp_offsets,
 	VDESC_NO_OFFSET,
 	VDESC_NO_OFFSET,
@@ -685,7 +681,7 @@ int vop_rename_vp_offsets[] = {
 struct vnodeop_desc vop_rename_desc = {
 	0,
 	"vop_rename",
-	0 | VDESC_VP0_WILLRELE | VDESC_VP1_WILLRELE | VDESC_VP2_WILLRELE | VDESC_VP3_WILLRELE,
+	0 | VDESC_VP0_WILLRELE | VDESC_VP1_WILLRELE | VDESC_VP2_WILLPUT | VDESC_VP3_WILLRELE,
 	vop_rename_vp_offsets,
 	VDESC_NO_OFFSET,
 	VDESC_NO_OFFSET,
@@ -724,7 +720,7 @@ int vop_mkdir_vp_offsets[] = {
 struct vnodeop_desc vop_mkdir_desc = {
 	0,
 	"vop_mkdir",
-	0 | VDESC_VP0_WILLRELE,
+	0 | VDESC_VP0_WILLPUT,
 	vop_mkdir_vp_offsets,
 	VOPARG_OFFSETOF(struct vop_mkdir_args, a_vpp),
 	VDESC_NO_OFFSET,
@@ -760,7 +756,7 @@ int vop_rmdir_vp_offsets[] = {
 struct vnodeop_desc vop_rmdir_desc = {
 	0,
 	"vop_rmdir",
-	0 | VDESC_VP0_WILLRELE | VDESC_VP1_WILLRELE,
+	0 | VDESC_VP0_WILLPUT | VDESC_VP1_WILLPUT,
 	vop_rmdir_vp_offsets,
 	VDESC_NO_OFFSET,
 	VDESC_NO_OFFSET,
@@ -797,7 +793,7 @@ int vop_symlink_vp_offsets[] = {
 struct vnodeop_desc vop_symlink_desc = {
 	0,
 	"vop_symlink",
-	0 | VDESC_VP0_WILLRELE | VDESC_VPP_WILLRELE,
+	0 | VDESC_VP0_WILLPUT | VDESC_VPP_WILLRELE,
 	vop_symlink_vp_offsets,
 	VOPARG_OFFSETOF(struct vop_symlink_args, a_vpp),
 	VDESC_NO_OFFSET,
@@ -933,7 +929,7 @@ int vop_inactive_vp_offsets[] = {
 struct vnodeop_desc vop_inactive_desc = {
 	0,
 	"vop_inactive",
-	0,
+	0 | VDESC_VP0_WILLUNLOCK,
 	vop_inactive_vp_offsets,
 	VDESC_NO_OFFSET,
 	VDESC_NO_OFFSET,
@@ -1151,7 +1147,7 @@ struct vnodeop_desc vop_advlock_desc = {
 
 int VOP_ADVLOCK(vp, id, op, fl, flags)
 	struct vnode *vp;
-	caddr_t id;
+	void *id;
 	int op;
 	struct flock *fl;
 	int flags;

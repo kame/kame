@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_socket.c,v 1.32 2002/10/29 12:47:06 art Exp $	*/
+/*	$OpenBSD: nfs_socket.c,v 1.34 2003/07/10 22:53:19 tedu Exp $	*/
 /*	$NetBSD: nfs_socket.c,v 1.27 1996/04/15 20:20:00 thorpej Exp $	*/
 
 /*
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -601,10 +597,12 @@ errout:
 				    error,
 				 rep->r_nmp->nm_mountp->mnt_stat.f_mntfromname);
 			error = nfs_sndlock(&rep->r_nmp->nm_flag, rep);
-			if (!error)
+			if (!error) {
 				error = nfs_reconnect(rep);
-			if (!error)
-				goto tryagain;
+				if (!error)
+					goto tryagain;
+				nfs_sndunlock(&rep->r_nmp->nm_flag);
+			}
 		}
 	} else {
 		if ((so = rep->r_nmp->nm_so) == NULL)

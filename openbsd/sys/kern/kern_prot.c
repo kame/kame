@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_prot.c,v 1.23 2003/01/30 03:29:49 millert Exp $	*/
+/*	$OpenBSD: kern_prot.c,v 1.26 2003/09/01 18:06:03 henning Exp $	*/
 /*	$NetBSD: kern_prot.c,v 1.33 1996/02/09 18:59:42 christos Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -387,21 +383,21 @@ sys_setresuid(p, v, retval)
 	    ruid != pc->p_ruid &&
 	    ruid != pc->pc_ucred->cr_uid &&
 	    ruid != pc->p_svuid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+	    (error = suser(p, 0)))
 		return (error);
 
 	if (euid != (uid_t)-1 &&
 	    euid != pc->p_ruid &&
 	    euid != pc->pc_ucred->cr_uid &&
 	    euid != pc->p_svuid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+	    (error = suser(p, 0)))
 		return (error);
 
 	if (suid != (uid_t)-1 &&
 	    suid != pc->p_ruid &&
 	    suid != pc->pc_ucred->cr_uid &&
 	    suid != pc->p_svuid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+	    (error = suser(p, 0)))
 		return (error);
 
 	/*
@@ -493,21 +489,21 @@ sys_setresgid(p, v, retval)
 	    rgid != pc->p_rgid &&
 	    rgid != pc->pc_ucred->cr_gid &&
 	    rgid != pc->p_svgid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+	    (error = suser(p, 0)))
 		return (error);
 
 	if (egid != (gid_t)-1 &&
 	    egid != pc->p_rgid &&
 	    egid != pc->pc_ucred->cr_gid &&
 	    egid != pc->p_svgid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+	    (error = suser(p, 0)))
 		return (error);
 
 	if (sgid != (gid_t)-1 &&
 	    sgid != pc->p_rgid &&
 	    sgid != pc->pc_ucred->cr_gid &&
 	    sgid != pc->p_svgid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+	    (error = suser(p, 0)))
 		return (error);
 
 	/*
@@ -620,14 +616,14 @@ sys_setuid(p, v, retval)
 	if (uid != pc->p_ruid &&
 	    uid != pc->p_svuid &&
 	    uid != pc->pc_ucred->cr_uid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+	    (error = suser(p, 0)))
 		return (error);
 
 	/*
 	 * Everything's okay, do it.
 	 */
 	if (uid == pc->pc_ucred->cr_uid ||
-	    suser(pc->pc_ucred, &p->p_acflag) == 0) {
+	    suser(p, 0) == 0) {
 		/*
 		 * Transfer proc count to new user.
 		 */
@@ -668,7 +664,7 @@ sys_seteuid(p, v, retval)
 		return (0);
 
 	if (euid != pc->p_ruid && euid != pc->p_svuid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+	    (error = suser(p, 0)))
 		return (error);
 
 	/*
@@ -704,11 +700,11 @@ sys_setgid(p, v, retval)
 	if (gid != pc->p_rgid &&
 	    gid != pc->p_svgid &&
 	    gid != pc->pc_ucred->cr_gid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+	    (error = suser(p, 0)))
 		return (error);
 
 	if (gid == pc->pc_ucred->cr_gid ||
-	    suser(pc->pc_ucred, &p->p_acflag) == 0) {
+	    suser(p, 0) == 0) {
 		pc->p_rgid = gid;
 		pc->p_svgid = gid;
 	}
@@ -742,7 +738,7 @@ sys_setegid(p, v, retval)
 		return (0);
 
 	if (egid != pc->p_rgid && egid != pc->p_svgid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+	    (error = suser(p, 0)))
 		return (error);
 
 	/*
@@ -763,13 +759,13 @@ sys_setgroups(p, v, retval)
 {
 	struct sys_setgroups_args /* {
 		syscallarg(int) gidsetsize;
-		syscallarg(gid_t *) gidset;
+		syscallarg(const gid_t *) gidset;
 	} */ *uap = v;
 	struct pcred *pc = p->p_cred;
 	u_int ngrp;
 	int error;
 
-	if ((error = suser(pc->pc_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return (error);
 	ngrp = SCARG(uap, gidsetsize);
 	if (ngrp > NGROUPS)
@@ -803,21 +799,30 @@ groupmember(gid, cred)
 }
 
 /*
- * Test whether the specified credentials imply "super-user"
- * privilege; if so, and we have accounting info, set the flag
- * indicating use of super-powers.
+ * Test whether this process has special user powers.
  * Returns 0 or error.
  */
 int
-suser(cred, acflag)
-	struct ucred *cred;
-	u_short *acflag;
+suser(struct proc *p, u_int flags)
 {
+	struct ucred *cred = p->p_ucred;
+
 	if (cred->cr_uid == 0) {
-		if (acflag)
-			*acflag |= ASU;
+		if (!(flags & SUSER_NOACCT))
+			p->p_acflag |= ASU;
 		return (0);
 	}
+	return (EPERM);
+}
+
+/*
+ * replacement for old suser, for callers who don't have a process
+ */
+int
+suser_ucred(struct ucred *cred)
+{
+	if (cred->cr_uid == 0)
+		return (0);
 	return (EPERM);
 }
 
@@ -913,11 +918,11 @@ sys_setlogin(p, v, retval)
 	register_t *retval;
 {
 	struct sys_setlogin_args /* {
-		syscallarg(char *) namebuf;
+		syscallarg(const char *) namebuf;
 	} */ *uap = v;
 	int error;
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return (error);
 	error = copyinstr((caddr_t) SCARG(uap, namebuf),
 	    (caddr_t) p->p_pgrp->pg_session->s_login,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: bioscons.c,v 1.21 2003/01/17 20:58:27 mickey Exp $	*/
+/*	$OpenBSD: bioscons.c,v 1.24 2003/08/11 06:23:09 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Michael Shalayeff
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -42,6 +37,7 @@
 #include <dev/cons.h>
 #include <lib/libsa/stand.h>
 #include "debug.h"
+#include "biosdev.h"
 
 /* XXX cannot trust NVRAM on this.  Maybe later we make a real probe.  */
 #if 0
@@ -51,8 +47,7 @@
 #endif
 
 void
-pc_probe(cn)
-	struct consdev *cn;
+pc_probe(struct consdev *cn)
 {
 	cn->cn_pri = CN_INTERNAL;
 	cn->cn_dev = makedev(12, 0);
@@ -70,14 +65,12 @@ pc_probe(cn)
 }
 
 void
-pc_init(cn)
-	struct consdev *cn;
+pc_init(struct consdev *cn)
 {
 }
 
 int
-pc_getc(dev)
-	dev_t dev;
+pc_getc(dev_t dev)
 {
 	register int rv;
 
@@ -93,9 +86,7 @@ pc_getc(dev)
 }
 
 void
-pc_putc(dev, c)
-	dev_t dev;
-	int c;
+pc_putc(dev_t dev, int c)
 {
 	__asm __volatile(DOINT(0x10) : : "a" (c | 0xe00), "b" (1) :
 	    "%ecx", "%edx", "cc" );
@@ -104,8 +95,7 @@ pc_putc(dev, c)
 const int comports[4] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8 };
 
 void
-com_probe(cn)
-	struct consdev *cn;
+com_probe(struct consdev *cn)
 {
 	register int i, n;
 
@@ -123,8 +113,7 @@ com_probe(cn)
 }
 
 void
-com_init(cn)
-	struct consdev *cn;
+com_init(struct consdev *cn)
 {
 	register int unit = minor(cn->cn_dev);
 
@@ -134,8 +123,7 @@ com_init(cn)
 }
 
 int
-com_getc(dev)
-	dev_t dev;
+com_getc(dev_t dev)
 {
 	register int rv;
 
@@ -156,9 +144,7 @@ com_getc(dev)
 /* call with sp == 0 to query the current speed */
 int com_speed = 9600;  /* default speed is 9600 baud */
 int
-comspeed(dev, sp)
-	dev_t dev;
-	int sp;
+comspeed(dev_t dev, int sp)
 {
 	int i, newsp;
         int err;
@@ -169,7 +155,12 @@ comspeed(dev, sp)
 	if (115200 < sp || sp < 75)
 		return -1;
 
-	for (i = sp; i != 75; i >>= 1)
+	/*
+	 * Accepted speeds:
+	 *   75 150 300 600 1200 2400 4800 9600 19200 38400 76800 and
+	 *   14400 28800 57600 115200
+	 */
+	for (i = sp; i != 75 && i != 14400; i >>= 1)
 		if (i & 1)
 			return -1;
 
@@ -206,9 +197,7 @@ comspeed(dev, sp)
 }
 
 void
-com_putc(dev, c)
-	dev_t dev;
-	int c;
+com_putc(dev_t dev, int c)
 {
 	register int rv;
 

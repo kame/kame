@@ -1,4 +1,4 @@
-/*	$OpenBSD: spif.c,v 1.6 2003/02/14 22:04:22 jason Exp $	*/
+/*	$OpenBSD: spif.c,v 1.10 2003/08/15 20:32:17 tedu Exp $	*/
 
 /*
  * Copyright (c) 1999-2002 Jason L. Wright (jason@thought.net)
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -191,7 +186,7 @@ spifattach(parent, self, aux)
 	sc->sc_bustag = sa->sa_bustag;
 	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[0].sbr_slot,
 	    sa->sa_reg[0].sbr_offset, sa->sa_reg[0].sbr_size,
-	    BUS_SPACE_MAP_LINEAR, 0, &sc->sc_regh) != 0) {
+	    0, 0, &sc->sc_regh) != 0) {
 		printf(": can't map registers\n");
 		return;
 	}
@@ -221,14 +216,16 @@ spifattach(parent, self, aux)
 	}
 
 	sc->sc_ppcih = bus_intr_establish(sa->sa_bustag,
-	    sa->sa_intr[PARALLEL_INTR].sbi_pri, IPL_TTY, 0, spifppcintr, sc);
+	    sa->sa_intr[PARALLEL_INTR].sbi_pri, IPL_TTY, 0, spifppcintr, sc,
+	    self->dv_xname);
 	if (sc->sc_ppcih == NULL) {
 		printf(": failed to establish ppc interrupt\n");
 		goto fail_unmapregs;
 	}
 
 	sc->sc_stcih = bus_intr_establish(sa->sa_bustag,
-	    sa->sa_intr[SERIAL_INTR].sbi_pri, IPL_TTY, 0, spifstcintr, sc);
+	    sa->sa_intr[SERIAL_INTR].sbi_pri, IPL_TTY, 0, spifstcintr, sc,
+	    self->dv_xname);
 	if (sc->sc_stcih == NULL) {
 		printf(": failed to establish stc interrupt\n");
 		goto fail_unmapregs;
@@ -518,7 +515,7 @@ sttyioctl(dev, cmd, data, flags, p)
 		*((int *)data) = sp->sp_openflags;
 		break;
 	case TIOCSFLAGS:
-		if (suser(p->p_ucred, &p->p_acflag))
+		if (suser(p, 0))
 			error = EPERM;
 		else
 			sp->sp_openflags = *((int *)data) &

@@ -1,4 +1,4 @@
-/*	$OpenBSD: npx.c,v 1.25 2002/03/14 01:26:33 millert Exp $	*/
+/*	$OpenBSD: npx.c,v 1.28 2003/07/25 18:31:25 jason Exp $	*/
 /*	$NetBSD: npx.c,v 1.57 1996/05/12 23:12:24 mycroft Exp $	*/
 
 #if 0
@@ -21,11 +21,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -152,9 +148,9 @@ extern int i386_fpu_fdivbug;
  */
 void probeintr(void);
 asm (".text\n\t"
-"_probeintr:\n\t"
+"probeintr:\n\t"
 	"ss\n\t"
-	"incl	_npx_intrs_while_probing\n\t"
+	"incl	npx_intrs_while_probing\n\t"
 	"pushl	%eax\n\t"
 	"movb	$0x20,%al	# EOI (asm in strings loses cpp features)\n\t"
 	"outb	%al,$0xa0	# IO_ICU2\n\t"
@@ -166,9 +162,9 @@ asm (".text\n\t"
 
 void probetrap(void);
 asm (".text\n\t"
-"_probetrap:\n\t"
+"probetrap:\n\t"
 	"ss\n\t"
-	"incl	_npx_traps_while_probing\n\t"
+	"incl	npx_traps_while_probing\n\t"
 	"fnclex\n\t"
 	"iret\n\t");
 
@@ -234,7 +230,10 @@ npxprobe1(ia)
 			return 1;
 		}
 	}
+#else
+	npx_intrs_while_probing = npx_traps_while_probing = 0;
 #endif
+
 	/*
 	 * Probe failed.  There is no usable FPU.
 	 */
@@ -307,7 +306,7 @@ npxprobe(parent, match, aux)
 
 int npx586bug1(int, int);
 asm (".text\n\t"
-"_npx586bug1:\n\t"
+"npx586bug1:\n\t"
 	"fildl	4(%esp)		# x\n\t"
 	"fildl	8(%esp)		# y\n\t"
 	"fld	%st(1)\n\t"

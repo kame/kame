@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.46 2003/03/14 22:05:43 deraadt Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.50 2003/09/11 21:48:56 deraadt Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.20 1996/05/03 19:41:56 christos Exp $	*/
 
 /*-
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -85,6 +81,11 @@ dev_t	bootdev = 0;		/* bootdevice, initialized in locore.s */
 extern struct timeout viac3_rnd_tmo;
 extern int	viac3_rnd_present;
 void		viac3_rnd(void *);
+
+#ifdef CRYPTO
+extern int	viac3_crypto_present;
+void		viac3_crypto_setup(void);
+#endif
 #endif
 
 /*
@@ -129,6 +130,13 @@ cpu_configure()
 		timeout_set(&viac3_rnd_tmo, viac3_rnd, &viac3_rnd_tmo);
 		viac3_rnd(&viac3_rnd_tmo);
 	}
+	/*
+	 * Also, if the chip as crypto available, enable it.
+	 */
+#ifdef CRYPTO
+	if (viac3_crypto_present)
+		viac3_crypto_setup();
+#endif /* CRYPTO */
 #endif
 }
 
@@ -359,7 +367,9 @@ rootconf()
 		char name[128];
 retry:
 		printf("root device? ");
+		cnpollc(TRUE);
 		getsn(name, sizeof name);
+		cnpollc(FALSE);
 		if (*name == '\0')
 			goto noask;
 		for (gc = genericconf; gc->gc_driver; gc++)

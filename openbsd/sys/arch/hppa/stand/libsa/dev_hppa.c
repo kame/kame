@@ -1,4 +1,4 @@
-/*	$OpenBSD: dev_hppa.c,v 1.6 2003/01/14 11:38:56 mickey Exp $	*/
+/*	$OpenBSD: dev_hppa.c,v 1.9 2003/06/01 17:00:34 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -54,8 +54,8 @@ const struct pdc_devs {
 	char	name[3];
 	int	dev_type;
 } pdc_devs[] = {
-	{ "ct",  0 },
-	{ "dk",  1 },
+	{ "dk",  0 },
+	{ "ct",  1 },
 	{ "lf",  2 },
 	{ "",   -1 },
 	{ "rd", -1 },
@@ -70,9 +70,9 @@ devopen(f, fname, file)
 	const char *fname;
 	char **file;
 {
-	register struct hppa_dev *hpd;
-	register const struct pdc_devs *dp = pdc_devs;
-	register int rc = 1;
+	struct hppa_dev *hpd;
+	const struct pdc_devs *dp = pdc_devs;
+	int rc = 1;
 
 	if (!(*file = strchr(fname, ':')))
 		return ENODEV;
@@ -127,17 +127,17 @@ devboot(dev, p)
 	dev_t dev;
 	char *p;
 {
-	register const char *q;
+	const char *q;
 	if (!dev) {
 		int type, unit;
 
 		switch (PAGE0->mem_boot.pz_class) {
 		case PCL_RANDOM:
-			type = 1;
+			type = 0;
 			unit = PAGE0->mem_boot.pz_layers[0];
 			break;
 		case PCL_SEQU:
-			type = 0;
+			type = 1;
 			unit = PAGE0->mem_boot.pz_layers[0];
 			break;
 		case PCL_NET_MASK|PCL_SEQU:
@@ -201,7 +201,7 @@ putchar(c)
 int
 getchar()
 {
-	register int c = cngetc();
+	int c = cngetc();
 
 	if (c == '\r')
 		c = '\n';
@@ -219,7 +219,8 @@ char *
 ttyname(fd)
 	int fd;
 {
-	sprintf(ttyname_buf, "%s%d", cdevs[major(cn_tab->cn_dev)],
+	snprintf(ttyname_buf, sizeof ttyname_buf, "%s%d",
+	    cdevs[major(cn_tab->cn_dev)],
 	    minor(cn_tab->cn_dev));
 	return (ttyname_buf);
 }

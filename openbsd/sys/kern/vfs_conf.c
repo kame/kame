@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_conf.c,v 1.17 2003/02/24 20:02:13 deraadt Exp $	*/
+/*	$OpenBSD: vfs_conf.c,v 1.22 2003/08/14 07:46:39 mickey Exp $	*/
 /*	$NetBSD: vfs_conf.c,v 1.21.4.1 1995/11/01 00:06:26 jtc Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -84,71 +80,71 @@ struct vnode *rootvnode;
 
 
 #ifdef FFS
-extern	struct vfsops ffs_vfsops;
+extern	const struct vfsops ffs_vfsops;
 #endif
 
 #ifdef LFS
-extern	struct vfsops lfs_vfsops;
+extern	const struct vfsops lfs_vfsops;
 #endif
 
 #ifdef MFS
-extern	struct vfsops mfs_vfsops;
+extern	const struct vfsops mfs_vfsops;
 #endif
 
 #ifdef MSDOSFS
-extern	struct vfsops msdosfs_vfsops;
+extern	const struct vfsops msdosfs_vfsops;
 #endif
 
 #ifdef NFSCLIENT
-extern	struct vfsops nfs_vfsops;
+extern	const struct vfsops nfs_vfsops;
 #endif
 
 #ifdef FDESC
-extern	struct vfsops fdesc_vfsops;
+extern	const struct vfsops fdesc_vfsops;
 #endif
 
 #ifdef PORTAL
-extern	struct vfsops portal_vfsops;
+extern	const struct vfsops portal_vfsops;
 #endif
 
 #ifdef NULLFS
-extern	struct vfsops null_vfsops;
+extern	const struct vfsops nullfs_vfsops;
 #endif
 
 #ifdef UMAPFS
-extern	struct vfsops umap_vfsops;
+extern	const struct vfsops umapfs_vfsops;
 #endif
 
 #ifdef KERNFS
-extern	struct vfsops kernfs_vfsops;
+extern	const struct vfsops kernfs_vfsops;
 #endif
 
 #ifdef PROCFS
-extern	struct vfsops procfs_vfsops;
-#endif
-
-#ifdef AFS
-extern	struct vfsops afs_vfsops;
+extern	const struct vfsops procfs_vfsops;
 #endif
 
 #ifdef CD9660
-extern	struct vfsops cd9660_vfsops;
+extern	const struct vfsops cd9660_vfsops;
 #endif
 
 #ifdef UNION
-extern	struct vfsops union_vfsops;
+extern	const struct vfsops union_vfsops;
 #endif
 
 #ifdef ADOSFS
-extern 	struct vfsops adosfs_vfsops;
+extern 	const struct vfsops adosfs_vfsops;
 #endif
 
 #ifdef EXT2FS
-extern	struct vfsops ext2fs_vfsops;
+extern	const struct vfsops ext2fs_vfsops;
 #endif
 
 #ifdef XFS
-extern  struct vfsops xfs_vfsops;
+extern  const struct vfsops xfs_vfsops;
+#endif
+
+#ifdef NTFS
+extern  const struct vfsops ntfs_vfsops;
 #endif
 
 /*
@@ -194,11 +190,6 @@ static struct vfsconf vfsconflist[] = {
         { &nfs_vfsops, MOUNT_NFS, 2, 0, 0, nfs_mountroot, NULL },
 #endif
 
-        /* Andrew Filesystem */
-#ifdef AFS
-        { &afs_vfsops, MOUNT_AFS, 13, 0, 0, afs_mountroot, NULL },
-#endif
-
 	/* XFS */
 #ifdef XFS
 	{ &xfs_vfsops, MOUNT_XFS, 21, 0, 0, NULL, NULL },
@@ -211,7 +202,7 @@ static struct vfsconf vfsconflist[] = {
 
         /* Loopback (Minimal) Filesystem Layer */
 #ifdef NULLFS
-        { &null_vfsops, MOUNT_NULL, 9, 0, 0, NULL, NULL },
+        { &nullfs_vfsops, MOUNT_NULL, 9, 0, 0, NULL, NULL },
 #endif
 
         /* Union (translucent) Filesystem */
@@ -221,7 +212,7 @@ static struct vfsconf vfsconflist[] = {
 
         /* User/Group Identifer Remapping Filesystem */
 #ifdef UMAPFS
-        { &umap_vfsops, MOUNT_UMAP, 10, 0, 0, NULL, NULL },
+        { &umapfs_vfsops, MOUNT_UMAP, 10, 0, 0, NULL, NULL },
 #endif
 
         /* Portal Filesystem */
@@ -237,6 +228,11 @@ static struct vfsconf vfsconflist[] = {
         /* Kernel Information Filesystem */
 #ifdef KERNFS
         { &kernfs_vfsops, MOUNT_KERNFS, 11, 0, 0, NULL, NULL },
+#endif
+
+	/* NTFS Filesystem */
+#ifdef NTFS
+	{ &ntfs_vfsops, MOUNT_NTFS, 6, 0, MNT_LOCAL, NULL, NULL },
 #endif
 
 };
@@ -271,8 +267,8 @@ extern struct vnodeopv_desc spec_nfsv2nodeop_opv_desc;
 extern struct vnodeopv_desc fifo_nfsv2nodeop_opv_desc;
 extern struct vnodeopv_desc fdesc_vnodeop_opv_desc;
 extern struct vnodeopv_desc portal_vnodeop_opv_desc;
-extern struct vnodeopv_desc null_vnodeop_opv_desc;
-extern struct vnodeopv_desc umap_vnodeop_opv_desc;
+extern struct vnodeopv_desc nullfs_vnodeop_opv_desc;
+extern struct vnodeopv_desc umapfs_vnodeop_opv_desc;
 extern struct vnodeopv_desc kernfs_vnodeop_opv_desc;
 extern struct vnodeopv_desc procfs_vnodeop_opv_desc;
 extern struct vnodeopv_desc cd9660_vnodeop_opv_desc;
@@ -285,6 +281,7 @@ extern struct vnodeopv_desc ext2fs_vnodeop_opv_desc;
 extern struct vnodeopv_desc ext2fs_specop_opv_desc;
 extern struct vnodeopv_desc ext2fs_fifoop_opv_desc;
 extern struct vnodeopv_desc xfs_vnodeop_opv_desc;
+extern struct vnodeopv_desc ntfs_vnodeop_opv_desc;
 
 struct vnodeopv_desc *vfs_opv_descs[] = {
 	&sync_vnodeop_opv_desc,
@@ -324,10 +321,10 @@ struct vnodeopv_desc *vfs_opv_descs[] = {
 	&portal_vnodeop_opv_desc,
 #endif
 #ifdef NULLFS
-	&null_vnodeop_opv_desc,
+	&nullfs_vnodeop_opv_desc,
 #endif
 #ifdef UMAPFS
-	&umap_vnodeop_opv_desc,
+	&umapfs_vnodeop_opv_desc,
 #endif
 #ifdef KERNFS
 	&kernfs_vnodeop_opv_desc,
@@ -360,6 +357,9 @@ struct vnodeopv_desc *vfs_opv_descs[] = {
 #endif
 #ifdef XFS
 	&xfs_vnodeop_opv_desc,
+#endif
+#ifdef NTFS
+	&ntfs_vnodeop_opv_desc,
 #endif
 
 	NULL

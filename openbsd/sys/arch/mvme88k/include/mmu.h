@@ -1,4 +1,4 @@
-/*	$OpenBSD: mmu.h,v 1.18 2003/01/24 09:57:41 miod Exp $ */
+/*	$OpenBSD: mmu.h,v 1.20 2003/09/07 13:52:17 miod Exp $ */
 
 /*
  * This file bears almost no resemblance to the original m68k file,
@@ -23,11 +23,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -159,7 +155,8 @@ typedef u_int32_t	pt_entry_t;
 #define	PG_RO		0x00000004
 #define	PG_RW		0x00000000
 #define	PG_SO		0x00000100
-#define	PG_W		0x00000400	/* XXX unused but reserved field */
+#define	PG_W		0x00000020	/* XXX unused but reserved field */
+#define	PG_U0		0x00000400	/* U0 bit for M88110 */
 #define	PG_U1		0x00000800	/* U1 bit for M88110 */
 
 #define	PDT_VALID(pte)	(*(pte) & PG_V)

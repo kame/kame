@@ -1,4 +1,4 @@
-/*	$OpenBSD: biosprobe.c,v 1.1 2002/06/20 20:22:58 weingart Exp $	*/
+/*	$OpenBSD: biosprobe.c,v 1.3 2003/08/11 06:23:09 deraadt Exp $	*/
 
 /*
  * Copyright (c) 2002 Tobias Weingartner
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    This product includes software developed by Tobias Weingartner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -30,16 +25,19 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
+#include <sys/param.h>
 #include <machine/biosvar.h>
 #include <machine/pio.h>
 #include <dev/cons.h>
-#include <lib/libsa/stand.h>
+#include <sys/disklabel.h>
+#include "disk.h"
 #include "debug.h"
+#include "libsa.h"
+#include "biosdev.h"
 
 
 void *
-getSYSCONFaddr()
+getSYSCONFaddr(void)
 {
  	u_int32_t status;
 	u_int8_t *vers;
@@ -60,7 +58,7 @@ getSYSCONFaddr()
 }
 
 void *
-getEBDAaddr()
+getEBDAaddr(void)
 {
 	u_int32_t status;
 	u_int8_t *info;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_malloc.c,v 1.48 2002/06/11 05:58:17 art Exp $	*/
+/*	$OpenBSD: kern_malloc.c,v 1.55 2003/07/21 22:44:50 tedu Exp $	*/
 /*	$NetBSD: kern_malloc.c,v 1.15.4.2 1996/06/13 17:10:56 cgd Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -90,7 +86,7 @@ extern struct lock sysctl_kmemlock;
 /*
  * This structure provides a set of masks to catch unaligned frees.
  */
-long addrmask[] = { 0,
+const long addrmask[] = { 0,
 	0x00000001, 0x00000003, 0x00000007, 0x0000000f,
 	0x0000001f, 0x0000003f, 0x0000007f, 0x000000ff,
 	0x000001ff, 0x000003ff, 0x000007ff, 0x00000fff,
@@ -146,7 +142,7 @@ malloc(size, type, flags)
 #ifdef KMEMSTATS
 	register struct kmemstats *ksp = &kmemstats[type];
 
-	if (((unsigned long)type) > M_LAST)
+	if (((unsigned long)type) >= M_LAST)
 		panic("malloc - bogus type");
 #endif
 
@@ -166,7 +162,7 @@ malloc(size, type, flags)
 		}
 		if (ksp->ks_limblocks < 65535)
 			ksp->ks_limblocks++;
-		tsleep((caddr_t)ksp, PSWP+2, memname[type], 0);
+		tsleep(ksp, PSWP+2, memname[type], 0);
 	}
 	ksp->ks_size |= 1 << indx;
 #endif
@@ -373,7 +369,7 @@ free(addr, type)
 		kup->ku_pagecnt = 0;
 		if (ksp->ks_memuse + size >= ksp->ks_limit &&
 		    ksp->ks_memuse < ksp->ks_limit)
-			wakeup((caddr_t)ksp);
+			wakeup(ksp);
 		ksp->ks_inuse--;
 		kbp->kb_total -= 1;
 #endif
@@ -419,7 +415,7 @@ free(addr, type)
 	ksp->ks_memuse -= size;
 	if (ksp->ks_memuse + size >= ksp->ks_limit &&
 	    ksp->ks_memuse < ksp->ks_limit)
-		wakeup((caddr_t)ksp);
+		wakeup(ksp);
 	ksp->ks_inuse--;
 #endif
 	if (kbp->kb_next == NULL)
@@ -474,6 +470,7 @@ kmeminit_nkmempages()
 void
 kmeminit()
 {
+	vaddr_t base, limit;
 #ifdef KMEMSTATS
 	long indx;
 #endif
@@ -488,10 +485,12 @@ kmeminit()
 	 * done so already.
 	 */
 	kmeminit_nkmempages();
-
-	kmem_map = uvm_km_suballoc(kernel_map, (vaddr_t *)&kmembase,
-		(vaddr_t *)&kmemlimit, (vsize_t)(nkmempages * PAGE_SIZE), 
-			VM_MAP_INTRSAFE, FALSE, &kmem_map_store.vmi_map);
+	base = vm_map_min(kernel_map);
+	kmem_map = uvm_km_suballoc(kernel_map, &base, &limit,
+	    (vsize_t)(nkmempages * PAGE_SIZE), VM_MAP_INTRSAFE, FALSE,
+	    &kmem_map_store.vmi_map);
+	kmembase = (char *)base;
+	kmemlimit = (char *)limit;
 	kmemusage = (struct kmemusage *) uvm_km_zalloc(kernel_map,
 		(vsize_t)(nkmempages * sizeof(struct kmemusage)));
 #ifdef KMEMSTATS
@@ -536,9 +535,12 @@ sysctl_malloc(name, namelen, oldp, oldlenp, newp, newlen, p)
 		if (buckstring_init == 0) {
 			buckstring_init = 1;
 			bzero(buckstring, sizeof(buckstring));
-			for (siz = 0, i = MINBUCKET; i < MINBUCKET + 16; i++)
-			    siz += sprintf(buckstring + siz,
-			    "%d,", (u_int)(1<<i));
+			for (siz = 0, i = MINBUCKET; i < MINBUCKET + 16; i++) {
+				snprintf(buckstring + siz,
+				    sizeof buckstring - siz,
+				    "%d,", (u_int)(1<<i));
+				siz += strlen(buckstring + siz);
+			}
 			/* Remove trailing comma */
 			if (siz)
 				buckstring[siz - 1] = '\0';
@@ -575,10 +577,12 @@ sysctl_malloc(name, namelen, oldp, oldlenp, newp, newlen, p)
 			}
 			memall = malloc(totlen + M_LAST, M_SYSCTL, M_WAITOK);
 			bzero(memall, totlen + M_LAST);
-			for (siz = 0, i = 0; i < M_LAST; i++)
-				siz += sprintf(memall + siz, "%s,",
-				    memname[i] ? memname[i] : "");
-
+			for (siz = 0, i = 0; i < M_LAST; i++) {
+				snprintf(memall + siz, 
+				    totlen + M_LAST - siz,
+				    "%s,", memname[i] ? memname[i] : "");
+				siz += strlen(memall + siz);
+			}
 			/* Remove trailing comma */
 			if (siz)
 				memall[siz - 1] = '\0';

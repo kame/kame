@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile.sparc,v 1.28 2002/12/25 21:10:26 miod Exp $
+#	$OpenBSD: Makefile.sparc,v 1.32 2003/07/22 19:39:50 otto Exp $
 # 	$NetBSD: Makefile.sparc,v 1.32.4.1 1996/06/12 20:26:32 pk Exp $
 
 # Makefile for OpenBSD
@@ -45,7 +45,9 @@ CMACHFLAGS=	-mcpu=supersparc
 .else
 CMACHFLAGS=
 .endif
+.if ${IDENT:M-DNO_PROPOLICE}
 CMACHFLAGS+=	-fno-stack-protector
+.endif
 
 CFLAGS=		${DEBUG} -O2 ${CDIAGFLAGS} ${CMACHFLAGS} ${COPTS} ${PIPE}
 # add `-mno-fpu' to work around gcc (last noticed in v2.7.2) bug
@@ -147,7 +149,7 @@ clean::
 
 lint:
 	@lint -hbxncez -DGENERIC -Dvolatile= ${CPPFLAGS} ${PARAM} -UKGDB \
-	    ${CFILES} ${SPARC}/sparc/swapgeneric.c ioconf.c param.c | \
+	    ${CFILES} ioconf.c param.c | \
 	    grep -v 'static function .* unused'
 
 tags:
@@ -170,6 +172,10 @@ depend:: .depend
 .if !empty(SFILES)
 	${MKDEP} -a ${AFLAGS} ${CPPFLAGS} ${SFILES}
 .endif
+	sh $S/kern/genassym.sh ${MKDEP} -f assym.dep ${CFLAGS} \
+	    ${CPPFLAGS} < ${SPARC}/sparc/genassym.cf
+	@sed -e 's/.*\.o:.* /assym.h: /' < assym.dep >> .depend
+	@rm -f assym.dep
 
 
 # depend on root or device configuration

@@ -1,4 +1,4 @@
-/*	$OpenBSD: esp_sbus.c,v 1.11 2003/02/17 01:29:20 henric Exp $	*/
+/*	$OpenBSD: esp_sbus.c,v 1.15 2003/07/03 21:02:13 jason Exp $	*/
 /*	$NetBSD: esp_sbus.c,v 1.14 2001/04/25 17:53:37 bouyer Exp $	*/
 
 /*-
@@ -150,10 +150,7 @@ static struct ncr53c9x_glue esp_sbus_glue1 = {
 static void	espattach(struct esp_softc *, struct ncr53c9x_glue *);
 
 int
-espmatch_sbus(parent, vcf, aux)
-	struct device *parent;
-	void *vcf;
-	void *aux;
+espmatch_sbus(struct device *parent, void *vcf, void *aux)
 {
 	struct cfdata *cf = vcf;
 	int rv;
@@ -168,9 +165,7 @@ espmatch_sbus(parent, vcf, aux)
 }
 
 void
-espattach_sbus(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+espattach_sbus(struct device *parent, struct device *self, void *aux)
 {
 	struct esp_softc *esc = (void *)self;
 	struct ncr53c9x_softc *sc = &esc->sc_ncr53c9x;
@@ -226,12 +221,9 @@ espattach_sbus(parent, self, aux)
 		      sizeof (lsc->sc_dev.dv_xname));
 
 		/* Map dma registers */
-		if (sbus_bus_map(sa->sa_bustag,
-		                   sa->sa_reg[0].sbr_slot,
-			           sa->sa_reg[0].sbr_offset,
-			           sa->sa_reg[0].sbr_size,
-			           BUS_SPACE_MAP_LINEAR,
-			           0, &lsc->sc_regs) != 0) {
+		if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[0].sbr_slot,
+		    sa->sa_reg[0].sbr_offset, sa->sa_reg[0].sbr_size,
+		    0, 0, &lsc->sc_regs) != 0) {
 			printf("%s: cannot map dma registers\n", self->dv_xname);
 			return;
 		}
@@ -271,12 +263,9 @@ espattach_sbus(parent, self, aux)
 		/*
 		 * map SCSI core registers
 		 */
-		if (sbus_bus_map(sa->sa_bustag,
-				 sa->sa_reg[1].sbr_slot,
-				 sa->sa_reg[1].sbr_offset,
-				 sa->sa_reg[1].sbr_size,
-				 BUS_SPACE_MAP_LINEAR, 
-				 0, &esc->sc_reg) != 0) {
+		if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[1].sbr_slot,
+		    sa->sa_reg[1].sbr_offset, sa->sa_reg[1].sbr_size,
+		    0, 0, &esc->sc_reg) != 0) {
 			printf("%s: cannot map scsi core registers\n",
 			       self->dv_xname);
 			return;
@@ -334,19 +323,15 @@ espattach_sbus(parent, self, aux)
 	 */
 	if (sa->sa_npromvaddrs) {
 		if (bus_space_map(sa->sa_bustag, sa->sa_promvaddrs[0],
-				 sa->sa_size,
-				 BUS_SPACE_MAP_PROMADDRESS | BUS_SPACE_MAP_LINEAR,
-				 &esc->sc_reg) != 0) {
+		    sa->sa_size, BUS_SPACE_MAP_PROMADDRESS,
+		    &esc->sc_reg) != 0) {
 			printf("%s @ sbus: cannot map registers\n",
 				self->dv_xname);
 			return;
 		}
 	} else {
 		if (sbus_bus_map(sa->sa_bustag, sa->sa_slot,
-				 sa->sa_offset,
-				 sa->sa_size,
-				 BUS_SPACE_MAP_LINEAR,
-				 0, &esc->sc_reg) != 0) {
+		    sa->sa_offset, sa->sa_size, 0, 0, &esc->sc_reg) != 0) {
 			printf("%s @ sbus: cannot map registers\n",
 				self->dv_xname);
 			return;
@@ -376,9 +361,7 @@ espattach_sbus(parent, self, aux)
 }
 
 void
-espattach_dma(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+espattach_dma(struct device *parent, struct device *self, void *aux)
 {
 	struct esp_softc *esc = (void *)self;
 	struct ncr53c9x_softc *sc = &esc->sc_ncr53c9x;
@@ -402,22 +385,16 @@ espattach_dma(parent, self, aux)
 	 * address space.
 	 */
 	if (sa->sa_npromvaddrs) {
-		if (bus_space_map(sa->sa_bustag,
-				   sa->sa_promvaddrs[0],
-				   sa->sa_size,		/* ??? */
-				   BUS_SPACE_MAP_PROMADDRESS | BUS_SPACE_MAP_LINEAR,
-				   &esc->sc_reg) != 0) {
+		if (bus_space_map(sa->sa_bustag, sa->sa_promvaddrs[0],
+		    sa->sa_size /* ??? */, BUS_SPACE_MAP_PROMADDRESS,
+		    &esc->sc_reg) != 0) {
 			printf("%s @ dma: cannot map registers\n",
 				self->dv_xname);
 			return;
 		}
 	} else {
-		if (sbus_bus_map(sa->sa_bustag,
-				   sa->sa_slot,
-				   sa->sa_offset,
-				   sa->sa_size,
-				   BUS_SPACE_MAP_LINEAR,
-				   0, &esc->sc_reg) != 0) {
+		if (sbus_bus_map(sa->sa_bustag, sa->sa_slot, sa->sa_offset,
+		    sa->sa_size, 0, 0, &esc->sc_reg) != 0) {
 			printf("%s @ dma: cannot map registers\n",
 				self->dv_xname);
 			return;
@@ -447,9 +424,7 @@ espattach_dma(parent, self, aux)
  * Attach this instance, and then all the sub-devices
  */
 void
-espattach(esc, gluep)
-	struct esp_softc *esc;
-	struct ncr53c9x_glue *gluep;
+espattach(struct esp_softc *esc, struct ncr53c9x_glue *gluep)
 {
 	struct ncr53c9x_softc *sc = &esc->sc_ncr53c9x;
 	void *icookie;
@@ -553,7 +528,7 @@ espattach(esc, gluep)
 
 	/* Establish interrupt channel */
 	icookie = bus_intr_establish(esc->sc_bustag, esc->sc_pri, IPL_BIO, 0,
-				     ncr53c9x_intr, sc);
+				     ncr53c9x_intr, sc, sc->sc_dev.dv_xname);
 
 	/* register interrupt stats */
 	evcnt_attach(&sc->sc_dev, "intr", &sc->sc_intrcnt);
@@ -619,9 +594,7 @@ static struct {
 #endif
 
 u_char
-esp_read_reg(sc, reg)
-	struct ncr53c9x_softc *sc;
-	int reg;
+esp_read_reg(struct ncr53c9x_softc *sc, int reg)
 {
 	struct esp_softc *esc = (struct esp_softc *)sc;
 	u_char v;
@@ -636,10 +609,7 @@ esp_read_reg(sc, reg)
 }
 
 void
-esp_write_reg(sc, reg, v)
-	struct ncr53c9x_softc *sc;
-	int reg;
-	u_char v;
+esp_write_reg(struct ncr53c9x_softc *sc, int reg, u_char v)
 {
 	struct esp_softc *esc = (struct esp_softc *)sc;
 
@@ -652,9 +622,7 @@ esp_write_reg(sc, reg, v)
 }
 
 u_char
-esp_rdreg1(sc, reg)
-	struct ncr53c9x_softc *sc;
-	int reg;
+esp_rdreg1(struct ncr53c9x_softc *sc, int reg)
 {
 	struct esp_softc *esc = (struct esp_softc *)sc;
 
@@ -662,10 +630,7 @@ esp_rdreg1(sc, reg)
 }
 
 void
-esp_wrreg1(sc, reg, v)
-	struct ncr53c9x_softc *sc;
-	int reg;
-	u_char v;
+esp_wrreg1(struct ncr53c9x_softc *sc, int reg, u_char v)
 {
 	struct esp_softc *esc = (struct esp_softc *)sc;
 
@@ -673,8 +638,7 @@ esp_wrreg1(sc, reg, v)
 }
 
 int
-esp_dma_isintr(sc)
-	struct ncr53c9x_softc *sc;
+esp_dma_isintr(struct ncr53c9x_softc *sc)
 {
 	struct esp_softc *esc = (struct esp_softc *)sc;
 
@@ -682,8 +646,7 @@ esp_dma_isintr(sc)
 }
 
 void
-esp_dma_reset(sc)
-	struct ncr53c9x_softc *sc;
+esp_dma_reset(struct ncr53c9x_softc *sc)
 {
 	struct esp_softc *esc = (struct esp_softc *)sc;
 
@@ -691,8 +654,7 @@ esp_dma_reset(sc)
 }
 
 int
-esp_dma_intr(sc)
-	struct ncr53c9x_softc *sc;
+esp_dma_intr(struct ncr53c9x_softc *sc)
 {
 	struct esp_softc *esc = (struct esp_softc *)sc;
 
@@ -700,12 +662,8 @@ esp_dma_intr(sc)
 }
 
 int
-esp_dma_setup(sc, addr, len, datain, dmasize)
-	struct ncr53c9x_softc *sc;
-	caddr_t *addr;
-	size_t *len;
-	int datain;
-	size_t *dmasize;
+esp_dma_setup(struct ncr53c9x_softc *sc, caddr_t *addr, size_t *len,
+    int datain, size_t *dmasize)
 {
 	struct esp_softc *esc = (struct esp_softc *)sc;
 
@@ -713,8 +671,7 @@ esp_dma_setup(sc, addr, len, datain, dmasize)
 }
 
 void
-esp_dma_go(sc)
-	struct ncr53c9x_softc *sc;
+esp_dma_go(struct ncr53c9x_softc *sc)
 {
 	struct esp_softc *esc = (struct esp_softc *)sc;
 
@@ -722,8 +679,7 @@ esp_dma_go(sc)
 }
 
 void
-esp_dma_stop(sc)
-	struct ncr53c9x_softc *sc;
+esp_dma_stop(struct ncr53c9x_softc *sc)
 {
 	struct esp_softc *esc = (struct esp_softc *)sc;
 	u_int32_t csr;
@@ -734,8 +690,7 @@ esp_dma_stop(sc)
 }
 
 int
-esp_dma_isactive(sc)
-	struct ncr53c9x_softc *sc;
+esp_dma_isactive(struct ncr53c9x_softc *sc)
 {
 	struct esp_softc *esc = (struct esp_softc *)sc;
 
@@ -749,11 +704,7 @@ esp_dma_isactive(sc)
 void db_esp(db_expr_t, int, db_expr_t, char *);
 
 void
-db_esp(addr, have_addr, count, modif)
-	db_expr_t addr;
-	int have_addr;
-	db_expr_t count;
-	char *modif;
+db_esp(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 {
 	struct ncr53c9x_softc *sc;
 	struct ncr53c9x_ecb *ecb;

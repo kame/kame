@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_icmp.c,v 1.57 2003/02/12 14:41:07 jason Exp $	*/
+/*	$OpenBSD: ip_icmp.c,v 1.61 2003/07/09 22:03:16 itojun Exp $	*/
 /*	$NetBSD: ip_icmp.c,v 1.19 1996/02/13 23:42:22 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -151,7 +147,7 @@ icmp_do_error(struct mbuf *n, int type, int code, n_long dest,
 	 * Don't error if the old packet protocol was ICMP
 	 * error message, only known informational types.
 	 */
-	if (oip->ip_off & IP_OFFMASK)
+	if (oip->ip_off & htons(IP_OFFMASK))
 		goto freeit;
 	if (oip->ip_p == IPPROTO_ICMP && type != ICMP_REDIRECT &&
 	    n->m_len >= oiplen + ICMP_MINLEN &&
@@ -173,7 +169,7 @@ icmp_do_error(struct mbuf *n, int type, int code, n_long dest,
 	/*
 	 * Now, formulate icmp message
 	 */
-	icmplen = oiplen + min(8, oip->ip_len);
+	icmplen = oiplen + min(8, ntohs(oip->ip_len));
 	/*
 	 * Defend against mbuf chains shorter than oip->ip_len:
 	 */
@@ -229,11 +225,8 @@ icmp_do_error(struct mbuf *n, int type, int code, n_long dest,
 			icp->icmp_nextmtu = htons(destifp->if_mtu);
 	}
 
-	HTONS(oip->ip_off);
-	HTONS(oip->ip_len);
 	icp->icmp_code = code;
 	m_copydata(n, 0, icmplen, (caddr_t)&icp->icmp_ip);
-	nip = &icp->icmp_ip;
 
 	/*
 	 * Now, copy old ip header (without options)
@@ -250,7 +243,7 @@ icmp_do_error(struct mbuf *n, int type, int code, n_long dest,
 	/* ip_v set in ip_output */
 	nip->ip_hl = sizeof(struct ip) >> 2;
 	nip->ip_tos = 0;
-	nip->ip_len = m->m_len;
+	nip->ip_len = htons(m->m_len);
 	/* ip_id set in ip_output */
 	nip->ip_off = 0;
 	/* ip_ttl set in icmp_reflect */
@@ -302,7 +295,7 @@ icmp_input(struct mbuf *m, ...)
 {
 	struct icmp *icp;
 	struct ip *ip = mtod(m, struct ip *);
-	int icmplen = ip->ip_len;
+	int icmplen;
 	int i;
 	struct in_ifaddr *ia;
 	void *(*ctlfunc)(int, struct sockaddr *, void *);
@@ -320,11 +313,12 @@ icmp_input(struct mbuf *m, ...)
 	 * Locate icmp structure in mbuf, and check
 	 * that not corrupted and of at least minimum length.
 	 */
+	icmplen = ntohs(ip->ip_len) - hlen;
 #ifdef ICMPPRINTFS
 	if (icmpprintfs) {
 		char buf[4 * sizeof("123")];
 
-		strcpy(buf, inet_ntoa(ip->ip_dst));
+		strlcpy(buf, inet_ntoa(ip->ip_dst), sizeof buf);
 		printf("icmp_input from %s to %s, len %d\n",
 		    inet_ntoa(ip->ip_src), buf, icmplen);
 	}
@@ -429,7 +423,6 @@ icmp_input(struct mbuf *m, ...)
 		}
 		if (IN_MULTICAST(icp->icmp_ip.ip_dst.s_addr))
 			goto badcode;
-		NTOHS(icp->icmp_ip.ip_len);
 #ifdef INET6
 		/* Get more contiguous data for a v6 in v4 ICMP message. */
 		if (icp->icmp_ip.ip_p == IPPROTO_IPV6) {
@@ -529,7 +522,6 @@ reflect:
 		if (m->m_flags & M_PKTHDR)
 			m_tag_delete_chain(m, NULL);
 
-		ip->ip_len += hlen;	/* since ip_input deducts this */
 		icmpstat.icps_reflect++;
 		icmpstat.icps_outhist[icp->icmp_type]++;
 		icmp_reflect(m);
@@ -560,7 +552,8 @@ reflect:
 #ifdef	ICMPPRINTFS
 		if (icmpprintfs) {
 			char buf[4 * sizeof("123")];
-			strcpy(buf, inet_ntoa(icp->icmp_ip.ip_dst));
+			strlcpy(buf, inet_ntoa(icp->icmp_ip.ip_dst),
+			    sizeof buf);
 
 			printf("redirect dst %s to %s\n",
 			    buf, inet_ntoa(icp->icmp_gwaddr));
@@ -740,7 +733,7 @@ icmp_reflect(struct mbuf *m)
 		 * Now strip out original options by copying rest of first
 		 * mbuf's data back, and adjust the IP length.
 		 */
-		ip->ip_len -= optlen;
+		ip->ip_len = htons(ntohs(ip->ip_len) - optlen);
 		ip->ip_hl = sizeof(struct ip) >> 2;
 		m->m_len -= optlen;
 		if (m->m_flags & M_PKTHDR)
@@ -772,14 +765,14 @@ icmp_send(struct mbuf *m, struct mbuf *opts)
 	m->m_len -= hlen;
 	icp = mtod(m, struct icmp *);
 	icp->icmp_cksum = 0;
-	icp->icmp_cksum = in_cksum(m, ip->ip_len - hlen);
+	icp->icmp_cksum = in_cksum(m, ntohs(ip->ip_len) - hlen);
 	m->m_data -= hlen;
 	m->m_len += hlen;
 #ifdef ICMPPRINTFS
 	if (icmpprintfs) {
 		char buf[4 * sizeof("123")];
 
-		strcpy(buf, inet_ntoa(ip->ip_dst));
+		strlcpy(buf, inet_ntoa(ip->ip_dst), sizeof buf);
 		printf("icmp_send dst %s src %s\n",
 		    buf, inet_ntoa(ip->ip_src));
 	}
@@ -907,7 +900,7 @@ icmp_mtudisc(struct icmp *icp)
 	if (mtu == 0) {
 		int i = 0;
 
-		mtu = icp->icmp_ip.ip_len; /* NTOHS happened in deliver: */
+		mtu = ntohs(icp->icmp_ip.ip_len);
 		/* Some 4.2BSD-based routers incorrectly adjust the ip_len */
 		if (mtu > rt->rt_rmx.rmx_mtu && rt->rt_rmx.rmx_mtu != 0)
 			mtu -= (icp->icmp_ip.ip_hl << 2);

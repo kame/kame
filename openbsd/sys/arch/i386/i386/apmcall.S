@@ -1,4 +1,4 @@
-/*	$OpenBSD: apmcall.S,v 1.3 2001/06/29 22:22:45 mickey Exp $	*/
+/*	$OpenBSD: apmcall.S,v 1.5 2003/06/03 20:10:31 mickey Exp $	*/
 
 /*
  * Copyright (c) 2000,2001 Michael Shalayeff
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -79,7 +74,7 @@ ENTRY(apmcall)
 	movl	8(%ebp), %eax
 
 	clc
-	lcall	%cs:(_C_LABEL(apm_ep))
+	lcall	%cs:*(_C_LABEL(apm_ep))
 	pushl	%eax
 	setc	%al
 	movzbl	%al, %esi

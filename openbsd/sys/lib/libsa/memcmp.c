@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -35,7 +31,7 @@
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
-static char *rcsid = "$OpenBSD: memcmp.c,v 1.4 1997/04/07 05:59:30 millert Exp $";
+static char *rcsid = "$OpenBSD: memcmp.c,v 1.6 2003/08/08 03:36:06 deraadt Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include "stand.h"
@@ -44,12 +40,10 @@ static char *rcsid = "$OpenBSD: memcmp.c,v 1.4 1997/04/07 05:59:30 millert Exp $
  * Compare memory regions.
  */
 int
-memcmp(s1, s2, n)
-	const void *s1, *s2;
-	size_t n;
+memcmp(const void *s1, const void *s2, size_t n)
 {
 	if (n != 0) {
-		register const unsigned char *p1 = s1, *p2 = s2;
+		const unsigned char *p1 = s1, *p2 = s2;
 
 		do {
 			if (*p1++ != *p2++)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_mbuf.c,v 1.59 2003/02/12 14:41:07 jason Exp $	*/
+/*	$OpenBSD: uipc_mbuf.c,v 1.63 2003/08/12 05:09:18 mickey Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.15.4.1 1996/06/13 17:11:44 cgd Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -122,6 +118,7 @@ mbinit()
 {
 	vaddr_t minaddr, maxaddr;
 
+	minaddr = vm_map_min(kernel_map);
 	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 	    nmbclust*(MCLBYTES), VM_MAP_INTRSAFE, FALSE, NULL);
 
@@ -423,6 +420,60 @@ m_copydata(m, off, len, cp)
 		off = 0;
 		m = m->m_next;
 	}
+}
+
+/*
+ * Copy data from a buffer back into the indicated mbuf chain,
+ * starting "off" bytes from the beginning, extending the mbuf
+ * chain if necessary. The mbuf needs to be properly initialized
+ * including the setting of m_len.
+ */
+void
+m_copyback(m0, off, len, cp)
+	struct	mbuf *m0;
+	register int off;
+	register int len;
+	const void *cp;
+{
+	register int mlen;
+	register struct mbuf *m = m0, *n;
+	int totlen = 0;
+
+	if (m0 == 0)
+		return;
+	while (off > (mlen = m->m_len)) {
+		off -= mlen;
+		totlen += mlen;
+		if (m->m_next == 0) {
+			n = m_getclr(M_DONTWAIT, m->m_type);
+			if (n == 0)
+				goto out;
+			n->m_len = min(MLEN, len + off);
+			m->m_next = n;
+		}
+		m = m->m_next;
+	}
+	while (len > 0) {
+		mlen = min (m->m_len - off, len);
+		bcopy(cp, off + mtod(m, caddr_t), (unsigned)mlen);
+		cp += mlen;
+		len -= mlen;
+		mlen += off;
+		off = 0;
+		totlen += mlen;
+		if (len == 0)
+			break;
+		if (m->m_next == 0) {
+			n = m_get(M_DONTWAIT, m->m_type);
+			if (n == 0)
+				break;
+			n->m_len = min(MLEN, len);
+			m->m_next = n;
+		}
+		m = m->m_next;
+	}
+out:	if (((m = m0)->m_flags & M_PKTHDR) && (m->m_pkthdr.len < totlen))
+		m->m_pkthdr.len = totlen;
 }
 
 /*

@@ -1,10 +1,10 @@
-/*	$OpenBSD: miidevs.h,v 1.36 2003/02/19 10:13:05 miod Exp $	*/
+/*	$OpenBSD: miidevs.h,v 1.40 2003/08/12 19:44:43 mickey Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	OpenBSD: miidevs,v 1.33 2003/02/19 10:12:55 miod Exp 
+ *	OpenBSD: miidevs,v 1.37 2003/08/12 19:42:37 mickey Exp 
  */
 /* $NetBSD: miidevs,v 1.3 1998/11/05 03:43:43 thorpej Exp $ */
 
@@ -109,6 +109,8 @@
 /* Altima Communications PHYs */
 #define	MII_MODEL_xxALTIMA_AC101	0x0021
 #define	MII_STR_xxALTIMA_AC101	"AC101 10/100 media interface"
+#define	MII_MODEL_xxALTIMA_AC101L	0x0012
+#define	MII_STR_xxALTIMA_AC101L	"AC101L 10/100 media interface"
 
 /* Broadcom Corp. PHYs */
 #define	MII_MODEL_xxBROADCOM_BCM5400	0x0004
@@ -153,8 +155,14 @@
 /* Marvell Semiconductor PHYs */
 #define	MII_MODEL_MARVELL_E1000	0x0000
 #define	MII_STR_MARVELL_E1000	"Marvell 88E1000* Gigabit PHY"
+#define	MII_MODEL_MARVELL_E1011	0x0002
+#define	MII_STR_MARVELL_E1011	"Marvell 88E1011 Gigabit PHY"
 #define	MII_MODEL_MARVELL_E1000_3	0x0003
 #define	MII_STR_MARVELL_E1000_3	"Marvell 88E1000 Gigabit PHY"
+#define	MII_MODEL_MARVELL_E1000_4	0x0004
+#define	MII_STR_MARVELL_E1000_4	"Marvell 88E1000S Gigabit PHY"
+#define	MII_MODEL_MARVELL_E1000_5	0x0005
+#define	MII_STR_MARVELL_E1000_5	"Marvell 88E1000 Gigabit PHY"
 #define	MII_MODEL_MARVELL_E1000_6	0x0006
 #define	MII_STR_MARVELL_E1000_6	"Marvell 88E1000 Gigabit PHY"
 #define	MII_MODEL_xxMARVELL_E1000_3	0x0003

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vnd.c,v 1.35 2003/02/25 09:13:35 tedu Exp $	*/
+/*	$OpenBSD: vnd.c,v 1.39 2003/08/15 20:32:16 tedu Exp $	*/
 /*	$NetBSD: vnd.c,v 1.26 1996/03/30 23:06:11 christos Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -302,9 +298,9 @@ vndgetdisklabel(dev, sc)
 		/* as long as it's not 0 - readdisklabel divides by it (?) */
 	}
 
-	strncpy(lp->d_typename, "vnd device", 16);
+	strncpy(lp->d_typename, "vnd device", sizeof(lp->d_typename));
 	lp->d_type = DTYPE_SCSI;
-	strncpy(lp->d_packname, "fictitious", 16);
+	strncpy(lp->d_packname, "fictitious", sizeof(lp->d_packname));
 	lp->d_secperunit = sc->sc_size;
 	lp->d_rpm = 3600;
 	lp->d_interleave = 1;
@@ -429,7 +425,7 @@ vndstrategy(bp)
 	}
 	if (DISKPART(bp->b_dev) != RAW_PART &&
 	    bounds_check_with_label(bp, vnd->sc_dk.dk_label,
-	    vnd->sc_dk.dk_cpulabel, 1) == 0) {
+	    vnd->sc_dk.dk_cpulabel, 1) <= 0) {
 		s = splbio();
 		biodone(bp);
 		splx(s);
@@ -761,7 +757,7 @@ vndioctl(dev, cmd, addr, flag, p)
 		printf("vndioctl(%x, %lx, %p, %x, %p): unit %d\n",
 		    dev, cmd, addr, flag, p, unit);
 #endif
-	error = suser(p->p_ucred, &p->p_acflag);
+	error = suser(p, 0);
 	if (error)
 		return (error);
 	if (unit >= numvnd)
@@ -779,6 +775,14 @@ vndioctl(dev, cmd, addr, flag, p)
 
 		if ((error = vndlock(vnd)) != 0)
 			return (error);
+
+		bzero(vnd->sc_dev.dv_xname, sizeof(vnd->sc_dev.dv_xname));
+		if (snprintf(vnd->sc_dev.dv_xname, sizeof(vnd->sc_dev.dv_xname),
+		    "vnd%d", unit) >= sizeof(vnd->sc_dev.dv_xname)) {
+			printf("VNDIOCSET: device name too long\n");
+			vndunlock(vnd);
+			return(ENXIO);
+		}
 
 		/*
 		 * Always open for read and write.
@@ -837,8 +841,6 @@ vndioctl(dev, cmd, addr, flag, p)
 #endif
 
 		/* Attach the disk. */
-		bzero(vnd->sc_dev.dv_xname, sizeof(vnd->sc_dev.dv_xname));
-		sprintf(vnd->sc_dev.dv_xname, "vnd%d", unit);
 		vnd->sc_dk.dk_driver = &vnddkdriver;
 		vnd->sc_dk.dk_name = vnd->sc_dev.dv_xname;
 		disk_attach(&vnd->sc_dk);

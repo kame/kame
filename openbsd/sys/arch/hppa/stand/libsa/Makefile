@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.11 2002/12/20 02:44:26 mickey Exp $
+#	$OpenBSD: Makefile,v 1.13 2003/06/08 14:25:05 miod Exp $
 
 .include "${.CURDIR}/../Makefile.inc"
 
@@ -11,7 +11,7 @@ DIR_SA=	$S/lib/libsa
 NOPROFILE=noprofile
 NOPIC=nopic
 
-#AS=cat ; 
+#AS=cat ;
 #AS+=	-R
 #AS+=	-a
 
@@ -21,7 +21,7 @@ SRCS=	machdep.c pdc.c itecons.c dev_hppa.c time.c \
 
 # stand routines
 SRCS+=	alloc.c exit.c getfile.c gets.c globals.c \
-	printf.c strerror.c strtol.c strchr.c ctime.c loadfile.c
+	printf.c strerror.c strtol.c strchr.c ctime.c loadfile.c snprintf.c
 
 # io routines
 SRCS+=	close.c closeall.c dev.c disklabel.c dkcksum.c fstat.c ioctl.c lseek.c \

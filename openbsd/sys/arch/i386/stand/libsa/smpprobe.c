@@ -1,4 +1,4 @@
-/*	$OpenBSD: smpprobe.c,v 1.3 1998/09/27 17:42:07 mickey Exp $	*/
+/*	$OpenBSD: smpprobe.c,v 1.5 2003/08/11 06:23:09 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Tobias Weingartner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
@@ -53,9 +48,7 @@ typedef struct _mp_float {
 
 
 static __inline int
-mp_checksum(ptr, len)
-	u_int8_t *ptr;
-	int len;
+mp_checksum(u_int8_t *ptr, int len)
 {
 	register int i, sum = 0;
 
@@ -71,9 +64,7 @@ mp_checksum(ptr, len)
 
 
 static mp_float_t *
-mp_probefloat(ptr, len)
-	u_int8_t *ptr;
-	int len;
+mp_probefloat(u_int8_t *ptr, int len)
 {
 	mp_float_t *mpp = NULL;
 	int i;
@@ -84,6 +75,7 @@ mp_probefloat(ptr, len)
 #endif
 	for(i = 0; i < 1024; i++){
 		mp_float_t *tmp = (mp_float_t*)(ptr + i);
+
 		if(tmp->signature == MP_FLOAT_SIG){
 			printf("Found possible MP signature at: %p\n", ptr);
 
@@ -91,7 +83,7 @@ mp_probefloat(ptr, len)
 			break;
 		}
 		if((tmp->signature == MP_FLOAT_SIG) &&
-			mp_checksum(tmp, tmp->length*16)){
+			mp_checksum((u_int8_t *)tmp, tmp->length*16)){
 #ifdef DEBUG
 			if (debug)
 				printf("Found valid MP signature at: %p\n", ptr);
@@ -106,7 +98,7 @@ mp_probefloat(ptr, len)
 
 
 void
-smpprobe()
+smpprobe(void)
 {
 	mp_float_t *mp = NULL;
 

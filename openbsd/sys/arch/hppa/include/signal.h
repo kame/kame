@@ -1,4 +1,4 @@
-/*	$OpenBSD: signal.h,v 1.2 2002/02/06 19:39:20 mickey Exp $	*/
+/*	$OpenBSD: signal.h,v 1.4 2003/08/04 16:39:24 mickey Exp $	*/
 
 /* 
  * Copyright (c) 1994, The University of Utah and
@@ -41,13 +41,13 @@ typedef int sig_atomic_t;
  * a non-standard exit is performed.
  */
 struct	sigcontext {
-	int	sc_onstack;		/* sigstack state to restore */
-	int	sc_mask;		/* signal mask to restore */
-	int	sc_ps;			/* psl to restore */
-	int	sc_sp;			/* sp to restore */
-	int	sc_fp;			/* fp to restore */
-	int	sc_pcoqh;		/* pc offset queue (head) to restore */
-	int	sc_pcoqt;		/* pc offset queue (tail) to restore */
-	int	sc_resv[5];
-	int	sc_tf[64];
+	unsigned	sc_onstack;	/* sigstack state to restore */
+	unsigned	sc_mask;	/* signal mask to restore */
+	unsigned	sc_ps;		/* psl to restore */
+	unsigned	sc_fp;		/* fp to restore */
+	unsigned	sc_pcoqh;	/* pc offset queue (head) to restore */
+	unsigned	sc_pcoqt;	/* pc offset queue (tail) to restore */
+	unsigned	sc_resv[2];
+	unsigned	sc_regs[32];
+	unsigned	sc_fpregs[64];
 };

@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISK,v 1.116 2002/12/02 09:00:54 deraadt Exp $
+#	$OpenBSD: RAMDISK,v 1.122 2003/08/08 19:37:59 deraadt Exp $
 
 machine		i386		# architecture, used by config; REQUIRED
 
@@ -12,6 +12,7 @@ option		I686_CPU
 option		GPL_MATH_EMULATE	# floating point emulation
 
 option		SMALL_KERNEL
+option		NO_PROPOLICE
 
 #option		DUMMY_NOPS	# speed hack; recommended
 
@@ -94,7 +95,7 @@ pccom2	at isa? port 0x3e8 irq 5
 #pccom*	at boca? slave ?
 #rtfps0	at isa? port 0x1230 irq 10	# RT 4-port serial cards
 #pccom*	at rtfps? slave ?
-pccom*	at pcmcia? function ?		# PCMCIA modem cards
+#pccom*	at pcmcia? function ?		# PCMCIA modem cards
 pccom*	at isapnp?
 
 # option for using CD1400 handshaking for incoming data
@@ -219,9 +220,22 @@ rl*	at pci? dev ? function ?		# RealTek 81[23]9 ethernet
 tx*	at pci? dev ? function ?		# SMC 83C170 EPIC ethernet cards
 tl*	at pci? dev ? function ?		# Compaq Thunderlan ethernet cards
 vr*	at pci? dev ? function ?		# VIA Rhine ethernet
-wb*	at pci? dev ? function ?		# Winbond W89C840F ethernet
+#wb*	at pci? dev ? function ?		# Winbond W89C840F ethernet
 dc*	at pci? dev ? function ?		# 21143, "tulip" clone ethernet
 sis*	at pci? dev ? function ?		# SiS 900/7016 ethernet
+#ste*	at pci? dev ? function ?		# Sundance ST201 ethernet
+#dc*	at pci? dev ? function ?		# 21143, "tulip" clone ethernet
+#dc*	at cardbus? dev ? function ?		# 21143, "tulip" clone ethernet
+#ti*	at pci? dev ? function ?		# Alteon Tigon 1Gb ethernet
+#skc*	at pci? dev ? function ?		# SysKonnect GEnesis 984x
+#sk*	at skc?					#  each port of above
+em*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
+#txp*	at pci? dev ? function ?		# 3com 3CR990
+#nge*	at pci? dev ? function ?		# NS DP83820/DP83821 GigE
+#bge*	at pci? dev ? function ?		# Broadcom BCM570x (aka Tigon3)
+#stge*	at pci? dev ? function ?		# Sundance TC9021 GigE
+#lge*	at pci? dev ? function ?		# Level1 LXT1001 GigE
+#hme*	at pci? dev ? function ?		# Sun Happy Meal
 
 # Wireless network cards
 wi*	at pci? dev ? function ?		# WaveLAN IEEE 802.11DS

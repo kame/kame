@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.55 2003/01/22 19:01:19 miod Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.59 2003/06/23 09:23:31 miod Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.73 1997/07/29 09:41:53 fair Exp $ */
 
 /*
@@ -25,11 +25,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -94,7 +90,6 @@
  * the configuration process, and are used in initializing
  * the machine.
  */
-int	cold;		/* if 1, still working on cold-start */
 int	fbnode;		/* node ID of ROM's console frame buffer */
 int	optionsnode;	/* node ID of ROM's options */
 int	mmu_3l;		/* SUN4_400 models have a 3-level MMU */
@@ -141,6 +136,14 @@ LIST_HEAD(, mountroot_hook) mrh_list;
 #ifdef RAMDISK_HOOKS
 static struct device fakerdrootdev = { DV_DISK, {}, NULL, 0, "rd0", NULL };
 #endif
+
+/* Translate SBus interrupt level to processor IPL */
+int	intr_sbus2ipl_4c[] = {
+	0, 1, 2, 3, 5, 7, 8, 9
+};
+int	intr_sbus2ipl_4m[] = {
+	0, 2, 3, 5, 7, 9, 11, 13
+};
 
 /*
  * Most configuration on the SPARC is done by matching OPENPROM Forth
@@ -496,7 +499,7 @@ bootpath_fake(bp, cp)
 	int v0val[3];
 
 #define BP_APPEND(BP,N,V0,V1,V2) { \
-	strcpy((BP)->name, N); \
+	strlcpy((BP)->name, N, sizeof (BP)->name); \
 	(BP)->val[0] = (V0); \
 	(BP)->val[1] = (V1); \
 	(BP)->val[2] = (V2); \
@@ -532,9 +535,9 @@ bootpath_fake(bp, cp)
 			} else {
 				BP_APPEND(bp, "vmes", -1, 0, 0);
 			}
-			sprintf(tmpname,"x%cc", cp[1]); /* e.g. xdc */
+			snprintf(tmpname,sizeof tmpname,"x%cc", cp[1]); /* e.g. xdc */
 			BP_APPEND(bp, tmpname,-1, v0val[0], 0);
-			sprintf(tmpname,"%c%c", cp[0], cp[1]);
+			snprintf(tmpname,sizeof tmpname,"%c%c", cp[0], cp[1]);
 			BP_APPEND(bp, tmpname,v0val[1], v0val[2], 0); /* e.g. xd */
 			return;
 		}
@@ -545,7 +548,7 @@ bootpath_fake(bp, cp)
 		 */
 		if ((cp[0] == 'i' || cp[0] == 'l') && cp[1] == 'e')  {
 			BP_APPEND(bp, "obio", -1, 0, 0);
-			sprintf(tmpname,"%c%c", cp[0], cp[1]);
+			snprintf(tmpname,sizeof tmpname,"%c%c", cp[0], cp[1]);
 			BP_APPEND(bp, tmpname, -1, 0, 0);
 			return;
 		}
@@ -591,7 +594,7 @@ bootpath_fake(bp, cp)
 				target = v0val[1] >> 2; /* old format */
 				lun    = v0val[1] & 0x3;
 			}
-			sprintf(tmpname, "%c%c", cp[0], cp[1]);
+			snprintf(tmpname, sizeof tmpname, "%c%c", cp[0], cp[1]);
 			BP_APPEND(bp, tmpname, target, lun, v0val[2]);
 			return;
 		}
@@ -639,9 +642,9 @@ bootpath_fake(bp, cp)
 		BP_APPEND(bp, "sbus", -1, 0, 0);
 		BP_APPEND(bp, "esp", -1, v0val[0], 0);
 		if (cp[1] == 'r')
-			sprintf(tmpname, "cd"); /* netbsd uses 'cd', not 'sr'*/
+			snprintf(tmpname, sizeof tmpname, "cd"); /* netbsd uses 'cd', not 'sr'*/
 		else
-			sprintf(tmpname,"%c%c", cp[0], cp[1]);
+			snprintf(tmpname, sizeof tmpname, "%c%c", cp[0], cp[1]);
 		/* XXX - is TARGET/LUN encoded in v0val[1]? */
 		target = v0val[1];
 		lun = 0;
@@ -921,12 +924,12 @@ clockfreq(freq)
 	static char buf[10];
 
 	freq /= 1000;
-	sprintf(buf, "%d", freq / 1000);
+	snprintf(buf, sizeof buf, "%d", freq / 1000);
 	freq %= 1000;
 	if (freq) {
 		freq += 1000;	/* now in 1000..1999 */
 		p = buf + strlen(buf);
-		sprintf(p, "%d", freq);
+		snprintf(p, buf + sizeof buf - p, "%d", freq);
 		*p = '.';	/* now buf = %d.%3d */
 	}
 	return (buf);
@@ -986,7 +989,7 @@ romprop(rp, cp, node)
 	const char *cp;
 	register int node;
 {
-	register int len;
+	int len, n;
 	union { char regbuf[256]; struct rom_reg rr[RA_MAXREG]; } u;
 	static const char pl[] = "property length";
 
@@ -1025,6 +1028,32 @@ romprop(rp, cp, node)
 	len = getprop(node, "intr", (void *)&rp->ra_intr, sizeof rp->ra_intr);
 	if (len == -1)
 		len = 0;
+
+	/*
+	 * Some SBus cards only provide an "interrupts" properly, listing
+	 * SBus levels. But since obio devices will usually also provide
+	 * both properties, only check for "interrupts" last.
+	 */
+	if (len == 0) {
+		u_int32_t *interrupts;
+		len = getproplen(node, "interrupts");
+		if (len > 0 &&
+		    (interrupts = malloc(len, M_TEMP, M_NOWAIT)) != NULL) {
+			/* Build rom_intr structures from the list */
+			getprop(node, "interrupts", interrupts, len);
+			len /= sizeof(u_int32_t);
+			for (n = 0; n < len; n++) {
+				rp->ra_intr[n].int_pri = CPU_ISSUN4M ?
+				    intr_sbus2ipl_4m[interrupts[n]] :
+				    intr_sbus2ipl_4c[interrupts[n]];
+				rp->ra_intr[n].int_vec = 0;
+			};
+			len *= sizeof(struct rom_intr);
+			free(interrupts, M_TEMP);
+		} else
+			len = 0;
+	}
+
 	if (len & 7) {
 		printf("%s \"intr\" %s = %d (need multiple of 8)\n",
 		    cp, pl, len);
@@ -1042,7 +1071,6 @@ romprop(rp, cp, node)
 		if (CPU_ISSUN4M) {
 			/* What's in these high bits anyway? */
 			rp->ra_intr[len].int_pri &= 0xf;
-			/* Look at "interrupts" property too? */
 		}
 #endif
 
@@ -1146,9 +1174,11 @@ mainbus_attach(parent, dev, aux)
 #endif
 
 	if (CPU_ISSUN4)
-		sprintf(mainbus_model, "SUN-4/%d series", cpuinfo.classlvl);
+		snprintf(mainbus_model, sizeof mainbus_model,
+			"SUN-4/%d series", cpuinfo.classlvl);
 	else
-		strcat(mainbus_model, getpropstring(ca->ca_ra.ra_node, "name"));
+		strlcat(mainbus_model, getpropstring(ca->ca_ra.ra_node,"name"),
+			sizeof mainbus_model);
 	printf(": %s\n", mainbus_model);
 
 	/*
@@ -1696,11 +1726,11 @@ romgetcursoraddr(rowp, colp)
 	 * correct cutoff point is unknown, as yet; we use 2.9 here.
 	 */
 	if (promvec->pv_romvec_vers < 2 || promvec->pv_printrev < 0x00020009)
-		sprintf(buf,
+		snprintf(buf, sizeof buf,
 		    "' line# >body >user %lx ! ' column# >body >user %lx !",
 		    (u_long)rowp, (u_long)colp);
 	else
-		sprintf(buf,
+		snprintf(buf, sizeof buf,
 		    "stdout @ is my-self addr line# %lx ! addr column# %lx !",
 		    (u_long)rowp, (u_long)colp);
 	*rowp = *colp = NULL;
@@ -1943,7 +1973,8 @@ setroot()
 		unit = DISKUNIT(rootdev);
 		part = DISKPART(rootdev);
 
-		len = sprintf(buf, "%s%d", findblkname(majdev), unit);
+		len = snprintf(buf, sizeof buf, "%s%d", findblkname(majdev),
+			unit);
 		if (len >= sizeof(buf))
 			panic("setroot: device name too long");
 
@@ -1968,7 +1999,7 @@ setroot()
 			printf(": ");
 			len = getstr(buf, sizeof(buf));
 			if (len == 0 && bootdv != NULL) {
-				strcpy(buf, bootdv->dv_xname);
+				strlcpy(buf, bootdv->dv_xname, sizeof buf);
 				len = strlen(buf);
 			}
 			if (len > 0 && buf[len - 1] == '*') {
@@ -2191,13 +2222,13 @@ getdevunit(name, unit)
 	int lunit;
 
 	/* compute length of name and decimal expansion of unit number */
-	sprintf(num, "%d", unit);
+	snprintf(num, sizeof num, "%d", unit);
 	lunit = strlen(num);
 	if (strlen(name) + lunit >= sizeof(fullname) - 1)
 		panic("config_attach: device name too long");
 
-	strcpy(fullname, name);
-	strcat(fullname, num);
+	strlcpy(fullname, name, sizeof fullname);
+	strlcat(fullname, num, sizeof fullname);
 
 	while (strcmp(dev->dv_xname, fullname) != 0) {
 		if ((dev = dev->dv_list.tqe_next) == NULL)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ffs_vfsops.c,v 1.54 2002/08/01 16:41:33 millert Exp $	*/
+/*	$OpenBSD: ffs_vfsops.c,v 1.59 2003/08/25 23:26:55 tedu Exp $	*/
 /*	$NetBSD: ffs_vfsops.c,v 1.19 1996/02/09 22:22:26 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -72,7 +68,7 @@ int ffs_sbupdate(struct ufsmount *, int);
 int ffs_reload_vnode(struct vnode *, void *);
 int ffs_sync_vnode(struct vnode *, void *);
 
-struct vfsops ffs_vfsops = {
+const struct vfsops ffs_vfsops = {
 	ffs_mount,
 	ufs_start,
 	ffs_unmount,
@@ -288,7 +284,7 @@ ffs_mount(mp, path, data, ndp, p)
 					printf(
 "WARNING: R/W mount of %s denied.  Filesystem is not clean - run fsck\n",
 					    fs->fs_fsmnt);
-					error = EPERM;
+					error = EROFS;
 					goto error_1;
 				}
 			}
@@ -487,7 +483,7 @@ ffs_reload_vnode(struct vnode *vp, void *args)
 		vput(vp);
 		return (error);
 	}
-	ip->i_din.ffs_din = *((struct dinode *)bp->b_data +
+	ip->i_din1 = *((struct ufs1_dinode *)bp->b_data +
 	    ino_to_fsbo(fra->fs, ip->i_number));
 	ip->i_effnlink = ip->i_ffs_nlink;
 	brelse(bp);
@@ -690,7 +686,7 @@ ffs_mountfs(devvp, mp, p)
 			printf(
 "WARNING: R/W mount of %s denied.  Filesystem is not clean - run fsck\n",
 			    fs->fs_fsmnt);
-			error = EPERM;
+			error = EROFS;
 			goto out;
 		}
 	}
@@ -997,7 +993,7 @@ ffs_statfs(mp, sbp, p)
 	sbp->f_blocks = fs->fs_dsize;
 	sbp->f_bfree = fs->fs_cstotal.cs_nbfree * fs->fs_frag +
 		fs->fs_cstotal.cs_nffree;
-	sbp->f_bavail = sbp->f_bfree - fs->fs_dsize * fs->fs_minfree / 100;
+	sbp->f_bavail = sbp->f_bfree - ((int64_t)fs->fs_dsize * fs->fs_minfree / 100);
 	sbp->f_files = fs->fs_ncg * fs->fs_ipg - ROOTINO;
 	sbp->f_ffree = fs->fs_cstotal.cs_nifree;
 	if (sbp != &mp->mnt_stat) {
@@ -1200,7 +1196,7 @@ retry:
 		*vpp = NULL;
 		return (error);
 	}
-	ip->i_din.ffs_din = *((struct dinode *)bp->b_data + ino_to_fsbo(fs, ino));
+	ip->i_din1 = *((struct ufs1_dinode *)bp->b_data + ino_to_fsbo(fs, ino));
 	if (DOINGSOFTDEP(vp))
 		softdep_load_inodeblock(ip);
 	else
@@ -1238,8 +1234,8 @@ retry:
 	 * fix until fsck has been changed to do the update.
 	 */
 	if (fs->fs_inodefmt < FS_44INODEFMT) {			/* XXX */
-		ip->i_ffs_uid = ip->i_din.ffs_din.di_ouid;	/* XXX */
-		ip->i_ffs_gid = ip->i_din.ffs_din.di_ogid;	/* XXX */
+		ip->i_ffs_uid = ip->i_din1.di_ouid;		/* XXX */
+		ip->i_ffs_gid = ip->i_din1.di_ogid;		/* XXX */
 	}							/* XXX */
 
 	*vpp = vp;

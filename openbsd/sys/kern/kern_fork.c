@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_fork.c,v 1.59 2002/10/31 01:33:27 art Exp $	*/
+/*	$OpenBSD: kern_fork.c,v 1.62 2003/07/02 00:07:42 avsm Exp $	*/
 /*	$NetBSD: kern_fork.c,v 1.29 1996/02/09 18:59:34 christos Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -175,7 +171,7 @@ fork1(struct proc *p1, int exitsig, int flags, void *stack, size_t stacksize,
 	}
 
 	/*
-	 * From now on, we're comitted to the fork and cannot fail.
+	 * From now on, we're committed to the fork and cannot fail.
 	 */
 
 	/* Allocate new proc. */
@@ -279,6 +275,11 @@ fork1(struct proc *p1, int exitsig, int flags, void *stack, size_t stacksize,
 	else
 		p2->p_sigacts = sigactsinit(p1);
 
+	/*
+	 * If emulation has process fork hook, call it now.
+	 */
+	if (p2->p_emul->e_proc_fork)
+		(*p2->p_emul->e_proc_fork)(p2, p1);
 	/*
 	 * This begins the section where we must prevent the parent
 	 * from being swapped.

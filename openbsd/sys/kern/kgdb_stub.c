@@ -1,4 +1,4 @@
-/* $OpenBSD: kgdb_stub.c,v 1.4 2002/03/14 03:16:09 millert Exp $ */
+/* $OpenBSD: kgdb_stub.c,v 1.6 2003/06/02 23:28:06 millert Exp $ */
 /*	$NetBSD: kgdb_stub.c,v 1.6 1998/08/30 20:30:57 scottr Exp $	*/
 
 /*
@@ -22,11 +22,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -379,7 +375,7 @@ kgdb_trap(type, regs)
 		kgdb_active = 1;
 	} else {
 		/* Tell remote host that an exception has occurred. */
-		sprintf(buffer, "S%02x", kgdb_signal(type));
+		snprintf(buffer, sizeof buffer, "S%02x", kgdb_signal(type));
 		kgdb_send(buffer);
 	}
 
@@ -407,7 +403,7 @@ kgdb_trap(type, regs)
 			 * knowing if we're in or out of this loop
 			 * when he issues a "remote-signal".
 			 */
-			sprintf(buffer, "S%02x", kgdb_signal(type));
+			snprintf(buffer, sizeof buffer, "S%02x", kgdb_signal(type));
 			kgdb_send(buffer);
 			continue;
 

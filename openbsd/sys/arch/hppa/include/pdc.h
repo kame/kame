@@ -1,4 +1,4 @@
-/*	$OpenBSD: pdc.h,v 1.22 2002/12/15 21:07:26 mickey Exp $	*/
+/*	$OpenBSD: pdc.h,v 1.26 2003/08/20 22:51:07 mickey Exp $	*/
 
 /*
  * Copyright (c) 1990 mt Xinu, Inc.  All rights reserved.
@@ -24,6 +24,7 @@
  * improvements that they make and grant CSL redistribution rights.
  *
  *	Utah $Hdr: pdc.h 1.12 94/12/14$
+ *	Author: Jeff Forys (CSS), Dave Slattengren (mtXinu)
  */
 
 #ifndef	_MACHINE_PDC_H_
@@ -90,6 +91,7 @@
 #define	IODC_MAXSIZE	(16 * 4 * 1024)	/* maximum size of IODC */
 #define	IODC_MINIOSIZ	64		/* minimum buffer size for IODC call */
 #define	IODC_MAXIOSIZ	(64 * 1024)	/* maximum buffer size for IODC call */
+#define	IODC_IOSIZ	(16 * 1024)
 
 #define	PDC_ALIGNMENT	__attribute__ ((__aligned__(64)))
 #define	PDC_STACKSIZE	(4*NBPG)
@@ -403,8 +405,8 @@ struct pdc_coproc {	/* PDC_COPROC */
 	u_int	ccr_enable;	/* same format as CCR (CR 10) */
 	u_int	ccr_present;	/* which co-proc's are present (bitset) */
 	u_int	pad[15];
-	u_int	fpu_model;
 	u_int	fpu_revision;
+	u_int	fpu_model;
 	u_int	filler2[13];
 };
 
@@ -452,6 +454,11 @@ struct pdc_btlb {	/* PDC_BLOCK_TLB */
 struct pdc_hwtlb {	/* PDC_TLB */
 	u_int	min_size;	/* What do these mean? */
 	u_int	max_size;
+	u_int	filler[30];
+};
+
+struct pdc_power_info {		/* PDC_SOFT_POWER_INFO */
+	u_int	addr;		/* power register address */
 	u_int	filler[30];
 };
 

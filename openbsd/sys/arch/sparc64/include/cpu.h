@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.19 2003/03/21 22:59:09 jason Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.24 2003/07/10 15:26:54 jason Exp $	*/
 /*	$NetBSD: cpu.h,v 1.28 2001/06/14 22:56:58 thorpej Exp $ */
 
 /*
@@ -22,11 +22,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -74,10 +70,10 @@
  * Exported definitions unique to SPARC cpu support.
  */
 
+#include <machine/ctlreg.h>
 #include <machine/psl.h>
 #include <machine/reg.h>
 #include <machine/intr.h>
-#include <sparc64/sparc64/intreg.h>
 
 /*#include <sys/sched.h> */
 
@@ -197,15 +193,8 @@ union sir {
 #define SIR_CLOCK	1
 #endif
 
-extern struct intrhand soft01intr, soft01net, soft01clock;
-
-#if 0
-#define setsoftint()	send_softint(-1, IPL_SOFTINT, &soft01intr)
-#define setsoftnet()	send_softint(-1, IPL_SOFTNET, &soft01net)
-#else
 void setsoftint(void);
 void setsoftnet(void);
-#endif
 
 extern	int want_ast;
 
@@ -237,29 +226,6 @@ extern	int want_resched;	/* resched() was called */
 extern	struct proc *fpproc;	/* FPU owner */
 extern	int foundfpu;		/* true => we have an FPU */
 
-/*
- * Interrupt handler chains.  Interrupt handlers should return 0 for
- * ``not me'' or 1 (``I took care of it'').  intr_establish() inserts a
- * handler into the list.  The handler is called with its (single)
- * argument, or with a pointer to a clockframe if ih_arg is NULL.
- */
-struct intrhand {
-	int			(*ih_fun)(void *);
-	void			*ih_arg;
-	short			ih_number;	/* interrupt number */
-						/* the H/W provides */
-	char			ih_pil;		/* interrupt priority */
-	volatile char		ih_busy;	/* handler is on list */
-	struct intrhand		*ih_next;	/* global list */
-	struct intrhand		*ih_pending;	/* pending list */
-	volatile u_int64_t	*ih_map;	/* Interrupt map reg */
-	volatile u_int64_t	*ih_clr;	/* clear interrupt reg */
-};
-extern struct intrhand *intrhand[];
-extern struct intrhand *intrlev[MAXINTNUM];
-
-void	intr_establish(int level, struct intrhand *);
-
 /* disksubr.c */
 struct dkbad;
 int isbad(struct dkbad *bt, int, int, int);
@@ -278,13 +244,8 @@ void	savefpstate(struct fpstate64 *);
 void	loadfpstate(struct fpstate64 *);
 u_int64_t	probeget(paddr_t, int, int);
 int	probeset(paddr_t, int, int, u_int64_t);
-#if 0
-void	write_all_windows(void);
-void	write_user_windows(void);
-#else
 #define	 write_all_windows() __asm __volatile("flushw" : : )
 #define	 write_user_windows() __asm __volatile("flushw" : : )
-#endif
 void 	proc_trampoline(void);
 struct pcb;
 void	snapshot(struct pcb *);
@@ -319,6 +280,8 @@ void kgdb_panic(void);
 /* emul.c */
 int	fixalign(struct proc *, struct trapframe64 *);
 int	emulinstr(vaddr_t, struct trapframe64 *);
+int	emul_qf(int32_t, struct proc *, union sigval, struct trapframe64 *);
+int	emul_popc(int32_t, struct proc *, union sigval, struct trapframe64 *);
 
 /*
  *

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ipsp.h,v 1.121 2002/06/09 16:26:10 itojun Exp $	*/
+/*	$OpenBSD: ip_ipsp.h,v 1.123 2003/07/24 08:03:20 itojun Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr),
@@ -57,6 +57,9 @@ union sockaddr_union {
 #define	MD5HMAC96_KEYSIZE	16
 #define	SHA1HMAC96_KEYSIZE	20
 #define	RIPEMD160HMAC96_KEYSIZE	20
+#define	SHA2_256HMAC96_KEYSIZE	32
+#define	SHA2_384HMAC96_KEYSIZE	48
+#define	SHA2_512HMAC96_KEYSIZE	64
 
 #define	AH_HMAC_HASHLEN		12	/* 96 bits of authenticator */
 #define	AH_HMAC_RPLENGTH	4	/* 32 bits of replay counter */
@@ -66,7 +69,10 @@ union sockaddr_union {
 #define	AH_MD5_ALEN		16
 #define	AH_SHA1_ALEN		20
 #define	AH_RMD160_ALEN		20
-#define	AH_ALEN_MAX		20 	/* Keep updated */
+#define	AH_SHA2_256_ALEN	32
+#define	AH_SHA2_384_ALEN	48
+#define	AH_SHA2_512_ALEN	64
+#define	AH_ALEN_MAX		64 	/* Keep updated */
 
 /* Reserved SPI numbers */
 #define	SPI_LOCAL_USE		0
@@ -659,7 +665,7 @@ extern struct m_tag *ipsp_parse_headers(struct mbuf *, int, u_int8_t);
 extern int ipsp_ref_match(struct ipsec_ref *, struct ipsec_ref *);
 extern ssize_t ipsec_hdrsz(struct tdb *);
 extern void ipsec_adjust_mtu(struct mbuf *, u_int32_t);
-extern int ipsp_print_tdb(struct tdb *, char *);
+extern int ipsp_print_tdb(struct tdb *, char *, size_t);
 extern struct ipsec_acquire *ipsec_get_acquire(u_int32_t);
 extern int ipsp_aux_match(struct ipsec_ref *, struct ipsec_ref *,
     struct ipsec_ref *, struct ipsec_ref *, struct ipsec_ref *,

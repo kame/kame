@@ -1,4 +1,4 @@
-/*	$OpenBSD: printf.c,v 1.17 2002/03/15 18:19:52 millert Exp $	*/
+/*	$OpenBSD: printf.c,v 1.21 2003/08/11 06:23:09 deraadt Exp $	*/
 /*	$NetBSD: printf.c,v 1.10 1996/11/30 04:19:21 gwr Exp $	*/
 
 /*-
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -65,32 +61,8 @@
 
 #include "stand.h"
 
-static void kprintn(void (*)(int), u_long, int);
-static void kdoprnt(void (*)(int), const char *, va_list);
-
-#ifndef	STRIPPED
-static void sputchar(int);
-static char *sbuf;
-
-static void
-sputchar(c)
-	int c;
-{
-	*sbuf++ = c;
-}
-
-void
-sprintf(char *buf, const char *fmt, ...)
-{
-	va_list ap;
-
-	sbuf = buf;
-	va_start(ap, fmt);
-	kdoprnt(sputchar, fmt, ap);
-	va_end(ap);
-	*sbuf = '\0';
-}
-#endif	/* NO_SPRINTF */
+void kprintn(void (*)(int), u_long, int);
+void kdoprnt(void (*)(int), const char *, va_list);
 
 void
 printf(const char *fmt, ...)
@@ -108,16 +80,12 @@ vprintf(const char *fmt, va_list ap)
 	kdoprnt(putchar, fmt, ap);
 }
 
-static void
-kdoprnt(put, fmt, ap)
-	void (*put)(int);
-	const char *fmt;
-	va_list ap;
+void
+kdoprnt(void (*put)(int), const char *fmt, va_list ap)
 {
-	register char *p;
-	register int ch;
 	unsigned long ul;
-	int lflag;
+	int ch, lflag;
+	char *p;
 
 	for (;;) {
 		while ((ch = *fmt++) != '%') {
@@ -133,7 +101,8 @@ reswitch:	switch (ch = *fmt++) {
 #ifndef	STRIPPED
 		case 'b':
 		{
-			register int set, n;
+			int set, n;
+
 			ul = va_arg(ap, int);
 			p = va_arg(ap, char *);
 			kprintn(put, ul, *p++);
@@ -148,7 +117,8 @@ reswitch:	switch (ch = *fmt++) {
 						put(n);
 					set = 1;
 				} else
-					for (; *p > ' '; ++p);
+					for (; *p > ' '; ++p)
+						;
 			}
 			if (set)
 				put('>');
@@ -157,7 +127,7 @@ reswitch:	switch (ch = *fmt++) {
 #endif
 		case 'c':
 			ch = va_arg(ap, int);
-				put(ch & 0x7f);
+			put(ch & 0x7f);
 			break;
 		case 's':
 			p = va_arg(ap, char *);
@@ -202,13 +172,10 @@ reswitch:	switch (ch = *fmt++) {
 	va_end(ap);
 }
 
-static void
-kprintn(put, ul, base)
-	void (*put)(int);
-	unsigned long ul;
-	int base;
+void
+kprintn(void (*put)(int), unsigned long ul, int base)
 {
-					/* hold a long in base 8 */
+	/* hold a long in base 8 */
 	char *p, buf[(sizeof(long) * NBBY / 3) + 1];
 
 	p = buf;
@@ -223,7 +190,7 @@ kprintn(put, ul, base)
 int donottwiddle = 0;
 
 void
-twiddle()
+twiddle(void)
 {
 	static int pos;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: bpf.c,v 1.33 2002/06/06 21:34:16 provos Exp $	*/
+/*	$OpenBSD: bpf.c,v 1.37 2003/07/29 23:02:52 itojun Exp $	*/
 /*	$NetBSD: bpf.c,v 1.33 1997/02/21 23:59:35 thorpej Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -493,7 +489,7 @@ bpfwrite(dev, uio, ioflag)
 	struct ifnet *ifp;
 	struct mbuf *m;
 	int error, s;
-	struct sockaddr dst;
+	struct sockaddr_storage dst;
 
 	if (d->bd_bif == 0)
 		return (ENXIO);
@@ -503,7 +499,8 @@ bpfwrite(dev, uio, ioflag)
 	if (uio->uio_resid == 0)
 		return (0);
 
-	error = bpf_movein(uio, (int)d->bd_bif->bif_dlt, &m, &dst);
+	error = bpf_movein(uio, (int)d->bd_bif->bif_dlt, &m,
+	    (struct sockaddr *)&dst);
 	if (error)
 		return (error);
 
@@ -513,10 +510,11 @@ bpfwrite(dev, uio, ioflag)
 	}
 
 	if (d->bd_hdrcmplt)
-		dst.sa_family = pseudo_AF_HDRCMPLT;
+		dst.ss_family = pseudo_AF_HDRCMPLT;
 
 	s = splsoftnet();
-	error = (*ifp->if_output)(ifp, m, &dst, (struct rtentry *)0);
+	error = (*ifp->if_output)(ifp, m, (struct sockaddr *)&dst,
+	    (struct rtentry *)0);
 	splx(s);
 	/*
 	 * The driver frees the mbuf.
@@ -1163,13 +1161,6 @@ bpf_catchpacket(d, pkt, pktlen, snaplen, cpfn)
 		bpf_wakeup(d);
 		curlen = 0;
 	}
-	else if (d->bd_immediate) {
-		/*
-		 * Immediate mode is set.  A packet arrived so any
-		 * reads should be woken up.
-		 */
-		bpf_wakeup(d);
-	}
 
 	/*
 	 * Append the bpf header.
@@ -1185,6 +1176,14 @@ bpf_catchpacket(d, pkt, pktlen, snaplen, cpfn)
 	 */
 	(*cpfn)(pkt, (u_char *)hp + hdrlen, (hp->bh_caplen = totlen - hdrlen));
 	d->bd_slen = curlen + totlen;
+
+	if (d->bd_immediate) {
+		/*
+		 * Immediate mode is set.  A packet arrived so any
+		 * reads should be woken up.
+		 */
+		bpf_wakeup(d);
+	}
 
 	if (d->bd_rdStart && (d->bd_rtout + d->bd_rdStart < ticks)) {
 		/*
@@ -1208,8 +1207,14 @@ int
 bpf_allocbufs(d)
 	register struct bpf_d *d;
 {
-	d->bd_fbuf = (caddr_t)malloc(d->bd_bufsize, M_DEVBUF, M_WAITOK);
-	d->bd_sbuf = (caddr_t)malloc(d->bd_bufsize, M_DEVBUF, M_WAITOK);
+	d->bd_fbuf = (caddr_t)malloc(d->bd_bufsize, M_DEVBUF, M_NOWAIT);
+	if (d->bd_fbuf == NULL)
+		return (ENOBUFS);
+	d->bd_sbuf = (caddr_t)malloc(d->bd_bufsize, M_DEVBUF, M_NOWAIT);
+	if (d->bd_sbuf == NULL) {
+		free(d->bd_fbuf, M_DEVBUF);
+		return (ENOBUFS);
+	}
 	d->bd_slen = 0;
 	d->bd_hlen = 0;
 	return (0);

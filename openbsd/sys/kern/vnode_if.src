@@ -1,4 +1,4 @@
-#	$OpenBSD: vnode_if.src,v 1.19 2002/02/22 20:37:45 drahn Exp $
+#	$OpenBSD: vnode_if.src,v 1.22 2003/07/21 22:44:50 tedu Exp $
 #	$NetBSD: vnode_if.src,v 1.10 1996/05/11 18:26:27 mycroft Exp $
 #
 # Copyright (c) 1992, 1993
@@ -12,11 +12,7 @@
 # 2. Redistributions in binary form must reproduce the above copyright
 #    notice, this list of conditions and the following disclaimer in the
 #    documentation and/or other materials provided with the distribution.
-# 3. All advertising materials mentioning features or use of this software
-#    must display the following acknowledgement:
-#	This product includes software developed by the University of
-#	California, Berkeley and its contributors.
-# 4. Neither the name of the University nor the names of its contributors
+# 3. Neither the name of the University nor the names of its contributors
 #    may be used to endorse or promote products derived from this software
 #    without specific prior written permission.
 #
@@ -94,7 +90,7 @@ vop_lookup {
 #
 
 vop_create {
-	IN SHOULDBELOCKED WILLRELE struct vnode *dvp;
+	IN SHOULDBELOCKED WILLPUT struct vnode *dvp;
 	OUT struct vnode **vpp;
 	IN struct componentname *cnp;
 	IN struct vattr *vap;
@@ -106,7 +102,7 @@ vop_create {
 #
 
 vop_mknod {
-	IN SHOULDBELOCKED WILLRELE struct vnode *dvp;
+	IN SHOULDBELOCKED WILLPUT struct vnode *dvp;
 	OUT WILLRELE struct vnode **vpp;
 	IN struct componentname *cnp;
 	IN struct vattr *vap;
@@ -207,7 +203,7 @@ vop_lease {
 vop_ioctl {
 	IN struct vnode *vp;
 	IN u_long command;
-	IN caddr_t data;
+	IN void *data;
 	IN int fflag;
 	IN struct ucred *cred;
 	IN struct proc *p;
@@ -258,8 +254,8 @@ vop_fsync {
 #
 
 vop_remove {
-	IN SHOULDBELOCKED WILLRELE struct vnode *dvp;
-	IN SHOULDBELOCKED WILLRELE struct vnode *vp;
+	IN SHOULDBELOCKED WILLPUT struct vnode *dvp;
+	IN SHOULDBELOCKED WILLPUT struct vnode *vp;
 	IN struct componentname *cnp;
 };
 
@@ -268,7 +264,7 @@ vop_remove {
 #% link		tdvp	L U U
 #
 vop_link {
-	IN SHOULDBELOCKED WILLRELE struct vnode *dvp;
+	IN SHOULDBELOCKED WILLPUT struct vnode *dvp;
 	IN struct vnode *vp;
 	IN struct componentname *cnp;
 };
@@ -284,7 +280,7 @@ vop_rename {
 	IN WILLRELE struct vnode *fdvp;
 	IN WILLRELE struct vnode *fvp;
 	IN struct componentname *fcnp;
-	IN SHOULDBELOCKED WILLRELE struct vnode *tdvp;
+	IN SHOULDBELOCKED WILLPUT struct vnode *tdvp;
 	IN WILLRELE struct vnode *tvp;
 	IN struct componentname *tcnp;
 };
@@ -295,7 +291,7 @@ vop_rename {
 #
 
 vop_mkdir {
-	IN SHOULDBELOCKED WILLRELE struct vnode *dvp;
+	IN SHOULDBELOCKED WILLPUT struct vnode *dvp;
 	OUT struct vnode **vpp;
 	IN struct componentname *cnp;
 	IN struct vattr *vap;
@@ -307,8 +303,8 @@ vop_mkdir {
 #
 
 vop_rmdir {
-	IN SHOULDBELOCKED WILLRELE struct vnode *dvp;
-	IN SHOULDBELOCKED WILLRELE struct vnode *vp;
+	IN SHOULDBELOCKED WILLPUT struct vnode *dvp;
+	IN SHOULDBELOCKED WILLPUT struct vnode *vp;
 	IN struct componentname *cnp;
 };
 
@@ -322,7 +318,7 @@ vop_rmdir {
 #
 
 vop_symlink {
-	IN SHOULDBELOCKED WILLRELE struct vnode *dvp;
+	IN SHOULDBELOCKED WILLPUT struct vnode *dvp;
 	OUT WILLRELE struct vnode **vpp;
 	IN struct componentname *cnp;
 	IN struct vattr *vap;
@@ -364,7 +360,7 @@ vop_abortop {
 #% inactive	vp	L U U
 #
 vop_inactive {
-	IN SHOULDBELOCKED struct vnode *vp;
+	IN SHOULDBELOCKED WILLUNLOCK struct vnode *vp;
 	IN struct proc *p;
 };
 
@@ -437,7 +433,7 @@ vop_pathconf {
 #
 vop_advlock {
 	IN struct vnode *vp;
-	IN caddr_t id;
+	IN void *id;
 	IN int op;
 	IN struct flock *fl;
 	IN int flags;

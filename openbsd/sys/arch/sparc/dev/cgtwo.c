@@ -1,4 +1,4 @@
-/*	$OpenBSD: cgtwo.c,v 1.25 2002/11/06 21:06:20 miod Exp $	*/
+/*	$OpenBSD: cgtwo.c,v 1.29 2003/06/28 17:05:33 miod Exp $	*/
 /*	$NetBSD: cgtwo.c,v 1.22 1997/05/24 20:16:12 pk Exp $ */
 
 /*
@@ -46,11 +46,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -177,11 +173,6 @@ cgtwomatch(parent, vcf, aux)
 	struct romaux *ra = &ca->ca_ra;
 	caddr_t tmp;
 
-	/*
-	 * Mask out invalid flags from the user.
-	 */
-	cf->cf_flags &= FB_USERMASK;
-
 	if (strcmp(cf->cf_driver->cd_name, ra->ra_name))
 		return (0);
 
@@ -211,8 +202,6 @@ cgtwoattach(parent, self, args)
 	int node = 0;
 	int isconsole = 0;
 	char *nam = NULL;
-
-	sc->sc_sunfb.sf_flags = self->dv_cfdata->cf_flags;
 
 	switch (ca->ca_bustype) {
 	case BUS_VME16:
@@ -263,7 +252,7 @@ cgtwoattach(parent, self, args)
 	sc->sc_sunfb.sf_ro.ri_bits = mapiodev(&sc->sc_phys, CG2_PIXMAP_OFF,
 	    round_page(sc->sc_sunfb.sf_fbsize));
 	sc->sc_sunfb.sf_ro.ri_hw = sc;
-	fbwscons_init(&sc->sc_sunfb, isconsole);
+	fbwscons_init(&sc->sc_sunfb, isconsole ? 0 : RI_CLEAR);
 	fbwscons_setcolormap(&sc->sc_sunfb, cgtwo_setcolor);
 
 	cgtwo_stdscreen.capabilities = sc->sc_sunfb.sf_ro.ri_caps;
@@ -300,7 +289,7 @@ cgtwo_ioctl(v, cmd, data, flags, p)
 
 	switch (cmd) {
 	case WSDISPLAYIO_GTYPE:
-		*(u_int *)data = WSDISPLAY_TYPE_UNKNOWN;
+		*(u_int *)data = WSDISPLAY_TYPE_SUNCG2;
 		break;
 	case WSDISPLAYIO_GINFO:
 		wdf = (struct wsdisplay_fbinfo *)data;

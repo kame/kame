@@ -1,4 +1,4 @@
-/*	$OpenBSD: sd.c,v 1.56 2002/12/30 21:50:29 grange Exp $	*/
+/*	$OpenBSD: sd.c,v 1.62 2003/06/24 22:42:07 mickey Exp $	*/
 /*	$NetBSD: sd.c,v 1.111 1997/04/02 02:29:41 mycroft Exp $	*/
 
 /*-
@@ -124,7 +124,7 @@ struct scsi_device sd_switch = {
 	sddone,			/* deal with stats at interrupt time */
 };
 
-struct scsi_inquiry_pattern sd_patterns[] = {
+const struct scsi_inquiry_pattern sd_patterns[] = {
 	{T_DIRECT, T_FIXED,
 	 "",         "",                 ""},
 	{T_DIRECT, T_REMOV,
@@ -155,7 +155,7 @@ sdmatch(parent, match, aux)
 	int priority;
 
 	(void)scsi_inqmatch(sa->sa_inqbuf,
-	    (caddr_t)sd_patterns, sizeof(sd_patterns)/sizeof(sd_patterns[0]),
+	    sd_patterns, sizeof(sd_patterns)/sizeof(sd_patterns[0]),
 	    sizeof(sd_patterns[0]), &priority);
 	return (priority);
 }
@@ -202,7 +202,7 @@ sdattach(parent, self, aux)
 	}
 
 	if (!(sc_link->inquiry_flags & SID_RelAdr))
-		sc_link->quirks |= SDEV_NOCDB6;
+		sc_link->quirks |= SDEV_ONLYBIG;
 
 	/*
 	 * Note if this device is ancient.  This is used in sdminphys().
@@ -234,7 +234,7 @@ sdattach(parent, self, aux)
 		result = SDGP_RESULT_OFFLINE;
 	else
 		result = (*sd->sc_ops->sdo_get_parms)(sd, &sd->params,
-		    scsi_autoconf);
+		    scsi_autoconf | SCSI_IGNORE_MEDIA_CHANGE);
 
 	printf("%s: ", sd->sc_dev.dv_xname);
 	switch (result) {
@@ -699,7 +699,7 @@ sdstart(v)
 		 *  fit in a "small" cdb, use it.
 		 */
 		if (!(sc_link->flags & SDEV_ATAPI) &&
-		    !(sc_link->quirks & SDEV_NOCDB6) && 
+		    !(sc_link->quirks & SDEV_ONLYBIG) && 
 		    ((blkno & 0x1fffff) == blkno) &&
 		    ((nblks & 0xff) == nblks)) {
 			/*
@@ -979,7 +979,8 @@ sdgetdisklabel(dev, sd, lp, clp, spoofonly)
 	struct cpu_disklabel *clp;
 	int spoofonly;
 {
-	char *errstring;
+	size_t len;
+	char *errstring, packname[sizeof(lp->d_packname) + 1];
 
 	bzero(lp, sizeof(struct disklabel));
 	bzero(clp, sizeof(struct cpu_disklabel));
@@ -997,21 +998,32 @@ sdgetdisklabel(dev, sd, lp, clp, spoofonly)
 	lp->d_type = DTYPE_SCSI;
 	if (sd->type == T_OPTICAL)
 		strncpy(lp->d_typename, "SCSI optical",
-		    sizeof(lp->d_typename) - 1);
+		    sizeof(lp->d_typename));
 	else
 		strncpy(lp->d_typename, "SCSI disk",
-		    sizeof(lp->d_typename) - 1);
+		    sizeof(lp->d_typename));
 
-	if (strlen(sd->name.vendor) + strlen(sd->name.product) + 1 <
-	    sizeof(lp->d_packname))
-		sprintf(lp->d_packname, "%s %s", sd->name.vendor,
-		    sd->name.product);
-	else
-		strncpy(lp->d_packname, sd->name.product,
-		    sizeof(lp->d_packname) - 1);
+	/*
+	 * Try to fit '<vendor> <product>' into d_packname. If that doesn't fit
+	 * then leave out '<vendor> ' and use only as much of '<product>' as
+	 * does fit.
+	 */
+	len = snprintf(packname, sizeof(packname), "%s %s",
+	    sd->name.vendor, sd->name.product);
+	if (len > sizeof(lp->d_packname)) {
+		strlcpy(packname, sd->name.product, sizeof(packname));
+		len = strlen(packname);
+	}
+	/*
+	 * It is safe to use len as the count of characters to copy because
+	 * packname is sizeof(lp->d_packname)+1, the string in packname is
+	 * always null terminated and len does not count the terminating null.
+	 * d_packname is not a null terminated string.
+	 */
+	bcopy(packname, lp->d_packname, len);
 
 	lp->d_secperunit = sd->params.disksize;
-	lp->d_rpm = 3600;
+	lp->d_rpm = sd->params.rot_rate;
 	lp->d_interleave = 1;
 	lp->d_flags = 0;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ccd.c,v 1.50 2002/11/10 21:23:09 miod Exp $	*/
+/*	$OpenBSD: ccd.c,v 1.53 2003/06/02 23:28:01 millert Exp $	*/
 /*	$NetBSD: ccd.c,v 1.33 1996/05/05 04:21:14 thorpej Exp $	*/
 
 /*-
@@ -56,11 +56,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -289,7 +285,11 @@ ccdinit(ccd, cpaths, p)
 	cs->sc_size = 0;
 	cs->sc_ileave = ccd->ccd_interleave;
 	cs->sc_nccdisks = ccd->ccd_ndev;
-	sprintf(cs->sc_xname, "ccd%d", ccd->ccd_unit);	/* XXX */
+	if (snprintf(cs->sc_xname, sizeof(cs->sc_xname), "ccd%d",
+	    ccd->ccd_unit) >= sizeof(cs->sc_xname)) {
+		printf("ccdinit: device name too long.\n");
+		return(ENXIO);
+	}
 
 	/* Allocate space for the component info. */
 	cs->sc_cinfo = malloc(cs->sc_nccdisks * sizeof(struct ccdcinfo),
@@ -1456,17 +1456,20 @@ ccdsize(dev)
 	dev_t dev;
 {
 	struct ccd_softc *cs;
-	int part, size;
+	int part, size, unit;
+
+	unit = ccdunit(dev);
+	if (unit >= numccd)
+		return (-1);
+
+	cs = &ccd_softc[unit];
+	if ((cs->sc_flags & CCDF_INITED) == 0)
+		return (-1);
 
 	if (ccdopen(dev, 0, S_IFBLK, curproc))
 		return (-1);
 
-	cs = &ccd_softc[ccdunit(dev)];
 	part = DISKPART(dev);
-
-	if ((cs->sc_flags & CCDF_INITED) == 0)
-		return (-1);
-
 	if (cs->sc_dkdev.dk_label->d_partitions[part].p_fstype != FS_SWAP)
 		size = -1;
 	else

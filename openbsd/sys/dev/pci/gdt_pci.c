@@ -1,4 +1,4 @@
-/*	$OpenBSD: gdt_pci.c,v 1.17 2002/06/11 14:41:35 niklas Exp $	*/
+/*	$OpenBSD: gdt_pci.c,v 1.19 2003/08/06 21:08:06 millert Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Niklas Hallqvist.  All rights reserved.
@@ -11,11 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Niklas Hallqvist.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -306,7 +301,7 @@ gdt_pci_attach(parent, self, aux)
 #if 0
 		/* disable board interrupts, deinit services */
 		gdth_writeb(0xff, &dp6_ptr->io.irqdel);
-		gdth_writeb(0x00, &dp6_ptr->io.irqen);;
+		gdth_writeb(0x00, &dp6_ptr->io.irqen);
 		gdth_writeb(0x00, &dp6_ptr->u.ic.S_Status);
 		gdth_writeb(0x00, &dp6_ptr->u.ic.Cmd_Index);
 

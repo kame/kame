@@ -1,4 +1,4 @@
-\	$OpenBSD: bootblk.fth,v 1.1 2001/08/18 04:16:37 jason Exp $
+\	$OpenBSD: bootblk.fth,v 1.3 2003/08/28 23:47:31 jason Exp $
 \	$NetBSD: bootblk.fth,v 1.3 2001/08/15 20:10:24 eeh Exp $
 \
 \	IEEE 1275 Open Firmware Boot Block
@@ -213,7 +213,7 @@ struct
    8		field	>f_ihandle	\ device handle
    8 		field 	>f_seekp	\ seek pointer
    8 		field 	>f_fs		\ pointer to super block
-   dinode_SIZEOF 	field 	>f_di	\ copy of on-disk inode
+   ufs1_dinode_SIZEOF 	field 	>f_di	\ copy of on-disk inode
    8		field	>f_buf		\ buffer for data block
    4		field 	>f_buf_size	\ size of data block
    4		field	>f_buf_blkno	\ block number of data block
@@ -222,7 +222,7 @@ constant file_SIZEOF
 file_SIZEOF buffer: the-file
 sb-buf the-file >f_fs x!
 
-dinode_SIZEOF buffer: cur-inode
+ufs1_dinode_SIZEOF buffer: cur-inode
 h# 2000 buffer: indir-block
 -1 value indir-addr
 
@@ -285,7 +285,8 @@ h# 2000 buffer: indir-block
 \ Read file into internal buffer and return pointer and len
 \
 
-2000 buffer: cur-block		\ Why do dynamic allocation?
+0 value cur-block			\ allocated dynamically in ufs-open
+0 value cur-blocksize			\ size of cur-block
 -1 value cur-blockno
 0 value cur-offset
 
@@ -339,8 +340,8 @@ h# 2000 buffer: indir-block
    <>  if ." read-inode - residual" cr abort then
    dup 2over				( inode fs buffer -- inode fs buffer buffer inode fs )
    ino-to-fsbo				( inode fs buffer -- inode fs buffer buffer fsbo )
-   dinode_SIZEOF * +			( inode fs buffer buffer fsbo -- inode fs buffer dinop )
-   cur-inode dinode_SIZEOF move 	( inode fs buffer dinop -- inode fs buffer )
+   ufs1_dinode_SIZEOF * +			( inode fs buffer buffer fsbo -- inode fs buffer dinop )
+   cur-inode ufs1_dinode_SIZEOF move 	( inode fs buffer dinop -- inode fs buffer )
 	\ clear out the old buffers
    drop					( inode fs buffer -- inode fs )
    2drop
@@ -405,9 +406,10 @@ h# 2000 buffer: indir-block
       niaddr 0 ?do
 	sb-buf fs_nindir l@ * dup	( sizebp sizebp -- )
 	sb-buf fs_maxfilesize dup x@	( sizebp sizebp *fs_maxfilesize fs_maxfilesize -- )
-	rot ( sizebp *fs_maxfilesize fs_maxfilesize sizebp -- )
-	+ ( sizebp *fs_maxfilesize new_fs_maxfilesize  -- ) swap x! ( sizebp -- )
-      loop drop ( -- )
+	rot 				( sizebp *fs_maxfilesize fs_maxfilesize sizebp -- )
+	+ 				( sizebp *fs_maxfilesize new_fs_maxfilesize  -- ) 
+        swap x! 			( sizebp -- )
+      loop drop 			( -- )
       sb-buf dup fs_bmask l@ not swap fs_qbmask x!
       sb-buf dup fs_fmask l@ not swap fs_qfmask x!
    then
@@ -451,17 +453,21 @@ h# 2000 buffer: indir-block
       ." Superblock bsize" space . ." too large" cr
       abort
    then 
-   fs_SIZEOF <  if
+   dup fs_SIZEOF <  if
       ." Superblock bsize < size of superblock" cr
       abort
    then
-   ffs_oldcompat
+   ffs_oldcompat	( fs_bsize -- fs_bsize )
+   dup to cur-blocksize alloc-mem to cur-block    \ Allocate cur-block
    boot-debug?  if ." ufs-open complete" cr then
 ;
 
 : ufs-close ( -- ) 
    boot-ihandle dup -1 <>  if
       cif-close -1 to boot-ihandle 
+   then
+   cur-block 0<> if
+      cur-block cur-blocksize free-mem
    then
 ;
 
@@ -551,7 +557,16 @@ h# 2000 buffer: indir-block
    2drop
 ;
 
-h# 5000 constant loader-base
+\
+\ According to the 1275 addendum for SPARC processors:
+\ Default load-base is 0x4000.  At least 0x8.0000 or
+\ 512KB must be available at that address.  
+\
+\ The Fcode bootblock can take up up to 8KB (O.K., 7.5KB) 
+\ so load programs at 0x4000 + 0x2000=> 0x6000
+\
+
+h# 6000 constant loader-base
 
 \
 \ Elf support -- find the load addr
@@ -596,7 +611,7 @@ h# 5000 constant loader-base
 ;
 
 : do-boot ( bootfile -- )
-   ." OpenBSD IEEE 1275 Bootblock" cr
+   ." OpenBSD IEEE 1275 Bootblock 1.1" cr
    boot-path load-file ( -- load-base )
    dup 0<> if  " to load-base init-program" evaluate then
 ;

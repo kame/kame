@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_usrreq.c,v 1.6 2002/07/01 21:56:55 miod Exp $	*/
+/*	$OpenBSD: db_usrreq.c,v 1.8 2003/06/28 01:52:18 tedu Exp $	*/
 
 /*
  * Copyright (c) 1996 Michael Shalayeff.  All rights reserved.
@@ -11,11 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -37,6 +32,8 @@
 #include <sys/sysctl.h>
 
 #include <ddb/db_var.h>
+
+int	db_log;
 
 int
 ddb_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
@@ -86,6 +83,8 @@ ddb_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 			return (EPERM);
 		db_console = ctlval;
 		return (0);
+	case DBCTL_LOG:
+		return (sysctl_int(oldp, oldlenp, newp, newlen, &db_log));
 	default:
 		return (EOPNOTSUPP);
 	}

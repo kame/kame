@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.45 2003/01/16 04:16:00 art Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.51 2003/07/28 21:15:28 jason Exp $	*/
 /*	$NetBSD: cpu.h,v 1.35 1996/05/05 19:29:26 christos Exp $	*/
 
 /*-
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -105,7 +101,7 @@ extern u_quad_t pentium_base_tsc;
 	do {								\
 		if (pentium_mhz) {					\
 			__asm __volatile("cli\n"			\
-					 ".byte 0xf, 0x31\n"		\
+					 "rdtsc\n"			\
 					 "sti\n"			\
 					 : "=A" (pentium_base_tsc)	\
 					 : );				\
@@ -170,6 +166,7 @@ void	dkcsumattach(void);
 void	dumpconf(void);
 void	cpu_reset(void);
 void	i386_proc0_tss_ldt_init(void);
+void	cpuid(u_int32_t, u_int32_t *);
 
 /* locore.s */
 struct region_descriptor;
@@ -190,13 +187,14 @@ void	rtcdrain(void *);
 void	npxdrop(void);
 void	npxsave(void);
 
-#if defined(MATH_EMULATE) || defined(GPL_MATH_EMULATE)
+#if defined(GPL_MATH_EMULATE)
 /* math_emulate.c */
 int	math_emulate(struct trapframe *);
 #endif
 
 #ifdef USER_LDT
 /* sys_machdep.h */
+extern int user_ldt_enable;
 void	i386_user_cleanup(struct pcb *);
 int	i386_get_ldt(struct proc *, void *, register_t *);
 int	i386_set_ldt(struct proc *, void *, register_t *);
@@ -238,7 +236,9 @@ void	setconf(void);
 #define CPU_APMWARN		9	/* APM battery warning percentage */
 #define CPU_KBDRESET		10	/* keyboard reset under pcvt */
 #define CPU_APMHALT		11	/* halt -p hack */
-#define	CPU_MAXID		12	/* number of valid machdep ids */
+#define CPU_USERLDT		12
+#define	CPU_LONGRUN		13	/* LongRun status */
+#define	CPU_MAXID		14	/* number of valid machdep ids */
 
 #define	CTL_MACHDEP_NAMES { \
 	{ 0, 0 }, \
@@ -253,6 +253,8 @@ void	setconf(void);
 	{ "apmwarn", CTLTYPE_INT }, \
 	{ "kbdreset", CTLTYPE_INT }, \
 	{ "apmhalt", CTLTYPE_INT }, \
+	{ "userldt", CTLTYPE_INT }, \
+	{ "longrun", CTLTYPE_STRUCT }, \
 }
 
 #endif /* !_I386_CPU_H_ */

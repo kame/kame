@@ -1,4 +1,4 @@
-/*	$OpenBSD: ffs_alloc.c,v 1.42 2002/06/23 03:07:22 deraadt Exp $	*/
+/*	$OpenBSD: ffs_alloc.c,v 1.44 2003/06/02 23:28:22 millert Exp $	*/
 /*	$NetBSD: ffs_alloc.c,v 1.11 1996/05/11 18:27:09 mycroft Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -167,11 +163,11 @@ ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp, blknop)
 	int osize, nsize;
 	struct ucred *cred;
 	struct buf **bpp;
-	ufs_daddr_t *blknop;
+	daddr_t *blknop;
 {
 	register struct fs *fs;
 	struct buf *bp = NULL;
-	ufs_daddr_t quota_updated = 0;
+	daddr_t quota_updated = 0;
 	int cg, request, error;
 	daddr_t bprev, bno;
 

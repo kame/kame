@@ -1,4 +1,4 @@
-/* $OpenBSD: machdep.c,v 1.100 2003/01/13 20:12:18 miod Exp $	*/
+/* $OpenBSD: machdep.c,v 1.110 2003/09/08 20:44:52 miod Exp $	*/
 /*
  * Copyright (c) 1998, 1999, 2000, 2001 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -98,7 +98,6 @@
 #include <mvme88k/dev/pcctworeg.h>
 #include <mvme88k/dev/busswreg.h>
 
-#include "assym.h"			/* EF_EPSR, etc. */
 #include "ksyms.h"
 #if DDB
 #include <machine/db_machdep.h>
@@ -120,8 +119,6 @@ vm_offset_t interrupt_stack[MAX_CPUS] = {0};
 struct md_p md;
 
 /* prototypes */
-void m88100_Xfp_precise(void);
-void m88110_Xfp_precise(void);
 void setupiackvectors(void);
 void regdump(struct trapframe *f);
 void dumpsys(void);
@@ -270,7 +267,7 @@ extern void nullcnpollc(dev_t, int);
 
 #define bootcnpollc nullcnpollc
 
-static struct consdev bootcons = {
+struct consdev bootcons = {
 	NULL, 
 	NULL, 
 	bootcngetc, 
@@ -418,8 +415,9 @@ void
 identifycpu()
 {
 	cpuspeed = getcpuspeed();
-	sprintf(cpu_model, "Motorola MVME%x, %dMHz", brdtyp, cpuspeed);
-	printf("\nModel: %s\n", cpu_model);
+	snprintf(cpu_model, sizeof cpu_model,
+	    "Motorola MVME%x, %dMHz", brdtyp, cpuspeed);
+	printf("Model: %s\n", cpu_model);
 }
 
 /*
@@ -498,7 +496,7 @@ cpu_startup()
 	 * avail_end was pre-decremented in mvme_bootstrap() to compensate.
 	 */
 	for (i = 0; i < btoc(MSGBUFSIZE); i++)
-		pmap_kenter_pa((vm_offset_t)msgbufp, 
+		pmap_kenter_pa((vm_offset_t)msgbufp + i * NBPG,
 			   avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE);
 	pmap_update(pmap_kernel());
 	initmsgbuf((caddr_t)msgbufp, round_page(MSGBUFSIZE));
@@ -812,6 +810,10 @@ setregs(p, pack, stack, retval)
 		 * graphics unit, fp enabled 
 		 */
 		tf->epsr = PSR_SRM | PSR_SFD;  
+		/*
+		 * XXX disable OoO for now...
+		 */
+		tf->epsr |= PSR_SER;
 	} else {
 		/* 
 		 * user mode, interrupts enabled, 
@@ -829,10 +831,12 @@ setregs(p, pack, stack, retval)
 	 */
 	if (cputyp == CPU_88110) {
 		tf->exip = pack->ep_entry & ~3;
+#ifdef DEBUG
 		printf("exec @ 0x%x\n", tf->exip);
+#endif
 	} else {
-	tf->snip = pack->ep_entry & ~3;
-	tf->sfip = (pack->ep_entry & ~3) | FIP_V;
+		tf->snip = pack->ep_entry & ~3;
+		tf->sfip = (pack->ep_entry & ~3) | FIP_V;
 	}
 	tf->r[2] = stack;
 	tf->r[31] = stack;
@@ -885,7 +889,7 @@ sendsig(catcher, sig, mask, code, type, val)
 	int addr;
 
 	tf = p->p_md.md_tf;
-	oonstack = psp->ps_sigstk.ss_flags & SA_ONSTACK;
+	oonstack = psp->ps_sigstk.ss_flags & SS_ONSTACK;
 	/*
 	 * Allocate and validate space for the signal handler
 	 * context. Note that if the stack is in data space, the
@@ -895,11 +899,11 @@ sendsig(catcher, sig, mask, code, type, val)
 	 */
 	fsize = sizeof(struct sigframe);
 	if ((psp->ps_flags & SAS_ALTSTACK) &&
-	    (psp->ps_sigstk.ss_flags & SA_ONSTACK) == 0 &&
+	    (psp->ps_sigstk.ss_flags & SS_ONSTACK) == 0 &&
 	    (psp->ps_sigonstack & sigmask(sig))) {
 		fp = (struct sigframe *)(psp->ps_sigstk.ss_sp +
 					 psp->ps_sigstk.ss_size - fsize);
-		psp->ps_sigstk.ss_flags |= SA_ONSTACK;
+		psp->ps_sigstk.ss_flags |= SS_ONSTACK;
 	} else
 		fp = (struct sigframe *)(tf->r[31] - fsize);
 	if ((unsigned)fp <= USRSTACK - ctob(p->p_vmspace->vm_ssize)) 
@@ -933,9 +937,9 @@ sendsig(catcher, sig, mask, code, type, val)
 	      sizeof(sf.sf_sc.sc_regs));
 	if (cputyp != CPU_88110) {
 		/* mc88100 */
-	sf.sf_sc.sc_xip = tf->sxip & ~3;
-	sf.sf_sc.sc_nip = tf->snip & ~3;
-	sf.sf_sc.sc_fip = tf->sfip & ~3;
+		sf.sf_sc.sc_xip = tf->sxip & ~3;
+		sf.sf_sc.sc_nip = tf->snip & ~3;
+		sf.sf_sc.sc_fip = tf->sfip & ~3;
 	} else {
 		/* mc88110 */
 		sf.sf_sc.sc_xip = tf->exip & ~3;
@@ -948,16 +952,16 @@ sendsig(catcher, sig, mask, code, type, val)
 	sf.sf_sc.sc_fpcr = tf->fpcr;
 	if (cputyp != CPU_88110) {
 		/* mc88100 */
-	sf.sf_sc.sc_ssbr = tf->ssbr;
-	sf.sf_sc.sc_dmt0 = tf->dmt0;
-	sf.sf_sc.sc_dmd0 = tf->dmd0;
-	sf.sf_sc.sc_dma0 = tf->dma0;
-	sf.sf_sc.sc_dmt1 = tf->dmt1;
-	sf.sf_sc.sc_dmd1 = tf->dmd1;
-	sf.sf_sc.sc_dma1 = tf->dma1;
-	sf.sf_sc.sc_dmt2 = tf->dmt2;
-	sf.sf_sc.sc_dmd2 = tf->dmd2;
-	sf.sf_sc.sc_dma2 = tf->dma2;
+		sf.sf_sc.sc_ssbr = tf->ssbr;
+		sf.sf_sc.sc_dmt0 = tf->dmt0;
+		sf.sf_sc.sc_dmd0 = tf->dmd0;
+		sf.sf_sc.sc_dma0 = tf->dma0;
+		sf.sf_sc.sc_dmt1 = tf->dmt1;
+		sf.sf_sc.sc_dmd1 = tf->dmd1;
+		sf.sf_sc.sc_dma1 = tf->dma1;
+		sf.sf_sc.sc_dmt2 = tf->dmt2;
+		sf.sf_sc.sc_dmd2 = tf->dmd2;
+		sf.sf_sc.sc_dma2 = tf->dma2;
 	} else {
 		/* mc88110 */
 		sf.sf_sc.sc_dsr  = tf->dsr;
@@ -1000,8 +1004,8 @@ sendsig(catcher, sig, mask, code, type, val)
 	addr = p->p_sigcode;
 	if (cputyp != CPU_88110) {
 		/* mc88100 */
-	tf->snip = (addr & ~3) | NIP_V;
-	tf->sfip = (tf->snip + 4) | FIP_V;
+		tf->snip = (addr & ~3) | NIP_V;
+		tf->sfip = (tf->snip + 4) | FIP_V;
 	} else {
 		/* mc88110 */
 		tf->exip = (addr & ~3);
@@ -1029,9 +1033,9 @@ sendsig(catcher, sig, mask, code, type, val)
 /* ARGSUSED */
 int
 sys_sigreturn(p, v, retval)
-struct proc *p;
-void *v;
-register_t *retval;
+	struct proc *p;
+	void *v;
+	register_t *retval;
 {
 	struct sys_sigreturn_args /* {
 	   syscallarg(struct sigcontext *) sigcntxp;
@@ -1045,7 +1049,7 @@ register_t *retval;
 	if (sigdebug & SDB_FOLLOW)
 		printf("sigreturn: pid %d, scp %x\n", p->p_pid, scp);
 #endif
-	if ((int)scp & 3 || uvm_useracc((caddr_t)scp, sizeof *scp, B_WRITE) == 0 ||
+	if ((int)scp & 3 ||
 	    copyin((caddr_t)scp, (caddr_t)&ksc, sizeof(struct sigcontext)))
 		return (EINVAL);
 
@@ -1074,9 +1078,9 @@ register_t *retval;
 	bcopy((caddr_t)scp->sc_regs, (caddr_t)tf->r, sizeof(scp->sc_regs));
 	if (cputyp != CPU_88110) {
 		/* mc88100 */
-	tf->sxip = (scp->sc_xip) | XIP_V;
-	tf->snip = (scp->sc_nip) | NIP_V;
-	tf->sfip = (scp->sc_fip) | FIP_V;
+		tf->sxip = (scp->sc_xip) | XIP_V;
+		tf->snip = (scp->sc_nip) | NIP_V;
+		tf->sfip = (scp->sc_fip) | FIP_V;
 	} else {
 		/* mc88110 */
 		tf->exip = (scp->sc_xip);
@@ -1089,16 +1093,16 @@ register_t *retval;
 	tf->fpcr = scp->sc_fpcr;
 	if (cputyp != CPU_88110) {
 		/* mc88100 */
-	tf->ssbr = scp->sc_ssbr;
-	tf->dmt0 = scp->sc_dmt0;
-	tf->dmd0 = scp->sc_dmd0;
-	tf->dma0 = scp->sc_dma0;
-	tf->dmt1 = scp->sc_dmt1;
-	tf->dmd1 = scp->sc_dmd1;
-	tf->dma1 = scp->sc_dma1;
-	tf->dmt2 = scp->sc_dmt2;
-	tf->dmd2 = scp->sc_dmd2;
-	tf->dma2 = scp->sc_dma2;
+		tf->ssbr = scp->sc_ssbr;
+		tf->dmt0 = scp->sc_dmt0;
+		tf->dmd0 = scp->sc_dmd0;
+		tf->dma0 = scp->sc_dma0;
+		tf->dmt1 = scp->sc_dmt1;
+		tf->dmd1 = scp->sc_dmd1;
+		tf->dma1 = scp->sc_dma1;
+		tf->dmt2 = scp->sc_dmt2;
+		tf->dmd2 = scp->sc_dmd2;
+		tf->dma2 = scp->sc_dma2;
 	} else {
 		/* mc88110 */
 		tf->dsr  = scp->sc_dsr;
@@ -1126,9 +1130,9 @@ register_t *retval;
 	 * Restore the user supplied information
 	 */
 	if (scp->sc_onstack & 01)
-		p->p_sigacts->ps_sigstk.ss_flags |= SA_ONSTACK;
+		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigacts->ps_sigstk.ss_flags &= ~SA_ONSTACK;
+		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
 	p->p_sigmask = scp->sc_mask & ~sigcantmask;
 	return (EJUSTRETURN);
 }
@@ -1146,7 +1150,7 @@ __dead void
 boot(howto)
 	register int howto;
 {
-	/* take a snap shot before clobbering any registers */
+	/* take a snapshot before clobbering any registers */
 	if (curproc && curproc->p_addr)
 		savectx(curpcb);
 
@@ -1469,7 +1473,8 @@ get_slave_stack()
  *
  * Called from "mvme88k/locore.S"
  */
-void slave_pre_main()
+void
+slave_pre_main()
 {
    set_cpu_number(cmmu_cpu_number()); /* Determine cpu number by CMMU */
    splhigh();
@@ -1728,11 +1733,8 @@ m188_ext_int(u_int v, struct m88100_saved_state *eframe)
 	 * returning to assembler
 	 */
 	disable_interrupt();
-	if (eframe->dmt0 & DMT_VALID) {
+	if (eframe->dmt0 & DMT_VALID)
 		m88100_trap(T_DATAFLT, eframe);
-		data_access_emulation((unsigned *)eframe);
-		eframe->dmt0 &= ~DMT_VALID;
-	}
 
 	/*
 	 * Restore the mask level to what it was when the interrupt
@@ -1757,8 +1759,8 @@ m188_ext_int(u_int v, struct m88100_saved_state *eframe)
 void
 m187_ext_int(u_int v, struct m88100_saved_state *eframe)
 {
-	register u_char mask, level;
-	register struct intrhand *intr;
+	int mask, level;
+	struct intrhand *intr;
 	int ret;
 	u_char vec;
 
@@ -1802,10 +1804,6 @@ m187_ext_int(u_int v, struct m88100_saved_state *eframe)
 	flush_pipeline();
 	flush_pipeline();
 
-	if (vec > 0xff) {
-		panic("interrupt vector %x greater than 255", vec);
-	}
-
 	enable_interrupt();
 
 	if ((intr = intr_handlers[vec]) == NULL) {
@@ -1827,9 +1825,9 @@ m187_ext_int(u_int v, struct m88100_saved_state *eframe)
 		 */
 
 		for (ret = 0; intr; intr = intr->ih_next) {
-			if (intr->ih_wantframe != 0)
+			if (intr->ih_wantframe != 0) {
 				ret = (*intr->ih_fn)((void *)eframe);
-			else
+			} else
 				ret = (*intr->ih_fn)(intr->ih_arg);
 			if (ret != 0) {
 				/* increment intr counter */
@@ -1849,20 +1847,14 @@ m187_ext_int(u_int v, struct m88100_saved_state *eframe)
 	 * returning to assembler
 	 */
 	disable_interrupt();
-
-	if (eframe->dmt0 & DMT_VALID) {
+	if (eframe->dmt0 & DMT_VALID)
 		m88100_trap(T_DATAFLT, eframe);
-		data_access_emulation((unsigned *)eframe);
-		eframe->dmt0 &= ~DMT_VALID;
-	}
-
-	mask = eframe->mask;
 
 	/*
 	 * Restore the mask level to what it was when the interrupt
 	 * was taken.
 	 */
-	setipl(mask);
+	setipl(eframe->mask);
 }
 #endif /* MVME187 */
 
@@ -1870,8 +1862,8 @@ m187_ext_int(u_int v, struct m88100_saved_state *eframe)
 void
 m197_ext_int(u_int v, struct m88100_saved_state *eframe)
 {
-	register u_char mask, level, src;
-	register struct intrhand *intr;
+	int mask, level, src;
+	struct intrhand *intr;
 	int ret;
 	u_char vec;
 
@@ -1915,10 +1907,6 @@ m197_ext_int(u_int v, struct m88100_saved_state *eframe)
 		flush_pipeline();
 	}
 
-	if (vec > 0xff) {
-		panic("interrupt vector %x greater than 255", vec);
-	}
-
 	enable_interrupt();
 
 	if ((intr = intr_handlers[vec]) == NULL) {
@@ -1958,20 +1946,18 @@ m197_ext_int(u_int v, struct m88100_saved_state *eframe)
 
 	disable_interrupt();
 
-	mask = eframe->mask;
-
 	/*
 	 * Restore the mask level to what it was when the interrupt
 	 * was taken.
 	 */
-	setipl(mask);
+	setipl(eframe->mask);
 }
 #endif 
 
 int
 cpu_exec_aout_makecmds(p, epp)
-struct proc *p;
-struct exec_package *epp;
+	struct proc *p;
+	struct exec_package *epp;
 {
 #ifdef COMPAT_25
 	/*
@@ -2209,10 +2195,10 @@ spl0()
 
 void
 MY_info(f, p, flags, s)
-struct trapframe  *f;
-caddr_t     p;
-int         flags;
-char        *s;
+	struct trapframe  *f;
+	caddr_t     p;
+	int         flags;
+	char        *s;
 {
 	regdump(f);
 	printf("proc %x flags %x type %s\n", p, flags, s);
@@ -2296,7 +2282,7 @@ regdump(struct trapframe *f)
 	}
 #endif
 #ifdef MVME188
-	if (brdtyp == BRD_188 ) {
+	if (brdtyp == BRD_188) {
 		unsigned int istr, cur_mask;
 
 		istr = *(int *volatile)IST_REG;
@@ -2332,7 +2318,7 @@ mvme_bootstrap()
 	curproc = &proc0;
 	curpcb = &proc0paddr->u_pcb;
 
-	/* zreo out the machine dependant function pointers */
+	/* zero out the machine dependant function pointers */
 	bzero(&md, sizeof(struct md_p));
 
 	buginit(); /* init the bug routines */
@@ -2398,6 +2384,7 @@ mvme_bootstrap()
 		last_addr = memsize187();
 		break;
 #endif
+#if defined(MVME188) || defined(MVME197)
 #ifdef MVME188
 	case BRD_188:
 #endif
@@ -2405,6 +2392,9 @@ mvme_bootstrap()
 	case BRD_197:
 #endif
 		last_addr = size_memory();
+		break;
+#endif
+	default:
 		break;
 	}
 	physmem = btoc(last_addr);

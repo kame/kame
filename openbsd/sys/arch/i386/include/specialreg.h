@@ -1,4 +1,4 @@
-/*	$OpenBSD: specialreg.h,v 1.12 2003/03/14 22:05:45 deraadt Exp $	*/
+/*	$OpenBSD: specialreg.h,v 1.16 2003/07/25 21:42:02 mickey Exp $	*/
 /*	$NetBSD: specialreg.h,v 1.7 1994/10/27 04:16:26 cgd Exp $	*/
 
 /*-
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -103,7 +99,7 @@
 #define CPUID_CX8	0x00000100	/* has CMPXCHG8B instruction */
 #define CPUID_APIC	0x00000200	/* has enabled APIC */
 #define CPUID_SYS1	0x00000400	/* has SYSCALL/SYSRET inst. (Cyrix) */
-#define CPUID_SYS2	0x00000800	/* has SYSCALL/SYSRET inst. (AMD/Intel) */
+#define CPUID_SEP	0x00000800	/* has SYSCALL/SYSRET inst. (AMD/Intel) */
 #define CPUID_MTRR	0x00001000	/* has memory type range register */
 #define CPUID_PGE	0x00002000	/* has page global extension */
 #define CPUID_MCA	0x00004000	/* has machine check architecture */
@@ -120,18 +116,23 @@
 #define CPUID_EMMX	0x01000000	/* has extended MMX (Cyrix; obsolete) */
 #define CPUID_SIMD	0x02000000	/* has SIMD instructions (Intel) */
 #define CPUID_SIMD2	0x04000000	/* has SIMD instructions (Intel) #2 */
-#define	CPUID_SS	0x08000000	/* self-snoop */
-#define	CPUID_TM	0x20000000	/* thermal monitor (TCC) */
-#define CPUID_3DNOW	0x80000000	/* has 3DNow! instructions (AMD) */
-/* bits 26->31 also reserved. */
+#define CPUID_SS	0x08000000	/* self-snoop */
+#define CPUID_HTT	0x10000000	/* hyper-threading tech */
+#define CPUID_TM	0x20000000	/* thermal monitor (TCC) */
+#define CPUID_B30	0x40000000	/* reserved */
+#define CPUID_SBF	0x80000000	/* signal break on FERR */
 
-#define CPUID_FLAGS1	"\20\1FPU\2VME\3DE\4PSE\5TSC\6MSR\7PAE" \
-			    "\10MCE\11CX8\12APIC\13SYS1\14SYS2\15MTRR"
-#define CPUID_MASK1	0x00001fff
-#define CPUID_FLAGS2	"\20\16PGE\17MCA\20CMOV\21PAT\22PSE36\23SER\24CFLUSH" \
-			    "\25B20\26DS\27ACPI\30MMX\31FXSR\32SIMD\33SIMD2" \
-			    "\34SS\35B28\36TM\37B30\40B31"
-#define CPUID_MASK2	0xffffe000
+/*
+ * Note: The 3DNOW flag does not really belong in this feature set since it is
+ * returned by the cpuid instruction when called with 0x80000001 in eax rather
+ * than 0x00000001, but cyrix3_cpu_setup() moves it to a reserved bit of the
+ * feature set for simplicity
+ */
+#define CPUID_3DNOW	0x40000000	/* has 3DNow! instructions (AMD) */
+
+#define CPUIDECX_EST	0x00000080	/* enhanced SpeedStep */
+#define CPUIDECX_TM2	0x00000100	/* thermal monitor 2 */
+#define CPUIDECX_CNXTID	0x00000400	/* Context ID */
 
 /*
  * Model-specific registers for the i386 family
@@ -159,6 +160,9 @@
 #define	MSR_BBL_CR_TRIG		0x11a	/* PII+ only */
 #define	MSR_BBL_CR_BUSY		0x11b	/* PII+ only */
 #define	MSR_BBL_CR_CTR3		0x11e	/* PII+ only */
+#define MSR_SYSENTER_CS		0x174
+#define MSR_SYSENTER_ESP	0x175
+#define MSR_SYSENTER_EIP	0x176
 #define MSR_MCG_CAP		0x179
 #define MSR_MCG_STATUS		0x17a
 #define MSR_MCG_CTL		0x17b

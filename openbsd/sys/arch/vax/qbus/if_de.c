@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_de.c,v 1.1 2002/06/11 09:36:24 hugh Exp $ */
+/*	$OpenBSD: if_de.c,v 1.3 2003/06/02 23:27:58 millert Exp $ */
 /*	$NetBSD: if_de.c,v 1.11 2001/11/13 07:11:24 lukem Exp $	*/
 
 /*
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -239,7 +235,7 @@ deattach(struct device *parent, struct device *self, void *aux)
 	evcnt_attach_dynamic(&sc->sc_intrcnt, EVCNT_TYPE_INTR, ua->ua_evcnt,
 	    sc->sc_dev.dv_xname, "intr");
 
-	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
+	strlcpy(ifp->if_xname, sc->sc_dev.dv_xname, sizeof ifp->if_xname);
 	ifp->if_softc = sc;
 	ifp->if_flags = IFF_BROADCAST|IFF_SIMPLEX|IFF_MULTICAST|IFF_ALLMULTI;
 	ifp->if_ioctl = deioctl;

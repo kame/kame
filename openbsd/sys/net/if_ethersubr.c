@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ethersubr.c,v 1.68 2003/02/16 21:30:13 deraadt Exp $	*/
+/*	$OpenBSD: if_ethersubr.c,v 1.70 2003/08/18 11:01:41 dhartmei Exp $	*/
 /*	$NetBSD: if_ethersubr.c,v 1.19 1996/05/07 02:40:30 thorpej Exp $	*/
 
 /*
@@ -42,11 +42,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -287,7 +283,8 @@ ether_output(ifp, m0, dst, rt0)
 		if (!arpresolve(ac, rt, m, dst, edst))
 			return (0);	/* if not yet resolved */
 		/* If broadcasting on a simplex interface, loopback a copy */
-		if ((m->m_flags & M_BCAST) && (ifp->if_flags & IFF_SIMPLEX))
+		if ((m->m_flags & M_BCAST) && (ifp->if_flags & IFF_SIMPLEX) &&
+		    m_tag_find(m, PACKET_TAG_PF_ROUTED, NULL) == NULL)
 			mcopy = m_copy(m, 0, (int)M_COPYALL);
 		etype = htons(ETHERTYPE_IP);
 		break;

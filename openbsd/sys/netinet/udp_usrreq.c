@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_usrreq.c,v 1.86 2002/08/28 15:43:03 pefo Exp $	*/
+/*	$OpenBSD: udp_usrreq.c,v 1.91 2003/07/09 22:03:16 itojun Exp $	*/
 /*	$NetBSD: udp_usrreq.c,v 1.28 1996/03/16 23:54:03 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -108,6 +104,8 @@ extern int ip6_defhlim;
  */
 int	udpcksum = 1;
 
+struct	inpcbtable udbtable;
+struct	udpstat udpstat;
 
 static	void udp_detach(struct inpcb *);
 static	void udp_notify(struct inpcb *, int);
@@ -203,38 +201,11 @@ udp_input(struct mbuf *m, ...)
 		goto bad;
 	}
 
-	/*
-	 * Strip IP options, if any; should skip this,
-	 * make available to user, and use on returned packets,
-	 * but we don't yet have a way to check the checksum
-	 * with options still present.
-	 */
-	/*
-	 * (contd. from above...)  Furthermore, we may want to strip options
-	 * for such things as ICMP errors, where options just get in the way.
-	 */
-	if (ip && iphlen > sizeof (struct ip)) {
-		ip_stripoptions(m, (struct mbuf *)0);
-		iphlen = sizeof(struct ip);
+	IP6_EXTHDR_GET(uh, struct udphdr *, m, iphlen, sizeof(struct udphdr));
+	if (!uh) {
+		udpstat.udps_hdrops++;
+		return;
 	}
-
-	/*
-	 * Get IP and UDP header together in first mbuf.
-	 */
-	if (m->m_len < iphlen + sizeof(struct udphdr)) {
-		if ((m = m_pullup2(m, iphlen + sizeof(struct udphdr))) ==
-		    NULL) {
-			udpstat.udps_hdrops++;
-			return;
-		}
-#ifdef INET6
-		if (ip6)
-			ip6 = mtod(m, struct ip6_hdr *);
-		else
-#endif /* INET6 */
-			ip = mtod(m, struct ip *);
-	}
-	uh = (struct udphdr *)(mtod(m, caddr_t) + iphlen);
 
 	/* Check for illegal destination port 0 */
 	if (uh->uh_dport == 0) {
@@ -247,14 +218,30 @@ udp_input(struct mbuf *m, ...)
 	 * If not enough data to reflect UDP length, drop.
 	 */
 	len = ntohs((u_int16_t)uh->uh_ulen);
-	if (m->m_pkthdr.len - iphlen != len) {
-		if (len > (m->m_pkthdr.len - iphlen) ||
-		    len < sizeof(struct udphdr)) {
+	if (ip) {
+		if (m->m_pkthdr.len - iphlen != len) {
+			if (len > (m->m_pkthdr.len - iphlen) ||
+			    len < sizeof(struct udphdr)) {
+				udpstat.udps_badlen++;
+				goto bad;
+			}
+			m_adj(m, len - (m->m_pkthdr.len - iphlen));
+		}
+	}
+#ifdef INET6
+	else if (ip6) {
+		/* jumbograms */
+		if (len == 0 && m->m_pkthdr.len - iphlen > 0xffff)
+			len = m->m_pkthdr.len - iphlen;
+		if (len != m->m_pkthdr.len - iphlen) {
 			udpstat.udps_badlen++;
 			goto bad;
 		}
-		m_adj(m, len - (m->m_pkthdr.len - iphlen));
 	}
+#endif
+	else /* shouldn't happen */
+		goto bad;
+
 	/*
 	 * Save a copy of the IP header in case we want restore it
 	 * for sending an ICMP error message in response.
@@ -613,8 +600,7 @@ udp_input(struct mbuf *m, ...)
 	}
 	iphlen += sizeof(struct udphdr);
 	m_adj(m, iphlen);
-	if (sbappendaddr(&inp->inp_socket->so_rcv,
-		&srcsa.sa, m, opts) == 0) {
+	if (sbappendaddr(&inp->inp_socket->so_rcv, &srcsa.sa, m, opts) == 0) {
 		udpstat.udps_fullsock++;
 		goto bad;
 	}
@@ -963,7 +949,7 @@ udp_output(struct mbuf *m, ...)
 		    sizeof (struct udphdr) + IPPROTO_UDP));
 	} else
 		ui->ui_sum = 0;
-	((struct ip *)ui)->ip_len = sizeof (struct udpiphdr) + len;
+	((struct ip *)ui)->ip_len = htons(sizeof (struct udpiphdr) + len);
 	((struct ip *)ui)->ip_ttl = inp->inp_ip.ip_ttl;
 	((struct ip *)ui)->ip_tos = inp->inp_ip.ip_tos;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: comvar.h,v 1.31 2002/03/14 01:26:54 millert Exp $	*/
+/*	$OpenBSD: comvar.h,v 1.33 2003/07/15 03:15:58 jason Exp $	*/
 /*	$NetBSD: comvar.h,v 1.5 1996/05/05 19:50:47 christos Exp $	*/
 
 /*
@@ -12,13 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Jason Downs for the
- *      OpenBSD system.
- * 4. Neither the name(s) of the author(s) nor the name OpenBSD
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR(S) ``AS IS'' AND ANY EXPRESS
  * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -162,6 +155,7 @@ void	comcnputc(dev_t, int);
 void	comcnpollc(dev_t, int);
 int	com_common_getc(bus_space_tag_t, bus_space_handle_t);
 void	com_common_putc(bus_space_tag_t, bus_space_handle_t, int);
+void	com_raisedtr(void *);
 
 #ifdef KGDB
 int	com_kgdb_attach(bus_space_tag_t, int, int, int, tcflag_t);

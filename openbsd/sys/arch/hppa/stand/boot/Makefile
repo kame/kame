@@ -1,7 +1,7 @@
-#	$OpenBSD: Makefile,v 1.16 2003/01/27 23:56:44 miod Exp $
+#	$OpenBSD: Makefile,v 1.18 2003/07/19 00:03:51 david Exp $
 
 MAN=	boot.8
-MANSUBDIR=/hppa
+MANSUBDIR=hppa
 MLINKS=	boot.8 boot.conf.8
 S	=${.CURDIR}/../../../..
 CLEANFILES+=	boot.gdb boot.map boot.lif
@@ -14,7 +14,7 @@ LDFLAGS+=-Bstatic -nostartfiles -nostdlib -N -Ttext $(LINKADDR)
 LDFLAGS+=-T ${.CURDIR}/ld.script -Map boot.map
 SIZE?=	size
 STRIP?=	strip
-SADIR=	${.CURDIR}/..
+STANDIR=${.CURDIR}/..
 CRTBEGIN=
 CRTEND=
 LINKS=	${BINDIR}/boot.lif ${BINDIR}/sdboot \
@@ -29,6 +29,8 @@ DPADD=	${LIBSA} ${LIBZ} ${LIBKERN}
 all:	boot.lif
 
 realinstall:
+	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+	    boot ${DESTDIR}${BINDIR}
 	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
 	    boot.lif ${DESTDIR}${BINDIR}
 

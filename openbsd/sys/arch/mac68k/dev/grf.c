@@ -1,4 +1,4 @@
-/*	$OpenBSD: grf.c,v 1.22 2002/10/29 18:30:21 art Exp $	*/
+/*	$OpenBSD: grf.c,v 1.24 2003/06/02 23:27:48 millert Exp $	*/
 /*	$NetBSD: grf.c,v 1.41 1997/02/24 06:20:04 scottr Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -369,7 +365,7 @@ grfmap(dev, addrp, p)
 	vn.v_rdev = dev;	/* XXX */
 
 	error = uvm_mmap(&p->p_vmspace->vm_map, (vm_offset_t *)addrp,
-	    (vm_size_t)len, VM_PROT_ALL, VM_PROT_ALL, flags, (caddr_t)&vn, 0,
+	    (vm_size_t)len, UVM_PROT_RW, UVM_PROT_RW, flags, (caddr_t)&vn, 0,
 	    p->p_rlimit[RLIMIT_MEMLOCK].rlim_cur);
 
 	/* Offset into page: */

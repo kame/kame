@@ -1,4 +1,4 @@
-/*	$OpenBSD: libsa.h,v 1.35 2002/06/20 20:22:58 weingart Exp $	*/
+/*	$OpenBSD: libsa.h,v 1.38 2003/06/03 20:22:12 mickey Exp $	*/
 
 /*
  * Copyright (c) 1996-1999 Michael Shalayeff
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -34,9 +29,9 @@
 #include <lib/libsa/stand.h>
 #include <machine/biosvar.h>
 
-#define	EXEC_AOUT
+#define	EXEC_ELF
 
-#define	DEFAULT_KERNEL_ADDRESS	0x100000
+#define	DEFAULT_KERNEL_ADDRESS	0
 
 void gateA20(int);
 

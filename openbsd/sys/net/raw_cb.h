@@ -1,4 +1,4 @@
-/*	$OpenBSD: raw_cb.h,v 1.4 2002/03/14 01:27:10 millert Exp $	*/
+/*	$OpenBSD: raw_cb.h,v 1.6 2003/06/02 23:28:12 millert Exp $	*/
 /*	$NetBSD: raw_cb.h,v 1.9 1996/02/13 22:00:41 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -60,7 +56,7 @@ struct rawcb {
 #define	RAWRCVQ		8192
 
 #ifdef _KERNEL
-LIST_HEAD(, rawcb) rawcb;		/* head of list */
+extern LIST_HEAD(rawcbhead, rawcb) rawcb;		/* head of list */
 
 int	 raw_attach(struct socket *, int);
 void	 *raw_ctlinput(int, struct sockaddr *, void *);

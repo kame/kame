@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.31 2002/12/05 02:49:55 kjc Exp $	*/
+/*	$OpenBSD: conf.c,v 1.34 2003/06/02 23:27:49 millert Exp $	*/
 /*	$NetBSD: conf.c,v 1.41 1997/02/11 07:35:49 scottr Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -214,7 +210,7 @@ getnulldev()
 	return makedev(mem_no, 2);
 }
 
-static int chrtoblktab[] = {
+int chrtoblktbl[] = {
 	/* XXXX This needs to be dynamic for LKMs. */
 	/*VCHR*/	/*VBLK*/
 	/*  0 */	NODEV,
@@ -239,39 +235,7 @@ static int chrtoblktab[] = {
 	/* 19 */	8,
 	/* 20 */	9,
 };
-
-dev_t
-chrtoblk(dev)
-	dev_t	dev;
-{
-	int	blkmaj;
-
-	if (major(dev) >= nchrdev ||
-	    major(dev) > sizeof(chrtoblktab)/sizeof(chrtoblktab[0]))
-		return (NODEV);
-	blkmaj = chrtoblktab[major(dev)];
-	if (blkmaj == NODEV)
-		return (NODEV);
-	return (makedev(blkmaj, minor(dev)));
-}
-
-/*
- * Convert a character device number to a block device number.
- */
-dev_t
-blktochr(dev)
-	dev_t dev;
-{
-	int blkmaj = major(dev);
-	int i;
-
-	if (blkmaj >= nblkdev)
-		return (NODEV);
-	for (i = 0; i < sizeof(chrtoblktab)/sizeof(chrtoblktab[0]); i++)
-		if (blkmaj == chrtoblktab[i])
-			return (makedev(i, minor(dev)));
-	return (NODEV);
-}
+int nchrtoblktbl = sizeof(chrtoblktbl) / sizeof(chrtoblktbl[0]);
 
 #define itecnpollc	nullcnpollc
 cons_decl(ite);

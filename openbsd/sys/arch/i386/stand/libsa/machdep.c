@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.31 2001/08/18 15:34:17 mickey Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.34 2003/08/11 06:23:09 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Michael Shalayeff
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -37,7 +32,7 @@
 #include "debug.h"
 #include "ps2probe.h"
 
-struct BIOS_regs	BIOS_regs;
+volatile struct BIOS_regs	BIOS_regs;
 
 #if defined(DEBUG) && !defined(_TEST)
 #define CKPT(c)	(*(u_int16_t*)0xb8148 = 0x4700 + (c))
@@ -49,7 +44,7 @@ extern int debug;
 int ps2model;
 
 void
-machdep()
+machdep(void)
 {
 	/* here */	CKPT('0');
 	printf("probing:");

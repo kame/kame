@@ -1,4 +1,4 @@
-/*	$OpenBSD: freebsd_exec.c,v 1.13 2003/03/11 22:43:23 millert Exp $	*/
+/*	$OpenBSD: freebsd_exec.c,v 1.15 2003/05/16 05:30:47 millert Exp $	*/
 /*	$NetBSD: freebsd_exec.c,v 1.2 1996/05/18 16:02:08 christos Exp $	*/
 
 /*
@@ -157,9 +157,14 @@ freebsd_elf_probe(p, epp, itp, pos, os)
 	int error;
 	size_t len;
 
-	brand = elf32_check_brand(eh);
-	if ((brand == NULL || strcmp(brand, "FreeBSD")) && eh->e_ident[EI_PAD] != 9)
-		return (EINVAL);
+	/*
+	 * Older FreeBSD ELF binaries use a brand; newer ones use EI_OSABI
+	 */
+	if (eh->e_ident[EI_OSABI] != ELFOSABI_FREEBSD) {
+		brand = elf32_check_brand(eh);
+		if (brand == NULL || strcmp(brand, "FreeBSD") != 0)
+			return (EINVAL);
+	}
 	if (itp[0]) {
 		if ((error = emul_find(p, NULL, freebsd_emul_path, itp, &bp, 0)))
 			return (error);

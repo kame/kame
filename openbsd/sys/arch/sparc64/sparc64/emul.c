@@ -1,4 +1,4 @@
-/*	$OpenBSD: emul.c,v 1.3 2002/03/14 01:26:45 millert Exp $	*/
+/*	$OpenBSD: emul.c,v 1.11 2003/07/14 00:05:35 jason Exp $	*/
 /*	$NetBSD: emul.c,v 1.8 2001/06/29 23:58:40 eeh Exp $	*/
 
 /*-
@@ -40,15 +40,17 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/signalvar.h>
+#include <sys/malloc.h>
 #include <machine/reg.h>
 #include <machine/instr.h>
 #include <machine/cpu.h>
 #include <machine/psl.h>
 #include <sparc64/sparc64/cpuvar.h>
+#include <uvm/uvm_extern.h>
 
-#define DEBUG_EMUL
 #ifdef DEBUG_EMUL
-# define DPRINTF(a) uprintf a
+# define DPRINTF(a) printf a
 #else
 # define DPRINTF(a)
 #endif
@@ -64,6 +66,7 @@ static __inline int writefpreg(struct proc *, int, const void *);
 static __inline int decodeaddr(struct trapframe64 *, union instr *, void *);
 static int muldiv(struct trapframe64 *, union instr *, int32_t *, int32_t *,
     int32_t *);
+void swap_quad(int64_t *);
 
 #define	REGNAME(i)	"goli"[i >> 3], i & 7
 
@@ -176,14 +179,14 @@ muldiv(tf, code, rd, rs1, rs2)
 	op.num = code->i_op3.i_op3;
 
 #ifdef DEBUG_EMUL
-	uprintf("muldiv 0x%x: %c%s%s %c%d, %c%d, ", code->i_int,
+	printf("muldiv 0x%x: %c%s%s %c%d, %c%d, ", code->i_int,
 	    "us"[op.bits.sgn], op.bits.div ? "div" : "mul",
 	    op.bits.cc ? "cc" : "", REGNAME(code->i_op3.i_rd),
 	    REGNAME(code->i_op3.i_rs1));
 	if (code->i_loadstore.i_i)
-		uprintf("0x%x\n", *rs2);
+		printf("0x%x\n", *rs2);
 	else
-		uprintf("%c%d\n", REGNAME(code->i_asi.i_rs2));
+		printf("%c%d\n", REGNAME(code->i_asi.i_rs2));
 #endif
 
 	if (op.bits.div) {
@@ -194,7 +197,7 @@ muldiv(tf, code, rd, rs1, rs2)
 			 *	It should be easy to fix by passing struct
 			 *	proc in here.
 			 */
-			DPRINTF(("emulinstr: avoid zerodivide\n"));
+			DPRINTF(("muldiv: avoid zerodivide\n"));
 			return EINVAL;
 		}
 		*rd = *rs1 / *rs2;
@@ -292,12 +295,12 @@ fixalign(p, tf)
 	write_user_windows();
 
 	if ((error = readgpreg(tf, code.i_op3.i_rs1, &rs1)) != 0) {
-		DPRINTF(("emulinstr: read rs1 %d\n", error));
+		DPRINTF(("fixalign: read rs1 %d\n", error));
 		return error;
 	}
 
 	if ((error = decodeaddr(tf, &code, &rs2)) != 0) {
-		DPRINTF(("emulinstr: decode addr %d\n", error));
+		DPRINTF(("fixalign: decode addr %d\n", error));
 		return error;
 	}
 
@@ -305,14 +308,14 @@ fixalign(p, tf)
 	rs1 += rs2;
 
 #ifdef DEBUG_EMUL
-	uprintf("memalign 0x%x: %s%c%c %c%d, %c%d, ", code.i_int,
+	printf("memalign 0x%x: %s%c%c %c%d, %c%d, ", code.i_int,
 	    op.bits.st ? "st" : "ld", "us"[op.bits.sgn],
 	    "w*hd"[op.bits.sz], op.bits.fl ? 'f' : REGNAME(code.i_op3.i_rd),
 	    REGNAME(code.i_op3.i_rs1));
 	if (code.i_loadstore.i_i)
-		uprintf("0x%llx\n", (unsigned long long)rs2);
+		printf("0x%llx\n", (unsigned long long)rs2);
 	else
-		uprintf("%c%d\n", REGNAME(code.i_asi.i_rs2));
+		printf("%c%d\n", REGNAME(code.i_asi.i_rs2));
 #endif
 #ifdef DIAGNOSTIC
 	if (op.bits.fl && p != fpproc)
@@ -412,46 +415,182 @@ emulinstr(pc, tf)
 	error = copyin((caddr_t) pc, &code.i_int, sizeof(code.i_int));
 	if (error != 0) {
 		DPRINTF(("emulinstr: Bad instruction fetch\n"));
-		return SIGILL;
+		return (SIGILL);
 	}
 
 	/* Only support format 2 */
 	if (code.i_any.i_op != 2) {
 		DPRINTF(("emulinstr: Not a format 2 instruction\n"));
-		return SIGILL;
+		return (SIGILL);
 	}
 
 	write_user_windows();
 
 	if ((error = readgpreg(tf, code.i_op3.i_rs1, &rs1)) != 0) {
 		DPRINTF(("emulinstr: read rs1 %d\n", error));
-		return SIGILL;
+		return (SIGILL);
 	}
 
 	if ((error = decodeaddr(tf, &code, &rs2)) != 0) {
 		DPRINTF(("emulinstr: decode addr %d\n", error));
-		return SIGILL;
+		return (SIGILL);
 	}
 
 	switch (code.i_op3.i_op3) {
 	case IOP3_FLUSH:
 /*		cpuinfo.cache_flush((caddr_t)(rs1 + rs2), 4); XXX */
-		return 0;
+		return (0);
 
 	default:
 		if ((code.i_op3.i_op3 & 0x2a) != 0xa) {
 			DPRINTF(("emulinstr: Unsupported op3 0x%x\n",
 			    code.i_op3.i_op3));
-			return SIGILL;
+			return (SIGILL);
 		}
 		else if ((error = muldiv(tf, &code, &rd, &rs1, &rs2)) != 0)
-			return SIGFPE;
+			return (SIGFPE);
 	}
 
 	if ((error = writegpreg(tf, code.i_op3.i_rd, &rd)) != 0) {
 		DPRINTF(("muldiv: write rd %d\n", error));
-		return SIGILL;
+		return (SIGILL);
 	}
 
-	return 0;
+	return (0);
+}
+
+#define	SIGN_EXT13(v)	(((int64_t)(v) << 51) >> 51)
+
+void
+swap_quad(int64_t *p)
+{
+	int64_t t;
+
+	t = htole64(p[0]);
+	p[0] = htole64(p[1]);
+	p[1] = t;
+}
+
+/*
+ * emulate STQF, STQFA, LDQF, and LDQFA
+ */
+int
+emul_qf(int32_t insv, struct proc *p, union sigval sv, struct trapframe *tf)
+{
+	extern struct fpstate64 initfpstate;
+	struct fpstate64 *fs = p->p_md.md_fpstate;
+	int64_t addr, buf[2];
+	union instr ins;
+	int freg, isload, err;
+	u_int8_t asi;
+
+	ins.i_int = insv;
+	freg = ins.i_op3.i_rd & ~1;
+	freg |= (ins.i_op3.i_rd & 1) << 5;
+
+	if (ins.i_op3.i_op3 == IOP3_LDQF || ins.i_op3.i_op3 == IOP3_LDQFA)
+		isload = 1;
+	else
+		isload = 0;
+
+	if (ins.i_op3.i_op3 == IOP3_STQF || ins.i_op3.i_op3 == IOP3_LDQF)
+		asi = ASI_PRIMARY;
+	else if (ins.i_loadstore.i_i)
+		asi = (tf->tf_tstate & TSTATE_ASI) >> TSTATE_ASI_SHIFT;
+	else
+		asi = ins.i_asi.i_asi;
+
+	addr = tf->tf_global[ins.i_asi.i_rs1];
+	if (ins.i_loadstore.i_i)
+		addr += SIGN_EXT13(ins.i_simm13.i_simm13);
+	else
+		addr += tf->tf_global[ins.i_asi.i_rs2];
+
+	if (asi < ASI_PRIMARY) {
+		/* priviledged asi */
+		trapsignal(p, SIGILL, 0, ILL_PRVOPC, sv);
+		return (0);
+	}
+	if (asi > ASI_SECONDARY_NOFAULT_LITTLE ||
+	    (asi > ASI_SECONDARY_NOFAULT && asi < ASI_PRIMARY_LITTLE)) {
+		/* architecturally undefined user ASI's */
+		goto segv;
+	}
+
+	if ((freg & 3) != 0) {
+		/* only valid for %fN where N % 4 = 0 */
+		trapsignal(p, SIGILL, 0, ILL_ILLOPN, sv);
+		return (0);
+	}
+
+	if ((p->p_md.md_flags & MDP_FIXALIGN) == 0 && (addr & 3) != 0) {
+		/*
+		 * If process doesn't want us to fix alignment and the
+		 * request isn't aligned, kill it.
+		 */
+		trapsignal(p, SIGBUS, 0, BUS_ADRALN, sv);
+		return (0);
+	}
+
+	fs = p->p_md.md_fpstate;
+	if (fs == NULL) {
+		/* don't currently have an fpu context, get one */
+		fs = malloc(sizeof(*fs), M_SUBPROC, M_WAITOK);
+		*fs = initfpstate;
+		fs->fs_qsize = 0;
+		p->p_md.md_fpstate = fs;
+	}
+	if (fpproc != p) {
+		/* make this process the current holder of the fpu */
+		if (fpproc != NULL)
+			savefpstate(fpproc->p_md.md_fpstate);
+		fpproc = p;
+	}
+	tf->tf_tstate |= TSTATE_PEF;
+
+	/* Ok, try to do the actual operation (finally) */
+	if (isload) {
+		err = copyin((caddr_t)addr, buf, sizeof(buf));
+		if (err != 0 && (asi & 2) == 0)
+			goto segv;
+		if (err == 0) {
+			savefpstate(fs);
+			if (asi & 8)
+				swap_quad(buf);
+			bcopy(buf, &fs->fs_regs[freg], sizeof(buf));
+			loadfpstate(fs);
+		}
+	} else {
+		bcopy(&fs->fs_regs[freg], buf, sizeof(buf));
+		if (asi & 8)
+			swap_quad(buf);
+		if (copyout(buf, (caddr_t)addr, sizeof(buf)) && (asi & 2) == 0)
+			goto segv;
+	}
+
+	return (1);
+
+segv:
+	trapsignal(p, SIGSEGV, isload ? VM_PROT_READ : VM_PROT_WRITE,
+	    SEGV_MAPERR, sv);
+	return (0);
+}
+
+int
+emul_popc(int32_t insv, struct proc *p, union sigval sv, struct trapframe *tf)
+{
+	u_int64_t val, ret = 0;
+	union instr ins;
+
+	ins.i_int = insv;
+	if (ins.i_simm13.i_i == 0)
+		val = tf->tf_global[ins.i_asi.i_rs2];
+	else
+		val = SIGN_EXT13(ins.i_simm13.i_simm13);
+
+	for (; val != 0; val >>= 1)
+		ret += val & 1;
+
+	tf->tf_global[ins.i_asi.i_rd] = ret;
+	return (1);
 }

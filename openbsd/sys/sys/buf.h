@@ -1,4 +1,4 @@
-/*	$OpenBSD: buf.h,v 1.42 2002/07/03 21:19:08 miod Exp $	*/
+/*	$OpenBSD: buf.h,v 1.44 2003/06/25 20:52:57 tedu Exp $	*/
 /*	$NetBSD: buf.h,v 1.25 1997/04/09 21:12:17 mycroft Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -103,6 +99,28 @@ struct buf {
 	int	b_validend;		/* Offset of end of valid region. */
  	struct	workhead b_dep;		/* List of filesystem dependencies. */
 };
+
+/*
+ * bufq
+ * flexible buffer queue routines
+ */
+struct bufq {
+	void (*bufq_add)(struct bufq*, struct buf *);
+	struct buf *(*bufq_get)(struct bufq*);
+};
+
+struct bufq_default {
+	struct bufq bufq;
+	struct buf bufq_head[3];
+};
+
+#define BUFQ_ADD(_bufq, _bp) \
+    ((struct bufq *)_bufq)->bufq_add((struct bufq *)_bufq, _bp)
+#define BUFQ_GET(_bufq) \
+    ((struct bufq *)_bufq)->bufq_get((struct bufq *)_bufq)
+
+void bufq_default_add(struct bufq *, struct buf *);
+struct buf *bufq_default_get(struct bufq *);
 
 /*
  * For portability with historic industry practice, the cylinder number has

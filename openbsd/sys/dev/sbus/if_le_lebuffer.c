@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_le_lebuffer.c,v 1.2 2002/05/13 18:16:38 jason Exp $	*/
+/*	$OpenBSD: if_le_lebuffer.c,v 1.5 2003/07/25 03:50:56 jason Exp $	*/
 /*	$NetBSD: if_le_lebuffer.c,v 1.10 2002/03/11 16:00:56 pk Exp $	*/
 
 /*-
@@ -95,13 +95,11 @@ struct cfdriver lebuffer_cd = {
 	NULL, "lebuffer", DV_DULL
 };
 
-static void lewrcsr(struct am7990_softc *, u_int16_t, u_int16_t);
-static u_int16_t lerdcsr(struct am7990_softc *, u_int16_t);
+void le_lebuffer_wrcsr(struct am7990_softc *, u_int16_t, u_int16_t);
+u_int16_t le_lebuffer_rdcsr(struct am7990_softc *, u_int16_t);
 
-static void
-lewrcsr(sc, port, val)
-	struct am7990_softc *sc;
-	u_int16_t port, val;
+void
+le_lebuffer_wrcsr(struct am7990_softc *sc, u_int16_t port, u_int16_t val)
 {
 	struct le_softc *lesc = (struct le_softc *)sc;
 
@@ -122,10 +120,8 @@ lewrcsr(sc, port, val)
 #endif
 }
 
-static u_int16_t
-lerdcsr(sc, port)
-	struct am7990_softc *sc;
-	u_int16_t port;
+u_int16_t
+le_lebuffer_rdcsr(struct am7990_softc *sc, u_int16_t port)
 {
 	struct le_softc *lesc = (struct le_softc *)sc;
 
@@ -134,10 +130,7 @@ lerdcsr(sc, port)
 }
 
 int
-lematch_lebuffer(parent, vcf, aux)
-	struct device *parent;
-	void *vcf;
-	void *aux;
+lematch_lebuffer(struct device *parent, void *vcf, void *aux)
 {
 	struct sbus_attach_args *sa = aux;
 	struct cfdata *cf = vcf;
@@ -147,9 +140,7 @@ lematch_lebuffer(parent, vcf, aux)
 
 
 void
-leattach_lebuffer(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+leattach_lebuffer(struct device *parent, struct device *self, void *aux)
 {
 	struct sbus_attach_args *sa = aux;
 	struct le_softc *lesc = (struct le_softc *)self;
@@ -164,7 +155,7 @@ leattach_lebuffer(parent, self, aux)
 	if (sbus_bus_map(sa->sa_bustag,
 	    sa->sa_slot, sa->sa_offset, sa->sa_size,
 	    0, 0, &lesc->sc_reg)) {
-		printf(": cannot map registers\n", self->dv_xname);
+		printf(": cannot map registers\n");
 		return;
 	}
 
@@ -189,13 +180,13 @@ leattach_lebuffer(parent, self, aux)
 	sc->sc_copyfrombuf = am7990_copyfrombuf_contig;
 	sc->sc_zerobuf = am7990_zerobuf_contig;
 
-	sc->sc_rdcsr = lerdcsr;
-	sc->sc_wrcsr = lewrcsr;
+	sc->sc_rdcsr = le_lebuffer_rdcsr;
+	sc->sc_wrcsr = le_lebuffer_wrcsr;
 
 	am7990_config(&lesc->sc_am7990);
 
 	/* Establish interrupt handler */
 	if (sa->sa_nintr != 0)
 		(void)bus_intr_establish(lesc->sc_bustag, sa->sa_pri,
-		    IPL_NET, 0, am7990_intr, sc);
+		    IPL_NET, 0, am7990_intr, sc, self->dv_xname);
 }

@@ -1,4 +1,4 @@
-/*       $OpenBSD: vfs_sync.c,v 1.23 2002/03/14 01:27:06 millert Exp $  */
+/*       $OpenBSD: vfs_sync.c,v 1.25 2003/09/01 18:06:03 henning Exp $  */
 
 /*
  *  Portions of this code are:
@@ -19,11 +19,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -329,6 +325,7 @@ sync_fsync(v)
 	void *v;
 {
 	struct vop_fsync_args /* {
+		struct vnodeop_desc *a_desc;
 		struct vnode *a_vp;
 		struct ucred *a_cred;
 		int a_waitfor;
@@ -375,6 +372,7 @@ sync_inactive(v)
 	void *v;
 {
 	struct vop_inactive_args /* {
+		struct vnodeop_desc *a_desc;
 		struct vnode *a_vp;
 		struct proc *a_p;
 	} */ *ap = v;
@@ -402,6 +400,7 @@ sync_print(v)
 
 {
 	struct vop_print_args /* {
+		struct vnodeop_desc *a_desc;
 		struct vnode *a_vp;
 	} */ *ap = v;
 	struct vnode *vp = ap->a_vp;

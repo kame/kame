@@ -1,4 +1,4 @@
-/*	$OpenBSD: bugtty.c,v 1.13 2002/06/12 03:49:56 miod Exp $ */
+/*	$OpenBSD: bugtty.c,v 1.16 2003/09/01 19:14:01 miod Exp $ */
 
 /* Copyright (c) 1998 Steve Murphree, Jr. 
  * Copyright (c) 1995 Dale Rahn.
@@ -12,10 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *   This product includes software developed by Dale Rahn.
- * 4. The name of the author may not be used to endorse or promote products
+ * 3. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
@@ -116,7 +113,7 @@ bugttyattach(parent, self, aux)
 	struct device *self;
 	void *aux;
 {
-	printf(": bugtty\n");
+	printf(": fallback console\n");
 }
 
 #define BUGTTYUNIT(x) ((x) & (0x7f))
@@ -424,7 +421,7 @@ bugttyioctl(dev, cmd, data, flag, p)
 		*(int *)data = SWFLAGS(dev);
 		break;
 	case TIOCSFLAGS:
-		error = suser(p->p_ucred, &p->p_acflag); 
+		error = suser(p, 0); 
 		if (error != 0)
 			return (EPERM); 
 
@@ -470,21 +467,6 @@ bugttycnprobe(cp)
 		return (0);
 	}
 		
-#if 0
-	switch (cputyp) {
-	case CPU_147:
-	case CPU_162:
-		cp->cn_pri = CN_NORMAL;
-		return (0);
-	default:
-		break;
-	}
-#endif
-#if 0
-	cp->cn_pri = CN_NORMAL;
-	return (0);
-#endif /* 0 */
-
 	/* locate the major number */
 	for (maj = 0; maj < nchrdev; maj++)
 		if (cdevsw[maj].d_open == bugttyopen)

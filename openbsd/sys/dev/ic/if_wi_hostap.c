@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wi_hostap.c,v 1.24 2003/02/15 17:49:39 millert Exp $	*/
+/*	$OpenBSD: if_wi_hostap.c,v 1.26 2003/08/15 20:32:17 tedu Exp $	*/
 
 /*
  * Copyright (c) 2002
@@ -329,7 +329,8 @@ static __inline int
 addr_cmp(u_int8_t a[], u_int8_t b[])
 {
 	return (*(u_int16_t *)(a + 4) == *(u_int16_t *)(b + 4) &&
-		*(u_int32_t *)(a    ) == *(u_int32_t *)(b));
+		*(u_int16_t *)(a + 2) == *(u_int16_t *)(b + 2) &&
+		*(u_int16_t *)(a    ) == *(u_int16_t *)(b));
 }
 
 /* wihap_sta_movetail(): move sta to the tail of the station list in whi */
@@ -1202,7 +1203,7 @@ wihap_ioctl(struct wi_softc *sc, u_long command, caddr_t data)
 
 	switch (command) {
 	case SIOCHOSTAP_DEL:
-		if ((error = suser(p->p_ucred, &p->p_acflag)))
+		if ((error = suser(p, 0)))
 			break;
 		if ((error = copyin(ifr->ifr_data, &reqsta, sizeof(reqsta))))
 			break;
@@ -1246,7 +1247,7 @@ wihap_ioctl(struct wi_softc *sc, u_long command, caddr_t data)
 		break;
 
 	case SIOCHOSTAP_ADD:
-		if ((error = suser(p->p_ucred, &p->p_acflag)))
+		if ((error = suser(p, 0)))
 			break;
 		if ((error = copyin(ifr->ifr_data, &reqsta, sizeof(reqsta))))
 			break;
@@ -1269,7 +1270,7 @@ wihap_ioctl(struct wi_softc *sc, u_long command, caddr_t data)
 		break;
 
 	case SIOCHOSTAP_SFLAGS:
-		if ((error = suser(p->p_ucred, &p->p_acflag)))
+		if ((error = suser(p, 0)))
 			break;
 		if ((error = copyin(ifr->ifr_data, &flag, sizeof(int))))
 			break;

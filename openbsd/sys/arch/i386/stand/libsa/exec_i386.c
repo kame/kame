@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_i386.c,v 1.26 2000/03/05 18:40:59 niklas Exp $	*/
+/*	$OpenBSD: exec_i386.c,v 1.28 2003/06/03 20:22:11 mickey Exp $	*/
 
 /*
  * Copyright (c) 1997-1998 Michael Shalayeff
@@ -13,12 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- *	This product includes software developed by Tobias Weingartner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHORS ``AS IS'' AND ANY EXPRESS OR 
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
@@ -41,17 +35,15 @@
 #include <sys/disklabel.h>
 #include "disk.h"
 #include "libsa.h"
-#include <lib/libsa/exec.h>
+#include <lib/libsa/loadfile.h>
 
 typedef void (*startfuncp)(int, int, int, int, int, int, int, int)
 	__attribute__ ((noreturn));
 
 void
-machdep_exec(xp, howto, loadaddr)
-	struct x_param *xp;
-	int howto;
-	void *loadaddr;
+run_loadfile(u_long *marks, int howto)
 {
+	u_long entry;
 #ifndef _TEST
 #ifdef EXEC_DEBUG
 	extern int debug;
@@ -71,25 +63,12 @@ machdep_exec(xp, howto, loadaddr)
 
 	makebootargs(av, &ac);
 
-#ifdef EXEC_DEBUG
-	if (debug) {
-		struct exec *x = (void *)loadaddr;
-		printf("exec {\n\ta_midmag = %x\n\ta_text = %x\n\ta_data = %x\n"
-		       "\ta_bss = %x\n\ta_syms = %x\n\ta_entry = %x\n"
-		       "\ta_trsize = %x\n\ta_drsize = %x\n}\n",
-		       x->a_midmag, x->a_text, x->a_data, x->a_bss, x->a_syms,
-		       x->a_entry, x->a_trsize, x->a_drsize);
+	entry = marks[MARK_ENTRY] & 0x0fffffff;
 
-		printf("/bsd(%x,%u,%p)\n", BOOTARG_APIVER, ac, av);
-		getchar();
-	}
-#endif
-	xp->xp_entry &= 0xffffff;
-
-	printf("entry point at 0x%x\n", xp->xp_entry);
+	printf("entry point at 0x%x\n", (int) entry);
 	/* stack and the gung is ok at this point, so, no need for asm setup */
-	(*(startfuncp)xp->xp_entry)(howto, bootdev, BOOTARG_APIVER,
-		xp->xp_end, extmem, cnvmem, ac, (int)av);
+	(*(startfuncp)entry)(howto, bootdev, BOOTARG_APIVER,
+		marks[MARK_END], extmem, cnvmem, ac, (int)av);
 	/* not reached */
 #endif
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cgthree.c,v 1.18 2002/11/06 21:06:20 miod Exp $	*/
+/*	$OpenBSD: cgthree.c,v 1.24 2003/08/01 19:24:49 miod Exp $	*/
 /*	$NetBSD: cgthree.c,v 1.33 1997/05/24 20:16:11 pk Exp $ */
 
 /*
@@ -14,11 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -57,11 +52,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -81,8 +72,9 @@
  */
 
 /*
- * color display (cgthree) driver.
- *
+ * Color display (cgthree) driver.
+ * Works with the real Sun hardware, as well as various clones from Tatung,
+ * Integrix (S20), and the Vigra VS10-EK.
  */
 
 #include <sys/param.h>
@@ -207,11 +199,6 @@ cgthreematch(parent, vcf, aux)
 	struct confargs *ca = aux;
 	struct romaux *ra = &ca->ca_ra;
 
-	/*
-	 * Mask out invalid flags from the user.
-	 */
-	cf->cf_flags &= FB_USERMASK;
-
 	if (strcmp(cf->cf_driver->cd_name, ra->ra_name) &&
 	    strcmp("cgRDI", ra->ra_name))
 		return (0);
@@ -238,8 +225,6 @@ cgthreeattach(parent, self, args)
 	volatile struct bt_regs *bt;
 	int isconsole = 0, sbus = 1;
 	char *nam = NULL;
-
-	sc->sc_sunfb.sf_flags = self->dv_cfdata->cf_flags;
 
 	switch (ca->ca_bustype) {
 	case BUS_OBIO:
@@ -318,7 +303,23 @@ cgthreeattach(parent, self, args)
 	sc->sc_sunfb.sf_ro.ri_bits = mapiodev(ca->ca_ra.ra_reg, CG3REG_MEM,
 	    round_page(sc->sc_sunfb.sf_fbsize));
 	sc->sc_sunfb.sf_ro.ri_hw = sc;
-	fbwscons_init(&sc->sc_sunfb, isconsole);
+
+	printf(", %dx%d\n", sc->sc_sunfb.sf_width, sc->sc_sunfb.sf_height);
+
+	/*
+	 * If the framebuffer width is under 1024x768, which is the case for
+	 * some clones on laptops, as well as with the VS10-EK, switch from
+	 * the PROM font to the more adequate 8x16 font here.
+	 * However, we need to adjust two things in this case:
+	 * - the display row should be overrided from the current PROM metrics,
+	 *   to prevent us from overwriting the last few lines of text.
+	 * - if the 80x34 screen would make a large margin appear around it,
+	 *   choose to clear the screen rather than keeping old prom output in
+	 *   the margins.
+	 * XXX there should be a rasops "clear margins" feature
+	 */
+	fbwscons_init(&sc->sc_sunfb, isconsole &&
+	    (sc->sc_sunfb.sf_width >= 1024) ? 0 : RI_CLEAR);
 	fbwscons_setcolormap(&sc->sc_sunfb, cgthree_setcolor);
 
 	cgthree_stdscreen.capabilities = sc->sc_sunfb.sf_ro.ri_caps;
@@ -326,12 +327,11 @@ cgthreeattach(parent, self, args)
 	cgthree_stdscreen.ncols = sc->sc_sunfb.sf_ro.ri_cols;
 	cgthree_stdscreen.textops = &sc->sc_sunfb.sf_ro.ri_ops;
 
-	printf(", %dx%d\n", sc->sc_sunfb.sf_width, sc->sc_sunfb.sf_height);
-
 	if (isconsole) {
-		fbwscons_console_init(&sc->sc_sunfb, &cgthree_stdscreen, -1,
-		    cgthree_burner);
+		fbwscons_console_init(&sc->sc_sunfb, &cgthree_stdscreen,
+		    sc->sc_sunfb.sf_width >= 1024 ? -1 : 0, cgthree_burner);
 	}
+
 #if defined(SUN4C) || defined(SUN4M)
 	if (sbus)
 		sbus_establish(&sc->sc_sd, &sc->sc_sunfb.sf_dev);
@@ -359,7 +359,7 @@ cgthree_ioctl(v, cmd, data, flags, p)
 
 	switch (cmd) {
 	case WSDISPLAYIO_GTYPE:
-		*(u_int *)data = WSDISPLAY_TYPE_UNKNOWN;
+		*(u_int *)data = WSDISPLAY_TYPE_SUNCG3;
 		break;
 	case WSDISPLAYIO_GINFO:
 		wdf = (struct wsdisplay_fbinfo *)data;

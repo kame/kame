@@ -1,6 +1,6 @@
-#	$OpenBSD: Makefile.inc,v 1.30 2002/12/02 09:00:23 miod Exp $
+#	$OpenBSD: Makefile.inc,v 1.34 2003/08/08 07:37:15 deraadt Exp $
 
-CFLAGS=${DEBUG} -Os -Wall -Werror
+CFLAGS=${DEBUG} ${COPTS} -Os -Wall -Werror
 CFLAGS+=	-fno-stack-protector
 CPPFLAGS+=-I${S} -I${SADIR}/libsa -I. -I${.CURDIR}
 SACFLAGS=-D_STANDALONE
@@ -15,7 +15,7 @@ DEBUGFLAGS=
 # DEBUGFLAGS+=-DUNIX_DEBUG
 # DEBUGFLAGS+=-DBOOTP_DEBUG -DNETIF_DEBUG -DETHER_DEBUG
 # DEBUGFLAGS+=-DNFS_DEBUG -DRPC_DEBUG -DRARP_DEBUG
-LINKADDR=0x40000
+LINKADDR=0x40120
 LOADADDR=0x40000
 HEAP_LIMIT=0x90000
 BOOTREL=0x60000
@@ -29,7 +29,7 @@ SACFLAGS+=-nostdinc -fno-builtin -fpack-struct
 
 .if !make(libdep) && !make(sadep) && !make(salibdir) && !make(kernlibdir) && !make(obj)
 .BEGIN:
-	@([ -h machine ] || ln -s $(S)/arch/i386/include machine)
+	@([ X$(S) == X -o -h machine ] || ln -s $(S)/arch/i386/include machine)
 .endif
 
 
@@ -52,4 +52,4 @@ LIBZ=${SADIR}/libz/${__objdir}/libz.a
 # NO_NET=no_net
 BINDIR=	/usr/mdec
 
-MANSUBDIR=/i386
+MANSUBDIR=i386

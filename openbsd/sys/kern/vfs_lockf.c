@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_lockf.c,v 1.5 2001/09/05 19:22:23 deraadt Exp $	*/
+/*	$OpenBSD: vfs_lockf.c,v 1.7 2003/07/21 22:44:50 tedu Exp $	*/
 /*	$NetBSD: vfs_lockf.c,v 1.7 1996/02/04 02:18:21 christos Exp $	*/
 
 /*
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -260,7 +256,7 @@ lf_setlock(lock)
 		}
 #endif /* LOCKF_DEBUG */
 		TAILQ_INSERT_TAIL(&block->lf_blkhd, lock, lf_block);
-		error = tsleep((caddr_t)lock, priority, lockstr, 0);
+		error = tsleep(lock, priority, lockstr, 0);
 #if 0
 		if (error) {
 			/*
@@ -668,7 +664,7 @@ lf_split(lock1, lock2)
 	 * the encompassing lock
 	 */
 	MALLOC(splitlock, struct lockf *, sizeof *splitlock, M_LOCKF, M_WAITOK);
-	memcpy((caddr_t)splitlock, (caddr_t)lock1, sizeof (*splitlock));
+	memcpy(splitlock, lock1, sizeof (*splitlock));
 	splitlock->lf_start = lock2->lf_end + 1;
 	splitlock->lf_block.tqe_next = NULL;
 	TAILQ_INIT(&splitlock->lf_blkhd);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: qe.c,v 1.10 2003/02/17 01:29:21 henric Exp $	*/
+/*	$OpenBSD: qe.c,v 1.14 2003/06/27 01:36:53 jason Exp $	*/
 /*	$NetBSD: qe.c,v 1.16 2001/03/30 17:30:18 christos Exp $	*/
 
 /*-
@@ -49,8 +49,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. The name of the authors may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHORS ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -164,9 +162,9 @@ int	qe_rint(struct qe_softc *);
 int	qe_tint(struct qe_softc *);
 void	qe_mcreset(struct qe_softc *);
 
-static int	qe_put(struct qe_softc *, int, struct mbuf *);
-static void	qe_read(struct qe_softc *, int, int);
-static struct mbuf	*qe_get(struct qe_softc *, int, int);
+int	qe_put(struct qe_softc *, int, struct mbuf *);
+void	qe_read(struct qe_softc *, int, int);
+struct mbuf	*qe_get(struct qe_softc *, int, int);
 
 /* ifmedia callbacks */
 void	qe_ifmedia_sts(struct ifnet *, struct ifmediareq *);
@@ -218,20 +216,16 @@ qeattach(parent, self, aux)
 		return;
 	}
 
-	if (sbus_bus_map(sa->sa_bustag,
-	    sa->sa_reg[0].sbr_slot,
+	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[0].sbr_slot,
 	    (bus_addr_t)sa->sa_reg[0].sbr_offset,
-	    (bus_size_t)sa->sa_reg[0].sbr_size,
-	    BUS_SPACE_MAP_LINEAR, 0, &sc->sc_cr) != 0) {
+	    (bus_size_t)sa->sa_reg[0].sbr_size, 0, 0, &sc->sc_cr) != 0) {
 		printf("%s: cannot map registers\n", self->dv_xname);
 		return;
 	}
 
-	if (sbus_bus_map(sa->sa_bustag,
-	    sa->sa_reg[1].sbr_slot,
+	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[1].sbr_slot,
 	    (bus_addr_t)sa->sa_reg[1].sbr_offset,
-	    (bus_size_t)sa->sa_reg[1].sbr_size,
-	    BUS_SPACE_MAP_LINEAR, 0, &sc->sc_mr) != 0) {
+	    (bus_size_t)sa->sa_reg[1].sbr_size, 0, 0, &sc->sc_mr) != 0) {
 		printf("%s: cannot map registers\n", self->dv_xname);
 		return;
 	}
@@ -248,8 +242,8 @@ qeattach(parent, self, aux)
 	qestop(sc);
 
 	/* Note: no interrupt level passed */
-	if (bus_intr_establish(sa->sa_bustag, 0, IPL_NET, 0, qeintr, sc) ==
-	    NULL) {
+	if (bus_intr_establish(sa->sa_bustag, 0, IPL_NET, 0, qeintr, sc,
+	    self->dv_xname) == NULL) {
 		printf(": no interrupt established\n");
 		return;
 	}
@@ -338,7 +332,7 @@ qeattach(parent, self, aux)
  * We copy the data into mbufs.  When full cluster sized units are present,
  * we copy into clusters.
  */
-static __inline__ struct mbuf *
+struct mbuf *
 qe_get(sc, idx, totlen)
 	struct qe_softc *sc;
 	int idx, totlen;

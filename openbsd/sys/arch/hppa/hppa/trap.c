@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.62 2003/02/25 14:04:09 miod Exp $	*/
+/*	$OpenBSD: trap.c,v 1.68 2003/08/07 05:19:57 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998-2003 Michael Shalayeff
@@ -194,8 +194,11 @@ trap(type, frame)
 		}
 	}
 #endif
-	if (trapnum != T_INTERRUPT)
+	if (trapnum != T_INTERRUPT) {
+		uvmexp.traps++;
 		mtctl(frame->tf_eiem, CR_EIEM);
+	} else
+		uvmexp.intrs++;
 
 	switch (type) {
 	case T_NONEXIST:
@@ -355,47 +358,23 @@ trap(type, frame)
 			break;
 		}
 
-		if (!(vm = p->p_vmspace)) {
-			printf("trap: no vm, p=%p\n", p);
-			goto dead_end;
-		}
-
 		/*
 		 * it could be a kernel map for exec_map faults
 		 */
-		if (!(type & T_USER) && space == HPPA_SID_KERNEL)
+		if (space == HPPA_SID_KERNEL)
 			map = kernel_map;
-		else
+		else {
+			vm = p->p_vmspace;
 			map = &vm->vm_map;
-
-		if (map->pmap->pm_space != space) {
-			if (map->pmap->pm_space != HPPA_SID_KERNEL) {
-				sv.sival_int = va;
-				trapsignal(p, SIGSEGV, vftype, SEGV_MAPERR, sv);
-			} else {
-				printf("trap: space missmatch %d != %d\n",
-				    space, map->pmap->pm_space);
-				goto dead_end;
-			}
 		}
 
-#ifdef TRAPDEBUG
-		if (space == -1) {
-			extern int pmapdebug;
-			pmapdebug = 0xffffff;
+		if (type & T_USER && map->pmap->pm_space != space) {
+			sv.sival_int = va;
+			trapsignal(p, SIGSEGV, vftype, SEGV_MAPERR, sv);
+			break;
 		}
-#endif
+
 		ret = uvm_fault(map, hppa_trunc_page(va), fault, vftype);
-
-#ifdef TRAPDEBUG
-		if (space == -1) {
-			extern int pmapdebug;
-			pmapdebug = 0;
-		}
-
-		printf("uvm_fault(%p, %x, %d, %d)=%d\n",
-		    map, va, 0, vftype, ret);
-#endif
 
 		/*
 		 * If this was a stack access we keep track of the maximum
@@ -484,7 +463,14 @@ if (kdb_trap (type, va, frame))
 	if (trapnum != T_INTERRUPT)
 		splx(cpl);	/* process softints */
 
-	if (type & T_USER)
+	/*
+	 * in case we were interrupted from the syscall gate page
+	 * treat this as we were not realy running user code no more
+	 * for weird things start to happen on return to the userland
+	 * and also see a note in locore.S:TLABEL(all)
+	 */
+	if ((type & T_USER) &&
+	    (frame->tf_iioq_head & ~PAGE_MASK) != SYSCALLGATE)
 		userret(p, frame->tf_iioq_head, 0);
 }
 
@@ -538,7 +524,7 @@ syscall(struct trapframe *frame)
 			break;
 		/*
 		 * this works, because quads get magically swapped
-		 * due to the args being layed backwards on the stack
+		 * due to the args being laid backwards on the stack
 		 * and then copied in words
 		 */
 		code = frame->tf_arg0;
@@ -623,10 +609,10 @@ syscall(struct trapframe *frame)
 	else
 #endif
 		oerror = error = (*callp->sy_call)(p, args, rval);
+	p = curproc;
+	frame = p->p_md.md_regs;
 	switch (error) {
 	case 0:
-		p = curproc;			/* changes on exec() */
-		frame = p->p_md.md_regs;
 		frame->tf_ret0 = rval[0];
 		frame->tf_ret1 = rval[!retq];
 		frame->tf_t1 = 0;
@@ -634,10 +620,7 @@ syscall(struct trapframe *frame)
 	case ERESTART:
 		frame->tf_iioq_head -= 12;
 		frame->tf_iioq_tail -= 12;
-		break;
 	case EJUSTRETURN:
-		p = curproc;
-		frame = p->p_md.md_regs;
 		break;
 	default:
 	bad:
@@ -650,15 +633,17 @@ syscall(struct trapframe *frame)
 	scdebug_ret(p, code, oerror, rval);
 #endif
 	userret(p, frame->tf_iioq_head, 0);
-	splx(cpl);	/* process softints */
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
 		ktrsysret(p, code, oerror, rval[0]);
 #endif
 #ifdef DIAGNOSTIC
-	if (cpl != oldcpl)
+	if (cpl != oldcpl) {
 		printf("WARNING: SPL (0x%x) NOT LOWERED ON "
 		    "syscall(0x%x, 0x%x, 0x%x, 0x%x...) EXIT, PID %d\n",
 		    cpl, code, args[0], args[1], args[2], p->p_pid);
+		cpl = oldcpl;
+	}
 #endif
+	splx(cpl);	/* process softints */
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: portal_vfsops.c,v 1.15 2003/02/24 22:32:46 tedu Exp $	*/
+/*	$OpenBSD: portal_vfsops.c,v 1.18 2003/08/14 07:46:39 mickey Exp $	*/
 /*	$NetBSD: portal_vfsops.c,v 1.14 1996/02/09 22:40:41 christos Exp $	*/
 
 /*
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -158,7 +154,7 @@ portal_unmount(mp, mntflags, p)
 	int mntflags;
 	struct proc *p;
 {
-	struct vnode *rootvp = VFSTOPORTAL(mp)->pm_root;
+	struct vnode *rvp = VFSTOPORTAL(mp)->pm_root;
 	int error, flags = 0;
 
 	if (mntflags & MNT_FORCE) {
@@ -175,19 +171,19 @@ portal_unmount(mp, mntflags, p)
 	if (mntinvalbuf(mp, 1))
 		return (EBUSY);
 #endif
-	if (rootvp->v_usecount > 1)
+	if (rvp->v_usecount > 1)
 		return (EBUSY);
-	if ((error = vflush(mp, rootvp, flags)) != 0)
+	if ((error = vflush(mp, rvp, flags)) != 0)
 		return (error);
 
 	/*
 	 * Release reference on underlying root vnode
 	 */
-	vrele(rootvp);
+	vrele(rvp);
 	/*
 	 * And blow it away for future re-use
 	 */
-	vgone(rootvp);
+	vgone(rvp);
 	/*
 	 * Shutdown the socket.  This will cause the select in the
 	 * daemon to wake up, and then the accept will get ECONNABORTED
@@ -265,7 +261,7 @@ portal_statfs(mp, sbp, p)
 #define portal_checkexp ((int (*)(struct mount *, struct mbuf *,	\
 	int *, struct ucred **))eopnotsupp)
 
-struct vfsops portal_vfsops = {
+const struct vfsops portal_vfsops = {
 	portal_mount,
 	portal_start,
 	portal_unmount,

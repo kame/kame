@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcibios.c,v 1.27 2002/07/12 21:17:06 mickey Exp $	*/
+/*	$OpenBSD: pcibios.c,v 1.29 2003/06/03 20:10:32 mickey Exp $	*/
 /*	$NetBSD: pcibios.c,v 1.5 2000/08/01 05:23:59 uch Exp $	*/
 
 /*
@@ -13,11 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -358,9 +353,9 @@ pcibios_get_status(sc, rev_maj, rev_min, mech1, mech2, scmech1, scmech2, maxbus)
 
 	__asm __volatile("pushl	%%es\n\t"
 			 "pushl	%%ds\n\t"
-			 "movw	4(%%edi), %%ecx\n\t"
+			 "movw	4(%%edi), %%cx\n\t"
 			 "movl	%%ecx, %%ds\n\t"
-			 "lcall	%%cs:(%%edi)\n\t"
+			 "lcall	%%cs:*(%%edi)\n\t"
 			 "pop	%%ds\n\t"
 			 "pop	%%es\n\t"
 			 "jc	1f\n\t"
@@ -414,9 +409,9 @@ pcibios_get_intr_routing(sc, table, nentries, exclirq)
 
 	__asm __volatile("pushl	%%es\n\t"
 			 "pushl	%%ds\n\t"
-			 "movw	4(%%esi), %%ecx\n\t"
+			 "movw	4(%%esi), %%cx\n\t"
 			 "movl	%%ecx, %%ds\n\t"
-			 "lcall	%%cs:(%%esi)\n\t"
+			 "lcall	%%cs:*(%%esi)\n\t"
 			 "popl	%%ds\n\t"
 			 "popl	%%es\n\t"
 			 "jc	1f\n\t"

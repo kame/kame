@@ -1,4 +1,4 @@
-/*	$OpenBSD: bpf.h,v 1.20 2002/11/29 18:35:15 henning Exp $	*/
+/*	$OpenBSD: bpf.h,v 1.23 2003/08/25 08:16:41 fgsch Exp $	*/
 /*	$NetBSD: bpf.h,v 1.15 1996/12/13 07:57:33 mikel Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -169,8 +165,10 @@ struct bpf_hdr {
 #define DLT_RAW		14	/* raw IP */
 #define DLT_SLIP_BSDOS	15	/* BSD/OS Serial Line IP */
 #define DLT_PPP_BSDOS	16	/* BSD/OS Point-to-point Protocol */
-#define DLT_PFLOG	17	/* Packet filter logging */
+#define DLT_OLD_PFLOG	17	/* Packet filter logging, old (XXX remove?) */
 #define DLT_PFSYNC	18	/* Packet filter state syncing */
+#define DLT_IEEE802_11	105	/* IEEE 802.11 wireless */
+#define DLT_PFLOG	117	/* Packet filter logging, by pcap people */
 
 /*
  * The instruction encodings.

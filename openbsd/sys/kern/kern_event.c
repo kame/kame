@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_event.c,v 1.18 2002/10/01 14:06:53 art Exp $	*/
+/*	$OpenBSD: kern_event.c,v 1.20 2003/08/15 20:32:18 tedu Exp $	*/
 
 /*-
  * Copyright (c) 1999,2000,2001 Jonathan Lemon <jlemon@FreeBSD.org>
@@ -195,8 +195,7 @@ filt_procattach(struct knote *kn)
 	 * setuid/setgid privs (unless you're root).
 	 */
 	if ((p->p_cred->p_ruid != curproc->p_cred->p_ruid ||
-	        (p->p_flag & P_SUGID)) &&
-	    suser(curproc->p_ucred, &curproc->p_acflag) != 0)
+	    (p->p_flag & P_SUGID)) && suser(curproc, 0) != 0)
 		return (EACCES);
 
 	kn->kn_ptr.p_proc = p;
@@ -286,6 +285,24 @@ filt_proc(struct knote *kn, long hint)
 	}
 
 	return (kn->kn_fflags != 0);
+}
+
+/*
+ * filt_seltrue:
+ *
+ *	This filter "event" routine simulates seltrue().
+ */
+int
+filt_seltrue(struct knote *kn, long hint)
+{
+
+	/*
+	 * We don't know how much data can be read/written,
+	 * but we know that it *can* be.  This is about as
+	 * good as select/poll does as well.
+	 */
+	kn->kn_data = 0;
+	return (1);
 }
 
 int

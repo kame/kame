@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.h,v 1.16 2003/02/12 14:41:07 jason Exp $	*/
+/*	$OpenBSD: route.h,v 1.18 2003/08/26 08:33:12 itojun Exp $	*/
 /*	$NetBSD: route.h,v 1.9 1996/02/13 22:00:49 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -143,6 +139,7 @@ struct ortentry {
 #define RTF_PROTO3	0x2000		/* protocol specific routing flag */
 #define RTF_PROTO2	0x4000		/* protocol specific routing flag */
 #define RTF_PROTO1	0x8000		/* protocol specific routing flag */
+#define RTF_CLONED	0x10000		/* this is a cloned route */
 
 #ifndef _KERNEL
 /* obsoleted */

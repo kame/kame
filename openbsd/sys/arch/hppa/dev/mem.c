@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.17 2003/01/22 14:44:55 mickey Exp $	*/
+/*	$OpenBSD: mem.c,v 1.20 2003/04/07 20:18:34 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998-2002 Michael Shalayeff
@@ -141,8 +141,8 @@ memattach(parent, self, aux)
 	void *aux;
 {
 	struct pdc_iodc_minit pdc_minit PDC_ALIGNMENT;
-	register struct confargs *ca = aux;
-	register struct mem_softc *sc = (struct mem_softc *)self;
+	struct mem_softc *sc = (struct mem_softc *)self;
+	struct confargs *ca = aux;
 	int err;
 
 	printf (":");
@@ -153,25 +153,30 @@ memattach(parent, self, aux)
 		sc->sc_vp = (struct vi_trs *)
 		    &((struct iomod *)ca->ca_hpa)->priv_trs;
 
-		printf(" viper rev %x,", sc->sc_vp->vi_status.hw_rev);
-#if 0
-		{
+		/* XXX other values seem to blow it up */
+		if (sc->sc_vp->vi_status.hw_rev == 0) {
+			u_int32_t vic;
 			int s;
 
-			printf(" ctrl %b", VI_CTRL, VIPER_BITS);
-
-			s = splhigh();
-			VI_CTRL |= VI_CTRL_ANYDEN;
-			((struct vi_ctrl *)&VI_CTRL)->core_den = 0;
-			((struct vi_ctrl *)&VI_CTRL)->sgc0_den = 0;
-			((struct vi_ctrl *)&VI_CTRL)->sgc1_den = 0;
-			((struct vi_ctrl *)&VI_CTRL)->core_prf = 1;
-			sc->sc_vp->vi_control = VI_CTRL;
-			splx(s);
-
-			printf (" >> %b,", VI_CTRL, VIPER_BITS);
-		}
+			printf(" viper rev %x,", sc->sc_vp->vi_status.hw_rev);
+#ifdef DEBUG
+			printf(" ctrl %b", VI_CTRL, VI_CTRL_BITS);
 #endif
+			s = splhigh();
+			vic = VI_CTRL;
+			vic &= ~VI_CTRL_CORE_DEN;
+			vic &= ~VI_CTRL_SGC0_DEN;
+			vic &= ~VI_CTRL_SGC1_DEN;
+			vic |=  VI_CTRL_CORE_PRF;
+			sc->sc_vp->vi_control = vic;
+			__asm __volatile("stwas %1, 0(%0)"
+			    :: "r" (&VI_CTRL), "r" (vic) : "memory");
+			splx(s);
+#ifdef DEBUG
+			printf (" >> %b,", vic, VI_CTRL_BITS);
+#endif
+		} else
+			sc->sc_vp = NULL;
 	} else
 		sc->sc_vp = NULL;
 
@@ -200,13 +205,21 @@ viper_setintrwnd(mask)
 void
 viper_eisa_en()
 {
-	register struct mem_softc *sc;
+	struct mem_softc *sc;
 
 	sc = mem_cd.cd_devs[0];
-#if 0
-	if (sc->sc_vp)
-		((struct vi_ctrl *)&VI_CTRL)->eisa_den = 0;
-#endif
+	if (sc->sc_vp) {
+		u_int32_t vic;
+		int s;
+
+		s = splhigh();
+		vic = VI_CTRL;
+		vic &= ~VI_CTRL_EISA_DEN;
+		sc->sc_vp->vi_control = vic;
+		__asm __volatile("stwas %1, 0(%0)"
+		    :: "r" (&VI_CTRL), "r" (vic) : "memory");
+		splx(s);
+	}
 }
 
 int
@@ -238,7 +251,7 @@ mmrw(dev, uio, flags)
 	extern u_int totalphysmem;
 	struct iovec	*iov;
 	vaddr_t	v, o;
-	int rw, error = 0;
+	int error = 0;
 	u_int	c;
 
 	while (uio->uio_resid > 0 && error == 0) {
@@ -270,9 +283,8 @@ mmrw(dev, uio, flags)
 			v = uio->uio_offset;
 			o = v & PGOFSET;
 			c = min(uio->uio_resid, (int)(PAGE_SIZE - o));
-			rw = (uio->uio_rw == UIO_READ) ? B_READ : B_WRITE;
-			if (btoc(v) > totalphysmem &&
-			    !uvm_kernacc((caddr_t)v, c, rw)) {
+			if (btoc(v) > totalphysmem && !uvm_kernacc((caddr_t)v,
+			    c, (uio->uio_rw == UIO_READ) ? B_READ : B_WRITE)) {
 				error = EFAULT;
 				/* this will break us out of the loop */
 				continue;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: qec.c,v 1.5 2003/02/17 01:29:21 henric Exp $	*/
+/*	$OpenBSD: qec.c,v 1.8 2003/06/27 01:36:53 jason Exp $	*/
 /*	$NetBSD: qec.c,v 1.12 2000/12/04 20:12:55 fvdl Exp $ */
 
 /*-
@@ -53,26 +53,27 @@
 #include <dev/sbus/qecreg.h>
 #include <dev/sbus/qecvar.h>
 
-static int	qecprint(void *, const char *);
-static int	qecmatch(struct device *, void *, void *);
-static void	qecattach(struct device *, struct device *, void *);
-void		qec_init(struct qec_softc *);
+int	qecprint(void *, const char *);
+int	qecmatch(struct device *, void *, void *);
+void	qecattach(struct device *, struct device *, void *);
+void	qec_init(struct qec_softc *);
 
-static int qec_bus_map(
+int	qec_bus_map(
 		bus_space_tag_t,
 		bus_space_tag_t,
 		bus_addr_t,		/*offset*/
 		bus_size_t,		/*size*/
 		int,			/*flags*/
 		bus_space_handle_t *);
-static void *qec_intr_establish(
+void *	qec_intr_establish(
 		bus_space_tag_t,
 		bus_space_tag_t,
 		int,			/*bus interrupt priority*/
 		int,			/*`device class' interrupt level*/
 		int,			/*flags*/
 		int (*)(void *),	/*handler*/
-		void *);		/*arg*/
+		void *,			/*arg*/
+		const char *);		/*what*/
 
 struct cfattach qec_ca = {
 	sizeof(struct qec_softc), qecmatch, qecattach
@@ -135,11 +136,9 @@ qecattach(parent, self, aux)
 		return;
 	}
 
-	if (sbus_bus_map(sa->sa_bustag,
-			 sa->sa_reg[0].sbr_slot,
-			 sa->sa_reg[0].sbr_offset,
-			 sa->sa_reg[0].sbr_size,
-			 BUS_SPACE_MAP_LINEAR, 0, &sc->sc_regs) != 0) {
+	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[0].sbr_slot,
+	    sa->sa_reg[0].sbr_offset, sa->sa_reg[0].sbr_size,
+	    0, 0, &sc->sc_regs) != 0) {
 		printf("%s: attach: cannot map registers\n", self->dv_xname);
 		return;
 	}
@@ -149,11 +148,8 @@ qecattach(parent, self, aux)
 	 * Lance ring-buffers can be stored. Note the buffer's location
 	 * and size, so the child driver can pick them up.
 	 */
-	if (sbus_bus_map(sa->sa_bustag,
-			 sa->sa_reg[1].sbr_slot,
-			 sa->sa_reg[1].sbr_offset,
-			 sa->sa_reg[1].sbr_size,
-			 BUS_SPACE_MAP_LINEAR, 0, &bh) != 0) {
+	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[1].sbr_slot,
+	    sa->sa_reg[1].sbr_offset, sa->sa_reg[1].sbr_size, 0, 0, &bh) != 0) {
 		printf("%s: attach: cannot map registers\n", self->dv_xname);
 		return;
 	}
@@ -286,7 +282,7 @@ qec_bus_map(t, t0, addr, size, flags, hp)
 }
 
 void *
-qec_intr_establish(t, t0, pri, level, flags, handler, arg)
+qec_intr_establish(t, t0, pri, level, flags, handler, arg, what)
 	bus_space_tag_t t;
 	bus_space_tag_t t0;
 	int pri;
@@ -294,6 +290,7 @@ qec_intr_establish(t, t0, pri, level, flags, handler, arg)
 	int flags;
 	int (*handler)(void *);
 	void *arg;
+	const char *what;
 {
 	struct qec_softc *sc = t->cookie;
 
@@ -310,15 +307,15 @@ qec_intr_establish(t, t0, pri, level, flags, handler, arg)
 		pri = sc->sc_intr->sbi_pri;
 	}
 
-        if (t->parent == 0 || t->parent->sparc_bus_mmap == 0) {
-                printf("\nebus_bus_mmap: invalid parent");
-                return (NULL);
-        }
+	for (t = t->parent; t; t = t->parent) {
+		if (t->sparc_intr_establish != NULL)
+			return ((*t->sparc_intr_establish)
+			    (t, t0, pri, level, flags, handler, arg, what));
+	}
 
-        t = t->parent;
+	panic("qec_intr_extablish): no handler found");
 
-        return ((*t->sparc_intr_establish)(t, t0, pri, level, flags,
-            handler, arg));
+	return (NULL);
 }
 
 void

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sd.c,v 1.28 2002/12/25 20:56:59 miod Exp $	*/
+/*	$OpenBSD: sd.c,v 1.31 2003/08/15 20:32:13 tedu Exp $	*/
 /*	$NetBSD: sd.c,v 1.34 1997/07/10 18:14:10 kleink Exp $	*/
 
 /*
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -446,20 +442,20 @@ sdgetinfo(dev, sc, lp, spoofonly)
 
 		switch (sc->sc_type) {
 		case 4:	
-			strcpy(lp->d_typename, "SCSI WORM");
+			strncpy(lp->d_typename, "SCSI WORM", sizeof lp->d_typename);
 			break;
 		case 5:
-			strcpy(lp->d_typename, "SCSI CD-ROM");
+			strncpy(lp->d_typename, "SCSI CD-ROM", sizeof lp->d_typename);
 			break;
 		case 7:
-			strcpy(lp->d_typename, "SCSI optical");
+			strncpy(lp->d_typename, "SCSI optical", sizeof lp->d_typename);
 			break;
 		default:
-			strcpy(lp->d_typename, "SCSI disk");
+			strncpy(lp->d_typename, "SCSI disk", sizeof lp->d_typename);
 			break;
 		}
 		lp->d_type = DTYPE_SCSI;
-		strcpy(lp->d_packname, "fictitious");
+		strncpy(lp->d_packname, "fictitious", sizeof lp->d_packname);
 		lp->d_secsize = sc->sc_blksize;
 		lp->d_secpercyl = lp->d_nsectors * lp->d_ntracks;
 		lp->d_rpm = 3600;
@@ -1113,7 +1109,7 @@ sdioctl(dev, cmd, data, flag, p)
 
 	case SDIOCSFORMAT:
 		/* take this device into or out of "format" mode */
-		if (suser(p->p_ucred, &p->p_acflag))
+		if (suser(p, 0))
 			return(EPERM);
 
 		if (*(int *)data) {

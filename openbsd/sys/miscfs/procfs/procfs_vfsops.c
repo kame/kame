@@ -1,4 +1,4 @@
-/*	$OpenBSD: procfs_vfsops.c,v 1.19 2003/02/24 22:32:46 tedu Exp $	*/
+/*	$OpenBSD: procfs_vfsops.c,v 1.22 2003/08/14 07:46:40 mickey Exp $	*/
 /*	$NetBSD: procfs_vfsops.c,v 1.25 1996/02/09 22:40:53 christos Exp $	*/
 
 /*
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -113,6 +109,7 @@ procfs_mount(mp, path, data, ndp, p)
 	bzero(mp->mnt_stat.f_mntonname + size, MNAMELEN - size);
 	bzero(mp->mnt_stat.f_mntfromname, MNAMELEN);
 	bcopy("procfs", mp->mnt_stat.f_mntfromname, sizeof("procfs"));
+	bcopy(&args, &mp->mnt_stat.mount_info.procfs_args, sizeof(args));
 
 #ifdef notyet
 	pmnt->pmnt_exechook = exechook_establish(procfs_revoke_vnodes, mp);
@@ -200,6 +197,8 @@ procfs_statfs(mp, sbp, p)
 		bcopy(&mp->mnt_stat.f_fsid, &sbp->f_fsid, sizeof(sbp->f_fsid));
 		bcopy(mp->mnt_stat.f_mntonname, sbp->f_mntonname, MNAMELEN);
 		bcopy(mp->mnt_stat.f_mntfromname, sbp->f_mntfromname, MNAMELEN);
+		bcopy(&mp->mnt_stat.mount_info.procfs_args,
+		    &sbp->mount_info.procfs_args, sizeof(struct procfs_args));
 	}
 	strncpy(sbp->f_fstypename, mp->mnt_vfc->vfc_name, MFSNAMELEN);
 	return (0);
@@ -221,7 +220,7 @@ procfs_statfs(mp, sbp, p)
 #define procfs_checkexp ((int (*)(struct mount *, struct mbuf *,	\
 	int *, struct ucred **))eopnotsupp)
 
-struct vfsops procfs_vfsops = {
+const struct vfsops procfs_vfsops = {
 	procfs_mount,
 	procfs_start,
 	procfs_unmount,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: alloc.c,v 1.6 2002/03/14 03:16:09 millert Exp $	*/
+/*	$OpenBSD: alloc.c,v 1.9 2003/08/11 06:23:09 deraadt Exp $	*/
 /*	$NetBSD: alloc.c,v 1.6 1997/02/04 18:36:33 thorpej Exp $	*/
 
 /*
@@ -19,11 +19,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -40,30 +36,30 @@
  * SUCH DAMAGE.
  *
  *	@(#)alloc.c	8.1 (Berkeley) 6/11/93
- *  
+ *
  *
  * Copyright (c) 1989, 1990, 1991 Carnegie Mellon University
  * All Rights Reserved.
  *
  * Author: Alessandro Forin
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
  * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND FOR
  * ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
- * 
+ *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
  *  School of Computer Science
  *  Carnegie Mellon University
  *  Pittsburgh PA 15213-3890
- * 
+ *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
@@ -123,10 +119,9 @@ static char *top = end;
 #endif
 
 void *
-alloc(size)
-	unsigned size;
+alloc(unsigned int size)
 {
-	register struct fl **f = &freelist, **bestf = NULL;
+	struct fl **f = &freelist, **bestf = NULL;
 #ifndef ALLOC_FIRST_FIT
 	unsigned bestsize = 0xffffffff;	/* greater than any real size */
 #endif
@@ -151,11 +146,11 @@ alloc(size)
 
 			if ((*f)->size < bestsize) {
 				/* keep best fit */
-	                        bestf = f;
-	                        bestsize = (*f)->size;
-	                }
-	        }
-	        f = &((*f)->next);
+				bestf = f;
+				bestsize = (*f)->size;
+			}
+		}
+		f = &((*f)->next);
 	}
 
 	/* no match in freelist if bestsize unchanged */
@@ -163,11 +158,11 @@ alloc(size)
 #endif
 
 	if (failed) { /* nothing found */
-	        /*
+		/*
 		 * allocate from heap, keep chunk len in
 		 * first word
 		 */
-	        help = top;
+		help = top;
 
 		/* make _sure_ the region can hold a struct fl. */
 		if (size < ALIGN(sizeof (struct fl *)))
@@ -175,7 +170,7 @@ alloc(size)
 		top += ALIGN(sizeof(unsigned)) + ALIGN(size);
 #ifdef HEAP_LIMIT
 		if (top > (char *)HEAP_LIMIT)
-		        panic("heap full (0x%lx+%u)", help, size);
+			panic("heap full (0x%lx+%u)", help, size);
 #endif
 		*(unsigned *)help = ALIGN(size);
 #ifdef ALLOC_TRACE
@@ -190,8 +185,8 @@ alloc(size)
 #ifndef ALLOC_FIRST_FIT
 found:
 #endif
-        /* remove from freelist */
-        help = (char *)*f;
+	/* remove from freelist */
+	help = (char *)*f;
 	*f = (*f)->next;
 #ifdef ALLOC_TRACE
 	printf("=%p (origsize %u)\n", help + ALIGN(sizeof(unsigned)),
@@ -201,18 +196,17 @@ found:
 }
 
 void
-free(ptr, size)
-	void *ptr;
-	unsigned size; /* only for consistence check */
+free(void *ptr, unsigned int size)
 {
-	register struct fl *f =
-	    (struct fl *)((char *)ptr - ALIGN(sizeof(unsigned)));
+	struct fl *f = (struct fl *)((char *)ptr -
+	    ALIGN(sizeof(unsigned)));
+
 #ifdef ALLOC_TRACE
 	printf("free(%p, %u) (origsize %u)\n", ptr, size, f->size);
 #endif
 #ifdef DEBUG
-        if (size > f->size)
-	        printf("free %u bytes @%p, should be <=%u\n",
+	if (size > f->size)
+		printf("free %u bytes @%p, should be <=%u\n",
 		    size, ptr, f->size);
 #ifdef HEAP_START
 	if (ptr < (void *)HEAP_START)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: bios.c,v 1.49 2002/05/20 16:38:01 mickey Exp $	*/
+/*	$OpenBSD: bios.c,v 1.52 2003/07/11 17:51:11 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1997-2001 Michael Shalayeff
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -324,7 +319,9 @@ bios_getopt()
 #if NPCI > 0
 		case BOOTARG_PCIINFO:
 			bios_pciinfo = (bios_pciinfo_t *)q->ba_arg;
+#ifdef BIOS_DEBUG
 			printf(" pciinfo %p", bios_pciinfo);
+#endif
 			break;
 #endif
 		case BOOTARG_CONSDEV:
@@ -388,7 +385,7 @@ bios32_service(service, e, ei)
 		return 0;
 
 	base = 0;
-	__asm __volatile("lcall (%4)"
+	__asm __volatile("lcall *(%4)"
 	    : "+a" (service), "+b" (base), "=c" (count), "=d" (off)
 	    : "D" (&bios32_entry)
 	    : "%esi", "cc", "memory");

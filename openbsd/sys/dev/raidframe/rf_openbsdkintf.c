@@ -1,4 +1,4 @@
-/* $OpenBSD: rf_openbsdkintf.c,v 1.22 2003/01/19 14:32:00 tdeval Exp $	*/
+/* $OpenBSD: rf_openbsdkintf.c,v 1.24 2003/06/02 23:28:03 millert Exp $	*/
 /* $NetBSD: rf_netbsdkintf.c,v 1.109 2001/07/27 03:30:07 oster Exp $	*/
 
 /*-
@@ -54,11 +54,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -438,7 +434,8 @@ raidattach(int num)
 		raidrootdev[raidID].dv_unit   = raidID;
 		raidrootdev[raidID].dv_parent = NULL;
 		raidrootdev[raidID].dv_flags  = 0;
-		sprintf(raidrootdev[raidID].dv_xname,"raid%d",raidID);
+		snprintf(raidrootdev[raidID].dv_xname,
+		    sizeof raidrootdev[raidID].dv_xname,"raid%d",raidID);
 
 		RF_Calloc(raidPtrs[raidID], 1, sizeof (RF_Raid_t),
 		    (RF_Raid_t *));
@@ -1646,7 +1643,7 @@ raidinit(RF_Raid_t *raidPtr)
 	rs->sc_flags |= RAIDF_INITED;
 
 	/* XXX doesn't check bounds. */
-	sprintf(rs->sc_xname, "raid%d", unit);
+	snprintf(rs->sc_xname, sizeof rs->sc_xname, "raid%d", unit);
 
 	rs->sc_dkdev.dk_name = rs->sc_xname;
 
@@ -2881,8 +2878,9 @@ rf_find_raid_components(void)
 						return(NULL);
 					}
 
-					sprintf(ac->devname, "%s%c",
-						dv->dv_xname, 'a'+i);
+					snprintf(ac->devname,
+						 sizeof ac->devname, "%s%c",
+						 dv->dv_xname, 'a'+i);
 					ac->dev = dev;
 					ac->vp = vp;
 					ac->clabel = clabel;
@@ -3213,7 +3211,7 @@ rf_create_configuration(RF_AutoConfig_t *ac, RF_Config_t *config,
 	config->SUsPerRU = clabel->SUsPerRU;
 	config->parityConfig = clabel->parityConfig;
 	/* XXX... */
-	strcpy(config->diskQueueType,"fifo");
+	strlcpy(config->diskQueueType,"fifo", sizeof config->diskQueueType);
 	config->maxOutstandingDiskReqs = clabel->maxOutstanding;
 	config->layoutSpecificSize = 0;	/* XXX ?? */
 
@@ -3222,8 +3220,9 @@ rf_create_configuration(RF_AutoConfig_t *ac, RF_Config_t *config,
 		 * row/col values will be in range due to the checks
 		 * in reasonable_label().
 		 */
-		strcpy(config->devnames[ac->clabel->row][ac->clabel->column],
-		    ac->devname);
+		strlcpy(config->devnames[ac->clabel->row][ac->clabel->column],
+		    ac->devname,
+		    sizeof config->devnames[ac->clabel->row][ac->clabel->column]);
 		ac = ac->next;
 	}
 

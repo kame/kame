@@ -1,4 +1,4 @@
-/*	$OpenBSD: procfs_ctl.c,v 1.10 2002/03/14 01:27:08 millert Exp $	*/
+/*	$OpenBSD: procfs_ctl.c,v 1.12 2003/08/11 10:08:04 mickey Exp $	*/
 /*	$NetBSD: procfs_ctl.c,v 1.14 1996/02/09 22:40:48 christos Exp $	*/
 
 /*
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -71,7 +67,7 @@
 #define PROCFS_CTL_RUN		4
 #define PROCFS_CTL_WAIT		5
 
-static vfs_namemap_t ctlnames[] = {
+static const vfs_namemap_t ctlnames[] = {
 	/* special /proc commands */
 	{ "attach",	PROCFS_CTL_ATTACH },
 	{ "detach",	PROCFS_CTL_DETACH },
@@ -83,7 +79,7 @@ static vfs_namemap_t ctlnames[] = {
 
 #endif
 
-static vfs_namemap_t signames[] = {
+static const vfs_namemap_t signames[] = {
 	/* regular signal names */
 	{ "hup",	SIGHUP },	{ "int",	SIGINT },
 	{ "quit",	SIGQUIT },	{ "ill",	SIGILL },
@@ -270,7 +266,7 @@ procfs_doctl(curp, p, pfs, uio)
 	int xlen;
 	int error;
 	char msg[PROCFS_CTLLEN+1];
-	vfs_namemap_t *nm;
+	const vfs_namemap_t *nm;
 
 	if (uio->uio_rw != UIO_WRITE)
 		return (EOPNOTSUPP);

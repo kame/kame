@@ -12,11 +12,7 @@ copyright="\
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -33,7 +29,7 @@ copyright="\
  * SUCH DAMAGE.
  */
 "
-SCRIPT_ID='$OpenBSD: vnode_if.sh,v 1.10 2002/03/14 23:47:05 millert Exp $'
+SCRIPT_ID='$OpenBSD: vnode_if.sh,v 1.13 2003/06/02 23:28:07 millert Exp $'
 # SCRIPT_ID='$NetBSD: vnode_if.sh,v 1.9 1996/02/29 20:58:22 cgd Exp $'
 
 # Script to produce VFS front-end sugar.
@@ -112,10 +108,18 @@ awk_parser='
 	    $3 == "WILLRELE") {
 		willrele[argc] = 1;
 		i++;
+	} else if ($2 == "WILLUNLOCK" ||
+	    $3 == "WILLUNLOCK") {
+		willrele[argc] = 2;
+		i++;
+	} else if ($2 == "WILLPUT" ||
+	    $3 == "WILLPUT") {
+		willrele[argc] = 3;
+		i++;
 	} else
 		willrele[argc] = 0;
 
-    if ($2 == "SHOULDBELOCKED") {
+	if ($2 == "SHOULDBELOCKED") {
 	   shouldbelocked[argc] = 1;
 	   i++;
 	} else
@@ -280,10 +284,17 @@ function doit() {
 	vpnum = 0;
 	for (i=0; i<argc; i++) {
 		if (willrele[i]) {
-			if (argdir[i] ~ /OUT/) {
-				printf(" | VDESC_VPP_WILLRELE");
+			if (willrele[i] == 2) {
+				word = "UNLOCK";
+			} else if (willrele[i] == 3) {
+				word = "PUT";
 			} else {
-				printf(" | VDESC_VP%s_WILLRELE", vpnum);
+				word = "RELE";
+			}
+			if (argdir[i] ~ /OUT/) {
+				printf(" | VDESC_VPP_WILL%s", word);
+			} else {
+				printf(" | VDESC_VP%s_WILL%s", vpnum, word);
 			};
 			vpnum++;
 		}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: wd.c,v 1.27 2003/02/21 20:10:33 grange Exp $ */
+/*	$OpenBSD: wd.c,v 1.32 2003/07/20 19:57:04 grange Exp $ */
 /*	$NetBSD: wd.c,v 1.193 1999/02/28 17:15:27 explorer Exp $ */
 
 /*
@@ -110,7 +110,7 @@
 
 #define	WDUNIT(dev)		DISKUNIT(dev)
 #define	WDPART(dev)		DISKPART(dev)
-#define WDMINOR(unit, part)     DISKMINOR(unit, part)
+#define WDMINOR(unit, part)	DISKMINOR(unit, part)
 #define	MAKEWDDEV(maj, unit, part)	MAKEDISKDEV(maj, unit, part)
 
 #define	WDLABELDEV(dev)	(MAKEWDDEV(major(dev), WDUNIT(dev), RAW_PART))
@@ -134,7 +134,7 @@ struct wd_softc {
 	/* General disk infos */
 	struct device sc_dev;
 	struct disk sc_dk;
-	struct buf sc_q;
+	struct bufq_default sc_q;
 	/* IDE disk soft states */
 	struct ata_bio sc_wdc_bio; /* current transfer */
 	struct buf *sc_bp; /* buf being transferred */
@@ -178,8 +178,8 @@ int	wdprobe(struct device *, struct cfdata *, void *);
 int	wdprobe(struct device *, void *, void *);
 #endif
 void	wdattach(struct device *, struct device *, void *);
-int     wddetach(struct device *, int);
-int     wdactivate(struct device *, enum devact);
+int	wddetach(struct device *, int);
+int	wdactivate(struct device *, enum devact);
 void    wdzeroref(struct device *);
 int	wdprint(void *, char *);
 
@@ -272,6 +272,9 @@ wdattach(parent, self, aux)
 	int i, blank;
 	char buf[41], c, *p, *q;
 	WDCDEBUG_PRINT(("wdattach\n"), DEBUG_FUNCS | DEBUG_PROBE);
+
+	wd->sc_q.bufq.bufq_get = bufq_default_get;
+	wd->sc_q.bufq.bufq_add = bufq_default_add;
 
 	wd->openings = aa_link->aa_openings;
 	wd->drvp = aa_link->aa_drv_data;
@@ -393,53 +396,51 @@ wdattach(parent, self, aux)
 
 int
 wdactivate(self, act)
-        struct device *self;
-        enum devact act;
+	struct device *self;
+	enum devact act;
 {
-        int rv = 0;
+	int rv = 0;
 
-        switch (act) {
-        case DVACT_ACTIVATE:
-                break;
+	switch (act) {
+	case DVACT_ACTIVATE:
+		break;
 
-        case DVACT_DEACTIVATE:
-                /*
-                 * Nothing to do; we key off the device's DVF_ACTIVATE.
-                 */
-                break;
-        }
-        return (rv);
+	case DVACT_DEACTIVATE:
+		/*
+		* Nothing to do; we key off the device's DVF_ACTIVATE.
+		*/
+		break;
+	}
+	return (rv);
 }
 
 
 int
 wddetach(self, flags)
-        struct device *self;
-        int flags;
+	struct device *self;
+	int flags;
 {
-        struct wd_softc *sc = (struct wd_softc *)self;
-        struct buf *dp, *bp;
-        int s, bmaj, cmaj, mn;
+	struct wd_softc *sc = (struct wd_softc *)self;
+	struct buf *bp;
+	int s, bmaj, cmaj, mn;
 
 	/* Remove unprocessed buffers from queue */
 	s = splbio();
-	for (dp = &sc->sc_q; (bp = dp->b_actf) != NULL; ) {
-		dp->b_actf = bp->b_actf;
-		
+	while ((bp = BUFQ_GET(&sc->sc_q)) != NULL) {
 		bp->b_error = ENXIO;
 		bp->b_flags |= B_ERROR;
 		biodone(bp);
 	}
 	splx(s);
 
-        /* locate the major number */
-        mn = WDMINOR(self->dv_unit, 0);
+	/* locate the major number */
+	mn = WDMINOR(self->dv_unit, 0);
 
-        for (bmaj = 0; bmaj < nblkdev; bmaj++)
-                if (bdevsw[bmaj].d_open == wdopen)
+	for (bmaj = 0; bmaj < nblkdev; bmaj++)
+		if (bdevsw[bmaj].d_open == wdopen)
 			vdevgone(bmaj, mn, mn + MAXPARTITIONS - 1, VBLK);
-        for (cmaj = 0; cmaj < nchrdev; cmaj++)
-                if (cdevsw[cmaj].d_open == wdopen)
+	for (cmaj = 0; cmaj < nchrdev; cmaj++)
+		if (cdevsw[cmaj].d_open == wdopen)
 			vdevgone(cmaj, mn, mn + MAXPARTITIONS - 1, VCHR);
 
 	/* Get rid of the shutdown hook. */
@@ -447,21 +448,21 @@ wddetach(self, flags)
 		shutdownhook_disestablish(sc->sc_sdhook);
 
 #if NRND > 0
-        /* Unhook the entropy source. */
-        rnd_detach_source(&sc->rnd_source);
+	/* Unhook the entropy source. */
+	rnd_detach_source(&sc->rnd_source);
 #endif
 
-        return (0);
+	return (0);
 }
 
 void
 wdzeroref(self)
-        struct device *self;
+	struct device *self;
 {
-        struct wd_softc *sc = (struct wd_softc *)self;
+	struct wd_softc *sc = (struct wd_softc *)self;
 
-        /* Detach disk. */
-        disk_detach(&sc->sc_dk);
+	/* Detach disk. */
+	disk_detach(&sc->sc_dk);
 }
 
 /*
@@ -512,7 +513,7 @@ wdstrategy(bp)
 		goto done;
 	/* Queue transfer on drive, activate drive and controller if idle. */
 	s = splbio();
-	disksort(&wd->sc_q, bp);
+	BUFQ_ADD(&wd->sc_q, bp);
 	wdstart(wd);
 	splx(s);
 	device_unref(&wd->sc_dev);
@@ -537,18 +538,16 @@ wdstart(arg)
 	void *arg;
 {
 	struct wd_softc *wd = arg;
-	struct buf *dp, *bp=0;
+	struct buf *bp = NULL;
 
 	WDCDEBUG_PRINT(("wdstart %s\n", wd->sc_dev.dv_xname),
 	    DEBUG_XFERS);
 	while (wd->openings > 0) {
 
 		/* Is there a buf for us ? */
-		dp = &wd->sc_q;
-		if ((bp = dp->b_actf) == NULL)  /* yes, an assign */
-			 return;
-		dp->b_actf = bp->b_actf;
-	
+		if ((bp = BUFQ_GET(&wd->sc_q)) == NULL)
+			return;
+
 		/* 
 		 * Make the command. First lock the device
 		 */
@@ -565,6 +564,8 @@ __wdstart(wd, bp)
 	struct buf *bp;
 {
 	daddr_t p_offset;
+	daddr_t nblks;
+
 	if (WDPART(bp->b_dev) != RAW_PART)
 		p_offset =
 		    wd->sc_dk.dk_label->d_partitions[WDPART(bp->b_dev)].p_offset;
@@ -583,7 +584,10 @@ __wdstart(wd, bp)
 		wd->sc_wdc_bio.flags = ATA_SINGLE;
 	else
 		wd->sc_wdc_bio.flags = 0;
-	if (wd->sc_flags & WDF_LBA48)
+	nblks = bp->b_bcount / wd->sc_dk.dk_label->d_secsize;
+	if ((wd->sc_flags & WDF_LBA48) &&
+	    /* use LBA48 only if really need */
+	    ((wd->sc_wdc_bio.blkno + nblks - 1 > 0xfffffff) || (nblks > 0xff)))
 		wd->sc_wdc_bio.flags |= ATA_LBA48;
 	if (wd->sc_flags & WDF_LBA)
 		wd->sc_wdc_bio.flags |= ATA_LBA;
@@ -646,7 +650,8 @@ wddone(v)
 		if (wd->sc_wdc_bio.r_error != 0 &&
 		    (wd->sc_wdc_bio.r_error & ~(WDCE_MC | WDCE_MCR)) == 0)
 			goto noerror;
-		ata_perror(wd->drvp, wd->sc_wdc_bio.r_error, errbuf);
+		ata_perror(wd->drvp, wd->sc_wdc_bio.r_error, errbuf,
+		    sizeof buf);
 retry:
 		/* Just reset and retry. Can we do more ? */
 		wdc_reset_channel(wd->drvp);
@@ -760,7 +765,7 @@ wdopen(dev, flag, fmt, p)
 
 			/* Load the partition info if not already loaded. */
 			wdgetdisklabel(dev, wd, wd->sc_dk.dk_label,
-				       wd->sc_dk.dk_cpulabel, 0);
+			    wd->sc_dk.dk_cpulabel, 0);
 		}
 	}
 
@@ -864,13 +869,13 @@ wdgetdefaultlabel(wd, lp)
 	lp->d_secpercyl = lp->d_ntracks * lp->d_nsectors;
 	if (wd->drvp->ata_vers == -1) {
 		lp->d_type = DTYPE_ST506;
-		strncpy(lp->d_typename, "ST506/MFM/RLL", 16);
+		strncpy(lp->d_typename, "ST506/MFM/RLL", sizeof lp->d_typename);
 	} else {
 		lp->d_type = DTYPE_ESDI;
-		strncpy(lp->d_typename, "ESDI/IDE disk", 16);
+		strncpy(lp->d_typename, "ESDI/IDE disk", sizeof lp->d_typename);
 	}
 	/* XXX - user viscopy() like sd.c */
-	strncpy(lp->d_packname, wd->sc_params.atap_model, 16);
+	strncpy(lp->d_packname, wd->sc_params.atap_model, sizeof lp->d_packname);
 	lp->d_secperunit = wd->sc_capacity;
 	lp->d_rpm = 3600;
 	lp->d_interleave = 1;
@@ -1111,11 +1116,8 @@ wdsize(dev)
 		goto exit;
 	}
 
-	if (wd->sc_dk.dk_label->d_partitions[part].p_fstype != FS_SWAP)
-		size = -1;
-	else
-		size = wd->sc_dk.dk_label->d_partitions[part].p_size *
-		    (wd->sc_dk.dk_label->d_secsize / DEV_BSIZE);
+	size = wd->sc_dk.dk_label->d_partitions[part].p_size *
+	    (wd->sc_dk.dk_label->d_secsize / DEV_BSIZE);
 	if (omask == 0 && wdclose(dev, 0, S_IFBLK, NULL) != 0)
 		size = -1;
 
@@ -1223,7 +1225,8 @@ again:
 			break;
 		case ERROR:
 			errbuf[0] = '\0';
-			ata_perror(wd->drvp, wd->sc_wdc_bio.r_error, errbuf);
+			ata_perror(wd->drvp, wd->sc_wdc_bio.r_error, errbuf,
+			    sizeof errbuf);
 			printf("wddump: %s", errbuf);
 			err = EIO;
 			break;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: creatorvar.h,v 1.7 2002/08/19 20:16:04 jason Exp $	*/
+/*	$OpenBSD: creatorvar.h,v 1.10 2003/06/17 17:35:40 miod Exp $	*/
 
 /*
  * Copyright (c) 2002 Jason L. Wright (jason@thought.net),
@@ -13,11 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -32,32 +27,42 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define FFB_CREATOR		0
-#define FFB_AFB			1
+/* device types */
+#define FFB_CREATOR		0	/* Creator/Creator3d */
+#define FFB_AFB			1	/* Elite3D */
 
 #define	CREATOR_CFFLAG_NOACCEL	0x1
 
 struct creator_softc {
-	struct device sc_dv;
+	struct sunfb sc_sunfb;
 	bus_space_tag_t sc_bt;
 	bus_space_handle_t sc_pixel_h;
 	bus_space_handle_t sc_fbc_h;
+	bus_space_handle_t sc_dac_h;
 	bus_addr_t sc_addrs[FFB_NREGS];
 	bus_size_t sc_sizes[FFB_NREGS];
-	int sc_height, sc_width, sc_linebytes, sc_depth;
 	int sc_nscreens, sc_nreg;
 	int sc_console;
 	int sc_node;
 	int sc_type;
 	u_int sc_mode;
-	struct rasops_info sc_rasops;
 	int32_t sc_fifo_cache, sc_fg_cache;
-	int *sc_crowp, *sc_ccolp;
+	u_int32_t sc_dacrev;
+	u_int sc_curs_enabled, sc_curs_fg, sc_curs_bg;
+	struct wsdisplay_curpos sc_curs_pos, sc_curs_hot, sc_curs_size;
+	u_char sc_curs_image[512], sc_curs_mask[512];
 };
+
+#define	CREATOR_CURS_MAX	64
 
 #define	FBC_WRITE(sc,r,v) \
     bus_space_write_4((sc)->sc_bt, (sc)->sc_fbc_h, (r), (v))
 #define	FBC_READ(sc,r) \
     bus_space_read_4((sc)->sc_bt, (sc)->sc_fbc_h, (r))
+
+#define	DAC_WRITE(sc,r,v) \
+    bus_space_write_4((sc)->sc_bt, (sc)->sc_dac_h, (r), (v))
+#define	DAC_READ(sc,r) \
+    bus_space_read_4((sc)->sc_bt, (sc)->sc_dac_h, (r))
 
 void	creator_attach(struct creator_softc *);

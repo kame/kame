@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_lookup.c,v 1.22 2003/01/31 17:37:50 art Exp $	*/
+/*	$OpenBSD: vfs_lookup.c,v 1.25 2003/06/02 23:28:07 millert Exp $	*/
 /*	$NetBSD: vfs_lookup.c,v 1.17 1996/02/09 19:00:59 christos Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -167,6 +163,11 @@ namei(ndp)
 		VREF(dp);
 	}
 	for (;;) {
+		if (!dp->v_mount) {
+			/* Give up if the directory is no longer mounted */
+			FREE(cnp->cn_pnbuf, M_NAMEI);
+			return (ENOENT);
+		}
 		cnp->cn_nameptr = cnp->cn_pnbuf;
 		ndp->ni_startdir = dp;
 		if ((error = lookup(ndp)) != 0) {
@@ -617,7 +618,6 @@ relookup(dvp, vpp, cnp)
 {
 	struct proc *p = cnp->cn_proc;
 	register struct vnode *dp = 0;	/* the directory we are searching */
-	int docache;			/* == 0 do not cache last component */
 	int wantparent;			/* 1 => wantparent or lockparent flag */
 	int rdonly;			/* lookup read-only flag bit */
 	int error = 0;
@@ -630,10 +630,6 @@ relookup(dvp, vpp, cnp)
 	 * Setup: break out flag bits into variables.
 	 */
 	wantparent = cnp->cn_flags & (LOCKPARENT|WANTPARENT);
-	docache = (cnp->cn_flags & NOCACHE) ^ NOCACHE;
-	if (cnp->cn_nameiop == DELETE ||
-	    (wantparent && cnp->cn_nameiop != CREATE))
-		docache = 0;
 	rdonly = cnp->cn_flags & RDONLY;
 	cnp->cn_flags &= ~ISSYMLINK;
 	dp = dvp;

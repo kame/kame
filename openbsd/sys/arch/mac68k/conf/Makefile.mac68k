@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile.mac68k,v 1.29 2002/12/25 21:10:26 miod Exp $
+#	$OpenBSD: Makefile.mac68k,v 1.33 2003/07/22 19:39:50 otto Exp $
 #	$NetBSD: Makefile.mac68k,v 1.53 1997/04/15 06:11:38 scottr Exp $
 
 # Makefile for OpenBSD
@@ -40,7 +40,10 @@ CPPFLAGS=	${INCLUDES} ${IDENT} ${PARAM} -D_KERNEL \
 		-Dmc68020 -Dmac68k
 CWARNFLAGS=	-Werror -Wall -Wstrict-prototypes -Wmissing-prototypes \
 		-Wno-uninitialized -Wno-format -Wno-main
-CMACHFLAGS=	-msoft-float -fno-stack-protector
+CMACHFLAGS=	-msoft-float
+.if ${IDENT:M-DNO_PROPOLICE}
+CMACHFLAGS+=	-fno-stack-protector
+.endif
 COPTS?= 	-O2
 CFLAGS=		${DEBUG} ${COPTS} ${CWARNFLAGS} ${CMACHFLAGS} ${PIPE}
 AFLAGS=		-x assembler-with-cpp -traditional-cpp -D_LOCORE
@@ -146,7 +149,7 @@ clean::
 
 lint:
 	@lint -hbxncez -DGENERIC -Dvolatile= ${CPPFLAGS} ${PARAM} -UKGDB \
-	    ${CFILES} ${MAC68K}/mac68k/swapgeneric.c ioconf.c param.c | \
+	    ${CFILES} ioconf.c param.c | \
 	    grep -v 'static function .* unused'
 
 tags:
@@ -170,6 +173,10 @@ depend:: .depend
 	-if test -n "${SFILES}"; then \
 		${MKDEP} -a ${AFLAGS} ${CPPFLAGS} ${SFILES}; \
 	fi
+	sh $S/kern/genassym.sh ${MKDEP} -f assym.dep ${CFLAGS} \
+	    ${CPPFLAGS} < ${MAC68K}/mac68k/genassym.cf
+	@sed -e 's/.*\.o:.* /assym.h: /' < assym.dep >> .depend
+	@rm -f assym.dep
 
 
 

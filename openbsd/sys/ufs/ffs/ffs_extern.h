@@ -1,4 +1,4 @@
-/*	$OpenBSD: ffs_extern.h,v 1.19 2002/03/14 01:27:14 millert Exp $	*/
+/*	$OpenBSD: ffs_extern.h,v 1.21 2003/06/02 23:28:23 millert Exp $	*/
 /*	$NetBSD: ffs_extern.h,v 1.4 1996/02/09 22:22:22 christos Exp $	*/
 
 /*-
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -172,13 +168,13 @@ void  softdep_load_inodeblock(struct inode *);
 void  softdep_freefile(struct vnode *, ino_t, int);
 void  softdep_setup_freeblocks(struct inode *, off_t);
 void  softdep_setup_inomapdep(struct buf *, struct inode *, ino_t);
-void  softdep_setup_blkmapdep(struct buf *, struct fs *, ufs_daddr_t);
-void  softdep_setup_allocdirect(struct inode *, ufs_lbn_t, ufs_daddr_t,
-            ufs_daddr_t, long, long, struct buf *);
+void  softdep_setup_blkmapdep(struct buf *, struct fs *, daddr_t);
+void  softdep_setup_allocdirect(struct inode *, ufs_lbn_t, daddr_t,
+            daddr_t, long, long, struct buf *);
 void  softdep_setup_allocindir_meta(struct buf *, struct inode *,
-            struct buf *, int, ufs_daddr_t);
+            struct buf *, int, daddr_t);
 void  softdep_setup_allocindir_page(struct inode *, ufs_lbn_t,
-            struct buf *, int, ufs_daddr_t, ufs_daddr_t, struct buf *);
+            struct buf *, int, daddr_t, daddr_t, struct buf *);
 void  softdep_fsync_mountdev(struct vnode *);
 int   softdep_sync_metadata(struct vop_fsync_args *);
 int   softdep_fsync(struct vnode *vp);

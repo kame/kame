@@ -1,4 +1,4 @@
-/*	$OpenBSD: cmd_i386.c,v 1.24 2002/03/14 03:15:54 millert Exp $	*/
+/*	$OpenBSD: cmd_i386.c,v 1.27 2003/08/11 06:23:09 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Michael Shalayeff
@@ -13,11 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
@@ -65,7 +60,7 @@ const struct cmd_table cmd_machine[] = {
 };
 
 int
-Xdiskinfo()
+Xdiskinfo(void)
 {
 #ifndef _TEST
 	dump_diskinfo();
@@ -75,7 +70,7 @@ Xdiskinfo()
 
 #ifdef DEBUG
 int
-Xregs()
+Xregs(void)
 {
 	DUMP_REGS;
 	return 0;
@@ -83,10 +78,11 @@ Xregs()
 #endif
 
 int
-Xboot()
+Xboot(void)
 {
 #ifndef _TEST
 	int dev, part, st;
+	bios_diskinfo_t *bd = NULL;
 	char buf[DEV_BSIZE], *dest = (void *)BOOTBIOS_ADDR;
 
 	if(cmd.argc != 2) {
@@ -118,7 +114,8 @@ Xboot()
 		printf("[%x]\n", dev);
 
 	/* Read boot sector from device */
-	st = biosd_io(F_READ, dev, 0, 0, 0, 1, buf);
+	bd = bios_dklookup(dev);
+	st = biosd_io(F_READ, bd, 0, 1, buf);
 	if(st) goto bad;
 
 	/* Frob boot flag in buffer from HD */
@@ -143,7 +140,7 @@ bad:
 }
 
 int
-Xmemory()
+Xmemory(void)
 {
 	if (cmd.argc >= 2) {
 		int i;

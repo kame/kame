@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_debug.c,v 1.12 2002/06/09 16:26:11 itojun Exp $	*/
+/*	$OpenBSD: tcp_debug.c,v 1.18 2003/06/09 10:12:52 itojun Exp $	*/
 /*	$NetBSD: tcp_debug.c,v 1.10 1996/02/13 23:43:36 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -84,6 +80,7 @@
 #include <sys/systm.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
+#include <sys/protosw.h>
 
 #include <net/route.h>
 #include <net/if.h>
@@ -98,6 +95,7 @@
 #include <netinet/tcp_var.h>
 #include <netinet/tcpip.h>
 #include <netinet/tcp_debug.h>
+#include <netinet/tcp_fsm.h>
 
 #ifdef INET6
 #ifndef INET
@@ -109,6 +107,10 @@
 #ifdef TCPDEBUG
 int	tcpconsdebug = 0;
 #endif
+
+struct	tcp_debug tcp_debug[TCP_NDEBUG];
+int	tcp_debx;
+
 /*
  * Tcp debug routines
  */
@@ -144,7 +146,7 @@ tcp_trace(act, ostate, tp, headers, req, len)
 	switch (tp->pf) {
 #ifdef INET6
 	case PF_INET6:
-		if (ti) {
+		if (ti6) {
 			th = &ti6->ti6_t;
 			td->td_ti6 = *ti6;
 		} else

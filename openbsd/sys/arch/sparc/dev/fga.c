@@ -1,4 +1,4 @@
-/*	$OpenBSD: fga.c,v 1.11 2002/07/08 21:55:56 jason Exp $	*/
+/*	$OpenBSD: fga.c,v 1.13 2003/06/04 07:18:16 miod Exp $	*/
 
 /*
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
@@ -15,12 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright for
- *	RTMX Incorporated.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -785,12 +779,10 @@ fvmescan(parent, child, aux)
 	    mapdev(&oca.ca_ra.ra_reg[0], TMPMAP_VA, 0, NBPG);
 
 	if ((*cf->cf_attach->ca_match)(parent, cf, &oca) == 0) {
-		pmap_remove(pmap_kernel(), TMPMAP_VA, TMPMAP_VA + NBPG);
-		pmap_update(pmap_kernel());
+		bus_untmp();
 		return (0);
 	}
-	pmap_remove(pmap_kernel(), TMPMAP_VA, TMPMAP_VA + NBPG);
-	pmap_update(pmap_kernel());
+	bus_untmp();
 
 	oca.ca_ra.ra_reg[0].rr_paddr = (void *)paddr;
 	config_attach(parent, cf, &oca, fvmeprint);

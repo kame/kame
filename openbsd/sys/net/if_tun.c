@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tun.c,v 1.45 2003/01/07 09:00:34 kjc Exp $	*/
+/*	$OpenBSD: if_tun.c,v 1.49 2003/08/15 20:32:19 tedu Exp $	*/
 /*	$NetBSD: if_tun.c,v 1.24 1996/05/07 02:40:48 thorpej Exp $	*/
 
 /*
@@ -151,7 +151,7 @@ tunattach(n)
 		tunctl[i].tun_flags = TUN_INITED;
 
 		ifp = &tunctl[i].tun_if;
-		sprintf(ifp->if_xname, "tun%d", i);
+		snprintf(ifp->if_xname, sizeof ifp->if_xname, "tun%d", i);
 		ifp->if_softc = &tunctl[i];
 		ifp->if_mtu = TUNMTU;
 		ifp->if_ioctl = tun_ioctl;
@@ -193,7 +193,7 @@ tunopen(dev, flag, mode, p)
 	struct ifnet	*ifp;
 	register int	unit, error;
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return (error);
 
 	if ((unit = minor(dev)) >= ntun)
@@ -299,6 +299,23 @@ tuninit(tp)
 				tp->tun_flags &= ~TUN_BRDADDR;
 		}
 #endif
+#ifdef INET6
+		if (ifa->ifa_addr->sa_family == AF_INET6) {
+			struct sockaddr_in6 *sin;
+
+			sin = (struct sockaddr_in6 *)ifa->ifa_addr;
+			if (!IN6_IS_ADDR_UNSPECIFIED(&sin->sin6_addr))
+				tp->tun_flags |= TUN_IASET;
+
+			if (ifp->if_flags & IFF_POINTOPOINT) {
+				sin = (struct sockaddr_in6 *)ifa->ifa_dstaddr;
+				if (sin &&
+				    !IN6_IS_ADDR_UNSPECIFIED(&sin->sin6_addr))
+					tp->tun_flags |= TUN_DSTADDR;
+			} else
+				tp->tun_flags &= ~TUN_DSTADDR;
+		}
+#endif /* INET6 */
 	}
 
 	return 0;
@@ -433,6 +450,7 @@ tunioctl(dev, cmd, data, flag, p)
 	int		unit, s;
 	struct tun_softc *tp;
 	struct tuninfo *tunp;
+	struct mbuf *m;
 
 	if ((unit = minor(dev)) >= ntun)
 		return (ENXIO);
@@ -494,8 +512,9 @@ tunioctl(dev, cmd, data, flag, p)
 			tp->tun_flags &= ~TUN_ASYNC;
 		break;
 	case FIONREAD:
-		if (tp->tun_if.if_snd.ifq_head)
-			*(int *)data = tp->tun_if.if_snd.ifq_head->m_pkthdr.len;
+		IFQ_POLL(&tp->tun_if.if_snd, m);
+		if (m != NULL)
+			*(int *)data = m->m_pkthdr.len;
 		else	
 			*(int *)data = 0;
 		break;
@@ -731,6 +750,7 @@ tunselect(dev, rw, p)
 	int		unit, s;
 	struct tun_softc *tp;
 	struct ifnet	*ifp;
+	struct mbuf	*m;
 
 	if ((unit = minor(dev)) >= ntun)
 		return (ENXIO);
@@ -742,7 +762,8 @@ tunselect(dev, rw, p)
 
 	switch (rw) {
 	case FREAD:
-		if (ifp->if_snd.ifq_len > 0) {
+		IFQ_POLL(&ifp->if_snd, m);
+		if (m != NULL) {
 			splx(s);
 			TUNDEBUG(("%s: tunselect q=%d\n", ifp->if_xname,
 				  ifp->if_snd.ifq_len));

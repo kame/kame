@@ -1,4 +1,4 @@
-/*	$OpenBSD: comkbd_ebus.c,v 1.11 2003/02/17 01:29:20 henric Exp $	*/
+/*	$OpenBSD: comkbd_ebus.c,v 1.14 2003/06/24 21:54:39 henric Exp $	*/
 
 /*
  * Copyright (c) 2002 Jason L. Wright (jason@thought.net)
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -117,7 +112,7 @@ int comkbd_ioctl(void *, u_long, caddr_t, int, struct proc *);
 /* internals */
 void comkbd_enqueue(struct comkbd_softc *, u_int8_t *, u_int);
 void comkbd_raw(struct comkbd_softc *, u_int8_t);
-void comkbd_init(struct comkbd_softc *);
+int comkbd_init(struct comkbd_softc *);
 void comkbd_putc(struct comkbd_softc *, u_int8_t);
 int comkbd_intr(void *);
 void comkbd_soft(void *);
@@ -233,30 +228,16 @@ comkbd_attach(parent, self, aux)
 	}
 
 	sc->sc_ih = bus_intr_establish(sc->sc_iot,
-	    ea->ea_intrs[0], IPL_TTY, 0, comkbd_intr, sc);
+	    ea->ea_intrs[0], IPL_TTY, 0, comkbd_intr, sc, self->dv_xname);
 	if (sc->sc_ih == NULL) {
 		printf(": can't get hard intr\n");
 		return;
 	}
 
-	if (console) {
-		comkbd_init(sc);
-		cn_tab->cn_dev = makedev(77, sc->sc_dv.dv_unit); /* XXX */
-		cn_tab->cn_pollc = wskbd_cnpollc;
-		cn_tab->cn_getc = wskbd_cngetc;
-		if (ISTYPE5(sc->sc_layout)) {
-			wskbd_cnattach(&comkbd_consops, sc,
-			    &sunkbd5_keymapdata);
-		} else {
-			wskbd_cnattach(&comkbd_consops, sc,
-			    &sunkbd_keymapdata);
-		}
-		sc->sc_ier = IER_ETXRDY | IER_ERXRDY;
-		COM_WRITE(sc, com_ier, sc->sc_ier);
-		COM_READ(sc, com_iir);
-		COM_WRITE(sc, com_mcr, MCR_IENABLE | MCR_DTR | MCR_RTS);
-	} else
-		printf("\n");
+	if (!comkbd_init(sc)) {
+		printf("%s: no keyboard\n", self->dv_xname);
+		return;
+	}
 
 	a.console = console;
 	if (ISTYPE5(sc->sc_layout)) {
@@ -278,6 +259,25 @@ comkbd_attach(parent, self, aux)
 	}
 	a.accessops = &comkbd_accessops;
 	a.accesscookie = sc;
+
+	if (console) {
+		cn_tab->cn_dev = makedev(77, sc->sc_dv.dv_unit); /* XXX */
+		cn_tab->cn_pollc = wskbd_cnpollc;
+		cn_tab->cn_getc = wskbd_cngetc;
+		if (ISTYPE5(sc->sc_layout)) {
+			wskbd_cnattach(&comkbd_consops, sc,
+			    &sunkbd5_keymapdata);
+		} else {
+			wskbd_cnattach(&comkbd_consops, sc,
+			    &sunkbd_keymapdata);
+		}
+		sc->sc_ier = IER_ETXRDY | IER_ERXRDY;
+		COM_WRITE(sc, com_ier, sc->sc_ier);
+		COM_READ(sc, com_iir);
+		COM_WRITE(sc, com_mcr, MCR_IENABLE | MCR_DTR | MCR_RTS);
+	} else
+		printf("\n");
+
 	sc->sc_wskbddev = config_found(self, &a, wskbddevprint);
 }
 
@@ -544,7 +544,7 @@ comkbd_intr(vsc)
 	return (1);
 }
 
-void
+int
 comkbd_init(sc)
 	struct comkbd_softc *sc;
 {
@@ -612,6 +612,8 @@ comkbd_init(sc)
 		printf(": reset timeout\n");
 	else
 		printf(": layout %d\n", sc->sc_layout);
+
+	return tries;
 }
 
 void

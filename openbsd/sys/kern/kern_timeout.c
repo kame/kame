@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_timeout.c,v 1.15 2002/12/08 04:21:07 art Exp $	*/
+/*	$OpenBSD: kern_timeout.c,v 1.18 2003/06/03 12:05:25 art Exp $	*/
 /*
  * Copyright (c) 2001 Thomas Nordin <nordin@openbsd.org>
  * Copyright (c) 2000-2001 Artur Grabowski <art@openbsd.org>
@@ -10,10 +10,7 @@
  *
  * 1. Redistributions of source code must retain the above copyright 
  *    notice, this list of conditions and the following disclaimer. 
- * 2. Redistributions in binary form must reproduce the above copyright 
- *    notice, this list of conditions and the following disclaimer in the 
- *    documentation and/or other materials provided with the distribution. 
- * 3. The name of the author may not be used to endorse or promote products
+ * 2. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission. 
  *
  * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
@@ -126,7 +123,7 @@ struct simplelock _timeout_lock;
  * scheduled to timeout further in time than INT_MAX, but to->to_time can
  * be positive or negative so comparing it with anything is dangerous.
  * The only way we can use the to->to_time value in any predictable way
- * is when we caluculate how far in the future `to' will timeout -
+ * is when we calculate how far in the future `to' will timeout -
  * "to->to_time - ticks". The result will always be positive for future
  * timeouts and 0 or negative for due timeouts.
  */
@@ -177,7 +174,7 @@ timeout_add(struct timeout *new, int to_ticks)
 	 * and let it be rescheduled later.
 	 */
 	if (new->to_flags & TIMEOUT_ONQUEUE) {
-		if (new->to_time < old_time) {
+		if (new->to_time - ticks < old_time - ticks) {
 			CIRCQ_REMOVE(&new->to_list);
 			CIRCQ_INSERT(&new->to_list, &timeout_todo);
 		}

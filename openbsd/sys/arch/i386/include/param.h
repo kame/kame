@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.21 2002/06/26 08:42:39 art Exp $	*/
+/*	$OpenBSD: param.h,v 1.24 2003/06/02 23:27:47 millert Exp $	*/
 /*	$NetBSD: param.h,v 1.29 1996/03/04 05:04:26 cgd Exp $	*/
 
 /*-
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -61,9 +57,15 @@
  * Round p (pointer or byte index) up to a correctly-aligned value
  * for all data types (int, long, ...).   The result is u_int and
  * must be cast to any desired pointer type.
+ *
+ * ALIGNED_POINTER is a boolean macro that checks whether an address
+ * is valid to fetch data elements of type t from on this architecture.
+ * This does not reflect the optimal alignment, just the possibility
+ * (within reasonable limits). 
  */
 #define ALIGNBYTES	(sizeof(int) - 1)
 #define ALIGN(p)	(((u_int)(p) + ALIGNBYTES) &~ ALIGNBYTES)
+#define ALIGNED_POINTER(p,t)   1
 
 #define	PGSHIFT		12		/* LOG2(NBPG) */
 #define	NBPG		(1 << PGSHIFT)	/* bytes/page */
@@ -75,7 +77,12 @@
 
 #define	NPTEPG		(NBPG/(sizeof (pt_entry_t)))
 
-#define	KERNBASE	0xd0000000		/* start of kernel virtual space */
+/*
+ * Start of kernel virtual space.  Remember to alter the memory and
+ * page table layout description in pmap.h when changing this.
+ */
+#define	KERNBASE	0xd0000000
+
 #define	KERNTEXTOFF	(KERNBASE+0x100000)	/* start of kernel text */
 #define	BTOPKERNBASE	((u_long)KERNBASE >> PGSHIFT)
 

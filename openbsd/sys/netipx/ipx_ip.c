@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipx_ip.c,v 1.13 2002/09/18 07:46:56 mickey Exp $	*/
+/*	$OpenBSD: ipx_ip.c,v 1.16 2003/07/09 22:03:16 itojun Exp $	*/
 
 /*-
  *
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -94,7 +90,7 @@ ipxipattach(void)
 
 	if (ipxipif.if_mtu == 0) {
 		ifp = &ipxipif;
-		sprintf(ifp->if_xname, "ipx0");
+		snprintf(ifp->if_xname, sizeof ifp->if_xname, "ipx0");
 		ifp->if_mtu = LOMTU;
 		ifp->if_ioctl = ipxipioctl;
 		ifp->if_output = ipxipoutput;
@@ -111,7 +107,7 @@ ipxipattach(void)
 	ipxip_list = m;
 	ifp = &m->ifen_ifnet;
 
-	sprintf(ifp->if_xname, "ipx0");
+	snprintf(ifp->if_xname, sizeof ifp->if_xname, "ipx0");
 	ifp->if_mtu = LOMTU;
 	ifp->if_ioctl = ipxipioctl;
 	ifp->if_output = ipxipoutput;
@@ -208,8 +204,8 @@ ipxip_input( struct mbuf *m, ...)
 	len = ntohs(ipx->ipx_len);
 	if (len & 1)
 		len++;		/* Preserve Garbage Byte */
-	if (ip->ip_len != len) {
-		if (len > ip->ip_len) {
+	if (ntohs(ip->ip_len) - (ip->ip_hl << 2) != len) {
+		if (len > ntohs(ip->ip_len) - (ip->ip_hl << 2)) {
 			ipxipif.if_ierrors++;
 			if (ipxip_badlen)
 				m_freem(ipxip_badlen);
@@ -294,7 +290,11 @@ ipxipoutput(ifp, m, dst, rt)
 	ip->ip_p = IPPROTO_IDP;
 	ip->ip_src = ifn->ifen_src;
 	ip->ip_dst = ifn->ifen_dst;
-	ip->ip_len = (u_short)len + sizeof(struct ip);
+	if (len + sizeof(struct ip) > IP_MAXPACKET) {
+		m_freem(m);
+		return EMSGSIZE;
+	}
+	ip->ip_len = htons(len + sizeof(struct ip));
 	ip->ip_ttl = MAXTTL;
 
 	/*

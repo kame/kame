@@ -1,4 +1,4 @@
-/*	$OpenBSD: cs4231.c,v 1.16 2003/02/17 01:29:20 henric Exp $	*/
+/*	$OpenBSD: cs4231.c,v 1.21 2003/07/03 20:36:07 jason Exp $	*/
 
 /*
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -153,15 +148,15 @@ int	cs4231_halt_input(void *);
 int	cs4231_getdev(void *, struct audio_device *);
 int	cs4231_set_port(void *, mixer_ctrl_t *);
 int	cs4231_get_port(void *, mixer_ctrl_t *);
-int	cs4231_query_devinfo(void *addr, mixer_devinfo_t *);
+int	cs4231_query_devinfo(void *, mixer_devinfo_t *);
 void *	cs4231_alloc(void *, int, size_t, int, int);
 void	cs4231_free(void *, void *, int);
 size_t	cs4231_round_buffersize(void *, int, size_t);
 int	cs4231_get_props(void *);
 int	cs4231_trigger_output(void *, void *, void *, int,
-    void (*intr)(void *), void *arg, struct audio_params *);
+    void (*)(void *), void *, struct audio_params *);
 int	cs4231_trigger_input(void *, void *, void *, int,
-    void (*intr)(void *), void *arg, struct audio_params *);
+    void (*)(void *), void *, struct audio_params *);
 
 struct audio_hw_if cs4231_sa_hw_if = {
 	cs4231_open,
@@ -207,9 +202,7 @@ struct audio_device cs4231_device = {
 };
 
 int
-cs4231_match(parent, vcf, aux)
-	struct device *parent;
-	void *vcf, *aux;
+cs4231_match(struct device *parent, void *vcf, void *aux)
 {
 	struct sbus_attach_args *sa = aux;
 
@@ -217,9 +210,7 @@ cs4231_match(parent, vcf, aux)
 }
 
 void    
-cs4231_attach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+cs4231_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct sbus_attach_args *sa = aux;
 	struct cs4231_softc *sc = (struct cs4231_softc *)self;
@@ -244,7 +235,7 @@ cs4231_attach(parent, self, aux)
 	}
 
 	if (bus_intr_establish(sa->sa_bustag, sa->sa_pri, IPL_AUDIO, 0,
-	    cs4231_intr, sc) == NULL) {
+	    cs4231_intr, sc, self->dv_xname) == NULL) {
 		printf(": couldn't establish interrupt, pri %d\n", sa->sa_pri);
 		return;
 	}
@@ -287,9 +278,7 @@ cs4231_attach(parent, self, aux)
  * Write to one of the indexed registers of cs4231.
  */
 void
-cs4231_write(sc, r, v)
-	struct cs4231_softc *sc;
-	u_int8_t r, v;
+cs4231_write(struct cs4231_softc *sc, u_int8_t r, u_int8_t v)
 {
 	CS_WRITE(sc, AD1848_IADDR, r);
 	CS_WRITE(sc, AD1848_IDATA, v);
@@ -299,19 +288,14 @@ cs4231_write(sc, r, v)
  * Read from one of the indexed registers of cs4231.
  */
 u_int8_t
-cs4231_read(sc, r)
-	struct cs4231_softc *sc;
-	u_int8_t r;
+cs4231_read(struct cs4231_softc *sc, u_int8_t r)
 {
 	CS_WRITE(sc, AD1848_IADDR, r);
 	return (CS_READ(sc, AD1848_IDATA));
 }
 
 int
-cs4231_set_speed(sc, argp)
-	struct cs4231_softc *sc;
-	u_long *argp;
-
+cs4231_set_speed(struct cs4231_softc *sc, u_long *argp)
 {
 	/*
 	 * The available speeds are in the following table. Keep the speeds in
@@ -323,7 +307,7 @@ cs4231_set_speed(sc, argp)
 	} speed_struct;
 	u_long arg = *argp;
 
-	static speed_struct speed_table[] = {
+	const static speed_struct speed_table[] = {
 		{5510,	(0 << 1) | CLOCK_XTAL2},
 		{5510,	(0 << 1) | CLOCK_XTAL2},
 		{6620,	(7 << 1) | CLOCK_XTAL2},
@@ -379,11 +363,9 @@ cs4231_set_speed(sc, argp)
  * Audio interface functions
  */
 int
-cs4231_open(addr, flags)
-	void *addr;
-	int flags;
+cs4231_open(void *vsc, int flags)
 {
-	struct cs4231_softc *sc = addr;
+	struct cs4231_softc *sc = vsc;
 	int tries;
 
 	if (sc->sc_open)
@@ -427,8 +409,7 @@ cs4231_open(addr, flags)
 }
 
 void
-cs4231_setup_output(sc)
-	struct cs4231_softc *sc;
+cs4231_setup_output(struct cs4231_softc *sc)
 {
 	u_int8_t pc, mi, rm, lm;
 
@@ -498,10 +479,9 @@ cs4231_setup_output(sc)
 }
 
 void
-cs4231_close(addr)
-	void *addr;
+cs4231_close(void *vsc)
 {
-	struct cs4231_softc *sc = addr;
+	struct cs4231_softc *sc = vsc;
 
 	cs4231_halt_input(sc);
 	cs4231_halt_output(sc);
@@ -511,63 +491,61 @@ cs4231_close(addr)
 }
 
 int
-cs4231_query_encoding(addr, fp)
-	void *addr;
-	struct audio_encoding *fp;
+cs4231_query_encoding(void *vsc, struct audio_encoding *fp)
 {
 	int err = 0;
 
 	switch (fp->index) {
 	case 0:
-		strcpy(fp->name, AudioEmulaw);
+		strlcpy(fp->name, AudioEmulaw, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ULAW;
 		fp->precision = 8;
 		fp->flags = 0;
 		break;
 	case 1:
-		strcpy(fp->name, AudioEalaw);
+		strlcpy(fp->name, AudioEalaw, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ALAW;
 		fp->precision = 8;
 		fp->flags = 0;
 		break;
 	case 2:
-		strcpy(fp->name, AudioEslinear_le);
+		strlcpy(fp->name, AudioEslinear_le, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_SLINEAR_LE;
 		fp->precision = 16;
 		fp->flags = 0;
 		break;
 	case 3:
-		strcpy(fp->name, AudioEulinear);
+		strlcpy(fp->name, AudioEulinear, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ULINEAR;
 		fp->precision = 8;
 		fp->flags = 0;
 		break;
 	case 4:
-		strcpy(fp->name, AudioEslinear_be);
+		strlcpy(fp->name, AudioEslinear_be, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_SLINEAR_BE;
 		fp->precision = 16;
 		fp->flags = 0;
 		break;
 	case 5:
-		strcpy(fp->name, AudioEslinear);
+		strlcpy(fp->name, AudioEslinear, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_SLINEAR;
 		fp->precision = 8;
 		fp->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		break;
 	case 6:
-		strcpy(fp->name, AudioEulinear_le);
+		strlcpy(fp->name, AudioEulinear_le, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ULINEAR_LE;
 		fp->precision = 16;
 		fp->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		break;
 	case 7:
-		strcpy(fp->name, AudioEulinear_be);
+		strlcpy(fp->name, AudioEulinear_be, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ULINEAR_BE;
 		fp->precision = 16;
 		fp->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		break;
 	case 8:
-		strcpy(fp->name, AudioEadpcm);
+		strlcpy(fp->name, AudioEadpcm, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ADPCM;
 		fp->precision = 8;
 		fp->flags = 0;
@@ -579,12 +557,10 @@ cs4231_query_encoding(addr, fp)
 }
 
 int
-cs4231_set_params(addr, setmode, usemode, p, r)
-	void *addr;
-	int setmode, usemode;
-	struct audio_params *p, *r;
+cs4231_set_params(void *vsc, int setmode, int usemode,
+    struct audio_params *p, struct audio_params *r)
 {
-	struct cs4231_softc *sc = (struct cs4231_softc *)addr;
+	struct cs4231_softc *sc = (struct cs4231_softc *)vsc;
 	int err, bits, enc = p->encoding;
 	void (*pswcode)(void *, u_char *, int cnt) = NULL;
 	void (*rswcode)(void *, u_char *, int cnt) = NULL;
@@ -674,18 +650,15 @@ cs4231_set_params(addr, setmode, usemode, p, r)
 }
 
 int
-cs4231_round_blocksize(addr, blk)
-	void *addr;
-	int blk;
+cs4231_round_blocksize(void *vsc, int blk)
 {
 	return (blk & (-4));
 }
 
 int
-cs4231_commit_settings(addr)
-	void *addr;
+cs4231_commit_settings(void *vsc)
 {
-	struct cs4231_softc *sc = (struct cs4231_softc *)addr;
+	struct cs4231_softc *sc = (struct cs4231_softc *)vsc;
 	int s, tries;
 	u_int8_t r, fs;
 
@@ -746,10 +719,9 @@ cs4231_commit_settings(addr)
 }
 
 int
-cs4231_halt_output(addr)
-	void *addr;
+cs4231_halt_output(void *vsc)
 {
-	struct cs4231_softc *sc = (struct cs4231_softc *)addr;
+	struct cs4231_softc *sc = (struct cs4231_softc *)vsc;
 
 	/* XXX Kills some capture bits */
 	APC_WRITE(sc, APC_CSR, APC_READ(sc, APC_CSR) &
@@ -762,10 +734,9 @@ cs4231_halt_output(addr)
 }
 
 int
-cs4231_halt_input(addr)
-	void *addr;
+cs4231_halt_input(void *vsc)
 {
-	struct cs4231_softc *sc = (struct cs4231_softc *)addr;
+	struct cs4231_softc *sc = (struct cs4231_softc *)vsc;
 
 	/* XXX Kills some playback bits */
 	APC_WRITE(sc, APC_CSR, APC_CSR_CAPTURE_PAUSE);
@@ -776,20 +747,16 @@ cs4231_halt_input(addr)
 }
 
 int
-cs4231_getdev(addr, retp)
-	void *addr;
-	struct audio_device *retp;
+cs4231_getdev(void *vsc, struct audio_device *retp)
 {
 	*retp = cs4231_device;
 	return (0);
 }
 
 int
-cs4231_set_port(addr, cp)
-	void *addr;
-	mixer_ctrl_t *cp;
+cs4231_set_port(void *vsc, mixer_ctrl_t *cp)
 {
-	struct cs4231_softc *sc = (struct cs4231_softc *)addr;
+	struct cs4231_softc *sc = (struct cs4231_softc *)vsc;
 	int error = EINVAL;
 
 	DPRINTF(("cs4231_set_port: port=%d type=%d\n", cp->dev, cp->type));
@@ -977,11 +944,9 @@ cs4231_set_port(addr, cp)
 }
 
 int
-cs4231_get_port(addr, cp)
-	void *addr;
-	mixer_ctrl_t *cp;
+cs4231_get_port(void *vsc, mixer_ctrl_t *cp)
 {
-	struct cs4231_softc *sc = (struct cs4231_softc *)addr;
+	struct cs4231_softc *sc = (struct cs4231_softc *)vsc;
 	int error = EINVAL;
 
 	DPRINTF(("cs4231_get_port: port=%d type=%d\n", cp->dev, cp->type));
@@ -1145,9 +1110,7 @@ cs4231_get_port(addr, cp)
 }
 
 int
-cs4231_query_devinfo(addr, dip)
-	void *addr;
-	mixer_devinfo_t *dip;
+cs4231_query_devinfo(void *vsc, mixer_devinfo_t *dip)
 {
 	int err = 0;
 
@@ -1157,54 +1120,63 @@ cs4231_query_devinfo(addr, dip)
 		dip->mixer_class = CSAUDIO_INPUT_CLASS;
 		dip->prev = AUDIO_MIXER_LAST;
 		dip->next = CSAUDIO_MIC_MUTE;
-		strcpy(dip->label.name, AudioNmicrophone);
+		strlcpy(dip->label.name, AudioNmicrophone,
+		    sizeof dip->label.name);
 		dip->un.v.num_channels = 1;
-		strcpy(dip->un.v.units.name, AudioNvolume);
+		strlcpy(dip->un.v.units.name, AudioNvolume,
+		    sizeof dip->un.v.units.name);
 		break;
 	case CSAUDIO_DAC_LVL:		/* dacout */
 		dip->type = AUDIO_MIXER_VALUE;
 		dip->mixer_class = CSAUDIO_INPUT_CLASS;
 		dip->prev = AUDIO_MIXER_LAST;
 		dip->next = CSAUDIO_DAC_MUTE;
-		strcpy(dip->label.name, AudioNdac);
+		strlcpy(dip->label.name, AudioNdac,
+		    sizeof dip->label.name);
 		dip->un.v.num_channels = 2;
-		strcpy(dip->un.v.units.name, AudioNvolume);
+		strlcpy(dip->un.v.units.name, AudioNvolume,
+		    sizeof dip->un.v.units.name);
 		break;
 	case CSAUDIO_LINE_IN_LVL:	/* line */
 		dip->type = AUDIO_MIXER_VALUE;
 		dip->mixer_class = CSAUDIO_INPUT_CLASS;
 		dip->prev = AUDIO_MIXER_LAST;
 		dip->next = CSAUDIO_LINE_IN_MUTE;
-		strcpy(dip->label.name, AudioNline);
+		strlcpy(dip->label.name, AudioNline, sizeof dip->label.name);
 		dip->un.v.num_channels = 2;
-		strcpy(dip->un.v.units.name, AudioNvolume);
+		strlcpy(dip->un.v.units.name, AudioNvolume,
+		    sizeof dip->un.v.units.name);
 		break;
 	case CSAUDIO_CD_LVL:		/* cd */
 		dip->type = AUDIO_MIXER_VALUE;
 		dip->mixer_class = CSAUDIO_INPUT_CLASS;
 		dip->prev = AUDIO_MIXER_LAST;
 		dip->next = CSAUDIO_CD_MUTE;
-		strcpy(dip->label.name, AudioNcd);
+		strlcpy(dip->label.name, AudioNcd, sizeof dip->label.name);
 		dip->un.v.num_channels = 2;
-		strcpy(dip->un.v.units.name, AudioNvolume);
+		strlcpy(dip->un.v.units.name, AudioNvolume,
+		    sizeof dip->un.v.units.name);
 		break;
 	case CSAUDIO_MONITOR_LVL:	/* monitor level */
 		dip->type = AUDIO_MIXER_VALUE;
 		dip->mixer_class = CSAUDIO_MONITOR_CLASS;
 		dip->prev = AUDIO_MIXER_LAST;
 		dip->next = CSAUDIO_MONITOR_MUTE;
-		strcpy(dip->label.name, AudioNmonitor);
+		strlcpy(dip->label.name, AudioNmonitor,
+		    sizeof dip->label.name);
 		dip->un.v.num_channels = 1;
-		strcpy(dip->un.v.units.name, AudioNvolume);
+		strlcpy(dip->un.v.units.name, AudioNvolume,
+		    sizeof dip->un.v.units.name);
 		break;
 	case CSAUDIO_OUTPUT_LVL:
 		dip->type = AUDIO_MIXER_VALUE;
 		dip->mixer_class = CSAUDIO_OUTPUT_CLASS;
 		dip->prev = AUDIO_MIXER_LAST;
 		dip->next = CSAUDIO_OUTPUT_MUTE;
-		strcpy(dip->label.name, AudioNoutput);
+		strlcpy(dip->label.name, AudioNoutput, sizeof dip->label.name);
 		dip->un.v.num_channels = 2;
-		strcpy(dip->un.v.units.name, AudioNvolume);
+		strlcpy(dip->un.v.units.name, AudioNvolume,
+		    sizeof dip->un.v.units.name);
 		break;
 	case CSAUDIO_LINE_IN_MUTE:
 		dip->type = AUDIO_MIXER_ENUM;
@@ -1244,11 +1216,13 @@ cs4231_query_devinfo(addr, dip)
 		goto mute;
 
 	mute:
-		strcpy(dip->label.name, AudioNmute);
+		strlcpy(dip->label.name, AudioNmute, sizeof dip->label.name);
 		dip->un.e.num_mem = 2;
-		strcpy(dip->un.e.member[0].label.name, AudioNon);
+		strlcpy(dip->un.e.member[0].label.name, AudioNon,
+		    sizeof dip->un.e.member[0].label.name);
 		dip->un.e.member[0].ord = 0;
-		strcpy(dip->un.e.member[1].label.name, AudioNoff);
+		strlcpy(dip->un.e.member[1].label.name, AudioNoff,
+		    sizeof dip->un.e.member[1].label.name);
 		dip->un.e.member[1].ord = 1;
 		break;
 	case CSAUDIO_REC_LVL:		/* record level */
@@ -1256,37 +1230,45 @@ cs4231_query_devinfo(addr, dip)
 		dip->mixer_class = CSAUDIO_RECORD_CLASS;
 		dip->prev = AUDIO_MIXER_LAST;
 		dip->next = CSAUDIO_RECORD_SOURCE;
-		strcpy(dip->label.name, AudioNrecord);
+		strlcpy(dip->label.name, AudioNrecord, sizeof dip->label.name);
 		dip->un.v.num_channels = 2;
-		strcpy(dip->un.v.units.name, AudioNvolume);
+		strlcpy(dip->un.v.units.name, AudioNvolume,
+		    sizeof dip->un.v.units.name);
 		break;
 	case CSAUDIO_RECORD_SOURCE:
 		dip->type = AUDIO_MIXER_ENUM;
 		dip->mixer_class = CSAUDIO_RECORD_CLASS;
 		dip->prev = CSAUDIO_REC_LVL;
 		dip->next = AUDIO_MIXER_LAST;
-		strcpy(dip->label.name, AudioNsource);
+		strlcpy(dip->label.name, AudioNsource, sizeof dip->label.name);
 		dip->un.e.num_mem = 4;
-		strcpy(dip->un.e.member[0].label.name, AudioNmicrophone);
+		strlcpy(dip->un.e.member[0].label.name, AudioNmicrophone,
+		    sizeof dip->un.e.member[0].label.name);
 		dip->un.e.member[0].ord = CSPORT_MICROPHONE;
-		strcpy(dip->un.e.member[1].label.name, AudioNline);
+		strlcpy(dip->un.e.member[1].label.name, AudioNline,
+		    sizeof dip->un.e.member[1].label.name);
 		dip->un.e.member[1].ord = CSPORT_LINEIN;
-		strcpy(dip->un.e.member[2].label.name, AudioNcd);
+		strlcpy(dip->un.e.member[2].label.name, AudioNcd,
+		    sizeof dip->un.e.member[2].label.name);
 		dip->un.e.member[2].ord = CSPORT_AUX1;
-		strcpy(dip->un.e.member[3].label.name, AudioNdac);
+		strlcpy(dip->un.e.member[3].label.name, AudioNdac,
+		    sizeof dip->un.e.member[3].label.name);
 		dip->un.e.member[3].ord = CSPORT_DAC;
 		break;
 	case CSAUDIO_OUTPUT:
 		dip->type = AUDIO_MIXER_ENUM;
 		dip->mixer_class = CSAUDIO_MONITOR_CLASS;
 		dip->prev = dip->next = AUDIO_MIXER_LAST;
-		strcpy(dip->label.name, AudioNoutput);
+		strlcpy(dip->label.name, AudioNoutput, sizeof dip->label.name);
 		dip->un.e.num_mem = 3;
-		strcpy(dip->un.e.member[0].label.name, AudioNspeaker);
+		strlcpy(dip->un.e.member[0].label.name, AudioNspeaker,
+		    sizeof dip->un.e.member[0].label.name);
 		dip->un.e.member[0].ord = CSPORT_SPEAKER;
-		strcpy(dip->un.e.member[1].label.name, AudioNline);
+		strlcpy(dip->un.e.member[1].label.name, AudioNline,
+		    sizeof dip->un.e.member[1].label.name);
 		dip->un.e.member[1].ord = CSPORT_LINEOUT;
-		strcpy(dip->un.e.member[2].label.name, AudioNheadphone);
+		strlcpy(dip->un.e.member[2].label.name, AudioNheadphone,
+		    sizeof dip->un.e.member[2].label.name);
 		dip->un.e.member[2].ord = CSPORT_HEADPHONE;
 		break;
 	case CSAUDIO_INPUT_CLASS:	/* input class descriptor */
@@ -1294,28 +1276,30 @@ cs4231_query_devinfo(addr, dip)
 		dip->mixer_class = CSAUDIO_INPUT_CLASS;
 		dip->prev = AUDIO_MIXER_LAST;
 		dip->next = AUDIO_MIXER_LAST;
-		strcpy(dip->label.name, AudioCinputs);
+		strlcpy(dip->label.name, AudioCinputs, sizeof dip->label.name);
 		break;
 	case CSAUDIO_OUTPUT_CLASS:	/* output class descriptor */
 		dip->type = AUDIO_MIXER_CLASS;
 		dip->mixer_class = CSAUDIO_OUTPUT_CLASS;
 		dip->prev = AUDIO_MIXER_LAST;
 		dip->next = AUDIO_MIXER_LAST;
-		strcpy(dip->label.name, AudioCoutputs);
+		strlcpy(dip->label.name, AudioCoutputs,
+		    sizeof dip->label.name);
 		break;
 	case CSAUDIO_MONITOR_CLASS:	/* monitor class descriptor */
 		dip->type = AUDIO_MIXER_CLASS;
 		dip->mixer_class = CSAUDIO_MONITOR_CLASS;
 		dip->prev = AUDIO_MIXER_LAST;
 		dip->next = AUDIO_MIXER_LAST;
-		strcpy(dip->label.name, AudioCmonitor);
+		strlcpy(dip->label.name, AudioCmonitor,
+		    sizeof dip->label.name);
 		break;
 	case CSAUDIO_RECORD_CLASS:	/* record class descriptor */
 		dip->type = AUDIO_MIXER_CLASS;
 		dip->mixer_class = CSAUDIO_RECORD_CLASS;
 		dip->prev = AUDIO_MIXER_LAST;
 		dip->next = AUDIO_MIXER_LAST;
-		strcpy(dip->label.name, AudioCrecord);
+		strlcpy(dip->label.name, AudioCrecord, sizeof dip->label.name);
 		break;
 	default:
 		err = ENXIO;
@@ -1325,17 +1309,13 @@ cs4231_query_devinfo(addr, dip)
 }
 
 size_t
-cs4231_round_buffersize(addr, direction, size)
-	void *addr;
-	int direction;
-	size_t size;
+cs4231_round_buffersize(void *vsc, int direction, size_t size)
 {
 	return (size);
 }
 
 int
-cs4231_get_props(addr)
-	void *addr;
+cs4231_get_props(void *vsc)
 {
 	return (AUDIO_PROP_FULLDUPLEX);
 }
@@ -1344,10 +1324,9 @@ cs4231_get_props(addr)
  * Hardware interrupt handler
  */
 int
-cs4231_intr(v)
-	void *v;
+cs4231_intr(void *vsc)
 {
-	struct cs4231_softc *sc = (struct cs4231_softc *)v;
+	struct cs4231_softc *sc = (struct cs4231_softc *)vsc;
 	u_int32_t csr;
 	u_int8_t reg, status;
 	struct cs_dma *p;
@@ -1449,14 +1428,9 @@ cs4231_intr(v)
 }
 
 void *
-cs4231_alloc(addr, direction, size, pool, flags)
-	void *addr;
-	int direction;
-	size_t size;
-	int pool;
-	int flags;
+cs4231_alloc(void *vsc, int direction, size_t size, int pool, int flags)
 {
-	struct cs4231_softc *sc = (struct cs4231_softc *)addr;
+	struct cs4231_softc *sc = (struct cs4231_softc *)vsc;
 	bus_dma_tag_t dmat = sc->sc_dmatag;
 	struct cs_dma *p;
 
@@ -1498,12 +1472,9 @@ fail:
 }
 
 void
-cs4231_free(addr, ptr, pool)
-	void *addr;
-	void *ptr;
-	int pool;
+cs4231_free(void *vsc, void *ptr, int pool)
 {
-	struct cs4231_softc *sc = addr;
+	struct cs4231_softc *sc = vsc;
 	bus_dma_tag_t dmat = sc->sc_dmatag;
 	struct cs_dma *p, **pp;
 
@@ -1522,14 +1493,10 @@ cs4231_free(addr, ptr, pool)
 }
 
 int
-cs4231_trigger_output(addr, start, end, blksize, intr, arg, param)
-	void *addr, *start, *end;
-	int blksize;
-	void (*intr)(void *);
-	void *arg;
-	struct audio_params *param;
+cs4231_trigger_output(void *vsc, void *start, void *end, int blksize,
+    void (*intr)(void *), void *arg, struct audio_params *param)
 {
-	struct cs4231_softc *sc = addr;
+	struct cs4231_softc *sc = vsc;
 	struct cs_channel *chan = &sc->sc_playback;
 	struct cs_dma *p;
 	u_int32_t csr;
@@ -1588,14 +1555,10 @@ cs4231_trigger_output(addr, start, end, blksize, intr, arg, param)
 }
 
 int
-cs4231_trigger_input(addr, start, end, blksize, intr, arg, param)
-	void *addr, *start, *end;
-	int blksize;
-	void (*intr)(void *);
-	void *arg;
-	struct audio_params *param;
+cs4231_trigger_input(void *vsc, void *start, void *end, int blksize,
+    void (*intr)(void *), void *arg, struct audio_params *param)
 {
-	struct cs4231_softc *sc = addr;
+	struct cs4231_softc *sc = vsc;
 	struct cs_channel *chan = &sc->sc_capture;
 	struct cs_dma *p;
 	u_int32_t csr;

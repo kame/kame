@@ -1,4 +1,4 @@
-/*	$OpenBSD: reg_ld_str.c,v 1.2 2003/01/09 22:27:12 miod Exp $	*/
+/*	$OpenBSD: reg_ld_str.c,v 1.4 2003/07/30 21:30:31 jason Exp $	*/
 /*
  *  reg_ld_str.c
  *
@@ -71,10 +71,8 @@
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
+#include <sys/user.h>
 #include <machine/cpu.h>
-#if defined(__FreeBSD__)
-#include <machine/md_var.h>
-#endif
 #include <machine/pcb.h>
 
 #include <gnu/arch/i386/fpemul/fpu_emu.h>

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sunos_misc.c,v 1.41 2002/08/23 22:21:44 art Exp $	*/
+/*	$OpenBSD: sunos_misc.c,v 1.43 2003/08/15 20:32:16 tedu Exp $	*/
 /*	$NetBSD: sunos_misc.c,v 1.65 1996/04/22 01:44:31 christos Exp $	*/
 
 /*
@@ -22,11 +22,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -592,7 +588,7 @@ sunos_sys_fchroot(p, v, retval)
 	struct file *fp;
 	int error;
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return (error);
 	if ((error = getvnode(fdp, SCARG(uap, fd), &fp)) != 0)
 		return (error);
@@ -1059,7 +1055,7 @@ sunos_sys_reboot(p, v, retval)
 	struct sunos_howto_conv *convp;
 	int error, bsd_howto, sun_howto;
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return (error);
 
 	/*
@@ -1173,7 +1169,7 @@ sunos_sys_ostime(p, v, retval)
 	struct timeval tv;
 	int error;
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return (error);
 
 	tv.tv_sec = SCARG(uap, time);

@@ -1,5 +1,5 @@
-/*	$OpenBSD: usb_mem.c,v 1.13 2002/07/25 02:18:11 nate Exp $ */
-/*	$NetBSD: usb_mem.c,v 1.22 2001/11/13 06:24:56 lukem Exp $	*/
+/*	$OpenBSD: usb_mem.c,v 1.15 2003/08/06 20:43:12 millert Exp $ */
+/*	$NetBSD: usb_mem.c,v 1.26 2003/02/01 06:23:40 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -65,10 +65,16 @@
 #ifdef USB_DEBUG
 #define DPRINTF(x)	if (usbdebug) logprintf x
 #define DPRINTFN(n,x)	if (usbdebug>(n)) logprintf x
-int usbdebug;
+extern int usbdebug;
 #else
 #define DPRINTF(x)
 #define DPRINTFN(n,x)
+#endif
+
+#if defined(__NetBSD__)
+MALLOC_DEFINE(M_USB, "USB", "USB misc. memory");
+MALLOC_DEFINE(M_USBDEV, "USB device", "USB device driver");
+MALLOC_DEFINE(M_USBHC, "USB HC", "USB host controller");
 #endif
 
 #define USB_MEM_SMALL 64
@@ -137,7 +143,6 @@ usb_block_allocmem(bus_dma_tag_t tag, size_t size, size_t align,
 	p = malloc(sizeof *p, M_USB, M_NOWAIT);
 	if (p == NULL)
 		return (USBD_NOMEM);
-	*dmap = p;
 
 	p->tag = tag;
 	p->size = size;
@@ -146,12 +151,12 @@ usb_block_allocmem(bus_dma_tag_t tag, size_t size, size_t align,
 				 p->segs, sizeof(p->segs)/sizeof(p->segs[0]),
 				 &p->nsegs, BUS_DMA_NOWAIT);
 	if (error)
-		return (USBD_NOMEM);
+		goto free0;
 
 	error = bus_dmamem_map(tag, p->segs, p->nsegs, p->size,
 			       &p->kaddr, BUS_DMA_NOWAIT|BUS_DMA_COHERENT);
 	if (error)
-		goto free;
+		goto free1;
 
 	error = bus_dmamap_create(tag, p->size, 1, p->size,
 				  0, BUS_DMA_NOWAIT, &p->map);
@@ -162,14 +167,18 @@ usb_block_allocmem(bus_dma_tag_t tag, size_t size, size_t align,
 				BUS_DMA_NOWAIT);
 	if (error)
 		goto destroy;
+
+	*dmap = p;
 	return (USBD_NORMAL_COMPLETION);
 
 destroy:
 	bus_dmamap_destroy(tag, p->map);
 unmap:
 	bus_dmamem_unmap(tag, p->kaddr, p->size);
-free:
+free1:
 	bus_dmamem_free(tag, p->segs, p->nsegs);
+free0:
+	free(p, M_USB);
 	return (USBD_NOMEM);
 }
 
@@ -270,7 +279,7 @@ usb_freemem(usbd_bus_handle bus, usb_dma_t *p)
 		usb_block_freemem(p->block);
 		return;
 	}
-	f = KERNADDR(p);
+	f = KERNADDR(p, 0);
 	f->block = p->block;
 	f->offs = p->offs;
 	s = splusb();

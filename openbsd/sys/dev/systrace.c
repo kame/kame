@@ -1,4 +1,4 @@
-/*	$OpenBSD: systrace.c,v 1.28 2003/02/20 22:03:31 art Exp $	*/
+/*	$OpenBSD: systrace.c,v 1.31 2003/08/15 20:32:16 tedu Exp $	*/
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * All rights reserved.
@@ -139,6 +139,7 @@ void	systrace_closepolicy(struct fsystrace *, struct str_policy *);
 int	systrace_insert_process(struct fsystrace *, struct proc *);
 struct str_policy *systrace_newpolicy(struct fsystrace *, int);
 int	systrace_msg_child(struct fsystrace *, struct str_process *, pid_t);
+int	systrace_msg_policyfree(struct fsystrace *, struct str_policy *);
 int	systrace_msg_ask(struct fsystrace *, struct str_process *,
 	    int, size_t, register_t []);
 int	systrace_msg_result(struct fsystrace *, struct str_process *,
@@ -523,7 +524,6 @@ systraceioctl(dev, cmd, data, flag, p)
 
 	switch (cmd) {
 	case STRIOCCLONE:
-	case SYSTR_CLONE:
 		MALLOC(fst, struct fsystrace *, sizeof(struct fsystrace),
 		    M_XDATA, M_WAITOK);
 
@@ -533,7 +533,7 @@ systraceioctl(dev, cmd, data, flag, p)
 		TAILQ_INIT(&fst->messages);
 		TAILQ_INIT(&fst->policies);
 
-		if (suser(p->p_ucred, &p->p_acflag) == 0)
+		if (suser(p, 0) == 0)
 			fst->issuser = 1;
 		fst->p_ruid = p->p_cred->p_ruid;
 		fst->p_rgid = p->p_cred->p_rgid;
@@ -1155,7 +1155,7 @@ systrace_attach(struct fsystrace *fst, pid_t pid)
 	 */
 	if ((proc->p_cred->p_ruid != p->p_cred->p_ruid ||
 		ISSET(proc->p_flag, P_SUGID)) &&
-	    (error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	    (error = suser(p, 0)) != 0)
 		goto out;
 
 	/*
@@ -1375,8 +1375,23 @@ systrace_newpolicy(struct fsystrace *fst, int maxents)
 	struct str_policy *pol;
 	int i;
 
-	if (fst->npolicies > SYSTR_MAX_POLICIES && !fst->issuser)
-		return (NULL);
+	if (fst->npolicies > SYSTR_MAX_POLICIES && !fst->issuser) {
+		struct str_policy *tmp;
+
+		/* Try to find a policy for freeing */
+		TAILQ_FOREACH(tmp, &fst->policies, next) {
+			if (tmp->refcount == 1)
+				break;
+		}
+
+		if (tmp == NULL)
+			return (NULL);
+
+		/* Notify userland about freed policy */
+		systrace_msg_policyfree(fst, tmp);
+		/* Free this policy */
+		systrace_closepolicy(fst, tmp);
+	}
 
 	pol = pool_get(&systr_policy_pl, PR_NOWAIT);
 	if (pol == NULL)
@@ -1491,7 +1506,7 @@ systrace_make_msg(struct str_process *strp, int type)
 	while (1) {
 		st = tsleep(strp, PWAIT | PCATCH, "systrmsg", 0);
 		if (st != 0)
-			return (EINTR);
+			return (ERESTART);
 		/* If we detach, then everything is permitted */
 		if ((strp = curproc->p_systrace) == NULL)
 			return (0);
@@ -1525,6 +1540,29 @@ systrace_msg_child(struct fsystrace *fst, struct str_process *strp, pid_t npid)
 	else
 		msg->msg_policy = -1;
 	msg_child->new_pid = npid;
+
+	TAILQ_INSERT_TAIL(&fst->messages, nstrp, msg_next);
+
+	systrace_wakeup(fst);
+
+	return (0);
+}
+
+int
+systrace_msg_policyfree(struct fsystrace *fst, struct str_policy *strpol)
+{
+	struct str_process *nstrp;
+	struct str_message *msg;
+
+	nstrp = pool_get(&systr_proc_pl, PR_WAITOK);
+	memset(nstrp, 0, sizeof(struct str_process));
+
+	DPRINTF(("%s: free %d\n", __func__, strpol->nr));
+
+	msg = &nstrp->msg;
+
+	msg->msg_type = SYSTR_MSG_POLICYFREE;
+	msg->msg_policy = strpol->nr;
 
 	TAILQ_INSERT_TAIL(&fst->messages, nstrp, msg_next);
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: malloc.h,v 1.65 2003/01/30 16:38:39 art Exp $	*/
+/*	$OpenBSD: malloc.h,v 1.68 2003/06/21 00:42:58 tedu Exp $	*/
 /*	$NetBSD: malloc.h,v 1.39 1998/07/12 19:52:01 augustss Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -156,7 +152,8 @@
 #define M_PACKET_TAGS	111	/* Packet-attached information */
 #define M_1394CTL	112	/* IEEE 1394 control structures */
 #define M_1394DATA	113	/* IEEE 1394 data buffers */
-/* 114-122 - free */
+#define	M_EMULDATA	114	/* Per-process emulation data */
+/* 115-122 - free */
 
 /* KAME IPv6 */
 #define	M_IP6OPT	123	/* IPv6 options */
@@ -164,7 +161,17 @@
 #define	M_IP6RR		125	/* IPv6 Router Renumbering Prefix */
 #define	M_RR_ADDR	126	/* IPv6 Router Renumbering Ifid */
 #define	M_TEMP		127	/* misc temporary data buffers */
-#define M_LAST		128	/* Must be last type + 1 */
+
+#define	M_NTFSMNT	128	/* NTFS mount structure */
+#define	M_NTFSNTNODE	129	/* NTFS ntnode information */
+#define	M_NTFSFNODE	130	/* NTFS fnode information */
+#define	M_NTFSDIR	131	/* NTFS dir buffer */
+#define	M_NTFSNTHASH	132	/* NTFS ntnode hash tables */
+#define	M_NTFSNTVATTR	133	/* NTFS file attribute information */
+#define	M_NTFSRDATA	134	/* NTFS resident data */
+#define	M_NTFSDECOMP	135	/* NTFS decompression temporary */
+#define	M_NTFSRUN	136	/* NTFS vrun storage */
+#define	M_LAST		137	/* Must be last type + 1 */
 
 
 #define	INITKMEMNAMES { \
@@ -273,13 +280,23 @@
 	"packet tags",	/* 111 M_PACKET_TAGS */ \
 	"1394ctl",	/* 112 M_1394CTL */ \
 	"1394data",	/* 113 M_1394DATA */ \
-	NULL, NULL, NULL, NULL, NULL, \
+	"emuldata",	/* 114 M_EMULDATA */ \
+	NULL, NULL, NULL, NULL, \
 	NULL, NULL, NULL, NULL, \
 	"ip6_options",	/* 123 M_IP6OPT */ \
 	"NDP",		/* 124 M_IP6NDP */ \
 	"ip6rr",	/* 125 M_IP6RR */ \
 	"rp_addr",	/* 126 M_RR_ADDR */ \
 	"temp",		/* 127 M_TEMP */ \
+	"NTFS mount",	/* 128 M_NTFSMNT */ \
+	"NTFS node",	/* 129 M_NTFSNTNODE */ \
+	"NTFS fnode",	/* 130 M_NTFSFNODE */ \
+	"NTFS dir",	/* 131 M_NTFSDIR */ \
+	"NTFS hash tables",	/* 132 M_NTFSNTHASH */ \
+	"NTFS file attr",	/* 133 M_NTFSNTVATTR */ \
+	"NTFS resident data ",	/* 134 M_NTFSRDATA */ \
+	"NTFS decomp",	/* 135 M_NTFSDECOMP */ \
+	"NTFS vrun",	/* 136 M_NTFSRUN */ \
 }
 
 struct kmemstats {

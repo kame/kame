@@ -28,10 +28,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: aic7xxx.c,v 1.45 2003/03/21 14:58:06 drahn Exp $
+ * $Id: aic7xxx.c,v 1.49 2003/08/12 22:47:02 fgsch Exp $
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.c,v 1.80 2001/12/16 17:38:30 gibbs Exp $
- * $OpenBSD: aic7xxx.c,v 1.45 2003/03/21 14:58:06 drahn Exp $
+ * $OpenBSD: aic7xxx.c,v 1.49 2003/08/12 22:47:02 fgsch Exp $
  */
 
 #ifdef __OpenBSD__
@@ -230,7 +230,7 @@ static void		ahc_dumpseq(struct ahc_softc *ahc);
 #endif
 static void		ahc_loadseq(struct ahc_softc *ahc);
 static int		ahc_check_patch(struct ahc_softc *ahc,
-					struct patch **start_patch,
+					const struct patch **start_patch,
 					u_int start_instr, u_int *skip_addr);
 static void		ahc_download_instr(struct ahc_softc *ahc,
 					   u_int instrptr, uint8_t *dconsts);
@@ -1389,11 +1389,15 @@ void
 ahc_clear_intstat(struct ahc_softc *ahc)
 {
 	/* Clear any interrupt conditions this may have caused */
+	ahc_flush_device_writes(ahc);
 	ahc_outb(ahc, CLRSINT1, CLRSELTIMEO|CLRATNO|CLRSCSIRSTI
 				|CLRBUSFREE|CLRSCSIPERR|CLRPHASECHG|
 				CLRREQINIT);
+	ahc_flush_device_writes(ahc);
 	ahc_outb(ahc, CLRSINT0, CLRSELDO|CLRSELDI|CLRSELINGO);
+	ahc_flush_device_writes(ahc);
 	ahc_outb(ahc, CLRINT, CLRSCSIINT);
+	ahc_flush_device_writes(ahc);
 }
 
 /**************************** Debugging Routines ******************************/
@@ -4144,17 +4148,18 @@ ahc_alloc_scbs(struct ahc_softc *ahc)
 #endif /* __OpenBSD__ */
 
 void
-ahc_controller_info(struct ahc_softc *ahc, char *buf)
+ahc_controller_info(struct ahc_softc *ahc, char *buf, size_t buf_len)
 {
-	int len;
+	int len = 0;
 
-	len = sprintf(buf, "%s: ", ahc_chip_names[ahc->chip & AHC_CHIPID_MASK]);
-	buf += len;
+	snprintf(buf + len, buf_len - len, "%s: ",
+		 ahc_chip_names[ahc->chip & AHC_CHIPID_MASK]);
+	len = strlen(buf);
 	if ((ahc->features & AHC_TWIN) != 0)
- 		len = sprintf(buf, "Twin Channel, A SCSI Id=%d, "
-			      "B SCSI Id=%d, primary %c, ",
-			      ahc->our_id, ahc->our_id_b,
-			      (ahc->flags & AHC_PRIMARY_CHANNEL) + 'A');
+		snprintf(buf + len, buf_len - len,
+			 "Twin Channel, A SCSI Id=%d, B SCSI Id=%d, "
+			 "primary %c, ", ahc->our_id, ahc->our_id_b,
+			 (ahc->flags & AHC_PRIMARY_CHANNEL) + 'A');
 	else {
 		const char *speed;
 		const char *type;
@@ -4172,16 +4177,18 @@ ahc_controller_info(struct ahc_softc *ahc, char *buf)
 		} else {
 			type = "Single";
 		}
-		len = sprintf(buf, "%s%s Channel %c, SCSI Id=%d, ",
-			      speed, type, ahc->channel, ahc->our_id);
+		snprintf(buf + len, buf_len - len,
+			 "%s%s Channel %c, SCSI Id=%d, ",
+			 speed, type, ahc->channel, ahc->our_id);
 	}
-	buf += len;
+	len = strlen(buf);
 
 	if ((ahc->flags & AHC_PAGESCBS) != 0)
-		sprintf(buf, "%d/%d SCBs",
-			ahc->scb_data->maxhscbs, AHC_SCB_MAX);
+		snprintf(buf + len, buf_len - len, "%d/%d SCBs",
+			 ahc->scb_data->maxhscbs, AHC_SCB_MAX);
 	else
-		sprintf(buf, "%d SCBs", ahc->scb_data->maxhscbs);
+		snprintf(buf + len, buf_len - len, "%d SCBs",
+			 ahc->scb_data->maxhscbs);
 }
 
 /*
@@ -5627,6 +5634,7 @@ ahc_reset_current_bus(struct ahc_softc *ahc)
 	ahc_outb(ahc, SIMODE1, ahc_inb(ahc, SIMODE1) & ~ENSCSIRST);
 	scsiseq = ahc_inb(ahc, SCSISEQ);
 	ahc_outb(ahc, SCSISEQ, scsiseq | SCSIRSTO);
+	ahc_flush_device_writes(ahc);
 	ahc_delay(AHC_BUSRESET_DELAY);
 	/* Turn off the bus reset */
 	ahc_outb(ahc, SCSISEQ, scsiseq & ~SCSIRSTO);
@@ -6007,7 +6015,7 @@ ahc_loadseq(struct ahc_softc *ahc)
 	struct	cs cs_table[num_critical_sections];
 	u_int	begin_set[num_critical_sections];
 	u_int	end_set[num_critical_sections];
-	struct	patch *cur_patch;
+	const struct	patch *cur_patch;
 	u_int	cs_count;
 	u_int	cur_cs;
 	u_int	i;
@@ -6096,11 +6104,11 @@ ahc_loadseq(struct ahc_softc *ahc)
 }
 
 static int
-ahc_check_patch(struct ahc_softc *ahc, struct patch **start_patch,
+ahc_check_patch(struct ahc_softc *ahc, const struct patch **start_patch,
 		u_int start_instr, u_int *skip_addr)
 {
-	struct	patch *cur_patch;
-	struct	patch *last_patch;
+	const struct	patch *cur_patch;
+	const struct	patch *last_patch;
 	u_int	num_patches;
 
 	num_patches = sizeof(patches)/sizeof(struct patch);
@@ -6159,7 +6167,7 @@ ahc_download_instr(struct ahc_softc *ahc, u_int instrptr, uint8_t *dconsts)
 	case AIC_OP_JE:
 	case AIC_OP_JZ:
 	{
-		struct patch *cur_patch;
+		const struct patch *cur_patch;
 		int address_offset;
 		u_int address;
 		u_int skip_addr;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: limits.h,v 1.5 2002/07/30 01:22:00 millert Exp $	*/
+/*	$OpenBSD: limits.h,v 1.7 2003/06/15 04:35:54 brad Exp $	*/
 /*	$NetBSD: limits.h,v 1.8 2000/08/08 22:31:14 tshiozak Exp $ */
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -40,11 +36,6 @@
 #define	_MACHINE_LIMITS_H_
 
 #define	MB_LEN_MAX	32		/* no multibyte characters */
-
-/* Make sure _LP64 is defined if we have a 64-bit compiler */
-#ifndef _LP64
-#define _LP64
-#endif
 
 #if !defined(_ANSI_SOURCE)
 #define	SIZE_MAX	ULONG_MAX	/* max value for a size_t */

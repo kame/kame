@@ -1,4 +1,4 @@
-/*	$OpenBSD: bootxx.c,v 1.8 2002/08/11 20:02:06 hugh Exp $ */
+/*	$OpenBSD: bootxx.c,v 1.10 2003/08/15 23:16:30 deraadt Exp $ */
 /* $NetBSD: bootxx.c,v 1.16 2002/03/29 05:45:08 matt Exp $ */
 
 /*-
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -95,7 +91,7 @@ extern int from;
  * VS3100/??, VS4000 and VAX6000/???, and only when booting from disk.
  */
 void
-Xmain()
+Xmain(void)
 {
 	union {
 		struct exec aout;
@@ -220,9 +216,7 @@ struct devsw   devsw[] = {
 int    ndevs = (sizeof(devsw)/sizeof(devsw[0]));
 
 int
-romopen(f, adapt, ctlr, unit, part)
-       struct open_file *f;
-       int adapt, ctlr, unit, part;
+romopen(struct open_file *f, int adapt, int ctlr, int unit, int part)
 {
        rom_softc.unit = unit;
        rom_softc.part = part;
@@ -234,43 +228,8 @@ romopen(f, adapt, ctlr, unit, part)
 
 #endif
 
-#if 0
-int tar_open(char *path, struct open_file *f);
-ssize_t tar_read(struct open_file *f, void *buf, size_t size, size_t *resid);
-
 int
-tar_open(path, f)
-	char *path;
-	struct open_file *f;
-{
-	char *buf = alloc(512);
-
-	bzero(buf, 512);
-	romstrategy(0, 0, 8192, 512, buf, 0);
-	if (bcmp(buf, "boot", 5) || bcmp(&buf[257], "ustar", 5))
-		return EINVAL; /* Not a ustarfs with "boot" first */
-	return 0;
-}
-
-ssize_t
-tar_read(f, buf, size, resid)
-	struct open_file *f;
-	void *buf;
-	size_t size;
-	size_t *resid;
-{
-	romstrategy(0, 0, (8192+512), size, buf, 0);
-	*resid = size;
-	return 0; /* XXX */
-}
-#endif
-
-
-int
-devopen(f, fname, file)
-	struct open_file *f;
-	const char    *fname;
-	char          **file;
+devopen(struct open_file *f, const char *fname, char **file)
 {
 
 #ifdef LIBSA_TOO_OLD
@@ -413,8 +372,7 @@ extern char end[];
 static char *top = (char*)end;
 
 void *
-alloc(size)
-        unsigned size;
+alloc(unsigned int size)
 {
 	void *ut = top;
 	top += size;
@@ -422,17 +380,8 @@ alloc(size)
 }
 
 void
-free(ptr, size)
-        void *ptr;
-        unsigned size;
+free(void *ptr, unsigned int size)
 {
-}
-
-int
-romclose(f)
-	struct open_file *f;
-{
-	return 0;
 }
 
 #ifdef USE_PRINTF

@@ -1,4 +1,4 @@
-/*	$OpenBSD: in.c,v 1.30 2002/10/04 05:23:39 henric Exp $	*/
+/*	$OpenBSD: in.c,v 1.32 2003/06/23 08:09:21 itojun Exp $	*/
 /*	$NetBSD: in.c,v 1.26 1996/02/13 23:41:39 christos Exp $	*/
 
 /*
@@ -41,11 +41,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -759,21 +755,20 @@ in_addprefix(target, flags)
 
 	if ((flags & RTF_HOST) != 0)
 		prefix = target->ia_dstaddr.sin_addr;
-	else
+	else {
 		prefix = target->ia_addr.sin_addr;
-	mask = target->ia_sockmask.sin_addr;
-	prefix.s_addr &= mask.s_addr;
+		mask = target->ia_sockmask.sin_addr;
+		prefix.s_addr &= mask.s_addr;
+	}
 
 	for (ia = in_ifaddr.tqh_first; ia; ia = ia->ia_list.tqe_next) {
-		/* easy one first */
-		if (mask.s_addr != ia->ia_sockmask.sin_addr.s_addr)
-			continue;
-
 		if (rtinitflags(ia))
 			p = ia->ia_dstaddr.sin_addr;
-		else
+		else {
 			p = ia->ia_addr.sin_addr;
-		p.s_addr &= ia->ia_sockmask.sin_addr.s_addr;
+			p.s_addr &= ia->ia_sockmask.sin_addr.s_addr;
+		}
+
 		if (prefix.s_addr != p.s_addr)
 			continue;
 
@@ -812,21 +807,20 @@ in_scrubprefix(target)
 
 	if (rtinitflags(target))
 		prefix = target->ia_dstaddr.sin_addr;
-	else
+	else {
 		prefix = target->ia_addr.sin_addr;
-	mask = target->ia_sockmask.sin_addr;
-	prefix.s_addr &= mask.s_addr;
+		mask = target->ia_sockmask.sin_addr;
+		prefix.s_addr &= mask.s_addr;
+	}
 
 	for (ia = in_ifaddr.tqh_first; ia; ia = ia->ia_list.tqe_next) {
-		/* easy one first */
-		if (mask.s_addr != ia->ia_sockmask.sin_addr.s_addr)
-			continue;
-
 		if (rtinitflags(ia))
 			p = ia->ia_dstaddr.sin_addr;
-		else
+		else {
 			p = ia->ia_addr.sin_addr;
-		p.s_addr &= ia->ia_sockmask.sin_addr.s_addr;
+			p.s_addr &= ia->ia_sockmask.sin_addr.s_addr;
+		}
+
 		if (prefix.s_addr != p.s_addr)
 			continue;
 

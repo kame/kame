@@ -1,4 +1,4 @@
-/*	$OpenBSD: rpc.c,v 1.11 2002/03/14 01:27:07 millert Exp $	*/
+/*	$OpenBSD: rpc.c,v 1.13 2003/08/11 06:23:09 deraadt Exp $	*/
 /*	$NetBSD: rpc.c,v 1.16 1996/10/13 02:29:06 christos Exp $	*/
 
 /*
@@ -62,7 +62,7 @@
 #include "rpc.h"
 
 struct auth_info {
-	int32_t 	authtype;	/* auth type */
+	int32_t		authtype;	/* auth type */
 	u_int32_t	authlen;	/* auth length */
 };
 
@@ -76,7 +76,7 @@ struct auth_unix {
 
 struct rpc_call {
 	u_int32_t	rp_xid;		/* request transaction id */
-	int32_t 	rp_direction;	/* call direction (0) */
+	int32_t		rp_direction;	/* call direction (0) */
 	u_int32_t	rp_rpcvers;	/* rpc version (2) */
 	u_int32_t	rp_prog;	/* program */
 	u_int32_t	rp_vers;	/* version */
@@ -85,8 +85,8 @@ struct rpc_call {
 
 struct rpc_reply {
 	u_int32_t	rp_xid;		/* request transaction id */
-	int32_t 	rp_direction;	/* call direction (1) */
-	int32_t 	rp_astatus;	/* accept status (0: accepted) */
+	int32_t		rp_direction;	/* call direction (1) */
+	int32_t		rp_astatus;	/* accept status (0: accepted) */
 	union {
 		u_int32_t	rpu_errno;
 		struct {
@@ -108,15 +108,10 @@ int rpc_port = 0x400;	/* predecrement */
  * Note: Caller must leave room for headers.
  */
 ssize_t
-rpc_call(d, prog, vers, proc, sdata, slen, rdata, rlen)
-	register struct iodesc *d;
-	register n_long prog, vers, proc;
-	register void *sdata;
-	register size_t slen;
-	register void *rdata;
-	register size_t rlen;
+rpc_call(struct iodesc *d, n_long prog, n_long vers, n_long proc, void *sdata,
+    size_t slen, void *rdata, size_t rlen)
 {
-	register ssize_t cc;
+	ssize_t cc;
 	struct auth_info *auth;
 	struct rpc_call *call;
 	struct rpc_reply *reply;
@@ -232,13 +227,9 @@ rpc_call(d, prog, vers, proc, sdata, slen, rdata, rlen)
  * Remaining checks are done by callrpc
  */
 static ssize_t
-recvrpc(d, pkt, len, tleft)
-	register struct iodesc *d;
-	register void *pkt;
-	register size_t len;
-	time_t tleft;
+recvrpc(struct iodesc *d, void *pkt, size_t len, time_t tleft)
 {
-	register struct rpc_reply *reply;
+	struct rpc_reply *reply;
 	ssize_t	n;
 	int	x;
 
@@ -288,10 +279,7 @@ recvrpc(d, pkt, len, tleft)
  * dig out the IP address/port from the headers.
  */
 void
-rpc_fromaddr(pkt, addr, port)
-	void		*pkt;
-	struct in_addr	*addr;
-	u_short		*port;
+rpc_fromaddr(void *pkt, struct in_addr *addr, u_short *port)
 {
 	struct hackhdr {
 		/* Tail of IP header: just IP addresses */
@@ -321,34 +309,25 @@ struct pmap_list {
 	struct in_addr	addr;	/* server, net order */
 	u_int	prog;		/* host order */
 	u_int	vers;		/* host order */
-	int 	port;		/* host order */
+	int	port;		/* host order */
 } rpc_pmap_list[PMAP_NUM];
 
 /* return port number in host order, or -1 */
 int
-rpc_pmap_getcache(addr, prog, vers)
-	struct in_addr	addr;	/* server, net order */
-	u_int		prog;	/* host order */
-	u_int		vers;	/* host order */
+rpc_pmap_getcache(struct in_addr addr, u_int prog, u_int vers)
 {
 	struct pmap_list *pl;
 
 	for (pl = rpc_pmap_list; pl < &rpc_pmap_list[rpc_pmap_num]; pl++) {
 		if (pl->addr.s_addr == addr.s_addr &&
-			pl->prog == prog && pl->vers == vers )
-		{
+		    pl->prog == prog && pl->vers == vers)
 			return (pl->port);
-		}
 	}
 	return (-1);
 }
 
 void
-rpc_pmap_putcache(addr, prog, vers, port)
-	struct in_addr	addr;	/* server, net order */
-	u_int		prog;	/* host order */
-	u_int		vers;	/* host order */
-	int 		port;	/* host order */
+rpc_pmap_putcache(struct in_addr addr, u_int prog, u_int vers, int port)
 {
 	struct pmap_list *pl;
 
@@ -377,10 +356,7 @@ rpc_pmap_putcache(addr, prog, vers, port)
  * Returns the port in host order.
  */
 int
-rpc_getport(d, prog, vers)
-	register struct iodesc *d;
-	n_long prog;	/* host order */
-	n_long vers;	/* host order */
+rpc_getport(struct iodesc *d, n_long prog, n_long vers)
 {
 	struct args {
 		n_long	prog;		/* call program */

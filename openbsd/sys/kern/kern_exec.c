@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_exec.c,v 1.76 2003/03/09 01:27:50 millert Exp $	*/
+/*	$OpenBSD: kern_exec.c,v 1.82 2003/09/01 18:06:03 henning Exp $	*/
 /*	$NetBSD: kern_exec.c,v 1.75 1996/02/09 18:59:28 christos Exp $	*/
 
 /*-
@@ -75,7 +75,7 @@ int exec_sigcode_map(struct proc *, struct emul *);
  * to it. Must be a n^2. If non-zero, the stack gap will be calculated as:
  * (arc4random() * ALIGNBYTES) & (stackgap_random - 1) + STACKGAPLEN.
  */
-int stackgap_random = 1024;
+int stackgap_random = 64*1024;
 
 /*
  * check exec:
@@ -175,6 +175,8 @@ check_exec(p, epp)
 		if (execsw[i].es_check == NULL)
 			continue;
 		newerror = (*execsw[i].es_check)(p, epp);
+		if (!newerror && !(epp->ep_emul->e_flags & EMUL_ENABLED))
+			newerror = ENOEXEC;
 		/* make sure the first "interesting" error code is saved. */
 		if (!newerror || error == ENOEXEC)
 			error = newerror;
@@ -231,11 +233,11 @@ sys_execve(p, v, retval)
 	register_t *retval;
 {
 	struct sys_execve_args /* {
-		syscallarg(char *) path;
-		syscallarg(char * *) argp;
-		syscallarg(char * *) envp;
+		syscallarg(const char *) path;
+		syscallarg(char *const *) argp;
+		syscallarg(char *const *) envp;
 	} */ *uap = v;
-	int error, i;
+	int error;
 	struct exec_package pack;
 	struct nameidata nid;
 	struct vattr attr;
@@ -258,18 +260,6 @@ sys_execve(p, v, retval)
 	 * Mark this process as "leave me alone, I'm execing".
 	 */
 	p->p_flag |= P_INEXEC;
-
-	/*
-	 * figure out the maximum size of an exec header, if necessary.
-	 * XXX should be able to keep LKM code from modifying exec switch
-	 * when we're still using it, but...
-	 */
-	if (exec_maxhdrsz == 0) {
-		for (i = 0; i < nexecs; i++)
-			if (execsw[i].es_check != NULL
-			    && execsw[i].es_hdrsz > exec_maxhdrsz)
-				exec_maxhdrsz = execsw[i].es_hdrsz;
-	}
 
 	/* init the namei data to point the file user's program name */
 	NDINIT(&nid, LOOKUP, NOFOLLOW, UIO_USERSPACE, SCARG(uap, path), p);
@@ -599,8 +589,31 @@ sys_execve(p, v, retval)
 	if (p->p_flag & P_TRACED)
 		psignal(p, SIGTRAP);
 
-	p->p_emul = pack.ep_emul;
 	free(pack.ep_hdr, M_EXEC);
+
+	/*
+	 * Call emulation specific exec hook. This can setup per-process
+	 * p->p_emuldata or do any other per-process stuff an emulation needs.
+	 *
+	 * If we are executing process of different emulation than the
+	 * original forked process, call e_proc_exit() of the old emulation
+	 * first, then e_proc_exec() of new emulation. If the emulation is
+	 * same, the exec hook code should deallocate any old emulation
+	 * resources held previously by this process.
+	 */
+	if (p->p_emul && p->p_emul->e_proc_exit &&
+	    p->p_emul != pack.ep_emul)
+		(*p->p_emul->e_proc_exit)(p);
+
+	/*
+	 * Call exec hook. Emulation code may NOT store reference to anything
+	 * from &pack.
+	 */
+	if (pack.ep_emul->e_proc_exec)
+		(*pack.ep_emul->e_proc_exec)(p, &pack);
+
+	/* update p_emul, the old value is no longer needed */
+	p->p_emul = pack.ep_emul;
 
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_EMUL))
@@ -710,7 +723,7 @@ exec_sigcode_map(struct proc *p, struct emul *e)
 	 * in all processes that need this sigcode. The creation is simple,
 	 * we create an object, add a permanent reference to it, map it in
 	 * kernel space, copy out the sigcode to it and unmap it.
-	 * The we map it with PROT_READ|PROT_EXEC into the process just
+	 * Then we map it with PROT_READ|PROT_EXEC into the process just
 	 * the way sys_mmap would map it.
 	 */
 	if (e->e_sigobject == NULL) {
@@ -732,7 +745,7 @@ exec_sigcode_map(struct proc *p, struct emul *e)
 	}
 
 	/* Just a hint to uvm_mmap where to put it. */
-	p->p_sigcode = round_page((vaddr_t)p->p_vmspace->vm_daddr + MAXDSIZ);
+	p->p_sigcode = uvm_map_hint(p, VM_PROT_READ|VM_PROT_EXECUTE);
 	uao_reference(e->e_sigobject);
 	if (uvm_map(&p->p_vmspace->vm_map, &p->p_sigcode, round_page(sz),
 	    e->e_sigobject, 0, 0, UVM_MAPFLAG(UVM_PROT_RX, UVM_PROT_RX,

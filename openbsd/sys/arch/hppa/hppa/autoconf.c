@@ -1,7 +1,7 @@
-/*	$OpenBSD: autoconf.c,v 1.29 2003/02/18 19:01:50 deraadt Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.35 2003/07/30 22:29:45 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998-2001 Michael Shalayeff
+ * Copyright (c) 1998-2003 Michael Shalayeff
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -22,11 +22,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -138,6 +134,8 @@ heartbeat(v)
 	static u_int hbcnt = 0, ocp_total, ocp_idle;
 	int toggle, cp_mask, cp_total;
 
+	timeout_add(&heartbeat_tmo, hz / 16);
+
 	cp_total = cp_time[CP_USER] + cp_time[CP_NICE] + cp_time[CP_SYS] +
 	    cp_time[CP_INTR] + cp_time[CP_IDLE];
 	if (!cp_total)
@@ -154,11 +152,13 @@ heartbeat(v)
 	 *  _| |_| |_,_,_,_
 	 *   0 1 2 3 4 6 7
 	 */
-	if (hbcnt++ < 4)
+	toggle = 0;
+	if (hbcnt++ < 8 && hbcnt & 1)
 		toggle = PALED_HEARTBEAT;
-	timeout_add(&heartbeat_tmo, hz / 8);
-	hbcnt &= 7;
-	ledctl(cp_mask, (~cp_mask & 0xf0)|PALED_NETRCV|PALED_NETSND, toggle);
+	hbcnt &= 15;
+	ledctl(cp_mask,
+	    (~cp_mask & 0xf0) | PALED_NETRCV | PALED_NETSND | PALED_DISK,
+	    toggle);
 }
 #endif
 
@@ -403,7 +403,7 @@ setroot(void)
 			printf(": ");
 			len = getstr(buf, sizeof(buf));
 			if (len == 0 && bootdv != NULL) {
-				strcpy(buf, bootdv->dv_xname);
+				strlcpy(buf, bootdv->dv_xname, sizeof buf);
 				len = strlen(buf);
 			}
 			if (len > 0 && buf[len - 1] == '*') {
@@ -594,6 +594,11 @@ getstr(cp, size)
 	}
 }
 
+struct pdc_memmap pdc_memmap PDC_ALIGNMENT;
+struct pdc_sysmap_find pdc_find PDC_ALIGNMENT;
+struct pdc_sysmap_addrs pdc_addr PDC_ALIGNMENT;
+struct pdc_iodc_read pdc_iodc_read PDC_ALIGNMENT;
+
 void
 pdc_scanbus(self, ca, maxmod)
 	struct device *self;
@@ -603,14 +608,12 @@ pdc_scanbus(self, ca, maxmod)
 	int i;
 
 	for (i = maxmod; i--; ) {
-		struct pdc_iodc_read pdc_iodc_read;
-		struct pdc_memmap pdc_memmap;
 		struct confargs nca;
-		hppa_hpa_t hpa;
 		int error;
 
-		hpa = 0;
-		nca = *ca;
+		bzero(&nca, sizeof(nca));
+		nca.ca_iot = ca->ca_iot;
+		nca.ca_dmatag = ca->ca_dmatag;
 		nca.ca_dp.dp_bc[0] = ca->ca_dp.dp_bc[1];
 		nca.ca_dp.dp_bc[1] = ca->ca_dp.dp_bc[2];
 		nca.ca_dp.dp_bc[2] = ca->ca_dp.dp_bc[3];
@@ -618,29 +621,71 @@ pdc_scanbus(self, ca, maxmod)
 		nca.ca_dp.dp_bc[4] = ca->ca_dp.dp_bc[5];
 		nca.ca_dp.dp_bc[5] = ca->ca_dp.dp_mod;
 		nca.ca_dp.dp_mod = i;
+		nca.ca_hpamask = ca->ca_hpamask;
 
 		if ((error = pdc_call((iodcio_t)pdc, 0, PDC_MEMMAP,
 		    PDC_MEMMAP_HPA, &pdc_memmap, &nca.ca_dp)) == 0)
-			hpa = pdc_memmap.hpa;
+			nca.ca_hpa = pdc_memmap.hpa;
 		else if ((error = pdc_call((iodcio_t)pdc, 0, PDC_SYSMAP,
-		    PDC_SYSMAP_HPA, &pdc_memmap, &nca.ca_dp)) == 0)
-			hpa = pdc_memmap.hpa;
+		    PDC_SYSMAP_HPA, &pdc_memmap, &nca.ca_dp)) == 0) {
+			struct device_path path;
+			int im, ia;
 
-		if (!hpa)
+			nca.ca_hpa = pdc_memmap.hpa;
+
+			/* TODO fetch the hpa size and the addrs */
+			for (im = 0; !(error = pdc_call((iodcio_t)pdc, 0,
+			    PDC_SYSMAP, PDC_SYSMAP_FIND,
+			    &pdc_find, &path, im)) &&
+			    pdc_find.hpa != nca.ca_hpa; im++)
+				;
+
+			if (!error)
+				nca.ca_hpasz = pdc_find.size << PGSHIFT;
+
+			if (!error && pdc_find.naddrs) {
+				nca.ca_naddrs = pdc_find.naddrs;
+				if (nca.ca_naddrs > 16) {
+					nca.ca_naddrs = 16;
+					printf("WARNING: too many (%d) addrs\n",
+					    pdc_find.naddrs);
+				}
+
+				if (autoconf_verbose)
+					printf(">> ADDRS:");
+
+				for (ia = 0; !(error = pdc_call((iodcio_t)pdc,
+				    0, PDC_SYSMAP, PDC_SYSMAP_ADDR, &pdc_addr,
+				    im, ia)) && ia < nca.ca_naddrs; ia++) {
+					nca.ca_addrs[ia].addr = pdc_addr.hpa;
+					nca.ca_addrs[ia].size =
+					    pdc_addr.size << PGSHIFT;
+
+					if (autoconf_verbose)
+						printf(" 0x%x[0x%x]",
+						    nca.ca_addrs[ia].addr,
+						    nca.ca_addrs[ia].size);
+				}
+				if (autoconf_verbose)
+					printf("\n");
+			}
+		}
+
+		if (!nca.ca_hpa)
 			continue;
 
 		if (autoconf_verbose)
-			printf(">> HPA 0x%x\n", hpa);
+			printf(">> HPA 0x%x[0x%x]\n",
+			    nca.ca_hpa, nca.ca_hpasz);
 
 		if ((error = pdc_call((iodcio_t)pdc, 0, PDC_IODC,
-		    PDC_IODC_READ, &pdc_iodc_read, hpa, IODC_DATA,
+		    PDC_IODC_READ, &pdc_iodc_read, nca.ca_hpa, IODC_DATA,
 		    &nca.ca_type, sizeof(nca.ca_type))) < 0) {
 			if (autoconf_verbose)
 				printf(">> iodc_data error %d\n", error);
 			continue;
 		}
 
-		nca.ca_hpa = hpa;
 		nca.ca_pdc_iodc_read = &pdc_iodc_read;
 		nca.ca_name = hppa_mod_info(nca.ca_type.iodc_type,
 					    nca.ca_type.iodc_sv_model);
@@ -652,7 +697,7 @@ pdc_scanbus(self, ca, maxmod)
 			    nca.ca_dp.dp_bc[2], nca.ca_dp.dp_bc[3],
 			    nca.ca_dp.dp_bc[4], nca.ca_dp.dp_bc[5]);
 			printf("mod %x hpa %x type %x sv %x\n",
-			    nca.ca_dp.dp_mod, hpa,
+			    nca.ca_dp.dp_mod, nca.ca_hpa,
 			    nca.ca_type.iodc_type, nca.ca_type.iodc_sv_model);
 		}
 
@@ -675,7 +720,7 @@ hppa_mod_info(type, sv)
 	    (mi->mi_type != type || mi->mi_sv != sv); mi++);
 
 	if (mi->mi_type < 0) {
-		sprintf(fakeid, "type %x, sv %x", type, sv);
+		snprintf(fakeid, sizeof fakeid, "type %x, sv %x", type, sv);
 		return fakeid;
 	} else
 		return mi->mi_name;

@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile.i386,v 1.33 2002/12/25 21:10:26 miod Exp $
+#	$OpenBSD: Makefile.i386,v 1.38 2003/07/22 19:39:50 otto Exp $
 #	$NetBSD: Makefile.i386,v 1.67 1996/05/11 16:12:11 mycroft Exp $
 
 # Makefile for OpenBSD
@@ -44,13 +44,15 @@ CMACHFLAGS=	-march=i486
 .else
 CMACHFLAGS=
 .endif
+.if ${IDENT:M-DNO_PROPOLICE}
 CMACHFLAGS+=	-fno-stack-protector
+.endif
 
 COPTS?=		-O2
 CFLAGS=		${DEBUG} ${CDIAGFLAGS} ${CMACHFLAGS} ${COPTS} ${PIPE}
 AFLAGS=		-x assembler-with-cpp -traditional-cpp -D_LOCORE
-LINKFLAGS=	-z -Ttext D0100000 -e start
-STRIPFLAGS=	-d
+LINKFLAGS=	-Ttext 0xD0100120 -e start -N
+STRIPFLAGS=	-g -X -x
 
 HOSTCC= ${CC}
 HOSTED_CPPFLAGS=${CPPFLAGS:S/^-nostdinc$//}
@@ -145,7 +147,7 @@ clean::
 
 lint:
 	@lint -hbxncez -Dvolatile= ${CPPFLAGS} ${PARAM} -UKGDB \
-	    ${CFILES} ${I386}/i386/swapgeneric.c ioconf.c param.c | \
+	    ${CFILES} ioconf.c param.c | \
 	    grep -v 'static function .* unused'
 
 tags:
@@ -166,6 +168,10 @@ depend:: .depend
 	${MKDEP} ${AFLAGS} ${CPPFLAGS} ${I386}/i386/locore.s
 	${MKDEP} -a ${CFLAGS} ${CPPFLAGS} param.c ioconf.c ${CFILES}
 	${MKDEP} -a ${AFLAGS} ${CPPFLAGS} ${SFILES}
+	sh $S/kern/genassym.sh ${MKDEP} -f assym.dep ${CFLAGS} \
+	    ${CPPFLAGS} < ${I386}/i386/genassym.cf
+	@sed -e 's/.*\.o:.* /assym.h: /' < assym.dep >> .depend
+	@rm -f assym.dep
 
 
 # depend on root or device configuration

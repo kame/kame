@@ -1,4 +1,4 @@
-/*	$OpenBSD: sys_machdep.c,v 1.19 2002/08/02 00:19:18 nate Exp $	*/
+/*	$OpenBSD: sys_machdep.c,v 1.22 2003/08/15 20:32:13 tedu Exp $	*/
 /*	$NetBSD: sys_machdep.c,v 1.28 1996/05/03 19:42:29 christos Exp $	*/
 
 /*-
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -111,6 +107,9 @@ i386_get_ldt(p, args, retval)
 	union descriptor *lp;
 	struct i386_get_ldt_args ua;
 
+	if (user_ldt_enable == 0)
+		return (ENOSYS);
+
 	if ((error = copyin(args, &ua, sizeof(ua))) != 0)
 		return (error);
 
@@ -157,6 +156,9 @@ i386_set_ldt(p, args, retval)
 	struct i386_set_ldt_args ua;
 	union descriptor desc;
 
+	if (user_ldt_enable == 0)
+		return (ENOSYS);
+
 	if ((error = copyin(args, &ua, sizeof(ua))) != 0)
 		return (error);
 
@@ -195,10 +197,10 @@ i386_set_ldt(p, args, retval)
 		bzero((caddr_t)new_ldt + old_len, new_len - old_len);
 		pmap->pm_ldt = new_ldt;
 
-		if (pmap->pm_flags & PCB_USER_LDT)
+		if (pmap->pm_flags & PMF_USER_LDT)
 			ldt_free(pmap);
 		else
-			pmap->pm_flags |= PCB_USER_LDT;
+			pmap->pm_flags |= PMF_USER_LDT;
 		ldt_alloc(pmap, new_ldt, new_len);
 		pcb->pcb_ldt_sel = pmap->pm_ldt_sel;
 		if (pcb == curpcb)
@@ -315,7 +317,7 @@ i386_iopl(p, args, retval)
 	struct trapframe *tf = p->p_md.md_regs;
 	struct i386_iopl_args ua;
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return error;
 #ifdef APERTURE
 	if (!allowaperture && securelevel > 0)
@@ -362,7 +364,7 @@ i386_set_ioperm(p, args, retval)
 	struct pcb *pcb = &p->p_addr->u_pcb;
 	struct i386_set_ioperm_args ua;
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return error;
 
 	if ((error = copyin(args, &ua, sizeof(ua))) != 0)

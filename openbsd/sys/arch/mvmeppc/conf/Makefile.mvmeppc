@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile.mvmeppc,v 1.11 2002/12/25 21:10:26 miod Exp $
+#	$OpenBSD: Makefile.mvmeppc,v 1.15 2003/07/22 19:39:50 otto Exp $
 #
 # Makefile for OpenBSD PowerPC
 #
@@ -40,7 +40,10 @@ CPPFLAGS=	${INCLUDES} ${IDENT} -D_KERNEL \
 		-Dpowerpc -D__mvmeppc__
 CWARNFLAGS=	-Werror -Wall -Wstrict-prototypes -Wmissing-prototypes \
 		-Wno-uninitialized -Wno-format -Wno-main
-CMACHFLAGS=	-msoft-float -Wa,-m7400 -fno-stack-protector
+CMACHFLAGS=	-msoft-float -Wa,-m7400
+.if ${IDENT:M-DNO_PROPOLICE}
+CMACHFLAGS+=	-fno-stack-protector
+.endif
 COPTS?=		-O2
 CFLAGS=		${DEBUG} ${CWARNFLAGS} ${CMACHFLAGS} ${COPTS} ${PIPE}
 AFLAGS=		-D_LOCORE
@@ -140,7 +143,7 @@ clean::
 
 lint:
 	@lint -hbxncez -DGENERIC -Dvolatile= ${CPPFLAGS} -UKGDB \
-		${PPC}/mvmeppc/Locore.c ${CFILES} ${PPC}/mvmeppc/swapgeneric.c \
+		${PPC}/mvmeppc/Locore.c \
 		ioconf.c param.c | \
 		grep -v 'static function .* unused'
 
@@ -164,6 +167,10 @@ depend:: .depend
 .if ${SFILES} != ""
 	${MKDEP} -a ${AFLAGS} ${CPPFLAGS} ${SFILES}
 .endif
+	sh $S/kern/genassym.sh ${MKDEP} -f assym.dep ${CFLAGS} \
+	    ${CPPFLAGS} < ${PPC}/mvmeppc/genassym.cf
+	@sed -e 's/.*\.o:.* /assym.h: /' < assym.dep >> .depend
+	@rm -f assym.dep
 
 # depend on root or device configuration
 autoconf.o conf.o: Makefile

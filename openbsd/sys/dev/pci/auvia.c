@@ -1,4 +1,4 @@
-/*	$OpenBSD: auvia.c,v 1.23 2003/02/28 15:26:23 mickey Exp $ */
+/*	$OpenBSD: auvia.c,v 1.25 2003/05/21 19:32:20 drahn Exp $ */
 /*	$NetBSD: auvia.c,v 1.7 2000/11/15 21:06:33 jdolecek Exp $	*/
 
 /*-
@@ -463,49 +463,49 @@ auvia_query_encoding(void *addr, struct audio_encoding *fp)
 {
 	switch (fp->index) {
 	case 0:
-		strcpy(fp->name, AudioEulinear);
+		strlcpy(fp->name, AudioEulinear, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ULINEAR;
 		fp->precision = 8;
 		fp->flags = 0;
 		return (0);
 	case 1:
-		strcpy(fp->name, AudioEmulaw);
+		strlcpy(fp->name, AudioEmulaw, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ULAW;
 		fp->precision = 8;
 		fp->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		return (0);
 	case 2:
-		strcpy(fp->name, AudioEalaw);
+		strlcpy(fp->name, AudioEalaw, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ALAW;
 		fp->precision = 8;
 		fp->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		return (0);
 	case 3:
-		strcpy(fp->name, AudioEslinear);
+		strlcpy(fp->name, AudioEslinear, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_SLINEAR;
 		fp->precision = 8;
 		fp->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		return (0);
 	case 4:
-		strcpy(fp->name, AudioEslinear_le);
+		strlcpy(fp->name, AudioEslinear_le, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_SLINEAR_LE;
 		fp->precision = 16;
 		fp->flags = 0;
 		return (0);
 	case 5:
-		strcpy(fp->name, AudioEulinear_le);
+		strlcpy(fp->name, AudioEulinear_le, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ULINEAR_LE;
 		fp->precision = 16;
 		fp->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		return (0);
 	case 6:
-		strcpy(fp->name, AudioEslinear_be);
+		strlcpy(fp->name, AudioEslinear_be, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_SLINEAR_BE;
 		fp->precision = 16;
 		fp->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		return (0);
 	case 7:
-		strcpy(fp->name, AudioEulinear_be);
+		strlcpy(fp->name, AudioEulinear_be, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ULINEAR_BE;
 		fp->precision = 16;
 		fp->flags = AUDIO_ENCODINGFLAG_EMULATED;
@@ -851,10 +851,10 @@ auvia_build_dma_ops(struct auvia_softc *sc, struct auvia_softc_chan *ch,
 	op = ch->sc_dma_ops;
 
 	while (l) {
-		op->ptr = s;
+		op->ptr = htole32(s);
 		l = l - blksize;
 		/* if last block */
-		op->flags = (l? AUVIA_DMAOP_FLAG : AUVIA_DMAOP_EOL) | blksize;
+		op->flags = htole32((l? AUVIA_DMAOP_FLAG : AUVIA_DMAOP_EOL) | blksize);
 		s += blksize;
 		op++;
 	}

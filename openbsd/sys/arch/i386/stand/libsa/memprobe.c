@@ -1,4 +1,4 @@
-/*	$OpenBSD: memprobe.c,v 1.37 2002/06/20 20:22:58 weingart Exp $	*/
+/*	$OpenBSD: memprobe.c,v 1.39 2003/08/11 06:23:09 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Michael Shalayeff
@@ -13,11 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Tobias Weingartner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
@@ -70,8 +65,7 @@ checkA20(void)
  * This is the "prefered" method.
  */
 static __inline bios_memmap_t *
-bios_E820(mp)
-	register bios_memmap_t *mp;
+bios_E820(bios_memmap_t *mp)
 {
 	void *info;
 	int rc, off = 0, sig, gotcha = 0;
@@ -112,8 +106,7 @@ bios_E820(mp)
  * like this call.
  */
 static __inline bios_memmap_t *
-bios_E801(mp)
-	register bios_memmap_t *mp;
+bios_E801(bios_memmap_t *mp)
 {
 	int rc, m1, m2, m3, m4;
 	u_int8_t *info;
@@ -165,8 +158,7 @@ bios_E801(mp)
  * Machines with this are restricted to 64MB.
  */
 static __inline bios_memmap_t *
-bios_8800(mp)
-	register bios_memmap_t *mp;
+bios_8800(bios_memmap_t *mp)
 {
 	int rc, mem;
 
@@ -191,8 +183,7 @@ bios_8800(mp)
  * Only used if int 15, AX=E820 does not work.
  */
 static __inline bios_memmap_t *
-bios_int12(mp)
-	register bios_memmap_t *mp;
+bios_int12(bios_memmap_t *mp)
 {
 	int mem;
 #ifdef DEBUG
@@ -228,8 +219,7 @@ const u_int addrprobe_pat[] = {
 	0x55555555, 0xCCCCCCCC
 };
 static int
-addrprobe(kloc)
-	u_int kloc;
+addrprobe(u_int kloc)
 {
 	__volatile u_int *loc;
 	register u_int i, ret = 0;
@@ -275,8 +265,7 @@ addrprobe(kloc)
  * XXX - Could be destructive, as it does write.
  */
 static __inline bios_memmap_t *
-badprobe(mp)
-	register bios_memmap_t *mp;
+badprobe(bios_memmap_t *mp)
 {
 	u_int64_t ram;
 #ifdef DEBUG
@@ -301,7 +290,7 @@ badprobe(mp)
 bios_memmap_t bios_memmap[32];	/* This is easier */
 #ifndef _TEST
 void
-memprobe()
+memprobe(void)
 {
 	bios_memmap_t *pm = bios_memmap, *im;
 
@@ -370,8 +359,7 @@ memprobe()
 #endif
 
 void
-dump_biosmem(tm)
-	bios_memmap_t *tm;
+dump_biosmem(bios_memmap_t *tm)
 {
 	register bios_memmap_t *p;
 	register u_int total = 0;
@@ -398,8 +386,7 @@ dump_biosmem(tm)
 }
 
 int
-mem_delete(sa, ea)
-	long sa, ea;
+mem_delete(long sa, long ea)
 {
 	register bios_memmap_t *p;
 
@@ -436,8 +423,7 @@ mem_delete(sa, ea)
 }
 
 int
-mem_add(sa, ea)
-	long sa, ea;
+mem_add(long sa, long ea)
 {
 	register bios_memmap_t *p;
 
@@ -479,12 +465,12 @@ mem_add(sa, ea)
 }
 
 void
-mem_pass()
+mem_pass(void)
 {
 	bios_memmap_t *p;
 
 	for (p = bios_memmap; p->type != BIOS_MAP_END; p++)
 		;
 	addbootarg(BOOTARG_MEMMAP, (p - bios_memmap + 1) * sizeof *bios_memmap,
-		bios_memmap);
+	    bios_memmap);
 }

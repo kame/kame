@@ -1,4 +1,4 @@
-/*	$OpenBSD: kernfs_vfsops.c,v 1.21 2003/01/31 20:41:29 art Exp $	*/
+/*	$OpenBSD: kernfs_vfsops.c,v 1.25 2003/08/14 07:46:39 mickey Exp $	*/
 /*	$NetBSD: kernfs_vfsops.c,v 1.26 1996/04/22 01:42:27 christos Exp $	*/
 
 /*
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -169,7 +165,7 @@ kernfs_root(mp, vpp)
 	struct mount *mp;
 	struct vnode **vpp;
 {
-	struct kern_target *kt;
+	const struct kern_target *kt;
 	int error;
 
 #ifdef KERNFS_DIAGNOSTIC
@@ -179,7 +175,7 @@ kernfs_root(mp, vpp)
 	error = kernfs_allocvp(kt, mp, vpp);
 	if (error)
 		return (error);
-	vn_lock(*vpp, LK_EXCLUSIVE, curproc);
+	vn_lock(*vpp, LK_EXCLUSIVE | LK_RETRY, curproc);
 
 	return (0);
 }
@@ -213,7 +209,7 @@ kernfs_statfs(mp, sbp, p)
 	return (0);
 }
 
-struct vfsops kernfs_vfsops = {
+const struct vfsops kernfs_vfsops = {
 	kernfs_mount,
 	kernfs_start,
 	kernfs_unmount,

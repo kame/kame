@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_info_09.c,v 1.9 2002/03/14 20:31:31 mickey Exp $	*/
+/*	$OpenBSD: kern_info_09.c,v 1.11 2003/08/15 20:32:15 tedu Exp $	*/
 /*	$NetBSD: kern_info_09.c,v 1.5 1996/02/21 00:10:59 cgd Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -88,7 +84,7 @@ compat_09_sys_setdomainname(p, v, retval)
 	int name;
 	int error;
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return (error);
 	name = KERN_DOMAINNAME;
 	return (kern_sysctl(&name, 1, 0, 0, SCARG(uap, domainname),

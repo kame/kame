@@ -1,4 +1,4 @@
-/*	$OpenBSD: dkcksum.c,v 1.3 1996/09/23 14:18:51 mickey Exp $	*/
+/*	$OpenBSD: dkcksum.c,v 1.5 2003/08/11 06:23:09 deraadt Exp $	*/
 /*	$NetBSD: disklabel.c,v 1.3 1994/10/26 05:44:42 cgd Exp $	*/
 
 /*-
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -44,11 +40,10 @@
  * Compute checksum for disk label.
  */
 u_int
-dkcksum(lp)
-	register struct disklabel *lp;
+dkcksum(struct disklabel *lp)
 {
-	register u_short *start, *end;
-	register u_short sum = 0;
+	u_short *start, *end;
+	u_short sum = 0;
 
 	start = (u_short *)lp;
 	end = (u_short *)&lp->d_partitions[lp->d_npartitions];

@@ -1,4 +1,4 @@
-/*	$OpenBSD: debug_i386.S,v 1.9 1998/04/18 07:39:46 deraadt Exp $	*/
+/*	$OpenBSD: debug_i386.S,v 1.11 2003/06/03 20:22:11 mickey Exp $	*/
 
 /*
  * Copyright (c) 1997 Michael Shalayeff
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
@@ -89,9 +84,9 @@ ENTRY(check_regs)
 	movl	$0x47334732, (%edi)
 #endif
 	movl	$0x10, %eax
-	movl	%ax, %ds
-	movl	%ax, %es
-	movl	$_reg, %edi
+	mov	%ax, %ds
+	mov	%ax, %es
+	movl	$reg, %edi
 	cld
 	movl	0x0c*4(%esp), %eax; stosl /* %eax	*/
 	movl	0x0b*4(%esp), %eax; stosl /* %ecx	*/
@@ -104,7 +99,7 @@ ENTRY(check_regs)
 	movl	0x0f*4(%esp), %eax; stosl /* %eip	*/
 	movl	0x11*4(%esp), %eax; stosl /* %eflags	*/
 	movl	0x10*4(%esp), %eax; stosl /* %cs	*/
-	movl		%ss,  %ax ; stosl /* %ss	*/
+	mov		%ss,  %ax ; stosl /* %ss	*/
 	movl	0x04*4(%esp), %eax; stosl /* %ds	*/
 	movl	0x03*4(%esp), %eax; stosl /* %es	*/
 	movl	0x02*4(%esp), %eax; stosl /* %fs	*/

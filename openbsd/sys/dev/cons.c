@@ -1,4 +1,4 @@
-/*	$OpenBSD: cons.c,v 1.10 2001/04/17 04:30:49 aaron Exp $	*/
+/*	$OpenBSD: cons.c,v 1.13 2003/08/15 20:32:16 tedu Exp $	*/
 /*	$NetBSD: cons.c,v 1.30 1996/04/08 19:57:30 jonathan Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -183,7 +179,7 @@ cnioctl(dev, cmd, data, flag, p)
 	 * output from the "virtual" console.
 	 */
 	if (cmd == TIOCCONS && constty != NULL) {
-		error = suser(p->p_ucred, (u_short *) NULL);
+		error = suser(p, SUSER_NOACCT);
 		if (error)
 			return (error);
 		constty = NULL;
@@ -233,12 +229,17 @@ cnkqfilter(dev, kn)
 	dev_t dev;
 	struct knote *kn;
 {
-	if (constty != NULL && (cn_tab == NULL || cn_tab->cn_pri != CN_REMOTE))
-		return 0;
-	if (cn_tab == NULL)
-		return (1);
 
-	dev = cn_tab->cn_dev;
+	/*
+	 * Redirect output, if that's appropriate.
+	 * If there's no real console, return 1.
+	 */
+	if (constty != NULL && (cn_tab == NULL || cn_tab->cn_pri != CN_REMOTE))
+		dev = constty->t_dev;
+	else if (cn_tab == NULL)
+		return (1);
+	else
+		dev = cn_tab->cn_dev;
 	if (cdevsw[major(dev)].d_type & D_KQFILTER)
 		return ((*cdevsw[major(dev)].d_kqfilter)(dev, kn));
 	return (1);
@@ -301,4 +302,3 @@ cnbell(pitch, period, volume)
 
 	(*cn_tab->cn_bell)(cn_tab->cn_dev, pitch, period, volume);
 }
-

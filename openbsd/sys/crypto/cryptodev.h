@@ -1,4 +1,4 @@
-/*	$OpenBSD: cryptodev.h,v 1.37 2003/02/15 22:57:58 jason Exp $	*/
+/*	$OpenBSD: cryptodev.h,v 1.42 2003/08/14 15:18:05 jason Exp $	*/
 
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
@@ -27,12 +27,10 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *   notice, this list of conditions and the following disclaimer.
+ *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
- *   notice, this list of conditions and the following disclaimer in the
- *   documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *   derived from this software without specific prior written permission.
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -75,7 +73,7 @@
 #define EALG_MAX_BLOCK_LEN	16 /* Keep this updated */
 
 /* Maximum hash algorithm result length */
-#define AALG_MAX_RESULT_LEN	20 /* Keep this updated */
+#define AALG_MAX_RESULT_LEN	64 /* Keep this updated */
 
 #define CRYPTO_DES_CBC		1
 #define CRYPTO_3DES_CBC		2
@@ -95,7 +93,10 @@
 #define CRYPTO_DEFLATE_COMP	15 /* Deflate compression algorithm */
 #define CRYPTO_NULL		16
 #define CRYPTO_LZS_COMP		17 /* LZS compression algorithm */
-#define CRYPTO_ALGORITHM_MAX	17 /* Keep updated - see below */
+#define CRYPTO_SHA2_256_HMAC	18
+#define CRYPTO_SHA2_384_HMAC	19
+#define CRYPTO_SHA2_512_HMAC	20
+#define CRYPTO_ALGORITHM_MAX	20 /* Keep updated - see below */
 
 #define	CRYPTO_ALGORITHM_ALL	(CRYPTO_ALGORITHM_MAX + 1)
 
@@ -160,6 +161,8 @@ struct cryptop {
 #define CRYPTO_F_IMBUF	0x0001	/* Input/output are mbuf chains, otherwise contig */
 #define CRYPTO_F_IOV	0x0002	/* Input/output are uio */
 #define CRYPTO_F_REL	0x0004	/* Must return data in same place */
+#define CRYPTO_F_NOQUEUE	0x0008	/* Don't use crypto queue/thread */
+#define CRYPTO_F_DONE	0x0010	/* request completed */
 
 	caddr_t		crp_buf;	/* Data to be processed */
 	caddr_t		crp_opaque;	/* Opaque pointer, passed along */
@@ -311,7 +314,7 @@ void	crypto_kdone(struct cryptkop *);
 int	crypto_getfeat(int *);
 
 void	cuio_copydata(struct uio *, int, int, caddr_t);
-void	cuio_copyback(struct uio *, int, int, caddr_t);
+void	cuio_copyback(struct uio *, int, int, const void *);
 int	cuio_getptr(struct uio *, int, int *);
 int	cuio_apply(struct uio *, int, int,
 	    int (*f)(caddr_t, caddr_t, unsigned int), caddr_t);

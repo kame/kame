@@ -1,4 +1,4 @@
-/*	$OpenBSD: mkboot.c,v 1.11 2002/06/11 05:18:22 jsyn Exp $	*/
+/*	$OpenBSD: mkboot.c,v 1.14 2003/08/11 06:51:45 mickey Exp $	*/
 
 /*
  * Copyright (c) 1990, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -43,7 +39,7 @@ static char copyright[] =
 #endif /* not lint */
 
 #ifndef lint
-static char rcsid[] = "$OpenBSD: mkboot.c,v 1.11 2002/06/11 05:18:22 jsyn Exp $";
+static char rcsid[] = "$OpenBSD: mkboot.c,v 1.14 2003/08/11 06:51:45 mickey Exp $";
 #endif /* not lint */
 #endif
 
@@ -101,8 +97,7 @@ char *__progname = "mkboot";
  *	sector 32-:	LIF file 0, LIF file 1, etc.
  */
 int
-main(argc, argv)
-	char **argv;
+main(int argc, char **argv)
 {
 	int to;
 	register int n, pos, c;
@@ -133,7 +128,7 @@ main(argc, argv)
 
 	bzero(buf, sizeof(buf));
 	/* clear possibly unused directory entries */
-	memset(lifd[1].dir_name, ' ', 10);
+	memset(lifd[1].dir_name, ' ', sizeof lifd[1].dir_name);
 	lifd[1].dir_type = -1;
 	lifd[1].dir_addr = 0;
 	lifd[1].dir_length = 0;
@@ -174,7 +169,8 @@ main(argc, argv)
 			lifd[1].dir_implement = htobe32(loadpoint + entry);
 		}
 
-		strcpy(lifd[optind].dir_name, lifname(argv[optind]));
+		strlcpy(lifd[optind].dir_name, lifname(argv[optind]),
+		    sizeof lifd[optind].dir_name);
 		lifd[optind].dir_length = htobe32(n);
 		bcddate(argv[optind], lifd[optind].dir_toc);
 		lifd[optind].dir_flag = htobe16(LIF_DIR_FLAG);

@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile.mvme88k,v 1.23 2002/12/25 21:10:26 miod Exp $
+#	$OpenBSD: Makefile.mvme88k,v 1.28 2003/08/30 21:15:59 miod Exp $
 #
 # Makefile for OpenBSD
 #
@@ -37,7 +37,10 @@ INCLUDES=	-nostdinc -I. -I$S/arch -I$S
 CPPFLAGS=	${INCLUDES} ${IDENT} ${PARAM} -D_KERNEL -Dmvme88k -Dm88k
 CWARNFLAGS=	-Wall -Werror -Wmissing-prototypes \
 		-Wno-uninitialized -Wno-format -Wno-main -Wstrict-prototypes
-CMACHFLAGS=	-fno-stack-protector
+CMACHFLAGS=	-mno-check-zero-division
+.if ${IDENT:M-DNO_PROPOLICE}
+CMACHFLAGS+=	-fno-stack-protector
+.endif
 COPTS?=		-O
 CFLAGS=		${DEBUG} ${CWARNFLAGS} ${CMACHFLAGS} ${COPTS} ${PIPE}
 AFLAGS=		-x assembler-with-cpp -traditional-cpp -D_LOCORE ${CMACHFLAGS}
@@ -151,7 +154,7 @@ clean::
 
 lint:
 	@lint -hbxncez -DGENERIC -Dvolatile= ${CPPFLAGS} ${PARAM} -UKGDB \
-	    ${CFILES} ${MVME88K}/mvme88k/swapgeneric.c ioconf.c param.c | \
+	    ${CFILES} ioconf.c param.c | \
 	    grep -v 'struct/union .* never defined' | \
 	    grep -v 'possible pointer alignment problem'
 
@@ -174,6 +177,10 @@ depend:: .depend
 .if !empty(SFILES)
 	${MKDEP} -a ${AFLAGS} ${CPPFLAGS} ${SFILES}
 .endif
+	sh $S/kern/genassym.sh ${MKDEP} -f assym.dep ${CFLAGS} \
+	    ${CPPFLAGS} < ${MVME88K}/mvme88k/genassym.cf
+	@sed -e 's/.*\.o:.* /assym.h: /' < assym.dep >> .depend
+	@rm -f assym.dep
 
 # depend on root or device configuration
 autoconf.o conf.o: Makefile

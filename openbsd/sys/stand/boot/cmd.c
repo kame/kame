@@ -1,4 +1,4 @@
-/*	$OpenBSD: cmd.c,v 1.48 2002/07/14 09:19:17 mdw Exp $	*/
+/*	$OpenBSD: cmd.c,v 1.51 2003/08/11 06:23:07 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Michael Shalayeff
@@ -12,14 +12,9 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
  * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -35,6 +30,7 @@
 #include <sys/param.h>
 #include <libsa.h>
 #include <sys/reboot.h>
+#include <lib/libkern/funcs.h>
 #include "cmd.h"
 
 #define CTRL(c)	((c)&0x1f)
@@ -72,17 +68,17 @@ const struct cmd_table cmd_table[] = {
 	{NULL, 0},
 };
 
-static void ls(char *, register struct stat *);
-static int readline(register char *, size_t, int);
-char *nextword(register char *);
-static char *whatcmd(register const struct cmd_table **ct, register char *);
+static void ls(char *, struct stat *);
+static int readline(char *, size_t, int);
+char *nextword(char *);
+static char *whatcmd(const struct cmd_table **ct, char *);
 static int docmd(void);
 static char *qualify(char *);
 
 char cmd_buf[133];
 
 int
-getcmd()
+getcmd(void)
 {
 	cmd.cmd = NULL;
 
@@ -93,7 +89,7 @@ getcmd()
 }
 
 int
-read_conf()
+read_conf(void)
 {
 #ifndef INSECURE
 	struct stat sb;
@@ -118,13 +114,13 @@ read_conf()
 #endif
 
 	do {
-		register char *p = cmd_buf;
+		char *p = cmd_buf;
 
 		cmd.cmd = NULL;
 
-		do
+		do {
 			eof = read(fd, p, 1);
-		while (eof > 0 && *p++ != '\n');
+		} while (eof > 0 && *p++ != '\n');
 
 		if (eof < 0)
 			printf("%s: %s\n", cmd.path, strerror(errno));
@@ -138,9 +134,9 @@ read_conf()
 }
 
 static int
-docmd()
+docmd(void)
 {
-	register char *p = NULL;
+	char *p = NULL;
 	const struct cmd_table *ct = cmd_table, *cs;
 
 	cmd.argc = 1;
@@ -192,12 +188,10 @@ docmd()
 }
 
 static char *
-whatcmd(ct, p)
-	register const struct cmd_table **ct;
-	register char *p;
+whatcmd(const struct cmd_table **ct, char *p)
 {
-	register char *q;
-	register int l;
+	char *q;
+	int l;
 
 	q = nextword(p);
 
@@ -214,15 +208,12 @@ whatcmd(ct, p)
 }
 
 static int
-readline(buf, n, to)
-	register char *buf;
-	size_t n;
-	int	to;
+readline(char *buf, size_t n, int to)
 {
 #ifdef DEBUG
 	extern int debug;
 #endif
-	register char *p = buf, ch;
+	char *p = buf, ch;
 
 	/* Only do timeout if greater than 0 */
 	if (to > 0) {
@@ -239,12 +230,13 @@ readline(buf, n, to)
 				break;
 
 		if (!cnischar()) {
-			strncpy(buf, "boot", 5);
+			strlcpy(buf, "boot", 5);
 			putchar('\n');
 			return strlen(buf);
 		}
 	} else
-		while (!cnischar()) ;
+		while (!cnischar())
+			;
 
 	while (1) {
 		switch ((ch = getchar())) {
@@ -283,11 +275,10 @@ readline(buf, n, to)
 /*
  * Search for spaces/tabs after the current word. If found, \0 the
  * first one.  Then pass a pointer to the first character of the
- * next word, or NULL if there is no next word. 
+ * next word, or NULL if there is no next word.
  */
 char *
-nextword(p)
-	register char *p;
+nextword(char *p)
 {
 	/* skip blanks */
 	while (*p && *p != '\t' && *p != ' ')
@@ -303,8 +294,7 @@ nextword(p)
 }
 
 static void
-print_help(ct)
-	register const struct cmd_table *ct;
+print_help(const struct cmd_table *ct)
 {
 	for (; ct->cmd_name != NULL; ct++)
 		printf(" %s", ct->cmd_name);
@@ -312,7 +302,7 @@ print_help(ct)
 }
 
 static int
-Xhelp()
+Xhelp(void)
 {
 	printf("commands:");
 	print_help(cmd_table);
@@ -325,7 +315,7 @@ Xhelp()
 
 #ifdef MACHINE_CMD
 static int
-Xmachine()
+Xmachine(void)
 {
 	printf("machine:");
 	print_help(MACHINE_CMD);
@@ -334,9 +324,10 @@ Xmachine()
 #endif
 
 static int
-Xecho()
+Xecho(void)
 {
-	register int i;
+	int i;
+
 	for (i = 1; i < cmd.argc; i++)
 		printf("%s ", cmd.argv[i]);
 	putchar('\n');
@@ -344,10 +335,10 @@ Xecho()
 }
 
 static int
-Xstty()
+Xstty(void)
 {
-	register int sp;
-	register char *cp;
+	int sp;
+	char *cp;
 	dev_t dev;
 
 	if (cmd.argc == 1)
@@ -373,7 +364,7 @@ Xstty()
 }
 
 static int
-Xtime()
+Xtime(void)
 {
 	time_t tt = getsecs();
 
@@ -386,10 +377,10 @@ Xtime()
 }
 
 static int
-Xls()
+Xls(void)
 {
 	struct stat sb;
-	register char *p;
+	char *p;
 	int fd;
 
 	if (stat(qualify((cmd.argv[1]? cmd.argv[1]: "/.")), &sb) < 0) {
@@ -407,7 +398,8 @@ Xls()
 		}
 
 		/* no strlen in lib !!! */
-		for (p = cmd.path; *p; p++);
+		for (p = cmd.path; *p; p++)
+			;
 		*p++ = '/';
 		*p = '\0';
 
@@ -429,9 +421,7 @@ Xls()
 	putchar ((mode) & S_IXOTH? *(s): (s)[1]);
 
 static void
-ls(name, sb)
-	register char *name;
-	register struct stat *sb;
+ls(char *name, struct stat *sb)
 {
 	putchar("-fc-d-b---l-s-w-"[(sb->st_mode & S_IFMT) >> 12]);
 	lsrwx(sb->st_mode >> 6, (sb->st_mode & S_ISUID? "sS" : "x-"));
@@ -439,14 +429,14 @@ ls(name, sb)
 	lsrwx(sb->st_mode     , (sb->st_mode & S_ISTXT? "tT" : "x-"));
 
 	printf (" %u,%u\t%lu\t%s\n", sb->st_uid, sb->st_gid,
-		(u_long)sb->st_size, name);
+	    (u_long)sb->st_size, name);
 }
 #undef lsrwx
 
 int doboot = 1;
 
 static int
-Xnop()
+Xnop(void)
 {
 	if (doboot) {
 		doboot = 0;
@@ -457,7 +447,7 @@ Xnop()
 }
 
 static int
-Xboot()
+Xboot(void)
 {
 	if (cmd.argc > 1 && cmd.argv[1][0] != '-') {
 		qualify((cmd.argv[1]? cmd.argv[1]: cmd.image));
@@ -466,7 +456,8 @@ Xboot()
 	} else {
 		if (bootparse(1))
 			return 0;
-		sprintf(cmd.path, "%s:%s", cmd.bootdev, cmd.image);
+		snprintf(cmd.path, sizeof cmd.path, "%s:%s",
+		    cmd.bootdev, cmd.image);
 	}
 
 	return 1;
@@ -477,23 +468,23 @@ Xboot()
  */
 
 static char *
-qualify(name)
-	char *name;
+qualify(char *name)
 {
-	register char *p;
+	char *p;
 
 	for (p = name; *p; p++)
 		if (*p == ':')
 			break;
 	if (*p == ':')
-		strncpy(cmd.path, name, sizeof(cmd.path));
+		strlcpy(cmd.path, name, sizeof(cmd.path));
 	else
-		sprintf(cmd.path, "%s:%s", cmd.bootdev, name);
+		snprintf(cmd.path, sizeof cmd.path, "%s:%s",
+		    cmd.bootdev, name);
 	return cmd.path;
 }
 
 static int
-Xreboot()
+Xreboot(void)
 {
 	printf("Rebooting...\n");
 	exit();

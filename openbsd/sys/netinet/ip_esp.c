@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_esp.c,v 1.80 2003/02/28 21:42:56 jason Exp $ */
+/*	$OpenBSD: ip_esp.c,v 1.87 2003/08/14 19:00:12 jason Exp $ */
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -156,8 +156,20 @@ esp_init(struct tdb *tdbp, struct xformsw *xsp, struct ipsecinit *ii)
 			thash = &auth_hash_hmac_sha1_96;
 			break;
 
-		case SADB_AALG_RIPEMD160HMAC:
+		case SADB_X_AALG_RIPEMD160HMAC:
 			thash = &auth_hash_hmac_ripemd_160_96;
+			break;
+
+		case SADB_X_AALG_SHA2_256:
+			thash = &auth_hash_hmac_sha2_256_96;
+			break;
+
+		case SADB_X_AALG_SHA2_384:
+			thash = &auth_hash_hmac_sha2_384_96;
+			break;
+
+		case SADB_X_AALG_SHA2_512:
+			thash = &auth_hash_hmac_sha2_512_96;
 			break;
 
 		default:
@@ -471,7 +483,16 @@ esp_input_cb(void *op)
 	skip = tc->tc_skip;
 	protoff = tc->tc_protoff;
 	mtag = (struct m_tag *) tc->tc_ptr;
+
 	m = (struct mbuf *) crp->crp_buf;
+	if (m == NULL) {
+		/* Shouldn't happen... */
+		FREE(tc, M_XDATA);
+		crypto_freereq(crp);
+		espstat.esps_crypto++;
+		DPRINTF(("esp_input_cb(): bogus returned buffer from crypto\n"));
+		return (EINVAL);
+	}
 
 	s = spltdb();
 
@@ -488,29 +509,17 @@ esp_input_cb(void *op)
 
 	/* Check for crypto errors */
 	if (crp->crp_etype) {
-		FREE(tc, M_XDATA);
-
-		/* Reset the session ID */
-		if (tdb->tdb_cryptoid != 0)
-			tdb->tdb_cryptoid = crp->crp_sid;
-
 		if (crp->crp_etype == EAGAIN) {
+			/* Reset the session ID */
+			if (tdb->tdb_cryptoid != 0)
+				tdb->tdb_cryptoid = crp->crp_sid;
 			splx(s);
 			return crypto_dispatch(crp);
 		}
-
+		FREE(tc, M_XDATA);
 		espstat.esps_noxform++;
 		DPRINTF(("esp_input_cb(): crypto error %d\n", crp->crp_etype));
 		error = crp->crp_etype;
-		goto baddone;
-	}
-
-	/* Shouldn't happen... */
-	if (m == NULL) {
-		FREE(tc, M_XDATA);
-		espstat.esps_crypto++;
-		DPRINTF(("esp_input_cb(): bogus returned buffer from crypto\n"));
-		error = EINVAL;
 		goto baddone;
 	}
 
@@ -540,7 +549,6 @@ esp_input_cb(void *op)
 		/* Remove trailing authenticator */
 		m_adj(m, -(esph->authsize));
 	}
-
 	FREE(tc, M_XDATA);
 
 	/* Replay window checking, if appropriate */
@@ -601,30 +609,30 @@ esp_input_cb(void *op)
 		if (!(m1->m_flags & M_PKTHDR))
 			m->m_pkthdr.len -= hlen;
 	} else if (roff + hlen >= m1->m_len) {
-			/*
-			 * Part or all of the ESP header is at the end of this mbuf, so
-			 * first let's remove the remainder of the ESP header from the
-			 * beginning of the remainder of the mbuf chain, if any.
-			 */
-			if (roff + hlen > m1->m_len) {
-				/* Adjust the next mbuf by the remainder */
-				m_adj(m1->m_next, roff + hlen - m1->m_len);
+		/*
+		 * Part or all of the ESP header is at the end of this mbuf, so
+		 * first let's remove the remainder of the ESP header from the
+		 * beginning of the remainder of the mbuf chain, if any.
+		 */
+		if (roff + hlen > m1->m_len) {
+			/* Adjust the next mbuf by the remainder */
+			m_adj(m1->m_next, roff + hlen - m1->m_len);
 
-				/* The second mbuf is guaranteed not to have a pkthdr... */
-				m->m_pkthdr.len -= (roff + hlen - m1->m_len);
-			}
+			/* The second mbuf is guaranteed not to have a pkthdr... */
+			m->m_pkthdr.len -= (roff + hlen - m1->m_len);
+		}
 
-			/* Now, let's unlink the mbuf chain for a second...*/
-			mo = m1->m_next;
-			m1->m_next = NULL;
+		/* Now, let's unlink the mbuf chain for a second...*/
+		mo = m1->m_next;
+		m1->m_next = NULL;
 
-			/* ...and trim the end of the first part of the chain...sick */
-			m_adj(m1, -(m1->m_len - roff));
-			if (!(m1->m_flags & M_PKTHDR))
-				m->m_pkthdr.len -= (m1->m_len - roff);
+		/* ...and trim the end of the first part of the chain...sick */
+		m_adj(m1, -(m1->m_len - roff));
+		if (!(m1->m_flags & M_PKTHDR))
+			m->m_pkthdr.len -= (m1->m_len - roff);
 
-			/* Finally, let's relink */
-			m1->m_next = mo;
+		/* Finally, let's relink */
+		m1->m_next = mo;
 	} else {
 		/*
 		 * The ESP header lies in the "middle" of the mbuf...do an
@@ -715,6 +723,7 @@ esp_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 		if (esph)
 			hdr.flags |= M_AUTH;
 
+		m1.m_flags = 0;
 		m1.m_next = m;
 		m1.m_len = ENC_HDRLEN;
 		m1.m_data = (char *) &hdr;
@@ -879,7 +888,7 @@ esp_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 
 	/* Fix Next Protocol in IPv4/IPv6 header. */
 	prot = IPPROTO_ESP;
-	m_copyback(m, protoff, sizeof(u_int8_t), (u_char *) &prot);
+	m_copyback(m, protoff, sizeof(u_int8_t), &prot);
 
 	/* Get crypto descriptors. */
 	crp = crypto_getreq(esph && espx ? 2 : 1);
@@ -979,7 +988,18 @@ esp_output_cb(void *op)
 	int error, s;
 
 	tc = (struct tdb_crypto *) crp->crp_opaque;
+
 	m = (struct mbuf *) crp->crp_buf;
+	if (m == NULL) {
+		/* Shouldn't happen... */
+		FREE(tc, M_XDATA);
+		crypto_freereq(crp);
+		espstat.esps_crypto++;
+		DPRINTF(("esp_output_cb(): bogus returned buffer from "
+		    "crypto\n"));
+		return (EINVAL);
+	}
+
 
 	s = spltdb();
 
@@ -994,32 +1014,21 @@ esp_output_cb(void *op)
 
 	/* Check for crypto errors. */
 	if (crp->crp_etype) {
-		/* Reset session ID. */
-		if (tdb->tdb_cryptoid != 0)
-			tdb->tdb_cryptoid = crp->crp_sid;
-
 		if (crp->crp_etype == EAGAIN) {
+			/* Reset the session ID */
+			if (tdb->tdb_cryptoid != 0)
+				tdb->tdb_cryptoid = crp->crp_sid;
 			splx(s);
 			return crypto_dispatch(crp);
 		}
-
 		FREE(tc, M_XDATA);
 		espstat.esps_noxform++;
 		DPRINTF(("esp_output_cb(): crypto error %d\n",
 		    crp->crp_etype));
 		error = crp->crp_etype;
 		goto baddone;
-	} else
-		FREE(tc, M_XDATA);
-
-	/* Shouldn't happen... */
-	if (m == NULL) {
-		espstat.esps_crypto++;
-		DPRINTF(("esp_output_cb(): bogus returned buffer from "
-		    "crypto\n"));
-		error = EINVAL;
-		goto baddone;
 	}
+	FREE(tc, M_XDATA);
 
 	/* Release crypto descriptors. */
 	crypto_freereq(crp);

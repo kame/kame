@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_pcb.c,v 1.64 2002/09/11 03:15:36 itojun Exp $	*/
+/*	$OpenBSD: in_pcb.c,v 1.67 2003/08/15 20:32:20 tedu Exp $	*/
 /*	$NetBSD: in_pcb.c,v 1.25 1996/02/13 23:41:53 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -128,7 +124,9 @@ in_pcbinit(table, hashsize)
 {
 
 	CIRCLEQ_INIT(&table->inpt_queue);
-	table->inpt_hashtbl = hashinit(hashsize, M_PCB, M_WAITOK, &table->inpt_hash);
+	table->inpt_hashtbl = hashinit(hashsize, M_PCB, M_NOWAIT, &table->inpt_hash);
+	if (table->inpt_hashtbl == NULL)
+		panic("in_pcbinit: hashinit failed");
 	table->inpt_lastport = 0;
 }
 
@@ -257,7 +255,7 @@ in_pcbbind(v, nam)
 
 			/* GROSS */
 			if (ntohs(lport) < IPPORT_RESERVED &&
-			    (error = suser(p->p_ucred, &p->p_acflag)))
+			    (error = suser(p, 0)))
 				return (EACCES);
 			if (so->so_euid) {
 				t = in_pcblookup(table, &zeroin_addr, 0,
@@ -281,7 +279,7 @@ in_pcbbind(v, nam)
 			first = ipport_hifirstauto;	/* sysctl */
 			last = ipport_hilastauto;
 		} else if (inp->inp_flags & INP_LOWPORT) {
-			if ((error = suser(p->p_ucred, &p->p_acflag)))
+			if ((error = suser(p, 0)))
 				return (EACCES);
 			first = IPPORT_RESERVED-1; /* 1023 */
 			last = 600;		   /* not IPPORT_RESERVED/2 */

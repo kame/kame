@@ -1,4 +1,4 @@
-/*	$OpenBSD: prom.h,v 1.9 2002/03/05 22:11:40 miod Exp $ */
+/*	$OpenBSD: prom.h,v 1.11 2003/09/01 19:14:04 miod Exp $ */
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -13,10 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Theo de Raadt
- * 4. The name of the author may not be used to endorse or promote products
+ * 3. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
@@ -32,6 +29,9 @@
  */
 #ifndef __MACHINE_PROM_H__
 #define __MACHINE_PROM_H__
+
+/* BUG trap vector */
+#define	MVMEPROM_VECTOR		496
 
 #define MVMEPROM_INCHR		0x00
 #define MVMEPROM_INSTAT		0x01
@@ -160,11 +160,9 @@ struct mvmeprom_args {
 	u_int	cputyp;
 };
 
-#endif
+extern unsigned long bugvec[2], sysbugvec[2];	/* BUG trap vector copies */
 
-#define MVMEPROM_CALL(x)	\
-	__asm__ __volatile__ ( __CONCAT("or r9,r0,",__STRING(x)) ); \
-	__asm__ __volatile__ ("tb0 0,r0,496")
+#endif	/* _LOCORE */
 
 #define MVMEPROM_REG_DEVLUN	"r2"
 #define MVMEPROM_REG_CTRLLUN	"r3"

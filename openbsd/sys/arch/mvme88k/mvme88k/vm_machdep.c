@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.49 2003/01/04 01:12:08 miod Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.53 2003/08/08 13:47:36 miod Exp $	*/
 
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
@@ -20,11 +20,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -54,6 +50,9 @@
 #include <sys/user.h>
 #include <sys/vnode.h>
 #include <sys/extent.h>
+#include <sys/core.h>
+#include <sys/exec.h>
+#include <sys/ptrace.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -61,7 +60,6 @@
 #include <machine/board.h>
 #include <machine/cmmu.h>
 #include <machine/cpu.h>
-#include <machine/cpu_number.h>
 #include <machine/locore.h>
 #include <machine/trap.h>
 
@@ -95,7 +93,6 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 	void *arg;
 {
 	struct switchframe *p2sf;
-	int cpu;
 	struct ksigframe {
 		void (*func)(void *);
 		void *proc;
@@ -104,23 +101,22 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 	extern void proc_trampoline(void);
         extern void save_u_area(struct proc *, vm_offset_t);
 
-	cpu = cpu_number();
-/*	
-	savectx(p1->p_addr->u_pcb);
-*/
-	savectx(curpcb);
+	/* Copy pcb from p1 to p2. */
+	if (p1 == curproc) {
+		/* Sync the PCB before we copy it. */
+		savectx(curpcb);
+	}
+#ifdef DIAGNOSTIC
+	else if (p1 != &proc0)
+		panic("cpu_fork: curproc");
+#endif
 	
-	/* copy p1 pcb to p2 */
-	bcopy((void *)&p1->p_addr->u_pcb, (void *)&p2->p_addr->u_pcb, sizeof(struct pcb));
-	p2->p_addr->u_pcb.kernel_state.pcb_ipl = 0;
-
+	bcopy(&p1->p_addr->u_pcb, &p2->p_addr->u_pcb, sizeof(struct pcb));
+	p2->p_addr->u_pcb.kernel_state.pcb_ipl = IPL_NONE;	/* XXX */
 	p2->p_md.md_tf = USER_REGS(p2);
 
 	/*XXX these may not be necessary nivas */
 	save_u_area(p2, (vm_offset_t)p2->p_addr);
-#ifdef notneeded 
-	pmap_activate(p2);
-#endif /* notneeded */
 
 	/*
 	 * Create a switch frame for proc 2
@@ -172,11 +168,48 @@ cpu_exit(struct proc *p)
 	/* NOTREACHED */
 }
 
+/*
+ * Dump the machine specific header information at the start of a core dump.
+ */
 int
-cpu_coredump(struct proc *p, struct vnode *vp, struct ucred *cred, struct core *corep)
+cpu_coredump(p, vp, cred, chdr)
+	struct proc *p;
+	struct vnode *vp;
+	struct ucred *cred;
+	struct core *chdr;
 {
-	return (vn_rdwr(UIO_WRITE, vp, (caddr_t) p->p_addr, ctob(UPAGES),
-	    (off_t)0, UIO_SYSSPACE, IO_NODELOCKED|IO_UNIT, cred, NULL, p));
+	struct reg reg;
+	struct coreseg cseg;
+	int error;
+
+	CORE_SETMAGIC(*chdr, COREMAGIC, MID_MACHINE, 0);
+	chdr->c_hdrsize = ALIGN(sizeof(*chdr));
+	chdr->c_seghdrsize = ALIGN(sizeof(cseg));
+	chdr->c_cpusize = sizeof(reg);
+
+	/* Save registers. */
+	error = process_read_regs(p, &reg);
+	if (error)
+		return error;
+
+	CORE_SETMAGIC(cseg, CORESEGMAGIC, MID_MACHINE, CORE_CPU);
+	cseg.c_addr = 0;
+	cseg.c_size = chdr->c_cpusize;
+
+	error = vn_rdwr(UIO_WRITE, vp, (caddr_t)&cseg, chdr->c_seghdrsize,
+	    (off_t)chdr->c_hdrsize, UIO_SYSSPACE, IO_NODELOCKED|IO_UNIT, cred,
+	    NULL, p);
+	if (error)
+		return error;
+
+	error = vn_rdwr(UIO_WRITE, vp, (caddr_t)&reg, sizeof(reg),
+	    (off_t)(chdr->c_hdrsize + chdr->c_seghdrsize), UIO_SYSSPACE,
+	    IO_NODELOCKED|IO_UNIT, cred, NULL, p);
+	if (error)
+		return error;
+
+	chdr->c_nseg++;
+	return 0;
 }
 
 /*

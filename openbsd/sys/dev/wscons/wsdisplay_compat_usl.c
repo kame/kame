@@ -1,4 +1,4 @@
-/* $OpenBSD: wsdisplay_compat_usl.c,v 1.11 2002/03/14 03:16:08 millert Exp $ */
+/* $OpenBSD: wsdisplay_compat_usl.c,v 1.14 2003/08/15 20:32:18 tedu Exp $ */
 /* $NetBSD: wsdisplay_compat_usl.c,v 1.12 2000/03/23 07:01:47 thorpej Exp $ */
 
 /*
@@ -107,6 +107,9 @@ usl_sync_init(scr, sdp, p, acqsig, relsig, frsig)
 	struct usl_syncdata *sd;
 	int res;
 
+	if (acqsig <= 0 || acqsig >= NSIG || relsig <= 0 || relsig >= NSIG ||
+	    frsig <= 0 || frsig >= NSIG)
+		return (EINVAL);
 	sd = malloc(sizeof(struct usl_syncdata), M_DEVBUF, M_NOWAIT);
 	if (!sd)
 		return (ENOMEM);
@@ -350,7 +353,7 @@ wsdisplay_usl_ioctl1(sc, cmd, data, flag, p)
 #ifdef WSDISPLAY_COMPAT_PCVT
 	    case VGAPCVTID:
 #define id ((struct pcvtid *)data)
-		strcpy(id->name, "pcvt");
+		strlcpy(id->name, "pcvt", sizeof id->name);
 		id->rmajor = 3;
 		id->rminor = 32;
 #undef id
@@ -429,7 +432,7 @@ wsdisplay_usl_ioctl2(sc, scr, cmd, data, flag, p)
 		return (0);
 
 	    case KDENABIO:
-		if (suser(p->p_ucred, &p->p_acflag) || securelevel > 1)
+		if (suser(p, 0) || securelevel > 1)
 			return (EPERM);
 		/* FALLTHRU */
 	    case KDDISABIO:

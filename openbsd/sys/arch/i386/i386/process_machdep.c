@@ -1,4 +1,4 @@
-/*	$OpenBSD: process_machdep.c,v 1.10 2002/03/14 01:26:33 millert Exp $	*/
+/*	$OpenBSD: process_machdep.c,v 1.12 2003/09/04 03:42:02 avsm Exp $	*/
 /*	$NetBSD: process_machdep.c,v 1.22 1996/05/03 19:42:25 christos Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -153,9 +149,9 @@ process_read_fpregs(p, regs)
 			npxsave();
 #endif
 
-		bcopy(frame, regs, sizeof(frame));
+		bcopy(frame, regs, sizeof(*frame));
 	} else
-		bzero(regs, sizeof(regs));
+		bzero(regs, sizeof(*regs));
 
 	return (0);
 }
@@ -243,7 +239,7 @@ process_write_fpregs(p, regs)
 #endif
 
 	p->p_md.md_flags |= MDP_USEDFPU;
-	bcopy(regs, frame, sizeof(frame));
+	bcopy(regs, frame, sizeof(*frame));
 
 	return (0);
 }

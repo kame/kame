@@ -1,4 +1,4 @@
-/*	$OpenBSD: opl.c,v 1.3 2002/03/14 01:26:55 millert Exp $	*/
+/*	$OpenBSD: opl.c,v 1.5 2003/08/11 10:34:06 mickey Exp $	*/
 /*	$NetBSD: opl.c,v 1.7 1998/12/08 14:26:56 augustss Exp $	*/
 
 /*
@@ -80,7 +80,7 @@ struct real_voice {
 	u_int8_t op[4]; /* Operator offsets */
 };
 
-struct opl_voice voicetab[] = {
+const struct opl_voice voicetab[] = {
 /*       No    I/O offs		OP1	OP2	OP3   OP4	*/
 /*	---------------------------------------------------	*/
 	{ 0,   OPL_L,	{0x00,	0x03,	0x08, 0x0b}},
@@ -159,7 +159,8 @@ opl_attach(sc)
 	}
 
 	sc->syn.mets = &opl3_midi;
-	sprintf(sc->syn.name, "%sYamaha OPL%d", sc->syn.name, sc->model);
+	snprintf(sc->syn.name, sizeof sc->syn.name, "%sYamaha OPL%d",
+	    sc->syn.name, sc->model);
 	sc->syn.data = sc;
 	sc->syn.nvoice = sc->model == OPL_2 ? OPL2_NVOICE : OPL3_NVOICE;
 	sc->syn.flags =  MS_DOALLOC | MS_FREQXLATE;

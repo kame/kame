@@ -1,4 +1,4 @@
-/*	$OpenBSD: sunos_machdep.c,v 1.14 2002/06/04 00:09:08 deraadt Exp $	*/
+/*	$OpenBSD: sunos_machdep.c,v 1.16 2003/08/01 18:37:28 miod Exp $	*/
 /*	$NetBSD: sunos_machdep.c,v 1.12 1996/10/13 03:19:22 christos Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -150,24 +146,6 @@ sunos_sendsig(catcher, sig, mask, code, type, val)
 		printf("sunos_sendsig(%d): sig %d ssp %p usp %p scp %p ft %d\n",
 		       p->p_pid, sig, &oonstack, fp, &fp->sf_sc, ft);
 #endif
-	if (uvm_useracc((caddr_t)fp, fsize, B_WRITE) == 0) {
-#ifdef DEBUG
-		if ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid)
-			printf("sunos_sendsig(%d): useracc failed on sig %d\n",
-			       p->p_pid, sig);
-#endif
-		/*
-		 * Process has trashed its stack; give it an illegal
-		 * instruction to halt it in its tracks.
-		 */
-		SIGACTION(p, SIGILL) = SIG_DFL;
-		sig = sigmask(SIGILL);
-		p->p_sigignore &= ~sig;
-		p->p_sigcatch &= ~sig;
-		p->p_sigmask &= ~sig;
-		psignal(p, SIGILL);
-		return;
-	}
 	/* 
 	 * Build the argument list for the signal handler.
 	 */
@@ -186,12 +164,22 @@ sunos_sendsig(catcher, sig, mask, code, type, val)
 	kfp.sf_sc.sc_ps = frame->f_sr;
 
 	if (copyout(&kfp, fp, fsize) != 0) {
+#ifdef DEBUG
+		if ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid)
+			printf("sunos_sendsig(%d): copyout failed on sig %d\n",
+			       p->p_pid, sig);
+#endif
 		/*
 		 * Process has trashed its stack; give it an illegal
 		 * instruction to halt it in its tracks.
 		 */
-		sigexit(p, SIGILL);
-		/* NOTREACHED */ 
+		SIGACTION(p, SIGILL) = SIG_DFL;
+		sig = sigmask(SIGILL);
+		p->p_sigignore &= ~sig;
+		p->p_sigcatch &= ~sig;
+		p->p_sigmask &= ~sig;
+		psignal(p, SIGILL);
+		return;
 	}
 
 	frame->f_regs[SP] = (int)fp;
@@ -244,8 +232,7 @@ sunos_sys_sigreturn(p, v, retval)
 	 * Test and fetch the context structure.
 	 * We grab it all at once for speed.
 	 */
-	if (uvm_useracc((caddr_t)scp, sizeof(*scp), B_WRITE) == 0 ||
-	    copyin((caddr_t)scp, (caddr_t)&tsigc, sizeof(tsigc)))
+	if (copyin((caddr_t)scp, (caddr_t)&tsigc, sizeof(tsigc)))
 		return (EINVAL);
 	scp = &tsigc;
 	if ((scp->sc_ps & (PSL_MBZ|PSL_IPL|PSL_S)) != 0)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: openpic.c,v 1.19 2003/02/12 22:40:59 jason Exp $	*/
+/*	$OpenBSD: openpic.c,v 1.22 2003/08/07 16:08:58 drahn Exp $	*/
 
 /*-
  * Copyright (c) 1995 Per Fogelstrom
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -67,8 +63,6 @@ int o_hwirq[ICU_LEN], o_virq[ICU_LEN];
 unsigned int imen_o = 0xffffffff;
 int o_virq_max;
 
-struct evcnt o_evirq[ICU_LEN];
-
 static int fakeintr(void *);
 static char *intr_typename(int type);
 static void intr_calculatemasks(void);
@@ -82,7 +76,8 @@ void openpic_enable_irq_mask(int irq_mask);
 
 static __inline u_int openpic_read(int);
 static __inline void openpic_write(int, u_int);
-void openpic_enable_irq(int, int);
+void openpic_set_enable_irq(int, int);
+void openpic_enable_irq(int);
 void openpic_disable_irq(int);
 void openpic_init(void);
 void openpic_set_priority(int, int);
@@ -407,8 +402,7 @@ intr_calculatemasks()
 		for (irq = 0; irq < ICU_LEN; irq++) {
 			if (o_intrhand[irq]) {
 				irqs |= 1 << irq;
-				openpic_enable_irq(o_hwirq[irq],
-				    o_intrtype[irq]);
+				openpic_enable_irq(o_hwirq[irq]);
 			} else {
 				openpic_disable_irq(o_hwirq[irq]);
 			}
@@ -478,7 +472,7 @@ openpic_do_pending_int()
 	int irq;
 	int pcpl;
 	int hwpend;
-	int emsr, dmsr;
+	int s;
 	static int processing;
 
 	if (processing)
@@ -486,9 +480,7 @@ openpic_do_pending_int()
 
 	processing = 1;
 	pcpl = splhigh();		/* Turn off all */
-	asm volatile("mfmsr %0" : "=r"(emsr));
-	dmsr = emsr & ~PSL_EE;
-	asm volatile("mtmsr %0" :: "r"(dmsr));
+	s = ppc_intr_disable();
 
 	hwpend = ipending & ~pcpl;	/* Do now unmasked pendings */
 	imen_o &= ~hwpend;
@@ -502,8 +494,6 @@ openpic_do_pending_int()
 			(*ih->ih_fun)(ih->ih_arg);
 			ih = ih->ih_next;
 		}
-
-		o_evirq[o_hwirq[irq]].ev_count++;
 	}
 
 	/*out32rb(INT_ENABLE_REG, ~imen_o);*/
@@ -527,7 +517,7 @@ openpic_do_pending_int()
 	} while (ipending & (SINT_NET|SINT_CLOCK|SINT_TTY) & ~cpl);
 	ipending &= pcpl;
 	cpl = pcpl;	/* Don't use splx... we are here already! */
-	asm volatile("mtmsr %0" :: "r"(emsr));
+	ppc_intr_enable(s);
 	processing = 0;
 }
 
@@ -557,14 +547,15 @@ int irq_mask;
 	int irq;
 	for ( irq = 0; irq <= o_virq_max; irq++) {
 		if (irq_mask & (1 << irq)) {
-			openpic_enable_irq(o_hwirq[irq], o_intrtype[irq]);
+			openpic_enable_irq(o_hwirq[irq]);
 		} else {
 			openpic_disable_irq(o_hwirq[irq]);
 		}
 	}
 }
+
 void
-openpic_enable_irq(irq, type)
+openpic_set_enable_irq(irq, type)
 	int irq;
 	int type;
 {
@@ -573,6 +564,21 @@ openpic_enable_irq(irq, type)
 	x = openpic_read(OPENPIC_SRC_VECTOR(irq));
 	x &= ~(OPENPIC_IMASK|OPENPIC_SENSE_LEVEL|OPENPIC_SENSE_EDGE);
 	if (type == IST_LEVEL) {
+		x |= OPENPIC_SENSE_LEVEL;
+	} else {
+		x |= OPENPIC_SENSE_EDGE;
+	}
+	openpic_write(OPENPIC_SRC_VECTOR(irq), x);
+}
+void
+openpic_enable_irq(irq)
+	int irq;
+{
+	u_int x;
+
+	x = openpic_read(OPENPIC_SRC_VECTOR(irq));
+	x &= ~(OPENPIC_IMASK|OPENPIC_SENSE_LEVEL|OPENPIC_SENSE_EDGE);
+	if (o_intrtype[o_virq[irq]] == IST_LEVEL) {
 		x |= OPENPIC_SENSE_LEVEL;
 	} else {
 		x |= OPENPIC_SENSE_EDGE;
@@ -623,7 +629,7 @@ ext_intr_openpic()
 {
 	int irq, realirq;
 	int r_imen;
-	int pcpl;
+	int pcpl, ocpl;
 	struct intrhand *ih;
 
 	pcpl = cpl;
@@ -641,23 +647,32 @@ ext_intr_openpic()
 		if ((pcpl & r_imen) != 0) {
 			ipending |= r_imen;     /* Masked! Mark this as pending */
 			openpic_disable_irq(realirq);
+			openpic_eoi(0);
 		} else {
-			splraise(o_intrmask[irq]);
+			openpic_disable_irq(realirq);
+			openpic_eoi(0);
+			ocpl = splraise(o_intrmask[irq]);
 
 			ih = o_intrhand[irq];
 			while (ih) {
+				ppc_intr_enable(1);
+
 				(*ih->ih_fun)(ih->ih_arg);
+
+				(void)ppc_intr_disable();
 				ih = ih->ih_next;
 			}
 
 			uvmexp.intrs++;
-			o_evirq[realirq].ev_count++;
+			__asm__ volatile("":::"memory"); /* don't reorder.... */
+			cpl = ocpl;
+			__asm__ volatile("":::"memory"); /* don't reorder.... */
+			openpic_enable_irq(realirq);
 		}
-
-		openpic_eoi(0);
 
 		realirq = openpic_read_irq(0);
 	}
+	ppc_intr_enable(1);
 
 	splx(pcpl);     /* Process pendings. */
 }

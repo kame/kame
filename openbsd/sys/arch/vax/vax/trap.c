@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.25 2002/06/23 03:03:15 deraadt Exp $     */
+/*	$OpenBSD: trap.c,v 1.27 2003/05/27 23:05:41 miod Exp $     */
 /*	$NetBSD: trap.c,v 1.47 1999/08/21 19:26:20 matt Exp $     */
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden.
@@ -153,6 +153,7 @@ arithflt(frame)
 	int typ;
 	union sigval sv;
 	
+	sv.sival_int = frame->pc;
 	uvmexp.traps++;
 	if ((umode = USERMODE(frame))) {
 		type |= T_USER;
@@ -200,6 +201,7 @@ fram:
 #endif
 	case T_ACCFLT|T_USER:
 		if (frame->code < 0) { /* Check for kernel space */
+			sv.sival_int = frame->code;
 			sig = SIGSEGV;
 			typ = SEGV_ACCERR;
 			break;
@@ -222,7 +224,7 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 		 * because we must check for PTE pages anyway we don't
 		 * bother doing it here.
 		 */
-		addr = trunc_page((vaddr_t)frame->code);
+		sv.sival_int = frame->code;
 		if ((umode == 0) && (frame->code < 0))
 			map = kernel_map;
 		else
@@ -233,6 +235,7 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 		else
 			ftype = VM_PROT_READ;
 
+		addr = trunc_page((vaddr_t)frame->code);
 		rv = uvm_fault(map, addr, 0, ftype);
 		if (rv) {
 			if (umode == 0) {
@@ -247,7 +250,7 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 				       p->p_cred && p->p_ucred ?
 				       p->p_ucred->cr_uid : -1);
 				sig = SIGKILL;
-				typ = 0; 		/* XXX what goes here? (does it matter?) */
+				typ = 0;
 			} else {
 				sig = SIGSEGV;
 				typ = SEGV_MAPERR;
@@ -263,6 +266,7 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 		    frame->code, frame->pc);
 
 	case T_PTELEN|T_USER:	/* Page table length exceeded */
+		sv.sival_int = frame->code;
 		sig = SIGSEGV;
 		typ = SEGV_MAPERR;
 		break;
@@ -296,6 +300,7 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 		break;
 
 	case T_ARITHFLT|T_USER:
+		sv.sival_int = frame->code;
 		typ = 0;				/* XXX */
 		sig = SIGFPE;
 		break;
@@ -316,7 +321,6 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 	}
 
 	if (trapsig) { 
-		sv.sival_ptr = (caddr_t)frame->pc;
 		trapsignal(p, sig, frame->code, typ, sv);
 
 		/*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cdefs.h,v 1.8 2002/12/28 18:04:49 espie Exp $	*/
+/*	$OpenBSD: cdefs.h,v 1.10 2003/08/24 01:27:07 avsm Exp $	*/
 /*	$NetBSD: cdefs.h,v 1.16 1996/04/03 20:46:39 christos Exp $	*/
 
 /*
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,14 +37,6 @@
 
 #ifndef	_CDEFS_H_
 #define	_CDEFS_H_
-
-/*
- * Gratuitous NetBSD gcc extensions we can do without.
- */
-
-#ifdef __KPRINTF_ATTRIBUTE__
-#undef __KPRINTF_ATTRIBUTE__
-#endif
 
 #include <machine/cdefs.h>
 
@@ -173,12 +161,6 @@
 #else
 #define __predict_true(exp)	((exp) != 0)
 #define __predict_false(exp)	((exp) != 0)
-#endif
-
-#ifdef __KPRINTF_ATTRIBUTE__
-#define __kprintf_attribute__(a) __attribute__(a)
-#else
-#define __kprintf_attribute__(a)
 #endif
 
 /* Delete pseudo-keywords wherever they are not available or needed. */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: dk.c,v 1.8 2003/01/14 19:32:23 mickey Exp $	*/
+/*	$OpenBSD: dk.c,v 1.12 2003/08/11 06:51:45 mickey Exp $	*/
 
 /*
  * Copyright 1996 1995 by Open Software Foundation, Inc.   
@@ -32,12 +32,8 @@
 
 #include "dev_hppa.h"
 
-iodcio_t dkiodc;	/* boot IODC entry point */
-
 const char *
-dk_disklabel(dp, label)
-	struct hppa_dev *dp;
-	struct disklabel *label;
+dk_disklabel(struct hppa_dev *dp, struct disklabel *label)
 {
 	char buf[DEV_BSIZE];
 	int ret;
@@ -52,9 +48,9 @@ dk_disklabel(dp, label)
 int
 dkopen(struct open_file *f, ...)
 {
-	register struct disklabel *lp;
-	register struct hppa_dev *dp = f->f_devdata;
-	register const char *st;
+	struct disklabel *lp;
+	struct hppa_dev *dp = f->f_devdata;
+	const char *st;
 
 #ifdef	DEBUG
 	if (debug)
@@ -70,6 +66,7 @@ dkopen(struct open_file *f, ...)
 #ifdef DEBUG
 	if (debug)
 		printf ("disklabel\n");
+#endif
 
 	if ((st = dk_disklabel(dp, lp)) != NULL) {
 #ifdef DEBUG
@@ -78,7 +75,7 @@ dkopen(struct open_file *f, ...)
 #endif
 		/* we do not know if it's a disk or net, but do not fail */
 	} else {
-		register u_int i;
+		u_int i;
 
 		i = B_PARTITION(dp->bootdev);
 		if (i >= lp->d_npartitions || !lp->d_partitions[i].p_size)
@@ -86,7 +83,7 @@ dkopen(struct open_file *f, ...)
 
 		dp->fsoff = lp->d_partitions[i].p_offset;
 	}
-#endif
+
 #ifdef DEBUGBUG
 	if (debug)
 		printf ("dkopen() ret\n");

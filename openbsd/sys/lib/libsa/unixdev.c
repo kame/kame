@@ -1,4 +1,4 @@
-/*	$OpenBSD: unixdev.c,v 1.4 1998/05/25 18:37:30 mickey Exp $	*/
+/*	$OpenBSD: unixdev.c,v 1.7 2003/08/11 06:23:09 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1996-1998 Michael Shalayeff
@@ -12,14 +12,9 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
  * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -44,23 +39,18 @@
 #include <lib/libsa/unixdev.h>
 
 int
-unixstrategy(devdata, rw, blk, size, buf, rsize)
-	void *devdata;
-	int rw;
-	daddr_t blk;
-	size_t size;
-	void *buf;
-	size_t *rsize;
+unixstrategy(void *devdata, int rw, daddr_t blk, size_t size, void *buf,
+    size_t *rsize)
 {
 	int	rc = 0;
 
 #ifdef	UNIX_DEBUG
 	printf("unixstrategy: %s %d bytes @ %d\n",
-		(rw==F_READ?"reading":"writing"), size, blk);
+	    (rw==F_READ?"reading":"writing"), size, blk);
 #endif
 	if ((rc = ulseek((int)devdata, blk * DEV_BSIZE, 0)) >= 0)
-		rc = rw==F_READ? uread((int)devdata, buf, size) :
-			uwrite((int)devdata, buf, size);
+		rc = (rw==F_READ) ? uread((int)devdata, buf, size) :
+		    uwrite((int)devdata, buf, size);
 
 	if (rc >= 0) {
 		*rsize = (size_t)rc;
@@ -74,9 +64,9 @@ unixstrategy(devdata, rw, blk, size, buf, rsize)
 int
 unixopen(struct open_file *f, ...)
 {
-	register int fd;
-	register va_list ap;
-	register char **file, *p = NULL;
+	char **file, *p = NULL;
+	va_list ap;
+	int fd;
 
 	va_start(ap, f);
 	file = va_arg(ap, char **);
@@ -88,7 +78,8 @@ unixopen(struct open_file *f, ...)
 
 	if (strncmp("/dev/", *file, 5) == 0) {
 		/* p = strchr(p + 5, '/') */
-		for (p = *file + 5; *p != '\0' && *p != '/'; p++);
+		for (p = *file + 5; *p != '\0' && *p != '/'; p++)
+			;
 		if (*p == '/')
 			*p = '\0';
 	}
@@ -99,38 +90,30 @@ unixopen(struct open_file *f, ...)
 	if (p != NULL)
 		*p = '/';
 
-	return fd<0? -1: 0;
+	return fd < 0 ? -1 : 0;
 }
 
 int
-unixclose(f)
-	struct open_file *f;
+unixclose(struct open_file *f)
 {
 	return uclose((int)f->f_devdata);
 }
 
 int
-unixioctl(f, cmd, data)
-	struct open_file *f;
-	u_long cmd;
-	void *data;
+unixioctl(struct open_file *f, u_long cmd, void *data)
 {
 	return uioctl((int)f->f_devdata, cmd, data);
 }
 
 off_t
-ulseek( fd, off, wh)
-	int fd;
-	off_t off;
-	int wh;
+ulseek(int fd, off_t off, int wh)
 {
 	return __syscall((quad_t)SYS_lseek, fd, 0, off, wh);
 }
 
 
 void
-unix_probe(cn)
-	struct consdev *cn;
+unix_probe(struct consdev *cn)
 {
 	cn->cn_pri = CN_INTERNAL;
 	cn->cn_dev = makedev(0,0);
@@ -138,22 +121,18 @@ unix_probe(cn)
 }
 
 void
-unix_init(cn)
-	struct consdev *cn;
+unix_init(struct consdev *cn)
 {
 }
 
 void
-unix_putc(dev, c)
-	dev_t dev;
-	int c;
+unix_putc(dev_t dev, int c)
 {
 	uwrite(1, &c, 1);
 }
 
 int
-unix_getc(dev)
-	dev_t dev;
+unix_getc(dev_t dev)
 {
 	if (dev & 0x80) {
 		struct timeval tv;
@@ -171,36 +150,34 @@ unix_getc(dev)
 			return 1;
 	} else {
 		char c;
+
 		return uread(0, &c, 1)<1? -1: c;
 	}
 }
 
 time_t
-getsecs()
+getsecs(void)
 {
 	return 1;
 }
 
 void
-time_print()
+time_print(void)
 {
 }
 
 void
-atexit()
+atexit(void)
 {
 }
 
 int
-cnspeed(dev, sp)
-	dev_t dev;
-	int sp;
+cnspeed(dev_t dev, int sp)
 {
 	return 9600;
 }
 
 void
-__main()
+__main(void)
 {
 }
-

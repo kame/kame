@@ -1,4 +1,4 @@
-/*	$OpenBSD: ahc_pci.c,v 1.37 2003/02/18 13:14:42 jmc Exp $	*/
+/*	$OpenBSD: ahc_pci.c,v 1.40 2003/08/15 23:01:01 fgsch Exp $	*/
 /*	$NetBSD: ahc_pci.c,v 1.9 1996/10/21 22:56:24 thorpej Exp $	*/
 
 /*
@@ -145,6 +145,7 @@ void load_seeprom(struct ahc_softc *ahc);
 static int acquire_seeprom(struct ahc_softc *ahc,
 			   struct seeprom_descriptor *sd);
 static void release_seeprom(struct seeprom_descriptor *sd);
+static int verify_cksum(struct seeprom_config *);
 int ahc_probe_scbs(struct ahc_softc *ahc);
 
 static u_char aic3940_count;
@@ -160,8 +161,6 @@ const struct pci_matchid ahc_pci_devices[] = {
 	{ PCI_VENDOR_ADP, PCI_PRODUCT_ADP_AIC7810 },
 	{ PCI_VENDOR_ADP, PCI_PRODUCT_ADP_AIC7850 },
 	{ PCI_VENDOR_ADP, PCI_PRODUCT_ADP_AIC7855 },
-	{ PCI_VENDOR_ADP, PCI_PRODUCT_ADP_AIC5900 },
-	{ PCI_VENDOR_ADP, PCI_PRODUCT_ADP_AIC5905 },
 	{ PCI_VENDOR_ADP, PCI_PRODUCT_ADP_AIC7860 },
 	{ PCI_VENDOR_ADP, PCI_PRODUCT_ADP_2940AU },
 	{ PCI_VENDOR_ADP, PCI_PRODUCT_ADP_AIC7870 },
@@ -949,7 +948,9 @@ check_extport(ahc, sxfrctl1)
 	int	have_seeprom;
 	int	have_autoterm;
 	
-	sd.sd_ahc = ahc;
+	sd.sd_tag = ahc->tag;
+	sd.sd_bsh = ahc->bsh;
+	sd.sd_regsize = 1;
 	sd.sd_control_offset = SEECTL;		
 	sd.sd_status_offset = SEECTL;		
 	sd.sd_dataout_offset = SEECTL;		
@@ -1664,4 +1665,26 @@ ahc_pci_intr(ahc)
 	ahc_unpause(ahc);
 
 	return;
+}
+
+static int
+verify_cksum(struct seeprom_config *sc)
+{
+	int i;
+	int maxaddr;
+	u_int32_t checksum;
+	u_int16_t *scarray;
+
+	maxaddr = (sizeof(*sc)/2) - 1;
+	checksum = 0;
+	scarray = (uint16_t *)sc;
+
+	for (i = 0; i < maxaddr; i++)
+		checksum = checksum + scarray[i];
+	if (checksum == 0 ||
+	    (checksum & 0xFFFF) != sc->checksum) {
+		return (0);
+	} else {
+		return (1);
+	}
 }

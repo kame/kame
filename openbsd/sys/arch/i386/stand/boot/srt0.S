@@ -1,4 +1,4 @@
-/*	$OpenBSD: srt0.S,v 1.10 1998/05/14 20:59:12 mickey Exp $	*/
+/*	$OpenBSD: srt0.S,v 1.13 2003/06/27 05:13:19 weingart Exp $	*/
 
 /*
  * Copyright (c) 1997 Michael Shalayeff
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
@@ -32,33 +27,57 @@
  *
  */
 #include <machine/asm.h>
+#include <assym.h>
+
+#define BOOTSTACK 0xfffc
 
 	.globl	_C_LABEL(end)
 	.globl	_C_LABEL(edata)
 	.globl	_C_LABEL(boot)
 	.globl	_C_LABEL(_rtt)
+	.globl	_C_LABEL(bios_bootdev)
 	.globl	_ASM_LABEL(pmm_init)
+	.globl	Gdtr
 
 	.text
-	.globl	start
-start:
+	.code16
+	.globl	_start
+_start:
+	popl %eax
+	cmpl $BOOTMAGIC, %eax
+	je	1f
 #ifdef DEBUG
 	movl	$0xb80a0, %ebx
 	movl	$0x07420742, (%ebx)
 #endif
+1:
+	popl %edx
+	cli
+	pushl	%cs
+	popl	%ds
+	addr32 data32 lgdt	(Gdtr - LINKADDR)
+	movl	%cr0, %eax
+	orl $CR0_PE, %eax
+	data32 movl %eax, %cr0
+	data32 ljmp $8, $1f
+1:
+	.code32
+	movl	$0x10,%eax
+	mov	%ax,%ds
+	mov	%ax,%ss
+	mov	%ax,%es
+	mov	%ax,%fs
+	mov	%ax,%gs
+	movl	$BOOTSTACK,%esp
+	pushl	%edx
+	movl	%edx, _C_LABEL(bios_bootdev)
+
+	/* Now do it all */
 	call	_ASM_LABEL(pmm_init)
 #ifdef DEBUG
 	movl	$0xb80a4, %ebx
 	movl	$0x07520752, (%ebx)
 #endif
-	popl	%eax
-	cmpl	$BOOTMAGIC, %eax
-	je	1f
-#ifdef DEBUG
-	movl	$0xb80a8, %ebx
-	movl	$0xcf41cf4d, (%ebx)
-#endif
-1:
 	/* zero .bss */
 	xorl	%eax, %eax
 	movl	$_C_LABEL(end), %ecx

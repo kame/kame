@@ -1,6 +1,7 @@
-/*	$OpenBSD: boot.c,v 1.23 2000/12/29 19:24:44 mickey Exp $	*/
+/*	$OpenBSD: boot.c,v 1.29 2003/08/11 06:23:07 deraadt Exp $	*/
 
 /*
+ * Copyright (c) 2003 Dale Rahn
  * Copyright (c) 1997,1998 Michael Shalayeff
  * All rights reserved.
  *
@@ -12,14 +13,9 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
  * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -36,6 +32,9 @@
 #include <sys/reboot.h>
 #include <sys/stat.h>
 #include <libsa.h>
+#include <lib/libsa/loadfile.h>
+#include <lib/libkern/funcs.h>
+
 #include "cmd.h"
 
 static const char *const kernels[] = {
@@ -47,43 +46,51 @@ static const char *const kernels[] = {
 
 extern	const char version[];
 struct cmd_state cmd;
+int bootprompt = 1;
 
 void
-boot(bootdev)
-	dev_t	bootdev;
+boot(dev_t bootdev)
 {
-	register const char *bootfile = kernels[0];
-	register int i = 0, try = 0, st;
+	const char *bootfile = kernels[0];
+	int i = 0, try = 0, st;
+	u_long marks[MARK_MAX];
 
 	machdep();
 
 	printf(">> OpenBSD/" MACHINE " BOOT %s\n", version);
 
 	devboot(bootdev, cmd.bootdev);
-	strncpy(cmd.image, bootfile, sizeof(cmd.image));
+	strlcpy(cmd.image, bootfile, sizeof(cmd.image));
 	cmd.boothowto = 0;
 	cmd.conf = "/etc/boot.conf";
 	cmd.addr = (void *)DEFAULT_KERNEL_ADDRESS;
 	cmd.timeout = 5;
 
 	st = read_conf();
+	if (!bootprompt)
+		snprintf(cmd.path, sizeof cmd.path, "%s:%s",
+		    cmd.bootdev, cmd.image);
 
 	while (1) {
-		if (st <= 0) /* no boot.conf, or no boot cmd in there */
+		/* no boot.conf, or no boot cmd in there */
+		if (bootprompt && st <= 0)
 			do {
 				printf("boot> ");
 			} while(!getcmd());
 		st = 0;
+		bootprompt = 1;	/* allow reselect should we fail */
 
 		printf("booting %s: ", cmd.path);
-		exec(cmd.path, cmd.addr, cmd.boothowto);
+		marks[MARK_START] = (u_long)cmd.addr;
+		if (loadfile(cmd.path, marks, LOAD_ALL) >= 0)
+			break;
 
 		if (kernels[++i] == NULL) {
 			try += 1;
 			bootfile = kernels[i=0];
 		} else
 			bootfile = kernels[i];
-		strncpy(cmd.image, bootfile, sizeof(cmd.image));
+		strlcpy(cmd.image, bootfile, sizeof(cmd.image));
 		printf(" failed(%d). will try %s\n", errno, bootfile);
 
 		if (try < 2)
@@ -94,6 +101,9 @@ boot(bootdev)
 			cmd.timeout = 0;
 		}
 	}
+
+	/* exec */
+	run_loadfile(marks, cmd.boothowto);
 }
 
 #ifdef _TEST

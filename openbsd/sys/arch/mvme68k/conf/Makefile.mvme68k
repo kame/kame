@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile.mvme68k,v 1.19 2002/12/25 21:10:26 miod Exp $
+#	$OpenBSD: Makefile.mvme68k,v 1.23 2003/07/22 19:39:50 otto Exp $
 
 # This makefile is constructed from a machine description:
 #	config machineid
@@ -43,7 +43,10 @@ CMACHFLAGS=	-m68020
 .else
 CMACHFLAGS=	-m68060 -Wa,-m68030
 .endif
-CMACHFLAGS+=	-msoft-float -fno-stack-protector
+CMACHFLAGS+=	-msoft-float
+.if ${IDENT:M-DNO_PROPOLICE}
+CMACHFLAGS+=	-fno-stack-protector
+.endif
 
 COPTS?=		-O2
 CFLAGS=		${DEBUG} ${COPTS} ${CWARNFLAGS} ${CMACHFLAGS} ${PIPE}
@@ -144,7 +147,7 @@ clean::
 
 lint: /tmp param.c
 	@lint -hbxn -DGENERIC -Dvolatile= ${COPTS} ${PARAM} -UKGDB \
-	    ${CFILES} ${MVME68K}/mvme68k/swapgeneric.c ioconf.c param.c | \
+	    ${CFILES} ioconf.c param.c | \
 	    grep -v 'struct/union .* never defined' | \
 	    grep -v 'possible pointer alignment problem'
 
@@ -166,6 +169,10 @@ depend:: .depend
 	mkdep ${AFLAGS} ${CPPFLAGS} ${MVME68K}/mvme68k/locore.s
 	mkdep -a ${CFLAGS} ${CPPFLAGS} param.c ioconf.c ${CFILES}
 	mkdep -a ${AFLAGS} ${CPPFLAGS} ${SFILES}
+	sh $S/kern/genassym.sh mkdep -f assym.dep ${CFLAGS} \
+	    ${CPPFLAGS} < ${MVME68K}/mvme68k/genassym.cf
+	@sed -e 's/.*\.o:.* /assym.h: /' < assym.dep >> .depend
+	@rm -f assym.dep
 
 
 # depend on root or device configuration

@@ -1,5 +1,5 @@
-/*	$OpenBSD: if_aue.c,v 1.29 2002/11/11 02:32:32 nate Exp $ */
-/*	$NetBSD: if_aue.c,v 1.81 2002/09/29 19:55:52 augustss Exp $	*/
+/*	$OpenBSD: if_aue.c,v 1.31 2003/05/17 17:48:32 nate Exp $ */
+/*	$NetBSD: if_aue.c,v 1.82 2003/03/05 17:37:36 shiba Exp $	*/
 /*
  * Copyright (c) 1997, 1998, 1999, 2000
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
@@ -200,9 +200,9 @@ Static const struct aue_type aue_devs[] = {
  {{ USB_VENDOR_DLINK,		USB_PRODUCT_DLINK_DSB650TX2},	  LSYS|PII },
  {{ USB_VENDOR_DLINK,		USB_PRODUCT_DLINK_DSB650},	  0 },
  {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBTX0},	  0 },
- {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBTX1},	  0 },
+ {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBTX1},	  LSYS },
  {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBTX2},	  0 },
- {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBTX3},	  PII },
+ {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBTX3},	  LSYS },
  {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBLTX},	  PII },
  {{ USB_VENDOR_ELSA,		USB_PRODUCT_ELSA_USB2ETHERNET},	  0 },
  {{ USB_VENDOR_IODATA,		USB_PRODUCT_IODATA_USBETTX},	  0 },
@@ -730,7 +730,7 @@ USB_ATTACH(aue)
 
 	DPRINTFN(5,(" : aue_attach: sc=%p", sc));
 
-	usbd_devinfo(dev, 0, devinfo);
+	usbd_devinfo(dev, 0, devinfo, sizeof devinfo);
 	USB_ATTACH_SETUP;
 	printf("%s: %s\n", USBDEVNAME(sc->aue_dev), devinfo);
 

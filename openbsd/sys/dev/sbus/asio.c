@@ -1,4 +1,4 @@
-/*	$OpenBSD: asio.c,v 1.6 2003/02/17 01:29:20 henric Exp $	*/
+/*	$OpenBSD: asio.c,v 1.10 2003/06/27 01:50:52 jason Exp $	*/
 
 /*
  * Copyright (c) 2002 Jason L. Wright (jason@thought.net)
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -99,10 +94,7 @@ struct cfdriver asio_cd = {
 };
 
 int
-asio_match(parent, match, aux)
-	struct device *parent;
-	void *match;
-	void *aux;
+asio_match(struct device *parent, void *match, void *aux)
 {
 	struct sbus_attach_args *sa = aux;
 
@@ -112,9 +104,7 @@ asio_match(parent, match, aux)
 }
 
 void
-asio_attach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+asio_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct asio_softc *sc = (void *)self;
 	struct sbus_attach_args *sa = aux;
@@ -141,21 +131,17 @@ asio_attach(parent, self, aux)
 		return;
 	}
 
-	if (sbus_bus_map(sa->sa_bustag,
-	    sa->sa_reg[0].sbr_slot,
-	    sa->sa_reg[0].sbr_offset,
-	    sa->sa_reg[0].sbr_size,
-	    BUS_SPACE_MAP_LINEAR, 0, &sc->sc_csr_h)) {
+	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[0].sbr_slot,
+	    sa->sa_reg[0].sbr_offset, sa->sa_reg[0].sbr_size,
+	    0, 0, &sc->sc_csr_h)) {
 		printf(": couldn't map csr\n");
 		return;
 	}
 
 	for (i = 0; i < sc->sc_nports; i++) {
-		if (sbus_bus_map(sa->sa_bustag,
-		    sa->sa_reg[i + 1].sbr_slot,
-		    sa->sa_reg[i + 1].sbr_offset,
-		    sa->sa_reg[i + 1].sbr_size,
-		    BUS_SPACE_MAP_LINEAR, 0, &sc->sc_ports[i].ap_bh)) {
+		if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[i + 1].sbr_slot,
+		    sa->sa_reg[i + 1].sbr_offset, sa->sa_reg[i + 1].sbr_size,
+		    0, 0, &sc->sc_ports[i].ap_bh)) {
 			printf(": couldn't map uart%d\n", i);
 			return;
 		}
@@ -178,9 +164,7 @@ asio_attach(parent, self, aux)
 }
 
 int
-asio_print(aux, name)
-	void *aux;
-	const char *name;
+asio_print(void *aux, const char *name)
 {
 	struct asio_attach_args *aaa = aux;
 
@@ -199,9 +183,7 @@ struct cfattach com_asio_ca = {
 };
 
 void
-asio_intr_enable(dv, en)
-	struct device *dv;
-	u_int8_t en;
+asio_intr_enable(struct device *dv, u_int8_t en)
 {
 	struct asio_softc *sc = (struct asio_softc *)dv;
 	u_int8_t csr;
@@ -213,18 +195,13 @@ asio_intr_enable(dv, en)
 }
 
 int
-com_asio_match(parent, match, aux)
-	struct device *parent;
-	void *match;
-	void *aux;
+com_asio_match(struct device *parent, void *match, void *aux)
 {
 	return (1);
 }
 
 void
-com_asio_attach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+com_asio_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct com_softc *sc = (struct com_softc *)self;
 	struct asio_attach_args *aaa = aux;
@@ -237,7 +214,7 @@ com_asio_attach(parent, self, aux)
 	sc->sc_frequency = BAUD_BASE;
 
 	sc->sc_ih = bus_intr_establish(aaa->aaa_iot, aaa->aaa_pri,
-	    IPL_TTY, 0, comintr, sc);
+	    IPL_TTY, 0, comintr, sc, self->dv_xname);
 	if (sc->sc_ih == NULL) {
 		printf(": cannot allocate intr\n");
 		return;

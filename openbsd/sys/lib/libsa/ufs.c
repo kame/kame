@@ -1,4 +1,4 @@
-/*	$OpenBSD: ufs.c,v 1.13 2002/03/14 01:27:07 millert Exp $	*/
+/*	$OpenBSD: ufs.c,v 1.17 2003/08/25 23:27:44 tedu Exp $	*/
 /*	$NetBSD: ufs.c,v 1.16 1996/09/30 16:01:22 ws Exp $	*/
 
 /*-
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -35,30 +31,30 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *  
+ *
  *
  * Copyright (c) 1990, 1991 Carnegie Mellon University
  * All Rights Reserved.
  *
  * Author: David Golub
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
  * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND FOR
  * ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
- * 
+ *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
  *  School of Computer Science
  *  Carnegie Mellon University
  *  Pittsburgh PA 15213-3890
- * 
+ *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
@@ -76,6 +72,7 @@
 #include <lib/libkern/libkern.h>
 
 #include "stand.h"
+#include "ufs.h"
 
 /*
  * In-core open file.
@@ -83,7 +80,7 @@
 struct file {
 	off_t		f_seekp;	/* seek pointer */
 	struct fs	*f_fs;		/* pointer to super-block */
-	struct dinode	f_di;		/* copy of on-disk inode */
+	struct ufs1_dinode	f_di;		/* copy of on-disk inode */
 	int		f_nindir[NIADDR];
 					/* number of blocks mapped by
 					   indirect block at level i */
@@ -109,12 +106,10 @@ static void	ffs_oldfscompat(struct fs *);
  * Read a new inode into a file structure.
  */
 static int
-read_inode(inumber, f)
-	ino_t inumber;
-	struct open_file *f;
+read_inode(ino_t inumber, struct open_file *f)
 {
-	register struct file *fp = (struct file *)f->f_fsdata;
-	register struct fs *fs = fp->f_fs;
+	struct file *fp = (struct file *)f->f_fsdata;
+	struct fs *fs = fp->f_fs;
 	char *buf;
 	size_t rsize;
 	int rc;
@@ -125,8 +120,8 @@ read_inode(inumber, f)
 	buf = alloc(fs->fs_bsize);
 	twiddle();
 	rc = (f->f_dev->dv_strategy)(f->f_devdata, F_READ,
-		fsbtodb(fs, ino_to_fsba(fs, inumber)), fs->fs_bsize,
-		buf, &rsize);
+	    fsbtodb(fs, ino_to_fsba(fs, inumber)), fs->fs_bsize,
+	    buf, &rsize);
 	if (rc)
 		goto out;
 	if (rsize != (size_t)fs->fs_bsize) {
@@ -135,9 +130,9 @@ read_inode(inumber, f)
 	}
 
 	{
-		register struct dinode *dp;
+		struct ufs1_dinode *dp;
 
-		dp = (struct dinode *)buf;
+		dp = (struct ufs1_dinode *)buf;
 		fp->f_di = dp[ino_to_fsbo(fs, inumber)];
 	}
 
@@ -145,7 +140,7 @@ read_inode(inumber, f)
 	 * Clear out the old buffers
 	 */
 	{
-		register int level;
+		int level;
 
 		for (level = 0; level < NIADDR; level++)
 			fp->f_blkno[level] = -1;
@@ -153,7 +148,7 @@ read_inode(inumber, f)
 	}
 out:
 	free(buf, fs->fs_bsize);
-	return (rc);	 
+	return (rc);
 }
 
 /*
@@ -161,18 +156,12 @@ out:
  * contains that block.
  */
 static int
-block_map(f, file_block, disk_block_p)
-	struct open_file *f;
-	daddr_t file_block;
-	daddr_t *disk_block_p;	/* out */
+block_map(struct open_file *f, daddr_t file_block, daddr_t *disk_block_p)
 {
-	register struct file *fp = (struct file *)f->f_fsdata;
-	register struct fs *fs = fp->f_fs;
-	int level;
-	int idx;
-	daddr_t ind_block_num;
-	daddr_t *ind_p;
-	int rc;
+	struct file *fp = (struct file *)f->f_fsdata;
+	daddr_t ind_block_num, *ind_p;
+	struct fs *fs = fp->f_fs;
+	int level, idx, rc;
 
 	/*
 	 * Index structure of an inode:
@@ -232,13 +221,11 @@ block_map(f, file_block, disk_block_p)
 		if (fp->f_blkno[level] != ind_block_num) {
 			if (fp->f_blk[level] == (char *)0)
 				fp->f_blk[level] =
-					alloc(fs->fs_bsize);
+				    alloc(fs->fs_bsize);
 			twiddle();
 			rc = (f->f_dev->dv_strategy)(f->f_devdata, F_READ,
-				fsbtodb(fp->f_fs, ind_block_num),
-				fs->fs_bsize,
-				fp->f_blk[level],
-				&fp->f_blksize[level]);
+			    fsbtodb(fp->f_fs, ind_block_num), fs->fs_bsize,
+			    fp->f_blk[level], &fp->f_blksize[level]);
 			if (rc)
 				return (rc);
 			if (fp->f_blksize[level] != (size_t)fs->fs_bsize)
@@ -258,7 +245,6 @@ block_map(f, file_block, disk_block_p)
 	}
 
 	*disk_block_p = ind_block_num;
-
 	return (0);
 }
 
@@ -267,17 +253,13 @@ block_map(f, file_block, disk_block_p)
  * the location in the buffer and the amount in the buffer.
  */
 static int
-buf_read_file(f, buf_p, size_p)
-	struct open_file *f;
-	char **buf_p;		/* out */
-	size_t *size_p;		/* out */
+buf_read_file(struct open_file *f, char **buf_p, size_t *size_p)
 {
-	register struct file *fp = (struct file *)f->f_fsdata;
-	register struct fs *fs = fp->f_fs;
-	long off;
-	register daddr_t file_block;
-	daddr_t	disk_block;
+	struct file *fp = (struct file *)f->f_fsdata;
+	struct fs *fs = fp->f_fs;
+	daddr_t file_block, disk_block;
 	size_t block_size;
+	long off;
 	int rc;
 
 	off = blkoff(fs, fp->f_seekp);
@@ -298,8 +280,8 @@ buf_read_file(f, buf_p, size_p)
 		} else {
 			twiddle();
 			rc = (f->f_dev->dv_strategy)(f->f_devdata, F_READ,
-				fsbtodb(fs, disk_block),
-				block_size, fp->f_buf, &fp->f_buf_size);
+			    fsbtodb(fs, disk_block),
+			    block_size, fp->f_buf, &fp->f_buf_size);
 			if (rc)
 				return (rc);
 		}
@@ -329,18 +311,13 @@ buf_read_file(f, buf_p, size_p)
  * i_number.
  */
 static int
-search_directory(name, f, inumber_p)
-	char *name;
-	struct open_file *f;
-	ino_t *inumber_p;		/* out */
+search_directory(char *name, struct open_file *f, ino_t *inumber_p)
 {
-	register struct file *fp = (struct file *)f->f_fsdata;
-	register struct direct *dp;
-	struct direct *edp;
-	char *buf;
+	struct file *fp = (struct file *)f->f_fsdata;
+	int namlen, length, rc;
+	struct direct *dp, *edp;
 	size_t buf_size;
-	int namlen, length;
-	int rc;
+	char *buf;
 
 	length = strlen(name);
 
@@ -379,20 +356,14 @@ search_directory(name, f, inumber_p)
  * Open a file.
  */
 int
-ufs_open(path, f)
-	char *path;
-	struct open_file *f;
+ufs_open(char *path, struct open_file *f)
 {
-	register char *cp, *ncp;
-	register int c;
+	char namebuf[MAXPATHLEN+1], *cp, *ncp, *buf = NULL;
 	ino_t inumber, parent_inumber;
+	int rc, c, nlinks = 0;
 	struct file *fp;
-	struct fs *fs;
-	int rc;
 	size_t buf_size;
-	int nlinks = 0;
-	char namebuf[MAXPATHLEN+1];
-	char *buf = NULL;
+	struct fs *fs;
 
 	/* allocate file system specific data structure */
 	fp = alloc(sizeof(struct file));
@@ -404,7 +375,7 @@ ufs_open(path, f)
 	fp->f_fs = fs;
 	twiddle();
 	rc = (f->f_dev->dv_strategy)(f->f_devdata, F_READ,
-		SBLOCK, SBSIZE, (char *)fs, &buf_size);
+	    SBLOCK, SBSIZE, (char *)fs, &buf_size);
 	if (rc)
 		goto out;
 
@@ -421,8 +392,8 @@ ufs_open(path, f)
 	 * Calculate indirect block levels.
 	 */
 	{
-		register int mult;
-		register int level;
+		int mult;
+		int level;
 
 		mult = 1;
 		for (level = 0; level < NIADDR; level++) {
@@ -458,7 +429,7 @@ ufs_open(path, f)
 		 * Get next component of path name.
 		 */
 		{
-			register int len = 0;
+			int len = 0;
 
 			ncp = cp;
 			while ((c = *cp) != '\0' && c != '/') {
@@ -507,25 +478,25 @@ ufs_open(path, f)
 
 			if (link_len < fs->fs_maxsymlinklen) {
 				bcopy(fp->f_di.di_shortlink, namebuf,
-				      (unsigned) link_len);
+				    (unsigned) link_len);
 			} else {
 				/*
 				 * Read file for symbolic link
 				 */
 				size_t buf_size;
 				daddr_t	disk_block;
-				register struct fs *fs = fp->f_fs;
+				struct fs *fs = fp->f_fs;
 
 				if (!buf)
 					buf = alloc(fs->fs_bsize);
 				rc = block_map(f, (daddr_t)0, &disk_block);
 				if (rc)
 					goto out;
-				
+
 				twiddle();
 				rc = (f->f_dev->dv_strategy)(f->f_devdata,
-					F_READ, fsbtodb(fs, disk_block),
-					fs->fs_bsize, buf, &buf_size);
+				    F_READ, fsbtodb(fs, disk_block),
+				    fs->fs_bsize, buf, &buf_size);
 				if (rc)
 					goto out;
 
@@ -562,10 +533,9 @@ out:
 }
 
 int
-ufs_close(f)
-	struct open_file *f;
+ufs_close(struct open_file *f)
 {
-	register struct file *fp = (struct file *)f->f_fsdata;
+	struct file *fp = (struct file *)f->f_fsdata;
 	int level;
 
 	f->f_fsdata = (void *)0;
@@ -588,18 +558,12 @@ ufs_close(f)
  * Cross block boundaries when necessary.
  */
 int
-ufs_read(f, start, size, resid)
-	struct open_file *f;
-	void *start;
-	size_t size;
-	size_t *resid;	/* out */
+ufs_read(struct open_file *f, void *start, size_t size, size_t *resid)
 {
-	register struct file *fp = (struct file *)f->f_fsdata;
-	register size_t csize;
-	char *buf;
-	size_t buf_size;
+	struct file *fp = (struct file *)f->f_fsdata;
+	char *buf, *addr = start;
+	size_t csize, buf_size;
 	int rc = 0;
-	register char *addr = start;
 
 	while (size != 0) {
 		if (fp->f_seekp >= fp->f_di.di_size)
@@ -628,23 +592,16 @@ ufs_read(f, start, size, resid)
  * Not implemented.
  */
 int
-ufs_write(f, start, size, resid)
-	struct open_file *f;
-	void *start;
-	size_t size;
-	size_t *resid;	/* out */
+ufs_write(struct open_file *f, void *start, size_t size, size_t *resid)
 {
 
 	return (EROFS);
 }
 
 off_t
-ufs_seek(f, offset, where)
-	struct open_file *f;
-	off_t offset;
-	int where;
+ufs_seek(struct open_file *f, off_t offset, int where)
 {
-	register struct file *fp = (struct file *)f->f_fsdata;
+	struct file *fp = (struct file *)f->f_fsdata;
 
 	switch (where) {
 	case SEEK_SET:
@@ -663,11 +620,9 @@ ufs_seek(f, offset, where)
 }
 
 int
-ufs_stat(f, sb)
-	struct open_file *f;
-	struct stat *sb;
+ufs_stat(struct open_file *f, struct stat *sb)
 {
-	register struct file *fp = (struct file *)f->f_fsdata;
+	struct file *fp = (struct file *)f->f_fsdata;
 
 	/* only important stuff */
 	sb->st_mode = fp->f_di.di_mode;
@@ -679,15 +634,13 @@ ufs_stat(f, sb)
 
 #ifndef	NO_READDIR
 int
-ufs_readdir(f, name)
-	struct open_file *f;
-	char	*name;
+ufs_readdir(struct open_file *f, char *name)
 {
-	register struct file *fp = (struct file *)f->f_fsdata;
-	char *buf;
+	struct file *fp = (struct file *)f->f_fsdata;
+	struct direct *dp, *edp;
 	size_t buf_size;
-	register struct direct *dp, *edp;
 	int rc, namlen;
+	char *buf;
 
 	if (name == NULL)
 		fp->f_seekp = 0;
@@ -707,7 +660,7 @@ ufs_readdir(f, name)
 			while (dp < edp && dp->d_ino == (ino_t)0)
 				dp = (struct direct *)((char *)dp + dp->d_reclen);
 			fp->f_seekp += buf_size -
-				((u_int8_t *)edp - (u_int8_t *)dp);
+			    ((u_int8_t *)edp - (u_int8_t *)dp);
 		} while (dp >= edp);
 
 #if BYTE_ORDER == LITTLE_ENDIAN
@@ -732,8 +685,7 @@ ufs_readdir(f, name)
  * XXX - goes away some day.
  */
 static void
-ffs_oldfscompat(fs)
-	struct fs *fs;
+ffs_oldfscompat(struct fs *fs)
 {
 	int i;
 

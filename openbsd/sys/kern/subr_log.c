@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr_log.c,v 1.8 2002/06/29 02:58:14 mickey Exp $	*/
+/*	$OpenBSD: subr_log.c,v 1.10 2003/07/21 22:44:50 tedu Exp $	*/
 /*	$NetBSD: subr_log.c,v 1.11 1996/03/30 22:24:44 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -153,7 +149,7 @@ logread(dev, uio, flag)
 			return (EWOULDBLOCK);
 		}
 		logsoftc.sc_state |= LOG_RDWAIT;
-		error = tsleep((caddr_t)mbp, LOG_RDPRI | PCATCH,
+		error = tsleep(mbp, LOG_RDPRI | PCATCH,
 			       "klog", 0);
 		if (error) {
 			splx(s);
@@ -170,8 +166,7 @@ logread(dev, uio, flag)
 		l = min(l, uio->uio_resid);
 		if (l == 0)
 			break;
-		error = uiomove((caddr_t)&mbp->msg_bufc[mbp->msg_bufr],
-			(int)l, uio);
+		error = uiomove(&mbp->msg_bufc[mbp->msg_bufr], (int)l, uio);
 		if (error)
 			break;
 		mbp->msg_bufr += l;
@@ -257,7 +252,7 @@ logwakeup()
 		csignal(logsoftc.sc_pgid, SIGIO,
 		    logsoftc.sc_siguid, logsoftc.sc_sigeuid);
 	if (logsoftc.sc_state & LOG_RDWAIT) {
-		wakeup((caddr_t)msgbufp);
+		wakeup(msgbufp);
 		logsoftc.sc_state &= ~LOG_RDWAIT;
 	}
 	KNOTE(&logsoftc.sc_selp.si_note, 0);

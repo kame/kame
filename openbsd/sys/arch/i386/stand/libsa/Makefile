@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.39 2002/06/20 20:22:58 weingart Exp $
+#	$OpenBSD: Makefile,v 1.42 2003/08/08 07:38:45 deraadt Exp $
 
 .include "${.CURDIR}/../Makefile.inc"
 
@@ -10,7 +10,7 @@ DIR_SA=	$S/lib/libsa
 DIR_KERN=$S/lib/libkern
 
 # i386 stuff (so, it will possibly load in the same 64k)
-SRCS+=	machdep.c dev_i386.c exec_i386.c cmd_i386.c
+SRCS+=	machdep.c dev_i386.c exec_i386.c cmd_i386.c loadfile.c
 
 .if defined(DEBUGFLAGS) && !empty(DEBUGFLAGS:M-D_TEST)
 SRCS+=	unixdev.c unixsys.S nullfs.c memprobe.c
@@ -28,8 +28,8 @@ CLEANFILES+=	unixdev.o unixsys.o nullfs.o
 
 # stand routines
 SRCS+=	alloc.c exit.c getfile.c gets.c globals.c strcmp.c strlen.c \
-	strncmp.c memcmp.c memcpy.c memset.c printf.c strerror.c strncpy.c \
-	strtol.c ctime.c exec.new.c exec_aout.c
+	strncmp.c memcmp.c memcpy.c memset.c printf.c snprintf.c \
+	strerror.c strncpy.c strtol.c ctime.c strlcpy.c strlcat.c
 
 # io routines
 SRCS+=	close.c closeall.c dev.c disklabel.c dkcksum.c fstat.c ioctl.c lseek.c \
@@ -59,7 +59,7 @@ install:
 .include <bsd.lib.mk>
 
 CPPFLAGS+=-DLINKADDR=${LINKADDR} -DHEAP_LIMIT=${HEAP_LIMIT} ${DEBUGFLAGS}
-CPPFLAGS+=-I${S}/stand/boot -DCOMPAT_UFS
+CPPFLAGS+=-I${S}/stand/boot #-DCOMPAT_UFS
 CFLAGS+=${SACFLAGS} -D__INTERNAL_LIBSA_CREAD
 #AS=cat ; 
 #AS+=	-R

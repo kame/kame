@@ -3,9 +3,9 @@
  * (Modifications made here may easily be lost!)
  *
  * Created from the file:
- *	OpenBSD: vnode_if.src,v 1.19 2002/02/22 20:37:45 drahn Exp 
+ *	OpenBSD: vnode_if.src,v 1.22 2003/07/21 22:44:50 tedu Exp 
  * by the script:
- *	OpenBSD: vnode_if.sh,v 1.8 2001/02/26 17:34:18 art Exp 
+ *	OpenBSD: vnode_if.sh,v 1.13 2003/06/02 23:28:07 millert Exp 
  */
 
 /*
@@ -20,11 +20,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -121,8 +117,7 @@ struct vop_getattr_args {
 	struct proc *a_p;
 };
 extern struct vnodeop_desc vop_getattr_desc;
-int VOP_GETATTR(struct vnode *, struct vattr *, struct ucred *, 
-    struct proc *);
+int VOP_GETATTR(struct vnode *, struct vattr *, struct ucred *, struct proc *);
 
 struct vop_setattr_args {
 	struct vnodeop_desc *a_desc;
@@ -132,8 +127,7 @@ struct vop_setattr_args {
 	struct proc *a_p;
 };
 extern struct vnodeop_desc vop_setattr_desc;
-int VOP_SETATTR(struct vnode *, struct vattr *, struct ucred *, 
-    struct proc *);
+int VOP_SETATTR(struct vnode *, struct vattr *, struct ucred *, struct proc *);
 
 struct vop_read_args {
 	struct vnodeop_desc *a_desc;
@@ -169,13 +163,13 @@ struct vop_ioctl_args {
 	struct vnodeop_desc *a_desc;
 	struct vnode *a_vp;
 	u_long a_command;
-	caddr_t a_data;
+	void *a_data;
 	int a_fflag;
 	struct ucred *a_cred;
 	struct proc *a_p;
 };
 extern struct vnodeop_desc vop_ioctl_desc;
-int VOP_IOCTL(struct vnode *, u_long, caddr_t, int, struct ucred *, 
+int VOP_IOCTL(struct vnode *, u_long, void *, int, struct ucred *, 
     struct proc *);
 
 struct vop_select_args {
@@ -275,8 +269,8 @@ struct vop_symlink_args {
 	char *a_target;
 };
 extern struct vnodeop_desc vop_symlink_desc;
-int VOP_SYMLINK(struct vnode *, struct vnode **, 
-    struct componentname *, struct vattr *, char *);
+int VOP_SYMLINK(struct vnode *, struct vnode **, struct componentname *, 
+    struct vattr *, char *);
 
 struct vop_readdir_args {
 	struct vnodeop_desc *a_desc;
@@ -288,8 +282,8 @@ struct vop_readdir_args {
 	u_long **a_cookies;
 };
 extern struct vnodeop_desc vop_readdir_desc;
-int VOP_READDIR(struct vnode *, struct uio *, struct ucred *, int *, 
-    int *, u_long **);
+int VOP_READDIR(struct vnode *, struct uio *, struct ucred *, int *, int *, 
+    u_long **);
 
 struct vop_readlink_args {
 	struct vnodeop_desc *a_desc;
@@ -372,13 +366,13 @@ int VOP_PATHCONF(struct vnode *, int, register_t *);
 struct vop_advlock_args {
 	struct vnodeop_desc *a_desc;
 	struct vnode *a_vp;
-	caddr_t a_id;
+	void *a_id;
 	int a_op;
 	struct flock *a_fl;
 	int a_flags;
 };
 extern struct vnodeop_desc vop_advlock_desc;
-int VOP_ADVLOCK(struct vnode *, caddr_t, int, struct flock *, int);
+int VOP_ADVLOCK(struct vnode *, void *, int, struct flock *, int);
 
 struct vop_reallocblks_args {
 	struct vnodeop_desc *a_desc;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vars.c,v 1.7 2002/03/14 01:27:13 millert Exp $	*/
+/*	$OpenBSD: vars.c,v 1.10 2003/08/11 06:23:07 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1998-2000 Michael Shalayeff
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -35,6 +30,7 @@
 #include <sys/param.h>
 #include <libsa.h>
 #include <sys/reboot.h>
+#include <lib/libkern/funcs.h>
 #include "cmd.h"
 
 extern const char version[];
@@ -55,7 +51,7 @@ int Xenv(void);
 const struct cmd_table cmd_set[] = {
 	{"addr",   CMDT_VAR, Xaddr},
 	{"howto",  CMDT_VAR, Xhowto},
-#ifdef DEBUG	
+#ifdef DEBUG
 	{"debug",  CMDT_VAR, Xdebug},
 #endif
 	{"device", CMDT_VAR, Xdevice},
@@ -67,7 +63,7 @@ const struct cmd_table cmd_set[] = {
 
 #ifdef DEBUG
 static int
-Xdebug()
+Xdebug(void)
 {
 	if (cmd.argc != 2)
 		printf( "o%s\n", debug? "n": "ff" );
@@ -80,7 +76,7 @@ Xdebug()
 #endif
 
 static int
-Xtimeout()
+Xtimeout(void)
 {
 	if (cmd.argc != 2)
 		printf( "%d\n", cmd.timeout );
@@ -91,9 +87,9 @@ Xtimeout()
 
 /* called only w/ no arguments */
 int
-Xset()
+Xset(void)
 {
-	register const struct cmd_table *ct;
+	const struct cmd_table *ct;
 
 	printf(">> OpenBSD/" MACHINE_ARCH " BOOT %s\n", version);
 	for (ct = cmd_set; ct->cmd_name != NULL; ct++) {
@@ -104,27 +100,27 @@ Xset()
 }
 
 static int
-Xdevice()
+Xdevice(void)
 {
 	if (cmd.argc != 2)
 		printf("%s\n", cmd.bootdev);
 	else
-		strncpy(cmd.bootdev, cmd.argv[1], sizeof(cmd.bootdev));
+		strlcpy(cmd.bootdev, cmd.argv[1], sizeof(cmd.bootdev));
 	return 0;
 }
 
 static int
-Ximage()
+Ximage(void)
 {
 	if (cmd.argc != 2)
 		printf("%s\n", cmd.image);
 	else
-		strncpy(cmd.image, cmd.argv[1], sizeof(cmd.image));
+		strlcpy(cmd.image, cmd.argv[1], sizeof(cmd.image));
 	return 0;
 }
 
 static int
-Xaddr()
+Xaddr(void)
 {
 	if (cmd.argc != 2)
 		printf("%p\n", cmd.addr);
@@ -134,7 +130,7 @@ Xaddr()
 }
 
 static int
-Xtty()
+Xtty(void)
 {
 	dev_t dev;
 
@@ -155,7 +151,7 @@ Xtty()
 }
 
 static int
-Xhowto()
+Xhowto(void)
 {
 	if (cmd.argc == 1) {
 		if (cmd.boothowto) {
@@ -180,10 +176,9 @@ Xhowto()
 }
 
 int
-bootparse(i)
-	int i;
+bootparse(int i)
 {
-	register char *cp;
+	char *cp;
 	int howto = cmd.boothowto;
 
 	for (; i < cmd.argc; i++) {
@@ -232,8 +227,9 @@ bootparse(i)
  * terminated by the usual '\0'
  */
 char *environ;
+
 int
-Xenv()
+Xenv(void)
 {
 	if (cmd.argc == 1) {
 		if (environ)
@@ -241,24 +237,28 @@ Xenv()
 		else
 			printf("empty\n");
 	} else {
-		register char *p, *q;
+		char *p, *q;
 		int l;
+
 		for (p = environ; p && *p; p = q) {
 			l = strlen(cmd.argv[1]);
-			for (q = p; *q != '='; q++);
+			for (q = p; *q != '='; q++)
+				;
 			l = max(l, q - p) + 1;
-			for (q = p; *q != '\n'; q++);
+			for (q = p; *q != '\n'; q++)
+				;
 			if (*q)
 				q++;
 			if (!strncmp(p, cmd.argv[1], l)) {
-				while((*p++ = *q++));
+				while((*p++ = *q++))
+					;
 				p--;
 			}
 		}
 		if (!p)
 			p = environ = alloc(4096);
-		sprintf(p, "%s=%s\n",
-			cmd.argv[1], (cmd.argc==3?cmd.argv[2]:""));
+		snprintf(p, environ + 4096 - p, "%s=%s\n",
+		    cmd.argv[1], (cmd.argc==3?cmd.argv[2]:""));
 	}
 
 	return 0;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.17 2003/02/25 01:45:12 miod Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.19 2003/06/02 23:27:49 millert Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.38 1996/12/18 05:46:09 scottr Exp $	*/
 
 /*
@@ -22,11 +22,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -282,7 +278,7 @@ setroot(void)
 			printf(": ");
 			len = getstr(buf, sizeof(buf));
 			if (len == 0 && bootdv != NULL) {
-				strcpy(buf, bootdv->dv_xname);
+				strlcpy(buf, bootdv->dv_xname, sizeof buf);
 				len = strlen(buf);
 			}
 			if (len == 4 && !strcmp(buf, "halt"))

@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_socket.c,v 1.49 2003/02/03 21:22:09 deraadt Exp $	*/
+/*	$OpenBSD: uipc_socket.c,v 1.51 2003/07/21 22:44:50 tedu Exp $	*/
 /*	$NetBSD: uipc_socket.c,v 1.21 1996/02/04 02:17:52 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -112,7 +108,7 @@ socreate(dom, aso, type, proto)
 		return (EPROTOTYPE);
 	s = splsoftnet();
 	so = pool_get(&socket_pool, PR_WAITOK);
-	bzero((caddr_t)so, sizeof(*so));
+	bzero(so, sizeof(*so));
 	TAILQ_INIT(&so->so_q0);
 	TAILQ_INIT(&so->so_q);
 	so->so_type = type;
@@ -240,7 +236,7 @@ soclose(so)
 			    (so->so_state & SS_NBIO))
 				goto drop;
 			while (so->so_state & SS_ISCONNECTED) {
-				error = tsleep((caddr_t)&so->so_timeo,
+				error = tsleep(&so->so_timeo,
 				    PSOCK | PCATCH, netcls,
 				    so->so_linger * hz);
 				if (error)
@@ -973,7 +969,7 @@ sorflush(so)
 	socantrcvmore(so);
 	sbunlock(sb);
 	asb = *sb;
-	bzero((caddr_t)sb, sizeof (*sb));
+	bzero(sb, sizeof (*sb));
 	/* XXX - the bzero stumps all over so_rcv */
 	if (asb.sb_flags & SB_KNOTE) {
 		sb->sb_sel.si_note = asb.sb_sel.si_note;

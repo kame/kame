@@ -1,4 +1,4 @@
-/*	$OpenBSD: tvtwo.c,v 1.1 2003/03/05 14:34:40 miod Exp $	*/
+/*	$OpenBSD: tvtwo.c,v 1.3 2003/06/28 17:05:33 miod Exp $	*/
 /*
  * Copyright (c) 2003, Miodrag Vallat.
  * All rights reserved.
@@ -205,7 +205,6 @@ tvtwoattach(struct device *parent, struct device *self, void *args)
 	int isconsole;
 	char *freqstring;
 
-	sc->sc_sunfb.sf_flags = self->dv_cfdata->cf_flags & FB_USERMASK;
 	node = ca->ca_ra.ra_node;
 
 	printf(": %s", getpropstring(node, "model"));
@@ -247,7 +246,7 @@ tvtwoattach(struct device *parent, struct device *self, void *args)
 	tvtwo_initcmap(sc);
 
 	sc->sc_sunfb.sf_ro.ri_hw = sc;
-	fbwscons_init(&sc->sc_sunfb, isconsole);
+	fbwscons_init(&sc->sc_sunfb, isconsole ? 0 : RI_CLEAR);
 
 	tvtwo_stdscreen.capabilities = sc->sc_sunfb.sf_ro.ri_caps;
 	tvtwo_stdscreen.nrows = sc->sc_sunfb.sf_ro.ri_rows;

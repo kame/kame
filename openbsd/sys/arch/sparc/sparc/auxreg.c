@@ -1,4 +1,4 @@
-/*	$OpenBSD: auxreg.c,v 1.9 2002/03/14 01:26:44 millert Exp $	*/
+/*	$OpenBSD: auxreg.c,v 1.11 2003/06/02 23:27:55 millert Exp $	*/
 /*	$NetBSD: auxreg.c,v 1.21 1997/05/24 20:15:59 pk Exp $ */
 
 /*
@@ -22,11 +22,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -67,6 +63,8 @@ struct cfdriver auxreg_cd = {
 	0, "auxreg", DV_DULL
 };
 
+volatile u_char *auxio_reg;	/* Copy of AUXIO_REG */
+u_char auxio_regval;
 extern int sparc_led_blink;	/* from machdep */
 struct timeout sparc_led_to;
 

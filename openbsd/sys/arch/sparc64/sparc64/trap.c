@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.24 2003/02/17 01:29:20 henric Exp $	*/
+/*	$OpenBSD: trap.c,v 1.30 2003/07/14 02:03:16 jason Exp $	*/
 /*	$NetBSD: trap.c,v 1.73 2001/08/09 01:03:01 eeh Exp $ */
 
 /*
@@ -48,8 +48,6 @@
  *
  *	@(#)trap.c	8.4 (Berkeley) 9/23/93
  */
-
-#define NEW_FPSTATE
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -455,28 +453,16 @@ trap(tf, type, pc, tstate)
 		 * the FPU.
 		 */
 		if (type == T_FPDISABLED) {
-extern void db_printf(const char * , ...);
-#ifndef NEW_FPSTATE
-			if (fpproc != NULL) {	/* someone else had it */
-				savefpstate(fpproc->p_md.md_fpstate);
-				fpproc = NULL;
-				/* Enable the FPU */
-/*				loadfpstate(initfpstate);*/
-			}
-			tf->tf_tstate |= (PSTATE_PEF<<TSTATE_PSTATE_SHIFT);
-			return;
-#else
 			struct proc *newfpproc;
 
-			/* New scheme */
-			if (CLKF_INTR((struct clockframe *)tf) || !curproc) {
+			if (CLKF_INTR((struct clockframe *)tf) || !curproc)
 				newfpproc = &proc0;
-			} else {
+			else
 				newfpproc = curproc;
-			}
+
 			if (fpproc != newfpproc) {
 				if (fpproc != NULL) {
-				/* someone else had it, maybe? */
+					/* someone else had it, maybe? */
 					savefpstate(fpproc->p_md.md_fpstate);
 					fpproc = NULL;
 				}
@@ -490,7 +476,6 @@ extern void db_printf(const char * , ...);
 			/* Enable the FPU */
 			tf->tf_tstate |= (PSTATE_PEF<<TSTATE_PSTATE_SHIFT);
 			return;
-#endif
 		}
 		goto dopanic;
 	}
@@ -543,11 +528,36 @@ badtrap:
 		break;	/* the work is all in userret() */
 
 	case T_ILLINST:
-	case T_INST_EXCEPT:
-	case T_TEXTFAULT:
+	{
+		union instr ins;
+
+		if (copyin((caddr_t)pc, &ins, sizeof(ins)) != 0) {
+			/* XXX Can this happen? */
+			trapsignal(p, SIGILL, 0, ILL_ILLOPC, sv);
+			break;
+		}
+		if (ins.i_any.i_op == IOP_mem &&
+		    (ins.i_op3.i_op3 == IOP3_LDQF ||
+		     ins.i_op3.i_op3 == IOP3_STQF ||
+		     ins.i_op3.i_op3 == IOP3_LDQFA ||
+		     ins.i_op3.i_op3 == IOP3_STQFA)) {
+			if (emul_qf(ins.i_int, p, sv, tf))
+				ADVANCE;
+			break;
+		}
+		if (ins.i_any.i_op == IOP_reg &&
+		    ins.i_op3.i_op3 == IOP3_POPC &&
+		    ins.i_op3.i_rs1 == 0) {
+			if (emul_popc(ins.i_int, p, sv, tf))
+				ADVANCE;
+			break;
+		}
 		trapsignal(p, SIGILL, 0, ILL_ILLOPC, sv);	/* XXX code?? */
 		break;
+	}
 
+	case T_INST_EXCEPT:
+	case T_TEXTFAULT:
 	case T_PRIVINST:
 		trapsignal(p, SIGILL, 0, ILL_ILLOPC, sv);	/* XXX code?? */
 		break;
@@ -568,14 +578,10 @@ badtrap:
 		 * Since All UltraSPARC CPUs have an FPU how can this happen?
 		 */
 		if (!foundfpu) {
-#ifdef notyet
-			fpu_emulate(p, tf, fs);
+			trapsignal(p, SIGFPE, 0, FPE_FLTINV, sv);
 			break;
-#else
-			trapsignal(p, SIGFPE, 0, FPE_FLTINV, sv);	/* XXX code?? */
-			break;
-#endif
 		}
+
 		/*
 		 * We may have more FPEs stored up and/or ops queued.
 		 * If they exist, handle them and get out.  Otherwise,
@@ -595,6 +601,28 @@ badtrap:
 			fpproc = p;		/* now we do have it */
 		}
 		tf->tf_tstate |= (PSTATE_PEF<<TSTATE_PSTATE_SHIFT);
+		break;
+	}
+
+	case T_LDQF_ALIGN:
+	case T_STQF_ALIGN:
+	{
+		union instr ins;
+
+		if (copyin((caddr_t)pc, &ins, sizeof(ins)) != 0) {
+			/* XXX Can this happen? */
+			trapsignal(p, SIGILL, 0, ILL_ILLOPC, sv);
+			break;
+		}
+		if (ins.i_any.i_op == IOP_mem &&
+		    (ins.i_op3.i_op3 == IOP3_LDQF ||
+		     ins.i_op3.i_op3 == IOP3_STQF ||
+		     ins.i_op3.i_op3 == IOP3_LDQFA ||
+		     ins.i_op3.i_op3 == IOP3_STQFA)) {
+			if (emul_qf(ins.i_int, p, sv, tf))
+				ADVANCE;
+		} else
+			trapsignal(p, SIGILL, 0, ILL_ILLOPC, sv);
 		break;
 	}
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cgsixreg.h,v 1.4 2002/08/12 16:18:59 jason Exp $	*/
+/*	$OpenBSD: cgsixreg.h,v 1.8 2003/06/18 17:35:30 miod Exp $	*/
 
 /*
  * Copyright (c) 2002 Jason L. Wright (jason@thought.net)
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -92,24 +87,88 @@ union bt_cmap {
 #define	CG6_FBC_S		0x010		/* global status */
 #define	CG6_FBC_DRAW		0x014		/* drawing pipeline status */
 #define	CG6_FBC_BLIT		0x018		/* blitter status */
+#define	CG6_FBC_FONT		0x01c		/* font */
 #define	CG6_FBC_X0		0x080		/* blitter, src llx */
 #define	CG6_FBC_Y0		0x084		/* blitter, src lly */
+#define	CG6_FBC_Z0		0x088		/* blitter, src llz */
+#define	CB6_FBC_C0		0x08c		/* blitter, src llcolor */
 #define	CG6_FBC_X1		0x090		/* blitter, src urx */
 #define	CG6_FBC_Y1		0x094		/* blitter, src ury */
+#define	CG6_FBC_Z1		0x098		/* blitter, src urz */
+#define	CB6_FBC_C1		0x09c		/* blitter, src urcolor */
 #define	CG6_FBC_X2		0x0a0		/* blitter, dst llx */
 #define	CG6_FBC_Y2		0x0a4		/* blitter, dst lly */
+#define	CG6_FBC_Z2		0x0a8		/* blitter, dst llz */
+#define	CB6_FBC_C2		0x0ac		/* blitter, dst llcolor */
 #define	CG6_FBC_X3		0x0b0		/* blitter, dst urx */
 #define	CG6_FBC_Y3		0x0b4		/* blitter, dst ury */
+#define	CG6_FBC_Z3		0x0b8		/* blitter, dst urz */
+#define	CB6_FBC_C3		0x0bc		/* blitter, dst urcolor */
 #define	CG6_FBC_OFFX		0x0c0		/* x offset for drawing */
 #define	CG6_FBC_OFFY		0x0c4		/* y offset for drawing */
+#define	CG6_FBC_INCX		0x0d0		/* x increment */
+#define	CG6_FBC_INCY		0x0d4		/* y increment */
 #define	CG6_FBC_CLIPMINX	0x0e0		/* clip rectangle llx */
 #define	CG6_FBC_CLIPMINY	0x0e4		/* clip rectangle lly */
 #define	CG6_FBC_CLIPMAXX	0x0f0		/* clip rectangle urx */
 #define	CG6_FBC_CLIPMAXY	0x0f4		/* clip rectangle ury */
 #define	CG6_FBC_FG		0x100		/* fg value for rop */
+#define	CG6_FBC_BG		0x104		/* bg value for rop */
 #define	CG6_FBC_ALU		0x108		/* operation */
+#define	CG6_FBC_PM		0x10c		/* */
+#define	CG6_FBC_PIXELM		0x110		/* */
+#define	CG6_FBC_PATALIGN	0x11c		/* */
+#define	CG6_FBC_PATTERN		0x120		/* 8 u_int32_t pattern */
+#define	CG6_FBC_APOINTX		0x800		/* */
+#define	CG6_FBC_APOINTY		0x804		/* */
+#define	CG6_FBC_APOINTZ		0x808		/* */
+#define	CG6_FBC_RPOINTX		0x810		/* */
+#define	CG6_FBC_RPOINTY		0x814		/* */
+#define	CG6_FBC_RPOINTZ		0x818		/* */
+#define	CG6_FBC_POINTR		0x830		/* */
+#define	CG6_FBC_POINTG		0x834		/* */
+#define	CG6_FBC_POINTB		0x838		/* */
+#define	CG6_FBC_POINTA		0x83c		/* */
+#define	CG6_FBC_ALINEX		0x840		/* */
+#define	CG6_FBC_ALINEY		0x844		/* */
+#define	CG6_FBC_ALINEZ		0x848		/* */
+#define	CG6_FBC_RLINEX		0x850		/* */
+#define	CG6_FBC_RLINEY		0x854		/* */
+#define	CG6_FBC_RLINEZ		0x858		/* */
+#define	CG6_FBC_LINER		0x870		/* */
+#define	CG6_FBC_LINEG		0x874		/* */
+#define	CG6_FBC_LINEB		0x878		/* */
+#define	CG6_FBC_LINEA		0x87c		/* */
+#define	CG6_FBC_ATRIX		0x880		/* */
+#define	CG6_FBC_ATRIY		0x884		/* */
+#define	CG6_FBC_ATRIZ		0x888		/* */
+#define	CG6_FBC_RTRIX		0x890		/* */
+#define	CG6_FBC_RTRIY		0x894		/* */
+#define	CG6_FBC_RTRIZ		0x898		/* */
+#define	CG6_FBC_TRIR		0x8b0		/* */
+#define	CG6_FBC_TRIG		0x8b4		/* */
+#define	CG6_FBC_TRIB		0x8b8		/* */
+#define	CG6_FBC_TRIA		0x8bc		/* */
+#define	CG6_FBC_AQUADX		0x8c0		/* */
+#define	CG6_FBC_AQUADY		0x8c4		/* */
+#define	CG6_FBC_AQUADZ		0x8c8		/* */
+#define	CG6_FBC_RQUADX		0x8d0		/* */
+#define	CG6_FBC_RQUADY		0x8d4		/* */
+#define	CG6_FBC_RQUADZ		0x8d8		/* */
+#define	CG6_FBC_QUADR		0x8f0		/* */
+#define	CG6_FBC_QUADG		0x8f4		/* */
+#define	CG6_FBC_QUADB		0x8f8		/* */
+#define	CG6_FBC_QUADA		0x8fc		/* */
 #define	CG6_FBC_ARECTX		0x900		/* rectangle drawing, x coord */
 #define	CG6_FBC_ARECTY		0x904		/* rectangle drawing, y coord */
+#define	CG6_FBC_ARECTZ		0x908		/* rectangle drawing, z coord */
+#define	CG6_FBC_RRECTX		0x910		/* */
+#define	CG6_FBC_RRECTY		0x914		/* */
+#define	CG6_FBC_RRECTZ		0x918		/* */
+#define	CG6_FBC_RRECTR		0x930		/* */
+#define	CG6_FBC_RRECTG		0x934		/* */
+#define	CG6_FBC_RRECTB		0x938		/* */
+#define	CG6_FBC_RRECTA		0x938		/* */
 
 #define	FBC_MODE_VAL	(						\
 	  0x00200000 /* GX_BLIT_SRC */					\
@@ -205,7 +264,7 @@ union bt_cmap {
 #define	THC_MISC_CYCLS		0x0000000f	/* cycles before transfer */
 
 struct cgsix_softc {
-	struct device sc_dev;
+	struct sunfb sc_sunfb;
 	struct sbusdev sc_sd;
 	bus_space_tag_t sc_bustag;
 	bus_addr_t sc_paddr;
@@ -215,13 +274,13 @@ struct cgsix_softc {
 	bus_space_handle_t sc_tec_regs;
 	bus_space_handle_t sc_vid_regs;
 	bus_space_handle_t sc_fbc_regs;
-	struct rasops_info sc_rasops;
 	int sc_nscreens;
-	int sc_width, sc_height, sc_depth, sc_linebytes;
 	union bt_cmap sc_cmap;
 	void *sc_ih;
 	u_int sc_mode;
-	int *sc_crowp, *sc_ccolp;
+	u_int sc_curs_enabled, sc_curs_fg, sc_curs_bg;
+	struct wsdisplay_curpos sc_curs_pos, sc_curs_hot, sc_curs_size;
+	u_char sc_curs_image[128], sc_curs_mask[128];
 };
 
 #define	CG6_USER_FBC	0x70000000
@@ -271,5 +330,7 @@ struct cgsix_softc {
 	    (FBC_DRAW_UNKNOWN|FBC_DRAW_GXFULL))
 #define	CG6_DRAIN(sc)						\
 	while (FBC_READ(sc, CG6_FBC_S) & FBC_S_GXINPROGRESS)
+
+#define	CG6_MAX_CURSOR		32
 
 #define	CG6_CFFLAG_NOACCEL	0x1	/* disable console acceleration */

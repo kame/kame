@@ -1,9 +1,13 @@
-/*	$OpenBSD: linux_misc.c,v 1.48 2003/01/30 03:29:49 millert Exp $	*/
+/*	$OpenBSD: linux_misc.c,v 1.54 2003/08/15 20:32:16 tedu Exp $	*/
 /*	$NetBSD: linux_misc.c,v 1.27 1996/05/20 01:59:21 fvdl Exp $	*/
 
-/*
- * Copyright (c) 1995 Frank van der Linden
+/*-
+ * Copyright (c) 1995, 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Frank van der Linden and Eric Haszlakiewicz; by Jason R. Thorpe
+ * of the Numerical Aerospace Simulation Facility, NASA Ames Research Center.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -15,21 +19,23 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *      This product includes software developed for the NetBSD Project
- *      by Frank van der Linden
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission
+ *	This product includes software developed by the NetBSD
+ *	Foundation, Inc. and its contributors.
+ * 4. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
 
 /*
@@ -77,6 +83,7 @@
 #include <compat/linux/linux_syscallargs.h>
 #include <compat/linux/linux_util.h>
 #include <compat/linux/linux_dirent.h>
+#include <compat/linux/linux_emuldata.h>
 
 #include <compat/common/compat_dir.h>
 
@@ -85,6 +92,8 @@ static void bsd_to_linux_statfs(struct statfs *, struct linux_statfs *);
 int	linux_select1(struct proc *, register_t *, int, fd_set *,
      fd_set *, fd_set *, struct timeval *);
 static int getdents_common(struct proc *, void *, register_t *, int);
+static void linux_to_bsd_mmap_args(struct sys_mmap_args *,
+    const struct linux_sys_mmap2_args *);
 
 /*
  * The information on a terminated (or stopped) process needs
@@ -333,21 +342,16 @@ linux_sys_brk(p, v, retval)
 	char *nbrk = SCARG(uap, nsize);
 	struct sys_obreak_args oba;
 	struct vmspace *vm = p->p_vmspace;
-	caddr_t oldbrk;
+	struct linux_emuldata *ed = (struct linux_emuldata*)p->p_emuldata;
 
-	oldbrk = vm->vm_daddr + ctob(vm->vm_dsize);
-	/*
-	 * XXX inconsistent.. Linux always returns at least the old
-	 * brk value, but it will be page-aligned if this fails,
-	 * and possibly not page aligned if it succeeds (the user
-	 * supplied pointer is returned).
-	 */
 	SCARG(&oba, nsize) = nbrk;
 
 	if ((caddr_t) nbrk > vm->vm_daddr && sys_obreak(p, &oba, retval) == 0)
-		retval[0] = (register_t)nbrk;
+		ed->p_break = (char*)nbrk;
 	else
-		retval[0] = (register_t)oldbrk;
+		nbrk = ed->p_break;
+
+	retval[0] = (register_t)nbrk;
 
 	return 0;
 }
@@ -611,29 +615,82 @@ linux_sys_mmap(p, v, retval)
 		syscallarg(struct linux_mmap *) lmp;
 	} */ *uap = v;
 	struct linux_mmap lmap;
+	struct linux_sys_mmap2_args nlmap;
 	struct sys_mmap_args cma;
-	int error, flags;
+	int error;
 
 	if ((error = copyin(SCARG(uap, lmp), &lmap, sizeof lmap)))
 		return error;
 
-	flags = 0;
-	flags |= cvtto_bsd_mask(lmap.lm_flags, LINUX_MAP_SHARED, MAP_SHARED);
-	flags |= cvtto_bsd_mask(lmap.lm_flags, LINUX_MAP_PRIVATE, MAP_PRIVATE);
-	flags |= cvtto_bsd_mask(lmap.lm_flags, LINUX_MAP_FIXED, MAP_FIXED);
-	flags |= cvtto_bsd_mask(lmap.lm_flags, LINUX_MAP_ANON, MAP_ANON);
+	if (lmap.lm_pos & PAGE_MASK)
+		return EINVAL;
 
-	SCARG(&cma,addr) = lmap.lm_addr;
-	SCARG(&cma,len) = lmap.lm_len;
-	if (lmap.lm_prot & VM_PROT_WRITE)	/* XXX */
-		lmap.lm_prot |= VM_PROT_READ;
- 	SCARG(&cma,prot) = lmap.lm_prot;
-	SCARG(&cma,flags) = flags;
-	SCARG(&cma,fd) = flags & MAP_ANON ? -1 : lmap.lm_fd;
-	SCARG(&cma,pad) = 0;
-	SCARG(&cma,pos) = lmap.lm_pos;
+	/* repackage into something sane */
+	SCARG(&nlmap,addr) = (unsigned long)lmap.lm_addr;
+	SCARG(&nlmap,len) = lmap.lm_len;
+	SCARG(&nlmap,prot) = lmap.lm_prot;
+	SCARG(&nlmap,flags) = lmap.lm_flags;
+	SCARG(&nlmap,fd) = lmap.lm_fd;
+	SCARG(&nlmap,offset) = (unsigned)lmap.lm_pos;
+
+	linux_to_bsd_mmap_args(&cma, &nlmap);
+	SCARG(&cma, pos) = (off_t)SCARG(&nlmap, offset);
 
 	return sys_mmap(p, &cma, retval);
+}
+
+/*
+ * Guts of most architectures' mmap64() implementations.  This shares
+ * its list of arguments with linux_sys_mmap().
+ *
+ * The difference in linux_sys_mmap2() is that "offset" is actually
+ * (offset / pagesize), not an absolute byte count.  This translation
+ * to pagesize offsets is done inside glibc between the mmap64() call
+ * point, and the actual syscall.
+ */
+int
+linux_sys_mmap2(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct linux_sys_mmap2_args /* {
+		syscallarg(unsigned long) addr;
+		syscallarg(size_t) len;
+		syscallarg(int) prot;
+		syscallarg(int) flags;
+		syscallarg(int) fd;
+		syscallarg(linux_off_t) offset;
+	} */ *uap = v;
+	struct sys_mmap_args cma;
+
+	linux_to_bsd_mmap_args(&cma, uap);
+	SCARG(&cma, pos) = ((off_t)SCARG(uap, offset)) << PAGE_SHIFT;
+
+	return sys_mmap(p, &cma, retval);
+}
+
+static void
+linux_to_bsd_mmap_args(cma, uap)
+	struct sys_mmap_args *cma;
+	const struct linux_sys_mmap2_args *uap;
+{
+	int flags = MAP_TRYFIXED, fl = SCARG(uap, flags);
+	
+	flags |= cvtto_bsd_mask(fl, LINUX_MAP_SHARED, MAP_SHARED);
+	flags |= cvtto_bsd_mask(fl, LINUX_MAP_PRIVATE, MAP_PRIVATE);
+	flags |= cvtto_bsd_mask(fl, LINUX_MAP_FIXED, MAP_FIXED);
+	flags |= cvtto_bsd_mask(fl, LINUX_MAP_ANON, MAP_ANON);
+	/* XXX XAX ERH: Any other flags here?  There are more defined... */
+
+	SCARG(cma, addr) = (void *)SCARG(uap, addr);
+	SCARG(cma, len) = SCARG(uap, len);
+	SCARG(cma, prot) = SCARG(uap, prot);
+	if (SCARG(cma, prot) & VM_PROT_WRITE) /* XXX */
+		SCARG(cma, prot) |= VM_PROT_READ;
+	SCARG(cma, flags) = flags;
+	SCARG(cma, fd) = flags & MAP_ANON ? -1 : SCARG(uap, fd);
+	SCARG(cma, pad) = 0;
 }
 
 int
@@ -1395,7 +1452,7 @@ linux_sys_stime(p, v, retval)
 	linux_time_t tt;
 	int error;
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return (error);
 
 	if ((error = copyin(SCARG(uap, t), &tt, sizeof(tt))) != 0)
@@ -1440,4 +1497,43 @@ linux_sys_getgid(p, v, retval)
 
 	*retval = p->p_cred->p_rgid;
 	return (0);
+}
+
+
+/*
+ * sysinfo()
+ */
+/* ARGSUSED */
+int
+linux_sys_sysinfo(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct linux_sys_sysinfo_args /* {
+		syscallarg(struct linux_sysinfo *) sysinfo;
+	} */ *uap = v;
+	struct linux_sysinfo si;
+	struct loadavg *la;
+	extern int bufpages;
+
+
+	si.uptime = time.tv_sec - boottime.tv_sec;
+	la = &averunnable;
+	si.loads[0] = la->ldavg[0] * LINUX_SYSINFO_LOADS_SCALE / la->fscale;
+	si.loads[1] = la->ldavg[1] * LINUX_SYSINFO_LOADS_SCALE / la->fscale;
+	si.loads[2] = la->ldavg[2] * LINUX_SYSINFO_LOADS_SCALE / la->fscale;
+	si.totalram = ctob(physmem);
+	si.freeram = uvmexp.free * uvmexp.pagesize;
+	si.sharedram = 0;/* XXX */
+	si.bufferram = bufpages * PAGE_SIZE;
+	si.totalswap = uvmexp.swpages * PAGE_SIZE;
+	si.freeswap = (uvmexp.swpages - uvmexp.swpginuse) * PAGE_SIZE;
+	si.procs = nprocs;
+	/* The following are only present in newer Linux kernels. */
+	si.totalbig = 0;
+	si.freebig = 0;
+	si.mem_unit = 1;
+
+	return (copyout(&si, SCARG(uap, sysinfo), sizeof(si)));
 }

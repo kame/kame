@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ne_pcmcia.c,v 1.66 2003/03/18 23:13:26 mickey Exp $	*/
+/*	$OpenBSD: if_ne_pcmcia.c,v 1.72 2003/06/25 17:35:37 miod Exp $	*/
 /*	$NetBSD: if_ne_pcmcia.c,v 1.17 1998/08/15 19:00:04 thorpej Exp $	*/
 
 /*
@@ -43,7 +43,6 @@
 #include <netinet/if_ether.h>
 
 #include <machine/bus.h>
-#include <machine/intr.h>
 
 #include <dev/pcmcia/pcmciareg.h>
 #include <dev/pcmcia/pcmciavar.h>
@@ -146,6 +145,10 @@ const struct ne2000dev {
       0, 0x0ff0, { 0x00, 0x00, 0xe8 } },
 
     { PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID,
+      PCMCIA_CIS_ADDTRON_W89C926, 
+      0, -1, { 0x00, 0x40, 0x33 } },
+
+    { PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID,
       PCMCIA_CIS_SVEC_COMBOCARD,
       0, -1, { 0x00, 0xe0, 0x98 } },
 
@@ -164,6 +167,10 @@ const struct ne2000dev {
     { PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID,
       PCMCIA_CIS_CNET_NE2000,
       0, -1, { 0x00, 0x80, 0xad } },
+
+    { PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_CNET_CNF301,
+      PCMCIA_CIS_CNET_CNF301,
+      0, -1, { 0x00, 0x10, 0x60 } },
 
     { PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID,
       PCMCIA_CIS_BILLIONTON_LNT10TN,
@@ -403,6 +410,10 @@ const struct ne2000dev {
       PCMCIA_CIS_ALLIEDTELESIS_LA_PCM,
       0, 0x0ff0, { 0x00, 0x00, 0xf4 } },
 
+    { PCMCIA_VENDOR_KINGSTON, PCMCIA_PRODUCT_KINGSTON_KNE_PCM,
+      PCMCIA_CIS_KINGSTON_KNE_PCM,
+      0, 0x0ff0, { 0xe2, 0x0c, 0x0f } },
+
     { PCMCIA_VENDOR_KINGSTON, PCMCIA_PRODUCT_KINGSTON_KNE_PC2,
       PCMCIA_CIS_KINGSTON_KNE_PC2,
       0, 0x0180, { 0x00, 0xc0, 0xf0 } },
@@ -422,6 +433,10 @@ const struct ne2000dev {
     { PCMCIA_VENDOR_NETGEAR, PCMCIA_PRODUCT_NETGEAR_FA410TXC,
       PCMCIA_CIS_NETGEAR_FA410TXC,
       0, -1, { 0x00, 0x48, 0x54 } },
+
+    { PCMCIA_VENDOR_NETGEAR, PCMCIA_PRODUCT_NETGEAR_FA410TXC,
+      PCMCIA_CIS_DLINK_DFE670TXD,
+      0, -1, { 0x00, 0x40, 0x05 } },
 
     { PCMCIA_VENDOR_NETGEAR, PCMCIA_PRODUCT_NETGEAR_FA411,
       PCMCIA_CIS_NETGEAR_FA411,
@@ -471,9 +486,6 @@ const struct ne2000dev {
     { "Kingston KNE-PCM/x",
       0x0000, 0x0000, NULL, NULL, 0,
       0x0ff0, { 0x00, 0xc0, 0xf0 } },
-    { "Kingston KNE-PCM/x",
-      0x0000, 0x0000, NULL, NULL, 0,
-      0x0ff0, { 0xe2, 0x0c, 0x0f } },
     { "Longshine LCS-8534",
       0x0000, 0x0000, NULL, NULL, 0,
       0x0000, { 0x08, 0x00, 0x00 } },
@@ -937,7 +949,7 @@ ne_pcmcia_ax88190_set_iobase(psc)
 		goto fail_2;
 	}
 
-#ifdef DIAGNOSTIC
+#ifdef NE_DEBUG
 	printf(": LAN iobase 0x%x (0x%x) ->",
 	    bus_space_read_1(pcmh.memt, pcmh.memh, offset + 0) |
 	    bus_space_read_1(pcmh.memt, pcmh.memh, offset + 2) << 8,
@@ -947,7 +959,7 @@ ne_pcmcia_ax88190_set_iobase(psc)
 	    psc->sc_pcioh.addr & 0xff);
 	bus_space_write_1(pcmh.memt, pcmh.memh, offset + 2,
 	    psc->sc_pcioh.addr >> 8);
-#ifdef DIAGNOSTIC
+#ifdef NE_DEBUG
 	printf(" 0x%x", bus_space_read_1(pcmh.memt, pcmh.memh, offset + 0) |
 	    bus_space_read_1(pcmh.memt, pcmh.memh, offset + 2) << 8);
 #endif

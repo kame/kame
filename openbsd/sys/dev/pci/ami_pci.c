@@ -1,4 +1,4 @@
-/*	$OpenBSD: ami_pci.c,v 1.15 2003/02/28 15:26:23 mickey Exp $	*/
+/*	$OpenBSD: ami_pci.c,v 1.18 2003/06/02 19:24:22 mickey Exp $	*/
 
 /*
  * Copyright (c) 2001 Michael Shalayeff
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -84,6 +79,8 @@ struct	ami_pci_device {
 	{ PCI_VENDOR_AMI,	PCI_PRODUCT_AMI_MEGARAID,	0 },
 	{ PCI_VENDOR_AMI,	PCI_PRODUCT_AMI_MEGARAID428,	0 },
 	{ PCI_VENDOR_AMI,	PCI_PRODUCT_AMI_MEGARAID434,	0 },
+	{ PCI_VENDOR_DELL,	PCI_PRODUCT_DELL_PERC_4DI,	0 },
+	{ PCI_VENDOR_DELL,	PCI_PRODUCT_DELL_PERC_4DI_2,	0 },
 	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_80960RP_ATU, AMI_CHECK_SIGN },
 	{ 0 }
 };
@@ -232,10 +229,11 @@ ami_pci_attach(parent, self, aux)
 		for (vp = ami_pci_vendors;
 		     vp->id && vp->id != (csr & 0xffff); vp++);
 		if (vp->id)
-			sprintf(modelbuf, "%s %x", vp->name,
+			snprintf(modelbuf, sizeof modelbuf, "%s %x", vp->name,
 			    (csr >> 16) & 0xffff);
 		else
-			sprintf(modelbuf, "unknown 0x%08x", csr);
+			snprintf(modelbuf, sizeof modelbuf, "unknown 0x%08x",
+			    csr);
 		model = modelbuf;
 	}
 

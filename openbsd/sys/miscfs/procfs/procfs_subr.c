@@ -1,4 +1,4 @@
-/*	$OpenBSD: procfs_subr.c,v 1.17 2002/03/14 00:42:25 miod Exp $	*/
+/*	$OpenBSD: procfs_subr.c,v 1.20 2003/08/11 10:08:04 mickey Exp $	*/
 /*	$NetBSD: procfs_subr.c,v 1.15 1996/02/12 15:01:42 christos Exp $	*/
 
 /*
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -103,6 +99,12 @@ procfs_allocvp(mp, vpp, pid, pfs_type)
 	struct vnode *vp;
 	int error;
 
+	/*
+	 * Lock the vp list, getnewvnode can sleep.
+	 */
+	error = lockmgr(&pfs_vlock, LK_EXCLUSIVE, NULL, p);
+	if (error)
+		return (error);
 loop:
 	for (pfs = pfshead.tqh_first; pfs != NULL; pfs = pfs->list.tqe_next) {
 		vp = PFSTOV(pfs);
@@ -112,14 +114,9 @@ loop:
 			if (vget(vp, 0, p))
 				goto loop;
 			*vpp = vp;
-			return (0);
+			goto out;
 		}
 	}
-
-	/*
-	 * Lock the vp list, getnewvnode can sleep.
-	 */
-	lockmgr(&pfs_vlock, LK_EXCLUSIVE, NULL, p);
 
 	if ((error = getnewvnode(VT_PROCFS, mp, procfs_vnodeop_p, vpp)) != 0)
 		goto out;
@@ -301,16 +298,15 @@ vfs_getuserstr(uio, buf, buflenp)
 	return (0);
 }
 
-vfs_namemap_t *
+const vfs_namemap_t *
 vfs_findname(nm, buf, buflen)
-	vfs_namemap_t *nm;
+	const vfs_namemap_t *nm;
 	char *buf;
 	int buflen;
 {
 
 	for (; nm->nm_name; nm++)
-		if (bcmp((const void *) buf, (const void *) nm->nm_name,
-		    buflen + 1) == 0)
+		if (bcmp(buf, nm->nm_name, buflen + 1) == 0)
 			return (nm);
 
 	return (0);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: systm.h,v 1.54 2003/01/21 16:59:23 markus Exp $	*/
+/*	$OpenBSD: systm.h,v 1.58 2003/08/24 01:27:07 avsm Exp $	*/
 /*	$NetBSD: systm.h,v 1.50 1996/06/09 04:55:09 briggs Exp $	*/
 
 /*-
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -158,29 +154,23 @@ void	*hashinit(int, int, int, u_long *);
 int	sys_nosys(struct proc *, void *, register_t *);
 
 void	panic(const char *, ...)
-#ifdef __KPRINTF_ATTRIBUTE__
-    __kprintf_attribute__((__noreturn__,__format__(__kprintf__,1,2)));
-#else
-    __attribute__((__noreturn__));
-#endif
+    __attribute__((__noreturn__,__format__(__kprintf__,1,2)));
 void	__assert(const char *, const char *, int, const char *)
     __attribute__((__noreturn__));
 int	printf(const char *, ...)
-    __kprintf_attribute__((__format__(__kprintf__,1,2)));
+    __attribute__((__format__(__kprintf__,1,2)));
 void	uprintf(const char *, ...)
-    __kprintf_attribute__((__format__(__kprintf__,1,2)));
-void	vprintf(const char *, _BSD_VA_LIST_);
-int	vsprintf(char *, const char *, va_list)
-    __kprintf_attribute__((__format__(__kprintf__,2,3)));
+    __attribute__((__format__(__kprintf__,1,2)));
+int	vprintf(const char *, _BSD_VA_LIST_);
+int	vsprintf(char *, const char *, va_list);
 int	sprintf(char *buf, const char *, ...)
-    __kprintf_attribute__((__format__(__kprintf__,2,3)));
-int	vsnprintf(char *, size_t, const char *, va_list)
-    __kprintf_attribute__((__format__(__kprintf__,3,4)));
+    __attribute__((__format__(__kprintf__,2,3)));
+int	vsnprintf(char *, size_t, const char *, va_list);
 int	snprintf(char *buf, size_t, const char *, ...)
-    __kprintf_attribute__((__format__(__kprintf__,3,4)));
+    __attribute__((__format__(__kprintf__,3,4)));
 struct tty;
 void	ttyprintf(struct tty *, const char *, ...)
-    __kprintf_attribute__((__format__(__kprintf__,2,3)));
+    __attribute__((__format__(__kprintf__,2,3)));
 
 void	splassert_fail(int, int, const char *);
 extern	int splassert_ctl;
@@ -271,7 +261,7 @@ void	dopowerhooks(int);
 #define PWR_STANDBY 2
 
 struct uio;
-int	uiomove(caddr_t, int, struct uio *);
+int	uiomove(void *, int, struct uio *);
 
 int	setjmp(label_t *);
 void	longjmp(label_t *);

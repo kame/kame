@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci_machdep.c,v 1.11 2003/02/17 01:29:20 henric Exp $	*/
+/*	$OpenBSD: pci_machdep.c,v 1.14 2003/06/24 21:54:39 henric Exp $	*/
 /*	$NetBSD: pci_machdep.c,v 1.22 2001/07/20 00:07:13 eeh Exp $	*/
 
 /*
@@ -415,7 +415,11 @@ pci_intr_map(pa, ihp)
 
 	/* XXXX -- we use the ino.  What if there is a valid IGN? */
 	*ihp = interrupts;
-	return (0);
+
+	if (pa->pa_pc->intr_map)
+		return ((*pa->pa_pc->intr_map)(pa, ihp));
+	else
+		return (0);
 }
 
 const char *
@@ -426,7 +430,7 @@ pci_intr_string(pc, ih)
 	static char str[16];
 
 	DPRINTF(SPDB_INTR, ("pci_intr_string: ih %u", ih));
-	sprintf(str, "ivec %x", ih);
+	snprintf(str, sizeof str, "ivec %x", ih);
 	DPRINTF(SPDB_INTR, ("; returning %s\n", str));
 
 	return (str);
@@ -454,8 +458,9 @@ pci_intr_establish(pc, ih, level, func, arg, what)
 	void *cookie;
 	struct psycho_pbm *pp = (struct psycho_pbm *)pc->cookie;
 
-	DPRINTF(SPDB_INTR, ("pci_intr_establish: ih %lu; level %d", (u_long)ih, level));
-	cookie = bus_intr_establish(pp->pp_memt, ih, level, 0, func, arg);
+	DPRINTF(SPDB_INTR, ("pci_intr_establish: ih %lu; level %d",
+	    (u_long)ih, level));
+	cookie = bus_intr_establish(pp->pp_memt, ih, level, 0, func, arg, what);
 
 	DPRINTF(SPDB_INTR, ("; returning handle %p\n", cookie));
 	return (cookie);

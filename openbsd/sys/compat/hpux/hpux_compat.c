@@ -1,4 +1,4 @@
-/*	$OpenBSD: hpux_compat.c,v 1.22 2003/01/09 22:27:11 miod Exp $	*/
+/*	$OpenBSD: hpux_compat.c,v 1.24 2003/08/15 20:32:15 tedu Exp $	*/
 /*	$NetBSD: hpux_compat.c,v 1.35 1997/05/08 16:19:48 mycroft Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -488,7 +484,7 @@ hpux_sys_ulimit(p, v, retval)
 	case 2:
 		SCARG(uap, newlimit) *= 512;
 		if (SCARG(uap, newlimit) > limp->rlim_max &&
-		    (error = suser(p->p_ucred, &p->p_acflag)))
+		    (error = suser(p, 0)))
 			break;
 		limp->rlim_cur = limp->rlim_max = SCARG(uap, newlimit);
 		/* else fall into... */
@@ -1213,7 +1209,7 @@ hpux_sys_stime_6x(p, v, retval)
 
 	tv.tv_sec = SCARG(uap, time);
 	tv.tv_usec = 0;
-	if ((error = suser(p->p_ucred, &p->p_acflag)))
+	if ((error = suser(p, 0)))
 		return (error);
 
 	/* WHAT DO WE DO ABOUT PENDING REAL-TIME TIMEOUTS??? */

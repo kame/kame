@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec.c,v 1.22 1998/07/14 14:26:18 mickey Exp $	*/
+/*	$OpenBSD: exec.c,v 1.26 2003/08/11 06:23:09 deraadt Exp $	*/
 /*	$NetBSD: exec.c,v 1.15 1996/10/13 02:29:01 christos Exp $	*/
 
 /*-
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -48,10 +44,7 @@ static char *ssym, *esym;
 extern u_int opendev;
 
 void
-exec(path, loadaddr, howto)
-	char *path;
-	void *loadaddr;
-	int howto;
+exec(char *path, void *loadaddr, int howto)
 {
 	int io;
 #ifndef INSECURE
@@ -75,6 +68,7 @@ exec(path, loadaddr, howto)
 
 	sz = read(io, (char *)&x, sizeof(x));
 	if (sz != sizeof(x) || N_BADMAG(x)) {
+		close(io);
 		errno = EFTYPE;
 		return;
 	}
@@ -85,7 +79,7 @@ exec(path, loadaddr, howto)
 		x.a_entry, x.a_trsize, x.a_drsize);
 #endif
 
-        /* Text */
+	/* Text */
 	printf("%u", x.a_text);
 	addr = loadaddr;
 	sz = x.a_text;
@@ -106,7 +100,7 @@ exec(path, loadaddr, howto)
 		while ((long)addr & (N_PAGSIZ(x) - 1))
 			*addr++ = 0;
 
-        /* Data */
+	/* Data */
 #ifdef EXEC_DEBUG
 	daddr = addr;
 #endif
@@ -115,12 +109,12 @@ exec(path, loadaddr, howto)
 		goto shread;
 	addr += x.a_data;
 
-        /* Bss */
+	/* Bss */
 	printf("+%u", x.a_bss);
 	for (i = 0; i < x.a_bss; i++)
 		*addr++ = 0;
 
-        /* Symbols */
+	/* Symbols */
 	if (x.a_syms) {
 		ssym = addr;
 		bcopy(&x.a_syms, addr, sizeof(x.a_syms));
@@ -138,7 +132,7 @@ exec(path, loadaddr, howto)
 			sz = i - sizeof(int);
 			addr += sizeof(int);
 			if (read(io, addr, sz) != sz)
-                	goto shread;
+				goto shread;
 			addr += sz;
 		}
 
@@ -165,10 +159,10 @@ exec(path, loadaddr, howto)
 	printf(" start=0x%x\n", x.a_entry);
 
 #ifdef EXEC_DEBUG
-        printf("loadaddr=%p etxt=%p daddr=%p ssym=%p esym=%p\n",
-	    	loadaddr, etxt, daddr, ssym, esym);
-        printf("\n\nReturn to boot...\n");
-        getchar();
+	printf("loadaddr=%p etxt=%p daddr=%p ssym=%p esym=%p\n",
+	    loadaddr, etxt, daddr, ssym, esym);
+	printf("\n\nReturn to boot...\n");
+	getchar();
 #endif
 
 	machdep_start((char *)((register_t)x.a_entry), howto, loadaddr, ssym,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: diskprobe.c,v 1.18 2002/03/14 01:26:34 millert Exp $	*/
+/*	$OpenBSD: diskprobe.c,v 1.21 2003/08/11 06:23:09 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Tobias Weingartner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
@@ -61,7 +56,7 @@ extern int debug;
 
 /* Probe for all BIOS floppies */
 static void
-floppyprobe()
+floppyprobe(void)
 {
 	struct diskinfo *dip;
 	int i;
@@ -97,7 +92,7 @@ floppyprobe()
 
 /* Probe for all BIOS hard disks */
 static void
-hardprobe()
+hardprobe(void)
 {
 	struct diskinfo *dip;
 	int i;
@@ -161,7 +156,7 @@ hardprobe()
 /* Probe for all BIOS supported disks */
 u_int32_t bios_cksumlen;
 void
-diskprobe()
+diskprobe(void)
 {
 	struct diskinfo *dip;
 	int i;
@@ -206,8 +201,7 @@ diskprobe()
 
 /* Find info on given BIOS disk */
 struct diskinfo *
-dklookup(dev)
-	int dev;
+dklookup(int dev)
 {
 	struct diskinfo *dip;
 
@@ -219,7 +213,7 @@ dklookup(dev)
 }
 
 void
-dump_diskinfo()
+dump_diskinfo(void)
 {
 	struct diskinfo *dip;
 
@@ -243,8 +237,7 @@ dump_diskinfo()
  * XXX - Use dklookup() instead.
  */
 bios_diskinfo_t *
-bios_dklookup(dev)
-	register int dev;
+bios_dklookup(int dev)
 {
 	struct diskinfo *dip;
 
@@ -262,14 +255,11 @@ bios_dklookup(dev)
  * as it is quick, small, and available.
  */
 int
-disksum(blk)
-	int blk;
+disksum(int blk)
 {
 	struct diskinfo *dip, *dip2;
 	int st, reprobe = 0;
-	int hpc, spt, dev;
 	char *buf;
-	int cyl, head, sect;
 
 	buf = alloca(DEV_BSIZE);
 	for(dip = TAILQ_FIRST(&disklist); dip; dip = TAILQ_NEXT(dip, list)){
@@ -279,13 +269,8 @@ disksum(blk)
 		if (!(bdi->bios_number & 0x80) || bdi->flags & BDI_INVALID)
 			continue;
 
-		dev = bdi->bios_number;
-		hpc = bdi->bios_heads;
-		spt = bdi->bios_sectors;
-
 		/* Adler32 checksum */
-		btochs(blk, cyl, head, sect, hpc, spt);
-		st = biosd_io(F_READ, dev, cyl, head, sect, 1, buf);
+		st = biosd_io(F_READ, bdi, blk, 1, buf);
 		if (st) {
 			bdi->flags |= BDI_INVALID;
 			continue;

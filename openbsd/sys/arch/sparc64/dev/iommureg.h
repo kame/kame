@@ -1,4 +1,4 @@
-/*	$OpenBSD: iommureg.h,v 1.6 2003/03/06 08:26:08 henric Exp $	*/
+/*	$OpenBSD: iommureg.h,v 1.9 2003/06/02 23:27:55 millert Exp $	*/
 /*	$NetBSD: iommureg.h,v 1.6 2001/07/20 00:07:13 eeh Exp $	*/
 
 /*
@@ -22,11 +22,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -97,7 +93,7 @@ struct iommu_strbuf {
 #define IOTTE_8K	0x0000000000000000LL
 #define IOTTE_STREAM	0x1000000000000000LL	/* Is page streamable? */
 #define	IOTTE_LOCAL	0x0800000000000000LL	/* Accesses to same bus segment? */
-#define IOTTE_PAMASK	0x000007ffffffe000LL	/* Let's assume this is correct (bits 42..12) */
+#define IOTTE_PAMASK	0x000007ffffffe000LL	/* Let's assume this is correct (bits 42..13) */
 #define IOTTE_C		0x0000000000000010LL	/* Accesses to cacheable space */
 #define IOTTE_W		0x0000000000000002LL	/* Writeable */
 #define IOTTE_SOFTWARE	0x0000000000001f80LL	/* For software use (bits 12..7) */
@@ -165,5 +161,7 @@ struct iommu_strbuf {
 #define	INTPCI_MAXOBINO	0x16		/* maximum OBIO INO value for PCI */
 #define	INTPCIOBINOX(x)	((x)&0x1f)	/* OBIO ino index (for PCI machines) */
 #define	INTPCIINOX(x)	(((x)&0x1c)>>2)	/* PCI ino index */
+
+#define	INTCLR_IDLE	0
 
 #endif /* _SPARC64_DEV_IOMMUREG_H_ */

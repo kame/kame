@@ -1,8 +1,8 @@
-/*	$OpenBSD: if_le.c,v 1.5 1997/01/29 07:58:38 deraadt Exp $ */
+/*	$OpenBSD: if_le.c,v 1.7 2003/08/19 10:22:30 deraadt Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -11,12 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed under OpenBSD by
- *	Theo de Raadt for Willowglen Singapore.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
  * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -72,10 +66,8 @@ struct {
 	int     next_tmd;
 }       le_softc;
 
-void 
-le_error(str, ler1)
-	char   *str;
-	struct lereg1 *ler1;
+static void
+le_error(char *str, struct lereg1 *ler1)
 {
 	/* ler1->ler1_rap = LE_CSRO done in caller */
 	if (ler1->ler1_rdp & LE_C0_BABL) {
@@ -94,9 +86,8 @@ le_error(str, ler1)
 	}
 }
 
-void 
-le_reset(myea)
-	u_char *myea;
+static void
+le_reset(u_char *myea)
 {
 	struct lereg1 *ler1 = le_softc.sc_r1;
 	struct lereg2 *ler2 = le_softc.sc_r2;
@@ -115,7 +106,6 @@ le_reset(myea)
 	ler2->ler2_padr[3] = myea[2];
 	ler2->ler2_padr[4] = myea[5];
 	ler2->ler2_padr[5] = myea[4];
-
 
 	ler2->ler2_ladrf0 = 0;
 	ler2->ler2_ladrf1 = 0;
@@ -171,10 +161,8 @@ le_reset(myea)
 	ler1->ler1_rdp = LE_C0_STRT;
 }
 
-int 
-le_poll(pkt, len)
-	void   *pkt;
-	int     len;
+static int
+le_poll(void *pkt, int len)
 {
 	struct lereg1 *ler1 = le_softc.sc_r1;
 	struct lereg2 *ler2 = le_softc.sc_r2;
@@ -224,10 +212,8 @@ cleanup:
 	return length;
 }
 
-int 
-le_put(pkt, len)
-	u_char *pkt;
-	size_t  len;
+int
+le_put(u_char *pkt, size_t len)
 {
 	struct lereg1 *ler1 = le_softc.sc_r1;
 	struct lereg2 *ler2 = le_softc.sc_r2;
@@ -284,11 +270,8 @@ le_put(pkt, len)
 	return len;
 }
 
-int 
-le_get(pkt, len, timeout)
-	u_char *pkt;
-	size_t  len;
-	u_long  timeout;
+int
+le_get(u_char *pkt, size_t len, u_long timeout)
 {
 	int     cc;
 	int     now, then;
@@ -319,13 +302,14 @@ le_get(pkt, len, timeout)
 	return cc;
 }
 
-void 
-le_init()
+void
+le_init(void)
 {
 	caddr_t addr;
 	int    *ea = (int *) LANCE_ADDR;
 	u_long *eram = (u_long *) ERAM_ADDR;
 	u_long  e = *ea;
+
 	if ((e & 0x2fffff00) == 0x2fffff00) {
 		printf("ERROR: ethernet address not set!  Use LSAD.\n");
 		callrom();
@@ -347,8 +331,8 @@ le_init()
 	le_reset(myea);
 }
 
-void 
-le_end()
+void
+le_end(void)
 {
 	struct lereg1 *ler1 = le_softc.sc_r1;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.30 2003/02/17 01:29:20 henric Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.33 2003/07/31 17:23:24 jason Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.51 2001/07/24 19:32:11 eeh Exp $ */
 
 /*
@@ -25,11 +25,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -563,7 +559,8 @@ setroot()
 		unit = DISKUNIT(rootdev);
 		part = DISKPART(rootdev);
 
-		len = sprintf(buf, "%s%d", findblkname(majdev), unit);
+		len = snprintf(buf, sizeof buf, "%s%d", findblkname(majdev),
+			unit);
 		if (len >= sizeof(buf))
 			panic("setroot: device name too long");
 
@@ -588,7 +585,7 @@ setroot()
 			printf(": ");
 			len = getstr(buf, sizeof(buf));
 			if (len == 0 && bootdv != NULL) {
-				strcpy(buf, bootdv->dv_xname);
+				strlcpy(buf, bootdv->dv_xname, sizeof buf);
 				len = strlen(buf);
 			}
 			if (len > 0 && buf[len - 1] == '*') {
@@ -921,12 +918,12 @@ clockfreq(freq)
 	static char buf[10];
 
 	freq /= 1000;
-	sprintf(buf, "%ld", freq / 1000);
+	snprintf(buf, sizeof buf, "%ld", freq / 1000);
 	freq %= 1000;
 	if (freq) {
 		freq += 1000;	/* now in 1000..1999 */
 		p = buf + strlen(buf);
-		sprintf(p, "%ld", freq);
+		snprintf(p, buf + sizeof buf - p, "%ld", freq);
 		*p = '.';	/* now buf = %d.%3d */
 	}
 	return (buf);
@@ -989,8 +986,6 @@ mainbus_match(parent, cf, aux)
 
 	return (1);
 }
-
-int autoconf_nzs = 0;	/* must be global so obio.c can see it */
 
 /*
  * Attach the mainbus.
@@ -1346,13 +1341,13 @@ getdevunit(name, unit)
 	int lunit;
 
 	/* compute length of name and decimal expansion of unit number */
-	sprintf(num, "%d", unit);
+	snprintf(num, sizeof num, "%d", unit);
 	lunit = strlen(num);
 	if (strlen(name) + lunit >= sizeof(fullname) - 1)
 		panic("config_attach: device name too long");
 
-	strcpy(fullname, name);
-	strcat(fullname, num);
+	strlcpy(fullname, name, sizeof fullname);
+	strlcat(fullname, num, sizeof fullname);
 
 	while (strcmp(dev->dv_xname, fullname) != 0) {
 		if ((dev = dev->dv_list.tqe_next) == NULL)

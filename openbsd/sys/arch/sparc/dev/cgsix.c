@@ -1,4 +1,4 @@
-/*	$OpenBSD: cgsix.c,v 1.23 2002/12/12 23:35:32 miod Exp $	*/
+/*	$OpenBSD: cgsix.c,v 1.28 2003/06/28 17:05:33 miod Exp $	*/
 /*	$NetBSD: cgsix.c,v 1.33 1997/08/07 19:12:30 pk Exp $ */
 
 /*
@@ -14,11 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -57,11 +52,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -345,7 +336,20 @@ cgsixattach(parent, self, args)
         sc->sc_sunfb.sf_ro.ri_bits = mapiodev(ca->ca_ra.ra_reg,
 	    CGSIX_VID_OFFSET, round_page(sc->sc_sunfb.sf_fbsize));
 	sc->sc_sunfb.sf_ro.ri_hw = sc;
-	fbwscons_init(&sc->sc_sunfb, isconsole);
+
+	/*
+	 * If the framebuffer width is under 1024x768, we will switch from the
+	 * PROM font to the more adequate 8x16 font here.
+	 * However, we need to adjust two things in this case:
+	 * - the display row should be overrided from the current PROM metrics,
+	 *   to prevent us from overwriting the last few lines of text.
+	 * - if the 80x34 screen would make a large margin appear around it,
+	 *   choose to clear the screen rather than keeping old prom output in
+	 *   the margins.
+	 * XXX there should be a rasops "clear margins" feature
+	 */
+	fbwscons_init(&sc->sc_sunfb, isconsole &&
+	    (sc->sc_sunfb.sf_width >= 1024) ? 0 : RI_CLEAR);
 	fbwscons_setcolormap(&sc->sc_sunfb, cgsix_setcolor);
 
 	/*
@@ -372,8 +376,8 @@ cgsixattach(parent, self, args)
 	    sc->sc_sunfb.sf_height, fhcrev);
 
 	if (isconsole) {
-		fbwscons_console_init(&sc->sc_sunfb, &cgsix_stdscreen, -1,
-		    cgsix_burner);
+		fbwscons_console_init(&sc->sc_sunfb, &cgsix_stdscreen,
+		    sc->sc_sunfb.sf_width >= 1024 ? -1 : 0, cgsix_burner);
 	}
 
 #if defined(SUN4C) || defined(SUN4M)
@@ -403,7 +407,7 @@ cgsix_ioctl(dev, cmd, data, flags, p)
 
 	switch (cmd) {
 	case WSDISPLAYIO_GTYPE:
-		*(u_int *)data = WSDISPLAY_TYPE_UNKNOWN;
+		*(u_int *)data = WSDISPLAY_TYPE_SUNCG6;
 		break;
 	case WSDISPLAYIO_GINFO:
 		wdf = (struct wsdisplay_fbinfo *)data;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: stivar.h,v 1.9 2003/02/18 09:39:45 miod Exp $	*/
+/*	$OpenBSD: stivar.h,v 1.14 2003/08/19 03:13:07 mickey Exp $	*/
 
 /*
  * Copyright (c) 2000-2003 Michael Shalayeff
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -34,19 +29,19 @@
 #ifndef _IC_STIVAR_H_
 #define _IC_STIVAR_H_
 
-/* #define	STIDEBUG */
-
 struct sti_softc {
 	struct device sc_dev;
 	void *sc_ih;
 
+	u_int	sc_wsmode;
 	u_int	sc_flags;
 #define	STI_TEXTMODE	0x0001
 #define	STI_CLEARSCR	0x0002
 #define	STI_CONSOLE	0x0004
 	int	sc_devtype;
 	int	sc_nscreens;
-	
+	int	sc_bpp;
+
 	bus_space_tag_t iot, memt;
 	bus_space_handle_t ioh, romh, fbh;
 
@@ -59,6 +54,7 @@ struct sti_softc {
 	u_int	sc_fontmaxcol;		/* ...or in off-screen frame buffer */
 	u_int	sc_fontbase;
 
+	u_int8_t sc_rcmap[STI_NCMAP], sc_gcmap[STI_NCMAP], sc_bcmap[STI_NCMAP];
 	vaddr_t	sc_code;
 
 	sti_init_t	init;

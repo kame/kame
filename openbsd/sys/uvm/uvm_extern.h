@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_extern.h,v 1.46 2002/10/29 18:30:21 art Exp $	*/
+/*	$OpenBSD: uvm_extern.h,v 1.50 2003/08/10 00:04:50 miod Exp $	*/
 /*	$NetBSD: uvm_extern.h,v 1.57 2001/03/09 01:02:12 chs Exp $	*/
 
 /*
@@ -47,11 +47,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -220,7 +216,7 @@ typedef int		vm_prot_t;
  * flags for uvm_pagealloc_strat()
  */
 #define UVM_PGA_USERESERVE	0x0001	/* ok to use reserve pages */
-#define	UVM_PGA_ZERO		0x0002	/* returned page must be zero'd */
+#define	UVM_PGA_ZERO		0x0002	/* returned page must be zeroed */
 
 /*
  * lockflags that control the locking behavior of various functions.
@@ -347,7 +343,7 @@ struct uvmexp {
 	int pdrevs;	/* number of times daemon rev'd clock hand */
 	int pdswout;	/* number of times daemon called for swapout */
 	int pdfreed;	/* number of pages daemon freed since boot */
-	int pdscans;	/* number of pages daemon scaned since boot */
+	int pdscans;	/* number of pages daemon scanned since boot */
 	int pdanscan;	/* number of anonymous pages scanned by daemon */
 	int pdobscan;	/* number of object pages scanned by daemon */
 	int pdreact;	/* number of pages daemon reactivated since boot */
@@ -481,7 +477,6 @@ void			uvm_init_limits(struct proc *);
 boolean_t		uvm_kernacc(caddr_t, size_t, int);
 __dead void		uvm_scheduler(void);
 void			uvm_swapin(struct proc *);
-boolean_t		uvm_useracc(caddr_t, size_t, int);
 int			uvm_vslock(struct proc *, caddr_t, size_t,
 			    vm_prot_t);
 void			uvm_vsunlock(struct proc *, caddr_t, size_t);

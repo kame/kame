@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipx_if.h,v 1.4 2002/03/14 01:27:12 millert Exp $	*/
+/*	$OpenBSD: ipx_if.h,v 1.6 2003/06/02 23:28:16 millert Exp $	*/
 
 /*-
  *
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -74,12 +70,12 @@ struct	ipx_aliasreq {
 
 #define	IA_SIPX(ia) (&(((struct ipx_ifaddr *)(ia))->ia_addr))
 
-#define ETHERTYPE_8023	0x0001	/* Ethernet_802.3 */
-#define ETHERTYPE_8022	0x0004	/* Ethernet_802.2 */
-#define	ETHERTYPE_SNAP	0x0005	/* Ethernet_SNAP, internal use only */
-#define	ETHERTYPE_8022TR 0x0011	/* Ethernet_802.2 w/ trailers */
-#define ETHERTYPE_II	0x8137	/* Ethernet_II */
-#define ETHERTYPE_IPX	ETHERTYPE_II
+#define IPX_ETHERTYPE_8023	0x0001	/* Ethernet_802.3 */
+#define IPX_ETHERTYPE_8022	0x0004	/* Ethernet_802.2 */
+#define	IPX_ETHERTYPE_SNAP	0x0005	/* Ethernet_SNAP, internal use only */
+#define	IPX_ETHERTYPE_8022TR	0x0011	/* Ethernet_802.2 w/ trailers */
+#define IPX_ETHERTYPE_II	0x8137	/* Ethernet_II */
+#define IPX_ETHERTYPE_IPX	IPX_ETHERTYPE_II
 
 #ifdef	IPXIP
 struct ipxip_req {

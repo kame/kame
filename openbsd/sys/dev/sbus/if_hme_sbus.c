@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_hme_sbus.c,v 1.4 2003/02/17 01:29:20 henric Exp $	*/
+/*	$OpenBSD: if_hme_sbus.c,v 1.7 2003/07/07 15:37:07 jason Exp $	*/
 /*	$NetBSD: if_hme_sbus.c,v 1.6 2001/02/28 14:52:48 mrg Exp $	*/
 
 /*-
@@ -84,10 +84,7 @@ struct cfattach hme_sbus_ca = {
 };
 
 int
-hmematch_sbus(parent, vcf, aux)
-	struct device *parent;
-	void *vcf;
-	void *aux;
+hmematch_sbus(struct device *parent, void *vcf, void *aux)
 {
 	struct cfdata *cf = vcf;
 	struct sbus_attach_args *sa = aux;
@@ -98,9 +95,7 @@ hmematch_sbus(parent, vcf, aux)
 }
 
 void
-hmeattach_sbus(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+hmeattach_sbus(struct device *parent, struct device *self, void *aux)
 {
 	struct sbus_attach_args *sa = aux;
 	struct hmesbus_softc *hsc = (void *)self;
@@ -133,43 +128,33 @@ hmeattach_sbus(parent, self, aux)
 	 *	bank 4: HME MIF registers
 	 *
 	 */
-	if (sbus_bus_map(sa->sa_bustag,
-			 sa->sa_reg[0].sbr_slot,
-			 (bus_addr_t)sa->sa_reg[0].sbr_offset,
-			 (bus_size_t)sa->sa_reg[0].sbr_size,
-			 BUS_SPACE_MAP_LINEAR, 0, &sc->sc_seb) != 0) {
+	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[0].sbr_slot,
+	    (bus_addr_t)sa->sa_reg[0].sbr_offset,
+	    (bus_size_t)sa->sa_reg[0].sbr_size, 0, 0, &sc->sc_seb) != 0) {
 		printf("%s @ sbus: cannot map registers\n", self->dv_xname);
 		return;
 	}
-	if (sbus_bus_map(sa->sa_bustag,
-			 sa->sa_reg[1].sbr_slot,
-			 (bus_addr_t)sa->sa_reg[1].sbr_offset,
-			 (bus_size_t)sa->sa_reg[1].sbr_size,
-			 BUS_SPACE_MAP_LINEAR, 0, &sc->sc_etx) != 0) {
+	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[1].sbr_slot,
+	    (bus_addr_t)sa->sa_reg[1].sbr_offset,
+	    (bus_size_t)sa->sa_reg[1].sbr_size, 0, 0, &sc->sc_etx) != 0) {
 		printf("%s @ sbus: cannot map registers\n", self->dv_xname);
 		return;
 	}
-	if (sbus_bus_map(sa->sa_bustag,
-			 sa->sa_reg[2].sbr_slot,
-			 (bus_addr_t)sa->sa_reg[2].sbr_offset,
-			 (bus_size_t)sa->sa_reg[2].sbr_size,
-			 BUS_SPACE_MAP_LINEAR, 0, &sc->sc_erx) != 0) {
+	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[2].sbr_slot,
+	    (bus_addr_t)sa->sa_reg[2].sbr_offset,
+	    (bus_size_t)sa->sa_reg[2].sbr_size, 0, 0, &sc->sc_erx) != 0) {
 		printf("%s @ sbus: cannot map registers\n", self->dv_xname);
 		return;
 	}
-	if (sbus_bus_map(sa->sa_bustag,
-			 sa->sa_reg[3].sbr_slot,
-			 (bus_addr_t)sa->sa_reg[3].sbr_offset,
-			 (bus_size_t)sa->sa_reg[3].sbr_size,
-			 BUS_SPACE_MAP_LINEAR, 0, &sc->sc_mac) != 0) {
+	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[3].sbr_slot,
+	    (bus_addr_t)sa->sa_reg[3].sbr_offset,
+	    (bus_size_t)sa->sa_reg[3].sbr_size, 0, 0, &sc->sc_mac) != 0) {
 		printf("%s @ sbus: cannot map registers\n", self->dv_xname);
 		return;
 	}
-	if (sbus_bus_map(sa->sa_bustag,
-			 sa->sa_reg[4].sbr_slot,
-			 (bus_addr_t)sa->sa_reg[4].sbr_offset,
-			 (bus_size_t)sa->sa_reg[4].sbr_size,
-			 BUS_SPACE_MAP_LINEAR, 0, &sc->sc_mif) != 0) {
+	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[4].sbr_slot,
+	    (bus_addr_t)sa->sa_reg[4].sbr_offset,
+	    (bus_size_t)sa->sa_reg[4].sbr_size, 0, 0, &sc->sc_mif) != 0) {
 		printf("%s @ sbus: cannot map registers\n", self->dv_xname);
 		return;
 	}
@@ -207,5 +192,5 @@ hmeattach_sbus(parent, self, aux)
 	/* Establish interrupt handler */
 	if (sa->sa_nintr != 0)
 		(void)bus_intr_establish(sa->sa_bustag, sa->sa_pri, IPL_NET, 0,
-					 hme_intr, sc);
+					 hme_intr, sc, self->dv_xname);
 }

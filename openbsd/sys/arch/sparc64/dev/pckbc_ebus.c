@@ -1,4 +1,4 @@
-/*	$OpenBSD: pckbc_ebus.c,v 1.3 2003/02/17 01:29:20 henric Exp $	*/
+/*	$OpenBSD: pckbc_ebus.c,v 1.5 2003/06/24 21:54:39 henric Exp $	*/
 
 /*
  * Copyright (c) 2002 Jason L. Wright (jason@thought.net)
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -148,14 +143,14 @@ pckbc_ebus_attach(parent, self, aux)
 	psc->intr_establish = pckbc_ebus_intr_establish;
 
 	sc->sc_irq[0] = bus_intr_establish(ea->ea_iotag, ea->ea_intrs[0],
-	    IPL_TTY, 0, pckbcintr, psc);
+	    IPL_TTY, 0, pckbcintr, psc, self->dv_xname);
 	if (sc->sc_irq[0] == NULL) {
 		printf(": couldn't get intr0\n");
 		return;
 	}
 
 	sc->sc_irq[1] = bus_intr_establish(ea->ea_iotag, ea->ea_intrs[1],
-	    IPL_TTY, 0, pckbcintr, psc);
+	    IPL_TTY, 0, pckbcintr, psc, self->dv_xname);
 	if (sc->sc_irq[1] == NULL) {
 		printf(": couldn't get intr1\n");
 		return;

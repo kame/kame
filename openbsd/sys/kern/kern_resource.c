@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_resource.c,v 1.21 2002/10/15 01:27:31 nordin Exp $	*/
+/*	$OpenBSD: kern_resource.c,v 1.24 2003/09/01 18:06:03 henning Exp $	*/
 /*	$NetBSD: kern_resource.c,v 1.38 1996/10/23 07:19:38 matthias Exp $	*/
 
 /*-
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -198,7 +194,7 @@ donice(curp, chgp, n)
 	if (n < PRIO_MIN)
 		n = PRIO_MIN;
 	n += NZERO;
-	if (n < chgp->p_nice && suser(pcred->pc_ucred, &curp->p_acflag))
+	if (n < chgp->p_nice && suser(curp, 0))
 		return (EACCES);
 	chgp->p_nice = n;
 	(void)resetpriority(chgp);
@@ -214,7 +210,7 @@ sys_setrlimit(p, v, retval)
 {
 	register struct sys_setrlimit_args /* {
 		syscallarg(int) which;
-		syscallarg(struct rlimit *) rlp;
+		syscallarg(const struct rlimit *) rlp;
 	} */ *uap = v;
 	struct rlimit alim;
 	int error;
@@ -245,7 +241,7 @@ dosetrlimit(p, which, limp)
 	alimp = &p->p_rlimit[which];
 	if (limp->rlim_cur > alimp->rlim_max ||
 	    limp->rlim_max > alimp->rlim_max)
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+		if ((error = suser(p, 0)) != 0)
 			return (error);
 	if (p->p_limit->p_refcnt > 1 &&
 	    (p->p_limit->p_lflags & PL_SHAREMOD) == 0) {

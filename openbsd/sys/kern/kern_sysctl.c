@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_sysctl.c,v 1.79 2003/01/21 16:59:23 markus Exp $	*/
+/*	$OpenBSD: kern_sysctl.c,v 1.89 2003/08/23 20:02:59 tedu Exp $	*/
 /*	$NetBSD: kern_sysctl.c,v 1.17 1996/05/20 17:49:05 mrg Exp $	*/
 
 /*-
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -65,6 +61,7 @@
 #include <sys/namei.h>
 #include <sys/exec.h>
 #include <sys/mbuf.h>
+#include <sys/sensors.h>
 
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
@@ -94,6 +91,8 @@ extern  long numvnodes;
 int sysctl_diskinit(int, struct proc *);
 int sysctl_proc_args(int *, u_int, void *, size_t *, struct proc *);
 int sysctl_intrcnt(int *, u_int, void *, size_t *);
+int sysctl_sensors(int *, u_int, void *, size_t *, void *, size_t);
+int sysctl_emul(int *, u_int, void *, size_t *, void *, size_t);
 
 /*
  * Lock to avoid too many processes vslocking a large amount of memory
@@ -136,7 +135,7 @@ sys___sysctl(p, v, retval)
 	int name[CTL_MAXNAME];
 
 	if (SCARG(uap, new) != NULL &&
-	    (error = suser(p->p_ucred, &p->p_acflag)))
+	    (error = suser(p, 0)))
 		return (error);
 	/*
 	 * all top-level sysctl names are non-terminal
@@ -270,6 +269,7 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		case KERN_SHMINFO:
 		case KERN_INTRCNT:
 		case KERN_WATCHDOG:
+		case KERN_EMUL:
 			break;
 		default:
 			return (ENOTDIR);	/* overloaded */
@@ -308,8 +308,8 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		if ((error = sysctl_int(oldp, oldlenp, newp, newlen, &level)) ||
 		    newp == NULL)
 			return (error);
-		if ((securelevel > 0 || level < -1)
-		    && level < securelevel && p->p_pid != 1)
+		if ((securelevel > 0 || level < -1) &&
+		    level < securelevel && p->p_pid != 1)
 			return (EPERM);
 		securelevel = level;
 		return (0);
@@ -484,6 +484,9 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	case KERN_WATCHDOG:
 		return (sysctl_wdog(name + 1, namelen - 1, oldp, oldlenp,
 		    newp, newlen));
+	case KERN_EMUL:
+		return (sysctl_emul(name + 1, namelen - 1, oldp, oldlenp,
+		    newp, newlen));
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -506,8 +509,8 @@ hw_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	extern char machine[], cpu_model[];
 	int err;
 
-	/* all sysctl names at this level are terminal */
-	if (namelen != 1)
+	/* all sysctl names at this level except sensors are terminal */
+	if (name[0] != HW_SENSORS && namelen != 1)
 		return (ENOTDIR);		/* overloaded */
 
 	switch (name[0]) {
@@ -543,6 +546,9 @@ hw_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		    disk_count * sizeof(struct diskstats)));
 	case HW_DISKCOUNT:
 		return (sysctl_rdint(oldp, oldlenp, newp, disk_count));
+	case HW_SENSORS:
+		return (sysctl_sensors(name + 1, namelen - 1, oldp, oldlenp,
+		    newp, newlen));
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -553,7 +559,8 @@ hw_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 /*
  * Debugging related system variables.
  */
-struct ctldebug debug0, debug1, debug2, debug3, debug4;
+extern struct ctldebug debug0, debug1;
+struct ctldebug debug2, debug3, debug4;
 struct ctldebug debug5, debug6, debug7, debug8, debug9;
 struct ctldebug debug10, debug11, debug12, debug13, debug14;
 struct ctldebug debug15, debug16, debug17, debug18, debug19;
@@ -1221,7 +1228,7 @@ more:
 		buf[0] = '\0';
 		if ((error = copyout(buf, rarg, 1)) != 0)
 			goto out;
-		*oldlenp += 1;;
+		*oldlenp += 1;
 		rarg += 1;
 
 		vargv++;
@@ -1279,8 +1286,9 @@ sysctl_diskinit(update, p)
 
 		for (dk = TAILQ_FIRST(&disklist), i = 0, l = 0; dk;
 		    dk = TAILQ_NEXT(dk, dk_link), i++) {
-			l += sprintf(disknames + l, "%s,",
+			snprintf(disknames + l, tlen - l, "%s,",
 			    dk->dk_name ? dk->dk_name : "");
+			l += strlen(disknames + l);
 			sdk = diskstats + i;
 			sdk->ds_busy = dk->dk_busy;
 			sdk->ds_xfer = dk->dk_xfer;
@@ -1487,5 +1495,62 @@ sysctl_intrcnt(int *name, u_int namelen, void *oldp, size_t *oldlenp)
 		return (sysctl_rdstring(oldp, oldlenp, NULL, intrname));
 	default:
 		return (EOPNOTSUPP);
+	}
+}
+
+int nsensors = 0;
+struct sensors_head sensors = SLIST_HEAD_INITIALIZER(&sensors);
+
+int
+sysctl_sensors(int *name, u_int namelen, void *oldp, size_t *oldlenp,
+    void *newp, size_t newlen)
+{
+	struct sensor *s = NULL;
+	int num;
+
+	if (namelen != 1)
+		return (ENOTDIR);
+
+	num = name[0];
+	if (num >= nsensors)
+		return (ENXIO);
+
+	SLIST_FOREACH(s, &sensors, list)
+		if (s->num == num)
+			break;
+
+	return (sysctl_rdstruct(oldp, oldlenp, newp, s, sizeof(struct sensor)));
+}
+
+int
+sysctl_emul(int *name, u_int namelen, void *oldp, size_t *oldlenp,
+    void *newp, size_t newlen)
+{
+	int enabled, error;
+	struct emul *e;
+
+	if (name[0] == KERN_EMUL_NUM) {
+		if (namelen != 1)
+			return (ENOTDIR);
+		return (sysctl_rdint(oldp, oldlenp, newp, nemuls));
+	}
+
+	if (namelen != 2)
+		return (ENOTDIR);
+	if (name[0] > nemuls || name[0] < 0)
+		return (EINVAL);
+	e = emulsw[name[0] - 1];
+
+	switch (name[1]) {
+	case KERN_EMUL_NAME:
+		return (sysctl_rdstring(oldp, oldlenp, newp, e->e_name));
+	case KERN_EMUL_ENABLED:
+		enabled = (e->e_flags & EMUL_ENABLED);
+		error = sysctl_int(oldp, oldlenp, newp, newlen,
+		    &enabled);
+		e->e_flags = (enabled & EMUL_ENABLED);
+		return (error);
+	default:
+		return (EINVAL);
 	}
 }

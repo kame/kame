@@ -1,8 +1,8 @@
-/*	$OpenBSD: cac.c,v 1.13 2003/03/15 19:16:10 deraadt Exp $	*/
+/*	$OpenBSD: cac.c,v 1.16 2003/06/02 19:24:22 mickey Exp $	*/
 /*	$NetBSD: cac.c,v 1.15 2000/11/08 19:20:35 ad Exp $	*/
 
 /*
- * Copyright (c) 2001 Michael Shalayeff
+ * Copyright (c) 2001,2003 Michael Shalayeff
  * All rights reserved.
  *
  * The SCSI emulation layer is derived from gdt(4) driver,
@@ -16,11 +16,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -254,6 +249,8 @@ cac_init(struct cac_softc *sc, int startfw)
 	if (cac_sdh == NULL)
 		cac_sdh = shutdownhook_establish(cac_shutdown, NULL);
 
+	(*sc->sc_cl->cl_intr_enable)(sc, 1);
+
 	return (0);
 }
 
@@ -301,7 +298,6 @@ cac_intr(v)
 	if (!(istat = (sc->sc_cl->cl_intr_pending)(sc)))
 		return 0;
 
-	(*sc->sc_cl->cl_intr_enable)(sc, 0);
 	if (istat & CAC_INTR_FIFO_NEMPTY)
 		while ((ccb = (*sc->sc_cl->cl_completed)(sc)) != NULL) {
 			ret = 1;
@@ -377,7 +373,6 @@ cac_cmd(struct cac_softc *sc, int command, void *data, int datasize,
 	ccb->ccb_datasize = size;
 	ccb->ccb_xs = xs;
 
-	(*sc->sc_cl->cl_intr_enable)(sc, 0);
 	if (!xs || xs->flags & SCSI_POLL) {
 
 		/* Synchronous commands musn't wait. */
@@ -389,7 +384,6 @@ cac_cmd(struct cac_softc *sc, int command, void *data, int datasize,
 			(*sc->sc_cl->cl_submit)(sc, ccb);
 			rv = cac_ccb_poll(sc, ccb, 2000);
 		}
-		(*sc->sc_cl->cl_intr_enable)(sc, 1);
 	} else
 		rv = cac_ccb_start(sc, ccb);
 
@@ -435,8 +429,6 @@ cac_ccb_start(struct cac_softc *sc, struct cac_ccb *ccb)
 		ccb->ccb_flags |= CAC_CCB_ACTIVE;
 		(*sc->sc_cl->cl_submit)(sc, ccb);
 	}
-
-	(*sc->sc_cl->cl_intr_enable)(sc, 1);
 
 	return (0);
 }
@@ -620,7 +612,7 @@ cac_scsi_cmd(xs)
 		inq.version = 2;
 		inq.response_format = 2;
 		inq.additional_length = 32;
-		strcpy(inq.vendor, "Compaq  ");
+		strlcpy(inq.vendor, "Compaq  ", sizeof inq.vendor);
 		switch (CAC_GET1(dinfo->mirror)) {
 		case 0: p = "RAID0";	break;
 		case 1: p = "RAID4";	break;
@@ -628,8 +620,9 @@ cac_scsi_cmd(xs)
 		case 3: p = "RAID5";	break;
 		default:p = "<UNK>";	break;
 		}
-		sprintf(inq.product, "%s volume  #%02d", p, target);
-		strcpy(inq.revision, "   ");
+		snprintf(inq.product, sizeof inq.product, "%s volume  #%02d",
+		    p, target);
+		strlcpy(inq.revision, "   ", sizeof inq.revision);
 		cac_copy_internal_data(xs, &inq, sizeof inq);
 		break;
 

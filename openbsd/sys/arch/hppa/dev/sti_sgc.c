@@ -1,7 +1,7 @@
-/*	$OpenBSD: sti_sgc.c,v 1.9 2002/03/14 01:26:31 millert Exp $	*/
+/*	$OpenBSD: sti_sgc.c,v 1.16 2003/08/21 18:03:18 mickey Exp $	*/
 
 /*
- * Copyright (c) 2000 Michael Shalayeff
+ * Copyright (c) 2000-2003 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -55,56 +55,90 @@
 
 #include <hppa/dev/cpudevs.h>
 
-#define	STI_MEMSIZE	0x1000000
+#define	STI_MEMSIZE	0x2000000
+#define	STI_ROMSIZE	0x8000
+#define	STI_ID_FDDI	0x280b31af	/* Medusa FDDI ROM id */
 
-int  sti_sgc_probe(struct device *, void *, void *);
+/* gecko optional graphics */
+#define	STI_GOPT1_REV	0x17
+#define	STI_GOPT2_REV	0x70
+
+/* internal EG */
+#define	STI_INEG_REV	0x60
+#define	STI_INEG_PROM	0xf0011000
+
+int sti_sgc_probe(struct device *, void *, void *);
 void sti_sgc_attach(struct device *, struct device *, void *);
 
 struct cfattach sti_sgc_ca = {
 	sizeof(struct sti_softc), sti_sgc_probe, sti_sgc_attach
 };
 
+struct cfattach sti_phantom_ca = {
+	sizeof(struct sti_softc), sti_sgc_probe, sti_sgc_attach
+};
+
+/*
+ * Locate STI ROM.
+ * On some machines it may not be part of the HPA space.
+ */
+paddr_t
+sti_sgc_getrom(int unit, struct confargs *ca)
+{
+	paddr_t rom = PAGE0->pd_resv2[1];
+
+	if (unit) {
+		if (ca->ca_type.iodc_sv_model == HPPA_FIO_GSGC &&
+		    (ca->ca_type.iodc_revision == STI_GOPT1_REV ||
+		     ca->ca_type.iodc_revision == STI_GOPT2_REV))
+			/* these two share the onboard's prom */ ;
+		else
+			rom = 0;
+	}
+
+	if (rom < HPPA_IOBEGIN) {
+		if (unit == 0 &&
+		    ca->ca_type.iodc_sv_model == HPPA_FIO_GSGC &&
+		    ca->ca_type.iodc_revision == STI_INEG_REV)
+			rom = STI_INEG_PROM;
+		else
+			rom = ca->ca_hpa;
+	}
+
+	return (rom);
+}
+
 int
 sti_sgc_probe(parent, match, aux)
 	struct device *parent;
 	void *match, *aux;
 {
-	register struct confargs *ca = aux;
-	bus_space_handle_t ioh, romh;
-	u_int rom;
+	struct cfdata *cf = match;
+	struct confargs *ca = aux;
+	bus_space_handle_t romh;
+	paddr_t rom;
+	u_int32_t id;
 	u_char devtype;
 	int rv = 0, romunmapped = 0;
 
-	if (ca->ca_type.iodc_type != HPPA_TYPE_FIO ||
-	    (ca->ca_type.iodc_sv_model != HPPA_FIO_GSGC &&
-	     ca->ca_type.iodc_sv_model != HPPA_FIO_SGC))
+	if (ca->ca_type.iodc_type != HPPA_TYPE_FIO)
+		return (0);
+
+	/* these can only be graphics anyway */
+	if (ca->ca_type.iodc_sv_model == HPPA_FIO_GSGC)
+		return (1);
+
+	/* these need futher checking for the graphics id */
+	if (ca->ca_type.iodc_sv_model != HPPA_FIO_SGC)
 		return 0;
 
-	if ((rv = bus_space_map(ca->ca_iot, ca->ca_hpa, STI_MEMSIZE, 0, &ioh))) {
-#ifdef STIDEBUG
-		printf("st: cannot map io space (%d)\n", rv);
-#endif
-		return 0;
-	}
-
-	/*
-	 * Locate STI ROM.
-	 * On some machines it may not be part of the HPA space.
-	 */
-	if (PAGE0->pd_resv2[1] < HPPA_IOBEGIN) {
-		rom = ca->ca_hpa;
-		romh = ioh;
-		romunmapped++;
-	} else
-		rom = PAGE0->pd_resv2[1];
-
+	rom = sti_sgc_getrom(cf->cf_unit, ca);
 #ifdef STIDEBUG
 	printf ("sti: hpa=%x, rom=%x\n", ca->ca_hpa, rom);
 #endif
 
 	/* if it does not map, probably part of the lasi space */
-	if (rom != ca->ca_hpa &&
-	    (rv = bus_space_map(ca->ca_iot, rom, IOMOD_HPASIZE, 0, &romh))) {
+	if ((rv = bus_space_map(ca->ca_iot, rom, STI_ROMSIZE, 0, &romh))) {
 #ifdef STIDEBUG
 		printf ("sti: cannot map rom space (%d)\n", rv);
 #endif
@@ -113,13 +147,12 @@ sti_sgc_probe(parent, match, aux)
 			romunmapped++;
 		} else {
 			/* in this case i have no freaking idea */
-			bus_space_unmap(ca->ca_iot, ioh,  STI_MEMSIZE);
 			return 0;
 		}
 	}
 
 #ifdef STIDEBUG
-	printf("sti: ioh=%x, romh=%x\n", ioh, romh);
+	printf("sti: romh=%x\n", romh);
 #endif
 
 	devtype = bus_space_read_1(ca->ca_iot, romh, 3);
@@ -127,21 +160,36 @@ sti_sgc_probe(parent, match, aux)
 #ifdef STIDEBUG
 	printf("sti: devtype=%d\n", devtype);
 #endif
-#if 0 /* ignore this for now */
-	if ((ca->ca_type.iodc_sv_model == HPPA_FIO_SGC &&
-	     STI_ID_HI(STI_TYPE_BWGRF, rioh) == STI_ID_FDDI) ||
-	    (devtype != STI_TYPE_BWGRF && devtype != STI_TYPE_WWGRF)) {
-#ifdef STIDEBUG
-		printf("sti: not a graphics device (%x)\n", devtype);
-#endif
-	} else
-#endif
-		rv = 1;
+	rv = 1;
+	switch (devtype) {
+	case STI_DEVTYPE4:
+		id = bus_space_read_4(ca->ca_iot, romh, 0x8);
+		break;
+	case STI_DEVTYPE1:
+		id = (bus_space_read_1(ca->ca_iot, romh, 0x10 +  3) << 24) |
+		     (bus_space_read_1(ca->ca_iot, romh, 0x10 +  7) << 16) |
+		     (bus_space_read_1(ca->ca_iot, romh, 0x10 + 11) <<  8) |
+		     (bus_space_read_1(ca->ca_iot, romh, 0x10 + 15));
 
-	bus_space_unmap(ca->ca_iot, ioh,  STI_MEMSIZE);
+		break;
+	default:
+#ifdef STIDEBUG
+		printf("sti: unknown type (%x)\n", devtype);
+#endif
+		rv = 0;
+	}
+
+	if (rv &&
+	    ca->ca_type.iodc_sv_model == HPPA_FIO_SGC && id == STI_ID_FDDI) {
+#ifdef STIDEBUG
+		printf("sti: not a graphics device\n");
+#endif
+		rv = 0;
+	}
+
 	if (!romunmapped)
-		bus_space_unmap(ca->ca_iot, romh, IOMOD_HPASIZE);
-	return rv;
+		bus_space_unmap(ca->ca_iot, romh, STI_ROMSIZE);
+	return (rv);
 }
 
 void
@@ -151,47 +199,45 @@ sti_sgc_attach(parent, self, aux)
 {
 	struct sti_softc *sc = (void *)self;
 	struct confargs *ca = aux;
-	bus_addr_t addr;
+	paddr_t rom;
 	int rv;
 
-	if (PAGE0->pd_resv2[1] < HPPA_IOBEGIN)
-		addr = ca->ca_hpa;
-	else
-		addr = PAGE0->pd_resv2[1];
+	rom = sti_sgc_getrom(sc->sc_dev.dv_cfdata->cf_unit, ca);
 
+#ifdef STIDEBUG
+	printf("sti: hpa=%x, rom=%x\n", ca->ca_hpa, rom);
+#endif
 	sc->memt = sc->iot = ca->ca_iot;
 
 	if ((rv = bus_space_map(ca->ca_iot, ca->ca_hpa, STI_MEMSIZE, 0,
 	    &sc->ioh))) {
 #ifdef STIDEBUG
-		printf("st: cannot map io space (%d)\n", rv);
+		printf(": cannot map io space (%d)\n", rv);
 #endif
 		return;
 	}
 
 	/* if it does not map, probably part of the lasi space */
-	if (addr == ca->ca_hpa)
+	if (rom == ca->ca_hpa)
 		sc->romh = sc->ioh;
-	else if ((rv = bus_space_map(ca->ca_iot, addr, IOMOD_HPASIZE, 0, &sc->romh))) {
-#ifdef STIDEBUG
-		printf ("sti: cannot map rom space (%d)\n", rv);
-#endif
-		if ((addr & HPPA_IOBEGIN) == HPPA_IOBEGIN)
-			sc->romh = addr;
+	else if ((rv = bus_space_map(ca->ca_iot, rom, STI_ROMSIZE, 0, &sc->romh))) {
+		if ((rom & HPPA_IOBEGIN) == HPPA_IOBEGIN)
+			sc->romh = rom;
 		else {
+#ifdef STIDEBUG
+			printf (": cannot map rom space (%d)\n", rv);
+#endif
 			/* in this case i have no freaking idea */
 			bus_space_unmap(ca->ca_iot, sc->ioh,  STI_MEMSIZE);
 			return;
 		}
 	}
 
-	sc->sc_devtype = bus_space_read_1(sc->iot, sc->romh, 3);
 #ifdef STIDEBUG
-	printf("sti: hpa=%x, rom=%x\n", ca->ca_hpa, addr);
 	printf("sti: ioh=%x, romh=%x\n", sc->ioh, sc->romh);
 #endif
+	sc->sc_devtype = bus_space_read_1(sc->iot, sc->romh, 3);
 	if (ca->ca_hpa == (hppa_hpa_t)PAGE0->mem_cons.pz_hpa)
 		sc->sc_flags |= STI_CONSOLE;
 	sti_attach_common(sc);
 }
-

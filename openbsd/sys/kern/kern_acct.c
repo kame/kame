@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_acct.c,v 1.10 2001/11/02 21:42:15 art Exp $	*/
+/*	$OpenBSD: kern_acct.c,v 1.13 2003/09/01 18:06:03 henning Exp $	*/
 /*	$NetBSD: kern_acct.c,v 1.42 1996/02/04 02:15:12 christos Exp $	*/
 
 /*-
@@ -19,11 +19,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -104,13 +100,13 @@ sys_acct(p, v, retval)
 	register_t *retval;
 {
 	struct sys_acct_args /* {
-		syscallarg(char *) path;
+		syscallarg(const char *) path;
 	} */ *uap = v;
 	struct nameidata nd;
 	int error;
 
 	/* Make sure that the caller is root. */
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return (error);
 
 	/*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.38 2002/12/05 02:49:55 kjc Exp $ */
+/*	$OpenBSD: conf.c,v 1.41 2003/06/26 13:06:26 miod Exp $ */
 /*	$NetBSD: conf.c,v 1.44 1999/10/27 16:38:54 ragge Exp $	*/
 
 /*-
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -535,39 +531,7 @@ int	chrtoblktbl[] = {
 	25,	/* 73 */
 	NODEV,	/* 74 */
 };
-
-dev_t
-chrtoblk(dev)
-	dev_t dev;
-{
-	int blkmaj;
-
-	if (major(dev) >= nchrdev ||
-	    major(dev) > sizeof(chrtoblktbl)/sizeof(chrtoblktbl[0]))
-		return (NODEV);
-	blkmaj = chrtoblktbl[major(dev)];
-	if (blkmaj == NODEV)
-		return (NODEV);
-	return (makedev(blkmaj, minor(dev)));
-}
-
-/*
- * Convert a character device number to a block device number.
- */
-dev_t
-blktochr(dev)
-    dev_t dev;
-{
-    int blkmaj = major(dev);
-    int i;
-
-    if (blkmaj >= nblkdev)
-        return (NODEV);
-    for (i = 0; i < sizeof(chrtoblktbl)/sizeof(chrtoblktbl[0]); i++)
-        if (blkmaj == chrtoblktbl[i])
-            return (makedev(i, minor(dev)));
-    return (NODEV);
-}
+int nchrtoblktbl = sizeof(chrtoblktbl) / sizeof(chrtoblktbl[0]);
 
 /*
  * Returns true if dev is /dev/mem or /dev/kmem.
@@ -590,6 +554,8 @@ iszerodev(dev)
 
 	return (major(dev) == 3 && minor(dev) == 12);
 }
+
+int getmajor(void *);	/* XXX used by dz_ibus and smg, die die die */
 
 int
 getmajor(void *ptr)

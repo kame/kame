@@ -1,4 +1,4 @@
-/*	$OpenBSD: instr.h,v 1.2 2001/09/15 23:42:37 jason Exp $	*/
+/*	$OpenBSD: instr.h,v 1.7 2003/07/13 07:00:48 jason Exp $	*/
 /*	$NetBSD: instr.h,v 1.3 2000/01/10 03:53:20 eeh Exp $ */
 
 /*
@@ -22,11 +22,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -52,8 +48,8 @@ enum IOP2 { IOP2_UNIMP, IOP2_BPcc, IOP2_Bicc, IOP2_BPr,
 enum IOP3_reg {
 	IOP3_ADD, IOP3_AND, IOP3_OR, IOP3_XOR,
 	IOP3_SUB, IOP3_ANDN, IOP3_ORN, IOP3_XNOR,
-	IOP3_ADDX, IOP3_rerr09, IOP3_UMUL, IOP3_SMUL,
-	IOP3_SUBX, IOP3_rerr0d, IOP3_UDIV, IOP3_SDIV,
+	IOP3_ADDX, IOP3_MULX, IOP3_UMUL, IOP3_SMUL,
+	IOP3_SUBX, IOP3_UDIVX, IOP3_UDIV, IOP3_SDIV,
 	IOP3_ADDcc, IOP3_ANDcc, IOP3_ORcc, IOP3_XORcc,
 	IOP3_SUBcc, IOP3_ANDNcc, IOP3_ORNcc, IOP3_XNORcc,
 	IOP3_ADDXcc, IOP3_rerr19, IOP3_UMULcc, IOP3_SMULcc,
@@ -61,29 +57,29 @@ enum IOP3_reg {
 	IOP3_TADDcc, IOP3_TSUBcc, IOP3_TADDccTV, IOP3_TSUBccTV,
 	IOP3_MULScc, IOP3_SLL, IOP3_SRL, IOP3_SRA,
 	IOP3_RDASR_RDY_STBAR, IOP3_RDPSR, IOP3_RDWIM, IOP3_RDTGBR,
-	IOP3_rerr2c, IOP3_rerr2d, IOP3_rerr2e, IOP3_rerr2f,
+	IOP3_MOVcc, IOP3_SDIVX, IOP3_POPC, IOP3_MOVr,
 	IOP3_WRASR_WRY, IOP3_WRPSR, IOP3_WRWIM, IOP3_WRTBR,
 	IOP3_FPop1, IOP3_FPop2, IOP3_CPop1, IOP3_CPop2,
 	IOP3_JMPL, IOP3_RETT, IOP3_Ticc, IOP3_FLUSH,
-	IOP3_SAVE, IOP3_RESTORE, IOP3_rerr3e, IOP3_rerr3f
+	IOP3_SAVE, IOP3_RESTORE, IOP3_DONE_RETRY, IOP3_rerr3f
 };
 enum IOP3_mem {
 	IOP3_LD, IOP3_LDUB, IOP3_LDUH, IOP3_LDD,
 	IOP3_ST, IOP3_STB, IOP3_STH, IOP3_STD,
-	IOP3_merr08, IOP3_LDSB, IOP3_LDSH, IOP3_merr0b,
-	IOP3_merr0c, IOP3_LDSTUB, IOP3_merr0f, IOP3_SWAP,
+	IOP3_LDSW, IOP3_LDSB, IOP3_LDSH, IOP3_LDX,
+	IOP3_merr0c, IOP3_LDSTUB, IOP3_STX, IOP3_SWAP,
 	IOP3_LDA, IOP3_LDUBA, IOP3_LDUHA, IOP3_LDDA,
 	IOP3_STA, IOP3_STBA, IOP3_STHA, IOP3_STDA,
-	IOP3_merr18, IOP3_LDSBA, IOP3_LDSHA, IOP3_merr1b,
-	IOP3_merr1c, IOP3_LDSTUBA, IOP3_merr1f, IOP3_SWAPA,
-	IOP3_LDF, IOP3_LDFSR, IOP3_merr22, IOP3_LDDF,
-	IOP3_STF, IOP3_STFSR, IOP3_STDFQ, IOP3_STDF,
+	IOP3_LDSWA, IOP3_LDSBA, IOP3_LDSHA, IOP3_LDXA,
+	IOP3_merr1c, IOP3_LDSTUBA, IOP3_STXA, IOP3_SWAPA,
+	IOP3_LDF, IOP3_LDFSR, IOP3_LDQF, IOP3_LDDF,
+	IOP3_STF, IOP3_STFSR, IOP3_STQF, IOP3_STDF,
 	IOP3_merr28, IOP3_merr29, IOP3_merr2a, IOP3_merr2b,
-	IOP3_merr2c, IOP3_merr2d, IOP3_merr2e, IOP3_merr2f,
-	IOP3_LFC, IOP3_LDCSR, IOP3_merr32, IOP3_LDDC,
-	IOP3_STC, IOP3_STCSR, IOP3_STDCQ, IOP3_STDC,
+	IOP3_merr2c, IOP3_PREFETCH, IOP3_merr2e, IOP3_merr2f,
+	IOP3_LFC, IOP3_LDCSR, IOP3_LDQFA, IOP3_LDDC,
+	IOP3_STC, IOP3_STCSR, IOP3_STQFA, IOP3_STDC,
 	IOP3_merr38, IOP3_merr39, IOP3_merr3a, IOP3_merr3b,
-	IOP3_merr3c, IOP3_merr3d, IOP3_merr3e, IOP3_merr3f
+	IOP3_CASA, IOP3_PREFETCHA, IOP3_CASXA, IOP3_merr3f
 };
 
 /*
@@ -248,6 +244,7 @@ union instr {
 		u_int	:2;		/* 11 only */
 		u_int	i_rd:5;		/* destination register */
 		u_int	i_op3:6;	/* second-level decode (see IOP3_mem) */
+		u_int	i_rs1:5;	/* source register 1 */
 		u_int	i_i:1;		/* immediate vs asi */
 		u_int	i_low13:13;	/* depend on i bit */
 	} i_loadstore;

@@ -1,4 +1,4 @@
-	$OpenBSD: pcmciadevs,v 1.99 2003/03/18 23:13:26 mickey Exp $
+	$OpenBSD: pcmciadevs,v 1.105 2003/07/14 22:05:15 millert Exp $
 /* $NetBSD: pcmciadevs,v 1.13 1998/08/17 23:10:12 thorpej Exp $ */
 
 /*
@@ -61,6 +61,7 @@ vendor COMPAQ			0x0138	Compaq
 vendor GREYCELL			0x0143	Grey Cell
 vendor LINKSYS			0x0149	Linksys
 vendor NETGEAR			0x0149	Netgear
+vendor SIEMENS			0x02ac	Siemens
 vendor SIMPLETECH		0x014d	Simple Technology
 vendor SYMBOL2			0x014d	Symbol
 vendor LUCENT			0x0156	Lucent
@@ -220,6 +221,7 @@ product INTEL PRO_WLAN_2011	0x0001 Intel PRO/Wireless 2011
 product INTEL EEPRO100		0x010a Intel EtherExpress PRO/100
 
 /* Kingston */
+product KINGSTON KNE_PCM	0x0001 Kingston KNE-PCM
 product KINGSTON KNE_PC2	0x0100 Kingston KNE-PC2
 
 /* Lasat */
@@ -313,6 +315,9 @@ product SANDISK SDCFB		0x0401 Sandisk CompactFlash
 
 /* Simple Technology */
 product SIMPLETECH COMMUNICATOR288 0x0100 Simple Technology 28.8 Communicator
+
+/* Siemens */
+product SIEMENS SS1021		0x0002 Siemens SpeedStream 1021
 
 /* Socket Communications */
 product SOCKET EA_ETHER		0x0000 Socket Communications EA
@@ -411,6 +416,7 @@ product COREGA FETHER_PCC_TXF	{ "corega", "FEther&spPCC-TXF", NULL, NULL }
 product COREGA WIRELESS_LAN_PCC_11	{ "corega&spK.K.", "Wireless&spLAN&spPCC-11", NULL, NULL }
 product COREGA WIRELESS_LAN_PCCA_11	{ "corega&spK.K.", "Wireless&spLAN&spPCCA-11", NULL, NULL }
 product COREGA WIRELESS_LAN_PCCB_11	{ "corega_K.K.", "Wireless_LAN_PCCB-11", NULL, NULL }
+product COREGA WIRELESS_LAN_PCCL_11	{ "corega", "WL&spPCCL-11", "ISL37300P", NULL }
 product SVEC COMBOCARD		{ "Ethernet", "Adapter", NULL, NULL }
 product SVEC LANCARD		{ "SVEC", "FD605&spPCMCIA&spEtherNet&spCard", "V1-1", NULL }
 /*
@@ -432,6 +438,8 @@ product PROXIM RL2_7400		{ "PROXIM", "LAN&spPC&spCARD", "RANGELAN2", NULL }
 product PROXIM SYMPHONY		{ "PROXIM", "LAN&spPC&spCARD", "SYMPHONY", NULL }
 product EDIMAX NE2000		{ "PCMCIA", "Ethernet", NULL, NULL }
 product CNET NE2000		{ "CNet", "CN40BC&spEthernet", "D", "NE2000" }
+product CNET CNF301		{ "PCMCIA", "FastEthernet", "V", "1.0" }
+product ADDTRON W89C926		{ "PCMCIA", "ETHERNET", "W89C926", NULL }
 product SHUTTLE IDE_ATAPI	{ "SHUTTLE&spTECHNOLOGY&spLTD.", "PCCARD-IDE/ATAPI&spAdapter", NULL, NULL }
 product ZOOM AIR4000		{ "Zoom", "Air-4000", NULL, NULL }
 product TAMARACK NE2000		{ "TAMARACK", "Ethernet", NULL, NULL }

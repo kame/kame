@@ -1,8 +1,8 @@
-/*	$OpenBSD: net.h,v 1.5 2002/03/14 03:16:10 millert Exp $	*/
+/*	$OpenBSD: net.h,v 1.7 2003/08/11 06:23:09 deraadt Exp $	*/
 /*	$NetBSD: net.h,v 1.10 1995/10/20 00:46:30 cgd Exp $	*/
 
 /*
- * Copyright (c) 1993 Adam Glass 
+ * Copyright (c) 1993 Adam Glass
  * Copyright (c) 1992 Regents of the University of California.
  * All rights reserved.
  *
@@ -95,6 +95,7 @@ extern struct iodesc sockets[SOPEN_MAX];
 u_char	*arpwhohas(struct iodesc *, struct in_addr);
 void	arp_reply(struct iodesc *, void *);
 int	rarp_getipaddress(int);
+n_long	ip_convertaddr(char *);
 
 /* Link functions: */
 ssize_t sendether(struct iodesc *d, void *pkt, size_t len,

@@ -1,5 +1,5 @@
-/*	$OpenBSD: ucom.c,v 1.17 2002/11/11 02:32:32 nate Exp $ */
-/*	$NetBSD: ucom.c,v 1.47 2002/10/23 09:13:59 jdolecek Exp $	*/
+/*	$OpenBSD: ucom.c,v 1.19 2003/08/15 20:32:18 tedu Exp $ */
+/*	$NetBSD: ucom.c,v 1.49 2003/01/01 00:10:25 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -692,7 +692,7 @@ ucom_do_ioctl(struct ucom_softc *sc, u_long cmd, caddr_t data,
 		break;
 
 	case TIOCSFLAGS:
-		error = suser(p->p_ucred, &p->p_acflag);
+		error = suser(p, 0);
 		if (error)
 			break;
 		sc->sc_swflags = *(int *)data;
@@ -1111,7 +1111,7 @@ ucomreadcb(usbd_xfer_handle xfer, usbd_private_handle p, usbd_status status)
 		return;
 	}
 
-	usbd_get_xfer_status(xfer, NULL, (void **)&cp, &cc, NULL);
+	usbd_get_xfer_status(xfer, NULL, (void *)&cp, &cc, NULL);
 #if defined(__NetBSD__) && NRND > 0
 	rnd_add_uint32(&sc->sc_rndsource, cc);
 #endif

@@ -1,4 +1,4 @@
-/*	$OpenBSD: fdesc_vnops.c,v 1.33 2003/01/31 17:37:50 art Exp $	*/
+/*	$OpenBSD: fdesc_vnops.c,v 1.35 2003/06/02 23:28:10 millert Exp $	*/
 /*	$NetBSD: fdesc_vnops.c,v 1.32 1996/04/11 11:24:29 mrg Exp $	*/
 
 /*
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -710,7 +706,8 @@ fdesc_readdir(v)
 				if (fd_getfile(fdp, i - 2) == NULL)
 					continue;
 				d.d_fileno = i - 2 + FD_STDIN;
-				d.d_namlen = sprintf(d.d_name, "%d", i - 2);
+				d.d_namlen = snprintf(d.d_name, sizeof d.d_name,
+				    "%d", i - 2);
 				d.d_type = DT_UNKNOWN;
 				break;
 			}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: netbsd_stat.c,v 1.14 2002/03/14 01:26:50 millert Exp $	*/
+/*	$OpenBSD: netbsd_stat.c,v 1.16 2003/08/15 20:32:16 tedu Exp $	*/
 /*
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -127,7 +123,7 @@ netbsd_sys___stat13(p, v, retval)
 	if (error)
 		return (error);
 	/* Don't let non-root see generation numbers (for NFS security) */
-	if (suser(p->p_ucred, &p->p_acflag))
+	if (suser(p, 0))
 		sb.st_gen = 0;
 	openbsd_to_netbsd_stat(&sb, &nsb);
 	error = copyout(&nsb, SCARG(uap, ub), sizeof(nsb));
@@ -164,7 +160,7 @@ netbsd_sys___lstat13(p, v, retval)
 	if (error)
 		return (error);
 	/* Don't let non-root see generation numbers (for NFS security) */
-	if (suser(p->p_ucred, &p->p_acflag))
+	if (suser(p, 0))
 		sb.st_gen = 0;
 	openbsd_to_netbsd_stat(&sb, &nsb);
 	error = copyout(&nsb, SCARG(uap, ub), sizeof(nsb));

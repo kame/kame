@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.h,v 1.67 2002/11/08 19:00:37 mickey Exp $	*/
+/*	$OpenBSD: conf.h,v 1.71 2003/06/27 16:57:14 nate Exp $	*/
 /*	$NetBSD: conf.h,v 1.33 1996/05/03 20:03:32 christos Exp $	*/
 
 /*-
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -277,7 +273,7 @@ extern struct cdevsw cdevsw[];
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) nullop, \
 	dev_init(c,n,tty), dev_init(c,n,select), (dev_type_mmap((*))) enodev, \
-	D_TTY | D_KQFILTER, ttkqfilter }
+	D_TTY | D_KQFILTER, dev_init(c,n,kqfilter) }
 
 /* open, close, read, ioctl, select, kqfilter -- XXX should be a generic device */
 #define cdev_log_init(c,n) { \
@@ -412,10 +408,17 @@ void	randomattach(void);
 	(dev_type_mmap((*))) enodev }
 
 /* open, close, read, write, ioctl, select, nokqfilter */
-#define	cdev_usbdev_init(c,n) { \
+#define	cdev_urio_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
 	0, dev_init(c,n,select), (dev_type_mmap((*))) enodev }
+
+/* open, close, read, write, ioctl, select, kqfilter */
+#define	cdev_usbdev_init(c,n) { \
+	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
+	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
+	0, dev_init(c,n,select), (dev_type_mmap((*))) enodev, D_KQFILTER, \
+	dev_init(c,n,kqfilter) }
 
 /* open, close, init */
 #define cdev_pci_init(c,n) { \
@@ -499,7 +502,11 @@ struct swdevt {
 
 #ifdef _KERNEL
 extern struct swdevt swdevt[];
+extern int chrtoblktbl[];
+extern int nchrtoblktbl;
 
+struct bdevsw *bdevsw_lookup(dev_t);
+struct cdevsw *cdevsw_lookup(dev_t);
 int	chrtoblk(dev_t);
 int	blktochr(dev_t);
 int	iskmemdev(dev_t);

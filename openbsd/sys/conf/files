@@ -1,4 +1,4 @@
-#	$OpenBSD: files,v 1.269 2003/02/24 01:17:36 deraadt Exp $
+#	$OpenBSD: files,v 1.279 2003/08/21 19:12:07 frantzen Exp $
 #	$NetBSD: files,v 1.87 1996/05/19 17:17:50 jonathan Exp $
 
 #	@(#)files.newconf	7.5 (Berkeley) 5/10/93
@@ -73,6 +73,10 @@ define	wskbddev {[console = -1], [mux = -1]}
 define	wsmousedev {[mux = -1]}
 define	wsrasteremulops
 
+# SMC 93Cx6 Serial EEPROM devices
+define	smc93cx6
+file	dev/ic/smc93cx6.c		smc93cx6
+
 # common PC display functions
 define	pcdisplayops
 file	dev/ic/pcdisplay_subr.c		pcdisplayops
@@ -103,10 +107,9 @@ file	dev/ic/wdc.c wdc_base
 # contain the cfdrivers.  Attachments are provided by files.<bus>
 
 # Adaptec 2[789]4X, 394X, aic7770 and aic78[5678]0 SCSI controllers
-device	ahc: scsi
+device	ahc: scsi, smc93cx6
 file	dev/ic/aic7xxx.c		ahc
 file	dev/ic/aic7xxx_openbsd.c	ahc
-file	dev/ic/smc93cx6.c		ahc
 
 # Adaptec AIC-6[23]60 SCSI controllers
 device	aic: scsi
@@ -172,7 +175,7 @@ file	dev/ic/siop.c			siop
 
 # Symbios/NCR 53c720/53c8xx SCSI controllers
 device	osiop: scsi
-file	dev/ic/osiop.c			osiop & osiop_gsc
+file	dev/ic/osiop.c			osiop & (osiop_gsc | osiop_eisa)
 
 # 3Com Etherlink-III Ethernet controller
 device	ep: ether, ifnet, ifmedia, mii
@@ -207,6 +210,10 @@ file	dev/ic/xl.c		xl
 # Intel EtherExpress PRO 10/100B
 device	fxp: ether, ifnet, ifmedia, mii
 file	dev/ic/fxp.c		fxp
+
+# Myson MTD803
+device	mtd: ether, ifnet, ifmedia, mii
+file	dev/ic/mtd803.c		mtd
 
 # RealTek 8129/8139
 device	rl: ether, ifnet, ifmedia, mii
@@ -273,7 +280,7 @@ file	dev/ic/lpt.c		lpt & (lpt_isa | lpt_pica | lpt_algor | lpt_gsc | lpt_puc | l
 
 # STI (hp graphics)
 device	sti: wsemuldisplaydev
-file	dev/ic/sti.c		sti & (sti_pci | sti_sgc)	needs-flag
+file	dev/ic/sti.c		sti & (sti_pci | sti_sgc | sti_phantom)
 
 # Initio ULTRA WIDE/ULTRA2 WIDE SCSI Controllers
 device	iha: scsi
@@ -282,6 +289,10 @@ file	dev/ic/iha.c		iha
 # Tekram TRM-S1040 SCSI Cards (DC395U/UW/F,DC315/U)
 device	trm: scsi
 file	dev/ic/trm.c		trm
+
+# National Semiconductor LM7[89] and compatible hardware monitors
+device	lm
+file	dev/ic/nslm7x.c		lm
 
 # Attributes which machine-independent bus support can be attached to.
 # These should be defined here, because some of these busses can have
@@ -304,6 +315,10 @@ file	dev/usb/uhci.c			uhci	needs-flag
 # OHCI USB controller
 device	ohci: usbus
 file	dev/usb/ohci.c			ohci	needs-flag
+
+# EHCI USB controller
+device	ehci: usbus
+file	dev/usb/ehci.c			ehci	needs-flag
 
 # radio devices, attaches to radio hardware driver
 device	radio
@@ -362,6 +377,7 @@ file	net/pf.c		pf	needs-flag
 file	net/pf_norm.c		pf
 file	net/pf_ioctl.c		pf
 file	net/pf_table.c		pf
+file	net/pf_osfp.c		pf
 pseudo-device pflog: ifnet
 file	net/if_pflog.c		pflog	needs-flag
 pseudo-device pfsync: ifnet
@@ -572,12 +588,14 @@ file kern/vfs_syscalls.c
 file kern/vfs_vnops.c
 file kern/vnode_if.c
 file miscfs/deadfs/dead_vnops.c
+file miscfs/genfs/layer_subr.c		nullfs | umapfs
+file miscfs/genfs/layer_vfsops.c	nullfs | umapfs
+file miscfs/genfs/layer_vnops.c		nullfs | umapfs
 file miscfs/fdesc/fdesc_vfsops.c	fdesc
 file miscfs/fdesc/fdesc_vnops.c		fdesc
 file miscfs/fifofs/fifo_vnops.c		fifo
 file miscfs/kernfs/kernfs_vfsops.c	kernfs
 file miscfs/kernfs/kernfs_vnops.c	kernfs
-file miscfs/nullfs/null_subr.c		nullfs
 file miscfs/nullfs/null_vfsops.c	nullfs
 file miscfs/nullfs/null_vnops.c		nullfs
 file miscfs/portal/portal_vfsops.c	portal
@@ -606,12 +624,18 @@ file msdosfs/msdosfs_fat.c		msdosfs
 file msdosfs/msdosfs_lookup.c		msdosfs
 file msdosfs/msdosfs_vfsops.c		msdosfs
 file msdosfs/msdosfs_vnops.c		msdosfs
+file ntfs/ntfs_compr.c			ntfs
+file ntfs/ntfs_conv.c			ntfs
+file ntfs/ntfs_ihash.c			ntfs
+file ntfs/ntfs_subr.c			ntfs
+file ntfs/ntfs_vfsops.c			ntfs
+file ntfs/ntfs_vnops.c			ntfs
 file net/bpf.c				bpfilter		needs-count
 file net/bpf_filter.c			bpfilter | ppp
 file net/if.c
 file net/if_arcsubr.c			arc			needs-flag
 file net/if_atmsubr.c			atm			needs-flag
-file net/if_ethersubr.c			ether | fddi | token	needs-flag
+file net/if_ethersubr.c			ether | inet | fddi | token needs-flag
 file net/if_fddisubr.c			fddi
 file net/if_spppsubr.c			sppp
 file net/if_loop.c			loop
@@ -657,7 +681,7 @@ file netccitt/pk_subr.c			ccitt
 file netccitt/pk_timer.c		ccitt
 file netccitt/pk_usrreq.c		ccitt
 file netinet/if_atm.c			atm
-file netinet/if_ether.c			ether
+file netinet/if_ether.c			ether | inet
 #file netinet/if_ieee1394arp.c		ieee1394 & inet
 file netinet/in4_cksum.c		inet
 file netinet/igmp.c			inet
@@ -690,6 +714,7 @@ file netinet/ip_ipcomp.c		inet & ipsec
 file crypto/rijndael.c			(inet & ipsec) | crypto | uvm_swap_encrypt
 file crypto/rmd160.c			(inet & ipsec) | crypto
 file crypto/sha1.c			(inet & ipsec) | crypto
+file crypto/sha2.c			(inet & ipsec) | crypto
 file crypto/blf.c			(inet & ipsec) | crypto | vnd
 file crypto/cast.c			(inet & ipsec) | crypto
 file crypto/skipjack.c			(inet & ipsec) | crypto
@@ -815,6 +840,7 @@ file xfs/xfs_deb.c			xfs
 file xfs/xfs_dev-bsd.c			xfs
 file xfs/xfs_dev-common.c		xfs
 file xfs/xfs_message.c			xfs
+file xfs/xfs_node.c			xfs
 file xfs/xfs_node-bsd.c			xfs
 file xfs/xfs_syscalls-common.c		xfs
 file xfs/xfs_vfsops-bsd.c		xfs

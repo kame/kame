@@ -1,4 +1,4 @@
-/* $OpenBSD: if_wi_pcmcia.c,v 1.40 2003/02/26 18:58:32 millert Exp $ */
+/* $OpenBSD: if_wi_pcmcia.c,v 1.43 2003/09/06 20:53:57 drahn Exp $ */
 /* $NetBSD: if_wi_pcmcia.c,v 1.14 2001/11/26 04:34:56 ichiro Exp $ */
 
 /*
@@ -123,6 +123,11 @@ static const struct wi_pcmcia_product {
 	  PCMCIA_PRODUCT_COREGA_WIRELESS_LAN_PCCB_11,
 	  PCMCIA_CIS_COREGA_WIRELESS_LAN_PCCB_11,
 	  "Corega Wireless LAN PCCB-11",
+	},
+	{ PCMCIA_VENDOR_COREGA,
+	  PCMCIA_PRODUCT_COREGA_WIRELESS_LAN_PCCL_11,
+	  PCMCIA_CIS_COREGA_WIRELESS_LAN_PCCL_11,
+	  "Corega Wireless LAN PCCL-11",
 	},
 	{ PCMCIA_VENDOR_INTEL,
 	  PCMCIA_PRODUCT_INTEL_PRO_WLAN_2011,
@@ -274,6 +279,11 @@ static const struct wi_pcmcia_product {
 	  PCMCIA_CIS_AIRVAST_WN_100,
 	  "AirVast WN-100 Wireless LAN PC CARD",
 	},
+	{ PCMCIA_VENDOR_SIEMENS,
+	  PCMCIA_PRODUCT_SIEMENS_SS1021,
+	  PCMCIA_CIS_SIEMENS_SS1021,
+	  "SpeedStream 1021 Wireless PCMCIA CARD",
+	},
 	{ 0,
 	  0,
 	  { NULL, NULL, NULL, NULL },
@@ -407,8 +417,7 @@ wi_pcmcia_detach(dev, flags)
 		return (0);
 	}
 
-	if (ifp->if_flags & IFF_RUNNING)
-		wi_stop(sc);
+	wi_detach(sc);
 
 	sc->wi_flags = 0;
 

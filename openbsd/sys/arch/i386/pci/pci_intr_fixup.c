@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci_intr_fixup.c,v 1.24 2002/05/30 15:52:09 mickey Exp $	*/
+/*	$OpenBSD: pci_intr_fixup.c,v 1.28 2003/07/30 05:26:33 mickey Exp $	*/
 /*	$NetBSD: pci_intr_fixup.c,v 1.10 2000/08/10 21:18:27 soda Exp $	*/
 
 /*
@@ -13,11 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -153,6 +148,8 @@ const struct pciintr_icu_table {
 	  piix_init },
 	{ PCI_VENDOR_INTEL,     PCI_PRODUCT_INTEL_82801BAM_LPC,
 	  piix_init },
+	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801EB_LPC,
+	  piix_init },
 
 	{ PCI_VENDOR_OPTI,	PCI_PRODUCT_OPTI_82C558,
 	  opti82c558_init },
@@ -164,7 +161,10 @@ const struct pciintr_icu_table {
 	{ PCI_VENDOR_VIATECH,	PCI_PRODUCT_VIATECH_VT82C586_ISA,
 	  via82c586_init, },
 	{ PCI_VENDOR_VIATECH,	PCI_PRODUCT_VIATECH_VT82C686A_ISA,
-	  via82c586_init, },
+	  via82c586_init },
+
+	{ PCI_VENDOR_VIATECH,	PCI_PRODUCT_VIATECH_VT8231_ISA,
+	  via8231_init },
 
 	{ PCI_VENDOR_SIS,	PCI_PRODUCT_SIS_85C503,
 	  sis85c503_init },
@@ -805,7 +805,8 @@ pci_intr_fixup(sc, pc, iot)
 		    PIR_DEVFUNC_DEVICE(pirh->router_devfunc),
 		    PIR_DEVFUNC_FUNCTION(pirh->router_devfunc));
 		if (pirh->compat_router != 0) {
-			pci_devinfo(pirh->compat_router, 0, 0, devinfo);
+			pci_devinfo(pirh->compat_router, 0, 0, devinfo,
+			    sizeof devinfo);
 			printf(" (%s)", devinfo);
 		}
 		printf("\n");

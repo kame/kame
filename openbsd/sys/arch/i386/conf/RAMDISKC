@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISKC,v 1.29 2002/09/03 16:43:13 mickey Exp $
+#	$OpenBSD: RAMDISKC,v 1.34 2003/08/08 19:38:45 deraadt Exp $
 
 machine		i386		# architecture, used by config; REQUIRED
 
@@ -12,6 +12,7 @@ option		I686_CPU
 option		GPL_MATH_EMULATE	# floating point emulation
 
 option		SMALL_KERNEL
+option		NO_PROPOLICE
 
 #option		DUMMY_NOPS	# speed hack; recommended
 
@@ -132,12 +133,12 @@ pccom*	at isapnp?
 #ahc*	at eisa? slot ?			# Adaptec 274x, aic7770 SCSI controllers
 #ahc*	at pci? dev ? function ?	# Adaptec 2940 SCSI controllers
 #scsibus* at ahc?
-gdt*	at pci? dev ? function ?	# ICP Vortex GDT RAID controllers
-scsibus* at gdt?
+#gdt*	at pci? dev ? function ?	# ICP Vortex GDT RAID controllers
+#scsibus* at gdt?
 #twe*	at pci? dev ? function ?	# 3ware Escalade RAID controllers
 #scsibus* at pci? dev ? function ?
-isp*	at pci? dev ? function ?	# Qlogic ISP [12]0x0 SCSI/FibreChannel
-scsibus* at isp?
+#isp*	at pci? dev ? function ?	# Qlogic ISP [12]0x0 SCSI/FibreChannel
+#scsibus* at isp?
 aic0	at isa? port 0x340 irq 11	# Adaptec 152[02] SCSI controllers
 #aic*	at isapnp?
 aic*	at pcmcia? function ?		# PCMCIA based aic SCSI controllers
@@ -234,6 +235,16 @@ rl*	at pci? dev ? function ?		# RealTek 81[23]9 ethernet
 wb*	at pci? dev ? function ?		# Winbond W89C840F ethernet
 dc*	at pci? dev ? function ?		# 21143, "tulip" clone ethernet
 dc*	at cardbus? dev ? function ?		# 21143, "tulip" clone ethernet
+#ti*	at pci? dev ? function ?		# Alteon Tigon 1Gb ethernet
+#skc*	at pci? dev ? function ?		# SysKonnect GEnesis 984x
+#sk*	at skc?					#  each port of above
+em*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
+#txp*	at pci? dev ? function ?		# 3com 3CR990
+#nge*	at pci? dev ? function ?		# NS DP83820/DP83821 GigE
+#bge*	at pci? dev ? function ?		# Broadcom BCM570x (aka Tigon3)
+#stge*	at pci? dev ? function ?		# Sundance TC9021 GigE
+#lge*	at pci? dev ? function ?		# Level1 LXT1001 GigE
+#hme*	at pci? dev ? function ?		# Sun Happy Meal
 
 # Wireless network cards
 wi*	at pci? dev ? function ?		# WaveLAN IEEE 802.11DS

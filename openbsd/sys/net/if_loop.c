@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_loop.c,v 1.26 2003/01/07 09:00:33 kjc Exp $	*/
+/*	$OpenBSD: if_loop.c,v 1.29 2003/06/02 23:28:12 millert Exp $	*/
 /*	$NetBSD: if_loop.c,v 1.15 1996/05/07 02:40:33 thorpej Exp $	*/
 
 /*
@@ -42,11 +42,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -191,7 +187,7 @@ loopattach(n)
 		bzero(ifp, sizeof(struct ifnet));
 		if (i == 0)
 			lo0ifp = ifp;
-		sprintf(ifp->if_xname, "lo%d", i);
+		snprintf(ifp->if_xname, sizeof ifp->if_xname, "lo%d", i);
 		ifp->if_softc = NULL;
 		ifp->if_mtu = LOMTU;
 		ifp->if_flags = IFF_LOOPBACK | IFF_MULTICAST;
@@ -241,6 +237,7 @@ looutput(ifp, m, dst, rt)
 		struct mbuf m0;
 		u_int32_t af = htonl(dst->sa_family);
 
+		m0.m_flags = 0;
 		m0.m_next = m;
 		m0.m_len = sizeof(af);
 		m0.m_data = (char *)&af;

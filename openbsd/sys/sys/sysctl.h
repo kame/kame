@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysctl.h,v 1.62 2003/01/21 16:59:23 markus Exp $	*/
+/*	$OpenBSD: sysctl.h,v 1.65 2003/08/21 18:56:07 tedu Exp $	*/
 /*	$NetBSD: sysctl.h,v 1.16 1996/04/09 20:55:36 cgd Exp $	*/
 
 /*
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -181,7 +177,8 @@ struct ctlname {
 #define	KERN_SHMINFO		62	/* struct: SysV struct shminfo */
 #define KERN_INTRCNT		63	/* node: interrupt counters */
 #define	KERN_WATCHDOG		64	/* node: watchdog */
-#define	KERN_MAXID		65	/* number of valid kern ids */
+#define	KERN_EMUL		65	/* node: emuls */
+#define	KERN_MAXID		66	/* number of valid kern ids */
 
 #define	CTL_KERN_NAMES { \
 	{ 0, 0 }, \
@@ -249,7 +246,17 @@ struct ctlname {
 	{ "shminfo", CTLTYPE_STRUCT }, \
 	{ "intrcnt", CTLTYPE_NODE }, \
  	{ "watchdog", CTLTYPE_NODE }, \
+ 	{ "emul", CTLTYPE_NODE }, \
 }
+
+/*
+ * KERN_EMUL subtypes.
+ */
+#define	KERN_EMUL_NUM		0
+/* Fourth level sysctl names */
+#define KERN_EMUL_NAME		0
+#define KERN_EMUL_ENABLED	1
+
 
 /*
  * KERN_PROC subtypes
@@ -376,7 +383,8 @@ struct kinfo_proc {
 #define	HW_DISKNAMES	 8		/* strings: disk drive names */
 #define	HW_DISKSTATS	 9		/* struct: diskstats[] */
 #define	HW_DISKCOUNT	10		/* int: number of disks */
-#define	HW_MAXID	11		/* number of valid hw ids */
+#define	HW_SENSORS	11		/* node: hardware monitors */
+#define	HW_MAXID	12		/* number of valid hw ids */
 
 #define	CTL_HW_NAMES { \
 	{ 0, 0 }, \
@@ -390,6 +398,7 @@ struct kinfo_proc {
 	{ "disknames", CTLTYPE_STRING }, \
 	{ "diskstats", CTLTYPE_STRUCT }, \
 	{ "diskcount", CTLTYPE_INT }, \
+	{ "sensors", CTLTYPE_NODE}, \
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cd.c,v 1.67 2003/01/17 04:30:06 jason Exp $	*/
+/*	$OpenBSD: cd.c,v 1.72 2003/07/30 16:57:54 tedu Exp $	*/
 /*	$NetBSD: cd.c,v 1.100 1997/04/02 02:29:30 mycroft Exp $	*/
 
 /*
@@ -162,7 +162,7 @@ struct scsi_device cd_switch = {
 	cddone,			/* deal with stats at interrupt time */
 };
 
-struct scsi_inquiry_pattern cd_patterns[] = {
+const struct scsi_inquiry_pattern cd_patterns[] = {
 	{T_CDROM, T_REMOV,
 	 "",         "",                 ""},
 	{T_WORM, T_REMOV,
@@ -191,7 +191,7 @@ cdmatch(parent, match, aux)
 	int priority;
 
 	(void)scsi_inqmatch(sa->sa_inqbuf,
-	    (caddr_t)cd_patterns, sizeof(cd_patterns)/sizeof(cd_patterns[0]),
+	    cd_patterns, sizeof(cd_patterns)/sizeof(cd_patterns[0]),
 	    sizeof(cd_patterns[0]), &priority);
 	return (priority);
 }
@@ -347,8 +347,9 @@ cdopen(dev, flag, fmt, p)
 		 * If any partition is open, but the disk has been invalidated,
 		 * disallow further opens.
 		 */
-		if ((sc_link->flags & SDEV_MEDIA_LOADED) == 0 &&
-		    (part != RAW_PART || fmt != S_IFCHR)) {
+		if ((sc_link->flags & SDEV_MEDIA_LOADED) == 0) {
+			if (part == RAW_PART && fmt == S_IFCHR)
+				goto out;
 			error = EIO;
 			goto bad3;
 		}
@@ -361,10 +362,10 @@ cdopen(dev, flag, fmt, p)
 		error = scsi_test_unit_ready(sc_link, TEST_READY_RETRIES_CD,
 		    SCSI_IGNORE_ILLEGAL_REQUEST | SCSI_IGNORE_MEDIA_CHANGE);
 		if (error) {
-			if (part != RAW_PART || fmt != S_IFCHR)
-				goto bad3;
-			else
+			if (part == RAW_PART && fmt == S_IFCHR)
 				goto out;
+			else
+				goto bad3;
 		}
 			
 		/* Start the pack spinning if necessary. */
@@ -373,10 +374,10 @@ cdopen(dev, flag, fmt, p)
 		    SCSI_IGNORE_MEDIA_CHANGE | SCSI_SILENT);
 
 		if (error) {
-			if (part != RAW_PART || fmt != S_IFCHR)
-				goto bad3;
-			else
+			if (part == RAW_PART && fmt == S_IFCHR)
 				goto out;
+			else
+				goto bad3;
 		}
 
 		sc_link->flags |= SDEV_OPEN;
@@ -667,6 +668,7 @@ cdstart(v)
 		 *  fit in a "small" cdb, use it.
 		 */
 		if (!(sc_link->flags & SDEV_ATAPI) &&
+		    !(sc_link->quirks & SDEV_ONLYBIG) && 
 		    ((blkno & 0x1fffff) == blkno) &&
 		    ((nblks & 0xff) == nblks)) {
 			/*
@@ -1214,14 +1216,14 @@ cdgetdisklabel(dev, cd, lp, clp, spoofonly)
 	}
 
 	if (cd->sc_link->flags & SDEV_ATAPI) {
-		strncpy(lp->d_typename, "ATAPI CD-ROM", sizeof(lp->d_typename) - 1);
+		strncpy(lp->d_typename, "ATAPI CD-ROM", sizeof(lp->d_typename));
 		lp->d_type = DTYPE_ATAPI;
 	} else {
-		strncpy(lp->d_typename, "SCSI CD-ROM", sizeof(lp->d_typename) - 1);
+		strncpy(lp->d_typename, "SCSI CD-ROM", sizeof(lp->d_typename));
 		lp->d_type = DTYPE_SCSI;
 	}
 
-	strncpy(lp->d_packname, "fictitious", sizeof(lp->d_packname) - 1);
+	strncpy(lp->d_packname, "fictitious", sizeof(lp->d_packname));
 	lp->d_secperunit = cd->params.disksize;
 	lp->d_rpm = 300;
 	lp->d_interleave = 1;
@@ -1338,7 +1340,7 @@ cd_size(cd, flags)
 	u_long size;
 	
 	/* Reasonable defaults for drives that don't support
-	   READ_CD_CAPCITY */
+	   READ_CD_CAPACITY */
 	cd->params.blksize = 2048;
 	cd->params.disksize = 400000;
 

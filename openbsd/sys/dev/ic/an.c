@@ -1,4 +1,4 @@
-/*	$OpenBSD: an.c,v 1.25 2002/07/10 20:21:15 fgsch Exp $	*/
+/*	$OpenBSD: an.c,v 1.28 2003/08/15 20:32:16 tedu Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -124,7 +124,6 @@
 #endif
 
 #include <machine/bus.h>
-#include <machine/intr.h>
 
 #include <dev/ic/anvar.h>
 #include <dev/ic/anreg.h>
@@ -657,6 +656,7 @@ an_read_record(sc, ltv)
 #if BYTE_ORDER == BIG_ENDIAN
 	switch (ltv->an_type) {
 	case AN_RID_GENCONFIG:
+	case AN_RID_ACTUALCFG:
 		an_swap16(&ltv->an_val[4], 7); /* an_macaddr, an_rates */
 		an_swap16(&ltv->an_val[63], 8);  /* an_nodename */
 		break;
@@ -718,6 +718,7 @@ an_write_record(sc, ltv)
 #if BYTE_ORDER == BIG_ENDIAN
 	switch (ltv->an_type) {
 	case AN_RID_GENCONFIG:
+	case AN_RID_ACTUALCFG:
 		an_swap16(&ltv->an_val[4], 7); /* an_macaddr, an_rates */
 		an_swap16(&ltv->an_val[63], 8);  /* an_nodename */
 		break;
@@ -1061,7 +1062,7 @@ an_ioctl(ifp, command, data)
 			break;
 #ifdef ANCACHE
 		if (areq.an_type == AN_RID_ZERO_CACHE) {
-			error = suser(p->p_ucred, &p->p_acflag);
+			error = suser(p, 0);
 			if (error)
 				break;
 			sc->an_sigitems = sc->an_nextitem = 0;
@@ -1085,7 +1086,7 @@ an_ioctl(ifp, command, data)
 		error = copyout(&areq, ifr->ifr_data, sizeof(areq));
 		break;
 	case SIOCSAIRONET:
-		error = suser(p->p_ucred, &p->p_acflag);
+		error = suser(p, 0);
 		if (error)
 			break;
 		error = copyin(ifr->ifr_data, &areq, sizeof(areq));

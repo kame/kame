@@ -1,4 +1,4 @@
-/*	$OpenBSD: ofcons.c,v 1.9 2002/03/14 01:26:58 millert Exp $	*/
+/*	$OpenBSD: ofcons.c,v 1.11 2003/08/15 20:32:17 tedu Exp $	*/
 /*	$NetBSD: ofcons.c,v 1.3 1996/10/13 01:38:11 christos Exp $	*/
 
 /*
@@ -150,7 +150,7 @@ ofcopen(dev, flag, mode, p)
 		tp->t_ispeed = tp->t_ospeed = TTYDEF_SPEED;
 		ofcparam(tp, &tp->t_termios);
 		ttsetwater(tp);
-	} else if ((tp->t_state&TS_XCLUDE) && suser(p->p_ucred, &p->p_acflag))
+	} else if ((tp->t_state&TS_XCLUDE) && suser(p, 0))
 		return EBUSY;
 	tp->t_state |= TS_CARR_ON;
 	
@@ -393,7 +393,7 @@ ofprintf(char *fmt, ...)
 
 	va_start(ap, fmt);
 
-	vsprintf(buf, fmt, ap);
+	vsnprintf(buf, sizeof buf, fmt, ap);
 
 	c = buf;
 	while (*c != '\0') {

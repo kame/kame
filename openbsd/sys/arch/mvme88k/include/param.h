@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.27 2002/03/14 01:26:39 millert Exp $ */
+/*	$OpenBSD: param.h,v 1.30 2003/08/10 07:26:33 miod Exp $ */
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
  * Copyright (c) 1988 University of Utah.
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -70,7 +66,7 @@
 #define  ALIGN(p)		(((u_int)(p) + ALIGNBYTES) & ~ALIGNBYTES)
 #define  ALIGNED_POINTER(p,t)	((((u_long)(p)) & (sizeof(t)-1)) == 0)
 
-#define NBPG		4096		/* bytes/page */
+#define NBPG		(1 << PGSHIFT)	/* bytes/page */
 #define PGOFSET		(NBPG-1)	/* byte offset into page */
 #define PGSHIFT		12		/* LOG2(NBPG) */
 
@@ -78,27 +74,27 @@
 #define	PAGE_SIZE	(1 << PAGE_SHIFT)
 #define	PAGE_MASK	(PAGE_SIZE - 1)
 
-#define NPTEPG		(PAGE_SIZE / (sizeof(u_int)))
+#define NPTEPG		(PAGE_SIZE / (sizeof(pt_entry_t)))
 
 /*
  * 187 Bug uses the bottom 64k. We allocate ptes to map this into the
  * kernel. But when we link the kernel, we tell it to start linking
- * past this 64k. How does this change KERNBASE? XXX
+ * past this 64k.
  */
+#define KERNBASE	0x00000000	/* start of kernel virtual */
+#define	KERNTEXTOFF	0x00010000	/* start of kernel text */
 
-#define KERNBASE	0x0		/* start of kernel virtual */
-#define BTOPKERNBASE	((u_long)KERNBASE >> PGSHIFT)
-
-#define DEV_BSIZE	512
 #define DEV_BSHIFT	9		/* log2(DEV_BSIZE) */
-#define BLKDEV_IOSIZE	2048		/* Should this be changed? XXX */
+#define DEV_BSIZE	(1 << DEV_BSHIFT)
+#define BLKDEV_IOSIZE	2048
 #define MAXPHYS		(64 * 1024)	/* max raw I/O transfer size */
 
 #define SSIZE		1		/* initial stack size/NBPG */
 #define SINCR		1		/* increment of stack/NBPG */
-#define USPACE		ctob(UPAGES)
 
 #define UPAGES		8		/* pages of u-area */
+#define USPACE		(UPAGES * NBPG)
+
 #define UADDR		0xEEE00000	/* address of u */
 #define UVPN		(UADDR>>PGSHIFT)	/* virtual page number of u */
 #define KERNELSTACK	(UADDR+UPAGES*NBPG)	/* top of kernel stack */
@@ -141,18 +137,14 @@
 /* pages ("clicks") to disk blocks */
 #define ctod(x)			((x) << (PGSHIFT - DEV_BSHIFT))
 #define dtoc(x)			((x) >> (PGSHIFT - DEV_BSHIFT))
-#define dtob(x)			((x) << DEV_BSHIFT)
 
 /* pages to bytes */
 #define ctob(x)			((x) << PGSHIFT)
+#define btoc(x)			(((x) + PGOFSET) >> PGSHIFT)
 
-/* bytes to pages */
-#define btoc(x)			(((unsigned)(x) + PAGE_MASK) >> PGSHIFT)
-
-#define btodb(bytes)         /* calculates (bytes / DEV_BSIZE) */ \
-	((unsigned)(bytes) >> DEV_BSHIFT)
-#define dbtob(db)            /* calculates (db * DEV_BSIZE) */ \
-	((unsigned)(db) << DEV_BSHIFT)
+/* bytes to disk blocks */
+#define btodb(x)		((x) >> DEV_BSHIFT)
+#define dbtob(x)		((x) << DEV_BSHIFT)
 
 /*
  * Map a ``block device block'' to a file system block.
@@ -165,7 +157,6 @@
 /*
  * Get interrupt glue.
  */
-#include <machine/psl.h>
 #include <machine/intr.h>
 
 #ifdef   _KERNEL

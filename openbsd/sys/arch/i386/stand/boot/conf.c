@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.19 2002/06/21 21:02:57 weingart Exp $	*/
+/*	$OpenBSD: conf.c,v 1.24 2003/09/11 17:39:33 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1996 Michael Shalayeff
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
@@ -46,15 +41,10 @@
 #include <lib/libsa/unixdev.h>
 #include <biosdev.h>
 #include <dev/cons.h>
-#include <lib/libsa/exec.h>
 
-const char version[] = "1.29";
+const char version[] = "2.02";
 int	debug = 1;
 
-const struct x_sw execsw[] = {
-	{ "aout", aout_probe, aout_load, aout_ldsym },
-	{ "",     NULL,       NULL,      NULL       },
-};
 
 struct fs_ops file_system[] = {
 	{ ufs_open,    ufs_close,    ufs_read,    ufs_write,    ufs_seek,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ct.c,v 1.6 2002/03/15 18:19:52 millert Exp $	*/
+/*	$OpenBSD: ct.c,v 1.8 2003/04/29 22:38:50 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -30,25 +30,25 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 1996 1995 by Open Software Foundation, Inc.   
- *              All Rights Reserved 
- *  
- * Permission to use, copy, modify, and distribute this software and 
- * its documentation for any purpose and without fee is hereby granted, 
- * provided that the above copyright notice appears in all copies and 
- * that both the copyright notice and this permission notice appear in 
- * supporting documentation. 
- *  
- * OSF DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE 
- * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
- * FOR A PARTICULAR PURPOSE. 
- *  
- * IN NO EVENT SHALL OSF BE LIABLE FOR ANY SPECIAL, INDIRECT, OR 
- * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM 
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN ACTION OF CONTRACT, 
- * NEGLIGENCE, OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION 
- * WITH THE USE OR PERFORMANCE OF THIS SOFTWARE. 
- * 
+ * Copyright 1996 1995 by Open Software Foundation, Inc.
+ *              All Rights Reserved
+ *
+ * Permission to use, copy, modify, and distribute this software and
+ * its documentation for any purpose and without fee is hereby granted,
+ * provided that the above copyright notice appears in all copies and
+ * that both the copyright notice and this permission notice appear in
+ * supporting documentation.
+ *
+ * OSF DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE
+ * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ * FOR A PARTICULAR PURPOSE.
+ *
+ * IN NO EVENT SHALL OSF BE LIABLE FOR ANY SPECIAL, INDIRECT, OR
+ * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+ * LOSS OF USE, DATA OR PROFITS, WHETHER IN ACTION OF CONTRACT,
+ * NEGLIGENCE, OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
+ * WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
  */
 
 #include "libsa.h"
@@ -62,33 +62,13 @@
 
 #include "dev_hppa.h"
 
-struct pz_device ctdev;
-iodcio_t ctiodc;	/* cartridge tape IODC entry point */
-int ctcode[IODC_MAXSIZE/sizeof(int)];
-
 int
 ctopen(struct open_file *f, ...)
 {
-	register struct hppa_dev *dp = f->f_devdata;
-	int ret;
+	struct hppa_dev *dp = f->f_devdata;
 
-	if (ctiodc == 0) {
-
-		if ((ret = (*pdc)(PDC_IODC, PDC_IODC_READ, pdcbuf, ctdev.pz_hpa,
-				  IODC_IO, ctcode, IODC_MAXSIZE)) < 0) {
-			printf("ct: device ENTRY_IO Read ret'd %d\n", ret);
-			return (EIO);
-		} else
-			ctdev.pz_iodc_io = ctiodc = (iodcio_t) ctcode;
-	}
-
-	dp->pz_dev = &ctdev;
-
-	if (ctiodc != NULL)
-		if ((ret = (*ctiodc)(ctdev.pz_hpa, IODC_IO_READ, ctdev.pz_spa,
-				     ctdev.pz_layers, pdcbuf, 0,
-				     dp->buf, 0, 0)) < 0)
-			printf("ct: device rewind ret'd %d\n", ret);
+	if (!(dp->pz_dev = pdc_findev(-1, PCL_SEQU)))
+		return (ENXIO);
 
 	return (0);
 }

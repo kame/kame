@@ -1,4 +1,4 @@
-/*	$OpenBSD: cd9660_vfsops.c,v 1.32 2002/04/23 18:54:12 espie Exp $	*/
+/*	$OpenBSD: cd9660_vfsops.c,v 1.35 2003/08/14 07:46:39 mickey Exp $	*/
 /*	$NetBSD: cd9660_vfsops.c,v 1.26 1997/06/13 15:38:58 pk Exp $	*/
 
 /*-
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -66,7 +62,7 @@
 #include <isofs/cd9660/iso_rrip.h>
 #include <isofs/cd9660/cd9660_node.h>
 
-struct vfsops cd9660_vfsops = {
+const struct vfsops cd9660_vfsops = {
 	cd9660_mount,
 	cd9660_start,
 	cd9660_unmount,
@@ -503,8 +499,8 @@ iso_disklabelspoof(dev, strat, lp)
 	/*
 	 * build a disklabel for the CD
 	 */
-	strncpy(lp->d_typename, pri->volume_id, 16);
-	strncpy(lp->d_packname, pri->volume_id+16, 16);
+	strncpy(lp->d_typename, pri->volume_id, sizeof lp->d_typename);
+	strncpy(lp->d_packname, pri->volume_id+16, sizeof lp->d_packname);
 	for (i = 0; i < MAXPARTITIONS; i++) {
 		lp->d_partitions[i].p_size = 0;
 		lp->d_partitions[i].p_offset = 0;

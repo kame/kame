@@ -1,4 +1,4 @@
-/*	$OpenBSD: fs.h,v 1.12 2001/04/19 16:22:16 gluk Exp $	*/
+/*	$OpenBSD: fs.h,v 1.15 2003/08/26 16:10:57 mickey Exp $	*/
 /*	$NetBSD: fs.h,v 1.6 1995/04/12 21:21:02 mycroft Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -171,10 +167,10 @@ struct csum {
 struct fs {
 	int32_t	 fs_firstfield;		/* historic file system linked list, */
 	int32_t	 fs_unused_1;		/*     used for incore super blocks */
-	daddr_t	 fs_sblkno;		/* addr of super-block in filesys */
-	daddr_t	 fs_cblkno;		/* offset of cyl-block in filesys */
-	daddr_t	 fs_iblkno;		/* offset of inode-blocks in filesys */
-	daddr_t	 fs_dblkno;		/* offset of first data after cg */
+	int32_t	 fs_sblkno;		/* addr of super-block in filesys */
+	int32_t	 fs_cblkno;		/* offset of cyl-block in filesys */
+	int32_t	 fs_iblkno;		/* offset of inode-blocks in filesys */
+	int32_t	 fs_dblkno;		/* offset of first data after cg */
 	int32_t	 fs_cgoffset;		/* cylinder group offset in cylinder */
 	int32_t	 fs_cgmask;		/* used to calc mod fs_ntrak */
 	time_t 	 fs_time;		/* last time written */
@@ -214,7 +210,7 @@ struct fs {
 /* fs_id takes the space of the unused fs_headswitch and fs_trkseek fields */
 	int32_t  fs_id[2];		/* unique filesystem id */
 /* sizes determined by number of cylinder groups and their sizes */
-	daddr_t  fs_csaddr;		/* blk addr of cyl grp summary area */
+	int32_t  fs_csaddr;		/* blk addr of cyl grp summary area */
 	int32_t	 fs_cssize;		/* size of cyl grp summary area */
 	int32_t	 fs_cgsize;		/* cylinder group size */
 /* these fields are derived from the hardware */
@@ -534,5 +530,5 @@ struct ocg {
  */
 #define	NINDIR(fs)	((fs)->fs_nindir)
 
-extern int inside[], around[];
-extern u_char *fragtbl[];
+extern const int inside[], around[];
+extern const u_char *fragtbl[];

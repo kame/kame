@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_bridge.h,v 1.20 2002/12/09 10:11:52 markus Exp $	*/
+/*	$OpenBSD: if_bridge.h,v 1.25 2003/07/15 03:41:15 jason Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Jason L. Wright (jason@thought.net)
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -39,6 +34,8 @@
 #ifndef _NET_IF_BRIDGE_H_
 #define _NET_IF_BRIDGE_H_
 
+#include <net/pfvar.h>
+
 /*
  * Bridge control request: add/delete member interfaces.
  */
@@ -54,7 +51,7 @@ struct ifbreq {
 /* SIOCBRDGIFFLGS, SIOCBRDGIFFLGS */
 #define	IFBIF_LEARNING		0x0001	/* ifs can learn */
 #define	IFBIF_DISCOVER		0x0002	/* ifs sends packets w/unknown dest */
-#define	IFBIF_BLOCKNONIP 	0x0004	/* ifs blocks non-IP/ARP in/out */
+#define	IFBIF_BLOCKNONIP	0x0004	/* ifs blocks non-IP/ARP in/out */
 #define	IFBIF_STP		0x0008	/* ifs participates in spanning tree */
 #define	IFBIF_SPAN		0x0100	/* ifs is a span port (ro) */
 #define	IFBIF_RO_MASK		0xff00	/* read only bits */
@@ -113,7 +110,7 @@ struct ifbrparam {
 	char			ifbrp_name[IFNAMSIZ];
 	union {
 		u_int32_t	ifbrpu_csize;		/* cache size */
-		u_int32_t	ifbrpu_ctime;		/* cache time (sec) */
+		int		ifbrpu_ctime;		/* cache time (sec) */
 		u_int16_t	ifbrpu_prio;		/* bridge priority */
 		u_int8_t	ifbrpu_hellotime;	/* hello time (sec) */
 		u_int8_t	ifbrpu_fwddelay;	/* fwd delay (sec) */
@@ -137,6 +134,7 @@ struct ifbrlreq {
 	u_int8_t		ifbr_flags;		/* flags */
 	struct ether_addr	ifbr_src;		/* source mac */
 	struct ether_addr	ifbr_dst;		/* destination mac */
+	char			ifbr_tagname[PF_TAG_NAME_SIZE];	/* pf tagname */
 };
 #define	BRL_ACTION_BLOCK	0x01			/* block frame */
 #define	BRL_ACTION_PASS		0x02			/* pass frame */
@@ -167,6 +165,7 @@ struct brl_node {
 	SIMPLEQ_ENTRY(brl_node)	brl_next;	/* next rule */
 	struct ether_addr	brl_src;	/* source mac address */
 	struct ether_addr	brl_dst;	/* destination mac address */
+	u_int16_t		brl_tag;	/* pf tag ID */
 	u_int8_t		brl_action;	/* what to do with match */
 	u_int8_t		brl_flags;	/* comparision flags */
 };
@@ -256,7 +255,7 @@ struct bridge_softc {
 	struct bridge_timer		sc_tcn_timer;
 	u_int32_t			sc_brtmax;	/* max # addresses */
 	u_int32_t			sc_brtcnt;	/* current # addrs */
-	u_int32_t			sc_brttimeout;	/* timeout ticks */
+	int				sc_brttimeout;	/* timeout ticks */
 	u_int32_t			sc_hashkey;	/* hash key */
 	struct timeout			sc_brtimeout;	/* timeout state */
 	struct timeout			sc_bstptimeout;	/* stp timeout */
@@ -271,7 +270,7 @@ void	bridge_ifdetach(struct ifnet *);
 struct mbuf *bridge_input(struct ifnet *, struct ether_header *,
     struct mbuf *);
 int	bridge_output(struct ifnet *, struct mbuf *, struct sockaddr *,
-    struct rtentry *rt);
+    struct rtentry *);
 struct mbuf *bstp_input(struct bridge_softc *, struct ifnet *,
     struct ether_header *, struct mbuf *);
 void	bstp_initialization(struct bridge_softc *);

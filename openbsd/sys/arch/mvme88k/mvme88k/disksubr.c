@@ -1,4 +1,4 @@
-/*	$OpenBSD: disksubr.c,v 1.17 2002/03/14 01:26:40 millert Exp $	*/
+/*	$OpenBSD: disksubr.c,v 1.22 2003/08/21 20:40:33 miod Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1995 Dale Rahn.
@@ -12,10 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *   This product includes software developed by Dale Rahn.
- * 4. The name of the author may not be used to endorse or promote products
+ * 3. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
@@ -34,7 +31,6 @@
 #include <sys/systm.h>
 #include <sys/buf.h>
 #include <sys/device.h>
-#undef DKTYPENAMES
 #include <sys/disklabel.h>
 #include <sys/disk.h>
 
@@ -63,29 +59,29 @@ static void printclp(struct cpu_disklabel *clp, char *str);
 /* 
  * Returns the ID of the SCSI disk based on Motorola's CLUN/DLUN stuff
  * bootdev == CLUN << 8 | DLUN.
- * This handles SBC SCSI and MVME328.  It will need to be modified for 
- * MVME327.  We do not handle MVME328 daughter cards.  smurph
+ * This handles SBC SCSI and MVME32[78].
+ * MVME328 daughter cards (DLUN >= 0x40) are not handled correctly yet.
  */
 int
 get_target()
 {
 	extern int bootdev;
 
-	switch (bootdev) {
-	case 0x0000: case 0x0600: case 0x0700: case 0x1600: case 0x1700: case 0x1800: case 0x1900:
-		return 0;
-	case 0x0010: case 0x0608: case 0x0708: case 0x1608: case 0x1708: case 0x1808: case 0x1908:
-		return 1;
-	case 0x0020: case 0x0610: case 0x0710: case 0x1610: case 0x1710: case 0x1810: case 0x1910:
-		return 2;
-	case 0x0030: case 0x0618: case 0x0718: case 0x1618: case 0x1718: case 0x1818: case 0x1918:
-		return 3;
-	case 0x0040: case 0x0620: case 0x0720: case 0x1620: case 0x1720: case 0x1820: case 0x1920:
-		return 4;
-	case 0x0050: case 0x0628: case 0x0728: case 0x1628: case 0x1728: case 0x1828: case 0x1928:
-		return 5;
-	case 0x0060: case 0x0630: case 0x0730: case 0x1630: case 0x1730: case 0x1830: case 0x1930:
-		return 6;
+	switch (bootdev >> 8) {
+	/* built-in controller */
+	case 0x00:
+	/* MVME327 */
+	case 0x02:
+	case 0x03:
+		return ((bootdev & 0xff) >> 4);
+	/* MVME328 */
+	case 0x06:
+	case 0x07:
+	case 0x16:
+	case 0x17:
+	case 0x18:
+	case 0x19:
+		return ((bootdev & 0xff) >> 3);
 	default:
 		return 0;
 	}
@@ -148,7 +144,7 @@ readdisklabel(dev, strat, lp, clp, spoofonly)
 	if (lp->d_secperunit == 0)
 		lp->d_secperunit = 0x1fffffff;
 	lp->d_npartitions = RAW_PART + 1;
-	for (i = 0; i < RAW_PART ; i++) {
+	for (i = 0; i < RAW_PART; i++) {
 		lp->d_partitions[i].p_size = 0;
 		lp->d_partitions[i].p_offset = 0;
 	}
@@ -200,68 +196,18 @@ readdisklabel(dev, strat, lp, clp, spoofonly)
 	return (NULL);
 }
 
-#if 0
-char *
-readdisklabel(dev, strat, lp, clp)
-	dev_t dev;
-	void (*strat)();
-	struct disklabel *lp;
-	struct cpu_disklabel *clp;
-{
-	struct buf *bp;
-	char *msg = NULL;
-
-	/* obtain buffer to probe drive with */
-	bp = geteblk((int)lp->d_secsize);
-
-	/* request no partition relocation by driver on I/O operations */
-	bp->b_dev = dev;
-	bp->b_blkno = 0; /* contained in block 0 */
-	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_BUSY | B_READ;
-	bp->b_cylin = 0; /* contained in block 0 */
-	(*strat)(bp);
-
-	if (biowait(bp)) {
-		msg = "cpu_disklabel read error\n";
-	}else {
-		bcopy(bp->b_data, clp, sizeof (struct cpu_disklabel));
-	}
-
-	bp->b_flags = B_INVAL | B_AGE | B_READ;
-	brelse(bp);
-
-	if (msg || clp->magic1 != DISKMAGIC || clp->magic2 != DISKMAGIC) {
-#if defined(CD9660)
-		if (iso_disklabelspoof(dev, strat, lp) == 0)
-			msg = NULL;
-#endif
-		return (msg); 
-	}
-
-	cputobsdlabel(lp, clp);
-#ifdef DEBUG
-	if(disksubr_debug > 0) {
-		printlp(lp, "readdisklabel:bsd label");
-		printclp(clp, "readdisklabel:cpu label");
-	}
-#endif
-	return (msg);
-}
-
-#endif /* 0 */
 /*
  * Check new disk label for sensibility
  * before setting it.
  */
 int
 setdisklabel(olp, nlp, openmask, clp)
-	register struct disklabel *olp, *nlp;
+	struct disklabel *olp, *nlp;
 	u_long openmask;
 	struct cpu_disklabel *clp;
 {
-	register int i;
-	register struct partition *opp, *npp;
+	int i;
+	struct partition *opp, *npp;
 
 #ifdef DEBUG
 	if(disksubr_debug > 0) {
@@ -349,7 +295,7 @@ writedisklabel(dev, strat, lp, clp)
 	bp->b_cylin = 0; /* contained in block 0 */
 	(*strat)(bp);
 
-	if ((error = biowait(bp)) != 0 ) {
+	if ((error = biowait(bp)) != 0) {
 		/* nothing */
 	} else {
 		bcopy(bp->b_data, clp, sizeof(struct cpu_disklabel));
@@ -456,6 +402,9 @@ bsdtocpulabel(lp, clp)
 	struct disklabel *lp;
 	struct cpu_disklabel *clp;
 {
+	char *tmot = "MOTOROLA";
+	char *id = "M88K";
+	char *mot;
 	int i;
 
 	clp->magic1 = lp->d_magic;
@@ -508,6 +457,17 @@ bsdtocpulabel(lp, clp)
 	bcopy(&lp->d_partitions[0], clp->vid_4, sizeof(struct partition) * 4);
 	bcopy(&lp->d_partitions[4], clp->cfg_4, sizeof(struct partition) * 12);
 	clp->version = 1;
+
+	/* Put "MOTOROLA" in the VID.  This makes it a valid boot disk. */
+	mot = clp->vid_mot;
+	for (i = 0; i < 8; i++) {
+		*mot++ = *tmot++;
+	}
+	/* put volume id in the VID */
+	mot = clp->vid_id;
+	for (i = 0; i < 4; i++) {
+		*mot++ = *id++;
+	}
 }
 
 struct cpu_disklabel_old {
@@ -602,8 +562,8 @@ cputobsdlabel(lp, clp)
 		lp->d_magic = clp->magic1;
 		lp->d_type = clp->type;
 		lp->d_subtype = clp->subtype;
-		strncpy(lp->d_typename, clp->vid_vd, 16);
-		strncpy(lp->d_packname, clp->packname, 16);
+		strncpy(lp->d_typename, clp->vid_vd, sizeof lp->d_typename);
+		strncpy(lp->d_packname, clp->packname, sizeof lp->d_packname);
 		lp->d_secsize = clp->cfg_psm;
 		lp->d_nsectors = clp->cfg_spt;
 		lp->d_ncylinders = clp->cfg_trk; /* trk is really num of cyl! */
@@ -666,8 +626,8 @@ cputobsdlabel(lp, clp)
 		lp->d_magic = clp->magic1;
 		lp->d_type = clp->type;
 		lp->d_subtype = clp->subtype;
-		strncpy(lp->d_typename, clp->vid_vd, 16);
-		strncpy(lp->d_packname, clp->packname, 16);
+		strncpy(lp->d_typename, clp->vid_vd, sizeof lp->d_typename);
+		strncpy(lp->d_packname, clp->packname, sizeof lp->d_packname);
 		lp->d_secsize = clp->cfg_psm;
 		lp->d_nsectors = clp->cfg_spt;
 		lp->d_ncylinders = clp->cfg_trk; /* trk is really num of cyl! */
@@ -740,7 +700,7 @@ printlp(lp, str)
 	printf("%s\n", str);
 	printf("magic1 %x\n", lp->d_magic);
 	printf("magic2 %x\n", lp->d_magic2);
-	printf("typename %s\n", lp->d_typename);
+	printf("typename %.*s\n", (int)sizeof(lp->d_typename), lp->d_typename);
 	printf("secsize %x nsect %x ntrack %x ncylinders %x\n",
 	    lp->d_secsize, lp->d_nsectors, lp->d_ntracks, lp->d_ncylinders);
 	printf("Num partitions %x\n", lp->d_npartitions);

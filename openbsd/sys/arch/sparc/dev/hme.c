@@ -1,4 +1,4 @@
-/*	$OpenBSD: hme.c,v 1.40 2002/11/09 22:22:35 fgsch Exp $	*/
+/*	$OpenBSD: hme.c,v 1.42 2003/06/18 19:11:49 jason Exp $	*/
 
 /*
  * Copyright (c) 1998 Jason L. Wright (jason@thought.net)
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -40,6 +35,9 @@
  * and Networks Department for some of the resources used to develop
  * this driver.
  */
+
+#include "bpfilter.h"
+#include "vlan.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,10 +64,13 @@
 #include <netinet/if_ether.h>
 #endif
 
-#include "bpfilter.h"
 #if NBPFILTER > 0
 #include <net/bpf.h>
 #include <net/bpfdesc.h>
+#endif
+
+#if NVLAN > 0
+#include <net/if_vlan_var.h>
 #endif
 
 #include <machine/autoconf.h>
@@ -247,6 +248,7 @@ hmeattach(parent, self, aux)
 	ifp->if_watchdog = hmewatchdog;
 	ifp->if_flags =
 		IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
+	ifp->if_capabilities |= IFCAP_VLAN_MTU;
 	IFQ_SET_MAXLEN(&ifp->if_snd, HME_TX_RING_SIZE);
 	IFQ_SET_READY(&ifp->if_snd);
 
@@ -547,6 +549,7 @@ hmeinit(sc)
 			   sc->sc_arpcom.ac_enaddr[3];
 	cr->mac_addr2 = (sc->sc_arpcom.ac_enaddr[4] << 8) |
 			   sc->sc_arpcom.ac_enaddr[5];
+	cr->tx_pkt_max = cr->rx_pkt_max = HME_MTU;
 
 	cr->jsize = HME_DEFAULT_JSIZE;
 	cr->ipkt_gap1 = HME_DEFAULT_IPKT_GAP1;

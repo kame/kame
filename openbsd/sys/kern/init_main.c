@@ -1,4 +1,4 @@
-/*	$OpenBSD: init_main.c,v 1.101 2003/03/06 17:06:18 mickey Exp $	*/
+/*	$OpenBSD: init_main.c,v 1.107 2003/09/01 18:06:03 henning Exp $	*/
 /*	$NetBSD: init_main.c,v 1.84.4.1 1996/06/02 09:08:06 mrg Exp $	*/
 
 /*
@@ -19,11 +19,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -80,6 +76,8 @@
 #include <sys/syscall.h>
 #include <sys/syscallargs.h>
 
+#include <dev/rndvar.h>
+
 #include <ufs/ufs/quota.h>
 
 #include <machine/cpu.h>
@@ -125,6 +123,10 @@ int	boothowto;
 struct	timeval boottime;
 struct	timeval runtime;
 
+#if !defined(NO_PROPOLICE)
+long	__guard[8];
+#endif
+
 /* XXX return int so gcc -Werror won't complain */
 int	main(void *);
 void	check_console(struct proc *);
@@ -133,6 +135,7 @@ void	start_cleaner(void *);
 void	start_update(void *);
 void	start_reaper(void *);
 void    start_crypto(void *);
+void	init_exec(void);
 
 extern char sigcode[], esigcode[];
 #ifdef SYSCALL_DEBUG
@@ -157,7 +160,9 @@ struct emul emul_native = {
 	NULL,
 	sigcode,
 	esigcode,
+	EMUL_ENABLED | EMUL_NATIVE,
 };
+
 
 /*
  * System startup; initialize the world, create process 0, mount root
@@ -176,6 +181,9 @@ main(framep)
 	quad_t lim;
 	int s, i;
 	register_t rval[2];
+#if !defined(NO_PROPOLICE)
+	int *guard = (int *)&__guard[0];
+#endif
 	extern struct pdevinit pdevinit[];
 	extern void scheduler_start(void);
 	extern void disk_init(void);
@@ -363,6 +371,14 @@ main(framep)
 	kmstartup();
 #endif
 
+#if !defined(NO_PROPOLICE)
+	for (i = 0; i < sizeof(__guard) / 4; i++)
+		guard[i] = arc4random();
+#endif
+
+	/* init exec and emul */
+	init_exec();
+
 	/* Start the scheduler */
 	scheduler_start();
 
@@ -476,9 +492,9 @@ start_init(arg)
 	struct proc *p = arg;
 	vaddr_t addr;
 	struct sys_execve_args /* {
-		syscallarg(char *) path;
-		syscallarg(char **) argp;
-		syscallarg(char **) envp;
+		syscallarg(const char *) path;
+		syscallarg(char *const *) argp;
+		syscallarg(char *const *) envp;
 	} */ args;
 	int options, error;
 	long i;
@@ -503,7 +519,7 @@ start_init(arg)
 #endif
 	if (uvm_map(&p->p_vmspace->vm_map, &addr, PAGE_SIZE, 
 	    NULL, UVM_UNKNOWN_OFFSET, 0,
-	    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
+	    UVM_MAPFLAG(UVM_PROT_RW, UVM_PROT_ALL, UVM_INH_COPY,
 	    UVM_ADV_NORMAL, UVM_FLAG_FIXED|UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW)))
 		panic("init: couldn't allocate argument space");
 	p->p_vmspace->vm_maxsaddr = (caddr_t)addr;

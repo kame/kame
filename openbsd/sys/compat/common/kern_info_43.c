@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_info_43.c,v 1.12 2002/03/14 20:31:31 mickey Exp $	*/
+/*	$OpenBSD: kern_info_43.c,v 1.15 2003/08/15 20:32:15 tedu Exp $	*/
 /*	$NetBSD: kern_info_43.c,v 1.5 1996/02/04 02:02:22 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -278,17 +274,17 @@ compat_43_sys_getkerninfo(p, v, retval)
 
 		bsdi_si.bsdi_ostype = ((char *)(s - bsdi_strings)) +
 				       sizeof(bsdi_si);
-		strcpy(s, ostype);
+		strlcpy(s, ostype, bsdi_strings + sizeof bsdi_strings - s);
 		s += strlen(s) + 1;
 
 		bsdi_si.bsdi_osrelease = ((char *)(s - bsdi_strings)) +
 					  sizeof(bsdi_si);
-		strcpy(s, osrelease);
+		strlcpy(s, osrelease, bsdi_strings + sizeof bsdi_strings - s);
 		s += strlen(s) + 1;
 
 		bsdi_si.bsdi_machine = ((char *)(s - bsdi_strings)) +
 					sizeof(bsdi_si);
-		strcpy(s, machine);
+		strlcpy(s, machine, bsdi_strings + sizeof bsdi_strings - s);
 		s += strlen(s) + 1;
 
 		needed = sizeof(bsdi_si) + (s - bsdi_strings);
@@ -348,7 +344,7 @@ compat_43_sys_sethostid(p, v, retval)
 	} */ *uap = v;
 	int error;
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return (error);
 	hostid = SCARG(uap, hostid);
 	return (0);
@@ -366,7 +362,7 @@ compat_43_sys_sethostname(p, v, retval)
 	int name;
 	int error;
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return (error);
 	name = KERN_HOSTNAME;
 	return (kern_sysctl(&name, 1, 0, 0, SCARG(uap, hostname),

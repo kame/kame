@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_le.c,v 1.20 2002/04/30 01:12:29 art Exp $	*/
+/*	$OpenBSD: if_le.c,v 1.23 2003/06/04 22:08:17 deraadt Exp $	*/
 /*	$NetBSD: if_le.c,v 1.50 1997/09/09 20:54:48 pk Exp $	*/
 
 /*-
@@ -26,8 +26,6 @@
  *	Harvard University.
  *	This product includes software developed for the NetBSD Project
  *	by Jason R. Thorpe.
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -131,7 +129,9 @@ hide void lewrcsr(struct am7990_softc *, u_int16_t, u_int16_t);
 hide u_int16_t lerdcsr(struct am7990_softc *, u_int16_t);
 hide void lehwreset(struct am7990_softc *);
 hide void lehwinit(struct am7990_softc *);
+#if defined(SUN4M)
 hide void lenocarrier(struct am7990_softc *);
+#endif
 
 hide void
 lewrcsr(sc, port, val)
@@ -347,41 +347,40 @@ lehwinit(sc)
 #endif
 }
 
+#if defined(SUN4M)
 hide void
 lenocarrier(sc)
 	struct am7990_softc *sc;
 {
-#if defined(SUN4M)
 	struct le_softc *lesc = (struct le_softc *)sc;
 
-	if (CPU_ISSUN4M && lesc->sc_dma) {
+	if (lesc->sc_dma) {
 		/* 
 		 * Check if the user has requested a certain cable type, and
 		 * if so, honor that request.
 		 */
-		printf("%s: lost carrier on ", sc->sc_dev.dv_xname);
 		if (lesc->sc_dma->sc_regs->csr & DE_AUI_TP) {
-			printf("UTP port");
 			switch (IFM_SUBTYPE(sc->sc_ifmedia.ifm_media)) {
 			case IFM_10_5:
 			case IFM_AUTO:
-				printf(", switching to AUI port");
+				printf("%s: lost carrier on UTP port"
+				    ", switching to AUI port\n",
+				    sc->sc_dev.dv_xname);
 				lesetaui(sc);
 			}
 		} else {
-			printf("AUI port");
 			switch (IFM_SUBTYPE(sc->sc_ifmedia.ifm_media)) {
 			case IFM_10_T:
 			case IFM_AUTO:
-				printf(", switching to UTP port");
+				printf("%s: lost carrier on AUI port"
+				    ", switching to UTP port\n",
+				    sc->sc_dev.dv_xname);
 				lesetutp(sc);
 			}
 		}
-		printf("\n");
-	} else
-#endif
-		printf("%s: lost carrier\n", sc->sc_dev.dv_xname);
+	}
 }
+#endif
 
 int
 lematch(parent, vcf, aux)
@@ -542,7 +541,10 @@ leattach(parent, self, aux)
 	sc->sc_rdcsr = lerdcsr;
 	sc->sc_wrcsr = lewrcsr;
 	sc->sc_hwinit = lehwinit;
-	sc->sc_nocarrier = lenocarrier;
+#if defined(SUN4M)
+	if (CPU_ISSUN4M)
+		sc->sc_nocarrier = lenocarrier;
+#endif
 	sc->sc_hwreset = lehwreset;
 
 	ifmedia_init(&sc->sc_ifmedia, 0, lemediachange, lemediastatus);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ami.c,v 1.20 2003/02/25 00:26:08 tedu Exp $	*/
+/*	$OpenBSD: ami.c,v 1.23 2003/06/28 23:55:50 avsm Exp $	*/
 
 /*
  * Copyright (c) 2001 Michael Shalayeff
@@ -15,11 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -432,10 +427,10 @@ ami_attach(sc)
 	    'A' <= sc->sc_biosver[2] && sc->sc_biosver[2] <= 'Z' &&
 	    sc->sc_biosver[1] < ' ' && sc->sc_biosver[0] < ' ') {
 
-		sprintf(sc->sc_fwver, "%c.%02d.%02d", sc->sc_fwver[2],
-		    sc->sc_fwver[1], sc->sc_fwver[0]);
-		sprintf(sc->sc_biosver, "%c.%02d.%02d", sc->sc_biosver[2],
-		    sc->sc_biosver[1], sc->sc_biosver[0]);
+		snprintf(sc->sc_fwver, sizeof sc->sc_fwver, "%c.%02d.%02d",
+		    sc->sc_fwver[2], sc->sc_fwver[1], sc->sc_fwver[0]);
+		snprintf(sc->sc_biosver, sizeof sc->sc_biosver, "%c.%02d.%02d",
+		    sc->sc_biosver[2], sc->sc_biosver[1], sc->sc_biosver[0]);
 	}
 
 	printf(": FW %s, BIOS v%s, %dMB RAM\n"
@@ -824,7 +819,7 @@ ami_stimeout(v)
 		break;
 	case AMI_CCB_FREE:
 	case AMI_CCB_READY:
-		panic("ami_stimeout(%p) botch", cmd->acc_id);
+		panic("ami_stimeout(%d) botch", cmd->acc_id);
 	}
 	AMI_UNLOCK_AMI(sc, lock);
 }
@@ -1120,9 +1115,10 @@ ami_scsi_cmd(xs)
 		inq.version = 2;
 		inq.response_format = 2;
 		inq.additional_length = 32;
-		strcpy(inq.vendor, "AMI    ");
-		sprintf(inq.product, "Host drive  #%02d", target);
-		strcpy(inq.revision, "   ");
+		strlcpy(inq.vendor, "AMI    ", sizeof inq.vendor);
+		snprintf(inq.product, sizeof inq.product, "Host drive  #%02d",
+		    target);
+		strlcpy(inq.revision, "   ", sizeof inq.revision);
 		ami_copy_internal_data(xs, &inq, sizeof inq);
 		break;
 

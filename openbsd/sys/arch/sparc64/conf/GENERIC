@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.79 2003/03/09 02:06:33 tedu Exp $
+#	$OpenBSD: GENERIC,v 1.87 2003/08/14 14:54:54 jason Exp $
 # 	$NetBSD: GENERIC32,v 1.18 2001/07/20 00:07:12 eeh Exp $
 
 machine		sparc64
@@ -6,7 +6,6 @@ machine		sparc64
 include "../../../conf/GENERIC"
 
 option		SUN4U
-option		_LP64
 
 option		PCIVERBOSE
 option		USER_PCICONF	# user-space PCI configuration
@@ -36,16 +35,19 @@ ebus*	at pci?
 # PCI Ethernet
 hme*	at pci? dev ? function ?
 gem*	at pci? dev ? function ?
-#ti*	at pci? dev ? function ?		# Alteon Tigon 1Gb ethernet
-fxp*	at pci? dev ? function ?		# EtherExpress 10/100B ethernet
-xl*	at pci? dev ? function ?		# 3C9xx ethernet
-dc*	at pci? dev ? function ?		# 21143, "tulip" clone ethernet
+#ti*	at pci? dev ? function ?	# Alteon Tigon 1Gb ethernet
+fxp*	at pci? dev ? function ?	# EtherExpress 10/100B ethernet
+xl*	at pci? dev ? function ?	# 3C9xx ethernet
+dc*	at pci? dev ? function ?	# 21143, "tulip" clone ethernet
+em*	at pci? dev ? function ?	# Intel Pro/1000 ethernet
 
 # PCI SCSI
-siop*	at pci? dev ? function ?
-isp*	at pci? dev ? function ?
-option ISP_COMPILE_FW=1
+ahc*	at pci? dev ? function ?	# Adaptec 2940 SCSI controllers
+scsibus* at ahc?
+siop*	at pci? dev ? function ?	# NCR 538XX SCSI controllers
 scsibus* at siop?
+isp*	at pci? dev ? function ?	# Qlogic ISP [12]0x0 SCSI/FibreChannel
+option ISP_COMPILE_FW=1
 
 # PCI Display
 vgafb*		at pci? dev ? function ?
@@ -59,14 +61,32 @@ ubsec*		at pci? dev ? function ?	# Broadcom 580[125]/582[012]
 
 # PCI sound
 autri*		at pci? dev ? function ? flags 0x0000	# Trident 4D WAVE
-eap*		at pci? dev ? function ?	# Ensoniq
-midi*		at autri?
+eap*		at pci? dev ? function ?	# Ensoniq AudioPCI S5016
+eso*		at pci? dev ? function ?	# ESS Solo-1 PCI AudioDrive
+
+#puc*		at pci?				# PCI "universial" comm device
+#com*		at puc? port ?
+#lpt*		at puc? port ?
+
+# Sound support
+audio*		at audioce?
+audio*		at audiocs?
 audio*		at autri?
 audio*		at eap?
+audio*		at eso?
+
+# OPL[23] FM synthesizers
+opl*		at eso?
+
+# MIDI support
+midi*		at autri?
+midi*		at opl?
 
 # USB bridges
-ohci*	at pci? dev ? function ?
+ohci*	at pci? dev ? function ?	# Open Host Controller
+uhci*	at pci? dev ? function ?	# Universal Host Controller (Intel)
 usb*	at ohci? flags 0x1
+usb*	at uhci? flags 0x1
 
 # USB devices
 uhub*	at usb?
@@ -82,7 +102,7 @@ ugen*	at uhub? port ? configuration ?		# USB generic device
 #### Standard system devices -- all required for a given architecture
 
 auxio*	at ebus?
-auxio*	at sbus? slot ? offset ?
+auxio*	at sbus?
 beeper*	at ebus?
 
 # SAB82532 based serial ports
@@ -103,17 +123,16 @@ wsmouse* at pms?				#   generic mouse
 pmsi*	at pckbc?				#  ps2 "intelli"mouse
 wsmouse* at pmsi?				#   generic mouse
 
-audioce*	at ebus?
-audio*		at audioce?
+audioce*	at ebus?			# ebus cs4231
 
 # parallel ports
 lpt*	at ebus?
 
 # performance counters
 uperf*	at ebus?
-uperf*	at sbus? slot ? offset ?
+uperf*	at sbus?
 
-zs*	at sbus? slot ? offset ?
+zs*	at sbus?
 zstty*	at zs? channel ?
 zskbd*	at zs? channel ?
 wskbd*	at zskbd? console ?
@@ -122,7 +141,7 @@ wskbd*	at zskbd? console ?
 pcons0	at mainbus0				# PROM console
 
 ## Mostek/DS1287 clocks
-clock*	at sbus? slot ? offset ?
+clock*	at sbus?
 clock*	at ebus?
 rtc*	at ebus?
 
@@ -130,26 +149,26 @@ rtc*	at ebus?
 timer*	at mainbus0
 
 ## Lance Ethernet - AMD7990
-le*		at sbus? slot ? offset ?
-ledma*		at sbus? slot ? offset ?
+le*		at sbus?
+ledma*		at sbus?
 le*		at ledma?
-lebuffer*	at sbus? slot ? offset ?
+lebuffer*	at sbus?
 le*		at lebuffer?
 
 # Quad-ethernet glue device, and sub-devices
-qec*		at sbus? slot ? offset ?
+qec*		at sbus?
 qe*		at qec?
 be*		at qec?
 
-hme*		at sbus? slot ? offset ?
+hme*		at sbus?
 
 # Magma serial/parallel port devices
-magma*		at sbus? slot ? offset ?
+magma*		at sbus?
 mtty*		at magma?
 mbpp*		at magma?
 
 # Magma serial/parallel port devices
-spif*		at sbus? slot ? offset ?
+spif*		at sbus?
 stty*		at spif?
 sbpp*		at spif?
 
@@ -168,11 +187,11 @@ scsibus* at atapiscsi?
 #	      devices should be allowed to disconnect for the SCSI bus
 #	      to operate acceptably.
 #
-dma*	at sbus? slot ? offset ?		# SBus
+dma*	at sbus?				# SBus
 esp*	at dma? flags 0x0000			# SBus
-esp*	at sbus? slot ? offset ?
+esp*	at sbus?
 
-isp*	at sbus? slot ? offset ?
+isp*	at sbus?
 option ISP_COMPILE_1000_FW=1
 
 # SCSI bus layer.  SCSI devices attach to the SCSI bus, which attaches
@@ -198,26 +217,26 @@ dcphy*	at mii? phy ?				# Digital clone PHYs
 amphy*	at mii? phy ?				# AMD AM79c873 PHYs
 iophy*	at mii? phy ?				# Intel 82553 PHYs
 inphy*	at mii? phy ?				# Intel 82555 PHYs
+lxtphy*	at mii? phy ?				# Level1 LXT970 PHYs
 ukphy*	at mii? phy ?				# Unknown PHYs
 
-bwtwo*		at sbus? slot ? offset ?	# bw2, sbus mono framebuffer
+bwtwo*		at sbus?			# bw2, sbus mono framebuffer
 wsdisplay*	at bwtwo?
 
-cgsix*		at sbus? slot ? offset ?	# cg6, sbus color framebuffer
+cgsix*		at sbus?			# cg6, sbus color framebuffer
 wsdisplay*	at cgsix?
 
-cgthree*	at sbus? slot ? offset ?	# cg3, sbus color framebuffer
+cgthree*	at sbus?			# cg3, sbus color framebuffer
 wsdisplay*	at cgthree?
 
-audiocs*	at sbus? slot ? offset ?
-audio*		at audiocs?
+audiocs*	at sbus?
 
-asio*		at sbus? slot ? offset ?	# Aurora 210SJ
+asio*		at sbus?			# Aurora 210SJ
 com*		at asio?
-apio*		at sbus? slot ? offset ?	# Aurora 210SJ
+apio*		at sbus?			# Aurora 210SJ
 lpt*		at apio?
 
-stp*		at sbus? slot ? offset ?	# STP4020
+stp*		at sbus?			# STP4020
 pcmcia*		at stp? socket ?
 #com*		at pcmcia? function ?		# PCMCIA modems/serial ports
 wi*		at pci? dev ? function ?	# WaveLAN IEEE 802.11DS

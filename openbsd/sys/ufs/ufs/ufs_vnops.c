@@ -1,4 +1,4 @@
-/*	$OpenBSD: ufs_vnops.c,v 1.45 2002/05/23 12:46:42 art Exp $	*/
+/*	$OpenBSD: ufs_vnops.c,v 1.49 2003/08/15 20:32:21 tedu Exp $	*/
 /*	$NetBSD: ufs_vnops.c,v 1.18 1996/05/11 18:28:04 mycroft Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -367,7 +363,7 @@ ufs_setattr(v)
 		if (vp->v_mount->mnt_flag & MNT_RDONLY)
 			return (EROFS);
 		if (cred->cr_uid != ip->i_ffs_uid &&
-		    (error = suser(cred, &p->p_acflag)))
+		    (error = suser_ucred(cred)))
 			return (error);
 		if (cred->cr_uid == 0) {
 			if ((ip->i_ffs_flags & (SF_IMMUTABLE | SF_APPEND)) &&
@@ -421,7 +417,7 @@ ufs_setattr(v)
 		if (vp->v_mount->mnt_flag & MNT_RDONLY)
 			return (EROFS);
 		if (cred->cr_uid != ip->i_ffs_uid &&
-		    (error = suser(cred, &p->p_acflag)) &&
+		    (error = suser_ucred(cred)) &&
 		    ((vap->va_vaflags & VA_UTIMES_NULL) == 0 || 
 		    (error = VOP_ACCESS(vp, VWRITE, cred, p))))
 			return (error);
@@ -458,7 +454,7 @@ ufs_chmod(vp, mode, cred, p)
 	int error;
 
 	if (cred->cr_uid != ip->i_ffs_uid &&
-	    (error = suser(cred, &p->p_acflag)))
+	    (error = suser_ucred(cred)))
 		return (error);
 	if (cred->cr_uid) {
 		if (vp->v_type != VDIR && (mode & S_ISTXT))
@@ -490,7 +486,7 @@ ufs_chown(vp, uid, gid, cred, p)
 	uid_t ouid;
 	gid_t ogid;
 	int error = 0;
-	ufs_daddr_t change;
+	daddr_t change;
 	enum ufs_quota_flags quota_flags = 0;
 
 	if (uid == (uid_t)VNOVAL)
@@ -504,7 +500,7 @@ ufs_chown(vp, uid, gid, cred, p)
 	 */
 	if ((cred->cr_uid != ip->i_ffs_uid || uid != ip->i_ffs_uid ||
 	    (gid != ip->i_ffs_gid && !groupmember((gid_t)gid, cred))) &&
-	    (error = suser(cred, &p->p_acflag)))
+	    (error = suser_ucred(cred)))
 		return (error);
 	ogid = ip->i_ffs_gid;
 	ouid = ip->i_ffs_uid;
@@ -2113,7 +2109,7 @@ ufs_makeinode(mode, dvp, vpp, cnp)
 		softdep_change_linkcnt(ip);
 	if ((ip->i_ffs_mode & ISGID) &&
 		!groupmember(ip->i_ffs_gid, cnp->cn_cred) &&
-	    suser(cnp->cn_cred, NULL))
+	    suser_ucred(cnp->cn_cred))
 		ip->i_ffs_mode &= ~ISGID;
 
 	if (cnp->cn_flags & ISWHITEOUT)
@@ -2147,6 +2143,7 @@ bad:
 	ip->i_flag |= IN_CHANGE;
 	if (DOINGSOFTDEP(tvp))
 		softdep_change_linkcnt(ip);
+	tvp->v_type = VNON;
 	vput(tvp);
 
 	return (error);

@@ -1,9 +1,7 @@
-/*	$NetBSD: db_disasm.c,v 1.8 2001/06/12 05:31:44 simonb Exp $	*/
-/*	$OpenBSD: db_disasm.c,v 1.5 2003/02/20 16:48:25 drahn Exp $	*/
+/*	$OpenBSD: db_disasm.c,v 1.12 2003/05/09 21:36:05 drahn Exp $	*/
 /*
- * Copyright (c) 1996 Dale Rahn. All rights reserved.
+ * Copyright (c) 1996, 2001, 2003 Dale Rahn. All rights reserved.
  *
- *   
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -12,11 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Dale Rahn.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -28,7 +21,7 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */  
+ */
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -123,7 +116,7 @@ struct db_field {
 	{ "sh",		Opf_sh },
 	{ "spr",	Opf_spr },
 	{ "tbr",	Opf_tbr },
-	{ NULL,	 	0 }
+	{ NULL,		0 }
 };
 
 struct opcode {
@@ -138,8 +131,11 @@ typedef void (op_class_func) (u_int32_t addr, instr_t instr);
 
 u_int32_t extract_field(u_int32_t value, u_int32_t base, u_int32_t width);
 void disasm_fields(u_int32_t addr, const struct opcode *popcode, instr_t instr,
-    char *disasm_str);
+    char *disasm_str, size_t bufsize);
+void disasm_process_field(u_int32_t addr, instr_t instr, char **ppfmt,
+    char *ppoutput, size_t bufsize);
 void dis_ppc(u_int32_t addr, const struct opcode *opcodeset, instr_t instr);
+
 
 op_class_func op_ill, op_base;
 op_class_func op_cl_x13, op_cl_x1e, op_cl_x1f;
@@ -149,26 +145,26 @@ op_class_func op_cl_x3e, op_cl_x3f;
 op_class_func *opcodes_base[] = {
 /*x00*/	op_ill,		op_ill,		op_base,	op_ill,
 /*x04*/	op_ill,		op_ill,		op_ill,		op_base,
-/*x08*/	op_base,	op_base,	op_base,	op_base,	
-/*x0C*/ op_base,	op_base,	op_base/*XXX*/,	op_base/*XXX*/,
-/*x10*/ op_base,	op_base,	op_base,	op_cl_x13,
+/*x08*/	op_base,	op_base,	op_base,	op_base,
+/*x0C*/	op_base,	op_base,	op_base/*XXX*/,	op_base/*XXX*/,
+/*x10*/	op_base,	op_base,	op_base,	op_cl_x13,
 /*x14*/	op_base,	op_base,	op_ill,		op_base,
 /*x18*/	op_base,	op_base,	op_base,	op_base,
-/*x1C*/ op_base,	op_base,	op_cl_x1e,	op_cl_x1f,
+/*x1C*/	op_base,	op_base,	op_cl_x1e,	op_cl_x1f,
 /*x20*/	op_base,	op_base,	op_base,	op_base,
 /*x24*/	op_base,	op_base,	op_base,	op_base,
 /*x28*/	op_base,	op_base,	op_base,	op_base,
 /*x2C*/	op_base,	op_base,	op_base,	op_base,
 /*x30*/	op_base,	op_base,	op_base,	op_base,
 /*x34*/	op_base,	op_base,	op_base,	op_base,
-/*x38*/ op_ill,		op_ill,		op_cl_x3a,	op_cl_x3b,
+/*x38*/	op_ill,		op_ill,		op_cl_x3a,	op_cl_x3b,
 /*x3C*/	op_ill,		op_ill,		op_cl_x3e,	op_cl_x3f
 };
 
 
 /* This table could be modified to make significant the "reserved" fields
  * of the opcodes, But I didn't feel like it when typing in the table,
- * I would recommend that this table be looked over for errors, 
+ * I would recommend that this table be looked over for errors,
  * This was derived from the table in Appendix A.2 of (Mot part # MPCFPE/AD)
  * PowerPC Microprocessor Family: The Programming Environments
  */
@@ -188,8 +184,8 @@ const struct opcode opcodes[] = {
 	{ "addi",	0xfc000000, 0x38000000, " %{D},%{A0}%{SIMM}" },
 	{ "addis",	0xfc000000, 0x3c000000, " %{D},%{A0}%{SIMM}" },
 	{ "sc",		0xffffffff, 0x44000002, "" },
-	{ "b",		0xfc000000, 0x40000000, "%{BO}%{AA}%{LK} %{BI}%{BD}" },
-	{ "b",		0xfc000000, 0x48000000, "%{AA}%{LK} %{LI}" },
+	{ "b",		0xfc000000, 0x40000000, "%{BO}%{LK}%{AA} %{BI}%{BD}" },
+	{ "b",		0xfc000000, 0x48000000, "%{LK}%{AA} %{LI}" },
 
 	{ "rlwimi",	0xfc000000, 0x50000000, "%{RC} %{A},%{S},%{SH},%{MB},%{ME}" },
 	{ "rlwinm",	0xfc000000, 0x54000000, "%{RC} %{A},%{S},%{SH},%{MB},%{ME}" },
@@ -460,11 +456,17 @@ op_ill(u_int32_t addr, instr_t instr)
 	db_printf("illegal instruction %x\n", instr);
 }
 
+/*
+ * Extracts bits out of an instruction opcode, base indicates the lsb
+ * to keep.
+ * Note that this uses the PowerPC bit number for base, MSb == 0
+ * because all of the documentation is written that way.
+ */
 u_int32_t
 extract_field(u_int32_t value, u_int32_t base, u_int32_t width)
 {
 	u_int32_t mask = (1 << width) - 1;
-	return ((value >> base) & mask);
+	return ((value >> (31 - base)) & mask);
 }
 
 const struct opcode * search_op(const struct opcode *);
@@ -481,18 +483,18 @@ char *db_BOBI_cond[] = {
 };
 /* what about prediction directions? */
 char *db_BO_op[] = {
-	"dnz",
-	"dnz",
-	"dz",
-	"dz",
+	"dnzf",
+	"dnzf-",
+	"dzf",
+	"dzf-",
 	"",
 	"",
 	"",
 	"",
-	"dnz",
-	"dnz",
-	"dz",
-	"dz",
+	"dnzt",
+	"dnzt-",
+	"dzt",
+	"dzt-",
 	"",
 	"",
 	"",
@@ -515,28 +517,74 @@ char *db_BO_op[] = {
 	""
 };
 
-void disasm_process_field(u_int32_t addr, instr_t instr, char **ppfmt, char **ppoutput);
+char *BItbl[] = {
+	"", "gt", "eq", "so"
+};
+
+char BO_uses_tbl[32] = {
+	/* 0 */ 1,
+	/* 1 */ 1,
+	/* 2 */ 1,
+	/* 3 */ 1,
+	/* 4 */ 0,
+	/* 5 */ 0,
+	/* 6 */ 0, /* invalid */
+	/* 7 */ 0, /* invalid */
+	/* 8 */ 1,
+	/* 9 */ 1,
+	/* a */ 1,
+	/* b */ 1,
+	/* c */ 0,
+	/* d */ 0,
+	/* e */ 0, /* invalid */
+	/* f */ 1,
+	/* 10 */        1,
+	/* 11 */        1,
+	/* 12 */        1,
+	/* 13 */        1,
+	/* 14 */        1,
+	/* 15 */        0, /* invalid */
+	/* 16 */        0, /* invalid */
+	/* 17 */        0, /* invalid */
+	/* 18 */        0, /* invalid */
+	/* 19 */        0, /* invalid */
+	/* 1a */        0, /* invalid */
+	/* 1b */        0, /* invalid */
+	/* 1c */        0, /* invalid */
+	/* 1d */        0, /* invalid */
+	/* 1e */        0, /* invalid */
+	/* 1f */        0, /* invalid */
+};
+
 void
-disasm_process_field(u_int32_t addr, instr_t instr, char **ppfmt, char **ppoutput)
+disasm_process_field(u_int32_t addr, instr_t instr, char **ppfmt,
+    char *disasm_buf, size_t bufsize)
 {
 	char field [8];
+	char lbuf[50];
 	int i;
 	char *pfmt = *ppfmt;
-	char *pstr;
 	enum opf opf;
 	char *name;
 	db_expr_t offset;
 
 	/* find field */
 	if (pfmt[0] != '%' || pfmt[1] != '{') {
-		printf("error in disasm fmt [%s]\n",pfmt);
+		printf("error in disasm fmt [%s]\n", pfmt);
 	}
 	pfmt = &pfmt[2];
-	for (i = 0; pfmt[i] != '\0' && pfmt[i] != '}';  i++) {
+	for (i = 0;
+	    pfmt[i] != '\0' && pfmt[i] != '}' && i < sizeof(field);
+	    i++) {
 		field[i] = pfmt[i];
+	}
+	if (i == sizeof(field)) {
+		printf("error in disasm fmt [%s]\n", pfmt);
+		return;
 	}
 	field[i] = 0;
 	if (pfmt[i] == '\0') {
+		/* match following close paren { */
 		printf("disasm_process_field: missing } in [%s]\n", pfmt);
 	}
 	*ppfmt = &pfmt[i+1];
@@ -547,37 +595,38 @@ disasm_process_field(u_int32_t addr, instr_t instr, char **ppfmt, char **ppoutpu
 			break;
 		}
 	}
-	pstr = *ppoutput;
 	switch (opf) {
 	case Opf_INVALID:
 		{
-			printf("unable to find variable [%s]\n",field);
+			printf("unable to find variable [%s]\n", field);
 		}
 	case Opf_A:
 		{
 			u_int A;
-			A = extract_field(instr, 31 - 15, 5);
-			pstr += sprintf (pstr, "r%d", A);
+			A = extract_field(instr, 15, 5);
+			snprintf(lbuf, sizeof (lbuf), "r%d", A);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_A0:
 		{
 			u_int A;
-			A = extract_field(instr, 31 - 15, 5);
+			A = extract_field(instr, 15, 5);
 			if (A != 0) {
-				pstr += sprintf (pstr, "r%d,", A);
+				snprintf(lbuf, sizeof (lbuf), "r%d,", A);
+				strlcat (disasm_buf, lbuf, bufsize);
 			}
 		}
 		break;
 	case Opf_AA:
 		if (instr & 0x2) {
-			pstr += sprintf (pstr,"a");
+			strlcat (disasm_buf, "a", bufsize);
 		}
 		break;
 	case Opf_LI:
 		{
 			u_int LI;
-			LI = extract_field(instr, 31 - 29, 24);
+			LI = extract_field(instr, 29, 24);
 			LI = LI << 2;
 			if (LI & 0x02000000) {
 				LI |= ~0x03ffffff;
@@ -589,28 +638,33 @@ disasm_process_field(u_int32_t addr, instr_t instr, char **ppfmt, char **ppoutpu
 			db_find_sym_and_offset(LI, &name, &offset);
 			if (name) {
 				if (offset == 0) {
-				pstr += sprintf (pstr, "0x%x (%s)", LI,
-					name);
+					snprintf(lbuf, sizeof (lbuf),
+					    "0x%x (%s)", LI, name);
+					strlcat (disasm_buf, lbuf, bufsize);
 				} else {
-				pstr += sprintf (pstr, "0x%x (%s+0x%x)", LI,
-					name, offset);
+					snprintf(lbuf, sizeof (lbuf),
+					    "0x%x (%s+0x%x)", LI, name,
+					    offset);
+					strlcat (disasm_buf, lbuf, bufsize);
 				}
 			} else {
-				pstr += sprintf (pstr, "0x%x", LI);
+				snprintf(lbuf, sizeof (lbuf), "0x%x", LI);
+				strlcat (disasm_buf, lbuf, bufsize);
 			}
 		}
 		break;
 	case Opf_B:
 		{
 			u_int B;
-			B = extract_field(instr, 31 - 20, 5);
-			pstr += sprintf (pstr, "r%d", B);
+			B = extract_field(instr, 20, 5);
+			snprintf(lbuf, sizeof (lbuf), "r%d", B);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_BD:
 		{
 			u_int BD;
-			BD = extract_field(instr, 31 - 29, 14);
+			BD = extract_field(instr, 29, 14);
 			BD = BD << 2;
 			if (BD & 0x00008000) {
 				BD &= ~0x00007fff;
@@ -622,106 +676,126 @@ disasm_process_field(u_int32_t addr, instr_t instr, char **ppfmt, char **ppoutpu
 			db_find_sym_and_offset(BD, &name, &offset);
 			if (name) {
 				if (offset == 0) {
-				pstr += sprintf (pstr, "0x%x (%s)", BD,
-					name);
+					snprintf(lbuf, sizeof (lbuf),
+					    "0x%x (%s)", BD, name);
+					strlcat (disasm_buf, lbuf, bufsize);
 				} else {
-				pstr += sprintf (pstr, "0x%x (%s+0x%x)", BD,
-					name, offset);
+					snprintf(lbuf, sizeof (lbuf),
+					    "0x%x (%s+0x%x)", BD, name, offset);
+					strlcat (disasm_buf, lbuf, bufsize);
 				}
 			} else {
-				pstr += sprintf (pstr, "0x%x", BD);
-			}
-		}
-		break;
-	case Opf_BI:
-		{
-			u_int BI;
-			BI = extract_field(instr, 31 - 10, 5);
-			if (BI != 0) {
-			pstr += sprintf (pstr, "%d,", BI);
+				snprintf(lbuf, sizeof (lbuf), "0x%x", BD);
+				strlcat (disasm_buf, lbuf, bufsize);
 			}
 		}
 		break;
 	case Opf_BI1:
+	case Opf_BI:
 		{
-			u_int BI;
-			BI = extract_field(instr, 31 - 10, 5);
-			if (BI != 0) {
-			pstr += sprintf (pstr, "%d", BI);
+			int BO, BI, cr, printcomma = 0;
+			BO = extract_field(instr, 10, 5);
+			BI = extract_field(instr, 15, 5);
+			cr =  (BI >> 2) & 7;
+			if (cr != 0) {
+				snprintf(lbuf, sizeof (lbuf), "cr%d", cr);
+				strlcat (disasm_buf, lbuf, bufsize);
+				printcomma = 1;
 			}
+			if (BO_uses_tbl[BO]) {
+				if ((cr != 0) && ((BI & 3) != 0) &&
+				    BO_uses_tbl[BO] != 0)
+					strlcat (disasm_buf, "+", bufsize);
+
+				snprintf(lbuf, sizeof (lbuf), "%s",
+				    BItbl[BI & 3]);
+				strlcat (disasm_buf, lbuf, bufsize);
+				printcomma = 1;
+			}
+			if ((opf == Opf_BI) && printcomma)
+				strlcat (disasm_buf, ",", bufsize);
 		}
 		break;
 	case Opf_BO:
 		{
-			int BO,BI;
-			BO = extract_field(instr, 31 - 10, 5);
-			pstr += sprintf (pstr ,"%s", db_BO_op[BO]);
-			if (BO < 8) {
-				BI = extract_field(instr, 31 - 10, 5);
-				pstr += sprintf (pstr ,"%s",
-				    db_BOBI_cond[(BI & 0x3)|((BO & 1) << 2)]);
+			int BO, BI;
+			BO = extract_field(instr, 10, 5);
+			strlcat (disasm_buf, db_BO_op[BO], bufsize);
+			if ((BO & 4) != 0) {
+				BI = extract_field(instr, 15, 5);
+				strlcat (disasm_buf,
+				    db_BOBI_cond[(BI & 0x3)| (((BO & 8) >> 1))],
+				    bufsize);
 
+				if (BO & 1)
+					strlcat (disasm_buf, "-", bufsize);
 			}
 		}
 		break;
 	case Opf_C:
 		{
 			u_int C;
-			C = extract_field(instr, 31 - 25, 5);
-			pstr += sprintf (pstr, "r%d, ", C);
+			C = extract_field(instr, 25, 5);
+			snprintf(lbuf, sizeof (lbuf), "r%d, ", C);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_CRM:
 		{
 			u_int CRM;
-			CRM = extract_field(instr, 31 - 19, 8);
-			pstr += sprintf (pstr, "0x%x", CRM);
+			CRM = extract_field(instr, 19, 8);
+			snprintf(lbuf, sizeof (lbuf), "0x%x", CRM);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_FM:
 		{
 			u_int FM;
-			FM = extract_field(instr, 31 - 10, 8);
-			pstr += sprintf (pstr, "%d", FM);
+			FM = extract_field(instr, 10, 8);
+			snprintf(lbuf, sizeof (lbuf), "%d", FM);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_LK:
 		if (instr & 0x1) {
-			pstr += sprintf (pstr,"l");
+			strlcat (disasm_buf, "l", bufsize);
 		}
 		break;
 	case Opf_MB:
 		{
 			u_int MB;
-			MB = extract_field(instr, 31 - 20, 5);
-			pstr += sprintf (pstr, "%d", MB);
+			MB = extract_field(instr, 20, 5);
+			snprintf(lbuf, sizeof (lbuf), "%d", MB);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_ME:
 		{
 			u_int ME;
-			ME = extract_field(instr, 31 - 25, 5);
-			pstr += sprintf (pstr, "%d", ME);
+			ME = extract_field(instr, 25, 5);
+			snprintf(lbuf, sizeof (lbuf), "%d", ME);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_NB:
 		{
 			u_int NB;
-			NB = extract_field(instr, 31 - 20, 5);
+			NB = extract_field(instr, 20, 5);
 			if (NB == 0 ) {
 				NB=32;
 			}
-			pstr += sprintf (pstr, "%d", NB);
+			snprintf(lbuf, sizeof (lbuf), "%d", NB);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_OE:
 		if (instr & (1 << (31-21))) {
-			*pstr++ = 'o';
+			strlcat (disasm_buf, "o", bufsize);
 		}
 		break;
 	case Opf_RC:
 		if (instr & 0x1) {
-			*pstr++  = '.';
+			strlcat (disasm_buf, ".", bufsize);
 		}
 		break;
 	case Opf_S:
@@ -729,101 +803,113 @@ disasm_process_field(u_int32_t addr, instr_t instr, char **ppfmt, char **ppoutpu
 		{
 			u_int D;
 			/* S and D are the same */
-			D = extract_field(instr, 31 - 10, 5);
-			pstr += sprintf (pstr, "r%d", D);
+			D = extract_field(instr, 10, 5);
+			snprintf(lbuf, sizeof (lbuf), "r%d", D);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_SH:
 		{
 			u_int SH;
-			SH = extract_field(instr, 31 - 20, 5);
-			pstr += sprintf (pstr, "%d", SH);
+			SH = extract_field(instr, 20, 5);
+			snprintf(lbuf, sizeof (lbuf), "%d", SH);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_SIMM:
 	case Opf_d:
 		{
 			int32_t IMM;
-			IMM = extract_field(instr, 31 - 31, 16);
-			if (IMM & 0x8000) {
+			IMM = extract_field(instr, 31, 16);
+			if (IMM & 0x8000)
 				IMM |= ~0x7fff;
-			}
-			pstr += sprintf (pstr, "%d", IMM);
+			snprintf(lbuf, sizeof (lbuf), "%d", IMM);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_UIMM:
 		{
 			u_int32_t IMM;
-			IMM = extract_field(instr, 31 - 31, 16);
-			pstr += sprintf (pstr, "0x%x", IMM);
+			IMM = extract_field(instr, 31, 16);
+			snprintf(lbuf, sizeof (lbuf), "0x%x", IMM);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_SR:
 		{
 			u_int SR;
-			SR = extract_field(instr, 31 - 15, 3);
-			pstr += sprintf (pstr, "sr%d", SR);
+			SR = extract_field(instr, 15, 3);
+			snprintf(lbuf, sizeof (lbuf), "sr%d", SR);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_TO:
 		{
 			u_int TO;
-			TO = extract_field(instr, 31 - 10, 1);
-			pstr += sprintf (pstr, "%d", TO);
+			TO = extract_field(instr, 10, 1);
+			snprintf(lbuf, sizeof (lbuf), "%d", TO);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_crbA:
 		{
 			u_int crbA;
-			crbA = extract_field(instr, 31 - 15, 5);
-			pstr += sprintf (pstr, "%d", crbA);
+			crbA = extract_field(instr, 15, 5);
+			snprintf(lbuf, sizeof (lbuf), "%d", crbA);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_crbB:
 		{
 			u_int crbB;
-			crbB = extract_field(instr, 31 - 20, 5);
-			pstr += sprintf (pstr, "%d", crbB);
+			crbB = extract_field(instr, 20, 5);
+			snprintf(lbuf, sizeof (lbuf), "%d", crbB);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_crbD:
 		{
 			u_int crfD;
-			crfD = extract_field(instr, 31 - 8, 3);
-			pstr += sprintf (pstr, "crf%d", crfD);
+			crfD = extract_field(instr, 8, 3);
+			snprintf(lbuf, sizeof (lbuf), "crf%d", crfD);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_crfD:
 		{
 			u_int crfD;
-			crfD = extract_field(instr, 31 - 8, 3);
-			pstr += sprintf (pstr, "crf%d", crfD);
+			crfD = extract_field(instr, 8, 3);
+			snprintf(lbuf, sizeof (lbuf), "crf%d", crfD);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_crfS:
 		{
 			u_int crfS;
-			crfS = extract_field(instr, 31 - 13, 3);
-			pstr += sprintf (pstr, "%d", crfS);
+			crfS = extract_field(instr, 13, 3);
+			snprintf(lbuf, sizeof (lbuf), "%d", crfS);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 		break;
 	case Opf_mb:
 		{
 			u_int mb, mbl, mbh;
-			mbl = extract_field(instr, 31 - 25, 4);
-			mbh = extract_field(instr, 31 - 26, 1);
+			mbl = extract_field(instr, 25, 4);
+			mbh = extract_field(instr, 26, 1);
 			mb = mbh << 4 | mbl;
-			pstr += sprintf (pstr, ", %d", mb);
+			snprintf(lbuf, sizeof (lbuf), ", %d", mb);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_sh:
 		{
 			u_int sh, shl, shh;
-			shl = extract_field(instr, 31 - 19, 4);
-			shh = extract_field(instr, 31 - 20, 1);
+			shl = extract_field(instr, 19, 4);
+			shh = extract_field(instr, 20, 1);
 			sh = shh << 4 | shl;
-			pstr += sprintf (pstr, ", %d", sh);
+			snprintf(lbuf, sizeof (lbuf), ", %d", sh);
+			strlcat (disasm_buf, lbuf, bufsize);
 		}
 		break;
 	case Opf_spr:
@@ -832,118 +918,120 @@ disasm_process_field(u_int32_t addr, instr_t instr, char **ppfmt, char **ppoutpu
 			u_int sprl;
 			u_int sprh;
 			char *reg;
-			sprl = extract_field(instr, 31 - 15, 5);
-			sprh = extract_field(instr, 31 - 20, 5);
+			sprl = extract_field(instr, 15, 5);
+			sprh = extract_field(instr, 20, 5);
 			spr = sprh << 5 | sprl;
 
 			/* this table could be written better */
 			switch (spr) {
-			case 	1:
+			case	1:
 				reg = "xer";
 				break;
-			case 	8:
+			case	8:
 				reg = "lr";
 				break;
-			case 	9:
+			case	9:
 				reg = "ctr";
 				break;
-			case 	18:
+			case	18:
 				reg = "dsisr";
 				break;
-			case 	19:
+			case	19:
 				reg = "dar";
 				break;
-			case 	22:
+			case	22:
 				reg = "dec";
 				break;
-			case 	25:
+			case	25:
 				reg = "sdr1";
 				break;
-			case 	26:
+			case	26:
 				reg = "srr0";
 				break;
-			case 	27:
+			case	27:
 				reg = "srr1";
 				break;
-			case 	272:
+			case	272:
 				reg = "SPRG0";
 				break;
-			case 	273:
+			case	273:
 				reg = "SPRG1";
 				break;
-			case 	274:
+			case	274:
 				reg = "SPRG3";
 				break;
-			case 	275:
+			case	275:
 				reg = "SPRG3";
 				break;
-			case 	280:
+			case	280:
 				reg = "asr";
 				break;
-			case 	282:
+			case	282:
 				reg = "aer";
 				break;
-			case 	287:
+			case	287:
 				reg = "pvr";
 				break;
-			case 	528:
+			case	528:
 				reg = "ibat0u";
 				break;
-			case 	529:
+			case	529:
 				reg = "ibat0l";
 				break;
-			case 	530:
+			case	530:
 				reg = "ibat1u";
 				break;
-			case 	531:
+			case	531:
 				reg = "ibat1l";
 				break;
-			case 	532:
+			case	532:
 				reg = "ibat2u";
 				break;
-			case 	533:
+			case	533:
 				reg = "ibat2l";
 				break;
-			case 	534:
+			case	534:
 				reg = "ibat3u";
 				break;
-			case 	535:
+			case	535:
 				reg = "ibat3l";
 				break;
-			case 	536:
+			case	536:
 				reg = "dbat0u";
 				break;
-			case 	537:
+			case	537:
 				reg = "dbat0l";
 				break;
-			case 	538:
+			case	538:
 				reg = "dbat1u";
 				break;
-			case 	539:
+			case	539:
 				reg = "dbat1l";
 				break;
-			case 	540:
+			case	540:
 				reg = "dbat2u";
 				break;
-			case 	541:
+			case	541:
 				reg = "dbat2l";
 				break;
-			case 	542:
+			case	542:
 				reg = "dbat3u";
 				break;
-			case 	543:
+			case	543:
 				reg = "dbat3l";
 				break;
-			case 	1013:
+			case	1013:
 				reg = "dabr";
 				break;
 			default:
 				reg = 0;
 			}
 			if (reg == 0) {
-				pstr += sprintf (pstr, "spr%d", spr);
+				snprintf(lbuf, sizeof (lbuf), "spr%d", spr);
+				strlcat (disasm_buf, lbuf, bufsize);
 			} else {
-				pstr += sprintf (pstr, "%s", reg);
+				snprintf(lbuf, sizeof (lbuf), "%s", reg);
+				strlcat (disasm_buf, lbuf, bufsize);
 			}
 		}
 		break;
@@ -952,9 +1040,9 @@ disasm_process_field(u_int32_t addr, instr_t instr, char **ppfmt, char **ppoutpu
 			u_int tbr;
 			u_int tbrl;
 			u_int tbrh;
-			char *reg;
-			tbrl = extract_field(instr, 31 - 15, 5);
-			tbrh = extract_field(instr, 31 - 20, 5);
+			char *reg = NULL;
+			tbrl = extract_field(instr, 15, 5);
+			tbrh = extract_field(instr, 20, 5);
 			tbr = tbrh << 5 | tbrl;
 
 			switch (tbr) {
@@ -967,105 +1055,103 @@ disasm_process_field(u_int32_t addr, instr_t instr, char **ppfmt, char **ppoutpu
 			default:
 				reg = 0;
 			}
-			if (reg == 0) {
-				pstr += sprintf (pstr, "tbr%d", tbr);
+			if (reg == NULL) {
+				snprintf(lbuf, sizeof (lbuf), "tbr%d", tbr);
+				strlcat (disasm_buf, lbuf, bufsize);
 			} else {
-				pstr += sprintf (pstr, "%s", reg);
+				snprintf(lbuf, sizeof (lbuf), "%s", reg);
+				strlcat (disasm_buf, lbuf, bufsize);
 			}
 		}
 		break;
 	}
-	*ppoutput = pstr;
-
 }
 
 void
-disasm_fields(u_int32_t addr, const struct opcode *popcode, instr_t instr, char *disasm_str)
+disasm_fields(u_int32_t addr, const struct opcode *popcode, instr_t instr,
+    char *disasm_str, size_t bufsize)
 {
 	char *pfmt;
-	char *poutput;
-	disasm_str[0] = '\0';
+	char cbuf[2];
 	if (popcode->decode_str == NULL || popcode->decode_str[0] == '0') {
 		return;
 	}
 	pfmt = popcode->decode_str;
-	poutput = disasm_str;
 
 	while (*pfmt != '\0')  {
 		if (*pfmt == '%') {
-			disasm_process_field(addr, instr, &pfmt, &poutput);
+			disasm_process_field(addr, instr, &pfmt, disasm_str,
+			    bufsize);
 		} else {
-			*poutput = *pfmt;
-			poutput++;
+			cbuf[0] = *pfmt;
+			cbuf[1] = '\0';
+			strlcat(disasm_str, cbuf, bufsize);
 			pfmt++;
 		}
 	}
-	*poutput = '\0';
 }
 
 void
 op_base(u_int32_t addr, instr_t instr)
 {
-	dis_ppc (addr, opcodes,instr);
+	dis_ppc(addr, opcodes, instr);
 }
 
 void
 op_cl_x13(u_int32_t addr, instr_t instr)
 {
-	dis_ppc (addr, opcodes_13,instr);
+	dis_ppc(addr, opcodes_13, instr);
 }
 
 void
 op_cl_x1e(u_int32_t addr, instr_t instr)
 {
-	dis_ppc (addr, opcodes_1e,instr);
+	dis_ppc(addr, opcodes_1e, instr);
 }
 
 void
 op_cl_x1f(u_int32_t addr, instr_t instr)
 {
-	dis_ppc (addr, opcodes_1f,instr);
+	dis_ppc(addr, opcodes_1f, instr);
 }
 
 void
 op_cl_x3a(u_int32_t addr, instr_t instr)
 {
-	dis_ppc (addr, opcodes_3a,instr);
+	dis_ppc(addr, opcodes_3a, instr);
 }
 
 void
 op_cl_x3b(u_int32_t addr, instr_t instr)
 {
-	dis_ppc (addr, opcodes_3b,instr);
+	dis_ppc(addr, opcodes_3b, instr);
 }
 
 void
 op_cl_x3e(u_int32_t addr, instr_t instr)
 {
-	dis_ppc (addr, opcodes_3e,instr);
+	dis_ppc(addr, opcodes_3e, instr);
 }
 
 void
 op_cl_x3f(u_int32_t addr, instr_t instr)
 {
-	dis_ppc (addr, opcodes_3f,instr);
+	dis_ppc(addr, opcodes_3f, instr);
 }
 
 void
 dis_ppc(u_int32_t addr, const struct opcode *opcodeset, instr_t instr)
 {
 	const struct opcode *op;
-	int found = 0;
 	int i;
-	char disasm_str[30];
+	char disasm_str[80];
 
-	for (i=0, op = &opcodeset[0];
-	    found == 0 && op->mask != 0;
-	    i++, op= &opcodeset[i] ) {
+	for (i=0; opcodeset[i].mask != 0; i++) {
+		op = &opcodeset[i];
 		if ((instr & op->mask) == op->code) {
-			found = 1;
-			disasm_fields(addr, op, instr, disasm_str);
-			db_printf("%s%s",op->name, disasm_str);
+			disasm_fields(addr, op, instr, disasm_str,
+			    sizeof disasm_str);
+			db_printf("%s%s\n", op->name, disasm_str);
 			return;
 		}
 	}

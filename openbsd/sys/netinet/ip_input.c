@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_input.c,v 1.110 2003/02/12 14:41:07 jason Exp $	*/
+/*	$OpenBSD: ip_input.c,v 1.114 2003/07/29 03:21:57 itojun Exp $	*/
 /*	$NetBSD: ip_input.c,v 1.30 1996/03/16 23:53:58 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -193,7 +189,8 @@ inet_ntoa(ina)
 	static char buf[4*sizeof "123"];
 	unsigned char *ucp = (unsigned char *)&ina;
 
-	sprintf(buf, "%d.%d.%d.%d", ucp[0] & 0xff, ucp[1] & 0xff,
+	snprintf(buf, sizeof buf, "%d.%d.%d.%d",
+	    ucp[0] & 0xff, ucp[1] & 0xff,
 	    ucp[2] & 0xff, ucp[3] & 0xff);
 	return (buf);
 }
@@ -299,7 +296,7 @@ ipv4_input(m)
 	register struct ipq *fp;
 	struct in_ifaddr *ia;
 	struct ipqent *ipqe;
-	int hlen, mff;
+	int hlen, mff, len;
 	in_addr_t pfrdr = 0;
 #ifdef IPSEC
 	int error, s;
@@ -363,15 +360,16 @@ ipv4_input(m)
 		ipstat.ips_inhwcsum++;
 	}
 
+	/* Retrieve the packet lenght. */
+	len = ntohs(ip->ip_len);
+
 	/*
 	 * Convert fields to host representation.
 	 */
-	NTOHS(ip->ip_len);
-	if (ip->ip_len < hlen) {
+	if (len < hlen) {
 		ipstat.ips_badlen++;
 		goto bad;
 	}
-	NTOHS(ip->ip_off);
 
 	/*
 	 * Check that the amount of data in the buffers
@@ -379,16 +377,16 @@ ipv4_input(m)
 	 * Trim mbufs if longer than we expect.
 	 * Drop packet if shorter than we expect.
 	 */
-	if (m->m_pkthdr.len < ip->ip_len) {
+	if (m->m_pkthdr.len < len) {
 		ipstat.ips_tooshort++;
 		goto bad;
 	}
-	if (m->m_pkthdr.len > ip->ip_len) {
+	if (m->m_pkthdr.len > len) {
 		if (m->m_len == m->m_pkthdr.len) {
-			m->m_len = ip->ip_len;
-			m->m_pkthdr.len = ip->ip_len;
+			m->m_len = len;
+			m->m_pkthdr.len = len;
 		} else
-			m_adj(m, ip->ip_len - m->m_pkthdr.len);
+			m_adj(m, len - m->m_pkthdr.len);
 	}
 
 #if NPF > 0
@@ -530,7 +528,7 @@ ours:
 	 * if the packet was previously fragmented,
 	 * but it's not worth the time; just let them time out.)
 	 */
-	if (ip->ip_off &~ (IP_DF | IP_RF)) {
+	if (ip->ip_off &~ htons(IP_DF | IP_RF)) {
 		if (m->m_flags & M_EXT) {		/* XXX */
 			if ((m = m_pullup(m, hlen)) == NULL) {
 				ipstat.ips_toosmall++;
@@ -558,20 +556,21 @@ found:
 		 * set ipqe_mff if more fragments are expected,
 		 * convert offset of this to bytes.
 		 */
-		ip->ip_len -= hlen;
-		mff = (ip->ip_off & IP_MF) != 0;
+		ip->ip_len = htons(ntohs(ip->ip_len) - hlen);
+		mff = (ip->ip_off & htons(IP_MF)) != 0;
 		if (mff) {
 			/*
 			 * Make sure that fragments have a data length
 			 * that's a non-zero multiple of 8 bytes.
 			 */
-			if (ip->ip_len == 0 || (ip->ip_len & 0x7) != 0) {
+			if (ntohs(ip->ip_len) == 0 ||
+			    (ntohs(ip->ip_len) & 0x7) != 0) {
 				ipstat.ips_badfrags++;
 				ipq_unlock();
 				goto bad;
 			}
 		}
-		ip->ip_off <<= 3;
+		ip->ip_off = htons(ntohs(ip->ip_off) << 3);
 
 		/*
 		 * If datagram marked as having more fragments
@@ -605,12 +604,12 @@ found:
 			ipstat.ips_reassembled++;
 			ip = mtod(m, struct ip *);
 			hlen = ip->ip_hl << 2;
+			ip->ip_len = htons(ntohs(ip->ip_len) + hlen);
 		} else
 			if (fp)
 				ip_freef(fp);
 		ipq_unlock();
-	} else
-		ip->ip_len -= hlen;
+	}
 
 #ifdef IPSEC
         /*
@@ -788,7 +787,7 @@ ip_reass(ipqe, fp)
 	 */
 	for (p = NULL, q = fp->ipq_fragq.lh_first; q != NULL;
 	    p = q, q = q->ipqe_q.le_next)
-		if (q->ipqe_ip->ip_off > ipqe->ipqe_ip->ip_off)
+		if (ntohs(q->ipqe_ip->ip_off) > ntohs(ipqe->ipqe_ip->ip_off))
 			break;
 
 	/*
@@ -797,14 +796,16 @@ ip_reass(ipqe, fp)
 	 * segment.  If it provides all of our data, drop us.
 	 */
 	if (p != NULL) {
-		i = p->ipqe_ip->ip_off + p->ipqe_ip->ip_len -
-		    ipqe->ipqe_ip->ip_off;
+		i = ntohs(p->ipqe_ip->ip_off) + ntohs(p->ipqe_ip->ip_len) -
+		    ntohs(ipqe->ipqe_ip->ip_off);
 		if (i > 0) {
-			if (i >= ipqe->ipqe_ip->ip_len)
+			if (i >= ntohs(ipqe->ipqe_ip->ip_len))
 				goto dropfrag;
 			m_adj(ipqe->ipqe_m, i);
-			ipqe->ipqe_ip->ip_off += i;
-			ipqe->ipqe_ip->ip_len -= i;
+			ipqe->ipqe_ip->ip_off =
+			    htons(ntohs(ipqe->ipqe_ip->ip_off) + i);
+			ipqe->ipqe_ip->ip_len =
+			    htons(ntohs(ipqe->ipqe_ip->ip_len) - i);
 		}
 	}
 
@@ -812,13 +813,16 @@ ip_reass(ipqe, fp)
 	 * While we overlap succeeding segments trim them or,
 	 * if they are completely covered, dequeue them.
 	 */
-	for (; q != NULL && ipqe->ipqe_ip->ip_off + ipqe->ipqe_ip->ip_len >
-	    q->ipqe_ip->ip_off; q = nq) {
-		i = (ipqe->ipqe_ip->ip_off + ipqe->ipqe_ip->ip_len) -
-		    q->ipqe_ip->ip_off;
-		if (i < q->ipqe_ip->ip_len) {
-			q->ipqe_ip->ip_len -= i;
-			q->ipqe_ip->ip_off += i;
+	for (; q != NULL &&
+	    ntohs(ipqe->ipqe_ip->ip_off) + ntohs(ipqe->ipqe_ip->ip_len) >
+	    ntohs(q->ipqe_ip->ip_off); q = nq) {
+		i = (ntohs(ipqe->ipqe_ip->ip_off) +
+		    ntohs(ipqe->ipqe_ip->ip_len)) - ntohs(q->ipqe_ip->ip_off);
+		if (i < ntohs(q->ipqe_ip->ip_len)) {
+			q->ipqe_ip->ip_len =
+			    htons(ntohs(q->ipqe_ip->ip_len) - i);
+			q->ipqe_ip->ip_off =
+			    htons(ntohs(q->ipqe_ip->ip_off) + i);
 			m_adj(q->ipqe_m, i);
 			break;
 		}
@@ -842,9 +846,9 @@ insert:
 	next = 0;
 	for (p = NULL, q = fp->ipq_fragq.lh_first; q != NULL;
 	    p = q, q = q->ipqe_q.le_next) {
-		if (q->ipqe_ip->ip_off != next)
+		if (ntohs(q->ipqe_ip->ip_off) != next)
 			return (0);
-		next += q->ipqe_ip->ip_len;
+		next += ntohs(q->ipqe_ip->ip_len);
 	}
 	if (p->ipqe_mff)
 		return (0);
@@ -881,7 +885,7 @@ insert:
 	 * dequeue and discard fragment reassembly header.
 	 * Make header visible.
 	 */
-	ip->ip_len = next;
+	ip->ip_len = htons(next);
 	ip->ip_src = fp->ipq_src;
 	ip->ip_dst = fp->ipq_dst;
 	LIST_REMOVE(fp, ipq_q);
@@ -1040,7 +1044,8 @@ ip_dooptions(m)
 			if (!ip_dosourceroute) {
 				char buf[4*sizeof "123"];
 
-				strcpy(buf, inet_ntoa(ip->ip_dst));
+				strlcpy(buf, inet_ntoa(ip->ip_dst),
+				    sizeof buf);
 				log(LOG_WARNING,
 				    "attempted source route from %s to %s\n",
 				    inet_ntoa(ip->ip_src), buf);
@@ -1194,7 +1199,6 @@ ip_dooptions(m)
 	}
 	return (0);
 bad:
-	ip->ip_len -= ip->ip_hl << 2;   /* XXX icmp_error adds in hdr length */
 	icmp_error(m, type, code, 0, 0);
 	ipstat.ips_badoptions++;
 	return (1);
@@ -1472,7 +1476,7 @@ ip_forward(m, srcrt)
 	 * we need to generate an ICMP message to the src.
 	 * Pullup to avoid sharing mbuf cluster between m and mcopy.
 	 */
-	mcopy = m_copym(m, 0, imin((int)ip->ip_len, 68), M_DONTWAIT);
+	mcopy = m_copym(m, 0, imin(ntohs(ip->ip_len), 68), M_DONTWAIT);
 	if (mcopy)
 		mcopy = m_pullup(mcopy, ip->ip_hl << 2);
 

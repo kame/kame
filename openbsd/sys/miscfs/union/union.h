@@ -1,5 +1,5 @@
-/*	$OpenBSD: union.h,v 1.7 2002/03/14 01:27:08 millert Exp $	*/
-/*	$NetBSD: union.h,v 1.9 1996/02/09 22:41:08 christos Exp $	*/
+/*	$OpenBSD: union.h,v 1.10 2003/08/14 07:46:40 mickey Exp $	*/
+/*	$NetBSD: union.h,v 1.13 2002/09/21 18:09:31 christos Exp $	*/
 
 /*
  * Copyright (c) 1994 The Regents of the University of California.
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -40,8 +36,6 @@
  *	@(#)union.h	8.9 (Berkeley) 12/10/94
  */
 
-struct vfsconf;
-
 struct union_args {
 	char		*target;	/* Target of loopback  */
 	int		mntflags;	/* Options on the mount */
@@ -51,6 +45,9 @@ struct union_args {
 #define UNMNT_BELOW	0x0002		/* Target appears below mount point */
 #define UNMNT_REPLACE	0x0003		/* Target replaces mount point */
 #define UNMNT_OPMASK	0x0003
+
+#define UNMNT_BITS "\177\20" \
+    "b\00above\0b\01below\0b\02replace"
 
 struct union_mount {
 	struct vnode	*um_uppervp;
@@ -65,8 +62,8 @@ struct union_mount {
 /*
  * DEFDIRMODE is the mode bits used to create a shadow directory.
  */
-#define UN_DIRMODE	(S_IRWXU|S_IRWXG|S_IRWXO)
-#define UN_FILEMODE	(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)
+#define	UN_DIRMODE	(S_IRWXU|S_IRWXG|S_IRWXO)
+#define	UN_FILEMODE	(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH)
 
 /*
  * A cache of vnode references
@@ -95,6 +92,8 @@ struct union_node {
 #define UN_ULOCK	0x04		/* Upper node is locked */
 #define UN_KLOCK	0x08		/* Keep upper node locked on vput */
 #define UN_CACHED	0x10		/* In union cache */
+#define UN_DRAINING	0x20		/* upper node lock is draining */
+#define UN_DRAINED	0x40		/* upper node lock is drained */
 
 extern int union_allocvp(struct vnode **, struct mount *,
 				struct vnode *, struct vnode *,
@@ -129,7 +128,7 @@ extern void union_newsize(struct vnode *, off_t, off_t);
 #define OTHERVP(vp) (UPPERVP(vp) ? UPPERVP(vp) : LOWERVP(vp))
 
 extern int (**union_vnodeop_p)(void *);
-extern struct vfsops union_vfsops;
+extern const struct vfsops union_vfsops;
 
 int union_init(struct vfsconf *);
 int union_freevp(struct vnode *);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: nofn.c,v 1.7 2002/11/21 19:34:25 jason Exp $	*/
+/*	$OpenBSD: nofn.c,v 1.9 2003/06/02 19:08:58 jason Exp $	*/
 
 /*
  * Copyright (c) 2002 Jason L. Wright (jason@thought.net)
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -243,7 +238,8 @@ nofn_rng_read(sc)
 		reg = PK_READ_4(sc, NOFN_PK_SR);
 		if (reg & PK_SR_UFLOW) {
 			ret = -1;
-			printf("%s: rng underflow, disabling.\n");
+			printf("%s: rng underflow, disabling.\n",
+			    sc->sc_dev.dv_xname);
 			nofn_rng_disable(sc);
 			break;
 		}
@@ -318,7 +314,8 @@ nofn_rng_disable(sc)
 		REG_WRITE_4(sc, NOFN_PCI_INT_MASK, sc->sc_intrmask);
 		break;
 	default:
-		printf("%s: nofn_rng_disable: unknown rev %x\n", sc->sc_revid);
+		printf("%s: nofn_rng_disable: unknown rev %x\n", 
+		    sc->sc_dev.dv_xname, sc->sc_revid);
 		break;
 	}
 
@@ -361,7 +358,8 @@ nofn_rng_enable(sc)
 		sc->sc_intrmask |= PCIINTMASK_RNGRDY;
 		break;
 	default:
-		printf("%s: nofn_rng_enable: unknown rev %x\n", sc->sc_revid);
+		printf("%s: nofn_rng_enable: unknown rev %x\n", 
+		    sc->sc_dev.dv_xname, sc->sc_revid);
 		break;
 	}
 

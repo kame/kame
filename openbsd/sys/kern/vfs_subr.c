@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_subr.c,v 1.88 2002/08/11 22:32:31 art Exp $	*/
+/*	$OpenBSD: vfs_subr.c,v 1.95 2003/07/21 22:44:50 tedu Exp $	*/
 /*	$NetBSD: vfs_subr.c,v 1.53 1996/04/22 01:39:13 christos Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -409,12 +405,19 @@ getnewvnode(tag, mp, vops, vpp)
 		simple_unlock(&vnode_free_list_slock);
 		vp = pool_get(&vnode_pool, PR_WAITOK);
 		bzero((char *)vp, sizeof *vp);
+		simple_lock_init(&vp->v_interlock);
 		numvnodes++;
 	} else {
 		for (vp = TAILQ_FIRST(listhd); vp != NULLVP;
 		    vp = TAILQ_NEXT(vp, v_freelist)) {
-			if (simple_lock_try(&vp->v_interlock))
-				break;
+			if (simple_lock_try(&vp->v_interlock)) {
+				if ((vp->v_flag & VLAYER) == 0)
+					break;
+				if (VOP_ISLOCKED(vp) == 0)
+					break;
+				else
+					simple_unlock(&vp->v_interlock);
+			}
 		}
 		/*
 		 * Unless this is a bad time of the month, at most
@@ -457,6 +460,8 @@ getnewvnode(tag, mp, vops, vpp)
 	}
 	vp->v_type = VNON;
 	cache_purge(vp);
+	vp->v_vnlock = NULL;
+	lockinit(&vp->v_lock, PVFS, "v_lock", 0, 0);
 	vp->v_tag = tag;
 	vp->v_op = vops;
 	insmntque(vp, mp);
@@ -633,6 +638,8 @@ loop:
 	VOP_UNLOCK(vp, 0, p);
 	simple_lock(&vp->v_interlock);
 	vclean(vp, 0, p);
+	vp->v_vnlock = NULL;
+	lockinit(&vp->v_lock, PVFS, "v_lock", 0, 0);
 	vp->v_op = nvp->v_op;
 	vp->v_tag = nvp->v_tag;
 	nvp->v_type = VNON;
@@ -669,7 +676,7 @@ vget(vp, flags, p)
 	if (vp->v_flag & VXLOCK) {
  		vp->v_flag |= VXWANT;
 		simple_unlock(&vp->v_interlock);
-		tsleep((caddr_t)vp, PINOD, "vget", 0);
+		tsleep(vp, PINOD, "vget", 0);
 		return (ENOENT);
  	}
 	if (vp->v_usecount == 0 &&
@@ -1060,12 +1067,6 @@ vclean(vp, flags, p)
 		simple_unlock(&vp->v_interlock);
 	}
 	cache_purge(vp);
-	if (vp->v_vnlock) {
-		if ((vp->v_vnlock->lk_flags & LK_DRAINED) == 0)
-			vprint("vclean: lock not drained", vp);
-		FREE(vp->v_vnlock, M_VNODE);
-		vp->v_vnlock = NULL;
-	}
 
 	/*
 	 * Done with purge, notify sleepers of the grim news.
@@ -1081,7 +1082,7 @@ vclean(vp, flags, p)
 #endif
 	if (vp->v_flag & VXWANT) {
 		vp->v_flag &= ~VXWANT;
-		wakeup((caddr_t)vp);
+		wakeup(vp);
 	}
 }
 
@@ -1142,7 +1143,7 @@ vgonel(vp, p)
 	if (vp->v_flag & VXLOCK) {
 		vp->v_flag |= VXWANT;
 		simple_unlock(&vp->v_interlock);
-		tsleep((caddr_t)vp, PINOD, "vgone", 0);
+		tsleep(vp, PINOD, "vgone", 0);
 		return;
 	}
 	/*
@@ -1314,19 +1315,19 @@ vprint(label, vp)
 		vp->v_holdcnt);
 	buf[0] = '\0';
 	if (vp->v_flag & VROOT)
-		strcat(buf, "|VROOT");
+		strlcat(buf, "|VROOT", sizeof buf);
 	if (vp->v_flag & VTEXT)
-		strcat(buf, "|VTEXT");
+		strlcat(buf, "|VTEXT", sizeof buf);
 	if (vp->v_flag & VSYSTEM)
-		strcat(buf, "|VSYSTEM");
+		strlcat(buf, "|VSYSTEM", sizeof buf);
 	if (vp->v_flag & VXLOCK)
-		strcat(buf, "|VXLOCK");
+		strlcat(buf, "|VXLOCK", sizeof buf);
 	if (vp->v_flag & VXWANT)
-		strcat(buf, "|VXWANT");
+		strlcat(buf, "|VXWANT", sizeof buf);
 	if (vp->v_bioflag & VBIOWAIT)
-		strcat(buf, "| VBIOWAIT");
+		strlcat(buf, "| VBIOWAIT", sizeof buf);
 	if (vp->v_flag & VALIASED)
-		strcat(buf, "|VALIASED");
+		strlcat(buf, "|VALIASED", sizeof buf);
 	if (buf[0] != '\0')
 		printf(" flags (%s)", &buf[1]);
 	if (vp->v_data == NULL) {
@@ -1472,10 +1473,10 @@ again:
 				vfs_unbusy(mp, p);
 				return (ENOMEM);
 			}
-			if ((error = copyout((caddr_t)&vp,
+			if ((error = copyout(&vp,
 			    &((struct e_vnode *)bp)->vptr,
 			    sizeof(struct vnode *))) ||
-			   (error = copyout((caddr_t)vp,
+			   (error = copyout(vp,
 			    &((struct e_vnode *)bp)->vnode,
 			    sizeof(struct vnode)))) {
 				vfs_unbusy(mp, p);
@@ -1557,16 +1558,16 @@ vfs_hang_addrlist(mp, nep, argp)
 		return (EINVAL);
 	i = sizeof(struct netcred) + argp->ex_addrlen + argp->ex_masklen;
 	np = (struct netcred *)malloc(i, M_NETADDR, M_WAITOK);
-	bzero((caddr_t)np, i);
+	bzero(np, i);
 	saddr = (struct sockaddr *)(np + 1);
-	error = copyin(argp->ex_addr, (caddr_t)saddr, argp->ex_addrlen);
+	error = copyin(argp->ex_addr, saddr, argp->ex_addrlen);
 	if (error)
 		goto out;
 	if (saddr->sa_len > argp->ex_addrlen)
 		saddr->sa_len = argp->ex_addrlen;
 	if (argp->ex_masklen) {
 		smask = (struct sockaddr *)((caddr_t)saddr + argp->ex_addrlen);
-		error = copyin(argp->ex_mask, (caddr_t)smask, argp->ex_masklen);
+		error = copyin(argp->ex_mask, smask, argp->ex_masklen);
 		if (error)
 			goto out;
 		if (smask->sa_len > argp->ex_masklen)
@@ -1617,7 +1618,7 @@ vfs_free_netcred(rn, w)
 	register struct radix_node_head *rnh = (struct radix_node_head *)w;
 
 	(*rnh->rnh_deladdr)(rn->rn_key, rn->rn_mask, rnh);
-	free((caddr_t)rn, M_NETADDR);
+	free(rn, M_NETADDR);
 	return (0);
 }
 
@@ -1634,7 +1635,7 @@ vfs_free_addrlist(nep)
 	for (i = 0; i <= AF_MAX; i++)
 		if ((rnh = nep->ne_rtable[i]) != NULL) {
 			(*rnh->rnh_walktree)(rnh, vfs_free_netcred, rnh);
-			free((caddr_t)rnh, M_RTABLE);
+			free(rnh, M_RTABLE);
 			nep->ne_rtable[i] = 0;
 		}
 }
@@ -1766,7 +1767,7 @@ vfs_unmountall(void)
 		nmp = CIRCLEQ_PREV(mp, mnt_list);
 		if ((vfs_busy(mp, LK_EXCLUSIVE|LK_NOWAIT, NULL, p)) != 0)
 			continue;
-		if ((error = dounmount(mp, MNT_FORCE, curproc)) != 0) {
+		if ((error = dounmount(mp, MNT_FORCE, curproc, NULL)) != 0) {
 			printf("unmount of %s failed with error %d\n",
 			    mp->mnt_stat.f_mntonname, error);
 			allerror = 1;
@@ -1935,7 +1936,7 @@ vwaitforio(vp, slpflag, wmesg, timeo)
 
 	while (vp->v_numoutput) {
 		vp->v_bioflag |= VBIOWAIT;
-		error = tsleep((caddr_t)&vp->v_numoutput,
+		error = tsleep(&vp->v_numoutput,
 		    slpflag | (PRIBIO + 1), wmesg, timeo);
 		if (error)
 			break;
@@ -1961,7 +1962,7 @@ vwakeup(vp)
 			panic("vwakeup: neg numoutput");
 		if ((vp->v_bioflag & VBIOWAIT) && vp->v_numoutput == 0) {
 			vp->v_bioflag &= ~VBIOWAIT;
-			wakeup((caddr_t)&vp->v_numoutput);
+			wakeup(&vp->v_numoutput);
 		}
 	}
 }
@@ -2016,9 +2017,8 @@ loop:
 				continue;
 			if (bp->b_flags & B_BUSY) {
 				bp->b_flags |= B_WANTED;
-				error = tsleep((caddr_t)bp,
-					slpflag | (PRIBIO + 1), "vinvalbuf",
-					slptimeo);
+				error = tsleep(bp, slpflag | (PRIBIO + 1),
+				    "vinvalbuf", slptimeo);
 				if (error) {
 					splx(s);
 					return (error);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_cksum.c,v 1.8 1997/08/08 08:27:15 downsj Exp $	*/
+/*	$OpenBSD: in_cksum.c,v 1.10 2003/06/04 22:08:17 deraadt Exp $	*/
 /*	$NetBSD: in_cksum.c,v 1.7 1996/10/05 23:44:34 mrg Exp $ */
 
 /*
@@ -8,11 +8,6 @@
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
- * All advertising materials mentioning features or use of this software
- * must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, and it's contributors.
- *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -21,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *

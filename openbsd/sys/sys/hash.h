@@ -1,4 +1,4 @@
-/*	$OpenBSD: hash.h,v 1.1 2002/06/11 22:27:03 ericj Exp $	*/
+/*	$OpenBSD: hash.h,v 1.3 2003/06/03 00:57:47 weingart Exp $	*/
 
 /*
  * Copyright (c) 2001 Tobias Weingartner
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *    This product includes software developed by Tobias Weingartner.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -38,7 +33,7 @@
  * Note: SMALL_KERNEL might be used to shrink these, right now I
  * do not see the point, as my kernel did not grow appreciably when
  * I switched to these from other inline code.  This may have to be
- * revisited when/if these functions become more prelevant in the
+ * revisited when/if these functions become more prevalant in the
  * kernel.
  */
 

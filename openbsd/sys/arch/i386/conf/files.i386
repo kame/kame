@@ -1,4 +1,4 @@
-#	$OpenBSD: files.i386,v 1.102 2003/02/10 22:32:33 jason Exp $
+#	$OpenBSD: files.i386,v 1.108 2003/08/07 08:32:56 markus Exp $
 #	$NetBSD: files.i386,v 1.73 1996/05/07 00:58:36 thorpej Exp $
 #
 # new style config file for i386 architecture
@@ -24,7 +24,7 @@ file	arch/i386/i386/in_cksum.s	inet
 file	arch/i386/i386/ipx_cksum.c	ipx
 file	arch/i386/i386/machdep.c
 file	arch/i386/i386/kgdb_machdep.c	kgdb
-file	arch/i386/i386/math_emulate.c	math_emulate
+file	arch/i386/i386/longrun.c	!small_kernel
 file	arch/i386/i386/mem.c
 file	arch/i386/i386/i686_mem.c	mtrr
 file	arch/i386/i386/k6_mem.c		mtrr
@@ -109,6 +109,11 @@ file	arch/i386/pci/pchb.c		pchb
 device	elansc
 attach	elansc at pci
 file	arch/i386/pci/elan520.c		elansc
+
+# Geode SC1100
+device	geodesc
+attach	geodesc at pci
+file	arch/i386/pci/geodesc.c		geodesc
 
 # PCI-ISA bridge chipsets
 device	pcib:	isabus
@@ -222,6 +227,9 @@ file	arch/i386/isa/joy_isapnp.c	joy_isapnp
 # VM86 mode
 file	arch/i386/i386/vm86.c			vm86
 
+# a.out binary compatibility (COMPAT_AOUT)
+include "../../../compat/aout/files.aout"
+
 # SVR4 binary compatibility (COMPAT_SVR4)
 include "../../../compat/svr4/files.svr4"
 file	arch/i386/i386/svr4_machdep.c		compat_svr4
@@ -263,6 +271,7 @@ file	arch/i386/pci/opti82c700.c	pcibios
 file	arch/i386/pci/piix.c		pcibios
 file	arch/i386/pci/sis85c503.c	pcibios
 file	arch/i386/pci/via82c586.c	pcibios
+file	arch/i386/pci/via8231.c		pcibios
 file	arch/i386/pci/amd756.c		pcibios
 file	arch/i386/pci/ali1543.c		pcibios
 

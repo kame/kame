@@ -1,4 +1,4 @@
-/*	$OpenBSD: cd9660_vnops.c,v 1.24 2002/11/08 04:34:17 art Exp $	*/
+/*	$OpenBSD: cd9660_vnops.c,v 1.28 2003/06/02 23:28:05 millert Exp $	*/
 /*	$NetBSD: cd9660_vnops.c,v 1.42 1997/10/16 23:56:57 christos Exp $	*/
 
 /*-
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -665,7 +661,8 @@ cd9660_readdir(v)
 				error = iso_uiodir(idp,&idp->current,idp->curroff);
 			break;
 		default:	/* ISO_FTYPE_DEFAULT || ISO_FTYPE_9660 */
-			strcpy(idp->current.d_name,"..");
+			strlcpy(idp->current.d_name,"..",
+			    sizeof idp->current.d_name);
 			if (idp->current.d_namlen == 1 && ep->name[0] == 0) {
 				idp->current.d_namlen = 1;
 				error = iso_uiodir(idp,&idp->current,idp->curroff);
@@ -787,7 +784,8 @@ cd9660_readlink(v)
 	 * Now get a buffer
 	 * Abuse a namei buffer for now.
 	 */
-	if (uio->uio_segflg == UIO_SYSSPACE)
+	if (uio->uio_segflg == UIO_SYSSPACE &&
+	    uio->uio_iov->iov_len >= MAXPATHLEN)
 		symname = uio->uio_iov->iov_base;
 	else
 		MALLOC(symname, char *, MAXPATHLEN, M_NAMEI, M_WAITOK);
@@ -796,7 +794,8 @@ cd9660_readlink(v)
 	 * Ok, we just gathering a symbolic name in SL record.
 	 */
 	if (cd9660_rrip_getsymname(dirp, symname, &symlen, imp) == 0) {
-		if (uio->uio_segflg != UIO_SYSSPACE)
+		if (uio->uio_segflg != UIO_SYSSPACE ||
+		    uio->uio_iov->iov_len < MAXPATHLEN)
 			FREE(symname, M_NAMEI);
 		brelse(bp);
 		return (EINVAL);
@@ -809,7 +808,8 @@ cd9660_readlink(v)
 	/*
 	 * return with the symbolic name to caller's.
 	 */
-	if (uio->uio_segflg != UIO_SYSSPACE) {
+	if (uio->uio_segflg != UIO_SYSSPACE ||
+	    uio->uio_iov->iov_len < MAXPATHLEN) {
 		error = uiomove(symname, symlen, uio);
 		FREE(symname, M_NAMEI);
 		return (error);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: osiopvar.h,v 1.1 2003/01/08 02:11:38 krw Exp $	*/
+/*	$OpenBSD: osiopvar.h,v 1.7 2003/06/26 00:40:53 mickey Exp $	*/
 /*	$NetBSD: osiopvar.h,v 1.3 2002/05/14 02:58:35 matt Exp $	*/
 
 /*
@@ -42,11 +42,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -115,6 +111,9 @@ struct osiop_ds {
 	u_int8_t msgout[8];
 	u_int8_t msgbuf[8];
 	u_int8_t stat[8];
+	
+	struct scsi_generic scsi_cmd;	/* DMA'able copy of xs->cmd */
+	u_int32_t pad[1+4];		/* pad to 256 bytes */
 } __attribute__((__packed__));
 
 /* status can hold the SCSI_* status values, and 2 additionnal values: */
@@ -130,6 +129,7 @@ struct osiop_ds {
 #define OSIOP_DSEXTMSGOFF	OSIOP_DSOFF(msgbuf[2])
 #define OSIOP_DSSYNMSGOFF	OSIOP_DSOFF(msgbuf[3])
 #define OSIOP_DSSTATOFF		OSIOP_DSOFF(stat[0])
+#define OSIOP_DSCMDOFF		OSIOP_DSOFF(scsi_cmd)
 
 /*
  * ACB. Holds additional information for each SCSI command Comments:
@@ -143,17 +143,14 @@ struct osiop_acb {
 	struct scsi_xfer *xs;	/* SCSI xfer ctrl block from upper layer */
 	struct osiop_softc *sc;	/* points back to our adapter */
 
-	bus_dmamap_t cmddma;	/* DMA map for SCSI command */
 	bus_dmamap_t datadma;	/* DMA map for data transfer */
 
 	struct osiop_ds *ds;	/* data structure for this acb */
 	bus_size_t dsoffset;	/* offset of data structure for this acb */
 
-	bus_size_t cmdlen;	/* command length */
-	bus_size_t datalen;	/* transfer data length */
-#ifdef OSIOP_DEBUG
+	int	xsflags;	/* copy of xs->flags */
+	int	datalen;
 	void *data;		/* transfer data buffer ptr */
-#endif
 
 	bus_addr_t curaddr;	/* current transfer data buffer */
 	bus_size_t curlen;	/* current transfer data length */
@@ -179,6 +176,7 @@ struct osiop_acb {
  */
 struct osiop_tinfo {
 	int cmds;		/* number of commands processed */
+	int senses;		/* number of sense requests */
 	int dconns;		/* number of disconnects */
 	int touts;		/* number of timeouts */
 	int perrs;		/* number of parity errors */
@@ -239,6 +237,7 @@ struct osiop_softc {
 	u_int8_t sc_istat;
 	u_int8_t sc_dcntl;
 	u_int8_t sc_ctest7;
+	u_int8_t sc_dmode;
 	u_int8_t sc_sien;
 	u_int8_t sc_dien;
 };

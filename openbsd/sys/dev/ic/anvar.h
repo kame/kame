@@ -1,4 +1,4 @@
-/*	$OpenBSD: anvar.h,v 1.11 2002/06/09 03:14:18 todd Exp $	*/
+/*	$OpenBSD: anvar.h,v 1.13 2003/08/19 04:21:41 mickey Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -271,8 +271,8 @@ struct an_ltv_stats {
 	u_int32_t		an_lostsync_hostreq;	/* 0x16C */
 	u_int32_t		an_host_tx_bytes;	/* 0x170 */
 	u_int32_t		an_host_rx_bytes;	/* 0x174 */
-	u_int32_t		an_uptime_secs;		/* 0x178 */
-	u_int32_t		an_uptime_usecs;	/* 0x17C */
+	u_int32_t		an_uptime_usecs;	/* 0x178 */
+	u_int32_t		an_uptime_secs;		/* 0x17C */
 	u_int32_t		an_lostsync_better_ap;	/* 0x180 */
 	u_int32_t		an_rsvd[10];
 };
@@ -346,7 +346,7 @@ struct an_ltv_genconfig {
 	u_int8_t		an_rsvd8;		/* 0x97 */
 	u_int8_t		an_magic_packet_action;	/* 0x98 */
 	u_int8_t		an_magic_packet_ctl;	/* 0x99 */
-	u_int16_t		an_rsvd9;
+	u_int16_t		an_rsvd9[2];		/* 0x9a */
 };
 
 #define AN_OPMODE_IBSS_ADHOC			0x0000
@@ -504,7 +504,7 @@ struct an_ltv_caps {
 	u_int16_t		an_softcaps;		/* 0x7C */
 	u_int16_t		an_bootblockrev;	/* 0x7E */
 	u_int16_t		an_req_hw_support;	/* 0x80 */
-	u_int16_t		an_rsvd1;		/* 0x82 */
+	u_int16_t		an_rsvd1[21];		/* 0x82 */
 };
 
 /*

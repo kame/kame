@@ -1,4 +1,4 @@
-/*	$OpenBSD: cgfour.c,v 1.17 2002/11/06 21:06:20 miod Exp $	*/
+/*	$OpenBSD: cgfour.c,v 1.21 2003/06/28 17:05:33 miod Exp $	*/
 /*	$NetBSD: cgfour.c,v 1.13 1997/05/24 20:16:06 pk Exp $	*/
 
 /*
@@ -7,10 +7,6 @@
  * Copyright (c) 1995 Theo de Raadt.  All rights reserved.
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
- *
- * All advertising materials mentioning features or use of this software
- * must display the following acknowledgement:
- *	This product includes software developed by Theo de Raadt.
  *
  * This software was developed by the Computer Systems Engineering group
  * at Lawrence Berkeley Laboratory under DARPA contract BG 91-66 and
@@ -29,11 +25,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -245,7 +237,7 @@ cgfourattach(parent, self, args)
 	sc->sc_sunfb.sf_ro.ri_bits = mapiodev(ca->ca_ra.ra_reg,
 	    PFOUR_COLOR_OFF_COLOR, round_page(sc->sc_sunfb.sf_fbsize));
 	sc->sc_sunfb.sf_ro.ri_hw = sc;
-	fbwscons_init(&sc->sc_sunfb, isconsole);
+	fbwscons_init(&sc->sc_sunfb, isconsole ? 0 : RI_CLEAR);
 	fbwscons_setcolormap(&sc->sc_sunfb, cgfour_setcolor);
 
 	cgfour_stdscreen.capabilities = sc->sc_sunfb.sf_ro.ri_caps;
@@ -282,7 +274,7 @@ cgfour_ioctl(v, cmd, data, flags, p)
 
 	switch (cmd) {
 	case WSDISPLAYIO_GTYPE:
-		*(u_int *)data = WSDISPLAY_TYPE_UNKNOWN;
+		*(u_int *)data = WSDISPLAY_TYPE_SUNCG4;
 		break;
 	case WSDISPLAYIO_GINFO:
 		wdf = (struct wsdisplay_fbinfo *)data;

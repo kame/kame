@@ -1,4 +1,4 @@
-/*	$OpenBSD: fbvar.h,v 1.8 2002/11/06 21:06:22 miod Exp $	*/
+/*	$OpenBSD: fbvar.h,v 1.11 2003/06/28 17:05:35 miod Exp $	*/
 /*	$NetBSD: fbvar.h,v 1.9 1997/07/07 23:31:30 pk Exp $ */
 
 /*
@@ -22,11 +22,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -50,9 +46,7 @@
  */
 
 #define	FB_PFOUR	0x00010000	/* indicates fb is a pfour fb */
-#define FB_FORCELOW	0x00000001	/* run 24 bit fb in 8 bit mode */
-					/* or cg12 in 1 bit mode */
-#define FB_USERMASK	(0xffff)	/* flags that the user can set */
+#define FB_USERMASK	(0)		/* flags that the user can set */
 
 /*
  * Common frame buffer variables.
@@ -67,6 +61,8 @@ struct sunfb {
 	int	sf_linebytes;
 
 	int	sf_fbsize;		/* sf_height * sf_linebytes */
+
+	int	*sf_crowp, *sf_ccolp;	/* PROM cursor position */
 
 	int	sf_flags;
 	volatile u_int32_t* sf_pfour;	/* P4 register when applicable */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_physio.c,v 1.19 2002/03/14 01:27:04 millert Exp $	*/
+/*	$OpenBSD: kern_physio.c,v 1.21 2003/07/21 22:44:50 tedu Exp $	*/
 /*	$NetBSD: kern_physio.c,v 1.28 1997/05/19 10:43:28 pk Exp $	*/
 
 /*-
@@ -19,11 +19,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -99,7 +95,7 @@ physio(strategy, bp, dev, flags, minphys, uio)
 		/* [mark the buffer wanted] */
 		bp->b_flags |= B_WANTED;
 		/* [wait until the buffer is available] */
-		tsleep((caddr_t)bp, PRIBIO+1, "physbuf", 0);
+		tsleep(bp, PRIBIO+1, "physbuf", 0);
 	}
 
 	/* Mark it busy, so nobody else will use it. */
@@ -183,7 +179,7 @@ physio(strategy, bp, dev, flags, minphys, uio)
 
 			/* [wait for the transfer to complete] */
 			while ((bp->b_flags & B_DONE) == 0)
-				tsleep((caddr_t) bp, PRIBIO + 1, "physio", 0);
+				tsleep(bp, PRIBIO + 1, "physio", 0);
 
 			/* Mark it busy again, so nobody else will use it. */
 			bp->b_flags |= B_BUSY;

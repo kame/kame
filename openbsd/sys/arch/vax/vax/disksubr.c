@@ -1,4 +1,4 @@
-/*	$OpenBSD: disksubr.c,v 1.18 2002/04/29 19:12:31 miod Exp $	*/
+/*	$OpenBSD: disksubr.c,v 1.20 2003/06/26 13:06:26 miod Exp $	*/
 /*	$NetBSD: disksubr.c,v 1.21 1999/06/30 18:48:06 ragge Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -44,6 +40,7 @@
 #include <sys/syslog.h>
 #include <sys/proc.h>
 #include <sys/user.h>
+#include <sys/disk.h>
 
 #include <uvm/uvm_extern.h>
 

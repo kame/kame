@@ -1,4 +1,4 @@
-/*	$OpenBSD: disksubr.c,v 1.26 2002/08/21 18:59:05 miod Exp $	*/
+/*	$OpenBSD: disksubr.c,v 1.29 2003/08/23 22:52:40 deraadt Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1995 Dale Rahn.
@@ -12,10 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *   This product includes software developed by Dale Rahn.
- * 4. The name of the author may not be used to endorse or promote products
+ * 3. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
@@ -164,9 +161,9 @@ readdisklabel(dev, strat, lp, clp, spoofonly)
 #endif
 	if (clp->magic1 != DISKMAGIC || clp->magic2 != DISKMAGIC)
 		return ("no disk label");
-	
+
 	cputobsdlabel(lp, clp);
-	
+
 	if (dkcksum(lp) != 0)
 		return ("disk label corrupted");
 
@@ -440,17 +437,17 @@ bsdtocpulabel(lp, clp)
 	bcopy(&lp->d_partitions[0], clp->vid_4, sizeof(struct partition) * 4);
 	bcopy(&lp->d_partitions[4], clp->cfg_4, sizeof(struct partition) * 12);
 	clp->version = 1;
- 	/* put "MOTOROLA" in the VID.  This makes it a valid boot disk also. xxx - smurph */
+
+	/* Put "MOTOROLA" in the VID.  This makes it a valid boot disk. */
 	mot = clp->vid_mot;
-	for (i=0; i<8; i++) {
+	for (i = 0; i < 8; i++) {
 		*mot++ = *tmot++;
 	}
 	/* put volume id in the VID */
 	mot = clp->vid_id;
-	for (i=0; i<4; i++) {
+	for (i = 0; i < 4; i++) {
 		*mot++ = *id++;
 	}
-
 }
 
 struct cpu_disklabel_old {
@@ -545,8 +542,8 @@ cputobsdlabel(lp, clp)
 		lp->d_magic = clp->magic1;
 		lp->d_type = clp->type;
 		lp->d_subtype = clp->subtype;
-		strncpy(lp->d_typename, clp->vid_vd, 16);
-		strncpy(lp->d_packname, clp->packname, 16);
+		strncpy(lp->d_typename, clp->vid_vd, sizeof lp->d_typename);
+		strncpy(lp->d_packname, clp->packname, sizeof lp->d_packname);
 		lp->d_secsize = clp->cfg_psm;
 		lp->d_nsectors = clp->cfg_spt;
 		lp->d_ncylinders = clp->cfg_trk; /* trk is really num of cyl! */
@@ -609,8 +606,8 @@ cputobsdlabel(lp, clp)
 		lp->d_magic = clp->magic1;
 		lp->d_type = clp->type;
 		lp->d_subtype = clp->subtype;
-		strncpy(lp->d_typename, clp->vid_vd, 16);
-		strncpy(lp->d_packname, clp->packname, 16);
+		strncpy(lp->d_typename, clp->vid_vd, sizeof lp->d_typename);
+		strncpy(lp->d_packname, clp->packname, sizeof lp->d_packname);
 		lp->d_secsize = clp->cfg_psm;
 		lp->d_nsectors = clp->cfg_spt;
 		lp->d_ncylinders = clp->cfg_trk; /* trk is really num of cyl! */

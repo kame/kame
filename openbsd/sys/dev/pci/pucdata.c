@@ -1,4 +1,4 @@
-/*	$OpenBSD: pucdata.c,v 1.25 2003/02/11 19:20:28 mickey Exp $	*/
+/*	$OpenBSD: pucdata.c,v 1.30 2003/08/06 22:07:37 deraadt Exp $	*/
 /*	$NetBSD: pucdata.c,v 1.6 1999/07/03 05:55:23 cgd Exp $	*/
 
 /*
@@ -618,17 +618,13 @@ const struct puc_device_description puc_devices[] = {
 	/*
 	 * VScom PCI 200HV2, is 200H Version 2.
 	 * Sells as 200H
-	 * strange things with the second port, either my card is simply
-	 * broken or something really strange is going on.
-	 * second port does not work at all. I'll request another one for
-	 * further testing.
 	 */
 	{   /* "VScom PCI-200HV2", */
 	    {	PCI_VENDOR_OXFORD, PCI_PRODUCT_OXFORD_VSCOM_PCI200HV2,	0, 0 },
 	    {	0xffff, 0xffff,						0, 0 },
 	    {
 		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8 },
-		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ * 8 },
 	    },
 	},
 
@@ -676,12 +672,12 @@ const struct puc_device_description puc_devices[] = {
 	/*
 	 * VScom PCI-200L has 2 x 16550 UARTS.
 	 * The board has a jumper which allows you to select a clock speed
-	 * of either 14.7456MHz or 1.8432MHz. By default it runs at 
+	 * of either 14.7456MHz or 1.8432MHz. By default it runs at
 	 * the fast speed.
 	 */
 	{   /* "VScom PCI-200L with 2 x 16550 UARTS" */
 	    {	PCI_VENDOR_OXFORD, PCI_PRODUCT_OXFORD_VSCOM_PCI200L,	0, 0 },
-	    {	0xffff, 0xffff,					    	0, 0 },
+	    {	0xffff, 0xffff,						0, 0 },
 	    {
 		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ * 8},
 		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8},
@@ -695,7 +691,7 @@ const struct puc_device_description puc_devices[] = {
 	 */
 	{   /* "VScom PCI-210L" */
 	    {	PCI_VENDOR_OXFORD, PCI_PRODUCT_OXFORD_VSCOM_PCI210L,	0, 0 },
-	    {	0xffff, 0xffff,					    	0, 0 },
+	    {	0xffff, 0xffff,						0, 0 },
 	    {
 		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ * 8 },
 		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
@@ -799,7 +795,7 @@ const struct puc_device_description puc_devices[] = {
 	{   /* "Lava Computers high-speed port", */
 	    {	PCI_VENDOR_LAVA, PCI_PRODUCT_LAVA_LAVAPORT_0,	0, 0	},
 	    {	0xffff,	0xfffc,					0, 0	},
-	    {	
+	    {
 		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ*4 },
 		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ*4 },
 	    },
@@ -845,7 +841,7 @@ const struct puc_device_description puc_devices[] = {
 	},
 
 	/* US Robotics (3Com) PCI Modems */
-	{   /* "US Robotics (3Com) 3CP5609 PCI 16550 Modem", */
+	{   /* "US Robotics (3Com) 3CP5610 PCI 16550 Modem", */
 	    {	PCI_VENDOR_USR, PCI_PRODUCT_USR_3CP5610,	0, 0	},
 	    {	0xffff,	0xffff,					0, 0	},
 	    {
@@ -898,6 +894,18 @@ const struct puc_device_description puc_devices[] = {
 	    },
 	},
 
+	/* Moxa Technologies Co., Ltd. PCI I/O Card 4S RS232/422/485 */
+	{   /* "Moxa Technologies, SmartIO C104H/PCI" */
+	    {	PCI_VENDOR_MOXA, PCI_PRODUCT_MOXA_C104H,	0, 0	},
+	    {	0xffff,	0xffff,					0, 0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x10, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x18, COM_FREQ * 8 },
+	    },
+	},
+
 	/* Moxa Technologies Co., Ltd. PCI I/O Card 8S RS232 */
 	{   /* "Moxa Technologies, Industio C168H" */
 	    {	PCI_VENDOR_MOXA, PCI_PRODUCT_MOXA_C168H,	0, 0	},
@@ -929,24 +937,106 @@ const struct puc_device_description puc_devices[] = {
 	    {   PCI_VENDOR_SUNIX, PCI_PRODUCT_SUNIX_4018A,	0, 0	},
 	    {	0xffff,	0xffff,					0, 0	},
 	    {
-                { PUC_PORT_TYPE_LPT, 0x10, 0x00 },                              
-                { PUC_PORT_TYPE_LPT, 0x18, 0x00 },                              
+                { PUC_PORT_TYPE_LPT, 0x10, 0x00 },
+                { PUC_PORT_TYPE_LPT, 0x18, 0x00 },
 	    },
 	},
 
-	/* Sunix 4065A : 8-port */
-	{   /* "Sunix 4065A : 8-port" */
-	    {   PCI_VENDOR_SUNIX, PCI_PRODUCT_SUNIX_4065A,	0, 0	},
-	    {	0xffff,	0xffff,					0, 0	},
+	/*
+	 * SUNIX 40XX series of serial/parallel combo cards.
+	 * Tested with 4055A and 4065A.
+	 */
+	{   /* SUNIX 400X 1P */
+	    {	PCI_VENDOR_SUNIX, PCI_PRODUCT_SUNIX_40XX, 0x1409, 0x4000 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
 	    {
-		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8 },
-		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8 },
-		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ * 8 },
-		{ PUC_PORT_TYPE_COM, 0x14, 0x08, COM_FREQ * 8 },
-		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
-		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
-		{ PUC_PORT_TYPE_COM, 0x1A, 0x00, COM_FREQ * 8 },
-		{ PUC_PORT_TYPE_COM, 0x1A, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_LPT, 0x10, 0x00, 0x00 },
+	    },
+	},
+
+	{   /* SUNIX 401X 2P */
+	    {	PCI_VENDOR_SUNIX, PCI_PRODUCT_SUNIX_40XX, 0x1409, 0x4010 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_LPT, 0x10, 0x00, 0x00 },
+		{ PUC_PORT_TYPE_LPT, 0x18, 0x00, 0x00 },
+	    },
+	},
+
+	{   /* SUNIX 402X 1S */
+	    {	PCI_VENDOR_SUNIX, PCI_PRODUCT_SUNIX_40XX, 0x1409, 0x4020 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+	    },
+	},
+
+	{   /* SUNIX 403X 2S */
+	    {	PCI_VENDOR_SUNIX, PCI_PRODUCT_SUNIX_40XX, 0x1409, 0x4030 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8},
+	    },
+	},
+
+	{   /* SUNIX 405X 4S */
+	    {	PCI_VENDOR_SUNIX, PCI_PRODUCT_SUNIX_40XX, 0x1409, 0x4050 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ},
+		{ PUC_PORT_TYPE_COM, 0x14, 0x08, COM_FREQ},
+	    },
+	},
+
+	{   /* SUNIX 406X 8S */
+	    {	PCI_VENDOR_SUNIX, PCI_PRODUCT_SUNIX_40XX, 0x1409, 0x4060 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ},
+		{ PUC_PORT_TYPE_COM, 0x14, 0x08, COM_FREQ},
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ},
+		{ PUC_PORT_TYPE_COM, 0x1c, 0x00, COM_FREQ},
+		{ PUC_PORT_TYPE_COM, 0x20, 0x00, COM_FREQ},
+		{ PUC_PORT_TYPE_COM, 0x24, 0x00, COM_FREQ},
+	    },
+	},
+
+	{   /* SUNIX 407X 2S/1P */
+	    {	PCI_VENDOR_SUNIX, PCI_PRODUCT_SUNIX_40XX, 0x1409, 0x4070 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_LPT, 0x18, 0x00, 0x00 },
+	    },
+	},
+
+	{   /* SUNIX 408X 2S/2P */
+	    {	PCI_VENDOR_SUNIX, PCI_PRODUCT_SUNIX_40XX, 0x1409, 0x4080 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_LPT, 0x18, 0x00, 0x00 },
+		{ PUC_PORT_TYPE_LPT, 0x20, 0x00, 0x00 },
+	    },
+	},
+
+	{   /* SUNIX 409X 4S/2P */
+	    {	PCI_VENDOR_SUNIX, PCI_PRODUCT_SUNIX_40XX, 0x1409, 0x4090 },
+	    {	0xffff,	0xffff,	0xffff,	0xeff0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ * 8},
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ},
+		{ PUC_PORT_TYPE_COM, 0x14, 0x08, COM_FREQ},
+		{ PUC_PORT_TYPE_LPT, 0x18, 0x00, 0x00 },
+		{ PUC_PORT_TYPE_LPT, 0x20, 0x00, 0x00 },
 	    },
 	},
 
@@ -963,7 +1053,7 @@ const struct puc_device_description puc_devices[] = {
 		{ PUC_PORT_TYPE_COM, 0x18, 0x08, COM_FREQ * 4 },
 		{ PUC_PORT_TYPE_COM, 0x18, 0x10, COM_FREQ * 4 },
 		{ PUC_PORT_TYPE_COM, 0x18, 0x18, COM_FREQ * 4 },
-	    }, 
+	    },
 	},
 
 	/*
@@ -983,7 +1073,7 @@ const struct puc_device_description puc_devices[] = {
 		{ PUC_PORT_TYPE_COM, 0x18, 0x28, COM_FREQ * 4 },
 		{ PUC_PORT_TYPE_COM, 0x18, 0x30, COM_FREQ * 4 },
 		{ PUC_PORT_TYPE_COM, 0x18, 0x38, COM_FREQ * 4 },
-	    }, 
+	    },
 	},
 
 	{   /* NULL, */

@@ -1,8 +1,8 @@
-/*	$OpenBSD: sboot.c,v 1.7 1996/10/16 13:50:01 mickey Exp $ */
+/*	$OpenBSD: sboot.c,v 1.9 2003/08/19 10:22:30 deraadt Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -11,12 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed under OpenBSD by
- *	Theo de Raadt for Willowglen Singapore.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
  * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -64,8 +58,8 @@
 #include <sys/types.h>
 #include "sboot.h"
 
-void
-main()
+int
+main(int argc, char *argv[])
 {
 	char    buf[128], *ebuf;
 
@@ -82,8 +76,8 @@ main()
 /*
  * exit to rom
  */
-void 
-callrom()
+void
+callrom(void)
 {
 	asm("trap #15; .word 0x0063");
 }
@@ -91,9 +85,8 @@ callrom()
 /*
  * do_cmd: do a command
  */
-void 
-do_cmd(buf, ebuf)
-	char   *buf, *ebuf;
+void
+do_cmd(char *buf, char *ebuf)
 {
 	switch (*buf) {
 	case '\0':
@@ -162,24 +155,26 @@ do_cmd(buf, ebuf)
 	}
 }
 
-/* 
- * ngets: get string from console 
+/*
+ * ngets: get string from console
  */
- 
-char *ngets ( char * str, int size )
+char *
+ngets(char * str, int size)
 {
-  int i = 0;
-  while ( (i < size - 1) && (str[i] = getchar()) != '\r') {
-    if ( str[i] == '\b' || str[i] == 0x7F ) {
-      if ( i == 0) continue;
-      i--;
-      printf("\b \b");
-      continue;
-    }
-    putchar(str[i]);
-    i++; 
-  }
-  printf("\n");
-  str[i] = '\0';
-  return(&str[i]);
+	int i = 0;
+
+	while ((i < size - 1) && (str[i] = getchar()) != '\r') {
+		if (str[i] == '\b' || str[i] == 0x7F) {
+			if (i == 0)
+				continue;
+			i--;
+			printf("\b \b");
+			continue;
+		}
+		putchar(str[i]);
+		i++;
+	}
+	printf("\n");
+	str[i] = '\0';
+	return(&str[i]);
 }

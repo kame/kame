@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_map.c,v 1.56 2002/12/09 02:35:21 art Exp $	*/
+/*	$OpenBSD: uvm_map.c,v 1.62 2003/09/03 22:52:47 tedu Exp $	*/
 /*	$NetBSD: uvm_map.c,v 1.86 2000/11/27 08:40:03 chs Exp $	*/
 
 /* 
@@ -78,6 +78,8 @@
 #include <sys/malloc.h>
 #include <sys/pool.h>
 #include <sys/kernel.h>
+
+#include <dev/rndvar.h>
 
 #ifdef SYSVSHM
 #include <sys/shm.h>
@@ -319,7 +321,7 @@ _uvm_tree_sanity(vm_map_t map, const char *name)
 			goto error;
 		}
 		if (trtmp != NULL && trtmp->start >= tmp->start) {
-			printf("%s: corrupt: %p >= %p\n",
+			printf("%s: corrupt: 0x%lx >= 0x%lx\n",
 			    name, trtmp->start, tmp->start);
 			goto error;
 		}
@@ -1069,6 +1071,34 @@ uvm_map_spacefits(vm_map_t map, vaddr_t *phint, vsize_t length,
 		return (FALSE);
 	
 	return (TRUE);
+}
+
+/*
+ * uvm_map_hint: return the beginning of the best area suitable for
+ * creating a new mapping with "prot" protection.
+ */
+vaddr_t
+uvm_map_hint(struct proc *p, vm_prot_t prot)
+{
+	vaddr_t addr;
+
+#ifdef __i386__
+	/*
+	 * If executable skip first two pages, otherwise start
+	 * after data + heap region.
+	 */
+	if ((prot & VM_PROT_EXECUTE) &&
+	    ((vaddr_t)p->p_vmspace->vm_daddr >= I386_MAX_EXE_ADDR)) {
+		addr = (PAGE_SIZE*2) +
+		    (arc4random() & (I386_MAX_EXE_ADDR / 2 - 1));
+		return (round_page(addr));
+	}
+#endif
+	addr = (vaddr_t)p->p_vmspace->vm_daddr + MAXDSIZ;
+#if 0
+	addr += arc4random() & (256 * 1024 * 1024 - 1);
+#endif
+	return (round_page(addr));
 }
 
 /*
@@ -3587,7 +3617,6 @@ uvmspace_fork(vm1)
 	UVMHIST_LOG(maphist,"<- done",0,0,0,0);
 	return(vm2);    
 }
-
 
 #if defined(DDB)
 

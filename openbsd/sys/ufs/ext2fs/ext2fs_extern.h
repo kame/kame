@@ -1,4 +1,4 @@
-/*	$OpenBSD: ext2fs_extern.h,v 1.15 2002/03/14 03:16:13 millert Exp $	*/
+/*	$OpenBSD: ext2fs_extern.h,v 1.18 2003/07/06 09:07:18 tedu Exp $	*/
 /*	$NetBSD: ext2fs_extern.h,v 1.1 1997/06/11 09:33:55 bouyer Exp $	*/
 
 /*-
@@ -14,11 +14,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -60,15 +56,15 @@ extern struct pool ext2fs_inode_pool;		/* memory pool for inodes */
 __BEGIN_DECLS
 
 /* ext2fs_alloc.c */
-int ext2fs_alloc(struct inode *, ufs_daddr_t, ufs_daddr_t , struct ucred *,
-		   ufs_daddr_t *);
-int ext2fs_realloccg(struct inode *, ufs_daddr_t, ufs_daddr_t, int, int,
+int ext2fs_alloc(struct inode *, ufs1_daddr_t, ufs1_daddr_t , struct ucred *,
+		   ufs1_daddr_t *);
+int ext2fs_realloccg(struct inode *, ufs1_daddr_t, ufs1_daddr_t, int, int,
 			  struct ucred *, struct buf **);
 int ext2fs_reallocblks(void *);
 int ext2fs_inode_alloc(struct inode *pip, int mode, struct ucred *, 
     struct vnode **);
-daddr_t ext2fs_blkpref(struct inode *, ufs_daddr_t, int, ufs_daddr_t *);
-void ext2fs_blkfree(struct inode *, ufs_daddr_t);
+daddr_t ext2fs_blkpref(struct inode *, ufs1_daddr_t, int, ufs1_daddr_t *);
+void ext2fs_blkfree(struct inode *, ufs1_daddr_t);
 int ext2fs_inode_free(struct inode *pip, ino_t ino, int mode);
 
 /* ext2fs_balloc.c */
@@ -140,8 +136,6 @@ int ext2fs_rmdir(void *);
 int ext2fs_symlink(void *);
 int ext2fs_readlink(void *);
 int ext2fs_advlock(void *);
-int ext2fs_vinit(struct mount *, int (**specops)(void *),
-                 int (**fifoops)(void *), struct vnode **);
 int ext2fs_makeinode(int, struct vnode *, struct vnode **,
                      struct componentname *cnp);
 int ext2fs_fsync(void *);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wi.c,v 1.94 2003/03/10 00:59:54 millert Exp $	*/
+/*	$OpenBSD: if_wi.c,v 1.98 2003/09/06 20:53:57 drahn Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -124,7 +124,7 @@ u_int32_t	widebug = WIDEBUG;
 
 #if !defined(lint) && !defined(__OpenBSD__)
 static const char rcsid[] =
-	"$OpenBSD: if_wi.c,v 1.94 2003/03/10 00:59:54 millert Exp $";
+	"$OpenBSD: if_wi.c,v 1.98 2003/09/06 20:53:57 drahn Exp $";
 #endif	/* lint */
 
 #ifdef foo
@@ -391,7 +391,7 @@ wi_attach(sc)
 	    sizeof(struct ether_header));
 #endif
 
-	shutdownhook_establish(wi_shutdown, sc);
+	sc->sc_sdhook = shutdownhook_establish(wi_shutdown, sc);
 
 	wi_init(sc);
 	wi_stop(sc);
@@ -1515,7 +1515,7 @@ wi_ioctl(ifp, command, data)
 	case SIOCS80211NWID:
 	case SIOCS80211NWKEY:
 	case SIOCS80211POWER:
-		error = suser(p->p_ucred, &p->p_acflag);
+		error = suser(p, 0);
 		if (error) {
 			splx(s);
 			return (error);
@@ -1603,7 +1603,7 @@ wi_ioctl(ifp, command, data)
 			break;
 		case WI_RID_DEFLT_CRYPT_KEYS:
 			/* For non-root user, return all-zeroes keys */
-			if (suser(p->p_ucred, &p->p_acflag))
+			if (suser(p, 0))
 				bzero((char *)&wreq,
 					sizeof(struct wi_ltv_keys));
 			else
@@ -1831,7 +1831,7 @@ wi_init(sc)
 	/* Power Management Enabled */
 	WI_SETVAL(WI_RID_PM_ENABLED, sc->wi_pm_enabled);
 
-	/* Power Managment Max Sleep */
+	/* Power Management Max Sleep */
 	WI_SETVAL(WI_RID_MAX_SLEEP, sc->wi_max_sleep);
 
 	/* Set Roaming Mode unless this is a Symbol card. */
@@ -2390,6 +2390,21 @@ wi_watchdog(ifp)
 	return;
 }
 
+void
+wi_detach(sc)
+	struct wi_softc *sc;
+{
+	struct ifnet *ifp;
+	ifp = &sc->sc_arpcom.ac_if;
+
+	if (ifp->if_flags & IFF_RUNNING)
+		wi_stop(sc);
+	
+	sc->wi_flags &= ~WI_FLAGS_ATTACHED;
+	shutdownhook_disestablish(sc->sc_sdhook);
+
+}
+
 STATIC void
 wi_shutdown(arg)
 	void			*arg;
@@ -2474,7 +2489,7 @@ wi_get_id(sc)
 	}
 
 	if (sc->sc_firmware_type == WI_LUCENT) {
-		printf("\n%s: Firmware %d.%d variant %d, ", WI_PRT_ARG(sc),
+		printf("\n%s: Firmware %d.%02d variant %d, ", WI_PRT_ARG(sc),
 		    ver.wi_ver[2], ver.wi_ver[3], ver.wi_ver[1]);
 	} else {
 		printf("\n%s: %s%s, Firmware %d.%d.%d (primary), %d.%d.%d (station), ",
@@ -2755,7 +2770,7 @@ wi_get_nwkey(sc, nwkey)
 	nwkey->i_defkid = sc->wi_tx_key + 1;
 
 	/* do not show any keys to non-root user */
-	error = suser(curproc->p_ucred, &curproc->p_acflag);
+	error = suser(curproc, 0);
 	for (i = 0; i < IEEE80211_WEP_NKID; i++) {
 		if (nwkey->i_key[i].i_keydat == NULL)
 			continue;

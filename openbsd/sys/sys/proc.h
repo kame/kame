@@ -1,4 +1,4 @@
-/*	$OpenBSD: proc.h,v 1.62 2002/07/20 19:24:57 art Exp $	*/
+/*	$OpenBSD: proc.h,v 1.67 2003/08/21 18:56:07 tedu Exp $	*/
 /*	$NetBSD: proc.h,v 1.44 1996/04/22 01:23:21 christos Exp $	*/
 
 /*-
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -99,8 +95,19 @@ struct	emul {
 	int	(*e_fixup)(struct proc *, struct exec_package *);
 	char	*e_sigcode;		/* Start of sigcode */
 	char	*e_esigcode;		/* End of sigcode */
+	int	e_flags;		/* Flags, see below */
 	struct uvm_object *e_sigobject;	/* shared sigcode object */
+					/* Per-process hooks */
+	void	(*e_proc_exec)(struct proc *, struct exec_package *);
+	void	(*e_proc_fork)(struct proc *p, struct proc *parent);
+	void	(*e_proc_exit)(struct proc *);
 };
+/* Flags for e_flags */
+#define	EMUL_ENABLED	0x0001		/* Allow exec to continue */
+#define	EMUL_NATIVE	0x0002		/* Always enabled */
+
+extern struct emul *emulsw[];		/* All emuls in system */
+extern int nemuls;			/* Number of emuls */
 
 /*
  * Description of a process.
@@ -177,7 +184,8 @@ struct	proc {
 
 	int	p_holdcnt;		/* If non-zero, don't swap. */
 	struct	emul *p_emul;		/* Emulation information */
-
+	void	*p_emuldata;		/* Per-process emulation data, or */
+					/* NULL. Malloc type M_EMULDATA */
 	struct	klist p_klist;		/* knotes attached to this process */
 					/* pad to 256, avoid shifting eproc. */
 
@@ -254,6 +262,13 @@ struct	proc {
 #define	P_NOZOMBIE	0x100000	/* Pid 1 waits for me instead of dad */
 #define P_INEXEC	0x200000	/* Process is doing an exec right now */
 #define P_SYSTRACE	0x400000	/* Process system call tracing active*/
+#define P_CONTINUED	0x800000	/* Proc has continued from a stopped state. */
+
+#define	P_BITS \
+    ("\20\01ADVLOCK\02CTTY\03INMEM\04NOCLDSTOP\05PPWAIT\06PROFIL\07SELECT" \
+     "\010SINTR\011SUGID\012SYSTEM\013TIMEOUT\014TRACED\015WAITED\016WEXIT" \
+     "\017EXEC\020PWEUPC\021FSTRACE\022SSTEP\023SUGIDEXEC\024NOCLDWAIT" \
+     "\025NOZOMBIE\026INEXEC\027SYSTRACE\030CONTINUED")
 
 /* Macro to compute the exit signal to be delivered. */
 #define P_EXITSIG(p) \
@@ -363,6 +378,8 @@ struct simplelock;
 
 struct proc *pfind(pid_t);	/* Find process by id. */
 struct pgrp *pgfind(pid_t);	/* Find process group by id. */
+void	proc_printit(struct proc *p, const char *modif,
+    int (*pr)(const char *, ...));
 
 int	chgproccnt(uid_t uid, int diff);
 int	enterpgrp(struct proc *p, pid_t pgid, int mksess);

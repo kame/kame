@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.19 2002/03/14 01:26:26 millert Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.22 2003/06/02 23:27:43 millert Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.16 1996/11/13 21:13:04 cgd Exp $	*/
 
 /*
@@ -22,11 +22,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -302,7 +298,8 @@ setroot()
 		unit = DISKUNIT(rootdev);
 		part = DISKPART(rootdev);
 
-		len = sprintf(buf, "%s%d", findblkname(majdev), unit);
+		len = snprintf(buf, sizeof buf, "%s%d",
+		    findblkname(majdev), unit);
 		if (len >= sizeof(buf))
 			panic("setroot: device name too long");
 
@@ -328,7 +325,7 @@ setroot()
 			printf(": ");
 			len = getstr(buf, sizeof(buf));
 			if (len == 0 && bootdv != NULL) {
-				strcpy(buf, bootdv->dv_xname);
+				strlcpy(buf, bootdv->dv_xname, sizeof buf);
 				len = strlen(buf);
 			}
 			if (len > 0 && buf[len - 1] == '*') {
@@ -427,10 +424,11 @@ gotswap:
 		rootdevname = findblkname(major(rootdev));
 		if (rootdevname == NULL) {
 			/* Root on NFS or unknown device. */
-			strcpy(root_device, "??");
+			strlcpy(root_device, "??", sizeof root_device);
 		} else {
 			/* Root on known block device. */
-			sprintf(root_device, "%s%d%c", rootdevname,
+			snprintf(root_device, sizeof root_device,
+			    "%s%d%c", rootdevname,
 			    DISKUNIT(rootdev), DISKPART(rootdev) + 'a');
 		}
 			
@@ -440,14 +438,15 @@ gotswap:
 	switch (rootdv->dv_class) {
 #if defined(NFSCLIENT)
 	case DV_IFNET:
-		strcpy(root_device, "??");
+		strlcpy(root_device, "??", sizeof root_device);
 		mountroot = nfs_mountroot;
 		nfsbootdevname = rootdv->dv_xname;
 		return;
 #endif
 	case DV_DISK:
 		mountroot = dk_mountroot;
-		sprintf(root_device, "%s%c", rootdv->dv_xname,
+		snprintf(root_device, sizeof root_device,
+		    "%s%c", rootdv->dv_xname,
 		    DISKPART(rootdev) + 'a');
 		printf("root on %s", root_device);
 		if (nswapdev != NODEV)

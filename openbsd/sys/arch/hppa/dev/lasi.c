@@ -1,7 +1,7 @@
-/*	$OpenBSD: lasi.c,v 1.11 2002/12/18 23:52:45 mickey Exp $	*/
+/*	$OpenBSD: lasi.c,v 1.17 2003/08/28 15:24:19 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998-2002 Michael Shalayeff
+ * Copyright (c) 1998-2003 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -145,10 +145,8 @@ lasiattach(parent, self, aux)
 	int s, in;
 
 	if (bus_space_map(ca->ca_iot, ca->ca_hpa + 0xc000,
-			  IOMOD_HPASIZE, 0, &ioh)) {
-#ifdef DEBUG
-		printf("lasiattach: can't map IO space\n");
-#endif
+	    IOMOD_HPASIZE, 0, &ioh)) {
+		printf(": can't map IO space\n");
 		return;
 	}
 
@@ -173,6 +171,52 @@ lasiattach(parent, self, aux)
 	sc->sc_ic.gsc_dv = sc;
 	sc->sc_ic.gsc_base = sc->sc_trs;
 
+#ifdef USELEDS
+	/* figure out the leds address */
+	switch (cpu_hvers) {
+	case HPPA_BOARD_HP712_60:
+	case HPPA_BOARD_HP712_80:
+	case HPPA_BOARD_HP712_100:
+	case HPPA_BOARD_HP743I_64:
+	case HPPA_BOARD_HP743I_100:
+	case HPPA_BOARD_HP712_120:
+		break;	/* only has one led. works different */
+
+	case HPPA_BOARD_HP715_64:
+	case HPPA_BOARD_HP715_80:
+	case HPPA_BOARD_HP715_100:
+	case HPPA_BOARD_HP715_100XC:
+	case HPPA_BOARD_HP725_100:
+	case HPPA_BOARD_HP725_120:
+		if (bus_space_map(ca->ca_iot, ca->ca_hpa - 0x20000,
+		    4, 0, (bus_space_handle_t *)&machine_ledaddr))
+			machine_ledaddr = NULL;
+		machine_ledword = 1;
+		break;
+
+	case HPPA_BOARD_HP800_A180C:
+	case HPPA_BOARD_HP778_B180L:
+	case HPPA_BOARD_HP780_C100:
+	case HPPA_BOARD_HP780_C110:
+	case HPPA_BOARD_HP779_C132L:
+	case HPPA_BOARD_HP779_C160L:
+	case HPPA_BOARD_HP779_C180L:
+	case HPPA_BOARD_HP779_C160L1:
+	case HPPA_BOARD_HP770_J200:
+	case HPPA_BOARD_HP770_J210:
+		if (bus_space_map(ca->ca_iot, 0xf0190000,
+		    4, 0, (bus_space_handle_t *)&machine_ledaddr))
+			machine_ledaddr = NULL;
+		machine_ledword = 1;
+		break;
+
+	default:
+		machine_ledaddr = (u_int8_t *)sc->sc_hw;
+		machine_ledword = 1;
+		break;
+	}
+#endif
+
 	sc->ga.ga_ca = *ca;	/* clone from us */
 	if (!sc->sc_phantomassed) {
 		sc->ga.ga_dp.dp_bc[0] = sc->ga.ga_dp.dp_bc[1];
@@ -189,7 +233,9 @@ lasiattach(parent, self, aux)
 		extern void (*cold_hook)(int);
 
 		lasi_gsc_attach(self);
-		cold_hook = lasi_cold_hook;
+		/* could be already set by power(4) */
+		if (!cold_hook)
+			cold_hook = lasi_cold_hook;
 	}
 }
 

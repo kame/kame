@@ -1,4 +1,4 @@
-/*	$OpenBSD: raw_ip.c,v 1.27 2003/02/15 16:43:10 markus Exp $	*/
+/*	$OpenBSD: raw_ip.c,v 1.30 2003/07/09 22:03:16 itojun Exp $	*/
 /*	$NetBSD: raw_ip.c,v 1.25 1996/02/18 18:58:33 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -204,12 +200,14 @@ rip_output(struct mbuf *m, ...)
 			m_freem(m);
 			return (EMSGSIZE);
 		}
-		M_PREPEND(m, sizeof(struct ip), M_WAIT);
+		M_PREPEND(m, sizeof(struct ip), M_DONTWAIT);
+		if (!m)
+			return (ENOBUFS);
 		ip = mtod(m, struct ip *);
 		ip->ip_tos = 0;
-		ip->ip_off = 0;
+		ip->ip_off = htons(0);
 		ip->ip_p = inp->inp_ip.ip_p;
-		ip->ip_len = m->m_pkthdr.len;
+		ip->ip_len = htons(m->m_pkthdr.len);
 		ip->ip_src = inp->inp_laddr;
 		ip->ip_dst.s_addr = dst;
 		ip->ip_ttl = MAXTTL;
@@ -218,20 +216,18 @@ rip_output(struct mbuf *m, ...)
 			m_freem(m);
 			return (EMSGSIZE);
 		}
-		if (m->m_pkthdr.len < sizeof (struct ip)) {
+		if (m->m_pkthdr.len < sizeof(struct ip)) {
 			m_freem(m);
 			return (EINVAL);
 		}
 		ip = mtod(m, struct ip *);
-		NTOHS(ip->ip_len);
-		NTOHS(ip->ip_off);
 		/*
 		 * don't allow both user specified and setsockopt options,
 		 * and don't allow packet length sizes that will crash
 		 */
 		if ((ip->ip_hl != (sizeof (*ip) >> 2) && inp->inp_options) ||
-		    ip->ip_len > m->m_pkthdr.len ||
-		    ip->ip_len < ip->ip_hl << 2) {
+		    ntohs(ip->ip_len) > m->m_pkthdr.len ||
+		    ntohs(ip->ip_len) < ip->ip_hl << 2) {
 			m_freem(m);
 			return (EINVAL);
 		}

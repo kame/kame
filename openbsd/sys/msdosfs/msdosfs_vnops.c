@@ -1,4 +1,4 @@
-/*	$OpenBSD: msdosfs_vnops.c,v 1.37 2002/05/24 08:54:24 art Exp $	*/
+/*	$OpenBSD: msdosfs_vnops.c,v 1.41 2003/08/15 20:32:19 tedu Exp $	*/
 /*	$NetBSD: msdosfs_vnops.c,v 1.63 1997/10/17 11:24:19 ws Exp $	*/
 
 /*-
@@ -238,6 +238,12 @@ msdosfs_access(v)
 	if ((dep->de_Attributes & ATTR_READONLY) == 0)
 		dosmode |= (S_IWUSR|S_IWGRP|S_IWOTH);
 	dosmode &= pmp->pm_mask;
+	if (dep->de_Attributes & ATTR_DIRECTORY
+	    && pmp->pm_flags & MSDOSFSMNT_ALLOWDIRX) {
+		dosmode |= (dosmode & S_IRUSR) ? S_IXUSR : 0;
+		dosmode |= (dosmode & S_IRGRP) ? S_IXGRP : 0;
+		dosmode |= (dosmode & S_IROTH) ? S_IXOTH : 0;
+	}
 
 	return (vaccess(dosmode, pmp->pm_uid, pmp->pm_gid, ap->a_mode,
 	    ap->a_cred));
@@ -280,10 +286,16 @@ msdosfs_getattr(v)
 	}
 	vap->va_fileid = fileid;
 	vap->va_mode = (S_IXUSR|S_IXGRP|S_IXOTH) | (S_IRUSR|S_IRGRP|S_IROTH) |
-		((dep->de_Attributes & ATTR_READONLY) ? 0 : (S_IWUSR|S_IWGRP|S_IWOTH));
+	    ((dep->de_Attributes & ATTR_READONLY) ? 0 : (S_IWUSR|S_IWGRP|S_IWOTH));
 	vap->va_mode &= dep->de_pmp->pm_mask;
-	if (dep->de_Attributes & ATTR_DIRECTORY)
+	if (dep->de_Attributes & ATTR_DIRECTORY) {
 		vap->va_mode |= S_IFDIR;
+		if (pmp->pm_flags & MSDOSFSMNT_ALLOWDIRX) {
+			vap->va_mode |= (vap->va_mode & S_IRUSR) ? S_IXUSR : 0;
+			vap->va_mode |= (vap->va_mode & S_IRGRP) ? S_IXGRP : 0;
+			vap->va_mode |= (vap->va_mode & S_IROTH) ? S_IXOTH : 0;
+		}
+	}
 	vap->va_nlink = 1;
 	vap->va_gid = dep->de_pmp->pm_gid;
 	vap->va_uid = dep->de_pmp->pm_uid;
@@ -356,7 +368,7 @@ msdosfs_setattr(v)
 	}
 	if (vap->va_atime.tv_sec != VNOVAL || vap->va_mtime.tv_sec != VNOVAL) {
 		if (cred->cr_uid != dep->de_pmp->pm_uid &&
-		    (error = suser(cred, &ap->a_p->p_acflag)) &&
+		    (error = suser_ucred(cred)) &&
 		    ((vap->va_vaflags & VA_UTIMES_NULL) == 0 ||
 		    (error = VOP_ACCESS(ap->a_vp, VWRITE, cred, ap->a_p))))
 			return (error);
@@ -375,7 +387,7 @@ msdosfs_setattr(v)
 	 */
 	if (vap->va_mode != (mode_t)VNOVAL) {
 		if (cred->cr_uid != dep->de_pmp->pm_uid &&
-		    (error = suser(cred, &ap->a_p->p_acflag)))
+		    (error = suser_ucred(cred)))
 			return (error);
 		/* We ignore the read and execute bits. */
 		if (vap->va_mode & VWRITE)
@@ -389,7 +401,7 @@ msdosfs_setattr(v)
 	 */
 	if (vap->va_flags != VNOVAL) {
 		if (cred->cr_uid != dep->de_pmp->pm_uid &&
-		    (error = suser(cred, &ap->a_p->p_acflag)))
+		    (error = suser_ucred(cred)))
 			return (error);
 		if (vap->va_flags & SF_ARCHIVED)
 			dep->de_Attributes &= ~ATTR_ARCHIVE;
@@ -865,7 +877,7 @@ msdosfs_rename(v)
 	u_char to_count;
 	int doingdirectory = 0, newparent = 0;
 	int error;
-	u_long cn;
+	u_long cn, pcl;
 	daddr_t bn;
 	struct msdosfsmount *pmp;
 	struct direntry *dotdotp;
@@ -1123,8 +1135,16 @@ abortit:
 			brelse(bp);
 			goto bad;
 		}
-		dotdotp = (struct direntry *)bp->b_data + 1;
-		putushort(dotdotp->deStartCluster, dp->de_StartCluster);
+		dotdotp = (struct direntry *)bp->b_data;
+		putushort(dotdotp[0].deStartCluster, dp->de_StartCluster);
+		pcl = dp->de_StartCluster;
+		if (FAT32(pmp) && pcl == pmp->pm_rootdirblk)
+			pcl = 0;
+		putushort(dotdotp[1].deStartCluster, pcl);
+		if (FAT32(pmp)) {
+			putushort(dotdotp[0].deHighClust, cn >> 16);
+			putushort(dotdotp[1].deHighClust, pcl >> 16);
+		}
 		if ((error = bwrite(bp)) != 0) {
 			/* XXX should really panic here, fs is corrupt */
 			goto bad;
@@ -1479,11 +1499,13 @@ msdosfs_readdir(v)
 				switch (n) {
 				case 0:
 					dirbuf.d_namlen = 1;
-					strcpy(dirbuf.d_name, ".");
+					strlcpy(dirbuf.d_name, ".",
+					    sizeof dirbuf.d_name);
 					break;
 				case 1:
 					dirbuf.d_namlen = 2;
-					strcpy(dirbuf.d_name, "..");
+					strlcpy(dirbuf.d_name, "..",
+					    sizeof dirbuf.d_name);
 					break;
 				}
 				dirbuf.d_reclen = DIRENT_SIZE(&dirbuf);

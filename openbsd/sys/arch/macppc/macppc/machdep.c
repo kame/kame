@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.48 2003/02/26 21:54:44 drahn Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.54 2003/07/14 18:56:12 drahn Exp $	*/
 /*	$NetBSD: machdep.c,v 1.4 1996/10/16 19:33:11 ws Exp $	*/
 
 /*
@@ -219,14 +219,14 @@ where = 3;
 	 * Initialize BAT registers to unmapped to not generate
 	 * overlapping mappings below.
 	 */
-	__asm__ volatile ("mtibatu 0,%0" :: "r"(0));
-	__asm__ volatile ("mtibatu 1,%0" :: "r"(0));
-	__asm__ volatile ("mtibatu 2,%0" :: "r"(0));
-	__asm__ volatile ("mtibatu 3,%0" :: "r"(0));
-	__asm__ volatile ("mtdbatu 0,%0" :: "r"(0));
-	__asm__ volatile ("mtdbatu 1,%0" :: "r"(0));
-	__asm__ volatile ("mtdbatu 2,%0" :: "r"(0));
-	__asm__ volatile ("mtdbatu 3,%0" :: "r"(0));
+	ppc_mtibat0u(0);
+	ppc_mtibat1u(0);
+	ppc_mtibat2u(0);
+	ppc_mtibat3u(0);
+	ppc_mtdbat0u(0);
+	ppc_mtdbat1u(0);
+	ppc_mtdbat2u(0);
+	ppc_mtdbat3u(0);
 
 	/*
 	 * Set up initial BAT table to only map the lowest 256 MB area
@@ -241,13 +241,12 @@ where = 3;
 	 * registers were cleared above.
 	 */
 	/* IBAT0 used for initial 256 MB segment */
-	__asm__ volatile ("mtibatl 0,%0; mtibatu 0,%1"
-		      :: "r"(battable[0].batl), "r"(battable[0].batu));
+	ppc_mtibat0l(battable[0].batl);
+	ppc_mtibat0u(battable[0].batu);
+
 	/* DBAT0 used similar */
-	__asm__ volatile ("mtdbatl 0,%0; mtdbatu 0,%1"
-		      :: "r"(battable[0].batl), "r"(battable[0].batu));
-
-
+	ppc_mtdbat0l(battable[0].batl);
+	ppc_mtdbat0u(battable[0].batu);
 
 	/*
 	 * Set up trap vectors
@@ -322,19 +321,16 @@ where = 3;
 
 	/* use BATs to map 1GB memory, no pageable BATs now */
 	if (physmem > btoc(0x10000000)) {
-		__asm__ volatile ("mtdbatl 1,%0; mtdbatu 1,%1"
-			      :: "r"(BATL(0x10000000, BAT_M)),
-			      "r"(BATU(0x10000000)));
+		ppc_mtdbat1l(BATL(0x10000000, BAT_M));
+		ppc_mtdbat1u(BATU(0x10000000));
 	}
 	if (physmem > btoc(0x20000000)) {
-		__asm__ volatile ("mtdbatl 2,%0; mtdbatu 2,%1"
-			      :: "r"(BATL(0x20000000, BAT_M)),
-			      "r"(BATU(0x20000000)));
+		ppc_mtdbat2l(BATL(0x20000000, BAT_M));
+		ppc_mtdbat2u(BATU(0x20000000));
 	}
 	if (physmem > btoc(0x30000000)) {
-		__asm__ volatile ("mtdbatl 3,%0; mtdbatu 3,%1"
-			      :: "r"(BATL(0x30000000, BAT_M)),
-			      "r"(BATU(0x30000000)));
+		ppc_mtdbat3l(BATL(0x30000000, BAT_M));
+		ppc_mtdbat3u(BATU(0x30000000));
 	}
 #if 0
 	/* now that we know physmem size, map physical memory with BATs */
@@ -510,13 +506,14 @@ install_extint(handler)
 	if (offset > 0x1ffffff)
 		panic("install_extint: too far away");
 #endif
-	__asm__ volatile ("mfmsr %0; andi. %1, %0, %2; mtmsr %1"
-		      : "=r"(omsr), "=r"(msr) : "K"((u_short)~PSL_EE));
+	omsr = ppc_mfmsr();
+	msr = omsr & ~PSL_EE;
+	ppc_mtmsr(msr);
 	extint_call = (extint_call & 0xfc000003) | offset;
 	bcopy(&extint, (void *)EXC_EXI, (size_t)&extsize);
 	syncicache((void *)&extint_call, sizeof extint_call);
 	syncicache((void *)EXC_EXI, (int)&extsize);
-	__asm__ volatile ("mtmsr %0" :: "r"(omsr));
+	ppc_mtmsr(omsr);
 }
 
 /*
@@ -591,6 +588,7 @@ cpu_startup()
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
 	 */
+	minaddr = vm_map_min(kernel_map);
 	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr, 16 * NCARGS,
 	    VM_MAP_PAGEABLE, FALSE, NULL);
 
@@ -835,7 +833,7 @@ dumpsys()
 	printf("dumpsys: TBD\n");
 }
 
-volatile int cpl, ipending, astpending, tickspending;
+volatile int cpl, ipending, astpending;
 int imask[7];
 
 /* 
@@ -1060,33 +1058,6 @@ ppc_intr_setup(intr_establish_t *establish, intr_disestablish_t *disestablish)
 {
 	intr_establish_func = establish;
 	intr_disestablish_func = disestablish;
-}
-
-/*
- * General functions to enable and disable interrupts
- * without having inlined assembly code in many functions,
- * should be moved into a header file for inlining the function
- * so it is faster
- */
-void
-ppc_intr_enable(int enable)
-{
-	u_int32_t emsr, dmsr;
-	if (enable != 0)  {
-		__asm__ volatile("mfmsr %0" : "=r"(emsr));
-		dmsr = emsr | PSL_EE;
-		__asm__ volatile("mtmsr %0" :: "r"(dmsr));
-	}
-}
-
-int
-ppc_intr_disable(void)
-{
-	u_int32_t emsr, dmsr;
-	__asm__ volatile("mfmsr %0" : "=r"(emsr));
-	dmsr = emsr & ~PSL_EE;
-	__asm__ volatile("mtmsr %0" :: "r"(dmsr));
-	return (emsr & PSL_EE);
 }
 
 /* BUS functions */
@@ -1399,7 +1370,6 @@ __C(bus_space_read_raw_multi_,BYTES)(bst, h, o, dst, size)		\
 		__asm__("eieio");					\
 	}								\
 }
-BUS_SPACE_READ_RAW_MULTI_N(1,0,u_int8_t)
 BUS_SPACE_READ_RAW_MULTI_N(2,1,u_int16_t)
 BUS_SPACE_READ_RAW_MULTI_N(4,2,u_int32_t)
 
@@ -1424,7 +1394,6 @@ __C(bus_space_write_raw_multi_,BYTES)(bst, h, o, src, size)		\
 	}								\
 }
 
-BUS_SPACE_WRITE_RAW_MULTI_N(1,0,u_int8_t)
 BUS_SPACE_WRITE_RAW_MULTI_N(2,1,u_int16_t)
 BUS_SPACE_WRITE_RAW_MULTI_N(4,2,u_int32_t)
 
@@ -1506,8 +1475,8 @@ nameinterrupt(replace, newstr)
 		src+=1; /* skip the NUL */
 	}
 
-	strcat(intrname[replace], "/");
-	strcat(intrname[replace], newstr);
+	strlcat(intrname[replace], "/", sizeof intrname[replace]);
+	strlcat(intrname[replace], newstr, sizeof intrname[replace]);
 
 	p = intrnames;
 	for (i = 0; i < NENTRIES; i++) {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_clock.c,v 1.40 2002/09/24 00:06:23 nordin Exp $	*/
+/*	$OpenBSD: kern_clock.c,v 1.42 2003/06/02 23:28:05 millert Exp $	*/
 /*	$NetBSD: kern_clock.c,v 1.34 1996/06/09 04:51:03 briggs Exp $	*/
 
 /*-
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -110,7 +106,8 @@ static int tickfixcnt;			/* accumulated fractional error */
 
 long cp_time[CPUSTATES];
 
-volatile struct	timeval time;
+volatile struct	timeval time
+	__attribute__((__aligned__(__alignof__(quad_t))));
 volatile struct	timeval mono_time;
 
 #ifdef __HAVE_GENERIC_SOFT_INTERRUPTS

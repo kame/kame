@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.51 2003/02/12 23:07:28 deraadt Exp $	*/
+/*	$OpenBSD: param.h,v 1.53 2003/08/11 14:52:42 deraadt Exp $	*/
 /*	$NetBSD: param.h,v 1.23 1996/03/17 01:02:29 thorpej Exp $	*/
 
 /*-
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -45,8 +41,8 @@
 #define BSD4_3	1
 #define BSD4_4	1
 
-#define OpenBSD	200305		/* OpenBSD version (year & month). */
-#define OpenBSD3_3 1		/* OpenBSD 3.3 */
+#define OpenBSD	200311		/* OpenBSD version (year & month). */
+#define OpenBSD3_4 1		/* OpenBSD 3.4 */
 
 #ifndef NULL
 #ifdef 	__GNUG__

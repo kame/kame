@@ -1,4 +1,4 @@
-/*	$OpenBSD: file.h,v 1.18 2002/05/16 16:16:52 provos Exp $	*/
+/*	$OpenBSD: file.h,v 1.22 2003/08/06 20:51:35 deraadt Exp $	*/
 /*	$NetBSD: file.h,v 1.11 1995/03/26 20:24:13 jtc Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -46,6 +42,20 @@ struct proc;
 struct uio;
 struct knote;
 struct stat;
+struct file;
+
+struct	fileops {
+	int	(*fo_read)(struct file *, off_t *, struct uio *,
+		    struct ucred *);
+	int	(*fo_write)(struct file *, off_t *, struct uio *,
+		    struct ucred *);
+	int	(*fo_ioctl)(struct file *, u_long, caddr_t,
+		    struct proc *);
+	int	(*fo_select)(struct file *, int, struct proc *);
+	int	(*fo_kqfilter)(struct file *, struct knote *);
+	int	(*fo_stat)(struct file *, struct stat *, struct proc *);
+	int	(*fo_close)(struct file *, struct proc *);
+};
 
 /*
  * Kernel descriptor table.
@@ -64,25 +74,9 @@ struct file {
 	long	f_count;	/* reference count */
 	long	f_msgcount;	/* references from message queue */
 	struct	ucred *f_cred;	/* credentials associated with descriptor */
-	struct	fileops {
-		int	(*fo_read)(struct file *fp, off_t *, 
-					     struct uio *uio,
-					     struct ucred *cred);
-		int	(*fo_write)(struct file *fp, off_t *,
-					     struct uio *uio,
-					     struct ucred *cred);
-		int	(*fo_ioctl)(struct file *fp, u_long com,
-					    caddr_t data, struct proc *p);
-		int	(*fo_select)(struct file *fp, int which,
-					     struct proc *p);
-		int	(*fo_kqfilter)(struct file *fp,
-					     struct knote *kn);
-		int	(*fo_stat)(struct file *fp, struct stat *sb,
-					     struct proc *p);
-		int	(*fo_close)(struct file *fp, struct proc *p);
-	} *f_ops;
+	struct	fileops *f_ops;
 	off_t	f_offset;
-	caddr_t	f_data;		/* private data */
+	void 	*f_data;	/* private data */
 	int	f_iflags;	/* internal flags */
 	int	f_usecount;	/* number of users (temporary references). */
 };

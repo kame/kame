@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_time.c,v 1.32 2002/10/02 17:43:38 nordin Exp $	*/
+/*	$OpenBSD: kern_time.c,v 1.38 2003/09/01 18:06:03 henning Exp $	*/
 /*	$NetBSD: kern_time.c,v 1.20 1996/02/18 11:57:06 fvdl Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -46,12 +42,6 @@
 
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
-
-#if defined(NFSCLIENT) || defined(NFSSERVER)
-#include <nfs/rpcv2.h>
-#include <nfs/nfsproto.h>
-#include <nfs/nfs_var.h>
-#endif
 
 #include <machine/cpu.h>
 
@@ -130,12 +120,23 @@ sys_clock_gettime(p, v, retval)
 	clockid_t clock_id;
 	struct timeval atv;
 	struct timespec ats;
+	int s;
 
 	clock_id = SCARG(uap, clock_id);
-	if (clock_id != CLOCK_REALTIME)
+	switch (clock_id) {
+	case CLOCK_REALTIME:
+		microtime(&atv);
+		break;
+	case CLOCK_MONOTONIC:
+		/* XXX "hz" granularity */
+		s = splclock();
+		atv = mono_time;
+		splx(s);
+		break;
+	default:
 		return (EINVAL);
+	}
 
-	microtime(&atv);
 	TIMEVAL_TO_TIMESPEC(&atv,&ats);
 
 	return copyout(&ats, SCARG(uap, tp), sizeof(ats));
@@ -157,21 +158,26 @@ sys_clock_settime(p, v, retval)
 	struct timespec ats;
 	int error;
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return (error);
-
-	clock_id = SCARG(uap, clock_id);
-	if (clock_id != CLOCK_REALTIME)
-		return (EINVAL);
 
 	if ((error = copyin(SCARG(uap, tp), &ats, sizeof(ats))) != 0)
 		return (error);
 
-	TIMESPEC_TO_TIMEVAL(&atv,&ats);
+	clock_id = SCARG(uap, clock_id);
+	switch (clock_id) {
+	case CLOCK_REALTIME:
+		TIMESPEC_TO_TIMEVAL(&atv, &ats);
+		if ((error = settime(&atv)) != 0)
+			return (error);
+		break;
+	case CLOCK_MONOTONIC:
+		return (EINVAL);	/* read-only clock */
+	default:
+		return (EINVAL);
+	}
 
-	error = settime(&atv);
-
-	return (error);
+	return (0);
 }
 
 int
@@ -189,15 +195,18 @@ sys_clock_getres(p, v, retval)
 	int error = 0;
 
 	clock_id = SCARG(uap, clock_id);
-	if (clock_id != CLOCK_REALTIME)
-		return (EINVAL);
-
-	if (SCARG(uap, tp)) {
+	switch (clock_id) {
+	case CLOCK_REALTIME:
+	case CLOCK_MONOTONIC:
 		ts.tv_sec = 0;
 		ts.tv_nsec = 1000000000 / hz;
-
-		error = copyout(&ts, SCARG(uap, tp), sizeof (ts));
+		break;
+	default:
+		return (EINVAL);
 	}
+
+	if (SCARG(uap, tp))
+		error = copyout(&ts, SCARG(uap, tp), sizeof (ts));
 
 	return error;
 }
@@ -303,14 +312,14 @@ sys_settimeofday(p, v, retval)
 	register_t *retval;
 {
 	struct sys_settimeofday_args /* {
-		syscallarg(struct timeval *) tv;
-		syscallarg(struct timezone *) tzp;
+		syscallarg(const struct timeval *) tv;
+		syscallarg(const struct timezone *) tzp;
 	} */ *uap = v;
 	struct timeval atv;
 	struct timezone atz;
 	int error;
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)))
+	if ((error = suser(p, 0)))
 		return (error);
 	/* Verify all parameters before changing time. */
 	if (SCARG(uap, tv) && (error = copyin((void *)SCARG(uap, tv),
@@ -340,14 +349,14 @@ sys_adjtime(p, v, retval)
 	register_t *retval;
 {
 	register struct sys_adjtime_args /* {
-		syscallarg(struct timeval *) delta;
+		syscallarg(const struct timeval *) delta;
 		syscallarg(struct timeval *) olddelta;
 	} */ *uap = v;
 	struct timeval atv;
 	register long ndelta, ntickdelta, odelta;
 	int s, error;
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)))
+	if ((error = suser(p, 0)))
 		return (error);
 	if ((error = copyin((void *)SCARG(uap, delta), (void *)&atv,
 	    sizeof(struct timeval))))
@@ -460,7 +469,7 @@ sys_setitimer(p, v, retval)
 {
 	register struct sys_setitimer_args /* {
 		syscallarg(int) which;
-		syscallarg(struct itimerval *) itv;
+		syscallarg(const struct itimerval *) itv;
 		syscallarg(struct itimerval *) oitv;
 	} */ *uap = v;
 	struct itimerval aitv;

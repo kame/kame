@@ -1,4 +1,4 @@
-/*	$OpenBSD: hmevar.h,v 1.7 2000/06/18 17:39:17 jason Exp $	*/
+/*	$OpenBSD: hmevar.h,v 1.9 2003/06/18 19:13:01 jason Exp $	*/
 
 /*
  * Copyright (c) 1998 Jason L. Wright (jason@thought.net)
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -63,3 +58,10 @@ struct hme_softc {
 	int	sc_first_td, sc_last_td, sc_no_td;	/* tx counters */
 	int	sc_last_rd;				/* rx counters */
 };
+
+#ifndef	EVL_ENCAPLEN	/* defined if NVLAN > 0 */
+#define	EVL_ENCAPLEN	0
+#endif
+ 
+#define	HME_MTU		\
+    (ETHERMTU + EVL_ENCAPLEN + sizeof(u_int32_t) + sizeof(struct ether_header))

@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.5 2002/06/08 15:50:00 miod Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.7 2003/06/02 23:27:53 millert Exp $	*/
 /*
  * Copyright (c) 1996, 1997 Per Fogelstrom
  * Copyright (c) 1995 Theo de Raadt
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,7 +37,7 @@
  * from: Utah Hdr: autoconf.c 1.31 91/01/21
  *
  *	from: @(#)autoconf.c	8.1 (Berkeley) 6/10/93
- *      $Id: autoconf.c,v 1.5 2002/06/08 15:50:00 miod Exp $
+ *      $Id: autoconf.c,v 1.7 2003/06/02 23:27:53 millert Exp $
  */
 
 /*
@@ -344,7 +340,8 @@ setroot()
 		unit = DISKUNIT(rootdev);
 		part = DISKPART(rootdev);
 
-		len = sprintf(buf, "%s%d", findblkname(majdev), unit);
+		len = snprintf(buf, sizeof buf, "%s%d", findblkname(majdev),
+			unit);
 		if (len >= sizeof(buf))
 			panic("setroot: device name too long");
 
@@ -375,7 +372,7 @@ setroot()
 			printf(": ");
 			len = getsn(buf, sizeof(buf));
 			if (len == 0 && bootdv != NULL) {
-				strcpy(buf, bootdv->dv_xname);
+				strlcpy(buf, bootdv->dv_xname, sizeof buf);
 				len = strlen(buf);
 			}
 			if (len > 0 && buf[len - 1] == '*') {
@@ -532,13 +529,13 @@ getdevunit(name, unit)
 	int lunit;
 
 	/* compute length of name and decimal expansion of unit number */
-	sprintf(num, "%d", unit);
+	snprintf(num, sizeof num, "%d", unit);
 	lunit = strlen(num);
 	if (strlen(name) + lunit >= sizeof(fullname) - 1)
 		panic("config_attach: device name too long");
 
-	strcpy(fullname, name);
-	strcat(fullname, num);
+	strlcpy(fullname, name, sizeof fullname);
+	strlcat(fullname, num, sizeof fullname);
 
 	while (strcmp(dev->dv_xname, fullname) != 0) {
 		if ((dev = dev->dv_list.tqe_next) == NULL)
@@ -626,7 +623,7 @@ makebootdev(bp)
 		return;
 	}
 	unit = getpno(&cp);
-	sprintf(bootdev, "%s%d%c", dev, unit, 'a');
+	snprintf(bootdev, sizeof bootdev, "%s%d%c", dev, unit, 'a');
 }
 
 int

@@ -1,4 +1,4 @@
-/* $OpenBSD: wsemul_vt100_subr.c,v 1.8 2002/03/14 01:27:03 millert Exp $ */
+/* $OpenBSD: wsemul_vt100_subr.c,v 1.10 2003/08/06 21:08:07 millert Exp $ */
 /* $NetBSD: wsemul_vt100_subr.c,v 1.7 2000/04/28 21:56:16 mycroft Exp $ */
 
 /*
@@ -227,11 +227,11 @@ wsemul_vt100_handle_csi(edp, c)
 	    case A3('\0', '\0', 'l'): /* RM */
 		for (n = 0; n < edp->nargs; n++)
 			vt100_ansimode(edp, ARG(n), VTMODE_RESET);
-		break;;
+		break;
 	    case A3('?', '\0', 'l'): /* DECRM */
 		for (n = 0; n < edp->nargs; n++)
 			vt100_decmode(edp, ARG(n), VTMODE_RESET);
-		break;;
+		break;
 	    case A3('\0', '$', 'p'): /* DECRQM request mode ANSI */
 		vt100_ansimode(edp, ARG(0), VTMODE_REPORT);
 		break;
@@ -343,7 +343,7 @@ wsemul_vt100_handle_csi(edp, c)
 			wsdisplay_emulinput(edp->cbcookie, "\033P2$u", 5);
 			for (i = 0; i < edp->ncols; i++)
 				if (edp->tabs[i]) {
-					n = sprintf(buf, "%s%d",
+					n = snprintf(buf, sizeof buf, "%s%d",
 						    (ps ? "/" : ""), i + 1);
 					wsdisplay_emulinput(edp->cbcookie,
 							    buf, n);
@@ -566,7 +566,7 @@ wsemul_vt100_handle_csi(edp, c)
 				row = ROWS_ABOVE;
 			else
 				row = edp->crow;
-			n = sprintf(buf, "\033[%d;%dR",
+			n = snprintf(buf, sizeof buf, "\033[%d;%dR",
 				    row + 1, edp->ccol + 1);
 			wsdisplay_emulinput(edp->cbcookie, buf, n);
 			}

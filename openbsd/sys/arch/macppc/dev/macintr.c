@@ -1,4 +1,4 @@
-/*	$OpenBSD: macintr.c,v 1.16 2003/02/12 22:40:59 jason Exp $	*/
+/*	$OpenBSD: macintr.c,v 1.18 2003/07/02 21:30:13 drahn Exp $	*/
 
 /*-
  * Copyright (c) 1995 Per Fogelstrom
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -572,7 +568,7 @@ mac_intr_do_pending_int()
 	int irq;
 	int pcpl;
 	int hwpend;
-	int emsr, dmsr;
+	int s;
 	static int processing;
 
 	if (processing)
@@ -580,9 +576,7 @@ mac_intr_do_pending_int()
 
 	processing = 1;
 	pcpl = splhigh();		/* Turn off all */
-	asm volatile("mfmsr %0" : "=r"(emsr));
-	dmsr = emsr & ~PSL_EE;
-	asm volatile("mtmsr %0" :: "r"(dmsr));
+	s = ppc_intr_disable();
 
 	hwpend = ipending & ~pcpl;	/* Do now unmasked pendings */
 	imen_m &= ~hwpend;
@@ -621,7 +615,7 @@ mac_intr_do_pending_int()
 	} while (ipending & (SINT_NET|SINT_CLOCK|SINT_TTY) & ~cpl);
 	ipending &= pcpl;
 	cpl = pcpl;	/* Don't use splx... we are here already! */
-	asm volatile("mtmsr %0" :: "r"(emsr));
+	ppc_intr_enable(s);
 	processing = 0;
 }
 

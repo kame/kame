@@ -1,4 +1,4 @@
-/*	$OpenBSD: com.c,v 1.88 2002/12/19 01:22:40 mickey Exp $	*/
+/*	$OpenBSD: com.c,v 1.92 2003/08/15 20:32:16 tedu Exp $	*/
 /*	$NetBSD: com.c,v 1.82.4.1 1996/06/02 09:08:00 mrg Exp $	*/
 
 /*
@@ -12,9 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name(s) of the author(s) nor the name OpenBSD
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR(S) ``AS IS'' AND ANY EXPRESS
  * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -42,11 +39,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -106,7 +99,6 @@ cdev_decl(com);
 static u_char tiocm_xxx2mcr(int);
 
 void	compwroff(struct com_softc *);
-void	com_raisedtr(void *);
 void	com_enable_debugport(struct com_softc *);
 
 struct cfdriver com_cd = {
@@ -892,7 +884,7 @@ comioctl(dev, cmd, data, flag, p)
 	case TIOCSFLAGS: {
 		int userbits, driverbits = 0;
 
-		error = suser(p->p_ucred, &p->p_acflag);
+		error = suser(p, 0);
 		if (error != 0)
 			return(EPERM);
 

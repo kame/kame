@@ -1,4 +1,4 @@
-/*	$OpenBSD: installboot.c,v 1.6 2002/03/14 03:15:57 millert Exp $ */
+/*	$OpenBSD: installboot.c,v 1.8 2003/08/25 23:36:46 tedu Exp $ */
 /*	$NetBSD: installboot.c,v 1.5 1995/11/17 23:23:50 gwr Exp $ */
 
 /*
@@ -121,7 +121,7 @@ main(argc, argv)
 	boot = argv[optind];
 	proto = argv[optind + 1];
 	dev = argv[optind + 2];
-	strcpy(cdev, dev);
+	strlcpy(cdev, dev, sizeof cdev);
 	cdev[strlen(cdev)-1] = 'c';
 	
 	if (verbose) {
@@ -297,7 +297,7 @@ int	devfd;
 	struct fs	*fs;
 	char		*buf;
 	daddr_t		blk, *ap;
-	struct dinode	*ip;
+	struct ufs1_dinode	*ip;
 	int		ndb;
 
 	/*
@@ -345,7 +345,7 @@ int	devfd;
 
 	blk = fsbtodb(fs, ino_to_fsba(fs, statbuf.st_ino));
 	devread(devfd, buf, blk, fs->fs_bsize, "inode");
-	ip = (struct dinode *)(buf) + ino_to_fsbo(fs, statbuf.st_ino);
+	ip = (struct ufs1_dinode *)(buf) + ino_to_fsbo(fs, statbuf.st_ino);
 
 	/*
 	 * Have the inode.  Figure out how many blocks we need.
@@ -423,7 +423,7 @@ char *bootproto;
 
 
 	pcpul->version = 1;
-	strcpy(pcpul->vid_id, "M88K");
+	memcpy(pcpul->vid_id, "M88K", sizeof pcpul->vid_id);
 
 	fstat(exe_file, &stat);
 

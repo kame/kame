@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_input.c,v 1.125 2003/02/14 17:54:46 dhartmei Exp $	*/
+/*	$OpenBSD: tcp_input.c,v 1.132 2003/07/09 22:03:16 itojun Exp $	*/
 /*	$NetBSD: tcp_input.c,v 1.23 1996/02/13 23:43:44 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -523,11 +519,7 @@ tcp_input(struct mbuf *m, ...)
 		struct tcpiphdr *ti;
 
 		ip = mtod(m, struct ip *);
-#if 1
 		tlen = m->m_pkthdr.len - iphlen;
-#else
-		tlen = ((struct ip *)ti)->ip_len;
-#endif
 		ti = mtod(m, struct tcpiphdr *);
 
 #ifdef TCP_ECN
@@ -1474,7 +1466,7 @@ trimthenstep6:
 				tiflags &= ~TH_URG;
 			todrop--;
 		}
-		if (todrop >= tlen ||
+		if (todrop > tlen ||
 		    (todrop == tlen && (tiflags & TH_FIN) == 0)) {
 			/*
 			 * Any valid FIN must be to the left of the
@@ -2243,7 +2235,7 @@ dodata:							/* XXX */
 		}
 	}
 	if (so->so_options & SO_DEBUG) {
-		switch (tp->pf == PF_INET6) {
+		switch (tp->pf) {
 #ifdef INET6
 		case PF_INET6:
 			tcp_trace(TA_INPUT, ostate, tp, (caddr_t) &tcp_saveti6,
@@ -3063,7 +3055,16 @@ tcp_mss(tp, offer)
 
 	/* Calculate the value that we offer in TCPOPT_MAXSEG */
 	if (offer != -1) {
+#ifndef INET6
 		mssopt = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+#else
+		if (tp->pf == AF_INET)
+			mssopt = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+		else
+			mssopt = IN6_LINKMTU(ifp) - iphlen -
+			    sizeof(struct tcphdr);
+#endif
+
 		mssopt = max(tcp_mssdflt, mssopt);
 	}
 

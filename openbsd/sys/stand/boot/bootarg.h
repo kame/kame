@@ -1,4 +1,4 @@
-/*	$OpenBSD: bootarg.h,v 1.9 2002/03/14 01:27:13 millert Exp $	*/
+/*	$OpenBSD: bootarg.h,v 1.11 2003/06/02 20:20:54 mickey Exp $	*/
 
 /*
  * Copyright (c) 1996-1999 Michael Shalayeff
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -50,7 +45,7 @@ typedef struct _boot_args {
 
 #if defined(_KERNEL) || defined(_STANDALONE)
 extern void *bootargv;
-extern int bootargc;                                                     
+extern int bootargc;
 extern bootarg_t *bootargp;
 #endif
 

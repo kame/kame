@@ -1,5 +1,5 @@
-/*	$OpenBSD: uscanner.c,v 1.13 2002/11/11 02:32:32 nate Exp $ */
-/*	$NetBSD: uscanner.c,v 1.34 2002/10/23 09:14:03 jdolecek Exp $	*/
+/*	$OpenBSD: uscanner.c,v 1.16 2003/06/27 16:57:14 nate Exp $ */
+/*	$NetBSD: uscanner.c,v 1.40 2003/01/27 00:32:44 wiz Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -178,10 +178,13 @@ static const struct uscan_info uscanner_devs[] = {
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_610 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1200 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1240 }, 0 },
+ {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1260 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1600 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1640 }, 0 },
+ {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1660 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_640U }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1650 }, 0 },
+ {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_2400 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_GT9700F }, USC_KEEP_OPEN },
 
   /* UMAX */
@@ -228,6 +231,8 @@ struct uscanner_softc {
 	void 			*sc_bulkout_buffer;
 	int			sc_bulkout_bufferlen;
 	int			sc_bulkout_datalen;
+
+	struct selinfo		sc_selq;
 
 	u_char			sc_state;
 #define USCANNER_OPEN		0x01	/* opened */
@@ -306,7 +311,7 @@ USB_ATTACH(uscanner)
 	int i;
 	usbd_status err;
 
-	usbd_devinfo(uaa->device, 0, devinfo);
+	usbd_devinfo(uaa->device, 0, devinfo, sizeof devinfo);
 	USB_ATTACH_SETUP;
 	printf("%s: %s\n", USBDEVNAME(sc->sc_dev), devinfo);
 
@@ -705,6 +710,54 @@ int
 uscannerioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, usb_proc_ptr p)
 {
 	return (EINVAL);
+}
+
+Static void filt_uscannerdetach(struct knote *);
+int uscannerkqfilter(dev_t, struct knote *);
+
+Static void
+filt_uscannerdetach(struct knote *kn)
+{
+	struct uscanner_softc *sc = (void *)kn->kn_hook;
+
+	SLIST_REMOVE(&sc->sc_selq.sel_klist, kn, knote, kn_selnext);
+}
+
+Static struct filterops uscanner_seltrue_filtops =
+	{ 1, NULL, filt_uscannerdetach, filt_seltrue };
+
+int
+uscannerkqfilter(dev_t dev, struct knote *kn)
+{
+	struct uscanner_softc *sc;
+	struct klist *klist;
+
+	USB_GET_SC(uscanner, USCANNERUNIT(dev), sc);
+
+	if (sc->sc_dying)
+		return (1);
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+	case EVFILT_WRITE:
+		/* 
+		 * We have no easy way of determining if a read will
+		 * yield any data or a write will happen.
+		 * Pretend they will.
+		 */
+		klist = &sc->sc_selq.sel_klist;
+		kn->kn_fop = &uscanner_seltrue_filtops;
+		break;
+
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = (void *)sc;
+
+	SLIST_INSERT_HEAD(klist, kn, kn_selnext);
+
+	return (0);
 }
 
 #if defined(__FreeBSD__)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: twe.c,v 1.18 2002/09/17 13:45:38 mickey Exp $	*/
+/*	$OpenBSD: twe.c,v 1.22 2003/08/06 21:08:06 millert Exp $	*/
 
 /*
  * Copyright (c) 2000-2002 Michael Shalayeff.  All rights reserved.
@@ -14,11 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -188,7 +183,7 @@ twe_attach(sc)
 	lockinit(&sc->sc_lock, PWAIT, "twelk", 0, 0);
 
 	pa = sc->sc_cmdmap->dm_segs[0].ds_addr +
-	    sizeof(struct twe_cmd) * (TWE_MAXCMDS - 1);;
+	    sizeof(struct twe_cmd) * (TWE_MAXCMDS - 1);
 	for (cmd = sc->sc_cmds + sizeof(struct twe_cmd) * (TWE_MAXCMDS - 1);
 	     cmd >= (struct twe_cmd *)sc->sc_cmds; cmd--, pa -= sizeof(*cmd)) {
 
@@ -417,8 +412,9 @@ twe_thread_create(void *v)
 	if (kthread_create(twe_thread, sc, &sc->sc_thread,
 	    "%s", sc->sc_dev.dv_xname)) {
 		/* TODO disable twe */
-		printf("%s: failed to create kernel thread, disabled",
+		printf("%s: failed to create kernel thread, disabled\n",
 		    sc->sc_dev.dv_xname);
+		return;
 	}
 
 	TWE_DPRINTF(TWE_D_CMD, ("stat=%b ",
@@ -849,9 +845,10 @@ twe_scsi_cmd(xs)
 		inq.version = 2;
 		inq.response_format = 2;
 		inq.additional_length = 32;
-		strcpy(inq.vendor, "3WARE  ");
-		sprintf(inq.product, "Host drive  #%02d", target);
-		strcpy(inq.revision, "   ");
+		strlcpy(inq.vendor, "3WARE  ", sizeof inq.vendor);
+		snprintf(inq.product, sizeof inq.product, "Host drive  #%02d",
+		    target);
+		strlcpy(inq.revision, "   ", sizeof inq.revision);
 		twe_copy_internal_data(xs, &inq, sizeof inq);
 		break;
 

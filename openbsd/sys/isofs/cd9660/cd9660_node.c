@@ -1,4 +1,4 @@
-/*	$OpenBSD: cd9660_node.c,v 1.12 2002/03/14 01:27:03 millert Exp $	*/
+/*	$OpenBSD: cd9660_node.c,v 1.14 2003/06/02 23:28:05 millert Exp $	*/
 /*	$NetBSD: cd9660_node.c,v 1.17 1997/05/05 07:13:57 mycroft Exp $	*/
 
 /*-
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -72,7 +68,7 @@ u_long idvhash;
 #define	DNOHASH(device, inum)	(((device) + ((inum)>>12)) & idvhash)
 #endif
 
-int prtactive;	/* 1 => print out reclaim of active vnodes */
+extern int prtactive;	/* 1 => print out reclaim of active vnodes */
 
 static u_int cd9660_chars2ui(u_char *, int);
 

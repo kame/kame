@@ -1,4 +1,4 @@
-/*	$OpenBSD: cgthree.c,v 1.26 2003/02/12 19:41:20 henric Exp $	*/
+/*	$OpenBSD: cgthree.c,v 1.35 2003/08/01 19:24:47 miod Exp $	*/
 
 /*
  * Copyright (c) 2001 Jason L. Wright (jason@thought.net)
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -54,6 +49,9 @@
 #include <dev/wscons/wsdisplayvar.h>
 #include <dev/wscons/wscons_raster.h>
 #include <dev/rasops/rasops.h>
+#include <machine/fbvar.h>
+
+#include <dev/ic/bt458reg.h>
 
 #define	CGTHREE_CTRL_OFFSET	0x400000
 #define	CGTHREE_CTRL_SIZE	(sizeof(u_int32_t) * 8)
@@ -120,27 +118,19 @@ union bt_cmap {
     bus_space_write_1((sc)->sc_bustag, (sc)->sc_ctrl_regs, (reg), (val))
 
 struct cgthree_softc {
-	struct device sc_dev;
+	struct sunfb sc_sunfb;
 	struct sbusdev sc_sd;
 	bus_space_tag_t sc_bustag;
 	bus_addr_t sc_paddr;
 	bus_space_handle_t sc_ctrl_regs;
 	bus_space_handle_t sc_vid_regs;
 	int sc_nscreens;
-	int sc_width, sc_height, sc_depth, sc_linebytes;
 	union bt_cmap sc_cmap;
-	struct rasops_info sc_rasops;
 	u_int sc_mode;
-	int *sc_crowp, *sc_ccolp;
 };
 
 struct wsscreen_descr cgthree_stdscreen = {
 	"std",
-	0, 0,	/* will be filled in -- XXX shouldn't, it's global. */
-	0,
-	0, 0,
-	WSSCREEN_UNDERLINE | WSSCREEN_HILIT |
-	WSSCREEN_REVERSE | WSSCREEN_WSCOLORS
 };
 
 const struct wsscreen_descr *cgthree_scrlist[] = {
@@ -163,12 +153,10 @@ int cgthree_is_console(int);
 void cgthree_loadcmap(struct cgthree_softc *, u_int, u_int);
 int cg3_bt_putcmap(union bt_cmap *, struct wsdisplay_cmap *);
 int cg3_bt_getcmap(union bt_cmap *, struct wsdisplay_cmap *);
-void cgthree_setcolor(struct cgthree_softc *, u_int,
-    u_int8_t, u_int8_t, u_int8_t);
+void cgthree_setcolor(void *, u_int, u_int8_t, u_int8_t, u_int8_t);
 void cgthree_burner(void *, u_int, u_int);
 void cgthree_reset(struct cgthree_softc *);
 void cgthree_updatecursor(struct rasops_info *);
-static int a2int(char *, int);
 
 struct wsdisplay_accessops cgthree_accessops = {
 	cgthree_ioctl,
@@ -223,9 +211,7 @@ struct cg3_videoctrl {
 };
 
 int
-cgthreematch(parent, vcf, aux)
-	struct device *parent;
-	void *vcf, *aux;
+cgthreematch(struct device *parent, void *vcf, void *aux)
 {
 	struct cfdata *cf = vcf;
 	struct sbus_attach_args *sa = aux;
@@ -234,18 +220,17 @@ cgthreematch(parent, vcf, aux)
 }
 
 void    
-cgthreeattach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+cgthreeattach(struct device *parent, struct device *self, void *aux)
 {
 	struct cgthree_softc *sc = (struct cgthree_softc *)self;
 	struct sbus_attach_args *sa = aux;
 	struct wsemuldisplaydev_attach_args waa;
 	int console, i;
-	long defattr;
 
 	sc->sc_bustag = sa->sa_bustag;
 	sc->sc_paddr = sbus_bus_addr(sa->sa_bustag, sa->sa_slot, sa->sa_offset);
+
+	fb_setsize(&sc->sc_sunfb, 8, 1152, 900, sa->sa_node, 0);
 
 	if (sa->sa_nreg != 1) {
 		printf(": expected %d registers, got %d\n", 1, sa->sa_nreg);
@@ -257,15 +242,14 @@ cgthreeattach(parent, self, aux)
 	 */
 	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[0].sbr_slot,
 	    sa->sa_reg[0].sbr_offset + CGTHREE_CTRL_OFFSET,
-	    CGTHREE_CTRL_SIZE, BUS_SPACE_MAP_LINEAR,
-	    0, &sc->sc_ctrl_regs) != 0) {
+	    CGTHREE_CTRL_SIZE, 0, 0, &sc->sc_ctrl_regs) != 0) {
 		printf(": cannot map ctrl registers\n");
 		goto fail_ctrl;
 	}
 
 	if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[0].sbr_slot,
 	    sa->sa_reg[0].sbr_offset + CGTHREE_VID_OFFSET,
-	    CGTHREE_VID_SIZE, BUS_SPACE_MAP_LINEAR,
+	    sc->sc_sunfb.sf_fbsize, BUS_SPACE_MAP_LINEAR,
 	    0, &sc->sc_vid_regs) != 0) {
 		printf(": cannot map vid registers\n");
 		goto fail_vid;
@@ -273,12 +257,7 @@ cgthreeattach(parent, self, aux)
 
 	console = cgthree_is_console(sa->sa_node);
 
-	sc->sc_depth = getpropint(sa->sa_node, "depth", 8);
-	sc->sc_linebytes = getpropint(sa->sa_node, "linebytes", 1152);
-	sc->sc_height = getpropint(sa->sa_node, "height", 900);
-	sc->sc_width = getpropint(sa->sa_node, "width", 1152);
-
-	sbus_establish(&sc->sc_sd, &sc->sc_dev);
+	sbus_establish(&sc->sc_sd, &sc->sc_sunfb.sf_dev);
 
 	cgthree_reset(sc);
 
@@ -288,50 +267,38 @@ cgthreeattach(parent, self, aux)
 
 	cgthree_burner(sc, 1, 0);
 
-	sc->sc_rasops.ri_depth = sc->sc_depth;
-	sc->sc_rasops.ri_stride = sc->sc_linebytes;
-	sc->sc_rasops.ri_flg = RI_CENTER |
-	    (console ? 0 : RI_CLEAR);
-	sc->sc_rasops.ri_bits = (void *)bus_space_vaddr(sc->sc_bustag,
+	sc->sc_sunfb.sf_ro.ri_bits = (void *)bus_space_vaddr(sc->sc_bustag,
 	    sc->sc_vid_regs);
-	sc->sc_rasops.ri_width = sc->sc_width;
-	sc->sc_rasops.ri_height = sc->sc_height;
-	sc->sc_rasops.ri_hw = sc;
-
-	rasops_init(&sc->sc_rasops,
-	    a2int(getpropstring(optionsnode, "screen-#rows"), 34),
-	    a2int(getpropstring(optionsnode, "screen-#columns"), 80));
-
-	cgthree_stdscreen.nrows = sc->sc_rasops.ri_rows;
-	cgthree_stdscreen.ncols = sc->sc_rasops.ri_cols;
-	cgthree_stdscreen.textops = &sc->sc_rasops.ri_ops;
-	sc->sc_rasops.ri_ops.alloc_attr(&sc->sc_rasops,
-	    WSCOL_BLACK, WSCOL_WHITE, WSATTR_WSCOLORS, &defattr);
-	sc->sc_rasops.ri_hw = sc;
+	sc->sc_sunfb.sf_ro.ri_hw = sc;
 
 	printf("\n");
 
-	cgthree_setcolor(sc, WSCOL_BLACK, 0, 0, 0);
-	cgthree_setcolor(sc, 255, 0, 0, 0);
-	cgthree_setcolor(sc, WSCOL_RED, 255, 0, 0);
-	cgthree_setcolor(sc, WSCOL_GREEN, 0, 255, 0);
-	cgthree_setcolor(sc, WSCOL_BROWN, 154, 85, 46);
-	cgthree_setcolor(sc, WSCOL_BLUE, 0, 0, 255);
-	cgthree_setcolor(sc, WSCOL_MAGENTA, 255, 255, 0);
-	cgthree_setcolor(sc, WSCOL_CYAN, 0, 255, 255);
-	cgthree_setcolor(sc, WSCOL_WHITE, 255, 255, 255);
+	/*
+	 * If the framebuffer width is under 1024x768, which is the case for
+	 * some clones on laptops, as well as with the VS10-EK, switch from
+	 * the PROM font to the more adequate 8x16 font here.
+	 * However, we need to adjust two things in this case:
+	 * - the display row should be overrided from the current PROM metrics,
+	 *   to prevent us from overwriting the last few lines of text.
+	 * - if the 80x34 screen would make a large margin appear around it,
+	 *   choose to clear the screen rather than keeping old prom output in
+	 *   the margins.
+	 * XXX there should be a rasops "clear margins" feature
+	 */
+	fbwscons_init(&sc->sc_sunfb, console &&
+	    (sc->sc_sunfb.sf_width >= 1024) ? 0 : RI_CLEAR);
+
+	cgthree_stdscreen.capabilities = sc->sc_sunfb.sf_ro.ri_caps;
+	cgthree_stdscreen.nrows = sc->sc_sunfb.sf_ro.ri_rows;
+	cgthree_stdscreen.ncols = sc->sc_sunfb.sf_ro.ri_cols;
+	cgthree_stdscreen.textops = &sc->sc_sunfb.sf_ro.ri_ops;
+
+	fbwscons_setcolormap(&sc->sc_sunfb, cgthree_setcolor);
 
 	if (console) {
-		if (romgetcursoraddr(&sc->sc_crowp, &sc->sc_ccolp))
-			sc->sc_ccolp = sc->sc_crowp = NULL;
-		if (sc->sc_ccolp != NULL)
-			sc->sc_rasops.ri_ccol = *sc->sc_ccolp;
-		if (sc->sc_crowp != NULL)
-			sc->sc_rasops.ri_crow = *sc->sc_crowp;
-		sc->sc_rasops.ri_updatecursor = cgthree_updatecursor;
-
-		wsdisplay_cnattach(&cgthree_stdscreen, &sc->sc_rasops,
-		    sc->sc_rasops.ri_ccol, sc->sc_rasops.ri_crow, defattr);
+		sc->sc_sunfb.sf_ro.ri_updatecursor = cgthree_updatecursor;
+		fbwscons_console_init(&sc->sc_sunfb, &cgthree_stdscreen,
+		    sc->sc_sunfb.sf_width >= 1024 ? -1 : 0, cgthree_burner);
 	}
 
 	waa.console = console;
@@ -350,12 +317,7 @@ fail:
 }
 
 int
-cgthree_ioctl(v, cmd, data, flags, p)
-	void *v;
-	u_long cmd;
-	caddr_t data;
-	int flags;
-	struct proc *p;
+cgthree_ioctl(void *v, u_long cmd, caddr_t data, int flags, struct proc *p)
 {
 	struct cgthree_softc *sc = v;
 	struct wsdisplay_fbinfo *wdf;
@@ -364,20 +326,20 @@ cgthree_ioctl(v, cmd, data, flags, p)
 
 	switch (cmd) {
 	case WSDISPLAYIO_GTYPE:
-		*(u_int *)data = WSDISPLAY_TYPE_UNKNOWN;
+		*(u_int *)data = WSDISPLAY_TYPE_SUNCG3;
 		break;
 	case WSDISPLAYIO_SMODE:
 		sc->sc_mode = *(u_int *)data;
 		break;
 	case WSDISPLAYIO_GINFO:
 		wdf = (void *)data;
-		wdf->height = sc->sc_height;
-		wdf->width  = sc->sc_width;
-		wdf->depth  = sc->sc_depth;
+		wdf->height = sc->sc_sunfb.sf_height;
+		wdf->width  = sc->sc_sunfb.sf_width;
+		wdf->depth  = sc->sc_sunfb.sf_depth;
 		wdf->cmsize = 256;
 		break;
 	case WSDISPLAYIO_LINEBYTES:
-		*(u_int *)data = sc->sc_linebytes;
+		*(u_int *)data = sc->sc_sunfb.sf_linebytes;
 		break;
 
 	case WSDISPLAYIO_GETCMAP:
@@ -410,31 +372,25 @@ cgthree_ioctl(v, cmd, data, flags, p)
 }
 
 int
-cgthree_alloc_screen(v, type, cookiep, curxp, curyp, attrp)
-	void *v;
-	const struct wsscreen_descr *type;
-	void **cookiep;
-	int *curxp, *curyp;
-	long *attrp;
+cgthree_alloc_screen(void *v, const struct wsscreen_descr *type,
+    void **cookiep, int *curxp, int *curyp, long *attrp)
 {
 	struct cgthree_softc *sc = v;
 
 	if (sc->sc_nscreens > 0)
 		return (ENOMEM);
 
-	*cookiep = &sc->sc_rasops;
+	*cookiep = &sc->sc_sunfb.sf_ro;
 	*curyp = 0;
 	*curxp = 0;
-	sc->sc_rasops.ri_ops.alloc_attr(&sc->sc_rasops,
+	sc->sc_sunfb.sf_ro.ri_ops.alloc_attr(&sc->sc_sunfb.sf_ro,
 	    WSCOL_BLACK, WSCOL_WHITE, WSATTR_WSCOLORS, attrp);
 	sc->sc_nscreens++;
 	return (0);
 }
 
 void
-cgthree_free_screen(v, cookie)
-	void *v;
-	void *cookie;
+cgthree_free_screen(void *v, void *cookie)
 {
 	struct cgthree_softc *sc = v;
 
@@ -442,12 +398,8 @@ cgthree_free_screen(v, cookie)
 }
 
 int
-cgthree_show_screen(v, cookie, waitok, cb, cbarg)
-	void *v;
-	void *cookie;
-	int waitok;
-	void (*cb)(void *, int, int);
-	void *cbarg;
+cgthree_show_screen(void *v, void *cookie, int waitok,
+    void (*cb)(void *, int, int), void *cbarg)
 {
 	return (0);
 }
@@ -456,10 +408,7 @@ cgthree_show_screen(v, cookie, waitok, cb, cbarg)
 #define	NOOVERLAY	(0x04000000)
 
 paddr_t
-cgthree_mmap(v, offset, prot)
-	void *v;
-	off_t offset;
-	int prot;
+cgthree_mmap(void *v, off_t offset, int prot)
 {
 	struct cgthree_softc *sc = v;
 
@@ -474,12 +423,12 @@ cgthree_mmap(v, offset, prot)
 			offset -= START;
 		else
 			offset = 0;
-		if (offset >= sc->sc_linebytes * sc->sc_height)
+		if (offset >= sc->sc_sunfb.sf_fbsize)
 			return (-1);
 		return (bus_space_mmap(sc->sc_bustag, sc->sc_paddr,
 		    CGTHREE_VID_OFFSET + offset, prot, BUS_SPACE_MAP_LINEAR));
 	case WSDISPLAYIO_MODE_DUMBFB:
-		if (offset < (sc->sc_linebytes * sc->sc_height))
+		if (offset < sc->sc_sunfb.sf_fbsize)
 			return (bus_space_mmap(sc->sc_bustag, sc->sc_paddr,
 			    CGTHREE_VID_OFFSET + offset, prot,
 			    BUS_SPACE_MAP_LINEAR));
@@ -488,21 +437,8 @@ cgthree_mmap(v, offset, prot)
 	return (-1);
 }
 
-static int
-a2int(char *cp, int deflt)
-{
-	int i = 0;
-
-	if (*cp == '\0')
-		return (deflt);
-	while (*cp != '\0')
-		i = i * 10 + *cp++ - '0';
-	return (i);
-}
-
 int
-cgthree_is_console(node)
-	int node;
+cgthree_is_console(int node)
 {
 	extern int fbnode;
 
@@ -510,11 +446,9 @@ cgthree_is_console(node)
 }
 
 void
-cgthree_setcolor(sc, index, r, g, b)
-	struct cgthree_softc *sc;
-	u_int index;
-	u_int8_t r, g, b;
+cgthree_setcolor(void *v, u_int index, u_int8_t r, u_int8_t g, u_int8_t b)
 {
+	struct cgthree_softc *sc = v;
 	union bt_cmap *bcm = &sc->sc_cmap;
 
 	bcm->cm_map[index][0] = r;
@@ -524,9 +458,7 @@ cgthree_setcolor(sc, index, r, g, b)
 }
 
 void
-cgthree_loadcmap(sc, start, ncolors)
-	struct cgthree_softc *sc;
-	u_int start, ncolors;
+cgthree_loadcmap(struct cgthree_softc *sc, u_int start, u_int ncolors)
 {
 	u_int cstart;
 	int count;
@@ -541,9 +473,7 @@ cgthree_loadcmap(sc, start, ncolors)
 }
 
 int
-cg3_bt_getcmap(bcm, rcm)
-	union bt_cmap *bcm;
-	struct wsdisplay_cmap *rcm;
+cg3_bt_getcmap(union bt_cmap *bcm, struct wsdisplay_cmap *rcm)
 {
 	u_int index = rcm->index, count = rcm->count, i;
 	int error;
@@ -565,9 +495,7 @@ cg3_bt_getcmap(bcm, rcm)
 }
 
 int
-cg3_bt_putcmap(bcm, rcm)
-	union bt_cmap *bcm;
-	struct wsdisplay_cmap *rcm;
+cg3_bt_putcmap(union bt_cmap *bcm, struct wsdisplay_cmap *rcm)
 {
 	u_int index = rcm->index, count = rcm->count, i;
 	int error;
@@ -589,8 +517,7 @@ cg3_bt_putcmap(bcm, rcm)
 }
 
 void
-cgthree_reset(sc)
-	struct cgthree_softc *sc;
+cgthree_reset(struct cgthree_softc *sc)
 {
 	int i, j;
 	u_int8_t sts, ctrl;
@@ -618,31 +545,37 @@ cgthree_reset(sc)
 		}
 	}
 
-	BT_WRITE(sc, BT_ADDR, 0x04);
+	/* enable all the bit planes */
+	BT_WRITE(sc, BT_ADDR, BT_RMR);
 	BT_BARRIER(sc, BT_ADDR, BUS_SPACE_BARRIER_WRITE);
 	BT_WRITE(sc, BT_CTRL, 0xff);
 	BT_BARRIER(sc, BT_CTRL, BUS_SPACE_BARRIER_WRITE);
 
-	BT_WRITE(sc, BT_ADDR, 0x05);
+	/* no plane should blink */
+	BT_WRITE(sc, BT_ADDR, BT_BMR);
 	BT_BARRIER(sc, BT_ADDR, BUS_SPACE_BARRIER_WRITE);
 	BT_WRITE(sc, BT_CTRL, 0x00);
 	BT_BARRIER(sc, BT_CTRL, BUS_SPACE_BARRIER_WRITE);
 
-	BT_WRITE(sc, BT_ADDR, 0x06);
+	/*
+	 * enable the RAMDAC, disable blink, disable overlay 0 and 1,
+	 * use 4:1 multiplexor.
+	 */
+	BT_WRITE(sc, BT_ADDR, BT_CR);
 	BT_BARRIER(sc, BT_ADDR, BUS_SPACE_BARRIER_WRITE);
-	BT_WRITE(sc, BT_CTRL, 0x70);
+	BT_WRITE(sc, BT_CTRL,
+	    (BTCR_MPLX_4 | BTCR_RAMENA | BTCR_BLINK_6464));
 	BT_BARRIER(sc, BT_CTRL, BUS_SPACE_BARRIER_WRITE);
 
-	BT_WRITE(sc, BT_ADDR, 0x07);
+	/* disable the D/A read pins */
+	BT_WRITE(sc, BT_ADDR, BT_CTR);
 	BT_BARRIER(sc, BT_ADDR, BUS_SPACE_BARRIER_WRITE);
 	BT_WRITE(sc, BT_CTRL, 0x00);
 	BT_BARRIER(sc, BT_CTRL, BUS_SPACE_BARRIER_WRITE);
 }
 
 void
-cgthree_burner(vsc, on, flags)
-	void *vsc;
-	u_int on, flags;
+cgthree_burner(void *vsc, u_int on, u_int flags)
 {
 	struct cgthree_softc *sc = vsc;
 	int s;
@@ -662,13 +595,12 @@ cgthree_burner(vsc, on, flags)
 }
 
 void
-cgthree_updatecursor(ri)
-	struct rasops_info *ri;
+cgthree_updatecursor(struct rasops_info *ri)
 {
 	struct cgthree_softc *sc = ri->ri_hw;
 
-	if (sc->sc_crowp != NULL)
-		*sc->sc_crowp = ri->ri_crow;
-	if (sc->sc_ccolp != NULL)
-		*sc->sc_ccolp = ri->ri_ccol;
+	if (sc->sc_sunfb.sf_crowp != NULL)
+		*sc->sc_sunfb.sf_crowp = ri->ri_crow;
+	if (sc->sc_sunfb.sf_ccolp != NULL)
+		*sc->sc_sunfb.sf_ccolp = ri->ri_ccol;
 }

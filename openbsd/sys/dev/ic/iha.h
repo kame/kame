@@ -1,4 +1,4 @@
-/*	$OpenBSD: iha.h,v 1.11 2002/11/14 02:31:46 krw Exp $ */
+/*	$OpenBSD: iha.h,v 1.13 2003/03/30 00:32:48 krw Exp $ */
 /*-------------------------------------------------------------------------
  *
  * Device driver for the INI-9XXXU/UW or INIC-940/950  PCI SCSI Controller.
@@ -42,18 +42,21 @@
  *   Scatter-Gather Element Structure
  */
 struct iha_sg_element {
-	u_int32_t SG_Ptr;  /* Data Pointer */
-	u_int32_t SG_Len;  /* Data Length  */
+	u_int32_t SG_Addr; /* Physical address of segment */
+	u_int32_t SG_Len;  /* Length of segment */
 };
 
 /*
- * iha_scsi_req_q - SCSI Request structure used by the
- *		    Tulip (aka inic-940/950). Note that 32
- *		    bit pointers and ints are assumed!
+ * iha_scb - SCSI Request structure used by the
+ *	     Tulip (aka inic-940/950). Note that 32
+ *	     bit pointers and ints are assumed!
  */
 
-struct iha_scsi_req_q {
-	TAILQ_ENTRY(iha_scsi_req_q) SCB_ScbList;
+struct iha_scb {
+	TAILQ_ENTRY(iha_scb) SCB_ScbList;
+
+	bus_dmamap_t	SCB_DataDma;	/* maps xfer buffer	     */
+	bus_dmamap_t	SCB_SGDma;	/* maps scatter-gather list  */
 
 	int	  SCB_Status;		   /* Current status of the SCB	     */
 #define		      STATUS_QUEUED   0	   /*	   SCB one of Free/Done/Pend */
@@ -61,16 +64,14 @@ struct iha_scsi_req_q {
 #define		      STATUS_SELECT   2	   /*	   SCB being selected	     */
 #define		      STATUS_BUSY     3	   /*	   SCB I/O is active	     */
 	u_int8_t  SCB_NxtStat;		   /* Next state function to apply   */
-	u_int16_t SCB_SGIdx;		   /* Scatter/Gather Index	     */
-	u_int16_t SCB_SGMax;		   /* Scatter/Gather # valid entries */
 	int	  SCB_Flags;		   /* SCB Flags (xs->flags + private)*/
 #define		      FLAG_RSENS      0x00010000 /*	 Request Sense sent  */
 #define		      FLAG_SG	      0x00020000 /*      Scatter/Gather used */
 #define		      FLAG_DIR	      (SCSI_DATA_IN | SCSI_DATA_OUT)
 	u_int8_t  SCB_Target;		   /* Target Id			     */
 	u_int8_t  SCB_Lun;		   /* Lun			     */
-	u_int32_t SCB_BufPAddr;		   /* Data Buffer Physical Addr	     */
-	u_int32_t SCB_BufLen;		   /* Data Allocation Length	     */
+	u_int32_t SCB_BufChars;		   /* size of data buf		     */
+	u_int32_t SCB_BufCharsLeft;	   /* Chars left to xfer to/from buf */
 	u_int8_t  SCB_HaStat;		   /* Status of Host Adapter	     */
 #define		      HOST_OK	      0x00 /*	   OK - operation a success  */
 #define		      HOST_TIMED_OUT  0x01 /*      Request timed out         */
@@ -81,25 +82,21 @@ struct iha_scsi_req_q {
 #define		      HOST_SCSI_RST   0x1B /*	   SCSI bus was reset	     */
 #define		      HOST_DEV_RST    0x1C /*	   Device was reset	     */
 	u_int8_t  SCB_TaStat;		   /* SCSI Status Byte		     */
-	u_int8_t  SCB_SGLen;		   /* # of valid entries in SGList   */
-	u_int8_t  SCB_SenseLen;		   /* Sense Data Allocation Length   */
-	u_int8_t  SCB_CDBLen;		   /* CDB Length		     */
 	u_int8_t  SCB_Ident;		   /* Identity Message		     */
 	u_int8_t  SCB_TagMsg;		   /* Tag Message		     */
 	u_int8_t  SCB_TagId;		   /* Queue Tag			     */
-	u_int8_t  SCB_CDB[12];		   /* SCSI Command		     */
-	u_int32_t SCB_SGPAddr;		   /* SGList Physical Address	     */
-	u_int32_t SCB_SensePAddr;	   /* Sense Data PhysicalAddress     */
+
+	u_int8_t  SCB_CDB[12];		   /* SCSI command being executed    */
+	u_int8_t  SCB_CDBLen;		   /* Length of SCSI command in CDB  */
 
 	struct scsi_xfer *SCB_Xs;	   /* xs this SCB is executing	     */
+					   
+	struct iha_sg_element SCB_SGList[IHA_MAX_SG_ENTRIES]; /* SG list     */
+	u_int16_t SCB_SGCount;		   /* # segments in list             */
+	u_int16_t SCB_SGIdx;		   /* index to current element       */
 
-					   /* Start of SG list		     */
-	struct iha_sg_element SCB_SGList[IHA_MAX_SG_ENTRIES];
-
-	struct scsi_sense_data	SCB_ScsiSenseData;
-	bus_dmamap_t		SCB_Dmamap;/* maps xs->buf xfer buffer	     */
-	int			SCB_Timeout; /* in milliseconds              */
-	struct tcs	       *SCB_Tcs;   /* tcs for SCB_Target	     */
+	struct scsi_sense_data	SCB_ScsiSenseData; /* DMA-able sense buffer  */
+	struct tcs	       *SCB_Tcs;   	   /* tcs for SCB_Target     */
 };
 
 /*
@@ -124,7 +121,7 @@ struct tcs {
 	u_int8_t  TCS_SConfig0;
 	u_int8_t  TCS_TagCnt;
 
-	struct iha_scsi_req_q  *TCS_NonTagScb;
+	struct iha_scb  *TCS_NonTagScb;
 };
 
 struct iha_softc {
@@ -164,10 +161,10 @@ struct iha_softc {
 	u_int8_t  HCS_SConf1;
 	u_int8_t  HCS_Msg[IHA_MAX_EXTENDED_MSG];    /* [0] len, [1] Msg Code */
 
-	struct iha_scsi_req_q *HCS_Scb;		    /* SCB array	     */
-	struct iha_scsi_req_q *HCS_ActScb;	    /* SCB using SCSI bus    */
+	struct iha_scb *HCS_Scb;		    /* SCB array	     */
+	struct iha_scb *HCS_ActScb;	    /* SCB using SCSI bus    */
 
-	TAILQ_HEAD(, iha_scsi_req_q) HCS_FreeScb, HCS_PendScb, HCS_DoneScb;
+	TAILQ_HEAD(, iha_scb) HCS_FreeScb, HCS_PendScb, HCS_DoneScb;
 
 	struct tcs HCS_Tcs[IHA_MAX_TARGETS];
 };

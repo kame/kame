@@ -1,4 +1,4 @@
-/*	$OpenBSD: schizo.c,v 1.11 2003/03/06 08:26:08 henric Exp $	*/
+/*	$OpenBSD: schizo.c,v 1.16 2003/06/24 21:54:39 henric Exp $	*/
 
 /*
  * Copyright (c) 2002 Jason L. Wright (jason@thought.net)
@@ -13,11 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -87,25 +82,11 @@ paddr_t schizo_bus_mmap(bus_space_tag_t, bus_addr_t, off_t, int, int);
 int _schizo_bus_map(bus_space_tag_t, bus_space_tag_t, bus_addr_t,
     bus_size_t, int, bus_space_handle_t *);
 void *_schizo_intr_establish(bus_space_tag_t, bus_space_tag_t, int, int, int,
-    int (*)(void *), void *);
+    int (*)(void *), void *, const char *);
 paddr_t _schizo_bus_mmap(bus_space_tag_t, bus_space_tag_t, bus_addr_t, off_t, int, int);
 
 int schizo_dmamap_create(bus_dma_tag_t, bus_dma_tag_t, bus_size_t, int,
     bus_size_t, bus_size_t, int, bus_dmamap_t *);
-void schizo_dmamap_destroy(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t);
-int schizo_dmamap_load(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t, void *,
-    bus_size_t, struct proc *, int);
-void schizo_dmamap_unload(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t);
-int schizo_dmamap_load_raw(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t,
-    bus_dma_segment_t *, int, bus_size_t, int);
-void schizo_dmamap_sync(bus_dma_tag_t, bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
-    bus_size_t, int);
-int schizo_dmamem_alloc(bus_dma_tag_t, bus_dma_tag_t, bus_size_t, bus_size_t,
-    bus_size_t, bus_dma_segment_t *, int, int *, int);
-void schizo_dmamem_free(bus_dma_tag_t, bus_dma_tag_t, bus_dma_segment_t *, int);
-int schizo_dmamem_map(bus_dma_tag_t, bus_dma_tag_t, bus_dma_segment_t *, int,
-    size_t, caddr_t *, int);
-void schizo_dmamem_unmap(bus_dma_tag_t, bus_dma_tag_t, caddr_t, size_t);
 
 int
 schizo_match(struct device *parent, void *match, void *aux)
@@ -199,8 +180,7 @@ schizo_init(struct schizo_softc *sc, int busa)
 	pbm->sp_cfgt = schizo_alloc_config_tag(pbm);
 	pbm->sp_dmat = schizo_alloc_dma_tag(pbm);
 
-	if (bus_space_map(pbm->sp_cfgt, pbm->sp_confpaddr, 0x1000000,
-	    0, &pbm->sp_cfgh))
+	if (bus_space_map(pbm->sp_cfgt, 0, 0x1000000, 0, &pbm->sp_cfgh))
 		panic("schizo: could not map config space");
 
 	pbm->sp_pc = schizo_alloc_chipset(pbm, sc->sc_node,
@@ -249,7 +229,7 @@ schizo_init_iommu(struct schizo_softc *sc, struct schizo_pbm *pbm)
 	    offsetof(struct schizo_pbm_regs, strbuf),
 	    sizeof(struct iommu_strbuf), &is->is_sb[0]->sb_sb)) {
 		panic("schizo: unable to create streaming buffer handle");
-		is->is_sb[0]->sb_flush = 0;
+		is->is_sb[0]->sb_flush = NULL;
 	} 
 
 #if 1
@@ -258,6 +238,7 @@ schizo_init_iommu(struct schizo_softc *sc, struct schizo_pbm *pbm)
 	    STRBUFREG(strbuf_ctl),
 	    bus_space_read_8(is->is_bustag, is->is_sb[0]->sb_sb,
 		STRBUFREG(strbuf_ctl)) & ~STRBUF_EN);
+	is->is_sb[0]->sb_flush = NULL;
 #endif
 
 	name = (char *)malloc(32, M_DEVBUF, M_NOWAIT);
@@ -341,16 +322,16 @@ schizo_alloc_dma_tag(struct schizo_pbm *pbm)
 	bzero(dt, sizeof(*dt));
 	dt->_cookie = pbm;
 	dt->_parent = pdt;
-	dt->_dmamap_create = schizo_dmamap_create;
-	dt->_dmamap_destroy = schizo_dmamap_destroy;
-	dt->_dmamap_load = schizo_dmamap_load;
-	dt->_dmamap_load_raw = schizo_dmamap_load_raw;
-	dt->_dmamap_unload = schizo_dmamap_unload;
-	dt->_dmamap_sync = schizo_dmamap_sync;
-	dt->_dmamem_alloc = schizo_dmamem_alloc;
-	dt->_dmamem_free = schizo_dmamem_free;
-	dt->_dmamem_map = schizo_dmamem_map;
-	dt->_dmamem_unmap = schizo_dmamem_unmap;
+	dt->_dmamap_create	= schizo_dmamap_create;
+	dt->_dmamap_destroy	= iommu_dvmamap_destroy;
+	dt->_dmamap_load	= iommu_dvmamap_load;
+	dt->_dmamap_load_raw	= iommu_dvmamap_load_raw;
+	dt->_dmamap_unload	= iommu_dvmamap_unload;
+	dt->_dmamap_sync	= iommu_dvmamap_sync;
+	dt->_dmamem_alloc	= iommu_dvmamem_alloc;
+	dt->_dmamem_free	= iommu_dvmamem_free;
+	dt->_dmamem_map		= iommu_dvmamem_map;
+	dt->_dmamem_unmap	= iommu_dvmamem_unmap;
 	return (dt);
 }
 
@@ -376,106 +357,8 @@ schizo_dmamap_create(bus_dma_tag_t t, bus_dma_tag_t t0, bus_size_t size,
 {
         struct schizo_pbm *sp = t->_cookie;
 
-        return (iommu_dvmamap_create(t0, &sp->sp_is, &sp->sp_sb, size,
-            nsegments, maxsegsz, boundary, flags, dmamp));
-}
-
-void
-schizo_dmamap_destroy(bus_dma_tag_t t, bus_dma_tag_t t0, bus_dmamap_t map)
-{
-	iommu_dvmamap_destroy(t0, map);
-}
-
-int
-schizo_dmamap_load(bus_dma_tag_t t, bus_dma_tag_t t0, bus_dmamap_t map,
-    void *buf, bus_size_t buflen, struct proc *p, int flags)
-{
-	struct schizo_pbm *pbm = t->_cookie;
-
-	return (iommu_dvmamap_load(t0, &pbm->sp_is, map, buf, buflen, p,
-	    flags));
-}
-
-void
-schizo_dmamap_unload(bus_dma_tag_t t, bus_dma_tag_t t0, bus_dmamap_t map)
-{
-	struct schizo_pbm *pbm = t->_cookie;
-
-        iommu_dvmamap_unload(t0, &pbm->sp_is, map);
-}
-
-int
-schizo_dmamap_load_raw(bus_dma_tag_t t, bus_dma_tag_t t0, bus_dmamap_t map,
-    bus_dma_segment_t *segs, int nsegs, bus_size_t size, int flags)
-{
-	struct schizo_pbm *pbm = t->_cookie;
-
-	return (iommu_dvmamap_load_raw(t0, &pbm->sp_is, map, segs, nsegs,
-	    flags, size));
-}
-
-void
-schizo_dmamap_sync(bus_dma_tag_t t, bus_dma_tag_t t0, bus_dmamap_t map,
-    bus_addr_t offset, bus_size_t len, int ops)
-{
-	struct schizo_pbm *pbm = t->_cookie;
-
-	if (t->_parent == NULL)
-		panic("schizo_dmamap_sync: no parent");
-
-	for (t = t->_parent; t->_dmamap_sync == NULL; t = t->_parent)
-		if (t == NULL)
-			panic("schizo_dmamap_sync: can't find implementation");
-
-
-	if (ops & (BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE)) {
-		/* Flush the CPU then the IOMMU */
-		(*t->_dmamap_sync)(t, t0, map, offset, len, ops);
-		iommu_dvmamap_sync(t0, &pbm->sp_is, map, offset, len, ops);
-	}
-	if (ops & (BUS_DMASYNC_POSTREAD|BUS_DMASYNC_POSTWRITE)) {
-		/* Flush the IOMMU then the CPU */
-		iommu_dvmamap_sync(t0, &pbm->sp_is, map, offset, len, ops);
-		(*t->_dmamap_sync)(t, t0, map, offset, len, ops);
-	}
-}
-
-int
-schizo_dmamem_alloc(bus_dma_tag_t t, bus_dma_tag_t t0, bus_size_t size,
-    bus_size_t alignment, bus_size_t boundary, bus_dma_segment_t *segs,
-    int nsegs, int *rsegs, int flags)
-{
-	struct schizo_pbm *pbm = t->_cookie;
-
-	return (iommu_dvmamem_alloc(t0, &pbm->sp_is, size, alignment, boundary,
-	    segs, nsegs, rsegs, flags));
-}
-
-void
-schizo_dmamem_free(bus_dma_tag_t t, bus_dma_tag_t t0, bus_dma_segment_t *segs,
-    int nsegs)
-{
-	struct schizo_pbm *pbm = t->_cookie;
-
-	iommu_dvmamem_free(t0, &pbm->sp_is, segs, nsegs);
-}
-
-int
-schizo_dmamem_map(bus_dma_tag_t t, bus_dma_tag_t t0, bus_dma_segment_t *segs,
-    int nsegs, size_t size, caddr_t *kvap, int flags)
-{
-	struct schizo_pbm *pbm = t->_cookie;
-
-	return (iommu_dvmamem_map(t0, &pbm->sp_is, segs, nsegs, size,
-	    kvap, flags));
-}
-
-void
-schizo_dmamem_unmap(bus_dma_tag_t t, bus_dma_tag_t t0, caddr_t kva, size_t size)
-{
-	struct schizo_pbm *pbm = t->_cookie;
-
-	iommu_dvmamem_unmap(t0, &pbm->sp_is, kva, size);
+        return (iommu_dvmamap_create(t, t0, &sp->sp_sb, size, nsegments,
+	    maxsegsz, boundary, flags, dmamp));
 }
 
 int
@@ -554,18 +437,13 @@ _schizo_bus_mmap(bus_space_tag_t t, bus_space_tag_t t0, bus_addr_t paddr,
 
 void *
 _schizo_intr_establish(bus_space_tag_t t, bus_space_tag_t t0, int ihandle,
-    int level, int flags, int (*handler)(void *), void *arg)
+    int level, int flags, int (*handler)(void *), void *arg, const char *what)
 {
 	struct schizo_pbm *pbm = t->cookie;
 	struct intrhand *ih = NULL;
 	volatile u_int64_t *intrmapptr = NULL, *intrclrptr = NULL;
 	int ino;
 	long vec = INTVEC(ihandle);
-
-	ih = (struct intrhand *)malloc(sizeof(struct intrhand), M_DEVBUF,
-	    M_NOWAIT);
-	if (ih == NULL)
-		return (NULL);
 
 	vec = INTVEC(ihandle);
 	ino = INTINO(vec);
@@ -585,11 +463,10 @@ _schizo_intr_establish(bus_space_tag_t t, bus_space_tag_t t0, int ihandle,
 		intrclrptr = &pbmreg->iclr[ino];
 	}
 
-	ih->ih_map = intrmapptr;
-	ih->ih_clr = intrclrptr;
-	ih->ih_fun = handler;
-	ih->ih_pil = level;
-	ih->ih_number = ino;
+	ih = bus_intr_allocate(t0, handler, arg, ino, level, intrmapptr,
+	    intrclrptr, what);
+	if (ih == NULL)
+		return (NULL);
 
 	intr_establish(ih->ih_pil, ih);
 

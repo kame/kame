@@ -1,4 +1,4 @@
-/*	$OpenBSD: mbuf.h,v 1.68 2003/02/12 14:41:08 jason Exp $	*/
+/*	$OpenBSD: mbuf.h,v 1.72 2003/08/12 05:09:17 mickey Exp $	*/
 /*	$NetBSD: mbuf.h,v 1.19 1996/02/09 18:25:14 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -144,6 +140,7 @@ struct mbuf {
 #define M_AUTH		0x0800  /* payload was authenticated (AH or ESP auth) */
 #define M_COMP		0x1000  /* payload was compressed (IPCOMP) */
 #define M_AUTH_AH	0x2000  /* header was authenticated (AH) */
+#define M_TUNNEL	0x4000  /* IP-in-IP added by tunnel mode IPsec */
 
 /* Checksumming flags */
 #define	M_IPV4_CSUM_OUT		0x0001	/* IPv4 checksum needed */
@@ -162,7 +159,8 @@ struct mbuf {
 #define M_LOOP		0x0040	/* for Mbuf statistics */
 
 /* flags copied when copying m_pkthdr */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_BCAST|M_MCAST|M_CONF|M_AUTH|M_COMP|M_ANYCAST6|M_LOOP)
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_BCAST|M_MCAST|M_CONF|\
+			 M_AUTH|M_COMP|M_ANYCAST6|M_LOOP|M_TUNNEL)
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */
@@ -557,7 +555,7 @@ struct  mbuf *m_inject(struct mbuf *, int, int, int);
 struct  mbuf *m_getptr(struct mbuf *, int, int *);
 void	m_adj(struct mbuf *, int);
 int	m_clalloc(int, int);
-void	m_copyback(struct mbuf *, int, int, caddr_t);
+void	m_copyback(struct mbuf *, int, int, const void *);
 void	m_freem(struct mbuf *);
 void	m_reclaim(void *, int);
 void	m_copydata(struct mbuf *, int, int, caddr_t);
@@ -598,6 +596,7 @@ struct m_tag *m_tag_next(struct mbuf *, struct m_tag *);
 #define PACKET_TAG_PF_ROUTED			12 /* PF routed, no route loops */
 #define PACKET_TAG_PF_FRAGCACHE			13 /* PF fragment cached */
 #define	PACKET_TAG_PF_QID			14 /* PF queue id */
+#define PACKET_TAG_PF_TAG			15 /* PF tags */
 
 #ifdef MBTYPES
 int mbtypes[] = {				/* XXX */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: hpux_machdep.c,v 1.15 2003/01/09 22:27:08 miod Exp $	*/
+/*	$OpenBSD: hpux_machdep.c,v 1.17 2003/08/01 18:37:26 miod Exp $	*/
 /*	$NetBSD: hpux_machdep.c,v 1.19 1998/02/16 20:58:30 thorpej Exp $	*/
 
 /*
@@ -19,11 +19,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. The name of the author may not be used to endorse or promote products
+ * 3. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
@@ -423,24 +419,6 @@ hpux_sendsig(catcher, sig, mask, code, type, val)
 		       p->p_pid, sig, &oonstack, fp, &fp->hsf_sc, ft);
 #endif
 
-	if (uvm_useracc((caddr_t)fp, fsize, B_WRITE) == 0) {
-#ifdef DEBUG
-		if ((hpuxsigdebug & SDB_KSTACK) && p->p_pid == hpuxsigpid)
-			printf("hpux_sendsig(%d): useracc failed on sig %d\n",
-			       p->p_pid, sig);
-#endif
-		/*
-		 * Process has trashed its stack; give it an illegal
-		 * instruction to halt it in its tracks.
-		 */
-		SIGACTION(p, SIGILL) = SIG_DFL;
-		sig = sigmask(SIGILL);
-		p->p_sigignore &= ~sig;
-		p->p_sigcatch &= ~sig;
-		p->p_sigmask &= ~sig;
-		psignal(p, SIGILL);
-		return;
-	}
 	kfp = (struct hpuxsigframe *)malloc((u_long)fsize, M_TEMP, M_WAITOK);
 
 	/* 
@@ -518,7 +496,24 @@ hpux_sendsig(catcher, sig, mask, code, type, val)
 	kfp->hsf_sc._hsc_pad	= 0;
 	kfp->hsf_sc._hsc_ap	= (int)&fp->hsf_sigstate;
 
-	(void) copyout((caddr_t)kfp, (caddr_t)fp, fsize);
+	if (copyout((caddr_t)kfp, (caddr_t)fp, fsize) != 0) {
+#ifdef DEBUG
+		if ((hpuxsigdebug & SDB_KSTACK) && p->p_pid == hpuxsigpid)
+			printf("hpux_sendsig(%d): copyout failed on sig %d\n",
+			       p->p_pid, sig);
+#endif
+		/*
+		 * Process has trashed its stack; give it an illegal
+		 * instruction to halt it in its tracks.
+		 */
+		SIGACTION(p, SIGILL) = SIG_DFL;
+		sig = sigmask(SIGILL);
+		p->p_sigignore &= ~sig;
+		p->p_sigcatch &= ~sig;
+		p->p_sigmask &= ~sig;
+		psignal(p, SIGILL);
+		return;
+	}
 	frame->f_regs[SP] = (int)fp;
 
 #ifdef DEBUG
@@ -581,8 +576,7 @@ hpux_sys_sigreturn(p, v, retval)
 	 * Fetch and test the HP-UX context structure.
 	 * We grab it all at once for speed.
 	 */
-	if (uvm_useracc((caddr_t)scp, sizeof (*scp), B_WRITE) == 0 ||
-	    copyin((caddr_t)scp, (caddr_t)&tsigc, sizeof tsigc))
+	if (copyin((caddr_t)scp, (caddr_t)&tsigc, sizeof tsigc))
 		return (EINVAL);
 	scp = &tsigc;
 	if ((scp->hsc_ps & (PSL_MBZ|PSL_IPL|PSL_S)) != 0)

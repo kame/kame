@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.19 2003/02/24 22:13:39 miod Exp $ */
+/*	$OpenBSD: autoconf.c,v 1.23 2003/08/23 22:52:30 deraadt Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -11,12 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed under OpenBSD by
- *	Theo de Raadt for Willowglen Singapore.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
  * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -46,11 +40,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -270,7 +260,7 @@ swapconf()
 	for (swp = swdevt; swp->sw_dev != NODEV; swp++)
 		if (bdevsw[major(swp->sw_dev)].d_psize) {
 			nblks =
-			  (*bdevsw[major(swp->sw_dev)].d_psize)(swp->sw_dev);
+			    (*bdevsw[major(swp->sw_dev)].d_psize)(swp->sw_dev);
 			if (nblks != -1 &&
 			    (swp->sw_nblks == 0 || swp->sw_nblks > nblks))
 				swp->sw_nblks = nblks;
@@ -289,7 +279,7 @@ struct nam2blk {
 } nam2blk[] = {
 	{ "sd",		4 },
 	{ "st",		7 },
-   { "rd",     9 },
+	{ "rd",		9 },
 };
 
 int
@@ -343,7 +333,7 @@ parsedisk(str, len, defpart, devp)
 		return (NULL);
 	cp = str + len - 1;
 	c = *cp;
-	if (c >= 'a' && c <= 'h') {
+	if (c >= 'a' && (c - 'a') < MAXPARTITIONS) {
 		part = c - 'a';
 		*cp = '\0';
 	} else
@@ -395,7 +385,7 @@ setroot()
 #endif
 
 	printf("boot device: %s\n",
-		(bootdv) ? bootdv->dv_xname : "<unknown>");
+	    (bootdv) ? bootdv->dv_xname : "<unknown>");
 
 	if (boothowto & RB_ASKNAME) {
 		for (;;) {
@@ -407,20 +397,20 @@ setroot()
 			printf(": ");
 			len = getsn(buf, sizeof(buf));
 			if (len == 0 && bootdv != NULL) {
-				strcpy(buf, bootdv->dv_xname);
+				strlcpy(buf, bootdv->dv_xname, sizeof buf);
 				len = strlen(buf);
 			}
 			if (len > 0 && buf[len - 1] == '*') {
 				buf[--len] = '\0';
 				dv = getdisk(buf, len, 1, &nrootdev);
-				if (dv != NULL) {
+				if (dv) {
 					bootdv = dv;
 					nswapdev = nrootdev;
 					goto gotswap;
 				}
 			}
 			dv = getdisk(buf, len, 0, &nrootdev);
-			if (dv != NULL) {
+			if (dv) {
 				bootdv = dv;
 				break;
 			}
@@ -470,9 +460,7 @@ gotswap:
 		dumpdev = nswapdev;
 		swdevt[0].sw_dev = nswapdev;
 		swdevt[1].sw_dev = NODEV;
-
 	} else if (mountroot == NULL) {
-
 		/*
 		 * `swap generic': Use the device the ROM told us to use.
 		 */
@@ -498,9 +486,7 @@ gotswap:
 		}
 		swdevt[0].sw_dev = nswapdev;
 		swdevt[1].sw_dev = NODEV;
-
 	} else {
-
 		/*
 		 * `root DEV swap DEV': honour rootdev/swdevt.
 		 * rootdev/swdevt/mountroot already properly set.
@@ -566,13 +552,13 @@ getdevunit(name, unit)
 	int lunit;
 
 	/* compute length of name and decimal expansion of unit number */
-	sprintf(num, "%d", unit);
+	snprintf(num, sizeof num, "%d", unit);
 	lunit = strlen(num);
 	if (strlen(name) + lunit >= sizeof(fullname) - 1)
 		panic("config_attach: device name too long");
 
-	strcpy(fullname, name);
-	strcat(fullname, num);
+	strlcpy(fullname, name, sizeof fullname);
+	strlcat(fullname, num, sizeof fullname);
 
 	while (strcmp(dev->dv_xname, fullname) != 0) {
 		if ((dev = dev->dv_list.tqe_next) == NULL)

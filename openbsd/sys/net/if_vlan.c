@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_vlan.c,v 1.35 2003/03/24 17:59:48 jason Exp $ */
+/*	$OpenBSD: if_vlan.c,v 1.41 2003/08/15 20:32:19 tedu Exp $ */
 /*
  * Copyright 1998 Massachusetts Institute of Technology
  *
@@ -78,7 +78,7 @@
 
 #include <net/if_vlan_var.h>
 
-struct	ifaddr	**ifnet_addrs;
+extern struct	ifaddr	**ifnet_addrs;
 
 struct ifvlan *ifv_softc;
 int nifvlan;
@@ -113,7 +113,7 @@ vlanattach(int count)
 		LIST_INIT(&ifv_softc[i].vlan_mc_listhead);
 		ifp = &ifv_softc[i].ifv_if;
 		ifp->if_softc = &ifv_softc[i];
-		sprintf(ifp->if_xname, "vlan%d", i);
+		snprintf(ifp->if_xname, sizeof ifp->if_xname, "vlan%d", i);
 		/* NB: flags are not set here */
 		/* NB: mtu is not set here */
 
@@ -206,7 +206,7 @@ vlan_start(struct ifnet *ifp)
 				    sizeof(struct ether_vlan_header);
 
 			m_copyback(m0, 0, sizeof(struct ether_vlan_header),
-			    (caddr_t)&evh);
+			    &evh);
 
 			m = m0;
 		}
@@ -265,7 +265,7 @@ vlan_input_tag(struct mbuf *m, u_int16_t t)
 		if (m->m_len < sizeof(struct ether_vlan_header) &&
 		    (m = m_pullup(m, sizeof(struct ether_vlan_header))) == NULL)
 			return (-1);
-		m_copyback(m, 0, sizeof(struct ether_vlan_header), (caddr_t)&vh);
+		m_copyback(m, 0, sizeof(struct ether_vlan_header), &vh);
 		ether_input_mbuf(m->m_pkthdr.rcvif, m);
 		return (-1);
 	}
@@ -351,6 +351,8 @@ vlan_input(eh, m)
 		 * that yet.
 		 */
 		struct mbuf m0;
+
+		m0.m_flags = 0;
 		m0.m_next = m;
 		m0.m_len = sizeof(struct ether_header);
 		m0.m_data = (char *)eh;
@@ -384,7 +386,7 @@ vlan_config(struct ifvlan *ifv, struct ifnet *p)
 		 */
 		ifv->ifv_if.if_mtu = p->if_mtu - EVL_ENCAPLEN;
 #ifdef DIAGNOSTIC
-		printf("%s: initialized with non-standard mtu %d (parent %s)\n",
+		printf("%s: initialized with non-standard mtu %lu (parent %s)\n",
 		    ifv->ifv_if.if_xname, ifv->ifv_if.if_mtu,
 		    ifv->ifv_p->if_xname);
 #endif
@@ -561,7 +563,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case SIOCSETVLAN:
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+		if ((error = suser(p, 0)) != 0)
 			break;
 		if ((error = copyin(ifr->ifr_data, &vlr, sizeof vlr)))
 			break;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: auich.c,v 1.31 2003/03/19 20:15:02 mickey Exp $	*/
+/*	$OpenBSD: auich.c,v 1.36 2003/08/06 21:08:06 millert Exp $	*/
 
 /*
  * Copyright (c) 2000,2001 Michael Shalayeff
@@ -12,8 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -165,9 +163,9 @@ struct auich_softc {
 	struct auich_dmalist *dmalist_pcmo, *dmap_pcmo,
 	    dmasto_pcmo[AUICH_DMALIST_MAX+1];
 	struct auich_dmalist *dmalist_pcmi, *dmap_pcmi,
-	    dmasto_pcmi[AUICH_DMALIST_MAX+1];;
+	    dmasto_pcmi[AUICH_DMALIST_MAX+1];
 	struct auich_dmalist *dmalist_mici, *dmap_mici,
-	    dmasto_mici[AUICH_DMALIST_MAX+1];;
+	    dmasto_mici[AUICH_DMALIST_MAX+1];
 	/* i/o buffer pointers */
 	u_int32_t pcmo_start, pcmo_p, pcmo_end;
 	int pcmo_blksize, pcmo_fifoe;
@@ -189,6 +187,7 @@ struct auich_softc {
 	int sc_sample_size;
 	int sc_sts_reg;
 	int sc_ignore_codecready;
+	int flags;
 };
 
 #ifdef AUICH_DEBUG
@@ -224,6 +223,7 @@ static const struct auich_devtype {
 	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801BA_ACA,	0, "ICH2" },
 	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801CA_ACA,	0, "ICH3" },
 	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801DB_ACA,	0, "ICH4" },
+	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801EB_ACA,	0, "ICH5" },
 	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82440MX_ACA,	0, "440MX" },
 	{ PCI_VENDOR_SIS,	PCI_PRODUCT_SIS_7012_ACA,	0, "SiS7012" },
 	{ PCI_VENDOR_NVIDIA,	PCI_PRODUCT_NVIDIA_NFORCE_ACA,	0, "nForce" },
@@ -289,6 +289,7 @@ int  auich_attach_codec(void *, struct ac97_codec_if *);
 int  auich_read_codec(void *, u_int8_t, u_int16_t *);
 int  auich_write_codec(void *, u_int8_t, u_int16_t);
 void auich_reset_codec(void *);
+enum ac97_host_flags auich_flags_codec(void *);
 
 int
 auich_match(parent, match, aux)
@@ -356,8 +357,8 @@ auich_attach(parent, self, aux)
 		return;
 	}
 	intrstr = pci_intr_string(pa->pa_pc, ih);
-	sc->sc_ih = pci_intr_establish(pa->pa_pc, ih, IPL_AUDIO, auich_intr, sc,
-				       sc->sc_dev.dv_xname);
+	sc->sc_ih = pci_intr_establish(pa->pa_pc, ih, IPL_AUDIO, auich_intr,
+				       sc, sc->sc_dev.dv_xname);
 	if (!sc->sc_ih) {
 		printf(": can't establish interrupt");
 		if (intrstr)
@@ -372,9 +373,12 @@ auich_attach(parent, self, aux)
 		if (PCI_PRODUCT(pa->pa_id) == auich_devices[i].product)
 			break;
 
-	sprintf(sc->sc_audev.name, "%s AC97", auich_devices[i].name);
-	sprintf(sc->sc_audev.version, "0x%02x", PCI_REVISION(pa->pa_class));
-	strcpy(sc->sc_audev.config, sc->sc_dev.dv_xname);
+	snprintf(sc->sc_audev.name, sizeof sc->sc_audev.name, "%s AC97",
+		 auich_devices[i].name);
+	snprintf(sc->sc_audev.version, sizeof sc->sc_audev.version, "0x%02x",
+		 PCI_REVISION(pa->pa_class));
+	strlcpy(sc->sc_audev.config, sc->sc_dev.dv_xname,
+		sizeof sc->sc_audev.config);
 
 	printf(": %s, %s\n", intrstr, sc->sc_audev.name);
 
@@ -404,6 +408,9 @@ auich_attach(parent, self, aux)
 	sc->host_if.read = auich_read_codec;
 	sc->host_if.write = auich_write_codec;
 	sc->host_if.reset = auich_reset_codec;
+	sc->host_if.flags = auich_flags_codec;
+	if (sc->sc_dev.dv_cfdata->cf_flags & 0x0001) 
+		sc->flags = AC97_HOST_SWAPPED_CHANNELS;
 
 	if (ac97_attach(&sc->host_if) != 0) {
 		pci_intr_disestablish(pa->pa_pc, sc->sc_ih);
@@ -502,6 +509,14 @@ auich_reset_codec(v)
 		    ("%s: reset_codec timeout\n", sc->sc_dev.dv_xname));
 }
 
+enum ac97_host_flags
+auich_flags_codec(void *v)
+{
+	struct auich_softc *sc = v;
+
+	return (sc->flags);
+}
+
 int
 auich_open(v, flags)
 	void *v;
@@ -523,49 +538,49 @@ auich_query_encoding(v, aep)
 {
 	switch (aep->index) {
 	case 0:
-		strcpy(aep->name, AudioEulinear);
+		strlcpy(aep->name, AudioEulinear, sizeof aep->name);
 		aep->encoding = AUDIO_ENCODING_ULINEAR;
 		aep->precision = 8;
 		aep->flags = 0;
 		return (0);
 	case 1:
-		strcpy(aep->name, AudioEmulaw);
+		strlcpy(aep->name, AudioEmulaw, sizeof aep->name);
 		aep->encoding = AUDIO_ENCODING_ULAW;
 		aep->precision = 8;
 		aep->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		return (0);
 	case 2:
-		strcpy(aep->name, AudioEalaw);
+		strlcpy(aep->name, AudioEalaw, sizeof aep->name);
 		aep->encoding = AUDIO_ENCODING_ALAW;
 		aep->precision = 8;
 		aep->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		return (0);
 	case 3:
-		strcpy(aep->name, AudioEslinear);
+		strlcpy(aep->name, AudioEslinear, sizeof aep->name);
 		aep->encoding = AUDIO_ENCODING_SLINEAR;
 		aep->precision = 8;
 		aep->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		return (0);
 	case 4:
-		strcpy(aep->name, AudioEslinear_le);
+		strlcpy(aep->name, AudioEslinear_le, sizeof aep->name);
 		aep->encoding = AUDIO_ENCODING_SLINEAR_LE;
 		aep->precision = 16;
 		aep->flags = 0;
 		return (0);
 	case 5:
-		strcpy(aep->name, AudioEulinear_le);
+		strlcpy(aep->name, AudioEulinear_le, sizeof aep->name);
 		aep->encoding = AUDIO_ENCODING_ULINEAR_LE;
 		aep->precision = 16;
 		aep->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		return (0);
 	case 6:
-		strcpy(aep->name, AudioEslinear_be);
+		strlcpy(aep->name, AudioEslinear_be, sizeof aep->name);
 		aep->encoding = AUDIO_ENCODING_SLINEAR_BE;
 		aep->precision = 16;
 		aep->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		return (0);
 	case 7:
-		strcpy(aep->name, AudioEulinear_be);
+		strlcpy(aep->name, AudioEulinear_be, sizeof aep->name);
 		aep->encoding = AUDIO_ENCODING_ULINEAR_BE;
 		aep->precision = 16;
 		aep->flags = AUDIO_ENCODINGFLAG_EMULATED;

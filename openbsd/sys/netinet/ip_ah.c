@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ah.c,v 1.72 2003/02/28 21:42:56 jason Exp $ */
+/*	$OpenBSD: ip_ah.c,v 1.79 2003/08/14 19:00:12 jason Exp $ */
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -103,8 +103,20 @@ ah_init(struct tdb *tdbp, struct xformsw *xsp, struct ipsecinit *ii)
 		thash = &auth_hash_hmac_sha1_96;
 		break;
 
-	case SADB_AALG_RIPEMD160HMAC:
+	case SADB_X_AALG_RIPEMD160HMAC:
 		thash = &auth_hash_hmac_ripemd_160_96;
+		break;
+
+	case SADB_X_AALG_SHA2_256:
+		thash = &auth_hash_hmac_sha2_256_96;
+		break;
+
+	case SADB_X_AALG_SHA2_384:
+		thash = &auth_hash_hmac_sha2_384_96;
+		break;
+
+	case SADB_X_AALG_SHA2_512:
+		thash = &auth_hash_hmac_sha2_512_96;
 		break;
 
 	case SADB_X_AALG_MD5:
@@ -214,20 +226,10 @@ ah_massage_headers(struct mbuf **m0, int proto, int skip, int alg, int out)
 		 * On input, fix ip_len which has been byte-swapped
 		 * at ip_input().
 		 */
-		if (!out) {
-			ip->ip_len += skip;
-			HTONS(ip->ip_len);
-
-			if (alg == CRYPTO_MD5_KPDK || alg == CRYPTO_SHA1_KPDK)
-				ip->ip_off = htons(ip->ip_off & IP_DF);
-			else
-				ip->ip_off = 0;
-		} else {
-			if (alg == CRYPTO_MD5_KPDK || alg == CRYPTO_SHA1_KPDK)
-				ip->ip_off = htons(ntohs(ip->ip_off) & IP_DF);
-			else
-				ip->ip_off = 0;
-		}
+		if (alg == CRYPTO_MD5_KPDK || alg == CRYPTO_SHA1_KPDK)
+			ip->ip_off &= htons(IP_DF);
+		else
+			ip->ip_off = 0;
 
 		ptr = mtod(m, unsigned char *) + sizeof(struct ip);
 
@@ -360,7 +362,7 @@ ah_massage_headers(struct mbuf **m0, int proto, int skip, int alg, int out)
 			ip6.ip6_dst.s6_addr16[1] = 0;
 
 		/* Done with IPv6 header. */
-		m_copyback(m, 0, sizeof(struct ip6_hdr), (caddr_t) &ip6);
+		m_copyback(m, 0, sizeof(struct ip6_hdr), &ip6);
 
 		/* Let's deal with the remaining headers (if any). */
 		if (skip - sizeof(struct ip6_hdr) > 0) {
@@ -704,7 +706,17 @@ ah_input_cb(void *op)
 	skip = tc->tc_skip;
 	protoff = tc->tc_protoff;
 	mtag = (struct m_tag *) tc->tc_ptr;
+
 	m = (struct mbuf *) crp->crp_buf;
+	if (m == NULL) {
+		/* Shouldn't happen... */
+		FREE(tc, M_XDATA);
+		crypto_freereq(crp);
+		ahstat.ahs_crypto++;
+		DPRINTF(("ah_input_cb(): bogus returned buffer from "
+		    "crypto\n"));
+		return (EINVAL);
+	}
 
 	s = spltdb();
 
@@ -721,16 +733,14 @@ ah_input_cb(void *op)
 
 	/* Check for crypto errors. */
 	if (crp->crp_etype) {
-		FREE(tc, M_XDATA);
-
-		if (tdb->tdb_cryptoid != 0)
-			tdb->tdb_cryptoid = crp->crp_sid;
-
 		if (crp->crp_etype == EAGAIN) {
+			/* Reset the session ID */
+			if (tdb->tdb_cryptoid != 0)
+				tdb->tdb_cryptoid = crp->crp_sid;
 			splx(s);
 			return crypto_dispatch(crp);
 		}
-
+		FREE(tc, M_XDATA);
 		ahstat.ahs_noxform++;
 		DPRINTF(("ah_input_cb(): crypto error %d\n", crp->crp_etype));
 		error = crp->crp_etype;
@@ -738,16 +748,6 @@ ah_input_cb(void *op)
 	} else {
 		crypto_freereq(crp); /* No longer needed. */
 		crp = NULL;
-	}
-
-	/* Shouldn't happen... */
-	if (m == NULL) {
-		FREE(tc, M_XDATA);
-		ahstat.ahs_crypto++;
-		DPRINTF(("ah_input_cb(): bogus returned buffer from "
-		    "crypto\n"));
-		error = EINVAL;
-		goto baddone;
 	}
 
 	if (!(tdb->tdb_flags & TDBF_NOREPLAY))
@@ -948,6 +948,7 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 		hdr.spi = tdb->tdb_spi;
 		hdr.flags |= M_AUTH | M_AUTH_AH;
 
+		m1.m_flags = 0;
 		m1.m_next = m;
 		m1.m_len = ENC_HDRLEN;
 		m1.m_data = (char *) &hdr;
@@ -971,7 +972,7 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 		    ipsp_address(tdb->tdb_dst), ntohl(tdb->tdb_spi)));
 		m_freem(m);
 		ahstat.ahs_wrap++;
-		return NULL;
+		return EINVAL;
 	}
 
 	if (!(tdb->tdb_flags & TDBF_NOREPLAY))
@@ -1152,7 +1153,7 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 			    (caddr_t) &iplen, sizeof(u_int16_t));
 			iplen = htons(ntohs(iplen) + rplen + ahx->authsize);
 			m_copyback(m, offsetof(struct ip, ip_len),
-			    sizeof(u_int16_t), (caddr_t) &iplen);
+			    sizeof(u_int16_t), &iplen);
 			break;
 #endif /* INET */
 
@@ -1163,7 +1164,7 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 			    (caddr_t) &iplen, sizeof(u_int16_t));
 			iplen = htons(ntohs(iplen) + rplen + ahx->authsize);
 			m_copyback(m, offsetof(struct ip6_hdr, ip6_plen),
-			    sizeof(u_int16_t), (caddr_t) &iplen);
+			    sizeof(u_int16_t), &iplen);
 			break;
 #endif /* INET6 */
 		}
@@ -1173,7 +1174,7 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 
 		/* Update the Next Protocol field in the IP header. */
 		prot = IPPROTO_AH;
-		m_copyback(m, protoff, sizeof(u_int8_t), (caddr_t) &prot);
+		m_copyback(m, protoff, sizeof(u_int8_t), &prot);
 
 		/* "Massage" the packet headers for crypto processing. */
 		if ((len = ah_massage_headers(&m, tdb->tdb_dst.sa.sa_family,
@@ -1186,7 +1187,7 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 	} else {
 		/* Update the Next Protocol field in the IP header. */
 		prot = IPPROTO_AH;
-		m_copyback(m, protoff, sizeof(u_int8_t), (caddr_t) &prot);
+		m_copyback(m, protoff, sizeof(u_int8_t), &prot);
 	}
 
 	/* Crypto operation descriptor. */
@@ -1229,7 +1230,17 @@ ah_output_cb(void *op)
 	skip = tc->tc_skip;
 	protoff = tc->tc_protoff;
 	ptr = (caddr_t) (tc + 1);
+
 	m = (struct mbuf *) crp->crp_buf;
+	if (m == NULL) {
+		/* Shouldn't happen... */
+		FREE(tc, M_XDATA);
+		crypto_freereq(crp);
+		ahstat.ahs_crypto++;
+		DPRINTF(("ah_output_cb(): bogus returned buffer from "
+		    "crypto\n"));
+		return (EINVAL);
+	}
 
 	s = spltdb();
 
@@ -1244,28 +1255,17 @@ ah_output_cb(void *op)
 
 	/* Check for crypto errors. */
 	if (crp->crp_etype) {
-		if (tdb->tdb_cryptoid != 0)
-			tdb->tdb_cryptoid = crp->crp_sid;
-
 		if (crp->crp_etype == EAGAIN) {
+			/* Reset the session ID */
+			if (tdb->tdb_cryptoid != 0)
+				tdb->tdb_cryptoid = crp->crp_sid;
 			splx(s);
 			return crypto_dispatch(crp);
 		}
-
 		FREE(tc, M_XDATA);
 		ahstat.ahs_noxform++;
 		DPRINTF(("ah_output_cb(): crypto error %d\n", crp->crp_etype));
 		error = crp->crp_etype;
-		goto baddone;
-	}
-
-	/* Shouldn't happen... */
-	if (m == NULL) {
-		FREE(tc, M_XDATA);
-		ahstat.ahs_crypto++;
-		DPRINTF(("ah_output_cb(): bogus returned buffer from "
-		    "crypto\n"));
-		error = EINVAL;
 		goto baddone;
 	}
 

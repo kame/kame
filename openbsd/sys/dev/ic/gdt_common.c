@@ -1,4 +1,4 @@
-/*	$OpenBSD: gdt_common.c,v 1.23 2003/02/25 09:12:39 tedu Exp $	*/
+/*	$OpenBSD: gdt_common.c,v 1.26 2003/06/28 23:56:40 avsm Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Niklas Hallqvist.  All rights reserved.
@@ -11,11 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Niklas Hallqvist.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -397,7 +392,7 @@ gdt_attach(gdt)
 
 #if NBIO > 0
 	if (bio_register(&gdt->sc_dev, gdt_ioctl) != 0)
-		panic("%s: controller registration failed");
+		panic("%s: controller registration failed", gdt->sc_dev.dv_xname);
 #endif
 	gdt_cnt++;
 
@@ -893,9 +888,10 @@ gdt_internal_cache_cmd(xs)
 		inq.version = 2;
 		inq.response_format = 2;
 		inq.additional_length = 32;
-		strcpy(inq.vendor, "ICP	   ");
-		sprintf(inq.product, "Host drive  #%02d", target);
-		strcpy(inq.revision, "	 ");
+		strlcpy(inq.vendor, "ICP	   ", sizeof inq.vendor);
+		snprintf(inq.product, sizeof inq.product, "Host drive  #%02d",
+		    target);
+		strlcpy(inq.revision, "	 ", sizeof inq.revision);
 		gdt_copy_internal_data(xs, (u_int8_t *)&inq, sizeof inq);
 		break;
 
@@ -1456,7 +1452,7 @@ gdt_ioctl(dev, cmd, addr)
 			p->revision = osrelease[4] - '0';
 		else
 			p->revision = 0;
-		strcpy(p->name, ostype);
+		strlcpy(p->name, ostype, sizeof p->name);
 		break;
 	}
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.S,v 1.105 2003/02/18 21:06:43 mickey Exp $	*/
+/*	$OpenBSD: locore.S,v 1.111 2003/08/07 19:23:52 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998-2003 Michael Shalayeff
@@ -104,13 +104,13 @@
 	.import	kpsw, data
 	.import	panic, code
 
-#define	EXIT_STACKSIZE	(2*NBPG)
-#define	EMRG_STACKSIZE	(2*NBPG)
-#define	FPEMU_STACKSIZE	(4*NBPG)
+#define	EMRG_STACKSIZE	(1*NBPG)
+#define	FPEMU_STACKSIZE	(1*NBPG)
 
 	.data
-$trap_tmp_save			/* XXX assumed to be aligned on 2048 */
-	.block	TF_PHYS		/* XXX must be aligned to 64 */
+	.align	64
+$trap_tmp_save
+	.block	TF_PHYS
 
 	.globl	intrcnt, eintrcnt, intrnames, eintrnames
 	.export	intrcnt, data
@@ -689,13 +689,11 @@ $syscall
 	 * Save hpt mask and v2p translation table pointer
 	 */
 	mfctl	eirr, arg0
-	mfctl	hptmask, arg1
+	mfctl	vtop, arg1
 	stw	arg0, TF_CR23-TRAPFRAME_SIZEOF(sr1, t3)
-	stw	arg1, TF_CR24-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	arg1, TF_CR25-TRAPFRAME_SIZEOF(sr1, t3)
 
-	mfctl	vtop, arg0
 	mfctl	cr28, arg1
-	stw	arg0, TF_CR25-TRAPFRAME_SIZEOF(sr1, t3)
 	stw	arg1, TF_CR28-TRAPFRAME_SIZEOF(sr1, t3)
 #endif
 
@@ -749,6 +747,7 @@ $syscall_return
 	 *	and interrupts are disabled.
 	 */
 	ldil	L%$trap_tmp_save, t2
+	ldo	R%$trap_tmp_save(t2), t2
 	/* use ,bc each cache line */
 	ldw  0(t3), r1 ! ldw  4(t3), t1 ! stw r1,  0(t2) ! stw t1,  4(t2)
 	ldw  8(t3), r1 ! ldw 12(t3), t1 ! stw r1,  8(t2) ! stw t1, 12(t2)
@@ -839,6 +838,7 @@ $syscall_return
 $syscall_return_phys
 
 	ldil	L%$trap_tmp_save, t3
+	ldo	R%$trap_tmp_save(t3), t3
 
 	/* finally we can restore the space and offset queues and the ipsw */
 	ldw	TF_IISQH(t3), t1
@@ -1194,23 +1194,13 @@ $fpusw_done
 	nop
 EXIT(TLABEL(emu))
 
-	/* Compute the hpt entry ptr */
-#define	HPTENT \
-	extru	r9, 23, 24, r16		/* r16 = (offset >> 8) */	! \
-	zdep	r8, 22, 16, r24		/* r24 = (space << 9) */	! \
-	mfctl	hptmask, r17		/* r17 = sizeof(HPT)-1 */	! \
-	xor	r16, r24, r24		/* r24 ^= r16 */		! \
-	and	r17, r24, r24		/* r24 &= r17 */		! \
-	mfctl	vtop, r16		/* r16 = address of HPT table */! \
-	or	r16, r24, r24		/* r24 = HPT entry */
-
 	/* Construct the virtual address tag. */
 #define	VTAG ! \
 	shd	r0, r9, 1, r16		/* r16[1..15] = off[0..14] */	! \
 	dep	r8, 31, 16, r16		/* put in the space id */	! \
 	depi	1, 0, 1, r16		/* and set the valid bit */
 
-#if 1
+#if 0
 	.export	dtlb_c, data
 	BSS(dtlb_c, 8)
 	.export	dtlb_c, data
@@ -1415,6 +1405,7 @@ ENTRY(TLABEL(all),0)
 	mtctl	t3, tr2
 
 	ldil	L%$trap_tmp_save, t3
+	ldo	R%$trap_tmp_save(t3), t3
 	stw	t1, TF_R22(t3)		/* use ,bc */
 	stw	t2, TF_R21(t3)
 
@@ -1571,6 +1562,7 @@ $trapnowvirt
 	 * Copy partially saved state from the store into the frame
 	 */
 	ldil	L%$trap_tmp_save, t2
+	ldo	R%$trap_tmp_save(t2), t2
 	/* use ,bc each cache line */
 	ldw  0(t2), r1 ! ldw  4(t2), t1 ! stw r1,  0(t3) ! stw t1,  4(t3)
 	ldw  8(t2), r1 ! ldw 12(t2), t1 ! stw r1,  8(t3) ! stw t1, 12(t3)
@@ -1626,13 +1618,11 @@ $trapnowvirt
 	 * Save hpt mask and v2p translation table pointer
 	 */
 	mfctl	eirr, t1
-	mfctl	hptmask, t2
+	mfctl	vtop, t2
 	stw	t1, TF_CR23(t3)
-	stw	t2, TF_CR24(t3)
+	stw	t2, TF_CR25(t3)
 
-	mfctl	vtop, t1
 	mfctl	cr28, t2
-	stw	t1, TF_CR25(t3)
 	stw	t2, TF_CR28(t3)
 #endif
 	mfctl	cr30, t1
@@ -1910,23 +1900,23 @@ ENTRY(TLABEL(intr),0)
 	ldil	L%intr_table, r1
 	ldo	R%intr_table(r1), r1
 $intr_ffs
-	addi	16, r1, r1
+	addi	32, r1, r1
 	bb,>=	r8, 31, $intr_ffs
 	shd	r0, r8, 1, r8
 
-	ldb	2-16(r1), r17
-	ldw	4-16(r1), r9
+	ldb	2-32(r1), r17
+	ldw	4-32(r1), r9
 	subi,<>	1, r17, r0
 	bv,n	r0(r9)
 	nop
 
 	mfctl	sar, r25
-	ldb	1-16(r1), r9
+	ldb	1-32(r1), r9
 	mtsar	r9
 	vdepi	1, 1, r24
 	mtsar	r25
 
-	ldb	0-16(r1), r9
+	ldb	0-32(r1), r9
 	ldil	L%intrcnt, r25
 	ldo	R%intrcnt(r25), r25
 	sh2add	r9, r25, r25
@@ -1957,23 +1947,29 @@ EXIT(TLABEL(intr))
 	.export	gsc_intr, entry
 LEAF_ENTRY(gsc_intr)
 
-	ldw	8-16(r1), r9	/* arg: ioreg */
+	ldw	8-32(r1), r9	/* arg: ioreg */
 	mtctl	r1, tr7
 	ldw	0(r9), r16	/* irr */
 
-	ldw	12-16(r1), r1	/* next: sub-intr_table */
+	ldw	12-32(r1), r1	/* next: sub-intr_table */
+
+$gsc_intr_loop
+	comb,=,n r0, r16, $intr_cont
+	mfctl	tr7, r1
 $gsc_ffs
-	addi	16, r1, r1
+	addi	32, r1, r1
 	bb,>=	r16, 31, $gsc_ffs
 	shd	r0, r16, 1, r16
 
+	copy	r1, r9
+$gsc_share
 	mfctl	sar, r25
-	ldb	1-16(r1), r17
+	ldb	1-32(r1), r17
 	mtsar	r17
 	vdepi	1, 1, r24
 	mtsar	r25
 
-	ldb	0-16(r1), r17
+	ldb	0-32(r1), r17
 	ldil	L%intrcnt, r25
 	ldo	R%intrcnt(r25), r25
 	sh2add	r17, r25, r25
@@ -1981,11 +1977,12 @@ $gsc_ffs
 	addi	1, r17, r17
 	stw	r17, 0(r25)
 
-	comb,<>	r0, r16, $gsc_ffs
-	nop
+	ldw	16-32(r1), r17
+	comb,<>,n r0, r17, $gsc_share
+	ldo	32(r17), r1
 
-	b	$intr_cont
-	mfctl	tr7, r1
+	b	$gsc_intr_loop
+	copy	r9, r1
 EXIT(gsc_intr)
 
 	.export	TLABEL(ibrk), entry
@@ -2390,7 +2387,7 @@ EXIT(ficache)
 LEAF_ENTRY(setjmp)
 /*
  * Save the other general registers whose contents are expected to remain
- * across function calls.  According to the "HP9000 Series 800 Assembly
+ * across function calls.  According to the "HP 9000 Series 800 Assembly
  * Language Reference Manual", procedures can use general registers 19-26,
  * 28, 29, 1, and 31 without restoring them.  Hence, we do not save these.
  */
@@ -2804,16 +2801,17 @@ EXIT(switch_trampoline)
  */
 ENTRY(sigcode,0)
 	.call
-	blr	r0, rp
-	bv,n	r0(arg3)
-	nop
-	copy	r3, arg0
+	ble	0(sr0, arg3)
+	copy	r31, rp
+
 	ldil	L%SYSCALLGATE, r1
+	copy	r4, arg0
 	.call
 	ble	4(sr7, r1)
 	ldi	SYS_sigreturn, t1
-	copy	ret0, arg0
+
 	ldil	L%SYSCALLGATE, r1
+	copy	ret0, arg0
 	.call
 	ble	4(sr7, r1)
 	ldi	SYS_exit, t1

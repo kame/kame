@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr_autoconf.c,v 1.32 2002/10/06 23:12:31 art Exp $	*/
+/*	$OpenBSD: subr_autoconf.c,v 1.36 2003/06/02 23:28:06 millert Exp $	*/
 /*	$NetBSD: subr_autoconf.c,v 1.21 1996/04/04 06:06:18 cgd Exp $	*/
 
 /*
@@ -22,11 +22,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -87,7 +83,6 @@ static struct cftable staticcftable = {
 #endif /* AUTOCONF_VERBOSE */
 int autoconf_verbose = AUTOCONF_VERBOSE;	/* trace probe calls */
 
-static char *number(char *, int);
 static void mapply(struct matchinfo *, struct cfdata *);
 
 struct deferred_config {
@@ -339,22 +334,6 @@ config_rootfound(rootname, aux)
 	return (NULL);
 }
 
-/* just like sprintf(buf, "%d") except that it works from the end */
-char *
-number(ep, n)
-	register char *ep;
-	register int n;
-{
-
-	*--ep = 0;
-	while (n >= 10) {
-		*--ep = (n % 10) + '0';
-		n /= 10;
-	}
-	*--ep = n + '0';
-	return (ep);
-}
-
 /*
  * Attach a found device.  Allocates memory for device variables.
  */
@@ -436,9 +415,6 @@ config_make_softc(parent, cf)
 	register struct device *dev;
 	register struct cfdriver *cd;
 	register struct cfattach *ca;
-	register size_t lname, lunit;
-	register char *xunit;
-	char num[10];
 
 	cd = cf->cf_driver;
 	ca = cf->cf_attach;
@@ -464,15 +440,10 @@ config_make_softc(parent, cf)
 	} else
 		dev->dv_unit = cf->cf_unit;
 
-	/* compute length of name and decimal expansion of unit number */
-	lname = strlen(cd->cd_name);
-	xunit = number(&num[sizeof num], dev->dv_unit);
-	lunit = &num[sizeof num] - xunit;
-	if (lname + lunit >= sizeof(dev->dv_xname))
+	/* Build the device name into dv_xname. */
+	if (snprintf(dev->dv_xname, sizeof(dev->dv_xname), "%s%d",
+	    cd->cd_name, dev->dv_unit) >= sizeof(dev->dv_xname))
 		panic("config_make_softc: device name too long");
-
-	bcopy(cd->cd_name, dev->dv_xname, lname);
-	bcopy(xunit, dev->dv_xname + lname, lunit);
 	dev->dv_parent = parent;
 
 	/* put this device in the devices array */
@@ -873,6 +844,6 @@ evcnt_attach(dev, name, ev)
 	/* ev->ev_next = NULL; */
 	ev->ev_dev = dev;
 	/* ev->ev_count = 0; */
-	strcpy(ev->ev_name, name);
+	strlcpy(ev->ev_name, name, sizeof ev->ev_name);
 	TAILQ_INSERT_TAIL(&allevents, ev, ev_list);
 }

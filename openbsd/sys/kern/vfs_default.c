@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_default.c,v 1.19 2002/03/14 01:27:06 millert Exp $  */
+/*	$OpenBSD: vfs_default.c,v 1.22 2003/09/01 18:06:03 henning Exp $  */
 
 /*
  *    Portions of this code are:
@@ -19,11 +19,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -66,6 +62,7 @@ vop_generic_revoke(v)
 	void *v;
 {
 	struct vop_revoke_args /* {
+		struct vnodeop_desc *a_desc;
 		struct vnode *a_vp;
 		int a_flags;
 	} */ *ap = v;
@@ -88,7 +85,7 @@ vop_generic_revoke(v)
 		if (vp->v_flag & VXLOCK) {
 			vp->v_flag |= VXWANT;
 			simple_unlock(&vp->v_interlock);
-			tsleep((caddr_t)vp, PINOD, "vop_generic_revokeall", 0);
+			tsleep(vp, PINOD, "vop_generic_revokeall", 0);
 			return(0);
 		}
 		/*
@@ -137,6 +134,7 @@ vop_generic_abortop(v)
 	void *v;
 {
 	struct vop_abortop_args /* {
+		struct vnodeop_desc *a_desc;
 		struct vnode *a_dvp;
 		struct componentname *a_cnp;
 	} */ *ap = v;
@@ -157,6 +155,7 @@ vop_generic_lock(v)
 	void *v;
 {
 	struct vop_lock_args /* {
+		struct vnodeop_desc *a_desc;
 		struct vnode *a_vp;
 		int a_flags;
 		struct proc *a_p;
@@ -226,6 +225,7 @@ vop_generic_unlock(v)
 	void *v;
 {
 	struct vop_unlock_args /* {
+		struct vnodeop_desc *a_desc;
 		struct vnode *a_vp;
 		int a_flags;
 		struct proc *a_p;
@@ -246,6 +246,7 @@ vop_generic_islocked(v)
 	void *v;
 {
 	struct vop_islocked_args /* {
+		struct vnodeop_desc *a_desc;
 		struct vnode *a_vp;
 	} */ *ap = v;
 
@@ -264,6 +265,7 @@ vop_generic_kqfilter(v)
 	void *v;
 {
 	struct vop_kqfilter_args /* {
+		struct vnodeop_desc *a_desc;
 		struct vnode *a_vp;
 		struct knote *a_kn;
 	} */ *ap = v;

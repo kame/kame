@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_syscalls.c,v 1.35 2002/10/29 12:47:06 art Exp $	*/
+/*	$OpenBSD: nfs_syscalls.c,v 1.38 2003/08/15 20:32:20 tedu Exp $	*/
 /*	$NetBSD: nfs_syscalls.c,v 1.19 1996/02/18 11:53:52 fvdl Exp $	*/
 
 /*
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -185,7 +181,7 @@ nfs_clientd(struct nfsmount *nmp, struct ucred *cred, struct nfsd_cargs *ncd,
 			"nqnfstimr", hz / 3);
 		    if (error == EINTR || error == ERESTART) {
 			if (vfs_busy(nmp->nm_mountp, LK_EXCLUSIVE, NULL, p) == 0)
-			    dounmount(nmp->nm_mountp, MNT_FORCE, p);
+			    dounmount(nmp->nm_mountp, MNT_FORCE, p, NULL);
 		    }
 	    }
 	}
@@ -247,7 +243,7 @@ sys_nfssvc(p, v, retval)
 	/*
 	 * Must be super user
 	 */
-	error = suser(p->p_ucred, &p->p_acflag);
+	error = suser(p, 0);
 	if(error)
 		return (error);
 	while (nfssvc_sockhead_flag & SLP_INIT) {

@@ -1,6 +1,7 @@
-/*	$OpenBSD: p9100.c,v 1.11 2002/11/06 21:06:20 miod Exp $	*/
+/*	$OpenBSD: p9100.c,v 1.24 2003/06/28 17:05:33 miod Exp $	*/
 
 /*
+ * Copyright (c) 2003, Miodrag Vallat.
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
  * All rights reserved.
  *
@@ -12,11 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Jason L. Wright
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -32,10 +28,9 @@
  */
 
 /*
- * color display (p9100) driver.  Based on cgthree.c and the NetBSD
- * p9100 driver.
- *
- * Does not handle interrupts, even though they can occur.
+ * color display (p9100) driver.
+ * Initially based on cgthree.c and the NetBSD p9100 driver, then hacked
+ * beyond recognition.
  */
 
 #include <sys/param.h>
@@ -65,6 +60,8 @@
 #include <sparc/dev/btvar.h>
 #include <sparc/dev/sbusvar.h>
 
+#include <dev/ic/p9000.h>
+
 #include "tctrl.h"
 #if NTCTRL > 0
 #include <sparc/dev/tctrlvar.h>
@@ -75,11 +72,12 @@ struct p9100_softc {
 	struct	sunfb sc_sunfb;		/* common base part */
 	struct	sbusdev sc_sd;		/* sbus device */
 	struct	rom_reg	sc_phys;	/* phys address description */
-	struct	p9100_cmd *sc_cmd;	/* command registers (dac, etc) */
-	struct	p9100_ctl *sc_ctl;	/* control registers (draw engine) */
+	volatile u_int8_t *sc_cmd;	/* command registers (dac, etc) */
+	volatile u_int8_t *sc_ctl;	/* control registers (draw engine) */
 	union	bt_cmap sc_cmap;	/* Brooktree color map */
-	u_int32_t	sc_junk;	/* throwaway value */
+	struct	intrhand sc_ih;
 	int	sc_nscreens;
+	u_int32_t	sc_junk;	/* throwaway value */
 };
 
 struct wsscreen_descr p9100_stdscreen = {
@@ -95,16 +93,19 @@ struct wsscreen_list p9100_screenlist = {
 	    p9100_scrlist
 };
 
-int p9100_ioctl(void *, u_long, caddr_t, int, struct proc *);
-int p9100_alloc_screen(void *, const struct wsscreen_descr *, void **,
-    int *, int *, long *);
-void p9100_free_screen(void *, void *);
-int p9100_show_screen(void *, void *, int, void (*cb)(void *, int, int),
-    void *);
-paddr_t p9100_mmap(void *, off_t, int);
-void p9100_loadcmap(struct p9100_softc *, u_int, u_int);
-void p9100_setcolor(void *, u_int, u_int8_t, u_int8_t, u_int8_t);
-void p9100_burner(void *, u_int, u_int);
+int	p9100_ioctl(void *, u_long, caddr_t, int, struct proc *);
+int	p9100_alloc_screen(void *, const struct wsscreen_descr *, void **,
+	    int *, int *, long *);
+void	p9100_free_screen(void *, void *);
+int	p9100_show_screen(void *, void *, int, void (*cb)(void *, int, int),
+	    void *);
+paddr_t	p9100_mmap(void *, off_t, int);
+static __inline__ void p9100_loadcmap_deferred(struct p9100_softc *,
+    u_int, u_int);
+void	p9100_loadcmap_immediate(struct p9100_softc *, u_int, u_int);
+void	p9100_setcolor(void *, u_int, u_int8_t, u_int8_t, u_int8_t);
+void	p9100_burner(void *, u_int, u_int);
+int	p9100_intr(void *);
 
 struct wsdisplay_accessops p9100_accessops = {
 	p9100_ioctl,
@@ -118,6 +119,13 @@ struct wsdisplay_accessops p9100_accessops = {
 	p9100_burner,
 };
 
+void	p9100_ras_init(struct p9100_softc *);
+void	p9100_ras_copycols(void *, int, int, int, int);
+void	p9100_ras_copyrows(void *, int, int, int);
+void	p9100_ras_do_cursor(struct rasops_info *);
+void	p9100_ras_erasecols(void *, int, int, int, long int);
+void	p9100_ras_eraserows(void *, int, int, long int);
+
 int	p9100match(struct device *, void *, void *);
 void	p9100attach(struct device *, struct device *, void *);
 
@@ -130,105 +138,98 @@ struct cfdriver pnozz_cd = {
 };
 
 /*
- * System control and command registers
- * (IBM RGB528 RamDac, p9100, video coprocessor)
+ * SBus registers mappings
  */
-struct p9100_ctl {
-	/* System control registers: 0x0000 - 0x00ff */
-	struct p9100_scr {
-		volatile u_int32_t	unused0;
-		volatile u_int32_t	scr;		/* system config reg */
-		volatile u_int32_t	ir;		/* interrupt reg */
-		volatile u_int32_t	ier;		/* interrupt enable */
-		volatile u_int32_t	arbr;		/* alt read bank reg */
-		volatile u_int32_t	awbr;		/* alt write bank reg */
-		volatile u_int32_t	unused1[58];
-	} ctl_scr;
-
-	/* Video control registers: 0x0100 - 0x017f */
-	struct p9100_vcr {
-		volatile u_int32_t	unused0;
-		volatile u_int32_t	hcr;		/* horizontal cntr */
-		volatile u_int32_t	htr;		/* horizontal total */
-		volatile u_int32_t	hsre;		/* horiz sync rising */
-		volatile u_int32_t	hbre;		/* horiz blank rising */
-		volatile u_int32_t	hbfe;		/* horiz blank fallng */
-		volatile u_int32_t	hcp;		/* horiz cntr preload */
-		volatile u_int32_t	vcr;		/* vertical cntr */
-		volatile u_int32_t	vl;		/* vertical length */
-		volatile u_int32_t	vsre;		/* vert sync rising */
-		volatile u_int32_t	vbre;		/* vert blank rising */
-		volatile u_int32_t	vbfe;		/* vert blank fallng */
-		volatile u_int32_t	vcp;		/* vert cntr preload */
-		volatile u_int32_t	sra;		/* scrn repaint addr */
-		volatile u_int32_t	srtc1;		/* scrn rpnt time 1 */
-		volatile u_int32_t	qsf;		/* qsf counter */
-		volatile u_int32_t	srtc2;		/* scrn rpnt time 2 */
-		volatile u_int32_t	unused1[15];
-	} ctl_vcr;
-
-	/* VRAM control registers: 0x0180 - 0x1ff */
-	struct p9100_vram {
-		volatile u_int32_t	unused0;
-		volatile u_int32_t	mc;		/* memory config */
-		volatile u_int32_t	rp;		/* refresh period */
-		volatile u_int32_t	rc;		/* refresh count */
-		volatile u_int32_t	rasmax;		/* ras low maximum */
-		volatile u_int32_t	rascur;		/* ras low current */
-		volatile u_int32_t	unused1[26];
-	} ctl_vram;
-
-	/* IBM RGB528 RAMDAC registers: 0x0200 - 0x3ff */
-	struct p9100_dac {
-		volatile u_int32_t	pwraddr;	/* wr palette address */
-		volatile u_int32_t	paldata;	/* palette data */
-		volatile u_int32_t	pixmask;	/* pixel mask */
-		volatile u_int32_t	prdaddr;	/* rd palette address */
-		volatile u_int32_t	idxlow;		/* reg index low */
-		volatile u_int32_t	idxhigh;	/* reg index high */
-		volatile u_int32_t	regdata;	/* register data */
-		volatile u_int32_t	idxctrl;	/* index control */
-		volatile u_int32_t	unused1[120];
-	} ctl_dac;
-
-	/* Video coprocessor interface: 0x0400 - 0x1fff */
-	volatile u_int32_t	ctl_vci[768];
-};
-
-#define	SRTC1_VIDEN	0x00000020
-
+#define	P9100_NREG	3
+#define	P9100_REG_CTL	0
+#define	P9100_REG_CMD	1
+#define	P9100_REG_VRAM	2
 
 /*
- * Select the appropriate register group within the control registers
- * (must be done before any write to a register within the group, but
- * subsquent writes to the same group do not need to reselect).
+ * IBM RGB525 RAMDAC registers
  */
-#define	P9100_SELECT_SCR(sc)	((sc)->sc_junk = (sc)->sc_ctl->ctl_scr.scr)
-#define	P9100_SELECT_VCR(sc)	((sc)->sc_junk = (sc)->sc_ctl->ctl_vcr.hcr)
-#define	P9100_SELECT_VRAM(sc)	((sc)->sc_junk = (sc)->sc_ctl->ctl_vram.mc)
-#define	P9100_SELECT_DAC(sc)	((sc)->sc_junk = (sc)->sc_ctl->ctl_dac.pwraddr)
-#define	P9100_SELECT_VCI(sc)	((sc)->sc_junk = (sc)->sc_ctl->ctl_vci[0])
+
+/* Palette write address */
+#define	IBM525_WRADDR			0
+/* Palette data */
+#define	IBM525_DATA			1
+/* Pixel mask */
+#define	IBM525_PIXMASK			2
+/* Read palette address */
+#define	IBM525_RDADDR			3
+/* Register index low */
+#define	IBM525_IDXLOW			4
+/* Register index high */
+#define	IBM525_IDXHIGH			5
+/* Register data */
+#define	IBM525_REGDATA			6
+/* Index control */
+#define	IBM525_IDXCONTROL		7
 
 /*
- * Drawing engine
+ * P9100 read/write macros
  */
-struct p9100_cmd {
-	volatile u_int32_t	cmd_regs[0x800];
-};
+
+#define	P9100_READ_CTL(sc,reg) \
+	*(volatile u_int32_t *)((sc)->sc_ctl + (reg))
+#define	P9100_READ_CMD(sc,reg) \
+	*(volatile u_int32_t *)((sc)->sc_cmd + (reg))
+#define	P9100_READ_RAMDAC(sc,reg) \
+	*(volatile u_int32_t *)((sc)->sc_ctl + P9100_RAMDAC_REGISTER(reg))
+
+#define	P9100_WRITE_CTL(sc,reg,value) \
+	*(volatile u_int32_t *)((sc)->sc_ctl + (reg)) = (value)
+#define	P9100_WRITE_CMD(sc,reg,value) \
+	*(volatile u_int32_t *)((sc)->sc_cmd + (reg)) = (value)
+#define	P9100_WRITE_RAMDAC(sc,reg,value) \
+	*(volatile u_int32_t *)((sc)->sc_ctl + P9100_RAMDAC_REGISTER(reg)) = \
+	    (value)
+
+/*
+ * On the Tadpole, the first write to a register group is ignored until
+ * the proper group address is latched, which can be done by reading from the
+ * register group first.
+ *
+ * Register groups are 0x80 bytes long (i.e. it is necessary to force a read
+ * when writing to an adress which upper 25 bit differ from the previous
+ * read or write operation).
+ *
+ * This is specific to the Tadpole design, and not a limitation of the
+ * Power 9100 hardware.
+ */
+#define	P9100_SELECT_SCR(sc) \
+	(sc)->sc_junk = P9100_READ_CTL(sc, P9000_SYSTEM_CONFIG)
+#define	P9100_SELECT_VCR(sc) \
+	(sc)->sc_junk = P9100_READ_CTL(sc, P9000_HCR)
+#define	P9100_SELECT_VRAM(sc) \
+	(sc)->sc_junk = P9100_READ_CTL(sc, P9000_MCR)
+#define	P9100_SELECT_DAC(sc) \
+	(sc)->sc_junk = P9100_READ_CTL(sc, P9100_RAMDAC_REGISTER(0))
+#define	P9100_SELECT_PE(sc) \
+	(sc)->sc_junk = P9100_READ_CMD(sc, P9000_PE_STATUS)
+#define	P9100_SELECT_DE_LOW(sc)	\
+	(sc)->sc_junk = P9100_READ_CMD(sc, P9000_DE_FG_COLOR)
+#define	P9100_SELECT_DE_HIGH(sc) \
+	(sc)->sc_junk = P9100_READ_CMD(sc, P9000_DE_PATTERN(0))
+#define	P9100_SELECT_COORD(sc,field) \
+	(sc)->sc_junk = P9100_READ_CMD(sc, field)
+
+/*
+ * For some reason, every write to a DAC register needs to be followed by a
+ * read from the ``free fifo number'' register, supposedly to have the write
+ * take effect faster...
+ */
+#define	P9100_FLUSH_DAC(sc) \
+	do { \
+		P9100_SELECT_VRAM(sc); \
+		(sc)->sc_junk = P9100_READ_CTL(sc, P9100_FREE_FIFO); \
+	} while (0)
 
 int
-p9100match(parent, vcf, aux)
-	struct device *parent;
-	void *vcf, *aux;
+p9100match(struct device *parent, void *vcf, void *aux)
 {
-	struct cfdata *cf = vcf;
 	struct confargs *ca = aux;
 	struct romaux *ra = &ca->ca_ra;
-
-	/*
-	 * Mask out invalid flags from the user.
-	 */
-	cf->cf_flags &= FB_USERMASK;
 
 	if (strcmp("p9100", ra->ra_name))
 		return (0);
@@ -240,76 +241,114 @@ p9100match(parent, vcf, aux)
  * Attach a display.
  */
 void
-p9100attach(parent, self, args)
-	struct device *parent, *self;
-	void *args;
+p9100attach(struct device *parent, struct device *self, void *args)
 {
 	struct p9100_softc *sc = (struct p9100_softc *)self;
 	struct confargs *ca = args;
 	struct wsemuldisplaydev_attach_args waa;
-	int node = 0, i;
-	int isconsole, fb_depth, fb_cmsize;
-	char *cp;
+	int node, row, scr;
+	int isconsole, fb_depth;
 
-	sc->sc_sunfb.sf_flags = self->dv_cfdata->cf_flags;
-	sc->sc_phys = ca->ca_ra.ra_reg[2];
+#ifdef DIAGNOSTIC
+	if (ca->ca_ra.ra_nreg < P9100_NREG) {
+		printf(": expected %d registers, got only %d\n",
+		    P9100_NREG, ca->ca_ra.ra_nreg);
+		return;
+	}
+#endif
 
-	sc->sc_ctl = mapiodev(&(ca->ca_ra.ra_reg[0]), 0,
+	sc->sc_phys = ca->ca_ra.ra_reg[P9100_REG_VRAM];
+
+	sc->sc_ctl = mapiodev(&(ca->ca_ra.ra_reg[P9100_REG_CTL]), 0,
 	    ca->ca_ra.ra_reg[0].rr_len);
-	sc->sc_cmd = mapiodev(&(ca->ca_ra.ra_reg[1]), 0,
+	sc->sc_cmd = mapiodev(&(ca->ca_ra.ra_reg[P9100_REG_CMD]), 0,
 	    ca->ca_ra.ra_reg[1].rr_len);
 
 	node = ca->ca_ra.ra_node;
 	isconsole = node == fbnode;
 
 	P9100_SELECT_SCR(sc);
-	i = sc->sc_ctl->ctl_scr.scr;
-	switch ((i >> 26) & 7) {
-	case 5:
+	scr = P9100_READ_CTL(sc, P9000_SYSTEM_CONFIG);
+	switch (scr & SCR_PIXEL_MASK) {
+	case SCR_PIXEL_32BPP:
 		fb_depth = 32;
 		break;
-	case 7:
+	case SCR_PIXEL_24BPP:
 		fb_depth = 24;
 		break;
-	case 3:
+	case SCR_PIXEL_16BPP:
 		fb_depth = 16;
 		break;
-	case 2:
 	default:
+#ifdef DIAGNOSTIC
+		printf(": unknown color depth code 0x%x, assuming 8\n%s",
+		    scr & SCR_PIXEL_MASK, self->dv_xname);
+#endif
+	case SCR_PIXEL_8BPP:
 		fb_depth = 8;
 		break;
 	}
 	fb_setsize(&sc->sc_sunfb, fb_depth, 800, 600, node, ca->ca_bustype);
-	sc->sc_sunfb.sf_ro.ri_bits = mapiodev(&(ca->ca_ra.ra_reg[2]), 0,
+	sc->sc_sunfb.sf_ro.ri_bits = mapiodev(&sc->sc_phys, 0,
 	    round_page(sc->sc_sunfb.sf_fbsize));
 	sc->sc_sunfb.sf_ro.ri_hw = sc;
-	fbwscons_init(&sc->sc_sunfb, isconsole);
+
+	printf(": rev %x, %dx%d, depth %d\n", scr & SCR_ID_MASK,
+	    sc->sc_sunfb.sf_width, sc->sc_sunfb.sf_height,
+	    sc->sc_sunfb.sf_depth);
+
+	sc->sc_ih.ih_fun = p9100_intr;
+	sc->sc_ih.ih_arg = sc;
+	intr_establish(ca->ca_ra.ra_intr[0].int_pri, &sc->sc_ih, IPL_FB);
+
+	/* Disable frame buffer interrupts */
+	P9100_SELECT_SCR(sc);
+	P9100_WRITE_CTL(sc, P9000_INTERRUPT_ENABLE, IER_MASTER_ENABLE | 0);
+
+	/*
+	 * If the framebuffer width is under 1024x768, we will switch from the
+	 * PROM font to the more adequate 8x16 font here.
+	 * However, we need to adjust two things in this case:
+	 * - the display row should be overrided from the current PROM metrics,
+	 *   to prevent us from overwriting the last few lines of text.
+	 * - if the 80x34 screen would make a large margin appear around it,
+	 *   choose to clear the screen rather than keeping old prom output in
+	 *   the margins.
+	 * XXX there should be a rasops "clear margins" feature
+	 */
+	fbwscons_init(&sc->sc_sunfb,
+	    isconsole && (sc->sc_sunfb.sf_width >= 1024) ? 0 : RI_CLEAR);
 	fbwscons_setcolormap(&sc->sc_sunfb, p9100_setcolor);
+
+	/*
+	 * Plug-in accelerated console operations if we can.
+	 */
+	if (sc->sc_sunfb.sf_depth == 8) {
+		sc->sc_sunfb.sf_ro.ri_ops.copycols = p9100_ras_copycols;
+		sc->sc_sunfb.sf_ro.ri_ops.copyrows = p9100_ras_copyrows;
+		sc->sc_sunfb.sf_ro.ri_ops.erasecols = p9100_ras_erasecols;
+		sc->sc_sunfb.sf_ro.ri_ops.eraserows = p9100_ras_eraserows;
+		sc->sc_sunfb.sf_ro.ri_do_cursor = p9100_ras_do_cursor;
+		p9100_ras_init(sc);
+	}
 
 	p9100_stdscreen.capabilities = sc->sc_sunfb.sf_ro.ri_caps;
 	p9100_stdscreen.nrows = sc->sc_sunfb.sf_ro.ri_rows;
 	p9100_stdscreen.ncols = sc->sc_sunfb.sf_ro.ri_cols;
 	p9100_stdscreen.textops = &sc->sc_sunfb.sf_ro.ri_ops;
 
-	printf(": rev %x, %dx%d, depth %d\n", i & 7,
-	    sc->sc_sunfb.sf_width, sc->sc_sunfb.sf_height,
-	    sc->sc_sunfb.sf_depth);
-
 	sbus_establish(&sc->sc_sd, &sc->sc_sunfb.sf_dev);
-
-	/* initialize color map */
-	fb_cmsize = getpropint(node, "cmsize", 256);
-	cp = &sc->sc_cmap.cm_map[0][0];
-	cp[0] = cp[1] = cp[2] = 0;
-	for (i = 1, cp = &sc->sc_cmap.cm_map[i][0]; i < fb_cmsize; cp += 3, i++)
-		cp[0] = cp[1] = cp[2] = 0xff;
-	p9100_loadcmap(sc, 0, 256);
 
 	/* enable video */
 	p9100_burner(sc, 1, 0);
 
 	if (isconsole) {
-		fbwscons_console_init(&sc->sc_sunfb, &p9100_stdscreen, -1,
+		if (sc->sc_sunfb.sf_width < 1024)
+			row = 0;	/* screen has been cleared above */
+		else
+			row = -1;
+
+		fbwscons_console_init(&sc->sc_sunfb, &p9100_stdscreen, row,
 		    p9100_burner);
 	}
 
@@ -321,22 +360,28 @@ p9100attach(parent, self, args)
 }
 
 int
-p9100_ioctl(v, cmd, data, flags, p)
-	void *v;
-	u_long cmd;
-	caddr_t data;
-	int flags;
-	struct proc *p;
+p9100_ioctl(void *v, u_long cmd, caddr_t data, int flags, struct proc *p)
 {
 	struct p9100_softc *sc = v;
 	struct wsdisplay_fbinfo *wdf;
 	struct wsdisplay_cmap *cm;
+#if NTCTRL > 0
+	struct wsdisplay_param *dp;
+#endif
 	int error;
 
 	switch (cmd) {
 
 	case WSDISPLAYIO_GTYPE:
 		*(u_int *)data = WSDISPLAY_TYPE_SB_P9100;
+		break;
+
+	case WSDISPLAYIO_SMODE:
+		/* Restore proper acceleration state upon leaving X11 */
+		if (*(u_int *)data == WSDISPLAYIO_MODE_EMUL &&
+		    sc->sc_sunfb.sf_depth == 8) {
+			p9100_ras_init(sc);
+		}
 		break;
 
 	case WSDISPLAYIO_GINFO:
@@ -363,8 +408,44 @@ p9100_ioctl(v, cmd, data, flags, p)
 		error = bt_putcmap(&sc->sc_cmap, cm);
 		if (error)
 			return (error);
-		p9100_loadcmap(sc, cm->index, cm->count);
+		p9100_loadcmap_deferred(sc, cm->index, cm->count);
 		break;
+
+#if NTCTRL > 0
+	case WSDISPLAYIO_GETPARAM:
+		dp = (struct wsdisplay_param *)data;
+
+		switch (dp->param) {
+		case WSDISPLAYIO_PARAM_BRIGHTNESS:
+			dp->min = 0;
+			dp->max = 255;
+			dp->curval = tadpole_get_brightness();
+			break;
+		case WSDISPLAYIO_PARAM_BACKLIGHT:
+			dp->min = 0;
+			dp->max = 1;
+			dp->curval = tadpole_get_video();
+			break;
+		default:
+			return (-1);
+		}
+		break;
+
+	case WSDISPLAYIO_SETPARAM:
+		dp = (struct wsdisplay_param *)data;
+
+		switch (dp->param) {
+		case WSDISPLAYIO_PARAM_BRIGHTNESS:
+			tadpole_set_brightness(dp->curval);
+			break;
+		case WSDISPLAYIO_PARAM_BACKLIGHT:
+			tadpole_set_video(dp->curval);
+			break;
+		default:
+			return (-1);
+		}
+		break;
+#endif	/* NTCTRL > 0 */
 
 	case WSDISPLAYIO_SVIDEO:
 	case WSDISPLAYIO_GVIDEO:
@@ -381,12 +462,8 @@ p9100_ioctl(v, cmd, data, flags, p)
 }
 
 int
-p9100_alloc_screen(v, type, cookiep, curxp, curyp, attrp)
-	void *v;
-	const struct wsscreen_descr *type;
-	void **cookiep;
-	int *curxp, *curyp;
-	long *attrp;
+p9100_alloc_screen(void *v, const struct wsscreen_descr *type, void **cookiep,
+    int *curxp, int *curyp, long *attrp)
 {
 	struct p9100_softc *sc = v;
 
@@ -408,9 +485,7 @@ p9100_alloc_screen(v, type, cookiep, curxp, curyp, attrp)
 }
 
 void
-p9100_free_screen(v, cookie)
-	void *v;
-	void *cookie;
+p9100_free_screen(void *v, void *cookie)
 {
 	struct p9100_softc *sc = v;
 
@@ -418,12 +493,8 @@ p9100_free_screen(v, cookie)
 }
 
 int
-p9100_show_screen(v, cookie, waitok, cb, cbarg)
-	void *v;
-	void *cookie;
-	int waitok;
-	void (*cb)(void *, int, int);
-	void *cbarg;
+p9100_show_screen(void *v, void *cookie, int waitok,
+    void (*cb)(void *, int, int), void *cbarg)
 {
 	return (0);
 }
@@ -433,10 +504,7 @@ p9100_show_screen(v, cookie, waitok, cb, cbarg)
  * offset, allowing for the given protection, or return -1 for error.
  */
 paddr_t
-p9100_mmap(v, offset, prot)
-	void *v;
-	off_t offset;
-	int prot;
+p9100_mmap(void *v, off_t offset, int prot)
 {
 	struct p9100_softc *sc = v;
 
@@ -451,10 +519,7 @@ p9100_mmap(v, offset, prot)
 }
 
 void
-p9100_setcolor(v, index, r, g, b)
-	void *v;
-	u_int index;
-	u_int8_t r, g, b;
+p9100_setcolor(void *v, u_int index, u_int8_t r, u_int8_t g, u_int8_t b)
 {
 	struct p9100_softc *sc = v;
 	union bt_cmap *bcm = &sc->sc_cmap;
@@ -462,35 +527,37 @@ p9100_setcolor(v, index, r, g, b)
 	bcm->cm_map[index][0] = r;
 	bcm->cm_map[index][1] = g;
 	bcm->cm_map[index][2] = b;
-	p9100_loadcmap(sc, index, 1);
+	p9100_loadcmap_immediate(sc, index, 1);
 }
 
 void
-p9100_loadcmap(sc, start, ncolors)
-	struct p9100_softc *sc;
-	u_int start, ncolors;
+p9100_loadcmap_immediate(struct p9100_softc *sc, u_int start, u_int ncolors)
 {
 	u_char *p;
 
-	P9100_SELECT_VRAM(sc);
-	P9100_SELECT_VRAM(sc);
-	sc->sc_junk = sc->sc_ctl->ctl_dac.pwraddr;
-	sc->sc_ctl->ctl_dac.pwraddr = start << 16;
+	P9100_SELECT_DAC(sc);
+	P9100_WRITE_RAMDAC(sc, IBM525_WRADDR, start << 16);
+	P9100_FLUSH_DAC(sc);
 
 	for (p = sc->sc_cmap.cm_map[start], ncolors *= 3; ncolors-- > 0; p++) {
-		/* These generate a short delay between ramdac writes */
-		P9100_SELECT_VRAM(sc);
-		P9100_SELECT_VRAM(sc);
-
-		sc->sc_junk = sc->sc_ctl->ctl_dac.paldata;
-		sc->sc_ctl->ctl_dac.paldata = (*p) << 16;
+		P9100_SELECT_DAC(sc);
+		P9100_WRITE_RAMDAC(sc, IBM525_DATA, (*p) << 16);
+		P9100_FLUSH_DAC(sc);
 	}
 }
 
+static __inline__ void
+p9100_loadcmap_deferred(struct p9100_softc *sc, u_int start, u_int ncolors)
+{
+	/* Schedule an interrupt for next retrace */
+	P9100_SELECT_SCR(sc);
+	P9100_WRITE_CTL(sc, P9000_INTERRUPT_ENABLE,
+	    IER_MASTER_ENABLE | IER_MASTER_INTERRUPT |
+	    IER_VBLANK_ENABLE | IER_VBLANK_INTERRUPT);
+}
+
 void
-p9100_burner(v, on, flags)
-	void *v;
-	u_int on, flags;
+p9100_burner(void *v, u_int on, u_int flags)
 {
 	struct p9100_softc *sc = v;
 	u_int32_t vcr;
@@ -498,15 +565,243 @@ p9100_burner(v, on, flags)
 
 	s = splhigh();
 	P9100_SELECT_VCR(sc);
-	vcr = sc->sc_ctl->ctl_vcr.srtc1;
+	vcr = P9100_READ_CTL(sc, P9000_SRTC1);
 	if (on)
 		vcr |= SRTC1_VIDEN;
 	else
 		vcr &= ~SRTC1_VIDEN;
-	/* XXX - what about WSDISPLAY_BURN_VBLANK? */
-	sc->sc_ctl->ctl_vcr.srtc1 = vcr;
+	P9100_WRITE_CTL(sc, P9000_SRTC1, vcr);
 #if NTCTRL > 0
 	tadpole_set_video(on);
 #endif
 	splx(s);
+}
+
+int
+p9100_intr(void *v)
+{
+	struct p9100_softc *sc = v;
+
+	if (P9100_READ_CTL(sc, P9000_INTERRUPT) & IER_VBLANK_INTERRUPT) {
+		p9100_loadcmap_immediate(sc, 0, 256);
+
+		/* Disable further interrupts now */
+		/* P9100_SELECT_SCR(sc); */
+		P9100_WRITE_CTL(sc, P9000_INTERRUPT_ENABLE,
+		    IER_MASTER_ENABLE | 0);
+
+		return (1);
+	}
+
+	return (0);
+}
+
+/*
+ * Accelerated text console code
+ */
+
+static __inline__ void p9100_drain(struct p9100_softc *);
+
+static __inline__ void
+p9100_drain(struct p9100_softc *sc)
+{
+	while (P9100_READ_CMD(sc, P9000_PE_STATUS) &
+	    (STATUS_QUAD_BUSY | STATUS_BLIT_BUSY));
+}
+
+void
+p9100_ras_init(struct p9100_softc *sc)
+{
+	/*
+	 * Setup safe defaults for the parameter and drawing engine, in
+	 * order to minimize the operations to do for ri_ops.
+	 */
+
+	P9100_SELECT_DE_LOW(sc);
+	P9100_WRITE_CMD(sc, P9000_DE_DRAWMODE,
+	    DM_PICK_CONTROL | 0 | DM_BUFFER_CONTROL | DM_BUFFER_ENABLE0);
+
+	P9100_WRITE_CMD(sc, P9000_DE_PATTERN_ORIGIN_X, 0);
+	P9100_WRITE_CMD(sc, P9000_DE_PATTERN_ORIGIN_Y, 0);
+	/* enable all planes */
+	P9100_WRITE_CMD(sc, P9000_DE_PLANEMASK, 0xffffffff);
+
+	/* Unclip */
+	P9100_WRITE_CMD(sc, P9000_DE_WINMIN, 0);
+	P9100_WRITE_CMD(sc, P9000_DE_WINMAX,
+	    P9000_COORDS(sc->sc_sunfb.sf_width - 1, sc->sc_sunfb.sf_height - 1));
+
+	P9100_SELECT_DE_HIGH(sc);
+	P9100_WRITE_CMD(sc, P9100_DE_B_WINMIN, 0);
+	P9100_WRITE_CMD(sc, P9100_DE_B_WINMAX,
+	    P9000_COORDS(sc->sc_sunfb.sf_width - 1, sc->sc_sunfb.sf_height - 1));
+
+	P9100_SELECT_PE(sc);
+	P9100_WRITE_CMD(sc, P9000_PE_WINOFFSET, 0);
+}
+
+void
+p9100_ras_copycols(void *v, int row, int src, int dst, int n)
+{
+	struct rasops_info *ri = v;
+	struct p9100_softc *sc = ri->ri_hw;
+
+	n *= ri->ri_font->fontwidth;
+	n--;
+	src *= ri->ri_font->fontwidth;
+	src += ri->ri_xorigin;
+	dst *= ri->ri_font->fontwidth;
+	dst += ri->ri_xorigin;
+	row *= ri->ri_font->fontheight;
+	row += ri->ri_yorigin;
+
+	p9100_drain(sc);
+	P9100_SELECT_DE_LOW(sc);
+	P9100_WRITE_CMD(sc, P9000_DE_RASTER,
+	    P9100_RASTER_SRC & P9100_RASTER_MASK);
+
+	P9100_SELECT_COORD(sc, P9000_DC_COORD(0));
+	P9100_WRITE_CMD(sc, P9000_DC_COORD(0) + P9000_COORD_XY,
+	    P9000_COORDS(src, row));
+	P9100_WRITE_CMD(sc, P9000_DC_COORD(1) + P9000_COORD_XY,
+	    P9000_COORDS(src + n, row + ri->ri_font->fontheight - 1));
+	P9100_SELECT_COORD(sc, P9000_DC_COORD(2));
+	P9100_WRITE_CMD(sc, P9000_DC_COORD(2) + P9000_COORD_XY,
+	    P9000_COORDS(dst, row));
+	P9100_WRITE_CMD(sc, P9000_DC_COORD(3) + P9000_COORD_XY,
+	    P9000_COORDS(dst + n, row + ri->ri_font->fontheight - 1));
+
+	sc->sc_junk = P9100_READ_CMD(sc, P9000_PE_BLIT);
+
+	p9100_drain(sc);
+}
+
+void
+p9100_ras_copyrows(void *v, int src, int dst, int n)
+{
+	struct rasops_info *ri = v;
+	struct p9100_softc *sc = ri->ri_hw;
+
+	n *= ri->ri_font->fontheight;
+	n--;
+	src *= ri->ri_font->fontheight;
+	src += ri->ri_yorigin;
+	dst *= ri->ri_font->fontheight;
+	dst += ri->ri_yorigin;
+
+	p9100_drain(sc);
+	P9100_SELECT_DE_LOW(sc);
+	P9100_WRITE_CMD(sc, P9000_DE_RASTER,
+	    P9100_RASTER_SRC & P9100_RASTER_MASK);
+
+	P9100_SELECT_COORD(sc, P9000_DC_COORD(0));
+	P9100_WRITE_CMD(sc, P9000_DC_COORD(0) + P9000_COORD_XY,
+	    P9000_COORDS(ri->ri_xorigin, src));
+	P9100_WRITE_CMD(sc, P9000_DC_COORD(1) + P9000_COORD_XY,
+	    P9000_COORDS(ri->ri_xorigin + ri->ri_emuwidth - 1, src + n));
+	P9100_SELECT_COORD(sc, P9000_DC_COORD(2));
+	P9100_WRITE_CMD(sc, P9000_DC_COORD(2) + P9000_COORD_XY,
+	    P9000_COORDS(ri->ri_xorigin, dst));
+	P9100_WRITE_CMD(sc, P9000_DC_COORD(3) + P9000_COORD_XY,
+	    P9000_COORDS(ri->ri_xorigin + ri->ri_emuwidth - 1, dst + n));
+
+	sc->sc_junk = P9100_READ_CMD(sc, P9000_PE_BLIT);
+
+	p9100_drain(sc);
+}
+
+void
+p9100_ras_erasecols(void *v, int row, int col, int n, long int attr)
+{
+	struct rasops_info *ri = v;
+	struct p9100_softc *sc = ri->ri_hw;
+	int fg, bg;
+
+	rasops_unpack_attr(attr, &fg, &bg, NULL);
+
+	n *= ri->ri_font->fontwidth;
+	col *= ri->ri_font->fontwidth;
+	col += ri->ri_xorigin;
+	row *= ri->ri_font->fontheight;
+	row += ri->ri_yorigin;
+
+	p9100_drain(sc);
+	P9100_SELECT_DE_LOW(sc);
+	P9100_WRITE_CMD(sc, P9000_DE_RASTER,
+	    P9100_RASTER_PATTERN & P9100_RASTER_MASK);
+	P9100_WRITE_CMD(sc, P9100_DE_COLOR0, P9100_COLOR8(bg));
+
+	P9100_SELECT_COORD(sc, P9000_LC_RECT);
+	P9100_WRITE_CMD(sc, P9000_LC_RECT + P9000_COORD_XY,
+	    P9000_COORDS(col, row));
+	P9100_WRITE_CMD(sc, P9000_LC_RECT + P9000_COORD_XY,
+	    P9000_COORDS(col + n, row + ri->ri_font->fontheight));
+
+	sc->sc_junk = P9100_READ_CMD(sc, P9000_PE_QUAD);
+
+	p9100_drain(sc);
+}
+
+void
+p9100_ras_eraserows(void *v, int row, int n, long int attr)
+{
+	struct rasops_info *ri = v;
+	struct p9100_softc *sc = ri->ri_hw;
+	int fg, bg;
+
+	rasops_unpack_attr(attr, &fg, &bg, NULL);
+
+	p9100_drain(sc);
+	P9100_SELECT_DE_LOW(sc);
+	P9100_WRITE_CMD(sc, P9000_DE_RASTER,
+	    P9100_RASTER_PATTERN & P9100_RASTER_MASK);
+	P9100_WRITE_CMD(sc, P9100_DE_COLOR0, P9100_COLOR8(bg));
+
+	P9100_SELECT_COORD(sc, P9000_LC_RECT);
+	if (n == ri->ri_rows && ISSET(ri->ri_flg, RI_FULLCLEAR)) {
+		P9100_WRITE_CMD(sc, P9000_LC_RECT + P9000_COORD_XY,
+		    P9000_COORDS(0, 0));
+		P9100_WRITE_CMD(sc, P9000_LC_RECT + P9000_COORD_XY,
+		    P9000_COORDS(ri->ri_width, ri->ri_height));
+	} else {
+		n *= ri->ri_font->fontheight;
+		row *= ri->ri_font->fontheight;
+		row += ri->ri_yorigin;
+
+		P9100_WRITE_CMD(sc, P9000_LC_RECT + P9000_COORD_XY,
+		    P9000_COORDS(ri->ri_xorigin, row));
+		P9100_WRITE_CMD(sc, P9000_LC_RECT + P9000_COORD_XY,
+		    P9000_COORDS(ri->ri_xorigin + ri->ri_emuwidth, row + n));
+	}
+
+	sc->sc_junk = P9100_READ_CMD(sc, P9000_PE_QUAD);
+
+	p9100_drain(sc);
+}
+
+void
+p9100_ras_do_cursor(struct rasops_info *ri)
+{
+	struct p9100_softc *sc = ri->ri_hw;
+	int row, col;
+
+	row = ri->ri_crow * ri->ri_font->fontheight + ri->ri_yorigin;
+	col = ri->ri_ccol * ri->ri_font->fontwidth + ri->ri_xorigin;
+
+	p9100_drain(sc);
+
+	P9100_SELECT_DE_LOW(sc);
+	P9100_WRITE_CMD(sc, P9000_DE_RASTER,
+	    (~P9100_RASTER_DST) & P9100_RASTER_MASK);
+
+	P9100_SELECT_COORD(sc, P9000_LC_RECT);
+	P9100_WRITE_CMD(sc, P9000_LC_RECT + P9000_COORD_XY,
+	    P9000_COORDS(col, row));
+	P9100_WRITE_CMD(sc, P9000_LC_RECT + P9000_COORD_XY,
+	    P9000_COORDS(col + ri->ri_font->fontwidth,
+	        row + ri->ri_font->fontheight));
+
+	sc->sc_junk = P9100_READ_CMD(sc, P9000_PE_QUAD);
+
+	p9100_drain(sc);
 }

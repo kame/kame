@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.59 2003/03/21 22:59:10 jason Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.65 2003/06/24 21:54:39 henric Exp $	*/
 /*	$NetBSD: machdep.c,v 1.108 2001/07/24 19:30:14 eeh Exp $ */
 
 /*-
@@ -59,11 +59,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -339,8 +335,9 @@ cpu_startup()
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
 	 */
-        exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-                                 16*NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
+	minaddr = vm_map_min(kernel_map);
+	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+	    16*NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
 
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
@@ -791,9 +788,7 @@ boot(howto)
 		goto haltsys;
 	}
 
-#if NFB > 0
 	fb_unblank();
-#endif
 	boothowto = howto;
 	if ((howto & RB_NOSYNC) == 0 && waittime < 0) {
 		extern struct proc proc0;
@@ -1264,6 +1259,15 @@ _bus_dmamap_load_mbuf(t, t0, map, m, flags)
 	int i;
 	size_t len;
 
+	/*
+	 * Make sure that on error condition we return "no valid mappings".
+	 */
+ 	map->dm_mapsize = 0;
+ 	map->dm_nsegs = 0;
+
+	if (m->m_pkthdr.len > map->_dm_size)
+		return (EINVAL);
+
 	/* Record mbuf for *_unload */
 	map->_dm_type = _DM_TYPE_MBUF;
 	map->_dm_source = m;
@@ -1330,6 +1334,15 @@ _bus_dmamap_load_uio(t, t0, map, uio, flags)
 	bus_dma_segment_t segs[MAX_DMA_SEGS];
 	int i, j;
 	size_t len;
+
+	/*
+	 * Make sure that on error condition we return "no valid mappings".
+	 */
+ 	map->dm_mapsize = 0;
+ 	map->dm_nsegs = 0;
+
+	if (uio->uio_resid > map->_dm_size)
+		return (EINVAL);
 
 	if (uio->uio_segflg != UIO_SYSSPACE)
 		return (EOPNOTSUPP);
@@ -1406,30 +1419,6 @@ _bus_dmamap_unload(t, t0, map)
 	bus_dma_tag_t t, t0;
 	bus_dmamap_t map;
 {
-	int i;
-	struct vm_page *m;
-	struct pglist *mlist;
-	paddr_t pa;
-
-	for (i = 0; i < map->dm_nsegs; i++) {
-		if ((mlist = map->dm_segs[i]._ds_mlist) == NULL) {
-			/* 
-			 * We were asked to load random VAs and lost the 
-			 * PA info so just blow the entire cache away.
-			 */
-			blast_vcache();
-			break;
-		}
-		for (m = TAILQ_FIRST(mlist); m != NULL;
-		     m = TAILQ_NEXT(m,pageq)) {
-			pa = VM_PAGE_TO_PHYS(m);
-			/* 
-			 * We should be flushing a subrange, but we
-			 * don't know where the segments starts.
-			 */
-			dcache_flush_page(pa);
-		}
-	}
 	/* Mark the mappings as invalid. */
 	map->dm_mapsize = 0;
 	map->dm_nsegs = 0;
@@ -1448,49 +1437,8 @@ _bus_dmamap_sync(t, t0, map, offset, len, ops)
 	bus_size_t len;
 	int ops;
 {
-	int i;
-	struct vm_page *m;
-	struct pglist *mlist;
-
-	/*
-	 * We sync out our caches, but the bus must do the same.
-	 *
-	 * Actually a #Sync is expensive.  We should optimize.
-	 */
-	if ((ops & BUS_DMASYNC_PREREAD) || (ops & BUS_DMASYNC_PREWRITE)) {
-		/* 
-		 * Don't really need to do anything, but flush any pending
-		 * writes anyway. 
-		 */
-		membar(Sync);
-	}
-	if (ops & BUS_DMASYNC_POSTREAD) {
-		/* Invalidate the vcache */
-		for (i=0; i<map->dm_nsegs; i++) {
-			if ((mlist = map->dm_segs[i]._ds_mlist) == NULL)
-				/* Should not really happen. */
-				continue;
-			for (m = TAILQ_FIRST(mlist);
-			     m != NULL; m = TAILQ_NEXT(m,pageq)) {
-				paddr_t start;
-				psize_t size = NBPG;
-
-				if (offset < NBPG) {
-					start = VM_PAGE_TO_PHYS(m) + offset;
-					size = NBPG;
-					if (size > len)
-						size = len;
-					cache_flush_phys(start, size, 0);
-					len -= size;
-					continue;
-				}
-				offset -= size;
-			}
-		}
-	}
-	if (ops & BUS_DMASYNC_POSTWRITE) {
-		/* Nothing to do.  Handled by the bus controller. */
-	}
+	if (ops & (BUS_DMASYNC_PREWRITE | BUS_DMASYNC_POSTREAD))
+		membar(MemIssue);
 }
 
 extern paddr_t   vm_first_phys, vm_num_phys;
@@ -1705,7 +1653,7 @@ int sparc_bus_subregion(bus_space_tag_t, bus_space_tag_t,  bus_space_handle_t,
 paddr_t sparc_bus_mmap(bus_space_tag_t, bus_space_tag_t, bus_addr_t, off_t,
     int, int);
 void *sparc_mainbus_intr_establish(bus_space_tag_t, bus_space_tag_t, int, int,
-    int, int (*)(void *), void *);
+    int, int (*)(void *), void *, const char *);
 void sparc_bus_barrier(bus_space_tag_t, bus_space_tag_t,  bus_space_handle_t,
     bus_size_t, bus_size_t, int);
 int sparc_bus_alloc(bus_space_tag_t, bus_space_tag_t, bus_addr_t, bus_addr_t,
@@ -1944,21 +1892,52 @@ bus_space_probe(bus_space_tag_t tag, bus_addr_t paddr, bus_size_t size,
 	return (result);
 }
 
-
 void *
-sparc_mainbus_intr_establish(bus_space_tag_t t, bus_space_tag_t t0, int	pil,
-    int level, int flags, int (*handler)(void *), void *arg)
+bus_intr_allocate(bus_space_tag_t t, int (*handler)(void *), void *arg,
+    int number, int pil,
+    volatile u_int64_t *mapper, volatile u_int64_t *clearer,
+    const char *what)
 {
 	struct intrhand *ih;
+	size_t namelen = strlen(what) + 1;
 
 	ih = (struct intrhand *)
-		malloc(sizeof(struct intrhand), M_DEVBUF, M_NOWAIT);
+		malloc(sizeof(struct intrhand) + namelen - 1, M_DEVBUF, M_NOWAIT);
 	if (ih == NULL)
 		return (NULL);
 
+	memset(ih, 0, sizeof(struct intrhand) + namelen);
+
 	ih->ih_fun = handler;
 	ih->ih_arg = arg;
-	intr_establish(pil, ih);
+	ih->ih_number = number;
+	ih->ih_pil = pil;
+	ih->ih_map = mapper;
+	ih->ih_clr = clearer;
+	ih->ih_bus = t;
+	strlcpy(ih->ih_name, what, namelen);
+
+	return (ih);
+}
+
+void
+bus_intr_free(void *arg)
+{
+	free(arg, M_DEVBUF);
+}
+
+void *
+sparc_mainbus_intr_establish(bus_space_tag_t t, bus_space_tag_t t0, int number,
+    int pil, int flags, int (*handler)(void *), void *arg, const char *what)
+{
+	struct intrhand *ih;
+
+	ih = bus_intr_allocate(t0, handler, arg, number, pil, NULL, NULL, what);
+	if (ih == NULL)
+		return (NULL);
+
+	intr_establish(ih->ih_pil, ih);
+
 	return (ih);
 }
 
@@ -2166,13 +2145,13 @@ bus_space_mmap(bus_space_tag_t t, bus_addr_t a, off_t o, int p, int f)
 
 void *
 bus_intr_establish(bus_space_tag_t t, int p, int l, int f, int (*h)(void *),
-    void *a)
+    void *a, const char *w)
 {
 	const bus_space_tag_t t0 = t;
 	void *ret;
 
 	_BS_PRECALL(t, sparc_intr_establish);
-	ret = _BS_CALL(t, sparc_intr_establish)(t, t0, p, l, f, h, a);
+	ret = _BS_CALL(t, sparc_intr_establish)(t, t0, p, l, f, h, a, w);
 	_BS_POSTCALL;
 	return (ret);
 }

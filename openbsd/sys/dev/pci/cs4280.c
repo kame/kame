@@ -1,4 +1,4 @@
-/*	$OpenBSD: cs4280.c,v 1.16 2002/11/19 18:40:17 jason Exp $	*/
+/*	$OpenBSD: cs4280.c,v 1.19 2003/08/21 04:57:40 mickey Exp $	*/
 /*	$NetBSD: cs4280.c,v 1.5 2000/06/26 04:56:23 simonb Exp $	*/
 
 /*
@@ -71,8 +71,6 @@ int cs4280debug = 0;
 #include <sys/fcntl.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
-#include <sys/types.h>
-#include <sys/systm.h>
 
 #include <dev/pci/pcidevs.h>
 #include <dev/pci/pcivar.h>
@@ -1025,49 +1023,49 @@ cs4280_query_encoding(addr, fp)
 {
 	switch (fp->index) {
 	case 0:
-		strcpy(fp->name, AudioEulinear);
+		strlcpy(fp->name, AudioEulinear, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ULINEAR;
 		fp->precision = 8;
 		fp->flags = 0;
 		break;
 	case 1:
-		strcpy(fp->name, AudioEmulaw);
+		strlcpy(fp->name, AudioEmulaw, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ULAW;
 		fp->precision = 8;
 		fp->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		break;
 	case 2:
-		strcpy(fp->name, AudioEalaw);
+		strlcpy(fp->name, AudioEalaw, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ALAW;
 		fp->precision = 8;
 		fp->flags = AUDIO_ENCODINGFLAG_EMULATED;
 		break;
 	case 3:
-		strcpy(fp->name, AudioEslinear);
+		strlcpy(fp->name, AudioEslinear, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_SLINEAR;
 		fp->precision = 8;
 		fp->flags = 0;
 		break;
 	case 4:
-		strcpy(fp->name, AudioEslinear_le);
+		strlcpy(fp->name, AudioEslinear_le, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_SLINEAR_LE;
 		fp->precision = 16;
 		fp->flags = 0;
 		break;
 	case 5:
-		strcpy(fp->name, AudioEulinear_le);
+		strlcpy(fp->name, AudioEulinear_le, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ULINEAR_LE;
 		fp->precision = 16;
 		fp->flags = 0;
 		break;
 	case 6:
-		strcpy(fp->name, AudioEslinear_be);
+		strlcpy(fp->name, AudioEslinear_be, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_SLINEAR_BE;
 		fp->precision = 16;
 		fp->flags = 0;
 		break;
 	case 7:
-		strcpy(fp->name, AudioEulinear_be);
+		strlcpy(fp->name, AudioEulinear_be, sizeof fp->name);
 		fp->encoding = AUDIO_ENCODING_ULINEAR_BE;
 		fp->precision = 16;
 		fp->flags = 0;

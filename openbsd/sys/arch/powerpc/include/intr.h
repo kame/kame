@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.h,v 1.21 2002/09/15 09:01:59 deraadt Exp $ */
+/*	$OpenBSD: intr.h,v 1.23 2003/07/14 19:23:52 drahn Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom, Opsycon AB and RTMX Inc, USA.
@@ -51,8 +51,9 @@
 
 #ifndef _LOCORE
 
-#define PPC_NIRQ	65
+#define PPC_NIRQ	66
 #define PPC_CLK_IRQ	64
+#define PPC_STAT_IRQ	65
 extern int intrcnt[PPC_NIRQ];
 
 void setsoftclock(void);
@@ -65,7 +66,7 @@ int  splsoftnet(void);
 void do_pending_int(void);
 
 
-volatile extern int cpl, ipending, astpending, tickspending;
+volatile extern int cpl, ipending, astpending;
 extern int imask[7];
 
 /* SPL asserts */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_vnops.c,v 1.41 2002/03/17 18:22:25 art Exp $	*/
+/*	$OpenBSD: vfs_vnops.c,v 1.43 2003/07/21 22:44:50 tedu Exp $	*/
 /*	$NetBSD: vfs_vnops.c,v 1.20 1996/02/04 02:18:41 christos Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -502,7 +498,7 @@ vn_lock(struct vnode *vp, int flags, struct proc *p)
 		if (vp->v_flag & VXLOCK) {
 			vp->v_flag |= VXWANT;
 			simple_unlock(&vp->v_interlock);
-			tsleep((caddr_t)vp, PINOD, "vn_lock", 0);
+			tsleep(vp, PINOD, "vn_lock", 0);
 			error = ENOENT;
 		} else {
 			error = VOP_LOCK(vp, flags | LK_INTERLOCK, p);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr_prof.c,v 1.11 2002/06/10 11:11:22 nordin Exp $	*/
+/*	$OpenBSD: subr_prof.c,v 1.14 2003/09/01 18:06:03 henning Exp $	*/
 /*	$NetBSD: subr_prof.c,v 1.12 1996/04/22 01:38:50 christos Exp $	*/
 
 /*-
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -158,9 +154,9 @@ sys_profil(p, v, retval)
 	register_t *retval;
 {
 	register struct sys_profil_args /* {
-		syscallarg(char *) samples;
-		syscallarg(u_int) size;
-		syscallarg(u_int) offset;
+		syscallarg(caddr_t) samples;
+		syscallarg(size_t) size;
+		syscallarg(u_long) offset;
 		syscallarg(u_int) scale;
 	} */ *uap = v;
 	register struct uprof *upp;
@@ -221,7 +217,7 @@ addupc_intr(struct proc *p, u_long pc)
  * update fails, we simply turn off profiling.
  */
 void
-addupc_task(struct proc *p, u_long pc, u_int ticks)
+addupc_task(struct proc *p, u_long pc, u_int nticks)
 {
 	struct uprof *prof;
 	caddr_t addr;
@@ -229,7 +225,7 @@ addupc_task(struct proc *p, u_long pc, u_int ticks)
 	u_short v;
 
 	/* Testing P_PROFIL may be unnecessary, but is certainly safe. */
-	if ((p->p_flag & P_PROFIL) == 0 || ticks == 0)
+	if ((p->p_flag & P_PROFIL) == 0 || nticks == 0)
 		return;
 
 	prof = &p->p_stats->p_prof;
@@ -239,7 +235,7 @@ addupc_task(struct proc *p, u_long pc, u_int ticks)
 
 	addr = prof->pr_base + i;
 	if (copyin(addr, (caddr_t)&v, sizeof(v)) == 0) {
-		v += ticks;
+		v += nticks;
 		if (copyout((caddr_t)&v, addr, sizeof(v)) == 0)
 			return;
 	}

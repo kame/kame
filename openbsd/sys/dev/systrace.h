@@ -1,4 +1,4 @@
-/*	$OpenBSD: systrace.h,v 1.12 2002/12/04 17:37:39 mickey Exp $	*/
+/*	$OpenBSD: systrace.h,v 1.14 2003/06/16 06:36:40 itojun Exp $	*/
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * All rights reserved.
@@ -34,9 +34,6 @@
 
 #include <sys/ioccom.h>
 
-	/* XXX kill this after a major release */
-#define	SYSTR_CLONE	_IOR('s', 1, int)
-
 #define SYSTR_EMULEN	8	/* sync with sys proc */
 
 struct str_msg_emul {
@@ -65,14 +62,16 @@ struct str_msg_child {
 	pid_t new_pid;
 };
 
-#define SYSTR_MSG_ASK	1
-#define SYSTR_MSG_RES	2
-#define SYSTR_MSG_EMUL	3
-#define SYSTR_MSG_CHILD	4
-#define SYSTR_MSG_UGID	5
+#define SYSTR_MSG_ASK		1
+#define SYSTR_MSG_RES		2
+#define SYSTR_MSG_EMUL		3
+#define SYSTR_MSG_CHILD		4
+#define SYSTR_MSG_UGID		5
+#define SYSTR_MSG_POLICYFREE	6
 
 #define SYSTR_MSG_NOPROCESS(x) \
-	((x)->msg.msg_type == SYSTR_MSG_CHILD)
+	((x)->msg.msg_type == SYSTR_MSG_CHILD || \
+	 (x)->msg.msg_type == SYSTR_MSG_POLICYFREE)
 
 struct str_message {
 	int msg_type;
@@ -142,6 +141,7 @@ struct systrace_replace {
 };
 
 #define STRIOCCLONE	_IOR('s', 100, int)
+#define SYSTR_CLONE	STRIOCCLONE
 #define STRIOCATTACH	_IOW('s', 101, pid_t)
 #define STRIOCDETACH	_IOW('s', 102, pid_t)
 #define STRIOCANSWER	_IOW('s', 103, struct systrace_answer)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: procfs.h,v 1.17 2003/01/31 20:41:29 art Exp $	*/
+/*	$OpenBSD: procfs.h,v 1.21 2003/08/14 07:46:40 mickey Exp $	*/
 /*	$NetBSD: procfs.h,v 1.17 1996/02/12 15:01:41 christos Exp $	*/
 
 /*
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -77,15 +73,6 @@ struct pfsnode {
 #define PROCFS_NOTELEN	64	/* max length of a note (/proc/$pid/note) */
 #define PROCFS_CTLLEN 	8	/* max length of a ctl msg (/proc/$pid/ctl */
 
-struct procfs_args {
-	int version;
-	int flags;
-};
-
-#define PROCFS_ARGSVERSION	1
-
-#define	PROCFSMNT_LINUXCOMPAT	0x01
-
 /*
  * Kernel stuff follows
  */
@@ -121,7 +108,7 @@ struct vfs_namemap {
 };
 
 int vfs_getuserstr(struct uio *, char *, int *);
-vfs_namemap_t *vfs_findname(vfs_namemap_t *, char *, int);
+const vfs_namemap_t *vfs_findname(const vfs_namemap_t *, char *, int);
 
 int procfs_allocvp(struct mount *, struct vnode **, long, pfstype);
 int procfs_checkioperm(struct proc *p, struct proc *t);
@@ -150,7 +137,7 @@ int procfs_rw(void *);
 #define PROCFS_WANT	0x02
 
 extern int (**procfs_vnodeop_p)(void *);
-extern struct vfsops procfs_vfsops;
+extern const struct vfsops procfs_vfsops;
 
 struct vfsconf;
 

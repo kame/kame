@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipsec_input.c,v 1.63 2003/02/20 18:35:43 deraadt Exp $	*/
+/*	$OpenBSD: ipsec_input.c,v 1.69 2003/07/28 10:10:16 markus Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -152,10 +152,10 @@ ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto)
 	}
 
 	/*
-     * Find tunnel control block and (indirectly) call the appropriate
-     * kernel crypto routine. The resulting mbuf chain is a valid
-     * IP packet ready to go through input processing.
-     */
+	 * Find tunnel control block and (indirectly) call the appropriate
+	 * kernel crypto routine. The resulting mbuf chain is a valid
+	 * IP packet ready to go through input processing.
+	 */
 
 	bzero(&dst_address, sizeof(dst_address));
 	dst_address.sa.sa_family = af;
@@ -307,15 +307,21 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff,
 
 		ip = mtod(m, struct ip *);
 		ip->ip_len = htons(m->m_pkthdr.len);
-		HTONS(ip->ip_off);
 		ip->ip_sum = 0;
 		ip->ip_sum = in_cksum(m, ip->ip_hl << 2);
 		prot = ip->ip_p;
 
 		/* IP-in-IP encapsulation */
 		if (prot == IPPROTO_IPIP) {
+			if (m->m_pkthdr.len - skip < sizeof(struct ip)) {
+				m_freem(m);
+				IPSEC_ISTAT(espstat.esps_hdrops,
+				    ahstat.ahs_hdrops,
+				    ipcompstat.ipcomps_hdrops);
+				return EINVAL;
+			}
 			/* ipn will now contain the inner IPv4 header */
-			m_copydata(m, ip->ip_hl << 2, sizeof(struct ip),
+			m_copydata(m, skip, sizeof(struct ip),
 			    (caddr_t) &ipn);
 
 			/*
@@ -349,8 +355,15 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff,
 #if INET6
 		/* IPv6-in-IP encapsulation. */
 		if (prot == IPPROTO_IPV6) {
+			if (m->m_pkthdr.len - skip < sizeof(struct ip6_hdr)) {
+				m_freem(m);
+				IPSEC_ISTAT(espstat.esps_hdrops,
+				    ahstat.ahs_hdrops,
+				    ipcompstat.ipcomps_hdrops);
+				return EINVAL;
+			}
 			/* ip6n will now contain the inner IPv6 header. */
-			m_copydata(m, ip->ip_hl << 2, sizeof(struct ip6_hdr),
+			m_copydata(m, skip, sizeof(struct ip6_hdr),
 			    (caddr_t) &ip6n);
 
 			/*
@@ -409,6 +422,13 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff,
 #ifdef INET
 		/* IP-in-IP encapsulation */
 		if (prot == IPPROTO_IPIP) {
+			if (m->m_pkthdr.len - skip < sizeof(struct ip)) {
+				m_freem(m);
+				IPSEC_ISTAT(espstat.esps_hdrops,
+				    ahstat.ahs_hdrops,
+				    ipcompstat.ipcomps_hdrops);
+				return EINVAL;
+			}
 			/* ipn will now contain the inner IPv4 header */
 			m_copydata(m, skip, sizeof(struct ip), (caddr_t) &ipn);
 
@@ -443,6 +463,13 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff,
 
 		/* IPv6-in-IP encapsulation */
 		if (prot == IPPROTO_IPV6) {
+			if (m->m_pkthdr.len - skip < sizeof(struct ip6_hdr)) {
+				m_freem(m);
+				IPSEC_ISTAT(espstat.esps_hdrops,
+				    ahstat.ahs_hdrops,
+				    ipcompstat.ipcomps_hdrops);
+				return EINVAL;
+			}
 			/* ip6n will now contain the inner IPv6 header. */
 			m_copydata(m, skip, sizeof(struct ip6_hdr),
 			    (caddr_t) &ip6n);
@@ -521,6 +548,9 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff,
 	else
 		m->m_flags |= M_AUTH | M_AUTH_AH;
 
+	if (tdbp->tdb_flags & TDBF_TUNNELING)
+		m->m_flags |= M_TUNNEL;
+
 #if NBPFILTER > 0
 	bpfif = &encif[0].sc_if;
 	if (bpfif->if_bpf) {
@@ -538,6 +568,7 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff,
 		hdr.spi = tdbp->tdb_spi;
 		hdr.flags = m->m_flags & (M_AUTH|M_CONF|M_AUTH_AH);
 
+		m1.m_flags = 0;
 		m1.m_next = m;
 		m1.m_len = ENC_HDRLEN;
 		m1.m_data = (char *) &hdr;

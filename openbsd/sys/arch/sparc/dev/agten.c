@@ -1,4 +1,4 @@
-/*	$OpenBSD: agten.c,v 1.2 2003/03/06 22:17:49 miod Exp $	*/
+/*	$OpenBSD: agten.c,v 1.5 2003/06/28 17:05:33 miod Exp $	*/
 /*
  * Copyright (c) 2002, 2003, Miodrag Vallat.
  * All rights reserved.
@@ -78,6 +78,7 @@
 #include <dev/rasops/rasops.h>
 #include <machine/fbvar.h>
 
+#include <dev/ic/p9000.h>
 #include <dev/ic/ibm561reg.h>
 
 #include <sparc/dev/sbusvar.h>
@@ -96,7 +97,7 @@ struct agten_softc {
 	struct	rom_reg sc_phys;		/* physical address and */
 	off_t	sc_physoffset;			/* offset for frame buffer */
 
-	volatile u_int32_t *sc_dac;
+	volatile u_int8_t *sc_p9100;
 	struct agten_cmap sc_cmap;		/* shadow color map */
 
 	volatile u_int32_t *sc_i128_fb;
@@ -157,14 +158,8 @@ struct cfdriver agten_cd = {
 int
 agtenmatch(struct device *parent, void *vcf, void *aux)
 {
-	struct cfdata *cf = vcf;
 	struct confargs *ca = aux;
 	struct romaux *ra = &ca->ca_ra;
-
-	/*
-	 * Mask out invalid flags from the user.
-	 */
-	cf->cf_flags &= FB_USERMASK;
 
 	if (strcmp(ra->ra_name, "PFU,aga") != 0)
 		return (0);
@@ -180,8 +175,6 @@ agtenattach(struct device *parent, struct device *self, void *args)
 	struct wsemuldisplaydev_attach_args waa;
 	int node, isconsole;
 	char *nam;
-
-	sc->sc_sunfb.sf_flags = self->dv_cfdata->cf_flags;
 
 	node = ca->ca_ra.ra_node;
 	nam = getpropstring(node, "model");
@@ -199,9 +192,9 @@ agtenattach(struct device *parent, struct device *self, void *args)
 	    (off_t)getpropint(node, "i128_fb_physaddr", 0x8000000);
 	sc->sc_i128_fb = mapiodev(ca->ca_ra.ra_reg, sc->sc_physoffset,
 	    getpropint(node, "i128_fb_size", 0x400000));
-	sc->sc_dac = mapiodev(ca->ca_ra.ra_reg,
-	    getpropint(node, "p9100_reg_physaddr", 0x10a0000) + 0x200,
-	    0x800 - 0x200);
+	sc->sc_p9100 = mapiodev(ca->ca_ra.ra_reg,
+	    getpropint(node, "p9100_reg_physaddr", 0x10a0000),
+	    0x4000);
 
 	/*
 	 * For some reason the agten does not use the canonical name for
@@ -231,7 +224,7 @@ agtenattach(struct device *parent, struct device *self, void *args)
 	sc->sc_sunfb.sf_ro.ri_bits = (void *)sc->sc_i128_fb;
 	
 	sc->sc_sunfb.sf_ro.ri_hw = sc;
-	fbwscons_init(&sc->sc_sunfb, isconsole);
+	fbwscons_init(&sc->sc_sunfb, isconsole ? 0 : RI_CLEAR);
 	fbwscons_setcolormap(&sc->sc_sunfb, agten_setcolor);
 
 	agten_stdscreen.capabilities = sc->sc_sunfb.sf_ro.ri_caps;
@@ -445,7 +438,8 @@ ibm561_write(struct agten_softc *sc, u_int32_t reg, u_int32_t value)
 	 * For some design reason the IBM561 PaletteDac needs to be fed
 	 * values shifted left by 16 bits. What happened to simplicity?
 	 */
-	sc->sc_dac[reg] = (value) << 16;
+	*(volatile u_int32_t *)(sc->sc_p9100 + P9100_RAMDAC_REGISTER(reg)) =
+	    (value) << 16;
 }
 
 void

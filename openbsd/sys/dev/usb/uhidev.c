@@ -1,5 +1,5 @@
-/*	$OpenBSD: uhidev.c,v 1.6 2002/11/11 02:32:32 nate Exp $	*/
-/*	$NetBSD: uhidev.c,v 1.10 2002/10/09 06:27:09 fair Exp $	*/
+/*	$OpenBSD: uhidev.c,v 1.9 2003/07/05 16:52:04 nate Exp $	*/
+/*	$NetBSD: uhidev.c,v 1.14 2003/03/11 16:44:00 augustss Exp $	*/
 
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -39,7 +39,7 @@
  */
 
 /*
- * HID spec: http://www.usb.org/developers/data/devclass/hid1_1.pdf
+ * HID spec: http://www.usb.org/developers/devclass_docs/HID1_11.pdf
  */
 
 #include <sys/param.h>
@@ -101,8 +101,6 @@ USB_MATCH(uhidev)
 	return (UMATCH_IFACECLASS_GENERIC);
 }
 
-int repproto = 1;
-
 USB_ATTACH(uhidev)
 {
 	USB_ATTACH_START(uhidev, sc, uaa);
@@ -120,7 +118,7 @@ USB_ATTACH(uhidev)
 	sc->sc_udev = uaa->device;
 	sc->sc_iface = iface;
 	id = usbd_get_interface_descriptor(iface);
-	usbd_devinfo(uaa->device, 0, devinfo);
+	usbd_devinfo(uaa->device, 0, devinfo, sizeof devinfo);
 	USB_ATTACH_SETUP;
 	printf("%s: %s, iclass %d/%d\n", USBDEVNAME(sc->sc_dev),
 	       devinfo, id->bInterfaceClass, id->bInterfaceSubClass);
@@ -486,17 +484,23 @@ uhidev_close(struct uhidev *scd)
 usbd_status
 uhidev_set_report(struct uhidev *scd, int type, void *data, int len)
 {
-	/* XXX */
-	char buf[100];
-	if (scd->sc_report_id) {
-		buf[0] = scd->sc_report_id;
-		memcpy(buf+1, data, len);
-		len++;
-		data = buf;
-	}
+	char *buf;
+	usbd_status retstat;
 
-	return usbd_set_report(scd->sc_parent->sc_iface, type,
-			       scd->sc_report_id, data, len);
+	if (scd->sc_report_id == 0)
+		return usbd_set_report(scd->sc_parent->sc_iface, type,
+				       scd->sc_report_id, data, len);
+
+	buf = malloc(len + 1, M_TEMP, M_WAITOK);
+	buf[0] = scd->sc_report_id;
+	memcpy(buf+1, data, len);
+
+	retstat = usbd_set_report(scd->sc_parent->sc_iface, type,
+				  scd->sc_report_id, data, len + 1);
+
+	free(buf, M_TEMP);
+
+	return retstat;
 }
 
 void

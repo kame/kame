@@ -1,4 +1,4 @@
-/*	$OpenBSD: readdir.c,v 1.4 1997/07/21 15:43:54 mickey Exp $	*/
+/*	$OpenBSD: readdir.c,v 1.7 2003/08/11 06:23:09 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1996 Michael Shalayeff
@@ -12,14 +12,9 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
  * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -43,11 +38,10 @@
 
 
 int
-opendir(name)
-	char *name;
+opendir(char *name)
 {
-	int fd;
 	struct stat sb;
+	int fd;
 
 	if (stat(name, &sb) < 0)
 		return -1;
@@ -68,13 +62,11 @@ opendir(name)
 
 	return fd;
 }
-	
+
 int
-readdir(fd, dest)
-	int fd;
-	char *dest;
+readdir(int fd, char *dest)
 {
-	register struct open_file *f = &files[fd];
+	struct open_file *f = &files[fd];
 
 	if (fd < 0 || fd >= SOPEN_MAX ||
 	    !((f = &files[fd])->f_flags & F_READ)) {
@@ -93,8 +85,7 @@ readdir(fd, dest)
 }
 
 void
-closedir(fd)
-	int fd;
+closedir(int fd)
 {
 #ifdef __INTERNAL_LIBSA_CREAD
 	oclose(fd);

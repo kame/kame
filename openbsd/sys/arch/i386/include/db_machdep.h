@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_machdep.h,v 1.7 2002/03/14 01:26:33 millert Exp $	*/
+/*	$OpenBSD: db_machdep.h,v 1.9 2003/05/18 02:43:13 andreas Exp $	*/
 /*	$NetBSD: db_machdep.h,v 1.9 1996/05/03 19:23:59 christos Exp $	*/
 
 /* 
@@ -91,12 +91,16 @@ boolean_t 	db_check_access(vaddr_t, int, task_t);
 boolean_t	db_phys_eq(task_t, vaddr_t, task_t, vaddr_t);
 #endif
 
+#define DB_MACHINE_COMMANDS
+
 /* macros for printing OS server dependent task name */
 
 #define DB_TASK_NAME(task)	db_task_name(task)
 #define DB_TASK_NAME_TITLE	"COMMAND                "
 #define DB_TASK_NAME_LEN	23
 #define DB_NULL_TASK_NAME	"?                      "
+#define DB_ELF_SYMBOLS
+#define DB_ELFSIZE		32
 
 /*
  * Constants for KGDB.
@@ -114,5 +118,7 @@ void		db_task_name(/* task_t */);
 #define db_thread_fp_used(thread)	((thread)->pcb->ims.ifps != 0)
 
 int kdb_trap(int, int, db_regs_t *);
+
+void db_machine_init(void);
 
 #endif	/* _I386_DB_MACHDEP_H_ */

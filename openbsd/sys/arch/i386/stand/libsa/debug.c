@@ -1,4 +1,4 @@
-/*	$OpenBSD: debug.c,v 1.9 2002/03/14 03:15:54 millert Exp $	*/
+/*	$OpenBSD: debug.c,v 1.11 2003/08/11 06:23:09 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1997 Michael Shalayeff
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
@@ -53,15 +48,14 @@ void d_putc(dev_t, int);
 #endif
 
 int
-debug_init()
+debug_init(void)
 {
 	return 0;
 }
 
 
 void
-dump_regs(trapno, arg)
-	u_int trapno, arg;
+dump_regs(u_int trapno, u_int arg)
 {
 	register int i;
 	/* make it local, so it won't rely on .data/.bss corruption */
@@ -75,12 +69,12 @@ dump_regs(trapno, arg)
 
 	/* Trap info */
 	printf("\ftrap: %u(%x): %s\ncn_tab=%p\n",
-		trapno, arg, trap_names[trapno], save_cons);
+	    trapno, arg, trap_names[trapno], save_cons);
 
 	/* Register dump */
 	for(i = 1; i <= nreg; i++)
 		printf("%s\t%x%c", reg_names[i-1], *reg_values[i-1],
-			((i%4)? ' ': '\n'));
+		    ((i%4)? ' ': '\n'));
 
 	dump_mem("Code dump", (void *)*reg_values[8], 8);
 	/* %ebx (void *)((*reg_values[3] + 15) & ~0x0F) */
@@ -92,10 +86,7 @@ dump_regs(trapno, arg)
 }
 
 void
-dump_mem(l, p, n)
-	char *l;
-	void *p;
-	size_t n;
+dump_mem(char *l, void *p, size_t n)
 {
 	register int i;
 	printf("%s [%p]:%s", l, p, (n > 6? "\n":" "));
@@ -109,9 +100,7 @@ dump_mem(l, p, n)
 u_int d_pos;
 
 void
-d_putc(d, c)
-	dev_t d;
-	int c;
+d_putc(dev_t d, int c)
 {
 	switch (c) {
 	case '\n':	d_pos += 80;					break;

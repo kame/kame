@@ -1,5 +1,5 @@
-/*	$OpenBSD: uftdi.c,v 1.10 2002/11/11 02:32:32 nate Exp $ 	*/
-/*	$NetBSD: uftdi.c,v 1.13 2002/09/23 05:51:23 simonb Exp $	*/
+/*	$OpenBSD: uftdi.c,v 1.12 2003/05/19 00:33:26 nate Exp $ 	*/
+/*	$NetBSD: uftdi.c,v 1.14 2003/02/23 04:20:07 simonb Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -173,7 +173,7 @@ USB_ATTACH(uftdi)
 		goto bad;
 	}
 
-	usbd_devinfo(dev, 0, devinfo);
+	usbd_devinfo(dev, 0, devinfo, sizeof devinfo);
 	USB_ATTACH_SETUP;
 	printf("%s: %s\n", devname, devinfo);
 
@@ -279,12 +279,11 @@ int
 uftdi_detach(device_ptr_t self, int flags)
 {
 	struct uftdi_softc *sc = (struct uftdi_softc *)self;
-	int rv = 0;
 
 	DPRINTF(("uftdi_detach: sc=%p flags=%d\n", sc, flags));
 	sc->sc_dying = 1;
 	if (sc->sc_subdev != NULL) {
-		rv = config_detach(sc->sc_subdev, flags);
+		config_detach(sc->sc_subdev, flags);
 		sc->sc_subdev = NULL;
 	}
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_interface.c,v 1.14 2003/02/12 06:33:00 jason Exp $	*/
+/*	$OpenBSD: db_interface.c,v 1.17 2003/07/09 18:08:01 jason Exp $	*/
 /*	$NetBSD: db_interface.c,v 1.61 2001/07/31 06:55:47 eeh Exp $ */
 
 /*
@@ -279,9 +279,9 @@ kdb_trap(type, tf)
 	extern int trap_trace_dis;
 
 	trap_trace_dis++;
-#if NFB > 0
+
 	fb_unblank();
-#endif
+
 	switch (type) {
 	case T_BREAKPOINT:	/* breakpoint */
 		printf("kdb breakpoint at %llx\n",
@@ -1336,11 +1336,11 @@ db_inst_store(inst)
       case IOP3_SWAPA:
       case IOP3_STF:
       case IOP3_STFSR:
-      case IOP3_STDFQ:
+      case IOP3_STQF:
       case IOP3_STDF:
       case IOP3_STC:
       case IOP3_STCSR:
-      case IOP3_STDCQ:
+      case IOP3_STQFA:
       case IOP3_STDC:
 	return 1;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: wait.h,v 1.8 2002/03/14 01:27:14 millert Exp $	*/
+/*	$OpenBSD: wait.h,v 1.11 2003/08/03 19:25:49 millert Exp $	*/
 /*	$NetBSD: wait.h,v 1.11 1996/04/09 20:55:51 cgd Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -57,12 +53,14 @@
 
 #define	_WSTATUS(x)	(_W_INT(x) & 0177)
 #define	_WSTOPPED	0177		/* _WSTATUS if process is stopped */
-#define WIFSTOPPED(x)	(_WSTATUS(x) == _WSTOPPED)
-#define WSTOPSIG(x)	(_W_INT(x) >> 8)
+#define	_WCONTINUED	0177777		/* process has continued */
+#define WIFSTOPPED(x)	((_W_INT(x) & 0xff) == _WSTOPPED)
+#define WSTOPSIG(x)	((_W_INT(x) >> 8) & 0xff)
 #define WIFSIGNALED(x)	(_WSTATUS(x) != _WSTOPPED && _WSTATUS(x) != 0)
 #define WTERMSIG(x)	(_WSTATUS(x))
 #define WIFEXITED(x)	(_WSTATUS(x) == 0)
-#define WEXITSTATUS(x)	(_W_INT(x) >> 8)
+#define WEXITSTATUS(x)	((_W_INT(x) >> 8) & 0xff)
+#define WIFCONTINUED(x)	((_W_INT(x) & _WCONTINUED) == _WCONTINUED)
 #ifndef _POSIX_SOURCE
 #define WCOREDUMP(x)	(_W_INT(x) & WCOREFLAG)
 
@@ -84,6 +82,7 @@
 #ifndef _POSIX_SOURCE
 #define	WALTSIG		4	/* wait for child with alternate exit signal */
 #endif
+#define	WCONTINUED	8	/* report a job control continued process */
 
 #ifndef _POSIX_SOURCE
 /* POSIX extensions and 4.2/4.3 compatibility: */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.20 2002/03/14 01:26:39 millert Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.23 2003/09/02 20:14:08 miod Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -47,6 +47,8 @@
 #include <machine/disklabel.h>
 #include <machine/vmparam.h>
 
+#include <dev/cons.h>
+
 /*
  * The following several variables are related to
  * the configuration process, and are used in initializing
@@ -57,7 +59,6 @@ struct	device *parsedisk(char *, int, int, dev_t *);
 void	setroot(void);
 void	swapconf(void);
 char	buginchr(void);
-int	getsb(char *, int);
 void	dumpconf(void);
 int	findblkmajor(struct device *);
 struct device	*getdisk(char *, int, int, dev_t *);
@@ -74,28 +75,37 @@ struct device *bootdv;	/* set by device drivers (if found) */
 void
 cpu_configure()
 {
+	struct consdev *temp;
+	extern struct consdev bootcons;
+
 	if (config_rootfound("mainbus", "mainbus") == 0)
 		panic("no mainbus found");
 
 	/*
-	 * Turn external interrupts on. We have all the drivers in
-	 * place now!
+	 * Turn external interrupts on.
+	 *
+	 * XXX We have a race here. If we enable interrupts after setroot(),
+	 * the kernel dies. If we enable interrupts here, console on cl does
+	 * not work (for boot -a). So we switch to the boot console for the
+	 * time being...
 	 */
+	temp = cn_tab;
+	cn_tab = &bootcons;
+
 	enable_interrupt();
 	spl0();
 	setroot();
 	swapconf();
 
-	/*
-	 * Done with autoconfig!
-	 */
+	cn_tab = temp;
+
 	cold = 0;
 }
 
 /*
  * Configure swap space and related parameters.
  */
-void 
+void
 swapconf()
 {
 	register struct swdevt *swp;
@@ -126,7 +136,6 @@ struct nam2blk {
 	{ "st",	5 },
 	{ "rd",	7 },
 };
-
 
 int
 findblkmajor(dv)
@@ -222,7 +231,7 @@ setroot()
 {
 	register struct swdevt *swp;
 	register struct device *dv;
-	register int len, majdev, unit, part;
+	register int len, majdev, unit;
 	dev_t nrootdev, nswapdev = NODEV;
 	char buf[128];
 	dev_t temp;
@@ -235,28 +244,28 @@ setroot()
 
 	if (boothowto & RB_ASKNAME) {
 		for (;;) {
-			printf("root device");
+			printf("root device ");
 			if (bootdv != NULL)
 				printf("(default %s%c)",
 				    bootdv->dv_xname,
 				    bootdv->dv_class == DV_DISK ? 'a' : ' ');
 			printf(": ");
-			len = getsb(buf, sizeof(buf));
+			len = getsn(buf, sizeof(buf));
 			if (len == 0 && bootdv != NULL) {
-				strcpy(buf, bootdv->dv_xname);
+				strlcpy(buf, bootdv->dv_xname, sizeof buf);
 				len = strlen(buf);
 			}
 			if (len > 0 && buf[len - 1] == '*') {
 				buf[--len] = '\0';
 				dv = getdisk(buf, len, 1, &nrootdev);
-				if (dv != NULL) {
+				if (dv) {
 					bootdv = dv;
 					nswapdev = nrootdev;
 					goto gotswap;
 				}
 			}
 			dv = getdisk(buf, len, 0, &nrootdev);
-			if (dv != NULL) {
+			if (dv) {
 				bootdv = dv;
 				break;
 			}
@@ -276,7 +285,7 @@ setroot()
 				    bootdv->dv_xname,
 				    bootdv->dv_class == DV_DISK ? 'b' : ' ');
 			printf(": ");
-			len = getsb(buf, sizeof(buf));
+			len = getsn(buf, sizeof(buf));
 			if (len == 0 && bootdv != NULL) {
 				switch (bootdv->dv_class) {
 				case DV_IFNET:
@@ -295,7 +304,7 @@ setroot()
 				break;
 			}
 			dv = getdisk(buf, len, 1, &nswapdev);
-			if (dv != NULL) {
+			if (dv) {
 				if (dv->dv_class == DV_IFNET)
 					nswapdev = NODEV;
 				break;
@@ -320,9 +329,8 @@ gotswap:
 			 * val[2] of the boot device is the partition number.
 			 * Assume swap is on partition b.
 			 */
-			part = bootpart;
 			unit = bootdv->dv_unit;
-			rootdev = MAKEDISKDEV(majdev, unit, part);
+			rootdev = MAKEDISKDEV(majdev, unit, bootpart);
 			nswapdev = dumpdev = MAKEDISKDEV(major(rootdev),
 			    DISKUNIT(rootdev), 1);
 		} else {
@@ -375,13 +383,15 @@ gotswap:
 			break;
 		}
 	}
-	if (swp->sw_dev != NODEV)
-		/*
-		 * If dumpdev was the same as the old primary swap device,
-		 * move it to the new primary swap device.
-		 */
-		if (temp == dumpdev)
-			dumpdev = swdevt[0].sw_dev;
+	if (swp->sw_dev == NODEV)
+		return;
+
+	/*
+	 * If dumpdev was the same as the old primary swap device, move
+	 * it to the new primary swap device.
+	 */
+	if (temp == dumpdev)
+		dumpdev = swdevt[0].sw_dev;
 }
 
 /*
@@ -397,62 +407,17 @@ getdevunit(name, unit)
 	int lunit;
 
 	/* compute length of name and decimal expansion of unit number */
-	sprintf(num, "%d", unit);
+	snprintf(num, sizeof num, "%d", unit);
 	lunit = strlen(num);
 	if (strlen(name) + lunit >= sizeof(fullname) - 1)
 		panic("config_attach: device name too long");
 
-	strcpy(fullname, name);
-	strcat(fullname, num);
+	strlcpy(fullname, name, sizeof fullname);
+	strlcat(fullname, num, sizeof fullname);
 
 	while (strcmp(dev->dv_xname, fullname) != 0) {
 		if ((dev = dev->dv_list.tqe_next) == NULL)
 			return NULL;
 	}
 	return dev;
-}
-
-int
-getsb(cp, size)
-	char *cp;
-	int size;
-{
-	register char *lp;
-	register int c;
-	register int len;
-
-	lp = cp;
-	len = 0;
-	for (;;) {
-		c = buginchr();
-		switch (c) {
-		case '\n':
-		case '\r':
-			printf("\n");
-			*lp++ = '\0';
-			return (len);
-		case '\b':
-		case '\177':
-			if (len) {
-				--len;
-				--lp;
-				printf("\b \b");
-			}
-			continue;
-		case '@':
-		case 'u' & 037:
-			len = 0;
-			lp = cp;
-			printf("\n");
-			continue;
-		default:
-			if (len + 1 >= size || c < ' ') {
-				printf("\007");
-				continue;
-			}
-			printf("%c", c);
-			++len;
-			*lp++ = c;
-		}
-	}
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cryptodev.c,v 1.55 2002/11/21 19:34:25 jason Exp $	*/
+/*	$OpenBSD: cryptodev.c,v 1.59 2003/06/10 18:34:51 jason Exp $	*/
 
 /*
  * Copyright (c) 2001 Theo de Raadt
@@ -12,8 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *   notice, this list of conditions and the following disclaimer in the
  *   documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *   derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -51,6 +49,9 @@
 #include <crypto/blf.h>
 #include <crypto/cryptodev.h>
 #include <crypto/xform.h>
+
+extern struct cryptocap *crypto_drivers;
+extern int crypto_drivers_num;
 
 struct csession {
 	TAILQ_ENTRY(csession) next;
@@ -297,11 +298,12 @@ bail:
 int
 cryptodev_op(struct csession *cse, struct crypt_op *cop, struct proc *p)
 {
-	struct cryptop *crp = NULL;
+	struct cryptop *crp= NULL;
 	struct cryptodesc *crde = NULL, *crda = NULL;
-	int i, error;
+	int i, s, error;
+	u_int32_t hid;
 
-	if (cop->len > 256*1024-4)
+	if (cop->len > 64*1024-4)
 		return (E2BIG);
 
 	if (cse->txform && (cop->len % cse->txform->blocksize) != 0) {
@@ -367,7 +369,6 @@ cryptodev_op(struct csession *cse, struct crypt_op *cop, struct proc *p)
 	}
 
 	crp->crp_ilen = cop->len;
-	crp->crp_flags = CRYPTO_F_IOV;
 	crp->crp_buf = (caddr_t)&cse->uio;
 	crp->crp_callback = (int (*) (struct cryptop *)) cryptodev_cb;
 	crp->crp_sid = cse->sid;
@@ -403,15 +404,33 @@ cryptodev_op(struct csession *cse, struct crypt_op *cop, struct proc *p)
 		crp->crp_mac=cse->tmp_mac;
 	}
 
+	/* try the fast path first */
+	crp->crp_flags = CRYPTO_F_IOV | CRYPTO_F_NOQUEUE;
+	hid = (crp->crp_sid >> 32) & 0xffffffff;
+	if (hid >= crypto_drivers_num)
+		goto dispatch;
+	if (crypto_drivers[hid].cc_flags & CRYPTOCAP_F_SOFTWARE)
+		goto dispatch;
+	if (crypto_drivers[hid].cc_process == NULL)
+		goto dispatch;
+	error = crypto_drivers[hid].cc_process(crp);
+	if (error) {
+		/* clear error */
+		crp->crp_etype = 0;
+		goto dispatch;
+	}
+	goto processed;
+ dispatch:
+	crp->crp_flags = CRYPTO_F_IOV;
 	crypto_dispatch(crp);
-	error = tsleep(cse, PSOCK, "crydev", 0);
+ processed:
+	s = splnet();
+	while (!(crp->crp_flags & CRYPTO_F_DONE)) {
+		error = tsleep(cse, PSOCK, "crydev", 0);
+	}
+	splx(s);
 	if (error) {
 		/* XXX can this happen?  if so, how do we recover? */
-		goto bail;
-	}
-
-	if (crp->crp_etype != 0) {
-		error = crp->crp_etype;
 		goto bail;
 	}
 
@@ -419,6 +438,11 @@ cryptodev_op(struct csession *cse, struct crypt_op *cop, struct proc *p)
 		error = cse->error;
 		goto bail;
 	}
+	if (crp->crp_etype != 0) {
+		error = crp->crp_etype;
+		goto bail;
+	}
+
 
 	if (cop->dst &&
 	    (error = copyout(cse->uio.uio_iov[0].iov_base, cop->dst, cop->len)))
@@ -444,8 +468,10 @@ cryptodev_cb(void *op)
 	struct csession *cse = (struct csession *)crp->crp_opaque;
 
 	cse->error = crp->crp_etype;
-	if (crp->crp_etype == EAGAIN)
+	if (crp->crp_etype == EAGAIN) {
+		crp->crp_flags = CRYPTO_F_IOV;
 		return crypto_dispatch(crp);
+	}
 	wakeup(cse);
 	return (0);
 }
@@ -604,7 +630,11 @@ cryptoopen(dev_t dev, int flag, int mode, struct proc *p)
 {
 	if (usercrypto == 0)
 		return (ENXIO);
+#ifdef CRYPTO
 	return (0);
+#else
+	return (ENXIO);
+#endif
 }
 
 int

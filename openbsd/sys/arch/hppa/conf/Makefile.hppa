@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile.hppa,v 1.18 2002/12/25 21:10:26 miod Exp $
+#	$OpenBSD: Makefile.hppa,v 1.21 2003/07/22 19:39:50 otto Exp $
 
 # Makefile for OpenBSD
 #
@@ -51,7 +51,7 @@ CFLAGS+=	-fno-omit-frame-pointer
 .endif
 
 .if ${IDENT:M-DHP7000_CPU} != ""
-CFLAGS+=	-mpa-risc-1-0 -mschedule=700
+CFLAGS+=	-mpa-risc-1-0
 .elif ${IDENT:M-DHP8*_CPU} != ""
 CFLAGS+=	-mpa-risc-2-0
 .else
@@ -61,6 +61,8 @@ CFLAGS+=	-mpa-risc-1-1
 .if ${IDENT:M-DHP*_CPU} == ${IDENT:M-HHP7100LC_CPU}
 # XXX they said gcc has bugs in 7100lc scheduling
 #CFLAGS+=	-mschedule=7100LC
+.else
+CFLAGS+=	-mschedule=700
 .endif
 
 .if ${IDENT:M-DFPEMUL} != ""
@@ -155,7 +157,7 @@ clean::
 
 lint:
 	@lint -hbxncez -DGENERIC -Dvolatile= ${CPPFLAGS} -UKGDB \
-	    ${CFILES} ${HPPA}/hppa/swapgeneric.c ioconf.c param.c | \
+	    ${CFILES} ioconf.c param.c | \
 	    grep -v 'static function .* unused'
 
 tags:
@@ -179,7 +181,7 @@ SRCS=	${HPPA}/hppa/locore.S \
 	fi
 	sh $S/kern/genassym.sh ${MKDEP} -f assym.dep ${CFLAGS} \
 	    ${CPPFLAGS} < ${HPPA}/hppa/genassym.cf
-	@sed -e 's/.*\.o:.*\.c/assym.h:/' < assym.dep >> .depend
+	@sed -e 's/.*\.o:.* /assym.h: /' < assym.dep >> .depend
 	@rm -f assym.dep
 
 # depend on root or device configuration

@@ -1,4 +1,4 @@
-/*	$OpenBSD: bootarg.c,v 1.7 2002/03/14 03:16:12 millert Exp $	*/
+/*	$OpenBSD: bootarg.c,v 1.10 2003/08/11 06:23:07 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1997,1998 Michael Shalayeff
@@ -12,14 +12,9 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
  * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -38,10 +33,7 @@
 bootarg_t *bootarg_list;
 
 void
-addbootarg(t, l, p)
-	int t;
-	size_t l;
-	void *p;
+addbootarg(int t, size_t l, void *p)
 {
 	bootarg_t *q = alloc(sizeof(*q) + l - sizeof(q->ba_arg));
 
@@ -53,13 +45,11 @@ addbootarg(t, l, p)
 }
 
 void
-makebootargs(v, lenp)
-	caddr_t v;
-	size_t *lenp;
+makebootargs(caddr_t v, size_t *lenp)
 {
-	register bootarg_t *p;
-	register u_char *q;
-	register size_t l;
+	bootarg_t *p;
+	u_char *q;
+	size_t l;
 
 	/* get total size */
 	l = sizeof(*p);
