@@ -15,7 +15,7 @@
 # device lines is also present in the ./LINT configuration file. If you are
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-# $FreeBSD: src/sys/pc98/conf/GENERIC,v 1.142.2.4 2000/07/14 03:57:35 nyan Exp $
+# $FreeBSD: src/sys/pc98/conf/GENERIC,v 1.142.2.13 2000/11/01 10:35:38 nyan Exp $
 
 machine		pc98
 cpu		I386_CPU
@@ -61,11 +61,6 @@ options		ICMP_BANDLIM		#Rate limit bad replies
 # To make an SMP kernel, the next two are needed
 #options 	SMP			# Symmetric MultiProcessor Kernel
 #options 	APIC_IO			# Symmetric (APIC) I/O
-# Optionally these may need tweaked, (defaults shown):
-#options 	NCPU=2			# number of CPUs
-#options 	NBUS=4			# number of busses
-#options 	NAPIC=1			# number of IO APICs
-#options 	NINTR=24		# number of INTs
 
 device		isa
 device		pci
@@ -122,17 +117,16 @@ device bs0 at isa? port IO_SCSI irq 5 drq 3 flags 0
 # PC-9801-100
 device	aic0	at isa? port 0x1840 irq 5 flags 0x10000
 
+device		ncv		# NCR 53C500
+device		nsp		# Workbit Ninja SCSI-3
+device		stg		# TMC 18C30/18C50
+
 # SCSI peripherals
 device		scbus		# SCSI bus (required)
 device		da		# Direct Access (disks)
 device		sa		# Sequential Access (tape etc)
 device		cd		# CD
 device		pass		# Passthrough device (direct SCSI access)
-
-# RAID controllers
-#device		ida		# Compaq Smart RAID
-#device		amr		# AMI MegaRAID
-#device		mlx		# Mylex DAC960 family
 
 # keyboard driver
 device		pckbd0	at isa? port IO_KBD irq 1
@@ -163,7 +157,7 @@ options 	COM_MULTIPORT
 # COM1
 device		sio0	at isa? port IO_COM1 irq 4
 # COM2 (2nd CCU)
-device		sio1	at isa? port 0x238 irq 5 flags 0x12000010
+device		sio1	at isa? port 0x238 irq 5 flags 0x12000000
 # PC-9861K, PC-9801-101, MDC-926Rs
 #device		sio1	at isa? port IO_COM2 irq 5 flags 0x01000000
 #device		sio2	at isa? port IO_COM3 irq 6 flags 0x02000000
@@ -259,8 +253,10 @@ device		vx		# 3Com 3c590, 3c595 (``Vortex'')
 device		wx		# Intel Gigabit Ethernet Card (``Wiseman'')
 
 # PCI Ethernet NICs that use the common MII bus controller code.
+# NOTE: Be sure to keep the 'device miibus' line in order to use these NICs!
 device		miibus		# MII bus support
 device		dc		# DEC/Intel 21143 and various workalikes
+device		pcn		# AMD Am79C79x PCI 10/100 NICs
 device		rl		# RealTek 8129/8139
 device		sf		# Adaptec AIC-6915 (``Starfire'')
 device		sis		# Silicon Integrated Systems SiS 900/SiS 7016
@@ -285,21 +281,34 @@ device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 # ed8: C-NET(98)
 # ed9: C-NET(98)E/L
 # ed10: EC/EP-98X
-# ed11: SIU-98-D
+# ed11: SB-9801
+# ed12: NC5098
 #
-#device ed0 at isa? port 0x00d0 irq 6
-##device ed0 at isa? port 0x10d0 irq 6 iomem 0xc8000    # SMC EtherEZ98
-#device ed5 at isa? port 0x00d0 irq 6 iomem 0xd0000 iosiz 16384 flags 0x600000
-#device ed1 at isa? port 0x00d8 irq 6 flags 0x200000
-#device ed3 at isa? port 0x00d0 irq 6 flags 0x400000
-#device ed4 at isa? port 0x56d0 irq 5 flags 0x500000
-#device ed2 at isa? port 0x00d8 irq 6 flags 0x300000
-#device ed7 at isa? port 0x00d0 irq 6 flags 0x900000
-#device ed6 at isa? port 0x0770 irq 6 flags 0x800000
-#device ed9 at isa? port 0x03d0 irq 6 flags 0xb00000
-#device ed8 at isa? port 0xa3d0 irq 6 iomem 0xd0000 iosiz 16384 flags 0xa00000
-#device ed10 at isa? port 0x00d0 irq 3 flags 0xd10000
-#device ed11 at isa? port 0x00d0 irq 6 iomem 0xd0000 iosiz 32768 flags 0x610000
+device	ed0 at isa? port 0x00d0 irq 6
+# EtherEZ98
+#device	ed0 at isa? port 0x10d0 irq 6 iomem 0xc8000
+device	ed5 at isa? port 0x00d0 irq 6 iomem 0xd0000 iosiz 16384 flags 0x600000
+# SIU-98-E
+#device	ed5 at isa? port 0x00d0 irq 6 iomem 0xd0000 iosiz 32768 flags 0x610000
+device	ed1 at isa? port 0x00d8 irq 6 flags 0x200000
+device	ed3 at isa? port 0x00d0 irq 6 flags 0x400000
+device	ed4 at isa? port 0x56d0 irq 5 flags 0x500000
+device	ed2 at isa? port 0x00d8 irq 6 flags 0x300000
+device	ed7 at isa? port 0x00d0 irq 6 flags 0x900000
+# PC-9801-77
+#device	ed7 at isa? port 0x00d0 irq 6 flags 0x910000
+device	ed6 at isa? port 0x0770 irq 6 flags 0x800000
+device	ed9 at isa? port 0x03d0 irq 6 flags 0xb00000
+# C-NET(98)E/L(0x55ED)
+#device	ed9 at isa? port 0x03d0 irq 6 flags 0xb10000
+device	ed8 at isa? port 0xa3d0 irq 6 iomem 0xd0000 iosiz 16384 flags 0xa00000
+# EN1646
+#device	ed10 at isa? port 0x00d0 irq 3 flags 0xd00000
+device	ed10 at isa? port 0x00d0 irq 3 flags 0xd10000
+device	ed11 at isa? port 0x00d0 irq 3 flags 0xe00000
+# SN-9801-2
+#device	ed11 at isa? port 0x00d0 irq 3 flags 0xe00001
+device	ed12 at isa? port 0x20d0 irq 3 flags 0xf00000
 #
 # MB86960A NIC
 #
@@ -314,6 +323,7 @@ device		fe1	at isa? port 0x73d0 irq 5
 
 device		ep0	at isa? port 0x40d0 irq 3
 device		lnc0	at isa? port 0x03d0 irq 6
+device		snc0	at isa? port 0x888  irq 6 iomem 0xc0000
 
 # WaveLAN/IEEE 802.11 wireless NICs. Note: the WaveLAN/IEEE really
 # exists only as a PCMCIA device, so there is no ISA attatement needed
@@ -380,6 +390,7 @@ pseudo-device	bpf		#Berkeley packet filter
 #device		ulpt		# Printer
 #device		umass		# Disks/Mass storage - Requires scbus and da
 #device		ums		# Mouse
+#device		uscanner	# Scanners
 # USB Ethernet, requires mii
 #device		aue		# ADMtek USB ethernet
 #device		cue		# CATC USB ethernet
