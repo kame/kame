@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: rc.mobileip6,v 1.6 2003/02/20 06:05:55 keiichi Exp $
+# $Id: rc.mobileip6,v 1.7 2003/08/07 08:54:57 keiichi Exp $
 
 # Mobile IPv6 startup
 
@@ -8,34 +8,41 @@ mobileip6_pass1() {
 
 	case ${ipv6_mobile_nodetype} in
 	[Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
-		case ${ipv6_mobile_home_prefixes} in
-		'')
-			;;
-		*)
-			echo -n ' Mobile Node:'
-			# setup SPD/SA
-			echo -n ' security'
-			for node_dir in ${ipv6_mobile_config_dir}/*
-			do
-				if [ ! -e ${node_dir}/add ]; then
-					continue;
-				fi
-				setkey -f ${node_dir}/add
-				setkey -f ${node_dir}/spdadd_mobile_node
-			done
-			mip6control -S 1
-			for home_prefix in ${ipv6_mobile_home_prefixes}
+		echo -n ' Mobile Node:'
+
+		# setup SPD/SA
+		echo -n ' security'
+		for node_dir in ${ipv6_mobile_config_dir}/*
+		do
+			if [ ! -e ${node_dir}/add ]; then
+				continue;
+			fi
+			setkey -f ${node_dir}/add
+			setkey -f ${node_dir}/spdadd_mobile_node
+		done
+		mip6control -S 1
+
+		# home prefixes
+		ipv6_mobile_home_prefixes_0=${ipv6_mobile_home_prefixes}
+		home_network=0
+		while : ; do
+			eval ipv6_mobile_home_prefixes_arg=\$ipv6_mobile_home_prefixes_${home_network}
+			if [ -z "${ipv6_mobile_home_prefixes_arg}" ]; then
+				break;
+			fi
+			for home_prefix in ${ipv6_mobile_home_prefixes_arg}
 			do
 				prefix=`expr "${home_prefix}" : "\(.*\)/.*"`
 				prefixlen=`expr "${home_prefix}" : ".*/\(.*\)"`
-				mip6control -H ${prefix} -P ${prefixlen}
+				mip6control -ihif${home_network} -H ${prefix} -P ${prefixlen}
 			done
-			echo -n ' enable'
-			mip6control -m
-			echo -n ' rtsold'
-			rtsold -a -m
-			;;
-		esac
+			home_network=$((${home_network} + 1))
+		done
+
+		echo -n ' enable'
+		mip6control -m
+		echo -n ' rtsold'
+		rtsold -a -m
 		;;
 	[Hh][Oo][Mm][Ee]_[Aa][Gg][Ee][Nn][Tt])
 		case ${ipv6_mobile_home_link} in
