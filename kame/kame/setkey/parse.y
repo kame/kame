@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.74 2003/05/28 04:28:10 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.75 2003/05/28 04:30:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -97,7 +97,9 @@ extern void yyerror __P((const char *));
 %token F_PROTOCOL F_AUTH F_ENC F_REPLAY F_COMP F_RAWCPI
 %token F_MODE MODE F_REQID
 %token F_EXT EXTENSION NOCYCLICSEQ
-%token ALG_AUTH ALG_ENC ALG_ENC_NOKEY ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP ALG_ENC_OLD
+%token ALG_AUTH ALG_AUTH_NOKEY
+%token ALG_ENC ALG_ENC_NOKEY ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_ENC_OLD
+%token ALG_COMP
 %token F_LIFETIME_HARD F_LIFETIME_SOFT
 %token DECSTRING QUOTEDSTRING HEXSTRING STRING ANY
 	/* SPD management */
@@ -106,8 +108,9 @@ extern void yyerror __P((const char *));
 %token F_AIFLAGS
 
 %type <num> prefix protocol_spec upper_spec
-%type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
-%type <num> ALG_ENC_OLD ALG_ENC_NOKEY ALG_AUTH_NOKEY
+%type <num> ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_ENC_OLD ALG_ENC_NOKEY
+%type <num> ALG_AUTH ALG_AUTH_NOKEY
+%type <num> ALG_COMP
 %type <num> PR_ESP PR_AH PR_IPCOMP
 %type <num> EXTENSION MODE
 %type <ulnum> DECSTRING
@@ -964,7 +967,7 @@ setkeymsg_add(type, satype, srcs, dsts)
 	l = sizeof(struct sadb_msg);
 
 	/* set encryption algorithm, if present. */
-	if (satype != SADB_X_SATYPE_IPCOMP && p_alg_enc != SADB_EALG_NONE) {
+	if (satype != SADB_X_SATYPE_IPCOMP && p_key_enc) {
 		struct sadb_key m_key;
 
 		m_key.sadb_key_len =
@@ -980,7 +983,7 @@ setkeymsg_add(type, satype, srcs, dsts)
 	}
 
 	/* set authentication algorithm, if present. */
-	if (p_alg_auth != SADB_AALG_NONE) {
+	if (p_key_auth) {
 		struct sadb_key m_key;
 
 		m_key.sadb_key_len =
