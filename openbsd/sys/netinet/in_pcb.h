@@ -117,7 +117,11 @@ struct inpcb {
 #define	inp_ip		inp_hu.hu_ip
 #define	inp_ipv6	inp_hu.hu_ipv6
 	struct	  mbuf *inp_options;	/* IPv4 options */
+#ifndef INET6
+	void *inp_inputopts6;	/* XXX bad fix. */
+#endif
 	struct ip6_recvpktopts inp_inputopts6;/* IPv6 opts for incoming pkts */
+#endif 
 	struct ip6_pktopts *inp_outputopts6; /* IP6 opts for outgoing pkts */
 	int inp_hops;
 	union {
@@ -142,7 +146,7 @@ struct inpcb {
 	struct	icmp6_filter *inp_icmp6filt;
 #if 0 /*KAME IPSEC*/
 	struct secpolicy *inp_sp;	/* security policy. It may not be
-					 * used according to policy selection.
+v					 * used according to policy selection.
 					 */
 #endif
 };
