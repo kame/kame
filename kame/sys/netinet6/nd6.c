@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.364 2004/08/12 03:54:30 keiichi Exp $	*/
+/*	$KAME: nd6.c,v 1.365 2004/11/11 22:34:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -159,6 +159,10 @@ struct nd_prhead nd_prefix = { 0 };
 int nd6_recalc_reachtm_interval = ND6_RECALC_REACHTM_INTERVAL;
 static struct sockaddr_in6 all1_sa;
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+static int nd6_is_new_addr_neighbor __P((struct sockaddr_in6 *,
+	struct ifnet *));
+#endif
 static void nd6_setmtu0 __P((struct ifnet *, struct nd_ifinfo *));
 static void nd6_slowtimo __P((void *));
 static int regen_tmpaddr __P((struct in6_ifaddr *));
@@ -213,6 +217,9 @@ nd6_init()
 
 	/* start timer */
 #if defined(__NetBSD__) || defined(__FreeBSD__)
+#ifdef __FreeBSD__
+	callout_init(&nd6_slowtimo_ch, 0);
+#endif
 	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
 	    nd6_slowtimo, NULL);
 #elif defined(__OpenBSD__)
@@ -1094,6 +1101,79 @@ nd6_lookup(addr6, create, ifp)
 	return (rt);
 }
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+/*
+ * Test whether a given IPv6 address is a neighbor or not, ignoring
+ * the actual neighbor cache.  The neighbor cache is ignored in order
+ * to not reenter the routing code from within itself.
+ */
+static int
+nd6_is_new_addr_neighbor(addr, ifp)
+	struct sockaddr_in6 *addr;
+	struct ifnet *ifp;
+{
+	struct nd_prefix *pr;
+	struct ifaddr *dstaddr;
+
+	/*
+	 * A link-local address is always a neighbor.
+	 * XXX: a link does not necessarily specify a single interface.
+	 */
+	if (IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr)) {
+		struct sockaddr_in6 sin6_copy;
+
+		/*
+		 * in6_recoverscope() returns 0 if and only if ifp is attached
+		 * to the link of this address.  We need sin6_copy since
+		 * in6_recoverscope() may modify the content (XXX).
+		 */
+		if (in6_recoverscope(&sin6_copy, &addr->sin6_addr, ifp) == 0)
+			return (1);
+		else
+			return (0);
+	}
+
+	/*
+	 * If the address matches one of our on-link prefixes, it should be a
+	 * neighbor.
+	 */
+	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
+		if (pr->ndpr_ifp != ifp)
+			continue;
+
+		if (!(pr->ndpr_stateflags & NDPRF_ONLINK))
+			continue;
+
+		if (IN6_ARE_MASKED_ADDR_EQUAL(&pr->ndpr_prefix.sin6_addr,
+		    &addr->sin6_addr, &pr->ndpr_mask))
+			return (1);
+	}
+
+	/*
+	 * If the address is assigned on the node of the other side of
+	 * a p2p interface, the address should be a neighbor.
+	 */
+	dstaddr = ifa_ifwithdstaddr((struct sockaddr *)addr);
+	if ((dstaddr != NULL) && (dstaddr->ifa_ifp == ifp))
+		return (1);
+
+	/*
+	 * If the default router list is empty, all addresses are regarded
+	 * as on-link, and thus, as a neighbor.
+	 * XXX: we restrict the condition to hosts, because routers usually do
+	 * not have the "default router list".
+	 */
+	if (!ip6_forwarding && TAILQ_FIRST(&nd_defrouter) == NULL &&
+	    nd6_defifindex == ifp->if_index) {
+		return (1);
+	}
+
+	return (0);
+}
+#endif /* FreeBSD5 */
+
+
+
 /*
  * Detect if a given IPv6 address identifies a neighbor on a given link.
  * XXX: should take care of the destination of a p2p link?
@@ -1103,8 +1183,13 @@ nd6_is_addr_neighbor(addr, ifp)
 	struct sockaddr_in6 *addr;
 	struct ifnet *ifp;
 {
-	struct nd_prefix *pr;
 	struct rtentry *rt;
+
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+	if (nd6_is_new_addr_neighbor(addr, ifp))
+		return (1);
+#else
+	struct nd_prefix *pr;
 	struct ifaddr *dstaddr;
 
 	/*
@@ -1158,6 +1243,7 @@ nd6_is_addr_neighbor(addr, ifp)
 	    nd6_defifindex == ifp->if_index) {
 		return (1);
 	}
+#endif /* FreeBSD5 */
 
 	/*
 	 * Even if the address matches none of our addresses, it might be
@@ -1378,7 +1464,12 @@ nd6_rtrequest(req, rt, info)
 
 	if (req == RTM_RESOLVE &&
 	    (nd6_need_cache(ifp) == 0 || /* stf case */
-	     !nd6_is_addr_neighbor((struct sockaddr_in6 *)rt_key(rt), ifp))) {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+	     !nd6_is_new_addr_neighbor((struct sockaddr_in6 *)rt_key(rt), ifp)
+#else
+	     !nd6_is_addr_neighbor((struct sockaddr_in6 *)rt_key(rt), ifp)
+#endif
+	     )) {
 		/*
 		 * FreeBSD and BSD/OS often make a cloned host route based
 		 * on a less-specific route (e.g. the default route).
@@ -1485,7 +1576,7 @@ nd6_rtrequest(req, rt, info)
 		bzero(ln, sizeof(*ln));
 		ln->ln_rt = rt;
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-		callout_init(&ln->ln_timer_ch, NULL);
+		callout_init(&ln->ln_timer_ch, 0);
 #elif defined(__NetBSD__) || defined(__FreeBSD__)
 		callout_init(&ln->ln_timer_ch);
 #elif defined(__OpenBSD__)
@@ -1527,7 +1618,7 @@ nd6_rtrequest(req, rt, info)
 			ln->ln_byhint = 0;
 			mine = 1;
 			if (macp) {
-				Bcopy(macp, LLADDR(SDL(gate)), ifp->if_addrlen);
+				bcopy(macp, LLADDR(SDL(gate)), ifp->if_addrlen);
 				SDL(gate)->sdl_alen = ifp->if_addrlen;
 			}
 			if (nd6_useloopback) {
@@ -2214,6 +2305,9 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	/*
 	 * next hop determination.  This routine is derived from ether_output.
 	 */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+again:
+#endif
 	if (rt) {
 		if ((rt->rt_flags & RTF_UP) == 0) {
 #ifdef __FreeBSD__
@@ -2231,7 +2325,16 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 				rt->rt_refcnt--;
 #endif
 				if (rt->rt_ifp != ifp)
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+					/*
+					 * XXX maybe we should update ifp too,
+					 * but the original code didn't and I
+					 * don't know what is correct here.
+					 */
+					goto again;
+#else
 					senderr(EHOSTUNREACH);
+#endif
 			} else
 				senderr(EHOSTUNREACH);
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.38 2003/09/10 21:10:32 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.39 2004/11/11 22:34:45 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -307,7 +307,8 @@ struct sadb_x_tag {
 #define SADB_SATYPE_MIP		8
 #define SADB_X_SATYPE_IPCOMP	9
 /*#define SADB_X_SATYPE_POLICY	10	obsolete, do not reuse */
-#define SADB_SATYPE_MAX		11
+#define SADB_X_SATYPE_TCPSIGNATURE	11
+#define SADB_SATYPE_MAX		12
 
 #define SADB_SASTATE_LARVAL   0
 #define SADB_SASTATE_MATURE   1
@@ -321,7 +322,7 @@ struct sadb_x_tag {
 #define SADB_AALG_NONE		0
 #define SADB_AALG_MD5HMAC	2
 #define SADB_AALG_SHA1HMAC	3
-#define SADB_AALG_MAX		251
+#define SADB_AALG_MAX		252
 /* private allocations - based on RFC2407/IANA assignment */
 #define SADB_X_AALG_SHA2_256	5
 #define SADB_X_AALG_SHA2_384	6
@@ -332,6 +333,7 @@ struct sadb_x_tag {
 #define SADB_X_AALG_MD5		249	/* Keyed MD5 */
 #define SADB_X_AALG_SHA		250	/* Keyed SHA */
 #define SADB_X_AALG_NULL	251	/* null authentication */
+#define SADB_X_AALG_TCP_MD5	252	/* Keyed TCP-MD5 (RFC2385) */
 
 /* RFC2367 numbers - meets RFC2407 */
 #define SADB_EALG_NONE		0

@@ -65,6 +65,16 @@
 
 #include "pathnames.h"
 
+#ifndef HTONS
+#define HTONS(x)	(x) = htons(x)
+#endif
+#ifndef HTONL
+#define HTONL(x)	(x) = htonl(x)
+#endif
+#ifndef NTOHS
+#define NTOHS(x)	(x) = ntohs(x)
+#endif
+
 extern u_char buf[];
 
 extern int getconfig __P((char *, u_char *));

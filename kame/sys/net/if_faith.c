@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.39 2004/05/26 09:56:15 itojun Exp $	*/
+/*	$KAME: if_faith.c,v 1.40 2004/11/11 22:34:45 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -182,13 +182,11 @@ faithoutput(ifp, m, dst, rt)
 	struct sockaddr *dst;
 	struct rtentry *rt;
 {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	int error;
-#else
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	int s;
+	struct ifqueue *ifq = NULL;
 #endif
 	int isr;
-	struct ifqueue *ifq = 0;
 
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("faithoutput no HDR");
@@ -235,13 +233,17 @@ faithoutput(ifp, m, dst, rt)
 	switch (dst->sa_family) {
 #ifdef INET
 	case AF_INET:
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 		ifq = &ipintrq;
+#endif
 		isr = NETISR_IP;
 		break;
 #endif
 #ifdef INET6
 	case AF_INET6:
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 		ifq = &ip6intrq;
+#endif
 		isr = NETISR_IPV6;
 		break;
 #endif
@@ -254,10 +256,10 @@ faithoutput(ifp, m, dst, rt)
 
 	m->m_pkthdr.rcvif = ifp;
 
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
-	IFQ_HANDOFF(ifp, m, NULL, error);
-	if (error)
-		return (error);
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+	ifp->if_ipackets++;
+	ifp->if_ibytes += m->m_pkthdr.len;
+	netisr_queue(isr, m);
 #else
 #ifdef __NetBSD__
 	s = splnet();
@@ -271,14 +273,12 @@ faithoutput(ifp, m, dst, rt)
 		return (ENOBUFS);
 	}
 	IF_ENQUEUE(ifq, m);
-#endif /* !FreeBSD5 */
-
 	schednetisr(isr);
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	splx(s);
-#endif
+#endif /* !FreeBSD5 */
+
 	return (0);
 }
 

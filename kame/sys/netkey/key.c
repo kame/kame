@@ -4823,7 +4823,7 @@ key_timehandler(arg)
 	 * should set timeout based on the most closest timer expiration.
 	 * we don't bother to do that yet.
 	 */
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 	callout_reset(&key_timehandler_ch, hz, key_timehandler, (void *)0);
 #else
 	(void)timeout(key_timehandler, (void *)0, hz);
@@ -7803,8 +7803,10 @@ key_init()
 
 	bzero((caddr_t)&key_cb, sizeof(key_cb));
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__)
 	callout_init(&key_timehandler_ch);
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 503000
+	callout_init(&key_timehandler_ch, 0);
 #endif
 
 	for (i = 0; i < IPSEC_DIR_MAX; i++)
@@ -7848,7 +7850,7 @@ key_init()
 	ip6_def_policy->persist = 1;
 #endif
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 	callout_reset(&key_timehandler_ch, hz, key_timehandler, (void *)0);
 #else
 	timeout(key_timehandler, (void *)0, hz);

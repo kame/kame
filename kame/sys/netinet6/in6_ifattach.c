@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.202 2004/11/06 15:44:28 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.203 2004/11/11 22:34:45 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1099,15 +1099,23 @@ in6_ifdetach(ifp)
 #ifndef SCOPEDROUTING
 	sin6.sin6_scope_id = 0;	/* XXX */
 #endif
-#ifndef __FreeBSD__
-	rt = rtalloc1((struct sockaddr *)&sin6, 0);
-#else
-	rt = rtalloc1((struct sockaddr *)&sin6, 0, 0UL);
+	if (rt_tables[AF_INET6] != NULL) {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+		RADIX_NODE_HEAD_LOCK(rt_tables[AF_INET6]);
 #endif
-	if (rt && rt->rt_ifp == ifp) {
-		rtrequest(RTM_DELETE, (struct sockaddr *)rt_key(rt),
-		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
-		rtfree(rt);
+#ifndef __FreeBSD__
+		rt = rtalloc1((struct sockaddr *)&sin6, 0);
+#else
+		rt = rtalloc1((struct sockaddr *)&sin6, 0, 0UL);
+#endif
+		if (rt && rt->rt_ifp == ifp) {
+			rtrequest(RTM_DELETE, (struct sockaddr *)rt_key(rt),
+			    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
+			rtfree(rt);
+		}
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+		RADIX_NODE_HEAD_UNLOCK(rt_tables[AF_INET6]);
+#endif
 	}
 
 #if defined(MIP6) && defined(MIP6_MOBILE_NODE)

@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.90 2004/06/02 05:53:14 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.91 2004/11/11 22:34:45 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -502,8 +502,8 @@ ah4_input(m, va_alist)
 		s = splimp();
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-		if (!IF_HANDOFF(&ipintrq, m, NULL)) {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+		if (netisr_queue(NETISR_IP, m)) {	/* (0) on success. */
 			ipsecstat.in_inval++;
 			m = NULL;
 			goto fail;
@@ -515,12 +515,10 @@ ah4_input(m, va_alist)
 			goto fail;
 		}
 		IF_ENQUEUE(&ipintrq, m);
-#endif
-		m = NULL;
 		schednetisr(NETISR_IP);	/* can be skipped but to make sure */
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 		splx(s);
 #endif
+		m = NULL;
 		nxt = IPPROTO_DONE;
 	} else {
 		/*
@@ -972,7 +970,7 @@ ah6_input(mp, offp, proto)
 		s = splimp();
 #endif
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-		if (!IF_HANDOFF(&ip6intrq, m, NULL)) {
+		if (netisr_queue(NETISR_IPV6, m)) {	/* (0) on success. */
 			ipsec6stat.in_inval++;
 			m = NULL;
 			goto fail;
@@ -984,12 +982,10 @@ ah6_input(mp, offp, proto)
 			goto fail;
 		}
 		IF_ENQUEUE(&ip6intrq, m);
-#endif
-		m = NULL;
 		schednetisr(NETISR_IPV6); /* can be skipped but to make sure */
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 		splx(s);
 #endif
+		m = NULL;
 		nxt = IPPROTO_DONE;
 	} else {
 		/*

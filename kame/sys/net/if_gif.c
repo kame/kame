@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.110 2004/07/27 13:11:59 suz Exp $	*/
+/*	$KAME: if_gif.c,v 1.111 2004/11/11 22:34:45 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -337,11 +337,24 @@ gif_output(ifp, m, dst, rt)
 	struct gif_softc *sc = (struct gif_softc*)ifp;
 	int error = 0;
 	static int called = 0;	/* XXX: MUTEX */
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 	ALTQ_DECL(struct altq_pktattr pktattr;)
+#endif
 	int s;
 	struct m_tag *mtag;
 
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+#endif
+
+#ifdef MAC
+	error = mac_check_ifnet_transmit(ifp, m);
+	if (error) {
+		m_freem(m);
+		goto end;
+	}
+#endif
 
 	/*
 	 * gif may cause infinite recursion calls when misconfigured.
@@ -407,7 +420,11 @@ gif_output(ifp, m, dst, rt)
 	*mtod(m, int *) = dst->sa_family;
 
 	s = splnet();
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+	IFQ_ENQUEUE(&ifp->if_snd, m, error);
+#else
 	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+#endif
 	if (error) {
 		splx(s);
 		goto end;
@@ -523,9 +540,9 @@ gif_input(m, af, ifp)
 {
 #if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	int s;
+	struct ifqueue *ifq = NULL;
 #endif
 	int isr;
-	struct ifqueue *ifq = NULL;
 
 	if (ifp == NULL) {
 		/* just in case */
@@ -574,13 +591,17 @@ gif_input(m, af, ifp)
 	switch (af) {
 #ifdef INET
 	case AF_INET:
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 		ifq = &ipintrq;
+#endif
 		isr = NETISR_IP;
 		break;
 #endif
 #ifdef INET6
 	case AF_INET6:
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 		ifq = &ip6intrq;
+#endif
 		isr = NETISR_IPV6;
 		break;
 #endif
@@ -589,7 +610,9 @@ gif_input(m, af, ifp)
 		m = gif_eon_decap(ifp, m);
 		if (!m)
 			return;
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 		ifq = &clnlintrq;
+#endif
 		isr = NETISR_ISO;
 		break;
 #endif
@@ -598,9 +621,11 @@ gif_input(m, af, ifp)
 		return;
 	}
 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	if (!IF_HANDOFF(ifq, m, NULL))
-		return;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+	ifp->if_ipackets++;
+	ifp->if_ibytes += m->m_pkthdr.len;
+	netisr_queue(isr, m);
+	return;
 #else
 #ifdef __NetBSD__
 	s = splnet();
@@ -614,16 +639,14 @@ gif_input(m, af, ifp)
 		return;
 	}
 	IF_ENQUEUE(ifq, m);
-#endif
-
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
+
 	/* we need schednetisr since the address family may change */
 	schednetisr(isr);
-
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	splx(s);
 #endif
+
 	return;
 }
 #endif /*!OpenBSD*/

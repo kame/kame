@@ -40,11 +40,17 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #ifdef __FreeBSD__
+#if __FreeBSD_version >= 503000
+#include <sys/lock.h>
+#endif
 #include <sys/sysctl.h>
 #endif
 #include <sys/mbuf.h>
 #ifdef __FreeBSD__
 #include <sys/malloc.h>
+#if __FreeBSD_version >= 503000
+#include <sys/mutex.h>
+#endif
 #endif
 #include <sys/socket.h>
 #include <sys/socketvar.h>

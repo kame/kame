@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.348 2004/08/11 10:20:48 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.349 2004/11/11 22:34:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -158,7 +158,9 @@
 #ifndef __FreeBSD__
 #include "bpfilter.h"
 #endif
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 #include "pf.h"
+#endif
 
 #if NGIF > 0
 #include <netinet6/in6_gif.h>
@@ -195,7 +197,7 @@ int ip6_sourcecheck_interval;		/* XXX */
 const int int6intrq_present = 1;
 #endif
 
-#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__FreeBSD__) && __FreeBSD_version > 503000)
 struct pfil_head inet6_pfil_hook;
 #endif
 
@@ -279,7 +281,7 @@ ip6_init()
 	mip6_init();
 #endif /* MIP6 */
 
-#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__FreeBSD__) && __FreeBSD_version > 503000)
 	/* Register our Packet Filter hook. */
 	inet6_pfil_hook.ph_type = PFIL_TYPE_AF;
 	inet6_pfil_hook.ph_af   = AF_INET6;
@@ -396,6 +398,8 @@ ip6_input(m)
 	caddr_t hist;
 #endif
 #if defined(PFIL_HOOKS) && (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+	struct sockaddr_in6 sa6;
+	u_int32_t srczone, dstzone;
 	struct packet_filter_hook *pfh;
 	struct mbuf *m0;
 	int rv;
@@ -572,6 +576,15 @@ ip6_input(m)
 #endif /* FreeBSD5 */
 #endif /* PFIL_HOOKS */
 
+	ip6stat.ip6s_nxthist[ip6->ip6_nxt]++;
+
+#ifdef ALTQ
+	if (altq_input != NULL && (*altq_input)(m, AF_INET6) == 0) {
+		/* packet is dropped by traffic conditioner */
+		return;
+	}
+#endif
+
 #if defined(IPV6FIREWALL) || defined(__FreeBSD__)
 	/*
 	 * Check with the firewall...
@@ -590,15 +603,6 @@ ip6_input(m)
 		}
 		if (!m)
 			return;
-	}
-#endif
-
-	ip6stat.ip6s_nxthist[ip6->ip6_nxt]++;
-
-#ifdef ALTQ
-	if (altq_input != NULL && (*altq_input)(m, AF_INET6) == 0) {
-		/* packet is dropped by traffic conditioner */
-		return;
 	}
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.37 2004/09/29 08:36:01 suz Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.38 2004/11/11 22:34:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1341,6 +1341,7 @@ ip6fw_modevent(module_t mod, int type, void *unused)
                 printf("IPv6 firewall unloaded\n");
                 return 0;
         default:
+		return EOPNOTSUPP;
                 break;
         }
         return 0;

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.224 2004/10/27 22:26:07 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.225 2004/11/11 22:34:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -135,6 +135,10 @@
 int ipsec_debug = 1;
 #else
 int ipsec_debug = 0;
+#endif
+
+#ifdef NET_NEEDS_GIANT
+NET_NEEEDS_GIANT("ipsec");
 #endif
 
 #ifndef offsetof		/* XXX */
@@ -2300,7 +2304,9 @@ ipsec4_encapsulate(m, sav)
 	}
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	ip->ip_id = htons(ip_randomid());
-#elif defined(__FreeBSD__)
+#elif (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+	ip->ip_id = ip_newid();
+#else
 #ifdef RANDOM_IP_ID
 	ip->ip_id = htons(ip_randomid());
 #else

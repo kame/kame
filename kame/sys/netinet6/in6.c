@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.382 2004/11/04 03:01:23 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.383 2004/11/11 22:34:45 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -949,7 +949,10 @@ in6_control(so, cmd, data, ifp, p)
 		 * that is, this address might make other addresses detached.
 		 */
 		pfxlist_onlink_check();
-
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+		if (error == 0 && ia)
+			EVENTHANDLER_INVOKE(ifaddr_event, ifp);
+#endif
 		break;
 	}
 
@@ -971,6 +974,9 @@ in6_control(so, cmd, data, ifp, p)
 		in6_purgeaddr(&ia->ia_ifa);
 		if (pr && pr->ndpr_refcnt == 0)
 			prelist_remove(pr);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+		EVENTHANDLER_INVOKE(ifaddr_event, ifp);
+#endif
 		break;
 	}
 

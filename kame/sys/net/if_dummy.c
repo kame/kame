@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.27 2004/05/21 08:46:15 itojun Exp $	*/
+/*	$KAME: if_dummy.c,v 1.28 2004/11/11 22:34:44 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -193,13 +193,11 @@ dummyoutput(ifp, m, dst, rt)
 	struct sockaddr *dst;
 	struct rtentry *rt;
 {
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
-	int error;
-#else
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	int s;
+	struct ifqueue *ifq = 0;
 #endif
 	int isr;
-	struct ifqueue *ifq = 0;
 
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("dummyoutput no HDR");
@@ -248,37 +246,49 @@ dummyoutput(ifp, m, dst, rt)
 
 #ifdef INET
 	case AF_INET:
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 		ifq = &ipintrq;
+#endif
 		isr = NETISR_IP;
 		break;
 #endif
 #ifdef IPX
 	case AF_IPX:
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 		ifq = &ipxintrq;
+#endif
 		isr = NETISR_IPX;
 		break;
 #endif
 #ifdef INET6
 	case AF_INET6:
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 		ifq = &ip6intrq;
+#endif
 		isr = NETISR_IPV6;
 		break;
 #endif
 #ifdef NS
 	case AF_NS:
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 		ifq = &nsintrq;
+#endif
 		isr = NETISR_NS;
 		break;
 #endif
 #ifdef ISO
 	case AF_ISO:
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 		ifq = &clnlintrq;
+#endif
 		isr = NETISR_ISO;
 		break;
 #endif
 #ifdef NETATALK
 	case AF_APPLETALK:
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 	        ifq = &atintrq2;
+#endif
 		isr = NETISR_ATALK;
 		break;
 #endif
@@ -289,10 +299,10 @@ dummyoutput(ifp, m, dst, rt)
 		return (EAFNOSUPPORT);
 	}
 
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
-	IFQ_HANDOFF(ifp, m, NULL, error);
-	if (error)
-		return (error);
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+	ifp->if_ipackets++;
+	ifp->if_ibytes += m->m_pkthdr.len;
+	netisr_queue(isr, m);
 #else
 #ifdef __NetBSD__
 	s = splnet();
@@ -306,14 +316,12 @@ dummyoutput(ifp, m, dst, rt)
 		return (ENOBUFS);
 	}
 	IF_ENQUEUE(ifq, m);
-#endif /* !FreeBSD5 */
-
 	schednetisr(isr);
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	splx(s);
-#endif
+#endif /* !FreeBSD5 */
+
 	return (0);
 }
 
