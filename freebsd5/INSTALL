@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 5.x
 KAME project
-$Id: INSTALL,v 1.1 2003/02/07 13:02:45 suz Exp $
+$Id: INSTALL,v 1.2 2003/02/08 19:27:55 kjc Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -101,9 +101,8 @@ E-3. Most of configuration files are shipped with normal OS distribution,
      /usr/local/v6/etc.  You may want to copy /usr/local/v6/etc/foo.sample into
      /usr/local/v6/etc/foo, and edit as necessary.
 
-E-4. If you wish to use ALTQ, you may need to invoke /dev/MAKEDEV.altq.
-	# cd /dev
-	# sh MAKEDEV.altq all
+E-4. You don't need to invoke /dev/MAKEDEV.altq for freebsd5.
+     The altq device files are automatically created by DEVFS in freebsd5.
 
 E-5. Commands modified by KAME project are placed in /usr/local/v6/{bin,sbin}.
      For daily use, you will need to add both of (or either of) them
