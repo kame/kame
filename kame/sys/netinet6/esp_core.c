@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.35 2000/08/30 02:29:21 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.36 2000/08/30 14:56:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1478,8 +1478,8 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 	}
 
 	if (m->m_pkthdr.len < bodyoff) {
-		ipseclog((LOG_ERR, "esp_cbc_decrypt %s: bad len %d/%d\n",
-		    algo->name, m->m_pkthdr.len, bodyoff));
+		ipseclog((LOG_ERR, "esp_cbc_decrypt %s: bad len %d/%lu\n",
+		    algo->name, m->m_pkthdr.len, (unsigned long)bodyoff));
 		m_freem(m);
 		return EINVAL;
 	}
@@ -1688,15 +1688,15 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	}
 
 	if (m->m_pkthdr.len < bodyoff) {
-		ipseclog((LOG_ERR, "esp_cbc_encrypt %s: bad len %d/%d\n",
-		    algo->name, m->m_pkthdr.len, bodyoff));
+		ipseclog((LOG_ERR, "esp_cbc_encrypt %s: bad len %d/%lu\n",
+		    algo->name, m->m_pkthdr.len, (unsigned long)bodyoff));
 		m_freem(m);
 		return EINVAL;
 	}
 	if ((m->m_pkthdr.len - bodyoff) % blocklen) {
 		ipseclog((LOG_ERR, "esp_cbc_encrypt %s: "
-		    "payload length must be multiple of %d\n",
-		    algo->name, algo->padbound));
+		    "payload length must be multiple of %lu\n",
+		    algo->name, (unsigned long)algo->padbound));
 		m_freem(m);
 		return EINVAL;
 	}
