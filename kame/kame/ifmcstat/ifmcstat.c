@@ -74,7 +74,7 @@ struct	nlist nl[] = {
 	{ "" },
 };
 
-const char *inet6_n2a __P((struct in6_addr *));
+const char *inet6_n2a __P((struct sockaddr_in6 *));
 int main __P((int, char **));
 char *ifname __P((struct ifnet *));
 void kread __P((u_long, void *, int));
@@ -106,7 +106,7 @@ struct multi6_kludge {
 #endif
 
 const char *inet6_n2a(p)
-	struct in6_addr *p;
+	struct sockaddr_in6 *p;
 {
 	static char buf[NI_MAXHOST];
 	struct sockaddr_in6 sin6;
@@ -114,10 +114,10 @@ const char *inet6_n2a(p)
 	const int niflags = NI_NUMERICHOST;
 
 	memset(&sin6, 0, sizeof(sin6));
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_len = sizeof(struct sockaddr_in6);
-	sin6.sin6_addr = *p;
-	if (IN6_IS_ADDR_LINKLOCAL(p) || IN6_IS_ADDR_MC_LINKLOCAL(p)) {
+	sin6 = *p;
+	if (IN6_IS_ADDR_LINKLOCAL(&p->sin6_addr) ||
+	    IN6_IS_ADDR_MC_LINKLOCAL(&p->sin6_addr) ||
+	    IN6_IS_ADDR_MC_NODELOCAL(&p->sin6_addr)) {
 		scopeid = ntohs(*(u_int16_t *)&sin6.sin6_addr.s6_addr[2]);
 		if (scopeid) {
 			sin6.sin6_scope_id = scopeid;
@@ -295,7 +295,7 @@ if6_addrlist(ifap)
 		if (sa.sa_family != PF_INET6)
 			goto nextifap;
 		KREAD(ifap, &if6a, struct in6_ifaddr);
-		printf("\tinet6 %s\n", inet6_n2a(&if6a.ia_addr.sin6_addr));
+		printf("\tinet6 %s\n", inet6_n2a(&if6a.ia_addr));
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		mc = mc ? mc : if6a.ia6_multiaddrs.lh_first;
 #endif
@@ -380,7 +380,7 @@ in6_multientry(mc)
 	struct in6_multi multi;
 
 	KREAD(mc, &multi, struct in6_multi);
-	printf("\t\tgroup %s", inet6_n2a(&multi.in6m_sa.sin6_addr));
+	printf("\t\tgroup %s", inet6_n2a(&multi.in6m_sa));
 	printf(" refcnt %u\n", multi.in6m_refcount);
 	return(multi.in6m_entry.le_next);
 }
