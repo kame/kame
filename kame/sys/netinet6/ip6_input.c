@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.164 2001/02/05 08:34:23 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.165 2001/02/05 08:57:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1282,6 +1282,7 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 	u_int8_t *opt = opthead;
 	u_int16_t rtalert_val;
 	u_int32_t jumboplen;
+	const int erroff = sizeof(struct ip6_hdr) + sizeof(struct ip6_hbh);
 
 	for (; hbhlen > 0; hbhlen -= optlen, opt += optlen) {
 		switch (*opt) {
@@ -1303,7 +1304,10 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 			}
 			if (*(opt + 1) != IP6OPT_RTALERT_LEN - 2) {
 				/* XXX stat */
-				goto bad;
+				icmp6_error(m, ICMP6_PARAM_PROB,
+					    ICMP6_PARAMPROB_HEADER,
+					    erroff + opt + 1 - opthead);
+				return(-1);
 			}
 			optlen = IP6OPT_RTALERT_LEN;
 			bcopy((caddr_t)(opt + 2), (caddr_t)&rtalert_val, 2);
@@ -1317,22 +1321,23 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 			}
 			if (*(opt + 1) != IP6OPT_JUMBO_LEN - 2) {
 				/* XXX stat */
-				goto bad;
+				icmp6_error(m, ICMP6_PARAM_PROB,
+					    ICMP6_PARAMPROB_HEADER,
+					    erroff + opt + 1 - opthead);
+				return(-1);
 			}
 			optlen = IP6OPT_JUMBO_LEN;
 
 			/*
 			 * IPv6 packets that have non 0 payload length
-			 * must not contain a jumbo paylod option.
+			 * must not contain a jumbo payload option.
 			 */
 			ip6 = mtod(m, struct ip6_hdr *);
 			if (ip6->ip6_plen) {
 				ip6stat.ip6s_badoptions++;
 				icmp6_error(m, ICMP6_PARAM_PROB,
 					    ICMP6_PARAMPROB_HEADER,
-					    sizeof(struct ip6_hdr) +
-					    sizeof(struct ip6_hbh) +
-					    opt - opthead);
+					    erroff + opt - opthead);
 				return(-1);
 			}
 
@@ -1356,9 +1361,7 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 				ip6stat.ip6s_badoptions++;
 				icmp6_error(m, ICMP6_PARAM_PROB,
 					    ICMP6_PARAMPROB_HEADER,
-					    sizeof(struct ip6_hdr) +
-					    sizeof(struct ip6_hbh) +
-					    opt + 2 - opthead);
+					    erroff + opt + 2 - opthead);
 				return(-1);
 			}
 #endif
@@ -1370,9 +1373,7 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 				ip6stat.ip6s_badoptions++;
 				icmp6_error(m, ICMP6_PARAM_PROB,
 					    ICMP6_PARAMPROB_HEADER,
-					    sizeof(struct ip6_hdr) +
-					    sizeof(struct ip6_hbh) +
-					    opt + 2 - opthead);
+					    erroff + opt + 2 - opthead);
 				return(-1);
 			}
 			*plenp = jumboplen;
@@ -1383,10 +1384,9 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 				ip6stat.ip6s_toosmall++;
 				goto bad;
 			}
-			if ((optlen = ip6_unknown_opt(opt, m,
-						      sizeof(struct ip6_hdr) +
-						      sizeof(struct ip6_hbh) +
-						      opt - opthead)) == -1)
+			optlen = ip6_unknown_opt(opt, m,
+			    erroff + opt - opthead);
+			if (optlen == -1)
 				return(-1);
 			optlen += 2;
 			break;
