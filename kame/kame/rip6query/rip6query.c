@@ -1,4 +1,4 @@
-/*	$KAME: rip6query.c,v 1.17 2002/09/08 01:35:17 itojun Exp $	*/
+/*	$KAME: rip6query.c,v 1.18 2003/04/15 07:12:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -81,7 +81,7 @@ main(argc, argv)
 	int c;
 	int ifidx = -1;
 	int error;
-	char pbuf[10];
+	char pbuf[NI_MAXSERV];
 	struct addrinfo hints, *res;
 
 	while ((c = getopt(argc, argv, "I:w:")) != -1) {

@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.95 2003/01/06 21:39:19 sumikawa Exp $	*/
+/*	$KAME: route6d.c,v 1.96 2003/04/15 07:12:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.95 2003/01/06 21:39:19 sumikawa Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.96 2003/04/15 07:12:47 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -606,7 +606,7 @@ init()
 	int	i, error;
 	const int int0 = 0, int1 = 1, int255 = 255;
 	struct	addrinfo hints, *res;
-	char	port[10];
+	char	port[NI_MAXSERV];
 
 	ifc = (struct ifc *)NULL;
 	nifc = 0;
