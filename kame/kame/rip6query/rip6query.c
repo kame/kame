@@ -1,4 +1,4 @@
-/*	$KAME: rip6query.c,v 1.11 2001/05/08 04:36:37 itojun Exp $	*/
+/*	$KAME: rip6query.c,v 1.12 2001/11/09 05:57:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -112,7 +112,7 @@ main(argc, argv)
 		/*NOTREACHED*/
 	}
 
-	/* getaddrinfo is preferred for addr@ifname syntax */
+	/* getaddrinfo is preferred for addr%scope syntax */
 	snprintf(pbuf, sizeof(pbuf), "%d", RIP6_PORT);
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
