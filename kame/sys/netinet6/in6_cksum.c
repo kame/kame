@@ -1,4 +1,4 @@
-/*	$KAME: in6_cksum.c,v 1.15 2003/01/06 21:49:50 sumikawa Exp $	*/
+/*	$KAME: in6_cksum.c,v 1.16 2003/07/18 06:46:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,9 +99,6 @@ in6_cksum(m, nxt, off, len)
 	int sum = 0;
 	int mlen = 0;
 	int byte_swapped = 0;
-#if 0
-	int srcifid = 0, dstifid = 0;
-#endif
 	struct ip6_hdr *ip6;
 	union {
 		u_int16_t phs[4];
@@ -136,16 +133,6 @@ in6_cksum(m, nxt, off, len)
 	 * First create IP6 pseudo header and calculate a summary.
 	 */
 	ip6 = mtod(m, struct ip6_hdr *);
-#if 0
-	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src)) {
-		srcifid = ip6->ip6_src.s6_addr16[1];
-		ip6->ip6_src.s6_addr16[1] = 0;
-	}
-	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
-		dstifid = ip6->ip6_dst.s6_addr16[1];
-		ip6->ip6_dst.s6_addr16[1] = 0;
-	}
-#endif
 	w = (u_int16_t *)&ip6->ip6_src;
 	uph.ph.ph_len = htonl(len);
 	uph.ph.ph_nxt = nxt;
@@ -166,12 +153,6 @@ in6_cksum(m, nxt, off, len)
 	sum += uph.phs[0];  sum += uph.phs[1];
 	sum += uph.phs[2];  sum += uph.phs[3];
 
-#if 0
-	if (srcifid)
-		ip6->ip6_src.s6_addr16[1] = srcifid;
-	if (dstifid)
-		ip6->ip6_dst.s6_addr16[1] = dstifid;
-#endif
  skip_phdr:
 	/*
 	 * Secondly calculate a summary of the first mbuf excluding offset.
