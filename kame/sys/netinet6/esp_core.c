@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.23 2000/08/28 05:24:03 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.24 2000/08/28 06:52:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,9 +68,6 @@
 #include <crypto/des/des.h>
 #include <crypto/blowfish/blowfish.h>
 #include <crypto/cast128/cast128.h>
-#ifdef SADB_X_EALG_RC5CBC
-#include <crypto/rc5/rc5.h>
-#endif
 
 #include <net/net_osdep.h>
 
@@ -109,14 +106,6 @@ static int esp_3descbc_encrypt __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_3descbc_schedule __P((const struct esp_algorithm *,
 	struct secasvar *));
-#ifdef SADB_X_EALG_RC5CBC
-static int esp_rc5cbc_decrypt __P((struct mbuf *, size_t,
-	struct secasvar *, const struct esp_algorithm *, int));
-static int esp_rc5cbc_encrypt __P((struct mbuf *, size_t, size_t,
-	struct secasvar *, const struct esp_algorithm *, int));
-static int esp_rc5cbc_schedule __P((const struct esp_algorithm *,
-	struct secasvar *));
-#endif
 static int esp_cipher_ivlen __P((const struct esp_algorithm *,
 	struct secasvar *));
 static void esp_increment_iv __P((struct secasvar *));
@@ -147,15 +136,6 @@ esp_algorithm_lookup(idx)
 			"cast128-cbc",
 			esp_cipher_ivlen, esp_cast128cbc_decrypt,
 			esp_cast128cbc_encrypt, esp_cast128cbc_schedule, },
-#ifdef SADB_X_EALG_RC5CBC
-		{ 8, 8, esp_cbc_mature, 40, 2040, sizeof(RC5_WORD) * 34,
-			"rc5-cbc",
-			esp_cipher_ivlen, esp_rc5cbc_decrypt,
-			esp_rc5cbc_encrypt, esp_rc5cbc_schedule, },
-#else
-		{ 8, 8, NULL, 40, 2040, 0, "rc5-cbc dummy",
-			NULL, NULL, NULL, NULL, },
-#endif
 	};
 
 	switch (idx) {
@@ -169,10 +149,6 @@ esp_algorithm_lookup(idx)
 		return &esp_algorithms[3];
 	case SADB_X_EALG_CAST128CBC:
 		return &esp_algorithms[4];
-#ifdef SADB_X_EALG_RC5CBC
-	case SADB_X_EALG_RC5CBC:
-		return &esp_algorithms[5];
-#endif
 	default:
 		return NULL;
 	}
@@ -571,9 +547,6 @@ esp_cbc_mature(sav)
 		break;
 	case SADB_X_EALG_BLOWFISHCBC:
 	case SADB_X_EALG_CAST128CBC:
-#ifdef SADB_X_EALG_RC5CBC
-	case SADB_X_EALG_RC5CBC:
-#endif
 		break;
 	}
 
@@ -997,139 +970,6 @@ esp_3descbc_schedule(algo, sav)
 	}
 	return 0;
 }
-
-#ifdef SADB_X_EALG_RC5CBC
-static int
-esp_rc5cbc_decrypt(m, off, sav, algo, ivlen)
-	struct mbuf *m;
-	size_t off;
-	struct secasvar *sav;
-	const struct esp_algorithm *algo;
-	int ivlen;
-{
-	size_t ivoff;
-	size_t bodyoff;
-	u_int8_t iv[8];
-	size_t plen;
-	int error;
-
-	/* sanity check */
-	if (sav->flags & SADB_X_EXT_OLD) {
-		ipseclog((LOG_ERR,
-		    "esp_rc5cbc_decrypt: unsupported ESP version\n"));
-		m_freem(m);
-		return EINVAL;
-	}
-	if (ivlen != 8) {
-		ipseclog((LOG_ERR, "esp_rc5cbc_decrypt: unsupported ivlen %d\n",
-		    ivlen));
-		m_freem(m);
-		return EINVAL;
-	}
-	error = esp_crypto_sanity(algo, sav, ivlen);
-	if (error) {
-		m_freem(m);
-		return error;
-	}
-
-	ivoff = off + sizeof(struct newesp);
-	bodyoff = off + sizeof(struct newesp) + ivlen;
-
-	/* copy mbuf's IV into iv */
-	m_copydata(m, ivoff, 8, iv);
-
-	plen = m->m_pkthdr.len;
-	if (plen < bodyoff) {
-		panic("esp_rc5cbc_decrypt: too short packet: len=%lu",
-			(u_long)plen);
-	}
-	plen -= bodyoff;
-
-	if (plen % 8) {
-		ipseclog((LOG_ERR, "esp_rc5cbc_decrypt: "
-		    "payload length must be multiple of 8\n"));
-		m_freem(m);
-		return EINVAL;
-	}
-
-	/* decrypt */
-	error = rc5_cbc_process(m, bodyoff, plen, (RC5_WORD *)sav->sched, iv,
-	    RC5_DECRYPT);
-
-	if (error)
-		m_freem(m);
-	return error;
-}
-
-static int
-esp_rc5cbc_encrypt(m, off, plen, sav, algo, ivlen)
-	struct mbuf *m;
-	size_t off;
-	size_t plen;
-	struct secasvar *sav;
-	const struct esp_algorithm *algo;
-	int ivlen;
-{
-	size_t ivoff;
-	size_t bodyoff;
-	u_int8_t *iv;
-	int error;
-
-	/* sanity check */
-	if (plen % 8) {
-		ipseclog((LOG_ERR, "esp_rc5cbc_encrypt: "
-		    "payload length must be multiple of 8\n"));
-		m_freem(m);
-		return EINVAL;
-	}
-	if (sav->flags & SADB_X_EXT_OLD) {
-		ipseclog((LOG_ERR,
-		    "esp_rc5cbc_encrypt: unsupported ESP version\n"));
-		m_freem(m);
-		return EINVAL;
-	}
-	if (ivlen != 8) {
-		ipseclog((LOG_ERR, "esp_rc5cbc_encrypt: unsupported ivlen %d\n",
-		    ivlen));
-		m_freem(m);
-		return EINVAL;
-	}
-	error = esp_crypto_sanity(algo, sav, ivlen);
-	if (error) {
-		m_freem(m);
-		return error;
-	}
-
-	ivoff = off + sizeof(struct newesp);
-	bodyoff = off + sizeof(struct newesp) + ivlen;
-
-	if (m->m_pkthdr.len < bodyoff)
-		panic("assumption failed: mbuf too short");
-	m_copyback(m, ivoff, ivlen, sav->iv);
-	iv = sav->iv;
-
-	/* encrypt */
-	error = rc5_cbc_process(m, bodyoff, plen, (RC5_WORD *)sav->sched, iv,
-	    RC5_ENCRYPT);
-
-	esp_increment_iv(sav);
-
-	if (error)
-		m_freem(m);
-	return error;
-}
-
-static int
-esp_rc5cbc_schedule(algo, sav)
-	const struct esp_algorithm *algo;
-	struct secasvar *sav;
-{
-
-	set_rc5_expandkey((RC5_WORD *)sav->sched, _KEYBUF(sav->key_enc),
-	    _KEYLEN(sav->key_enc), 16);
-	return 0;
-}
-#endif
 
 static int
 esp_cipher_ivlen(algo, sav)
