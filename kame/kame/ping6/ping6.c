@@ -167,6 +167,7 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #define F_FQDN		0x1000
 #define F_INTERFACE	0x2000
 #define F_SRCADDR	0x4000
+#define F_REACHCONF	0x8000
 u_int options;
 
 #define IN6LEN		sizeof(struct in6_addr)
@@ -276,12 +277,12 @@ main(argc, argv)
 	preload = 0;
 	datap = &outpack[ICMP6ECHOLEN + ICMP6ECHOTMLEN];
 #ifndef IPSEC
-	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qS:s:vwW")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qRS:s:vwW")) != EOF)
 #else
 #ifdef IPSEC_POLICY_IPSEC
-	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qS:s:vwWP:")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qRS:s:vwWP:")) != EOF)
 #else
-	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qS:s:vwWAE")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfh:I:i:l:np:qRS:s:vwWAE")) != EOF)
 #endif /*IPSEC_POLICY_IPSEC*/
 #endif
 		switch(ch) {
@@ -376,6 +377,9 @@ main(argc, argv)
 				break;
 		case 'q':
 			options |= F_QUIET;
+			break;
+		case 'R':
+			options |= F_REACHCONF;
 			break;
 		case 'S':
 			/* XXX: use getaddrinfo? */
@@ -587,6 +591,9 @@ main(argc, argv)
 	if (hoplimit != -1)
 		ip6optlen += CMSG_SPACE(sizeof(int));
 
+	if (options & F_REACHCONF)
+		ip6optlen += CMSG_SPACE(0);
+
 	/* set IP6 packet options */
 	if (ip6optlen) {
 		if ((scmsg = (char *)malloc(ip6optlen)) == 0)
@@ -627,6 +634,14 @@ main(argc, argv)
 
 		scmsgp = CMSG_NXTHDR(&smsghdr, scmsgp);
 	}
+	if (options & F_REACHCONF) {
+		scmsgp->cmsg_len = CMSG_LEN(0);
+		scmsgp->cmsg_level = IPPROTO_IPV6;
+		scmsgp->cmsg_type = IPV6_REACHCONF;
+
+		scmsgp = CMSG_NXTHDR(&smsghdr, scmsgp);
+	}
+
 	if (argc > 1) {	/* some intermediate addrs are specified */
 		int hops, error;
 		

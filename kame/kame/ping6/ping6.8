@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ping6.8,v 1.9 1999/12/23 09:37:58 jinmei Exp $
+.\"     $Id: ping6.8,v 1.10 1999/12/23 17:25:20 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt PING6 8
@@ -38,9 +38,9 @@ packets to network hosts
 .Sh SYNOPSIS
 .Nm
 .\" without ipsec, or new ipsec
-.Op Fl dfnqvw
+.Op Fl dfnqRvw
 .\" old ipsec
-.\" .Op Fl AdEfnqRrvw
+.\" .Op Fl AdEfnqRvw
 .Op Fl a Ar addrtype
 .Op Fl b Ar bufsiz
 .Op Fl c Ar count
@@ -173,6 +173,13 @@ specifies IPsec policy to be used for the probe.
 Quiet output.
 Nothing is displayed except the summary lines at startup time and
 when finished.
+.It Fl R
+Make the kernel believe that the target
+.Ar host
+is reachable, by injecting upper-layer reachability confirmation hint.
+The option is meaningful only if the target
+.Ar host
+is a neighbor.
 .It Fl S Ar sourceaddr
 Specifies the source address of request packets.
 The source address must be one of the unicast addresses of the sending
