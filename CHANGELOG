@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.971 2000/06/04 17:23:21 jinmei Exp $
+$Id: CHANGELOG,v 1.972 2000/06/05 12:04:43 jinmei Exp $
 
 <200006>
+2000-06-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/traceroute6/traceroute6.c (main): set a minimum set of
+	socket options as soon as opning a raw socket to avoid
+	intentionally receiving packets without ancillary data.
+	Note: this could actually happen when we used an unreachable IPv6
+	DNS server.
+
 2000-06-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_src.c (in6_pcbsetport): supported FreeBSD
 	3 and later as a separate function, the code which was a part of
