@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 Jun-ichiro Hagino, KAME project
-$Id: TODO,v 1.28 1999/11/21 14:25:04 itojun Exp $
+$Id: TODO,v 1.29 1999/11/26 08:36:42 itojun Exp $
 
 
 Things we can do with the current code:
@@ -13,19 +13,17 @@ Things we can do with the current code:
 - tcp6 socket input/output (both daemon and client)
 - udp6 socket input/output (need more testing)
 - "options IPSEC" compiles (enabled by default in sys/conf/files), but
-  it means OpenBSD IPsec.  KAME IPsec is not available (and will never be 
-  available as OpenBSD group will not be switching IPsec code).
-  Because of this IPv6 IPsec is not available.
+  it means OpenBSD IPsec for IPv4 only.  KAME IPsec is not available
+  (and will never be available as OpenBSD group will not be switching
+  IPsec code).  Because of this IPv6 IPsec is not available.
 - hoplimit control advapi works fine.
+- works just fine on i386 and sparc.
 
 Things we can't do with the current code:
 - setsockopt(), ioctl and advapi needs checking
 - ipv4 mapped address
 - check advanced APIs (both userland and kernel)
 - multicast related items need checking
-	I was told that OpenBSD guys will never replace IPsec code.
-	Since we use same symbol (#ifdef IPSEC) to control ipsec code,
-	we need to wrap KAME shared ipsec code by "#ifndef __OpenBSD__".
 - enable KAME "goto ours" hack (check routing table code)
 - ip6_output() does not consult /128 routes, and will not obey icmp6 redir.
 - if you login via ssh, over IPv4 traffic to AF_INET6 socket (using IPv4
@@ -33,8 +31,8 @@ Things we can't do with the current code:
   (string too long on wtmp?)
   workaround: run sshd -4, then sshd -6.  strangely enough no error will
   be raised with this configuration.
-- due to library twists, behavior of ifconfig for IPv6 network name does not
-  work.  it will be fixed once libinet6 is integrated into libc.
+- due to library twists, you can't specify IPv6 network name to ifconfig(8).
+  it will be fixed once libinet6 is integrated into libc.
 - ssh6 port does not work on sparc (ssh does not work.  sshd works fine - why?)
 
 Cleanup todo:
