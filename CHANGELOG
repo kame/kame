@@ -1,9 +1,9 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2568 2004/03/17 15:36:58 t-momose Exp $
+$KAME: CHANGELOG,v 1.2569 2004/03/17 15:39:18 jinmei Exp $
 
 <200403>
 2004-03-17  MOMOSE Tsuyoshi  <momose@az.jp.nec.com>
-	* dest6.c: A Binding Error against a packet includes an invalid 
+	* dest6.c: A Binding Error against a packet including an invalid 
 	home address is sent only when the packet is not Binding Update.
 	This problem was found by the v6pc conformance test tool and fixed 
 	with help by Noriko Mizusawa <mizusawa@mitaka.ntt-at.co.jp> in the
