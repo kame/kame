@@ -1,4 +1,4 @@
-/*	$KAME: if.h,v 1.11 2003/08/06 04:19:41 ono Exp $	*/
+/*	$KAME: if.h,v 1.12 2003/09/21 07:17:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -50,7 +50,6 @@ int if_getifaflag __P((char *, struct in6_addr *));
 int if_getflags __P((int, int));
 int lladdropt_length __P((struct sockaddr_dl *));
 void lladdropt_fill __P((struct sockaddr_dl *, struct nd_opt_hdr *));
-int rtbuf_len __P((void));
 char *get_next_msg __P((char *, char *, int, size_t *, int));
 struct in6_addr *get_addr __P((char *));
 int get_rtm_ifindex __P((char *));

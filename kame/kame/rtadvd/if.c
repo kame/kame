@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.29 2003/09/20 09:33:37 jinmei Exp $	*/
+/*	$KAME: if.c,v 1.30 2003/09/21 07:17:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,52 +102,29 @@ get_rtaddrs(int addrs, struct sockaddr *sa, struct sockaddr **rti_info)
 struct sockaddr_dl *
 if_nametosdl(char *name)
 {
-	int mib[6] = {CTL_NET, AF_ROUTE, 0, 0, NET_RT_IFLIST, 0};
-	char *buf, *next, *lim;
-	size_t len;
-	struct if_msghdr *ifm;
-	struct sockaddr *sa, *rti_info[RTAX_MAX];
-	struct sockaddr_dl *sdl = NULL, *ret_sdl = NULL;
+	struct ifaddrs *ifap, *ifa;
+	struct sockaddr_dl *sdl = NULL;
 
-	if (sysctl(mib, 6, NULL, &len, NULL, 0) < 0)
-		return(NULL);
-	if ((buf = malloc(len)) == NULL)
-		return(NULL);
-	if (sysctl(mib, 6, buf, &len, NULL, 0) < 0)
-		goto end;
+	if (getifaddrs(&ifap) != 0)
+		return (NULL);
 
-	lim = buf + len;
-	for (next = buf; next < lim; next += ifm->ifm_msglen) {
-		ifm = (struct if_msghdr *)next;
-		if (ifm->ifm_type == RTM_IFINFO) {
-			sa = (struct sockaddr *)(ifm + 1);
-			get_rtaddrs(ifm->ifm_addrs, sa, rti_info);
-			if ((sa = rti_info[RTAX_IFP]) != NULL) {
-				if (sa->sa_family == AF_LINK) {
-					sdl = (struct sockaddr_dl *)sa;
-					if (strlen(name) != sdl->sdl_nlen)
-						continue; /* not same len */
-					if (strncmp(&sdl->sdl_data[0],
-						    name,
-						    sdl->sdl_nlen) == 0) {
-						break;
-					}
-				}
-			}
-		}
-	}
-	if (next == lim) {
-		/* search failed */
-		goto end;
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (strcmp(ifa->ifa_name, name) != 0)
+			continue;
+		if (ifa->ifa_addr->sa_family != AF_LINK)
+			continue;
+
+		sdl = malloc(ifa->ifa_addr->sa_len);
+		if (!sdl)
+			continue;	/*XXX*/
+
+		memcpy(sdl, ifa->ifa_addr, ifa->ifa_addr->sa_len);
+		freeifaddrs(ifap);
+		return (sdl);
 	}
 
-	if ((ret_sdl = malloc(sdl->sdl_len)) == NULL)
-		goto end;
-	memcpy((caddr_t)ret_sdl, (caddr_t)sdl, sdl->sdl_len);
-
-  end:
-	free(buf);
-	return (ret_sdl);
+	freeifaddrs(ifap);
+	return (NULL);
 }
 
 int
@@ -279,19 +256,6 @@ lladdropt_fill(struct sockaddr_dl *sdl, struct nd_opt_hdr *ndopt)
 	}
 
 	return;
-}
-
-int
-rtbuf_len()
-{
-	size_t len;
-
-	int mib[6] = {CTL_NET, AF_ROUTE, 0, AF_INET6, NET_RT_DUMP, 0};
-
-	if (sysctl(mib, 6, NULL, &len, NULL, 0) < 0)
-		return(-1);
-
-	return(len);
 }
 
 #define FILTER_MATCH(type, filter) ((0x1 << type) & filter)
