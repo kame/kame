@@ -1977,6 +1977,10 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			error = ENOPROTOOPT;
 			break;
 		}
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		if (m)
+			(void)m_freem(m);
+#endif		
 		break;
 
 	case PRCO_GETOPT:
