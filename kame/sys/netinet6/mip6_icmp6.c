@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.89 2004/02/13 02:52:10 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.90 2004/04/22 09:40:59 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -679,7 +679,7 @@ mip6_icmp6_create_haanyaddr(haanyaddr, mpfx)
 		return (EINVAL);
 
 	bzero(&ndpr, sizeof(ndpr));
-	ndpr.ndpr_prefix = mpfx->mpfx_prefix;
+	ndpr.ndpr_prefix.sin6_addr = mpfx->mpfx_prefix;
 	ndpr.ndpr_plen = mpfx->mpfx_prefixlen;
 
 	if (mpfx->mpfx_prefixlen == 64)

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.48 2004/02/13 02:52:10 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.49 2004/04/22 09:40:59 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1271,9 +1271,9 @@ mip6_remove_addr(ifp, ia6)
 	pr0.ndpr_plen = in6_mask2len(&ia6->ia_prefixmask.sin6_addr, NULL);
 	if (pr0.ndpr_plen == 128)
 		goto purgeaddr;
-	pr0.ndpr_prefix = ia6->ia_addr.sin6_addr;
+	pr0.ndpr_prefix = ia6->ia_addr;
 	for (i = 0; i < 4; i++) {
-		pr0.ndpr_prefix.s6_addr32[i] &=
+		pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
 		    ia6->ia_prefixmask.sin6_addr.s6_addr32[i];
 	}
 	/*

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.27 2004/02/13 02:52:10 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.28 2004/04/22 09:40:59 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -127,8 +127,8 @@ mip6_process_hrbu(bi)
 	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 		if (pr->ndpr_ifp != destifp)
 			continue;
-		if (in6_are_prefix_equal(&bi->mbc_phaddr, &pr->ndpr_prefix,
-			pr->ndpr_plen)) {
+		if (in6_are_prefix_equal(&bi->mbc_phaddr,
+			&pr->ndpr_prefix.sin6_addr, pr->ndpr_plen)) {
 			hifp = pr->ndpr_ifp; /* home ifp. */
 			prlifetime = pr->ndpr_vltime;
 		}
@@ -151,7 +151,7 @@ mip6_process_hrbu(bi)
 				continue;
 			}
 			/* save link-local prefix. */
-			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix)) {
+			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr)) {
 				llpr = pr;
 				continue;
 			}
@@ -361,8 +361,8 @@ mip6_process_hurbu(bi)
 	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 		if (pr->ndpr_ifp != destifp)
 			continue;
-		if (in6_are_prefix_equal(&bi->mbc_phaddr, &pr->ndpr_prefix,
-			pr->ndpr_plen)) {
+		if (in6_are_prefix_equal(&bi->mbc_phaddr,
+			&pr->ndpr_prefix.sin6_addr, pr->ndpr_plen)) {
 			hifp = pr->ndpr_ifp; /* home ifp. */
 		}
 	}
