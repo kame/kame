@@ -30,6 +30,8 @@
 #include <sys/types.h>
 #include <sys/param.h>
 
+#include <netinet6/ipsec.h>
+
 #include <netkey/keyv2.h>
 
 #include "ipsec_strerror.h"

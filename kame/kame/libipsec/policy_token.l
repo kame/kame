@@ -46,6 +46,8 @@
 
 #include "y.tab.h"
 #define yylval __libyylval	/* XXX */
+
+int yylex __P((void));
 %}
 
 %option noyywrap
@@ -124,6 +126,8 @@ unique		{ yylval.num = IPSEC_LEVEL_UNIQUE; return(LEVEL); }
 {nl}		{ ; }
 
 %%
+
+void __policy__strbuffer__init__ __P((char *));
 
 void
 __policy__strbuffer__init__(msg)

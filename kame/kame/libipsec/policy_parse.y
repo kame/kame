@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: policy_parse.y,v 1.5 1999/12/02 05:23:56 sakane Exp $ */
+/* KAME $Id: policy_parse.y,v 1.6 2000/01/27 17:55:50 itojun Exp $ */
 
 /*
  * IN/OUT bound policy configuration take place such below:
@@ -72,8 +72,9 @@ static int p_dir, p_type, p_protocol, p_mode, p_level, p_reqid;
 static struct sockaddr *p_src = NULL;
 static struct sockaddr *p_dst = NULL;
 
+struct _val;
 extern void yyerror __P((char *msg));
-static struct sockaddr *parse_sockaddr __P((/*struct _val *buf*/));
+static struct sockaddr *parse_sockaddr __P((struct _val *buf));
 static int rule_check __P((void));
 static int init_x_policy __P((void));
 static int set_x_request __P((struct sockaddr *src, struct sockaddr *dst));
