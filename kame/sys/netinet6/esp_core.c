@@ -1,4 +1,5 @@
-/*	$KAME: esp_core.c,v 1.65 2003/08/27 00:17:56 itojun Exp $	*/
+/*	$NetBSD: esp_core.c,v 1.33 2003/08/27 00:08:31 thorpej Exp $	*/
+/*	$KAME: esp_core.c,v 1.66 2003/09/05 08:46:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -516,7 +517,7 @@ esp_cast128_schedlen(algo)
 	const struct esp_algorithm *algo;
 {
 
-	return sizeof(u_int32_t) * 32;
+	return sizeof(cast128_key);
 }
 
 static int
@@ -525,7 +526,7 @@ esp_cast128_schedule(algo, sav)
 	struct secasvar *sav;
 {
 
-	set_cast128_subkey((u_int32_t *)sav->sched, _KEYBUF(sav->key_enc),
+	cast128_setkey((cast128_key *)sav->sched, _KEYBUF(sav->key_enc),
 	    _KEYLEN(sav->key_enc));
 	return 0;
 }
@@ -538,10 +539,7 @@ esp_cast128_blockdecrypt(algo, sav, s, d)
 	u_int8_t *d;
 {
 
-	if (_KEYLEN(sav->key_enc) <= 80 / 8)
-		cast128_decrypt_round12(d, s, (u_int32_t *)sav->sched);
-	else
-		cast128_decrypt_round16(d, s, (u_int32_t *)sav->sched);
+	cast128_decrypt((cast128_key *)sav->sched, s, d);
 	return 0;
 }
 
@@ -553,10 +551,7 @@ esp_cast128_blockencrypt(algo, sav, s, d)
 	u_int8_t *d;
 {
 
-	if (_KEYLEN(sav->key_enc) <= 80 / 8)
-		cast128_encrypt_round12(d, s, (u_int32_t *)sav->sched);
-	else
-		cast128_encrypt_round16(d, s, (u_int32_t *)sav->sched);
+	cast128_encrypt((cast128_key *)sav->sched, s, d);
 	return 0;
 }
 
