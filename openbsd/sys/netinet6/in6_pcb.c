@@ -926,6 +926,8 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
        inp != (struct inpcb *)&head->inpt_queue; inp = ninp)
     {
       ninp = inp->inp_queue.cqe_next;
+      if ((inp->inp_flags & INP_IPV6) == 0)
+	continue;
 
       if (notify == in6_rtchange) {
 	/*
