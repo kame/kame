@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.154 2003/04/22 05:38:17 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.155 2003/04/22 05:40:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -657,9 +657,9 @@ globcopy:
 			continue;
 #endif
 
-		if ((pai->ai_flags & AI_PASSIVE) != 0 && WILD_ACTIVE(ex))
+		if ((pai->ai_flags & AI_PASSIVE) != 0 && WILD_PASSIVE(ex))
 			;
-		else if ((pai->ai_flags & AI_PASSIVE) == 0 && WILD_PASSIVE(ex))
+		else if ((pai->ai_flags & AI_PASSIVE) == 0 && WILD_ACTIVE(ex))
 			;
 		else
 			continue;
