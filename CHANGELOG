@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1813 2001/07/25 06:35:21 jinmei Exp $
+$KAME: CHANGELOG,v 1.1814 2001/07/25 06:37:33 itojun Exp $
 
 <200107>
+Wed Jul 25 15:33:06 JST 2001  itojun@iijlab.net
+	* netbsd/sys/net/route.c: do not fill rmx_mtu too much on RTM_ADD/
+	  RTM_RESOLVE.  this was merged by mistake during past kame work.
+
 2001-07-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/(various files): correctly supported
 	interface-local multicast:
