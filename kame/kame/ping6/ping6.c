@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.54 2000/06/12 16:16:44 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.55 2000/06/12 16:18:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1204,7 +1204,6 @@ pr_pack(buf, cc, mhdr)
 						break;
 					}
 				}
-		fqdnnameend:;
 			}
 			if (options & F_VERBOSE) {
 				int32_t ttl;
