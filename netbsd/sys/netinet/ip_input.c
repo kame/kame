@@ -213,6 +213,8 @@ struct ipqhead ipq;
 int	ipq_locked;
 int	ip_nfragpackets = 0;
 int	ip_maxfragpackets = 200;
+int	ip_nfrags = 0;
+int	ip_maxfrags = 200;
 
 static __inline int ipq_lock_try __P((void));
 static __inline void ipq_unlock __P((void));
@@ -857,6 +859,11 @@ ip_reass(ipqe, fp)
 	 */
 	m->m_data += hlen;
 	m->m_len -= hlen;
+
+	if (ip_maxfrags < 0)
+		;
+	eles if (ip_nfrags >= ip_maxfrags)
+		goto dropfrag;
 
 	/*
 	 * If first fragment to arrive, create a reassembly queue.
@@ -1927,6 +1934,8 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPCTL_MAXFRAGPACKETS:
 		return (sysctl_int(oldp, oldlenp, newp, newlen,
 		    &ip_maxfragpackets));
+	case IPCTL_MAXFRAGS:
+		return (sysctl_int(oldp, oldlenp, newp, newlen, &ip_maxfrags));
 
 	default:
 		return (EOPNOTSUPP);
