@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1156 2000/07/26 12:00:52 kjc Exp $
+$KAME: CHANGELOG,v 1.1157 2000/07/27 03:20:08 itojun Exp $
 
 <200007>
+Thu Jul 27 12:16:52 JST 2000  itojun@iijlab.net
+	* tcp, udp, raw ip6 layer (all *BSD):
+	  be proactive about unspecified IPv6 source address.  pcb layer uses
+	  unspecified address (::) to mean "unbounded" or "unconnected",
+	  and can be confused by packets from outside.
+
 Wed 26 Jul 19:55:19 JST 2000  kjc@csl.sony.co.jp
 	* add tbrconfig(8), a tool to configure a token bucket regulator
 	  for an interface.  
