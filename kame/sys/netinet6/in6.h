@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.83 2001/03/29 02:55:07 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.84 2001/05/10 08:10:09 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,7 +145,7 @@ struct sockaddr_in6 {
 	u_int16_t	sin6_port;	/* Transport layer port # (in_port_t)*/
 	u_int32_t	sin6_flowinfo;	/* IP6 flow information */
 	struct in6_addr	sin6_addr;	/* IP6 address */
-	u_int32_t	sin6_scope_id;	/* intface scope id */
+	u_int32_t	sin6_scope_id;	/* interface scope id */
 };
 
 /*
