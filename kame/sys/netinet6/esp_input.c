@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.73 2002/10/27 04:26:51 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.74 2002/10/28 16:42:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -679,7 +679,7 @@ esp6_input(mp, offp, proto)
 		goto noreplaycheck;
 	siz = (((*sumalgo->sumsiz)(sav) + 3) & ~(4 - 1));
 	if (m->m_pkthdr.len < off + ESPMAXLEN + siz) {
-		ipsecstat.in_inval++;
+		ipsec6stat.in_inval++;
 		goto bad;
 	}
 	if (AH_MAXSUMSIZE < siz) {
