@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.41 2000/06/12 10:59:00 itojun Exp $
+$Id: COVERAGE,v 1.42 2000/06/12 12:16:21 itojun Exp $
 
 
 x: supported/integrated
@@ -38,13 +38,10 @@ KAME extended resolver (IPv6 transport, EDNS0, bogus address filtering)
 
 
 		KAME	merged *-current	merged
-		*BSD	net	open	free	net15	open27	free40
-		--	--	--	--	--	--	--
-KAME IPv6 as of	latest	late	late	early	notyet	late	early
-			dec99	dec99	nov99		dec99	nov99
-			(*1)	(*1)			(*1)
-     (*1) many of stabilization/fixes are imported, so we can safely call it
-	"late feb2000 - 2292bis".
+		*BSD	net	open	free	net15	open27	free40	bsdi42
+		--	--	--	--	--	--	--	---
+KAME IPv6 as of	latest	early	early	early	notyet	late	early
+			june00	june00	nov99		may00	nov99
 
 KAME IPsec as of
 		latest	mid	-	early	notyet	-	early
@@ -87,14 +84,23 @@ CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	notyet	ALIGN	ALIGN
     (all) backward binary compatibility for old code that uses old CMSG_xx
 	  is not provided (yet).
 
+CMSG passing in unix domain socket obeys CMSG_xx
+		-	x	-	x	notyet	-	x
+
 getaddrinfo obeys configured resolv order
 		(+)	x	x	-	notyet	x	-
+
+getaddrinfo supports AI_ADDRCONFIG (2553bis)
+		-	-	-	?	notyet	-	?
 
 getnameinfo uses addr%numeric for scopeid > maxifindex
 		x	x	x	-	notyet	x	-
 
 getnameinfo, 2nd arg type is socklen_t
 		x	x	x	-	notyet	-	-
+
+getnameinfo uses EAI_xx as return value (2553bis)
+		x	x	x	-	notyet	x	-
 
 ALTQ		(+)	-	-	-	notyet	-	-
 
