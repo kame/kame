@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1428 2000/12/05 15:23:17 itojun Exp $
+$KAME: CHANGELOG,v 1.1429 2000/12/07 11:49:13 jinmei Exp $
 
 <200012>
+2000-12-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netkey/key.c (key_cmpspidx_withmask): compared
+	sin6_scope_id values only when both two values were
+	non-zero. Without this fix, ::/0 would not match fe80::1%ne0,
+	which could be a security hole.
+	TODO: there seem to be additional misuse about scope in this
+	file. We'll have to fix them eventually.
+
 Wed Dec  6 00:22:31 JST 2000  itojun@iijlab.net
 	* openbsd: use shared raw ip6 logic.
 
