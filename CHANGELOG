@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.423 2000/01/10 03:08:44 jinmei Exp $
+$Id: CHANGELOG,v 1.424 2000/01/10 06:37:09 jinmei Exp $
 
 <200001>
+2000-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/net/if_gif.c (gif_output): changed the (default) upper
+	limit of how many times gif_output can be called.
+	Now no nesting is allowed by default, since some systems do not
+	allow so many recursive calls in kernel.
+
 Sun Jan  9 10:32:59 JST 2000  sakane@kame.net
 	massive clarification to racoon ISAKMP daemon.
 	- Merged Eric Lemiere's code for limited certificate support.
