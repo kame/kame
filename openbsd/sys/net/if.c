@@ -99,6 +99,7 @@
 #ifndef INET
 #include <netinet/in.h>
 #endif
+#include <netinet6/in6_ifattach.h>
 #endif
 
 #ifdef IPFILTER
@@ -323,6 +324,9 @@ if_detach(ifp)
 #ifdef MROUTING
 	vif_delete(ifp);
 #endif
+#endif
+#ifdef INET6
+	in6_ifdetach(ifp);
 #endif
 
 #ifdef IPFILTER
