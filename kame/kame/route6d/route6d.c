@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.93 2002/10/26 20:03:05 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.94 2002/10/26 20:08:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.93 2002/10/26 20:03:05 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.94 2002/10/26 20:08:55 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -2769,16 +2769,16 @@ addroute(rrt, gw, ifcp)
 
 	if (errno == EEXIST) {
 		trace(0, "ADD: Route already exists %s/%d gw %s\n",
-			inet6_n2p(&np->rip6_dest), np->rip6_plen, buf1);
+		    inet6_n2p(&np->rip6_dest), np->rip6_plen, buf1);
 		if (rtlog)
 			fprintf(rtlog, "ADD: Route already exists %s/%d gw %s\n",
-				inet6_n2p(&np->rip6_dest), np->rip6_plen, buf1);
+			    inet6_n2p(&np->rip6_dest), np->rip6_plen, buf1);
 	} else {
 		trace(0, "Can not write to rtsock (addroute): %s\n",
-			strerror(errno));
+		    strerror(errno));
 		if (rtlog)
 			fprintf(rtlog, "\tCan not write to rtsock: %s\n",
-				strerror(errno));
+			    strerror(errno));
 	}
 	return -1;
 }
@@ -2836,16 +2836,16 @@ delroute(np, gw)
 
 	if (errno == ESRCH) {
 		trace(0, "RTDEL: Route does not exist: %s/%d gw %s\n",
-			inet6_n2p(&np->rip6_dest), np->rip6_plen, buf2);
+		    inet6_n2p(&np->rip6_dest), np->rip6_plen, buf2);
 		if (rtlog)
 			fprintf(rtlog, "RTDEL: Route does not exist: %s/%d gw %s\n",
-				inet6_n2p(&np->rip6_dest), np->rip6_plen, buf2);
+			    inet6_n2p(&np->rip6_dest), np->rip6_plen, buf2);
 	} else {
 		trace(0, "Can not write to rtsock (delroute): %s\n",
-			strerror(errno));
+		    strerror(errno));
 		if (rtlog)
 			fprintf(rtlog, "\tCan not write to rtsock: %s\n",
-				strerror(errno));
+			    strerror(errno));
 	}
 	return -1;
 }
@@ -3411,7 +3411,10 @@ fatal(fmt, va_alist)
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
 	perror(buf);
-	syslog(LOG_ERR, "%s: %s", buf, strerror(errno));
+	if (errno)
+		syslog(LOG_ERR, "%s: %s", buf, strerror(errno));
+	else
+		syslog(LOG_ERR, "%s", buf);
 	rtdexit();
 }
 
