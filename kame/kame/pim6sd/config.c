@@ -207,6 +207,7 @@ config_vifs_from_kernel()
 		 * XXX: how about a deprecated, tentative, duplicated or
 		 * detached address?
 		 */
+		ifr6.ifr_addr = *(struct sockaddr_in6 *)&ifrp->ifr_addr;
 		if (ioctl(udp_socket, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
 			log(LOG_ERR, errno, "ioctl SIOCGIFAFLAG_IN6 for %s",
 			    inet6_fmt(&ifr6.ifr_addr.sin6_addr));
