@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.134 2001/07/24 14:26:41 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.135 2001/07/28 06:18:47 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -137,6 +137,11 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #include <md5.h>
 #else
 #include "md5.h"
+#endif
+
+/* portability */
+#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+#define socklen_t	int
 #endif
 
 #define MAXPACKETLEN	131072
