@@ -2139,7 +2139,6 @@ static void ti_start(ifp)
 		    m_head->m_pkthdr.csum_flags & (CSUM_DELAY_DATA)) {
 			if ((TI_TX_RING_CNT - sc->ti_txcnt) <
 			    m_head->m_pkthdr.csum_data + 16) {
-				IF_PREPEND(&ifp->if_snd, m_head);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			}
