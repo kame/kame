@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.29 2001/11/06 01:20:29 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.30 2001/11/06 07:46:19 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -715,7 +715,9 @@ mip6_validate_bu(m, opt)
 	struct ip6aux *ip6a = NULL;
 	struct ip6_opt_binding_update *bu_opt;
 	struct mip6_bc *mbc;
+#ifndef MIP6_DRAFT13
 	int error = 0;
+#endif /* !MIP6_DRAFT13 */
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	bu_opt = (struct ip6_opt_binding_update *)(opt);
@@ -786,6 +788,7 @@ mip6_validate_bu(m, opt)
 			 __FILE__, __LINE__,
 			 bu_opt->ip6ou_seqno,
 			 mbc->mbc_seqno, ip6_sprintf(&ip6->ip6_src)));
+#ifndef MIP6_DRAFT13
 		/* seqno is too small.  send TOO_SMALL error. */
 		error = mip6_bc_send_ba(&mbc->mbc_addr,
 					&mbc->mbc_phaddr, &mbc->mbc_pcoa,
@@ -797,6 +800,7 @@ mip6_validate_bu(m, opt)
 				 "%s:%d: can't send BA\n",
 				 __FILE__, __LINE__));
 		}
+#endif /* !MIP6_DRAFT13 */
 		return (1);
 	}
 
@@ -1632,6 +1636,7 @@ mip6_validate_ba(m, opt)
 		/* silently ignore */
 		return (1);
 	}
+#ifndef MIP6_DRAFT13
 	if (ba_opt->ip6oa_status == MIP6_BA_STATUS_SEQNO_TOO_SMALL) {
 		/*
 		 * our HA has a greater seq number in her binging
@@ -1641,7 +1646,9 @@ mip6_validate_ba(m, opt)
 		 * valid though the seq number doesn't match.
 		 */
 		goto validate_ba_valid;
-	} else if (ba_opt->ip6oa_seqno != mbu->mbu_seqno) {
+	}
+#endif /* !MIP6_DRAFT13 */
+	else if (ba_opt->ip6oa_seqno != mbu->mbu_seqno) {
 		ip6stat.ip6s_badoptions++;
 		mip6log((LOG_NOTICE,
 			 "%s:%d: unmached sequence no "
@@ -1654,7 +1661,9 @@ mip6_validate_ba(m, opt)
 		return (1);
 	}
 
+#ifndef MIP6_DRAFT13
  validate_ba_valid:
+#endif /* !MIP6_DRAFT13 */
 	/* we have a valid BA */
 	return (0);
 }
@@ -1691,13 +1700,14 @@ mip6_process_ba(m, opt)
 		mip6log((LOG_NOTICE, 
 			 "%s:%d: BU rejected (error code %d).\n",
 			 __FILE__, __LINE__, ba_opt->ip6oa_status));
+#ifndef MIP6_DRAFT13
 		if (ba_opt->ip6oa_status == MIP6_BA_STATUS_SEQNO_TOO_SMALL) {
 			/* seqno is too small.  adjust it and re-send BU. */
 			mbu->mbu_seqno = ba_opt->ip6oa_seqno + 1;
 			mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 			return (0);
 		}
-
+#endif /* !MIP6_DRAFT13 */
 		/* BU error handling... */
 		error = mip6_bu_list_remove(&sc->hif_bu_list, mbu);
 		if (error) {
