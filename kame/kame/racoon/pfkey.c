@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.130 2001/10/10 08:33:45 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.131 2001/10/16 14:49:58 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1530,7 +1530,7 @@ pk_recvacquire(mhp)
 	spidx.prefd = sp_out->spidx.prefs;
 	spidx.ul_proto = sp_out->spidx.ul_proto;
 
-	sp_in = getsp_r(&spidx);
+	sp_in = getsp(&spidx);
 	if (sp_in) {
 		plog(LLV_DEBUG, LOCATION, NULL,
 			"suitable inbound SP found: %s.\n",
