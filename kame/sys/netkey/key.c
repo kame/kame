@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.257 2002/08/20 07:56:56 sakane Exp $	*/
+/*	$KAME: key.c,v 1.258 2002/08/23 06:02:47 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1936,7 +1936,7 @@ key_spdadd(so, m, mhp)
  * and send,
  *   <base, address(SD), policy(*)>
  * to the ikmpd.
- * policy(*) including direction of policy.
+ * policy(*) including the direction of the policy.
  *
  * m will always be freed.
  */
@@ -1997,7 +1997,7 @@ key_spddelete(so, m, mhp)
 		return key_senderror(so, m, EINVAL);
 	}
 
-	/* save policy id to buffer to be returned. */
+	/* save policy id to be returned. */
 	xpl0->sadb_x_policy_id = sp->id;
 
 	key_sp_dead(sp);
@@ -2035,7 +2035,7 @@ key_spddelete(so, m, mhp)
  * and send,
  *   <base, policy(*)>
  * to the ikmpd.
- * policy(*) including direction of policy.
+ * policy(*) including the policy id.
  *
  * m will always be freed.
  */
