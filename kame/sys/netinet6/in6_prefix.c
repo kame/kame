@@ -576,9 +576,9 @@ rrpr_update(struct socket *so, struct rr_prefix *new)
 		 *  been already included in rpp.
 		 */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		while(!LIST_EMPTY(&new->rp_addrhead))
+		while (!LIST_EMPTY(&new->rp_addrhead))
 #else
-		while(new->rp_addrhead.lh_first != NULL)
+		while (new->rp_addrhead.lh_first != NULL)
 #endif
 		{
 			rap = LIST_FIRST(&new->rp_addrhead);
@@ -609,9 +609,9 @@ rrpr_update(struct socket *so, struct rr_prefix *new)
 		LIST_INIT(&rpp->rp_addrhead);
 		/*  move rp_addr entries of new to rpp */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		while(!LIST_EMPTY(&new->rp_addrhead))
+		while (!LIST_EMPTY(&new->rp_addrhead))
 #else
-		while(new->rp_addrhead.lh_first != NULL)
+		while (new->rp_addrhead.lh_first != NULL)
 #endif
 		{
 			rap = LIST_FIRST(&new->rp_addrhead);
@@ -778,9 +778,9 @@ free_rp_entries(struct rr_prefix *rpp)
 	 * So no splnet() here
 	 */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	while(!LIST_EMPTY(&rpp->rp_addrhead))
+	while (!LIST_EMPTY(&rpp->rp_addrhead))
 #else
-	while(rpp->rp_addrhead.lh_first != NULL)
+	while (rpp->rp_addrhead.lh_first != NULL)
 #endif
 	{
 		struct rp_addr *rap;
@@ -849,9 +849,9 @@ delete_each_prefix(struct socket *so, struct rr_prefix *rpp, u_char origin)
 		return(EPERM);
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	while(!LIST_EMPTY(&rpp->rp_addrhead))
+	while (!LIST_EMPTY(&rpp->rp_addrhead))
 #else
-	while(rpp->rp_addrhead.lh_first != NULL)
+	while (rpp->rp_addrhead.lh_first != NULL)
 #endif
 	{
 		struct rp_addr *rap;
@@ -1084,7 +1084,7 @@ in6_rr_timer(void *ignored_arg)
 	s = splnet();
 	/* expire */
 	rpp = LIST_FIRST(&rr_prefix);
-	while(rpp) {
+	while (rpp) {
 		if (rpp->rp_expire && rpp->rp_expire < time_second) {
 			struct rr_prefix *next_rpp;
 			struct socket so;
