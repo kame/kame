@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.263 2002/02/08 09:56:03 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.264 2002/02/08 15:26:09 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -174,7 +174,7 @@ static void in6_unlink_ifa __P((struct in6_ifaddr *, struct ifnet *));
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 struct in6_multihead in6_multihead;	/* XXX BSS initialization */
-#if __FreeBSD__ >= 4
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 int	(*faithprefix_p)(struct in6_addr *);
 #endif
 #else

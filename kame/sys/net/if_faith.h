@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.h,v 1.2 2001/07/07 06:07:30 sumikawa Exp $	*/
+/*	$KAME: if_faith.h,v 1.3 2002/02/08 15:26:08 sakane Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -34,8 +34,10 @@
 
 #ifdef _KERNEL
 #ifdef INET6
+#if defined(__FreeBSD__) && __FreeBSD__ < 4
 struct in6_addr;
 int faithprefix __P((struct in6_addr *));
+#endif
 #endif
 #endif
 
