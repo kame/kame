@@ -10,3 +10,8 @@ exclude tcp6_timer.c
 exclude tcp6_timer.h
 exclude tcp6_usrreq.c
 exclude tcp6_var.h
+conflict in6_pcb.c
+conflict in6_pcb.h
+conflict raw_ip6.c
+conflict udp6_usrreq.c
+conflict udp6_var.h

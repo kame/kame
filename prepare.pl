@@ -1,6 +1,6 @@
 #
 # perl prepare.pl kame <osname>
-# $Id: prepare.pl,v 1.10 1999/08/17 15:02:43 itojun Exp $
+# $Id: prepare.pl,v 1.11 1999/08/19 13:24:42 itojun Exp $
 #
 
 $debug = 1;
@@ -21,6 +21,7 @@ sub dig {
 	local(@all);
 	local(%exclude);
 	local(%linkdir);
+	local(%conflict);
 
 	print "start: $curdir, $src, $dst\n";
 
@@ -31,6 +32,7 @@ sub dig {
 	if (-f "$dst/.prepare") {
 		%exclude = ();
 		%linkdir = ();
+		%conflict = ();
 		open(IN, "< $dst/.prepare");
 		while (<IN>) {
 			s/\s*\n$//;
@@ -41,6 +43,9 @@ sub dig {
 			}
 			if (/^linkdir\s+(\S+)$/) {
 				$linkdir{$1}++;
+			}
+			if (/^conflict\s+(\S+)$/) {
+				$conflict{$1}++;
 			}
 		}
 		close(IN);
@@ -70,6 +75,7 @@ sub dig {
 
 			if (-f "$dst/$i" && ! -l "$dst/$i") {
 				print "conflict: $dst/$i\n";
+				exit 1 if (!defined $conflict{$i});
 			} else {
 				if (-l "$dst/$i") {
 					print "unlink $dst/$i (symlink)\n" if $debug;
