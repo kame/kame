@@ -1458,7 +1458,7 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 	 * XXX: we assume in6_rtchange does not free the PCB.
 	 */
 	if (IN6_ARE_ADDR_EQUAL(&inp->inp_route6.ro_dst.sin6_addr,
-			       &faddr))
+			       &faddr)) {
 #ifdef IPSEC
 	  /* Pretend the packet came in for this source/destination port pair,
 	     since that's what we care about for policy. If the passed in
@@ -1476,6 +1476,7 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 	    {
 	      in6_rtchange(inp, errno);
 	    }
+	}
 
 	if (notify2 != NULL)
 	  continue;
