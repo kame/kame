@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.24 2000/06/11 14:31:38 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.25 2000/06/14 09:20:12 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -1022,6 +1022,11 @@ base_r2send(iph1, msg)
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 			isakmp_ph1resend, iph1);
+
+	/* save created date. */
+	(void)time(&iph1->created);
+
+	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
 
 	log_ph1established(iph1);
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
