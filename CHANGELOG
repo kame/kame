@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1204 2000/08/15 13:31:00 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1205 2000/08/15 14:46:41 sumikawa Exp $
 
 <200008>
 Tue Aug 15 22:28:09 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
@@ -8,6 +8,7 @@ Tue Aug 15 22:28:09 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/mrt: mrt 2.2.2a-Aug11
 	* freebsd3/ports/lynx: upgrade to 2.7.4dev7 which IPv6 patch was
 	  merged.
+	* freebsd3/ports/python: use latest IPv6 patch.
 
 Tue Aug 15 18:16:14 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/lang/python: use latest IPv6 patch.
