@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.132 2001/11/20 08:32:38 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.133 2001/11/26 05:11:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2571,7 +2571,7 @@ ok:
 }
 
 /*
- * shift variable length bunffer to left.
+ * shift variable length buffer to left.
  * IN:	bitmap: pointer to the buffer
  * 	nbit:	the number of to shift.
  *	wsize:	buffer size (bytes).
