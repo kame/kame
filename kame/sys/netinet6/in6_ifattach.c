@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.42 2000/03/25 07:23:43 sumikawa Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.43 2000/04/10 15:11:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -374,7 +374,7 @@ in6_ifattach(ifp, type, laddr, noloop)
 	 */
 	ia = (struct in6_ifaddr *)malloc(sizeof(*ia), M_IFADDR, M_WAITOK);
 	bzero((caddr_t)ia, sizeof(*ia));
-	ia->ia_ifa.ifa_addr =    (struct sockaddr *)&ia->ia_addr;
+	ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
 	if (ifp->if_flags & IFF_POINTOPOINT)
 		ia->ia_ifa.ifa_dstaddr = (struct sockaddr *)&ia->ia_dstaddr;
 	else
