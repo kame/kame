@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.51 2002/08/12 07:59:28 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.52 2002/08/14 06:19:21 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -118,6 +118,45 @@ natpt_lookForRule6(struct pcv *cv6)
 	}
 	splx(s);
 
+	return (NULL);
+}
+
+
+struct cSlot *
+natpt_reverseLookForRule6(struct sockaddr_in6 *sin6)
+{
+	int s;
+	int proto;
+	struct cSlot *csl;
+
+	proto = 0;
+	if (sin6->sin6_family == IPPROTO_ICMPV6)
+		proto |= NATPT_ICMP;
+	else if (sin6->sin6_family == IPPROTO_TCP)
+		proto |= NATPT_TCP;
+	else if (sin6->sin6_family == IPPROTO_UDP)
+		proto |= NATPT_UDP;
+
+	s = splnet();
+	for (csl = TAILQ_FIRST(&csl_head); csl; csl = TAILQ_NEXT(csl, csl_list)) {
+		if (csl->Remote.sa_family != AF_INET6)
+			continue;
+
+		if ((csl->proto != 0)
+		    && ((csl->proto & proto) == 0))
+			continue;
+
+		if ((csl->map & NATPT_REDIRECT_ADDR) == 0)
+			continue;
+
+		if (!IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &csl->remote.daddr.in6))
+			continue;
+
+		splx(s);
+		return (csl);
+	}
+
+	splx(s);
 	return (NULL);
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.62 2002/08/09 11:27:11 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.63 2002/08/14 06:19:21 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -394,6 +394,7 @@ natpt_checkICMP6return(struct pcv *cv6)
 		return (ats);
 	}
 
+	cv6->flags |= NATPT_noFootPrint;
 	return (NULL);
 }
 

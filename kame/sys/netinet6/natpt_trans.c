@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.144 2002/08/13 08:36:10 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.145 2002/08/14 06:19:21 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -591,6 +591,11 @@ natpt_icmp6MimicPayload(struct pcv *cv6, struct pcv *cv4, struct pAddr *pad)
 }
 
 
+/*
+ * Improve a destination address of IPv4 packet which is involved in
+ * ICMPv4.  This facility is requested by <miyata@64translator.com>,
+ * but I think this is an overkill or useless.
+ */
 void
 natpt_revertICMPv6To4address(struct pcv *cv6, struct mbuf *m4)
 {
@@ -601,6 +606,72 @@ natpt_revertICMPv6To4address(struct pcv *cv6, struct mbuf *m4)
 	if ((csl = natpt_lookForRule6(cv6)) != NULL) {
 		ip4 = mtod(m4, struct ip *);
 		ip4->ip_src = csl->Remote.in4src;
+	}
+
+	/* revert innermost IPv4 address */
+	if (cv6->flags & NATPT_noFootPrint) {
+		struct ip	*icmpip4;
+		struct ip6_hdr	*icmpip6;
+		struct icmp	*icmp4;
+		struct icmp6_hdr *icmp6;
+		struct sockaddr_in6	sin6;
+
+		icmp6 = cv6->pyld.icmp6;
+		icmpip6 = (struct ip6_hdr *)((caddr_t)icmp6 + sizeof(struct icmp6_hdr));
+		ip4 = mtod(m4, struct ip *);
+		icmp4 = (struct icmp *)(ip4 + 1);
+		icmpip4 = (struct ip *)((caddr_t)icmp4 + ICMP_MINLEN);
+
+		bzero(&sin6, sizeof(struct sockaddr_in6));
+		sin6.sin6_family = icmpip4->ip_p; /* divert to upper layer protocol */
+		sin6.sin6_addr = icmpip6->ip6_dst;
+		if ((csl = natpt_reverseLookForRule6(&sin6)) != NULL) {
+			u_short		ip_sum;
+			struct in_addr	ip_old, ip_new;
+			
+			ip_sum = icmpip4->ip_sum;
+			ip_old = icmpip4->ip_dst;
+			ip_new = csl->local.daddr.in4;
+			icmpip4->ip_dst = csl->local.daddr.in4;
+			icmpip4->ip_sum
+				= natpt_fixCksum(htons(ip_sum),
+					(u_char *)&ip_old, sizeof(struct in_addr),
+					(u_char *)&ip_new, sizeof(struct in_addr));
+			NTOHS(icmpip4->ip_sum);
+
+			if (icmpip4->ip_p == IPPROTO_UDP) {
+				u_short		 uh_sum;
+				struct udphdr	*icmpudp4;
+
+				icmpudp4 = (struct udphdr *)(icmpip4 + 1);
+				uh_sum = icmpudp4->uh_sum;
+				icmpudp4->uh_sum
+					= natpt_fixCksum(htons(uh_sum),
+						(u_char *)&ip_old, sizeof(struct in_addr),
+						(u_char *)&ip_new, sizeof(struct in_addr));
+				NTOHS(icmpudp4->uh_sum);
+			}
+
+			/*
+			 * We must re-calculate ICMP chekcsum because
+			 * ICMP payload was changed.
+			 */
+			{
+				int	hlen;
+
+#ifdef _IP_VHL
+				hlen = IP_VHL_HL(ip4->ip_vhl) << 2;
+#else
+				hlen = ip4->ip_hl << 2;
+#endif
+				m4->m_data += hlen;
+				m4->m_len  -= hlen;
+				icmp4->icmp_cksum = 0;
+				icmp4->icmp_cksum = in_cksum(m4, ip4->ip_len - hlen);
+				m4->m_data -= hlen;
+				m4->m_len  += hlen;
+			}
+		}
 	}
 }
 
