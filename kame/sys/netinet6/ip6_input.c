@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.165 2001/02/05 08:57:23 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.166 2001/02/06 01:37:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -646,15 +646,17 @@ ip6_input(m)
 	}
 
 	/*
-	 * XXX we need this since we do not have "goto ours" hack route
-	 * for some of our ifaddrs on loopback interface.
-	 * we should correct it by changing in6_ifattach to install
-	 * "goto ours" hack route.
+	 * We use rt->rt_ifp to determine if the address is ours or not.
+	 * If rt_ifp is lo0, the address is ours.
+	 * The problem here is, rt->rt_ifp for fe80::%lo0/64 is set to lo0,
+	 * so any address under fe80::%lo0/64 will be mistakenly considered
+	 * local.  The special case is supplied to handle the case properly
+	 * by actually looking at interface addresses
+	 * (using in6ifa_ifpwithaddr).
 	 */
 	if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) != 0 &&
 	    IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst)) {
-		if (!in6ifa_ifpwithaddr(m->m_pkthdr.rcvif,
-		    &ip6->ip6_dst)) {
+		if (!in6ifa_ifpwithaddr(m->m_pkthdr.rcvif, &ip6->ip6_dst)) {
 			icmp6_error(m, ICMP6_DST_UNREACH,
 			    ICMP6_DST_UNREACH_ADDR, 0);
 			/* m is already freed */
