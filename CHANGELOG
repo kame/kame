@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1496 2001/01/21 16:10:43 itojun Exp $
+$KAME: CHANGELOG,v 1.1497 2001/01/22 18:45:19 itojun Exp $
 
 <200101>
+Tue Jan 23 03:44:03 JST 2001  itojun@iijlab.net
+	* netbsd/openbsd: make sure do not return garbage, when accept(2) is
+	  called after socket is disconnected (like RST right after TCP
+	  establishment).
+
+Mon Jan 22 JST 2001  itojun@iijlab.net
+	* route6d: advertise aggregated route, only to interfaces specified
+	  after -A option.  found by IIJ IPv6 router torture testers.
+
 2001-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (in6_{ifadd, ifdel}): ifa_refcnt
 	clarifications:
