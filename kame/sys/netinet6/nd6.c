@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.272 2002/06/03 00:46:14 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.273 2002/06/03 00:51:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -259,9 +259,13 @@ nd6_setmtu0(ifp, ndi)
 	omaxmtu = ndi->maxmtu;
 
 	switch (ifp->if_type) {
-#ifdef ARC_PHDS_MAXMTU
+#ifdef IFT_ARCNET
 	case IFT_ARCNET:
+#ifdef ARC_PHDS_MAXMTU
 		ndi->maxmtu = MIN(ARC_PHDS_MAXMTU, ifp->if_mtu); /* RFC2497 */
+#else
+		ndi->maxmtu = MIN(60480, ifp->if_mtu); /* RFC2497 */
+#endif
 		break;
 #endif
 #ifdef IFT_FDDI
