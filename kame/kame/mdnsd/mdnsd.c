@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.59 2003/04/08 09:08:55 jinmei Exp $	*/
+/*	$KAME: mdnsd.c,v 1.60 2003/04/16 09:52:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -802,8 +802,8 @@ status()
 	for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
 		if (getnameinfo(ns->addr, ns->addrlen,
 		    hbuf, sizeof(hbuf), sbuf, sizeof(sbuf), niflags) != 0) {
-			strcpy(hbuf, "invalid");
-			strcpy(sbuf, "invalid");
+			strlcpy(hbuf, "invalid", sizeof(hbuf));
+			strlcpy(sbuf, "invalid", sizeof(sbuf));
 		}
 		switch (ns->type) {
 		case N_UNICAST:
@@ -839,8 +839,8 @@ status()
 		}
 		if (getnameinfo((struct sockaddr *)&ss, sslen,
 		    hbuf, sizeof(hbuf), sbuf, sizeof(sbuf), niflags) != 0) {
-			strcpy(hbuf, "invalid");
-			strcpy(sbuf, "invalid");
+			strlcpy(hbuf, "invalid", sizeof(hbuf));
+			strlcpy(sbuf, "invalid", sizeof(sbuf));
 		}
 		switch (sd->type) {
 		case S_UNICAST:
