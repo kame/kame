@@ -523,7 +523,7 @@ pf_state_expires(const struct pf_state *state)
 	if (state->timeout == PFTM_UNTIL_PACKET)
 		return (0);
 #ifdef __FreeBSD__
-	KASSERT(state->timeout < PFTM_MAX, "pf_state_expires failed");
+	KASSERT(state->timeout < PFTM_MAX, ("pf_state_expires failed"));
 #else
 	KASSERT(state->timeout < PFTM_MAX);
 #endif
@@ -595,9 +595,9 @@ pf_purge_expired_states(void)
 
 			peer = RB_FIND(pf_state_tree, &tree_lan_ext, &key);
 #ifdef __FreeBSD__
-			KASSERT(peer, "pf_purge_expired_states failed");
+			KASSERT(peer, ("pf_purge_expired_states failed"));
 			KASSERT(peer->state == cur->state,
-				"pf_purge_expired_states failed");
+				("pf_purge_expired_states failed"));
 #else
 			KASSERT(peer);
 			KASSERT(peer->state == cur->state);
