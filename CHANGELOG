@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1591 2001/03/05 23:36:31 thorpej Exp $
+$KAME: CHANGELOG,v 1.1592 2001/03/06 00:24:08 itojun Exp $
 
 <200103>
+Tue Mar  6 09:22:56 JST 2001  itojun@iijlab.net
+	* sys/netinet6/raw_ip6.c: permit IPV6_CHECKSUM socket option for
+	  the following cases only (previously it was allowed for any AF_INET6
+	  socket): raw ip6 socket, and protocol != IPPROTO_ICMPV6.
+
 2001-03-05  Jason R. Thorpe  <thorpej@zembu.com>
 
 	* kame/racoon/gssapi.c: Use GSS_C_MECH_CODE when reporting
