@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.97 2003/01/20 05:00:47 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.98 2003/01/20 07:29:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1651,7 +1651,7 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 	}
 
 	if (need_rr) {
-		/* nonce indices and authdata insersion. */
+		/* nonce indices and authdata insertion. */
 		/* Nonce Indicies */
 		mopt_nonce->ip6mon_type = IP6MOPT_NONCE;
 		mopt_nonce->ip6mon_len = sizeof(struct ip6m_opt_nonce) - 2;
@@ -1681,13 +1681,16 @@ mip6_hexdump("MN: Care-of Cookie: ", sizeof(mbu->mbu_careof_cookie), (caddr_t)&m
 mip6_hexdump("MN: Kbm: ", sizeof(key_bm), key_bm);
 #endif
 
-		/* Calculate authenticator (5.5.6) */
+		/* Calculate authenticator (5.2.6) */
 		/* HMAC_SHA1(Kbm, (coa, | cn | BU)) */
 		mip6_calculate_authenticator(key_bm, (u_int8_t *)(mopt_auth + 1), 
 			&mbu->mbu_coa.sin6_addr, &dst->sin6_addr, 
 			(caddr_t)ip6mu, bu_size + nonce_size + auth_size, 
 			bu_size + nonce_size + sizeof(struct ip6m_opt_authdata) ,
 			MIP6_AUTHENTICATOR_LEN);
+#ifdef RR_DBG
+mip6_hexdump("MN: Authenticator: ", (u_int8_t *)(mopt_auth + 1), MIP6_AUTHENTICATOR_LEN);
+#endif
 	}
 
 	/* calculate checksum. */
