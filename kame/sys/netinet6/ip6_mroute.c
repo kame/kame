@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.91 2003/04/09 09:28:19 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.92 2003/05/14 17:00:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1519,10 +1519,10 @@ ip6_mdq(m, ifp, rt)
  */
 
 #define MC6_SEND(ip6, mifp, m, s, d) do {			\
-		if ((mifp)->m6_flags & MIFF_REGISTER)		\
-		    register_send((ip6), (mifp), (m), (s), (d));\
-		else						\
-		    phyint_send((ip6), (mifp), (m), (s), (d));	\
+	if ((mifp)->m6_flags & MIFF_REGISTER)			\
+		register_send((ip6), (mifp), (m), (s), (d));	\
+	else							\
+		phyint_send((ip6), (mifp), (m), (s), (d));	\
 } while (/*CONSTCOND*/ 0)
 
 	/*
