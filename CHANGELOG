@@ -1,15 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1945 2001/10/25 09:52:07 jinmei Exp $
+$KAME: CHANGELOG,v 1.1946 2001/10/25 12:26:08 jinmei Exp $
 
 <200110>
 2001-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* kame/sys/netinet6/in6_gif.c (in6_gif_output):
+	* kame/sys/netinet6/in6_gif.c (in6_gif_output):	let ip6_output()
+	(and a subroutine) to validate the cache and to make a new one, in
+	order to avoid missing logic and code duplication.
 	* kame/sys/netinet/in_gif.c (in_gif_output):
-	Checked if the cached route (per gif) is up before using it.
+	added a check if the cached route (per gif) is up before using it.
 	This should be verified for all type of cached routes, but we've
-	forgotten the check.  With this change, FreeBSD and BSD/OS will be
-	able to catch a more specific route for the other end point of the
-	tunnel as soon as possible.
+	forgotten the check.  With this change, FreeBSD will be able to
+	catch a more specific route for the other end point of the tunnel
+	as soon as possible.
 
 	(OpenBSD IPv6 only)merged recent changes into the openbsd specific
 	code path.
