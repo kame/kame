@@ -202,6 +202,17 @@ rtalloc1(dst, report)
 				msgtype = RTM_RESOLVE;
 				goto miss;
 			}
+			/* Inform listeners of the new route */
+			bzero(&info, sizeof(info));
+			info.rti_info[RTAX_DST] = rt_key(rt);
+			info.rti_info[RTAX_NETMASK] = rt_mask(rt);
+			info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
+			if (rt->rt_ifp != NULL) {
+				info.rti_info[RTAX_IFP] = 
+				    rt->rt_ifp->if_addrlist.tqh_first->ifa_addr;
+				info.rti_info[RTAX_IFA] = rt->rt_ifa->ifa_addr;
+			}
+			rt_missmsg(RTM_ADD, &info, rt->rt_flags, 0);
 		} else
 			rt->rt_refcnt++;
 	} else {
