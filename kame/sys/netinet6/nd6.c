@@ -1209,7 +1209,8 @@ nd6_ioctl(cmd, data, ifp)
 	      {
 		struct rr_prefix *rpp;
 
-		LIST_FOREACH(rpp, &rr_prefix, rp_entry) {
+		for (rpp = LIST_FIRST(&rr_prefix); rpp;
+		     rpp = LIST_NEXT(rpp, rp_entry)) {
 			if (i >= PRLSTSIZ)
 				break;
 			prl->prefix[i].prefix = rpp->rp_prefix.sin6_addr;
