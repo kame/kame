@@ -70,6 +70,13 @@ network_start()
 	if ifconfig lo0 inet6 >/dev/null 2>&1; then
 		# We have IPv6 support in kernel.
 
+	        # install the policy of the address selection algorithm.
+		if [ -f /usr/local/v6/etc/ip6addrctl.conf ]; then
+			ip6addrctl flush
+			ip6addrctl install /usr/local/v6/etc/ip6addrctl.conf
+			ip6addrctl
+		fi
+
 		# disallow link-local unicast dest without outgoing scope
 		# identifiers.
 		#
