@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2626 2004/06/10 12:44:56 jinmei Exp $
+$KAME: CHANGELOG,v 1.2627 2004/06/12 11:12:25 jinmei Exp $
 
 <200406>
+2004-06-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: added control channel for the server so that
+	the administrator can reload the server or remove a particular
+	binding.  A new command "dhcp6sctl" was added for this purpose.
+	This is a very experimental support, and may change in the near
+	future.
+
 2004-06-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: supported the delayed authentication protocol
 	as specified in RFC3315 for secure DHCPv6 exchanges between the
