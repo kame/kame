@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.261 2002/02/04 05:58:24 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.262 2002/02/04 06:37:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -777,51 +777,6 @@ ip6_input(m)
 	/* attach the addresses to the packet for later use */
 	if (!ip6_setpktaddrs(m, &sa6_src, &sa6_dst))
 		goto bad;
-
-#if 0
-	/*
-	 * Embed interface ID as the zone ID for interface-local and
-	 * link-local addresses.
-	 * XXX: KAME assumes one-to-one mapping between interfaces and
-	 * links.
-	 * XXX: we should eventually avoid modifying the IPv6 header fields
-	 *      and use sa6_src and sa6_dst only.
-	 */
-	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src)) {
-		ip6->ip6_src.s6_addr16[1]
-			= htons(m->m_pkthdr.rcvif->if_index);
-	}
-	if (IN6_IS_ADDR_MC_INTFACELOCAL(&ip6->ip6_dst) ||
-	    IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
-		ip6->ip6_dst.s6_addr16[1]
-			= htons(m->m_pkthdr.rcvif->if_index);
-	}
-#endif
-
-#if 0 /* this case seems to be unnecessary. (jinmei, 20010401) */
-	/*
-	 * We use rt->rt_ifp to determine if the address is ours or not.
-	 * If rt_ifp is lo0, the address is ours.
-	 * The problem here is, rt->rt_ifp for fe80::%lo0/64 is set to lo0,
-	 * so any address under fe80::%lo0/64 will be mistakenly considered
-	 * local.  The special case is supplied to handle the case properly
-	 * by actually looking at interface addresses
-	 * (using in6ifa_ifpwithaddr).
-	 */
-	if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) != 0 &&
-	    IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst)) {
-		if (!in6ifa_ifpwithaddr(m->m_pkthdr.rcvif, &ip6->ip6_dst)) {
-			icmp6_error(m, ICMP6_DST_UNREACH,
-			    ICMP6_DST_UNREACH_ADDR, 0);
-			/* m is already freed */
-			return;
-		}
-
-		ours = 1;
-		deliverifp = m->m_pkthdr.rcvif;
-		goto hbhcheck;
-	}
-#endif
 
 	/*
 	 * Multicast check
