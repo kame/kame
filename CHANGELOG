@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1155 2000/07/26 08:09:55 itojun Exp $
+$KAME: CHANGELOG,v 1.1156 2000/07/26 12:00:52 kjc Exp $
 
 <200007>
+Wed 26 Jul 19:55:19 JST 2000  kjc@csl.sony.co.jp
+	* add tbrconfig(8), a tool to configure a token bucket regulator
+	  for an interface.  
+	  (need ALTQ configured in the kernel.  A SMP box should have
+	   ALTQ_NOPCC not to use processor cycle counter)
+	  tbrconfig(8) is originally written for tuning ALTQ, but
+	  can be used as a handy tool to rate-limit an interface.
+	  for example, to rate-limit the fxp0 interface up to 25Mbps,
+	    # tbrconfig fxp0 25M auto
+	  see tbrconfig(8) for more details.
+
 Wed Jul 26 12:52:50 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	Fixed to get a destination address when a packet is received from
