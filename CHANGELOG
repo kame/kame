@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1554 2001/02/14 07:29:28 itojun Exp $
+$KAME: CHANGELOG,v 1.1555 2001/02/14 08:38:30 itojun Exp $
 
 <200102>
+Wed Feb 14 17:37:34 JST 2001  itojun@iijlab.net
+	* sys/kern/uipc_mbuf2.c: make sure to return non-shared mbuf on
+	  calls to m_pulldown().
+
 Wed Feb 14 16:27:49 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ip6_input.c: merge mbuf data into single mbuf, if
 	  mbuf chain is passed to ip6_input.  it makes IPv6 packet processed
