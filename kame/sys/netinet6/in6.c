@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.48 2000/02/22 14:04:16 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.49 2000/02/24 05:39:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -454,7 +454,7 @@ in6_control(so, cmd, data, ifp)
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	struct  ifaddr *ifa;
 #endif
-	struct	in6_ifaddr *ia, *oia;
+	struct	in6_ifaddr *ia = NULL, *oia;
 	struct	in6_aliasreq *ifra = (struct in6_aliasreq *)data;
 	struct	sockaddr_in6 oldaddr, net;
 	int	error = 0, hostIsNew, prefixIsNew;
@@ -535,7 +535,7 @@ in6_control(so, cmd, data, ifp)
 	}
 #endif /* MIP6 */
 
-	if (ifp == 0)
+	if (ifp == NULL)
 		return(EOPNOTSUPP);
 
 	switch (cmd) {
@@ -584,7 +584,7 @@ in6_control(so, cmd, data, ifp)
 	/*
 	 * Find address for this interface, if it exists.
 	 */
-	{
+	if (ifra->ifra_addr.sin6_family == AF_INET6) { /* XXX */
 		struct sockaddr_in6 *sa6 =
 			(struct sockaddr_in6 *)&ifra->ifra_addr;
 
@@ -605,8 +605,8 @@ in6_control(so, cmd, data, ifp)
 				sa6->sin6_scope_id = 0; /* XXX: good way? */
 			}
 		}
+		ia = in6ifa_ifpwithaddr(ifp, &ifra->ifra_addr.sin6_addr);
 	}
- 	ia = in6ifa_ifpwithaddr(ifp, &ifra->ifra_addr.sin6_addr);
 
 	switch (cmd) {
 
@@ -618,24 +618,33 @@ in6_control(so, cmd, data, ifp)
 		 * address from the day one, we consider "remove the first one"
 		 * semantics to be not preferrable.
 		 */
-		if (ia == 0)
+		if (ia == NULL)
 			return(EADDRNOTAVAIL);
 		/* FALLTHROUGH */
 	case SIOCAIFADDR_IN6:
 	case SIOCSIFADDR_IN6:
-	case SIOCSIFNETMASK_IN6:
 	case SIOCSIFDSTADDR_IN6:
+	case SIOCSIFNETMASK_IN6: /* XXX: should be obsoleted? */
+		if (ifra->ifra_addr.sin6_family != AF_INET6)
+			return(EAFNOSUPPORT);
 		if (!privileged)
 			return(EPERM);
-		if (ia == 0) {
+		if (ia == NULL) {
 			ia = (struct in6_ifaddr *)
 				malloc(sizeof(*ia), M_IFADDR, M_WAITOK);
 			if (ia == NULL)
 				return (ENOBUFS);
 			bzero((caddr_t)ia, sizeof(*ia));
+			/* Initialize the address and masks */
 			ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
+			ia->ia_addr.sin6_family = AF_INET6;
+			ia->ia_addr.sin6_len = sizeof(ia->ia_addr);
 			ia->ia_ifa.ifa_dstaddr
 				= (struct sockaddr *)&ia->ia_dstaddr;
+			if (ifp->if_flags & IFF_POINTOPOINT) {
+				ia->ia_dstaddr.sin6_family = AF_INET6;
+				ia->ia_dstaddr.sin6_len = sizeof(ia->ia_dstaddr);
+			}
 			ia->ia_ifa.ifa_netmask
 				= (struct sockaddr *)&ia->ia_prefixmask;
 
@@ -685,7 +694,7 @@ in6_control(so, cmd, data, ifp)
 	case SIOCGIFDSTADDR_IN6:
 	case SIOCGIFALIFETIME_IN6:
 		/* must think again about its semantics */
-		if (ia == 0)
+		if (ia == NULL)
 			return(EADDRNOTAVAIL);
 		break;
 	case SIOCSIFALIFETIME_IN6:
@@ -694,7 +703,7 @@ in6_control(so, cmd, data, ifp)
 
 		if (!privileged)
 			return(EPERM);
-		if (ia == 0)
+		if (ia == NULL)
 			return(EADDRNOTAVAIL);
 		/* sanity for overflow - beware unsigned */
 		lt = &ifr->ifr_ifru.ifru_lifetime;
@@ -844,6 +853,22 @@ in6_control(so, cmd, data, ifp)
 					      &ia->ia_addr.sin6_addr))
 			hostIsNew = 0;
 
+		/* Validate address families: */
+		/*
+		 * The destination address for a p2p link must have a family
+		 * of AF_UNSPEC or AF_INET6.
+		 */
+		if ((ifp->if_flags & IFF_POINTOPOINT) != 0 &&
+		    ifra->ifra_dstaddr.sin6_family != AF_INET6 &&
+		    ifra->ifra_dstaddr.sin6_family != AF_UNSPEC)
+			return(EAFNOSUPPORT);
+		/*
+		 * The prefixmask must have a family of AF_UNSPEC or AF_INET6.
+		 */
+		if (ifra->ifra_prefixmask.sin6_family != AF_INET6 &&
+		    ifra->ifra_prefixmask.sin6_family != AF_UNSPEC)
+			return(EAFNOSUPPORT);
+
 		if (ifra->ifra_prefixmask.sin6_len) {
 			in6_ifscrub(ifp, ia);
 			ia->ia_prefixmask = ifra->ifra_prefixmask;
@@ -871,11 +896,9 @@ in6_control(so, cmd, data, ifp)
 			}
 			prefixIsNew = 1; /* We lie; but effect's the same */
 		}
-		if (ifra->ifra_addr.sin6_family == AF_INET6 &&
-		    (hostIsNew || prefixIsNew))
+		if (hostIsNew || prefixIsNew)
 			error = in6_ifinit(ifp, ia, &ifra->ifra_addr, 0);
-		if (ifra->ifra_addr.sin6_family == AF_INET6
-		    && hostIsNew && (ifp->if_flags & IFF_MULTICAST)) {
+		if (hostIsNew && (ifp->if_flags & IFF_MULTICAST)) {
 			int error_local = 0;
 
 			/*
@@ -966,7 +989,7 @@ in6_control(so, cmd, data, ifp)
 		break;
 
 	default:
-		if (ifp == 0 || ifp->if_ioctl == 0)
+		if (ifp == NULL || ifp->if_ioctl == 0)
 			return(EOPNOTSUPP);
 		return((*ifp->if_ioctl)(ifp, cmd, data));
 	}
