@@ -102,10 +102,9 @@ main(argc, argv)
 			if (*ep != '\0')
 				errx(1, "invalid scope: %s", optarg);
 			break;
-		case '?':
 		default:
 			errx(1,
-			     "usage: %s [-n] [-r] [-s scopeid] address_or_name",
+			     "usage: %s [-Nnr] [-s scopeid] address_or_name",
 			     argv[0]);
 		}
 	}
