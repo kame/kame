@@ -1,10 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.855 2000/05/06 11:21:08 jinmei Exp $
+$Id: CHANGELOG,v 1.856 2000/05/07 15:20:40 sumikawa Exp $
 
 <200005>
 Sat May  6 01:48:14 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/{libpcap, tcpdump}: upgrade to 2000/05/01.
+	* freebsd[23]/ports/tcp_wrapper: upgrade to latest IPv6 patch.
+	* {freebsd[23]/ports,netbsd/pkgsrc}/mtr: upgrade to 0.42.
 
 Sat May  6 00:30:39 JST 2000  itojun@iijlab.net
 	* */include/netdb.h, kame/libinet6/getnameinfo.c: 
