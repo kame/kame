@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.25 2000/06/04 01:03:14 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.26 2000/06/04 01:16:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -493,42 +493,28 @@ static int
 iscanon(n)
 	const char *n;
 {
-#if 0
-	struct addrinfo hints, *res;
-	int ret;
-#endif
+	const char *p;
+	int dot;
 
 	if (strlen(n) == 0)
 		return 0;
 	if (n[strlen(n) - 1] != '.')
 		return 0;
 
-#if 0
-	/*
-	 * XXX the code fragment does not work.  /etc/resolv.conf will have
-	 * "nameserver 0.0.0.0" to point to mdnsd itself!
-	 */
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = PF_UNSPEC;
-	hints.ai_socktype = SOCK_DGRAM;		/*dummy*/
-	hints.ai_flags = AI_CANONNAME;
-	if (getaddrinfo(n, "0", &hints, &res) != 0)
-		return 0;
-	if (!res->ai_canonname) {
-		freeaddrinfo(res);
-		return 0;
+	/* require at least three dots: host.baa.com. */
+	dot = 0;
+	for (p = n; *p; p++) {
+		if (*p == '.')
+			dot++;
 	}
-	if (strcmp(res->ai_canonname, n) == 0 ||
-	    (strlen(n) == strlen(res->ai_canonname) + 1 &&
-	     strncmp(res->ai_canonname, n, strlen(res->ai_canonname)) == 0))
-		ret = 1;
-	else
-		ret = 0;
-	freeaddrinfo(res);
-	return ret;
-#else
+	if (dot < 3)
+		return 0;
+
+	/* but no two subsequent dots */
+	if (strstr(n, ".."))
+		return 0;
+
 	return 1;
-#endif
 }
 
 int
