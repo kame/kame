@@ -1182,14 +1182,17 @@ altq_etherclassify(ifq, m, pktattr)
 		break;
 	}
 
+	while (m->m_len <= hlen) {
+		hlen -= m->m_len;
+		m = m->m_next;
+	}
 	if (m->m_len < (hlen + hdrsize)) {
 		/*
-		 * Ethernet and protocol header not in a single
-		 * mbuf.  We can't cope with this situation right
-		 * now (but it shouldn't ever happen, really, anyhow).
-		 * XXX Should use m_pulldown().
+		 * protocol header not in a single mbuf.
+		 * We can't cope with this situation right now
+		 * (but it shouldn't ever happen, really, anyhow).
 		 */
-#ifdef DEBUG	/* this can happen for openbsd's bridged broadcast! */
+#ifdef DEBUG
 		printf("altq_etherclassify: headers span multiple mbufs: "
 		    "%d < %d\n", m->m_len, (hlen + hdrsize));
 #endif
