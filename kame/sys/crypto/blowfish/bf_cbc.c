@@ -1,4 +1,4 @@
-/*	$KAME: bf_cbc.c,v 1.6 2001/09/10 04:03:56 itojun Exp $	*/
+/*	$KAME: bf_cbc.c,v 1.7 2002/09/07 23:42:35 itojun Exp $	*/
 
 /* crypto/bf/bf_cbc.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
@@ -58,7 +58,7 @@
  * [including the GNU Public Licence.]
  */
 
-#include <openssl/blowfish.h>
+#include <crypto/blowfish/blowfish.h>
 #include "bf_locl.h"
 
 void BF_cbc_encrypt(const unsigned char *in, unsigned char *out, long length,
