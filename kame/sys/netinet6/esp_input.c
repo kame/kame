@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.30 2000/08/16 09:52:35 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.31 2000/08/27 12:11:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -333,8 +333,10 @@ noreplaycheck:
 	if (!algo->decrypt)
 		panic("internal error: no decrypt function");
 	if ((*algo->decrypt)(m, off, sav, algo, ivlen)) {
-		ipseclog((LOG_ERR, "decrypt fail in IPv4 ESP input: %s %s\n",
-		    ipsec4_logpacketstr(ip, spi), ipsec_logsastr(sav)));
+		/* m is already freed */
+		m = NULL;
+		ipseclog((LOG_ERR, "decrypt fail in IPv4 ESP input: %s\n",
+		    ipsec_logsastr(sav)));
 		ipsecstat.in_inval++;
 		goto bad;
 	}
@@ -696,8 +698,10 @@ noreplaycheck:
 	if (!algo->decrypt)
 		panic("internal error: no decrypt function");
 	if ((*algo->decrypt)(m, off, sav, algo, ivlen)) {
-		ipseclog((LOG_ERR, "decrypt fail in IPv6 ESP input: %s %s\n",
-		    ipsec6_logpacketstr(ip6, spi), ipsec_logsastr(sav)));
+		/* m is already freed */
+		m = NULL;
+		ipseclog((LOG_ERR, "decrypt fail in IPv6 ESP input: %s\n",
+		    ipsec_logsastr(sav)));
 		ipsec6stat.in_inval++;
 		goto bad;
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.26 2000/08/05 17:57:17 sumikawa Exp $	*/
+/*	$KAME: esp_output.c,v 1.27 2000/08/27 12:11:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -545,8 +545,8 @@ esp_output(m, nexthdrp, md, isr, af)
 	if (!algo->encrypt)
 		panic("internal error: no encrypt function");
 	if ((*algo->encrypt)(m, espoff, plen + extendsiz, sav, algo, ivlen)) {
+		/* m is already freed */
 		ipseclog((LOG_ERR, "packet encryption failure\n"));
-		m_freem(m);
 		switch (af) {
 #ifdef INET
 		case AF_INET:

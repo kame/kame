@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.20 2000/07/21 02:42:12 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.21 2000/08/27 12:11:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -122,7 +122,9 @@ static int esp_rc5cbc_schedule __P((const struct esp_algorithm *,
 	struct secasvar *));
 #endif
 static void esp_increment_iv __P((struct secasvar *));
+#if 0
 static caddr_t mbuf_find_offset __P((struct mbuf *, size_t, size_t));
+#endif
 
 const struct esp_algorithm *
 esp_algorithm_lookup(idx)
@@ -345,8 +347,10 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 	derived = 0;
 	/* sanity check */
 	error = esp_crypto_sanity(algo, sav, ivlen);
-	if (error)
+	if (error) {
+		m_freem(m);
 		return error;
+	}
 
 	if (sav->flags & SADB_X_EXT_OLD) {
 		/* RFC 1827 */
@@ -375,7 +379,7 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 	if (ivlen == 4) {
 		iv = &tiv[0];
 		m_copydata(m, ivoff, 4, &tiv[0]);
-		m_copydata(m, ivoff, 4, &tiv[4]);
+		bcopy(&tiv[0], &tiv[4], 4);
 		tiv[4] ^= 0xff;
 		tiv[5] ^= 0xff;
 		tiv[6] ^= 0xff;
@@ -386,6 +390,7 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 	} else {
 		ipseclog((LOG_ERR, "esp_descbc_decrypt: unsupported ivlen %d\n",
 		    ivlen));
+		m_freem(m);
 		return EINVAL;
 	}
 
@@ -398,6 +403,7 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 	if (plen % 8) {
 		ipseclog((LOG_ERR, "esp_descbc_decrypt: "
 		    "payload length must be multiple of 8\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 
@@ -407,6 +413,8 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 	/* for safety */
 	bzero(&tiv[0], sizeof(tiv));
 
+	if (error)
+		m_freem(m);
 	return error;
 }
 
@@ -432,11 +440,14 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	if (plen % 8) {
 		ipseclog((LOG_ERR, "esp_descbc_encrypt: "
 		    "payload length must be multiple of 8\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 	error = esp_crypto_sanity(algo, sav, ivlen);
-	if (error)
+	if (error) {
+		m_freem(m);
 		return error;
+	}
 
 	if (sav->flags & SADB_X_EXT_OLD) {
 		/* RFC 1827 */
@@ -467,33 +478,26 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	if (m->m_pkthdr.len < bodyoff)
 		panic("assumption failed: mbuf too short");
-	iv = mbuf_find_offset(m, ivoff, ivlen);
-	if (!iv)
-		panic("assumption failed: bad mbuf chain");
 	if (ivlen == 4) {
-		if (!derived) {
+		if (derived)
+			m_copydata(m, ivoff, ivlen, &tiv[0]);
+		else {
+			m_copyback(m, ivoff, ivlen, sav->iv);
 			bcopy(sav->iv, &tiv[0], 4);
-			bcopy(sav->iv, &tiv[4], 4);
-			tiv[4] ^= 0xff;
-			tiv[5] ^= 0xff;
-			tiv[6] ^= 0xff;
-			tiv[7] ^= 0xff;
-			bcopy(&tiv[0], iv, 4);
-			iv = &tiv[0];
-		} else {
-			bcopy(iv, &tiv[0], 4);
-			bcopy(iv, &tiv[4], 4);
-			tiv[4] ^= 0xff;
-			tiv[5] ^= 0xff;
-			tiv[6] ^= 0xff;
-			tiv[7] ^= 0xff;
-			iv = &tiv[0];
 		}
-	} else if (ivlen == 8)
-		bcopy((caddr_t)sav->iv, (caddr_t)iv, ivlen);
-	else {
+		bcopy(&tiv[0], &tiv[4], 4);
+		tiv[4] ^= 0xff;
+		tiv[5] ^= 0xff;
+		tiv[6] ^= 0xff;
+		tiv[7] ^= 0xff;
+		iv = &tiv[0];
+	} else if (ivlen == 8) {
+		m_copyback(m, ivoff, ivlen, sav->iv);
+		iv = sav->iv;
+	} else {
 		ipseclog((LOG_ERR,
 		    "esp_descbc_encrypt: unsupported ivlen %d\n", ivlen));
+		m_freem(m);
 		return EINVAL;
 	}
 
@@ -505,6 +509,8 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	/* for safety */
 	bzero(&tiv[0], sizeof(tiv));
 
+	if (error)
+		m_freem(m);
 	return error;
 }
 
@@ -600,16 +606,20 @@ esp_blowfish_cbc_decrypt(m, off, sav, algo, ivlen)
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
 		    "esp_blowfish_cbc_decrypt: unsupported ESP version\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 	if (ivlen != 8) {
 		ipseclog((LOG_ERR,
 		    "esp_blowfish_cbc_decrypt: unsupported ivlen %d\n", ivlen));
+		m_freem(m);
 		return EINVAL;
 	}
 	error = esp_crypto_sanity(algo, sav, ivlen);
-	if (error)
+	if (error) {
+		m_freem(m);
 		return error;
+	}
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
@@ -625,6 +635,7 @@ esp_blowfish_cbc_decrypt(m, off, sav, algo, ivlen)
 	if (plen % 8) {
 		ipseclog((LOG_ERR, "esp_blowfish_cbc_decrypt: "
 			"payload length must be multiple of 8\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 
@@ -634,6 +645,8 @@ esp_blowfish_cbc_decrypt(m, off, sav, algo, ivlen)
 	/* for safety */
 	bzero(&tiv[0], sizeof(tiv));
 
+	if (error)
+		m_freem(m);
 	return error;
 }
 
@@ -655,38 +668,41 @@ esp_blowfish_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	if (plen % 8) {
 		ipseclog((LOG_ERR, "esp_blowfish_cbc_encrypt: "
 		    "payload length must be multiple of 8\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
 		    "esp_blowfish_cbc_encrypt: unsupported ESP version\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 	if (ivlen != 8) {
 		ipseclog((LOG_ERR,
 		    "esp_blowfish_cbc_encrypt: unsupported ivlen %d\n", ivlen));
+		m_freem(m);
 		return EINVAL;
 	}
 	error = esp_crypto_sanity(algo, sav, ivlen);
-	if (error)
+	if (error) {
+		m_freem(m);
 		return error;
+	}
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
 
 	if (m->m_pkthdr.len < bodyoff)
 		panic("assumption failed: mbuf too short");
-	iv = mbuf_find_offset(m, ivoff, ivlen);
-	if (!iv)
-		panic("assumption failed: bad mbuf chain");
-
-	bcopy((caddr_t)sav->iv, (caddr_t)iv, ivlen);
+	m_copyback(m, ivoff, ivlen, (caddr_t)sav->iv);
 
 	error = BF_cbc_encrypt_m(m, bodyoff, plen, (BF_KEY *)sav->sched, iv,
 	    BF_ENCRYPT);
 
 	esp_increment_iv(sav);
 
+	if (error)
+		m_freem(m);
 	return error;
 }
 
@@ -738,21 +754,26 @@ esp_cast128cbc_decrypt(m, off, sav, algo, ivlen)
 		    "esp_cast128cbc_decrypt: unsupported key length %d: "
 		    "needs %d to %d bits\n", _KEYBITS(sav->key_enc),
 		    algo->keymin, algo->keymax));
+		m_freem(m);
 		return EINVAL;
 	}
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
 		    "esp_cast128cbc_decrypt: unsupported ESP version\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 	if (ivlen != 8) {
 		ipseclog((LOG_ERR,
 		    "esp_cast128cbc_decrypt: unsupported ivlen %d\n", ivlen));
+		m_freem(m);
 		return EINVAL;
 	}
 	error = esp_crypto_sanity(algo, sav, ivlen);
-	if (error)
+	if (error) {
+		m_freem(m);
 		return error;
+	}
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
@@ -770,6 +791,7 @@ esp_cast128cbc_decrypt(m, off, sav, algo, ivlen)
 	if (plen % 8) {
 		ipseclog((LOG_ERR, "esp_cast128cbc_decrypt: "
 		    "payload length must be multiple of 8\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 
@@ -777,6 +799,8 @@ esp_cast128cbc_decrypt(m, off, sav, algo, ivlen)
 	error = cast128_cbc_process(m, bodyoff, plen, (u_int32_t *)sav->sched,
 	    iv, _KEYLEN(sav->key_enc), CAST128_DECRYPT);
 
+	if (error)
+		m_freem(m);
 	return error;
 }
 
@@ -798,6 +822,7 @@ esp_cast128cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	if (plen % 8) {
 		ipseclog((LOG_ERR, "esp_cast128cbc_encrypt: "
 		    "payload length must be multiple of 8\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 	if (_KEYBITS(sav->key_enc) < algo->keymin ||
@@ -806,32 +831,33 @@ esp_cast128cbc_encrypt(m, off, plen, sav, algo, ivlen)
 		    "esp_cast128cbc_encrypt: unsupported key length %d: "
 		    "needs %d to %d bits\n", _KEYBITS(sav->key_enc),
 		    algo->keymin, algo->keymax));
+		m_freem(m);
 		return EINVAL;
 	}
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
 		    "esp_cast128cbc_encrypt: unsupported ESP version\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 	if (ivlen != 8) {
 		ipseclog((LOG_ERR,
 		    "esp_cast128cbc_encrypt: unsupported ivlen %d\n", ivlen));
+		m_freem(m);
 		return EINVAL;
 	}
 	error = esp_crypto_sanity(algo, sav, ivlen);
-	if (error)
+	if (error) {
+		m_freem(m);
 		return error;
+	}
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
 
 	if (m->m_pkthdr.len < bodyoff)
 		panic("assumption failed: mbuf too short");
-	iv = mbuf_find_offset(m, ivoff, ivlen);
-	if (!iv)
-		panic("assumption failed: bad mbuf chain");
-
-	bcopy(sav->iv, iv, ivlen);
+	m_copyback(m, ivoff, ivlen, sav->iv);
 
 	/* encrypt */
 	error = cast128_cbc_process(m, bodyoff, plen, (u_int32_t *)sav->sched,
@@ -839,6 +865,8 @@ esp_cast128cbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	esp_increment_iv(sav);
 
+	if (error)
+		m_freem(m);
 	return error;
 }
 
@@ -879,16 +907,20 @@ esp_3descbc_decrypt(m, off, sav, algo, ivlen)
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
 		    "esp_3descbc_decrypt: unsupported ESP version\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 	if (ivlen != 8) {
 		ipseclog((LOG_ERR,
 		    "esp_3descbc_decrypt: unsupported ivlen %d\n", ivlen));
+		m_freem(m);
 		return EINVAL;
 	}
 	error = esp_crypto_sanity(algo, sav, ivlen);
-	if (error)
+	if (error) {
+		m_freem(m);
 		return error;
+	}
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
@@ -905,6 +937,7 @@ esp_3descbc_decrypt(m, off, sav, algo, ivlen)
 	if (plen % 8) {
 		ipseclog((LOG_ERR, "esp_3descbc_decrypt: "
 		    "payload length must be multiple of 8\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 
@@ -936,32 +969,33 @@ esp_3descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	if (plen % 8) {
 		ipseclog((LOG_ERR, "esp_3descbc_encrypt: "
 		    "payload length must be multiple of 8\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
 		    "esp_3descbc_encrypt: unsupported ESP version\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 	if (ivlen != 8) {
 		ipseclog((LOG_ERR,
 		    "esp_3descbc_encrypt: unsupported ivlen %d\n", ivlen));
+		m_freem(m);
 		return EINVAL;
 	}
 	error = esp_crypto_sanity(algo, sav, ivlen);
-	if (error)
+	if (error) {
+		m_freem(m);
 		return error;
+	}
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
 
 	if (m->m_pkthdr.len < bodyoff)
 		panic("assumption failed: mbuf too short");
-	iv = mbuf_find_offset(m, ivoff, ivlen);
-	if (!iv)
-		panic("assumption failed: bad mbuf chain");
-
-	bcopy((caddr_t)sav->iv, (caddr_t)iv, ivlen);
+	m_copyback(m, ivoff, ivlen, sav->iv);
 
 	/* encrypt packet */
 	des_3cbc_process(m, bodyoff, plen, (des_key_schedule *)sav->sched,
@@ -1019,16 +1053,20 @@ esp_rc5cbc_decrypt(m, off, sav, algo, ivlen)
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
 		    "esp_rc5cbc_decrypt: unsupported ESP version\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 	if (ivlen != 8) {
 		ipseclog((LOG_ERR, "esp_rc5cbc_decrypt: unsupported ivlen %d\n",
 		    ivlen));
+		m_freem(m);
 		return EINVAL;
 	}
 	error = esp_crypto_sanity(algo, sav, ivlen);
-	if (error)
+	if (error) {
+		m_freem(m);
 		return error;
+	}
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
@@ -1046,6 +1084,7 @@ esp_rc5cbc_decrypt(m, off, sav, algo, ivlen)
 	if (plen % 8) {
 		ipseclog((LOG_ERR, "esp_rc5cbc_decrypt: "
 		    "payload length must be multiple of 8\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 
@@ -1053,6 +1092,8 @@ esp_rc5cbc_decrypt(m, off, sav, algo, ivlen)
 	error = rc5_cbc_process(m, bodyoff, plen, (RC5_WORD *)sav->sched, iv,
 	    RC5_DECRYPT);
 
+	if (error)
+		m_freem(m);
 	return error;
 }
 
@@ -1074,32 +1115,33 @@ esp_rc5cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	if (plen % 8) {
 		ipseclog((LOG_ERR, "esp_rc5cbc_encrypt: "
 		    "payload length must be multiple of 8\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
 		    "esp_rc5cbc_encrypt: unsupported ESP version\n"));
+		m_freem(m);
 		return EINVAL;
 	}
 	if (ivlen != 8) {
 		ipseclog((LOG_ERR, "esp_rc5cbc_encrypt: unsupported ivlen %d\n",
 		    ivlen));
+		m_freem(m);
 		return EINVAL;
 	}
 	error = esp_crypto_sanity(algo, sav, ivlen);
-	if (error)
+	if (error) {
+		m_freem(m);
 		return error;
+	}
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
 
 	if (m->m_pkthdr.len < bodyoff)
 		panic("assumption failed: mbuf too short");
-	iv = mbuf_find_offset(m, ivoff, ivlen);
-	if (!iv)
-		panic("assumption failed: bad mbuf chain");
-
-	bcopy(sav->iv, iv, ivlen);
+	m_copyback(m, ivoff, ivlen, sav->iv);
 
 	/* encrypt */
 	error = rc5_cbc_process(m, bodyoff, plen, (RC5_WORD *)sav->sched, iv,
@@ -1107,6 +1149,8 @@ esp_rc5cbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	esp_increment_iv(sav);
 
+	if (error)
+		m_freem(m);
 	return error;
 }
 
@@ -1146,6 +1190,7 @@ esp_increment_iv(sav)
 	}
 }
 
+#if 0
 static caddr_t
 mbuf_find_offset(m, off, len)
 	struct mbuf *m;
@@ -1171,6 +1216,7 @@ mbuf_find_offset(m, off, len)
 	}
 	return (caddr_t)NULL;
 }
+#endif
 
 /*------------------------------------------------------------*/
 
