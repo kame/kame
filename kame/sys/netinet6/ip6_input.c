@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.101 2000/07/29 01:01:56 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.102 2000/07/29 23:28:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -528,7 +528,7 @@ ip6_input(m)
 		}
 	}
 
-#ifndef FAKE_LOOPBACK_IF
+#ifdef OLD_LOOPBACK_IF
 	if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0)
 #else
 	if (1)

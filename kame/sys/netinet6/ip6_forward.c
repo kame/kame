@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.44 2000/07/27 13:43:21 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.45 2000/07/29 23:28:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -523,7 +523,7 @@ ip6_forward(m, srcrt)
 	}
 	else
 		origifp = rt->rt_ifp;
-#ifndef FAKE_LOOPBACK_IF
+#ifdef OLD_LOOPBACK_IF
 	if ((rt->rt_ifp->if_flags & IFF_LOOPBACK) == 0)
 #else
 	if (1)

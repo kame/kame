@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.31 2000/07/28 12:12:22 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.32 2000/07/29 23:28:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -737,7 +737,7 @@ in6_recoverscope(sin6, in6, ifp)
 			/* sanity check */
 			if (scopeid < 0 || if_index < scopeid)
 				return ENXIO;
-#ifndef FAKE_LOOPBACK_IF
+#ifdef OLD_LOOPBACK_IF
 			if (ifp && (ifp->if_flags & IFF_LOOPBACK) == 0 &&
 			    ifp->if_index != scopeid) {
 				return ENXIO;

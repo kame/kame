@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.45 2000/07/24 13:29:31 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.46 2000/07/29 23:28:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,9 +90,7 @@ static void pfxrtr_del __P((struct nd_pfxrouter *));
 static void nd6_detach_prefix __P((struct nd_prefix *));
 static void nd6_attach_prefix __P((struct nd_prefix *));
 /* static void defrouter_addifreq __P((struct ifnet *)); XXXYYY */
-#ifdef ND6_USE_RTSOCK
 static void defrouter_msg __P((int, struct rtentry *));
-#endif
 
 static void in6_init_address_ltimes __P((struct nd_prefix *ndpr,
 					 struct in6_addrlifetime *lt6,
@@ -450,7 +448,6 @@ freeit:
  * default router list proccessing sub routines
  */
 
-#ifdef ND6_USE_RTSOCK
 /* tell the change to user processes watching the routing socket. */
 static void
 defrouter_msg(cmd, rt)
@@ -470,7 +467,6 @@ defrouter_msg(cmd, rt)
 
 	rt_missmsg(cmd, &info, rt->rt_flags, 0);
 }
-#endif
 
 void
 defrouter_addreq(new)
@@ -498,9 +494,7 @@ defrouter_addreq(new)
 		(struct sockaddr *)&gate, (struct sockaddr *)&mask,
 		RTF_GATEWAY, &newrt);
 	if (newrt) {
-#ifdef ND6_USE_RTSOCK
 		defrouter_msg(RTM_ADD, newrt); /* tell user process */
-#endif
 		newrt->rt_refcnt--;
 	}
 	splx(s);
@@ -550,9 +544,7 @@ defrouter_addifreq(ifp)
 			newrt->rt_refcnt--;
 	} else {
 		if (newrt) {
-#ifdef ND6_USE_RTSOCK
 			defrouter_msg(RTM_ADD, newrt);
-#endif
 			newrt->rt_refcnt--;
 		}
 	}
@@ -596,9 +588,7 @@ defrouter_delreq(dr, dofree)
 		  (struct sockaddr *)&mask,
 		  RTF_GATEWAY, &oldrt);
 	if (oldrt) {
-#ifdef ND6_USE_RTSOCK
 		defrouter_msg(RTM_DELETE, oldrt);
-#endif
 		if (oldrt->rt_refcnt <= 0)
 			oldrt->rt_refcnt++; /* XXX */
 		rtfree(oldrt);

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.117 2000/07/24 00:16:18 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.118 2000/07/29 23:28:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -900,7 +900,7 @@ skip_ipsec2:;
 	}
 	else
 		origifp = ifp;
-#ifndef FAKE_LOOPBACK_IF
+#ifdef OLD_LOOPBACK_IF
 	if ((ifp->if_flags & IFF_LOOPBACK) == 0)
 #else
 	if (1)
@@ -3357,7 +3357,7 @@ ip6_mloopback(ifp, m, dst)
 	}
 #endif
 
-#ifndef FAKE_LOOPBACK_IF
+#ifdef OLD_LOOPBACK_IF
 	if ((ifp->if_flags & IFF_LOOPBACK) == 0)
 #else
 	if (1)

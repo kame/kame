@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.126 2000/07/28 12:12:22 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.127 2000/07/29 23:28:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1291,7 +1291,7 @@ ni6_input(m, off)
 			    subjlen, (caddr_t)&sin6.sin6_addr);
 			/* XXX kame scope hack */
 			if (IN6_IS_SCOPE_LINKLOCAL(&sin6.sin6_addr)) {
-#ifdef FAKE_LOOPBACK_IF
+#ifndef OLD_LOOPBACK_IF
 				if ((m->m_flags & M_PKTHDR) != 0 &&
 				    m->m_pkthdr.rcvif) {
 					sin6.sin6_addr.s6_addr16[1] =
