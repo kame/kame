@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.48 2001/11/28 03:38:41 itojun Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.49 2001/12/12 05:37:45 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -1774,6 +1774,8 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 		    /* (*,G) JOIN_REQUEST (toward the RP) */
 		    mrtentry_ptr = find_route(&sockaddr6_any , &group, MRTF_WC,
 					      DONT_CREATE);
+		    if (mrtentry_ptr == NULL)
+			continue; 
 		    my_action = join_or_prune(mrtentry_ptr, upstream_router);
 		    if (my_action != PIM_ACTION_JOIN)
 			continue;
@@ -1799,6 +1801,8 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 		/* (S,G) Join suppresion */
 		mrtentry_ptr = find_route(&source, &group, MRTF_SG,
 					  DONT_CREATE);
+		if (mrtentry_ptr == NULL)
+		    continue; 
 		my_action = join_or_prune(mrtentry_ptr, upstream_router);
 		if (my_action != PIM_ACTION_JOIN)
 		    continue;
@@ -1843,6 +1847,8 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 					 * Ignore */
 		    mrtentry_ptr = find_route(&sockaddr6_any, &group, MRTF_WC,
 					      DONT_CREATE);
+		    if (mrtentry_ptr == NULL)
+		    	continue;
 		    my_action = join_or_prune(mrtentry_ptr, upstream_router);
 		    if (my_action == PIM_ACTION_PRUNE)
 		    {
@@ -1893,6 +1899,8 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 		/* (S,G) prune suppression */
 		mrtentry_ptr = find_route(&source, &group, MRTF_SG,
 					  DONT_CREATE);
+		if (mrtentry_ptr == NULL)
+		    continue;
 		my_action = join_or_prune(mrtentry_ptr, upstream_router);
 		if (my_action == PIM_ACTION_PRUNE)
 		{

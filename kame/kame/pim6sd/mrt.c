@@ -1,4 +1,4 @@
-/*	$KAME: mrt.c,v 1.9 2001/08/09 08:46:57 suz Exp $	*/
+/*	$KAME: mrt.c,v 1.10 2001/12/12 05:37:45 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -448,9 +448,11 @@ not_create:
     {
 	/* Get/return the (*,*,RP) routing entry */
 
-	if (group != NULL)
+	if (group != NULL) {
 	    rpentry_ptr = rp_match(group);
-	else
+	    if (rpentry_ptr == NULL)
+		return (mrtentry_t *) NULL;
+	} else
 	    if (source != NULL)
 	    {
 		rpentry_ptr = rp_find(source);
