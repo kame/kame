@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.97 2001/01/26 10:14:12 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.98 2001/01/31 05:32:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,6 +82,7 @@
 #include "proposal.h"
 #include "admin.h"
 #include "strnames.h"
+#include "backupsa.h"
 
 /* prototype */
 static u_int ipsecdoi2pfkey_aalg __P((u_int));
@@ -1003,6 +1004,32 @@ pk_sendupdate(iph2)
 				ipsec_strerror());
 			return -1;
 		}
+
+		if (!lcconf->pathinfo[LC_PATHTYPE_BACKUPSA])
+			continue;
+
+		/*
+		 * It maybe good idea to call backupsa_to_file() after
+		 * racoon will receive the sadb_update messages.
+		 * But it is impossible because there is not key in the
+		 * information from the kernel.
+		 */
+		if (backupsa_to_file(satype, mode, iph2->dst, iph2->src,
+				pr->spi, pr->reqid_in, 4,
+				pr->keymat_p->v,
+				e_type, e_keylen, a_type, a_keylen, flags,
+				0, iph2->approval->lifebyte * 1024,
+				iph2->approval->lifetime, 0,
+				iph2->seq) < 0) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"backuped SA failed: %s\n",
+				sadbsecas2str(iph2->dst, iph2->src,
+				satype, pr->spi, mode));
+		}
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"backuped SA: %s\n",
+			sadbsecas2str(iph2->dst, iph2->src,
+			satype, pr->spi, mode));
 	}
 
 	return 0;
@@ -1192,6 +1219,32 @@ pk_sendadd(iph2)
 				ipsec_strerror());
 			return -1;
 		}
+
+		if (!lcconf->pathinfo[LC_PATHTYPE_BACKUPSA])
+			continue;
+
+		/*
+		 * It maybe good idea to call backupsa_to_file() after
+		 * racoon will receive the sadb_update messages.
+		 * But it is impossible because there is not key in the
+		 * information from the kernel.
+		 */
+		if (backupsa_to_file(satype, mode, iph2->src, iph2->dst,
+				pr->spi_p, pr->reqid_out, 4,
+				pr->keymat_p->v,
+				e_type, e_keylen, a_type, a_keylen, flags,
+				0, iph2->approval->lifebyte * 1024,
+				iph2->approval->lifetime, 0,
+				iph2->seq) < 0) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"backuped SA failed: %s\n",
+				sadbsecas2str(iph2->src, iph2->dst,
+				satype, pr->spi_p, mode));
+		}
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"backuped SA: %s\n",
+			sadbsecas2str(iph2->src, iph2->dst,
+			satype, pr->spi_p, mode));
 	}
 
 	return 0;

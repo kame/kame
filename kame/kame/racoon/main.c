@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.24 2001/01/10 02:58:58 sakane Exp $	*/
+/*	$KAME: main.c,v 1.25 2001/01/31 05:32:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -60,10 +60,12 @@
 #include "pfkey.h"
 #include "crypto_openssl.h"
 #include "random.h"
+#include "backupsa.h"
 
 int f_foreground = 0;	/* force running in foreground. */
 int f_local = 0;	/* local test mode.  behave like a wall. */
 int vflag = 1;		/* for print-isakmp.c */
+static int loading_sa = 0;	/* install sa when racoon boots up. */
 
 static char version[] = "@(#)racoon 20001216 sakane@ydc.co.jp";
 
@@ -89,6 +91,7 @@ Usage()
 #else
 		""
 #endif
+		"[-B]"
 		);
 	printf("   -d: debug level, more -d will generate more debug message.\n");
 	printf("   -F: run in foreground, do not become daemon.\n");
@@ -103,6 +106,8 @@ Usage()
 	printf("   -6: IPv6 mode.\n");
 	printf("   -4: IPv4 mode.\n");
 #endif
+	printf("   -B: install SA to the kernel from the file "
+		"specified by the configuration file.\n");
 	exit(1);
 }
 
@@ -144,6 +149,15 @@ main(ac, av)
 		exit(1);
 	}
 	restore_params();
+
+	/*
+	 * install SAs from the specified file.  If the file is not specified
+	 * by the configuration file, racoon will exit.
+	 */
+	if (loading_sa && !f_local) {
+		if (backupsa_from_file() != 0)
+			exit(1);
+	}
 
 	if (f_foreground)
 		close(0);
@@ -201,7 +215,7 @@ parse(ac, av)
 	else
 		pname = *av;
 
-	while ((c = getopt(ac, av, "dFp:a:f:l:vZ"
+	while ((c = getopt(ac, av, "dFp:a:f:l:vZB"
 #ifdef YYDEBUG
 			"y"
 #endif
@@ -262,6 +276,9 @@ parse(ac, av)
 			lcconf->default_af = AF_INET6;
 			break;
 #endif
+		case 'B':
+			loading_sa++;
+			break;
 		default:
 			Usage();
 			break;

@@ -1,4 +1,4 @@
-/*	$KAME: localconf.h,v 1.22 2001/01/10 02:08:33 sakane Exp $	*/
+/*	$KAME: localconf.h,v 1.23 2001/01/31 05:32:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -38,7 +38,8 @@
 #define LC_PATHTYPE_INCLUDE	0
 #define LC_PATHTYPE_PSK		1
 #define LC_PATHTYPE_CERT	2
-#define LC_PATHTYPE_MAX		3
+#define LC_PATHTYPE_BACKUPSA	3
+#define LC_PATHTYPE_MAX		4
 
 #define LC_DEFAULT_PAD_MAXSIZE		20
 #define LC_DEFAULT_PAD_RANDOM		TRUE

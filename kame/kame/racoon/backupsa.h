@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.h,v 1.8 2001/01/31 05:32:55 sakane Exp $	*/
+/*	$KAME: backupsa.h,v 1.1 2001/01/31 05:32:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,32 +29,9 @@
  * SUCH DAMAGE.
  */
 
-#define DEFAULT_CF_FILE	SYSCONFDIR "/racoon.conf"
+extern int backupsa_to_file __P((u_int, u_int,
+	struct sockaddr *, struct sockaddr *, u_int32_t, u_int32_t, u_int,
+	caddr_t, u_int, u_int, u_int, u_int, u_int,
+	u_int32_t, u_int64_t, u_int64_t, u_int64_t, u_int32_t));
+extern int backupsa_from_file __P((void));
 
-#define CF_PATHTYPE_INCLUDE	0
-#define CF_PATHTYPE_PSK		1
-#define CF_PATHTYPE_CERT	2
-#define CF_PATHTYPE_BACKUPSA	3
-#define CF_PATHTYPE_MAX		4
-
-#define CF_PLADDR_ASSOCIATION	0
-#define CF_PLADDR_NEGOTIATION	1
-
-#define CF_SIDE_LOCAL		0
-#define CF_SIDE_REMOTE		1
-
-#define CF_LIFETYPE_TIME	0
-#define CF_LIFETYPE_BYTE	1
-
-#define CF_UNITTYPE_B	1
-#define CF_UNITTYPE_KB	1024
-#define CF_UNITTYPE_MB	(1024*1024)
-#define CF_UNITTYPE_TB	(1024*1024*1024)
-#define CF_UNITTYPE_S	1
-#define CF_UNITTYPE_M	60
-#define CF_UNITTYPE_H	(60*60)
-
-/* cfparse.y */
-extern int yyparse __P((void));
-extern int cfparse __P((void));
-extern int cfreparse __P((void));
