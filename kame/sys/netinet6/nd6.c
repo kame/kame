@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.240 2002/04/12 16:08:22 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.241 2002/04/22 08:27:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2282,23 +2282,27 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	 * There is a neighbor cache entry, but no ethernet address
 	 * response yet.  Replace the held mbuf (if any) with this
 	 * latest one.
-	 * This code conforms to the rate-limiting rule described in Section
-	 * 7.2.2 of RFC 2461, because the timer is set correctly after sending
-	 * an NS below.
 	 */
 	if (ln->ln_state == ND6_LLINFO_NOSTATE)
 		ln->ln_state = ND6_LLINFO_INCOMPLETE;
 	if (ln->ln_hold)
 		m_freem(ln->ln_hold);
 	ln->ln_hold = m;
-	if (ln->ln_expire) {
-		if (ln->ln_asked < nd6_mmaxtries &&
-		    ln->ln_expire < time_second) {
-			ln->ln_asked++;
-			ln->ln_expire = time_second +
-				nd_ifinfo[ifp->if_index].retrans / 1000;
-			nd6_ns_output(ifp, NULL, dst, ln, 0);
-		}
+	/*
+	 * If there has been no NS for the neighbor after entering the
+	 * INCOMPLETE state, send the first solicitation.
+	 * Technically this can be against the rate-limiting rule described in
+	 * Section 7.2.2 of RFC 2461 because the interval to the next scheduled
+	 * solicitation issued in nd6_timer() may be less than the specified
+	 * retransmission time.  This should not be a problem from a practical
+	 * point of view, because we'll typically see an immediate response
+	 * from the neighbor, which suppresses the succeeding solicitations. 
+	 */
+	if (ln->ln_expire && ln->ln_asked == 0) {
+		ln->ln_asked++;
+		ln->ln_expire = time_second +
+			nd_ifinfo[ifp->if_index].retrans / 1000;
+		nd6_ns_output(ifp, NULL, dst, ln, 0);
 	}
 	return(0);
 	
