@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.28 2004/05/31 12:38:08 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.29 2004/05/31 12:42:04 suz Exp $
  */
 
 /*
@@ -490,6 +490,12 @@ accept_multicast_record(vifi, mard, src, grp)
 	cbk_t *cbk;
 
 	switch (mard->record_type) {
+	case CHANGE_TO_INCLUDE_MODE:
+	    if (numsrc == 0) {
+		recv_listener_done(vifi, src, grp, MLDv2);
+	        break;
+	    }
+	    /* FALLTHOUGH */
 	case MODE_IS_INCLUDE:
 	case ALLOW_NEW_SOURCES:
 	    for (j = 0; j < numsrc; j++) {
@@ -654,14 +660,6 @@ accept_multicast_record(vifi, mard, src, grp)
 	case MODE_IS_EXCLUDE:
 	    /* just regard as (*,G) */
 	    recv_listener_report(vifi, src, grp);
-	    break;
-
-	case CHANGE_TO_INCLUDE_MODE:
-	    if (numsrc == 0) {
-		recv_listener_done(vifi, src, grp, MLDv2);
-	    } else {
-		recv_listener_report(vifi, src, grp);
-	    }
 	    break;
 
 	case CHANGE_TO_EXCLUDE_MODE:
