@@ -448,6 +448,9 @@ if_attach(struct ifnet *ifp)
 	ifp->if_snd.altq_ifp  = ifp;
 #endif
 
+	if (domains)
+		if_attachdomain1(ifp);
+
 	/* Announce the interface. */
 	rt_ifannouncemsg(ifp, IFAN_ARRIVAL);
 }
@@ -672,7 +675,6 @@ if_clone_create(char *name, int len)
 	int wildcard, bytoff, bitoff;
 	int unit;
 	int err;
-	int s;
 
 	ifc = if_clone_lookup(name, &unit);
 	if (ifc == NULL)
@@ -730,10 +732,6 @@ if_clone_create(char *name, int len)
 		}
 
 	}
-
-	s = splimp();
-	if_attachdomain1(ifunit(name));
-	splx(s);
 
 	return (0);
 }

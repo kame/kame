@@ -461,6 +461,9 @@ if_attach(ifp)
 		    ifp->if_xname);
 #endif
 
+	if (domains)
+		if_attachdomain1(ifp);
+
 	/* Announce the interface. */
 	rt_ifannouncemsg(ifp, IFAN_ARRIVAL);
 }
@@ -751,8 +754,6 @@ if_clone_create(name)
 {
 	struct if_clone *ifc;
 	int unit;
-	int error;
-	int s;
 
 	ifc = if_clone_lookup(name, &unit);
 	if (ifc == NULL)
@@ -761,15 +762,7 @@ if_clone_create(name)
 	if (ifunit(name) != NULL)
 		return (EEXIST);
 
-	error = (*ifc->ifc_create)(ifc, unit);
-	if (error)
-		return (error);
-
-	s = splnet();
-	if_attachdomain1(ifunit(name));
-	splx(s);
-
-	return (error);
+	return ((*ifc->ifc_create)(ifc, unit));
 }
 
 /*
