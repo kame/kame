@@ -6,7 +6,7 @@
 #
 
 PORTNAME=	mozilla
-PORTVERSION= 	M17
+PORTVERSION= 	M18
 CATEGORIES=	www ipv6
 MASTER_SITES=	ftp://ftp.mozilla.org/pub/mozilla/releases/${PORTVERSION:S/M/m/}/src/
 DISTNAME=	${PORTNAME}-source-${PORTVERSION}
