@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1085 2000/07/03 12:19:31 jinmei Exp $
+$Id: CHANGELOG,v 1.1086 2000/07/03 23:46:00 itojun Exp $
 
 <200006>
+Tue Jul  4 08:44:11 JST 2000  itojun@iijlab.net
+	* netbsd/usr.sbin/inetd: remove duplicated ipsec initialization code
+	  (used on SIGHUP).
+
 2000-07-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/bgpd/bgp.c (connect_try): made sure to zero-clear a
 	newly allocated buffer.
