@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.152 2000/08/26 01:49:49 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.153 2000/08/28 16:54:51 itojun Exp $
 
 1. IPv6
 
@@ -1551,13 +1551,15 @@ Here are some points to be noted:
 The IPsec code in the kernel conforms (or, tries to conform) to the
 following standards:
     "old IPsec" specification documented in rfc182[5-9].txt
-    "new IPsec" specification documented in rfc240[1-6].txt, rfc241[01].txt,
-	rfc2451.txt and draft-mcdonald-simple-ipsec-api-01.txt (draft expired,
-	but you can take from ftp://ftp.kame.net/pub/internet-drafts/).
-	(NOTE: IKE specifications, rfc240[7-9].txt are implemented in userland,
-	as "racoon" IKE daemon)
+    "new IPsec" specification documented in:
+	rfc240[1-6].txt rfc241[01].txt rfc2451.txt
+	draft-mcdonald-simple-ipsec-api-01.txt
+		(expired, available in ftp://ftp.kame.net/pub/internet-drafts/)
+	draft-ietf-ipsec-ciph-aes-cbc-00.txt
     IPComp:
 	RFC2393: IP Payload Compression Protocol (IPComp)
+IKE specifications (rfc240[7-9].txt) are implemented in userland
+as "racoon" IKE daemon.
 
 Currently supported algorithms are:
     old IPsec AH
@@ -1586,6 +1588,8 @@ Currently supported algorithms are:
 	each of the above can be combined with:
 	    ESP authentication with HMAC-MD5(96bit)
 	    ESP authentication with HMAC-SHA1(96bit)
+	RIJNDAEL CBC (draft-ietf-ipsec-ciph-aes-cbc-00.txt)
+	TWOFISH CBC (draft-ietf-ipsec-ciph-aes-cbc-00.txt)
     IPComp
 	RFC2394: IP Payload Compression Using DEFLATE
 
