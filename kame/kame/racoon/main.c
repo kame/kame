@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.28 2001/02/06 15:03:16 sakane Exp $	*/
+/*	$KAME: main.c,v 1.29 2001/02/06 15:15:46 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -279,6 +279,9 @@ parse(ac, av)
 		case 'Z':
 			/*
 			 * only local test.
+			 * To specify -Z option and to choice a appropriate
+			 * port number for ISAKMP, you can launch some racoons
+			 * on the local host for debug.
 			 * pk_sendadd() on initiator side is always failed
 			 * even if this flag is used.  Because there is same
 			 * spi in the SAD which is inserted by pk_sendgetspi()
