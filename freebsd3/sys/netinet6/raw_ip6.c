@@ -305,7 +305,7 @@ rip6_output(m, va_alist)
 
 		/*
 		 * XXX Boundary check is assumed to be already done in
-		 * in6_setpktoptions().
+		 * ip6_setpktoptions().
 		 */
 		if (optp && (pi = optp->ip6po_pktinfo) && pi->ipi6_ifindex) {
 			ip6->ip6_dst.s6_addr16[1] = htons(pi->ipi6_ifindex);
@@ -314,9 +314,8 @@ rip6_output(m, va_alist)
 		else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) &&
 			 in6p->in6p_moptions &&
 			 in6p->in6p_moptions->im6o_multicast_ifp) {
-			ip6->ip6_dst.s6_addr16[1] =
-				htons(in6p->in6p_moptions->im6o_multicast_ifp->if_index);
-			oifp = ifindex2ifnet[in6p->in6p_moptions->im6o_multicast_ifp->if_index];
+			oifp = in6p->in6p_moptions->im6o_multicast_ifp;
+			ip6->ip6_dst.s6_addr16[1] = htons(oifp->if_index);
 		} else if (dstsock->sin6_scope_id) {
 			/* boundary check */
 			if (dstsock->sin6_scope_id < 0 
