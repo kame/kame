@@ -485,7 +485,7 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
 	    if (ifindex != -1 || src) {
 		    struct in6_pktinfo *pktinfo;
 
-		    cmsgp->cmsg_len = CMSG_SPACE(sizeof(struct in6_pktinfo));
+		    cmsgp->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
 		    cmsgp->cmsg_level = IPPROTO_IPV6;
 		    cmsgp->cmsg_type = IPV6_PKTINFO;
 		    pktinfo = (struct in6_pktinfo *)CMSG_DATA(cmsgp);
@@ -501,7 +501,7 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
 		    int currentlen;
 		    void *hbhbuf, *optp = NULL;
 
-		    cmsgp->cmsg_len = CMSG_SPACE(hbhlen);
+		    cmsgp->cmsg_len = CMSG_LEN(hbhlen);
 		    cmsgp->cmsg_level = IPPROTO_IPV6;
 		    cmsgp->cmsg_type = IPV6_HOPOPTS;
 		    hbhbuf = CMSG_DATA(cmsgp);

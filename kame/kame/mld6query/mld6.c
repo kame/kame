@@ -206,7 +206,7 @@ make_msg(int index, struct in6_addr *addr, u_int type)
 	m.msg_control = (caddr_t)cmsgbuf;
 	m.msg_controllen = cmsglen;
 	/* specify the outgoing interface */
-	cmsgp->cmsg_len = CMSG_SPACE(sizeof(struct in6_pktinfo));
+	cmsgp->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
 	cmsgp->cmsg_level = IPPROTO_IPV6;
 	cmsgp->cmsg_type = IPV6_PKTINFO;
 	pi = (struct in6_pktinfo *)CMSG_DATA(cmsgp);
@@ -215,7 +215,7 @@ make_msg(int index, struct in6_addr *addr, u_int type)
 	/* specifiy to insert router alert option in a hop-by-hop opt hdr. */
 	cmsgp = CMSG_NXTHDR(&m, cmsgp);
 #ifdef USE_RFC2292BIS
-	cmsgp->cmsg_len = CMSG_SPACE(hbhlen);
+	cmsgp->cmsg_len = CMSG_LEN(hbhlen);
 	cmsgp->cmsg_level = IPPROTO_IPV6;
 	cmsgp->cmsg_type = IPV6_HOPOPTS;
 	hbhbuf = CMSG_DATA(cmsgp);

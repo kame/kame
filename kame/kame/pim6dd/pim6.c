@@ -62,7 +62,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: pim6.c,v 1.6 2000/03/07 02:23:50 jinmei Exp $
+ *  $Id: pim6.c,v 1.7 2000/12/04 04:23:00 jinmei Exp $
  */
 
 #include "defs.h"
@@ -130,7 +130,7 @@ init_pim6()
 	sndmh.msg_controllen = sndcmsglen;
 	/* initilization cmsg for specifing outgoing interfaces and source */
 	cmsgp=(struct cmsghdr *)sndcmsgbuf;
-	cmsgp->cmsg_len = CMSG_SPACE(sizeof(struct in6_pktinfo));
+	cmsgp->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
 	cmsgp->cmsg_level = IPPROTO_IPV6;
 	cmsgp->cmsg_type = IPV6_PKTINFO;
 	sndpktinfo = (struct in6_pktinfo *)CMSG_DATA(cmsgp);
