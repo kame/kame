@@ -105,9 +105,6 @@ pflogattach(int npflog)
 		bpfattach(&pflogif[i].sc_if.if_bpf, ifp, DLT_PFLOG,
 			  PFLOG_HDRLEN);
 #endif
-#ifdef INET6
-		nd6_ifattach(ifp);
-#endif
 	}
 }
 

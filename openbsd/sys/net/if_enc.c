@@ -115,9 +115,6 @@ encattach(int nenc)
 #if NBPFILTER > 0
 	bpfattach(&encif[i].sc_if.if_bpf, ifp, DLT_ENC, ENC_HDRLEN);
 #endif
-#ifdef INET6
-	nd6_ifattach(ifp);
-#endif
     }
 }
 
