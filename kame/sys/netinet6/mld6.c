@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.97 2004/03/12 12:07:21 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.98 2004/03/13 04:45:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
