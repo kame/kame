@@ -81,16 +81,18 @@ static const char rcsid[] =
 #define	TIMEOUT		5
 
 int	peer;
+u_short	peerport;
 int	rexmtval = TIMEOUT;
 int	maxtimeout = 5*TIMEOUT;
 
 #define	PKTSIZE	SEGSIZE+4
 char	buf[PKTSIZE];
 char	ackbuf[PKTSIZE];
-struct sockaddr_storage from;
+struct sockaddr_storage ss_from, ss_to;
 int	fromlen;
 
 void	tftp __P((struct tftphdr *, int));
+static u_short getport __P((struct sockaddr *));
 
 /*
  * Null-terminated directory prefix list for absolute pathname requests and
@@ -161,9 +163,9 @@ main(argc, argv)
 		syslog(LOG_ERR, "ioctl(FIONBIO): %m");
 		exit(1);
 	}
-	fromlen = sizeof (from);
+	fromlen = sizeof (ss_from);
 	n = recvfrom(0, buf, sizeof (buf), 0,
-	    (struct sockaddr *)&from, &fromlen);
+	    (struct sockaddr *)&ss_from, &fromlen);
 	if (n < 0) {
 		syslog(LOG_ERR, "recvfrom: %m");
 		exit(1);
@@ -200,9 +202,9 @@ main(argc, argv)
 				 * than one tftpd being started up to service
 				 * a single request from a single client.
 				 */
-				j = sizeof from;
+				j = sizeof ss_from;
 				i = recvfrom(0, buf, sizeof (buf), 0,
-				    (struct sockaddr *)&from, &j);
+				    (struct sockaddr *)&ss_from, &j);
 				if (i > 0) {
 					n = i;
 					fromlen = j;
@@ -241,22 +243,30 @@ main(argc, argv)
 	alarm(0);
 	close(0);
 	close(1);
-	peer = socket(from.ss_family, SOCK_DGRAM, 0);
+	peer = socket(ss_from.ss_family, SOCK_DGRAM, 0);
 	if (peer < 0) {
 		syslog(LOG_ERR, "socket: %m");
 		exit(1);
 	}
 	memset(&ss, 0, sizeof(ss));
-	ss.ss_family = from.ss_family;
-	ss.ss_len = from.ss_len;
+	ss.ss_family = ss_from.ss_family;
+	ss.ss_len = ss_from.ss_len;
 	if (bind(peer, (struct sockaddr *)&ss, ss.ss_len) < 0) {
 		syslog(LOG_ERR, "bind: %m");
 		exit(1);
 	}
-	if (connect(peer, (struct sockaddr *)&from, from.ss_len) < 0) {
+	memset(&ss_to, 0, sizeof(ss_to));
+	ss_to = ss_from;	/* XXX: flowinfo? */
+	peerport = getport((struct sockaddr *)&ss_from);
+#if 0
+	/*
+	 * XXX: connect(2) would unintentionally bind local address.
+	 */
+	if (connect(peer, (struct sockaddr *)&ss_from, ss_from.ss_len) < 0) {
 		syslog(LOG_ERR, "connect: %m");
 		exit(1);
 	}
+#endif
 	tp = (struct tftphdr *)buf;
 	tp->th_opcode = ntohs(tp->th_opcode);
 	if (tp->th_opcode == RRQ || tp->th_opcode == WRQ)
@@ -328,14 +338,14 @@ again:
 		int err, result = HOSTNAME_INVALIDADDR;
 		char host[MAXHOSTNAMELEN];
 
-		err = getnameinfo((struct sockaddr *)&from, from.ss_len,
+		err = getnameinfo((struct sockaddr *)&ss_from, ss_from.ss_len,
 				  host, sizeof(host), NULL, 0, 0);
 		if (err == NULL) {
 			struct addrinfo hints, *res, *ores;
 			struct sockaddr *sa;
 	
 			bzero(&hints, sizeof(struct addrinfo));
-			hints.ai_family = from.ss_family;
+			hints.ai_family = ss_from.ss_family;
 			hints.ai_socktype = SOCK_DGRAM;
 			hints.ai_protocol = IPPROTO_UDP;
 	
@@ -355,8 +365,8 @@ again:
 					result = HOSTNAME_INCORRECTNAME;
 					goto numeric;
 				}
-				if (sa->sa_len ==from.ss_len &&
-				    !bcmp(sa, &from, sa->sa_len)) {
+				if (sa->sa_len ==ss_from.ss_len &&
+				    !bcmp(sa, &ss_from, sa->sa_len)) {
 					result = HOSTNAME_FOUND;
 					break;	/* OK! */
 				}
@@ -364,8 +374,8 @@ again:
 			freeaddrinfo(ores);
 		} else {
 	    numeric:
-			err = getnameinfo((struct sockaddr *)&from,
-					  from.ss_len, host, sizeof(host),
+			err = getnameinfo((struct sockaddr *)&ss_from,
+					  ss_from.ss_len, host, sizeof(host),
 					  NULL, 0, NI_NUMERICHOST);
 			/* XXX: do 'err' check */
 		}
@@ -533,18 +543,26 @@ xmitfile(pf)
 		(void)setjmp(timeoutbuf);
 
 send_data:
-		if (send(peer, dp, size + 4, 0) != size + 4) {
+		if (sendto(peer, dp, size + 4, 0, (struct sockaddr *)&ss_to,
+			   ss_to.ss_len) != size + 4) {
 			syslog(LOG_ERR, "write: %m");
 			goto abort;
 		}
 		read_ahead(file, pf->f_convert);
 		for ( ; ; ) {
 			alarm(rexmtval);        /* read the ack */
-			n = recv(peer, ackbuf, sizeof (ackbuf), 0);
+			fromlen = sizeof(ss_from);
+			n = recvfrom(peer, ackbuf, sizeof (ackbuf), 0,
+				     (struct sockaddr *)&ss_from, &fromlen);
 			alarm(0);
 			if (n < 0) {
 				syslog(LOG_ERR, "read: %m");
 				goto abort;
+			}
+			/* check consistency of the peer port */
+			if (getport((struct sockaddr *)&ss_from) != peerport) {
+				syslog(LOG_INFO, "client port mismatch");
+				continue;
 			}
 			ap->th_opcode = ntohs((u_short)ap->th_opcode);
 			ap->th_block = ntohs((u_short)ap->th_block);
@@ -598,18 +616,26 @@ recvfile(pf)
 		block++;
 		(void) setjmp(timeoutbuf);
 send_ack:
-		if (send(peer, ackbuf, 4, 0) != 4) {
+		if (sendto(peer, ackbuf, 4, 0, (struct sockaddr *)&ss_to,
+			   ss_to.ss_len) != 4) {
 			syslog(LOG_ERR, "write: %m");
 			goto abort;
 		}
 		write_behind(file, pf->f_convert);
 		for ( ; ; ) {
 			alarm(rexmtval);
-			n = recv(peer, dp, PKTSIZE, 0);
+			fromlen = sizeof(ss_from);
+			n = recvfrom(peer, dp, PKTSIZE, 0,
+				     (struct sockaddr *)&ss_from, &fromlen);
 			alarm(0);
 			if (n < 0) {            /* really? */
 				syslog(LOG_ERR, "read: %m");
 				goto abort;
+			}
+			/* check consistency of the peer port */
+			if (getport((struct sockaddr *)&ss_from) != peerport) {
+				syslog(LOG_INFO, "client port mismatch");
+				continue;
 			}
 			dp->th_opcode = ntohs((u_short)dp->th_opcode);
 			dp->th_block = ntohs((u_short)dp->th_block);
@@ -638,16 +664,30 @@ send_ack:
 
 	ap->th_opcode = htons((u_short)ACK);    /* send the "final" ack */
 	ap->th_block = htons((u_short)(block));
-	(void) send(peer, ackbuf, 4, 0);
+	(void) sendto(peer, ackbuf, 4, 0, (struct sockaddr *)&ss_to,
+		      ss_to.ss_len);
 
 	signal(SIGALRM, justquit);      /* just quit on timeout */
 	alarm(rexmtval);
-	n = recv(peer, buf, sizeof (buf), 0); /* normally times out and quits */
+	fromlen = sizeof(ss_from);
+	while(1) {
+		n = recvfrom(peer, buf, sizeof (buf), 0,
+			     (struct sockaddr *)&ss_from,
+			     &fromlen); /* normally times out and quits */
+		/* check consistency of the peer port */
+		if (n >= 0 &&
+		    getport((struct sockaddr *)&ss_from) != peerport) {
+			syslog(LOG_INFO, "client port mismatch");
+			continue;
+		}
+		break;
+	}
 	alarm(0);
 	if (n >= 4 &&                   /* if read some data */
 	    dp->th_opcode == DATA &&    /* and got a data block */
 	    block == dp->th_block) {	/* then my last ack was lost */
-		(void) send(peer, ackbuf, 4, 0);     /* resend final ack */
+		(void) sendto(peer, ackbuf, 4, 0, (struct sockaddr *)&ss_to,
+			      ss_to.ss_len); /* resend final ack */
 	}
 abort:
 	return;
@@ -711,6 +751,37 @@ nak(error)
 	length = strlen(pe->e_msg);
 	tp->th_msg[length] = '\0';
 	length += 5;
-	if (send(peer, buf, length, 0) != length)
+	if (sendto(peer, buf, length, 0, (struct sockaddr *)&ss_to,
+		   ss_to.ss_len) != length)
 		syslog(LOG_ERR, "nak: %m");
+}
+
+static u_short
+getport(sa)
+	struct sockaddr *sa;
+{
+	char hostbuf[NI_MAXHOST];
+	char servbuf[NI_MAXSERV];
+	int flags = NI_NUMERICHOST|NI_NUMERICSERV;
+	char *ep;
+	u_short port;
+
+#ifdef NI_NUMERICSCOPE
+	flags |= NI_NUMERICSCOPE;
+#endif
+
+	if (getnameinfo(sa, sa->sa_len, hostbuf, sizeof(hostbuf),
+			servbuf, sizeof(servbuf), flags)) {
+		syslog(LOG_ERR, "getnameinfo failed");
+		exit(1);
+	}
+
+	port = (u_short)strtoul(servbuf, &ep, 10);
+	if (*ep == '\0')
+		return(port);
+	else {
+		syslog(LOG_ERR, "invalid port: %s", servbuf);
+		exit(1);
+		/* NOTREACHED */
+	}
 }
