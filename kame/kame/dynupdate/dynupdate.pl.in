@@ -1,6 +1,6 @@
 #! @PERL@
 
-#	$KAME: dynupdate.pl.in,v 1.7 2001/03/15 05:28:27 jinmei Exp $
+#	$KAME: dynupdate.pl.in,v 1.8 2001/03/15 05:33:57 jinmei Exp $
 
 # Copyright (C) 2001 WIDE Project.
 # All rights reserved.
@@ -90,15 +90,15 @@ if (defined($tsigkey)) {
 if (defined($tsigkeyfile)) {
 	$update_flags .= "-k $tsigkeyfile";
 }
-open(DOIT, " $nsupdate $update_flags") || die;    
+open(DOIT, "| $nsupdate $update_flags") || die;    
 
 print DOIT "update delete $name.$domain AAAA\n";
+
+if (defined($serveraddr)) {
+	print DOIT "server $serveraddr\n";
+}
 foreach $i (@addrs) {
-	if (defined($serveraddr)) {
-	    print DOIT "server $serveraddr update add $name.$domain $ttl AAAA $i\n";
-	} else {
-		print DOIT "update add $name.$domain $ttl AAAA $i\n";
-	}
+	print DOIT "update add $name.$domain $ttl AAAA $i\n";
 }
 print DOIT "\n\n";
 close(DOIT);
