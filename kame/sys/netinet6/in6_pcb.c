@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.90 2001/05/09 03:10:12 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.91 2001/05/21 05:37:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -345,7 +345,7 @@ in6_pcbconnect(in6p, nam)
 #ifndef TCP6
 	/* sanity check for mapped address case */
 	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-		if ((inp->inp_flags & IN6P_IPV6_V6ONLY) != 0)
+		if ((in6p->in6p_flags & IN6P_IPV6_V6ONLY) != 0)
 			return EINVAL;
 		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
 			in6p->in6p_laddr.s6_addr16[5] = htons(0xffff);
