@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.153 2005/02/14 20:35:33 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.154 2005/03/01 03:30:42 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -34,6 +34,7 @@
 #include <sys/uio.h>
 #include <sys/queue.h>
 #include <errno.h>
+#include <limits.h>
 #if TIME_WITH_SYS_TIME
 # include <sys/time.h>
 # include <time.h>
@@ -105,6 +106,8 @@ static char *ctlkeyfile = DEFAULT_KEYFILE;
 static struct keyinfo *ctlkey = NULL;
 static int ctldigestlen;
 
+static int infreq_mode = 0;
+
 static inline int get_val32 __P((char **, int *, u_int32_t *));
 static inline int get_ifname __P((char **, int *, char *, int));
 
@@ -143,6 +146,7 @@ static int set_auth __P((struct dhcp6_event *, struct dhcp6_optinfo *));
 
 struct dhcp6_timer *client6_timo __P((void *));
 int client6_start __P((struct dhcp6_if *));
+static void info_printf __P((const char *, ...));
 
 extern int client6_script __P((char *, int, struct dhcp6_optinfo *));
 
@@ -167,7 +171,7 @@ main(argc, argv)
 	else
 		progname++;
 
-	while ((ch = getopt(argc, argv, "c:dDfk:p:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:dDfik:p:")) != -1) {
 		switch (ch) {
 		case 'c':
 			conffile = optarg;
@@ -180,6 +184,9 @@ main(argc, argv)
 			break;
 		case 'f':
 			foreground++;
+			break;
+		case 'i':
+			infreq_mode = 1;
 			break;
 		case 'k':
 			ctlkeyfile = optarg;
@@ -215,12 +222,12 @@ main(argc, argv)
 		argv++;
 	}
 
-	if ((cfparse(conffile)) != 0) {
+	if (infreq_mode == 0 && (cfparse(conffile)) != 0) {
 		dprintf(LOG_ERR, FNAME, "failed to parse configuration file");
 		exit(1);
 	}
 
-	if (foreground == 0) {
+	if (foreground == 0 && infreq_mode == 0) {
 		if (daemon(0, 0) < 0)
 			err(1, "daemon");
 	}
@@ -241,7 +248,7 @@ static void
 usage()
 {
 
-	fprintf(stderr, "usage: dhcp6c [-c configfile] [-dDf] "
+	fprintf(stderr, "usage: dhcp6c [-c configfile] [-dDfi] "
 	    "[-p pid-file] interface [interfaces...]\n");
 }
 
@@ -870,7 +877,7 @@ client6_timo(arg)
 	switch(ev->state) {
 	case DHCP6S_INIT:
 		ev->timeouts = 0; /* indicate to generate a new XID. */
-		if ((ifp->send_flags & DHCIFF_INFO_ONLY))
+		if ((ifp->send_flags & DHCIFF_INFO_ONLY) || infreq_mode)
 			ev->state = DHCP6S_INFOREQ;
 		else {
 			ev->state = DHCP6S_SOLICIT;
@@ -1596,7 +1603,7 @@ client6_recvadvert(ifp, dh6, len, optinfo)
 	}
 
 	if (ev->state != DHCP6S_SOLICIT ||
-	    (ifp->send_flags & DHCIFF_RAPID_COMMIT)) {
+	    (ifp->send_flags & DHCIFF_RAPID_COMMIT) || infreq_mode) {
 		/*
 		 * We expected a reply message, but do actually receive an
 		 * Advertise message.  The server should be configured not to
@@ -1820,7 +1827,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 
 		for (d = TAILQ_FIRST(&optinfo->dns_list); d;
 		     d = TAILQ_NEXT(d, link), i++) {
-			dprintf(LOG_DEBUG, FNAME, "nameserver[%d] %s",
+			info_printf("nameserver[%d] %s",
 			    i, in6addr2str(&d->val_addr6, 0));
 		}
 	}
@@ -1831,7 +1838,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 
 		for (d = TAILQ_FIRST(&optinfo->dnsname_list); d;
 		     d = TAILQ_NEXT(d, link), i++) {
-			dprintf(LOG_DEBUG, FNAME, "Domain search list[%d] %s",
+			info_printf("Domain search list[%d] %s",
 			    i, d->val_vbuf.dv_buf);
 		}
 	}
@@ -1842,7 +1849,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 
 		for (d = TAILQ_FIRST(&optinfo->ntp_list); d;
 		     d = TAILQ_NEXT(d, link), i++) {
-			dprintf(LOG_DEBUG, FNAME, "NTP server[%d] %s",
+			info_printf("NTP server[%d] %s",
 			    i, in6addr2str(&d->val_addr6, 0));
 		}
 	}
@@ -1853,7 +1860,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 
 		for (d = TAILQ_FIRST(&optinfo->sip_list); d;
 		     d = TAILQ_NEXT(d, link), i++) {
-			dprintf(LOG_DEBUG, FNAME, "SIP server address[%d] %s",
+			info_printf("SIP server address[%d] %s",
 			    i, in6addr2str(&d->val_addr6, 0));
 		}
 	}
@@ -1864,8 +1871,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 
 		for (d = TAILQ_FIRST(&optinfo->sipname_list); d;
 		     d = TAILQ_NEXT(d, link), i++) {
-			dprintf(LOG_DEBUG, FNAME,
-			    "SIP server domain name[%d] %s",
+			info_printf("SIP server domain name[%d] %s",
 			    i, d->val_vbuf.dv_buf);
 		}
 	}
@@ -1948,6 +1954,12 @@ client6_recvreply(ifp, dh6, len, optinfo)
 
 	dprintf(LOG_DEBUG, FNAME, "got an expected reply, sleeping.");
 
+	if (infreq_mode) {
+		exit_ok = 1;
+		free_resources(NULL);
+		unlink(pid_file);
+		check_exit();
+	}
 	return (0);
 }
 
@@ -2155,4 +2167,20 @@ set_auth(ev, optinfo)
 	}
 
 	return (0);
+}
+
+static void
+info_printf(const char *fmt, ...)
+{
+	va_list ap;
+	char logbuf[LINE_MAX];
+
+	va_start(ap, fmt);
+	vsnprintf(logbuf, sizeof(logbuf), fmt, ap);
+
+	dprintf(LOG_DEBUG, FNAME, "%s", logbuf);
+	if (infreq_mode)
+		printf("%s\n", logbuf);
+
+	return;
 }

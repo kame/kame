@@ -1,5 +1,9 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2726 2005/02/28 02:07:30 t-momose Exp $
+$KAME: CHANGELOG,v 1.2727 2005/03/01 03:30:42 suz Exp $
+
+<200503>
+2005-03-01  SUZUKI, Shinsuke <suz@kame.net>
+	* integrated dhcp6lc functionality into dhcp6c ('i' option)
 
 <200502>
 2005-02-28  Tsuyoshi MOMOSE  <momose@az.jp.nec.com>

@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.8,v 1.34 2005/01/07 13:25:04 suz Exp $
+.\"	$KAME: dhcp6c.8,v 1.35 2005/03/01 03:30:42 suz Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -37,7 +37,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl c Ar configfile
-.Op Fl Ddf
+.Op Fl Ddfi
 .Op Fl p Ar pid-file
 .Ar interface
 .Op Ar interfaces...
@@ -73,6 +73,8 @@ usually prints warning, debugging, or error messages to
 .Xr syslog 8 ,
 it prints the messages to standard error if this option is
 specified.
+.It Fl i
+Info-req mode.  In this mode, stateless DHCPv6 is executed with an automatic configuration, and the obtained info is written to stdout.  After this output, the program is terminated.  (suits for a use in shell-script etc)
 .It Fl p Ar pid-file
 Use
 .Ar pid-file
@@ -82,6 +84,8 @@ to dump the process ID of
 .Pp
 The program will daemonize itself on invocation unless the
 .Fl f
+or
+.Fl i
 option is specified.
 .Pp
 Upon receipt of the
@@ -175,3 +179,7 @@ IPv6 and will not implement the stateful method in the future.
 Some of useful option type values are still not officially assigned.
 The current implementation uses experimental values,
 which may cause interoperability problems with other implementations.
+.Pp
+Information Refresh Time Option is not recognied in Info-req mode, since
+.Nm
+terminates after it receives a REPLY message.
