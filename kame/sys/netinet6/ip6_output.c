@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.326 2002/09/05 11:13:19 k-sugyou Exp $	*/
+/*	$KAME: ip6_output.c,v 1.327 2002/09/06 05:50:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2949,6 +2949,8 @@ do { \
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				struct mbuf *m = NULL;
 				struct mbuf **mp = &m;
+				size_t ovalsize = sopt->sopt_valsize;
+				caddr_t oval = (caddr_t)sopt->sopt_val;
 
 				error = soopt_getm(sopt, &m); /* XXX */
 				if (error != NULL)
@@ -2956,6 +2958,8 @@ do { \
 				error = soopt_mcopyin(sopt, m); /* XXX */
 				if (error != NULL)
 					break;
+				sopt->sopt_valsize = ovalsize;
+				sopt->sopt_val = oval;
 #endif
 				if (m) {
 					req = mtod(m, caddr_t);
