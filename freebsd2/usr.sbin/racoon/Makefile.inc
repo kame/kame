@@ -35,6 +35,9 @@ ssleay_cmd=/usr/local/bin/ssleay
 ssleay_cmd=openssl
 .endif
 SSLVERNUM!= $(ssleay_cmd) version | cut -d' ' -f2 | tr -d '[a-zA-Z\.]' | tr -d '^0'
+.if empty(SSLVERNUM)
+SSLVERNUM=0
+.endif
 
 LDADD+=	-ly -ll
 DPADD+=	${LIBY} ${LIBL}

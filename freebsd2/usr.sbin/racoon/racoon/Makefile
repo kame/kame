@@ -1,7 +1,8 @@
 PROG=	racoon
 SRCS=	handler.c isakmp.c isakmp_inf.c ipsec_doi.c pfkey.c main.c \
 	post_com.c schedule.c session.c crypto.c cfparse.c cftoken.c \
-	admin.c misc.c vmbuf.c signing.c
+	admin.c misc.c vmbuf.c
+#SRCS+=	signing.c
 
 # debugging code with print-isakmp.c
 SRCS+=	print-isakmp.c
