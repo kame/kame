@@ -1,4 +1,4 @@
-/*	$KAME: mrt.c,v 1.16 2003/08/12 02:04:48 suz Exp $	*/
+/*	$KAME: mrt.c,v 1.17 2003/08/15 05:59:52 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -321,8 +321,12 @@ find_route(source, group, flags, create)
 	else
 	    rpentry_ptr = grpentry_ptr->active_rp_grp->rp->rpentry;
 
-	/* there can be no PIM neighbor for static-RP */
-	if (rpentry_ptr->upstream == NULL) {
+	/* 
+	 * don't accept the RP without any PIM neighbor 
+	 * (except when RP is myself)
+	 */
+	if (rpentry_ptr->upstream == NULL &&
+	    rpentry_ptr->incoming != reg_vif_num) {
 		delete_grpentry(grpentry_ptr);
 		return NULL;
 	}
