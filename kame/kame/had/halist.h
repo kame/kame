@@ -1,4 +1,4 @@
-/*	$KAME: halist.h,v 1.1 2001/12/28 06:38:19 k-sugyou Exp $	*/
+/*	$KAME: halist.h,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: halist.h,v 1.1 2001/12/28 06:38:19 k-sugyou Exp $
+ * $Id: halist.h,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $
  */
 
 /*
@@ -61,6 +61,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <net/if.h>
+
 /*
  * home agent liast structures
  */
@@ -68,8 +70,18 @@
 /* global addresses for a home agent */
 struct hagent_gaddr {
 	struct hagent_gaddr	*hagent_next_gaddr, *hagent_prev_gaddr;
+	struct hagent_gaddr	*hagent_next_expire, *hagent_prev_expire;
 	struct in6_addr		hagent_gaddr;
 	u_int8_t		hagent_prefixlen;
+	struct hagent_flags {
+		u_char		onlink : 1;
+		u_char		autonomous : 1;
+		u_char		router : 1;
+	} hagent_flags;
+	u_int32_t		hagent_vltime;
+	u_int32_t		hagent_pltime;
+	long			hagent_expire;
+	long			hagent_preferred;
 };
 
 /* home agent entry */
@@ -89,6 +101,7 @@ struct hagent_entry {
 struct hagent_ifinfo {
 	struct hagent_entry	halist_pref;
 	int			ifindex;
+	char			ifname[IF_NAMESIZE];
 	struct ifaddrs		*linklocal;
 	struct ifaddrs		*global;
 	struct ifaddrs		*anycast;
@@ -113,3 +126,4 @@ void haif_prefix_update __P((struct hagent_ifinfo *, struct in6_addr *,
 			     u_int8_t, u_int32_t));
 int haif_getifaddrs __P((void));
 void haadisc_dump_file __P((char *dumpfile));
+void haadisc_hup __P(());

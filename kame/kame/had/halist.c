@@ -1,4 +1,4 @@
-/*	$KAME: halist.c,v 1.1 2001/12/28 06:38:19 k-sugyou Exp $	*/
+/*	$KAME: halist.c,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: halist.c,v 1.1 2001/12/28 06:38:19 k-sugyou Exp $
+ * $Id: halist.c,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $
  */
 
 /*
@@ -78,6 +78,7 @@
 #include <netinet/in_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/nd6.h>
 #include <netinet/icmp6.h>
 
 #include <arpa/inet.h>
@@ -108,9 +109,11 @@
 struct hagent_gaddr *hal_gaddr_add __P((struct hagent_entry *,
 					struct hagent_gaddr *,
 					struct nd_opt_prefix_info *));
+int hal_gaddr_init_prefix_ltimes __P((struct hagent_gaddr *));
 static struct hagent_gaddr *hal_gaddr_find __P((struct hagent_entry *,
 						struct in6_addr *, u_int8_t));
 static void hal_expire __P((struct hagent_entry *, long));
+static void hal_gaddr_expire __P((struct hagent_gaddr *, long));
 void hal_gaddr_clean __P((struct hagent_entry *));
 static int get_gaddr __P((struct hagent_gaddr *, struct in6_addr *,
 			  struct in6_addr *));
@@ -119,10 +122,11 @@ static void hal_dump __P((FILE *));
 static void halent_dump __P((FILE *, struct hagent_entry *));
 static void gaddr_dump __P((FILE *, struct hagent_gaddr *));
 
-/* 
- * home agent list (sorted by home agent preference)
- */
+/* home agent list entries (sorted by remaining home agent lifetime) */
 struct hagent_entry	halist_expire_head;
+
+/* global addresses (sorted by remaining valid lifetime) */
+struct hagent_gaddr	gaddr_expire_head;
 
 /* 
  * update home agent list with RA information
@@ -315,7 +319,7 @@ hal_gaddr_add(halp, lastp, pi)
     struct hagent_gaddr *lastp;
     struct nd_opt_prefix_info *pi;
 {
-    struct hagent_gaddr *galp;
+    struct hagent_gaddr *galp, *prevp, *curp;
 
     galp = hal_gaddr_find(halp, &pi->nd_opt_pi_prefix, 
 			  pi->nd_opt_pi_prefix_len);
@@ -323,16 +327,32 @@ hal_gaddr_add(halp, lastp, pi)
     if (! galp) {
 	/* create global address list entry and enqueue */
 	galp = malloc(sizeof(struct hagent_gaddr));
-	if (galp) {
-	    bzero(galp, sizeof(struct hagent_gaddr));
-	    bcopy(&(pi->nd_opt_pi_prefix), &(galp->hagent_gaddr), 
-		  sizeof(struct in6_addr));
-	    galp->hagent_prefixlen = pi->nd_opt_pi_prefix_len;
-	}
-	else {
+	if (galp == NULL) {
 	    syslog(LOG_ERR, __FUNCTION__ "cannt allocate memory.\n");
 	    goto err;
 	}
+
+	bzero(galp, sizeof(struct hagent_gaddr));
+	bcopy(&(pi->nd_opt_pi_prefix), &(galp->hagent_gaddr), 
+	      sizeof(struct in6_addr));
+	galp->hagent_prefixlen = pi->nd_opt_pi_prefix_len;
+	galp->hagent_flags.onlink = (pi->nd_opt_pi_flags_reserved &
+				     ND_OPT_PI_FLAG_ONLINK) ? 1 : 0;
+	galp->hagent_flags.autonomous = (pi->nd_opt_pi_flags_reserved &
+					 ND_OPT_PI_FLAG_AUTO) ? 1 : 0;
+	galp->hagent_flags.router = (pi->nd_opt_pi_flags_reserved &
+				     ND_OPT_PI_FLAG_ROUTER) ? 1 : 0;
+	galp->hagent_vltime = ntohl(pi->nd_opt_pi_valid_time);
+	galp->hagent_pltime = ntohl(pi->nd_opt_pi_preferred_time);
+
+#if 0
+	if (galp->hagent_flags.onlink == 0) {
+	    galp->hagent_vltime = 0;
+	    galp->hagent_pltime = 0;
+	}
+#endif /* 0 */
+	if (hal_gaddr_init_prefix_ltimes(galp))
+	    goto err;
     }
     else {
 	/* remove from old list */
@@ -345,14 +365,101 @@ hal_gaddr_add(halp, lastp, pi)
 		= galp->hagent_next_gaddr;
 	}
 	galp->hagent_next_gaddr = galp->hagent_prev_gaddr = NULL;
+
+	if (galp->hagent_next_expire) {
+	    galp->hagent_next_expire->hagent_prev_expire
+		= galp->hagent_prev_expire;
+	}
+	if (galp->hagent_prev_expire) {
+	    galp->hagent_prev_expire->hagent_next_expire
+		= galp->hagent_next_expire;
+	}
+	galp->hagent_next_expire = galp->hagent_prev_expire = NULL;
+
+	/* update entry */
+	if (pi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ONLINK)
+	    galp->hagent_flags.onlink = 1;
+	galp->hagent_flags.autonomous = (pi->nd_opt_pi_flags_reserved &
+					 ND_OPT_PI_FLAG_AUTO) ? 1 : 0;
+	galp->hagent_flags.router = (pi->nd_opt_pi_flags_reserved &
+				     ND_OPT_PI_FLAG_ROUTER) ? 1 : 0;
+
+	if (pi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ONLINK) {
+	    galp->hagent_vltime = ntohl(pi->nd_opt_pi_valid_time);
+	    galp->hagent_pltime = ntohl(pi->nd_opt_pi_preferred_time);
+	    if (hal_gaddr_init_prefix_ltimes(galp))
+		goto err;
+	}
     }
     /* insert to new list */
     lastp->hagent_next_gaddr = galp;
     galp->hagent_prev_gaddr = lastp;
 
     lastp = galp;
+
+    /* insert to expire list */
+    for (prevp = curp = gaddr_expire_head.hagent_next_expire;
+	 curp; curp = curp->hagent_next_expire) {
+	if (curp->hagent_expire > galp->hagent_expire) {
+	    galp->hagent_prev_expire = curp->hagent_prev_expire;
+	    galp->hagent_next_expire = curp;
+	    if (curp->hagent_prev_expire) {
+		curp->hagent_prev_expire->hagent_next_expire = galp;
+	    }
+	    curp->hagent_prev_expire = galp;
+
+	    break;
+	}
+	prevp = curp;
+    }
+    if (! curp) {
+	if (prevp) {
+	    /* append tail */
+	    prevp->hagent_next_expire = galp;
+	    galp->hagent_prev_expire = prevp;
+	}
+	else {
+	    /* insert head */
+	    gaddr_expire_head.hagent_next_expire = galp;
+	    galp->hagent_prev_expire = &gaddr_expire_head;
+	}
+    }
+
 err:
     return lastp;
+}
+
+/*
+ * check lifetimes and calculate expire time
+ */
+int
+hal_gaddr_init_prefix_ltimes(struct hagent_gaddr *galp)
+{
+    struct timeval tv;
+    long time_second;
+
+    gettimeofday(&tv, NULL);
+    time_second = tv.tv_sec;
+
+#if 0
+    /* check if preferred lifetime > valid lifetime.  RFC2462 5.5.3 (c) */
+    if (galp->hagent_pltime > galp->hagent_vltime) {
+	syslog(LOG_INFO, "hal_gaddr_init_prefix_ltimes: preferred lifetime"
+	       "(%d) is greater than valid lifetime(%d)\n",
+	       (u_int)galp->hagent_pltime, (u_int)galp->hagent_vltime);
+	return (EINVAL);
+    }
+#endif /* 0 */
+    if (galp->hagent_pltime == ND6_INFINITE_LIFETIME)
+	galp->hagent_preferred = 0;
+    else
+	galp->hagent_preferred = time_second + galp->hagent_pltime;
+    if (galp->hagent_vltime == ND6_INFINITE_LIFETIME)
+	galp->hagent_expire = 0;
+    else
+	galp->hagent_expire = time_second + galp->hagent_vltime;
+
+    return 0;
 }
 
 /*
@@ -422,13 +529,23 @@ hal_gaddr_clean(halp)
     while (halp->hagent_galist.hagent_next_gaddr) {
 	tmp = halp->hagent_galist.hagent_next_gaddr;
 	halp->hagent_galist.hagent_next_gaddr = tmp->hagent_next_gaddr;
+
+	/* remove from expire list */
+	if (tmp->hagent_next_expire) {
+	    tmp->hagent_next_expire->hagent_prev_expire
+		= tmp->hagent_prev_expire;
+	}
+	if (tmp->hagent_prev_expire) {
+	    tmp->hagent_prev_expire->hagent_next_expire
+		= tmp->hagent_next_expire;
+	}
+
 	free(tmp);
     }
 }
 
 /*
  * expiration check of home agent list entry
- * ToDo: expiration check of global address
  */
 void
 hal_check_expire()
@@ -446,6 +563,11 @@ hal_check_expire()
     if (halist_expire_head.hagent_next_expire
 	&& (halist_expire_head.hagent_next_expire->hagent_expire < now)) {
 	hal_expire(halist_expire_head.hagent_next_expire, now);
+    }
+
+    if (gaddr_expire_head.hagent_next_expire
+	&& (gaddr_expire_head.hagent_next_expire->hagent_expire < now)) {
+	hal_gaddr_expire(gaddr_expire_head.hagent_next_expire, now);
     }
 
     DPRINT("<e:hal_check_expire>\n");
@@ -496,6 +618,43 @@ hal_expire(halp, now)
     }
 
     DPRINT("<e:hal_expire>");
+}
+
+/*
+ * delete expired global address
+ */
+static void
+hal_gaddr_expire(galp, now)
+     struct hagent_gaddr *galp;
+     long now;
+{
+    struct hagent_gaddr *tmp;
+
+    for ( ; galp && (galp->hagent_expire < now); galp = tmp) {
+	tmp = galp->hagent_next_expire;
+
+	if (!galp->hagent_expire)
+	    continue;
+
+	if (galp->hagent_next_gaddr) {
+	    galp->hagent_next_gaddr->hagent_prev_gaddr
+		= galp->hagent_prev_gaddr;
+	}
+	if (galp->hagent_prev_gaddr) {
+	    galp->hagent_prev_gaddr->hagent_next_gaddr
+		= galp->hagent_next_gaddr;
+	}
+	if (galp->hagent_next_expire) {
+	    galp->hagent_next_expire->hagent_prev_expire
+		= galp->hagent_prev_expire;
+	}
+	if (galp->hagent_prev_expire) {
+	    galp->hagent_prev_expire->hagent_next_expire
+		= galp->hagent_next_expire;
+	}
+
+	free(galp);
+    }
 }
 
 /*
@@ -774,7 +933,8 @@ haif_findwithaddr(ha_addr)
 int
 haif_getifaddrs()
 {
-    struct ifaddrs *ifalist, *ifap;
+    static struct ifaddrs *ifalist = NULL;
+    struct ifaddrs *ifap;
     struct sockaddr_in6 *sa6;
     struct hagent_ifinfo *haif = NULL;
     int ifindex, oifindex = 0, anycast_found = 0;
@@ -785,6 +945,9 @@ haif_getifaddrs()
 				   0xff, 0xff, 0xff, 0xfe}}};
     int s;
     struct in6_ifreq ifr6;
+
+    if (ifalist)
+	freeifaddrs(ifalist);
 
     /* get interface adresses */
     if (getifaddrs(&ifalist) < 0) {
@@ -858,17 +1021,57 @@ void gaddr_dump(fp, galp)
  	FILE *fp;
 	struct hagent_gaddr *galp;
 {
-	char buf[40];
-	inet_ntop(AF_INET6, &galp->hagent_gaddr, buf, sizeof(buf) - 1);
-	fprintf(fp, "      %s/%d\n", buf, galp->hagent_prefixlen);
+	char ntopbuf[INET6_ADDRSTRLEN];
+	struct timeval now;
+
+	gettimeofday(&now, NULL);
+
+	fprintf(fp, "      %s/%d(",
+		inet_ntop(AF_INET6, &galp->hagent_gaddr,
+			  ntopbuf, INET6_ADDRSTRLEN),
+		galp->hagent_prefixlen);
+
+	if (galp->hagent_vltime == ND6_INFINITE_LIFETIME)
+		fprintf(fp, "vltime: infinity");
+	else
+		fprintf(fp, "vltime: %ld",
+			(long)galp->hagent_vltime);
+	if (galp->hagent_expire != 0)
+		fprintf(fp, "(decr,expire %ld), ", (long)
+			galp->hagent_expire > now.tv_sec ?
+			galp->hagent_expire - now.tv_sec : 0);
+	else
+		fprintf(fp, ", ");
+	if (galp->hagent_pltime ==  ND6_INFINITE_LIFETIME)
+		fprintf(fp, "pltime: infinity");
+	else
+		fprintf(fp, "pltime: %ld",
+			(long)galp->hagent_pltime);
+	if (galp->hagent_preferred != 0)
+		fprintf(fp, "(decr,expire %ld), ", (long)
+			galp->hagent_preferred > now.tv_sec ?
+			galp->hagent_preferred - now.tv_sec : 0);
+	else
+		fprintf(fp, ", ");
+	fprintf(fp, "flags: %s%s%s",
+		galp->hagent_flags.onlink ? "L" : "",
+		galp->hagent_flags.autonomous ? "A" : "",
+		galp->hagent_flags.router ? "R" :
+		"");
+	fprintf(fp, ")\n");
 }
 
 void halent_dump(fp, halp)
 	FILE *fp;
 	struct hagent_entry *halp;
 {
-	char buf[40];
+	char ntopbuf[INET6_ADDRSTRLEN];
 	struct hagent_gaddr *galp;
+	struct timeval now;
+
+	gettimeofday(&now, NULL);
+
+#ifdef DEBUG
 	fprintf(fp, "  <<<home agent entry %x>>>\n", (u_int32_t)halp);
 	fprintf(fp, "    [next expire=%x] [previous expire=%x]\n",
 	       (u_int32_t)(halp->hagent_next_expire),
@@ -876,10 +1079,13 @@ void halent_dump(fp, halp)
 	fprintf(fp, "    [next preference=%x] [previous preference=%x]\n",
 	       (u_int32_t)(halp->hagent_next_pref),
 	       (u_int32_t)(halp->hagent_prev_pref));
-	inet_ntop(AF_INET6, &halp->hagent_addr, buf, sizeof(buf) - 1);
-	fprintf(fp, "    home agent address=%s\n", buf);
-	fprintf(fp, "    lifetime=%d expire=%ld\n",
-		halp->hagent_lifetime, halp->hagent_expire);
+#endif
+	inet_ntop(AF_INET6, &halp->hagent_addr, ntopbuf, INET6_ADDRSTRLEN);
+	fprintf(fp, "  home agent address=%s\n", ntopbuf);
+	fprintf(fp, "    lifetime=%d expire=%ld(decr,expire %ld)\n",
+		halp->hagent_lifetime, halp->hagent_expire,
+		halp->hagent_expire  > now.tv_sec ?
+		halp->hagent_expire - now.tv_sec : 0);
 	fprintf(fp, "    preference=%d\n", halp->hagent_pref);
 	fprintf(fp, "    global addresses:\n");
 	for (galp = halp->hagent_galist.hagent_next_gaddr;  galp;
@@ -891,24 +1097,29 @@ void halent_dump(fp, halp)
 void hal_dump(FILE *fp)
 {
 	int i;
-	char buf[40];
+	char ntopbuf[INET6_ADDRSTRLEN];
 	struct hagent_entry *halp;
 	struct timeval tv;
 
 	gettimeofday(&tv, NULL);
-	fprintf(fp, "<<<DUMP home agent list ");
+
+	fprintf(fp, "dump home agent list at ");
 	ts_print(fp, &tv);
-	fprintf(fp, ">>>\n<<<dumping expiration list...>>>\n");
+	fprintf(fp, "\n");
+#ifdef DEBUG
+	fprintf(fp, "<<<dumping expiration list...>>>\n");
 	fprintf(fp, "  sentinel entry=%x\n", (u_int32_t)&halist_expire_head);
 	for (halp = halist_expire_head.hagent_next_expire; halp;
 	     halp = halp->hagent_next_expire) {
 		halent_dump(fp, halp);
 	}
+#endif
 	for (i = 0; i < ifnum; ++i) {
-		fprintf(fp, "<<<dumping preference list for ifindex %d>>>\n",
-			haifinfo_tab[i].ifindex);
+		fprintf(fp, "%s:\n", haifinfo_tab[i].ifname);
+#ifdef DEBUG
 		fprintf(fp, "  sentinel entry=%x\n",
 			(u_int32_t)&haifinfo_tab[i].halist_pref);
+#endif
 		for (halp = haifinfo_tab[i].halist_pref.hagent_next_pref; halp;
 		     halp = halp->hagent_next_pref) {
 			halent_dump(fp, halp);
@@ -916,17 +1127,19 @@ void hal_dump(FILE *fp)
 		if (haifinfo_tab[i].global != NULL) {
 			inet_ntop(AF_INET6,
 				  &((struct sockaddr_in6 *)(haifinfo_tab[i].global->ifa_addr))->sin6_addr,
-				  buf, sizeof(buf) - 1);
-		    fprintf(fp, "  global addresses=%s\n", buf);
+				  ntopbuf, INET6_ADDRSTRLEN);
+			fprintf(fp, "  global addresses=%s\n", ntopbuf);
 		}
 		if (haifinfo_tab[i].anycast != NULL) {
 			inet_ntop(AF_INET6,
 				  &((struct sockaddr_in6 *)(haifinfo_tab[i].anycast->ifa_addr))->sin6_addr,
-				  buf, sizeof(buf) - 1);
-		    fprintf(fp, "  anycast addresses=%s\n", buf);
+				  ntopbuf, INET6_ADDRSTRLEN);
+			fprintf(fp, "  anycast addresses=%s\n", ntopbuf);
 		}
 	}
+#ifdef DEBUG
 	fprintf(fp, "<<<DUMP done>>>\n");
+#endif
 	fflush(fp);
 }
 
@@ -945,4 +1158,27 @@ haadisc_dump_file(dumpfile)
 	hal_dump(fp);
 
 	fclose(fp);
+}
+
+void
+haadisc_hup()
+{
+	int i;
+
+	/* clean home agent list */
+	hal_clean();
+
+	/* clean interface addresses */
+	for (i = 0; i < ifnum; ++i) {
+		haifinfo_tab[i].linklocal = NULL;
+		haifinfo_tab[i].global = NULL;
+		haifinfo_tab[i].anycast = NULL;
+	}
+
+	/* get interface addresses */
+	if (haif_getifaddrs() != 0) {
+		syslog(LOG_ERR, __FUNCTION__
+		       "get linklocal address of interfaces failed");
+		exit(1);
+	}
 }

@@ -1,4 +1,4 @@
-/*	$KAME: timestamp.c,v 1.1 2001/12/28 06:38:19 k-sugyou Exp $	*/
+/*	$KAME: timestamp.c,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: timestamp.c,v 1.1 2001/12/28 06:38:19 k-sugyou Exp $
+ * $Id: timestamp.c,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $
  */
 
 /*
@@ -105,7 +105,7 @@ ts_print(FILE *fp, register const struct timeval *tvp)
 	if (tflag > 0) {
 		/* Default */
 		s = (tvp->tv_sec + thiszone) % 86400;
-		(void)fprintf(fp, "%02d:%02d:%02d.%06u ",
+		(void)fprintf(fp, "%02d:%02d:%02d.%06u",
 			      s / 3600, (s % 3600) / 60, s % 60,
 			      (u_int32_t)tvp->tv_usec);
 	} else if (tflag < 0) {

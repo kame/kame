@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.1 2001/12/28 06:38:18 k-sugyou Exp $
+#	$KAME: Makefile,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $
 #
 # Copyright (c) 2001 WIDE Project. All rights reserved.
 #
@@ -27,7 +27,7 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile,v 1.1 2001/12/28 06:38:18 k-sugyou Exp $
+# $Id: Makefile,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $
 #
 
 .if exists(${.CURDIR}/../Makefile.opsys)
@@ -39,7 +39,7 @@ PROG=	had
 SRCS=	haadisc.c halist.c timestamp.c
 
 .if (${OPSYS} != "NetBSD")
-CFLAGS+=-Wall -g -DDEBUG
+CFLAGS+=-Wall -g
 .endif
 .if (${OPSYS} != "NetBSD")
 CFLAGS+=-DINET6 -DHAVE_GETIFADDRS

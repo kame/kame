@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.c,v 1.1 2001/12/28 06:38:19 k-sugyou Exp $	*/
+/*	$KAME: haadisc.c,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.c,v 1.1 2001/12/28 06:38:19 k-sugyou Exp $
+ * $Id: haadisc.c,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $
  */
 
 /*
@@ -152,9 +152,9 @@ static void haadisc_clean_hal __P((void));
 /* home agent list for each interfaces */
 struct hagent_ifinfo *haifinfo_tab;
 
-static char *dumpfilename = "/var/run/haadisc.dump";
+static char *dumpfilename = "/var/run/had.dump";
 					/* XXX: should be configurable */
-static char *pidfilename = "/var/run/haadisc.pid";	/* XXX */
+static char *pidfilename = "/var/run/had.pid";	/* XXX */
 int ifnum;
 int sock;
 int dump, do_dump = 0, do_clean = 0;;
@@ -248,6 +248,7 @@ main(argc, argv)
     /* interfae table initializtion */
     for (i = 0; i < ifnum; ++i) {
 	haifinfo_tab[i].ifindex = if_nametoindex(argv[i]);
+	if_indextoname(haifinfo_tab[i].ifindex, haifinfo_tab[i].ifname);
     }
 
     /* get linklocal addresses of interfaces */
@@ -274,7 +275,7 @@ main(argc, argv)
 	daemon(1, 0);
 	pid = getpid();
 	if ((fp = fopen(pidfilename, "w")) == NULL)
-		syslog(LOG_ERR, __FUNCTION__,
+		syslog(LOG_ERR, __FUNCTION__
 		       "failed to open a log file(%s): %s",
 		       pidfilename, strerror(errno));
 	else {
@@ -298,9 +299,13 @@ main(argc, argv)
 	}
 
 	if (do_clean) { /* SIGHUP */
-	    hal_clean();
+	    /* clean home agent list and update interface address */
+	    haadisc_hup();
 	    do_clean = 0;
 	}
+
+	/* IMPLID:MIP6HA#15 */
+	hal_check_expire();
 
 	/* wait message arrival or timeout */
 	if ((i = select(maxfd + 1, &select_fd,
@@ -312,8 +317,6 @@ main(argc, argv)
 	if (FD_ISSET(sock, &select_fd)) {
 	    icmp6_recv();
 	}
-	/* IMPLID:MIP6HA#15 */
-	hal_check_expire();
     }
 
     exit(0);		/* NOTREACHED */
@@ -543,8 +546,8 @@ icmp6_recv()
 	/* IMPLID:MIP6HA#8 */
 	/* from contains sender's linklocal address */
 	if (!IN6_IS_ADDR_LINKLOCAL(&(from.sin6_addr))) {
-	    u_char ntopbuf[INET6_ADDRSTRLEN];
-	    syslog(LOG_ERR, "ra_input: src %s is not link-local",
+	    syslog(LOG_ERR, "<%s> src %s is not link-local",
+		   __FUNCTION__,
 		   inet_ntop(AF_INET6, &(from.sin6_addr), ntopbuf,
 			     INET6_ADDRSTRLEN));
 	    return;
@@ -600,6 +603,7 @@ ra_input(len, ra, pi, from)
     int16_t ha_pref = 0;
     struct hagent_entry *halp;
     struct hagent_ifinfo *haif;
+    u_char ntopbuf[INET6_ADDRSTRLEN];
 
     /* lookup home agent interface info from receiving ifindex */
     haif = haif_find(pi->ipi6_ifindex);
@@ -677,25 +681,44 @@ ra_input(len, ra, pi, from)
 	    pi = (struct nd_opt_prefix_info *)pt;
 
 	    if (pi->nd_opt_pi_len != 4) {
+		syslog(LOG_INFO,
+		       "ra_input: invalid option "
+		       "len %d for prefix information option, "
+		       "ignored\n", pi->nd_opt_pi_len);
 		continue;
 	    }
 
 	    if (128 < pi->nd_opt_pi_prefix_len) {
+		syslog(LOG_INFO,
+		       "ra_input: invalid prefix "
+		       "len %d for prefix information option, "
+		       "ignored\n", pi->nd_opt_pi_prefix_len);
 		continue;
 	    }
 
 	    if (IN6_IS_ADDR_MULTICAST(&pi->nd_opt_pi_prefix)
 		|| IN6_IS_ADDR_LINKLOCAL(&pi->nd_opt_pi_prefix)) {
+		syslog(LOG_INFO,
+		       "ra_input: invalid prefix "
+		       "%s, ignored\n",
+		       inet_ntop(AF_INET6, &pi->nd_opt_pi_prefix,
+				 ntopbuf, INET6_ADDRSTRLEN));
 		continue;
 	    }
 
 	    /* aggregatable unicast address, rfc2374 */
 	    if ((pi->nd_opt_pi_prefix.s6_addr[0] & 0xe0) == 0x20
 		&& pi->nd_opt_pi_prefix_len != 64) {
+		syslog(LOG_INFO,
+		       "ra_input: invalid prefixlen "
+		       "%d for rfc2374 prefix %s, ignored\n",
+		       pi->nd_opt_pi_prefix_len,
+		       inet_ntop(AF_INET6, &pi->nd_opt_pi_prefix,
+				 ntopbuf, INET6_ADDRSTRLEN));
 		continue;
 	    }
 
-	    /* onlink and R bit is set */
+	    /* onlink and R bit is set XXX */
 	    if ((pi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ONLINK)
 		&& (pi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ROUTER)) {
 		    /* IMPLID:MIP6HA#14 */
