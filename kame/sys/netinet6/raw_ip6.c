@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.29 2000/06/08 12:39:16 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.30 2000/06/08 13:27:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -776,10 +776,8 @@ rip6_usrreq(so, req, m, nam, control, p)
 	    {
 		struct sockaddr_in6 tmp;
 		struct sockaddr_in6 *dst;
-#ifdef ENABLE_DEFAULT_SCOPE
-		struct sockaddr_in6 sin6;
-#endif
 
+		/* always copy sockaddr to avoid overwrites */
 		if (so->so_state & SS_ISCONNECTED) {
 			if (nam) {
 				error = EISCONN;
@@ -797,13 +795,11 @@ rip6_usrreq(so, req, m, nam, control, p)
 				error = ENOTCONN;
 				break;
 			}
-			dst = mtod(nam, struct sockaddr_in6 *);
+			tmp = *mtod(nam, struct sockaddr_in6 *);
+			dst = &tmp;
 		}
 #ifdef ENABLE_DEFAULT_SCOPE
 		if (dst->sin6_scope_id == 0) {
-			/* protect *addr */
-			sin6 = *dst;
-			dst = &sin6;
 			dst->sin6_scope_id =
 				scope6_addr2default(&dst->sin6_addr);
 		}
