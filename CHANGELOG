@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2170 2002/05/30 04:36:54 jinmei Exp $
+$KAME: CHANGELOG,v 1.2171 2002/05/30 04:38:02 jinmei Exp $
 
 <200205>
+2002-05-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: [dhcp6c] added an ability to specify the SLA
+	length in the configuration file.
+
 Wed May 29 21:02:59 JST 2002  suz@crl.hitachi.co.jp
 	* kame/kame/pim6sd/config.c,vif.[ch],routesock.c: fixed RPF
 	algorithm bugs for P2P connected routes and static interface
