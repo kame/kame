@@ -1,4 +1,4 @@
-/*	$KAME: rafixd.c,v 1.7 2004/07/06 10:19:12 jinmei Exp $	*/
+/*	$KAME: rafixd.c,v 1.8 2004/07/06 10:21:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -58,6 +58,10 @@
 #include <syslog.h>
 
 #include "rafixd.h"
+
+#ifndef howmany
+#define	howmany(x, y)	(((x) + ((y) - 1)) / (y))
+#endif
 
 #define PURGE_MIN_DELAY 500
 #define PURGE_MAX_DELAY 1500
@@ -604,9 +608,9 @@ cksum6(buf, linkhdrlen, size)
 	bcopy(&ip6->ip6_dst, &ipovly[16], 16);
 	ipovly[32] = 0;
 	ipovly[33] = 0;
-	HTONS(plen);
+	plen = htons(plen);
 	bcopy((caddr_t)&plen, ipovly + 34, 2);
-	NTOHS(plen);
+	plen = ntohs(plen);
 	ipovly[36] = 0;
 	ipovly[37] = 0;
 	ipovly[38] = 0;
