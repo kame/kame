@@ -1,6 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.388 1999/12/31 04:22:07 itojun Exp $
+$Id: CHANGELOG,v 1.389 1999/12/31 18:02:45 itojun Exp $
+
+<200001>
+Sat Jan  1 03:02:02 JST 2000
+	* netbsd/usr.bin/ftp: fix "ftp URL" behavior.  it failed if the
+	  specified URL is in certain condition due to bug in IPv6 support.
 
 <199912>
 Fri Dec 31 13:21:58 JST 1999  itojun@iijab.net
