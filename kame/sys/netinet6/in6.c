@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.257 2002/01/08 02:40:56 k-sugyou Exp $	*/
+/*	$KAME: in6.c,v 1.258 2002/01/21 07:49:27 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -481,6 +481,11 @@ in6_control(so, cmd, data, ifp)
 			return(EPERM);
 		return(mip6_ioctl(cmd, data));
 	case SIOCGBC:
+		return(mip6_ioctl(cmd, data));
+	case SIOCSUNUSEHA:
+	case SIOCDUNUSEHA:
+		if (!privileged)
+			return(EPERM);
 		return(mip6_ioctl(cmd, data));
 	}
 #endif /* MIP6 */

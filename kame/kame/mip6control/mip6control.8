@@ -1,4 +1,4 @@
-.\"	$KAME: mip6control.8,v 1.4 2001/12/13 09:24:34 k-sugyou Exp $
+.\"	$KAME: mip6control.8,v 1.5 2002/01/21 07:49:26 k-sugyou Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001 WIDE Project.
 .\" All rights reserved.
@@ -83,6 +83,12 @@ Start acting as a home agent.
 Show the binding cache entries.
 .It Fl l
 Show information in a long format.
+.It Fl u Ar Address#Port
+Add a rule that MN doesn't add a Home Address option to the outgoing packet.
+.It Fl v Ar Address#Port
+Delete the rule which specified one.
+.It Fl w
+Show the rule.
 .El
 .\"
 .Sh EXAMPLES
@@ -97,6 +103,11 @@ Replace 2001:200:1:1:: with your home network prefix.
 To make a node act as a home agent, issue the following commands as a root.
 .Bd -literal
 root# mip6control -g
+.Ed
+.Pp
+To set a rule to avoid adding home address option when quering DNS, issue the following commands as a root.
+.Bd -literal
+root# mip6control -u ::#53
 .Ed
 .\"
 .Sh HISTORY

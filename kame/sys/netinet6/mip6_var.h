@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.20 2002/01/18 08:35:03 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.21 2002/01/21 07:49:28 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -217,5 +217,13 @@ struct mip6_buffer {
 #define IP6OPT_HALEN  16 /* Length of HA option */
 #define IP6OPT_UIDLEN  2 /* Length of Unique Identifier sub-option */
 #define IP6OPT_COALEN 16 /* Length of Alternate COA sub-option */
+
+
+struct mip6_unuse_hoa {
+	LIST_ENTRY (mip6_unuse_hoa) unuse_entry;
+	struct in6_addr unuse_addr;
+	u_int16_t unuse_port;
+};
+LIST_HEAD(mip6_unuse_hoa_list, mip6_unuse_hoa);
 
 #endif /* !_MIP6_VAR_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.102 2002/01/20 09:00:19 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.103 2002/01/21 07:49:27 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -130,6 +130,10 @@ struct in6_addrpolicy defaultaddrpolicy;
 
 int ip6_prefer_tempaddr = 0;
 
+#ifdef MIP6
+struct mip6_unuse_hoa_list mip6_unuse_hoa;
+#endif /* MIP6 */
+
 #ifdef NEW_STRUCT_ROUTE
 static int in6_selectif __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 			     struct ip6_moptions *, 
@@ -201,6 +205,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	struct in6_addrpolicy *dst_policy = NULL, *best_policy = NULL;
 #ifdef MIP6
 	struct hif_softc *sc;
+	struct mip6_unuse_hoa *uh;
 #ifdef MIP6_ALLOW_COA_FALLBACK
 	struct mip6_bu *mbu_dst;
 	u_int8_t coafallback = 0;
@@ -290,6 +295,16 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		    ((mbu_dst->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0))
 			coafallback = 1;
 	}
+	for (uh = LIST_FIRST(&mip6_unuse_hoa);
+	     uh;
+	     uh = LIST_NEXT(uh, unuse_entry)) {
+		if ((IN6_IS_ADDR_UNSPECIFIED(&uh->unuse_addr)
+			 || IN6_ARE_ADDR_EQUAL(dst, &uh->unuse_addr))
+		    && (!uh->unuse_port || (dstsock->sin6_port == uh->unuse_port))) {
+			coafallback = 1;
+			break;
+		}
+  	}
 #endif /* MIP6_ALLOW_COA_FALLBACK */
 #endif /* MIP6 */
 

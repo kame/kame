@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.104 2002/01/17 05:24:02 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.105 2002/01/21 07:49:27 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -105,6 +105,8 @@ extern struct mip6_prefix_list mip6_prefix_list;
 
 extern struct mip6_bc_list mip6_bc_list;
 
+extern struct mip6_unuse_hoa_list mip6_unuse_hoa;
+
 struct mip6_config mip6_config;
 
 #ifdef __NetBSD__
@@ -180,6 +182,7 @@ mip6_init()
 	mip6_subnet_init();
 
 	LIST_INIT(&mip6_subnet_list);
+	LIST_INIT(&mip6_unuse_hoa);
 }
 
 /*
@@ -1220,6 +1223,61 @@ mip6_ioctl(cmd, data)
 			mr->mip6r_count = i;
 		}
 		break;
+
+	case SIOCSUNUSEHA:
+		{
+			struct mip6_unuse_hoa *uh;
+
+			for (uh = LIST_FIRST(&mip6_unuse_hoa);
+			     uh;
+			     uh = LIST_NEXT(uh, unuse_entry)) {
+				if (IN6_ARE_ADDR_EQUAL(&uh->unuse_addr, 
+				    &mr->mip6r_ru.mip6r_sin6.sin6_addr) &&
+				    uh->unuse_port
+				    == mr->mip6r_ru.mip6r_sin6.sin6_port) {
+					splx(s);
+					return (EEXIST);
+				}
+			}
+
+			uh = malloc(sizeof(struct mip6_unuse_hoa), M_IP6OPT, M_WAIT);
+			if (uh == NULL) {
+				splx(s);
+				return (ENOBUFS);
+			}
+
+			uh->unuse_addr = mr->mip6r_ru.mip6r_sin6.sin6_addr;
+			uh->unuse_port = mr->mip6r_ru.mip6r_sin6.sin6_port;
+			LIST_INSERT_HEAD(&mip6_unuse_hoa, uh, unuse_entry);
+		}
+		break;
+
+	case SIOCGUNUSEHA:
+			/* Not yet */
+		break;
+
+	case SIOCDUNUSEHA:
+		{
+			struct mip6_unuse_hoa *uh, *nxt;
+
+			for (uh = LIST_FIRST(&mip6_unuse_hoa); uh; uh = nxt) {
+				nxt = LIST_NEXT(uh, unuse_entry);
+				if (IN6_ARE_ADDR_EQUAL(&uh->unuse_addr, 
+				    &mr->mip6r_ru.mip6r_sin6.sin6_addr) &&
+				    uh->unuse_port
+				    == mr->mip6r_ru.mip6r_sin6.sin6_port) {
+					LIST_REMOVE(uh, unuse_entry);
+					free(uh, M_IP6OPT);
+					break;
+				}
+			}
+			if (uh == NULL) {
+				splx(s);
+				return (ENOENT);
+			}
+		}
+		break;
+
 	}
 
 	splx(s);

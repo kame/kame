@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.16 2002/01/17 09:40:49 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.17 2002/01/21 07:49:27 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -73,6 +73,7 @@ static const char *bustate_sprintf __P((u_int8_t));
 static const char *bcflg_sprintf __P((u_int8_t));
 static struct hif_softc *get_hif_softc __P((char *));
 static void kread __P((u_long, void *, int));
+static int parse_address_port(char *, struct in6_addr *, uint16_t *);
 
 static const char *pfx_desc[] = {
 	"prefix\t\tplen\tvltime\tvlexp\tpltime\tplexp\thaddr\n",
@@ -107,6 +108,8 @@ struct nlist nl[] = {
 #define N_HIF_SOFTC_LIST 0
 	{ "_mip6_bc_list" },
 #define N_MIP6_BC_LIST 1
+	{ "_mip6_unuse_hoa" },
+#define N_MIP6_UNUSE_HOA 2
 	{ "" },
 };
 
@@ -136,8 +139,10 @@ main(argc, argv)
 	int gbu = 0;
 	int gbc = 0;
 	char kvm_err[_POSIX2_LINE_MAX];
+	int unuseha_s = 0, unuseha_d = 0, unuseha_g = 0;
+	char *uharg = NULL;
 
-	while ((ch = getopt(argc, argv, "mMngli:H:hP:A:L:abc")) != -1) {
+	while ((ch = getopt(argc, argv, "mMngli:H:hP:A:L:abcu:v:w")) != -1) {
 		switch(ch) {
 		case 'm':
 			enablemn = 1;
@@ -184,6 +189,17 @@ main(argc, argv)
 			break;
 		case 'c':
 			gbc = 1;
+			break;
+		case 'u':
+			unuseha_s = 1;
+			uharg = optarg;
+			break;
+		case 'v':
+			unuseha_d = 1;
+			uharg = optarg;
+			break;
+		case 'w':
+			unuseha_g = 1;
 			break;
 		}
 	}
@@ -438,6 +454,41 @@ main(argc, argv)
 			       bcflg_sprintf(mbc->mbc_state));
 		}
 	}
+
+	if (unuseha_s || unuseha_d) {
+		struct mip6_req mr;
+
+		if (parse_address_port(uharg, &mr.mip6r_ru.mip6r_sin6.sin6_addr,
+				    &mr.mip6r_ru.mip6r_sin6.sin6_port))
+			exit (-1);
+		if (ioctl(s, unuseha_s ? SIOCSUNUSEHA : SIOCDUNUSEHA
+		          , &mr) < 0) {
+			perror("ioctl");
+			exit(-1);
+		}
+	}
+
+	if (unuseha_g) {
+		struct mip6_unuse_hoa_list mip6_unuse_hoa_list;
+		struct mip6_unuse_hoa *uh, mip6_unuse_hoa;
+
+		if (nl[N_MIP6_UNUSE_HOA].n_value == 0) {
+			fprintf(stderr, "mip6_unuse_hoa not found\n");
+			exit(1);
+		}
+		KREAD(nl[N_MIP6_UNUSE_HOA].n_value, &mip6_unuse_hoa_list,
+		      mip6_unuse_hoa_list);
+		for (uh = LIST_FIRST(&mip6_unuse_hoa_list);
+		     uh;
+		     uh = LIST_NEXT(uh, unuse_entry)) {
+			KREAD(uh, &mip6_unuse_hoa, mip6_unuse_hoa);
+			uh = &mip6_unuse_hoa;
+			printf("%s", ip6_sprintf(&uh->unuse_addr));
+			if (uh->unuse_port)
+				printf("#%d", ntohs(uh->unuse_port));
+			printf("\n");
+		}
+	}
 	
 	exit(0);
 }
@@ -498,6 +549,44 @@ raflg_sprintf(flags)
 
 	return buf;
 }
+
+/* parse address and port in formart like 'addr#port' */
+/* ex) ::#80 means unspecified addr and port 80 */
+static int
+parse_address_port(arg, addr, port)
+	char *arg;
+	struct in6_addr *addr;
+	uint16_t *port;
+{
+	int error;
+	char *p = NULL;
+	struct addrinfo hints, *res;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
+	hints.ai_flags = AI_NUMERICHOST;
+	if ((p = strchr(arg, '#')))
+		*p++ = '\0';
+
+	error = getaddrinfo(arg, NULL, &hints, &res);
+	if (error) {
+		perror("getaddrinfo");
+		return 1;
+	}
+
+	if (res->ai_family == AF_INET6) 
+		*addr = ((struct sockaddr_in6 *)(res->ai_addr))->sin6_addr;
+	
+	if (p)
+		*port = htons(atoi(p));
+	else
+		*port = 0;
+	
+	freeaddrinfo(res);
+
+	return 0;
+}
+
 
 static const char *
 buflg_sprintf(flags)

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.44 2002/01/17 04:56:10 k-sugyou Exp $	*/
+/*	$KAME: mip6.h,v 1.45 2002/01/21 07:49:28 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -34,11 +34,15 @@
 #define SIOCENABLEMN _IOW('m', 120, int)
 #define SIOCENABLEHA _IOW('m', 121, int)
 #define SIOCGBC      _IOWR('m', 122, struct mip6_req)
+#define SIOCSUNUSEHA _IOW('m', 123, struct mip6_req)
+#define SIOCGUNUSEHA _IOWR('m', 124, struct mip6_req)
+#define SIOCDUNUSEHA _IOW('m', 125, struct mip6_req)
 
 struct mip6_req {
 	u_int8_t mip6r_count;
 	union {
 		struct mip6_bc *mip6r_mbc;
+		struct sockaddr_in6 mip6r_sin6;
 	} mip6r_ru;
 };
 
