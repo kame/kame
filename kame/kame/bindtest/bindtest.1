@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: bindtest.1,v 1.4 2000/01/19 06:24:51 itojun Exp $
+.\"     $Id: bindtest.1,v 1.5 2000/10/20 16:42:06 itojun Exp $
 .\"
 .Dd October 6, 1999
 .Dt BINDTEST 1
@@ -37,7 +37,7 @@
 .\"
 .Sh SYNOPSIS
 .Nm
-.Op Fl t
+.Op Fl st
 .Fl p Ar port
 .\"
 .Sh DESCRIPTION
@@ -84,6 +84,49 @@ TCP/UDP port number must be specified with
 The
 .Ar port
 needs to be vacant.
+.Pp
+With
+.Fl s ,
+.Nm
+generates summarized output instead of verbose output.
+Here are legends for summarized output.
+.Nm
+will make a two set of
+.Xr socket 2
+and
+.Xr bind 2 .
+The first set is presented above the table.
+The second set is presented on the lefthand side.
+.Bl -tag -width "xxxx"
+.It o
+The second
+.Xr bind 2
+attempt succeed after the first
+.Xr bind 2 .
+.It x
+.Xr bind 2
+failed for the second set, with
+.Dv EADDRINUSE .
+.It !1
+.Xr socket 2
+failed for the first set.
+Normally you will not see this, unless you run
+.Nm
+on IPv4-only/IPv6-only kernel.
+.It !2
+.Xr socket 2
+failed for the second set.
+Normally you will not see this, unless you run
+.Nm
+on IPv4-only/IPv6-only kernel.
+.It ?1
+.Xr bind 2
+failed for the first set.
+.It ?2
+.Xr bind 2
+failed for the second set, with some error other than
+.Dv EADDRINUSE .
+.El
 .\"
 .Sh RETURN VALUES
 .Nm
