@@ -18,8 +18,6 @@
 #include <sys/kernel.h>
 #include <sys/systm.h>
 
-#include <lib/libkern/libkern.h>
-
 #if NRND > 0
 #include <dev/rnd.h>
 #endif
