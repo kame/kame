@@ -1,4 +1,4 @@
-/*	$KAME: db.h,v 1.12 2001/05/02 11:07:57 itojun Exp $	*/
+/*	$KAME: db.h,v 1.13 2001/06/22 21:41:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -38,6 +38,7 @@ struct qcache {
 	u_int16_t id;	/* id on relayed query - net endian */
 	struct sockdb *sd;	/* inbound socket for query */
 	struct timeval ttq;	/* time to quit */
+	size_t rbuflen;	/* receive buffer size of the querier - for EDNS0 */
 };
 
 struct acache {

@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.52 2001/05/02 12:44:17 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.53 2001/06/22 21:41:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -921,8 +921,8 @@ getans(buf, len, from)
 
 		l16 = htons(len & 0xffff);
 		(void)write(qc->sd->s, &l16, sizeof(l16));
-	} else if (len > PACKETSZ) {
-		len = PACKETSZ;
+	} else if (len > qc->rbuflen) {
+		len = qc->rbuflen;
 		hp->tc = 1;
 	}
 	if (sendto(qc->sd->s, buf, len, 0, (struct sockaddr *)&qc->from,
@@ -970,6 +970,7 @@ relay(sd, buf, len, from)
 	int multicast, unicast;
 	const char *n = NULL;
 	const char *d;
+	enum sdtype servtype;	/* type of server we want to relay to */
 
 	if (sizeof(*hp) > len)
 		return -1;
@@ -999,13 +1000,10 @@ relay(sd, buf, len, from)
 		gettimeofday(&qc->ttq, NULL);
 		qc->ttq.tv_sec += MDNS_TIMEO;
 		qc->sd = sd;
+		qc->rbuflen = PACKETSZ;	/* should look at EDNS0 */
 
 		ord = hp->rd;
 
-		if (len > PACKETSZ) {
-			len = PACKETSZ;
-			hp->tc = 1;
-		}
 		qc->id = hp->id = htons(dnsid);
 		dnsid = (dnsid + 1) % 0x10000;
 
@@ -1024,8 +1022,16 @@ relay(sd, buf, len, from)
 				break;
 			}
 
-			sd = af2sockdb(ns->addr.ss_family,
-			    ns->type == N_MULTICAST ? S_MULTICAST : S_UNICAST);
+			if (len > PACKETSZ) {
+				if (multicast)
+					continue;
+				servtype = S_TCP;
+			} else if (ns->type == N_MULTICAST)
+				servtype = S_MULTICAST;
+			else
+				servtype = S_UNICAST;
+
+			sd = af2sockdb(ns->addr.ss_family, servtype);
 			if (sd == NULL)
 				continue;
 
@@ -1086,6 +1092,7 @@ serve(sd, buf, len, from)
 	int count;
 	int scoped, loopback;
 	const struct addrinfo *ai;
+	size_t rbuflen = PACKETSZ;	/* should look at EDNS0 */
 
 	if (dflag)
 		dnsdump("serve I", buf, len, from);
@@ -1150,7 +1157,7 @@ serve(sd, buf, len, from)
 
 			l16 = htons((p - replybuf) & 0xffff);
 			(void)write(sd->s, &l16, sizeof(l16));
-		} else if (p - replybuf > PACKETSZ) {
+		} else if (p - replybuf > rbuflen) {
 			p -= l;
 			hp->ancount = 0;
 			hp->tc = 1;
@@ -1202,8 +1209,8 @@ serve(sd, buf, len, from)
 
 			l16 = htons((p - replybuf) & 0xffff);
 			(void)write(sd->s, &l16, sizeof(l16));
-		} else if (p - replybuf > PACKETSZ) {
-			p = replybuf + PACKETSZ;
+		} else if (p - replybuf > rbuflen) {
+			p = replybuf + rbuflen;
 			hp->tc = 1;
 		}
 		sendto(sd->s, replybuf, p - replybuf, 0, from, from->sa_len);
