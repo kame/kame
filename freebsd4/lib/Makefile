@@ -1,4 +1,4 @@
 SUBDIR+=libinet6 libipsec
-SUBDIR+=libaltq libftpio
+SUBDIR+=libaltq
 
 .include <bsd.subdir.mk>
