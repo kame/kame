@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.32 2000/06/15 04:08:54 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.33 2000/06/19 14:31:49 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,7 +55,7 @@
 
 /*
  * Security Policy Index
- * NOTE: Encure to be same address family and upper layer protocol.
+ * NOTE: Ensure to be same address family and upper layer protocol.
  * NOTE: ul_proto, port number, uid, gid:
  *	ANY: reserved for waldcard.
  *	0 to (~0 - 1): is one of the number of each value.
