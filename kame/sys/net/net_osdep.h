@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.22 2000/08/15 07:23:10 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.23 2000/08/19 00:58:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -153,6 +153,9 @@
  * - IN_MULTICAST/IN_CLASS[A-D] macro.
  *	OpenBSD and NetBSD: net endian (kernel) or host endian (userland)
  *	others: always host endian
+ *
+ * - (m->m_flags & M_EXT) != 0 does *not* mean that the max data length of
+ *   the mbuf == MCLBYTES.
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
