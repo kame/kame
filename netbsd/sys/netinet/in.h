@@ -80,6 +80,9 @@
 #define	IPPROTO_RAW		255		/* raw IP packet */
 #define	IPPROTO_MAX		256
 
+/* last return value of *_input(), meaning "all job for this pkt is done".  */
+#define	IPPROTO_DONE		257
+
 
 /*
  * Local port number conventions:
@@ -186,9 +189,6 @@ struct in_addr {
 #define	INADDR_MAX_LOCAL_GROUP	__IPADDR(0xe00000ff)	/* 224.0.0.255 */
 
 #define	IN_LOOPBACKNET		127			/* official! */
-
-/* last return value of *_input(), meaning "all job for this pkt is done".  */
-#define	IPPROTO_DONE		257
 
 /*
  * Socket address, internet style.
