@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ptrace.h	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/sys/ptrace.h,v 1.10 1999/12/29 04:24:45 peter Exp $
+ * $FreeBSD: src/sys/sys/ptrace.h,v 1.10.2.1 2001/10/03 06:55:43 peter Exp $
  */
 
 #ifndef	_SYS_PTRACE_H_
@@ -40,10 +40,10 @@
 #define	PT_TRACE_ME	0	/* child declares it's being traced */
 #define	PT_READ_I	1	/* read word in child's I space */
 #define	PT_READ_D	2	/* read word in child's D space */
-#define	PT_READ_U	3	/* read word in child's user structure */
+/* was	PT_READ_U	3	 * read word in child's user structure */
 #define	PT_WRITE_I	4	/* write word in child's I space */
 #define	PT_WRITE_D	5	/* write word in child's D space */
-#define	PT_WRITE_U	6	/* write word in child's user structure */
+/* was	PT_WRITE_U	6	 * write word in child's user structure */
 #define	PT_CONTINUE	7	/* continue the child */
 #define	PT_KILL		8	/* kill the child process */
 #define	PT_STEP		9	/* single step the child */

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/nwfs/nwfs_vfsops.c,v 1.6.2.5 2001/07/26 20:37:29 iedowse Exp $
+ * $FreeBSD: src/sys/nwfs/nwfs_vfsops.c,v 1.6.2.6 2001/10/25 19:18:54 dillon Exp $
  */
 #include "opt_ncp.h"
 #ifndef NCP
@@ -476,9 +476,9 @@ nwfs_sync(mp, waitfor, cred, p)
 	 * Force stale buffer cache information to be flushed.
 	 */
 loop:
-	for (vp = LIST_FIRST(&mp->mnt_vnodelist);
+	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist);
 	     vp != NULL;
-	     vp = LIST_NEXT(vp, v_mntvnodes)) {
+	     vp = TAILQ_NEXT(vp, v_nmntvnodes)) {
 		/*
 		 * If the vnode that we are about to sync is no longer
 		 * associated with this mount point, start over.

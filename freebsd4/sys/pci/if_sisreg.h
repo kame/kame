@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sisreg.h,v 1.1.4.3 2001/02/21 22:17:51 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_sisreg.h,v 1.1.4.7 2002/01/13 00:32:22 wpaul Exp $
  */
 
 /*
@@ -105,6 +105,8 @@
 #define SIS_CSR_RX_RESET	0x00000020
 #define SIS_CSR_SOFTINTR	0x00000080
 #define SIS_CSR_RESET		0x00000100
+#define SIS_CSR_ACCESS_MODE	0x00000200
+#define SIS_CSR_RELOAD		0x00000400
 
 #define SIS_CFG_BIGENDIAN	0x00000001
 #define SIS_CFG_PERR_DETECT	0x00000008
@@ -185,6 +187,7 @@
 #define SIS_INTRS	\
 	(SIS_IMR_RX_OFLOW|SIS_IMR_TX_UFLOW|SIS_IMR_TX_OK|\
 	 SIS_IMR_TX_IDLE|SIS_IMR_RX_OK|SIS_IMR_RX_ERR|\
+	 SIS_IMR_RX_IDLE|\
 	 SIS_IMR_SYSERR)
 
 #define SIS_IER_INTRENB		0x00000001
@@ -305,7 +308,7 @@ struct sis_desc {
 
 #define SIS_LASTDESC(x)		(!((x)->sis_ctl & SIS_CMDSTS_MORE)))
 #define SIS_OWNDESC(x)		((x)->sis_ctl & SIS_CMDSTS_OWN)
-#define SIS_INC(x, y)		(x) = (x + 1) % y
+#define SIS_INC(x, y)		{ if (++(x) == y) x=0 ; }
 #define SIS_RXBYTES(x)		((x)->sis_ctl & SIS_CMDSTS_BUFLEN)
 
 #define SIS_RXSTAT_COLL		0x00010000
@@ -366,6 +369,8 @@ struct sis_ring_data {
 #define SIS_REV_630E		0x0081
 #define SIS_REV_630S		0x0082
 #define SIS_REV_630EA1		0x0083
+#define SIS_REV_630ET		0x0083
+#define SIS_REV_635		0x0090
 
 /*
  * NatSemi vendor ID
@@ -397,6 +402,7 @@ struct sis_softc {
 	device_t		sis_miibus;
 	u_int8_t		sis_unit;
 	u_int8_t		sis_type;
+	u_int8_t		sis_rev;
 	u_int8_t		sis_link;
 	struct sis_list_data	*sis_ldata;
 	struct sis_ring_data	sis_cdata;
@@ -411,6 +417,9 @@ struct sis_softc {
 
 #define CSR_READ_4(sc, reg)		\
 	bus_space_read_4(sc->sis_btag, sc->sis_bhandle, reg)
+
+#define CSR_READ_2(sc, reg)		\
+	bus_space_read_2(sc->sis_btag, sc->sis_bhandle, reg)
 
 #define SIS_TIMEOUT		1000
 #define ETHER_ALIGN		2

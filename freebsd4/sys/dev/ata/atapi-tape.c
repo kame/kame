@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000,2001 Søren Schmidt
+ * Copyright (c) 1998,1999,2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-tape.c,v 1.36.2.7 2001/08/28 17:56:14 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-tape.c,v 1.36.2.9 2002/01/02 15:30:23 sos Exp $
  */
 
 #include <sys/param.h>
@@ -96,14 +96,17 @@ astattach(struct atapi_softc *atp)
 	cdevsw_add(&ast_cdevsw);
 	ast_cdev_done = 1;
     }
+
     stp = malloc(sizeof(struct ast_softc), M_AST, M_NOWAIT | M_ZERO);
     if (!stp) {
 	printf("ast: out of memory\n");
 	return -1;
     }
-    bufq_init(&stp->bio_queue);
+
     stp->atp = atp;
     stp->lun = ata_get_lun(&ast_lun_map);
+    bufq_init(&stp->bio_queue);
+
     if (ast_sense(stp)) {
 	free(stp, M_AST);
 	return -1;
@@ -125,6 +128,7 @@ astattach(struct atapi_softc *atp)
 	ast_mode_select(stp, &identify, sizeof(identify));
 	ast_read_position(stp, 0, &position);
     }
+
     devstat_add_entry(&stp->stats, "ast", stp->lun, DEV_BSIZE,
 		      DEVSTAT_NO_ORDERED_TAGS,
 		      DEVSTAT_TYPE_SEQUENTIAL | DEVSTAT_TYPE_IF_IDE,

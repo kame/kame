@@ -1,7 +1,7 @@
 /*
  * Fundamental constants relating to ethernet.
  *
- * $FreeBSD: src/sys/net/ethernet.h,v 1.12.2.5 2000/07/19 21:43:52 archie Exp $
+ * $FreeBSD: src/sys/net/ethernet.h,v 1.12.2.6 2001/12/04 20:01:54 brooks Exp $
  *
  */
 
@@ -98,6 +98,41 @@ extern	void (*ng_ether_input_orphan_p)(struct ifnet *ifp,
 extern	int  (*ng_ether_output_p)(struct ifnet *ifp, struct mbuf **mp);
 extern	void (*ng_ether_attach_p)(struct ifnet *ifp);
 extern	void (*ng_ether_detach_p)(struct ifnet *ifp);
+
+extern	int (*vlan_input_p)(struct ether_header *eh, struct mbuf *m);
+extern	int (*vlan_input_tag_p)(struct ether_header *eh, struct mbuf *m,
+		u_int16_t t);
+#define _VLAN_INPUT(eh, m) do {					\
+	if (vlan_input_p != NULL) {				\
+		if ((*vlan_input_p)(eh, m) == -1)		\
+			(m)->m_pkthdr.rcvif->if_noproto++;	\
+	} else {						\
+		m_free(m);					\
+		(m)->m_pkthdr.rcvif->if_noproto++;		\
+	}							\
+} while (0)
+
+#define VLAN_INPUT(eh, m) do {					\
+	/* XXX: lock */						\
+	_VLAN_INPUT(eh, m);					\
+	/* XXX: unlock */					\
+} while (0)
+
+#define	_VLAN_INPUT_TAG(eh, m, t) do {			\
+	if (vlan_input_tag_p != NULL) { 			\
+		if ((*vlan_input_tag_p)(eh, m, t) == -1)	\
+			(m)->m_pkthdr.rcvif->if_noproto++;	\
+	} else {						\
+		m_free(m);					\
+		(m)->m_pkthdr.rcvif->if_noproto++;		\
+	}							\
+} while (0)
+
+#define VLAN_INPUT_TAG(eh, m, t) do {				\
+	/* XXX: lock */						\
+	_VLAN_INPUT_TAG(eh, m, t);				\
+	/* XXX: unlock */					\
+} while (0)
 
 #else /* _KERNEL */
 

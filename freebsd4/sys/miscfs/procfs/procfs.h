@@ -37,7 +37,7 @@
  *	@(#)procfs.h	8.9 (Berkeley) 5/14/95
  *
  * From:
- * $FreeBSD: src/sys/miscfs/procfs/procfs.h,v 1.32.2.2 2001/08/12 14:29:19 rwatson Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs.h,v 1.32.2.3 2002/01/22 17:22:59 nectar Exp $
  */
 
 /*
@@ -97,7 +97,7 @@ struct pfsnode {
      ((((p1)->p_cred->pc_ucred->cr_uid == (p2)->p_cred->p_ruid) && \
        ((p1)->p_cred->p_ruid == (p2)->p_cred->p_ruid) && \
        ((p1)->p_cred->p_svuid == (p2)->p_cred->p_ruid) && \
-       ((p2)->p_flag & P_SUGID) == 0) || \
+       ((p2)->p_flag & (P_SUGID|P_INEXEC)) == 0) || \
       (suser_xxx((p1)->p_cred->pc_ucred, (p1), PRISON_ROOT) == 0))
 
 /*

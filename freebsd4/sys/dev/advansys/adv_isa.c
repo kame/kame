@@ -44,7 +44,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/adv_isa.c,v 1.14.2.4 2001/06/02 04:38:50 nyan Exp $
+ * $FreeBSD: src/sys/dev/advansys/adv_isa.c,v 1.14.2.5 2002/01/06 21:21:42 dwmalone Exp $
  */
 
 #include <sys/param.h>
@@ -239,7 +239,7 @@ adv_isa_probe(device_t dev)
 			break;
 		}
 
-		adv->init_level++;
+		adv->init_level += 2;
 
 		if (overrun_buf == NULL) {
 			/* Need to allocate our overrun buffer */
@@ -280,6 +280,10 @@ adv_isa_probe(device_t dev)
 		adv->overrun_physbase = overrun_physbase;
 
 		if (adv_init(adv) != 0) {
+			bus_dmamap_unload(overrun_dmat, overrun_dmamap);
+			bus_dmamem_free(overrun_dmat, overrun_buf,
+			    overrun_dmamap);
+			bus_dma_tag_destroy(overrun_dmat);
 			adv_free(adv);
 			bus_release_resource(dev, SYS_RES_IOPORT, 0, iores);
 			break;
@@ -319,6 +323,10 @@ adv_isa_probe(device_t dev)
 		if (irqres == NULL ||
 		    bus_setup_intr(dev, irqres, INTR_TYPE_CAM, adv_intr, adv,
 				   &ih)) {
+			bus_dmamap_unload(overrun_dmat, overrun_dmamap);
+			bus_dmamem_free(overrun_dmat, overrun_buf,
+			    overrun_dmamap);
+			bus_dma_tag_destroy(overrun_dmat);
 			adv_free(adv);
 			bus_release_resource(dev, SYS_RES_IOPORT, 0, iores);
 			break;

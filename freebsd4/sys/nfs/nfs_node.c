@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_node.c	8.6 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/nfs/nfs_node.c,v 1.36.2.2 2001/06/26 04:20:10 bp Exp $
+ * $FreeBSD: src/sys/nfs/nfs_node.c,v 1.36.2.3 2002/01/05 22:25:04 dillon Exp $
  */
 
 
@@ -115,7 +115,7 @@ loop:
 		    bcmp((caddr_t)fhp, (caddr_t)np->n_fhp, fhsize))
 			continue;
 		vp = NFSTOV(np);
-		if (vget(vp, LK_EXCLUSIVE, p))
+		if (vget(vp, LK_EXCLUSIVE|LK_SLEEPFAIL, p))
 			goto loop;
 		*npp = np;
 		return(0);

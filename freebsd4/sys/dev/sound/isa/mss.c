@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.48.2.8 2001/08/01 03:40:55 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.48.2.9 2001/12/22 00:07:07 pb Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -816,7 +816,7 @@ ad_wait_init(struct mss_info *mss, int x)
 {
     	int arg = x, n = 0; /* to shut up the compiler... */
     	for (; x > 0; x--)
-		if ((n = io_rd(mss, MSS_INDEX)) & MSS_IDXBUSY) DELAY(10000);
+		if ((n = io_rd(mss, MSS_INDEX)) & MSS_IDXBUSY) DELAY(10);
 		else return n;
     	printf("AD_WAIT_INIT FAILED %d 0x%02x\n", arg, n);
     	return n;

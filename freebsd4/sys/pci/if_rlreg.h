@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.14.2.1 2001/07/19 18:33:07 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.14.2.2 2001/12/01 16:16:08 iwasaki Exp $
  */
 
 /*
@@ -368,6 +368,13 @@ struct rl_softc {
 	int			rl_txthresh;
 	struct rl_chain_data	rl_cdata;
 	struct callout_handle	rl_stat_ch;
+ 	int			suspended;	/* 0 = normal  1 = suspended */
+ 
+ 	u_int32_t		saved_maps[5];	/* pci data */
+ 	u_int32_t		saved_biosaddr;
+ 	u_int8_t		saved_intline;
+ 	u_int8_t		saved_cachelnsz;
+ 	u_int8_t		saved_lattimer;
 };
 
 /*

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_cache.c	8.5 (Berkeley) 3/22/95
- * $FreeBSD: src/sys/kern/vfs_cache.c,v 1.42.2.4 2001/03/21 10:50:58 peter Exp $
+ * $FreeBSD: src/sys/kern/vfs_cache.c,v 1.42.2.6 2001/10/05 20:07:03 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -405,6 +405,31 @@ cache_purgevfs(mp)
 }
 
 /*
+ * cache_leaf_test()
+ *
+ *	Test whether this (directory) vnode's namei cache entry contains
+ *	subdirectories or not.  Used to determine whether the directory is
+ *	a leaf in the namei cache or not.  Note: the directory may still
+ *	contain files in the namei cache.
+ *
+ *	Returns 0 if the directory is a leaf, -1 if it isn't.
+ */
+int
+cache_leaf_test(struct vnode *vp)
+{
+	struct namecache *ncpc;
+
+	for (ncpc = LIST_FIRST(&vp->v_cache_src);
+	     ncpc != NULL;
+	     ncpc = LIST_NEXT(ncpc, nc_src)
+	) {
+		if (ncpc->nc_vp != NULL && ncpc->nc_vp->v_type == VDIR)
+			return(-1);
+	}
+	return(0);
+}
+
+/*
  * Perform canonical checks and cache lookup and pass on to filesystem
  * through the vop_cachedlookup only if needed.
  */
@@ -536,8 +561,10 @@ __getcwd(p, uap)
 	slash_prefixed = 0;
 	for (vp = fdp->fd_cdir; vp != fdp->fd_rdir && vp != rootvnode;) {
 		if (vp->v_flag & VROOT) {
-			if (vp->v_mount == NULL)	/* forced unmount */
+			if (vp->v_mount == NULL) {	/* forced unmount */
+				free(buf, M_TEMP);
 				return (EBADF);
+			}
 			vp = vp->v_mount->mnt_vnodecovered;
 			continue;
 		}

@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.5.2.6 2001/02/16 17:37:48 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.5.2.9 2002/01/06 19:35:02 archie Exp $
  * $Whistle: ng_ksocket.c,v 1.1 1999/11/16 20:04:40 archie Exp $
  */
 
@@ -74,8 +74,12 @@
 struct ng_ksocket_private {
 	hook_p		hook;
 	struct socket	*so;
+	u_int32_t	flags;
 };
 typedef struct ng_ksocket_private *priv_p;
+
+/* Flags for priv_p */
+#define	KSF_SENDING	0x00000020	/* Sending on socket */
 
 /* Netgraph node methods */
 static ng_constructor_t	ng_ksocket_constructor;
@@ -116,7 +120,7 @@ static const struct ng_ksocket_alias ng_ksocket_types[] = {
 /* Protocol aliases */
 static const struct ng_ksocket_alias ng_ksocket_protos[] = {
 	{ "ip",		IPPROTO_IP,		PF_INET		},
-	{ "raw",	IPPROTO_IP,		PF_INET		},
+	{ "raw",	IPPROTO_RAW,		PF_INET		},
 	{ "icmp",	IPPROTO_ICMP,		PF_INET		},
 	{ "igmp",	IPPROTO_IGMP,		PF_INET		},
 	{ "tcp",	IPPROTO_TCP,		PF_INET		},
@@ -789,10 +793,39 @@ ng_ksocket_rcvdata(hook_p hook, struct mbuf *m, meta_p meta)
 	const node_p node = hook->node;
 	const priv_p priv = node->private;
 	struct socket *const so = priv->so;
+	struct sockaddr *sa = NULL;
 	int error;
 
+	/* Avoid reentrantly sending on the socket */
+	if ((priv->flags & KSF_SENDING) != 0) {
+		NG_FREE_DATA(m, meta);
+		return (EDEADLK);
+	}
+
+	/* If any meta info, look for peer socket address */
+	if (meta != NULL) {
+		struct meta_field_header *field;
+
+		/* Look for peer socket address */
+		for (field = &meta->options[0];
+		    (caddr_t)field < (caddr_t)meta + meta->used_len;
+		    field = (struct meta_field_header *)
+		      ((caddr_t)field + field->len)) {
+			if (field->cookie != NGM_KSOCKET_COOKIE
+			    || field->type != NG_KSOCKET_META_SOCKADDR)
+				continue;
+			sa = (struct sockaddr *)field->data;
+			break;
+		}
+	}
+
+	/* Send packet */
+	priv->flags |= KSF_SENDING;
+	error = (*so->so_proto->pr_usrreqs->pru_sosend)(so, sa, 0, m, 0, 0, p);
+	priv->flags &= ~KSF_SENDING;
+
+	/* Clean up and exit */
 	NG_FREE_META(meta);
-	error = (*so->so_proto->pr_usrreqs->pru_sosend)(so, 0, 0, m, 0, 0, p);
 	return (error);
 }
 
@@ -848,7 +881,6 @@ ng_ksocket_incoming(struct socket *so, void *arg, int waitflag)
 {
 	const node_p node = arg;
 	const priv_p priv = node->private;
-	meta_p meta = NULL;
 	struct mbuf *m;
 	struct uio auio;
 	int s, flags, error;
@@ -867,20 +899,55 @@ ng_ksocket_incoming(struct socket *so, void *arg, int waitflag)
 	auio.uio_procp = NULL;
 	auio.uio_resid = 1000000000;
 	flags = MSG_DONTWAIT;
-	do {
-		if ((error = (*so->so_proto->pr_usrreqs->pru_soreceive)
-		      (so, (struct sockaddr **)0, &auio, &m,
-		      (struct mbuf **)0, &flags)) == 0
-		    && m != NULL) {
-			struct mbuf *n;
+	while (1) {
+		struct sockaddr *sa = NULL;
+		meta_p meta = NULL;
+		struct mbuf *n;
 
-			/* Don't trust the various socket layers to get the
-			   packet header and length correct (eg. kern/15175) */
-			for (n = m, m->m_pkthdr.len = 0; n; n = n->m_next)
-				m->m_pkthdr.len += n->m_len;
-			NG_SEND_DATA(error, priv->hook, m, meta);
+		/* Try to get next packet from socket */
+		if ((error = (*so->so_proto->pr_usrreqs->pru_soreceive)
+		    (so, (so->so_state & SS_ISCONNECTED) ? NULL : &sa,
+		    &auio, &m, (struct mbuf **)0, &flags)) != 0)
+			break;
+
+		/* See if we got anything */
+		if (m == NULL) {
+			if (sa != NULL)
+				FREE(sa, M_SONAME);
+			break;
 		}
-	} while (error == 0 && m != NULL);
+
+		/* Don't trust the various socket layers to get the
+		   packet header and length correct (eg. kern/15175) */
+		for (n = m, m->m_pkthdr.len = 0; n != NULL; n = n->m_next)
+			m->m_pkthdr.len += n->m_len;
+
+		/* Put peer's socket address (if any) into a meta info blob */
+		if (sa != NULL) {
+			struct meta_field_header *mhead;
+			u_int len;
+
+			len = sizeof(*meta) + sizeof(*mhead) + sa->sa_len;
+			MALLOC(meta, meta_p, len, M_NETGRAPH, M_NOWAIT);
+			if (meta == NULL) {
+				FREE(sa, M_SONAME);
+				goto sendit;
+			}
+			mhead = &meta->options[0];
+			bzero(meta, sizeof(*meta));
+			bzero(mhead, sizeof(*mhead));
+			meta->allocated_len = len;
+			meta->used_len = len;
+			mhead->cookie = NGM_KSOCKET_COOKIE;
+			mhead->type = NG_KSOCKET_META_SOCKADDR;
+			mhead->len = sizeof(*mhead) + sa->sa_len;
+			bcopy(sa, mhead->data, sa->sa_len);
+			FREE(sa, M_SONAME);
+		}
+
+sendit:		/* Forward data with optional peer sockaddr as meta info */
+		NG_SEND_DATA(error, priv->hook, m, meta);
+	}
 	splx(s);
 }
 

@@ -33,7 +33,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_flow.c,v 1.9.2.1 2001/08/08 08:20:35 ru Exp $
+ * $FreeBSD: src/sys/netinet/ip_flow.c,v 1.9.2.2 2001/11/04 17:35:31 luigi Exp $
  */
 
 #include <sys/param.h>
@@ -199,7 +199,7 @@ ipflow_free(
 	ipflow_addstats(ipf);
 	RTFREE(ipf->ipf_ro.ro_rt);
 	ipflow_inuse--;
-	FREE(ipf, M_IPFLOW);
+	free(ipf, M_IPFLOW);
 }
 
 static struct ipflow *

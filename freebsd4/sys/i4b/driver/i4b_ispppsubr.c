@@ -15,7 +15,7 @@
  * or modify this software as long as this message is kept with the software,
  * all derivative works or modified versions.
  *
- * $FreeBSD: src/sys/i4b/driver/i4b_ispppsubr.c,v 1.11.2.1 2001/08/10 14:08:35 obrien Exp $
+ * $FreeBSD: src/sys/i4b/driver/i4b_ispppsubr.c,v 1.11.2.5 2002/01/08 06:49:04 joerg Exp $
  */
 
 #define USE_ISPPP
@@ -1497,6 +1497,16 @@ sppp_cp_input(const struct cp *cp, struct sppp *sp, struct mbuf *m)
 			/* fall through... */
 		case STATE_ACK_SENT:
 		case STATE_REQ_SENT:
+			/*
+			 * sppp_cp_change_state() have the side effect of
+			 * restarting the timeouts. We want to avoid that
+			 * if the state don't change, otherwise we won't
+			 * ever timeout and resend a configuration request
+			 * that got lost.
+			 */
+			if (sp->state[cp->protoidx] == (rv ? STATE_ACK_SENT:
+			    STATE_REQ_SENT))
+				break;
 			sppp_cp_change_state(cp, sp, rv?
 					     STATE_ACK_SENT: STATE_REQ_SENT);
 			break;
@@ -2558,7 +2568,7 @@ sppp_lcp_tlu(struct sppp *sp)
 
 	/* Send Up events to all started protos. */
 	for (i = 0, mask = 1; i < IDX_COUNT; i++, mask <<= 1)
-		if (sp->lcp.protos & mask && ((cps[i])->flags & CP_LCP) == 0)
+		if ((sp->lcp.protos & mask) && ((cps[i])->flags & CP_LCP) == 0)
 			(cps[i])->Up(sp);
 
 	/* notify low-level driver of state change */
@@ -2590,7 +2600,7 @@ sppp_lcp_tld(struct sppp *sp)
 	 * describes it.
 	 */
 	for (i = 0, mask = 1; i < IDX_COUNT; i++, mask <<= 1)
-		if (sp->lcp.protos & mask && ((cps[i])->flags & CP_LCP) == 0) {
+		if ((sp->lcp.protos & mask) && ((cps[i])->flags & CP_LCP) == 0) {
 			(cps[i])->Down(sp);
 			(cps[i])->Close(sp);
 		}
@@ -2684,7 +2694,7 @@ sppp_ncp_check(struct sppp *sp)
 	int i, mask;
 
 	for (i = 0, mask = 1; i < IDX_COUNT; i++, mask <<= 1)
-		if (sp->lcp.protos & mask && (cps[i])->flags & CP_NCP)
+		if ((sp->lcp.protos & mask) && (cps[i])->flags & CP_NCP)
 			return 1;
 	return 0;
 }
@@ -4294,6 +4304,9 @@ sppp_set_ip_addr(struct sppp *sp, u_long src)
 			" failed, error=%d\n", SPP_ARGS(ifp), error);
 		}
 #else
+#if __FreeBSD_version >= 450000
+		struct in_ifaddr *ia = ifatoia(ifa);
+#endif
 		/* delete old route */
 		error = rtinit(ifa, (int)RTM_DELETE, RTF_HOST);
 		if(debug && error)
@@ -4304,7 +4317,10 @@ sppp_set_ip_addr(struct sppp *sp, u_long src)
 
 		/* set new address */
 		si->sin_addr.s_addr = htonl(src);
-
+#if __FreeBSD_version >= 450000
+		LIST_REMOVE(ia, ia_hash);
+		LIST_INSERT_HEAD(INADDR_HASH(si->sin_addr.s_addr), ia, ia_hash);
+#endif
 		/* add new route */
 		error = rtinit(ifa, (int)RTM_ADD, RTF_HOST);		
 		if (debug && error)
@@ -4469,7 +4485,7 @@ sppp_phase_network(struct sppp *sp)
 
 	/* Send Up events to all NCPs. */
 	for (i = 0, mask = 1; i < IDX_COUNT; i++, mask <<= 1)
-		if (sp->lcp.protos & mask && ((cps[i])->flags & CP_NCP))
+		if ((sp->lcp.protos & mask) && ((cps[i])->flags & CP_NCP))
 			(cps[i])->Up(sp);
 
 	/* if no NCP is starting, all this was in vain, close down */

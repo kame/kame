@@ -37,7 +37,7 @@
  *
  *	@(#)procfs_mem.c	8.5 (Berkeley) 6/15/94
  *
- * $FreeBSD: src/sys/miscfs/procfs/procfs_mem.c,v 1.46.2.2 2001/08/12 14:29:19 rwatson Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_mem.c,v 1.46.2.3 2002/01/22 17:22:59 nectar Exp $
  */
 
 /*
@@ -244,6 +244,9 @@ procfs_domem(curp, p, pfs, uio)
 	if (uio->uio_resid == 0)
 		return (0);
 
+	/* Can't trace a process that's currently exec'ing. */ 
+	if ((p->p_flag & P_INEXEC) != 0)
+		return EAGAIN;
  	if (!CHECKIO(curp, p) || p_trespass(curp, p))
  		return EPERM;
 

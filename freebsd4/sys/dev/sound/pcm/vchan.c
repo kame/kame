@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/vchan.c,v 1.5.2.1 2001/08/01 03:41:03 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/vchan.c,v 1.5.2.2 2001/12/23 17:58:12 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -95,6 +95,8 @@ feed_vchan_s16(struct pcm_feeder *f, struct pcm_channel *c, u_int8_t *b, u_int32
 	SLIST_FOREACH(cce, &c->children, link) {
 		ch = cce->channel;
 		if (ch->flags & CHN_F_TRIGGERED) {
+			if (ch->flags & CHN_F_MAPPED)
+				sndbuf_acquire(ch->bufsoft, NULL, sndbuf_getfree(ch->bufsoft));
 			cnt = FEEDER_FEED(ch->feeder, ch, (u_int8_t *)tmp, count, ch->bufsoft);
 			vchan_mix_s16(dst, tmp, cnt / 2);
 		}

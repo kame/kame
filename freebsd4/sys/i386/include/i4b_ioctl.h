@@ -27,9 +27,9 @@
  *	i4b_ioctl.h - messages kernel <--> userland
  *	-------------------------------------------
  *
- * $FreeBSD: src/sys/i386/include/i4b_ioctl.h,v 1.6.2.2 2001/09/11 09:49:53 kris Exp $
+ * $FreeBSD: src/sys/i386/include/i4b_ioctl.h,v 1.6.2.4 2001/12/16 15:12:10 hm Exp $
  *
- *      last edit-date: [Sat Jul 21 12:24:56 2001]
+ *      last edit-date: [Sun Dec 16 15:09:12 2001]
  *
  *---------------------------------------------------------------------------*/
 
@@ -46,7 +46,7 @@
  *	version and release number for isdn4bsd package
  *---------------------------------------------------------------------------*/
 #define	VERSION		1		/* version number	*/
-#define	REL		0		/* release number	*/
+#define	REL		1		/* release number	*/
 #define STEP		1		/* release step		*/
 
 /*---------------------------------------------------------------------------*
@@ -136,7 +136,7 @@
 #define CARD_TYPEP_CCD_HFCS_PCI	28	/* Cologne Chip HFC-S PCI based	*/
 #define	CARD_TYPEP_NETJET_S	29	/* Traverse NetJet-S (Tiger300) */
 #define	CARD_TYPEP_DIVA_ISA	30	/* Eicon DIVA ISA PnP 2.0 or 2.02 */
-
+#define CARD_TYPEP_COMPAQ_M610	31	/* Compaq Microcom 610 		*/
 /*
  * in case you add support for more cards, please update:
  *
@@ -145,7 +145,7 @@
  * and adjust CARD_TYPEP_MAX below.
  */
 
-#define CARD_TYPEP_MAX		30	/* max type */
+#define CARD_TYPEP_MAX		31	/* max type */
 
 /*---------------------------------------------------------------------------*
  *	card types for CTRL_DAIC
@@ -170,6 +170,7 @@
 #define TELNO_MAX	41  /* max length of a telephone number (+ '\0')  */
 #define DISPLAY_MAX	91  /* max length of display information (+ '\0') */
 #define DATETIME_MAX	21  /* max length of datetime information (+ '\0')*/
+#define KEYPAD_MAX	35  /* max length of a keypad string (+ '\0')     */
 
 /*---------------------------------------------------------------------------*
  *	in case the src or dst telephone number is empty
@@ -318,6 +319,7 @@ typedef struct {
 #define	MSG_IFSTATE_CHANGED_IND	'o'
 #define MSG_DIALOUTNUMBER_IND	'p'
 #define MSG_PACKET_IND		'q'
+#define MSG_KEYPAD_IND		'r'
 	int		cdid;		/* call descriptor id		*/
 } msg_hdr_t;
 
@@ -408,6 +410,17 @@ typedef struct {
 	int		cmdlen;		/* length of string	*/
 	char		cmd[TELNO_MAX];	/* the number to dial	*/	
 } msg_dialoutnumber_ind_t;
+
+/*---------------------------------------------------------------------------*
+ *	send keypad string
+ *---------------------------------------------------------------------------*/
+typedef struct {
+	msg_hdr_t	header;		/* common header	*/
+	int		driver;		/* driver type		*/
+	int		driver_unit;	/* driver unit number	*/
+	int		cmdlen;		/* length of string	*/
+	char		cmd[KEYPAD_MAX];/* keypad string	*/	
+} msg_keypad_ind_t;
 
 /*---------------------------------------------------------------------------*
  *	idle timeout disconnect sent indication
@@ -556,6 +569,7 @@ typedef struct {
 #define  ULEN_METHOD_DYNAMIC 1	/* use AOCD */	
 	char		dst_telno[TELNO_MAX];	/* destination telephone no  */
 	char		src_telno[TELNO_MAX];	/* source telephone number   */
+	char		keypad[KEYPAD_MAX];	/* keypad string 	     */	
 } msg_connect_req_t;
 
 #define	I4B_CONNECT_REQ	_IOW('4', 1, msg_connect_req_t)

@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_param.h,v 1.13 1999/12/29 04:55:12 peter Exp $
+ * $FreeBSD: src/sys/vm/vm_param.h,v 1.13.2.1 2001/11/03 01:41:10 ps Exp $
  */
 
 /*
@@ -121,6 +121,12 @@
 #ifdef _KERNEL
 #define num_pages(x) \
 	((vm_offset_t)((((vm_offset_t)(x)) + PAGE_MASK) >> PAGE_SHIFT))
+extern	u_quad_t maxtsiz;
+extern	u_quad_t dfldsiz;
+extern	u_quad_t maxdsiz;
+extern	u_quad_t dflssiz;
+extern	u_quad_t maxssiz;
+extern	u_quad_t sgrowsiz;
 #endif				/* _KERNEL */
 #endif				/* ASSEMBLER */
 #endif				/* _VM_PARAM_ */

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ntfs/ntfs_vfsops.c,v 1.20.2.1 2001/07/26 20:37:27 iedowse Exp $
+ * $FreeBSD: src/sys/ntfs/ntfs_vfsops.c,v 1.20.2.5 2001/12/25 01:44:45 dillon Exp $
  */
 
 
@@ -501,6 +501,17 @@ ntfs_mountfs(devvp, mp, argsp, p)
 	ntmp->ntm_gid = argsp->gid;
 	ntmp->ntm_mode = argsp->mode;
 	ntmp->ntm_flag = argsp->flag;
+
+	/* Copy in the 8-bit to Unicode conversion table */
+	if (argsp->flag & NTFSMNT_U2WTABLE) {
+		ntfs_82u_init(ntmp, argsp->u2w);
+	} else {
+		ntfs_82u_init(ntmp, NULL);
+	}
+
+	/* Initialize Unicode to 8-bit table from 8toU table */
+	ntfs_u28_init(ntmp, ntmp->ntm_82u);
+
 	mp->mnt_data = (qaddr_t)ntmp;
 
 	dprintf(("ntfs_mountfs(): case-%s,%s uid: %d, gid: %d, mode: %o\n",
@@ -697,6 +708,8 @@ ntfs_unmount(
 	ntfs_toupper_unuse();
 
 	dprintf(("ntfs_umount: freeing memory...\n"));
+	ntfs_u28_uninit(ntmp);
+	ntfs_82u_uninit(ntmp);
 	mp->mnt_data = (qaddr_t)0;
 	mp->mnt_flag &= ~MNT_LOCAL;
 	FREE(ntmp->ntm_ad, M_NTFSMNT);
@@ -836,8 +849,7 @@ ntfs_fhtovp(
 	struct ntfid *ntfhp = (struct ntfid *)fhp;
 	int error;
 
-	ddprintf(("ntfs_fhtovp(): %s: %d\n", mp->mnt_stat->f_mntonname,
-		ntfhp->ntfid_ino));
+	ddprintf(("ntfs_fhtovp(): %d\n", ntfhp->ntfid_ino));
 
 	if ((error = VFS_VGET(mp, ntfhp->ntfid_ino, &nvp)) != 0) {
 		*vpp = NULLVP;
@@ -858,8 +870,7 @@ ntfs_vptofh(
 	register struct ntnode *ntp;
 	register struct ntfid *ntfhp;
 
-	ddprintf(("ntfs_fhtovp(): %s: %p\n", vp->v_mount->mnt_stat->f_mntonname,
-		vp));
+	ddprintf(("ntfs_fhtovp(): %p\n", vp));
 
 	ntp = VTONT(vp);
 	ntfhp = (struct ntfid *)fhp;
@@ -957,7 +968,7 @@ ntfs_vgetex(
 	dprintf(("ntfs_vget: vnode: %p for ntnode: %d\n", vp,ino));
 
 #ifdef __FreeBSD__
-	lockinit(&fp->f_lock, PINOD, "fnode", 0, 0);
+	lockinit(&fp->f_lock, PINOD, "fnode", VLKTIMEOUT, 0);
 #endif
 	fp->f_vp = vp;
 	vp->v_data = fp;
@@ -976,7 +987,6 @@ ntfs_vgetex(
 		}
 	}
 
-	VREF(ip->i_devvp);
 	*vpp = vp;
 	return (0);
 	

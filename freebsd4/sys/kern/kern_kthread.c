@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_kthread.c,v 1.5.2.2 2001/06/15 09:37:55 scottl Exp $
+ * $FreeBSD: src/sys/kern/kern_kthread.c,v 1.5.2.3 2001/12/25 01:51:14 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -119,6 +119,7 @@ suspend_kproc(struct proc *p, int timo)
 	if ((p->p_flag & P_SYSTEM) == 0)
 		return (EINVAL);
 	SIGADDSET(p->p_siglist, SIGSTOP);
+	wakeup(p);
 	return tsleep((caddr_t)&p->p_siglist, PPAUSE, "suspkp", timo);
 }
 

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)timeb.h	8.2 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/timeb.h,v 1.6 1999/08/28 00:52:04 peter Exp $
+ * $FreeBSD: src/sys/sys/timeb.h,v 1.6.2.1 2001/12/10 20:33:59 dwmalone Exp $
  */
 
 #ifndef _SYS_TIMEB_H_
@@ -49,5 +49,13 @@ struct timeb {
 	short	timezone;		/* minutes west of CUT */
 	short	dstflag;		/* DST == non-zero */
 };
+
+#ifndef _KERNEL
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
+int ftime __P((struct timeb *));
+__END_DECLS
+#endif /* _KERNEL */
 
 #endif

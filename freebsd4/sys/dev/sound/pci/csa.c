@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/csa.c,v 1.8.2.8 2001/08/02 14:55:19 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/csa.c,v 1.8.2.9 2001/11/29 16:16:32 bmah Exp $
  */
 
 #include <sys/param.h>
@@ -157,8 +157,7 @@ static struct csa_card cards_4614[] = {
 	{0x1071, 0x6003, "Mitac MI6020/21", amp_voyetra, NULL, NULL, 0},
 	{0x14AF, 0x0050, "Hercules Game Theatre XP", NULL, NULL, NULL, 0},
 	{0x1681, 0x0050, "Hercules Game Theatre XP", NULL, NULL, NULL, 0},
-	/* Not sure if the 570 needs the clkrun hack */
-	{0x1014, 0x0132, "Thinkpad 570", amp_none, NULL, clkrun_hack, 0},
+	{0x1014, 0x0132, "Thinkpad 570", amp_none, NULL, NULL, 0},
 	{0x1014, 0x0153, "Thinkpad 600X/A20/T20", amp_none, NULL, clkrun_hack, 0},
 	{0x1014, 0x1010, "Thinkpad 600E (unsupported)", NULL, NULL, NULL, 0},
 	{0, 0, "Unknown/invalid SSID (CS4614)", NULL, NULL, NULL, 0},

@@ -25,14 +25,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.110.2.7 2001/08/31 02:17:02 jlemon Exp $
+ * $FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.110.2.16 2002/01/24 16:07:03 jlemon Exp $
  */
 
 /*
  * Intel EtherExpress Pro/100B PCI Fast Ethernet driver
  */
-
-#include "vlan.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -41,6 +39,7 @@
 		/* #include <sys/mutex.h> */
 #include <sys/kernel.h>
 #include <sys/socket.h>
+#include <sys/sysctl.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -65,10 +64,8 @@
 #include <vm/pmap.h>		/* for vtophys */
 #include <machine/clock.h>	/* for DELAY */
 
-#if NVLAN > 0
 #include <net/if_types.h>
 #include <net/if_vlan_var.h>
-#endif
 
 #include <pci/pcivar.h>
 #include <pci/pcireg.h>		/* for PCIM_CMD_xxx */
@@ -78,18 +75,10 @@
 
 #include <dev/fxp/if_fxpreg.h>
 #include <dev/fxp/if_fxpvar.h>
+#include <dev/fxp/rcvbundl.h>
 
 MODULE_DEPEND(fxp, miibus, 1, 1, 1);
 #include "miibus_if.h"
-
-#ifdef KLD_MODULE
-#define NMIIBUS 1
-#else
-#include "miibus.h"
-#endif
-#if NMIIBUS < 1
-#error "You need to add 'device miibus' to your kernel config!"
-#else
 
 /*
  * NOTE!  On the Alpha, we have an alignment constraint.  The
@@ -191,6 +180,7 @@ static int		fxp_ioctl(struct ifnet *ifp, u_long command,
 			    caddr_t data);
 static void 		fxp_watchdog(struct ifnet *ifp);
 static int		fxp_add_rfabuf(struct fxp_softc *sc, struct mbuf *oldm);
+static int		fxp_mc_addrs(struct fxp_softc *sc);
 static void		fxp_mc_setup(struct fxp_softc *sc);
 static u_int16_t	fxp_eeprom_getword(struct fxp_softc *sc, int offset,
 			    int autosize);
@@ -210,6 +200,11 @@ static void		fxp_serial_ifmedia_sts(struct ifnet *ifp,
 static volatile int	fxp_miibus_readreg(device_t dev, int phy, int reg);
 static void		fxp_miibus_writereg(device_t dev, int phy, int reg,
 			    int value);
+static void		fxp_load_ucode(struct fxp_softc *sc);
+static int		sysctl_int_range(SYSCTL_HANDLER_ARGS,
+			    int low, int high);
+static int		sysctl_hw_fxp_bundle_max(SYSCTL_HANDLER_ARGS);
+static int		sysctl_hw_fxp_int_delay(SYSCTL_HANDLER_ARGS);
 static __inline void	fxp_lwcopy(volatile u_int32_t *src,
 			    volatile u_int32_t *dst);
 static __inline void 	fxp_scb_wait(struct fxp_softc *sc);
@@ -364,6 +359,7 @@ fxp_attach(device_t dev)
 	bzero(sc, sizeof(*sc));
 	sc->dev = dev;
 	callout_handle_init(&sc->stat_ch);
+	sysctl_ctx_init(&sc->sysctl_ctx);
 	mtx_init(&sc->sc_mtx, device_get_nameunit(dev), MTX_DEF | MTX_RECURSE);
 
 	s = splimp(); 
@@ -483,18 +479,47 @@ fxp_attach(device_t dev)
 		sc->flags |= FXP_FLAG_SERIAL_MEDIA;
 
 	/*
-	 * Find out the basic controller type; we currently only
-	 * differentiate between a 82557 and greater.
+	 * Create the sysctl tree
+	 */
+	sc->sysctl_tree = SYSCTL_ADD_NODE(&sc->sysctl_ctx,
+	    SYSCTL_STATIC_CHILDREN(_hw), OID_AUTO,
+	    device_get_nameunit(dev), CTLFLAG_RD, 0, "");
+	if (sc->sysctl_tree == NULL)
+		goto fail;
+	SYSCTL_ADD_PROC(&sc->sysctl_ctx, SYSCTL_CHILDREN(sc->sysctl_tree),
+	    OID_AUTO, "int_delay", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_PRISON,
+	    &sc->tunable_int_delay, 0, &sysctl_hw_fxp_int_delay, "I",
+	    "FXP driver receive interrupt microcode bundling delay");
+	SYSCTL_ADD_PROC(&sc->sysctl_ctx, SYSCTL_CHILDREN(sc->sysctl_tree),
+	    OID_AUTO, "bundle_max", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_PRISON,
+	    &sc->tunable_bundle_max, 0, &sysctl_hw_fxp_bundle_max, "I",
+	    "FXP driver receive interrupt microcode bundle size limit");
+
+	/*
+	 * Pull in device tunables.
+	 */
+	sc->tunable_int_delay = TUNABLE_INT_DELAY;
+	sc->tunable_bundle_max = TUNABLE_BUNDLE_MAX;
+	(void) resource_int_value(device_get_name(dev), device_get_unit(dev),
+	    "int_delay", &sc->tunable_int_delay);
+	(void) resource_int_value(device_get_name(dev), device_get_unit(dev),
+	    "bundle_max", &sc->tunable_bundle_max);
+
+	/*
+	 * Find out the chip revision; lump all 82557 revs together.
 	 */
 	fxp_read_eeprom(sc, &data, 5, 1);
 	if ((data >> 8) == 1)
-		sc->chip = FXP_CHIP_82557;
+		sc->revision = FXP_REV_82557;
+	else
+		sc->revision = pci_get_revid(dev);
 
 	/*
 	 * Enable workarounds for certain chip revision deficiencies.
 	 *
-	 * Systems based on the ICH2/ICH2-M chip from Intel have a defect
-	 * where the chip can cause a PCI protocol violation if it receives
+	 * Systems based on the ICH2/ICH2-M chip from Intel, and possibly
+	 * some systems based a normal 82559 design, have a defect where
+	 * the chip can cause a PCI protocol violation if it receives
 	 * a CU_RESUME command when it is entering the IDLE state.  The 
 	 * workaround is to disable Dynamic Standby Mode, so the chip never
 	 * deasserts CLKRUN#, and always remains in an active state.
@@ -502,14 +527,15 @@ fxp_attach(device_t dev)
 	 * See Intel 82801BA/82801BAM Specification Update, Errata #30.
 	 */
 	i = pci_get_device(dev);
-	if (i == 0x2449 || (i > 0x1030 && i < 0x1039)) {
+	if (i == 0x2449 || (i > 0x1030 && i < 0x1039) ||
+	    sc->revision >= FXP_REV_82559_A0) {
 		fxp_read_eeprom(sc, &data, 10, 1);
 		if (data & 0x02) {			/* STB enable */
 			u_int16_t cksum;
 			int i;
 
 			device_printf(dev,
-		    "*** DISABLING DYNAMIC STANDBY MODE IN EEPROM ***\n");
+			    "Disabling dynamic standby mode in EEPROM\n");
 			data &= ~0x02;
 			fxp_write_eeprom(sc, &data, 10, 1);
 			device_printf(dev, "New EEPROM ID: 0x%x\n", data);
@@ -525,15 +551,6 @@ fxp_attach(device_t dev)
 			device_printf(dev,
 			    "EEPROM checksum @ 0x%x: 0x%x -> 0x%x\n",
 			    i, data, cksum);
-			/*
-			 * We need to do a full PCI reset here.  A software 
-			 * reset to the port doesn't cut it, but let's try
-			 * anyway.
-			 */
-			CSR_WRITE_4(sc, FXP_CSR_PORT, FXP_PORT_SOFTWARE_RESET);
-			DELAY(50);
-			device_printf(dev,
-	    "*** PLEASE REBOOT THE SYSTEM NOW FOR CORRECT OPERATION ***\n");
 #if 1
 			/*
 			 * If the user elects to continue, try the software
@@ -547,7 +564,7 @@ fxp_attach(device_t dev)
 	/*
 	 * If we are not a 82557 chip, we can enable extended features.
 	 */
-	if (sc->chip != FXP_CHIP_82557) {
+	if (sc->revision != FXP_REV_82557) {
 		/*
 		 * If MWI is enabled in the PCI configuration, and there
 		 * is a valid cacheline size (8 or 16 dwords), then tell
@@ -559,10 +576,9 @@ fxp_attach(device_t dev)
 
 		/* turn on the extended TxCB feature */
 		sc->flags |= FXP_FLAG_EXT_TXCB;
-#if NVLAN > 0
+
 		/* enable reception of long frames for VLAN */
 		sc->flags |= FXP_FLAG_LONG_PKT_EN;
-#endif
 	}
 
 	/*
@@ -577,7 +593,9 @@ fxp_attach(device_t dev)
 		    pci_get_vendor(dev), pci_get_device(dev),
 		    pci_get_subvendor(dev), pci_get_subdevice(dev),
 		    pci_get_revid(dev));
-		device_printf(dev, "Chip Type: %d\n", sc->chip);
+		fxp_read_eeprom(sc, &data, 10, 1);
+		device_printf(dev, "Dynamic Standby mode is %s\n",
+		    data & 0x02 ? "enabled" : "disabled");
 	}
 
 	/*
@@ -620,12 +638,10 @@ fxp_attach(device_t dev)
 	 */
 	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
-#if NVLAN > 0
 	/*
 	 * Tell the upper layer(s) we support long frames.
 	 */
 	ifp->if_data.ifi_hdrlen = sizeof(struct ether_vlan_header);
-#endif
 
 	/*
 	 * Let the system queue as many packets as we have available
@@ -671,6 +687,9 @@ fxp_release(struct fxp_softc *sc)
 		bus_release_resource(sc->dev, SYS_RES_IRQ, 0, sc->irq);
 	if (sc->mem)
 		bus_release_resource(sc->dev, sc->rtp, sc->rgd, sc->mem);
+
+        sysctl_ctx_free(&sc->sysctl_ctx);
+
 	mtx_destroy(&sc->sc_mtx);
 }
 
@@ -1225,7 +1244,7 @@ rcvloop:
 						m_freem(m);
 						goto rcvloop;
 					}
-#if NVLAN > 0
+
 					/*
 					 * Drop the packet if it has CRC
 					 * errors.  This test is only needed
@@ -1237,7 +1256,7 @@ rcvloop:
 						m_freem(m);
 						goto rcvloop;
 					}
-#endif
+
 					m->m_pkthdr.rcvif = ifp;
 					m->m_pkthdr.len = m->m_len = total_len;
 					eh = mtod(m, struct ether_header *);
@@ -1392,10 +1411,11 @@ fxp_stop(struct fxp_softc *sc)
 	untimeout(fxp_tick, sc, sc->stat_ch);
 
 	/*
-	 * Issue software reset
+	 * Issue software reset, which also unloads the microcode.
 	 */
-	CSR_WRITE_4(sc, FXP_CSR_PORT, FXP_PORT_SELECTIVE_RESET);
-	DELAY(10);
+	sc->flags &= ~FXP_FLAG_UCODE;
+	CSR_WRITE_4(sc, FXP_CSR_PORT, FXP_PORT_SOFTWARE_RESET);
+	DELAY(50);
 
 	/*
 	 * Release any xmit buffers.
@@ -1455,6 +1475,7 @@ fxp_init(void *xsc)
 	struct fxp_cb_config *cbp;
 	struct fxp_cb_ias *cb_ias;
 	struct fxp_cb_tx *txp;
+	struct fxp_cb_mcs *mcsp;
 	int i, prm, s;
 
 	s = splimp();
@@ -1481,6 +1502,30 @@ fxp_init(void *xsc)
 	fxp_scb_wait(sc);
 	CSR_WRITE_4(sc, FXP_CSR_SCB_GENERAL, vtophys(sc->fxp_stats));
 	fxp_scb_cmd(sc, FXP_SCB_COMMAND_CU_DUMP_ADR);
+
+	/*
+	 * Attempt to load microcode if requested.
+	 */
+	if (ifp->if_flags & IFF_LINK0 && (sc->flags & FXP_FLAG_UCODE) == 0)
+		fxp_load_ucode(sc);
+
+	/*
+	 * Initialize the multicast address list.
+	 */
+	if (fxp_mc_addrs(sc)) {
+		mcsp = sc->mcsp;
+		mcsp->cb_status = 0;
+		mcsp->cb_command = FXP_CB_COMMAND_MCAS | FXP_CB_COMMAND_EL;
+		mcsp->link_addr = -1;
+		/*
+	 	 * Start the multicast setup command.
+		 */
+		fxp_scb_wait(sc);
+		CSR_WRITE_4(sc, FXP_CSR_SCB_GENERAL, vtophys(&mcsp->cb_status));
+		fxp_scb_cmd(sc, FXP_SCB_COMMAND_CU_START);
+		/* ...and wait for it to complete. */
+		fxp_dma_wait(&mcsp->cb_status, sc);
+	}
 
 	/*
 	 * We temporarily use memory that contains the TxCB list to
@@ -1519,11 +1564,7 @@ fxp_init(void *xsc)
 	cbp->ext_txcb_dis = 	sc->flags & FXP_FLAG_EXT_TXCB ? 0 : 1;
 	cbp->ext_stats_dis = 	1;	/* disable extended counters */
 	cbp->keep_overrun_rx = 	0;	/* don't pass overrun frames to host */
-#if NVLAN > 0
-	cbp->save_bf =		sc->chip == FXP_CHIP_82557 ? 1 : prm;
-#else
-	cbp->save_bf =		prm;	/* save bad frames */
-#endif
+	cbp->save_bf =		sc->revision == FXP_REV_82557 ? 1 : prm;
 	cbp->disc_short_rx =	!prm;	/* discard short packets */
 	cbp->underrun_retry =	1;	/* retry mode (once) on DMA underrun */
 	cbp->two_frames =	0;	/* do not limit FIFO to 2 frames */
@@ -1560,7 +1601,7 @@ fxp_init(void *xsc)
 	cbp->multi_ia =		0;	/* (don't) accept multiple IAs */
 	cbp->mc_all =		sc->flags & FXP_FLAG_ALL_MCAST ? 1 : 0;
 
-	if (sc->chip == FXP_CHIP_82557) {
+	if (sc->revision == FXP_REV_82557) {
 		/*
 		 * The 82557 has no hardware flow control, the values
 		 * below are the defaults for the chip.
@@ -1737,6 +1778,8 @@ fxp_add_rfabuf(struct fxp_softc *sc, struct mbuf *oldm)
 	if (m != NULL) {
 		MCLGET(m, M_DONTWAIT);
 		if ((m->m_flags & M_EXT) == 0) {
+			device_printf(sc->dev,
+			    "cluster allocation failed, packet dropped!\n");
 			m_freem(m);
 			if (oldm == NULL)
 				return 1;
@@ -1744,6 +1787,8 @@ fxp_add_rfabuf(struct fxp_softc *sc, struct mbuf *oldm)
 			m->m_data = m->m_ext.ext_buf;
 		}
 	} else {
+		device_printf(sc->dev,
+		    "mbuf allocation failed, packet dropped!\n");
 		if (oldm == NULL)
 			return 1;
 		m = oldm;
@@ -1912,6 +1957,41 @@ fxp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 }
 
 /*
+ * Fill in the multicast address list and return number of entries.
+ */
+static int
+fxp_mc_addrs(struct fxp_softc *sc)
+{
+	struct fxp_cb_mcs *mcsp = sc->mcsp;
+	struct ifnet *ifp = &sc->sc_if;
+	struct ifmultiaddr *ifma;
+	int nmcasts;
+
+	nmcasts = 0;
+	if ((sc->flags & FXP_FLAG_ALL_MCAST) == 0) {
+#if __FreeBSD_version < 500000
+		LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+#else
+		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+#endif
+			if (ifma->ifma_addr->sa_family != AF_LINK)
+				continue;
+			if (nmcasts >= MAXMCADDR) {
+				sc->flags |= FXP_FLAG_ALL_MCAST;
+				nmcasts = 0;
+				break;
+			}
+			bcopy(LLADDR((struct sockaddr_dl *)ifma->ifma_addr),
+			    (void *)(uintptr_t)(volatile void *)
+				&sc->mcsp->mc_addr[nmcasts][0], 6);
+			nmcasts++;
+		}
+	}
+	mcsp->mc_cnt = nmcasts * 6;
+	return (nmcasts);
+}
+
+/*
  * Program the multicast filter.
  *
  * We have an artificial restriction that the multicast setup command
@@ -1930,8 +2010,6 @@ fxp_mc_setup(struct fxp_softc *sc)
 {
 	struct fxp_cb_mcs *mcsp = sc->mcsp;
 	struct ifnet *ifp = &sc->sc_if;
-	struct ifmultiaddr *ifma;
-	int nmcasts;
 	int count;
 
 	/*
@@ -1953,8 +2031,8 @@ fxp_mc_setup(struct fxp_softc *sc)
 		sc->need_mcsetup = 1;
 
 		/*
-		 * Add a NOP command with interrupt so that we are notified when all
-		 * TX commands have been processed.
+		 * Add a NOP command with interrupt so that we are notified
+		 * when all TX commands have been processed.
 		 */
 		txp = sc->cbl_last->next;
 		txp->mb_head = NULL;
@@ -1991,28 +2069,7 @@ fxp_mc_setup(struct fxp_softc *sc)
 	mcsp->cb_command = FXP_CB_COMMAND_MCAS |
 	    FXP_CB_COMMAND_S | FXP_CB_COMMAND_I;
 	mcsp->link_addr = vtophys(&sc->cbl_base->cb_status);
-
-	nmcasts = 0;
-	if ((sc->flags & FXP_FLAG_ALL_MCAST) == 0) {
-#if __FreeBSD_version < 500000
-		LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-#else
-		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-#endif
-			if (ifma->ifma_addr->sa_family != AF_LINK)
-				continue;
-			if (nmcasts >= MAXMCADDR) {
-				sc->flags |= FXP_FLAG_ALL_MCAST;
-				nmcasts = 0;
-				break;
-			}
-			bcopy(LLADDR((struct sockaddr_dl *)ifma->ifma_addr),
-			    (void *)(uintptr_t)(volatile void *)
-				&sc->mcsp->mc_addr[nmcasts][0], 6);
-			nmcasts++;
-		}
-	}
-	mcsp->mc_cnt = nmcasts * 6;
+	(void) fxp_mc_addrs(sc);
 	sc->cbl_first = sc->cbl_last = (struct fxp_cb_tx *) mcsp;
 	sc->tx_queued = 1;
 
@@ -2040,4 +2097,99 @@ fxp_mc_setup(struct fxp_softc *sc)
 	return;
 }
 
-#endif /* NMIIBUS > 0 */
+static u_int32_t fxp_ucode_d101a[] = D101_A_RCVBUNDLE_UCODE;
+static u_int32_t fxp_ucode_d101b0[] = D101_B0_RCVBUNDLE_UCODE;
+static u_int32_t fxp_ucode_d101ma[] = D101M_B_RCVBUNDLE_UCODE;
+static u_int32_t fxp_ucode_d101s[] = D101S_RCVBUNDLE_UCODE;
+static u_int32_t fxp_ucode_d102[] = D102_B_RCVBUNDLE_UCODE;
+static u_int32_t fxp_ucode_d102c[] = D102_C_RCVBUNDLE_UCODE;
+
+#define UCODE(x)	x, sizeof(x)
+
+struct ucode {
+	u_int32_t	revision;
+	u_int32_t	*ucode;
+	int		length;
+	u_short		int_delay_offset;
+	u_short		bundle_max_offset;
+} ucode_table[] = {
+	{ FXP_REV_82558_A4, UCODE(fxp_ucode_d101a), D101_CPUSAVER_DWORD, 0 },
+	{ FXP_REV_82558_B0, UCODE(fxp_ucode_d101b0), D101_CPUSAVER_DWORD, 0 },
+	{ FXP_REV_82559_A0, UCODE(fxp_ucode_d101ma),
+	    D101M_CPUSAVER_DWORD, D101M_CPUSAVER_BUNDLE_MAX_DWORD },
+	{ FXP_REV_82559S_A, UCODE(fxp_ucode_d101s),
+	    D101S_CPUSAVER_DWORD, D101S_CPUSAVER_BUNDLE_MAX_DWORD },
+	{ FXP_REV_82550, UCODE(fxp_ucode_d102),
+	    D102_B_CPUSAVER_DWORD, D102_B_CPUSAVER_BUNDLE_MAX_DWORD },
+	{ FXP_REV_82550_C, UCODE(fxp_ucode_d102c),
+	    D102_C_CPUSAVER_DWORD, D102_C_CPUSAVER_BUNDLE_MAX_DWORD },
+	{ 0, NULL, 0, 0, 0 }
+};
+
+static void
+fxp_load_ucode(struct fxp_softc *sc)
+{
+	struct ucode *uc;
+	struct fxp_cb_ucode *cbp;
+
+	for (uc = ucode_table; uc->ucode != NULL; uc++)
+		if (sc->revision == uc->revision)
+			break;
+	if (uc->ucode == NULL)
+		return;
+	cbp = (struct fxp_cb_ucode *)sc->cbl_base;
+	cbp->cb_status = 0;
+	cbp->cb_command = FXP_CB_COMMAND_UCODE | FXP_CB_COMMAND_EL;
+	cbp->link_addr = -1;    	/* (no) next command */
+	memcpy(cbp->ucode, uc->ucode, uc->length);
+	if (uc->int_delay_offset)
+		*(u_short *)&cbp->ucode[uc->int_delay_offset] =
+		    sc->tunable_int_delay + sc->tunable_int_delay / 2;
+	if (uc->bundle_max_offset)
+		*(u_short *)&cbp->ucode[uc->bundle_max_offset] =
+		    sc->tunable_bundle_max;
+	/*
+	 * Download the ucode to the chip.
+	 */
+	fxp_scb_wait(sc);
+	CSR_WRITE_4(sc, FXP_CSR_SCB_GENERAL, vtophys(&cbp->cb_status));
+	fxp_scb_cmd(sc, FXP_SCB_COMMAND_CU_START);
+	/* ...and wait for it to complete. */
+	fxp_dma_wait(&cbp->cb_status, sc);
+	device_printf(sc->dev,
+	    "Microcode loaded, int_delay: %d usec  bundle_max: %d\n",
+	    sc->tunable_int_delay, 
+	    uc->bundle_max_offset == 0 ? 0 : sc->tunable_bundle_max);
+	sc->flags |= FXP_FLAG_UCODE;
+}
+
+static int
+sysctl_int_range(SYSCTL_HANDLER_ARGS, int low, int high)
+{
+	int error, value;
+
+	value = *(int *)arg1;
+	error = sysctl_handle_int(oidp, &value, 0, req);
+	if (error || !req->newptr)
+		return (error);
+	if (value < low || value > high)
+		return (EINVAL);
+	*(int *)arg1 = value;
+	return (0);
+}
+
+/*
+ * Interrupt delay is expressed in microseconds, a multiplier is used
+ * to convert this to the appropriate clock ticks before using. 
+ */
+static int
+sysctl_hw_fxp_int_delay(SYSCTL_HANDLER_ARGS)
+{
+	return (sysctl_int_range(oidp, arg1, arg2, req, 300, 3000));
+}
+
+static int
+sysctl_hw_fxp_bundle_max(SYSCTL_HANDLER_ARGS)
+{
+	return (sysctl_int_range(oidp, arg1, arg2, req, 1, 0xffff));
+}

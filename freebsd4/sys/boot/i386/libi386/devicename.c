@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/libi386/devicename.c,v 1.4 1999/08/28 00:40:15 peter Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/devicename.c,v 1.4.2.1 2001/12/21 22:19:58 jhb Exp $
  */
 
 #include <stand.h>
@@ -147,10 +147,11 @@ i386_parsedev(struct i386_devdesc **dev, const char *devspec, const char **path)
 	if (path != NULL)
 	    *path = (*cp == 0) ? cp : cp + 1;
 	break;
-	
+
+    case DEVT_CD:
     case DEVT_NET:
 	unit = 0;
-	
+
 	if (*np && (*np != ':')) {
 	    unit = strtol(np, &cp, 0);	/* get unit number if present */
 	    if (cp == np) {
@@ -162,8 +163,11 @@ i386_parsedev(struct i386_devdesc **dev, const char *devspec, const char **path)
 	    err = EINVAL;
 	    goto fail;
 	}
-	
-	idev->d_kind.netif.unit = unit;
+
+	if (dv->dv_type == DEVT_NET)
+	    idev->d_kind.netif.unit = unit;
+	else
+	    idev->d_kind.bioscd.unit = unit;
 	if (path != NULL)
 	    *path = (*cp == 0) ? cp : cp + 1;
 	break;
@@ -197,6 +201,10 @@ i386_fmtdev(void *vdev)
     switch(dev->d_type) {
     case DEVT_NONE:
 	strcpy(buf, "(no device)");
+	break;
+
+    case DEVT_CD:
+	sprintf(buf, "%s%d:", dev->d_dev->dv_name, dev->d_kind.bioscd.unit);
 	break;
 
     case DEVT_DISK:

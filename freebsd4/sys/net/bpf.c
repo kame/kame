@@ -37,7 +37,7 @@
  *
  *      @(#)bpf.c	8.2 (Berkeley) 3/28/94
  *
- * $FreeBSD: src/sys/net/bpf.c,v 1.59.2.5 2001/01/05 04:49:09 jdp Exp $
+ * $FreeBSD: src/sys/net/bpf.c,v 1.59.2.9 2001/12/19 04:47:52 dd Exp $
  */
 
 #include "bpf.h"
@@ -121,6 +121,7 @@ static void	bpf_mcopy __P((const void *, void *, size_t));
 static int	bpf_movein __P((struct uio *, int,
 		    struct mbuf **, struct sockaddr *, int *));
 static int	bpf_setif __P((struct bpf_d *, struct ifreq *));
+static void	bpf_timed_out __P((void *));
 static inline void
 		bpf_wakeup __P((struct bpf_d *));
 static void	catchpacket __P((struct bpf_d *, u_char *, u_int,
@@ -358,13 +359,12 @@ bpfopen(dev, flags, fmt, p)
 	if (d)
 		return (EBUSY);
 	make_dev(&bpf_cdevsw, minor(dev), 0, 0, 0600, "bpf%d", lminor(dev));
-	MALLOC(d, struct bpf_d *, sizeof(*d), M_BPF, M_WAITOK);
-	bzero(d, sizeof(*d));
+	MALLOC(d, struct bpf_d *, sizeof(*d), M_BPF, M_WAITOK | M_ZERO);
 	dev->si_drv1 = d;
 	d->bd_bufsize = bpf_bufsize;
 	d->bd_sig = SIGIO;
 	d->bd_seesent = 1;
-
+	callout_init(&d->bd_callout);
 	return (0);
 }
 
@@ -385,6 +385,9 @@ bpfclose(dev, flags, fmt, p)
 
 	funsetown(d->bd_sigio);
 	s = splimp();
+	if (d->bd_state == BPF_WAITING)
+		callout_stop(&d->bd_callout);
+	d->bd_state = BPF_IDLE;
 	if (d->bd_bif)
 		bpf_detachd(d);
 	splx(s);
@@ -455,6 +458,7 @@ bpfread(dev, uio, ioflag)
 	int ioflag;
 {
 	register struct bpf_d *d = dev->si_drv1;
+	int timed_out;
 	int error;
 	int s;
 
@@ -466,13 +470,17 @@ bpfread(dev, uio, ioflag)
 		return (EINVAL);
 
 	s = splimp();
+	if (d->bd_state == BPF_WAITING)
+		callout_stop(&d->bd_callout);
+	timed_out = (d->bd_state == BPF_TIMED_OUT);
+	d->bd_state = BPF_IDLE;
 	/*
 	 * If the hold buffer is empty, then do a timed sleep, which
 	 * ends when the timeout expires or when enough packets
 	 * have arrived to fill the store buffer.
 	 */
 	while (d->bd_hbuf == 0) {
-		if (d->bd_immediate && d->bd_slen != 0) {
+		if ((d->bd_immediate || timed_out) && d->bd_slen != 0) {
 			/*
 			 * A packet(s) either arrived since the previous
 			 * read or arrived while we were asleep.
@@ -554,6 +562,10 @@ static inline void
 bpf_wakeup(d)
 	register struct bpf_d *d;
 {
+	if (d->bd_state == BPF_WAITING) {
+		callout_stop(&d->bd_callout);
+		d->bd_state = BPF_IDLE;
+	}
 	wakeup((caddr_t)d);
 	if (d->bd_async && d->bd_sig && d->bd_sigio)
 		pgsigio(d->bd_sigio, d->bd_sig, 0);
@@ -569,6 +581,22 @@ bpf_wakeup(d)
 		d->bd_selproc = 0;
 	}
 #endif
+}
+
+static void
+bpf_timed_out(arg)
+	void *arg;
+{
+	struct bpf_d *d = (struct bpf_d *)arg;
+	int s;
+
+	s = splimp();
+	if (d->bd_state == BPF_WAITING) {
+		d->bd_state = BPF_TIMED_OUT;
+		if (d->bd_slen != 0)
+			bpf_wakeup(d);
+	}
+	splx(s);
 }
 
 static	int
@@ -665,6 +693,12 @@ bpfioctl(dev, cmd, addr, flags, p)
 {
 	register struct bpf_d *d = dev->si_drv1;
 	int s, error = 0;
+
+	s = splimp();
+	if (d->bd_state == BPF_WAITING)
+		callout_stop(&d->bd_callout);
+	d->bd_state = BPF_IDLE;
+	splx(s);
 
 	switch (cmd) {
 
@@ -1045,22 +1079,34 @@ bpfpoll(dev, events, p)
 {
 	register struct bpf_d *d;
 	register int s;
-	int revents = 0;
+	int revents;
 
-	/*
-	 * An imitation of the FIONREAD ioctl code.
-	 */
 	d = dev->si_drv1;
-
 	if (d->bd_bif == NULL)
 		return (ENXIO);
 
+	revents = events & (POLLIN | POLLWRNORM);
 	s = splimp();
 	if (events & (POLLIN | POLLRDNORM)) {
-		if (d->bd_hlen != 0 || (d->bd_immediate && d->bd_slen != 0))
+		/*
+		 * An imitation of the FIONREAD ioctl code.
+		 * XXX not quite.  An exact imitation:
+		 *	if (d->b_slen != 0 ||
+		 *	    (d->bd_hbuf != NULL && d->bd_hlen != 0)
+		 */
+		if (d->bd_hlen != 0 ||
+		    ((d->bd_immediate || d->bd_state == BPF_TIMED_OUT) &&
+		    d->bd_slen != 0))
 			revents |= events & (POLLIN | POLLRDNORM);
-		else
+		else {
 			selrecord(p, &d->bd_sel);
+			/* Start the read timeout if necessary. */
+			if (d->bd_rtout > 0 && d->bd_state == BPF_IDLE) {
+				callout_reset(&d->bd_callout, d->bd_rtout,
+				    bpf_timed_out, d);
+				d->bd_state = BPF_WAITING;
+			}
+		}
 	}
 	splx(s);
 	return (revents);
@@ -1199,10 +1245,11 @@ catchpacket(d, pkt, pktlen, snaplen, cpfn)
 		bpf_wakeup(d);
 		curlen = 0;
 	}
-	else if (d->bd_immediate)
+	else if (d->bd_immediate || d->bd_state == BPF_TIMED_OUT)
 		/*
-		 * Immediate mode is set.  A packet arrived so any
-		 * reads should be woken up.
+		 * Immediate mode is set, or the read timeout has
+		 * already expired during a select call.  A packet
+		 * arrived, so the reader should be woken up.
 		 */
 		bpf_wakeup(d);
 
@@ -1272,9 +1319,10 @@ bpf_freed(d)
 }
 
 /*
- * Attach an interface to bpf.  driverp is a pointer to a (struct bpf_if *)
- * in the driver's softc; dlt is the link layer type; hdrlen is the fixed
- * size of the link header (variable length headers not yet supported).
+ * Attach an interface to bpf.  ifp is a pointer to the structure
+ * defining the interface to be attached, dlt is the link layer type,
+ * and hdrlen is the fixed size of the link header (variable length
+ * headers are not yet supporrted).
  */
 void
 bpfattach(ifp, dlt, hdrlen)
@@ -1282,11 +1330,10 @@ bpfattach(ifp, dlt, hdrlen)
 	u_int dlt, hdrlen;
 {
 	struct bpf_if *bp;
-	bp = (struct bpf_if *)malloc(sizeof(*bp), M_BPF, M_DONTWAIT);
+	bp = (struct bpf_if *)malloc(sizeof(*bp), M_BPF, M_DONTWAIT | M_ZERO);
 	if (bp == 0)
 		panic("bpfattach");
 
-	bp->bif_dlist = 0;
 	bp->bif_ifp = ifp;
 	bp->bif_dlt = dlt;
 

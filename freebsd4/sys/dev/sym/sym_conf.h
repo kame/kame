@@ -2,7 +2,7 @@
  *  Device driver optimized for the Symbios/LSI 53C896/53C895A/53C1010 
  *  PCI-SCSI controllers.
  *
- *  Copyright (C) 1999-2000  Gerard Roudier <groudier@club-internet.fr>
+ *  Copyright (C) 1999-2001  Gerard Roudier <groudier@free.fr>
  *
  *  This driver also supports the following Symbios/LSI PCI-SCSI chips:
  *	53C810A, 53C825A, 53C860, 53C875, 53C876, 53C885, 53C895,
@@ -55,7 +55,7 @@
  * SUCH DAMAGE.
  */
 
-/* $FreeBSD: src/sys/dev/sym/sym_conf.h,v 1.4.2.1 2000/05/14 10:46:20 groudier Exp $ */
+/* $FreeBSD: src/sys/dev/sym/sym_conf.h,v 1.4.2.2 2001/11/11 17:58:53 groudier Exp $ */
 
 #ifndef SYM_CONF_H
 #define SYM_CONF_H

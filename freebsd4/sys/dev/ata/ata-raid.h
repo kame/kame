@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2000,2001 Søren Schmidt
+ * Copyright (c) 2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-raid.h,v 1.2.2.3 2001/02/25 21:35:20 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-raid.h,v 1.2.2.4 2002/01/02 15:30:23 sos Exp $
  */
 
 struct ar_softc {

@@ -46,7 +46,7 @@
  ** (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  ** THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **
- ** $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.6 2001/01/08 09:21:00 nyan Exp $
+ ** $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.7 2001/12/19 20:59:29 fjoe Exp $
  **/
 
 /**
@@ -362,6 +362,7 @@ static DEV_INFO device_info[] = {
 {"sn",          "SMC/Megahertz Ethernet adapters",			0,CLS_NETWORK},
 {"xe",          "Xircom PC Card Ethernet adapter",		0,	CLS_NETWORK},
 {"rdp",		"RealTek RTL8002 Pocket Ethernet",	0,		CLS_NETWORK},
+{"sbni",	"Granch SBNI12-xx adapters",		0,		CLS_NETWORK},
 
 {"sio",         "8250/16450/16550 Serial port",		0,		CLS_COMMS},
 {"cx",          "Cronyx/Sigma multiport sync/async adapter",0,		CLS_COMMS},
@@ -2423,7 +2424,7 @@ visuserconfig(void)
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.6 2001/01/08 09:21:00 nyan Exp $
+ * $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.7 2001/12/19 20:59:29 fjoe Exp $
  */
 
 #include "scbus.h"

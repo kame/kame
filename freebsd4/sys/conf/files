@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/files,v 1.340.2.79 2001/08/11 00:54:14 mp Exp $
+# $FreeBSD: src/sys/conf/files,v 1.340.2.87 2001/12/19 20:59:27 fjoe Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -143,12 +143,14 @@ dev/aic7xxx/aic7xxx.c	optional ahc
 dev/aic7xxx/aic7xxx_93cx6.c	optional ahc
 dev/aic7xxx/aic7xxx_freebsd.c	optional ahc
 dev/aic7xxx/aic7xxx_pci.c	optional ahc pci
+dev/bge/if_bge.c	optional bge
 dev/buslogic/bt.c	optional bt
 dev/buslogic/bt_isa.c	optional bt isa
 dev/buslogic/bt_mca.c	optional bt mca
 dev/buslogic/bt_eisa.c	optional bt eisa
 dev/buslogic/bt_pci.c	optional bt pci
 dev/ccd/ccd.c		optional ccd
+dev/ciss/ciss.c		optional ciss
 dev/cs/if_cs.c		optional cs
 dev/cs/if_cs_isa.c	optional cs isa
 dev/cs/if_cs_pccard.c	optional cs card
@@ -169,6 +171,7 @@ dev/ex/if_ex_pccard.c	optional ex card
 dev/fe/if_fe.c		optional fe
 dev/fe/if_fe_pccard.c	optional fe card
 dev/fxp/if_fxp.c	optional fxp
+dev/gx/if_gx.c		optional gx
 dev/hea/eni.c		optional hea
 dev/hea/eni_buffer.c	optional hea
 dev/hea/eni_globals.c	optional hea
@@ -349,6 +352,7 @@ dev/ppbus/vpo.c		optional vpo
 dev/ppbus/vpoio.c	optional vpo
 dev/ray/if_ray.c        optional ray card
 dev/ray/if_ray.c        optional ray pccard
+dev/sbni/if_sbni_pci.c	optional sbni pci
 smbus_if.o		optional smbus					\
 	dependency	"smbus_if.c smbus_if.h"				\
 	compile-with	"${NORMAL_C}"					\
@@ -843,6 +847,7 @@ netinet/tcp_debug.c	optional tcpdebug
 netinet/tcp_input.c	optional inet
 netinet/tcp_output.c	optional inet
 netinet/tcp_subr.c	optional inet
+netinet/tcp_syncache.c	optional inet
 netinet/tcp_timer.c	optional inet
 netinet/tcp_usrreq.c	optional inet
 netinet/udp_usrreq.c	optional inet
@@ -982,7 +987,6 @@ pci/if_ar_p.c		optional ar pci
 pci/if_dc.c		optional dc
 pci/if_de.c		optional de
 pci/if_en_pci.c		optional en pci
-#pci/if_fxp.c		optional fxp
 pci/if_lnc_p.c		optional lnc pci
 pci/if_pcn.c		optional pcn
 pci/if_mn.c		optional mn
@@ -1001,6 +1005,7 @@ pci/if_wx.c		optional wx
 pci/if_xl.c		optional xl
 pci/isp_pci.c		optional isp
 pci/intpm.c		optional intpm
+pci/amdpm.c		optional amdpm
 pci/meteor.c		optional meteor pci
 pci/ncr.c		optional ncr
 dev/sym/sym_hipd.c	optional sym					\
@@ -1106,6 +1111,7 @@ dev/usb/hid.c		optional usb
 dev/usb/ugen.c		optional ugen
 dev/usb/uhid.c		optional uhid
 dev/usb/ums.c		optional ums
+dev/usb/urio.c		optional urio
 dev/usb/ulpt.c		optional ulpt
 dev/usb/ukbd.c		optional ukbd
 dev/usb/umass.c		optional umass

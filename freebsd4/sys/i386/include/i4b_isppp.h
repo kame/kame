@@ -20,7 +20,7 @@
  *
  * $Id: i4b_isppp.h,v 1.5 2000/07/18 15:05:37 hm Exp $
  *
- * $FreeBSD: src/sys/i386/include/i4b_isppp.h,v 1.1.2.1 2001/08/01 17:45:01 obrien Exp $
+ * $FreeBSD: src/sys/i386/include/i4b_isppp.h,v 1.1.2.2 2001/09/28 07:43:19 gj Exp $
  */
 
 #ifndef _I4B_ISPPP_H_
@@ -75,7 +75,7 @@ struct sipcp {
 	int	compress_cid;	/* Comp-Slot-Id */
 };
 
-#define AUTHNAMELEN	32
+#define AUTHNAMELEN	42
 #define AUTHKEYLEN	16
 
 struct sauth {

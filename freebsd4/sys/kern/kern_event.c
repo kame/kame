@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_event.c,v 1.2.2.6 2001/02/26 04:23:15 jlemon Exp $
+ * $FreeBSD: src/sys/kern/kern_event.c,v 1.2.2.8 2001/12/14 19:24:42 jlemon Exp $
  */
 
 #include <sys/param.h>
@@ -43,10 +43,13 @@
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/stat.h>
+#include <sys/sysctl.h>
 #include <sys/sysproto.h>
 #include <sys/uio.h>
 
 #include <vm/vm_zone.h>
+
+MALLOC_DEFINE(M_KQUEUE, "kqueue", "memory for kqueue system");
 
 static int	kqueue_scan(struct file *fp, int maxevents,
 		    struct kevent *ulistp, const struct timespec *timeout,
@@ -88,15 +91,25 @@ static int	filt_procattach(struct knote *kn);
 static void	filt_procdetach(struct knote *kn);
 static int	filt_proc(struct knote *kn, long hint);
 static int	filt_fileattach(struct knote *kn);
+static void	filt_timerexpire(void *knx);
+static int	filt_timerattach(struct knote *kn);
+static void	filt_timerdetach(struct knote *kn);
+static int	filt_timer(struct knote *kn, long hint);
 
+static struct filterops file_filtops =
+	{ 1, filt_fileattach, NULL, NULL };
 static struct filterops kqread_filtops =
 	{ 1, NULL, filt_kqdetach, filt_kqueue };
 static struct filterops proc_filtops =
 	{ 0, filt_procattach, filt_procdetach, filt_proc };
-static struct filterops file_filtops =
-	{ 1, filt_fileattach, NULL, NULL };
+static struct filterops timer_filtops =
+	{ 0, filt_timerattach, filt_timerdetach, filt_timer };
 
 static vm_zone_t	knote_zone;
+static int 		kq_ncallouts = 0;
+static int 		kq_calloutmax = (4 * 1024);
+SYSCTL_INT(_kern, OID_AUTO, kq_calloutmax, CTLFLAG_RW,
+    &kq_calloutmax, 0, "Maximum number of callouts allocated for kqueue");
 
 #define KNOTE_ACTIVATE(kn) do { 					\
 	kn->kn_status |= KN_ACTIVE;					\
@@ -120,6 +133,7 @@ static struct filterops *sysfilt_ops[] = {
 	&file_filtops,			/* EVFILT_VNODE */
 	&proc_filtops,			/* EVFILT_PROC */
 	&sig_filtops,			/* EVFILT_SIGNAL */
+	&timer_filtops,			/* EVFILT_TIMER */
 };
 
 static int
@@ -261,6 +275,72 @@ filt_proc(struct knote *kn, long hint)
 	return (kn->kn_fflags != 0);
 }
 
+static void
+filt_timerexpire(void *knx)
+{
+	struct knote *kn = knx;
+	struct callout *calloutp;
+	struct timeval tv;
+	int tticks;
+
+	kn->kn_data++;
+	KNOTE_ACTIVATE(kn);
+
+	if ((kn->kn_flags & EV_ONESHOT) == 0) {
+		tv.tv_sec = kn->kn_sdata / 1000;
+		tv.tv_usec = (kn->kn_sdata % 1000) * 1000;
+		tticks = tvtohz(&tv);
+		calloutp = (struct callout *)kn->kn_hook;
+		callout_reset(calloutp, tticks, filt_timerexpire, kn);
+	}
+}
+
+/*
+ * data contains amount of time to sleep, in milliseconds
+ */ 
+static int
+filt_timerattach(struct knote *kn)
+{
+	struct callout *calloutp;
+	struct timeval tv;
+	int tticks;
+
+	if (kq_ncallouts >= kq_calloutmax)
+		return (ENOMEM);
+	kq_ncallouts++;
+
+	tv.tv_sec = kn->kn_sdata / 1000;
+	tv.tv_usec = (kn->kn_sdata % 1000) * 1000;
+	tticks = tvtohz(&tv);
+
+	kn->kn_flags |= EV_CLEAR;		/* automatically set */
+	MALLOC(calloutp, struct callout *, sizeof(*calloutp),
+	    M_KQUEUE, M_WAITOK);
+	callout_init(calloutp);
+	callout_reset(calloutp, tticks, filt_timerexpire, kn);
+	kn->kn_hook = (caddr_t)calloutp;
+
+	return (0);
+}
+
+static void
+filt_timerdetach(struct knote *kn)
+{
+	struct callout *calloutp;
+
+	calloutp = (struct callout *)kn->kn_hook;
+	callout_stop(calloutp);
+	FREE(calloutp, M_KQUEUE);
+	kq_ncallouts--;
+}
+
+static int
+filt_timer(struct knote *kn, long hint)
+{
+
+	return (kn->kn_data != 0);
+}
+
 int
 kqueue(struct proc *p, struct kqueue_args *uap)
 {
@@ -275,8 +355,7 @@ kqueue(struct proc *p, struct kqueue_args *uap)
 	fp->f_flag = FREAD | FWRITE;
 	fp->f_type = DTYPE_KQUEUE;
 	fp->f_ops = &kqueueops;
-	kq = malloc(sizeof(struct kqueue), M_TEMP, M_WAITOK);
-	bzero(kq, sizeof(*kq));
+	kq = malloc(sizeof(struct kqueue), M_KQUEUE, M_WAITOK | M_ZERO);
 	TAILQ_INIT(&kq->kq_head);
 	fp->f_data = (caddr_t)kq;
 	p->p_retval[0] = fd;
@@ -726,7 +805,7 @@ kqueue_close(struct file *fp, struct proc *p)
 			}
 		}
 	}
-	free(kq, M_TEMP);
+	free(kq, M_KQUEUE);
 	fp->f_data = NULL;
 
 	return (0);
@@ -794,7 +873,7 @@ knote_attach(struct knote *kn, struct filedesc *fdp)
 
 	if (! kn->kn_fop->f_isfd) {
 		if (fdp->fd_knhashmask == 0)
-			fdp->fd_knhash = hashinit(KN_HASHSIZE, M_TEMP,
+			fdp->fd_knhash = hashinit(KN_HASHSIZE, M_KQUEUE,
 			    &fdp->fd_knhashmask);
 		list = &fdp->fd_knhash[KN_HASH(kn->kn_id, fdp->fd_knhashmask)];
 		goto done;
@@ -805,14 +884,14 @@ knote_attach(struct knote *kn, struct filedesc *fdp)
 		while (size <= kn->kn_id)
 			size += KQEXTENT;
 		MALLOC(list, struct klist *,
-		    size * sizeof(struct klist *), M_TEMP, M_WAITOK);
+		    size * sizeof(struct klist *), M_KQUEUE, M_WAITOK);
 		bcopy((caddr_t)fdp->fd_knlist, (caddr_t)list,
 		    fdp->fd_knlistsize * sizeof(struct klist *));
 		bzero((caddr_t)list +
 		    fdp->fd_knlistsize * sizeof(struct klist *),
 		    (size - fdp->fd_knlistsize) * sizeof(struct klist *));
 		if (fdp->fd_knlist != NULL)
-			FREE(fdp->fd_knlist, M_TEMP);
+			FREE(fdp->fd_knlist, M_KQUEUE);
 		fdp->fd_knlistsize = size;
 		fdp->fd_knlist = list;
 	}

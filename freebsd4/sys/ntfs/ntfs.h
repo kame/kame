@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ntfs/ntfs.h,v 1.8.2.1 2000/11/03 15:55:40 bp Exp $
+ * $FreeBSD: src/sys/ntfs/ntfs.h,v 1.8.2.2 2001/10/12 22:08:49 semenu Exp $
  */
 
 /*#define NTFS_DEBUG 1*/
@@ -256,6 +256,8 @@ struct ntfsmount {
 	struct ntvattrdef *ntm_ad;
 	int		ntm_adnum;
 	struct netexport ntm_export;	/* export information */
+	wchar *		ntm_82u;	/* 8bit to Unicode */
+	char **		ntm_u28;	/* Unicode to 8 bit */
 };
 
 #define ntm_mftcn	ntm_bootfile.bf_mftcn

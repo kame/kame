@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/nwfs/nwfs_node.c,v 1.3.2.7 2001/03/14 11:26:59 bp Exp $
+ * $FreeBSD: src/sys/nwfs/nwfs_node.c,v 1.3.2.8 2001/12/25 01:44:45 dillon Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -187,7 +187,7 @@ rescan:
 	*vpp = vp;
 	np->n_fid = fid;
 	np->n_flag |= NNEW;
-	lockinit(&np->n_lock, PINOD, "nwnode", 0, LK_CANRECURSE);
+	lockinit(&np->n_lock, PINOD, "nwnode", VLKTIMEOUT, LK_CANRECURSE);
 	nhpp = NWNOHASH(fid);
 	LIST_INSERT_HEAD(nhpp, np, n_hash);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);

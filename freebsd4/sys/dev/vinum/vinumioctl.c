@@ -42,7 +42,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumioctl.c,v 1.14 2000/10/27 03:07:53 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumioctl.c,v 1.25.2.3 2001/03/13 02:59:43 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumioctl.c,v 1.25.2.3.6.1 2002/01/28 02:38:33 grog Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -82,9 +82,6 @@ vinumioctl(dev_t dev,
     switch (DEVTYPE(dev)) {
     case VINUM_SUPERDEV_TYPE:				    /* ordinary super device */
 	ioctl_reply = (struct _ioctl_reply *) data;	    /* save the address to reply to */
-	error = setjmp(command_fail);			    /* come back here on error */
-	if (error)					    /* bombed out */
-	    return 0;					    /* the reply will contain meaningful info */
 	switch (cmd) {
 #ifdef VINUMDEBUG
 	case VINUM_DEBUG:

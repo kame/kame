@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_freebsd.h,v 1.26.2.10 2001/07/30 01:32:20 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp_freebsd.h,v 1.26.2.12 2001/12/14 08:21:04 mjacob Exp $ */
 /*
  * Qlogic ISP SCSI Host Adapter FreeBSD Wrapper Definitions
  * Copyright (c) 1997, 1998, 1999, 2000, 2001 by Matthew Jacob
@@ -28,7 +28,7 @@
 #define	_ISP_FREEBSD_H
 
 #define	ISP_PLATFORM_VERSION_MAJOR	4
-#define	ISP_PLATFORM_VERSION_MINOR	15
+#define	ISP_PLATFORM_VERSION_MINOR	16
 
 #include <sys/param.h>
 #include <sys/param.h>
@@ -57,12 +57,29 @@
 
 #include "opt_ddb.h"
 #include "opt_isp.h"
+/*
+ * Efficiency- get rid of SBus code && tests unless we need them.
+ */
+#if	defined(__sparcv9__ ) || defined(__sparc__)
+#define	ISP_SBUS_SUPPORTED	1
+#else
+#define	ISP_SBUS_SUPPORTED	0
+#endif
 
 #define	HANDLE_LOOPSTATE_IN_OUTER_LAYERS	1
 
 typedef void ispfwfunc __P((int, int, int, const u_int16_t **));
 
 #ifdef	ISP_TARGET_MODE
+#define	ISP_TARGET_FUNCTIONS	1
+#define	ATPDPSIZE	256
+typedef struct {
+	u_int32_t	orig_datalen;
+	u_int32_t	bytes_xfered;
+	u_int32_t	last_xframt;
+	u_int32_t	tag;
+} atio_private_data_t;
+
 typedef struct tstate {
 	struct tstate *next;
 	struct cam_path *owner;
@@ -100,12 +117,14 @@ struct isposinfo {
 #ifdef	ISP_TARGET_MODE
 #define	TM_WANTED		0x80
 #define	TM_BUSY			0x40
-#define	TM_TMODE_ENABLED	0x03
-	u_int8_t		tmflags;
-	u_int8_t		rstatus;
+#define	TM_WILDCARD_ENABLED	0x02
+#define	TM_TMODE_ENABLED	0x01
+	u_int8_t		tmflags[2];	/* two busses */
+	u_int8_t		rstatus[2];	/* two bussed */
 	u_int16_t		rollinfo;
 	tstate_t		tsdflt[2];	/* two busses */
 	tstate_t		*lun_hash[LUN_HASH_SIZE];
+	atio_private_data_t 	atpdp[ATPDPSIZE];
 #endif
 };
 
@@ -147,8 +166,11 @@ struct isposinfo {
 
 #define	MAXISPREQUEST(isp)	256
 
-#ifdef	__alpha__
+#if	defined(__alpha__)
 #define	MEMORYBARRIER(isp, type, offset, size)	alpha_mb()
+#elif	defined(__ia64__)
+#define	MEMORYBARRIER(isp, type, offset, size)	\
+	do { ia64_mf(); ia64_mf_a(); } while (0)
 #else
 #define	MEMORYBARRIER(isp, type, offset, size)
 #endif
@@ -244,14 +266,38 @@ struct isposinfo {
 #define	ISP_NODEWWN(isp)	FCPARAM(isp)->isp_nodewwn
 #define	ISP_PORTWWN(isp)	FCPARAM(isp)->isp_portwwn
 
-#define	ISP_UNSWIZZLE_AND_COPY_PDBP(isp, dest, src)	\
-	if((void *)src != (void *)dest) bcopy(src, dest, sizeof (isp_pdb_t))
-#define	ISP_SWIZZLE_ICB(a, b)
-#define	ISP_SWIZZLE_REQUEST(a, b)
-#define	ISP_UNSWIZZLE_RESPONSE(a, b, c)
-#define	ISP_SWIZZLE_SNS_REQ(a, b)
-#define	ISP_UNSWIZZLE_SNS_RSP(a, b, c)
-#define	ISP_SWIZZLE_NVRAM_WORD(isp, x)
+#if	BYTE_ORDER == BIG_ENDIAN
+#ifdef	ISP_SBUS_SUPPORTED
+#define	ISP_IOXPUT_8(isp, s, d)		*(d) = s
+#define	ISP_IOXPUT_16(isp, s, d)				\
+	*(d) = (isp->isp_bustype == ISP_BT_SBUS)? s : bswap16(s)
+#define	ISP_IOXPUT_32(isp, s, d)				\
+	*(d) = (isp->isp_bustype == ISP_BT_SBUS)? s : bswap32(s)
+#define	ISP_IOXGET_8(isp, s, d)		d = (*((u_int8_t *)s))
+#define	ISP_IOXGET_16(isp, s, d)				\
+	d = (isp->isp_bustype == ISP_BT_SBUS)?			\
+	*((u_int16_t *)s) : bswap16(*((u_int16_t *)s))
+#define	ISP_IOXGET_32(isp, s, d)				\
+	d = (isp->isp_bustype == ISP_BT_SBUS)?			\
+	*((u_int32_t *)s) : bswap32(*((u_int32_t *)s))
+#else
+#define	ISP_IOXPUT_8(isp, s, d)		*(d) = s
+#define	ISP_IOXPUT_16(isp, s, d)	*(d) = bswap16(s)
+#define	ISP_IOXPUT_32(isp, s, d)	*(d) = bswap32(s)
+#define	ISP_IOXGET_8(isp, s, d)		d = (*((u_int8_t *)s))
+#define	ISP_IOXGET_16(isp, s, d)	d = bswap16(*((u_int16_t *)s))
+#define	ISP_IOXGET_32(isp, s, d)	d = bswap32(*((u_int32_t *)s))
+#endif
+#define	ISP_SWIZZLE_NVRAM_WORD(isp, rp)	*rp = bswap16(*rp)
+#else
+#define	ISP_IOXPUT_8(isp, s, d)		*(d) = s
+#define	ISP_IOXPUT_16(isp, s, d)	*(d) = s
+#define	ISP_IOXPUT_32(isp, s, d)	*(d) = s
+#define	ISP_IOXGET_8(isp, s, d)		d = *(s)
+#define	ISP_IOXGET_16(isp, s, d)	d = *(s)
+#define	ISP_IOXGET_32(isp, s, d)	d = *(s)
+#define	ISP_SWIZZLE_NVRAM_WORD(isp, rp)
+#endif
 
 /*
  * Includes of common header files
@@ -345,12 +391,17 @@ isp_mbox_wait_complete(struct ispsoftc *isp)
 	} else {
 		int j;
 		for (j = 0; j < 60 * 10000; j++) {
-			if (isp_intr(isp) == 0) {
-				USEC_DELAY(500);
-			}
+			u_int16_t isr, sema, mbox;
 			if (isp->isp_mboxbsy == 0) {
 				break;
 			}
+			if (ISP_READ_ISR(isp, &isr, &sema, &mbox)) {
+				isp_intr(isp, isr, sema, mbox);
+				if (isp->isp_mboxbsy == 0) {
+					break;
+				}
+			}
+			USEC_DELAY(500);
 		}
 		if (isp->isp_mboxbsy != 0) {
 			isp_prt(isp, ISP_LOGWARN,

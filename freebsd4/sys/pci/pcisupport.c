@@ -1,6 +1,6 @@
 /**************************************************************************
 **
-** $FreeBSD: src/sys/pci/pcisupport.c,v 1.154.2.7 2001/08/15 04:04:59 imp Exp $
+** $FreeBSD: src/sys/pci/pcisupport.c,v 1.154.2.10 2001/12/23 08:17:47 pirzyk Exp $
 **
 **  Device driver for DEC/INTEL PCI chipsets.
 **
@@ -700,6 +700,8 @@ pcib_match(device_t dev)
 		return ("VLSI 82C538 Eagle II PCI Docking bridge");
 
 	/* VIA Technologies -- vendor 0x1106 */
+	case 0x83051106:
+		return ("VIA 8363 (Apollo KT133) PCI-PCI (AGP) bridge");
 	case 0x85981106:
 		return ("VIA 82C598MVP (Apollo MVP3) PCI-PCI (AGP) bridge");
 
@@ -713,7 +715,9 @@ pcib_match(device_t dev)
 
 	/* AMD -- vendor 0x1022 */
 	case 0x70071022:
-		return ("AMD-751 PCI-PCI (AGP) bridge");
+		return ("AMD-751 PCI-PCI (1x/2x AGP) bridge");
+	case 0x700f1022:
+		return ("AMD-761 PCI-PCI (4x AGP) bridge");
 
 	/* DEC -- vendor 0x1011 */
 	case 0x00011011:
@@ -886,6 +890,8 @@ isab_match(device_t dev)
 		return ("Intel 82371SB PCI to ISA bridge");
 	case 0x71108086:
 		return ("Intel 82371AB PCI to ISA bridge");
+	case 0x71988086:
+		return ("Intel 82443MX PCI to ISA bridge");
 	case 0x24108086:
 		return ("Intel 82801AA (ICH) PCI to LPC bridge");
 	case 0x24208086:
@@ -1200,6 +1206,8 @@ chip_match(device_t dev)
 		return ("Intel 82439TX System controller (MTXC)");
 	case 0x71138086:
 		return ("Intel 82371AB Power management controller");
+	case 0x719b8086:
+		return ("Intel 82443MX Power management controller");
 	case 0x12378086:
 		fixwsc_natoma(dev);
 		return ("Intel 82440FX (Natoma) PCI and memory controller");
@@ -1269,6 +1277,8 @@ chip_match(device_t dev)
 	/* AMD -- vendor 0x1022 */
 	case 0x70061022:
 		return ("AMD-751 host to PCI bridge");
+	case 0x700e1022:
+		return ("AMD-761 host to PCI bridge");
 
 	/* NEC -- vendor 0x1033 */
 	case 0x00021033:
@@ -1462,6 +1472,8 @@ const char* pci_vga_match(device_t dev)
 			chip = "MGA G100"; break;
 		case 0x1001:
 			chip = "MGA G100 AGP"; break;
+		case 0x2527:
+			chip = "MGA G550 AGP"; break;
 
 		}
 		break;
@@ -1512,6 +1524,8 @@ const char* pci_vga_match(device_t dev)
 			chip = "Mach64-GX"; break;
 		case 0x4c4d:
 			chip = "Mobility-1"; break;
+		case 0x4c52:
+			chip = "RageMobility-P/M"; break;
 		case 0x475a:
 			chip = "Mach64-GZ"; break;
 		case 0x5245:

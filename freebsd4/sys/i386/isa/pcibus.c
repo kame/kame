@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/pcibus.c,v 1.57.2.4 2001/08/21 17:24:36 imp Exp $
+ * $FreeBSD: src/sys/i386/isa/pcibus.c,v 1.57.2.6 2001/12/23 08:17:43 pirzyk Exp $
  *
  */
 
@@ -75,6 +75,9 @@ nexus_pcib_is_host_bridge(pcicfgregs *cfg,
 		break;
 	case 0x71928086:
 		s = "Intel 82443BX host to PCI bridge (AGP disabled)";
+		break;
+	case 0x71948086:
+		s = "Intel 82443MX host to PCI bridge";
 		break;
 	case 0x71a08086:
 		s = "Intel 82443GX host to PCI bridge";
@@ -130,6 +133,9 @@ nexus_pcib_is_host_bridge(pcicfgregs *cfg,
 		/* AMD -- vendor 0x1022 */
 	case 0x70061022:
 		s = "AMD-751 host to PCI bridge";
+		break;
+	case 0x700e1022:
+		s = "AMD-761 host to PCI bridge";
 		break;
 
 		/* SiS -- vendor 0x1039 */

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agp_via.c,v 1.1.2.1 2000/07/19 09:48:04 ru Exp $
+ *	$FreeBSD: src/sys/pci/agp_via.c,v 1.1.2.2 2001/10/04 09:53:04 ru Exp $
  */
 
 #include "opt_bus.h"
@@ -70,6 +70,8 @@ agp_via_match(device_t dev)
 		return ("VIA 82C598 (Apollo MVP3) host to PCI bridge");
 	case 0x06911106:
 		return ("VIA 82C691 (Apollo Pro) host to PCI bridge");
+	case 0x03051106:
+	    return ("VIA 82C8363 (Apollo KT133A) host to PCI bridge");
 	};
 
 	if (pci_get_vendor(dev) == 0x1106)

@@ -35,11 +35,11 @@ eval 'exec /usr/bin/perl -S $0 ${1+"$@"}'
 # SUCH DAMAGE.
 #
 #	@(#)vnode_if.sh	8.1 (Berkeley) 6/10/93
-# $FreeBSD: src/sys/kern/vnode_if.pl,v 1.21 1999/12/12 16:43:05 peter Exp $
+# $FreeBSD: src/sys/kern/vnode_if.pl,v 1.21.2.1 2002/01/06 06:46:21 silby Exp $
 #
 # Script to produce VFS front-end sugar.
 #
-# usage: vnode_if.sh srcfile
+# usage: vnode_if.pl srcfile
 #	(where srcfile is currently /sys/kern/vnode_if.src)
 #
 
@@ -61,7 +61,7 @@ while ($arg = shift @ARGV) {
     } elsif ($arg =~ m/\.src$/) {
 	$SRC = $arg;
     } else {
-	print "usage: vnode_if.sh [-c] [-h] srcfile\n";
+	print "usage: vnode_if.pl [-c] [-h] srcfile\n";
 	exit(1);
     }
 }
@@ -78,12 +78,12 @@ open(SRC,     "<$SRC")   || die "Unable to open input file";
 if ($hfile) {
     open(HEADER, ">$HEADER") || die "Unable to create $HEADER";
     # Print out header information for vnode_if.h.
-    print HEADER <<END_OF_LEADING_COMMENT
+    print HEADER <<'END_OF_LEADING_COMMENT'
 /*
  * This file is produced automatically.
  * Do not modify anything in here by hand.
  *
- * Created from @(#)vnode_if.sh	8.1 (Berkeley) 6/10/93
+ * Created from $FreeBSD: src/sys/kern/vnode_if.pl,v 1.21.2.1 2002/01/06 06:46:21 silby Exp $
  */
 
 extern struct vnodeop_desc vop_default_desc;
@@ -94,12 +94,12 @@ END_OF_LEADING_COMMENT
 if ($cfile) {
     open(CFILE,   ">$CFILE") || die "Unable to create $CFILE";
     # Print out header information for vnode_if.c.
-    print CFILE <<END_OF_LEADING_COMMENT
+    print CFILE <<'END_OF_LEADING_COMMENT'
 /*
  * This file is produced automatically.
  * Do not modify anything in here by hand.
  *
- * Created from @(#)vnode_if.sh	8.1 (Berkeley) 6/10/93
+ * Created from $FreeBSD: src/sys/kern/vnode_if.pl,v 1.21.2.1 2002/01/06 06:46:21 silby Exp $
  */
 
 #include <sys/param.h>

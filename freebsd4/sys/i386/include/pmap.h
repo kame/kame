@@ -42,7 +42,7 @@
  *
  *	from: hp300: @(#)pmap.h	7.2 (Berkeley) 12/16/90
  *	from: @(#)pmap.h	7.4 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/i386/include/pmap.h,v 1.65.2.2 2000/11/30 01:54:42 peter Exp $
+ * $FreeBSD: src/sys/i386/include/pmap.h,v 1.65.2.3 2001/10/03 07:15:37 peter Exp $
  */
 
 #ifndef _MACHINE_PMAP_H_
@@ -83,19 +83,28 @@
 #define PGEX_U		0x04	/* access from User mode (UPL) */
 
 /*
+ * Size of Kernel address space.  This is the number of page table pages
+ * (4MB each) to use for the kernel.  256 pages == 1 Gigabyte.
+ * This **MUST** be a multiple of 4 (eg: 252, 256, 260, etc).
+ */
+#ifndef KVA_PAGES
+#define KVA_PAGES	256
+#endif
+
+/*
  * Pte related macros
  */
 #define VADDR(pdi, pti) ((vm_offset_t)(((pdi)<<PDRSHIFT)|((pti)<<PAGE_SHIFT)))
 
 #ifndef NKPT
-#define	NKPT			30	/* actual number of kernel page tables */
+#define	NKPT		30	/* actual number of kernel page tables */
 #endif
 #ifndef NKPDE
 #ifdef SMP
-#define NKPDE			254	/* addressable number of page tables/pde's */
+#define NKPDE	(KVA_PAGES - 2)	/* addressable number of page tables/pde's */
 #else
-#define NKPDE			255	/* addressable number of page tables/pde's */
-#endif	/* SMP */
+#define NKPDE	(KVA_PAGES - 1)	/* addressable number of page tables/pde's */
+#endif
 #endif
 
 /*

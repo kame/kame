@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/pci/if_wxreg.h,v 1.3.2.4 2001/04/21 18:45:40 mjacob Exp $ */
+/* $FreeBSD: src/sys/pci/if_wxreg.h,v 1.3.2.6 2001/10/20 17:44:12 mjacob Exp $ */
 /*
  * Principal Author: Matthew Jacob
  * Copyright (c) 1999, 2001 by Traakan Software
@@ -303,7 +303,7 @@ typedef struct {
 #define WXISR_GPI_EN3	0x4000
 
 #define	WXIENABLE_DEFAULT	\
-	 (WXISR_RXO | WXISR_RXT0 | WXISR_RXDMT0 | WXISR_RXSEQ |	\
+	 (WXISR_RXO | WXISR_RXT0 | WXISR_RXDMT0 | WXISR_RXSEQ |	WXISR_TXDW |\
 		    WXISR_LSC | WXISR_PCIE | WXISR_GPI_EN1)
 
 #define	WXDISABLE	0xffffffff

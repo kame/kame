@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/svr4/svr4_misc.c,v 1.13.2.1 2000/08/30 00:01:47 green Exp $
+ * $FreeBSD: src/sys/svr4/svr4_misc.c,v 1.13.2.2 2001/11/03 01:41:09 ps Exp $
  */
 
 /*
@@ -571,7 +571,7 @@ svr4_sys_mmap64(p, uap)
 	SCARG(&mm, addr) = SCARG(uap, addr);
 	SCARG(&mm, pos) = SCARG(uap, pos);
 
-	rp = (void *) round_page((vm_offset_t)(p->p_vmspace->vm_daddr + MAXDSIZ));
+	rp = (void *) round_page((vm_offset_t)(p->p_vmspace->vm_daddr + maxdsiz));
 	if ((SCARG(&mm, flags) & MAP_FIXED) == 0 &&
 	    SCARG(&mm, addr) != 0 && (void *)SCARG(&mm, addr) < rp)
 		SCARG(&mm, addr) = rp;

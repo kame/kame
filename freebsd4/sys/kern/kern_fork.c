@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_fork.c	8.6 (Berkeley) 4/8/94
- * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.7 2001/05/10 17:54:16 knu Exp $
+ * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.8 2001/10/24 19:14:51 dillon Exp $
  */
 
 #include "opt_ktrace.h"
@@ -459,10 +459,11 @@ again:
 
 #ifdef KTRACE
 	/*
-	 * Copy traceflag and tracefile if enabled.
-	 * If not inherited, these were zeroed above.
+	 * Copy traceflag and tracefile if enabled.  If not inherited,
+	 * these were zeroed above but we still could have a trace race
+	 * so make sure p2's p_tracep is NULL.
 	 */
-	if (p1->p_traceflag&KTRFAC_INHERIT) {
+	if ((p1->p_traceflag & KTRFAC_INHERIT) && p2->p_tracep == NULL) {
 		p2->p_traceflag = p1->p_traceflag;
 		if ((p2->p_tracep = p1->p_tracep) != NULL)
 			VREF(p2->p_tracep);

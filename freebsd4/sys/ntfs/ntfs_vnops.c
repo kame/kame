@@ -35,7 +35,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ntfs/ntfs_vnops.c,v 1.9.2.1 2001/05/30 01:34:53 bp Exp $
+ * $FreeBSD: src/sys/ntfs/ntfs_vnops.c,v 1.9.2.3 2001/10/12 22:08:49 semenu Exp $
  *
  */
 
@@ -298,10 +298,6 @@ ntfs_reclaim(ap)
 	
 	/* Purge old data structures associated with the inode. */
 	cache_purge(vp);
-	if (ip->i_devvp) {
-		vrele(ip->i_devvp);
-		ip->i_devvp = NULL;
-	}
 
 	ntfs_frele(fp);
 	ntfs_ntput(ip);
@@ -649,7 +645,7 @@ ntfs_readdir(ap)
 				continue;
 
 			for(i=0; i<iep->ie_fnamelen; i++) {
-				cde.d_name[i] = ntfs_u28(iep->ie_fname[i]);
+				cde.d_name[i] = NTFS_U28(iep->ie_fname[i]);
 			}
 			cde.d_name[i] = '\0';
 			dprintf(("ntfs_readdir: elem: %d, fname:[%s] type: %d, flag: %d, ",

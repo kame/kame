@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/nge/if_ngereg.h,v 1.4.2.1 2001/06/19 19:42:39 wpaul Exp $
+ * $FreeBSD: src/sys/dev/nge/if_ngereg.h,v 1.4.2.2 2001/09/19 23:14:28 wpaul Exp $
  */
 
 #define NGE_CSR			0x00
@@ -562,7 +562,7 @@ struct nge_desc_32 {
 #define NGE_RXEXTSTS_UDPPKT	0x00200000
 #define NGE_RXEXTSTS_UDPCSUMERR	0x00400000
 
-#define NGE_RX_LIST_CNT		64
+#define NGE_RX_LIST_CNT		128
 #define NGE_TX_LIST_CNT		128
 
 struct nge_list_data {

@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_pager.c,v 1.54.2.1 2000/08/04 22:31:11 peter Exp $
+ * $FreeBSD: src/sys/vm/vm_pager.c,v 1.54.2.2 2001/11/18 07:11:00 dillon Exp $
  */
 
 /*
@@ -512,8 +512,8 @@ vm_pager_chain_iodone(struct buf *nbp)
 			bp->b_flags &= ~B_WANT;
 			wakeup(bp);
 		}
-		if (!bp->b_chain.count && (bp->b_flags & B_AUTOCHAINDONE)) {
-			bp->b_flags &= ~B_AUTOCHAINDONE;
+		if (!bp->b_chain.count && (bp->b_xflags & BX_AUTOCHAINDONE)) {
+			bp->b_xflags &= ~BX_AUTOCHAINDONE;
 			if (bp->b_resid != 0 && !(bp->b_flags & B_ERROR)) {
 				bp->b_flags |= B_ERROR;
 				bp->b_error = EINVAL;
@@ -603,7 +603,7 @@ autochaindone(struct buf *bp)
 	if (bp->b_chain.count == 0)
 		biodone(bp);
 	else
-		bp->b_flags |= B_AUTOCHAINDONE;
+		bp->b_xflags |= BX_AUTOCHAINDONE;
 	splx(s);
 }
 

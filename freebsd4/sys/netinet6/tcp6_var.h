@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet6/tcp6_var.h,v 1.3.2.1 2000/07/15 07:14:38 kris Exp $
+ * $FreeBSD: src/sys/netinet6/tcp6_var.h,v 1.3.2.2 2001/12/14 20:21:11 jlemon Exp $
  */
 
 /*
@@ -62,7 +62,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_var.h	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet6/tcp6_var.h,v 1.3.2.1 2000/07/15 07:14:38 kris Exp $
+ * $FreeBSD: src/sys/netinet6/tcp6_var.h,v 1.3.2.2 2001/12/14 20:21:11 jlemon Exp $
  */
 
 #ifndef _NETINET_TCP6_VAR_H_
@@ -79,7 +79,7 @@ struct	ip6_hdr;
 void	tcp6_ctlinput __P((int, struct sockaddr *, void *));
 void	tcp6_init __P((void));
 int	tcp6_input __P((struct mbuf **, int *, int));
-struct	rtentry *tcp_rtlookup6 __P((struct inpcb *));
+struct	rtentry *tcp_rtlookup6(struct in_conninfo *);
 
 extern struct	pr_usrreqs tcp6_usrreqs;
 

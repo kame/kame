@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/param.h,v 1.17.2.3 2000/12/29 10:59:10 asmodai Exp $ */
+/* $FreeBSD: src/sys/alpha/include/param.h,v 1.17.2.4 2001/09/21 19:08:03 dillon Exp $ */
 /* From: NetBSD: param.h,v 1.20 1997/09/19 13:52:53 leo Exp */
 
 /*
@@ -131,6 +131,21 @@
 
 #define	UPAGES		2		/* pages of u-area */
 #define	USPACE		(UPAGES * PAGE_SIZE) /* total size of u-area */
+
+/*
+ * Ceiling on amount of swblock kva space.
+ */
+#ifndef VM_SWZONE_SIZE_MAX
+#define VM_SWZONE_SIZE_MAX     (70 * 1024 * 1024)
+#endif
+
+/*
+ * Ceiling on size of buffer cache (really only effects write queueing,
+ * the VM page cache is not effected).
+ */
+#ifndef VM_BCACHE_SIZE_MAX
+#define VM_BCACHE_SIZE_MAX     (200 * 1024 * 1024)
+#endif
 
 /*
  * Constants related to network buffer management.

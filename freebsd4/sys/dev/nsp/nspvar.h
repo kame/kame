@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/nsp/nspvar.h,v 1.1.2.3 2001/07/22 00:21:39 non Exp $	*/
+/*	$FreeBSD: src/sys/dev/nsp/nspvar.h,v 1.1.2.4 2001/12/17 13:30:19 non Exp $	*/
 /*	$NecBSD: nspvar.h,v 1.7.14.5 2001/06/29 06:27:54 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -58,7 +58,6 @@ struct nsp_softc {
 	bus_space_tag_t sc_memt;
 	bus_space_handle_t sc_memh;
 
-#if __FreeBSD_version >= 400001
 	int port_rid;
 	int irq_rid;
 	int mem_rid;
@@ -67,7 +66,6 @@ struct nsp_softc {
 	struct resource *mem_res;
 
 	void *nsp_intrhand;
-#endif	/* __FreeBSD_version */
 #endif	/* __FreeBSD__ */
 
 	int sc_tmaxcnt;				/* timeout count */

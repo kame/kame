@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/intr_machdep.h,v 1.19.2.1 2000/04/29 10:15:56 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/intr_machdep.h,v 1.19.2.2 2001/10/14 20:05:50 luigi Exp $
  */
 
 #ifndef _I386_ISA_INTR_MACHDEP_H_
@@ -140,9 +140,6 @@ typedef void inthand_t __P((u_int cs, u_int ef, u_int esp, u_int ss));
 
 #define	IDTVEC(name)	__CONCAT(X,name)
 
-extern char eintrnames[];	/* end of intrnames[] */
-extern u_long intrcnt[];	/* counts for for each device and stray */
-extern char intrnames[];	/* string table containing device names */
 extern u_long *intr_countp[];	/* pointers into intrcnt[] */
 extern inthand2_t *intr_handler[];	/* C entry points of intr handlers */
 extern u_int intr_mask[];	/* sets of intrs masked during handling of 1 */

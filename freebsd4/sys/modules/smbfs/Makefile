@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/smbfs/Makefile,v 1.1.2.2 2001/05/29 10:40:17 bp Exp $
+# $FreeBSD: src/sys/modules/smbfs/Makefile,v 1.1.2.3 2002/01/10 11:45:47 sheldonh Exp $
 
 .PATH:	${.CURDIR}/../../crypto/des \
 	${.CURDIR}/../../kern \
@@ -7,6 +7,7 @@
 	${.CURDIR}/../../fs/smbfs
 
 KMOD=	smbfs
+KMODDEPS=	libiconv libmchain
 
 SRCS=	vnode_if.h \
 	opt_inet.h opt_ipx.h \

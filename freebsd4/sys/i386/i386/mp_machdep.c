@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.115.2.9 2001/08/15 01:23:50 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.115.2.10 2001/10/05 06:20:17 peter Exp $
  */
 
 #include "opt_cpu.h"
@@ -2460,8 +2460,6 @@ ap_init()
 struct proc*	checkstate_curproc[MAXCPU];
 int		checkstate_cpustate[MAXCPU];
 u_long		checkstate_pc[MAXCPU];
-
-extern long	cp_time[CPUSTATES];
 
 #define PC_TO_INDEX(pc, prof)				\
         ((int)(((u_quad_t)((pc) - (prof)->pr_off) *	\

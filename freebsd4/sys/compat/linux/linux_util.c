@@ -27,7 +27,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *	from: svr4_util.c,v 1.5 1995/01/22 23:44:50 christos Exp
- * $FreeBSD: src/sys/compat/linux/linux_util.c,v 1.12.2.1 2000/10/30 10:51:37 obrien Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_util.c,v 1.12.2.2 2001/11/05 19:08:23 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -43,7 +43,7 @@ const char      linux_emul_path[] = "/compat/linux";
 
 /*
  * Search an alternate path before passing pathname arguments on
- * to system calls. Useful for keeping a seperate 'emulation tree'.
+ * to system calls. Useful for keeping a separate 'emulation tree'.
  *
  * If cflag is set, we check if an attempt can be made to create
  * the named file, i.e. we check if the directory it should
@@ -130,7 +130,7 @@ linux_emul_find(p, sgp, prefix, path, pbuf, cflag)
 		 * to the emulation root directory. This is expensive :-(
 		 */
 		NDINIT(&ndroot, LOOKUP, FOLLOW, UIO_SYSSPACE, linux_emul_path,
-		       p);
+		    p);
 
 		if ((error = namei(&ndroot)) != 0) {
 			/* Cannot happen! */

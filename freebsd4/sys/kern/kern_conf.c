@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_conf.c,v 1.73.2.1 2001/07/24 09:49:41 dd Exp $
+ * $FreeBSD: src/sys/kern/kern_conf.c,v 1.73.2.2 2001/11/08 15:40:06 roam Exp $
  */
 
 #include <sys/param.h>
@@ -289,7 +289,7 @@ makeudev(int x, int y)
 }
 
 dev_t
-make_dev(struct cdevsw *devsw, int minor, uid_t uid, gid_t gid, int perms, char *fmt, ...)
+make_dev(struct cdevsw *devsw, int minor, uid_t uid, gid_t gid, int perms, const char *fmt, ...)
 {
 	dev_t	dev;
 	va_list ap;

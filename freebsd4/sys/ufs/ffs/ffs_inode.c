@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_inode.c	8.13 (Berkeley) 4/21/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_inode.c,v 1.56.2.2 2000/12/28 11:01:44 ps Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_inode.c,v 1.56.2.4 2001/12/20 21:10:52 dillon Exp $
  */
 
 #include "opt_quota.h"
@@ -149,8 +149,6 @@ ffs_truncate(vp, length, flags, cred, p)
 	off_t osize;
 
 	oip = VTOI(ovp);
-	if (oip->i_size == length)
-		return (0);
 	fs = oip->i_fs;
 	if (length < 0)
 		return (EINVAL);
@@ -245,6 +243,19 @@ ffs_truncate(vp, length, flags, cred, p)
 		error = VOP_BALLOC(ovp, length - 1, 1, cred, aflags, &bp);
 		if (error) {
 			return (error);
+		}
+		/*
+		 * When we are doing soft updates and the UFS_BALLOC
+		 * above fills in a direct block hole with a full sized
+		 * block that will be truncated down to a fragment below,
+		 * we must flush out the block dependency with an FSYNC
+		 * so that we do not get a soft updates inconsistency
+		 * when we create the fragment below.
+		 */
+		if (DOINGSOFTDEP(ovp) && lbn < NDADDR &&
+		    fragroundup(fs, blkoff(fs, length)) < fs->fs_bsize &&
+		    (error = VOP_FSYNC(ovp, cred, MNT_WAIT, p)) != 0) {
+				return (error);
 		}
 		oip->i_size = length;
 		size = blksize(fs, oip, lbn);

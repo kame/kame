@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/dsp.c,v 1.15.2.10 2001/08/24 18:39:21 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/dsp.c,v 1.15.2.11 2001/12/19 19:40:27 cg Exp $
  */
 
 #include <sys/param.h>
@@ -777,8 +777,8 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct proc *p)
 	        		struct snd_dbuf *bs = rdch->bufsoft;
 
 				CHN_LOCK(rdch);
-				chn_rdupdate(rdch);
-				a->bytes = sndbuf_getfree(bs);
+				/* chn_rdupdate(rdch); */
+				a->bytes = sndbuf_getready(bs);
 	        		a->fragments = a->bytes / sndbuf_getblksz(bs);
 	        		a->fragstotal = sndbuf_getblkcnt(bs);
 	        		a->fragsize = sndbuf_getblksz(bs);

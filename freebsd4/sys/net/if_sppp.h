@@ -16,7 +16,7 @@
  *
  * From: Version 2.0, Fri Oct  6 20:39:21 MSK 1995
  *
- * $FreeBSD: src/sys/net/if_sppp.h,v 1.16.2.1 2001/07/03 11:01:41 ume Exp $
+ * $FreeBSD: src/sys/net/if_sppp.h,v 1.16.2.2 2002/01/06 10:51:22 joerg Exp $
  */
 
 #ifndef _NET_IF_SPPP_H_
@@ -48,9 +48,9 @@ struct sipcp {
 #define IPCP_MYADDR_DYN   2	/* my address is dynamically assigned */
 #define IPCP_MYADDR_SEEN  4	/* have seen his address already */
 #ifdef notdef
-#define IPV6CP_MYIFID_DYN   2	/* my ifid is dynamically assigned */
+#define IPV6CP_MYIFID_DYN 8	/* my ifid is dynamically assigned */
 #endif
-#define IPV6CP_MYIFID_SEEN  4	/* have seen his ifid already */
+#define IPV6CP_MYIFID_SEEN 0x10	/* have seen his ifid already */
 };
 
 #define AUTHNAMELEN	32

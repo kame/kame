@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)param.c	8.3 (Berkeley) 8/20/94
- * $FreeBSD: src/sys/kern/subr_param.c,v 1.42.2.1 2001/07/30 23:28:00 peter Exp $
+ * $FreeBSD: src/sys/kern/subr_param.c,v 1.42.2.8 2002/01/25 18:19:54 dillon Exp $
  */
 
 #include "opt_param.h"
@@ -45,6 +45,8 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+
+#include <machine/vmparam.h>
 
 /*
  * System parameter formulae.
@@ -76,6 +78,14 @@ int	ncallout;			/* maximum # of timer events */
 int	mbuf_wait = 32;			/* mbuf sleep time in ticks */
 int	nbuf;
 int	nswbuf;
+int	maxswzone;			/* max swmeta KVA storage */
+int	maxbcache;			/* max buffer cache KVA storage */
+u_quad_t	maxtsiz;			/* max text size */
+u_quad_t	dfldsiz;			/* initial data size limit */
+u_quad_t	maxdsiz;			/* max data size */
+u_quad_t	dflssiz;			/* initial stack size limit */
+u_quad_t	maxssiz;			/* max stack size */
+u_quad_t	sgrowsiz;			/* amount to grow stack */
 
 /* maximum # of sf_bufs (sendfile(2) zero-copy virtual buffers) */
 int	nsfbufs;
@@ -88,33 +98,77 @@ int	nsfbufs;
 struct	buf *swbuf;
 
 /*
- * Boot time overrides
+ * Boot time overrides that are not scaled against main memory
  */
 void
-init_param(void)
+init_param1(void)
 {
-
-	/* Base parameters */
-	maxusers = MAXUSERS;
-	TUNABLE_INT_FETCH("kern.maxusers", &maxusers);
 	hz = HZ;
 	TUNABLE_INT_FETCH("kern.hz", &hz);
 	tick = 1000000 / hz;
 	tickadj = howmany(30000, 60 * hz);	/* can adjust 30ms in 60s */
 
-	/* The following can be overridden after boot via sysctl */
+#ifdef VM_SWZONE_SIZE_MAX
+	maxswzone = VM_SWZONE_SIZE_MAX;
+#endif
+	TUNABLE_INT_FETCH("kern.maxswzone", &maxswzone);
+#ifdef VM_BCACHE_SIZE_MAX
+	maxbcache = VM_BCACHE_SIZE_MAX;
+#endif
+	TUNABLE_INT_FETCH("kern.maxbcache", &maxbcache);
+
+	maxtsiz = MAXTSIZ;
+	TUNABLE_QUAD_FETCH("kern.maxtsiz", &maxtsiz);
+	dfldsiz = DFLDSIZ;
+	TUNABLE_QUAD_FETCH("kern.dfldsiz", &dfldsiz);
+	maxdsiz = MAXDSIZ;
+	TUNABLE_QUAD_FETCH("kern.maxdsiz", &maxdsiz);
+	dflssiz = DFLSSIZ;
+	TUNABLE_QUAD_FETCH("kern.dflssiz", &dflssiz);
+	maxssiz = MAXSSIZ;
+	TUNABLE_QUAD_FETCH("kern.maxssiz", &maxssiz);
+	sgrowsiz = SGROWSIZ;
+	TUNABLE_QUAD_FETCH("kern.sgrowsiz", &sgrowsiz);
+}
+
+/*
+ * Boot time overrides that are scaled against main memory
+ */
+void
+init_param2(int physpages)
+{
+
+	/* Base parameters */
+	if ((maxusers = MAXUSERS) == 0) {
+		maxusers = physpages / (2 * 1024 * 1024 / PAGE_SIZE);
+		if (maxusers < 32)
+		    maxusers = 32;
+		if (maxusers > 384)
+		    maxusers = 384;
+	}
+	TUNABLE_INT_FETCH("kern.maxusers", &maxusers);
+
+	/*
+	 * The following can be overridden after boot via sysctl.  Note:
+	 * unless overriden, these macros are ultimately based on maxusers.
+	 */
 	maxproc = NPROC;
 	TUNABLE_INT_FETCH("kern.maxproc", &maxproc);
 	maxfiles = MAXFILES;
 	TUNABLE_INT_FETCH("kern.maxfiles", &maxfiles);
-	maxprocperuid = maxproc - 1;
-	maxfilesperproc = maxfiles;
+	maxprocperuid = (maxproc * 9) / 10;
+	maxfilesperproc = (maxfiles * 9) / 10;
 
-	/* Cannot be changed after boot */
+	/*
+	 * Cannot be changed after boot.  Unless overriden, NSFBUFS is based
+	 * on maxusers and NBUF is typically 0 (auto-sized later).
+	 */
 	nsfbufs = NSFBUFS;
 	TUNABLE_INT_FETCH("kern.ipc.nsfbufs", &nsfbufs);
 	nbuf = NBUF;
 	TUNABLE_INT_FETCH("kern.nbuf", &nbuf);
+
 	ncallout = 16 + maxproc + maxfiles;
 	TUNABLE_INT_FETCH("kern.ncallout", &ncallout);
 }
+

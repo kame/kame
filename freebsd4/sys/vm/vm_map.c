@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.9 2001/06/13 07:26:58 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.12 2001/11/10 22:27:09 tegge Exp $
  */
 
 /*
@@ -1217,7 +1217,7 @@ vm_map_madvise(map, start, end, behav)
 				    current->object.vm_object,
 				    pindex, 
 				    (count << PAGE_SHIFT),
-				    0
+				    MAP_PREFAULT_MADVISE
 				);
 			}
 		}
@@ -1288,6 +1288,7 @@ vm_map_user_pageable(map, start, end, new_pageable)
 	vm_map_entry_t entry;
 	vm_map_entry_t start_entry;
 	vm_offset_t estart;
+	vm_offset_t eend;
 	int rv;
 
 	vm_map_lock(map);
@@ -1365,6 +1366,7 @@ vm_map_user_pageable(map, start, end, new_pageable)
 			entry->wired_count++;
 			entry->eflags |= MAP_ENTRY_USER_WIRED;
 			estart = entry->start;
+			eend = entry->end;
 
 			/* First we need to allow map modifications */
 			vm_map_set_recursive(map);
@@ -1379,8 +1381,15 @@ vm_map_user_pageable(map, start, end, new_pageable)
 
 				vm_map_clear_recursive(map);
 				vm_map_unlock(map);
-				
-				(void) vm_map_user_pageable(map, start, entry->start, TRUE);
+			
+				/*
+				 * At this point, the map is unlocked, and
+				 * entry might no longer be valid.  Use copy
+				 * of entry start value obtained while entry
+				 * was valid.
+				 */
+				(void) vm_map_user_pageable(map, start, estart,
+							    TRUE);
 				return rv;
 			}
 
@@ -1390,9 +1399,15 @@ vm_map_user_pageable(map, start, end, new_pageable)
 				if (vm_map_lookup_entry(map, estart, &entry) 
 				    == FALSE) {
 					vm_map_unlock(map);
+					/* 
+					 * vm_fault_user_wire succeded, thus
+					 * the area between start and eend
+					 * is wired and has to be unwired
+					 * here as part of the cleanup.
+					 */
 					(void) vm_map_user_pageable(map,
 								    start,
-								    estart,
+								    eend,
 								    TRUE);
 					return (KERN_INVALID_ADDRESS);
 				}
@@ -1626,6 +1641,20 @@ vm_map_pageable(map, start, end, new_pageable)
 			vm_map_unlock(map);
 			(void) vm_map_pageable(map, start, failed, TRUE);
 			return (rv);
+		}
+		/*
+		 * An exclusive lock on the map is needed in order to call
+		 * vm_map_simplify_entry().  If the current lock on the map
+		 * is only a shared lock, an upgrade is needed.
+		 */
+		if (vm_map_pmap(map) != kernel_pmap &&
+		    vm_map_lock_upgrade(map)) {
+			vm_map_lock(map);
+			if (vm_map_lookup_entry(map, start, &start_entry) ==
+			    FALSE) {
+				vm_map_unlock(map);
+				return KERN_SUCCESS;
+			}
 		}
 		vm_map_simplify_entry(map, start_entry);
 	}
@@ -2267,10 +2296,10 @@ vm_map_stack (vm_map_t map, vm_offset_t addrbos, vm_size_t max_ssize,
 	if (VM_MIN_ADDRESS > 0 && addrbos < VM_MIN_ADDRESS)
 		return (KERN_NO_SPACE);
 
-	if (max_ssize < SGROWSIZ)
+	if (max_ssize < sgrowsiz)
 		init_ssize = max_ssize;
 	else
-		init_ssize = SGROWSIZ;
+		init_ssize = sgrowsiz;
 
 	vm_map_lock(map);
 
@@ -2410,7 +2439,7 @@ Retry:
 	}
 
 	/* Round up the grow amount modulo SGROWSIZ */
-	grow_amount = roundup (grow_amount, SGROWSIZ);
+	grow_amount = roundup (grow_amount, sgrowsiz);
 	if (grow_amount > stack_entry->avail_ssize) {
 		grow_amount = stack_entry->avail_ssize;
 	}

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.5 2001/08/16 23:52:23 brooks Exp $
+ * $FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.6 2001/09/26 01:02:01 brooks Exp $
  */
 
 /*
@@ -83,7 +83,7 @@
 
 #ifndef lint
 static const char rcsid[] =
- "$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.5 2001/08/16 23:52:23 brooks Exp $";
+ "$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.6 2001/09/26 01:02:01 brooks Exp $";
 #endif
 
 #include <dev/an/if_aironet_ieee.h>
@@ -115,13 +115,14 @@ static int an_probe_pci		__P((device_t));
 static int an_attach_pci	__P((device_t));
 static int an_detach_pci	__P((device_t));
 
-static int an_probe_pci(device_t dev)
+static int
+an_probe_pci(device_t dev)
 {
 	struct an_type		*t;
 
 	t = an_devs;
 
-	while(t->an_name != NULL) {
+	while (t->an_name != NULL) {
 		if (pci_get_vendor(dev) == t->an_vid &&
 		    pci_get_device(dev) == t->an_did) {
 			device_set_desc(dev, t->an_name);
@@ -133,7 +134,8 @@ static int an_probe_pci(device_t dev)
 	return(ENXIO);
 }
 
-static int an_attach_pci(dev)
+static int
+an_attach_pci(dev)
 	device_t		dev;
 {
 	int			s;
@@ -147,7 +149,7 @@ static int an_attach_pci(dev)
 	unit = device_get_unit(dev);
 	flags = device_get_flags(dev);
 	bzero(sc, sizeof(struct an_softc));
-	
+
 	/*
 	 * Map control/status registers.
  	 */
@@ -179,7 +181,7 @@ static int an_attach_pci(dev)
 		an_release_resources(dev);
 		goto fail;
         }
- 
+
 	error = bus_setup_intr(dev, sc->irq_res, INTR_TYPE_NET,
 	    an_intr, sc, &sc->irq_handle);
 	if (error) {
@@ -196,7 +198,7 @@ fail:
 	return(error);
 }
 
-static int 
+static int
 an_detach_pci(device_t dev)
 {
 	struct an_softc		*sc = device_get_softc(dev);

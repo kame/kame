@@ -1,5 +1,5 @@
 /*
- * $FreeBSD: src/sys/cam/scsi/scsi_sa.c,v 1.45.2.9 2001/07/09 19:21:06 mjacob Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_sa.c,v 1.45.2.10 2001/10/20 17:31:22 mjacob Exp $
  *
  * Implementation of SCSI Sequential Access Peripheral driver for CAM.
  *
@@ -2209,10 +2209,12 @@ tryagain:
 		    (softc->quirks & SA_QUIRK_NO_MODESEL) == 0) {
 			error = sasetparams(periph, SA_PARAM_BUFF_MODE, 0,
 			    0, 0, SF_NO_PRINT);
-			if (error == 0)
+			if (error == 0) {
 				softc->buffer_mode = SMH_SA_BUF_MODE_SIBUF;
-			xpt_print_path(ccb->ccb_h.path);
-			printf("unable to set buffered mode\n");
+			} else {
+				xpt_print_path(ccb->ccb_h.path);
+				printf("unable to set buffered mode\n");
+			}
 			error = 0;	/* not an error */
 		}
 

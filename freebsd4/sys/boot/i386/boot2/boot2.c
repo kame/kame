@@ -14,7 +14,7 @@
  */
 
 /*
- * $FreeBSD: src/sys/boot/i386/boot2/boot2.c,v 1.28.2.4 2001/08/14 22:55:29 jhb Exp $
+ * $FreeBSD: src/sys/boot/i386/boot2/boot2.c,v 1.28.2.5 2002/01/14 11:16:07 iedowse Exp $
  */
 
 #include <sys/param.h>
@@ -57,7 +57,7 @@
 
 #define ARGS		0x900
 #define NOPT		11
-#define BSIZEMAX	8192
+#define BSIZEMAX	16384
 #define NDEV		5
 #define MEM_BASE	0x12
 #define MEM_EXT 	0x15

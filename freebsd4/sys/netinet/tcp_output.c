@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_output.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.39.2.10 2001/07/07 04:30:38 silby Exp $
+ * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.39.2.14 2001/12/17 22:58:52 silby Exp $
  */
 
 #include "opt_inet6.h"
@@ -89,7 +89,7 @@ int ss_fltsz = 1;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, slowstart_flightsize, CTLFLAG_RW,
 	&ss_fltsz, 1, "Slow start flight size");
 
-int ss_fltsz_local = TCP_MAXWIN;               /* something large */
+int ss_fltsz_local = 4;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, local_slowstart_flightsize, CTLFLAG_RW,
 	&ss_fltsz_local, 1, "Slow start flight size for local networks");
 
@@ -116,7 +116,9 @@ tcp_output(tp)
 	u_char opt[TCP_MAXOLEN];
 	unsigned ipoptlen, optlen, hdrlen;
 	int idle, sendalot;
+#if 0
 	int maxburst = TCP_MAXBURST;
+#endif
 	struct rmxp_tao *taop;
 	struct rmxp_tao tao_noncached;
 #ifdef INET6
@@ -133,7 +135,7 @@ tcp_output(tp)
 	 * If there is some data or critical controls (SYN, RST)
 	 * to send, then transmit; otherwise, investigate further.
 	 */
-	idle = (tp->snd_max == tp->snd_una);
+	idle = (tp->t_flags & TF_LASTIDLE) || (tp->snd_max == tp->snd_una);
 	if (idle && (ticks - tp->t_rcvtime) >= tp->t_rxtcur) {
 		/*
 		 * We have been idle for "a while" and no acks are
@@ -156,6 +158,13 @@ tcp_output(tp)
 			tp->snd_cwnd = tp->t_maxseg * ss_fltsz_local;
 		else     
 			tp->snd_cwnd = tp->t_maxseg * ss_fltsz;
+	}
+	tp->t_flags &= ~TF_LASTIDLE;
+	if (idle) {
+		if (tp->t_flags & TF_MORETOCOME) {
+			tp->t_flags |= TF_LASTIDLE;
+			idle = 0;
+		}
 	}
 again:
 	sendalot = 0;
@@ -207,7 +216,7 @@ again:
 
 	len = (long)ulmin(so->so_snd.sb_cc, win) - off;
 
-	if ((taop = tcp_gettaocache(tp->t_inpcb)) == NULL) {
+	if ((taop = tcp_gettaocache(&tp->t_inpcb->inp_inc)) == NULL) {
 		taop = &tao_noncached;
 		bzero(taop, sizeof(*taop));
 	}
@@ -268,28 +277,38 @@ again:
 	win = sbspace(&so->so_rcv);
 
 	/*
-	 * Sender silly window avoidance.  If connection is idle
-	 * and can send all data, a maximum segment,
-	 * at least a maximum default-size segment do it,
-	 * or are forced, do it; otherwise don't bother.
-	 * If peer's buffer is tiny, then send
-	 * when window is at least half open.
-	 * If retransmitting (possibly after persist timer forced us
-	 * to send into a small window), then must resend.
+	 * Sender silly window avoidance.   We transmit under the following
+	 * conditions when len is non-zero:
+	 *
+	 *	- We have a full segment
+	 *	- This is the last buffer in a write()/send() and we are
+	 *	  either idle or running NODELAY
+	 *	- we've timed out (e.g. persist timer)
+	 *	- we have more then 1/2 the maximum send window's worth of
+	 *	  data (receiver may be limited the window size)
+	 *	- we need to retransmit
 	 */
 	if (len) {
 		if (len == tp->t_maxseg)
 			goto send;
-		if (!(tp->t_flags & TF_MORETOCOME) &&
-		    (idle || tp->t_flags & TF_NODELAY) &&
-		    (tp->t_flags & TF_NOPUSH) == 0 &&
-		    len + off >= so->so_snd.sb_cc)
+		/*
+		 * NOTE! on localhost connections an 'ack' from the remote
+		 * end may occur synchronously with the output and cause
+		 * us to flush a buffer queued with moretocome.  XXX
+		 *
+		 * note: the len + off check is almost certainly unnecessary.
+		 */
+		if (!(tp->t_flags & TF_MORETOCOME) &&	/* normal case */
+		    (idle || (tp->t_flags & TF_NODELAY)) &&
+		    len + off >= so->so_snd.sb_cc &&
+		    (tp->t_flags & TF_NOPUSH) == 0) {
 			goto send;
-		if (tp->t_force)
+		}
+		if (tp->t_force)			/* typ. timeout case */
 			goto send;
 		if (len >= tp->max_sndwnd / 2 && tp->max_sndwnd > 0)
 			goto send;
-		if (SEQ_LT(tp->snd_nxt, tp->snd_max))
+		if (SEQ_LT(tp->snd_nxt, tp->snd_max))	/* retransmit case */
 			goto send;
 	}
 
@@ -688,6 +707,20 @@ send:
 	if (win > (long)TCP_MAXWIN << tp->rcv_scale)
 		win = (long)TCP_MAXWIN << tp->rcv_scale;
 	th->th_win = htons((u_short) (win>>tp->rcv_scale));
+
+	/*
+	 * Adjust the RXWIN0SENT flag - indicate that we have advertised
+	 * a 0 window.  This may cause the remote transmitter to stall.  This
+	 * flag tells soreceive() to disable delayed acknowledgements when
+	 * draining the buffer.  This can occur if the receiver is attempting
+	 * to read more data then can be buffered prior to transmitting on
+	 * the connection.
+	 */
+	if (win == 0)
+		tp->t_flags |= TF_RXWIN0SENT;
+	else
+		tp->t_flags &= ~TF_RXWIN0SENT;
+
 	if (SEQ_GT(tp->snd_up, tp->snd_nxt)) {
 		th->th_urp = htons((u_short)(tp->snd_up - tp->snd_nxt));
 		th->th_flags |= TH_URG;
@@ -724,7 +757,7 @@ send:
 
 	/* IP version must be set here for ipv4/ipv6 checking later */
 	KASSERT(ip->ip_v == IPVERSION,
-	    ("%s: IP version incorrect: %d", __FUNCTION__, ip->ip_v));
+	    ("%s: IP version incorrect: %d", __func__, ip->ip_v));
       }
 
 	/*
@@ -912,7 +945,17 @@ out:
 	tp->t_flags &= ~TF_ACKNOW;
 	if (tcp_delack_enabled)
 		callout_stop(tp->tt_delack);
+#if 0
+	/*
+	 * This completely breaks TCP if newreno is turned on.  What happens
+	 * is that if delayed-acks are turned on on the receiver, this code
+	 * on the transmitter effectively destroys the TCP window, forcing
+	 * it to four packets (1.5Kx4 = 6K window).
+	 */
 	if (sendalot && (!tcp_do_newreno || --maxburst))
+		goto again;
+#endif
+	if (sendalot)
 		goto again;
 	return (0);
 }

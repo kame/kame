@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/via82c686.c,v 1.4.2.5 2001/08/03 12:40:13 greid Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/via82c686.c,v 1.4.2.6 2001/11/24 00:40:32 orion Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -490,8 +490,8 @@ via_attach(device_t dev)
 	mixer_init(dev, ac97_getmixerclass(), via->codec);
 
 	via->codec_caps = ac97_getextcaps(via->codec);
-	if (via->codec_caps & AC97_EXTCAP_VRA)
-		ac97_setextmode(via->codec, AC97_EXTCAP_VRA | AC97_EXTCAP_VRM);
+	ac97_setextmode(via->codec, 
+			via->codec_caps & (AC97_EXTCAP_VRA | AC97_EXTCAP_VRM));
 
 	/* DMA tag for buffers */
 	if (bus_dma_tag_create(/*parent*/NULL, /*alignment*/2, /*boundary*/0,

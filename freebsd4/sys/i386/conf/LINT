@@ -2,7 +2,7 @@
 # LINT -- config file for checking all the sources, tries to pull in
 #	as much of the source tree as it can.
 #
-# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.78 2001/08/30 12:29:56 murray Exp $
+# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.96 2001/12/23 08:17:37 pirzyk Exp $
 #
 # NB: You probably don't want to try running a kernel built from this
 # file.  Instead, you should start from GENERIC, and add options from
@@ -24,7 +24,9 @@ ident		LINT
 
 #
 # The `maxusers' parameter controls the static sizing of a number of
-# internal system tables by a complicated formula defined in param.c.
+# internal system tables by a formula defined in subr_param.c.  Setting
+# maxusers to 0 will cause the system to auto-size based on physical
+# memory.
 #
 maxusers	10
 
@@ -46,9 +48,13 @@ maxusers	10
 # KERNEL can be overridden so that you can change the default name of your
 # kernel.
 #
+# MODULES_OVERRIDE can be used to limit modules built to a specific list.
+#
 makeoptions	CONF_CFLAGS=-fno-builtin  #Don't allow use of memcmp, etc.
 #makeoptions	DEBUG=-g		#Build kernel with gdb(1) debug symbols
 #makeoptions	KERNEL=foo		#Build kernel "foo" and install "/foo"
+# Only build Linux API modules and plus those parts of the sound system I need.
+#makeoptions	MODULES_OVERRIDE="linux sound/snd sound/pcm sound/driver/maestro3"
 
 #
 # Certain applications can grow to be larger than the 128M limit
@@ -554,8 +560,7 @@ pseudo-device	stf			#6to4 IPv6 over IPv4 encapsulation
 #
 options 	MROUTING		# Multicast routing
 options 	IPFIREWALL		#firewall
-options 	IPFIREWALL_VERBOSE	#print information about
-					# dropped packets
+options 	IPFIREWALL_VERBOSE	#enable logging to syslogd(8)
 options 	IPFIREWALL_FORWARD	#enable transparent proxy support
 options 	IPFIREWALL_VERBOSE_LIMIT=100	#limit verbosity
 options 	IPFIREWALL_DEFAULT_TO_ACCEPT	#allow everything by default
@@ -678,7 +683,6 @@ options 	SOFTUPDATES
 
 # Directory hashing improves the speed of operations on very large
 # directories at the expense of some memory.
-# Warning: this is experimental code!
 options		UFS_DIRHASH
 
 # Make space in the kernel for a root filesystem on a md device.
@@ -742,8 +746,8 @@ pseudo-device	vcoda	4		#coda minicache <-> venus comm.
 options 	EXT2FS
 
 # Use real implementations of the aio_* system calls.  There are numerous
-# stability issues in the current aio code that make it unsuitable for
-# inclusion on shell boxes.
+# stability and security issues in the current aio code that make it
+# unsuitable for inclusion on machines with untrusted local users.
 options 	VFS_AIO
 
 
@@ -758,6 +762,26 @@ options 	VFS_AIO
 options 	P1003_1B
 options 	_KPOSIX_PRIORITY_SCHEDULING
 options 	_KPOSIX_VERSION=199309L
+
+
+#####################################################################
+# CLOCK OPTIONS
+
+# The granularity of operation is controlled by the kernel option HZ whose
+# default value (100) means a granularity of 10ms.  For an accurate simulation
+# of high data rates it might be necessary to reduce the timer granularity to
+# 1ms or less.  Consider, however, that some interfaces using programmed I/O
+# may require a considerable time to output packets.  So, reducing the
+# granularity too much might actually cause ticks to be missed thus reducing
+# the accuracy of operation.
+
+options 	HZ=100
+
+# Other clock options
+
+options 	CLK_CALIBRATION_LOOP
+options 	CLK_USE_I8254_CALIBRATION
+options 	CLK_USE_TSC_CALIBRATION
 
 
 #####################################################################
@@ -993,6 +1017,8 @@ options 	KBD_INSTALL_CDEV	# install a CDEV entry in /dev
 # `flags' for atkbd:
 #       0x01    Force detection of keyboard, else we always assume a keyboard
 #       0x02    Don't reset keyboard, useful for some newer ThinkPads
+#	0x03	Force detection and avoid reset, might help with certain
+#		dockingstations
 #       0x04    Old-style (XT) keyboard support, useful for older ThinkPads
 
 # PS/2 mouse
@@ -1333,6 +1359,7 @@ options 	COM_MULTIPORT		#code for some cards with shared IRQs
 #     DE101, DE200, DE201, DE202, DE203, DE204, DE205, DE422)
 # lnc: Lance/PCnet cards (Isolan, Novell NE2100, NE32-VL, AMD Am7990 & Am79C960)
 # rdp: RealTek RTL 8002-based pocket ethernet adapters
+# sbni: Granch SBNI12-xx adapters
 # sr: RISCom/N2 hdlc sync 1/2 port V.35/X.21 serial driver (requires sppp)
 # wl: Lucent Wavelan (ISA card only).
 # awi: IEEE 802.11b PRISM I cards.
@@ -1359,6 +1386,7 @@ device ie1 at isa? port 0x360 irq 7 iomem 0xd0000
 device le0 at isa? port 0x300 irq 5 iomem 0xd0000
 device lnc0 at isa? port 0x280 irq 10 drq 0
 device rdp0 at isa? port 0x378 irq 7 flags 2
+device sbni0 at isa? port 0x210 irq 5 flags 0xefdead
 device sr0 at isa? port 0x300 irq 5 iomem 0xd0000
 device sn0 at isa? port 0x300 irq 10
 device awi
@@ -1536,6 +1564,7 @@ device		pca0 at isa? port IO_TIMER1
 # si: Specialix SI/XIO 4-32 port terminal multiplexor
 # stl: Stallion EasyIO and EasyConnection 8/32 (ISA and PCI), EasyConnection 8/64 PCI
 # stli: Stallion EasyConnection 8/64 ISA/EISA, ONboard, Brumby (intelligent)
+# nmdm: nullmodem terminal driver (see nmdm(4))
 
 # Notes on APM
 #  The flags takes the following meaning for apm0:
@@ -1639,6 +1668,8 @@ device		stli0	at isa? port 0x2a0 iomem 0xcc000 flags 23 iosiz 0x1000
 device		loran0	at isa? irq 5
 # HOT1 Xilinx 6200 card (http://www.vcc.com/)
 device		xrpu
+# nullmodem terminal driver
+device		nmdm
 
 #
 # MCA devices:
@@ -1711,6 +1742,11 @@ device		pci
 # The `amd' device provides support for the AMD 53C974 SCSI host
 # adapter chip as found on devices such as the Tekram DC-390(T).
 #
+# The `bge' device provides support for gigabit ethernet adapters
+# based on the Broadcom BCM570x familiy of controllers, including the
+# 3Com 3c996-T, the SysKonnect SK-9D21 and SK-9D41, and the embedded
+# gigE NICs on Dell PowerEdge 2550 servers.
+#
 # The `ncr' device provides support for the NCR 53C810 and 53C825
 # self-contained SCSI host adapters.
 #
@@ -1736,6 +1772,9 @@ device		pci
 #
 # The `fxp' device provides support for the Intel EtherExpress Pro/100B
 # PCI Fast Ethernet adapters.
+#
+# The `gx' device provides support for the Intel Pro/1000 Gigabit Ethernet
+# PCI adapters (82542, 82543-F, 82543-T).
 #
 # The 'lge' device provides support for PCI gigabit ethernet adapters
 # based on the Level 1 LXT1001 NetCellerator chipset. This includes the
@@ -1934,8 +1973,12 @@ device		txp		# 3Com 3cR990 (``Typhoon'')
 device		vx		# 3Com 3c590, 3c595 (``Vortex'')
 
 # Gigabit Ethernet NICs.
-device		sk
-device		ti
+device		bge		# Broadcom BCM570x (``Tigon III'')
+device		gx		# Intel Pro/1000 (82542, 82543)
+device		lge		# Level 1 LXT1001 (``Mercury'')
+device		nge		# NatSemi DP83820 and DP83821
+device		sk		# SysKonnect GEnesis
+device		ti		# Alteon (``Tigon I'', ``Tigon II'')
 device		wx
 
 
@@ -1992,7 +2035,7 @@ options 	POWERFAIL_NMI	# make it beep instead of panicing
 # Supported SMB interfaces:
 # iicsmb	I2C to SMB bridge with any iicbus interface
 # bktr		brooktree848 I2C hardware interface
-# intpm		Intel PIIX4 Power Management Unit
+# intpm		Intel PIIX4 (82371AB, 82443MX) Power Management Unit
 # alpm		Acer Aladdin-IV/V/Pro2 Power Management Unit
 # ichsmb	Intel ICH SMBus controller chips (82801AA, 82801AB, 82801BA)
 #
@@ -2300,6 +2343,15 @@ options 	HW_WDOG
 options 	PMAP_SHPGPERPROC=201
 
 #
+# Change the size of the kernel virtual address space.  Due to
+# constraints in loader(8) on i386, this must be a multiple of 4.
+# 256 = 1 GB of kernel address space.  Increasing this also causes
+# a reduction of the address space in user processes.  512 splits
+# the 4GB cpu address space in half (2GB user, 2GB kernel).
+#
+options 	KVA_PAGES=260
+
+#
 # Disable swapping. This option removes all code which actually performs
 # swapping, so it's not possible to turn it back on at run-time.
 #
@@ -2315,6 +2367,43 @@ options 	PMAP_SHPGPERPROC=201
 # typically want about 4 of these for each simultaneous file send.
 #
 options 	NSFBUFS=1024
+
+# Set the size of the buffer cache KVM reservation, in buffers.  This is
+# scaled by approximately 16384 bytes.  The system will auto-size the buffer
+# cache if this option is not specified or set to 0.
+#
+options 	NBUF=512
+
+# Set the size of the mbuf KVM reservation, in clusters.  This is scaled
+# by approximately 2048 bytes.  The system will auto-size the mbuf area
+# if this options is not specified or set to 0.
+#
+options 	NMBCLUSTERS=1024
+
+# Tune the kernel malloc area parameters.  VM_KMEM_SIZE represents the 
+# minimum, in bytes, and is typically (12*1024*1024) (12MB). 
+# VM_KMEM_SIZE_MAX represents the maximum, typically 200 megabytes.
+# VM_KMEM_SIZE_SCALE can be set to adjust the auto-tuning factor, which
+# typically defaults to 4 (kernel malloc area size is physical memory 
+# divided by the scale factor).
+#
+options 	VM_KMEM_SIZE="(10*1024*1024)"
+options 	VM_KMEM_SIZE_MAX="(100*1024*1024)"
+options 	VM_KMEM_SIZE_SCALE="4"
+
+# Tune the buffer cache maximum KVA reservation, in bytes.  The maximum is
+# usually capped at 200 MB, effecting machines with > 1GB of ram.  Note
+# that the buffer cache only really governs write buffering and disk block
+# translations.  The VM page cache is our primary disk cache and is not
+# effected by the size of the buffer cache.
+#
+options		VM_BCACHE_SIZE_MAX="(100*1024*1024)"
+
+# Tune the swap zone KVA reservation, in bytes.  The default is typically
+# 70 MB, giving the system the ability to manage a maximum of 28GB worth
+# of swapped out data.  
+#
+options		VM_SWZONE_SIZE_MAX="(50*1024*1024)"
 
 #
 # Enable extra debugging code for locks.  This stores the filename and
@@ -2394,6 +2483,13 @@ options 	DPT_RESET_HBA
 options 	DPT_ALLOW_MEMIO
 
 #
+# Compaq "CISS" RAID controllers (SmartRAID 5* series)
+# These controllers have a SCSI-like interface, and require the
+# CAM infrastructure.
+#
+device		ciss
+
+#
 # Mylex AcceleRAID and eXtremeRAID controllers with v6 and later
 # firmware.  These controllers have a SCSI-like interface, and require
 # the CAM infrastructure.
@@ -2422,6 +2518,8 @@ device		umass
 device		umodem
 # USB mouse
 device		ums
+# USB Rio (MP3 Player)
+device		urio
 # USB scanners
 device		uscanner
 #
@@ -2477,9 +2575,6 @@ options 	NPX_DEBUG       # enable npx debugging (FPU/math emu)
 options 	AHC_DUMP_EEPROM
 options 	AHC_TMODE_ENABLE
 options 	CAM_DEBUG_DELAY
-options 	CLK_CALIBRATION_LOOP
-options 	CLK_USE_I8254_CALIBRATION
-options 	CLK_USE_TSC_CALIBRATION
 options 	CLUSTERDEBUG
 options 	COMPAT_LINUX
 options 	CPU_UPGRADE_HW_CACHE
@@ -2501,9 +2596,7 @@ options 	KBD_RESETDELAY=201
 options 	KEY
 options 	LOCKF_DEBUG
 options 	LOUTB
-options 	NBUF=512
 options 	NETATALKDEBUG
-options 	NMBCLUSTERS=1024
 #options 	OLTR_NO_BULLSEYE_MAC
 #options 	OLTR_NO_HAWKEYE_MAC
 #options 	OLTR_NO_TMS_MAC
@@ -2522,7 +2615,5 @@ options 	SLIP_IFF_OPTS
 options 	SPX_HACK
 options 	TIMER_FREQ="((14318182+6)/12)"
 options 	VFS_BIO_DEBUG
-options 	VM_KMEM_SIZE
-options 	VM_KMEM_SIZE_MAX
-options 	VM_KMEM_SIZE_SCALE
 options		XBONEHACK
+

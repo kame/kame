@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_vfsops.c,v 1.2.2.2 2001/07/26 20:36:51 iedowse Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_vfsops.c,v 1.2.2.4 2001/12/20 09:50:32 sheldonh Exp $
  */
 #include "opt_netsmb.h"
 #ifndef NETSMB
@@ -45,6 +45,7 @@
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 
 
 #include <netsmb/smb.h>
@@ -124,6 +125,7 @@ VFS_SET(smbfs_vfsops, smbfs, VFCF_NETWORK);
 
 MODULE_DEPEND(smbfs, netsmb, NSMB_VERSION, NSMB_VERSION, NSMB_VERSION);
 MODULE_DEPEND(smbfs, libiconv, 1, 1, 1);
+MODULE_DEPEND(smbfs, libmchain, 1, 1, 1);
 
 int smbfs_pbuf_freecnt = -1;	/* start out unlimited */
 
@@ -416,9 +418,9 @@ smbfs_sync(mp, waitfor, cred, p)
 	 * Force stale buffer cache information to be flushed.
 	 */
 loop:
-	for (vp = mp->mnt_vnodelist.lh_first;
+	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist);
 	     vp != NULL;
-	     vp = vp->v_mntvnodes.le_next) {
+	     vp = TAILQ_NEXT(vp, v_nmntvnodes)) {
 		/*
 		 * If the vnode that we are about to sync is no longer
 		 * associated with this mount point, start over.

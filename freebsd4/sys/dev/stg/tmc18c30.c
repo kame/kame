@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/stg/tmc18c30.c,v 1.1.2.4 2001/07/22 00:21:40 non Exp $	*/
+/*	$FreeBSD: src/sys/dev/stg/tmc18c30.c,v 1.1.2.5 2001/12/17 13:30:19 non Exp $	*/
 /*	$NecBSD: tmc18c30.c,v 1.28.12.3 2001/06/19 04:35:48 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -81,11 +81,6 @@
 #include <cam/scsi/scsi_low.h>
 #include <dev/stg/tmc18c30reg.h>
 #include <dev/stg/tmc18c30var.h>
-
-#if __FreeBSD_version < 400001
-#include "stg.h"
-struct	stg_softc *stgdata[NSTG];
-#endif
 #endif /* __FreeBSD__ */
 
 /***************************************************

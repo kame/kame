@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_vnops.c,v 1.2.2.2 2001/09/03 08:58:11 bp Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_vnops.c,v 1.2.2.4 2001/12/20 16:11:49 sheldonh Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -246,7 +246,8 @@ smbfs_closel(struct vop_close_args *ap)
 	smb_makescred(&scred, p, ap->a_cred);
 
 	if (np->n_opencount == 0) {
-		SMBERROR("Negative opencount\n");
+		if (vp->v_type != VDIR)
+			SMBERROR("Negative opencount\n");
 		return 0;
 	}
 	np->n_opencount--;

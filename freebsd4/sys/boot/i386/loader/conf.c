@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/loader/conf.c,v 1.11.2.3 2000/09/22 17:04:46 archie Exp $
+ * $FreeBSD: src/sys/boot/i386/loader/conf.c,v 1.11.2.5 2001/12/21 22:20:37 jhb Exp $
  */
 
 #include <stand.h>
@@ -47,6 +47,7 @@
 
 /* Exported for libstand */
 struct devsw *devsw[] = {
+    &bioscd,
     &biosdisk,
 #if defined(LOADER_NFS_SUPPORT) || defined(LOADER_TFTP_SUPPORT)
     &pxedisk,
@@ -58,7 +59,13 @@ struct fs_ops *file_system[] = {
     &ufs_fsops,
     &ext2fs_fsops,
     &dosfs_fsops,
+    &cd9660_fsops,
+#ifdef LOADER_GZIP_SUPPORT
     &zipfs_fsops,
+#endif
+#ifdef LOADER_BZIP2_SUPPORT
+    &bzipfs_fsops,
+#endif
 #ifdef LOADER_NFS_SUPPORT 
     &nfs_fsops,
 #endif

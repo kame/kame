@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)reboot.h	8.3 (Berkeley) 12/13/94
- * $FreeBSD: src/sys/sys/reboot.h,v 1.18 1999/08/28 00:51:58 peter Exp $
+ * $FreeBSD: src/sys/sys/reboot.h,v 1.18.2.1 2001/12/17 18:44:43 guido Exp $
  */
 
 #ifndef _SYS_REBOOT_H_
@@ -61,6 +61,7 @@
 #define	RB_GDB		0x8000	/* use GDB remote debugger instead of DDB */
 #define	RB_MUTE		0x10000	/* Come up with the console muted */
 #define	RB_SELFTEST	0x20000	/* don't boot to normal operation, do selftest */
+#define	RB_PAUSE	0x40000	/* pause after each output line during probe */
 
 #define	RB_BOOTINFO	0x80000000	/* have `struct bootinfo *' arg */
 

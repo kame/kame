@@ -35,7 +35,7 @@
  *
  *	@(#)fdesc_vfsops.c	8.4 (Berkeley) 1/21/94
  *
- * $FreeBSD: src/sys/miscfs/fdesc/fdesc_vfsops.c,v 1.22.2.1 2001/07/26 20:37:03 iedowse Exp $
+ * $FreeBSD: src/sys/miscfs/fdesc/fdesc_vfsops.c,v 1.22.2.2 2001/10/22 22:49:26 chris Exp $
  */
 
 /*
@@ -44,13 +44,16 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/filedesc.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/malloc.h>
+#include <sys/mount.h>
 #include <sys/proc.h>
 #include <sys/resourcevar.h>
-#include <sys/filedesc.h>
+#include <sys/socket.h>
 #include <sys/vnode.h>
-#include <sys/mount.h>
-#include <sys/malloc.h>
+
 #include <miscfs/fdesc/fdesc.h>
 
 static MALLOC_DEFINE(M_FDESCMNT, "FDESC mount", "FDESC mount structure");
@@ -74,7 +77,6 @@ fdesc_mount(mp, path, data, ndp, p)
 	struct proc *p;
 {
 	int error = 0;
-	u_int size;
 	struct fdescmount *fmp;
 	struct vnode *rvp;
 
@@ -84,7 +86,7 @@ fdesc_mount(mp, path, data, ndp, p)
 	if (mp->mnt_flag & MNT_UPDATE)
 		return (EOPNOTSUPP);
 
-	error = fdesc_allocvp(Froot, FD_ROOT, mp, &rvp);
+	error = fdesc_allocvp(Froot, FD_ROOT, mp, &rvp, p);
 	if (error)
 		return (error);
 
@@ -98,8 +100,6 @@ fdesc_mount(mp, path, data, ndp, p)
 	mp->mnt_data = (qaddr_t) fmp;
 	vfs_getnewfsid(mp);
 
-	(void) copyinstr(path, mp->mnt_stat.f_mntonname, MNAMELEN - 1, &size);
-	bzero(mp->mnt_stat.f_mntonname + size, MNAMELEN - size);
 	bzero(mp->mnt_stat.f_mntfromname, MNAMELEN);
 	bcopy("fdesc", mp->mnt_stat.f_mntfromname, sizeof("fdesc"));
 	(void)fdesc_statfs(mp, &mp->mnt_stat, p);

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.1.2.4 2001/07/04 00:12:32 brooks Exp $
+ * $FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.1.2.5 2001/09/26 01:02:01 brooks Exp $
  */
 
 /*
@@ -66,7 +66,7 @@
 
 #ifndef lint
 static const char rcsid[] =
- "$FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.1.2.4 2001/07/04 00:12:32 brooks Exp $";
+ "$FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.1.2.5 2001/09/26 01:02:01 brooks Exp $";
 #endif
 
 #include <dev/an/if_aironet_ieee.h>
@@ -99,7 +99,7 @@ static devclass_t an_pccard_devclass;
 
 DRIVER_MODULE(if_an, pccard, an_pccard_driver, an_pccard_devclass, 0, 0);
 
-static int 
+static int
 an_pccard_detach(device_t dev)
 {
 	struct an_softc		*sc = device_get_softc(dev);
@@ -141,10 +141,10 @@ an_pccard_attach(device_t dev)
 	struct an_softc *sc = device_get_softc(dev);
 	int flags = device_get_flags(dev);
 	int error;
-	
+
 	an_alloc_port(dev, sc->port_rid, AN_IOSIZ);
 	an_alloc_irq(dev, sc->irq_rid, 0);
-		
+
 	error = bus_setup_intr(dev, sc->irq_res, INTR_TYPE_NET,
 			       an_intr, sc, &sc->irq_handle);
 	if (error) {
@@ -152,12 +152,12 @@ an_pccard_attach(device_t dev)
 		an_release_resources(dev);
 		return (error);
 	}
-	      
+
 	sc->an_bhandle = rman_get_bushandle(sc->port_res);
 	sc->an_btag = rman_get_bustag(sc->port_res);
 	sc->an_dev = dev;
 
 	error = an_attach(sc, device_get_unit(dev), flags);
 	return (error);
-} 
+}
 

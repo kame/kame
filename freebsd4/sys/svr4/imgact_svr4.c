@@ -29,7 +29,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/svr4/imgact_svr4.c,v 1.8 1999/10/29 18:09:20 phk Exp $
+ * $FreeBSD: src/sys/svr4/imgact_svr4.c,v 1.8.2.1 2001/11/03 01:41:09 ps Exp $
  */
 
 #include <sys/param.h>
@@ -104,7 +104,7 @@ exec_svr4_imgact(imgp)
     /*
      * text/data/bss must not exceed limits
      */
-    if (a_out->a_text > MAXTSIZ ||
+    if (a_out->a_text > maxtsiz ||
 	a_out->a_data + bss_size > imgp->proc->p_rlimit[RLIMIT_DATA].rlim_cur)
 	return (ENOMEM);
 

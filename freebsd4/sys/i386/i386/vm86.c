@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/vm86.c,v 1.31.2.1 2000/09/21 17:50:31 jlemon Exp $
+ * $FreeBSD: src/sys/i386/i386/vm86.c,v 1.31.2.2 2001/10/05 06:18:55 peter Exp $
  */
 
 #include <sys/param.h>
@@ -704,11 +704,11 @@ vm86_sysarch(p, args)
 	case VM86_INTCALL: {
 		struct vm86_intcall_args sa;
 
-		if (error = suser(p))
+		if ((error = suser(p)))
 			return (error);
-		if (error = copyin(ua.sub_args, &sa, sizeof(sa)))
+		if ((error = copyin(ua.sub_args, &sa, sizeof(sa))))
 			return (error);
-		if (error = vm86_intcall(sa.intnum, &sa.vmf))
+		if ((error = vm86_intcall(sa.intnum, &sa.vmf)))
 			return (error);
 		error = copyout(&sa, ua.sub_args, sizeof(sa));
 		}

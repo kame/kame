@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
- * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.8 2001/07/30 23:28:01 peter Exp $
+ * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.13 2001/12/13 19:18:01 dillon Exp $
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -101,7 +101,7 @@ struct tty;
 struct uio;
 
 void	Debugger __P((const char *msg));
-int	dumpstatus __P((vm_offset_t addr, long count));
+int	dumpstatus __P((vm_offset_t addr, off_t count));
 int	nullop __P((void));
 int	eopnotsupp __P((void));
 int	einval __P((void));
@@ -112,7 +112,8 @@ void	*phashinit __P((int count, struct malloc_type *type, u_long *nentries));
 
 void	cpu_boot __P((int));
 void	cpu_rootconf __P((void));
-void	init_param __P((void));
+void	init_param1 __P((void));
+void	init_param2 __P((int physpages));
 void	tablefull __P((const char *));
 int	addlog __P((const char *, ...)) __printflike(1, 2);
 int	kvprintf __P((char const *, void (*)(int, void*), void *, int,
@@ -173,7 +174,8 @@ void	setstatclockrate __P((int hzrate));
 
 char	*getenv __P((const char *name));
 int	getenv_int __P((const char *name, int *data));
-quad_t	getenv_quad __P((const char *name, quad_t *data));
+int	getenv_string __P((const char *name, char *data, int size));
+int	getenv_quad __P((const char *name, quad_t *data));
 extern char *kern_envp;
 
 #ifdef APM_FIXUP_CALLTODO 

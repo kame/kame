@@ -4,7 +4,7 @@
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  *
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_fs.h,v 1.8.2.1 2000/11/05 19:17:40 bde Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_fs.h,v 1.8.2.2 2001/09/29 12:52:47 iedowse Exp $
  */
 /*
  *  linux/include/linux/ext2_fs.h
@@ -48,8 +48,8 @@
 #define i_block_group		i_spare[0]
 #define i_next_alloc_block	i_spare[1]
 #define i_next_alloc_goal	i_spare[2]
-#define i_prealloc_block	i_spare[3]
-#define i_prealloc_count	i_din.di_spare[0]
+#define i_prealloc_block	i_din.di_spare[0]
+#define i_prealloc_count	i_din.di_spare[1]
 
 /*
  * The second extended filesystem constants/structures

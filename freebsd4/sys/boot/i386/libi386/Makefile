@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/libi386/Makefile,v 1.15.2.3 2000/12/28 13:12:37 ps Exp $
+# $FreeBSD: src/sys/boot/i386/libi386/Makefile,v 1.15.2.4 2001/12/21 22:19:58 jhb Exp $
 #
 LIB=			i386
 NOPIC=
@@ -6,7 +6,7 @@ NOPROFILE=
 INTERNALLIB=		true
 INTERNALSTATICLIB=	true
 
-SRCS=	aout_freebsd.c biosdisk.c biosmem.c biospnp.c biospci.c \
+SRCS=	aout_freebsd.c bioscd.c biosdisk.c biosmem.c biospnp.c biospci.c \
 	bootinfo.c comconsole.c devicename.c elf_freebsd.c gatea20.c \
 	i386_copy.c i386_module.c nullconsole.c pxe.c pxetramp.s \
 	time.c vidconsole.c

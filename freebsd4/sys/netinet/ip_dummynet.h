@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_dummynet.h,v 1.10.2.3 2001/02/01 20:25:09 luigi Exp $
+ * $FreeBSD: src/sys/netinet/ip_dummynet.h,v 1.10.2.4 2001/11/03 00:36:09 luigi Exp $
  */
 
 #ifndef _IP_DUMMYNET_H
@@ -340,17 +340,15 @@ struct dn_pipe {			/* a pipe */
 };
 
 #ifdef _KERNEL
-
-MALLOC_DECLARE(M_IPFW);
-
-typedef int ip_dn_ctl_t __P((struct sockopt *)) ;
-extern ip_dn_ctl_t *ip_dn_ctl_ptr;
-
-void dn_rule_delete(void *r);		/* used in ip_fw.c */
-int dummynet_io(int pipe, int dir,
-	struct mbuf *m, struct ifnet *ifp, struct route *ro,
-	struct sockaddr_in * dst,
-	struct ip_fw_chain *rule, int flags);
+typedef	int ip_dn_ctl_t(struct sockopt *); /* raw_ip.c */
+typedef	void ip_dn_ruledel_t(void *); /* ip_fw.c */
+typedef	int ip_dn_io_t(int pipe, int dir, struct mbuf *m,
+	struct ifnet *ifp, struct route *ro, struct sockaddr_in * dst,
+	struct ip_fw *rule, int flags); /* ip_{in,out}put.c, bridge.c */
+extern	ip_dn_ctl_t *ip_dn_ctl_ptr;
+extern	ip_dn_ruledel_t *ip_dn_ruledel_ptr;
+extern	ip_dn_io_t *ip_dn_io_ptr;
+#define	DUMMYNET_LOADED	(ip_dn_io_ptr != NULL)
 #endif
 
 #endif /* _IP_DUMMYNET_H */

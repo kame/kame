@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.7 2000/11/02 00:04:27 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.8 2001/12/16 15:46:07 luigi Exp $
  */
 
 /*
@@ -112,7 +112,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.7 2000/11/02 00:04:27 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.8 2001/12/16 15:46:07 luigi Exp $";
 #endif
 
 static struct sk_type sk_devs[] = {
@@ -672,11 +672,8 @@ static int sk_newbuf(sc_if, c, m)
 		caddr_t			*buf = NULL;
 
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("sk%d: no memory for rx list -- "
-			    "packet dropped!\n", sc_if->sk_unit);
+		if (m_new == NULL)
 			return(ENOBUFS);
-		}
 
 		/* Allocate the jumbo buffer */
 		buf = sk_jalloc(sc_if);

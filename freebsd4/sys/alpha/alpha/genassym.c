@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)genassym.c	5.11 (Berkeley) 5/10/91
- * $FreeBSD: src/sys/alpha/alpha/genassym.c,v 1.16 2000/01/08 16:43:44 marcel Exp $
+ * $FreeBSD: src/sys/alpha/alpha/genassym.c,v 1.16.2.1 2001/09/20 09:29:22 peter Exp $
  */
 
 #include <stddef.h>
@@ -154,3 +154,4 @@ ASSYM(ALPHA_KENTRY_IF, ALPHA_KENTRY_IF);
 ASSYM(ALPHA_KENTRY_UNA, ALPHA_KENTRY_UNA);
 
 ASSYM(VPTBASE, VPTBASE);
+ASSYM(KERNBASE, KERNBASE);

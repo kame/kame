@@ -37,7 +37,7 @@
  *	@(#)procfs_ctl.c	8.4 (Berkeley) 6/15/94
  *
  * From:
- * $FreeBSD: src/sys/miscfs/procfs/procfs_ctl.c,v 1.20.2.1 2000/12/17 03:13:05 rwatson Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_ctl.c,v 1.20.2.2 2002/01/22 17:22:59 nectar Exp $
  */
 
 #include <sys/param.h>
@@ -110,6 +110,9 @@ procfs_control(curp, p, op)
 {
 	int error;
 
+	/* Can't trace a process that's currently exec'ing. */ 
+	if ((p->p_flag & P_INEXEC) != 0)
+		return EAGAIN;
 	/*
 	 * Authorization check: rely on normal debugging protection, except
 	 * allow processes to disengage debugging on a process onto which

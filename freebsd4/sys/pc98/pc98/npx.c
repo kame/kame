@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)npx.c	7.2 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/pc98/pc98/npx.c,v 1.54.2.4 2001/08/28 03:44:08 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/npx.c,v 1.54.2.5 2001/11/03 05:55:31 nyan Exp $
  */
 
 #include "opt_cpu.h"
@@ -556,6 +556,11 @@ npxinit(control)
 	 */
 	npxsave(&dummy);
 	stop_emulating();
+#ifdef CPU_ENABLE_SSE
+	/* XXX npxsave() doesn't actually initialize the fpu in the SSE case. */
+	if (cpu_fxsr)
+		fninit();
+#endif
 	fldcw(&control);
 	if (curpcb != NULL)
 		fpusave(&curpcb->pcb_save);

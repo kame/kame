@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/ac97.c,v 1.5.2.5 2001/08/01 03:41:03 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/ac97.c,v 1.5.2.7 2001/12/12 19:45:23 guido Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -235,8 +235,11 @@ int
 ac97_setextmode(struct ac97_info *codec, u_int16_t mode)
 {
 	mode &= AC97_EXTCAPS;
-	if ((mode & ~codec->extcaps) != 0)
+	if ((mode & ~codec->extcaps) != 0) {
+		device_printf(codec->dev, "ac97 invalid mode set 0x%04x\n", 
+			      mode);
 		return -1;
+	}
 	snd_mtxlock(codec->lock);
 	wrcd(codec, AC97_REGEXT_STAT, mode);
 	codec->extstat = rdcd(codec, AC97_REGEXT_STAT) & AC97_EXTCAPS;
@@ -465,9 +468,12 @@ ac97_reinitmixer(struct ac97_info *codec)
 
 	if (!codec->noext) {
 		wrcd(codec, AC97_REGEXT_STAT, codec->extstat);
-		if (rdcd(codec, AC97_REGEXT_STAT) != codec->extstat)
+		if ((rdcd(codec, AC97_REGEXT_STAT) & AC97_EXTCAPS)
+		    != codec->extstat)
 			device_printf(codec->dev, "ac97 codec failed to reset extended mode (%x, got %x)\n",
-				      codec->extstat, rdcd(codec, AC97_REGEXT_STAT));
+				      codec->extstat,
+				      rdcd(codec, AC97_REGEXT_STAT) &
+					AC97_EXTCAPS);
 	}
 
 	if ((rdcd(codec, AC97_REG_POWER) & 2) == 0)

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.pc98,v 1.103.2.9 2001/08/22 06:19:24 peter Exp $
+# $FreeBSD: src/sys/conf/options.pc98,v 1.103.2.11 2001/12/12 10:23:37 nyan Exp $
 
 DISABLE_PSE
 IDE_DELAY
@@ -32,6 +32,9 @@ DEBUG_SVR4		opt_svr4.h
 
 # i386 SMP options
 APIC_IO			opt_global.h
+
+# Change KVM size.  Changes things all over the kernel.
+KVA_PAGES		opt_global.h
 
 CLK_CALIBRATION_LOOP		opt_clock.h
 CLK_USE_I8254_CALIBRATION	opt_clock.h
@@ -154,6 +157,7 @@ ASUSCOM_IPAC		opt_i4b.h
 ELSA_QS1ISA		opt_i4b.h
 SIEMENS_ISURF2		opt_i4b.h
 EICON_DIVA		opt_i4b.h
+COMPAQ_M610		opt_i4b.h
 # -------------------------------
 # isdn4bsd: passive PCI cards
 # -------------------------------

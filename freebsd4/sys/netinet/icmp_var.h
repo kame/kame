@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)icmp_var.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/icmp_var.h,v 1.15.2.1 2001/02/24 21:35:18 bmilekic Exp $
+ * $FreeBSD: src/sys/netinet/icmp_var.h,v 1.15.2.2 2001/12/07 09:23:11 ru Exp $
  */
 
 #ifndef _NETINET_ICMP_VAR_H_
@@ -60,6 +60,8 @@ struct	icmpstat {
 	u_long	icps_inhist[ICMP_MAXTYPE + 1];
 	u_long	icps_bmcastecho; 	/* b/mcast echo requests dropped */
 	u_long	icps_bmcasttstamp; 	/* b/mcast tstamp requests dropped */
+	u_long	icps_badaddr;		/* bad return address */
+	u_long	icps_noroute; 		/* no route back */
 };
 
 /*

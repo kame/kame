@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/imgact_shell.c,v 1.21.2.1 2000/05/09 17:41:23 dillon Exp $
+ * $FreeBSD: src/sys/kern/imgact_shell.c,v 1.21.2.2 2001/12/22 01:21:39 jwd Exp $
  */
 
 #include <sys/param.h>
@@ -74,7 +74,7 @@ exec_shell_imgact(imgp)
 	 */
 	for (ihp = &image_header[2]; *ihp != '\n' && *ihp != '#'; ++ihp) {
 		if (ihp >= &image_header[MAXSHELLCMDLEN])
-			return(ENOEXEC);
+			return(ENAMETOOLONG);
 	}
 	line_endp = ihp;
 

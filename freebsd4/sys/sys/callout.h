@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)callout.h	8.2 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/callout.h,v 1.15 1999/12/29 04:24:37 peter Exp $
+ * $FreeBSD: src/sys/sys/callout.h,v 1.15.2.1 2001/11/13 18:24:52 archie Exp $
  */
 
 #ifndef _SYS_CALLOUT_H_
@@ -78,7 +78,7 @@ extern int	callwheelsize, callwheelbits, callwheelmask, softticks;
 void	callout_init __P((struct callout *));
 #define	callout_pending(c)	((c)->c_flags & CALLOUT_PENDING)
 void	callout_reset __P((struct callout *, int, void (*)(void *), void *));
-void	callout_stop __P((struct callout *));
+int	callout_stop __P((struct callout *));
 
 #endif
 

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_vnops.c	8.2 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/vfs_vnops.c,v 1.87.2.7 2001/06/03 05:00:09 dillon Exp $
+ * $FreeBSD: src/sys/kern/vfs_vnops.c,v 1.87.2.11 2002/01/19 21:01:32 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -52,6 +52,7 @@
 #include <sys/filio.h>
 #include <sys/ttycom.h>
 #include <sys/conf.h>
+#include <sys/syslog.h>
 
 static int vn_closefile __P((struct file *fp, struct proc *p));
 static int vn_ioctl __P((struct file *fp, u_long com, caddr_t data, 
@@ -311,6 +312,48 @@ vn_rdwr(rw, vp, base, len, offset, segflg, ioflg, cred, aresid, p)
 			error = EIO;
 	if ((ioflg & IO_NODELOCKED) == 0)
 		VOP_UNLOCK(vp, 0, p);
+	return (error);
+}
+
+/*
+ * Package up an I/O request on a vnode into a uio and do it.  The I/O
+ * request is split up into smaller chunks and we try to avoid saturating
+ * the buffer cache while potentially holding a vnode locked, so we 
+ * check bwillwrite() before calling vn_rdwr().  We also call uio_yield()
+ * to give other processes a chance to lock the vnode (either other processes
+ * core'ing the same binary, or unrelated processes scanning the directory).
+ */
+int
+vn_rdwr_inchunks(rw, vp, base, len, offset, segflg, ioflg, cred, aresid, p)
+	enum uio_rw rw;
+	struct vnode *vp;
+	caddr_t base;
+	int len;
+	off_t offset;
+	enum uio_seg segflg;
+	int ioflg;
+	struct ucred *cred;
+	int *aresid;
+	struct proc *p;
+{
+	int error = 0;
+
+	do {
+		int chunk = (len > MAXBSIZE) ? MAXBSIZE : len;
+
+		if (rw != UIO_READ && vp->v_type == VREG)
+			bwillwrite();
+		error = vn_rdwr(rw, vp, base, chunk, offset, segflg,
+		    ioflg, cred, aresid, p);
+		len -= chunk;	/* aresid calc already includes length */
+		if (error)
+			break;
+		offset += chunk;
+		base += chunk;
+		uio_yield();
+	} while (len);
+	if (aresid)
+		*aresid += len;
 	return (error);
 }
 
@@ -618,8 +661,11 @@ debug_vn_lock(vp, flags, p, filename, line)
 			tsleep((caddr_t)vp, PINOD, "vn_lock", 0);
 			error = ENOENT;
 		} else {
+#if 0
+			/* this can now occur in normal operation */
 			if (vp->v_vxproc != NULL)
-				printf("VXLOCK interlock avoided in vn_lock\n");
+				log(LOG_INFO, "VXLOCK interlock avoided in vn_lock\n");
+#endif
 #ifdef	DEBUG_LOCKS
 			vp->filename = filename;
 			vp->line = line;

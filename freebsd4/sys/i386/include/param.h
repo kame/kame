@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)param.h	5.8 (Berkeley) 6/28/91
- * $FreeBSD: src/sys/i386/include/param.h,v 1.54.2.4 2000/12/29 10:59:18 asmodai Exp $
+ * $FreeBSD: src/sys/i386/include/param.h,v 1.54.2.6 2001/09/25 06:14:07 dillon Exp $
  */
 
 /*
@@ -110,7 +110,23 @@
 #define MAXDUMPPGS	(DFLTPHYS/PAGE_SIZE)
 
 #define IOPAGES	2		/* pages of i/o permission bitmap */
-#define UPAGES	2		/* pages of u-area */
+#define UPAGES	3		/* pages of u-area */
+
+/*
+ * Ceiling on amount of swblock kva space.
+ */
+#ifndef VM_SWZONE_SIZE_MAX
+#define VM_SWZONE_SIZE_MAX	(70 * 1024 * 1024)
+#endif
+
+/*
+ * Ceiling on size of buffer cache (really only effects write queueing,
+ * the VM page cache is not effected).
+ */
+#ifndef VM_BCACHE_SIZE_MAX
+#define VM_BCACHE_SIZE_MAX	(200 * 1024 * 1024)
+#endif
+
 
 /*
  * Constants related to network buffer management.

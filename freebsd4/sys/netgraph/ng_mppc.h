@@ -37,7 +37,7 @@
  * Author: Archie Cobbs <archie@freebsd.org>
  *
  * $Whistle: ng_mppc.h,v 1.3 2000/02/12 01:17:22 archie Exp $
- * $FreeBSD: src/sys/netgraph/ng_mppc.h,v 1.1.2.2 2000/10/24 18:36:45 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_mppc.h,v 1.1.2.3 2001/12/18 02:31:54 archie Exp $
  */
 
 #ifndef _NETGRAPH_MPPC_H_
@@ -60,10 +60,11 @@
 /* MPPC/MPPE PPP negotiation bits */
 #define MPPC_BIT		0x00000001	/* mppc compression bits */
 #define MPPE_40			0x00000020	/* use 40 bit key */
+#define MPPE_56			0x00000080	/* use 56 bit key */
 #define MPPE_128		0x00000040	/* use 128 bit key */
-#define MPPE_BITS		0x00000060	/* mppe encryption bits */
+#define MPPE_BITS		0x000000e0	/* mppe encryption bits */
 #define MPPE_STATELESS		0x01000000	/* use stateless mode */
-#define MPPC_VALID_BITS		0x01000061	/* possibly valid bits */
+#define MPPC_VALID_BITS		0x010000e1	/* possibly valid bits */
 
 /* Config struct (per-direction) */
 struct ng_mppc_config {

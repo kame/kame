@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/syscons.c,v 1.143.2.11 2001/08/07 09:41:04 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/syscons.c,v 1.143.2.13 2001/11/17 13:42:48 nyan Exp $
  */
 
 #include "splash.h"
@@ -222,7 +222,7 @@ sc_probe_unit(int unit, int flags)
 {
     if (!scvidprobe(unit, flags, FALSE)) {
 	if (bootverbose)
-	    printf("sc%d: no video adapter is found.\n", unit);
+	    printf("sc%d: no video adapter found.\n", unit);
 	return ENXIO;
     }
 
@@ -1707,6 +1707,7 @@ scrn_update(scr_stat *scp, int show_cursor)
 	if ((scp->status & (MOUSE_MOVED | MOUSE_HIDDEN))
 	    || and_region(&s, &e, scp->start, scp->end)
 	    || ((scp->status & CURSOR_ENABLED) && 
+		(scp->cursor_pos != scp->cursor_oldpos) &&
 		(and_region(&s, &e, scp->cursor_pos, scp->cursor_pos)
 		 || and_region(&s, &e, scp->cursor_oldpos, scp->cursor_oldpos)))) {
 	    sc_remove_mouse_image(scp);

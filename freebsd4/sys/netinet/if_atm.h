@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/netinet/if_atm.h,v 1.2.6.1 2000/08/03 01:07:02 peter Exp $ */
+/* $FreeBSD: src/sys/netinet/if_atm.h,v 1.2.6.2 2001/12/20 10:30:18 ru Exp $ */
 /*      $NetBSD: if_atm.h,v 1.2 1996/07/03 17:17:17 chuck Exp $       */
 
 /*
@@ -42,6 +42,6 @@ struct mbuf;
 struct rtentry;
 struct sockaddr;
 
-void atm_rtrequest __P((int, struct rtentry *, struct sockaddr *));
+void atm_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 int atmresolve __P((struct rtentry *, struct mbuf *, struct sockaddr *, 
 		struct atm_pseudohdr *));

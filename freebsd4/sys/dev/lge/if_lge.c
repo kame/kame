@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/lge/if_lge.c,v 1.5.2.1 2001/06/19 19:42:38 wpaul Exp $
+ * $FreeBSD: src/sys/dev/lge/if_lge.c,v 1.5.2.2 2001/12/14 19:49:23 jlemon Exp $
  */
 
 /*
@@ -114,7 +114,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/lge/if_lge.c,v 1.5.2.1 2001/06/19 19:42:38 wpaul Exp $";
+  "$FreeBSD: src/sys/dev/lge/if_lge.c,v 1.5.2.2 2001/12/14 19:49:23 jlemon Exp $";
 #endif
 
 /*
@@ -648,6 +648,8 @@ static int lge_attach(dev)
 	ifp->if_init = lge_init;
 	ifp->if_baudrate = 1000000000;
 	ifp->if_snd.ifq_maxlen = LGE_TX_LIST_CNT - 1;
+	ifp->if_capabilities = IFCAP_RXCSUM;
+	ifp->if_capenable = ifp->if_capabilities;
 
 	if (CSR_READ_4(sc, LGE_GMIIMODE) & LGE_GMIIMODE_PCSENH)
 		sc->lge_pcs = 1;

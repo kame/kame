@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)pmap.c	7.7 (Berkeley)	5/12/91
- * $FreeBSD: src/sys/i386/i386/pmap.c,v 1.250.2.10 2001/07/30 23:27:59 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/pmap.c,v 1.250.2.15 2002/01/04 01:17:33 peter Exp $
  */
 
 /*
@@ -83,6 +83,7 @@
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
+#include <sys/sysctl.h>
 #include <sys/lock.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
@@ -522,6 +523,7 @@ pmap_init2()
 
 	TUNABLE_INT_FETCH("vm.pmap.shpgperproc", &shpgperproc);
 	pv_entry_max = shpgperproc * maxproc + vm_page_array_size;
+	TUNABLE_INT_FETCH("vm.pmap.pv_entries", &pv_entry_max);
 	pv_entry_high_water = 9 * (pv_entry_max / 10);
 	zinitna(pvzone, &pvzone_obj, NULL, 0, pv_entry_max, ZONE_INTERRUPT, 1);
 }
@@ -719,8 +721,7 @@ pmap_kenter(va, pa)
 	pte = (unsigned *)vtopte(va);
 	opte = *pte;
 	*pte = npte;
-	/*if (opte)*/
-		invltlb_1pg(va);	/* XXX what about SMP? */
+	invltlb_1pg(va);
 }
 
 /*
@@ -734,7 +735,7 @@ pmap_kremove(va)
 
 	pte = (unsigned *)vtopte(va);
 	*pte = 0;
-	invltlb_1pg(va);	/* XXX what about SMP? */
+	invltlb_1pg(va);
 }
 
 /*
@@ -774,12 +775,26 @@ pmap_qenter(va, m, count)
 	vm_page_t *m;
 	int count;
 {
-	int i;
+	vm_offset_t end_va;
 
-	for (i = 0; i < count; i++) {
-		vm_offset_t tva = va + i * PAGE_SIZE;
-		pmap_kenter(tva, VM_PAGE_TO_PHYS(m[i]));
+	end_va = va + count * PAGE_SIZE;
+		
+	while (va < end_va) {
+		unsigned *pte;
+
+		pte = (unsigned *)vtopte(va);
+		*pte = VM_PAGE_TO_PHYS(*m) | PG_RW | PG_V | pgeflag;
+#ifdef SMP
+		cpu_invlpg((void *)va);
+#else
+		invltlb_1pg(va);
+#endif
+		va += PAGE_SIZE;
+		m++;
 	}
+#ifdef SMP
+	smp_invltlb();
+#endif
 }
 
 /*
@@ -1370,6 +1385,26 @@ retry:
 	if (ptdpg && !pmap_release_free_page(pmap, ptdpg))
 		goto retry;
 }
+
+static int
+kvm_size(SYSCTL_HANDLER_ARGS)
+{
+	unsigned long ksize = VM_MAX_KERNEL_ADDRESS - KERNBASE;
+
+        return sysctl_handle_long(oidp, &ksize, 0, req);
+}
+SYSCTL_PROC(_vm, OID_AUTO, kvm_size, CTLTYPE_LONG|CTLFLAG_RD, 
+    0, 0, kvm_size, "IU", "Size of KVM");
+
+static int
+kvm_free(SYSCTL_HANDLER_ARGS)
+{
+	unsigned long kfree = VM_MAX_KERNEL_ADDRESS - kernel_vm_end;
+
+        return sysctl_handle_long(oidp, &kfree, 0, req);
+}
+SYSCTL_PROC(_vm, OID_AUTO, kvm_free, CTLTYPE_LONG|CTLFLAG_RD, 
+    0, 0, kvm_free, "IU", "Amount of KVM free");
 
 /*
  * grow the number of kernel page table entries, if needed
@@ -2333,7 +2368,7 @@ retry:
 	psize = i386_btop(size);
 
 	if ((object->type != OBJT_VNODE) ||
-		(limit && (psize > MAX_INIT_PT) &&
+		((limit & MAP_PREFAULT_PARTIAL) && (psize > MAX_INIT_PT) &&
 			(object->resident_page_count > MAX_INIT_PT))) {
 		return;
 	}
@@ -2364,6 +2399,14 @@ retry:
 			if (tmpidx >= psize) {
 				continue;
 			}
+			/*
+			 * don't allow an madvise to blow away our really
+			 * free pages allocating pv entries.
+			 */
+			if ((limit & MAP_PREFAULT_MADVISE) &&
+			    cnt.v_free_count < cnt.v_free_reserved) {
+				break;
+			}
 			if (((p->valid & VM_PAGE_BITS_ALL) == VM_PAGE_BITS_ALL) &&
 				(p->busy == 0) &&
 			    (p->flags & (PG_BUSY | PG_FICTITIOUS)) == 0) {
@@ -2382,6 +2425,14 @@ retry:
 		 * else lookup the pages one-by-one.
 		 */
 		for (tmpidx = 0; tmpidx < psize; tmpidx += 1) {
+			/*
+			 * don't allow an madvise to blow away our really
+			 * free pages allocating pv entries.
+			 */
+			if ((limit & MAP_PREFAULT_MADVISE) &&
+			    cnt.v_free_count < cnt.v_free_reserved) {
+				break;
+			}
 			p = vm_page_lookup(object, tmpidx + pindex);
 			if (p &&
 			    ((p->valid & VM_PAGE_BITS_ALL) == VM_PAGE_BITS_ALL) &&

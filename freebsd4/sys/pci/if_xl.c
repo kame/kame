@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_xl.c,v 1.72.2.6 2001/07/27 20:56:41 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_xl.c,v 1.72.2.11 2001/12/19 10:40:46 silby Exp $
  */
 
 /*
@@ -145,8 +145,10 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_xl.c,v 1.72.2.6 2001/07/27 20:56:41 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_xl.c,v 1.72.2.11 2001/12/19 10:40:46 silby Exp $";
 #endif
+
+#define XL905B_CSUM_FEATURES	(CSUM_IP | CSUM_TCP | CSUM_UDP)
 
 /*
  * Various supported device vendors/types and their names.
@@ -218,6 +220,8 @@ static void xl_init		__P((void *));
 static void xl_stop		__P((struct xl_softc *));
 static void xl_watchdog		__P((struct ifnet *));
 static void xl_shutdown		__P((device_t));
+static int xl_suspend		__P((device_t));
+static int xl_resume		__P((device_t));
 static int xl_ifmedia_upd	__P((struct ifnet *));
 static void xl_ifmedia_sts	__P((struct ifnet *, struct ifmediareq *));
 
@@ -264,6 +268,8 @@ static device_method_t xl_methods[] = {
 	DEVMETHOD(device_attach,	xl_attach),
 	DEVMETHOD(device_detach,	xl_detach),
 	DEVMETHOD(device_shutdown,	xl_shutdown),
+	DEVMETHOD(device_suspend,	xl_suspend),
+	DEVMETHOD(device_resume,	xl_resume),
 
 	/* bus interface */
 	DEVMETHOD(bus_print_child,	bus_generic_print_child),
@@ -1407,14 +1413,17 @@ static int xl_attach(dev)
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = xl_ioctl;
 	ifp->if_output = ether_output;
-	if (sc->xl_type == XL_TYPE_905B)
+	if (sc->xl_type == XL_TYPE_905B) {
 		ifp->if_start = xl_start_90xB;
-	else
+		ifp->if_hwassist = XL905B_CSUM_FEATURES;
+		ifp->if_capabilities = IFCAP_HWCSUM;
+	} else
 		ifp->if_start = xl_start;
 	ifp->if_watchdog = xl_watchdog;
 	ifp->if_init = xl_init;
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = XL_TX_LIST_CNT - 1;
+	ifp->if_capenable = ifp->if_capabilities;
 
 	/*
 	 * Now we have to see what sort of media we have.
@@ -1773,7 +1782,7 @@ static void xl_rxeof(sc)
         struct ifnet		*ifp;
 	struct xl_chain_onefrag	*cur_rx;
 	int			total_len = 0;
-	u_int16_t		rxstat;
+	u_int32_t		rxstat;
 
 	ifp = &sc->arpcom.ac_if;
 
@@ -1832,6 +1841,22 @@ again:
 
 		/* Remove header from mbuf and pass it on. */
 		m_adj(m, sizeof(struct ether_header));
+
+		if (sc->xl_type == XL_TYPE_905B) {
+			/* Do IP checksum checking. */
+			if (rxstat & XL_RXSTAT_IPCKOK)
+				m->m_pkthdr.csum_flags |= CSUM_IP_CHECKED;
+			if (!(rxstat & XL_RXSTAT_IPCKERR))
+				m->m_pkthdr.csum_flags |= CSUM_IP_VALID;
+			if ((rxstat & XL_RXSTAT_TCPCOK &&
+			     !(rxstat & XL_RXSTAT_TCPCKERR)) ||
+			    (rxstat & XL_RXSTAT_UDPCKOK &&
+			     !(rxstat & XL_RXSTAT_UDPCKERR))) {
+				m->m_pkthdr.csum_flags |=
+					CSUM_DATA_VALID|CSUM_PSEUDO_HDR;
+				m->m_pkthdr.csum_data = 0xffff;
+			}
+		}
 		ether_input(ifp, eh, m);
 	}
 
@@ -2115,7 +2140,7 @@ static void xl_stats_update(xsc)
 	XL_SEL_WIN(4);
 	CSR_READ_1(sc, XL_W4_BADSSD);
 
-	if (mii != NULL)
+	if ((mii != NULL) && (!sc->xl_stats_no_timeout))
 		mii_tick(mii);
 
 	XL_SEL_WIN(7);
@@ -2362,6 +2387,14 @@ static int xl_encap_90xB(sc, c, m_head)
 	c->xl_ptr->xl_frag[frag - 1].xl_len |= XL_LAST_FRAG;
 	c->xl_ptr->xl_status = XL_TXSTAT_RND_DEFEAT;
 
+	if (m_head->m_pkthdr.csum_flags) {
+		if (m_head->m_pkthdr.csum_flags & CSUM_IP)
+			c->xl_ptr->xl_status |= XL_TXSTAT_IPCKSUM;
+		if (m_head->m_pkthdr.csum_flags & CSUM_TCP)
+			c->xl_ptr->xl_status |= XL_TXSTAT_TCPCKSUM;
+		if (m_head->m_pkthdr.csum_flags & CSUM_UDP)
+			c->xl_ptr->xl_status |= XL_TXSTAT_UDPCKSUM;
+	}
 	return(0);
 }
 
@@ -2489,6 +2522,7 @@ static void xl_init(xsc)
 		printf("xl%d: initialization failed: no "
 			"memory for rx buffers\n", sc->xl_unit);
 		xl_stop(sc);
+		splx(s);
 		return;
 	}
 
@@ -2934,4 +2968,38 @@ static void xl_shutdown(dev)
 	xl_stop(sc);
 
 	return;
+}
+
+static int xl_suspend(dev)
+	device_t		dev;
+{
+	struct xl_softc		*sc;
+	int			s;
+
+	sc = device_get_softc(dev);
+
+	s = splimp();
+	xl_stop(sc);
+	splx(s);
+
+	return(0);
+}
+
+static int xl_resume(dev)
+	device_t		dev;
+{
+	struct xl_softc		*sc;
+	struct ifnet		*ifp;
+	int			s;
+
+	s = splimp();
+	sc = device_get_softc(dev);
+	ifp = &sc->arpcom.ac_if;
+
+	xl_reset(sc);
+	if (ifp->if_flags & IFF_UP)
+		xl_init(sc);
+
+	splx(s);
+	return(0);
 }

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/dec/mcclock.c,v 1.5.2.1 2001/03/10 19:21:41 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/dec/mcclock.c,v 1.5.2.2 2001/12/17 14:03:15 gallatin Exp $ */
 /* $NetBSD: mcclock.c,v 1.11 1998/04/19 07:50:25 jonathan Exp $ */
 
 /*
@@ -84,13 +84,6 @@ mcclock_get(device_t dev, time_t base, struct clocktime *ct)
 	ct->day = regs[MC_DOM];
 	ct->mon = regs[MC_MONTH];
 	ct->year = regs[MC_YEAR];
-	/*
-	 * This chip is not y2k compliant- If it's less than
-	 * 70, we're clearly past the year 2000.
-	 */
-	if (ct->year < 70) {
-		ct->year += 100;
-	}
 }
 
 /*
@@ -112,11 +105,8 @@ mcclock_set(device_t dev, struct clocktime *ct)
 	regs[MC_DOW] = ct->dow;
 	regs[MC_DOM] = ct->day;
 	regs[MC_MONTH] = ct->mon;
-	/*
-	 * This chip is not y2k compliant- write it with
-	 * no more than two digits.
-	 */
-	regs[MC_YEAR] = ct->year % 100;
+	regs[MC_YEAR] = ct->year;
+
 	s = splclock();
 	MC146818_PUTTOD(dev, &regs);
 	splx(s);

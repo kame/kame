@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_subr.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_subr.c,v 1.31 1999/10/29 18:08:51 phk Exp $
+ * $FreeBSD: src/sys/kern/kern_subr.c,v 1.31.2.1 2001/09/28 16:58:35 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -51,8 +51,6 @@
 #include <vm/vm.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
-
-static void	uio_yield __P((void));
 
 int
 uiomove(cp, n, uio)
@@ -414,7 +412,7 @@ phashinit(elements, type, nentries)
 	return (hashtbl);
 }
 
-static void
+void
 uio_yield()
 {
 	struct proc *p;

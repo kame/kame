@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/include/elf.h,v 1.9 1999/12/29 04:27:57 peter Exp $
+ * $FreeBSD: src/sys/alpha/include/elf.h,v 1.9.2.1 2001/11/03 01:41:07 ps Exp $
  */
 
 #ifndef _MACHINE_ELF_H_
@@ -143,8 +143,8 @@ __ElfType(Auxinfo);
  * calculation is that it leaves room for the heap to grow to
  * its maximum allowed size.
  */
-#define ELF_RTLD_ADDR(vmspace) \
-    (round_page((vm_offset_t)(vmspace)->vm_daddr + MAXDSIZ))
+#define	ELF_RTLD_ADDR(vmspace) \
+    (round_page((vm_offset_t)(vmspace)->vm_daddr + maxdsiz))
 
 #endif
 #endif /* !_MACHINE_ELF_H_ */

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agp_amd.c,v 1.3.2.1 2000/07/19 09:48:04 ru Exp $
+ *	$FreeBSD: src/sys/pci/agp_amd.c,v 1.3.2.2 2001/12/20 10:27:41 murray Exp $
  */
 
 #include "opt_bus.h"
@@ -163,6 +163,8 @@ agp_amd_match(device_t dev)
 	switch (pci_get_devid(dev)) {
 	case 0x70061022:
 		return ("AMD 751 host to AGP bridge");
+	case 0x700e1022:
+		return ("AMD 761 host to AGP bridge");
 	};
 
 	return NULL;

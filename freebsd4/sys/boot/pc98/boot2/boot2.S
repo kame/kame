@@ -25,7 +25,7 @@
  *
  *	from: Mach, Revision 2.2  92/04/04  11:35:26  rpd
  *	boot2.S,v 1.6 1995/01/25 21:37:40 bde Exp
- * $FreeBSD: src/sys/boot/pc98/boot2/boot2.S,v 1.1.4.1 2000/07/06 23:29:48 obrien Exp $
+ * $FreeBSD: src/sys/boot/pc98/boot2/boot2.S,v 1.1.4.2 2001/10/07 13:22:38 nyan Exp $
  */
 /*
  * Ported to PC-9801 by Yoshio Kimura
@@ -53,37 +53,36 @@
  * boot2() -- second stage boot
  * SP points to default string if found
  */
-
+	.code16
 ENTRY(boot2)
-	data32
 	subl	%eax, %eax
 	mov	%cs, %ax
 	mov	%ax, %ds
 	mov	%ax, %es
-	data32
 	shll	$4, %eax
 
 	/* fix up GDT entries for bootstrap */
 #define FIXUP(gdt_index) \
+	.code32; \
 	addr32; \
 	movl	%eax, EXT(Gdt)+(8*gdt_index)+2;	/* actually movw %ax */ \
 	addr32; \
-	movb	%bl, EXT(Gdt)+(8*gdt_index)+4
+	movb	%bl, EXT(Gdt)+(8*gdt_index)+4; \
+	.code16
 
-	data32
 	shld	$16, %eax, %ebx
 	FIXUP(BOOT_CS_INDEX)
 	FIXUP(BOOT_CS16_INDEX)
 	FIXUP(BOOT_DS_INDEX)
 
 	/* fix up GDT pointer */
-	data32
 	movl	%eax, %ecx
-	data32
 	addl	$ EXT(Gdt), %eax
+	.code32
 	addr32
 	data32
 	movl	%eax, EXT(Gdtr)+2
+	.code16
 
 #ifdef BDE_DEBUGGER
 	/* fix up GDT entry for GDT */
@@ -158,6 +157,7 @@ ENTRY(boot2)
 #endif /* BDE_DEBUGGER */
 
 	/* change to protected mode */
+	.code32
 	data32
 	call	EXT(real_to_prot)
 

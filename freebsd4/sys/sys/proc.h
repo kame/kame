@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)proc.h	8.15 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/sys/proc.h,v 1.99.2.5 2000/09/07 19:13:54 truckman Exp $
+ * $FreeBSD: src/sys/sys/proc.h,v 1.99.2.6 2002/01/22 17:23:02 nectar Exp $
  */
 
 #ifndef _SYS_PROC_H_
@@ -291,6 +291,7 @@ struct	proc {
 #define	P_JAILED	0x1000000 /* Process is in jail */
 #define	P_OLDMASK	0x2000000 /* need to restore mask before pause */
 #define	P_ALTSTACK	0x4000000 /* have alternate signal stack */
+#define	P_INEXEC	0x8000000 /* Process is in execve(). */
 
 /*
  * MOVE TO ucred.h?

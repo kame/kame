@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/i386/linux/linux_locore.s,v 1.5.2.2 2001/02/21 23:01:57 gallatin Exp $ */
+/* $FreeBSD: src/sys/i386/linux/linux_locore.s,v 1.5.2.3 2001/11/05 19:08:23 marcel Exp $ */
 
 #include "linux_assym.h"			/* system definitions */
 #include <machine/asmacros.h>			/* miscellaneous asm macros */
@@ -16,7 +16,7 @@ NON_GPROF_ENTRY(linux_sigcode)
 0:	jmp	0b
 	ALIGN_TEXT
 /* XXXXX */
-_linux_rt_sigcode:
+linux_rt_sigcode:
 	call	*LINUX_RT_SIGF_HANDLER(%esp)
 	leal	LINUX_RT_SIGF_UC(%esp),%ebx	/* linux ucp */
 	movl	LINUX_SC_GS(%ebx),%gs
@@ -26,11 +26,11 @@ _linux_rt_sigcode:
 0:	jmp	0b
 	ALIGN_TEXT
 /* XXXXX */
-_linux_esigcode:
+linux_esigcode:
 
 	.data
-	.globl	_linux_szsigcode, _linux_sznonrtsigcode
-_linux_szsigcode:
-	.long	_linux_esigcode-_linux_sigcode
-_linux_sznonrtsigcode:
-	.long	_linux_rt_sigcode-_linux_sigcode
+	.globl	linux_szsigcode, linux_sznonrtsigcode
+linux_szsigcode:
+	.long	linux_esigcode-linux_sigcode
+linux_sznonrtsigcode:
+	.long	linux_rt_sigcode-linux_sigcode

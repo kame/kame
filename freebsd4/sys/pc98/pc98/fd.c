@@ -50,7 +50,7 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)fd.c	7.4 (Berkeley) 5/25/91
- * $FreeBSD: src/sys/pc98/pc98/fd.c,v 1.83.2.5 2001/08/13 05:00:54 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/fd.c,v 1.83.2.6 2001/10/08 03:35:19 nyan Exp $
  *
  */
 
@@ -406,11 +406,13 @@ fdctl_wr_isa(fdc_p fdc, u_int8_t v)
 	bus_space_write_1(fdc->ctlt, fdc->ctlh, 0, v);
 }
 
+#if NCARD > 0
 static void
 fdctl_wr_pcmcia(fdc_p fdc, u_int8_t v)
 {
 	bus_space_write_1(fdc->portt, fdc->porth, FDCTL+fdc->port_off, v);
 }
+#endif
 #endif /* PC98 */
 
 #if 0

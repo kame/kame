@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)isa.h	5.7 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/pc98/pc98/pc98.h,v 1.12 1999/08/28 00:50:33 peter Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pc98.h,v 1.12.2.1 2001/10/08 03:33:04 nyan Exp $
  */
 
 #ifndef _PC98_PC98_PC98_H_
@@ -120,6 +120,8 @@
 #define	IO_ICUSIZE	16		/* 8259A interrupt controllers */
 #define	IO_KBDSIZE	16		/* 8042 Keyboard controllers */
 #define	IO_LPTSIZE	8		/* LPT controllers, some use only 4 */
+#define	IO_LPTSIZE_EXTENDED	8	/* "Extended" LPT controllers */
+#define	IO_LPTSIZE_NORMAL	4	/* "Normal" LPT controllers */
 #define	IO_MDASIZE	16		/* Monochrome display controllers */
 #define	IO_NPXSIZE	16		/* 80387/80487 NPX registers */
 #define	IO_PMPSIZE	2		/* 82347 power management peripheral */

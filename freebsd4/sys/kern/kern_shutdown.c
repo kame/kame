@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_shutdown.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.8 2001/08/23 10:32:29 bde Exp $
+ * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.10 2002/01/22 13:05:26 nik Exp $
  */
 
 #include "opt_ddb.h"
@@ -368,7 +368,8 @@ shutdown_panic(void *junk, int howto)
 		} else { /* zero time specified - reboot NOW */
 			return;
 		}
-		printf("--> Press a key on the console to reboot <--\n");
+		printf("--> Press a key on the console to reboot,\n");
+		printf("--> or switch off the system now.\n");
 		cngetc();
 	}
 }
@@ -523,7 +524,7 @@ dumpsys(void)
 }
 
 int
-dumpstatus(vm_offset_t addr, long count)
+dumpstatus(vm_offset_t addr, off_t count)
 {
 	int c;
 
@@ -532,7 +533,7 @@ dumpstatus(vm_offset_t addr, long count)
 		if (wdog_tickler)
 			(*wdog_tickler)();
 #endif   
-		printf("%ld ", count / (1024 * 1024));
+		printf("%ld ", (long)(count / (1024 * 1024)));
 	}
 
 	if ((c = cncheckc()) == 0x03)

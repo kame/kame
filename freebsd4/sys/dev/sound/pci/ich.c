@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/ich.c,v 1.3.2.2 2001/08/31 07:50:28 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/ich.c,v 1.3.2.5 2002/01/21 17:26:57 orion Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -53,6 +53,7 @@ struct sc_chinfo {
 	u_int32_t num, run;
 	u_int32_t blksz, blkcnt;
 	u_int32_t regbase, spdreg;
+	u_int32_t imask;
 	u_int32_t civ;
 
 	struct snd_dbuf *buffer;
@@ -78,6 +79,7 @@ struct sc_info {
 
 	struct ac97_info *codec;
 	struct sc_chinfo ch[3];
+	int ac97rate;
 	struct ich_desc *dtbl;
 };
 
@@ -245,18 +247,21 @@ ichchan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *
 		KASSERT(dir == PCMDIR_PLAY, ("wrong direction"));
 		ch->regbase = ICH_REG_PO_BASE;
 		ch->spdreg = sc->hasvra? AC97_REGEXT_FDACRATE : 0;
+		ch->imask = ICH_GLOB_STA_POINT;
 		break;
 
 	case 1: /* record */
 		KASSERT(dir == PCMDIR_REC, ("wrong direction"));
 		ch->regbase = ICH_REG_PI_BASE;
 		ch->spdreg = sc->hasvra? AC97_REGEXT_LADCRATE : 0;
+		ch->imask = ICH_GLOB_STA_PIINT;
 		break;
 
 	case 2: /* mic */
 		KASSERT(dir == PCMDIR_REC, ("wrong direction"));
 		ch->regbase = ICH_REG_MC_BASE;
 		ch->spdreg = sc->hasvrm? AC97_REGEXT_MADCRATE : 0;
+		ch->imask = ICH_GLOB_STA_MINT;
 		break;
 
 	default:
@@ -283,10 +288,16 @@ ichchan_setspeed(kobj_t obj, void *data, u_int32_t speed)
 	struct sc_chinfo *ch = data;
 	struct sc_info *sc = ch->parent;
 
-	if (ch->spdreg)
-		return ac97_setrate(sc->codec, ch->spdreg, speed);
-	else
+	if (ch->spdreg) {
+		int r;
+		if (sc->ac97rate <= 32000 || sc->ac97rate >= 64000)
+			sc->ac97rate = 48000;
+		r = speed * 48000 / sc->ac97rate;
+		return ac97_setrate(sc->codec, ch->spdreg, r) * 
+			sc->ac97rate / 48000;
+	} else {
 		return 48000;
+	}
 }
 
 static int
@@ -365,37 +376,151 @@ ich_intr(void *p)
 {
 	struct sc_info *sc = (struct sc_info *)p;
 	struct sc_chinfo *ch;
-	u_int32_t cbi, lbi, lvi, st;
+	u_int32_t cbi, lbi, lvi, st, gs;
 	int i;
+
+	gs = ich_rd(sc, ICH_REG_GLOB_STA, 4) & ICH_GLOB_STA_IMASK;
+	if (gs & (ICH_GLOB_STA_PRES | ICH_GLOB_STA_SRES)) {
+		/* Clear resume interrupt(s) - nothing doing with them */
+		ich_wr(sc, ICH_REG_GLOB_STA, gs, 4);
+	}
+	gs &= ~(ICH_GLOB_STA_PRES | ICH_GLOB_STA_SRES);
 
 	for (i = 0; i < 3; i++) {
 		ch = &sc->ch[i];
-		/* check channel status */
+		if ((ch->imask & gs) == 0) 
+			continue;
+		gs &= ~ch->imask;
 		st = ich_rd(sc, ch->regbase + ICH_REG_X_SR, 2);
 		st &= ICH_X_SR_FIFOE | ICH_X_SR_BCIS | ICH_X_SR_LVBCI;
-		if (st != 0) {
-			if (st & (ICH_X_SR_BCIS | ICH_X_SR_LVBCI)) {
+		if (st & (ICH_X_SR_BCIS | ICH_X_SR_LVBCI)) {
 				/* block complete - update buffer */
-				if (ch->run)
-					chn_intr(ch->channel);
-				lvi = ich_rd(sc, ch->regbase + ICH_REG_X_LVI, 1);
-				cbi = ch->civ % ch->blkcnt;
-				if (cbi == 0)
-					cbi = ch->blkcnt - 1;
-				else
-					cbi--;
-				lbi = lvi % ch->blkcnt;
-				if (cbi >= lbi)
-					lvi += cbi - lbi;
-				else
-					lvi += cbi + ch->blkcnt - lbi;
-				lvi %= ICH_DTBL_LENGTH;
-				ich_wr(sc, ch->regbase + ICH_REG_X_LVI, lvi, 1);
-			}
-			/* clear status bit */
-			ich_wr(sc, ch->regbase + ICH_REG_X_SR, st, 2);
+			if (ch->run)
+				chn_intr(ch->channel);
+			lvi = ich_rd(sc, ch->regbase + ICH_REG_X_LVI, 1);
+			cbi = ch->civ % ch->blkcnt;
+			if (cbi == 0)
+				cbi = ch->blkcnt - 1;
+			else
+				cbi--;
+			lbi = lvi % ch->blkcnt;
+			if (cbi >= lbi)
+				lvi += cbi - lbi;
+			else
+				lvi += cbi + ch->blkcnt - lbi;
+			lvi %= ICH_DTBL_LENGTH;
+			ich_wr(sc, ch->regbase + ICH_REG_X_LVI, lvi, 1);
+
 		}
+		/* clear status bit */
+		ich_wr(sc, ch->regbase + ICH_REG_X_SR, st, 2);
 	}
+	if (gs != 0) {
+		device_printf(sc->dev, 
+			      "Unhandled interrupt, gs_intr = %x\n", gs);
+	}
+}
+
+/* ------------------------------------------------------------------------- */
+/* Sysctl to control ac97 speed (some boards overclocked ac97). */
+
+static int
+ich_initsys(struct sc_info* sc)
+{
+#ifdef SND_DYNSYSCTL
+	struct snddev_info *d = device_get_softc(sc->dev);
+	SYSCTL_ADD_INT(&d->sysctl_tree, 
+		       SYSCTL_CHILDREN(d->sysctl_tree_top),
+		       OID_AUTO, "ac97rate", CTLFLAG_RW, 
+		       &sc->ac97rate, 48000, 
+		       "AC97 link rate (default = 48000)");
+#endif /* SND_DYNSYSCTL */
+	return 0;
+}
+
+/* -------------------------------------------------------------------- */
+/* Calibrate card (some boards are overclocked and need scaling) */
+
+static
+unsigned int ich_calibrate(struct sc_info *sc)
+{
+	struct sc_chinfo *ch = &sc->ch[1];
+	struct timeval t1, t2;
+	u_int8_t ociv, nciv;
+	u_int32_t wait_us, actual_48k_rate, bytes;
+
+	/*
+	 * Grab audio from input for fixed interval and compare how
+	 * much we actually get with what we expect.  Interval needs
+	 * to be sufficiently short that no interrupts are
+	 * generated.
+	 */
+
+	KASSERT(ch->regbase == ICH_REG_PI_BASE, ("wrong direction"));
+
+	bytes = sndbuf_getsize(ch->buffer) / 2;
+	ichchan_setblocksize(0, ch, bytes);
+
+	/*
+	 * our data format is stereo, 16 bit so each sample is 4 bytes.
+	 * assuming we get 48000 samples per second, we get 192000 bytes/sec.
+	 * we're going to start recording with interrupts disabled and measure
+	 * the time taken for one block to complete.  we know the block size,
+	 * we know the time in microseconds, we calculate the sample rate:
+	 *
+	 * actual_rate [bps] = bytes / (time [s] * 4)
+	 * actual_rate [bps] = (bytes * 1000000) / (time [us] * 4)
+	 * actual_rate [Hz] = (bytes * 250000) / time [us]
+	 */
+
+	/* prepare */
+	ociv = ich_rd(sc, ch->regbase + ICH_REG_X_CIV, 1);
+	nciv = ociv;
+	ich_wr(sc, ch->regbase + ICH_REG_X_BDBAR, (u_int32_t)vtophys(ch->dtbl), 4);
+
+	/* start */
+	microtime(&t1);
+	ich_wr(sc, ch->regbase + ICH_REG_X_CR, ICH_X_CR_RPBM, 1);
+
+	/* wait */
+	while (nciv == ociv) {
+		microtime(&t2);
+		if (t2.tv_sec - t1.tv_sec > 1)
+			break;
+		nciv = ich_rd(sc, ch->regbase + ICH_REG_X_CIV, 1);
+	}
+	microtime(&t2);
+
+	/* stop */
+	ich_wr(sc, ch->regbase + ICH_REG_X_CR, 0, 1);
+
+	/* reset */
+	DELAY(100);
+	ich_wr(sc, ch->regbase + ICH_REG_X_CR, ICH_X_CR_RR, 1);
+
+	/* turn time delta into us */
+	wait_us = ((t2.tv_sec - t1.tv_sec) * 1000000) + t2.tv_usec - t1.tv_usec;
+
+	if (nciv == ociv) {
+		device_printf(sc->dev, "ac97 link rate calibration timed out after %d us\n", wait_us);
+		return 0;
+	}
+
+	actual_48k_rate = (bytes * 250000) / wait_us;
+
+	if (actual_48k_rate < 47500 || actual_48k_rate > 48500) {
+		sc->ac97rate = actual_48k_rate;
+	} else {
+		sc->ac97rate = 48000;
+	}
+
+	if (bootverbose || sc->ac97rate != 48000) {
+		device_printf(sc->dev, "measured ac97 link rate at %d Hz", actual_48k_rate);
+		if (sc->ac97rate != actual_48k_rate)
+			printf(", will use %d Hz", sc->ac97rate);
+	 	printf("\n");
+	}
+	return sc->ac97rate;
 }
 
 /* -------------------------------------------------------------------- */
@@ -450,11 +575,15 @@ ich_pci_probe(device_t dev)
 		return 0;
 
 	case 0x24258086:
-		device_set_desc(dev, "Intel 82901AB (ICH)");
+		device_set_desc(dev, "Intel 82801AB (ICH)");
 		return 0;
 
 	case 0x24458086:
 		device_set_desc(dev, "Intel 82801BA (ICH2)");
+		return 0;
+
+	case 0x24858086:
+		device_set_desc(dev, "Intel 82801CA (ICH3)");
 		return 0;
 
 	default:
@@ -466,6 +595,7 @@ static int
 ich_pci_attach(device_t dev)
 {
 	u_int32_t		data;
+	u_int16_t		extcaps;
 	struct sc_info 		*sc;
 	char 			status[SND_STATUSLEN];
 
@@ -503,6 +633,13 @@ ich_pci_attach(device_t dev)
 		goto bad;
 	}
 
+	sc->irqid = 0;
+	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irqid, 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	if (!sc->irq || snd_setup_intr(dev, sc->irq, INTR_MPSAFE, ich_intr, sc, &sc->ih)) {
+		device_printf(dev, "unable to map interrupt\n");
+		goto bad;
+	}
+
 	if (ich_init(sc)) {
 		device_printf(dev, "unable to initialize the card\n");
 		goto bad;
@@ -514,17 +651,10 @@ ich_pci_attach(device_t dev)
 	mixer_init(dev, ac97_getmixerclass(), sc->codec);
 
 	/* check and set VRA function */
-	if (ac97_setextmode(sc->codec, AC97_EXTCAP_VRA) == 0)
-		sc->hasvra = 1;
-	if (ac97_setextmode(sc->codec, AC97_EXTCAP_VRM) == 0)
-		sc->hasvrm = 1;
-
-	sc->irqid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irqid, 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
-	if (!sc->irq || snd_setup_intr(dev, sc->irq, INTR_MPSAFE, ich_intr, sc, &sc->ih)) {
-		device_printf(dev, "unable to map interrupt\n");
-		goto bad;
-	}
+	extcaps = ac97_getextcaps(sc->codec);
+	sc->hasvra = extcaps & AC97_EXTCAP_VRA;
+	sc->hasvrm = extcaps & AC97_EXTCAP_VRM;
+	ac97_setextmode(sc->codec, sc->hasvra | sc->hasvrm);
 
 	if (pcm_register(dev, sc, 1, 2))
 		goto bad;
@@ -537,6 +667,9 @@ ich_pci_attach(device_t dev)
 		 rman_get_start(sc->nambar), rman_get_start(sc->nabmbar), rman_get_start(sc->irq));
 
 	pcm_setstatus(dev, status);
+
+	ich_initsys(sc);
+	ich_calibrate(sc);
 
 	return 0;
 

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.alpha,v 1.19.2.2 2000/07/18 20:39:05 dfr Exp $
+# $FreeBSD: src/sys/conf/options.alpha,v 1.19.2.3 2001/10/04 13:09:36 dfr Exp $
 
 EV5			opt_global.h
 EV4			opt_global.h
@@ -21,6 +21,8 @@ ATAPI			opt_atapi.h
 ATAPI_STATIC		opt_atapi.h
 
 CMD640			opt_wd.h
+
+MAXMEM
 
 PPC_PROBE_CHIPSET       opt_ppc.h
 PPC_DEBUG               opt_ppc.h

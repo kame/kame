@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/twe/twe_freebsd.c,v 1.2.2.3 2001/07/26 21:54:54 ps Exp $
+ * $FreeBSD: src/sys/dev/twe/twe_freebsd.c,v 1.2.2.4 2001/11/27 20:21:02 ps Exp $
  */
 
 /*
@@ -729,7 +729,7 @@ twed_dump(dev_t dev)
 	    return(error);
 
 
-	if (dumpstatus(addr, (long)(count * DEV_BSIZE)) < 0)
+	if (dumpstatus(addr, (off_t)count * DEV_BSIZE) < 0)
 	    return(EINTR);
 
 	blkno += blkcnt * dumppages;

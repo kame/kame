@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.17 2001/08/01 00:47:49 fenner Exp $
+ * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.23 2002/01/16 20:50:42 jesper Exp $
  */
 
 #include "opt_atalk.h"
@@ -58,6 +58,7 @@
 #include <net/if_types.h>
 #include <net/bpf.h>
 #include <net/ethernet.h>
+#include <net/bridge.h>
 
 #if defined(INET) || defined(INET6)
 #include <netinet/in.h>
@@ -96,15 +97,6 @@ extern u_char	at_org_code[3];
 extern u_char	aarp_org_code[3];
 #endif /* NETATALK */
 
-#ifdef BRIDGE
-#include <net/bridge.h>
-#endif
-
-#include "vlan.h"
-#if NVLAN > 0
-#include <net/if_vlan_var.h>
-#endif /* NVLAN > 0 */
-
 /* netgraph node hooks for ng_ether(4) */
 void	(*ng_ether_input_p)(struct ifnet *ifp,
 		struct mbuf **mp, struct ether_header *eh);
@@ -113,6 +105,17 @@ void	(*ng_ether_input_orphan_p)(struct ifnet *ifp,
 int	(*ng_ether_output_p)(struct ifnet *ifp, struct mbuf **mp);
 void	(*ng_ether_attach_p)(struct ifnet *ifp);
 void	(*ng_ether_detach_p)(struct ifnet *ifp);
+
+/* bridge support */
+int do_bridge = 0;
+bridge_in_t *bridge_in_ptr;
+bdg_forward_t *bdg_forward_ptr;
+bdgtakeifaces_t *bdgtakeifaces_ptr;
+struct bdg_softc *ifp2sc = NULL;
+
+int	(*vlan_input_p)(struct ether_header *eh, struct mbuf *m);
+int	(*vlan_input_tag_p)(struct ether_header *eh, struct mbuf *m,
+		u_int16_t t);
 
 static	int ether_resolvemulti __P((struct ifnet *, struct sockaddr **,
 				    struct sockaddr *));
@@ -327,12 +330,25 @@ ether_output(ifp, m, dst, rt0)
 	 * reasons and compatibility with the original behavior.
 	 */
 	if ((ifp->if_flags & IFF_SIMPLEX) && (loop_copy != -1)) {
+		int csum_flags = 0;
+
+		if (m->m_pkthdr.csum_flags & CSUM_IP)
+			csum_flags |= (CSUM_IP_CHECKED|CSUM_IP_VALID);
+		if (m->m_pkthdr.csum_flags & CSUM_DELAY_DATA)
+			csum_flags |= (CSUM_DATA_VALID|CSUM_PSEUDO_HDR);
 		if ((m->m_flags & M_BCAST) || (loop_copy > 0)) {
 			struct mbuf *n = m_copy(m, 0, (int)M_COPYALL);
+
+			n->m_pkthdr.csum_flags |= csum_flags;
+			if (csum_flags & CSUM_DATA_VALID)
+				n->m_pkthdr.csum_data = 0xffff;
 
 			(void) if_simloop(ifp, n, dst->sa_family, hlen);
 		} else if (bcmp(eh->ether_dhost,
 		    eh->ether_shost, ETHER_ADDR_LEN) == 0) {
+			m->m_pkthdr.csum_flags |= csum_flags;
+			if (csum_flags & CSUM_DATA_VALID)
+				m->m_pkthdr.csum_data = 0xffff;
 			(void) if_simloop(ifp, m, dst->sa_family, hlen);
 			return (0);	/* XXX */
 		}
@@ -366,24 +382,22 @@ ether_output_frame(ifp, m)
 {
 	int s, error = 0;
 
-#ifdef BRIDGE
-	if (do_bridge && BDG_USED(ifp) ) {
+	if (BDG_ACTIVE(ifp) ) {
 		struct ether_header *eh; /* a ptr suffices */
 
 		m->m_pkthdr.rcvif = NULL;
 		eh = mtod(m, struct ether_header *);
 		m_adj(m, ETHER_HDR_LEN);
-		m = bdg_forward(m, eh, ifp);
+		m = bdg_forward_ptr(m, eh, ifp);
 		if (m != NULL)
 			m_freem(m);
 		return (0);
 	}
-#endif
 
 	s = splimp();
 	/*
-	 * Queue message on interface, and start output if interface
-	 * not yet active.
+	 * Queue message on interface, update output statistics if
+	 * successful, and start output if interface not yet active.
 	 */
 	if (IF_QFULL(&ifp->if_snd)) {
 		IF_DROP(&ifp->if_snd);
@@ -406,6 +420,15 @@ ether_output_frame(ifp, m)
  * the packet is in the mbuf chain m without
  * the ether header, which is provided separately.
  *
+ * NOTA BENE: for many drivers "eh" is a pointer into the first mbuf or
+ * cluster, right before m_data. So be very careful when working on m,
+ * as you could destroy *eh !!
+ * A (probably) more convenient and efficient interface to ether_input
+ * is to have the whole packet (with the ethernet header) into the mbuf:
+ * modules which do not need the ethernet header can easily drop it, while
+ * others (most noticeably bridge and ng_ether) do not need to do additional
+ * work to put the ethernet header back into the mbuf.
+ *
  * First we perform any link layer operations, then continue
  * to the upper layers with ether_demux().
  */
@@ -415,9 +438,7 @@ ether_input(ifp, eh, m)
 	struct ether_header *eh;
 	struct mbuf *m;
 {
-#ifdef BRIDGE
 	struct ether_header save_eh;
-#endif
 
 	/* Check for a BPF tap */
 	if (ifp->if_bpf != NULL) {
@@ -430,6 +451,8 @@ ether_input(ifp, eh, m)
 		bpf_mtap(ifp, (struct mbuf *)&mh);
 	}
 
+	ifp->if_ibytes += m->m_pkthdr.len + sizeof (*eh);
+
 	/* Handle ng_ether(4) processing, if any */
 	if (ng_ether_input_p != NULL) {
 		(*ng_ether_input_p)(ifp, &m, eh);
@@ -437,13 +460,12 @@ ether_input(ifp, eh, m)
 			return;
 	}
 
-#ifdef BRIDGE
 	/* Check for bridging mode */
-	if (do_bridge && BDG_USED(ifp) ) {
+	if (BDG_ACTIVE(ifp) ) {
 		struct ifnet *bif;
 
 		/* Check with bridging code */
-		if ((bif = bridge_in(ifp, eh)) == BDG_DROP) {
+		if ((bif = bridge_in_ptr(ifp, eh)) == BDG_DROP) {
 			m_freem(m);
 			return;
 		}
@@ -451,9 +473,9 @@ ether_input(ifp, eh, m)
 			struct mbuf *oldm = m ;
 
 			save_eh = *eh ; /* because it might change */
-			m = bdg_forward(m, eh, bif);	/* needs forwarding */
+			m = bdg_forward_ptr(m, eh, bif); /* needs forwarding */
 			/*
-			 * Do not continue if bdg_forward() processed our
+			 * Do not continue if bdg_forward_ptr() processed our
 			 * packet (and cleared the mbuf pointer m) or if
 			 * it dropped (m_free'd) the packet itself.
 			 */
@@ -475,11 +497,8 @@ ether_input(ifp, eh, m)
 			m_freem(m);
 		return;
        }
-#endif
 
-#ifdef BRIDGE
 recvLocal:
-#endif
 	/* Continue with upper layer processing */
 	ether_demux(ifp, eh, m);
 }
@@ -500,9 +519,7 @@ ether_demux(ifp, eh, m)
 	register struct llc *l;
 #endif
 
-#ifdef BRIDGE
-    if (! (do_bridge && BDG_USED(ifp) ) )
-#endif
+    if (! (BDG_ACTIVE(ifp) ) )
 	/* Discard packet if upper layers shouldn't see it because it was
 	   unicast to a different Ethernet address. If the driver is working
 	   properly, then this situation can only happen when the interface
@@ -520,7 +537,6 @@ ether_demux(ifp, eh, m)
 		m_freem(m);
 		return;
 	}
-	ifp->if_ibytes += m->m_pkthdr.len + sizeof (*eh);
 	if (eh->ether_dhost[0] & 1) {
 		if (bcmp((caddr_t)etherbroadcastaddr, (caddr_t)eh->ether_dhost,
 			 sizeof(etherbroadcastaddr)) == 0)
@@ -532,14 +548,6 @@ ether_demux(ifp, eh, m)
 		ifp->if_imcasts++;
 
 	ether_type = ntohs(eh->ether_type);
-
-#if NVLAN > 0
-	if (ether_type == vlan_proto) {
-		if (vlan_input(eh, m) < 0)
-			ifp->if_data.ifi_noproto++;
-		return;
-	}
-#endif /* NVLAN > 0 */
 
 	switch (ether_type) {
 #ifdef INET
@@ -591,6 +599,9 @@ ether_demux(ifp, eh, m)
                 aarpinput(IFP2AC(ifp), m); /* XXX */
                 return;
 #endif NETATALK
+	case ETHERTYPE_VLAN:
+		VLAN_INPUT(eh, m);
+		return;
 	default:
 #ifdef IPX
 		if (ef_inputp && ef_inputp(ifp, eh, m) == 0)
@@ -680,10 +691,10 @@ ether_ifattach(ifp, bpf)
 	register struct ifaddr *ifa;
 	register struct sockaddr_dl *sdl;
 
-	if_attach(ifp);
 	ifp->if_type = IFT_ETHER;
 	ifp->if_addrlen = 6;
 	ifp->if_hdrlen = 14;
+	if_attach(ifp);
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_resolvemulti = ether_resolvemulti;
 	if (ifp->if_baudrate == 0)
@@ -698,6 +709,8 @@ ether_ifattach(ifp, bpf)
 		bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
 	if (ng_ether_attach_p != NULL)
 		(*ng_ether_attach_p)(ifp);
+	if (BDG_LOADED)
+		bdgtakeifaces_ptr();
 }
 
 /*
@@ -713,6 +726,8 @@ ether_ifdetach(ifp, bpf)
 	if (bpf)
 		bpfdetach(ifp);
 	if_detach(ifp);
+	if (BDG_LOADED)
+		bdgtakeifaces_ptr();
 }
 
 SYSCTL_DECL(_net_link);

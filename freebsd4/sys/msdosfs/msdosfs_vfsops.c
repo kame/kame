@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/msdosfs/msdosfs_vfsops.c,v 1.60.2.3 2001/07/26 20:37:23 iedowse Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfs_vfsops.c,v 1.60.2.5 2001/11/04 18:57:51 dillon Exp $ */
 /*	$NetBSD: msdosfs_vfsops.c,v 1.51 1997/11/17 15:36:58 ws Exp $	*/
 
 /*-
@@ -178,7 +178,8 @@ msdosfs_mountroot()
 	bzero((char *)mp, (u_long)sizeof(struct mount));
 	mp->mnt_op = &msdosfs_vfsops;
 	mp->mnt_flag = 0;
-	LIST_INIT(&mp->mnt_vnodelist);
+	TAILQ_INIT(&mp->mnt_nvnodelist);
+	TAILQ_INIT(&mp->mnt_reservedvnlist);
 
 	args.flags = 0;
 	args.uid = 0;
@@ -865,7 +866,7 @@ msdosfs_sync(mp, waitfor, cred, p)
 	 */
 	simple_lock(&mntvnode_slock);
 loop:
-	for (vp = mp->mnt_vnodelist.lh_first; vp != NULL; vp = nvp) {
+	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nvp) {
 		/*
 		 * If the vnode that we are about to sync is no longer
 		 * associated with this mount point, start over.
@@ -874,7 +875,7 @@ loop:
 			goto loop;
 
 		simple_lock(&vp->v_interlock);
-		nvp = vp->v_mntvnodes.le_next;
+		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
 		dep = VTODE(vp);
 		if (vp->v_type == VNON ||
 		    ((dep->de_flag &

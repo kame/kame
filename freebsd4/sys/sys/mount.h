@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mount.h	8.21 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/sys/mount.h,v 1.89.2.2 2001/05/28 21:29:52 dwmalone Exp $
+ * $FreeBSD: src/sys/sys/mount.h,v 1.89.2.5 2001/11/04 18:59:11 dillon Exp $
  */
 
 #ifndef _SYS_MOUNT_H_
@@ -106,8 +106,15 @@ struct statfs {
  * Structure per mounted file system.  Each mounted file system has an
  * array of operations and an instance record.  The file systems are
  * put on a doubly linked list.
+ *
+ * NOTE: mnt_nvnodelist and mnt_reservedvnlist.  At the moment vnodes
+ * are linked into mnt_nvnodelist.  At some point in the near future the
+ * vnode list will be split into a 'dirty' and 'clean' list. mnt_nvnodelist
+ * will become the dirty list and mnt_reservedvnlist will become the 'clean'
+ * list.  Filesystem kld's syncing code should remain compatible since
+ * they only need to scan the dirty vnode list (nvnodelist -> dirtyvnodelist).
  */
-LIST_HEAD(vnodelst, vnode);
+TAILQ_HEAD(vnodelst, vnode);
 
 struct mount {
 	TAILQ_ENTRY(mount) mnt_list;		/* mount list */
@@ -115,7 +122,7 @@ struct mount {
 	struct vfsconf	*mnt_vfc;		/* configuration info */
 	struct vnode	*mnt_vnodecovered;	/* vnode we mounted on */
 	struct vnode	*mnt_syncer;		/* syncer vnode */
-	struct vnodelst	mnt_vnodelist;		/* list of vnodes this mount */
+	struct vnodelst	mnt_nvnodelist;		/* list of vnodes this mount */
 	struct lock	mnt_lock;		/* mount structure lock */
 	int		mnt_flag;		/* flags shared with user */
 	int		mnt_kern_flag;		/* kernel only flags */
@@ -124,6 +131,7 @@ struct mount {
 	qaddr_t		mnt_data;		/* private data */
 	time_t		mnt_time;		/* last time written*/
 	u_int		mnt_iosize_max;		/* max IO request size */
+	struct vnodelst	mnt_reservedvnlist;	/* (future) dirty vnode list */
 };
 #endif /* _KERNEL */
 

@@ -65,7 +65,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_pageout.c,v 1.151.2.8 2001/06/13 07:26:58 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_pageout.c,v 1.151.2.11 2001/12/25 01:44:44 dillon Exp $
  */
 
 /*
@@ -187,6 +187,10 @@ SYSCTL_INT(_vm, OID_AUTO, defer_swapspace_pageouts,
 SYSCTL_INT(_vm, OID_AUTO, disable_swapspace_pageouts,
 	CTLFLAG_RW, &disable_swap_pageouts, 0, "Disallow swapout of dirty pages");
 
+static int pageout_lock_miss;
+SYSCTL_INT(_vm, OID_AUTO, pageout_lock_miss,
+	CTLFLAG_RD, &pageout_lock_miss, 0, "vget() lock misses during pageout");
+
 #define VM_PAGEOUT_PAGE_COUNT 16
 int vm_pageout_page_count = VM_PAGEOUT_PAGE_COUNT;
 
@@ -286,8 +290,8 @@ more:
 		vm_page_test_dirty(p);
 		if ((p->dirty & p->valid) == 0 ||
 		    p->queue != PQ_INACTIVE ||
-		    p->wire_count != 0 ||
-		    p->hold_count != 0) {
+		    p->wire_count != 0 ||	/* may be held by buf cache */
+		    p->hold_count != 0) {	/* may be undergoing I/O */
 			ib = 0;
 			break;
 		}
@@ -315,8 +319,8 @@ more:
 		vm_page_test_dirty(p);
 		if ((p->dirty & p->valid) == 0 ||
 		    p->queue != PQ_INACTIVE ||
-		    p->wire_count != 0 ||
-		    p->hold_count != 0) {
+		    p->wire_count != 0 ||	/* may be held by buf cache */
+		    p->hold_count != 0) {	/* may be undergoing I/O */
 			break;
 		}
 		mc[page_base + pageout_count] = p;
@@ -538,12 +542,14 @@ vm_pageout_map_deactivate_pages(map, desired)
 {
 	vm_map_entry_t tmpe;
 	vm_object_t obj, bigobj;
+	int nothingwired;
 
 	if (lockmgr(&map->lock, LK_EXCLUSIVE | LK_NOWAIT, (void *)0, curproc)) {
 		return;
 	}
 
 	bigobj = NULL;
+	nothingwired = TRUE;
 
 	/*
 	 * first, search out the biggest object, and try to free pages from
@@ -559,6 +565,8 @@ vm_pageout_map_deactivate_pages(map, desired)
 				bigobj = obj;
 			}
 		}
+		if (tmpe->wired_count > 0)
+			nothingwired = FALSE;
 		tmpe = tmpe->next;
 	}
 
@@ -585,7 +593,7 @@ vm_pageout_map_deactivate_pages(map, desired)
 	 * Remove all mappings if a process is swapped out, this will free page
 	 * table pages.
 	 */
-	if (desired == 0)
+	if (desired == 0 && nothingwired)
 		pmap_remove(vm_map_pmap(map),
 			VM_MIN_ADDRESS, VM_MAXUSER_ADDRESS);
 	vm_map_unlock(map);
@@ -695,6 +703,9 @@ rescan0:
 		if (m->flags & PG_MARKER)
 			continue;
 
+		/*
+		 * A held page may be undergoing I/O, so skip it.
+		 */
 		if (m->hold_count) {
 			s = splvm();
 			TAILQ_REMOVE(&vm_page_queues[PQ_INACTIVE].pl, m, pageq);
@@ -845,16 +856,20 @@ rescan0:
 			 * is holding a locked vnode at just the point where
 			 * the pageout daemon is woken up.
 			 *
-			 * XXX we need to be able to apply a timeout to the
-			 * vget() lock attempt.
+			 * We can't wait forever for the vnode lock, we might
+			 * deadlock due to a vn_read() getting stuck in
+			 * vm_wait while holding this vnode.  We skip the 
+			 * vnode if we can't get it in a reasonable amount
+			 * of time.
 			 */
 
 			if (object->type == OBJT_VNODE) {
 				vp = object->handle;
 
-				if (vget(vp, LK_EXCLUSIVE|LK_NOOBJ, curproc)) {
+				if (vget(vp, LK_EXCLUSIVE|LK_NOOBJ|LK_TIMELOCK, curproc)) {
+					++pageout_lock_miss;
 					if (object->flags & OBJ_MIGHTBEDIRTY)
-						vnodes_skipped++;
+						    vnodes_skipped++;
 					continue;
 				}
 
@@ -886,7 +901,8 @@ rescan0:
 				}
 
 				/*
-				 * If the page has become held, then skip it
+				 * If the page has become held it might
+				 * be undergoing I/O, so skip it
 				 */
 				if (m->hold_count) {
 					s = splvm();

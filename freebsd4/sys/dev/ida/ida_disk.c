@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida_disk.c,v 1.12.2.5 2001/07/26 21:54:54 ps Exp $
+ * $FreeBSD: src/sys/dev/ida/ida_disk.c,v 1.12.2.6 2001/11/27 20:21:02 ps Exp $
  */
 
 /*
@@ -236,7 +236,7 @@ idad_dump(dev_t dev)
 		if (error)
 			return (error);
 
-		if (dumpstatus(addr, (long)(count * DEV_BSIZE)) < 0)
+		if (dumpstatus(addr, (off_t)count * DEV_BSIZE) < 0)
 			return (EINTR);
 
 		blkno += blkcnt * dumppages;

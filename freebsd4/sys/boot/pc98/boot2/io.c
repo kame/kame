@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, Revision 2.2  92/04/04  11:35:57  rpd
- * $FreeBSD: src/sys/boot/pc98/boot2/io.c,v 1.2 1999/08/28 00:40:26 peter Exp $
+ * $FreeBSD: src/sys/boot/pc98/boot2/io.c,v 1.2.2.1 2001/10/07 13:22:38 nyan Exp $
  */
 
 #include "boot.h"
@@ -148,7 +148,7 @@ loop:
  * This routine uses an inb to an unused port, the time to execute that
  * inb is approximately 1.25uS.  This value is pretty constant across
  * all CPU's and all buses, with the exception of some PCI implentations
- * that do not forward this I/O adress to the ISA bus as they know it
+ * that do not forward this I/O address to the ISA bus as they know it
  * is not a valid ISA bus address, those machines execute this inb in
  * 60 nS :-(.
  *

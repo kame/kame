@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/ds1.c,v 1.8.2.6 2001/08/01 03:40:58 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/ds1.c,v 1.8.2.7 2001/12/19 20:25:22 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -38,7 +38,7 @@
 /* -------------------------------------------------------------------- */
 
 #define	DS1_CHANS 4
-#define DS1_RECPRIMARY 0
+#define DS1_RECPRIMARY 1
 #define DS1_IRQHZ ((48000 << 8) / 256)
 #define DS1_BUFFSIZE 4096
 

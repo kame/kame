@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)trap.c	7.4 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/trap.c,v 1.147.2.5 2001/08/15 01:23:50 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/trap.c,v 1.147.2.8 2002/01/12 11:03:30 bde Exp $
  */
 
 /*
@@ -1049,6 +1049,7 @@ syscall2(frame)
 	int i;
 	struct sysent *callp;
 	struct proc *p = curproc;
+	register_t orig_tf_eflags;
 	u_quad_t sticks;
 	int error;
 	int narg;
@@ -1075,6 +1076,7 @@ syscall2(frame)
 	p->p_md.md_regs = &frame;
 	params = (caddr_t)frame.tf_esp + sizeof(int);
 	code = frame.tf_eax;
+	orig_tf_eflags = frame.tf_eflags;
 
 	if (p->p_sysent->sv_prepsyscall) {
 		/*
@@ -1196,7 +1198,7 @@ bad:
 	/*
 	 * Traced syscall.  trapsignal() is not MP aware.
 	 */
-	if ((frame.tf_eflags & PSL_T) && !(frame.tf_eflags & PSL_VM)) {
+	if ((orig_tf_eflags & PSL_T) && !(orig_tf_eflags & PSL_VM)) {
 		if (have_mplock == 0) {
 			get_mplock();
 			have_mplock = 1;

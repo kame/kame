@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if_loop.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_disc.c,v 1.26.2.1 2001/03/06 00:32:09 obrien Exp $
+ * $FreeBSD: src/sys/net/if_disc.c,v 1.26.2.2 2001/12/20 10:30:16 ru Exp $
  */
 
 /*
@@ -66,7 +66,7 @@ static void discattach __P((void));
 static struct	ifnet discif;
 static int discoutput(struct ifnet *, struct mbuf *, struct sockaddr *,
 		    struct rtentry *);
-static void discrtrequest(int cmd, struct rtentry *rt, struct sockaddr *sa);
+static void discrtrequest(int cmd, struct rtentry *rt, struct rt_addrinfo *info);
 static int discioctl(struct ifnet *, u_long, caddr_t);
 
 /* ARGSUSED */
@@ -155,10 +155,10 @@ discoutput(ifp, m, dst, rt)
 
 /* ARGSUSED */
 static void
-discrtrequest(cmd, rt, sa)
+discrtrequest(cmd, rt, info)
 	int cmd;
 	struct rtentry *rt;
-	struct sockaddr *sa;
+	struct rt_addrinfo *info;
 {
 	if (rt)
 		rt->rt_rmx.rmx_mtu = DSMTU;

@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD: src/sys/boot/common/loader.8,v 1.18.2.8 2001/08/16 10:34:30 ru Exp $
+.\" $FreeBSD: src/sys/boot/common/loader.8,v 1.18.2.12 2001/12/14 15:23:50 ru Exp $
 .\"
 .\" Note: The date here should be updated whenever a non-trivial
 .\" change is made to the manual page.
@@ -297,7 +297,7 @@ builtin.
 Their values can also be accessed as described in
 .Sx BUILTIN PARSER .
 .Pp
-Notice that this environment variables are not inherited by any shell
+Notice that these environment variables are not inherited by any shell
 after the system has been booted.
 .Pp
 A few variables are set automatically by
@@ -397,6 +397,13 @@ explicitly.
 Other variables are used to override kernel tunable parameters.
 The following tunables are available:
 .Bl -tag -width Va
+.It Va kern.maxusers
+Set the size of a number of statically allocated system tables; see
+.Xr tuning 7
+for a description of how to select an appropriate value for this
+tunable.
+When set, this tunable replaces the value declared in the kernel
+compile-time configuration file.
 .It Va kern.ipc.nmbclusters
 Set the number of mbuf clusters to be allocated.
 The value cannot be set below the default
@@ -409,6 +416,41 @@ This overrides completely the value
 determined when the kernel was compiled.
 Modifies
 .Va VM_KMEM_SIZE .
+.It Va kern.maxswzone
+Limits the amount of KVM to be used to hold swap
+meta information, which directly governs the
+maximum amount of swap the system can support.
+This value is specified in bytes of KVA space
+and defaults to around 70MBytes.
+Care should be taken
+to not reduce this value such that the actual
+amount of configured swap exceeds 1/2 the
+kernel-supported swap.
+The default 70MB allows
+the kernel to support a maximum of (approximately)
+14GB of configured swap.
+Only mess around with
+this parameter if you need to greatly extend the
+KVM reservation for other resources such as the
+buffer cache or
+.Va NMBCLUSTERS .
+Modifies
+.Va VM_SWZONE_SIZE_MAX .
+.It Va kern.maxbcache
+Limits the amount of KVM reserved for use by the
+buffer cache, specified in bytes.
+The default maximum is 200MB.
+This parameter is used to
+prevent the buffer cache from eating too much
+KVM in large-memory machine configurations.
+Only mess around with this parameter if you need to
+greatly extend the KVM reservation for other resources
+such as the swap zone or
+.Va NMBCLUSTERS .
+Note that
+the NBUF parameter will override this limit.
+Modifies
+.Va VM_BCACHE_SIZE_MAX .
 .It Va machdep.pccard.pcic_irq
 Overrides the IRQ normally assigned to a PCCARD controller.
 Typically the first available interrupt will be allocated,
@@ -752,6 +794,7 @@ Unspecified error.
 .Sh SEE ALSO
 .Xr libstand 3 ,
 .Xr loader.conf 5 ,
+.Xr tuning 7 ,
 .Xr boot 8 ,
 .Xr btxld 8
 .Sh STANDARDS

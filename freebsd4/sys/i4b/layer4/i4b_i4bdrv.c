@@ -27,7 +27,7 @@
  *	i4b_i4bdrv.c - i4b userland interface driver
  *	--------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer4/i4b_i4bdrv.c,v 1.11.2.4 2001/09/11 09:49:53 kris Exp $
+ * $FreeBSD: src/sys/i4b/layer4/i4b_i4bdrv.c,v 1.11.2.5 2001/12/16 15:12:59 hm Exp $
  *
  *      last edit-date: [Sat Aug 11 18:08:10 2001]
  *
@@ -440,6 +440,12 @@ i4bioctl(dev_t dev, int cmd, caddr_t data, int flag, struct proc *p)
 
 			strcpy(cd->dst_telno, mcr->dst_telno);
 			strcpy(cd->src_telno, mcr->src_telno);
+
+			if(mcr->keypad[0] != '\0')
+				strcpy(cd->keypad, mcr->keypad);
+			else
+				cd->keypad[0] = '\0';
+				
 			cd->display[0] = '\0';
 
 			SET_CAUSE_TYPE(cd->cause_in, CAUSET_I4B);

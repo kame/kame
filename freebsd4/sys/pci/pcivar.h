@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/pcivar.h,v 1.41.2.1 2001/07/21 22:40:27 imp Exp $
+ * $FreeBSD: src/sys/pci/pcivar.h,v 1.41.2.2 2002/01/10 12:08:22 mdodd Exp $
  *
  */
 
@@ -339,6 +339,8 @@ static __inline void pcib_set_ ## A(device_t dev, T t)			 \
 
 PCIB_ACCESSOR(hose,		HOSE,		u_int32_t)
 
+device_t pci_find_bsf(u_int8_t, u_int8_t, u_int8_t);
+device_t pci_find_device(u_int16_t, u_int16_t);
 #endif
 
 /* for compatibility to FreeBSD-2.2 version of PCI code */

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_environment.c,v 1.10.2.3 2001/07/26 18:53:02 peter Exp $
+ * $FreeBSD: src/sys/kern/kern_environment.c,v 1.10.2.5 2001/11/03 01:41:08 ps Exp $
  */
 
 /*
@@ -46,6 +46,9 @@ char	*kern_envp;
 
 static char	*kernenv_next(char *cp);
 
+/*
+ * Look up an environment variable by name.
+ */
 char *
 getenv(const char *name)
 {
@@ -62,6 +65,23 @@ getenv(const char *name)
 	    return(ep);
     }
     return(NULL);
+}
+
+/*
+ * Return a string value from an environment variable.
+ */
+int
+getenv_string(const char *name, char *data, int size)
+{
+    char *tmp;
+
+    tmp = getenv(name);
+    if (tmp == NULL) {
+	strncpy(data, tmp, size);
+	data[size - 1] = 0;
+	return (1);
+    } else
+	return (0);
 }
 
 /*
@@ -83,7 +103,7 @@ getenv_int(const char *name, int *data)
 /*
  * Return a quad_t value from an environment variable.
  */
-quad_t
+int
 getenv_quad(const char *name, quad_t *data)
 {
     const char	*value;
@@ -157,6 +177,14 @@ tunable_int_init(void *data)
 	struct tunable_int *d = (struct tunable_int *)data;
 
 	TUNABLE_INT_FETCH(d->path, d->var);
+}
+
+void
+tunable_quad_init(void *data)
+{
+	struct tunable_quad *d = (struct tunable_quad *)data;
+
+	TUNABLE_QUAD_FETCH(d->path, d->var);
 }
 
 void

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/hpfs/hpfs_vfsops.c,v 1.3.2.1 2001/07/26 20:36:48 iedowse Exp $
+ * $FreeBSD: src/sys/fs/hpfs/hpfs_vfsops.c,v 1.3.2.2 2001/12/25 01:44:45 dillon Exp $
  */
 
 
@@ -668,7 +668,7 @@ hpfs_vget(
 		vp->v_flag |= VROOT;
 
 	simple_lock_init(&hp->h_interlock);
-	lockinit(&hp->h_lock, PINOD, "hpnode", 0, 0);
+	lockinit(&hp->h_lock, PINOD, "hpnode", VLKTIMEOUT, 0);
 
 	hp->h_flag = H_INVAL;
 	hp->h_vp = vp;

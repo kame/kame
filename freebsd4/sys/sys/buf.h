@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)buf.h	8.9 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/sys/buf.h,v 1.88.2.4 2001/06/03 05:00:10 dillon Exp $
+ * $FreeBSD: src/sys/sys/buf.h,v 1.88.2.7 2001/12/25 01:44:44 dillon Exp $
  */
 
 #ifndef _SYS_BUF_H_
@@ -195,6 +195,11 @@ struct buf {
  *			the pages underlying the buffer.   B_DIRECT is 
  *			sticky until the buffer is released and typically
  *			only has an effect when B_RELBUF is also set.
+ *
+ *	B_NOWDRAIN	This flag should be set when a device (like VN)
+ *			does a turn-around VOP_WRITE from its strategy
+ *			routine.  This flag prevents bwrite() from blocking
+ *			in wdrain, avoiding a deadlock situation.
  */
 
 #define	B_AGE		0x00000001	/* Move to age queue when I/O done. */
@@ -229,9 +234,9 @@ struct buf {
 #define B_RAM		0x10000000	/* Read ahead mark (flag) */
 #define B_VMIO		0x20000000	/* VMIO flag */
 #define B_CLUSTER	0x40000000	/* pagein op, so swap() can count it */
-#define B_AUTOCHAINDONE	0x80000000	/* Available flag */
+#define B_NOWDRAIN	0x80000000	/* Avoid wdrain deadlock */
 
-#define PRINT_BUF_FLAGS "\20\40autochain\37cluster\36vmio\35ram\34ordered" \
+#define PRINT_BUF_FLAGS "\20\40nowdrain\37cluster\36vmio\35ram\34ordered" \
 	"\33paging\32xxx\31writeinprog\30want\27relbuf\26dirty" \
 	"\25read\24raw\23phys\22clusterok\21malloc\20nocache" \
 	"\17locked\16inval\15scanned\14error\13eintr\12done\11freebuf" \
@@ -245,6 +250,7 @@ struct buf {
 #define	BX_BKGRDWRITE	0x00000004	/* Do writes in background */
 #define	BX_BKGRDINPROG	0x00000008	/* Background write in progress */
 #define	BX_BKGRDWAIT	0x00000010	/* Background write waiting */
+#define BX_AUTOCHAINDONE 0x00000020	/* pager I/O chain auto mode */
 
 #define	NOOFFSET	(-1LL)		/* No buffer offset calculated yet */
 
@@ -276,7 +282,7 @@ BUF_LOCK(struct buf *bp, int locktype)
 	locktype |= LK_INTERLOCK;
 	bp->b_lock.lk_wmesg = buf_wmesg;
 	bp->b_lock.lk_prio = PRIBIO + 4;
-	bp->b_lock.lk_timo = 0;
+	/* bp->b_lock.lk_timo = 0;   not necessary */
 	ret = lockmgr(&(bp)->b_lock, locktype, &buftimelock, curproc);
 	splx(s);
 	return ret;
@@ -292,7 +298,7 @@ BUF_TIMELOCK(struct buf *bp, int locktype, char *wmesg, int catch, int timo)
 
 	s = splbio();
 	simple_lock(&buftimelock);
-	locktype |= LK_INTERLOCK;
+	locktype |= LK_INTERLOCK | LK_TIMELOCK;
 	bp->b_lock.lk_wmesg = wmesg;
 	bp->b_lock.lk_prio = (PRIBIO + 4) | catch;
 	bp->b_lock.lk_timo = timo;
@@ -455,6 +461,8 @@ bufq_first(struct buf_queue_head *head)
 
 #ifdef _KERNEL
 extern int	nbuf;			/* The number of buffer headers */
+extern int	maxswzone;		/* Max KVA for swap structures */
+extern int	maxbcache;		/* Max KVA for buffer cache */
 extern int	runningbufspace;
 extern int      buf_maxio;              /* nominal maximum I/O for buffer */
 extern struct	buf *buf;		/* The buffer headers. */

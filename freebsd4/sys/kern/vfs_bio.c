@@ -11,7 +11,7 @@
  * 2. Absolutely no warranty of function or purpose is made by the author
  *		John S. Dyson.
  *
- * $FreeBSD: src/sys/kern/vfs_bio.c,v 1.242.2.9 2001/06/03 05:00:09 dillon Exp $
+ * $FreeBSD: src/sys/kern/vfs_bio.c,v 1.242.2.14 2001/12/20 19:56:27 dillon Exp $
  */
 
 /*
@@ -82,7 +82,7 @@ static void buf_daemon __P((void));
  * but the code is intricate enough already.
  */
 vm_page_t bogus_page;
-int vmiodirenable = FALSE;
+int vmiodirenable = TRUE;
 int runningbufspace;
 static vm_offset_t bogus_offset;
 
@@ -261,8 +261,12 @@ static __inline void
 waitrunningbufspace(void)
 {
 	while (runningbufspace > hirunningspace) {
+		int s;
+
+		s = splbio();	/* fix race against interrupt/biodone() */
 		++runningbufreq;
 		tsleep(&runningbufreq, PVM, "wdrain", 0);
+		splx(s);
 	}
 }
 
@@ -701,11 +705,15 @@ bwrite(struct buf * bp)
 		int rtval = biowait(bp);
 		brelse(bp);
 		return (rtval);
-	} else {
+	} else if ((oldflags & B_NOWDRAIN) == 0) {
 		/*
 		 * don't allow the async write to saturate the I/O
-		 * system.  There is no chance of deadlock here because
-		 * we are blocking on I/O that is already in-progress.
+		 * system.  Deadlocks can occur only if a device strategy
+		 * routine (like in VN) turns around and issues another
+		 * high-level write, in which case B_NOWDRAIN is expected
+		 * to be set.   Otherwise we will not deadlock here because
+		 * we are blocking waiting for I/O that is already in-progress
+		 * to complete.
 		 */
 		waitrunningbufspace();
 	}
@@ -1066,12 +1074,9 @@ brelse(struct buf * bp)
 
 		/*
 		 * Get the base offset and length of the buffer.  Note that 
-		 * for block sizes that are less then PAGE_SIZE, the b_data
-		 * base of the buffer does not represent exactly b_offset and
-		 * neither b_offset nor b_size are necessarily page aligned.
-		 * Instead, the starting position of b_offset is:
-		 *
-		 * 	b_data + (b_offset & PAGE_MASK)
+		 * in the VMIO case if the buffer block size is not
+		 * page-aligned then b_data pointer may not be page-aligned.
+		 * But our b_pages[] array *IS* page aligned.
 		 *
 		 * block sizes less then DEV_BSIZE (usually 512) are not 
 		 * supported due to the page granularity bits (m->valid,
@@ -1230,7 +1235,8 @@ brelse(struct buf * bp)
 
 	/* unlock */
 	BUF_UNLOCK(bp);
-	bp->b_flags &= ~(B_ORDERED | B_ASYNC | B_NOCACHE | B_AGE | B_RELBUF | B_DIRECT);
+	bp->b_flags &= ~(B_ORDERED | B_ASYNC | B_NOCACHE | B_AGE | B_RELBUF |
+			B_DIRECT | B_NOWDRAIN);
 	splx(s);
 }
 
@@ -2183,9 +2189,22 @@ loop:
 		 * to softupdates re-dirtying the buffer.  In the latter
 		 * case, B_CACHE is set after the first write completes,
 		 * preventing further loops.
+		 *
+		 * NOTE!  b*write() sets B_CACHE.  If we cleared B_CACHE
+		 * above while extending the buffer, we cannot allow the
+		 * buffer to remain with B_CACHE set after the write
+		 * completes or it will represent a corrupt state.  To
+		 * deal with this we set B_NOCACHE to scrap the buffer
+		 * after the write.
+		 *
+		 * We might be able to do something fancy, like setting
+		 * B_CACHE in bwrite() except if B_DELWRI is already set,
+		 * so the below call doesn't set B_CACHE, but that gets real
+		 * confusing.  This is much easier.
 		 */
 
 		if ((bp->b_flags & (B_CACHE|B_DELWRI)) == B_DELWRI) {
+			bp->b_flags |= B_NOCACHE;
 			VOP_BWRITE(bp->b_vp, bp);
 			goto loop;
 		}

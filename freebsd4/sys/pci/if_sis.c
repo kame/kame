@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.7 2001/02/21 22:17:51 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.18 2002/01/15 02:16:25 wpaul Exp $
  */
 
 /*
@@ -64,12 +64,15 @@
 #include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
+#include <sys/sysctl.h>
 
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <net/ethernet.h>
 #include <net/if_dl.h>
 #include <net/if_media.h>
+#include <net/if_types.h>
+#include <net/if_vlan_var.h>
 
 #include <net/bpf.h>
 
@@ -98,7 +101,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.7 2001/02/21 22:17:51 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.18 2002/01/15 02:16:25 wpaul Exp $";
 #endif
 
 /*
@@ -144,6 +147,7 @@ static void sis_read_eeprom	__P((struct sis_softc *, caddr_t, int,
 #ifdef __i386__
 static void sis_read_cmos	__P((struct sis_softc *, device_t, caddr_t,
 							int, int));
+static void sis_read_mac	__P((struct sis_softc *, device_t, caddr_t));
 static device_t sis_find_bridge	__P((device_t));
 #endif
 
@@ -192,6 +196,12 @@ static driver_t sis_driver = {
 };
 
 static devclass_t sis_devclass;
+
+#ifdef __i386__
+static int sis_quick=1;
+SYSCTL_INT(_hw, OID_AUTO, sis_quick, CTLFLAG_RW,
+	&sis_quick,0,"do not mdevget in sis driver");
+#endif
 
 DRIVER_MODULE(if_sis, pci, sis_driver, sis_devclass, 0, 0);
 DRIVER_MODULE(miibus, sis, miibus_driver, miibus_devclass, 0, 0);
@@ -374,6 +384,7 @@ static device_t sis_find_bridge(dev)
 	device_t		*pci_children;
 	int			pci_childcount = 0;
 	device_t		*busp, *childp;
+	device_t		child = NULL;
 	int			i, j;
 
 	if ((pci_devclass = devclass_find("pci")) == NULL)
@@ -388,16 +399,16 @@ static device_t sis_find_bridge(dev)
 		    j < pci_childcount; j++, childp++) {
 			if (pci_get_vendor(*childp) == SIS_VENDORID &&
 			    pci_get_device(*childp) == 0x0008) {
-				free(pci_devices, M_TEMP);
-				free(pci_children, M_TEMP);
-				return(*childp);
+				child = *childp;
+				goto done;
 			}
 		}
 	}
 
+done:
 	free(pci_devices, M_TEMP);
 	free(pci_children, M_TEMP);
-	return(NULL);
+	return(child);
 }
 
 static void sis_read_cmos(sc, dev, dest, off, cnt)
@@ -427,6 +438,33 @@ static void sis_read_cmos(sc, dev, dest, off, cnt)
 	}
 
 	pci_write_config(bridge, 0x48, reg & ~0x40, 1);
+	return;
+}
+
+static void sis_read_mac(sc, dev, dest)
+	struct sis_softc	*sc;
+	device_t		dev;
+	caddr_t			dest;
+{
+	u_int32_t		filtsave, csrsave;
+
+	filtsave = CSR_READ_4(sc, SIS_RXFILT_CTL);
+	csrsave = CSR_READ_4(sc, SIS_CSR);
+
+	CSR_WRITE_4(sc, SIS_CSR, SIS_CSR_RELOAD | filtsave);
+	CSR_WRITE_4(sc, SIS_CSR, 0);
+		
+	CSR_WRITE_4(sc, SIS_RXFILT_CTL, filtsave & ~SIS_RXFILTCTL_ENABLE);
+
+	CSR_WRITE_4(sc, SIS_RXFILT_CTL, SIS_FILTADDR_PAR0);
+	((u_int16_t *)dest)[0] = CSR_READ_2(sc, SIS_RXFILT_DATA);
+	CSR_WRITE_4(sc, SIS_RXFILT_CTL,SIS_FILTADDR_PAR1);
+	((u_int16_t *)dest)[1] = CSR_READ_2(sc, SIS_RXFILT_DATA);
+	CSR_WRITE_4(sc, SIS_RXFILT_CTL, SIS_FILTADDR_PAR2);
+	((u_int16_t *)dest)[2] = CSR_READ_2(sc, SIS_RXFILT_DATA);
+
+	CSR_WRITE_4(sc, SIS_RXFILT_CTL, filtsave);
+	CSR_WRITE_4(sc, SIS_CSR, csrsave);
 	return;
 }
 #endif
@@ -459,7 +497,8 @@ static int sis_miibus_readreg(dev, phy, reg)
 		return(val);
 	}
 
-	if (sc->sis_type == SIS_TYPE_900 && phy != 0)
+	if (sc->sis_type == SIS_TYPE_900 &&
+	    sc->sis_rev < SIS_REV_635 && phy != 0)
 		return(0);
 
 	CSR_WRITE_4(sc, SIS_PHYCTL, (phy << 11) | (reg << 6) | SIS_PHYOP_READ);
@@ -730,6 +769,8 @@ static int sis_attach(dev)
 	if (pci_get_vendor(dev) == NS_VENDORID)
 		sc->sis_type = SIS_TYPE_83815;
 
+	sc->sis_rev = pci_read_config(dev, PCIR_REVID, 1);
+
 	/*
 	 * Handle power management nonsense.
 	 */
@@ -876,11 +917,14 @@ static int sis_attach(dev)
 		 * requires some datasheets that I don't have access
 		 * to at the moment.
 		 */
-		command = pci_read_config(dev, PCIR_REVID, 1);
-		if (command == SIS_REV_630S ||
-		    command == SIS_REV_630E ||
-		    command == SIS_REV_630EA1)
+		if (sc->sis_rev == SIS_REV_630S ||
+		    sc->sis_rev == SIS_REV_630E ||
+		    sc->sis_rev == SIS_REV_630EA1 ||
+		    sc->sis_rev == SIS_REV_630ET)
 			sis_read_cmos(sc, dev, (caddr_t)&eaddr, 0x9, 6);
+
+		else if (sc->sis_rev == SIS_REV_635)
+			sis_read_mac(sc, dev, (caddr_t)&eaddr);
 		else
 #endif
 			sis_read_eeprom(sc, (caddr_t)&eaddr,
@@ -893,6 +937,13 @@ static int sis_attach(dev)
 	 */
 	printf("sis%d: Ethernet address: %6D\n", unit, eaddr, ":");
 
+	/*
+	 * From the Linux driver:
+	 * 630ET : set the mii access mode as software-mode
+	 */
+	if (sc->sis_rev == SIS_REV_630ET)
+		SIS_SETBIT(sc, SIS_CSR, SIS_CSR_ACCESS_MODE);
+	
 	sc->sis_unit = unit;
 	callout_handle_init(&sc->sis_stat_ch);
 	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
@@ -941,6 +992,12 @@ static int sis_attach(dev)
 	 * Call MI attach routine.
 	 */
 	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
+	
+	/*
+	 * Tell the upper layer(s) we support long frames.
+	 */
+	ifp->if_data.ifi_hdrlen = sizeof(struct ether_vlan_header);
+
 	callout_handle_init(&sc->sis_stat_ch);
 
 fail:
@@ -986,23 +1043,17 @@ static int sis_list_tx_init(sc)
 {
 	struct sis_list_data	*ld;
 	struct sis_ring_data	*cd;
-	int			i;
+	int			i, nexti;
 
 	cd = &sc->sis_cdata;
 	ld = sc->sis_ldata;
 
 	for (i = 0; i < SIS_TX_LIST_CNT; i++) {
-		if (i == (SIS_TX_LIST_CNT - 1)) {
-			ld->sis_tx_list[i].sis_nextdesc =
-			    &ld->sis_tx_list[0];
-			ld->sis_tx_list[i].sis_next =
-			    vtophys(&ld->sis_tx_list[0]);
-		} else {
-			ld->sis_tx_list[i].sis_nextdesc =
-			    &ld->sis_tx_list[i + 1];
-			ld->sis_tx_list[i].sis_next =
-			    vtophys(&ld->sis_tx_list[i + 1]);
-		}
+		nexti = (i == (SIS_TX_LIST_CNT - 1)) ? 0 : i+1;
+		ld->sis_tx_list[i].sis_nextdesc =
+			    &ld->sis_tx_list[nexti];
+		ld->sis_tx_list[i].sis_next =
+			    vtophys(&ld->sis_tx_list[nexti]);
 		ld->sis_tx_list[i].sis_mbuf = NULL;
 		ld->sis_tx_list[i].sis_ptr = 0;
 		ld->sis_tx_list[i].sis_ctl = 0;
@@ -1024,7 +1075,7 @@ static int sis_list_rx_init(sc)
 {
 	struct sis_list_data	*ld;
 	struct sis_ring_data	*cd;
-	int			i;
+	int			i, nexti;
 
 	ld = sc->sis_ldata;
 	cd = &sc->sis_cdata;
@@ -1032,17 +1083,11 @@ static int sis_list_rx_init(sc)
 	for (i = 0; i < SIS_RX_LIST_CNT; i++) {
 		if (sis_newbuf(sc, &ld->sis_rx_list[i], NULL) == ENOBUFS)
 			return(ENOBUFS);
-		if (i == (SIS_RX_LIST_CNT - 1)) {
-			ld->sis_rx_list[i].sis_nextdesc =
-			    &ld->sis_rx_list[0];
-			ld->sis_rx_list[i].sis_next =
-			    vtophys(&ld->sis_rx_list[0]);
-		} else {
-			ld->sis_rx_list[i].sis_nextdesc =
-			    &ld->sis_rx_list[i + 1];
-			ld->sis_rx_list[i].sis_next =
-			    vtophys(&ld->sis_rx_list[i + 1]);
-		}
+		nexti = (i == (SIS_RX_LIST_CNT - 1)) ? 0 : i+1;
+		ld->sis_rx_list[i].sis_nextdesc =
+			    &ld->sis_rx_list[nexti];
+		ld->sis_rx_list[i].sis_next =
+			    vtophys(&ld->sis_rx_list[nexti]);
 	}
 
 	cd->sis_rx_prod = 0;
@@ -1062,16 +1107,11 @@ static int sis_newbuf(sc, c, m)
 
 	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("sis%d: no memory for rx list "
-			    "-- packet dropped!\n", sc->sis_unit);
+		if (m_new == NULL)
 			return(ENOBUFS);
-		}
 
 		MCLGET(m_new, M_DONTWAIT);
 		if (!(m_new->m_flags & M_EXT)) {
-			printf("sis%d: no memory for rx list "
-			    "-- packet dropped!\n", sc->sis_unit);
 			m_freem(m_new);
 			return(ENOBUFS);
 		}
@@ -1109,7 +1149,6 @@ static void sis_rxeof(sc)
 	i = sc->sis_cdata.sis_rx_prod;
 
 	while(SIS_OWNDESC(&sc->sis_ldata->sis_rx_list[i])) {
-		struct mbuf		*m0 = NULL;
 
 		cur_rx = &sc->sis_ldata->sis_rx_list[i];
 		rxstat = cur_rx->sis_rxstat;
@@ -1132,16 +1171,34 @@ static void sis_rxeof(sc)
 			continue;
 		}
 
-		/* No errors; receive the packet. */	
-		m0 = m_devget(mtod(m, char *) - ETHER_ALIGN,
-		    total_len + ETHER_ALIGN, 0, ifp, NULL);
-		sis_newbuf(sc, cur_rx, m);
-		if (m0 == NULL) {
-			ifp->if_ierrors++;
-			continue;
+		/* No errors; receive the packet. */
+#ifdef __i386__
+		/*
+		 * On the x86 we do not have alignment problems, so try to
+		 * allocate a new buffer for the receive ring, and pass up
+		 * the one where the packet is already, saving the expensive
+		 * copy done in m_devget().
+		 * If we are on an architecture with alignment problems, or
+		 * if the allocation fails, then use m_devget and leave the
+		 * existing buffer in the receive ring.
+		 */
+		if (sis_quick && sis_newbuf(sc, cur_rx, NULL) == 0) {
+			m->m_pkthdr.rcvif = ifp;
+			m->m_pkthdr.len = m->m_len = total_len;
+		} else
+#endif
+		{
+			struct mbuf *m0;
+			m0 = m_devget(mtod(m, char *) - ETHER_ALIGN,
+				total_len + ETHER_ALIGN, 0, ifp, NULL);
+			sis_newbuf(sc, cur_rx, m);
+			if (m0 == NULL) {
+				ifp->if_ierrors++;
+				continue;
+			}
+			m_adj(m0, ETHER_ALIGN);
+			m = m0;
 		}
-		m_adj(m0, ETHER_ALIGN);
-		m = m0;
 
 		ifp->if_ipackets++;
 		eh = mtod(m, struct ether_header *);
@@ -1286,20 +1343,19 @@ static void sis_intr(arg)
 		if ((status & SIS_INTRS) == 0)
 			break;
 
-		if ((status & SIS_ISR_TX_DESC_OK) ||
-		    (status & SIS_ISR_TX_ERR) ||
-		    (status & SIS_ISR_TX_OK) ||
-		    (status & SIS_ISR_TX_IDLE))
+		if (status &
+		    (SIS_ISR_TX_DESC_OK|SIS_ISR_TX_ERR| \
+		     SIS_ISR_TX_OK|SIS_ISR_TX_IDLE) )
 			sis_txeof(sc);
 
-		if ((status & SIS_ISR_RX_DESC_OK) ||
-		    (status & SIS_ISR_RX_OK))
+		if (status & (SIS_ISR_RX_DESC_OK|SIS_ISR_RX_OK|SIS_ISR_RX_IDLE))
 			sis_rxeof(sc);
 
-		if ((status & SIS_ISR_RX_ERR) ||
-		    (status & SIS_ISR_RX_OFLOW)) {
+		if (status & (SIS_ISR_RX_ERR|SIS_ISR_RX_OFLOW))
 			sis_rxeoc(sc);
-		}
+
+		if (status & (SIS_ISR_RX_IDLE))
+			SIS_SETBIT(sc, SIS_CSR, SIS_CSR_RX_ENABLE);
 
 		if (status & SIS_ISR_SYSERR) {
 			sis_reset(sc);
@@ -1524,6 +1580,9 @@ static void sis_init(xsc)
 	/* Set RX configuration */
 	CSR_WRITE_4(sc, SIS_RX_CFG, SIS_RXCFG);
 
+	/* Accept Long Packets for VLAN support */
+	SIS_SETBIT(sc, SIS_RX_CFG, SIS_RXCFG_RX_JABBER);
+
 	/* Set TX configuration */
 	if (IFM_SUBTYPE(mii->mii_media_active) == IFM_10_T) {
 		CSR_WRITE_4(sc, SIS_TX_CFG, SIS_TXCFG_10);
@@ -1709,6 +1768,9 @@ static void sis_stop(sc)
 	ifp->if_timer = 0;
 
 	untimeout(sis_tick, sc, sc->sis_stat_ch);
+
+	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
+
 	CSR_WRITE_4(sc, SIS_IER, 0);
 	CSR_WRITE_4(sc, SIS_IMR, 0);
 	SIS_SETBIT(sc, SIS_CSR, SIS_CSR_TX_DISABLE|SIS_CSR_RX_DISABLE);
@@ -1742,8 +1804,6 @@ static void sis_stop(sc)
 
 	bzero((char *)&sc->sis_ldata->sis_tx_list,
 		sizeof(sc->sis_ldata->sis_tx_list));
-
-	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
 
 	return;
 }

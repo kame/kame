@@ -38,7 +38,7 @@
  * from: Utah $Hdr: vm_mmap.c 1.6 91/10/21$
  *
  *	@(#)vm_mmap.c	8.4 (Berkeley) 1/12/94
- * $FreeBSD: src/sys/vm/vm_mmap.c,v 1.108.2.4 2001/05/18 09:58:52 bp Exp $
+ * $FreeBSD: src/sys/vm/vm_mmap.c,v 1.108.2.5 2001/11/03 01:41:10 ps Exp $
  */
 
 /*
@@ -46,7 +46,6 @@
  */
 
 #include "opt_compat.h"
-#include "opt_rlimit.h"
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -263,8 +262,8 @@ mmap(p, uap)
 	 */
 	else if (addr == 0 ||
 	    (addr >= round_page((vm_offset_t)vms->vm_taddr) &&
-	     addr < round_page((vm_offset_t)vms->vm_daddr + MAXDSIZ)))
-		addr = round_page((vm_offset_t)vms->vm_daddr + MAXDSIZ);
+	     addr < round_page((vm_offset_t)vms->vm_daddr + maxdsiz)))
+		addr = round_page((vm_offset_t)vms->vm_daddr + maxdsiz);
 
 	if (flags & MAP_ANON) {
 		/*

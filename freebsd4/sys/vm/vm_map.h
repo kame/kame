@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_map.h,v 1.54.2.2 2001/06/13 07:26:58 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_map.h,v 1.54.2.3 2001/11/03 00:59:15 dillon Exp $
  */
 
 /*
@@ -336,6 +336,7 @@ vmspace_resident_count(struct vmspace *vmspace)
 #define MAP_PREFAULT_PARTIAL	0x0010
 #define MAP_DISABLE_SYNCER	0x0020
 #define MAP_DISABLE_COREDUMP	0x0100
+#define MAP_PREFAULT_MADVISE	0x0200	/* from (user) madvise request */
 
 /*
  * vm_fault option flags

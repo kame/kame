@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/nsp/nsp.c,v 1.1.2.5 2001/09/04 01:45:41 non Exp $	*/
+/*	$FreeBSD: src/sys/dev/nsp/nsp.c,v 1.1.2.6 2001/12/17 13:30:18 non Exp $	*/
 /*	$NecBSD: nsp.c,v 1.21.12.6 2001/06/29 06:27:52 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -83,11 +83,6 @@
 #include <cam/scsi/scsi_low.h>
 #include <dev/nsp/nspreg.h>
 #include <dev/nsp/nspvar.h>
-
-#if __FreeBSD_version < 400001
-#include "nsp.h"
-struct nsp_softc *nspdata[NNSP];
-#endif
 #endif /* __FreeBSD__ */
 
 /***************************************************

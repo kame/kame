@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/pci_cfgreg.c,v 1.1.2.5 2001/08/28 22:35:30 imp Exp $
+ * $FreeBSD: src/sys/i386/isa/pci_cfgreg.c,v 1.1.2.7 2001/11/28 05:47:03 imp Exp $
  *
  */
 
@@ -365,11 +365,20 @@ pci_cfgintr_search(struct PIR_entry *pe, int bus, int device, int matchpin, int 
 	for (j = 0, childp = pci_children; j < pci_childcount; j++, childp++) {
 	    if ((pci_get_bus(*childp) == bus) &&
 		(pci_get_slot(*childp) == device) &&
-		(pci_get_intpin(*childp) == matchpin) &&
-		((irq = pci_get_irq(*childp)) != 255)) {
-		PRVERB(("pci_cfgintr_search: linked (%x) to configured irq %d at %d:%d:%d\n",
-		       pe->pe_intpin[pin - 1].link, irq,
-		       pci_get_bus(*childp), pci_get_slot(*childp), pci_get_function(*childp)));
+		(pci_get_intpin(*childp) == matchpin)) {
+		irq = pci_get_irq(*childp);
+		/*
+		 * Some BIOS writers seem to want to ignore the spec and put
+		 * 0 in the intline rather than 255 to indicate none.  Once
+		 * we've found one that matches, we break because there can
+		 * be no others (which is why test looks a little odd).
+		 */
+		if (irq == 0)
+		    irq = 255;
+		if (irq != 255)
+		    PRVERB(("pci_cfgintr_search: linked (%x) to configured irq %d at %d:%d:%d\n",
+		      pe->pe_intpin[pin - 1].link, irq,
+		      pci_get_bus(*childp), pci_get_slot(*childp), pci_get_function(*childp)));
 		break;
 	    }
 	}

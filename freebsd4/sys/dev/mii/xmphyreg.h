@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/xmphyreg.h,v 1.1.2.2 2001/06/18 18:49:13 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/xmphyreg.h,v 1.1.2.3 2002/01/19 22:22:52 archie Exp $
  */
 
 #ifndef _DEV_MII_XMPHYREG_H_
@@ -61,16 +61,16 @@
 #define XMPHY_ANAR_ACK		0x4000	/* Next page or base received */
 #define XMPHY_ANAR_RFBITS	0x3000	/* Remote fault bits */
 #define XMPHY_ANAR_PAUSEBITS	0x0180	/* Pause bits */
-#define XMPHY_ANAR_FDX		0x0040	/* Select full duplex */
-#define XMPHY_ANAR_HDX		0x0020	/* Select half duplex */
+#define XMPHY_ANAR_HDX		0x0040	/* Select half duplex */
+#define XMPHY_ANAR_FDX		0x0020	/* Select full duplex */
 
 #define XMPHY_MII_ANLPAR	0x05
 #define XMPHY_ANLPAR_NP		0x8000	/* Next page */
 #define XMPHY_ANLPAR_ACK	0x4000	/* Next page or base received */
 #define XMPHY_ANLPAR_RFBITS	0x3000	/* Remote fault bits */
 #define XMPHY_ANLPAR_PAUSEBITS	0x0180	/* Pause bits */
-#define XMPHY_ANLPAR_FDX	0x0040	/* Select full duplex */
-#define XMPHY_ANLPAR_HDX	0x0020	/* Select half duplex */
+#define XMPHY_ANLPAR_HDX	0x0040	/* Select half duplex */
+#define XMPHY_ANLPAR_FDX	0x0020	/* Select full duplex */
 
 #define XMPHY_RF_OK		0x0000	/* No error -- link is good */
 #define XMPHY_RF_LINKFAIL	0x1000	/* Link failure */

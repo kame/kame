@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_readwrite.c	8.11 (Berkeley) 5/8/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_readwrite.c,v 1.65.2.7 2001/06/03 05:00:11 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_readwrite.c,v 1.65.2.8 2001/11/18 07:11:00 dillon Exp $
  */
 
 #define	BLKSIZE(a, b, c)	blksize(a, b, c)
@@ -497,6 +497,8 @@ WRITE(ap)
 			break;
 		if (ioflag & IO_DIRECT)
 			bp->b_flags |= B_DIRECT;
+		if (ioflag & IO_NOWDRAIN)
+			bp->b_flags |= B_NOWDRAIN;
 
 		if (uio->uio_offset + xfersize > ip->i_size) {
 			ip->i_size = uio->uio_offset + xfersize;

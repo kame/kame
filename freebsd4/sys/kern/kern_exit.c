@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_exit.c	8.7 (Berkeley) 2/12/94
- * $FreeBSD: src/sys/kern/kern_exit.c,v 1.92.2.5 2001/07/27 14:06:01 iedowse Exp $
+ * $FreeBSD: src/sys/kern/kern_exit.c,v 1.92.2.8 2001/12/14 03:33:50 luigi Exp $
  */
 
 #include "opt_compat.h"
@@ -93,9 +93,9 @@ static struct exit_list_head exit_list = TAILQ_HEAD_INITIALIZER(exit_list);
  *	Death of process.
  */
 void
-exit(p, uap)
+sys_exit(p, uap)
 	struct proc *p;
-	struct rexit_args /* {
+	struct sys_exit_args /* {
 		int	rval;
 	} */ *uap;
 {
@@ -116,6 +116,9 @@ exit1(p, rv)
 {
 	register struct proc *q, *nq;
 	register struct vmspace *vm;
+#ifdef KTRACE
+	struct vnode *vtmp;
+#endif
 	struct exitlist *ep;
 
 	if (p->p_pid == 1) {
@@ -256,8 +259,10 @@ exit1(p, rv)
 	 * release trace file
 	 */
 	p->p_traceflag = 0;	/* don't trace the vrele() */
-	if (p->p_tracep)
-		vrele(p->p_tracep);
+	if ((vtmp = p->p_tracep) != NULL) {
+		p->p_tracep = NULL;
+		vrele(vtmp);
+	}
 #endif
 	/*
 	 * Remove proc from allproc queue and pidhash chain.

@@ -1,7 +1,5 @@
-/* $FreeBSD: src/sys/i386/svr4/svr4_genassym.c,v 1.5 2000/01/08 19:56:03 bde Exp $ */
+/* $FreeBSD: src/sys/i386/svr4/svr4_genassym.c,v 1.5.2.1 2001/10/09 04:25:26 jlemon Exp $ */
 /* Derived from:  Id: linux_genassym.c,v 1.8 1998/07/29 15:50:41 bde Exp */
-
-#include <stddef.h>
 
 #include <sys/param.h>
 #include <sys/assym.h>

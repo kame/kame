@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs.h	8.4 (Berkeley) 5/1/95
- * $FreeBSD: src/sys/nfs/nfs.h,v 1.53.2.3 2001/09/11 09:49:54 kris Exp $
+ * $FreeBSD: src/sys/nfs/nfs.h,v 1.53.2.4 2001/12/20 19:56:28 dillon Exp $
  */
 
 #ifndef _NFS_NFS_H_
@@ -721,6 +721,8 @@ int	nfsrv_write __P((struct nfsrv_descript *nfsd, struct nfssvc_sock *slp,
 			 struct proc *procp, struct mbuf **mrq));
 void	nfsrv_rcv __P((struct socket *so, void *arg, int waitflag));
 void	nfsrv_slpderef __P((struct nfssvc_sock *slp));
+int	nfs_meta_setsize __P((struct vnode *vp, struct ucred *cred, struct proc *p, u_quad_t nsize));
+
 #endif	/* _KERNEL */
 
 #endif

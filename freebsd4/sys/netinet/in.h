@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.h	8.3 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/in.h,v 1.48.2.2 2001/04/21 14:53:06 ume Exp $
+ * $FreeBSD: src/sys/netinet/in.h,v 1.48.2.5 2001/12/14 19:53:55 jlemon Exp $
  */
 
 #ifndef _NETINET_IN_H_
@@ -292,18 +292,6 @@ struct sockaddr_in {
 #define	INET_ADDRSTRLEN                 16
 
 /*
- * Structure used to describe IP options.
- * Used to store options internally, to pass them to a process,
- * or to restore options retrieved earlier.
- * The ip_dst is used for the first-hop gateway when using a source route
- * (this gets put into the header proper).
- */
-struct ip_opts {
-	struct	in_addr ip_dst;		/* first hop, 0 w/o src rt */
-	char	ip_opts[40];		/* actually variable in size */
-};
-
-/*
  * Options for use with [gs]etsockopt at the IP level.
  * First word of comment is data type; bool is stored in int.
  */
@@ -470,14 +458,16 @@ struct ip_mreq {
 	{ "fastforwarding", CTLTYPE_INT }, \
 }
 
+#ifdef _KERNEL
+struct ifnet; struct mbuf;	/* forward declarations for Standard C */
+#endif
+
 /* INET6 stuff */
 #define	__KAME_NETINET_IN_H_INCLUDED_
 #include <netinet6/in6.h>
 #undef __KAME_NETINET_IN_H_INCLUDED_
 
 #ifdef _KERNEL
-struct ifnet; struct mbuf;	/* forward declarations for Standard C */
-struct proc;
 
 int	 in_broadcast __P((struct in_addr, struct ifnet *));
 int	 in_canforward __P((struct in_addr));
@@ -487,6 +477,10 @@ char 	*inet_ntoa __P((struct in_addr)); /* in libkern */
 
 int	prison_ip __P((struct proc *p, int flag, u_int32_t *ip));
 void	prison_remote_ip __P((struct proc *p, int flag, u_int32_t *ip));
+
+#define satosin(sa)	((struct sockaddr_in *)(sa))
+#define sintosa(sin)	((struct sockaddr *)(sin))
+#define ifatoia(ifa)	((struct in_ifaddr *)(ifa))
 
 #endif
 

@@ -38,7 +38,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vnode_pager.c	7.5 (Berkeley) 4/20/91
- * $FreeBSD: src/sys/vm/vnode_pager.c,v 1.116.2.3 2000/12/30 01:51:12 dillon Exp $
+ * $FreeBSD: src/sys/vm/vnode_pager.c,v 1.116.2.6 2001/12/20 19:56:30 dillon Exp $
  */
 
 /*
@@ -290,14 +290,18 @@ vnode_pager_setsize(vp, nsize)
 		}
 		/*
 		 * this gets rid of garbage at the end of a page that is now
-		 * only partially backed by the vnode...
+		 * only partially backed by the vnode.
+		 *
+		 * XXX for some reason (I don't know yet), if we take a
+		 * completely invalid page and mark it partially valid
+		 * it can screw up NFS reads, so we don't allow the case.
 		 */
 		if (nsize & PAGE_MASK) {
 			vm_offset_t kva;
 			vm_page_t m;
 
 			m = vm_page_lookup(object, OFF_TO_IDX(nsize));
-			if (m) {
+			if (m && m->valid) {
 				int base = (int)nsize & PAGE_MASK;
 				int size = PAGE_SIZE - base;
 
@@ -310,6 +314,20 @@ vnode_pager_setsize(vp, nsize)
 				vm_pager_unmap_page(kva);
 
 				/*
+				 * XXX work around SMP data integrity race
+				 * by unmapping the page from user processes.
+				 * The garbage we just cleared may be mapped
+				 * to a user process running on another cpu
+				 * and this code is not running through normal
+				 * I/O channels which handle SMP issues for
+				 * us, so unmap page to synchronize all cpus.
+				 *
+				 * XXX should vm_pager_unmap_page() have
+				 * dealt with this?
+				 */
+				vm_page_protect(m, VM_PROT_NONE);
+
+				/*
 				 * Clear out partial-page dirty bits.  This
 				 * has the side effect of setting the valid
 				 * bits, but that is ok.  There are a bunch
@@ -317,6 +335,10 @@ vnode_pager_setsize(vp, nsize)
 				 * m->dirty == VM_PAGE_BITS_ALL.  The file EOF
 				 * case is one of them.  If the page is still
 				 * partially dirty, make it fully dirty.
+				 *
+				 * note that we do not clear out the valid
+				 * bits.  This would prevent bogus_page
+				 * replacement from working properly.
 				 */
 				vm_page_set_validclean(m, base, size);
 				if (m->dirty != 0)
@@ -419,12 +441,17 @@ vnode_pager_input_smlfs(object, m)
 	kva = vm_pager_map_page(m);
 
 	for (i = 0; i < PAGE_SIZE / bsize; i++) {
+		vm_ooffset_t address;
 
 		if (vm_page_bits(i * bsize, bsize) & m->valid)
 			continue;
 
-		fileaddr = vnode_pager_addr(vp,
-			IDX_TO_OFF(m->pindex) + i * bsize, (int *)0);
+		address = IDX_TO_OFF(m->pindex) + i * bsize;
+		if (address >= object->un_pager.vnp.vnp_size) {
+			fileaddr = -1;
+		} else {
+			fileaddr = vnode_pager_addr(vp, address, NULL);
+		}
 		if (fileaddr != -1) {
 			bp = getpbuf(&vnode_pbuf_freecnt);
 
@@ -946,12 +973,33 @@ vnode_pager_generic_putpages(vp, m, bytecount, flags, rtvals)
 	ncount = count;
 
 	poffset = IDX_TO_OFF(m[0]->pindex);
+
+	/*
+	 * If the page-aligned write is larger then the actual file we
+	 * have to invalidate pages occuring beyond the file EOF.  However,
+	 * there is an edge case where a file may not be page-aligned where
+	 * the last page is partially invalid.  In this case the filesystem
+	 * may not properly clear the dirty bits for the entire page (which
+	 * could be VM_PAGE_BITS_ALL due to the page having been mmap()d).
+	 * With the page locked we are free to fix-up the dirty bits here.
+	 *
+	 * We do not under any circumstances truncate the valid bits, as
+	 * this will screw up bogus page replacement.
+	 */
 	if (maxsize + poffset > object->un_pager.vnp.vnp_size) {
-		if (object->un_pager.vnp.vnp_size > poffset)
+		if (object->un_pager.vnp.vnp_size > poffset) {
+			int pgoff;
+
 			maxsize = object->un_pager.vnp.vnp_size - poffset;
-		else
+			ncount = btoc(maxsize);
+			if ((pgoff = (int)maxsize & PAGE_MASK) != 0) {
+				vm_page_clear_dirty(m[ncount - 1], pgoff,
+					PAGE_SIZE - pgoff);
+			}
+		} else {
 			maxsize = 0;
-		ncount = btoc(maxsize);
+			ncount = 0;
+		}
 		if (ncount < count) {
 			for (i = ncount; i < count; i++) {
 				rtvals[i] = VM_PAGER_BAD;

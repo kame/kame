@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)kern_clock.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_timeout.c,v 1.59 1999/08/30 21:16:56 jlemon Exp $
+ * $FreeBSD: src/sys/kern/kern_timeout.c,v 1.59.2.1 2001/11/13 18:24:52 archie Exp $
  */
 
 #include <sys/param.h>
@@ -254,7 +254,7 @@ callout_reset(c, to_ticks, ftn, arg)
 	
 }
 
-void
+int
 callout_stop(c)
 	struct	callout *c;
 {
@@ -267,7 +267,7 @@ callout_stop(c)
 	if (!(c->c_flags & CALLOUT_PENDING)) {
 		c->c_flags &= ~CALLOUT_ACTIVE;
 		splx(s);
-		return;
+		return (0);
 	}
 	c->c_flags &= ~(CALLOUT_ACTIVE | CALLOUT_PENDING);
 
@@ -281,6 +281,7 @@ callout_stop(c)
 		SLIST_INSERT_HEAD(&callfree, c, c_links.sle);
 	}
 	splx(s);
+	return (1);
 }
 
 void

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/locore.s,v 1.9.2.1 2000/07/03 19:59:44 mjacob Exp $
+ * $FreeBSD: src/sys/alpha/alpha/locore.s,v 1.9.2.2 2001/09/20 09:29:22 peter Exp $
  */
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -70,7 +70,10 @@
 	.equ	PTlev2,PTmap + (PTLEV1I << ALPHA_L2SHIFT)
 	.equ	PTlev1,PTlev2 + (PTLEV1I << ALPHA_L3SHIFT)
 	.equ	PTlev1pte,PTlev1 + (PTLEV1I * PTESIZE)
-	
+
+	.globl	kernbase
+	.equ	kernbase,KERNBASE
+
 /*
  * Perform actions necessary to switch to a new context.  The
  * hwpcb should be in a0.

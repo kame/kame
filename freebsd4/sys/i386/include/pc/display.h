@@ -1,7 +1,7 @@
 /*
  * IBM PC display definitions
  *
- * $FreeBSD: src/sys/i386/include/pc/display.h,v 1.5 1999/08/28 00:44:33 peter Exp $
+ * $FreeBSD: src/sys/i386/include/pc/display.h,v 1.5.2.1 2001/12/17 10:31:05 nyan Exp $
  */
 
 /* Color attributes for foreground text */
@@ -37,7 +37,12 @@
 
 /* Monochrome attributes for foreground text */
 
+#ifdef PC98
+/* PC-98 attributes for foreground text */
+#define	FG_UNDERLINE		0x08
+#else
 #define	FG_UNDERLINE		0x01
+#endif
 #define	FG_INTENSE		0x08
 
 /* Monochrome attributes for text background */

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ntfs/ntfs_subr.h,v 1.7 2000/01/14 19:54:40 bde Exp $
+ * $FreeBSD: src/sys/ntfs/ntfs_subr.h,v 1.7.2.1 2001/10/12 22:08:49 semenu Exp $
  */
 
 #define	VA_LOADED		0x0001
@@ -84,7 +84,6 @@ int ntfs_filesize __P(( struct ntfsmount *, struct fnode *, u_int64_t *, u_int64
 int ntfs_times __P(( struct ntfsmount *, struct ntnode *, ntfs_times_t *));
 struct timespec	ntfs_nttimetounix __P(( u_int64_t ));
 int ntfs_ntreaddir __P(( struct ntfsmount *, struct fnode *, u_int32_t, struct attr_indexentry **));
-char ntfs_u28 __P((wchar));
 int ntfs_runtovrun __P(( cn_t **, cn_t **, u_long *, u_int8_t *));
 int ntfs_attrtontvattr __P(( struct ntfsmount *, struct ntvattr **, struct attr * ));
 void ntfs_freentvattr __P(( struct ntvattr * ));
@@ -107,3 +106,15 @@ int ntfs_toupper_use __P((struct mount *, struct ntfsmount *));
 void ntfs_toupper_unuse __P((void));
 int ntfs_fget __P((struct ntfsmount *, struct ntnode *, int, char *, struct fnode **));
 void ntfs_frele __P((struct fnode *));
+
+int ntfs_u28_init(struct ntfsmount *ntmp, wchar *u2w);
+int ntfs_u28_uninit(struct ntfsmount *ntmp);
+int ntfs_82u_init(struct ntfsmount *ntmp, u_int16_t *u2w);
+int ntfs_82u_uninit(struct ntfsmount *ntmp);
+char ntfs_u28(struct ntfsmount *ntmp, wchar wc);
+#define NTFS_U28(ch)		ntfs_u28(ntmp, (ch))
+#define NTFS_82U(ch)		(ntmp->ntm_82u[(ch)&0xFF])
+#define	NTFS_UASTRCMP(ustr, ustrlen, astr, astrlen)	\
+	ntfs_uastrcmp(ntmp, (ustr), (ustrlen), (astr), (astrlen))
+#define	NTFS_UASTRICMP(ustr, ustrlen, astr, astrlen)	\
+	ntfs_uastricmp(ntmp, (ustr), (ustrlen), (astr), (astrlen))

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/isa_compat.h,v 1.27.2.8 2001/08/09 01:12:49 obrien Exp $
+ * $FreeBSD: src/sys/i386/isa/isa_compat.h,v 1.27.2.9 2001/09/23 19:58:01 brian Exp $
  */
 
 #include "vt.h"
@@ -60,7 +60,6 @@
 #include "gsc.h"
 #include "cy.h"
 #include "dgb.h"
-#include "dgm.h"
 #include "labpc.h"
 #include "rc.h"
 #include "rp.h"
@@ -110,7 +109,6 @@ extern struct isa_driver  gpdriver;
 extern struct isa_driver gscdriver;
 extern struct isa_driver  cydriver;
 extern struct isa_driver dgbdriver;
-extern struct isa_driver dgmdriver;
 extern struct isa_driver labpcdriver;
 extern struct isa_driver  rcdriver;
 extern struct isa_driver  rpdriver;
@@ -150,9 +148,6 @@ static struct old_isa_driver old_drivers[] = {
 #endif
 #if NDGB > 0
 	{ INTR_TYPE_TTY, &dgbdriver },
-#endif
-#if NDGM > 0
-	{ INTR_TYPE_TTY, &dgmdriver },
 #endif
 #if NLABPC > 0
 	{ INTR_TYPE_TTY, &labpcdriver },

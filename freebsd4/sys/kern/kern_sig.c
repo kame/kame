@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sig.c	8.7 (Berkeley) 4/18/94
- * $FreeBSD: src/sys/kern/kern_sig.c,v 1.72.2.8 2001/07/27 14:06:01 iedowse Exp $
+ * $FreeBSD: src/sys/kern/kern_sig.c,v 1.72.2.14 2001/12/14 03:05:32 rwatson Exp $
  */
 
 #include "opt_compat.h"
@@ -62,6 +62,7 @@
 #include <sys/sysent.h>
 #include <sys/sysctl.h>
 #include <sys/malloc.h>
+#include <sys/unistd.h>
 
 
 #include <machine/ipl.h>
@@ -1597,6 +1598,7 @@ coredump(p)
 {
 	register struct vnode *vp;
 	register struct ucred *cred = p->p_ucred;
+	struct flock lf;
 	struct nameidata nd;
 	struct vattr vattr;
 	int error, error1;
@@ -1621,6 +1623,8 @@ coredump(p)
 		return 0;
 
 	name = expand_name(p->p_comm, p->p_ucred->cr_uid, p->p_pid);
+	if (name == NULL)
+		return (EINVAL);
 	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, name, p);
 	error = vn_open(&nd, O_CREAT | FWRITE | O_NOFOLLOW, S_IRUSR | S_IWUSR);
 	free(name, M_TEMP);
@@ -1629,24 +1633,38 @@ coredump(p)
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	vp = nd.ni_vp;
 
+	VOP_UNLOCK(vp, 0, p);
+	lf.l_whence = SEEK_SET;
+	lf.l_start = 0;
+	lf.l_len = 0;
+	lf.l_type = F_WRLCK;
+	error = VOP_ADVLOCK(vp, (caddr_t)p, F_SETLK, &lf, F_FLOCK);
+	if (error)
+		goto out2;
+
 	/* Don't dump to non-regular files or files with links. */
 	if (vp->v_type != VREG ||
 	    VOP_GETATTR(vp, &vattr, cred, p) || vattr.va_nlink != 1) {
 		error = EFAULT;
-		goto out;
+		goto out1;
 	}
+
 	VATTR_NULL(&vattr);
+	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
 	vattr.va_size = 0;
 	VOP_LEASE(vp, p, cred, LEASE_WRITE);
 	VOP_SETATTR(vp, &vattr, cred, p);
 	p->p_acflag |= ACORE;
+	VOP_UNLOCK(vp, 0, p);
 
 	error = p->p_sysent->sv_coredump ?
 	  p->p_sysent->sv_coredump(p, vp, limit) :
 	  ENOSYS;
 
-out:
-	VOP_UNLOCK(vp, 0, p);
+out1:
+	lf.l_type = F_UNLCK;
+	VOP_ADVLOCK(vp, (caddr_t)p, F_UNLCK, &lf, F_FLOCK);
+out2:
 	error1 = vn_close(vp, FWRITE, cred, p);
 	if (error == 0)
 		error = error1;
@@ -1674,7 +1692,7 @@ nosys(p, args)
 }
 
 /*
- * Send a signal to a SIGIO or SIGURG to a process or process group using
+ * Send a SIGIO or SIGURG signal to a process or process group using
  * stored credentials rather than those of the current process.
  */
 void

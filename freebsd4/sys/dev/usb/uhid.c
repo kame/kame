@@ -1,5 +1,5 @@
 /*	$NetBSD: uhid.c,v 1.38 2000/04/27 15:26:48 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uhid.c,v 1.27.2.5 2001/03/06 03:35:47 jkh Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhid.c,v 1.27.2.6 2001/10/05 07:02:48 peter Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -71,6 +71,10 @@
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
 #include <dev/usb/hid.h>
+
+#if defined(__FreeBSD__) && defined(__i386__)
+#include <i386/isa/intr_machdep.h>
+#endif
 
 #ifdef UHID_DEBUG
 #define DPRINTF(x)	if (uhiddebug) logprintf x

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/sio.c,v 1.291.2.20 2001/09/01 05:52:38 murray Exp $
+ * $FreeBSD: src/sys/isa/sio.c,v 1.291.2.25 2002/01/06 04:58:08 dillon Exp $
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
  *	from: i386/isa sio.c,v 1.234
  */
@@ -436,6 +436,7 @@ static	struct speedtab comspeedtab[] = {
 	{ 4800,		COMBRD(4800) },
 	{ 9600,		COMBRD(9600) },
 	{ 19200,	COMBRD(19200) },
+	{ 28800,	COMBRD(28800) },
 	{ 38400,	COMBRD(38400) },
 	{ 57600,	COMBRD(57600) },
 	{ 115200,	COMBRD(115200) },
@@ -673,6 +674,7 @@ static struct isa_pnp_id sio_ids[] = {
 	{0x00b4490a, NULL},	/* BRIB400 - Boca 56k PnP */
 	{0x0030320d, NULL},	/* CIR3000 - Cirrus Logic V43 */
 	{0x0100440e, NULL},	/* CRD0001 - Cardinal MVP288IV ? */
+	{0x01308c0e, NULL},	/* CTL3001 - Creative Labs Phoneblaster */
 	{0x36033610, NULL},     /* DAV0336 - DAVICOM 336PNP MODEM */
 	{0x0000aa1a, NULL},	/* FUJ0000 - FUJITSU Modem 33600 PNP/I2 */
 	{0x1200c31e, NULL},	/* GVC0012 - VF1128HV-R9 (win modem?) */
@@ -698,6 +700,7 @@ static struct isa_pnp_id sio_ids[] = {
 	{0x1200b23d, NULL},     /* RSS0012 - OMRON ME5614ISA */
 	{0x5002734a, NULL},	/* RSS0250 - 5614Jx3(G) Internal Modem */
 	{0x6202734a, NULL},	/* RSS0262 - 5614Jx3[G] V90+K56Flex Modem */
+	{0x1010104d, NULL},	/* SHP1010 - Rockwell 33600bps Modem */
 	{0xc100ad4d, NULL},	/* SMM00C1 - Leopard 56k PnP */
 	{0x9012b04e, NULL},	/* SUP1290 - Supra ? */
 	{0x1013b04e, NULL},	/* SUP1310 - SupraExpress 336i PnP */
@@ -1353,7 +1356,7 @@ determined_type: ;
 					     com->irqres, INTR_TYPE_TTY,
 					     siointr, com, &com->cookie);
 			if (ret == 0)
-				device_printf(dev, "unable to activate interrupt in fast mode - using normal mode");
+				device_printf(dev, "unable to activate interrupt in fast mode - using normal mode\n");
 		}
 		if (ret)
 			device_printf(dev, "could not activate interrupt\n");
@@ -2378,9 +2381,16 @@ comparam(tp, t)
 		 * latencies are reasonable for humans.  Serial comms
 		 * protocols shouldn't expect anything better since modem
 		 * latencies are larger.
+		 *
+		 * Interrupts can be held up for long periods of time
+		 * due to inefficiencies in other parts of the kernel,
+		 * certain video cards, etc.  Setting the FIFO trigger
+		 * point to MEDH instead of HIGH gives us 694uS of slop
+		 * (8 character times) instead of 173uS (2 character times)
+		 * @ 115200 bps.
 		 */
 		com->fifo_image = t->c_ospeed <= 4800
-				  ? FIFO_ENABLE : FIFO_ENABLE | FIFO_RX_HIGH;
+				  ? FIFO_ENABLE : FIFO_ENABLE | FIFO_RX_MEDH;
 #ifdef COM_ESP
 		/*
 		 * The Hayes ESP card needs the fifo DMA mode bit set

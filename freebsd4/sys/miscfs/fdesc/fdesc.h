@@ -35,7 +35,7 @@
  *
  *	@(#)fdesc.h	8.5 (Berkeley) 1/21/94
  *
- * $FreeBSD: src/sys/miscfs/fdesc/fdesc.h,v 1.8 1999/12/29 04:54:41 peter Exp $
+ * $FreeBSD: src/sys/miscfs/fdesc/fdesc.h,v 1.8.2.1 2001/10/22 22:49:26 chris Exp $
  */
 
 #ifdef _KERNEL
@@ -43,21 +43,12 @@ struct fdescmount {
 	struct vnode	*f_root;	/* Root node */
 };
 
-#define FD_ROOT		2
-#define FD_DEVFD	3
-#define FD_STDIN	4
-#define FD_STDOUT	5
-#define FD_STDERR	6
-#define FD_CTTY		7
-#define FD_DESC		8
-#define FD_MAX		12
+#define FD_ROOT		1
+#define FD_DESC		3
 
 typedef enum {
 	Froot,
-	Fdevfd,
-	Fdesc,
-	Flink,
-	Fctty
+	Fdesc
 } fdntype;
 
 struct fdescnode {
@@ -65,15 +56,14 @@ struct fdescnode {
 	struct vnode	*fd_vnode;	/* Back ptr to vnode */
 	fdntype		fd_type;	/* Type of this node */
 	unsigned	fd_fd;		/* Fd to be dup'ed */
-	char		*fd_link;	/* Link to fd/n */
 	int		fd_ix;		/* filesystem index */
 };
 
 #define VFSTOFDESC(mp)	((struct fdescmount *)((mp)->mnt_data))
 #define	VTOFDESC(vp) ((struct fdescnode *)(vp)->v_data)
 
-extern dev_t devctty;
 extern int fdesc_init __P((struct vfsconf *));
 extern int fdesc_root __P((struct mount *, struct vnode **));
-extern int fdesc_allocvp __P((fdntype, int, struct mount *, struct vnode **));
+extern int fdesc_allocvp __P((fdntype, int, struct mount *, struct vnode **,
+			      struct proc *));
 #endif /* _KERNEL */

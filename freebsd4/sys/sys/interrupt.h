@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/interrupt.h,v 1.9 1999/08/28 00:51:46 peter Exp $
+ * $FreeBSD: src/sys/sys/interrupt.h,v 1.9.2.1 2001/10/14 20:05:50 luigi Exp $
  */
 
 #ifndef _SYS_INTERRUPT_H_
@@ -39,4 +39,9 @@ void	unregister_swi __P((int intr, swihand_t *handler));
 
 extern swihand_t *ihandlers[];
 
+/* Counts and names for statistics (defined in MD code). */
+extern u_long	eintrcnt[];	/* end of intrcnt[] */
+extern char	eintrnames[];	/* end of intrnames[] */
+extern u_long	intrcnt[];	/* counts for for each device and stray */
+extern char	intrnames[];	/* string table containing device names */
 #endif

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vnode.h	8.7 (Berkeley) 2/4/94
- * $FreeBSD: src/sys/sys/vnode.h,v 1.111.2.11 2001/07/26 20:37:33 iedowse Exp $
+ * $FreeBSD: src/sys/sys/vnode.h,v 1.111.2.18 2001/12/25 01:44:44 dillon Exp $
  */
 
 #ifndef _SYS_VNODE_H_
@@ -94,7 +94,7 @@ struct vnode {
 	struct	mount *v_mount;			/* ptr to vfs we are in */
 	vop_t	**v_op;				/* vnode operations vector */
 	TAILQ_ENTRY(vnode) v_freelist;		/* vnode freelist */
-	LIST_ENTRY(vnode) v_mntvnodes;		/* vnodes for mount point */
+	TAILQ_ENTRY(vnode) v_nmntvnodes;	/* vnodes for mount point */
 	struct	buflists v_cleanblkhd;		/* clean blocklist head */
 	struct	buflists v_dirtyblkhd;		/* dirty blocklist head */
 	LIST_ENTRY(vnode) v_synclist;		/* vnodes with dirty buffers */
@@ -166,9 +166,9 @@ struct vnode {
 #define	VOWANT		0x20000	/* a process is waiting for VOLOCK */
 #define	VDOOMED		0x40000	/* This vnode is being recycled */
 #define	VFREE		0x80000	/* This vnode is on the freelist */
-#define	VTBFREE		0x100000 /* This vnode is on the to-be-freelist */
 #define	VONWORKLST	0x200000 /* On syncer work-list */
 #define	VMOUNT		0x400000 /* Mount in progress */
+#define VOBJDIRTY	0x800000 /* object might be dirty */
 
 /*
  * Vnode attributes.  A field value of VNOVAL represents a field whose value
@@ -215,6 +215,7 @@ struct vattr {
 #define	IO_INVAL	0x40		/* invalidate after I/O */
 #define IO_ASYNC	0x80		/* bawrite rather then bdwrite */
 #define IO_DIRECT	0x100		/* attempt to bypass buffer cache */
+#define IO_NOWDRAIN	0x200		/* do not block on wdrain */
 
 /*
  *  Modes.  Some values same as Ixxx entries from inode.h for now.
@@ -230,6 +231,11 @@ struct vattr {
  * Token indicating no attribute value yet assigned.
  */
 #define	VNOVAL	(-1)
+
+/*
+ * LK_TIMELOCK timeout for vnode locks (used mainly by the pageout daemon)
+ */
+#define VLKTIMEOUT     (hz / 20 + 1)
 
 #ifdef _KERNEL
 
@@ -301,8 +307,12 @@ extern void	(*lease_updatetime) __P((int deltat));
 	 (!(vp)->v_object || \
 	  !((vp)->v_object->ref_count || (vp)->v_object->resident_page_count)))
 
+#define VMIGHTFREE(vp) \
+        (!((vp)->v_flag & (VFREE|VDOOMED|VXLOCK)) &&   \
+	 LIST_EMPTY(&(vp)->v_cache_src) && !(vp)->v_usecount)
+
 #define VSHOULDBUSY(vp)	\
-	(((vp)->v_flag & (VFREE|VTBFREE)) && \
+	(((vp)->v_flag & VFREE) && \
 	 ((vp)->v_holdcnt || (vp)->v_usecount))
 
 #define	VI_LOCK(vp)	simple_lock(&(vp)->v_interlock)
@@ -550,6 +560,7 @@ int	cache_lookup __P((struct vnode *dvp, struct vnode **vpp,
 	    struct componentname *cnp));
 void	cache_purge __P((struct vnode *vp));
 void	cache_purgevfs __P((struct mount *mp));
+int	cache_leaf_test __P((struct vnode *vp));
 void	cvtstat __P((struct stat *st, struct ostat *ost));
 void	cvtnstat __P((struct stat *sb, struct nstat *nsb));
 int 	getnewvnode __P((enum vtagtype tag,
@@ -593,6 +604,9 @@ int	vn_pollrecord __P((struct vnode *vp, struct proc *p, int events));
 int 	vn_rdwr __P((enum uio_rw rw, struct vnode *vp, caddr_t base,
 	    int len, off_t offset, enum uio_seg segflg, int ioflg,
 	    struct ucred *cred, int *aresid, struct proc *p));
+int	vn_rdwr_inchunks __P((enum uio_rw rw, struct vnode *vp, caddr_t base,
+	    int len, off_t offset, enum uio_seg segflg, int ioflg,
+	    struct ucred *cred, int *aresid, struct proc *p));
 int	vn_stat __P((struct vnode *vp, struct stat *sb, struct proc *p));
 dev_t	vn_todev __P((struct vnode *vp));
 int	vfs_cache_lookup __P((struct vop_lookup_args *ap));
@@ -623,6 +637,7 @@ int	vop_stdcreatevobject __P((struct vop_createvobject_args *ap));
 int	vop_stddestroyvobject __P((struct vop_destroyvobject_args *ap));
 int	vop_stdgetvobject __P((struct vop_getvobject_args *ap));
 
+void	vfree __P((struct vnode *vp));
 void 	vput __P((struct vnode *vp));
 void 	vrele __P((struct vnode *vp));
 void	vref __P((struct vnode *vp));
@@ -630,9 +645,6 @@ void	vbusy __P((struct vnode *vp));
 
 extern	vop_t	**default_vnodeop_p;
 extern	vop_t **spec_vnodeop_p;
-
-extern TAILQ_HEAD(tobefreelist, vnode)
-	vnode_tobefree_list;	/* vnode free list */
 
 #endif /* _KERNEL */
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agpreg.h,v 1.3.2.1 2000/07/19 09:48:04 ru Exp $
+ *	$FreeBSD: src/sys/pci/agpreg.h,v 1.3.2.2 2001/11/19 07:16:40 kuriyama Exp $
  */
 
 #ifndef _PCI_AGPREG_H_
@@ -55,6 +55,14 @@
 #define AGP_INTEL_AGPCTRL	0xb0
 #define AGP_INTEL_APSIZE	0xb4
 #define AGP_INTEL_ATTBASE	0xb8
+
+/*
+ * Config offsets for Intel i820/i840/i845/i850/i860 AGP chipsets.
+ */
+#define AGP_INTEL_MCHCFG	0x50
+#define AGP_INTEL_I820_RDCR	0x51
+#define AGP_INTEL_I845_MCHCFG	0x51
+#define AGP_INTEL_I8XX_ERRSTS	0xc8
 
 /*
  * Config offsets for VIA AGP chipsets.

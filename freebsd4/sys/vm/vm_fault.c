@@ -66,7 +66,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_fault.c,v 1.108.2.5 2001/03/14 07:05:05 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_fault.c,v 1.108.2.7 2001/11/17 01:02:47 dillon Exp $
  */
 
 /*
@@ -246,11 +246,15 @@ RetryFault:;
 	 * are messing with it.  Once we have the reference, the map is free
 	 * to be diddled.  Since objects reference their shadows (and copies),
 	 * they will stay around as well.
+	 *
+	 * Bump the paging-in-progress count to prevent size changes (e.g.
+	 * truncation operations) during I/O.  This must be done after
+	 * obtaining the vnode lock in order to avoid possible deadlocks.
 	 */
 	vm_object_reference(fs.first_object);
+	fs.vp = vnode_pager_lock(fs.first_object);
 	vm_object_pip_add(fs.first_object, 1);
 
-	fs.vp = vnode_pager_lock(fs.first_object);
 	if ((fault_type & VM_PROT_WRITE) &&
 		(fs.first_object->type == OBJT_VNODE)) {
 		vm_freeze_copyopts(fs.first_object,
@@ -783,8 +787,7 @@ readrest:
 
 	if (prot & VM_PROT_WRITE) {
 		vm_page_flag_set(fs.m, PG_WRITEABLE);
-		vm_object_set_flag(fs.m->object,
-				   OBJ_WRITEABLE|OBJ_MIGHTBEDIRTY);
+		vm_object_set_writeable_dirty(fs.m->object);
 
 		/*
 		 * If the fault is a write, we know that this page is being

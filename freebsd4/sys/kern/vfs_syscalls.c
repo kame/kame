@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_syscalls.c	8.13 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.9 2001/08/12 10:48:00 iedowse Exp $
+ * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.13 2002/01/07 20:47:34 se Exp $
  */
 
 /* For 4.3 integer FS ID compatibility */
@@ -264,6 +264,8 @@ mount(p, uap)
 	 */
 	mp = malloc(sizeof(struct mount), M_MOUNT, M_WAITOK);
 	bzero((char *)mp, (u_long)sizeof(struct mount));
+	TAILQ_INIT(&mp->mnt_nvnodelist);
+	TAILQ_INIT(&mp->mnt_reservedvnlist);
 	lockinit(&mp->mnt_lock, PVFS, "vfslock", 0, LK_NOPAUSE);
 	(void)vfs_busy(mp, LK_NOWAIT, 0, p);
 	mp->mnt_op = vfsp->vfc_vfsops;
@@ -500,7 +502,7 @@ dounmount(mp, flags, p)
 		vrele(coveredvp);
 	}
 	mp->mnt_vfc->vfc_refcount--;
-	if (!LIST_EMPTY(&mp->mnt_vnodelist))
+	if (!TAILQ_EMPTY(&mp->mnt_nvnodelist))
 		panic("unmount: dangling vnode");
 	lockmgr(&mp->mnt_lock, LK_RELEASE | LK_INTERLOCK, &mountlist_slock, p);
 	if (mp->mnt_kern_flag & MNTK_MWAIT)
@@ -678,6 +680,8 @@ fstatfs(p, uap)
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
 	mp = ((struct vnode *)fp->f_data)->v_mount;
+	if (mp == NULL)
+		return (EBADF);
 	sp = &mp->mnt_stat;
 	error = VFS_STATFS(mp, sp, p);
 	if (error)
@@ -3304,8 +3308,11 @@ fhopen(p, uap)
 	 * end of vn_open code 
 	 */
 
-	if ((error = falloc(p, &nfp, &indx)) != 0)
+	if ((error = falloc(p, &nfp, &indx)) != 0) {
+		if (fmode & FWRITE)
+			vp->v_writecount--;
 		goto bad;
+	}
 	fp = nfp;	
 
 	/*

@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_subr.c	8.20 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/miscfs/union/union_subr.c,v 1.43.2.1 2001/06/14 10:01:18 bp Exp $
+ * $FreeBSD: src/sys/miscfs/union/union_subr.c,v 1.43.2.2 2001/12/25 01:44:45 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -566,7 +566,7 @@ loop:
 	un = VTOUNION(*vpp);
 	bzero(un, sizeof(*un));
 
-	lockinit(&un->un_lock, PVFS, "unlock", 0, 0);
+	lockinit(&un->un_lock, PVFS, "unlock", VLKTIMEOUT, 0);
 	vn_lock(*vpp, LK_EXCLUSIVE | LK_RETRY, p);
 
 	un->un_vnode = *vpp;

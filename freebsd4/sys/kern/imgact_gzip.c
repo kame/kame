@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/kern/imgact_gzip.c,v 1.40 1999/10/29 18:08:49 phk Exp $
+ * $FreeBSD: src/sys/kern/imgact_gzip.c,v 1.40.2.1 2001/11/03 01:41:08 ps Exp $
  *
  * This module handles execution of a.out files which have been run through
  * "gzip".  This saves diskspace, but wastes cpu-cycles and VM.
@@ -207,7 +207,7 @@ do_aout_hdr(struct imgact_gzip * gz)
 	 * text/data/bss must not exceed limits
 	 */
 	if (			/* text can't exceed maximum text size */
-	    gz->a_out.a_text > MAXTSIZ ||
+	    gz->a_out.a_text > maxtsiz ||
 
 	/* data + bss can't exceed rlimit */
 	    gz->a_out.a_data + gz->bss_size >

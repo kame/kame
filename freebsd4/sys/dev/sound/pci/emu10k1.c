@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/emu10k1.c,v 1.6.2.6 2001/08/01 03:40:58 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/emu10k1.c,v 1.6.2.8 2001/12/22 16:17:02 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -285,12 +285,11 @@ emu_settimer(struct sc_info *sc)
 			rate = tmp;
 	}
 
-	for (i = 0; i < 3; i++) {
-		rch = &sc->rch[i];
-		tmp = (rch->spd * sndbuf_getbps(rch->buffer)) / rch->blksz;
-		if (tmp > rate)
-			rate = tmp;
-	}
+	rch = &sc->rch[0];
+	tmp = (rch->spd * sndbuf_getbps(rch->buffer)) / rch->blksz;
+	if (tmp > rate)
+		rate = tmp;
+
 	RANGE(rate, 48, 9600);
 	sc->timerinterval = 48000 / rate;
 	emu_wr(sc, TIMER, sc->timerinterval & 0x03ff, 2);
@@ -1489,8 +1488,7 @@ emu_pci_attach(device_t dev)
 	if (pcm_register(dev, sc, EMU_CHANS, 3)) goto bad;
 	for (i = 0; i < EMU_CHANS; i++)
 		pcm_addchan(dev, PCMDIR_PLAY, &emupchan_class, sc);
-	for (i = 0; i < 3; i++)
-		pcm_addchan(dev, PCMDIR_REC, &emurchan_class, sc);
+	pcm_addchan(dev, PCMDIR_REC, &emurchan_class, sc);
 
 	pcm_setstatus(dev, status);
 

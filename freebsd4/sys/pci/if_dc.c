@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.22 2001/07/20 02:01:26 brooks Exp $
+ * $FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.31 2001/12/19 18:37:34 wpaul Exp $
  */
 
 /*
@@ -45,6 +45,7 @@
  * ADMtek AN985 (www.admtek.com.tw)
  * Davicom DM9100, DM9102, DM9102A (www.davicom8.com)
  * Accton EN1217 (www.accton.com)
+ * Conexant LANfinity (www.conexant.com)
  *
  * Datasheets for the 21143 are available at developer.intel.com.
  * Datasheets for the clone parts can be found at their respective sites.
@@ -93,6 +94,7 @@
 #include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
+#include <sys/sysctl.h>
 
 #include <net/if.h>
 #include <net/if_arp.h>
@@ -130,7 +132,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.22 2001/07/20 02:01:26 brooks Exp $";
+  "$FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.31 2001/12/19 18:37:34 wpaul Exp $";
 #endif
 
 /*
@@ -179,6 +181,8 @@ static struct dc_type dc_devs[] = {
 		"Accton EN1217 10/100BaseTX" },
 	{ DC_VENDORID_ACCTON, DC_DEVICEID_EN2242,
 		"Accton EN2242 MiniPCI 10/100BaseTX" },
+	{ DC_VENDORID_CONEXANT, DC_DEVICEID_RS7112,
+		"Conexant LANfinity MiniPCI 10/100BaseTX" },
 	{ 0, 0, NULL }
 };
 
@@ -285,6 +289,12 @@ static driver_t dc_driver = {
 
 static devclass_t dc_devclass;
 
+#ifdef __i386__
+static int dc_quick=1;
+SYSCTL_INT(_hw, OID_AUTO, dc_quick, CTLFLAG_RW,
+	&dc_quick,0,"do not mdevget in dc driver");
+#endif
+
 DRIVER_MODULE(if_dc, pci, dc_driver, dc_devclass, 0, 0);
 DRIVER_MODULE(miibus, dc, miibus_driver, miibus_devclass, 0, 0);
 
@@ -350,7 +360,7 @@ static void dc_eeprom_putbyte(sc, addr)
 	 * a 93C46. It uses a different bit sequence for
 	 * specifying the "read" opcode.
 	 */
-	if (DC_IS_CENTAUR(sc))
+	if (DC_IS_CENTAUR(sc) || DC_IS_CONEXANT(sc))
 		d = addr | (DC_EECMD_READ << 2);
 	else
 		d = addr | DC_EECMD_READ;
@@ -683,6 +693,14 @@ static int dc_miibus_readreg(dev, phy, reg)
 	if (DC_IS_ADMTEK(sc) && phy != DC_ADMTEK_PHYADDR)
 		return(0);
 
+	/*
+	 * Note: the ukphy probes of the RS7112 report a PHY at
+	 * MII address 0 (possibly HomePNA?) and 1 (ethernet)
+	 * so we only respond to correct one.
+	 */
+	if (DC_IS_CONEXANT(sc) && phy != DC_CONEXANT_PHYADDR)
+		return(0);
+
 	if (sc->dc_pmode != DC_PMODE_MII) {
 		if (phy == (MII_NPHY - 1)) {
 			switch(reg) {
@@ -787,6 +805,9 @@ static int dc_miibus_writereg(dev, phy, reg, data)
 	bzero((char *)&frame, sizeof(frame));
 
 	if (DC_IS_ADMTEK(sc) && phy != DC_ADMTEK_PHYADDR)
+		return(0);
+
+	if (DC_IS_CONEXANT(sc) && phy != DC_CONEXANT_PHYADDR)
 		return(0);
 
 	if (DC_IS_PNIC(sc)) {
@@ -1171,7 +1192,7 @@ static void dc_setfilt(sc)
 	struct dc_softc		*sc;
 {
 	if (DC_IS_INTEL(sc) || DC_IS_MACRONIX(sc) || DC_IS_PNIC(sc) ||
-	    DC_IS_PNICII(sc) || DC_IS_DAVICOM(sc))
+	    DC_IS_PNICII(sc) || DC_IS_DAVICOM(sc) || DC_IS_CONEXANT(sc))
 		dc_setfilt_21143(sc);
 
 	if (DC_IS_ASIX(sc))
@@ -1350,7 +1371,7 @@ static void dc_reset(sc)
 			break;
 	}
 
-	if (DC_IS_ASIX(sc) || DC_IS_ADMTEK(sc)) {
+	if (DC_IS_ASIX(sc) || DC_IS_ADMTEK(sc) || DC_IS_CONEXANT(sc)) {
 		DELAY(10000);
 		DC_CLRBIT(sc, DC_BUSCTL, DC_BUSCTL_RESET);
 		i = 0;
@@ -1809,6 +1830,13 @@ static int dc_attach(dev)
 		sc->dc_flags |= DC_REDUCED_MII_POLL;
 		sc->dc_pmode = DC_PMODE_MII;
 		break;
+	case DC_DEVICEID_RS7112:
+		sc->dc_type = DC_TYPE_CONEXANT;
+		sc->dc_flags |= DC_TX_INTR_ALWAYS;
+		sc->dc_flags |= DC_REDUCED_MII_POLL;
+		sc->dc_pmode = DC_PMODE_MII;
+		dc_read_eeprom(sc, (caddr_t)&sc->dc_srom, 0, 256, 0);
+		break;
 	default:
 		printf("dc%d: unknown device: %x\n", sc->dc_unit,
 		    sc->dc_info->dc_did);
@@ -1872,6 +1900,9 @@ static int dc_attach(dev)
 	case DC_TYPE_AL981:
 	case DC_TYPE_AN985:
 		dc_read_eeprom(sc, (caddr_t)&eaddr, DC_AL_EE_NODEADDR, 3, 0);
+		break;
+	case DC_TYPE_CONEXANT:
+		bcopy(sc->dc_srom + DC_CONEXANT_EE_NODEADDR, &eaddr, 6);
 		break;
 	default:
 		dc_read_eeprom(sc, (caddr_t)&eaddr, DC_EE_NODEADDR, 3, 0);
@@ -2113,16 +2144,11 @@ static int dc_newbuf(sc, i, m)
 
 	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("dc%d: no memory for rx list "
-			    "-- packet dropped!\n", sc->dc_unit);
+		if (m_new == NULL)
 			return(ENOBUFS);
-		}
 
 		MCLGET(m_new, M_DONTWAIT);
 		if (!(m_new->m_flags & M_EXT)) {
-			printf("dc%d: no memory for rx list "
-			    "-- packet dropped!\n", sc->dc_unit);
 			m_freem(m_new);
 			return(ENOBUFS);
 		}
@@ -2316,7 +2342,6 @@ static void dc_rxeof(sc)
 	i = sc->dc_cdata.dc_rx_prod;
 
 	while(!(sc->dc_ldata->dc_rx_list[i].dc_status & DC_RXSTAT_OWN)) {
-		struct mbuf		*m0 = NULL;
 
 		cur_rx = &sc->dc_ldata->dc_rx_list[i];
 		rxstat = cur_rx->dc_status;
@@ -2362,16 +2387,36 @@ static void dc_rxeof(sc)
 		/* No errors; receive the packet. */	
 		total_len -= ETHER_CRC_LEN;
 
-		m0 = m_devget(mtod(m, char *) - ETHER_ALIGN,
-		    total_len + ETHER_ALIGN, 0, ifp, NULL);
-		dc_newbuf(sc, i, m);
-		DC_INC(i, DC_RX_LIST_CNT);
-		if (m0 == NULL) {
-			ifp->if_ierrors++;
-			continue;
+#ifdef __i386__
+		/*
+		 * On the x86 we do not have alignment problems, so try to
+		 * allocate a new buffer for the receive ring, and pass up
+		 * the one where the packet is already, saving the expensive
+		 * copy done in m_devget().
+		 * If we are on an architecture with alignment problems, or
+		 * if the allocation fails, then use m_devget and leave the
+		 * existing buffer in the receive ring.
+		 */
+		if (dc_quick && dc_newbuf(sc, i, NULL) == 0) {
+			m->m_pkthdr.rcvif = ifp;
+			m->m_pkthdr.len = m->m_len = total_len;
+			DC_INC(i, DC_RX_LIST_CNT);
+		} else
+#endif
+		{
+			struct mbuf *m0;
+
+			m0 = m_devget(mtod(m, char *) - ETHER_ALIGN,
+			    total_len + ETHER_ALIGN, 0, ifp, NULL);
+			dc_newbuf(sc, i, m);
+			DC_INC(i, DC_RX_LIST_CNT);
+			if (m0 == NULL) {
+				ifp->if_ierrors++;
+				continue;
+			}
+			m_adj(m0, ETHER_ALIGN);
+			m = m0;
 		}
-		m_adj(m0, ETHER_ALIGN);
-		m = m0;
 
 		ifp->if_ipackets++;
 		eh = mtod(m, struct ether_header *);
@@ -2395,6 +2440,7 @@ static void dc_txeof(sc)
 	struct dc_desc		*cur_tx = NULL;
 	struct ifnet		*ifp;
 	int			idx;
+	u_int32_t		errmask;
 
 	ifp = &sc->arpcom.ac_if;
 
@@ -2438,11 +2484,19 @@ static void dc_txeof(sc)
 			continue;
 		}
 
-		if (/*sc->dc_type == DC_TYPE_21143 &&*/
-		    sc->dc_pmode == DC_PMODE_MII &&
-		    ((txstat & 0xFFFF) & ~(DC_TXSTAT_ERRSUM|
-		    DC_TXSTAT_NOCARRIER|DC_TXSTAT_CARRLOST)))
-			txstat &= ~DC_TXSTAT_ERRSUM;
+		if (sc->dc_pmode == DC_PMODE_MII) {
+			errmask = DC_TXSTAT_ERRSUM|
+			    DC_TXSTAT_NOCARRIER|DC_TXSTAT_CARRLOST;
+			/*
+			 * The Conexant chip always reports carrier lost
+			 * in full duplex modes.
+			 */
+			if (DC_IS_CONEXANT(sc) && (sc->dc_if_media & IFM_FDX)) {
+				errmask &= ~DC_TXSTAT_CARRLOST;
+			}
+			if ((txstat & 0xFFFF) & ~errmask)
+				txstat &= ~DC_TXSTAT_ERRSUM;
+		}
 
 		if (txstat & DC_TXSTAT_ERRSUM) {
 			ifp->if_oerrors++;
@@ -2614,11 +2668,10 @@ static void dc_intr(arg)
 	u_int32_t		status;
 
 	sc = arg;
+	ifp = &sc->arpcom.ac_if;
 
 	if ( (CSR_READ_4(sc, DC_ISR) & DC_INTRS) == 0)
 		return ;
-
-	ifp = &sc->arpcom.ac_if;
 
 	/* Suppress unwanted interrupts */
 	if (!(ifp->if_flags & IFF_UP)) {
@@ -2761,15 +2814,12 @@ static int dc_coal(sc, m_head)
 
 	m = *m_head;
 	MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-	if (m_new == NULL) {
-		printf("dc%d: no memory for tx list", sc->dc_unit);
+	if (m_new == NULL)
 		return(ENOBUFS);
-	}
 	if (m->m_pkthdr.len > MHLEN) {
 		MCLGET(m_new, M_DONTWAIT);
 		if (!(m_new->m_flags & M_EXT)) {
 			m_freem(m_new);
-			printf("dc%d: no memory for tx list", sc->dc_unit);
 			return(ENOBUFS);
 		}
 	}
@@ -2810,7 +2860,9 @@ static void dc_start(ifp)
 		if (m_head == NULL)
 			break;
 
-		if (sc->dc_flags & DC_TX_COALESCE) {
+		if (sc->dc_flags & DC_TX_COALESCE &&
+		    m_head->m_next != NULL) {
+			/* only coalesce if have >1 mbufs */
 			if (dc_coal(sc, &m_head)) {
 				IF_PREPEND(&ifp->if_snd, m_head);
 				ifp->if_flags |= IFF_OACTIVE;
@@ -2875,6 +2927,11 @@ static void dc_init(xsc)
 		CSR_WRITE_4(sc, DC_BUSCTL, 0);
 	else
 		CSR_WRITE_4(sc, DC_BUSCTL, DC_BUSCTL_MRME|DC_BUSCTL_MRLE);
+	/*
+	 * Evenly share the bus between receive and transmit process.
+	 */
+	if (DC_IS_INTEL(sc))
+		DC_SETBIT(sc, DC_BUSCTL, DC_BUSCTL_ARBITRATION);
 	if (DC_IS_DAVICOM(sc) || DC_IS_INTEL(sc)) {
 		DC_SETBIT(sc, DC_BUSCTL, DC_BURSTLEN_USECA);
 	} else {
@@ -3163,6 +3220,8 @@ static void dc_stop(sc)
 
 	untimeout(dc_tick, sc, sc->dc_stat_ch);
 
+	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
+
 	DC_CLRBIT(sc, DC_NETCFG, (DC_NETCFG_RX_ON|DC_NETCFG_TX_ON));
 	CSR_WRITE_4(sc, DC_IMR, 0x00000000);
 	CSR_WRITE_4(sc, DC_TXADDR, 0x00000000);
@@ -3198,8 +3257,6 @@ static void dc_stop(sc)
 
 	bzero((char *)&sc->dc_ldata->dc_tx_list,
 		sizeof(sc->dc_ldata->dc_tx_list));
-
-	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
 
 	return;
 }

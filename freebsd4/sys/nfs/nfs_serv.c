@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_serv.c  8.8 (Berkeley) 7/31/95
- * $FreeBSD: src/sys/nfs/nfs_serv.c,v 1.93 1999/12/18 19:20:05 dillon Exp $
+ * $FreeBSD: src/sys/nfs/nfs_serv.c,v 1.93.2.3 2002/01/19 02:06:47 dillon Exp $
  */
 
 /*
@@ -2015,6 +2015,8 @@ out:
 		error = VFS_VPTOFH(vp, &fhp->fh_fid);
 		if (!error)
 			error = VOP_GETATTR(vp, vap, cred, procp);
+	}
+	if (vp) {
 		vput(vp);
 		vp = NULL;
 		nd.ni_vp = NULL;
@@ -2565,10 +2567,9 @@ nfsrv_symlink(nfsd, slp, procp, mrq)
 	error = VOP_SYMLINK(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, vap, pathcp);
 	if (error)
 		NDFREE(&nd, NDF_ONLY_PNBUF);
-	else {
+	else
 		vput(nd.ni_vp);
-		nd.ni_vp = NULL;
-	}
+	nd.ni_vp = NULL;
 	/*
 	 * releases directory prior to potential lookup op.
 	 */
@@ -3998,6 +3999,7 @@ nfsrv_noop(nfsd, slp, procp, mrq)
 	else
 		error = EPROCUNAVAIL;
 	nfsm_reply(0);
+	error = 0;
 	nfsm_srvdone;
 }
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.31 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.117.2.3 2001/07/26 20:37:31 iedowse Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.117.2.7 2001/12/25 01:44:44 dillon Exp $
  */
 
 #include "opt_quota.h"
@@ -470,12 +470,18 @@ ffs_reload(mp, cred, p)
 	 */
 	newfs->fs_csp = fs->fs_csp;
 	newfs->fs_maxcluster = fs->fs_maxcluster;
+	newfs->fs_contigdirs = fs->fs_contigdirs;
 	bcopy(newfs, fs, (u_int)fs->fs_sbsize);
 	if (fs->fs_sbsize < SBSIZE)
 		bp->b_flags |= B_INVAL;
 	brelse(bp);
 	mp->mnt_maxsymlinklen = fs->fs_maxsymlinklen;
 	ffs_oldfscompat(fs);
+	/* An old fsck may have zeroed these fields, so recheck them. */
+	if (fs->fs_avgfilesize <= 0)		/* XXX */
+		fs->fs_avgfilesize = AVFILESIZ;	/* XXX */
+	if (fs->fs_avgfpdir <= 0)		/* XXX */
+		fs->fs_avgfpdir = AFPDIR;	/* XXX */
 
 	/*
 	 * Step 3: re-read summary information from disk.
@@ -505,12 +511,12 @@ ffs_reload(mp, cred, p)
 
 loop:
 	simple_lock(&mntvnode_slock);
-	for (vp = mp->mnt_vnodelist.lh_first; vp != NULL; vp = nvp) {
+	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nvp) {
 		if (vp->v_mount != mp) {
 			simple_unlock(&mntvnode_slock);
 			goto loop;
 		}
-		nvp = vp->v_mntvnodes.le_next;
+		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
 		/*
 		 * Step 4: invalidate all inactive vnodes.
 		 */
@@ -674,6 +680,7 @@ ffs_mountfs(devvp, mp, p, malloctype)
 	blks = howmany(size, fs->fs_fsize);
 	if (fs->fs_contigsumsize > 0)
 		size += fs->fs_ncg * sizeof(int32_t);
+	size += fs->fs_ncg * sizeof(u_int8_t);
 	space = malloc((u_long)size, M_UFSMNT, M_WAITOK);
 	fs->fs_csp = space;
 	for (i = 0; i < blks; i += fs->fs_frag) {
@@ -694,7 +701,16 @@ ffs_mountfs(devvp, mp, p, malloctype)
 		fs->fs_maxcluster = lp = space;
 		for (i = 0; i < fs->fs_ncg; i++)
 			*lp++ = fs->fs_contigsumsize;
+		space = lp;
 	}
+	size = fs->fs_ncg * sizeof(u_int8_t);
+	fs->fs_contigdirs = (u_int8_t *)space;
+	bzero(fs->fs_contigdirs, size);
+	/* Compatibility for old filesystems 	   XXX */
+	if (fs->fs_avgfilesize <= 0)		/* XXX */
+		fs->fs_avgfilesize = AVFILESIZ;	/* XXX */
+	if (fs->fs_avgfpdir <= 0)		/* XXX */
+		fs->fs_avgfpdir = AFPDIR;	/* XXX */
 	mp->mnt_data = (qaddr_t)ump;
 	mp->mnt_stat.f_fsid.val[0] = fs->fs_id[0];
 	mp->mnt_stat.f_fsid.val[1] = fs->fs_id[1];
@@ -950,44 +966,57 @@ ffs_sync(mp, waitfor, cred, p)
 	 */
 	simple_lock(&mntvnode_slock);
 loop:
-	for (vp = mp->mnt_vnodelist.lh_first; vp != NULL; vp = nvp) {
+	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nvp) {
 		/*
 		 * If the vnode that we are about to sync is no longer
 		 * associated with this mount point, start over.
 		 */
 		if (vp->v_mount != mp)
 			goto loop;
-		simple_lock(&vp->v_interlock);
-		nvp = vp->v_mntvnodes.le_next;
+
+		/*
+		 * Depend on the mntvnode_slock to keep things stable enough
+		 * for a quick test.  Since there might be hundreds of 
+		 * thousands of vnodes, we cannot afford even a subroutine
+		 * call unless there's a good chance that we have work to do.
+		 */
+		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
 		ip = VTOI(vp);
 		if (vp->v_type == VNON || ((ip->i_flag &
 		     (IN_ACCESS | IN_CHANGE | IN_MODIFIED | IN_UPDATE)) == 0 &&
 		     TAILQ_EMPTY(&vp->v_dirtyblkhd))) {
-			simple_unlock(&vp->v_interlock);
 			continue;
 		}
 		if (vp->v_type != VCHR) {
 			simple_unlock(&mntvnode_slock);
-			error =
-			  vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK, p);
+			error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT, p);
 			if (error) {
 				simple_lock(&mntvnode_slock);
 				if (error == ENOENT)
 					goto loop;
-				continue;
+			} else {
+				if ((error = VOP_FSYNC(vp, cred, waitfor, p)) != 0)
+					allerror = error;
+				VOP_UNLOCK(vp, 0, p);
+				vrele(vp);
+				simple_lock(&mntvnode_slock);
 			}
-			if ((error = VOP_FSYNC(vp, cred, waitfor, p)) != 0)
-				allerror = error;
-			VOP_UNLOCK(vp, 0, p);
-			vrele(vp);
-			simple_lock(&mntvnode_slock);
 		} else {
+			/*
+			 * We must reference the vp to prevent it from
+			 * getting ripped out from under UFS_UPDATE, since
+			 * we are not holding a vnode lock.  XXX why aren't
+			 * we holding a vnode lock?
+			 */
+			VREF(vp);
 			simple_unlock(&mntvnode_slock);
-			simple_unlock(&vp->v_interlock);
 			/* UFS_UPDATE(vp, waitfor == MNT_WAIT); */
 			UFS_UPDATE(vp, 0);
+			vrele(vp);
 			simple_lock(&mntvnode_slock);
 		}
+		if (TAILQ_NEXT(vp, v_nmntvnodes) != nvp)
+			goto loop;
 	}
 	simple_unlock(&mntvnode_slock);
 	/*
@@ -1076,7 +1105,7 @@ restart:
 		return (error);
 	}
 	bzero((caddr_t)ip, sizeof(struct inode));
-	lockinit(&ip->i_lock, PINOD, "inode", 0, LK_CANRECURSE);
+	lockinit(&ip->i_lock, PINOD, "inode", VLKTIMEOUT, LK_CANRECURSE);
 	vp->v_data = ip;
 	/*
 	 * FFS supports lock sharing in the stack of vnodes

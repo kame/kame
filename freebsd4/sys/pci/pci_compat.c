@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/pci_compat.c,v 1.35 2000/02/28 08:12:24 bde Exp $
+ * $FreeBSD: src/sys/pci/pci_compat.c,v 1.35.2.1 2001/10/14 21:14:14 luigi Exp $
  *
  */
 
@@ -50,11 +50,6 @@
 #ifdef APIC_IO
 #include <machine/smp.h>
 #endif
-
-#ifdef __i386__
-#include <i386/isa/intr_machdep.h>
-#endif
-
 
 #ifdef PCI_COMPAT
 

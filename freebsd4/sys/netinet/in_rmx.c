@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/in_rmx.c,v 1.37.2.1 2001/05/14 08:23:49 ru Exp $
+ * $FreeBSD: src/sys/netinet/in_rmx.c,v 1.37.2.2 2001/12/14 20:10:17 jlemon Exp $
  */
 
 /*
@@ -100,11 +100,9 @@ in_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 		if (in_broadcast(sin->sin_addr, rt->rt_ifp)) {
 			rt->rt_flags |= RTF_BROADCAST;
 		} else {
-#define satosin(sa) ((struct sockaddr_in *)sa)
 			if (satosin(rt->rt_ifa->ifa_addr)->sin_addr.s_addr
 			    == sin->sin_addr.s_addr)
 				rt->rt_flags |= RTF_LOCAL;
-#undef satosin
 		}
 	}
 

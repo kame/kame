@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)cd9660_vfsops.c	8.18 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.74.2.5 2001/07/26 20:36:57 iedowse Exp $
+ * $FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.74.2.6 2001/12/09 23:37:54 ken Exp $
  */
 
 #include <sys/param.h>
@@ -158,7 +158,17 @@ iso_mountroot(mp, p)
 		return (error);
 	}
 	args.flags = ISOFSMNT_ROOT;
+
+	vn_lock(rootvp, LK_EXCLUSIVE | LK_RETRY, p);
+	error = VOP_OPEN(rootvp, FREAD, FSCRED, p);
+	VOP_UNLOCK(rootvp, 0, p);
+	if (error)
+		return (error);
+
 	args.ssector = iso_get_ssector(rootdev, p);
+
+	(void)VOP_CLOSE(rootvp, FREAD, NOCRED, p);
+
 	if (bootverbose)
 		printf("iso_mountroot(): using session at block %d\n",
 		       args.ssector);

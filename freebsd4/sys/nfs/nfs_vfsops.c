@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_vfsops.c	8.12 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/nfs/nfs_vfsops.c,v 1.91.2.3 2001/08/11 01:52:31 peter Exp $
+ * $FreeBSD: src/sys/nfs/nfs_vfsops.c,v 1.91.2.4 2001/10/25 19:18:53 dillon Exp $
  */
 
 #include "opt_bootp.h"
@@ -1047,9 +1047,9 @@ nfs_sync(mp, waitfor, cred, p)
 	 * Force stale buffer cache information to be flushed.
 	 */
 loop:
-	for (vp = mp->mnt_vnodelist.lh_first;
+	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist);
 	     vp != NULL;
-	     vp = vp->v_mntvnodes.le_next) {
+	     vp = TAILQ_NEXT(vp, v_nmntvnodes)) {
 		/*
 		 * If the vnode that we are about to sync is no longer
 		 * associated with this mount point, start over.

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/loader/Makefile,v 1.41.2.6 2000/12/19 01:18:34 rnordier Exp $
+# $FreeBSD: src/sys/boot/i386/loader/Makefile,v 1.41.2.7 2001/10/18 11:35:54 sobomax Exp $
 
 BASE=		loader
 PROG=		${BASE}
@@ -30,6 +30,13 @@ LIBFICL=	${.OBJDIR}/../../ficl/libficl.a
 .else
 LIBFICL=	${.CURDIR}/../../ficl/libficl.a
 .endif
+.endif
+
+.if defined(LOADER_BZIP2_SUPPORT)
+CFLAGS+=	-DLOADER_BZIP2_SUPPORT
+.endif
+.if !defined(LOADER_NO_GZIP_SUPPORT)
+CFLAGS+=	-DLOADER_GZIP_SUPPORT
 .endif
 
 # Always add MI sources 

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/svr4/svr4_machdep.c,v 1.13 2000/01/15 15:29:37 newton Exp $
+ * $FreeBSD: src/sys/i386/svr4/svr4_machdep.c,v 1.13.2.1 2002/01/12 11:03:30 bde Exp $
  */
 
 #include <sys/types.h>
@@ -469,6 +469,7 @@ svr4_sendsig(catcher, sig, mask, code)
 #else
 	tf->tf_esp = (int)fp;
 	tf->tf_eip = (int)(((char *)PS_STRINGS) - *(p->p_sysent->sv_szsigcode));
+	tf->tf_eflags &= ~PSL_T;
 	tf->tf_cs = _ucodesel;
 	tf->tf_ds = _udatasel;
 	tf->tf_es = _udatasel;

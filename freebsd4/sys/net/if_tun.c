@@ -13,7 +13,7 @@
  * UCL. This driver is based much more on read/write/poll mode of
  * operation though.
  *
- * $FreeBSD: src/sys/net/if_tun.c,v 1.74.2.5 2001/08/08 13:07:00 fenner Exp $
+ * $FreeBSD: src/sys/net/if_tun.c,v 1.74.2.7 2001/11/25 08:48:15 brian Exp $
  */
 
 #include "opt_inet.h"
@@ -473,14 +473,11 @@ tunioctl(dev, cmd, data, flag, p)
 		if (tp->tun_if.if_flags & IFF_UP)
 			return(EBUSY);
 
-		switch (*(int *)data) {
+		switch (*(int *)data & ~IFF_MULTICAST) {
 		case IFF_POINTOPOINT:
-			tp->tun_if.if_flags |= IFF_POINTOPOINT;
-			tp->tun_if.if_flags &= ~IFF_BROADCAST;
-			break;
 		case IFF_BROADCAST:
-			tp->tun_if.if_flags &= ~IFF_POINTOPOINT;
-			tp->tun_if.if_flags |= IFF_BROADCAST;
+			tp->tun_if.if_flags &= ~(IFF_BROADCAST|IFF_POINTOPOINT);
+			tp->tun_if.if_flags |= *(int *)data;
 			break;
 		default:
 			return(EINVAL);

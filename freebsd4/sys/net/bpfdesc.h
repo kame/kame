@@ -37,12 +37,13 @@
  *
  *      @(#)bpfdesc.h	8.1 (Berkeley) 6/10/93
  *
- * $FreeBSD: src/sys/net/bpfdesc.h,v 1.14.2.1 2000/03/19 05:55:36 rwatson Exp $
+ * $FreeBSD: src/sys/net/bpfdesc.h,v 1.14.2.2 2001/12/17 19:32:33 jdp Exp $
  */
 
 #ifndef _NET_BPFDESC_H_
 #define _NET_BPFDESC_H_
 
+#include <sys/callout.h>
 #include <sys/select.h>
 
 /*
@@ -89,7 +90,13 @@ struct bpf_d {
 	u_char		bd_pad;		/* explicit alignment */
 	struct selinfo	bd_sel;		/* bsd select info */
 #endif
+	struct callout	bd_callout;	/* for BPF timeouts with select */
 };
+
+/* Values for bd_state */
+#define BPF_IDLE	0		/* no select in progress */
+#define BPF_WAITING	1		/* waiting for read timeout in select */
+#define BPF_TIMED_OUT	2		/* read timeout has expired in select */
 
 /*
  * Descriptor associated with each attached hardware interface.

@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)union_vfsops.c	8.20 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/miscfs/union/union_vfsops.c,v 1.39.2.1 2001/07/26 20:37:22 iedowse Exp $
+ * $FreeBSD: src/sys/miscfs/union/union_vfsops.c,v 1.39.2.2 2001/10/25 19:18:53 dillon Exp $
  */
 
 /*
@@ -336,10 +336,11 @@ union_unmount(mp, mntflags, p)
 		int n;
 
 		/* count #vnodes held on mount list */
-		for (n = 0, vp = mp->mnt_vnodelist.lh_first;
-				vp != NULLVP;
-				vp = vp->v_mntvnodes.le_next)
+		for (n = 0, vp = TAILQ_FIRST(&mp->mnt_nvnodelist);
+		    vp != NULLVP;
+		    vp = TAILQ_NEXT(vp, v_nmntvnodes)) {
 			n++;
+		}
 
 		/* if this is unchanged then stop */
 		if (n == freeing)

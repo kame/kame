@@ -1,3 +1,6 @@
+/*	$FreeBSD: src/sys/netinet6/ip6_ecn.h,v 1.2.2.2 2001/07/03 11:01:53 ume Exp $	*/
+/*	$KAME: ip6_ecn.h,v 1.1.1.2 2002/02/07 01:35:40 sakane Exp $	*/
+
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -26,8 +29,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ip6_ecn.h,v 1.1.1.1 2000/03/25 06:30:24 sumikawa Exp $
- * $FreeBSD: src/sys/netinet6/ip6_ecn.h,v 1.2 1999/12/29 04:46:04 peter Exp $
  */
 /*
  * ECN consideration on tunnel ingress/egress operation.
@@ -35,9 +36,6 @@
  */
 
 #ifdef _KERNEL
-extern void ip6_ecn_ingress __P((int, u_int32_t *, u_int32_t *));
-extern void ip6_ecn_egress __P((int, u_int32_t *, u_int32_t *));
+extern void ip6_ecn_ingress __P((int, u_int32_t *, const u_int32_t *));
+extern void ip6_ecn_egress __P((int, const u_int32_t *, u_int32_t *));
 #endif
-
-
-

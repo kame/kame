@@ -1,6 +1,6 @@
 #! /bin/sh -
 #	@(#)makesyscalls.sh	8.1 (Berkeley) 6/10/93
-# $FreeBSD: src/sys/kern/makesyscalls.sh,v 1.39.2.2 2000/08/08 22:25:55 peter Exp $
+# $FreeBSD: src/sys/kern/makesyscalls.sh,v 1.39.2.4 2001/10/20 09:01:24 marcel Exp $
 
 set -e
 
@@ -200,6 +200,7 @@ s/\$//g
 		}
 		if ($2 == "NODEF") {
 			funcname=$4
+			argssize = "AS(" $6 ")"
 			return
 		}
 		if ($f != "{")
@@ -282,16 +283,17 @@ s/\$//g
 					    argname[i], argtype[i]) > sysarg
 				printf("};\n") > sysarg
 			}
-			else if($2 != "NOARGS" && $2 != "NOPROTO")
+			else if ($2 != "NOARGS" && $2 != "NOPROTO" && \
+			    $2 != "NODEF")
 				printf("struct\t%s {\n\tregister_t dummy;\n};\n",
 				    argalias) > sysarg
 		}
-		if ($2 != "NOPROTO" && (!nosys || funcname != "nosys") && \
-		    (!lkmnosys || funcname != "lkmnosys")) {
+		if (($2 != "NOPROTO" && $2 != "NODEF" && \
+		    (funcname != "nosys" || !nosys)) || \
+		    (funcname == "lkmnosys" && !lkmnosys) || \
+		    funcname == "lkmressys") {
 			printf("%s\t%s __P((struct proc *, struct %s *))",
 			    rettype, funcname, argalias) > sysdcl
-			if (funcname == "exit")
-				printf(" __dead2") > sysdcl
 			printf(";\n") > sysdcl
 		}
 		if (funcname == "nosys")

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ntfs/ntfs_subr.c,v 1.7 1999/12/03 20:37:39 semenu Exp $
+ * $FreeBSD: src/sys/ntfs/ntfs_subr.c,v 1.7.2.4 2001/10/12 22:08:49 semenu Exp $
  */
 
 #include <sys/param.h>
@@ -63,21 +63,20 @@ MALLOC_DEFINE(M_NTFSDECOMP, "NTFS decomp", "NTFS decompression temporary");
 
 static int ntfs_ntlookupattr __P((struct ntfsmount *, const char *, int, int *, char **));
 static int ntfs_findvattr __P((struct ntfsmount *, struct ntnode *, struct ntvattr **, struct ntvattr **, u_int32_t, const char *, size_t, cn_t));
-static int ntfs_uastricmp __P((const wchar *, size_t, const char *, size_t));
-static int ntfs_uastrcmp __P((const wchar *, size_t, const char *, size_t));
+static int ntfs_uastricmp __P((struct ntfsmount *, const wchar *, size_t, const char *, size_t));
+static int ntfs_uastrcmp __P((struct ntfsmount *, const wchar *, size_t, const char *, size_t));
 
 /* table for mapping Unicode chars into uppercase; it's filled upon first
  * ntfs mount, freed upon last ntfs umount */
 static wchar *ntfs_toupper_tab;
-#define NTFS_U28(ch)		((((ch) & 0xFF) == 0) ? '_' : (ch) & 0xFF)
-#define NTFS_TOUPPER(ch)	(ntfs_toupper_tab[(unsigned char)(ch)])
+#define NTFS_TOUPPER(ch)	(ntfs_toupper_tab[(ch)])
 static struct lock ntfs_toupper_lock;
 static signed int ntfs_toupper_usecount;
 
 /* support macro for ntfs_ntvattrget() */
 #define NTFS_AALPCMP(aalp,type,name,namelen) (				\
   (aalp->al_type == type) && (aalp->al_namelen == namelen) &&		\
-  !ntfs_uastrcmp(aalp->al_name,aalp->al_namelen,name,namelen) )
+  !NTFS_UASTRCMP(aalp->al_name,aalp->al_namelen,name,namelen) )
 
 /*
  * 
@@ -406,6 +405,7 @@ ntfs_ntlookup(
 	ip->i_mp = ntmp;
 
 	LIST_INIT(&ip->i_fnlist);
+	VREF(ip->i_devvp);
 
 	/* init lock and lock the newborn ntnode */
 	lockinit(&ip->i_lock, PINOD, "ntnode", 0, LK_EXCLUSIVE);
@@ -449,24 +449,25 @@ ntfs_ntput(ip)
 	}
 #endif
 
-	if (ip->i_usecount == 0) {
-		dprintf(("ntfs_ntput: deallocating ntnode: %d\n",
-			ip->i_number));
-
-		if (ip->i_fnlist.lh_first)
-			panic("ntfs_ntput: ntnode has fnodes\n");
-
-		ntfs_nthashrem(ip);
-
-		while (ip->i_valist.lh_first != NULL) {
-			vap = ip->i_valist.lh_first;
-			LIST_REMOVE(vap,va_list);
-			ntfs_freentvattr(vap);
-		}
-		FREE(ip, M_NTFSNTNODE);
-	} else {
+	if (ip->i_usecount > 0) {
 		LOCKMGR(&ip->i_lock, LK_RELEASE|LK_INTERLOCK, &ip->i_interlock);
+		return;
 	}
+
+	dprintf(("ntfs_ntput: deallocating ntnode: %d\n", ip->i_number));
+
+	if (ip->i_fnlist.lh_first)
+		panic("ntfs_ntput: ntnode has fnodes\n");
+
+	ntfs_nthashrem(ip);
+
+	while ((vap = LIST_FIRST(&ip->i_valist)) != NULL) {
+		LIST_REMOVE(vap,va_list);
+		ntfs_freentvattr(vap);
+	}
+
+	vrele(ip->i_devvp);
+	FREE(ip, M_NTFSNTNODE);
 }
 
 /*
@@ -660,7 +661,8 @@ ntfs_runtovrun(
  * Compare unicode and ascii string case insens.
  */
 static int
-ntfs_uastricmp(ustr, ustrlen, astr, astrlen)
+ntfs_uastricmp(ntmp, ustr, ustrlen, astr, astrlen)
+	struct ntfsmount *ntmp;
 	const wchar *ustr;
 	size_t ustrlen;
 	const char *astr;
@@ -669,9 +671,13 @@ ntfs_uastricmp(ustr, ustrlen, astr, astrlen)
 	size_t             i;
 	int             res;
 
+	/*
+	 * XXX We use NTFS_82U(NTFS_U28(c)) to get rid of unicode
+	 * symbols not covered by translation table
+	 */
 	for (i = 0; i < ustrlen && i < astrlen; i++) {
-		res = ((int) NTFS_TOUPPER(NTFS_U28(ustr[i]))) -
-			((int)NTFS_TOUPPER(astr[i]));
+		res = ((int) NTFS_TOUPPER(NTFS_82U(NTFS_U28(ustr[i])))) -
+			((int)NTFS_TOUPPER(NTFS_82U(astr[i])));
 		if (res)
 			return res;
 	}
@@ -682,7 +688,8 @@ ntfs_uastricmp(ustr, ustrlen, astr, astrlen)
  * Compare unicode and ascii string case sens.
  */
 static int
-ntfs_uastrcmp(ustr, ustrlen, astr, astrlen)
+ntfs_uastrcmp(ntmp, ustr, ustrlen, astr, astrlen)
+	struct ntfsmount *ntmp;
 	const wchar *ustr;
 	size_t ustrlen;
 	const char *astr;
@@ -738,8 +745,12 @@ ntfs_fget(
 	dprintf(("ntfs_fget: allocating fnode: %p\n",fp));
 
 	fp->f_ip = ip;
-	fp->f_attrname = attrname;
-	if (fp->f_attrname) fp->f_flag |= FN_AATTRNAME;
+	if (attrname) {
+		fp->f_flag |= FN_AATTRNAME;
+		MALLOC(fp->f_attrname, char *, strlen(attrname)+1, M_TEMP, M_WAITOK);
+		strcpy(fp->f_attrname, attrname);
+	} else
+		fp->f_attrname = NULL;
 	fp->f_attrtype = attrtype;
 
 	ntfs_ntref(ip);
@@ -816,14 +827,14 @@ ntfs_ntlookupattr(
 			goto out;
 		}
 		return (ENOENT);
-	}
+	} else
+		*attrtype = NTFS_A_DATA;
 
     out:
 	if (namelen) {
 		MALLOC((*attrname), char *, namelen, M_TEMP, M_WAITOK);
 		memcpy((*attrname), name, namelen);
 		(*attrname)[namelen] = '\0';
-		*attrtype = NTFS_A_DATA;
 	}
 
 	return (0);
@@ -909,7 +920,7 @@ ntfs_ntlookupfile(
 			/* check the name - the case-insensitible check
 			 * has to come first, to break from this for loop
 			 * if needed, so we can dive correctly */
-			res = ntfs_uastricmp(iep->ie_fname, iep->ie_fnamelen,
+			res = NTFS_UASTRICMP(iep->ie_fname, iep->ie_fnamelen,
 				fname, fnamelen);
 			if (res > 0) break;
 			if (res < 0) continue;
@@ -917,7 +928,7 @@ ntfs_ntlookupfile(
 			if (iep->ie_fnametype == 0 ||
 			    !(ntmp->ntm_flag & NTFS_MFLAG_CASEINS))
 			{
-				res = ntfs_uastrcmp(iep->ie_fname,
+				res = NTFS_UASTRCMP(iep->ie_fname,
 					iep->ie_fnamelen, fname, fnamelen);
 				if (res != 0) continue;
 			}
@@ -943,17 +954,18 @@ ntfs_ntlookupfile(
 				goto fail;
 			}
 
+			/* vget node, but don't load it */
+			error = ntfs_vgetex(ntmp->ntm_mountp,
+				   iep->ie_number, attrtype, attrname,
+				   LK_EXCLUSIVE, VG_DONTLOADIN | VG_DONTVALIDFN,
+				   curproc, &nvp);
+
 			/* free the buffer returned by ntfs_ntlookupattr() */
 			if (attrname) {
 				FREE(attrname, M_TEMP);
 				attrname = NULL;
 			}
 
-			/* vget node, but don't load it */
-			error = ntfs_vgetex(ntmp->ntm_mountp,
-				   iep->ie_number, attrtype, attrname,
-				   LK_EXCLUSIVE, VG_DONTLOADIN | VG_DONTVALIDFN,
-				   curproc, &nvp);
 			if (error)
 				goto fail;
 
@@ -1403,7 +1415,7 @@ ntfs_writentvattr_plain(
 		return ENOTTY;
 	}
 
-	ddprintf(("ntfs_writentvattr_plain: data in run: %d chains\n",
+	ddprintf(("ntfs_writentvattr_plain: data in run: %ld chains\n",
 		 vap->va_vruncnt));
 
 	off = roff;
@@ -1509,7 +1521,7 @@ ntfs_readntvattr_plain(
 		struct buf     *bp;
 		size_t          tocopy;
 
-		ddprintf(("ntfs_readntvattr_plain: data in run: %d chains\n",
+		ddprintf(("ntfs_readntvattr_plain: data in run: %ld chains\n",
 			 vap->va_vruncnt));
 
 		off = roff;
@@ -1939,13 +1951,13 @@ ntfs_toupper_use(mp, ntmp)
 	 * XXX for now, just the first 256 entries are used anyway,
 	 * so don't bother reading more
 	 */
-	MALLOC(ntfs_toupper_tab, wchar *, 256 * sizeof(wchar),
+	MALLOC(ntfs_toupper_tab, wchar *, 65536 * sizeof(wchar),
 		M_NTFSRDATA, M_WAITOK);
 
 	if ((error = VFS_VGET(mp, NTFS_UPCASEINO, &vp)))
 		goto out;
 	error = ntfs_readattr(ntmp, VTONT(vp), NTFS_A_DATA, NULL,
-			0, 256*sizeof(wchar), (char *) ntfs_toupper_tab, NULL);
+			0, 65536*sizeof(wchar), (char *) ntfs_toupper_tab, NULL);
 	vput(vp);
 
     out:
@@ -1980,6 +1992,86 @@ ntfs_toupper_unuse()
 	LOCKMGR(&ntfs_toupper_lock, LK_RELEASE, NULL);
 } 
 
+int
+ntfs_u28_init(
+	struct ntfsmount *ntmp,
+	wchar *u2w)
+{
+	char ** u28;
+	int i, j, h, l;
+
+	MALLOC(u28, char **, 256 * sizeof(char*), M_TEMP, M_WAITOK | M_ZERO);
+
+	for (i=0; i<256; i++) {
+		h = (u2w[i] >> 8) & 0xFF;
+		l = (u2w[i]) &0xFF;
+
+		if (u28[h] == NULL) {
+			MALLOC(u28[h], char *, 256 * sizeof(char), M_TEMP, M_WAITOK);
+			for (j=0; j<256; j++)
+				u28[h][j] = '_';
+		}
+
+		u28[h][l] = i & 0xFF;
+	}
+
+	ntmp->ntm_u28 = u28;
+
+	return (0);
+}
+
+int
+ntfs_u28_uninit(struct ntfsmount *ntmp)
+{
+	char ** u28;
+	int i;
+
+	if (ntmp->ntm_u28 == NULL)
+		return (0);
+
+	u28 = ntmp->ntm_u28;
+
+	for (i=0; i<256; i++)
+		if (u28[i] != NULL)
+			FREE(u28[i], M_TEMP);
+
+	FREE(u28, M_TEMP);
+
+	return (0);
+}
+
+int
+ntfs_82u_init(
+	struct ntfsmount *ntmp,
+	u_int16_t *u2w)
+{
+	wchar * _82u;
+	int i;
+
+	MALLOC(_82u, wchar *, 256 * sizeof(wchar), M_TEMP, M_WAITOK);
+
+	if (u2w == NULL) {
+		for (i=0; i<256; i++)
+			_82u[i] = i;
+	} else {
+		for (i=0; i<128; i++)
+			_82u[i] = i;
+		for (i=0; i<128; i++)
+			_82u[i+128] = u2w[i];
+	}
+
+	ntmp->ntm_82u = _82u;
+
+	return (0);
+}
+
+int
+ntfs_82u_uninit(struct ntfsmount *ntmp)
+{
+	FREE(ntmp->ntm_82u, M_TEMP);
+	return (0);
+}
+
 /*
  * maps the Unicode char to 8bit equivalent
  * XXX currently only gets lower 8bit from the Unicode char
@@ -1987,9 +2079,15 @@ ntfs_toupper_unuse()
  * something better has to be definitely though out
  */
 char
-ntfs_u28(unichar)
-  wchar unichar;
+ntfs_u28(
+	struct ntfsmount *ntmp, 
+	wchar wc)
 {
-	return (char) NTFS_U28(unichar);
+	char * p;
+
+	p = ntmp->ntm_u28[(wc>>8)&0xFF];
+	if (p == NULL)
+		return ('_');
+	return (p[wc&0xFF]);
 }
 

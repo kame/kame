@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.11.2.4 2001/09/03 06:38:16 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.11.2.5 2001/10/15 23:05:15 archie Exp $
  * $Whistle: ng_socket.c,v 1.28 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -326,8 +326,8 @@ ngd_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	 * then handle specially.
 	 */
 	if ((sap == NULL)
-	|| ((len = sap->sg_len) <= 2)
-	|| (*sap->sg_data == '\0')) {
+	    || ((len = sap->sg_len - 2) <= 0)
+	    || (*sap->sg_data == '\0')) {
 		if (pcbp->sockdata->node->numhooks != 1) {
 			error = EDESTADDRREQ;
 			goto release;

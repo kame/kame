@@ -3,7 +3,7 @@
 #
 # modified for PC-9801
 #
-# $FreeBSD: src/sys/conf/files.pc98,v 1.140.2.19 2001/08/28 03:43:21 nyan Exp $
+# $FreeBSD: src/sys/conf/files.pc98,v 1.140.2.26 2001/12/20 11:39:24 nyan Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -44,6 +44,7 @@ ukbdmap.h			optional	ukbd_dflt_keymap	\
 	clean		"ukbdmap.h"
 #
 compat/linux/linux_file.c	optional	compat_linux
+compat/linux/linux_getcwd.c	optional	compat_linux
 compat/linux/linux_ioctl.c	optional	compat_linux
 compat/linux/linux_ipc.c	optional	compat_linux
 compat/linux/linux_mib.c	optional	compat_linux
@@ -51,6 +52,8 @@ compat/linux/linux_misc.c	optional	compat_linux
 compat/linux/linux_signal.c	optional	compat_linux
 compat/linux/linux_socket.c	optional	compat_linux
 compat/linux/linux_stats.c	optional	compat_linux
+compat/linux/linux_sysctl.c     optional        compat_linux
+compat/linux/linux_uid16.c      optional        compat_linux
 compat/linux/linux_util.c	optional	compat_linux
 #
 contrib/dev/fla/fla.c		optional	fla
@@ -71,12 +74,12 @@ crypto/des/des_ecb.c		optional	netsmbcrypto
 crypto/des/des_setkey.c		optional	netsmbcrypto
 #dev/advansys/adv_isa.c		optional	adv isa
 dev/aic/aic_cbus.c		optional	aic isa
-dev/ata/ata-all.c		optional	ata 
-dev/ata/ata-dma.c		optional	ata 
+dev/ata/ata-all.c		optional	ata
+dev/ata/ata-dma.c		optional	ata
 dev/ata/ata-disk.c		optional	atadisk
 dev/ata/ata-raid.c		optional	atadisk
-dev/ata/atapi-all.c		optional	atapicd 
-dev/ata/atapi-all.c		optional	atapifd 
+dev/ata/atapi-all.c		optional	atapicd
+dev/ata/atapi-all.c		optional	atapifd
 dev/ata/atapi-all.c		optional	atapist
 dev/ata/atapi-cd.c		optional	atapicd
 dev/ata/atapi-fd.c		optional	atapifd
@@ -84,10 +87,14 @@ dev/ata/atapi-tape.c		optional	atapist
 dev/ct/bshw_machdep.c		optional	ct
 dev/ct/ct.c			optional	ct
 dev/ct/ct_isa.c			optional	ct isa
+dev/dgb/dgm.c			optional	dgm
 dev/ed/if_ed.c			optional	ed
 dev/ed/if_ed_cbus.c		optional	ed isa
 dev/ed/if_ed_pccard.c		optional	ed card
 dev/eisa/eisaconf.c		optional	eisa
+dev/em/if_em.c			optional	em
+dev/em/if_em_fxhw.c		optional	em
+dev/em/if_em_phy.c		optional	em
 dev/fb/fb.c			optional	fb
 dev/fb/fb.c			optional	gdc
 dev/fb/splash.c			optional	splash
@@ -96,6 +103,8 @@ dev/kbd/kbd.c			optional	kbd
 dev/kbd/kbd.c			optional	sc
 dev/kbd/kbd.c			optional	ukbd
 dev/kbd/kbd.c			optional	pckbd
+dev/sbni/if_sbni.c		optional	sbni
+dev/sbni/if_sbni_isa.c		optional	sbni isa
 dev/snc/dp83932.c		optional	snc
 dev/snc/dp83932subr.c		optional	snc
 dev/snc/if_snc.c		optional	snc
@@ -139,7 +148,6 @@ gnu/i386/fpemul/reg_u_sub.s	optional	gpl_math_emulate
 gnu/i386/fpemul/wm_shrx.s	optional	gpl_math_emulate
 gnu/i386/fpemul/wm_sqrt.s	optional	gpl_math_emulate
 gnu/i386/isa/dgb.c		optional	dgb
-gnu/i386/isa/dgm.c		optional	dgm
 gnu/i386/isa/sound/awe_wave.c	optional	awe
 pc98/apm/apm.c			optional	apm
 pc98/apm/apm_bioscall.s		optional	apm
@@ -258,6 +266,7 @@ i386/isa/pcvt/pcvt_kbd.c	optional	vt
 i386/isa/pcvt/pcvt_out.c	optional	vt
 i386/isa/pcvt/pcvt_sup.c	optional	vt
 i386/isa/pcvt/pcvt_vtf.c	optional	vt
+pc98/pc98/pmc.c			optional	pmc
 pc98/pc98/ppc.c			optional	ppc
 i386/isa/prof_machdep.c		optional	profiling-routine
 i386/isa/rc.c			optional	rc

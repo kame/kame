@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vm_page.c	7.4 (Berkeley) 5/7/91
- * $FreeBSD: src/sys/vm/vm_page.c,v 1.147.2.7 2001/06/03 05:00:12 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_page.c,v 1.147.2.13 2001/12/20 19:56:30 dillon Exp $
  */
 
 /*
@@ -79,6 +79,8 @@
 #include <vm/vm_param.h>
 #include <sys/lock.h>
 #include <vm/vm_kern.h>
+#include <vm/pmap.h>
+#include <vm/vm_map.h>
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pageout.h>
@@ -404,7 +406,7 @@ vm_page_insert(m, object, pindex)
 	 * update the object's OBJ_WRITEABLE and OBJ_MIGHTBEDIRTY flags.
 	 */
 	if (m->flags & PG_WRITEABLE)
-	    vm_object_set_flag(object, OBJ_WRITEABLE|OBJ_MIGHTBEDIRTY);
+		vm_object_set_writeable_dirty(object);
 }
 
 /*
@@ -1119,12 +1121,8 @@ vm_page_free_toq(vm_page_t m)
 	) {
 		struct vnode *vp = (struct vnode *)object->handle;
 
-		if (vp && VSHOULDFREE(vp)) {
-			if ((vp->v_flag & (VTBFREE|VDOOMED|VFREE)) == 0) {
-				TAILQ_INSERT_TAIL(&vnode_tobefree_list, vp, v_freelist);
-				vp->v_flag |= VTBFREE;
-			}
-		}
+		if (vp && VSHOULDFREE(vp))
+			vfree(vp);
 	}
 
 	/*
@@ -1222,6 +1220,9 @@ vm_page_wire(m)
 		cnt.v_wire_count++;
 	}
 	m->wire_count++;
+	KASSERT(m->wire_count != 0,
+	    ("vm_page_wire: wire_count overflow m=%p", m));
+
 	splx(s);
 	vm_page_flag_set(m, PG_MAPPED);
 }
@@ -1624,10 +1625,24 @@ vm_page_set_validclean(m, base, size)
 	 * use this opportunity to clear the PG_NOSYNC flag.  If a process
 	 * takes a write fault on a MAP_NOSYNC memory area the flag will
 	 * be set again.
+	 *
+	 * We set valid bits inclusive of any overlap, but we can only
+	 * clear dirty bits for DEV_BSIZE chunks that are fully within
+	 * the range.
 	 */
 
 	pagebits = vm_page_bits(base, size);
 	m->valid |= pagebits;
+#if 0	/* NOT YET */
+	if ((frag = base & (DEV_BSIZE - 1)) != 0) {
+		frag = DEV_BSIZE - frag;
+		base += frag;
+		size -= frag;
+		if (size < 0)
+		    size = 0;
+	}
+	pagebits = vm_page_bits(base, size & (DEV_BSIZE - 1));
+#endif
 	m->dirty &= ~pagebits;
 	if (base == 0 && size == PAGE_SIZE) {
 		pmap_clear_modify(m);
@@ -1910,13 +1925,14 @@ again1:
 			vm_page_queues[m->queue].lcnt--;
 			cnt.v_free_count--;
 			m->valid = VM_PAGE_BITS_ALL;
+			if (m->flags & PG_ZERO)
+				vm_page_zero_count--;
 			m->flags = 0;
 			KASSERT(m->dirty == 0, ("contigmalloc1: page %p was dirty", m));
 			m->wire_count = 0;
 			m->busy = 0;
 			m->queue = PQ_NONE;
 			m->object = NULL;
-			vm_page_wire(m);
 		}
 
 		/*
@@ -1924,24 +1940,31 @@ again1:
 		 * Allocate kernel VM, unfree and assign the physical pages to it and
 		 * return kernel VM pointer.
 		 */
-		tmp_addr = addr = kmem_alloc_pageable(map, size);
-		if (addr == 0) {
+		vm_map_lock(map);
+		if (vm_map_findspace(map, vm_map_min(map), size, &addr) !=
+		    KERN_SUCCESS) {
 			/*
 			 * XXX We almost never run out of kernel virtual
 			 * space, so we don't make the allocated memory
 			 * above available.
 			 */
+			vm_map_unlock(map);
 			splx(s);
 			return (NULL);
 		}
+		vm_object_reference(kernel_object);
+		vm_map_insert(map, kernel_object, addr - VM_MIN_KERNEL_ADDRESS,
+		    addr, addr + size, VM_PROT_ALL, VM_PROT_ALL, 0);
+		vm_map_unlock(map);
 
+		tmp_addr = addr;
 		for (i = start; i < (start + size / PAGE_SIZE); i++) {
 			vm_page_t m = &pga[i];
 			vm_page_insert(m, kernel_object,
 				OFF_TO_IDX(tmp_addr - VM_MIN_KERNEL_ADDRESS));
-			pmap_kenter(tmp_addr, VM_PAGE_TO_PHYS(m));
 			tmp_addr += PAGE_SIZE;
 		}
+		vm_map_pageable(map, addr, addr + size, FALSE);
 
 		splx(s);
 		return ((void *)addr);

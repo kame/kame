@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/libi386/bootinfo.c,v 1.23.2.3 2000/12/28 13:12:40 ps Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/bootinfo.c,v 1.23.2.6 2002/01/07 07:37:52 jhb Exp $
  */
 
 #include <stand.h>
@@ -96,6 +96,9 @@ bi_getboothowto(char *kargs)
 		    break;
 		case 'h':
 		    howto |= RB_SERIAL;
+		    break;
+		case 'p':
+		    howto |= RB_PAUSE;
 		    break;
 		case 'r':
 		    howto |= RB_DFLTROOT;
@@ -274,20 +277,27 @@ bi_load(char *args, int *howtop, int *bootdevp, vm_offset_t *bip)
     bootdevnr = 0;
 
     switch(rootdev->d_type) {
+    case DEVT_CD:
+	    /* Pass in BIOS device number. */
+	    bi.bi_bios_dev = bc_unit2bios(rootdev->d_kind.bioscd.unit);
+	    bootdevnr = bc_getdev(rootdev);
+	    break;
+
     case DEVT_DISK:
 	/* pass in the BIOS device number of the current disk */
 	bi.bi_bios_dev = bd_unit2bios(rootdev->d_kind.biosdisk.unit);
 	bootdevnr = bd_getdev(rootdev);
-	if (bootdevnr != -1)
-	    break;
-	printf("root device %s invalid\n", i386_fmtdev(rootdev));
-	return(EINVAL);
-	
+	break;
+
     case DEVT_NET:
 	    break;
 	    
     default:
 	printf("WARNING - don't know how to boot from device type %d\n", rootdev->d_type);
+    }
+    if (bootdevnr == -1) {
+	printf("root device %s invalid\n", i386_fmtdev(rootdev));
+	return (EINVAL);
     }
     free(rootdev);
     *bootdevp = bootdevnr;

@@ -27,9 +27,9 @@
  *	isic - I4B driver for ELSA MicroLink ISDN/PCC-16 and ELSA PCFpro
  *	================================================================
  *
- * $FreeBSD: src/sys/i4b/layer1/isic/i4b_elsa_pcc16.c,v 1.5.2.1 2001/08/10 14:08:38 obrien Exp $
+ * $FreeBSD: src/sys/i4b/layer1/isic/i4b_elsa_pcc16.c,v 1.5.2.2 2001/10/24 14:17:20 hm Exp $
  *
- *      last edit-date: [Wed Jan 24 09:26:33 2001]
+ *      last edit-date: [Wed Oct 24 16:15:26 2001]
  *
  *---------------------------------------------------------------------------*/
 
@@ -277,7 +277,7 @@ isic_probe_Epcc16(device_t dev)
 
 	/* setup card type */
 	
-	sc->sc_cardtyp = CARD_TYPEP_ELSAQS1ISA;
+	sc->sc_cardtyp = CARD_TYPEP_PCC16;
 
 	/* setup IOM bus type */
 	

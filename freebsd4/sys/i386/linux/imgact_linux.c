@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/imgact_linux.c,v 1.35.2.1 2000/05/09 17:41:24 dillon Exp $
+ * $FreeBSD: src/sys/i386/linux/imgact_linux.c,v 1.35.2.2 2001/11/03 01:41:08 ps Exp $
  */
 
 #include <sys/param.h>
@@ -104,7 +104,7 @@ exec_linux_imgact(imgp)
     /*
      * text/data/bss must not exceed limits
      */
-    if (a_out->a_text > MAXTSIZ ||
+    if (a_out->a_text > maxtsiz ||
 	a_out->a_data + bss_size > imgp->proc->p_rlimit[RLIMIT_DATA].rlim_cur)
 	return (ENOMEM);
 

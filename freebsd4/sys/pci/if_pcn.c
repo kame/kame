@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.7 2001/06/05 20:51:47 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.8 2001/12/16 15:46:07 luigi Exp $
  */
 
 /*
@@ -96,7 +96,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.7 2001/06/05 20:51:47 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.8 2001/12/16 15:46:07 luigi Exp $";
 #endif
 
 /*
@@ -753,16 +753,11 @@ static int pcn_newbuf(sc, idx, m)
 
 	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("pcn%d: no memory for rx list "
-			    "-- packet dropped!\n", sc->pcn_unit);
+		if (m_new == NULL)
 			return(ENOBUFS);
-		}
 
 		MCLGET(m_new, M_DONTWAIT);
 		if (!(m_new->m_flags & M_EXT)) {
-			printf("pcn%d: no memory for rx list "
-			    "-- packet dropped!\n", sc->pcn_unit);
 			m_freem(m_new);
 			return(ENOBUFS);
 		}

@@ -30,13 +30,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/imgact.h,v 1.22.2.1 2000/05/09 17:41:24 dillon Exp $
+ * $FreeBSD: src/sys/sys/imgact.h,v 1.22.2.2 2001/12/22 01:21:44 jwd Exp $
  */
 
 #ifndef _SYS_IMGACT_H_
 #define	_SYS_IMGACT_H_
 
-#define MAXSHELLCMDLEN	64
+#define MAXSHELLCMDLEN	128
 
 struct image_params {
 	struct proc *proc;	/* our process struct */

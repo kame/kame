@@ -59,10 +59,9 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_glue.c,v 1.94.2.1 2000/08/02 22:15:09 peter Exp $
+ * $FreeBSD: src/sys/vm/vm_glue.c,v 1.94.2.2 2001/11/03 01:41:09 ps Exp $
  */
 
-#include "opt_rlimit.h"
 #include "opt_vm.h"
 
 #include <sys/param.h>
@@ -293,10 +292,10 @@ vm_init_limits(udata)
 	 * of memory - half of main memory helps to favor smaller processes,
 	 * and reduces thrashing of the object cache.
 	 */
-	p->p_rlimit[RLIMIT_STACK].rlim_cur = DFLSSIZ;
-	p->p_rlimit[RLIMIT_STACK].rlim_max = MAXSSIZ;
-	p->p_rlimit[RLIMIT_DATA].rlim_cur = DFLDSIZ;
-	p->p_rlimit[RLIMIT_DATA].rlim_max = MAXDSIZ;
+	p->p_rlimit[RLIMIT_STACK].rlim_cur = dflssiz;
+	p->p_rlimit[RLIMIT_STACK].rlim_max = maxssiz;
+	p->p_rlimit[RLIMIT_DATA].rlim_cur = dfldsiz;
+	p->p_rlimit[RLIMIT_DATA].rlim_max = maxdsiz;
 	/* limit the limit to no less than 2MB */
 	rss_limit = max(cnt.v_free_count, 512);
 	p->p_rlimit[RLIMIT_RSS].rlim_cur = ptoa(rss_limit);

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/Makefile,v 1.110.2.30 2001/08/11 00:54:14 mp Exp $
+# $FreeBSD: src/sys/modules/Makefile,v 1.110.2.44 2001/12/26 17:55:45 pdeuskar Exp $
 
 # XXX present but broken: ip_mroute_mod pcic
 
@@ -9,21 +9,27 @@ SUBDIR=	accf_data \
 	amr \
 	an \
 	aue \
+	bge \
+	bridge \
 	ccd \
 	cd9660 \
 	coda \
 	cue \
 	dc \
+	dummynet \
 	fdesc \
 	fxp \
+	gx \
 	if_disc \
 	if_ef \
+	if_faith \
 	if_gif \
 	if_ppp \
 	if_sl \
 	if_stf \
 	if_tap \
 	if_tun \
+	if_vlan \
 	ip6fw \
 	ipfilter \
 	ipfw \
@@ -32,6 +38,7 @@ SUBDIR=	accf_data \
 	kernfs \
 	kue \
 	lge \
+	libiconv \
 	libmchain \
 	linux \
 	md \
@@ -85,15 +92,22 @@ SUBDIR=	accf_data \
 SUBDIR+=aac \
 	asr \
 	bktr \
+	ciss \
 	coff \
+	em \
 	fpu \
 	gnufpu \
 	ibcs2 \
 	linprocfs \
 	mly \
+	ncv \
+	nsp \
 	ray \
+	sbni \
+	scsi_low \
 	smbfs \
 	splash \
+	stg \
 	streams \
 	svr4 \
 	vesa \
@@ -101,11 +115,16 @@ SUBDIR+=aac \
 .endif
 
 .if ${MACHINE} == "pc98"
-SUBDIR+=snc
+SUBDIR+=pmc \
+	snc
 .endif
 
 .if ${MACHINE_ARCH} == "alpha"
 SUBDIR+=osf1
+.endif
+
+.if defined(MODULES_OVERRIDE)
+SUBDIR=${MODULES_OVERRIDE}
 .endif
 
 .include <bsd.subdir.mk>

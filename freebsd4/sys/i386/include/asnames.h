@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/asnames.h,v 1.44.2.2 2001/08/15 01:23:52 peter Exp $
+ * $FreeBSD: src/sys/i386/include/asnames.h,v 1.44.2.5 2001/12/08 00:04:14 luigi Exp $
  */
 
 #ifndef _MACHINE_ASNAMES_H_
@@ -242,6 +242,7 @@
 #define _ioapic				ioapic
 #define _ipending			ipending
 #define _isr_lock			isr_lock
+#define _kernbase			kernbase
 #define _kernelname			kernelname
 #define _lapic				lapic
 #define _linux_sigcode			linux_sigcode

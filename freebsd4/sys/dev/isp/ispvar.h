@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/ispvar.h,v 1.25.2.10 2001/07/30 01:32:53 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/ispvar.h,v 1.25.2.12 2001/12/14 08:21:04 mjacob Exp $ */
 /*
  * Soft Definitions for for Qlogic ISP SCSI adapters.
  *
@@ -54,20 +54,22 @@
 #endif
 
 #define	ISP_CORE_VERSION_MAJOR	2
-#define	ISP_CORE_VERSION_MINOR	2
+#define	ISP_CORE_VERSION_MINOR	5
 
 /*
  * Vector for bus specific code to provide specific services.
  */
 struct ispsoftc;
 struct ispmdvec {
+	int		(*dv_rd_isr)
+	    (struct ispsoftc *, u_int16_t *, u_int16_t *, u_int16_t *);
 	u_int16_t	(*dv_rd_reg) (struct ispsoftc *, int);
 	void		(*dv_wr_reg) (struct ispsoftc *, int, u_int16_t);
 	int		(*dv_mbxdma) (struct ispsoftc *);
 	int		(*dv_dmaset) (struct ispsoftc *,
-		XS_T *, ispreq_t *, u_int16_t *, u_int16_t);
+	    XS_T *, ispreq_t *, u_int16_t *, u_int16_t);
 	void		(*dv_dmaclr)
-		(struct ispsoftc *, XS_T *, u_int16_t);
+	    (struct ispsoftc *, XS_T *, u_int16_t);
 	void		(*dv_reset0) (struct ispsoftc *);
 	void		(*dv_reset1) (struct ispsoftc *);
 	void		(*dv_dregs) (struct ispsoftc *, const char *);
@@ -79,16 +81,24 @@ struct ispmdvec {
 /*
  * Overall parameters
  */
-#define	MAX_TARGETS	16
-#define	MAX_FC_TARG	256
+#define	MAX_TARGETS		16
+#define	MAX_FC_TARG		256
 #define	ISP_MAX_TARGETS(isp)	(IS_FC(isp)? MAX_FC_TARG : MAX_TARGETS)
 #define	ISP_MAX_LUNS(isp)	(isp)->isp_maxluns
 
+/*
+ * 'Types'
+ */
+#ifndef	ISP_DMA_ADDR_T
+#define	ISP_DMA_ADDR_T	u_int32_t
+#endif
 
 /*
  * Macros to access ISP registers through bus specific layers-
  * mostly wrappers to vector through the mdvec structure.
  */
+#define	ISP_READ_ISR(isp, isrp, semap, mbox0p)	\
+	(*(isp)->isp_mdvec->dv_rd_isr)(isp, isrp, semap, mbox0p)
 
 #define	ISP_READ(isp, reg)	\
 	(*(isp)->isp_mdvec->dv_rd_reg)((isp), (reg))
@@ -150,10 +160,10 @@ struct ispmdvec {
 #define	ISP_QAVAIL(isp)	\
 	ISP_QFREE(isp->isp_reqidx, isp->isp_reqodx, RQUEST_QUEUE_LEN(isp))
 
-#define	ISP_ADD_REQUEST(isp, iptr)	\
-	MEMORYBARRIER(isp, SYNC_REQUEST, iptr, QENTRY_LEN); \
-	ISP_WRITE(isp, INMAILBOX4, iptr); \
-	isp->isp_reqidx = iptr
+#define	ISP_ADD_REQUEST(isp, nxti)					\
+	MEMORYBARRIER(isp, SYNC_REQUEST, isp->isp_reqidx, QENTRY_LEN);	\
+	WRITE_REQUEST_QUEUE_IN_POINTER(isp, nxti);			\
+	isp->isp_reqidx = nxti
 
 /*
  * SCSI Specific Host Adapter Parameters- per bus, per target
@@ -234,7 +244,7 @@ typedef struct {
 
 typedef struct {
 	u_int32_t		isp_fwoptions	: 16,
-						: 2,
+				isp_gbspeed	: 2,
 				isp_iid_set	: 1,
 				loop_seen_once	: 1,
 				isp_loopstate	: 4,	/* Current Loop State */
@@ -247,7 +257,7 @@ typedef struct {
 	u_int8_t		isp_alpa;	/* ALPA */
 	u_int32_t		isp_portid;
 	volatile u_int16_t	isp_lipseq;	/* LIP sequence # */
-	u_int16_t		isp_xxxxxx;
+	u_int16_t		isp_fwattr;	/* firmware attributes */
 	u_int8_t		isp_execthrottle;
 	u_int8_t		isp_retry_delay;
 	u_int8_t		isp_retry_count;
@@ -284,7 +294,7 @@ typedef struct {
 	 * Scratch DMA mapped in area to fetch Port Database stuff, etc.
 	 */
 	caddr_t			isp_scratch;
-	u_int32_t		isp_scdma;
+	ISP_DMA_ADDR_T		isp_scdma;
 } fcparam;
 
 #define	FW_CONFIG_WAIT		0
@@ -340,15 +350,21 @@ typedef struct ispsoftc {
 	u_int32_t		isp_maxluns;	/* maximum luns supported */
 
 	u_int32_t		isp_clock	: 8,	/* input clock */
-						: 6,
-				isp_role	: 2,
-						: 1,
+						: 5,
+				isp_failed	: 1,	/* board failed */
+				isp_open	: 1,	/* opened (ioctl) */
 				isp_touched	: 1,	/* board ever seen? */
 				isp_bustype	: 1,	/* SBus or PCI */
 				isp_loaded_fw	: 1,	/* loaded firmware */
+				isp_role	: 2,	/* roles supported */
 				isp_dblev	: 12;	/* debug log mask */
 
 	u_int32_t		isp_confopts;		/* config options */
+
+	u_int16_t		isp_rqstinrp;	/* register for REQINP */
+	u_int16_t		isp_rqstoutrp;	/* register for REQOUTP */
+	u_int16_t		isp_respinrp;	/* register for RESINP */
+	u_int16_t		isp_respoutrp;	/* register for RESOUTP */
 
 	/*
 	 * Instrumentation
@@ -361,8 +377,8 @@ typedef struct ispsoftc {
 	 */
 
 	volatile u_int32_t
-		isp_mboxbsy	:	8,	/* mailbox command active */
-				:	1,
+		isp_obits	:	8,	/* mailbox command output */
+		isp_mboxbsy	:	1,	/* mailbox command active */
 		isp_state	:	3,
 		isp_sendmarker	:	2,	/* send a marker entry */
 		isp_update	:	2,	/* update parameters */
@@ -384,8 +400,8 @@ typedef struct ispsoftc {
 	 */
 	caddr_t			isp_rquest;
 	caddr_t			isp_result;
-	u_int32_t		isp_rquest_dma;
-	u_int32_t		isp_result_dma;
+	ISP_DMA_ADDR_T		isp_rquest_dma;
+	ISP_DMA_ADDR_T		isp_result_dma;
 } ispsoftc_t;
 
 #define	SDPARAM(isp)	((sdparam *) (isp)->isp_param)
@@ -404,6 +420,8 @@ typedef struct ispsoftc {
  */
 #define	ISP_CFG_NORELOAD	0x80	/* don't download f/w */
 #define	ISP_CFG_NONVRAM		0x40	/* ignore NVRAM */
+#define	ISP_CFG_TWOGB		0x20	/* force 2GB connection (23XX only) */
+#define	ISP_CFG_ONEGB		0x10	/* force 1GB connection (23XX only) */
 #define	ISP_CFG_FULL_DUPLEX	0x01	/* Full Duplex (Fibre Channel only) */
 #define	ISP_CFG_OWNWWN		0x02	/* override NVRAM wwn */
 #define	ISP_CFG_PORT_PREF	0x0C	/* Mask for Port Prefs (2200 only) */
@@ -447,14 +465,29 @@ typedef struct ispsoftc {
  * Firmware related defines
  */
 #define	ISP_CODE_ORG			0x1000	/* default f/w code start */
+#define	ISP_CODE_ORG_2300		0x0800	/* ..except for 2300s */
 #define	ISP_FW_REV(maj, min, mic)	((maj << 24) | (min << 16) | mic)
+#define	ISP_FW_MAJOR(code)		((code >> 24) & 0xff)
+#define	ISP_FW_MINOR(code)		((code >> 16) & 0xff)
+#define	ISP_FW_MICRO(code)		((code >>  8) & 0xff)
 #define	ISP_FW_REVX(xp)			((xp[0]<<24) | (xp[1] << 16) | xp[2])
+#define	ISP_FW_MAJORX(xp)		(xp[0])
+#define	ISP_FW_MINORX(xp)		(xp[1])
+#define	ISP_FW_MICROX(xp)		(xp[2])
 
 /*
  * Bus (implementation) types
  */
 #define	ISP_BT_PCI		0	/* PCI Implementations */
 #define	ISP_BT_SBUS		1	/* SBus Implementations */
+
+/*
+ * If we have not otherwise defined SBus support away make sure
+ * it is defined here such that the code is included as default
+ */
+#ifndef	ISP_SBUS_SUPPORTED
+#define	ISP_SBUS_SUPPORTED	1
+#endif
 
 /*
  * Chip Types
@@ -490,16 +523,15 @@ typedef struct ispsoftc {
 #define	IS_FC(isp)	((isp)->isp_type & ISP_HA_FC)
 #define	IS_2100(isp)	((isp)->isp_type == ISP_HA_FC_2100)
 #define	IS_2200(isp)	((isp)->isp_type == ISP_HA_FC_2200)
-#define	IS_2300(isp)	((isp)->isp_type == ISP_HA_FC_2300)
-
-/* 2300 Support isn't ready yet */
-#define	ISP_DISABLE_2300_SUPPORT	1
+#define	IS_2300(isp)	((isp)->isp_type >= ISP_HA_FC_2300)
 
 /*
  * DMA cookie macros
  */
-#define	DMA_MSW(x)	(((x) >> 16) & 0xffff)
-#define	DMA_LSW(x)	(((x) & 0xffff))
+#define	DMA_WD3(x)	0
+#define	DMA_WD2(x)	0
+#define	DMA_WD1(x)	(((x) >> 16) & 0xffff)
+#define	DMA_WD0(x)	(((x) & 0xffff))
 
 /*
  * Core System Function Prototypes
@@ -522,9 +554,14 @@ void isp_init(struct ispsoftc *);
 void isp_reinit(struct ispsoftc *);
 
 /*
- * Interrupt Service Routine
+ * Internal Interrupt Service Routine
+ *
+ * The outer layers do the spade work to get the appropriate status register,
+ * semaphore register and first mailbox register (if appropriate). This also
+ * means that most spurious/bogus interrupts not for us can be filtered first.
  */
-int isp_intr(void *);
+void isp_intr(struct ispsoftc *, u_int16_t, u_int16_t, u_int16_t);
+
 
 /*
  * Command Entry Point- Platform Dependent layers call into this
@@ -628,9 +665,8 @@ int isp_control(struct ispsoftc *, ispctl_t, void *);
  *
  * ISPASYNC_UNHANDLED_RESPONSE gives outer layers a chance to parse a
  * response queue entry not otherwise handled. The outer layer should
- * return non-zero if it handled it. The 'arg' points to a (possibly only
- * partially) massaged response queue entry (see the platform's
- * ISP_UNSWIZZLE_RESPONSE macro).
+ * return non-zero if it handled it. The 'arg' points to an unmassaged
+ * response queue entry.
  */
 
 typedef enum {
@@ -688,6 +724,11 @@ void isp_prt(struct ispsoftc *, int level, const char *, ...);
  *
  *
  *	INLINE		-	platform specific define for 'inline' functions
+ *
+ *	ISP_DMA_ADDR_T	-	platform specific dma address coookie- basically
+ *				the largest integer that can hold the 32 or
+ *				64 bit value appropriate for the QLogic's DMA
+ *				addressing. Defaults to u_int32_t.
  *
  *	ISP2100_SCRLEN	-	length for the Fibre Channel scratch DMA area
  *
@@ -786,14 +827,16 @@ void isp_prt(struct ispsoftc *, int level, const char *, ...);
  *		Block.
  *
  *	(XXX these do endian specific transformations- in transition XXX)
- *	ISP_SWIZZLE_ICB
- *	ISP_UNSWIZZLE_AND_COPY_PDBP
- *	ISP_SWIZZLE_CONTINUATION
- *	ISP_SWIZZLE_REQUEST
- *	ISP_UNSWIZZLE_RESPONSE
- *	ISP_SWIZZLE_SNS_REQ
- *	ISP_UNSWIZZLE_SNS_RSP
- *	ISP_SWIZZLE_NVRAM_WORD
+ *
+ *	ISP_IOXPUT_8(struct ispsoftc *, u_int8_t srcval, u_int8_t *dstptr)
+ *	ISP_IOXPUT_16(struct ispsoftc *, u_int16_t srcval, u_int16_t *dstptr)
+ *	ISP_IOXPUT_32(struct ispsoftc *, u_int32_t srcval, u_int32_t *dstptr)
+ *
+ *	ISP_IOXGET_8(struct ispsoftc *, u_int8_t *srcptr, u_int8_t dstrval)
+ *	ISP_IOXGET_16(struct ispsoftc *, u_int16_t *srcptr, u_int16_t dstrval)
+ *	ISP_IOXGET_32(struct ispsoftc *, u_int32_t *srcptr, u_int32_t dstrval)
+ *
+ *	ISP_SWIZZLE_NVRAM_WORD(struct ispsoftc *, u_int16_t *)
  */
 
 #endif	/* _ISPVAR_H */

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.12 2001/07/30 00:48:20 mjacob Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.20 2002/01/14 09:25:43 sobomax Exp $
  */
 
 #ifdef _KERNEL
@@ -142,6 +142,21 @@ static struct da_quirk_entry da_quirk_table[] =
 {
 	{
 		/*
+		 * Fujitsu M2513A MO drives.
+		 * Tested devices: M2513A2 firmware versions 1200 & 1300.
+		 * (dip switch selects whether T_DIRECT or T_OPTICAL device)
+		 * Reported by: W.Scholten <whs@xs4all.nl>
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "FUJITSU", "M2513A", "*"},
+		/*quirks*/ DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/* See above. */
+		{T_OPTICAL, SIP_MEDIA_REMOVABLE, "FUJITSU", "M2513A", "*"},
+		/*quirks*/ DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/*
 		 * This particular Fujitsu drive doesn't like the
 		 * synchronize cache command.
 		 * Reported by: Tom Jackson <toj@gorilla.net>
@@ -226,13 +241,9 @@ static struct da_quirk_entry da_quirk_table[] =
 	},
 	{
 		/*
-		 * Sony Memory Stick adapter MSAC-US1,
-		 * does not support READ_6 commands only READ_10. It also does
-		 * not support sync cache (0x35).
-		 * Sony PCG-C1VJ Internal Memory Stick Slot (MSC-U01) also
-		 * has this quirk.  Make all sony MS* products use this
-		 * quirk.  Reported by: TERAMOTO Masahiro
-		 * <teramoto@comm.eng.osaka-u.ac.jp> (PR 23378).
+		 * Sony Memory Stick adapter MSAC-US1 and
+		 * Sony PCG-C1VJ Internal Memory Stick Slot (MSC-U01).
+		 * Make all sony MS* products use this quirk.
 		 */
 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Sony", "MS*", "*"},
 		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
@@ -240,13 +251,99 @@ static struct da_quirk_entry da_quirk_table[] =
 	{
 		/*
 		 * Sony DSC cameras (DSC-S30, DSC-S50, DSC-S70)
-		 * do not support READ_6 commands, only READ_10. 
 		 */
 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Sony", "Sony DSC", "*"},
 		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
 	},
+        {
+		/*
+		 * Maxtor 3000LE USB Drive
+		 */
+		{T_DIRECT, SIP_MEDIA_FIXED, "MAXTOR*", "K040H2*", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE
+	},
 	{
 		{T_OPTICAL, SIP_MEDIA_REMOVABLE, "FUJITSU", "MCF3064AP", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE
+	},
+	{
+		/*
+		 * Microtech USB CameraMate
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "eUSB    Compact*", "Compact Flash*", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/*
+		 * The vendor, product and version strings coming from the
+		 * controller are null terminated instead of being padded with
+		 * spaces. The trailing wildcard character '*' is required.
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "SMSC*", "USB FDC*","*"},
+		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
+	},
+        {
+		/*
+		 * Olympus digital cameras (C-3040ZOOM, C-2040ZOOM, C-1)
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "OLYMPUS", "C-*", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/*
+		 * Olympus digital cameras (D-370)
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "OLYMPUS", "D-*", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE
+	},
+	{
+		/*
+		 * Olympus digital cameras (E-100RS, E-10).
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "OLYMPUS", "E-*", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
+	},
+        {
+		/*
+		 * KingByte Pen Drives
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "NO BRAND", "PEN DRIVE", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
+ 	},
+ 	{
+		/*
+		 * FujiFilm Camera
+		 */
+ 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "FUJIFILMUSB-DRIVEUNIT", "USB-DRIVEUNIT", "*"},
+ 		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
+ 	},
+	{
+		/*
+		 * Nikon Coolpix E775/E995 Cameras 
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "NIKON", "NIKON DSC E*", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE
+	},
+	{
+		/*
+		 * Nikon Coolpix E885 Camera
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Nikon", "Digital Camera", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE
+	},
+	{
+		/*
+		 * Minolta Dimage 2330
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "MINOLTA", "DIMAGE 2330*", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE
+	},
+	{
+		/*
+		 * DIVA USB Mp3 Player.
+		 * Doesn't work correctly with 6 byte reads/writes.
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "DIVA USB", "Media Reader","*"},
 		/*quirks*/ DA_Q_NO_6_BYTE
 	}
 };
@@ -739,7 +836,7 @@ dadump(dev_t dev)
 			return(EIO);
 		}
 		
-		if (dumpstatus(addr, (long)(num * softc->params.secsize)) < 0)
+		if (dumpstatus(addr, (off_t)num * softc->params.secsize) < 0)
 			return (EINTR);
 
 		/* update block count */
@@ -904,6 +1001,9 @@ dacleanup(struct cam_periph *periph)
 	cam_extend_release(daperiphs, periph->unit_number);
 	xpt_print_path(periph->path);
 	printf("removing device entry\n");
+	if (softc->disk.d_dev) {
+		disk_destroy(softc->disk.d_dev);
+	}
 	free(softc, M_DEVBUF);
 }
 

@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sysctl.c	8.4 (Berkeley) 4/14/94
- * $FreeBSD: src/sys/kern/kern_sysctl.c,v 1.92.2.5 2001/06/18 23:48:13 dd Exp $
+ * $FreeBSD: src/sys/kern/kern_sysctl.c,v 1.92.2.6 2001/11/28 03:55:25 peter Exp $
  */
 
 #include "opt_compat.h"
@@ -461,6 +461,11 @@ sysctl_sysctl_debug_dump_node(struct sysctl_oid_list *l, int i)
 static int
 sysctl_sysctl_debug(SYSCTL_HANDLER_ARGS)
 {
+	int error;
+
+	error = suser(req->p);
+	if (error)
+		return error;
 	sysctl_sysctl_debug_dump_node(&sysctl__children, 0);
 	return ENOENT;
 }

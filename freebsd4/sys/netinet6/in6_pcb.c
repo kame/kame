@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.4 2001/08/13 16:26:17 ume Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.7 2001/12/20 10:30:19 ru Exp $	*/
 /*	$KAME: in6_pcb.c,v 1.31 2001/05/21 05:45:10 jinmei Exp $	*/
   
 /*
@@ -99,11 +99,6 @@
 #include <netinet6/nd6.h>
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_pcb.h>
-
-#include "faith.h"
-#if defined(NFAITH) && NFAITH > 0
-#include <net/if_faith.h>
-#endif
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -985,23 +980,20 @@ in6_losing(in6p)
 	struct rt_addrinfo info;
 
 	if ((rt = in6p->in6p_route.ro_rt) != NULL) {
-		in6p->in6p_route.ro_rt = 0;
 		bzero((caddr_t)&info, sizeof(info));
-		info.rti_info[RTAX_DST] =
-			(struct sockaddr *)&in6p->in6p_route.ro_dst;
+		info.rti_flags = rt->rt_flags;
+		info.rti_info[RTAX_DST] = rt_key(rt);
 		info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
 		info.rti_info[RTAX_NETMASK] = rt_mask(rt);
 		rt_missmsg(RTM_LOSING, &info, rt->rt_flags, 0);
 		if (rt->rt_flags & RTF_DYNAMIC)
-			(void)rtrequest(RTM_DELETE, rt_key(rt),
-					rt->rt_gateway, rt_mask(rt), rt->rt_flags,
-					(struct rtentry **)0);
-		else
+			(void)rtrequest1(RTM_DELETE, &info, NULL);
+		in6p->in6p_route.ro_rt = NULL;
+		rtfree(rt);
 		/*
 		 * A new route can be allocated
 		 * the next time output is attempted.
 		 */
-			rtfree(rt);
 	}
 }
 
@@ -1040,11 +1032,10 @@ in6_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard, ifp)
 	u_short fport = fport_arg, lport = lport_arg;
 	int faith;
 
-#if defined(NFAITH) && NFAITH > 0
-	faith = faithprefix(laddr);
-#else
-	faith = 0;
-#endif
+	if (faithprefix_p != NULL)
+		faith = (*faithprefix_p)(laddr);
+	else
+		faith = 0;
 
 	/*
 	 * First look for an exact match.

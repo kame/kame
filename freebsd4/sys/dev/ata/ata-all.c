@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000,2001 Søren Schmidt
+ * Copyright (c) 1998,1999,2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-all.c,v 1.50.2.20 2001/08/28 17:56:14 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-all.c,v 1.50.2.29 2002/01/05 17:49:36 sos Exp $
  */
 
 #include "ata.h"
@@ -87,7 +87,6 @@ static void ata_boot_attach(void);
 static void ata_intr(void *);
 static int ata_getparam(struct ata_softc *, int, u_int8_t);
 static int ata_service(struct ata_softc *);
-static char *active2str(int);
 static void bswap(int8_t *, int);
 static void btrim(int8_t *, int);
 static void bpack(int8_t *, int8_t *, int);
@@ -216,28 +215,51 @@ struct ata_pci_softc {
 };
 
 int
-ata_find_dev(device_t dev, u_int32_t type, u_int32_t revid)
+ata_find_dev(device_t dev, u_int32_t devid, u_int32_t revid)
 {
-    device_t *children, child;
+    device_t *children;
     int nchildren, i;
 
     if (device_get_children(device_get_parent(dev), &children, &nchildren))
 	return 0;
 
     for (i = 0; i < nchildren; i++) {
-	child = children[i];
-
-	/* check that it's on the same silicon and the device we want */
-	if (pci_get_slot(dev) == pci_get_slot(child) &&
-	    pci_get_vendor(child) == (type & 0xffff) &&
-	    pci_get_device(child) == ((type & 0xffff0000) >> 16) &&
-	    pci_get_revid(child) >= revid) {
+	if (pci_get_devid(children[i]) == devid &&
+	    pci_get_revid(children[i]) >= revid) {
 	    free(children, M_TEMP);
 	    return 1;
 	}
     }
     free(children, M_TEMP);
     return 0;
+}
+
+static void
+ata_via_southbridge_fixup(device_t dev)
+{
+    device_t *children;
+    int nchildren, i;
+
+    if (device_get_children(device_get_parent(dev), &children, &nchildren))
+	return;
+
+    for (i = 0; i < nchildren; i++) {
+	if (pci_get_devid(children[i]) == 0x03051106 ||         /* VIA VT8363 */
+	    pci_get_devid(children[i]) == 0x03911106 ||         /* VIA VT8371 */
+	    pci_get_devid(children[i]) == 0x31021106 ||         /* VIA VT8662 */
+	    pci_get_devid(children[i]) == 0x31121106) {         /* VIA VT8361 */
+	    u_int8_t reg76 = pci_read_config(children[i], 0x76, 1);
+     
+	    if ((reg76 & 0xf0) != 0xd0) {
+		device_printf(dev,
+		"Correcting VIA config for southbridge data corruption bug\n");
+		pci_write_config(children[i], 0x75, 0x80, 1);
+		pci_write_config(children[i], 0x76, (reg76 & 0x0f) | 0xd0, 1);
+	    }
+	    break;
+	}
+    }
+    free(children, M_TEMP);
 }
 
 static const char *
@@ -256,23 +278,33 @@ ata_pci_match(device_t dev)
 
     case 0x71118086:
     case 0x71998086:
+    case 0x84ca8086:
 	return "Intel PIIX4 ATA33 controller";
 
     case 0x24218086:
 	return "Intel ICH0 ATA33 controller";
 
     case 0x24118086:
+    case 0x76018086:
 	return "Intel ICH ATA66 controller";
 
     case 0x244a8086:
     case 0x244b8086:
 	return "Intel ICH2 ATA100 controller";
 
+    case 0x248a8086:
+    case 0x248b8086:
+	return "Intel ICH3 ATA100 controller";
+
     case 0x522910b9:
-	if (pci_get_revid(dev) < 0x20)
-	    return "AcerLabs Aladdin ATA controller";
-	else
+	if (pci_get_revid(dev) >= 0xc4)
+	    return "AcerLabs Aladdin ATA100 controller";
+	if (pci_get_revid(dev) >= 0xc2)
+	    return "AcerLabs Aladdin ATA66 controller";
+	if (pci_get_revid(dev) >= 0x20)
 	    return "AcerLabs Aladdin ATA33 controller";
+	else
+	    return "AcerLabs Aladdin ATA controller";
 
     case 0x05711106: 
 	if (ata_find_dev(dev, 0x05861106, 0x02))
@@ -284,6 +316,7 @@ ata_pci_match(device_t dev)
 	if (ata_find_dev(dev, 0x05961106, 0))
 	    return "VIA 82C596 ATA33 controller";
 	if (ata_find_dev(dev, 0x06861106, 0x40) ||
+	    ata_find_dev(dev, 0x82311106, 0) ||
 	    ata_find_dev(dev, 0x30741106, 0))
 	    return "VIA 82C686 ATA100 controller";
 	if (ata_find_dev(dev, 0x06861106, 0))
@@ -291,7 +324,26 @@ ata_pci_match(device_t dev)
 	return "VIA Apollo ATA controller";
 
     case 0x55131039:
-	return "SiS 5591 ATA33 controller";
+	if (ata_find_dev(dev, 0x06301039, 0x30) ||
+	    ata_find_dev(dev, 0x06331039, 0x00) ||
+	    ata_find_dev(dev, 0x06351039, 0x00) ||
+	    ata_find_dev(dev, 0x06401039, 0x00) ||
+	    ata_find_dev(dev, 0x06451039, 0x00) ||
+	    ata_find_dev(dev, 0x06501039, 0x00) ||
+	    ata_find_dev(dev, 0x07301039, 0x00) ||
+	    ata_find_dev(dev, 0x07331039, 0x00) ||
+	    ata_find_dev(dev, 0x07351039, 0x00) ||
+	    ata_find_dev(dev, 0x07401038, 0x00) ||
+	    ata_find_dev(dev, 0x07451038, 0x00) ||
+	    ata_find_dev(dev, 0x07501039, 0x00))
+	    return "SiS 5591 ATA100 controller";
+	else if (ata_find_dev(dev, 0x05301039, 0x00) ||
+	    ata_find_dev(dev, 0x05401039, 0x00) ||
+	    ata_find_dev(dev, 0x06201039, 0x00) ||
+	    ata_find_dev(dev, 0x06301039, 0x00))
+	    return "SiS 5591 ATA66 controller";
+        else
+	    return "SiS 5591 ATA33 controller";
 
     case 0x06491095:
 	return "CMD 649 ATA100 controller";
@@ -333,6 +385,9 @@ ata_pci_match(device_t dev)
     case 0x6268105a:
 	return "Promise TX2 ATA100 controller";
 
+    case 0x4d69105a:
+	return "Promise TX2 ATA133 controller";
+
     case 0x00041103:
 	switch (pci_get_revid(dev)) {
 	case 0x00:
@@ -343,6 +398,8 @@ ata_pci_match(device_t dev)
 	case 0x03:
 	case 0x04:
 	    return "HighPoint HPT370 ATA100 controller";
+	case 0x05:
+	    return "HighPoint HPT372 ATA100 controller";
 	default:
 	    return "Unknown revision HighPoint ATA controller";
 	}
@@ -465,9 +522,25 @@ ata_pci_attach(device_t dev)
 	}
 	break;
 
-    case 0x05711106:
-    case 0x74111022:
-    case 0x74091022: /* VIA 82C586, '596, '686 & AMD 756, 766 default setup */
+    case 0x05711106: /* VIA 82C586, '596, '686 default setup */
+	
+	/* prepare for ATA-66 on the 82C686a and rev 0x12 and newer 82C596's */
+	if ((ata_find_dev(dev, 0x06861106, 0) &&
+	     !ata_find_dev(dev, 0x06861106, 0x40)) ||
+	    ata_find_dev(dev, 0x05961106, 0x12)) {
+	    pci_write_config(dev, 0x50, 
+			     pci_read_config(dev, 0x50, 4) | 0x030b030b, 4);   
+	}
+
+	/* the '686b might need the data corruption fix */
+	if (ata_find_dev(dev, 0x06861106, 0x40) ||
+	    ata_find_dev(dev, 0x82311106, 0x10))
+	    ata_via_southbridge_fixup(dev);
+
+	/* FALLTHROUGH */
+
+    case 0x74091022: /* AMD 756 default setup */
+    case 0x74111022: /* AMD 766 default setup */
 
 	/* set prefetch, postwrite */
 	pci_write_config(dev, 0x41, pci_read_config(dev, 0x41, 1) | 0xf0, 1);
@@ -486,14 +559,6 @@ ata_pci_attach(device_t dev)
 	/* set sector size */
 	pci_write_config(dev, 0x60, DEV_BSIZE, 2);
 	pci_write_config(dev, 0x68, DEV_BSIZE, 2);
-	
-	/* prepare for ATA-66 on the 82C686a and rev 0x12 and newer 82C596's */
-	if ((ata_find_dev(dev, 0x06861106, 0) &&
-	     !ata_find_dev(dev, 0x06861106, 0x40)) ||
-	    ata_find_dev(dev, 0x05961106, 0x12)) {
-	    pci_write_config(dev, 0x50, 
-			     pci_read_config(dev, 0x50, 4) | 0x030b030b, 4);   
-	}
 	break;
 
     case 0x10001042:	/* RZ 100? known bad, no DMA */
@@ -1004,7 +1069,7 @@ ata_getparam(struct ata_softc *scp, int device, u_int8_t command)
 
     /* apparently some devices needs this repeated */
     do {
-	if (ata_command(scp, device, command, 0, 0, 0, 0, 0, ATA_WAIT_INTR)) {
+	if (ata_command(scp, device, command, 0, 0, 0, ATA_WAIT_INTR)) {
 	    ata_printf(scp, device, "identify failed\n");
 	    return -1;
 	}
@@ -1125,11 +1190,18 @@ ata_intr(void *data)
     case 0x4d38105a:	/* Promise Ultra/Fasttrak 66 */
     case 0x4d30105a:	/* Promise Ultra/Fasttrak 100 */
     case 0x0d30105a:	/* Promise OEM ATA100 */
-    case 0x4d68105a:	/* Promise TX2 ATA100 */
-    case 0x6268105a:	/* Promise TX2v2 ATA100 */
 	if (!(inl(rman_get_start(sc->bmio) + 0x1c) & 
 	      (scp->channel ? 0x00004000 : 0x00000400)))
 	    return;
+	goto out;
+
+    case 0x4d68105a:	/* Promise TX2 ATA100 */
+    case 0x6268105a:	/* Promise TX2v2 ATA100 */
+    case 0x4d69105a:    /* Promise ATA133 */
+	outb(rman_get_start(scp->r_bmio) + 0x01, 0x0b);
+	if (!(inb(rman_get_start(scp->r_bmio) + 0x03) & 0x20))
+	    return;
+
     	/* FALLTHROUGH */
 out:
 #endif
@@ -1268,8 +1340,10 @@ ata_reset(struct ata_softc *scp, int *mask)
     ostat0 = inb(scp->ioaddr + ATA_STATUS);
 
     /* in some setups we dont want to test for a slave */
-    if (scp->flags & ATA_NO_SLAVE)
+    if (scp->flags & ATA_NO_SLAVE) {
 	*mask &= ~0x02;
+	status1 = 0x0;
+    }
 
     if (bootverbose)
 	ata_printf(scp, -1, "mask=%02x ostat0=%02x ostat2=%02x\n",
@@ -1478,23 +1552,21 @@ ata_wait(struct ata_softc *scp, int device, u_int8_t mask)
 
 int
 ata_command(struct ata_softc *scp, int device, u_int8_t command,
-	   u_int16_t cylinder, u_int8_t head, u_int8_t sector, 
-	   u_int8_t count, u_int8_t feature, int flags)
+	    u_int64_t lba, u_int16_t count, u_int8_t feature, int flags)
 {
     int error = 0;
 #ifdef ATA_DEBUG
     ata_printf(scp, device, "ata_command: addr=%04x, cmd=%02x, "
-	       "c=%d, h=%d, s=%d, count=%d, feature=%d, flags=%02x\n",
-	       scp->ioaddr, command, cylinder, head, sector, 
-	       count, feature, flags);
+	       "lba=%lld, count=%d, feature=%d, flags=%02x\n",
+	       scp->ioaddr, command, lba, count, feature, flags);
 #endif
+
+    /* select device */
+    outb(scp->ioaddr + ATA_DRIVE, ATA_D_IBM | device);
 
     /* disable interrupt from device */
     if (scp->flags & ATA_QUEUED)
 	outb(scp->altioaddr, ATA_A_IDS | ATA_A_4BIT);
-
-    /* select device */
-    outb(scp->ioaddr + ATA_DRIVE, ATA_D_IBM | device);
 
     /* ready to issue command ? */
     if (ata_wait(scp, device, 0) < 0) { 
@@ -1504,14 +1576,68 @@ ata_command(struct ata_softc *scp, int device, u_int8_t command,
 	return -1;
     }
 
-    outb(scp->ioaddr + ATA_FEATURE, feature);
-    outb(scp->ioaddr + ATA_COUNT, count);
-    outb(scp->ioaddr + ATA_SECTOR, sector);
-    outb(scp->ioaddr + ATA_CYL_MSB, cylinder >> 8);
-    outb(scp->ioaddr + ATA_CYL_LSB, cylinder);
-    outb(scp->ioaddr + ATA_DRIVE, ATA_D_IBM | device | head);
+    /* only use 48bit addressing if needed because of the overhead */
+    if (lba > 268435455 && scp->dev_param[ATA_DEV(device)]->support.address48) {
+	outb(scp->ioaddr + ATA_FEATURE, (feature>>8) & 0xff);
+	outb(scp->ioaddr + ATA_FEATURE, feature);
+	outb(scp->ioaddr + ATA_COUNT, (count>>8) & 0xff);
+	outb(scp->ioaddr + ATA_COUNT, count & 0xff);
+	outb(scp->ioaddr + ATA_SECTOR, (lba>>24) & 0xff);
+	outb(scp->ioaddr + ATA_SECTOR, lba & 0xff);
+	outb(scp->ioaddr + ATA_CYL_LSB, (lba<<32) & 0xff);
+	outb(scp->ioaddr + ATA_CYL_LSB, (lba>>8) & 0xff);
+	outb(scp->ioaddr + ATA_CYL_MSB, (lba>>40) & 0xff);
+	outb(scp->ioaddr + ATA_CYL_MSB, (lba>>16) & 0xff);
+	outb(scp->ioaddr + ATA_DRIVE, ATA_D_LBA | device);
 
-    switch (flags) {
+	/* translate command into 48bit version */
+	switch (command) {
+	case ATA_C_READ:
+	    command = ATA_C_READ48; break;
+	case ATA_C_READ_MUL:
+	    command = ATA_C_READ_MUL48; break;
+	case ATA_C_READ_DMA:
+	    command = ATA_C_READ_DMA48; break;
+	case ATA_C_READ_DMA_QUEUED:
+	    command = ATA_C_READ_DMA_QUEUED48; break;
+	case ATA_C_WRITE:
+	    command = ATA_C_WRITE48; break;
+	case ATA_C_WRITE_MUL:
+	    command = ATA_C_WRITE_MUL48; break;
+	case ATA_C_WRITE_DMA:
+	    command = ATA_C_WRITE_DMA48; break;
+	case ATA_C_WRITE_DMA_QUEUED:
+	    command = ATA_C_WRITE_DMA_QUEUED48; break;
+	case ATA_C_FLUSHCACHE:
+	    command = ATA_C_FLUSHCACHE48; break;
+	default:
+	    ata_printf(scp, device, "can't translate cmd to 48bit version\n");
+	    return -1;
+	}
+    }
+    else {
+	outb(scp->ioaddr + ATA_FEATURE, feature);
+	outb(scp->ioaddr + ATA_COUNT, count);
+	outb(scp->ioaddr + ATA_SECTOR, lba & 0xff);
+	outb(scp->ioaddr + ATA_CYL_LSB, (lba>>8) & 0xff);
+	outb(scp->ioaddr + ATA_CYL_MSB, (lba>>16) & 0xff);
+	if (flags & ATA_USE_CHS)
+		outb(scp->ioaddr + ATA_DRIVE,
+			 ATA_D_IBM | device | ((lba>>24) & 0xf));
+	else
+		outb(scp->ioaddr + ATA_DRIVE,
+			 ATA_D_IBM | ATA_D_LBA | device | ((lba>>24) & 0xf));
+    }
+
+    switch (flags & ATA_WAIT_MASK) {
+    case ATA_IMMEDIATE:
+	outb(scp->ioaddr + ATA_CMD, command);
+
+	/* enable interrupt */
+	if (scp->flags & ATA_QUEUED)
+	    outb(scp->altioaddr, ATA_A_4BIT);
+	break;
+
     case ATA_WAIT_INTR:
 	scp->active = ATA_WAIT_INTR;
 	asleep((caddr_t)scp, PRIBIO, "atacmd", 10 * hz);
@@ -1541,18 +1667,7 @@ ata_command(struct ata_softc *scp, int device, u_int8_t command,
 	if (scp->active != ATA_REINITING)
 	    scp->active = ATA_IDLE;
 	break;
-
-    case ATA_IMMEDIATE:
-	outb(scp->ioaddr + ATA_CMD, command);
-	break;
-
-    default:
-	ata_printf(scp, device, "DANGER: illegal interrupt flag=%s\n",
-		   active2str(flags));
     }
-    /* enable interrupt */
-    if (scp->flags & ATA_QUEUED)
-	outb(scp->altioaddr, ATA_A_4BIT);
     return error;
 }
 
@@ -1602,21 +1717,9 @@ ata_mode2str(int mode)
     case ATA_UDMA2: return "UDMA33";
     case ATA_UDMA4: return "UDMA66";
     case ATA_UDMA5: return "UDMA100";
+    case ATA_UDMA6: return "UDMA133";
     case ATA_DMA: return "BIOSDMA";
     default: return "???";
-    }
-}
-
-int
-ata_pio2mode(int pio)
-{
-    switch (pio) {
-    default:
-    case 0: return ATA_PIO0;
-    case 1: return ATA_PIO1;
-    case 2: return ATA_PIO2;
-    case 3: return ATA_PIO3;
-    case 4: return ATA_PIO4;
     }
 }
 
@@ -1629,11 +1732,11 @@ ata_pmode(struct ata_params *ap)
 	if (ap->apiomodes & 1) 
 	    return 3;
     }	
-    if (ap->opiomode == 2)
+    if (ap->retired_piomode == 2)
 	return 2;
-    if (ap->opiomode == 1)
+    if (ap->retired_piomode == 1)
 	return 1;
-    if (ap->opiomode == 0)
+    if (ap->retired_piomode == 0)
 	return 0;
     return -1; 
 } 
@@ -1641,11 +1744,11 @@ ata_pmode(struct ata_params *ap)
 int
 ata_wmode(struct ata_params *ap)
 {
-    if (ap->wdmamodes & 4)
+    if (ap->mwdmamodes & 0x04)
 	return 2;
-    if (ap->wdmamodes & 2)
+    if (ap->mwdmamodes & 0x02)
 	return 1;
-    if (ap->wdmamodes & 1)
+    if (ap->mwdmamodes & 0x01)
 	return 0;
     return -1;
 }
@@ -1654,6 +1757,8 @@ int
 ata_umode(struct ata_params *ap)
 {
     if (ap->atavalid & ATA_FLAG_88) {
+	if (ap->udmamodes & 0x40)
+	    return 6;
 	if (ap->udmamodes & 0x20)
 	    return 5;
 	if (ap->udmamodes & 0x10)
@@ -1668,34 +1773,6 @@ ata_umode(struct ata_params *ap)
 	    return 0;
     }
     return -1;
-}
-
-static char *
-active2str(int active)
-{
-    static char buf[8];
-
-    switch (active) {
-    case ATA_IDLE:
-	return("ATA_IDLE");
-    case ATA_IMMEDIATE:
-	return("ATA_IMMEDIATE");
-    case ATA_WAIT_INTR:
-	return("ATA_WAIT_INTR");
-    case ATA_WAIT_READY:
-	return("ATA_WAIT_READY");
-    case ATA_ACTIVE:
-	return("ATA_ACTIVE");
-    case ATA_ACTIVE_ATA:
-	return("ATA_ACTIVE_ATA");
-    case ATA_ACTIVE_ATAPI:
-	return("ATA_ACTIVE_ATAPI");
-    case ATA_REINITING:
-	return("ATA_REINITING");
-    default:
-	sprintf(buf, "0x%02x", active);
-	return buf;
-    }
 }
 
 static void

@@ -38,7 +38,7 @@
  * SUCH DAMAGE.
  *
  *	from: Id: machdep.c,v 1.193 1996/06/18 01:22:04 bde Exp
- * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.80.2.6 2001/07/19 09:12:07 kato Exp $
+ * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.80.2.7 2001/10/18 04:05:14 jdp Exp $
  */
 
 #include "opt_cpu.h"
@@ -114,14 +114,9 @@ static void
 do_cpuid(u_int ax, u_int *p)
 {
 	__asm __volatile(
-	".byte	0x0f, 0xa2;"
-	"movl	%%eax, (%2);"
-	"movl	%%ebx, 4(%2);"
-	"movl	%%ecx, 8(%2);"
-	"movl	%%edx, 12(%2);"
-	: "=a" (ax)
-	:  "0" (ax), "S" (p)
-	: "bx", "cx", "dx"
+	"cpuid"
+	: "=a" (p[0]), "=b" (p[1]), "=c" (p[2]), "=d" (p[3])
+	:  "0" (ax)
 	);
 }
 

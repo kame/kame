@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/ct/ct_isa.c,v 1.3.2.1 2001/07/26 02:32:18 nyan Exp $ */
+/* $FreeBSD: src/sys/dev/ct/ct_isa.c,v 1.3.2.2 2001/10/17 14:00:34 nyan Exp $ */
 /*	$NecBSD: ct_isa.c,v 1.6 1999/07/26 06:32:01 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -113,6 +113,7 @@ struct ct_isa_softc {
 };
 
 static struct isa_pnp_id ct_pnp_ids[] = {
+	{ 0x0100e7b1,	"Logitec LHA-301" },
 	{ 0x110154dc,	"I-O DATA SC-98III" },
 	{ 0x4120acb4,	"MELCO IFC-NN" },
 	{ 0,		NULL }

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/stg/tmc18c30var.h,v 1.1.2.3 2001/07/22 00:21:40 non Exp $	*/
+/*	$FreeBSD: src/sys/dev/stg/tmc18c30var.h,v 1.1.2.4 2001/12/17 13:30:19 non Exp $	*/
 /*	$NecBSD: tmc18c30var.h,v 1.12.18.2 2001/06/13 05:51:23 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -57,7 +57,6 @@ struct stg_softc {
 	bus_space_tag_t sc_memt;
 	bus_space_handle_t sc_ioh;
 
-#if __FreeBSD_version >= 400001
 	int port_rid;
 	int irq_rid;
 	int mem_rid;
@@ -66,7 +65,6 @@ struct stg_softc {
 	struct resource *mem_res;
 
 	void *stg_intrhand;
-#endif	/* __FreeBSD_version */
 #endif	/* __FreeBSD__ */
 
 	int sc_tmaxcnt;

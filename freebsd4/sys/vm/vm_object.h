@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_object.h,v 1.63.2.1 2000/08/04 22:31:11 peter Exp $
+ * $FreeBSD: src/sys/vm/vm_object.h,v 1.63.2.2 2001/11/03 19:59:28 dillon Exp $
  */
 
 /*
@@ -243,6 +243,7 @@ void vm_object_collapse __P((vm_object_t));
 void vm_object_deallocate __P((vm_object_t));
 void vm_object_terminate __P((vm_object_t));
 void vm_object_vndeallocate __P((vm_object_t));
+void vm_object_set_writeable_dirty __P((vm_object_t));
 void vm_object_init __P((void));
 void vm_object_page_clean __P((vm_object_t, vm_pindex_t, vm_pindex_t, boolean_t));
 void vm_object_page_remove __P((vm_object_t, vm_pindex_t, vm_pindex_t, boolean_t));

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)subr_prf.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/subr_prf.c,v 1.61.2.2 2001/08/08 22:31:16 obrien Exp $
+ * $FreeBSD: src/sys/kern/subr_prf.c,v 1.61.2.3 2001/12/02 17:05:33 iedowse Exp $
  */
 
 #include <sys/param.h>
@@ -837,14 +837,17 @@ msgbufinit(void *ptr, size_t size)
 	char *cp;
 	static struct msgbuf *oldp = NULL;
 
+	size -= sizeof(*msgbufp);
 	cp = (char *)ptr;
-	msgbufp = (struct msgbuf *) (cp + size - sizeof(*msgbufp));
-	if (msgbufp->msg_magic != MSG_MAGIC || msgbufp->msg_ptr != cp) {
+	msgbufp = (struct msgbuf *) (cp + size);
+	if (msgbufp->msg_magic != MSG_MAGIC || msgbufp->msg_size != size ||
+	    msgbufp->msg_bufx >= size || msgbufp->msg_bufr >= size) {
 		bzero(cp, size);
+		bzero(msgbufp, sizeof(*msgbufp));
 		msgbufp->msg_magic = MSG_MAGIC;
 		msgbufp->msg_size = (char *)msgbufp - cp;
-		msgbufp->msg_ptr = cp;
 	}
+	msgbufp->msg_ptr = cp;
 	if (msgbufmapped && oldp != msgbufp)
 		msgbufcopy(oldp);
 	msgbufmapped = 1;

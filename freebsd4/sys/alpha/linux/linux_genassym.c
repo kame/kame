@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/linux/linux_genassym.c,v 1.15.2.1 2000/11/04 07:30:08 obrien Exp $ */
+/* $FreeBSD: src/sys/alpha/linux/linux_genassym.c,v 1.15.2.2 2001/11/05 19:08:22 marcel Exp $ */
 
 #include <stddef.h>
 
@@ -7,7 +7,5 @@
 
 #include <alpha/linux/linux.h>
 
-ASSYM(LINUX_SIGF_HANDLER, offsetof(struct linux_sigframe, sf_handler));
-ASSYM(LINUX_SIGF_SC, offsetof(struct linux_sigframe, sf_sc));
-/* ASSYM(LINUX_SC_GS, offsetof(struct linux_sigcontext, sc_gs)); */
-/* ASSYM(LINUX_SC_EFLAGS, offsetof(struct linux_sigcontext, sc_eflags)); */
+ASSYM(LINUX_SIGF_HANDLER, offsetof(struct l_sigframe, sf_handler));
+ASSYM(LINUX_SIGF_SC, offsetof(struct l_sigframe, sf_sc));

@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, Revision 2.7  92/02/29  15:33:41  rpd
- * $FreeBSD: src/sys/boot/pc98/boot2/asm.h,v 1.2 1999/08/28 00:40:23 peter Exp $
+ * $FreeBSD: src/sys/boot/pc98/boot2/asm.h,v 1.2.2.1 2001/10/07 13:22:38 nyan Exp $
  */
 
 #define S_ARG0	 4(%esp)
@@ -69,8 +69,8 @@
 
 #define LB(x,n) n
 #ifdef	__STDC__
-#define EXT(x) _ ## x
-#define LEXT(x) _ ## x ## :
+#define EXT(x) x
+#define LEXT(x) x ## :
 
 #define LBb(x,n) n ## b
 #define LBf(x,n) n ## f

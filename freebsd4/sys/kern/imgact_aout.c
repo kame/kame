@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/imgact_aout.c,v 1.59.2.2 2001/05/18 09:58:40 bp Exp $
+ * $FreeBSD: src/sys/kern/imgact_aout.c,v 1.59.2.5 2001/11/03 01:41:08 ps Exp $
  */
 
 #include <sys/param.h>
@@ -157,7 +157,7 @@ exec_aout_imgact(imgp)
 	 * text/data/bss must not exceed limits
 	 */
 	if (/* text can't exceed maximum text size */
-	    a_out->a_text > MAXTSIZ ||
+	    a_out->a_text > maxtsiz ||
 
 	    /* data + bss can't exceed rlimit */
 	    a_out->a_data + bss_size >
@@ -259,15 +259,15 @@ aout_coredump(p, vp, limit)
 	fill_eproc(p, &p->p_addr->u_kproc.kp_eproc);
 	error = cpu_coredump(p, vp, cred);
 	if (error == 0)
-		error = vn_rdwr(UIO_WRITE, vp, vm->vm_daddr,
+		error = vn_rdwr_inchunks(UIO_WRITE, vp, vm->vm_daddr,
 		    (int)ctob(vm->vm_dsize), (off_t)ctob(UPAGES), UIO_USERSPACE,
-		    IO_NODELOCKED|IO_UNIT, cred, (int *) NULL, p);
+		    IO_UNIT | IO_DIRECT, cred, (int *) NULL, p);
 	if (error == 0)
-		error = vn_rdwr(UIO_WRITE, vp,
+		error = vn_rdwr_inchunks(UIO_WRITE, vp,
 		    (caddr_t) trunc_page(USRSTACK - ctob(vm->vm_ssize)),
 		    round_page(ctob(vm->vm_ssize)),
 		    (off_t)ctob(UPAGES) + ctob(vm->vm_dsize), UIO_USERSPACE,
-		    IO_NODELOCKED|IO_UNIT, cred, (int *) NULL, p);
+		    IO_UNIT | IO_DIRECT, cred, (int *) NULL, p);
 	return (error);
 }
 

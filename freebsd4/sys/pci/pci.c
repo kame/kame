@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/pci.c,v 1.141.2.12 2001/08/30 19:42:37 gallatin Exp $
+ * $FreeBSD: src/sys/pci/pci.c,v 1.141.2.14 2002/01/10 12:08:22 mdodd Exp $
  *
  */
 
@@ -79,9 +79,10 @@ struct pci_quirk {
 
 struct pci_quirk pci_quirks[] = {
 	/*
-	 * The Intel 82371AB has a map register at offset 0x90.
+	 * The Intel 82371AB and 82443MX has a map register at offset 0x90.
 	 */
 	{ 0x71138086, PCI_QUIRK_MAP_REG,	0x90,	 0 },
+	{ 0x719b8086, PCI_QUIRK_MAP_REG,	0x90,	 0 },
 
 	{ 0 }
 };
@@ -101,6 +102,37 @@ struct pci_devinfo {
 static STAILQ_HEAD(devlist, pci_devinfo) pci_devq;
 u_int32_t pci_numdevs = 0;
 static u_int32_t pci_generation = 0;
+
+device_t
+pci_find_bsf (u_int8_t bus, u_int8_t slot, u_int8_t func)
+{
+	struct pci_devinfo *dinfo;
+
+	STAILQ_FOREACH(dinfo, &pci_devq, pci_links) {
+		if ((dinfo->cfg.bus == bus) &&
+		    (dinfo->cfg.slot == slot) &&
+		    (dinfo->cfg.func == func)) {
+			return (dinfo->cfg.dev);
+		}
+	}
+
+	return (NULL);
+}
+
+device_t
+pci_find_device (u_int16_t vendor, u_int16_t device)
+{
+	struct pci_devinfo *dinfo;
+
+	STAILQ_FOREACH(dinfo, &pci_devq, pci_links) {
+		if ((dinfo->cfg.vendor == vendor) &&
+		    (dinfo->cfg.device == device)) {
+			return (dinfo->cfg.dev);
+		}
+	}
+
+	return (NULL);
+}
 
 /* return base address of memory or port map */
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_exec.c,v 1.107.2.8 2001/07/09 19:03:13 guido Exp $
+ * $FreeBSD: src/sys/kern/kern_exec.c,v 1.107.2.13 2002/01/22 17:22:59 nectar Exp $
  */
 
 #include <sys/param.h>
@@ -47,6 +47,7 @@
 #include <sys/shm.h>
 #include <sys/sysctl.h>
 #include <sys/vnode.h>
+#include <sys/aio.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -111,6 +112,15 @@ execve(p, uap)
 	int (*img_first) __P((struct image_params *));
 
 	imgp = &image_params;
+
+	/*
+	 * Lock the process and set the P_INEXEC flag to indicate that
+	 * it should be left alone until we're done here.  This is
+	 * necessary to avoid race conditions - e.g. in ptrace() -
+	 * that might allow a local user to illicitly obtain elevated
+	 * privileges.
+	 */
+	p->p_flag |= P_INEXEC;
 
 	/*
 	 * Initialize part of the common data
@@ -250,7 +260,7 @@ interpret:
 	/*
 	 * For security and other reasons, signal handlers cannot
 	 * be shared after an exec. The new proces gets a copy of the old
-	 * handlers. In execsigs(), the new process wll have its signals
+	 * handlers. In execsigs(), the new process will have its signals
 	 * reset.
 	 */
 	if (p->p_procsig->ps_refcnt > 1) {
@@ -263,7 +273,7 @@ interpret:
 		p->p_procsig = newprocsig;
 		p->p_procsig->ps_refcnt = 1;
 		if (p->p_sigacts == &p->p_addr->u_sigacts)
-			panic("shared procsig but private sigacts?\n");
+			panic("shared procsig but private sigacts?");
 
 		p->p_addr->u_sigacts = *p->p_sigacts;
 		p->p_sigacts = &p->p_addr->u_sigacts;
@@ -310,9 +320,13 @@ interpret:
 		 */
 		setsugid(p);
 		if (p->p_tracep && suser(p)) {
-			p->p_traceflag = 0;
-			vrele(p->p_tracep);
-			p->p_tracep = NULL;
+			struct vnode *vtmp;
+
+			if ((vtmp = p->p_tracep) != NULL) {
+				p->p_tracep = NULL;
+				p->p_traceflag = 0;
+				vrele(vtmp);
+			}
 		}
 		/*
 		 * Set the new credentials.
@@ -343,10 +357,12 @@ interpret:
 	VREF(ndp->ni_vp);
 	p->p_textvp = ndp->ni_vp;
 
-	/*
-	 * notify others that we exec'd
-	 */
+        /*
+         * Notify others that we exec'd, and clear the P_INEXEC flag
+         * as we're now a bona fide freshly-execed process.
+         */
 	KNOTE(&p->p_klist, NOTE_EXEC);
+	p->p_flag &= ~P_INEXEC;
 
 	/*
 	 * If tracing the process, trap to debugger so breakpoints
@@ -400,6 +416,8 @@ exec_fail_dealloc:
 		return (0);
 
 exec_fail:
+	/* we're done here, clear P_INEXEC */
+	p->p_flag &= ~P_INEXEC;
 	if (imgp->vmspace_destroyed) {
 		/* sorry, no more process anymore. exit gracefully */
 		exit1(p, W_EXITCODE(0, SIGABRT));
@@ -493,10 +511,15 @@ exec_new_vmspace(imgp)
 {
 	int error;
 	struct vmspace *vmspace = imgp->proc->p_vmspace;
-	caddr_t	stack_addr = (caddr_t) (USRSTACK - MAXSSIZ);
+	vm_offset_t stack_addr = USRSTACK - maxssiz;
 	vm_map_t map = &vmspace->vm_map;
 
 	imgp->vmspace_destroyed = 1;
+
+	/*
+	 * Prevent a pending AIO from modifying the new address space.
+	 */
+	aio_proc_rundown(imgp->proc);
 
 	/*
 	 * Blow away entire process VM, if address space not shared,
@@ -515,8 +538,8 @@ exec_new_vmspace(imgp)
 	}
 
 	/* Allocate a new stack */
-	error = vm_map_stack (&vmspace->vm_map, (vm_offset_t)stack_addr,
-			      (vm_size_t)MAXSSIZ, VM_PROT_ALL, VM_PROT_ALL, 0);
+	error = vm_map_stack(&vmspace->vm_map, stack_addr, (vm_size_t)maxssiz,
+	    VM_PROT_ALL, VM_PROT_ALL, 0);
 	if (error)
 		return (error);
 
@@ -524,8 +547,8 @@ exec_new_vmspace(imgp)
 	 * VM_STACK case, but they are still used to monitor the size of the
 	 * process stack so we can check the stack rlimit.
 	 */
-	vmspace->vm_ssize = SGROWSIZ >> PAGE_SHIFT;
-	vmspace->vm_maxsaddr = (char *)USRSTACK - MAXSSIZ;
+	vmspace->vm_ssize = sgrowsiz >> PAGE_SHIFT;
+	vmspace->vm_maxsaddr = (char *)USRSTACK - maxssiz;
 
 	return(0);
 }

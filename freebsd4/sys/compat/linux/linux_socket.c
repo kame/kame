@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_socket.c,v 1.19.2.6 2001/03/04 08:38:20 assar Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_socket.c,v 1.19.2.8 2001/11/07 20:33:55 marcel Exp $
  */
 
 /* XXX we use functions that might not exist. */
@@ -50,13 +50,30 @@
 #include <netinet/ip.h>
 
 #include <machine/../linux/linux.h>
-#ifdef __alpha__
-#include <linux_proto.h>
-#else
 #include <machine/../linux/linux_proto.h>
-#endif
 #include <compat/linux/linux_socket.h>
 #include <compat/linux/linux_util.h>
+
+/*
+ * FreeBSD's socket calls require the sockaddr struct length to agree
+ * with the address family.  Linux does not, so we must force it.
+ */
+static int
+linux_to_bsd_namelen(caddr_t name, int namelen)
+{
+	uint16_t	family;	/* XXX must match Linux sockaddr */
+
+	if (copyin(name, &family, sizeof(family)))
+		return namelen;
+
+	switch (family) {
+		case AF_INET:
+			return sizeof(struct sockaddr_in);
+		case AF_INET6:
+			return sizeof(struct sockaddr_in6);
+	}
+	return namelen;
+}
 
 #ifndef __alpha__
 static int
@@ -377,7 +394,8 @@ linux_bind(struct proc *p, struct linux_bind_args *args)
 
 	bsd_args.s = linux_args.s;
 	bsd_args.name = (caddr_t)linux_args.name;
-	bsd_args.namelen = linux_args.namelen;
+	bsd_args.namelen = linux_to_bsd_namelen(bsd_args.name,
+	    linux_args.namelen);
 	return (bind(p, &bsd_args));
 }
 
@@ -411,7 +429,8 @@ linux_connect(struct proc *p, struct linux_connect_args *args)
 
 	bsd_args.s = linux_args.s;
 	bsd_args.name = (caddr_t)linux_args.name;
-	bsd_args.namelen = linux_args.namelen;
+	bsd_args.namelen = linux_to_bsd_namelen(bsd_args.name,
+	    linux_args.namelen);
 	error = connect(p, &bsd_args);
 	if (error != EISCONN)
 		return (error);
@@ -427,7 +446,7 @@ linux_connect(struct proc *p, struct linux_connect_args *args)
 	error = EISCONN;
 	if (fp->f_flag & FNONBLOCK) {
 		so = (struct socket *)fp->f_data;
-		if ((u_int)so->so_emuldata == 0)
+		if (so->so_emuldata == 0)
 			error = so->so_error;
 		so->so_emuldata = (void *)1;
 	}
@@ -874,38 +893,39 @@ linux_getsockopt(struct proc *p, struct linux_getsockopt_args *args)
 int
 linux_socketcall(struct proc *p, struct linux_socketcall_args *args)
 {
+	void *arg = (void *)args->args;
 
 	switch (args->what) {
 	case LINUX_SOCKET:
-		return (linux_socket(p, args->args));
+		return (linux_socket(p, arg));
 	case LINUX_BIND:
-		return (linux_bind(p, args->args));
+		return (linux_bind(p, arg));
 	case LINUX_CONNECT:
-		return (linux_connect(p, args->args));
+		return (linux_connect(p, arg));
 	case LINUX_LISTEN:
-		return (linux_listen(p, args->args));
+		return (linux_listen(p, arg));
 	case LINUX_ACCEPT:
-		return (linux_accept(p, args->args));
+		return (linux_accept(p, arg));
 	case LINUX_GETSOCKNAME:
-		return (linux_getsockname(p, args->args));
+		return (linux_getsockname(p, arg));
 	case LINUX_GETPEERNAME:
-		return (linux_getpeername(p, args->args));
+		return (linux_getpeername(p, arg));
 	case LINUX_SOCKETPAIR:
-		return (linux_socketpair(p, args->args));
+		return (linux_socketpair(p, arg));
 	case LINUX_SEND:
-		return (linux_send(p, args->args));
+		return (linux_send(p, arg));
 	case LINUX_RECV:
-		return (linux_recv(p, args->args));
+		return (linux_recv(p, arg));
 	case LINUX_SENDTO:
-		return (linux_sendto(p, args->args));
+		return (linux_sendto(p, arg));
 	case LINUX_RECVFROM:
-		return (linux_recvfrom(p, args->args));
+		return (linux_recvfrom(p, arg));
 	case LINUX_SHUTDOWN:
-		return (linux_shutdown(p, args->args));
+		return (linux_shutdown(p, arg));
 	case LINUX_SETSOCKOPT:
-		return (linux_setsockopt(p, args->args));
+		return (linux_setsockopt(p, arg));
 	case LINUX_GETSOCKOPT:
-		return (linux_getsockopt(p, args->args));
+		return (linux_getsockopt(p, arg));
 	case LINUX_SENDMSG:
 		do {
 			int error;
@@ -915,7 +935,7 @@ linux_socketcall(struct proc *p, struct linux_socketcall_args *args)
 				int s;
 				const struct msghdr *msg;
 				int flags;
-			} *uap = args->args;
+			} *uap = arg;
 
 			error = copyin(&uap->msg->msg_control, &control,
 			    sizeof(caddr_t));
@@ -943,10 +963,10 @@ linux_socketcall(struct proc *p, struct linux_socketcall_args *args)
 					return (error);
 			}
 		done:
-			return (sendmsg(p, args->args));
+			return (sendmsg(p, arg));
 		} while (0);
 	case LINUX_RECVMSG:
-		return (linux_recvmsg(p, args->args));
+		return (linux_recvmsg(p, arg));
 	}
 
 	uprintf("LINUX: 'socket' typ=%d not implemented\n", args->what);

@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/kern/subr_disk.c,v 1.20.2.5 2001/08/23 10:32:29 bde Exp $
+ * $FreeBSD: src/sys/kern/subr_disk.c,v 1.20.2.6 2001/10/05 07:14:57 peter Exp $
  *
  */
 
@@ -29,8 +29,6 @@ static d_open_t diskopen;
 static d_close_t diskclose; 
 static d_ioctl_t diskioctl;
 static d_psize_t diskpsize;
-
-struct disk *disk_enumerate(struct disk *disk);
 
 static LIST_HEAD(, disk) disklist = LIST_HEAD_INITIALIZER(&disklist);
 

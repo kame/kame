@@ -2,7 +2,7 @@
  *  Device driver optimized for the Symbios/LSI 53C896/53C895A/53C1010 
  *  PCI-SCSI controllers.
  *
- *  Copyright (C) 1999-2000  Gerard Roudier <groudier@club-internet.fr>
+ *  Copyright (C) 1999-2001  Gerard Roudier <groudier@free.fr>
  *
  *  This driver also supports the following Symbios/LSI PCI-SCSI chips:
  *	53C810A, 53C825A, 53C860, 53C875, 53C876, 53C885, 53C895,
@@ -55,7 +55,7 @@
  * SUCH DAMAGE.
  */
 
-/* $FreeBSD: src/sys/dev/sym/sym_hipd.c,v 1.6.2.10 2001/07/08 20:04:04 groudier Exp $ */
+/* $FreeBSD: src/sys/dev/sym/sym_hipd.c,v 1.6.2.12 2001/12/02 19:01:10 groudier Exp $ */
 
 #define SYM_DRIVER_NAME	"sym-1.6.5-20000902"
 
@@ -172,7 +172,7 @@ typedef	u_int32_t u32;
 #elif	defined	__ia64__
 #define MEMORY_BARRIER()	__asm__ volatile("mf.a; mf" : : : "memory")
 #elif	defined	__sparc64__
-#error	"Sorry, but maintainer is ignorant about sparc64 :)"
+#define MEMORY_BARRIER()	__asm__ volatile("membar #Sync" : : : "memory")
 #else
 #error	"Not supported platform"
 #endif
@@ -699,7 +699,7 @@ static void sym_mfree(void *ptr, int size, char *name)
 #define __sym_mfree_dma(b, p, s, n)	sym_mfree(p, s, n)
 #ifdef	__alpha__
 #define	__vtobus(b, p)	alpha_XXX_dmamap((vm_offset_t)(p))
-#else /*__i386__*/
+#else /*__i386__, __sparc64__*/
 #define __vtobus(b, p)	vtophys(p)
 #endif
 
@@ -1049,7 +1049,7 @@ struct sym_nvram {
 #define mmio_write32(a, b)   writel(a, b)
 #define memcpy_to_pci(d, s, n)	memcpy_toio((u32)(d), (void *)(s), (n))
 
-#else /*__i386__*/
+#else /*__i386__, __sparc64__*/
 
 #define mmio_read8(a)	     scr_to_cpu((*(volatile unsigned char *) (a)))
 #define mmio_read16(a)	     scr_to_cpu((*(volatile unsigned short *) (a)))
@@ -9373,7 +9373,7 @@ sym_pci_attach2(pcici_t pci_tag, int unit)
 	np->targtbl = (u32 *) sym_calloc_dma(256, "TARGTBL");
 	if (!np->targtbl)
 		goto attach_failed;
-	np->targtbl_ba = cpu_to_scr(vtobus(np->targtbl));
+	np->targtbl_ba = vtobus(np->targtbl);
 
 	/*
 	 *  Allocate SCRIPTS areas.

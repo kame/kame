@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)libkern.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/sys/libkern.h,v 1.20.2.1 2000/09/25 06:29:15 gibbs Exp $
+ * $FreeBSD: src/sys/sys/libkern.h,v 1.20.2.2 2001/09/30 21:12:54 luigi Exp $
  */
 
 #ifndef _SYS_LIBKERN_H_
@@ -103,7 +103,7 @@ memset(void *b, int c, size_t len)
 	if (c == 0)
 		bzero(b, len);
 	else
-		for (bb = b; len--; )
+		for (bb = (char *)b; len--; )
 			*bb++ = c;
 	return (b);
 }

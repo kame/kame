@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_intr.c,v 1.24 1999/10/11 15:19:09 peter Exp $
+ * $FreeBSD: src/sys/kern/kern_intr.c,v 1.24.2.1 2001/10/14 20:05:50 luigi Exp $
  *
  */
 
@@ -31,6 +31,8 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
 
 #include <machine/ipl.h>
 
@@ -128,3 +130,31 @@ unregister_swi(intr, handler)
 	splx(s);
 }
 
+/* 
+ * Sysctls used by systat and others: hw.intrnames and hw.intrcnt.
+ * The data for this machine dependent, and the declarations are in machine
+ * dependent code.  The layout of intrnames and intrcnt however is machine
+ * independent.
+ *
+ * We do not know the length of intrcnt and intrnames at compile time, so
+ * calculate things at run time.
+ */
+static int
+sysctl_intrnames(SYSCTL_HANDLER_ARGS)
+{
+	return (sysctl_handle_opaque(oidp, intrnames, eintrnames - intrnames, 
+	    req));
+}
+
+SYSCTL_PROC(_hw, OID_AUTO, intrnames, CTLTYPE_OPAQUE | CTLFLAG_RD,
+	NULL, 0, sysctl_intrnames, "", "Interrupt Names");
+
+static int
+sysctl_intrcnt(SYSCTL_HANDLER_ARGS)
+{
+	return (sysctl_handle_opaque(oidp, intrcnt, 
+	    (char *)eintrcnt - (char *)intrcnt, req));
+}
+
+SYSCTL_PROC(_hw, OID_AUTO, intrcnt, CTLTYPE_OPAQUE | CTLFLAG_RD,
+	NULL, 0, sysctl_intrcnt, "", "Interrupt Counts");

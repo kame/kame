@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/dec_2100_a500.c,v 1.1.2.4 2001/03/04 00:28:07 gallatin Exp $
+ * $FreeBSD: src/sys/alpha/alpha/dec_2100_a500.c,v 1.1.2.5 2001/10/20 21:07:17 gallatin Exp $
  */
 
 #include "opt_ddb.h"
@@ -65,7 +65,10 @@ dec_2100_a500_init(cputype)
 	 * See if we're a `Sable' or a `Lynx'.
 	 */
 	if (cputype == ST_DEC_2100_A500) {
-		sable_lynx_base = SABLE_BASE;
+		if (alpha_implver() == ALPHA_IMPLVER_EV5)
+			sable_lynx_base = LYNX_BASE;
+		else
+			sable_lynx_base = SABLE_BASE;
 		platform.family = "DEC AlphaServer 2100";
 	} else if (cputype == ST_DEC_2100A_A500) {
 		sable_lynx_base = LYNX_BASE;

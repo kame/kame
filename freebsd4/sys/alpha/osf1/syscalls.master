@@ -1,4 +1,4 @@
-;	$FreeBSD: src/sys/alpha/osf1/syscalls.master,v 1.1.2.1 2000/08/09 00:24:10 peter Exp $
+;	$FreeBSD: src/sys/alpha/osf1/syscalls.master,v 1.1.2.2 2001/10/05 07:34:36 peter Exp $
 
 ;       @(#)syscalls.master     8.1 (Berkeley) 7/19/93
 ; System call name/number master file (or rather, slave, from OSF1).
@@ -32,7 +32,7 @@
 
 
 0	NOPROTO	OSF1	{ int nosys(void); }
-1	NOPROTO	OSF1	{ void exit(int rval); } exit rexit_args void
+1	NOPROTO	OSF1	{ void sys_exit(int rval); } exit sys_exit_args void
 2	NOPROTO	OSF1	{ int fork(void); }
 3	NOPROTO	OSF1	{ ssize_t read(int fd, char *buf, ssize_t nbyte); }
 4	NOPROTO	OSF1	{ ssize_t write(int fd, char *buf, ssize_t nbyte); }

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/kern/sysv_shm.c,v 1.45.2.4 2001/05/15 03:15:17 dillon Exp $ */
+/* $FreeBSD: src/sys/kern/sysv_shm.c,v 1.45.2.5 2001/11/03 01:41:08 ps Exp $ */
 /*	$NetBSD: sysv_shm.c,v 1.23 1994/07/04 23:25:12 glass Exp $	*/
 
 /*
@@ -32,7 +32,6 @@
  */
 
 #include "opt_compat.h"
-#include "opt_rlimit.h"
 #include "opt_sysvipc.h"
 
 #include <sys/param.h>
@@ -305,7 +304,7 @@ shmat(p, uap)
 			return EINVAL;
 	} else {
 		/* This is just a hint to vm_map_find() about where to put it. */
-		attach_va = round_page((vm_offset_t)p->p_vmspace->vm_taddr + MAXTSIZ + MAXDSIZ);
+		attach_va = round_page((vm_offset_t)p->p_vmspace->vm_taddr + maxtsiz + maxdsiz);
 	}
 
 	shm_handle = shmseg->shm_internal;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/libi386/libi386.h,v 1.11.2.2 2000/12/28 13:12:40 ps Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/libi386.h,v 1.11.2.3 2001/12/21 22:19:58 jhb Exp $
  */
 
 
@@ -45,6 +45,11 @@ struct i386_devdesc
 	    int		partition;
 	    void	*data;
 	} biosdisk;
+	struct
+	{
+	    int		unit;
+	    void	*data;
+	} bioscd;
 	struct 
 	{
 	    int		unit;		/* XXX net layer lives over these? */
@@ -61,10 +66,15 @@ extern struct devdesc	currdev;	/* our current device */
 #define MAXDEV	31			/* maximum number of distinct devices */
 
 /* exported devices XXX rename? */
+extern struct devsw bioscd;
 extern struct devsw biosdisk;
 extern struct devsw pxedisk;
 extern struct fs_ops pxe_fsops;
 
+int	bc_add(int biosdev);		/* Register CD booted from. */
+int	bc_getdev(struct i386_devdesc *dev);	/* return dev_t for (dev) */
+int	bc_bios2unit(int biosdev);	/* xlate BIOS device -> bioscd unit */
+int	bc_unit2bios(int unit);		/* xlate bioscd unit -> BIOS device */
 u_int32_t	bd_getbigeom(int bunit);	/* return geometry in bootinfo format */
 int	bd_bios2unit(int biosdev);		/* xlate BIOS device -> biosdisk unit */
 int	bd_unit2bios(int unit);			/* xlate biosdisk unit -> BIOS device */

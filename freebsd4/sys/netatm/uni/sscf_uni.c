@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/uni/sscf_uni.c,v 1.7 2000/01/17 20:49:50 mks Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/sscf_uni.c,v 1.7.2.1 2001/09/30 22:54:35 kris Exp $
  *
  */
 
@@ -41,7 +41,7 @@
 #include <netatm/uni/sscf_uni_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscf_uni.c,v 1.7 2000/01/17 20:49:50 mks Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/sscf_uni.c,v 1.7.2.1 2001/09/30 22:54:35 kris Exp $");
 #endif
 
 
@@ -271,7 +271,7 @@ sscf_uni_abort(uvp, msg)
 	/*
 	 * Log error message
 	 */
-	log(LOG_ERR, msg);
+	log(LOG_ERR, "%s", msg);
 
 	/*
 	 * Set termination states

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/intpm.c,v 1.16 1999/12/03 08:41:21 mdodd Exp $
+ * $FreeBSD: src/sys/pci/intpm.c,v 1.16.2.1 2001/12/23 08:17:47 pirzyk Exp $
  */
 
 #include <sys/param.h>
@@ -62,7 +62,7 @@ static struct _pcsid
 } pci_ids[] =
 {
 	{ 0x71138086,"Intel 82371AB Power management controller"},
-	
+ 	{ 0x719b8086,"Intel 82443MX Power management controller"},
 	{ 0x00000000,	NULL					}
 };
 static int intsmb_probe(device_t);

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agp.c,v 1.3.2.1 2000/07/19 09:48:04 ru Exp $
+ *	$FreeBSD: src/sys/pci/agp.c,v 1.3.2.3 2002/01/10 12:07:07 mdodd Exp $
  */
 
 #include "opt_bus.h"
@@ -56,6 +56,8 @@
 #include <machine/bus.h>
 #include <machine/resource.h>
 #include <sys/rman.h>
+
+MODULE_VERSION(agp, 1);
 
 MALLOC_DEFINE(M_AGP, "agp", "AGP data structures");
 
@@ -528,22 +530,12 @@ static int
 agp_release_helper(device_t dev, enum agp_acquire_state state)
 {
 	struct agp_softc *sc = device_get_softc(dev);
-	struct agp_memory *mem;
 
 	if (sc->as_state == AGP_ACQUIRE_FREE)
 		return 0;
 
 	if (sc->as_state != state)
 		return EBUSY;
-
-	/*
-	 * Clear out the aperture and free any outstanding memory blocks.
-	 */
-	while ((mem = TAILQ_FIRST(&sc->as_memory)) != 0) {
-		if (mem->am_is_bound)
-			AGP_UNBIND_MEMORY(dev, mem);
-		AGP_FREE_MEMORY(dev, mem);
-	}
 
 	sc->as_state = AGP_ACQUIRE_FREE;
 	return 0;
@@ -660,10 +652,16 @@ agp_close(dev_t kdev, int fflag, int devtype, struct proc *p)
 {
 	device_t dev = KDEV2DEV(kdev);
 	struct agp_softc *sc = device_get_softc(dev);
+	struct agp_memory *mem;
 
 	/*
 	 * Clear the GATT and force release on last close
 	 */
+	while ((mem = TAILQ_FIRST(&sc->as_memory)) != 0) {
+		if (mem->am_is_bound)
+			AGP_UNBIND_MEMORY(dev, mem);
+		AGP_FREE_MEMORY(dev, mem);
+	}
 	if (sc->as_state == AGP_ACQUIRE_USER)
 		agp_release_helper(dev, AGP_ACQUIRE_USER);
 	sc->as_isopen = 0;
@@ -745,6 +743,7 @@ agp_get_info(device_t dev, struct agp_info *info)
 	info->ai_aperture_base = rman_get_start(sc->as_aperture);
 	info->ai_aperture_size = (rman_get_end(sc->as_aperture)
 				  - rman_get_start(sc->as_aperture)) + 1;
+	info->ai_aperture_va = (vm_offset_t) rman_get_virtual(sc->as_aperture);
 	info->ai_memory_allowed = sc->as_maxmem;
 	info->ai_memory_used = sc->as_allocated;
 }

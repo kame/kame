@@ -36,7 +36,7 @@
  *
  *	@(#)procfs_vnops.c	8.18 (Berkeley) 5/21/95
  *
- * $FreeBSD: src/sys/miscfs/procfs/procfs_vnops.c,v 1.76.2.5 2001/08/12 14:29:19 rwatson Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_vnops.c,v 1.76.2.7 2002/01/22 17:22:59 nectar Exp $
  */
 
 /*
@@ -148,6 +148,9 @@ procfs_open(ap)
 			return (EBUSY);
 
 		p1 = ap->a_p;
+		/* Can't trace a process that's currently exec'ing. */ 
+		if ((p2->p_flag & P_INEXEC) != 0)
+			return EAGAIN;
 		if (!CHECKIO(p1, p2) || p_trespass(p1, p2))
 			return (EPERM);
 
@@ -239,6 +242,9 @@ procfs_ioctl(ap)
 		return ENOTTY;
 	}
 
+	/* Can't trace a process that's currently exec'ing. */ 
+	if ((procp->p_flag & P_INEXEC) != 0)
+		return EAGAIN;
 	if (!CHECKIO(p, procp) || p_trespass(p, procp))
 		return EPERM;
 
@@ -262,6 +268,7 @@ procfs_ioctl(ap)
 	  break;
 	case PIOCGFL:
 	  *(unsigned int*)ap->a_data = (unsigned int)procp->p_pfsflags;
+	  break;
 	case PIOCSTATUS:
 	  psp = (struct procfs_status *)ap->a_data;
 	  psp->state = (procp->p_step == 0);

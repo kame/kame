@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_loop.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_loop.c,v 1.47.2.5 2001/07/03 11:01:41 ume Exp $
+ * $FreeBSD: src/sys/net/if_loop.c,v 1.47.2.6 2001/12/20 10:30:16 ru Exp $
  */
 
 /*
@@ -87,7 +87,7 @@
 #endif NETATALK
 
 int loioctl __P((struct ifnet *, u_long, caddr_t));
-static void lortrequest __P((int, struct rtentry *, struct sockaddr *));
+static void lortrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 
 static void loopattach __P((void *));
 PSEUDO_SET(loopattach, if_loop);
@@ -317,10 +317,10 @@ if_simloop(ifp, m, af, hlen)
 
 /* ARGSUSED */
 static void
-lortrequest(cmd, rt, sa)
+lortrequest(cmd, rt, info)
 	int cmd;
 	struct rtentry *rt;
-	struct sockaddr *sa;
+	struct rt_addrinfo *info;
 {
 	if (rt) {
 		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu; /* for ISO */

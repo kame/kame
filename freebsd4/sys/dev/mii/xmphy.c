@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/xmphy.c,v 1.1.2.3 2001/06/18 18:49:13 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/xmphy.c,v 1.1.2.4 2001/10/05 06:54:07 peter Exp $
  */
 
 /*
@@ -45,6 +45,7 @@
 #include <sys/socket.h>
 #include <sys/bus.h>
 
+#include <machine/clock.h>
 
 #include <net/if.h>
 #include <net/if_media.h>
@@ -59,7 +60,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/xmphy.c,v 1.1.2.3 2001/06/18 18:49:13 wpaul Exp $";
+  "$FreeBSD: src/sys/dev/mii/xmphy.c,v 1.1.2.4 2001/10/05 06:54:07 peter Exp $";
 #endif
 
 static int xmphy_probe		__P((device_t));

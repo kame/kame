@@ -31,7 +31,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/if_atm.c,v 1.8 1999/12/07 17:39:06 shin Exp $
+ * $FreeBSD: src/sys/netinet/if_atm.c,v 1.8.2.1 2001/12/20 10:30:18 ru Exp $
  */
 
 /*
@@ -71,14 +71,14 @@
  * atm_rtrequest: handle ATM rt request (in support of generic code)
  *   inputs: "req" = request code
  *           "rt" = route entry
- *           "sa" = sockaddr
+ *           "info" = rt_addrinfo
  */
 
 void
-atm_rtrequest(req, rt, sa)
+atm_rtrequest(req, rt, info)
 	int req;
 	register struct rtentry *rt;
-	struct sockaddr *sa;
+	struct rt_addrinfo *info;
 {
 	register struct sockaddr *gate = rt->rt_gateway;
 	struct atm_pseudoioctl api;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/sys/event.h,v 1.5.2.3 2001/02/26 04:23:21 jlemon Exp $
+ *	$FreeBSD: src/sys/sys/event.h,v 1.5.2.5 2001/12/14 19:21:22 jlemon Exp $
  */
 
 #ifndef _SYS_EVENT_H_
@@ -35,8 +35,9 @@
 #define EVFILT_VNODE		(-4)	/* attached to vnodes */
 #define EVFILT_PROC		(-5)	/* attached to struct proc */
 #define EVFILT_SIGNAL		(-6)	/* attached to struct proc */
+#define EVFILT_TIMER		(-7)	/* timers */
 
-#define EVFILT_SYSCOUNT		6
+#define EVFILT_SYSCOUNT		7
 
 #define EV_SET(kevp, a, b, c, d, e, f) do {	\
 	(kevp)->ident = (a);			\
@@ -112,6 +113,10 @@ struct knote;
 SLIST_HEAD(klist, knote);
 
 #ifdef _KERNEL
+
+#ifdef MALLOC_DECLARE
+MALLOC_DECLARE(M_KQUEUE);
+#endif
 
 #define KNOTE(list, hint)	if ((list) != NULL) knote(list, hint)
 

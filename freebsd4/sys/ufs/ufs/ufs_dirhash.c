@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ufs/ufs/ufs_dirhash.c,v 1.3.2.2 2001/08/28 17:28:49 iedowse Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_dirhash.c,v 1.3.2.4 2001/11/21 14:14:21 iedowse Exp $
  */
 /*
  * This implements a hash-based lookup scheme for UFS directories.
@@ -68,7 +68,7 @@ SYSCTL_INT(_vfs_ufs, OID_AUTO, dirhash_maxmem, CTLFLAG_RW, &ufs_dirhashmaxmem,
 static int ufs_dirhashmem;
 SYSCTL_INT(_vfs_ufs, OID_AUTO, dirhash_mem, CTLFLAG_RD, &ufs_dirhashmem,
     0, "current dirhash memory usage");
-static int ufs_dirhashcheck = 1;
+static int ufs_dirhashcheck = 0;
 SYSCTL_INT(_vfs_ufs, OID_AUTO, dirhash_docheck, CTLFLAG_RW, &ufs_dirhashcheck,
     0, "enable extra sanity tests");
 
@@ -337,7 +337,7 @@ restart:
 		 */
 		for (i = slot; (offset = DH_ENTRY(dh, i)) != DIRHASH_EMPTY;
 		    i = WRAPINCR(i, dh->dh_hlen))
-			if (offset == dh->dh_seqopt)
+			if (offset == dh->dh_seqoff)
 				break;
 		if (offset == dh->dh_seqoff) {
 			/*

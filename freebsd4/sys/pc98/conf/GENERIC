@@ -15,7 +15,7 @@
 # device lines is also present in the ./LINT configuration file. If you are
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-# $FreeBSD: src/sys/pc98/conf/GENERIC,v 1.142.2.23 2001/07/30 17:31:41 wpaul Exp $
+# $FreeBSD: src/sys/pc98/conf/GENERIC,v 1.142.2.27.2.1 2002/01/26 14:52:29 murray Exp $
 
 machine		pc98
 cpu		I386_CPU
@@ -23,7 +23,7 @@ cpu		I486_CPU
 cpu		I586_CPU
 cpu		I686_CPU
 ident		GENERIC
-maxusers	32
+maxusers	0
 
 #makeoptions	DEBUG=-g		#Build kernel with gdb(1) debug symbols
 
@@ -34,6 +34,7 @@ options 	INET6			#IPv6 communications protocols
 options 	FFS			#Berkeley Fast Filesystem
 options 	FFS_ROOT		#FFS usable as root device [keep this!]
 options 	SOFTUPDATES		#Enable FFS soft updates support
+options 	UFS_DIRHASH		#Improve performance on big directories
 options 	MFS			#Memory Filesystem
 options 	MD_ROOT			#MD is a potential root device
 options 	NFS			#Network Filesystem
@@ -155,6 +156,7 @@ device		npx0	at nexus? port IO_NPX irq 8
 
 # Power management support (see LINT for more options)
 #device		apm0    at nexus? disable flags 0x20 # Advanced Power Management
+#device		pmc0	at isa? port 0x8f0
 
 # PCCARD (PCMCIA) support
 device		card
@@ -224,6 +226,7 @@ device		vr		# VIA Rhine, Rhine II
 device		wb		# Winbond W89C840F
 device		wx		# Intel Gigabit Ethernet Card (``Wiseman'')
 device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
+device		bge		# Broadcom BCM570x (``Tigon III'')
 
 # ISA Ethernet NICs.
 #
@@ -350,6 +353,7 @@ pseudo-device	bpf		#Berkeley packet filter
 #device		umass		# Disks/Mass storage - Requires scbus and da
 #device		ums		# Mouse
 #device		uscanner	# Scanners
+#device		urio		# Diamond Rio MP3 Player
 # USB Ethernet, requires mii
 #device		aue		# ADMtek USB ethernet
 #device		cue		# CATC USB ethernet

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/maestro3.c,v 1.2.2.5 2001/08/01 18:43:17 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/maestro3.c,v 1.2.2.6 2001/12/12 19:49:29 guido Exp $
  */
 
 /*
@@ -1304,6 +1304,8 @@ m3_pci_resume(device_t dev)
 
 	reset_state = m3_assp_halt(sc);
 
+	m3_codec_reset(sc);
+
 	/* Restore the ASSP state */
 	for (i = REV_B_CODE_MEMORY_BEGIN; i <= REV_B_CODE_MEMORY_END; i++)
 		m3_wr_assp_code(sc, i, sc->savemem[index++]);
@@ -1319,6 +1321,11 @@ m3_pci_resume(device_t dev)
 	m3_enable_ints(sc);
 
 	m3_amp_enable(sc);
+
+	if (mixer_reinit(dev) == -1) {
+		device_printf(dev, "unable to reinitialize the mixer\n");
+		return ENXIO;
+	}
 
 	/* Turn the channels back on */
 	for (i=0 ; i<sc->pch_cnt ; i++) {

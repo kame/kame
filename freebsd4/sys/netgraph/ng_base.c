@@ -37,7 +37,7 @@
  * Authors: Julian Elischer <julian@freebsd.org>
  *          Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.11.2.15 2001/09/03 06:38:16 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.11.2.16 2001/12/08 19:07:51 jdp Exp $
  * $Whistle: ng_base.c,v 1.39 1999/01/28 23:54:53 julian Exp $
  */
 
@@ -1832,11 +1832,11 @@ struct ng_queue_entry {
 
 static struct ng_queue_entry   *ngqbase;	/* items to be unqueued */
 static struct ng_queue_entry   *ngqlast;	/* last item queued */
-static const int		ngqroom = 64;	/* max items to queue */
+static const int		ngqroom = 256;	/* max items to queue */
 static int			ngqsize;	/* number of items in queue */
 
 static struct ng_queue_entry   *ngqfree;	/* free ones */
-static const int		ngqfreemax = 16;/* cache at most this many */
+static const int		ngqfreemax = 256;/* cache at most this many */
 static int			ngqfreesize;	/* number of cached entries */
 
 /*

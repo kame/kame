@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/pc/bios.h,v 1.7.2.2 2001/08/21 15:31:53 imp Exp $
+ * $FreeBSD: src/sys/i386/include/pc/bios.h,v 1.7.2.3 2001/10/21 03:16:56 yokota Exp $
  */
 
 /* 
@@ -171,7 +171,7 @@ struct bios_args {
  */
 #define PNP_COUNT_DEVNODES	"sppD",		0x00
 #define PNP_GET_DEVNODE		"sppsD",	0x01
-#define PNP_SET_DEVNODE		"sppsD",	0x02
+#define PNP_SET_DEVNODE		"sspsD",	0x02
 #define PNP_GET_EVENT		"spD",		0x03
 #define PNP_SEND_MSG		"ssD",		0x04
 #define PNP_GET_DOCK_INFO	"spD",		0x05

@@ -27,7 +27,7 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  * 	@(#) src/sys/coda/coda_subr.c,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $
- * $FreeBSD: src/sys/coda/coda_subr.c,v 1.11 1999/08/28 00:40:55 peter Exp $
+ * $FreeBSD: src/sys/coda/coda_subr.c,v 1.11.2.1 2001/10/25 19:18:51 dillon Exp $
  * 
   */
 
@@ -313,10 +313,10 @@ coda_checkunmounting(mp)
 	struct cnode *cp;
 	int count = 0, bad = 0;
 loop:
-	for (vp = mp->mnt_vnodelist.lh_first; vp; vp = nvp) {
+	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp; vp = nvp) {
 		if (vp->v_mount != mp)
 			goto loop;
-		nvp = vp->v_mntvnodes.le_next;
+		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
 		cp = VTOC(vp);
 		count++;
 		if (!(cp->c_flags & C_UNMOUNTING)) {

@@ -1,3 +1,6 @@
+/*	$FreeBSD: src/sys/netinet6/ah6.h,v 1.2.2.2 2001/07/03 11:01:49 ume Exp $	*/
+/*	$KAME: ah6.h,v 1.1.1.2 2002/02/07 01:35:39 sakane Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -25,8 +28,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/netinet6/ah6.h,v 1.2 1999/12/29 04:46:02 peter Exp $
  */
 
 /*
@@ -34,7 +35,7 @@
  */
 
 #ifndef _NETINET6_AH6_H_
-#define	_NETINET6_AH6_H_
+#define _NETINET6_AH6_H_
 
 #ifdef _KERNEL
 struct secasvar;
@@ -42,8 +43,10 @@ struct secasvar;
 extern int ah6_input __P((struct mbuf **, int *, int));
 extern int ah6_output __P((struct mbuf *, u_char *, struct mbuf *,
 	struct ipsecrequest *));
-extern int ah6_calccksum __P((struct mbuf *, caddr_t,
-			      struct ah_algorithm *, struct secasvar *));
+extern int ah6_calccksum __P((struct mbuf *, caddr_t, size_t,
+	const struct ah_algorithm *, struct secasvar *));
+
+extern void ah6_ctlinput __P((int, struct sockaddr *, void *));
 #endif
 
 #endif /*_NETINET6_AH6_H_*/

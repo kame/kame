@@ -43,7 +43,7 @@
  *	from:	@(#)pmap.c	7.7 (Berkeley)	5/12/91
  *	from:	i386 Id: pmap.c,v 1.193 1998/04/19 15:22:48 bde Exp
  *		with some ideas from NetBSD's alpha pmap
- * $FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.35.2.6 2001/07/30 23:27:58 peter Exp $
+ * $FreeBSD: src/sys/alpha/alpha/pmap.c,v 1.35.2.7 2001/11/03 01:10:25 dillon Exp $
  */
 
 /*
@@ -2237,7 +2237,7 @@ pmap_object_init_pt(pmap_t pmap, vm_offset_t addr,
 	psize = alpha_btop(size);
 
 	if ((object->type != OBJT_VNODE) ||
-		(limit && (psize > MAX_INIT_PT) &&
+		((limit & MAP_PREFAULT_PARTIAL) && (psize > MAX_INIT_PT) &&
 			(object->resident_page_count > MAX_INIT_PT))) {
 		return;
 	}
@@ -2265,6 +2265,14 @@ pmap_object_init_pt(pmap_t pmap, vm_offset_t addr,
 			if (tmpidx >= psize) {
 				continue;
 			}
+			/*
+			 * don't allow an madvise to blow away our really
+			 * free pages allocating pv entries.
+			 */
+			if ((limit & MAP_PREFAULT_MADVISE) &&
+			    cnt.v_free_count < cnt.v_free_reserved) {
+				break;
+			}
 			if (((p->valid & VM_PAGE_BITS_ALL) == VM_PAGE_BITS_ALL) &&
 			    (p->flags & (PG_BUSY | PG_FICTITIOUS)) == 0) {
 				if ((p->queue - p->pc) == PQ_CACHE)
@@ -2282,6 +2290,14 @@ pmap_object_init_pt(pmap_t pmap, vm_offset_t addr,
 		 * else lookup the pages one-by-one.
 		 */
 		for (tmpidx = 0; tmpidx < psize; tmpidx += 1) {
+			/*
+			 * don't allow an madvise to blow away our really
+			 * free pages allocating pv entries.
+			 */
+			if ((limit & MAP_PREFAULT_MADVISE) &&
+			    cnt.v_free_count < cnt.v_free_reserved) {
+				break;
+			}
 			p = vm_page_lookup(object, tmpidx + pindex);
 			if (p &&
 			    ((p->valid & VM_PAGE_BITS_ALL) == VM_PAGE_BITS_ALL) &&

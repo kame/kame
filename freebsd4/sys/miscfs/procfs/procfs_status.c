@@ -37,7 +37,7 @@
  *	@(#)procfs_status.c	8.4 (Berkeley) 6/15/94
  *
  * From:
- * $FreeBSD: src/sys/miscfs/procfs/procfs_status.c,v 1.20.2.3 2000/11/16 13:50:00 eivind Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_status.c,v 1.20.2.4 2002/01/22 17:22:59 nectar Exp $
  */
 
 #include <sys/param.h>
@@ -211,7 +211,9 @@ procfs_docmdline(curp, p, pfs, uio)
 	 */
 
 	if (p->p_args &&
-	    (ps_argsopen || (CHECKIO(curp, p) && !p_trespass(curp, p)))) {
+	    (ps_argsopen || (CHECKIO(curp, p) &&
+			     (p->p_flag & P_INEXEC) == 0 &&
+			     !p_trespass(curp, p)))) {
 		bp = p->p_args->ar_args;
 		buflen = p->p_args->ar_length;
 		buf = 0;

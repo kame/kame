@@ -17,7 +17,7 @@
  *
  * From: Version 2.4, Thu Apr 30 17:17:21 MSD 1997
  *
- * $FreeBSD: src/sys/net/if_spppsubr.c,v 1.59.2.7 2001/07/31 19:43:55 ume Exp $
+ * $FreeBSD: src/sys/net/if_spppsubr.c,v 1.59.2.9 2002/01/07 15:02:18 joerg Exp $
  */
 
 #include <sys/param.h>
@@ -2526,7 +2526,7 @@ sppp_lcp_tlu(struct sppp *sp)
 
 	/* Send Up events to all started protos. */
 	for (i = 0, mask = 1; i < IDX_COUNT; i++, mask <<= 1)
-		if (sp->lcp.protos & mask && ((cps[i])->flags & CP_LCP) == 0)
+		if ((sp->lcp.protos & mask) && ((cps[i])->flags & CP_LCP) == 0)
 			(cps[i])->Up(sp);
 
 	/* notify low-level driver of state change */
@@ -2558,7 +2558,7 @@ sppp_lcp_tld(struct sppp *sp)
 	 * describes it.
 	 */
 	for (i = 0, mask = 1; i < IDX_COUNT; i++, mask <<= 1)
-		if (sp->lcp.protos & mask && ((cps[i])->flags & CP_LCP) == 0) {
+		if ((sp->lcp.protos & mask) && ((cps[i])->flags & CP_LCP) == 0) {
 			(cps[i])->Down(sp);
 			(cps[i])->Close(sp);
 		}
@@ -2651,7 +2651,7 @@ sppp_ncp_check(struct sppp *sp)
 	int i, mask;
 
 	for (i = 0, mask = 1; i < IDX_COUNT; i++, mask <<= 1)
-		if (sp->lcp.protos & mask && (cps[i])->flags & CP_NCP)
+		if ((sp->lcp.protos & mask) && (cps[i])->flags & CP_NCP)
 			return 1;
 	return 0;
 }
@@ -4584,6 +4584,7 @@ sppp_set_ip_addr(struct sppp *sp, u_long src)
 	STDDCL;
 	struct ifaddr *ifa;
 	struct sockaddr_in *si;
+	struct in_ifaddr *ia;
 
 	/*
 	 * Pick the first AF_INET address from the list,
@@ -4634,6 +4635,9 @@ sppp_set_ip_addr(struct sppp *sp, u_long src)
 
 		/* set new address */
 		si->sin_addr.s_addr = htonl(src);
+		ia = ifatoia(ifa);
+		LIST_REMOVE(ia, ia_hash);
+		LIST_INSERT_HEAD(INADDR_HASH(si->sin_addr.s_addr), ia, ia_hash);
 
 		/* add new route */
 		error = rtinit(ifa, (int)RTM_ADD, RTF_HOST);
@@ -4916,7 +4920,7 @@ sppp_phase_network(struct sppp *sp)
 
 	/* Send Up events to all NCPs. */
 	for (i = 0, mask = 1; i < IDX_COUNT; i++, mask <<= 1)
-		if (sp->lcp.protos & mask && ((cps[i])->flags & CP_NCP))
+		if ((sp->lcp.protos & mask) && ((cps[i])->flags & CP_NCP))
 			(cps[i])->Up(sp);
 
 	/* if no NCP is starting, all this was in vain, close down */

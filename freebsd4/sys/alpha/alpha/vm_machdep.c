@@ -38,7 +38,7 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.28.2.2 2000/07/04 01:45:29 mjacob Exp $
+ * $FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.28.2.4 2001/10/20 17:37:29 mjacob Exp $
  */
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -272,7 +272,7 @@ cpu_coredump(p, vp, cred)
 {
 
 	return (vn_rdwr(UIO_WRITE, vp, (caddr_t) p->p_addr, ctob(UPAGES),
-	    (off_t)0, UIO_SYSSPACE, IO_NODELOCKED|IO_UNIT, cred, (int *)NULL,
+	    (off_t)0, UIO_SYSSPACE, IO_UNIT, cred, (int *)NULL,
 	    p));
 }
 
@@ -317,7 +317,7 @@ vmapbuf(bp)
 		 * Do the vm_fault if needed; do the copy-on-write thing
 		 * when reading stuff off device into memory.
 		 */
-		vm_fault_quick(addr,
+		vm_fault_quick((addr >= bp->b_data) ? addr : bp->b_data,
 			(bp->b_flags&B_READ)?(VM_PROT_READ|VM_PROT_WRITE):VM_PROT_READ);
 		pa = trunc_page(pmap_kextract((vm_offset_t) addr));
 		if (pa == 0)

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_subs.c  8.8 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/nfs/nfs_subs.c,v 1.90.2.1 2000/10/28 16:27:27 dwmalone Exp $
+ * $FreeBSD: src/sys/nfs/nfs_subs.c,v 1.90.2.2 2001/10/25 19:18:53 dillon Exp $
  */
 
 /*
@@ -2139,10 +2139,10 @@ nfs_clearcommit(mp)
 
 	s = splbio();
 loop:
-	for (vp = mp->mnt_vnodelist.lh_first; vp; vp = nvp) {
+	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp; vp = nvp) {
 		if (vp->v_mount != mp)	/* Paranoia */
 			goto loop;
-		nvp = vp->v_mntvnodes.le_next;
+		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
 		for (bp = TAILQ_FIRST(&vp->v_dirtyblkhd); bp; bp = nbp) {
 			nbp = TAILQ_NEXT(bp, b_vnbufs);
 			if (BUF_REFCNT(bp) == 0 &&

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_vfsops.c	8.8 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_vfsops.c,v 1.17.2.2 2001/07/26 18:59:24 iedowse Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_vfsops.c,v 1.17.2.3 2001/10/14 19:08:16 iedowse Exp $
  */
 
 #include "opt_quota.h"
@@ -201,7 +201,10 @@ ufs_fhtovp(mp, ufhp, vpp)
 		return (error);
 	}
 	ip = VTOI(nvp);
-	if (ip->i_mode == 0 || ip->i_gen != ufhp->ufid_gen) {
+	if (ip->i_mode == 0 ||
+	    ip->i_gen != ufhp->ufid_gen ||
+	    (VFSTOUFS(mp)->um_i_effnlink_valid ? ip->i_effnlink :
+	    ip->i_nlink) <= 0) {
 		vput(nvp);
 		*vpp = NULLVP;
 		return (ESTALE);

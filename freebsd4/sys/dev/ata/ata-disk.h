@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000,2001 Søren Schmidt
+ * Copyright (c) 1998,1999,2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-disk.h,v 1.22.2.4 2001/05/31 15:20:34 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-disk.h,v 1.22.2.6 2002/01/05 17:49:36 sos Exp $
  */
 
 /* structure describing an ATA disk request */
@@ -58,14 +58,14 @@ struct ad_softc {
     struct ata_softc		*controller;	/* ptr to parent ctrl */
     int				unit;		/* ATA_MASTER or ATA_SLAVE */
     int				lun;		/* logical unit number */
-    u_int32_t			total_secs;	/* total # of sectors (LBA) */
+    u_int64_t			total_secs;	/* total # of sectors (LBA) */
     u_int8_t			heads;
     u_int8_t			sectors;
     u_int32_t			transfersize;	/* size of each transfer */
     int				num_tags;	/* number of tags supported */
     int				flags;		/* drive flags */
 #define		AD_F_LABELLING		0x0001		
-#define		AD_F_LBA_ENABLED	0x0002
+#define		AD_F_CHS_USED		0x0002
 #define		AD_F_32B_ENABLED	0x0004
 #define		AD_F_TAG_ENABLED	0x0008
 

@@ -25,15 +25,15 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/linux/linux_signal.h,v 1.2.2.2 2000/11/02 23:31:28 obrien Exp $
+ * $FreeBSD: src/sys/compat/linux/linux_signal.h,v 1.2.2.3 2001/11/05 19:08:23 marcel Exp $
  */
 
 #ifndef _LINUX_SIGNAL_H_
 #define _LINUX_SIGNAL_H_
 
-void linux_to_bsd_sigset __P((linux_sigset_t *, sigset_t *));
-void bsd_to_linux_sigset __P((sigset_t *, linux_sigset_t *));
-int linux_do_sigaction __P((struct proc *, int, linux_sigaction_t *,
-    linux_sigaction_t *));
+void linux_to_bsd_sigset __P((l_sigset_t *, sigset_t *));
+void bsd_to_linux_sigset __P((sigset_t *, l_sigset_t *));
+int linux_do_sigaction __P((struct proc *, int, l_sigaction_t *,
+    l_sigaction_t *));
 
 #endif /* _LINUX_SIGNAL_H_ */

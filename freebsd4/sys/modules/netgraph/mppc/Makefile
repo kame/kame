@@ -1,9 +1,8 @@
 # $Whistle: Makefile,v 1.1 1999/12/08 20:20:39 archie Exp $
-# $FreeBSD: src/sys/modules/netgraph/mppc/Makefile,v 1.3.2.3 2001/04/25 11:24:09 ru Exp $
+# $FreeBSD: src/sys/modules/netgraph/mppc/Makefile,v 1.3.2.4 2001/12/21 09:00:49 ru Exp $
 
 KMOD=		ng_mppc
 SRCS= 		ng_mppc.c opt_netgraph.h
-MAN=		ng_mppc.4
 KMODDEPS=	netgraph
 
 NETGRAPH_MPPC_COMPRESSION?=	0
