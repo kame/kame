@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.30 2000/06/04 16:51:38 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.31 2000/06/04 17:03:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -727,7 +727,6 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		}
 		if (hasv4addr) {
 			struct pr_usrreqs *pru;
-			int error;
 
 			if (sin6)
 				in6_sin6_2_sin_in_sock(addr);
