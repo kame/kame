@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.78 2000/11/16 05:21:07 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.79 2000/11/29 15:55:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -686,9 +686,7 @@ nd6_purge(ifp)
 	}
 
 	/*
-	 * Neighbor cache entry for interface route will be retained
-	 * with ND6_LLINFO_WAITDELETE state, by nd6_free().  Nuke it.
-	 * XXX: can it still happen? (20000711) 
+	 * Neighbor cache entry for interface route can be retained. Nuke it.
 	 */
 	ln = llinfo_nd6.ln_next;
 	while (ln && ln != &llinfo_nd6) {
