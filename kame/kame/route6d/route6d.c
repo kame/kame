@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.98 2003/04/24 12:26:19 keiichi Exp $	*/
+/*	$KAME: route6d.c,v 1.99 2003/05/28 08:39:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.98 2003/04/24 12:26:19 keiichi Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.99 2003/05/28 08:39:53 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -634,11 +634,13 @@ init()
 		fatal("rip socket");
 		/*NOTREACHED*/
 	}
+#ifdef IPV6_V6ONLY
 	if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_V6ONLY,
 	    &int1, sizeof(int1)) < 0) {
 		fatal("rip IPV6_V6ONLY");
 		/*NOTREACHED*/
 	}
+#endif
 	if (bind(ripsock, res->ai_addr, res->ai_addrlen) < 0) {
 		fatal("rip bind");
 		/*NOTREACHED*/
