@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.1 2000/11/01 14:55:39 itojun Exp $
+#	$KAME: Makefile,v 1.2 2000/11/01 15:25:26 itojun Exp $
 
 .include "../Makefile.inc"
 .include <bsd.own.mk>
@@ -8,7 +8,6 @@ PROG=	twofishtest
 SRCS=	twofishtest.c twofish2.c
 MKMAN=	no
 
-CFLAGS+=	-g
 .if ${OPSYS} == "NetBSD"
 CPPFLAGS+=	-I${SYSDIR}
 .else
