@@ -1,4 +1,4 @@
-$Id: README.certificate,v 1.1 2000/02/16 04:37:57 sakane Exp $
+$Id: README.certificate,v 1.2 2000/02/16 05:05:14 sakane Exp $
 
 Description how to use RSA signature authentication method with racoon.
 
@@ -96,7 +96,7 @@ TO GET YOUR CERT
   subject alt name under certificates saved directory.  For example of
   file name,
 
-	/usr/local/openssl/certs/User_FQDN/sakane@kame.net/cert.pem
+	/usr/local/openssl/certs/UserFQDN/sakane@kame.net/cert.pem
 
   The mapping between type of subject alt name and directory name:
 	type			directory name
@@ -104,3 +104,4 @@ TO GET YOUR CERT
 	Email (rfc822)		UserFQDN
 	Domain name (FQDN)	FQDN
 	IP-number		address
+	others			misc
