@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.20 2000/01/27 06:03:05 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.21 2000/01/27 08:30:14 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -131,8 +131,8 @@ pfkey_handler()
 
 	/* is it mine ? */
 	/* XXX should be handled all message in spite of mine */
-	if (msg->sadb_msg_type != SADB_DELETE
-	 && msg->sadb_msg_pid != 0 && msg->sadb_msg_pid != getpid()) {
+	if ((msg->sadb_msg_type == SADB_DELETE && msg->sadb_msg_pid == getpid())
+	 && (msg->sadb_msg_pid != 0 && msg->sadb_msg_pid != getpid())) {
 		YIPSDEBUG(DEBUG_PFKEY,
 			plog(logp, LOCATION, NULL,
 				"pfkey message pid %d not interesting.\n",
