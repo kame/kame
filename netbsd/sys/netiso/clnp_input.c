@@ -211,6 +211,7 @@ next:
 		m->m_pkthdr.len -= sizeof(struct fddi_header);
 		break;
 	case IFT_PTPSERIAL:
+	case IFT_GIF:
 		/* nothing extra to get from the mbuf */
 		bzero((caddr_t)sh.snh_dhost, sizeof(sh.snh_dhost));
 		bzero((caddr_t)sh.snh_shost, sizeof(sh.snh_shost));
