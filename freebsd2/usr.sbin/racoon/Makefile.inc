@@ -11,10 +11,10 @@ CFLAGS+=-I/usr/local/include
 .endif
 YFLAGS+=-d
 
-.if exists(/usr/local/ssl/include/openssl/pem.h) || exists(/usr/pkg/include/openssl/pem.h)
+.if exists(/usr/local/ssl/include/openssl/pem.h) || exists(/usr/local/include/openssl/pem.h)
 CPPFLAGS+=-DHAVE_OPENSSL_PEM_H=1
 .endif
-.if exists(/usr/local/ssl/include/openssl/x509.h) || exists(/usr/pkg/include/openssl/x509.h)
+.if exists(/usr/local/ssl/include/openssl/x509.h) || exists(/usr/local/include/openssl/x509.h)
 CPPFLAGS+=-DHAVE_OPENSSL_X509_H=1
 .endif
 .if exists(/usr/local/include/openssl/rc5.h) || exists(/usr/local/ssl/include/openssl/rc5.h)
