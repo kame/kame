@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.279 2003/06/27 05:42:32 itojun Exp $	*/
+/*	$KAME: key.c,v 1.280 2003/06/27 06:55:13 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -105,7 +105,9 @@
 
 #include <machine/stdarg.h>
 
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 #include "pf.h"
+#endif
 #if NPF > 0
 #include <net/pfvar.h>
 #else
