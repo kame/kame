@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.13 2000/02/09 12:42:55 itojun Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.14 2000/02/10 03:15:49 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -55,14 +55,21 @@
 #endif
 
 #ifdef INCLUDE_PATH_OPENSSL
+#ifdef HAVE_OPENSSL_PEM_H
 #include <openssl/pem.h>
+#endif
+#ifdef HAVE_OPENSSL_EVP_H
 #include <openssl/evp.h>
+#endif
+#ifdef HAVE_OPENSSL_X509_H
 #include <openssl/x509.h>
+#endif
 #include <openssl/bn.h>
 #include <openssl/dh.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
 #include <openssl/des.h>
+#include <openssl/crypto.h>
 #ifdef HAVE_OPENSSL_IDEA_H
 #include <openssl/idea.h>
 #endif
@@ -73,14 +80,21 @@
 #include <openssl/cast.h>
 #include <openssl/err.h>
 #else
+#ifdef HAVE_PEM_H
 #include <pem.h>
+#endif
+#ifdef HAVE_EVP_H
 #include <evp.h>
+#endif
+#ifdef HAVE_X509_H
 #include <x509.h>
+#endif
 #include <bn.h>
 #include <dh.h>
 #include <md5.h>
 #include <sha.h>
 #include <des.h>
+#include <crypto.h>
 #ifdef HAVE_IDEA_H
 #include <idea.h>
 #endif
@@ -103,6 +117,7 @@
  * necessary for SSLeay/OpenSSL portability.  It sucks.
  */
 
+#ifdef HAVE_SIGNING_C
 /* X509 Certificate */
 /*
  * get a certificate
@@ -358,6 +373,7 @@ end:
 
 	return pkey;
 }
+#endif
   
 /*
  * get error string
@@ -370,7 +386,11 @@ eay_strerror()
 	int len = 0;
 	unsigned long l;
 	char buf[200];
+#if SSLVER >= 0x0940
+	const char *file, *data;
+#else
 	char *file, *data;
+#endif
 	int line, flags;
 	unsigned long es;
 

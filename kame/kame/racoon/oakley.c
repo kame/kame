@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.13 2000/02/09 05:18:09 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.14 2000/02/10 03:15:50 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -105,7 +105,9 @@ static struct cipher_algorithm cipher[] = {
 };
 
 static int oakley_compute_keymat_x __P((struct ph2handle *iph2, int side, int sa_dir));
+#ifdef HAVE_SIGNING_C
 static char *oakley_getidstr __P((char *id, int len));
+#endif
 
 int
 oakley_get_defaultlifetime()

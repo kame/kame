@@ -466,9 +466,10 @@ AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS(limits.h sys/time.h unistd.h stdarg.h varargs.h)
 signing=yes
 if test "x$include_path_openssl" = "x"; then
-	AC_CHECK_HEADERS(idea.h rc5.h rsa.h, [], [signing=no])
+	AC_CHECK_HEADERS(idea.h rc5.h rsa.h pem.h evp.h x509.h,
+		[], [signing=no])
 else
-	AC_CHECK_HEADERS(openssl/idea.h openssl/rc5.h openssl/rsa.h,
+	AC_CHECK_HEADERS(openssl/idea.h openssl/rc5.h openssl/rsa.h openssl/pem.h openssl/evp.h openssl/x509.h,
 		[], [signing=no])
 fi
 if test $signing = "yes"; then

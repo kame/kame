@@ -2757,7 +2757,7 @@ done
 
 signing=yes
 if test "x$include_path_openssl" = "x"; then
-	for ac_hdr in idea.h rc5.h rsa.h
+	for ac_hdr in idea.h rc5.h rsa.h pem.h evp.h x509.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
@@ -2799,7 +2799,7 @@ fi
 done
 
 else
-	for ac_hdr in openssl/idea.h openssl/rc5.h openssl/rsa.h
+	for ac_hdr in openssl/idea.h openssl/rc5.h openssl/rsa.h openssl/pem.h openssl/evp.h openssl/x509.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
