@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.150 2000/08/21 09:00:49 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.151 2000/08/23 03:32:13 itojun Exp $
 
 1. IPv6
 
@@ -1191,6 +1191,16 @@ Here are couple of issues to mention:
   binary will not work correctly.  The problem is not KAME issue, but API
   issue.  For example, Solaris 8 implements 2292bis API.  If you compile
   RFC2292-based code on Solaris 8, the binary can behave strange.
+
+There are few (or couple of) incompatible behavior in RFC2292 binary backward
+compatibility support in KAME tree.  To enumerate:
+- Type 0 routing header lacks support for strict/loose bitmap.
+  Even if we see packets with "strict" bit set, those bits will not be made
+  visible to the userland.
+  Background: RFC2292 document is based on RFC1883 IPv6, and it uses
+  strict/loose bitmap.  2292bis document is based on RFC2460 IPv6, and it has
+  no strict/loose bitmap (it was removed from RFC2460).  KAME tree obeys
+  RFC2460 IPv6, and lacks support for strict/loose bitmap.
 
 2. Network Drivers
 
