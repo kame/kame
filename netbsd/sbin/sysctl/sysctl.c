@@ -99,6 +99,10 @@ __RCSID("$NetBSD: sysctl.c,v 1.58.2.1 2002/11/15 00:39:49 lukem Exp $");
 #include <netkey/key_var.h>
 #endif /* IPSEC */
 
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif
+
 #include <sys/pipe.h>
 
 #include <err.h>
@@ -861,6 +865,7 @@ struct ctlname icmp6name[] = ICMPV6CTL_NAMES;
 struct ctlname udp6name[] = UDP6CTL_NAMES;
 struct ctlname pim6name[] = PIM6CTL_NAMES;
 struct ctlname ipsec6name[] = IPSEC6CTL_NAMES;
+struct ctlname mip6name[] = MIP6CTL_NAMES;
 struct list inet6list = { inet6name, IPV6PROTO_MAXID };
 struct list inet6vars[] = {
 /*0*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
@@ -900,7 +905,13 @@ struct list inet6vars[] = {
 	{ 0, 0 },
 	{ icmp6name, ICMPV6CTL_MAXID },	/* icmp6 */
 	{ 0, 0 },
-/*60*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+/*60*/	{ 0, 0 }, { 0, 0 },
+#ifdef MIP6
+	{ mip6name, MIP6CTL_MAXID },
+#else
+	{ 0, 0 },
+#endif
+	{ 0, 0 }, { 0, 0 },
 	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
 /*70*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
 	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
