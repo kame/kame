@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.49 2000/04/18 04:07:24 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.50 2000/05/22 15:24:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1071,7 +1071,7 @@ udp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 
 	switch (name[0]) {
 
-	case UDP6CTL_SENDMAX:
+	case UDP6CTL_SENDSPACE:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 		    &udp6_sendspace);
 	case UDP6CTL_RECVSPACE:

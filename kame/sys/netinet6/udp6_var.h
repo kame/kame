@@ -1,4 +1,4 @@
-/*	$KAME: udp6_var.h,v 1.9 2000/05/22 15:18:57 itojun Exp $	*/
+/*	$KAME: udp6_var.h,v 1.10 2000/05/22 15:24:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,7 +89,11 @@ struct	udp6stat {
 /*
  * Names for UDP sysctl objects
  */
-#define UDP6CTL_SENDMAX		1	/* default send buffer */
+#ifdef __FreeBSD__
+#define UDP6CTL_MAXDGRAM	1	/* default send buffer */
+#else
+#define UDP6CTL_SENDSPACE	1	/* default send buffer */
+#endif
 #define UDP6CTL_RECVSPACE	2	/* default recv buffer */
 #define UDP6CTL_MAXID		3
 
