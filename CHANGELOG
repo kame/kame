@@ -1,7 +1,36 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1957 2001/10/29 15:15:43 sakane Exp $
+$KAME: CHANGELOG,v 1.1958 2001/10/31 08:10:41 fujisawa Exp $
 
 <200110>
+2001-10-31 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_{rule,tslot}.c:
+	  kame/kame/natptconfig/{cfparse,defs,misc,showsubs,yylex}.[chy]:
+	- Support IPv4 -> IPv6 translation.
+
+	  Translation is restricted, one ipv4 host can connect to ipv6
+	  host.  This connection is one-on-one.  So, if you want to
+	  connect more than one IPv6 host, same number of IPv4 addresses
+	  are necessary.
+
+	  For example,  assume you add following rule.
+		map from daddr 10.21.32.252
+			to daddr 2001:240:10a:5555:260:8ff:feb0:96f4
+
+	  (I bend this line because line is long, but describe it in
+	  single line)
+
+	  IPv4 packet destined to this IPv4 address described just after
+	  first "daddr" is a target of translation of IPv4->IPv6, and is
+	  redirected to 2001:240:10a:5555:260:8ff:feb0:96f4, also
+	  described just after second "daddr".
+
+	  This IPv4 address (10.21.32.252 in above example) had better
+	  not to be NAT-PT box address.  It will be easy to use ifconfig
+	  command.  For example,
+		ifconfig fxp0 inet 10.21.32.252 netmask 255.255.255.0 alias
+	  Of course, change interface name, ip address and netmask in
+	  accordance with your network.
+
 Tue Oct 30 00:01:35 JST 2001 sakane@kame.net
 	* kame/sys/netkey/key.c:
 	the system wide policy should be returned when no policy found
