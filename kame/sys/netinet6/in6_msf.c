@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.28 2004/04/06 09:27:28 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.29 2004/04/06 13:11:12 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2717,7 +2717,7 @@ match_msf6_per_if(in6m, src, dst)
 	LIST_FOREACH(i6as, in6ms->i6ms_cur->head, i6as_list) {
 		if (i6as->i6as_addr.sin6_family != AF_INET6)
 			continue;
-		if (!IN6_ARE_ADDR_EQUAL(&i6as->i6as_addr, src))
+		if (!IN6_ARE_ADDR_EQUAL(&i6as->i6as_addr.sin6_addr, src))
 			continue;
 
 		if (in6ms->i6ms_mode == MCAST_INCLUDE)
