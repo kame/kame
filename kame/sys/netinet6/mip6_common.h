@@ -34,7 +34,7 @@
  * Author:     Hesham Soliman <hesham.soliman@ericsson.com.au>
  *             Martti Kuparinen <martti.kuparinen@ericsson.com>
  *
- *  $Id: mip6_common.h,v 1.3 2000/02/08 02:58:55 itojun Exp $
+ *  $Id: mip6_common.h,v 1.4 2000/02/09 16:02:18 itojun Exp $
  */
 
 
@@ -120,11 +120,6 @@
 /*
  * Code below taken from common.h
  */
-
-#include <machine/param.h>
-#include <sys/mbuf.h>
-#include <net/if.h>
-#include <netinet/in.h>
 
 struct mip6_input_data {
 	char             if_name[IFNAMSIZ]; /* Interface name */

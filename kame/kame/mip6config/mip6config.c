@@ -34,7 +34,7 @@
  * Author:  Hesham Soliman <Hesham.Soliman@ericsson.com.au>
  *          Magnus Braathen <Magnus.Braathen@era.ericsson.se>
  *
- * $Id: mip6config.c,v 1.3 2000/02/07 17:50:08 itojun Exp $
+ * $Id: mip6config.c,v 1.4 2000/02/09 16:02:19 itojun Exp $
  *
  */
 
@@ -48,6 +48,7 @@
 #include <netdb.h>
 #include <err.h>
 #include <sys/ioctl.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netinet6/mip6_common.h>

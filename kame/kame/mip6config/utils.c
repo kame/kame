@@ -34,7 +34,7 @@
  * Author:  Hesham Soliman <Hesham.Soliman@ericsson.com.au>
  *          Magnus Braathen <Magnus.Braathen@era.ericsson.se>
  *
- * $Id: utils.c,v 1.2 2000/02/07 17:48:25 itojun Exp $
+ * $Id: utils.c,v 1.3 2000/02/09 16:02:20 itojun Exp $
  *
  */
 
@@ -42,6 +42,7 @@
 #include <sys/socket.h>
 #include <signal.h>
 #include <netdb.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdio.h>

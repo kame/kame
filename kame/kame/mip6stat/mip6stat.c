@@ -37,7 +37,7 @@
  *       like Binding cache, HA list, BU list. Other functions should be
  *       moved to config program.
  *
- * $Id: mip6stat.c,v 1.4 2000/02/08 04:01:14 itojun Exp $
+ * $Id: mip6stat.c,v 1.5 2000/02/09 16:02:20 itojun Exp $
  *
  */
 
@@ -46,6 +46,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <string.h>
