@@ -1,11 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1050 2000/06/20 18:22:15 sumikawa Exp $
+$Id: CHANGELOG,v 1.1051 2000/06/20 19:48:35 itojun Exp $
 
 <200006>
 Wed Jun 21 03:18:47 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/leafnode+: IPv6 enabled leafnode+-2.10
 	  From: yoshfuji@ecei.tohoku.ac.jp
+
+Wed Jun 21 03:00:16 JST 2000  itojun@iijlab.net
+	* openbsd/sys/dev/pcmcia/if_wi.c: make IPv6 work on wavelan cards.
 
 2000-06-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/net/if_gif.c (gif_ioctl): made sure to cast the
