@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.128 2001/08/20 06:46:28 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.129 2001/10/02 02:39:18 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1516,6 +1516,8 @@ pk_recvacquire(mhp)
 			xpl->sadb_x_policy_id);
 		return -1;
 	}
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"suitable outbound SP found: %s.\n", spidx2str(&sp_out->spidx));
 
 	/* get inbound policy */
     {
@@ -1536,8 +1538,6 @@ pk_recvacquire(mhp)
 		return -1;
 	}
     }
-	plog(LLV_DEBUG, LOCATION, NULL,
-		"suitable outbound SP found: %s.\n", spidx2str(&sp_out->spidx));
 	plog(LLV_DEBUG, LOCATION, NULL,
 		"suitable inbound SP found: %s.\n", spidx2str(&sp_in->spidx));
 
