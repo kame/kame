@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.38 2001/09/12 07:19:20 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.39 2001/09/27 08:56:14 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -488,14 +488,14 @@ cmpsatrns(tr1, tr2)
 		plog(LLV_ERROR, LOCATION, NULL,
 			"trns_id mismatched: "
 			"my:%d peer:%d\n",
-			tr1->trns_id, tr2->trns_id);
+			tr2->trns_id, tr1->trns_id);
 		return 1;
 	}
 	if (tr1->authtype != tr2->authtype) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"authtype mismatched: "
 			"my:%d peer:%d\n",
-			tr1->authtype, tr2->authtype);
+			tr2->authtype, tr1->authtype);
 		return 1;
 	}
 
@@ -507,7 +507,7 @@ cmpsatrns(tr1, tr2)
 		plog(LLV_WARNING, LOCATION, NULL,
 			"less key length proposed, "
 			"mine:%d peer:%d.  Use initiaotr's one.\n",
-			tr1->encklen, tr2->encklen);
+			tr2->encklen, tr1->encklen);
 		/* FALLTHRU */
 	}
 
