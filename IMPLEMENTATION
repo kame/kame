@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.295 2001/12/21 08:28:39 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.296 2001/12/24 04:42:58 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -252,10 +252,11 @@ draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
 
 1.2 Neighbor Discovery
 
-Neighbor Discovery is fairly stable.  Currently Address Resolution,
-Duplicated Address Detection, and Neighbor Unreachability Detection
-are supported.  In the near future we will be adding Unsolicited Neighbor
-Advertisement transmission command as admin tool.
+Our implementation of Neighbor Discovery is fairly stable.  Currently
+Address Resolution, Duplicated Address Detection, and Neighbor
+Unreachability Detection are supported.  In the near future we will be
+adding an Unsolicited Neighbor Advertisement transmission command as
+an administration tool.
 
 Duplicated Address Detection (DAD) will be performed when an IPv6 address
 is assigned to a network interface, or the network interface is enabled
@@ -273,15 +274,16 @@ DAD probes to not-really-ready network driver and the packet will not go out
 from the interface.  In such cases, network drivers should be corrected.
 
 Some of network drivers loop multicast packets back to themselves,
-even if instructed not to do so (especially in promiscuous mode).
-In such cases DAD may fail, because DAD engine sees inbound NS packet
-(actually from the node itself) and considers it as a sign of duplicate.
-In this case, drivers should be corrected to honor IFF_SIMPLEX behavior.
-For example, you may need to check source MAC address on a inbound packet,
-and reject it if it is from the node itself.
-You may also want to look at #if condition marked "heuristics" in
-sys/netinet6/nd6_nbr.c:nd6_dad_timer() as workaround (note that the code
-fragment in "heuristics" section is not spec conformant).
+even if instructed not to do so (especially in promiscuous mode).  In
+such cases DAD may fail, because the DAD engine sees inbound NS packet
+(actually from the node itself) and considers it as a sign of
+duplicate.  In this case, drivers should be corrected to honor
+IFF_SIMPLEX behavior.  For example, you may need to check source MAC
+address on a inbound packet, and reject it if it is from the node
+itself.  You may also want to look at #if condition marked
+"heuristics" in sys/netinet6/nd6_nbr.c:nd6_dad_timer() as workaround
+(note that the code fragment in "heuristics" section is not spec
+compliant).
 
 Neighbor Discovery specification (RFC2461) does not talk about neighbor
 cache handling in the following cases:
@@ -293,19 +295,42 @@ For (1), we implemented workaround based on discussions on IETF ipngwg mailing
 list.  For more details, see the comments in the source code and email
 thread started from (IPng 7155), dated Feb 6 1999.
 
-IPv6 on-link determination rule (RFC2461) is quite different from assumptions
-in BSD IPv4 network code.  To implement behavior in RFC2461 section 5.2
-(when default router list is empty), the kernel needs to know the default
+IPv6 on-link determination rule (RFC2461) is quite different from
+assumptions in BSD IPv4 network code.  To implement the behavior in
+RFC2461 section 6.3.6 (3), the kernel needs to know the default
 outgoing interface.  To configure the default outgoing interface, use
-commands like "ndp -I de0" as root.  Note that the spec misuse the word
-"host" and "node" in several places in the section.
+commands like "ndp -I de0" as root.  Then the kernel will have a
+"default" route to the interface with the cloning "C" bit being on.
+This default route will cause to make a neighbor cache entry for every
+destination that does not match an explicit route entry.
+
+Note that we intentionally disables configuring the default interface
+by default.  This is because we found it sometimes caused inconvenient
+situation while it was rarely useful in practical usage.  For example,
+consider a destination that has both IPv4 and IPv6 addresses but is
+only reachable via IPv4.  Since our getaddrinfo(3) prefers IPv6 by
+default, an (TCP) application using the library with PF_UNSPEC first
+tries to connect to the IPv6 address.  If we turn on RFC 2461 6.3.6
+(3), we have to wait for quite a long period before the first attempt
+to make a connection fails.  If we turn it off, the first attempt will
+immediately fail with EHOSTUNREACH, and then the application can try
+the next, reachable address.
+
+The notion of the default interface is also disabled when the node is
+acting as a router.  The reason is that routers tend to control all
+routes stored in the kernel and the default route automatically
+installed would rather confuse the routers.  Note that the spec misuse
+the word "host" and "node" in several places in Section 5.2 of RFC
+2461.  We basically read the word "node" in this section as "host,"
+and thus believe the implementation policy does not break the
+specification.
 
 To avoid possible DoS attacks and infinite loops, KAME stack will accept
 only 10 options on ND packet.  Therefore, if you have 20 prefix options
 attached to RA, only the first 10 prefixes will be recognized.
-If this troubles you, please contact KAME team and/or modify
+If this troubles you, please contact the KAME team and/or modify
 nd6_maxndopt in sys/netinet6/nd6.c.  If there are high demands we may
-provide sysctl knob for the variable.
+provide a sysctl knob for the variable.
 
 Proxy Neighbor Advertisement support is implemented in the kernel.
 For instance, you can configure it by using the following command:
@@ -324,32 +349,37 @@ There are certain limitations, though:
   We do not prohibit hosts from doing proxy ND, but there will be very limited
   use in it.
 
-Starting mid March 2000, we support Neighbor Unreachability Detection (NUD)
-on p2p interfaces, including tunnel interfaces (gif).  NUD is turned on by
-default.  Before March 2000 KAME stack did not perform NUD on p2p interfaces.
-If the change raises any interoperability issues, you can turn off/on NUD
-by per-interface basis.  Use "ndp -i interface -nud" to turn it off.
-Consult ndp(8) for details.
+Starting mid March 2000, we support Neighbor Unreachability Detection
+(NUD) on p2p interfaces, including tunnel interfaces (gif).  NUD is
+turned on by default.  Before March 2000 the KAME stack did not
+perform NUD on p2p interfaces.  If the change raises any
+interoperability issues, you can turn off/on NUD by per-interface
+basis.  Use "ndp -i interface -nud" to turn it off.  Consult ndp(8)
+for details.
 
 RFC2461 specifies upper-layer reachability confirmation hint.  Whenever
 upper-layer reachability confirmation hint comes, ND process can use it
 to optimize neighbor discovery process - ND process can omit real ND exchange
 and keep the neighbor cache state in REACHABLE.
 We currently have two sources for hints: (1) setsockopt(IPV6_REACHCONF)
-defined by 2292bis API, and (2) hints from tcp_input.
-It is questionable if they are really trustworthy.  For example, a rogue
-userland program can use IPV6_REACHCONF to confuse ND process.  Neighbor
-cache is a system-wide information pool, and it is bad to allow single process
-to affect others.  Also, tcp_input can be hosed by hijack attempts.  It is
-wrong to allow hijack attempts to affect ND process.
-Starting June 2000, ND code has a protection mechanism against incorrect
-upper-layer reachability confirmation.  ND code counts subsequent upper-layer
-hints.  If the number of hints reaches maximum, ND code will ignore further
-upper-layer hints and run real ND process to confirm reachability to the peer.
-sysctl net.inet6.icmp6.nd6_maxnudhint defines maximum # of subsequent
+defined by the 2292bis API, and (2) hints from tcp(6)_input.
+
+It is questionable if they are really trustworthy.  For example, a
+rogue userland program can use IPV6_REACHCONF to confuse the ND
+process.  Neighbor cache is a system-wide information pool, and it is
+bad to allow a single process to affect others.  Also, tcp(6)_input
+can be hosed by hijack attempts.  It is wrong to allow hijack attempts
+to affect the ND process.
+
+Starting June 2000, the ND code has a protection mechanism against
+incorrect upper-layer reachability confirmation.  The ND code counts
+subsequent upper-layer hints.  If the number of hints reaches the
+maximum, the ND code will ignore further upper-layer hints and run
+real ND process to confirm reachability to the peer.  sysctl
+net.inet6.icmp6.nd6_maxnudhint defines the maximum # of subsequent
 upper-layer hints to be accepted.
 (from April 2000 to June 2000, we rejected setsockopt(IPV6_REACHCONF) from
-non-root process - after local discussion, it looks that hints are not
+non-root process - after a local discussion, it looks that hints are not
 that trustworthy even if they are from privileged processes)
 
 If inbound ND packets carry invalid values, the KAME kernel will
@@ -359,7 +389,7 @@ turn on syslog output from the kernel on errors, by turning on sysctl MIB
 net.inet6.icmp6.nd6_debug.  nd6_debug can be turned on at bootstrap
 time, by defining ND6_DEBUG kernel compilation option (so you can
 debug behavior during bootstrap).  nd6_debug configuration should
-only be used for test/debug purposes - for production environment,
+only be used for test/debug purposes - for a production environment,
 nd6_debug must be set to 0.  If you leave it to 1, malicious parties
 can inject broken packet and fill up /var/log partition.
 
