@@ -1466,12 +1466,7 @@ void dc_attach_common(sc)
 	ifp->if_watchdog = dc_watchdog;
 	ifp->if_baudrate = 10000000;
 	IFQ_SET_MAXLEN(&ifp->if_snd, DC_TX_LIST_CNT - 1);
-#ifdef ALTQ
-	/* dc_coal breaks the poll-and-dequeue rule,
-	   so don't enable ALTQ for those chips */
-	if ((sc->dc_flags & DC_TX_COALESCE) == 0)
-#endif
-		IFQ_SET_READY(&ifp->if_snd);
+	IFQ_SET_READY(&ifp->if_snd);
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 
 	sc->sc_mii.mii_ifp = ifp;
@@ -2322,9 +2317,11 @@ void dc_start(ifp)
 
 		if (sc->dc_flags & DC_TX_COALESCE) {
 #ifdef ALTQ
-			/* note: dc_coal breaks the poll-and-dequeue rule
-			   and ALTQ is disabled in dc_attach for those chips */
+			/* note: dc_coal breaks the poll-and-dequeue rule.
+			 * if dc_coal fails, we lose the packet.
+			 */
 #endif
+			IFQ_DEQUEUE(&ifp->if_snd, m_head);
 			if (dc_coal(sc, &m_head)) {
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
@@ -2337,7 +2334,10 @@ void dc_start(ifp)
 		}
 
 		/* now we are committed to transmit the packet */
-		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		if (sc->dc_flags & DC_TX_COALESCE) {
+			/* if mbuf is coalesced, it is already dequeued */
+		} else
+			IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
