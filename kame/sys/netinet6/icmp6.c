@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.388 2004/07/09 14:13:59 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.389 2004/07/12 07:24:22 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1526,7 +1526,11 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 		}
 	}
 	if (rt) { /* XXX: need braces to avoid conflict with else in RTFREE. */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+		RTFREE_LOCKED(rt);
+#else
 		RTFREE(rt);
+#endif
 	}
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
