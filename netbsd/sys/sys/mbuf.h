@@ -492,6 +492,26 @@ do {									\
 } while (/* CONSTCOND */ 0)
 
 /*
+ * Move just m_pkthdr from `from' to `to',
+ * remove M_PKTHDR and clean the tag for `from'.
+ */
+#define M_MOVE_HDR(to, from) {						\
+	(to)->m_pkthdr = (from)->m_pkthdr;				\
+	(from)->m_flags &= ~M_PKTHDR;					\
+	SLIST_INIT(&(from)->m_pkthdr.tags);				\
+}
+
+/*
+ * MOVE mbuf pkthdr from `from' to `to'.
+ * `from' must have M_PKTHDR set, and `to' must be empty.
+ */
+#define	M_MOVE_PKTHDR(to, from) {					\
+	(to)->m_flags = (from)->m_flags & M_COPYFLAGS;			\
+	M_MOVE_HDR((to), (from));					\
+	(to)->m_data = (to)->m_pktdat;					\
+}
+
+/*
  * Set the m_data pointer of a newly-allocated mbuf (m_get/MGET) to place
  * an object of the specified size at the end of the mbuf, longword aligned.
  */

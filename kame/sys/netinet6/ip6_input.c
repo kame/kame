@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.306 2003/02/07 12:42:47 t-momose Exp $	*/
+/*	$KAME: ip6_input.c,v 1.307 2003/02/19 03:19:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -495,7 +495,7 @@ ip6_input(m)
 		MGETHDR(n, M_DONTWAIT, MT_HEADER);
 		if (n != NULL) {
 #ifdef __OpenBSD__
-			M_MOVE_PKTHDR(n, m);
+			M_DUP_PKTHDR(n, m);
 #else
 			M_COPY_PKTHDR(n, m);
 #endif

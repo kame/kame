@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.335 2003/02/18 14:24:31 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.336 2003/02/19 03:19:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -766,7 +766,7 @@ icmp6_input(mp, offp, proto)
 				m = NULL;
 				goto deliverecho;
 			}
-#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ < 5)
+#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ < 5)
 			M_MOVE_PKTHDR(n, n0);
 #else
 			M_COPY_PKTHDR(n, n0);
@@ -2392,6 +2392,7 @@ icmp6_rip6_input(mp, off, src, dst)
 				MGET(n, M_DONTWAIT, m->m_type);
 				if (n != NULL) {
 #ifdef __OpenBSD__
+					/* shouldn't this be M_DUP_PKTHDR? */
 					M_MOVE_PKTHDR(n, m);
 #else
 					M_COPY_PKTHDR(n, m);
@@ -2435,6 +2436,7 @@ icmp6_rip6_input(mp, off, src, dst)
 			MGET(n, M_DONTWAIT, m->m_type);
 			if (n != NULL) {
 #ifdef __OpenBSD__
+				/* shouldn't this be M_DUP_PKTHDR? */
 				M_MOVE_PKTHDR(n, m);
 #else
 				M_COPY_PKTHDR(n, m);

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.180 2003/02/18 14:24:32 jinmei Exp $	*/
+/*	$KAME: ipsec.c,v 1.181 2003/02/19 03:19:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3536,7 +3536,7 @@ ipsec4_splithdr(m)
 			m_freem(m);
 			return NULL;
 		}
-#if defined(__FreeBSD__) && __FreeBSD__ < 5
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ < 5)
 		M_MOVE_PKTHDR(mh, m);
 #else
 		M_COPY_PKTHDR(mh, m);
@@ -3577,7 +3577,7 @@ ipsec6_splithdr(m)
 			m_freem(m);
 			return NULL;
 		}
-#if defined(__FreeBSD__) && __FreeBSD__ < 5
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ < 5)
 		M_MOVE_PKTHDR(mh, m);
 #else
 		M_COPY_PKTHDR(mh, m);

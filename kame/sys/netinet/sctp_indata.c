@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.13 2003/01/21 06:33:03 itojun Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.14 2003/02/19 03:19:16 keiichi Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_indata.c,v 1.124 2002/04/04 18:48:39 randall Exp	*/
 
 /*
@@ -1852,7 +1852,7 @@ sctp_process_data(struct mbuf **mm,
 			caddr_t *from, *to;
 			if ((*mm)->m_flags & M_PKTHDR) {
 				/* got to copy the header first */
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ < 5)
 				M_MOVE_PKTHDR(m, (*mm));
 #else
 				M_COPY_PKTHDR(m, (*mm));
