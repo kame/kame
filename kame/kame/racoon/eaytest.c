@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.16 2000/12/15 13:43:55 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.17 2000/12/15 17:04:45 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -151,6 +151,16 @@ char *certs[] = {
 "EQ==\n"
 "-----END CERTIFICATE-----\n\n",
 };
+
+/* prototype */
+
+void certtest __P((void));
+void ciphertest __P((void));
+void hmactest __P((void));
+void sha1test __P((void));
+void md5test __P((void));
+void dhtest __P((int));
+void bntest __P((void));
 
 /* test */
 
@@ -518,7 +528,7 @@ md5test()
 	vfree(buf);
 }
 
-int
+void
 dhtest(f)
 	int f;
 {
@@ -547,7 +557,7 @@ dhtest(f)
 
 	if (eay_dh_generate(&p1, 2, 96, &pub1, &priv1) < 0) {
 		printf("error\n");
-		return(-1);
+		return;
 	}
 
 	printf("private key for user 1 = \n"); PVDUMP(priv1);
@@ -555,7 +565,7 @@ dhtest(f)
 
 	if (eay_dh_generate(&p2, 2, 96, &pub2, &priv2) < 0) {
 		printf("error\n");
-		return(-1);
+		return;
 	}
 
 	printf("private key for user 2 = \n"); PVDUMP(priv2);
@@ -576,7 +586,7 @@ dhtest(f)
 	vfree(priv2);
 	vfree(key);
 
-	return 0;
+	return;
 }
 
 void
@@ -603,7 +613,7 @@ main(ac, av)
 
 	if (ac == 1) {
 		bntest();
-		dhtest();
+		dhtest(0);
 		md5test();
 		sha1test();
 		hmactest();
