@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.21 2004/08/17 04:06:21 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.22 2004/10/27 07:34:05 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -173,6 +173,7 @@ int sctp_sysctl(int *, u_int, void *, size_t *, void *, size_t);
 
 /* map callout into timeout for OpenBSD */
 #ifdef __OpenBSD__
+#ifndef callout_init
 #define callout_init(args)
 #define callout_reset(c, ticks, func, arg) \
 { \
@@ -182,6 +183,7 @@ int sctp_sysctl(int *, u_int, void *, size_t *, void *, size_t);
 #define callout_stop(c) timeout_del(c)
 #define callout_pending(c) timeout_pending(c)
 #define callout_active(c) timeout_initialized(c)
+#endif
 #endif
 
 /* XXX: Temporary until I convert fix OpenBSD and move to newer defs */

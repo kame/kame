@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.15 2004/05/26 10:08:00 itojun Exp $	*/
+/*	$KAME: dccp_var.h,v 1.16 2004/10/27 07:34:05 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -262,6 +262,7 @@ SYSCTL_DECL(_net_inet_dccp);
 #endif
 
 #ifdef __OpenBSD__
+#ifndef callout_init
 #define callout_init(args)
 #define callout_reset(c, ticks, func, arg) \
 	{ \
@@ -269,6 +270,7 @@ SYSCTL_DECL(_net_inet_dccp);
 		timeout_add(c, ticks); \
 	}
 #define callout_stop(c)	timeout_del(c);
+#endif
 #endif
 
 extern struct	pr_usrreqs dccp_usrreqs;
