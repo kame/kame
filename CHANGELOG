@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.914 2000/05/22 08:55:43 itojun Exp $
+$Id: CHANGELOG,v 1.915 2000/05/22 12:10:32 itojun Exp $
 
 <200005>
+Mon May 22 21:08:55 JST 2000  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: disallow negative numbers for ICMPv6 rate limit
+	  interval.  use ratecheck(9) if exists (this will make
+	  netbsd15/openbsd27 merger easier).
+
 Mon May 22 17:54:29 JST 2000  itojun@iijlab.net
 	* sys/netinet6/{ah,esp}_output.c: correct rare error case handling
 	  (do not leak mbuf/do not emit incomplete packet).
