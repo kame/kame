@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.39 2002/02/22 15:02:05 sumikawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.40 2002/02/22 15:05:17 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -227,8 +227,8 @@ struct pAddr {
 };
 
 
-struct mAddr					/* sizeof(): 60[byte] */
-{
+struct mAddr {
+	/* sizeof(): 60[byte] */
 	struct pAddr	saddr;
 #define	Local			local.saddr
 #define	Remote			remote.saddr
@@ -241,8 +241,8 @@ struct mAddr					/* sizeof(): 60[byte] */
 
 /* Configuration slot entry */
 
-struct cSlot					/* sizeof(): 144[byte] */
-{
+struct cSlot {
+	/* sizeof(): 144[byte] */
 	TAILQ_ENTRY(cSlot)	csl_list;
 
 	int		 rnum;		/* rule number */
@@ -272,8 +272,8 @@ struct cSlot					/* sizeof(): 144[byte] */
 
 /* Translation slot entry */
 
-struct tSlot					/* sizeof(): 132[byte] */
-{
+struct tSlot {
+	/* sizeof(): 132[byte] */
 	TAILQ_ENTRY(tSlot)	tsl_list;
 	TAILQ_ENTRY(tSlot)	tsl_hashl;	/* Hash chain. */
 	TAILQ_ENTRY(tSlot)	tsl_hashr;	/* Hash chain. */
@@ -287,10 +287,10 @@ struct tSlot					/* sizeof(): 132[byte] */
 	time_t		 tstamp;
 	u_long		 fromto;		/* counter */
 	u_long		 tofrom;		/* counter */
-
-	/* This pointer is used in order to open connection from FTP
+	/*
+	 * This pointer is used in order to open connection from FTP
 	 * server when FTP non passive mode.
- */
+	 */
 	struct cSlot	*csl;
 	union {
 		struct {
@@ -303,8 +303,8 @@ struct tSlot					/* sizeof(): 132[byte] */
 };
 
 
-struct tcpstate					/* sizeof(): 32[byte] */
-{
+struct tcpstate {
+	/* sizeof(): 32[byte] */
 	u_char		state;		/* tcp status */
 	char		ftpstate;
 	char		rewrite[2];
@@ -318,7 +318,6 @@ struct tcpstate					/* sizeof(): 32[byte] */
 					/* [1]: incomingDelta */
 					/*	incomingSeq - increment */
 					/*	outgoingAck - decrement */
-
 	u_int32_t	seq[2];
 	u_int32_t	ack[2];
 };
