@@ -2827,7 +2827,6 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 			in6p->in6p_lport = ((struct sockaddr_in6 *)dst)->sin6_port;
 #if 0
 			in6p->in6p_flowinfo = ip6->ip6_flow & IPV6_FLOWINFO_MASK;
-			/*inp->inp_options = ip6_srcroute();*/ /* soon. */
 #endif
 		}
 		break;
@@ -2853,9 +2852,6 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 						    newopts.head) == 0)
 					m_freem(newopts.head);
 			}
-#if 0
-			in6p->in6p_recvoptions = NULL;
-#endif
 		}
 	}
 #endif
