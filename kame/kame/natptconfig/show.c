@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.38 2002/12/18 05:16:03 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.39 2002/12/18 08:50:32 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -480,8 +480,6 @@ readTQH(void *buf, int nbytes, int n_idx, int copy)
 			addr = prepareTQH(NATPT_duplicateXLate);
 		else
 			addr = prepareTQH(NATPT_originalXLate);
-
-		printf("%s(): %p\n", fn, addr);
 
 		if (addr == NULL)
 			return (0);
