@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.27 2003/11/25 07:34:52 ono Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.28 2004/01/19 08:39:25 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -733,7 +733,7 @@ dccp_input(struct mbuf *m, ...)
 	DCCP_DEBUG((LOG_INFO, "BEFORE state check, Got a %u packet while in %u state, who = %u!\n", dh->dh_type, dp->state, dp->who));
 
 	if (dp->state == DCCPS_LISTEN) {
-		switch(dh->dh_type) {
+		switch (dh->dh_type) {
 
 		case DCCP_TYPE_REQUEST:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP REQUEST\n"));
@@ -779,7 +779,7 @@ dccp_input(struct mbuf *m, ...)
 
 
 	} else if (dp->state == DCCPS_REQUEST) {
-		switch(dh->dh_type) {
+		switch (dh->dh_type) {
 		case DCCP_TYPE_RESPONSE:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP REPSONSE\n"));
 			dp->ack_rcv = ntohl(dah->dah_ack << 8); /* Ack num */
@@ -826,7 +826,7 @@ dccp_input(struct mbuf *m, ...)
 			}
 		}
 	} else if (dp->state == DCCPS_RESPOND) {
-		switch(dh->dh_type) {
+		switch (dh->dh_type) {
 
 		case DCCP_TYPE_REQUEST:
 			break;
@@ -877,7 +877,7 @@ dccp_input(struct mbuf *m, ...)
 			dccp_output(dp, DCCP_TYPE_RESET + 2);
 		}
 	} else if (dp->state == DCCPS_ESTAB) {
-		switch(dh->dh_type) {
+		switch (dh->dh_type) {
 
 		case DCCP_TYPE_DATA:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP DATA, state = %i, cc_in_use[1] = %u\n", dp->state, dp->cc_in_use[1]));
@@ -942,7 +942,7 @@ dccp_input(struct mbuf *m, ...)
 
 	} else if (dp->state == DCCPS_SERVER_CLOSE) {
 		/* Server */
-		switch(dh->dh_type) {
+		switch (dh->dh_type) {
 		case DCCP_TYPE_CLOSE:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP CLOSE (State DCCPS_SERVER_CLOSE)\n"));
 			callout_stop(&dp->retrans_timer);
@@ -962,7 +962,7 @@ dccp_input(struct mbuf *m, ...)
 
 	} else if (dp->state == DCCPS_CLIENT_CLOSE) {
 		/* Client */
-		switch(dh->dh_type) {
+		switch (dh->dh_type) {
 		case DCCP_TYPE_CLOSE:
 			/* Ignore */
 			break;
@@ -2896,7 +2896,7 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 		DCCP_DEBUG((LOG_INFO, "Parsing opt: 0x%02x\n", opt));
 
 		if (opt < 32) {
-			switch(opt) {
+			switch (opt) {
 			    case DCCP_OPT_PADDING:
 				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_PADDING!\n"));
 				break;
@@ -2932,7 +2932,7 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 				return;
 			}
 
-			switch(opt) {
+			switch (opt) {
 			    case DCCP_OPT_IGNORED:
 				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_IGNORED!\n"));
 				if (size != 4) {
@@ -3067,7 +3067,7 @@ dccp_feature_neg(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, u_int8_t val
 	char ignored[2];
 	DCCP_DEBUG((LOG_INFO, "Running dccp_feature_neg, opt = %u, feature = %u len = %u ", opt, feature, val_len));
 
-	switch(feature) {
+	switch (feature) {
 		case DCCP_FEATURE_CC:
 			DCCP_DEBUG((LOG_INFO, "Got CCID negotiation, opt = %u, val[0] = %u\n", opt, val[0]));
 			if (opt == DCCP_OPT_CHANGE) {

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.34 2004/01/16 09:56:01 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.35 2004/01/19 08:39:25 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -1476,7 +1476,7 @@ sctp_optsget(struct socket *so,
 	}
 #endif /* SCTP_DEBUG */
 
-	switch(opt) {
+	switch (opt) {
 	case SCTP_NODELAY:
 	case SCTP_AUTOCLOSE:
 	case SCTP_AUTO_ASCONF:
@@ -1487,7 +1487,7 @@ sctp_optsget(struct socket *so,
 			printf("other stuff\n");
 		}
 #endif /* SCTP_DEBUG */
-		switch(opt) {
+		switch (opt) {
 		case SCTP_DISABLE_FRAGMENTS:
 			optval = inp->sctp_flags & SCTP_PCB_FLAGS_NO_FRAGMENT;
 			break;
@@ -1510,7 +1510,7 @@ sctp_optsget(struct socket *so,
 
 		default:
 			error = ENOPROTOOPT;
-		} /* end switch(sopt->sopt_name) */
+		} /* end switch (sopt->sopt_name) */
 		if (opt != SCTP_AUTOCLOSE) {
 			/* make it an "on/off" value */
 			optval = (optval != 0);
@@ -2263,7 +2263,7 @@ sctp_optsget(struct socket *so,
 		error = ENOPROTOOPT;
 		m->m_len = 0;
 		break;
-	} /* end switch(sopt->sopt_name) */
+	} /* end switch (sopt->sopt_name) */
 	return (error);
 }
 
@@ -2299,7 +2299,7 @@ sctp_optsset(struct socket *so,
 		return EINVAL;
 
 	error = 0;
-	switch(opt) {
+	switch (opt) {
 	case SCTP_NODELAY:
 	case SCTP_AUTOCLOSE:
 	case SCTP_AUTO_ASCONF:
@@ -2314,7 +2314,7 @@ sctp_optsset(struct socket *so,
 		set_opt = 0;
 		if (error)
 			break;
-		switch(opt) {
+		switch (opt) {
 		case SCTP_DISABLE_FRAGMENTS:
 			set_opt = SCTP_PCB_FLAGS_NO_FRAGMENT;
 			break;
@@ -2873,7 +2873,7 @@ sctp_optsset(struct socket *so,
 	default:
 		error = ENOPROTOOPT;
 		break;
-	} /* end switch(opt) */
+	} /* end switch (opt) */
 	return (error);
 }
 

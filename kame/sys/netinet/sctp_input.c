@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.c,v 1.21 2004/01/19 03:58:35 itojun Exp $	*/
+/*	$KAME: sctp_input.c,v 1.22 2004/01/19 08:39:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -758,7 +758,7 @@ sctp_process_unrecog_chunk(struct sctp_tcb *tcb, struct sctp_paramhdr *phdr,
 	struct sctp_chunkhdr *chk;
 
 	chk = (struct sctp_chunkhdr *)((caddr_t)phdr + sizeof(*phdr));
-	switch(chk->chunk_type) {
+	switch (chk->chunk_type) {
 	case SCTP_ASCONF_ACK:
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_INPUT2) {
@@ -798,7 +798,7 @@ sctp_process_unrecog_param(struct sctp_tcb *tcb, struct sctp_paramhdr *phdr)
 	struct sctp_paramhdr *pbad;
 
 	pbad = phdr + 1;
-	switch(ntohs(pbad->param_type)) {
+	switch (ntohs(pbad->param_type)) {
 		/* pr-sctp draft */
 	case SCTP_PRSCTP_SUPPORTED:
 		tcb->asoc.peer_supports_prsctp = 0;
@@ -864,7 +864,7 @@ sctp_handle_error(struct sctp_chunkhdr *ch,
 #endif /* SCTP_DEBUG */
 			return;
 		}
-		switch(error_type) {
+		switch (error_type) {
 		case SCTP_CAUSE_INV_STRM:
 		case SCTP_CAUSE_MISS_PARAM:
 		case SCTP_CAUSE_INVALID_PARAM:
@@ -1918,7 +1918,7 @@ sctp_handle_cookie_echo(struct mbuf *m, int offset, int iphlen,
 		sin->sin_len = sizeof(*sin);
 		sin->sin_port = sctphdr->dest_port;
 		sin->sin_addr.s_addr = iph->ip_dst.s_addr ;
-	} else if (iph->ip_v == 6) {
+	} else if (iph->ip_v == (IPV6_VERSION >> 4)) {
 		/* its IPv6 */
 		struct ip6_hdr *ip6;
 		struct sockaddr_in6 *sin6;
@@ -3007,7 +3007,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 				sin->sin_len = sizeof(*sin);
 				sin->sin_port = sctphdr->dest_port;
 				sin->sin_addr.s_addr = iph->ip_dst.s_addr ;
-			} else if (iph->ip_v == 6) {
+			} else if (iph->ip_v == (IPV6_VERSION >> 4)) {
 				/* its IPv6 */
 				struct ip6_hdr *ip6;
 				struct sockaddr_in6 *sin6;
@@ -3673,7 +3673,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 				return (NULL);
 			} /* else skip this bad chunk and continue... */
 			break;
-		} /* switch(ch->chunk_type) */
+		} /* switch (ch->chunk_type) */
 		/* get the next chunk */
 		*offset += SCTP_SIZE32(chk_length);
 		*length -= SCTP_SIZE32(chk_length);
@@ -3811,7 +3811,7 @@ sctp_common_input_processing(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 		 * tag, so we don't abort if this happens, just
 		 * dump the chunk silently.
 		 */
-		switch(stcb->asoc.state & SCTP_STATE_MASK) {
+		switch (stcb->asoc.state & SCTP_STATE_MASK) {
 		case SCTP_STATE_COOKIE_ECHOED:
 			/*
 			 * we consider data with valid tags in

@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.24 2004/01/16 09:56:01 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.25 2004/01/19 08:39:26 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -885,7 +885,7 @@ sctp_timeout_handler(void *t)
 		return;
 	}
 	typ = tmr->type;
-	switch(tmr->type) {
+	switch (tmr->type) {
 		/* call the handler for the appropriate timer type */
 	case SCTP_TIMER_TYPE_SEND:
 		sctp_pegs[SCTP_TMIT_TIMER]++;
