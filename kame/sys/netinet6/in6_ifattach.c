@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.103 2001/02/08 10:56:59 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.104 2001/02/08 12:24:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -557,11 +557,9 @@ in6_ifattach_linklocal(ifp, altifp)
 	ifra.ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;
 
 	/*
-	 * Do not let in6_update_ifa() do DAD, since we have (probably) even
-	 * not joined all-nodes multicast group. (And we need at least
-	 * one unicast address configured to join the multicast group.
-	 * Here's a some kind of chicken egg problem).
-	 * Instead, in6_if_up() will do DAD later.
+	 * Do not let in6_update_ifa() do DAD, since we need a random delay
+	 * before sending an NS at the first time the inteface becomes up.
+	 * Instead, in6_if_up() will start DAD with a proper random delay.
 	 */
 	ifra.ifra_flags |= IN6_IFF_NODAD;
 
