@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_network.c,v 1.7 2003/02/24 11:15:46 ono Exp $	*/
+/*	$KAME: vrrp_network.c,v 1.8 2003/05/13 07:06:30 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -130,7 +130,7 @@ vrrp_network_initialize(void)
 }
 
 /* Open VRRP socket for reading */
-char 
+int
 vrrp_network_open_socket(struct vrrp_vr * vr)
 {
 	int offset = 6;
@@ -147,7 +147,7 @@ vrrp_network_open_socket(struct vrrp_vr * vr)
 	return 0;
 }
 
-char 
+int
 vrrp_network_set_socket(struct vrrp_vr * vr)
 {
 	int on;
@@ -274,7 +274,7 @@ vrrp_network_init_vrrphdr(char *buffer, struct vrrp_vr * vr)
 	return;
 }
 
-char 
+int
 vrrp_network_send_advertisement(struct vrrp_vr * vr)
 {
 	u_char         *buffer;
@@ -294,7 +294,7 @@ vrrp_network_send_advertisement(struct vrrp_vr * vr)
 	return 0;
 }
 
-char
+int
 vrrp_network_send_icmp_packet(char *p, int len, int ifindex)
 {
     struct msghdr m;
@@ -365,7 +365,7 @@ vrrp_network_send_icmp_packet(char *p, int len, int ifindex)
 
       
 
-char
+int
 vrrp_network_send_neighbor_advertisement(struct vrrp_vr *vr)
 {
 #define ROUNDUP8(a) (1 + (((a) - 1) | 7))
@@ -395,7 +395,7 @@ vrrp_network_send_neighbor_advertisement(struct vrrp_vr *vr)
 }
 
 #define rtm rtmsg.rthdr
-char 
+int
 vrrp_network_delete_local_route(struct in6_addr *addr)
 {
 	struct routemsg rtmsg;

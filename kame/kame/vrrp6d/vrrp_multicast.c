@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_multicast.c,v 1.4 2002/07/10 07:41:46 ono Exp $	*/
+/*	$KAME: vrrp_multicast.c,v 1.5 2003/05/13 07:06:30 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -63,7 +63,7 @@
 #include "vrrp_multicast.h"
 
 /* join multicast group with ip address */
-char 
+int
 vrrp_multicast_join_group(int sd, u_char * multicast_ip, u_int interface_index)
 {
 	struct in6_addr ia6;
@@ -86,7 +86,7 @@ vrrp_multicast_join_group(int sd, u_char * multicast_ip, u_int interface_index)
 }
 
 /* Set multicast ttl IP */
-char 
+int
 vrrp_multicast_set_hops(int sd, int hops)
 {
 	if (setsockopt(sd, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hops, sizeof(hops)) == -1) {
@@ -96,7 +96,7 @@ vrrp_multicast_set_hops(int sd, int hops)
 	return 0;
 }
 
-char 
+int
 vrrp_multicast_set_if(int sd, u_int ifindex, char *if_name)
 {
 	if (setsockopt(sd, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifindex, sizeof(ifindex)) == -1) {
@@ -107,7 +107,7 @@ vrrp_multicast_set_if(int sd, u_int ifindex, char *if_name)
 }
 
 /* Open VRRP socket and join multicast group */
-char 
+int
 vrrp_multicast_set_socket(struct vrrp_vr * vr)
 {
     /*
@@ -132,7 +132,7 @@ vrrp_multicast_set_socket(struct vrrp_vr * vr)
 	return 0;
 }
 
-char 
+int
 vrrp_multicast_open_socket(struct vrrp_vr * vr)
 {
 	if (vrrp_network_open_socket(vr) == -1)

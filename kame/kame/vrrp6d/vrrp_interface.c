@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_interface.c,v 1.7 2003/02/25 09:29:25 ono Exp $	*/
+/*	$KAME: vrrp_interface.c,v 1.8 2003/05/13 07:06:29 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -78,7 +78,7 @@ vrrp_interface_owner_verify(struct vrrp_vr * vr)
 	return;
 }
 
-char 
+int
 vrrp_interface_ethaddr_set(char *if_name, struct ether_addr * ethaddr)
 {
 	int             sd;
@@ -109,7 +109,7 @@ vrrp_interface_ethaddr_set(char *if_name, struct ether_addr * ethaddr)
 	return 0;
 }
 
-char 
+int
 vrrp_interface_vrrif_set(char *if_name, u_int parent_index, struct ether_addr *lladdr)
 {
 	int             sd;
@@ -134,14 +134,14 @@ vrrp_interface_vrrif_set(char *if_name, u_int parent_index, struct ether_addr *l
 	if (ioctl(sd, SIOCSETVRRP, (caddr_t) &ifr) == -1) {
 		syslog(LOG_ERR, "cannot set vrrp parent interface %s (ioctl): %m", if_name);
 		close(sd);
-		return -1;
+		exit(1);
 	}
 
 	close(sd);
 	return 0;
 }
 
-char 
+int
 vrrp_interface_vrrif_delete(char *if_name)
 {
 	int             sd;
@@ -164,7 +164,7 @@ vrrp_interface_vrrif_delete(char *if_name)
 	if (ioctl(sd, SIOCSETVRRP, (caddr_t) &ifr) == -1) {
 		syslog(LOG_ERR, "cannot delete vrrp parent interface %s (ioctl): %m", if_name);
 		close(sd);
-		return -1;
+		exit(1);
 	}
 
 	close(sd);
@@ -194,7 +194,7 @@ vrrp_interface_compute_netmask(u_int nbbits, struct in6_addr *mask)
 	return mask;
 }
 
-char 
+int
 vrrp_interface_ipaddr_set(char *if_name, struct in6_addr *addr, struct in6_addr *netmask)
 {
 	int             sd;
@@ -229,7 +229,7 @@ vrrp_interface_ipaddr_set(char *if_name, struct in6_addr *addr, struct in6_addr 
 	return 0;
 }
 
-char 
+int
 vrrp_interface_ipaddr_delete(char *if_name, struct in6_addr *addr, int verbose)
 {
 	int             sd;
@@ -257,7 +257,7 @@ vrrp_interface_ipaddr_delete(char *if_name, struct in6_addr *addr, int verbose)
 	return 0;
 }
 
-char 
+int
 vrrp_interface_vripaddr_set(struct vrrp_vr * vr)
 {
 	int             cpt;
@@ -283,7 +283,7 @@ vrrp_interface_vripaddr_set(struct vrrp_vr * vr)
 	return 0;
 }
 
-char 
+int
 vrrp_interface_vripaddr_delete(struct vrrp_vr * vr)
 {
 	int             cpt;
@@ -308,7 +308,7 @@ vrrp_interface_vripaddr_delete(struct vrrp_vr * vr)
 	return 0;
 }
 
-char 
+int
 vrrp_interface_down(char *if_name)
 {
 	int             sd;
@@ -335,7 +335,7 @@ vrrp_interface_down(char *if_name)
 	return 0;
 }
 
-char 
+int
 vrrp_interface_up(char *if_name)
 {
 	int             sd;

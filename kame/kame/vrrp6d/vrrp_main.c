@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_main.c,v 1.6 2003/04/16 09:47:41 ono Exp $	*/
+/*	$KAME: vrrp_main.c,v 1.7 2003/05/13 07:06:29 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -73,7 +73,7 @@ vrrp_main_pre_init(struct vrrp_vr * vr)
 	return;
 }
 
-char
+int
 vrrp_main_post_init(struct vrrp_vr * vr)
 {
 	int             size = MAX_IP_ALIAS;

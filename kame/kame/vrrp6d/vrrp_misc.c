@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_misc.c,v 1.7 2003/04/01 07:18:04 ono Exp $	*/
+/*	$KAME: vrrp_misc.c,v 1.8 2003/05/13 07:06:30 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -82,7 +82,7 @@ rt_xaddrs(caddr_t cp, caddr_t cplim, struct rt_addrinfo * rtinfo)
 	}
 }
 
-char 
+int
 vrrp_misc_get_if_infos(char *if_name, struct ether_addr * ethaddr, struct in6_addr * ip_addrs, int *size)
 {
 	int             addrcount;
@@ -242,7 +242,7 @@ vrrp_misc_compute_checksum(struct ip6_pseudohdr *phdr, u_char *payload)
 	return ~sum;
 }
 
-char 
+int
 vrrp_misc_calcul_tminterval(struct timeval * timer, u_int interval)
 {
 	struct timeval  tm;
@@ -257,7 +257,7 @@ vrrp_misc_calcul_tminterval(struct timeval * timer, u_int interval)
 	return 0;
 }
 
-char 
+int
 vrrp_misc_calcul_tmrelease(struct timeval * timer, struct timeval * interval)
 {
 	struct timeval  tm;
@@ -285,7 +285,7 @@ vrrp_misc_vphdr_len(struct vrrp_hdr * vph)
 	return (sizeof(struct vrrp_hdr) + sizeof(struct in6_addr) + VRRP_AUTH_DATA_LEN);
 }
 
-char 
+int
 vrrp_misc_check_vrrp_packet(struct vrrp_vr * vr, char *packet, struct ip6_pseudohdr *phdr, int hlim)
 {
 //	struct ip6_hdr  *iph = (struct ip6_hdr *) ip;

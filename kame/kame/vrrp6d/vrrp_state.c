@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_state.c,v 1.8 2003/04/16 10:59:03 ono Exp $	*/
+/*	$KAME: vrrp_state.c,v 1.9 2003/05/13 07:06:30 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -71,7 +71,7 @@ struct vrrp_vr *vr_ptr[VRRP_PROTOCOL_MAX_VRID];
 /* actual position on this table */
 u_char vr_ptr_pos = 0;
 
-char 
+int
 vrrp_state_initialize(struct vrrp_vr * vr)
 {
 	if (vr->priority == 255) {
@@ -83,7 +83,7 @@ vrrp_state_initialize(struct vrrp_vr * vr)
 	return 0;
 }
 
-char 
+int
 vrrp_state_initialize_all(void)
 {
 	int i;
@@ -96,7 +96,7 @@ vrrp_state_initialize_all(void)
 	return 0;
 }
 
-char 
+int
 vrrp_state_set_master(struct vrrp_vr * vr)
 {
 	if (vr->tm)
@@ -117,7 +117,7 @@ vrrp_state_set_master(struct vrrp_vr * vr)
 	return 0;
 }
 
-char 
+int
 vrrp_state_set_backup(struct vrrp_vr * vr)
 {
 	if (vr->tm)
@@ -138,7 +138,7 @@ vrrp_state_set_backup(struct vrrp_vr * vr)
 	return 0;
 }
 
-char 
+int
 vrrp_state_select(struct vrrp_vr * vr, struct timeval * interval)
 {
 	int             coderet;
@@ -231,7 +231,7 @@ vrrp_state_get_packet(struct vrrp_vr *vr,
 	return 0;
 }
 
-char 
+int
 vrrp_state_check_priority(struct vrrp_hdr * vrrph, struct vrrp_vr * vr, struct in6_addr *addr)
 {
 	if (vrrph->priority > vr->priority)
@@ -242,7 +242,7 @@ vrrp_state_check_priority(struct vrrp_hdr * vrrph, struct vrrp_vr * vr, struct i
 	return 0;
 }
 
-char
+int
 vrrp_state_proc_packet(struct vrrp_vr *vr)
 {
 	static u_char packet[4096];
