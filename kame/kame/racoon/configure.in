@@ -33,7 +33,7 @@ AC_MSG_RESULT($enable_pedant)
 AC_MSG_CHECKING(if --enable-adminport option is specified)
 AC_ARG_ENABLE(adminport,
 	[  --enable-adminport      enable admin port (INSECURE!)],
-	[AC_DEFINE(ENABLE_ADMINPORT])
+	[AC_DEFINE(ENABLE_ADMINPORT)])
 AC_MSG_RESULT($enable_adminport)
 
 efence_dir=
