@@ -245,12 +245,9 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 #if MAXHOSTNAMELEN < IF_NAMESIZE
 # error assumption failed (scopelen)
 #endif
-
-				if ((s = ip6_sa2str((struct sockaddr_in6 *)sa,
-					scopebuf, sizeof(scopebuf), 0)) == NULL)
-					/* XXX what should we do? */
-					strcpy(scopebuf, "0");
-
+				/* ip6_sa2str never fails */
+				(void)ip6_sa2str((struct sockaddr_in6 *)sa,
+						 scopebuf, sizeof(scopebuf), 0);
 				scopelen = strlen(scopebuf);
 				if (scopelen + 1 + numaddrlen + 1 > hostlen)
 					return ENI_MEMORY;
