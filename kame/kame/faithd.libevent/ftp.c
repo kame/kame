@@ -633,11 +633,19 @@ cmdin(s, event, arg)
 	cmd[sizeof(cmd) - 1] = '\0';
 
 	/* commands that are not relayed */
-	if (strncasecmp(relay->cli.buf, "EPSV ALL", 8) == 0 ||
-	    strcasecmp(cmd, "EPRT") == 0 || strcasecmp(cmd, "LPRT") == 0 ||
-	    strcasecmp(cmd, "LPSV") == 0) {
+	if (strncasecmp(relay->cli.buf, "EPSV ALL", 8) == 0) {
 		relay->ser.len = snprintf(relay->ser.buf,
 		    sizeof(relay->ser.buf), "502 not implemented.\r\n");
+		event_add(&relay->cli.outbound, NULL);
+		relay->cli.len = 0;
+		event_add(&relay->cli.inbound, NULL);
+		return;
+	}
+	if (strcasecmp(cmd, "EPRT") == 0 ||
+	    strcasecmp(cmd, "LPRT") == 0 || strcasecmp(cmd, "LPSV") == 0 ||
+	    strcasecmp(cmd, "PORT") == 0 || strcasecmp(cmd, "PASV") == 0) {
+		relay->ser.len = snprintf(relay->ser.buf,
+		    sizeof(relay->ser.buf), "502 %s not implemented.\r\n", cmd);
 		event_add(&relay->cli.outbound, NULL);
 		relay->cli.len = 0;
 		event_add(&relay->cli.inbound, NULL);
