@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.79 2002/11/05 03:48:31 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.80 2003/01/17 10:13:57 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -427,7 +427,6 @@ struct dhaad_req {		/* HA Address Discovery Request */
 struct dhaad_rep {		/* HA Address Discovery Reply */
 	struct icmp6_hdr	dhaad_rep_hdr;
 	u_int32_t		dhaad_rep_reserved2;
-	u_int32_t		dhaad_rep_reserved3;
 	/* could be followed by Home Agent addresses */
 } __attribute__((__packed__));
 
