@@ -9,6 +9,6 @@ SUBDIR+=pvcsif pvctxctl
 SUBDIR+=altqd tbrconfig
 #SUBDIR+=inet6d
 
-SUBDIR+=mip6config mip6stat
+#SUBDIR+=mip6config mip6stat
 
 .include <bsd.subdir.mk>
