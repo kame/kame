@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1490 2001/01/20 16:38:47 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1491 2001/01/21 08:27:39 itojun Exp $
 
 <200101>
+Sun Jan 21 00:26:47 PST 2001  itojun@iijlab.net
+	* sys/netinet6/ip6_input.c: do not accept packet to link-local address
+	  on loopback interface, if the destination address is not assigned
+	  to the node itself.  fixes KAME PR 250.
+
 Sun Jan 21 01:37:23 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* sys/netinet6/{nd6.c,nd6_nbr.c,nd6.h}: implement garbage
 	  correction for stale NDP entry which described in RFC2461
