@@ -260,6 +260,8 @@ ETHER_SNAP		opt_ef.h
 MROUTING		opt_mrouting.h
 INET			opt_inet.h
 INET6			opt_inet6.h
+MIP6			opt_inet.h
+MIP6_DEBUG		opt_inet.h
 IPSEC			opt_ipsec.h
 IPSEC_ESP		opt_ipsec.h
 IPSEC_DEBUG		opt_ipsec.h

@@ -124,6 +124,7 @@ struct mbuf {
 #define	M_EOR		0x0004	/* end of record */
 #define	M_PROTO1	0x0008	/* protocol-specific */
 #define	M_PROTO2	0x0010	/* protocol-specific */
+#define M_MIP6TUNNEL	M_PROTO2 /* MIP6 temporary use */
 #define	M_PROTO3	0x0020	/* protocol-specific */
 #define	M_PROTO4	0x0040	/* protocol-specific */
 #define	M_PROTO5	0x0080	/* protocol-specific */

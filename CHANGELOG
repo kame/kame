@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1013 2000/06/14 11:16:28 itojun Exp $
-
+$Id: CHANGELOG,v 1.1014 2000/06/14 15:01:22 suz Exp $
 <200006>
+2000-06-14  SUZUKI Shinsuke  <suz@sdl.hitachi.co.jp>
+	* sys/net/if_dummy.c, freebsd4/sys/conf/files:
+	dummy I/F is available on FreeBSD4.0, too.
+
+	* freebsd4/sys/conf/options, freebsd4/sys/conf/files
+	freebsd4/sys/sys/mbuf.h
+	FreeBSD-4.0 KAME with MIP6 option is available.
+	(In this patch, I used M_PROTO2 for MIP6-specific mbuf
+	 flag just to keep consistency with other platforms,
+	 however it might need be changed)
+	
 Wed Jun 14 20:14:47 JST 2000  itojun@iijlab.net
 	* sys/netinet6/esp_core.c: pass encryption failure code up to ESP
 	  engine, just in case the encryption routine fails.
