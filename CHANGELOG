@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.809 2000/04/24 14:03:58 jinmei Exp $
+$Id: CHANGELOG,v 1.810 2000/04/24 18:56:52 sakane Exp $
 
 <200004>
+Tue Apr 25 03:54:32 JST 2000 sakane@kame.net
+	* kame/kame/racoon:
+	enable VPN negotiation again.
+
+	XXX AS before, racoon can NOT negotiate the socket based SA.
+
 2000-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/net/if.c (ifa_ifwithnet): reverted a changed on
 	2000-02-25, since the logic is not related with our latest code.
