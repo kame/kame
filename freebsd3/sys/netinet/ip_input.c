@@ -1720,9 +1720,6 @@ ip_forward(m, srcrt)
 					}
 				}
 
-				KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-					printf("DP ip_forward calls free "
-					       "SP:%lx\n", sp));
 				key_freesp(sp);
 			}
 		}

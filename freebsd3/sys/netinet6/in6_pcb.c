@@ -379,11 +379,11 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 		 * with the address specified by setsockopt(IPV6_PKTINFO).
 		 * Is it the intended behavior?
 		 */
-		if ((*plocal_addr6 = in6_selectsrc(sin6, inp->in6p_outputopts,
-						   inp->in6p_moptions,
-						   &inp->in6p_route,
-						   &inp->in6p_laddr,
-						   &error)) == 0) {
+		*plocal_addr6 = in6_selectsrc(sin6, inp->in6p_outputopts,
+					      inp->in6p_moptions,
+					      &inp->in6p_route,
+					      &inp->in6p_laddr, &error);
+		if (*plocal_addr6 == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
 			return(error);

@@ -288,7 +288,7 @@ udp6_input(mp, offp, proto)
 					    || last->in6p_socket->so_options & SO_TIMESTAMP)
 						ip6_savecontrol(last, &opts,
 								ip6, n);
-					m_adj(m, off + sizeof(struct udphdr));
+					m_adj(n, off + sizeof(struct udphdr));
 					if (sbappendaddr(&last->in6p_socket->so_rcv,
 							(struct sockaddr *)&udp_in6,
 							n, opts) == 0) {
@@ -504,6 +504,10 @@ udp6_ctlinput(cmd, sa, ip6, m, off)
 	struct udphdr uh;
 	struct sockaddr_in6 sa6;
 
+	if (sa->sa_family != AF_INET6 ||
+	    sa->sa_len != sizeof(struct sockaddr_in6))
+		return;
+
 #if 0
 	if (cmd == PRC_IFNEWADDR)
 		in6_mrejoin(&udb6);
@@ -514,9 +518,6 @@ udp6_ctlinput(cmd, sa, ip6, m, off)
 		return;
 
 	/* translate addresses into internal form */
-	if (sa->sa_family != AF_INET6 ||
-	    sa->sa_len != sizeof(struct sockaddr_in6))
-		return;
 	sa6 = *(struct sockaddr_in6 *)sa;
 	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr))
 		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
@@ -584,6 +585,11 @@ udp6_output(in6p, m, addr6, control, p)
 		 * Must block input while temporarily connected.
 		 */
 		s = splnet();
+		/*
+		 * XXX: the user might want to overwrite the local address
+		 * via an ancillary data.
+		 */
+		bzero(&in6p->in6p_laddr, sizeof(struct in6_addr));
 		error = in6_pcbconnect(in6p, addr6, p);
 		if (error) {
 			splx(s);

@@ -568,11 +568,10 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		return EAFNOSUPPORT;
 
 	/* Source address selection. XXX: need pcblookup? */
-	in6a = &inp->in6p_laddr;
-	if (IN6_IS_ADDR_UNSPECIFIED(in6a) &&
-	    (in6a = in6_selectsrc(addr, inp->in6p_outputopts,
-				  inp->in6p_moptions, &inp->in6p_route,
-				  &inp->in6p_laddr, &error)) == NULL)
+	in6a = in6_selectsrc(addr, inp->in6p_outputopts,
+			     inp->in6p_moptions, &inp->in6p_route,
+			     &inp->in6p_laddr, &error);
+	if (in6a == NULL)
 		return (error ? error : EADDRNOTAVAIL);
 	inp->in6p_laddr = *in6a;
 	inp->in6p_faddr = addr->sin6_addr;
