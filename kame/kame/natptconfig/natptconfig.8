@@ -1,4 +1,4 @@
-.\"	$KAME: natptconfig.8,v 1.16 2002/02/04 08:02:22 fujisawa Exp $
+.\"	$KAME: natptconfig.8,v 1.17 2002/02/05 04:14:45 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -123,8 +123,17 @@ Show available subcommands on this stage.
 .Xc
 Show NAT-PT prefix and prefix mask.
 .It Xo Sy rules
+.Op Sy cui
 .Xc
-Show NAT-PT rules
+Show NAT-PT rules.  When
+.Sy cui
+is specified,
+.Sy show rules
+command shows translation rule with CUI format instead of natptconfig
+format.
+.Nm
+does not accept this CUI format.  Because CUI format is for a special
+intended use, a general people does not use it.
 .It Xo Sy xlate
 .Op Sy long
 .Op Ar interval
