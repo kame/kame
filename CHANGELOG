@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1141 2000/07/21 11:02:40 sakane Exp $
+$Id: CHANGELOG,v 1.1142 2000/07/21 12:18:48 jinmei Exp $
 
 <200006>
+2000-07-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd/bgp.c: clarification about the advanced API;
+	do not use IPV6_PKTOPTIONS in pure RFC2292 (i.e. not 2292bis)
+	paths.
+
 Thu Jul 20 01:52:59 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/{libpcap,tcpdump}: use 7/17 weekly snap.
 	* freebsd3/ports/mtr: use latest IPv6 patch.
