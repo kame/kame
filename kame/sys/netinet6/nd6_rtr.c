@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.160 2001/08/28 11:44:26 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.161 2001/08/30 11:45:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1385,8 +1385,21 @@ prelist_update(new, dr, m)
 		 * "two hours" rule and the privacy extension.
 		 */
 #define TWOHOUR		(120*60)
+		/*
+		 * RFC2462 introduces the notion of StoredLifetime to the
+		 * "two hours" rule as follows:
+		 *   the Lifetime associated with the previously autoconfigured
+		 *   address.
+		 * Our interpretation of this definition is "the remaining
+		 * lifetime to expiration at the evaluation time".  One might
+		 * be wondering if this interpretation is really conform to the
+		 * RFC, because the text can read that "Lifetimes" are never
+		 * decreased.  But, this is due to the wording of the text,
+		 * and our interpretation is the same as an author's intention.
+		 * See the discussion in the IETF ipngwg ML in August 2001,
+		 * with the Subject "StoredLifetime in RFC 2462".
+		 */
 		lt6_tmp = ifa6->ia6_lifetime;
-
 		storedlifetime = IFA6_IS_INVALID(ifa6) ? 0 :
 			(lt6_tmp.ia6t_expire - time_second);
 
