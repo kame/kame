@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.244 1999/11/02 10:19:31 itojun Exp $
+$Id: CHANGELOG,v 1.245 1999/11/03 15:30:50 sakane Exp $
 
 <199911>
+Wed Nov  3 22:11:16 JST 1999 sakane@ydc.co.jp
+	* kame/sys/netkey/key.c:
+	key_msg2sp() returns suitable error code.
+
+Wed Nov  3 21:48:29 JST 1999 sakane@ydc.co.jp
+	* kame/sys/netkey/key.c:
+	Toss up a policy index as identity of SA user when kernel acquired SA.
+	This is used extended identity type, that is SADB_X_IDENTTYPE_ADDR,
+	included in the SADB_EXT_IDENTITY extension.
+
 Tue Nov  2 13:27:36 JST 1999  itojun@iijlab.net
 	* freebsd2/ports/sendmail.beta, netbsd/pkgsrc/mail/sendmail.beta:
 	  add port directory for sendmail 8.10.0beta6, to stress-test IPv6
