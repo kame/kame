@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.91 2002/01/21 03:23:45 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.92 2002/01/21 04:56:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -425,7 +425,7 @@ ip6_forward(m, srcrt)
 
 		/* ip6_forward_rt.ro_dst.sin6_addr is equal to ip6->ip6_dst */
 		if (ip6_forward_rt.ro_rt == 0 ||
-		    (ip6_forward_rt.ro_rt->rt_flags & RTF_UP) == 0
+		    !(ip6_forward_rt.ro_rt->rt_flags & RTF_UP)
 #ifdef MEASURE_PERFORMANCE
 		    || (ip6_ours_check_algorithm != OURS_CHECK_ALG_RTABLE &&
 #ifdef SCOPEDROUTING
@@ -475,6 +475,7 @@ ip6_forward(m, srcrt)
 			return;
 		}
 	} else if ((rt = ip6_forward_rt.ro_rt) == 0 ||
+		    !(ip6_forward_rt.ro_rt->rt_flags & RTF_UP) ||
 #ifdef SCOPEDROUTING
 		   !SA6_ARE_ADDR_EQUAL(sa6_dst, dst)
 #else
