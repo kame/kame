@@ -1,4 +1,4 @@
-/*	$KAME: localconf.h,v 1.20 2000/10/11 19:54:08 sakane Exp $	*/
+/*	$KAME: localconf.h,v 1.21 2000/11/19 01:22:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -46,7 +46,7 @@
 #define LC_DEFAULT_PAD_STRICT		FALSE
 #define LC_DEFAULT_PAD_EXCLTAIL		TRUE
 #define LC_DEFAULT_RETRY_COUNTER	5
-#define LC_DEFAULT_RETRY_INTERVAL	20
+#define LC_DEFAULT_RETRY_INTERVAL	10
 #define LC_DEFAULT_COUNT_PERSEND	1
 #define LC_DEFAULT_RETRY_CHECKPH1	15
 #define LC_DEFAULT_WAIT_PH2COMPLETE	10
