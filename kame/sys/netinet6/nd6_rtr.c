@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.111 2001/04/27 01:37:15 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.112 2001/05/31 01:01:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -786,9 +786,12 @@ defrtrlist_del(dr)
 		rt6_flush(&dr->rtaddr, dr->ifp);
 	}
 
-	if (dr == TAILQ_FIRST(&nd_defrouter))
+	if (dr == nd_defrouter_primary) {
 		deldr = dr;	/* The router is primary. */
-
+#ifdef	RTPREF
+		nd_defrouter_primary = NULL;
+#endif
+	}
 	TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
 
 	/*
@@ -853,13 +856,17 @@ defrouter_select()
 		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
 		    ND6_IS_LLINFO_PROBREACH(ln)) {
 			/* Got it, and move it to the head */
+#ifdef	RTPREF
+			nd_defrouter_primary =  dr;
+#else
 			TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
 			TAILQ_INSERT_HEAD(&nd_defrouter, dr, dr_entry);
+#endif
 			break;
 		}
 	}
 
-	if ((dr = TAILQ_FIRST(&nd_defrouter))) {
+	if ((dr = nd_defrouter_primary)) {
 		/*
 		 * De-install the previous default gateway and install
 		 * a new one.
@@ -908,6 +915,30 @@ defrouter_select()
 	return;
 }
 
+
+/* 
+ * for default router selection
+ * regards router-preference field as a 2-bit signed integer 
+ */
+static inline int
+rtpref(struct nd_defrouter *dr)
+{
+	switch (dr->flags & ND_RA_FLAG_RTPREF_MASK) {
+	case ND_RA_FLAG_RTPREF_HIGH:
+		return 1;
+	case ND_RA_FLAG_RTPREF_MEDIUM:
+	case ND_RA_FLAG_RTPREF_RSV:
+		return 0;
+	case ND_RA_FLAG_RTPREF_LOW:
+		return -1;
+	default:
+		nd6log((LOG_ERR, "rtpref: impossible RA flag %x",
+		       dr->flags));
+		return -2;
+	}
+	/* NOT REACH HERE */
+}
+
 static struct nd_defrouter *
 defrtrlist_update(new)
 	struct nd_defrouter *new;
@@ -918,6 +949,9 @@ defrtrlist_update(new)
 #else
 	int s = splnet();
 #endif
+#ifdef	RTPREF
+	char found_primary = 0;
+#endif
 
 	if ((dr = defrouter_lookup(&new->rtaddr, new->ifp)) != NULL) {
 		/* entry exists */
@@ -925,10 +959,32 @@ defrtrlist_update(new)
 			defrtrlist_del(dr);
 			dr = NULL;
 		} else {
+#ifdef	RTPREF
+			int oldpref = rtpref(dr);
+#endif
 			/* override */
 			dr->flags = new->flags; /* xxx flag check */
 			dr->rtlifetime = new->rtlifetime;
 			dr->expire = new->expire;
+
+#ifdef	RTPREF
+			/* 
+			 * since router preference does not change, preferred 
+			 * router does not change either.
+			 */
+			if (rtpref(new) == oldpref) {
+				splx(s);
+				return(dr);
+			}
+
+			/*
+			 * preferred router may be changed, so relocate
+			 * this router
+			 */
+			TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
+			n = dr;
+			goto choose_best;
+#endif
 		}
 		splx(s);
 		return(dr);
@@ -948,14 +1004,48 @@ defrtrlist_update(new)
 	bzero(n, sizeof(*n));
 	*n = *new;
 
+#ifdef	RTPREF
+choose_best:
 	/*
-	 * Insert the new router at the end of the Default Router List.
-	 * If there is no other router, install it anyway. Otherwise,
-	 * just continue to use the current default router.
+	 * Insert the new router in the Default Router List;
+	 * The Default Router List should be in the descending order
+	 * of router-preferece.  Routers with the same preference are
+	 * sorted in the arriving time order.
+	 * 
+	 * If the new router is much more preferred to the current
+	 * primary router, then recalculate the best router.
 	 */
-	TAILQ_INSERT_TAIL(&nd_defrouter, n, dr_entry);
-	if (TAILQ_FIRST(&nd_defrouter) == n)
+	/* 
+	 * if the default router list is NULL, you just have to insert the
+	 * new one
+	 */
+	if (nd_defrouter_primary == NULL) {
+		TAILQ_INSERT_HEAD(&nd_defrouter, n, dr_entry);
 		defrouter_select();
+		splx(s);
+		return(n);
+	}
+
+	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
+	     dr = TAILQ_NEXT(dr, dr_entry)) {
+		if (rtpref(dr) < rtpref(n))
+			break;
+		if (nd_defrouter_primary == dr)
+			found_primary = 1;
+	}
+	if (dr)
+		TAILQ_INSERT_BEFORE(dr, n, dr_entry);
+	else
+		TAILQ_INSERT_TAIL(&nd_defrouter, n, dr_entry);
+		
+	if (found_primary == 0)
+		defrouter_select();
+#else
+	TAILQ_INSERT_TAIL(&nd_defrouter, n, dr_entry);
+	if (nd_defrouter_primary == n)
+		defrouter_select();
+#endif
+
 	splx(s);
 		
 	return(n);
@@ -2366,7 +2456,7 @@ nd6_setdefaultiface(ifindex)
 		 * we do this here to avoid re-install the default route
 		 * if the list is NOT empty.
 		 */
-		if (TAILQ_FIRST(&nd_defrouter) == NULL)
+		if (nd_defrouter_primary == NULL)
 			defrouter_select();
 
 		/*

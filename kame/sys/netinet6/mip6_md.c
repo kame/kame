@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.29 2001/03/29 05:34:32 itojun Exp $	*/
+/*	$KAME: mip6_md.c,v 1.30 2001/05/31 01:01:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -983,7 +983,7 @@ mip6_md_init_with_prefix(struct mip6_esm *esp)
 	 * XXXYYY Is this line actually correct? Don't we need to check
 	 * more than just first dr?
 	 */
-	dr = TAILQ_FIRST(&nd_defrouter);
+	dr = nd_defrouter_primary;
 	/* 
 	 * XXXYYY 
 	 * Add check for probably reachable router here as well. Mattias
@@ -1114,7 +1114,7 @@ mip6_md_init_with_addr(struct mip6_esm *esp)
 	}
 #endif
 
-	dr = TAILQ_FIRST(&nd_defrouter);
+	dr = nd_defrouter_primary;
 	/* 
 	 * XXXYYY 
 	 * Add check for probably reachable router here as well. Mattias
@@ -1417,6 +1417,9 @@ mip6_select_defrtr(prhint, drhint)
 						mip6_debug("%s: new probably reachable defrtr %s on foreign subnet selected.\n", __FUNCTION__, ip6_sprintf(&dr->rtaddr));
 #endif
 
+#ifdef	RTPREF
+						nd_defrouter_primary = dr;
+#else
 						/*
 						 * Place dr first since
 						 * it's prim.
@@ -1426,6 +1429,7 @@ mip6_select_defrtr(prhint, drhint)
 						TAILQ_INSERT_HEAD(
 							&nd_defrouter,
 							dr, dr_entry);
+#endif
 
 						goto found;
 					}

@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
-
-$KAME: CHANGELOG,v 1.1697 2001/05/30 18:23:30 itojun Exp $
+$KAME: CHANGELOG,v 1.1698 2001/05/31 01:01:24 suz Exp $
 
 <200105>
+2001-05-31 suz@sdl.hitachi.co.jp
+	* sys/netinet6/{nd6.c, nd6.h, nd6_rtr.c, mip6_md.c}
+	  bsdi3/sys/i386/conf/GENERIC.v6
+	  freebsd4/sys/i386/conf/GENERIC.KAME
+	implements router-preference on host side. (not enabled 
+	yet. plese include "option RTPREF" in your kernel to make
+	use of this feature.) [will commit kernel config for other OS, 
+	when I confirm its compilability]
+
 2001-05-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c (explore_numeric): when a
 	numeric address is given to getaddrinfo() with the AI_CANONNAME

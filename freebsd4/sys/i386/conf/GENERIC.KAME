@@ -262,6 +262,9 @@ options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 
 options 	NEW_STRUCT_ROUTE	# mandatory
 
+# Router Preference on host side
+#options	RTPREF
+
 # IPv6 firewall
 #options 	"IPV6FIREWALL"
 #options 	"IPV6FIREWALL_VERBOSE"

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.55 2001/04/27 15:09:49 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.56 2001/05/31 01:01:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -303,6 +303,11 @@ extern int nd6_gctimer;
 extern struct llinfo_nd6 llinfo_nd6;
 extern struct nd_ifinfo *nd_ifinfo;
 extern struct nd_drhead nd_defrouter;
+#ifdef	RTPREF
+extern struct nd_defrouter *nd_defrouter_primary;
+#else
+#define	nd_defrouter_primary	TAILQ_FIRST(&nd_defrouter)
+#endif
 extern struct nd_prhead nd_prefix;
 extern int nd6_debug;
 

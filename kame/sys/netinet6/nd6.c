@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.144 2001/05/24 07:44:00 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.145 2001/05/31 01:01:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -147,6 +147,9 @@ struct llinfo_nd6 llinfo_nd6 = {&llinfo_nd6, &llinfo_nd6};
 static size_t nd_ifinfo_indexlim = 8;
 struct nd_ifinfo *nd_ifinfo = NULL;
 struct nd_drhead nd_defrouter;
+#ifdef	RTPREF
+struct nd_defrouter *nd_defrouter_primary;
+#endif
 struct nd_prhead nd_prefix = { 0 };
 
 int nd6_recalc_reachtm_interval = ND6_RECALC_REACHTM_INTERVAL;
@@ -867,16 +870,19 @@ nd6_purge(ifp)
 	/* Nuke default router list entries toward ifp */
 	if ((dr = TAILQ_FIRST(&nd_defrouter)) != NULL) {
 		/*
-		 * The first entry of the list may be stored in
+		 * The primary entry of the list may be stored in
 		 * the routing table, so we'll delete it later.
 		 */
-		for (dr = TAILQ_NEXT(dr, dr_entry); dr; dr = ndr) {
+		for (; dr; dr = ndr) {
 			ndr = TAILQ_NEXT(dr, dr_entry);
+			if (dr == nd_defrouter_primary)
+				continue;
+
 			if (dr->ifp == ifp)
 				defrtrlist_del(dr);
 		}
-		dr = TAILQ_FIRST(&nd_defrouter);
-		if (dr->ifp == ifp)
+		dr = nd_defrouter_primary;
+		if (dr && dr->ifp == ifp)
 			defrtrlist_del(dr);
 	}
 
@@ -1144,7 +1150,7 @@ nd6_free(rt)
 			 */
 			pfxlist_onlink_check();
 
-			if (dr == TAILQ_FIRST(&nd_defrouter)) {
+			if (dr == nd_defrouter_primary) {
 				/*
 				 * It is used as the current default router,
 				 * so we have to move it to the end of the
@@ -1152,8 +1158,12 @@ nd6_free(rt)
 				 * XXX: it is not very efficient if this is
 				 *      the only router.
 				 */
+#ifdef	RTPREF
+				nd_defrouter_primary = NULL;
+#else
 				TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
 				TAILQ_INSERT_TAIL(&nd_defrouter, dr, dr_entry);
+#endif
 
 				defrouter_select();
 			}
@@ -1704,14 +1714,17 @@ nd6_ioctl(cmd, data, ifp)
 #endif
 		if ((dr = TAILQ_FIRST(&nd_defrouter)) != NULL) {
 			/*
-			 * The first entry of the list may be stored in
+			 * The primary entry of the list may be stored in
 			 * the routing table, so we'll delete it later.
 			 */
-			for (dr = TAILQ_NEXT(dr, dr_entry); dr; dr = next) {
+			for (; dr; dr = next) {
 				next = TAILQ_NEXT(dr, dr_entry);
+				if (dr == nd_defrouter_primary)
+					continue;
 				defrtrlist_del(dr);
 			}
-			defrtrlist_del(TAILQ_FIRST(&nd_defrouter));
+			if (nd_defrouter_primary)
+					defrtrlist_del(nd_defrouter_primary);
 		}
 		splx(s);
 		break;
