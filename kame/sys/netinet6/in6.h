@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.48 2000/06/26 15:55:32 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.49 2000/07/05 01:38:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -559,13 +559,18 @@ struct in6_pktinfo {
 #ifdef __NetBSD__
 #define IPV6CTL_BINDV6ONLY	24
 #endif
+#ifdef __FreeBSD__
+#define IPV6CTL_RTEXPIRE	25	/* cloned route expiration time */
+#define IPV6CTL_RTMINEXPIRE	26	/* min value for expiration time */
+#define IPV6CTL_RTMAXCACHE	27	/* trigger level for dynamic expire */
+#endif
 /* New entries should be added here from current IPV6CTL_MAXID value. */
-#define IPV6CTL_MAXID		25
+#define IPV6CTL_MAXID		28
 
 #ifdef IPV6CTL_MAPPED_ADDR
 #define __IPV6CTL_NAMES_MAPPED_ADDR	"mapped_addr"
 #define __IPV6CTL_TYPE_MAPPED_ADDR	CTLTYPE_INT
-#define __IPV6CTL_VARS_MAPPED_ADDR	&ip6_mapped_addr_on
+#define __IPV6CTL_VARS_MAPPED_ADDR	&ip6_mapped_addr
 #else
 #define __IPV6CTL_NAMES_MAPPED_ADDR	0
 #define __IPV6CTL_TYPE_MAPPED_ADDR	0
@@ -574,13 +579,44 @@ struct in6_pktinfo {
 
 #ifdef IPV6CTL_BINDV6ONLY
 #define __IPV6CTL_NAMES_BINDV6ONLY	"bindv6only"
-#define __IPV6CTL_TYPE_BINDV6ONLY		CTLTYPE_INT
-#define __IPV6CTL_VARS_BINDV6ONLY		&ip6_bindv6only
+#define __IPV6CTL_TYPE_BINDV6ONLY	CTLTYPE_INT
+#define __IPV6CTL_VARS_BINDV6ONLY	&ip6_bindv6only
 #else
 #define __IPV6CTL_NAMES_BINDV6ONLY	0
 #define __IPV6CTL_TYPE_BINDV6ONLY	0
 #define __IPV6CTL_VARS_BINDV6ONLY	0
 #endif
+
+#ifdef IPV6CTL_RTEXPIRE
+#define __IPV6CTL_NAMES_RTEXPIRE	"rtexpire"
+#define __IPV6CTL_TYPE_RTEXPIRE		CTLTYPE_INT
+#define __IPV6CTL_VARS_RTEXPIRE		0	/*&rtq_reallyold*/
+#else
+#define __IPV6CTL_NAMES_RTEXPIRE	0
+#define __IPV6CTL_TYPE_RTEXPIRE		0
+#define __IPV6CTL_VARS_RTEXPIRE		0
+#endif
+
+#ifdef IPV6CTL_MINEXPIRE
+#define __IPV6CTL_NAMES_MINEXPIRE	"minexpire"
+#define __IPV6CTL_TYPE_MINEXPIRE	CTLTYPE_INT
+#define __IPV6CTL_VARS_MINEXPIRE	0	/*&rtq_minreallyold*/
+#else
+#define __IPV6CTL_NAMES_MINEXPIRE	0
+#define __IPV6CTL_TYPE_MINEXPIRE	0
+#define __IPV6CTL_VARS_MINEXPIRE	0
+#endif
+
+#ifdef IPV6CTL_MAXCACHE
+#define __IPV6CTL_NAMES_MAXCACHE	"maxcache"
+#define __IPV6CTL_TYPE_MAXCACHE		CTLTYPE_INT
+#define __IPV6CTL_VARS_MAXCACHE		0	/*&rtq_toomany*/
+#else
+#define __IPV6CTL_NAMES_MAXCACHE	0
+#define __IPV6CTL_TYPE_MAXCACHE		0
+#define __IPV6CTL_VARS_MAXCACHE		0
+#endif
+
 
 #define IPV6CTL_NAMES { \
 	{ 0, 0 }, \
@@ -608,6 +644,9 @@ struct in6_pktinfo {
 	{ "rr_prune", CTLTYPE_INT }, \
 	{ __IPV6CTL_NAMES_MAPPED_ADDR, __IPV6CTL_TYPE_MAPPED_ADDR }, \
 	{ __IPV6CTL_NAMES_BINDV6ONLY, __IPV6CTL_TYPE_BINDV6ONLY }, \
+	{ __IPV6CTL_NAMES_RTEXPIRE, __IPV6CTL_TYPE_RTEXPIRE }, \
+	{ __IPV6CTL_NAMES_MINEXPIRE, __IPV6CTL_TYPE_MINEXPIRE }, \
+	{ __IPV6CTL_NAMES_MAXCACHE, __IPV6CTL_TYPE_MAXCACHE }, \
 }
 
 #ifdef __bsdi__
@@ -637,6 +676,9 @@ struct in6_pktinfo {
 	&ip6_rr_prune, \
 	__IPV6CTL_VARS_MAPPED_ADDR, \
 	__IPV6CTL_VARS_BINDV6ONLY, \
+	__IPV6CTL_VARS_RTEXPIRE, \
+	__IPV6CTL_VARS_MINEXPIRE, \
+	__IPV6CTL_VARS_MAXCACHE, \
 }
 #endif
 #endif /* !_XOPEN_SOURCE */
