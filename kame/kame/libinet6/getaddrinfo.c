@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.79 2001/01/05 03:20:38 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.80 2001/01/05 03:44:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -767,6 +767,11 @@ explore_copy(pai, src, res)
 	cur = &sentinel;
 
 	while (cur && src) {
+		if (src->ai_family != pai->ai_family) {
+			src = src->ai_next;
+			continue;
+		}
+
 		cur->ai_next = copy_ai(src);
 		if (!cur->ai_next) {
 			error = EAI_MEMORY;
