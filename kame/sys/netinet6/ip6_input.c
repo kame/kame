@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.225 2001/10/16 05:09:03 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.226 2001/10/24 06:17:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -514,7 +514,7 @@ ip6_input(m)
 	 * L2 bridge code and some other code can return mbuf chain
 	 * that does not conform to KAME requirement.  too bad.
 	 * XXX: fails to join if interface MTU > MCLBYTES.  jumbogram?
-	  */
+	 */
 	if (m && m->m_next != NULL && m->m_pkthdr.len < MCLBYTES) {
 		struct mbuf *n;
 
