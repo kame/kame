@@ -20,6 +20,7 @@ static int test __P((const char *, struct addrinfo *, struct addrinfo *));
 
 static struct addrinfo *wild4, *wild6;
 static struct addrinfo *specific4, *specific6;
+static struct addrinfo *one4, *one6;
 static char *port = NULL;
 
 int
@@ -56,10 +57,24 @@ main(argc, argv)
 	wild6 = getres(AF_INET6, NULL, port);
 	specific4 = getres(AF_INET, "127.0.0.1", port);
 	specific6 = getres(AF_INET6, "::1", port);
+	one4 = getres(AF_INET, "0.0.0.1", port);
+	one6 = getres(AF_INET6, "::1", port);
 
 #define TESTIT(x, y)	test(#x " then " #y, (x), (y));
 	TESTIT(wild4, wild6);
 	TESTIT(wild6, wild4);
+	TESTIT(specific4, specific6);
+	TESTIT(specific6, specific4);
+	TESTIT(wild4, specific4);
+	TESTIT(specific4, wild4);
+	TESTIT(wild6, specific6);
+	TESTIT(specific6, wild6);
+	TESTIT(wild4, specific6);
+	TESTIT(specific6, wild4);
+	TESTIT(wild6, specific4);
+	TESTIT(specific4, wild6);
+	TESTIT(one4, one6);
+	TESTIT(one6, one4);
 
 	exit(0);
 }
