@@ -622,6 +622,9 @@ in_multientry(mc)
 #ifdef HAVE_IGMPV3
 	struct in_multi_source src;
 #endif
+#ifdef __bsdi__
+#define rti_type type
+#endif
 
 	KREAD(mc, &multi, struct in_multi);
 	printf("\t\tgroup %s", inet_ntoa(multi.inm_addr));
@@ -674,6 +677,9 @@ in_multientry(mc)
 	return(multi.inm_next);
 #else
 	return(multi.inm_list.le_next);
+#endif
+#ifdef __bsdi__
+#undef rti_type
 #endif
 }
 
