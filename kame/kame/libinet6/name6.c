@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.8 1999/10/26 08:57:53 itojun Exp $ */
+/* $Id: name6.c,v 1.9 1999/10/29 03:04:26 itojun Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -492,7 +492,9 @@ gethostbyname2(const char *name, int af)
 struct hostent *
 gethostbyname(const char *name)
 {
+#ifdef INET6
 	struct hostent *hp;
+#endif
 
 	if ((_res.options & RES_INIT) == 0)
 		(void)res_init();
@@ -1185,7 +1187,9 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 	struct hostent hbuf;
 	int buflen;
 	int na;
+#ifdef INET6
 	static const char hex[] = "0123456789abcdef";
+#endif
 
 #ifdef INET6
 	/* XXX */

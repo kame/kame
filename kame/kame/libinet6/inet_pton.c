@@ -16,7 +16,7 @@
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
-static char rcsid[] = "$Id: inet_pton.c,v 1.2 1999/09/26 06:43:34 jinmei Exp $";
+static char rcsid[] = "$Id: inet_pton.c,v 1.3 1999/10/29 03:04:26 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #ifdef HAVE_CONFIG_H
@@ -60,7 +60,9 @@ static char rcsid[] = "$Id: inet_pton.c,v 1.2 1999/09/26 06:43:34 jinmei Exp $";
  */
 
 static int	inet_pton4 __P((const char *src, u_char *dst));
+#ifdef INET6
 static int	inet_pton6 __P((const char *src, u_char *dst));
+#endif
 
 /* int
  * inet_pton(af, src, dst)
@@ -143,6 +145,7 @@ inet_pton4(src, dst)
 	return (1);
 }
 
+#ifdef INET6
 /* int
  * inet_pton6(src, dst)
  *	convert presentation level address to network order binary form.
@@ -244,3 +247,4 @@ inet_pton6(src, dst)
 	memcpy(dst, tmp, NS_IN6ADDRSZ);
 	return (1);
 }
+#endif /*INET6*/

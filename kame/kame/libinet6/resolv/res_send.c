@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.1 1999/08/08 23:30:06 itojun Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.2 1999/10/29 03:04:29 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -853,7 +853,7 @@ read_len:
 		       (stdout, ";; got answer:\n"));
 		DprintQ((_res.options & RES_DEBUG) ||
 			(_res.pfcode & RES_PRF_REPLY),
-			(stdout, ""),
+			(stdout, "%s", ""),
 			ans, (resplen>anssiz)?anssiz:resplen);
 		/*
 		 * If using virtual circuits, we assume that the first server

@@ -16,7 +16,7 @@
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
-static char rcsid[] = "$Id: nsap_addr.c,v 1.1 1999/08/08 23:30:04 itojun Exp $";
+static char rcsid[] = "$Id: nsap_addr.c,v 1.2 1999/10/29 03:04:28 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -62,7 +62,7 @@ inet_nsap_addr(ascii, binary, maxlen)
 			c = toupper(c);
 		if (isxdigit(c)) {
 			nib = xtob(c);
-			if (c = *ascii++) {
+			if ((c = *ascii++) != 0) {
 				c = toupper(c);
 				if (isxdigit(c)) {
 					*binary++ = (nib << 4) | xtob(c);

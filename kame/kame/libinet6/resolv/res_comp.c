@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_comp.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_comp.c,v 1.1 1999/08/08 23:30:04 itojun Exp $";
+static char rcsid[] = "$Id: res_comp.c,v 1.2 1999/10/29 03:04:29 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -99,7 +99,7 @@ dn_expand(msg, eomorig, comp_dn, exp_dn, length)
 	/*
 	 * fetch next label in domain name
 	 */
-	while (n = *cp++) {
+	while ((n = *cp++) != 0) {
 		/*
 		 * Check for indirection
 		 */
@@ -304,7 +304,7 @@ dn_find(exp_dn, msg, dnptrs, lastdnptr)
 	for (cpp = dnptrs; cpp < lastdnptr; cpp++) {
 		dn = exp_dn;
 		sp = cp = *cpp;
-		while (n = *cp++) {
+		while ((n = *cp++) != 0) {
 			/*
 			 * check for indirection
 			 */
@@ -372,7 +372,7 @@ res_hnok(dn)
 		int nch = *dn++;
 
 		if (periodchar(ch)) {
-			NULL;
+			/*nothing*/;
 		} else if (periodchar(pch)) {
 			if (!borderchar(ch))
 				return (0);
