@@ -1,4 +1,4 @@
-/*	$KAME: nd6_ind.c,v 1.1 2001/06/28 04:34:59 sumikawa Exp $	*/
+/*	$KAME: nd6_ind.c,v 1.2 2001/06/28 05:30:57 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -92,11 +92,66 @@ nd6_ins_input(m, off, icmp6len)
 	struct mbuf *m;
 	int off, icmp6len;
 {
+	struct ifnet *ifp = m->m_pkthdr.rcvif;
+	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
+	struct ind_neighbor_solicit *ind_ns;
+	struct in6_addr saddr6 = ip6->ip6_src;
+	struct in6_addr daddr6 = ip6->ip6_dst;
+	union nd_opts ndopts;
+	char *slladdr = NULL, *tlladdr = NULL;
+	int slladdrlen = 0, tlladdrlen = 0;
+
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, icmp6len,);
+	ind_ns = (struct ind_neighbor_solicit *)((caddr_t)ip6 + off);
+#else
+	IP6_EXTHDR_GET(ind_ns, struct ind_neighbor_solicit *, m, off, icmp6len);
+	if (ind_ns == NULL) {
+		icmp6stat.icp6s_tooshort++;
+		return;
+	}
+#endif
+	ip6 = mtod(m, struct ip6_hdr *); /* adjust pointer for safety */
+
+	if (ip6->ip6_hlim != 255) {
+		nd6log((LOG_ERR,
+		    "ind6_ns_input: invalid hlim (%d) from %s to %s on %s\n",
+		    ip6->ip6_hlim, ip6_sprintf(&ip6->ip6_src),
+		    ip6_sprintf(&ip6->ip6_dst), if_name(ifp)));
+		goto bad;
+	}
+	if (icmp6len < 24)
+		goto freeit;
+	icmp6len -= sizeof(*ind_ns);
+
+	nd6_option_init(ind_ns + 1, icmp6len, &ndopts);
+	if (nd6_options(&ndopts) < 0) {
+		nd6log((LOG_INFO,
+		    "ind6_ns_input: invalid ND option, ignored\n"));
+		/* nd6_options have incremented stats */
+		goto freeit;
+	}
+	if (ndopts.nd_opts_src_lladdr) {
+		slladdr = (char *)(ndopts.nd_opts_src_lladdr + 1);
+		slladdrlen = ndopts.nd_opts_src_lladdr->nd_opt_len << 3;
+	} else
+		goto freeit;
+	if (ndopts.nd_opts_tgt_lladdr) {
+		tlladdr = (char *)(ndopts.nd_opts_tgt_lladdr + 1);
+		tlladdrlen = ndopts.nd_opts_tgt_lladdr->nd_opt_len << 3;
+	} else
+		goto freeit;
+	
  freeit:
 	m_freem(m);
 	return;
 
  bad:
+	nd6log((LOG_ERR, "ind6_ns_input: src=%s\n", ip6_sprintf(&saddr6)));
+	nd6log((LOG_ERR, "ind6_ns_input: dst=%s\n", ip6_sprintf(&daddr6)));
+#if 0
+	icmp6stat.icp6s_badns++;
+#endif
 	m_freem(m);
 }
 
@@ -117,6 +172,62 @@ nd6_ina_input(m, off, icmp6len)
 	struct mbuf *m;
 	int off, icmp6len;
 {
+	struct ifnet *ifp = m->m_pkthdr.rcvif;
+	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
+	struct ind_neighbor_advert *ind_na;
+#if 0
+	struct in6_addr saddr6 = ip6->ip6_src;
+#endif
+	struct in6_addr daddr6 = ip6->ip6_dst;
+	union nd_opts ndopts;
+	char *slladdr = NULL, *tlladdr = NULL;
+	int slladdrlen = 0, tlladdrlen = 0;
+
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, icmp6len,);
+	ind_na = (struct ind_neighbor_advert *)((caddr_t)ip6 + off);
+#else
+	IP6_EXTHDR_GET(ind_na, struct ind_neighbor_advert *, m, off, icmp6len);
+	if (ind_na == NULL) {
+		icmp6stat.icp6s_tooshort++;
+		return;
+	}
+#endif
+	ip6 = mtod(m, struct ip6_hdr *); /* adjust pointer for safety */
+	if (ip6->ip6_hlim != 255) {
+		nd6log((LOG_ERR,
+		    "ind6_na_input: invalid hlim (%d) from %s to %s on %s\n",
+		    ip6->ip6_hlim, ip6_sprintf(&ip6->ip6_src),
+		    ip6_sprintf(&ip6->ip6_dst), if_name(ifp)));
+		goto bad;
+	}
+
+	if (icmp6len < 48)
+		goto bad;
+	icmp6len -= sizeof(*ind_na);
+	nd6_option_init(ind_na + 1, icmp6len, &ndopts);
+	if (nd6_options(&ndopts) < 0) {
+		nd6log((LOG_INFO,
+		    "ind6_na_input: invalid ND option, ignored\n"));
+		/* nd6_options have incremented stats */
+		goto freeit;
+	}
+	if (ndopts.nd_opts_src_lladdr) {
+		slladdr = (char *)(ndopts.nd_opts_src_lladdr + 1);
+		slladdrlen = ndopts.nd_opts_src_lladdr->nd_opt_len << 3;
+	} else
+		goto freeit;
+	if (ndopts.nd_opts_tgt_lladdr) {
+		tlladdr = (char *)(ndopts.nd_opts_tgt_lladdr + 1);
+		tlladdrlen = ndopts.nd_opts_tgt_lladdr->nd_opt_len << 3;
+	} else
+		goto freeit;
+	if (ndopts.nd_opts_tgt_addrlist) {
+		if (ndopts.nd_opts_tgt_addrlist->nd_opt_len < 3)
+			goto freeit;
+	} else
+		goto freeit;
+
  freeit:
 	m_freem(m);
 	return;
