@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.252 2001/07/27 14:24:13 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.253 2001/07/27 15:21:05 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1937,7 +1937,7 @@ about which implementation interoperates with KAME IPsec/IKE implementation.
 
 4.8 Operations with IPsec tunnel mode
 
-First of all, IPsec tunnels are very hairy thing.  It seems to do a neat thing
+First of all, IPsec tunnel is a very hairy thing.  It seems to do a neat thing
 like VPN configuration or secure remote accesses, however, it comes with lots
 of architectural twists.
 
