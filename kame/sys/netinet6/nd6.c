@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.223 2002/02/03 11:27:07 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.224 2002/02/04 02:25:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2501,7 +2501,7 @@ fill_drlist(req)
 		    d + 1 <= de) {
 			bzero(d, sizeof(*d));
 			d->rtaddr = dr->rtaddr;
-			in6_clearscope(&d->rtaddr);
+			in6_clearscope(&d->rtaddr.sin6_addr);
 			d->flags = dr->flags;
 			d->rtlifetime = dr->rtlifetime;
 			d->expire = dr->expire;
