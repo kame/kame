@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.37 2000/11/07 14:14:34 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.38 2000/11/08 04:53:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1494,7 +1494,7 @@ ra_timer_update(void *data, struct timeval *tm)
 	 * Whenever a multicast advertisement is sent from an interface,
 	 * the timer is reset to a uniformly-distributed random value
 	 * between the interface's configured MinRtrAdvInterval and
-	 * MaxRtrAdvInterval(discovery-v2-02 6.2.4).
+	 * MaxRtrAdvInterval (RFC2461 6.2.4).
 	 */
 	interval = rai->mininterval; 
 	interval += random() % (rai->maxinterval - rai->mininterval);
