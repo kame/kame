@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.54 2001/06/19 09:55:27 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.55 2001/06/27 17:43:19 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -265,6 +265,26 @@ struct nd_redirect {		/* redirect */
 #define nd_rd_code		nd_rd_hdr.icmp6_code
 #define nd_rd_cksum		nd_rd_hdr.icmp6_cksum
 #define nd_rd_reserved		nd_rd_hdr.icmp6_data32[0]
+
+struct ind_neighbor_solicit {	/* inverse neighbor solicitation */
+	struct icmp6_hdr	ind_ns_hdr;
+	/* could be followed by options */
+} __attribute__((__packed__));
+
+#define ind_ns_type		ind_ns_hdr.icmp6_type
+#define ind_ns_code		ind_ns_hdr.icmp6_code
+#define ind_ns_cksum		ind_ns_hdr.icmp6_cksum
+#define ind_ns_reserved		ind_ns_hdr.icmp6_data32[0]
+
+struct ind_neighbor_advert {	/* inverse neighbor advertisement */
+	struct icmp6_hdr	ind_na_hdr;
+	/* could be followed by options */
+} __attribute__((__packed__));
+
+#define ind_na_type		ind_na_hdr.icmp6_type
+#define ind_na_code		ind_na_hdr.icmp6_code
+#define ind_na_cksum		ind_na_hdr.icmp6_cksum
+#define ind_na_flags_reserved	ind_na_hdr.icmp6_data32[0]
 
 struct ha_discov_req {          /* HA Address Discovery Request */
 	struct icmp6_hdr	ha_dreq_hdr;
