@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.69 2001/09/14 06:05:10 sumikawa Exp $	*/
+/*	$KAME: in6_src.c,v 1.70 2001/09/20 07:56:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -203,6 +203,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		struct mip6_bu *mbu;
 		
 		/* find the address that is currently at home. */
+		/* XXX no TAILQ_FOREACH on bsdi4 */
 		TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
 			if (sc->hif_location != HIF_LOCATION_HOME)
 				continue;
