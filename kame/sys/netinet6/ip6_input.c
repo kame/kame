@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.108 2000/08/14 15:06:09 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.109 2000/08/14 18:40:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -234,7 +234,7 @@ int (*mip6_route_optimize_hook)(struct mbuf *m) = 0;
 #endif
 
 #ifdef MEASURE_PERFORMANCE
-unsigned long long ctr_beg, ctr_end;
+static unsigned long long ctr_beg, ctr_end;
 
 static __inline unsigned long long read_tsc __P((void));
 static __inline void add_performance_log __P((unsigned long long)); 
@@ -804,13 +804,11 @@ ip6_input(m)
 
   hbhcheck:
 #ifdef MEASURE_PERFORMANCE
-	if (ours) {
-		ctr_end = read_tsc();
+	ctr_end = read_tsc();
 #ifdef MEASURE_PERFORMANCE_UDPONLY
-		if (ip6->ip6_nxt == IPPROTO_UDP)
+	if (ip6->ip6_nxt == IPPROTO_UDP)
 #endif
-			add_performance_log(ctr_end - ctr_beg);
-	}
+		add_performance_log(ctr_end - ctr_beg);
 #endif
 	/*
 	 * Process Hop-by-Hop options header if it's contained.
