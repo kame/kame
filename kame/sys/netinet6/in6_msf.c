@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.15 2003/03/25 09:57:07 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.16 2003/03/25 10:08:16 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -2091,7 +2091,8 @@ in6_merge_msf_source_addr(iasl, src, req)
 		/* here's the place to insert the source address entry */
 		if (req != IMS_ADD_SOURCE) {
 #ifdef MLDV2_DEBUG
-				printf("in_merge_msf_source_addr: %s cannot be deleted!?\n", ip6_sprintf(SIN6_ADDR(src)));
+			printf("in_merge_msf_source_addr: %s cannot be deleted!?\n",
+			       ip6_sprintf(SIN6_ADDR(src)));
 #endif
 			return -1;
 		}
@@ -2119,7 +2120,7 @@ in6_merge_msf_source_addr(iasl, src, req)
 		sizeof(*newias), M_MSFILTER, M_NOWAIT);
 	if (newias == NULL) {
 #ifdef MLDV2_DEBUG
-			printf("in_merge_msf_source_addr: %s cannot be deleted!?\n", ip6_sprintf(SIN6_ADDR(src)));
+		printf("in_merge_msf_source_addr: %s cannot be deleted!?\n", ip6_sprintf(SIN6_ADDR(src)));
 #endif
 		return -1;
 	}
