@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.68 2001/09/04 08:51:19 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.69 2001/09/12 07:05:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -556,10 +556,16 @@ encap_add(ep)
 #ifdef USE_RADIX
 	if (!ep->func && rnh) {
 		if (!rnh->rnh_addaddr((caddr_t)ep->addrpack,
-		    (caddr_t)ep->maskpack, rnh, ep->nodes))
+		    (caddr_t)ep->maskpack, rnh, ep->nodes)) {
 			error = EEXIST;
+			goto fail;
+		}
 	}
 #endif
+	return error;
+
+ fail:
+	LIST_REMOVE(ep, chain);
 	return error;
 }
 
