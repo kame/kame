@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.74 2002/10/28 16:42:17 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.75 2003/01/20 01:01:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -136,13 +136,13 @@ esp4_input(m, va_alist)
 	int s;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	va_list ap;
-	int off, proto;
+	int off;
 #endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	va_start(ap, m);
 	off = va_arg(ap, int);
-	proto = va_arg(ap, int);
+	(void)va_arg(ap, int);		/* ignore value, advance ap */
 	va_end(ap);
 #endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 
