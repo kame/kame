@@ -1,8 +1,23 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1388 2000/11/12 19:32:22 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1389 2000/11/15 04:41:59 jinmei Exp $
 
 <200011>
+2000-11-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_input):
+	* bsdi4/sys/netinet6/raw_ipv6.c (rip6_ctlinput):
+	* bsdi4/sys/netinet/{tcp,udp}_usrreq.c ({tcp6,udp6}_ctlinput):
+	* bsdi4/sys/netinet6/in6_pcb.c (in6_pcbnotify):
+	IPV6_RECVPATHMTU socket option support.
+	Note that the current implementation is not fully conformant to
+	the latest rfc2292bis spec. The implementation use a special
+	control structure to pass both the MTU value and the destination
+	to the application, while the spec says the corresponding
+	ancillary data just contains the MTU value.
+	We are now clarifying it in the IETF ipng ML, and the
+	implementation may change after the discussion.
+	TODO: transport layer support in other *BSD than bsdi4.
+
 Mon Nov 13 04:28:33 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/ncftp3: upgrade to 3.0.2
 
