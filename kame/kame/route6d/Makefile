@@ -18,10 +18,12 @@ CPPFLAGS+=	-Dss_len=__ss_len -Dss_family=__ss_family -DADVAPI -DINET6 -DHAVE_GET
 .else
 CFLAGS+=	-Dss_len=__ss_len -Dss_family=__ss_family -DADVAPI -DINET6 -DHAVE_GETIFADDRS
 .endif
+.if exists(/usr/local/v6/lib/libinet6.a)
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+= ${.OBJDIR}/../libinet6/libinet6.a \
 	${.OBJDIR}/../libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
+.endif
 
 .include <bsd.prog.mk>
