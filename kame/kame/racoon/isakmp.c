@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.48 2000/01/18 10:01:57 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.49 2000/02/07 18:02:11 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1766,16 +1766,19 @@ isakmp_printpacket(msg, from, my, decoded)
 	struct sockaddr *my;
 	int decoded;
 {
+#ifdef YIPS_DEBUG
 	struct timeval tv;
 	int s;
 	char hostbuf[NI_MAXHOST];
 	char portbuf[NI_MAXSERV];
 	struct isakmp *isakmp;
 	vchar_t *buf;
+#endif
 
 	YIPSDEBUG(DEBUG_SVERB, goto doit);
 	return;
 
+#ifdef YIPS_DEBUG
 doit:
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -1830,6 +1833,7 @@ doit:
 	fflush(stdout);
 
 	return;
+#endif
 }
 #endif /*HAVE_PRINT_ISAKMP_C*/
 
