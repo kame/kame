@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.52 2001/02/06 09:16:54 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.53 2001/02/10 02:44:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -541,7 +541,7 @@ struct	in6_multi {
 	struct	in6_addr in6m_addr;	/* IP6 multicast address */
 	struct	ifnet *in6m_ifp;	/* back pointer to ifnet */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	struct	in6_ifaddr *in6m_ia;    /* back pointer to in6_ifaddr */
+	struct	in6_ifaddr *in6m_ia;	/* back pointer to in6_ifaddr */
 #else
 	struct	ifmultiaddr *in6m_ifma;	/* back pointer to ifmultiaddr */
 #endif
