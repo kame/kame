@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.83 2001/10/01 12:51:47 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.84 2001/10/01 12:53:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -187,8 +187,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	struct rtentry *rt = NULL;
 	int clone;
 	int dst_scope = -1, best_scope = -1, best_matchlen = -1;
-	struct in6_addrpolicy *dst_policy = NULL, *new_policy = NULL,
-		*best_policy = NULL;
+	struct in6_addrpolicy *dst_policy = NULL, *best_policy = NULL;
 
 	dst = &dstsock->sin6_addr;
 	*errorp = 0;
@@ -291,6 +290,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 #endif
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 		int new_scope = -1, new_matchlen = -1;
+		struct in6_addrpolicy *new_policy = NULL;
 		int64_t srczone, dstzone;
 		struct ifnet *ifp1 = ia->ia_ifp;
 
