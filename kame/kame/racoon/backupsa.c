@@ -1,4 +1,4 @@
-/*	$KAME: backupsa.c,v 1.13 2001/10/26 04:57:20 sakane Exp $	*/
+/*	$KAME: backupsa.c,v 1.14 2001/10/26 05:01:37 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -342,13 +342,11 @@ do { \
 
 	/*
 	 * There is a possibility that an abnormal system down will happen
-	 * again.  Any old SA will not be installed because racoon checks
-	 * the lifetime and compare with current time.
+	 * again before new negotiation will be started.  so racoon clears
+	 * the backup file here.  it's ok that old SAs are remained in the
+	 * file.  any old SA will not be installed because racoon checks the
+	 * lifetime and compare with current time.
 	 */
-#if 0
-	/* clean the file if SA installation succeed. */
-	backupsa_clean();
-#endif
 
 	return 0;
 }
