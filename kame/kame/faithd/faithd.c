@@ -542,7 +542,7 @@ faith_prefix(struct sockaddr *dst)
 			break;
 		case AF_INET:
 			if (sin4->sin_addr.s_addr == dst4->sin_addr.s_addr)
-			return 0;
+				return 0;
 			break;
 		}
 	}
