@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.147 2003/04/15 09:14:26 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.148 2003/04/15 12:27:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -264,7 +264,7 @@ static int explore_copy __P((const struct addrinfo *, const struct addrinfo *,
 static int explore_null __P((const struct addrinfo *,
 	const char *, struct addrinfo **));
 static int explore_numeric __P((const struct addrinfo *, const char *,
-	const char *, struct addrinfo **));
+	const char *, struct addrinfo **, const char *));
 static int explore_numeric_scope __P((const struct addrinfo *, const char *,
 	const char *, struct addrinfo **));
 static int get_canonname __P((const struct addrinfo *,
@@ -1368,11 +1368,12 @@ free:
  * numeric hostname
  */
 static int
-explore_numeric(pai, hostname, servname, res)
+explore_numeric(pai, hostname, servname, res, ohostname)
 	const struct addrinfo *pai;
 	const char *hostname;
 	const char *servname;
 	struct addrinfo **res;
+	const char *ohostname;
 {
 	const struct afd *afd;
 	struct addrinfo *cur;
@@ -1415,7 +1416,7 @@ explore_numeric(pai, hostname, servname, res)
 					 * the canonical name, based on a
 					 * clarification in rfc2553bis-03.
 					 */
-					GET_CANONNAME(cur->ai_next, hostname);
+					GET_CANONNAME(cur->ai_next, ohostname);
 				}
 				while (cur && cur->ai_next)
 					cur = cur->ai_next;
@@ -1446,7 +1447,7 @@ explore_numeric_scope(pai, hostname, servname, res)
 	struct addrinfo **res;
 {
 #if !defined(SCOPE_DELIMITER) || !defined(INET6)
-	return explore_numeric(pai, hostname, servname, res);
+	return explore_numeric(pai, hostname, servname, res, hostname);
 #else
 	const struct afd *afd;
 	struct addrinfo *cur;
@@ -1459,11 +1460,11 @@ explore_numeric_scope(pai, hostname, servname, res)
 		return 0;
 
 	if (!afd->a_scoped)
-		return explore_numeric(pai, hostname, servname, res);
+		return explore_numeric(pai, hostname, servname, res, hostname);
 
 	cp = strchr(hostname, SCOPE_DELIMITER);
 	if (cp == NULL)
-		return explore_numeric(pai, hostname, servname, res);
+		return explore_numeric(pai, hostname, servname, res, hostname);
 
 #if 0
 	/*
@@ -1489,7 +1490,7 @@ explore_numeric_scope(pai, hostname, servname, res)
 	scope = cp + 1;
 #endif
 
-	error = explore_numeric(pai, addr, servname, res);
+	error = explore_numeric(pai, addr, servname, res, hostname);
 	if (error == 0) {
 		u_int32_t scopeid;
 
