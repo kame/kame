@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.87 2000/10/19 03:34:01 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.88 2000/11/08 17:15:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1401,6 +1401,25 @@ pk_recvacquire(mhp)
 				"ignore SPDGET message. type is not IPsec.\n"));
 		return 0;
 	}
+
+	/* ignore it if src is multicast address */
+    {
+	struct sockaddr *sa = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
+
+	if ((sa->sa_family == AF_INET
+	  && IN_MULTICAST(htonl(((struct sockaddr_in *)sa)->sin_addr.s_addr)))
+#ifdef INET6
+	 || (sa->sa_family == AF_INET6
+	  && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6 *)sa)->sin6_addr))
+#endif
+	) {
+		YIPSDEBUG(DEBUG_PFKEY,
+			plog(logp, LOCATION, NULL,
+				"ignore due to multicast address: %s.\n",
+				saddrwop2str(sa)));
+		return 0;
+	}
+    }
 
 	/* check there is phase 2 handler ? */
 	if (getph2byspid(xpl->sadb_x_policy_id) != NULL) {
