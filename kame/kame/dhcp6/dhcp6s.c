@@ -83,7 +83,7 @@ static void mainloop __P((void));
 static void server6_init __P((void));
 static void server6_mainloop __P((void));
 static ssize_t server6_recv __P((int, char *, size_t));
-static ssize_t server6_react __P((int, char *, size_t));
+static void server6_react __P((int, char *, size_t));
 static int server6_react_solicit __P((int, char *, size_t));
 static int server6_react_request __P((int, char *, size_t));
 
@@ -300,7 +300,7 @@ server6_mainloop()
 {
 	int ret;
 	fd_set r;
-	char abuf[BUFSIZ], sbuf[BUFSIZ];
+	char abuf[BUFSIZ];
 	ssize_t l;
 
 	while (1) {
@@ -341,7 +341,7 @@ server6_recv(s, buf, siz)
 	return len;
 }
 
-static ssize_t
+static void
 server6_react(agent, buf, siz)
 	int agent;	/* 0: via relay, 1: direct */
 	char *buf;
