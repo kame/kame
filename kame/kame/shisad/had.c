@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.2 2004/12/21 02:21:16 keiichi Exp $	*/
+/*	$KAME: had.c,v 1.3 2005/01/12 03:23:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -629,6 +629,8 @@ send_haadrep(dst, anycastaddr, dhreq, ifindex)
 
 	if (sendmsg(icmp6sock, &msg, 0) < 0)
 			perror ("sendmsg icmp6 @haadreply");
+	else
+		mip6stat.mip6s_odhreply++;
 
 	return (errno);
 }
@@ -781,6 +783,8 @@ send_mpa(dst, mps_id, ifindex)
 
 	if (sendmsg(icmp6sock, &msg, 0) < 0)
 		perror ("sendmsg icmp6 @haadreply");
+	else
+		mip6stat.mip6s_odhreply++;
 
 	return (errno);
 }

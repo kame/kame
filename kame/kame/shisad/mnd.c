@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.2 2004/12/21 02:21:16 keiichi Exp $	*/
+/*	$KAME: mnd.c,v 1.3 2005/01/12 03:23:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -109,7 +109,7 @@ static int mipsock_md_dereg_bul_fl(struct in6_addr *, struct in6_addr *,
     struct in6_addr *, u_int16_t, u_int16_t);
 #endif /* !MIP_MCOA */
 
-static int add_hal_by_commanline_xxx(char *);
+static int add_hal_by_commandline_xxx(char *);
 
 static void noro_show(int);
 static void noro_init(void);
@@ -249,7 +249,7 @@ main(argc, argv)
 	/* ETSI 2004.10.12 XXX */
 	/* install a home agent address, if specified. */
 	if (homeagent != NULL)
-		add_hal_by_commanline_xxx(homeagent);
+		add_hal_by_commandline_xxx(homeagent);
 #endif
 
 	/* let's insert NULL binding update list to each binding update list */
@@ -325,7 +325,6 @@ main(argc, argv)
 static void
 mn_lists_init()
 {
-
 	LIST_INIT(&hoa_head);
 	LIST_INIT(&mipifhead);
 	LIST_INIT(&noro_head);
@@ -1004,6 +1003,7 @@ send_haadreq(hoainfo, hoa_plen, src)
 	if (sendmsg(icmp6sock, &msg, 0) < 0)
 		perror ("sendmsg icmp6 @ haddreq");
 
+	mip6stat.mip6s_odhreq++;
 	syslog(LOG_INFO, "send DHAAD REQUEST\n");
 
 	return (errno);
@@ -1050,7 +1050,7 @@ mnd_add_hal(hpfx_entry, gladdr, flag)
 }
 
 static int
-add_hal_by_commanline_xxx(homeagent)
+add_hal_by_commandline_xxx(homeagent)
 	char *homeagent;
 {
 	struct in6_addr homeagent_in6;
@@ -1472,23 +1472,19 @@ command_show_status(s, arg)
 		write(s, msg, strlen(msg));
 
 		command_show_kbul(s);
-
 	} else if (strcmp(arg, "hal") == 0) {
 		sprintf(msg, "-- Home Agent List --\n");
 		write(s, msg, strlen(msg));
 
 		command_show_hal(s);
-
 	} else if (strcmp(arg, "bc") == 0) {
 		sprintf(msg, "Wrong port!\nPlease find Binding Cache at cnd\n");
 		write(s, msg, strlen(msg));
-
  	} else if (strcmp(arg, "stat") == 0) {
 		sprintf(msg, "-- Shisa Statistics --\n");
 		write(s, msg, strlen(msg));
 
 		command_show_stat(s);
-
 	} else if (strcmp(arg, "noro") == 0) {
 		sprintf(msg, "-- No Route Optimization --\n");
 		write(s, msg, strlen(msg));

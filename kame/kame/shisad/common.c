@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.2 2004/12/27 10:50:33 t-momose Exp $  */
+/*      $KAME: common.c,v 1.3 2005/01/12 03:23:33 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -396,7 +396,6 @@ mip6_get_hpfxlist(prefix, prefixlen, hpfxhead)
 
 		if (mip6_are_prefix_equal(prefix, &hpl->hpfx_prefix, prefixlen))
 			return (hpl);
-			
 	}
 	return (NULL);
 }
@@ -667,6 +666,7 @@ icmp6_input_common(fd)
 
 #ifdef MIP_HA
 	case MIP6_HA_DISCOVERY_REQUEST:
+		mip6stat.mip6s_dhreq++;
 		dhreq = (struct mip6_dhaad_req *)msg.msg_iov[0].iov_base;
 		error = send_haadrep(&from.sin6_addr, &dst, dhreq, receivedifindex);
 
@@ -676,6 +676,7 @@ icmp6_input_common(fd)
 	{
 		struct mip6_prefix_solicit *mps;
 
+		mip6stat.mip6s_mps++;
 		mps = (struct mip6_prefix_solicit *)msg.msg_iov[0].iov_base;
 		error = send_mpa(&from.sin6_addr, mps->mip6_ps_id, receivedifindex);
 		break;
@@ -691,6 +692,7 @@ icmp6_input_common(fd)
 		char *options;
 		int optlen, total;
 
+		mip6stat.mip6s_dhreply++;
 		dhrep = (struct mip6_dhaad_rep *)msg.msg_iov[0].iov_base;
 		
 		/* Is this HAADREPLY mine? */

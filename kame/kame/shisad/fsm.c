@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.4 2004/12/16 12:47:07 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.5 2005/01/12 03:23:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -125,6 +125,7 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 
 	switch(mh->ip6mh_type) {
 	case IP6_MH_TYPE_BRR:
+		mip6stat.mip6s_br++;
 		hinfo = hoainfo_find_withhoa(dst);
 		if (hinfo == NULL) {
 			syslog(LOG_NOTICE,
@@ -154,6 +155,7 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 
 	case IP6_MH_TYPE_HOT:
+		mip6stat.mip6s_hot++;
 		if (hoa || rtaddr)
 			break;
 		hinfo = hoainfo_find_withhoa(dst);  
@@ -184,6 +186,7 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 
 	case IP6_MH_TYPE_COT:
+		mip6stat.mip6s_cot++;
 		if (hoa || rtaddr)
 			break;
 		ip6mhct = (struct ip6_mh_careof_test *)mh;
@@ -202,6 +205,7 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 
 	case IP6_MH_TYPE_BACK:
+		mip6stat.mip6s_ba++;
 		hinfo = hoainfo_find_withhoa(dst);  
 		if (hinfo == NULL) {
 			syslog(LOG_NOTICE,
@@ -238,6 +242,7 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 
 	case IP6_MH_TYPE_BERROR:
+		mip6stat.mip6s_be++;
 		ip6mhbe = (struct ip6_mh_binding_error *)mh;
 
 		if (IN6_IS_ADDR_UNSPECIFIED(&ip6mhbe->ip6mhbe_homeaddr))
@@ -296,12 +301,16 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 		break;
 
 	case IP6_MH_TYPE_HOTI:
+		mip6stat.mip6s_hoti++;
 	case IP6_MH_TYPE_COTI:
+		mip6stat.mip6s_coti++;
 	case IP6_MH_TYPE_BU:
+		mip6stat.mip6s_bu++;
 		/* MN just ignores */
 		break;
 
 	default:
+		mip6stat.mip6s_unknowntype++;
 		syslog(LOG_ERR,
 		    "Unknown Mobility Header Message is received\n");
 

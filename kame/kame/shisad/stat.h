@@ -1,4 +1,4 @@
-/*      $KAME: stat.h,v 1.1 2004/12/09 02:18:48 t-momose Exp $  */
+/*      $KAME: stat.h,v 1.2 2005/01/12 03:23:33 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -28,9 +28,9 @@
  */
 
 struct mip6stat {
-        u_quad_t mip6s_mobility;        /* Mobility Header recieved */
+        u_quad_t mip6s_mobility;        /* Mobility Header received */
         u_quad_t mip6s_omobility;       /* Mobility Header sent */
-        u_quad_t mip6s_hoti;            /* HoTI recieved */
+        u_quad_t mip6s_hoti;            /* HoTI received */
         u_quad_t mip6s_ohoti;           /* HoTI sent */
         u_quad_t mip6s_coti;            /* CoTI received */
         u_quad_t mip6s_ocoti;           /* CoTI sent */
@@ -50,6 +50,14 @@ struct mip6stat {
         u_quad_t mip6s_be_hist[256];    /* BE status input histogram */
         u_quad_t mip6s_obe;             /* BE sent */
         u_quad_t mip6s_obe_hist[256];   /* BE status output histogram */
+	u_quad_t mip6s_dhreq;		/* DHAAD request received */
+	u_quad_t mip6s_odhreq;		/* DHAAD request sent */
+	u_quad_t mip6s_dhreply;		/* DHAAD reply received */
+	u_quad_t mip6s_odhreply;	/* DHAAD reply sent */
+	u_quad_t mip6s_mps;		/* MPS received */
+	u_quad_t mip6s_omps;		/* MPS sent */
+	u_quad_t mip6s_mpa;		/* MPA received */
+	u_quad_t mip6s_ompa;		/* MPA sent */
         u_quad_t mip6s_hao;             /* HAO received */
         u_quad_t mip6s_unverifiedhao;   /* unverified HAO received */
         u_quad_t mip6s_ohao;            /* HAO sent */
