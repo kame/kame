@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.18 2003/07/28 11:04:32 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.19 2003/08/04 05:25:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -86,9 +86,12 @@ t.
 #define SIOCGHOMEPREFIX_HIF _IOWR('i', 121, struct hif_ifreq)
 #define SIOCAHOMEAGENT_HIF  _IOW('i', 122, struct hif_ifreq)
 #define SIOCGHOMEAGENT_HIF  _IOWR('i', 123, struct hif_ifreq)
+/* 124 */
 #define SIOCGBU_HIF         _IOWR('i', 125, struct hif_ifreq)
 #define SIOCSIFID_HIF       _IOW('i', 126, struct hif_ifreq)
 #define SIOCGIFID_HIF       _IOWR('i', 127, struct hif_ifreq)
+#define SIOCASITEPREFIX_HIF _IOW('i', 128, struct hif_ifreq)
+#define SIOCGSITEPREFIX_HIF _IOWR('i', 129, struct hif_ifreq)
 
 struct hif_ifreq {
 	char     ifr_name[IFNAMSIZ];
@@ -98,6 +101,7 @@ struct hif_ifreq {
 		struct mip6_ha     *ifr_mha;
 		struct mip6_bu     *ifr_mbu;
 		struct in6_addr    *ifr_ifid;
+		struct hif_site_prefix *ifr_hsp;
 	} ifr_ifru;
 };
 
@@ -107,12 +111,20 @@ struct hif_ha {
 };
 LIST_HEAD(hif_ha_list, hif_ha);
 
+struct hif_site_prefix {
+	LIST_ENTRY(hif_site_prefix) hsp_entry;
+	struct sockaddr_in6         hsp_prefix;
+	u_int8_t                    hsp_prefixlen;
+};
+LIST_HEAD(hif_site_prefix_list, hif_site_prefix);
+
 struct hif_softc {
 	struct ifnet hif_if;
 	TAILQ_ENTRY(hif_softc) hif_entry;
 	int                    hif_location;             /* cur location */
 	int                    hif_location_prev; /* XXX */
 	struct in6_ifaddr      *hif_coa_ifa;
+	struct hif_site_prefix_list hif_sp_list;
 	LIST_HEAD(mip6_bu_list, mip6_bu) hif_bu_list;    /* list of BUs */
 	struct hif_ha_list     hif_ha_list_home;
 	struct hif_ha_list     hif_ha_list_foreign;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.22 2003/07/31 09:56:39 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.23 2003/08/04 05:25:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -175,8 +175,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 			/*
 			 * Start RR.
 			 */
-			if ((mbu->mbu_state
-			    & (MIP6_BU_STATE_BUNOTSUPP|MIP6_BU_STATE_MIP6NOTSUPP))
+			if ((mbu->mbu_state & MIP6_BU_STATE_NEEDTUNNEL)
 			    != 0) {
 				/*
 				 * if the peer doesn't support MIP6,
@@ -207,8 +206,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
 
-			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
-			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_DISABLE;
 
 			break;
 		}
@@ -273,8 +271,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
 
-			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
-			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_DISABLE;
 
 			break;
 			
@@ -372,8 +369,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
 
-			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
-			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_DISABLE;
 
 			break;
 		}
@@ -438,8 +434,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
 
-			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
-			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_DISABLE;
 
 			break;
 			
@@ -540,8 +535,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
 
-			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
-			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_DISABLE;
 
 			break;
 		}
@@ -634,8 +628,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
 
-			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
-			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_DISABLE;
 
 			break;
 
@@ -842,8 +835,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
 
-			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
-			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_DISABLE;
 
 			break;
 
@@ -1029,8 +1021,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
 
-			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
-			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_DISABLE;
 
 			break;
 
@@ -1200,8 +1191,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 
 			*mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_IDLE;
 
-			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
-			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_DISABLE;
 
 			break;
 		}

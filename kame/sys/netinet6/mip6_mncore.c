@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.19 2003/07/31 09:56:39 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.20 2003/08/04 05:25:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -122,6 +122,8 @@ static int mip6_bu_list_remove(struct mip6_bu_list *, struct mip6_bu *);
 static int mip6_home_registration(struct hif_softc *);
 static int mip6_bu_list_notify_binding_change(struct hif_softc *, int);
 static int64_t mip6_coa_get_lifetime(struct in6_addr *);
+static void mip6_bu_update_firewallstate(struct mip6_bu *);
+static void mip6_bu_list_update_firewallstate(struct hif_softc *);
 static void mip6_bu_starttimer(void);
 static void mip6_bu_stoptimer(void);
 static void mip6_bu_timeout(void *);
@@ -542,6 +544,7 @@ mip6_process_movement(void)
 				hif_restore_location(sc);
 				continue;
 			}
+			mip6_bu_list_update_firewallstate(sc);
 		} else
 			hif_restore_location(sc);
 	}
@@ -1443,12 +1446,13 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	mbu->mbu_refresh = mbu->mbu_lifetime;
 	/* Sequence Number SHOULD start at a random value */
 	mbu->mbu_seqno = (u_int16_t)arc4random();
-	mbu->mbu_hif = sc;
-	/* *mbu->mbu_encap = NULL; */
 	cookie = arc4random();
 	bcopy(&cookie, &mbu->mbu_mobile_cookie[0], 4);
 	cookie = arc4random();
 	bcopy(&cookie, &mbu->mbu_mobile_cookie[4], 4);
+	mbu->mbu_hif = sc;
+	/* *mbu->mbu_encap = NULL; */
+	mip6_bu_update_firewallstate(mbu);
 
 	return (mbu);
 }
@@ -1478,12 +1482,6 @@ mip6_bu_list_remove(mbu_list, mbu)
 	if ((mbu_list == NULL) || (mbu == NULL)) {
 		return (EINVAL);
 	}
-
-#if 0 /* mip6_bdt_xxx are not used any more. */
-	if ((mbu->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0) {
-		mip6_bdt_delete(&mbu->mbu_paddr);
-	}
-#endif /* 0 */
 
 	LIST_REMOVE(mbu, mbu_entry);
 	FREE(mbu, M_TEMP);
@@ -1518,8 +1516,7 @@ mip6_bu_list_remove_all(mbu_list, all)
 
 		if (!all &&
 		    (mbu->mbu_flags & IP6MU_HOME) == 0 &&
-		    (mbu->mbu_state & (MIP6_BU_STATE_BUNOTSUPP|
-				       MIP6_BU_STATE_MIP6NOTSUPP)) == 0)
+		    (mbu->mbu_state & MIP6_BU_STATE_DISABLE) == 0)
 			continue;
 
 		error = mip6_bu_list_remove(mbu_list, mbu);
@@ -1915,6 +1912,46 @@ mip6_bu_list_notify_binding_change(sc, home)
 	return (0);
 }
 
+static void
+mip6_bu_update_firewallstate(mbu)
+	struct mip6_bu *mbu;
+{
+	int coa_is_in, paddr_is_in;
+	struct hif_site_prefix *hsp;
+
+	if ((mbu->mbu_flags & IP6MU_HOME) != 0)
+		return;
+
+	coa_is_in = paddr_is_in = 0;
+	for (hsp = LIST_FIRST(&mbu->mbu_hif->hif_sp_list); hsp;
+	     hsp = LIST_NEXT(hsp, hsp_entry)) {
+		if (in6_are_prefix_equal(&hsp->hsp_prefix.sin6_addr,
+			&mbu->mbu_paddr.sin6_addr, hsp->hsp_prefixlen))
+			paddr_is_in = 1;
+		if (in6_are_prefix_equal(&hsp->hsp_prefix.sin6_addr,
+			&mbu->mbu_coa.sin6_addr, hsp->hsp_prefixlen))
+			coa_is_in = 1;
+	}
+	if (((coa_is_in == 0) && (paddr_is_in == 0))
+	    || ((coa_is_in != 0) && (paddr_is_in != 0))) 
+		mbu->mbu_state &= ~MIP6_BU_STATE_FIREWALLED;
+	else
+		mbu->mbu_state |= MIP6_BU_STATE_FIREWALLED;
+}
+
+static void
+mip6_bu_list_update_firewallstate(sc)
+	struct hif_softc *sc;
+{
+	struct mip6_bu *mbu;
+
+
+	for (mbu = LIST_FIRST(&sc->hif_bu_list); mbu;
+	     mbu = LIST_NEXT(mbu, mbu_entry)) {
+		mip6_bu_update_firewallstate(mbu);
+	}
+}
+
 static int64_t
 mip6_coa_get_lifetime(coa)
 	struct in6_addr *coa;
@@ -2272,8 +2309,8 @@ mip6_bu_timeout(arg)
 				}
 			}
 
-			/* check if the peer supports BU */
-			if ((mbu->mbu_state & MIP6_BU_STATE_BUNOTSUPP) != 0)
+			/* check if we need retransmit something. */
+			if ((mbu->mbu_state & MIP6_BU_STATE_NEEDTUNNEL) != 0)
 				continue;
 
 			/* check timeout. */
@@ -2346,7 +2383,7 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	haddr_opt.ip6oh_len = IP6OPT_HALEN;
 
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst, src);
-	if (mbu && ((mbu->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0)) {
+	if (mbu && ((mbu->mbu_state & MIP6_BU_STATE_NEEDTUNNEL) != 0)) {
 		return (0);
 	}
 	if (mbu)
@@ -3513,14 +3550,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		 */
 		return (0);
 	}
-	if ((mbu->mbu_state & MIP6_BU_STATE_BUNOTSUPP) != 0) {
-		/*
-		 * MIP6_BU_STATE_NOBUSUPPORT is set when we receive
-		 * ICMP6_PARAM_PROB against the binding update sent
-		 * before.  this means the peer doesn't support MIP6
-		 * (at least the BU destopt).  we should not send any
-		 * BU to such a peer.
-		 */
+	if ((mbu->mbu_state & MIP6_BU_STATE_NEEDTUNNEL) != 0) {
 		return (0);
 	}
 	if (SA6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr)) {

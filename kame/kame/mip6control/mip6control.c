@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.48 2003/07/31 09:56:39 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.49 2003/08/04 05:25:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -155,6 +155,8 @@ main(argc, argv)
 	char *ifnarg = "hif0";
 	int pfx = 0;
 	char *pfxarg = NULL;
+	int shsp = 0;
+	char *shsparg = NULL;
 	int smhp = 0, gmhp = 0;
 	char *smhparg = NULL;
 	int sha = 0, sll = 0, gha = 0;
@@ -181,7 +183,7 @@ main(argc, argv)
 	else
 		__progname++;
 
-	while ((ch = getopt(argc, argv, "nli:mMgH:hP:A:aL:bcC:u:v:wD:S:T:I:F:")) != -1) {
+	while ((ch = getopt(argc, argv, "nli:mMgH:hP:O:A:aL:bcC:u:v:wD:S:T:I:F:")) != -1) {
 		switch(ch) {
 		case 'm':
 			enablemn = 1;
@@ -208,6 +210,10 @@ main(argc, argv)
 		case 'P':
 			pfx = 1;
 			pfxarg = optarg;
+			break;
+		case 'O':
+			shsp = 1;
+			shsparg = optarg;
 			break;
 		case 'A':
 			sha = 1;
@@ -367,6 +373,31 @@ main(argc, argv)
 		mpfx->mpfx_vltime = 0xffff; /* XXX */
 		mpfx->mpfx_pltime = 0xff00; /* XXX */
 		if(ioctl(s, SIOCAHOMEPREFIX_HIF, (caddr_t)ifr) == -1) {
+			perror("ioctl");
+			exit(1);
+		}
+	}
+
+	if (shsparg && pfxarg) {
+		struct hif_ifreq *ifr;
+		struct hif_site_prefix *hsp;
+
+		ifr = malloc(sizeof(struct hif_ifreq) + sizeof(*hsp));
+		if (ifr == NULL) {
+			perror("malloc");
+			exit(1);
+		}
+		strcpy(ifr->ifr_name, ifnarg);
+		ifr->ifr_count = 1;
+		hsp = (struct hif_site_prefix *)((caddr_t)ifr 
+		    + sizeof(struct hif_ifreq));
+		ifr->ifr_ifru.ifr_hsp = hsp;
+		bzero(&hsp->hsp_prefix, sizeof(hsp->hsp_prefix));
+		hsp->hsp_prefix.sin6_len = sizeof(hsp->hsp_prefix);
+		hsp->hsp_prefix.sin6_family = AF_INET6;
+		getaddress(shsparg, &hsp->hsp_prefix);
+		hsp->hsp_prefixlen = atoi(pfxarg);
+		if(ioctl(s, SIOCASITEPREFIX_HIF, (caddr_t)ifr) == -1) {
 			perror("ioctl");
 			exit(1);
 		}
@@ -861,11 +892,11 @@ static const char *
 bustate_sprintf(flags)
 	u_int8_t flags;
 {
-	static char buf[] = "MUAS";
+	static char buf[] = "FD";
 
 	snprintf(buf, sizeof(buf), "%s%s",
-	    (flags & MIP6_BU_STATE_MIP6NOTSUPP ? "M" : "-"),
-	    (flags & MIP6_BU_STATE_BUNOTSUPP ? "U" : "-"));
+	    (flags & MIP6_BU_STATE_FIREWALLED ? "F" : "-"),
+	    (flags & MIP6_BU_STATE_DISABLE ? "D" : "-"));
 
 	return buf;
 }

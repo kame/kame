@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.51 2003/07/28 11:04:32 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.52 2003/08/04 05:25:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -216,6 +216,9 @@ hifattach(dummy)
 		sc->hif_location = HIF_LOCATION_UNKNOWN;
 		sc->hif_coa_ifa = NULL;
 
+		/* site prefix list. */
+		LIST_INIT(&sc->hif_sp_list);
+
 		/* binding update list and home agent list. */
 		LIST_INIT(&sc->hif_bu_list);
 		LIST_INIT(&sc->hif_ha_list_home);
@@ -316,6 +319,10 @@ hif_ioctl(ifp, cmd, data)
 			hifr->ifr_count = i;
 		}
 		
+		break;
+
+	case SIOCASITEPREFIX_HIF:
+		error = hif_site_prefix_list_update_withioctl(sc, data);
 		break;
 
 	case SIOCAHOMEAGENT_HIF:
@@ -563,6 +570,52 @@ hif_ha_list_find_preferable(hif_ha_list, mpfx)
 	if (hha)
 		return(hha);
 	return (NULL);
+}
+
+static int
+hif_site_prefix_list_update_withioctl(sc, data)
+     struct hif_softc *sc;
+     caddr_t data;
+{
+	struct hif_ifreq *hifr = (struct hif_ifreq *)data;
+	struct hif_site_prefix *nhsp = (struct hif_site_prefix *)data;
+	struct hif_site_prefix *hsp;
+
+	if (hifr == NULL) {
+		return (EINVAL);
+	}
+	if ((nhsp = hifr->ifr_ifru.ifr_hsp) == NULL) {
+		return (EINVAL);
+	}
+
+	for (hsp = LIST_FIRST(&sc->hif_sp_list); hsp;
+	     hsp = LIST_NEXT(hsp, hsp_entry)) {
+		if (!in6_are_prefix_equal(&nhsp->hsp_prefix.sin6_addr,
+			&hsp->hsp_prefix.sin6_addr, nhsp->hsp_prefixlen))
+			continue;
+		if (nhsp->hsp_prefix.sin6_scope_id
+		    != hsp->hsp_prefix.sin6_scope_id)
+			continue;
+		if (nhsp->hsp_prefixlen != hsp->hsp_prefixlen)
+			continue;
+		break;
+	}
+	if (hsp != NULL)
+		return (EEXIST);
+
+	MALLOC(hsp, struct hif_site_prefix *, sizeof(struct hif_site_prefix),
+	    M_TEMP, M_NOWAIT);
+	if (hsp == NULL) {
+		mip6log((LOG_ERR, "%s:%d: memory allocation failed.\n",
+		    __FILE__, __LINE__));
+		return (ENOMEM);
+	}
+	hsp->hsp_prefix = nhsp->hsp_prefix;
+	hsp->hsp_prefixlen = nhsp->hsp_prefixlen;
+
+	LIST_INSERT_HEAD(&sc->hif_sp_list, hsp, hsp_entry);
+
+	return (0);
 }
 
 static int

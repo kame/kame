@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.96 2003/07/31 09:56:39 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.97 2003/08/04 05:25:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -150,7 +150,7 @@ struct mip6_bu {
 	u_int8_t            mbu_flags;      /* BU flags */
 	mip6_cookie_t       mbu_mobile_cookie;
 	u_int16_t           mbu_home_nonce_index;
-	mip6_home_token_t  mbu_home_token;  /* home keygen token */
+	mip6_home_token_t   mbu_home_token; /* home keygen token */
 	u_int16_t           mbu_careof_nonce_index;
         mip6_careof_token_t mbu_careof_token; /* careof keygen token */
 	u_int8_t            mbu_pri_fsm_state; /* primary fsm state */
@@ -159,12 +159,14 @@ struct mip6_bu {
 	time_t              mbu_retrans;    /* retrans/refresh timo value */
 	u_int8_t            mbu_retrans_count;
 	time_t              mbu_failure;    /* failure timo value */
-	u_int8_t            mbu_state;
+	u_int8_t            mbu_state;      /* local status */
 	struct hif_softc    *mbu_hif;       /* back pointer to hif */
 	const struct encaptab *mbu_encap;
 };
-#define MIP6_BU_STATE_BUNOTSUPP   0x04
-#define MIP6_BU_STATE_MIP6NOTSUPP 0x80
+#define MIP6_BU_STATE_DISABLE     0x01
+#define MIP6_BU_STATE_FIREWALLED  0x80
+#define MIP6_BU_STATE_NEEDTUNNEL \
+    (MIP6_BU_STATE_DISABLE | MIP6_BU_STATE_FIREWALLED)
 
 /* states for the primary fsm. */
 #define MIP6_BU_PRI_FSM_STATE_IDLE	0
