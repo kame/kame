@@ -1170,56 +1170,97 @@ again:
 		break;
 	    }
 
-	case IPPROTO_HOPOPTS:
-	case IPPROTO_DSTOPTS:
-	    {
-		int hdrlen, optlen, remain;
-		u_int8_t *optp, opt;
+	 case IPPROTO_HOPOPTS:
+	 case IPPROTO_DSTOPTS:
+	 {
+		 int hdrlen, optlen;
+		 u_int8_t *optp, *lastp = p, *optend, opt;
 
-		tlen = m->m_len - (p - mtod(m, u_char *));
-		/* We assume all the options is contained in a single mbuf */
-		if (tlen < sizeof(struct ip6_ext)) {
-			error = EINVAL;
-			goto bad;
-		}
-		hdrlen  = (((struct ip6_ext *)p)->ip6e_len + 1) << 3;
-		hdrtype = (int)((struct ip6_ext *)p)->ip6e_nxt;
-		if (tlen < hdrlen) {
-			error = EINVAL;
-			goto bad;
-		}
+		 tlen = m->m_len - (p - mtod(m, u_char *));
+		 /* We assume all the options is contained in a single mbuf */
+		 if (tlen < sizeof(struct ip6_ext)) {
+			 error = EINVAL;
+			 goto bad;
+		 }
+		 hdrlen  = (((struct ip6_ext *)p)->ip6e_len + 1) << 3;
+		 hdrtype = (int)((struct ip6_ext *)p)->ip6e_nxt;
+		 if (tlen < hdrlen) {
+			 error = EINVAL;
+			 goto bad;
+		 }
+		 optend = p + hdrlen;
 
-		/* first, update the top of 2 bytes. */
-		(algo->update)(&algos, p, 2);
-
-		for (optp = p + 2, remain = hdrlen - 2;
-		     remain > 0;
-		     optp += optlen, remain -= optlen) {
-			opt = optp[0];
-			if (opt == IP6OPT_PAD1) {
-				optlen = 1;
-				(algo->update)(&algos, optp, optlen);
-				continue;
-			}
-			if (remain < 2) {
-				error = EINVAL; /* malformed option */
-				goto bad;
-			}
-			optlen = optp[1] + 2;
-			if (opt & IP6OPT_MUTABLE) {
-				(algo->update)(&algos, optp, 2);
-				if (optlen - 2 > ZEROBUFLEN) {
-					error = EINVAL; /* XXX */
-					goto bad;
-				}
-				(algo->update)(&algos, zerobuf, optlen - 2);
-				continue;
-			}
-			(algo->update)(&algos, optp, optlen);
-		}
-		advancewidth = hdrlen;
-		break;
-	    }
+		 /*
+		  * ICV calculation for the options header including all
+		  * options. This part is a little tricky since there are
+		  * two type of options; mutable and immutable. Our approach
+		  * is to calculate ICV for a consecutive immutable options
+		  * at once. Here is an example. In the following figure,
+		  * suppose that we've calculated ICV from the top of the
+		  * header to MutableOpt1, which is a mutable option.
+		  * lastp points to the end of MutableOpt1. Some immutable
+		  * options follows MutableOpt1, and we encounter a new
+		  * mutable option; MutableOpt2. optp points to the head
+		  * of MutableOpt2. In this situation, uncalculated immutable
+		  * field is the field from lastp to optp+2 (note that the
+		  * type and the length fields are considered as immutable
+		  * even in a mutable option). So we first calculate ICV
+		  * for the field as immutable, then calculate from optp+2
+		  * to the end of MutableOpt2, whose length is optlen-2,
+		  * where optlen is the length of MutableOpt2. Finally,
+		  * lastp is updated to point to the end of MutableOpt2
+		  * for further calculation. The updated point is shown as
+		  * lastp' in the figure.
+		  *                                <------ optlen ----->
+		  * -----------+-------------------+---+---+-----------+
+		  * MutableOpt1|ImmutableOptions...|typ|len|MutableOpt2|
+		  * -----------+-------------------+---+---+-----------+
+		  *            ^                   ^       ^
+		  *            lastp               optp    optp+2
+		  *            <---- optp + 2 - lastp -----><-optlen-2->
+		  *                                                    ^
+		  *                                                    lastp'
+		  */
+		 for (optp = p + 2; optp < optend; optp += optlen) {
+			 opt = optp[0];
+			 if (opt == IP6OPT_PAD1) {
+				 optlen = 1;
+			 } else {
+				 if (optp + 2 > optend) {
+					 error = EINVAL; /* malformed option */
+					 goto bad;
+				 }
+				 optlen = optp[1] + 2;
+				 if (opt & IP6OPT_MUTABLE) {
+					 /*
+					  * ICV calc. for the (consecutive)
+					  * immutable field followd by the
+					  * option.
+					  */
+					 (algo->update)(&algos, lastp,
+							optp + 2 - lastp);
+					 if (optlen - 2 > ZEROBUFLEN) {
+						 error = EINVAL; /* XXX */
+						 goto bad;
+					 }
+					 /*
+					  * ICV calc. for the immutable
+					  * option using an all-0 buffer.
+					  */
+					 (algo->update)(&algos, zerobuf,
+							optlen - 2);
+					 lastp = optp + optlen;
+				 }
+			 }
+		 }
+		 /*
+		  * Wrap up the calulation; compute ICV for the consecutive
+		  * immutable options at the end of the header(if any).
+		  */
+		 (algo->update)(&algos, lastp, p + hdrlen - lastp);
+		 advancewidth = hdrlen;
+		 break;
+	 }
 	 case IPPROTO_ROUTING:
 	 {
 		 /*
