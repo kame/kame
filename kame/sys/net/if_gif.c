@@ -484,7 +484,7 @@ gif_ioctl(ifp, cmd, data)
 		bcopy((caddr_t)dst, (caddr_t)sa, size);
 		sc->gif_pdst = sa;
 		
-		ifp->if_flags |= (IFF_UP|IFF_RUNNING);
+		ifp->if_flags |= IFF_UP;
 		if_up(ifp);		/* send up RTM_IFINFO */
 
 		break;
@@ -550,11 +550,6 @@ gif_ioctl(ifp, cmd, data)
 		break;
 
 	case SIOCSIFFLAGS:
-		/* sync "running" with "up" */
-		if (ifp->if_flags & IFF_UP)
-			ifp->if_flags |= IFF_RUNNING;
-		else
-			ifp->if_flags &= ~IFF_RUNNING;
 		break;
 
 	default:
