@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.193 1999/10/18 15:58:44 sumikawa Exp $
+$Id: CHANGELOG,v 1.194 1999/10/18 23:01:21 itojun Exp $
 
 <199910>
+Tue Oct 19 07:13:02 JST 1999  itojun@iijlab.net
+	* kame/dhcp6: server passes timezone information to clients.
+
 Tue Oct 19 00:53:51 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/wu-ftpd: upgrade to 2.5.0 with security
 	patches. If you use old wu-ftpd, you should upgrade it because of
