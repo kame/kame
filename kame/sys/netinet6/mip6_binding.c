@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.173 2003/02/13 09:10:40 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.174 2003/02/14 08:47:20 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2153,8 +2153,6 @@ mip6_timeoutentry_update(mtoe, newexpire)
 
 	mip6_timeoutentry_remove_without_mtoe_free(mtoe);
 	mip6_timeoutentry_insert_with_mtoe(newexpire, mtoe);
-	mip6log((LOG_INFO, "%s:%d: A timeout entry is updated.\n",
-		__FILE__, __LINE__));
 }
 
 static void
@@ -2235,8 +2233,6 @@ mip6_bc_list_remove(mbc_list, mbc)
 #ifdef MIP6_CALLOUTTEST
 	if (mbc->mbc_timeout) {
 		mip6_timeoutentry_remove(mbc->mbc_timeout);
-		mip6log((LOG_INFO, "%s:%d: Removed timeout entry.\n",
-			 __FILE__, __LINE__));
 	}
 #endif
 	LIST_REMOVE(mbc, mbc_entry);
