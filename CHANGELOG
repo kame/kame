@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2466 2003/09/06 15:36:59 jinmei Exp $
+$KAME: CHANGELOG,v 1.2467 2003/09/07 20:42:54 itojun Exp $
 
 <200309>
+Mon Sep  8 05:42:19 JST 2003  itojun@iijlab.net
+	* sys/netkey/key.c: lookup SPI by hash table.  bunch of cleanups.
+
 Sat Sep  6 11:36:50 JST 2003  itojun@iijlab.net
 	* sys/netinet6/ip6_id.c: randomize flowlabel and fragment ID.
 
