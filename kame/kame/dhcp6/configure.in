@@ -140,31 +140,30 @@ case $pred_func_id in
 		;;
 esac
 
-dnl DHCP option type values not officially defined
+dnl DHCP option type values that have been assigned very recently:
+dnl These values may need be configurable for interoperability with
+dnl prior experimental implementations.
 AC_MSG_CHECKING(for DHCP DNS option)
 AC_ARG_WITH(opt-dns,
 [  --with-opt-dns=VALUE    specify DHCP option value for DNS],
     dhcpopt_dns="$withval", dhcpopt_dns=0)
-if test $dhcpopt_dns = 0 ; then
-	dhcpopt_dns=25
-	AC_MSG_RESULT(unspecified and using $dhcpopt_dns)
-else
+if test $dhcpopt_dns != 0 ; then
 	AC_MSG_RESULT(using $dhcpopt_dns)
+	DHCPOPT_DNS="-DDH6OPT_DNS=$dhcpopt_dns"
+	AC_SUBST(DHCPOPT_DNS)
 fi
-AC_SUBST(dhcpopt_dns)
 
 AC_MSG_CHECKING(for DHCP DNS_NAME option)
 AC_ARG_WITH(opt-dnsname,
 [  --with-opt-dnsname=VALUE    specify DHCP option value for DNS_NAME],
     dhcpopt_dnsname="$withval", dhcpopt_dnsname=0)
-if test $dhcpopt_dnsname = 0 ; then
-	dhcpopt_dnsname=26
-	AC_MSG_RESULT(unspecified and using $dhcpopt_dnsname)
-else
+if test $dhcpopt_dnsname != 0 ; then
 	AC_MSG_RESULT(using $dhcpopt_dnsname)
+	DH6OPT_DNSNAME="-DDH6OPT_DNSNAME=$dhcpopt_dnsname"
+	AC_SUBST(DH6OPT_DNSNAME)
 fi
-AC_SUBST(dhcpopt_dnsname)
 
+dnl DHCP option type values not officially defined
 AC_MSG_CHECKING(for DHCP prefix delegation option)
 AC_ARG_WITH(opt-pdel,
 [  --with-opt-pdel=VALUE   specify DHCP option value for prefix delegation],
