@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.30 2000/07/15 16:08:01 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.31 2000/12/05 09:13:33 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -157,23 +157,13 @@ add_command
 	/* delete */
 delete_command
 	:	DELETE { p_type = SADB_DELETE; }
-		sa_selector_spec extension_spec
-		{
-			if (p_mode != IPSEC_MODE_ANY)
-				yyerror("WARNING: mode is obsoleted.");
-		}
-		EOT
+		sa_selector_spec EOT
 	;
 
 	/* get command */
 get_command
 	:	GET { p_type = SADB_GET; }
-		sa_selector_spec extension_spec
-		{
-			if (p_mode != IPSEC_MODE_ANY)
-				yyerror("WARNING: mode is obsoleted.");
-		}
-		EOT
+		sa_selector_spec EOT
 	;
 
 	/* flush */
