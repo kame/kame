@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.730 2000/03/28 00:04:13 itojun Exp $
+$Id: CHANGELOG,v 1.731 2000/03/28 08:24:07 itojun Exp $
 
 <200003>
+Tue Mar 28 10:35:50 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/socks64: upgrade to latest patch.
+
 Tue Mar 28 09:03:03 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/devel/unproven-pthreads: upgrade to 0.12.
 
