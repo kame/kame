@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.68 2000/03/07 00:56:41 sakane Exp $	*/
+/*	$KAME: key.c,v 1.69 2000/03/07 02:33:11 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.68 2000/03/07 00:56:41 sakane Exp $ */
+/* KAME $Id: key.c,v 1.69 2000/03/07 02:33:11 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -997,7 +997,7 @@ key_msg2sp(xpl0, len, error)
 		struct ipsecrequest **p_isr = &newsp->req;
 
 		/* validity check */
-		if (PFKEY_EXTLEN(xpl0) <= sizeof(*xpl0)) {
+		if (PFKEY_EXTLEN(xpl0) < sizeof(*xpl0)) {
 #ifdef IPSEC_DEBUG
 			printf("key_msg2sp: Invalid msg length.\n");
 #endif
@@ -1285,7 +1285,7 @@ key_sp2msg(sp)
 }
 
 /*
- * SADB_SPDADD processing
+ * SADB_SPDADD or SADB_SPDSETIDX processing
  * add a entry to SP database, when received
  *   <base, address(SD), policy>
  * from the user(?).
@@ -1375,7 +1375,8 @@ key_spdadd(mhp)
 	}
 
 	/* requests are mandatory when action is ipsec. */
-        if (xpl0->sadb_x_policy_type == IPSEC_POLICY_IPSEC
+        if (msg0->sadb_msg_type == SADB_X_SPDADD
+	 && xpl0->sadb_x_policy_type == IPSEC_POLICY_IPSEC
 	 && PFKEY_EXTLEN(xpl0) <= sizeof(*xpl0)) {
 #ifdef IPSEC_DEBUG
 		printf("key_spdadd: some policy requests part required.\n");
@@ -5739,6 +5740,7 @@ key_parse(msgp, so, targetp)
 		case SADB_X_SPDGET:
 		case SADB_X_SPDDUMP:
 		case SADB_X_SPDFLUSH:
+		case SADB_X_SPDSETIDX:
 #ifdef IPSEC_DEBUG
 			printf("key_parse: illegal satype=%u\n",
 			    msg->sadb_msg_type);
@@ -5945,6 +5947,7 @@ key_parse(msgp, so, targetp)
 #endif
 
 	case SADB_X_SPDADD:
+	case SADB_X_SPDSETIDX:
 		if ((newmsg = key_spdadd(mhp)) == NULL)
 			return orglen;
 		if (targetp)
