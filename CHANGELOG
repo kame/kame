@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1237 2000/08/28 16:51:44 itojun Exp $
+$KAME: CHANGELOG,v 1.1238 2000/08/29 04:00:40 jinmei Exp $
 
 <200008>
+2000-08-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (prelist_update): clarification
+	about the "two-hour" rule in RFC 2462 (currently disabled,
+	though)
+	- do not take into account if the pakcet is authenticated unless
+	  storedlifetime <= TWOHOUR.
+	- changed the semantics of storedlifetime
+	  from "Valid Lifetime in the previously received advertisement"
+	  to "*remaining* lifetime of the stored entry".
+
 Tue Aug 29 01:45:33 JST 2000  itojun@iijlab.net
 	* sys/netinet6/esp_core.c: experimental twofish/rijndael (AES
 	  candidate) support in kernel IPsec, based on
