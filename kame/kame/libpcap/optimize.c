@@ -22,7 +22,7 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/optimize.c,v 1.3 1999/12/13 00:54:47 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/optimize.c,v 1.4 2002/08/12 02:47:56 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/types.h>
@@ -1913,7 +1913,7 @@ convert_code_r(p)
 
 	/* generate offset[] for convenience  */
 	if (slen) {
-		offset = (struct slist **)calloc(sizeof(struct slist *), slen);
+		offset = (struct slist **)calloc(slen, sizeof(struct slist *));
 		if (!offset) {
 			bpf_error("not enough core");
 			/*NOTREACHED*/
