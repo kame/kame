@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1899 2001/10/08 23:52:16 sakane Exp $
+$KAME: CHANGELOG,v 1.1900 2001/10/09 11:01:14 jinmei Exp $
 
 <200110>
+2001-10-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd/config.c (getconfig): made configuration parser
+	compatible with FreeBSD 4.4-RELEASE, in terms of the route
+	information option:
+	- allowed rtrXXX instead of rtXXX.
+	- made route lifetime optional.
+	In any case, some warning messages are printed as well, so that the
+	user can notice the change and fix the configuration.
+
 Tue Oct  9 08:43:04 JST 2001 sakane@kame.net
 	* kame/kame/racoon/schedule.c:
 	the entry of the schedule is marked with dead before the function in
