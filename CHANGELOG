@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.872 2000/05/14 14:35:21 itojun Exp $
+$Id: CHANGELOG,v 1.873 2000/05/14 14:36:28 itojun Exp $
 
 <200005>
 Sun May 14 JST 2000  itojun@iijlab.net
@@ -35,7 +35,7 @@ Sat May 13 JST 2000  itojun@iijlab.net
 	  family mismatch.
 	* sys/netinet6/icmp6.c: improve icmp6 node information support.
 	  we have not been conformant to the latest specification (05).
-	  the current code was mixture of 05 draft and 03 draft.
+	  the current code is a mixture of 05 draft and 03 draft.
 	  need more fixes (see comment in code for detail).
 
 2000-05-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
