@@ -1019,45 +1019,26 @@ findpcb:
 			tcp_saveti = NULL;
 			if (iphlen + sizeof(struct tcphdr) > MHLEN)
 				goto nosave;
-
-			if (m->m_len > iphlen && (m->m_flags & M_EXT) == 0) {
-				tcp_saveti = m_copym(m, 0, iphlen, M_DONTWAIT);
-				if (!tcp_saveti)
-					goto nosave;
-			} else {
-				MGETHDR(tcp_saveti, M_DONTWAIT, MT_HEADER);
-				if (!tcp_saveti)
-					goto nosave;
-				tcp_saveti->m_len = iphlen;
-				m_copydata(m, 0, iphlen,
-				    mtod(tcp_saveti, caddr_t));
-			}
-
-			if (M_TRAILINGSPACE(tcp_saveti) < sizeof(struct tcphdr)) {
-				m_freem(tcp_saveti);
-				tcp_saveti = NULL;
-			} else {
-				tcp_saveti->m_len += sizeof(struct tcphdr);
-				bcopy(th, mtod(tcp_saveti, caddr_t) + iphlen,
-				    sizeof(struct tcphdr));
-			}
-			if (tcp_saveti) {
-				/*
-				 * need to recover version # field, which was
-				 * overwritten on ip_cksum computation.
-				 */
-				struct ip *sip;
-				sip = mtod(tcp_saveti, struct ip *);
-				switch (af) {
-				case AF_INET:
-					sip->ip_v = 4;
-					break;
+			MGETHDR(tcp_saveti, M_DONTWAIT, MT_HEADER);
+			if (!tcp_saveti)
+				goto nosave;
+			tcp_saveti->m_len = iphlen + sizeof(struct tcphdr);
+			m_copydata(m, 0, iphlen, mtod(tcp_saveti, caddr_t));
+			bcopy(th, mtod(tcp_saveti, caddr_t) + iphlen,
+			    sizeof(struct tcphdr));
+			/*
+			 * need to recover version # field, which was
+			 * overwritten on ip_cksum computation.
+			 */
+			switch (af) {
+			case AF_INET:
+				mtod(tcp_saveti, struct ip *)->ip_v = 4;
+				break;
 #ifdef INET6
-				case AF_INET6:
-					sip->ip_v = 6;
-					break;
+			case AF_INET6:
+				mtod(tcp_saveti, struct ip *)->ip_v = 6;
+				break;
 #endif
-				}
 			}
 	nosave:;
 		}
