@@ -1,6 +1,10 @@
-$Id: question,v 1.15 2000/09/20 14:54:01 sakane Exp $
+$Id: question,v 1.16 2000/09/20 20:26:55 sakane Exp $
 
 HOW DO I DO ?
+
+Q. If there is the phase 1 spi size excepting 16 and 0.
+	warn it.  and reject or accept ?
+
 Q. ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
    e.g. IPSECDOI_ID_DER_ASN1_DN.  Well, are these used in phase 2 ?
 Q. What should I do when HARD expiration has come ?
@@ -213,8 +217,10 @@ Q: Which SPI should I carry on Delete notify ?
 Q: "heartbeat"
 	It means a signal of "I'm alive".
 	It is exchanged in phase 1.5.
-	When a responder dies/reboots, we can know it by using "heartbeat".
-	Is INITIAL-CONTACT message useless ?
+	When a responder dies/reboots, phase 2 SA sitll remains but
+	we can know the rebooting of the peer by using "heartbeat".
+
+	Is INITIAL-CONTACT message useless if we choise "heartbeat" ?
 		We don't know.
 
 Q: responder's action in a normal case.
@@ -229,25 +235,21 @@ Q: only the byte type of lifetime on phase 2, not exist the type of time.
 	We can choose to use default lifetime (28800).
 	We can reject it accortding to a policy.
 
-Q: lifetime negotiation
-	what should we do if we got lifetime value that does not match our
-	policy?
-	- reject it
-	- RESPONDER LIFETIME
+Q: phase 2 lifetime negotiation
+	what should I do if the peer has proposed the lifetime value which
+	does not match to our policy ?
+	- always reject it.
+	- use my lifetime, then send RESPONDER LIFETIME.
 	- during negotiation obey the initiator.  install SA lifetime based
 	  on the lifetime we have decided (not from the negotiation).
 
-	短いlifetimeを採用した時は、自分がinitiateしてもいいかもしんない。
-	ほんと？
-		- remoteがserverにつなぐ。
-		- tcpで通信。
-		- phase1が消える。
-		- serverはtcpの戻りのパケットで initiateしない方がいい？
-	RFC2407 4.5.4 Lifetime Notificationを読む
-		phase[12]のどっちの時かはっきりしない
-		phase1だとして 2)番の時は多分困る。
-	phase1での responder lifetimeは適当じゃないかもしれない。
-		1st exchangeのresponder sideだけをfakeして悪戯できる。
+Q: Does RFC2407 4.5.4 Lifetime Notification say for phase 2 ? or phase 1 ?
+	responder lifetime may be inapproprite for phase1 because
+	proposal is not encrypted, so bad guy can forge it.
+
+Q: phase 1 lifetime of bytes.
+	What should we count ?
+	Or it should be obsoleted ?
 
 Q: responder should not modify phase 2 attributes
 	even for phase 1, we should not modify attributes.
@@ -262,15 +264,36 @@ Q: check if reserved field is zero, reject if
 	we should do this (sakane)
 	i don't think so, it will kill future protocol enhancements (itojun)
 
-Q: commit bit (optional)
-	racoon will do this	XXX
-
 Q: order of proposals in IKE phase 2 packet, and IPsec processing order
+	how to negotiate SA bundle.
 	IKE: esp+ah, or ah+esp
 		-> is it safe to consider both as IP|AH|ESP|ULP?
-	proposalは AH/ESPが好ましいかも…
+		-> is the proposal prefered to send the order of ah+esp.
 	IKE: ah+ah?
-		reject?
+		reject? or policy issue.
+	RFC2401bis should state the pattern of SA bundle.
+	      AH
+	      AH+ESP
+	      AH    +IPCOMP
+	      AH+ESP+IPCOMP
+		 ESP
+	      AH+ESP
+	      AH+ESP+IPCOMP
+		 ESP+IPCOMP
+	      AH+ESP
+	      AH+ESP+IPCOMP
+	Also RFC2401bis should state the meaning of protcol mode.
+
+	we are going to install both SAs, ESP and AH.  and they are bundled.
+	we should negotiate both SAs in single phase2.
+
+	can we do that separately ?
+		it is hard to verify the policy because the policy might be
+		defined SA bundle.
+	when i make packet IP2|AH|ESP|IP1|ULP.
+		proposal and order must be
+			ah/transport + esp/tunnel ?
+			ah/tunnel + esp/tunnel ?
 
 Q: what should we do if phase 1 SA expires, during phase2 SA negotiation?
 	restart phase 2 negotiation from scratch
@@ -283,11 +306,13 @@ Q: what kind of notification message a node should send on decode failure?
 	ISAKMP_NTYPE_PAYLOAD_MALFORMED
 		sanity check would be hairy
 
-Q: where to attach CR?
-	obey draft-ietf-ipsec-pki-req-05.txt
+Q: Certificate Request.
+	where to attach CR?
+		obey draft-ietf-ipsec-pki-req-05.txt.
 	what should we put inside CR?
 		my own signer?
-		RFC2408
+	RFC2408 page 34 says;
+
     o  Certificate Authority (variable length) - Contains an encoding of
        an acceptable certificate authority for the type of certificate
        requested.  As an example, for an X.509 certificate this field
@@ -299,14 +324,21 @@ Q: where to attach CR?
        certificate authority requested, this field SHOULD not be
        included.
 
-再送
-	phase1の最後が落ちたら？
-		再送すべき。
-			racoonは再送してないっす。
-		自分が期待してないメッセージを再送された時
-			捨てる。
-		処理したはずのメッセージを...
-			再送。
+retransmission method (implementation issue)
+	how can I realize that the last packet in phase 1 was dropped.
+	main/base mode:
+		no problem in initiator side.
+		responder should wait for the retransmited 5th(3rd) packet
+		from initiator.
+	aggressive mode:
+		responder should wait for the retransmited 2nd packet
+		from responder.
+	quick mode:
+		initiator should wait for the retransmited 2nd packet
+		from responder.
+		when i am initiator, if we don not use commit bit, i will
+		install the SAs after sending last message.
+
 	under the following situation we will see retransmisson of phase 1 3rd
 	packet (prior to the last packet) from the peer, even if we already
 	have started phase 2 negotiaiton:
@@ -316,18 +348,6 @@ Q: where to attach CR?
 	responder retransmits phase 1 N-1 packet
 		main mode
 	FW-1 transmits the last packet in phase 1/2 exchange, 3 times.
-
-ESP+AH
-	ESPとAHを別々に設定すると…
-		どっちを先にパケットに適用していいか分からなくなるのでなしだろう。
-	proposalをどう投げるか
-		昨日やった	
-		ah+espのtunnelのときは？
-			ah/transport + esp/tunnel (sakane)
-			optionでなんでもあり。(watanabe)
-			ah/tunnel + esp/tunnel (cisco?)
-				IP2|AH|IP1|ESP|IP0|ULP (sakane)
-				これはおかしい。(kimura)
 
 Q: retransmission timer?
 	should we manage it in per-peer basis?
@@ -369,19 +389,17 @@ Q: Nonce size
 	reject if the value is out-of-range
 
 Q: phase2 KE payload
-	KE付けられたら返す。
-	PFS の設定をしてない時に敵が送って来たら？
-		はねる。
-		まぁ受けてもいい。
+	when the responder was not required PFS, if the initiator send KE ?
+	if the responder's pfs group is not match to the initiator's one ?
+		reject.
+		accept.
+	it's policy issue.
 
-Q: subjectAltName and ID
-	IDとsubjectAltNameが等しいかをチェックする。
-		IDがDNだったら -> subject
-			DNの書く順序は？
-			FW-1は厳しいかもしれない？
-		IDがDN以外 -> subjectAltName
-	win2KのCAにsubjectaltnameを設定してサインしてもらう方法がわからない。
-	sshはWEBから subjectaltnameを入れられる。
+Q: x.509 certificate and ID payload
+	if there is the certificate and the type of ID payload is
+		not DN, then compare with the subjectAltName in certificate.
+		DN, then compare with the subjectName in certificate.
+			must take care of the order of OID.
 
 Q: IP address of subjectAltName and of real entity.
 	There are two subjectAltName, email and IP address, in the certificate.
@@ -405,3 +423,5 @@ Q: phase 1 ID payload
 	RSA signature and pre-shared key
 	same ID value.
 	must include the ID into subject alt name.
+
+Q: how may policy issue are.  can we interoperate ?
