@@ -532,6 +532,11 @@ rip6_usrreq(so, req, m, nam, control, p)
 		
 		MALLOC(in6p->in6p_icmp6filt, struct icmp6_filter *,
 			sizeof(struct icmp6_filter), M_PCB, M_NOWAIT);
+		if (in6p->in6p_icmp6filt == NULL) {
+			in6_pcbdetach(in6p);
+			error = ENOMEM;
+			break;
+		}
 		ICMP6_FILTER_SETPASSALL(in6p->in6p_icmp6filt);
 		break;
 
