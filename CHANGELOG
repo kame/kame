@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2259 2002/10/22 04:26:35 suz Exp $
+$KAME: CHANGELOG,v 1.2260 2002/10/24 10:14:59 suz Exp $
 
 <200210>
+Thu Oct 24 19:14:11 JST 2002	suz@crl.hitachi.co.jp
+	* freebsd4: sync with FreeBSD 4.7-RELEASE.
+
 Tue Oct 22 13:19:54 JST 2002	suz@crl.hitachi.co.jp
 	* freebsd4/sys/netinet/in.c: fixed a kernel crash in FreeBSD-4
 	  by "ifconfig stf0 inet 1.2.3.4"
