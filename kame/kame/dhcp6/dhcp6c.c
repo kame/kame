@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.92 2002/06/21 10:23:33 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.93 2002/06/21 11:02:14 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -93,6 +93,7 @@ static void client6_init __P((void));
 static void client6_ifinit __P((void));
 static void free_resources __P((void));
 static void client6_mainloop __P((void));
+static void process_signals __P((void));
 static struct dhcp6_serverinfo *find_server __P((struct dhcp6_if *,
 						 struct duid *));
 static struct dhcp6_serverinfo *select_server __P((struct dhcp6_if *));
@@ -427,6 +428,24 @@ free_resources()
 }
 
 static void
+process_signals()
+{
+	if ((sig_flags & SIGF_TERM)) {
+		dprintf(LOG_INFO, FNAME "exiting");
+		free_resources();
+		unlink(DHCP6C_PIDFILE);
+		exit(0);
+	}
+	if ((sig_flags & SIGF_HUP)) {
+		dprintf(LOG_INFO, FNAME "restarting");
+		free_resources();
+		client6_ifinit();
+	}
+
+	sig_flags = 0;
+}
+
+static void
 client6_mainloop()
 {
 	struct timeval *w;
@@ -434,20 +453,8 @@ client6_mainloop()
 	fd_set r;
 
 	while(1) {
-		if (sig_flags) {
-			if ((sig_flags & SIGF_TERM)) {
-				dprintf(LOG_INFO, FNAME "exiting");
-				free_resources();
-				exit(0);
-			}
-			if ((sig_flags & SIGF_HUP)) {
-				dprintf(LOG_INFO, FNAME "restarting");
-				free_resources();
-				client6_ifinit();
-			}
-
-			sig_flags = 0;
-		}
+		if (sig_flags)
+			process_signals();
 
 		w = dhcp6_check_timer();
 
