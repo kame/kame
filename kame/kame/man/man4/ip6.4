@@ -56,7 +56,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	KAME $Id: ip6.4,v 1.5 1999/12/22 06:02:58 jinmei Exp $
+.\"	KAME $Id: ip6.4,v 1.6 1999/12/22 06:49:12 itojun Exp $
 .\"
 .Dd December 17, 1999
 .Dt IP6 4
@@ -354,9 +354,6 @@ equals the destination IPv6 address of the datagram, then this is
 equivalent to the existing
 .Dv SO_DONTROUTE
 socket option.
-.Pp
-Note, however, that the IPV6_NEXTHOP object/option is not fully
-implemented as of writing this.
 .Pp
 For applications that do not, or unable to use
 .Xr sendmsg 2
@@ -660,3 +657,8 @@ which is decendant of WIDE hydrangea IPv6 stack kit
 .Pc .
 .Pp
 Part of the document was shamelessly copied from RFC2553 and RFC2292.
+.\"
+.Sh BUGS
+The
+.Dv IPV6_NEXTHOP
+object/option is not fully implemented as of writing this.
