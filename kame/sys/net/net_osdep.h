@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.43 2001/05/16 03:02:13 jinmei Exp $	*/
+/*	$KAME: net_osdep.h,v 1.44 2001/05/16 03:13:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,7 +41,7 @@
  *          ip_len ip_id ip_off
  * bsdi3:       xs     x      x
  * bsdi4:       xs            x
- * FreeBSD4:    xs            x
+ * FreeBSD:     xs            x
  * NetBSD:       x            x
  * OpenBSD:     xs     x      x
  *
