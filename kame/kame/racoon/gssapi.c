@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.3 2000/12/15 13:43:55 sakane Exp $	*/
+/*	$KAME: gssapi.c,v 1.4 2000/12/15 15:26:29 itojun Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -84,7 +84,7 @@ gssapi_error(OM_uint32 status_code, const char *where,
 	va_list ap;
 
 	va_start(ap, fmt);
-	plogv(LOGTAB_ERROR, where, NULL, fmt, ap);
+	plogv(LLV_ERROR, where, NULL, fmt, ap);
 	va_end(ap);
 
 	message_context = 0;
