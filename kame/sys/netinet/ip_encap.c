@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.98 2004/08/16 04:53:18 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.99 2004/08/17 07:04:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -231,9 +231,9 @@ encap_init()
 	 * initialize radix lookup table.
 	 * max_keylen initialization should happen before the call to rn_init().
 	 */
-	rn_inithead((void **)&encap_head[0], sizeof(struct sockaddr_pack) << 3);
+	rn_inithead((void *)&encap_head[0], sizeof(struct sockaddr_pack) << 3);
 #ifdef INET6
-	rn_inithead((void **)&encap_head[1], sizeof(struct sockaddr_pack) << 3);
+	rn_inithead((void *)&encap_head[1], sizeof(struct sockaddr_pack) << 3);
 #endif
 #endif
 }
