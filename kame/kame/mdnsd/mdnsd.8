@@ -1,4 +1,4 @@
-.\"	$KAME: mdnsd.8,v 1.29 2000/11/23 23:03:26 itojun Exp $
+.\"	$KAME: mdnsd.8,v 1.30 2001/03/28 07:08:29 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -38,9 +38,6 @@
 .Nm mdnsd
 .Bk -words
 .Op Fl 46Dflm
-.Ek
-.Bk -words
-.Op Fl d Ar dnsserv
 .Ek
 .Bk -words
 .Op Fl h Ar hostname
@@ -93,19 +90,6 @@ Enable trace messages for debugging.
 .It Fl f
 Run in foreground mode.
 Do not daemonize on invocation.
-.It Fl d Ar dnsserv
-.Nm
-will advertise DNS server
-.Ar dnsserv
-to
-.Li _dns._udp.lcl
-SRV queries.
-.Ar dnsserv
-must be a fully qualified canonical DNS name.
-.Ar dnsserv
-must not point to CNAME record.
-Also, it must carry terminating period, like
-.Dq Li ns.ietf.org. .
 .It Fl h Ar hostname
 .Ar hostname
 specifies local hostname that
@@ -205,13 +189,13 @@ DNS queries will be sent to both multicast and unicast servers.
 .\"
 .Sh SEE ALSO
 .Rs
+.%A Levon Esibov
 .%A Bernard Aboba
 .%A Dave Thaler
-.%A Levon Esibov
-.%D March 9, 2000
+.%D November 16, 2000
 .%T Multicast DNS
 .%R internet draft
-.%N draft-aboba-dnsext-mdns-00.txt
+.%N draft-ietf-dnsext-mdns-00.txt
 .%O work in progress material
 .Re
 .\"

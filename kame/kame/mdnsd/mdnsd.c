@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.32 2001/01/15 05:42:30 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.33 2001/03/28 07:08:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -58,8 +58,6 @@
 u_int16_t dnsid;
 const char *srcport = "53";
 const char *dstport = MDNS_PORT;
-const char *dnsserv = NULL;
-const struct addrinfo *dnsserv_ai = NULL;
 const char *intface = NULL;
 int family = PF_UNSPEC;
 static char hostnamebuf[MAXHOSTNAMELEN];
@@ -79,7 +77,6 @@ const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
 int signo = 0;
 
 static void usage __P((void));
-static int config_dnsserv __P((const char *));
 static int getsock __P((int, const char *, const char *, int, int,
 	enum sdtype));
 static int getsock0 __P((const struct addrinfo *));
@@ -99,20 +96,13 @@ main(argc, argv)
 	struct sockdb *sd;
 	int nsock;
 
-	while ((ch = getopt(argc, argv, "46d:Dfh:i:lmp:P:")) != EOF) {
+	while ((ch = getopt(argc, argv, "46Dfh:i:lmp:P:")) != EOF) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
 			break;
 		case '6':
 			family = AF_INET6;
-			break;
-		case 'd':
-			if (iscanon(optarg) == 0) {
-				errx(1, "%s: not a canonical name", optarg);
-				/*NOTREACHED*/
-			}
-			dnsserv = optarg;
 			break;
 		case 'D':
 			dflag++;
@@ -169,9 +159,6 @@ main(argc, argv)
 		}
 		argv++;
 	}
-
-	if (dnsserv)
-		(void)config_dnsserv(dnsserv);
 
 	srandom(time(NULL) ^ getpid());
 	dnsid = random() & 0xffff;
@@ -294,42 +281,8 @@ usage()
 {
 
 	fprintf(stderr,
-"usage: mdnsd [-46Dflm] [-d server] [-h hostname] [-p srcport] [-P dstport]\n"
+"usage: mdnsd [-46Dflm] [-h hostname] [-p srcport] [-P dstport]\n"
 "             -i iface [userv...]\n");
-}
-
-static int
-config_dnsserv(serv)
-	const char *serv;
-{
-#if 0
-	/* XXX chokes if resolv.conf has no other name server */
-	struct addrinfo hints, *res;
-	int l;
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = PF_UNSPEC;
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_flags = AI_CANONNAME;
-	if (getaddrinfo(serv, "0", &hints, &res) != 0)
-		return -1;
-
-	if (res->ai_canonname) {
-		l = strlen(serv);
-		if (strcmp(res->ai_canonname, serv) == 0)
-			;
-		else if (strlen(res->ai_canonname) == l - 1 &&
-			 strncmp(res->ai_canonname, serv, l - 1) == 0)
-			;
-		else {
-			freeaddrinfo(res);
-			return -1;
-		}
-	}
-
-	dnsserv_ai = res;
-#endif
-	return 0;
 }
 
 static int

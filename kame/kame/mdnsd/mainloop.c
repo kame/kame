@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.43 2001/03/09 13:51:39 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.44 2001/03/28 07:08:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * multicast DNS resolver, based on draft-aboba-dnsext-mdns-00.txt.
+ * multicast DNS resolver, based on draft-ietf-dnsext-mdns-00.txt.
  *
  * TODO:
  * - query timeout
@@ -46,8 +46,9 @@
  *	- conflict resolution
  * - [phmb]-mode configuration - is it necessary?
  * - spec conformance check
+ * - set hoplimit on reply to 255, verify
  *
- * 00 -> 01 difference:
+ * draft-aboba-dnsext-mdns-00 -> draft-aboba-dnsext-mdns-01 differences:
  * - 01 specification requires us to query names under "lcl.arpa" only.
  *   For example, we cannot use 01 mdns to lookup address against
  *   "starfruit.itojun.org".  We are allowed to use 01 mdns, only when we
@@ -59,7 +60,7 @@
  *   respond with cached data.  01 drops the comment, puts it as future
  *   study, and forbids to answer using cached data.
  *
- * draft-aboba-dnsext-mdns-01 -> draft-ietf-dnsext-mdns-00 difference:
+ * draft-aboba-dnsext-mdns-01 -> draft-ietf-dnsext-mdns-00 differences:
  * - the former uses "foo.lcl.arpa" as the local name.
  *   the latter uses "foo.local.arpa".
  * - the latter has more limitation on retransmission (MUST NOT repeat more
@@ -69,7 +70,7 @@
  * - IP TTL/hoplimit value must be 255.
  * - clarified that no unicast queries should be used for local.arpa, and
  *   it is okay to query normal (unicast) DNS server for outside of local.arpa.
- * - name server device must not listen to multicast queries.
+ * - normal name server devices must not listen to multicast queries.
  * - more security section.
  */
 
@@ -106,7 +107,9 @@ static int ptr2in __P((const char *, struct in_addr *));
 static int ptr2in6 __P((const char *, struct in6_addr *));
 static int match_ptrquery __P((const char *));
 static int encode_myaddrs __P((const char *, u_int16_t, u_int16_t, char *,
-	int, int, int *, int));
+	int, int, int *, int, int));
+static int ismyname __P((const char *));
+static int islocalname __P((const char *));
 #if 0
 static const struct sockaddr *getsa __P((const char *, const char *, int));
 #endif
@@ -185,6 +188,10 @@ mainloop0(sd)
 	 * reason 2: for unicast query, we need to flip the src/dst
 	 *	pair.
 	 * reason 3: we do not want to be hosed by fake multicast reply.
+	 * reason 4: for newer specs, local.arpa (or lcl.arpa) queries must be
+	 *	handled iff the query is sent to multicast address.
+	 * reason 5: for newer specs, PTR query must return local.arpa (or
+	 *	lcl.arpa) zone iff the query is sent to multicast address.
 	 */
 	fromlen = sizeof(from);
 	l = recvfrom(sd->s, buf, sizeof(buf), 0, (struct sockaddr *)&from,
@@ -622,7 +629,7 @@ fail:
 }
 
 static int
-encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped)
+encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped, loopback)
 	const char *n;
 	u_int16_t type;
 	u_int16_t class;
@@ -631,6 +638,7 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped)
 	int buflen;
 	int *naddrs;
 	int scoped;
+	int loopback;
 {
 	struct ifaddrs *ifap = NULL, *ifa;
 	char *p;
@@ -674,8 +682,10 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped)
 			if (ntohl(sin->sin_addr.s_addr) == INADDR_ANY ||
 			    IN_CLASSD(sin->sin_addr.s_addr))
 				continue;
-			if (ntohl(sin->sin_addr.s_addr) == INADDR_LOOPBACK)
-				continue;
+			if (ntohl(sin->sin_addr.s_addr) == INADDR_LOOPBACK) {
+				if (!loopback)
+					continue;
+			}
 			alen = sizeof(sin->sin_addr);
 			abuf = (char *)&sin->sin_addr;
 			ntype = T_A;
@@ -686,8 +696,10 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped)
 			if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr) ||
 			    IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr))
 				continue;
-			if (IN6_IS_ADDR_LOOPBACK(&sin6->sin6_addr))
-				continue;
+			if (IN6_IS_ADDR_LOOPBACK(&sin6->sin6_addr)) {
+				if (!loopback)
+					continue;
+			}
 
 			/* XXX be careful about scope issue! */
 			if (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
@@ -747,6 +759,32 @@ fail:
 	if (ifap)
 		freeifaddrs(ifap);
 	return -1;
+}
+
+static int
+ismyname(n)
+	const char *n;
+{
+
+	if (strcmp(hostname, n) == 0)
+		return 1;
+	else if (islocalname(n) &&
+	    strncmp(n, hostname, strlen(n) - strlen(MDNS_LOCALDOM)) == 0)
+		return 1;
+	else
+		return 0;
+}
+
+static int
+islocalname(n)
+	const char *n;
+{
+
+	if (strlen(n) > strlen(MDNS_LOCALDOM) &&
+	    strcmp(n + strlen(n) - strlen(MDNS_LOCALDOM), MDNS_LOCALDOM) == 0)
+		return 1;
+	else
+		return 0;
 }
 
 #if 0
@@ -867,10 +905,29 @@ relay(sd, buf, len, from)
 	struct nsdb *ns;
 	int sent;
 	int ord;
+	int multicast, unicast;
+	const char *n = NULL;
+	const char *d;
 
 	if (sizeof(*hp) > len)
 		return -1;
 	hp = (HEADER *)buf;
+	d = (const char *)(hp + 1);
+	n = decode_name(&d, len - (d - buf));
+	if (!n || len - (d - buf) < 4) {
+		/* LINTED const cast */
+		free((char *)n);
+		return -1;
+	}
+	if (islocalname(n)) {
+		multicast = 1;
+		unicast = 0;
+	} else {
+		multicast = 0;
+		unicast = 1;
+	}
+	/* LINTED const cast */
+	free((char *)n);
 
 	if (dflag)
 		dnsdump("relay I", buf, len, from);
@@ -892,6 +949,16 @@ relay(sd, buf, len, from)
 		for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
 			if (dflag)
 				printnsdb(ns);
+			switch (ns->type) {
+			case N_MULTICAST:
+				if (!multicast)
+					continue;
+				break;
+			case N_UNICAST:
+				if (!unicast)
+					continue;
+				break;
+			}
 
 			sd = af2sockdb(ns->addr.ss_family,
 			    ns->type == N_MULTICAST ? S_MULTICAST : S_UNICAST);
@@ -947,7 +1014,7 @@ serve(sd, buf, len, from)
 	char replybuf[8 * 1024];
 	int l;
 	int count;
-	int scoped;
+	int scoped, loopback;
 	const struct addrinfo *ai;
 
 	if (dflag)
@@ -959,6 +1026,14 @@ serve(sd, buf, len, from)
 		scoped = lflag;
 	} else
 		scoped = 0;
+	if (from->sa_family == AF_INET &&
+	    ((struct sockaddr_in *)from)->sin_addr.s_addr == INADDR_LOOPBACK) {
+		loopback = 1;
+	} else if (from->sa_family == AF_INET6 &&
+	    IN6_IS_ADDR_LOOPBACK(&((struct sockaddr_in6 *)from)->sin6_addr)) {
+		loopback = 1;
+	} else
+		loopback = 0;
 
 	/* we handle queries only */
 	if (sizeof(*hp) > len)
@@ -979,9 +1054,7 @@ serve(sd, buf, len, from)
 	if (class != C_IN)
 		goto fail;
 
-	if (strcmp(hostname, n) == 0 ||
-	    (strlen(hostname) + 1 == strlen(n) &&
-	     strncmp(hostname, n, strlen(hostname)) == 0)) {
+	if (ismyname(n)) {
 		/* hostname for forward query - advertise my addresses */
 		memcpy(replybuf, buf, d - buf);
 		hp = (HEADER *)replybuf;
@@ -993,7 +1066,7 @@ serve(sd, buf, len, from)
 
 		count = 0;
 		l = encode_myaddrs(n, type, class, replybuf, d - buf,
-		    sizeof(replybuf), &count, scoped);
+		    sizeof(replybuf), &count, scoped, loopback);
 		if (l <= 0)
 			goto fail;
 		p += l;
@@ -1047,106 +1120,6 @@ serve(sd, buf, len, from)
 
 		if (dflag)
 			dnsdump("serve P", replybuf, p - replybuf, from);
-
-		if (p - replybuf > PACKETSZ) {
-			p = replybuf + PACKETSZ;
-			hp->tc = 1;
-		}
-		sendto(sd->s, replybuf, p - replybuf, 0, from, from->sa_len);
-
-		if (n) {
-			/* LINTED const cast */
-			free((char *)n);
-		}
-		return 0;
-	} else if (type == T_SRV && dnsserv &&
-		   strcmp("_dns._udp.lcl.", n) == 0) {
-		/* DNS server query - advert DNS server */
-		memcpy(replybuf, buf, d - buf);
-		hp = (HEADER *)replybuf;
-		p = replybuf + (d - buf);
-		hp->qr = 1;	/* it is response */
-		hp->aa = 1;	/* authoritative answer */
-		hp->ra = 0;	/* recursion not available */
-		hp->rcode = NOERROR;
-
-		/* answers section */
-		if (encode_name(&p, sizeof(replybuf) - (p - replybuf), n)
-				== NULL) {
-			goto fail;
-		}
-		if (p + 16 - replybuf > sizeof(replybuf))
-			goto fail;
-		/* XXX alignment */
-		*(u_int16_t *)p = htons(type);	/*SRV*/
-		p += sizeof(u_int16_t);
-		*(u_int16_t *)p = htons(class);	/*IN*/
-		p += sizeof(u_int16_t);
-		*(int32_t *)p = htonl(30);	/*TTL*/
-		p += sizeof(int32_t);
-		q = p;
-		*(u_int16_t *)p = htons(0);	/*filled later*/
-		p += sizeof(u_int16_t);
-		*(u_int16_t *)p = htons(0);	/*priority*/
-		p += sizeof(u_int16_t);
-		*(u_int16_t *)p = htons(0);	/*weight*/
-		p += sizeof(u_int16_t);
-		*(u_int16_t *)p = htons(53);	/*port*/
-		p += sizeof(u_int16_t);
-		if (encode_name(&p, sizeof(replybuf) - (p - replybuf), dnsserv)
-				== NULL) {
-			goto fail;
-		}
-		*(u_int16_t *)q = htons(p - q - sizeof(u_int16_t));
-		hp->ancount = htons(1);
-
-		/* additional records */
-		for (ai = dnsserv_ai; ai; ai = ai->ai_next) {
-			const char *addr;
-			int alen;
-			u_int16_t t;
-
-			switch (ai->ai_family) {
-			case AF_INET:
-				t = T_A;
-				addr = (char *)&((struct sockaddr_in *)ai->ai_addr)->sin_addr;
-				alen = 4;
-				break;
-			case AF_INET6:
-				t = T_AAAA;
-				addr = (char *)&((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr;
-				alen = 16;
-				break;
-			default:
-				addr = NULL;	/*fool gcc*/
-				alen = 0;	/*fool gcc*/
-				continue;
-			}
-
-			if (encode_name(&p, sizeof(replybuf) - (p - replybuf), n)
-					== NULL) {
-				goto fail;
-			}
-			if (p + 10 + alen - replybuf > sizeof(replybuf))
-				goto fail;
-			/* XXX alignment */
-			*(u_int16_t *)p = htons(t);
-			p += sizeof(u_int16_t);
-			*(u_int16_t *)p = htons(C_IN);	/*IN*/
-			p += sizeof(u_int16_t);
-			*(int32_t *)p = htonl(30);	/*TTL*/
-			p += sizeof(int32_t);
-			q = p;
-			*(u_int16_t *)p = htons(0);	/*filled later*/
-			p += sizeof(u_int16_t);
-			memcpy(p, addr, alen);
-			p += alen;
-			*(u_int16_t *)q = htons(p - q - sizeof(u_int16_t));
-			hp->arcount = htons(ntohs(hp->arcount) + 1);
-		}
-
-		if (dflag)
-			dnsdump("serve D", replybuf, p - replybuf, from);
 
 		if (p - replybuf > PACKETSZ) {
 			p = replybuf + PACKETSZ;
