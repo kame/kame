@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2159 2002/05/22 10:24:29 itojun Exp $
+$KAME: CHANGELOG,v 1.2160 2002/05/22 12:43:19 jinmei Exp $
 
 <200205>
+2002-05-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: supported renewal of delegated prefixes.
+
 Wed May 22 19:23:40 JST 2002  itojun@iijlab.net
 	* kame/revlookupd: a daemon to translate DNS reverse lookup (PTR query)
 	  into ICMPv6 node information query.  internet draft for this
