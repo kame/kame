@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.176 2001/04/04 05:17:30 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.177 2001/04/11 01:19:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2858,18 +2858,21 @@ ip6_pcbopt(optname, buf, len, pktopt, priv)
 
 		/*
 		 * Check if the requested source address is indeed a unicast
-		 * address assigned to the node.
+		 * address assigned to the node, and can be used as the
+		 * packet's source address.
 		 */
 		if (!IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr)) {
-			struct ifaddr *ia;
+			struct in6_ifaddr *ia6;
 			struct sockaddr_in6 sin6;
 
 			bzero(&sin6, sizeof(sin6));
 			sin6.sin6_len = sizeof(sin6);
 			sin6.sin6_family = AF_INET6;
 			sin6.sin6_addr = pktinfo->ipi6_addr;
-			ia = ifa_ifwithaddr(sin6tosa(&sin6));
-			if (ia == NULL)
+			ia6 = (struct in6_ifaddr *)ifa_ifwithaddr(sin6tosa(&sin6));
+			if (ia6 == NULL ||
+			    (ia6->ia6_flags & (IN6_IFF_ANYCAST |
+					       IN6_IFF_NOTREADY)) != 0)
 				return(EADDRNOTAVAIL);
 		}
 
@@ -3679,10 +3682,11 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 
 			/*
 			 * Check if the requested source address is indeed a
-			 * unicast address assigned to the node.
+			 * unicast address assigned to the node, and can be
+			 * used as the packet's source address.
 			 */
 			if (!IN6_IS_ADDR_UNSPECIFIED(&opt->ip6po_pktinfo->ipi6_addr)) {
-				struct ifaddr *ia;
+				struct in6_ifaddr *ia6;
 				struct sockaddr_in6 sin6;
 
 				bzero(&sin6, sizeof(sin6));
@@ -3690,8 +3694,10 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 				sin6.sin6_family = AF_INET6;
 				sin6.sin6_addr =
 					opt->ip6po_pktinfo->ipi6_addr;
-				ia = ifa_ifwithaddr(sin6tosa(&sin6));
-				if (ia == NULL)
+				ia6 = (struct in6_ifaddr *)ifa_ifwithaddr(sin6tosa(&sin6));
+				if (ia6 == NULL ||
+				    (ia6->ia6_flags & (IN6_IFF_ANYCAST |
+						       IN6_IFF_NOTREADY)) != 0)
 					return(EADDRNOTAVAIL);
 			}
 			break;
