@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.333 1999/12/13 03:29:54 itojun Exp $
+$Id: CHANGELOG,v 1.334 1999/12/13 05:42:15 jinmei Exp $
 
 <199912>
 Mon Dec 13 10:49:48 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
@@ -9,7 +9,7 @@ Mon Dec 13 10:49:48 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 
 Sun Dec 12 19:22:39 JST 1999  itojun@iijlab.net
 	* openbsd/sys/netinet/udp_usrreq.c: fix advanced API for udp.
-	  route6d seem to work.
+	  route6d seems to work.
 
 Sat Dec 11 02:55:23 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/nd6.c: add missing splx().
