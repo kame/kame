@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.43 2000/04/10 15:11:08 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.44 2000/04/11 05:56:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,56 +70,40 @@ size_t in6_ifstatmax = 0;
 size_t icmp6_ifstatmax = 0;
 unsigned long in6_maxmtu = 0;
 
-int found_first_ifid = 0;
-#define IFID_LEN 8
-static u_int8_t first_ifid[IFID_LEN];
+static int get_rand_ifid __P((struct ifnet *, struct in6_addr *));
+static int get_hw_ifid __P((struct ifnet *, struct in6_addr *));
+static int get_ifid __P((struct ifnet *, struct in6_addr *));
 
-static int laddr_to_eui64 __P((u_int8_t *, u_int8_t *, size_t));
-static int gen_rand_eui64 __P((u_int8_t *));
+#define EUI64_GBIT	0x01
+#define EUI64_UBIT	0x02
+#define EUI64_TO_IFID(in6)	do {(in6)->s6_addr[8] ^= EUI64_UBIT; } while (0)
+#define EUI64_GROUP(in6)	((in6)->s6_addr[8] & EUI64_GBIT)
+#define EUI64_INDIVIDUAL(in6)	(!EUI64_GROUP(in6))
+#define EUI64_LOCAL(in6)	((in6)->s6_addr[8] & EUI64_UBIT)
+#define EUI64_UNIVERSAL(in6)	(!EUI64_LOCAL(in6))
 
-static int
-laddr_to_eui64(dst, src, len)
-	u_int8_t *dst;
-	u_int8_t *src;
-	size_t len;
+#define IFID_LOCAL(in6)		(!EUI64_LOCAL(in6))
+#define IFID_UNIVERSAL(in6)	(!EUI64_UNIVERSAL(in6))
+
+/*dummy*/
+int
+in6_ifattach_getifid(ifp)
+	struct ifnet *ifp;
 {
-	static u_int8_t zero[8];
-
-	bzero(zero, sizeof(zero));
-
-	switch (len) {
-	case 6:
-		if (bcmp(zero, src, 6) == 0)
-			return EINVAL;
-		dst[0] = src[0];
-		dst[1] = src[1];
-		dst[2] = src[2];
-		dst[3] = 0xff;
-		dst[4] = 0xfe;
-		dst[5] = src[3];
-		dst[6] = src[4];
-		dst[7] = src[5];
-		break;
-	case 8:
-		if (bcmp(zero, src, 8) == 0)
-			return EINVAL;
-		bcopy(src, dst, len);
-		break;
-	default:
-		return EINVAL;
-	}
-
 	return 0;
 }
 
 /*
  * Generate a last-resort interface identifier, when the machine has no
  * IEEE802/EUI64 address sources.
- * The address should be random, and should not change across reboot.
+ * The goal here is to get an interface identifier that is
+ * (1) random enough and (2) does not change across reboot.
+ * We currently use MD5(hostname) for it.
  */
 static int
-gen_rand_eui64(dst)
-	u_int8_t *dst;
+get_rand_ifid(ifp, in6)
+	struct ifnet *ifp;
+	struct in6_addr *in6;	/*upper 64bits are preserved */
 {
 	MD5_CTX ctxt;
 	u_int8_t digest[16];
@@ -127,117 +111,200 @@ gen_rand_eui64(dst)
 	int hostnamelen	= strlen(hostname);
 #endif
 
-	/* generate 8bytes of pseudo-random value. */
+#if 0
+	/* we need at least several letters as seed for ifid */
+	if (hostnamelen < 3)
+		return -1;
+#endif
+
+	/* generate 8 bytes of pseudo-random value. */
 	bzero(&ctxt, sizeof(ctxt));
 	MD5Init(&ctxt);
 	MD5Update(&ctxt, hostname, hostnamelen);
 	MD5Final(digest, &ctxt);
 
-	/* assumes sizeof(digest) > sizeof(first_ifid) */
-	bcopy(digest, dst, 8);
+	/* assumes sizeof(digest) > sizeof(ifid) */
+	bcopy(digest, &in6->s6_addr[8], 8);
 
 	/* make sure to set "u" bit to local, and "g" bit to individual. */
-	dst[0] &= 0xfe;
-	dst[0] |= 0x02;		/* EUI64 "local" */
+	in6->s6_addr[8] &= ~EUI64_GBIT;	/* g bit to "individual" */
+	in6->s6_addr[8] |= EUI64_UBIT;	/* u bit to "local" */
+
+	/* convert EUI64 into IPv6 interface identifier */
+	EUI64_TO_IFID(in6);
 
 	return 0;
 }
 
 /*
- * Find first ifid on list of interfaces.
- * This is assumed that ifp0's interface token (for example, IEEE802 MAC)
- * is globally unique.  We may need to have a flag parameter in the future.
+ * Get interface identifier for the specified interface.
  */
-int
-in6_ifattach_getifid(ifp0)
+static int
+get_hw_ifid(ifp, in6)
+	struct ifnet *ifp;
+	struct in6_addr *in6;	/*upper 64bits are preserved */
+{
+	struct ifaddr *ifa;
+	struct sockaddr_dl *sdl;
+	u_int8_t *addr;
+	size_t addrlen;
+	static u_int8_t allzero[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+	static u_int8_t allone[8] =
+		{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+#else
+	for (ifa = ifp->if_addrlist.tqh_first;
+	     ifa;
+	     ifa = ifa->ifa_list.tqe_next)
+#endif
+	{
+		if (ifa->ifa_addr->sa_family != AF_LINK)
+			continue;
+		sdl = (struct sockaddr_dl *)ifa->ifa_addr;
+		if (sdl == NULL)
+			continue;
+		if (sdl->sdl_alen == 0)
+			continue;
+
+		goto found;
+	}
+
+	return -1;
+
+found:
+	addr = LLADDR(sdl);
+	addrlen = sdl->sdl_alen;
+
+	/* get EUI64 */
+	switch (ifp->if_type) {
+	case IFT_ETHER:
+	case IFT_FDDI:
+	case IFT_ATM:
+		/* IEEE802/EUI64 cases - what others? */
+
+		/* look at IEEE802/EUI64 only */
+		if (addrlen != 8 && addrlen != 6)
+			return -1;
+
+		/*
+		 * check for invalid MAC address - on bsdi, we see it a lot
+		 * since wildboar configures all-zero MAC on pccard before
+		 * card insertion.
+		 */
+		if (bcmp(addr, allzero, addrlen) == 0)
+			return -1;
+		if (bcmp(addr, allone, addrlen) == 0)
+			return -1;
+
+		/* make EUI64 address */
+		if (addrlen == 8)
+			bcopy(addr, &in6->s6_addr[8], 8);
+		else if (addrlen == 6) {
+			in6->s6_addr[8] = addr[0];
+			in6->s6_addr[9] = addr[1];
+			in6->s6_addr[10] = addr[2];
+			in6->s6_addr[11] = 0xff;
+			in6->s6_addr[12] = 0xff;
+			in6->s6_addr[13] = addr[3];
+			in6->s6_addr[14] = addr[4];
+			in6->s6_addr[15] = addr[5];
+		}
+		break;
+	case IFT_ARCNET:
+		if (addrlen != 1)
+			return -1;
+
+		bzero(&in6->s6_addr[8], 8);
+		in6->s6_addr[15] = addr[0];
+
+		in6->s6_addr[8] &= ~EUI64_GBIT;	/* g bit to "individual" */
+		in6->s6_addr[8] |= EUI64_UBIT;	/* u bit to "local" */
+		break;
+	default:
+		return -1;
+	}
+
+	/* sanity check: g bit must not indicate "group" */
+	if (EUI64_GROUP(in6))
+		return -1;
+
+	/* convert EUI64 into IPv6 interface identifier */
+	EUI64_TO_IFID(in6);
+
+	return 0;
+}
+
+/*
+ * Get interface identifier for the specified interface.  If it is not
+ * available on ifp0, borrow interface identifier from other information
+ * sources.
+ */
+static int
+get_ifid(ifp0, in6)
 	struct ifnet *ifp0;
+	struct in6_addr *in6;
 {
 	struct ifnet *ifp;
-	struct ifaddr *ifa;
-	u_int8_t *addr = NULL;
-	int addrlen = 0;
-	struct sockaddr_dl *sdl;
 
-	if (found_first_ifid)
-		return 0;
+	/* first, try to get it from the interface itself */
+	if (get_hw_ifid(ifp0, in6) == 0) {
+#ifdef ND6_DEBUG
+		printf("%s: got interface identifier from itself\n",
+		    if_name(ifp0));
+#endif
+		goto success;
+	}
 
+	/* next, try to get it from some other hardware interface */
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifp = ifnet; ifp; ifp = ifp->if_next)
 #else
 	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next)
 #endif
 	{
-		if (ifp0 != NULL && ifp0 != ifp)
+		if (ifp == ifp0)
 			continue;
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#else
-		for (ifa = ifp->if_addrlist.tqh_first;
-		     ifa;
-		     ifa = ifa->ifa_list.tqe_next)
+		if (get_hw_ifid(ifp, in6) != 0)
+			continue;
+		/*
+		 * to borrow ifid from other interface, ifid needs to be
+		 * globally unique
+		 */
+		if (IFID_UNIVERSAL(in6)) {
+
+#ifdef ND6_DEBUG
+			printf("%s: borrow interface identifier from %s\n",
+			    if_name(ifp0), if_name(ifp));
 #endif
-		{
-			if (ifa->ifa_addr->sa_family != AF_LINK)
-				continue;
-			sdl = (struct sockaddr_dl *)ifa->ifa_addr;
-			if (sdl == NULL)
-				continue;
-			if (sdl->sdl_alen == 0)
-				continue;
-			switch (ifp->if_type) {
-			case IFT_ETHER:
-			case IFT_FDDI:
-			case IFT_ATM:
-				/* IEEE802/EUI64 cases - what others? */
-				addr = LLADDR(sdl);
-				addrlen = sdl->sdl_alen;
-				/*
-				 * to copy ifid from IEEE802/EUI64 interface,
-				 * u bit of the source needs to be 0.
-				 */
-				if ((addr[0] & 0x02) != 0)
-					break;
-				goto found;
-			case IFT_ARCNET:
-				/*
-				 * ARCnet interface token cannot be used as
-				 * globally unique identifier due to its
-				 * small bitwidth.
-				 */
-				break;
-			default:
-				break;
-			}
+			goto success;
 		}
 	}
-#ifdef DEBUG
-	printf("in6_ifattach_getifid: failed to get EUI64");
+
+	/* last resort: get from random number source */
+	if (get_rand_ifid(ifp, in6) == 0) {
+#ifdef ND6_DEBUG
+		printf("%s: interface identifier generated by random number\n",
+		    if_name(ifp0));
 #endif
-	return EADDRNOTAVAIL;
-
-found:
-	if (laddr_to_eui64(first_ifid, addr, addrlen) == 0)
-		found_first_ifid = 1;
-
-	if (found_first_ifid) {
-		printf("%s: supplying EUI64: "
-			"%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
-			if_name(ifp),
-			first_ifid[0], first_ifid[1],
-			first_ifid[2], first_ifid[3],
-			first_ifid[4], first_ifid[5],
-			first_ifid[6], first_ifid[7]);
-
-		/* invert u bit to convert EUI64 to RFC2373 interface ID. */
-		first_ifid[0] ^= 0x02;
-
-		return 0;
-	} else {
-#ifdef DEBUG
-		printf("in6_ifattach_getifid: failed to get EUI64");
-#endif
-		return EADDRNOTAVAIL;
+		goto success;
 	}
+
+	printf("%s: failed to get interface identifier", if_name(ifp0));
+	return -1;
+
+success:
+#ifdef ND6_DEBUG
+	printf("%s: ifid: "
+		"%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
+		if_name(ifp0),
+		in6->s6_addr[8], in6->s6_addr[9],
+		in6->s6_addr[10], in6->s6_addr[11],
+		in6->s6_addr[12], in6->s6_addr[13],
+		in6->s6_addr[14], in6->s6_addr[15]);
+#endif
+	return 0;
 }
 
 /*
@@ -248,9 +315,9 @@ void
 in6_ifattach(ifp, type, laddr, noloop)
 	struct ifnet *ifp;
 	u_int type;
-	caddr_t laddr;
+	caddr_t laddr;	/* not used any more */
 	/* size_t laddrlen; */
-	int noloop;
+	int noloop;	/* not used any more */
 {
 	static size_t if_indexlim = 8;
 	struct sockaddr_in6 mltaddr;
@@ -264,32 +331,6 @@ in6_ifattach(ifp, type, laddr, noloop)
 	struct in6_ifaddr *ia, *ib, *oia;
 	struct ifaddr *ifa;
 	int rtflag = 0;
-
-	if (type == IN6_IFT_P2P && found_first_ifid == 0) {
-		printf("%s: no ifid available for IPv6 link-local address\n",
-			if_name(ifp));
-#if 0
-		return;
-#else
-		/* last resort */
-		if (gen_rand_eui64(first_ifid) == 0) {
-			printf("%s: using random value as EUI64: "
-				"%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
-				if_name(ifp),
-				first_ifid[0], first_ifid[1],
-				first_ifid[2], first_ifid[3],
-				first_ifid[4], first_ifid[5],
-				first_ifid[6], first_ifid[7]);
-			/*
-			 * invert u bit to convert EUI64 to RFC2373 interface
-			 * ID.
-			 */
-			first_ifid[0] ^= 0x02;
-
-			found_first_ifid = 1;
-		}
-#endif
-	}
 
 	if ((ifp->if_flags & IFF_MULTICAST) == 0) {
 		printf("%s: not multicast capable, IPv6 not enabled\n",
@@ -411,56 +452,20 @@ in6_ifattach(ifp, type, laddr, noloop)
 	ia->ia_addr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
 	ia->ia_addr.sin6_addr.s6_addr32[1] = 0;
 
-	switch (type) {
-	case IN6_IFT_LOOP:
+	if (ifp->if_flags & IFF_LOOPBACK) {
 		ia->ia_addr.sin6_addr.s6_addr32[2] = 0;
 		ia->ia_addr.sin6_addr.s6_addr32[3] = htonl(1);
-		break;
-	case IN6_IFT_802:
+	} else {
 		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
 		ia->ia_ifa.ifa_flags |= RTF_CLONING;
 		rtflag = RTF_CLONING;
-		/* fall through */
-	case IN6_IFT_P2P802:
-		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
-		ia->ia_ifa.ifa_flags |= RTF_CLONING;
-		rtflag = RTF_CLONING;
-		if (laddr == NULL)
-			break;
-		/* XXX use laddrlen */
-		if (laddr_to_eui64(&ia->ia_addr.sin6_addr.s6_addr8[8],
-				laddr, 6) != 0) {
-			break;
+		if (get_ifid(ifp, &ia->ia_addr.sin6_addr) != 0) {
+			printf("invalid ifid\n");
+			/* XXX should cleanup the mess */
 		}
-		/* invert u bit to convert EUI64 to RFC2373 interface ID. */
-		ia->ia_addr.sin6_addr.s6_addr8[8] ^= 0x02;
-		if (found_first_ifid == 0)
-			in6_ifattach_getifid(ifp);
 		bzero(&ia->ia_dstaddr, sizeof(struct sockaddr_in6));
 		ia->ia_dstaddr.sin6_len = sizeof(struct sockaddr_in6);
 		ia->ia_dstaddr.sin6_family = AF_INET6;
-		break;
-	case IN6_IFT_P2P:
-		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
-		ia->ia_ifa.ifa_flags |= RTF_CLONING;
-		rtflag = RTF_CLONING;
-		bcopy((caddr_t)first_ifid,
-		      (caddr_t)&ia->ia_addr.sin6_addr.s6_addr8[8],
-		      IFID_LEN);
-		bzero(&ia->ia_dstaddr, sizeof(struct sockaddr_in6));
-		ia->ia_dstaddr.sin6_len = sizeof(struct sockaddr_in6);
-		ia->ia_dstaddr.sin6_family = AF_INET6;
-		break;
-	case IN6_IFT_ARCNET:
-		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
-		ia->ia_ifa.ifa_flags |= RTF_CLONING;
-		rtflag = RTF_CLONING;
-		if (laddr == NULL)
-			break;
-
-		/* make non-global IF id out of link-level address */
-		bzero(&ia->ia_addr.sin6_addr.s6_addr8[8], 7);
-		ia->ia_addr.sin6_addr.s6_addr8[15] = *laddr;
 	}
 
 	ia->ia_ifa.ifa_metric = ifp->if_metric;
@@ -514,7 +519,7 @@ in6_ifattach(ifp, type, laddr, noloop)
 		  (struct rtentry **)0);
 	ia->ia_flags |= IFA_ROUTE;
 
-	if (type == IN6_IFT_P2P || type == IN6_IFT_P2P802) {
+	if (ifp->if_flags & IFF_POINTOPOINT) {
 		/*
 		 * route local address to loopback
 		 */
@@ -538,7 +543,7 @@ in6_ifattach(ifp, type, laddr, noloop)
 	 * loopback address
 	 */
 	ib = (struct in6_ifaddr *)NULL;
-	if (type == IN6_IFT_LOOP) {
+	if (ifp->if_flags & IFF_LOOPBACK) {
 		ib = (struct in6_ifaddr *)
 			malloc(sizeof(*ib), M_IFADDR, M_WAITOK);
 		bzero((caddr_t)ib, sizeof(*ib));
@@ -620,7 +625,7 @@ in6_ifattach(ifp, type, laddr, noloop)
 			  (struct rtentry **)0);
 		(void)in6_addmulti(&mltaddr.sin6_addr, ifp, &error);
 
-		if (type == IN6_IFT_LOOP) {
+		if (ifp->if_flags & IFF_LOOPBACK) {
 			/*
 			 * join node-local all-nodes address
 			 */
@@ -772,7 +777,7 @@ in6_ifdetach(ifp)
 				ia = ia->ia_next;
 			if (ia->ia_next)
 				ia->ia_next = oia->ia_next;
-#ifdef DEBUG
+#ifdef ND6_DEBUG
 			else
 				printf("%s: didn't unlink in6ifaddr from "
 				    "list\n", if_name(ifp));
