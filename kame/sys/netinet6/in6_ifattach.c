@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.52 2000/04/14 23:19:28 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.53 2000/04/16 14:01:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -437,6 +437,7 @@ in6_ifattach_addaddr(ifp, ia)
 	}
 
 	/* configure link-layer address resolution */
+	rtflag = 0;
 	if (IN6_ARE_ADDR_EQUAL(&ia->ia_prefixmask.sin6_addr, &in6mask128))
 		rtflag = RTF_HOST;
 	else {
