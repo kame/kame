@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.36 2000/08/02 17:58:25 sakane Exp $	*/
+/*	$KAME: ipsec.h,v 1.37 2000/10/17 07:30:03 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -48,6 +48,7 @@
 #endif
 #endif
 
+#include <sys/queue.h>
 #include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
 
