@@ -8,6 +8,7 @@ SRCS+=	print-isakmp.c
 CFLAGS+=-I${SRCDIR}/../tcpdump -I${SRCDIR}/../tcpdump/lbl \
 	-DHAVE_PRINT_ISAKMP_C=1 
 
+MAN5=	racoon.conf.5
 MAN8=	racoon.8
 
 .include <bsd.prog.mk>
