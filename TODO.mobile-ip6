@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.16 2001/10/15 00:18:47 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.17 2001/10/26 13:31:21 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -6,8 +6,9 @@ KAME project
 
 <<Notice>>
 
-This is the alpha release of KAME/MIP6.  The code is based on draft-14
-(in the sense of the packet format) with no authentication.
+This is the alpha release of KAME/MIP6.  The code is based on
+pre-draft-15 (in the sense of the packet format) with no
+authentication.
 
 This release supports very basic functions of MIP6.  Current status is
 described below.
@@ -29,7 +30,7 @@ todo
 - DAD when registering CoA.
 - mobile prefix advertisement.
 - NA when returning to home.
-- complete dynamic home agent discovery.
+- complete dynamic home agent discovery. (implement user-land daemon?)
 - rate limit.
 - BR.
 - homeagent info handling.
