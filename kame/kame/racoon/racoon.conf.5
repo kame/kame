@@ -414,9 +414,8 @@ The followings are the list of statements.
 .El
 .\"
 .Sh EXAMPLE
+The following shows how remote directive should be configured.
 .Bd -literal -offset
-
-For example of remote directive.
 remote 172.168.2.2 [7000]
 {
 	exchange_mode main;
@@ -462,9 +461,10 @@ remote 172.168.2.2 [7000]
 		authentication_method pre_shared_key ;
 	}
 }
-
-For example of policy directive.
-
+.Ed
+.Pp
+The following example shows how policy directives should be configured.
+.Bd -literal -offset
 # Fot example.
 # 10.1.1.0/24                  10.2.2.0/24
 #     --+--                      --+--
@@ -528,7 +528,6 @@ policy 10.1.1.0/24 10.2.2.0/24 any inout ipsec
 		}
 	}
 }
-
 .Ed
 .\"
 .Sh SEE ALSO
