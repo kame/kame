@@ -677,12 +677,12 @@ printproto(tp, name)
 #ifdef IPSEC
 static void ipsec_stats0 (u_long off __unused, char *name, int af __unused)
 {
-	ipsec_stats(off, name);
+	ipsec_stats(off, name, af);
 }
 
 static void pfkey_stats0 (u_long off __unused, char *name, int af __unused)
 {
-	pfkey_stats(off, name);
+	pfkey_stats(off, name, af);
 }
 #endif
 
