@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.73 2002/11/28 02:50:09 k-sugyou Exp $	*/
+/*	$KAME: config.c,v 1.74 2003/02/24 11:29:10 ono Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -60,6 +60,9 @@
 #endif
 #include <unistd.h>
 #include <ifaddrs.h>
+#ifdef VRRP
+#include <net/if_types.h>
+#endif
 
 #include "rtadvd.h"
 #include "advcap.h"
@@ -132,6 +135,16 @@ getconfig(intface)
 		if ((forwarding = getinet6sysctl(IPV6CTL_FORWARDING)) < 0)
 			exit(1);
 	}
+
+#ifdef VRRP
+	/* check if interface is VRRP interface */
+	if (if_getiftype(intface) == IFT_VRRP) {
+		tmp->vrrpflg = VRRP_FLG_VRRPIF;
+		tmp->vrrpindex = if_getvrrp(intface);
+		if (tmp->vrrpindex > 0)
+			tmp->vrrpflg |= VRRP_FLG_ACTIVE;
+	}
+#endif
 
 	/* get interface information */
 	if (agetflag("nolladdr"))
@@ -581,6 +594,9 @@ get_prefix(struct rainfo *rai)
 	struct in6_addr *a;
 	u_char *p, *ep, *m, *lim;
 	u_char ntopbuf[INET6_ADDRSTRLEN];
+#ifdef VRRP
+	u_char ifnamebuf[IFNAMSIZ], *parent;
+#endif
 
 	if (getifaddrs(&ifap) < 0) {
 		syslog(LOG_ERR,
@@ -588,6 +604,13 @@ get_prefix(struct rainfo *rai)
 		       __func__);
 		exit(1);
 	}
+#ifdef VRRP
+	parent = NULL;
+	if (rai->vrrpflg & VRRP_FLG_ACTIVE) {
+		parent = if_indextoname(rai->vrrpindex, ifnamebuf);
+	}
+#endif
+
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
 		int plen;
 #ifdef MIP6
@@ -595,15 +618,21 @@ get_prefix(struct rainfo *rai)
 		int routeraddr = 0;
 #endif
 
+#ifdef VRRP
+		if (strcmp(ifa->ifa_name, rai->ifname) != 0 &&
+		    !(parent && strcmp(ifa->ifa_name, parent) == 0))
+			continue;
+#else
 		if (strcmp(ifa->ifa_name, rai->ifname) != 0)
 			continue;
+#endif
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
 		a = &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
 		if (IN6_IS_ADDR_LINKLOCAL(a))
 			continue;
 #ifdef MIP6
-		ifa_flag = if_getifaflag(rai->ifname, a);
+		ifa_flag = if_getifaflag(ifa->ifa_name, a);
 		if (ifa_flag & IN6_IFF_ANYCAST)
 			continue;			/* XXX */
 		if (mobileip6 && !IN6_IS_ADDR_SITELOCAL(a)) {
@@ -1114,3 +1143,13 @@ getinet6sysctl(int code)
 	else
 		return(value);
 }
+
+#ifdef VRRP
+void
+getvrrpcfg(struct rainfo *rai)
+{
+	if (rai == NULL)
+		return;
+	
+}
+#endif

@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.22 2002/06/06 11:55:36 jinmei Exp $	*/
+/*	$KAME: rtadvd.h,v 1.23 2003/02/24 11:29:11 ono Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -110,6 +110,9 @@ struct soliciter {
 	struct sockaddr_in6 addr;
 };
 
+#define VRRP_FLG_VRRPIF 0x1
+#define VRRP_FLG_ACTIVE 0x2
+
 struct	rainfo {
 	/* pointer for list */
 	struct	rainfo *next;
@@ -133,6 +136,7 @@ struct	rainfo {
 	u_int	mininterval;	/* MinRtrAdvInterval */
 	int 	managedflg;	/* AdvManagedFlag */
 	int	otherflg;	/* AdvOtherConfigFlag */
+
 #ifdef MIP6
 	int	haflg;		/* HAFlag */
 #endif
@@ -145,6 +149,11 @@ struct	rainfo {
 	int	pfxs;		/* number of prefixes */
 	long	clockskew;	/* used for consisitency check of lifetimes */
 
+#ifdef VRRP
+	int     vrrpflg;        /* vrrpflag */
+	int     vrrpindex;      /* vrrp parent index */
+#endif
+	
 #ifdef MIP6
 	u_short	hapref;		/* Home Agent Preference */
 	u_short	hatime;		/* Home Agent Lifetime */

@@ -1,4 +1,4 @@
-/*	$KAME: if.h,v 1.9 2003/01/08 08:47:23 suz Exp $	*/
+/*	$KAME: if.h,v 1.10 2003/02/24 11:29:10 ono Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -44,6 +44,9 @@ extern char *ifblock;
 struct nd_opt_hdr;
 struct sockaddr_dl *if_nametosdl __P((char *));
 int if_getmtu __P((char *));
+#ifdef VRRP
+u_char if_getiftype __P((char *));
+#endif
 #ifdef MIP6
 int if_getifaflag __P((char *, struct in6_addr *));
 #endif
@@ -67,3 +70,9 @@ void init_iflist __P((void));
 
 int is_isatap __P((struct rainfo *));
 int is_isatap_router __P((struct rainfo *, struct in6_addr *));
+
+#ifdef VRRP
+int if_getvrrp __P((char *));
+#endif
+
+

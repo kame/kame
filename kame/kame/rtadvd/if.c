@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.26 2003/02/24 09:51:14 ono Exp $	*/
+/*	$KAME: if.c,v 1.27 2003/02/24 11:29:10 ono Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,6 +64,9 @@
 #include <string.h>
 #include <syslog.h>
 #include <net/if_stf.h>
+#ifdef VRRP
+#include <net/if_vrrp_var.h>
+#endif
 #include "rtadvd.h"
 #include "if.h"
 
@@ -192,6 +195,29 @@ if_getmtu(char *name)
 
 	return(mtu);
 }
+
+#ifdef VRRP
+u_char
+if_getiftype(char *name)
+{
+	struct ifaddrs *ifap, *ifa;
+	struct if_data *ifd;
+
+	if (getifaddrs(&ifap) < 0)
+		return(0);
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (strcmp(ifa->ifa_name, name) == 0) {
+			ifd = ifa->ifa_data;
+			if (ifd)
+				return ifd->ifi_type;
+			break;
+		}
+	}
+	freeifaddrs(ifap);
+
+	return 0;
+}
+#endif
 
 #ifdef MIP6
 int
@@ -704,3 +730,30 @@ is_isatap_router(struct rainfo *rai, struct in6_addr *src)
 	return 0;
 #endif /* ISATAP */
 }
+
+#ifdef VRRP
+int
+if_getvrrp(char *intface)
+{
+	struct ifreq ifr;
+	int s;
+	int ifindex; /* parent index */
+
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
+		syslog(LOG_ERR, "<%s> socket open failed",
+		       __func__);
+		exit(1);
+	}
+
+	strncpy(ifr.ifr_name, intface, sizeof(ifr.ifr_name));
+	ifr.ifr_data = (caddr_t)&ifindex;
+
+	if (ioctl(s, SIOCGETVRRP, (caddr_t)&ifr) < 0) {
+		syslog(LOG_ERR, "<%s> ioctl SIOCGETVRRP failed",
+		       __func__);
+		exit(1);
+	}
+	
+	return ifindex;
+}
+#endif
