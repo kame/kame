@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.106 2001/02/08 12:58:23 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.107 2001/02/08 16:23:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -809,9 +809,6 @@ in6_ifattach(ifp, altifp)
 	static size_t if_indexlim = 8;
 	struct in6_ifaddr *ia;
 	struct in6_addr in6;
-#ifdef __FreeBSD__
-	int hostnamelen	= strlen(hostname);
-#endif
 
 	/* some of the interfaces are inherently not IPv6 capable */
 	switch (ifp->if_type) {
