@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.33 2002/05/27 22:17:30 itojun Exp $	*/
+/*	$KAME: scope6.c,v 1.34 2002/05/28 05:11:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -61,11 +61,6 @@ scope6_init()
 	bzero(&sid_default, sizeof(sid_default));
 }
 
-/*
- * TODO: this function should be called when an interface is attached
- * even if the interface has not become up.  We'll need a hook in net/if.c
- * for this.
- */
 struct scope6_id *
 scope6_ifattach(ifp)
 	struct ifnet *ifp;
