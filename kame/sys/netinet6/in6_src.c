@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.89 2001/11/12 07:41:11 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.90 2001/11/12 07:41:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1115,10 +1115,6 @@ in6_embedscope(in6, sin6)
 	return 0;
 #endif
 }
-#ifdef HAVE_NRL_INPCB
-#undef in6p_outputopts
-#undef in6p_moptions
-#endif
 
 /*
  * generate standard sockaddr_in6 from embedded form.
