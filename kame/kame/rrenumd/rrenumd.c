@@ -411,7 +411,7 @@ rrenum_output(struct payload_list *pl, struct dst_list *dl)
 		pi = (struct in6_pktinfo *)CMSG_DATA(cm);
 		memset(&pi->ipi6_addr, 0, sizeof(pi->ipi6_addr));	/*XXX*/
 		pi->ipi6_ifindex = sin6->sin6_scope_id;
-		msglen += CMSG_SPACE(sizeof(struct in6_pktinfo));
+		msglen += CMSG_LEN(sizeof(struct in6_pktinfo));
 
 		/* specify the hop limit of the packet if dest is link local */
 		/* not defined by router-renum-05.txt, but maybe its OK */
@@ -420,7 +420,7 @@ rrenum_output(struct payload_list *pl, struct dst_list *dl)
 		cm->cmsg_type = IPV6_HOPLIMIT;
 		cm->cmsg_len = CMSG_LEN(sizeof(int));
 		memcpy(CMSG_DATA(cm), &hoplimit, sizeof(int));
-		msglen += CMSG_SPACE(sizeof(int));
+		msglen += CMSG_LEN(sizeof(int));
 	}
 	sndmhdr.msg_controllen = msglen;
 	if (sndmhdr.msg_controllen == 0)
