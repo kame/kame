@@ -1208,7 +1208,6 @@ sctp_peeloff(p, v, retval)
 	struct file *nfp = NULL;
 	int error, s;
 	struct socket *head, *so;
-	caddr_t assoc_id;
 	int fd;
 	short fflag;		/* type must match fp->f_flag */
 
