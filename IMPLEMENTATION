@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/01/04 17:56:28 $
+			$Date: 2000/01/07 14:22:27 $
 
 1. IPv6
 
@@ -92,11 +92,15 @@ draft-ietf-dhc-v6exts-11.txt: Extensions for DHCPv6
     * kame/dhcp6 has test implementation, which will not be compiled in
       default compilation.
 draft-itojun-ipv6-tcp-to-anycast-00:
-	Disconnecting TCP connection toward IPv6 anycast address
+    * Disconnecting TCP connection toward IPv6 anycast address
 draft-yamamoto-wideipv6-comm-model-00
     * See 1.6 in this document for details.
 draft-ietf-ipngwg-scopedaddr-format-00.txt:
-	An Extension of Format for IPv6 Scoped Addresses
+    * An Extension of Format for IPv6 Scoped Addresses
+draft-ietf-ipngwg-rfc2292bis-01.txt:
+    * A revised version of the advanced API
+      Some of the draft have not been implemented. See TODO.2292bis
+      form more detais.
 
 1.2 Neighbor Discovery
 
