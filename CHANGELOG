@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.599 2000/02/23 16:54:14 itojun Exp $
+$Id: CHANGELOG,v 1.600 2000/02/24 02:23:25 jinmei Exp $
 
 <200002>
 2000-02-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -16,8 +16,6 @@ Thu Feb 24 JST 2000  itojun@iijlab.net
 2000-02-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ah_input.c (ah4_input): prevented
 	re-translating the byte order of the ip_id field on bsdi4.
-	(I'm quite sure that AH4 works well on bsdi4 with this change, but
-	I'll check it tomorrow.)
 
 2000-02-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/netstat/ipsec.c: 
