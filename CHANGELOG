@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1823 2001/07/29 12:26:15 jinmei Exp $
+$KAME: CHANGELOG,v 1.1824 2001/07/29 14:25:10 itojun Exp $
 
 <200107>
 2001-07-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -38,8 +38,9 @@ Fri Jul 27 17:39:24 JST 2001  itojun@iijlab.net
 	* sys/net/if_sec.c: "sec*" pseudo device for decapsulating IPsec
 	  tunnel packets.  if we have the device, we depart from RFC2401
 	  tunnelling model (where IPsec tunnels are defined within IPsec
-	  document) to draft-touch-ipsec-vpn-01.txt model.  all IPsec tunnel-
-	  mode SPD entries will automagically be accompanied with a sec* device.
+	  document) to draft-touch-ipsec-vpn-01.txt model on inbound.
+	  all IPsec tunnel-mode SPD entries will automagically be accompanied
+	  with a sec* device.  refer to IMPLEMENTATION for more details.
 
 Fri Jul 27 12:49:47 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ipsec.c: cache ipsec policy on pcbs, try to avoid
