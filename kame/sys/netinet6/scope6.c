@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.7 2000/05/17 03:22:29 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.8 2000/05/17 05:07:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -260,4 +260,35 @@ in6_addr2scopeid(ifp, addr)
 		return(0);	/* XXX: treat as global. */
 	}
 #undef SID
+}
+
+void
+scope6_setdefault(ifp)
+	struct ifnet *ifp;	/* note that this might be NULL */
+{
+	/*
+	 * Currently, this function just set the default "link" according to
+	 * the given interface.
+	 * We might eventually have to separate the notion of "link" from
+	 * "interface" and provide a user interface to set the default.
+	 */
+	if (ifp) {
+		scope6_ids[0].s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL] =
+			ifp->if_index;
+	}
+	else
+		scope6_ids[0].s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL] = 0;
+}
+
+int
+scope6_get_default(idlist)
+	u_int32_t *idlist;
+{
+	if (scope6_ids == NULL)	/* paranoid? */
+		return(EINVAL);
+
+	bcopy(scope6_ids[0].s6id_list, idlist,
+	      sizeof(scope6_ids[0].s6id_list));
+
+	return(0);
 }

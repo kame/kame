@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.32 2000/05/05 11:01:04 sumikawa Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.33 2000/05/17 05:07:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,6 +66,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
 #include <netinet/icmp6.h>
+#include <netinet6/scope6_var.h>
 
 #ifdef MIP6
 #include <netinet6/mip6.h>
@@ -1726,6 +1727,13 @@ nd6_setdefaultiface(ifindex)
 		 */
 		if (TAILQ_FIRST(&nd_defrouter) == NULL)
 			defrouter_select();
+
+		/*
+		 * Our current implementation assumes one-to-one maping between
+		 * interfaces and links, so it would be natural to use the
+		 * default interface as default link.
+		 */
+		scope6_setdefault(nd6_defifp);
 	}
 
 	return(error);

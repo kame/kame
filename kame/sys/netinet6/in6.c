@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.80 2000/05/05 11:00:59 sumikawa Exp $	*/
+/*	$KAME: in6.c,v 1.81 2000/05/17 05:07:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -509,6 +509,9 @@ in6_control(so, cmd, data, ifp)
 		break;
 	case SIOCGSCOPE6:
 		return(scope6_get(ifp, ifr->ifr_ifru.ifru_scope_id));
+		break;
+	case SIOCGSCOPE6DEF:
+		return(scope6_get_default(ifr->ifr_ifru.ifru_scope_id));
 		break;
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.32 2000/04/18 08:03:39 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.33 2000/05/17 05:07:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -401,6 +401,7 @@ struct	in6_rrenumreq {
 
 #define SIOCSSCOPE6		_IOW('i', 88, struct in6_ifreq)
 #define SIOCGSCOPE6		_IOWR('i', 89, struct in6_ifreq)
+#define SIOCGSCOPE6DEF		_IOWR('i', 90, struct in6_ifreq)
 
 #define SIOCSIFPREFIX_IN6	_IOW('i', 100, struct in6_prefixreq) /* set */
 #define SIOCGIFPREFIX_IN6	_IOWR('i', 101, struct in6_prefixreq) /* get */
