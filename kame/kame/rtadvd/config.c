@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.64 2002/06/06 12:57:00 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.65 2002/06/08 18:08:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -868,6 +868,7 @@ update_prefix(struct prefix * prefix)
 static int
 init_prefix(struct in6_prefixreq *ipr)
 {
+#if 0
 	int s;
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
@@ -900,6 +901,13 @@ init_prefix(struct in6_prefixreq *ipr)
 
 	close(s);
 	return 0;
+#else
+	ipr->ipr_vltime = DEF_ADVVALIDLIFETIME;
+	ipr->ipr_pltime = DEF_ADVPREFERREDLIFETIME;
+	ipr->ipr_raf_onlink = 1;
+	ipr->ipr_raf_auto = 1;
+	return 0;
+#endif
 }
 
 void
