@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.h,v 1.6 2000/12/14 08:12:46 thorpej Exp $	*/
+/*	$KAME: altq_hfsc.h,v 1.7 2002/11/08 06:33:32 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -88,6 +88,7 @@ struct hfsc_delete_class {
 /* service curve types */
 #define	HFSC_REALTIMESC		1
 #define	HFSC_LINKSHARINGSC	2
+#define	HFSC_UPPERLIMITSC	4
 #define	HFSC_DEFAULTSC		(HFSC_REALTIMESC|HFSC_LINKSHARINGSC)
 
 struct hfsc_modify_class {
@@ -115,6 +116,7 @@ struct class_stats {
 	u_long			class_handle;
 	struct service_curve	rsc;
 	struct service_curve	fsc;
+	struct service_curve	usc;	/* upper limit service curve */
 
 	u_int64_t		total;	/* total work in bytes */
 	u_int64_t		cumul;	/* cumulative work in bytes
@@ -122,11 +124,26 @@ struct class_stats {
 	u_int64_t		d;		/* deadline */
 	u_int64_t		e;		/* eligible time */
 	u_int64_t		vt;		/* virtual time */
+	u_int64_t		f;		/* fit time for upper-limit */
+
+	/* info helpful for debugging */
+	u_int64_t		initvt;		/* init virtual time */
+	u_int64_t		vtoff;		/* cl_vt_ipoff */
+	u_int64_t		cvtmax;		/* cl_maxvt */
+	u_int64_t		myf;		/* cl_myf */
+	u_int64_t		cfmin;		/* cl_mincf */
+	u_int64_t		cvtmin;		/* cl_mincvt */
+	u_int64_t		myfadj;		/* cl_myfadj */
+	u_int64_t		vtadj;		/* cl_vtadj */
 
 	u_int			qlength;
 	struct pktcntr		xmit_cnt;
 	struct pktcntr		drop_cnt;
 	u_int 			period;
+
+	u_int			vtperiod;	/* vt period sequence no */
+	u_int			parentperiod;	/* parent's vt period seqno */
+	int			nactive;	/* number of active children */
 
 	/* red and rio related info */
 	int		qtype;
@@ -138,6 +155,7 @@ struct hfsc_class_stats {
 	int			nskip;		/* skip # of classes */
 	int			nclasses;	/* # of class stats (WR) */
 	u_int64_t		cur_time;	/* current time */
+	u_int32_t		machclk_freq;	/* machine clock frequency */
 	u_int			hif_classes;	/* # of classes in the tree */
 	u_int			hif_packets;	/* # of packets in the tree */
 	struct class_stats	*stats;		/* pointer to stats array */
@@ -228,12 +246,31 @@ struct hfsc_class {
 	u_int64_t	cl_d;		/* deadline */
 	u_int64_t	cl_e;		/* eligible time */
 	u_int64_t	cl_vt;		/* virtual time */
+	u_int64_t	cl_f;		/* time when this class will fit for
+					   link-sharing, max(myf, cfmin) */
+	u_int64_t	cl_myf;		/* my fit-time (as calculated from this
+					   class's own upperlimit curve) */
+	u_int64_t	cl_myfadj;	/* my fit-time adjustment
+					   (to cancel history dependence) */
+	u_int64_t	cl_cfmin;	/* earliest children's fit-time (used
+					   with cl_myf to obtain cl_f) */
+	u_int64_t	cl_cvtmin;	/* minimal virtual time among the
+					   children fit for link-sharing
+					   (monotonic within a period) */
+	u_int64_t	cl_vtadj;	/* intra-period cumulative vt
+					   adjustment */
+	u_int64_t	cl_vtoff;	/* inter-period cumulative vt offset */
+	u_int64_t	cl_cvtmax;	/* max child's vt in the last period */
+
+	u_int64_t	cl_initvt;	/* init virtual time (for debugging) */
 
 	struct internal_sc *cl_rsc;	/* internal real-time service curve */
 	struct internal_sc *cl_fsc;	/* internal fair service curve */
+	struct internal_sc *cl_usc;	/* internal upperlimit service curve */
 	struct runtime_sc  cl_deadline;	/* deadline curve */
 	struct runtime_sc  cl_eligible;	/* eligible curve */
 	struct runtime_sc  cl_virtual;	/* virtual curve */
+	struct runtime_sc  cl_ulimit;	/* upperlimit curve */
 
 	u_int		cl_vtperiod;	/* vt period sequence no */
 	u_int		cl_parentperiod;  /* parent's vt period seqno */
@@ -263,7 +300,7 @@ struct hfsc_if {
 	u_int	hif_classes;			/* # of classes in the tree */
 	u_int	hif_packets;			/* # of packets in the tree */
 	u_int	hif_classid;			/* class id sequence number */
-	
+
 	ellist_t *hif_eligible;			/* eligible list */
 
 	struct acc_classifier	hif_classifier;
