@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.118 2003/12/10 09:08:00 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.119 2003/12/10 09:08:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -339,25 +339,25 @@ ip6_mrouter_set(so, sopt)
 		error = ip6_mrouter_done();
 		break;
 	case MRT6_ADD_MIF:
-		error = sooptcopyin(sopt, &mifc, sizeof(mifc), sizeof (mifc));
+		error = sooptcopyin(sopt, &mifc, sizeof(mifc), sizeof(mifc));
 		if (error)
 			break;
 		error = add_m6if(&mifc);
 		break;
 	case MRT6_ADD_MFC:
-		error = sooptcopyin(sopt, &mfcc, sizeof(mfcc), sizeof (mfcc));
+		error = sooptcopyin(sopt, &mfcc, sizeof(mfcc), sizeof(mfcc));
 		if (error)
 			break;
 		error = add_m6fc(&mfcc);
 		break;
 	case MRT6_DEL_MFC:
-		error = sooptcopyin(sopt, &mfcc, sizeof(mfcc), sizeof (mfcc));
+		error = sooptcopyin(sopt, &mfcc, sizeof(mfcc), sizeof(mfcc));
 		if (error)
 			break;
 		error = del_m6fc(&mfcc);
 		break;
 	case MRT6_DEL_MIF:
-		error = sooptcopyin(sopt, &mifi, sizeof(mifi), sizeof (mifi));
+		error = sooptcopyin(sopt, &mifi, sizeof(mifi), sizeof(mifi));
 		if (error)
 			break;
 		error = del_m6if(&mifi);
