@@ -1,4 +1,4 @@
-/*	$KAME: altqstat.c,v 1.3 2000/12/03 05:03:20 kjc Exp $	*/
+/*	$KAME: altqstat.c,v 1.4 2000/12/03 05:44:19 kawa Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -137,7 +137,7 @@ main (int argc, char **argv)
 
 	if (show_config) {
 		if (no_server)
-			errx(1, "no server (-n) can't be set for show config (-s)!"
+			errx(1, "no server (-n) can't be set for show config (-s)!");
 		quip_printconfig();
 		quip_closeserver();
 		exit(0);
