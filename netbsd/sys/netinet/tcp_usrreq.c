@@ -203,11 +203,13 @@ tcp_usrreq(so, req, m, nam, control, p)
 	if (req == PRU_PURGEIF) {
 		switch (family) {
 		case PF_INET:
+			in_pcbpurgeif0(&tcbtable, (struct ifnet *)control);
 			in_purgeif((struct ifnet *)control);
 			in_pcbpurgeif(&tcbtable, (struct ifnet *)control);
 			break;
 #ifdef INET6
 		case PF_INET6:
+			in6_pcbpurgeif0(&tcb6, (struct ifnet *)control);
 			in6_purgeif((struct ifnet *)control);
 			in6_pcbpurgeif(&tcb6, (struct ifnet *)control);
 			break;

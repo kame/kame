@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.190 2001/06/20 04:59:26 sumikawa Exp $	*/
+/*	$KAME: in6.c,v 1.191 2001/07/02 08:56:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -852,6 +852,7 @@ in6_update_ifa(ifp, ifra, ia)
 #endif
 	struct sockaddr_in6 dst6;
 	struct in6_addrlifetime *lt;
+	struct in6_multi_mship *imm;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	time_t time_second = (time_t)time.tv_sec;
 #endif
@@ -980,6 +981,7 @@ in6_update_ifa(ifp, ifra, ia)
 		if (ia == NULL)
 			return (ENOBUFS);
 		bzero((caddr_t)ia, sizeof(*ia));
+		LIST_INIT(&ia->ia6_memberships);
 		/* Initialize the address and masks */
 		ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
 		ia->ia_addr.sin6_family = AF_INET6;
@@ -1112,15 +1114,16 @@ in6_update_ifa(ifp, ifra, ia)
 			llsol.s6_addr32[3] =
 				ifra->ifra_addr.sin6_addr.s6_addr32[3];
 			llsol.s6_addr8[12] = 0xff;
-			(void)in6_addmulti(&llsol, ifp, &error);
-			if (error != 0) {
+			imm = in6_joingroup(ifp, &llsol, &error);
+			if (imm) {
+				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
+				    i6mm_chain);
+			} else {
 				log(LOG_WARNING,
 				    "in6_update_ifa: addmulti failed for "
 				    "%s on %s (errno=%d)\n",
-				    ip6_sprintf(&llsol), if_name(ifp),
-				    error);
-				in6_purgeaddr((struct ifaddr *)ia);
-				return(error);
+				    ip6_sprintf(&mltaddr.sin6_addr), 
+				    if_name(ifp), error);
 			}
 		}
 
@@ -1161,14 +1164,17 @@ in6_update_ifa(ifp, ifra, ia)
 				  RTF_UP|RTF_CLONING,  /* xxx */
 				  (struct rtentry **)0);
 #endif
-			(void)in6_addmulti(&mltaddr.sin6_addr, ifp, &error);
-			if (error != 0) {
-				log(LOG_WARNING,
-				    "in6_update_ifa: addmulti failed for "
-				    "%s on %s (errno=%d)\n",
-				    ip6_sprintf(&mltaddr.sin6_addr), 
-				    if_name(ifp), error);
-			}
+		}
+		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
+		if (imm) {
+			LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
+			    i6mm_chain);
+		} else {
+			log(LOG_WARNING,
+			    "in6_update_ifa: addmulti failed for "
+			    "%s on %s (errno=%d)\n",
+			    ip6_sprintf(&mltaddr.sin6_addr), 
+			    if_name(ifp), error);
 		}
 
 		/*
@@ -1179,17 +1185,16 @@ in6_update_ifa(ifp, ifra, ia)
 #endif
 		if (in6_nigroup(ifp, hostname, hostnamelen, &mltaddr.sin6_addr)
 		    == 0) {
-			IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
-			if (in6m == NULL && ia != NULL) {
-				(void)in6_addmulti(&mltaddr.sin6_addr,
-				    ifp, &error);
-				if (error != 0) {
-					log(LOG_WARNING, "in6_update_ifa: "
-					    "addmulti failed for "
-					    "%s on %s (errno=%d)\n",
-					    ip6_sprintf(&mltaddr.sin6_addr), 
-					    if_name(ifp), error);
-				}
+			imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
+			if (imm) {
+				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
+				    i6mm_chain);
+			} else {
+				log(LOG_WARNING, "in6_update_ifa: "
+				    "addmulti failed for "
+				    "%s on %s (errno=%d)\n",
+				    ip6_sprintf(&mltaddr.sin6_addr), 
+				    if_name(ifp), error);
 			}
 		}
 #ifdef __FreeBSD__
@@ -1202,29 +1207,30 @@ in6_update_ifa(ifp, ifra, ia)
 		 *      we have to join the group on every interface with
 		 *      some interface-boundary restriction.
 		 */
-		if (ifp->if_flags & IFF_LOOPBACK) {
-			struct in6_addr loop6 = in6addr_loopback;
-			ia = in6ifa_ifpwithaddr(ifp, &loop6);
-
+#if 0
+		if ((ifp->if_flags & IFF_LOOPBACK) != 0)
+#endif
+		{
 			mltaddr.sin6_addr = in6addr_nodelocal_allnodes;
-
 			IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
-			if (in6m == NULL && ia != NULL) {
+			if (!in6m) {
 				rtrequest(RTM_ADD,
 					  (struct sockaddr *)&mltaddr,
 					  (struct sockaddr *)&ia->ia_addr,
 					  (struct sockaddr *)&mltmask,
 					  RTF_UP,
 					  (struct rtentry **)0);
-				(void)in6_addmulti(&mltaddr.sin6_addr, ifp,
-						   &error);
-				if (error != 0) {
-					log(LOG_WARNING, "in6_update_ifa: "
-					    "addmulti failed for %s on %s "
-					    "(errno=%d)\n",
-					    ip6_sprintf(&mltaddr.sin6_addr), 
-					    if_name(ifp), error);
-				}
+			}
+			imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
+			if (imm) {
+				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
+				    i6mm_chain);
+			} else {
+				log(LOG_WARNING, "in6_update_ifa: "
+				    "addmulti failed for %s on %s "
+				    "(errno=%d)\n",
+				    ip6_sprintf(&mltaddr.sin6_addr), 
+				    if_name(ifp), error);
 			}
 		}
 	}
@@ -1292,6 +1298,7 @@ in6_purgeaddr(ifa)
 {
 	struct ifnet *ifp = ifa->ifa_ifp;
 	struct in6_ifaddr *ia = (struct in6_ifaddr *) ifa;
+	struct in6_multi_mship *imm;
 
 	/* stop DAD processing */
 	nd6_dad_stop(ifa);
@@ -1319,24 +1326,12 @@ in6_purgeaddr(ifa)
 	/* Remove ownaddr's loopback rtentry, if it exists. */
 	in6_ifremloop(&(ia->ia_ifa));
 
-	if (ifp->if_flags & IFF_MULTICAST) {
-		/*
-		 * delete solicited multicast addr for deleting host id
-		 */
-		struct in6_multi *in6m;
-		struct in6_addr llsol;
-		bzero(&llsol, sizeof(struct in6_addr));
-		llsol.s6_addr16[0] = htons(0xff02);
-		llsol.s6_addr16[1] = htons(ifp->if_index);
-		llsol.s6_addr32[1] = 0;
-		llsol.s6_addr32[2] = htonl(1);
-		llsol.s6_addr32[3] =
-			ia->ia_addr.sin6_addr.s6_addr32[3];
-		llsol.s6_addr8[12] = 0xff;
-
-		IN6_LOOKUP_MULTI(llsol, ifp, in6m);
-		if (in6m)
-			in6_delmulti(in6m);
+	/*
+	 * leave from multicast groups we have joined for the interface
+	 */
+	while ((imm = ia->ia6_memberships.lh_first) != NULL) {
+		LIST_REMOVE(imm, i6mm_chain);
+		in6_leavegroup(imm);
 	}
 
 	in6_unlink_ifa(ia, ifp);
@@ -1951,8 +1946,10 @@ in6_purgemkludge(ifp)
 			continue;
 
 		/* leave from all multicast groups joined */
-		while ((in6m = LIST_FIRST(&mk->mk_head)) != NULL)
+		while ((in6m = LIST_FIRST(&mk->mk_head)) != NULL) {
+printf("purgemkludge: %s\n", ip6_sprintf(&in6m->in6m_addr));
 			in6_delmulti(in6m);
+		}
 		LIST_REMOVE(mk, mk_entry);
 		free(mk, M_IPMADDR);
 		break;
@@ -2176,6 +2173,39 @@ in6_delmulti(in6m)
 	splx(s);
 }
 #endif /* not FreeBSD3 */
+
+struct in6_multi_mship *
+in6_joingroup(ifp, addr, errorp)
+	struct ifnet *ifp;
+	struct in6_addr *addr;
+	int *errorp;
+{
+	struct in6_multi_mship *imm;
+
+	imm = malloc(sizeof(*imm), M_IPMADDR, M_NOWAIT);
+	if (!imm) {
+		*errorp = ENOBUFS;
+		return NULL;
+	}
+	imm->i6mm_maddr = in6_addmulti(addr, ifp, errorp);
+	if (!imm->i6mm_maddr) {
+		/* *errorp is alrady set */
+		free(imm, M_IPMADDR);
+		return NULL;
+	}
+	return imm;
+}
+
+int
+in6_leavegroup(imm)
+	struct in6_multi_mship *imm;
+{
+
+	if (imm->i6mm_maddr)
+		in6_delmulti(imm->i6mm_maddr);
+	free(imm,  M_IPMADDR);
+	return 0;
+}
 
 /*
  * Find an IPv6 interface link-local address specific to an interface.

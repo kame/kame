@@ -1277,6 +1277,7 @@ udp_usrreq(so, req, m, nam, control, p)
 		    (struct ifnet *)control, p));
 
 	if (req == PRU_PURGEIF) {
+		in_pcbpurgeif0(&udbtable, (struct ifnet *)control);
 		in_purgeif((struct ifnet *)control);
 		in_pcbpurgeif(&udbtable, (struct ifnet *)control);
 		return (0);

@@ -151,6 +151,7 @@ int	in_pcbnotify __P((struct inpcbtable *, struct in_addr, u_int,
 	    struct in_addr, u_int, int, void (*)(struct inpcb *, int)));
 void	in_pcbnotifyall __P((struct inpcbtable *, struct in_addr, int,
 	    void (*)(struct inpcb *, int)));
+void	in_pcbpurgeif0 __P((struct inpcbtable *, struct ifnet *));
 void	in_pcbpurgeif __P((struct inpcbtable *, struct ifnet *));
 void	in_pcbstate __P((struct inpcb *, int));
 void	in_rtchange __P((struct inpcb *, int));

@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.57 2001/06/20 04:59:26 sumikawa Exp $	*/
+/*	$KAME: in6_var.h,v 1.58 2001/07/02 08:56:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -122,13 +122,15 @@ struct	in6_ifaddr {
 	struct in6_addrlifetime ia6_lifetime;
 	struct ifprefix *ia6_ifpr; /* back pointer to ifprefix */
 
-	struct nd_prefix *ia6_ndpr; /* back pointer to the ND prefix
-				     * (for autoconfigured addresses only)
-				     */
+	/* back pointer to the ND prefix (for autoconfigured addresses only) */
+	struct nd_prefix *ia6_ndpr;
 
 #ifdef MEASURE_PERFORMANCE
 	struct in6hash ia6_hash;	/* hash for ia_addr */
 #endif
+
+	/* multicast addresses joined from the kernel */
+	LIST_HEAD(, in6_multi_mship) ia6_memberships;
 };
 
 /*
@@ -673,6 +675,9 @@ do {						\
 struct	in6_multi *in6_addmulti __P((struct in6_addr *, struct ifnet *,
 				     int *));
 void	in6_delmulti __P((struct in6_multi *));
+struct in6_multi_mship *in6_joingroup __P((struct ifnet *, struct in6_addr *,
+	int *));
+int in6_leavegroup __P((struct in6_multi_mship *));
 extern int in6_ifindex2scopeid __P((int));
 extern int in6_mask2len __P((struct in6_addr *, u_char *));
 #if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)

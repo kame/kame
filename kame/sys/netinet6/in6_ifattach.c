@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.118 2001/05/24 07:44:00 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.119 2001/07/02 08:56:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -758,6 +758,7 @@ in6_nigroup(ifp, name, namelen, in6)
 	return 0;
 }
 
+#if 0
 void
 in6_nigroup_attach(name, namelen)
 	const char *name;
@@ -820,6 +821,7 @@ in6_nigroup_detach(name, namelen)
 			in6_delmulti(in6m);
 	}
 }
+#endif
 
 /*
  * XXX multiple loopback interface needs more care.  for instance,
@@ -988,10 +990,10 @@ in6_ifdetach(ifp)
 	struct rtentry *rt;
 	short rtflags;
 	struct sockaddr_in6 sin6;
-	struct in6_multi *in6m;
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct in6_multi *in6m_next;
 #endif
+	struct in6_multi_mship *imm;
 
 	/* nuke prefix list.  this may try to remove some of ifaddrs as well */
 	in6_purgeprefix(ifp);
@@ -1040,11 +1042,13 @@ in6_ifdetach(ifp)
 
 		ia = (struct in6_ifaddr *)ifa;
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-		/* leave from all multicast groups joined */
-		while ((in6m = LIST_FIRST(&ia->ia6_multiaddrs)) != NULL)
-			in6_delmulti(in6m);
-#endif
+		/*
+		 * leave from multicast groups we have joined for the interface
+		 */
+		while ((imm = ia->ia6_memberships.lh_first) != NULL) {
+			LIST_REMOVE(imm, i6mm_chain);
+			in6_leavegroup(imm);
+		}
 
 		/* remove from the routing table */
 		if ((ia->ia_flags & IFA_ROUTE)

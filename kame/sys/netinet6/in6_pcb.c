@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.97 2001/06/22 14:22:01 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.98 2001/06/27 15:50:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -684,7 +684,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 }
 
 void
-in6_pcbpurgeif(head, ifp)
+in6_pcbpurgeif0(head, ifp)
 	struct in6pcb *head;
 	struct ifnet *ifp;
 {
@@ -694,9 +694,6 @@ in6_pcbpurgeif(head, ifp)
 
 	for (in6p = head->in6p_next; in6p != head; in6p = nin6p) {
 		nin6p = in6p->in6p_next;
-		if (in6p->in6p_route.ro_rt != NULL &&
-		    in6p->in6p_route.ro_rt->rt_ifp == ifp)
-			in6_rtchange(in6p, 0);
 		im6o = in6p->in6p_moptions;
 		if (im6o) {
 			/*
@@ -717,11 +714,25 @@ in6_pcbpurgeif(head, ifp)
 				nimm = imm->i6mm_chain.le_next;
 				if (imm->i6mm_maddr->in6m_ifp == ifp) {
 					LIST_REMOVE(imm, i6mm_chain);
-					in6_delmulti(imm->i6mm_maddr);
-					free(imm, M_IPMADDR);
+					in6_leavegroup(imm);
 				}
 			}
 		}
+	}
+}
+
+void
+in6_pcbpurgeif(head, ifp)
+	struct in6pcb *head;
+	struct ifnet *ifp;
+{
+	struct in6pcb *in6p, *nin6p;
+
+	for (in6p = head->in6p_next; in6p != head; in6p = nin6p) {
+		nin6p = in6p->in6p_next;
+		if (in6p->in6p_route.ro_rt != NULL &&
+		    in6p->in6p_route.ro_rt->rt_ifp == ifp)
+			in6_rtchange(in6p, 0);
 	}
 }
 

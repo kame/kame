@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.79 2001/06/04 12:03:44 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.80 2001/07/02 08:56:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -744,6 +744,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 
 #ifdef __NetBSD__
 	if (req == PRU_PURGEIF) {
+		in6_pcbpurgeif0(&rawin6pcb, (struct ifnet *)control);
 		in6_purgeif((struct ifnet *)control);
 		in6_pcbpurgeif(&rawin6pcb, (struct ifnet *)control);
 		return (0);
