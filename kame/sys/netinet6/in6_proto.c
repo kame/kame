@@ -590,6 +590,13 @@ sysctl_ip6_forwarding SYSCTL_HANDLER_ARGS
 	changed = (ip6_forwarding ? 1 : 0) ^ (old_ip6_forwarding ? 1 : 0);
 	if (changed == 0)
 		return (error);
+	/*
+	 * XXX while host->router removes prefix got from RA,
+	 * router->host case nukes all the prefixes managed by in6_prefix.c
+	 * (both RR and static).  therefore, switching from host->router->host
+	 * will remove statically configured addresses/prefixes.
+	 * not sure if it is intended behavior or not.
+	 */
 	if (ip6_forwarding != 0) {	/* host becomes router */
 		int s = splnet();
 		struct nd_prefix *pr, *next;
