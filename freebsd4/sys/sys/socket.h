@@ -46,6 +46,11 @@
  */
 #include <machine/types.h>
 
+/*
+ * needed for __CMSG_ALIGN
+ */
+#include <machine/param.h>
+
 typedef u_char		sa_family_t;
 #ifdef	_BSD_SOCKLEN_T_
 typedef	_BSD_SOCKLEN_T_	socklen_t;
@@ -363,7 +368,7 @@ struct cmsgcred {
 
 /* given pointer to struct cmsghdr, return pointer to data */
 #define	CMSG_DATA(cmsg)		((u_char *)(cmsg) + \
-				 ALIGN(sizeof(struct cmsghdr)))
+				 __CMSG_ALIGN(sizeof(struct cmsghdr)))
 
 #define __CMSG_ALIGN(n)		ALIGN(n)
 #ifdef _KERNEL
@@ -372,18 +377,18 @@ struct cmsgcred {
 
 /* given pointer to struct cmsghdr, return pointer to next cmsghdr */
 #define	CMSG_NXTHDR(mhdr, cmsg)	\
-	(((caddr_t)(cmsg) + ALIGN((cmsg)->cmsg_len) + \
-	  ALIGN(sizeof(struct cmsghdr)) > \
+	(((caddr_t)(cmsg) + __CMSG_ALIGN((cmsg)->cmsg_len) + \
+	  __CMSG_ALIGN(sizeof(struct cmsghdr)) > \
 	    (caddr_t)(mhdr)->msg_control + (mhdr)->msg_controllen) ? \
 	    (struct cmsghdr *)NULL : \
-	    (struct cmsghdr *)((caddr_t)(cmsg) + ALIGN((cmsg)->cmsg_len)))
+	    (struct cmsghdr *)((caddr_t)(cmsg) + __CMSG_ALIGN((cmsg)->cmsg_len)))
 
 #define	CMSG_FIRSTHDR(mhdr)	((struct cmsghdr *)(mhdr)->msg_control)
 
 /* RFC 2292 additions */
 
-#define	CMSG_SPACE(l)		(ALIGN(sizeof(struct cmsghdr)) + ALIGN(l))
-#define	CMSG_LEN(l)		(ALIGN(sizeof(struct cmsghdr)) + (l))
+#define	CMSG_SPACE(l) (__CMSG_ALIGN(sizeof(struct cmsghdr)) + __CMSG_ALIGN(l))
+#define	CMSG_LEN(l) (__CMSG_ALIGN(sizeof(struct cmsghdr)) + (l))
 
 /* "Socket"-level control message types: */
 #define	SCM_RIGHTS	0x01		/* access rights (array of int) */
