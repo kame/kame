@@ -245,8 +245,8 @@ ip_output(m0, va_alist)
 	 * cache with IPv6.
 	 */
 	if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
-			  dst->sin_family != AF_INET || 
-			  !in_hosteq(dst->sin_addr, ip->ip_dst))) {
+	    dst->sin_family != AF_INET || 
+	    !in_hosteq(dst->sin_addr, ip->ip_dst))) {
 		RTFREE(ro->ro_rt);
 		ro->ro_rt = (struct rtentry *)0;
 	}
