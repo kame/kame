@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.53 2001/12/12 15:29:12 sakane Exp $	*/
+/*	$KAME: handler.c,v 1.54 2001/12/13 17:13:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -477,7 +477,6 @@ initph2(iph2)
 	VPTRINIT(iph2->id_p);
 	VPTRINIT(iph2->nonce);
 	VPTRINIT(iph2->nonce_p);
-	VPTRINIT(iph2->hash);
 	VPTRINIT(iph2->sa);
 	VPTRINIT(iph2->sa_ret);
 

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.89 2001/12/12 15:29:13 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.90 2001/12/13 17:13:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,7 +84,7 @@
 #include "strnames.h"
 
 /* quick mode */
-static vchar_t *quick_ir1mx __P((struct ph2handle *, vchar_t *));
+static vchar_t *quick_ir1mx __P((struct ph2handle *, vchar_t *, vchar_t *));
 static int get_sainfo_r __P((struct ph2handle *));
 static int get_proposal_r __P((struct ph2handle *));
 static u_int32_t setscopeid __P((struct sockaddr *, struct sockaddr *));
@@ -147,6 +147,7 @@ quick_i1send(iph2, msg)
 	vchar_t *msg; /* must be null pointer */
 {
 	vchar_t *body = NULL;
+	vchar_t *hash = NULL;
 	struct isakmp_gen *gen;
 	char *p;
 	int tlen;
@@ -270,12 +271,12 @@ quick_i1send(iph2, msg)
 		p = set_isakmp_payload(p, iph2->id_p, ISAKMP_NPTYPE_NONE);
 
 	/* generate HASH(1) */
-	iph2->hash = oakley_compute_hash1(iph2->ph1, iph2->msgid, body);
-	if (iph2->hash == NULL)
+	hash = oakley_compute_hash1(iph2->ph1, iph2->msgid, body);
+	if (hash == NULL)
 		goto end;
 
 	/* send isakmp payload */
-	iph2->sendbuf = quick_ir1mx(iph2, body);
+	iph2->sendbuf = quick_ir1mx(iph2, body, hash);
 	if (iph2->sendbuf == NULL)
 		goto end;
 
@@ -292,6 +293,8 @@ quick_i1send(iph2, msg)
 end:
 	if (body != NULL)
 		vfree(body);
+	if (hash != NULL)
+		vfree(hash);
 
 	return error;
 }
@@ -540,6 +543,7 @@ quick_i2send(iph2, msg0)
 {
 	vchar_t *msg = NULL;
 	vchar_t *buf = NULL;
+	vchar_t *hash = NULL;
 	char *p = NULL;
 	int tlen;
 	int error = ISAKMP_INTERNAL_ERROR;
@@ -566,16 +570,16 @@ quick_i2send(iph2, msg0)
 	memcpy(tmp->v, iph2->nonce->v, iph2->nonce->l);
 	memcpy(tmp->v + iph2->nonce->l, iph2->nonce_p->v, iph2->nonce_p->l);
 
-	iph2->hash = oakley_compute_hash3(iph2->ph1, iph2->msgid, tmp);
+	hash = oakley_compute_hash3(iph2->ph1, iph2->msgid, tmp);
 	vfree(tmp);
 
-	if (iph2->hash == NULL)
+	if (hash == NULL)
 		goto end;
     }
 
 	/* create buffer for isakmp payload */
 	tlen = sizeof(struct isakmp)
-		+ sizeof(struct isakmp_gen) + iph2->hash->l;
+		+ sizeof(struct isakmp_gen) + hash->l;
 	buf = vmalloc(tlen);
 	if (buf == NULL) { 
 		plog(LLV_ERROR, LOCATION, NULL,
@@ -589,7 +593,7 @@ quick_i2send(iph2, msg0)
 		goto end;
 
 	/* add HASH(3) payload */
-	p = set_isakmp_payload(p, iph2->hash, ISAKMP_NPTYPE_NONE);
+	p = set_isakmp_payload(p, hash, ISAKMP_NPTYPE_NONE);
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(buf, iph2->ph1->local, iph2->ph1->remote, 1);
@@ -661,6 +665,8 @@ end:
 		vfree(buf);
 	if (msg != NULL)
 		vfree(msg);
+	if (hash != NULL)
+		vfree(hash);
 
 	return error;
 }
@@ -1153,6 +1159,7 @@ quick_r2send(iph2, msg)
 	vchar_t *msg;
 {
 	vchar_t *body = NULL;
+	vchar_t *hash = NULL;
 	struct isakmp_gen *gen;
 	char *p;
 	int tlen;
@@ -1305,15 +1312,15 @@ quick_r2send(iph2, msg)
 	memcpy(tmp->v, iph2->nonce_p->v, iph2->nonce_p->l);
 	memcpy(tmp->v + iph2->nonce_p->l, body->v, body->l);
 
-	iph2->hash = oakley_compute_hash1(iph2->ph1, iph2->msgid, tmp);
+	hash = oakley_compute_hash1(iph2->ph1, iph2->msgid, tmp);
 	vfree(tmp);
 
-	if (iph2->hash == NULL)
+	if (hash == NULL)
 		goto end;
     }
 
 	/* send isakmp payload */
-	iph2->sendbuf = quick_ir1mx(iph2, body);
+	iph2->sendbuf = quick_ir1mx(iph2, body, hash);
 	if (iph2->sendbuf == NULL)
 		goto end;
 
@@ -1337,6 +1344,8 @@ quick_r2send(iph2, msg)
 end:
 	if (body != NULL)
 		vfree(body);
+	if (hash != NULL)
+		vfree(hash);
 
 	return error;
 }
@@ -1675,9 +1684,9 @@ end:
  * create HASH, body (SA, NONCE) payload with isakmp header.
  */
 static vchar_t *
-quick_ir1mx(iph2, body)
+quick_ir1mx(iph2, body, hash)
 	struct ph2handle *iph2;
-	vchar_t *body;
+	vchar_t *body, *hash;
 {
 	struct isakmp *isakmp;
 	vchar_t *buf = NULL, *new = NULL;
@@ -1688,7 +1697,7 @@ quick_ir1mx(iph2, body)
 
 	/* create buffer for isakmp payload */
 	tlen = sizeof(*isakmp)
-		+ sizeof(*gen) + iph2->hash->l
+		+ sizeof(*gen) + hash->l
 		+ body->l;
 	buf = vmalloc(tlen);
 	if (buf == NULL) { 
@@ -1707,7 +1716,7 @@ quick_ir1mx(iph2, body)
 
 	/* add HASH payload */
 	/* XXX is next type always SA ? */
-	p = set_isakmp_payload(p, iph2->hash, ISAKMP_NPTYPE_SA);
+	p = set_isakmp_payload(p, hash, ISAKMP_NPTYPE_SA);
 
 	/* add body payload */
 	memcpy(p, body->v, body->l);

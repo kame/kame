@@ -1,4 +1,4 @@
-/*	$KAME: handler.h,v 1.42 2001/12/12 15:29:13 sakane Exp $	*/
+/*	$KAME: handler.h,v 1.43 2001/12/13 17:13:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -259,7 +259,6 @@ struct ph2handle {
 	vchar_t *id_p;			/* peer's ID minus general header */
 	vchar_t *nonce;			/* nonce value in phase 2 */
 	vchar_t *nonce_p;		/* partner's nonce value in phase 2 */
-	vchar_t *hash;			/* HASH2 minus general header */
 
 	vchar_t *sa;			/* whole SA payload to send/to be sent*/
 					/* to calculate HASH */
