@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.12 2002/05/23 11:08:57 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.13 2002/05/29 14:50:07 jinmei Exp $	*/
 
 %{
 /*
@@ -152,6 +152,7 @@ ecl		\}
 	/* interface parameters for delegated prefix configuration */
 <S_CNF>prefix-interface { DECHO; BEGIN S_IFACE; return(PREFIX_INTERFACE); }
 <S_CNF>sla-id { DECHO; return(SLA_ID); }
+<S_CNF>sla-len { DECHO; return(SLA_LEN); }
 
 	/* duration */
 <S_CNF>infinite { DECHO; return(INFINITE); }

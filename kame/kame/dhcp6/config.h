@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.16 2002/05/23 11:08:57 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.17 2002/05/29 14:50:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -181,7 +181,7 @@ struct cf_list {
 
 enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
       DECL_PREFIX, DECL_PREFERENCE,
-      IFPARAM_SLA_ID,
+      IFPARAM_SLA_ID, IFPARAM_SLA_LEN,
       DHCPOPT_RAPID_COMMIT, DHCPOPT_PREFIX_DELEGATION,
       ADDRESS_LIST_ENT };
 

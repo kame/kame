@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.2 2002/05/23 13:50:58 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.3 2002/05/29 14:50:07 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -144,6 +144,15 @@ will combine the two values into a single IPv6 prefix,
 3ffe:ffff:0:1::/64,
 and will configure the prefix on the specified
 .Ar interface .
+.It Xo
+.Ic sla-len Ar length
+;
+.Xc
+This statement specifies the length of the SLA ID in bits.
+.Ar length
+must be a decimal number between 0 and 128.
+If the length is not specified by this statement,
+the default value 16 will be used.
 .El
 .El
 .\"

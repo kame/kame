@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.18 2002/05/24 09:09:46 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.19 2002/05/29 14:50:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -263,6 +263,15 @@ configure_prefix_interface(iflist)
 			switch(cfl->type) {
 			case IFPARAM_SLA_ID:
 				pif->sla_id = (u_int32_t)cfl->num;
+				break;
+			case IFPARAM_SLA_LEN:
+				pif->sla_len = (int)cfl->num;
+				if (pif->sla_len < 0 || pif->sla_len > 128) {
+					dprintf(LOG_ERR, "%s"
+					    "invalid SLA length: %d", FNAME,
+					    pif->sla_len);
+					goto bad;
+				}
 				break;
 			default:
 				dprintf(LOG_ERR, "%s" "%s:%d "

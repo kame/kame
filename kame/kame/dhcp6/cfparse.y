@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.13 2002/05/23 11:57:15 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.14 2002/05/29 14:50:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -80,7 +80,7 @@ static void cleanup_cflist __P((struct cf_list *));
 %}
 
 %token INTERFACE IFNAME
-%token PREFIX_INTERFACE SLA_ID DUID_ID
+%token PREFIX_INTERFACE SLA_ID SLA_LEN DUID_ID
 %token REQUEST SEND ALLOW PREFERENCE
 %token HOST HOSTNAME DUID
 %token OPTION RAPID_COMMIT PREFIX_DELEGATION DNS_SERVERS
@@ -323,14 +323,22 @@ ifparams:
 	;
 
 ifparam:
-	SLA_ID NUMBER EOS
-	{
-		struct cf_list *l;
+		SLA_ID NUMBER EOS
+		{
+			struct cf_list *l;
 
-		MAKE_CFLIST(l, IFPARAM_SLA_ID, NULL, NULL);
-		l->num = $2;
-		$$ = l;
-	}
+			MAKE_CFLIST(l, IFPARAM_SLA_ID, NULL, NULL);
+			l->num = $2;
+			$$ = l;
+		}
+	|	SLA_LEN NUMBER EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, IFPARAM_SLA_LEN, NULL, NULL);
+			l->num = $2;
+			$$ = l;
+		}
 	;
 
 prefixparam:
