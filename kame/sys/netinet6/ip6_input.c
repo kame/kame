@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.159 2001/02/03 18:40:03 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.160 2001/02/05 08:11:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1281,41 +1281,43 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 
 	for (; hbhlen > 0; hbhlen -= optlen, opt += optlen) {
 		switch(*opt) {
-		 case IP6OPT_PAD1:
-			 optlen = 1;
-			 break;
-		 case IP6OPT_PADN:
-			 if (hbhlen < IP6OPT_MINLEN) {
-				 ip6stat.ip6s_toosmall++;
-				 goto bad;
-			 }
-			 optlen = *(opt + 1) + 2;
-			 break;
-		 case IP6OPT_RTALERT:
-			 /* XXX may need check for alignment */
-			 if (hbhlen < IP6OPT_RTALERT_LEN) {
-				 ip6stat.ip6s_toosmall++;
-				 goto bad;
-			 }
-			 if (*(opt + 1) != IP6OPT_RTALERT_LEN - 2)
-				  /* XXX: should we discard the packet? */
-				 log(LOG_ERR, "length of router alert opt is inconsitent(%d)",
-				     *(opt + 1));
-			 optlen = IP6OPT_RTALERT_LEN;
-			 bcopy((caddr_t)(opt + 2), (caddr_t)&rtalert_val, 2);
-			 *rtalertp = ntohs(rtalert_val);
-			 break;
-		 case IP6OPT_JUMBO:
+		case IP6OPT_PAD1:
+			optlen = 1;
+			break;
+		case IP6OPT_PADN:
+			if (hbhlen < IP6OPT_MINLEN) {
+				ip6stat.ip6s_toosmall++;
+				goto bad;
+			}
+			optlen = *(opt + 1) + 2;
+			break;
+		case IP6OPT_RTALERT:
+			/* XXX may need check for alignment */
+			if (hbhlen < IP6OPT_RTALERT_LEN) {
+				ip6stat.ip6s_toosmall++;
+				goto bad;
+			}
+			if (*(opt + 1) != IP6OPT_RTALERT_LEN - 2) {
+				/* XXX: should we discard the packet? */
+				log(LOG_ERR, "length of router alert opt is inconsitent(%d)",
+				    *(opt + 1));
+			}
+			optlen = IP6OPT_RTALERT_LEN;
+			bcopy((caddr_t)(opt + 2), (caddr_t)&rtalert_val, 2);
+			*rtalertp = ntohs(rtalert_val);
+			break;
+		case IP6OPT_JUMBO:
 			/* XXX may need check for alignment */
 			if (hbhlen < IP6OPT_JUMBO_LEN) {
 				ip6stat.ip6s_toosmall++;
 				goto bad;
 			}
-			if (*(opt + 1) != IP6OPT_JUMBO_LEN - 2)
-				 /* XXX: should we discard the packet? */
+			if (*(opt + 1) != IP6OPT_JUMBO_LEN - 2) {
+				/* XXX: should we discard the packet? */
 				log(LOG_ERR, "length of jumbopayload opt "
-				    "is inconsistent(%d)\n",
-				    *(opt + 1));
+				   "is inconsistent(%d)\n",
+				   *(opt + 1));
+			}
 			optlen = IP6OPT_JUMBO_LEN;
 
 			/*
@@ -1326,10 +1328,10 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 			if (ip6->ip6_plen) {
 				ip6stat.ip6s_badoptions++;
 				icmp6_error(m, ICMP6_PARAM_PROB,
-					    ICMP6_PARAMPROB_HEADER,
-					    sizeof(struct ip6_hdr) +
-					    sizeof(struct ip6_hbh) +
-					    opt - opthead);
+					   ICMP6_PARAMPROB_HEADER,
+					   sizeof(struct ip6_hdr) +
+					   sizeof(struct ip6_hbh) +
+					   opt - opthead);
 				return(-1);
 			}
 
@@ -1352,10 +1354,10 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 			if (*plenp != 0) {
 				ip6stat.ip6s_badoptions++;
 				icmp6_error(m, ICMP6_PARAM_PROB,
-					    ICMP6_PARAMPROB_HEADER,
-					    sizeof(struct ip6_hdr) +
-					    sizeof(struct ip6_hbh) +
-					    opt + 2 - opthead);
+					   ICMP6_PARAMPROB_HEADER,
+					   sizeof(struct ip6_hdr) +
+					   sizeof(struct ip6_hbh) +
+					   opt + 2 - opthead);
 				return(-1);
 			}
 #endif
@@ -1366,27 +1368,27 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 			if (jumboplen <= IPV6_MAXPACKET) {
 				ip6stat.ip6s_badoptions++;
 				icmp6_error(m, ICMP6_PARAM_PROB,
-					    ICMP6_PARAMPROB_HEADER,
-					    sizeof(struct ip6_hdr) +
-					    sizeof(struct ip6_hbh) +
-					    opt + 2 - opthead);
+					   ICMP6_PARAMPROB_HEADER,
+					   sizeof(struct ip6_hdr) +
+					   sizeof(struct ip6_hbh) +
+					   opt + 2 - opthead);
 				return(-1);
 			}
 			*plenp = jumboplen;
 
 			break;
-		 default:		/* unknown option */
-			 if (hbhlen < IP6OPT_MINLEN) {
-				 ip6stat.ip6s_toosmall++;
-				 goto bad;
-			 }
-			 if ((optlen = ip6_unknown_opt(opt, m,
-						       sizeof(struct ip6_hdr) +
-						       sizeof(struct ip6_hbh) +
-						       opt - opthead)) == -1)
-				 return(-1);
-			 optlen += 2;
-			 break;
+		default:		/* unknown option */
+			if (hbhlen < IP6OPT_MINLEN) {
+				ip6stat.ip6s_toosmall++;
+				goto bad;
+			}
+			if ((optlen = ip6_unknown_opt(opt, m,
+						      sizeof(struct ip6_hdr) +
+						      sizeof(struct ip6_hbh) +
+						      opt - opthead)) == -1)
+				return(-1);
+			optlen += 2;
+			break;
 		}
 	}
 
@@ -1412,25 +1414,25 @@ ip6_unknown_opt(optp, m, off)
 	struct ip6_hdr *ip6;
 
 	switch(IP6OPT_TYPE(*optp)) {
-	 case IP6OPT_TYPE_SKIP: /* ignore the option */
-		 return((int)*(optp + 1));
-	 case IP6OPT_TYPE_DISCARD:	/* silently discard */
-		 m_freem(m);
-		 return(-1);
-	 case IP6OPT_TYPE_FORCEICMP: /* send ICMP even if multicasted */
-		 ip6stat.ip6s_badoptions++;
-		 icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_OPTION, off);
-		 return(-1);
-	 case IP6OPT_TYPE_ICMP: /* send ICMP if not multicasted */
-		 ip6stat.ip6s_badoptions++;
-		 ip6 = mtod(m, struct ip6_hdr *);
-		 if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) ||
-		     (m->m_flags & (M_BCAST|M_MCAST)))
-			 m_freem(m);
-		 else
-			 icmp6_error(m, ICMP6_PARAM_PROB,
-				     ICMP6_PARAMPROB_OPTION, off);
-		 return(-1);
+	case IP6OPT_TYPE_SKIP: /* ignore the option */
+		return((int)*(optp + 1));
+	case IP6OPT_TYPE_DISCARD:	/* silently discard */
+		m_freem(m);
+		return(-1);
+	case IP6OPT_TYPE_FORCEICMP: /* send ICMP even if multicasted */
+		ip6stat.ip6s_badoptions++;
+		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_OPTION, off);
+		return(-1);
+	case IP6OPT_TYPE_ICMP: /* send ICMP if not multicasted */
+		ip6stat.ip6s_badoptions++;
+		ip6 = mtod(m, struct ip6_hdr *);
+		if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) ||
+		    (m->m_flags & (M_BCAST|M_MCAST)))
+			m_freem(m);
+		else
+			icmp6_error(m, ICMP6_PARAM_PROB,
+				    ICMP6_PARAMPROB_OPTION, off);
+		return(-1);
 	}
 
 	m_freem(m);		/* XXX: NOTREACHED */
