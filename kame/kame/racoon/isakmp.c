@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.122 2001/01/13 22:42:52 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.123 2001/01/24 02:35:23 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -748,6 +748,8 @@ isakmp_ph1begin_i(rmconf, remote)
 	iph1->msgid = 0;
 	iph1->flags = 0;
 	iph1->ph2cnt = 0;
+	iph1->gssapi_state = NULL;
+	iph1->approval = NULL;
 
 	/* XXX copy remote address */
 	if (copy_ph1addresses(iph1, rmconf, remote, NULL) < 0)
@@ -830,6 +832,8 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 	iph1->etype = etypeok->type;
 	iph1->version = isakmp->v;
 	iph1->msgid = 0;
+	iph1->gssapi_state = NULL;
+	iph1->approval = NULL;
 
 	/* copy remote address */
 	if (copy_ph1addresses(iph1, rmconf, remote, local) < 0)
