@@ -7,6 +7,7 @@ MAN8=	altqd.8
 CFLAGS+=-DALTQ -DINET6 -I${.CURDIR}/../../kame/libaltq
 
 LDADD+=	-L${.OBJDIR}/../../lib/libaltq \
+	-L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -laltq
 DPADD+= ${.OBJDIR}/../../lib/libaltq/libaltq.a \
 	/usr/local/v6/lib/libaltq.a
