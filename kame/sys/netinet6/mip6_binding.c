@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.134 2002/09/20 05:08:47 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.135 2002/09/20 05:13:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2539,8 +2539,8 @@ mip6_bu_encapcheck(m, off, proto, arg)
 
 	/*
 	 * check whether this packet is from the correct sender (that
-	 * is, our home agent) to the CoA the mobile node has
-	 * registered before.
+	 * is, our home agent) to the CoA or the HoA the mobile node
+	 * has registered before.
 	 */
 	if (!SA6_ARE_ADDR_EQUAL(encap_src, haaddr) ||
 	    !(SA6_ARE_ADDR_EQUAL(encap_dst, mycoa) ||
