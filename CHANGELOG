@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1553 2001/02/13 09:44:34 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1554 2001/02/14 07:29:28 itojun Exp $
 
 <200102>
+Wed Feb 14 16:27:49 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ip6_input.c: merge mbuf data into single mbuf, if
+	  mbuf chain is passed to ip6_input.  it makes IPv6 packet processed
+	  okay when L2 code passes non-continuous mbuf data (like L2 bridge
+	  code).  affects freebsd[234] and bsdi[34] only.
+
 Tue Feb 13 18:42:17 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd4/sys/{if_sppp.h,if_spppsubr.c}: supported PPPv6 for
 	  kernel level PPP.
