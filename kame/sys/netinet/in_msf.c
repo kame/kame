@@ -3543,10 +3543,11 @@ in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 	}
 
 	for (i = 0; i < numsrc; i++) {
-		u_char len = src->sa_len;
-		u_char family = src->sa_family;
+		u_char len, family;
 
 		src = (struct sockaddr *)&ss[i];
+		len = src->sa_len;
+		family = src->sa_family;
 
 		/* Note that ss lists are already ordered smaller first. */
 		if (src->sa_family != AF_INET && src->sa_family != AF_INET6)
