@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1239 2000/08/29 07:30:01 itojun Exp $
+$KAME: CHANGELOG,v 1.1240 2000/08/29 07:34:05 jinmei Exp $
 
 <200008>
+2000-08-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (prelist_update): reverted the
+	original two-hour rule for updating address lifetime in RFC 2462.
+	We've adopted the "Jim Bound algorithm", but we found no strong
+	reason to do so through recent discussions.
+
 Tue Aug 29 16:29:49 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 2000/8/28 weekly snap
 	  from tcpdump.org.
