@@ -179,7 +179,7 @@ config		netbsd	root on ? type ?
 
 mainbus0 at root
 
-apm0	at mainbus0			# Advanced power management
+#apm0	at mainbus0			# Advanced power management
 
 # Tuning for power management, see apm(4) for more details.
 #options 	APM_NO_IDLE		# Don't call BIOS CPU idle function
@@ -458,7 +458,7 @@ ca*	at cac? unit ?			# Compaq array disk device
 # The 0x0001 flag force the driver to use DMA, even if the driver doesn't know
 # how to set up DMA modes for this chip. This may work, or may cause
 # a machine hang with some controllers.
-#pciide* at pci? dev ? function ? flags 0x0000
+pciide* at pci? dev ? function ? flags 0x0000
 
 # ISA Plug-and-Play IDE controllers
 wdc*	at isapnp? 
@@ -485,11 +485,11 @@ wdc1	at isa? port 0x170 irq 15 flags 0x00
 # (0xc=1100, 0xa=1010, 0xf=1111)
 # 0x0000 means "use whatever the drive claims to support".
 wd*	at wdc? channel ? drive ? flags 0x0000
-#wd*	at pciide? channel ? drive ? flags 0x0000
+wd*	at pciide? channel ? drive ? flags 0x0000
 
 # ATAPI bus support
 atapibus* at wdc? channel ?
-#atapibus* at pciide? channel ?
+atapibus* at pciide? channel ?
 
 # ATAPI devices
 # flags have the same meaning as for IDE drives.
