@@ -1,19 +1,19 @@
 # New ports collection makefile for:    sendmail6
-# Version required:	8.10Beta
+# Version required:	8.10.0
 # Date created:		1 Oct 1997
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.2 1999/12/28 05:02:16 itojun Exp $
+# $Id: Makefile,v 1.3 2000/03/20 14:30:36 itojun Exp $
 #
 
 DISTNAME=	sendmail.${SENDMAILVER}
-PKGNAME=	sendmail-8.10.0.10
+PKGNAME=	sendmail-8.10.0
 CATEGORIES=	mail
 MASTER_SITES=	ftp://ftp.sendmail.org/pub/sendmail/
 
 MAINTAINER=	itojun@itojun.org
 
-SENDMAILVER=	8.10.0.Beta10
+SENDMAILVER=	8.10.0
 
 WRKSRC=		${WRKDIR}/sendmail-${SENDMAILVER}/sendmail
 
@@ -27,6 +27,6 @@ do-install:
 	${MKDIR} ${PREFIX}/libexec/sendmail
 	${INSTALL} -c -o root -g kmem -m 6555 \
 		${WRKSRC}/../obj.NetBSD.*/sendmail/sendmail \
-		${PREFIX}/libexec/sendmail/sendmail.8.10.0.10
+		${PREFIX}/libexec/sendmail/sendmail.8.10.0
 
 .include "../../mk/bsd.pkg.mk"
