@@ -68,7 +68,6 @@
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/malloc.h>
-#include <sys/map.h>
 #include <sys/mbuf.h>
 
 /*
@@ -174,10 +173,24 @@ m_pulldown(m, off, len, offp)
 	 * easy cases first.
 	 * we need to use m_copydata() to get data from <n->m_next, 0>.
 	 */
-	if ((n->m_flags & M_EXT) != 0 && MCLISREFERENCED(n))
-		sharedcluster = 1;
-	else
+	if ((n->m_flags & M_EXT) == 0)
 		sharedcluster = 0;
+	else {
+#ifdef __bsdi__
+		if (n->m_ext.ext_func)
+#else
+		if (n->m_ext.ext_free)
+#endif
+			sharedcluster = 1;
+#ifdef __NetBSD__
+		else if (MCLISREFERENCED(n))
+#else
+		else if (mclrefcnt[mtocl(n->m_ext.ext_buf)] > 1)
+#endif
+			sharedcluster = 1;
+		else
+			sharedcluster = 0;
+	}
 	if ((off == 0 || offp) && M_TRAILINGSPACE(n) >= tlen
 	 && !sharedcluster) {
 		m_copydata(n->m_next, 0, tlen, mtod(n, caddr_t) + n->m_len);
