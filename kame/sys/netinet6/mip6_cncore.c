@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.39 2003/10/16 08:12:54 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.40 2003/10/16 08:50:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1388,14 +1388,16 @@ mip6_get_nonce(index, nonce)
 	int32_t offset;
 
 	offset = index - nonce_index;
+	if (offset > 0) {
+		/* nonce_index was wrapped. */
+		offset = offset - 0xffff;
+	}
 
-	if ((offset < -MIP6_NONCE_HISTORY)
-	    || (offset > MIP6_NONCE_HISTORY))
+	if (offset < -MIP6_NONCE_HISTORY) {
+		/* too old index. */
 		return (-1);
+	}
 		
-	if (nonce_head + offset >= mip6_nonce + MIP6_NONCE_HISTORY)
-		offset = offset - MIP6_NONCE_HISTORY;
-
 	if (nonce_head + offset < mip6_nonce)
 		offset = nonce_head - mip6_nonce - offset;
 
@@ -1412,14 +1414,12 @@ mip6_get_nodekey(index, nodekey)
 	mip6_nodekey_t *nodekey_head;
 
 	offset = index - nonce_index;
+	if (offset > 0)
+		offset = offset - 0xffff;
 
-	if ((offset < -MIP6_NONCE_HISTORY)
-	    || (offset > MIP6_NONCE_HISTORY))
+	if (offset < -MIP6_NONCE_HISTORY)
 		return (-1);
 		
-	if (nonce_head + offset >= mip6_nonce + MIP6_NONCE_HISTORY)
-		offset = offset - MIP6_NONCE_HISTORY;
-
 	if (nonce_head + offset < mip6_nonce)
 		offset = nonce_head - mip6_nonce - offset;
 
