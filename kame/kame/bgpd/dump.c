@@ -42,6 +42,7 @@
 
 extern struct ifinfo *ifentry;
 extern struct ripif *ripifs;	/* defined in ripng.c */
+extern task *taskhead;
 
 char *dumpfile;
 #define DUMPFILE "/var/run/bgpd.dump"
@@ -412,6 +413,19 @@ static void
 print_rip_dump(FILE *fp)
 {
 	struct ripif *ripif = ripifs;
+	task *t = taskhead;
+
+	fprintf(fp, "\n=== RIPng generic information ===\n");
+	while (t) {
+		if (t->tsk_timename == RIP_DUMP_TIMER) {
+			fprintf(fp, "  Dump timer=%d:%02d\n",
+				(int)(t->tsk_timeval.tv_sec / 60),
+				(int)(t->tsk_timeval.tv_usec % 60));
+			break;
+		}
+		if ((t = t->tsk_next) == taskhead)
+			break;
+	}
 
 	fprintf(fp, "\n=== RIPng per interface information ===\n");
 	while(ripif) {
