@@ -35,6 +35,10 @@
  * I left the code mostly as it was in 970310.  -- itojun
  */
 
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#include "opt_inet.h"
+#endif
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -121,6 +125,10 @@ int nd6_recalc_reachtm_interval = ND6_RECALC_REACHTM_INTERVAL;
 static struct sockaddr_in6 all1_sa;
 
 static void nd6_slowtimo __P((void *));
+
+#ifdef MIP6
+void (*mip6_expired_defrouter_hook)(struct nd_defrouter *dr) = 0;
+#endif
 
 void
 nd6_init()
@@ -346,6 +354,7 @@ nd6_options(ndopts)
 		case ND_OPT_TARGET_LINKADDR:
 		case ND_OPT_MTU:
 		case ND_OPT_REDIRECTED_HEADER:
+		case ND_OPT_ADV_INTERVAL:
 			if (ndopts->nd_opt_array[nd_opt->nd_opt_type]) {
 				printf("duplicated ND6 option found "
 					"(type=%d)\n", nd_opt->nd_opt_type);
@@ -362,6 +371,8 @@ nd6_options(ndopts)
 			}
 			ndopts->nd_opts_pi_end =
 				(struct nd_opt_prefix_info *)nd_opt;
+			break;
+		case ND_OPT_HA_INFORMATION:
 			break;
 		default:
 			/*
@@ -511,8 +522,13 @@ nd6_timer(ignored_arg)
 			t = TAILQ_NEXT(dr, dr_entry);
 			defrtrlist_del(dr);
 			dr = t;
-		} else
+		} else {
+#ifdef MIP6
+			if (mip6_expired_defrouter_hook)
+				(*mip6_expired_defrouter_hook)(dr);
+#endif /* MIP6 */
 			dr = TAILQ_NEXT(dr, dr_entry);
+		}
 	}
 	pr = nd_prefix.lh_first;
 	while (pr) {

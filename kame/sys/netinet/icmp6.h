@@ -193,6 +193,7 @@ struct nd_router_advert {	/* router advertisement */
 #define nd_ra_flags_reserved	nd_ra_hdr.icmp6_data8[1]
 #define ND_RA_FLAG_MANAGED	0x80
 #define ND_RA_FLAG_OTHER	0x40
+#define ND_RA_FLAG_HA		0x20
 #define nd_ra_router_lifetime	nd_ra_hdr.icmp6_data16[1]
 
 struct nd_neighbor_solicit {	/* neighbor solicitation */
@@ -251,6 +252,8 @@ struct nd_opt_hdr {		/* Neighbor discovery option header */
 #define ND_OPT_PREFIX_INFORMATION	3
 #define ND_OPT_REDIRECTED_HEADER	4
 #define ND_OPT_MTU			5
+#define ND_OPT_ADV_INTERVAL	7	/* MIPv6 */
+#define ND_OPT_HA_INFORMATION	8	/* MIPv6 */
 
 struct nd_opt_prefix_info {	/* prefix information */
 	u_int8_t	nd_opt_pi_type;
@@ -265,8 +268,9 @@ struct nd_opt_prefix_info {	/* prefix information */
 
 #define ND_OPT_PI_FLAG_ONLINK		0x80
 #define ND_OPT_PI_FLAG_AUTO		0x40
+#define ND_OPT_PI_FLAG_RTADDR		0x20
 
-struct nd_opt_rd_hdr {         /* redirected header */
+struct nd_opt_rd_hdr {		/* redirected header */
 	u_int8_t	nd_opt_rh_type;
 	u_int8_t	nd_opt_rh_len;
 	u_int16_t	nd_opt_rh_reserved1;
@@ -279,6 +283,21 @@ struct nd_opt_mtu {		/* MTU option */
 	u_int8_t	nd_opt_mtu_len;
 	u_int16_t	nd_opt_mtu_reserved;
 	u_int32_t	nd_opt_mtu_mtu;
+};
+
+struct nd_opt_advint {		/* Advertisement Interval option (MIPv6) */
+	u_int8_t	nd_opt_int_type;
+	u_int8_t	nd_opt_int_len;
+	u_int16_t	nd_opt_int_reserved;
+	u_int32_t	nd_opt_int_interval;
+};
+
+struct nd_opt_hai {		/* Home Agent Information option (MIPv6) */
+	u_int8_t	nd_opt_hai_type;
+	u_int8_t	nd_opt_hai_len;
+	u_int16_t	nd_opt_hai_reserved;
+	u_int16_t	nd_opt_hai_pref;
+	u_int16_t	nd_opt_hai_lifetime;
 };
 
 /*

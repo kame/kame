@@ -27,6 +27,10 @@
  * SUCH DAMAGE.
  */
 
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#include "opt_inet.h"
+#endif
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -49,6 +53,12 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
+
+#ifdef MIP6
+int (*mip6_store_dstopt_pre_hook)(struct mbuf *m, u_int8_t *opt,
+				  u_int8_t off, u_int8_t dstlen) = NULL;
+int (*mip6_rec_ctrl_sig_hook)(struct mbuf *m, int off) = NULL;
+#endif /* MIP6 */
 
 /*
  * Destination options header processing.
@@ -99,6 +109,20 @@ dest6_input(mp, offp, proto)
 			 }
 			 optlen = *(opt + 1) + 2;
 			 break;
+
+#ifdef MIP6
+		 case IP6OPT_BINDING_UPDATE:
+		 case IP6OPT_BINDING_ACK:
+		 case IP6OPT_BINDING_REQ:
+		 case IP6OPT_HOME_ADDRESS:
+			if (mip6_store_dstopt_pre_hook) {
+				if ((*mip6_store_dstopt_pre_hook)(m, opt, off, dstoptlen) != 0)
+					goto bad;
+			}
+			optlen = *(opt + 1) + 2;
+			break;
+#endif /* MIP6 */
+
 		 default:		/* unknown option */
 			 if (dstoptlen < IP6OPT_MINLEN) {
 				 ip6stat.ip6s_toosmall++;
@@ -111,6 +135,17 @@ dest6_input(mp, offp, proto)
 			 break;
 		}
 	}
+
+#ifdef MIP6
+	if (mip6_rec_ctrl_sig_hook) {
+		/*
+		 * All Destinations options have been processed. Call MIPv6 to
+		 * process stored options.
+		 */
+		if ((*mip6_rec_ctrl_sig_hook)(m, *offp) != 0)
+			return(IPPROTO_DONE);
+	}
+#endif /* MIP6 */
 
 	*offp = off;
 	return(dstopts->ip6d_nxt);

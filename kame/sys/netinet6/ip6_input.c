@@ -117,6 +117,10 @@
 #include <netinet6/nd6.h>
 #include <netinet6/in6_prefix.h>
 
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif
+
 #ifdef IPV6FIREWALL
 #include <netinet6/ip6_fw.h>
 #endif
@@ -186,6 +190,11 @@ int	natpt_in6	__P((struct mbuf *, struct mbuf **));
 extern void ip_forward	__P((struct mbuf *, int));
 #endif
 
+
+#ifdef MIP6
+int (*mip6_new_packet_hook)(struct mbuf *m) = 0;
+#endif /* MIP6 */
+
 /*
  * IP6 initialization: fill in IP6 protocol switch table.
  * All protocols not implemented in kernel go to raw IP6 protocol handler.
@@ -229,6 +238,11 @@ ip6_init()
 #ifndef __FreeBSD__
 	ip6_init2((void *)0);
 #endif
+
+#ifdef MIP6
+	/* Initialize the Mobile IPv6 code */
+	mip6_init();
+#endif /* MIP6 */
 }
 
 static void
@@ -717,6 +731,19 @@ ip6_input(m)
 	ip6stat.ip6s_delivered++;
 	in6_ifstat_inc(deliverifp, ifs6_in_deliver);
 	nest = 0;
+
+#ifdef MIP6
+	/*
+	 * Mobile IPv6
+	 *
+	 * Assume that the received packet shall be processed by MIPv6 when
+	 * the destination header has been taken care of. Because of this,
+	 * some flags have to be reset for later evaluation.
+	 */
+	if (mip6_new_packet_hook)
+		(*mip6_new_packet_hook)(m);
+#endif /* MIP6 */
+
 	while (nxt != IPPROTO_DONE) {
 		if (ip6_hdrnestlimit && (++nest > ip6_hdrnestlimit)) {
 			ip6stat.ip6s_toomanyhdr++;
@@ -1344,7 +1371,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 					ctl->rthdr = *mp;
 				if (*mp)
 					mp = &(*mp)->m_next;
-				break;   
+				break;
 			}
 			case IPPROTO_HOPOPTS:
 			case IPPROTO_AH: /* is it possible? */

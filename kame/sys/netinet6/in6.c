@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -108,6 +108,13 @@
 #include <netinet6/in6_ifattach.h>
 
 #include <net/net_osdep.h>
+
+#ifdef MIP6 /* FIX THIS && defined(MIP6_MN) */
+#include <netinet6/mip6.h>
+#include <netinet6/mip6_common.h>
+
+struct nd_prefix *(*mip6_get_home_prefix_hook) __P((void));
+#endif /* MIP6 */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 MALLOC_DEFINE(M_IPMADDR, "in6_multi", "internet multicast address");
@@ -303,7 +310,7 @@ in6_ifproxy_request(int cmd, struct in6_ifaddr *ia)
 {
 	int error = 0;
 
-	/* 
+	/*
 	 * If we have an IPv6 dstaddr on adding p2p interface,
 	 * join dstaddr's solicited multicast on necessary interface.
 	 */
@@ -342,7 +349,7 @@ in6_ifproxy_request(int cmd, struct in6_ifaddr *ia)
 			llsol.s6_addr16[1] = htons(ia_lan->ia_ifp->if_index);
 			llsol.s6_addr32[1] = 0;
 			llsol.s6_addr32[2] = htonl(1);
-			llsol.s6_addr32[3] = 
+			llsol.s6_addr32[3] =
 				ia->ia_dstaddr.sin6_addr.s6_addr32[3];
 			llsol.s6_addr8[12] = 0xff;
 
@@ -472,8 +479,15 @@ in6_control(so, cmd, data, ifp)
 
 	privileged = 0;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if 0
+	/* ericsson patch includes this - it is VERY troublesome */
+	if ((p && !suser(p->p_ucred, &p->p_acflag)) || p == NULL)
+#else
 	if (p && !suser(p->p_ucred, &p->p_acflag))
+#endif
+	{
 		privileged++;
+	}
 #else
 	if ((so->so_state & SS_PRIV) != 0)
 		privileged++;
@@ -500,6 +514,47 @@ in6_control(so, cmd, data, ifp)
 	case SIOCGETMIFCNT_IN6:
 		return (mrt6_ioctl(cmd, data));
 	}
+
+#ifdef MIP6
+	/* These require root privileges */
+	switch (cmd) {
+	case SIOCSDEBUG_MIP6:
+	case SIOCSBCFLUSH_MIP6:
+	case SIOCSDEFCONFIG_MIP6:
+	case SIOCSBRUPDATE_MIP6:
+	case SIOCSENABLEBR_MIP6:
+	case SIOCSATTACH_MIP6:
+	case SIOCSRELEASE_MIP6:
+
+	case SIOCSHALISTFLUSH_MIP6:
+	case SIOCSHAPREF_MIP6:
+	case SIOCSFWDSLUNICAST_MIP6:
+	case SIOCSFWDSLMULTICAST_MIP6:
+
+	case SIOCSFORADDRFLUSH_MIP6:
+	case SIOCSHADDRFLUSH_MIP6:
+	case SIOCSBULISTFLUSH_MIP6:
+	case SIOCACOADDR_MIP6:
+	case SIOCAHOMEADDR_MIP6:
+	case SIOCSBULIFETIME_MIP6:
+	case SIOCSHRLIFETIME_MIP6:
+	case SIOCDCOADDR_MIP6:
+	case SIOCSPROMMODE_MIP6:
+	case SIOCSBU2CN_MIP6:
+	case SIOCSREVTUNNEL_MIP6:
+	case SIOCSAUTOCONFIG_MIP6:
+	case SIOCSEAGERMD_MIP6:
+		if (!privileged)
+			return(EPERM);
+		/* Anyone can use these or the user is root */
+		/* case SIOCXVERYSAFECOMMAND_MIP6:  */
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+		return mip6_ioctl(so, cmd, data, ifp, p);
+#else
+		return mip6_ioctl(so, cmd, data, ifp);
+#endif
+	}
+#endif /* MIP6 */
 
 	if (ifp == 0)
 		return(EOPNOTSUPP);
@@ -695,7 +750,7 @@ in6_control(so, cmd, data, ifp)
 	case SIOCGIFAFLAG_IN6:
 		ifr->ifr_ifru.ifru_flags6 = ia->ia6_flags;
 		break;
- 
+
 	case SIOCGIFSTAT_IN6:
 		if (ifp == NULL)
 			return EINVAL;
@@ -871,6 +926,7 @@ in6_control(so, cmd, data, ifp)
 
 		ia->ia6_flags = ifra->ifra_flags;
 		ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/*safety*/
+		ia->ia6_flags &= ~IN6_IFF_NODAD;	/* Mobile IPv6 */
 
 		ia->ia6_lifetime = ifra->ifra_lifetime;
 		/* for sanity */
@@ -886,7 +942,7 @@ in6_control(so, cmd, data, ifp)
 			ia->ia6_lifetime.ia6t_preferred = 0;
 
 		/*
-		 * Perform DAD, if needed. 
+		 * Perform DAD, if needed.
 		 * XXX It may be of use, if we can administratively
 		 * disable DAD.
 		 */
@@ -899,8 +955,11 @@ in6_control(so, cmd, data, ifp)
 		case IFT_SLIP:
 		case IFT_PPP:
 #endif
-			ia->ia6_flags |= IN6_IFF_TENTATIVE;
-			nd6_dad_start(&ia->ia_ifa, NULL);
+			/* Mobile IPv6 modification */
+			if ((ifra->ifra_flags & IN6_IFF_NODAD) == 0) {
+				ia->ia6_flags |= IN6_IFF_TENTATIVE;
+				nd6_dad_start((struct ifaddr *)ia, NULL);
+			}
 			break;
 		case IFT_DUMMY:
 		case IFT_FAITH:
@@ -1341,7 +1400,7 @@ in6_ifinit(ifp, ia, sin6, scrub)
 		in6_ifscrub(ifp, ia);
 		ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
 	}
-	/* xxx 
+	/* xxx
 	 * in_socktrim
 	 */
 	/*
@@ -1468,7 +1527,7 @@ in6_purgemkludge(ifp)
 }
 
 /*
- * Add an address to the list of IP6 multicast addresses for a 
+ * Add an address to the list of IP6 multicast addresses for a
  * given interface.
  */
 struct	in6_multi *
@@ -1580,7 +1639,7 @@ in6_delmulti(in6m)
 			IFAFREE(&in6m->in6m_ia->ia_ifa); /* release reference */
 
 		/*
-		 * Notify the network driver to update its multicast 
+		 * Notify the network driver to update its multicast
 		 * reception filter.
 		 */
 		bzero(&ifr.ifr_addr, sizeof(struct sockaddr_in6));
@@ -1595,7 +1654,7 @@ in6_delmulti(in6m)
 }
 #else /* not FreeBSD3 */
 /*
- * Add an address to the list of IP6 multicast addresses for a 
+ * Add an address to the list of IP6 multicast addresses for a
  * given interface.
  */
 struct	in6_multi *
@@ -1837,7 +1896,7 @@ struct in6_addr *addr;
 	if (addr->s6_addr8[0] == 0xff) {
 		scope = addr->s6_addr8[1] & 0x0f;
 
-		/* 
+		/*
 		 * due to other scope such as reserved,
 		 * return scope doesn't work.
 		 */
@@ -1985,7 +2044,7 @@ in6_ifawithscope(oifp, dst)
 	}
 
 	/*
-	 * We first look for addresses in the same scope on all interfaces. 
+	 * We first look for addresses in the same scope on all interfaces.
 	 * If there is only one, just return it.
 	 * If two or more exist, return one which matches the dst longest.
 	 */
@@ -2028,7 +2087,7 @@ in6_ifawithscope(oifp, dst)
 			       ifa_best ? IN6_ARE_SCOPE_CMP(src_scope, best_scope) : -1,
 			       in6_matchlen(IFA_IN6(ifa), dst),
 			       ((struct in6_ifaddr *)ifa)->ia6_flags);
-#endif 
+#endif
 
 			/*
 			 * Don't use an address before completing DAD
@@ -2239,8 +2298,26 @@ in6_ifawithifp(ifp, dst)
 
 	dep[0] = dep[1] = NULL;
 
+#ifdef MIP6
+	if (mip6_get_home_prefix_hook) {
+		struct nd_prefix *pr;
+		if ((pr = (*mip6_get_home_prefix_hook)()) != NULL &&
+			!IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
+		{
+			if (dst_scope == in6_addrscope(&pr->ndpr_addr)) {
+				printf("%s: Local address %s is chosen for "
+				    "pcb to dest %s.\n",
+				    __FUNCTION__,
+				    ip6_sprintf(&pr->ndpr_addr),
+				    ip6_sprintf(dst));
+				return (in6ifa_ifpwithaddr(ifp, &pr->ndpr_addr));
+			}
+		}
+	}
+#endif /* MIP6 */
+
 	/*
-	 * We first look for addresses in the same scope. 
+	 * We first look for addresses in the same scope.
 	 * If there is one, return it.
 	 * If two or more, return one which matches the dst longest.
 	 * If none, return one of global addresses assigned other ifs.
@@ -2277,7 +2354,7 @@ in6_ifawithifp(ifp, dst)
 					blen = tlen;
 					besta = (struct in6_ifaddr *)ifa;
 				}
-			} else 
+			} else
 				besta = (struct in6_ifaddr *)ifa;
 		}
 	}
@@ -2429,7 +2506,7 @@ in6_setmaxmtu()
 }
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)
-/* 
+/*
  * Convert sockaddr_in6 to sockaddr_in. Original sockaddr_in6 must be
  * v4 mapped addr or v4 compat addr
  */

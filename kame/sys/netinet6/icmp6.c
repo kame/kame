@@ -160,6 +160,10 @@ static struct route_in6 icmp6_reflect_rt;
 #endif 
 static struct timeval icmp6_nextsend = {0, 0};
 
+#ifdef MIP6
+int (*mip6_icmp6_input_hook)(struct mbuf *m, int off) = NULL;
+#endif /* MIP6 */
+
 void
 icmp6_init()
 {
@@ -428,8 +432,21 @@ icmp6_input(mp, offp, proto)
 	if (icmp6->icmp6_type < ICMP6_INFOMSG_MASK)
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_error);
 
+#ifdef MIP6
+	/*
+	 * Mobile IPv6
+	 *
+	 * Check for ICMP errors and modifications and extensions to Router
+	 * Advertisement.
+	 */
+	if (mip6_icmp6_input_hook) {
+		if ((*mip6_icmp6_input_hook)(m, off) != 0)
+			goto freeit;
+	}
+#endif /* MIP6 */
+	
 	switch (icmp6->icmp6_type) {
-
+		
 	case ICMP6_DST_UNREACH:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_dstunreach);
 		switch (code) {

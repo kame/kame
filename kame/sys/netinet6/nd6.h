@@ -144,6 +144,9 @@ struct	nd_defrouter {
 	u_char	flags;
 	u_short	rtlifetime;
 	u_long	expire;
+	u_long	advint;		/* Mobile IPv6 addition (milliseconds) */
+	u_long	advint_expire;	/* Mobile IPv6 addition */
+	int	advints_lost;	/* Mobile IPv6 addition */
 	struct  ifnet *ifp;
 };
 
@@ -232,10 +235,11 @@ extern struct nd_drhead nd_defrouter;
 extern struct nd_prhead nd_prefix;
 
 /* nd6_rtr.c */
+extern struct ifnet *nd6_defifp;  /* XXXYYY */
 extern int nd6_defifindex;
 
 union nd_opts {
-	struct nd_opt_hdr *nd_opt_array[6];	/*max = ND_OPT_MTU*/
+	struct nd_opt_hdr *nd_opt_array[9];	/*max = home agent info*/
 	struct {
 		struct nd_opt_hdr *zero;
 		struct nd_opt_hdr *src_lladdr;
@@ -243,6 +247,9 @@ union nd_opts {
 		struct nd_opt_prefix_info *pi_beg;/* multiple opts, start */
 		struct nd_opt_rd_hdr *rh;
 		struct nd_opt_mtu *mtu;
+		struct nd_opt_hdr *six;
+		struct nd_opt_advint *adv;
+		struct nd_opt_hai *hai;
 		struct nd_opt_hdr *search;	/* multiple opts */
 		struct nd_opt_hdr *last;	/* multiple opts */
 		int done;
@@ -255,6 +262,8 @@ union nd_opts {
 #define nd_opts_pi_end		nd_opt_each.pi_end
 #define nd_opts_rh		nd_opt_each.rh
 #define nd_opts_mtu		nd_opt_each.mtu
+#define nd_opts_adv		nd_opt_each.adv
+#define nd_opts_hai		nd_opt_each.hai
 #define nd_opts_search		nd_opt_each.search
 #define nd_opts_last		nd_opt_each.last
 #define nd_opts_done		nd_opt_each.done
@@ -313,10 +322,15 @@ void defrtrlist_del __P((struct nd_defrouter *));
 void prelist_remove __P((struct nd_prefix *));
 int prelist_update __P((struct nd_prefix *, struct nd_defrouter *,
 	struct mbuf *));
+struct nd_pfxrouter *find_pfxlist_reachable_router __P((struct nd_prefix *)); /* XXXYYY */
 void pfxlist_onlink_check __P((void));
+void defrouter_addifreq __P((struct ifnet *));           /* XXXYYY */
 struct nd_defrouter *defrouter_lookup __P((struct in6_addr *,
 					   struct ifnet *));
+struct nd_prefix *prefix_lookup __P((struct nd_prefix *));  /* XXXYYY */
 int in6_ifdel __P((struct ifnet *, struct in6_addr *));
+struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
+                                        struct nd_defrouter *));  /* XXXYYY */
 int in6_init_prefix_ltimes __P((struct nd_prefix *ndpr));
 void rt6_flush __P((struct in6_addr *, struct ifnet *));
 int nd6_setdefaultiface __P((int));

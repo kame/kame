@@ -27,6 +27,10 @@
  * SUCH DAMAGE.
  */
 
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#include "opt_inet.h"
+#endif
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -57,23 +61,27 @@
 #include <netinet6/nd6.h>
 #include <netinet/icmp6.h>
 
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif
+
 #include <net/net_osdep.h>
 
 #define SDL(s)	((struct sockaddr_dl *)s)
 
 static struct nd_defrouter *defrtrlist_update __P((struct nd_defrouter *));
 static int prelist_add __P((struct nd_prefix *, struct nd_defrouter *));
-static struct nd_prefix *prefix_lookup __P((struct nd_prefix *));
+/* static struct nd_prefix *prefix_lookup __P((struct nd_prefix *)); XXXYYY */
 static struct in6_ifaddr *in6_ifadd __P((struct ifnet *, struct in6_addr *,
 			  struct in6_addr *, int));
-static struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
-					       struct nd_defrouter *));
+/*static struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
+  struct nd_defrouter *)); XXXYYYY */
 static void pfxrtr_add __P((struct nd_prefix *, struct nd_defrouter *));
 static void pfxrtr_del __P((struct nd_pfxrouter *));
-static struct nd_pfxrouter *find_pfxlist_reachable_router __P((struct nd_prefix *));
+/*static struct nd_pfxrouter *find_pfxlist_reachable_router __P((struct nd_prefix *));  XXXYYY */
 static void nd6_detach_prefix __P((struct nd_prefix *));
 static void nd6_attach_prefix __P((struct nd_prefix *));
-static void defrouter_addifreq __P((struct ifnet *));
+/* static void defrouter_addifreq __P((struct ifnet *)); XXXYYY */
 
 static void in6_init_address_ltimes __P((struct nd_prefix *ndpr,
 					 struct in6_addrlifetime *lt6,
@@ -85,6 +93,19 @@ extern int nd6_recalc_reachtm_interval;
 
 struct ifnet *nd6_defifp;
 int nd6_defifindex;
+
+
+#ifdef MIP6
+void (*mip6_select_defrtr_hook)(void) = NULL;
+struct nd_prefix * (*mip6_get_home_prefix_hook)(void) = NULL;
+void (*mip6_prelist_update_hook)(struct nd_prefix *pr, 
+				 struct nd_defrouter *dr) = NULL;
+void (*mip6_probe_pfxrtrs_hook)(void) = NULL;
+void (*mip6_store_advint_hook)(struct nd_opt_advint *ai,
+			       struct nd_defrouter *dr) = NULL;
+int (*mip6_get_md_state_hook)(void) = 0;
+void (*mip6_minus_a_case_hook)(struct nd_prefix *) = NULL;
+#endif /* MIP6 */
 
 /*
  * Receive Router Solicitation Message - just for routers.
@@ -241,6 +262,9 @@ nd6_ra_input(m, off, icmp6len)
 	dr0.rtlifetime = ntohs(nd_ra->nd_ra_router_lifetime);
 	dr0.expire = time_second + dr0.rtlifetime;
 	dr0.ifp = ifp;
+	dr0.advint = 0;		/* Mobile IPv6 */
+	dr0.advint_expire = 0;	/* Mobile IPv6 */
+	dr0.advints_lost = 0;	/* Mobile IPv6 */
 	/* unspecified or not? (RFC 2461 6.3.4) */
 	if (advreachable) {
 		NTOHL(advreachable);
@@ -396,6 +420,13 @@ nd6_ra_input(m, off, icmp6len)
 	pfxlist_onlink_check();
     }
 
+#ifdef MIP6
+	if (mip6_store_advint_hook) {
+		if (ndopts.nd_opts_adv)
+			(*mip6_store_advint_hook)(ndopts.nd_opts_adv, dr);
+	}
+#endif
+
 freeit:
 	m_freem(m);
 }
@@ -432,7 +463,7 @@ defrouter_addreq(new)
 }
 
 /* Add a route to a given interface as default */
-static void
+void
 defrouter_addifreq(ifp)
 	struct ifnet *ifp;
 {
@@ -576,6 +607,16 @@ defrouter_select()
 	struct rtentry *rt = NULL;
 	struct llinfo_nd6 *ln = NULL;
 
+#ifdef MIP6
+	/* Mobile IPv6 alternative routine */
+	if (mip6_select_defrtr_hook) {
+		(*mip6_select_defrtr_hook)();    /* XXXYYY Temporary? */
+		splx(s);
+		return;
+	}
+	/* End of Mobile IPv6 */
+#endif /* MIP6 */
+
 	/*
 	 * Search for a (probably) reachable router from the list.
 	 */
@@ -689,7 +730,7 @@ defrtrlist_update(new)
 	return(n);
 }
 
-static struct nd_pfxrouter *
+struct nd_pfxrouter *
 pfxrtr_lookup(pr, dr)
 	struct nd_prefix *pr;
 	struct nd_defrouter *dr;
@@ -730,7 +771,7 @@ pfxrtr_del(pfr)
 	free(pfr, M_IP6NDP);
 }
 
-static struct nd_prefix *
+struct nd_prefix *
 prefix_lookup(pr)
 	struct nd_prefix *pr;
 {
@@ -784,8 +825,23 @@ prelist_add(pr, dr)
 	LIST_INSERT_HEAD(&nd_prefix, new, ndpr_entry);
 	splx(s);
 
-	if (dr)
+	if (dr) {
 		pfxrtr_add(new, dr);
+#ifdef MIP6
+		if (mip6_get_md_state_hook) {
+			/* 
+			 * If we are in UNDEFINED state and a router appears,
+			 * select that router and change state.
+			 * This case takes care of transitions from UNDEFINED
+			 * to FOREIGN when the prefix is not known from before.
+			 */
+			if ((*mip6_get_md_state_hook)() == MIP6_MD_UNDEFINED) {
+				if (mip6_select_defrtr_hook)
+					(*mip6_select_defrtr_hook)();
+			}
+		}
+#endif /* MIP6 */
+	}
 
 	return 0;
 }
@@ -839,6 +895,7 @@ prelist_update(new, dr, m)
 	int error = 0;
 	int auth;
 	struct in6_addrlifetime *lt6;
+	u_char onlink;	/* Mobile IPv6 */
 
 	auth = 0;
 	if (m) {
@@ -857,6 +914,19 @@ prelist_update(new, dr, m)
 			error = EADDRNOTAVAIL;
 			goto end;
 		}
+
+#ifdef MIP6
+		if (mip6_get_home_prefix_hook) {
+			/* 
+			 * The home prefix should be kept away from updates.
+			 * XXXYYY Tunneled RA? New Home Prefix? Unless
+			 * configured, the code below will be executed.
+			 */
+			if (pr == (*mip6_get_home_prefix_hook)())
+				goto noautoconf1;
+		}
+#endif /* MIP6 */
+
 		/* update prefix information */
 		pr->ndpr_flags = new->ndpr_flags;
 		pr->ndpr_vltime = new->ndpr_vltime;
@@ -971,8 +1041,30 @@ prelist_update(new, dr, m)
 		}
 #endif
 
+		onlink = pr->ndpr_statef_onlink;     /* Mobile IPv6 */
+
 		if (dr && pfxrtr_lookup(pr, dr) == NULL)
 			pfxrtr_add(pr, dr);
+
+#ifdef MIP6
+		if (mip6_prelist_update_hook) {
+			/*
+			 * Check for home prefix. It can't be a fresh prefix
+			 * (since it's static), so check here.
+			 */
+			(*mip6_prelist_update_hook)(pr, dr);
+		}
+
+		if (mip6_probe_pfxrtrs_hook) {
+			/*
+			 * If this prefix previously was detached, maybe we
+			 * have moved.
+			 */
+			if (!onlink)
+				(*mip6_probe_pfxrtrs_hook)();
+		}
+#endif /* MIP6 */
+
 	} else {
 		int error_tmp;
 
@@ -1010,6 +1102,25 @@ prelist_update(new, dr, m)
  noautoconf2:
 		error_tmp = prelist_add(new, dr);
 		error = error_tmp ? error_tmp : error;
+
+#ifdef MIP6
+		if (mip6_probe_pfxrtrs_hook) {
+			/* This is a new prefix, maybe we have moved. */
+			(*mip6_probe_pfxrtrs_hook)();
+		}
+
+		if (mip6_minus_a_case_hook) {
+			/*
+			 * If we are still looking for an autoconfigured home
+			 * address when we are in "minus a" case, here's a new
+			 * prefix and hopefully we can use the address derived
+			 *from that.
+			 */
+			if (ia6)
+				(*mip6_minus_a_case_hook)(new);
+		}
+#endif /* MIP6 */
+
 	}
 
  end:
@@ -1022,7 +1133,7 @@ prelist_update(new, dr, m)
  * detect if a given prefix has a (probably) reachable advertising router.
  * XXX: lengthy function name...
  */
-static struct nd_pfxrouter *
+struct nd_pfxrouter *
 find_pfxlist_reachable_router(pr)
 	struct nd_prefix *pr;
 {

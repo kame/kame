@@ -166,6 +166,10 @@ extern struct ifnet *loifp;
 extern struct ifnet loif[NLOOP];
 #endif
 
+#ifdef MIP6
+int (*mip6_output_hook)(struct mbuf *m, struct ip6_pktopts **opt);
+#endif /* MIP6 */
+
 /*
  * IP6 output. The packet in mbuf chain m contains a skeletal IP6
  * header (with pri, len, nxt, hlim, src, dst).
@@ -221,6 +225,20 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			goto freehdrs;					\
 	}								\
     }
+	
+#ifdef MIP6
+	/*
+	 * Mobile IPv6
+	 *
+	 * Call Mobile IPv6 to check if there are any Destination Header
+	 * options to add.
+	 */
+	if (mip6_output_hook) {
+		error = (*mip6_output_hook)(m, &opt);
+		if (error)
+			goto freehdrs;
+	}
+#endif /* MIP6 */
 
 	bzero(&exthdrs, sizeof(exthdrs));
 	if (opt) {
