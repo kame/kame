@@ -1,0 +1,14 @@
+--- lib/kernel/mroute.c-	Mon Nov  1 21:17:01 1999
++++ lib/kernel/mroute.c	Mon Nov  1 21:17:13 1999
+@@ -15,7 +15,11 @@
+ /*#include <netinet/ip_mroute.h>*/
+ #endif /* linux */
+ #ifdef WIDE_IPV6
++#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+ #include <net/if_var.h>
++#else
++#include <net/if.h>
++#endif
+ #include <netinet6/in6_var.h>
+ #include <netinet6/ip6_mroute.h>
+ #endif /* WIDE_IPV6 */
