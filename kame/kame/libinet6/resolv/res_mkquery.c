@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_mkquery.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_mkquery.c,v 1.3 2000/03/30 14:13:29 itojun Exp $";
+static char rcsid[] = "$Id: res_mkquery.c,v 1.4 2000/04/26 02:56:27 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -186,7 +186,7 @@ res_mkquery(op, dname, class, type, data, datalen, newrr_in, buf, buflen)
 	return (cp - buf);
 }
 
-#ifdef USE_EDNS0
+#ifdef RES_USE_EDNS0
 /* attach OPT pseudo-RR, as documented in RFC2671 (EDNS0). */
 #ifndef T_OPT
 #define T_OPT	41
