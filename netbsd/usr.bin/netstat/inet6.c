@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.1 1999/08/05 09:42:06 itojun Exp $");
+__RCSID("$Id: inet6.c,v 1.2 1999/08/05 16:12:39 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -141,7 +141,7 @@ ip6protopr(off, name)
 			printf("???\n");
 			break;
 		}
-		if (!aflag && IN6_IS_ADDR_ANY(&in6pcb.in6p_laddr)) {
+		if (!aflag && IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_laddr)) {
 			prev = next;
 			continue;
 		}
