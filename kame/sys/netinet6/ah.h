@@ -1,4 +1,4 @@
-/*	$KAME: ah.h,v 1.7 2000/05/22 08:50:33 itojun Exp $	*/
+/*	$KAME: ah.h,v 1.8 2000/05/29 08:05:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -92,15 +92,15 @@ extern int ah_hdrlen __P((struct secasvar *));
 extern size_t ah_hdrsiz __P((struct ipsecrequest *));
 extern void ah4_input __P((struct mbuf *, ...));
 extern int ah4_output __P((struct mbuf *, struct ipsecrequest *));
-extern int ah4_calccksum __P((struct mbuf *, caddr_t,
-				struct ah_algorithm *, struct secasvar *));
+extern int ah4_calccksum __P((struct mbuf *, caddr_t, size_t,
+	struct ah_algorithm *, struct secasvar *));
 
 #ifdef INET6
 extern int ah6_input __P((struct mbuf **, int *, int));
 extern int ah6_output __P((struct mbuf *, u_char *, struct mbuf *,
 	struct ipsecrequest *));
-extern int ah6_calccksum __P((struct mbuf *, caddr_t,
-			      struct ah_algorithm *, struct secasvar *));
+extern int ah6_calccksum __P((struct mbuf *, caddr_t, size_t,
+	struct ah_algorithm *, struct secasvar *));
 #endif /* INET6 */
 
 #endif /*_KERNEL*/

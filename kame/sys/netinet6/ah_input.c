@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.27 2000/05/24 15:04:57 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.28 2000/05/29 08:05:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -195,11 +195,19 @@ ah4_input(m, va_alist)
 
 	sizoff = (sav->flags & SADB_X_EXT_OLD) ? 0 : 4;
 
+	if (siz1 < siz) {
+		ipseclog((LOG_NOTICE, "sum length too short in IPv4 AH input "
+		    "(%lu, should be at least %lu): %s\n",
+		    (u_long)siz1, (u_long)siz,
+		    ipsec4_logpacketstr(ip, spi)));
+		ipsecstat.in_inval++;
+		goto fail;
+	}
 	if ((ah->ah_len << 2) - sizoff != siz1) {
 		ipseclog((LOG_NOTICE, "sum length mismatch in IPv4 AH input "
-			"(%d should be %u): %s\n",
-			(ah->ah_len << 2) - sizoff, (unsigned int)siz1,
-			ipsec4_logpacketstr(ip, spi)));
+		    "(%d should be %lu): %s\n",
+		    (ah->ah_len << 2) - sizoff, (u_long)siz1,
+		    ipsec4_logpacketstr(ip, spi)));
 		ipsecstat.in_inval++;
 		goto fail;
 	}
@@ -270,7 +278,7 @@ ah4_input(m, va_alist)
 #endif
 	ip->ip_off = htons(ip->ip_off);
 #endif
-	if (ah4_calccksum(m, (caddr_t)cksum, algo, sav)) {
+	if (ah4_calccksum(m, (caddr_t)cksum, siz1, algo, sav)) {
 		free(cksum, M_TEMP);
 		ipsecstat.in_inval++;
 		goto fail;
@@ -645,11 +653,19 @@ ah6_input(mp, offp, proto)
 
 	sizoff = (sav->flags & SADB_X_EXT_OLD) ? 0 : 4;
 
+	if (siz1 < siz) {
+		ipseclog((LOG_NOTICE, "sum length too short in IPv6 AH input "
+		    "(%lu, should be at least %lu): %s\n",
+		    (u_long)siz1, (u_long)siz,
+		    ipsec6_logpacketstr(ip6, spi)));
+		ipsec6stat.in_inval++;
+		goto fail;
+	}
 	if ((ah->ah_len << 2) - sizoff != siz1) {
 		ipseclog((LOG_NOTICE, "sum length mismatch in IPv6 AH input "
-			"(%d should be %u): %s\n",
-			(ah->ah_len << 2) - sizoff, (unsigned int)siz1,
-			ipsec6_logpacketstr(ip6, spi)));
+		    "(%d should be %lu): %s\n",
+		    (ah->ah_len << 2) - sizoff, (u_long)siz1,
+		    ipsec6_logpacketstr(ip6, spi)));
 		ipsec6stat.in_inval++;
 		goto fail;
 	}
@@ -695,7 +711,7 @@ ah6_input(mp, offp, proto)
 		goto fail;
 	}
 	
-	if (ah6_calccksum(m, (caddr_t)cksum, algo, sav)) {
+	if (ah6_calccksum(m, (caddr_t)cksum, siz1, algo, sav)) {
 		free(cksum, M_TEMP);
 		ipsec6stat.in_inval++;
 		goto fail;

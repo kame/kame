@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.33 2000/05/22 08:50:33 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.34 2000/05/29 08:05:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -718,9 +718,10 @@ ah_update_mbuf(m, off, len, algo, algos)
  * Don't use m_copy(), it will try to share cluster mbuf by using refcnt.
  */
 int
-ah4_calccksum(m, ahdat, algo, sav)
+ah4_calccksum(m, ahdat, len, algo, sav)
 	struct mbuf *m;
 	caddr_t ahdat;
+	size_t len;
 	struct ah_algorithm *algo;
 	struct secasvar *sav;
 {
@@ -910,6 +911,11 @@ again:
 	if (off < m->m_pkthdr.len)
 		goto again;
 
+	if (len < (*algo->sumsiz)(sav)) {
+		error = EINVAL;
+		goto fail;
+	}
+
 	(algo->result)(&algos, &sumbuf[0]);
 	bcopy(&sumbuf[0], ahdat, (*algo->sumsiz)(sav));
 
@@ -932,9 +938,10 @@ fail:
  * Don't use m_copy(), it will try to share cluster mbuf by using refcnt.
  */
 int
-ah6_calccksum(m, ahdat, algo, sav)
+ah6_calccksum(m, ahdat, len, algo, sav)
 	struct mbuf *m;
 	caddr_t ahdat;
+	size_t len;
 	struct ah_algorithm *algo;
 	struct secasvar *sav;
 {
@@ -1128,6 +1135,11 @@ ah6_calccksum(m, ahdat, algo, sav)
 		proto = nxt;
 		off = newoff;
 		goto again;
+	}
+
+	if (len < (*algo->sumsiz)(sav)) {
+		error = EINVAL;
+		goto fail;
 	}
 
 	(algo->result)(&algos, &sumbuf[0]);
