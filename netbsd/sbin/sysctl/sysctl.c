@@ -865,7 +865,9 @@ struct ctlname icmp6name[] = ICMPV6CTL_NAMES;
 struct ctlname udp6name[] = UDP6CTL_NAMES;
 struct ctlname pim6name[] = PIM6CTL_NAMES;
 struct ctlname ipsec6name[] = IPSEC6CTL_NAMES;
+#ifdef MIP6
 struct ctlname mip6name[] = MIP6CTL_NAMES;
+#endif
 struct list inet6list = { inet6name, IPV6PROTO_MAXID };
 struct list inet6vars[] = {
 /*0*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
