@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.16 2000/10/05 06:34:56 itojun Exp $	*/
+/*	$KAME: main.c,v 1.17 2000/11/11 04:55:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,7 +68,7 @@ int f_debugcmd = 0;	/* specifyed debug level by command line. */
 int f_local = 0;	/* local test mode.  behave like a wall. */
 int vflag = 1;		/* for print-isakmp.c */
 
-static char version[] = "@(#)racoon 20000718 sakane@ydc.co.jp";
+static char version[] = "@(#)racoon 20001111 sakane@ydc.co.jp";
 static char *pname;
 
 int main __P((int, char **));
