@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.80 2002/03/27 11:34:40 itojun Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.81 2002/04/15 01:58:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1065,7 +1065,7 @@ info_recv_initialcontact(iph1)
 		if (cmpsaddrwop(iph1->local, src) == 0 &&
 		    cmpsaddrwop(iph1->remote, dst) == 0)
 			;
-		else if (cmpsaddrwop(iph1->remote, src)  == 0 &&
+		else if (cmpsaddrwop(iph1->remote, src) == 0 &&
 		    cmpsaddrwop(iph1->local, dst) == 0)
 			;
 		else {
