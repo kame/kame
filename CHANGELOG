@@ -1,7 +1,20 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2483 2003/10/01 05:11:59 itojun Exp $
+$KAME: CHANGELOG,v 1.2484 2003/10/01 12:44:50 keiichi Exp $
 
 <200310>
+Wed Oct  1 21:20:16 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/netinet6/mip6_cncore.c:
+	do not insert Home Address Option to any MH header except
+	binding update.
+	detected by the conformance test provided by
+	Yaskawa	Information Systems Corp.
+
+Wed Oct  1 21:20:16 JST 2003	keiichi@iij.ad.jp
+	* kame/kame/mip6control/mip6makeconfig.sh
+	updated the SA/SPD configuration generator script to make it easy
+	to produce esp entries with authentication.  a non-null
+	authentication must be used according to the Mobile IPv6 spec.
+
 Wed Oct  1 15:05:30 JST 2003
 	* sys/net/if.c: make ifindex2ifnet[] growing code safer.  from IIJ SEIL
 	  team.
