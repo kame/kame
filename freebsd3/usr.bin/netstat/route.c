@@ -241,10 +241,10 @@ pr_rthdr()
 	if (Aflag)
 		printf("%-8.8s ","Address");
 	if (lflag)
-		printf("%-*.*s %-*.*s %-6.6s  %6.6s%8.8s  %8.8s %6s\n",
+		printf("%-*.*s %-*.*s %-6.6s  %6.6s%8.8s%6s  %8.8s %6s\n",
 			WID_DST, WID_DST, "Destination",
 			WID_GW, WID_GW, "Gateway",
-			"Flags", "Refs", "Use", "Netif", "Expire");
+			"Flags", "Refs", "Use", "Mtu", "Netif", "Expire");
 	else
 		printf("%-*.*s %-*.*s %-6.6s  %8.8s %6s\n",
 			WID_DST, WID_DST, "Destination",
@@ -589,8 +589,13 @@ p_rtentry(rt)
 	p_sockaddr(&addr.u_sa, &mask.u_sa, rt->rt_flags, WID_DST);
 	p_sockaddr(kgetsa(rt->rt_gateway), NULL, RTF_HOST, WID_GW);
 	p_flags(rt->rt_flags, "%-6.6s ");
-	if (lflag)
-		printf("%6d %8ld ", rt->rt_refcnt, rt->rt_use);
+	if (lflag) {
+		printf("%6d %8ld", rt->rt_refcnt, rt->rt_use);
+		if (rt->rt_rmx.rmx_mtu != 0)
+			printf("%6lu ", rt->rt_rmx.rmx_mtu);
+		else
+			printf("%6s ", "");
+	}
 	if (rt->rt_ifp) {
 		if (rt->rt_ifp != lastif) {
 			kget(rt->rt_ifp, ifnet);
