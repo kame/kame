@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.228 2002/02/14 08:47:04 sakane Exp $	*/
+/*	$KAME: nd6.c,v 1.229 2002/02/22 16:32:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1287,13 +1287,14 @@ nd6_rtrequest(req, rt, sa)
 	}
 
 	if (req == RTM_RESOLVE &&
-	    !nd6_is_addr_neighbor((struct sockaddr_in6 *)rt_key(rt), ifp)) {
+	    (nd6_need_cache(ifp) == 0 || /* stf case */
+	     !nd6_is_addr_neighbor((struct sockaddr_in6 *)rt_key(rt), ifp))) {
 		/*
 		 * FreeBSD and BSD/OS often make a cloned host route based
 		 * on a less-specific route (e.g. the default route).
 		 * If the less specific route does not have a "gateway"
-		 * (this is the case when the route just goes to a p2p
-		 * interface), we'll mistakenly make a neighbor cache for
+		 * (this is the case when the route just goes to a p2p or an
+		 * stf interface), we'll mistakenly make a neighbor cache for
 		 * the host route, and will see strange neighbor solicitation
 		 * for the corresponding destination.  In order to avoid the
 		 * confusion, we check if the destination of the route is
