@@ -1,6 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1304 2000/09/30 15:10:04 itojun Exp $
+$KAME: CHANGELOG,v 1.1305 2000/10/01 03:44:18 jinmei Exp $
+
+<200010>
+2000-10-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/timer.c: fixed a bug that missed necessary
+	braces.
+	(applied a patch from Toshiaki.Nakatsu@fujixerox.co.jp)
 
 <200009>
 Sun Sep 30 JST 2000  itojun@iijlab.net
