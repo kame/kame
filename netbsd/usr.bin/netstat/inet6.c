@@ -67,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.26 2000/02/26 09:41:49 itojun Exp $");
+__RCSID("$Id: inet6.c,v 1.27 2000/02/26 09:43:07 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -807,7 +807,8 @@ ip6_ifstats(ifname)
 	struct in6_ifreq ifr;
 	int s;
 #define	p(f, m) if (ifr.ifr_ifru.ifru_stat.f || sflag <= 1) \
-    printf(m, (unsigned long long)ifr.ifr_ifru.ifru_stat.f, plural(ifr.ifr_ifru.ifru_stat.f))
+    printf(m, (unsigned long long)ifr.ifr_ifru.ifru_stat.f, \
+	plural(ifr.ifr_ifru.ifru_stat.f))
 #define	p_5(f, m) if (ifr.ifr_ifru.ifru_stat.f || sflag <= 1) \
     printf(m, (unsigned long long)ip6stat.f)
 
