@@ -1,30 +1,5 @@
-#
-# diff of /v/obj/editors/emacs/work/emacs-20.3
-# taken at Fri Jul 30 12:32:15 PDT 1999 by wolfgang
-#
---- configure.in-dist	Tue Jun 30 15:15:05 1998
-+++ configure.in	Wed Jul 28 10:38:16 1999
-@@ -1613,7 +1613,7 @@
- rename closedir mkdir rmdir sysinfo \
- random lrand48 bcopy bcmp logb frexp fmod rint cbrt ftime res_init setsid \
- strerror fpathconf select mktime euidaccess getpagesize tzset setlocale \
--utimes setrlimit setpgid getcwd shutdown strftime)
-+utimes setrlimit setpgid getcwd shutdown strftime getaddrinfo)
- 
- # Check this now, so that we will NOT find the above functions in ncurses.
- # That is because we have not set up to link ncurses in lib-src.
---- src/config.in-dist	Sun May 24 21:07:33 1998
-+++ src/config.in	Wed Jul 28 10:40:37 1999
-@@ -233,6 +233,7 @@
- #undef HAVE_GETCWD
- #undef HAVE_SHUTDOWN
- #undef HAVE_STRFTIME
-+#undef HAVE_GETADDRINFO
- 
- #undef LOCALTIME_CACHE
- #undef HAVE_INET_SOCKETS
---- src/process.c-dist	Fri Aug 14 22:51:44 1998
-+++ src/process.c	Fri Jul 30 12:21:11 1999
+--- src/process.c-dist Fri Aug 14 22:51:44 1998
++++ src/process.c      Fri Jul 30 12:21:11 1999
 @@ -1,7 +1,18 @@
 +/*
 + * Locally hacked process.c to add ipv6 support. -wsr
@@ -94,7 +69,7 @@
      port = htons ((unsigned short) XINT (service));
    else
 @@ -1839,6 +1873,8 @@
- 	error ("Unknown service \"%s\"", XSTRING (service)->data);
+       error ("Unknown service \"%s\"", XSTRING (service)->data);
        port = svc_info->s_port;
      }
 +#endif /* HAVE_GETADDRINFO */
@@ -106,7 +81,7 @@
  #endif
  
  #ifndef TERM
-+#ifdef HAVE_GETADDRINFO		/* We have a modern OS. -wsr */
++#ifdef HAVE_GETADDRINFO               /* We have a modern OS. -wsr */
 +  {
 +      immediate_quit = 1;
 +      QUIT;
@@ -117,8 +92,8 @@
 +      hints.ai_protocol = 0;
 +      ret = getaddrinfo(XSTRING (host)->data, portstring, &hints, &res);
 +      if (ret){
-+	  error("%s/%s %s", XSTRING (host)->data, portstring,
-+		gai_strerror(ret));
++        error("%s/%s %s", XSTRING (host)->data, portstring,
++              gai_strerror(ret));
 +      }
 +      immediate_quit = 0;
 +  }
@@ -126,25 +101,25 @@
 +  for (lres = res; lres ; lres = lres->ai_next) { /* address loop */
 +      s = socket(lres->ai_family, lres->ai_socktype, lres->ai_protocol);
 +      if (s < 0) 
-+	  continue;
++        continue;
 +
 +      /* Kernel bugs (on Ultrix at least) cause lossage (not just EINTR)
-+	 when connect is interrupted.  So let's not let it get interrupted.
-+	 Note we do not turn off polling, because polling is only used
-+	 when not interrupt_input, and thus not normally used on the systems
-+	 which have this bug.  On systems which use polling, there's no way
-+	 to quit if polling is turned off.  */
++       when connect is interrupted.  So let's not let it get interrupted.
++       Note we do not turn off polling, because polling is only used
++       when not interrupt_input, and thus not normally used on the systems
++       which have this bug.  On systems which use polling, there's no way
++       to quit if polling is turned off.  */
 +      if (interrupt_input)
-+	  unrequest_sigio ();
++        unrequest_sigio ();
 +
 +      immediate_quit = 1;
 +      QUIT;
 +
 +      ret = connect(s, lres->ai_addr, lres->ai_addrlen);
 +      if (ret){
-+	  close(s);
-+	  s= -1;
-+	  continue;
++        close(s);
++        s= -1;
++        continue;
 +      }
 +
 +      break;
@@ -154,11 +129,11 @@
 +  if (s < 0)
 +  {
 +      if (interrupt_input)
-+	  request_sigio ();
++        request_sigio ();
 +
 +      errno = xerrno;
 +      report_file_error ("connection failed",
-+			 Fcons (host, Fcons (name, Qnil)));
++                       Fcons (host, Fcons (name, Qnil)));
 +  }
 +#else /* HAVE_GETADDRINFO */
 +
@@ -167,7 +142,7 @@
  #ifdef TRY_AGAIN
 @@ -1938,6 +2030,7 @@
        report_file_error ("connection failed",
- 			 Fcons (host, Fcons (name, Qnil)));
+                        Fcons (host, Fcons (name, Qnil)));
      }
 +#endif /* HAVE_GETADDRINFO */
  
