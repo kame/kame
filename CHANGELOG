@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2095 2002/03/02 05:55:45 jinmei Exp $
+$KAME: CHANGELOG,v 1.2096 2002/03/02 09:58:55 jinmei Exp $
 
 <200203>
+2002-03-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput, and related
+	functions):
+	- applied recent clarifications in rfc2292bis:
+	  + ignored IPV6_DONTFRAG and IPV6_RECVPATHMTU for TCP sockets
+	  + disallowed to set non-unspecified address by IPV6_PKTINFO for
+	    TCP sockets
+	- corrected the return value from getsocketopt for IPV6_DONTFRAG and
+	  IPV6_USE_MIN_MTU
+
 2002-03-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_redirect_output): included
 	a target link layer address option in the redirect message for an
