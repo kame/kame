@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.80 2000/08/23 05:18:50 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.81 2000/08/30 05:23:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2299,24 +2299,36 @@ nigroup(name)
 	char *name;
 {
 	char *p;
+	unsigned char *q;
 	MD5_CTX ctxt;
 	u_int8_t digest[16];
 	char l;
 	char hbuf[NI_MAXHOST];
 	struct in6_addr in6;
 
-	p = name;
-	while (p && *p && *p != '.')
-		p++;
-	if (p - name > 63)
-		return NULL;	/*label too long*/
+	p = strchr(name, '.');
+	if (!p)
+		p = name + strlen(name);
 	l = p - name;
+	if (l > 63)
+		return NULL;	/*label too long*/
+#ifdef DIAGNOSTIC
+	if (sizeof(hbuf) - 1 > l)
+		return NULL;	/*label too long*/
+#endif
+	strncpy(hbuf, name, l);
+	hbuf[(int)l] = '\0';
+
+	for (q = name; *q; q++) {
+		if (isupper(*q))
+			*q = tolower(*q);
+	}
 
 	/* generate 8 bytes of pseudo-random value. */
 	bzero(&ctxt, sizeof(ctxt));
 	MD5Init(&ctxt);
 	MD5Update(&ctxt, &l, sizeof(l));
-	MD5Update(&ctxt, name, p - name);
+	MD5Update(&ctxt, name, l);
 	MD5Final(digest, &ctxt);
 
 	if (inet_pton(AF_INET6, "ff02::2:0000:0000", &in6) != 1)
