@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.319 2002/10/02 03:02:11 k-sugyou Exp $	*/
+/*	$KAME: in6.c,v 1.320 2002/10/04 12:00:44 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -131,7 +131,6 @@
 
 #ifdef MLDV2
 #include <netinet/icmp6.h>
-#include <netinet/in_msf.h>
 #include <netinet6/in6_msf.h>
 #endif
 

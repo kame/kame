@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.338 2002/09/27 15:27:23 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.339 2002/10/04 12:00:44 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -123,7 +123,6 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #ifdef MLDV2
-#include <netinet/in_msf.h>
 #include <netinet6/in6_msf.h>
 #endif
 #include <netinet6/nd6.h>

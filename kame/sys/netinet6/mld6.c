@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.61 2002/10/02 11:24:48 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.62 2002/10/04 12:00:44 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -146,7 +146,6 @@
 #include <netinet/icmp6.h>
 #include <netinet6/mld6_var.h>
 #ifdef MLDV2
-#include <netinet/in_msf.h>
 #include <netinet6/in6_msf.h>
 #endif
 #include <net/net_osdep.h>

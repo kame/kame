@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.4 2002/09/19 03:39:15 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.5 2002/10/04 12:00:44 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -96,7 +96,6 @@
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #include <netinet/in_pcb.h>
-#include <netinet/in_msf.h>
 #include <netinet/ip_mroute.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
