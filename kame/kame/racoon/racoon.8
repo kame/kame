@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.8,v 1.26 2001/08/17 07:10:20 itojun Exp $
+.\"	$KAME: racoon.8,v 1.27 2001/08/29 06:11:09 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -98,6 +98,13 @@ assumes the presence of kernel random number device
 .Xr rnd 4
 at
 .Pa /dev/urandom .
+Informational messages are labeled
+.Em info ,
+and debugging messages are labeled
+.Em debug .
+You have to configure
+.Xr syslog.conf 5
+if you want to see them in a logging file.
 .\"
 .Sh FILES
 .Bl -tag -width /usr/local/v6/etc/racoon.conf -compact
@@ -113,6 +120,7 @@ The command exits with 0 on success, and non-zero on errors.
 .Xr racoon.conf 5 ,
 .Xr setkey 8 ,
 .Xr syslogd 8
+.Xr syslog.conf 5
 .\"
 .Sh HISTORY
 The
