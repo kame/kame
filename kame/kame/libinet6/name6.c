@@ -1,8 +1,91 @@
-/* $Id: name6.c,v 1.20 2000/05/01 05:04:44 itojun Exp $ */
+/*	$KAME: name6.c,v 1.21 2000/05/01 05:18:21 itojun Exp $	*/
+
+/*
+ * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/*
+ * ++Copyright++ 1985, 1988, 1993
+ * -
+ * Copyright (c) 1985, 1988, 1993
+ *    The Regents of the University of California.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ * 	This product includes software developed by the University of
+ * 	California, Berkeley and its contributors.
+ * 4. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ * -
+ * Portions Copyright (c) 1993 by Digital Equipment Corporation.
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies, and that
+ * the name of Digital Equipment Corporation not be used in advertising or
+ * publicity pertaining to distribution of the document or software without
+ * specific, written prior permission.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND DIGITAL EQUIPMENT CORP. DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS.   IN NO EVENT SHALL DIGITAL EQUIPMENT
+ * CORPORATION BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
+ * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
+ * SOFTWARE.
+ * -
+ * --Copyright--
+ */
+
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
-
 /*
  * TODO for thread safe
  *	use mutex for _hostconf, _hostconf_init if HOSTCONF is defined.
@@ -17,7 +100,7 @@
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif 
+#endif
 
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -37,19 +120,19 @@
 
 #ifndef HAVE_PORTABLE_PROTOTYPE
 #include "cdecl_ext.h"
-#endif 
+#endif
 
 #ifndef HAVE_U_INT32_T
 #include "bittypes.h"
-#endif 
+#endif
 
 #ifndef HAVE_RES_USE_INET6
 #include "resolv6.h"
-#endif 
+#endif
 
 #ifndef HAVE_SOCKADDR_STORAGE
 #include "sockstorage.h"
-#endif 
+#endif
 
 #ifdef NEED_ADDRINFO_H
 #include "addrinfo.h"
@@ -57,7 +140,7 @@
 
 #ifndef HAVE_RES_STATE_EXT
 #include "resolv_ext.h"
-#endif 
+#endif
 
 #ifndef _PATH_HOSTS
 #define	_PATH_HOSTS	"/etc/hosts"
@@ -94,7 +177,7 @@ union inx_addr {
 	struct in_addr	in_addr;
 #ifdef INET6
 	struct in6_addr	in6_addr;
-#endif 
+#endif
 	struct {
 		u_char	mau_zero[10];
 		u_char	mau_one[2];
@@ -110,7 +193,7 @@ static struct hostent *_hpaddr(int af, const char *name, void *addr, int *errp);
 static struct hostent *_hpmerge(struct hostent *hp1, struct hostent *hp2, int *errp);
 #ifdef INET6
 static struct hostent *_hpmapv6(struct hostent *hp, int *errp);
-#endif 
+#endif
 static struct hostent *_hpsort(struct hostent *hp);
 static struct hostent *_ghbyname(const char *name, int af, int flags, int *errp);
 static char *_hgetword(char **pp);
@@ -341,7 +424,7 @@ getipnodebyname(const char *name, int af, int flags, int *errp)
 		}
 		return _hpaddr(af, name, &addrbuf, errp);
 	}
-#endif 
+#endif
 	if (inet_pton(AF_INET, name, &addrbuf) == 1) {
 		if (af != AF_INET) {
 			if (MAPADDRENABLED(flags)) {
@@ -377,7 +460,7 @@ getipnodebyname(const char *name, int af, int flags, int *errp)
 			hp = _hpmerge(hp, hp2, errp);
 		}
 	}
-#endif 
+#endif
 	return _hpsort(hp);
 }
 
@@ -390,7 +473,7 @@ getipnodebyaddr(const void *src, size_t len, int af, int *errp)
 	struct in6_addr addrbuf;
 #else
 	struct in_addr addrbuf;
-#endif 
+#endif
 
 	*errp = HOST_NOT_FOUND;
 
@@ -427,7 +510,7 @@ getipnodebyaddr(const void *src, size_t len, int af, int *errp)
 			len = sizeof(struct in_addr);
 		}
 		break;
-#endif 
+#endif
 	default:
 		*errp = NO_RECOVERY;
 		return NULL;
@@ -485,7 +568,7 @@ gethostbyname2(const char *name, int af)
 #ifdef INET6
 		if (_res.options & RES_USE_INET6)
 			saved_hp = _hpmapv6(saved_hp, &h_errno);
-#endif 
+#endif
 	}
 	return saved_hp;
 }
@@ -506,7 +589,7 @@ gethostbyname(const char *name)
 		if (hp != NULL)
 			return hp;
 	}
-#endif 
+#endif
 	return gethostbyname2(name, AF_INET);
 }
 
@@ -525,7 +608,7 @@ gethostbyaddr(const char *src, int len, int af)
 #ifdef INET6
 		if (_res.options & RES_USE_INET6)
 			saved_hp = _hpmapv6(saved_hp, &h_errno);
-#endif 
+#endif
 	}
 	return saved_hp;
 }
@@ -717,12 +800,12 @@ _hpmerge(struct hostent *hp1, struct hostent *hp2, int *errp)
 		hp->h_addrtype = AF_INET6;
 		hp->h_length = sizeof(struct in6_addr);
 	} else {
-#endif 
+#endif
 		hp->h_addrtype = hp1->h_addrtype;
 		hp->h_length = hp1->h_length;
 #ifdef INET6
 	}
-#endif 
+#endif
 	hp->h_addr_list = addrs;
 	naddr = 0;
 	for (i = 1; i <= 2; i++) {
@@ -773,7 +856,7 @@ _hpmapv6(struct hostent *hp, int *errp)
 	hp6->h_addr_list = NULL;
 	return _hpmerge(hp6, hp, errp);
 }
-#endif 
+#endif
 
 /*
  * _hpsort: sort address by sortlist
@@ -789,7 +872,7 @@ _hpsort(struct hostent *hp)
 	int nsort = _res.nsort;
 #else
 	int nsort = MAXADDRS;
-#endif 
+#endif
 
 	if (hp == NULL || hp->h_addr_list[1] == NULL || nsort == 0)
 		return hp;
@@ -1412,7 +1495,7 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 	/* XXX */
 	if (af == AF_INET6 && IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)addr))
 		return NULL;
-#endif 
+#endif
 
 	if ((_res.options & RES_INIT) == 0) {
 		if (res_init() < 0) {
@@ -1442,7 +1525,7 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 		}
 		strcpy(bp, "ip6.int");
 		break;
-#endif 
+#endif
 	default:
 		for (; n < addrlen; n++, cp--) {
 			c = *cp;
