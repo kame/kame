@@ -1,4 +1,4 @@
-.\"	$KAME: natpt.conf.5,v 1.13 2002/01/18 07:02:42 fujisawa Exp $
+.\"	$KAME: natpt.conf.5,v 1.14 2002/01/25 02:54:14 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -252,7 +252,8 @@ Enable or disable translation.  Initial status is disabled.
 .\"
 .It Xo Sy set Ar var Ar = Ar value
 .Xc
-Set the value to the variable.  Allowed variable is as follows.
+Set the value to the variable.  Value can use decimal or hexadecimal
+(begin with 0x) notation.  Allowed variable is as follows.
 .Bl -tag -width XXX
 .It Sy translation
 The flag which does Protocol translation.  If this value is not zero,
