@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.16 2000/01/11 16:43:10 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.17 2000/01/11 16:54:34 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -111,10 +111,19 @@ struct prop_pair {
 };
 #define MAXPROPPAIRLEN	256	/* It's enough because field size is 1 octet. */
 
-static vchar_t *get_ph1approval __P((struct ph1handle *iph1, struct prop_pair **pair));
-static struct isakmpsa *get_ph1approvalx __P((struct prop_pair *p, struct isakmpsa *proposal));
+static vchar_t *get_ph1approval __P((struct ph1handle *iph1,
+	struct prop_pair **pair));
+static struct isakmpsa *get_ph1approvalx __P((struct prop_pair *p,
+	struct isakmpsa *proposal));
 static int t2isakmpsa __P((struct isakmp_pl_t *trns, struct isakmpsa *sa));
-static vchar_t *get_ph2approval __P((struct ph2handle *iph2, struct prop_pair **pair));
+static vchar_t *get_ph2approval __P((struct ph2handle *iph2,
+	struct prop_pair **pair));
+static struct ipsecsa *prop2ipsecsa_emit1 __P((struct prop_pair *p));
+static int prop2ipsecsa_emit __P((struct prop_pair **b, size_t max,
+	struct ipsecsa **result));
+static int prop2ipsecsa_recurse __P((struct prop_pair **b0,
+	struct prop_pair **b, size_t l, size_t max, struct ipsecsa **result));
+static struct ipsecsa *prop2ipsecsa __P((struct prop_pair *p));
 static struct ipsecsa *prop2ipsecsa __P((struct prop_pair *));
 static int get_ph2approvalx __P((struct ph2handle *, struct prop_pair *));
 #if 0
@@ -692,7 +701,7 @@ found:
 }
 
 static struct ipsecsa *
-emit1(p)
+prop2ipsecsa_emit1(p)
 	struct prop_pair *p;
 {
 	struct ipsecsa *q;
@@ -723,7 +732,7 @@ emit1(p)
 }
 
 static int
-emit(b, max, result)
+prop2ipsecsa_emit(b, max, result)
 	struct prop_pair **b;
 	size_t max;
 	struct ipsecsa **result;
@@ -736,7 +745,7 @@ emit(b, max, result)
 	for (i = 0; i < max; i++) {
 		YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "param[%d]: %p\n", i, b[i]);
 			print_proppair(b[i]););
-		q->bundles = emit1(b[i]);
+		q->bundles = prop2ipsecsa_emit1(b[i]);
 		YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "got %p from %p\n", q->bundles, b[i]););
 		if (q->bundles == NULL) {
 			delipsecsa(top.next);
@@ -754,7 +763,7 @@ emit(b, max, result)
 	return 0;
 }
 
-int
+static int
 prop2ipsecsa_recurse(b0, b, l, max, result)
 	struct prop_pair **b0;
 	struct prop_pair **b;
@@ -774,7 +783,7 @@ prop2ipsecsa_recurse(b0, b, l, max, result)
 			for (i = 0; i < max; i++)
 				printf(" %d=%p", i, b[i]);
 			printf("\n");
-			ret = emit(b, max, result);
+			ret = prop2ipsecsa_emit(b, max, result);
 			YIPSDEBUG(DEBUG_SA,
 				plog(logp, LOCATION, NULL, "%p\n", result);
 				ipsecdoi_printsa(*result););
