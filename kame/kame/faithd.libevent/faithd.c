@@ -369,10 +369,9 @@ inbound(s, event, arg)
 	}
 
 	l = read(r->s, r->buf, sizeof(r->buf));
-	if (l < 0) {
-		logmsg(LOG_ERR, "read fail, errno=%d", errno);
+	if (l < 0 && errno == EAGAIN) {
 		event_add(&r->inbound, NULL);
-	} else if (l == 0) {
+	} else if (l <= 0) {
 		shutdown(r->s, SHUT_RD);
 		shutdown(w->s, SHUT_WR);
 		r->shutdown++;
