@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.29 2001/05/21 12:42:59 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.30 2001/05/21 13:48:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -180,7 +180,7 @@ udp6_output(in6p, m, addr6, control)
 	int priv;
 	int af = AF_INET6, hlen = sizeof(struct ip6_hdr);
 #ifdef INET
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 	struct ip *ip;
 	struct udpiphdr *ui;
 #endif
@@ -413,7 +413,7 @@ udp6_output(in6p, m, addr6, control)
 		    flags, in6p->in6p_moptions, NULL);
 		break;
 	case AF_INET:
-#if defined(INET) && defined(__NetBSD__)
+#if defined(INET) && (defined(__NetBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
 		/* can't transmit jumbogram over IPv4 */
 		if (plen > 0xffff) {
 			error = EMSGSIZE;
@@ -422,7 +422,13 @@ udp6_output(in6p, m, addr6, control)
 
 		ip = mtod(m, struct ip *);
 		ui = (struct udpiphdr *)ip;
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+		ui->ui_x00 = 0;
+		ui->ui_x01 = 0;
+		ui->ui_x1 = 0;
+#else
 		bzero(ui->ui_x1, sizeof ui->ui_x1);
+#endif
 		ui->ui_pr = IPPROTO_UDP;
 		ui->ui_len = htons(plen);
 		bcopy(&laddr->s6_addr[12], &ui->ui_src, sizeof(ui->ui_src));
@@ -443,7 +449,14 @@ udp6_output(in6p, m, addr6, control)
 #ifdef IPSEC
 		(void)ipsec_setsocket(m, NULL);	/* XXX */
 #endif /*IPSEC*/
+#ifdef __NetBSD__
 		error = ip_output(m, NULL, &in6p->in6p_route, 0 /* XXX */);
+#elif defined(__bsdi__) && _BSDI_VERSION >= 199802
+		error = ip_output(m, NULL, (struct route *)&in6p->in6p_route,
+				  0, NULL);
+#else
+#error OS not supported
+#endif /* INET && (freebsd || bsdi4) */
 		break;
 #else
 		error = EAFNOSUPPORT;
