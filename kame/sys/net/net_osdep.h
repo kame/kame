@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.42 2001/04/27 23:51:40 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.43 2001/05/16 03:02:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -34,6 +34,16 @@
 
 /*
  * OS dependencies:
+ *
+ * - whether the IPv4 input routine convert the byte order of some fileds
+ *   of the IP header (x: convert to the host byte order, s: strip the header
+ *   length for possible reassembly)
+ *          ip_len ip_id ip_off
+ * bsdi3:       xs     x      x
+ * bsdi4:       xs            x
+ * FreeBSD4:    xs            x
+ * NetBSD:       x            x
+ * OpenBSD:     xs     x      x
  *
  * - ifa_ifwithaf()
  *   bsdi[34], netbsd, and openbsd define it in sys/net/if.c
@@ -260,6 +270,22 @@ extern const char *if_name __P((struct ifnet *));
 #ifndef __NetBSD__
 #define IFAREF(ifa)	do { ++(ifa)->ifa_refcnt; } while (0)
 #endif
+
+#if defined(__bsdi__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+#define WITH_CONVERT_AND_STRIP_IP_LEN
+#endif
+#ifdef __NetBSD__
+#define WITH_CONVERT_IP_LEN
+#endif
+
+#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(__OpenBSD__)
+#define WITH_CONVERT_IP_ID
+#endif
+
+#if 1				/* at this moment, all OSes do this */
+#define WITH_CONVERT_IP_OFF
+#endif
+
 
 #endif /*_KERNEL*/
 #endif /*__NET_NET_OSDEP_H_DEFINED_ */
