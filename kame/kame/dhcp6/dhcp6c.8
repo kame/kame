@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.8,v 1.18 2003/01/06 16:12:02 jinmei Exp $
+.\"	$KAME: dhcp6c.8,v 1.19 2003/01/21 07:42:15 jinmei Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -77,9 +77,13 @@ or
 .Dv SIGTERM
 signals,
 .Nm
-will release all stateful resources from the system.
+will remove all stateful resources from the system.
 In the former case the daemon will then reinvoke itself,
 while it will stop running in the latter case.
+Note that in the former case
+.Nm
+does not send release message to the server,
+the message which the implementation currently does not support.
 .\"
 .Sh FILES
 .Bl -tag -width /usr/local/v6/etc/dhcp6c.conf -compact
