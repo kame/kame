@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.9 2000/04/14 08:36:02 itojun Exp $	*/
+/*	$KAME: if_gif.h,v 1.10 2000/04/19 01:51:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -49,7 +49,7 @@
 struct encaptab;
 
 struct gif_softc {
-	struct ifnet	gif_if;	   /* common area */
+	struct ifnet	gif_if;	   /* common area - must be at the top */
 	struct sockaddr	*gif_psrc; /* Physical src addr */
 	struct sockaddr	*gif_pdst; /* Physical dst addr */
 	union {
