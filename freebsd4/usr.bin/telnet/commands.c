@@ -2254,7 +2254,7 @@ tn(argc, argv)
 	hints.ai_family = family;
 	hints.ai_socktype = SOCK_STREAM;
 	error = getaddrinfo(src_addr, 0, &hints, &src_res);
-	if (error == EAI_NODATA) {
+	if (error == EAI_NONAME) {
 		hints.ai_flags = 0;
 		error = getaddrinfo(src_addr, 0, &hints, &src_res);
 	}
@@ -2859,8 +2859,13 @@ sourceroute(ai, arg, cpp, lenp, protop, optp)
 	int	*protop;
 	int	*optp;
 {
-	static char buf[1024 + ALIGNBYTES];	/*XXX*/
+	/* XXX: 2064 = 127(max hops in type 0 rthdr) * sizeof(ip6_hdr)
+	   + 16(margin) */
+	static char buf[2064 + ALIGNBYTES];
 	struct cmsghdr *cmsg;
+#ifdef INET6
+	struct ip6_rthdr *rth;
+#endif
 #ifdef	sysV88
 	static IOPTN ipopt;
 #endif
@@ -2909,11 +2914,13 @@ sourceroute(ai, arg, cpp, lenp, protop, optp)
 
 #ifdef INET6
 	if (ai->ai_family == AF_INET6) {
-		cmsg = inet6_rthdr_init(*cpp, IPV6_RTHDR_TYPE_0);
+		if ((rth = inet6_rth_init((void *)*cpp, sizeof(buf),
+					  IPV6_RTHDR_TYPE_0, 0)) == NULL)
+			return -1;
 		if (*cp != '@')
 			return -1;
 		*protop = IPPROTO_IPV6;
-		*optp = IPV6_PKTOPTIONS;
+		*optp = IPV6_RTHDR;
 	} else
 #endif
       {
@@ -2980,7 +2987,7 @@ sourceroute(ai, arg, cpp, lenp, protop, optp)
 
 		hints.ai_flags = AI_NUMERICHOST;
 		error = getaddrinfo(cp, NULL, &hints, &res);
-		if (error == EAI_NODATA) {
+		if (error == EAI_NONAME) {
 			hints.ai_flags = 0;
 			error = getaddrinfo(cp, NULL, &hints, &res);
 		}
@@ -2995,8 +3002,8 @@ sourceroute(ai, arg, cpp, lenp, protop, optp)
 #ifdef INET6
 		if (res->ai_family == AF_INET6) {
 			sin6 = (struct sockaddr_in6 *)res->ai_addr;
-			inet6_rthdr_add(cmsg, &sin6->sin6_addr,
-					IPV6_RTHDR_LOOSE);
+			if (inet6_rth_add((void *)rth, &sin6->sin6_addr) == -1)
+				return(0);
 		} else
 #endif
 	      {
@@ -3011,23 +3018,14 @@ sourceroute(ai, arg, cpp, lenp, protop, optp)
 		/*
 		 * Check to make sure there is space for next address
 		 */
-#ifdef INET6
-		if (res->ai_family == AF_INET6) {
-			if (((char *)CMSG_DATA(cmsg) +
-			     sizeof(struct ip6_rthdr) +
-			     ((inet6_rthdr_segments(cmsg) + 1) *
-			      sizeof(struct in6_addr))) > ep)
-			return -1;
-		} else
-#endif
 		if (lsrp + 4 > ep)
 			return -1;
 		freeaddrinfo(res);
 	}
 #ifdef INET6
 	if (res->ai_family == AF_INET6) {
-		inet6_rthdr_lasthop(cmsg, IPV6_RTHDR_LOOSE);
-		*lenp = cmsg->cmsg_len;
+		rth->ip6r_len = rth->ip6r_segleft * 2;
+		*lenp = (rth->ip6r_len + 1) << 3;
 	} else
 #endif
       {
