@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.17 2003/01/23 05:08:59 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.18 2003/02/05 08:25:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -305,7 +305,7 @@ duration(iac)
 	u_int32_t base = DHCP6_DURATITION_INFINITE;
 
 	/*
-	 * Determine for the smallest pltime.
+	 * Determine the smallest pltime.
 	 * XXX: we assume the lifetimes of all prefixes are synchronized.
 	 */
 	for (sp = TAILQ_FIRST(&iac_pd->siteprefix_head); sp;
