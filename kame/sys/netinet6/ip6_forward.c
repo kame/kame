@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.49 2000/08/14 18:40:10 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.50 2000/08/14 18:47:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -119,7 +119,7 @@ static __inline void
 add_performance_log2(val)
 	unsigned long long val;
 {
-	ip6_performance_log[ip6_logentry] = +val;
+	ip6_performance_log[ip6_logentry] += val;
 }
 #endif
 
