@@ -464,7 +464,7 @@ insert_bgp_route_entry(list, rte, bnp)
 	newbre->bnp = bnp;
 	newbre->rte = rte;
 	newbre->next = *brep;
-	brep = &newbre;
+	*brep = newbre;
 }
 
 static struct bgproute_list *
