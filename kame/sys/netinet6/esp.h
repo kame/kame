@@ -1,4 +1,4 @@
-/*	$KAME: esp.h,v 1.9 2000/07/15 16:07:48 itojun Exp $	*/
+/*	$KAME: esp.h,v 1.10 2000/07/20 17:41:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -42,8 +42,6 @@
 #endif
 #endif
 
-struct secasvar;
-
 struct esp {
 	u_int32_t	esp_spi;	/* ESP */
 	/*variable size, 32bit bound*/	/* Initialization Vector */
@@ -72,26 +70,25 @@ struct esptail {
 	/*variable size, 32bit bound*/	/* Authentication data (new IPsec)*/
 };
 
-struct esp_algorithm_state {
-	struct secasvar *sav;
-	void* foo;	/*per algorithm data - maybe*/
-};
+#ifdef _KERNEL
+struct secasvar;
 
-/* XXX yet to be defined */
 struct esp_algorithm {
 	size_t padbound;	/* pad boundary, in byte */
 	int (*mature) __P((struct secasvar *));
 	int keymin;	/* in bits */
 	int keymax;	/* in bits */
+	size_t schedlen;
 	const char *name;
 	int (*ivlen) __P((struct secasvar *));
 	int (*decrypt) __P((struct mbuf *, size_t,
 		struct secasvar *, const struct esp_algorithm *, int));
 	int (*encrypt) __P((struct mbuf *, size_t, size_t,
 		struct secasvar *, const struct esp_algorithm *, int));
+	/* not supposed to be called directly */
+	int (*schedule) __P((const struct esp_algorithm *, struct secasvar *));
 };
 
-#ifdef _KERNEL
 extern const struct esp_algorithm *esp_algorithm_lookup __P((int));
 
 /* crypt routines */
@@ -106,6 +103,7 @@ extern int esp6_input __P((struct mbuf **, int *, int));
 #endif /* INET6 */
 #endif /*_KERNEL*/
 
+extern int esp_schedule __P((const struct esp_algorithm *, struct secasvar *));
 extern int esp_auth __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, u_char *));
 

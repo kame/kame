@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.142 2000/07/17 01:42:39 itojun Exp $	*/
+/*	$KAME: key.c,v 1.143 2000/07/20 17:41:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2546,10 +2546,18 @@ key_delsav(sav)
 	if (__LIST_CHAINED(sav))
 		LIST_REMOVE(sav, chain);
 
-	if (sav->key_auth != NULL)
+	if (sav->key_auth != NULL) {
+		bzero(_KEYBUF(sav->key_auth), _KEYLEN(sav->key_auth));
 		KFREE(sav->key_auth);
-	if (sav->key_enc != NULL)
+	}
+	if (sav->key_enc != NULL) {
+		bzero(_KEYBUF(sav->key_enc), _KEYLEN(sav->key_enc));
 		KFREE(sav->key_enc);
+	}
+	if (sav->sched) {
+		bzero(sav->sched, sav->schedlen);
+		KFREE(sav->sched);
+	}
 	if (sav->replay != NULL)
 		keydb_delsecreplay(sav->replay);
 	if (sav->lft_c != NULL)
@@ -2699,6 +2707,8 @@ key_setsaval(sav, m, mhp)
 	sav->replay = NULL;
 	sav->key_auth = NULL;
 	sav->key_enc = NULL;
+	sav->sched = NULL;
+	sav->schedlen = 0;
 	sav->iv = NULL;
 	sav->lft_c = NULL;
 	sav->lft_h = NULL;
@@ -2966,6 +2976,8 @@ key_setsaval(sav, m, mhp)
 		KFREE(sav->key_auth);
 	if (sav->key_enc != NULL)
 		KFREE(sav->key_enc);
+	if (sav->sched)
+		KFREE(sav->sched);
 	if (sav->iv != NULL)
 		KFREE(sav->iv);
 	if (sav->lft_c != NULL)

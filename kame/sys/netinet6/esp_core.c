@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.18 2000/07/16 08:44:24 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.19 2000/07/20 17:41:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -86,28 +86,38 @@ static int esp_descbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_descbc_encrypt __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
+static int esp_descbc_schedule __P((const struct esp_algorithm *,
+	struct secasvar *));
 static int esp_cbc_mature __P((struct secasvar *));
 static int esp_blowfish_cbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_blowfish_cbc_encrypt __P((struct mbuf *, size_t,
 	size_t, struct secasvar *, const struct esp_algorithm *, int));
+static int esp_blowfish_cbc_schedule __P((const struct esp_algorithm *,
+	struct secasvar *));
 static int esp_blowfish_cbc_ivlen __P((struct secasvar *));
 static int esp_cast128cbc_ivlen __P((struct secasvar *));
 static int esp_cast128cbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_cast128cbc_encrypt __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
+static int esp_cast128cbc_schedule __P((const struct esp_algorithm *,
+	struct secasvar *));
 static int esp_3descbc_ivlen __P((struct secasvar *));
 static int esp_3descbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_3descbc_encrypt __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
+static int esp_3descbc_schedule __P((const struct esp_algorithm *,
+	struct secasvar *));
 #ifdef SADB_X_EALG_RC5CBC
 static int esp_rc5cbc_ivlen __P((struct secasvar *));
 static int esp_rc5cbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_rc5cbc_encrypt __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
+static int esp_rc5cbc_schedule __P((const struct esp_algorithm *,
+	struct secasvar *));
 #endif
 static void esp_increment_iv __P((struct secasvar *));
 static caddr_t mbuf_find_offset __P((struct mbuf *, size_t, size_t));
@@ -117,26 +127,31 @@ esp_algorithm_lookup(idx)
 	int idx;
 {
 	static struct esp_algorithm esp_algorithms[] = {
-		{ 8, esp_descbc_mature, 64, 64, "des-cbc",
+		{ 8, esp_descbc_mature, 64, 64, sizeof(des_key_schedule),
+			"des-cbc",
 			esp_descbc_ivlen, esp_descbc_decrypt,
-			esp_descbc_encrypt, },
-		{ 8, esp_cbc_mature, 192, 192, "3des-cbc",
+			esp_descbc_encrypt, esp_descbc_schedule, },
+		{ 8, esp_cbc_mature, 192, 192, sizeof(des_key_schedule) * 3,
+			"3des-cbc",
 			esp_3descbc_ivlen, esp_3descbc_decrypt,
-			esp_3descbc_encrypt, },
-		{ 1, esp_null_mature, 0, 2048, "null",
-			esp_null_ivlen, esp_null_decrypt, esp_null_encrypt, },
-		{ 8, esp_cbc_mature, 40, 448, "blowfish-cbc",
+			esp_3descbc_encrypt, esp_3descbc_schedule, },
+		{ 1, esp_null_mature, 0, 2048, 0, "null",
+			esp_null_ivlen, esp_null_decrypt,
+			esp_null_encrypt, NULL, },
+		{ 8, esp_cbc_mature, 40, 448, sizeof(BF_KEY), "blowfish-cbc",
 			esp_blowfish_cbc_ivlen, esp_blowfish_cbc_decrypt,
-			esp_blowfish_cbc_encrypt, },
-		{ 8, esp_cbc_mature, 40, 128, "cast128-cbc",
+			esp_blowfish_cbc_encrypt, esp_blowfish_cbc_schedule, },
+		{ 8, esp_cbc_mature, 40, 128, sizeof(u_int32_t) * 32,
+			"cast128-cbc",
 			esp_cast128cbc_ivlen, esp_cast128cbc_decrypt,
-			esp_cast128cbc_encrypt, },
+			esp_cast128cbc_encrypt, esp_cast128cbc_schedule, },
 #ifdef SADB_X_EALG_RC5CBC
-		{ 8, esp_cbc_mature, 40, 2040, "rc5-cbc",
+		{ 8, esp_cbc_mature, 40, 2040, sizeof(RC5_WORD) * 34, "rc5-cbc",
 			esp_rc5cbc_ivlen, esp_rc5cbc_decrypt,
-			esp_rc5cbc_encrypt, },
+			esp_rc5cbc_encrypt, esp_rc5cbc_schedule, },
 #else
-		{ 8, NULL, 40, 2040, "rc5-cbc dummy", NULL, NULL, NULL, },
+		{ 8, NULL, 40, 2040, 0, "rc5-cbc dummy",
+			NULL, NULL, NULL, NULL, },
 #endif
 	};
 
@@ -158,6 +173,28 @@ esp_algorithm_lookup(idx)
 	default:
 		return NULL;
 	}
+}
+
+int
+esp_schedule(algo, sav)
+	const struct esp_algorithm *algo;
+	struct secasvar *sav;
+{
+
+	if (_KEYBITS(sav->key_enc) < algo->keymin ||
+	    _KEYBITS(sav->key_enc) > algo->keymax) {
+		ipseclog((LOG_ERR,
+		    "esp_schedule %s: unsupported key length %d: "
+		    "need %d to %d bits\n", algo->name, _KEYBITS(sav->key_enc),
+		    algo->keymin, algo->keymax));
+		return EINVAL;
+	}
+
+	if (!algo->schedule || algo->schedlen == 0)
+		return 0;
+	if (!sav->sched || sav->schedlen != algo->schedlen)
+		panic("invalid sav->schedlen in esp_schedule");
+	return (*algo->schedule)(algo, sav);
 }
 
 /*
@@ -281,12 +318,8 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
-	if (_KEYBITS(sav->key_enc) < algo->keymin
-	 || algo->keymax < _KEYBITS(sav->key_enc)) {
-		ipseclog((LOG_ERR, "esp_descbc_decrypt: bad keylen %d\n",
-		    _KEYBITS(sav->key_enc)));
+	if (!sav->sched || sav->schedlen != algo->schedlen)
 		return EINVAL;
-	}
 
 	if (sav->flags & SADB_X_EXT_OLD) {
 		/* RFC 1827 */
@@ -341,23 +374,8 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 		return EINVAL;
 	}
 
-    {
-	int deserr;
-	des_key_schedule ks;
-
-	deserr = des_key_sched((C_Block *)_KEYBUF(sav->key_enc), ks);
-	if (deserr != 0) {
-		ipseclog((LOG_ERR,
-		    "esp_descbc_decrypt: key error %d\n", deserr));
-		return EINVAL;
-	}
-
-	error = des_cbc_encrypt(m, bodyoff, plen, ks, (C_Block *)iv,
-	    DES_DECRYPT);
-
-	/* for safety */
-	bzero(&ks, sizeof(des_key_schedule));
-    }
+	error = des_cbc_encrypt(m, bodyoff, plen,
+	    *(des_key_schedule *)sav->sched, (C_Block *)iv, DES_DECRYPT);
 
 	/* for safety */
 	bzero(&tiv[0], sizeof(tiv));
@@ -394,12 +412,8 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
-	if (_KEYBITS(sav->key_enc) < algo->keymin
-	 || algo->keymax < _KEYBITS(sav->key_enc)) {
-		ipseclog((LOG_ERR, "esp_descbc_encrypt: bad keylen %d\n",
-		    _KEYBITS(sav->key_enc)));
+	if (!sav->sched || sav->schedlen != algo->schedlen)
 		return EINVAL;
-	}
 
 	if (sav->flags & SADB_X_EXT_OLD) {
 		/* RFC 1827 */
@@ -462,23 +476,8 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 		return EINVAL;
 	}
 
-    {
-	int deserr;
-	des_key_schedule ks;
-
-	deserr = des_key_sched((C_Block *)_KEYBUF(sav->key_enc), ks);
-	if (deserr != 0) {
-		ipseclog((LOG_ERR,
-		    "esp_descbc_encrypt: key error %d\n", deserr));
-		return EINVAL;
-	}
-
-	error = des_cbc_encrypt(m, bodyoff, plen, ks, (C_Block *)iv,
-	    DES_ENCRYPT);
-
-	/* for safety */
-	bzero(&ks, sizeof(des_key_schedule));
-    }
+	error = des_cbc_encrypt(m, bodyoff, plen,
+	    *(des_key_schedule *)sav->sched, (C_Block *)iv, DES_ENCRYPT);
 
 	esp_increment_iv(sav);
 
@@ -486,6 +485,19 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	bzero(&tiv[0], sizeof(tiv));
 
 	return error;
+}
+
+static int
+esp_descbc_schedule(algo, sav)
+	const struct esp_algorithm *algo;
+	struct secasvar *sav;
+{
+
+	if (des_key_sched((C_Block *)_KEYBUF(sav->key_enc),
+	    *(des_key_schedule *)sav->sched))
+		return EINVAL;
+	else
+		return 0;
 }
 
 static int
@@ -571,14 +583,6 @@ esp_blowfish_cbc_decrypt(m, off, sav, algo, ivlen)
 		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
-	if (_KEYBITS(sav->key_enc) < algo->keymin
-	 || algo->keymax < _KEYBITS(sav->key_enc)) {
-		ipseclog((LOG_ERR,
-		    "esp_blowfish_cbc_decrypt: unsupported key length %d: "
-		    "need %d to %d bits\n", _KEYBITS(sav->key_enc),
-		    algo->keymin, algo->keymax));
-		return EINVAL;
-	}
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
 		    "esp_blowfish_cbc_decrypt: unsupported ESP version\n"));
@@ -589,6 +593,8 @@ esp_blowfish_cbc_decrypt(m, off, sav, algo, ivlen)
 		    "esp_blowfish_cbc_decrypt: unsupported ivlen %d\n", ivlen));
 		return EINVAL;
 	}
+	if (!sav->sched || sav->schedlen != algo->schedlen)
+		return EINVAL;
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
@@ -613,8 +619,8 @@ esp_blowfish_cbc_decrypt(m, off, sav, algo, ivlen)
 	s = splnet();	/* XXX correct? */
 #endif
 
-	BF_set_key(&key, _KEYBITS(sav->key_enc) / 8, _KEYBUF(sav->key_enc));
-	error = BF_cbc_encrypt_m(m, bodyoff, plen, &key, iv, BF_DECRYPT);
+	error = BF_cbc_encrypt_m(m, bodyoff, plen, (BF_KEY *)sav->sched, iv,
+	    BF_DECRYPT);
 
 	/* for safety */
 	bzero(&key, sizeof(BF_KEY));
@@ -655,14 +661,6 @@ esp_blowfish_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
-	if (_KEYBITS(sav->key_enc) < algo->keymin
-	 || algo->keymax < _KEYBITS(sav->key_enc)) {
-		ipseclog((LOG_ERR,
-		    "esp_blowfish_cbc_encrypt: unsupported key length %d: "
-		    "need %d to %d bits\n", _KEYBITS(sav->key_enc),
-		    algo->keymin, algo->keymax));
-		return EINVAL;
-	}
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
 		    "esp_blowfish_cbc_encrypt: unsupported ESP version\n"));
@@ -673,6 +671,8 @@ esp_blowfish_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 		    "esp_blowfish_cbc_encrypt: unsupported ivlen %d\n", ivlen));
 		return EINVAL;
 	}
+	if (!sav->sched || sav->schedlen != algo->schedlen)
+		return EINVAL;
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
@@ -691,8 +691,8 @@ esp_blowfish_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	s = splnet();	/* XXX correct? */
 #endif
 
-	BF_set_key(&key, _KEYBITS(sav->key_enc) / 8, _KEYBUF(sav->key_enc));
-	error = BF_cbc_encrypt_m(m, bodyoff, plen, &key, iv, BF_ENCRYPT);
+	error = BF_cbc_encrypt_m(m, bodyoff, plen, (BF_KEY *)sav->sched, iv,
+	    BF_ENCRYPT);
 
 	/* for safety */
 	bzero(&key, sizeof(BF_KEY));
@@ -702,6 +702,17 @@ esp_blowfish_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	esp_increment_iv(sav);
 
 	return error;
+}
+
+static int
+esp_blowfish_cbc_schedule(algo, sav)
+	const struct esp_algorithm *algo;
+	struct secasvar *sav;
+{
+
+	BF_set_key((BF_KEY *)sav->sched, _KEYLEN(sav->key_enc),
+	    _KEYBUF(sav->key_enc));
+	return 0;
 }
 
 static int
@@ -756,6 +767,8 @@ esp_cast128cbc_decrypt(m, off, sav, algo, ivlen)
 		    "esp_cast128cbc_decrypt: unsupported ivlen %d\n", ivlen));
 		return EINVAL;
 	}
+	if (!sav->sched || sav->schedlen != algo->schedlen)
+		return EINVAL;
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
@@ -777,21 +790,8 @@ esp_cast128cbc_decrypt(m, off, sav, algo, ivlen)
 	}
 
 	/* decrypt */
-    {
-	u_int8_t key[16];
-	u_int32_t subkey[32];
-
-	bzero(key, sizeof(key));
-	bcopy(_KEYBUF(sav->key_enc), key, _KEYLEN(sav->key_enc));
-
-	set_cast128_subkey(subkey, key);
-	error = cast128_cbc_process(m, bodyoff, plen, subkey, iv,
-	    _KEYBITS(sav->key_enc) / 8, CAST128_DECRYPT);
-
-	/* for safety */
-	bzero(subkey, sizeof(subkey));
-	bzero(key, sizeof(key));
-    }
+	error = cast128_cbc_process(m, bodyoff, plen, (u_int32_t *)sav->sched,
+	    iv, _KEYLEN(sav->key_enc), CAST128_DECRYPT);
 
 	return error;
 }
@@ -839,6 +839,8 @@ esp_cast128cbc_encrypt(m, off, plen, sav, algo, ivlen)
 		    "esp_cast128cbc_encrypt: unsupported ivlen %d\n", ivlen));
 		return EINVAL;
 	}
+	if (!sav->sched || sav->schedlen != algo->schedlen)
+		return EINVAL;
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
@@ -852,25 +854,22 @@ esp_cast128cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	bcopy(sav->iv, iv, ivlen);
 
 	/* encrypt */
-    {
-	u_int8_t key[16];
-	u_int32_t subkey[32];
-
-	bzero(key, sizeof(key));
-	bcopy(_KEYBUF(sav->key_enc), key, _KEYLEN(sav->key_enc));
-
-	set_cast128_subkey(subkey, key);
-	error = cast128_cbc_process(m, bodyoff, plen, subkey, iv,
-	    _KEYBITS(sav->key_enc) / 8, CAST128_ENCRYPT);
-
-	/* for safety */
-	bzero(subkey, sizeof(subkey));
-	bzero(key, sizeof(key));
-    }
+	error = cast128_cbc_process(m, bodyoff, plen, (u_int32_t *)sav->sched,
+	    iv, _KEYLEN(sav->key_enc), CAST128_ENCRYPT);
 
 	esp_increment_iv(sav);
 
 	return error;
+}
+
+static int
+esp_cast128cbc_schedule(algo, sav)
+	const struct esp_algorithm *algo;
+	struct secasvar *sav;
+{
+
+	set_cast128_subkey((u_int32_t *)sav->sched, _KEYBUF(sav->key_enc));
+	return 0;
 }
 
 static int
@@ -900,12 +899,6 @@ esp_3descbc_decrypt(m, off, sav, algo, ivlen)
 		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
-	if (_KEYBITS(sav->key_enc) < algo->keymin
-	 || algo->keymax < _KEYBITS(sav->key_enc)) {
-		ipseclog((LOG_ERR, "esp_3descbc_decrypt: bad keylen %d\n",
-		    _KEYBITS(sav->key_enc)));
-		return EINVAL;
-	}
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
 		    "esp_3descbc_decrypt: unsupported ESP version\n"));
@@ -916,6 +909,8 @@ esp_3descbc_decrypt(m, off, sav, algo, ivlen)
 		    "esp_3descbc_decrypt: unsupported ivlen %d\n", ivlen));
 		return EINVAL;
 	}
+	if (!sav->sched || sav->schedlen != algo->schedlen)
+		return EINVAL;
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
@@ -936,24 +931,8 @@ esp_3descbc_decrypt(m, off, sav, algo, ivlen)
 	}
 
 	/* decrypt packet */
-    {
-	int deserr[3];
-	des_key_schedule ks[3];
-
-	deserr[0] = des_key_sched((C_Block *)_KEYBUF(sav->key_enc),ks[0]);
-	deserr[1] = des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 8), ks[1]);
-	deserr[2] = des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 16), ks[2]);
-	if ((deserr[0] != 0) || (deserr[1] != 0) || (deserr[2] != 0)) {
-		ipseclog((LOG_ERR, "esp_3descbc_decrypt: key error %d/%d/%d\n",
-		    deserr[0], deserr[1], deserr[2]));
-		return EINVAL;
-	}
-
-	des_3cbc_process(m, bodyoff, plen, ks, (C_Block *)iv, DES_DECRYPT);
-
-	/* for safety */
-	bzero(ks[0], sizeof(des_key_schedule)*3);
-    }
+	des_3cbc_process(m, bodyoff, plen, (des_key_schedule *)sav->sched,
+	    (C_Block *)iv, DES_DECRYPT);
 
 	/* for safety */
 	bzero(&tiv[0], sizeof(tiv));
@@ -985,12 +964,6 @@ esp_3descbc_encrypt(m, off, plen, sav, algo, ivlen)
 		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
-	if (_KEYBITS(sav->key_enc) < algo->keymin
-	 || algo->keymax < _KEYBITS(sav->key_enc)) {
-		ipseclog((LOG_ERR, "esp_3descbc_encrypt: bad keylen %d\n",
-		    _KEYBITS(sav->key_enc)));
-		return EINVAL;
-	}
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
 		    "esp_3descbc_encrypt: unsupported ESP version\n"));
@@ -1001,6 +974,8 @@ esp_3descbc_encrypt(m, off, plen, sav, algo, ivlen)
 		    "esp_3descbc_encrypt: unsupported ivlen %d\n", ivlen));
 		return EINVAL;
 	}
+	if (!sav->sched || sav->schedlen != algo->schedlen)
+		return EINVAL;
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
@@ -1014,27 +989,31 @@ esp_3descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	bcopy((caddr_t)sav->iv, (caddr_t)iv, ivlen);
 
 	/* encrypt packet */
-    {
-	int deserr[3];
-	des_key_schedule ks[3];
-
-	deserr[0] = des_key_sched((C_Block *)_KEYBUF(sav->key_enc),     ks[0]);
-	deserr[1] = des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 8), ks[1]);
-	deserr[2] = des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 16), ks[2]);
-	if ((deserr[0] != 0) || (deserr[1] != 0) || (deserr[2] != 0)) {
-		ipseclog((LOG_ERR, "esp_3descbc_encrypt: key error %d/%d/%d\n",
-		    deserr[0], deserr[1], deserr[2]));
-		return EINVAL;
-	}
-
-	des_3cbc_process(m, bodyoff, plen, ks, (C_Block *)iv, DES_ENCRYPT);
-
-	/* for safety */
-	bzero(ks[0], sizeof(des_key_schedule)*3);
-    }
+	des_3cbc_process(m, bodyoff, plen, (des_key_schedule *)sav->sched,
+	    (C_Block *)iv, DES_ENCRYPT);
 
 	esp_increment_iv(sav);
 
+	return 0;
+}
+
+static int
+esp_3descbc_schedule(algo, sav)
+	const struct esp_algorithm *algo;
+	struct secasvar *sav;
+{
+	int error;
+	des_key_schedule *p;
+	int i;
+	char *k;
+
+	p = (des_key_schedule *)sav->sched;
+	k = _KEYBUF(sav->key_enc);
+	for (i = 0; i < 3; i++) {
+		error = des_key_sched((C_Block *)(k + 8 * i), p[i]);
+		if (error)
+			return EINVAL;
+	}
 	return 0;
 }
 
@@ -1066,12 +1045,6 @@ esp_rc5cbc_decrypt(m, off, sav, algo, ivlen)
 		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
-	if ((_KEYBITS(sav->key_enc) < 40) || (_KEYBITS(sav->key_enc) > 2040)) {
-		ipseclog((LOG_ERR,
-		    "esp_rc5cbc_decrypt: unsupported key length %d: "
-		    "need 40 to 2040 bit\n", _KEYBITS(sav->key_enc)));
-		return EINVAL;
-	}
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
 		    "esp_rc5cbc_decrypt: unsupported ESP version\n"));
@@ -1082,6 +1055,8 @@ esp_rc5cbc_decrypt(m, off, sav, algo, ivlen)
 		    ivlen));
 		return EINVAL;
 	}
+	if (!sav->sched || sav->schedlen != algo->schedlen)
+		return EINVAL;
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
@@ -1103,16 +1078,8 @@ esp_rc5cbc_decrypt(m, off, sav, algo, ivlen)
 	}
 
 	/* decrypt */
-    {
-	RC5_WORD e_key[34];
-
-	set_rc5_expandkey(e_key, _KEYBUF(sav->key_enc),
-			_KEYBITS(sav->key_enc) / 8, 16);
-	error = rc5_cbc_process(m, bodyoff, plen, e_key, iv, RC5_DECRYPT);
-
-	/* for safety */
-	bzero(e_key, sizeof(e_key));
-    }
+	error = rc5_cbc_process(m, bodyoff, plen, (RC5_WORD *)sav->sched, iv,
+	    RC5_DECRYPT);
 
 	return error;
 }
@@ -1142,14 +1109,6 @@ esp_rc5cbc_encrypt(m, off, plen, sav, algo, ivlen)
 		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
-	if (_KEYBITS(sav->key_enc) < algo->keymin
-	 || _KEYBITS(sav->key_enc) > algo->keymax) {
-		ipseclog((LOG_ERR,
-		    "esp_rc5cbc_encrypt: unsupported key length %d: "
-		    "need %d to %d bits\n", _KEYBITS(sav->key_enc),
-		    algo->keymin, algo->keymax));
-		return EINVAL;
-	}
 	if (sav->flags & SADB_X_EXT_OLD) {
 		ipseclog((LOG_ERR,
 		    "esp_rc5cbc_encrypt: unsupported ESP version\n"));
@@ -1160,6 +1119,8 @@ esp_rc5cbc_encrypt(m, off, plen, sav, algo, ivlen)
 		    ivlen));
 		return EINVAL;
 	}
+	if (!sav->sched || sav->schedlen != algo->schedlen)
+		return EINVAL;
 
 	ivoff = off + sizeof(struct newesp);
 	bodyoff = off + sizeof(struct newesp) + ivlen;
@@ -1173,20 +1134,23 @@ esp_rc5cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	bcopy(sav->iv, iv, ivlen);
 
 	/* encrypt */
-    {
-	RC5_WORD e_key[34];
-
-	set_rc5_expandkey(e_key, _KEYBUF(sav->key_enc),
-			_KEYBITS(sav->key_enc) / 8, 16);
-	error = rc5_cbc_process(m, bodyoff, plen, e_key, iv, RC5_ENCRYPT);
-
-	/* for safety */
-	bzero(e_key, sizeof(e_key));
-    }
+	error = rc5_cbc_process(m, bodyoff, plen, (RC5_WORD *)sav->sched, iv,
+	    RC5_ENCRYPT);
 
 	esp_increment_iv(sav);
 
 	return error;
+}
+
+static int
+esp_rc5cbc_schedule(algo, sav)
+	const struct esp_algorithm *algo;
+	struct secasvar *sav;
+{
+
+	set_rc5_expandkey((RC5_WORD *)sav->sched, _KEYBUF(sav->key_enc),
+	    _KEYLEN(sav->key_enc), 16);
+	return 0;
 }
 #endif
 
