@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.107 2000/05/28 00:57:57 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.108 2000/05/28 02:19:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -136,8 +136,9 @@ extern struct in6pcb rawin6pcb;
 extern struct inpcbhead ripcb;
 #endif
 extern struct timeval icmp6errratelim;
+static struct timeval icmp6errratelim_last;
 extern int icmp6errppslim;
-static int icmp6errppscount = 0;
+static int icmp6errpps_count = 0;
 extern int icmp6_nodeinfo;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
@@ -2024,7 +2025,7 @@ icmp6_fasttimo()
 	mld6_fasttimeo();
 
 	/* reset ICMPv6 pps limit */
-	icmp6errppscount = 0;
+	icmp6errpps_count = 0;
 }
 
 static const char *
@@ -2735,14 +2736,13 @@ icmp6_ratelimit(dst, type, code)
 	const int type;			/* not used at this moment */
 	const int code;			/* not used at this moment */
 {
-	static struct timeval icmp6errratelim_last;
 	int ret;
 
 	ret = 0;	/*okay to send*/
 
 	/* PPS limit */
-	icmp6errppscount++;
-	if (icmp6errppslim && icmp6errppscount > icmp6errppslim / 5) {
+	icmp6errpps_count++;
+	if (icmp6errppslim && icmp6errpps_count > icmp6errppslim / 5) {
 		/* The packet is subject to pps limit */
 		ret++;
 	}
