@@ -466,6 +466,9 @@ udp6_ctlinput(cmd, sa, ip6, m, off)
 	struct udphdr uh;
 	struct sockaddr_in6 sa6;
 
+	if (sa->sa_family != AF_INET6 ||
+	    sa->sa_len != sizeof(struct sockaddr_in6))
+		return;
 #if 0
 	if (cmd == PRC_IFNEWADDR)
 		in6_mrejoin(&udb6);
@@ -476,13 +479,6 @@ udp6_ctlinput(cmd, sa, ip6, m, off)
 		return;
 
 	/* translate addresses into internal form */
-	if (sa->sa_family != AF_INET6 ||
-	    sa->sa_len != sizeof(struct sockaddr_in6)) {
-		log(LOG_ERR, "udp6_ctlinput: arg sa is not for IPv6,"
-		    "sa->sa_family = %d, len = %d\n",
-		    sa->sa_family, sa->sa_len);
-		return;
-	}
 	sa6 = *(struct sockaddr_in6 *)sa;
 	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr))
 		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
