@@ -1016,6 +1016,7 @@ in_broadcast(in, ifp)
 #define ia (ifatoia(ifa))
 	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
 		if (ifa->ifa_addr->sa_family == AF_INET &&
+		    !in_hosteq(in, ia->ia_addr.sin_addr) &&
 		    (in_hosteq(in, ia->ia_broadaddr.sin_addr) ||
 		     in_hosteq(in, ia->ia_netbroadcast) ||
 		     (hostzeroisbroadcast && 
