@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.46 2000/01/14 08:24:20 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.47 2000/01/14 09:36:52 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -2134,14 +2134,8 @@ key_getsavbyspi(sah, spi)
 				continue;
 			}
 
-			if (sav->spi == spi) {
-				sav->refcnt++;
-				KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-					printf("DP key_getsavbyspi cause "
-						"refcnt++:%d SA:%p\n",
-						sav->refcnt, sav));
+			if (sav->spi == spi)
 				return sav;
-			}
 		}
 	}
 
@@ -3825,7 +3819,6 @@ key_do_getnewspi(spirange, saidx)
 	u_int32_t newspi;
 	u_int32_t min, max;
 	int count = key_spi_trycnt;
-	struct secasvar *sav;	/* existence check */
 
 	/* set spi range to allocate */
 	if (spirange != NULL) {
@@ -3848,10 +3841,8 @@ key_do_getnewspi(spirange, saidx)
 	}
 
 	if (min == max) {
-		if ((sav = key_checkspidup(saidx, min)) != NULL) {
-			printf("key_do_getnewspi: SPI %u exists already.\n",
-				min);
-			key_freesav(sav);
+		if (key_checkspidup(saidx, min) != NULL) {
+			printf("key_do_getnewspi: SPI %u exists already.\n", min);
 			return 0;
 		}
 
@@ -3868,9 +3859,8 @@ key_do_getnewspi(spirange, saidx)
 			/* generate pseudo-random SPI value ranged. */
 			newspi = min + (random() % ( max - min + 1 ));
 
-			if ((sav = key_checkspidup(saidx, newspi)) == NULL)
+			if (key_checkspidup(saidx, newspi) == NULL)
 				break;
-			key_freesav(sav);
 		}
 
 		if (count == 0 || newspi == 0) {
@@ -3972,7 +3962,7 @@ key_update(mhp)
 	if ((sav = key_getsavbyspi(sah, sa0->sadb_sa_spi)) == NULL) {
 		printf("key_update: no such a SA found (spi:%u)\n",
 			(u_int32_t)ntohl(sa0->sadb_sa_spi));
-		msg0->sadb_msg_errno = ENOENT;
+		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
 #endif
@@ -3982,7 +3972,7 @@ key_update(mhp)
 		printf("key_update: protocol mismatched (DB=%u param=%u)\n",
 			sav->sah->saidx.proto, proto);
 		msg0->sadb_msg_errno = EINVAL;
-		goto err;
+		return NULL;
 	}
 #ifdef IPSEC_DOSEQCHECK
 	if (sav->spi != sa0->sadb_sa_spi) {
@@ -3990,23 +3980,27 @@ key_update(mhp)
 			(u_int32_t)ntohl(sav->spi),
 			(u_int32_t)ntohl(sa0->sadb_sa_spi));
 		msg0->sadb_msg_errno = EINVAL;
-		goto err;
+		return NULL;
 	}
 #endif
 	if (sav->pid != msg0->sadb_msg_pid) {
 		printf("key_update: pid mismatched (DB:%u param:%u)\n",
 			sav->pid, msg0->sadb_msg_pid);
 		msg0->sadb_msg_errno = EINVAL;
-		goto err;
+		return NULL;
 	}
 
 	/* copy sav values */
-	if (key_setsaval(sav, mhp))
-		goto err;
+	if (key_setsaval(sav, mhp)) {
+		key_freesav(sav);
+		return NULL;
+	}
 
 	/* check SA values to be mature. */
-	if ((msg0->sadb_msg_errno = key_mature(sav)) != 0)
-		goto err;
+	if ((msg0->sadb_msg_errno = key_mature(sav)) != 0) {
+		key_freesav(sav);
+		return NULL;
+	}
 
 	/*
 	 * we must call key_freesav() whenever we leave a function context,
@@ -4026,10 +4020,6 @@ key_update(mhp)
 	}
 	return newmsg;
     }
-
-  err:
-	key_freesav(sav);
-	return NULL;
 }
 
 /*
@@ -4150,9 +4140,8 @@ key_add(mhp)
 
 	/* create new SA entry. */
 	/* We can create new SA only if SPI is differenct. */
-	if ((newsav = key_getsavbyspi(newsah, sa0->sadb_sa_spi)) != NULL) {
+	if (key_getsavbyspi(newsah, sa0->sadb_sa_spi)) {
 		printf("key_add: SA already exists.\n");
-		key_freesav(newsav);
 		msg0->sadb_msg_errno = EEXIST;
 		return NULL;
 	}
@@ -4406,12 +4395,7 @@ key_delete(mhp)
 		return NULL;
 	}
 
-	/*
-	 * call key_freesav() by 2 times because refcnt incremented
-	 * key_getsavbyspi(), also call it whenever status change to DELETE
-	 */
 	key_sa_chgstate(sav, SADB_SASTATE_DEAD);
-	key_freesav(sav);
 	key_freesav(sav);
 	sav = NULL;
 
@@ -4523,7 +4507,6 @@ key_get(mhp)
 	if ((satype = key_proto2satype(sah->saidx.proto)) == 0) {
 		printf("key_get: there was invalid proto in SAD.\n");
 		msg0->sadb_msg_errno = EINVAL;
-		key_freesav(sav);
 		return NULL;
 	}
 
@@ -4534,15 +4517,12 @@ key_get(mhp)
 	if (newmsg == NULL) {
 		printf("key_get: No more memory.\n");
 		msg0->sadb_msg_errno = ENOBUFS;
-		key_freesav(sav);
 		return NULL;
 	}
 
 	/* create new sadb_msg to reply. */
 	(void)key_setdumpsa(newmsg, sav, SADB_GET,
 	                    satype, msg0->sadb_msg_seq, msg0->sadb_msg_pid);
-
-	key_freesav(sav);
 
 	return newmsg;
     }
