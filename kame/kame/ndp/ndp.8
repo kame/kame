@@ -1,4 +1,4 @@
-.\"	$KAME: ndp.8,v 1.16 2001/07/24 03:25:17 itojun Exp $
+.\"	$KAME: ndp.8,v 1.17 2001/08/28 12:04:08 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -150,6 +150,7 @@ If additional arguments
 are given,
 .Nm
 sets or clears the specified flags for the interface.
+Each flag should be separated by white spaces or tab characters.
 Possible flags are as follows.
 All of the flags can begin with the
 special character
@@ -163,6 +164,17 @@ which means the flag should be cleared.
 turn on or off NUD (Neighbor Unreachability Detection) on the
 interface.
 NUD is usually turned on by default.
+.It Xo
+.Ic accept_rtadv
+.Xc
+specify whether or not to accept Router Advertisement messages
+received on the
+.Ar interface .
+Note that the kernel does not accept Router Advertisement messages
+unless the
+.Li net.inet6.ip6.accept_rtadv
+variable is non-0, even if the flag is on.
+This flag is set to 1 by default.
 .El
 .It Fl n
 Do not try to resolve numeric address to hostname.
