@@ -130,6 +130,7 @@ man/man8/kpasswdd.8.gz
 man/man8/kstash.8.gz
 man/man8/ktutil.8.gz
 man/man8/push.8.gz
+man/man8/string2key.8.gz
 sbin/dump_log
 sbin/kadmin
 sbin/kstash
