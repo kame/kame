@@ -150,7 +150,7 @@ struct udp_ip6 {
 #endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
 
 static void udp_append __P((struct inpcb *last, struct ip *ip,
-			    struct mbuf *n));
+			    struct mbuf *n, int off));
 #if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
 static void ip_2_ip6_hdr __P((struct ip6_hdr *ip6, struct ip *ip));
 #endif
@@ -268,8 +268,6 @@ udp_input(m, off, proto)
 		 */
 		udp_in.sin_port = uh->uh_sport;
 		udp_in.sin_addr = ip->ip_src;
-		m->m_len -= sizeof (struct udpiphdr);
-		m->m_data += sizeof (struct udpiphdr);
 		/*
 		 * Locate pcb(s) for datagram.
 		 * (Algorithm copied from raw_intr().)
@@ -300,21 +298,15 @@ udp_input(m, off, proto)
 
 #ifdef IPSEC
 				/* check AH/ESP integrity. */
-				if (last != NULL) {
-					/* due to different from other BSD stacks */
-					m->m_len += sizeof (struct udpiphdr);
-					m->m_data -= sizeof (struct udpiphdr);
-
-				    	if (ipsec4_in_reject_so(m, last->inp_socket)) {
-						ipsecstat.in_polvio++;
-						/* do not inject data to pcb */
-					}
-					m->m_len -= sizeof (struct udpiphdr);
-					m->m_data += sizeof (struct udpiphdr);
-				} else
+				if (ipsec4_in_reject_so(m, last->inp_socket))
+					ipsecstat.in_polvio++;
+					/* do not inject data to pcb */
+				else
 #endif /*IPSEC*/
 				if ((n = m_copy(m, 0, M_COPYALL)) != NULL)
-					udp_append(last, ip, n);
+					udp_append(last, ip, n,
+						   iphlen +
+						   sizeof(struct udphdr));
 			}
 			last = inp;
 			/*
@@ -339,20 +331,13 @@ udp_input(m, off, proto)
 			goto bad;
 		}
 #ifdef IPSEC
-		/* due to different from other BSD stacks */
-		m->m_len += sizeof (struct udpiphdr);
-		m->m_data -= sizeof (struct udpiphdr);
-
 		/* check AH/ESP integrity. */
-		if (last != NULL && ipsec4_in_reject_so(m, last->inp_socket)) {
+		if (ipsec4_in_reject_so(m, last->inp_socket)) {
 			ipsecstat.in_polvio++;
 			goto bad;
 		}
-
-		m->m_len -= sizeof (struct udpiphdr);
-		m->m_data += sizeof (struct udpiphdr);
 #endif /*IPSEC*/
-		udp_append(last, ip, m);
+		udp_append(last, ip, m, iphlen + sizeof(struct udphdr));
 		return;
 	}
 	/*
@@ -384,17 +369,10 @@ udp_input(m, off, proto)
 		return;
 	}
 #ifdef IPSEC
-	/* due to different from other BSD stacks */
-	m->m_len += sizeof (struct udpiphdr);
-	m->m_data -= sizeof (struct udpiphdr);
-
-	if (inp != NULL && ipsec4_in_reject_so(m, inp->inp_socket)) {
+	if (ipsec4_in_reject_so(m, inp->inp_socket)) {
 		ipsecstat.in_polvio++;
 		goto bad;
 	}
-
-	m->m_len -= sizeof (struct udpiphdr);
-	m->m_data += sizeof (struct udpiphdr);
 #endif /*IPSEC*/
 
 	/*
@@ -418,10 +396,7 @@ udp_input(m, off, proto)
 #endif
 		ip_savecontrol(inp, &opts, ip, m);
 	}
-	iphlen += sizeof(struct udphdr);
-	m->m_len -= iphlen;
-	m->m_pkthdr.len -= iphlen;
-	m->m_data += iphlen;
+	m_adj(m, iphlen + sizeof(struct udphdr));
 #if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
 	if (inp->inp_vflag & INP_IPV6) {
 		in6_sin_2_v4mapsin6(&udp_in, &udp_in6.uin6_sin);
@@ -466,10 +441,11 @@ ip_2_ip6_hdr(ip6, ip)
  * caller must properly init udp_ip6 and udp_in6 beforehand.
  */
 static void
-udp_append(last, ip, n)
+udp_append(last, ip, n, off)
 	struct inpcb *last;
 	struct ip *ip;
 	struct mbuf *n;
+	int off;
 {
 	struct sockaddr *append_sa;
 	struct mbuf *opts = 0;
@@ -502,7 +478,7 @@ udp_append(last, ip, n)
 	} else
 #endif
 	append_sa = (struct sockaddr *)&udp_in;
-
+	m_adj(n, off);
 	if (sbappendaddr(&last->inp_socket->so_rcv, append_sa, n, opts) == 0) {
 		m_freem(n);
 		if (opts)
