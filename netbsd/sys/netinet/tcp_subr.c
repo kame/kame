@@ -483,8 +483,8 @@ tcp_template(tp)
 		ip6->ip6_flow = in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK;
 		if (in6p->in6p_flags & IN6P_AUTOFLOWLABEL) {
 			ip6->ip6_flow &= ~IPV6_FLOWLABEL_MASK;
-			ip6->ip6_flow |= (htonl(ip6_randomflowlabel()) &
-			    IPV6_FLOWLABEL_MASK);
+			ip6->ip6_flow |=
+			    (htonl(ip6_randomflowlabel()) & IPV6_FLOWLABEL_MASK);
 		}
 		ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
 		ip6->ip6_vfc |= IPV6_VERSION;
@@ -805,8 +805,8 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			ip6->ip6_hlim = ip6_defhlim;
 		ip6->ip6_flow &= ~IPV6_FLOWINFO_MASK;
 		if (tp && (tp->t_in6pcb->in6p_flags & IN6P_AUTOFLOWLABEL)) {
-			ip6->ip6_flow |= (htonl(ip6_randomflowlabel()) &
-			    IPV6_FLOWLABEL_MASK);
+			ip6->ip6_flow |=
+			    (htonl(ip6_randomflowlabel()) & IPV6_FLOWLABEL_MASK);
 		}
 		break;
 	    }
