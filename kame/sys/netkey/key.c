@@ -33,7 +33,7 @@
  * This code is referd to RFC 2367
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
@@ -127,7 +127,7 @@
 #include <sys/rnd.h>
 #endif
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #include <sys/random.h>
 #endif
 
@@ -607,7 +607,7 @@ found:
 	KEY_CHKSPDIR(sp->dir, dir, "key_allocsp");
 
 	/* found a SPD entry */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	sp->lastused = time_second;
 #else
 	sp->lastused = time.tv_sec;
@@ -697,7 +697,7 @@ key_gettunnel(osrc, odst, isrc, idst)
 	return NULL;
 
 found:
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	sp->lastused = time_second;
 #else
 	sp->lastused = time.tv_sec;
@@ -2080,7 +2080,7 @@ key_spdadd(so, m, mhp)
 		}
 	}
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	newsp->created = time_second;
 	newsp->lastused = time_second;
 #else
@@ -2100,7 +2100,7 @@ key_spdadd(so, m, mhp)
 		struct secspacq *spacq;
 		if ((spacq = key_getspacq(&spidx)) != NULL) {
 			/* reset counter in order to deletion by timehandler. */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 			spacq->created = time_second;
 #else
 			spacq->created = time.tv_sec;
@@ -3095,7 +3095,7 @@ key_newsav(m, mhp, sah, errp)
 	}
 
 	/* reset created */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	newsav->created = time_second;
 #else
 	newsav->created = time.tv_sec;
@@ -3398,7 +3398,7 @@ key_setsaval(sav, m, mhp)
 	}
 
 	/* reset created */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	sav->created = time_second;
 #else
 	sav->created = time.tv_sec;
@@ -3418,7 +3418,7 @@ key_setsaval(sav, m, mhp)
 	sav->lft_c->sadb_lifetime_exttype = SADB_EXT_LIFETIME_CURRENT;
 	sav->lft_c->sadb_lifetime_allocations = 0;
 	sav->lft_c->sadb_lifetime_bytes = 0;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	sav->lft_c->sadb_lifetime_addtime = time_second;
 #else
 	sav->lft_c->sadb_lifetime_addtime = time.tv_sec;
@@ -4190,7 +4190,7 @@ key_ismyaddr(sa)
 		sin = (struct sockaddr_in *)sa;
 #ifdef __NetBSD__
 		for (ia = in_ifaddr.tqh_first; ia; ia = ia->ia_list.tqe_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+#elif defined(__FreeBSD__)
 		for (ia = in_ifaddrhead.tqh_first; ia;
 		     ia = ia->ia_link.tqe_next)
 #else
@@ -4246,7 +4246,7 @@ key_ismyaddr6(sin6)
 		 * about IPv4 multicast??
 		 */
 		in6m = NULL;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 		IN6_LOOKUP_MULTI(in6, ia->ia_ifp, in6m);
 #else
 		for ((in6m) = ia->ia6_multiaddrs.lh_first;
@@ -4880,7 +4880,7 @@ key_randomfill(p, l)
 	n = l;
 #elif defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	n = (size_t)read_random(p, (u_int)l);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#elif defined(__FreeBSD__)
 	n = (size_t)read_random_unlimited(p, (u_int)l);
 #else
 	*(u_int32_t *)p = arc4random();
@@ -5079,7 +5079,7 @@ key_getspi(so, m, mhp)
 		struct secacq *acq;
 		if ((acq = key_getacqbyseq(mhp->msg->sadb_msg_seq)) != NULL) {
 			/* reset counter in order to deletion by timehandler. */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 			acq->created = time_second;
 #else
 			acq->created = time.tv_sec;
@@ -6414,7 +6414,7 @@ key_newacq(saidx)
 	/* copy secindex */
 	bcopy(saidx, &newacq->saidx, sizeof(newacq->saidx));
 	newacq->seq = (acq_seq == ~0 ? 1 : ++acq_seq);
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	newacq->created = time_second;
 #else
 	newacq->created = time.tv_sec;
@@ -6472,7 +6472,7 @@ key_newspacq(spidx)
 
 	/* copy secindex */
 	bcopy(spidx, &acq->spidx, sizeof(acq->spidx));
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	acq->created = time_second;
 #else
 	acq->created = time.tv_sec;
@@ -6556,7 +6556,7 @@ key_acquire2(so, m, mhp)
 		}
 
 		/* reset acq counter in order to deletion by timehandler. */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 		acq->created = time_second;
 #else
 		acq->created = time.tv_sec;
@@ -8013,7 +8013,7 @@ key_sa_recordxfer(sav, m)
 	 *	<-----> SOFT
 	 */
     {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	sav->lft_c->sadb_lifetime_usetime = time_second;
 #else
 	sav->lft_c->sadb_lifetime_usetime = time.tv_sec;

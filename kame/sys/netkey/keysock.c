@@ -29,11 +29,11 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_ipsec.h"
 #endif
 
-/* This code has derived from sys/net/rtsock.c on FreeBSD2.2.5 */
+/* This code has derived from sys/net/rtsock.c on FreeBSD 2.2.5 */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -43,7 +43,7 @@
 #include <sys/sysctl.h>
 #endif
 #include <sys/mbuf.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 #include <sys/socket.h>
@@ -59,10 +59,8 @@
 #ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
  /* include nothing */
-#elif __FreeBSD__ >= 3
-#include <machine/ipl.h>
 #else
-#include <machine/spl.h>
+#include <machine/ipl.h>
 #endif
 #endif
 
@@ -411,7 +409,7 @@ key_sendup_mbuf(so, m, target)
 
 #ifdef __NetBSD__
 	for (rp = rawcb.lh_first; rp; rp = rp->rcb_list.le_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+#elif defined(__FreeBSD__)
 	LIST_FOREACH(rp, &rawcb_list, list)
 #else
 	for (rp = rawcb.rcb_next; rp != &rawcb; rp = rp->rcb_next)

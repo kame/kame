@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.38 2003/09/06 05:15:44 itojun Exp $	*/
+/*	$KAME: key_debug.c,v 1.39 2004/06/02 10:32:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifdef _KERNEL
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"

@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.82 2003/09/07 07:47:33 itojun Exp $	*/
+/*	$KAME: keydb.c,v 1.83 2004/06/02 10:32:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -68,7 +68,7 @@
 #define NPF 0
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 MALLOC_DEFINE(M_SECA, "key mgmt", "security associations, key management");
 #endif
 
