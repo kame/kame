@@ -1,4 +1,4 @@
-/*	$KAME: scope.c,v 1.7 2001/11/13 10:26:41 jinmei Exp $ */
+/*	$KAME: scope.c,v 1.8 2001/11/13 10:28:31 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -32,6 +32,8 @@
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 
+#include <netinet/in.h>
+
 #ifdef INET6
 #include <sys/queue.h>		/* XXX in6_var.h requires this */
 #include <net/if.h>
@@ -41,8 +43,8 @@
 #include <netinet6/in6_var.h>
 #endif
 
-#include <netinet/in.h>
-
+#include <string.h>
+#include <unistd.h>
 #include <errno.h>
 
 int
