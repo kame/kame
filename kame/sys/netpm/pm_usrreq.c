@@ -29,7 +29,7 @@
 //# SUCH DAMAGE.
 //#
 //#	$SuMiRe: pm_usrreq.c,v 1.1 1998/09/14 19:49:58 shin Exp $
-//#	$Id: pm_usrreq.c,v 1.1 1999/08/12 12:41:10 shin Exp $
+//#	$Id: pm_usrreq.c,v 1.2 1999/08/22 18:40:00 shin Exp $
 //#
 //#------------------------------------------------------------------------
 */
@@ -457,6 +457,7 @@ static int
 pm_detach(struct socket *so)
 {
     struct rawcb *rp = sotorawcb(so);
+    int s;
 
     if (rp == NULL)
 	return EINVAL;
@@ -465,16 +466,23 @@ static void
 pm_detach(struct rawcb *rp)
 {
     struct socket *so = rp->rcb_socket;
+    int s;
 #endif
 
+    s = splnet();
     so->so_pcb = NULL;
     sofree(so);
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+    LIST_REMOVE(rp, list);
+#else
     remque(rp);
+#endif
     if (rp->rcb_laddr)
 	m_freem(dtom(rp->rcb_laddr));
     if (rp->rcb_faddr)
 	m_freem(dtom(rp->rcb_faddr));
     FREE(rp, M_PCB);
+    splx(s);
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
     return 0;
 #endif
