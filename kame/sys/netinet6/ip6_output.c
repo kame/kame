@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.442 2004/03/24 08:47:00 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.443 2004/03/24 09:03:29 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -156,6 +156,7 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #ifdef MLDV2
+#include <netinet6/mld6_var.h>
 #include <netinet6/in6_msf.h>
 #endif
 #include <netinet6/nd6.h>
@@ -5084,8 +5085,7 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 			break;
 		}
 
-		if (!IN6_IS_ADDR_MULTICAST(SIN6_ADDR(ss_grp)) ||
-		    IN6_IS_LOCAL_GROUP(SIN6_ADDR(ss_grp))) {
+		if (!in6_is_mld_target(&sin6_grp->sin6_addr)) {
 #ifdef MLDV2_DEBUG
 			printf("invalid group %s specified\n",
 			       ip6_sprintf(&sin6_grp->sin6_addr));

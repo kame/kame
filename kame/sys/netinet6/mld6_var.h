@@ -1,4 +1,4 @@
-/*	$KAME: mld6_var.h,v 1.10 2004/03/10 09:10:38 suz Exp $	*/
+/*	$KAME: mld6_var.h,v 1.11 2004/03/24 09:03:29 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -100,6 +100,10 @@ void	mld_send_state_change_report(struct mbuf **, int *,
 				     struct in6_multi *, u_int8_t, int);
 #if defined(MLDV2) && !defined(__FreeBSD__)
 int	mld_sysctl(int *, u_int, void *, size_t *, void *, size_t);
+#endif
+
+#ifdef MLDV2
+int	in6_is_mld_target(struct in6_addr *);
 #endif
 #endif /* _KERNEL */
 

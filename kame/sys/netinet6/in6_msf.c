@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.25 2004/03/18 05:56:56 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.26 2004/03/24 09:03:29 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2064,7 +2064,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		return EPFNOSUPPORT;
 	if (!IN6_IS_ADDR_MULTICAST(SIN6_ADDR(sa_grp)))
 		return EINVAL;
-	if (grpf->gf_numsrc != 0 && IN6_IS_LOCAL_GROUP(SIN6_ADDR(sa_grp)))
+	if (grpf->gf_numsrc != 0 && !in6_is_mld_target(SIN6_ADDR(sa_grp)))
 		return EINVAL;
 
 	/*
@@ -2703,7 +2703,7 @@ match_msf6_per_if(in6m, src, dst)
 	/* in6ms is NULL only in case of ff02::1 and ffx{0,1}:: */
 	if (in6ms == NULL) {
 		/* assumes ffx{0,1} case has already been eliminated */
-		if (IN6_IS_LOCAL_GROUP(dst))
+		if (!in6_is_mld_target(dst))
 			return 1;
 		mldlog((LOG_DEBUG, "grp found, but src is NULL. impossible"));
 		return 0;

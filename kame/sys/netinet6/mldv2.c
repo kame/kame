@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.11 2004/03/18 05:09:50 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.12 2004/03/24 09:03:29 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -798,7 +798,7 @@ mld_fasttimeo()
 
 	state_change_timer:
 		/* State-Change Record timer */
-		if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr))
+		if (!in6_is_mld_target(&in6m->in6m_addr))
 			goto next_in6m; /* skip */
 
 		if (in6m->in6m_source == NULL)
@@ -1182,7 +1182,7 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 
 	IN6_FIRST_MULTI(step, in6m);
 	while (in6m != NULL) {
-		if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr) ||
+		if (!in6_is_mld_target(&in6m->in6m_addr) ||
 		    in6m->in6m_ifp != ifp)
 			goto next_multi;
 
@@ -1451,7 +1451,7 @@ mld_send_all_current_state_report(ifp)
 	IN6_FIRST_MULTI(step, in6m);
 	while (in6m != NULL) {
 		if (in6m->in6m_ifp != ifp ||
-		    IN6_IS_LOCAL_GROUP(&in6m->in6m_addr))
+		    !in6_is_mld_target(&in6m->in6m_addr))
 			goto next_multi;
 
 		if (mld_send_current_state_report(&m, &buflen, in6m) != 0)
@@ -1480,7 +1480,7 @@ mld_send_current_state_report(m0, buflenp, in6m)
 	u_int8_t type = 0;
 	struct mld_hdr *mldh;
 
-	if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr) ||
+	if (!in6_is_mld_target(&in6m->in6m_addr) ||
 		(in6m->in6m_ifp->if_flags & IFF_LOOPBACK) != 0)
 	    return 0;
 
@@ -1618,7 +1618,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 	u_int16_t numsrc = 0, src_once, src_done = 0;
 	struct mld_hdr *mldh;
 
-	if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr) ||
+	if (!in6_is_mld_target(&in6m->in6m_addr) ||
 		(in6m->in6m_ifp->if_flags & IFF_LOOPBACK) != 0)
 		return;
 
@@ -1985,7 +1985,7 @@ mld_cancel_pending_response(ifp, rti)
 	while (in6m != NULL) {
 		if (in6m->in6m_ifp != ifp)
 			goto next_multi;
-		if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr))
+		if (!in6_is_mld_target(&in6m->in6m_addr))
 			goto next_multi;
 		if (in6mm_src == NULL)
 			goto next_multi;
@@ -2133,7 +2133,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 	 */
 	IN6_LOOKUP_MULTI(*maddr6, ifp, in6m);
 	if (in6m != NULL) {
-		if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
+		if (!in6_is_mld_target(&in6m->in6m_addr)) {
 			++in6m->in6m_refcount;
 			splx(s);
 			return in6m;
@@ -2280,7 +2280,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 		}
 
 		in6m->in6m_source = NULL;
-		if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
+		if (!in6_is_mld_target(&in6m->in6m_addr)) {
 			splx(s);
 			return in6m;
 		}
@@ -2359,7 +2359,7 @@ in6_delmulti2(in6m, errorp, numsrc, src, mode, final)
 		return;
 	}
 
-	if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
+	if (!in6_is_mld_target(&in6m->in6m_addr)) {
 		if (--in6m->in6m_refcount == 0) {
 			/*
 			 * Unlink from list.
@@ -2532,7 +2532,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 		* If requested multicast address is local address, update
 		* the condition, join or leave, based on a requested filter.
 		*/
-		if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
+		if (!in6_is_mld_target(&in6m->in6m_addr)) {
 			if (numsrc != 0) {
 				mldlog((LOG_DEBUG,
 				    "in6_modmulti: "
@@ -2643,7 +2643,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 		 * join a local group address with some filtered address,
 		 * return.
 		 */
-		if ((old_num != 0) || (IN6_IS_LOCAL_GROUP(ap) && numsrc != 0)) {
+		if ((old_num != 0) || (!in6_is_mld_target(ap) && numsrc != 0)) {
 			*error = EINVAL;
 			splx(s);
 			return NULL;
@@ -2708,7 +2708,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 		}
 
 		in6m->in6m_source = NULL;
-		if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
+		if (!in6_is_mld_target(&in6m->in6m_addr)) {
 			splx(s);
 			return in6m;
 		}
@@ -2835,7 +2835,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 		 * MLDv2 (i.e. ffx1::/16, ff02::1).  (ifma_refcount is already
 		 * counted up in if_addmulti())
 		 */
-		if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
+		if (!in6_is_mld_target(&in6m->in6m_addr)) {
 			splx(s);
 			return in6m;
 		}
@@ -2953,7 +2953,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 	}
 
 	in6m->in6m_source = NULL;
-	if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
+	if (!in6_is_mld_target(&in6m->in6m_addr)) {
 		splx(s);
 		return in6m;
 	}
@@ -3032,7 +3032,7 @@ in6_delmulti2(in6m, error, numsrc, src, mode, final)
 		splx(s);
 		return;
 	}
-	if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
+	if (!in6_is_mld_target(&in6m->in6m_addr)) {
 		if (ifma->ifma_refcount == 1) {
 			ifma->ifma_protospec = 0;
 			LIST_REMOVE(in6m, in6m_entry);
@@ -3182,7 +3182,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 		 * If requested multicast address is local address, update
 		 * the condition, join or leave, based on a requested filter.
 		 */
-		if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
+		if (!in6_is_mld_target(&in6m->in6m_addr)) {
 			if (numsrc != 0) {
 				mldlog((LOG_DEBUG,
 				    "in6_modmulti: source filter not supported for %s\n",
@@ -3290,7 +3290,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 		 * join a local group address with some filtered address,
 		 * return.
 		 */
-		if ((old_num != 0) || (IN6_IS_LOCAL_GROUP(ap) && numsrc != 0)) {
+		if ((old_num != 0) || (!in6_is_mld_target(ap) && numsrc != 0)) {
 			*error = EINVAL;
 			splx(s);
 			return NULL;
@@ -3348,7 +3348,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 		}
 
 		in6m->in6m_source = NULL;
-		if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
+		if (!in6_is_mld_target(&in6m->in6m_addr)) {
 			splx(s);
 			return in6m;
 		}
@@ -3406,6 +3406,31 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 	return in6m;
 }
 #endif /* not FreeBSD3 */
+
+/* 
+ * check if the given address should be announced via MLDv1/v2.
+ */
+int
+in6_is_mld_target(group)
+	struct in6_addr *group;
+{
+	struct in6_addr tmp = *group;
+
+	if (!IN6_IS_ADDR_MULTICAST(group))
+		return 0;
+	if (IPV6_ADDR_MC_SCOPE(group) < IPV6_ADDR_SCOPE_LINKLOCAL)
+		return 0;
+
+	/*
+	 * link index may be embedded into group address, so it has to be 
+	 * cleared before being compared to ff02::1.
+	 */
+	in6_clearscope(&tmp);
+	if (IN6_ARE_ADDR_EQUAL(&tmp, &in6addr_linklocal_allnodes))
+		return 0;
+	
+	return 1;
+}
 
 struct in6_multi_mship *
 in6_joingroup(ifp, addr, errorp)
