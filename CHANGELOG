@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.892 2000/05/17 12:53:53 sakane Exp $
+$Id: CHANGELOG,v 1.893 2000/05/17 14:44:29 itojun Exp $
 
 <200005>
 Wed May 17 21:50:27 JST 2000 sakane@ydc.co.jp
@@ -21,6 +21,13 @@ Wed May 17 21:50:27 JST 2000 sakane@ydc.co.jp
 	link-local address.
 	This is currently experimental and enabled only when the
 	FAKE_LOOPBACK_IF kernel compile option is specified.
+
+Wed May 17 JST 2000  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: correct node information lookup, when
+	  the query is formatted in 05 draft format and IPv6 multicast
+	  address is attached as subject.  this will make node to reply to
+	  "ping6 -w ff02::1" like before (actually, validation rule is not
+	  really conformant to 05 draft.  see comments in source for details).
 
 Wed May 17 19:09:51 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/freebsd3/ports/{squid11, qmail}: upgrade to latest IPv6
