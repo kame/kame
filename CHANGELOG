@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.710 2000/03/21 12:55:13 jinmei Exp $
+$Id: CHANGELOG,v 1.711 2000/03/22 06:53:40 itojun Exp $
 
 <200003>
+Wed Mar 22 15:52:48 JST 2000  itojun@iijlab.net
+	* netbsd/sys: synchronize with NetBSD 1.4.2.  userland still needs
+	  some work.
+
 2000-03-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput): set the
 	INP_IPV6_MCAST flag after ip6_setmoptions() for a NRL pcb
