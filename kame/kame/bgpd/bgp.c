@@ -686,11 +686,7 @@ bgp_process_open(struct rpcb *bnp) {
   syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
 	 bgp_statestr[p->rp_state], bgp_peerstr(p));
 #endif 
-
 }
-
-
-
 
 /*
  *    bgp_process_update()
@@ -1392,8 +1388,6 @@ bgp_process_update(struct rpcb *bnp)
       }
 
       break;
-
-
 
     case PA4_TYPE_MPUNREACHNLRI:
       /* MP_UNREACH_NLRI (Type Code 15) optional non-transitive */

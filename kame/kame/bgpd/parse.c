@@ -394,7 +394,6 @@ conf_check(char *filename)
 	    rtp->rtp_type = RTPROTO_IF;
 	    rtp->rtp_if   = ifp;
 
-
 	    if (aggregated->rt_aggr.ag_rtp != NULL) {
 	      if (find_rtp(rtp, aggregated->rt_aggr.ag_rtp)) {
 		syslog(LOG_ERR,
@@ -417,7 +416,67 @@ conf_check(char *filename)
 	    }
 	    SENTENCE_END(i);
 	    /* End-of-"direct" */
-	  } else {
+	  }
+	  /*
+	   * BGP
+	   * XXX: this must be placed after bgp{} statements...
+	   */
+	  else if (strncasecmp(&buf[i], sysatom[C_BGP], strlen(sysatom[C_BGP]))
+		   == 0) {
+	    struct rpcb   *asp = NULL;
+	    u_int16_t  easnum;
+
+	    if (strncasecmp(&buf[i], sysatom[C_AS], strlen(sysatom[C_AS]))
+		!= 0) {
+	      syslog(LOG_ERR, "%s:%d syntax error, missing \'%s\'",
+		     filename, line, sysatom[C_AS]);
+	      fatalx("<conf_check>: syntax error");
+	    }
+	    i += strlen(sysatom[C_AS]);
+	    SKIP_WHITE(i); READ_ATOM(i, j);
+
+	    if ((easnum = atoi(atom)) == 0) {
+	      syslog(LOG_ERR, "%s:%d invalid AS number", filename, line);
+	      fatalx("<conf_check>: invalid AS number");
+	    }
+	    if (easnum == my_as_number) {	/* IBGP peer */
+	      /* XXX currently the address for the peer is always required. */
+	      struct sockaddr_in6 sa6_peer;
+
+	      memset(&sa6_peer, 0, sizeof(sa6_peer));
+	      SKIP_WHITE(i); READ_ATOM(i, j);
+	      /* TODO: support scoped addresses */
+	      if (get_in6_addr(atom, &sa6_peer) ||
+		  (asp = find_apeer_by_addr(&sa6_peer.sin6_addr)) == NULL) {
+		syslog(LOG_ERR, "%s:%d invalid peer address", filename, line);
+		fatalx("<conf_check>: invalid peer address");
+	      }
+	    }
+	    else if ((asp = find_peer_by_as(easnum)) == NULL) {  /* already ? */
+	      syslog(LOG_ERR, "%s:%d AS %d not defined",
+		     filename, line, easnum);
+	      fatalx("<conf_check>: AS not defined");
+	    }
+
+	    /* XXX: duplicated code...(see above) */
+	    rtp->rtp_type = RTPROTO_BGP;
+	    rtp->rtp_bgp = asp;
+	    if (aggregated->rt_aggr.ag_rtp != NULL) {
+	      if (find_rtp(rtp, aggregated->rt_aggr.ag_rtp)) {
+		syslog(LOG_ERR,
+		       "%s:%d BGP peer doubly defined", filename,line);
+		fatalx("<conf_check>: BGP peer for aggregation doubly defined");
+	      }
+	      insque(rtp, aggregated->rt_aggr.ag_rtp);
+	    } else {
+	      rtp->rtp_next = rtp;
+	      rtp->rtp_prev = rtp;
+	      aggregated->rt_aggr.ag_rtp = rtp;
+	    }
+
+	    SENTENCE_END(i);
+	  }
+	  else {
 	    syslog(LOG_ERR, "%s:%d syntax error", filename, line);
 	    fatalx("<conf_check>: syntax error");	      
 	  }
@@ -774,7 +833,7 @@ conf_check(char *filename)
      */
     if (strncasecmp(&buf[i], sysatom[C_EXPORT], strlen(sysatom[C_EXPORT]))
 	== 0) {
-      struct rpcb   *asp;         /* export to */
+      struct rpcb   *asp = NULL; /* export to */
       u_int16_t  easnum;      /* export to */
 
       i += strlen(sysatom[C_EXPORT]);
@@ -788,7 +847,6 @@ conf_check(char *filename)
       }
       i += strlen(sysatom[C_PROTO]);
       SKIP_WHITE(i);
-
 
       if (strncasecmp(&buf[i], sysatom[C_BGP], strlen(sysatom[C_BGP]))
 	  == 0) {
@@ -808,12 +866,25 @@ conf_check(char *filename)
 	/*
 	 *   "as"        (to be exported to)
 	 */
-	if ((easnum = atoi(atom)) == 0 ||
-	    easnum == my_as_number) {
+	if ((easnum = atoi(atom)) == 0) {
 	  syslog(LOG_ERR, "%s:%d invalid AS number", filename, line);
 	  fatalx("<conf_check>: invalid AS number");
 	}
-	if ((asp = find_peer_by_as(easnum)) == NULL) {  /* already ? */
+	/* experimentally allow bgpd to export to IBGP peers(20000210) */
+	if (easnum == my_as_number) {	/* IBGP peer */
+	  /* XXX currently the address for the peer is always required. */
+	  struct sockaddr_in6 sa6_peer;
+
+	  memset(&sa6_peer, 0, sizeof(sa6_peer));
+	  SKIP_WHITE(i); READ_ATOM(i, j);
+	  /* TODO: support scoped addresses */
+	  if (get_in6_addr(atom, &sa6_peer) ||
+	      (asp = find_apeer_by_addr(&sa6_peer.sin6_addr)) == NULL) {
+	    syslog(LOG_ERR, "%s:%d invalid peer address", filename, line);
+	    fatalx("<conf_check>: invalid peer address");
+	  }
+	}
+	else if ((asp = find_peer_by_as(easnum)) == NULL) {  /* already ? */
 	  syslog(LOG_ERR, "%s:%d AS %d not defined",
 		 filename, line, easnum);
 	  fatalx("<conf_check>: AS not defined");

@@ -273,3 +273,40 @@ ip6str(addr, ifindex)
 		    NULL, 0, NI_NUMERICHOST|NI_WITHSCOPEID);
 	return(cp);
 }
+
+int
+get_in6_addr(addr, sap)
+	char *addr;
+	struct sockaddr_in6 *sap;
+{
+	int ret_ga, error = 0;
+	struct addrinfo *res, hints;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
+
+	ret_ga = getaddrinfo(addr, NULL, &hints, &res);
+	if (ret_ga) {
+		syslog(LOG_DEBUG, "getaddrinfo failed for %s: %s",
+		       addr, gai_strerror(ret_ga));
+		return(-1);
+	}
+
+
+	for(; res; res = res->ai_next) {
+		if (res->ai_addr->sa_family == AF_INET6) {
+			memcpy(sap, res->ai_addr, sizeof(*sap));
+			break;
+		}
+	}
+	if (res == NULL) {	/* no inet6 addr */
+		syslog(LOG_DEBUG, "getaddrinfo returns no INET6 addr for %s",
+		       addr);
+		error = -1;
+		goto end;
+	}
+	
+  end:
+	freeaddrinfo(res);
+	return(error);
+}

@@ -389,11 +389,9 @@ bgp_send_update(bnp, rte, headrte)
     return NULL;
   }
 
-
   memset(&artp, 0, sizeof(artp));
-  artp.rtp_type = RTPROTO_IF;
-  artp.rtp_if   = bnp->rp_ife;
-
+  artp.rtp_type = RTPROTO_BGP;
+  artp.rtp_bgp   = bnp;
 
   memset(outpkt, 0, BGPMAXPACKETSIZE);
   rt = NULL;
