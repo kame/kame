@@ -1,4 +1,4 @@
-/*	$KAME: plog.c,v 1.8 2000/12/15 13:43:56 sakane Exp $	*/
+/*	$KAME: plog.c,v 1.9 2000/12/15 15:41:40 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -126,7 +126,8 @@ plog(int pri, const char *func, struct sockaddr *sa, const char *fmt, ...)
 	va_start(ap, fmt);
 	if (f_foreground)
 		vprintf(newfmt, ap);
-	else if (logfile)
+
+	if (logfile)
 		log_vaprint(logp, newfmt, ap);
 	else
 		vsyslog(pri, newfmt, ap);
@@ -146,7 +147,8 @@ plogv(int pri, const char *func, struct sockaddr *sa,
 
 	if (f_foreground)
 		vprintf(newfmt, ap);
-	else if (logfile)
+
+	if (logfile)
 		log_vaprint(logp, newfmt, ap);
 	else
 		vsyslog(pri, newfmt, ap);
