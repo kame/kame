@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1358 2000/11/01 08:25:47 itojun Exp $
+$KAME: CHANGELOG,v 1.1359 2000/11/01 14:59:39 itojun Exp $
 
 <200011>
+Wed Nov  1 23:58:34 JST 2000  itojun@iijlab.net
+	* sys/crypto/twofish: fix runtime error check logic.  it has been
+	  broken for some time.
+	* regress/crypto: regression test for kernel crypto logic.
+
 Wed Nov  1 17:24:31 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_{in,out}put.c: implement flow label manipulation
 	  setsockopt, as documented in draft-itojun-ipv6-flowlabel-api-00.txt.
