@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.58 2001/11/26 16:41:35 sakane Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.59 2001/12/10 17:52:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -140,11 +140,14 @@ ident_i1send(iph1, msg)
 	if (isakmp_send(iph1, iph1->sendbuf) < 0)
 		goto end;
 
-	iph1->status = PHASE1ST_MSG1SENT;
+	/* add to the schedule to resend, and seve back pointer. */
+	if (iph1->rmconf->retry_counter) {
+		iph1->retry_counter = iph1->rmconf->retry_counter;
+		iph1->scr = sched_new(iph1->rmconf->retry_interval,
+		    isakmp_ph1resend_stub, iph1);
+	}
 
-	iph1->retry_counter = iph1->rmconf->retry_counter;
-	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-	    isakmp_ph1resend_stub, iph1);
+	iph1->status = PHASE1ST_MSG1SENT;
 
 	error = 0;
 
@@ -294,12 +297,14 @@ ident_i2send(iph1, msg)
 	if (iph1->sendbuf == NULL)
 		goto end;
 
-	iph1->status = PHASE1ST_MSG2SENT;
-
 	/* add to the schedule to resend, and seve back pointer. */
-	iph1->retry_counter = iph1->rmconf->retry_counter;
-	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-	    isakmp_ph1resend_stub, iph1);
+	if (iph1->rmconf->retry_counter) {
+		iph1->retry_counter = iph1->rmconf->retry_counter;
+		iph1->scr = sched_new(iph1->rmconf->retry_interval,
+		    isakmp_ph1resend_stub, iph1);
+	}
+
+	iph1->status = PHASE1ST_MSG2SENT;
 
 	error = 0;
 
@@ -482,11 +487,14 @@ ident_i3send(iph1, msg)
 	if (iph1->sendbuf == NULL)
 		goto end;
 
-	iph1->status = PHASE1ST_MSG3SENT;
+	/* add to the schedule to resend, and seve back pointer. */
+	if (iph1->rmconf->retry_counter) {
+		iph1->retry_counter = iph1->rmconf->retry_counter;
+		iph1->scr = sched_new(iph1->rmconf->retry_interval,
+		    isakmp_ph1resend_stub, iph1);
+	}
 
-	iph1->retry_counter = iph1->rmconf->retry_counter;
-	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-	    isakmp_ph1resend_stub, iph1);
+	iph1->status = PHASE1ST_MSG3SENT;
 
 	error = 0;
 
@@ -847,11 +855,14 @@ ident_r1send(iph1, msg)
 	if (isakmp_send(iph1, iph1->sendbuf) < 0)
 		goto end;
 
-	iph1->status = PHASE1ST_MSG1SENT;
+	/* add to the schedule to resend, and seve back pointer. */
+	if (iph1->rmconf->retry_counter) {
+		iph1->retry_counter = iph1->rmconf->retry_counter;
+		iph1->scr = sched_new(iph1->rmconf->retry_interval,
+		    isakmp_ph1resend_stub, iph1);
+	}
 
-	iph1->retry_counter = iph1->rmconf->retry_counter;
-	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-	    isakmp_ph1resend_stub, iph1);
+	iph1->status = PHASE1ST_MSG1SENT;
 
 	error = 0;
 
@@ -1021,11 +1032,14 @@ ident_r2send(iph1, msg)
 	if (oakley_newiv(iph1) < 0)
 		goto end;
 
-	iph1->status = PHASE1ST_MSG2SENT;
+	/* add to the schedule to resend, and seve back pointer. */
+	if (iph1->rmconf->retry_counter) {
+		iph1->retry_counter = iph1->rmconf->retry_counter;
+		iph1->scr = sched_new(iph1->rmconf->retry_interval,
+		    isakmp_ph1resend_stub, iph1);
+	}
 
-	iph1->retry_counter = iph1->rmconf->retry_counter;
-	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-	    isakmp_ph1resend_stub, iph1);
+	iph1->status = PHASE1ST_MSG2SENT;
 
 	error = 0;
 

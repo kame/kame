@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.85 2001/11/07 01:48:50 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.86 2001/12/10 17:52:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -274,13 +274,15 @@ quick_i1send(iph2, msg)
 	if (iph2->sendbuf == NULL)
 		goto end;
 
+	/* add to the schedule to resend, and seve back pointer. */
+	if (iph2->ph1->rmconf->retry_counter) {
+		iph2->retry_counter = iph2->ph1->rmconf->retry_counter;
+		iph2->scr = sched_new(iph2->ph1->rmconf->retry_interval,
+		    isakmp_ph2resend_stub, iph2);
+	}
+
 	/* change status of isakmp status entry */
 	iph2->status = PHASE2ST_MSG1SENT;
-
-	/* add to the schedule to resend */
-	iph2->retry_counter = iph2->ph1->rmconf->retry_counter;
-	iph2->scr = sched_new(iph2->ph1->rmconf->retry_interval,
-	    isakmp_ph2resend_stub, iph2);
 
 	error = 0;
 
@@ -1287,13 +1289,15 @@ quick_r2send(iph2, msg)
 	if (iph2->sendbuf == NULL)
 		goto end;
 
+	/* add to the schedule to resend, and seve back pointer. */
+	if (iph2->ph1->rmconf->retry_counter) {
+		iph2->retry_counter = iph2->ph1->rmconf->retry_counter;
+		iph2->scr = sched_new(iph2->ph1->rmconf->retry_interval,
+		    isakmp_ph2resend_stub, iph2);
+	}
+
 	/* change status of isakmp status entry */
 	iph2->status = PHASE2ST_MSG1SENT;
-
-	/* add to the schedule to resend */
-	iph2->retry_counter = iph2->ph1->rmconf->retry_counter;
-	iph2->scr = sched_new(iph2->ph1->rmconf->retry_interval,
-	    isakmp_ph2resend_stub, iph2);
 
 	error = 0;
 
