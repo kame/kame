@@ -1,4 +1,4 @@
-.\"	$KAME: ip6.4,v 1.13 2001/01/05 22:32:27 itojun Exp $
+.\"	$KAME: ip6.4,v 1.14 2001/02/26 09:31:39 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -239,14 +239,14 @@ int range = IPV6_PORTRANGE_LOW;       /* see <netinet/in.h> */
 setsockopt(s, IPPROTO_IPV6, IPV6_PORTRANGE, &range, sizeof(range));
 .Ed
 .Pp
-.Dv IPV6_BINDV6ONLY
+.Dv IPV6_V6ONLY
 controls behavior of
 .Dv AF_INET6
 wildcard listening socket.
 The following example sets the option to 1:
 .Bd -literal -offset indent
 int on = 1;
-setsockopt(s, IPPROTO_IPV6, IPV6_BINDV6ONLY, &on, sizeof(on));
+setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on));
 .Ed
 .Pp
 If set to 1,
@@ -267,7 +267,7 @@ you will end up accepting IPv4 traffic by
 listening socket on the same port.
 The default value for this flag is copied at socket instantiation time,
 from
-.Li net.inet6.ip6.bindv6only
+.Li net.inet6.ip6.v6only
 .Xr sysctl 3
 variable.
 The option affects
@@ -684,13 +684,13 @@ The ancillary data items were improperly formed, or option name was unknown.
 Most of the socket options are defined in
 RFC2292 and/or RFC2553.
 .Pp
-.Dv IPV6_PORTRANGE ,
-.Dv IPV6_BINDV6ONLY
+.Dv IPV6_V6ONLY
+socket option is defined in draft-ietf-ipngwg-rfc2553bis-03.
+.Dv IPV6_PORTRANGE
+socket option
 and
 conflict resolution rule
 are not defined in the RFCs and should be considered implementation dependent.
-.Dv IPV6_BINDV6ONLY
-is supplied on KAME/NetBSD only.
 .\"
 .Sh HISTORY
 The implementation is based on KAME stack
