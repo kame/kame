@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.353 1999/12/21 08:30:44 itojun Exp $
+$Id: CHANGELOG,v 1.354 1999/12/21 11:40:58 jinmei Exp $
 
 <199912>
+1999-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_ctloutput: supported IPV6_RECVxxx socket
+	options according to rfc2292bis-01.
+
 Tue Dec 21 17:30:09 JST 1999  itojun@iijlab.net
 	* netbsd/sys: make AF_INET6 wildcard socket special behavior
 	  (RFC1933 IPv4 mapped addr) configurable.
