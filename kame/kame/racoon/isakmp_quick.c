@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.21 2000/04/24 07:37:43 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.22 2000/04/24 08:21:16 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1718,14 +1718,6 @@ get_sainfo_r(iph2)
 					? AF_INET : AF_INET6;
 			sa.ss_len = id->type == IPSECDOI_ID_IPV4_ADDR
 					? 16 : 28;
-
-			/* sanity check */
-			if (iph2->id_p->l > _INALENBYAF(sa.ss_family)) {
-				plog(logp, LOCATION, NULL,
-					"invalid ID payload length:%d.\n",
-					iph2->id_p->l);
-				return -1;
-			}
 
 			memcpy(_INADDRBYSA(&sa), id + 1,
 				_INALENBYAF(sa.ss_family));
