@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.288 2002/02/26 03:31:43 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.289 2002/03/02 09:56:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -181,7 +181,8 @@ struct ip6_exthdrs {
 	struct mbuf *ip6e_dest2;
 };
 
-static int ip6_pcbopt __P((int, u_char *, int, struct ip6_pktopts **, int));
+static int ip6_pcbopt __P((int, u_char *, int, struct ip6_pktopts **,
+			   int, int));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
 			    struct socket *, struct sockopt *));
@@ -192,7 +193,7 @@ static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
 static int ip6_getpcbopt __P((struct ip6_pktopts *, int, struct mbuf **));
 #endif
 static int ip6_setpktoption __P((int, u_char *, int, struct ip6_pktopts *, int,
-				 int, int));
+				 int, int, int));
 static int ip6_setmoptions __P((int, struct ip6_moptions **, struct mbuf *));
 static int ip6_getmoptions __P((int, struct ip6_moptions *, struct mbuf **));
 static int ip6_copyexthdr __P((struct mbuf **, caddr_t, int));
@@ -1823,7 +1824,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 	struct mbuf **mp;
 #endif
 {
-	int privileged, optdatalen;
+	int privileged, optdatalen, uproto;
 	void *optdata;
 	struct ip6_recvpktopts *rcvopts;
 #if defined(IPSEC) && defined(__OpenBSD__)
@@ -1873,6 +1874,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #else
 	privileged = (in6p->in6p_socket->so_state & SS_PRIV);
 #endif
+	uproto = (int)so->so_proto->pr_protocol;
 	rcvopts = in6p->in6p_inputopts;
 
 	if (level == IPPROTO_IPV6) {
@@ -2007,7 +2009,7 @@ do { \
 							   (u_char *)&optval,
 							   sizeof(optval),
 							   optp,
-							   privileged);
+							   privileged, uproto);
 					break;
 				}
 
@@ -2061,7 +2063,14 @@ do { \
 					break;
 
 				case IPV6_RECVPATHMTU:
-					OPTSET(IN6P_MTU);
+					/*
+					 * We ignore this option for TCP
+					 * sockets.
+					 * (rfc2292bis leaves this case
+					 * unspecified.)
+					 */
+					if (uproto != IPPROTO_TCP)
+						OPTSET(IN6P_MTU);
 					break;
 
 				case IPV6_V6ONLY:
@@ -2130,7 +2139,7 @@ do { \
 						   (u_char *)&tclass,
 						   sizeof(tclass),
 						   optp,
-						   privileged);
+						   privileged, uproto);
 				break;
 			}
 
@@ -2156,7 +2165,7 @@ do { \
 							   (u_char *)&optval,
 							   sizeof(optval),
 							   optp,
-							   privileged);
+							   privileged, uproto);
 					break;
 				}
 
@@ -2241,7 +2250,7 @@ do { \
 				optp = &in6p->in6p_outputopts;
 				error = ip6_pcbopt(optname,
 						   optbuf, optlen,
-						   optp, privileged);
+						   optp, privileged, uproto);
 				break;
 			}
 #undef OPTSET
@@ -2511,9 +2520,7 @@ do { \
 			case IPV6_RECVPKTINFO:
 			case IPV6_RECVHOPLIMIT:
 			case IPV6_RECVRTHDR:
-			case IPV6_USE_MIN_MTU:
 			case IPV6_RECVPATHMTU:
-			case IPV6_DONTFRAG:
 
 			case IPV6_FAITH:
 			case IPV6_V6ONLY:
@@ -2552,16 +2559,8 @@ do { \
 					optval = OPTBIT(IN6P_RTHDR);
 					break;
 
-				case IPV6_USE_MIN_MTU:
-					optval = OPTBIT(IP6PO_MINMTU);
-					break;
-
 				case IPV6_RECVPATHMTU:
 					optval = OPTBIT(IN6P_MTU);
-					break;
-
-				case IPV6_DONTFRAG:
-					optval = OPTBIT(IP6PO_DONTFRAG);
 					break;
 
 				case IPV6_FAITH:
@@ -2705,6 +2704,8 @@ do { \
 			case IPV6_NEXTHOP:
 			case IPV6_OTCLASS:
 			case IPV6_TCLASS:
+			case IPV6_USE_MIN_MTU:
+			case IPV6_DONTFRAG:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				error = ip6_getpcbopt(in6p->in6p_outputopts,
 						      optname, sopt);
@@ -3052,7 +3053,8 @@ ip6_pcbopts(pktopt, m, so)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		priv = 1;
 #endif
-	if ((error = ip6_setpktoptions(m, opt, NULL, priv, 1)) != 0) {
+	if ((error = ip6_setpktoptions(m, opt, NULL, priv, 1,
+				       so->so_proto->pr_protocol)) != 0) {
 		ip6_clearpktopts(opt, -1); /* XXX: discard all options */
 		return(error);
 	}
@@ -3076,10 +3078,11 @@ init_ip6pktopts(opt)
 
 #define sin6tosa(sin6)	((struct sockaddr *)(sin6)) /* XXX */
 static int
-ip6_pcbopt(optname, buf, len, pktopt, priv)
+ip6_pcbopt(optname, buf, len, pktopt, priv, uproto)
 	int optname, len, priv;
 	u_char *buf;
 	struct ip6_pktopts **pktopt;
+	int uproto;
 {
 	struct ip6_pktopts *opt;
 	
@@ -3091,7 +3094,7 @@ ip6_pcbopt(optname, buf, len, pktopt, priv)
 	}
 	opt = *pktopt;
 
-	return(ip6_setpktoption(optname, buf, len, opt, priv, 1, 0));
+	return(ip6_setpktoption(optname, buf, len, opt, priv, 1, 0, uproto));
 }
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -3113,7 +3116,7 @@ ip6_getpcbopt(pktopt, optname, mp)
 	struct ip6_ext *ip6e;
 	int error = 0;
 	struct in6_pktinfo null_pktinfo;
-	int deftclass = 0;
+	int deftclass = 0, on, flag = 0;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct mbuf *m;
 #endif
@@ -3172,6 +3175,23 @@ ip6_getpcbopt(pktopt, optname, mp)
 			optdata = (void *)pktopt->ip6po_nexthop;
 			optdatalen = pktopt->ip6po_nexthop->sa_len;
 		}
+		break;
+	case IPV6_DONTFRAG:
+	case IPV6_USE_MIN_MTU:
+		switch (optname) {
+		case IPV6_USE_MIN_MTU:
+			flag = IP6PO_MINMTU;
+			break;
+		case IPV6_DONTFRAG:
+			flag = IP6PO_DONTFRAG;
+			break;
+		}
+		if (pktopt && ((pktopt->ip6po_flags) & flag))
+			on = 1;
+		else
+			on = 0;
+		optdata = (void *)&on;
+		optdatalen = sizeof(on);
 		break;
 	default:		/* should not happen */
 		printf("ip6_getpcbopt: unexpected option: %d\n", optname);
@@ -3740,10 +3760,10 @@ ip6_freemoptions(im6o)
  * Set IPv6 outgoing packet options based on advanced API.
  */
 int
-ip6_setpktoptions(control, opt, stickyopt, priv, needcopy)
+ip6_setpktoptions(control, opt, stickyopt, priv, needcopy, uproto)
 	struct mbuf *control;
 	struct ip6_pktopts *opt, *stickyopt;
-	int priv, needcopy;
+	int priv, needcopy, uproto;
 {
 	struct cmsghdr *cm = 0;
 
@@ -3787,7 +3807,7 @@ ip6_setpktoptions(control, opt, stickyopt, priv, needcopy)
 
 		error = ip6_setpktoption(cm->cmsg_type, CMSG_DATA(cm),
 					 cm->cmsg_len - CMSG_LEN(0),
-					 opt, priv, needcopy, 1);
+					 opt, priv, needcopy, 1, uproto);
 		if (error)
 			return(error);
 	}
@@ -3805,11 +3825,10 @@ ip6_setpktoptions(control, opt, stickyopt, priv, needcopy)
  * "sticky=1, cmsg=1": RFC2292 socket option
  */
 static int
-ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
-	int optname, len, priv, cmsg;
+ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
+	int optname, len, priv, sticky, cmsg, uproto;
 	u_char *buf;
 	struct ip6_pktopts *opt;
-	int sticky;
 {
 	if (!sticky && !cmsg) {
 #ifdef DIAGNOSTIC
@@ -3878,6 +3897,11 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 				ip6_clearpktopts(opt, optname);
 				break;
 			}
+		}
+
+		if (uproto == IPPROTO_TCP && optname == IPV6_PKTINFO &&
+		    sticky && !IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr)) {
+			return(EINVAL);
 		}
 
 		/* validate the interface index if specified. */
@@ -4187,6 +4211,14 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		if (len != sizeof(int))
 			return(EINVAL);
 		on = *(int *)buf;
+
+		if (optname == IPV6_DONTFRAG && uproto == IPPROTO_TCP) {
+			/*
+			 * we ignore this option for TCP sockets.
+			 * (rfc2292bis leaves this case unspecified.)
+			 */
+			on = 0;
+		}
 
 		switch (optname) {
 		case IPV6_USE_MIN_MTU:

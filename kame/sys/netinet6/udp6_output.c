@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.59 2002/02/26 03:18:01 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.60 2002/03/02 09:56:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -218,7 +218,8 @@ udp6_output(in6p, m, addr6, control)
 	}
 
 	if (control) {
-		if ((error = ip6_setpktoptions(control, &opt, stickyopt, priv, 0)) != 0)
+		if ((error = ip6_setpktoptions(control, &opt, stickyopt, priv,
+					       0, IPPROTO_UDP)) != 0)
 			goto release;
 		in6p->in6p_outputopts = &opt;
 	}
