@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.10 1999/12/07 16:18:19 sumikawa Exp $
+# $Id: Makefile,v 1.11 1999/12/20 07:30:13 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -29,6 +29,7 @@ SUBDIR+=	mpg123
 SUBDIR+=	mrt
 SUBDIR+=	ncftp3
 SUBDIR+=	netperf
+SUBDIR+=	netris
 SUBDIR+=	newbie
 SUBDIR+=	openssh
 SUBDIR+=	pchar
@@ -63,6 +64,7 @@ SUBDIR+=	wbd
 SUBDIR+=	wget
 SUBDIR+=	wu-ftpd
 SUBDIR+=	wwwoffle
+SUBDIR+=	xtris
 SUBDIR+=	zebra
 
 .include <bsd.port.subdir.mk>
