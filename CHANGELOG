@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.168 1999/10/07 05:07:55 itojun Exp $
+$Id: CHANGELOG,v 1.169 1999/10/07 06:52:39 itojun Exp $
 
 <199910>
 Thu Oct  7 14:08:24 JST 1999  itojun@iijlab.net
@@ -142,9 +142,9 @@ Wed Sep 22 20:42:25 JST 1999 sakane@ydc.co.jp
 
 Wed Sep 22 15:22:21 JST 1999  itojun@iijlab.net
 	* netbsd/sys/netinet/tcp* (tcp4/6)
-	* bsdi/sys/netinet/tcp* (tcp4)
+	* bsdi3/sys/netinet/tcp* (tcp4)
 	* freebsd2/sys/netinet/tcp* (tcp4)
-	* kame/sys/netinet6/tcp6* (tcp6 for bsdi/freebsd2)
+	* kame/sys/netinet6/tcp6* (tcp6 for bsdi3/freebsd2)
 	* freebsd3/sys/netinet/tcp* (tcp4/6)
 	  fix TCP MSS computation with IPsec headers.  (1) TCP MSS option
 	  must be mtu - iphdrlen - tcphdrlen.  it is a violation of protocol
