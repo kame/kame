@@ -17,6 +17,8 @@ PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@kame.net
 
+BROKEN=		"security issues"
+
 GNU_CONFIGURE=	yes
 CONFIGURE_ARGS+=--enable-ipv6
 

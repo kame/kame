@@ -18,6 +18,8 @@ PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	k-sugyou@kame.net
 
+BROKEN=		"security issues"
+
 USE_BZIP2=      YES
 WRKSRC=         ${WRKDIR}/lynx2-8-2
 GNU_CONFIGURE=  YES

@@ -4,7 +4,7 @@
 # Date created:         12 May 1998
 # Whom:                 k-sugyou
 #
-# $Id: Makefile,v 1.2 1999/10/08 03:37:42 itojun Exp $
+# $Id: Makefile,v 1.3 2000/03/17 16:36:53 itojun Exp $
 #
 
 DISTNAME=       lynx2-8-2
@@ -18,6 +18,8 @@ PATCHFILES=	lynx-282-v6-19991008.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	k-sugyou@kame.net
+
+BROKEN=		"security issues"
 
 NO_LATEST_LINK=	YES
 WRKSRC=         ${WRKDIR}/lynx2-8-2
