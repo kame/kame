@@ -197,6 +197,7 @@ struct	servtab {
 	int	se_socktype;		/* type of socket to use */
 	int	se_family;		/* address family */
 	char	*se_proto;		/* protocol used */
+	int	se_protocol;		/* protocol # */
 	int	se_rpcprog;		/* rpc program number */
 	int	se_rpcversl;		/* rpc program lowest version */
 	int	se_rpcversh;		/* rpc program highest version */
@@ -956,7 +957,8 @@ setup(struct servtab *sep)
 	int on = 1;
 	int r;
 
-	if ((sep->se_fd = socket(sep->se_family, sep->se_socktype, 0)) < 0) {
+	if ((sep->se_fd = socket(sep->se_family, sep->se_socktype,
+	    sep->se_protocol)) < 0) {
 		syslog(LOG_ERR, "%s/%s: socket: %m",
 		    sep->se_service, sep->se_proto);
 		return;
@@ -1293,6 +1295,15 @@ more:
 				sep->se_rpcversh = l;
 			} else if (*ccp != '\0')
 				goto badafterall;
+		} else {
+			if (strncmp(sep->se_proto, "tcp", 3) == 0)
+				sep->se_protocol = IPPROTO_TCP;
+			else if (strncmp(sep->se_proto, "udp", 3) == 0)
+				sep->se_protocol = IPPROTO_UDP;
+			else if (strncmp(sep->se_proto, "dccp", 4) == 0)
+				sep->se_protocol = IPPROTO_DCCP;
+			else
+				sep->se_protocol = 0;
 		}
 	}
 	arg = skip(&cp, 1);
@@ -1522,6 +1533,7 @@ dupconfig(struct servtab *sep)
 	newtab->se_socktype = sep->se_socktype;
 	newtab->se_family = sep->se_family;
 	newtab->se_proto = sep->se_proto ? newstr(sep->se_proto) : NULL;
+	newtab->se_protocol = sep->se_protocol;
 	newtab->se_rpcprog = sep->se_rpcprog;
 	newtab->se_rpcversl = sep->se_rpcversl;
 	newtab->se_rpcversh = sep->se_rpcversh;
