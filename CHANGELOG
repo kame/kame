@@ -1,9 +1,9 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.152 1999/10/04 09:56:20 itojun Exp $
+$Id: CHANGELOG,v 1.153 1999/10/04 10:01:06 itojun Exp $
 
 <199910>
-Mon Oct  4 03:01:04 PDT 1999  itojun@iijlab.net
+Mon Oct  4 18:59:06 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/www/w3m: new port for W3M, simple text based WWW
 	  client.
 	* netbsd/pkgsrc/devel/boehm-gc: conservative garbage collector for C
