@@ -4,7 +4,7 @@
 # Date created:         Thu Nov  4 14:11:56 JST 1999
 # Whom:                 sumikawa@kame.net
 #
-# $Id: Makefile,v 1.1 1999/11/04 05:50:18 sumikawa Exp $
+# $Id: Makefile,v 1.1.1.1 1999/11/04 05:50:18 sumikawa Exp $
 #
 
 DISTNAME=       pchar-1.0
