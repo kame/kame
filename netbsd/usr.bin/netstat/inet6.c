@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.13 1999/11/22 10:17:35 itojun Exp $");
+__RCSID("$Id: inet6.c,v 1.14 1999/11/22 15:46:12 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -1178,6 +1178,11 @@ inet6name(in6p)
 	static int first = 1;
 	char hbuf[NI_MAXHOST];
 	struct sockaddr_in6 sin6;
+#ifdef KAME_SCOPEID
+	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflag = NI_NUMERICHOST;
+#endif
 
 	if (first && !nflag) {
 		first = 0;
@@ -1215,10 +1220,8 @@ inet6name(in6p)
 		}
 #endif
 		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
-				hbuf, sizeof(hbuf), NULL, 0,
-				NI_NUMERICHOST | NI_WITHSCOPEID)) {
+				hbuf, sizeof(hbuf), NULL, 0, niflag))
 			strcpy(hbuf, "?");
-		}
 		sprintf(line, "%s", hbuf);
 	}
 	return (line);

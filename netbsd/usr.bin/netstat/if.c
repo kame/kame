@@ -102,6 +102,11 @@ intpr(interval, ifnetaddr, pfunc)
 	char name[IFNAMSIZ];
 #ifdef INET6
 	char hbuf[NI_MAXHOST];		/* for getnameinfo() */
+#ifdef KAME_SCOPEID
+	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflag = NI_NUMERICHOST;
+#endif
 #endif
 
 	if (ifnetaddr == 0) {
@@ -246,7 +251,7 @@ intpr(interval, ifnetaddr, pfunc)
 				if (getnameinfo((struct sockaddr *)sin6,
 						sin6->sin6_len,
 						hbuf, sizeof(hbuf), NULL, 0,
-						NI_NUMERICHOST | NI_WITHSCOPEID)) {
+						niflag) != 0) {
 					cp = "?";
 				} else
 					cp = hbuf;

@@ -176,7 +176,7 @@ routepr(rtree)
 			} else if (af == AF_UNSPEC || af == i) {
 				pr_family(i);
 				do_rtent = 1;
-				pr_rthdr();
+				pr_rthdr(af);
 				p_tree(head.rnh_treetop);
 			}
 		}
@@ -225,25 +225,34 @@ pr_family(af)
 
 /* column widths; each followed by one space */
 #ifndef INET6
-#define	WID_DST		18	/* width of destination column */
-#define	WID_GW		18	/* width of gateway column */
+#define	WID_DST(af)	18	/* width of destination column */
+#define	WID_GW(af)	18	/* width of gateway column */
 #else
-#define	WID_DST	(nflag ? 32 : 18)	/* width of destination column */
-#define	WID_GW	(nflag ? 30 : 18)	/* width of gateway column */
+/* width of destination/gateway column */
+#ifdef KAME_SCOPEID
+/* strlen("fe80::aaaa:bbbb:cccc:dddd@gif0") == 30 */
+#define	WID_DST(af)	((af) == AF_INET6 ? (nflag ? 32 : 18) : 18)
+#define	WID_GW(af)	((af) == AF_INET6 ? (nflag ? 30 : 18) : 18)
+#else
+/* strlen("fe80::aaaa:bbbb:cccc:dddd") == 25 */
+#define	WID_DST(af)	((af) == AF_INET6 ? (nflag ? 28 : 18) : 18)
+#define	WID_GW(af)	((af) == AF_INET6 ? (nflag ? 26 : 18) : 18)
+#endif
 #endif /* INET6 */
 
 /*
  * Print header for routing table columns.
  */
 void
-pr_rthdr()
+pr_rthdr(af)
+	int af;
 {
 
 	if (Aflag)
 		printf("%-8.8s ","Address");
 	printf("%-*.*s %-*.*s %-6.6s  %6.6s%8.8s %6.6s  %s\n",
-		WID_DST, WID_DST, "Destination",
-		WID_GW, WID_GW, "Gateway",
+		WID_DST(af), WID_DST(af), "Destination",
+		WID_GW(af), WID_GW(af), "Gateway",
 		"Flags", "Refs", "Use", "Mtu", "Interface");
 }
 
@@ -577,16 +586,18 @@ p_rtentry(rt)
 	static struct ifnet ifnet, *lastif;
 	union sockaddr_union addr_un, mask_un;
 	struct sockaddr *addr, *mask;
+	int af;
 
 	memset(&addr_un, 0, sizeof(addr_un));
 	memset(&mask_un, 0, sizeof(mask_un));
 	addr = sockcopy(kgetsa(rt_key(rt)), &addr_un);
+	af = addr->sa_family;
 	if (rt_mask(rt))
 		mask = sockcopy(kgetsa(rt_mask(rt)), &mask_un);
 	else
 		mask = sockcopy(NULL, &mask_un);
-	p_sockaddr(addr, mask, rt->rt_flags, WID_DST);
-	p_sockaddr(kgetsa(rt->rt_gateway), NULL, RTF_HOST, WID_GW);
+	p_sockaddr(addr, mask, rt->rt_flags, WID_DST(af));
+	p_sockaddr(kgetsa(rt->rt_gateway), NULL, RTF_HOST, WID_GW(af));
 	p_flags(rt->rt_flags, "%-6.6s ");
 	printf("%6d %8lu ", rt->rt_refcnt, rt->rt_use);
 	if (rt->rt_rmx.rmx_mtu)
@@ -793,7 +804,12 @@ netname6(sa6, mask)
 	static char line[NI_MAXHOST];
 	u_char *p;
 	u_char *lim;
-	int masklen, final = 0, illegal = 0, flag = NI_WITHSCOPEID;
+	int masklen, final = 0, illegal = 0;
+#ifdef KAME_SCOPEID
+	int flag = NI_WITHSCOPEID;
+#else
+	int flag = 0;
+#endif
 
 	if (mask) {
 		masklen = 0;
@@ -868,7 +884,11 @@ routename6(sa6)
 	struct sockaddr_in6 *sa6;
 {
 	static char line[MAXHOSTNAMELEN + 1];
+#ifdef KAME_SCOPEID
 	int flag = NI_WITHSCOPEID;
+#else
+	int flag = 0;
+#endif
 
 	if (nflag)
 		flag |= NI_NUMERICHOST;

@@ -100,7 +100,7 @@ void	mbpr(u_long, u_long, u_long, u_long, u_long);
 void	hostpr __P((u_long, u_long));
 void	impstats __P((u_long, u_long));
 
-void	pr_rthdr __P((void));
+void	pr_rthdr __P((int));
 void	pr_family __P((int));
 void	rt_stats __P((u_long));
 char	*ns_phost __P((struct sockaddr *));
