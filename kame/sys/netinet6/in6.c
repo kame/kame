@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.166 2001/02/04 10:16:35 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.167 2001/02/05 12:52:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -962,7 +962,7 @@ in6_update_ifa(ifp, ifra, ia)
 	 * zone identifier.
 	 */
 	dst6 = ifra->ifra_dstaddr;
-	if ((ifp->if_flags & IFF_POINTOPOINT) &&
+	if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LOOPBACK)) &&
 	    (dst6.sin6_family == AF_INET6)) {
 		int scopeid;
 
@@ -985,23 +985,31 @@ in6_update_ifa(ifp, ifra, ia)
 #endif
 	}
 	/*
-	 * When the destination address is specified, the corresponding
-	 * prefix length must be 128.
+	 * The destination address can be specified only for a p2p or a
+	 * loopback interface.  If specified, the corresponding prefix length
+	 * must be 128.
 	 */
-	if (ifra->ifra_dstaddr.sin6_family == AF_INET6 && plen != 128) {
-		/*
-		 * The following message seems noisy, but we dare to add it for
-		 * diagnosis.
-		 */
-		log(LOG_INFO, "in6_update_ifa: prefixlen must be 128 when "
-		    "dstaddr is specified\n");
-		return(EINVAL);
-	}
-	/* lifetime consistency check */
-	lt = &ifra->ifra_lifetime;
-	if (lt->ia6t_vltime != ND6_INFINITE_LIFETIME
-	    && lt->ia6t_vltime + time_second < time_second) {
-		return EINVAL;
+	if (ifra->ifra_dstaddr.sin6_family == AF_INET6) {
+		if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LOOPBACK)) == 0) {
+			/* XXX: noisy message */
+			log(LOG_INFO, "in6_update_ifa: a destination can be "
+			    "specified for a p2p or a loopback IF only\n");
+			return(EINVAL);
+		}
+		if (plen != 128) {
+			/*
+			 * The following message seems noisy, but we dare to
+			 * add it for diagnosis.
+			 */
+			log(LOG_INFO, "in6_update_ifa: prefixlen must be 128 "
+			    "when dstaddr is specified\n");
+			return(EINVAL);
+		}
+		/* lifetime consistency check */
+		lt = &ifra->ifra_lifetime;
+		if (lt->ia6t_vltime != ND6_INFINITE_LIFETIME
+		    && lt->ia6t_vltime + time_second < time_second) {
+			return EINVAL;
 	}
 	if (lt->ia6t_vltime == 0) {
 		/*
