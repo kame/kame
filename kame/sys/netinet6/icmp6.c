@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.222 2001/07/24 01:40:18 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.223 2001/07/24 01:47:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -621,10 +621,19 @@ icmp6_input(mp, offp, proto)
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_echo);
 		if (code != 0)
 			goto badcode;
+		/*
+		 * copy mbuf to send to two data paths: userland sockets,
+		 * and to the querier (echo reply).
+		 */
 		if ((n = m_copy(m, 0, M_COPYALL)) == NULL) {
 			/* Give up remote */
 			break;
 		}
+		/*
+		 * if the first mbuf is shared, or the first mbuf is too short,
+		 * copy the first part of the data into a fresh mbuf.
+		 * otherwise, we will wrongly overwrite both copies.
+		 */
 		if ((n->m_flags & M_EXT) != 0 ||
 		    n->m_len < off + sizeof(struct icmp6_hdr)) {
 			struct mbuf *n0 = n;
