@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.59 2001/12/10 17:52:02 sakane Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.60 2001/12/10 18:08:15 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -98,6 +98,11 @@ ident_i1send(iph1, msg)
 	int error = -1;
 
 	/* validity check */
+	if (msg != NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"msg has to be NULL in this function.\n");
+		goto end;
+	}
 	if (iph1->status != PHASE1ST_START) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);

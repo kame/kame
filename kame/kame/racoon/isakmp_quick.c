@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.86 2001/12/10 17:52:03 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.87 2001/12/10 18:08:15 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -156,6 +156,11 @@ quick_i1send(iph2, msg)
 	struct ipsecdoi_id_b *id, *id_p;
 
 	/* validity check */
+	if (msg != NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"msg has to be NULL in this function.\n");
+		goto end;
+	}
 	if (iph2->status != PHASE2ST_GETSPIDONE) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph2->status);
@@ -1138,6 +1143,11 @@ quick_r2send(iph2, msg)
 	u_int8_t *np_p = NULL;
 
 	/* validity check */
+	if (msg != NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"msg has to be NULL in this function.\n");
+		goto end;
+	}
 	if (iph2->status != PHASE2ST_GETSPIDONE) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph2->status);
