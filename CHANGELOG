@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.166 1999/10/06 11:02:37 itojun Exp $
+$Id: CHANGELOG,v 1.167 1999/10/06 11:44:16 jinmei Exp $
 
 <199910>
+1999-10-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *bsd*/netstat/route.c (netname6, routename6): were changed to
+	use getnameinfo in order to accomodate to the new format for
+	scoped addresses.
+	Now link-local gateways when invoking `netstat -rn' are shown like
+	fe80::5254:ff:fedc:5217@ne0.
+
 Wed Oct  6 19:50:37 JST 1999	k-sugyou@kame.net
 	* freebsd[23]/ports/perl5: update to latest IPv6 patch.
 
