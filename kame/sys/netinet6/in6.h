@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.116 2002/01/31 14:14:50 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.117 2002/02/01 05:22:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -260,6 +260,14 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 	 (*(const u_int32_t *)(const void *)(&(a)->s6_addr[4]) == 0) &&	\
 	 (*(const u_int32_t *)(const void *)(&(a)->s6_addr[8]) == 0) &&	\
 	 (*(const u_int32_t *)(const void *)(&(a)->s6_addr[12]) == 0))
+#ifdef _KERNEL
+#define SA6_IS_ADDR_UNSPECIFIED(a)	\
+	((*(const u_int32_t *)(const void *)(&(a)->sin6_addr.s6_addr[0]) == 0) && \
+	 (*(const u_int32_t *)(const void *)(&(a)->sin6_addr.s6_addr[4]) == 0) && \
+	 (*(const u_int32_t *)(const void *)(&(a)->sin6_addr.s6_addr[8]) == 0) && \
+	 (*(const u_int32_t *)(const void *)(&(a)->sin6_addr.s6_addr[12]) == 0) && \
+	 ((a)->sin6_scope_id == 0))
+#endif
 
 /*
  * Loopback
