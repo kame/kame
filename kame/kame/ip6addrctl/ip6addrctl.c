@@ -1,4 +1,4 @@
-/*	$KAME: ip6addrctl.c,v 1.1 2001/12/27 12:45:24 jinmei Exp $	*/
+/*	$KAME: ip6addrctl.c,v 1.2 2003/12/16 08:00:03 suz Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -87,7 +87,7 @@ main(argc, argv)
 		if (argc < 5)
 			usage();
 		add_policy(argv[2], argv[3], argv[4]);
-	} else if (strcasecmp(argv[0], "delete") == 0) {
+	} else if (strcasecmp(argv[1], "delete") == 0) {
 		if (argc < 3)
 			usage();
 		delete_policy(argv[2]);

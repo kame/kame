@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2517 2003/12/14 04:14:06 itojun Exp $
+$KAME: CHANGELOG,v 1.2518 2003/12/16 08:01:22 suz Exp $
 
 <200312>
+2003-12-16  SUZUKI Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/ip6addrctl: 'ip6addrctl delete ...' works now
+
 Sun Dec 14 13:12:52 JST 2003  itojun@iijlab.net
 	* racoon: RFC3526 D-H groups support.  from Damien Miller and hshoexer.
 
