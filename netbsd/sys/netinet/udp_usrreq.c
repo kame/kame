@@ -371,6 +371,10 @@ udp6_input(mp, offp, proto)
 	}
 #endif
 	ulen = ntohs((u_short)uh->uh_ulen);
+	/*
+	 * RFC2675 section 4: jumbograms will have 0 in the UDP header field,
+	 * iff payload length > 0xffff.
+	 */
 	if (ulen == 0 && plen > 0xffff)
 		ulen = plen;
 

@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.40 2000/02/28 15:44:13 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.41 2000/02/29 03:59:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -194,7 +194,11 @@ udp6_input(mp, offp, proto)
 	}
 #endif
 	ulen = ntohs((u_short)uh->uh_ulen);
-	if (ulen == 0 && plen > 0xffff)	/* jumbogram */
+	/*
+	 * RFC2675 section 4: jumbograms will have 0 in the UDP header field,
+	 * iff payload length > 0xffff.
+	 */
+	if (ulen == 0 && plen > 0xffff)
 		ulen = plen;
 	
 	if (plen != ulen) {
