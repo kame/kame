@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.22 2001/12/20 14:12:06 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.23 2001/12/21 04:35:25 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -64,7 +64,7 @@ struct cmsghdr *cmsgp = NULL;
 static int calc_opthlen __P((int));
 static void setopthdr __P((int, int));
 static void usage __P((void));
-static int mflag, fflag;
+static int Pflag, mflag, fflag;
 
 #ifndef IPV6_MINMTU
 #define IPV6_MINMTU 1280
@@ -75,7 +75,7 @@ main(argc, argv)
     int argc;
     char *argv[];
 {
-	int i, s;
+	int i, s, isconnected = 0;
 	int rthlen = 0, ip6optlen = 0, hops = 0, error;
 	char *portstr = DEFAULTPORT;
 	char *finaldst;
@@ -91,7 +91,7 @@ main(argc, argv)
 	int socktype = SOCK_DGRAM;
 	int proto = IPPROTO_UDP;
 
-	while ((ch = getopt(argc, argv, "d:D:fh:l:Mmn:p:s:")) != -1)
+	while ((ch = getopt(argc, argv, "D:d:fh:l:Mmn:Pp:s:")) != -1)
 		switch(ch) {
 		case 'D':
 			dsthdr1len = atoi(optarg);
@@ -116,6 +116,9 @@ main(argc, argv)
 			break;
 		case 'n':
 			nexthop = optarg;
+			break;
+		case 'P':
+			Pflag++;
 			break;
 		case 'p':
 			portstr = optarg;
@@ -297,6 +300,22 @@ main(argc, argv)
 	}
 #endif
 
+#ifdef IPV6_PATHMTU
+	if (Pflag) {
+		struct ip6_mtuinfo mtuinfo;
+		int optlen = sizeof(mtuinfo);
+
+		if (connect(s, res->ai_addr, res->ai_addrlen))
+			errx(1, "connect");
+		isconnected++;
+		if (getsockopt(s, IPPROTO_IPV6, IPV6_PATHMTU, &mtuinfo,
+			       &optlen)) {
+			errx(1, "getsockopt(IPV6_PATHMTU)");
+		}
+		printf("Current path MTU is %ld\n", (long)mtuinfo.ip6m_mtu);
+	}
+#endif
+
 #if 0
 	bzero(&local, sizeof(local));
 	local.sin6_family = AF_INET6;
@@ -304,8 +323,10 @@ main(argc, argv)
 		err(1, "bind");
 #endif
 
-	msg.msg_name = (void *)res->ai_addr;
-	msg.msg_namelen = res->ai_addrlen;
+	if (!isconnected) {
+		msg.msg_name = (void *)res->ai_addr;
+		msg.msg_namelen = res->ai_addrlen;
+	}
 	msgiov.iov_base = (void *)databuf;
 	msgiov.iov_len = datalen;
 	msg.msg_iov = &msgiov;
@@ -400,7 +421,7 @@ static void
 usage()
 {
 	fprintf(stderr, "usage: sender [-d optlen] [-D optlen] [-f] "
-		"[-h optlen] [-l hoplimit] [-mM] [-n nexthop] [-p port] "
+		"[-h optlen] [-l hoplimit] [-mM] [-n nexthop] [-P] [-p port] "
 		"[-s packetsize] IPv6addrs...\n");
 	exit(1);
 }
