@@ -265,7 +265,8 @@ wi_pcmcia_attach(parent, self, aux)
 	ifp->if_start = wi_start;
 	ifp->if_watchdog = wi_watchdog;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	bzero(sc->wi_node_name, sizeof(sc->wi_node_name));
 	bcopy(WI_DEFAULT_NODENAME, sc->wi_node_name,
@@ -454,7 +455,7 @@ wi_intr(vsc)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, WI_INT_EN, WI_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		wi_start(ifp);
 
 	return (1);
@@ -1309,7 +1310,7 @@ wi_start(ifp)
 	if (ifp->if_flags & IFF_OACTIVE)
 		return;
 
-	IF_DEQUEUE(&ifp->if_snd, m0);
+	IFQ_DEQUEUE(&ifp->if_snd, m0);
 	if (m0 == NULL)
 		return;
 

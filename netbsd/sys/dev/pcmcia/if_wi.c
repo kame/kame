@@ -375,6 +375,7 @@ wi_attach(parent, self, aux)
 	ifp->if_ioctl = wi_ioctl;
 	ifp->if_watchdog = wi_watchdog;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	(void)wi_set_ssid(&sc->wi_nodeid, WI_DEFAULT_NODENAME,
 	    sizeof(WI_DEFAULT_NODENAME) - 1);
@@ -714,7 +715,7 @@ int wi_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, WI_INT_EN, WI_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		wi_start(ifp);
 
 	return 1;
@@ -1594,7 +1595,7 @@ static void wi_start(ifp)
 	if (ifp->if_flags & IFF_OACTIVE)
 		return;
 
-	IF_DEQUEUE(&ifp->if_snd, m0);
+	IFQ_DEQUEUE(&ifp->if_snd, m0);
 	if (m0 == NULL)
 		return;
 

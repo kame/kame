@@ -306,10 +306,11 @@ awi_attach(sc)
 #endif
 #ifdef __FreeBSD__
 	ifp->if_output = ether_output;
-	ifp->if_snd.ifq_maxlen = ifqmaxlen;
+	IFQ_SET_MAXLEN(&ifp->if_snd, ifqmaxlen);
 	memcpy(sc->sc_ec.ac_enaddr, sc->sc_mib_addr.aMAC_Address,
 	    ETHER_ADDR_LEN);
 #endif
+	IFQ_SET_READY(&ifp->if_snd);
 
 	printf("%s: IEEE802.11 %s %dMbps (firmware %s)\n",
 	    sc->sc_dev.dv_xname,
@@ -875,12 +876,7 @@ awi_stop(sc)
 			break;
 		m_freem(m);
 	}
-	for (;;) {
-		IF_DEQUEUE(&ifp->if_snd, m);
-		if (m == NULL)
-			break;
-		m_freem(m);
-	}
+	IFQ_PURGE(&ifp->if_snd);
 	while ((bp = TAILQ_FIRST(&sc->sc_scan)) != NULL) {
 		TAILQ_REMOVE(&sc->sc_scan, bp, list);
 		free(bp, M_DEVBUF);
@@ -959,7 +955,7 @@ awi_start(ifp)
 		} else {
 			if (!(ifp->if_flags & IFF_RUNNING))
 				break;
-			IF_DEQUEUE(&ifp->if_snd, m0);
+			IFQ_POLL(&ifp->if_snd, m0);
 			if (m0 == NULL)
 				break;
 			len = m0->m_pkthdr.len + sizeof(struct ieee80211_frame);
@@ -970,10 +966,10 @@ awi_start(ifp)
 				len += IEEE80211_WEP_IVLEN +
 				    IEEE80211_WEP_KIDLEN + IEEE80211_WEP_CRCLEN;
 			if (awi_next_txd(sc, len, &frame, &ntxd)) {
-				IF_PREPEND(&ifp->if_snd, m0);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			}
+			IFQ_DEQUEUE(&ifp->if_snd, m0);
 			AWI_BPF_MTAP(sc, m0, AWI_BPF_NORM);
 			m0 = awi_fix_txhdr(sc, m0);
 			if (sc->sc_wep_algo != NULL && m0 != NULL)
