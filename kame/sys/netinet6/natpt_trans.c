@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.13 2000/04/06 08:30:48 sumikawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.14 2000/04/19 06:48:58 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,6 +28,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#if defined(__FreeBSD__)
+#include "opt_natpt.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -70,11 +74,13 @@
 
 #include <netinet6/natpt_defs.h>
 #include <netinet6/natpt_list.h>
+#include <netinet6/natpt_log.h>
 #include <netinet6/natpt_var.h>
 
 
 #define	recalculateTCP4Checksum		1
 #define	recalculateTCP6Checksum		1
+#define	recalculateUDP4Checksum		1
 
 
 /*
@@ -82,7 +88,6 @@
  */
 
 int		 errno;
-int		 natpt_initialized;
 int		 ip6_protocol_tr;
 
 extern	struct in6_addr	 natpt_prefix;
@@ -105,12 +110,14 @@ void		 tr_icmp6EchoRequest		__P((struct _cv *, struct _cv *));
 void		 tr_icmp6EchoReply		__P((struct _cv *, struct _cv *));
 
 static	void	 _recalculateTCP4Checksum	__P((struct _cv *));
+static	void	 _recalculateUDP4Checksum	__P((struct _cv *));
 
 static	int	 updateTcpStatus		__P((struct _cv *));
 static	int	 _natpt_tcpfsm			__P((int, int, u_short, u_char));
 static	int	 _natpt_tcpfsmSessOut		__P((int, short, u_char));
 static	int	 _natpt_tcpfsmSessIn		__P((int, short, u_char));
 
+static	void	 adjustPayloadChecksum		__P((int, struct _cv *, struct _cv *));
 static	void	 adjustUpperLayerChecksum	__P((int, int, struct _cv *, struct _cv *));
 static	int	 adjustChecksum			__P((int, u_char *, int, u_char *, int));
 
@@ -132,7 +139,7 @@ translatingIPv4To4(struct _cv *cv4, struct pAddr *pad)
     struct mbuf		*m4 = NULL;
 
     if (isDump(D_TRANSLATINGIPV4))
-	natpt_logIp4(LOG_DEBUG, cv4->_ip._ip4);
+	natpt_logIp4(LOG_DEBUG, cv4->_ip._ip4, NULL);
 
     microtime(&atv);
     cv4->ats->tstamp = atv.tv_sec;
@@ -160,8 +167,10 @@ translatingIPv4To4(struct _cv *cv4, struct pAddr *pad)
 	ip4->ip_sum = 0;			/* Header checksum	*/
 	ip4->ip_sum = in_cksum(m4, sizeof(struct ip));
 	m4->m_pkthdr.rcvif = cv4->m->m_pkthdr.rcvif;
-	
 	m4->m_pkthdr.len = cv4->m->m_pkthdr.len;
+
+	if (isDump(D_TRANSLATEDIPV4))
+	    natpt_logIp4(LOG_DEBUG, ip4, NULL);
     }
 
     return (m4);
@@ -179,7 +188,7 @@ translatingICMPv4To4(struct _cv *cv4from, struct pAddr *pad)
     ip4from = mtod(cv4from->m, struct ip *);
     icmp4from = cv4from->_payload._icmp4;
 
-    m4 = m_copym(cv4from->m,0, M_COPYALL, M_NOWAIT);
+    m4 = m_copym(cv4from->m, 0, M_COPYALL, M_NOWAIT);
     ReturnEnobufs(m4);
 
     bzero(&cv4to, sizeof(struct _cv));
@@ -214,10 +223,11 @@ translatingTCPv4To4(struct _cv *cv4from, struct pAddr *pad)
 
     bzero(&cv4to, sizeof(struct _cv));
     m4 = translatingTCPUDPv4To4(cv4from, pad, &cv4to);
-    cv4to.ip_p = cv4to.ip_payload = IPPROTO_TCP;
+    cv4to.ip_p  = cv4to.ip_payload = IPPROTO_TCP;
+    cv4to.inout = cv4from->inout;
 
     updateTcpStatus(&cv4to);
-    adjustUpperLayerChecksum(IPPROTO_IPV4, IPPROTO_TCP, cv4from, &cv4to);
+    adjustPayloadChecksum(IPPROTO_TCP, cv4from, &cv4to);
 
 #ifdef recalculateTCP4Checksum
     _recalculateTCP4Checksum(&cv4to);
@@ -237,7 +247,11 @@ translatingUDPv4To4(struct _cv *cv4from, struct pAddr *pad)
     m4 = translatingTCPUDPv4To4(cv4from, pad, &cv4to);
     cv4to.ip_p = cv4to.ip_payload = IPPROTO_UDP;
 
-    adjustUpperLayerChecksum(IPPROTO_IPV4, IPPROTO_UDP, cv4from, &cv4to);
+    adjustPayloadChecksum(IPPROTO_UDP, cv4from, &cv4to);
+
+#ifdef recalculateUDP4Checksum
+    _recalculateUDP4Checksum(&cv4to);
+#endif
 
     return (m4);
 }
@@ -250,7 +264,7 @@ translatingTCPUDPv4To4(struct _cv *cv4from, struct pAddr *pad, struct _cv *cv4to
     struct ip		*ip4to;
     struct tcphdr	*tcp4to;
 
-    m4 = m_copym(cv4from->m,0, M_COPYALL, M_NOWAIT);
+    m4 = m_copym(cv4from->m, 0, M_COPYALL, M_NOWAIT);
     ReturnEnobufs(m4);
 
     ip4to = mtod(m4, struct ip *);
@@ -284,7 +298,7 @@ translatingIPv4To6(struct _cv *cv4, struct pAddr *pad)
     struct mbuf		*m6 = NULL;
 
     if (isDump(D_TRANSLATINGIPV4))
-	natpt_logIp4(LOG_DEBUG, cv4->_ip._ip4);
+	natpt_logIp4(LOG_DEBUG, cv4->_ip._ip4, NULL);
 
     microtime(&atv);
     cv4->ats->tstamp = atv.tv_sec;
@@ -826,7 +840,7 @@ translatingIPv6To4(struct _cv *cv6, struct pAddr *pad)
     struct mbuf		*m4 = NULL;
 
     if (isDump(D_TRANSLATINGIPV6))
-	natpt_logIp6(LOG_DEBUG, cv6->_ip._ip6);
+	natpt_logIp6(LOG_DEBUG, cv6->_ip._ip6, NULL);
 
     microtime(&atv);
     cv6->ats->tstamp = atv.tv_sec;
@@ -865,7 +879,7 @@ translatingIPv6To4(struct _cv *cv6, struct pAddr *pad)
 	m4->m_pkthdr.len = mlen;
 
 	if (isDump(D_TRANSLATEDIPV4))
-	    natpt_logIp4(LOG_DEBUG, ip4);
+	    natpt_logIp4(LOG_DEBUG, ip4, NULL);
     }
 
     return (m4);
@@ -1272,6 +1286,44 @@ _recalculateTCP4Checksum(struct _cv *cv4)
 }
 
 
+static void
+_recalculateUDP4Checksum(struct _cv *cv4)
+{
+    int			 cksumAdj, cksumCks;
+    int			 iphlen;
+    struct ip		*ip4 = cv4->_ip._ip4;
+    struct ip		 save_ip;
+    struct udpiphdr	*ui;
+
+    cksumAdj = cv4->_payload._tcp4->th_sum;
+
+    ui = mtod(cv4->m, struct udpiphdr *);
+    iphlen = ip4->ip_hl << 2;
+
+    save_ip = *cv4->_ip._ip4;
+#ifdef ui_next
+    ui->ui_next = ui->ui_prev = 0;
+    ui->ui_x1 = 0;
+#else
+    bzero(ui->ui_x1, 9);
+#endif
+    ui->ui_pr = IPPROTO_UDP;
+    ui->ui_len = htons(cv4->m->m_pkthdr.len - iphlen);
+    ui->ui_src = save_ip.ip_src;
+    ui->ui_dst = save_ip.ip_dst;
+
+    ui->ui_sum = 0;
+    ui->ui_sum = in_cksum(cv4->m, cv4->m->m_pkthdr.len);
+    *cv4->_ip._ip4 = save_ip;
+
+    cksumCks = ui->ui_sum;
+#if	0
+    printf("translatingUDPv6To4: UDP6->UDP4: %04x, %04x %d\n",
+	   cksumAdj, cksumCks, cv4->m->m_pkthdr.len);
+#endif
+}
+
+
 /*
  *
  */
@@ -1318,6 +1370,18 @@ _natpt_tcpfsm(int session, int inout, u_short state, u_char flags)
 	rv = _natpt_tcpfsmSessOut(inout, state, flags);
     else
 	rv = _natpt_tcpfsmSessIn (inout, state, flags);
+
+    if (isDebug(F_TCPFSM))
+    {
+	int	wow[5];
+
+	wow[0] = session;
+	wow[1] = inout;
+	wow[2] = state;
+	wow[3] = flags;
+	wow[4] = rv;
+	natpt_log(LOG_TCPFSM, LOG_DEBUG, wow, sizeof(wow));
+    }
 
     return (rv);
 }
@@ -1493,6 +1557,46 @@ _natpt_tcpfsmSessIn(int inout, short state, u_char flags)
 /*
  *
  */
+
+static void
+adjustPayloadChecksum(int proto, struct _cv *cv4from, struct _cv *cv4to)
+{
+    u_short		cksum;
+    struct ipovly	ip4from, ip4to;
+
+    bzero(&ip4from, sizeof(ip4from));
+    bzero(&ip4to,   sizeof(ip4to));
+
+    ip4from.ih_src = cv4from->_ip._ip4->ip_src;
+    ip4from.ih_dst = cv4from->_ip._ip4->ip_dst;
+    ip4from.ih_len = htons(cv4from->plen);
+    ip4from.ih_pr  = cv4from->ip_p;
+
+    ip4to.ih_src = cv4to->_ip._ip4->ip_src;
+    ip4to.ih_dst = cv4to->_ip._ip4->ip_dst;
+    ip4to.ih_len = htons(cv4to->plen);
+    ip4to.ih_pr  = cv4to->ip_p;
+
+    switch (proto)
+    {
+      case IPPROTO_TCP:
+	cksum = adjustChecksum(ntohs(cv4from->_payload._tcp4->th_sum),
+			       (u_char *)&ip4from, sizeof(struct ipovly),
+			       (u_char *)&ip4to,   sizeof(struct ipovly));
+	break;
+
+      case IPPROTO_UDP:
+	cksum = adjustChecksum(ntohs(cv4from->_payload._udp->uh_sum),
+			       (u_char *)&ip4from, sizeof(struct ipovly),
+			       (u_char *)&ip4to,   sizeof(struct ipovly));
+	break;
+
+      default:
+	break;
+    }
+
+}
+
 
 static void
 adjustUpperLayerChecksum(int header, int proto, struct _cv *cv6, struct _cv *cv4)

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.10 2000/04/06 08:30:46 sumikawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.11 2000/04/19 06:48:57 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,6 +28,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#if defined(__FreeBSD__)
+#include "opt_natpt.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -62,6 +66,8 @@
  *
  */
 
+int		natpt_initialized;
+int		natpt_gotoOneself;
 u_int		natpt_debug;
 u_int		natpt_dump;
 
@@ -78,21 +84,23 @@ struct in6_addr	 natpt_prefix
 struct in6_addr	 natpt_prefixmask
 			= {{{0x00000000, 0x00000000, 0x00000000, 0x00000000}}};
 
-int		 natpt_in4			__P((struct mbuf *, struct mbuf **));
-int		 natpt_in6			__P((struct mbuf *, struct mbuf **));
-int		 natpt_out4			__P((struct mbuf *, struct mbuf **));
-int		 natpt_out6			__P((struct mbuf *, struct mbuf **));
-int		 natpt_incomingIPv4		__P((int, struct mbuf *, struct mbuf **));
-int		 natpt_outgoingIPv4		__P((int, struct mbuf *, struct mbuf **));
-int		 natpt_incomingIPv6		__P((int, struct mbuf *, struct mbuf **));
-int		 natpt_outgoingIPv6		__P((int, struct mbuf *, struct mbuf **));
 
-int		 configCv4			__P((int, struct mbuf *, struct _cv *));
-int		 configCv6			__P((int, struct mbuf *, struct _cv *));
-caddr_t		 foundFinalPayload		__P((struct mbuf *, int *, int *));
-int		 sanityCheckIn4			__P((struct _cv *));
-int		 sanityCheckOut6		__P((struct _cv *));
-int		 checkMTU			__P((struct _cv *));
+int		 natpt_in4		__P((struct mbuf *, struct mbuf **));
+int		 natpt_in6		__P((struct mbuf *, struct mbuf **));
+int		 natpt_out4		__P((struct mbuf *, struct mbuf **));
+int		 natpt_out6		__P((struct mbuf *, struct mbuf **));
+int		 natpt_incomingIPv4	__P((int, struct ifBox *, struct mbuf *, struct mbuf **));
+int		 natpt_outgoingIPv4	__P((int, struct ifBox *, struct mbuf *, struct mbuf **));
+int		 natpt_incomingIPv6	__P((int, struct ifBox *, struct mbuf *, struct mbuf **));
+int		 natpt_outgoingIPv6	__P((int, struct ifBox *, struct mbuf *, struct mbuf **));
+
+int		 configCv4		__P((int, struct mbuf *, struct _cv *));
+int		 configCv6		__P((int, struct mbuf *, struct _cv *));
+caddr_t		 foundFinalPayload	__P((struct mbuf *, int *, int *));
+int		 sanityCheckIn4		__P((struct _cv *));
+int		 sanityCheckOut6	__P((struct _cv *));
+int		 checkMTU		__P((struct _cv *));
+int		 toOneself4		__P((struct ifBox *, struct _cv *));
 
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -116,7 +124,7 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 	return (IPPROTO_IP);			/* goto ours		*/
 
     if (isDump(D_DIVEIN4))
-	natpt_logMBuf(LOG_DEBUG, m4, "dive into natpt_in4.");
+	natpt_logMBuf(LOG_DEBUG, m4, "natpt_in4().");
 
     ifnet = m4->m_pkthdr.rcvif;
     for (p = ifBox; p; p = CDR(p))
@@ -125,9 +133,9 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 	if (ifb->ifnet == ifnet)
 	{
 	    if (ifb->side == outSide)
-		rv = natpt_incomingIPv4(NATPT_INBOUND,	m4, m6);
+		rv = natpt_incomingIPv4(NATPT_INBOUND,	ifb, m4, m6);
 	    else
-		rv = natpt_outgoingIPv4(NATPT_OUTBOUND, m4, m6);
+		rv = natpt_outgoingIPv4(NATPT_OUTBOUND, ifb, m4, m6);
 	    goto    exit;
 	}
     }
@@ -151,7 +159,7 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 	return (IPPROTO_IP);			/* goto mcastcheck	*/
 
     if (isDump(D_DIVEIN6))
-	natpt_logMBuf(LOG_DEBUG, m6, "dive into natpt_in6.");
+	natpt_logMBuf(LOG_DEBUG, m6, "natpt_in6().");
 
     ip6 = mtod(m6, struct ip6_hdr *);
 
@@ -181,9 +189,9 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 	if (ifb->ifnet == ifnet)
 	{
 	    if (ifb->side == outSide)
-		rv = natpt_incomingIPv6(NATPT_INBOUND,	m6, m4);
+		rv = natpt_incomingIPv6(NATPT_INBOUND,	ifb, m6, m4);
 	    else
-		rv = natpt_outgoingIPv6(NATPT_OUTBOUND, m6, m4);
+		rv = natpt_outgoingIPv6(NATPT_OUTBOUND, ifb, m6, m4);
 	    goto    exit;
 	}
     }
@@ -201,6 +209,12 @@ natpt_out4(struct mbuf *m4, struct mbuf **m6)
     struct ifBox    *ifb;
     int		     rv = IPPROTO_IP;
 
+    if (natpt_initialized == 0)
+	return (IPPROTO_IP);			/* goto ours		*/
+
+    if (isDump(D_DIVEIN4))
+	natpt_logMBuf(LOG_DEBUG, m4, "natpt_out4().");
+
     ifnet = m4->m_pkthdr.rcvif;
     for (p = ifBox; p; p = CDR(p))
     {
@@ -208,9 +222,9 @@ natpt_out4(struct mbuf *m4, struct mbuf **m6)
 	if (ifb->ifnet == ifnet)
 	{
 	    if (ifb->side == outSide)
-		rv = natpt_outgoingIPv4(NATPT_OUTBOUND, m4, m6);
+		rv = natpt_outgoingIPv4(NATPT_OUTBOUND, ifb, m4, m6);
 	    else
-		rv = natpt_incomingIPv4(NATPT_INBOUND,	m4, m6);
+		rv = natpt_incomingIPv4(NATPT_INBOUND,	ifb, m4, m6);
 	    goto    exit;
 	}
     }
@@ -236,9 +250,9 @@ natpt_out6(struct mbuf *m6, struct mbuf **m4)
 	if (ifb->ifnet == ifnet)
 	{
 	    if (ifb->side == outSide)
-		rv = natpt_outgoingIPv6(NATPT_OUTBOUND, m6, m4);
+		rv = natpt_outgoingIPv6(NATPT_OUTBOUND, ifb, m6, m4);
 	    else
-		rv = natpt_incomingIPv6(NATPT_INBOUND,	m6, m4);
+		rv = natpt_incomingIPv6(NATPT_INBOUND,	ifb, m6, m4);
 	    goto    exit;
 	}
     }
@@ -249,7 +263,7 @@ natpt_out6(struct mbuf *m6, struct mbuf **m4)
 
 
 int
-natpt_incomingIPv4(int sess, struct mbuf *m4, struct mbuf **m6)
+natpt_incomingIPv4(int sess, struct ifBox *ifb, struct mbuf *m4, struct mbuf **m6)
 {
     int			 rv;
     struct _cv		 cv;
@@ -268,15 +282,14 @@ natpt_incomingIPv4(int sess, struct mbuf *m4, struct mbuf **m6)
 
     if (cv.ats == NULL)
     {
-	if ((acs = lookingForIncomingV4Rule(&cv)) == NULL)
+	if ((acs = lookingForIncomingV4Rule(ifb, &cv)) == NULL)
 	    return (IPPROTO_IP);			/* goto ours		*/
 
 	if ((cv.ats = internIncomingV4Hash(sess, acs, &cv)) == NULL)
 	    return (IPPROTO_IP);			/* goto ours		*/
     }
 
-    if (checkMTU(&cv) != IPPROTO_IPV4)
-	return (IPPROTO_DONE);		/* discard this packet without free	*/
+    cv.ats->inbound++;
 
 #ifdef NATPT_NAT
     if (cv.ats->local.sa_family == AF_INET)
@@ -287,6 +300,9 @@ natpt_incomingIPv4(int sess, struct mbuf *m4, struct mbuf **m6)
     else
 #endif
     {
+	if (checkMTU(&cv) != IPPROTO_IPV4)
+	    return (IPPROTO_DONE);	/* discard this packet without free	*/
+
 	if ((*m6 = translatingIPv4To6(&cv, &cv.ats->local)) != NULL)
 	    return (IPPROTO_IPV6);
     }
@@ -296,7 +312,7 @@ natpt_incomingIPv4(int sess, struct mbuf *m4, struct mbuf **m6)
 
 
 int
-natpt_outgoingIPv4(int sess, struct mbuf *m4, struct mbuf **m6)
+natpt_outgoingIPv4(int sess, struct ifBox *ifb, struct mbuf *m4, struct mbuf **m6)
 {
     int			 rv;
     struct _cv		 cv;
@@ -308,7 +324,7 @@ natpt_outgoingIPv4(int sess, struct mbuf *m4, struct mbuf **m6)
 
     if ((cv.ats = lookingForOutgoingV4Hash(&cv)) == NULL)
     {
-	if ((acs = lookingForOutgoingV4Rule(&cv)) == NULL)
+	if ((acs = lookingForOutgoingV4Rule(ifb, &cv)) == NULL)
 	    return (IPPROTO_IP);			/* goto ours		*/
 
 	ip4 = mtod(m4, struct ip *);
@@ -317,12 +333,14 @@ natpt_outgoingIPv4(int sess, struct mbuf *m4, struct mbuf **m6)
 	    n_long	dest = 0;
 
 	    icmp_error(m4, ICMP_TIMXCEED, ICMP_TIMXCEED_INTRANS, dest, 0);
-	    return (IPPROTO_MAX);			/* discard this packet	*/
+	    return (IPPROTO_DONE);	/* discard this packet without free	*/
 	}
 	
 	if ((cv.ats = internOutgoingV4Hash(sess, acs, &cv)) == NULL)
 	    return (IPPROTO_IP);			/* goto ours		*/
     }
+
+    cv.ats->outbound++;
 
 #ifdef NATPT_NAT
     if (cv.ats->remote.sa_family == AF_INET)
@@ -342,7 +360,7 @@ natpt_outgoingIPv4(int sess, struct mbuf *m4, struct mbuf **m6)
 
 
 int
-natpt_incomingIPv6(int sess, struct mbuf *m6, struct mbuf **m4)
+natpt_incomingIPv6(int sess, struct ifBox *ifb, struct mbuf *m6, struct mbuf **m4)
 {
     int			 rv;
     struct _cv		 cv;
@@ -355,7 +373,7 @@ natpt_incomingIPv6(int sess, struct mbuf *m6, struct mbuf **m4)
 
     if ((cv.ats = lookingForIncomingV6Hash(&cv)) == NULL)
     {
-	if ((acs = lookingForIncomingV6Rule(&cv)) == NULL)
+	if ((acs = lookingForIncomingV6Rule(ifb, &cv)) == NULL)
 	    return (IPPROTO_IP);			/* goto mcastcheck	*/
 
 	ip6 = mtod(m6, struct ip6_hdr *);
@@ -377,7 +395,7 @@ natpt_incomingIPv6(int sess, struct mbuf *m6, struct mbuf **m4)
 
 
 int
-natpt_outgoingIPv6(int sess, struct mbuf *m6, struct mbuf **m4)
+natpt_outgoingIPv6(int sess, struct ifBox *ifb, struct mbuf *m6, struct mbuf **m4)
 {
     int			 rv;
     struct _cv		 cv6;
@@ -391,11 +409,11 @@ natpt_outgoingIPv6(int sess, struct mbuf *m6, struct mbuf **m4)
 	return (IPPROTO_DONE);				/* discard this packet	*/
 
     if (isDump(D_PEEKOUTGOINGV6))
-	natpt_logIp6(LOG_DEBUG, cv6._ip._ip6);
+	natpt_logIp6(LOG_DEBUG, cv6._ip._ip6, NULL);
 
     if ((cv6.ats = lookingForOutgoingV6Hash(&cv6)) == NULL)
     {
-	if ((acs = lookingForOutgoingV6Rule(&cv6)) == NULL)
+	if ((acs = lookingForOutgoingV6Rule(ifb, &cv6)) == NULL)
 	    return (IPPROTO_IP);			/* goto mcastcheck	*/
 
 	if ((cv6.ats = internOutgoingV6Hash(sess, acs, &cv6)) == NULL)
@@ -588,6 +606,74 @@ checkMTU(struct _cv *cv4)
 }
 
 
+int
+toOneself4(struct ifBox *ifb, struct _cv *cv)
+{
+    struct ifaddr	*ifa;
+    struct in_addr	*dstaddr;
+
+    dstaddr = &cv->_ip._ip4->ip_dst;
+
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+    for (ifa = ifb->ifnet->if_addrlist; ifa; ifa = ifa->ifa_next)
+#else
+    for (ifa = ifb->ifnet->if_addrlist.tqh_first; ifa;
+	 ifa = ifa->ifa_list.tqe_next)
+#endif
+    {
+	if (ifa->ifa_addr->sa_family != AF_INET)
+	    continue;
+
+	if (isDump(D_TOONESELF4))
+	{
+	    char	Wow[256];
+
+	    sprintf(Wow, "toOneself4(): %s: %s:%s",
+		    ifb->ifName,
+		    ip4_sprintf(&SIN4(ifa->ifa_addr)->sin_addr),
+		    ip4_sprintf(dstaddr));
+	    natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+	}
+	if (SIN4(ifa->ifa_addr)->sin_addr.s_addr == dstaddr->s_addr)
+	    return (1);
+
+#ifdef BOOTP_COMPAT
+	if (SIN4(ifa->ifa_addr)->sin_addr.s_addr  == INADDR_ANY)
+	    return (1);
+#endif
+
+	if (ifa->ifa_ifp && (ifa->ifa_ifp->if_flags & IFF_BROADCAST))
+	{
+	    if (isDump(D_TOONESELF4))
+	    {
+		char	Wow[256];
+
+		sprintf(Wow, "toOneself4(): %s: %s:%s",
+			ifb->ifName,
+			ip4_sprintf(&SIN4(ifa->ifa_broadaddr)->sin_addr),
+			ip4_sprintf(dstaddr));
+		natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
+	    }
+	    if (SIN4(ifa->ifa_broadaddr)->sin_addr.s_addr == dstaddr->s_addr)
+		return (1);
+	}
+    }
+
+    return (0);
+}
+
+
+char *
+ip4_sprintf(struct in_addr *addr)
+{
+    static char	 ip4buf[32];
+    u_char	*s = (u_char *)&addr->s_addr;
+
+    sprintf(ip4buf, "%d.%d.%d.%d%c", s[0], s[1], s[2], s[3], '\0');
+    return (ip4buf);
+}
+
+
 /*
  *
  */
@@ -660,11 +746,13 @@ natpt_debugProbe()
 
 
 void
-natpt_assert(const char *file, int line, const char *failedexpr)
+natpt_assert(const char *file, int line, const char *expr)
 {
-    (void)printf("natpt assertion \"%s\" failed: file \"%s\", line %d\n",
-		 failedexpr, file, line);
-    panic("natpt assertion");
+    char	Wow[128];
+
+    sprintf(Wow, "natpt assertion \"%s\" failed: file \"%s\", line %d\n",
+	    expr, file, line);
+    panic("Wow");
     /* NOTREACHED */
 }
 
@@ -684,6 +772,7 @@ natpt_initialize()
 	return;
 
     natpt_initialized = 1;
+    natpt_gotoOneself = TRUE;		/* Allow go to ours packet	*/
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
     for (ifn = ifnet; ifn; ifn = ifn->if_next)

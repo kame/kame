@@ -1,4 +1,4 @@
-/*	$KAME: natpt_log.h,v 1.6 2000/04/06 08:30:47 sumikawa Exp $	*/
+/*	$KAME: natpt_log.h,v 1.7 2000/04/19 06:48:57 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,7 +84,8 @@ enum
     LOG_IN6ADDR,
     LOG_CSLOT,
     LOG_TSLOT,
-    LOG_RULE
+    LOG_RULE,
+    LOG_TCPFSM,
 };
 
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.7 2000/04/06 08:30:49 sumikawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.8 2000/04/19 06:48:58 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,18 +30,23 @@
  */
 
 
-extern int		 natpt_initialized;
 extern int		 ip6_protocol_tr;
+extern int		 natpt_initialized;
+extern int		 natpt_gotoOneself;
 extern u_int		 natpt_debug;
 extern u_int		 natpt_dump;
 
 extern struct ifnet	*natpt_ip6src;
 
+/*	natpt_dispatch.c	*/
+char		*ip4_sprintf			__P((struct in_addr *));
+
+
 /*	natpt_log.c		*/
 void		 natpt_logMsg			__P((int, void *, size_t));
 void		 natpt_logMBuf			__P((int, struct mbuf *, char *));
-void		 natpt_logIp4			__P((int, struct ip *));
-void		 natpt_logIp6			__P((int, struct ip6_hdr *));
+void		 natpt_logIp4			__P((int, struct ip *, char *));
+void		 natpt_logIp6			__P((int, struct ip6_hdr *, char *));
 int		 natpt_log			__P((int, int, void *, size_t));
 int		 natpt_logIN6addr		__P((int, char *, struct in6_addr *));
 
@@ -51,10 +56,10 @@ void		 natpt_initialize		__P((void));
 
 
 /*	natpt_rule.c		*/
-struct _cSlot	*lookingForIncomingV4Rule	__P((struct _cv *));
-struct _cSlot	*lookingForOutgoingV4Rule	__P((struct _cv *));
-struct _cSlot	*lookingForIncomingV6Rule	__P((struct _cv *));
-struct _cSlot	*lookingForOutgoingV6Rule	__P((struct _cv *));
+struct _cSlot	*lookingForIncomingV4Rule	__P((struct ifBox *, struct _cv *));
+struct _cSlot	*lookingForOutgoingV4Rule	__P((struct ifBox *, struct _cv *));
+struct _cSlot	*lookingForIncomingV6Rule	__P((struct ifBox *, struct _cv *));
+struct _cSlot	*lookingForOutgoingV6Rule	__P((struct ifBox *, struct _cv *));
 int		 _natptEnableTrans		__P((caddr_t));
 int		 _natptDisableTrans		__P((caddr_t));
 int		 _natptSetRule			__P((caddr_t));

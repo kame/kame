@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.8 2000/04/06 08:30:46 sumikawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.9 2000/04/19 06:48:57 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,11 +29,18 @@
  * SUCH DAMAGE.
  */
 
+#ifndef FALSE
+#define	FALSE		0
+#define	TRUE		1
+#endif
+
 #define	SAME		(0)
 
 #define	NATPT_MAXHASH	(397)
 #define	MAXTSLOTENTRY	(4096)
 
+#define	SIN4(s)		((struct sockaddr_in  *)s)
+#define	SIN6(s)		((struct sockaddr_in6 *)s)
 #define	SZSIN6		sizeof(struct sockaddr_in6)
 #define	SZSIN		sizeof(struct sockaddr_in)
 
@@ -72,11 +79,17 @@
 
 #define	isDebug(d)	(natpt_debug & (d))
 #define	isDump(d)	(natpt_dump  & (d))
+#define	isOn(s,d)	((s & d) != 0)
+
+#define	F_TOONESELF4			0x00000001
+#define	F_TCPFSM			0x00000010
 
 #define	D_DIVEIN4			0x00000001
 #define	D_PEEKOUTGOINGV4		0x00000002
+#define	D_MATCHINGRULE4			0x00000004
 #define	D_TRANSLATINGIPV4		0x00000010
 #define	D_TRANSLATEDIPV4		0x00001000
+#define	D_TOONESELF4			0x00008000
 
 #define	D_DIVEIN6			0x00010000
 #define	D_IN6REJECT			0x00020000
@@ -85,7 +98,7 @@
 #define	D_TRANSLATINGIPV6		0x00100000
 #define	D_TRANSLATEDIPV6		0x01000000
 
-#define	fixSuMiReICMPBug	(1)
+#define	fixSuMiReICMPBug	(0)
 
 #ifdef fixSuMiReICMPBug
 #define	IPDST		(0xc48db2cb)		/* == 203.178.141.196	XXX	*/
@@ -231,15 +244,16 @@ struct pAddr					/* sizeof():  44[byte]	*/
 
 struct	_cSlot					/* sizeof(): 100[byte]	*/
 {
-    u_char		 flags;
+    u_char		 type;
 #define	NATPT_STATIC		(1)	/* Rule was set statically	*/
 #define	NATPT_DYNAMIC		(2)	/* Rule was set dynamically	*/
 #define NATPT_FAITH		(3)
 
     u_char		 dir;
-#define	NATPT_UNSPEC		(0)
-#define	NATPT_INBOUND		(1)
-#define	NATPT_OUTBOUND		(2)
+#define	NATPT_UNSPEC		(0x00)
+#define	NATPT_INBOUND		(0x01)
+#define	NATPT_OUTBOUND		(0x02)
+#define	NATPT_BIDIRECTIONAL	(0x03)	/* inbound and outgound		*/
 
     u_char		 map;
 #define	NATPT_PORT_MAP		(0x01)	/* Mapping dest port		   */
@@ -252,7 +266,8 @@ struct	_cSlot					/* sizeof(): 100[byte]	*/
     u_short		 prefix;
     u_short		 cport;		/* current port			*/
 
-    struct pAddr	 local, remote;
+    struct pAddr	 local;
+    struct pAddr	 remote;
     struct _cSlotAux	*aux;		/* place holder			*/
 };
 
@@ -290,6 +305,8 @@ struct	_tSlot					/* sizeof(): 104[byte]	*/
     struct pAddr	remote;
     time_t		tstamp;
     int			lcount;
+    u_long		inbound;
+    u_long		outbound;
 
     union
     {

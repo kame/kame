@@ -1,4 +1,4 @@
-/*	$KAME: natpt_usrreq.c,v 1.10 2000/04/06 08:30:48 sumikawa Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.11 2000/04/19 06:48:58 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,6 +28,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#if defined(__FreeBSD__)
+#include "opt_natpt.h"
+#endif
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -323,10 +327,12 @@ natpt_uabort(struct socket *so)
 int
 natpt_uattach(struct socket *so, int proto, struct proc *p)
 {
+#ifndef NATPT_NOSUSER
     int		error;
 
     if (p && (error = suser(p->p_ucred, &p->p_acflag)) != 0)
 	return (error);
+#endif
 
     return (natpt_attach(so, proto));
 }

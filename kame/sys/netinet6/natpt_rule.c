@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.10 2000/04/06 08:30:47 sumikawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.11 2000/04/19 06:48:57 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,8 +74,9 @@ extern	struct in6_addr	 faith_prefixmask;
 extern	struct in6_addr	 natpt_prefix;
 extern	struct in6_addr	 natpt_prefixmask;
 
-extern	void	in4_len2mask __P((struct in_addr *, int));
-extern	void	in6_len2mask __P((struct in6_addr *, int));
+extern	void	in4_len2mask	__P((struct in_addr *, int));
+extern	void	in6_len2mask	__P((struct in6_addr *, int));
+extern	int	toOneself4	__P((struct ifBox *, struct _cv *));
 
 
 /*
@@ -83,29 +84,51 @@ extern	void	in6_len2mask __P((struct in6_addr *, int));
  */
 
 struct _cSlot	*
-lookingForIncomingV4Rule(struct _cv *cv)
+lookingForIncomingV4Rule(struct ifBox *ifb, struct _cv *cv)
 {
     Cell		*p;
     struct _cSlot	*acs;
 
+    /*
+     * If incoming IPv4 packet is addressed to oneself,
+     * this packet is not subject to translate.
+     */
+    if ((natpt_gotoOneself == TRUE)
+	&& toOneself4(ifb, cv))
+	return (NULL);					/* goto ours	*/
+
     for (p = natptStatic; p; p = CDR(p))
     {
 	acs = (struct _cSlot *)CAR(p);
-	if ((acs->dir == NATPT_INBOUND)
+
+	if (isOn(acs->dir, NATPT_INBOUND)
 	    && ((acs->proto == 0)
 		|| (acs->proto == cv->ip_payload))
 	    && (matchIn4addr(cv, &acs->remote) != 0))
+	{
+	    if (isDump(D_MATCHINGRULE4))
+	    {
+		char	Wow[256];
+
+		sprintf(Wow, "lookingForIncomingV4Rule(): %s", ifb->ifName);
+		natpt_logIp4(LOG_DEBUG, cv->_ip._ip4, Wow);
+	    }
 	    return (acs);
+	}
     }
 
     for (p = natptDynamic; p; p = CDR(p))
     {
 	acs = (struct _cSlot *)CAR(p);
-	if ((acs->dir == NATPT_INBOUND)
+	if (isOn(acs->dir, NATPT_INBOUND)
 	    && ((acs->proto == 0)
 		|| (acs->proto == cv->ip_payload))
 	    && (matchIn4addr(cv, &acs->remote) != 0))
+	{
+	    if (isDump(D_MATCHINGRULE4))
+		natpt_logIp4(LOG_DEBUG, cv->_ip._ip4, NULL);
 	    return (acs);
+	}
     }
 
     return (NULL);
@@ -113,26 +136,47 @@ lookingForIncomingV4Rule(struct _cv *cv)
 
 
 struct _cSlot	*
-lookingForOutgoingV4Rule(struct _cv *cv)
+lookingForOutgoingV4Rule(struct ifBox *ifb, struct _cv *cv)
 {
     Cell		*p;
     struct _cSlot	*acs;
+
+    /*
+     * If incoming IPv4 packet is addressed to oneself,
+     * this packet is not subject to translate.
+     */
+    if ((natpt_gotoOneself == TRUE)
+	&& toOneself4(ifb, cv))
+	return (NULL);					/* goto ours	*/
 
     for (p = natptStatic; p; p = CDR(p))
     {
 	acs = (struct _cSlot *)CAR(p);
 
-	if ((acs->dir == NATPT_OUTBOUND)
+	if (isOn(acs->dir, NATPT_OUTBOUND)
 	    && (matchIn4addr(cv, &acs->local) != 0))
+	{
+	    if (isDump(D_MATCHINGRULE4))
+	    {
+		char	Wow[256];
+
+		sprintf(Wow, "lookingForOutgoingV4Rule(): %s", ifb->ifName);
+		natpt_logIp4(LOG_DEBUG, cv->_ip._ip4, Wow);
+	    }
 	    return (acs);
+	}
     }
 
     for (p = natptDynamic; p; p = CDR(p))
     {
 	acs = (struct _cSlot *)CAR(p);
-	if ((acs->dir == NATPT_OUTBOUND)
+	if (isOn(acs->dir,NATPT_OUTBOUND)
 	    && (matchIn4addr(cv, &acs->local) != 0))
+	{
+	    if (isDump(D_MATCHINGRULE4))
+		natpt_logIp4(LOG_DEBUG, cv->_ip._ip4, NULL);
 	    return (acs);
+	}
     }
 
     return (NULL);
@@ -140,7 +184,7 @@ lookingForOutgoingV4Rule(struct _cv *cv)
 
 
 struct _cSlot	*
-lookingForIncomingV6Rule(struct _cv *cv)
+lookingForIncomingV6Rule(struct ifBox *ifb, struct _cv *cv)
 {
     Cell		*p;
     struct _cSlot	*acs;
@@ -166,7 +210,7 @@ lookingForIncomingV6Rule(struct _cv *cv)
 
 
 struct _cSlot	*
-lookingForOutgoingV6Rule(struct _cv *cv)
+lookingForOutgoingV6Rule(struct ifBox *ifb, struct _cv *cv)
 {
     Cell		*p;
     struct _cSlot	*acs;
@@ -208,8 +252,13 @@ lookingForOutgoingV6Rule(struct _cv *cv)
 int
 matchIn4addr(struct _cv *cv4, struct pAddr *from)
 {
-    struct in_addr	in4from = cv4->_ip._ip4->ip_src;
+    struct in_addr	in4from;
     struct in_addr	in4masked;
+
+    if (cv4->inout == NATPT_OUTBOUND)
+	in4from = cv4->_ip._ip4->ip_src;
+    else
+	in4from = cv4->_ip._ip4->ip_dst;
 
     if (from->sa_family != AF_INET)
 	return (0);
@@ -368,32 +417,35 @@ _natptSetRule(caddr_t addr)
 	struct pAddr	*from;
 
 	from = &cst->local;
-	if (cst->dir == NATPT_INBOUND)
+	if (cst->dir == NATPT_INBOUND)			/* inbound only	*/
 	    from = &cst->remote;
 
-	if (from->sa_family == AF_INET)
+	if (from->ad.type == ADDR_MASK)
 	{
-	    in4_len2mask(&from->in4Mask, cst->prefix);
-	    from->in4Addr.s_addr &= from->in4Mask.s_addr;
-	}
-	else
-	{
-	    in6_len2mask(&from->in6Mask, cst->prefix);
-	    from->in6Addr.s6_addr32[0]
-		= from->in6Addr.s6_addr32[0] & from->in6Mask.s6_addr32[0];
-	    from->in6Addr.s6_addr32[1]
-		= from->in6Addr.s6_addr32[1] & from->in6Mask.s6_addr32[1];
-	    from->in6Addr.s6_addr32[2]
-		= from->in6Addr.s6_addr32[2] & from->in6Mask.s6_addr32[2];
-	    from->in6Addr.s6_addr32[3]
-		= from->in6Addr.s6_addr32[3] & from->in6Mask.s6_addr32[3];
+	    if (from->sa_family == AF_INET)
+	    {
+		in4_len2mask(&from->in4Mask, cst->prefix);
+		from->in4Addr.s_addr &= from->in4Mask.s_addr;
+	    }
+	    else
+	    {
+		in6_len2mask(&from->in6Mask, cst->prefix);
+		from->in6Addr.s6_addr32[0]
+		    = from->in6Addr.s6_addr32[0] & from->in6Mask.s6_addr32[0];
+		from->in6Addr.s6_addr32[1]
+		    = from->in6Addr.s6_addr32[1] & from->in6Mask.s6_addr32[1];
+		from->in6Addr.s6_addr32[2]
+		    = from->in6Addr.s6_addr32[2] & from->in6Mask.s6_addr32[2];
+		from->in6Addr.s6_addr32[3]
+		    = from->in6Addr.s6_addr32[3] & from->in6Mask.s6_addr32[3];
+	    }
 	}
     }
 
     natpt_log(LOG_CSLOT, LOG_DEBUG, (void *)cst, sizeof(struct _cSlot));
 
     anchor = &natptStatic;
-    if (cst->flags == NATPT_DYNAMIC)
+    if (cst->type == NATPT_DYNAMIC)
 	anchor = &natptDynamic;
 
     LST_hookup_list(anchor, cst);

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.9 2000/04/06 08:30:48 sumikawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.10 2000/04/19 06:48:58 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,6 +28,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#if defined(__FreeBSD__)
+#include "opt_natpt.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -280,7 +284,7 @@ internIncomingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 	}
     }
     else
-#else
+#endif
     {
 	local->ip_p = IPPROTO_IPV6;
 	local->sa_family = AF_INET6;
@@ -299,7 +303,6 @@ internIncomingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 	    }
 	}
     }
-#endif
 
     remote = &ats->remote;
     remote->ip_p = IPPROTO_IPV4;
@@ -327,9 +330,8 @@ internIncomingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
     if (acs->local.sa_family == AF_INET)
 	hv6 = _hash_pat4(local);
     else
-#else
-	hv6 = _hash_pat6(local);
 #endif
+	hv6 = _hash_pat6(local);
 
     s = splnet();
     LST_hookup_list(&_insideHash [hv6], ats);
@@ -385,7 +387,7 @@ internOutgoingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 	remote->in4dst = cv4->_ip._ip4->ip_dst;
     }
     else
-#else								/* need check	*/
+#endif
     {
 	remote->ip_p = IPPROTO_IPV6;
 	remote->sa_family = AF_INET6;
@@ -396,7 +398,7 @@ internOutgoingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 	    remote->_dport = cv4->_payload._tcp4->th_dport;
 	}
 
-	if (acs->flags == NATPT_FAITH)
+	if (acs->type == NATPT_FAITH)
 	{
 	    struct in6_ifaddr	*ia6;
 
@@ -413,7 +415,6 @@ internOutgoingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 	    remote->in6dst = acs->remote.in6src;
 	}
     }
-#endif
 
     ats->ip_payload = cv4->ip_payload;
     ats->session = sess;
@@ -424,9 +425,8 @@ internOutgoingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
     if (acs->remote.sa_family == AF_INET)
 	hv6 = _hash_pat4(remote);
     else
-#else
-	hv6 = _hash_pat6(remote);
 #endif
+	hv6 = _hash_pat6(remote);
 
     s = splnet();
     LST_hookup_list(&_insideHash [hv4], ats);
@@ -503,7 +503,7 @@ internOutgoingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
     struct pAddr	*local, *remote;
     struct _tSlot	*ats;
 
-    natpt_logIp6(LOG_DEBUG, cv6->_ip._ip6);
+    natpt_logIp6(LOG_DEBUG, cv6->_ip._ip6, NULL);
 
     MALLOC(ats, struct _tSlot *, sizeof(struct _tSlot), M_TEMP, M_NOWAIT);
     if (ats == NULL)

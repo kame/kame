@@ -1,4 +1,4 @@
-/*	$KAME: natpt_log.c,v 1.7 2000/04/06 08:30:47 sumikawa Exp $	*/
+/*	$KAME: natpt_log.c,v 1.8 2000/04/19 06:48:57 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -27,8 +27,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
  */
+
+#if defined(__FreeBSD__)
+#include "opt_natpt.h"
+#endif
 
 #include <sys/errno.h>
 #include <sys/param.h>
@@ -68,7 +71,7 @@ struct mbuf	*natpt_lbuf	__P((int type, int priorities, size_t size));
 void
 natpt_logMsg(int priorities, void *item, size_t size)
 {
-    natpt_log(LOG_MSG, priorities, item, size);
+    natpt_log(LOG_MSG, priorities, item, size+1);
 }
 
 
@@ -82,15 +85,20 @@ natpt_logMBuf(int priorities, struct mbuf *m, char *msg)
 
 
 void
-natpt_logIp4(int priorities, struct ip *ip4)
+natpt_logIp4(int priorities, struct ip *ip4, char *msg)
 {
-    natpt_log(LOG_IP4, priorities, (void *)ip4, sizeof(struct ip)+8);
+    if (msg)
+	natpt_log(LOG_MSG,  priorities, (void *)msg, strlen(msg)+1);
+
+    natpt_log(LOG_IP4, priorities, (void *)ip4, ((ip4->ip_hl << 2) + 20));
 }
 
 
 void
-natpt_logIp6(int priorities, struct ip6_hdr *ip6)
+natpt_logIp6(int priorities, struct ip6_hdr *ip6, char *msg)
 {
+    if (msg)
+	natpt_log(LOG_MSG,  priorities, (void *)msg, strlen(msg)+1);
     natpt_log(LOG_IP6, priorities, (void *)ip6, sizeof(struct ip6_hdr)+8);
 }
 
@@ -156,6 +164,8 @@ natpt_lbuf(int type, int priorities, size_t size)
     MGETHDR(m, M_NOWAIT, MT_DATA);
     if (m == NULL)
 	return (NULL);
+    if (LBFSZ < size)
+	MCLGET(m, M_NOWAIT);
 
     m->m_pkthdr.len = m->m_len = MHLEN;
     m->m_pkthdr.rcvif = NULL;
