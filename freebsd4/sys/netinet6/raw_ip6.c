@@ -313,6 +313,7 @@ rip6_output(m, so, dstsock, control)
 	int type = 0, code = 0;		/* for ICMPv6 output statistics only */
 	int priv = 0;
 	int flags;
+	struct in6_addr *in6a;
 
 	in6p = sotoin6pcb(so);
 	stickyopt = in6p->in6p_outputopts;
@@ -346,31 +347,27 @@ rip6_output(m, so, dstsock, control)
 	M_PREPEND(m, sizeof(*ip6), M_WAIT);
 	ip6 = mtod(m, struct ip6_hdr *);
 
-	/*
-	 * Source address selection.
-	 */
-	{
-		struct in6_addr *in6a;
+	/* Source address selection. */
+	if ((in6a = in6_selectsrc(dstsock, in6p->in6p_outputopts,
+				  in6p->in6p_moptions,
+				  &in6p->in6p_route,
+				  &in6p->in6p_laddr, &oifp,
+				  &error)) == 0) {
+		if (error == 0)
+			error = EADDRNOTAVAIL;
+		goto bad;
+	}
+	ip6->ip6_src = *in6a;
 
-		if ((in6a = in6_selectsrc(dstsock, in6p->in6p_outputopts,
-					  in6p->in6p_moptions,
-					  &in6p->in6p_route,
-					  &in6p->in6p_laddr, &oifp,
-					  &error)) == 0) {
-			if (error == 0)
-				error = EADDRNOTAVAIL;
-			goto bad;
-		}
-		ip6->ip6_src = *in6a;
-
-		if (oifp && dstsock->sin6_scope_id == 0 &&
-		    (error = scope6_setzoneid(oifp, dstsock)) != 0) { /* XXX */
-			goto bad;
-		}
-		if (oifp == NULL && in6p->in6p_route.ro_rt)
-			oifp = ifindex2ifnet[in6p->in6p_route.ro_rt->rt_ifp->if_index];
+	if (oifp && dstsock->sin6_scope_id == 0 &&
+	    (error = scope6_setzoneid(oifp, dstsock)) != 0) { /* XXX */
+		goto bad;
+	}
+	if (oifp == NULL && in6p->in6p_route.ro_rt)
+		oifp = ifindex2ifnet[in6p->in6p_route.ro_rt->rt_ifp->if_index];
 	}
 
+	/* fill in the rest of the IPv6 header fields */
 	ip6->ip6_dst = *dst;
 	ip6->ip6_flow = (ip6->ip6_flow & ~IPV6_FLOWINFO_MASK) |
 		(in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK);
@@ -682,7 +679,6 @@ rip6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 		dst = &tmp;
 		if (dst->sin6_family != AF_INET6)
 			return(EAFNOSUPPORT);
-		/* KAME hack: embed scopeid */
 		if ((error = scope6_check_id(dst, ip6_use_defzone)) != 0)
 			return(error);
 	}
