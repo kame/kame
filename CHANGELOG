@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.285 1999/11/22 20:20:58 itojun Exp $
+$Id: CHANGELOG,v 1.286 1999/11/22 20:49:54 itojun Exp $
 
 <199911>
 Tue Nov 23 05:19:38 JST 1999  itojun@iijlab.net
@@ -8,6 +8,7 @@ Tue Nov 23 05:19:38 JST 1999  itojun@iijlab.net
 	  upgrade to 1.1p1.  the author of totd says that 1.1 has serious
 	  bug (which can flood your network with DNS queries) so please
 	  be sure to upgrade to 1.1p1.
+	* openbsd/ports/net/totd: add port directory for totd.
 
 Mon Nov 22 19:19:31 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/*.h, */usr.bin/netstat: use u_quad_t for all
