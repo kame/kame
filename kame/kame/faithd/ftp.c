@@ -1,4 +1,4 @@
-/*	$KAME: ftp.c,v 1.15 2002/06/07 00:16:37 itojun Exp $	*/
+/*	$KAME: ftp.c,v 1.16 2002/06/23 14:36:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -83,27 +83,25 @@ ftp_relay(int ctl6, int ctl4)
 
 		FD_ZERO(&readfds);
 		FD_SET(ctl4, &readfds);
+		maxfd = ctl4;
 		FD_SET(ctl6, &readfds);
+		maxfd = (ctl6 > maxfd) ? ctl6 : maxfd;
 		if (0 <= port4) {
 			FD_SET(port4, &readfds);
-			if (port4 > maxfd)
-				maxfd = port4;
+			maxfd = (port4 > maxfd) ? port4 : maxfd;
 		}
 		if (0 <= port6) {
 			FD_SET(port6, &readfds);
-			if (port6 > maxfd)
-				maxfd = port6;
+			maxfd = (port6 > maxfd) ? port6 : maxfd;
 		}
 #if 0
 		if (0 <= wport4) {
 			FD_SET(wport4, &readfds);
-			if (wport4 > maxfd)
-				maxfd = wport4;
+			maxfd = (wport4 > maxfd) ? wport4 : maxfd;
 		}
 		if (0 <= wport6) {
 			FD_SET(wport6, &readfds);
-			if (wport6 > maxfd)
-				maxfd = wport6;
+			maxfd = (wport6 > maxfd) ? wport6 : maxfd;
 		}
 #endif
 		tv.tv_sec = FAITH_TIMEOUT;
