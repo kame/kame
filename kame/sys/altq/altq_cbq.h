@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.h,v 1.6 2002/04/03 05:43:44 kjc Exp $	*/
+/*	$KAME: altq_cbq.h,v 1.7 2002/07/18 12:22:29 itojun Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -80,7 +80,7 @@ typedef struct cbq_class_spec {
 	int		flags;
 } cbq_class_spec_t;
 
-/* class flags shoud be same as class flags in rm_class.h */
+/* class flags should be same as class flags in rm_class.h */
 #define	CBQCLF_RED		0x0001	/* use RED */
 #define	CBQCLF_ECN		0x0002  /* use RED/ECN */
 #define	CBQCLF_RIO		0x0004  /* use RIO */

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.165 2002/07/10 05:07:21 k-sugyou Exp $	*/
+/*	$KAME: ipsec.c,v 1.166 2002/07/18 12:22:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2081,7 +2081,7 @@ ipsec6_hdrsiz(m, dir, in6p)
 
 	/* sanity check */
 	if (m == NULL)
-		return 0;	/* XXX shoud be panic ? */
+		return 0;	/* XXX should be panic ? */
 	if (in6p != NULL && in6p->in6p_socket == NULL)
 		panic("ipsec6_hdrsize: why is socket NULL but there is PCB.");
 
