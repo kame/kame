@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.17 2000/07/16 08:41:49 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.18 2000/07/16 08:44:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,7 +68,9 @@
 #include <crypto/des/des.h>
 #include <crypto/blowfish/blowfish.h>
 #include <crypto/cast128/cast128.h>
+#ifdef SADB_X_EALG_RC5CBC
 #include <crypto/rc5/rc5.h>
+#endif
 
 #include <net/net_osdep.h>
 
@@ -100,11 +102,13 @@ static int esp_3descbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_3descbc_encrypt __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
+#ifdef SADB_X_EALG_RC5CBC
 static int esp_rc5cbc_ivlen __P((struct secasvar *));
 static int esp_rc5cbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_rc5cbc_encrypt __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
+#endif
 static void esp_increment_iv __P((struct secasvar *));
 static caddr_t mbuf_find_offset __P((struct mbuf *, size_t, size_t));
 
@@ -127,9 +131,13 @@ esp_algorithm_lookup(idx)
 		{ 8, esp_cbc_mature, 40, 128, "cast128-cbc",
 			esp_cast128cbc_ivlen, esp_cast128cbc_decrypt,
 			esp_cast128cbc_encrypt, },
+#ifdef SADB_X_EALG_RC5CBC
 		{ 8, esp_cbc_mature, 40, 2040, "rc5-cbc",
 			esp_rc5cbc_ivlen, esp_rc5cbc_decrypt,
 			esp_rc5cbc_encrypt, },
+#else
+		{ 8, NULL, 40, 2040, "rc5-cbc dummy", NULL, NULL, NULL, },
+#endif
 	};
 
 	switch (idx) {
@@ -1030,6 +1038,7 @@ esp_3descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	return 0;
 }
 
+#ifdef SADB_X_EALG_RC5CBC
 static int
 esp_rc5cbc_ivlen(sav)
 	struct secasvar *sav;
@@ -1179,6 +1188,7 @@ esp_rc5cbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	return error;
 }
+#endif
 
 /*
  * increment iv.
