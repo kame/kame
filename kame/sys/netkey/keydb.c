@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.1 1999/08/03 01:02:07 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.2 1999/08/03 01:04:50 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367,
@@ -36,6 +36,9 @@
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #include "opt_inet.h"
+#ifdef __NetBSD__
+#include "opt_ipsec.h"
+#endif
 #endif
 
 #ifdef __NetBSD__
