@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.90 2004/01/29 00:38:35 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.91 2004/02/01 06:52:04 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1083,7 +1083,7 @@ mld_allocbuf(mh, len, in6m, type)
 	/* ip6_plen will be set later */
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	/* ip6_hlim will be set by im6o.im6o_multicast_hlim */
-	/* ip6_src/dst will be set by mld_sendpkt() or mld_sendbuf() */
+	/* ip6_src/dst will be set by mld6_sendpkt() or mld_sendbuf() */
 
 	/* fill in the MLD header as much as possible */
 	md->m_len = len;
