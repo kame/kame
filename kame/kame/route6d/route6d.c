@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.80 2002/02/24 07:10:10 suz Exp $	*/
+/*	$KAME: route6d.c,v 1.81 2002/02/25 02:27:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.80 2002/02/24 07:10:10 suz Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.81 2002/02/25 02:27:22 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -199,7 +199,6 @@ int logopened = 0;
 
 static	u_long	seq = 0;
 
-volatile int signo;
 volatile sig_atomic_t seenalrm;
 volatile sig_atomic_t seenquit;
 volatile sig_atomic_t seenusr1;
@@ -452,7 +451,6 @@ main(argc, argv)
 		}
 
 		FD_COPY(&sockvec, &recvec);
-		signo = 0;
 		switch (select(maxfd + 1, &recvec, 0, 0, 0)) {
 		case -1:
 			if (errno != EINTR) {
@@ -478,11 +476,10 @@ main(argc, argv)
 }
 
 void
-sighandler(sig)
-	int sig;
+sighandler(signo)
+	int signo;
 {
 
-	signo = sig;
 	switch (signo) {
 	case SIGALRM:
 		seenalrm++;
