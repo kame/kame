@@ -471,7 +471,7 @@ assegcpy(asg, len)
   cpy->asg_next = cpy->asg_prev = cpy;
   cpy->asg_type = src->asg_type;
   cpy->asg_len  = src->asg_len;
-  cpy->asg_asn  = asnumcpy(src->asg_asn, src->asg_len);
+  cpy->asg_asn  = asnumcpy(src->asg_asn, src->asg_len);b
   src  = src->asg_next;
 
   for (i = 1; i < len ; i++) {

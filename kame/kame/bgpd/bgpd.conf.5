@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: bgpd.conf.5,v 1.3 1999/10/21 12:54:59 jinmei Exp $
+.\"     $Id: bgpd.conf.5,v 1.4 1999/10/22 08:46:05 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt BGPD.CONF 5
@@ -452,6 +452,12 @@ autonomoussystem 2500;
 
 #RIPng settings
 rip yes {
+	# If you want to accept and advertise site-local addresses,
+	# uncomment below.
+	# XXX: there is no site-boundary consideration implemented.
+	#      be careful to uncomment this!
+	#sitelocal yes;
+
 	# It's better to add an appropriate cost for the interface
 	# since the serial line is slow
 	interface ntwo0 metricin 5;
