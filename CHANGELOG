@@ -1,9 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.136 1999/09/25 05:22:15 itojun Exp $
+$Id: CHANGELOG,v 1.137 1999/09/26 03:12:12 itojun Exp $
 
 
 <199909>
+Sun Sep 26 12:08:28 JST 1999  itojun@iijlab.net
+	* freebsd[23]/ports/vic6: upgrade to new IPv6 patch.
+	  From: isaki@net.ipc.hiroshima-u.ac.jp
+
 Fri Sep 24 21:15:02 JST 1999  itojun@iijlab.net
 	* freebsd2/sys/netinet/ip_output.c: prevent kernel panic on
 	  per-socket IPsec policy specification, like:
