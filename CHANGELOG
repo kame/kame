@@ -1,12 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.148 1999/10/02 07:34:47 itojun Exp $
+$Id: CHANGELOG,v 1.149 1999/10/02 17:23:03 itojun Exp $
 
 <199910>
 Sat Oct  2 16:18:35 JST 1999  itojun@iijlab.net
-	* freebsd[23]: import ALTQ 2.0.  ALTQ on bsdi3 or netbsd are not
+	* freebsd[23], netbsd: import ALTQ 2.0.  ALTQ on bsdi3 is not
 	  supported yet.  IPv6 support needs improvement.  Testers wanted.
-	* freebsd[23]/ports/altq: update ALTQ userland to 2.0.
+	* freebsd[23]/ports/altq, netbsd/pkgsrc/net/altq:
+	  update ALTQ userland to 2.0.
 
 Fri Oct  1 09:02:23 JST 1999  itojun@iijlab.net
 	* freebsd[23]/lib/libftpio: fix EPSV case.
