@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.122 2001/01/03 08:02:04 sumikawa Exp $	*/
+/*	$KAME: in6.c,v 1.123 2001/01/18 04:13:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -702,6 +702,7 @@ in6_control(so, cmd, data, ifp)
 			return(EOPNOTSUPP);
 		return((*ifp->if_ioctl)(ifp, cmd, data));
 	}
+
 	return(0);
 }
 
@@ -1001,6 +1002,9 @@ in6_update_ifa(ifp, ifra, ia)
 		splx(s);
 	}
 #endif
+
+	/* make sure to initialize ND6 information. */
+	nd6_ifattach(ifp);
 
 	/*
 	 * Perform DAD, if needed.
