@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.31 2004/12/31 19:56:27 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.32 2004/12/31 20:00:13 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1291,18 +1291,21 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 			 break;
 		}
 		/* Queried sources are augmented. */
-		if ((error = mld_record_queried_source(in6m, mld, mldlen)) > 0) {
+		error = mld_record_queried_source(in6m, mld, mldlen);
+		if (error > 0) {
 			/* XXX: ToDo: ICMPv6 error statistics */
 			splx(s);
 			return error;
-		} else if (error == 0) {
-			if (in6m->in6m_timer != 0)
-				in6m->in6m_timer = min(in6m->in6m_timer, timer_g);
-			else {
-				mld_group_timers_are_running = 1;
-				in6m->in6m_timer = timer_g;
-			}
-			in6m->in6m_state = MLD_SG_QUERY_PENDING_MEMBER;
+		}
+		if (error < 0)
+			break;	/* no need to do any additional things */
+
+		in6m->in6m_state = MLD_SG_QUERY_PENDING_MEMBER;
+		if (in6m->in6m_timer != 0)
+			in6m->in6m_timer = min(in6m->in6m_timer, timer_g);
+		else {
+			mld_group_timers_are_running = 1;
+			in6m->in6m_timer = timer_g;
 		}
 		break;
 
