@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.8 2001/08/14 12:28:21 itojun Exp $
+$KAME: helsinki-result.jp,v 1.9 2001/08/14 12:53:54 itojun Exp $
 
 
 generic
@@ -86,3 +86,18 @@ F-Secure VPN+ 5.40
 	でっかいDH group、phase 1 SHA2-256/AESもできるらしい。後でやりたい。
 
 SecGo CryptoIP v3
+	Tue Aug 14 21:41:36 JST 2001
+	IPv4, ESP, transport mode
+	phase 1 3DES + SHA1, lifetime = 10min
+	phase 2 blowfish, lifetime = 2min
+
+	phase 2 AESも試そうとしたが失敗(SecGo側が12以外のalgorithm #を
+	使っていた or コンパイルしてなかった)。rekeyもやってみた。
+
+	phase 1 AESもできるらしい(SSH toolkit使用)。
+
+Oullim information technologies SECUREWORKS VPN gateway 3.0
+	Tue Aug 14 21:48:36 JST 2001
+	phase 2 AES/blowfishはどうだねとナンパしてみるも、not ready。
+	明日か明後日ねとのこと。
+
