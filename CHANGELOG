@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2700 2004/12/03 05:50:13 jinmei Exp $
+$KAME: CHANGELOG,v 1.2701 2004/12/03 12:57:23 jinmei Exp $
 
 <200412>
+2004-12-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd5/lib/libinet6/res_send.c (res_send): made sure this
+	function return a valid value.
+
 2004-12-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/common.c: silenced strict-aliasing warnings.
 	Otherwise dhcp6 could not be built with -O2 on FreeBSD 5.3.
