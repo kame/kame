@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.35 2000/03/02 11:19:04 itojun Exp $
+	$Id: PORTABILITY,v 1.36 2000/03/03 04:27:46 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -93,8 +93,12 @@ across those possibilities.
 	printf("%llu", (unsigned long long)x);
   %qu is outside of standard, and %llu is in C99 standard.
 
-  Also note that FreeBSD 2.2.8 cannot handle %llu correctly - you need to
-  use %qu only for FreeBSD 2.2.8.  So you end up doing #ifdef __FreeBSD__.
+  Also note that FreeBSD prior to 3.2 cannot handle %llu correctly - you need
+  to use %qu on these platforms (3.2 and later are okay).
+  So you end up doing #ifdef __FreeBSD__.
+
+  KAME libinet6 includes vfprintf() with %llu support where necessary,
+  to ease code sharing in KAME userland code.
 
 - tv.tv_sec is not typed as time_t.
   If you want time_t, explicitly copy the value.
