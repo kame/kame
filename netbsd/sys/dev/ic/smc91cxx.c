@@ -923,14 +923,27 @@ smc91cxx_read(sc)
 
 	ifp->if_ipackets++;
 
+	/*
+	 * Make sure to behave as IFF_SIMPLEX in all cases.
+	 * This is to cope with SMC91C92 (Megahertz XJ10BT), which
+	 * loops back packets to itself on promiscuous mode.
+	 * (should be ensured by chipset configuration)
+	 */
 	if ((ifp->if_flags & IFF_PROMISC) != 0) {
 		/*
-		 * Make sure to behave as IFF_SIMPLEX in all cases.
-		 * Drop multicast/broadcast packet looped back from myself
-		 * (should be ensured by chipset configuration).
+		 * Drop multicast/broadcast packet looped back from myself.
 		 */
 		if ((eh->ether_dhost[0] & 1) == 1 &&	/* mcast || bcast */
 		    ether_cmp(eh->ether_shost, LLADDR(ifp->if_sadl)) == 0) {
+			m_freem(m);
+			goto out;
+		}
+
+		/*
+		 * If this is unicast and not for me, drop it.
+		 */
+		if ((eh->ether_dhost[0] & 1) == 0 &&	/* !mcast and !bcast */
+		    ether_cmp(eh->ether_dhost, LLADDR(ifp->if_sadl)) != 0) {
 			m_freem(m);
 			goto out;
 		}
@@ -943,17 +956,6 @@ smc91cxx_read(sc)
 	if (ifp->if_bpf)
 		bpf_mtap(ifp->if_bpf, m);
 #endif
-
-	if ((ifp->if_flags & IFF_PROMISC) != 0) {
-		/*
-		 * If this is unicast and not for me, drop it.
-		 */
-		if ((eh->ether_dhost[0] & 1) == 0 &&	/* !mcast and !bcast */
-		    ether_cmp(eh->ether_dhost, LLADDR(ifp->if_sadl)) != 0) {
-			m_freem(m);
-			goto out;
-		}
-	}
 
 	/*
 	 * Strip the ethernet header.
