@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.229 2001/10/17 07:26:16 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.230 2001/10/17 08:24:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -685,8 +685,9 @@ skip_ipsec2:;
 	 */
 	if ((error = mip6_addr_exchange(m, exthdrs.ip6e_haddr)) != 0) {
 		mip6log((LOG_ERR,
-			 "%s: addr exchange between haddr and coa failed.\n",
-			 __FUNCTION__));
+			 "%s:%d: "
+			 "addr exchange between haddr and coa failed.\n",
+			 __FILE__, __LINE__));
 		goto bad;
 	}
 #endif /* MIP6 */

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.169 2001/10/11 08:37:09 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.170 2001/10/17 08:24:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -417,8 +417,9 @@ nd6_ra_input(m, off, icmp6len)
 	    && (dr->flags & ND_RA_FLAG_HOME_AGENT)) {
 		if (mip6_ha_list_update_hainfo(&mip6_ha_list,
 					       dr, ndopts.nd_opts_hai)) {
-			mip6log((LOG_ERR, "%s: global HA list update failed\n",
-				 __FUNCTION__));
+			mip6log((LOG_ERR,
+				 "%s:%d: global HA list update failed\n",
+				 __FILE__, __LINE__));
 		}
 	}
 	if (dr == NULL) {
@@ -429,8 +430,8 @@ nd6_ra_input(m, off, icmp6len)
 		if (mha) {
 			if (mip6_ha_list_remove(&mip6_ha_list, mha)) {
 				mip6log((LOG_ERR,
-					 "%s: HA entry remove failed.\n",
-					 __FUNCTION__));
+					 "%s:%d: HA entry remove failed.\n",
+					 __FILE__, __LINE__));
 			}
 		}
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.16 2001/10/11 12:58:21 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.17 2001/10/17 08:24:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -133,8 +133,8 @@ mip6_icmp6_input(m, off, icmp6len)
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, paddr);
 		if (mbc) {
 			mip6log((LOG_INFO,
-				 "%s: a MN (%s) moved.\n",
-				 __FUNCTION__,
+				 "%s:%d: a MN (%s) moved.\n",
+				 __FILE__, __LINE__,
 				 ip6_sprintf(paddr)));
 			mip6_bc_list_remove(&mip6_bc_list, mbc);
 		}
@@ -191,8 +191,8 @@ mip6_icmp6_input(m, off, icmp6len)
 								  paddr);
 				if (mbu) {
 					mip6log((LOG_INFO,
-						 "%s: a node (%s) doesn't support a binding update destopt.\n",
-						 __FUNCTION__,
+						 "%s:%d: a node (%s) doesn't support a binding update destopt.\n",
+						 __FILE__, __LINE__,
 						 ip6_sprintf(paddr)));
 					mbu->mbu_dontsend = 1;
 				}
@@ -205,8 +205,8 @@ mip6_icmp6_input(m, off, icmp6len)
 			mip6_icmp6_find_addr((caddr_t)icmp6, icmp6len,
 					     &laddr, &paddr);
 			mip6log((LOG_NOTICE,
-				 "%s: a node (%s) doesn't support a home address destopt.\n",
-				 __FUNCTION__,
+				 "%s:%d: a node (%s) doesn't support a home address destopt.\n",
+				 __FILE__, __LINE__,
 				 ip6_sprintf(paddr)));
 #ifdef MIP6_ALLOW_COA_FALLBACK
 			for (sc = TAILQ_FIRST(&hif_softc_list);
@@ -298,8 +298,8 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	n = m_copym(m, 0, M_COPYALL, M_DONTWAIT);
 	if (n == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: mbuf allocation failed.\n",
-			 __FUNCTION__));
+			 "%s:%d: mbuf allocation failed.\n",
+			 __FILE__, __LINE__));
 		/* continue, anyway */
 		return (0);
 	}
@@ -308,8 +308,8 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		  M_DONTWAIT);
 	if (n == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: mbuf prepend for ip6/icmp6 failed.\n",
-			 __FUNCTION__));
+			 "%s:%d: mbuf prepend for ip6/icmp6 failed.\n",
+			 __FILE__, __LINE__));
 		/* continue */
 		return (0);
 	}
@@ -342,8 +342,8 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	error = ip6_output(n, NULL, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
-			 "%s: send failed. (errno = %d)\n",
-			 __FUNCTION__, error));
+			 "%s:%d: send failed. (errno = %d)\n",
+			 __FILE__, __LINE__, error));
 		m_freem(n);
 		/* continue processing 'm' (the original icmp) */
 		return (0);
@@ -517,8 +517,8 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 			       IPPROTO_ICMPV6, hdreplen + halistlen);
 	if (n == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: mbuf allocation failed\n",
-			 __FUNCTION__));
+			 "%s:%d: mbuf allocation failed\n",
+			 __FILE__, __LINE__));
 		/* free the input packet */
 		m_freem(m);
 		FREE(halist, M_TEMP);
@@ -543,8 +543,8 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 	error = ip6_output(n, NULL, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
-			 "%s: send failed (errno = %d)\n",
-			 __FUNCTION__, error));
+			 "%s:%d: send failed (errno = %d)\n",
+			 __FILE__, __LINE__, error));
 	}
 
 	return (0);
@@ -634,8 +634,8 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 					     0, MIP6_HA_DEFAULT_LIFETIME);
 			if (mha == NULL) {
 				mip6log((LOG_ERR,
-					 "%s: mip6_ha create failed\n",
-					 __FUNCTION__));
+					 "%s:%d: mip6_ha create failed\n",
+					 __FILE__, __LINE__));
 				return (ENOMEM);
 			}
 			mip6_ha_list_insert(&mip6_ha_list, mha);
@@ -657,8 +657,8 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 					     0, MIP6_HA_DEFAULT_LIFETIME);
 			if (mha == NULL) {
 				mip6log((LOG_ERR,
-					 "%s: mip6_ha create failed\n",
-					 __FUNCTION__));
+					 "%s:%d: mip6_ha create failed\n",
+					 __FILE__, __LINE__));
 				return (ENOMEM);
 			}
 			mip6_ha_list_insert(&mip6_ha_list, mha);
@@ -706,9 +706,9 @@ mip6_ha_discov_ha_list_insert(sc, mha)
 	if (hs == NULL) {
 		/* must not happen */
 		mip6log((LOG_ERR,
-			 "%s: receive dhaad reply.  "
+			 "%s:%d: receive dhaad reply.  "
 			 "but we have no home subnet???\n",
-			 __FUNCTION__));
+			 __FILE__, __LINE__));
 		return (EINVAL);
 	}
 	if ((ms = hs->hs_ms) == NULL)
@@ -717,16 +717,16 @@ mip6_ha_discov_ha_list_insert(sc, mha)
 	msha = mip6_subnet_ha_create(mha);
 	if (msha == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: can't create msha\n",
-			 __FUNCTION__));
+			 "%s:%d: can't create msha\n",
+			 __FILE__, __LINE__));
 		return (ENOMEM);
 	}
 
 	error = mip6_subnet_ha_list_insert(&ms->ms_msha_list, msha);
 	if (error) {
 		mip6log((LOG_ERR,
-			 "%s: insert msha entry to msha_list failed.\n",
-			 __FUNCTION__));
+			 "%s:%d: insert msha entry to msha_list failed.\n",
+			 __FILE__, __LINE__));
 		return (EINVAL);
 	}
 
@@ -763,8 +763,8 @@ mip6_icmp6_ha_discov_req_output(sc)
 	m = mip6_create_ip6hdr(&hif_coa, &haanyaddr,
 			       IPPROTO_ICMPV6, icmp6len);
 	if (m == NULL) {
-		mip6log((LOG_ERR, "%s: mbuf allocation failed\n",
-			 __FUNCTION__));
+		mip6log((LOG_ERR, "%s:%d: mbuf allocation failed\n",
+			 __FILE__, __LINE__));
 
 		return (ENOBUFS);
 	}
@@ -787,8 +787,8 @@ mip6_icmp6_ha_discov_req_output(sc)
 	/* send the ICMP6 packet to the home agent anycast address. */
 	error = ip6_output(m, NULL, NULL, 0, NULL, NULL);
 	if (error) {
-		mip6log((LOG_ERR, "%s: send failed (errno = %d)\n",
-			 __FUNCTION__, error));
+		mip6log((LOG_ERR, "%s:%d: send failed (errno = %d)\n",
+			 __FILE__, __LINE__, error));
 	}
 
 	return (0);
@@ -846,8 +846,8 @@ mip6_tunneled_rs_output(sc, mpfx)
 	maxlen += (sizeof(struct nd_opt_hdr) + 6 + 7) & ~7;
 	if (max_linkhdr + maxlen >= MCLBYTES) {
 #ifdef DIAGNOSTIC
-		printf("%s: max_linkhdr + maxlen >= MCLBYTES (%d + %d > %d)\n",
-		       __FUNCTION__, max_linkhdr, maxlen, MCLBYTES);
+		printf("%s:%d: max_linkhdr + maxlen >= MCLBYTES (%d + %d > %d)\n",
+		       __FILE__, __LINE__, max_linkhdr, maxlen, MCLBYTES);
 #endif /* DIAGNOSTIC */
 		return (-1);
 	}
@@ -879,8 +879,8 @@ mip6_tunneled_rs_output(sc, mpfx)
 	ip6->ip6_hlim = 255;
 	ip6->ip6_src = mpfx->mpfx_haddr;
 	ip6->ip6_dst = mpfx->mpfx_haaddr;
-	mip6log((LOG_INFO, "%s: inner src %s\ninner dst%s\n",
-		 __FUNCTION__,
+	mip6log((LOG_INFO, "%s:%d: inner src %s\ninner dst%s\n",
+		 __FILE__, __LINE__,
 		 ip6_sprintf(&ip6->ip6_src),
 		 ip6_sprintf(&ip6->ip6_dst)));
 
@@ -909,7 +909,9 @@ mip6_tunneled_rs_output(sc, mpfx)
 	if (m && m->m_len < sizeof(struct ip6_hdr))
 		m = m_pullup(m, sizeof(struct ip6_hdr));
 	if (m == NULL) {
-		printf("%s: mbuf allocation falied\n", __FUNCTION__);
+		mip6log((LOG_ERR,
+			 "%s:%d: mbuf allocation falied\n",
+			 __FILE__, __LINE__));
 		return (-1);
 	}
 
@@ -922,8 +924,8 @@ mip6_tunneled_rs_output(sc, mpfx)
 	ip6->ip6_hlim = IPV6_DEFHLIM;
 	ip6->ip6_src = hif_coa;
 	ip6->ip6_dst = mpfx->mpfx_haaddr;
-	mip6log((LOG_INFO, "%s: outer src %s\nouter dst%s\n",
-		 __FUNCTION__,
+	mip6log((LOG_INFO, "%s:%d: outer src %s\nouter dst%s\n",
+		 __FILE__, __LINE__,
 		 ip6_sprintf(&ip6->ip6_src),
 		 ip6_sprintf(&ip6->ip6_dst)));
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.19 2001/10/16 10:23:23 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.20 2001/10/17 08:24:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -204,8 +204,8 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	       M_TEMP, M_NOWAIT);
 	if (mbu == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: memory allocation failed.\n",
-			 __FUNCTION__));
+			 "%s:%d: memory allocation failed.\n",
+			 __FILE__, __LINE__));
 		return (NULL);
 	}
 
@@ -253,8 +253,8 @@ mip6_home_registration(sc)
 	hs = TAILQ_FIRST(&sc->hif_hs_list_home);
 	if (hs == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: no home subnet\n",
-			 __FUNCTION__));
+			 "%s:%d: no home subnet\n",
+			 __FILE__, __LINE__));
 		return (EINVAL);
 	}
 	if ((ms = hs->hs_ms) == NULL) {
@@ -303,8 +303,9 @@ mip6_home_registration(sc)
 			 * Dynamic Home Agent Discovery.
 			 */
 			mip6log((LOG_INFO,
-				 "%s: no home agent.  start ha discovery.\n",
-				 __FUNCTION__));
+				 "%s:%d: "
+				 "no home agent.  start ha discovery.\n",
+				 __FILE__, __LINE__));
 			mip6_icmp6_ha_discov_req_output(sc);
 			haaddr = &in6addr_any;
 		} else {
@@ -324,15 +325,15 @@ mip6_home_registration(sc)
 		 */
 		if ((mspfx = TAILQ_FIRST(&ms->ms_mspfx_list)) == NULL) {
 			mip6log((LOG_ERR,
-				 "%s: we don't have any home prefix.\n",
-				 __FUNCTION__));
+				 "%s:%d: we don't have any home prefix.\n",
+				 __FILE__, __LINE__));
 			return (EINVAL);
 		}
 		if ((mpfx = mspfx->mspfx_mpfx) == NULL)
 			return (EINVAL);
 		mip6log((LOG_INFO,
-			 "%s: home address is %s\n",
-			 __FUNCTION__,
+			 "%s:%d: home address is %s\n",
+			 __FILE__, __LINE__,
 			 ip6_sprintf(&mpfx->mpfx_haddr)));
 
 		mbu = mip6_bu_create(haaddr, mpfx, &hif_coa,
@@ -415,9 +416,9 @@ mip6_home_registration_old(sc)
 	hs = TAILQ_FIRST(&sc->hif_hs_list_home);
 	if (hs == NULL) {
 		mip6log((LOG_NOTICE,
-			 "%s: no home subnet info.  "
+			 "%s:%d: no home subnet info.  "
 			 "you must specify at least one home prefix.\n",
-			 __FUNCTION__));
+			 __FILE__, __LINE__));
 		return (0);
 	}
 	if ((ms = hs->hs_ms) == NULL) {
@@ -436,8 +437,8 @@ mip6_home_registration_old(sc)
 		 * bu seems reasonable to me.  reconsider later...
 		 */
 		mip6log((LOG_INFO,
-			 "%s: no home agent.  start ha discovery.\n",
-			 __FUNCTION__));
+			 "%s:%d: no home agent.  start ha discovery.\n",
+			 __FILE__, __LINE__));
 		mip6_icmp6_ha_discov_req_output(sc);
 		haaddr = &in6addr_any;
 	} else {
@@ -447,8 +448,8 @@ mip6_home_registration_old(sc)
 		haaddr = &mha->mha_gaddr;
 	}
 	mip6log((LOG_INFO,
-		 "%s: our home agent is %s\n",
-		 __FUNCTION__,
+		 "%s:%d: our home agent is %s\n",
+		 __FILE__, __LINE__,
 		 ip6_sprintf(haaddr)));
 
 	/* pick one prefix up to get the home address. */
@@ -458,15 +459,15 @@ mip6_home_registration_old(sc)
 	 */
 	if ((mspfx = TAILQ_FIRST(&ms->ms_mspfx_list)) == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: we don't have any home prefix.\n",
-			 __FUNCTION__));
+			 "%s:%d: we don't have any home prefix.\n",
+			 __FILE__, __LINE__));
 		return (EINVAL);
 	}
 	if ((mpfx = mspfx->mspfx_mpfx) == NULL)
 		return (EINVAL);
 	mip6log((LOG_INFO,
-		 "%s: home address is %s\n",
-		 __FUNCTION__,
+		 "%s:%d: home address is %s\n",
+		 __FILE__, __LINE__,
 		 ip6_sprintf(&mpfx->mpfx_haddr)));
 
 	/* search a BU entry for our home agent */
@@ -558,8 +559,9 @@ mip6_bu_list_notify_binding_change(sc)
 						       &mbu->mbu_haddr);
 		if (mpfx == NULL) {
 			mip6log((LOG_NOTICE,
-				 "%s: expired prefix (%s).\n",
-				 __FUNCTION__, ip6_sprintf(&mbu->mbu_haddr)));
+				 "%s:%d: expired prefix (%s).\n",
+				 __FILE__, __LINE__,
+				 ip6_sprintf(&mbu->mbu_haddr)));
 			mip6_bu_list_remove(&sc->hif_bu_list, mbu);
 			continue;
 		}
@@ -607,8 +609,8 @@ mip6_bu_starttimer()
 			mip6_bu_restarttimer();
 			mip6_bu_timer_running = 1;
 			mip6log((LOG_INFO,
-				 "%s: timer started.\n",
-				 __FUNCTION__));
+				 "%s:%d: timer started.\n",
+				 __FILE__, __LINE__));
 			break;
 		}
 	}
@@ -679,14 +681,15 @@ mip6_bu_timeout(arg)
 			/* check expiration */
 			if (mbu->mbu_remain < 0) {
 				mip6log((LOG_INFO,
-					 "%s: an BU entry (0x%p) expired.\n",
-					 __FUNCTION__, mbu));
+					 "%s:%d: "
+					 "an BU entry (0x%p) expired.\n",
+					 __FILE__, __LINE__, mbu));
 				error = mip6_bu_list_remove(&sc->hif_bu_list,
 							    mbu);
 				if (error) {
 					mip6log((LOG_ERR,
-						 "%s: can't remove BU.\n",
-						 __FUNCTION__));
+						 "%s:%d: can't remove BU.\n",
+						 __FILE__, __LINE__));
 					continue;
 				}
 				continue;
@@ -707,8 +710,10 @@ mip6_bu_timeout(arg)
 			    && (mbu->mbu_state & MIP6_BU_STATE_WAITACK)
 			    && (mbu->mbu_ackremain < 0)) {
 				mip6log((LOG_INFO,
-					 "%s: ack for an BU (0x%p) timeout.\n",
-					 __FUNCTION__, mbu));
+					 "%s:%d: "
+					 "ack for an BU (0x%p) timeout.\n",
+					 __FILE__, __LINE__,
+					 mbu));
 				mbu->mbu_acktimeout *= 2;
 				if (mbu->mbu_acktimeout > MIP6_BA_MAX_TIMEOUT)
 					mbu->mbu_acktimeout
@@ -735,12 +740,14 @@ mip6_bu_timeout(arg)
 			/* send pending BUs */
 			if (mbu->mbu_state & MIP6_BU_STATE_WAITSENT) {
 				mip6log((LOG_INFO,
-					 "%s: we have a pending BU (0x%p)\n",
-					 __FUNCTION__, mbu));
+					 "%s:%d: "
+					 "we have a pending BU (0x%p)\n",
+					 __FILE__, __LINE__,
+					 mbu));
 				if (mip6_bu_send_bu(mbu)) {
 					mip6log((LOG_ERR,
-						 "%s: sending BU from %s(%s) to %s failed.\n",
-						 __FUNCTION__,
+						 "%s:%d: sending BU from %s(%s) to %s failed.\n",
+						 __FILE__, __LINE__,
 						 ip6_sprintf(&mbu->mbu_haddr),
 						 ip6_sprintf(&mbu->mbu_coa),
 						 ip6_sprintf(&mbu->mbu_paddr)));
@@ -765,8 +772,8 @@ mip6_bu_send_bu(mbu)
 
 	if (IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_haddr)) {
 		mip6log((LOG_INFO,
-			 "%s: no home agent.  start ha discovery.\n",
-			 __FUNCTION__));
+			 "%s:%d: no home agent.  start ha discovery.\n",
+			 __FILE__, __LINE__));
 		mip6_icmp6_ha_discov_req_output(mbu->mbu_hif);
 		return (0);
 	}
@@ -775,9 +782,10 @@ mip6_bu_send_bu(mbu)
 
 	error = ip6_output(m, NULL, NULL, 0, NULL, NULL);
 	if (error) {
-		mip6log((LOG_ERR, "%s: ip6_output returns error (%d) "
+		mip6log((LOG_ERR,
+			 "%s:%d: ip6_output returns error (%d) "
 			 "when sending NULL packet to send BU.\n",
-			 __FUNCTION__,
+			 __FILE__, __LINE__,
 			 error));
 	}
 	/*
@@ -797,8 +805,8 @@ mip6_bu_list_insert(bu_list, mbu)
 	LIST_INSERT_HEAD(bu_list, mbu, mbu_entry);
 
 	if (mip6_bu_count == 0) {
-		mip6log((LOG_INFO, "%s: BU timer started.\n",
-			__FUNCTION__));
+		mip6log((LOG_INFO, "%s:%d: BU timer started.\n",
+			__FILE__, __LINE__));
 		mip6_bu_starttimer();
 	}
 	mip6_bu_count++;
@@ -826,8 +834,9 @@ mip6_bu_list_remove(mbu_list, mbu)
 	}
 
 	mip6log((LOG_INFO,
-		 "%s: removing a BU entry (0x%p).\n",
-		 __FUNCTION__, mbu));
+		 "%s:%d: removing a BU entry (0x%p).\n",
+		 __FILE__, __LINE__,
+		 mbu));
 
 #ifndef BUOLDTIMER
 	LIST_REMOVE(mbu, mbu_entry);
@@ -836,8 +845,9 @@ mip6_bu_list_remove(mbu_list, mbu)
 	mip6_bu_count--;
 	if (mip6_bu_count == 0) {
 		mip6_bu_stoptimer();
-		mip6log((LOG_INFO, "%s: BU timer stopped.\n",
-			__FUNCTION__));
+		mip6log((LOG_INFO,
+			 "%s:%d: BU timer stopped.\n",
+			__FILE__, __LINE__));
 	}
 #else
 	LIST_REMOVE(mbu, mbu_entry);
@@ -850,8 +860,8 @@ mip6_bu_list_remove(mbu_list, mbu)
 	}
 	if (empty) {
 		mip6log((LOG_INFO,
-			 "%s: no BU entry left.  stop timer.\n",
-			 __FUNCTION__));
+			 "%s:%d: no BU entry left.  stop timer.\n",
+			 __FILE__, __LINE__));
 		mip6_bu_stoptimer();
 	}
 #endif
@@ -878,8 +888,8 @@ mip6_bu_list_remove_all(mbu_list)
 		error = mip6_bu_list_remove(mbu_list, mbu);
 		if (error) {
 			mip6log((LOG_ERR,
-				 "%s: can't remove BU.\n",
-				 __FUNCTION__));
+				 "%s:%d: can't remove BU.\n",
+				 __FILE__, __LINE__));
 			continue;
 		}
 	}
@@ -911,8 +921,8 @@ mip6_validate_bu(m, opt)
 #ifdef IPSEC
 #ifndef __OpenBSD__
 	if (!((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM))) {
-		mip6log((LOG_NOTICE, "%s: an unprotected BU from %s.\n",
-			 __FUNCTION__,
+		mip6log((LOG_NOTICE, "%s:%d: an unprotected BU from %s.\n",
+			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
 		/* silently ignore */
 		return (1);
@@ -931,9 +941,10 @@ mip6_validate_bu(m, opt)
 	}
 	ip6a = mtod(n, struct ip6aux *);
 	if ((ip6a == NULL) || (ip6a->ip6a_flags & IP6A_HASEEN) == 0) {
-		mip6log((LOG_NOTICE, "%s: no Home Address option found "
+		mip6log((LOG_NOTICE,
+			 "%s:%d: no Home Address option found "
 			 "for an BU from host %s.\n",
-			 __FUNCTION__,
+			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
 		return (1);
 	}
@@ -942,9 +953,10 @@ mip6_validate_bu(m, opt)
 	/* Make sure that the length field in the BU is >= IP6OPT_BULEN. */
 	if (bu_opt->ip6ou_len < IP6OPT_BULEN) {
 		ip6stat.ip6s_badoptions++;
-		mip6log((LOG_NOTICE, "%s: an BU length is too short (%d) "
+		mip6log((LOG_NOTICE,
+			 "%s:%d: an BU length is too short (%d) "
 			 "from host %s.\n",
-			 __FUNCTION__,
+			 __FILE__, __LINE__,
 			 bu_opt->ip6ou_len,
 			 ip6_sprintf(&ip6->ip6_src)));
 		/* silently ignore */
@@ -960,9 +972,9 @@ mip6_validate_bu(m, opt)
 	if (MIP6_LEQ(bu_opt->ip6ou_seqno, mbc->mbc_seqno)) {
 		ip6stat.ip6s_badoptions++;
 		mip6log((LOG_NOTICE,
-			 "%s: received sequence no (%d) <= current "
+			 "%s:%d: received sequence no (%d) <= current "
 			 "seq no (%d) in BU from host %s.\n",
-			 __FUNCTION__,
+			 __FILE__, __LINE__,
 			 bu_opt->ip6ou_seqno,
 			 mbc->mbc_seqno, ip6_sprintf(&ip6->ip6_src)));
 		/* seqno is too small.  send TOO_SMALL error. */
@@ -973,8 +985,8 @@ mip6_validate_bu(m, opt)
 					0, 0);
 		if (error) {
 			mip6log((LOG_ERR,
-				 "%s: can't send BA\n",
-				 __FUNCTION__));
+				 "%s:%d: can't send BA\n",
+				 __FILE__, __LINE__));
 		}
 		return (1);
 	}
@@ -1070,9 +1082,9 @@ mip6_process_bu(m, opt)
 						     lifetime);
 				if (mbc == NULL) {
 					mip6log((LOG_ERR,
-						 "%s: mip6_bc memory "
+						 "%s:%d: mip6_bc memory "
 						 "allocation failed.\n",
-						 __FUNCTION__));
+						 __FILE__, __LINE__));
 					return (ENOMEM);
 				}
 				error = mip6_bc_list_insert(&mip6_bc_list,
@@ -1125,8 +1137,8 @@ mip6_process_bu(m, opt)
 							    mbc);
 				if (error) {
 					mip6log((LOG_ERR,
-						 "%s: can't remove BC.\n",
-						 __FUNCTION__));
+						 "%s:%d: can't remove BC.\n",
+						 __FILE__, __LINE__));
 					return (error);
 				}
 			}
@@ -1185,8 +1197,8 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 		error = mip6_bc_list_remove(&mip6_bc_list, mbc);
 		if (error) {
 			mip6log((LOG_ERR,
-				 "%s: can't remove BC.\n",
-				 __FUNCTION__));
+				 "%s:%d: can't remove BC.\n",
+				 __FILE__, __LINE__));
 			mip6_bc_send_ba(haaddr, haddr0, coa,
 					MIP6_BA_STATUS_UNSPECIFIED,
 					bu_opt->ip6ou_seqno,
@@ -1221,8 +1233,8 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 			error = mip6_bc_list_remove(&mip6_bc_list, mbc);
 			if (error) {
 				mip6log((LOG_ERR,
-					 "%s: can't remove BC.\n",
-					 __FUNCTION__));
+					 "%s:%d: can't remove BC.\n",
+					 __FILE__, __LINE__));
 				mip6_bc_send_ba(haaddr, haddr0, coa,
 						MIP6_BA_STATUS_UNSPECIFIED,
 						bu_opt->ip6ou_seqno,
@@ -1240,8 +1252,8 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 			    0,
 			    0)) {
 		mip6log((LOG_ERR,
-			 "%s: sending BA to %s(%s) failed.  send it later.\n",
-			 __FUNCTION__,
+			 "%s:%d: sending BA to %s(%s) failed.  send it later.\n",
+			 __FILE__, __LINE__,
 			 ip6_sprintf(&mbc->mbc_phaddr),
 			 ip6_sprintf(&mbc->mbc_pcoa)));
 	}
@@ -1446,9 +1458,9 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 				    lifetime,
 				    lifetime / 2 /* XXX */)) {
 			mip6log((LOG_ERR,
-				 "%s: sending BA to %s(%s) failed. "
+				 "%s:%d: sending BA to %s(%s) failed. "
 				 "send it later.\n",
-				 __FUNCTION__,
+				 __FILE__, __LINE__,
 				 ip6_sprintf(&mbc->mbc_phaddr),
 				 ip6_sprintf(&mbc->mbc_pcoa)));
 		}
@@ -1479,8 +1491,8 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 	m = mip6_create_ip6hdr(src, dst, IPPROTO_NONE, 0);
 	if (m == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: creating ip6hdr failed.\n",
-			 __FUNCTION__));
+			 "%s:%d: creating ip6hdr failed.\n",
+			 __FILE__, __LINE__));
 		return (-1);
 	}
 
@@ -1501,8 +1513,8 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 
 	if (ip6_output(m, &opt, NULL, 0, NULL, NULL)) {
 		mip6log((LOG_ERR,
-			 "%s: sending ip packet error.\n",
-			 __FUNCTION__));
+			 "%s:%d: sending ip packet error.\n",
+			 __FILE__, __LINE__));
 	}
 
 	return (0);
@@ -1543,9 +1555,9 @@ mip6_bc_proxy_control(target, local, cmd)
 		rt = NULL;
 		if (error) {
 			mip6log((LOG_ERR,
-				 "%s: RTM_DELETE for %s returned "
+				 "%s:%d: RTM_DELETE for %s returned "
 				 "error = %d\n",
-				 __FUNCTION__,
+				 __FILE__, __LINE__,
 				 ip6_sprintf(target), error));
 		}
 
@@ -1565,8 +1577,8 @@ mip6_bc_proxy_control(target, local, cmd)
 		if (rt && (rt->rt_flags & RTF_ANNOUNCE) != 0 &&
 		    rt->rt_gateway->sa_family == AF_LINK) {
 			mip6log((LOG_NOTICE,
-				 "%s: RTM_ADD: we are already proxy for %s\n",
-				 __FUNCTION__,
+				 "%s:%d: RTM_ADD: we are already proxy for %s\n",
+				 __FILE__, __LINE__,
 				 ip6_sprintf(target)));
 			return (EEXIST);
 		}
@@ -1624,9 +1636,9 @@ mip6_bc_proxy_control(target, local, cmd)
 				error = EINVAL;
 		} else {
 			mip6log((LOG_ERR,
-				 "%s: RTM_ADD for %s returned "
+				 "%s:%d: RTM_ADD for %s returned "
 				 "error = %d\n",
-				 __FUNCTION__,
+				 __FILE__, __LINE__,
 				 ip6_sprintf(target), error));
 		}
 		
@@ -1647,8 +1659,8 @@ mip6_bc_proxy_control(target, local, cmd)
 
 	default:
 		mip6log((LOG_ERR,
-			 "%s: we only support RTM_ADD/DELETE operation.\n",
-			 __FUNCTION__));
+			 "%s:%d: we only support RTM_ADD/DELETE operation.\n",
+			 __FILE__, __LINE__));
 		error = -1;
 		break;
 	}
@@ -1733,8 +1745,8 @@ mip6_validate_ba(m, opt)
 #ifndef __OpenBSD__
 	if (!((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM))) {
 		mip6log((LOG_NOTICE,
-			 "%s: an unprotected BA from %s.\n",
-			 __FUNCTION__,
+			 "%s:%d: an unprotected BA from %s.\n",
+			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
 		/* silently ignore */
 		return (1);
@@ -1750,8 +1762,8 @@ mip6_validate_ba(m, opt)
 	if (ba_opt->ip6oa_len < IP6OPT_BALEN) {
 		ip6stat.ip6s_badoptions++;
 		mip6log((LOG_NOTICE,
-			 "%s: received BA is too short (%d) from host %s.\n",
-			 __FUNCTION__,
+			 "%s:%d: received BA is too short (%d) from host %s.\n",
+			 __FILE__, __LINE__,
 			 ba_opt->ip6oa_len,
 			 ip6_sprintf(&ip6->ip6_src)));
 		/* silently ignore */
@@ -1763,17 +1775,17 @@ mip6_validate_ba(m, opt)
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &ip6->ip6_src);
 	if (mbu == NULL) {
 		mip6log((LOG_NOTICE,
-			 "%s: no matching BU entry found.\n",
-			 __FUNCTION__));
+			 "%s:%d: no matching BU entry found.\n",
+			 __FILE__, __LINE__));
 		/* silently ignore */
 		return (1);
 	}
 	if (ba_opt->ip6oa_seqno != mbu->mbu_seqno) {
 		ip6stat.ip6s_badoptions++;
 		mip6log((LOG_NOTICE,
-			 "%s: unmached sequence no "
+			 "%s:%d: unmached sequence no "
 			 "(%d recv, %d sent) from host %s.\n",
-			 __FUNCTION__,
+			 __FILE__, __LINE__,
 			 ba_opt->ip6oa_seqno,
 			 mbu->mbu_seqno,
 			 ip6_sprintf(&ip6->ip6_src)));
@@ -1807,16 +1819,16 @@ mip6_process_ba(m, opt)
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &ip6->ip6_src);
 	if (mbu == NULL) {
 		mip6log((LOG_NOTICE,
-			 "%s: no matching BU entry found from host %s.\n",
-			 __FUNCTION__, ip6_sprintf(&ip6->ip6_src)));
+			 "%s:%d: no matching BU entry found from host %s.\n",
+			 __FILE__, __LINE__, ip6_sprintf(&ip6->ip6_src)));
 		/* ignore */
 		return (0);
 	}
 
 	if (ba_opt->ip6oa_status >= MIP6_BA_STATUS_ERRORBASE) {
 		mip6log((LOG_NOTICE, 
-			 "%s: BU rejected (error code %d).\n",
-			 __FUNCTION__, ba_opt->ip6oa_status));
+			 "%s:%d: BU rejected (error code %d).\n",
+			 __FILE__, __LINE__, ba_opt->ip6oa_status));
 		if (ba_opt->ip6oa_status == MIP6_BA_STATUS_SEQNO_TOO_SMALL) {
 			/* seqno is too small.  adjust it and re-send BU. */
 			mbu->mbu_seqno = ba_opt->ip6oa_seqno + 1;
@@ -1828,8 +1840,8 @@ mip6_process_ba(m, opt)
 		error = mip6_bu_list_remove(&sc->hif_bu_list, mbu);
 		if (error) {
 			mip6log((LOG_ERR,
-				 "%s: can't remove BU.\n",
-				 __FUNCTION__));
+				 "%s:%d: can't remove BU.\n",
+				 __FILE__, __LINE__));
 			return (error);
 		}
 		/* XXX some error recovery process needed. */
@@ -1865,8 +1877,8 @@ mip6_process_ba(m, opt)
 			error = mip6_bu_list_remove(&sc->hif_bu_list, mbu);
 			if (error) {
 				mip6log((LOG_ERR,
-					 "%s: can't remove BU.\n",
-					 __FUNCTION__));
+					 "%s:%d: can't remove BU.\n",
+					 __FILE__, __LINE__));
 				return (error);
 			}
 
@@ -1877,8 +1889,8 @@ mip6_process_ba(m, opt)
 						   &mbu->mbu_encap);
 			if (error) {
 				mip6log((LOG_ERR,
-					 "%s: tunnel removal failed.\n",
-					 __FUNCTION__));
+					 "%s:%d: tunnel removal failed.\n",
+					 __FILE__, __LINE__));
 				return (error);
 			}
 
@@ -1890,8 +1902,8 @@ mip6_process_ba(m, opt)
 			error = mip6_bu_list_remove_all(&sc->hif_bu_list);
 			if (error) {
 				mip6log((LOG_ERR,
-					 "%s: BC remove all failed.\n",
-					 __FUNCTION__));
+					 "%s:%d: BC remove all failed.\n",
+					 __FILE__, __LINE__));
 				return (error);
 			}
 		} else {
@@ -1905,8 +1917,8 @@ mip6_process_ba(m, opt)
 						    &mbu->mbu_encap);
 			if (error) {
 				mip6log((LOG_ERR,
-					 "%s: tunnel move failed.\n",
-					 __FUNCTION__));
+					 "%s:%d: tunnel move failed.\n",
+					 __FILE__, __LINE__));
 				return (error);
 			}
 
@@ -2008,8 +2020,8 @@ mip6_bc_create(phaddr, pcoa, addr, flags, prefixlen, seqno, lifetime)
 	       M_TEMP, M_NOWAIT);
 	if (mbc == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: memory allocation failed.\n",
-			 __FUNCTION__));
+			 "%s:%d: memory allocation failed.\n",
+			 __FILE__, __LINE__));
 		return (NULL);
 	}
 	bzero(mbc, sizeof(*mbc));
@@ -2035,8 +2047,8 @@ mip6_bc_list_insert(mbc_list, mbc)
 	LIST_INSERT_HEAD(mbc_list, mbc, mbc_entry);
 
 	if (mip6_bc_count == 0) {
-		mip6log((LOG_INFO, "%s: BC timer started.\n",
-			__FUNCTION__));
+		mip6log((LOG_INFO, "%s:%d: BC timer started.\n",
+			__FILE__, __LINE__));
 		mip6_bc_starttimer();
 	}
 	mip6_bc_count++;
@@ -2059,8 +2071,8 @@ mip6_bc_list_remove(mbc_list, mbc)
 	error = mip6_bc_proxy_control(&mbc->mbc_phaddr, NULL, RTM_DELETE);
 	if (error) {
 		mip6log((LOG_ERR,
-			 "%s: can't delete a proxy ND entry for %s.\n",
-			 __FUNCTION__,
+			 "%s:%d: can't delete a proxy ND entry for %s.\n",
+			 __FILE__, __LINE__,
 			 ip6_sprintf(&mbc->mbc_phaddr)));
 	}
 	FREE(mbc, M_TEMP);
@@ -2068,8 +2080,8 @@ mip6_bc_list_remove(mbc_list, mbc)
 	mip6_bc_count--;
 	if (mip6_bc_count == 0) {
 		mip6_bc_stoptimer();
-		mip6log((LOG_INFO, "%s: BC timer stopped.\n",
-			__FUNCTION__));
+		mip6log((LOG_INFO, "%s:%d: BC timer stopped.\n",
+			__FILE__, __LINE__));
 	}
 
 	return (0);
@@ -2391,7 +2403,10 @@ mip6_tunnel_input(mp, offp, proto)
 		break;
 	}
 	default:
-		mip6log((LOG_ERR, "protocol %d not supported.\n", proto));
+		mip6log((LOG_ERR,
+			 "%s:%d: protocol %d not supported.\n",
+			 __FILE__, __LINE__,
+			 proto));
 		goto bad;
 	}
 
@@ -2456,8 +2471,8 @@ mip6_tunnel_output(mp, mbc)
 		m = m_pullup(m, sizeof(struct ip6_hdr));
 	if (m == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: ENOBUFS in mip6_tunnel_output %d\n",
-			 __FUNCTION__, __LINE__));
+			 "%s:%d: ENOBUFS in mip6_tunnel_output\n",
+			 __FILE__, __LINE__));
 		return (ENOBUFS);
 	}
 

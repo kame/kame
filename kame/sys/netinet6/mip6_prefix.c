@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.10 2001/10/11 12:58:21 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.11 2001/10/17 08:24:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -104,8 +104,8 @@ mip6_prefix_create(prefix, prefixlen, lifetime)
 	       M_TEMP, M_NOWAIT);
 	if (mpfx == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: memory allocation failed.\n",
-			 __FUNCTION__));
+			 "%s:%d: memory allocation failed.\n",
+			 __FILE__, __LINE__));
 		return (NULL);
 	}
 	bzero(mpfx, sizeof(*mpfx));
@@ -155,8 +155,8 @@ mip6_prefix_list_insert(mpfx_list, mpfx)
 	if (mip6_prefix_count == 0) {
 		mip6_prefix_starttimer();
 		mip6log((LOG_INFO,
-			 "%s: prefix timer started.\n",
-			 __FUNCTION__));
+			 "%s:%d: prefix timer started.\n",
+			 __FILE__, __LINE__));
 	}
 	mip6_prefix_count++;
 
@@ -195,8 +195,8 @@ mip6_prefix_list_remove(mpfx_list, mpfx)
 	mip6_prefix_count--;
 	if (mip6_prefix_count == 0) {
 		mip6log((LOG_INFO,
-			 "%s: prefix timer stopped.\n",
-			 __FUNCTION__));
+			 "%s:%d: prefix timer stopped.\n",
+			 __FILE__, __LINE__));
 		mip6_prefix_stoptimer();
 	}
 

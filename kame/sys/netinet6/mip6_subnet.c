@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.8 2001/10/05 07:57:45 itojun Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.9 2001/10/17 08:24:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -84,8 +84,8 @@ mip6_subnet_create(void)
 	       M_TEMP, M_NOWAIT);
 	if (ms == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: memory allocation failed.\n",
-			 __FUNCTION__));
+			 "%s:%d: memory allocation failed.\n",
+			 __FILE__, __LINE__));
 		return (NULL);
 	}
 
@@ -136,8 +136,8 @@ mip6_subnet_delete(ms)
 							       hs);
 				if (error) {
 					mip6log((LOG_ERR,
-						 "%s: can't remove hif_subnet (0x%p).\n",
-						 __FUNCTION__, hs));
+						 "%s:%d: can't remove hif_subnet (0x%p).\n",
+						 __FILE__, __LINE__, hs));
 				}
 			}
 		}
@@ -148,8 +148,8 @@ mip6_subnet_delete(ms)
 							       hs);
 				if (error) {
 					mip6log((LOG_ERR,
-						 "%s: can't remove hif_subnet (0x%p).\n",
-						 __FUNCTION__, hs));
+						 "%s:%d: can't remove hif_subnet (0x%p).\n",
+						 __FILE__, __LINE__, hs));
 				}
 			}
 		}
@@ -255,8 +255,8 @@ mip6_subnet_prefix_create(mpfx)
 	       sizeof(struct mip6_subnet_prefix), M_TEMP, M_NOWAIT);
 	if (mspfx == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: memory allocation failed.\n",
-			 __FUNCTION__));
+			 "%s:%d: memory allocation failed.\n",
+			 __FILE__, __LINE__));
 		return (NULL);
 	}
 	bzero(mspfx, sizeof(*mspfx));
@@ -343,8 +343,8 @@ mip6_subnet_prefix_list_find_withprefix(mspfx_list, prefix, prefixlen)
 		if ((mpfx = mspfx->mspfx_mpfx) == NULL) {
 			/* must not happen. */
 			mip6log((LOG_ERR,
-				 "%s: mspfx_mpfx is a NULL pointer.\n",
-				 __FUNCTION__));
+				 "%s:%d: mspfx_mpfx is a NULL pointer.\n",
+				 __FILE__, __LINE__));
 			return (NULL);
 		}
 		if ((in6_are_prefix_equal(&mpfx->mpfx_prefix,
@@ -394,8 +394,8 @@ mip6_subnet_ha_create(mha)
 	       sizeof(struct mip6_subnet_ha), M_TEMP, M_NOWAIT);
 	if (msha == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: memory allocation failed.\n",
-			 __FUNCTION__));
+			 "%s:%d: memory allocation failed.\n",
+			 __FILE__, __LINE__));
 		return (NULL);
 	}
 	bzero(msha, sizeof(*msha));
@@ -487,8 +487,8 @@ mip6_subnet_ha_list_find_withhaaddr(msha_list, haaddr)
 		if ((mha = msha->msha_mha) == NULL) {
 			/* must not happen. */
 			mip6log((LOG_ERR,
-				 "%s: msha_mha is a NULL pointer.\n",
-				 __FUNCTION__));
+				 "%s:%d: msha_mha is a NULL pointer.\n",
+				 __FILE__, __LINE__));
 			return (NULL);
 		}
 		if (IN6_ARE_ADDR_EQUAL(&mha->mha_lladdr,

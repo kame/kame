@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.25 2001/09/20 07:13:22 keiichi Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.26 2001/10/17 08:24:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -103,8 +103,8 @@ mip6_ha_create(lladdr, gaddr, flags, pref, lifetime)
 	       M_TEMP, M_NOWAIT);
 	if (mha == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: memory allocation failed.\n",
-			 __FUNCTION__));
+			 "%s:%d: memory allocation failed.\n",
+			 __FILE__, __LINE__));
 		return (NULL);
 	}
 	bzero(mha, sizeof(*mha));
@@ -144,8 +144,8 @@ mip6_ha_list_insert(mha_list, mha)
 
 	if (mip6_ha_count == 0) {
 		mip6_ha_starttimer();
-		mip6log((LOG_INFO, "%s: HA timer started.\n",
-			 __FUNCTION__));
+		mip6log((LOG_INFO, "%s:%d: HA timer started.\n",
+			 __FILE__, __LINE__));
 	}
 	mip6_ha_count++;
 
@@ -340,9 +340,9 @@ mip6_ha_timeout(dummy)
 			error = mip6_ha_list_remove(&mip6_ha_list, mha);
 			if (error) {
 				mip6log((LOG_ERR,
-					 "%s: mha deletion failed "
+					 "%s:%d: mha deletion failed "
 					 "(code %d).\n",
-					 __FUNCTION__, error));
+					 __FILE__, __LINE__, error));
 			}
 		}
 	}

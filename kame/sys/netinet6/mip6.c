@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.62 2001/10/17 07:26:17 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.63 2001/10/17 08:24:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -255,8 +255,8 @@ mip6_process_nd_prefix(saddr, ndpr, dr, m)
 		error = mip6_determine_location_withndpr(sc, saddr, ndpr, dr);
 		if (error) {
 			mip6log((LOG_ERR,
-				 "%s: error while determining location\n",
-				 __FUNCTION__));
+				 "%s:%d: error while determining location\n",
+				 __FILE__, __LINE__));
 			goto process_ndpr_done;
 		}
 		error = mip6_haddr_config(sc, ndpr->ndpr_ifp);
@@ -318,9 +318,8 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 	sc->hif_location = HIF_LOCATION_UNKNOWN;
 	if (!IN6_IS_ADDR_LINKLOCAL(rtaddr)) {
 		mip6log((LOG_NOTICE,
-			 "%s: RA from a non-linklocal router (%s).\n",
-			 __FUNCTION__,
-			 ip6_sprintf(rtaddr)));
+			 "%s:%d: RA from a non-linklocal router (%s).\n",
+			 __FILE__, __LINE__, ip6_sprintf(rtaddr)));
 		return (0);
 	}
 
@@ -333,18 +332,21 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 	if (hsbypfx) {
 		/* we are home. */
 		sc->hif_location = HIF_LOCATION_HOME;
-		mip6log((LOG_INFO, "%s: recv home prefix.  we are home.\n",
-			 __FUNCTION__));
+		mip6log((LOG_INFO,
+			 "%s:%d: recv home prefix.  we are home.\n",
+			 __FILE__, __LINE__));
 	} else if ((hsbypfx == NULL) && hsbyha) {
 		/* we are home. */
 		sc->hif_location = HIF_LOCATION_HOME;
-		mip6log((LOG_INFO, "%s: recv ndpr by home ha.  we are home.\n",
-			 __FUNCTION__));
+		mip6log((LOG_INFO,
+			 "%s:%d: recv ndpr by home ha.  we are home.\n",
+			 __FILE__, __LINE__));
 	} else {
 		/* we are foreign. */
 		sc->hif_location = HIF_LOCATION_FOREIGN;
-		mip6log((LOG_INFO, "%s: we are foreign.\n",
-			 __FUNCTION__));
+		mip6log((LOG_INFO,
+			 "%s:%d: we are foreign.\n",
+			 __FILE__, __LINE__));
 	}
 
 	/* update mip6_prefix_list. */
@@ -366,8 +368,9 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 					  ndpr->ndpr_vltime);
 		if (mpfx == NULL) {
 			mip6log((LOG_ERR,
-				"%s: mip6_prefix memory allocation failed.\n",
-				__FUNCTION__));
+				 "%s:%d: "
+				 "mip6_prefix memory allocation failed.\n",
+				 __FILE__, __LINE__));
 			return (ENOMEM);
 		}
 		error = mip6_prefix_list_insert(&mip6_prefix_list,
@@ -396,8 +399,8 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 				     dr->flags, 0, dr->rtlifetime);
 		if (mha == NULL) {
 			mip6log((LOG_ERR,
-				 "%s: mip6_ha memory allcation failed.\n",
-				 __FUNCTION__));
+				 "%s:%d mip6_ha memory allcation failed.\n",
+				 __FILE__, __LINE__));
 			return (ENOMEM);
 		}
 		error = mip6_ha_list_insert(&mip6_ha_list, mha);
@@ -412,9 +415,9 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 		mspfx = mip6_subnet_prefix_create(mpfx);
 		if (mspfx == NULL) {
 			mip6log((LOG_ERR,
-				 "%s: mip6_subnet_prefix memory allocation "
+				 "%s:%d: mip6_subnet_prefix memory allocation "
 				 "failed.\n",
-				 __FUNCTION__));
+				 __FILE__, __LINE__));
 			return (ENOMEM);
 		}
 	}
@@ -424,9 +427,9 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 		msha = mip6_subnet_ha_create(mha);
 		if (msha == NULL) {
 			mip6log((LOG_ERR,
-				 "%s: mip6_subnet_ha memory allocation "
+				 "%s:%d: mip6_subnet_ha memory allocation "
 				 "failed.\n",
-				 __FUNCTION__));
+				 __FILE__, __LINE__));
 			return (ENOMEM);
 		}
 	}
@@ -442,9 +445,9 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 		if (ms == NULL) {
 			/* must not happen. */
 			mip6log((LOG_ERR,
-				 "%s: mha_is_new == 0, "
+				 "%s:%d: mha_is_new == 0, "
 				 "mip6_subnet should be exist!\n",
-				 __FUNCTION__));
+				 __FILE__, __LINE__));
 			return (EINVAL);
 		}
 		error = mip6_subnet_prefix_list_insert(&ms->ms_mspfx_list,
@@ -466,9 +469,10 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 		if (ms == NULL) {
 			/* must not happen. */
 			mip6log((LOG_ERR,
-				 "%s: mpfx_is_new == 0, "
+				 "%s:%d: mip6_determine_location_withndpr: "
+				 "mpfx_is_new == 0, "
 				 "mip6_subnet should be exist!\n",
-				 __FUNCTION__));
+				 __FILE__, __LINE__));
 			return (EINVAL);
 		}
 		error = mip6_subnet_ha_list_insert(&ms->ms_msha_list,
@@ -486,8 +490,9 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 		ms = mip6_subnet_create();
 		if (ms == NULL) {
 			mip6log((LOG_ERR,
-				 "%s: mip6_subnet memory allcation failed.\n",
-				 __FUNCTION__));
+				 "%s:%d: mip6_determine_location_withndpr: "
+				 "mip6_subnet memory allcation failed.\n",
+				 __FILE__, __LINE__));
 			return (ENOMEM);
 		}
 		error = mip6_subnet_list_insert(&mip6_subnet_list, ms);
@@ -511,8 +516,9 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 		hs = hif_subnet_create(ms);
 		if (hs == NULL) {
 			mip6log((LOG_ERR,
-				 "%s: hif_subnet memory allocation failed.\n",
-				 __FUNCTION__));
+				 "%s:%d: mip6_determine_location_withndpr: "
+				 "hif_subnet memory allocation failed.\n",
+				 __FILE__, __LINE__));
 			return (ENOMEM);
 		}
 		if (sc->hif_location == HIF_LOCATION_HOME) {
@@ -608,7 +614,9 @@ mip6_haddr_config(sc, ifp)
 		}
 		break;
 	case HIF_LOCATION_UNKNOWN:
-		mip6log((LOG_ERR, "UNKNOWN location??\n"));
+		mip6log((LOG_ERR,
+			 "%s:%d: UNKNOWN location??\n",
+			 __FILE__, __LINE__));
 		/* XXX what should we do? */
 		break;
 	}
@@ -706,8 +714,8 @@ mip6_select_coa(preferedifp)
 	}
 
 	mip6log((LOG_INFO,
-		 "%s: prefered ifp is %s(%p)\n",
-		 __FUNCTION__,
+		 "%s:%d: prefered ifp is %s(%p)\n",
+		 __FILE__, __LINE__,
 		 if_name(preferedifp), preferedifp));
 	
 	hcoa = hif_coa_list_find_withifp(&hif_coa_list, preferedifp);
@@ -723,8 +731,9 @@ mip6_select_coa(preferedifp)
 		}
 	}
 	mip6log((LOG_INFO,
-		 "%s: hifcoa = %p, hifcoa->ifp = %s(%p)\n",
-		 __FUNCTION__, hcoa, if_name(hcoa->hcoa_ifp), hcoa->hcoa_ifp));
+		 "%s:%d: hifcoa = %p, hifcoa->ifp = %s(%p)\n",
+		 __FILE__, __LINE__,
+		 hcoa, if_name(hcoa->hcoa_ifp), hcoa->hcoa_ifp));
 
 	/*
 	 * XXX TODO
@@ -736,8 +745,9 @@ mip6_select_coa(preferedifp)
 		goto select_coa_end;
 	}
 	mip6log((LOG_INFO,
-		 "%s: new CoA is %s\n",
-		 __FUNCTION__, ip6_sprintf(&ia6->ia_addr.sin6_addr)));
+		 "%s:%d: new CoA is %s\n",
+		 __FILE__, __LINE__,
+		 ip6_sprintf(&ia6->ia_addr.sin6_addr)));
 
 	if (!IN6_ARE_ADDR_EQUAL(&hif_coa, &ia6->ia_addr.sin6_addr)) {
 		hif_coa = ia6->ia_addr.sin6_addr;
@@ -788,8 +798,10 @@ mip6_remove_addrs(ifp)
 			continue;
 
 		if (mip6_remove_addr(ifp, ia6) != 0) {
-			mip6log((LOG_ERR, "address deletion (%s) failed\n",
-			    ip6_sprintf(&ia6->ia_addr.sin6_addr)));
+			mip6log((LOG_ERR,
+				 "%s:%d: address deletion (%s) failed\n",
+				 __FILE__, __LINE__,
+				 ip6_sprintf(&ia6->ia_addr.sin6_addr)));
 			continue;
 		}
 	}
@@ -812,8 +824,9 @@ mip6_attach_haddrs(sc, ifp)
 	error = mip6_remove_haddrs(sc, ifp);
 	if (error) {
 		mip6log((LOG_ERR,
-			 "%s: remove haddrs from %s failed.\n",
-			 __FUNCTION__, if_name(ifp)));
+			 "%s:%d: remove haddrs from %s failed.\n",
+			 __FILE__, __LINE__,
+			 if_name(ifp)));
 		return (error);
 	}
 
@@ -821,8 +834,9 @@ mip6_attach_haddrs(sc, ifp)
 	error = mip6_add_haddrs(sc, (struct ifnet *)sc);
 	if (error) {
 		mip6log((LOG_ERR,
-			 "%s: add haddrs to %s failed.\n",
-			 __FUNCTION__, if_name((struct ifnet*)sc)));
+			 "%s:%d: add haddrs to %s failed.\n",
+			 __FILE__, __LINE__,
+			 if_name((struct ifnet*)sc)));
 		return (error);
 	}
 
@@ -888,7 +902,8 @@ mip6_remove_haddrs(sc, ifp)
 				}
 				error = mip6_remove_addr(ifp, ia6);
 				if (error) {
-					mip6log((LOG_ERR, "deletion %s from %s failed\n",
+					mip6log((LOG_ERR, "%s:%d: deletion %s from %s failed\n",
+						 __FILE__, __LINE__,
 						 if_name(ifp),
 						 ip6_sprintf(&ia6->ia_addr.sin6_addr)));
 					continue;
@@ -943,8 +958,8 @@ mip6_detach_haddrs(sc, ifp)
 		error = mip6_remove_addr(hif_ifp, ia6);
 		if (error) {
 			mip6log((LOG_ERR,
-				 "%s: address deletion failed (%s)\n",
-				 __FUNCTION__,
+				 "%s:%d: address deletion failed (%s)\n",
+				 __FILE__, __LINE__,
 				 ip6_sprintf(&ia6->ia_addr.sin6_addr)));
 			return (error);
 		}
@@ -993,8 +1008,8 @@ mip6_add_haddrs(sc, ifp)
 				error = mip6_prefix_haddr_assign(mpfx, sc);
 				if (error) {
 					mip6log((LOG_ERR,
-						 "%s: can't assign home address for prefix %s.\n",
-						 __FUNCTION__,
+						 "%s:d: can't assign home address for prefix %s.\n",
+						 __FILE__, __LINE__,
 						 ip6_sprintf(&mpfx->mpfx_prefix)));
 					return (error);
 				}
@@ -1034,7 +1049,8 @@ mip6_add_haddrs(sc, ifp)
 #endif
 			{
 				mip6log((LOG_ERR,
-					 "add address failed (%s)\n",
+					 "%s:%d: add address failed (%s)\n",
+					 __FILE__, __LINE__,
 					 ip6_sprintf(&ifra.ifra_addr.sin6_addr)));
 				return (error);
 			}
@@ -1066,8 +1082,10 @@ mip6_remove_addr(ifp, ia6)
 	if (in6_control(NULL, SIOCDIFADDR_IN6, (caddr_t)&ifra, ifp))
 #endif
 	{
-		mip6log((LOG_ERR, "in6_control delete addr failed (%s)\n",
-		    ip6_sprintf(&ifra.ifra_addr.sin6_addr)));
+		mip6log((LOG_ERR,
+			 "%s:%d: in6_control delete addr failed (%s)\n",
+			 __FILE__, __LINE__,
+			 ip6_sprintf(&ifra.ifra_addr.sin6_addr)));
 		error = -1;
 	}
 
@@ -1083,12 +1101,16 @@ mip6_ioctl(cmd, data)
 
 	switch (cmd) {
 	case SIOCENABLEMN:
-		mip6log((LOG_INFO, "MN function enabled\n"));
+		mip6log((LOG_INFO,
+			 "%s:%d: MN function enabled\n",
+			 __FILE__, __LINE__));
 		mip6_config.mcfg_type = MIP6_CONFIG_TYPE_MN;
 		break;
 
 	case SIOCENABLEHA:
-		mip6log((LOG_INFO, "HA function enabled\n"));
+		mip6log((LOG_INFO,
+			 "%s:%d: HA function enabled\n",
+			 __FILE__, __LINE__));
 		mip6_config.mcfg_type = MIP6_CONFIG_TYPE_HA;
 		break;
 
@@ -1228,8 +1250,8 @@ mip6_exthdr_create(m, opt, mip6opt)
 		error = mip6_rthdr_create_withdst(&mip6opt->mip6po_rthdr, dst);
 		if (error) {
 			mip6log((LOG_ERR,
-				 "%s: rthdr creation failed.\n",
-				 __FUNCTION__));
+				 "%s:%d: rthdr creation failed.\n",
+				 __FILE__, __LINE__));
 			goto bad;
 		}
 	}
@@ -1283,8 +1305,8 @@ mip6_exthdr_create(m, opt, mip6opt)
 				       src, dst, opt, sc);
 	if (error) {
 		mip6log((LOG_ERR,
-			 "%s: BU destopt insertion failed.\n",
-			 __FUNCTION__));
+			 "%s:%d: BU destopt insertion failed.\n",
+			 __FILE__, __LINE__));
 		goto bad;
 	}
 
@@ -1293,8 +1315,8 @@ mip6_exthdr_create(m, opt, mip6opt)
 					  src, dst, sc);
 	if (error) {
 		mip6log((LOG_ERR,
-			 "%s: homeaddress insertion failed.\n",
-			 __FUNCTION__));
+			 "%s:%d: homeaddress insertion failed.\n",
+			 __FILE__, __LINE__));
 		
 		goto bad;
 	}
@@ -1409,8 +1431,8 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		 * is known.
 		 */
 		mip6log((LOG_INFO,
-			 "%s: the peer addr is unspecified.\n",
-			 __FUNCTION__));
+			 "%s:%d: the peer addr is unspecified.\n",
+			 __FILE__, __LINE__));
 		mip6_icmp6_ha_discov_req_output(sc);
 		return (0);
 	}
@@ -1871,8 +1893,8 @@ mip6_addr_exchange(m, dstm)
 	dstoptlen = (dstopt->ip6d_len + 1) << 3;
 	if (dstoptlen > dstm->m_len) {
 		mip6log((LOG_ERR,
-			 "%s: haddr destopt illegal mbuf length.\n",
-			 __FUNCTION__));
+			 "%s:%d: haddr destopt illegal mbuf length.\n",
+			 __FILE__, __LINE__));
 		return (EINVAL);
 	}
 
@@ -1899,8 +1921,8 @@ mip6_addr_exchange(m, dstm)
 
 	if (haopt == NULL) {
 		mip6log((LOG_INFO,
-			 "%s: haddr dest opt not found.\n",
-			 __FUNCTION__));
+			 "%s:d: haddr dest opt not found.\n",
+			 __FILE__, __LINE__));
 		return (0);
 	}
 
@@ -1932,22 +1954,22 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 		error = mip6_validate_bu(m, opt);
 		if (error == -1) {
 			mip6log((LOG_ERR,
-				 "%s: invalid BU received.\n",
-				 __FUNCTION__));
+				 "%s:%d: invalid BU received.\n",
+				 __FILE__, __LINE__));
 			goto bad;
 		}
 		if (error == 1) {
 			/* invalid BU.  we ignore this silently */
 			mip6log((LOG_NOTICE,
-				 "%s: invalid BU received.  ignore this.\n",
-				 __FUNCTION__));
+				 "%s:d: invalid BU received.  ignore this.\n",
+				 __FILE__, __LINE__));
 			return (0);
 		}
 
 		if (mip6_process_bu(m, opt) != 0) {
 			mip6log((LOG_ERR,
-				 "%s: processing BU failed\n",
-				 __FUNCTION__));
+				 "%s:d: processing BU failed\n",
+				 __FILE__, __LINE__));
 			goto bad;
 		}
 		break;
@@ -1964,22 +1986,22 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 		error = mip6_validate_ba(m, opt);
 		if (error == -1) {
 			mip6log((LOG_ERR,
-				 "%s: invalid BA received.\n",
-				 __FUNCTION__));
+				 "%s:%d: invalid BA received.\n",
+				 __FILE__, __LINE__));
 			goto bad;
 		}
 		if (error == 1) {
 			/* invalid BA.  we ignore this silently */
 			mip6log((LOG_NOTICE,
-				 "%s: invalid BA received.  ignore this.\n",
-				 __FUNCTION__));
+				 "%s:%d: invalid BA received.  ignore this.\n",
+				 __FILE__, __LINE__));
 			return (0);
 		}
 
 		if (mip6_process_ba(m, opt) != 0) {
 			mip6log((LOG_ERR,
-				 "%s: processing BA failed\n",
-				 __FUNCTION__));
+				 "%s:%d: processing BA failed\n",
+				 __FILE__, __LINE__));
 			goto bad;
 		}
 		break;
@@ -1990,15 +2012,15 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 		
 		if (mip6_validate_br(m, opt)) {
 			mip6log((LOG_ERR,
-				 "%s: invalid BR received\n",
-				 __FUNCTION__));
+				 "%s:%d: invalid BR received\n",
+				 __FILE__, __LINE__));
 			goto bad;
 		}
 
 		if (mip6_process_br(m, opt) != 0) {
 			mip6log((LOG_ERR,
-				 "%s: processing BR failed\n",
-				 __FUNCTION__));
+				 "%s:%d: processing BR failed\n",
+				 __FILE__, __LINE__));
 			goto bad;
 		}
 		break;
