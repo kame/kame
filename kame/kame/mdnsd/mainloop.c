@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.6 2000/05/30 15:55:35 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.7 2000/05/30 16:13:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -27,6 +27,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+
+/*
+ * TODO:
+ * - query timeout
+ * - negative cache on explicit failure reply, or query timeout
+ * - attach additional section on reply
+ * - random delay before reply
+ * - spec conformance check
+ * - EDNS0 receiver buffer size notification
  */
 
 #include <sys/types.h>
