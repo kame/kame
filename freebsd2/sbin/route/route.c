@@ -871,10 +871,10 @@ getaddr(which, s, hpp)
 				 * freeifaddrs().
 				 */
 				memcpy(&su->sdl, sdl, sdl->sdl_len);
-				return(1);
 			}
-
 			freeifaddrs(ifap);
+			if (sdl)
+				return(1);
 		}
 		break;
 	case RTA_NETMASK:
