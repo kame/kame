@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.41 2002/07/13 17:55:24 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.42 2002/07/26 11:51:46 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -536,8 +536,7 @@ int mip6_process_br			__P((struct mbuf *, u_int8_t *));
 
 /* binding cache management */
 void mip6_bc_init			__P((void));
-int mip6_bc_register			__P((struct mip6_bc *,
-					     struct sockaddr_in6 *,
+int mip6_bc_register			__P((struct sockaddr_in6 *,
 					     struct sockaddr_in6 *,
 					     struct sockaddr_in6 *,
 					     u_int16_t, u_int16_t, u_int32_t));

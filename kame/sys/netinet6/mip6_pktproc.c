@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.29 2002/07/26 02:36:11 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.30 2002/07/26 11:51:46 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -719,8 +719,7 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen, mbc)
 		/* request to cache/remove a binding for CN. */
 		if (IS_REQUEST_TO_CACHE(lifetime, &hoa_sa, coa_sa)) {
 			if (mbc == NULL)
-				error = mip6_bc_register(mbc, &hoa_sa, coa_sa,
-							 dst_sa,
+				error = mip6_bc_register(src_sa, coa_sa, dst_sa,
 							 ip6mu->ip6mu_flags,
 							 seqno, lifetime);
 			else

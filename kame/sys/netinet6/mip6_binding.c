@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.110 2002/07/24 08:53:36 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.111 2002/07/26 11:51:46 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1847,8 +1847,7 @@ mip6_bc_init()
 }
 
 int
-mip6_bc_register(mbc, hoa_sa, coa_sa, dst_sa, flags, seqno, lifetime)
-	struct mip6_bc *mbc;
+mip6_bc_register(hoa_sa, coa_sa, dst_sa, flags, seqno, lifetime)
 	struct sockaddr_in6 *hoa_sa;
 	struct sockaddr_in6 *coa_sa;
 	struct sockaddr_in6 *dst_sa;
@@ -1856,6 +1855,8 @@ mip6_bc_register(mbc, hoa_sa, coa_sa, dst_sa, flags, seqno, lifetime)
 	u_int16_t seqno;
 	u_int32_t lifetime;
 {
+	struct mip6_bc *mbc;
+
 	/* create a binding cache entry. */
 	mbc = mip6_bc_create(hoa_sa, coa_sa, dst_sa,
 			     flags, seqno, lifetime, NULL);
@@ -2040,7 +2041,7 @@ mip6_bc_list_insert(mbc_list, mbc)
 	int id = MIP6_BC_HASH_ID(&mbc->mbc_phaddr.sin6_addr);
 
 	if (mip6_bc_hash[id] != NULL) {
-		LIST_INSERT_BEFORE(mbc, mip6_bc_hash[id], mbc_entry);
+		LIST_INSERT_BEFORE(mip6_bc_hash[id], mbc, mbc_entry);
 	} else {
 		LIST_INSERT_HEAD(mbc_list, mbc, mbc_entry);
 	}
