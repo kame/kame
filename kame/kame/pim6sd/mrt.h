@@ -273,9 +273,9 @@ typedef struct mrtentry {
  */
 
 struct sg_count {
-	u_long 					pktcnt;				/*  Number of packets for (s,g) */
-	u_long 					bytecnt;			/*  Number of bytes for (s,g)   */
-	u_long 					wrong_if;		 	/*  Number of packets received on wrong iif for (s,g) */	
+	u_quad_t pktcnt;	/*  Number of packets for (s,g) */
+	u_quad_t bytecnt;	/*  Number of bytes for (s,g)   */
+	u_quad_t wrong_if;	/*  Number of packets received on wrong iif for (s,g) */	
 };
 
 /*
