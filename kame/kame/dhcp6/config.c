@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.47 2004/11/28 10:48:38 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.48 2004/12/02 13:00:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -1157,7 +1157,7 @@ configure_commit()
 			clear_iaconf(&ifp->iaconf_list);
 			while ((iac = TAILQ_FIRST(&ifc->iaconf_list))
 			    != NULL) {
-				TAILQ_REMOVE(&ia_conflist0, iac, link);
+				TAILQ_REMOVE(&ifc->iaconf_list, iac, link);
 				TAILQ_INSERT_TAIL(&ifp->iaconf_list,
 				    iac, link);
 			}
