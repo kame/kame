@@ -1,4 +1,4 @@
-/*	$NetBSD: igmp.c,v 1.28 2002/05/12 20:33:50 matt Exp $	*/
+/*	$NetBSD: igmp.c,v 1.28.4.2 2003/07/02 14:02:43 tron Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -76,7 +76,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: igmp.c,v 1.28 2002/05/12 20:33:50 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: igmp.c,v 1.28.4.2 2003/07/02 14:02:43 tron Exp $");
 
 #include "opt_mrouting.h"
 
@@ -193,7 +193,7 @@ int igmp_create_group_record __P((struct mbuf *, int *, struct in_multi *,
 void igmp_cancel_pending_response __P((struct ifnet *, struct router_info *));
 static int rti_fill __P((struct in_multi *));
 static struct router_info *rti_find __P((struct ifnet *));
-static void rti_delete(struct ifnet *);
+static void rti_delete __P((struct ifnet *));
 
 void
 igmp_init()

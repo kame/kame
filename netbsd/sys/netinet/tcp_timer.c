@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_timer.c,v 1.57 2001/11/13 00:32:42 lukem Exp $	*/
+/*	$NetBSD: tcp_timer.c,v 1.57.10.2 2003/10/22 06:06:05 jmc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,7 +102,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tcp_timer.c,v 1.57 2001/11/13 00:32:42 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tcp_timer.c,v 1.57.10.2 2003/10/22 06:06:05 jmc Exp $");
 
 #include "opt_inet.h"
 #include "opt_tcp_debug.h"
@@ -197,6 +197,24 @@ tcp_timer_init(void)
 }
 
 /*
+ * Return how many timers are currently being invoked.
+ */
+int
+tcp_timers_invoking(struct tcpcb *tp)
+{
+	int i;
+	int count = 0;
+
+	for (i = 0; i < TCPT_NTIMERS; i++)
+		if (callout_invoking(&tp->t_timer[i]))
+			count++;
+	if (callout_invoking(&tp->t_delack_ch))
+		count++;
+
+	return count;
+}
+
+/*
  * Callout to process delayed ACKs for a TCPCB.
  */
 void
@@ -212,6 +230,12 @@ tcp_delack(void *arg)
 	 */
 
 	s = splsoftnet();
+	callout_ack(&tp->t_delack_ch);
+	if (tcp_isdead(tp)) {
+		splx(s);
+		return;
+	}
+
 	tp->t_flags |= TF_ACKNOW;
 	(void) tcp_output(tp);
 	splx(s);
@@ -268,6 +292,11 @@ tcp_timer_rexmt(void *arg)
 #endif
 
 	s = splsoftnet();
+	callout_ack(&tp->t_timer[TCPT_KEEP]);
+	if (tcp_isdead(tp)) {
+		splx(s);
+		return;
+	}
 
 	callout_deactivate(&tp->t_timer[TCPT_REXMT]);
 
@@ -434,6 +463,11 @@ tcp_timer_persist(void *arg)
 #endif
 
 	s = splsoftnet();
+	callout_ack(&tp->t_timer[TCPT_PERSIST]);
+	if (tcp_isdead(tp)) {
+		splx(s);
+		return;
+	}
 
 	callout_deactivate(&tp->t_timer[TCPT_PERSIST]);
 
@@ -498,6 +532,11 @@ tcp_timer_keep(void *arg)
 #endif
 
 	s = splsoftnet();
+	callout_ack(&tp->t_timer[TCPT_KEEP]);
+	if (tcp_isdead(tp)) {
+		splx(s);
+		return;
+	}
 
 	callout_deactivate(&tp->t_timer[TCPT_KEEP]);
 
@@ -582,6 +621,11 @@ tcp_timer_2msl(void *arg)
 #endif
 
 	s = splsoftnet();
+	callout_ack(&tp->t_timer[TCPT_2MSL]);
+	if (tcp_isdead(tp)) {
+		splx(s);
+		return;
+	}
 
 	callout_deactivate(&tp->t_timer[TCPT_2MSL]);
 

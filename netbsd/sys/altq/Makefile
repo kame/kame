@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.1 1998/06/12 23:23:07 cgd Exp $
+#	$NetBSD: Makefile,v 1.1 2000/12/15 01:20:32 thorpej Exp $
 
 KDIR=	/sys/altq
 INCSDIR= /usr/include/altq

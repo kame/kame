@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_output.c,v 1.95.10.2 2002/11/01 12:14:28 tron Exp $	*/
+/*	$NetBSD: ip_output.c,v 1.95.10.3 2003/06/30 03:25:22 grant Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -133,7 +133,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ip_output.c,v 1.95.10.2 2002/11/01 12:14:28 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ip_output.c,v 1.95.10.3 2003/06/30 03:25:22 grant Exp $");
 
 #include "opt_pfil_hooks.h"
 #include "opt_ipsec.h"

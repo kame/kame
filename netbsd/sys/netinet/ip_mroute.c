@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_mroute.c,v 1.59.8.1 2002/08/02 00:39:23 lukem Exp $	*/
+/*	$NetBSD: ip_mroute.c,v 1.59.8.4 2003/07/11 14:23:40 tron Exp $	*/
 
 /*
  * Copyright (c) 1989 Stephen Deering
@@ -54,7 +54,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ip_mroute.c,v 1.59.8.1 2002/08/02 00:39:23 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ip_mroute.c,v 1.59.8.4 2003/07/11 14:23:40 tron Exp $");
 
 #include "opt_ipsec.h"
 
@@ -482,6 +482,32 @@ ip_mrouter_init(so, m)
 		log(LOG_DEBUG, "ip_mrouter_init\n");
 
 	return (0);
+}
+
+void
+ip_mrouter_detach(ifp)
+	struct ifnet *ifp;
+{
+	int vifi, i;
+	struct vif *vifp;
+	struct mfc *rt;
+	struct rtdetq *rte;
+
+	/* XXX not sure about sideeffect to userland routing daemon */
+	for (vifi = 0; vifi < numvifs; vifi++) {
+		vifp = &viftable[vifi];
+		if (vifp->v_ifp == ifp)
+			reset_vif(vifp);
+	}
+	for (i = 0; i < MFCTBLSIZ; i++) {
+		if (nexpire[i] == 0)
+			continue;
+		LIST_FOREACH(rt, &mfchashtbl[i], mfc_hash) {
+			for (rte = rt->mfc_stall; rte; rte = rte->next)
+				if (rte->ifp == ifp)
+					rte->ifp = NULL;
+		}
+	}
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_bge.c,v 1.29.2.1 2003/01/28 06:19:13 jmc Exp $	*/
+/*	$NetBSD: if_bge.c,v 1.29.2.5 2003/10/20 05:02:44 cyber Exp $	*/
 
 /*
  * Copyright (c) 2001 Wind River Systems
@@ -886,8 +886,7 @@ bge_init_rx_ring_jumbo(sc)
 	struct bge_softc *sc;
 {
 	int i;
-	struct bge_rcb *rcb;
-	struct bge_rcb_opaque *rcbo;
+	volatile struct bge_rcb *rcb;
 
 	for (i = 0; i < BGE_JUMBO_RX_RING_CNT; i++) {
 		if (bge_newbuf_jumbo(sc, i, NULL) == ENOBUFS)
@@ -897,9 +896,8 @@ bge_init_rx_ring_jumbo(sc)
 	sc->bge_jumbo = i - 1;
 
 	rcb = &sc->bge_rdata->bge_info.bge_jumbo_rx_rcb;
-	rcbo = (struct bge_rcb_opaque *)rcb;
-	rcb->bge_flags = 0;
-	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_MAXLEN_FLAGS, rcbo->bge_reg2);
+	rcb->bge_maxlen_flags = 0;
+	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_MAXLEN_FLAGS, rcb->bge_maxlen_flags);
 
 	CSR_WRITE_4(sc, BGE_MBX_RX_JUMBO_PROD_LO, sc->bge_jumbo);
 
@@ -1258,8 +1256,7 @@ int
 bge_blockinit(sc)
 	struct bge_softc *sc;
 {
-	struct bge_rcb		*rcb;
-	struct bge_rcb_opaque	*rcbo;
+	volatile struct bge_rcb		*rcb;
 	bus_size_t		rcb_addr;
 	int			i;
 	struct ifnet		*ifp = &sc->ethercom.ec_if;
@@ -1342,17 +1339,15 @@ bge_blockinit(sc)
 	rcb = &sc->bge_rdata->bge_info.bge_std_rx_rcb;
 	bge_set_hostaddr(&rcb->bge_hostaddr,
 	    BGE_RING_DMA_ADDR(sc, bge_rx_std_ring));
-	rcb->bge_max_len = BGE_MAX_FRAMELEN;
+	rcb->bge_maxlen_flags = BGE_RCB_MAXLEN_FLAGS(BGE_MAX_FRAMELEN, 0);
 	if (sc->bge_extram)
 		rcb->bge_nicaddr = BGE_EXT_STD_RX_RINGS;
 	else
 		rcb->bge_nicaddr = BGE_STD_RX_RINGS;
-	rcb->bge_flags = 0;
-	rcbo = (struct bge_rcb_opaque *)rcb;
-	CSR_WRITE_4(sc, BGE_RX_STD_RCB_HADDR_HI, rcbo->bge_reg0);
-	CSR_WRITE_4(sc, BGE_RX_STD_RCB_HADDR_LO, rcbo->bge_reg1);
-	CSR_WRITE_4(sc, BGE_RX_STD_RCB_MAXLEN_FLAGS, rcbo->bge_reg2);
-	CSR_WRITE_4(sc, BGE_RX_STD_RCB_NICADDR, rcbo->bge_reg3);
+	CSR_WRITE_4(sc, BGE_RX_STD_RCB_HADDR_HI, rcb->bge_hostaddr.bge_addr_hi);
+	CSR_WRITE_4(sc, BGE_RX_STD_RCB_HADDR_LO, rcb->bge_hostaddr.bge_addr_lo);
+	CSR_WRITE_4(sc, BGE_RX_STD_RCB_MAXLEN_FLAGS, rcb->bge_maxlen_flags);
+	CSR_WRITE_4(sc, BGE_RX_STD_RCB_NICADDR, rcb->bge_nicaddr);
 
 	/*
 	 * Initialize the jumbo RX ring control block
@@ -1364,24 +1359,23 @@ bge_blockinit(sc)
 	rcb = &sc->bge_rdata->bge_info.bge_jumbo_rx_rcb;
 	bge_set_hostaddr(&rcb->bge_hostaddr,
 	    BGE_RING_DMA_ADDR(sc, bge_rx_jumbo_ring));
-	rcb->bge_max_len = BGE_MAX_FRAMELEN;
+	rcb->bge_maxlen_flags = 
+	   BGE_RCB_MAXLEN_FLAGS(BGE_MAX_FRAMELEN, BGE_RCB_FLAG_RING_DISABLED);
 	if (sc->bge_extram)
 		rcb->bge_nicaddr = BGE_EXT_JUMBO_RX_RINGS;
 	else
 		rcb->bge_nicaddr = BGE_JUMBO_RX_RINGS;
-	rcb->bge_flags = BGE_RCB_FLAG_RING_DISABLED;
 
-	rcbo = (struct bge_rcb_opaque *)rcb;
-	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_HADDR_HI, rcbo->bge_reg0);
-	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_HADDR_LO, rcbo->bge_reg1);
-	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_MAXLEN_FLAGS, rcbo->bge_reg2);
-	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_NICADDR, rcbo->bge_reg3);
+	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_HADDR_HI, rcb->bge_hostaddr.bge_addr_hi);
+	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_HADDR_LO, rcb->bge_hostaddr.bge_addr_lo);
+	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_MAXLEN_FLAGS, rcb->bge_maxlen_flags);
+	CSR_WRITE_4(sc, BGE_RX_JUMBO_RCB_NICADDR, rcb->bge_nicaddr);
 
 	/* Set up dummy disabled mini ring RCB */
 	rcb = &sc->bge_rdata->bge_info.bge_mini_rx_rcb;
-	rcb->bge_flags = BGE_RCB_FLAG_RING_DISABLED;
-	rcbo = (struct bge_rcb_opaque *)rcb;
-	CSR_WRITE_4(sc, BGE_RX_MINI_RCB_MAXLEN_FLAGS, rcbo->bge_reg2);
+	rcb->bge_maxlen_flags = BGE_RCB_MAXLEN_FLAGS(0,
+	    BGE_RCB_FLAG_RING_DISABLED);
+	CSR_WRITE_4(sc, BGE_RX_MINI_RCB_MAXLEN_FLAGS, rcb->bge_maxlen_flags);
 
 	bus_dmamap_sync(sc->bge_dmatag, sc->bge_ring_map,
 	    offsetof(struct bge_ring_data, bge_info), sizeof (struct bge_gib),
@@ -1402,9 +1396,8 @@ bge_blockinit(sc)
 	 */
 	rcb_addr = BGE_MEMWIN_START + BGE_SEND_RING_RCB;
 	for (i = 0; i < BGE_TX_RINGS_EXTSSRAM_MAX; i++) {
-		RCB_WRITE_2(sc, rcb_addr, bge_flags,
-			    BGE_RCB_FLAG_RING_DISABLED);
-		RCB_WRITE_2(sc, rcb_addr, bge_max_len, 0);
+		RCB_WRITE_4(sc, rcb_addr, bge_maxlen_flags,
+		    BGE_RCB_MAXLEN_FLAGS(0,BGE_RCB_FLAG_RING_DISABLED));
 		RCB_WRITE_4(sc, rcb_addr, bge_nicaddr, 0);
 		rcb_addr += sizeof(struct bge_rcb);
 	}
@@ -1416,17 +1409,17 @@ bge_blockinit(sc)
 	RCB_WRITE_4(sc, rcb_addr, bge_hostaddr.bge_addr_lo, taddr.bge_addr_lo);
 	RCB_WRITE_4(sc, rcb_addr, bge_nicaddr,
 		    BGE_NIC_TXRING_ADDR(0, BGE_TX_RING_CNT));
-	RCB_WRITE_2(sc, rcb_addr, bge_max_len, BGE_TX_RING_CNT);
-	RCB_WRITE_2(sc, rcb_addr, bge_flags, 0);
+	RCB_WRITE_4(sc, rcb_addr, bge_maxlen_flags, 
+	    BGE_RCB_MAXLEN_FLAGS(BGE_TX_RING_CNT, 0));
 
 	/* Disable all unused RX return rings */
 	rcb_addr = BGE_MEMWIN_START + BGE_RX_RETURN_RING_RCB;
 	for (i = 0; i < BGE_RX_RINGS_MAX; i++) {
 		RCB_WRITE_4(sc, rcb_addr, bge_hostaddr.bge_addr_hi, 0);
 		RCB_WRITE_4(sc, rcb_addr, bge_hostaddr.bge_addr_lo, 0);
-		RCB_WRITE_2(sc, rcb_addr, bge_flags,
-			    BGE_RCB_FLAG_RING_DISABLED);
-		RCB_WRITE_2(sc, rcb_addr, bge_max_len, BGE_RETURN_RING_CNT);
+		RCB_WRITE_4(sc, rcb_addr, bge_maxlen_flags, 
+			    BGE_RCB_MAXLEN_FLAGS(BGE_RETURN_RING_CNT,
+                                     BGE_RCB_FLAG_RING_DISABLED));
 		RCB_WRITE_4(sc, rcb_addr, bge_nicaddr, 0);
 		CSR_WRITE_4(sc, BGE_MBX_RX_CONS0_LO +
 		    (i * (sizeof(u_int64_t))), 0);
@@ -1449,8 +1442,8 @@ bge_blockinit(sc)
 	RCB_WRITE_4(sc, rcb_addr, bge_hostaddr.bge_addr_hi, taddr.bge_addr_hi);
 	RCB_WRITE_4(sc, rcb_addr, bge_hostaddr.bge_addr_lo, taddr.bge_addr_lo);
 	RCB_WRITE_4(sc, rcb_addr, bge_nicaddr, 0x00000000);
-	RCB_WRITE_2(sc, rcb_addr, bge_max_len, BGE_RETURN_RING_CNT);
-	RCB_WRITE_2(sc, rcb_addr, bge_flags, 0);
+	RCB_WRITE_4(sc, rcb_addr, bge_maxlen_flags,
+	    BGE_RCB_MAXLEN_FLAGS(BGE_RETURN_RING_CNT,0));
 
 	/* Set random backoff seed for TX */
 	CSR_WRITE_4(sc, BGE_TX_RANDOM_BACKOFF,
@@ -1600,9 +1593,6 @@ bge_blockinit(sc)
 	CSR_WRITE_4(sc, BGE_SDI_STATS_ENABLE_MASK, 0x007FFFFF);
 	CSR_WRITE_4(sc, BGE_SDI_STATS_CTL,
 	    BGE_SDISTATSCTL_ENABLE|BGE_SDISTATSCTL_FASTER);
-
-	/* init LED register */
-	CSR_WRITE_4(sc, BGE_MAC_LED_CTL, 0x00000000);
 
 	/* ack/clear link change events */
 	CSR_WRITE_4(sc, BGE_MAC_STS, BGE_MACSTAT_SYNC_CHANGED|
@@ -2099,14 +2089,20 @@ bge_attach(parent, self, aux)
 
 	/*
 	 * Figure out what sort of media we have by checking the
-	 * hardware config word in the EEPROM. Note: on some BCM5700
+	 * hardware config word in the first 32k of NIC internal memory,
+	 * or fall back to the config word in the EEPROM. Note: on some BCM5700
 	 * cards, this value appears to be unset. If that's the
 	 * case, we have to rely on identifying the NIC by its PCI
 	 * subsystem ID, as we do below for the SysKonnect SK-9D41.
 	 */
-	bge_read_eeprom(sc, (caddr_t)&hwcfg,
+	if (bge_readmem_ind(sc, BGE_SOFTWARE_GENCOMM_SIG) == BGE_MAGIC_NUMBER) {
+		hwcfg = bge_readmem_ind(sc, BGE_SOFTWARE_GENCOMM_NICCFG);
+	} else {
+		bge_read_eeprom(sc, (caddr_t)&hwcfg,
 		    BGE_EE_HWCFG_OFFSET, sizeof(hwcfg));
-	if ((be32toh(hwcfg) & BGE_HWCFG_MEDIA) == BGE_MEDIA_FIBER)
+		hwcfg = be32toh(hwcfg);
+	}
+	if ((hwcfg & BGE_HWCFG_MEDIA) == BGE_MEDIA_FIBER)
 		sc->bge_tbi = 1;
 
 	/* The SysKonnect SK-9D41 is a 1000baseSX card. */
@@ -2577,7 +2573,6 @@ bge_tick(xsc)
 		    BGE_MACSTAT_TBI_PCS_SYNCHED) {
 			sc->bge_link++;
 			CSR_WRITE_4(sc, BGE_MAC_STS, 0xFFFFFFFF);
-			printf("%s: gigabit link up\n", sc->bge_dev.dv_xname);
 			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				bge_start(ifp);
 		}
@@ -2590,9 +2585,6 @@ bge_tick(xsc)
 	if (!sc->bge_link && mii->mii_media_status & IFM_ACTIVE &&
 	    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 		sc->bge_link++;
-		if (IFM_SUBTYPE(mii->mii_media_active) == IFM_1000_T ||
-		    IFM_SUBTYPE(mii->mii_media_active) == IFM_1000_SX)
-			printf("%s: gigabit link up\n", sc->bge_dev.dv_xname);
 		if (!IFQ_IS_EMPTY(&ifp->if_snd))
 			bge_start(ifp);
 	}

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_sip.c,v 1.52.4.7 2002/11/21 18:28:15 he Exp $	*/
+/*	$NetBSD: if_sip.c,v 1.52.4.10 2003/10/02 10:02:00 tron Exp $	*/
 
 /*-
  * Copyright (c) 2001, 2002 The NetBSD Foundation, Inc.
@@ -82,7 +82,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_sip.c,v 1.52.4.7 2002/11/21 18:28:15 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_sip.c,v 1.52.4.10 2003/10/02 10:02:00 tron Exp $");
 
 #include "bpfilter.h"
 
@@ -146,7 +146,7 @@ __KERNEL_RCSID(0, "$NetBSD: if_sip.c,v 1.52.4.7 2002/11/21 18:28:15 he Exp $");
 #define	SIP_NTXDESC_MASK	(SIP_NTXDESC - 1)
 #define	SIP_NEXTTX(x)		(((x) + 1) & SIP_NTXDESC_MASK)
 
-#if defined(DP83020)
+#if defined(DP83820)
 #define	TX_DMAMAP_SIZE		ETHER_MAX_LEN_JUMBO
 #else
 #define	TX_DMAMAP_SIZE		MCLBYTES
@@ -2149,7 +2149,9 @@ SIP_DECL(init)(struct ifnet *ifp)
 	struct sip_txsoft *txs;
 	struct sip_rxsoft *rxs;
 	struct sip_desc *sipd;
+#if defined(DP83820)
 	u_int32_t reg;
+#endif
 	int i, error = 0;
 
 	/*
@@ -2182,14 +2184,14 @@ SIP_DECL(init)(struct ifnet *ifp)
 		 * Note that only the low-order 12 bits of 0xe4 are documented
 		 * and that this sets reserved bits in that register.
 		 */
-		reg = bus_space_read_4(st, sh, SIP_NS_SRR);
-		if (reg == 0x302) {
-			bus_space_write_4(st, sh, 0x00cc, 0x0001);
-			bus_space_write_4(st, sh, 0x00e4, 0x189C);
-			bus_space_write_4(st, sh, 0x00fc, 0x0000);
-			bus_space_write_4(st, sh, 0x00f4, 0x5040);
-			bus_space_write_4(st, sh, 0x00f8, 0x008c);
-		}
+		bus_space_write_4(st, sh, 0x00cc, 0x0001);
+
+		bus_space_write_4(st, sh, 0x00e4, 0x189C);
+		bus_space_write_4(st, sh, 0x00fc, 0x0000);
+		bus_space_write_4(st, sh, 0x00f4, 0x5040);
+		bus_space_write_4(st, sh, 0x00f8, 0x008c);
+
+		bus_space_write_4(st, sh, 0x00cc, 0x0000);
 	}
 #endif /* ! DP83820 */
 
@@ -2293,6 +2295,14 @@ SIP_DECL(init)(struct ifnet *ifp)
 	 * Initialize the prototype RXCFG register.
 	 */
 	sc->sc_rxcfg |= (sc->sc_rx_drain_thresh << RXCFG_DRTH_SHIFT);
+#ifndef DP83820
+	/*
+	* Accept packets >1518 bytes (including FCS) so we can handle
+	* 802.1q-tagged frames properly.
+	*/
+	if (sc->sc_ethercom.ec_capenable & ETHERCAP_VLAN_MTU)
+		sc->sc_rxcfg |= RXCFG_ALP;
+#endif
 	bus_space_write_4(st, sh, SIP_RXCFG, sc->sc_rxcfg);
 
 #ifdef DP83820
@@ -3138,6 +3148,34 @@ SIP_DECL(dp83815_mii_statchg)(struct device *self)
 
 	bus_space_write_4(sc->sc_st, sc->sc_sh, SIP_TXCFG, sc->sc_txcfg);
 	bus_space_write_4(sc->sc_st, sc->sc_sh, SIP_RXCFG, sc->sc_rxcfg);
+
+	/*
+	 * Some DP83815s experience problems when used with short
+	 * (< 30m/100ft) Ethernet cables in 100BaseTX mode.  This
+	 * sequence adjusts the DSP's signal attenuation to fix the
+	 * problem.
+	 */
+	if (IFM_SUBTYPE(sc->sc_mii.mii_media_active) == IFM_100_TX) {
+		uint32_t reg;
+
+		bus_space_write_4(sc->sc_st, sc->sc_sh, 0x00cc, 0x0001);
+
+		reg = bus_space_read_4(sc->sc_st, sc->sc_sh, 0x00f4);
+		reg &= 0x0fff;
+		bus_space_write_4(sc->sc_st, sc->sc_sh, 0x00f4, reg | 0x1000);
+		delay(100);
+		reg = bus_space_read_4(sc->sc_st, sc->sc_sh, 0x00fc);
+		reg &= 0x00ff;
+		if ((reg & 0x0080) == 0 || (reg >= 0x00d8)) {
+			bus_space_write_4(sc->sc_st, sc->sc_sh, 0x00fc,
+			    0x00e8);
+			reg = bus_space_read_4(sc->sc_st, sc->sc_sh, 0x00f4);
+			bus_space_write_4(sc->sc_st, sc->sc_sh, 0x00f4,
+			    reg | 0x20);
+		}
+
+		bus_space_write_4(sc->sc_st, sc->sc_sh, 0x00cc, 0);
+	}
 }
 #endif /* DP83820 */
 

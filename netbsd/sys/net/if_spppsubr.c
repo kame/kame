@@ -1,4 +1,4 @@
-/*	$NetBSD: if_spppsubr.c,v 1.46.4.17 2003/02/07 18:40:19 tron Exp $	 */
+/*	$NetBSD: if_spppsubr.c,v 1.46.4.19 2003/07/10 15:40:45 tron Exp $	 */
 
 /*
  * Synchronous PPP/Cisco link level subroutines.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_spppsubr.c,v 1.46.4.17 2003/02/07 18:40:19 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_spppsubr.c,v 1.46.4.19 2003/07/10 15:40:45 tron Exp $");
 
 #include "opt_inet.h"
 #include "opt_ipx.h"

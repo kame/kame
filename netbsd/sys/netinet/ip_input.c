@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_input.c,v 1.150.4.2 2002/11/12 14:44:11 tron Exp $	*/
+/*	$NetBSD: ip_input.c,v 1.150.4.3 2003/06/17 11:55:53 msaitoh Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -133,7 +133,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ip_input.c,v 1.150.4.2 2002/11/12 14:44:11 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ip_input.c,v 1.150.4.3 2003/06/17 11:55:53 msaitoh Exp $");
 
 #include "opt_gateway.h"
 #include "opt_pfil_hooks.h"
@@ -1942,13 +1942,8 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPCTL_MTUDISC:
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
 		    &ip_mtudisc);
-		if (ip_mtudisc != 0 && ip_mtudisc_timeout_q == NULL) {
-			ip_mtudisc_timeout_q = 
-			    rt_timer_queue_create(ip_mtudisc_timeout);
-		} else if (ip_mtudisc == 0 && ip_mtudisc_timeout_q != NULL) {
-			rt_timer_queue_destroy(ip_mtudisc_timeout_q, TRUE);
-			ip_mtudisc_timeout_q = NULL;
-		}
+		if (error == 0 && ip_mtudisc == 0)
+			rt_timer_queue_remove_all(ip_mtudisc_timeout_q, TRUE);
 		return error;
 	case IPCTL_ANONPORTMIN:
 		old = anonportmin;

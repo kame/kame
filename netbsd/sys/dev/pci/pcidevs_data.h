@@ -1,10 +1,10 @@
-/*	$NetBSD: pcidevs_data.h,v 1.431.2.18 2003/01/28 06:24:48 jmc Exp $	*/
+/*	$NetBSD: pcidevs_data.h,v 1.431.2.26 2003/10/20 04:49:35 cyber Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: pcidevs,v 1.428.2.19 2003/01/27 06:21:36 jmc Exp 
+ *	NetBSD
  */
 
 /*
@@ -1226,6 +1226,18 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Apple Computer",
 	    "UniNorth Host-PCI Bridge",
+	},
+	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_KAUAI,
+	    0,
+	    "Apple Computer",
+	    "Kauai ATA Controller",
+	},
+	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_INTREPID,
+	    0,
+	    "Apple Computer",
+	    "MAC-IO I/O Controller (Intrepid)",
 	},
 	{
 	    PCI_VENDOR_ARC, PCI_PRODUCT_ARC_1000PV,
@@ -3502,6 +3514,24 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    "PRO/100 VM (MOB) Network Controller",
 	},
 	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_PRO_WL_2100,
+	    0,
+	    "Intel",
+	    "PRO/Wireless LAN 2100 3B Mini PCI Adapter",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_PRO_100_VM_6,
+	    0,
+	    "Intel",
+	    "PRO/100 VM Network Controller with 82562ET PHY",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_PRO_100_M,
+	    0,
+	    "Intel",
+	    "PRO/100 M Network Controller",
+	},
+	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82815_DC100_HUB,
 	    0,
 	    "Intel",
@@ -4012,10 +4042,88 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    "82801DB IDE Controller (UltraATA/100)",
 	},
 	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801DB_ISA,
+	    0,
+	    "Intel",
+	    "82801DB ISA Bridge",
+	},
+	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801DB_USBC,
 	    0,
 	    "Intel",
-	    "82801DB USB EHCI Controller",
+	    "82801DB/DBM USB EHCI Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801EB_LPC,
+	    0,
+	    "Intel",
+	    "82801EB LPC Interface Bridge",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801EB_SATA,
+	    0,
+	    "Intel",
+	    "82801EB Serial ATA Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801EB_USB_0,
+	    0,
+	    "Intel",
+	    "82801EB/ER USB UHCI Controller #0",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801EB_SMB,
+	    0,
+	    "Intel",
+	    "82801EB/ER SMBus Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801EB_USB_1,
+	    0,
+	    "Intel",
+	    "82801EB/ER USB UHCI Controller #1",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801EB_AC,
+	    0,
+	    "Intel",
+	    "82801EB/ER AC'97 Audio Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801EB_MOD,
+	    0,
+	    "Intel",
+	    "82801EB/ER AC'97 Modem Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801EB_USB_2,
+	    0,
+	    "Intel",
+	    "82801EB/ER USB UHCI Controller #2",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801EB_IDE,
+	    0,
+	    "Intel",
+	    "82801EB/ER IDE Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801EB_EHCI,
+	    0,
+	    "Intel",
+	    "82801EB/ER USB EHCI Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801EB_USB_3,
+	    0,
+	    "Intel",
+	    "82801EB/ER USB UHCI Controller #3",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801ER_SATA,
+	    0,
+	    "Intel",
+	    "82801ER Serial ATA Controller",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82820_MCH,
@@ -4142,6 +4250,90 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Intel",
 	    "82845G/GL Integrated Graphics Device",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82865_HB,
+	    0,
+	    "Intel",
+	    "82865 Host",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82865_AGP,
+	    0,
+	    "Intel",
+	    "82865 AGP",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82865_IGD,
+	    0,
+	    "Intel",
+	    "82865G Integrated Graphics Device",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801EB_HPB,
+	    0,
+	    "Intel",
+	    "82801EB Hub-to-PCI Bridge",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82875P_HB,
+	    0,
+	    "Intel",
+	    "82875P Host",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82875P_AGP,
+	    0,
+	    "Intel",
+	    "82875P AGP",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_31244,
+	    0,
+	    "Intel",
+	    "31244 Serial ATA Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82855PM_DDR,
+	    0,
+	    "Intel",
+	    "82855PM MCH Host Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82855PM_AGP,
+	    0,
+	    "Intel",
+	    "82855PM Host-to-AGP Bridge",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82855PM_PM,
+	    0,
+	    "Intel",
+	    "82855PM Power Management Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82855GM_MCH,
+	    0,
+	    "Intel",
+	    "82855GM Host-to-Hub Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82855GM_IGD,
+	    0,
+	    "Intel",
+	    "82855PM GMCH Integrated Graphics Device",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82855GM_MC,
+	    0,
+	    "Intel",
+	    "82855PM GMCH Memory Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82855GM_CP,
+	    0,
+	    "Intel",
+	    "82855PM GMCH Configuration Process",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82830MP_IO_1,
@@ -4916,6 +5108,36 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "National Semiconductor",
 	    "NS87410",
+	},
+	{
+	    PCI_VENDOR_NS, PCI_PRODUCT_NS_SC1100_ISA,
+	    0,
+	    "National Semiconductor",
+	    "SC1100 PCI-ISA bridge",
+	},
+	{
+	    PCI_VENDOR_NS, PCI_PRODUCT_NS_SC1100_ACPI,
+	    0,
+	    "National Semiconductor",
+	    "SC1100 SMI/ACPI",
+	},
+	{
+	    PCI_VENDOR_NS, PCI_PRODUCT_NS_SC1100_IDE,
+	    0,
+	    "National Semiconductor",
+	    "SC1100 PCI IDE",
+	},
+	{
+	    PCI_VENDOR_NS, PCI_PRODUCT_NS_SC1100_AUDIO,
+	    0,
+	    "National Semiconductor",
+	    "SC1100 XpressAUDIO",
+	},
+	{
+	    PCI_VENDOR_NS, PCI_PRODUCT_NS_SC1100_XBUS,
+	    0,
+	    "National Semiconductor",
+	    "SC1100 X-Bus",
 	},
 	{
 	    PCI_VENDOR_SYMBIOS, PCI_PRODUCT_SYMBIOS_810,
@@ -6046,16 +6268,28 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    "530 Host to PCI Bridge",
 	},
 	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_540HB,
+	    0,
+	    "Silicon Integrated System",
+	    "540 Host to PCI Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_550HB,
+	    0,
+	    "Silicon Integrated System",
+	    "550 Host to PCI Bridge",
+	},
+	{
 	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_85C601,
 	    0,
 	    "Silicon Integrated System",
 	    "85C601",
 	},
 	{
-	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_645,
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_620,
 	    0,
 	    "Silicon Integrated System",
-	    "SiS 645 Host Bridge",
+	    "SiS 620 Host Bridge",
 	},
 	{
 	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_630,
@@ -6064,10 +6298,70 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    "SiS 630 Host Bridge",
 	},
 	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_633,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 633 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_635,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 635 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_640,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 640 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_645,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 645 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_646,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 646 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_648,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 648 Host Bridge",
+	},
+	{
 	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_650,
 	    0,
 	    "Silicon Integrated System",
 	    "SiS 650 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_651,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 651 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_652,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 652 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_655,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 655 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_658,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 658 Host Bridge",
 	},
 	{
 	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_730,
@@ -6076,16 +6370,88 @@ const struct pci_knowndev pci_knowndevs[] = {
 	    "SiS 730 Host Bridge",
 	},
 	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_733,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 733 Host Bridge",
+	},
+	{
 	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_735,
 	    0,
 	    "Silicon Integrated System",
 	    "SiS 735 Host Bridge",
 	},
 	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_740,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 740 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_745,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 745 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_746,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 746 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_748,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 748 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_750,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 750 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_751,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 751 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_752,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 752 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_755,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 755 Host Bridge",
+	},
+	{
 	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_900,
 	    0,
 	    "Silicon Integrated System",
 	    "SiS 900 10/100 Ethernet",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_961,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 961 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_962,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 962 Host Bridge",
+	},
+	{
+	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_963,
+	    0,
+	    "Silicon Integrated System",
+	    "SiS 963 Host Bridge",
 	},
 	{
 	    PCI_VENDOR_SIS, PCI_PRODUCT_SIS_5597_IDE,

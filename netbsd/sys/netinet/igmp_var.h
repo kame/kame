@@ -1,4 +1,4 @@
-/*	$NetBSD: igmp_var.h,v 1.12 2002/05/12 20:33:50 matt Exp $	*/
+/*	$NetBSD: igmp_var.h,v 1.12.4.1 2003/06/30 02:16:56 grant Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.

@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_mroute.h,v 1.19 2001/05/08 10:07:15 itojun Exp $	*/
+/*	$NetBSD: ip_mroute.h,v 1.19.16.1 2003/06/30 02:21:21 grant Exp $	*/
 
 /*
  * Definitions for IP multicast forwarding.

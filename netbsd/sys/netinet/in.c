@@ -1,4 +1,4 @@
-/*	$NetBSD: in.c,v 1.76 2002/05/09 06:49:15 itojun Exp $	*/
+/*	$NetBSD: in.c,v 1.76.4.3 2003/07/02 14:10:36 tron Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -140,7 +140,7 @@
 
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: in.c,v 1.76 2002/05/09 06:49:15 itojun Exp $");
+__KERNEL_RCSID(0, "$NetBSD: in.c,v 1.76.4.3 2003/07/02 14:10:36 tron Exp $");
 
 #include "opt_inet.h"
 #include "opt_inet_conf.h"
