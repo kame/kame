@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.29 2003/02/05 15:30:32 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.30 2003/02/12 04:30:11 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -1123,6 +1123,7 @@ cf_init(s, d)
 
 	rp_attr = bsr_attr = grp_prefix = regthres_attr	= datathres_attr = NULL;
 
+	cand_rp_flag = cand_bsr_flag = FALSE;
 	cand_rp_ifname = cand_bsr_ifname = NULL;
 
 	srcmetric = srcpref = helloperiod = jpperiod = jpperiod_coef

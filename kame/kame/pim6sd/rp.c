@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.23 2003/02/05 15:30:33 suz Exp $	*/
+/*	$KAME: rp.c,v 1.24 2003/02/12 04:30:11 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -123,7 +123,7 @@ u_int16         		pim_bootstrap_timer;	/* For electing the BSR and sending
 u_int8          		my_bsr_priority;
 struct sockaddr_in6		my_bsr_address;
 struct in6_addr         	my_bsr_hash_mask;
-u_int8          		cand_bsr_flag = FALSE;	/* Set to TRUE if I am a candidate
+u_int8          		cand_bsr_flag;	/* Set to TRUE if I am a candidate
 						 	 * BSR */
 char				*cand_bsr_ifname;
 
@@ -135,7 +135,7 @@ u_int16         		my_cand_rp_adv_period;	/* The locally configured Cand-RP
 u_int16         		my_bsr_period;		/* The locally configured BSR	
 							   period */
 u_int16         		pim_cand_rp_adv_timer;
-u_int8          		cand_rp_flag = FALSE;	/* Candidate RP flag */
+u_int8          		cand_rp_flag;	/* Candidate RP flag */
 struct cand_rp_adv_message_ 	cand_rp_adv_message;
 struct in6_addr         	rp_my_ipv6_hashmask;
 char				*cand_rp_ifname;
