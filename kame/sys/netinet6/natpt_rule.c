@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.30 2001/10/27 09:59:40 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.31 2001/10/29 06:31:43 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -178,12 +178,12 @@ natpt_matchIn6addr(struct pcv *cv6, struct mAddr *from)
 
 	switch (from->saddr.aType) {
 	case ADDR_ANY:
-		goto proto;
+		break;
 
 	case ADDR_SINGLE:
-		if (IN6_ARE_ADDR_EQUAL(in6from, &from->saddr.in6Addr))
-			goto proto;
-		return (0);
+		if (!IN6_ARE_ADDR_EQUAL(in6from, &from->saddr.in6Addr))
+			return (0);
+		break;
 
 	case ADDR_MASK:
 		bcopy(in6from, &match, sizeof(struct in6_addr));
@@ -192,15 +192,14 @@ natpt_matchIn6addr(struct pcv *cv6, struct mAddr *from)
 		match.s6_addr32[2] &= from->saddr.in6Mask.s6_addr32[2];
 		match.s6_addr32[3] &= from->saddr.in6Mask.s6_addr32[3];
 
-		if (IN6_ARE_ADDR_EQUAL(&match, &from->saddr.in6Addr))
-			goto proto;
-		return (0);
+		if (!IN6_ARE_ADDR_EQUAL(&match, &from->saddr.in6Addr))
+			return (0);
+		break;
 
 	default:
 		return (0);
 	}
 
- proto:;
 	if ((cv6->ip_p != IPPROTO_UDP)
 	    && (cv6->ip_p != IPPROTO_TCP))
 		return (1);
@@ -221,30 +220,29 @@ natpt_matchIn4addr(struct pcv *cv4, struct mAddr *from)
 
 	switch (from->saddr.aType) {
 	case ADDR_ANY:
-		goto proto;
+		break;
 
 	case ADDR_SINGLE:
-		if (in4from.s_addr == from->saddr.in4Addr.s_addr)
-			goto proto;
-		return (0);
+		if (in4from.s_addr != from->saddr.in4Addr.s_addr)
+			return (0);
+		break;
 
 	case ADDR_MASK:
 		in4masked.s_addr = in4from.s_addr & from->saddr.in4Mask.s_addr;
-		if (in4masked.s_addr == from->saddr.in4Addr.s_addr)
-			goto proto;
-		return (0);
+		if (in4masked.s_addr != from->saddr.in4Addr.s_addr)
+			return (0);
+		break;
 
 	case ADDR_RANGE:
-		if ((in4from.s_addr >= from->saddr.in4RangeStart.s_addr)
-		    && (in4from.s_addr <= from->saddr.in4RangeEnd.s_addr))
-			goto proto;
-		return (0);
+		if ((in4from.s_addr < from->saddr.in4RangeStart.s_addr)
+		    || (in4from.s_addr > from->saddr.in4RangeEnd.s_addr))
+			return (0);
+		break;
 
 	default:
 		return (0);
 	}
 
- proto:;
 	if ((cv4->ip_p != IPPROTO_UDP)
 	    && (cv4->ip_p != IPPROTO_TCP))
 		return (1);
