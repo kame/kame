@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.851 2000/05/05 14:20:06 sumikawa Exp $
+$Id: CHANGELOG,v 1.852 2000/05/05 15:55:54 sumikawa Exp $
 
 <200005>
+Sat May  6 00:55:30 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/mozilla: upgrade to M15. From: ume
+
 Fri May  5 23:19:10 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3: INET6 and IPSEC* defines are moved from opt_inet.h to
 	  opt_inet6.h and opt_ipsec.h
