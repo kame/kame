@@ -1,10 +1,11 @@
-# $Id: Makefile,v 1.21 2000/02/01 16:19:55 sumikawa Exp $
+# $Id: Makefile,v 1.22 2000/02/05 18:03:34 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
 SUBDIR+=	apache12
 SUBDIR+=	apache13
 SUBDIR+=	bind8
+SUBDIR+=	bind9
 SUBDIR+=	ct
 SUBDIR+=	echoping
 SUBDIR+=	emacs20

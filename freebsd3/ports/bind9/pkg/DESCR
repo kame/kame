@@ -1,0 +1,14 @@
+BIND 9
+
+	BIND version 9 is a major rewrite of nearly all aspects of the
+	underlying BIND architecture. This re-architecting of BIND was
+	necessitated by the expected demands of:
+
+		- Domain name system growth, particularly in very large
+		  zones such as .COM
+		- Protocol enhancements necessary to securely query and
+		  update zones
+		- Protocol enhancements necessary to take advantage of
+		  certain architectural features of IP version 6
+
+WWW: http://www.isc.org/
