@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2452 2003/08/05 11:52:52 itojun Exp $
+$KAME: CHANGELOG,v 1.2453 2003/08/06 19:55:17 jinmei Exp $
 
 <200308>
+2003-08-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/cftoken.l: use a stronger lexical check for
+	interface names.
+	From: Hajimu UMEMOTO <ume@mahoroba.org>
+	* kame/kame/dhcp6/config.c (configure_interface): check interfaces
+	specified in the configuration file really exist.
+
 2003-08-05  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
 	* removed vrrp6 support because it might be a patent infringement.
 	  http://www.ietf.org/ietf/IPR/cisco-ipr-draft-ietf-vrrp-ipv6-spec.txt
