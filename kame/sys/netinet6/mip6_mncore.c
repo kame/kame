@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.37 2003/09/06 09:13:52 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.38 2003/10/21 10:53:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -145,6 +145,68 @@ mip6_mn_init(void)
 	mip6_prefix_init();
 
 	LIST_INIT(&mip6_unuse_hoa);
+}
+
+int
+mip6_mobile_node_start(void)
+{
+#ifdef MIP6_STATIC_HADDR
+	struct hif_softc *hif;
+
+	for (hif = TAILQ_FIRST(&hif_softc_list); hif;
+	    hif = TAILQ_NEXT(hif, hif_entry)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&hif->hif_ifid)) {
+			mip6log((LOG_INFO,
+			    "mip6_mobile_node_start:%d: "
+			    "You must specify the IFID.\n",
+			    __LINE__));
+			return (EINVAL);
+		}
+	}
+#endif
+	mip6log((LOG_INFO,
+	    "mip6_mobile_node_start:%d: "
+	    "mobile node function enabled.\n",
+	    __LINE__));
+	mip6ctl_nodetype = MIP6_NODETYPE_MOBILE_NODE;
+	mip6_process_movement();
+
+	return (0);
+}
+
+void
+mip6_mobile_node_stop(void)
+{
+	struct hif_softc *hif;
+
+	for (hif = LIST_FIRST(&hif_softc_list); hif;
+	    hif = LIST_NEXT(hif, hif_entry)) {
+		if (hif->hif_coa_ifa != NULL)
+			IFAFREE(&hif->hif_coa_ifa->ia_ifa);
+		hif->hif_coa_ifa = NULL;
+		mip6_detach_haddrs(hif);
+		mip6_bu_list_remove_all(&hif->hif_bu_list, 1);
+		while (!LIST_EMPTY(&hif->hif_prefix_list_home))
+			hif_prefix_list_remove(&hif->hif_prefix_list_home,
+			    LIST_FIRST(&hif->hif_prefix_list_home));
+		while (!LIST_EMPTY(&hif->hif_prefix_list_foreign))
+			hif_prefix_list_remove(&hif->hif_prefix_list_foreign,
+			    LIST_FIRST(&hif->hif_prefix_list_foreign));
+		while (!LIST_EMPTY(&hif->hif_sp_list))
+			hif_site_prefix_list_remove(&hif->hif_sp_list,
+			    LIST_FIRST(&hif->hif_sp_list));
+			}
+	while (!LIST_EMPTY(&mip6_prefix_list))
+		mip6_prefix_list_remove(&mip6_prefix_list,
+		    LIST_FIRST(&mip6_prefix_list));
+	while (!TAILQ_EMPTY(&mip6_ha_list))
+		mip6_ha_list_remove(&mip6_ha_list,
+		    TAILQ_FIRST(&mip6_ha_list));
+	mip6log((LOG_INFO,
+	    "mip6_mobile_node_stopt:%d: "
+	    "mobile node function disabled.\n",
+	    __LINE__));
+	mip6ctl_nodetype = MIP6_NODETYPE_CORRESPONDENT_NODE;
 }
 
 /*

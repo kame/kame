@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.h,v 1.16 2003/10/21 03:03:10 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.h,v 1.17 2003/10/21 10:53:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -62,6 +62,10 @@ void mip6_mn_init(void);
 void mip6_bu_init(void);
 void mip6_halist_init(void);
 void mip6_prefix_init(void);
+
+/* administrative operations. */
+int mip6_mobile_node_start(void);
+void mip6_mobile_node_stop(void);
 
 /* movement processing. */
 int mip6_prelist_update(struct sockaddr_in6 *, union nd_opts *,

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.42 2003/10/16 09:22:02 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.43 2003/10/21 10:53:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -247,9 +247,6 @@ mip6_ioctl(cmd, data)
 	caddr_t data;
 {
 	int subcmd;
-#ifdef MIP6_MOBILE_NODE
-	struct hif_softc *sc;
-#endif /* MIP6_MOBILE_NODE */
 	struct mip6_req *mr = (struct mip6_req *)data;
 	int s;
 
@@ -265,58 +262,18 @@ mip6_ioctl(cmd, data)
 		switch (subcmd) {
 #ifdef MIP6_MOBILE_NODE
 		case SIOCSMIP6CFG_ENABLEMN:
-#ifdef MIP6_STATIC_HADDR
-			for (sc = TAILQ_FIRST(&hif_softc_list);
-			     sc;
-			     sc = TAILQ_NEXT(sc, hif_entry)) {
-				if (IN6_IS_ADDR_UNSPECIFIED(&sc->hif_ifid)) {
-					mip6log((LOG_INFO,
-						 "%s:%d: "
-						 "You must specify the IFID.\n",
-						 __FILE__, __LINE__));
-					splx(s);
-					return (EINVAL);
-				}
+		{
+			int error;
+			error = mip6_mobile_node_start();
+			if (error) {
+				splx(s);
+				return (error);
 			}
-#endif
-			mip6log((LOG_INFO,
-				 "%s:%d: MN function enabled\n",
-				 __FILE__, __LINE__));
-			mip6ctl_nodetype = MIP6_NODETYPE_MOBILE_NODE;
-			mip6_process_movement();
+		}
 			break;
 
 		case SIOCSMIP6CFG_DISABLEMN:
-			mip6log((LOG_INFO,
-			    "%s:%d: MN function disabled\n",
-			    __FILE__, __LINE__));
-			for (sc = LIST_FIRST(&hif_softc_list); sc;
-			    sc = LIST_NEXT(sc, hif_entry)) {
-				if (sc->hif_coa_ifa != NULL)
-					IFAFREE(&sc->hif_coa_ifa->ia_ifa);
-				sc->hif_coa_ifa = NULL;
-				mip6_detach_haddrs(sc);
-				mip6_bu_list_remove_all(&sc->hif_bu_list, 1);
-				while (!LIST_EMPTY(&sc->hif_prefix_list_home))
-					hif_prefix_list_remove(
-					    &sc->hif_prefix_list_home,
-					    LIST_FIRST(&sc->hif_prefix_list_home));
-				while (!LIST_EMPTY(&sc->hif_prefix_list_foreign))
-					hif_prefix_list_remove(
-					    &sc->hif_prefix_list_foreign,
-					    LIST_FIRST(&sc->hif_prefix_list_foreign));
-				while (!LIST_EMPTY(&sc->hif_sp_list))
-					hif_site_prefix_list_remove(
-					    &sc->hif_sp_list,
-					    LIST_FIRST(&sc->hif_sp_list));
-			}
-			while (!LIST_EMPTY(&mip6_prefix_list))
-				mip6_prefix_list_remove(&mip6_prefix_list,
-				    LIST_FIRST(&mip6_prefix_list));
-			while (!TAILQ_EMPTY(&mip6_ha_list))
-				mip6_ha_list_remove(&mip6_ha_list,
-				    TAILQ_FIRST(&mip6_ha_list));
-			mip6ctl_nodetype = MIP6_NODETYPE_CORRESPONDENT_NODE;
+			mip6_mobile_node_stop();
 			break;
 #endif /* MIP6_MOBILE_NODE */
 
