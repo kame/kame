@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.13 2001/12/18 03:10:41 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.14 2002/08/09 08:49:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -51,6 +51,25 @@
 #include <stdio.h>
 #include <string.h>
 #include <err.h>
+
+/* portability with older KAME headers */
+#ifndef MLD_LISTENER_QUERY
+#define MLD_LISTENER_QUERY	MLD6_LISTENER_QUERY
+#define MLD_LISTENER_REPORT	MLD6_LISTENER_REPORT
+#define MLD_LISTENER_DONE	MLD6_LISTENER_DONE
+#define MLD_MTRACE_RESP		MLD6_MTRACE_RESP
+#define MLD_MTRACE		MLD6_MTRACE
+#define mld_hdr		mld6_hdr
+#define mld_type	mld6_type
+#define mld_code	mld6_code
+#define mld_cksum	mld6_cksum
+#define mld_maxdelay	mld6_maxdelay
+#define mld_reserved	mld6_reserved
+#define mld_addr	mld6_addr
+#endif
+#ifndef IP6OPT_ROUTER_ALERT
+#define IP6OPT_ROUTER_ALERT	IP6OPT_RTALERT
+#endif
 
 struct msghdr m;
 struct sockaddr_in6 dst;
@@ -140,6 +159,8 @@ main(int argc, char *argv[])
 	(void)setitimer(ITIMER_REAL, &itimer, NULL);
 
 	FD_ZERO(&fdset);
+	if (s >= FD_SETSIZE)
+		errx(1, "descriptor too big");
 	for (;;) {
 		FD_SET(s, &fdset);
 		if ((i = select(s + 1, &fdset, NULL, NULL, NULL)) < 0)
