@@ -693,6 +693,10 @@ fetch_url(url, proxyenv, proxyauth, wwwauth)
 		reason = NULL;
 		s = -1;
 		for (res = res0; res; res = res->ai_next) {
+			/*
+			 * see comment in hookup()
+			 */
+			ai_unmapped(res);
 			if (getnameinfo(res->ai_addr, res->ai_addrlen,
 					hbuf, sizeof(hbuf), NULL, 0,
 					NI_NUMERICHOST) != 0)
