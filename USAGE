@@ -1,6 +1,6 @@
 	USAGE
 	KAME Project
-	$KAME: USAGE,v 1.31 2000/11/15 16:55:52 itojun Exp $
+	$KAME: USAGE,v 1.32 2000/11/15 16:57:10 itojun Exp $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -571,5 +571,13 @@ Caveats:
   bytes, however, BIND9 may not.
 - Some of our platforms do not use our extended resolver code in libinet6.
   See COVERAGE for detail.
+
+
+<<Further readings>>
+
+http://www.netbsd.org/Documentation/network/ipv6/
+	Even if you are on non-netbsd operating system, the URL should be
+	useful.
+http://www.kame.net/
 
 							<end of USAGE>
