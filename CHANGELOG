@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.76 1999/08/28 06:29:13 itojun Exp $
+$Id: CHANGELOG,v 1.77 1999/08/28 07:33:11 itojun Exp $
 
 <199908>
+Sat Aug 28 16:32:29 JST 1999  itojun@iijlab.net
+	* netbsd/usr.bin/whois: IPv6-ready whois client.
+
+	  From: seirios@iri.co.jp
+
 Sat Aug 28 15:28:16 JST 1999  itojun@iijlab.net
 	* kame/rtsold: fix rtsol's behavior when link-local address is
 	  considered a duplicated address (by DAD).
