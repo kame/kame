@@ -359,7 +359,7 @@ cleanup_parse_url:
 		*host = (char *)xmalloc(len + 1);
 		strncpy(*host, thost + 1, len);
 		(*host)[len] = '\0';
-		cp = strrchr(++cp, ':');
+		cp++;
 	} else if ((cp = strrchr(thost, ':')) != NULL) {
 		size_t len = cp - thost;
 		*host = (char *)xmalloc(len + 1);
@@ -386,7 +386,8 @@ cleanup_parse_url:
 
 	if (debug)
 		fprintf(ttyout,
-		    "parse_url: user `%s' pass `%s' host %s:%s path `%s'\n",
+		    "parse_url: user `%s' pass `%s' host %s port %s "
+		    "path `%s'\n",
 		    *user ? *user : "<null>", *pass ? *pass : "<null>",
 		    *host ? *host : "<null>", *port ? *port : "<null>",
 		    *path ? *path : "<null>");
@@ -1243,7 +1244,8 @@ fetch_ftp(url)
 	}
 	if (debug)
 		fprintf(ttyout,
-    "fetch_ftp: user `%s' pass `%s' host %s:%s path `%s' dir `%s' file `%s'\n",
+		    "fetch_ftp: user `%s' pass `%s' host %s port %s "
+		    "path `%s' dir `%s' file `%s'\n",
 		    user ? user : "<null>", pass ? pass : "<null>",
 		    host ? host : "<null>", port ? port : "<null>",
 		    path ? path : "<null>",
