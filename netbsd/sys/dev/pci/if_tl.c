@@ -1,4 +1,4 @@
-/*	$NetBSD: if_tl.c,v 1.32 2000/03/23 07:01:39 thorpej Exp $	*/
+/*	$NetBSD: if_tl.c,v 1.32.4.3 2002/03/11 22:23:51 he Exp $	*/
 
 /*
  * Copyright (c) 1997 Manuel Bouyer.  All rights reserved.
@@ -209,7 +209,7 @@ const struct tl_product_desc tl_compaq_products[] = {
 	  "Compaq ProLiant Integrated Netelligent 10/100 TX" },
 	{ PCI_PRODUCT_COMPAQ_DPNet100TX, TLPHY_MEDIA_10_5|TLPHY_MEDIA_NO_10_T,
 	  "Compaq Dual Port Netelligent 10/100 TX" },
-	{ PCI_PRODUCT_COMPAQ_DP4000, TLPHY_MEDIA_10_5,
+	{ PCI_PRODUCT_COMPAQ_DP4000, TLPHY_MEDIA_10_5|TLPHY_MEDIA_NO_10_T,
 	  "Compaq Deskpro 4000 5233MMX" },
 	{ PCI_PRODUCT_COMPAQ_NF3P_BNC, TLPHY_MEDIA_10_2,
 	  "Compaq NetFlex 3/P w/ BNC" },
@@ -397,6 +397,7 @@ tl_pci_attach(parent, self, aux)
 		return;
 	}
 	intrstr = pci_intr_string(pa->pa_pc, intrhandle);
+	sc->tl_if.if_softc = sc;
 	sc->tl_ih = pci_intr_establish(pa->pa_pc, intrhandle, IPL_NET,
 	    tl_intr, sc);
 	if (sc->tl_ih == NULL) {
@@ -440,7 +441,6 @@ tl_pci_attach(parent, self, aux)
 		ifmedia_set(&sc->tl_mii.mii_media, IFM_ETHER|IFM_AUTO);
 
 	bcopy(sc->sc_dev.dv_xname, sc->tl_if.if_xname, IFNAMSIZ);
-	sc->tl_if.if_softc = sc;
 	ifp->if_flags = IFF_BROADCAST|IFF_SIMPLEX|IFF_NOTRAILERS|IFF_MULTICAST;
 	ifp->if_ioctl = tl_ifioctl;
 	ifp->if_start = tl_ifstart;

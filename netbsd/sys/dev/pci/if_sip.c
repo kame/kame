@@ -1,4 +1,4 @@
-/*	$NetBSD: if_sip.c,v 1.11.4.5 2001/03/13 20:26:01 he Exp $	*/
+/*	$NetBSD: if_sip.c,v 1.11.4.8 2002/03/27 09:50:43 he Exp $	*/
 
 /*-
  * Copyright (c) 1999 Network Computer, Inc.
@@ -86,14 +86,18 @@
 
 #include <dev/pci/if_sipreg.h>
 
+#if !defined(IF_POLL)
+#define IF_POLL(ifq, m)		((m) = (ifq)->ifq_head)
+#endif
+
 /*
  * Transmit descriptor list size.  This is arbitrary, but allocate
  * enough descriptors for 64 pending transmissions, and 16 segments
  * per packet.  This MUST work out to a power of 2.
  */
-#define	SIP_NTXSEGS		16
+#define	SIP_NTXSEGS		8
 
-#define	SIP_TXQUEUELEN		64
+#define	SIP_TXQUEUELEN		256
 #define	SIP_NTXDESC		(SIP_TXQUEUELEN * SIP_NTXSEGS)
 #define	SIP_NTXDESC_MASK	(SIP_NTXDESC - 1)
 #define	SIP_NEXTTX(x)		(((x) + 1) & SIP_NTXDESC_MASK)
@@ -102,7 +106,7 @@
  * Receive descriptor list size.  We have one Rx buffer per incoming
  * packet, so this logic is a little simpler.
  */
-#define	SIP_NRXDESC		64
+#define	SIP_NRXDESC		128
 #define	SIP_NRXDESC_MASK	(SIP_NRXDESC - 1)
 #define	SIP_NEXTRX(x)		(((x) + 1) & SIP_NRXDESC_MASK)
 
@@ -676,8 +680,11 @@ sip_start(ifp)
 	 * until we drain the queue, or use up all available transmit
 	 * descriptors.
 	 */
-	while ((txs = SIMPLEQ_FIRST(&sc->sc_txfreeq)) != NULL &&
-	       sc->sc_txfree != 0) {
+	for (;;) {
+		if ((txs = SIMPLEQ_FIRST(&sc->sc_txfreeq)) == NULL) {
+			break;
+		}
+
 		/*
 		 * Grab a packet off the queue.
 		 */
@@ -686,6 +693,7 @@ sip_start(ifp)
 			break;
 		m = NULL;
 
+		m = NULL;
 		dmamap = txs->txs_dmamap;
 
 		/*
@@ -724,9 +732,11 @@ sip_start(ifp)
 
 		/*
 		 * Ensure we have enough descriptors free to describe
-		 * the packet.
+		 * the packet.  Note, we always reserve one descriptor
+		 * at the end of the ring as a termination point, to
+		 * prevent wrap-around.
 		 */
-		if (dmamap->dm_nsegs > sc->sc_txfree) {
+		if (dmamap->dm_nsegs > (sc->sc_txfree - 1)) {
 			/*
 			 * Not enough free descriptors to transmit this
 			 * packet.  We haven't committed anything yet,
@@ -832,13 +842,31 @@ sip_start(ifp)
 		SIP_CDTXSYNC(sc, firsttx, 1,
 		    BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
 
-		/* Start the transmit process. */
+		/*
+		 * Start the transmit process.  Note, the manual says
+		 * that if there are no pending transmissions in the
+		 * chip's internal queue (indicated by TXE being clear),
+		 * then the driver software must set the TXDP to the
+		 * first descriptor to be transmitted.  However, if we
+		 * do this, it causes serious performance degredation on
+		 * the DP83820 under load, not setting TXDP doesn't seem
+		 * to adversely affect the SiS 900 or DP83815.
+		 *
+		 * Well, I guess it wouldn't be the first time a manual
+		 * has lied -- and they could be speaking of the NULL-
+		 * terminated descriptor list case, rather than OWN-
+		 * terminated rings.
+		 */
+#if 0
 		if ((bus_space_read_4(sc->sc_st, sc->sc_sh, SIP_CR) &
 		     CR_TXE) == 0) {
 			bus_space_write_4(sc->sc_st, sc->sc_sh, SIP_TXDP,
 			    SIP_CDTXADDR(sc, firsttx));
 			bus_space_write_4(sc->sc_st, sc->sc_sh, SIP_CR, CR_TXE);
 		}
+#else
+		bus_space_write_4(sc->sc_st, sc->sc_sh, SIP_CR, CR_TXE);
+#endif
 
 		/* Set a watchdog timer in case the chip flakes out. */
 		ifp->if_timer = 5;
@@ -1140,15 +1168,16 @@ sip_txintr(sc)
 		 */
 		if (cmdsts &
 		    (CMDSTS_Tx_TXA|CMDSTS_Tx_TFU|CMDSTS_Tx_ED|CMDSTS_Tx_EC)) {
+			ifp->if_opackets++;
+			if (cmdsts & CMDSTS_Tx_EC)
+				ifp->if_collisions += 16;
 			if (ifp->if_flags & IFF_DEBUG) {
-				if (CMDSTS_Tx_ED)
+				if (cmdsts & CMDSTS_Tx_ED)
 					printf("%s: excessive deferral\n",
 					    sc->sc_dev.dv_xname);
-				if (CMDSTS_Tx_EC) {
+				if (cmdsts & CMDSTS_Tx_EC)
 					printf("%s: excessive collisions\n",
 					    sc->sc_dev.dv_xname);
-					ifp->if_collisions += 16;
-				}
 			}
 		} else {
 			/* Packet was transmitted successfully. */
@@ -1952,7 +1981,8 @@ sip_dp83815_set_filter(sc)
 	struct ether_multi *enm;
 	u_int8_t *cp;    
 	struct ether_multistep step; 
-	u_int32_t crc, mchash[16];
+	u_int32_t crc;
+	u_int16_t mchash[32];
 	int i;
 
 	/*
@@ -1999,13 +2029,13 @@ sip_dp83815_set_filter(sc)
 				goto allmulti;
 			}
 
-			crc = ether_crc32_le(enm->enm_addrlo, ETHER_ADDR_LEN);
+			crc = ether_crc32_be(enm->enm_addrlo, ETHER_ADDR_LEN);
 
 			/* Just want the 9 most significant bits. */
 			crc >>= 23;
 
 			/* Set the corresponding bit in the hash table. */
-			mchash[crc >> 5] |= 1 << (crc & 0x1f);
+			mchash[crc >> 4] |= 1 << (crc & 0xf);
 
 			ETHER_NEXT_MULTI(step, enm);
 		}
@@ -2037,11 +2067,9 @@ sip_dp83815_set_filter(sc)
 		/*
 		 * Program the multicast hash table.
 		 */
-		for (i = 0; i < 16; i++) {
+		for (i = 0; i < 32; i++) {
 			FILTER_EMIT(RFCR_NS_RFADDR_FILTMEM + (i * 2),
 			    mchash[i] & 0xffff);
-			FILTER_EMIT(RFCR_NS_RFADDR_FILTMEM + (i * 2) + 2,
-			    (mchash[i] >> 16) & 0xffff);
 		}
 	}
 #undef FILTER_EMIT

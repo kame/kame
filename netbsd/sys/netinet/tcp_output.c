@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_output.c,v 1.56.4.4 2001/04/06 00:26:13 he Exp $	*/
+/*	$NetBSD: tcp_output.c,v 1.56.4.5 2002/01/24 22:44:37 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

@@ -1,4 +1,4 @@
-/*	$NetBSD: in.c,v 1.61.4.3 2000/10/17 00:45:36 tv Exp $	*/
+/*	$NetBSD: in.c,v 1.61.4.4 2002/04/03 21:16:45 he Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.

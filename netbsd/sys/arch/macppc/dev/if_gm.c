@@ -1,4 +1,4 @@
-/*	$NetBSD: if_gm.c,v 1.7.2.1 2001/06/18 16:49:10 jhawk Exp $	*/
+/*	$NetBSD$	*/
 
 /*-
  * Copyright (c) 2000 Tsubai Masanari.  All rights reserved.

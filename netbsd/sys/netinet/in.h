@@ -1,4 +1,4 @@
-/*	$NetBSD: in.h,v 1.47.4.2 2001/04/24 22:21:35 he Exp $	*/
+/*	$NetBSD: in.h,v 1.47.4.3 2002/02/26 20:57:22 he Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -457,8 +457,9 @@ struct group_filter {
 #define IPCTL_LOWPORTMIN       16	/* minimum reserved port */
 #define IPCTL_LOWPORTMAX       17	/* maximum reserved port */
 #define IPCTL_MAXFRAGPACKETS   18	/* max packets in reassembly queue */
-#define IPCTL_MAXFRAGS	       19	/* max packets in reassembly queue */
-#define	IPCTL_MAXID	       20
+#define	IPCTL_GRE_TTL          19	/* default TTL for gre encap packet */
+#define IPCTL_MAXFRAGS	       20	/* max packets in reassembly queue */
+#define	IPCTL_MAXID	       21
 
 #define	IPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -480,6 +481,7 @@ struct group_filter {
 	{ "lowportmin", CTLTYPE_INT }, \
 	{ "lowportmax", CTLTYPE_INT }, \
 	{ "maxfragpackets", CTLTYPE_INT }, \
+	{ "grettl", CTLTYPE_INT }, \
 	{ "maxfrags", CTLTYPE_INT }, \
 }
 #endif /* !_XOPEN_SOURCE */

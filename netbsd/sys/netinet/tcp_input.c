@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_input.c,v 1.108.4.9 2001/05/09 19:37:19 he Exp $	*/
+/*	$NetBSD: tcp_input.c,v 1.108.4.12 2002/04/03 21:17:06 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

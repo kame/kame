@@ -1,4 +1,4 @@
-#	$NetBSD: files.i386,v 1.163.2.3 2001/03/30 22:29:40 he Exp $
+#	$NetBSD: files.i386,v 1.163.2.4 2001/10/25 18:05:27 he Exp $
 #
 # new style config file for i386 architecture
 #
@@ -90,6 +90,12 @@ major	{cd = 6}
 include "dev/ata/files.ata"
 major	{wd = 0}
 
+#
+# Machine-independent I2O drivers
+#
+
+include "dev/i2o/files.i2o"
+
 # Memory Disk for install floppy
 file arch/i386/i386/md_root.c	memory_disk_hooks
 major	{md = 17}
@@ -98,7 +104,7 @@ major	{md = 17}
 major	{raid = 18}
 
 # Compaq arrays
-major	{ca = 19}
+major	{ld = 19}
 
 # attribute used to bring in BIOS trampoline code for real-mode probing
 # of certain devices/BIOS features
@@ -134,6 +140,7 @@ file	arch/i386/pci/opti82c558.c	pcibios & pcibios_intr_fixup
 file	arch/i386/pci/opti82c700.c	pcibios & pcibios_intr_fixup
 file	arch/i386/pci/sis85c503.c	pcibios & pcibios_intr_fixup
 file	arch/i386/pci/via82c586.c	pcibios & pcibios_intr_fixup
+file	arch/i386/pci/ali1543.c		pcibios & pcibios_intr_fixup
 file	arch/i386/pci/pci_bus_fixup.c	pcibios & pcibios_bus_fixup
 file	arch/i386/pci/pci_addr_fixup.c	pcibios & pcibios_addr_fixup
 defopt PCI_CONF_MODE

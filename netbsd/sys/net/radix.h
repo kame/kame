@@ -1,4 +1,4 @@
-/*	$NetBSD: radix.h,v 1.10 2000/11/06 11:07:37 itojun Exp $	*/
+/*	$NetBSD: radix.h,v 1.9.32.1 2002/02/20 22:55:45 he Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1993
