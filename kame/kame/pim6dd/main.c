@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.7 2001/08/20 08:25:37 itojun Exp $	*/
+/*	$KAME: main.c,v 1.8 2001/11/08 09:47:05 itojun Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Oregon.
@@ -273,7 +273,7 @@ main(argc, argv)
 	else if (strcmp(*argv, "-c") == 0) {
 	    if (argc > 1) {
 		argv++; argc--;
-		strcpy(configfilename, *argv);
+		strlcpy(configfilename, *argv, sizeof(configfilename));
 	    }
 	    else
 		goto usage;
