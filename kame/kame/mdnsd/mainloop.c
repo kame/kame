@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.42 2001/01/15 05:42:30 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.43 2001/03/09 13:51:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -55,8 +55,22 @@
  *   mapping?)
  * - 00 mdns resolver queries to linklocal and local multicast group address.
  *   01 mdns resolver will query linklocal multicast group address only.
- * - 00 defines AA (authoritative answer) bit handling.  01 drops the comment
- *   and puts it as future study.
+ * - 00 defines AA (authoritative answer) bit handling, and allows hosts to
+ *   respond with cached data.  01 drops the comment, puts it as future
+ *   study, and forbids to answer using cached data.
+ *
+ * draft-aboba-dnsext-mdns-01 -> draft-ietf-dnsext-mdns-00 difference:
+ * - the former uses "foo.lcl.arpa" as the local name.
+ *   the latter uses "foo.local.arpa".
+ * - the latter has more limitation on retransmission (MUST NOT repeat more
+ *   than 5 times.  interval has to be 0.1 seconds or longer, and should be
+ *   exponentially increased).
+ * - TC and RA bits handling.
+ * - IP TTL/hoplimit value must be 255.
+ * - clarified that no unicast queries should be used for local.arpa, and
+ *   it is okay to query normal (unicast) DNS server for outside of local.arpa.
+ * - name server device must not listen to multicast queries.
+ * - more security section.
  */
 
 #include <sys/types.h>
