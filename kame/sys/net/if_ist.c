@@ -1,4 +1,4 @@
-/*	$KAME: if_ist.c,v 1.4 2004/12/10 05:38:54 suz Exp $	*/
+/*	$KAME: if_ist.c,v 1.5 2004/12/18 02:08:37 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -558,6 +558,9 @@ struct rtentry *rt;
 	struct ip *ip;
 	struct ip6_hdr *ip6;
 	struct in6_ifaddr *ia6;
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif
 
 	sc = (struct ist_softc*)ifp;
 	dst6 = (struct sockaddr_in6 *)dst;
