@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.38 2001/06/02 18:34:16 jinmei Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.39 2001/06/20 07:05:00 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -125,8 +125,10 @@ and Bit 3
 .Li 0x08
 .Pc
 are used to encode router preference.
-0x01 means high, 0x00 means medium, and 0x11 means low.
-The default value is 0.
+Bits 01 means high, 00 means medium, and 11 means low.
+Bits 10 is reserved, and must not be specified.
+The default value of the entire flag is 0, which means no additional
+configuration methods, and the medium router preference.
 .It Cm \&rltime
 (num) Router lifetime field
 .Pq unit: seconds .
@@ -313,8 +315,8 @@ and Bit 3
 .Po
 .Li 0x08
 .Pc
-are used to encode router preference for the route.
-The default value is 0x00, i.e. medium router preference.
+are used to encode the route preference for the route.
+The default value is 0x00, i.e. medium preference.
 .It Cm \&rtprefix
 (str) The prefix filled into the Prefix field of route information option.
 Since
