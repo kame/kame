@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1933 2001/10/23 12:46:38 jinmei Exp $
+$KAME: CHANGELOG,v 1.1934 2001/10/24 02:22:48 sumikawa Exp $
 
 <200110>
+Wed Oct 24 11:15:40 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd4: fix the bug IPv6 over vlan do not work when updating
+	  freebsd4.4
+
 2001-10-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	added a per-gif timer to refresh a (possibly) stale cached route
 	towards the tunnel end.  Based on a comment from kato@wide.ad.jp.
