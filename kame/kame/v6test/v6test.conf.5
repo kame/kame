@@ -1,4 +1,4 @@
-.\"	$KAME: v6test.conf.5,v 1.3 2001/04/04 18:47:20 suz Exp $
+.\"	$KAME: v6test.conf.5,v 1.4 2001/06/27 09:43:57 suz Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -63,7 +63,7 @@ except for the entries to be specified in the arguments of
 .Xr v6test 1 .
 Their name determines their properties to be specified.
 
-\fBinterval ether ip6 hbh icmp6echorpl icmp6echo icmp6err rtsol rtadvd nsol nadv redirect frghdr dstopt tcp udp raw\fR
+\fBinterval ether ip6 hbh icmp6echorpl icmp6echo icmp6err mld rtsol rtadvd nsol nadv redirect frghdr dstopt tcp udp raw\fR
 
 .Pp
 Every description begins with phrases regarding its argument. Its meanings are
@@ -160,6 +160,12 @@ jumbo-packet hop-by-hop option.  Following entry should be specified.
 .It Cm \&jumbo_len \fI(num)\fR
 jumbo-payload length field
 .El
+.It Cm \&rtalert \fI(entry)\fR
+router-alert option.  Following entry should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&rtalert_data \fI(num)\fR
+rtalert options's data
+.El
 .It Cm \&unknownopt \fI(text)\fR
 unknown option. Following entries should be specified.
 .Bl -tag -width indent -compact
@@ -201,6 +207,20 @@ is
 pointer for ICMPv6 Parameter Problem message. Can be specified only when 
 .Ic icmp6_type
 is 4 (=ICMP6_PARAM_PROB).
+.El
+
+.Pp
+.It Cm \&mld \fI(entry)\fR
+MLD data. The following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&mld_type \fI(num)\fR
+MLD Type field.
+.It Cm \&mld_code \fI(num, optional)\fR
+MLD Code field.  If not specified, 0 is assumed.
+.It Cm \&mld_rsv \fI(num, optional)\fR
+MLD reserved field.  If not specified, 0 is assumed.
+.It Cm \&mld_addr \fI(text)\fR
+MLD multicast address field.  Should be an IPv6 address.
 .El
 
 .Pp

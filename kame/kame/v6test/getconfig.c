@@ -65,6 +65,7 @@ static void make_hbh(char *);
 static void make_dstopts(char *);
 static void make_padnopt(char *);
 static void make_jumboopt(char *);
+static void make_rtalert(char *);
 static void make_unknownopt(char *);
 static void make_rthdr(char *);
 static void make_frghdr(char *);
@@ -73,6 +74,7 @@ static void make_ah(char *);
 #endif
 static void make_icmp6echo(char *, u_char);
 static void make_icmperr(char *);
+static void make_mld(char *name);
 static void make_rtsol(char *);
 static void make_rtadv(char *);
 static void make_nsol(char *);
@@ -238,6 +240,8 @@ make_hbh(char *name)
 			make_padnopt(opttype);
 		else if (strncmp("jumbo", opttype, 5) == 0)
 			make_jumboopt(opttype);
+		else if (strncmp("rtalert", opttype, 7) == 0)
+			make_rtalert(opttype);
 		else if (strncmp("unknownopt", opttype, 10) == 0)
 			make_unknownopt(opttype);
 		else {
@@ -325,6 +329,26 @@ make_jumboopt(char *name)
 	bcopy((caddr_t)&jumbolen, optp + 2, 4); /* XXX */
 
 	pbp += 6;		/* size of jumbo payload option */
+}
+
+void
+make_rtalert(char *name)
+{
+	char optbuf[BUFSIZ];
+	u_char *optp = pbp;
+	u_short val16 = 0;
+    
+	if (tgetent(optbuf, name) <= 0) {
+		fprintf(stderr, "v6test: unknown option %s\n", name);
+		exit(1);
+	}
+	*optp = 0x05;
+	*(optp + 1) = 2;
+	MUSTHAVE(val16, "rtalert_data", optbuf);
+	HTONS(val16);
+	bcopy((caddr_t)&val16, optp + 2, 2); /* XXX */
+
+	pbp += 4;		/* size of router-alert option */
 }
 
 void
@@ -547,6 +571,44 @@ make_icmperr(char *name)
 		break;
 	}
 	pbp += sizeof(*icmp6);
+}
+
+static void
+make_mld(char *name)
+{
+	char mldbuf[BUFSIZ], area[BUFSIZ];
+	char *bp = area, *target;
+	struct mld6_hdr *mld = (struct mld6_hdr *)pbp;
+    
+	if (tgetent(mldbuf, name) <= 0) {
+		fprintf(stderr, "v6test: unknown header %s\n", name);
+		exit(1);
+	}
+	MUSTHAVE(mld->mld6_type, "mld_type", mldbuf);
+	MAYHAVE(mld->mld6_code, "mld_code", 0, mldbuf);
+	MAYHAVE(mld->mld6_cksum, "mld_cksum", 0, mldbuf);
+	MAYHAVE(mld->mld6_reserved, "mld_rsv", 0, mldbuf);
+	if ((target = tgetstr("mld_addr", &bp, mldbuf)) == NULL) {
+		fprintf(stderr, "v6test: needs addr for MLD\n");
+		exit(1);
+	}
+	if (inet_pton(AF_INET6, target, &mld->mld6_addr) != 1) {
+		perror("inet_pton");
+		exit(1);
+	}
+
+	switch(mld->mld6_type) {
+	case MLD6_LISTENER_QUERY:
+		MUSTHAVE(mld->mld6_maxdelay, "mld_maxdelay", mldbuf);
+		break;
+	case MLD6_LISTENER_REPORT:
+	case MLD6_LISTENER_DONE:
+		MAYHAVE(mld->mld6_maxdelay, "mld_maxdelay", 0, mldbuf);
+		break;
+	default:
+		break;
+	}
+	pbp += sizeof(*mld);
 }
 
 void
@@ -1113,6 +1175,11 @@ getconfig(char *testname, u_char *buf)
 				*nxthdrp = IPPROTO_ICMPV6;
 			nxthdrp = 0;
 			make_redirect(hdrtype);
+		} else if (strncmp("mld", hdrtype, 3) == 0) {
+			if (nxthdrp)
+				*nxthdrp = IPPROTO_ICMPV6;
+			nxthdrp = 0;
+			make_mld(hdrtype);
 		} else if (strncmp("rthdr", hdrtype, 5) == 0) {
 			if (nxthdrp)
 				*nxthdrp = IPPROTO_ROUTING;
