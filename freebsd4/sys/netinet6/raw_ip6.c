@@ -365,7 +365,7 @@ rip6_output(m, so, dstsock, control)
 	M_PREPEND(m, sizeof(*ip6), M_WAIT);
 	ip6 = mtod(m, struct ip6_hdr *);
 
-	if ((error = in6_embedscope(&ip6->ip6_dst, dstsock)) != 0)
+	if ((error = scope6_check_id(dstsock, ip6_use_defzone)) != 0)
 		goto bad;
 
 	/* Source address selection. */
