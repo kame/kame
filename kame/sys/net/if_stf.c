@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.89 2002/11/05 03:02:28 k-sugyou Exp $	*/
+/*	$KAME: if_stf.c,v 1.90 2002/11/17 16:21:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -707,6 +707,14 @@ stf_checkaddr4(sc, in, inifp)
 	 * (requirement from RFC3056 section 2 1st paragraph)
 	 */
 	if (isrfc1918addr(in))
+		return -1;
+
+	/*
+	 * reject packet with IPv4 link-local (169.254.0.0/16),
+	 * as suggested in draft-savola-v6ops-6to4-security-00.txt
+	 */
+	if (((ntohl(in->s_addr) & 0xff000000) >> 24) == 169 &&
+	    ((ntohl(in->s_addr) & 0x00ff0000) >> 16) == 254)
 		return -1;
 
 	/*
