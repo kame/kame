@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.71 2001/08/16 16:50:17 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.72 2001/08/16 17:10:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -940,7 +940,9 @@ gif_set_tunnel(ifp, src, dst)
 	if (odst)
 		free((caddr_t)odst, M_IFADDR);
 
-	error = 0;
+	ifp->if_flags |= IFF_RUNNING;
+	splx(s);
+	return 0;
 
  bad:
 #ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
