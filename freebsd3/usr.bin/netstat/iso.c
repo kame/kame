@@ -36,8 +36,8 @@ static char sccsid[] = "@(#)iso.c	8.1 (Berkeley) 6/6/93";
 #endif /* not lint */
 
 /*
- * $Header: /home/ncvs/src/usr.bin/netstat/iso.c,v 1.2 1995/04/09 05:33:17 davidg Exp $
- * $Source: /home/ncvs/src/usr.bin/netstat/iso.c,v $
+ * $Header: /cvsroot/hydrangea-freebsd-30/src/usr.bin/netstat/iso.c,v 1.1.1.1 1998/11/07 13:24:56 shin Exp $
+ * $Source: /cvsroot/hydrangea-freebsd-30/src/usr.bin/netstat/iso.c,v $
  */
 /*******************************************************************************
 	          Copyright IBM Corporation 1987

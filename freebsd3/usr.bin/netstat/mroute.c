@@ -77,7 +77,7 @@ mroutepr(mfcaddr, vifaddr)
 	vifi_t maxvif = 0;
 
 	if (mfcaddr == 0 || vifaddr == 0) {
-		printf("No multicast routing compiled into this system.\n");
+		printf("No IPv4 multicast routing compiled into this system.\n");
 		return;
 	}
 
@@ -118,7 +118,7 @@ mroutepr(mfcaddr, vifaddr)
 			kread((u_long)m, (char *)&mfc, sizeof mfc);
 
 			if (!banner_printed) {
-				printf("\nMulticast Forwarding Cache\n"
+				printf("\nIPv4 Multicast Forwarding Cache\n"
 				       " Origin          Group            "
 				       " Packets In-Vif  Out-Vifs:Ttls\n");
 				banner_printed = 1;
@@ -152,12 +152,12 @@ mrt_stats(mstaddr)
 	struct mrtstat mrtstat;
 
 	if (mstaddr == 0) {
-		printf("No multicast routing compiled into this system.\n");
+		printf("No IPv4 multicast routing compiled into this system.\n");
 		return;
 	}
 
 	kread(mstaddr, (char *)&mrtstat, sizeof(mrtstat));
-	printf("multicast forwarding:\n");
+	printf("IPv4 multicast forwarding:\n");
 	printf(" %10lu multicast forwarding cache lookup%s\n",
 	  mrtstat.mrts_mfc_lookups, plural(mrtstat.mrts_mfc_lookups));
 	printf(" %10lu multicast forwarding cache miss%s\n",

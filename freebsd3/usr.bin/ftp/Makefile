@@ -10,13 +10,23 @@ PROG=	ftp
 SRCS=	cmds.c cmdtab.c complete.c domacro.c fetch.c ftp.c main.c ruserpass.c \
 	util.c
 CFLAGS+=-I${.CURDIR}/../../contrib-crypto/telnet
+CFLAGS+=-DINET6
 
 LDADD+=	-ledit -ltermcap
 DPADD+=	${LIBEDIT} ${LIBTERMCAP}
+LDADD+= -L${.OBJDIR}/../../../src/libinet6 \
+        -L${.OBJDIR}/../../../src/libinet6/obj \
+        -L/usr/local/v6/lib -linet6
+DPADD+= ${.OBJDIR}/../../../src/libinet6/libinet6.a \
+        ${.OBJDIR}/../../../src/libinet6/obj/libinet6.a \
+        /usr/local/v6/lib/libinet6.a
 
 LINKS=	${BINDIR}/ftp ${BINDIR}/pftp \
 	${BINDIR}/ftp ${BINDIR}/gate-ftp
 MLINKS=	ftp.1 pftp.1 \
 	ftp.1 gate-ftp.1
+#SRCS=	cmds.c cmdtab.c ftp.c main.c ruserpass.c domacro.c
+#LINKS=  ${BINDIR}/ftp ${BINDIR}/pftp
+#MLINKS= ftp.1 pftp.1
 
 .include <bsd.prog.mk>

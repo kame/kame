@@ -121,6 +121,24 @@ static struct nlist nl[] = {
 	{ "_ddpstat"},
 #define N_DDPCB		26
 	{ "_ddpcb"},
+#define N_IP6STAT	27
+	{ "_ip6stat" },
+#define N_ICMP6STAT	28
+	{ "_icmp6stat" },
+#define N_IPSECSTAT	29
+	{ "_ipsecstat" },
+#define N_IPSEC6STAT	30
+	{ "_ipsec6stat" },
+#define N_PIM6STAT	31
+	{ "_pim6stat" },
+#define N_MRT6PROTO	32
+	{ "_ip6_mrtproto" },
+#define N_MRT6STAT	33
+	{ "_mrt6stat" },
+#define N_MF6CTABLE	34
+	{ "_mf6ctable" },
+#define N_MIF6TABLE	35
+	{ "_mif6table" },
 	{ "" },
 };
 
@@ -145,11 +163,38 @@ struct protox {
 	  icmp_stats,	"icmp",		IPPROTO_ICMP },
 	{ -1,		-1,		1,	protopr,
 	  igmp_stats,	"igmp",		IPPROTO_IGMP },
+#ifdef IPSEC
+	{ -1,		N_IPSECSTAT,	1,	0,
+	  ipsec_stats,	"ipsec", 	0},
+#endif
 	{ -1,		-1,		1,	protopr,
 	  bdg_stats,	"bdg",		1 /* bridging... */ },
 	{ -1,		-1,		0,	0,
 	  0,		0 }
 };
+
+#ifdef INET6
+struct protox ip6protox[] = {
+	{ -1,		-1,		1,	protopr,
+	  tcp_stats,	"tcp",		IPPROTO_TCP },
+	{ -1,		-1,		1,	protopr,
+	  udp_stats,	"udp",		IPPROTO_UDP },
+	{ -1,		N_IP6STAT,	1,	0,
+	  ip6_stats,	"ip6",		0 },
+	{ -1,		N_ICMP6STAT,	1,	0,
+	  icmp6_stats,	"icmp6",	0 },
+#ifdef IPSEC
+	{ -1,		N_IPSEC6STAT,	1,	0,
+	  ipsec_stats,	"ipsec6",	0 },
+#endif
+	{ -1,		N_PIM6STAT,	1,	0,
+	  pim6_stats,	"pim6",		0 },
+	{ -1,		-1,		1,	protopr,
+	  bdg_stats,	"bdg",		1 /* bridging... */ },
+	{ -1,		-1,		0,	0,
+	  0,		0,		0 }
+};
+#endif /*INET6*/
 
 struct protox atalkprotox[] = {
 	{ N_DDPCB,	N_DDPSTAT,	1,	atalkprotopr,
@@ -195,14 +240,20 @@ struct protox isoprotox[] = {
 };
 #endif
 
-struct protox *protoprotox[] = { protox, ipxprotox, atalkprotox,
+struct protox *protoprotox[] = {
+	protox,
+#ifdef INET6
+	ip6protox,
+#endif
+	ipxprotox, atalkprotox,
 #ifdef NS
-					 nsprotox, 
+	nsprotox, 
 #endif
 #ifdef ISO
-					 isoprotox, 
+	isoprotox, 
 #endif
-					 NULL };
+	NULL
+};
 
 static void printproto __P((struct protox *, char *));
 static void usage __P((void));
@@ -223,7 +274,7 @@ main(argc, argv)
 
 	af = AF_UNSPEC;
 
-	while ((ch = getopt(argc, argv, "Aabdf:ghI:iM:mN:np:rstuw:")) != -1)
+	while ((ch = getopt(argc, argv, "Aabdf:ghI:liM:mN:np:rstuw:")) != -1)
 		switch(ch) {
 		case 'A':
 			Aflag = 1;
@@ -247,6 +298,10 @@ main(argc, argv)
 				af = AF_IPX;
 			else if (strcmp(optarg, "inet") == 0)
 				af = AF_INET;
+#ifdef INET6
+			else if (strcmp(optarg, "inet6") == 0)
+				af = AF_INET6;
+#endif /*INET6*/
 			else if (strcmp(optarg, "unix") == 0)
 				af = AF_UNIX;
 			else if (strcmp(optarg, "atalk") == 0)
@@ -273,6 +328,9 @@ main(argc, argv)
 		}
 		case 'i':
 			iflag = 1;
+			break;
+		case 'l':
+			lflag = 1;
 			break;
 		case 'M':
 			memf = optarg;
@@ -389,13 +447,24 @@ main(argc, argv)
 	}
 	if (gflag) {
 		kread(0, 0, 0);
-		if (sflag)
-			mrt_stats(nl[N_MRTSTAT].n_value);
-		else
-			mroutepr(nl[N_MFCTABLE].n_value,
-			    nl[N_VIFTABLE].n_value);
+		if (sflag) {
+			if (af == AF_INET || af == AF_UNSPEC)
+				mrt_stats(nl[N_MRTSTAT].n_value);
+			if (af == AF_INET6 || af == AF_UNSPEC)
+				mrt6_stats(nl[N_MRT6STAT].n_value);
+		}
+		else {
+			if (af == AF_INET || af == AF_UNSPEC)
+				mroutepr(nl[N_MFCTABLE].n_value,
+					 nl[N_VIFTABLE].n_value);
+			else if (af == AF_INET6 || af == AF_UNSPEC)
+				mroute6pr(nl[N_MF6CTABLE].n_value,
+					  nl[N_MIF6TABLE].n_value);
+		}
 		exit(0);
 	}
+	kread(0, 0, 0);
+#if 0
 	if (af == AF_INET || af == AF_UNSPEC) {
 		setprotoent(1);
 		setservent(1);
@@ -410,8 +479,16 @@ main(argc, argv)
 		}
 		endprotoent();
 	}
+#endif
+	if (af == AF_INET || af == AF_UNSPEC)
+		for (tp = protox; tp->pr_name; tp++)
+			printproto(tp, tp->pr_name);
+#ifdef INET6
+	if (af == AF_INET6 || af == AF_UNSPEC)
+		for (tp = ip6protox; tp->pr_name; tp++)
+			printproto(tp, tp->pr_name);
+#endif /*INET6*/
 	if (af == AF_IPX || af == AF_UNSPEC) {
-		kread(0, 0, 0);
 		for (tp = ipxprotox; tp->pr_name; tp++)
 			printproto(tp, tp->pr_name);
 	}
@@ -456,7 +533,7 @@ printproto(tp, name)
 			: nl[tp->pr_index].n_value;
 	}
 	if (pr != NULL && (off || af != AF_UNSPEC))
-		(*pr)(off, name);
+		(*pr)(off, name, af);
 }
 
 /*
@@ -547,11 +624,11 @@ name2protox(name)
 	 * Try to find the name in the list of "well-known" names. If that
 	 * fails, check if name is an alias for an Internet protocol.
 	 */
-	if ((tp = knownname(name)))
+	if (tp = knownname(name))
 		return (tp);
 
 	setprotoent(1);			/* make protocol lookup cheaper */
-	while ((p = getprotoent())) {
+	while (p = getprotoent()) {
 		/* assert: name not same as p->name */
 		for (alias = p->p_aliases; *alias; alias++)
 			if (strcmp(name, *alias) == 0) {

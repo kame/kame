@@ -74,12 +74,12 @@ static const char rcsid[] =
 
 #define	TIMEOUT		5		/* secs between rexmt's */
 
-struct	sockaddr_in peeraddr;
-int	f;
-short   port;
+struct sockaddr_storage peeraddr;
+int	f = -1;
+char	*port = "tftp";
 int	trace;
 int	verbose;
-int	connected;
+int	connected = 0;
 char	mode[32];
 char	line[200];
 int	margc;
@@ -87,7 +87,6 @@ char	*margv[20];
 char	*prompt = "tftp";
 jmp_buf	toplevel;
 void	intr();
-struct	servent *sp;
 
 void	get __P((int, char **));
 void	help __P((int, char **));
@@ -157,18 +156,9 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	struct sockaddr_in sin;
-
-	sp = getservbyname("tftp", "udp");
-	if (sp == 0)
-		errx(1, "udp/tftp: unknown service");
-	f = socket(AF_INET, SOCK_DGRAM, 0);
-	if (f < 0)
-		err(3, "socket");
-	bzero((char *)&sin, sizeof(sin));
-	sin.sin_family = AF_INET;
-	if (bind(f, (struct sockaddr *)&sin, sizeof(sin)) < 0)
-		err(1, "bind");
+	port = "tftp";
+	f = -1;
+	connected = 0;
 	strcpy(mode, "netascii");
 	signal(SIGINT, intr);
 	if (argc > 1) {
@@ -188,7 +178,10 @@ setpeer(argc, argv)
 	int argc;
 	char *argv[];
 {
-	struct hostent *host;
+	struct addrinfo hints;
+	struct addrinfo *res;
+	int error;
+	struct sockaddr_storage me;
 
 	if (argc < 2) {
 		strcpy(line, "Connect ");
@@ -202,33 +195,48 @@ setpeer(argc, argv)
 		printf("usage: %s host-name [port]\n", argv[0]);
 		return;
 	}
-	host = gethostbyname(argv[1]);
-	if (host) {
-		peeraddr.sin_family = host->h_addrtype;
-		bcopy(host->h_addr, &peeraddr.sin_addr, 
-			MIN(sizeof(peeraddr.sin_addr), host->h_length));
-		strncpy(hostname, host->h_name, sizeof(hostname));
-	} else {
-		peeraddr.sin_family = AF_INET;
-		peeraddr.sin_addr.s_addr = inet_addr(argv[1]);
-		if (peeraddr.sin_addr.s_addr == -1) {
-			connected = 0;
-			printf("%s: unknown host\n", argv[1]);
-			return;
-		}
+	if (argc == 3)
+		port = argv[2];
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_protocol = IPPROTO_UDP;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_CANONNAME;
+	error = getaddrinfo(argv[1], port, &hints, &res);
+	if (error) {
+		printf("%s/%s: %s\n", argv[1], port, gai_strerror(error));
+		connected = 0;
+		return;
+	}
+
+	memcpy(&peeraddr, res->ai_addr, res->ai_addrlen);
+	if (res->ai_canonname)
+		strncpy(hostname, res->ai_canonname, sizeof(hostname));
+	else
 		strncpy(hostname, argv[1], sizeof(hostname));
-	}
 	hostname[sizeof(hostname) - 1] = '\0';
-	port = sp->s_port;
-	if (argc == 3) {
-		port = atoi(argv[2]);
-		if (port < 0) {
-			printf("%s: bad port number\n", argv[2]);
-			connected = 0;
-			return;
-		}
-		port = htons(port);
+
+	if (res->ai_next || verbose) {
+		char numhost[MAXHOSTNAMELEN];
+		char numserv[MAXHOSTNAMELEN];
+		getnameinfo((struct sockaddr *)&peeraddr, peeraddr.__ss_len,
+			numhost, sizeof(numhost), numserv, sizeof(numserv),
+			NI_NUMERICHOST | NI_NUMERICSERV);
+		printf("%s/%s: connected to %s/%s\n", argv[1], port, numhost,
+			numserv);
 	}
+
+	if (0 <= f)
+		close(f);
+	f = socket(peeraddr.__ss_family, SOCK_DGRAM, 0);
+	if (f < 0)
+		err(3, "socket");
+	memset(&me, 0, sizeof(me));
+	me.__ss_family = peeraddr.__ss_family;
+	me.__ss_len = peeraddr.__ss_len;
+	if (bind(f, (struct sockaddr *)&me, me.__ss_len) < 0)
+		err(1, "bind");
 	connected = 1;
 }
 
@@ -333,9 +341,10 @@ put(argc, argv)
 		return;
 	}
 	targ = argv[argc - 1];
+	if (argc < 4) {
+	}
 	if (index(argv[argc - 1], ':')) {
-		char *cp;
-		struct hostent *hp;
+		char *targv[3];
 
 		for (n = 1; n < argc - 1; n++)
 			if (index(argv[n], ':')) {
@@ -345,18 +354,10 @@ put(argc, argv)
 		cp = argv[argc - 1];
 		targ = index(cp, ':');
 		*targ++ = 0;
-		hp = gethostbyname(cp);
-		if (hp == NULL) {
-			fprintf(stderr, "tftp: %s: ", cp);
-			herror((char *)NULL);
-			return;
-		}
-		bcopy(hp->h_addr, (caddr_t)&peeraddr.sin_addr, 
-			MIN(sizeof(peeraddr.sin_addr), hp->h_length));
-		peeraddr.sin_family = hp->h_addrtype;
-		connected = 1;
-		strncpy(hostname, hp->h_name, sizeof(hostname));
-		hostname[sizeof(hostname) - 1] = '\0';
+		targv[0] = "connect";
+		targv[1] = cp;
+		targv[2] = '\0';
+		setpeer(2, targv);
 	}
 	if (!connected) {
 		printf("No target machine specified.\n");
@@ -372,7 +373,6 @@ put(argc, argv)
 		if (verbose)
 			printf("putting %s to %s:%s [%s]\n",
 				cp, hostname, targ, mode);
-		peeraddr.sin_port = port;
 		xmitfile(fd, targ, mode);
 		return;
 	}
@@ -390,7 +390,6 @@ put(argc, argv)
 		if (verbose)
 			printf("putting %s to %s:%s [%s]\n",
 				argv[n], hostname, targ, mode);
-		peeraddr.sin_port = port;
 		xmitfile(fd, targ, mode);
 	}
 }
@@ -440,21 +439,13 @@ get(argc, argv)
 		if (src == NULL)
 			src = argv[n];
 		else {
-			struct hostent *hp;
+			char *targv[3];
 
 			*src++ = 0;
-			hp = gethostbyname(argv[n]);
-			if (hp == NULL) {
-				fprintf(stderr, "tftp: %s: ", argv[n]);
-				herror((char *)NULL);
-				continue;
-			}
-			bcopy(hp->h_addr, (caddr_t)&peeraddr.sin_addr,
-			    MIN(sizeof(peeraddr.sin_addr), hp->h_length));
-			peeraddr.sin_family = hp->h_addrtype;
-			connected = 1;
-			strncpy(hostname, hp->h_name, sizeof(hostname));
-			hostname[sizeof(hostname) - 1] = '\0';
+			targv[0] = "connect";
+			targv[1] = argv[n];
+			targv[2] = '\0';
+			setpeer(2, targv);
 		}
 		if (argc < 4) {
 			cp = argc == 3 ? argv[2] : tail(src);
@@ -466,7 +457,6 @@ get(argc, argv)
 			if (verbose)
 				printf("getting from %s:%s to %s [%s]\n",
 					hostname, src, cp, mode);
-			peeraddr.sin_port = port;
 			recvfile(fd, src, mode);
 			break;
 		}
@@ -479,7 +469,6 @@ get(argc, argv)
 		if (verbose)
 			printf("getting from %s:%s to %s [%s]\n",
 				hostname, src, cp, mode);
-		peeraddr.sin_port = port;
 		recvfile(fd, src, mode);
 	}
 }

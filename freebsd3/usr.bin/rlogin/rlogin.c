@@ -173,7 +173,7 @@ main(argc, argv)
 		argoff = 1;
 	}
 
-#ifdef KERBEROS
+#ifdef	KERBEROS
 #define	OPTIONS	"8DEKLde:k:l:x"
 #else
 #define	OPTIONS	"8DEKLde:l:"
@@ -340,9 +340,21 @@ main(argc, argv)
 	    setsockopt(rem, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one)) < 0)
 		warn("setsockopt NODELAY (ignored)");
 
-	one = IPTOS_LOWDELAY;
-	if (setsockopt(rem, IPPROTO_IP, IP_TOS, (char *)&one, sizeof(int)) < 0)
-		warn("setsockopt TOS (ignored)");
+#if defined(IPPROTO_IP) && defined(IP_TOS)
+    {
+	struct sockaddr_storage ss;
+	int sslen;
+	sslen = sizeof(ss);
+	if (getsockname(rem, (struct sockaddr *)&ss, &sslen) == 0 &&
+	    ss.__ss_family == AF_INET) {
+		one = IPTOS_LOWDELAY;
+		if (setsockopt(rem, IPPROTO_IP, IP_TOS, (char *)&one,
+				sizeof(int)) < 0) {
+			warn("setsockopt TOS (ignored)");
+		}
+	}
+    }
+#endif
 
 	(void)setuid(uid);
 	doit(omask);

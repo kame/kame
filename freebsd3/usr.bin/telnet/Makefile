@@ -39,13 +39,28 @@ CFLAGS+=-DTERMCAP -DKLUDGELINEMODE -DUSE_TERMIO #-DAUTHENTICATION -DENCRYPTION
 CFLAGS+=-DENV_HACK
 CFLAGS+=-DSKEY
 CFLAGS+=-I${.CURDIR}/../../lib
+CFLAGS+=-DIPSEC
 
 #CFLAGS+= -DKRB4
 
 DPADD=	${LIBTERMCAP} ${LIBTELNET}
-LDADD=	-ltermcap -ltelnet
+LDADD=
+LDADD+=	-ltermcap -ltelnet
+CFLAGS+=-DINET6
 #DPADD+=	${LIBKRB} ${LIBDES}
 #LDADD+=	-lkrb -ldes
+LDADD+=	-L${.CURDIR}/../../../src/libipsec \
+	-L${.CURDIR}/../../../src/libipsec/obj \
+	-L/usr/local/v6/lib -lipsec
+DPADD+=	${.CURDIR}/../../../src/libipsec/libipsec.a \
+	${.CURDIR}/../../../src/libipsec/obj/libipsec.a \
+	/usr/local/v6/lib/libipsec.a
+LDADD+= -L${.OBJDIR}/../../../src/libinet6 \
+        -L${.OBJDIR}/../../../src/libinet6/obj \
+        -L/usr/local/v6/lib -linet6
+DPADD+= ${.OBJDIR}/../../../src/libinet6/libinet6.a \
+        ${.OBJDIR}/../../../src/libinet6/obj/libinet6.a \
+        /usr/local/v6/lib/libinet6.a
 
 SRCS=	authenc.c commands.c main.c network.c ring.c sys_bsd.c telnet.c \
 	terminal.c tn3270.c utilities.c

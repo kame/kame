@@ -166,8 +166,28 @@ protocol, the remote site will probably have some
 sort of file-access restrictions in place.  The
 exact methods are specific to each site and therefore
 difficult to document here.
+.Pp
+"TFTP over IPv6" is yet to be standardized.
+Therefore, there is no documented maximum segment size.
+The implementation uses 512
+.Pq same as IPv4 case
+for simplicity.
+.Pp
+If the hostname string specified by
+.Ar host
+argument is ambiguous
+.Po
+i.e. two ore more IP address is assigned to the hostname
+.Pc ,
+.Nm
+tries the first one only.
+If it causes any trouble, please specify
+.Ar host
+by numeric IPv4/v6 address.
 .Sh HISTORY
 The
 .Nm
 command appeared in
 .Bx 4.3 .
+.Pp
+IPv6 support was added by WIDE/KAME Project in 1998.

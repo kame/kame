@@ -48,6 +48,7 @@
 .Nm Rlogin
 starts a terminal session on a remote host
 .Ar host  .
+The version supports IPv6 as well as IPv4.
 .Pp
 .Nm Rlogin
 first attempts to use the Kerberos authorization mechanism, described below.
@@ -204,6 +205,8 @@ The
 .Nm
 command appeared in
 .Bx 4.2 .
+.Pp
+IPv6 support was added by WIDE/KAME project.
 .Sh BUGS
 .Nm Rlogin
 will be replaced by

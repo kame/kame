@@ -1,3 +1,32 @@
+/*
+ * Copyright (C) 1997 and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+  * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 /*	$Id: ftp_var.h,v 1.6 1997/12/13 20:38:18 pst Exp $	*/
 /*	$NetBSD: ftp_var.h,v 1.20.2.1 1997/11/18 01:01:37 mellon Exp $	*/
 
@@ -95,7 +124,7 @@ int	preserve;		/* preserve modification time on files */
 int	progress;		/* display transfer progress bar */
 int	code;			/* return/reply code for ftp command */
 int	crflag;			/* if 1, strip car. rets. on ascii gets */
-char	pasv[64];		/* passive port for proxy data connection */
+char	pasv[BUFSIZ];		/* passive port for proxy data connection */
 int	passivemode;		/* passive mode enabled */
 int	restricted_data_ports;	/* enable quarantine FTP area */
 char   *altarg;			/* argv[1] with no shell-like preprocessing  */
@@ -137,9 +166,15 @@ char   *hostname;		/* name of host connected to */
 int	unix_server;		/* server is unix, can use binary for ascii */
 int	unix_proxy;		/* proxy is unix, can use binary for ascii */
 
+#if 0
 u_int16_t	ftpport;	/* port number to use for ftp connections */
 u_int16_t	httpport;	/* port number to use for http connections */
 u_int16_t	gateport;	/* port number to use for gateftp connections */
+#else
+char *ftpport;			/* port number to use for ftp connections */
+char *httpport;			/* port number to use for http connections */
+char *gateport;			/* port number to use for gateftp connections */
+#endif
 
 jmp_buf	toplevel;		/* non-local goto stuff for cmd scanner */
 
