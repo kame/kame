@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.104 2003/06/27 07:48:39 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.105 2004/01/08 06:50:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -903,7 +903,7 @@ rtmsg(cmd)
 		rtm->rtm_flags |= (RTF_HOST | RTF_STATIC);
 		if (rtm->rtm_flags & RTF_ANNOUNCE) {
 			rtm->rtm_flags &= ~RTF_HOST;
-			rtm->rtm_flags |= RTA_NETMASK;
+			rtm->rtm_addrs |= RTA_NETMASK;
 		}
 		/* FALLTHROUGH */
 	case RTM_GET:
