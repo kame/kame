@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.25 2002/07/17 00:17:43 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.26 2002/07/23 13:23:23 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -203,7 +203,7 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	ip6mh->ip6mh_type = IP6M_HOME_TEST;
 	ip6mh->ip6mh_nonce_index = htonl(nonce_index);
 	ip6mh->ip6mh_mobile_cookie = htonl(cookie);
-	mip6_create_cookie(&src->sin6_addr,
+	mip6_create_cookie(&dst->sin6_addr,
 			   &home_nodekey, &home_nonce, &ip6mh->ip6mh_cookie);
 
 	/* calculate checksum. */
@@ -310,7 +310,7 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	ip6mc->ip6mc_type = IP6M_CAREOF_TEST;
 	ip6mc->ip6mc_nonce_index = htonl(nonce_index);
 	ip6mc->ip6mc_mobile_cookie = htonl(cookie);
-	mip6_create_cookie(&src->sin6_addr,
+	mip6_create_cookie(&dst->sin6_addr,
 			   &careof_nodekey, &careof_nonce,
 			   &ip6mc->ip6mc_cookie);
 	
@@ -1372,7 +1372,7 @@ mip6_ip6mci_create(pktopt_mobility, mbu)
 	return (0);
 }
 
-#define AUTH_SIZE	sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN
+#define AUTH_SIZE	(sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN)
 
 int
 mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
@@ -1451,6 +1451,9 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		nonce_size += PADLEN(bu_size + nonce_size, 4, 2);
 		auth_size = AUTH_SIZE;
 		auth_size += PADLEN(bu_size + nonce_size + auth_size, 8, 0);
+#if RR_DBG
+printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_size, nonce_size, auth_size, AUTH_SIZE);
+#endif
 	} else {
 		bu_size += PADLEN(bu_size, 8, 0);
 		nonce_size = auth_size = 0;
@@ -1464,7 +1467,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 
 	if (need_rr) {
 		mopt_nonce = (struct ip6m_opt_nonce *)((u_int8_t *)ip6mu + bu_size);
-		mopt_auth = (struct ip6m_opt_authdata *)(u_int8_t *)mopt_nonce + nonce_size;
+		mopt_auth = (struct ip6m_opt_authdata *)((u_int8_t *)mopt_nonce + nonce_size);
 	}
 
 	/* update sequence number of this binding update entry. */
@@ -1542,6 +1545,10 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
 		mopt_auth->ip6moau_len = AUTH_SIZE;
 
+#if RR_DBG
+printf("MN: Home Cookie: %*D\n", sizeof(mbu->mbu_home_cookie), (caddr_t)&mbu->mbu_home_cookie, ":");
+printf("MN: Care-of Cookie: %*D\n", sizeof(mbu->mbu_careof_cookie), (caddr_t)&mbu->mbu_careof_cookie, ":");
+#endif
 		/* Calculate K_bu */
 		SHA1Init(&sha1_ctx);
 		SHA1Update(&sha1_ctx, (caddr_t)&mbu->mbu_home_cookie,
@@ -1549,23 +1556,39 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		SHA1Update(&sha1_ctx, (caddr_t)&mbu->mbu_careof_cookie,
 			   sizeof(mbu->mbu_careof_cookie));
 		SHA1Final(key_bu, &sha1_ctx);
+#if RR_DBG
+printf("MN: K_bu: %*D\n", sizeof(key_bu), key_bu, ":");
+#endif
 
 		/* Calculate authenticator (5.5.6) */
 		/* MAC_Kbu(coa, | cn | BU) */
 		hmac_init(&hmac_ctx, key_bu, sizeof(key_bu), HMAC_SHA1);
-		hmac_loop(&hmac_ctx, (u_int8_t *)&src->sin6_addr,
-			  sizeof(src->sin6_addr));
+		hmac_loop(&hmac_ctx, (u_int8_t *)&mbu->mbu_coa.sin6_addr,
+			  sizeof(mbu->mbu_coa.sin6_addr));
+#if RR_DBG
+printf("MN: Auth: %*D\n", sizeof(mbu->mbu_coa.sin6_addr), &mbu->mbu_coa.sin6_addr, ":");
+#endif
 		hmac_loop(&hmac_ctx, (u_int8_t *)&dst->sin6_addr,
 			  sizeof(dst->sin6_addr));
+#if RR_DBG
+printf("MN: Auth: %*D\n", sizeof(dst->sin6_addr), &dst->sin6_addr, ":");
 		hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu, bu_size + nonce_size);
+printf("MN: Auth: %*D\n", bu_size + nonce_size, ip6mu, ":");
+#endif
 		/* Eliminate authdata mobility option to calculate authdata 
 		   But it should be included padding area */
 		if (auth_size > AUTH_SIZE) {
 			hmac_loop(&hmac_ctx,
 				  (u_int8_t *)ip6mu + bu_size + nonce_size
 				  + AUTH_SIZE, auth_size - AUTH_SIZE);
+#if RR_DBG
+printf("MN: Auth: %*D\n", auth_size - AUTH_SIZE, (u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE, ":");
+#endif
 		}
 		hmac_result(&hmac_ctx, (u_int8_t *)(mopt_auth + 1));
+#if RR_DBG
+printf("MN: Authdata: %*D\n", SHA1_RESULTLEN, (u_int8_t *)(mopt_auth + 1), ":");
+#endif
 	}
 
 	/* calculate checksum. */

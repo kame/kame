@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.144 2002/07/16 17:04:30 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.145 2002/07/23 13:23:23 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2608,6 +2608,7 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
 	mip6_careof_cookie_t careof_cookie;
 	u_int8_t key_bu[SHA1_RESULTLEN]; /* Stated as 'Kbu' in the spec */
 	u_int8_t authdata[SHA1_RESULTLEN];
+	u_int16_t cksum_backup;
 	SHA1_CTX sha1_ctx;
 	HMAC_CTX hmac_ctx;
 	int restlen;
@@ -2619,7 +2620,10 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
 			 __FILE__, __LINE__, mopt->valid_options));
 		return (EINVAL);
 	}
-
+#if RR_DBG
+printf("CN: Home   Nonce IDX: %d\n", mopt->mopt_ho_nonce_idx);
+printf("CN: Careof Nonce IDX: %d\n", mopt->mopt_co_nonce_idx);
+#endif
 	if ((mip6_get_nonce(mopt->mopt_ho_nonce_idx, &home_nonce) != 0) ||
 	    (mip6_get_nonce(mopt->mopt_co_nonce_idx, &careof_nonce) != 0)) {
 		mip6log((LOG_ERR,
@@ -2627,6 +2631,10 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
 			 __FILE__, __LINE__));
 		return (EINVAL);
 	}
+#if RR_DBG
+printf("CN: Home   Nonce: %*D\n", sizeof(home_nonce), &home_nonce, ":");
+printf("CN: Careof Nonce: %*D\n", sizeof(careof_nonce), &careof_nonce, ":");
+#endif
 
 	if ((mip6_get_nodekey(mopt->mopt_ho_nonce_idx, &home_nodekey) != 0) ||
 	    (mip6_get_nodekey(mopt->mopt_co_nonce_idx, &coa_nodekey) != 0)) {
@@ -2635,36 +2643,67 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
 			 __FILE__, __LINE__));
 		return (EINVAL);
 	}
+#if RR_DBG
+printf("CN: Home   Nodekey: %*D\n", sizeof(home_nodekey), &home_nodekey, ":");
+printf("CN: Careof Nodekey: %*D\n", sizeof(coa_nodekey), &coa_nodekey, ":");
+#endif
 
 	/* Calculate home cookie */
 	mip6_create_cookie(&ip6mu->ip6mu_addr,
 			   &home_nodekey, &home_nonce, &home_cookie);
+#if RR_DBG
+printf("CN: Home Cookie: %*D\n", sizeof(home_cookie), (u_int8_t *)&home_cookie, ":");
+#endif
 
 	/* Calculate care-of cookie */
 	mip6_create_cookie(&ip6->ip6_src, 
 			   &coa_nodekey, &careof_nonce, &careof_cookie);
+#if RR_DBG
+printf("CN: Care-of Cookie: %*D\n", sizeof(careof_cookie), (u_int8_t *)&careof_cookie, ":");
+#endif
 
 	/* Calculate K_bu */
 	SHA1Init(&sha1_ctx);
 	SHA1Update(&sha1_ctx, (caddr_t)&home_cookie, sizeof(home_cookie));
 	SHA1Update(&sha1_ctx, (caddr_t)&careof_cookie, sizeof(careof_cookie));
 	SHA1Final(key_bu, &sha1_ctx);
+#if RR_DBG
+printf("CN: K_bu: %*D\n", sizeof(key_bu), key_bu, ":");
+#endif
 
+	cksum_backup = ip6mu->ip6mu_cksum;
+	ip6mu->ip6mu_cksum = 0;
 	/* Calculate authenticator */
 	hmac_init(&hmac_ctx, key_bu, sizeof(key_bu), HMAC_SHA1);
 	hmac_loop(&hmac_ctx, (u_int8_t *)&ip6->ip6_src,
 		  sizeof(ip6->ip6_src));
+#if RR_DBG
+printf("CN: Auth: %*D\n", sizeof(ip6->ip6_src), &ip6->ip6_src, ":");
+#endif
 	hmac_loop(&hmac_ctx, (u_int8_t *)&ip6->ip6_dst,
 		  sizeof(ip6->ip6_dst));
+#if RR_DBG
+printf("CN: Auth: %*D\n", sizeof(ip6->ip6_dst), &ip6->ip6_dst, ":");
+#endif
 	hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu,
 		  (u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu);
+#if RR_DBG
+printf("CN: Auth: %*D\n", (u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu, ip6mu, ":");
+#endif
 	restlen = ip6mulen - (((u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu) + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len);
 	if (restlen > 0) {
 	    hmac_loop(&hmac_ctx,
 		      mopt->mopt_auth
-		      + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len + 2, restlen);
+		      + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len, restlen); 
+#if RR_DBG
+printf("CN: Auth: %*D\n", restlen, mopt->mopt_auth + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len, ":");
+#endif
 	}
 	hmac_result(&hmac_ctx, authdata);
+#if RR_DBG
+printf("CN: Auth Data: %*D\n", sizeof(authdata), authdata, ":");
+#endif
+	ip6mu->ip6mu_cksum = cksum_backup;
 
 	return (bcmp(mopt->mopt_auth + 2, authdata, sizeof(authdata)));
 }
