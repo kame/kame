@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.9 2000/05/31 09:24:51 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.10 2000/05/31 10:16:32 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -153,7 +153,7 @@ If you would like to contact unicast DNS servers as well, you may want to
 specify them on the command line.
 DNS queries will be sent to both multicast and unicast servers.
 .Bd -literal -offset indent
-# mdnsd -6 -u 3ffe:501:4819::42 -i wi0
+# mdnsd -6 -i wi0 3ffe:501:4819::42
 .Ed
 .\"
 .Sh SEE ALSO
