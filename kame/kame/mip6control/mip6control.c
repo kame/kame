@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.57 2003/09/06 09:36:23 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.58 2003/09/12 12:44:13 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -350,16 +350,14 @@ main(argc, argv)
 		struct hif_ifreq *ifr;
 		struct mip6_prefix *mpfx;
 
-		ifr = malloc(sizeof(struct hif_ifreq) + sizeof(*mpfx));
+		ifr = malloc(sizeof(struct hif_ifreq));
 		if (ifr == NULL) {
 			perror("malloc");
 			exit(1);
 		}
 		strcpy(ifr->ifr_name, ifnarg);
 		ifr->ifr_count = 1;
-		mpfx = (struct mip6_prefix *)((caddr_t)ifr 
-					      + sizeof(struct hif_ifreq));
-		ifr->ifr_ifru.ifr_mpfx = mpfx;
+		mpfx = &ifr->ifr_ifru.ifr_mpfx;
 		bzero(&mpfx->mpfx_prefix, sizeof(mpfx->mpfx_prefix));
 		mpfx->mpfx_prefix.sin6_len = sizeof(mpfx->mpfx_prefix);
 		mpfx->mpfx_prefix.sin6_family = AF_INET6;
@@ -377,16 +375,14 @@ main(argc, argv)
 		struct hif_ifreq *ifr;
 		struct hif_site_prefix *hsp;
 
-		ifr = malloc(sizeof(struct hif_ifreq) + sizeof(*hsp));
+		ifr = malloc(sizeof(struct hif_ifreq));
 		if (ifr == NULL) {
 			perror("malloc");
 			exit(1);
 		}
 		strcpy(ifr->ifr_name, ifnarg);
 		ifr->ifr_count = 1;
-		hsp = (struct hif_site_prefix *)((caddr_t)ifr 
-		    + sizeof(struct hif_ifreq));
-		ifr->ifr_ifru.ifr_hsp = hsp;
+		hsp = &ifr->ifr_ifru.ifr_hsp;
 		bzero(&hsp->hsp_prefix, sizeof(hsp->hsp_prefix));
 		hsp->hsp_prefix.sin6_len = sizeof(hsp->hsp_prefix);
 		hsp->hsp_prefix.sin6_family = AF_INET6;
@@ -460,16 +456,14 @@ main(argc, argv)
 
 		printf("set homeagent to %s (%s)\n",
 		       ifnarg, shaarg);
-		ifr = malloc(sizeof(struct hif_ifreq) + sizeof(*mha));
+		ifr = malloc(sizeof(struct hif_ifreq));
 		if (ifr == NULL) {
 			perror("malloc");
 			exit(1);
 		}
 		strcpy(ifr->ifr_name, ifnarg);
 		ifr->ifr_count = 1;
-		mha = (struct mip6_ha *)((caddr_t)ifr 
-					 + sizeof(struct hif_ifreq));
-		ifr->ifr_ifru.ifr_mha = mha;
+		mha = &ifr->ifr_ifru.ifr_mha;
 		bzero(&mha->mha_addr, sizeof(mha->mha_addr));
 		mha->mha_addr.sin6_len = sizeof(mha->mha_addr);
 		mha->mha_addr.sin6_family = AF_INET6;
@@ -685,16 +679,14 @@ main(argc, argv)
 		struct sockaddr_in6 ifid_sa;
 		struct in6_addr *ifid;
 
-		ifr = malloc(sizeof(struct hif_ifreq) + sizeof(*ifid));
+		ifr = malloc(sizeof(struct hif_ifreq));
 		if (ifr == NULL) {
 			perror("malloc");
 			exit(1);
 		}
 		strcpy(ifr->ifr_name, ifnarg);
 		ifr->ifr_count = 1;
-		ifid = (struct in6_addr *)((caddr_t)ifr 
-					   + sizeof(struct hif_ifreq));
-		ifr->ifr_ifru.ifr_ifid = ifid;
+		ifid = &ifr->ifr_ifru.ifr_ifid;
 		getaddress(ifidarg, &ifid_sa);
 		*ifid = ifid_sa.sin6_addr;
 		if (ioctl(s, SIOCSIFID_HIF, (caddr_t)ifr) == -1) {
