@@ -3694,6 +3694,15 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	GET_BYTE(curr_frag_rp_count, data_ptr);
 	GET_HOSTSHORT(reserved_short, data_ptr);
 	MASKLEN_TO_MASK6(curr_group_addr.masklen, curr_group_mask);
+
+	if (IN6_IS_ADDR_MC_NODELOCAL(&curr_group_addr.mcast_addr) ||
+	    IN6_IS_ADDR_MC_LINKLOCAL(&curr_group_addr.mcast_addr)) {
+		log(LOG_WARNING, 0,
+		    "receive_pim6_bootstrap: "
+		    "group prefix has a narraw scope: %s (ignored)",
+		    inet6_fmt(&curr_group_addr.mcast_addr));
+		continue;
+	}
 	if (curr_rp_count == 0)
 	{
 	    group_.sin6_addr = curr_group_addr.mcast_addr;
