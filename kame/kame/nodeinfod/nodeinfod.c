@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.13 2001/10/22 05:54:01 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.14 2001/10/22 07:53:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -33,6 +33,7 @@
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/queue.h>
+#include <sys/sysctl.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
@@ -81,6 +82,7 @@ static time_t getlifetime __P((const char *, const struct sockaddr *, socklen_t)
 #if 0
 static const char *getifname __P((const struct sockaddr *, socklen_t));
 #endif
+static void setkernmode __P((int));
 
 int s;
 int mode = 7;	/* reply to all message types */
@@ -138,6 +140,7 @@ main(argc, argv)
 	joingroups(hostname);
 	if (!foreground)
 		daemon(0, 0);
+	setkernmode(0);
 	mainloop();
 	exit(0);
 }
@@ -1200,3 +1203,16 @@ getifname(sa, salen)
 	return NULL;
 }
 #endif
+
+static void
+setkernmode(m)
+	int m;
+{
+	int mib[] = { CTL_NET, AF_INET6, IPPROTO_ICMPV6, ICMPV6CTL_NODEINFO };
+
+	if (sysctl(mib, sizeof(mib)/sizeof(mib[0]), NULL, NULL, &m,
+	    sizeof(m)) < 0) {
+		err(1, "sysctl");
+		/* NOTREACHED */
+	}
+}
