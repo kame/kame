@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_agg.c,v 1.59 2004/03/27 03:27:46 suz Exp $	*/
+/*	$KAME: isakmp_agg.c,v 1.60 2004/09/07 16:28:25 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -339,7 +339,18 @@ agg_i2recv(iph1, msg)
 	}
 
 	/* payload existency check */
-	/* XXX to be checked each authentication method. */
+	/*
+	 * This check should take place after parsing SA payload because
+	 * payloads are different by a authentication method.  However,
+         * both rsa and rev are never supported, so it can be here.
+	 */
+	if (iph1->dhpub_p == NULL ||
+	    iph1->nonce_p == NULL ||
+	    iph1->id_p == NULL) {
+		plog(LLV_ERROR, LOCATION, iph1->remote,
+		    "some payload type doesn't exist.\n");
+		goto end;
+	}
 
 	/* verify identifier */
 	if (ipsecdoi_checkid1(iph1) != 0) {
@@ -671,7 +682,18 @@ agg_r1recv(iph1, msg)
 	}
 
 	/* payload existency check */
-	/* XXX to be checked each authentication method. */
+	/*
+	 * This check should take place after parsing SA payload because
+	 * payloads are different by a authentication method.  However,
+         * both rsa and rev are never supported, so it can be here.
+	 */
+	if (iph1->dhpub_p == NULL ||
+	    iph1->nonce_p == NULL ||
+	    iph1->id_p == NULL) {
+		plog(LLV_ERROR, LOCATION, iph1->remote,
+		    "some payload type doesn't exist.\n");
+		goto end;
+	}
 
 	/* verify identifier */
 	if (ipsecdoi_checkid1(iph1) != 0) {
