@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.27 2000/08/28 08:29:54 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.28 2000/08/28 14:26:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -95,10 +95,12 @@ static int esp_descbc_encrypt __P((struct mbuf *, size_t, size_t,
 static int esp_des_schedule __P((const struct esp_algorithm *,
 	struct secasvar *));
 static int esp_cbc_mature __P((struct secasvar *));
+#if 0
 static int esp_blowfish_cbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_blowfish_cbc_encrypt __P((struct mbuf *, size_t,
 	size_t, struct secasvar *, const struct esp_algorithm *, int));
+#endif
 static int esp_blowfish_schedule __P((const struct esp_algorithm *,
 	struct secasvar *));
 static int esp_blowfish_blockdecrypt __P((const struct esp_algorithm *,
@@ -177,14 +179,12 @@ esp_algorithm_lookup(idx)
 			esp_common_ivlen, esp_null_decrypt,
 			esp_null_encrypt, NULL, },
 		/*
-		 * XXX due to strange bug, we still are using
-		 * esp_blowfish_cbc_{en,de}crypt, to keep oldkame-newkame
-		 * interoperability.  we'll switch to esp_cipher_{en,de}crypt
-		 * as soon as we confirmed interop.
+		 * XXX it seems that old blowfish code had a bug.
+		 * hardcode to esp_cbc_{en,de}crypt.
 		 */
 		{ 8, 8, esp_cbc_mature, 40, 448, sizeof(BF_KEY), "blowfish-cbc",
-			esp_common_ivlen, esp_blowfish_cbc_decrypt,
-			esp_blowfish_cbc_encrypt, esp_blowfish_schedule,
+			esp_common_ivlen, esp_cbc_decrypt,
+			esp_cbc_encrypt, esp_blowfish_schedule,
 			esp_blowfish_blockdecrypt, esp_blowfish_blockencrypt, },
 		{ 8, 8, esp_cbc_mature, 40, 128, sizeof(u_int32_t) * 32,
 			"cast128-cbc",
@@ -642,6 +642,7 @@ esp_cbc_mature(sav)
 	return 0;
 }
 
+#if 0
 static int
 esp_blowfish_cbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
@@ -761,6 +762,7 @@ esp_blowfish_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 		m_freem(m);
 	return error;
 }
+#endif
 
 static int
 esp_blowfish_schedule(algo, sav)
