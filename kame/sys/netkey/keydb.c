@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.67 2002/07/08 07:10:21 itojun Exp $	*/
+/*	$KAME: keydb.c,v 1.68 2003/06/28 22:47:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -235,7 +235,7 @@ keydb_newsecreplay(wsize)
 
 	bzero(p, sizeof(*p));
 	if (wsize != 0) {
-		p->bitmap = (caddr_t)malloc(wsize, M_SECA, M_NOWAIT);
+		p->bitmap = malloc(wsize, M_SECA, M_NOWAIT);
 		if (!p->bitmap) {
 			free(p, M_SECA);
 			return NULL;
