@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.148 2001/01/23 09:08:14 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.149 2001/01/23 11:43:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -780,8 +780,7 @@ in6_update_ifa(ifp, ifra, ia)
 	struct in6_ifaddr *ia;
 {
 	int error = 0, hostIsNew = 1, prefixIsNew = 0, plen = -1;
-	struct ifaddr *ifa;
-	struct in6_ifaddr *oia;
+	struct in6_ifaddr *oia, *ib;
 	struct sockaddr_in6 dst6;
 	struct in6_addrlifetime *lt;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -979,34 +978,32 @@ in6_update_ifa(ifp, ifra, ia)
 
 	/*
 	 * Check if we have another address that shares the same prefix
-	 * of the address being configured.
+	 * of the address being configured.  We search in all the interfaces,
+	 * since the user tries to assign a same single prefix on multiple
+	 * interfaces.  Such a configuration is not very healthy, but
+	 * it seems too restrictive to prevent it.
 	 */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
-	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
-#else
-	for (ifa = ifp->if_addrlist.tqh_first; ifa;
-	     ifa = ifa->ifa_list.tqe_next)
-#endif
-	{
-		struct in6_ifaddr *ifa6;
+	for (ib = in6_ifaddr; ib; ib = ib->ia_next) {
 		int ifa6_plen;
 
-		if (ifa->ifa_addr->sa_family != AF_INET6)
-			continue;
-		if (ifa == (struct ifaddr *)ia)
+		if (ib == ia)
 			continue;
 
-		ifa6 = (struct in6_ifaddr *)ifa;
-		ifa6_plen = in6_mask2len(&ifa6->ia_prefixmask.sin6_addr, NULL);
+		/*
+		 * we are only intersted in routes that are associated with
+		 * an interface direct route.
+		 */
+		if ((ib->ia_ifa.ifa_flags & IFA_ROUTE) == 0)
+			continue;
+
+		ifa6_plen = in6_mask2len(&ib->ia_prefixmask.sin6_addr, NULL);
 		if (plen == ifa6_plen &&
 		    in6_are_prefix_equal(&ifra->ifra_addr.sin6_addr,
-					 &ifa6->ia_addr.sin6_addr,
+					 &ib->ia_addr.sin6_addr,
 					 plen))
 			break;
 	}
-	if (ifa == NULL)
+	if (ib == NULL)
 		prefixIsNew = 1;
 
 	/*
@@ -1583,8 +1580,8 @@ in6_ifscrub(ifp, ia, delloop)
 	struct in6_ifaddr *ia;
 	int delloop;
 {
-	int plen;
-	struct ifaddr *ifa;
+	int plen, error;
+	struct in6_ifaddr *ia6, *ia6_cand = NULL;
 
 	/* Remove ownaddr's loopback rtentry, if it exists. */
 	if (delloop && ia->ia_addr.sin6_family == AF_INET6)
@@ -1601,46 +1598,72 @@ in6_ifscrub(ifp, ia, delloop)
 	 */
 	if (ia->ia_ifa.ifa_dstaddr != NULL && /* we should ensure this... */
 	    ia->ia_ifa.ifa_dstaddr->sa_family == AF_INET6)
-		rtinit(&(ia->ia_ifa), (int)RTM_DELETE, RTF_HOST);
+		error = rtinit(&(ia->ia_ifa), (int)RTM_DELETE, RTF_HOST);
 	else
-		rtinit(&(ia->ia_ifa), (int)RTM_DELETE, 0);
+		error = rtinit(&(ia->ia_ifa), (int)RTM_DELETE, 0);
+	if (error != 0) {
+		/* this should be impossible! what should we do? */
+
+		log(LOG_ERR, "in6_ifscrub: failed to delete interface route "
+		    "(ifa=%s, errno=%d)\n",
+		    ip6_sprintf(&ia->ia_addr.sin6_addr), error);
+		return;		/* is this correct?  reset the flag anyway? */
+	}
 	ia->ia_flags &= ~IFA_ROUTE;
 
 	/*
 	 * Check if we have another address that has the same prefix of
-	 * the scrubbed address. If we have one, reinstall the corresponding
+	 * the scrubbed address.  If we have one, reinstall the corresponding
 	 * interface route.
+	 * We may have more than one candidates.  If they belong to different
+	 * interfaces, prefer the one(s) on the same interface as of the
+	 * address just deleted.
 	 */
 	plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL);
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
-	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
-#else
-	for (ifa = ifp->if_addrlist.tqh_first; ifa;
-	     ifa = ifa->ifa_list.tqe_next)
-#endif
-	{
-		int e, ia6_plen;
-		struct in6_ifaddr *ia6;
+	for (ia6 = in6_ifaddr; ia6; ia6 = ia6->ia_next) {
+		int ia6_plen;
 
-		if (ifa->ifa_addr->sa_family != AF_INET6)
-			continue;
-		if (ifa == (struct ifaddr *)ia)
+		if (ia6 == ia)
 			continue;
 
-		ia6 = (struct in6_ifaddr *)ifa;
 		ia6_plen = in6_mask2len(&ia6->ia_prefixmask.sin6_addr, NULL);
-		if (in6_are_prefix_equal(&ia->ia_addr.sin6_addr,
+		if (ia6_plen == plen &&
+		    in6_are_prefix_equal(&ia->ia_addr.sin6_addr,
 					 &ia6->ia_addr.sin6_addr, plen)) {
-			if ((e = in6_ifaddroute(ifp, ia6, plen)) != 0) {
-				log(LOG_NOTICE,
-				    "in6_ifscrub: failed to restore an interface"
-				    " route for %s/%d on %s, errno = %d\n",
-				    ip6_sprintf(&ia->ia_addr.sin6_addr),
-				    plen, if_name(ia->ia_ifp), e);
+
+			if ((ia6->ia_ifa.ifa_flags & IFA_ROUTE) != 0) {
+				/* this should be impossible! */
+				log(LOG_NOTICE, "in6_ifscrub: there seem to "
+				    "be more than one ifaddr that has an "
+				    "interface route (%s/%d)\n",
+				    ip6_sprintf(&ia6->ia_addr.sin6_addr),
+				    plen);
+
+				/*
+				 * we could proceed anway, but it will probably
+				 * be in vain.
+				 */
+				return;
 			}
+
+			if (ia6->ia_ifa.ifa_ifp == ia->ia_ifa.ifa_ifp) {
+				ia6_cand = ia6;
+				break;
+			}
+			else if (ia6_cand == NULL)
+				ia6_cand = ia6;
 		}
+	}
+
+	if (ia6_cand != NULL &&
+	    (error = in6_ifaddroute(ifp, ia6_cand, plen)) != 0) {
+		log(LOG_NOTICE,
+		    "in6_ifscrub: failed to restore an interface"
+		    " route for %s/%d on %s, errno = %d\n",
+		    ip6_sprintf(&ia->ia_addr.sin6_addr),
+		    plen, if_name(ia->ia_ifp), error);
+
+		/* XXX: we could try other candidates, but... */
 	}
 }
 
