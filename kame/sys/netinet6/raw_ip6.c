@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.45 2000/11/30 16:00:06 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.46 2000/11/30 16:34:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -243,7 +243,7 @@ rip6_ctlinput(cmd, sa, d)
 	struct mbuf *m;
 	int off;
 	struct ip6ctlparam *ip6cp = NULL;
-	struct sockaddr_in6 *sa6_src = NULL;
+	const struct sockaddr_in6 *sa6_src = NULL;
 	void *cmdarg;
 	void (*notify) __P((struct in6pcb *, int)) = in6_rtchange;
 
@@ -275,8 +275,8 @@ rip6_ctlinput(cmd, sa, d)
 		sa6_src = &sa6_any;
 	}
 
-	(void) in6_pcbnotify(&rawin6pcb, sa6, 0, sa6_src, 0, cmd,
-			     cmdarg, notify);
+	(void) in6_pcbnotify(&rawin6pcb, sa, 0, (struct sockaddr *)sa6_src,
+	    0, cmd, cmdarg, notify);
 }
 
 /*
