@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.95 2000/05/08 04:39:48 itojun Exp $	*/
+/*	$KAME: key.c,v 1.96 2000/05/08 05:35:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -424,9 +424,9 @@ static int key_update __P((struct socket *, struct mbuf *, struct sadb_msghdr *)
 #ifdef IPSEC_DOSEQCHECK
 static struct secasvar *key_getsavbyseq __P((struct secashead *, u_int32_t));
 #endif
-static struct sadb_msg *key_add __P((caddr_t *));
+static int key_add __P((struct socket *, struct mbuf *, struct sadb_msghdr *));
 static int key_setident __P((struct secashead *, caddr_t *));
-static struct sadb_msg *key_getmsgbuf_x1 __P((caddr_t *));
+static struct mbuf *key_getmsgbuf_x1 __P((struct mbuf *, struct sadb_msghdr *));
 static int key_delete __P((struct socket *, struct mbuf *,
 	struct sadb_msghdr *));
 static int key_get __P((struct socket *, struct mbuf *, struct sadb_msghdr *));
@@ -4331,7 +4331,7 @@ key_getspi(so, m, mhp)
 
 	/* get a new SA */
 	/* XXX rewrite */
-	if ((newsav = key_newsav((caddr_t *)&mhp->ext, newsah)) == NULL) {
+	if ((newsav = key_newsav((caddr_t *)mhp->ext, newsah)) == NULL) {
 		/* XXX don't free new SA index allocated in above. */
 		return key_senderror(so, m, ENOBUFS);
 	}
@@ -4570,7 +4570,7 @@ key_update(so, m, mhp)
 
 	/* set spidx if there */
 	/* XXX rewrite */
-	if (key_setident(sah, (caddr_t *)&mhp->ext) < 0) {
+	if (key_setident(sah, (caddr_t *)mhp->ext) < 0) {
 		return key_senderror(so, m, 0);
 	}
 
@@ -4622,7 +4622,7 @@ key_update(so, m, mhp)
 
 	/* copy sav values */
 	/* XXX rewrite */
-	if (key_setsaval(sav, (caddr_t *)&mhp->ext)) {
+	if (key_setsaval(sav, (caddr_t *)mhp->ext)) {
 		key_freesav(sav);
 		return key_senderror(so, m, 0);
 	}
@@ -4634,24 +4634,19 @@ key_update(so, m, mhp)
 	}
 
     {
-	/*XXX temporary workaround */
-	struct sadb_msg *newmsg;
-	int error;
+	struct mbuf *n;
 
 	/* set msg buf from mhp */
-	/* XXX rewrite */
-	if ((newmsg = key_getmsgbuf_x1((caddr_t *)&mhp->ext)) == NULL) {
+	n = key_getmsgbuf_x1(m, mhp);
+	if (n == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_update: No more memory.\n");
 #endif
 		return key_senderror(so, m, ENOBUFS);
 	}
 
-	error = key_sendup(so, newmsg, PFKEY_UNUNIT64(newmsg->sadb_msg_len),
-	    KEY_SENDUP_ALL);
 	m_freem(m);
-	KFREE(newmsg);
-	return error;
+	return key_sendup_mbuf(so, n, KEY_SENDUP_ALL);
     }
 }
 
@@ -4709,74 +4704,80 @@ key_getsavbyseq(sah, seq)
  * OUT:	NULL if fail.
  *	other if success, return pointer to the message to send.
  */
-static struct sadb_msg *
-key_add(mhp)
-	caddr_t *mhp;
+static int
+key_add(so, m, mhp)
+	struct socket *so;
+	struct mbuf *m;
+	struct sadb_msghdr *mhp;
 {
-	struct sadb_msg *msg0;
 	struct sadb_sa *sa0;
 	struct sadb_address *src0, *dst0;
 	struct secasindex saidx;
 	struct secashead *newsah;
 	struct secasvar *newsav;
 	u_int16_t proto;
+	int error;
 
 	/* sanity check */
-	if (mhp == NULL || mhp[0] == NULL)
+	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
 		panic("key_add: NULL pointer is passed.\n");
 
-	msg0 = (struct sadb_msg *)mhp[0];
-
 	/* map satype to proto */
-	if ((proto = key_satype2proto(msg0->sadb_msg_satype)) == 0) {
+	if ((proto = key_satype2proto(mhp->msg->sadb_msg_satype)) == 0) {
 #ifdef IPSEC_DEBUG
 		printf("key_add: invalid satype is passed.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
+		return key_senderror(so, m, EINVAL);
 	}
 
-	if (mhp[SADB_EXT_SA] == NULL
-	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
-	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
-	 || (msg0->sadb_msg_satype == SADB_SATYPE_ESP
-	  && mhp[SADB_EXT_KEY_ENCRYPT] == NULL)
-	 || (msg0->sadb_msg_satype == SADB_SATYPE_AH
-	  && mhp[SADB_EXT_KEY_AUTH] == NULL)
-	 || (mhp[SADB_EXT_LIFETIME_HARD] != NULL
-	  && mhp[SADB_EXT_LIFETIME_SOFT] == NULL)
-	 || (mhp[SADB_EXT_LIFETIME_HARD] == NULL
-	  && mhp[SADB_EXT_LIFETIME_SOFT] != NULL)) {
+	if (mhp->ext[SADB_EXT_SA] == NULL ||
+	    mhp->ext[SADB_EXT_ADDRESS_SRC] == NULL ||
+	    mhp->ext[SADB_EXT_ADDRESS_DST] == NULL ||
+	    (mhp->msg->sadb_msg_satype == SADB_SATYPE_ESP &&
+	     mhp->ext[SADB_EXT_KEY_ENCRYPT] == NULL) ||
+	    (mhp->msg->sadb_msg_satype == SADB_SATYPE_AH &&
+	     mhp->ext[SADB_EXT_KEY_AUTH] == NULL) ||
+	    (mhp->ext[SADB_EXT_LIFETIME_HARD] != NULL &&
+	     mhp->ext[SADB_EXT_LIFETIME_SOFT] == NULL) ||
+	    (mhp->ext[SADB_EXT_LIFETIME_HARD] == NULL &&
+	     mhp->ext[SADB_EXT_LIFETIME_SOFT] != NULL)) {
 #ifdef IPSEC_DEBUG
 		printf("key_add: invalid message is passed.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
+		return key_senderror(so, m, EINVAL);
+	}
+	if (mhp->extlen[SADB_EXT_SA] == NULL < sizeof(struct sadb_sa) ||
+	    mhp->extlen[SADB_EXT_ADDRESS_SRC] < sizeof(struct sadb_address) ||
+	    mhp->extlen[SADB_EXT_ADDRESS_DST] < sizeof(struct sadb_address)) {
+		/* XXX need more */
+#ifdef IPSEC_DEBUG
+		printf("key_add: invalid message is passed.\n");
+#endif
+		return key_senderror(so, m, EINVAL);
 	}
 
-	sa0 = (struct sadb_sa *)mhp[SADB_EXT_SA];
-	src0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_SRC]);
-	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
+	sa0 = (struct sadb_sa *)mhp->ext[SADB_EXT_SA];
+	src0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_SRC];
+	dst0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_DST];
 
 	/* XXX boundary check against sa_len */
-	KEY_SETSECASIDX(proto, msg0, src0+1, dst0+1, &saidx);
+	KEY_SETSECASIDX(proto, mhp->msg, src0+1, dst0+1, &saidx);
 
 	/* get a SA header */
 	if ((newsah = key_getsah(&saidx)) == NULL) {
-
 		/* create a new SA header */
 		if ((newsah = key_newsah(&saidx)) == NULL) {
 #ifdef IPSEC_DEBUG
 			printf("key_add: No more memory.\n");
 #endif
-			msg0->sadb_msg_errno = ENOBUFS;
-			return NULL;
+			return key_senderror(so, m, ENOBUFS);
 		}
 	}
 
 	/* set spidx if there */
-	if (key_setident(newsah, mhp) < 0)
-		return NULL;
+	/* XXX rewrite */
+	if (key_setident(newsah, (caddr_t *)mhp->ext) < 0)
+		return key_sendup_mbuf(so, m, KEY_SENDUP_ONE);
 
 	/* create new SA entry. */
 	/* We can create new SA only if SPI is differenct. */
@@ -4784,16 +4785,16 @@ key_add(mhp)
 #ifdef IPSEC_DEBUG
 		printf("key_add: SA already exists.\n");
 #endif
-		msg0->sadb_msg_errno = EEXIST;
-		return NULL;
+		return key_senderror(so, m, EEXIST);
 	}
-	if ((newsav = key_newsav(mhp, newsah)) == NULL)
-		return NULL;
+	/* XXX rewrite */
+	if ((newsav = key_newsav((caddr_t *)mhp->ext, newsah)) == NULL)
+		return key_sendup_mbuf(so, m, KEY_SENDUP_ONE);
 
 	/* check SA values to be mature. */
-	if ((msg0->sadb_msg_errno = key_mature(newsav)) != NULL) {
+	if ((error = key_mature(newsav)) != NULL) {
 		key_freesav(newsav);
-		return NULL;
+		return key_senderror(so, m, error);
 	}
 
 	/*
@@ -4802,18 +4803,19 @@ key_add(mhp)
 	 */
 
     {
-	struct sadb_msg *newmsg;
+	struct mbuf *n;
 
 	/* set msg buf from mhp */
-	if ((newmsg = key_getmsgbuf_x1(mhp)) == NULL) {
+	n = key_getmsgbuf_x1(m, mhp);
+	if (n == NULL) {
 #ifdef IPSEC_DEBUG
-		printf("key_add: No more memory.\n");
+		printf("key_update: No more memory.\n");
 #endif
-		msg0->sadb_msg_errno = ENOBUFS;
-		return NULL;
+		return key_senderror(so, m, ENOBUFS);
 	}
 
-	return newmsg;
+	m_freem(m);
+	return key_sendup_mbuf(so, n, KEY_SENDUP_ALL);
     }
 }
 
@@ -4930,61 +4932,105 @@ key_setident(sah, mhp)
 	return 0;
 }
 
-static struct sadb_msg *
-key_getmsgbuf_x1(mhp)
-	caddr_t *mhp;
+/*
+ * m will not be freed on return.
+ * it is caller's responsibility to free the result. 
+ */
+static struct mbuf *
+key_getmsgbuf_x1(m, mhp)
+	struct mbuf *m;
+	struct sadb_msghdr *mhp;
 {
-	struct sadb_msg *msg0;
-	struct sadb_msg *newmsg;
-	u_int len;
+	struct mbuf *n;
+	int len, off;
 	caddr_t p;
 
 	/* sanity check */
-	if (mhp == NULL || mhp[0] == NULL)
+	if (m == NULL || mhp == NULL || mhp->msg == NULL)
 		panic("key_getmsgbuf_x1: NULL pointer is passed.\n");
 
-	msg0 = (struct sadb_msg *)mhp[0];
-
 	/* create new sadb_msg to reply. */
-	len = sizeof(struct sadb_msg)
-	    + sizeof(struct sadb_sa)
-	    + PFKEY_EXTLEN(mhp[SADB_EXT_ADDRESS_SRC])
-	    + PFKEY_EXTLEN(mhp[SADB_EXT_ADDRESS_DST])
-	    + (mhp[SADB_EXT_LIFETIME_HARD] == NULL
-		? 0 : sizeof(struct sadb_lifetime))
-	    + (mhp[SADB_EXT_LIFETIME_SOFT] == NULL
-		? 0 : sizeof(struct sadb_lifetime))
-	    + (mhp[SADB_EXT_IDENTITY_SRC] == NULL
-		? 0 : PFKEY_EXTLEN(mhp[SADB_EXT_IDENTITY_SRC]))
-	    + (mhp[SADB_EXT_IDENTITY_DST] == NULL
-		? 0 : PFKEY_EXTLEN(mhp[SADB_EXT_IDENTITY_DST]));
+	len = sizeof(struct sadb_msg) + mhp->extlen[SADB_EXT_SA] +
+	    mhp->extlen[SADB_EXT_ADDRESS_SRC] +
+	    mhp->extlen[SADB_EXT_ADDRESS_DST] +
+	    (mhp->ext[SADB_EXT_LIFETIME_HARD]
+		? 0 : mhp->extlen[SADB_EXT_LIFETIME_HARD]) +
+	    (mhp->ext[SADB_EXT_LIFETIME_SOFT] == NULL
+		? 0 : mhp->extlen[SADB_EXT_LIFETIME_SOFT]) +
+	    (mhp->ext[SADB_EXT_IDENTITY_SRC] == NULL
+		? 0 : mhp->extlen[SADB_EXT_IDENTITY_SRC]) +
+	    (mhp->ext[SADB_EXT_IDENTITY_DST] == NULL
+		? 0 : mhp->extlen[SADB_EXT_IDENTITY_DST]);
 
-	KMALLOC(newmsg, struct sadb_msg *, len);
-	if (newmsg == NULL)
-		return NULL;
-	bzero((caddr_t)newmsg, len);
+	if (len > MCLBYTES)
+		return NULL;	/*ENOBUFS*/
+	MGETHDR(n, M_DONTWAIT, MT_DATA);
+	if (n && len > MHLEN) {
+		if ((n->m_flags & M_EXT) == 0) {
+			m_freem(n);
+			n = NULL;
+		}
+	}
+	if (!n)
+		return NULL;	/*ENOBUFS*/
 
-	bcopy((caddr_t)mhp[0], (caddr_t)newmsg, sizeof(*msg0));
-	newmsg->sadb_msg_errno = 0;
-	newmsg->sadb_msg_len = PFKEY_UNIT64(len);
-	p = (caddr_t)newmsg + sizeof(*msg0);
+	n->m_pkthdr.len = n->m_len = len;
+	n->m_next = NULL;
+	bzero(mtod(n, caddr_t), len);
 
-	p = key_setsadbext(p, mhp[SADB_EXT_SA]);
-	p = key_setsadbext(p, mhp[SADB_EXT_ADDRESS_SRC]);
-	p = key_setsadbext(p, mhp[SADB_EXT_ADDRESS_DST]);
+	off = 0;
 
-	if (mhp[SADB_EXT_LIFETIME_HARD] != NULL)
-		p = key_setsadbext(p, mhp[SADB_EXT_LIFETIME_HARD]);
+	m_copydata(m, 0, sizeof(struct sadb_msg), mtod(n, caddr_t));
+	mtod(n, struct sadb_msg *)->sadb_msg_errno = 0;
+	mtod(n, struct sadb_msg *)->sadb_msg_len = PFKEY_UNIT64(len);
+	off += PFKEY_ALIGN8(sizeof(struct sadb_msg));
 
-	if (mhp[SADB_EXT_LIFETIME_SOFT] != NULL)
-		p = key_setsadbext(p, mhp[SADB_EXT_LIFETIME_SOFT]);
+	m_copydata(m, mhp->extoff[SADB_EXT_SA],
+	    mhp->extlen[SADB_EXT_SA], mtod(n, caddr_t) + off);
+	off += mhp->extlen[SADB_EXT_SA];
 
-	if (mhp[SADB_EXT_IDENTITY_SRC] != NULL)
-		p = key_setsadbext(p, mhp[SADB_EXT_IDENTITY_SRC]);
-	if (mhp[SADB_EXT_IDENTITY_DST] != NULL)
-		p = key_setsadbext(p, mhp[SADB_EXT_IDENTITY_DST]);
+	m_copydata(m, mhp->extoff[SADB_EXT_ADDRESS_SRC],
+	    mhp->extlen[SADB_EXT_ADDRESS_SRC], mtod(n, caddr_t) + off);
+	off += mhp->extlen[SADB_EXT_ADDRESS_SRC];
 
-	return newmsg;
+	m_copydata(m, mhp->extoff[SADB_EXT_ADDRESS_DST],
+	    mhp->extlen[SADB_EXT_ADDRESS_DST], mtod(n, caddr_t) + off);
+	off += mhp->extlen[SADB_EXT_ADDRESS_DST];
+
+	if (mhp->ext[SADB_EXT_LIFETIME_HARD]) {
+		m_copydata(m, mhp->extoff[SADB_EXT_LIFETIME_HARD],
+		    mhp->extlen[SADB_EXT_LIFETIME_HARD],
+		    mtod(n, caddr_t) + off);
+		off += mhp->extlen[SADB_EXT_LIFETIME_HARD];
+	}
+
+	if (mhp->ext[SADB_EXT_LIFETIME_SOFT]) {
+		m_copydata(m, mhp->extoff[SADB_EXT_LIFETIME_SOFT],
+		    mhp->extlen[SADB_EXT_LIFETIME_SOFT],
+		    mtod(n, caddr_t) + off);
+		off += mhp->extlen[SADB_EXT_LIFETIME_SOFT];
+	}
+
+	if (mhp->ext[SADB_EXT_IDENTITY_SRC]) {
+		m_copydata(m, mhp->extoff[SADB_EXT_IDENTITY_SRC],
+		    mhp->extlen[SADB_EXT_IDENTITY_SRC],
+		    mtod(n, caddr_t) + off);
+		off += mhp->extlen[SADB_EXT_IDENTITY_SRC];
+	}
+
+	if (mhp->ext[SADB_EXT_IDENTITY_DST]) {
+		m_copydata(m, mhp->extoff[SADB_EXT_IDENTITY_DST],
+		    mhp->extlen[SADB_EXT_IDENTITY_DST],
+		    mtod(n, caddr_t) + off);
+		off += mhp->extlen[SADB_EXT_IDENTITY_DST];
+	}
+
+#ifdef DIAGNOSTIC
+	if (off != len)
+		panic("length inconsistency in key_getmsgbuf_x1");
+#endif
+
+	return n;
 }
 
 /*
@@ -6536,11 +6582,8 @@ key_parse(m, so)
 	case SADB_UPDATE:	/*almost done*/
 		return key_update(so, m, &mh);
 
-	case SADB_ADD:
-		if ((newmsg = key_add((caddr_t *)mh.ext)) == NULL)
-			goto sendback;
-		target = KEY_SENDUP_ALL;
-		break;
+	case SADB_ADD:	/*almost done*/
+		return key_add(so, m, &mh);
 
 	case SADB_DELETE:	/*done*/
 		return key_delete(so, m, &mh);
@@ -6582,7 +6625,7 @@ key_parse(m, so)
 
 	case SADB_X_SPDADD:
 	case SADB_X_SPDSETIDX:
-	case SADB_X_SPDUPDATE:
+	case SADB_X_SPDUPDATE:	/*almost done*/
 		return key_spdadd(so, m, &mh);
 
 	case SADB_X_SPDDELETE:	/*done*/
