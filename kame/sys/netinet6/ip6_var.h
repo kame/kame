@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.114 2003/07/28 11:58:14 t-momose Exp $	*/
+/*	$KAME: ip6_var.h,v 1.115 2003/08/07 08:49:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -321,6 +321,7 @@ extern u_int32_t ip6_id;		/* fragment identifier */
 extern int	ip6_defhlim;		/* default hop limit */
 extern int	ip6_defmcasthlim;	/* default multicast hop limit */
 extern int	ip6_forwarding;		/* act as router? */
+extern int	ip6_sendredirect;	/* send ICMPv6 redirect? */
 extern int	ip6_forward_srcrt;	/* forward src-routed? */
 extern int	ip6_use_deprecated;	/* allow deprecated addr as source */
 extern int	ip6_rr_prune;		/* router renumbering prefix
