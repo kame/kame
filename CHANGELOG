@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1790 2001/07/20 21:36:17 itojun Exp $
+$KAME: CHANGELOG,v 1.1791 2001/07/20 21:41:36 itojun Exp $
 
 <200107>
 Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
@@ -31,6 +31,11 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	  # route add -inet 10.1.0.0 -netmask 0xffffff00 10.0.0.1
 	  # route add -inet 10.1.0.0 -netmask 0xffffff00 10.0.0.2
 	  # route add -inet 10.1.0.0 -netmask 0xffffff00 10.0.0.3
+	  (use different gateways based on ip_dst)
+	  # ping -n -c1 10.1.0.1
+	  # ping -n -c1 10.1.0.2
+	  # ping -n -c1 10.1.0.3
+	  # ping -n -c1 10.1.0.4
 	  (removing only one of them)
 	  # route delete -inet 10.1.0.0 10.0.0.2
 	  (it will raise error as there are two routes with the same rt_key)
