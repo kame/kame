@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	$Id: pim6dd.8,v 1.1 1999/08/08 23:30:53 itojun Exp $
+.\"	$Id: pim6dd.8,v 1.2 1999/08/13 08:32:36 jinmei Exp $
 .\"
 .Dd Nov 17, 1998
 .Dt PIM6DD 8
@@ -108,4 +108,8 @@ daemon needs to run on the system.
 The kernel unicast routing table is periodically polled by
 .Nm
 in order to follow changes of existing unicast routes.
+.Pp
+.Nm Pim6dd
+does not correctly handle the SIGHUP signal.
+It should be explicitly killed and then restarted.
 .\"
