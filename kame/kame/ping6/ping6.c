@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.104 2000/12/01 14:24:47 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.105 2000/12/02 02:48:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -496,11 +496,13 @@ main(argc, argv)
 #ifdef IPSEC_POLICY_IPSEC
 		case 'P':
 			options |= F_POLICY;
-			if (!strncmp("in", optarg, 2))
-				policy_in = strdup(optarg);
-			else if (!strncmp("out", optarg, 3))
-				policy_out = strdup(optarg);
-			else
+			if (!strncmp("in", optarg, 2)) {
+				if ((policy_in = strdup(optarg)) == NULL)
+					errx(1, "strdup");
+			} else if (!strncmp("out", optarg, 3)) {
+				if ((policy_out = strdup(optarg)) == NULL)
+					errx(1, "strdup");
+			} else
 				errx(1, "invalid security policy");
 			break;
 #else
