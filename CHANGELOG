@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.805 2000/04/24 08:25:02 sakane Exp $
+$Id: CHANGELOG,v 1.806 2000/04/24 12:40:02 sakane Exp $
 
 <200004>
+Mon Apr 24 21:39:23 JST 2000 sakane@kame.net
+	* kame/kame/racoon:
+	- enable to define some algorithm each algorithm class.
+	- use internal SPD, don't SPDGET in order to get SP entry.
+	- fix to negotiate phase 2 with multiple transform in a single protocol.
+
 Mon Apr 24 17:22:51 JST 2000 sakane@kame.net
 	* kame/kame/racoon:
 	improve phase 2 configuration and parse phase 2 SA payload.
