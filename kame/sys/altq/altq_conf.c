@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.14 2002/04/03 05:38:50 kjc Exp $	*/
+/*	$KAME: altq_conf.c,v 1.15 2002/09/26 12:03:32 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#ifdef ALTQ
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
 #if (__FreeBSD__ != 2)
@@ -459,5 +458,3 @@ altq_module_handler(mod, cmd, arg)
 }
 	
 #endif  /* ALTQ_KLD */
-
-#endif /* ALTQ */
