@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.h,v 1.11 2000/10/10 06:18:04 itojun Exp $	*/
+/*	$KAME: rtsold.h,v 1.12 2001/09/19 06:59:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -61,10 +61,14 @@ struct ifinfo {
 /* rtsold.c */
 extern struct timeval tm_max;
 extern int dflag;
+extern int aflag;
+extern int ifconfig __P((char *));
+extern void iflist_init __P((void));
 struct ifinfo *find_ifinfo __P((int ifindex));
 void rtsol_timer_update __P((struct ifinfo *ifinfo));
 extern void warnmsg __P((int, const char *, const char *, ...))
      __attribute__((__format__(__printf__, 3, 4)));
+extern char **autoifprobe __P((void));
 
 /* if.c */
 extern int ifinit __P((void));

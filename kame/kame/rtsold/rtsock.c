@@ -1,4 +1,4 @@
-/*	$KAME: rtsock.c,v 1.3 2000/10/10 08:46:45 itojun Exp $	*/
+/*	$KAME: rtsock.c,v 1.4 2001/09/19 06:59:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -65,6 +65,9 @@
 #ifdef RTM_IFANNOUNCE	/*NetBSD 1.5 or later*/
 static int rtsock_input_ifannounce __P((int, struct rt_msghdr *, char *));
 #endif
+#if defined(__FreeBSD__)
+static int rtsock_ifprobe __P((int, struct rt_msghdr *, char *));
+#endif
 
 static struct {
 	u_char type;
@@ -74,6 +77,9 @@ static struct {
 #ifdef RTM_IFANNOUNCE	/*NetBSD 1.5 or later*/
 	{ RTM_IFANNOUNCE, sizeof(struct if_announcemsghdr),
 	  rtsock_input_ifannounce },
+#endif
+#if defined(__FreeBSD__)
+	{ RTM_IFINFO, 0, rtsock_ifprobe },
 #endif
 	{ 0, NULL },
 };
@@ -171,6 +177,32 @@ rtsock_input_ifannounce(s, rtm, lim)
 			ifinfo->state = IFS_DOWN;
 		}
 		break;
+	}
+
+	return 0;
+}
+#endif
+
+#if defined(__FreeBSD__)
+static int
+rtsock_ifprobe(s, rtm, lim)
+	int s;
+	struct rt_msghdr *rtm;
+	char *lim;
+{
+	char **argv;
+
+	if (!aflag)
+		return 0;
+
+	iflist_init();
+	argv = autoifprobe();
+	while (argv && *argv) {
+		if (ifconfig(*argv)) {
+			errx(1, "failed to initialize %s", *argv);
+			/*NOTREACHED*/
+		}
+		argv++;
 	}
 
 	return 0;

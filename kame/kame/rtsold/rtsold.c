@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.41 2001/09/19 05:46:37 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.42 2001/09/19 06:59:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,8 +88,6 @@ static int do_dump;
 static char *dumpfilename = "/var/run/rtsold.dump"; /* XXX: should be configurable */
 static char *pidfilename = "/var/run/rtsold.pid"; /* should be configurable */
 
-static int ifconfig __P((char *));
-static void iflist_init __P((void));
 #if 0
 static int ifreconfig __P((char *));
 #endif
@@ -102,7 +100,6 @@ static void TIMEVAL_SUB __P((struct timeval *, struct timeval *,
 
 static void rtsold_set_dump_file __P((void));
 static void usage __P((char *));
-static char **autoifprobe __P((void));
 
 int
 main(argc, argv)
@@ -291,22 +288,8 @@ main(argc, argv)
 		}
 
 		/* packet reception */
-		if (FD_ISSET(rtsock, &select_fd)) {
-			if (aflag) {
-				iflist_init();
-				argv = autoifprobe();
-				while (argv && *argv) {
-					if (ifconfig(*argv)) {
-						errx(1, "failed to "
-						    "initialize %s",
-						    *argv);
-						/*NOTREACHED*/
-					}
-					argv++;
-				}
-			}
+		if (FD_ISSET(rtsock, &select_fd))
 			rtsock_input(rtsock);
-		}
 		if (FD_ISSET(s, &select_fd))
 			rtsol_input(s);
 	}
@@ -315,7 +298,7 @@ main(argc, argv)
 	return 0;
 }
 
-static int
+int
 ifconfig(char *ifname)
 {
 	struct ifinfo *ifinfo;
@@ -386,7 +369,7 @@ ifconfig(char *ifname)
 	return(-1);
 }
 
-static void
+void
 iflist_init()
 {
 	struct ifinfo *ifi, *next;
@@ -749,7 +732,7 @@ warnmsg(priority, func, msg, va_alist)
 /*
  * return a list of interfaces which is suitable to sending an RS.
  */
-static char **
+char **
 autoifprobe()
 {
 #ifndef HAVE_GETIFADDRS
