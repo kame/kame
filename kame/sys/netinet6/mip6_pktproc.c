@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.79 2002/11/05 03:48:33 itojun Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.80 2002/11/05 08:23:59 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -702,8 +702,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 					 __FILE__, __LINE__));
 				/* XXX */
 			}
-			error = mip6_process_hrbu(&bi);
-			if (error) {
+			if (mip6_process_hrbu(&bi)) {
 				mip6log((LOG_ERR,
 					 "%s:%d: home registration failed\n",
 					 __FILE__, __LINE__));
@@ -719,8 +718,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			 * ignore 'S' bit (issue #66)
 			 * XXX 'L'?
 			 */
-			error = mip6_process_hurbu(&bi);
-			if (error) {
+			if (mip6_process_hurbu(&bi)) {
 				mip6log((LOG_ERR,
 					 "%s:%d: home unregistration failed\n",
 					 __FILE__, __LINE__));
@@ -730,15 +728,22 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	} else {
 		/* request to cache/remove a binding for CN. */
 		if (IS_REQUEST_TO_CACHE(bi.mbc_lifetime, &bi.mbc_phaddr, &bi.mbc_pcoa)) {
+			int bc_error;
+
 			if (mbc == NULL)
-				error = mip6_bc_register(&bi.mbc_phaddr, &bi.mbc_pcoa, &bi.mbc_addr,
-							 ip6mu->ip6mu_flags,
-							 bi.mbc_seqno, bi.mbc_lifetime);
+				bc_error = mip6_bc_register(&bi.mbc_phaddr,
+							&bi.mbc_pcoa,
+							&bi.mbc_addr,
+							ip6mu->ip6mu_flags,
+							bi.mbc_seqno,
+							bi.mbc_lifetime);
 			else
-			  /* Update a cache */
-				error = mip6_bc_update(mbc, &bi.mbc_pcoa, &bi.mbc_addr,
-						       ip6mu->ip6mu_flags,
-					 		bi.mbc_seqno, bi.mbc_lifetime);
+			  /* Update a cache entry */
+				bc_error = mip6_bc_update(mbc, &bi.mbc_pcoa,
+							&bi.mbc_addr,
+					 		ip6mu->ip6mu_flags,
+					 		bi.mbc_seqno,
+							bi.mbc_lifetime);
 		} else {
 			mip6_bc_delete(mbc);
 		}
