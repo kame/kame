@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.19 2001/07/05 06:33:25 itojun Exp $
+$KAME: FAQ,v 1.20 2001/07/13 01:49:54 itojun Exp $
 
 
 GENERAL
@@ -45,8 +45,8 @@ Which version of IPv6/IPsec does KAME support?
 	KAME project tries to support the latest specification as possible.
 
 	For list of currently-supported standard documents, please refer to
-	kit/IMPLEMENTATION in the distribution kit, or
-	http://www2.kame.net/dev/cvsweb.cgi/kit/IMPLEMENTATION.
+	IMPLEMENTATION in the distribution kit, or
+	http://www.kame.net/dev/cvsweb.cgi/kame/IMPLEMENTATION.
 
 Q: Why does KAME separate ping6 from ping (for IPv4), and traceroute6 from
    traceroute (for IPv4)?
@@ -299,7 +299,7 @@ Q: Would like to connect from IPv6-only host to IPv4-only host.
 	please visit ftp://ftp.kame.net/pub/kame/misc/.
 
 Q: How can I enable FAITH IPv6-to-IPv4 tcp relay?
-	Please consult KAME kit/src/faithd/README.* for details.
+	Please consult KAME faithd/README.* for details.
 
 Q: How do I configure ATM PVC?
 	KAME includes ATM PVC support, from ALTQ package.  No SVC support is
