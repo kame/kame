@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.77 2000/04/06 05:41:27 itojun Exp $	*/
+/*	$KAME: key.c,v 1.78 2000/04/19 17:50:49 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4181,6 +4181,10 @@ key_getspi(mhp)
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
+
+	/* make sure if port number is zero. */
+	_INPORTBYSA((struct sockaddr *)(src0 + 1)) = 0;
+	_INPORTBYSA((struct sockaddr *)(dst0 + 1)) = 0;
 
 	KEY_SETSECASIDX(proto, msg0, src0+1, dst0+1, &saidx);
 
