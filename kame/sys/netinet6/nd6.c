@@ -619,9 +619,16 @@ nd6_lookup(addr6, create, ifp)
 			return(NULL);
 	}
 	rt->rt_refcnt--;
+	/*
+	 * Validation for the entry.
+	 * XXX: we can't use rt->rt_ifp to check for the interface, since
+	 *      it might be the loopback interface if the entry is for our
+	 *      own address on a non-loopback interface. Instead, we should
+	 *      use rt->rt_ifa->ifa_ifp, which would specify the REAL interface.
+	 */
 	if ((rt->rt_flags & RTF_GATEWAY) || (rt->rt_flags & RTF_LLINFO) == 0 ||
 	    rt->rt_gateway->sa_family != AF_LINK ||
-	    (ifp && rt->rt_ifp != ifp)) {
+	    (ifp && rt->rt_ifa->ifa_ifp != ifp)) {
 		if (create) {
 			log(LOG_DEBUG, "nd6_lookup: failed to lookup %s (if = %s)\n",
 			    ip6_sprintf(addr6), ifp ? if_name(ifp) : "unspec");
