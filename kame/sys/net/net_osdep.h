@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.38 2001/02/09 21:42:42 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.39 2001/02/14 12:30:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,11 +77,13 @@
  *		needs to give struct proc * as argument
  *	OpenBSD, BSDI [34], FreeBSD 2
  *		do not need struct proc *
+ *
  * - bpf:
  *	OpenBSD, NetBSD 1.5, BSDI [34]
  *		need caddr_t * (= if_bpf **) and struct ifnet *
  *	FreeBSD 2, FreeBSD 3, NetBSD 1.6? (1.5N and later)
  *		need only struct ifnet * as argument
+ *
  * - struct ifnet
  *			use queue.h?	member names	if name
  *			---		---		---
@@ -90,16 +92,19 @@
  *	OpenBSD		yes		standard	if_xname
  *	NetBSD		yes		standard	if_xname
  *	BSDI [34]	no		old standard	if_name+unit
+ *
  * - usrreq
  *	NetBSD, OpenBSD, BSDI [34], FreeBSD 2
  *		single function with PRU_xx, arguments are mbuf
  *	FreeBSD 3
  *		separates functions, non-mbuf arguments
+ *
  * - {set,get}sockopt
  *	NetBSD, OpenBSD, BSDI [34], FreeBSD 2
  *		manipulation based on mbuf
  *	FreeBSD 3
  *		non-mbuf manipulation using sooptcopy{in,out}()
+ *
  * - timeout() and untimeout()
  *	NetBSD 1.4.x, OpenBSD, BSDI [34], FreeBSD 2
  *		timeout() is a void function
@@ -110,6 +115,7 @@
  *		timeout() is obsoleted, use callout_xx (sys/callout.h)
  *	OpenBSD 2.8
  *		timeout_{add,set,del} is encouraged (sys/timeout.h)
+ *
  * - sysctl
  *	NetBSD, OpenBSD
  *		foo_sysctl()
@@ -123,6 +129,7 @@
  *		2nd argument is u_long cmd
  *	FreeBSD 2
  *		2nd argument is int cmd
+ *
  * - if attach routines
  *	NetBSD
  *		void xxattach(int);
@@ -133,6 +140,7 @@
  * - ovbcopy()
  *	in NetBSD 1.4 or later, ovbcopy() is not supplied in the kernel.
  *	bcopy() is safe against overwrites.
+ *
  * - splnet()
  *	NetBSD 1.4 or later requires splsoftnet().
  *	other operating systems use splnet().
@@ -164,8 +172,11 @@
  *	FreeBSD4: struct ipprotosw in netinet/ipprotosw.h
  *	others: struct protosw in sys/protosw.h
  *
- * - protosw.  NetBSD 1.5 has extra member for ipfilter.  NetBSD 1.5 requires
- *   PR_LISTEN flag bit with protocols that permit listen/accept (like tcp).
+ * - protosw in general.
+ *	NetBSD 1.5 has extra member for ipfilter (netbsd-current dropped
+ *	it so it will go away in 1.6).
+ *	NetBSD 1.5 requires PR_LISTEN flag bit with protocols that permit
+ *	listen/accept (like tcp).
  *
  * - header files with defopt (opt_xx.h)
  *	FreeBSD3: opt_{inet,ipsec,ip6fw,altq}.h
@@ -179,6 +190,9 @@
  *
  * - (m->m_flags & M_EXT) != 0 does *not* mean that the max data length of
  *   the mbuf == MCLBYTES.
+ *
+ * - sys/kern/uipc_mbuf.c:m_dup()
+ *	freebsd[34] and netbsd have it.  others do not.
  *
  * - ifa_refcnt (struct ifaddr) management (IFAREF/IFAFREE).
  *	NetBSD 1.5: always use IFAREF whenever reference gets added.
