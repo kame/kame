@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.14 2000/03/12 10:23:58 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.15 2000/03/12 10:46:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -30,7 +30,9 @@
  */
 
 /*
- * 6to4 interface, based on draft-ietf-ngtrans-6to4-03.txt.
+ * 6to4 interface, based on draft-ietf-ngtrans-6to4-04.txt.
+ *
+ * 6to4 interface is NOT capable of link-layer multicasting.
  *
  * Due to the lack of address mapping for link-local addresses, we cannot
  * throw packets toward link-local addresses (fe80::x).  Also, we cannot throw
@@ -54,6 +56,11 @@
  *
  * ICMPv6:
  * - Redirects cannot be used due to the lack of link-local address.
+ *
+ * 6to4 interface has security issues.  Refer to
+ * http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt
+ * for details.  The code tries to filter out some of malicious packets.
+ * Note that there is no way to be 100% secure.
  */
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
@@ -153,7 +160,7 @@ static int stf_encapcheck __P((const struct mbuf *, int, int, void *));
 static struct in6_ifaddr *stf_getsrcifa6 __P((struct ifnet *));
 static int stf_output __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 	struct rtentry *));
-static int stf_checkinner __P((struct in6_addr *in6));
+static int stf_checkinner __P((struct in6_addr *in6, struct ifnet *));
 static void stf_rtrequest __P((int, struct rtentry *, struct sockaddr *));
 #if defined(__FreeBSD__) && __FreeBSD__ < 3
 static int stf_ioctl __P((struct ifnet *, int, caddr_t));
@@ -407,8 +414,9 @@ stf_output(ifp, m, dst, rt)
 }
 
 static int
-stf_checkinner(in6)
+stf_checkinner(in6, ifp)
 	struct in6_addr *in6;
+	struct ifnet *ifp;	/* incoming interface */
 {
 	struct in_addr *in;
 	struct in_ifaddr *ia4;
@@ -443,6 +451,29 @@ stf_checkinner(in6)
 			continue;
 		if (in->s_addr == ia4->ia_broadaddr.sin_addr.s_addr)
 			return -1;
+	}
+
+	/*
+	 * perform ingress filter
+	 */
+	if (ifp) {
+		struct sockaddr_in sin;
+		struct rtentry *rt;
+
+		bzero(&sin, sizeof(sin));
+		sin.sin_family = AF_INET;
+		sin.sin_len = sizeof(struct sockaddr_in);
+		sin.sin_addr = *in;
+#ifdef __FreeBSD__
+		rt = rtalloc1((struct sockaddr *)&sin, 0, 0UL);
+#else
+		rt = rtalloc1((struct sockaddr *)&sin, 0);
+#endif
+		if (rt->rt_ifp != ifp) {
+			rtfree(rt);
+			return -1;
+		}
+		rtfree(rt);
 	}
 
 	return 0;
@@ -505,10 +536,10 @@ in_stf_input(m, va_alist)
 
 	/*
 	 * perform sanity check against inner src/dst.
-	 * XXX use routing table to detect address spoofs?
+	 * for source, perform ingress filter as well.
 	 */
-	if (stf_checkinner(&ip6->ip6_dst) < 0 ||
-	    stf_checkinner(&ip6->ip6_src) < 0) {
+	if (stf_checkinner(&ip6->ip6_dst, NULL) < 0 ||
+	    stf_checkinner(&ip6->ip6_src, m->m_pkthdr.rcvif) < 0) {
 		m_freem(m);
 		return;
 	}

@@ -1,4 +1,4 @@
-.\"     $KAME: stf.4,v 1.11 2000/03/12 10:23:58 itojun Exp $
+.\"     $KAME: stf.4,v 1.12 2000/03/12 10:46:12 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -119,10 +119,20 @@ Packets with 6to4 address based on IPv4 multicast address, as inner destination/
 Packets with 6to4 address based on 0.0.0.0, as inner destination/source
 .Pq Li 2002:0000:0000::/48
 .It
-Packets with 6to4 address based on 255.255.255.255, as inner destination/source
+Packets with 6to4 address based on 255.255.255.255,
+as inner destination/source
 .Pq Li 2002:ffff:ffff::/48
 .It
-Packets with 6to4 address based on subnet broadcast address, as inner destination/source
+Packets with 6to4 address based on subnet broadcast address,
+as inner destination/source
+.It
+Packets with 6to4 address as inner source,
+when the inner source does not match the IPv4 topology.
+IPv4 routing table will be queried against inner source.
+If the incoming interface for the packet does not match the IPv4 outgoing
+interface for the IPv4 address derived from the inner source,
+packet will be dropped
+.Pq similar to ingress filters .
 .El
 .Pp
 You may also want to reject encapsulated IPv6 packets with
