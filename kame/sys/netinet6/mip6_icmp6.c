@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.84 2003/10/22 02:12:54 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.85 2003/11/11 19:05:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -255,7 +255,7 @@ mip6_icmp6_input(m, off, icmp6len)
 		case ICMP6_PARAMPROB_NEXTHEADER:
 			origip6 = (caddr_t)(icmp6 + 1);
 			switch (*(u_int8_t *)(origip6 + pptr)) {
-			case IPPROTO_MOBILITY:
+			case IPPROTO_MH:
 				/*
 				 * the peer doesn't recognize mobility header.
 				 */

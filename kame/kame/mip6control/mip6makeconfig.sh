@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: mip6makeconfig.sh,v 1.6 2003/11/04 10:29:03 keiichi Exp $
+# $Id: mip6makeconfig.sh,v 1.7 2003/11/11 19:05:26 keiichi Exp $
 
 cat=/bin/cat
 basename=/usr/bin/basename
@@ -134,10 +134,10 @@ EOF
 #
 ${cat} <<EOF > ${node_dir}/spdadd_home_agent
 spdadd ${home_agent} ${mobile_node}
-	62 -P out ipsec
+	135 -P out ipsec
 	${transport_protocol}/transport//require;
 spdadd ${mobile_node} ${home_agent}
-	62 -P in ipsec
+	135 -P in ipsec
 	${transport_protocol}/transport//require;
 EOF
 
@@ -146,9 +146,9 @@ EOF
 #
 ${cat} <<EOF > ${node_dir}/spddelete_home_agent
 spddelete ${home_agent} ${mobile_node}
-	62 -P out ipsec;
+	135 -P out ipsec;
 spddelete ${mobile_node} ${home_agent}
-	62 -P in ipsec;
+	135 -P in ipsec;
 EOF
 
 #
@@ -156,10 +156,10 @@ EOF
 #
 ${cat} <<EOF >> ${node_dir}/spdadd_home_agent
 spdadd ::/0 ${mobile_node}
-	62 -P out ipsec
+	135 -P out ipsec
 	esp/tunnel/${home_agent}-${mobile_node}/unique:${tunnel_uid_ha_to_mn};
 spdadd ${mobile_node} ::/0
-	62 -P in ipsec
+	135 -P in ipsec
 	esp/tunnel/${mobile_node}-${home_agent}/unique:${tunnel_uid_mn_to_ha};
 EOF
 
@@ -168,9 +168,9 @@ EOF
 #
 ${cat} <<EOF >> ${node_dir}/spddelete_home_agent
 spddelete ::/0 ${mobile_node}
-	62 -P out ipsec;
+	135 -P out ipsec;
 spddelete ${mobile_node} ::/0
-	62 -P in ipsec;
+	135 -P in ipsec;
 EOF
 
 #
@@ -178,10 +178,10 @@ EOF
 #
 ${cat} <<EOF > ${node_dir}/spdadd_mobile_node
 spdadd ${mobile_node} ${home_agent}
-	62 -P out ipsec
+	135 -P out ipsec
 	${transport_protocol}/transport//require;
 spdadd ${home_agent} ${mobile_node}
-	62 -P in ipsec
+	135 -P in ipsec
 	${transport_protocol}/transport//require;
 EOF
 
@@ -190,9 +190,9 @@ EOF
 #
 ${cat} <<EOF > ${node_dir}/spddelete_mobile_node
 spddelete ${mobile_node} ${home_agent}
-	62 -P out ipsec;
+	135 -P out ipsec;
 spddelete ${home_agent} ${mobile_node}
-	62 -P in ipsec;
+	135 -P in ipsec;
 EOF
 
 #
@@ -200,10 +200,10 @@ EOF
 #
 ${cat} <<EOF >> ${node_dir}/spdadd_mobile_node
 spdadd ${mobile_node} ::/0
-	62 -P out ipsec
+	135 -P out ipsec
 	esp/tunnel/${mobile_node}-${home_agent}/unique:${tunnel_uid_mn_to_ha};
 spdadd ::/0 ${mobile_node}
-	62 -P in ipsec
+	135 -P in ipsec
 	esp/tunnel/${home_agent}-${mobile_node}/unique:${tunnel_uid_ha_to_mn};
 EOF
 
@@ -212,7 +212,7 @@ EOF
 #
 ${cat} <<EOF >> ${node_dir}/spddelete_mobile_node
 spddelete ${mobile_node} ::/0
-	62 -P out ipsec;
+	135 -P out ipsec;
 spddelete ::/0 ${mobile_node}
-	62 -P in ipsec;
+	135 -P in ipsec;
 EOF

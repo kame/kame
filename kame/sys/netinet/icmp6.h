@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.85 2003/06/06 09:36:42 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.86 2003/11/11 19:05:25 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -167,13 +167,13 @@ struct icmp6_hdr {
 
 /* The belows are not yet defined in 2292bis. They will be renamed */
 #define IND_SOLICIT			141	/* inverse neighbor solicitation */
-#define IND_ADVERT			142	/* inverse neighbor advertisment */
+#define IND_ADVERT			142	/* inverse neighbor advertisement */
 
 /* Folloing numbers are defined in the mobile-ip draft. */
-#define ICMP6_DHAAD_REQUEST		150	/* XXX To be authorized */
-#define ICMP6_DHAAD_REPLY		151	/* XXX To be authorized */
-#define ICMP6_MOBILEPREFIX_SOLICIT	152	/* XXX To be authorized */
-#define ICMP6_MOBILEPREFIX_ADVERT	153	/* XXX To be authorized */
+#define ICMP6_DHAAD_REQUEST		143	/* home agent address discovery request */
+#define ICMP6_DHAAD_REPLY		144	/* home agent address discovery reply */
+#define ICMP6_MOBILEPREFIX_SOLICIT	145	/* mobile prefix solicitation */
+#define ICMP6_MOBILEPREFIX_ADVERT	146	/* mobile prefix advertisement */
 
 /* The definitions below are experimental. TBA */
 #define MLD_MTRACE_RESP			200	/* mtrace resp (to sender) */

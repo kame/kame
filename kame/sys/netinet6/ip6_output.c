@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.404 2003/11/09 14:28:15 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.405 2003/11/11 19:05:25 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -489,7 +489,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		exthdrs.ip6e_mobility->m_next = m->m_next;
 		m->m_next = exthdrs.ip6e_mobility;
 		*mtod(exthdrs.ip6e_mobility, u_char *) = ip6->ip6_nxt;
-		ip6->ip6_nxt = IPPROTO_MOBILITY;
+		ip6->ip6_nxt = IPPROTO_MH;
 		m->m_pkthdr.len += exthdrs.ip6e_mobility->m_len;
 		exthdrs.ip6e_mobility = NULL;
 	}

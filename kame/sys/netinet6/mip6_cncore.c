@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.48 2003/11/11 17:08:10 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.49 2003/11/11 19:05:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -2353,8 +2353,8 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	}
 
 	/* calculate checksum. */
-	ip6mh->ip6mh_cksum = mip6_cksum(src, dst,
-	    ip6mh_size, IPPROTO_MOBILITY, (char *)ip6mh);
+	ip6mh->ip6mh_cksum = mip6_cksum(src, dst, ip6mh_size, IPPROTO_MH,
+	    (char *)ip6mh);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6mh;
 
@@ -2401,8 +2401,8 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	}
 
 	/* calculate checksum. */
-	ip6mc->ip6mc_cksum = mip6_cksum(src, dst,
-	    ip6mc_size, IPPROTO_MOBILITY, (char *)ip6mc);
+	ip6mc->ip6mc_cksum = mip6_cksum(src, dst, ip6mc_size, IPPROTO_MH,
+	    (char *)ip6mc);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6mc;
 
@@ -2534,8 +2534,8 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime,
 #endif
 
 	/* calculate checksum. */
-	ip6ma->ip6ma_cksum = mip6_cksum(src, dst, ip6ma_size,
-					IPPROTO_MOBILITY, (char *)ip6ma);
+	ip6ma->ip6ma_cksum = mip6_cksum(src, dst, ip6ma_size, IPPROTO_MH,
+	    (char *)ip6ma);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6ma;
 
@@ -2566,7 +2566,7 @@ mip6_ip6mr_create(pktopt_mobility, src, dst)
 	ip6mr->ip6mr_type = IP6M_BINDING_REQUEST;
 
 	/* calculate checksum. */
-	ip6mr->ip6mr_cksum = mip6_cksum(src, dst, ip6mr_size, IPPROTO_MOBILITY,
+	ip6mr->ip6mr_cksum = mip6_cksum(src, dst, ip6mr_size, IPPROTO_MH,
 	    (char *)ip6mr);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6mr;
@@ -2603,8 +2603,8 @@ mip6_ip6me_create(pktopt_mobility, src, dst, status, addr)
 	in6_clearscope(&ip6me->ip6me_addr);
 
 	/* calculate checksum. */
-	ip6me->ip6me_cksum = mip6_cksum(src, dst, ip6me_size,
-					IPPROTO_MOBILITY, (char *)ip6me);
+	ip6me->ip6me_cksum = mip6_cksum(src, dst, ip6me_size, IPPROTO_MH,
+	    (char *)ip6me);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6me;
 

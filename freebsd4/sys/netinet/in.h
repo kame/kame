@@ -143,7 +143,6 @@
 #define	IPPROTO_DSTOPTS		60		/* IP6 destination option */
 #define	IPPROTO_AHIP		61		/* any host internal protocol */
 #define	IPPROTO_CFTP		62		/* CFTP */
-#define	IPPROTO_MOBILITY	62		/* XXX is CFTP used? */
 #define	IPPROTO_HELLO		63		/* "hello" routing protocol */
 #define	IPPROTO_SATEXPAK	64		/* SATNET/Backroom EXPAK */
 #define	IPPROTO_KRYPTOLAN	65		/* Kryptolan */
@@ -187,6 +186,7 @@
 #define	IPPROTO_PGM		113		/* PGM */
 #define IPPROTO_SCTP		132		/* SCTP (RFC2960) */
 /* 134-254: Partly Unassigned */
+#define	IPPROTO_MH		135		/* IPv6 Mobility Header */
 /* 255: Reserved */
 /* BSD Private, local use, namespace incursion */
 #define	IPPROTO_DIVERT		254		/* divert pseudo-protocol */

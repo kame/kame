@@ -139,13 +139,13 @@ typedef __sa_family_t	sa_family_t;
 #define	IPPROTO_NONE		59		/* IP6 no next header */
 #define	IPPROTO_DSTOPTS		60		/* IP6 destination option */
 #define	IPPROTO_AHIP		61		/* any host internal protocol */
-#define	IPPROTO_MOBILITY	62		/* Mobile IPv6 mobility hdr */
 #define	IPPROTO_EON		80		/* ISO cnlp */
 #define	IPPROTO_ENCAP		98		/* encapsulation header */
 #define	IPPROTO_PIM		103		/* Protocol indep. multicast */
 #define	IPPROTO_IPCOMP		108		/* IP Payload Comp. Protocol */
 #define	IPPROTO_SCTP		132		/* SCTP (RFC2960) */
 #define	IPPROTO_VRRP		112		/* VRRP RFC 2338 */
+#define	IPPROTO_MH		135		/* IPv6 Mobility Header */
 
 #define	IPPROTO_RAW		255		/* raw IP packet */
 #define	IPPROTO_MAX		256

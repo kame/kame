@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.144 2003/11/04 10:34:52 ono Exp $	*/
+/*	$KAME: in6_proto.c,v 1.145 2003/11/11 19:05:25 keiichi Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -441,7 +441,7 @@ struct ip6protosw inet6sw[] = {
 #endif
 },
 #ifdef MIP6
-{ SOCK_RAW,	&inet6domain,	IPPROTO_MOBILITY,PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inet6domain,	IPPROTO_MH,PR_ATOMIC|PR_ADDR,
   mobility6_input,	0,	 	0,		0,
   0,
   0,		0,		0,		0,
@@ -772,7 +772,7 @@ SYSCTL_NODE(_net,	PF_INET6,	inet6,	CTLFLAG_RW,	0,
 SYSCTL_NODE(_net_inet6,	IPPROTO_IPV6,	ip6,	CTLFLAG_RW, 0,	"IP6");
 SYSCTL_NODE(_net_inet6,	IPPROTO_ICMPV6,	icmp6,	CTLFLAG_RW, 0,	"ICMP6");
 #ifdef MIP6
-SYSCTL_NODE(_net_inet6,	IPPROTO_MOBILITY,	mip6,	CTLFLAG_RW, 0,	"MIP6");
+SYSCTL_NODE(_net_inet6,	IPPROTO_MH,	mip6,	CTLFLAG_RW, 0,	"MIP6");
 #endif /* MIP6 */
 SYSCTL_NODE(_net_inet6,	IPPROTO_UDP,	udp6,	CTLFLAG_RW, 0,	"UDP6");
 SYSCTL_NODE(_net_inet6,	IPPROTO_TCP,	tcp6,	CTLFLAG_RW, 0,	"TCP6");

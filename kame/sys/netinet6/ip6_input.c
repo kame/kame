@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.331 2003/10/10 13:58:00 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.332 2003/11/11 19:05:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1247,7 +1247,7 @@ ip6_input(m)
 		if ((nxt != IPPROTO_HOPOPTS) && (nxt != IPPROTO_DSTOPTS) &&
 		    (nxt != IPPROTO_ROUTING) && (nxt != IPPROTO_FRAGMENT) &&
 		    (nxt != IPPROTO_ESP) && (nxt != IPPROTO_AH) &&
-		    (nxt != IPPROTO_MOBILITY) && (nxt != IPPROTO_NONE)) {
+		    (nxt != IPPROTO_MH) && (nxt != IPPROTO_NONE)) {
 			if (mip6_route_optimize(m))
 				goto bad;
 		}

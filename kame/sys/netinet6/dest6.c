@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.60 2003/09/24 11:04:51 t-momose Exp $	*/
+/*	$KAME: dest6.c,v 1.61 2003/11/11 19:05:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -360,7 +360,7 @@ dest6_mip6_hao(m, mhoff, nxt)
 	swap = 0;
 	if (nxt == IPPROTO_AH || nxt == IPPROTO_ESP)
 		swap = 1;
-	if (nxt == IPPROTO_MOBILITY) {
+	if (nxt == IPPROTO_MH) {
 		m_copydata(m, mhoff, sizeof(mh), (caddr_t)&mh);
 		if (mh.ip6m_type == IP6M_BINDING_UPDATE)
 			swap = 1;

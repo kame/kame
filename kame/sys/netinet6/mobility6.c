@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.27 2003/11/02 23:04:02 jinmei Exp $	*/
+/*	$KAME: mobility6.c,v 1.28 2003/11/11 19:05:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -143,7 +143,7 @@ mobility6_input(mp, offp, proto)
 	if (mh6 == NULL)
 		return (IPPROTO_DONE);
 #endif
-	if ((sum = in6_cksum(m, IPPROTO_MOBILITY, off, mh6len)) != 0) {
+	if ((sum = in6_cksum(m, IPPROTO_MH, off, mh6len)) != 0) {
 		mip6log((LOG_ERR,
 		    "%s:%d: Mobility Header checksum error(%d|%x) %s\n",
 		    __FILE__, __LINE__,

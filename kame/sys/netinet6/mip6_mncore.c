@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.41 2003/11/02 23:04:02 jinmei Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.42 2003/11/11 19:05:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -3620,7 +3620,7 @@ mip6_ip6mhi_create(pktopt_mobility, mbu)
 
 	/* calculate checksum. */
 	ip6mhi->ip6mhi_cksum = mip6_cksum(&mbu->mbu_haddr, &mbu->mbu_paddr,
-	    ip6mhi_size, IPPROTO_MOBILITY, (char *)ip6mhi);
+	    ip6mhi_size, IPPROTO_MH, (char *)ip6mhi);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6mhi;
 
@@ -3658,7 +3658,7 @@ mip6_ip6mci_create(pktopt_mobility, mbu)
 
 	/* calculate checksum. */
 	ip6mci->ip6mci_cksum = mip6_cksum(&mbu->mbu_coa, &mbu->mbu_paddr,
-	    ip6mci_size, IPPROTO_MOBILITY, (char *)ip6mci);
+	    ip6mci_size, IPPROTO_MH, (char *)ip6mci);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6mci;
 
@@ -3909,7 +3909,7 @@ mip6_hexdump("MN: Authenticator: ", (u_int8_t *)(mopt_auth + 1), MIP6_AUTHENTICA
 
 	/* calculate checksum. */
 	ip6mu->ip6mu_cksum = mip6_cksum(&mbu->mbu_haddr, dst, ip6mu_size,
-					IPPROTO_MOBILITY, (char *)ip6mu);
+	    IPPROTO_MH, (char *)ip6mu);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6mu;
 
