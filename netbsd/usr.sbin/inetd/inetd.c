@@ -890,9 +890,18 @@ config(signo)
 				port = sep->se_service;
 			error = getaddrinfo(host, port, &hints, &res);
 			if (error) {
-				syslog(LOG_ERR, "%s/%s: %s: %s",
-				    sep->se_service, sep->se_proto,
-				    sep->se_hostaddr, gai_strerror(error));
+				if (host == NULL) {
+					syslog(LOG_ERR, "%s/%s: %s: "
+					    "the address family is not "
+					    "supported by the kernel",
+					    sep->se_service, sep->se_proto,
+					    sep->se_hostaddr);
+				} else {
+					syslog(LOG_ERR, "%s/%s: %s: %s",
+					    sep->se_service, sep->se_proto,
+					    sep->se_hostaddr,
+					    gai_strerror(error));
+				}
 				sep->se_checked = 0;
 				continue;
 			}
