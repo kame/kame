@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.10 2001/12/14 09:48:13 k-sugyou Exp $	*/
+/*	$KAME: mip6control.c,v 1.11 2002/01/07 13:41:53 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -45,13 +45,20 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif
+#define _KERNEL 1
 #include <net/if_hif.h>
+#undef _KERNEL
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
+
+#include <fcntl.h>
+#include <kvm.h>
+#include <nlist.h>
+#include <limits.h>
 
 #include <netinet6/mip6.h>
 
@@ -61,6 +68,8 @@ static int getaddress(char *, struct in6_addr *);
 static const char *ip6_sprintf(const struct in6_addr *);
 static const char *raflg_sprintf(u_int8_t);
 static const char *buflg_sprintf(u_int8_t);
+static struct hif_softc *get_hif_softc(char *);
+static void kread __P((u_long, void *, int));
 
 static const char *pfx_desc[] = {
 	"prefix\t\tplen\tvltime\tvlrem\tpltime\tplrem\thaddr\n",
@@ -90,6 +99,18 @@ static const char *ipaddr_fmt[] = {
 	"%-31s "
 };
 
+struct nlist nl[] = {
+	{ "_hif_softc_list" },
+#define N_HIF_SOFTC_LIST 0
+	{ "_mip6_bc_list" },
+#define N_MIP6_BC_LIST 1
+	{ "" },
+};
+
+#define KREAD(addr, buf, type) \
+	kread((u_long)addr, (void *)buf, sizeof(type))
+
+kvm_t *kvmd;
 int numerichost = 0;
 
 int
@@ -111,6 +132,7 @@ main(argc, argv)
 	char *shaarg = NULL, *sllarg = NULL;
 	int gbu = 0;
 	int gbc = 0;
+	char kvm_err[_POSIX2_LINE_MAX];
 
 	while ((ch = getopt(argc, argv, "mMngli:H:hP:A:L:abc")) != -1) {
 		switch(ch) {
@@ -163,16 +185,25 @@ main(argc, argv)
 		}
 	}
 
+	if ((kvmd = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, kvm_err)) == NULL) {
+		fprintf(stderr, "%s\n", kvm_err);
+		exit(1);
+	}
+	if (kvm_nlist(kvmd, nl) < 0) {
+		fprintf(stderr, "no namelist\n");
+		exit(1);
+	}
+
 	if((s = socket(AF_INET6, SOCK_DGRAM, 0)) == -1) {
 		perror("socket");
-		exit(-1);
+		exit(1);
 	}
 
 	if (enablemn) {
 		int enable = 1;
 		if(ioctl(s, SIOCENABLEMN, (caddr_t)&enable) == -1) {
 			perror("ioctl");
-			exit(-1);
+			exit(1);
 		}
 	}
 
@@ -180,7 +211,7 @@ main(argc, argv)
 		int enable = 0;
 		if(ioctl(s, SIOCENABLEMN, (caddr_t)&enable) == -1) {
 			perror("ioctl");
-			exit(-1);
+			exit(1);
 		}
 	}
 
@@ -188,7 +219,7 @@ main(argc, argv)
 		int enable = 1;
 		if(ioctl(s, SIOCENABLEHA, (caddr_t)&enable) == -1) {
 			perror("ioctl");
-			exit(-1);
+			exit(1);
 		}
 	}
 
@@ -199,7 +230,7 @@ main(argc, argv)
 		ifr = malloc(sizeof(struct hif_ifreq) + sizeof(*mpfx));
 		if (ifr == NULL) {
 			perror("malloc");
-			exit(-1);
+			exit(1);
 		}
 		strcpy(ifr->ifr_name, ifnarg);
 		ifr->ifr_count = 1;
@@ -212,48 +243,45 @@ main(argc, argv)
 		mpfx->mpfx_pltime = 0xff00; /* XXX */
 		if(ioctl(s, SIOCAHOMEPREFIX_HIF, (caddr_t)ifr) == -1) {
 			perror("ioctl");
-			exit(-1);
+			exit(1);
 		}
 	}
 
 	if (gmhp) {
-		struct hif_ifreq *ifr;
-		struct mip6_prefix *mpfx;
-		int i;
+		struct hif_softc *sc;
+		struct hif_subnet *hs, hif_subnet;
+		struct mip6_subnet *ms, mip6_subnet;
+		struct mip6_subnet_prefix *mspfx, mip6_subnet_prefix;
+		struct mip6_prefix *mpfx, mip6_prefix;
 
-		ifr = malloc(sizeof(struct hif_ifreq)
-			     + IOC_ENTRY_COUNT * sizeof(struct mip6_prefix));
-		if (ifr == NULL) {
-			perror("malloc");
-			exit(-1);
-		}
-		bzero(ifr, sizeof(sizeof(struct hif_ifreq)
-				  + IOC_ENTRY_COUNT * sizeof(struct mip6_prefix)));
-
-		strcpy(ifr->ifr_name, ifnarg);
-		ifr->ifr_count = IOC_ENTRY_COUNT;
-		mpfx = (struct mip6_prefix *)((caddr_t)ifr 
-					   + sizeof(struct hif_ifreq));
-		ifr->ifr_ifru.ifr_mpfx = mpfx;
-		if (ioctl(s, SIOCGHOMEPREFIX_HIF, (caddr_t)ifr) == -1) {
-			perror("ioctl");
-			exit(-1);
-		}
-
+		sc = get_hif_softc(ifnarg);
 		printf(pfx_desc[longdisp]);
-		for (i = 0; i < ifr->ifr_count; i++) {
-			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mpfx->mpfx_prefix));
-			printf("%7u %7u %7qd %7u %7qd ",
-			       mpfx->mpfx_prefixlen,
-			       mpfx->mpfx_vltime,
-			       mpfx->mpfx_vlremain,
-			       mpfx->mpfx_pltime,
-			       mpfx->mpfx_plremain);
-			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mpfx->mpfx_haddr));
-			printf("\n");
-			mpfx++;
+		for (hs = TAILQ_FIRST(&sc->hif_hs_list_home);
+		     hs;
+		     hs = TAILQ_NEXT(hs, hs_entry)) {
+			KREAD(hs, &hif_subnet, hif_subnet);
+			hs = &hif_subnet;
+			KREAD(hs->hs_ms, &mip6_subnet, mip6_subnet);
+			ms = &mip6_subnet;
+			for (mspfx = TAILQ_FIRST(&ms->ms_mspfx_list);
+			     mspfx;
+			     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
+				KREAD(mspfx, &mip6_subnet_prefix, mip6_subnet_prefix);
+				mspfx = &mip6_subnet_prefix;
+				KREAD(mspfx->mspfx_mpfx, &mip6_prefix, mip6_prefix);
+				mpfx = &mip6_prefix;
+				printf(ipaddr_fmt[longdisp],
+				       ip6_sprintf(&mpfx->mpfx_prefix));
+				printf("%7u %7u %7qd %7u %7qd ",
+				       mpfx->mpfx_prefixlen,
+				       mpfx->mpfx_vltime,
+				       mpfx->mpfx_vlremain,
+				       mpfx->mpfx_pltime,
+				       mpfx->mpfx_plremain);
+				printf(ipaddr_fmt[longdisp],
+				       ip6_sprintf(&mpfx->mpfx_haddr));
+				printf("\n");
+			}
 		}
 	}
 
@@ -266,7 +294,7 @@ main(argc, argv)
 		ifr = malloc(sizeof(struct hif_ifreq) + sizeof(*mha));
 		if (ifr == NULL) {
 			perror("malloc");
-			exit(-1);
+			exit(1);
 		}
 		strcpy(ifr->ifr_name, ifnarg);
 		ifr->ifr_count = 1;
@@ -280,75 +308,63 @@ main(argc, argv)
 		mha->mha_lifetime = 0xffff;
 		if(ioctl(s, SIOCAHOMEAGENT_HIF, (caddr_t)ifr) == -1) {
 			perror("ioctl");
-			exit(-1);
+			exit(1);
 		}
 	}
 
 	if (gha) {
-		struct hif_ifreq *ifr;
-		struct mip6_ha *mha;
+		struct hif_softc *sc;
+		struct hif_subnet *hs, hif_subnet;
+		struct mip6_subnet *ms, mip6_subnet;
+		struct mip6_subnet_ha *msha, mip6_subnet_ha;
+		struct mip6_ha *mha, mip6_ha;
+		struct hif_subnet *hsl[2];
 		int i;
 
-		ifr = malloc(sizeof(struct hif_ifreq)
-			     + IOC_ENTRY_COUNT * sizeof(struct mip6_ha));
-		if (ifr == NULL) {
-			perror("malloc");
-			exit(-1);
-		}
-		bzero(ifr, sizeof(sizeof(struct hif_ifreq)
-				  + IOC_ENTRY_COUNT * sizeof(struct mip6_ha)));
-
-		strcpy(ifr->ifr_name, ifnarg);
-		ifr->ifr_count = IOC_ENTRY_COUNT;
-		mha = (struct mip6_ha *)((caddr_t)ifr 
-					 + sizeof(struct hif_ifreq));
-		ifr->ifr_ifru.ifr_mha = mha;
-		if (ioctl(s, SIOCGHOMEAGENT_HIF, (caddr_t)ifr) == -1) {
-			perror("ioctl");
-			exit(-1);
-		}
-
+		sc = get_hif_softc(ifnarg);
+		hsl[0] = TAILQ_FIRST(&sc->hif_hs_list_home);
+		hsl[1] = TAILQ_FIRST(&sc->hif_hs_list_foreign);
 		printf(ha_desc[longdisp]);
-		for (i = 0; i < ifr->ifr_count; i++) {
-			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mha->mha_lladdr));
-			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mha->mha_gaddr));
-			printf("%-7s %7d %7d %7d\n",
-			       raflg_sprintf(mha->mha_flags),
-			       mha->mha_pref,
-			       mha->mha_lifetime,
-			       mha->mha_remain);
-			mha++;
+		for (i = 0; i < 2; i++) {
+			for (hs = hsl[i];
+			     hs;
+			     hs = TAILQ_NEXT(hs, hs_entry)) {
+				KREAD(hs, &hif_subnet, hif_subnet);
+				hs = &hif_subnet;
+				KREAD(hs->hs_ms, &mip6_subnet, mip6_subnet);
+				ms = &mip6_subnet;
+				for (msha = TAILQ_FIRST(&ms->ms_msha_list);
+				     msha;
+				     msha = TAILQ_NEXT(msha, msha_entry)) {
+					KREAD(msha, &mip6_subnet_ha, mip6_subnet_ha);
+					msha = &mip6_subnet_ha;
+					KREAD(msha->msha_mha, &mip6_ha, mip6_ha);
+					mha = &mip6_ha;
+					printf(ipaddr_fmt[longdisp],
+					       ip6_sprintf(&mha->mha_lladdr));
+					printf(ipaddr_fmt[longdisp],
+					       ip6_sprintf(&mha->mha_gaddr));
+					printf("%-7s %7d %7d %7d\n",
+					       raflg_sprintf(mha->mha_flags),
+					       mha->mha_pref,
+					       mha->mha_lifetime,
+					       mha->mha_remain);
+				}
+			}
 		}
-		
 	}
 
 	if (gbu) {
-		struct hif_ifreq *ifr;
-		struct mip6_bu *mbu;
-		int i;
+		struct hif_softc *sc;
+		struct mip6_bu *mbu, mip6_bu;
 
-		ifr = malloc(sizeof(struct hif_ifreq)
-			     + IOC_ENTRY_COUNT * sizeof(struct mip6_bu));
-		if (ifr == NULL) {
-			perror("malloc");
-			exit(-1);
-		}
-		bzero(ifr, sizeof(sizeof(struct hif_ifreq)
-				  + IOC_ENTRY_COUNT * sizeof(struct mip6_bu)));
-
-		strcpy(ifr->ifr_name, ifnarg);
-		ifr->ifr_count = IOC_ENTRY_COUNT;
-		mbu = (struct mip6_bu *)((caddr_t)ifr 
-					 + sizeof(struct hif_ifreq));
-		ifr->ifr_ifru.ifr_mbu = mbu;
-		if (ioctl(s, SIOCGBU_HIF, (caddr_t)ifr) == -1) {
-			perror("ioctl");
-			exit(-1);
-		}
+		sc = get_hif_softc(ifnarg);
 		printf(bu_desc[longdisp]);
-		for (i = 0; i < ifr->ifr_count; i++) {
+		for (mbu = LIST_FIRST(&sc->hif_bu_list);
+		     mbu;
+		     mbu = LIST_NEXT(mbu, mbu_entry)) {
+			KREAD(mbu, &mip6_bu, mip6_bu);
+			mbu = &mip6_bu;
 			printf(ipaddr_fmt[longdisp],
 			       ip6_sprintf(&mbu->mbu_paddr));
 			printf(ipaddr_fmt[longdisp],
@@ -368,33 +384,24 @@ main(argc, argv)
 			       mbu->mbu_state,
 			       mbu->mbu_dontsend,
 			       mbu->mbu_coafallback);
-			mbu++;
 		}
 	}
 
 	if (gbc) {
-		struct mip6_req *mr;
-		struct mip6_bc *mbc;
-		int i;
+		struct mip6_bc_list mip6_bc_list;
+		struct mip6_bc *mbc, mip6_bc;
 
-		mr = malloc(sizeof(struct mip6_req)
-			    + IOC_ENTRY_COUNT * sizeof(struct mip6_bc));
-		if (mr == NULL) {
-			perror("malloc");
-			exit(-1);
+		if (nl[N_MIP6_BC_LIST].n_value == 0) {
+			fprintf(stderr, "bc not found\n");
+			exit(1);
 		}
-		bzero(mr, sizeof(*mr) + IOC_ENTRY_COUNT * sizeof(*mbc));
-
-		mr->mip6r_count = IOC_ENTRY_COUNT;
-		mbc = (struct mip6_bc *)((caddr_t)mr
-					 + sizeof(*mr));
-		mr->mip6r_ru.mip6r_mbc = mbc;
-		if (ioctl(s, SIOCGBC, (caddr_t)mr) == -1) {
-			perror("ioctl");
-			exit(-1);
-		}
+		KREAD(nl[N_MIP6_BC_LIST].n_value, &mip6_bc_list, mip6_bc_list);
 		printf(bc_desc[longdisp]);
-		for (i = 0; i < mr->mip6r_count; i++) {
+		for (mbc = LIST_FIRST(&mip6_bc_list);
+		     mbc;
+		     mbc = LIST_NEXT(mbc, mbc_entry)) {
+			KREAD(mbc, &mip6_bc, mip6_bc);
+			mbc = &mip6_bc;
 			printf(ipaddr_fmt[longdisp],
 			       ip6_sprintf(&mbc->mbc_phaddr));
 			printf(ipaddr_fmt[longdisp],
@@ -415,9 +422,7 @@ main(argc, argv)
 			       mbc->mbc_lifetime,
 			       mbc->mbc_remain,
 			       mbc->mbc_state);
-			mbc++;
 		}
-
 	}
 	
 	exit(0);
@@ -497,4 +502,51 @@ buflg_sprintf(flags)
 		 (flags & IP6_BUF_DAD ? "D" : ""));
 
 	return buf;
+}
+
+static struct hif_softc *
+get_hif_softc(ifname)
+	char *ifname;
+{
+	TAILQ_HEAD(hif_softc_list, hif_softc) hif_softc_list;
+	struct hif_softc *sc;
+	static struct hif_softc hif_softc;
+	u_short ifindex = if_nametoindex(ifname);
+
+	if (ifindex == 0) {
+		fprintf(stderr, "%s: not found\n", ifname);
+		exit(1);
+	}
+
+	if (nl[N_HIF_SOFTC_LIST].n_value == 0) {
+		fprintf(stderr, "hif not found\n");
+		exit(1);
+	}
+	KREAD(nl[N_HIF_SOFTC_LIST].n_value, &hif_softc_list, hif_softc_list);
+	for (sc = TAILQ_FIRST(&hif_softc_list);
+	     sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
+		KREAD(sc, &hif_softc, hif_softc);
+		sc = &hif_softc;
+		if (sc->hif_if.if_index == ifindex)
+			break;
+	}
+	if (sc == NULL) {
+		fprintf(stderr, "%s: not found\n", ifname);
+		exit(1);
+	}
+
+	return sc;
+}
+
+static void
+kread(addr, buf, size)
+	u_long addr;
+	void *buf;
+	int size;
+{
+	if (kvm_read(kvmd, addr, buf, size) != size) {
+		fprintf(stderr, "%s\n", kvm_geterr(kvmd));
+		exit(1);
+	}
 }
