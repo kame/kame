@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.48 2001/09/21 04:05:51 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.49 2001/10/14 16:27:47 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2377,7 +2377,7 @@ natpt_fixCksum(int cksum, u_char *optr, int olen, u_char *nptr, int nlen)
 
 	while (olen) {
 		if (olen == 1) {
-			old = optr[0] * 256 + optr[1];
+			old = optr[0] * 256;
 			x -= old & 0xff00;
 			if ( x <= 0 ) { x--; x &= 0xffff; }
 			break;
@@ -2392,7 +2392,7 @@ natpt_fixCksum(int cksum, u_char *optr, int olen, u_char *nptr, int nlen)
 
 	while (nlen) {
 		if (nlen == 1) {
-			new = nptr[0] * 256 + nptr[1];
+			new = nptr[0] * 256;
 			x += new & 0xff00;
 			if (x & 0x10000) { x++; x &= 0xffff; }
 			break;
