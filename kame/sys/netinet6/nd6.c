@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.176 2001/07/24 05:30:08 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.177 2001/07/24 08:55:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -98,7 +98,6 @@
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
-#include <netinet6/in6_prefix.h>
 #include <netinet/icmp6.h>
 
 #if !defined(__bsdi__) && !defined(__OpenBSD__)
@@ -1564,26 +1563,6 @@ nd6_ioctl(cmd, data, ifp)
 			i++;
 			pr = pr->ndpr_next;
 		}
-	      {
-		struct rr_prefix *rpp;
-
-		for (rpp = LIST_FIRST(&rr_prefix); rpp;
-		     rpp = LIST_NEXT(rpp, rp_entry)) {
-			if (i >= PRLSTSIZ)
-				break;
-			(void)in6_embedscope(&prl->prefix[i].prefix,
-			    &pr->ndpr_prefix, NULL, NULL);
-			prl->prefix[i].raflags = rpp->rp_raf;
-			prl->prefix[i].prefixlen = rpp->rp_plen;
-			prl->prefix[i].vltime = rpp->rp_vltime;
-			prl->prefix[i].pltime = rpp->rp_pltime;
-			prl->prefix[i].if_index = rpp->rp_ifp->if_index;
-			prl->prefix[i].expire = rpp->rp_expire;
-			prl->prefix[i].advrtrs = 0;
-			prl->prefix[i].origin = rpp->rp_origin;
-			i++;
-		}
-	      }
 		splx(s);
 
 		break;

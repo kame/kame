@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.98 2001/07/20 18:35:00 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.99 2001/07/24 08:55:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -157,9 +157,6 @@
 #include <netinet6/pim6_var.h>
 
 #include <netinet6/nd6.h>
-#ifdef __FreeBSD__
-#include <netinet6/in6_prefix.h>
-#endif
 
 #ifdef IPSEC
 #ifdef __OpenBSD__

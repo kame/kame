@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.124 2001/07/18 08:32:51 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.125 2001/07/24 08:55:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1010,9 +1010,6 @@ in6_ifdetach(ifp)
 	struct in6_multi *in6m, *in6m_next;
 #endif
 	struct in6_multi_mship *imm;
-
-	/* nuke prefix list.  this may try to remove some of ifaddrs as well */
-	in6_purgeprefix(ifp);
 
 	/* remove neighbor management table */
 	nd6_purge(ifp);

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.204 2001/07/23 07:06:50 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.205 2001/07/24 08:55:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -128,7 +128,6 @@
 #include <netinet/icmp6.h>
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/nd6.h>
-#include <netinet6/in6_prefix.h>
 #ifdef __bsdi__
 #include <netinet6/raw_ip6.h>
 #endif
@@ -365,18 +364,6 @@ ip6_init2(dummy)
 	timeout_add(&nd6_timer_ch, hz);
 #else
 	timeout(nd6_timer, (caddr_t)0, hz);
-#endif
-
-	/* router renumbering prefix list maintenance */
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	callout_init(&in6_rr_timer_ch);
-	callout_reset(&in6_rr_timer_ch, hz, in6_rr_timer, NULL);
-#elif defined(__OpenBSD__)
-	bzero(&in6_rr_timer_ch, sizeof(in6_rr_timer_ch));
-	timeout_set(&in6_rr_timer_ch, in6_rr_timer, (caddr_t)0);
-	timeout_add(&in6_rr_timer_ch, hz);
-#else
-	timeout(in6_rr_timer, (caddr_t)0, hz);
 #endif
 
 	/* timer for regeneranation of temporary addresses randomize ID */

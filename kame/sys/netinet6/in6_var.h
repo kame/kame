@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.60 2001/07/24 08:37:55 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.61 2001/07/24 08:55:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -120,7 +120,6 @@ struct	in6_ifaddr {
 	int	ia6_flags;
 
 	struct in6_addrlifetime ia6_lifetime;
-	struct ifprefix *ia6_ifpr; /* back pointer to ifprefix */
 
 	/* back pointer to the ND prefix (for autoconfigured addresses only) */
 	struct nd_prefix *ia6_ndpr;
@@ -370,8 +369,6 @@ struct	in6_rrenumreq {
 #define IA6_DSTSIN6(ia)	(&((ia)->ia_dstaddr))
 #define IFA_IN6(x)	(&((struct sockaddr_in6 *)((x)->ifa_addr))->sin6_addr)
 #define IFA_DSTIN6(x)	(&((struct sockaddr_in6 *)((x)->ifa_dstaddr))->sin6_addr)
-
-#define IFPR_IN6(x)	(&((struct sockaddr_in6 *)((x)->ifpr_prefix))->sin6_addr)
 
 #ifdef _KERNEL
 #define IN6_ARE_MASKED_ADDR_EQUAL(d, a, m)	(	\
