@@ -484,10 +484,14 @@ rtadvd_input()
 
 	switch(icp->icmp6_type) {
 	 case ND_ROUTER_SOLICIT:
-		 /* hop limit verification - RFC-2461 6.1.1 */
+		 /*
+		  * Message verification - RFC-2461 6.1.1
+		  * XXX: these checks must be done in the kernel as well,
+		  *      but we can't complete rely on it.
+		  */
 		 if (*hlimp != 255) {
 			 syslog(LOG_NOTICE,
-				"<%s> invalid hop limit(%d) "
+				"<%s> RS with invalid hop limit(%d) "
 				"received from %s on %s",
 				__FUNCTION__, *hlimp,
 				inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
@@ -495,19 +499,60 @@ rtadvd_input()
 				if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 			 return;
 		 }
+		 if (icp->icmp6_code) {
+			 syslog(LOG_NOTICE,
+				"<%s> RS with invalid ICMP6 code(%d) "
+				"received from %s on %s",
+				__FUNCTION__, icp->icmp6_code,
+				inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
+					  INET6_ADDRSTRLEN),
+				if_indextoname(pi->ipi6_ifindex, ifnamebuf));
+			 return;
+		 }
+		 if (i < sizeof(struct nd_router_solicit) {
+			 syslog(LOG_NOTICE,
+				"<%s> RS from %s on %s does not have enough "
+				"length (len = %d)",
+				__FUNCTION__,
+				inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
+					  INET6_ADDRSTRLEN),
+				if_indextoname(pi->ipi6_ifindex, ifnamebuf), i);
+		 }
 		 rs_input(i, (struct nd_router_solicit *)icp, pi, &from);
 		 break;
 	 case ND_ROUTER_ADVERT:
-		 /* hop limit verification - RFC-2461 6.1.1 */
+		 /*
+		  * Message verification - RFC-2461 6.1.2
+		  * XXX: there's a same dilemma as above... 
+		  */
 		 if (*hlimp != 255) {
 			 syslog(LOG_NOTICE,
-				"<%s> invalid hop limit(%d) "
+				"<%s> RA with invalid hop limit(%d) "
 				"received from %s on %s",
 				__FUNCTION__, *hlimp,
 				inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
 					  INET6_ADDRSTRLEN),
 				if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 			 return;
+		 }
+		 if (icp->icmp6_code) {
+			 syslog(LOG_NOTICE,
+				"<%s> RA with invalid ICMP6 code(%d) "
+				"received from %s on %s",
+				__FUNCTION__, icp->icmp6_code,
+				inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
+					  INET6_ADDRSTRLEN),
+				if_indextoname(pi->ipi6_ifindex, ifnamebuf));
+			 return;
+		 }
+		 if (i < sizeof(struct nd_router_advert) {
+			 syslog(LOG_NOTICE,
+				"<%s> RA from %s on %s does not have enough "
+				"length (len = %d)",
+				__FUNCTION__,
+				inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
+					  INET6_ADDRSTRLEN),
+				if_indextoname(pi->ipi6_ifindex, ifnamebuf), i);
 		 }
 		 ra_input(i, (struct nd_router_advert *)icp, pi, &from);
 		 break;
