@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_var.h,v 1.13 2000/06/14 17:52:08 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_var.h,v 1.14 2000/07/04 14:12:17 sakane Exp $ */
 
 #define PORT_ISAKMP 500
 
@@ -55,7 +55,7 @@ struct isakmp_pl_nonce;	/* XXX */
 extern int isakmp_handler __P((int));
 extern int isakmp_ph1begin_i __P((struct remoteconf *, struct sockaddr *));
 
-extern vchar_t * isakmp_parsewoh __P((int, struct isakmp_gen *, int));
+extern vchar_t *isakmp_parsewoh __P((int, struct isakmp_gen *, int));
 extern vchar_t *isakmp_parse __P((vchar_t *));
 
 extern int isakmp_init __P((void));
