@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.59 2002/05/21 14:21:40 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.60 2002/05/21 14:26:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1298,7 +1298,7 @@ free_ndopts(union nd_opts *ndopts)
 {
 	struct nd_optlist *opt = ndopts->nd_opts_list, *next;
 
-	while(opt) {
+	while (opt) {
 		next = opt->next;
 		free(opt);
 		opt = next;
@@ -1395,7 +1395,7 @@ sock_open()
 		       __FUNCTION__);
 		exit(1);
 	}
-	while(ra) {
+	while (ra) {
 		mreq.ipv6mr_interface = ra->ifindex;
 		if (setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq,
 			       sizeof(mreq)) < 0) {

@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.20 2001/12/20 02:09:37 k-sugyou Exp $	*/
+/*	$KAME: if.c,v 1.21 2002/05/21 14:26:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -248,7 +248,7 @@ if_getflags(int ifindex, int oifflags)
 int
 lladdropt_length(struct sockaddr_dl *sdl)
 {
-	switch(sdl->sdl_type) {
+	switch (sdl->sdl_type) {
 	case IFT_ETHER:
 	case IFT_FDDI:
 		return(ROUNDUP8(ETHER_ADDR_LEN + 2));
@@ -264,7 +264,7 @@ lladdropt_fill(struct sockaddr_dl *sdl, struct nd_opt_hdr *ndopt)
 
 	ndopt->nd_opt_type = ND_OPT_SOURCE_LINKADDR; /* fixed */
 
-	switch(sdl->sdl_type) {
+	switch (sdl->sdl_type) {
 	case IFT_ETHER:
 	case IFT_FDDI:
 		ndopt->nd_opt_len = (ROUNDUP8(ETHER_ADDR_LEN + 2)) >> 3;

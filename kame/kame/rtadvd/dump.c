@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.20 2001/06/11 03:09:54 itojun Exp $	*/
+/*	$KAME: dump.c,v 1.21 2002/05/21 14:26:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -180,7 +180,7 @@ if_dump()
 				inet_ntop(AF_INET6, &pfx->prefix,
 					  prefixbuf, sizeof(prefixbuf)),
 				pfx->prefixlen);
-			switch(pfx->origin) {
+			switch (pfx->origin) {
 			case PREFIX_FROM_KERNEL:
 				fprintf(fp, "KERNEL, ");
 				break;
