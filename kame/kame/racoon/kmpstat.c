@@ -1,4 +1,4 @@
-/*	$KAME: kmpstat.c,v 1.32 2004/04/15 08:55:22 sakane Exp $	*/
+/*	$KAME: kmpstat.c,v 1.33 2004/08/16 08:20:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -366,7 +366,7 @@ com_recv()
 		break;
 
 	default:
-		/* IGNORE */
+		break;
 	}
 
 	(void)close(so);
