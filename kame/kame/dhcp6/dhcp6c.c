@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.120 2003/07/31 22:24:23 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.121 2003/07/31 23:20:25 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -27,8 +27,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/uio.h>

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_script.c,v 1.5 2003/07/31 21:44:11 jinmei Exp $	*/
+/*	$KAME: dhcp6c_script.c,v 1.6 2003/07/31 23:20:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -51,6 +51,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <syslog.h>
 #include <errno.h>

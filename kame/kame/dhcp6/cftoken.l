@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.21 2003/07/31 21:44:10 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.22 2003/07/31 23:20:25 jinmei Exp $	*/
 
 %{
 /*
@@ -50,6 +50,8 @@
 #include "common.h"
 #include "y.tab.h"
 
+#define YY_NO_UNPUT 1
+
 char *configfilename;
 int lineno = 1;
 
@@ -63,6 +65,9 @@ int cfdebug = 1;
 #else
 int cfdebug = 0;
 #endif
+
+extern int yyparse __P((void));
+extern int cf_post_config __P((void));
 
 static void cfdebug_print __P((char *, char *, int));
 

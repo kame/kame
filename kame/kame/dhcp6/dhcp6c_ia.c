@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.18 2003/07/31 22:24:23 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.19 2003/07/31 23:20:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -164,6 +164,9 @@ update_ia(iatype, ialist, ifp, serverid)
 					goto nextia;
 				}
 				break;
+			default:
+				dprintf(LOG_ERR, FNAME, "impossible case");
+				goto nextia;
 			}
 		}
 
@@ -566,6 +569,8 @@ ia_timo(arg)
 				goto fail;
 			}
 		}
+		break;
+	default:
 		break;
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.23 2003/07/31 21:44:10 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.24 2003/07/31 23:20:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -349,8 +349,6 @@ dhcpoption_list:
 		}
 	|	dhcpoption COMMA dhcpoption_list
 		{
-			struct cf_list *head;
-
 			$1->next = $3;
 			$1->tail = $3->tail;
 

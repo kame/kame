@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.107 2003/07/31 22:41:49 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.108 2003/07/31 23:20:25 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -795,7 +795,10 @@ set_statelessinfo(optinfo)
 		dprintf(LOG_ERR, FNAME, "failed to copy NTP servers");
 		return (-1);
 	}
+
+	return (0);
 }
+
 
 static int
 react_solicit(ifp, dh6, optinfo, from, fromlen, relayinfohead)
@@ -1522,6 +1525,10 @@ make_binding_ia(msgtype, iapd, retlist, optinfo)
 					dhcp6_clear_list(&ialist);
 					return (-1);
 				}
+				break;
+			default:
+				dprintf(LOG_ERR, FNAME, "unsupported IA type");
+				return (-1); /* XXX */
 			}
 		}
 
@@ -1689,7 +1696,6 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen,
 	int len, optlen;
 	int relayed = 0;
 	struct dhcp6 *dh6;
-	struct dhcp6_relay *dh6relay;
 	struct relayinfo *relayinfo;
 
 	if (sizeof(struct dhcp6) > sizeof(replybuf)) {
@@ -1929,6 +1935,9 @@ make_match_ia(spec, conflist, retlist)
 			match = dhcp6_find_listval(conflist, spec->type,
 			    &spec->uv, MATCHLIST_PREFIXLEN);
 			break;
+		default:
+			dprintf(LOG_ERR, FNAME, "unsupported IA type");
+			return (0); /* XXX */
 		}
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.88 2003/07/31 22:24:23 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.89 2003/07/31 23:20:25 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -53,6 +53,7 @@
 
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
+#include <ctype.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
@@ -158,6 +159,8 @@ dhcp6_clear_listval(lv)
 	switch (lv->type) {
 	case DHCP6_LISTVAL_VBUF:
 		dhcp6_vbuf_free(&lv->val_vbuf);
+		break;
+	default:		/* nothing to do */
 		break;
 	}
 	free(lv);
@@ -1777,7 +1780,7 @@ dnsencode(name, buf, buflen)
 {
 	char *cp, *ep;
 	const char *p, *q;
-	int i, nterm = 1;
+	int i;
 	int namelen = strlen(name);
 
 	cp = buf;

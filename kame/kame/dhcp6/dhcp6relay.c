@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.45 2003/07/31 22:24:23 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.46 2003/07/31 23:20:25 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -70,10 +70,9 @@ static char *boundaddr;
 static char *serveraddr = DH6ADDR_ALLSERVER;
 
 static char *rmsgctlbuf;
-static socklen_t rmsgctllen, smsgctllen;
+static socklen_t rmsgctllen;
 static struct msghdr rmh;
 static char rdatabuf[BUFSIZ];
-static struct in6_pktinfo *spktinfo;
 static int relayifid;
 
 static int mhops = DHCP6_RELAY_MULTICAST_HOPS;
@@ -251,11 +250,9 @@ relay6_init()
 {
 	struct addrinfo hints;
 	struct addrinfo *res, *res2;
-	int i, ifid, error;
+	int i, ifid, error, on;
 	struct ipv6_mreq mreq6;
-	int type, on;
 	static struct iovec iov[2];
-	struct cmsghdr *cm;
 
 	/* initialize non-link-local prefixes list */
 	TAILQ_INIT(&global_prefixes);
@@ -452,7 +449,7 @@ static void
 relay6_loop()
 {
 	fd_set readfds;
-	int e, cc;
+	int e;
 
 	while(1) {
 		/* we'd rather use FD_COPY here, but it's not POSIX friendly */
