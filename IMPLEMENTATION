@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.248 2001/07/23 15:03:51 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.249 2001/07/24 02:08:25 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -2140,6 +2140,7 @@ to make the distributed develoment smooth.
 		...
 	     }
 	}
+- Do not use printf() in the kernel code.
 
 When you want to contribute something to the KAME project, and if *you
 do not mind* the agreement, it would be helpful for the project to
