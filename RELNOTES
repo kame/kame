@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/06/29 08:31:55 $
+		     $Date: 2000/07/02 02:27:02 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -86,5 +86,7 @@ Many of old ones have been solved.
 
 - openbsd: 3COM 3C905B card driver (xl) does not handle multicast properly,
   and will have a major problem with IPv6.  already corrected in SNAP kits.
+
+- netbsd: faithd(8) may not work right.
 
 							<end of RELNOTES>
