@@ -15,6 +15,7 @@
     SUBDIR += rsync
     SUBDIR += socks64
     SUBDIR += tcptrace
+    SUBDIR += totd
     SUBDIR += ucd-snmp
     SUBDIR += v6tun
     SUBDIR += wget
