@@ -5,6 +5,7 @@
 .include "../mk/bsd.prefs.mk"
 
     SUBDIR += bind8
+    SUBDIR += bind9
     SUBDIR += echoping
     SUBDIR += ethereal
     SUBDIR += gated-ipv6
