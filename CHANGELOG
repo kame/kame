@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.527 2000/02/06 08:57:49 itojun Exp $
+$Id: CHANGELOG,v 1.528 2000/02/06 18:04:55 itojun Exp $
 
 <200002>
+Mon Feb  7 03:03:42 JST 2000  itojun@iijlab.net
+	* sys/net/rtsock.c (except bsdi[34])
+	  avoid panic on RTM_IFINFO, due to decreased MHLEN.
+	  From: Conny Larsson <conny@verkstad.net>
+
 Sun Feb  6 17:56:47 JST 2000  itojun@iijlab.net
 	* netbsd/sys/netinet/tcp_output.c: optimize mbuf allocation on output.
 	  allocate cluster only when necessary.
