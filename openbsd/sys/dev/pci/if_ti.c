@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ti.c,v 1.6 1999/10/04 12:37:17 jason Exp $	*/
+/*	$OpenBSD: if_ti.c,v 1.18 2001/03/28 04:11:34 jason Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -31,14 +31,14 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_ti.c,v 1.24 1999/09/23 03:32:54 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_ti.c,v 1.25 2000/01/18 00:26:29 wpaul Exp $
  */
 
 /*
  * Alteon Networks Tigon PCI gigabit ethernet driver for FreeBSD.
  * Manuals, sample driver and firmware source kits are available
  * from http://www.alteon.com/support/openkits.
- * 
+ *
  * Written by Bill Paul <wpaul@ctr.columbia.edu>
  * Electrical Engineering Department
  * Columbia University, New York City
@@ -491,14 +491,6 @@ void ti_handle_events(sc)
 		switch(e->ti_event) {
 		case TI_EV_LINKSTAT_CHANGED:
 			sc->ti_linkstat = e->ti_code;
-			if (e->ti_code == TI_EV_CODE_LINK_UP)
-				printf("%s: 10/100 link up\n",
-				    sc->sc_dv.dv_xname);
-			else if (e->ti_code == TI_EV_CODE_GIG_LINK_UP)
-				printf("%s: gigabit link up\n",
-				    sc->sc_dv.dv_xname);
-			else if (e->ti_code == TI_EV_CODE_LINK_DOWN)
-				printf("%s: link down\n", sc->sc_dv.dv_xname);
 			break;
 		case TI_EV_ERROR:
 			if (e->ti_code == TI_EV_CODE_ERR_INVAL_CMD)
@@ -560,24 +552,41 @@ void ti_handle_events(sc)
 int ti_alloc_jumbo_mem(sc)
 	struct ti_softc		*sc;
 {
-	caddr_t			ptr;
-	register int		i;
-	struct ti_jpool_entry   *entry;
+	caddr_t ptr, kva;
+	bus_dma_segment_t seg;
+	bus_dmamap_t dmamap;
+	int i, rseg;
+	struct ti_jpool_entry *entry;
 
 	/* Grab a big chunk o' storage. */
-#ifndef UVM
-	sc->ti_cdata.ti_jumbo_buf = (caddr_t) vm_page_alloc_contig(
-	    TI_JMEM, 0x100000, 0xffffffff, PAGE_SIZE);
-#else
-	sc->ti_cdata.ti_jumbo_buf = (caddr_t) uvm_pagealloc_contig(
-	    TI_JMEM, 0x100000, 0xffffffff, PAGE_SIZE);
-#endif
-
-	if (sc->ti_cdata.ti_jumbo_buf == NULL) {
-		printf("%s: no memory for jumbo buffers!\n",
-		    sc->sc_dv.dv_xname);
-		return(ENOBUFS);
+	if (bus_dmamem_alloc(sc->sc_dmatag, TI_JMEM, PAGE_SIZE, 0,
+	    &seg, 1, &rseg, BUS_DMA_NOWAIT)) {
+		printf("%s: can't alloc rx buffers\n", sc->sc_dv.dv_xname);
+		return (ENOBUFS);
 	}
+	if (bus_dmamem_map(sc->sc_dmatag, &seg, rseg, TI_JMEM, &kva,
+	    BUS_DMA_NOWAIT)) {
+		printf("%s: can't map dma buffers (%d bytes)\n",
+		    sc->sc_dv.dv_xname, TI_JMEM);
+		bus_dmamem_free(sc->sc_dmatag, &seg, rseg);
+		return (ENOBUFS);
+	}
+	if (bus_dmamap_create(sc->sc_dmatag, TI_JMEM, 1,
+	    TI_JMEM, 0, BUS_DMA_NOWAIT, &dmamap)) {
+		printf("%s: can't create dma map\n", sc->sc_dv.dv_xname);
+		bus_dmamem_unmap(sc->sc_dmatag, kva, TI_JMEM);
+		bus_dmamem_free(sc->sc_dmatag, &seg, rseg);
+		return (ENOBUFS);
+	}
+	if (bus_dmamap_load(sc->sc_dmatag, dmamap, kva, TI_JMEM,
+	    NULL, BUS_DMA_NOWAIT)) {
+		printf("%s: can't load dma map\n", sc->sc_dv.dv_xname);
+		bus_dmamap_destroy(sc->sc_dmatag, dmamap);
+		bus_dmamem_unmap(sc->sc_dmatag, kva, TI_JMEM);
+		bus_dmamem_free(sc->sc_dmatag, &seg, rseg);
+		return (ENOBUFS);
+	}
+	sc->ti_cdata.ti_jumbo_buf = (caddr_t)kva;
 
 	LIST_INIT(&sc->ti_jfree_listhead);
 	LIST_INIT(&sc->ti_jinuse_listhead);
@@ -591,13 +600,16 @@ int ti_alloc_jumbo_mem(sc)
 		sc->ti_cdata.ti_jslots[i].ti_buf = ptr;
 		sc->ti_cdata.ti_jslots[i].ti_inuse = 0;
 		ptr += TI_JLEN;
-		entry = malloc(sizeof(struct ti_jpool_entry), 
+		entry = malloc(sizeof(struct ti_jpool_entry),
 			       M_DEVBUF, M_NOWAIT);
 		if (entry == NULL) {
-			free(sc->ti_cdata.ti_jumbo_buf, M_DEVBUF);
+			bus_dmamap_unload(sc->sc_dmatag, dmamap);
+			bus_dmamap_destroy(sc->sc_dmatag, dmamap);
+			bus_dmamem_unmap(sc->sc_dmatag, kva, TI_JMEM);
+			bus_dmamem_free(sc->sc_dmatag, &seg, rseg);
 			sc->ti_cdata.ti_jumbo_buf = NULL;
-			printf("%s: no memory for jumbo "
-			    "buffer queue!\n", sc->sc_dv.dv_xname);
+			printf("%s: no memory for jumbo buffer queue\n",
+			    sc->sc_dv.dv_xname);
 			return(ENOBUFS);
 		}
 		entry->slot = i;
@@ -614,9 +626,9 @@ void *ti_jalloc(sc)
 	struct ti_softc		*sc;
 {
 	struct ti_jpool_entry   *entry;
-	
+
 	entry = LIST_FIRST(&sc->ti_jfree_listhead);
-	
+
 	if (entry == NULL) {
 		printf("%s: no free jumbo buffers\n", sc->sc_dv.dv_xname);
 		return(NULL);
@@ -700,7 +712,7 @@ ti_jfree(m)
 				panic("ti_jfree: buffer not in use!");
 			entry->slot = i;
 			LIST_REMOVE(entry, jpool_entries);
-			LIST_INSERT_HEAD(&sc->ti_jfree_listhead, 
+			LIST_INSERT_HEAD(&sc->ti_jfree_listhead,
 					  entry, jpool_entries);
 		}
 	}
@@ -905,7 +917,7 @@ int ti_init_rx_ring_jumbo(sc)
 	register int		i;
 	struct ti_cmd_desc	cmd;
 
-	for (i = 0; i < (TI_JSLOTS - 20); i++) {
+	for (i = 0; i < TI_JUMBO_RX_RING_CNT; i++) {
 		if (ti_newbuf_jumbo(sc, i, NULL) == ENOBUFS)
 			return(ENOBUFS);
 	};
@@ -1115,6 +1127,7 @@ void ti_setmulti(sc)
 		bcopy(enm->enm_addrlo, (char *)&mc->mc_addr, ETHER_ADDR_LEN);
 		LIST_INSERT_HEAD(&sc->ti_mc_listhead, mc, mc_entries);
 		ti_add_mcast(sc, &mc->mc_addr);
+		ETHER_NEXT_MULTI(step, enm);
 	}
 
 	/* Re-enable interrupts. */
@@ -1246,9 +1259,9 @@ int ti_chipinit(sc)
 	/*
 	 * From the Alteon sample driver:
 	 * Must insure that we do not cross an 8K (bytes) boundary
-	 * for DMA reads.  Our highest limit is 1K bytes.  This is a 
-	 * restriction on some ALPHA platforms with early revision 
-	 * 21174 PCI chipsets, such as the AlphaPC 164lx 
+	 * for DMA reads.  Our highest limit is 1K bytes.  This is a
+	 * restriction on some ALPHA platforms with early revision
+	 * 21174 PCI chipsets, such as the AlphaPC 164lx
 	 */
 	TI_SETBIT(sc, TI_PCI_STATE, pci_writemax|TI_PCI_READMAX_1024);
 #else
@@ -1476,11 +1489,13 @@ ti_probe(parent, match, aux)
 	struct pci_attach_args *pa = (struct pci_attach_args *)aux;
 
 	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_NETGEAR &&
-	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_NETGEAR_GA620)
+	    (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_NETGEAR_GA620 ||
+	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_NETGEAR_GA620T))
 		return (1);
 
 	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_ALTEON &&
-	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ALTEON_ACENIC)
+	    (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ALTEON_ACENIC ||
+	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ALTEON_ACENICT))
 		return (1);
 
 	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_3COM &&
@@ -1489,6 +1504,11 @@ ti_probe(parent, match, aux)
 
 	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_SGI &&
 	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_SGI_TIGON)
+		return (1);
+
+	/* This is really a Farallon board, they used the wrong vendorid */
+	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_DEC &&
+	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_DEC_PN9000SX)
 		return (1);
 
 	return (0);
@@ -1507,9 +1527,12 @@ ti_attach(parent, self, aux)
 	const char *intrstr = NULL;
 	bus_addr_t iobase;
 	bus_size_t iosize;
-	int s;
+	bus_dma_segment_t seg;
+	bus_dmamap_t dmamap;
+	int s, rseg;
 	u_int32_t command;
 	struct ifnet *ifp;
+	caddr_t kva;
 
 	s = splimp();
 
@@ -1571,7 +1594,7 @@ ti_attach(parent, self, aux)
 	 * Get station address from the EEPROM. Note: the manual states
 	 * that the MAC address is at offset 0x8c, however the data is
 	 * stored as two longwords (since that's how it's loaded into
-	 * the NIC). This means the MAC address is actually preceeded
+	 * the NIC). This means the MAC address is actually preceded
 	 * by two zero bytes. We need to skip over those.
 	 */
 	if (ti_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
@@ -1589,19 +1612,36 @@ ti_attach(parent, self, aux)
 	     ether_sprintf(sc->arpcom.ac_enaddr));
 
 	/* Allocate the general information block and ring buffers. */
-#ifndef UVM
-	sc->ti_rdata = (struct ti_ring_data *) vm_page_alloc_contig(
-	    sizeof(struct ti_ring_data), 0x100000, 0xffffffff, PAGE_SIZE);
-#else
-	sc->ti_rdata = (struct ti_ring_data *) uvm_pagealloc_contig(
-	    sizeof(struct ti_ring_data), 0x100000, 0xffffffff, PAGE_SIZE);
-#endif
-
-	if (sc->ti_rdata == NULL) {
-		printf("%s: no memory for list buffers!\n", sc->sc_dv.dv_xname);
+	sc->sc_dmatag = pa->pa_dmat;
+	if (bus_dmamem_alloc(sc->sc_dmatag, sizeof(struct ti_ring_data),
+	    PAGE_SIZE, 0, &seg, 1, &rseg, BUS_DMA_NOWAIT)) {
+		printf("%s: can't alloc rx buffers\n", sc->sc_dv.dv_xname);
 		goto fail;
 	}
-
+	if (bus_dmamem_map(sc->sc_dmatag, &seg, rseg,
+	    sizeof(struct ti_ring_data), &kva, BUS_DMA_NOWAIT)) {
+		printf("%s: can't map dma buffers (%d bytes)\n",
+		       sc->sc_dv.dv_xname, sizeof(struct ti_ring_data));
+		bus_dmamem_free(sc->sc_dmatag, &seg, rseg);
+		goto fail;
+	}
+	if (bus_dmamap_create(sc->sc_dmatag, sizeof(struct ti_ring_data), 1,
+	    sizeof(struct ti_ring_data), 0, BUS_DMA_NOWAIT, &dmamap)) {
+		printf("%s: can't create dma map\n", sc->sc_dv.dv_xname);
+		bus_dmamem_unmap(sc->sc_dmatag, kva,
+		    sizeof(struct ti_ring_data));
+		bus_dmamem_free(sc->sc_dmatag, &seg, rseg);
+		goto fail;
+	}
+	if (bus_dmamap_load(sc->sc_dmatag, dmamap, kva,
+	    sizeof(struct ti_ring_data), NULL, BUS_DMA_NOWAIT)) {
+		bus_dmamap_destroy(sc->sc_dmatag, dmamap);
+		bus_dmamem_unmap(sc->sc_dmatag, kva,
+		    sizeof(struct ti_ring_data));
+		bus_dmamem_free(sc->sc_dmatag, &seg, rseg);
+		goto fail;
+	}
+	sc->ti_rdata = (struct ti_ring_data *)kva;
 	bzero(sc->ti_rdata, sizeof(struct ti_ring_data));
 
 	/* Try to allocate memory for jumbo buffers. */
@@ -1610,6 +1650,21 @@ ti_attach(parent, self, aux)
 		    sc->sc_dv.dv_xname);
 		goto fail;
 	}
+
+	/*
+	 * We really need a better way to tell a 1000baseTX card
+	 * from a 1000baseSX one, since in theory there could be
+	 * OEMed 1000baseTX cards from lame vendors who aren't
+	 * clever enough to change the PCI ID. For the moment
+	 * though, the AceNIC is the only copper card available.
+	 */
+	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_ALTEON &&
+	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ALTEON_ACENICT)
+		sc->ti_copper = 1;
+	/* Ok, it's not the only copper card available */
+	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_NETGEAR &&
+	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_NETGEAR_GA620T)
+		sc->ti_copper = 1;
 
 	/* Set default tuneable values. */
 	sc->ti_stat_ticks = 2 * TI_TICKS_PER_SEC;
@@ -1628,17 +1683,36 @@ ti_attach(parent, self, aux)
 	ifp->if_start = ti_start;
 	ifp->if_watchdog = ti_watchdog;
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_snd.ifq_maxlen = TI_TX_RING_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, TI_TX_RING_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 	bcopy(sc->sc_dv.dv_xname, ifp->if_xname, IFNAMSIZ);
 
 	/* Set up ifmedia support. */
 	ifmedia_init(&sc->ifmedia, IFM_IMASK, ti_ifmedia_upd, ti_ifmedia_sts);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_10_FL, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_10_FL|IFM_FDX, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_100_FX, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_100_FX|IFM_FDX, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_1000_SX, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_1000_SX|IFM_FDX, 0, NULL);
+	if (sc->ti_copper) {
+		/*
+		 * Copper cards allow manual 10/100 mode selection,
+		 * but not manual 1000baseTX mode selection. Why?
+		 * Becuase currently there's no way to specify the
+		 * master/slave setting through the firmware interface,
+		 * so Alteon decided to just bag it and handle it
+		 * via autonegotiation.
+		 */
+		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_10_T, 0, NULL);
+		ifmedia_add(&sc->ifmedia,
+		    IFM_ETHER|IFM_10_T|IFM_FDX, 0, NULL);
+		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_100_TX, 0, NULL);
+		ifmedia_add(&sc->ifmedia,
+		    IFM_ETHER|IFM_100_TX|IFM_FDX, 0, NULL);
+		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_1000_TX, 0, NULL);
+		ifmedia_add(&sc->ifmedia,
+		    IFM_ETHER|IFM_1000_TX|IFM_FDX, 0, NULL);
+	} else {
+		/* Fiber cards don't support 10/100 modes. */
+		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_1000_SX, 0, NULL);
+		ifmedia_add(&sc->ifmedia,
+		    IFM_ETHER|IFM_1000_SX|IFM_FDX, 0, NULL);
+	}
 	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_AUTO, 0, NULL);
 	ifmedia_set(&sc->ifmedia, IFM_ETHER|IFM_AUTO);
 
@@ -1647,11 +1721,6 @@ ti_attach(parent, self, aux)
 	 */
 	if_attach(ifp);
 	ether_ifattach(ifp);
-
-#if NBPFILTER > 0
-	bpfattach(&sc->arpcom.ac_if.if_bpf, ifp,
-	    DLT_EN10MB, sizeof(struct ether_header));
-#endif
 
 	shutdownhook_establish(ti_shutdown, sc);
 
@@ -1778,7 +1847,8 @@ void ti_rxeof(sc)
 		 * to vlan_input() instead of ether_input().
 		 */
 		if (have_tag) {
-			vlan_input_tag(eh, m, vlan_tag);
+			if (vlan_input_tag(eh, m, vlan_tag) < 0)
+				ifp->if_data.ifi_noproto++;
 			have_tag = vlan_tag = 0;
 			continue;
 		}
@@ -1852,24 +1922,19 @@ int ti_intr(xsc)
 {
 	struct ti_softc		*sc;
 	struct ifnet		*ifp;
-	int			claimed = 0;
 
 	sc = xsc;
 	ifp = &sc->arpcom.ac_if;
 
-#ifdef notdef
-	/* Avoid this for now -- checking this register is expensive. */
+	/* XXX checking this register is expensive. */
 	/* Make sure this is really our interrupt. */
 	if (!(CSR_READ_4(sc, TI_MISC_HOST_CTL) & TI_MHC_INTSTATE))
-		return;
-#endif
+		return (0);
 
 	/* Ack interrupt and stop others from occuring. */
 	CSR_WRITE_4(sc, TI_MB_HOSTINTR, 1);
 
 	if (ifp->if_flags & IFF_RUNNING) {
-		claimed = 1;
-
 		/* Check RX return ring producer/consumer */
 		ti_rxeof(sc);
 
@@ -1882,10 +1947,10 @@ int ti_intr(xsc)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, TI_MB_HOSTINTR, 0);
 
-	if (ifp->if_flags & IFF_RUNNING && ifp->if_snd.ifq_head != NULL)
+	if (ifp->if_flags & IFF_RUNNING && !IFQ_IS_EMPTY(&ifp->if_snd))
 		ti_start(ifp);
 
-	return (claimed);
+	return (1);
 }
 
 void ti_stats_update(sc)
@@ -2006,13 +2071,14 @@ void ti_start(ifp)
 	struct ti_softc		*sc;
 	struct mbuf		*m_head = NULL;
 	u_int32_t		prodidx = 0;
+	int			pkts = 0;
 
 	sc = ifp->if_softc;
 
 	prodidx = CSR_READ_4(sc, TI_MB_SENDPROD_IDX);
 
 	while(sc->ti_cdata.ti_tx_chain[prodidx] == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -2022,10 +2088,13 @@ void ti_start(ifp)
 		 * for the NIC to drain the ring.
 		 */
 		if (ti_encap(sc, m_head, &prodidx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		/* now we are committed to transmit the packet */
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		pkts++;
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -2036,6 +2105,8 @@ void ti_start(ifp)
 			bpf_mtap(ifp->if_bpf, m_head);
 #endif
 	}
+	if (pkts == 0)
+		return;
 
 	/* Transmit */
 	CSR_WRITE_4(sc, TI_MB_SENDPROD_IDX, prodidx);
@@ -2184,17 +2255,24 @@ int ti_ifmedia_upd(ifp)
 		    TI_CMD_CODE_NEGOTIATE_BOTH, 0);
 		break;
 	case IFM_1000_SX:
+	case IFM_1000_TX:
 		CSR_WRITE_4(sc, TI_GCR_GLINK, TI_GLNK_PREF|TI_GLNK_1000MB|
-		    TI_GLNK_FULL_DUPLEX|TI_GLNK_RX_FLOWCTL_Y|TI_GLNK_ENB);
+		    TI_GLNK_RX_FLOWCTL_Y|TI_GLNK_ENB);
 		CSR_WRITE_4(sc, TI_GCR_LINK, 0);
+		if ((ifm->ifm_media & IFM_GMASK) == IFM_FDX) {
+			TI_SETBIT(sc, TI_GCR_GLINK, TI_GLNK_FULL_DUPLEX);
+		}
 		TI_DO_CMD(TI_CMD_LINK_NEGOTIATION,
 		    TI_CMD_CODE_NEGOTIATE_GIGABIT, 0);
 		break;
 	case IFM_100_FX:
 	case IFM_10_FL:
+	case IFM_100_TX:
+	case IFM_10_T:
 		CSR_WRITE_4(sc, TI_GCR_GLINK, 0);
 		CSR_WRITE_4(sc, TI_GCR_LINK, TI_LNK_ENB|TI_LNK_PREF);
-		if (IFM_SUBTYPE(ifm->ifm_media) == IFM_100_FX) {
+		if (IFM_SUBTYPE(ifm->ifm_media) == IFM_100_FX ||
+		    IFM_SUBTYPE(ifm->ifm_media) == IFM_100_TX) {
 			TI_SETBIT(sc, TI_GCR_LINK, TI_LNK_100MB);
 		} else {
 			TI_SETBIT(sc, TI_GCR_LINK, TI_LNK_10MB);
@@ -2220,6 +2298,7 @@ void ti_ifmedia_sts(ifp, ifmr)
 	struct ifmediareq	*ifmr;
 {
 	struct ti_softc		*sc;
+	u_int32_t		media = 0;
 
 	sc = ifp->if_softc;
 
@@ -2231,21 +2310,35 @@ void ti_ifmedia_sts(ifp, ifmr)
 
 	ifmr->ifm_status |= IFM_ACTIVE;
 
-	if (sc->ti_linkstat == TI_EV_CODE_GIG_LINK_UP)
-		ifmr->ifm_active |= IFM_1000_SX|IFM_FDX;
-	else if (sc->ti_linkstat == TI_EV_CODE_LINK_UP) {
-		u_int32_t		media;
+	if (sc->ti_linkstat == TI_EV_CODE_GIG_LINK_UP) {
+		media = CSR_READ_4(sc, TI_GCR_GLINK_STAT);
+		if (sc->ti_copper)
+			ifmr->ifm_active |= IFM_1000_TX;
+		else
+			ifmr->ifm_active |= IFM_1000_SX;
+		if (media & TI_GLNK_FULL_DUPLEX)
+			ifmr->ifm_active |= IFM_FDX;
+		else
+			ifmr->ifm_active |= IFM_HDX;
+	} else if (sc->ti_linkstat == TI_EV_CODE_LINK_UP) {
 		media = CSR_READ_4(sc, TI_GCR_LINK_STAT);
-		if (media & TI_LNK_100MB)
-			ifmr->ifm_active |= IFM_100_FX;
-		if (media & TI_LNK_10MB)
-			ifmr->ifm_active |= IFM_10_FL;
+		if (sc->ti_copper) {
+			if (media & TI_LNK_100MB)
+				ifmr->ifm_active |= IFM_100_TX;
+			if (media & TI_LNK_10MB)
+				ifmr->ifm_active |= IFM_10_T;
+		} else {
+			if (media & TI_LNK_100MB)
+				ifmr->ifm_active |= IFM_100_FX;
+			if (media & TI_LNK_10MB)
+				ifmr->ifm_active |= IFM_10_FL;
+		}
 		if (media & TI_LNK_FULL_DUPLEX)
 			ifmr->ifm_active |= IFM_FDX;
 		if (media & TI_LNK_HALF_DUPLEX)
 			ifmr->ifm_active |= IFM_HDX;
 	}
-	
+
 	return;
 }
 
@@ -2255,8 +2348,8 @@ int ti_ioctl(ifp, command, data)
 	caddr_t			data;
 {
 	struct ti_softc		*sc = ifp->if_softc;
-	struct ifreq		*ifr = (struct ifreq *) data;
-	struct ifaddr		*ifa = (struct ifaddr *) data;
+	struct ifreq		*ifr = (struct ifreq *)data;
+	struct ifaddr		*ifa = (struct ifaddr *)data;
 	int			s, error = 0;
 	struct ti_cmd_desc	cmd;
 
@@ -2314,8 +2407,13 @@ int ti_ioctl(ifp, command, data)
 		break;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-		if (ifp->if_flags & IFF_RUNNING) {
-			ti_setmulti(sc);
+		error = (command == SIOCADDMULTI) ?
+		    ether_addmulti(ifr, &sc->arpcom) :
+		    ether_delmulti(ifr, &sc->arpcom);
+
+		if (error == ENETRESET) {
+			if (ifp->if_flags & IFF_RUNNING)
+				ti_setmulti(sc);
 			error = 0;
 		}
 		break;
