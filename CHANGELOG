@@ -1,5 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2674 2004/11/02 04:22:50 itojun Exp $
+$KAME: CHANGELOG,v 1.2675 2004/11/08 05:02:51 jinmei Exp $
+
+<200411>
+2004-11-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/tcp_input.c (tcp_mssopt): corrected the
+	default MSS computation for TCP/IPv6.
 
 <200410>
 Tue Oct 26 JST 2004  itojun@iijlab.net
