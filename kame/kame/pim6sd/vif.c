@@ -141,8 +141,6 @@ void init_vifs()
 	IF_DEBUG(DEBUG_IF)
 		log(LOG_DEBUG,0,"Getting vifs from kernel");
 	config_vifs_from_kernel();
-	if (max_global_address() == NULL)
-		log(LOG_ERR, 0, "There's no global address");
 	IF_DEBUG(DEBUG_IF)
 		log(LOG_DEBUG,0,"Getting vifs from %s",configfilename);
 

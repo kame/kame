@@ -643,6 +643,10 @@ phyint_config()
 		}
 	}
 
+	/* IPv6 PIM needs one global unicast address (at least for now) */
+	if (max_global_address() == NULL)
+		log(LOG_ERR, 0, "There's no global address available");
+
 	return(0);
 }
 
@@ -691,7 +695,7 @@ rp_config()
 	}
 
 	if (!sa6_rp)
-		sa6_rp = max_global_address(); /* this MUST suceed */
+		sa6_rp = max_global_address(); /* this MUST succeed */
 	my_cand_rp_address = *sa6_rp;
 
 	/*
@@ -792,7 +796,7 @@ bsr_config()
 	}
 
 	if (!sa6_bsr)
-		sa6_bsr = max_global_address(); /* this MUST suceed */
+		sa6_bsr = max_global_address(); /* this MUST succeed */
 	my_bsr_address = *sa6_bsr;
 	MASKLEN_TO_MASK6(my_bsr_hash_masklen, my_bsr_hash_mask);
 
