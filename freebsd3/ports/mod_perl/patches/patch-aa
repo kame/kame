@@ -1,0 +1,33 @@
+--- src/modules/perl/Connection.xs-	Sun May 28 22:43:06 2000
++++ src/modules/perl/Connection.xs	Sun May 28 22:53:33 2000
+@@ -78,7 +78,7 @@
+     RETVAL = newSVpv((char *)&conn->remote_addr,
+                       sizeof conn->remote_addr);
+     if(sv_addr) {
+-        struct sockaddr_in addr; 
++        struct sockaddr_storage addr; 
+         STRLEN sockaddrlen; 
+         char * new_addr = SvPV(sv_addr,sockaddrlen); 
+         if (sockaddrlen != sizeof(addr)) { 
+@@ -99,6 +99,7 @@
+     RETVAL = conn->remote_ip;
+  
+     if(items > 1) {
++	struct addrinfo hints, *res;
+ #ifdef SGI_BOOST
+         ap_cpystrn(conn->remote_ip, (char *)SvPV(ST(1),na),
+                    sizeof(conn->remote_ip));
+@@ -106,7 +107,12 @@
+ #else
+         conn->remote_ip = pstrdup(conn->pool, (char *)SvPV(ST(1),na));
+ #endif
+-        conn->remote_addr.sin_addr.s_addr = inet_addr(conn->remote_ip);
++	memset(&hints, 0, sizeof(hints));
++	hints.ai_family = PF_UNSPEC;
++	hints.ai_flags = AI_NUMERICHOST; 
++	getaddrinfo(conn->remote_ip, NULL, &hints, &res);
++	memcpy(&conn->remote_addr, res->ai_addr, res->ai_addrlen);
++	freeaddrinfo(res);
+     }
+ 
+     OUTPUT:
