@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.117 2001/07/27 23:29:27 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.118 2001/07/27 23:39:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -142,7 +142,7 @@ struct secpolicy ip4_def_policy;
 int ip4_ipsec_ecn = 0;		/* ECN ignore(-1)/forbidden(0)/allowed(1) */
 int ip4_esp_randpad = -1;
 
-static int sp_cachegen = 0;	/* cache generation # */
+static int sp_cachegen = 1;	/* cache generation # */
 
 #ifdef __FreeBSD__
 #ifdef SYSCTL_DECL
