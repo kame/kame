@@ -1,4 +1,4 @@
-/*	$NetBSD: route.c,v 1.30 1998/10/23 05:36:42 lukem Exp $	*/
+/*	$NetBSD: route.c,v 1.38.4.1 2000/10/17 20:44:14 tv Exp $	*/
 
 /*
  * Copyright (c) 1983, 1989, 1991, 1993
@@ -43,7 +43,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1989, 1991, 1993\n\
 #if 0
 static char sccsid[] = "@(#)route.c	8.6 (Berkeley) 4/28/95";
 #else
-__RCSID("$NetBSD: route.c,v 1.30 1998/10/23 05:36:42 lukem Exp $");
+__RCSID("$NetBSD: route.c,v 1.38.4.1 2000/10/17 20:44:14 tv Exp $");
 #endif
 #endif /* not lint */
 
@@ -86,9 +86,15 @@ static char *any_ntoa __P((const struct sockaddr *));
 static void set_metric __P((char *, int));
 static void newroute __P((int, char **));
 static void inet_makenetandmask __P((u_int32_t, struct sockaddr_in *));
+#ifdef INET6
+static void inet6_makenetandmask __P((struct sockaddr_in6 *));
+#endif
 static int getaddr __P((int, char *, struct hostent **));
 static void flushroutes __P((int, char *[]));
 #ifndef SMALL
+#ifdef INET6
+static int prefixlen __P((char *));
+#endif
 static int x25_makemask __P((void));
 static void interfaces __P((void));
 static void monitor __P((void));
@@ -108,6 +114,9 @@ struct	ortentry route;
 union	sockunion {
 	struct	sockaddr sa;
 	struct	sockaddr_in sin;
+#ifdef INET6
+	struct	sockaddr_in6 sin6;
+#endif
 	struct	sockaddr_at sat;
 	struct	sockaddr_dl sdl;
 #ifndef SMALL
@@ -139,7 +148,7 @@ usage(cp)
 }
 
 #define ROUNDUP(a) \
-	((a) > 0 ? (1 + (((a) - 1) | (sizeof(int32_t) - 1))) : sizeof(int32_t))
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 #define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 
 int
@@ -253,6 +262,11 @@ flushroutes(argc, argv)
 			case K_INET:
 				af = AF_INET;
 				break;
+#ifdef INET6
+			case K_INET6:
+				af = AF_INET6;
+				break;
+#endif
 			case K_ATALK:
 				af = AF_APPLETALK;
 				break;
@@ -327,7 +341,7 @@ bad:			usage(*argv);
 			struct sockaddr *sa = (struct sockaddr *)(rtm + 1);
 			(void) printf("%-20.20s ", rtm->rtm_flags & RTF_HOST ?
 			    routename(sa) : netname(sa));
-			sa = (struct sockaddr *)(sa->sa_len + (char *)sa);
+			sa = (struct sockaddr *)(ROUNDUP(sa->sa_len) + (char *)sa);
 			(void) printf("%-20.20s ", routename(sa));
 			(void) printf("done\n");
 		}
@@ -413,6 +427,41 @@ routename(sa)
 		return (link_ntoa((struct sockaddr_dl *)sa));
 
 #ifndef SMALL
+#ifdef INET6
+	case AF_INET6:
+	    {
+		struct sockaddr_in6 sin6;
+		int niflags;
+
+#ifdef NI_WITHSCOPEID
+		niflags = NI_WITHSCOPEID;
+#else
+		niflags = 0;
+#endif
+		if (nflag)
+			niflags |= NI_NUMERICHOST;
+		memset(&sin6, 0, sizeof(sin6));
+		memcpy(&sin6, sa, sa->sa_len);
+		sin6.sin6_len = sizeof(struct sockaddr_in6);
+		sin6.sin6_family = AF_INET6;
+#ifdef __KAME__
+		if (sa->sa_len == sizeof(struct sockaddr_in6) &&
+		    (IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr) ||
+		     IN6_IS_ADDR_MC_LINKLOCAL(&sin6.sin6_addr)) &&
+		    sin6.sin6_scope_id == 0) {
+			sin6.sin6_scope_id =
+			    ntohs(*(u_int16_t *)&sin6.sin6_addr.s6_addr[2]);
+			sin6.sin6_addr.s6_addr[2] = 0;
+			sin6.sin6_addr.s6_addr[3] = 0;
+		}
+#endif
+		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
+		    line, sizeof(line), NULL, 0, niflags) != 0)
+			strncpy(line, "invalid", sizeof(line));
+		break;
+	    }
+#endif
+
 	case AF_NS:
 		return (ns_print((struct sockaddr_ns *)sa));
 
@@ -515,6 +564,41 @@ netname(sa)
 		return (link_ntoa((struct sockaddr_dl *)sa));
 
 #ifndef SMALL
+#ifdef INET6
+	case AF_INET6:
+	    {
+		struct sockaddr_in6 sin6;
+		int niflags;
+
+#ifdef NI_WITHSCOPEID
+		niflags = NI_WITHSCOPEID;
+#else
+		niflags = 0;
+#endif
+		if (nflag)
+			niflags |= NI_NUMERICHOST;
+		memset(&sin6, 0, sizeof(sin6));
+		memcpy(&sin6, sa, sa->sa_len);
+		sin6.sin6_len = sizeof(struct sockaddr_in6);
+		sin6.sin6_family = AF_INET6;
+#ifdef __KAME__
+		if (sa->sa_len == sizeof(struct sockaddr_in6) &&
+		    (IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr) ||
+		     IN6_IS_ADDR_MC_LINKLOCAL(&sin6.sin6_addr)) &&
+		    sin6.sin6_scope_id == 0) {
+			sin6.sin6_scope_id =
+			    ntohs(*(u_int16_t *)&sin6.sin6_addr.s6_addr[2]);
+			sin6.sin6_addr.s6_addr[2] = 0;
+			sin6.sin6_addr.s6_addr[3] = 0;
+		}
+#endif
+		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
+		    line, sizeof(line), NULL, 0, niflags) != 0)
+			strncpy(line, "invalid", sizeof(line));
+		break;
+	    }
+#endif
+
 	case AF_NS:
 		return (ns_print((struct sockaddr_ns *)sa));
 
@@ -598,6 +682,13 @@ newroute(argc, argv)
 				af = AF_INET;
 				aflen = sizeof(struct sockaddr_in);
 				break;
+
+#ifdef INET6
+			case K_INET6:
+				af = AF_INET6;
+				aflen = sizeof(struct sockaddr_in6);
+				break;
+#endif
 
 			case K_LINK:
 				af = AF_LINK;
@@ -696,6 +787,18 @@ newroute(argc, argv)
 			case K_NET:
 				forcenet++;
 				break;
+#ifdef INET6
+			case K_PREFIXLEN:
+				argc--;
+				if (prefixlen(*++argv) == 128) {
+					forcenet = 0;
+					ishost = 1;
+				} else {
+					forcenet = 1;
+					ishost = 0;
+				}
+				break;
+#endif
 			case K_MTU:
 			case K_HOPCOUNT:
 			case K_EXPIRE:
@@ -841,6 +944,37 @@ inet_makenetandmask(net, sin)
 	sin->sin_len = 1 + cp - (char *)sin;
 }
 
+#ifdef INET6
+/*
+ * XXX the function may need more improvement...
+ */
+static void
+inet6_makenetandmask(sin6)
+	struct sockaddr_in6 *sin6;
+{
+	char *plen;
+	struct in6_addr in6;
+
+	plen = NULL;
+	if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr) &&
+	    sin6->sin6_scope_id == 0) {
+		plen = "0";
+	} else if ((sin6->sin6_addr.s6_addr[0] & 0xe0) == 0x20) {
+		/* aggregatable global unicast - RFC2374 */
+		memset(&in6, 0, sizeof(in6));
+		if (!memcmp(&sin6->sin6_addr.s6_addr[8], &in6.s6_addr[8], 8))
+			plen = "64";
+		else
+			plen = "128";
+	}
+
+	if (plen) {
+		rtm_addrs |= RTA_NETMASK;
+		prefixlen(plen);
+	}
+}
+#endif
+
 /*
  * Interpret an argument as a network address of some kind,
  * returning 1 if a host address, 0 if a network address.
@@ -856,20 +990,20 @@ getaddr(which, s, hpp)
 	struct netent *np;
 	u_int32_t val;
 	char *t;
+	int afamily;  /* local copy of af so we can change it */
 
 	if (af == 0) {
 		af = AF_INET;
 		aflen = sizeof(struct sockaddr_in);
 	}
+	afamily = af;
 	rtm_addrs |= which;
 	switch (which) {
 	case RTA_DST:
 		su = &so_dst;
-		su->sa.sa_family = af;
 		break;
 	case RTA_GATEWAY:
 		su = &so_gate;
-		su->sa.sa_family = af;
 		break;
 	case RTA_NETMASK:
 		su = &so_mask;
@@ -879,7 +1013,7 @@ getaddr(which, s, hpp)
 		break;
 	case RTA_IFP:
 		su = &so_ifp;
-		su->sa.sa_family = af;
+		afamily = AF_LINK;
 		break;
 	case RTA_IFA:
 		su = &so_ifa;
@@ -891,6 +1025,7 @@ getaddr(which, s, hpp)
 		/*NOTREACHED*/
 	}
 	su->sa.sa_len = aflen;
+	su->sa.sa_family = afamily; /* cases that don't want it have left already */
 	if (strcmp(s, "default") == 0) {
 		switch (which) {
 		case RTA_DST:
@@ -903,8 +1038,40 @@ getaddr(which, s, hpp)
 		}
 		return (0);
 	}
-	switch (af) {
+	switch (afamily) {
 #ifndef SMALL
+#ifdef INET6
+	case AF_INET6:
+	    {
+		struct addrinfo hints, *res;
+
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = afamily;	/*AF_INET6*/
+		hints.ai_flags = AI_NUMERICHOST;
+		hints.ai_socktype = SOCK_DGRAM;		/*dummy*/
+		if (getaddrinfo(s, "0", &hints, &res) != 0 ||
+		    res->ai_family != AF_INET6 ||
+		    res->ai_addrlen != sizeof(su->sin6)) {
+			(void) fprintf(stderr, "%s: bad value\n", s);
+			exit(1);
+		}
+		memcpy(&su->sin6, res->ai_addr, sizeof(su->sin6));
+#ifdef __KAME__
+		if ((IN6_IS_ADDR_LINKLOCAL(&su->sin6.sin6_addr) ||
+		     IN6_IS_ADDR_MC_LINKLOCAL(&su->sin6.sin6_addr)) &&
+		    su->sin6.sin6_scope_id) {
+			*(u_int16_t *)&su->sin6.sin6_addr.s6_addr[2] =
+				htons(su->sin6.sin6_scope_id);
+			su->sin6.sin6_scope_id = 0;
+		}
+#endif
+		if (which == RTA_DST)
+			inet6_makenetandmask(&su->sin6);
+		freeaddrinfo(res);
+		return 0;
+	    }
+#endif
+
 	case AF_NS:
 		if (which == RTA_DST) {
 			extern short ns_bh[3];
@@ -993,6 +1160,33 @@ netdone:
 	}
 	errx(1, "bad value: %s", s);
 }
+
+#ifdef INET6
+int
+prefixlen(s)
+	char *s;
+{
+	int len = atoi(s), q, r;
+
+	rtm_addrs |= RTA_NETMASK;	
+	if (len < -1 || len > 129) {
+		(void) fprintf(stderr, "%s: bad value\n", s);
+		exit(1);
+	}
+	
+	q = len >> 3;
+	r = len & 7;
+	so_mask.sin6.sin6_family = AF_INET6;
+	so_mask.sin6.sin6_len = sizeof(struct sockaddr_in6);
+	memset((void *)&so_mask.sin6.sin6_addr, 0,
+		sizeof(so_mask.sin6.sin6_addr));
+	if (q > 0)
+		memset((void *)&so_mask.sin6.sin6_addr, 0xff, q);
+	if (r > 0)
+		*((u_char *)&so_mask.sin6.sin6_addr + q) = (0xff00 >> r) & 0xff;
+	return(len);
+}
+#endif
 
 #ifndef SMALL
 int
@@ -1097,8 +1291,10 @@ monitor()
 		exit(0);
 	}
 	for(;;) {
+		time_t now;
 		n = read(s, msg, 2048);
-		(void) printf("got message of size %d\n", n);
+		now = time(NULL);
+		(void) printf("got message of size %d on %s", n, ctime(&now));
 		print_rtmsg((struct rt_msghdr *)msg, n);
 	}
 }
@@ -1201,6 +1397,9 @@ mask_addr()
 		return;
 	switch (so_dst.sa.sa_family) {
 	case AF_INET:
+#ifdef INET6
+	case AF_INET6:
+#endif
 	case AF_APPLETALK:
 #ifndef SMALL
 	case AF_NS:
@@ -1246,7 +1445,9 @@ char *msgtypes[] = {
 	"RTM_RESOLVE: Route created by cloning",
 	"RTM_NEWADDR: address being added to iface",
 	"RTM_DELADDR: address being removed from iface",
+	"RTM_OIFINFO: iface status change (pre-1.5)",
 	"RTM_IFINFO: iface status change",
+	"RTM_IFANNOUNCE: iface arrival/departure",
 	0,
 };
 
@@ -1266,6 +1467,7 @@ print_rtmsg(rtm, msglen)
 {
 	struct if_msghdr *ifm;
 	struct ifa_msghdr *ifam;
+	struct if_announcemsghdr *ifan;
 
 	if (verbose == 0)
 		return;
@@ -1274,7 +1476,11 @@ print_rtmsg(rtm, msglen)
 		    rtm->rtm_version);
 		return;
 	}
-	(void)printf("%s: len %d, ", msgtypes[rtm->rtm_type], rtm->rtm_msglen);
+	if (msgtypes[rtm->rtm_type])
+		(void)printf("%s: ", msgtypes[rtm->rtm_type]);
+	else
+		(void)printf("#%d: ", rtm->rtm_type);
+	(void)printf("len %d, ", rtm->rtm_msglen);
 	switch (rtm->rtm_type) {
 	case RTM_IFINFO:
 		ifm = (struct if_msghdr *)rtm;
@@ -1288,6 +1494,22 @@ print_rtmsg(rtm, msglen)
 		(void) printf("metric %d, flags:", ifam->ifam_metric);
 		bprintf(stdout, ifam->ifam_flags, routeflags);
 		pmsg_addrs((char *)(ifam + 1), ifam->ifam_addrs);
+		break;
+	case RTM_IFANNOUNCE:
+		ifan = (struct if_announcemsghdr *)rtm;
+		(void) printf("if# %d, what: ", ifan->ifan_index);
+		switch (ifan->ifan_what) {
+		case IFAN_ARRIVAL:
+			printf("arrival");
+			break;
+		case IFAN_DEPARTURE:
+			printf("departure");
+			break;
+		default:
+			printf("#%d", ifan->ifan_what);
+			break;
+		}
+		printf("\n");
 		break;
 	default:
 		(void) printf("pid: %d, seq %d, errno %d, flags:",
@@ -1303,7 +1525,7 @@ print_getmsg(rtm, msglen)
 	struct rt_msghdr *rtm;
 	int msglen;
 {
-	struct sockaddr *dst = NULL, *gate = NULL, *mask = NULL;
+	struct sockaddr *dst = NULL, *gate = NULL, *mask = NULL, *ifa = NULL;
 	struct sockaddr_dl *ifp = NULL;
 	struct sockaddr *sa;
 	char *cp;
@@ -1344,6 +1566,9 @@ print_getmsg(rtm, msglen)
 					   ((struct sockaddr_dl *)sa)->sdl_nlen)
 						ifp = (struct sockaddr_dl *)sa;
 					break;
+				case RTA_IFA:
+					ifa = sa;
+					break;
 				}
 				ADVANCE(cp, sa);
 			}
@@ -1360,6 +1585,8 @@ print_getmsg(rtm, msglen)
 	}
 	if (gate && rtm->rtm_flags & RTF_GATEWAY)
 		(void)printf("    gateway: %s\n", routename(gate));
+	if (ifa)
+		(void)printf(" local addr: %s\n", routename(ifa));
 	if (ifp)
 		(void)printf("  interface: %.*s\n",
 		    ifp->sdl_nlen, ifp->sdl_data);
@@ -1474,6 +1701,10 @@ sodump(su, which)
 	sup su;
 	char *which;
 {
+#ifdef INET6
+	char ntop_buf[NI_MAXHOST];
+#endif
+
 	switch (su->sa.sa_family) {
 	case AF_INET:
 		(void) printf("%s: inet %s; ",
@@ -1488,6 +1719,13 @@ sodump(su, which)
 		    which, link_ntoa(&su->sdl));
 		break;
 #ifndef SMALL
+#ifdef INET6
+	case AF_INET6:
+		(void) printf("%s: inet6 %s; ",
+		    which, inet_ntop(AF_INET6, &su->sin6.sin6_addr,
+				     ntop_buf, sizeof(ntop_buf)));
+		break;
+#endif
 	case AF_ISO:
 		(void) printf("%s: iso %s; ",
 		    which, iso_ntoa(&su->siso.siso_addr));

@@ -1,4 +1,4 @@
-/*	$NetBSD: show.c,v 1.8 1998/10/23 05:36:43 lukem Exp $	*/
+/*	$NetBSD: show.c,v 1.14.4.1 2000/10/18 00:39:48 tv Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)route.c	8.3 (Berkeley) 3/9/94";
 #else
-__RCSID("$NetBSD: show.c,v 1.8 1998/10/23 05:36:43 lukem Exp $");
+__RCSID("$NetBSD: show.c,v 1.14.4.1 2000/10/18 00:39:48 tv Exp $");
 #endif
 #endif /* not lint */
 
@@ -64,6 +64,10 @@ __RCSID("$NetBSD: show.c,v 1.8 1998/10/23 05:36:43 lukem Exp $");
 #include <err.h>
 
 #include "extern.h"
+
+#define ROUNDUP(a) \
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+#define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 
 /*
  * Definitions for showing gateway flags.
@@ -94,7 +98,7 @@ static void pr_rthdr __P((void));
 static void p_rtentry __P((struct rt_msghdr *));
 static void pr_family __P((int));
 static void p_sockaddr __P((struct sockaddr *, int, int ));
-static void p_flags __P((int, char *));
+static void p_flags __P((int));
 
 /*
  * Print routing tables.
@@ -120,7 +124,7 @@ show(argc, argv)
 		exit(1);
 	}
 	if ((buf = malloc(needed)) == 0)
-		err(1, "%s", "");
+		err(1, NULL);
 	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0)
 		err(1, "sysctl of routing table");
 	lim  = buf + needed;
@@ -189,15 +193,13 @@ p_rtentry(rtm)
 		pr_rthdr();
 	}
 	if (rtm->rtm_addrs == RTA_DST)
-		p_sockaddr(sa, 0, 36);
+		p_sockaddr(sa, 0, WID_DST + 1 + WID_GW + 1);
 	else {
-		p_sockaddr(sa, rtm->rtm_flags, 16);
-		if (sa->sa_len == 0)
-			sa->sa_len = sizeof(long);
-		sa = (struct sockaddr *)(sa->sa_len + (char *)sa);
-		p_sockaddr(sa, 0, 18);
+		p_sockaddr(sa, rtm->rtm_flags, WID_DST);
+		sa = (struct sockaddr *)(ROUNDUP(sa->sa_len) + (char *)sa);
+		p_sockaddr(sa, 0, WID_GW);
 	}
-	p_flags(rtm->rtm_flags & interesting, "%-6.6s ");
+	p_flags(rtm->rtm_flags & interesting);
 	putchar('\n');
 }
 
@@ -216,6 +218,11 @@ pr_family(af)
 		afname = "Internet";
 		break;
 #ifndef SMALL
+#ifdef INET6
+	case AF_INET6:
+		afname = "Internet6";
+		break;
+#endif /* INET6 */
 	case AF_NS:
 		afname = "XNS";
 		break;
@@ -295,6 +302,21 @@ p_sockaddr(sa, flags, width)
 	    }
 
 #ifndef SMALL
+#ifdef INET6
+	case AF_INET6:
+	    {
+		struct sockaddr_in6 *sin = (struct sockaddr_in6 *)sa;
+
+		cp = IN6_IS_ADDR_UNSPECIFIED(&sin->sin6_addr) ? "default" :
+			((flags & RTF_HOST) ?
+			routename(sa) :	netname(sa));
+		/* make sure numeric address is not truncated */
+		if (strchr(cp, ':') != NULL && strlen(cp) > width)
+			width = strlen(cp);
+		break;
+	    }
+#endif /* INET6 */
+
 	case AF_NS:
 		cp = ns_print((struct sockaddr_ns *)sa);
 		break;
@@ -326,9 +348,8 @@ p_sockaddr(sa, flags, width)
 }
 
 static void
-p_flags(f, format)
+p_flags(f)
 	int f;
-	char *format;
 {
 	char name[33], *flags;
 	const struct bits *p = bits;
@@ -337,6 +358,6 @@ p_flags(f, format)
 		if (p->b_mask & f)
 			*flags++ = p->b_val;
 	*flags = '\0';
-	printf(format, name);
+	printf("%-6.6s ", name);
 }
 
