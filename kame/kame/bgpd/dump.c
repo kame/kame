@@ -48,6 +48,22 @@ char *dumpfile;
 static char *aspath2str(struct aspath *);
 static char *cll2str(struct clstrlist *);
 
+/* structures to show all BGP route */
+struct bgproute_entry {
+	struct bgproute_entry *next;
+	struct bgproute_list *head; /* back pointer to the list */
+	struct rpcb *bnp;
+	struct rt_entry *rte;
+};
+struct bgproute_list {
+	struct bgproute_list *next;
+	struct bgproute_list *prev;
+	struct bgproute_entry *entry;
+};
+#define bgp_route_head(l) ((l)->next)
+#define bgp_route_isend(e,b) ((e) == (b))
+#define bgp_route_next(l) ((l)->next)
+
 static void
 dump_if_rtable(FILE *fp, struct rt_entry *base)
 {
@@ -160,91 +176,98 @@ dump_rip_filterinfo(FILE *fp, struct ripif *ripif)
 }
 
 static void
+dump_bgp_rtentry(FILE *fp, struct rt_entry *rte, char *indent)
+{
+	struct aspath *ap;
+	extern char *origin_str[];
+	struct optatr *optatr;
+	char inetaddrstr[INET_ADDRSTRLEN];
+
+	ap = rte->rt_aspath;
+
+	fprintf(fp, "%s", indent); /* indentation */
+	fprintf(fp, "%s/%d nexthop: %s\n",
+		ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		rte->rt_ripinfo.rip6_plen, ip6str(&rte->rt_bgw, 0));
+
+	fprintf(fp, "%s  ", indent); /* more indent */
+	fprintf(fp, "Gateway: %s ",
+		ip6str(&rte->rt_gw,
+		       rte->rt_gwif ? rte->rt_gwif->ifi_ifn->if_index : 0));
+	fprintf(fp, "Flags:");
+	if (rte->rt_flags & RTF_UP) fprintf(fp, " UP");
+	if (rte->rt_flags & RTF_GATEWAY) fprintf(fp, " GW");
+	if (rte->rt_flags & RTF_HOST) fprintf(fp, " HOST");
+	if (rte->rt_flags & RTF_IGP_EGP_SYNC) fprintf(fp, " IESYNC");
+	if (rte->rt_flags & RTF_NH_NOT_LLADDR)
+		fprintf(fp, " NONLOCAL");
+	if (rte->rt_flags & RTF_INSTALLED) fprintf(fp, " INSTALLED");
+	fputc('\n', fp);
+	if (!IN6_IS_ADDR_UNSPECIFIED(&rte->rt_gw)) {
+		fprintf(fp, "%s    ", indent); /* more^2 indent */
+		switch(rte->rt_gwsrc_type) {
+		case RTPROTO_IF:
+			fprintf(fp, "gwsrc: ifroute(%s/%d on %s)",
+				ip6str(&rte->rt_gwsrc_entry->rt_ripinfo.rip6_dest, 0),
+				rte->rt_gwsrc_entry->rt_ripinfo.rip6_plen,
+				rte->rt_gwif->ifi_ifn->if_name);
+			break;
+		case RTPROTO_RIP:
+			fprintf(fp, "gwsrc: ripng(%s/%d on %s,\n",
+				ip6str(&rte->rt_gwsrc_entry->rt_ripinfo.rip6_dest, 0),
+				rte->rt_gwsrc_entry->rt_ripinfo.rip6_plen,
+				rte->rt_gwif->ifi_ifn->if_name);
+			fprintf(fp, "%s    ", indent); /* more^2 indent */
+			fprintf(fp, "             %s)",
+				ip6str(&rte->rt_gwsrc_entry->rt_gw,
+				       rte->rt_gwif->ifi_ifn->if_index));
+			break;
+		default:
+			fprintf(fp, "gwsrc: unknown(%d)",
+				rte->rt_gwsrc_type);
+			break;
+		}
+		fputc('\n', fp);
+	}
+
+	fprintf(fp, "%s  ", indent); /* more indent */
+	fprintf(fp, "MED: %d localpref: %d origin: ID=%s,code=%s\n",
+		(int)ntohl(ap->asp_med), (int)ntohl(ap->asp_localpref),
+		inet_ntop(AF_INET, &ap->asp_origid,
+			  inetaddrstr, INET_ADDRSTRLEN),
+		origin_str[ap->asp_origin]);
+
+	fprintf(fp, "%s  ", indent); /* more indent */
+	fprintf(fp, "ASPATH: %s\n", aspath2str(ap));
+	if (ap->asp_clstr) {
+		fprintf(fp, "%s  ", indent); /* more indent */
+		fprintf(fp, "Cluster list: %s\n",
+			cll2str(ap->asp_clstr));
+	}
+
+	/* unrecognized attributes */
+	if ((optatr = ap->asp_optatr) != NULL)
+		fprintf(fp, "%s  Unrecognized Attributes:\n", indent);
+	for (optatr = ap->asp_optatr; optatr; optatr = optatr->next) {
+		int c = 0;
+
+		fprintf(fp, "%s    ", indent);
+		for (c = 0; c < optatr->len && c < 20; c++)
+			fprintf(fp, "%02x ",
+				(unsigned char)optatr->data[c]);
+		if (optatr->len > 20)
+			fprintf(fp, "...");
+		fputc('\n', fp);
+	}
+}
+
+static void
 dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 {
 	struct rt_entry *rte = base;
-	struct aspath *ap;
-	char inetaddrstr[INET_ADDRSTRLEN];
-	extern char *origin_str[];
-	struct optatr *optatr;
 
 	while(rte) {
-		ap = rte->rt_aspath;
-
-		fprintf(fp, "    "); /* indentation */
-		fprintf(fp, "%s/%d nexthop: %s\n",
-			ip6str(&rte->rt_ripinfo.rip6_dest, 0),
-			rte->rt_ripinfo.rip6_plen, ip6str(&rte->rt_bgw, 0));
-
-		fprintf(fp, "      "); /* more indent */
-		fprintf(fp, "Gateway: %s ",
-			ip6str(&rte->rt_gw,
-			       rte->rt_gwif ? rte->rt_gwif->ifi_ifn->if_index : 0));
-		fprintf(fp, "Flags:");
-		if (rte->rt_flags & RTF_UP) fprintf(fp, " UP");
-		if (rte->rt_flags & RTF_GATEWAY) fprintf(fp, " GW");
-		if (rte->rt_flags & RTF_HOST) fprintf(fp, " HOST");
-		if (rte->rt_flags & RTF_IGP_EGP_SYNC) fprintf(fp, " IESYNC");
-		if (rte->rt_flags & RTF_NH_NOT_LLADDR)
-			fprintf(fp, " NONLOCAL");
-		if (rte->rt_flags & RTF_INSTALLED) fprintf(fp, " INSTALLED");
-		fputc('\n', fp);
-		if (!IN6_IS_ADDR_UNSPECIFIED(&rte->rt_gw)) {
-			fprintf(fp, "        "); /* more^2 indent */
-			switch(rte->rt_gwsrc_type) {
-			case RTPROTO_IF:
-				fprintf(fp, "gwsrc: ifroute(%s/%d on %s)",
-					ip6str(&rte->rt_gwsrc_entry->rt_ripinfo.rip6_dest, 0),
-					rte->rt_gwsrc_entry->rt_ripinfo.rip6_plen,
-					rte->rt_gwif->ifi_ifn->if_name);
-				break;
-			case RTPROTO_RIP:
-				fprintf(fp, "gwsrc: ripng(%s/%d on %s,\n",
-					ip6str(&rte->rt_gwsrc_entry->rt_ripinfo.rip6_dest, 0),
-					rte->rt_gwsrc_entry->rt_ripinfo.rip6_plen,
-					rte->rt_gwif->ifi_ifn->if_name);
-				fprintf(fp, "        ");
-				fprintf(fp, "             %s)",
-					ip6str(&rte->rt_gwsrc_entry->rt_gw,
-					       rte->rt_gwif->ifi_ifn->if_index));
-				break;
-			default:
-				fprintf(fp, "gwsrc: unknown(%d)",
-					rte->rt_gwsrc_type);
-				break;
-			}
-			fputc('\n', fp);
-		}
-
-		fprintf(fp, "      "); /* more indent */
-		fprintf(fp, "MED: %d localpref: %d origin: ID=%s,code=%s\n",
-			(int)ntohl(ap->asp_med), (int)ntohl(ap->asp_localpref),
-			inet_ntop(AF_INET, &ap->asp_origid,
-				  inetaddrstr, INET_ADDRSTRLEN),
-			origin_str[ap->asp_origin]);
-
-		fprintf(fp, "      "); /* more indent */
-		fprintf(fp, "ASPATH: %s\n", aspath2str(ap));
-		if (ap->asp_clstr) {
-			fprintf(fp, "      "); /* more indent */
-			fprintf(fp, "Cluster list: %s\n",
-				cll2str(ap->asp_clstr));
-		}
-
-		/* unrecognized attributes */
-		if ((optatr = ap->asp_optatr) != NULL)
-			fprintf(fp, "      Unrecognized Attributes:\n");
-		for (optatr = ap->asp_optatr; optatr; optatr = optatr->next) {
-			int c = 0;
-
-			fprintf(fp, "        ");
-			for (c = 0; c < optatr->len && c < 20; c++)
-				fprintf(fp, "%02x ",
-					(unsigned char)optatr->data[c]);
-			if (optatr->len > 20)
-				fprintf(fp, "...");
-			fputc('\n', fp);
-		}
+		dump_bgp_rtentry(fp, rte, "    ");
 
 		if ((rte = rte->rt_next) == base)
 			break;
@@ -351,6 +374,206 @@ print_rip_dump(FILE *fp)
 	}
 }
 
+static struct bgproute_list *
+init_bgp_route_list()
+{
+	static struct bgproute_list head;
+
+	memset(&head, 0, sizeof(head));
+	head.next = head.prev = &head;
+	return(&head);
+}
+
+/*
+ * Compare two IPv6 prefixes. A supplement function.
+ * Return value:
+ *   -1 if rte1 < rte2
+ *    0 if rte1 == rte2
+ *   +1 if rte1 > rte2
+ */
+static int
+prefix_comp(rte1, rte2)
+	struct rt_entry *rte1, *rte2;
+{
+	u_int32_t i32_1, i32_2;
+	int i;
+
+	for (i = 0; i < 4; i++) {
+		i32_1 = ntohl(*(u_int32_t *)&(rte1->rt_ripinfo.rip6_dest.s6_addr[i * 4]));
+		i32_2 = ntohl(*(u_int32_t *)&(rte2->rt_ripinfo.rip6_dest.s6_addr[i * 4]));
+		if (i32_1 < i32_2)
+			return(-1);
+		if (i32_1 > i32_2)
+			return(1);
+		/* continue to next 32 bits */
+	}
+
+	/* Two addresses are equal. Compare prefix length. */
+	if (rte1->rt_ripinfo.rip6_plen < rte2->rt_ripinfo.rip6_plen)
+		return(-1);
+	if (rte1->rt_ripinfo.rip6_plen > rte2->rt_ripinfo.rip6_plen)
+		return(1);
+	return(0);		/* completely equal */
+}
+
+static void
+insert_bgp_route_entry(list, rte, bnp)
+	struct bgproute_list *list;
+	struct rt_entry *rte;
+	struct rpcb *bnp;
+{
+	struct bgproute_list *brl, *newbrl;
+	struct rt_entry *orte;
+	struct bgproute_entry **brep, *newbre;
+	int cmp;
+
+	for (brl = bgp_route_head(list); !bgp_route_isend(brl, list);
+	     brl = bgp_route_next(brl)) {
+		if (brl->entry == NULL || (orte = brl->entry->rte) == NULL) {
+			syslog(LOG_ERR, "<%s>: bogus bgproute list(%p)", brl);
+			continue; /* XXX */
+		}
+		if ((cmp = prefix_comp(rte, orte)) < 0)	/* rte < orte */
+			continue;
+		else if (cmp > 0) /* rte > orte */
+			break;	/* insert new list and entry */
+		goto insert_entry; /* rte == orte */
+	}
+	if ((newbrl = (struct bgproute_list *)malloc(sizeof(*newbrl))) == NULL)
+		fatalx("<insert_bgp_route_entry>: malloc failed"); /* XXX */
+	memset(newbrl, 0, sizeof(*newbrl));
+	insque(newbrl, brl);
+	brl = newbrl;
+	
+  insert_entry:
+	for (brep = &brl->entry; *brep; brep = &(*brep)->next) {
+		orte = (*brep)->rte;
+		/*
+		 * if the new entry is preferred to the old one, insert here.
+		 * A route that is installed to the kernel is the most preferable
+		 * one. There is no preference between routes that is not up. 
+		 */
+		if ((rte->rt_flags & RTF_INSTALLED) ||
+		    !(orte->rt_flags & RTF_UP))
+			break;
+	}
+	/* allocate a new entry and insert it */
+	if ((newbre = (struct bgproute_entry *)malloc(sizeof(*newbre))) == NULL)
+		fatalx("<insert_bgp_route_entry>: malloc failed"); /* XXX */
+	newbre->head = brl;
+	newbre->bnp = bnp;
+	newbre->rte = rte;
+	newbre->next = *brep;
+	brep = &newbre;
+}
+
+static struct bgproute_list *
+make_bgp_route_list()
+{
+	extern struct rpcb *bgb;
+	struct bgproute_list *brl;
+	struct rpcb *bnp = bgb;
+	struct rt_entry *rte;
+
+	brl = init_bgp_route_list();
+	
+	while(bnp) {
+		if (bnp->rp_state == BGPSTATE_ESTABLISHED) {
+			rte = bnp->rp_adj_ribs_in;
+			while(rte) {
+				insert_bgp_route_entry(brl, rte, bnp);
+				if ((rte = rte->rt_next) == bnp->rp_adj_ribs_in)
+					break;
+			}
+		}
+
+		if ((bnp = bnp->rp_next) == bgb)
+			break;
+	}
+
+	return(brl);
+}
+
+static void
+free_bgp_route_list(head)
+	struct bgproute_list *head;
+{
+	struct bgproute_list *brl, *brl_next;
+	struct bgproute_entry *bre, *bre_next;
+
+	for (brl = bgp_route_head(head); !bgp_route_isend(brl, head);
+	     brl = brl_next) {
+		brl_next = bgp_route_next(brl);	/* brl will soon be freed */
+
+		for (bre = brl->entry; bre; bre = bre_next) {
+			bre_next = bre->next; /* bre will soon be freed */
+			free(bre);
+		}
+
+		remque(brl);
+		free(brl);
+	}
+}
+
+static void
+show_bgp_route_entry(fp, bre)
+	FILE *fp;
+	struct bgproute_entry *bre;
+{
+	struct rpcb *bnp = bre->bnp;
+	char inetaddrstr[INET_ADDRSTRLEN]; /* XXX */
+	char *indent = " ";
+
+	dump_bgp_rtentry(fp, bre->rte, indent);
+	fprintf(fp, "%sPeerInfo: Addr: %s, ID: %s, Type: %s\n", indent,
+		bgp_peerstr(bnp),
+		inet_ntop(AF_INET, &bnp->rp_id, inetaddrstr, INET_ADDRSTRLEN),
+		(bnp->rp_mode & BGPO_IGP) ? "IBGP" : "EBGP");
+}
+
+static struct bgproute_entry *
+bgp_route_headentry(head)
+	struct bgproute_list *head;
+{
+	struct bgproute_list *brl;
+
+	brl = bgp_route_head(head);
+	return(brl->entry);
+}
+
+static struct bgproute_entry *
+bgp_route_nextentry(listhead, prev)
+	struct bgproute_list *listhead;
+	struct bgproute_entry *prev;
+{
+	struct bgproute_list *brl;
+
+	if (prev->next)
+		return(prev->next);
+
+	for (brl = prev->head; brl != listhead; brl = brl->next) {
+		if (brl->entry)
+			return(brl->entry);
+	}
+
+	return(NULL);
+}
+
+/* show a sorted list of BGP routes per prefix */
+static void
+print_bgp_routes(fp)
+	FILE *fp;
+{
+	struct bgproute_list *brl;
+	struct bgproute_entry *bre;
+
+	brl = make_bgp_route_list(); /* make a sorted list */
+	for (bre = bgp_route_headentry(brl); bre;
+	     bre = bgp_route_nextentry(brl, bre))
+		show_bgp_route_entry(fp, bre);
+	free_bgp_route_list(brl);
+}
+
 static void
 print_bgp_dump(FILE *fp)
 {
@@ -382,6 +605,9 @@ print_bgp_dump(FILE *fp)
 		if (IamRR)
 			fprintf(fp, ", Reflector");
 		fputc('\n', fp);
+
+		fprintf(fp, "\n=== BGP routing information ===\n");
+		print_bgp_routes(fp);
 
 		fprintf(fp, "\n=== BGP per peer information ===\n");
 	}
