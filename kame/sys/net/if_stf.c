@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.55 2001/04/27 08:48:05 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.56 2001/04/27 09:38:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -433,10 +433,10 @@ stf_output(ifp, m, dst, rt)
 	 * table configurations like this:
 	 * # route add -inet6 2002:: -prefixlen 16 ::1 -ifp stf0
 	 */
-	if (IN6_IS_ADDR_6TO4(&dst6->sin6_addr))
-		in4 = GET_V4(&dst6->sin6_addr);
-	else if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst))
+	if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst))
 		in4 = GET_V4(&ip6->ip6_dst);
+	else if (IN6_IS_ADDR_6TO4(&dst6->sin6_addr))
+		in4 = GET_V4(&dst6->sin6_addr);
 	else {
 		m_freem(m);
 		return ENETUNREACH;
@@ -520,10 +520,10 @@ stf_output(ifp, m, dst, rt)
 	 * table configurations like this:
 	 * # route add -inet6 2002:: -prefixlen 16 ::1 -ifp stf0
 	 */
-	if (IN6_IS_ADDR_6TO4(&dst6->sin6_addr))
-		in4 = GET_V4(&dst6->sin6_addr);
-	else if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst))
+	if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst))
 		in4 = GET_V4(&ip6->ip6_dst);
+	else if (IN6_IS_ADDR_6TO4(&dst6->sin6_addr))
+		in4 = GET_V4(&dst6->sin6_addr);
 	else {
 		m_freem(m);
 		return ENETUNREACH;
