@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.155 1999/10/05 09:56:41 jinmei Exp $
+$Id: CHANGELOG,v 1.156 1999/10/05 10:16:26 jinmei Exp $
 
 <199910>
+1999-10-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *bsd*/*/netstat/inet6.c (ip6_ifstats): added the case of
+	ifs6_in_truncated to be printed, which was just forgotten so far.
+
 1999-10-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/v6test/getconfig.c (make_padnopt): added a new
 	attribute(padoptreallen) for the PadN option so that v6test could
