@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.66 2000/10/10 15:35:47 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.67 2000/10/10 16:26:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -672,30 +672,6 @@ sysctl_ip6_forwarding SYSCTL_HANDLER_ARGS
 	}
 
 	return (error);
-}
-
-static int
-sysctl_icmp6_ratelimit SYSCTL_HANDLER_ARGS
-{
-	int rate_usec, error, s;
-
-	/*
-	 * The sysctl specifies the rate in usec-between-icmp,
-	 * so we must convert from/to a timeval.
-	 */
-	rate_usec = (icmp6errratelim.tv_sec * 1000000) +
-	    icmp6errratelim.tv_usec;
-	error = sysctl_handle_int(oidp, &rate_usec, 0, req);
-	if (error)
-		return (error);
-	if (rate_usec < 0)
-		return (EINVAL);
-	s = splnet();
-	icmp6errratelim.tv_sec = rate_usec / 1000000;
-	icmp6errratelim.tv_usec = rate_usec % 1000000;
-	splx(s);
-
-	return (0);
 }
 
 SYSCTL_OID(_net_inet6_ip6, IPV6CTL_FORWARDING, forwarding,
