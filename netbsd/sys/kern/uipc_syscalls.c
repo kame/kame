@@ -43,6 +43,8 @@
 #include "opt_compat_ultrix.h"
 #include "opt_compat_43.h"
 #include "opt_compat_osf1.h"
+#include "opt_sctp.h"
+
 #if defined(COMPAT_43) || defined(COMPAT_SUNOS) || defined(COMPAT_LINUX) || \
     defined(COMPAT_HPUX) || defined(COMPAT_FREEBSD) || \
     defined(COMPAT_ULTRIX) || defined(COMPAT_OSF1)
@@ -64,6 +66,10 @@
 #include <sys/un.h>
 #ifdef KTRACE
 #include <sys/ktrace.h>
+#endif
+
+#ifdef SCTP
+#include <netinet/sctp_peeloff.h>
 #endif
 
 #include <sys/mount.h>
@@ -921,9 +927,12 @@ sys_getsockopt(p, v, retval)
 	} */ *uap = v;
 	struct file *fp;
 	struct mbuf *m = NULL, *m0;
+	struct mbuf *msav = NULL;
 	unsigned int op, i, valsize;
+	int s, used_my_mbuf;
 	int error;
 
+	used_my_mbuf = 0;
 	/* getsock() will use the descriptor for us */
 	if ((error = getsock(p->p_fd, SCARG(uap, s), &fp)) != 0)
 		return (error);
@@ -934,9 +943,47 @@ sys_getsockopt(p, v, retval)
 			goto out;
 	} else
 		valsize = 0;
+	if (valsize > MCLBYTES) {
+		/*
+		 * Restrict us down to a cluster size, thats
+		 * all we can pass either way...
+		 */
+		valsize = MCLBYTES;
+	}
+	if (SCARG(uap, val)) {
+		/*
+		 * SCTP wants to get some information
+		 * from the getopt call.. to lookup an
+		 * association. The alternative is to
+		 * add special in/out syscalls which seems
+		 * a large waste :>
+		 */
+		s = splsoftnet();
+		m = m_get(M_WAIT, MT_SOOPTS);
+		if (valsize > MLEN) {
+			MCLGET(m, M_DONTWAIT);
+			if ((m->m_flags & M_EXT) == 0) {
+				m_freem(m);
+				splx(s);
+				return (ENOBUFS);
+			}
+		}
+		splx(s);
+		error = copyin(SCARG(uap, val),
+		mtod(m, caddr_t), valsize);
+		if (error) {
+			(void) m_free(m);
+			goto out;
+		}
+		m->m_len = valsize;
+		msav = m;
+		used_my_mbuf = 0;
+	}
 	if ((error = sogetopt((struct socket *)fp->f_data, SCARG(uap, level),
 	    SCARG(uap, name), &m)) == 0 && SCARG(uap, val) && valsize &&
 	    m != NULL) {
+		if (m == msav)
+			used_my_mbuf = 1;
 		op = 0;
 		while (m && !error && op < valsize) {
 			i = min(m->m_len, (valsize - op));
@@ -951,8 +998,27 @@ sys_getsockopt(p, v, retval)
 			error = copyout(&valsize,
 					SCARG(uap, avalsize), sizeof(valsize));
 	}
-	if (m != NULL)
+	/*
+	 * Check to see if the caller used my mbuf or
+	 * not. SCTP will reuse what I pass in. Where has
+	 * other protocols will ignore the passed mbuf and
+	 * replace it with one they allocate.
+	 */
+	if ((used_my_mbuf == 0) && msav) {
+		/*
+		 * If what was returned is different than
+		 * what was sent in, we need to free
+		 * what was sent in.
+		 */
+		s = splsoftnet();
+		(void) m_free(msav);
+		splx(s);
+	}
+	if (m != NULL) {
+		s = splsoftnet();
 		(void) m_free(m);
+		splx(s);
+	}
  out:
 	FILE_UNUSE(fp, p);
 	return (error);
@@ -1176,4 +1242,100 @@ getsock(fdp, fdes, fpp)
 	}
 	*fpp = fp;
 	return (0);
+}
+
+
+int
+sctp_peeloff(p, v, retval)
+     struct proc *p;
+     void *v;
+     register_t *retval;
+{
+#ifdef SCTP
+	struct sctp_peeloff_args *uap;
+	struct filedesc *fdp = p->p_fd;
+	struct file *lfp = NULL;
+	struct file *nfp = NULL;
+	int error, s;
+	struct socket *head, *so;
+	caddr_t assoc_id;
+	int fd;
+	short fflag;		/* type must match fp->f_flag */
+
+	uap = (struct sctp_peeloff_args *)v;
+	error = copyin((caddr_t)SCARG(uap, name), &assoc_id,
+	    sizeof (assoc_id));
+	if (error)
+		return(error);
+	error = getsock(fdp, SCARG(uap, sd), &lfp);
+	if (error)
+		return (error);
+	s = splsoftnet();
+	head = (struct socket *)lfp->f_data;
+	error = sctp_can_peel_off(head, assoc_id);
+	if (error) {
+		splx(s);
+		goto done;
+	}
+	/*
+	 * At this point we know we do have a assoc to pull
+	 * we proceed to get the fd setup. This may block
+	 * but that is ok.
+	 */
+
+	fflag = lfp->f_flag;
+	error = falloc(p, &nfp, &fd);
+	if (error) {
+		/*
+		 * Probably ran out of file descriptors. Put the
+		 * unaccepted connection back onto the queue and
+		 * do another wakeup so some other process might
+		 * have a chance at it.
+		 */
+		splx(s);
+		goto done;
+	}
+	FILE_USE(nfp);
+	*retval = fd;
+
+	so = sctp_get_peeloff(head,assoc_id, &error);
+	if (so == NULL) {
+		/*
+		 * Either someone else peeled it off OR
+		 * we can't get a socket.
+		 */
+		goto noconnection;
+	}
+	so->so_state &= ~SS_NOFDREF;
+	so->so_state &= ~SS_ISCONNECTING;
+	so->so_head = NULL;
+	nfp->f_data = (caddr_t)so;
+	nfp->f_flag = FREAD|FWRITE;
+	nfp->f_ops = &socketops;
+	nfp->f_type = DTYPE_SOCKET;
+
+ noconnection:
+	/*
+	 * close the new descriptor, assuming someone hasn't ripped it
+	 * out from under us.
+	 */
+	if (error) {
+		if (fdp->fd_ofiles[fd] == nfp) {
+			fdp->fd_ofiles[fd] = NULL;
+			FILE_UNUSE(nfp, p);
+		}
+	}
+	splx(s);
+
+	/*
+	 * Release explicitly held references before returning.
+	 */
+ done:
+	if (nfp != NULL)
+		FILE_UNUSE(nfp, p);
+	FILE_UNUSE(lfp, p);
+	return (error);
+#else
+	return (EOPNOTSUPP);
+#endif
 }

@@ -12,6 +12,12 @@ options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
 
 options 	NEW_STRUCT_ROUTE		# mandatory
 
+#options 	SCTP		# adds SCTP stack to kernel - requires INET6
+#options 	SCTP_DEBUG	# adds debugging support for SCTP
+#options 	SCTP_TCP_MODEL_SUPPORT	# adds TCP model support
+#options 	SCTP_USE_ADLER32	# use obsolete Adler32 checksum,
+#options 	SCTP_ALTERNATE_ROUTE	# alternate route support - TBD
+
 # IPv6 firewall
 #options 	IPV6FIREWALL
 #options 	IPV6FIREWALL_VERBOSE

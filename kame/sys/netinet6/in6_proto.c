@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.114 2002/04/08 11:17:41 jinmei Exp $	*/
+/*	$KAME: in6_proto.c,v 1.115 2002/04/15 08:34:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,11 +69,13 @@
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
 #include "opt_mip6.h"
+#include "opt_sctp.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 #include "opt_iso.h"
+#include "opt_sctp.h"
 #endif
 
 #include <sys/param.h>
@@ -154,6 +156,14 @@
 #endif
 #include <netinet6/udp6_var.h>
 #endif
+
+#ifdef SCTP
+#include <netinet/in_pcb.h>
+#include <netinet/sctp_pcb.h>
+#include <netinet/sctp.h>
+#include <netinet/sctp_var.h>
+#include <netinet6/sctp6_var.h>
+#endif /* SCTP */
 
 #include <netinet6/pim6_var.h>
 
@@ -294,6 +304,42 @@ struct ip6protosw inet6sw[] = {
 #endif
 },
 #endif /* TCP6 */
+
+#ifdef SCTP
+{ SOCK_DGRAM,	&inet6domain,	IPPROTO_SCTP,	PR_ATOMIC|PR_ADDR_OPT|PR_WANTRCVD,
+  sctp6_input,	0,		sctp6_ctlinput,	sctp_ctloutput,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
+  sctp6_usrreqs,
+#endif
+  0,		0,		0,		sctp_drain,
+#ifndef __FreeBSD__
+    /*sctp_sysctl*/0,
+#else
+# if __FreeBSD__ >= 3
+  &sctp6_usrreqs
+# endif
+#endif
+},
+{ SOCK_STREAM,	&inet6domain,	IPPROTO_SCTP,	PR_ATOMIC|PR_ADDR_OPT|PR_WANTRCVD,
+  sctp6_input,	0,		sctp6_ctlinput,	sctp_ctloutput,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
+  sctp6_usrreqs,
+#endif
+  0,		0,		0,		sctp_drain,
+#ifndef __FreeBSD__
+    /*sctp_sysctl*/0,
+#else
+# if __FreeBSD__ >= 3
+  &sctp6_usrreqs
+# endif
+#endif
+},
+#endif /* SCTP */
+
 { SOCK_RAW,	&inet6domain,	IPPROTO_RAW,	PR_ATOMIC|PR_ADDR,
   rip6_input,	rip6_output,	rip6_ctlinput,	rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -666,6 +712,9 @@ SYSCTL_NODE(_net_inet6,	IPPROTO_IPV6,	ip6,	CTLFLAG_RW, 0,	"IP6");
 SYSCTL_NODE(_net_inet6,	IPPROTO_ICMPV6,	icmp6,	CTLFLAG_RW, 0,	"ICMP6");
 SYSCTL_NODE(_net_inet6,	IPPROTO_UDP,	udp6,	CTLFLAG_RW, 0,	"UDP6");
 SYSCTL_NODE(_net_inet6,	IPPROTO_TCP,	tcp6,	CTLFLAG_RW, 0,	"TCP6");
+#ifdef SCTP
+SYSCTL_NODE(_net_inet6,	IPPROTO_SCTP,	sctp6,	CTLFLAG_RW, 0,	"SCTP6");
+#endif /* SCTP */
 #ifdef IPSEC
 SYSCTL_NODE(_net_inet6,	IPPROTO_ESP,	ipsec6,	CTLFLAG_RW, 0,	"IPSEC6");
 #endif /* IPSEC */

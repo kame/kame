@@ -36,6 +36,7 @@
  */
 
 #include "opt_compat_sunos.h"
+#include "opt_sctp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -146,10 +147,27 @@ solisten(so, backlog)
 	int backlog;
 {
 	int s = splsoftnet(), error;
+	short oldopt,oldqlimit;
 
+	oldopt = so->so_options;
+	oldqlimit = so->so_qlimit;
+
+	if (so->so_q.tqh_first == NULL)
+		so->so_options |= SO_ACCEPTCONN;
+	if (backlog < 0)
+		backlog = 0;
+	so->so_qlimit = min(backlog, somaxconn);
+	/*
+	 * SCTP needs to look at and tweak both
+	 * the inbound backlog paramter AND the
+	 * so_options (UDP model both connect's and
+	 * gets inbound connections .. implicitly).
+	 */
 	error = (*so->so_proto->pr_usrreq)(so, PRU_LISTEN, (struct mbuf *)0,
 	    (struct mbuf *)0, (struct mbuf *)0, (struct proc *)0);
 	if (error) {
+		so->so_options = oldopt;
+	        so->so_qlimit = oldqlimit;
 		splx(s);
 		return (error);
 	}
@@ -695,6 +713,31 @@ dontblock:
 			}
 		}
 	}
+	if (pr->pr_flags & PR_ADDR_OPT) {
+		/*
+		 * Fhor SCTP we may be getting a
+		 * whole message OR a partial delivery.
+		 */
+		if (m->m_type == MT_SONAME) {
+			orig_resid = 0;
+			if (flags & MSG_PEEK) {
+				if (paddr)
+					*paddr = m_copy(m, 0, m->m_len);
+				m = m->m_next;
+			} else {
+				sbfree(&so->so_rcv, m);
+				if (paddr) {
+					*paddr = m;
+					so->so_rcv.sb_mb = m->m_next;
+					m->m_next = 0;
+					m = so->so_rcv.sb_mb;
+				} else {
+					MFREE(m, so->so_rcv.sb_mb);
+					m = so->so_rcv.sb_mb;
+				}
+			}
+		}
+	}
 	while (m && m->m_type == MT_CONTROL && error == 0) {
 		if (flags & MSG_PEEK) {
 			if (controlp)
@@ -763,6 +806,10 @@ dontblock:
 		if (len == m->m_len - moff) {
 			if (m->m_flags & M_EOR)
 				flags |= MSG_EOR;
+#ifdef SCTP
+			if (m->m_flags & M_NOTIFICATION)
+				flags |= MSG_NOTIFICATION;
+#endif /* SCTP */
 			if (flags & MSG_PEEK) {
 				m = m->m_next;
 				moff = 0;

@@ -385,6 +385,7 @@ struct msghdr {
 #define	MSG_DONTWAIT	0x80		/* this message should be nonblocking */
 #define	MSG_BCAST	0x100		/* this message was rcvd using link-level brdcst */
 #define	MSG_MCAST	0x200		/* this message was rcvd using link-level mcast */
+#define	MSG_NOTIFICATION 0x400		/* This message is a notification */
 
 /*
  * Header for ancillary data objects in msg_control buffer.

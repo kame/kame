@@ -53,6 +53,8 @@ defopt	opt_inet.h	INET INET6
 defopt	opt_ipsec.h	IPSEC IPSEC_ESP
 defopt	opt_inet_conf.h	SUBNETSARELOCAL HOSTZEROBROADCAST
 defopt	opt_atalk.h	NETATALK
+defopt	opt_sctp.h      SCTP SCTP_TCP_MODEL_SUPPORT
+defopt	opt_sctp.h      SCTP_DEBUG SCTP_USE_ADLER32
 defopt	opt_ns.h	NS NSIP	 	# NS network stack,
 					# XNS tunneled over IP
 defopt	opt_iso.h	ISO TPIP	# ISO network stack
@@ -904,13 +906,25 @@ file netinet/ip_output.c		inet
 file netinet/ip_proxy.c			ipfilter
 file netinet/ip_state.c			ipfilter
 file netinet/raw_ip.c			inet
+# should be sctp & ( inet | inet6 )
+file netinet/sctp_asconf.c		sctp & inet & inet6
+file netinet/sctp_crc32.c		sctp & inet & inet6
+file netinet/sctp_hashdriver.c		sctp & inet & inet6
+file netinet/sctp_indata.c		sctp & inet & inet6
+file netinet/sctp_input.c		sctp & inet & inet6
+file netinet/sctp_output.c		sctp & inet & inet6
+file netinet/sctp_pcb.c			sctp & inet & inet6
+file netinet/sctp_peeloff.c		sctp & inet & inet6
+file netinet/sctp_sha1.c		sctp & inet & inet6
+file netinet/sctp_timer.c		sctp & inet & inet6
+file netinet/sctp_usrreq.c		sctp & inet & inet6
+file netinet/sctputil.c			sctp & inet & inet6
 file netinet/tcp_debug.c		inet | inet6
 file netinet/tcp_input.c		inet | inet6
 file netinet/tcp_output.c		inet | inet6
 file netinet/tcp_subr.c			inet | inet6
 file netinet/tcp_timer.c		inet | inet6
 file netinet/tcp_usrreq.c		inet | inet6
-#file netinet/sctp_usrreq.c		inet
 file netinet/udp_usrreq.c		inet | inet6
 file netinet6/ah_core.c			ipsec
 file netinet6/ah_input.c		ipsec
@@ -952,6 +966,7 @@ file netinet6/nd6_rtr.c			inet6
 file netinet6/raw_ip6.c			inet6
 file netinet6/route6.c			inet6
 file netinet6/scope6.c			inet6
+file netinet6/sctp6_usrreq.c		sctp & inet6
 file netinet6/udp6_output.c		inet6
 file netinet6/udp6_usrreq.c		inet6
 file netiso/clnp_debug.c		iso

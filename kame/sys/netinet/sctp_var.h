@@ -1,7 +1,11 @@
-/*	$KAME: sctp_var.h,v 1.2 2001/01/05 11:49:14 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.3 2002/04/15 08:34:07 itojun Exp $	*/
+/*	Header: /home/sctpBsd/netinet/sctp_var.h,v 1.46 2002/04/04 16:53:46 randall Exp	*/
+
+#ifndef _NETINET_SCTP_VAR_H_
+#define _NETINET_SCTP_VAR_H_
 
 /*
- * Copyright (C) 2000 WIDE Project.
+ * Copyright (c) 2001, 2002 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -12,14 +16,17 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the project nor the names of its contributors
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *      This product includes software developed by Cisco Systems, Inc.
+ * 4. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY CISCO SYSTEMS AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL CISCO SYSTEMS OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -28,49 +35,143 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include "opt_inet6.h"
+#include "opt_inet.h"
+#endif
 
-#ifndef _NETINET_SCTP_VAR_H_
-#define _NETINET_SCTP_VAR_H_
+#if defined(__NetBSD__)
+#include "opt_inet.h"
+#endif
 
-enum sctpstate {
-	SCTPS_CLOSED,
-	SCTPS_COOKIE_WAIT,
-	SCTPS_COOKIE_ECHOED,
-	SCTPS_ESTABLISHED,
-	SCTPS_SHUTDOWN_PEND,
-	SCTPS_SHUTDOWN_SENT,
-	SCTPS_SHUTDOWN_RCVD,
-	SCTPS_SHUTDOWN_ACK_SENT,
+#ifndef __OpenBSD__
+#include <sys/socketvar.h>
+#endif
+
+#include <netinet/sctp_uio.h>
+
+/* SCTP Kernel structures */
+
+/*
+ * SCTP_INPCB structure exported to user-land via sysctl(3).
+ * Evil hack: declare only if in_pcb.h and sys/socketvar.h have been
+ * included.  Not all of our clients do.
+ */
+#ifdef __FreeBSD__
+struct  xsctp_inpcb {
+	size_t xs_len;
+ 	struct inpcb		xs_inp;
+ 	struct sctp_inpcb	xs_sctp_inpcb;
+ 	struct sctp_tcb		xs_sctp_tcb;
+ 	struct xsocket		xs_socket;
+	u_quad_t		xs_alignment_hack;
 };
+#endif /* __FreeBSD__ */
 
-struct sctpcb {
-	struct inpcb *sc_inpcb;
-	enum sctpstate sc_state;
+/*
+ * Names for UDP sysctl objects
+ */
+#define SCTPCTL_STATS		1	/* statistics (read-only) */
+#define	SCTPCTL_MAXDGRAM	2	/* max datagram size */
+#define	SCTPCTL_RECVSPACE	3	/* default receive buffer space */
+#define	SCTPCTL_PCBLIST		4	/* list of PCBs for SCTP sockets */
+#define SCTPCTL_ASOC_CNT	5	/* number of assoc for zinit */
+#define SCTPCTL_SCALE_VAL	6	/* how to scale up for addr's */
+#define SCTPCTL_MAXID		7
 
-	/* cookie */
-	size_t sc_cookiesize;
-	u_int8_t *sc_cookie;
-
-	u_int32_t sc_litag;	/* local initiation tag */
-	u_int32_t sc_fitag;	/* foreign initiation tag */
-};
+#define SCTPCTL_NAMES { \
+	{ 0, 0 }, \
+	{ "stats", CTLTYPE_STRUCT }, \
+	{ "maxdgram", CTLTYPE_INT }, \
+	{ "recvspace", CTLTYPE_INT }, \
+	{ "pcblist", CTLTYPE_STRUCT }, \
+	{ "asoccount", CTLTYPE_INT }, \
+	{ "asocscale", CTLTYPE_INT }, \
+}
 
 #ifdef _KERNEL
-#define	intosctpcb(ip)	((struct sctpcb *)(ip)->inp_ppcb)
-#define	sotosctpcb(so)	(intosctpcb(sotoinpcb(so)))
 
-void sctp_init __P((void));
+#ifdef __FreeBSD__
+SYSCTL_DECL(_net_inet_sctp);
+extern struct	pr_usrreqs sctp_usrreqs;
+
+#else /* to __FreeBSD__ */
+
+#if defined(__NetBSD__)
+int sctp_usrreqs __P((struct socket *, int, struct mbuf *, struct mbuf *,
+		      struct mbuf *, struct proc *));
+#else /* to __NetBSD__ */
+int sctp_usrreqs __P((struct socket *, int, struct mbuf *, struct mbuf *,
+		      struct mbuf *));
+#endif /* __NetBSD__/else */
+
+#endif /* __FreeBSD__ */
+
+
+#define	sctp_sbspace(sb) ((long) ((sb)->sb_hiwat - (sb)->sb_cc))
+
+extern u_long	sctp_sendspace;
+extern u_long	sctp_recvspace;
+
+#if defined(__OpenBSD__)
+void sctp_fasttim(void);
+#endif
+#if defined(__FreeBSD__)
+void	sctp_ctlinput __P((int, struct sockaddr *, void *));
+int	sctp_ctloutput __P((struct socket *, struct sockopt *));
+void	sctp_input __P((struct mbuf *, int));
+#else
+void*	sctp_ctlinput __P((int, struct sockaddr *, void *));
+int	sctp_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
+void	sctp_input __P((struct mbuf *, ... ));
+#endif /* __FreeBSD__ */
+
+void	sctp_init __P((void));
+int	sctp_shutdown __P((struct socket *so));
+
+void	sctp_notify __P((struct sctp_inpcb *, int, struct sctphdr *,
+			 struct sockaddr *, struct sctp_tcb *,
+			 struct sctp_nets *));
+
+int sctp_usr_recvd __P((struct socket *so, int flags));
+
+
 #ifdef INET6
-int sctp6_input __P((struct mbuf **, int *, int));
-#endif
-void sctp_input __P((struct mbuf *, ...));
-void *sctp_ctlinput __P((int, struct sockaddr *, void *));
-int sctp_output __P((struct sctpcb *));
-struct sctpcb *sctp_newsctpcb __P((int, void *));
-int sctp_attach __P((struct socket *));
-struct sctpcb *sctp_close __P((struct sctpcb *));
-int sctp_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
-	struct mbuf *, struct proc *));
-#endif
+void ip_2_ip6_hdr __P((struct ip6_hdr *ip6, struct ip *ip));
+#endif /* INET6 */
 
-#endif /* _NETINET_SCTP_VAR_H_ */
+int sctp_bindx(struct socket *so, int sd, struct sockaddr_storage *addrs, 
+	       int addrcnt, int flags, struct proc *p);
+
+int sctp_peeloff(struct socket *so, struct socket *nso, int sd,
+		 sctp_assoc_t assoc_id, int *addrlen);
+
+int sctp_ingetaddr(struct socket *so,
+#if defined(__FreeBSD__)
+		   struct sockaddr **nam
+#else
+		   struct sockaddr *nam
+#endif
+);
+
+int sctp_peeraddr(struct socket *so,
+#if defined(__FreeBSD__)
+		  struct sockaddr **nam
+#else
+		  struct sockaddr *nam
+#endif
+);
+
+int sctp_listen(struct socket *so, struct proc *p);
+
+int sctp_accept(struct socket *so, 
+#if defined(__FreeBSD__)
+		struct sockaddr **nam
+#else
+		struct sockaddr *nam
+#endif
+);
+
+#endif /* _KERNEL */
+
+#endif /* !_NETINET_SCTP_VAR_H_ */

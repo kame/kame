@@ -70,9 +70,11 @@
 #include "opt_ns.h"			/* NSIP: XNS tunneled over IP */
 #include "opt_inet.h"
 #include "opt_ipsec.h"
+#include "opt_sctp.h"
 
 #include <sys/param.h>
 #include <sys/socket.h>
+#include <sys/socketvar.h>
 #include <sys/protosw.h>
 #include <sys/domain.h>
 #include <sys/mbuf.h>
@@ -150,6 +152,12 @@
 #include <netinet/ip_gre.h>
 #endif
 
+#ifdef SCTP
+#include <netinet/sctp_pcb.h>
+#include <netinet/sctp.h>
+#include <netinet/sctp_var.h>
+#endif /* SCTP */
+
 #ifdef NATPT
 void	natpt_init	__P((void));
 int	natpt_usrreq	__P((struct socket *, int,
@@ -174,13 +182,24 @@ struct protosw inetsw[] = {
   tcp_usrreq,
   tcp_init,	tcp_fasttimo,	tcp_slowtimo,	tcp_drain,	tcp_sysctl
 },
-#if 0
-{ SOCK_STREAM,	&inetdomain,	IPPROTO_SCTP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN,
-  sctp_input,	0,		sctp_ctlinput,	0,
-  sctp_usrreq,
-  sctp_init,	0,		0,		0,		0
+#ifdef SCTP
+/*
+ * Order is very important here, we add the good one in
+ * in this postion so it maps to the right ip_protox[]
+ * postion for SCTP. Don't move the one above below
+ * this one or IPv6/4 compatability will break
+ */
+{ SOCK_DGRAM,	&inetdomain,	IPPROTO_SCTP,	PR_ATOMIC|PR_ADDR_OPT|PR_WANTRCVD,
+  sctp_input,	0,		sctp_ctlinput,	sctp_ctloutput,
+  &sctp_usrreqs,
+  sctp_init,	0,		0,		sctp_drain,	0
 },
-#endif
+{ SOCK_STREAM,	&inetdomain,	IPPROTO_SCTP,	PR_ATOMIC|PR_ADDR_OPT|PR_WANTRCVD,
+  sctp_input,	0,		sctp_ctlinput,	sctp_ctloutput,
+  &sctp_usrreqs,
+  0,		0,		0,		sctp_drain,	0
+},
+#endif /* SCTP */
 { SOCK_RAW,	&inetdomain,	IPPROTO_RAW,	PR_ATOMIC|PR_ADDR,
   rip_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,
