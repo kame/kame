@@ -1,4 +1,4 @@
-/*	$KAME: sainfo.c,v 1.16 2003/06/27 07:32:39 sakane Exp $	*/
+/*	$KAME: sainfo.c,v 1.17 2005/02/07 04:19:45 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,7 +87,7 @@ getsainfo(src, dst, peer)
 		if (s->id_i != NULL) {
 			if (pass == 2)
 				continue;
-			if (memcmp(peer->v, s->id_i->v, s->id_i->l) != 0)
+			if (memcmp(peer->v + 4, s->id_i->v + 4, s->id_i->l - 4) != 0)
 				continue;
 		} else if (pass == 1)
 			continue;
