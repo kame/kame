@@ -3,7 +3,7 @@
 SUBDIR+=inetd sysctl
 
 SUBDIR+=rtsold ifmcstat ndp tcpdump
-# does not work due to lack of hoplimit control
-#SUBDIR+=traceroute6 rtadvd mld6query rrenumd prefix icmp6dump gifconfig rip6query route6d
+SUBDIR+=traceroute6 rtadvd mld6query rrenumd prefix icmp6dump gifconfig
+SUBDIR+=rip6query route6d faithd bgpg hroute6d
 
 .include <bsd.subdir.mk>
