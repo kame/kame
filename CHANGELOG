@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.792 2000/04/18 12:46:20 jinmei Exp $
+$Id: CHANGELOG,v 1.793 2000/04/19 01:54:28 itojun Exp $
 
 <200004>
+Wed Apr 19 10:52:56 JST 2000  itojun@iijlab.net
+	* sys/netinet{,6}/in{,6}_gif.c: do not attempt to transmit packet
+	  if we are apparently making infinite loop.
+	* sys/netinet6/in6_gif.c: always fragment encapsulated IPv6 packet
+	  to minimum IPv6 MTU.  otherwise, inner layer (like IPv4 in
+	  IPv4-in-IPv6) needs to retransmit to kick path MTU discovery in
+	  the outer layer - too painful.
+
 2000-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.c (ip6_mdq): added scope boundary
 	check.
