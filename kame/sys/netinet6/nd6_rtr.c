@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.84 2001/02/03 13:19:16 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.85 2001/02/03 13:26:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1240,7 +1240,7 @@ prelist_update(new, dr, m)
 		/*
 		 * When adjusting the lifetimes of an existing temporary
 		 * address, only lower the lifetimes.
-		 * addrconf-privacy-04 3.3. (1).
+		 * RFC 3041 3.3. (1).
 		 * XXX: how should we modify ia6t_[pv]ltime?
 		 */
 		if ((ifa6->ia6_flags & IN6_IFF_TEMPORARY) != 0) {
@@ -1271,11 +1271,11 @@ prelist_update(new, dr, m)
 			ia6->ia6_ndpr = pr;
 
 			/*
-			 * addrconf-privacy-04 3.3 (2).
+			 * RFC 3041 3.3 (2).
 			 * When a new public address is created as described
 			 * in RFC2462, also create a new temporary address.
 			 *
-			 * addrconf-privacy-04 3.5.
+			 * RFC 3041 3.5.
 			 * When an interface connects to a new link, a new
 			 * randomized interface identifier should be generated
 			 * immediately together with a new set of temporary
@@ -1905,7 +1905,7 @@ in6_tmpifadd(ia0, forcegen)
 	 * If by chance the new temporary address is the same as an address
 	 * already assigned to the interface, generate a new randomized
 	 * interface identifier and repeat this step.
-	 * addrconf-privacy-04 3.3 (4).
+	 * RFC 3041 3.3 (4).
 	 */
 	if (in6ifa_ifpwithaddr(ifp, &ifra.ifra_addr.sin6_addr) != NULL) {
 		if (trylimit-- == 0) {

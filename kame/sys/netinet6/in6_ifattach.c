@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.94 2001/02/03 13:19:15 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.95 2001/02/03 13:26:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -235,7 +235,7 @@ generate_tmp_ifid(seed0, seed1, ret)
 	MD5Final(digest, &ctxt);
 
 	/*
-	 * addrconf-privacy-04 3.2.1. (3)
+	 * RFC 3041 3.2.1. (3)
 	 * Take the left-most 64-bits of the MD5 digest and set bit 6 (the
 	 * left-most bit is numbered 0) to zero.
 	 */
@@ -261,7 +261,7 @@ generate_tmp_ifid(seed0, seed1, ret)
 	}
 
 	/*
-	 * addrconf-privacy-04 3.2.1. (4)
+	 * RFC 3041 3.2.1. (4)
 	 * Take the rightmost 64-bits of the MD5 digest and save them in
 	 * stable storage as the history value to be used in the next
 	 * iteration of the algorithm. 
