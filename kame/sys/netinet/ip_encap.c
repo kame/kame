@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.44 2001/06/22 15:17:13 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.45 2001/06/22 15:33:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -171,7 +171,7 @@ encap4_lookup(m, off, proto)
 	int off;
 	int proto;
 {
-	struct ip *ip;
+	struct ip *ip = mtod(m, struct ip *);
 	struct sockaddr_in s, d;
 	struct encaptab *ep, *match;
 	int prio, matchprio;
@@ -543,7 +543,7 @@ fail:
 /* XXX encap4_ctlinput() is necessary if we set DF=1 on outer IPv4 header */
 
 #ifdef INET6
-#ifdef HAVE_NRL_INPCB
+#if defined(HAVE_NRL_INPCB) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #define in6_rtchange	in_rtchange
 #define in6pcb		inpcb
 #endif
