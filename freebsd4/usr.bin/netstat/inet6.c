@@ -336,6 +336,25 @@ static	char *ip6nh[] = {
 	"#255",
 };
 
+static char *srcrule_str[] = {
+	"first candidate",
+	"same address",
+	"appropriate scope",
+	"deprecated address",
+	"home address",
+	"outgoing interface",
+	"matching label",
+	"public/temporary address",
+	"longest match",
+	"rule #9",
+	"rule #10",
+	"rule #11",
+	"rule #12",
+	"rule #13",
+	"rule #14",
+	"rule #15",
+};
+
 /*
  * Dump IP6 statistics structure.
  */
@@ -492,6 +511,12 @@ ip6_stats(off, name)
 
 	p1a(ip6s_forward_cachehit, "\t%llu forward cache hit\n");
 	p1a(ip6s_forward_cachemiss, "\t%llu forward cache miss\n");
+	printf("\tSource addresses selection rule applied:\n");
+	for (i = 0; i < 16; i++) {
+		if (ip6stat.ip6s_sources_rule[i])
+			printf("\t\t%llu %s\n", ip6stat.ip6s_sources_rule[i],
+			       srcrule_str[i]);
+	}
 #undef p
 #undef p1a
 }
