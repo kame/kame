@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.223 2003/01/20 13:39:46 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.224 2003/01/21 01:35:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1341,7 +1341,11 @@ prelist_update(new, dr, m)
 			pr->ndpr_vltime = new->ndpr_vltime;
 			pr->ndpr_pltime = new->ndpr_pltime;
 			(void)in6_init_prefix_ltimes(pr); /* XXX error case? */
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+			pr->ndpr_lastupdate = time.tv_sec;
+#else
 			pr->ndpr_lastupdate = time_second;
+#endif
 		}
 
 		if (new->ndpr_raf_onlink &&
