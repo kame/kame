@@ -28,7 +28,7 @@
  */
 
 #ifndef lint
-static char *rcsid = "@(#) ipsec_policy.c $Revision: 1.2 $";
+static char *rcsid = "@(#) ipsec_policy.c $Revision: 1.3 $";
 #endif
 
 /*
@@ -76,14 +76,14 @@ static char *tokens[] = {
 	"in", "out",
 	"discard", "none", "ipsec", "entrust", "bypass",
 	"esp", "ah", "ipcomp", "default", "use", "require",
-	"transport", "tunnel", "/", NULL
+	"transport", "tunnel", "/", "-", NULL
 };
 enum token {
 	t_invalid = -1,
 	t_in, t_out,
 	t_discard, t_none, t_ipsec, t_entrust, t_bypass,
 	t_esp, t_ah, t_ipcomp, t_default, t_use, t_require,
-	t_transport, t_tunnel, t_slash,
+	t_transport, t_tunnel, t_slash, t_minus,
 };
 static int values[] = {
 	IPSEC_DIR_INBOUND, IPSEC_DIR_OUTBOUND,
@@ -91,7 +91,7 @@ static int values[] = {
 	IPSEC_POLICY_ENTRUST, IPSEC_POLICY_BYPASS,
 	IPPROTO_ESP, IPPROTO_AH, IPPROTO_IPCOMP,
 	IPSEC_LEVEL_DEFAULT, IPSEC_LEVEL_USE, IPSEC_LEVEL_REQUIRE,
-	IPSEC_MODE_TRANSPORT, IPSEC_MODE_TUNNEL, 0
+	IPSEC_MODE_TRANSPORT, IPSEC_MODE_TUNNEL, 0, 0
 };
 struct pbuf {
 	char *buf;
@@ -111,8 +111,10 @@ static enum token gettoken __P((char *p));
 static char *skiptoken __P((char *p, enum token t));
 static char *skipspaces __P((char *p));
 static char *parse_request __P((struct pbuf *pbuf, char *p));
+#if 0
 static char *parse_addresses __P((struct sockaddr *src, struct sockaddr *dst,
 	char *p));
+#endif
 static char *parse_policy __P((struct pbuf *pbuf, char *p));
 static char *get_sockaddr __P((char *host, struct sockaddr *addr));
 static int parse_setreq __P((struct pbuf *pbuf, int proto, int mode, int level,
@@ -134,7 +136,7 @@ gettoken(p)
 		if (strncmp(p, tokens[i], l) != 0)
 			continue;
 		/* slash alone is okay as token */
-		if (i == t_slash)
+		if (i == t_slash || i == t_minus)
 			return i;
 		/* other ones are words, so needs proper termination */
 		if (isspace(p[l]) || p[l] == '/' || p[l] == '\0')
@@ -173,7 +175,7 @@ parse_request(pbuf, p)
 {
 	enum token t;
 	int i;
-	enum token ts[7];	/* set of tokens */
+	enum token ts[10];	/* set of tokens */
 	struct sockaddr_storage src, dst;
 
 	assert(p);
@@ -198,11 +200,15 @@ parse_request(pbuf, p)
 		switch (t) {
 		case t_invalid:
 			if (i == 4) {
-				/* this may be peer's addresses. */
-				p = parse_addresses((struct sockaddr *)&src,
-				                    (struct sockaddr *)&dst, p);
+				p = get_sockaddr(p, (struct sockaddr *)&src);
 				if (p == NULL) {
-					/* parse_address sets ipsec_errorcode.*/
+					ipsec_errcode = EIPSEC_INVAL_ADDRESS;
+					return NULL;
+				}
+			} else if (i == 6) {
+				p = get_sockaddr(p, (struct sockaddr *)&dst);
+				if (p == NULL) {
+					ipsec_errcode = EIPSEC_INVAL_ADDRESS;
 					return NULL;
 				}
 			} else if (*p == '\0') {
@@ -253,8 +259,11 @@ parse_request(pbuf, p)
 			/* we may reach at next request. */
 			goto breakbreak;
 		case t_slash:
-			/* odds is always 'slash'. */
+		case t_minus:
+			/* odds is almost always 'slash'. */
 			if (!(i & 1))
+				goto parseerror;
+			if (i == 5 && t != t_minus)
 				goto parseerror;
 			i++;
 			p = skiptoken(p, t);
@@ -274,11 +283,13 @@ breakbreak:
 	case 2:
 	case 3:
 	case 4:
-		ipsec_errcode = EIPSEC_NO_PROTO;
-		return NULL;	/* less token?  naa, go away */
 	case 5:
 	case 6:
+		ipsec_errcode = EIPSEC_NO_PROTO;	/*XXX*/
+		return NULL;	/* less token?  naa, go away */
 	case 7:
+	case 8:
+	case 9:
 		if (!(ts[0] == t_esp || ts[0] == t_ah || ts[0] == t_ipcomp)) {
 			ipsec_errcode = EIPSEC_INVAL_PROTO;
 			return NULL;
@@ -287,10 +298,14 @@ breakbreak:
 			ipsec_errcode = EIPSEC_INVAL_MODE;
 			return NULL;
 		}
-		if (i != 7)
-			ts[6] = t_default;
-		if (!(ts[6] == t_default || ts[6] == t_use
-		 || ts[6] == t_require)) {
+		if (src.__ss_family == 0 || dst.__ss_family == 0) {
+			ipsec_errcode = EIPSEC_INVAL_ADDRESS;
+			return NULL;
+		}
+		if (i != 9)
+			ts[8] = t_default;
+		if (!(ts[8] == t_default || ts[8] == t_use
+		 || ts[8] == t_require)) {
 			ipsec_errcode = EIPSEC_INVAL_LEVEL;
 			return NULL;
 		}
@@ -300,7 +315,7 @@ breakbreak:
 		return NULL;
 	}
 
-	if (parse_setreq(pbuf, values[ts[0]], values[ts[2]], values[ts[6]],
+	if (parse_setreq(pbuf, values[ts[0]], values[ts[2]], values[ts[8]],
 			(struct sockaddr *)&src, (struct sockaddr *)&dst) < 0) {
 		/* parse_setreq updates ipsec_errcode */
 		return NULL;
@@ -310,27 +325,24 @@ breakbreak:
 
 parseerror:
 	ipsec_errcode = EIPSEC_NO_ERROR;	/*sentinel*/
-	switch (i) {
-	case 0:
+	if (i == 0)
 		ipsec_errcode = EIPSEC_NO_PROTO;
-		break;
-	case 1:
-	case 2:
-		if (!(ts[0] == t_esp || ts[0] == t_ah || ts[0] == t_ipcomp))
-			ipsec_errcode = EIPSEC_INVAL_PROTO;
-		if (i == 1)
-			break;
-		if (!(ts[1] == t_default || ts[1] == t_use
-		 || ts[1] == t_require)) {
-			ipsec_errcode = EIPSEC_INVAL_LEVEL;
-		}
-		break;
-	}
-	if (ipsec_errcode == EIPSEC_NO_ERROR)
+	else if (i > 0
+	      && !(ts[0] == t_esp || ts[0] == t_ah || ts[0] == t_ipcomp)) {
+		ipsec_errcode = EIPSEC_INVAL_PROTO;
+	} else if (i > 2 && !(ts[2] == t_transport || ts[2] == t_tunnel))
+		ipsec_errcode = EIPSEC_INVAL_MODE;
+	else if (i < 8)
+		ipsec_errcode = EIPSEC_INVAL_ADDRESS;
+	else if (i > 8 &&
+		 !(ts[8] == t_default || ts[8] == t_use || ts[8] == t_require)) {
+		ipsec_errcode = EIPSEC_INVAL_LEVEL;
+	} else 
 		ipsec_errcode = EIPSEC_INVAL_LEVEL;	/*XXX*/
 	return NULL;
 }
 
+#if 0
 static char *
 parse_addresses(src, dst, p)
 	struct sockaddr *src, *dst;
@@ -363,6 +375,7 @@ parse_addresses(src, dst, p)
 
 	return p;
 }
+#endif
 
 static char *
 parse_policy(pbuf, p)
@@ -458,7 +471,7 @@ get_sockaddr(host, addr)
 
 	/* find the next delimiter */
 	p = host;
-	while (p && *p && !isspace(*p) && *p != '/')
+	while (p && *p && !isspace(*p) && *p != '/' && *p != '-')
 		p++;
 	if (p == host)
 		return NULL;
