@@ -12,7 +12,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- *	$Id: ip6_fw.c,v 1.5 1999/08/12 09:34:14 itojun Exp $
+ *	$Id: ip6_fw.c,v 1.6 1999/08/12 09:42:32 itojun Exp $
  */
 
 /*
@@ -69,7 +69,9 @@
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <vm/vm.h>
 #endif
+#ifdef __FreeBSD__
 #include <sys/sysctl.h>
+#endif
 
 #include <net/net_osdep.h>
 
