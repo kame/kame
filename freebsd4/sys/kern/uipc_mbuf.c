@@ -746,7 +746,7 @@ m_prepend(m, len, how)
 		return ((struct mbuf *)NULL);
 	}
 	if (m->m_flags & M_PKTHDR) {
-		M_COPY_PKTHDR(mn, m);
+		M_MOVE_PKTHDR(mn, m);
 		m->m_flags &= ~M_PKTHDR;
 	}
 	mn->m_next = m;
@@ -1165,7 +1165,7 @@ m_pullup(n, len)
 			goto bad;
 		m->m_len = 0;
 		if (n->m_flags & M_PKTHDR) {
-			M_COPY_PKTHDR(m, n);
+			M_MOVE_PKTHDR(m, n);
 			n->m_flags &= ~M_PKTHDR;
 		}
 	}
