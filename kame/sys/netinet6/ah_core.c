@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.50 2002/09/11 03:45:31 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.51 2002/09/11 05:58:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -834,7 +834,7 @@ ah_hmac_sha2_256_init(state, sav)
 static void
 ah_hmac_sha2_256_loop(state, addr, len)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t *addr;
 	size_t len;
 {
 	SHA256_CTX *ctxt;
@@ -849,7 +849,7 @@ ah_hmac_sha2_256_loop(state, addr, len)
 static void
 ah_hmac_sha2_256_result(state, addr)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t *addr;
 {
 	u_char digest[SHA256_DIGEST_LENGTH];
 	u_char *ipad;
@@ -967,7 +967,7 @@ ah_hmac_sha2_384_init(state, sav)
 static void
 ah_hmac_sha2_384_loop(state, addr, len)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t *addr;
 	size_t len;
 {
 	SHA384_CTX *ctxt;
@@ -982,7 +982,7 @@ ah_hmac_sha2_384_loop(state, addr, len)
 static void
 ah_hmac_sha2_384_result(state, addr)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t *addr;
 {
 	u_char digest[SHA384_DIGEST_LENGTH];
 	u_char *ipad;
@@ -1100,7 +1100,7 @@ ah_hmac_sha2_512_init(state, sav)
 static void
 ah_hmac_sha2_512_loop(state, addr, len)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t *addr;
 	size_t len;
 {
 	SHA512_CTX *ctxt;
@@ -1115,7 +1115,7 @@ ah_hmac_sha2_512_loop(state, addr, len)
 static void
 ah_hmac_sha2_512_result(state, addr)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t *addr;
 {
 	u_char digest[SHA512_DIGEST_LENGTH];
 	u_char *ipad;
