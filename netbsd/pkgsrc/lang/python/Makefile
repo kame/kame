@@ -9,7 +9,7 @@ EXTRACT_SUFX=	.tgz
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
 		ftp://ftp.v6.kame.net/pub/kame/misc/
-PATCHFILES=	python-152-v6-19990420.diff.gz
+PATCHFILES=	python-152-v6-20000120.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@kame.net
