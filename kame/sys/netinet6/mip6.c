@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.195 2003/01/29 12:28:16 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.196 2003/01/29 15:57:49 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2660,8 +2660,8 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa, status)
 			 __FILE__, __LINE__, mopt->valid_options));
 		return (EINVAL);
 	}
-	if (*status = mip6_calculate_kbm_from_index(hoa_sa, coa_sa, mopt->mopt_ho_nonce_idx, 
-			mopt->mopt_co_nonce_idx, key_bm)) {
+	if ((*status = mip6_calculate_kbm_from_index(hoa_sa, coa_sa, mopt->mopt_ho_nonce_idx, 
+			mopt->mopt_co_nonce_idx, key_bm))) {
 		return (EINVAL);
 	}
 
