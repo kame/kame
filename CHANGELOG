@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.156 1999/10/05 10:16:26 jinmei Exp $
+$Id: CHANGELOG,v 1.157 1999/10/05 11:49:17 itojun Exp $
 
 <199910>
+Tue Oct  5 20:46:33 JST 1999  itojun@iijlab.net
+	* bsdi3/sys/i386/isa/if_mz.c: drop faulty multicast loopback packet
+	  on promiscuous mode.  this is to make the driver always behave as
+	  IFF_SIMPLEX.
+
 1999-10-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd*/*/netstat/inet6.c (ip6_ifstats): added the case of
 	ifs6_in_truncated to be printed, which was just forgotten so far.
