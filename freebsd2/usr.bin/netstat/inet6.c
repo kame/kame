@@ -47,7 +47,7 @@ static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
-#include <netinet6/in6_systm.h>
+#include <netinet/in_systm.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/tcp6.h>
@@ -112,7 +112,7 @@ ip6protopr(off, name)
 			printf("???\n");
 			break;
 		}
-		if (!aflag && IN6_IS_ADDR_ANY(&in6pcb.in6p_laddr)) {
+		if (!aflag && IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_laddr)) {
 			prev = next;
 			continue;
 		}
