@@ -170,7 +170,7 @@ static CONST		char *modeString		=MOD_STRING;
 #define		CHECK_TABLE		0		/* nonzero --> compare against "slow" table */
 #define		VALIDATE_PARMS	0		/* disable for full speed */
 
-#include	"debug.h"				/* debug display macros */
+#include	<crypto/twofish/debug.h>				/* debug display macros */
 
 /* end of debug macros */
 
