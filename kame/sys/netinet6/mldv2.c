@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.3 2004/02/06 07:56:48 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.4 2004/02/06 08:52:32 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -408,12 +408,14 @@ mld6_start_listening(in6m, type)
 		in6m->in6m_state = MLD_OTHERLISTENER;
 	} else {
 		if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
-			mldlog((LOG_DEBUG, "mld_start_listening: send v2 report for %s\n",
+			mldlog((LOG_DEBUG,
+			    "mld_start_listening: send v2 report for %s\n",
 			    ip6_sprintf(&in6m->in6m_addr)));
 			mld_send_state_change_report(&m, &buflen, in6m,
 			    type, timer_init);
 		} else {
-			mldlog((LOG_DEBUG, "mld_start_listening: send v1 report for %s\n",
+			mldlog((LOG_DEBUG,
+			    "mld_start_listening: send v1 report for %s\n",
 			    ip6_sprintf(&in6m->in6m_addr)));
 			mld6_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
 			in6m->in6m_timer =
@@ -528,7 +530,9 @@ mld6_input(m, off)
 
 	rt6i = find_rt6i(ifp);
 	if (rt6i == NULL) {
-		mldlog((LOG_DEBUG, "mld_input(): cannot find router6_info at link#%d\n", ifp->if_index));
+		mldlog((LOG_DEBUG,
+			"mld_input(): cannot find router6_info at link#%d\n",
+			ifp->if_index));
 		goto end;
 	}
 
@@ -739,16 +743,16 @@ mld6_fasttimeo()
 
 	if (mld_interface_timers_are_running) {
 		mld_interface_timers_are_running = 0;
-		for (rt6i = Head6;
-		     rt6i;
-		     rt6i = rt6i->rt6i_next) {
+		for (rt6i = Head6; rt6i; rt6i = rt6i->rt6i_next) {
 			if (rt6i->rt6i_timer2 == 0)
-				; /* do nothing */
-			else if (--rt6i->rt6i_timer2 == 0)
-				mld_send_all_current_state_report
-						(rt6i->rt6i_ifp);
-			else
+				continue; /* do nothing */
+
+			rt6i->rt6i_timer2--;
+			if (rt6i->rt6i_timer2 > 0) {
 				mld_interface_timers_are_running = 1;
+				continue;
+			}
+			mld_send_all_current_state_report(rt6i->rt6i_ifp);
 		}
 	}
 
@@ -781,17 +785,14 @@ mld6_fasttimeo()
 			mldlog((LOG_DEBUG, "mld_fasttimeo: v1 report\n"));
 			mld6_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
 			in6m->in6m_state = MLD_IREPORTEDLAST;
-		} else if ((in6m->in6m_state
-			    == MLD_G_QUERY_PENDING_MEMBER) ||
-			   (in6m->in6m_state
-			    == MLD_SG_QUERY_PENDING_MEMBER)) {
-			if ((cm != NULL) && (ifp != in6m->in6m_ifp)) {
+		} else if (in6m->in6m_state == MLD_G_QUERY_PENDING_MEMBER ||
+			   in6m->in6m_state == MLD_SG_QUERY_PENDING_MEMBER) {
+			if (cm != NULL && ifp != in6m->in6m_ifp) {
 				mldlog((LOG_DEBUG, "mld_fasttimeo: v2 report\n"));
 				mld_sendbuf(cm, ifp);
 				cm = NULL;
 			}
-			(void)mld_send_current_state_report
-				(&cm, &cbuflen, in6m);
+			mld_send_current_state_report(&cm, &cbuflen, in6m);
 			ifp = in6m->in6m_ifp;
 			in6m->in6m_state = MLD_OTHERLISTENER;
 		}
@@ -812,7 +813,7 @@ mld6_fasttimeo()
 			goto next_in6m;
 		}
 
-		if ((sm != NULL) && (ifp != in6m->in6m_ifp)) {
+		if (sm != NULL && ifp != in6m->in6m_ifp) {
 			mld_sendbuf(sm, ifp);
 			sm = NULL;
 		}
@@ -826,12 +827,10 @@ mld6_fasttimeo()
 		mldlog((LOG_DEBUG, "mld_fasttimeo: handles pending report\n"));
 		if (in6m->in6m_source->i6ms_robvar
 		    == in6m->in6m_rti->rt6i_qrv) {
-			mld_send_state_change_report(&sm, &sbuflen,
-						     in6m, (u_int8_t)0, (int)1);
+			mld_send_state_change_report(&sm, &sbuflen, in6m, 0, 1);
 			sm = NULL;
 		} else if (in6m->in6m_source->i6ms_robvar > 0) {
-			mld_send_state_change_report(&sm, &sbuflen,
-						     in6m, (u_int8_t)0, (int)0);
+			mld_send_state_change_report(&sm, &sbuflen, in6m, 0, 0);
 			ifp = in6m->in6m_ifp;
 		}
 
@@ -943,11 +942,8 @@ mld6_sendpkt(in6m, type, dst)
 		break;
 	}
 
-	ip6_output(mh, &ip6_opts, NULL, ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-		   ,NULL
-#endif
-		   );
+	ip6_output(mh, &ip6_opts, NULL,
+		   ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL, NULL);
 }
 
 static struct mld_hdr *
@@ -1093,11 +1089,8 @@ mld_sendbuf(mh, ifp)
 
 	/* XXX: ToDo: create MLDv2 statistics field */
 	icmp6_ifstat_inc(ifp, ifs6_out_mldreport);
-	ip6_output(mh, &ip6_opts, NULL, ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-		   , NULL
-#endif
-		  );
+	ip6_output(mh, &ip6_opts, NULL,
+		   ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL, NULL);
 }
 
 
@@ -1297,7 +1290,9 @@ mld_set_hostcompat(ifp, rti, query_ver)
 	int s = splnet();
 #endif
 
-	mldlog((LOG_DEBUG, "mld_set_compat: query_ver=%d for %s\n", query_ver, if_name(ifp)));
+	mldlog((LOG_DEBUG,
+		"mld_set_compat: query_ver=%d for %s\n",
+		query_ver, if_name(ifp)));
 	/*
 	 * Keep Older Version Querier Present timer.
 	 */
@@ -1315,7 +1310,8 @@ mld_set_hostcompat(ifp, rti, query_ver)
 	mldlog((LOG_DEBUG, "mld_set_compat: timer=%d\n", rti->rt6i_timer1));
 	if (rti->rt6i_timer1 > 0) {
 		if (rti->rt6i_type != MLD_V1_ROUTER) {
-			mldlog((LOG_DEBUG, "mld_set_compat: set timer to MLDv1-compat mode\n"));
+			mldlog((LOG_DEBUG, "mld_set_compat: "
+				"set timer to MLDv1-compat mode\n"));
 			rti->rt6i_type = MLD_V1_ROUTER;
 			mld_cancel_pending_response(ifp, rti);
 		}
@@ -1719,7 +1715,9 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			m = NULL;
 			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 			if (mldh == NULL) {
-				mldlog((LOG_DEBUG, "mld_send_state_change_report: error preparing new report header.\n"));
+				mldlog((LOG_DEBUG,
+					"mld_send_state_change_report: "
+					"error preparing new report header.\n"));
 				return; 
 			}
 			m = *m0;
@@ -1735,7 +1733,9 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 		 */
 		if (mld_create_group_record(m, buflenp, in6m, numsrc,
 					    &src_done, type) != numsrc) {
-			mldlog((LOG_DEBUG, "mld_send_state_change_report: error of sending CHANGE_TO_EXCLUDE_MODE report?\n"));
+			mldlog((LOG_DEBUG, "mld_send_state_change_report: "
+				"error of sending "
+				"CHANGE_TO_EXCLUDE_MODE report?\n"));
 			m_freem(m);
 			return; 
 			/* XXX source address insert didn't finished.
@@ -1787,7 +1787,9 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			m = NULL;
 			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 			if (mldh == NULL) {
-				mldlog((LOG_DEBUG, "mld_send_state_change_report: error preparing additional report header.\n"));
+				mldlog((LOG_DEBUG,
+					"mld_send_state_change_report: "
+					"error preparing additional report header.\n"));
 				return;
 			}
 			m = *m0;
@@ -1852,10 +1854,14 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 		if (numsrc > src_done) {
 			mld_sendbuf(m, in6m->in6m_ifp);
 			m = NULL;
-			mldlog((LOG_DEBUG, "mld_send_current_state_report: re-allocbuf4\n"));
+			mldlog((LOG_DEBUG,
+				"mld_send_current_state_report: "
+				"re-allocbuf4\n"));
 			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 			if (mldh == NULL) {
-				mldlog((LOG_DEBUG, "mld_send_state_change_report: error preparing additional report header.\n"));
+				mldlog((LOG_DEBUG, 
+					"mld_send_state_change_report: "
+					"error preparing additional report header.\n"));
 				return;
 			}
 			m = *m0;
@@ -2139,8 +2145,9 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 		 * Add each source address to in6m_source and get new source
 		 * filter mode and its calculated source list.
 		 */
-		if ((*errorp = in6_addmultisrc(in6m, numsrc, src, mode, init,
-		    &newhead, &newmode, &newnumsrc)) != 0) {
+		*errorp = in6_addmultisrc(in6m, numsrc, src, mode, init,
+					  &newhead, &newmode, &newnumsrc);
+		if (*errorp != 0) {
 			splx(s);
 			return NULL;
 		}
@@ -2149,8 +2156,9 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 			 * Merge new source list to current pending report's
 			 * source list.
 			 */
-			if ((*errorp = in6_merge_msf_state(in6m, newhead,
-			    newmode, newnumsrc)) > 0) {
+			*errorp = in6_merge_msf_state(in6m, newhead, newmode,
+						      newnumsrc);
+			if (*errorp > 0) {
 				/* State-Change Report will not be sent.
 				 * Just return immediately. */
 				/* Each ias linked from newhead is used by new
@@ -2197,10 +2205,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 		*errorp = 0;
 		/* for this group address, init join request by the socket. */
 		if (init)
-		/*
-		 * Found it; just increment the refrence count.
-		 */
-		in6m->in6m_refcount++;
+			in6m->in6m_refcount++;
 	} else {
 		/*
 		 * New address; allocate a new multicast record
@@ -2526,8 +2531,9 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 		if (IN6_IS_LOCAL_GROUP(&in6m->in6m_addr)) {
 			if (numsrc != 0) {
 				mldlog((LOG_DEBUG,
-				    "in6_modmulti: source filter not supported for %s\n",
-				   ip6_sprintf(&in6m->in6m_addr)));
+				    "in6_modmulti: "
+				    "source filter not supported for %s\n",
+				    ip6_sprintf(&in6m->in6m_addr)));
 				splx(s);
 				*error = EINVAL;
 				return NULL;
@@ -2568,9 +2574,10 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 
 		curmode = in6m->in6m_source->i6ms_mode;
 		curnumsrc = in6m->in6m_source->i6ms_cur->numsrc;
-		if ((*error = in6_modmultisrc(in6m, numsrc, src, mode,
-		    old_num, old_src, old_mode, grpjoin, &newhead, &newmode,
-		    &newnumsrc)) != 0) {
+		*error = in6_modmultisrc(in6m, numsrc, src, mode, old_num,
+					 old_src, old_mode, grpjoin,
+					 &newhead, &newmode, &newnumsrc);
+		if (*error != 0) {
 			splx(s);
 			return NULL;
 		}
@@ -2579,8 +2586,9 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 			 * Merge new source list to current pending report's
 			 * source list.
 			 */
-			if ((*error = in6_merge_msf_state(in6m, newhead,
-			    newmode, newnumsrc)) > 0) {
+			*error = in6_merge_msf_state(in6m, newhead, newmode,
+						     newnumsrc);
+			if (*error > 0) {
 				/*
 				 * State-Change Report will not be sent.
 				 * Just return immediately.
@@ -3303,7 +3311,9 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 		}
 		if (ifma->ifma_protospec != NULL) {
 			mldlog((LOG_DEBUG,
-			    "in6_modmulti: there's a corresponding if_multiaddr although IN6_LOOKUP_MULTI fails \n"));
+			    "in6_modmulti: "
+			    "there's a corresponding if_multiaddr "
+			    "although IN6_LOOKUP_MULTI fails \n"));
 			free(in6m, M_IPMADDR);
 			splx(s);
 			return NULL;
@@ -3339,9 +3349,10 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 			return in6m;
 		}
 
-		if ((*error = in6_modmultisrc(in6m, numsrc, src, mode, 0, NULL,
-		    MCAST_INCLUDE, grpjoin, &newhead, &newmode,
-		    &newnumsrc)) != 0) {
+		*error = in6_modmultisrc(in6m, numsrc, src, mode, 0, NULL,
+					MCAST_INCLUDE, grpjoin, &newhead,
+					&newmode, &newnumsrc);
+		if (*error != 0) {
 			in6_free_all_msf_source_list(in6m);
 			LIST_REMOVE(in6m, in6m_entry);
 			free(in6m, M_IPMADDR);
@@ -3414,7 +3425,7 @@ in6_joingroup(ifp, addr, errorp)
 		return NULL;
 	}
 	imm->i6mm_maddr = in6_addmulti2(addr, ifp, errorp, 0, NULL,
-	    MCAST_EXCLUDE, 1);
+					MCAST_EXCLUDE, 1);
 	imm->i6mm_msf->msf_grpjoin++;
 	if (*errorp != 0) {
 		IMO_MSF_FREE(imm->i6mm_msf);
