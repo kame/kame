@@ -22,14 +22,6 @@ DPADD+=	-L${.OBJDIR}/../../../lib/libinet6/libinet6.a \
 	-L/usr/local/v6/lib/libinet6.a
 LDADD+= -lcrypto
 DPADD+= ${LIBCRYPTO}
-# for USA resident
-.if exists(/usr/local/lib/libRSAglue.a) && exists(/usr/local/lib/librsaref.a)
-LDADD+=	-L/usr/local/lib -lRSAglue -lrsaref
-DPADD+=	/usr/local/lib/libRSAglue.a /usr/local/lib/librsaref.a
-.elif exists(/usr/lib/libRSAglue.a) && exists(/usr/local/lib/librsaref.a)
-LDADD+=	-lRSAglue -L/usr/local/lib -lrsaref
-DPADD+=	/usr/lib/libRSAglue.a /usr/local/lib/librsaref.a
-.endif
 
 .PATH:	${SRCDIR} ${SRCDIR}/../tcpdump
 
