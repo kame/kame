@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.27 1999/08/19 00:25:55 itojun Exp $
+$Id: CHANGELOG,v 1.28 1999/08/19 05:43:20 itojun Exp $
 
 <199908>
 Thu Aug 19 00:38:02 JST 1999  itojun@iijlab.net
@@ -15,6 +15,10 @@ Wed Aug 18 22:02:14 JST 1999  itojun@iijlab.net
 
 	  NOTE: rebuild all userland tools as struct in6_ifreq is changed
 	  its size.
+	  NOTE: for forwarding case, we count on wrong interface (to fix this
+	  we need to do an extra routing table lookup).
+	  NOTE: in some cases we are unable to increment counter, because
+	  there's no route for packet (hence interface).
 
 1999-08-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/libinet6/ip6opt.c (inet6_option_append, inet6_option_alloc): 
