@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.333 2002/09/17 05:56:52 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.334 2002/09/23 13:20:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1774,7 +1774,7 @@ ip6_insert_jumboopt(exthdrs, plen)
 			mopt->m_len += JUMBOOPTLEN;
 		}
 		optbuf[0] = IP6OPT_PADN;
-		optbuf[1] = 1;
+		optbuf[1] = 0;
 
 		/*
 		 * Adjust the header length according to the pad and
