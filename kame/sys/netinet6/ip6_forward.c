@@ -321,7 +321,8 @@ ip6_forward(m, srcrt)
 	if (rt->rt_flags & RTF_GATEWAY)
 		dst = (struct sockaddr_in6 *)rt->rt_gateway;
 	/*
-	 * Save at most 528 bytes of the packet in case
+	 * Save at most ICMPV6_PLD_MAXLEN (= the min IPv6 MTU -
+	 * size of IPv6 + ICMPv6 headers) bytes of the packet in case
 	 * we need to generate an ICMP6 message to the src.
 	 * Thanks to M_EXT, in most cases copy will not occur.
 	 */
