@@ -1,4 +1,8 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2033 2002/01/02 07:08:18 jinmei Exp $
+$KAME: CHANGELOG,v 1.2034 2002/01/02 07:09:26 jinmei Exp $
 
 <200201>
+2002-01-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.h: restricted the use of
+	IPV6_RECVRTHDRDSTOPTS in the kernel.  This option was obsoleted in
+	rfc2292bis-03.
