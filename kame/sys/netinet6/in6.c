@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.204 2001/07/24 07:14:29 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.205 2001/07/24 07:45:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -740,7 +740,7 @@ in6_control(so, cmd, data, ifp)
 			if ((error = nd6_prelist_add(&pr0, NULL, &pr)) != 0)
 				return(error);
 			if (pr == NULL) {
-				log(LOG_ERR, "nd6_prelist_add succedded but "
+				log(LOG_ERR, "nd6_prelist_add succeeded but "
 				    "no prefix\n");
 				return(EINVAL); /* XXX panic here? */
 			}
