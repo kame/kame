@@ -123,7 +123,7 @@ struct mbuf {
 #define	M_PKTHDR	0x0002	/* start of record */
 #define	M_EOR		0x0004	/* end of record */
 #define	M_PROTO1	0x0008	/* protocol-specific */
-#define	M_MIP6TUNNEL	0x0010	/* MIP6 temporary use */
+#define	M_PROTO2	0x0010	/* protocol-specific */
 #define	M_PROTO3	0x0020	/* protocol-specific */
 #define	M_PROTO4	0x0040	/* protocol-specific */
 #define	M_PROTO5	0x0080	/* protocol-specific */
@@ -132,13 +132,10 @@ struct mbuf {
 #define	M_BCAST		0x0100	/* send/received as link-level broadcast */
 #define	M_MCAST		0x0200	/* send/received as link-level multicast */
 #define	M_FRAG		0x0400	/* packet is a fragment of a larger packet */
-#define	M_ANYCAST6	0x0800	/* received as IPv6 anycast */
-#define	M_LOOP		0x4000	/* for Mbuf statistics */
 
 /* flags copied when copying m_pkthdr */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_PROTO1|M_MIP6TUNNEL|M_PROTO3 | \
-			    M_PROTO4|M_PROTO5|M_BCAST|M_MCAST|M_FRAG | \
-			    M_ANYCAST6|M_LOOP)
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_PROTO1|M_PROTO2|M_PROTO3 | \
+			    M_PROTO4|M_PROTO5|M_BCAST|M_MCAST|M_FRAG)
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */

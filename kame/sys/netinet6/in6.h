@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.41 2000/03/29 03:45:56 sumikawa Exp $	*/
+/*	$KAME: in6.h,v 1.42 2000/05/08 08:03:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -640,6 +640,17 @@ struct in6_pktinfo {
 }
 #endif
 #endif /* !_XOPEN_SOURCE */
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+/*
+ * Redefinition of mbuf flags
+ */
+#define	M_ANYCAST6	M_PROTO1
+#define	M_AUTHIPHDR	M_PROTO2
+#define	M_DECRYPTED	M_PROTO3
+#define	M_LOOP		M_PROTO4
+#define	M_AUTHIPDGM	M_PROTO5
+#endif
 
 #ifdef _KERNEL
 struct cmsghdr;
