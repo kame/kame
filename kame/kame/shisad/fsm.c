@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.11 2005/01/27 07:44:46 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.12 2005/02/28 22:39:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2309,8 +2309,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
                 return (-1);
 	}
 	/* check the status code */
-	if ((ip6mhba->ip6mhba_status != IP6_MH_BAS_ACCEPTED)
-	    && (ip6mhba->ip6mhba_status != IP6_MH_BAS_PRFX_DISCOV)) {
+	if (ip6mhba->ip6mhba_status >= IP6_MH_BAS_ERRORBASE) {
 		syslog(LOG_NOTICE,
 		    "bul_fsm_back_preprocess:"
 		    "received an error status %d.\n",
