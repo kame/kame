@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.24 2000/04/24 18:34:42 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.25 2000/04/24 20:01:15 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -309,12 +309,6 @@ quick_i2recv(iph2, msg0)
 
 	/* create buffer for validating HASH(2) */
 	/*
-	 * ISAKMP_ETYPE_QUICK, INITIATOR, PHASE2ST_EX2SENT
-	 * ISAKMP_NPTYPE_HASH, ISAKMP_NPTYPE_SA
-	 * ISAKMP_NPTYPE_NONCE,
-	 * (ISAKMP_NPTYPE_KE), (ISAKMP_NPTYPE_ID, ISAKMP_NPTYPE_ID)
-	 * (ISAKMP_NPTYPE_N)
-	 *
 	 * ordering rule:
 	 *	1. the first one must be HASH
 	 *	2. the second one must be SA (added in isakmp-oakley-05!)
@@ -678,10 +672,6 @@ quick_i3recv(iph2, msg0)
 		goto end;
 
 	/* validate the type of next payload */
-	/*
-	 * ISAKMP_ETYPE_QUICK, RESPONDER, PHASE2ST_COMMIT
-	 * ISAKMP_NPTYPE_HASH, (ISAKMP_NPTYPE_N), ISAKMP_NPTYPE_NONE
-	 */
 	pbuf = isakmp_parse(msg);
 	if (pbuf == NULL)
 		goto end;
@@ -832,12 +822,6 @@ quick_r1recv(iph2, msg0)
 
 	/* create buffer for using to validate HASH(1) */
 	/*
-	 * ISAKMP_ETYPE_QUICK, INITIATOR
-	 * ISAKMP_NPTYPE_HASH, ISAKMP_NPTYPE_SA
-	 * ISAKMP_NPTYPE_NONCE,
-	 * (ISAKMP_NPTYPE_KE), (ISAKMP_NPTYPE_ID, ISAKMP_NPTYPE_ID)
-	 * (ISAKMP_NPTYPE_N)
-	 *
 	 * ordering rule:
 	 *	1. the first one must be HASH
 	 *	2. the second one must be SA (added in isakmp-oakley-05!)
@@ -1303,10 +1287,6 @@ quick_r3recv(iph2, msg0)
 		goto end;
 
 	/* validate the type of next payload */
-	/*
-	 * ISAKMP_ETYPE_QUICK, RESPONDER, PHASE2ST_EX2SENT
-	 * ISAKMP_NPTYPE_HASH, (ISAKMP_NPTYPE_N), ISAKMP_NPTYPE_NONE
-	 */
 	pbuf = isakmp_parse(msg);
 	if (pbuf == NULL)
 		goto end;

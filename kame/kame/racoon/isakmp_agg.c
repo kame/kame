@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.20 2000/04/18 12:20:11 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.21 2000/04/24 20:01:15 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -494,12 +494,6 @@ agg_r1recv(iph1, msg)
 	}
 
 	/* validate the type of next payload */
-	/*
-	 * ISAKMP_ETYPE_AGG, RESPONDER, PHASE1ST_ESTABLISHED
-	 * ISAKMP_NPTYPE_SA,
-	 * ISAKMP_NPTYPE_KE, ISAKMP_NPTYPE_NONCE, ISAKMP_NPTYPE_ID,
-	 * ISAKMP_NPTYPE_HASH, (ISAKMP_NPTYPE_VID), ISAKMP_NPTYPE_NONE
-	 */
 	pbuf = isakmp_parse(msg);
 	if (pbuf == NULL)
 		goto end;

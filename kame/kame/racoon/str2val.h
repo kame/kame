@@ -26,10 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: str2val.h,v 1.1 2000/01/09 01:31:33 itojun Exp $ */
+/* YIPS @(#)$Id: str2val.h,v 1.2 2000/04/24 19:57:24 sakane Exp $ */
 
 extern caddr_t val2str __P((const char *buf, size_t mlen));
 extern char *str2val __P((char *str, int base, size_t *len));
-#if 0
-extern caddr_t hexstr2val __P((caddr_t buf, size_t len));
-#endif

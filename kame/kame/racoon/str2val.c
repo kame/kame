@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: str2val.c,v 1.3 2000/02/07 11:36:17 itojun Exp $ */
+/* YIPS @(#)$Id: str2val.c,v 1.4 2000/04/24 19:57:24 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -118,28 +118,3 @@ str2val(str, base, len)
 	return(dst);
 }
 
-#if 0
-/*
- * exchange hex string to value.
- */
-caddr_t
-hexstr2val(buf, len)
-	caddr_t buf;
-	size_t len;
-{
-	caddr_t res, bp;
-	caddr_t p = buf;
-
-	if ((res = malloc(len)) == 0)
-		return(0);
-	memset(res, 0, len);
-
-	bp = res;
-	while (*p) {
-		*bp = (ATOX(p[0]) << 4) | ATOX(p[1]);
-		p += 2, bp++;
-	}
-
-	return(res);
-}
-#endif

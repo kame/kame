@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.13 2000/04/18 12:20:11 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.14 2000/04/24 20:01:15 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -191,11 +191,6 @@ base_i2recv(iph1, msg)
 	}
 
 	/* validate the type of next payload */
-	/*
-	 * ISAKMP_ETYPE_BASE, INITIATOR
-	 * ISAKMP_NPTYPE_SA,
-	 * (ISAKMP_NPTYPE_VID), ISAKMP_NPTYPE_NONE
-	 */
 	pbuf = isakmp_parse(msg);
 	if (pbuf == NULL)
 		goto end;
@@ -362,11 +357,6 @@ base_i3recv(iph1, msg)
 	}
 
 	/* validate the type of next payload */
-	/*
-	 * ISAKMP_ETYPE_IDENT, INITIATOR
-	 * ISAKMP_NPTYPE_KE, ISAKMP_NPTYPE_NONCE, ISAKMP_NPTYPE_NONE
-	 * (ISAKMP_NPTYPE_VID)
-	 */
 	pbuf = isakmp_parse(msg);
 	if (pbuf == NULL)
 		goto end;
@@ -493,9 +483,6 @@ base_r1recv(iph1, msg)
 
 	/* validate the type of next payload */
 	/*
-	 * ISAKMP_ETYPE_BASE, RESPONDER,
-	 * ISAKMP_NPTYPE_SA, (ISAKMP_NPTYPE_VID,) ISAKMP_NPTYPE_NONE
-	 *
 	 * NOTE: XXX even if multiple VID, we'll silently ignore those.
 	 */
 	pbuf = isakmp_parse(msg);
@@ -689,11 +676,6 @@ base_r2recv(iph1, msg)
 	}
 
 	/* validate the type of next payload */
-	/*
-	 * ISAKMP_ETYPE_IDENT, RESPONDER
-	 * ISAKMP_NPTYPE_KE, ISAKMP_NPTYPE_NONCE, ISAKMP_NPTYPE_NONE
-	 * (ISAKMP_NPTYPE_VID)
-	 */
 	pbuf = isakmp_parse(msg);
 	if (pbuf == NULL)
 		goto end;

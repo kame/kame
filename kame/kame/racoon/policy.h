@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.h,v 1.10 2000/04/24 14:25:47 sakane Exp $ */
+/* YIPS @(#)$Id: policy.h,v 1.11 2000/04/24 19:57:24 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -81,9 +81,6 @@ struct ipsecrequest {
 				/* if __ss_len == 0 then no address specified.*/
 	u_int level;		/* IPsec level defined below. */
 
-#if 0
-	struct secasvar *sav;	/* place holder of SA for use */
-#endif
 	struct secpolicy *sp;	/* back pointer to SP */
 };
 
@@ -100,11 +97,7 @@ do {                                                                         \
 
 struct ph2handle;
 extern struct secpolicy *getsp __P((struct policyindex *));
-#if 1
 extern struct secpolicy *getsp_r __P((struct policyindex *));
-#else
-extern struct secpolicy *getsp_r __P((struct policyindex *, struct ph2handle *));
-#endif
 struct secpolicy *getspbyspid __P((u_int32_t));
 extern int cmpspidx __P((struct policyindex *, struct policyindex *));
 extern int cmpspidx_wild __P((struct policyindex *, struct policyindex *));

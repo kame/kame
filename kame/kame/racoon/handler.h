@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.16 2000/04/24 07:37:43 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.17 2000/04/24 19:57:24 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -202,11 +202,6 @@ struct ph2handle {
 	struct sockaddr *dst;		/* peer's address of SA. */
 
 	u_int32_t spid;			/* policy id by kernel */
-#if 0
-	struct policyindex *spidx;	/* pointer to policy */
-			/* initiator set when get acquire msg.
-			 * responder set after check 1st phase 2 msg. */
-#endif
 
 	int status;			/* ipsec sa status */
 	u_int8_t side;			/* INITIATOR or RESPONDER */

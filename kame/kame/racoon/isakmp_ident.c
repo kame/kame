@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.21 2000/04/18 12:20:11 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.22 2000/04/24 20:01:15 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -176,10 +176,6 @@ ident_i2recv(iph1, msg)
 
 	/* validate the type of next payload */
 	/*
-	 * ISAKMP_ETYPE_IDENT, INITIATOR
-	 * ISAKMP_NPTYPE_SA,
-	 * (ISAKMP_NPTYPE_VID), ISAKMP_NPTYPE_NONE
-	 *
 	 * NOTE: RedCreek(as responder) attaches N[responder-lifetime] here,
 	 *	if proposal-lifetime > lifetime-redcreek-wants.
 	 *	(see doi-08 4.5.4)
@@ -329,11 +325,6 @@ ident_i3recv(iph1, msg)
 	}
 
 	/* validate the type of next payload */
-	/*
-	 * ISAKMP_ETYPE_IDENT, INITIATOR
-	 * ISAKMP_NPTYPE_KE, ISAKMP_NPTYPE_NONCE, ISAKMP_NPTYPE_NONE
-	 * (ISAKMP_NPTYPE_VID)
-	 */
 	pbuf = isakmp_parse(msg);
 	if (pbuf == NULL)
 		goto end;
@@ -493,11 +484,6 @@ ident_i4recv(iph1, msg0)
 		goto end;
 
 	/* validate the type of next payload */
-	/*
-	 * ISAKMP_ETYPE_IDENT, INITIATOR
-	 * ISAKMP_NPTYPE_ID, ISAKMP_NPTYPE_HASH, ISAKMP_NPTYPE_NONE
-	 * (ISAKMP_NPTYPE_VID), (ISAKMP_NPTYPE_N)
-	 */
 	pbuf = isakmp_parse(msg);
 	if (pbuf == NULL)
 		goto end;
@@ -655,9 +641,6 @@ ident_r1recv(iph1, msg)
 
 	/* validate the type of next payload */
 	/*
-	 * ISAKMP_ETYPE_IDENT, RESPONDER, PHASE1_STATE_ESTABLISHED
-	 * ISAKMP_NPTYPE_SA, (ISAKMP_NPTYPE_VID,) ISAKMP_NPTYPE_NONE
-	 *
 	 * NOTE: XXX even if multiple VID, we'll silently ignore those.
 	 */
 	pbuf = isakmp_parse(msg);
@@ -822,11 +805,6 @@ ident_r2recv(iph1, msg)
 	}
 
 	/* validate the type of next payload */
-	/*
-	 * ISAKMP_ETYPE_IDENT, RESPONDER
-	 * ISAKMP_NPTYPE_KE, ISAKMP_NPTYPE_NONCE, ISAKMP_NPTYPE_NONE
-	 * (ISAKMP_NPTYPE_VID)
-	 */
 	pbuf = isakmp_parse(msg);
 	if (pbuf == NULL)
 		goto end;
@@ -984,11 +962,6 @@ ident_r3recv(iph1, msg0)
 		goto end;
 
 	/* validate the type of next payload */
-	/*
-	 * ISAKMP_ETYPE_IDENT, RESPONDER
-	 * ISAKMP_NPTYPE_ID, ISAKMP_NPTYPE_HASH, ISAKMP_NPTYPE_NONE
-	 * (ISAKMP_NPTYPE_VID), (ISAKMP_NPTYPE_N)
-	 */
 	pbuf = isakmp_parse(msg);
 	if (pbuf == NULL)
 		goto end;
