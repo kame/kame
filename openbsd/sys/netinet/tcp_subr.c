@@ -128,7 +128,7 @@ extern int ip6_defhlim;
 #endif /* INET6 */
 
 #ifdef INET6
-void	tcp_mtudisc_callback __P((struct in6_addr *));
+void	tcp6_mtudisc_callback __P((struct in6_addr *));
 void	tcp_mtudisc __P((struct inpcb *, int));
 #endif
 
@@ -160,7 +160,7 @@ tcp_init()
 #endif /* INET6 */
 
 #if defined(INET6) && !defined(TCP6)
-	icmp6_mtudisc_callback_register(tcp_mtudisc_callback);
+	icmp6_mtudisc_callback_register(tcp6_mtudisc_callback);
 #endif
 }
 
@@ -910,7 +910,7 @@ tcp_quench(inp, errno)
  * Path MTU Discovery handlers.
  */
 void
-tcp_mtudisc_callback(faddr)
+tcp6_mtudisc_callback(faddr)
 	struct in6_addr *faddr;
 {
 	struct sockaddr_in6 sin6;
