@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.115 2003/12/08 14:53:57 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.116 2003/12/09 13:42:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -883,7 +883,7 @@ del_m6if(mifip)
 	s = splnet();
 #endif
 
-	if (mifp->m6_flags & MIFF_REGISTER && reg_mif_num != (mifi_t) -1) {
+	if ((mifp->m6_flags & MIFF_REGISTER) && reg_mif_num != (mifi_t) -1) {
 		reg_mif_num = -1;
 		if (inet6domain.dom_ifdetach) {
 			ifp = &multicast_register_if;
