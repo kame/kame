@@ -159,8 +159,10 @@ main(argc, argv)
 			setlogmask(LOG_UPTO(log_upto));
 	}
 
+#ifdef HAVE_ARC4RANDOM
 	/* random value initilization */
 	srandom((u_long)time(NULL));
+#endif
 
 	/* warn if accept_rtadv is down */
 	if (!getinet6sysctl(IPV6CTL_ACCEPT_RTADV))
@@ -504,7 +506,11 @@ rtsol_timer_update(struct ifinfo *ifinfo)
 			ifinfo->timer = tm_max;	/* stop timer(valid?) */
 		break;
 	case IFS_DELAY:
+#ifdef HAVE_ARC4RANDOM
+		interval = arc4random() % (MAX_RTR_SOLICITATION_DELAY * MILLION);
+#else
 		interval = random() % (MAX_RTR_SOLICITATION_DELAY * MILLION);
+#endif
 		ifinfo->timer.tv_sec = interval / MILLION;
 		ifinfo->timer.tv_usec = interval % MILLION;
 		break;
