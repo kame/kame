@@ -235,7 +235,7 @@ static
 #ifndef GPROF
 __inline
 #endif
-void
+int
 tcp_segsize(struct tcpcb *tp, int *txsegsizep, int *rxsegsizep)
 {
 #ifdef INET
@@ -292,9 +292,23 @@ tcp_segsize(struct tcpcb *tp, int *txsegsizep, int *rxsegsizep)
 	ifp = rt->rt_ifp;
 
 	size = tcp_mssdflt;
-	if (rt->rt_rmx.rmx_mtu != 0)
+	if (tp->t_mtudisc && rt->rt_rmx.rmx_mtu != 0) {
+#ifdef INET6
+		if (in6p && rt->rt_rmx.rmx_mtu < IPV6_MMTU) {
+			/*
+			 * RFC2460 section 5, last paragraph: if path MTU is
+			 * smaller than 1280, use 1280 as packet size and
+			 * attach fragment header.
+			 */
+			size = IPV6_MMTU - iphlen - sizeof(struct ip6_frag) -
+			    sizeof(struct tcphdr);
+		} else
+			size = rt->rt_rmx.rmx_mtu - iphlen -
+			    sizeof(struct tcphdr);
+#else
 		size = rt->rt_rmx.rmx_mtu - iphlen - sizeof(struct tcphdr);
-	else if (ifp->if_flags & IFF_LOOPBACK)
+#endif
+	} else if (ifp->if_flags & IFF_LOOPBACK)
 		size = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
 #ifdef INET
 	else if (inp && tp->t_mtudisc)
@@ -370,6 +384,10 @@ tcp_segsize(struct tcpcb *tp, int *txsegsizep, int *rxsegsizep)
 #endif
 	size -= optlen;
 
+	/* there may not be any room for data if mtu is too small */
+	if (size < 0)
+		return (EMSGSIZE);
+
 	/*
 	 * *rxsegsizep holds *estimated* inbound segment size (estimation
 	 * assumes that path MTU is the same for both ways).  this is only
@@ -407,6 +425,8 @@ tcp_segsize(struct tcpcb *tp, int *txsegsizep, int *rxsegsizep)
 		}
 		tp->t_segsz = *txsegsizep;
 	}
+
+	return (0);
 }
 
 static
@@ -540,13 +560,14 @@ tcp_output(tp)
 	case AF_INET6:
 		if (tp->t_in6pcb)
 			break;
-		return EINVAL;
+		return (EINVAL);
 #endif
 	default:
-		return EAFNOSUPPORT;
+		return (EAFNOSUPPORT);
 	}
 
-	tcp_segsize(tp, &txsegsize, &rxsegsize);
+	if (tcp_segsize(tp, &txsegsize, &rxsegsize))
+		return (EMSGSIZE);
 
 	idle = (tp->snd_max == tp->snd_una);
 
