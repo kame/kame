@@ -1,4 +1,4 @@
-/*	$KAME: parser.c,v 1.6 2001/05/30 10:30:44 kjc Exp $	*/
+/*	$KAME: parser.c,v 1.7 2001/08/06 06:55:48 itojun Exp $	*/
 /*******************************************************************
 
   Copyright (c) 1996 by the University of Southern California
@@ -459,7 +459,7 @@ static int
 get_addr(char **cpp, struct in_addr *addr, struct in_addr *mask)
 {
 	char w[128], *ocp;
-	u_long tmp;
+	struct in_addr tmp;
 	
 	addr->s_addr = 0;
 	mask->s_addr = 0xffffffff;
@@ -467,7 +467,7 @@ get_addr(char **cpp, struct in_addr *addr, struct in_addr *mask)
 	if (!next_word(cpp, w))
 		return (0);
 
-	if ((tmp = inet_addr((char *)w)) == INADDR_NONE) {
+	if (inet_aton((char *)w, &tmp) != 1) {
 		/* try gethostbyname */
 		struct hostent *h;
 
@@ -478,7 +478,7 @@ get_addr(char **cpp, struct in_addr *addr, struct in_addr *mask)
 		bcopy(h->h_addr, &tmp, (size_t)h->h_length);
 	}
 
-	addr->s_addr = tmp;
+	addr->s_addr = tmp.s_addr;
 
 	/* check if netmask option is present */
 	ocp = *cpp;
@@ -489,7 +489,7 @@ get_addr(char **cpp, struct in_addr *addr, struct in_addr *mask)
 		if (inet_aton((char *)w, (struct in_addr *)&tmp) == 0)
 			return (0);
 
-		mask->s_addr = tmp;
+		mask->s_addr = tmp.s_addr;
 		*cpp = ocp;	
 		return (1);
 	}
@@ -576,7 +576,7 @@ interface_parser(char *cmdbuf)
 	/*
 	 * Create argment list & look for scheduling discipline options.
 	 */
-	sprintf(qdisc_name, "null");
+	snprintf(qdisc_name, sizeof(qdisc_name), "null");
 	argc = 0;
 	ap = w;
 	while (next_word(&cp, ap)) {
