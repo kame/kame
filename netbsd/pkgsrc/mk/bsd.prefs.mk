@@ -5,6 +5,8 @@
 # statements, to make sure any variables defined in /etc/mk.conf or
 # $MAKECONF are used.
 
+BROKEN?=	"the tree is obsolete, should consult NetBSD pkgsrc-current"
+
 .if !defined(OPSYS)
 OPSYS!= /usr/bin/uname -s
 .endif
