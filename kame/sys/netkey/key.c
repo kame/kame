@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.155 2000/09/20 19:27:49 itojun Exp $	*/
+/*	$KAME: key.c,v 1.156 2000/09/21 04:10:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -5900,10 +5900,10 @@ key_acquire2(so, m, mhp)
 		}
 
 		if ((acq = key_getacqbyseq(mhp->msg->sadb_msg_seq)) == NULL) {
-#ifdef IPSEC_DEBUG
-			printf("key_acquire2: "
-				"invalid sequence number is passed.\n");
-#endif
+			/*
+			 * the specified larval SA is already gone, or we got
+			 * a bogus sequence number.  we can silently ignore it.
+			 */
 			m_freem(m);
 			return 0;
 		}
