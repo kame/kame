@@ -1,5 +1,10 @@
 TARGET?=	netbsd
 
+all:
+	@(echo '**** WARNING: Read through INSTALL and platform/INSTALL, '; \
+	echo '    and follow the steps documented'.; \
+	exit 1)
+
 prepare::
 	(cd ${.CURDIR}; perl prepare.pl kame ${TARGET})
 
