@@ -9,5 +9,6 @@ INCS=	ah.h esp.h in6.h in6_gif.h in6_ifattach.h in6_pcb.h \
 INCS+=	raw_ip6.h
 INCS+=	ip6_fw.h
 INCS+=	natpt_defs.h natpt_log.h natpt_soctl.h natpt_var.h
+INCS+=	mip6.h mip6_var.h
 
 .include <bsd.kinc.mk>
