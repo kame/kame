@@ -17,7 +17,7 @@
 .\" 5. Modifications may be freely made to this file providing the above
 .\"    conditions are met.
 .\"
-.\" $FreeBSD: src/lib/libutil/login.conf.5,v 1.15.2.4 1999/09/21 19:41:08 phantom Exp $
+.\" $FreeBSD: src/lib/libutil/login.conf.5,v 1.15.2.6 2000/03/03 14:59:44 sheldonh Exp $
 .\"
 .Dd November 22, 1996
 .Dt LOGIN.CONF 5
@@ -186,9 +186,10 @@ the login session will be terminated.
 .It setenv	list		A comma-separated list of environment variables and
 values to which they are to be set.
 .It shell	prog		Session shell to execute rather than the
-shell specified in the passwd file. The SHELL environment variable will
+shell specified in the passwd file.
+The SHELL environment variable will
 contain the shell specified in the password file.
-.It term	string	su	Default terminal type if not able to determine from
+.It term	string		Default terminal type if not able to determine from
 other means.
 .It timezone	string		Default value of $TZ environment variable.
 .It umask	number	022	Initial umask. Should always have a leading 0 to

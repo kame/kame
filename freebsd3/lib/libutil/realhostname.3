@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD: src/lib/libutil/realhostname.3,v 1.1.2.3 1999/09/20 09:49:52 phantom Exp $
+.\" $FreeBSD: src/lib/libutil/realhostname.3,v 1.1.2.4 2000/04/23 17:48:17 phantom Exp $
 .\"
 .Dd April 6, 1999
 .Os
@@ -30,18 +30,14 @@
 .Sh NAME
 .Nm realhostname
 .Nd "convert an IP number to the real host name"
+.Sh LIBRARY
+.Lb libutil
 .Sh SYNOPSIS
 .Fd #include <sys/types.h>
 .Fd #include <netinet/in.h>
 .Fd #include <libutil.h>
 .Ft int
 .Fn realhostname "char *host" "size_t hsize" "const struct in_addr *ip"
-.Pp
-Link with
-.Va -lutil
-on the
-.Xr cc 1
-command line.
 .Sh DESCRIPTION
 The function
 .Fn realhostname

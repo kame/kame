@@ -21,7 +21,7 @@
  *
  * High-level routines relating to use of the user capabilities database
  *
- * $FreeBSD: src/lib/libutil/login_class.c,v 1.10.2.2 1999/08/29 14:57:53 peter Exp $
+ * $FreeBSD: src/lib/libutil/login_class.c,v 1.10.2.3 2000/01/19 11:00:32 ru Exp $
  */
 
 #include <stdio.h>
@@ -39,10 +39,6 @@
 #include <login_cap.h>
 #include <paths.h>
 #include <sys/rtprio.h>
-
-
-#undef	UNKNOWN
-#define	UNKNOWN	"su"
 
 
 static struct login_res {
@@ -123,7 +119,7 @@ static struct login_vars {
     { "lang",		"LANG",	      NULL    },
     { "charset",	"MM_CHARSET", NULL    },
     { "timezone",	"TZ",	      NULL    },
-    { "term",		"TERM",       UNKNOWN },
+    { "term",		"TERM",       NULL    },
     { NULL,		NULL,	      NULL    }
 };
 

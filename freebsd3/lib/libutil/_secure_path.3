@@ -17,7 +17,7 @@
 .\" 5. Modifications may be freely made to this file providing the above
 .\"    conditions are met.
 .\"
-.\" $FreeBSD: src/lib/libutil/_secure_path.3,v 1.3.2.3 1999/09/21 19:41:08 phantom Exp $
+.\" $FreeBSD: src/lib/libutil/_secure_path.3,v 1.3.2.4 2000/04/23 17:48:12 phantom Exp $
 .\"
 .Dd May 2, 1997
 .Os FreeBSD
@@ -25,6 +25,8 @@
 .Sh NAME
 .Nm _secure_path
 .Nd determine if a file appears to be secure
+.Sh LIBRARY
+.Lb libutil
 .Sh SYNOPSIS
 .Fd #include <sys/types.h>
 .Fd #include <libutil.h>
@@ -66,7 +68,7 @@ to eliminate race conditions between use of this function and
 access to the file referenced.
 .Sh SEE ALSO
 .Xr lstat 2 ,
-.Xr syslog 3 .
+.Xr syslog 3
 .Sh HISTORY
 Code from which this function was derived was contributed to the
 .Fx

@@ -17,17 +17,19 @@
 .\" 5. Modifications may be freely made to this file providing the above
 .\"    conditions are met.
 .\"
-.\" $FreeBSD: src/lib/libutil/login_class.3,v 1.6.2.1 1999/08/29 14:57:53 peter Exp $
+.\" $FreeBSD: src/lib/libutil/login_class.3,v 1.6.2.2 2000/04/23 17:48:14 phantom Exp $
 .\"
 .Dd December 28, 1996
 .Os FreeBSD
 .Dt LOGIN_CLASS 3
 .Sh NAME
 .Nm setclasscontext ,
-.Nm setusercontext ,
+.Nm setclassenvironment ,
 .Nm setclassresources ,
-.Nm setclassenvironment
+.Nm setusercontext
 .Nd functions for using the login class capabilities database.
+.Sh LIBRARY
+.Lb libutil
 .Sh SYNOPSIS
 .Fd #include <sys/types.h>
 .Fd #include <login_cap.h>

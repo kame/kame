@@ -23,7 +23,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\" 
-.\" $FreeBSD: src/lib/libutil/uucplock.3,v 1.11.2.2 1999/08/29 14:58:03 peter Exp $
+.\" $FreeBSD: src/lib/libutil/uucplock.3,v 1.11.2.3 2000/04/23 17:48:18 phantom Exp $
 .\" "
 .Dd March 30, 1997
 .Os
@@ -33,6 +33,8 @@
 .Nm uu_unlock ,
 .Nm uu_lockerr
 .Nd acquire and release control of a serial device
+.Sh LIBRARY
+.Lb libutil
 .Sh SYNOPSIS
 .Fd #include <sys/types.h>
 .Fd #include <libutil.h>
@@ -44,12 +46,6 @@
 .Fn uu_unlock "const char *ttyname"
 .Ft const char *
 .Fn uu_lockerr "int uu_lockresult"
-.Pp
-Link with
-.Va -lutil
-on the
-.Xr cc 1
-command line.
 .Sh DESCRIPTION
 The
 .Fn uu_lock

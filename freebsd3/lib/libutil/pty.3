@@ -23,7 +23,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\" 
-.\" $FreeBSD: src/lib/libutil/pty.3,v 1.6.2.2 1999/08/29 14:57:59 peter Exp $
+.\" $FreeBSD: src/lib/libutil/pty.3,v 1.6.2.3 2000/04/23 17:48:16 phantom Exp $
 .\" "
 .Dd December 29, 1996
 .Os
@@ -32,6 +32,8 @@
 .Nm openpty , 
 .Nm forkpty
 .Nd auxiliary functions to obtain a pseudo-terminal
+.Sh LIBRARY
+.Lb libutil
 .Sh SYNOPSIS
 .Fd #include <sys/types.h>
 .Fd #include <sys/ioctl.h>
@@ -41,12 +43,6 @@
 .Fn openpty "int *amaster" "int *aslave" "char *name" "struct termios *termp" "struct winsize *winp"
 .Ft int
 .Fn forkpty "int *amaster" "char *name" "struct termios *termp" "struct winsize *winp"
-.Pp
-Link with
-.Va -lutil
-on the
-.Xr cc 1
-command line.
 .Sh DESCRIPTION
 The function
 .Fn openpty
