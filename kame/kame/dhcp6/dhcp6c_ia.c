@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.16 2003/07/18 09:14:38 suz Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.17 2003/07/20 11:10:00 suz Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -216,7 +216,7 @@ update_ia(iatype, ialist, ifp, serverid)
 			    "is too small", ia->t1, ia->t2);
 			ia->t2 = DHCP6_DURATITION_MIN;
 			ia->t1 = ia->t2 * 5 / 8;
-			dprintf(LOG_INFO, FNAME, "  adjusted to %lu and %lu",
+			dprintf(LOG_INFO, "", "  adjusted to %lu and %lu",
 			    ia->t1, ia->t2);
 		}
 

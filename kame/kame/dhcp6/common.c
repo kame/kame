@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.84 2003/07/18 09:14:38 suz Exp $	*/
+/*	$KAME: common.c,v 1.85 2003/07/20 11:10:01 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -981,7 +981,7 @@ dhcp6_get_options(p, ep, optinfo)
 				goto malformed;
 			duid0.duid_len = optlen;
 			duid0.duid_id = cp;
-			dprintf(LOG_DEBUG, FNAME,
+			dprintf(LOG_DEBUG, "",
 				"  DUID: %s", duidstr(&duid0));
 			if (duidcpy(&optinfo->clientID, &duid0)) {
 				dprintf(LOG_ERR, FNAME, "failed to copy DUID");
@@ -993,7 +993,7 @@ dhcp6_get_options(p, ep, optinfo)
 				goto malformed;
 			duid0.duid_len = optlen;
 			duid0.duid_id = cp;
-			dprintf(LOG_DEBUG, FNAME, "  DUID: %s", duidstr(&duid0));
+			dprintf(LOG_DEBUG, "", "  DUID: %s", duidstr(&duid0));
 			if (duidcpy(&optinfo->serverID, &duid0)) {
 				dprintf(LOG_ERR, FNAME, "failed to copy DUID");
 				goto fail;
@@ -1004,7 +1004,7 @@ dhcp6_get_options(p, ep, optinfo)
 				goto malformed;
 			memcpy(&val16, cp, sizeof(val16));
 			num = ntohs(val16);
-			dprintf(LOG_DEBUG, FNAME, "  status code: %s",
+			dprintf(LOG_DEBUG, "", "  status code: %s",
 			    dhcp6_stcodestr(num));
 
 			/* need to check duplication? */
@@ -1028,7 +1028,7 @@ dhcp6_get_options(p, ep, optinfo)
 				memcpy(&opttype, val, sizeof(u_int16_t));
 				num = ntohs(opttype);
 
-				dprintf(LOG_DEBUG, FNAME,
+				dprintf(LOG_DEBUG, "",
 					"  requested option: %s",
 					dhcp6optstr(num));
 
@@ -1052,7 +1052,7 @@ dhcp6_get_options(p, ep, optinfo)
 		case DH6OPT_PREFERENCE:
 			if (optlen != 1)
 				goto malformed;
-			dprintf(LOG_DEBUG, FNAME, "  preference: %d",
+			dprintf(LOG_DEBUG, "", "  preference: %d",
 			    (int)*(u_char *)cp);
 			if (optinfo->pref != DH6OPT_PREF_UNDEF) {
 				dprintf(LOG_INFO, FNAME,
@@ -1065,7 +1065,7 @@ dhcp6_get_options(p, ep, optinfo)
 				goto malformed;
 			memcpy(&val16, cp, sizeof(val16));
 			val16 = ntohs(val16);
-			dprintf(LOG_DEBUG, FNAME, "  elapsed time: %lu",
+			dprintf(LOG_DEBUG, "", "  elapsed time: %lu",
 			    (u_int32_t)val16);
 			if (optinfo->elapsed_time !=
 			    DH6OPT_ELAPSED_TIME_UNDEF) {
@@ -1123,7 +1123,7 @@ dhcp6_get_options(p, ep, optinfo)
 			ia.t1 = ntohl(optia.dh6_ia_t1);
 			ia.t2 = ntohl(optia.dh6_ia_t2);
 
-			dprintf(LOG_DEBUG, FNAME,
+			dprintf(LOG_DEBUG, "",
 			    "  IA_PD: ID=%lu, T1=%lu, T2=%lu",
 			    ia.iaid, ia.t1, ia.t2);
 
@@ -1286,7 +1286,7 @@ copyin_option(type, p, ep, list)
 			opt_stcode.dh6_stcode_code =
 			    ntohs(opt_stcode.dh6_stcode_code);
 
-			dprintf(LOG_DEBUG, FNAME, "  status code: %s",
+			dprintf(LOG_DEBUG, "", "  status code: %s",
 			    dhcp6_stcodestr(opt_stcode.dh6_stcode_code));
 
 			/* duplication check */
@@ -1311,7 +1311,7 @@ copyin_option(type, p, ep, list)
 	return (0);
 
   malformed:
-	dprintf(LOG_INFO, FNAME, "  malformed DHCP option: type %d", opt);
+	dprintf(LOG_INFO, "", "  malformed DHCP option: type %d", opt);
 
   fail:
 	dhcp6_clear_list(&sublist);
@@ -1337,7 +1337,7 @@ get_delegated_prefixes(p, ep, optinfo)
 
 		cp = p + sizeof(opth);
 		np = cp + optlen;
-		dprintf(LOG_DEBUG, FNAME, "  prefix delegation option: %s, "
+		dprintf(LOG_DEBUG, "", "  prefix delegation option: %s, "
 			"len %d", dhcp6optstr(opt), optlen);
 
 		if (np > ep) {
@@ -1371,13 +1371,13 @@ get_delegated_prefixes(p, ep, optinfo)
 			prefix.pltime = ntohl(pi.dh6_pi_duration);
 
 			if (prefix.vltime != DHCP6_DURATITION_INFINITE) {
-				dprintf(LOG_DEBUG, FNAME,
+				dprintf(LOG_DEBUG, "",
 				    "  prefix information: "
 				    "%s/%d duration %lu",
 				    in6addr2str(&prefix.addr, 0),
 				    prefix.plen, prefix.vltime);
 			} else {
-				dprintf(LOG_DEBUG, FNAME,
+				dprintf(LOG_DEBUG, "",
 				    "  prefix information: "
 				    "%s/%d duration infinity",
 				    in6addr2str(&prefix.addr, 0),
@@ -1407,8 +1407,8 @@ get_delegated_prefixes(p, ep, optinfo)
 	return (0);
 
   malformed:
-	dprintf(LOG_INFO, FNAME,
-		"  malformed prefix delegation option: type %d, len %d",
+	dprintf(LOG_INFO,
+		"", "  malformed prefix delegation option: type %d, len %d",
 		opt, optlen);
   fail:
 	return (-1);
