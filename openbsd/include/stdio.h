@@ -1,4 +1,4 @@
-/*	$OpenBSD: stdio.h,v 1.11 1999/09/17 13:13:46 espie Exp $	*/
+/*	$OpenBSD: stdio.h,v 1.14 2000/03/04 17:16:02 millert Exp $	*/
 /*	$NetBSD: stdio.h,v 1.18 1996/04/25 18:29:21 jtc Exp $	*/
 
 /*-
@@ -47,11 +47,16 @@
 #endif
 
 #include <sys/cdefs.h>
-
 #include <machine/ansi.h>
+
 #ifdef	_BSD_SIZE_T_
 typedef	_BSD_SIZE_T_	size_t;
 #undef	_BSD_SIZE_T_
+#endif
+
+#ifdef	_BSD_OFF_T_
+typedef	_BSD_OFF_T_	off_t;
+#undef	_BSD_OFF_T_
 #endif
 
 #ifndef NULL
@@ -62,21 +67,9 @@ typedef	_BSD_SIZE_T_	size_t;
 #endif
 #endif
 
-/*      
- * This is fairly grotesque, but pure ANSI code must not inspect the
- * innards of an fpos_t anyway.  The library internally uses off_t,
- * which we assume is exactly as big as eight chars.
- */
-#if !defined(_ANSI_SOURCE) && !defined(__STRICT_ANSI__)
-typedef off_t fpos_t;
-#else
-typedef struct __sfpos {
-	/* LONGLONG */
-	long long _pos;			/* XXX must be the same as off_t */
-} fpos_t;
-#endif
-
 #define	_FSTDIO			/* Define for new stdio with functions. */
+
+typedef off_t fpos_t;		/* stdio file position type */
 
 /*
  * NB: to fit things in six character monocase externals, the stdio
@@ -194,7 +187,7 @@ __END_DECLS
 
 /* System V/ANSI C; this is the wrong way to do this, do *not* use these. */
 #ifndef _ANSI_SOURCE
-#define	P_tmpdir	"/var/tmp/"
+#define	P_tmpdir	"/tmp/"
 #endif
 #define	L_tmpnam	1024	/* XXX must be == PATH_MAX */
 #define	TMP_MAX		308915776
@@ -233,8 +226,10 @@ size_t	 fread __P((void *, size_t, size_t, FILE *));
 FILE	*freopen __P((const char *, const char *, FILE *));
 int	 fscanf __P((FILE *, const char *, ...));
 int	 fseek __P((FILE *, long, int));
+int	 fseeko __P((FILE *, off_t, int));
 int	 fsetpos __P((FILE *, const fpos_t *));
 long	 ftell __P((FILE *));
+off_t	 ftello __P((FILE *));
 size_t	 fwrite __P((const void *, size_t, size_t, FILE *));
 int	 getc __P((FILE *));
 int	 getchar __P((void));
