@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.162 2001/11/20 12:45:58 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.163 2001/11/22 08:00:11 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -958,7 +958,16 @@ isakmp_ph2begin_i(iph1, iph2)
 	struct ph2handle *iph2;
 {
 	/* found ISAKMP-SA. */
+	plog(LLV_DEBUG, LOCATION, NULL, "===\n");
 	plog(LLV_DEBUG, LOCATION, NULL, "begin QUICK mode.\n");
+    {
+	char *a;
+	a = strdup(saddr2str(iph2->src));
+	plog(LLV_INFO, LOCATION, NULL,
+		"initiate new phase 2 negotiation: %s<=>%s\n",
+		a, saddr2str(iph2->dst));
+	racoon_free(a);
+    }
 
 #ifdef ENABLE_STATS
 	gettimeofday(&iph2->start, NULL);
