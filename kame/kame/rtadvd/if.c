@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.13 2000/09/06 20:06:29 itojun Exp $	*/
+/*	$KAME: if.c,v 1.14 2000/10/25 04:28:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -146,42 +146,44 @@ if_nametosdl(char *name)
 int
 if_getmtu(char *name)
 {
-#ifdef SIOCGIFMTU
-	struct ifreq ifr;
-	int s;
-
-	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
-		return(0);
-
-	ifr.ifr_addr.sa_family = AF_INET6;
-	strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
-	if (ioctl(s, SIOCGIFMTU, (caddr_t)&ifr) < 0) {
-		close(s);
-		return(0);
-	}
-
-	close(s);
-
-	return(ifr.ifr_mtu);
-#else
 	struct ifaddrs *ifap, *ifa;
 	struct if_data *ifd;
+	u_long mtu = 0;
 
 	if (getifaddrs(&ifap) < 0)
 		return(0);
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
 		if (strcmp(ifa->ifa_name, name) == 0) {
 			ifd = ifa->ifa_data;
-			freeifaddrs(ifap);
 			if (ifd)
-				return ifd->ifi_mtu;
-			else
-				return 0;
+				mtu = ifd->ifi_mtu;
+			break;
 		}
 	}
 	freeifaddrs(ifap);
-	return 0;
+
+#ifdef SIOCGIFMTU
+	if (mtu == 0) {
+		struct ifreq ifr;
+		int s;
+
+		if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
+			return(0);
+
+		ifr.ifr_addr.sa_family = AF_INET6;
+		strncpy(ifr.ifr_name, name,
+			sizeof(ifr.ifr_name));
+		if (ioctl(s, SIOCGIFMTU, (caddr_t)&ifr) < 0) {
+			close(s);
+			return(0);
+		}
+		close(s);
+
+		mtu = ifr.ifr_mtu;
+	}
 #endif
+
+	return(mtu);
 }
 
 /* give interface index and its old flags, then new flags returned */
