@@ -1,4 +1,4 @@
-/*	$KAME: gaistatd.c,v 1.7 2001/07/22 03:22:42 itojun Exp $	*/
+/*	$KAME: gaistatd.c,v 1.8 2001/07/23 03:47:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -128,13 +128,13 @@ main()
 
 		if ((fp = fopen(PATH_LOGIFLE, "a+")) == NULL)
 			continue;
-		fprintf(fp, "%s (%lu.%06lu): pid=%d, proc=%s, "
-			"delay0=%lu.%06lu, delay1=%lu.%06lu, numeric=%d, "
+		fprintf(fp, "%s (%ld.%06lu): pid=%d, proc=%s, "
+			"delay0=%ld.%06lu, delay1=%ld.%06lu, numeric=%d, "
 			"entries=%d, ", timebuf,
-			(u_long)st.start0.tv_sec,
+			st.start0.tv_sec,
 			(u_long)st.start0.tv_usec,
-			st.pid, procname, (u_long)delay0.tv_sec,
-			(u_long)delay0.tv_usec, (u_long)delay1.tv_sec,
+			st.pid, procname, delay0.tv_sec,
+			(u_long)delay0.tv_usec, delay1.tv_sec,
 			(u_long)delay1.tv_usec, st.numeric, st.entries);
 		fprintf(fp, " rulestat: ");
 		for (i = 0; i < 16; i++) {
