@@ -1,4 +1,4 @@
-/* $KAME: in_msf.h,v 1.11 2004/03/19 12:13:51 suz Exp $	*/
+/* $KAME: in_msf.h,v 1.12 2004/03/19 12:51:28 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
@@ -229,7 +229,7 @@ struct in_multi_source {
 	((ntohl((x).sin_addr.s_addr) & 0xffffff00) == 0xe0000000)
 
 #define	IN6_IS_LOCAL_GROUP(x)						\
-	/* struct in6_addr *x, not compare embedded ifindex */		\
+	/* struct in6_addr *x, not compare embedded link index */	\
 	(IPV6_ADDR_MC_SCOPE(x) < IPV6_ADDR_SCOPE_LINKLOCAL || 		\
 	((*(const u_int16_t *)(const void *)(&(x)->s6_addr[0]) == ntohs(0xff02))&&\
 	 (*(const u_int32_t *)(const void *)(&(x)->s6_addr[4]) == 0) &&	\
