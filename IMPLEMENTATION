@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/11/25 09:29:23 $
+			$Date: 1999/11/25 09:40:28 $
 
 1. IPv6
 
@@ -443,8 +443,9 @@ address those, but we need more time to finalize these.  To name a few:
 - mbuf pkthdr.len field is typed as "int", so it will not hold jumbogram
   with len > 2G on 32bit architecture CPUs.
 - We (mistakingly) used "int" to hold packet length.  We need to convert them
-  into larger integral type.  It is not safe to convert them to u_int32_t,
-  as there can be overflow during packet length computation.
+  into larger integral type.  It needs a great care (we can't just query-
+  replace them into u_int32_t), as there can be overflow during packet length
+  computation.
 - We (mistakingly) check for ip6_plen field of IPv6 header for packet payload
   length in various places.  We should be checking mbuf pkthdr.len instead.
 
