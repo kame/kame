@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.132 2000/08/06 13:12:29 kjc Exp $	*/
+/*	$KAME: icmp6.c,v 1.133 2000/08/18 14:20:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1410,12 +1410,9 @@ ni6_input(m, off)
 		int lenlim, copied;
 
 		nni6->ni_code = ICMP6_NI_SUCCESS;
-		if (n->m_flags & M_EXT)
-			lenlim = MCLBYTES - sizeof(struct ip6_hdr) -
-				sizeof(struct icmp6_nodeinfo);
-		else
-			lenlim = MHLEN - sizeof(struct ip6_hdr) -
-				sizeof(struct icmp6_nodeinfo);
+		n->m_pkthdr.len = n->m_len =
+		    sizeof(struct ip6_hdr) + sizeof(struct icmp6_nodeinfo);
+		lenlim = M_TRAILINGSPACE(n);
 		copied = ni6_store_addrs(ni6, nni6, ifp, lenlim);
 		/* XXX: reset mbuf length */
 		n->m_pkthdr.len = n->m_len = sizeof(struct ip6_hdr) +
@@ -2386,7 +2383,8 @@ icmp6_redirect_output(m0, rt)
 		MCLGET(m, M_DONTWAIT);
 	if (!m)
 		goto fail;
-	maxlen = (m->m_flags & M_EXT) ? MCLBYTES : MHLEN;
+	m->m_len = 0;
+	maxlen = M_TRAILINGSPACE(m);
 	maxlen = min(IPV6_MMTU, maxlen);
 	/* just for safety */
 	if (maxlen < sizeof(struct ip6_hdr) + sizeof(struct icmp6_hdr) +
