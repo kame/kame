@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.34 2000/07/04 13:15:51 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.35 2000/07/04 16:35:59 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -487,6 +487,9 @@ agg_i2send(iph1, msg)
 	/* send to responder */
 	if (isakmp_send(iph1, iph1->sendbuf) < 0)
 		goto end;
+
+	/* set encryption flag */
+	iph1->flags |= ISAKMP_FLAG_E;
 
 	iph1->status = PHASE1ST_ESTABLISHED;
 
@@ -986,7 +989,9 @@ agg_r2send(iph1, msg)
 		memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->iv->l);
 	}
 
-	/* change status of isakmp status entry */
+	/* set encryption flag */
+	iph1->flags |= ISAKMP_FLAG_E;
+
 	iph1->status = PHASE1ST_ESTABLISHED;
 
 	error = 0;

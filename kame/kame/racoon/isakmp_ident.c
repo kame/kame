@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.34 2000/07/04 13:15:52 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.35 2000/07/04 16:35:59 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -1157,7 +1157,7 @@ ident_r3send(iph1, msg0)
 	if (iph1->hash == NULL)
 		goto end;
 
-	/* re-set encryption flag, for serurity. */
+	/* set encryption flag */
 	iph1->flags |= ISAKMP_FLAG_E;
 
 	/* create HDR;ID;HASH payload */

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.26 2000/07/04 13:15:51 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.27 2000/07/04 16:35:59 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -531,6 +531,9 @@ base_i3recv(iph1, msg)
 	memcpy(iph1->ivm->ivd->v, iph1->ivm->ive->v, iph1->ivm->iv->l);
 	memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->iv->l);
 
+	/* set encryption flag */
+	iph1->flags |= ISAKMP_FLAG_E;
+
 	iph1->status = PHASE1ST_ESTABLISHED;
 
 	error = 0;
@@ -1007,6 +1010,9 @@ base_r2send(iph1, msg)
 		goto end;
 	if (oakley_newiv(iph1) < 0)
 		goto end;
+
+	/* set encryption flag */
+	iph1->flags |= ISAKMP_FLAG_E;
 
 	iph1->status = PHASE1ST_ESTABLISHED;
 
