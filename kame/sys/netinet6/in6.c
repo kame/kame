@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.128 2001/01/21 11:20:59 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.129 2001/01/22 09:59:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -218,6 +218,7 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 	struct sockaddr_in6 lo_sa;
 	struct sockaddr_in6 all1_sa;
 	struct rtentry *nrt = NULL, **nrtp = NULL;
+	int e;
 	
 	bzero(&lo_sa, sizeof(lo_sa));
 	bzero(&all1_sa, sizeof(all1_sa));
@@ -234,10 +235,17 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 	 */
 	if (cmd == RTM_ADD)
 		nrtp = &nrt;
-	rtrequest(cmd, ifa->ifa_addr,
-		  (struct sockaddr *)&lo_sa,
-		  (struct sockaddr *)&all1_sa,
-		  RTF_UP|RTF_HOST, nrtp);
+	e = rtrequest(cmd, ifa->ifa_addr,
+		      (struct sockaddr *)&lo_sa,
+		      (struct sockaddr *)&all1_sa,
+		      RTF_UP|RTF_HOST, nrtp);
+	if (e != 0) {
+		log(LOG_ERR, "in6_ifloop_request: "
+		    "%s operation failed for %s (errno=%d)\n",
+		    cmd == RTM_ADD ? "ADD" : "DELETE",
+		    ip6_sprintf(&((struct in6_ifaddr *)ifa)->ia_addr.sin6_addr),
+		    e);
+	}
 
 	/*
 	 * Make sure rt_ifa be equal to IFA, the second argument of the
@@ -272,7 +280,8 @@ in6_ifaddloop(struct ifaddr *ifa)
 			      , 0
 #endif /* __FreeBSD__ */
 			      );
-		if (rt == 0 || (rt->rt_ifp->if_flags & IFF_LOOPBACK) == 0)
+		if (rt == 0 || (rt->rt_flags & RTF_HOST) == 0 ||
+		    (rt->rt_ifp->if_flags & IFF_LOOPBACK) == 0)
 			in6_ifloop_request(RTM_ADD, ifa);
 		if (rt)
 			rt->rt_refcnt--;
@@ -345,22 +354,39 @@ in6_ifindex2scopeid(idx)
 }
 
 int
-in6_mask2len(mask)
+in6_mask2len(mask, lim0)
 	struct in6_addr *mask;
+	u_char *lim0;
 {
-	int x, y;
+	int x = 0, y;
+	u_char *lim = lim0, *p;
 
-	for (x = 0; x < sizeof(*mask); x++) {
-		if (mask->s6_addr8[x] != 0xff)
+	if (lim0 == NULL)
+		lim = (u_char *)mask + sizeof(*mask);
+	for (p = (u_char *)mask; p < lim; x++, p++) {
+		if (*p != 0xff)
 			break;
 	}
 	y = 0;
-	if (x < sizeof(*mask)) {
+	if (p < lim) {
 		for (y = 0; y < 8; y++) {
-			if ((mask->s6_addr8[x] & (0x80 >> y)) == 0)
+			if ((*p & (0x80 >> y)) == 0)
 				break;
 		}
 	}
+
+	/*
+	 * when the limit pointer is given, do a stricter check on the
+	 * remaining bits.
+	 */
+	if (p < lim) {
+		if (y != 0 && (*p & (0x00ff >> y)) != 0)
+			return(-1);
+		for (p = p + 1; p < lim; p++)
+			if (*p != 0)
+				return(-1);
+	}
+	
 	return x * 8 + y;
 }
 
@@ -718,7 +744,7 @@ in6_update_ifa(ifp, ifra, ia)
 	struct in6_aliasreq *ifra;
 	struct in6_ifaddr *ia;
 {
-	int error = 0, hostIsNew = 1, prefixIsNew = 0, plen;
+	int error = 0, hostIsNew = 1, prefixIsNew = 0, plen = -1;
 	struct ifaddr *ifa;
 	struct in6_ifaddr *oia;
 	struct sockaddr_in6 dst6;
@@ -749,11 +775,27 @@ in6_update_ifa(ifp, ifra, ia)
 	    ifra->ifra_prefixmask.sin6_family != AF_UNSPEC)
 		return(EAFNOSUPPORT);
 	/*
-	 * Because the IPv6 address architecture is classless,
-	 * prefix length must be specified for a new address. 
+	 * Because the IPv6 address architecture is classless, we require
+	 * users to specify a (non 0) prefix length (mask) for a new address.
+	 * We also require the prefix (when specified) mask is valid, and thus
+	 * reject a non-consecutive mask.
+	 * XXX: mask for scoped address?
 	 */
-	if (hostIsNew && ifra->ifra_prefixmask.sin6_len == 0)
+	if (ia == NULL && ifra->ifra_prefixmask.sin6_len == 0)
 		return(EINVAL);
+	if (ifra->ifra_prefixmask.sin6_len != 0) {
+		plen = in6_mask2len(&ifra->ifra_prefixmask.sin6_addr,
+				    (u_char *)&ifra->ifra_prefixmask +
+				    ifra->ifra_prefixmask.sin6_len);
+		if (plen <= 0)
+			return(EINVAL);
+	}
+	else {
+		/*
+		 * in this, ia must not be NULL. we just use its prefix length.
+		 */
+		plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL);
+	}
 	/*
 	 * If the destination address on a p2p interface is specified,
 	 * and the address is a scoped one, validate/set the scope
@@ -777,7 +819,20 @@ in6_update_ifa(ifp, ifra, ia)
 			}
 		}
 	}
-
+	/*
+	 * When the destination address is specified, the corresponding
+	 * prefix length must be 128.
+	 */
+	if (ifra->ifra_dstaddr.sin6_family == AF_INET6 && plen != 128) {
+		/*
+		 * The following message seems noisy, but we dare to add it for
+		 * diagnosis.
+		 */
+		printf("in6_update_ifa: prefixlen must be 128 when "
+		       "dstaddr is specified\n");
+		return(EINVAL);
+	}
+	/* lifetime consistency check */
 	lt = &ifra->ifra_lifetime;
 	if (lt->ia6t_vltime != ND6_INFINITE_LIFETIME
 	    && lt->ia6t_vltime + time_second < time_second) {
@@ -802,20 +857,16 @@ in6_update_ifa(ifp, ifra, ia)
 		ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
 		ia->ia_addr.sin6_family = AF_INET6;
 		ia->ia_addr.sin6_len = sizeof(ia->ia_addr);
-#if 1
-		if (ifp->if_flags & IFF_POINTOPOINT) {
+		if ((ifp->if_flags & (IFF_POINTOPOINT | IFF_LOOPBACK)) != 0) {
+			/*
+			 * XXX: some functions expect that ifa_dstaddr is not
+			 * NULL for p2p interfaces.
+			 */
 			ia->ia_ifa.ifa_dstaddr
 				= (struct sockaddr *)&ia->ia_dstaddr;
-			ia->ia_dstaddr.sin6_family = AF_INET6;
-			ia->ia_dstaddr.sin6_len = sizeof(ia->ia_dstaddr);
 		} else {
 			ia->ia_ifa.ifa_dstaddr = NULL;
-			bzero(&ia->ia_dstaddr, sizeof(ia->ia_dstaddr));
 		}
-#else  /* always initilize by NULL */
-		ia->ia_ifa.ifa_dstaddr = NULL;
-		bzero(&ia->ia_dstaddr, sizeof(ia->ia_dstaddr));
-#endif
 		ia->ia_ifa.ifa_netmask
 			= (struct sockaddr *)&ia->ia_prefixmask;
 
@@ -864,11 +915,6 @@ in6_update_ifa(ifp, ifra, ia)
 		hostIsNew = 0;
 	}
 
-	/* calculate the prefix length, which will be used later */
-	if (ifra->ifra_prefixmask.sin6_len)
-		plen = in6_mask2len(&ifra->ifra_prefixmask.sin6_addr);
-	else
-		plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr);
 
 #ifdef USE_FIXED_P2P_PLEN
 	/*
@@ -895,7 +941,7 @@ in6_update_ifa(ifp, ifra, ia)
 		 * corresponding to the old prefix.
 		 */
 		if (ia->ia_prefixmask.sin6_len &&
-		    in6_mask2len(&ia->ia_prefixmask.sin6_addr) != plen)
+		    in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL) != plen)
 			in6_ifscrub(ifp, ia, 0);
 		ia->ia_prefixmask = ifra->ifra_prefixmask;
 	}
@@ -914,6 +960,7 @@ in6_update_ifa(ifp, ifra, ia)
 #endif
 	{
 		struct in6_ifaddr *ifa6;
+		int ifa6_plen;
 
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
@@ -921,7 +968,9 @@ in6_update_ifa(ifp, ifra, ia)
 			continue;
 
 		ifa6 = (struct in6_ifaddr *)ifa;
-		if (in6_are_prefix_equal(&ifra->ifra_addr.sin6_addr,
+		ifa6_plen = in6_mask2len(&ifa6->ia_prefixmask.sin6_addr, NULL);
+		if (plen == ifa6_plen &&
+		    in6_are_prefix_equal(&ifra->ifra_addr.sin6_addr,
 					 &ifa6->ia_addr.sin6_addr,
 					 plen))
 			break;
@@ -930,7 +979,7 @@ in6_update_ifa(ifp, ifra, ia)
 		prefixIsNew = 1;
 
 	/*
-	 * If a new destination address on a p2p link, scrub the
+	 * If a new destination address is on a p2p link, scrub the
 	 * old one and install the new destination.
 	 */
 	if ((ifp->if_flags & IFF_POINTOPOINT) &&
@@ -951,8 +1000,7 @@ in6_update_ifa(ifp, ifra, ia)
 	if (hostIsNew) {
 		int iilen;
 
-		iilen = (sizeof(ia->ia_prefixmask.sin6_addr) << 3) -
-			in6_mask2len(&ia->ia_prefixmask.sin6_addr);
+		iilen = (sizeof(ia->ia_prefixmask.sin6_addr) << 3) - plen;
 		if ((error = in6_prefix_add_ifid(iilen, ia)) != 0)
 			goto unlink;
 	}
@@ -1145,7 +1193,7 @@ in6_unlink_ifa(ia, ifp)
 	}
 
 	if (oia->ia6_ifpr) {	/* check for safety */
-		plen = in6_mask2len(&oia->ia_prefixmask.sin6_addr);
+		plen = in6_mask2len(&oia->ia_prefixmask.sin6_addr, NULL);
 		iilen = (sizeof(oia->ia_prefixmask.sin6_addr) << 3) - plen;
 		in6_prefix_remove_ifid(iilen, oia);
 	}
@@ -1160,7 +1208,7 @@ in6_unlink_ifa(ia, ifp)
 #endif
 
 	/*
-	 * release another refcnt for the link from in6_ifaddr
+	 * release another refcnt for the link from in6_ifaddr.
 	 * Note that we should decrement the refcnt at least once for all *BSD.
 	 */
 	IFAFREE(&oia->ia_ifa);
@@ -1453,7 +1501,8 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 				bzero(&iflr->dstaddr, sizeof(iflr->dstaddr));
 
 			iflr->prefixlen =
-				in6_mask2len(&ia->ia_prefixmask.sin6_addr);
+				in6_mask2len(&ia->ia_prefixmask.sin6_addr,
+					     NULL);
 
 			iflr->flags = ia->ia6_flags;	/*XXX*/
 
@@ -1519,8 +1568,8 @@ in6_ifscrub(ifp, ia, delloop)
 	 * even on point-to-point or loopback interfaces.
 	 * In this case, kernel would panic in rtinit()...
 	 */
-	if (ifp->if_flags & (IFF_LOOPBACK | IFF_POINTOPOINT) &&
-	    (ia->ia_ifa.ifa_dstaddr != NULL))
+	if (ia->ia_ifa.ifa_dstaddr != NULL && /* we should ensure this... */
+	    ia->ia_ifa.ifa_dstaddr->sa_family == AF_INET6)
 		rtinit(&(ia->ia_ifa), (int)RTM_DELETE, RTF_HOST);
 	else
 		rtinit(&(ia->ia_ifa), (int)RTM_DELETE, 0);
@@ -1531,7 +1580,7 @@ in6_ifscrub(ifp, ia, delloop)
 	 * the scrubbed address. If we have one, reinstall the corresponding
 	 * interface route.
 	 */
-	plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr);
+	plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL);
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 4
@@ -1541,7 +1590,7 @@ in6_ifscrub(ifp, ia, delloop)
 	     ifa = ifa->ifa_list.tqe_next)
 #endif
 	{
-		int e;
+		int e, ia6_plen;
 		struct in6_ifaddr *ia6;
 
 		if (ifa->ifa_addr->sa_family != AF_INET6)
@@ -1550,6 +1599,7 @@ in6_ifscrub(ifp, ia, delloop)
 			continue;
 
 		ia6 = (struct in6_ifaddr *)ifa;
+		ia6_plen = in6_mask2len(&ia6->ia_prefixmask.sin6_addr, NULL);
 		if (in6_are_prefix_equal(&ia->ia_addr.sin6_addr,
 					 &ia6->ia_addr.sin6_addr, plen)) {
 			if ((e = in6_ifaddroute(ifp, ia6)) != 0) {
@@ -1574,7 +1624,7 @@ in6_ifinit(ifp, ia, sin6, newhost, newprefix)
 	struct sockaddr_in6 *sin6;
 	int newhost, newprefix;
 {
-	int	error = 0;
+	int	error = 0, plen;
 	int	s = splimp();
 
 	ia->ia_addr = *sin6;
@@ -1588,7 +1638,27 @@ in6_ifinit(ifp, ia, sin6, newhost, newprefix)
 		splx(s);
 		return(error);
 	}
+	splx(s);
 
+	/* xxx
+	 * in(6)_socktrim...why omitted?
+	 */
+
+#if 1
+	/*
+	 * We'll make an interface direct route when
+	 * - prefixlen is smaller than 128, or
+	 * - the destination address is specified.
+	 * Even for these cases, we don't need cloning for host routes.
+	 */
+	plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL); /* XXX  */
+	if (plen == 128 && ia->ia_dstaddr.sin6_family != AF_INET6)
+		newprefix = 0;
+	if (plen < 128) {
+		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
+		ia->ia_ifa.ifa_flags |= RTF_CLONING;
+	}
+#else  /* this case should be removed in a short peroid */
 	switch (ifp->if_type) {
 	case IFT_ARCNET:
 	case IFT_ETHER:
@@ -1605,18 +1675,14 @@ in6_ifinit(ifp, ia, sin6, newhost, newprefix)
 		ia->ia_ifa.ifa_flags |= RTF_CLONING;
 		break;
 	}
-
-	splx(s);
-	/* xxx
-	 * in(6)_socktrim...why omitted?
-	 */
+#endif
 
 	/* this should be in in6_ifaddroute()? */
 	ia->ia_ifa.ifa_metric = ifp->if_metric;
 	/*
 	 * Add route for the network if a new prefix is assigned.
 	 * This should not fail, because we do it only when the prefix is new.
-	 * We there return the error immediately on failure.
+	 * We therefore return the error immediately on failure.
 	 */
 	if (newprefix) {
 		if ((error = in6_ifaddroute(ifp, ia)) != 0)
@@ -1645,10 +1711,11 @@ in6_ifaddroute(ifp, ia)
 	if (ifp->if_flags & IFF_LOOPBACK) {
 		ia->ia_ifa.ifa_dstaddr = ia->ia_ifa.ifa_addr;
 		flags |= RTF_HOST;
-	} else if (ifp->if_flags & IFF_POINTOPOINT) {
-		if (ia->ia_dstaddr.sin6_family != AF_INET6)
-			return(0);
-		flags |= RTF_HOST;
+	} else if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
+		if (ia->ia_dstaddr.sin6_family == AF_INET6) {
+			/* note that prefixlen must be 128 in this case. */
+			flags |= RTF_HOST;
+		}
 	}
 
 	if ((error = rtinit(&(ia->ia_ifa), (int)RTM_ADD, flags)) == 0)

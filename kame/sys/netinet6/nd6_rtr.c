@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.59 2001/01/21 11:24:35 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.60 2001/01/22 09:59:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1424,7 +1424,7 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 {
 	struct ifaddr *ifa;
 	struct in6_ifaddr *ia, *ib, *oia;
-	int s, error;
+	int s, error, plen0;
 	struct in6_addr mask;
 
 	in6_len2mask(&mask, prefixlen);
@@ -1445,11 +1445,11 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 #endif
 
 	/* prefixlen + ifidlen must be equal to 128 */
-	if (prefixlen != in6_mask2len(&ib->ia_prefixmask.sin6_addr)) {
-		log(LOG_ERR, "in6_ifadd: wrong prefixlen for %s"
-			"(prefix=%d ifid=%d)\n", if_name(ifp),
-			prefixlen,
-			128 - in6_mask2len(&ib->ia_prefixmask.sin6_addr));
+	plen0 = in6_mask2len(&ib->ia_prefixmask.sin6_addr, NULL);
+	if (prefixlen != plen0) {
+		log(LOG_ERR, "in6_ifadd: wrong prefixlen for %s "
+		    "(prefix=%d ifid=%d)\n",
+		    if_name(ifp), prefixlen, 128 - plen0);
 		return NULL;
 	}
 

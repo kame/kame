@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.c,v 1.40 2001/01/22 06:56:06 jinmei Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.41 2001/01/22 09:59:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -720,7 +720,7 @@ add_each_addr(struct socket *so, struct rr_prefix *rpp, struct rp_addr *rap)
 		    "failed because there is already another addr %s/%d\n",
 		    ip6_sprintf(&ifra.ifra_addr.sin6_addr), rpp->rp_plen,
 		    ip6_sprintf(IA6_IN6(ia6)),
-		    in6_mask2len(&ia6->ia_prefixmask.sin6_addr));
+		    in6_mask2len(&ia6->ia_prefixmask.sin6_addr, NULL));
 		return;
 	}
 	/* propagate ANYCAST flag if it is set for ancestor addr */
