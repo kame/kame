@@ -309,13 +309,14 @@ in_gif_input(m, va_alist)
 #ifdef __OpenBSD__
 #if defined(MROUTING) || defined(IPSEC)
 			ip4_input(m, off, proto);
+			return;
 #endif
 #else
 #ifdef MROUTING
 			ipip_input(m, off, proto);
+			return;
 #endif /*MROUTING*/
 #endif
-			return;
 		}
 		m_freem(m);
 		ipstat.ips_nogif++;
