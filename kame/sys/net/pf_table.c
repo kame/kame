@@ -33,11 +33,9 @@
 #ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
-#include "opt_altq.h"
 #endif
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
-#include "opt_altq.h"
 #endif
 
 #include <sys/param.h>
