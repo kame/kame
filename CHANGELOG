@@ -1,7 +1,21 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2398 2003/05/20 11:57:15 suz Exp $
+$KAME: CHANGELOG,v 1.2399 2003/05/23 07:16:41 sakane Exp $
 
 <200305>
+Fri May 23 16:00:26 JST 2003 sakane@kame.net
+	* kame/racoon
+	applyed RFC compliance patches from <toml@us.ibm.com>.
+	- only single proposal and single transform are allowed to be received
+	  during phase 1 by a initiator.
+	- ESP with NULL encryption must specify authentication.
+
+Fri May 23 16:00:26 JST 2003 sakane@kame.net
+	* kame/racoon
+	- a regular expression can be used as a include file name
+	  in a configuratoin file.
+	- some memory leaks are fixed.
+	they are from <jgraessley@apple.com>.
+
 Tue May 20 19:44:50 JST 2003	suz@crl.hitachi.co.jp
 	* freebsd[45]/sys/netinet6/udp6_usrreq.c,
 	* {netbsd,openbsd}/sys/netinet/udp_usrreq.c: fixed a bug that UDP 
