@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.138 2004/06/14 05:36:09 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.139 2004/07/28 22:34:00 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1543,6 +1543,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 		client6_script(ifp->scriptpath, state, optinfo);
 	}
 
+#ifdef USE_DH6OPT_LIFETIME
 	/*
 	 * Set timer if an option lifetime is specified in a reply to
 	 * information-request.  We do not use the value in the stateful
@@ -1578,6 +1579,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 			}
 		}
 	}
+#endif USE_DH6OPT_LIFETIME
 
 	/* update stateful configuration information */
 	if (state != DHCP6S_RELEASE) {

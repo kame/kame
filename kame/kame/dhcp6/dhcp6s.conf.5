@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6s.conf.5,v 1.11 2004/07/06 14:35:21 jinmei Exp $
+.\"	$KAME: dhcp6s.conf.5,v 1.12 2004/07/28 22:34:00 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -27,7 +27,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd May 23, 2002
+.Dd July 29, 2004
 .Dt DHCP6S.CONF 5
 .Os KAME
 .\"
@@ -95,6 +95,10 @@ Each
 must be a numeric IPv6 address.
 Multiple server addresses can also be specified by a sequence of these
 statements.
+As of this writing, the option type for this option is not officially
+assigned.
+.Nm dhcp6s
+will reject this option unless it is explicitly built to accept the option.
 .It Xo
 .Ic sip-server-address Ar sip-server-address Op Ar sip-server-addresses... ;
 .Xc
@@ -117,6 +121,10 @@ specifies the lifetime of option values that do not have particular
 lease duration in seconds.
 This option is particularly useful for stateless configuration by
 information-request and reply exchanges.
+As of this writing, the option type for this option is not officially
+assigned.
+.Nm dhcp6s
+will reject this option unless it is explicitly built to accept the option.
 .El
 .\"
 .Sh Interface statement

@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.45 2004/06/17 13:10:53 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.46 2004/07/28 22:33:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -953,6 +953,7 @@ configure_global_option()
 	/* NTP servers */
 	TAILQ_INIT(&ntplist0);
 	for (cl = cf_ntp_list; cl; cl = cl->next) {
+#ifdef USE_DH6OPT_NTP
 		/* duplication check */
 		if (dhcp6_find_listval(&ntplist0, DHCP6_LISTVAL_ADDR6,
 		    cl->ptr, 0)) {
@@ -967,10 +968,23 @@ configure_global_option()
 			dprintf(LOG_ERR, FNAME, "failed to add an NTP server");
 			goto bad;
 		}
+#else
+		dprintf(LOG_ERR, FNAME,
+		    "the support for NTP option is disabled");
+		goto bad;
+#endif
 	}
 
 	/* Lifetime for stateless options */
-	optlifetime0 = cf_lifetime;
+	if (cf_lifetime >= 0) {
+#ifdef USE_DH6OPT_LIFETIME
+		optlifetime0 = cf_lifetime;
+#else
+		dprintf(LOG_ERR, FNAME,
+		    "the support for lifetime option is disabled");
+		goto bad;
+#endif
+	}
 
 	return (0);
 
@@ -1426,10 +1440,21 @@ add_options(opcode, ifc, cfl0)
 				opttype = DH6OPT_DNSNAME;
 				break;
 			case DHCPOPT_NTP:
+#ifdef USE_DH6OPT_NTP
 				opttype = DH6OPT_NTP;
+#else
+				dprintf(LOG_ERR, FNAME, "the support "
+				    "for NTP option is disabled");
+#endif
 				break;
 			case DHCPOPT_LIFETIME:
+#ifdef USE_DH6OPT_LIFETIME
 				opttype = DH6OPT_LIFETIME;
+#else
+				dprintf(LOG_ERR, FNAME, "the support "
+				    "for lifetime option is disabled");
+				return (-1);
+#endif
 				break;
 			}
 			switch(opcode) {

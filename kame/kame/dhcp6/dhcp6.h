@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.49 2004/06/10 07:28:29 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.50 2004/07/28 22:33:59 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -283,7 +283,13 @@ struct dhcp6_relay {
 #define DH6OPT_PREFIX_REQUEST CONF_DH6OPT_PREFIX_REQUEST
 
 /* The followings are KAME specific. */
+#if CONF_DH6OPT_NTP > 0
+#define USE_DH6OPT_NTP
+#endif
 #define DH6OPT_NTP CONF_DH6OPT_NTP
+#if CONF_DH6OPT_LIFETIME > 0
+#define USE_DH6OPT_LIFETIME
+#endif
 #define DH6OPT_LIFETIME CONF_DH6OPT_LIFETIME
 #  define DH6OPT_LIFETIME_UNDEF -1
 

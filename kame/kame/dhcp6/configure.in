@@ -233,8 +233,8 @@ AC_ARG_WITH(opt-ntp,
 [  --with-opt-ntp=VALUE    specify DHCP option value for NTP],
     dhcpopt_ntp="$withval", dhcpopt_ntp=0)
 if test $dhcpopt_ntp = 0 ; then
-	dhcpopt_ntp=35
-	AC_MSG_RESULT(unspecified and using $dhcpopt_ntp)
+	dhcpopt_ntp=-1
+	AC_MSG_RESULT(unspecified)
 else
 	AC_MSG_RESULT(using $dhcpopt_ntp)
 fi
@@ -245,8 +245,8 @@ AC_ARG_WITH(opt-lifetime,
 [  --with-opt-lifetime=VALUE    specify DHCP option value for lifetime],
     dhcpopt_lifetime="$withval", dhcpopt_lifetime=0)
 if test $dhcpopt_lifetime = 0 ; then
-	dhcpopt_lifetime=36
-	AC_MSG_RESULT(unspecified and using $dhcpopt_lifetime)
+	dhcpopt_lifetime=-1
+	AC_MSG_RESULT(unspecified)
 else
 	AC_MSG_RESULT(using $dhcpopt_lifetime)
 fi

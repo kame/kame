@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.110 2004/06/12 10:43:33 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.111 2004/07/28 22:33:59 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1400,6 +1400,7 @@ dhcp6_get_options(p, ep, optinfo)
 				}
 			}
 			break;
+#ifdef USE_DH6OPT_NTP
 		case DH6OPT_NTP:
 			if (optlen % sizeof(struct in6_addr) || optlen == 0)
 				goto malformed;
@@ -1425,6 +1426,7 @@ dhcp6_get_options(p, ep, optinfo)
 				;
 			}
 			break;
+#endif
 		case DH6OPT_IA_PD:
 			if (optlen + sizeof(struct dhcp6opt) <
 			    sizeof(optia))
@@ -1467,6 +1469,7 @@ dhcp6_get_options(p, ep, optinfo)
 			if (get_delegated_prefixes(cp, cp + optlen, optinfo))
 				goto fail;
 			break;
+#ifdef USE_DH6OPT_LIFETIME
 		case DH6OPT_LIFETIME:
 			if (optlen != 4)
 				goto malformed;
@@ -1479,6 +1482,7 @@ dhcp6_get_options(p, ep, optinfo)
 			} else
 				optinfo->lifetime = (int64_t)val32;
 			break;
+#endif
 		default:
 			/* no option specific behavior */
 			dprintf(LOG_INFO, FNAME,
@@ -2061,6 +2065,7 @@ dhcp6_set_options(bp, ep, optinfo)
 		free(tmpbuf);
 	}
 
+#ifdef USE_DH6OPT_NTP
 	if (!TAILQ_EMPTY(&optinfo->ntp_list)) {
 		struct in6_addr *in6;
 
@@ -2080,6 +2085,7 @@ dhcp6_set_options(bp, ep, optinfo)
 		COPY_OPTION(DH6OPT_NTP, optlen, tmpbuf, p);
 		free(tmpbuf);
 	}
+#endif
 
 	for (op = TAILQ_FIRST(&optinfo->iapd_list); op;
 	    op = TAILQ_NEXT(op, link)) {
@@ -2154,12 +2160,14 @@ dhcp6_set_options(bp, ep, optinfo)
 			    optinfo->ifidopt_id, p);
 	}
 
+#ifdef USE_DH6OPT_LIFETIME
 	if (optinfo->lifetime != DH6OPT_LIFETIME_UNDEF) {
 		u_int32_t p32 = (u_int32_t)optinfo->lifetime;
 
 		p32 = htonl(p32);
 		COPY_OPTION(DH6OPT_LIFETIME, sizeof(p32), &p32, p);
 	}
+#endif
 
 	if (optinfo->authproto != DHCP6_AUTHPROTO_UNDEF) {
 		struct dhcp6opt_auth *auth;
@@ -2661,8 +2669,10 @@ dhcp6optstr(type)
 		return ("DNS");
 	case DH6OPT_DNSNAME:
 		return ("domain search list");
+#ifdef USE_DH6OPT_NTP
 	case DH6OPT_NTP:
 		return ("NTP server");
+#endif
 	case DH6OPT_PREFIX_DELEGATION:
 		return ("prefix delegation");
 	case DH6OPT_PREFIX_INFORMATION:
@@ -2671,8 +2681,10 @@ dhcp6optstr(type)
 		return ("IA_PD");
 	case DH6OPT_IA_PD_PREFIX:
 		return ("IA_PD prefix");
+#ifdef USE_DH6OPT_LIFETIME
 	case DH6OPT_LIFETIME:
 		return ("Lifetime");
+#endif
 	default:
 		snprintf(genstr, sizeof(genstr), "opt_%d", type);
 		return (genstr);

@@ -4355,9 +4355,9 @@ else
   dhcpopt_ntp=0
 fi;
 if test $dhcpopt_ntp = 0 ; then
-	dhcpopt_ntp=35
-	echo "$as_me:$LINENO: result: unspecified and using $dhcpopt_ntp" >&5
-echo "${ECHO_T}unspecified and using $dhcpopt_ntp" >&6
+	dhcpopt_ntp=-1
+	echo "$as_me:$LINENO: result: unspecified" >&5
+echo "${ECHO_T}unspecified" >&6
 else
 	echo "$as_me:$LINENO: result: using $dhcpopt_ntp" >&5
 echo "${ECHO_T}using $dhcpopt_ntp" >&6
@@ -4375,9 +4375,9 @@ else
   dhcpopt_lifetime=0
 fi;
 if test $dhcpopt_lifetime = 0 ; then
-	dhcpopt_lifetime=36
-	echo "$as_me:$LINENO: result: unspecified and using $dhcpopt_lifetime" >&5
-echo "${ECHO_T}unspecified and using $dhcpopt_lifetime" >&6
+	dhcpopt_lifetime=-1
+	echo "$as_me:$LINENO: result: unspecified" >&5
+echo "${ECHO_T}unspecified" >&6
 else
 	echo "$as_me:$LINENO: result: using $dhcpopt_lifetime" >&5
 echo "${ECHO_T}using $dhcpopt_lifetime" >&6
