@@ -1682,9 +1682,17 @@ pf_map_addr(u_int8_t af, struct pf_pool *rpool, struct pf_addr *saddr,
 	if (rpool->cur->addr.addr.type == PF_ADDR_NOROUTE ||
 	    rpool->cur->addr.addr.type == PF_ADDR_TABLE)
 		return (1);
+#ifdef __OpenBSD__
 	if (rpool->cur->addr.addr.type == PF_ADDR_DYNIFTL &&
 	    rpool->cur->addr.addr.p.dyn->undefined)
 		return (1);
+#else
+	if (rpool->cur->addr.addr.type == PF_ADDR_DYNIFTL) {
+		pf_dynaddr_update(rpool->cur->addr.addr.p.dyn);
+		if (rpool->cur->addr.addr.p.dyn->undefined)
+			return (1);
+	}
+#endif
 
 	switch (rpool->opts & PF_POOL_TYPEMASK) {
 	case PF_POOL_NONE:
@@ -1952,10 +1960,20 @@ pf_get_translation(int direction, struct ifnet *ifp, u_int8_t proto,
 		case PF_BINAT:
 			switch (direction) {
 			case PF_OUT:
+#ifdef __OpenBSD__
 				if (r->rpool.cur->addr.addr.type ==
 				    PF_ADDR_DYNIFTL &&
-				    r->rpool.cur->addr.addr.p.dyn->undefined)
+				    r->rpool.cur->addr.addr.p.dyn->undefined) {
 					return (NULL);
+				}
+#else
+				if (r->rpool.cur->addr.addr.type ==
+				    PF_ADDR_DYNIFTL) {
+					pf_dynaddr_update(r->rpool.cur->addr.addr.p.dyn);
+					if (r->rpool.cur->addr.addr.p.dyn->undefined)
+						return (NULL);
+				}
+#endif
 				else
 					PF_POOLMASK(naddr,
 					    &r->rpool.cur->addr.addr.v.a.addr,
@@ -1963,9 +1981,18 @@ pf_get_translation(int direction, struct ifnet *ifp, u_int8_t proto,
 					    saddr, af);
 				break;
 			case PF_IN:
+#ifdef __OpenBSD__
 				if (r->src.addr.type == PF_ADDR_DYNIFTL &&
-				    r->src.addr.p.dyn->undefined)
+				    r->src.addr.p.dyn->undefined) {
 					return (NULL);
+				}
+#else
+				if (r->src.addr.type == PF_ADDR_DYNIFTL) {
+					pf_dynaddr_update(r->src.addr.p.dyn);
+					if (r->src.addr.p.dyn->undefined)
+						return (NULL);
+				}
+#endif
 				else
 					PF_POOLMASK(naddr,
 					    &r->src.addr.v.a.addr,
