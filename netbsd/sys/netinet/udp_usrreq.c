@@ -637,11 +637,6 @@ udp4_realinput(src, dst, m, off)
 	int rcvcnt;
 	struct in_addr *src4, *dst4;
 	struct inpcb *inp;
-#ifdef IGMPV3
-	struct ip_moptions *imo;
-	struct sock_msf_source *msfsrc;
-	int i;
-#endif
 
 	rcvcnt = 0;
 	off += sizeof(struct udphdr);	/* now, offset of payload */
@@ -694,97 +689,14 @@ udp4_realinput(src, dst, m, off)
 			}
 
 #ifdef IGMPV3
-#define PASS_TO_PCB() \
-	do { \
-		last = inp; \
-		udp4_sendup(m, off, (struct sockaddr *)src, inp->inp_socket); \
-		rcvcnt++; \
-	} while (0)
-			/*
-			 * Receive multicast data which fits MSF condition.
-			 * Broadcast data needs no further check.
-			 */
-			if (!IN_MULTICAST(dst4->s_addr)) {
-				PASS_TO_PCB();
-				goto next_inp;
-			}
-			
-			if ((imo = inp->inp_moptions) == NULL)
+			if (match_msf4_per_socket(inp, src4, dst4) == 0)
 				continue;
-			for (i = 0; i < imo->imo_num_memberships; i++) {
-				if (imo->imo_membership[i]->inm_addr.s_addr
-				    != dst4->s_addr)
-					continue;
-				
-				/* receive data from any source */
-				if (imo->imo_msf[i]->msf_grpjoin != 0) {
-					PASS_TO_PCB();
-					break;
-				}
-				goto search_allow_list;
-
-			search_allow_list:
-				if (imo->imo_msf[i]->msf_numsrc == 0)
-					goto search_block_list;
-				
-				LIST_FOREACH(msfsrc,
-					     imo->imo_msf[i]->msf_head,
-					     list) {
-					if (SS_CMP(&msfsrc->src, <, src)) {
-						continue;
-					}
-					if (SS_CMP(&msfsrc->src, >, src)) {
-						/* terminate search, as there
-						 * will be no match */
-						break;
-					}
-					
-					PASS_TO_PCB();
-					break;
-				}
-				
-			search_block_list:
-				if (imo->imo_msf[i]->msf_blknumsrc == 0)
-					goto end_of_search;
-
-				LIST_FOREACH(msfsrc,
-					     imo->imo_msf[i]->msf_blkhead,
-					     list) {
-					if (SS_CMP(&msfsrc->src, <, src)) {
-						continue;
-					}
-					if (SS_CMP(&msfsrc->src, ==, src)) {
-						/* blocks if the src matched
-						 * with block list */
-						break;
-					}
-					
-					/* terminate search, as there will be
-					 * no match */
-					msfsrc = NULL;
-					break;
-				}
-				/* blocks since the source matched with block
-				 * list */
-				if (msfsrc == NULL)
-					PASS_TO_PCB();
-				
-			end_of_search:
-				break;
-			}
-			if (i == imo->imo_num_memberships)
-				continue;
-#undef PASS_TO_PCB
-#else
+#endif
 			last = inp;
 			udp4_sendup(m, off, (struct sockaddr *)src,
 				inp->inp_socket);
 			rcvcnt++;
-#endif
 
-#ifdef IGMPV3
-		next_inp:
-#endif
 			/*
 			 * Don't look for additional matches if this one does
 			 * not have either the SO_REUSEPORT or SO_REUSEADDR
