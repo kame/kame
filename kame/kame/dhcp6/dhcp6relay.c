@@ -63,7 +63,7 @@ static char *rmsgctlbuf, *smsgctlbuf;
 static int rmsgctllen, smsgctllen;
 static struct msghdr rmh, smh;
 static char rdatabuf[BUFSIZ];
-struct in6_pktinfo *spktinfo;
+static struct in6_pktinfo *spktinfo;
 
 static int mhops = DEFAULT_SOLICIT_HOPCOUNT;
 
