@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.203 2004/12/03 12:54:23 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.204 2004/12/03 12:54:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4470,7 +4470,6 @@ _nis_getaddrinfo(pai, hostname, res, ac)
 	struct addrconfig *ac;	/* XXX: unused */
 {
 	struct hostent *hp;
-	int h_error;
 	int af;
 	struct addrinfo sentinel, *cur;
 	int i;
