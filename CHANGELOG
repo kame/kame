@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.774 2000/04/14 09:18:36 itojun Exp $
+$Id: CHANGELOG,v 1.775 2000/04/14 15:44:37 jinmei Exp $
 
 <200003>
+2000-04-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6[cs].c: tiny clarifications;
+	- shutdown(0) for write only sockets
+	- do not set IPV6_MULTICAST_IF for a read-only socket.
+
 Fri Apr 14 18:18:18 JST 2000  itojun@iijlab.net
 	* ports/pkgsrc for libpcap and tcpdump (freebsd[23], netbsd):
 	  upgrade to use 2000/4/3 snapshot.
