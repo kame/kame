@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.16 2001/08/15 07:18:52 itojun Exp $
+$KAME: helsinki-result.jp,v 1.17 2001/08/15 08:32:20 itojun Exp $
 
 
 generic
@@ -40,15 +40,15 @@ USAGI linux
 Compaq Tru54 UNIX X5.1B-BL4
 	Tue Aug 14 17:09:18 JST 2001
 	IPv4, ESP, tunnel mode
-	phase 1/2とも3DES + SHA1
+	phase 1/2とも3DES + SHA1, group 2
 	phase 1 lifetime = 10min, phase 2 lifetime = 5min
 
 	IPv6, ESP + AH, transport tunnel mode
-	phase 1/2とも3DES + SHA1
+	phase 1/2とも3DES + SHA1, group 2
 	phase 1 lifetime = 10min, phase 2 lifetime = 5min
 
 	IPv6, IPComp + ESP + AH, transport mode
-	phase 1/2とも3DES + SHA1 + defalte
+	phase 1/2とも3DES + SHA1 + defalte, group 2
 	phase 1 lifetime = 10min, phase 2 lifetime = 5min
 
 	initiator/responderどちらもやった。
@@ -74,12 +74,12 @@ IBM AIX 5.1
 F-Secure VPN+ 5.40
 	Tue Aug 14 19:44:15 JST 2001
 	IPv4, ESP, tunnel mode
-	phase 1 3DES + SHA1, lifetime = 10min
-	phase 2 AES + SHA1, lifetime = 2min
+	phase 1 3DES + SHA1, group 5, lifetime = 10min
+	phase 2 AES + SHA1, group 5, lifetime = 2min
 
 	IPv4, IPComp + ESP, transport mode
-	phase 1 3DES + SHA1, lifetime = 10min
-	phase 2 AES + SHA1 + deflate, lifetime = 2min
+	phase 1 3DES + SHA1, group 5, lifetime = 10min
+	phase 2 AES + SHA1 + deflate, group 5, lifetime = 2min
 
 	どちらも問題なし、rekeyもOK。
 
@@ -96,8 +96,8 @@ F-Secure VPN+ 5.40
 SecGo CryptoIP v3
 	Tue Aug 14 21:41:36 JST 2001
 	IPv4, ESP, transport mode
-	phase 1 3DES + SHA1, lifetime = 10min
-	phase 2 blowfish, lifetime = 2min
+	phase 1 3DES + SHA1, group 5, lifetime = 10min
+	phase 2 blowfish, group 5, lifetime = 2min
 
 	phase 2 AESも試そうとしたが失敗(SecGo側が12以外のalgorithm #を
 	使っていた or コンパイルしてなかった)。rekeyもやってみた。
@@ -117,6 +117,38 @@ Oullim information technologies SECUREWORKS VPN gateway 3.0
 	phase 2 AES/blowfishはどうだねとナンパしてみるも、not ready。
 	明日か明後日ねとのこと。
 
+	Wed Aug 15 17:15:09 JST 2001
+	IPv4, ESP, tunnel mode
+	phase 1 3DES + SHA1, group 2, lifetime = 10min
+	phase 2 AES + SHA1, group 2, lifetime = 2min
+
+	失敗。先方がAESのときにESP ICV checkに失敗する。
+
+	IPv4, ESP, tunnel mode
+	phase 1 3DES + SHA1, group 2, lifetime = 10min
+	phase 2 AES + MD5, group 2, lifetime = 2min
+
+	おなじく失敗
+
+	IPv4, ESP, tunnel mode
+	phase 1 3DES + SHA1, group 2, lifetime = 10min
+	phase 2 3DES + MD5, group 2, lifetime = 2min
+
+	成功。
+
+	先方がこういうの投げてくるので、こっちは怒る(id payloadの順序が
+	普通ではない)。
+
+>11:59.824877 130.233.10.30:500 -> 130.233.9.166:500: isakmp 1.0 msgid 75973360: phase 2/others ? oakley-quick:
+>    (hash: len=20)
+>    (sa: doi=ipsec situation=identity
+>        (p: #1 protoid=ipsec-esp transform=1 spi=6fd60ca5
+>            (t: #1 id=3des (type=lifetype value=sec)(type=life value=0078)(type=enc mode value=tunnel)(type=auth value=hmac-md5)(type=group desc value=modp1024))))
+>    (nonce: n len=16)
+>    (ke: key len=128)
+>    (id: idtype=IPv4 protoid=0 port=0 len=4 130.233.9.166)
+>    (id: idtype=IPv4net protoid=0 port=0 len=8 192.168.10.0/255.255.255.0)
+
 
 Trilogy AdmitOne 2.6
 	Tue Aug 14 21:58:01 JST 2001
@@ -127,8 +159,8 @@ Trilogy AdmitOne 2.6
 
 	Wed Aug 15 16:09:50 JST 2001
 	IPv4, ESP, transport mode
-	phase 1 3DES + SHA1, lifetime = 10min
-	phase 2 AES + SHA1, lifetime = 2min
+	phase 1 3DES + SHA1, group 1, lifetime = 10min
+	phase 2 AES + SHA1, group 1, lifetime = 2min
 
 	Trilogy側はIKE phase 2のkey lengthがbyte単位だと思っているらしく
 	negotiation失敗。修正後再挑戦。
@@ -166,3 +198,72 @@ WindowsXP
 Ashley
 	Tue Aug 14 18:00
 	明日 9:00 RSA signature mode 予約
+
+
+isakmpd (jakob@openbsd)
+	IPv4, ESP, transport mode
+	phase 1 3DES + SHA1, group 2, lifetime = 10min
+	phase 2 AES + SHA1, group 2, lifetime = 2min
+
+	問題なし。
+
+
+freeswan
+	IPv4, IPComp + ESP, transport mode
+	phase 1 3DES + SHA1, group 5, lifetime = 10min
+	phase 2 3DES + SHA1 + deflate, group 5, lifetime = 2min
+
+	IPCompには問題なし。
+
+	先方がinitiateしてきたときに問題あり。phase 2で、ipcomp enc modeが
+	無指定の場合、ipcompの場合だけはtransportと思わなければならない。
+	が、racoonは現状これをRFC2407的に(Anyとして)取り扱う。ので、no
+	proposal chosenになる。
+	RFC2407からすると、enc mode unspecified == transportでもよいような
+	気がするが...  ("host-dependent"って書いてあるから)
+
+RFC2407
+>         Encapsulation Mode
+>           RESERVED                0
+>           Tunnel                  1
+>           Transport               2
+>
+>           Values 3-61439 are reserved to IANA.  Values 61440-65535 are
+>           for private use.
+>
+>           If unspecified, the default value shall be assumed to be
+>           unspecified (host-dependent).
+
+draft-shacham-ippcp-rfc2393bis-08.txt
+>      Encapsulation Mode
+>
+>         To propose a non-default Encapsulation Mode (such as Tunnel
+>         Mode), an IPComp proposal MUST include an Encapsulation Mode
+>         attribute.  If the Encapsulation Mode is unspecified, the
+>         default value of Transport Mode is assumed.
+
+>42:28.211568 130.233.9.175:500 -> 130.233.9.166:500: isakmp 1.0 msgid 6935cbd8: phase 2/others ? oakley-quick:
+>    (hash: len=20)
+>    (sa: doi=ipsec situation=identity
+>        (p: #0 protoid=ipsec-esp transform=2 spi=3a47a3e7
+>            (t: #0 id=3des (type=group desc value=0005)(type=enc mode value=transport)(type=lifetype value=sec)(type=life value=7080)(type=auth value=hmac-md5))
+>            (t: #1 id=3des (type=group desc value=0005)(type=enc mode value=transport)(type=lifetype value=sec)(type=life value=7080)(type=auth value=hmac-sha1)))
+>        (p: #0 protoid=ipcomp transform=1 spi=ac23
+>            (t: #0 id=deflate (type=lifetype value=sec)(type=life value=7080))))
+>    (nonce: n len=16)
+>    (ke: key len=192)
+
+>2001-08-15 16:42:28: DEBUG: ipsec_doi.c:1024:get_ph2approvalx(): peer's single bundle:
+>2001-08-15 16:42:28: DEBUG: proposal.c:814:printsaproto():  (proto_id=ESP spisize=4 spi=3a47a3e7 spi_p=00000000 encmode=Transport reqid=0:0)
+>2001-08-15 16:42:28: DEBUG: proposal.c:848:printsatrns():   (trns_id=3DES encklen=0 authtype=1)
+>2001-08-15 16:42:28: DEBUG: proposal.c:848:printsatrns():   (trns_id=3DES encklen=0 authtype=2)
+>2001-08-15 16:42:28: DEBUG: proposal.c:814:printsaproto():  (proto_id=IPCOMP spisize=2 spi=0000ac23 spi_p=00000000 encmode=Any reqid=0:0)
+>2001-08-15 16:42:28: DEBUG: proposal.c:855:printsatrns():   (trns_id=DEFLATE)
+>2001-08-15 16:42:28: DEBUG: ipsec_doi.c:1027:get_ph2approvalx(): my single bundle:
+>2001-08-15 16:42:28: DEBUG: proposal.c:814:printsaproto():  (proto_id=ESP spisize=4 spi=00000000 spi_p=00000000 encmode=Transport reqid=0:0)
+>2001-08-15 16:42:28: DEBUG: proposal.c:848:printsatrns():   (trns_id=3DES encklen=0 authtype=2)
+>2001-08-15 16:42:28: DEBUG: proposal.c:814:printsaproto():  (proto_id=IPCOMP spisize=4 spi=00000000 spi_p=00000000 encmode=Transport reqid=0:0)
+>2001-08-15 16:42:28: DEBUG: proposal.c:855:printsatrns():   (trns_id=DEFLATE)
+>2001-08-15 16:42:28: ERROR: proposal.c:497:cmpsatrns(): authtype mismatched: my:1 peer:2
+>2001-08-15 16:42:28: ERROR: proposal.c:365:cmpsaprop_alloc(): IPComp SPI size promoted from 16bit to 32bit
+>2001-08-15 16:42:28: ERROR: proposal.c:378:cmpsaprop_alloc(): encmode mismatched: my:2 peer:0			<-----
