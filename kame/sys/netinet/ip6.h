@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.57 2004/06/01 13:11:38 jinmei Exp $	*/
+/*	$KAME: ip6.h,v 1.58 2004/06/03 04:16:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -336,8 +336,6 @@ do {									\
  * with type "typ".
  * IP6_EXTHDR_GET0 does the same, except that it aligns the structure at the
  * very top of mbuf.  GET0 is likely to make memory copy than GET.
- *
- * XXX we're now testing this, needs m_pulldown()
  */
 #define IP6_EXTHDR_GET(val, typ, m, off, len) \
 do {									\
