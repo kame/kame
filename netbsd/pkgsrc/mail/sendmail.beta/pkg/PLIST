@@ -1,1 +1,2 @@
-sbin/sendmail.8.10.0.6
+libexec/sendmail/sendmail.8.10.0.10
+@dirrm libexec/sendmail
