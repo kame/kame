@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/ipsec.h,v 1.4.2.1 2000/07/15 07:14:35 kris Exp $	*/
-/*	$KAME: ipsec.h,v 1.36 2000/08/02 17:58:25 sakane Exp $	*/
+/*	$KAME: ipsec.h,v 1.39 2000/12/27 11:47:10 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,6 +79,18 @@ struct secpolicy {
 	struct ipsecrequest *req;
 				/* pointer to the ipsec request tree, */
 				/* if policy == IPSEC else this value == NULL.*/
+
+	/*
+	 * lifetime handler.
+	 * the policy can be used without limitiation if both lifetime and
+	 * validtime are zero.
+	 * "lifetime" is passed by sadb_lifetime.sadb_lifetime_addtime.
+	 * "validtime" is passed by sadb_lifetime.sadb_lifetime_usetime.
+	 */
+	long created;		/* time created the policy */
+	long lastused;		/* updated every when kernel sends a packet */
+	long lifetime;		/* duration of the lifetime of this policy */
+	long validtime;		/* duration this policy is valid without use */
 };
 
 /* Request for IPsec */
