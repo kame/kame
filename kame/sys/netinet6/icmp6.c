@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.147 2000/10/10 15:35:47 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.148 2000/10/10 16:44:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2833,6 +2833,19 @@ icmp6_ctloutput(op, so, level, optname, mp)
 	return(error);
 }
 #endif /*NRL inpcb*/
+
+#if !defined(HAVE_RATECHECK) || !defined(HAVE_PPSRATECHECK)
+#ifndef timersub
+#define	timersub(tvp, uvp, vvp)						\
+	do {								\
+		(vvp)->tv_sec = (tvp)->tv_sec - (uvp)->tv_sec;		\
+		(vvp)->tv_usec = (tvp)->tv_usec - (uvp)->tv_usec;	\
+		if ((vvp)->tv_usec < 0) {				\
+			(vvp)->tv_sec--;				\
+			(vvp)->tv_usec += 1000000;			\
+		}							\
+	} while (0)
+#endif
 
 #if 0 /*ndef HAVE_RATECHECK*/
 /*
