@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.692 2000/03/15 00:40:33 itojun Exp $
+$Id: CHANGELOG,v 1.693 2000/03/15 13:52:02 jinmei Exp $
 
 <200003>
+2000-03-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6/ping6.c: added a new option 'H', which specifies
+	to try reverse-lookup of IPv6 addresses. ping6 now does not try
+	reverse-lookup by default. We hope that this change will decrease
+	a report like "ping6 does not work with a global address".
+
 Tue Mar 14 10:04:42 JST 2000  itojun@iijlab.net
 	* libinet6/getnameinfo.c: configure return value correctly, when
 	  name lookup is asked and there's no DNS records.
