@@ -1,4 +1,4 @@
-.\"	$KAME: natptconfig.8,v 1.12 2002/01/25 02:54:14 fujisawa Exp $
+.\"	$KAME: natptconfig.8,v 1.13 2002/01/25 07:18:24 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -125,21 +125,23 @@ is empty at first.  Kernel forms an entry that packet flows, 1 entry
 per 1 TCP session, 1 entry per 1 UDP/ICMP packet.
 .Bl -bullet -offset indent
 .It
-.Qq long
+.Sy long
 shows with long format.
 .It
-.Ql interval
-is a number, and this option specified,
+.Em interval
+is a number, and if this option is specified,
 .Nm
-will continuously display the information which is shown with xlate
-subcommand in specified second interval.
+shows the information shown with
+.Sy xlate
+subcommand regularly in specified second interval.
 .El
 .Pp
-By default, this command display IPv6 as short format (22 columns per
-address), when
-.Qq long
-specified, this command display IPv6 address
-without omitting it.
+By default, this command displays IPv6 address with short format
+.Pq 22 columns per address ,
+and when
+.Sy long
+was specified, this command displays IPv6 address without shortening
+it.
 .Pp
 It is useful to see this
 table entry when this translator seems not to work.  See
@@ -147,11 +149,15 @@ table entry when this translator seems not to work.  See
 section below for more detail.
 .It Xo Sy variables
 .Xc
-Show variables set with set subcommand.
+Show variables that was set by
+.Sy set
+subcommand.
 .It Xo Sy mapping
 .Xc
-Show current mapping status.  Status is displayed as "enable" or
-"disable".
+Show current translation status.  Status is displayed as
+.Sy enable
+or
+.Sy disable .
 .El
 .It Xo Sy test Ar subcommand
 .Op Ar args ...
