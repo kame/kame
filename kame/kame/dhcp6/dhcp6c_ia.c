@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.21 2004/06/10 07:28:29 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.22 2004/08/16 04:05:43 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -86,7 +86,7 @@ static struct ia *get_ia __P((iatype_t, struct dhcp6_if *, struct ia_conf *,
 static struct ia *find_ia __P((struct ia_conf *, iatype_t, u_int32_t));
 static struct dhcp6_timer *ia_timo __P((void *));
 
-static char *iastr __P((iastate_t));
+static char *iastr __P((iatype_t));
 static char *statestr __P((iastate_t));
 
 void
