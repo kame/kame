@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.c,v 1.5 2000/01/11 01:02:18 itojun Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.c,v 1.6 2000/02/07 12:01:41 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -45,6 +45,7 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#include <netdb.h>
 
 #include "var.h"
 #include "misc.h"
@@ -59,6 +60,7 @@
 #include "isakmp_var.h"
 
 static unsigned int if_maxindex __P((void));
+static void clear_myaddr __P((struct myaddrs **));
 
 static unsigned int
 if_maxindex()
@@ -73,6 +75,19 @@ if_maxindex()
 	}
 	if_freenameindex(p0);
 	return max;
+}
+
+static void
+clear_myaddr(db)
+	struct myaddrs **db;
+{
+	struct myaddrs *p;
+
+	while (*db) {
+		p = (*db)->next;
+		delmyaddr(*db);
+		*db = p;
+	}
 }
 
 void
@@ -122,6 +137,8 @@ grab_myaddrs()
 	}
 	close(s);
 
+	clear_myaddr(&lcconf->myaddrs);
+
 	/* Look for this interface in the list */
 	ifr_end = (struct ifreq *) (ifconf.ifc_buf + ifconf.ifc_len);
 	for (ifr = ifconf.ifc_req;
@@ -143,7 +160,6 @@ grab_myaddrs()
 				exit(1);
 				/*NOTREACHED*/
 			}
-			p->next = lcconf->myaddrs;
 #ifdef INET6
 #ifdef __KAME__
 			sin6 = (struct sockaddr_in6 *)p->addr;
@@ -156,7 +172,6 @@ grab_myaddrs()
 			}
 #endif
 #endif
-			lcconf->myaddrs = p;
 			YIPSDEBUG(DEBUG_MISC,
 				if (getnameinfo(p->addr, p->addr->sa_len,
 						_addr1_, sizeof(_addr1_),
@@ -166,11 +181,15 @@ grab_myaddrs()
 				plog(logp, LOCATION, NULL,
 					"my interface: %s (%s)\n",
 					_addr1_, ifr->ifr_name));
+			p->next = lcconf->myaddrs;
+			lcconf->myaddrs = p;
 			break;
 		default:
 			break;
 		}
 	}
+
+	free(iflist);
 }
 
 int
