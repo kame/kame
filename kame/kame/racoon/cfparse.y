@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.119 2003/12/14 04:13:11 itojun Exp $	*/
+/*	$KAME: cfparse.y,v 1.120 2004/03/03 05:14:39 mk Exp $	*/
 
 %{
 /*
@@ -1438,6 +1438,7 @@ cfreparse()
 	flushph1();
 	flushrmconf();
 	cleanprhead();
+	flushsainfo();
 	clean_tmpalgtype();
 	yycf_init_buffer();
 
