@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.10 2005/02/18 00:22:32 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.11 2005/02/18 05:28:01 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -42,7 +42,6 @@
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/sysctl.h>
-#include <sys/uio.h>
 #include <sys/ioctl.h>
 #include <ifaddrs.h>
 
@@ -91,8 +90,6 @@ struct ha_ifinfo {
 
 static void ha_lists_init(void);
 static void had_init_homeprefix(char *, int);
-/*static void command_show_status(int, char *);*/
-static void command_flush(int, char *);
 static void terminate(int);
 static void command_show_hal(int, char *);
 
@@ -105,9 +102,20 @@ struct command_table show_command_table[] = {
 	{NULL}
 };
 
+static void had_flush_bc(int, char *);
+static void had_flush_stat(int, char *);
+static void had_flush_hal(int, char *);
+
+struct command_table flush_command[] = {
+	{"bc", had_flush_bc, "Clear bc"},
+	{"stat", had_flush_stat, "clear stat"},
+	{"hal", had_flush_hal, "clear home agent list"},
+	{NULL}
+};
+
 struct command_table command_table[] = {
 	{"show", NULL, "Show status", show_command_table},
-        {"flush", command_flush, "Flush stat, bc, hal"},
+	{"flush", NULL, "Flush stat, bc, hal", flush_command},
 };
 
 void
@@ -634,32 +642,31 @@ send_haadrep(dst, anycastaddr, dhreq, ifindex)
 }
 
 static void
-command_flush(s, arg)
+had_flush_bc(s, line)
 	int s;
-	char *arg;
+	char *line;
 {
-	char msg[1024];
+	command_printf(s, "-- Clear Binding Cache --\n");
+	/*flush_bc();*/
+	mip6_flush_kernel_bc();
+}
 
-	if (strcmp(arg, "bc") == 0) {
-		/*flush_bc();*/
-		sprintf(msg, "-- Clear Binding Cache --\n");
-		write(s, msg, strlen(msg));
+static void
+had_flush_stat(s, line)
+	int s;
+	char *line;
+{
+	command_printf(s, "-- Clear Shisa Statistics --\n");
+	command_printf(s, "Not implemented yet\n");
+}
 
-		mip6_flush_kernel_bc();
-
-	} else if (strcmp(arg, "stat") == 0) {
-		sprintf(msg, "-- Clear Shisa Statistics --\n");
-		write(s, msg, strlen(msg));
-
-	} else if (strcmp(arg, "hal") == 0) {
-		sprintf(msg, "-- Clear Home Agent List --\n");
-		write(s, msg, strlen(msg));
-
-	} else {
-		sprintf(msg, "Available options are:\n");
-                sprintf(msg + strlen(msg), "\tbc (Binding Cache)\n\tstat (Statistics)\n\thal (Home Agent List)\n");
-		write(s, msg, strlen(msg));
-	}
+static void
+had_flush_hal(s, line)
+	int s;
+	char *line;
+{
+	command_printf(s, "-- Clear Home Agent List --\n");
+	command_printf(s, "Not implemented yet\n");
 }
 
 static void
