@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.569 2000/02/17 06:16:28 itojun Exp $
+$Id: CHANGELOG,v 1.570 2000/02/17 07:54:03 sumikawa Exp $
 
 <200002>
+Thu Feb 17 16:52:56 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* {freebsd[23]/ports, netbsd/pkgsrc/net}/rsync: upgrade to 2.4.1.
+
 Thu Feb 17 15:15:02 JST 2000  itojun@iijlab.net
 	* sys/net/if_gif.c: fix bogus gifconfig failure, on multiple gif
 	  configuration.
