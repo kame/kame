@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.19 2000/01/31 23:23:41 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.20 2000/04/18 12:20:11 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -279,7 +279,6 @@ quick_i2recv(iph2, msg0)
 	struct isakmp_parse_t *pa;
 	struct isakmp *isakmp = (struct isakmp *)msg0->v;
 	struct isakmp_pl_hash *hash = NULL;
-	struct ipsecdoi_pl_sa *sa_tmp = NULL; /* SA payloads to parse. */
 	int f_id;
 	char *p;
 	int tlen;
@@ -364,7 +363,7 @@ quick_i2recv(iph2, msg0)
 	 * parse the payloads.
 	 * copy non-HASH payloads into hbuf, so that we can validate HASH.
 	 */
-	sa_tmp = NULL;
+	iph2->sa = NULL;
 	f_id = 0;	/* flag to use checking ID */
 	tlen = 0;	/* count payload length except of HASH payload. */
 	for (; pa->type; pa++) {
@@ -375,13 +374,14 @@ quick_i2recv(iph2, msg0)
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_SA:
-			if (sa_tmp != NULL) {
+			if (iph2->sa != NULL) {
 				plog(logp, LOCATION, NULL,
 					"Ignored, multiple SA "
 					"isn't supported.\n");
 				break;
 			}
-			sa_tmp = (struct ipsecdoi_pl_sa *)pa->ptr;
+			if (isakmp_p2ph(&iph2->sa, pa->ptr) < 0)
+				goto end;
 			break;
 
 		case ISAKMP_NPTYPE_NONCE:
@@ -440,7 +440,7 @@ quick_i2recv(iph2, msg0)
 	}
 
 	/* payload existency check */
-	if (hash == NULL || sa_tmp == NULL || iph2->nonce_p == NULL) {
+	if (hash == NULL || iph2->sa == NULL || iph2->nonce_p == NULL) {
 		plog(logp, LOCATION, iph2->ph1->remote,
 			"few isakmp message received.\n");
 		goto end;
@@ -482,7 +482,7 @@ quick_i2recv(iph2, msg0)
     }
 
 	/* check SA payload and set approval SA for use */
-	if (ipsecdoi_checkph2proposal(sa_tmp, iph2) < 0) {
+	if (ipsecdoi_checkph2proposal(iph2->sa, iph2) < 0) {
 		/* XXX send information */
 		goto end;
 	}
@@ -803,7 +803,6 @@ quick_r1recv(iph2, msg0)
 	struct isakmp_parse_t *pa;
 	struct isakmp *isakmp = (struct isakmp *)msg0->v;
 	struct isakmp_pl_hash *hash = NULL;
-	struct ipsecdoi_pl_sa *sa_tmp = NULL; /* SA payloads to parse. */
 	char *p;
 	int tlen;
 	int f_id_order;	/* for ID payload detection */
@@ -891,7 +890,7 @@ quick_r1recv(iph2, msg0)
 	 * parse the payloads.
 	 * copy non-HASH payloads into hbuf, so that we can validate HASH.
 	 */
-	sa_tmp = NULL;	/* we don't support multi SAs. */
+	iph2->sa = NULL;	/* we don't support multi SAs. */
 	iph2->nonce_p = NULL;
 	iph2->dhpub_p = NULL;
 	iph2->id_p = NULL;
@@ -916,12 +915,13 @@ quick_r1recv(iph2, msg0)
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_SA:
-			if (sa_tmp != NULL) {
+			if (iph2->sa != NULL) {
 				plog(logp, LOCATION, NULL,
 					"Multi SAs isn't supported.\n");
 				goto end;
 			}
-			sa_tmp = (struct ipsecdoi_pl_sa *)pa->ptr;
+			if (isakmp_p2ph(&iph2->sa, pa->ptr) < 0)
+				goto end;
 			break;
 
 		case ISAKMP_NPTYPE_NONCE:
@@ -994,7 +994,7 @@ quick_r1recv(iph2, msg0)
 	}
 
 	/* payload existency check */
-	if (hash == NULL || sa_tmp == NULL || iph2->nonce_p == NULL) {
+	if (hash == NULL || iph2->sa == NULL || iph2->nonce_p == NULL) {
 		plog(logp, LOCATION, iph2->ph1->remote,
 			"few isakmp message received.\n");
 		error = ISAKMP_NTYPE_PAYLOAD_MALFORMED;
@@ -1117,7 +1117,7 @@ quick_r1recv(iph2, msg0)
 	}
 
 	/* check SA payload and set approval SA for use */
-	if (ipsecdoi_checkph2proposal(sa_tmp, iph2) < 0) {
+	if (ipsecdoi_checkph2proposal(iph2->sa, iph2) < 0) {
 		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
 		goto end;
 	}

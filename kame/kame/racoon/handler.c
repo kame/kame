@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.17 2000/03/24 11:17:45 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.18 2000/04/18 12:20:11 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -386,6 +386,14 @@ initph2(iph2)
 	if (iph2->ivm) {
 		oakley_delivm(iph2->ivm);
 		iph2->ivm = NULL;
+	}
+	if (iph2->sa) {
+		vfree(iph2->sa);
+		iph2->sa = NULL;
+	}
+	if (iph2->sa_ret) {
+		vfree(iph2->sa_ret);
+		iph2->sa_ret = NULL;
 	}
 #if 0
 	if (iph2->approval) {

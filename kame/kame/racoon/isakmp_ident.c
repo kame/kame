@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.20 2000/03/01 08:01:45 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.21 2000/04/18 12:20:11 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -161,7 +161,6 @@ ident_i2recv(iph1, msg)
 	struct ph1handle *iph1;
 	vchar_t *msg;
 {
-	struct ipsecdoi_pl_sa *sa_tmp = NULL;
 	vchar_t *pbuf = NULL;
 	struct isakmp_parse_t *pa;
 	int error = -1;
@@ -202,7 +201,8 @@ ident_i2recv(iph1, msg)
 			pa->type, ISAKMP_NPTYPE_SA);
 		goto end;
 	}
-	sa_tmp = (struct ipsecdoi_pl_sa *)pa->ptr;
+	if (isakmp_p2ph(&iph1->sa, pa->ptr) < 0)
+		goto end;
 	pa++;
 
 	for (/*nothing*/;
@@ -226,7 +226,7 @@ ident_i2recv(iph1, msg)
 	}
 
 	/* check SA payload and set approval SA for use */
-	if (ipsecdoi_checkph1proposal(sa_tmp, iph1) < 0) {
+	if (ipsecdoi_checkph1proposal(iph1->sa, iph1) < 0) {
 		plog(logp, LOCATION, iph1->remote,
 			"failed to get valid proposal.\n");
 		/* XXX send information */
@@ -640,7 +640,6 @@ ident_r1recv(iph1, msg)
 	struct ph1handle *iph1;
 	vchar_t *msg;
 {
-	struct ipsecdoi_pl_sa *sa_tmp = NULL;
 	vchar_t *pbuf = NULL;
 	struct isakmp_parse_t *pa;
 	int error = -1;
@@ -674,7 +673,8 @@ ident_r1recv(iph1, msg)
 			pa->type, ISAKMP_NPTYPE_SA);
 		goto end;
 	}
-	sa_tmp = (struct ipsecdoi_pl_sa *)pa->ptr;
+	if (isakmp_p2ph(&iph1->sa, pa->ptr) < 0)
+		goto end;
 	pa++;
 
 	for (/*nothing*/;
@@ -704,23 +704,12 @@ ident_r1recv(iph1, msg)
 	}
 
 	/* check SA payload and set approval SA for use */
-	if (ipsecdoi_checkph1proposal(sa_tmp, iph1) < 0) {
+	if (ipsecdoi_checkph1proposal(iph1->sa, iph1) < 0) {
 		plog(logp, LOCATION, iph1->remote,
 			"failed to get valid proposal.\n");
 		/* XXX send information */
 		goto end;
 	}
-
-	/* save SA payload minus genera header to calculate hash later */
-	iph1->sa = vmalloc(ntohs(sa_tmp->h.len) - sizeof(struct isakmp_gen));
-	if (iph1->sa == NULL) {
-		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
-		/* XXX send information */
-		goto end;
-	}
-	memmove(iph1->sa->v, &sa_tmp->h + 1,
-		ntohs(sa_tmp->h.len) - sizeof(struct isakmp_gen));
 
 	iph1->status = PHASE1ST_MSG1RECEIVED;
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.53 2000/03/24 16:32:01 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.54 2000/04/18 12:20:11 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -138,8 +138,7 @@ static int cmpproposal __P((const struct ipsecsa *p1,
 static int t2ipsecsa __P((struct isakmp_pl_t *trns, struct ipsecsa *sa));
 
 static void free_proppair __P((struct prop_pair **));
-static struct prop_pair **get_proppair
-	__P((struct ipsecdoi_pl_sa *sa, int mode));
+static struct prop_pair **get_proppair __P((vchar_t *sa, int mode));
 static int get_transform
 	__P((struct isakmp_pl_p *prop, struct prop_pair **pair, int *num_p));
 static vchar_t *get_sabyproppair __P((struct prop_pair *pair));
@@ -217,7 +216,7 @@ static void print_proppair __P((struct prop_pair *));
  */
 int
 ipsecdoi_checkph1proposal(sa, iph1)
-	struct ipsecdoi_pl_sa *sa;
+	vchar_t *sa;
 	struct ph1handle *iph1;
 {
 	vchar_t *newsa;		/* new SA payload approved. */
@@ -664,7 +663,7 @@ err:
  */
 int
 ipsecdoi_checkph2proposal(sa, iph2)
-	struct ipsecdoi_pl_sa *sa;
+	vchar_t *sa;
 	struct ph2handle *iph2;
 {
 	vchar_t *newsa;		/* new SA payload approved. */
@@ -1315,7 +1314,7 @@ free_proppair(pair)
  */
 static struct prop_pair **
 get_proppair(sa, mode)
-	struct ipsecdoi_pl_sa *sa;
+	vchar_t *sa;
 	int mode;
 {
 	struct prop_pair **pair;
@@ -1323,18 +1322,25 @@ get_proppair(sa, mode)
 	int tlen;
 	caddr_t bp;
 	int i;
+	struct ipsecdoi_sa_b *sab = (struct ipsecdoi_sa_b *)sa->v;
 
 	YIPSDEBUG(DEBUG_SA,
+		plog(logp, LOCATION, NULL, "total SA len=%d\n", sa->l));
+	YIPSDEBUG(DEBUG_DSA, PVDUMP(sa));
+
+	/* check SA payload size */
+	if (sa->l < sizeof(*sab)) {
 		plog(logp, LOCATION, NULL,
-			"total SA len=%d\n", ntohs(sa->h.len)));
-	YIPSDEBUG(DEBUG_DSA, hexdump(sa, ntohs(sa->h.len)));
+			"Invalid SA length = %d.\n", sa->l);
+		return NULL;
+	}
 
 	/* check DOI */
-	if (check_doi(ntohl(sa->b.doi)) < 0)
+	if (check_doi(ntohl(sab->doi)) < 0)
 		return NULL;
 
 	/* check SITUATION */
-	if (check_situation(ntohl(sa->b.sit)) < 0)
+	if (check_situation(ntohl(sab->sit)) < 0)
 		return NULL;
 
 	pair = CALLOC(MAXPROPPAIRLEN * sizeof(*pair), struct prop_pair **);
@@ -1345,15 +1351,8 @@ get_proppair(sa, mode)
 	}
 	memset(pair, 0, sizeof(pair));
 
-	bp = (caddr_t)(sa + 1);
-	tlen = ntohs(sa->h.len) - sizeof(*sa);
-
-	if (tlen <= 0) {
-		plog(logp, LOCATION, NULL,
-			"Invalid length of SA payload = %d.\n",
-			tlen + sizeof(*sa));
-		return NULL;
-	}
+	bp = (caddr_t)(sab + 1);
+	tlen = sa->l - sizeof(*sab);
 
     {
 	struct isakmp_pl_p *prop;

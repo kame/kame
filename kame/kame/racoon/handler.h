@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.14 2000/03/24 11:17:46 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.15 2000/04/18 12:20:11 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -244,6 +244,9 @@ struct ph2handle {
 	vchar_t *nonce;			/* nonce value in phase 2 */
 	vchar_t *nonce_p;		/* partner's nonce value in phase 2 */
 	vchar_t *hash;			/* HASH2 minus general header */
+
+	vchar_t *sa;			/* whole SA payload to calculate HASH */
+					/* NOT INCLUDING general header. */
 
 	vchar_t *sa_ret;		/* SA payload to be reply */
 					/* NOT INCLUDING general header. */
