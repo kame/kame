@@ -765,6 +765,19 @@ found:
 	}
 #endif
 
+#ifdef IPSEC
+	/*
+	 * enforce IPsec policy checking if we are seeing last header.
+	 * note that we do not visit this with protocols with pcb layer
+	 * code - like udp/tcp/raw ip.
+	 */
+	if ((inetsw[ip_protox[ip->ip_p]].pr_flags & PR_LASTHDR) != 0 &&
+	    ipsec4_in_reject(m, NULL)) {
+		ipsecstat.in_polvio++;
+		goto bad;
+	}
+#endif
+
 	/*
 	 * Switch out to protocol's input routine.
 	 */

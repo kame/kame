@@ -171,16 +171,16 @@ struct protosw inetsw[] = {
   rip_usrreq,
   0,		0,		0,		0,
 },
-{ SOCK_RAW,	&inetdomain,	IPPROTO_ICMP,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_ICMP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   icmp_input,	0,		0,		rip_ctloutput,
   rip_usrreq
 },
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IGMP,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IGMP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   igmp_input,	0,		0,		rip_ctloutput,
   rip_usrreq,
   igmp_init,	igmp_fasttimo,	igmp_slowtimo
 },
-{ SOCK_RAW,	&inetdomain,	IPPROTO_RSVP,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_RSVP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   rsvp_input,	0,		0,		rip_ctloutput,
   rip_usrreq,
   0,		0,		0,		0,
@@ -204,34 +204,34 @@ struct protosw inetsw[] = {
   0,		0,		0,		0,
 },
 #endif /* IPSEC */
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   encap4_input,	0,	 	0,		rip_ctloutput,
   rip_usrreq,	  
   encap_init,	0,		0,		0,
 },
 #ifdef INET6
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   encap4_input,	0,	 	0,		rip_ctloutput,
   rip_usrreq,	  
   encap_init,	0,		0,		0,
 },
 #endif /* INET6 */
 #if 0
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IPIP,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IPIP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   ipip_input,	0,	 	0,		rip_ctloutput,
   rip_usrreq,
   0,		0,		0,		0,
 },
 #endif
 #ifdef IPDIVERT
-{ SOCK_RAW,	&inetdomain,	IPPROTO_DIVERT,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_DIVERT,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   div_input,	0,	 	0,		ip_ctloutput,
   div_usrreq,
   div_init,	0,		0,		0,
 },
 #endif
 #ifdef TPIP
-{ SOCK_SEQPACKET,&inetdomain,	IPPROTO_TP,	PR_CONNREQUIRED|PR_WANTRCVD,
+{ SOCK_SEQPACKET,&inetdomain,	IPPROTO_TP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LASTHDR,
   tpip_input,	0,		tpip_ctlinput,	tp_ctloutput,
   tp_usrreq,
   tp_init,	0,		tp_slowtimo,	tp_drain,
@@ -239,21 +239,21 @@ struct protosw inetsw[] = {
 #endif
 /* EON (ISO CLNL over IP) */
 #ifdef EON
-{ SOCK_RAW,	&inetdomain,	IPPROTO_EON,	0,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_EON,	PR_LASTHDR,
   eoninput,	0,		eonctlinput,		0,
   0,
   eonprotoinit,	0,		0,		0,
 },
 #endif
 #ifdef IPXIP
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IDP,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IDP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   ipxip_input,	0,		ipxip_ctlinput,	0,
   rip_usrreq,
   0,		0,		0,		0,
 },
 #endif
 #ifdef NSIP
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IDP,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IDP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   idpip_input,	0,		nsip_ctlinput,	0,
   rip_usrreq,
   0,		0,		0,		0,
