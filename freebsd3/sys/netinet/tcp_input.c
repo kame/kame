@@ -1,3 +1,4 @@
+#define DEFER_MADJ
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -161,7 +162,7 @@ struct inpcbinfo tcbinfo;
 static void	 tcp_dooptions __P((struct tcpcb *,
 	    u_char *, int, struct tcphdr *, struct tcpopt *));
 static void	 tcp_pulloutofband __P((struct socket *,
-	    struct tcphdr *, struct mbuf *));
+	    struct tcphdr *, struct mbuf *, int));
 static void	 tcp_xmit_timer __P((struct tcpcb *, int));
 
 /*
@@ -573,8 +574,10 @@ tcp_input(m, off, proto)
 	 * Drop TCP, IP headers and TCP options.
 	 */
 	hdroptlen = off+toff;
+#ifndef DEFER_MADJ
 	m->m_data += hdroptlen;
 	m->m_len  -= hdroptlen;
+#endif
 
 	/*
 	 * Locate pcb for segment.
@@ -624,8 +627,10 @@ findpcb:
 
 #ifdef IPSEC
 	/* due to difference from other BSD stacks */
+#ifndef DEFER_MADJ
 	m->m_data -= hdroptlen;
 	m->m_len  += hdroptlen;
+#endif
 #ifdef INET6
 	if (isipv6) {
 		if (inp != NULL && ipsec6_in_reject_so(m, inp->inp_socket)) {
@@ -638,8 +643,10 @@ findpcb:
 		ipsecstat.in_polvio++;
 		goto drop;
 	}
+#ifndef DEFER_MADJ
 	m->m_data += hdroptlen;
 	m->m_len  -= hdroptlen;
+#endif
 #endif /*IPSEC*/
 
 #ifdef ALTQ_ECN
@@ -713,11 +720,15 @@ findpcb:
 		 * XXX: we'll soon make a more natural fix after getting a
 		 *      consensus.
 		 */
+#ifndef DEFER_MADJ
 		m->m_data -= hdroptlen;
 		m->m_len  += hdroptlen;
+#endif
 		ip6_savecontrol(inp, &inp->in6p_options, ip6, m);
+#ifndef DEFER_MADJ
 		m->m_data += hdroptlen;	/* XXX */
 		m->m_len  -= hdroptlen;	/* XXX */
+#endif
 	}
 #endif /* INET6 */
 
@@ -862,13 +873,17 @@ findpcb:
 					 * fix after getting a consensus.
 					 * (see above)
 					 */
+#ifndef DEFER_MADJ
 					m->m_data -= hdroptlen;
 					m->m_len  += hdroptlen;
+#endif
 					ip6_savecontrol(inp,
 							&inp->in6p_options,
 							ip6, m);
+#ifndef DEFER_MADJ
 					m->m_data += hdroptlen;	/* XXX */
 					m->m_len  -= hdroptlen;	/* XXX */
+#endif
 				}
 			} else
 #endif /* INET6 */
@@ -1029,6 +1044,9 @@ findpcb:
 			/* some progress has been done */
 			if (isipv6)
 				ND6_HINT(tp);
+#endif
+#ifdef DEFER_MADJ
+			m_adj(m, hdroptlen);
 #endif
 			sbappend(&so->so_rcv, m);
 			sorwakeup(so);
@@ -1690,7 +1708,11 @@ trimthenstep6:
 			tcpstat.tcps_rcvpartduppack++;
 			tcpstat.tcps_rcvpartdupbyte += todrop;
 		}
+#ifndef DEFER_MADJ
 		m_adj(m, todrop);
+#else
+		hdroptlen += todrop;	/* drop from the top afterwards */
+#endif
 		th->th_seq += todrop;
 		tilen -= todrop;
 		if (th->th_urp > todrop)
@@ -2205,8 +2227,13 @@ step6:
 #ifdef SO_OOBINLINE
 		     && (so->so_options & SO_OOBINLINE) == 0
 #endif
-		     )
-			tcp_pulloutofband(so, th, m);
+		     ) {
+#ifdef DEFER_MADJ
+			tcp_pulloutofband(so, th, m, hdroptlen);
+#else
+			tcp_pulloutofband(so, th, m, 0);
+#endif
+		}
 	} else
 		/*
 		 * If no out of band data is expected,
@@ -2227,6 +2254,9 @@ dodata:							/* XXX */
 	 */
 	if ((tilen || (thflags&TH_FIN)) &&
 	    TCPS_HAVERCVDFIN(tp->t_state) == 0) {
+#ifdef DEFER_MADJ
+		m_adj(m, hdroptlen);
+#endif
 		TCP_REASS(tp, th, tilen, m, so, thflags, isipv6);
 		/*
 		 * Note the amount of data that peer has sent into
@@ -2586,12 +2616,13 @@ tcp_dooptions(tp, cp, cnt, th, to)
  * sequencing purposes.
  */
 static void
-tcp_pulloutofband(so, th, m)
+tcp_pulloutofband(so, th, m, off)
 	struct socket *so;
 	struct tcphdr *th;
 	register struct mbuf *m;
+	int off;
 {
-	int cnt = th->th_urp - 1;
+	int cnt = off + th->th_urp - 1;
 
 	while (cnt >= 0) {
 		if (m->m_len > cnt) {
