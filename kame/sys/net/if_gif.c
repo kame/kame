@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.75 2001/08/17 05:15:09 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.76 2001/08/20 02:01:02 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -193,6 +193,9 @@ gifattach0(sc)
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 	sc->gif_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
 #endif
+#ifdef ALTQ
+	IFQ_SET_READY(&sc->gif_if.if_snd);
+#endif
 	if_attach(&sc->gif_if);
 #if NBPFILTER > 0
 #ifdef HAVE_OLD_BPF
@@ -232,7 +235,11 @@ gif_start(ifp)
 
 	for (;;) {
 		s = splimp();
+#ifdef ALTQ
+		IFQ_DEQUEUE(&ifp->if_snd, m);
+#else
 		IF_DEQUEUE(&ifp->if_snd, m);
+#endif
 		splx(s);
 
 		if (m == NULL) return;
@@ -439,7 +446,11 @@ gifintr(arg)
 	/* output processing */
 	while (1) {
 		s = splnet();
+#ifdef ALTQ
+		IFQ_DEQUEUE(&sc->gif_if.if_snd, m);
+#else
 		IF_DEQUEUE(&sc->gif_if.if_snd, m);
+#endif
 		splx(s);
 		if (m == NULL)
 			break;
