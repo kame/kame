@@ -49,6 +49,7 @@
 #endif
 
 #include <stdio.h>
+#include <err.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -151,10 +152,9 @@ init_globals()
 {
 	static struct iovec rcviov;
 	static u_char rprdata[4500]; /* maximal MTU of connected links */
-	static u_char rcvcmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-				 CMSG_SPACE(sizeof(int))];
-	static u_char sndcmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-				 CMSG_SPACE(sizeof(int))];
+	static u_char *rcvcmsgbuf = NULL;
+	static u_char *sndcmsgbuf = NULL;
+	int sndcmsglen, rcvcmsglen;
 
 	/* init ll_allrouters */
 	init_sin6(&sin6_ll_allrouters, LL_ALLROUTERS);
@@ -165,14 +165,28 @@ init_globals()
 	rcvmhdr.msg_namelen = sizeof(struct sockaddr_in6);
 	rcvmhdr.msg_iov = &rcviov;
 	rcvmhdr.msg_iovlen = 1;
+	rcvcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
+		CMSG_SPACE(sizeof(int));
+	if (rcvcmsgbuf == NULL &&
+	    (rcvcmsgbuf = (u_char *)malloc(rcvcmsglen)) == NULL) {
+		syslog(LOG_ERR, "<%s>: malloc failed", __FUNCTION__);
+		exit(1);
+	}
 	rcvmhdr.msg_control = (caddr_t)rcvcmsgbuf;
-	rcvmhdr.msg_controllen = sizeof(rcvcmsgbuf);
+	rcvmhdr.msg_controllen = rcvcmsglen;
 
 	/* initialize msghdr for sending packets */
 	sndmhdr.msg_namelen = sizeof(struct sockaddr_in6);
 	sndmhdr.msg_iovlen = 1;
+	sndcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
+		CMSG_SPACE(sizeof(int));
+	if (sndcmsgbuf == NULL &&
+	    (sndcmsgbuf = (u_char *)malloc(sndcmsglen)) == NULL) {
+		syslog(LOG_ERR, "<%s>: malloc failed", __FUNCTION__);
+		exit(1);
+	}
 	sndmhdr.msg_control = (caddr_t)sndcmsgbuf;
-	sndmhdr.msg_controllen = sizeof(sndcmsgbuf);
+	sndmhdr.msg_controllen = sndcmsglen;
 }
 
 void
@@ -226,7 +240,12 @@ sock6_open(struct flags *flags
 	   )
 {
 	struct icmp6_filter filt;
-	int on, optval;
+	int on;
+#ifdef IPSEC
+#ifndef IPSEC_POLICY_IPSEC
+	int optval;
+#endif 
+#endif 
 
 	if (with_v6dest == 0)
 		return;
@@ -309,7 +328,11 @@ sock4_open(struct flags *flags
 #endif /* IPSEC_POLICY_IPSEC */
 	   )
 {
-	int on, optval;
+#ifdef IPSEC
+#ifndef IPSEC_POLICY_IPSEC
+	int optval;
+#endif 
+#endif 
 
 	if (with_v4dest == 0)
 		return;
@@ -370,7 +393,6 @@ rrenum_output(struct payload_list *pl, struct dst_list *dl)
 	int i, msglen = 0;
 	struct cmsghdr *cm;
 	struct in6_pktinfo *pi;
-	struct icmp6_router_renum *rr;
 	struct sockaddr_in6 *sin6 = NULL;
 
 	sndmhdr.msg_name = (caddr_t)dl->dl_dst;
@@ -475,7 +497,6 @@ rrenum_input(int s)
 int
 main(int argc, char *argv[])
 {
-	char *cfile = NULL;
 	FILE *fp = stdin;
 	fd_set fdset;
 	struct timeval timeout;
