@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.37 2000/12/04 06:45:31 itojun Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.38 2000/12/22 13:12:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -1596,8 +1596,8 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 		continue;	/* Ignore this group and jump to the next */
 	    }
 
-	    if (inet6_equal(&group,&sockaddr6_d) &&
-		(encod_src.masklen == STAR_STAR_RP_MSK6LEN))
+	    if (inet6_equal(&group, &sockaddr6_d) &&
+		(encod_group.masklen == STAR_STAR_RP_MSK6LEN))
 	    {
 		/* (*,*,RP) Join suppression */
 
@@ -1850,9 +1850,9 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 		if ((s_flags & USADDR_RP_BIT) && (s_flags & USADDR_WC_BIT))
 		{
 		    /* (*,G) prune suppression */
-		    rpentry_ptr = rp_match(&source);
-		    if ((rpentry_ptr == (rpentry_t *) NULL)
-			|| (!inet6_equal(&rpentry_ptr->address , &source)))
+		    rpentry_ptr = rp_match(&group);
+		    if ((rpentry_ptr == (rpentry_t *)NULL)
+			|| (!inet6_equal(&rpentry_ptr->address, &source)))
 			continue;	/* No such RP or it is different.
 					 * Ignore */
 		    mrtentry_ptr = find_route(&sockaddr6_any, &group, MRTF_WC,
@@ -1996,8 +1996,8 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 		    "Number of prune  : %d",num_p_srcs );
 	}
 
-	if (!(inet6_equal(&group,&sockaddr6_d))
-	    || (encod_src.masklen != STAR_STAR_RP_MSK6LEN))
+	if (!(inet6_equal(&group, &sockaddr6_d))
+	    || (encod_group.masklen != STAR_STAR_RP_MSK6LEN))
 	{
 	    /* This is not (*,*,RP). Jump to the next group. */
 	    data_ptr += (num_j_srcs + num_p_srcs) * sizeof(pim6_encod_src_addr_t);

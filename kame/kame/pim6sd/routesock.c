@@ -1,4 +1,4 @@
-/*	$KAME: routesock.c,v 1.10 2000/12/04 06:45:31 itojun Exp $	*/
+/*	$KAME: routesock.c,v 1.11 2000/12/22 13:12:29 jinmei Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Southern California.
@@ -119,7 +119,7 @@ __P((register struct rt_msghdr *, int,
 #ifdef HAVE_SA_LEN
 #define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 #else
-#define ADVANCE(x, n) (x += ROUNDUP(4))	/* TODO: a hack!! */
+#define ADVANCE(x, n) (x += ROUNDUP(sizeof(*(n)))) /* XXX: sizeof(sa) */
 #endif
 
 /* Open and initialize the routing socket */
@@ -187,7 +187,7 @@ k_req_incoming(source, rpfp)
 #else
 #define NEXTADDR(w, u) \
     if (rtm_addrs & (w)) { \
-	l = ROUNDUP(4); bcopy((char *)&(u), cp, l); cp += l;\
+	l = ROUNDUP(sizeof(struct sockaddr)); bcopy((char *)&(u), cp, l); cp += l;\
     }
 #endif				/* HAVE_SA_LEN */
 
