@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.20 2001/09/17 12:42:39 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.21 2001/09/20 08:31:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -156,6 +156,9 @@ void mip6_create_addr			__P((struct in6_addr *,
 					     struct in6_addr *,
 					     struct in6_addr *,
 					     u_int8_t));
+struct mip6_bc *mip6_bc_list_find_withcoa
+					__P((struct mip6_bc_list *,
+					     struct in6_addr *));
 
 int mip6_ioctl				__P((u_long, caddr_t));
 int mip6_tunnel				__P((struct in6_addr *,
@@ -257,7 +260,7 @@ int mip6_ha_list_update_gaddr		__P((struct mip6_ha_list*,
 
 /* binding update management */
 void mip6_bu_init			__P((void));
-struct mip6_bu *mip6_bu_create		__P((struct in6_addr *,
+struct mip6_bu *mip6_bu_create		__P((const struct in6_addr *,
 					     struct mip6_prefix *,
 					     struct in6_addr *,
 					     u_int16_t,
