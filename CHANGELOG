@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.877 2000/05/15 09:28:26 itojun Exp $
+$Id: CHANGELOG,v 1.878 2000/05/15 10:20:48 jinmei Exp $
 
 <200005>
+2000-05-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/v6test/conf/ext.conf (jumbolack): added to see if the
+	target is coformant to the 1st validation in Section 3. of rfc
+	2675.
+
+2000-05-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_input): if ip6_plen == 0 &&
+	HbH is included && no jumbo opt, return icmp6 error and discard
+	packet. This is a new validation check added in RFC 2675.
+
 Mon May 15 18:25:52 JST 2000  itojun@iijlab.net
 	* sys/netinet6/icmp6.c: support DNS subject name in NI6 query.
 	  receiving node will supress reply, if DNS subject name does not
