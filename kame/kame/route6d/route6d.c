@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.47 2001/01/22 11:25:15 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.48 2001/01/22 11:45:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.47 2001/01/22 11:25:15 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.48 2001/01/22 11:45:18 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -781,7 +781,6 @@ ripsend(ifcp, sin, flag)
 		 * -A: filter out less specific routes, if we have aggregated
 		 * route configured.
 		 */ 
-		ok = 1;
 		for (iffp = ifcp->ifc_filter; iffp; iffp = iffp->iff_next) {
 			if (iffp->iff_type != 'A')
 				continue;
@@ -789,46 +788,62 @@ ripsend(ifcp, sin, flag)
 				continue;
 			ia = rrt->rrt_info.rip6_dest; 
 			applyplen(&ia, iffp->iff_plen);
-			if (IN6_ARE_ADDR_EQUAL(&ia, &iffp->iff_addr)) {
-				ok = 0;
-				break;
-			}
+			if (IN6_ARE_ADDR_EQUAL(&ia, &iffp->iff_addr))
+				goto noadvert;
 		}
-		if (!ok)
-			continue;
 
 		/*
-		 * if it is an aggregated route and the interface is not
-		 * listed on -A, we don't advertise it.
+		 * if it is an aggregated route, advertise it only to the
+		 * interfaces specified on -A.
 		 */
-		if ((rrt->rrt_rflags & RRTF_AGGREGATE) && !iff_find(ifcp, 'A'))
-			continue;
+		if ((rrt->rrt_rflags & RRTF_AGGREGATE) != 0) {
+			ok = 0;
+			for (iffp = ifcp->ifc_filter; iffp;
+			     iffp = iffp->iff_next) {
+				if (iffp->iff_type != 'A')
+					continue;
+				if (rrt->rrt_info.rip6_plen == iffp->iff_plen &&
+				    IN6_ARE_ADDR_EQUAL(&rrt->rrt_info.rip6_dest,
+				    &iffp->iff_addr)) {
+					ok = 1;
+					break;
+				}
+			}
+			if (!ok)
+				goto noadvert;
+		}
 
 		/*
 		 * -O: advertise only if prefix matches the configured prefix.
 		 */
-		for (iffp = ifcp->ifc_filter; iffp; iffp = iffp->iff_next) {
-			if (iffp->iff_type != 'O')
-				continue;
+		if (iff_find(ifcp, 'O')) {
 			ok = 0;
-			if (rrt->rrt_info.rip6_plen < iffp->iff_plen)
-				continue;
-			ia = rrt->rrt_info.rip6_dest; 
-			applyplen(&ia, iffp->iff_plen);
-			if (IN6_ARE_ADDR_EQUAL(&ia, &iffp->iff_addr)) {
-				ok = 1;
-				break;
+			for (iffp = ifcp->ifc_filter; iffp;
+			     iffp = iffp->iff_next) {
+				if (iffp->iff_type != 'O')
+					continue;
+				if (rrt->rrt_info.rip6_plen < iffp->iff_plen)
+					continue;
+				ia = rrt->rrt_info.rip6_dest; 
+				applyplen(&ia, iffp->iff_plen);
+				if (IN6_ARE_ADDR_EQUAL(&ia, &iffp->iff_addr)) {
+					ok = 1;
+					break;
+				}
 			}
+			if (!ok)
+				goto noadvert;
 		}
-		if (!ok)
-			continue;
+
 		/* Check split horizon and other conditions */
 		if (tobeadv(rrt, ifcp) == 0)
 			continue;
+
 		/* Only considers the routes with flag if specified */
 		if ((flag & RRTF_CHANGED) &&
 		    (rrt->rrt_rflags & RRTF_CHANGED) == 0)
 			continue;
+
 		/* Check nexthop */
 		if (rrt->rrt_index == ifcp->ifc_index &&
 		    !IN6_IS_ADDR_UNSPECIFIED(&rrt->rrt_gw) &&
@@ -856,6 +871,7 @@ ripsend(ifcp, sin, flag)
 			nh = NULL;
 			np++; nrt++;
 		}
+
 		/* Put the route to the buffer */
 		*np = rrt->rrt_info;
 		np++; nrt++;
@@ -863,6 +879,8 @@ ripsend(ifcp, sin, flag)
 			ripflush(ifcp, sin);
 			nh = NULL;
 		}
+
+noadvert:;
 	}
 	if (nrt)	/* Send last packet */
 		ripflush(ifcp, sin);
