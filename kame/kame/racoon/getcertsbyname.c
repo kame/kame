@@ -1,4 +1,4 @@
-/*	$KAME: getcertsbyname.c,v 1.1 2001/04/11 06:11:55 sakane Exp $	*/
+/*	$KAME: getcertsbyname.c,v 1.2 2001/04/11 09:51:59 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -34,7 +34,12 @@
 #include <netinet/in.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
+#ifdef HAVE_LWRES
+#include <lwres/netdb.h>
+#include <lwres/lwres.h>
+#else
 #include <netdb.h>
+#endif
 #include <stdlib.h>
 #include <errno.h>
 
@@ -47,6 +52,35 @@
 
 /* XXX should it use ci_errno to hold errno instead of h_errno ? */
 extern int h_errno;
+
+static struct certinfo *getnewci __P((int, int, int, int, int, char *));
+
+static struct certinfo *
+getnewci(qtype, keytag, algorithm, flags, certlen, cert)
+	int qtype, keytag, algorithm, flags, certlen;
+	char *cert;
+{
+	struct certinfo *res;
+
+	res = malloc(sizeof(*res));
+	if (!res)
+		return NULL;
+
+	memset(res, 0, sizeof(*res));
+	res->ci_type = qtype;
+	res->ci_keytag = keytag;
+	res->ci_algorithm = algorithm;
+	res->ci_flags = flags;
+	res->ci_certlen = certlen;
+	res->ci_cert = malloc(certlen);
+	if (!res->ci_cert) {
+		free(res);
+		return NULL;
+	}
+	memcpy(res->ci_cert, cert, certlen);
+
+	return res;
+}
 
 void
 freecertinfo(ci)
@@ -66,6 +100,90 @@ freecertinfo(ci)
 /*
  * get CERT RR by FQDN and create certinfo structure chain.
  */
+#ifdef HAVE_LWRES
+int
+getcertsbyname(name, res)
+	char *name;
+	struct certinfo **res;
+{
+	int rdlength;
+	char *cp;
+	int type, keytag, algorithm;
+	struct certinfo head, *cur;
+	struct rrsetinfo *rr = NULL;
+	int i;
+	int error = -1;
+
+	/* initialize res */
+	*res = NULL;
+
+	memset(&head, 0, sizeof(head));
+	cur = &head;
+
+	error = lwres_getrrsetbyname(name, C_IN, T_CERT, 0, &rr);
+	if (error) {
+#ifdef DNSSEC_DEBUG
+		printf("lwres_getrrsetbyname: %s\n", lwres_hstrerror(error));
+#endif
+		h_errno = NO_RECOVERY;
+		goto end;
+	}
+
+	if (rr->rri_rdclass != C_IN
+	 || rr->rri_rdtype != T_CERT
+	 || rr->rri_nrdatas == 0) {
+#ifdef DNSSEC_DEBUG
+		printf("lwres_getrrsetbyname: %s", lwres_hstrerror(error));
+#endif
+		h_errno = NO_RECOVERY;
+		goto end;
+	}
+#ifdef DNSSEC_DEBUG
+	if (!(rr->rri_flags & LWRDATA_VALIDATED))
+		printf("rr is not valid");
+#endif
+
+	for (i = 0; i < rr->rri_nrdatas; i++) {
+		rdlength = rr->rri_rdatas[i].rdi_length;
+		cp = rr->rri_rdatas[i].rdi_data;
+
+		GETSHORT(type, cp);	/* type */
+		rdlength -= INT16SZ;
+		GETSHORT(keytag, cp);	/* key tag */
+		rdlength -= INT16SZ;
+		algorithm = *cp++;	/* algorithm */
+		rdlength -= 1;
+
+#ifdef DNSSEC_DEBUG
+		printf("type=%d keytag=%d alg=%d len=%d\n",
+			type, keytag, algorithm, rdlength);
+#endif
+
+		/* create new certinfo */
+		cur->ci_next = getnewci(type, keytag, algorithm,
+					rr->rri_flags, rdlength, cp);
+		if (!cur->ci_next) {
+#ifdef DNSSEC_DEBUG
+			printf("getnewci: %s", strerror(errno));
+#endif
+			h_errno = NO_RECOVERY;
+			goto end;
+		}
+		cur = cur->ci_next;
+	}
+
+	*res = head.ci_next;
+	error = 0;
+
+end:
+	if (rr)
+		lwres_freerrset(rr);
+	if (error && head.ci_next)
+		freecertinfo(head.ci_next);
+
+	return error;
+}
+#else	/*!HAVE_LWRES*/
 int
 getcertsbyname(name, res)
 	char *name;
@@ -181,29 +299,17 @@ getcertsbyname(name, res)
 #endif
 
 		/* create new certinfo */
-		cur->ci_next = malloc(sizeof(*cur));
+		cur->ci_next = getnewci(qtype, keytag, algorithm,
+					0, rdlength, cp);
 		if (!cur->ci_next) {
 #ifdef DNSSEC_DEBUG
-			printf("malloc(certinfo): %s", strerror(errno));
+			printf("getnewci: %s", strerror(errno));
 #endif
 			h_errno = NO_RECOVERY;
 			goto end;
 		}
 		cur = cur->ci_next;
-		memset(cur, 0, sizeof(*cur));
-		cur->ci_type = qtype;
-		cur->ci_keytag = keytag;
-		cur->ci_algorithm = algorithm;
-		cur->ci_certlen = rdlength;
-		cur->ci_cert = malloc(rdlength);
-		if (!cur->ci_cert) {
-#ifdef DNSSEC_DEBUG
-			printf("malloc(cert): %s", strerror(errno));
-#endif
-			h_errno = NO_RECOVERY;
-			goto end;
-		}
-		memcpy(cur->ci_cert, cp, rdlength);
+
 		cp += rdlength;
 	}
 
@@ -218,6 +324,7 @@ end:
 
 	return error;
 }
+#endif
 
 #ifdef DNSSEC_DEBUG
 int
@@ -280,6 +387,7 @@ main(ac, av)
 		printf("\tci_type=%d\n", p->ci_type);
 		printf("\tci_keytag=%d\n", p->ci_keytag);
 		printf("\tci_algorithm=%d\n", p->ci_algorithm);
+		printf("\tci_flags=%d\n", p->ci_flags);
 		printf("\tci_certlen=%d\n", p->ci_certlen);
 		printf("\tci_cert: ");
 		b64encode(p->ci_cert, p->ci_certlen);

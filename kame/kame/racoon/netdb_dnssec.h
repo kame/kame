@@ -1,4 +1,4 @@
-/*	$KAME: netdb_dnssec.h,v 1.1 2001/04/11 06:11:55 sakane Exp $	*/
+/*	$KAME: netdb_dnssec.h,v 1.2 2001/04/11 09:52:00 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,6 +57,7 @@ struct certinfo {
 	int ci_type;			/* certificate type */
 	int ci_keytag;			/* keytag */
 	int ci_algorithm;		/* algorithm */
+	int ci_flags;			/* currently, 1:valid or 0:uncertain */
 	size_t ci_certlen;		/* length of certificate */
 	char *ci_cert;			/* certificate */
 	struct certinfo *ci_next;	/* next structure */
