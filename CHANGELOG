@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2729 2005/03/02 04:00:50 suz Exp $
+$KAME: CHANGELOG,v 1.2730 2005/03/02 04:51:29 suz Exp $
 
 <200503>
+2005-03-02  SUZUKI, Shinsuke <suz@kame.net>
+	* kame/kame/dhcp6/dhcp6relay.[c8]: supports multiple client-side 
+	  interfaces
+
 2005-03-02  SUZUKI, Shinsuke <suz@kame.net>
 	* kame/sys/netinet6/ip6_output.c: fixed a freebsd5 kernel crash when
 	  WITNESS debug option is enabled

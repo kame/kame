@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.51 2004/11/28 11:29:36 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.52 2005/03/02 04:51:29 suz Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -64,7 +64,6 @@ static int maxfd;		/* maxi file descriptor for select(2) */
 
 static int debug = 0;
 
-static char *device;
 static char *relaydevice;
 static char *boundaddr;
 static char *serveraddr = DH6ADDR_ALLSERVER;
@@ -93,7 +92,7 @@ static char *global_strings[] = {
 
 static void usage __P((void));
 static struct prefix_list *make_prefix __P((char *));
-static void relay6_init __P((void));
+static void relay6_init __P((int, char *[]));
 static void relay6_loop __P((void));
 static void relay6_recv __P((int, int));
 static int make_msgcontrol __P((struct msghdr *, void *, socklen_t,
@@ -108,7 +107,7 @@ usage()
 {
 	fprintf(stderr,
 	    "usage: dhcp6relay [-dDf] [-b boundaddr] [-H hoplim] "
-	    "[-r relay-IF] [-s serveraddr] IF\n");
+	    "[-r relay-IF] [-s serveraddr] IF ...\n");
 	exit(0);
 }
 
@@ -166,13 +165,19 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 1) {
+	if (argc < 1) {
 		usage();
 		/* NOTREACHED */
 	}
-	device = argv[0];
-	if (relaydevice == NULL)
-		relaydevice = device;
+	if (relaydevice == NULL) {
+		if (argc != 1) {
+			fprintf(stderr, "you should explicitly specify a "
+			    "relaying interface, when you are to "
+			    "listen to multiple interfaces");
+			exit(0);
+		}
+		relaydevice = argv[0];
+	}
 
 	if (foreground == 0) {
 		if (daemon(0, 0) < 0)
@@ -181,7 +186,7 @@ main(argc, argv)
 	}
 	setloglevel(debug);
 
-	relay6_init();
+	relay6_init(argc, argv);
 
 	dprintf(LOG_INFO, FNAME, "dhcp6relay started");
 	relay6_loop();
@@ -246,11 +251,11 @@ make_prefix(pstr0)
 }
 
 static void
-relay6_init()
+relay6_init(int ifnum, char *iflist[])
 {
 	struct addrinfo hints;
 	struct addrinfo *res, *res2;
-	int i, ifid, error, on;
+	int i, error, on;
 	struct ipv6_mreq mreq6;
 	static struct iovec iov[2];
 
@@ -301,10 +306,6 @@ relay6_init()
 	/*
 	 * Setup a socket to communicate with clients.
 	 */
-	ifid = if_nametoindex(device);
-	if (ifid == 0)
-		dprintf(LOG_ERR, FNAME, "invalid interface %s", device);
-
 	memset(&hints, 0, sizeof (hints));
 	hints.ai_family = PF_INET6;
 	hints.ai_socktype = SOCK_DGRAM;
@@ -360,14 +361,23 @@ relay6_init()
 		goto failexit;
 	}
 	memset(&mreq6, 0, sizeof (mreq6));
-	mreq6.ipv6mr_interface = ifid;
 	memcpy(&mreq6.ipv6mr_multiaddr,
 	    &((struct sockaddr_in6 *)res2->ai_addr)->sin6_addr,
 	    sizeof (mreq6.ipv6mr_multiaddr));
-	if (setsockopt(csock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
-	    &mreq6, sizeof (mreq6))) {
-		dprintf(LOG_ERR, FNAME,
-		    "setsockopt(csock, IPV6_JOIN_GROUP): %s", strerror(errno));
+
+	while (ifnum-- > 0) {
+		char *ifp = iflist[0];
+		mreq6.ipv6mr_interface = if_nametoindex(ifp);
+		if (mreq6.ipv6mr_interface == 0)
+			dprintf(LOG_ERR, FNAME, "invalid interface %s", ifp);
+
+		if (setsockopt(csock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
+		    &mreq6, sizeof (mreq6))) {
+			dprintf(LOG_ERR, FNAME,
+			    "setsockopt(csock, IPV6_JOIN_GROUP): %s",
+			     strerror(errno));
+		}
+		iflist++;
 	}
 	freeaddrinfo(res2);
 
@@ -376,7 +386,7 @@ relay6_init()
 	 */
 	relayifid = if_nametoindex(relaydevice);
 	if (relayifid == 0)
-		dprintf(LOG_ERR, FNAME, "invalid interface %s", device);
+		dprintf(LOG_ERR, FNAME, "invalid interface %s", relaydevice);
 	/*
 	 * We are not really sure if we need to listen on the downstream
 	 * port to receive packets from serves.  We'll need to clarify the
