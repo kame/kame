@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.15 2001/06/20 12:33:00 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.16 2001/06/20 12:35:12 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -334,7 +334,7 @@ static void
 usage()
 {
 	fprintf(stderr, "usage: sender [-d optlen] [-D optlen] [-h optlen] "
-		"[-l hoplimit] [-M mtu] [-m] [-p port] [-s packetsize] "
+		"[-l hoplimit] [-m] [-p port] [-s packetsize] "
 		"IPv6addrs...\n");
 	exit(1);
 }
