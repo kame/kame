@@ -3,29 +3,35 @@
 ip6router=NO
 ip6mrouter=NO
 
-#----------
-# manual configurations - in case ip6router=YES
-#route6dflags=
-#mroute6dflags=
-#
-## list of interfaces, and prefix for interfaces
-## NOTE: no trailing double colon necessary here!
-#iface="ed0 ep0"
-#prefix_ed0="fec0:0000:0000:0001"
-#prefix_ep0="fec0:0000:0000:0002"
-#
-## list of outer ip addresses for gif.
-#gifs="gif0 gif1"
-#gifconfig_gif0="10.1.1.1 10.1.2.1"
-#gifconfig_gif1="10.1.1.2 10.1.2.2"
+if [ X"${ip6router}" = X"YES" ]; then
+	#
+	# manual configurations - in case ip6router=YES
+	#
+#	route6dflags=
+#	mroute6dflags=
 
-#----------
-# manual configurations - in case ip6router=NO
-# you can configure only single interface, as specification assumes that
-# autoconfigured host has single interface only.
-iface="ed0"
-
-#----------
+	#
+	# list of interfaces, and prefix for interfaces
+	# NOTE: no trailing double colon necessary here!
+	#
+	iface="ed0 ep0"
+	prefix_ed0="fec0:0000:0000:0001"
+	prefix_ep0="fec0:0000:0000:0002"
+	
+	#
+	# list of outer ip addresses for gif.
+	#
+#	gifs="gif0 gif1"
+#	gifconfig_gif0="10.1.1.1 10.1.2.1"
+#	gifconfig_gif1="10.1.1.2 10.1.2.2"
+else
+	#
+	# manual configurations - in case ip6router=NO
+	# you can configure only single interface, as specification assumes that
+	# autoconfigured host has single interface only.
+	#
+	iface="ed0"
+fi
 
 # tool locations
 ifconfig=/usr/local/v6/sbin/ifconfig
