@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.85 2001/05/21 09:04:24 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.86 2001/05/27 17:33:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -425,7 +425,6 @@ udp6_input(mp, offp, proto)
 #endif
 		udp6stat.udp6s_noport++;
 		if (m->m_flags & M_MCAST) {
-			printf("UDP6: M_MCAST is set in a unicast packet.\n");
 			udp6stat.udp6s_noportmcast++;
 			goto bad;
 		}
@@ -806,10 +805,8 @@ udp6_usrreq(so, req, m, addr6, control)
 	}
 
 release:
-	if (control) {
-		printf("udp control data unexpectedly retained\n");
+	if (control)
 		m_freem(control);
-	}
 	if (m)
 		m_freem(m);
 	return(error);
