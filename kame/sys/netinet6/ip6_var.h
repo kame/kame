@@ -274,11 +274,11 @@ int	ip6_process_hopopts __P((struct mbuf *, u_int8_t *, int, u_int32_t *,
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */
 void	ip6_savecontrol __P((struct inpcb *, struct ip6_hdr *, struct mbuf *,
 			     struct ip6_recvpktopts *,
-			     struct ip6_recvpktopts *));
+			     struct ip6_recvpktopts **));
 #else
 void	ip6_savecontrol __P((struct in6pcb *, struct ip6_hdr *, struct mbuf *,
 			     struct ip6_recvpktopts *,
-			     struct ip6_recvpktopts *));
+			     struct ip6_recvpktopts **));
 #endif
 void	ip6_update_recvpcbopt __P((struct ip6_recvpktopts *,
 				   struct ip6_recvpktopts *));

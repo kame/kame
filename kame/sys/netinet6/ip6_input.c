@@ -960,7 +960,7 @@ ip6_unknown_opt(optp, m, off)
  * you are using IP6_EXTHDR_CHECK() not m_pulldown())
  */
 void
-ip6_savecontrol(in6p, ip6, m, ctl, prevctl)
+ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
 	register struct inpcb *in6p;
 #else
@@ -968,10 +968,11 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctl)
 #endif
 	register struct ip6_hdr *ip6;
 	register struct mbuf *m;
-	struct ip6_recvpktopts *ctl, *prevctl;
+	struct ip6_recvpktopts *ctl, **prevctlp;
 {
 	register struct mbuf **mp;
 	struct cmsghdr *cm = NULL;
+	struct ip6_recvpktopts *prevctl = NULL;
 #ifdef HAVE_NRL_INPCB
 # define in6p_flags	inp_flags
 #endif
@@ -988,6 +989,26 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctl)
 		return;
 	bzero(ctl, sizeof(*ctl)); /* XXX is it really OK? */
 	mp = &ctl->head;
+
+	/*
+	 * If caller wanted to keep history, allocate space to store the
+	 * history at the first time. 
+	 */
+	if (prevctlp) {
+		if (*prevctlp == NULL) {
+			MALLOC(prevctl, struct ip6_recvpktopts *,
+			       sizeof(*prevctl), M_IP6OPT, M_NOWAIT);
+			if (prevctl == NULL) {
+				printf("ip6_savecontrol: can't allocate "
+				       " enough space for history\n");
+				return;
+			}
+			bzero(prevctl, sizeof(*prevctl));
+			*prevctlp = prevctl;
+		}
+		else
+			prevctl = *prevctlp;
+	}
 
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
@@ -1396,6 +1417,9 @@ ip6_reset_rcvopt(opts, optname)
 	struct ip6_recvpktopts *opts;
 	int optname;
 {
+	if (opts == NULL)
+		return;
+
 	switch(optname) {
 	case IPV6_RECVPKTINFO:
 		if (opts->pktinfo) m_free(opts->pktinfo);
