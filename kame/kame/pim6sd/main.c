@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.15 2000/12/10 08:29:14 itojun Exp $	*/
+/*	$KAME: main.c,v 1.16 2001/03/22 03:34:47 jinmei Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Southern California.
@@ -439,7 +439,6 @@ usage:
     sigaction(SIGINFO, &sa, NULL);
 
     FD_ZERO(&readers);
-    FD_SET(mld6_socket, &readers);
     for (i = 0; i < nhandlers; i++)
     {
 	FD_SET(ihandlers[i].fd, &readers);
