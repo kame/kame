@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.61 2001/08/03 11:44:57 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.62 2001/08/03 11:54:41 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -260,7 +260,7 @@
  * - kernel compilation options ("options HOGE" in kernel config file)
  *	freebsd4: sys/conf/options has to have mapping between option
  *		and a header file (opt_hoge.h).
- *	netbsd: by default, -DHOGE will go into sys/arch/*/compile/*/Makefile.
+ *	netbsd: by default, -DHOGE will go into sys/arch/-*-/compile/-*-/Makefile.
  *		if you define mapping in sys/conf/files, you can create
  *		a header file like opt_hoge.h to help make dependencies.
  *	bsdi/openbsd: always use -DHOGE in Makefile.  there's no need/way
