@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.72 2001/07/05 07:26:09 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.73 2001/07/09 09:13:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -127,9 +127,13 @@ static const struct sockaddr *getsa __P((const char *, const char *, int));
 #endif
 static int getans_dns __P((char *, int, struct sockaddr *));
 static int getans_icmp6 __P((char *, int, struct sockaddr *));
+static int getans_icmp6_fqdn __P((char *, int, struct sockaddr *));
+static int getans_icmp6_nodeaddr __P((char *, int, struct sockaddr *));
 static int relay __P((struct sockdb *, char *, int, struct sockaddr *));
 static int relay_dns __P((struct sockdb *, char *, int, struct sockaddr *));
 static int relay_icmp6 __P((struct sockdb *, char *, int, struct sockaddr *));
+static ssize_t ping6 __P((char *, size_t, const struct qcache *, const char *,
+	const char *, int));
 static int serve __P((struct sockdb *, char *, int, struct sockaddr *));
 
 #ifndef INADDR_LOOPBACK
@@ -1161,8 +1165,31 @@ getans_icmp6(buf, len, from)
 	struct sockaddr *from;
 {
 	struct icmp6_nodeinfo *ni6;
-	u_int32_t *ttl;
 	u_int16_t qtype;
+
+	if (sizeof(*ni6) > len)
+		return -1;
+	ni6 = (struct icmp6_nodeinfo *)buf;
+	qtype = ntohs(ni6->ni_qtype);
+
+	switch (qtype) {
+	case NI_QTYPE_FQDN:
+		return getans_icmp6_fqdn(buf, len, from);
+	case NI_QTYPE_NODEADDR:
+		return getans_icmp6_nodeaddr(buf, len, from);
+	default:
+		return -1;
+	}
+}
+
+static int
+getans_icmp6_fqdn(buf, len, from)
+	char *buf;
+	int len;
+	struct sockaddr *from;
+{
+	struct icmp6_nodeinfo *ni6;
+	u_int32_t *ttl;
 	char dnsbuf[RECVBUFSIZ];
 	HEADER *ohp, *hp;
 	struct qcache *qc;
@@ -1175,10 +1202,6 @@ getans_icmp6(buf, len, from)
 		return -1;
 	ni6 = (struct icmp6_nodeinfo *)buf;
 	ttl = (u_int32_t *)(ni6 + 1);
-	qtype = ntohs(ni6->ni_qtype);
-
-	if (qtype != NI_QTYPE_FQDN)
-		return -1;
 
 	if (dflag) {
 		int i;
@@ -1261,9 +1284,8 @@ getans_icmp6(buf, len, from)
 	hp->ra = 0;	/* recursion not available */
 	hp->rcode = NOERROR;
 
-	if (encode_name(&p, sizeof(dnsbuf) - (p - dnsbuf), on) == NULL) {
+	if (encode_name(&p, sizeof(dnsbuf) - (p - dnsbuf), on) == NULL)
 		goto fail;
-	}
 	if (p - dnsbuf + sizeof(u_int16_t) * 3 + sizeof(u_int32_t) +
 	    sizeof(struct in6_addr) >= sizeof(dnsbuf))
 		goto fail;
@@ -1307,6 +1329,121 @@ fail:
 	if (n) {
 		/* LINTED const cast */
 		free((char *)n);
+	}
+
+	return -1;
+}
+
+static int
+getans_icmp6_nodeaddr(buf, len, from)
+	char *buf;
+	int len;
+	struct sockaddr *from;
+{
+	struct icmp6_nodeinfo *ni6;
+	char dnsbuf[RECVBUFSIZ];
+	HEADER *ohp, *hp;
+	struct qcache *qc;
+	const char *on = NULL;
+	const char *d, *e;
+	char *p;
+	struct nodeaddr {
+		int32_t ttl;
+		struct in_addr in6;
+	} *nodeaddr;
+
+#if 0
+	/* length validation has already been done */
+	if (sizeof(*ni6) > len)
+		return -1;
+#endif
+	ni6 = (struct icmp6_nodeinfo *)buf;
+
+	if (dflag) {
+		int i;
+		printf("nodeaddr reply: ");
+		for (i = 0; i < len; i++)
+			printf("%02x", buf[i] & 0xff);
+		printf("\n");
+	}
+
+	d = (const char *)(ni6 + 1);
+	e = buf + len;
+	nodeaddr = (struct nodeaddr *)d;
+	if ((e - d) % sizeof(*nodeaddr))
+		return -1;
+
+	for (qc = LIST_FIRST(&qcache); qc; qc = LIST_NEXT(qc, link)) {
+		if (memcmp(ni6->icmp6_ni_nonce, &qc->id, sizeof(qc->id)) == 0)
+			break;
+	}
+	if (!qc)
+		goto fail;
+
+	/* validate reply against original query */
+	ohp = (HEADER *)qc->qbuf;
+	p = (char *)(ohp + 1);
+	on = decode_name((const char **)&p, qc->qlen - (p - qc->qbuf));
+	dprintf("validate reply: query=%s\n", on);
+	if (!on || qc->qlen - (p - qc->qbuf) < 4)
+		goto fail;
+	if (strlen(on) == 0)
+		goto fail;
+	/* XXX more validation! */
+
+	p += 4;	/* skip type/class */
+
+	memset(dnsbuf, 0, sizeof(dnsbuf));
+	memcpy(dnsbuf, qc->qbuf, p - qc->qbuf);
+	hp = (HEADER *)dnsbuf;
+	*hp = *ohp;
+	p = dnsbuf + (p - qc->qbuf);
+
+	hp->qr = 1;	/* it is response */
+	hp->aa = 0;	/* non-authoritative */
+	hp->ra = 0;	/* recursion not available */
+	hp->rcode = NOERROR;
+	hp->ancount = htons(0);
+
+	while (nodeaddr < (struct nodeaddr *)e) {
+		if (encode_name(&p, sizeof(dnsbuf) - (p - dnsbuf), on) == NULL)
+			goto fail;
+		if (p - dnsbuf + sizeof(u_int16_t) * 3 + sizeof(u_int32_t) +
+		    sizeof(struct in6_addr) >= sizeof(dnsbuf))
+			goto fail;
+		*(u_int16_t *)p = htons(T_AAAA);
+		p += sizeof(u_int16_t);
+		*(u_int16_t *)p = htons(C_IN);
+		p += sizeof(u_int16_t);
+		*(int32_t *)p = nodeaddr->ttl;	/*TTL*/
+		p += sizeof(int32_t);
+		*(u_int16_t *)p = htons(sizeof(struct in6_addr));
+		p += sizeof(u_int16_t);
+		memcpy(p, &nodeaddr->in6, sizeof(struct in6_addr));
+		p += sizeof(struct in6_addr);
+		hp->ancount = htons(ntohs(hp->ancount) + 1);
+		nodeaddr++;
+	}
+
+	if (dflag)
+		dnsdump("serve O", dnsbuf, p - dnsbuf, from);
+
+	/* XXX TC bit processing */
+
+	sendto(qc->sd->s, dnsbuf, p - dnsbuf, 0, (struct sockaddr *)&qc->from,
+	    qc->from.ss_len);
+
+	if (on) {
+		/* LINTED const cast */
+		free((char *)on);
+	}
+
+	return 0;
+
+fail:
+	if (on) {
+		/* LINTED const cast */
+		free((char *)on);
 	}
 
 	return -1;
@@ -1499,7 +1636,6 @@ relay_icmp6(sd, buf, len, from)
 	const char *d;
 	size_t rbuflen = PACKETSZ;
 	int edns0len = -1;
-	struct icmp6_nodeinfo *ni6;
 	struct addrinfo hints, *res;
 	char icmp6buf[RECVBUFSIZ];
 	u_int16_t qtype, qclass;
@@ -1558,34 +1694,26 @@ relay_icmp6(sd, buf, len, from)
 		qc->ttq.tv_sec += MDNS_TIMEO;
 		qc->sd = sd;
 		qc->rbuflen = rbuflen;
+		qc->id = htons(dnsid);
+		dnsid = (dnsid + 1) % 0x10000;
 
-		/*
-		 * it should be NI group address, however, most of *BSD
-		 * releases do not join NI group at this moment.
-		 */
+		len = ping6(icmp6buf, sizeof(icmp6buf), qc, "ff02::1",
+		    "ff02::1", 0);
+
+		sd = af2sockdb(PF_INET6, S_ICMP6);
+		if (sd == NULL)
+			return -1;
+
 		memset(&hints, 0, sizeof(hints));
 		hints.ai_family = PF_INET6;
 		hints.ai_socktype = SOCK_RAW;
 		hints.ai_protocol = IPPROTO_ICMPV6;
 		if (getaddrinfo("ff02::1", NULL, &hints, &res))
 			return -1;
-
-		/* XXX boundary check! */
-		ni6 = (struct icmp6_nodeinfo *)icmp6buf;
-		memset(ni6, 0, sizeof(*ni6));
-		ni6->ni_type = ICMP6_NI_QUERY;
-		ni6->ni_code = ICMP6_NI_SUBJ_IPV6;
-		ni6->ni_qtype = htons(NI_QTYPE_FQDN);
-		qc->id = htons(dnsid);
-		memcpy(ni6->icmp6_ni_nonce, &qc->id, sizeof(qc->id));
-		memcpy(ni6 + 1, &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr,
-		    sizeof(struct in6_addr));
-		dnsid = (dnsid + 1) % 0x10000;
-		len = sizeof(*ni6) + sizeof(struct in6_addr);
-
-		sd = af2sockdb(PF_INET6, S_ICMP6);
-		if (sd == NULL)
+		if (res->ai_next || res->ai_family != AF_INET6) {
+			freeaddrinfo(res);
 			return -1;
+		}
 
 		/* multicast outgoing interface is already configured */
 		sent = 0;
@@ -1610,6 +1738,69 @@ relay_icmp6(sd, buf, len, from)
 		return 0;
 	} else
 		return -1;
+}
+
+/*
+ * construct ping6 packet.
+ */
+static ssize_t
+ping6(buf, siz, qc, addr, subj, mode)
+	char *buf;
+	size_t siz;
+	const struct qcache *qc;
+	const char *addr;
+	const char *subj;
+	int mode;
+{
+	struct icmp6_nodeinfo *ni6;
+	struct in6_addr addr6;
+	struct in6_addr subj6;
+	struct addrinfo hints, *res;
+	ssize_t l;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_INET6;
+	hints.ai_socktype = SOCK_RAW;
+	hints.ai_protocol = IPPROTO_ICMPV6;
+	if (getaddrinfo(addr, NULL, &hints, &res))
+		return -1;
+	if (res->ai_next || res->ai_family != AF_INET6) {
+		freeaddrinfo(res);
+		return -1;
+	}
+	memcpy(&addr6, &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr,
+	    sizeof(addr6));
+	freeaddrinfo(res);
+
+	if (getaddrinfo(subj, NULL, &hints, &res))
+		return -1;
+	if (res->ai_next || res->ai_family != AF_INET6) {
+		freeaddrinfo(res);
+		return -1;
+	}
+	memcpy(&subj6, &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr,
+	    sizeof(subj6));
+	freeaddrinfo(res);
+
+	l = sizeof(*ni6) + sizeof(subj6);
+	if (l > siz)
+		return -1;
+
+	switch (mode) {
+	case 0:	/* ping6 -w */
+		ni6 = (struct icmp6_nodeinfo *)buf;
+		memset(ni6, 0, sizeof(*ni6));
+		ni6->ni_type = ICMP6_NI_QUERY;
+		ni6->ni_code = ICMP6_NI_SUBJ_IPV6;
+		ni6->ni_qtype = htons(NI_QTYPE_FQDN);
+		memcpy(ni6->icmp6_ni_nonce, &qc->id, sizeof(qc->id));
+		memcpy(ni6 + 1, &subj6, sizeof(subj6));
+		break;
+	default:
+		return -1;
+	}
+
+	return l;
 }
 
 /*
