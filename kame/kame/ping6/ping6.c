@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.146 2002/01/11 17:54:05 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.147 2002/01/12 01:57:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1585,9 +1585,11 @@ pr_pack(buf, cc, mhdr)
 			} else {
 				i = 0;
 				while (cp < end) {
-					if (dnsdecode((const u_char **)&cp, end,
-					    (const u_char *)(ni + 1), dnsname,
-					    sizeof(dnsname)) == NULL) {
+					if (dnsdecode((const u_char **)&cp,
+						      end,
+						      (const u_char *)(ni + 1),
+						      dnsname,
+						      sizeof(dnsname)) == NULL) {
 						printf("???");
 						break;
 					}
