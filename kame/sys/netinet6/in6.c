@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.387 2005/01/17 07:13:41 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.388 2005/03/14 08:53:36 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -526,6 +526,7 @@ in6_control(so, cmd, data, ifp, p)
 		/* FALLTHROUGH */
 	case OSIOCGIFINFO_IN6:
 	case SIOCGIFINFO_IN6:
+	case SIOCSIFINFO_IN6:
 	case SIOCGDRLST_IN6:
 	case SIOCGPRLST_IN6:
 	case SIOCGNBRINFO_IN6:

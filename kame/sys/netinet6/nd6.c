@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.370 2005/01/21 03:14:49 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.371 2005/03/14 08:53:36 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1878,6 +1878,36 @@ nd6_ioctl(cmd, data, ifp)
 		break;
 	case SIOCGIFINFO_IN6:
 		ndi->ndi = *ND_IFINFO(ifp);
+		break;
+	case SIOCSIFINFO_IN6:
+		/* 
+		 * used to change host variables from userland.
+		 * intented for a use on router to reflect RA configurations.
+		 */
+#define ND	ndi->ndi
+		/* 0 means 'unspecified' */
+		if (ND.linkmtu != 0) {
+			if (ND.linkmtu < IPV6_MMTU ||
+			    ND.linkmtu > IN6_LINKMTU(ifp)) {
+				error = EINVAL;
+				break;
+			}
+			ND_IFINFO(ifp)->linkmtu = ND.linkmtu;
+		}
+
+		if (ND.basereachable != 0) {
+			int obasereachable = ND_IFINFO(ifp)->basereachable);
+
+			ND_IFINFO(ifp)->basereachable = ND.basereachable;
+			if (ND.basereachable != obasereachable)
+				ND_IFINFO(ifp)->reachable =
+				    ND_COMPUTE_RTIME(ND.basereachable);
+		}
+		if (ND.retrans != 0)
+			ND_IFINFO(ifp)->retrans = ND.retrans;
+		if (ND.chlim != 0)
+			ND_IFINFO(ifp)->chlim = ND.chlim;
+#undef ND
 		break;
 	case SIOCSIFINFO_FLAGS:
 		ND_IFINFO(ifp)->flags = ndi->ndi.flags;
