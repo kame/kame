@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.71 2001/07/24 02:40:02 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.72 2001/07/24 03:25:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -550,7 +550,7 @@ delete:
 	return 0;
 }
 
-#define W_ADDR	31
+#define W_ADDR	36
 #define W_LL	17
 #define W_IF	6
 
@@ -578,9 +578,9 @@ dump(addr)
 
 	/* Print header */
 	if (!tflag && !cflag)
-		printf("%-*.*s %-*.*s %*.*s %-9.9s %2s %4s %4s\n",
+		printf("%-*.*s %-*.*s %*.*s %-9.9s %1s %4s\n",
 		    W_ADDR, W_ADDR, "Neighbor", W_LL, W_LL, "Linklayer Address",
-		    W_IF, W_IF, "Netif", "Expire", "St", "Flgs", "Prbs");
+		    W_IF, W_IF, "Netif", "Expire", "S", "Flgs");
 
 again:;
 	mib[0] = CTL_NET;
@@ -686,30 +686,30 @@ again:;
 				printf(" %-9.9s", "expired");
 
 			switch(nbi->state) {
-			 case ND6_LLINFO_NOSTATE:
+			case ND6_LLINFO_NOSTATE:
 				 printf(" N");
 				 break;
 #ifdef ND6_LLINFO_WAITDELETE
-			 case ND6_LLINFO_WAITDELETE:
+			case ND6_LLINFO_WAITDELETE:
 				 printf(" W");
 				 break;
 #endif
-			 case ND6_LLINFO_INCOMPLETE:
+			case ND6_LLINFO_INCOMPLETE:
 				 printf(" I");
 				 break;
-			 case ND6_LLINFO_REACHABLE:
+			case ND6_LLINFO_REACHABLE:
 				 printf(" R");
 				 break;
-			 case ND6_LLINFO_STALE:
+			case ND6_LLINFO_STALE:
 				 printf(" S");
 				 break;
-			 case ND6_LLINFO_DELAY:
+			case ND6_LLINFO_DELAY:
 				 printf(" D");
 				 break;
-			 case ND6_LLINFO_PROBE:
+			case ND6_LLINFO_PROBE:
 				 printf(" P");
 				 break;
-			 default:
+			default:
 				 printf(" ?");
 				 break;
 			}
@@ -720,7 +720,6 @@ again:;
 			warnx("failed to get neighbor information");
 			printf("  ");
 		}
-		putchar(' ');
 
 		/*
 		 * other flags. R: router, P: proxy, W: ??
@@ -732,6 +731,7 @@ again:;
 		} else {
 			sin = (struct sockaddr_in6 *)
 				(sdl->sdl_len + (char *)sdl);
+#if 0	/* W and P are mystery even for us */
 			snprintf(flgbuf, sizeof(flgbuf), "%s%s%s%s",
 				isrouter ? "R" : "",
 				!IN6_IS_ADDR_UNSPECIFIED(&sin->sin6_addr)
@@ -739,11 +739,16 @@ again:;
 				(sin->sin6_len != sizeof(struct sockaddr_in6))
 					? "W" : "",
 				(rtm->rtm_flags & RTF_ANNOUNCE) ? "p" : "");
+#else
+			snprintf(flgbuf, sizeof(flgbuf), "%s%s",
+				isrouter ? "R" : "",
+				(rtm->rtm_flags & RTF_ANNOUNCE) ? "p" : "");
+#endif
 		}
-		printf(" %-4.4s", flgbuf);
+		printf(" %s", flgbuf);
 
 		if (prbs)
-			printf(" %4d", prbs);
+			printf(" %d", prbs);
 
 		printf("\n");
 	}
