@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.234 2002/04/01 05:20:19 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.235 2002/04/01 05:20:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -990,7 +990,8 @@ nd6_lookup(addr6, create, ifp)
 	 * XXX: we can't use rt->rt_ifp to check for the interface, since
 	 *      it might be the loopback interface if the entry is for our
 	 *      own address on a non-loopback interface. Instead, we should
-	 *      use rt->rt_ifa->ifa_ifp, which would specify the REAL interface.
+	 *      use rt->rt_ifa->ifa_ifp, which would specify the REAL
+	 *	interface.
 	 */
 	if ((rt->rt_flags & RTF_GATEWAY) || (rt->rt_flags & RTF_LLINFO) == 0 ||
 	    rt->rt_gateway->sa_family != AF_LINK || rt->rt_llinfo == NULL ||
