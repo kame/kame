@@ -100,7 +100,7 @@ __RCSID("$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $");
 /*
  * XXX see PORTABILITY for the twist
  */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ < 3
 #define LLU	"%qu"
 #define CAST	u_quad_t
 #else

@@ -4,7 +4,7 @@
 PROG=	netstat
 SRCS=	if.c inet.c inet6.c main.c mbuf.c mroute.c ipx.c route.c \
 	unix.c atalk.c netgraph.c mroute6.c # iso.c ns.c tp_astring.c
-CFLAGS+=-Wall
+CFLAGS+=-Wall -I${.CURDIR}
 
 #CFLAGS+=-g
 #.PATH:	${.CURDIR}/../../sys/netiso
@@ -12,11 +12,15 @@ BINGRP=	kmem
 BINMODE=2555
 DPADD=	${LIBKVM} ${LIBIPX} ${LIBNETGRAPH}
 LDADD=	-lkvm -lipx -lnetgraph
-CFLAGS+=-DINET6 -DIPSEC
+CFLAGS+=-DINET6
 
 LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6
 DPADD+= ${.OBJDIR}/../lib/libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
+
+CFLAGS+=-DIPSEC
+SRCS+=	ipsec.c
+.PATH:	${.CURDIR}/../../kame/netstat
 
 .include <bsd.prog.mk>
