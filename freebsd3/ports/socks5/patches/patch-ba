@@ -1,0 +1,10 @@
+--- lib/confutil.c-	Tue Nov 30 20:50:05 1999
++++ lib/confutil.c	Tue Nov 30 20:52:02 1999
+@@ -15,6 +15,7 @@
+ #include "confutil.h"
+ #include "log.h"
+ #if defined(SUPPORT_IPV6) && defined(KAME)
++#include <net/if_var.h>
+ #include <netinet6/in6_var.h>
+ #endif
+ 

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.7 1999/11/25 09:00:49 sumikawa Exp $
+# $Id: Makefile,v 1.8 1999/11/30 12:52:25 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -41,6 +41,7 @@ SUBDIR+=	rev_v6_address
 SUBDIR+=	rsync
 SUBDIR+=	ruby
 SUBDIR+=	sendmail6
+SUBDIR+=	socks5
 SUBDIR+=	socks64
 SUBDIR+=	squid11
 SUBDIR+=	ssh
