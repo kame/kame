@@ -29,16 +29,16 @@ beforeinstall:
 	done
 
 afterinstall:
-	cp kame/rtadvd/rtadvd.conf $(PREFIX)/etc/rtadvd.conf.sample
-	cp kame/bgpd/bgpd.conf $(PREFIX)/etc/bgpd.conf.sample
+	cp ${.CURDIR}/kame/rtadvd/rtadvd.conf $(PREFIX)/etc/rtadvd.conf.sample
+	cp ${.CURDIR}/kame/bgpd/bgpd.conf $(PREFIX)/etc/bgpd.conf.sample
 	if test -x $(PREFIX)/sbin/inet6d || test -x $(PREFIX)/sbin/inet46d; \
 	then \
-		cp kame/inet6d/inet6d.conf $(PREFIX)/etc/inet6d.conf.sample; \
+		cp ${.CURDIR}/kame/inet6d/inet6d.conf $(PREFIX)/etc/inet6d.conf.sample; \
 	fi
-	cp kame/etc/rc.net6 $(PREFIX)/etc/rc.net6.sample
+	cp ${.CURDIR}/kame/etc/rc.net6 $(PREFIX)/etc/rc.net6.sample
 	for i in $(DOCS); do \
-		if test -f ../$$i; then \
-			cp ../$$i $(PREFIX)/share/doc/kame; \
+		if test -f ${.CURDIR}/../$$i; then \
+			cp ${.CURDIR}/../$$i $(PREFIX)/share/doc/kame; \
 		fi \
 	done
 
