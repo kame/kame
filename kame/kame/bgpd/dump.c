@@ -197,7 +197,7 @@ dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 		}
 
 		/* unrecognized attributes */
-		if (optatr = ap->asp_optatr)
+		if ((optatr = ap->asp_optatr) != NULL)
 			fprintf(fp, "      Unrecognized Attributes:\n");
 		for (optatr = ap->asp_optatr; optatr; optatr = optatr->next) {
 			int c = 0;
