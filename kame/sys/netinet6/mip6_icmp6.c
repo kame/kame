@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.62 2003/02/20 05:34:09 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.63 2003/02/20 12:06:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -572,7 +572,7 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	struct mip6_ha *mha, *mha_prefered = NULL;
 	struct in6_addr *haaddrs, *haaddrptr;
 	struct sockaddr_in6 lladdr;
-	int i, hacount = 0, found = 0;
+	int i, hacount = 0;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 
