@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.47 2003/08/01 06:55:35 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.48 2003/08/18 17:59:00 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -88,6 +88,7 @@ TAILQ_HEAD(, prefix_list) global_prefixes; /* list of non-link-local prefixes */
 static char *global_strings[] = {
 	/* "fec0::/10",	site-local unicast addresses were deprecated */
 	"2000::/3",
+	NULL
 };
 
 static void usage __P((void));
