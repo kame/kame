@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.907 2000/05/19 07:40:51 jinmei Exp $
+$Id: CHANGELOG,v 1.908 2000/05/19 20:01:03 itojun Exp $
 
 <200005>
+Sat May 20 04:59:26 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_{forward,output,input}.c:
+	  correct link-local scope manipulation on looopback interface.
+	  broken on FAKE_LOOPBACK_IF code committed on 17 May 2000.
+
 2000-05-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.c (ip6_mdq): loosened scope check
 	in ip6_mdq() for packets forwarded to a register I/F. Without
