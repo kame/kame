@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.227 2003/02/07 15:09:28 suz Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.228 2003/03/22 09:03:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1506,6 +1506,10 @@ prelist_update(new, dr, m)
 		} else
 			storedlifetime = lt6_tmp.ia6t_vltime -
 				(time_second - ifa6->ia6_updatetime);
+
+		/* when not updating, keep the current stored lifetime. */
+		lt6_tmp.ia6t_vltime = storedlifetime;
+
 		if (TWOHOUR < new->ndpr_vltime ||
 		    storedlifetime < new->ndpr_vltime) {
 			lt6_tmp.ia6t_vltime = new->ndpr_vltime;
@@ -2323,7 +2327,6 @@ in6_init_address_ltimes(struct nd_prefix *new, struct in6_addrlifetime *lt6)
 	long time_second = time.tv_sec;
 #endif
 
-	/* Valid lifetime must not be updated unless explicitly specified. */
 	/* init ia6t_expire */
 	if (lt6->ia6t_vltime == ND6_INFINITE_LIFETIME)
 		lt6->ia6t_expire = 0;
