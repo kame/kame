@@ -4,7 +4,7 @@
 PROG=	netstat
 SRCS=	atalk.c if.c inet.c iso.c main.c mbuf.c mroute.c ns.c route.c \
 	tp_astring.c unix.c mroute6.c
-SRCS+=	inet6.c
+SRCS+=	inet6.c ipsec.c
 .PATH:	${.CURDIR}/../../sys/netiso
 BINGRP=	kmem
 BINMODE=2555

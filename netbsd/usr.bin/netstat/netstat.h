@@ -95,6 +95,10 @@ void	mrt6_stats __P((u_long, u_long));
 char	*routename6 __P((struct sockaddr_in6 *));
 #endif /*INET6*/
 
+#ifdef IPSEC
+void	pfkey_stats __P((u_long, char *));
+#endif
+
 void	mbpr(u_long, u_long, u_long, u_long, u_long);
 
 void	hostpr __P((u_long, u_long));
