@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.41 2003/01/21 07:11:32 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.42 2003/02/06 16:08:30 suz Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -382,11 +382,6 @@ m_dup1(m, off, len, wait)
 
 	return n;
 }
-#endif
-
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-/* duplicated use of name m_tag_id */
-#undef m_tag_id
 #endif
 
 /* Get a packet tag structure along with specified data following. */
