@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.126 2004/06/12 13:20:59 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.127 2004/06/17 06:22:27 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -644,7 +644,8 @@ server6_do_command(buf, len)
 		memcpy(&p32, bp, sizeof(bp));
 		p32 = ntohl(p32);
 		if (p32 != DHCP6CTL_BINDING) {
-			dprintf(LOG_INFO, FNAME, "unknown remove target");
+			dprintf(LOG_INFO, FNAME,
+			    "unknown remove target: %ul", p32);
 			return (DHCP6CTL_R_FAILURE);
 		}
 		bp += sizeof(p32);
@@ -652,14 +653,16 @@ server6_do_command(buf, len)
 		memcpy(&p32, bp, sizeof(bp));
 		p32 = ntohl(p32);
 		if (p32 != DHCP6CTL_BINDING_IA) {
-			dprintf(LOG_INFO, FNAME, "unknown binding type");
+			dprintf(LOG_INFO, FNAME, "unknown binding type: %ul",
+			    p32);
 			return (DHCP6CTL_R_FAILURE);
 		}
 		bp += sizeof(p32);
 
 		memcpy(&iaspec, bp, sizeof(iaspec));
 		if (ntohl(iaspec.type) != DHCP6CTL_IA_PD) {
-			dprintf(LOG_INFO, FNAME, "unknown IA type");
+			dprintf(LOG_INFO, FNAME, "unknown IA type: %ul",
+			    ntohl(iaspec.type));
 			return (DHCP6CTL_R_FAILURE);
 		}
 		bp += sizeof(iaspec);
