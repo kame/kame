@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.162 2001/07/18 12:32:45 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.163 2001/07/18 12:36:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1041,6 +1041,9 @@ nd6_is_addr_neighbor(addr, ifp)
 
 /*
  * Free an nd6 llinfo entry.
+ * Since the function would cause significant changes in the kernel, DO NOT
+ * make it global, unless you have a strong reason for the change, and are sure
+ * that the change is safe.
  */
 static struct llinfo_nd6 *
 nd6_free(rt, gc)
