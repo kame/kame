@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1759 2001/07/05 23:34:54 itojun Exp $
+$KAME: CHANGELOG,v 1.1760 2001/07/06 05:39:58 suz Exp $
 
 <200107>
+Fri Jul  6 14:37:30 JST 2001	suz@sdl.hitachi.co.jp
+	* freebsd4/usr.bin/v6test: added v6test to FreeBSD4-KAME
+
 Fri Jul  6 08:33:30 JST 2001  itojun@iijlab.net
 	* sys/netinet/ip6.h: IP6_EXTHRD_GET0() did not check the mbuf length,
 	  when off == 0.  noone was using this macro.

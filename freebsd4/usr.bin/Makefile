@@ -1,4 +1,4 @@
 SUBDIR+=netstat tftp telnet
-SUBDIR+=altqstat mcastsend mcastread mchat
+SUBDIR+=altqstat mcastsend mcastread mchat v6test
 
 .include <bsd.subdir.mk>
