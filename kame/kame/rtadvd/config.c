@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.82 2003/06/10 00:27:40 suz Exp $	*/
+/*	$KAME: config.c,v 1.83 2003/06/17 08:07:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -764,6 +764,8 @@ get_prefix(struct rainfo *rai)
 		memcpy(&pp->prefix, a, sizeof(*a));
 #ifdef MIP6
 		if (!routeraddr)
+#else
+		if (1)
 #endif
 		{
 			p = (u_char *)&pp->prefix;
