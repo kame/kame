@@ -746,8 +746,8 @@ udp6_output(in6p, m, addr6, control)
 		error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route,
 			    0, in6p->in6p_moptions, NULL);
 		break;
-#ifdef __NetBSD__
 	case AF_INET:
+#if defined(INET) && defined(__NetBSD__)
 		/* can't transmit jumbogram over IPv4 */
 		if (plen > 0xffff) {
 			error = EMSGSIZE;
@@ -772,11 +772,11 @@ udp6_output(in6p, m, addr6, control)
 		m->m_pkthdr.rcvif = NULL;	/*XXX*/
 #endif /*IPSEC*/
 		error = ip_output(m, NULL, &in6p->in6p_route, 0 /*XXX*/);
+		break;
 #else
 		error = EAFNOSUPPORT;
 		goto release;
 #endif
-		break;
 	}
 	goto releaseopt;
 
