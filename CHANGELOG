@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1091 2000/07/04 05:54:27 jinmei Exp $
+$Id: CHANGELOG,v 1.1092 2000/07/04 06:01:11 jinmei Exp $
 
 <200006>
+2000-07-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_is_ifloop_auto): removed an `ifdef'
+	part for openbsd, which made the function always return 0.
+
 2000-07-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_unlink_ifa): newly added to release
 	various links for in6_ifaddr when deleting an address.
