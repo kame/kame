@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.453 2004/07/05 03:10:13 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.454 2004/07/14 02:20:54 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1050,9 +1050,9 @@ skip_ipsec2:;
 
 		m = state.m;
 #ifdef NEW_STRUCT_ROUTE
-		ro = state.ro;
+		ro_pmtu = ro = state.ro;
 #else
-		ro = (struct route_in6 *)state.ro;
+		ro_pmtu = ro = (struct route_in6 *)state.ro;
 #endif
 		dst = (struct sockaddr_in6 *)state.dst;
 		if (error) {
