@@ -331,7 +331,9 @@ rtredirect(dst, gateway, netmask, flags, src, rtp)
 			 * Don't create entry if we are going to set
 			 * rt_key and rt_gateway to the same value.  It will
 			 * only happen when we have manually configured
-			 * network route toward onlink destinations.
+			 * network route toward part of onlink destinations
+			 * (is bogus with IPv4/v6).
+			 * XXX non-IP protocol needs checking
 			 */
 			if (equal(dst, gateway)) {
 				error = EINVAL;
@@ -364,11 +366,11 @@ rtredirect(dst, gateway, netmask, flags, src, rtp)
 			 * In this case, we may be able to nuke the entry
 			 * and then overwrite it with cloned RTF_LLINFO route.
 			 * We don't do that at this moment since (1) we are
-			 * not sure if RTF_CLONING interface route exists, and
+			 * not sure if RTF_CLONING interface route exists,
 			 * (2) there's no case where RTF_STATIC gets erased
-			 * or overwritten by non-static routes (from within
-			 * the kernel), and (3) assumes too much about L3
-			 * behavior.
+			 * or overwritten by non-static routes from within
+			 * the kernel, and (3) the analysis assumes too much
+			 * about IPv4/v6-like L3 behavior.
 			 * XXX non-IP protocol needs checking
 			 */
 			if (equal(rt_key(rt), gateway)) {
