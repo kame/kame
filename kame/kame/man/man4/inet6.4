@@ -1,4 +1,4 @@
-.\"	$KAME: inet6.4,v 1.22 2002/06/07 17:29:41 itojun Exp $
+.\"	$KAME: inet6.4,v 1.23 2002/06/07 17:36:22 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -266,10 +266,14 @@ message protocol is accessible from a raw socket.
 .\" packets, whether locally-generated or forwarded, will not.
 .Ss Interaction between IPv4/v6 sockets
 .\"By default,
-.\"KAME/NetBSD and KAME/OpenBSD
+.\"KAME/NetBSD
 .\"does not route IPv4 traffic to
 .\".Dv AF_INET6
 .\"sockets.
+.\"KAME/OpenBSD never routes IPv4 traffic to
+.\".Dv AF_INET6
+.\"sockets.
+.\"The behavior intentionally violates RFC2553 for security reasons.
 .\"Listen to two sockets if you want to accept both IPv4 and IPv6 traffic.
 .\"On KAME/NetBSD, IPv4 traffic may be routed with certain
 .\"per-socket/per-node configuration, however, it is not recommended.
