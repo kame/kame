@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1223 2000/08/23 01:44:32 sakane Exp $
+$KAME: CHANGELOG,v 1.1224 2000/08/23 03:33:37 itojun Exp $
 
 <200008>
+Wed Aug 23 12:30:02 JST 2000  itojun@iijlab.net
+	* sys/netinet6/route6.c: dropped COMPAT_RFC2292 clause.
+	  it still have binary backward compatible behavior with RFC2292,
+	  modulo strict/loose bit.
+
 Wed Aug 23 10:43:07 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	Enabled to check PFS group strictly.  It can be done by
