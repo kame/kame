@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.4 2001/07/20 07:11:20 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.5 2001/08/19 05:51:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/param.h>
+#include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
@@ -49,6 +50,11 @@
 #include <md5.h>
 #include <ctype.h>
 
+/* portability */
+#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+#define socklen_t       int
+#endif
+
 int main __P((int, char **));
 void usage __P((void));
 void sockinit __P((void));
@@ -63,7 +69,12 @@ static ssize_t ni6_nametodns __P((const char *, char *, char *, ssize_t, int));
 static int ni6_dnsmatch __P((const char *, int, const char *, int));
 static ssize_t ni6_addrs __P((struct icmp6_nodeinfo *, char *, char *,
 	ssize_t, struct sockaddr *, socklen_t, const char *));
-int ismyaddr __P((struct sockaddr *, socklen_t));
+static int ismyaddr __P((struct sockaddr *, socklen_t));
+static int getflags6 __P((const char *, const struct sockaddr *, socklen_t));
+static time_t getlifetime __P((const char *, const struct sockaddr *, socklen_t));
+#if 0
+static const char *getifname __P((const struct sockaddr *, socklen_t));
+#endif
 
 int s;
 int mode = 7;	/* reply to all message types */
@@ -503,7 +514,8 @@ ni6_input(from, fromlen, buf, l)
 			memcpy(&sin6.sin6_addr, ni6 + 1,
 			    sizeof(sin6.sin6_addr));
 			if (from->sa_family == AF_INET6)
-				sin6.sin6_scope_id = ((struct sockaddr_in6 *)from)->sin6_scope_id;
+				sin6.sin6_scope_id =
+				    ((struct sockaddr_in6 *)from)->sin6_scope_id;
 			subj = (const char *)&sin6;
 			if (ismyaddr((struct sockaddr *)&sin6, sizeof(sin6)) ||
 			    IN6_IS_ADDR_MULTICAST(&sin6.sin6_addr))
@@ -823,6 +835,8 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj)
 	char *cp, *ep;
 	int32_t ltime;
 	struct in6_addr *in6;
+	int flags6;
+	time_t expire;
 
 	cp = p;
 	if (buf)
@@ -895,18 +909,21 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj)
 				continue;
 		}
 
-#if 0
+		flags6 = getflags6(ifa->ifa_name, ifa->ifa_addr,
+		    ifa->ifa_addr->sa_len);
+		if (flags6 < 0)
+			continue;
+
 		/*
 		 * check if anycast is okay.
 		 * XXX: just experimental. not in the spec.
 		 */
-		if ((ifa6->ia6_flags & IN6_IFF_ANYCAST) != 0 &&
+		if ((flags6 & IN6_IFF_ANYCAST) != 0 &&
 		    (niflags & NI_NODEADDR_FLAG_ANYCAST) == 0)
 			continue; /* we need only unicast addresses */
-		if ((ifa6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
-		    (mode & 4) == 0) {
+#ifdef IN6_IFF_TEMPORARY
+		if ((flags6 & IN6_IFF_TEMPORARY) != 0 && (mode & 4) == 0)
 			continue;
-		}
 #endif
 
 		/* now we can copy the address */
@@ -922,7 +939,6 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj)
 				return(copied);
 			}
 
-#if 0
 			/*
 			 * Set the TTL of the address.
 			 * The TTL value should be one of the following
@@ -938,18 +954,17 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj)
 			 * address configuration by DHCPv6, so the former
 			 * case can't happen.
 			 */
-			if (ifa6->ia6_lifetime.ia6t_expire == 0)
+			expire = getlifetime(ifa->ifa_name, ifa->ifa_addr,
+			    ifa->ifa_addr->sa_len);
+			if (expire == 0)
 				ltime = ND6_INFINITE_LIFETIME;
 			else {
-				if (ifa6->ia6_lifetime.ia6t_expire >
-				    time_second)
-					ltime = htonl(ifa6->ia6_lifetime.ia6t_expire - time_second);
+				if (expire > time(NULL))
+					ltime = expire;
 				else
 					ltime = 0;
 			}
-#else
-			ltime = 0;
-#endif
+			ltime = ntohl(ltime & 0x7fffffff);
 			memcpy(cp, &ltime, sizeof(ltime));
 			cp += sizeof(ltime);
 
@@ -975,7 +990,7 @@ fail:
 	return(0);
 }
 
-int
+static int
 ismyaddr(sa, salen)
 	struct sockaddr *sa;
 	socklen_t salen;
@@ -1013,3 +1028,102 @@ ismyaddr(sa, salen)
 	freeifaddrs(ifap);
 	return 0;
 }
+
+static int
+getflags6(ifname, sa, salen)
+	const char *ifname;
+	const struct sockaddr *sa;
+	socklen_t salen;
+{
+	const struct sockaddr_in6 *sin6;
+	struct in6_ifreq ifr6;
+	int s;
+
+	if (sa->sa_family != AF_INET6)
+		return -1;
+	sin6 = (const struct sockaddr_in6 *)sa;
+
+	s = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (s < 0)
+		return -1;
+
+	memset(&ifr6, 0, sizeof(ifr6));
+	strncpy(ifr6.ifr_name, ifname, sizeof(ifr6.ifr_name));
+	ifr6.ifr_addr = *sin6;
+	if (ioctl(s, SIOCGIFAFLAG_IN6, (caddr_t)&ifr6) < 0) {
+		close(s);
+		return -1;
+	}
+
+	close(s);
+	return ifr6.ifr_ifru.ifru_flags6;
+}
+
+static time_t
+getlifetime(ifname, sa, salen)
+	const char *ifname;
+	const struct sockaddr *sa;
+	socklen_t salen;
+{
+	const struct sockaddr_in6 *sin6;
+	struct in6_ifreq ifr6;
+	int s;
+
+	if (sa->sa_family != AF_INET6)
+		return -1;
+	sin6 = (const struct sockaddr_in6 *)sa;
+
+	s = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (s < 0)
+		return -1;
+
+	memset(&ifr6, 0, sizeof(ifr6));
+	strncpy(ifr6.ifr_name, ifname, sizeof(ifr6.ifr_name));
+	ifr6.ifr_addr = *sin6;
+	if (ioctl(s, SIOCGIFALIFETIME_IN6, (caddr_t)&ifr6) < 0) {
+		close(s);
+		return -1;
+	}
+
+	close(s);
+	return ifr6.ifr_ifru.ifru_lifetime.ia6t_expire;
+}
+
+#if 0
+static const char *
+getifname(sa, salen)
+	const struct sockaddr *sa;
+	socklen_t salen;
+{
+	struct ifaddrs *ifap, *ifa;
+	char h1[NI_MAXHOST], h2[NI_MAXHOST];
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST;
+#endif
+	static char ifname[IFNAMSIZ];
+
+	if (getifaddrs(&ifap) < 0)
+		return NULL;
+
+	if (getnameinfo(sa, salen, h1, sizeof(h1), NULL, 0, niflags))
+		return NULL;
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (sa->sa_family != ifa->ifa_addr->sa_family)
+			continue;
+		if (getnameinfo(ifa->ifa_addr, ifa->ifa_addr->sa_len,
+		    h2, sizeof(h2), NULL, 0, niflags))
+			continue;
+		if (strcmp(h1, h2) != 0)
+			continue;
+		/* XXX ifnet.if_xname termination rule? */
+		strlcpy(ifname, ifa->ifa_name, sizeof(ifname));
+		freeifaddrs(ifap);
+		return ifname;
+	}
+
+	freeifaddrs(ifap);
+	return NULL;
+}
+#endif

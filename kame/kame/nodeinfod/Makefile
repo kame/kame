@@ -11,4 +11,6 @@ MAN8=	nodeinfod.0
 MAN8=	nodeinfod.8
 .endif
 
+WARNS?=	1
+
 .include <bsd.prog.mk>
