@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/07 02:30:29 $
+		     $Date: 1999/10/07 02:31:21 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -22,7 +22,7 @@ hardware address (e.g. for PCMCIA network cards). In such cases, it is
 possible that an interface has no link-local address even if the
 interface is up. If you see such situation, please disable the
 interface once and then re-enable it (i.e. do `ifconfig IF down;
-ifconfig IF up).
+ifconfig IF up').
 
 If you have a router announcing Router Advertisement,
 global addresses will be assigned automatically.  So, neither
