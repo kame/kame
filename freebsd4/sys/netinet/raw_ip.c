@@ -140,11 +140,11 @@ rip_input(m, off, proto)
 
 #ifdef IPSEC
 			/* check AH/ESP integrity. */
-			if (n && ipsec4_in_reject_so(n, last->inp_socket))
+			if (n && ipsec4_in_reject_so(n, last->inp_socket)) {
 				m_freem(n);
 				ipsecstat.in_polvio++;
 				/* do not inject data to pcb */
-			else
+			} else
 #endif /*IPSEC*/
 			if (n) {
 				if (last->inp_flags & INP_CONTROLOPTS ||
