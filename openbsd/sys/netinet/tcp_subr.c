@@ -757,9 +757,6 @@ tcp6_ctlinput(cmd, sa, d)
 			finaldst.s6_addr16[1] =
 			    htons(m->m_pkthdr.rcvif->if_index);
 		}
-		bcopy(&ip6->ip6_src, &s, sizeof(s));
-		if (IN6_IS_ADDR_LINKLOCAL(&s))
-			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 	} else {
 		m = NULL;
 		ip6 = NULL;
@@ -776,11 +773,6 @@ tcp6_ctlinput(cmd, sa, d)
 		 * M and OFF are valid.
 		 */
 		struct sockaddr_in6 sa6_src;
-
-		/* translate addresses into internal form */
-		bcopy(&ip6->ip6_src, &s, sizeof(s));
-		if (IN6_IS_ADDR_LINKLOCAL(&s))
-			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 
 		/* check if we can safely examine src and dst ports */
 		if (m->m_pkthdr.len < off + sizeof(*thp))
