@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.755.2.3 2000/04/14 13:51:46 itojun Exp $
+$Id: CHANGELOG,v 1.755.2.4 2000/04/17 14:57:44 jinmei Exp $
 
 <200003>
+2000-04-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/udp6_usrreq.c (udp6_output): 
+	* bsdi4/sys/netinet/udp_usrreq.c (udp6_output):
+	considered byte order of an embedded link-identifier.
+
 Fri Apr 14 01:00:41 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_output.c: require root privilege on IPV6_REACHCONF
 	  ancillary message (experimental, from jinmei).
