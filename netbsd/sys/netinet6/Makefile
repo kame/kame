@@ -9,5 +9,6 @@ INCS=	ah.h esp.h in6.h in6_gif.h in6_ifattach.h in6_pcb.h \
 	raw_ip6.h udp6.h udp6_var.h
 INCS+=	in6_msf.h
 INCS+=	dccp6_var.h
+INCS+=	mip6.h mip6_var.h
 
 .include <bsd.kinc.mk>
