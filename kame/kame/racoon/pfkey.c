@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.58 2000/06/29 01:54:48 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.59 2000/07/04 00:53:26 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -856,9 +856,6 @@ pk_recvgetspi(mhp)
 	}
 
 	if (allspiok) {
-		/* turn off the timer for calling pfkey_timeover() */
-		SCHED_KILL(iph2->sce);
-	
 		/* update status */
 		iph2->status = PHASE2ST_GETSPIDONE;
 		if (isakmp_post_getspi(iph2) < 0) {
@@ -1025,6 +1022,9 @@ pk_recvupdate(mhp)
 	if (incomplete)
 		return 0;
 
+	/* turn off the timer for calling pfkey_timeover() */
+	SCHED_KILL(iph2->sce);
+	
 	/* update status */
 	iph2->status = PHASE2ST_ESTABLISHED;
 
@@ -1531,25 +1531,16 @@ pk_recvdelete(mhp)
 		return 0;
 	}
 
-	if (iph2->status != PHASE2ST_ESTABLISHED) {
-		/* ignore */
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"status mismatched: %s\n",
-				sadbsecas2str(iph2->src, iph2->dst,
-					msg->sadb_msg_satype,
-					sa->sadb_sa_spi, IPSEC_MODE_ANY)));
-		return 0;
-	}
-
 	plog(logp, LOCATION, NULL,
 		"pfkey DELETE received: %s\n",
 		sadbsecas2str(iph2->src, iph2->dst,
 			msg->sadb_msg_satype, sa->sadb_sa_spi, IPSEC_MODE_ANY));
 
 	/* send delete information */
-	isakmp_info_send_d2(iph2);
+	if (iph2->status == PHASE2ST_ESTABLISHED)
+		isakmp_info_send_d2(iph2);
 
+	unbindph12(iph2);
 	remph2(iph2);
 	delph2(iph2);
 
