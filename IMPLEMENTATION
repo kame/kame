@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.256 2001/08/04 01:35:59 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.257 2001/08/08 14:52:30 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -2323,6 +2323,12 @@ to make the distributed develoment smooth.
 	     }
 	}
 - Do not use printf() in the packet input path of the kernel code.
+- (not a style issue)
+  To disable a module that is mistakenly imported (by CVS), just to
+  remove the source tree in the repository.  Note, however, that the
+  removal might annoy other developers who have already checked the
+  module out, so you should announce the removal as soon as possible.
+  Also, be 100% sure not to remove other modules.
 
 When you want to contribute something to the KAME project, and if *you
 do not mind* the agreement, it would be helpful for the project to
