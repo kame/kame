@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.98 2000/07/25 10:12:32 kjc Exp $	*/
+/*	$KAME: ip6_input.c,v 1.99 2000/07/26 02:10:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -470,12 +470,24 @@ ip6_input(m)
 		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
 		goto bad;
 	}
-
 	/*
-	 * Don't check IPv4 mapped address here.  SIIT assumes that
-	 * routers would forward IPv6 native packets with IPv4 mapped
-	 * address normally.
+	 * The following check is not documented in the spec.  Malicious party
+	 * may be able to use IPv4 mapped addr to confuse tcp/udp stack and
+	 * bypass security checks (act as if it was from 127.0.0.1 by using
+	 * IPv6 src ::ffff:127.0.0.1).	Be cautious.
+	 *
+	 * This check chokes if we are in SIIT cloud.  As none of BSDs support
+	 * IPv4-less kernel compilation, we cannot support SIIT environment
+	 * at all.  So, it makes more sense for us to reject any malicious
+	 * packets for non-SIIT environment, than try to do a partical support
+	 * for SIIT environment.
 	 */
+	if (IN6_IS_ADDR_V4MAPPED(&ip6->ip6_src) ||
+	    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst)) {
+		ip6stat.ip6s_badscope++;
+		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
+		goto bad;
+	}
 #if 0
 	/*
 	 * Reject packets with IPv4 compatible addresses (auto tunnel).
