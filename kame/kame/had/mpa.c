@@ -1,4 +1,4 @@
-/*	$KAME: mpa.c,v 1.4 2003/08/14 10:34:09 keiichi Exp $	*/
+/*	$KAME: mpa.c,v 1.5 2003/08/15 07:10:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: mpa.c,v 1.4 2003/08/14 10:34:09 keiichi Exp $
+ * $Id: mpa.c,v 1.5 2003/08/15 07:10:26 keiichi Exp $
  */
 
 #include <sys/param.h>
@@ -304,8 +304,8 @@ pi_pick(home_addr, prefix_info, haif, count)
         if (hagent_addr.hagent_pltime == 0)
                 pltime = hagent_addr.hagent_preferred;
         else
-                pltime = (hagent_addr.hagent_pltime > now.tv_sec) ? 
-                        hagent_addr.hagent_pltime - now.tv_sec : 0;
+                pltime = (hagent_addr.hagent_preferred > now.tv_sec) ? 
+                        hagent_addr.hagent_preferred - now.tv_sec : 0;
         if (vltime < pltime) {
                 /*
                  * this can happen if vltime is decrement but pltime
