@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.84 2000/06/13 02:38:10 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.85 2000/06/13 10:10:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -220,7 +220,11 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 	lo_sa.sin6_addr = in6addr_loopback;
 	all1_sa.sin6_addr = in6mask128;
 	
-	/* So we add or remove static loopback entry, here. */
+	/*
+	 * So we add or remove static loopback entry, here.
+	 * This request for deletion could fail, e.g. when we remove
+	 * an address right after adding it.
+	 */
 	rtrequest(cmd, ifa->ifa_addr,
 		  (struct sockaddr *)&lo_sa,
 		  (struct sockaddr *)&all1_sa,
@@ -273,10 +277,19 @@ in6_ifaddloop(struct ifaddr *ifa)
 static void
 in6_ifremloop(struct ifaddr *ifa)
 {
-	if (!in6_is_ifloop_auto(ifa)) {
-		struct in6_ifaddr *ia;
-		int ia_count = 0;
+	struct in6_ifaddr *ia;
+	int ia_count = 0;
 
+	/*
+	 * All BSD variants except BSD/OS do not remove cloned routes
+	 * from an interface direct route, when removing the direct route
+	 * (see commens in net/net_osdep.h).
+	 * So we should remove the route corresponding to the deleted address
+	 * regardless of the result of in6_is_ifloop_auto().
+	 */
+#ifdef __bsdi__
+	if (!in6_is_ifloop_auto(ifa)) {
+#endif
 		/* If only one ifa for the loopback entry, delete it. */
 		for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 			if (IN6_ARE_ADDR_EQUAL(IFA_IN6(ifa),
@@ -288,7 +301,9 @@ in6_ifremloop(struct ifaddr *ifa)
 		}
 		if (ia_count == 1)
 			in6_ifloop_request(RTM_DELETE, ifa);
+#ifdef __bsdi__
 	}
+#endif
 }
 
 int
@@ -1022,6 +1037,7 @@ in6_purgeaddr(ifa, ifp)
 	struct ifnet *ifp;
 {
 	struct in6_ifaddr *oia, *ia = (void *) ifa;
+	int plen;
 
 	in6_ifscrub(ifp, ia);
 
@@ -1077,8 +1093,8 @@ in6_purgeaddr(ifa, ifp)
 	{
 		int iilen;
 
-		iilen = (sizeof(oia->ia_prefixmask.sin6_addr) << 3) -
-			in6_mask2len(&oia->ia_prefixmask.sin6_addr);
+		plen = in6_mask2len(&oia->ia_prefixmask.sin6_addr);
+		iilen = (sizeof(oia->ia_prefixmask.sin6_addr) << 3) - plen;
 		in6_prefix_remove_ifid(iilen, oia);
 	}
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -1086,6 +1102,32 @@ in6_purgeaddr(ifa, ifp)
 		in6_savemkludge(oia);
 #endif
 
+	/*
+	 * Check if we have another address that has the same prefix of
+	 * the purged address. If we have one, reinstall the corresponding
+	 * interface route.
+	 */
+	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
+		int e;
+
+		if (in6_are_prefix_equal(&ia->ia_addr.sin6_addr,
+					 &oia->ia_addr.sin6_addr, plen)) {
+			if ((e = rtinit(&(ia->ia_ifa), (int)RTM_ADD,
+					ia->ia_flags)) == 0) {
+				ia->ia_flags |= IFA_ROUTE;
+				break;
+			}
+			else {
+				log(LOG_NOTICE,
+				    "in6_purgeaddr: failed to add an interface"
+				    " route for %s/%d on %s, errno = %d\n",
+				    ip6_sprintf(&ia->ia_addr.sin6_addr),
+				    plen, if_name(ia->ia_ifp), e);
+				/* still trying */
+			}
+		}
+	}
+	
 	/* release another refcnt for the link from in6_ifaddr */
 	IFAFREE(&oia->ia_ifa);
 }
@@ -1925,6 +1967,7 @@ struct in6_addr *src, *dst;
 	return match;
 }
 
+/* XXX: to be scope conscious */
 int
 in6_are_prefix_equal(p1, p2, len)
 	struct in6_addr *p1, *p2;
@@ -2027,20 +2070,6 @@ in6_ifawithscope(oifp, dst)
 				continue;
 
 			src_scope = in6_addrscope(IFA_IN6(ifa));
-
-#ifdef ADDRSELECT_DEBUG		/* should be removed after stabilization */
-			dscopecmp = IN6_ARE_SCOPE_CMP(src_scope, dst_scope);
-			printf("in6_ifawithscope: dst=%s bestaddr=%s, "
-			       "newaddr=%s, scope=%x, dcmp=%d, bcmp=%d, "
-			       "matchlen=%d, flgs=%x\n",
-			       ip6_sprintf(dst),
-			       ifa_best ? ip6_sprintf(&ifa_best->ia_addr.sin6_addr) : "none",
-			       ip6_sprintf(IFA_IN6(ifa)), src_scope,
-			       dscopecmp,
-			       ifa_best ? IN6_ARE_SCOPE_CMP(src_scope, best_scope) : -1,
-			       in6_matchlen(IFA_IN6(ifa), dst),
-			       ((struct in6_ifaddr *)ifa)->ia6_flags);
-#endif
 
 			/*
 			 * Don't use an address before completing DAD
@@ -2238,7 +2267,6 @@ in6_ifawithscope(oifp, dst)
  * return the best address out of the same scope. if no address was
  * found, return the first valid address from designated IF.
  */
-
 struct in6_ifaddr *
 in6_ifawithifp(ifp, dst)
 	register struct ifnet *ifp;
