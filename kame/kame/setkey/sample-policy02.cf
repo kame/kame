@@ -2,7 +2,6 @@
 # this is test configuration for unique policy on loopback.
 #
 
-root setkey -c <<EOF
 spdflush;
 # connection to 9999 encrypted, reverse no encrypted.
 spdadd ::1 ::1[9999] tcp
@@ -42,5 +41,3 @@ add ::1 ::1 esp 0x1001
 add ::1 ::1 esp 0x1002
 	-u 2
 	-E des-cbc "hogehoge";
-EOF
-

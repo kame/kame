@@ -1,7 +1,7 @@
 #
 # This is for basic policy test on loopback.
 #
-root setkey -c <<EOF
+
 spdflush;
 spdadd 127.0.0.1 127.0.0.1 icmp
 	-P out ipsec
@@ -18,5 +18,3 @@ add ::1 ::1 esp 0x1001
 	-m transport
 	-E des-cbc "hagehage";
 flush;
-EOF
-
