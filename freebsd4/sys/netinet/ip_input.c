@@ -275,7 +275,6 @@ static void	ipintr(void);
 #ifdef NATPT
 extern	int			natpt_enable;
 extern	int natpt_in4		__P((struct mbuf *, struct mbuf **));
-extern	void ip6_forward	__P((struct mbuf *, int));
 #endif	/* NATPT */
 
 /*
@@ -290,7 +289,7 @@ ip_init()
 
 	TAILQ_INIT(&in_ifaddrhead);
 	in_ifaddrhashtbl = hashinit(INADDR_NHASH, M_IFADDR, &in_ifaddrhmask);
-	pr = (struct ipprotosw *)pffindproto(PF_INET, IPPROTO_RAW, SOCK_RAW);
+	pr = (struct protosw *)pffindproto(PF_INET, IPPROTO_RAW, SOCK_RAW);
 	if (pr == 0)
 		panic("ip_init");
 	for (i = 0; i < IPPROTO_MAX; i++)
@@ -567,7 +566,7 @@ pass:
 			goto checkaddresses;
 
 		case IPPROTO_IPV4:
-			ip_forward(m1, 0);
+			ip_forward(m1, 0, args.next_hop);
 			break;
 
 		case IPPROTO_IPV6:
