@@ -6,7 +6,7 @@ include	"arch/i386/conf/GENERIC"
 options 	IPSEC		# IP security
 options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
 #options 	IPSEC_DEBUG	# debug for IP security
-#pseudo-device sec		# IPsec tunnel decap by sec* tunnel device
+#pseudo-device	sec		# IPsec tunnel by sec* device
 
 #options 	ND6_DEBUG	# net.inet6.icmp6.nd6_debug=1 by default
 
