@@ -33,7 +33,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: timer.c,v 1.4 2000/04/30 10:50:31 jinmei Exp $
+ *  $Id: timer.c,v 1.5 2000/05/18 16:09:39 itojun Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -204,7 +204,7 @@ age_routes()
 	ucast_flag = FALSE;
     }
 
-    /* Walk the the (S,G) entries */
+    /* Walk the (S,G) entries */
     if(grplist == (grpentry_t *)NULL) 
 	return;
     for(grpentry_ptr = grplist;
