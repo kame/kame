@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.25 2003/07/31 12:16:02 keiichi Exp $	*/
+/*	$KAME: mobility6.c,v 1.26 2003/08/07 10:37:30 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -224,33 +224,40 @@ mobility6_input(mp, offp, proto)
 		n = ip6_findaux(m);
 		if (n) {
 			struct ip6aux *ip6a;
-			struct sockaddr_in6 src_sa;
-			struct sockaddr_in6 *home_sa, sin6;
+			struct sockaddr_in6 src_sa, home_sa;
 
 			ip6a = (struct ip6aux *) (n + 1);
 			src_sa = ip6a->ip6a_src;
-			home_sa = &ip6a->ip6a_src;
 			if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
-				/*
-				 * HAO exists and swapped already at
-				 * this point.  send a binding error
-				 * to CoA of the sending node.
-				 */
-				src_sa.sin6_addr = ip6a->ip6a_coa;
+				home_sa = ip6a->ip6a_src;
+				if ((ip6a->ip6a_flags & IP6A_SWAP) != 0) {
+					/*
+					 * HAO exists and swapped
+					 * already at this point.
+					 * send a binding error to CoA
+					 * of the sending node.
+					 */
+					src_sa.sin6_addr = ip6a->ip6a_coa;
+				} else {
+					/*
+					 * HAO exists but not swapped
+					 * yet.
+					 */
+					home_sa.sin6_addr = ip6a->ip6a_coa;
+				}
 			} else {
 				/*
 				 * if no HAO exists, the home address
 				 * field of the binding error message
 				 * must be an unspecified address.
 				 */
-				bzero(&sin6, sizeof(sin6));
-				sin6.sin6_family = AF_INET6;
-				sin6.sin6_len = sizeof(sin6);
-				sin6.sin6_addr = in6addr_any;
-				home_sa = &sin6;
+				bzero(&home_sa, sizeof(home_sa));
+				home_sa.sin6_family = AF_INET6;
+				home_sa.sin6_len = sizeof(home_sa);
+				home_sa.sin6_addr = in6addr_any;
 			}
 			(void)mobility6_send_be(&ip6a->ip6a_dst, &src_sa,
-			    IP6ME_STATUS_UNRECOGNIZED_TYPE, home_sa);
+			    IP6ME_STATUS_UNRECOGNIZED_TYPE, &home_sa);
 		}
 		m_freem(m);
 		mip6stat.mip6s_unknowntype++;
