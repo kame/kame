@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.19 2000/05/31 17:35:15 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.20 2000/05/31 17:49:56 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -188,6 +188,8 @@ nameserver ::
 If you would like to contact unicast DNS servers as well, you may want to
 specify them on the command line.
 DNS queries will be sent to both multicast and unicast servers.
+In the following example, the latter configuration will contact DNS server
+on the node itself, by unicast queries.
 .Bd -literal -offset indent
 # mdnsd -6 -i wi0 3ffe:501:4819::42
 # mdnsd -i wi0 0.0.0.0
@@ -223,7 +225,7 @@ the features are not implemented yet.
 Since there is no standard IPv6 multicast address assigned for multicast DNS,
 we use linklocal all-node multicast address at this moment.
 .Pp
-IPv4 mode does not work well at this moment.
+IPv4 multicast query/reply does not work at this moment.
 .Pp
 .Nm
 is too aggressive when sending queries.
