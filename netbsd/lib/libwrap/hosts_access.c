@@ -201,6 +201,7 @@ struct request_info *request;
 int   (*match_fn) __P((char *, struct request_info *));
 {
     char   *tok;
+    int l;
 
     /*
      * Process tokens one at a time. We have exhausted all possible matches
@@ -212,6 +213,11 @@ int   (*match_fn) __P((char *, struct request_info *));
     for (tok = strtok(list, sep); tok != 0; tok = strtok((char *) 0, sep)) {
 	if (STR_EQ(tok, "EXCEPT"))		/* EXCEPT: give up */
 	    return (NO);
+	l = strlen(tok);
+	if (*tok == '[' && tok[l - 1] == ']') {
+	    tok[l - 1] = '\0';
+	    tok++;
+	}
 	if (match_fn(tok, request)) {		/* YES: look for exceptions */
 	    while ((tok = strtok((char *) 0, sep)) && STR_NE(tok, "EXCEPT"))
 		 /* VOID */ ;

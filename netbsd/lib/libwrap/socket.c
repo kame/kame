@@ -186,6 +186,7 @@ struct host_info *host;
 	break;
 #ifdef INET6
     case AF_INET6:
+	/* XXX more special cases? */
 	ap = (char *)&((struct sockaddr_in6 *)sin)->sin6_addr;
 	alen = sizeof(struct in6_addr);
 	break;

@@ -40,6 +40,17 @@ struct request_info *request;
     struct protoent *ip;
     int     fd = request->fd;
     int     len = sizeof lbuf;
+    struct sockaddr_storage ss;
+    int sslen;
+
+    /* check if this is AF_INET socket */
+    sslen = sizeof(ss);
+    if (getsockname(fd, (struct sockaddr *)&ss, &sslen < 0)) {
+	syslog(LOG_ERR, "getpeername: %m");
+	clean_exit(request);
+    }
+    if (ss.ss_family != AF_INET)
+	return;
 
     if ((ip = getprotobyname("ip")) != 0)
 	ipproto = ip->p_proto;

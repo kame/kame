@@ -102,6 +102,7 @@ char   *dest;
     (void)&fp;	/* XXX gcc */
 #endif
 
+    /* address family must be the same */
     if (rmt_sin->sa_family != our_sin->sa_family) {
 	STRN_CPY(dest, result, STRING_LENGTH);
 	return;

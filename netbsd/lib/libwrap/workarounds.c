@@ -141,10 +141,10 @@ int    *fromlen;
 
     if ((ret = recvfrom(sock, buf, buflen, flags, from, fromlen)) >= 0) {
 	if (from->sa_family == 0) {
-	    struct sockaddr my_addr;
+	    struct sockaddr_storage my_addr;
 	    int     my_addr_len = sizeof(my_addr);
 
-	    if (getsockname(0, &my_addr, &my_addr_len)) {
+	    if (getsockname(0, (struct sockaddr *)&my_addr, &my_addr_len)) {
 		tcpd_warn("getsockname: %m");
 	    } else {
 		from->sa_family = my_addr.sa_family;

@@ -61,11 +61,36 @@ char   *split_at(string, delimiter)
 char   *string;
 int     delimiter;
 {
+#if 0
     char   *cp;
 
     if ((cp = strchr(string, delimiter)) != 0)
 	*cp++ = 0;
     return (cp);
+#else
+    char *cp;
+    int bracket;
+
+    bracket = 0;
+    for (cp = string; cp && *cp; cp++) {
+	switch (*cp) {
+	case '[':
+	    bracket++;
+	    break;
+	case ']':
+	    bracket--;
+	    break;
+	default:
+	    if (bracket == 0 && *cp == delimiter) {
+		*cp++ = 0;
+		return cp;
+	    }
+	    break;
+	}
+    }
+    return NULL;
+    return cp;
+#endif
 }
 
 /* dot_quad_addr - convert dotted quad to internal form */
