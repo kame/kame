@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$KAME: PORTABILITY,v 1.61 2001/07/23 15:07:20 itojun Exp $
+	$KAME: PORTABILITY,v 1.62 2001/09/27 04:49:47 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -359,3 +359,12 @@ across those possibilities.
 	freebsd4 and netbsd have it in libc.
 	bsdi4 does not have it.
 	others?
+
+- snprintf and friends can return negative value, as well as value larger
+  than the specified region.  therefore, it is unsafe to manipulate a pointer
+  directly by the return value.
+	WRONG:	lp += snprintf(lp, ep - lp, "%s", foo);
+	RIGHT:	n = snprintf(lp, ep - lp, "%s", foo);
+		if (n < 0 || n >= ep - lp)
+			die();
+		lp += n;
