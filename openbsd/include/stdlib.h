@@ -1,4 +1,4 @@
-/*	$OpenBSD: stdlib.h,v 1.29 2004/01/21 19:50:39 millert Exp $	*/
+/*	$OpenBSD: stdlib.h,v 1.32 2004/08/03 19:59:42 millert Exp $	*/
 /*	$NetBSD: stdlib.h,v 1.25 1995/12/27 21:19:08 jtc Exp $	*/
 
 /*-
@@ -111,6 +111,7 @@ void	*calloc(size_t, size_t);
 div_t	 div(int, int);
 char	*ecvt(double, int, int *, int *);
 __dead void	 exit(int);
+__dead void	 _Exit(int);
 char	*fcvt(double, int, int *, int *);
 void	 free(void *);
 char	*gcvt(double, int, char *);
@@ -129,6 +130,8 @@ double	 strtod(const char *, char **);
 long	 strtol(const char *, char **, int);
 long long
 	 strtoll(const char *, char **, int);
+long long
+	 strtonum(const char *, long long, long long, const char **);
 unsigned long
 	 strtoul(const char *, char **, int);
 unsigned long long

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pwd.h,v 1.15 2003/06/02 19:34:12 millert Exp $	*/
+/*	$OpenBSD: pwd.h,v 1.17 2004/07/13 21:09:47 millert Exp $	*/
 /*	$NetBSD: pwd.h,v 1.9 1996/05/15 21:36:45 jtc Exp $	*/
 
 /*-
@@ -45,7 +45,6 @@
 
 #ifndef _POSIX_SOURCE
 #define	_PATH_PASSWD		"/etc/passwd"
-#define _PATH_PASSWDCONF	"/etc/passwd.conf"
 #define	_PATH_MASTERPASSWD	"/etc/master.passwd"
 #define	_PATH_MASTERPASSWD_LOCK	"/etc/ptmp"
 
@@ -101,6 +100,8 @@ struct passwd	*getpwent(void);
 int		 setpassent(int);
 char		*user_from_uid(uid_t, int);
 char		*bcrypt_gensalt(u_int8_t);
+char		*bcrypt(const char *, const char *);
+char		*md5crypt(const char *, const char *);
 struct passwd	*pw_dup(const struct passwd *);
 #endif
 void		 setpwent(void);

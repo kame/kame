@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.125 2004/03/08 23:31:51 drahn Exp $
+#	$OpenBSD: Makefile,v 1.128 2004/07/15 12:07:53 henning Exp $
 #	$NetBSD: Makefile,v 1.59 1996/05/15 21:36:43 jtc Exp $
 
 #	@(#)Makefile	5.45.1.1 (Berkeley) 5/6/91
@@ -34,7 +34,7 @@ LFILES=	errno.h fcntl.h syslog.h termios.h stdarg.h varargs.h
 
 DIRS=	arpa protocols rpc rpcsvc
 LDIRS=	crypto ddb dev isofs miscfs net netatalk netccitt netinet altq \
-	netinet6 netipx netiso netnatm netns nfs scsi sys ufs uvm xfs
+	netinet6 netipx netnatm netns nfs scsi sys ufs uvm xfs
 
 # Directories with an includes target
 RDIRS=	../lib/libpthread ../lib/libcompat ../lib/libcurses \
@@ -42,25 +42,19 @@ RDIRS=	../lib/libpthread ../lib/libcompat ../lib/libcurses \
 	../lib/libocurses ../lib/libossaudio ../lib/libpanel ../lib/librpcsvc \
 	../lib/libskey ../lib/libsectok ../lib/libedit ../lib/libpcap \
 	../lib/libutil ../lib/libusbhid ../lib/libwrap ../lib/libz \
-	../lib/libkeynote ../lib/libevent \
-	../usr.bin/lex ../gnu/lib/libreadline \
+	../lib/libkeynote ../lib/libevent ../usr.bin/lex \
+	../gnu/lib/libreadline ../gnu/usr.sbin/sendmail/libmilter \
 	../sys/arch/${MACHINE}
 
 # Places using Makefile that needs a prerequisite target met before includes
 PRDIRS=
 
 # Directories with an includes target that use Makefile.bsd-wrapper
-WDIRS=	../usr.sbin/httpd
-.if ${MACHINE_ARCH} != "arm"
-WDIRS+=	../gnu/usr.bin/binutils
-.endif
+WDIRS=	../usr.sbin/httpd ../gnu/usr.bin/binutils
 
 # Places using Makefile.bsd-wrapper that needs a prerequisite target met
 # before includes
-PWDIRS=	../usr.sbin/httpd
-.if ${MACHINE_ARCH} != "arm"
-PWDIRS+=	../gnu/usr.bin/binutils
-.endif
+PWDIRS=	../usr.sbin/httpd ../gnu/usr.bin/binutils
 
 .if ${USE_GCC3:L} == "yes"
 WDIRS+= ../gnu/lib/libstdc++ ../gnu/usr.bin/gcc ../gnu/lib/libobjc \
