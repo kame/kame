@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1401 2000/11/25 11:51:31 jinmei Exp $
+$KAME: CHANGELOG,v 1.1402 2000/11/25 17:56:25 kawa Exp $
 
 <200011>
 2000-11-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -16,9 +16,8 @@ $KAME: CHANGELOG,v 1.1401 2000/11/25 11:51:31 jinmei Exp $
 	In response to: a comment from toshiaki.nakatsu@fujixerox.co.jp.
 
 2000-11-25  Koji Kawano <K.Kawano@rdmg.mgcs.mei.co.jp>
-	* kame/freebsdX/net/if_loop.c: fix memory leak
-	when icmp reply with loop back interface:
-	ex: ping6 -w -I lo0 ::1
+	* kame/freebsdX/net/if_loop.c: fixed duplicated free of pkt's aux data.
+	This happens in case of that "ping6 -w -I lo0 ::1" for example.
 
 Fri Nov 24 17:29:30 JST 2000  itojun@iijlab.net
 	* libinet6/if_nametoindex.c: conform to RFC2553 (ENXIO if the interface
