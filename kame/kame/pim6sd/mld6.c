@@ -118,9 +118,12 @@ static struct iovec 		rcviov[2];
 static struct sockaddr_in6 	from;
 static u_char   		rcvcmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo)) +
 			   	CMSG_SPACE(sizeof(int))];
+#ifndef USE_RFC2292BIS
 u_int8_t raopt[IP6OPT_RTALERT_LEN];
+#endif 
 static char *sndcmsgbuf;
 static int ctlbuflen = 0;
+static u_short rtalert_code;
 
 /* local functions */
 
@@ -135,8 +138,8 @@ init_mld6()
 {
     struct icmp6_filter filt;
     int             on;
-    u_short         rtalert_code = htons(IP6OPT_RTALERT_MLD);
 
+    rtalert_code = htons(IP6OPT_RTALERT_MLD);
     if (!mld6_recv_buf && (mld6_recv_buf = malloc(RECV_BUF_SIZE)) == NULL)
 	    log(LOG_ERR, 0, "malloca failed");
     if (!mld6_send_buf && (mld6_send_buf = malloc(RECV_BUF_SIZE)) == NULL)
@@ -210,9 +213,11 @@ init_mld6()
     sndmh.msg_iov = sndiov;
     sndmh.msg_iovlen = 1;
     /* specifiy to insert router alert option in a hop-by-hop opt hdr. */
-    raopt[0] = IP6OPT_RTALERT;
+#ifndef USE_RFC2292BIS
+    raopt[0] = IP6OPT_ROUTER_ALERT;
     raopt[1] = IP6OPT_RTALERT_LEN - 2;
     memcpy(&raopt[2], (caddr_t) & rtalert_code, sizeof(u_short));
+#endif 
 
     /* register MLD message handler */
     if (register_input_handler(mld6_socket, mld6_read) < 0)
@@ -391,7 +396,7 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
 {
     static struct sockaddr_in6 dst_sa = {sizeof(dst_sa), AF_INET6};
     struct mld6_hdr *mhp = (struct mld6_hdr *)mld6_send_buf;
-    int ctllen;
+    int ctllen, hbhlen = 0;
 
     switch(type) {
     case MLD6_MTRACE:
@@ -420,8 +425,20 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
     ctllen = 0;
     if (ifindex != -1 || src)
 	    ctllen += CMSG_SPACE(sizeof(struct in6_pktinfo));
-    if (alert)
-	    ctllen += inet6_option_space(sizeof(raopt));
+    if (alert) {
+#ifdef USE_RFC2292BIS
+	if ((hbhlen = inet6_opt_init(NULL, 0)) == -1)
+		log(LOG_ERR, 0, "inet6_opt_init(0) failed");
+	if ((hbhlen = inet6_opt_append(NULL, 0, hbhlen, IP6OPT_ROUTER_ALERT, 2,
+				       2, NULL)) == -1)
+		log(LOG_ERR, 0, "inet6_opt_append(0) failed");
+	if ((hbhlen = inet6_opt_finish(NULL, 0, hbhlen)) == -1)
+		log(LOG_ERR, 0, "inet6_opt_finish(0) failed");
+#else  /* old advanced API */
+	    hbhlen = inet6_option_space(sizeof(raopt));
+#endif
+	    ctllen += CMSG_SPACE(hbhlen);
+    }
     /* extend ancillary data space (if necessary) */
     if (ctlbuflen < ctllen) {
 	    if (sndcmsgbuf)
@@ -452,12 +469,37 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
 		    cmsgp = CMSG_NXTHDR(&sndmh, cmsgp);
 	    }
 	    if (alert) {
+#ifdef USE_RFC2292BIS
+		    int currentlen;
+		    void *hbhbuf, *optp = NULL;
+
+		    cmsgp->cmsg_len = CMSG_SPACE(hbhlen);
+		    cmsgp->cmsg_level = IPPROTO_IPV6;
+		    cmsgp->cmsg_type = IPV6_HOPOPTS;
+		    hbhbuf = CMSG_DATA(cmsgp);
+
+		    if ((currentlen = inet6_opt_init(hbhbuf, hbhlen)) == -1)
+			    log(LOG_ERR, 0, "inet6_opt_init(len = %d) failed",
+				hbhlen);
+		    if ((currentlen = inet6_opt_append(hbhbuf, hbhlen,
+						       currentlen,
+						       IP6OPT_ROUTER_ALERT, 2,
+						       2, &optp)) == -1)
+			    log(LOG_ERR, 0,
+				"inet6_opt_append(len = %d) failed",
+				currentlen, hbhlen);
+		    (void)inet6_opt_set_val(optp, 0, &rtalert_code,
+					    sizeof(rtalert_code));
+		    if (inet6_opt_finish(hbhbuf, hbhlen, currentlen) == -1)
+			    log(LOG_ERR, 0, "inet6_opt_finish(buf) failed");
+#else  /* old advanced API */
 		    if (inet6_option_init((void *)cmsgp, &cmsgp, IPV6_HOPOPTS))
 			    log(LOG_ERR, 0, /* assert */
 				"make_mld6_msg: inet6_option_init failed");
 		    if (inet6_option_append(cmsgp, raopt, 4, 0))
 			    log(LOG_ERR, 0, /* assert */
 				"make_mld6_msg: inet6_option_append failed");
+#endif 
 		    cmsgp = CMSG_NXTHDR(&sndmh, cmsgp);
 	    }
     }
