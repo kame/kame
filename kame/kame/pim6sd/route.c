@@ -1,4 +1,4 @@
-/*	$KAME: route.c,v 1.25 2003/02/05 15:30:33 suz Exp $	*/
+/*	$KAME: route.c,v 1.26 2003/04/30 02:01:57 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -1143,8 +1143,8 @@ process_wrong_iif(im)
 
     /* Don't create routing entries for the LAN scoped addresses */
     if (IN6_IS_ADDR_MC_NODELOCAL(&group.sin6_addr) ||/* sanity? */
-    IN6_IS_ADDR_MC_LINKLOCAL(&group.sin6_addr))
-    return;
+	IN6_IS_ADDR_MC_LINKLOCAL(&group.sin6_addr))
+	return;
 
 
     /*
