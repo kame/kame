@@ -1,6 +1,6 @@
 #! /usr/pkg/bin/perl
 
-#	$KAME: dynupdate.pl,v 1.1 2001/02/20 03:16:34 itojun Exp $
+#	$KAME: dynupdate.pl,v 1.2 2001/02/20 03:22:38 itojun Exp $
 
 # Copyright (C) 2001 WIDE Project.
 # All rights reserved.
@@ -36,6 +36,8 @@
 #	if you don't define $tsigkey, the script will not use TSIG.
 #	in this case your zone becomes very insecure.  we do not recomment that.
 # yourhost.dyn.your.domain ($name.$domain): FQDN of your machine
+#
+# TODO: register PTR record for reverse lookup
 #
 
 $nsupdate = '/usr/pkg/bin/nsupdate';
