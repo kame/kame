@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.465 2005/01/20 09:14:05 t-momose Exp $	*/
+/*	$KAME: ip6_output.c,v 1.466 2005/03/02 04:00:50 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -4542,7 +4542,9 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		 */
 		if (opt->ip6po_pktinfo == NULL) {
 			opt->ip6po_pktinfo = malloc(sizeof(*pktinfo),
-			    M_IP6OPT, M_WAITOK);
+			    M_IP6OPT, M_NOWAIT);
+			if (opt->ip6po_pktinfo == NULL)
+				return (ENOBUFS);
 		}
 		bcopy(pktinfo, opt->ip6po_pktinfo, sizeof(*pktinfo));
 		break;
@@ -4634,7 +4636,9 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 
 		/* turn off the previous option, then set the new option. */
 		ip6_clearpktopts(opt, IPV6_NEXTHOP);
-		opt->ip6po_nexthop = malloc(*buf, M_IP6OPT, M_WAITOK);
+		opt->ip6po_nexthop = malloc(*buf, M_IP6OPT, M_NOWAIT);
+		if (opt->ip6po_nexthop == NULL)
+			return (ENOBUFS);
 		bcopy(buf, opt->ip6po_nexthop, *buf);
 		break;
 
@@ -4667,7 +4671,9 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 
 		/* turn off the previous option, then set the new option. */
 		ip6_clearpktopts(opt, IPV6_HOPOPTS);
-		opt->ip6po_hbh = malloc(hbhlen, M_IP6OPT, M_WAITOK);
+		opt->ip6po_hbh = malloc(hbhlen, M_IP6OPT, M_NOWAIT);
+		if (opt->ip6po_hbh == NULL)
+			return (ENOBUFS);
 		bcopy(hbh, opt->ip6po_hbh, hbhlen);
 
 		break;
@@ -4740,7 +4746,9 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 
 		/* turn off the previous option, then set the new option. */
 		ip6_clearpktopts(opt, optname);
-		*newdest = malloc(destlen, M_IP6OPT, M_WAITOK);
+		*newdest = malloc(destlen, M_IP6OPT, M_NOWAIT);
+		if (*newdest == NULL)
+			return (ENOBUFS);
 		bcopy(dest, *newdest, destlen);
 
 		break;
@@ -4792,11 +4800,15 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 #ifdef MIP6
 		if (rth->ip6r_type == IPV6_RTHDR_TYPE_0) {
 #endif /* MIP6 */
-		opt->ip6po_rthdr = malloc(rthlen, M_IP6OPT, M_WAITOK);
+		opt->ip6po_rthdr = malloc(rthlen, M_IP6OPT, M_NOWAIT);
+		if (opt->ip6po_rthdr == NULL)
+			return (ENOBUFS);
 		bcopy(rth, opt->ip6po_rthdr, rthlen);
 #ifdef MIP6
 		} else if (rth->ip6r_type == IPV6_RTHDR_TYPE_2) {
 			opt->ip6po_rthdr2 = malloc(rthlen, M_IP6OPT, M_WAITOK);
+			if (opt->ip6po_rthdr2 == NULL)
+				return (ENOBUFS);
 			bcopy(rth, opt->ip6po_rthdr2, rthlen);
 		}
 #endif /* MIP6 */
