@@ -1,7 +1,21 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2415 2003/06/24 05:53:13 itojun Exp $
+$KAME: CHANGELOG,v 1.2416 2003/06/26 15:46:14 t-momose Exp $
 
 <200306>
+2003-06-26  Tsuyoshi MOMOSE  <t-momose@netlab.nec.co.jp>
+
+	* kame/sys/netinet6/{mip6_cncore.c, dest6.c}: Several bugs related
+	mobile ipv6 correspondent node functinonalyty was fixed.  Thease
+	problems are found and reported by v6pc certification WG
+	conformance testing.
+	  - shouldn't check care-of nonce index on deregistration.
+	  - shouldn't send binding errors with Home Address optino in HoTI,
+	    or CoTI packet
+	  - should send a binding error when an address included in home
+	    address option is not a  routable unicast address.
+	  - should send binding error with status code 2 when received
+	    a packet which has a unknown mobility header type.
+
 Tue Jun 24 14:52:16 JST 2003  itojun@iijlab.net
 	* sys/netinet/sctp*: sctp patch 9 from rrs@cisco.com.  (7) is disabled
 	  by default, as there's no floating point in kernel land.
