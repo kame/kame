@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.35 2003/10/21 08:15:45 itojun Exp $	*/
+/*	$KAME: cfparse.y,v 1.36 2004/05/19 13:46:03 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -41,6 +41,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "defs.h"
 #include "vif.h"
@@ -88,7 +89,7 @@ enum {IFA_FLAG, IFA_PREFERENCE, IFA_METRIC, RPA_PRIORITY, RPA_TIME,
       BSRA_PRIORITY, BSRA_TIME, BSRA_MASKLEN, IN6_PREFIX, THRESA_RATE,
       THRESA_INTERVAL,
       IFA_ROBUST, IFA_QUERY_INT, IFA_QUERY_INT_RESP, IFA_MLD_VERSION, IFA_LLQI,
-      STATICRP,
+      RPA_STATICADDR,
      };
 
 static int strict;		/* flag if the grammer check is strict */
@@ -101,6 +102,20 @@ static double helloperiod_coef, jpperiod_coef;
 static int debugonly;
 
 extern int yylex __P((void));
+
+static struct attr_list *add_attribute_flag __P((struct attr_list *, int,
+	unsigned int));
+static struct attr_list *add_attribute_num __P((struct attr_list *, int,
+	double));
+static void free_attr_list __P((struct attr_list *));
+static int param_config __P((void));
+static int phyint_config __P((void));
+static int rp_config __P((void));
+static int bsr_config __P((void));
+static int static_rp_config __P((void));
+static int regthres_config __P((void));
+static int datathres_config __P((void));
+
 %}
 
 %union {
@@ -429,7 +444,7 @@ staticrp_statement:
 			return(0);
 		}
 		memset(new, 0, sizeof(*new));
-		new->type = STATICRP;
+		new->type = RPA_STATICADDR;
 		new->attru.staticrp = entry;
 		new->next = static_rp;
 		static_rp = new;
@@ -600,19 +615,6 @@ param_statement:
 	;
 %%
 
-static struct attr_list *add_attribute_flag __P((struct attr_list *, int,
-	unsigned int));
-static struct attr_list *add_attribute_num __P((struct attr_list *, int,
-	double));
-static void free_attr_list __P((struct attr_list *));
-static int param_config __P((void));
-static int phyint_config __P((void));
-static int rp_config __P((void));
-static int bsr_config __P((void));
-static int static_rp_config __P((void));
-static int regthres_config __P((void));
-static int datathres_config __P((void));
-
 static struct attr_list *
 add_attribute_flag(list, type, flag)
 	struct attr_list *list;
@@ -742,8 +744,10 @@ phyint_config()
 	struct uvif *v;
 	mifi_t vifi;
 	struct attr_list *al;
+#ifdef MLDV2_LISTENER_REPORT
 	unsigned int qqic;
 	unsigned int realnbr;
+#endif
 	
 	for (vifi = 0, v = uvifs; vifi < numvifs ; ++vifi , ++v) {
 		for (al = (struct attr_list *)v->config_attr; al; al = al->next) {
@@ -822,11 +826,11 @@ phyint_config()
 						yywarn("unrepresentable query int. value %.0f, corrected to %d",
 							al->attru.number,realnbr);
 				}
-#endif
 
 				if (v->uv_mld_version & MLDv2)
 					v->uv_mld_query_interval = realnbr;
 				else
+#endif
 					v->uv_mld_query_interval = al->attru.number;
 
 				IF_DEBUG(DEBUG_MLD)
@@ -848,11 +852,11 @@ phyint_config()
 						yywarn("unrepresentable query resp. value %.0f, corrected to %d",
 							al->attru.number,realnbr);
 				}
-#endif
 
 				if (v->uv_mld_version & MLDv2) 
 					v->uv_mld_query_rsp_interval = realnbr;
 				else
+#endif
 				{
 					if(al->attru.number>65536)
 					{
@@ -881,11 +885,11 @@ phyint_config()
 						yywarn("unrepresentable llqi value %.0f, corrected to %d",
 							al->attru.number,realnbr);
 				}
-#endif
 
 				if (v->uv_mld_version & MLDv2) 
 					v->uv_mld_llqi = realnbr;
 				else
+#endif
 				{
 					if(al->attru.number>65536)
 					{
@@ -943,7 +947,7 @@ static_rp_config()
 		struct in6_addr grp_mask;
 		struct in6_addr bsr_mask;
 
-		if (al->type != STATICRP)
+		if (al->type != RPA_STATICADDR)
 			continue;
 		entry = &al->attru.staticrp;
 
