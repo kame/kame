@@ -1,4 +1,4 @@
-.\"	$KAME: mip6control.8,v 1.5 2002/01/21 07:49:26 k-sugyou Exp $
+.\"	$KAME: mip6control.8,v 1.6 2002/01/21 12:22:36 keiichi Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001 WIDE Project.
 .\" All rights reserved.
@@ -37,13 +37,29 @@
 .\"
 .Sh SYNOPSIS
 .Nm
-.Op -i ifname
-.Op -abcghlm
-.Oo
--H
+.Oo -i
+.Ar ifname
+.Oc
+.Op -abcghlmnw
+.Oo -H
 .Ar home_prefix
 -P
 .Ar prefixlen
+.Oc
+.Oo -u
+.Ar address#port
+.Oc
+.Oo -v
+.Ar address#port
+.Oc
+.Oo -S
+.Ar 0|1
+.Oc
+.Oo -T
+.Ar 0|1
+.Oc
+.Oo -D
+.Ar 0|1
 .Oc
 .\"
 .Sh DESCRIPTION
@@ -89,6 +105,16 @@ Add a rule that MN doesn't add a Home Address option to the outgoing packet.
 Delete the rule which specified one.
 .It Fl w
 Show the rule.
+.It Fl S Ar 0|1
+When set to 0, the IPsec protection check of the incoming binding updates
+and binding acks will not be performed (always pass the check).
+.It Fl T Ar 0|1
+When set to 0, the authentication sub-option check of the incoming binding
+updates and binding acks will not be performed.  Also, do not insert
+the authentication sub-option when sending the binding updates/binding
+acks.
+.It Fl D Ar 0|1
+When set to 0, no debug messages are printed.
 .El
 .\"
 .Sh EXAMPLES
