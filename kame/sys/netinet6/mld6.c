@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.65 2002/11/04 04:01:09 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.66 2002/11/04 04:22:15 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1588,7 +1588,7 @@ mld_send_current_state_report(m0, buflenp, in6m)
 	u_int16_t max_len;
 	u_int16_t numsrc = 0, src_once, src_done = 0;
 	u_int8_t type = 0;
-	int error = 0;
+	struct mld_hdr *mldh;
 
 	if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa) ||
 		(in6m->in6m_ifp->if_flags & IFF_LOOPBACK) != 0)
@@ -1629,12 +1629,12 @@ mld_send_current_state_report(m0, buflenp, in6m)
 	}
 
 	if (m == NULL) {
-		mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
-		if (error != 0) {
+		mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
+		if (mldh == NULL) {
 #ifdef MLDV2_DEBUG
-			printf("mld_send_current_state_report: error preparing new report header 1.\n");
+			printf("mld_send_current_state_report: error preparing new report header\n");
 #endif
-			return error;
+			return ENOBUFS;
 		}
 		m = *m0;
 		*buflenp = 0;
@@ -1647,12 +1647,12 @@ mld_send_current_state_report(m0, buflenp, in6m)
 			 */
 			mld_sendbuf(m, in6m->in6m_ifp);
 			m = NULL;
-			mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
-			if (error != 0) {
+			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
+			if (mldh == NULL) {
 #ifdef MLDV2_DEBUG
-				printf("mld_send_current_state_report: error preparing new report header 2.\n");
+				printf("mld_send_current_state_report: error preparing new report header.\n");
 #endif
-				return error;
+				return ENOBUFS;
 			}
 			m = *m0;
 			*buflenp = 0;
@@ -1687,14 +1687,14 @@ mld_send_current_state_report(m0, buflenp, in6m)
 			 * MLD report here and try to make separate message
 			 * with remaining sources.
 			 */
-			 mld_sendbuf(m, in6m->in6m_ifp);
-			 m = NULL;
-			 mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
-			if (error != 0) {
+			mld_sendbuf(m, in6m->in6m_ifp);
+			m = NULL;
+			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
+			if (mldh == NULL) {
 #ifdef MLDV2_DEBUG
 				printf("mld_send_current_state_report: error preparing additional report header.\n");
 #endif
-				return error;
+				return ENOBUFS;
 			}
 			m = *m0;
 			*buflenp = 0;
@@ -1734,7 +1734,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 	struct mbuf *m = *m0;
 	u_int16_t max_len;
 	u_int16_t numsrc = 0, src_once, src_done = 0;
-	int error = 0;
+	struct mld_hdr *mldh;
 
 	if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa) ||
 		(in6m->in6m_ifp->if_flags & IFF_LOOPBACK) != 0)
@@ -1817,8 +1817,8 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 	}
 
 	if (m == NULL) {
-		mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
-		if (error != 0) {
+		mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
+		if (mldh == NULL) {
 #ifdef MLDV2_DEBUG
 			printf("mld_send_state_change_report: error preparing new report header.\n");
 #endif
@@ -1834,10 +1834,10 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			 * group record, send current buffer and create a new
 			 * buffer for this record.
 			 */
-			 mld_sendbuf(m, in6m->in6m_ifp);
-			 m = NULL;
-			 mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
-			if (error != 0) {
+			mld_sendbuf(m, in6m->in6m_ifp);
+			m = NULL;
+			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
+			if (mldh == NULL) {
 #ifdef MLDV2_DEBUG
 				printf("mld_send_state_change_report: error preparing new report header.\n");
 #endif
@@ -1908,8 +1908,8 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 
 			mld_sendbuf(m, in6m->in6m_ifp);
 			m = NULL;
-			mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
-			if (error != 0) {
+			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
+			if (mldh == NULL) {
 #ifdef MLDV2_DEBUG
 				printf("mld_send_state_change_report: error preparing additional report header.\n");
 #endif
@@ -1982,8 +1982,8 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 #ifdef MLDV2_DEBUG
 			printf("mld_send_current_state_report: re-allocbuf4\n");
 #endif
-			mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
-			if (error != 0) {
+			mldh = mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
+			if (mldh == NULL) {
 #ifdef MLDV2_DEBUG
 				printf("mld_send_state_change_report: error preparing additional report header.\n");
 #endif
