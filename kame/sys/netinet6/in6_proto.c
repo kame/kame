@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.73 2000/12/04 05:36:09 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.74 2000/12/27 09:45:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,6 +90,9 @@
 
 #include <net/if.h>
 #include <net/radix.h>
+#ifdef RADIX_ART
+#include <net/radix_art.h>
+#endif
 #include <net/route.h>
 
 #include <netinet/in.h>
@@ -479,7 +482,11 @@ struct domain inet6domain =
 #ifdef __FreeBSD__
       in6_inithead,
 #else
+#ifdef RADIX_ART
+      rn_art_inithead,
+#else
       rn_inithead,
+#endif
 #endif
       offsetof(struct sockaddr_in6, sin6_addr) << 3,
       sizeof(struct sockaddr_in6) };

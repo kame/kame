@@ -79,6 +79,9 @@
 
 #include <net/if.h>
 #include <net/radix.h>
+#ifdef RADIX_ART
+#include <net/radix_art.h>
+#endif
 #include <net/route.h>
 
 #include <netinet/in.h>
@@ -106,6 +109,9 @@
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 #include <netinet/ip_encap.h>
+#if 0
+#include <netinet/sctp_var.h>
+#endif
 /*
  * TCP/IP protocol family: IP, ICMP, UDP, TCP.
  */
@@ -176,6 +182,13 @@ struct protosw inetsw[] = {
   tcp_usrreq,
   tcp_init,	tcp_fasttimo,	tcp_slowtimo,	tcp_drain,	tcp_sysctl
 },
+#if 0
+{ SOCK_STREAM,	&inetdomain,	IPPROTO_SCTP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN,
+  sctp_input,	0,		sctp_ctlinput,	0,
+  sctp_usrreq,
+  sctp_init,	0,		0,		0,		0
+},
+#endif
 { SOCK_RAW,	&inetdomain,	IPPROTO_RAW,	PR_ATOMIC|PR_ADDR,
   rip_input,	rip_output,	0,		rip_ctloutput,
   rip_usrreq,
@@ -301,7 +314,12 @@ struct protosw in_stf_protosw =
 struct domain inetdomain =
     { PF_INET, "internet", 0, 0, 0, 
       inetsw, &inetsw[sizeof(inetsw)/sizeof(inetsw[0])], 0,
-      rn_inithead, 32, sizeof(struct sockaddr_in) };
+#ifdef RADIX_ART
+      rn_art_inithead,
+#else
+      rn_inithead,
+#endif
+      32, sizeof(struct sockaddr_in) };
 
 u_char	ip_protox[IPPROTO_MAX];
 
