@@ -91,7 +91,7 @@ __RCSID("$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $");
 
 /*
  * portability issues:
- * - bsdi3 uses PLURAL(), not plural().
+ * - bsdi[34] uses PLURAL(), not plural().
  * - freebsd2 can't print "unsigned long long" properly.
  */
 #ifdef __bsdi__
@@ -105,7 +105,7 @@ __RCSID("$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $");
 #define CAST	unsigned long long
 #endif
 
-#ifdef IPSEC
+#ifdef IPSEC 
 static const char *ipsec_ahnames[] = {
 	"none",
 	"hmac MD5",
@@ -139,6 +139,16 @@ static const char *pfkey_msgtypenames[] = {
 	"x_spddelete", "x_spdget", "x_spdacquire", "x_spddump", "x_spdflush",
 	"x_spdsetidx", "x_spdexpire",
 };
+
+static struct ipsecstat ipsecstat;
+
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+struct data_info ipsecstat_info = {	/* for bsdi4 only */
+	"_ipsecstat",
+	NULL, 0,
+	&ipsecstat, sizeof(struct ipsecstat)
+};
+#endif
 
 static const char *pfkey_msgtype_names __P((int));
 static void ipsec_hist __P((const u_quad_t *, size_t, const char **, size_t,
@@ -176,17 +186,8 @@ ipsec_hist(hist, histmax, name, namemax, title)
 }
 
 void
-ipsec_stats(off, name)
-	u_long off;
-	char *name;
+print_ipsecstats()
 {
-	struct ipsecstat ipsecstat;
-
-	if (off == 0)
-		return;
-	printf ("%s:\n", name);
-	kread(off, (char *)&ipsecstat, sizeof (ipsecstat));
-
 #define	p(f, m) if (ipsecstat.f || sflag <= 1) \
     printf(m, (CAST)ipsecstat.f, plural(ipsecstat.f))
 #define hist(f, n, t) \
@@ -220,6 +221,30 @@ ipsec_stats(off, name)
 #undef p
 #undef hist
 }
+
+void
+ipsec_stats(off, name)
+	u_long off;
+	char *name;
+{
+	if (off == 0)
+		return;
+	printf ("%s:\n", name);
+	kread(off, (char *)&ipsecstat, sizeof (ipsecstat));
+
+	print_ipsecstats();
+}
+
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802 /* bsdi4 only */
+void
+ipsec_stats0(name)
+	char *name;
+{
+	skread(name, &ipsecstat_info);
+
+	print_ipsecstats();
+}
+#endif
 
 static const char *
 pfkey_msgtype_names(x)
