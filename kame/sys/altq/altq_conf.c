@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.21 2003/08/09 16:57:42 suz Exp $	*/
+/*	$KAME: altq_conf.c,v 1.22 2003/08/14 08:22:25 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2003
@@ -187,11 +187,17 @@ static struct cdevsw altq_cdevsw =
         { altqopen,	altqclose,	noread,	        nowrite,
 	  altqioctl,	seltrue,	nommap,		nostrategy,
 	  "altq",	CDEV_MAJOR,	nodump,		nopsize,  0,  -1 };
-#else
+#elif (__FreeBSD_version < 501000)
 static struct cdevsw altq_cdevsw =
         { altqopen,	altqclose,	noread,	        nowrite,
 	  altqioctl,	seltrue,	nommap,		nostrategy,
 	  "altq",	CDEV_MAJOR,	nodump,		nopsize,  0 };
+#else
+static struct cdevsw altq_cdevsw =
+	{ CDEV_MAJOR,	0, 		"altq",
+	  altqopen,	altqclose,	noread,	        nowrite,
+	  altqioctl,	nopoll,		nommap,		nostrategy,
+	  nodump,	nokqfilter };
 #endif
 #endif /* __FreeBSD__ */
 
