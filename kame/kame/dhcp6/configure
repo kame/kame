@@ -836,6 +836,7 @@ Optional Packages:
   --with-opt-pinfo=VALUE  specify DHCP option value for prefix information
   --with-opt-preq=VALUE   specify DHCP option value for prefix request
   --with-opt-ntp=VALUE    specify DHCP option value for NTP
+  --with-opt-lifetime=VALUE    specify DHCP option value for lifetime
 
 Some influential environment variables:
   CC          C compiler command
@@ -4363,6 +4364,26 @@ echo "${ECHO_T}using $dhcpopt_ntp" >&6
 fi
 
 
+echo "$as_me:$LINENO: checking for DHCP Lifetime option" >&5
+echo $ECHO_N "checking for DHCP Lifetime option... $ECHO_C" >&6
+
+# Check whether --with-opt-lifetime or --without-opt-lifetime was given.
+if test "${with_opt_lifetime+set}" = set; then
+  withval="$with_opt_lifetime"
+  dhcpopt_lifetime="$withval"
+else
+  dhcpopt_lifetime=0
+fi;
+if test $dhcpopt_ntp = 0 ; then
+	dhcpopt_ntp=36
+	echo "$as_me:$LINENO: result: unspecified and using $dhcpopt_lifetime" >&5
+echo "${ECHO_T}unspecified and using $dhcpopt_lifetime" >&6
+else
+	echo "$as_me:$LINENO: result: using $dhcpopt_lifetime" >&5
+echo "${ECHO_T}using $dhcpopt_lifetime" >&6
+fi
+
+
 
 for ac_header in stdarg.h
 do
@@ -5078,6 +5099,7 @@ s,@dhcpopt_pdel@,$dhcpopt_pdel,;t t
 s,@dhcpopt_pinfo@,$dhcpopt_pinfo,;t t
 s,@dhcpopt_preq@,$dhcpopt_preq,;t t
 s,@dhcpopt_ntp@,$dhcpopt_ntp,;t t
+s,@dhcpopt_lifetime@,$dhcpopt_lifetime,;t t
 CEOF
 
 _ACEOF
