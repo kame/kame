@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.37 2002/12/17 08:53:36 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.38 2002/12/18 05:16:03 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -137,26 +137,44 @@ showRules(int cui)
 
 
 void
-showSessions()
+showSessions(int protos)
 {
-	struct sessions	sess;
+	struct sessions	 sess;
+	char		*heading;
 
 	if (readSessions(&sess) == 0)
 		return ;
 
-	printf("proto:    count    close    estab      fin      syn\n");
+	heading = NULL;
+	if ((protos == 0) || (protos & PROTO_TCP)) {
+		heading = "proto:    count    close    estab      fin      syn";
+	}
 
-	printf("%5s:", "tcp");
-	printf("%9d", sess.tcp);
-	printf("%9d", sess.tcps[TCPS_CLOSED]);
-	printf("%9d", sess.tcps[TCPS_ESTABLISHED]);
-	printf("%9d", sess.tcps[TCPS_FIN_WAIT_1]);
-	printf("%9d", sess.tcps[TCPS_SYN_SENT]);
-	printf("\n");
+	if (heading) {
+		printf("%s\n", heading);
+	}
 
-	printf("%5s:%9d\n", "udp", sess.udp);
-	printf("%5s:%9d\n", "icmp", sess.icmp);
-	printf("%5s:%9d\n", "misc", sess.others);
+	if ((protos == 0) || (protos & PROTO_TCP)) {
+		printf("%5s:", "tcp");
+		printf("%9d", sess.tcp);
+		printf("%9d", sess.tcps[TCPS_CLOSED]);
+		printf("%9d", sess.tcps[TCPS_ESTABLISHED]);
+		printf("%9d", sess.tcps[TCPS_FIN_WAIT_1]);
+		printf("%9d", sess.tcps[TCPS_SYN_SENT]);
+		printf("\n");
+	}
+
+	if ((protos == 0) || (protos & PROTO_UDP)) {
+		printf("%5s:%9d\n", "udp", sess.udp);
+	}
+
+	if ((protos == 0) || (protos & PROTO_ICMP)) {
+		printf("%5s:%9d\n", "icmp", sess.icmp);
+	}
+
+	if (protos == 0) {
+		printf("%5s:%9d\n", "misc", sess.others);
+	}
 }
 
 

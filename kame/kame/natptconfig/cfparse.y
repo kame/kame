@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.37 2002/12/16 09:23:04 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.38 2002/12/18 05:16:03 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -420,7 +420,9 @@ show
 		| SSHOW SRULES opt_cui
 		    { showRules($3); }
 		| SSHOW SSESSIONS
-		    { showSessions(); }
+		    { showSessions(0); }
+		| SSHOW SSESSIONS protos
+		    { showSessions($3); }
 		| SSHOW STIMER
 		    { showTimer(); }
 		| SSHOW STTL
