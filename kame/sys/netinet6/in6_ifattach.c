@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.126 2001/07/24 09:42:39 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.127 2001/07/24 09:48:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -354,7 +354,7 @@ found:
 #endif
 		/* IEEE802/EUI64 cases - what others? */
 		/* IEEE1394 uses 16byte length address starting with EUI64 */
-		if (addrlen > 8)
+		if (ifp->if_type == IFT_IEEE80211 && addrlen > 8)
 			addrlen = 8;
 
 		/* look at IEEE802/EUI64 only */
