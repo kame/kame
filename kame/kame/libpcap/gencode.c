@@ -21,7 +21,7 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/gencode.c,v 1.1 1999/08/08 23:30:14 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/gencode.c,v 1.2 1999/08/17 12:14:27 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/types.h>
@@ -713,6 +713,7 @@ gen_hostop6(addr, mask, dir, proto, src_off, dst_off)
 {
 	struct block *b0, *b1;
 	u_int offset;
+	u_int32_t *a, *m;
 
 	switch (dir) {
 
@@ -741,16 +742,14 @@ gen_hostop6(addr, mask, dir, proto, src_off, dst_off)
 		abort();
 	}
 	/* this order is important */
-	b1 = gen_mcmp(offset + 12, BPF_W, ntohl(addr->s6_addr32[3]),
-		ntohl(mask->s6_addr32[3]));
-	b0 = gen_mcmp(offset + 8, BPF_W, ntohl(addr->s6_addr32[2]),
-		ntohl(mask->s6_addr32[2]));
+	a = (u_int32_t *)addr;
+	m = (u_int32_t *)mask;
+	b1 = gen_mcmp(offset + 12, BPF_W, ntohl(a[3]), ntohl(m[3]));
+	b0 = gen_mcmp(offset + 8, BPF_W, ntohl(a[2]), ntohl(m[2]));
 	gen_and(b0, b1);
-	b0 = gen_mcmp(offset + 4, BPF_W, ntohl(addr->s6_addr32[1]),
-		ntohl(mask->s6_addr32[1]));
+	b0 = gen_mcmp(offset + 4, BPF_W, ntohl(a[1]), ntohl(m[1]));
 	gen_and(b0, b1);
-	b0 = gen_mcmp(offset + 0, BPF_W, ntohl(addr->s6_addr32[0]),
-		ntohl(mask->s6_addr32[0]));
+	b0 = gen_mcmp(offset + 0, BPF_W, ntohl(a[0]), ntohl(m[0]));
 	gen_and(b0, b1);
 	b0 = gen_linktype(proto);
 	gen_and(b0, b1);
@@ -2212,6 +2211,7 @@ gen_mcode6(s1, s2, masklen, q)
 	struct in6_addr *addr;
 	struct in6_addr mask;
 	struct block *b;
+	u_int32_t *a, *m;
 
 	if (s2)
 		bpf_error("no mask %s supported", s2);
@@ -2227,14 +2227,14 @@ gen_mcode6(s1, s2, masklen, q)
 		bpf_error("mask length must be <= %u", (unsigned int)(sizeof(mask) * 8));
 	memset(&mask, 0xff, masklen / 8);
 	if (masklen % 8) {
-		mask.s6_addr8[masklen / 8] =
+		mask.s6_addr[masklen / 8] =
 			(0xff << (8 - masklen % 8)) & 0xff;
 	}
 
-	if ((addr->s6_addr32[0] & ~mask.s6_addr32[0])
-	 || (addr->s6_addr32[1] & ~mask.s6_addr32[1])
-	 || (addr->s6_addr32[2] & ~mask.s6_addr32[2])
-	 || (addr->s6_addr32[3] & ~mask.s6_addr32[3])) {
+	a = (u_int32_t *)addr;
+	m = (u_int32_t *)&mask;
+	if ((a[0] & ~m[0]) || (a[1] & ~m[1])
+	 || (a[2] & ~m[2]) || (a[3] & ~m[3])) {
 		bpf_error("non-network bits set in \"%s/%d\"", s1, masklen);
 	}
 

@@ -442,7 +442,8 @@ getifflag6(name, flag6)
 	sin6 = (struct sockaddr_in6 *)&iflr.addr;
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_len = sizeof(*sin6);
-	sin6->sin6_addr.s6_addr16[0] = htons(0xfe80);	/*XXX hardcode*/
+	sin6->sin6_addr.s6_addr[0] = 0xfe;
+	sin6->sin6_addr.s6_addr[1] = 0x80;
 	if (ioctl(s, SIOCGLIFADDR, &iflr) < 0) {
 		if (errno == EADDRNOTAVAIL)	/*no match - portability?*/
 			return -1;

@@ -150,7 +150,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	    {
 		struct sockaddr_in6 *sin6;
 		sin6 = (struct sockaddr_in6 *)sa;
-		switch (sin6->sin6_addr.s6_addr8[0]) {
+		switch (sin6->sin6_addr.s6_addr[0]) {
 		case 0x00:
 			if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
 				;

@@ -1,5 +1,5 @@
 /*
- * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.1 1999/08/08 23:31:35 itojun Exp $
+ * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.2 1999/08/17 12:14:28 itojun Exp $
  */
 
 /*
@@ -32,7 +32,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$Id: route6d.c,v 1.1 1999/08/08 23:31:35 itojun Exp $";
+static char _rcsid[] = "$Id: route6d.c,v 1.2 1999/08/17 12:14:28 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -89,12 +89,12 @@ static char _rcsid[] = "$Id: route6d.c,v 1.1 1999/08/08 23:31:35 itojun Exp $";
  * Following two macros are highly depending on KAME Release
  */
 #define	IN6_LINKLOCAL_IFINDEX(addr) \
-	((addr).s6_addr8[2] << 8 | (addr).s6_addr8[3])
+	((addr).s6_addr[2] << 8 | (addr).s6_addr[3])
 
 #define	SET_IN6_LINKLOCAL_IFINDEX(addr, index) \
 	{ \
-		(addr).s6_addr8[2] = ((index) >> 8) & 0xff; \
-		(addr).s6_addr8[3] = (index) & 0xff; \
+		(addr).s6_addr[2] = ((index) >> 8) & 0xff; \
+		(addr).s6_addr[3] = (index) & 0xff; \
 	}
 
 struct	ifc {			/* Configuration of an interface */
@@ -2658,7 +2658,7 @@ applyplen(ia, plen)
 	u_char	*p;
 	int	i;
 
-	p = ia->s6_addr8;
+	p = ia->s6_addr;
 	for (i = 0; i < 16; i++) {
 		if (plen <= 0)
 			*p = 0;

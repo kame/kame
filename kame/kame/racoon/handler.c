@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.1 1999/08/08 23:31:21 itojun Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.2 1999/08/17 12:14:50 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1544,8 +1544,9 @@ grab_myaddrs()
 			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)
 			 || IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
 				sin6->sin6_scope_id =
-					ntohs(sin6->sin6_addr.s6_addr16[1]);
-				sin6->sin6_addr.s6_addr16[1] = 0;
+					*(u_int16_t *)&sin6->sin6_addr.s6_addr[2];
+				sin6->sin6_addr.s6_addr[2] = 0;
+				sin6->sin6_addr.s6_addr[3] = 0;
 			}
 #endif
 #endif
