@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.15 2000/04/26 08:04:57 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.16 2000/05/22 10:30:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -160,6 +160,10 @@ extern char *if_name __P((struct ifnet *));
 
 #if defined(__NetBSD__) && __NetBSD_Version__ >= 104000000
 #define ovbcopy		bcopy
+#endif
+
+#if (defined(__NetBSD__) && __NetBSD_Version__ >= 104210000) || (defined(__OpenBSD__) && OpenBSD >= 200006)
+#define HAVE_RATECHECK
 #endif
 
 #if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)

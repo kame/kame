@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.51 2000/05/05 13:27:14 sumikawa Exp $	*/
+/*	$KAME: in6_proto.c,v 1.52 2000/05/22 10:30:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -530,7 +530,7 @@ u_long	rip6_recvspace = RIPV6RCVQ;
 /* ICMPV6 parameters */
 int	icmp6_rediraccept = 1;		/* accept and process redirects */
 int	icmp6_redirtimeout = 10 * 60;	/* 10 minutes */
-u_int	icmp6errratelim = 1000;		/* 1000usec = 1msec */
+struct timeval icmp6errratelim = { 0, 1000 };	/* 1000usec = 1msec */
 int	icmp6_nodeinfo = 1;		/* enable/disable NI response */
 
 #ifdef TCP6
