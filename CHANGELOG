@@ -1,7 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2043 2002/01/11 08:46:29 jinmei Exp $
+$KAME: CHANGELOG,v 1.2044 2002/01/12 08:43:39 jinmei Exp $
 
 <200201>
+2002-01-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/wru: was added as a separate command for ICMPv6 node
+	information queries.  The first motivation of this command is to
+	provide the ability to handle the queries and responses with
+	platforms that do not support 'ping6 -w'.  Though this command is
+	just a subset of 'ping6 -w' at this moment, it has some useful
+	properties comparing to the existing command.  For example, wru
+	only sends a single query even for a multicast destination.  In
+	this case, it collects replies during a certain amount of period,
+	prints the result, and then exits.
+
 2002-01-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_src.c (in6_selectif): do not use a
 	rejected or black route to pick the outgoing interface.
