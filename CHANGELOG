@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1159 2000/07/27 06:27:22 itojun Exp $
+$KAME: CHANGELOG,v 1.1160 2000/07/27 13:44:25 itojun Exp $
 
 <200007>
+Thu Jul 27 22:40:51 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_forward.c: do not forward packets with unspecified
+	  IPv6 source.  this is not on the documents, but it seems to have got
+	  rough consensus on ipngwg (July 2000).
+
 Thu Jul 27 12:16:52 JST 2000  itojun@iijlab.net
 	* tcp6 layer (all *BSD):
 	  be proactive about unspecified IPv6 source address.  pcb layer uses
