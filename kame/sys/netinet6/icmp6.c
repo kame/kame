@@ -605,7 +605,7 @@ icmp6_input(mp, offp, proto)
 	case MLD6_MTRACE:
 		/* XXX: these two are experimental. not officially defind. */
 		/* XXX: per-interface statistics? */
-		break;		/* just pass it to the userland daemon */
+		break;		/* just pass it to applications */
 
 	case ICMP6_WRUREQUEST:	/* ICMP6_FQDN_QUERY */
 	    {
