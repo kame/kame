@@ -612,7 +612,7 @@ ah6_input(mp, offp, proto)
 	IP6_EXTHDR_GET(ah, struct ah *, m, off,
 		sizeof(struct ah) + sizoff + siz1);
 	if (ah == NULL) {
-		ipseclog((LOG_NOTICE, "couldn't pullup gather IPv6 AH checksum part");
+		ipseclog((LOG_NOTICE, "couldn't pullup gather IPv6 AH checksum part"));
 		ipsecstat.in_inval++;
 		m = NULL;
 		goto fail;
