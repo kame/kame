@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.28 2001/08/16 21:44:50 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.29 2001/09/07 01:00:11 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -626,59 +626,67 @@ void
 dhtest(f)
 	int f;
 {
-	vchar_t p1, p2, *pub1, *priv1, *pub2, *priv2, *key;
+	static struct {
+		char *name;
+		char *p;
+	} px[] = {
+		{ "modp768",	OAKLEY_PRIME_MODP768, },
+		{ "modp1024",	OAKLEY_PRIME_MODP1024, },
+		{ "modp1536",	OAKLEY_PRIME_MODP1536, },
+		{ "modp2048",	OAKLEY_PRIME_MODP2048, },
+		{ "modp3072",	OAKLEY_PRIME_MODP3072, },
+		{ "modp4096",	OAKLEY_PRIME_MODP4096, },
+		{ "modp8192",	OAKLEY_PRIME_MODP8192, },
+	};
+	vchar_t p1, *pub1, *priv1, *gxy1;
+	vchar_t p2, *pub2, *priv2, *gxy2;
+	int i;
 
 	printf("\n**Test for DH.**\n");
 
-	switch (f) {
-	case 0:
-		p1.v = str2val(OAKLEY_PRIME_MODP768, 16, &p1.l);
-		p2.v = str2val(OAKLEY_PRIME_MODP768, 16, &p2.l);
-		break;
-	case 1:
-		p1.v = str2val(OAKLEY_PRIME_MODP1024, 16, &p1.l);
-		p2.v = str2val(OAKLEY_PRIME_MODP1024, 16, &p2.l);
-		break;
-	case 2:
-	default:
-		p1.v = str2val(OAKLEY_PRIME_MODP1536, 16, &p1.l);
-		p2.v = str2val(OAKLEY_PRIME_MODP1536, 16, &p2.l);
-		break;
+	for (i = 0; i < sizeof(px)/sizeof(px[0]); i++) {
+		printf("\n**Test for DH %s.**\n", px[i].name);
+
+		p1.v = str2val(px[i].p, 16, &p1.l);
+		p2.v = str2val(px[i].p, 16, &p2.l);
+		printf("prime number = \n"); PVDUMP(&p1);
+
+		if (eay_dh_generate(&p1, 2, 96, &pub1, &priv1) < 0) {
+			printf("error\n");
+			return;
+		}
+		printf("private key for user 1 = \n"); PVDUMP(priv1);
+		printf("public key for user 1  = \n"); PVDUMP(pub1);
+
+		if (eay_dh_generate(&p2, 2, 96, &pub2, &priv2) < 0) {
+			printf("error\n");
+			return;
+		}
+		printf("private key for user 2 = \n"); PVDUMP(priv2);
+		printf("public key for user 2  = \n"); PVDUMP(pub2);
+
+		/* process to generate key for user 1 */
+		gxy1 = vmalloc(p1.l);
+		memset(gxy1->v, 0, gxy1->l);
+		eay_dh_compute(&p1, 2, pub1, priv1, pub2, &gxy1);
+		printf("sharing gxy1 of user 1 = \n"); PVDUMP(gxy1);
+
+		/* process to generate key for user 2 */
+		gxy2 = vmalloc(p1.l);
+		memset(gxy2->v, 0, gxy2->l);
+		eay_dh_compute(&p2, 2, pub2, priv2, pub1, &gxy2);
+		printf("sharing gxy2 of user 2 = \n"); PVDUMP(gxy2);
+
+		if (memcmp(gxy1->v, gxy2->v, gxy1->l))
+			printf("ERROR: sharing gxy mismatched.\n");
+
+		vfree(pub1);
+		vfree(pub2);
+		vfree(priv1);
+		vfree(priv2);
+		vfree(gxy1);
+		vfree(gxy2);
 	}
-	printf("prime number = \n"); PVDUMP(&p1);
-
-	key = vmalloc(p1.l);
-
-	if (eay_dh_generate(&p1, 2, 96, &pub1, &priv1) < 0) {
-		printf("error\n");
-		return;
-	}
-
-	printf("private key for user 1 = \n"); PVDUMP(priv1);
-	printf("public key for user 1  = \n"); PVDUMP(pub1);
-
-	if (eay_dh_generate(&p2, 2, 96, &pub2, &priv2) < 0) {
-		printf("error\n");
-		return;
-	}
-
-	printf("private key for user 2 = \n"); PVDUMP(priv2);
-	printf("public key for user 2  = \n"); PVDUMP(pub2);
-
-	/* process to generate key for user 1 */
-	memset(key->v, 0, key->l);
-	eay_dh_compute(&p1, 2, pub1, priv1, pub2, &key);
-	printf("sharing key of user 1 = \n"); PVDUMP(key);
-
-	/* process to generate key for user 2 */
-	memset(key->v, 0, key->l);
-	eay_dh_compute(&p2, 2, pub2, priv2, pub1, &key);
-	printf("sharing key of user 2 = \n"); PVDUMP(key);
-
-	vfree(pub1);
-	vfree(priv1);
-	vfree(priv2);
-	vfree(key);
 
 	return;
 }
