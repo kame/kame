@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.80 2001/10/01 11:08:12 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.81 2001/10/01 11:10:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -362,65 +362,64 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		 * simultaneously a home address and care-of address and SA is
 		 * not, then prefer SB. 
 		 */
-	{
-		struct mip6_bu *mbu_ia_best = NULL, *mbu_ia = NULL;
-		struct hif_softc *sc;
+		{
+			struct mip6_bu *mbu_ia_best = NULL, *mbu_ia = NULL;
+			struct hif_softc *sc;
 
-		if (ia_best->ia6_flags & IN6_IFF_HOME) {
+			if (ia_best->ia6_flags & IN6_IFF_HOME) {
+				/*
+				 * find a binding update entry for ia_best.
+				 */
+				for (sc = TAILQ_FIRST(&hif_softc_list);
+				     sc;
+				     sc = TAILQ_NEXT(sc, hif_entry)) {
+					mbu_ia_best = mip6_bu_list_find_withhaddr(
+						&sc->hif_bu_list,
+						&ia->ia_addr.sin6_addr);
+					if (mbu_ia_best)
+						break;
+				}
+			}
+			if (ia->ia6_flags & IN6_IFF_HOME) {
+				/*
+				 * find a binding update entry for ia.
+				 */
+				for (sc = TAILQ_FIRST(&hif_softc_list);
+				     sc;
+				     sc = TAILQ_NEXT(sc, hif_entry)) {
+					mbu_ia = mip6_bu_list_find_withhaddr(
+						&sc->hif_bu_list,
+						&ia->ia_addr.sin6_addr);
+					if (mbu_ia)
+						break;
+					
+				}
+			}
 			/*
-			 * find a binding update entry for ia_best.
+			 * if the binding update entry for a certain address
+			 * exists and its registration status is
+			 * MIP6_BU_REG_STATE_NOTREG, the address is a home
+			 * address and a care of addres simultaneously.
 			 */
-			for (sc = TAILQ_FIRST(&hif_softc_list);
-			     sc;
-			     sc = TAILQ_NEXT(sc, hif_entry)) {
-				mbu_ia_best = mip6_bu_list_find_withhaddr(
-					&sc->hif_bu_list,
-					&ia->ia_addr.sin6_addr);
-				if (mbu_ia_best)
-					break;
-			
+			if ((mbu_ia_best &&
+			     (mbu_ia_best->mbu_reg_state
+			      == MIP6_BU_REG_STATE_NOTREG))
+			    &&
+			    !(mbu_ia &&
+			      (mbu_ia->mbu_reg_state
+			       == MIP6_BU_REG_STATE_NOTREG))) {
+				NEXT(4);
+			}
+			if (!(mbu_ia_best &&
+			      (mbu_ia_best->mbu_reg_state
+			       == MIP6_BU_REG_STATE_NOTREG))
+			    &&
+			    (mbu_ia &&
+			     (mbu_ia->mbu_reg_state
+			      == MIP6_BU_REG_STATE_NOTREG))) {
+				REPLACE(4);
 			}
 		}
-		if (ia->ia6_flags & IN6_IFF_HOME) {
-			/*
-			 * find a binding update entry for ia.
-			 */
-			for (sc = TAILQ_FIRST(&hif_softc_list);
-			     sc;
-			     sc = TAILQ_NEXT(sc, hif_entry)) {
-				mbu_ia = mip6_bu_list_find_withhaddr(
-					&sc->hif_bu_list,
-					&ia->ia_addr.sin6_addr);
-				if (mbu_ia)
-					break;
-			
-			}
-		}
-		/*
-		 * if the binding update entry for a certain address
-		 * exists and its registration status is
-		 * MIP6_BU_REG_STATE_NOTREG, the address is a home
-		 * address and a care of addres simultaneously.
-		 */
-		if ((mbu_ia_best &&
-		     (mbu_ia_best->mbu_reg_state
-		      == MIP6_BU_REG_STATE_NOTREG))
-		    &&
-		    !(mbu_ia &&
-		      (mbu_ia->mbu_reg_state
-		       == MIP6_BU_REG_STATE_NOTREG))) {
-			NEXT(4);
-		}
-		if (!(mbu_ia_best &&
-		      (mbu_ia_best->mbu_reg_state
-		       == MIP6_BU_REG_STATE_NOTREG))
-		    &&
-		    (mbu_ia &&
-		     (mbu_ia->mbu_reg_state
-		      == MIP6_BU_REG_STATE_NOTREG))) {
-			REPLACE(4);
-		}
-	}
 		/*
 		 * If SA is just a home address and SB is just a care-of
 		 * address, then prefer SA. Similarly, if SB is just a home
