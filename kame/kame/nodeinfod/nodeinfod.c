@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.2 2001/07/20 06:58:16 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.3 2001/07/20 07:06:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -169,6 +169,7 @@ joingroups(name)
 	unsigned int ifidx;
 	struct ipv6_mreq m6;
 	struct sockaddr_in6 *sin6;
+	int sock;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
@@ -209,11 +210,19 @@ joingroups(name)
 
 		m6.ipv6mr_interface = ifidx;
 
-		if (setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP, &m6,
+		sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (sock < 0) {
+			err(1, "socket");
+			/* NOTREACHED */
+		}
+
+		if (setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, &m6,
 		    sizeof(m6)) < 0) {
 			err(1, "setsockopt(IPV6_JOIN_GROUP)");
 			/* NOTREACHED */
 		}
+
+		(void)shutdown(sock, SHUT_RD);
 	}
 
 	freeifaddrs(ifap);
@@ -665,6 +674,7 @@ ni6_nametodns(name, cp0, buf, buflen, old)
 
 	if (old) {
 		i = strlen(name);
+		cp = cp0;
 		cp[0] = i;
 		memcpy(cp + 1, name, i);
 		return 1 + i;
