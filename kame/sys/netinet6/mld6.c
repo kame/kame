@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.22 2000/12/03 00:54:00 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.23 2000/12/11 18:57:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -253,7 +253,7 @@ mld6_input(m, off)
 			break;
 
 		if (!IN6_IS_ADDR_UNSPECIFIED(&mldh->mld6_addr) &&
-		!IN6_IS_ADDR_MULTICAST(&mldh->mld6_addr))
+		    !IN6_IS_ADDR_MULTICAST(&mldh->mld6_addr))
 			break;	/* print error or log stat? */
 		if (IN6_IS_ADDR_MC_LINKLOCAL(&mldh->mld6_addr))
 			mldh->mld6_addr.s6_addr16[1] =
