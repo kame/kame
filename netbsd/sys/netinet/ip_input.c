@@ -135,6 +135,11 @@
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
 #include <netinet/ip_icmp.h>
+
+#ifdef NATPT
+#include <netinet6/ip6_var.h>
+#endif
+
 /* just for gif_ttl */
 #include <netinet/in_gif.h>
 #include "gif.h"
@@ -538,6 +543,7 @@ nofilt:;
 	if (ip6_protocol_tr)
 	{
 		struct mbuf *m1 = NULL;
+		struct sockaddr_in6 sa6_src, sa6_dst;
 
 		switch (natpt_in4(m, &m1))
 		{
@@ -547,6 +553,25 @@ nofilt:;
 			ip_forward(m1, 0);
 			break;
 		case IPPROTO_IPV6:
+			/*
+			 * record the sockaddr_in6 structures of the source and
+			 * destination addresses for ip6_forward().
+			 * XXX: not care about scope zone ambiguity.
+			 */
+			bzero(&sa6_src, sizeof(sa6_src));
+			bzero(&sa6_dst, sizeof(sa6_dst));
+			sa6_src.sin6_family = sa6_dst.sin6_family = AF_INET6;
+			sa6_src.sin6_len =
+				sa6_dst.sin6_len = sizeof(struct sockaddr_in6);
+			sa6_src.sin6_addr =
+				mtod(m1, struct ip6_hdr *)->ip6_src;
+			sa6_dst.sin6_addr =
+				mtod(m1, struct ip6_hdr *)->ip6_dst;
+			if (!ip6_setpktaddrs(m1, &sa6_src, &sa6_dst)) {
+				m_freem(m1);
+				return;
+			}
+
 			ip6_forward(m1, 1);
 			break;
 		case IPPROTO_MAX: /* discard this packet */
