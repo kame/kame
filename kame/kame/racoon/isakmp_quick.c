@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.31 2000/05/30 02:03:31 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.32 2000/05/30 02:06:51 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -148,7 +148,7 @@ quick_i1send(iph2, msg)
 {
 	vchar_t *body = NULL;
 	struct isakmp_gen *gen;
-	vchar_t *sa_tmp;
+	vchar_t *sa_tmp = NULL;
 	char *p;
 	int tlen;
 	int error = -1;
@@ -263,6 +263,8 @@ quick_i1send(iph2, msg)
 end:
 	if (body != NULL)
 		vfree(body);
+	if (sa_tmp != NULL)
+		vfree(sa_tmp);
 
 	return error;
 }
