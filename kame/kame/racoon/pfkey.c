@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.118 2001/06/28 10:45:46 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.119 2001/06/28 11:50:11 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1517,7 +1517,7 @@ pk_recvacquire(mhp)
 
 		/* don't process it because there is no suitable phase1-sa. */
 		iph1 = getph1byaddr(iph2[0]->src, iph2[0]->dst);
-		if (!iph1 && iph1->status == PHASE2ST_EXPIRED) {
+		if (iph1 && iph1->status == PHASE2ST_EXPIRED) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"the negotiation is stopped, "
 				"because there is no suitable ISAKMP-SA.\n");
