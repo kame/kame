@@ -302,6 +302,23 @@ route_output(m, va_alist)
 			senderr(ESRCH);
 		}
 		rt = (struct rtentry *)rn;
+#ifdef RADIX_MPATH
+		/*
+		 * for RTM_CHANGE/LOCK, if we got multipath routes,
+		 * we require users to specify a matching RTAX_GATEWAY.
+		 *
+		 * for RTM_GET, gate is optional even with multipath.
+		 * if gate == NULL the first match is returned.
+		 * (no need to call rt_mpath_matchgate if gate == NULL)
+		 */
+		if (rn_mpath_capable(rnh) &&
+		    (rtm->rtm_type != RTM_GET || gate)) {
+			rt = rt_mpath_matchgate(rt, gate);
+			rn = (struct radix_node *)rt;
+			if (!rt)
+				senderr(ESRCH);
+		}
+#endif
 		rt->rt_refcnt++;
 
 		switch(rtm->rtm_type) {

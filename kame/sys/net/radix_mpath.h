@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.h,v 1.1 2001/07/20 18:34:59 itojun Exp $	*/
+/*	$KAME: radix_mpath.h,v 1.2 2001/07/20 19:45:58 itojun Exp $	*/
 /*	$NetBSD: radix.h,v 1.10 2000/11/06 11:07:37 itojun Exp $	*/
 
 /*
@@ -75,9 +75,12 @@
 /*
  * Radix tree API with multipath support
  */
+struct rtentry;
+struct sockaddr;
 int	rn_mpath_capable __P((struct radix_node_head *));
 struct radix_node *rn_mpath_next __P((struct radix_node *));
 int rn_mpath_count __P((struct radix_node *));
+struct rtentry *rt_mpath_matchgate __P((struct rtentry *, struct sockaddr *));
 struct radix_node *rn_mpath_lookup __P((void *, void *,
 	struct radix_node_head *));
 int	rn_mpath_inithead __P((void **, int));

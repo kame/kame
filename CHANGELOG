@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1786 2001/07/20 18:55:45 itojun Exp $
+$KAME: CHANGELOG,v 1.1787 2001/07/20 19:45:56 itojun Exp $
 
 <200107>
 Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
@@ -16,11 +16,14 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	    gets rejected with EEXIST).  first one to get added will appear
 	    at the top of rn_dupedkey, so on normal lookups first one got
 	    added will be picked up (i.e. fewer behavior change).
-	  - on route deletion, it is now required to specify rt_gateway, if
-	    there are multiple route entries with the same rt_key.
-	    if there's only one entry, no need for rt_gateway (preserves
-	    original behavior for non-multipath case).
-
+	  - on RTM_DELETE/CHANGE/LOCK, it is now required to specify
+	    rt_gateway, if there are multiple route entries with the same
+	    rt_key.  if there's only one entry, no need for rt_gateway
+	    (preserves original behavior for non-multipath case).
+	  - on RTM_GET, you can identify single route out of multipaths
+	    if you specify rt_gateway.  rt_gateway is still optional,
+	    and the first route is returned if it is not specified.
+	  
 	  DEMO:
 	  (adding multipath routes)
 	  # route add -inet 10.1.0.0 -netmask 0xffffff00 10.0.0.1

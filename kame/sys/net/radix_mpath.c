@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.c,v 1.1 2001/07/20 18:34:58 itojun Exp $	*/
+/*	$KAME: radix_mpath.c,v 1.2 2001/07/20 19:45:57 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -70,11 +70,13 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
+#include <sys/socket.h>
 #define	M_DONTWAIT M_NOWAIT
 #include <sys/domain.h>
 #include <sys/syslog.h>
 #include <net/radix.h>
 #include <net/radix_mpath.h>
+#include <net/route.h>
 #ifdef __NetBSD__
 #include <sys/pool.h>
 #endif
@@ -112,6 +114,32 @@ rn_mpath_count(rn)
 	while ((rn = rn_mpath_next(rn)) != NULL)
 		i++;
 	return i;
+}
+
+struct rtentry *
+rt_mpath_matchgate(rt, gate)
+	struct rtentry *rt;
+	struct sockaddr *gate;
+{
+	struct radix_node *rn;
+
+	if (!rn_mpath_next((struct radix_node *)rt))
+		return rt;
+
+	if (!gate)
+		return NULL;
+	/* beyond here, we use rn as the master copy */
+	rn = (struct radix_node *)rt;
+	do {
+		rt = (struct rtentry *)rn;
+		if (rt->rt_gateway->sa_len == gate->sa_len &&
+		    !memcmp(rt->rt_gateway, gate, gate->sa_len))
+			break;
+	} while ((rn = rn_mpath_next(rn)) != NULL);
+	if (!rn)
+		return NULL;
+
+	return (struct rtentry *)rn;
 }
 
 /*
