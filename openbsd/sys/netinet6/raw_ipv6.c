@@ -850,8 +850,7 @@ MAYBESTATIC MAYBEINLINE int rip6_usrreq_bind(struct socket *so,
    if ((ifnet == 0) ||
 #endif /* __NetBSD__ || __OpenBSD__ || __FreeBSD__ */
        (addr->sin6_family != AF_INET6)) {    /* I only allow AF_INET6 */
-	  error = EADDRNOTAVAIL;
-	  break;
+	  return EADDRNOTAVAIL;
    }
 
 #ifdef ENABLE_DEFAULT_SCOPE
