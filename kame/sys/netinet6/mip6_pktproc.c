@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.84 2002/11/27 12:00:59 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.85 2002/11/27 14:06:04 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1726,9 +1726,9 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 		*p = IP6MOPT_PADN;
 		*(p + 1) = pad - 2;
 	}
-	if (pad + (ip6ma_size - ba_size + refresh_size + auth_size) >= 2) {
+	if (pad + (ip6ma_size - (ba_size + refresh_size + auth_size)) >= 2) {
 		*p = IP6MOPT_PADN;
-		*(p + 1) += ip6ma_size - ba_size + refresh_size + auth_size - 2;
+		*(p + 1) += ip6ma_size - (ba_size + refresh_size + auth_size) - 2;
 	}
 
 	/* binding refresh advice option */
