@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.71 2002/06/29 13:11:45 itojun Exp $	*/
+/*	$KAME: config.c,v 1.72 2002/07/10 21:08:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -116,6 +116,11 @@ getconfig(intface)
 	}
 
 	tmp = (struct rainfo *)malloc(sizeof(*ralist));
+	if (tmp == NULL) {
+		syslog(LOG_INFO, "<%s> %s: can't allocate enough memory",
+		    __func__, intface);
+		exit(1);
+	}
 	memset(tmp, 0, sizeof(*tmp));
 	tmp->prefix.next = tmp->prefix.prev = &tmp->prefix;
 #ifdef ROUTEINFO
