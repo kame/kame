@@ -1,8 +1,28 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.249 1999/11/04 00:03:44 itojun Exp $
+$Id: CHANGELOG,v 1.250 1999/11/04 00:44:44 sakane Exp $
 
 <199911>
+Thu Nov  4 09:40:08 JST 1999 sakane@ydc.co.jp
+	* kame/sys/{netkey,netinet6}:
+	* kame/kame/{libipsec,setkey,racoon}:
+	Implemented a policy level of `unique' for strict use of SA.
+	The decimal number named `reqid' is used as the identifier in order to
+	relate between a SA and SA requests in some policy.
+	Manual keying may need explicitly to specify the identifier.  You can
+	put the decimal number as the identifier after keyword `unique' of
+	policy level followed by colon(:).  For example, "unique:1225".
+	The value is:
+		0 are reserved.
+		1 - 16383 are reserved for manual keying.
+		Others are for kernel use.
+	Note that this id doesn't identify a SA by only itself.
+	XXX To be implemented the inbound policy check by level of `unique'
+	    after a implement of holding SA used to decode.
+	XXX The field of reqid on PF_KEY message is in sadb_msg structure.
+	    It may not be adequated for portablity.
+	XXX racoon has not been supported yet.
+
 Thu Nov  4 05:52:12 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/ucd-snmp, freebsd[23]/ucd-snmp:
 	  use latest IPv6 patch.
