@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.11 2001/07/24 15:07:00 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.12 2001/07/24 15:15:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -133,6 +133,16 @@ scope6_set(ifp, idlist)
 	for (i = 0; i < 16; i++) {
 		if (idlist[i] &&
 		    idlist[i] != scope6_ids[ifp->if_index].s6id_list[i]) {
+			/*
+			 * An interface zone ID must be the corresponding
+			 * interface index by definition.
+			 */
+			if (i == IPV6_ADDR_SCOPE_INTFACELOCAL &&
+			    idlist[i] != ifp->if_index) {
+				splx(s);
+				return(EINVAL);
+			}
+
 			if (i == IPV6_ADDR_SCOPE_LINKLOCAL &&
 			    idlist[i] > if_index) {
 				/*
@@ -281,7 +291,7 @@ scope6_setdefault(ifp)
 			ifp->if_index;
 	}
 	else {
-		scope6_ids[0].s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL] = 0
+		scope6_ids[0].s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL] = 0;
 		scope6_ids[0].s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL] = 0;
 	}
 }
