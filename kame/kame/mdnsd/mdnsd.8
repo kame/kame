@@ -1,4 +1,4 @@
-.\"	$KAME: mdnsd.8,v 1.37 2001/06/23 02:07:20 itojun Exp $
+.\"	$KAME: mdnsd.8,v 1.38 2001/06/29 19:26:41 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -58,26 +58,33 @@
 .Sh DESCRIPTION
 .Nm
 serves as multicast DNS resolver.
+The program should be invoked on every node which speaks multicast DNS.
+.Pp
 .Nm
-will get unicast DNS queries from local node,
+will receive unicast DNS queries from local node,
 and forward the queries toward link-local multicast DNS address on
-.Ar intface .
+.Ar intface
+if the query is within
+.Dq local.arpa.
+domain.
 Whenever a reply comes back against the multicast queries,
 .Nm
 will forward the reply to the original querier.
 .Nm
-can also relay queries to unicast DNS server(s).
+can also relay queries to unicast DNS server(s), if the query is outside of
+.Dq local.arpa.
+domain.
 .Pp
 .Nm
 will reply to multicast DNS queries from other nodes,
 to advertise mapping between the name of the local node and the addresses
 of the local node.
-If two or more nodes on the same link are running
+.Pp
+Therefore, if two or more nodes on the same link are running
 .Nm Ns ,
 they can resolve their addresses without having to configure unicast
 DNS servers.
 Users just need to know the FQDN name for the neighboring node.
-.Pp
 .Bl -tag -width Ds
 .It Fl 4
 .It Fl 6
@@ -108,7 +115,7 @@ The flag is mandatory.
 Advertise scoped addresses against queries from IPv6 link-local address,
 or loopback address.
 Care must be taken if you enable it,
-scoped address and DNS are not really friendly.
+scoped address and DNS are not really compatible.
 .It Fl m
 Be compatible with
 .Dq mediator
@@ -125,6 +132,10 @@ Do not send questions about this
 .It Fl N
 Transmit ICMPv6 node information queries, instead of multicast DNS queries,
 for resolving names on the adjacent link.
+With the option, it is highly possible for
+.Nm
+to respond with link-local addresses in DNS packet.
+Experimental.
 .It Fl p Ar inport
 .Nm
 listens to UDP port
@@ -188,7 +199,7 @@ iff names are under
 domain.
 .Bd -literal -offset indent
 search itojun.org itojun.org.local.arpa local.arpa
-nameserver ::
+nameserver ::1
 .Ed
 .Pp
 If you would like to contact unicast DNS servers as well, you may want to
@@ -198,6 +209,37 @@ DNS queries will be sent to unicast servers, if the DNS name is outside of
 .Bd -literal -offset indent
 # mdnsd -6 -i wi0 3ffe:501:4819::42
 .Ed
+.Pp
+Here are the sequence of events happen on multicast name resolution:
+.Bl -bullet
+.It
+An application on node A queries AAAA record of
+.Dq b.local.arpa. .
+The query is transmitted toward the address configured in
+.Pa /etc/resolv.conf ,
+which is the loopback address.
+.It
+The query reaches
+.Nm
+on node A.
+.It
+.Nm
+on node A relays the query out to the ethernet interface, as multicast packet.
+.It
+.Nm
+on node B receives the packet, and finds out that it is asking for
+.Dq b.local.arpa. .
+.It
+.Nm
+on node B responds to node A, with the list of IPv6 addresses assigned to
+the node B.
+.It
+.Nm
+on node A gets the reply from node B.
+.It
+.Nm
+on node A relays the response back to the application.
+.El
 .\"
 .Sh SEE ALSO
 .Rs
@@ -250,13 +292,14 @@ to be available and in
 state, on invocation.
 This may be too much to ask for laptop usage.
 .Pp
-.Nm
-does not support EDNS0 option.
-Also,
-.Nm
-handles DNS queries/replies over virtual connection
-.Pq Tn TCP
-naively.
-.Pp
 .Fl N
 may not be very useful, as DNS responses will contain link-local addresses.
+.Pp
+With
+.Fl N
+.Nm
+sends ICMPv6 node information queries to link-local all node multicast address
+.Pq Li ff02::1 .
+We should be using NI group address
+.Pq Li ff02::2:xxxx:xxxx
+instead, however, it is not useful right now due to deployment issues.

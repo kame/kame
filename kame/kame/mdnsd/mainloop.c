@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.66 2001/06/27 21:16:29 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.67 2001/06/29 19:26:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -39,7 +39,6 @@
  * - negative cache on NXRRSET reply on query timeout
  * - attach additional section on reply
  * - random delay before reply
- * - EDNS0 receiver buffer size notification (send/relay case)
  * - as querier, retry by TCP/EDNS0 on truncated response
  * - multiple replies
  *	- how long should we wait for subsequent replies?
@@ -108,6 +107,7 @@ static int conf_mediator __P((struct sockdb *));
 static char *encode_name __P((char **, int, const char *));
 static char *decode_name __P((const char **, int));
 static int decode_edns0 __P((const HEADER *, const char **, int));
+static int update_edns0 __P((const HEADER *, char *, int, size_t));
 static int dnsdump __P((const char *, const char *, int,
 	const struct sockaddr *));
 static int ptr2in __P((const char *, struct in_addr *));
@@ -512,6 +512,36 @@ decode_edns0(hp, bufp, len)
 	edns0len = ntohs(*(u_int16_t *)&buf[2]);
 	buf += 10;
 	*bufp = buf;
+	return edns0len;
+}
+
+/* buf has to point additional section */
+static int
+update_edns0(hp, buf, len, edns0len)
+	const HEADER *hp;
+	char *buf;
+	int len;
+	size_t edns0len;
+{
+	char *str;
+	char *p;
+	const char *q;
+	u_int16_t v;
+
+	if (ntohs(hp->arcount) != 1 || len != 11)
+		return -1;
+	if (buf[0] != 0)	/* . */
+		return -1;
+	buf++;
+	if (ntohs(*(u_int16_t *)&buf[0]) != T_OPT || buf[4] != NOERROR ||
+	    buf[5] != 0)
+	if (ntohs(*(u_int16_t *)&buf[6]) != 0)	/*MBZ*/
+		return -1;
+	if (ntohs(*(u_int16_t *)&buf[8]) != 0)	/*RDLEN*/
+		return -1;
+
+	v = htons(edns0len & 0xffff);
+	memcpy(&buf[2], &v, sizeof(v));
 	return edns0len;
 }
 
@@ -1316,6 +1346,7 @@ relay_dns(sd, buf, len, from)
 	enum sdtype servtype;	/* type of server we want to relay to */
 	size_t rbuflen = PACKETSZ;
 	int edns0len = -1;
+	char *edns0;
 
 	if (sizeof(*hp) > len)
 		return -1;
@@ -1332,6 +1363,7 @@ relay_dns(sd, buf, len, from)
 	/* XXX should drop assumption on packet format */
 	if (ntohs(hp->qdcount) == 1 && ntohs(hp->ancount) == 0 &&
 	    ntohs(hp->nscount) == 0) {
+		edns0 = buf + (d - buf);
 		edns0len = decode_edns0(hp, &d, len - (d - buf));
 		if (edns0len > 0 && edns0len > rbuflen) {
 			if (dflag)
@@ -1343,14 +1375,18 @@ relay_dns(sd, buf, len, from)
 		}
 	}
 
+	if (dflag)
+		dnsdump("relay I", buf, len, from);
+
+	/* if the querier's buffer size is bigger than mine, lower it */
 	if (rbuflen > RECVBUFSIZ) {
-		/*
-		 * we can't relay this, until we have a code to
-		 * re-construct EDNS0.  EDNS0 is a hop-by-hop payload...
-		 */
-		/* LINTED const cast */
-		free((char *)n);
-		return -1;
+		if (update_edns0(hp, edns0, len - (edns0 - buf),
+		    RECVBUFSIZ) < 0) {
+			/* LINTED const cast */
+			free((char *)n);
+			return -1;
+		}
+		dprintf("lower EDNS0 to %lu on relay\n", (u_long)RECVBUFSIZ);
 	}
 
 	if (islocalname(n)) {
@@ -1363,8 +1399,6 @@ relay_dns(sd, buf, len, from)
 	/* LINTED const cast */
 	free((char *)n);
 
-	if (dflag)
-		dnsdump("relay I", buf, len, from);
 	if (hp->qr == 0 && hp->opcode == QUERY) {
 		/* query - relay it */
 		qc = newqcache(from, buf, len);
