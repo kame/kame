@@ -336,9 +336,18 @@ bgp_recover_rte(drte)
 		   __FUNCTION__,
 		   ip6str(&drte->rt_ripinfo.rip6_dest, 0),
 		   drte->rt_ripinfo.rip6_plen,
-		   bgp_peerstr(&rrte->rt_proto.rtp_bgp));
+		   bgp_peerstr(rrte->rt_proto.rtp_bgp));
 #endif
 	    obnp->rp_adj_ribs_in = rte_remove(rrte, obnp->rp_adj_ribs_in);
+    }
+    else if (!(rrte->rt_flags & RTF_INSTALLED)) {
+#ifdef DEBUG_BGP
+	    syslog(LOG_NOTICE,
+		   "<%s>: route recover for %s/%d, origin: %s (not installed)",
+		   ip6str(&drte->rt_ripinfo.rip6_dest, 0),
+		   drte->rt_ripinfo.rip6_plen,
+		   bgp_peerstr(rrte->rt_proto.rtp_bgp));
+#endif 
     }
     else {
 #ifdef DEBUG_BGP
@@ -346,7 +355,7 @@ bgp_recover_rte(drte)
 		   __FUNCTION__,
 		   ip6str(&drte->rt_ripinfo.rip6_dest, 0),
 		   drte->rt_ripinfo.rip6_plen,
-		   bgp_peerstr(&rrte->rt_proto.rtp_bgp));
+		   bgp_peerstr(rrte->rt_proto.rtp_bgp));
 #endif
 	    crte = *rrte;
 	    crte.rt_next = crte.rt_prev = &crte;
