@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.33 2001/08/16 11:19:53 sakane Exp $
+$KAME: helsinki-result.jp,v 1.34 2001/08/16 11:28:31 itojun Exp $
 
 
 generic
@@ -304,6 +304,7 @@ Fitec
 
 	openssl 0.9.6 にしたら成功。違いが分からず。
 
+
 SSH
 	ssh solaris version:
 	ssh側: IKEのパケットが出ない。
@@ -426,3 +427,13 @@ Nokia EPOC
 	phase 2 3DES + SHA1 + deflate, group 2, lifetime = 2min
 
 	IPsec keyも入るが、先方のポリシ問題でpingは返らない。
+
+
+Trustworks TrustedClient v3.2
+	Thu Aug 16 20:17:51 JST 2001
+	IPv6, AH + ESP, transport mode
+	phase 1 3DES + SHA1, group 5, lifetime = 3min
+	phase 2 3DES + SHA1, group 5, lifetime = 2min
+
+	先方がresponderのとき、鍵交換が終了した瞬間先方のIKE daemonがpanic。
+	まあ鍵交換自体はできているようだ。
