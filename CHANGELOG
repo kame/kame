@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1594 2001/03/06 11:24:18 jinmei Exp $
+$KAME: CHANGELOG,v 1.1595 2001/03/06 20:41:01 thorpej Exp $
 
 <200103>
+2001-03-06  Jason R. Thorpe  <thorpej@zembu.com>
+
+	* kame/racoon/schedule.c: Implement sched_scrub_param(),
+	which kills all scheduler work queue entries which a
+	specified parameter.
+	* kame/racoon/handler.c: Use sched_scrub_param() to make
+	sure no references to a handler exist when it is freed.
+
 2001-03-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (nd6_prefix_onlink): set RTF_GATEWAY
 	to an interface direct route when nd6_need_cache() is false, in
