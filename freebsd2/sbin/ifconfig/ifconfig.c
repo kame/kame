@@ -1093,37 +1093,37 @@ in6_status(s, info)
 	sin = (struct sockaddr_in6 *)info->rti_info[RTAX_NETMASK];
 	if (!sin)
 		sin = &null_sin;
-	printf("prefixlen %d ", prefix(&sin->sin6_addr,
+	printf("prefixlen %d", prefix(&sin->sin6_addr,
 		sizeof(struct in6_addr)));
 
 	if (flags6 & IN6_IFF_ANYCAST)
-		printf("anycast ");
+		printf(" anycast");
 	if (flags6 & IN6_IFF_TENTATIVE)
-		printf("tentative ");
+		printf(" tentative");
 	if (flags6 & IN6_IFF_DUPLICATED)
-		printf("duplicated ");
+		printf(" duplicated");
 	if (flags6 & IN6_IFF_DETACHED)
-		printf("detached ");
+		printf(" detached");
 	if (flags6 & IN6_IFF_DEPRECATED)
-		printf("deprecated ");
+		printf(" deprecated");
 
 	if (scopeid)
 		printf(" scopeid 0x%x", scopeid);
 
 	if (ip6lifetime && (lifetime.ia6t_preferred || lifetime.ia6t_expire)) {
-		printf("pltime ");
+		printf(" pltime ");
 		if (lifetime.ia6t_preferred) {
-			printf("%s ", lifetime.ia6t_preferred < t
+			printf("%s", lifetime.ia6t_preferred < t
 				? "0" : sec2str(lifetime.ia6t_preferred - t));
 		} else
-			printf("infty ");
+			printf("infty");
 
-		printf("vltime ");
+		printf(" vltime ");
 		if (lifetime.ia6t_expire) {
-			printf("%s ", lifetime.ia6t_expire < t
+			printf("%s", lifetime.ia6t_expire < t
 				? "0" : sec2str(lifetime.ia6t_expire - t));
 		} else
-			printf("infty ");
+			printf("infty");
 	}
 
 	putchar('\n');
