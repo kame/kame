@@ -6,7 +6,7 @@ $hostname =~ s/\n$//;
 $userfqdn = `whoami`;
 $userfqdn =~ s/\n$//;
 $userfqdn .= '@' . $hostname;
-$rcsid = '$Id: sandiego.pl,v 1.7 2000/01/12 00:35:55 itojun Exp $';
+$rcsid = '$Id: sandiego.pl,v 1.8 2000/01/12 07:36:48 itojun Exp $';
 
 print <<EOF;
 # automatically generated from $rcsid
@@ -186,7 +186,7 @@ remote 194.100.55.1 [500]
 	}
 }
 
-policy $me/32 $you/32 any inout ipsec
+policy $me $you any inout ipsec
 {
 	pfs_group modp1024;
 
