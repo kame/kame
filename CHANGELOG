@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1483 2001/01/18 12:58:13 jinmei Exp $
+$KAME: CHANGELOG,v 1.1484 2001/01/19 06:43:53 jinmei Exp $
 
 <200101>
+2001-01-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/i386/isa/if_ef.c (efintr): do not use the sentinel
+	pointer stored in ef_mb, and force the EF_NEWM macro to create a
+	fresh mbuf chain to store incoming ether frames (with mbuf cluster
+	if necessary). This fix is essential to the KAME IPv6 stack
+	(without the m_pulldown stuff), so please be sure to apply this
+	fix if you use IPv6 on an interface using the ef driver.
+
 2001-01-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/contrib/bind/src/lib/irs/{lcl,nis}_ho.c: set ho_addrinfo
 	function(s) properly. Without this fix, getaddrinfo() could cause
