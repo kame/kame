@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.35 2004/06/08 07:52:55 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.36 2004/06/08 10:36:14 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -332,14 +332,15 @@ accept_listener_report(src, dst, group)
 		return;
 	}
 #endif
-	recv_listener_report(mifi, src, &group_sa);
+	recv_listener_report(mifi, src, &group_sa, MLDv1);
 }
 
 /* shared with MLDv1-compat mode in mld6v2_proto.c */
 void
-recv_listener_report(mifi, src, grp)
+recv_listener_report(mifi, src, grp, mld_version)
 	mifi_t mifi;
 	struct sockaddr_in6 *src, *grp;
+	int mld_version;
 {
 	struct uvif *v = &uvifs[mifi];
 	register struct listaddr *g;
@@ -390,7 +391,7 @@ recv_listener_report(mifi, src, grp)
 	g->al_reporter = *src;
 	g->al_timerid = SetTimer(mifi, g);
 	g->al_next = v->uv_groups;
-	g->comp_mode = MLDv1;
+	g->comp_mode = mld_version;
 	v->uv_groups = g;
 	time(&g->al_ctime);
 

@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2619 2004/06/08 07:52:54 suz Exp $
+$KAME: CHANGELOG,v 1.2620 2004/06/08 10:36:13 suz Exp $
 
 <200406>
 2004-06-08  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
+	* kame/pimsd/mld6_proto.[ch], mld6v2_proto.c:
+	decides the MLD-compat-mode based on an arriving MLDv1/v2 packet.
+
 	* kame/pimsd/mld6_proto.[ch], mld6v2.c, mld6v2_proto.[ch]:
 	When pim6sd receives a MLDv1 done from an interface, it advertises 
 	a group-specific Query in MLDv2 unless the interface is configured

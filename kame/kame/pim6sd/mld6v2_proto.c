@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.33 2004/06/08 07:54:31 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.34 2004/06/08 10:36:14 suz Exp $
  */
 
 /*
@@ -658,13 +658,13 @@ accept_multicast_record(vifi, mard, src, grp)
 	    break;
 
 	case MODE_IS_EXCLUDE:
-	    /* just regard as (*,G) */
-	    recv_listener_report(vifi, src, grp);
+	    /* just regard as (*,G) but not shift to mldv1-compat-mode */
+	    recv_listener_report(vifi, src, grp, MLDv2);
 	    break;
 
 	case CHANGE_TO_EXCLUDE_MODE:
-	    /* just regard as (*,G) */
-	    recv_listener_report(vifi, src, grp);
+	    /* just regard as (*,G) but not shift to mldv1-compat-mode */
+	    recv_listener_report(vifi, src, grp, MLDv2);
 	    break;
 
 	default:
@@ -735,7 +735,7 @@ regard_as_done:
 	return;
 
 regard_as_report:
-	recv_listener_report(vifi, src, grp);
+	recv_listener_report(vifi, src, grp, MLDv1);
 	return;
 }
 

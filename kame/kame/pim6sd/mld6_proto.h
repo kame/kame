@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.h,v 1.11 2004/06/08 07:52:55 suz Exp $	*/
+/*	$KAME: mld6_proto.h,v 1.12 2004/06/08 10:36:14 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -108,7 +108,8 @@ extern int      check_multicast_listener __P((struct uvif *v,
 
 extern void     recv_listener_report	__P((mifi_t,
 					     struct sockaddr_in6 *src,
-                                             struct sockaddr_in6 *group));
+                                             struct sockaddr_in6 *group,
+					     int mld_version));
 extern void     recv_listener_done      __P((mifi_t,
 					     struct sockaddr_in6 *src,
                                              struct sockaddr_in6 *group));
