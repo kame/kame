@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.882 2000/05/16 14:19:25 itojun Exp $
+$Id: CHANGELOG,v 1.883 2000/05/16 14:56:36 jinmei Exp $
 
 <200005>
+2000-05-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/common.c (getifaddr): corrected the 2nd argument
+	to in6_matchflags().
+	* kame/kame/dhcp6/dhcp6s.c (server6_react_solicit,
+	server6_react_request): corrected scope validation for incoming
+	packets.
+
 Tue May 16 23:05:56 JST 2000  itojun@iijlab.net
 	* kame/route6d/route6d.c: memory leak and bzero() correction.
 	* kame/route6d/route6d.c: correct interface address handling
