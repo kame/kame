@@ -135,6 +135,8 @@ struct pf_rule		 pf_default_rule;
 #define	TAGID_MAX	 50000
 TAILQ_HEAD(pf_tags, pf_tagname)	pf_tags = TAILQ_HEAD_INITIALIZER(pf_tags);
 
+static	int pf_altq_running;	/* altq running state */
+
 #define DPFPRINTF(n, x) if (pf_status.debug >= (n)) printf x
 
 void
@@ -475,6 +477,11 @@ pf_rm_rule(struct pf_rulequeue *rulequeue, struct pf_rule *rule)
 		return;
 	pf_tag_unref(rule->tag);
 	pf_tag_unref(rule->match_tag);
+#ifdef ALTQ
+	if (rule->pqid != rule->qid)
+		pf_qid_unref(rule->pqid);
+	pf_qid_unref(rule->qid);
+#endif
 	pf_dynaddr_remove(&rule->src.addr);
 	pf_dynaddr_remove(&rule->dst.addr);
 	if (rulequeue == NULL) {
@@ -561,6 +568,31 @@ pf_tag_unref(u_int16_t tag)
 		}
 	}
 }
+
+#if 1
+/*
+ * temporarily use tagname functions for qnames until we have a common
+ * framework for both tagname and qname.
+ */
+
+u_int32_t
+pf_qname2qid(char *qname)
+{
+	return ((u_int32_t)pf_tagname2tag(qname));
+}
+
+void
+pf_qid2qname(u_int32_t qid, char *p)
+{
+	pf_tag2tagname((u_int16_t)qid, p);
+}
+
+void
+pf_qid_unref(u_int32_t qid)
+{
+	pf_tag_unref((u_int32_t)qid);
+}
+#endif
 
 int
 pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
@@ -775,6 +807,16 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			}
 		}
 
+#ifdef ALTQ
+		/* set queue IDs */
+		if (rule->qname[0] != 0) {
+			rule->qid = pf_qname2qid(rule->qname);
+			if (rule->pqname[0] != 0)
+				rule->pqid = pf_qname2qid(rule->pqname);
+			else
+				rule->pqid = rule->qid;
+		}
+#endif
 		if (rule->tagname[0])
 			if ((rule->tag = pf_tagname2tag(rule->tagname)) == 0)
 				error = EBUSY;
@@ -835,12 +877,6 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EBUSY;
 			break;
 		}
-
-#ifdef ALTQ
-		/* set queue IDs */
-		if (rs_num == PF_RULESET_FILTER)
-			pf_rule_set_qid(ruleset->rules[rs_num].inactive.ptr);
-#endif
 
 		/* Swap rules, keep the old. */
 		s = splsoftnet();
@@ -1016,10 +1052,10 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 #ifdef ALTQ
 			/* set queue IDs */
 			if (newrule->qname[0] != 0) {
-				newrule->qid = pf_qname_to_qid(newrule->qname);
+				newrule->qid = pf_qname2qid(newrule->qname);
 				if (newrule->pqname[0] != 0)
 					newrule->pqid =
-					    pf_qname_to_qid(newrule->pqname);
+					    pf_qname2qid(newrule->pqname);
 				else
 					newrule->pqid = newrule->qid;
 			}
@@ -1465,71 +1501,6 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 	}
 
 #ifdef ALTQ
-	case DIOCSTARTALTQ: {
-		struct pf_altq		*altq;
-		struct ifnet		*ifp;
-		struct tb_profile	 tb;
-
-		/* enable all altq interfaces on active list */
-		s = splsoftnet();
-		TAILQ_FOREACH(altq, pf_altqs_active, entries) {
-			if (altq->qname[0] == 0) {
-				if ((ifp = ifunit(altq->ifname)) == NULL) {
-					error = EINVAL;
-					break;
-				}
-				if (ifp->if_snd.altq_type != ALTQT_NONE)
-					error = altq_enable(&ifp->if_snd);
-				if (error != 0)
-					break;
-				/* set tokenbucket regulator */
-				tb.rate = altq->ifbandwidth;
-				tb.depth = altq->tbrsize;
-				error = tbr_set(&ifp->if_snd, &tb);
-				if (error != 0)
-					break;
-			}
-		}
-		if (error == 0)
-			pfaltq_running = 1;
-		splx(s);
-		DPFPRINTF(PF_DEBUG_MISC, ("altq: started\n"));
-		break;
-	}
-
-	case DIOCSTOPALTQ: {
-		struct pf_altq		*altq;
-		struct ifnet		*ifp;
-		struct tb_profile	 tb;
-		int			 err;
-
-		/* disable all altq interfaces on active list */
-		s = splsoftnet();
-		TAILQ_FOREACH(altq, pf_altqs_active, entries) {
-			if (altq->qname[0] == 0) {
-				if ((ifp = ifunit(altq->ifname)) == NULL) {
-					error = EINVAL;
-					break;
-				}
-				if (ifp->if_snd.altq_type != ALTQT_NONE) {
-					err = altq_disable(&ifp->if_snd);
-					if (err != 0 && error == 0)
-						error = err;
-				}
-				/* clear tokenbucket regulator */
-				tb.rate = 0;
-				err = tbr_set(&ifp->if_snd, &tb);
-				if (err != 0 && error == 0)
-					error = err;
-			}
-		}
-		if (error == 0)
-			pfaltq_running = 0;
-		splx(s);
-		DPFPRINTF(PF_DEBUG_MISC, ("altq: stopped\n"));
-		break;
-	}
-
 	case DIOCBEGINALTQS: {
 		u_int32_t	*ticket = (u_int32_t *)addr;
 		struct pf_altq	*altq;
@@ -1540,7 +1511,8 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			if (altq->qname[0] == 0) {
 				/* detach and destroy the discipline */
 				error = altq_remove(altq);
-			}
+			} else
+				pf_qid_unref(altq->qid);
 			pool_put(&pf_altq_pl, altq);
 		}
 		*ticket = ++ticket_altqs_inactive;
@@ -1567,6 +1539,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		 * copy the necessary fields
 		 */
 		if (altq->qname[0] != 0) {
+			altq->qid = pf_qname2qid(altq->qname);
 			TAILQ_FOREACH(a, pf_altqs_inactive, entries) {
 				if (strncmp(a->ifname, altq->ifname,
 				    IFNAMSIZ) == 0 && a->qname[0] == 0) {
@@ -1591,8 +1564,6 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		u_int32_t		*ticket = (u_int32_t *)addr;
 		struct pf_altqqueue	*old_altqs;
 		struct pf_altq		*altq;
-		struct pf_anchor	*anchor;
-		struct pf_ruleset	*ruleset;
 		int			 err;
 
 		if (*ticket != ticket_altqs_inactive) {
@@ -1630,21 +1601,79 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 				err = altq_remove(altq);
 				if (err != 0 && error == 0)
 					error = err;
-			}
+			} else
+				pf_qid_unref(altq->qid);
 			pool_put(&pf_altq_pl, altq);
 		}
 		splx(s);
 
-		/* update queue IDs */
-		pf_rule_set_qid(
-		    pf_main_ruleset.rules[PF_RULESET_FILTER].active.ptr);
-		TAILQ_FOREACH(anchor, &pf_anchors, entries) {
-			TAILQ_FOREACH(ruleset, &anchor->rulesets, entries) {
-				pf_rule_set_qid(
-				    ruleset->rules[PF_RULESET_FILTER].active.ptr
-				    );
+		if (pf_altq_running == 0)
+			break;
+		/* fall through...  when altq is already running, enable it */
+	}
+
+	case DIOCSTARTALTQ: {
+		struct pf_altq		*altq;
+		struct ifnet		*ifp;
+		struct tb_profile	 tb;
+
+		/* enable all altq interfaces on active list */
+		s = splsoftnet();
+		TAILQ_FOREACH(altq, pf_altqs_active, entries) {
+			if (altq->qname[0] == 0) {
+				if ((ifp = ifunit(altq->ifname)) == NULL) {
+					error = EINVAL;
+					break;
+				}
+				if (ifp->if_snd.altq_type != ALTQT_NONE)
+					error = altq_enable(&ifp->if_snd);
+				if (error != 0)
+					break;
+				/* set tokenbucket regulator */
+				tb.rate = altq->ifbandwidth;
+				tb.depth = altq->tbrsize;
+				error = tbr_set(&ifp->if_snd, &tb);
+				if (error != 0)
+					break;
 			}
 		}
+		if (error == 0)
+			pf_altq_running = 1;
+		splx(s);
+		DPFPRINTF(PF_DEBUG_MISC, ("altq: started\n"));
+		break;
+	}
+
+	case DIOCSTOPALTQ: {
+		struct pf_altq		*altq;
+		struct ifnet		*ifp;
+		struct tb_profile	 tb;
+		int			 err;
+
+		/* disable all altq interfaces on active list */
+		s = splsoftnet();
+		TAILQ_FOREACH(altq, pf_altqs_active, entries) {
+			if (altq->qname[0] == 0) {
+				if ((ifp = ifunit(altq->ifname)) == NULL) {
+					error = EINVAL;
+					break;
+				}
+				if (ifp->if_snd.altq_type != ALTQT_NONE) {
+					err = altq_disable(&ifp->if_snd);
+					if (err != 0 && error == 0)
+						error = err;
+				}
+				/* clear tokenbucket regulator */
+				tb.rate = 0;
+				err = tbr_set(&ifp->if_snd, &tb);
+				if (err != 0 && error == 0)
+					error = err;
+			}
+		}
+		if (error == 0)
+			pf_altq_running = 0;
+		splx(s);
+		DPFPRINTF(PF_DEBUG_MISC, ("altq: stopped\n"));
 		break;
 	}
 

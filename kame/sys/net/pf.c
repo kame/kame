@@ -121,7 +121,7 @@
 #endif /* INET6 */
 
 #ifdef ALTQ
-#include <altq/if_altq.h>
+#include <altq/altq.h>
 #endif
 
 #ifdef __FreeBSD__
@@ -949,33 +949,6 @@ pf_addr_wrap_neq(struct pf_addr_wrap *aw1, struct pf_addr_wrap *aw2)
 		printf("invalid address type: %d\n", aw1->type);
 		return (1);
 	}
-}
-
-void
-pf_rule_set_qid(struct pf_rulequeue *rules)
-{
-	struct pf_rule *rule;
-
-	TAILQ_FOREACH(rule, rules, entries)
-		if (rule->qname[0] != 0) {
-			rule->qid = pf_qname_to_qid(rule->qname);
-			if (rule->pqname[0] != 0)
-				rule->pqid = pf_qname_to_qid(rule->pqname);
-			else
-				rule->pqid = rule->qid;
-		}
-}
-
-u_int32_t
-pf_qname_to_qid(char *qname)
-{
-	struct pf_altq		*altq;
-
-	TAILQ_FOREACH(altq, pf_altqs_active, entries)
-		if (!strcmp(altq->qname, qname))
-			return (altq->qid);
-
-	return (0);
 }
 
 void

@@ -1158,7 +1158,6 @@ extern void			 pf_dynaddr_copyout(struct pf_addr_wrap *);
 extern void			 pf_dynaddr_remove(struct pf_addr_wrap *);
 extern void			 pf_calc_skip_steps(struct pf_rulequeue *);
 extern void			 pf_rule_set_qid(struct pf_rulequeue *);
-extern u_int32_t		 pf_qname_to_qid(char *);
 extern void			 pf_update_anchor_rules(void);
 extern pool_t			 pf_tree_pl, pf_rule_pl, pf_addr_pl;
 extern pool_t			 pf_state_pl, pf_altq_pl, pf_pooladdr_pl;
@@ -1257,6 +1256,9 @@ u_int16_t	pf_tagname2tag(char *);
 void		pf_tag2tagname(u_int16_t, char *);
 void		pf_tag_unref(u_int16_t);
 int		pf_tag_packet(struct mbuf *, struct pf_tag *, int);
+u_int32_t	pf_qname2qid(char *);
+void		pf_qid2qname(u_int32_t, char *);
+void		pf_qid_unref(u_int32_t);
 
 extern struct pf_status	pf_status;
 extern pool_t		pf_frent_pl, pf_frag_pl;
