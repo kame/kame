@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.24 2002/02/08 15:26:08 sakane Exp $	*/
+/*	$KAME: if_faith.c,v 1.25 2002/02/12 04:05:05 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -53,6 +53,8 @@
 #ifndef NFAITH
 #include "faith.h"
 #endif
+#else
+#include "faith.h"
 #endif
 
 #if NFAITH > 0
