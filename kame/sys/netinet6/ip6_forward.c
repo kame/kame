@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.112 2002/09/27 09:21:24 keiichi Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.113 2002/10/29 09:41:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -536,10 +536,11 @@ ip6_forward(m, srcrt)
 #endif
 
 	/*
-	 * Scope check: if a packet can't be delivered to its destination
-	 * for the reason that the destination is beyond the scope of the
-	 * source address, discard the packet and return an icmp6 destination
-	 * unreachable error with Code 2 (beyond scope of source address).
+	 * Source scope check: if a packet can't be delivered to its
+	 * destination for the reason that the destination is beyond the scope
+	 * of the source address, discard the packet and return an icmp6
+	 * destination unreachable error with Code 2 (beyond scope of source
+	 * address).
 	 * [draft-ietf-ipngwg-icmp-v3-02.txt, Section 3.1]
 	 */
 	if (in6_addr2zoneid(rt->rt_ifp, &ip6->ip6_src, &dstzone)) {
@@ -567,6 +568,21 @@ ip6_forward(m, srcrt)
 		if (mcopy)
 			icmp6_error(mcopy, ICMP6_DST_UNREACH,
 				    ICMP6_DST_UNREACH_BEYONDSCOPE, 0);
+		m_freem(m);
+		return;
+	}
+
+	/*
+	 * Destination scope check: if a packet is going to break the scope
+	 * zone of packet's destination address, discard it.  This case should
+	 * usually be prevented by appropriately-configured routing table, but
+	 * we need an explicit check because we may mistakenly forward the
+	 * packet to a different zone by (e.g.) a default route.
+	 */
+	if (in6_addr2zoneid(rt->rt_ifp, &ip6->ip6_dst, &dstzone) ||
+	    sa6_dst->sin6_scope_id != dstzone) {
+		ip6stat.ip6s_cantforward++;
+		ip6stat.ip6s_badscope++;
 		m_freem(m);
 		return;
 	}
