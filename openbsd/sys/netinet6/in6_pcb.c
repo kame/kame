@@ -546,7 +546,6 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, cmdarg, notify)
 	struct in6_addr *faddr,laddr = *la;
 	u_short fport = fport_arg, lport = lport_arg;
 	int errno, nmatch = 0;
-	int do_rtchange = (notify == in_rtchange);
 
 	if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET6)
 		return 1;
@@ -569,7 +568,8 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, cmdarg, notify)
 		lport = 0;
 		laddr = in6addr_any;
 
-		notify = in_rtchange;
+		if (cmd != PRC_HOSTDEAD)
+			notify = in_rtchange;
 	}
 	errno = inet6ctlerrmap[cmd];
 
@@ -598,23 +598,6 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, cmdarg, notify)
 		     IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr))) {
 			ip6_notify_pmtu(inp, (struct sockaddr_in6 *)dst,
 			    (u_int32_t *)cmdarg);
-		}
-
-		if (do_rtchange) {
-			struct sockaddr_in6 *dst6;
-
-			/*
-			 * Since a non-connected PCB might have a cached route,
-			 * we always call in_rtchange without matching
-			 * the PCB to the src/dst pair.
-			 *
-			 * XXX: we assume in_rtchange does not free the PCB.
-			 */
-			dst6 = (struct sockaddr_in6 *)&inp->inp_route6.ro_dst;
-			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr, faddr))
-				in_rtchange(inp, errno);
-
-			continue; /* there's nothing to do any more */
 		}
 
 		if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr) ||
