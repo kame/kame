@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.68 2001/07/23 12:15:02 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.69 2001/07/23 12:17:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -457,7 +457,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 		else {
 			ia = in6_ifawithifp(ifp, &ip6->ip6_dst);
 			if (ia == NULL) {
-				m_freem(m);	/*XXX*/
+				m_freem(m);
 				return;
 			}
 			ip6->ip6_src = ia->ia_addr.sin6_addr;
