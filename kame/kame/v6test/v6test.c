@@ -37,6 +37,8 @@ static struct in6_addr ip6src, ip6dst;
 struct in6_addr *optsrcn, *optdstn;
 int sflag = 0, dflag = 0, nflag = 0;
 static void usage __P((void));
+int main __P((int, char *[]));
+int bpf_open __P((char *));
 static int linkhdrlen __P((int, char *));
 static void form __P((int, char *));
 static void form_ether __P((void));

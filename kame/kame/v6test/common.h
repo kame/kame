@@ -61,8 +61,13 @@
 #include <netinet6/ah.h>
 #endif
 
+#include <arpa/inet.h>
+
 #include "pathnames.h"
 
 extern u_char buf[];
 
-extern int getconfig(char *, u_char *);
+extern int getconfig __P((char *, u_char *));
+/* cksum.c */
+extern void cksum6 __P((void));
+extern u_short in_cksum __P((u_short *, u_short *, int));

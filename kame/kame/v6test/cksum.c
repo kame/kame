@@ -44,8 +44,6 @@ static u_short in_cksum(u_short *, u_short *, int);
 void
 cksum6()
 {
-	int i;
-	u_int a;
 	int len = 0;
 	int off, nh;
 	u_char ipovly[40];
