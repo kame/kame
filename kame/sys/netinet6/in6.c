@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.77 2000/04/18 12:36:03 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.78 2000/04/26 06:00:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,10 +88,6 @@
 #include <net/if.h>
 #include <net/if_types.h>
 #include <net/route.h>
-#include "gif.h"
-#if NGIF > 0
-#include <net/if_gif.h>
-#endif
 #include <net/if_dl.h>
 
 #include <netinet/in.h>
@@ -109,6 +105,11 @@
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/scope6_var.h>
+
+#include "gif.h"
+#if NGIF > 0
+#include <net/if_gif.h>
+#endif
 
 #include <net/net_osdep.h>
 
