@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.335 2003/01/20 13:39:45 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.336 2003/01/20 15:50:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -763,9 +763,6 @@ in6_control(so, cmd, data, ifp)
 		int i, error = 0;
 		struct nd_prefixctl pr0;
 		struct nd_prefix *pr;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-		long time_second;
-#endif
 
 		/* reject read-only flags */
 		if ((ifra->ifra_flags & IN6_IFF_READONLY))
