@@ -11,7 +11,7 @@
 # device lines is present in the ./LINT configuration file. If you are 
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-#	$Id: ALTQ,v 1.2 1999/09/08 06:43:02 shin Exp $
+#	$Id: ALTQ,v 1.3 1999/09/10 08:08:05 itojun Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -43,7 +43,6 @@ options		VISUAL_USERCONFIG	#visual boot -c editor
 options		NMBCLUSTERS=2048
 options		MROUTING		# Multicast routing
 options		NATM			#native mode atm
-options		_KERNEL			# mandatory for code share
 
 options		ALTQ		#alternate queueing
 #options		CBQ		#class based queueing
