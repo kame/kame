@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/02/08 15:29:50 $
+			$Date: 2000/02/10 04:51:31 $
 
 1. IPv6
 
@@ -94,11 +94,11 @@ draft-ietf-dhc-dhcpv6-14.txt: DHCPv6
 draft-ietf-dhc-v6exts-11.txt: Extensions for DHCPv6
     * kame/dhcp6 has test implementation, which will not be compiled in
       default compilation.
-draft-itojun-ipv6-tcp-to-anycast-00:
+draft-itojun-ipv6-tcp-to-anycast-00.txt:
 	Disconnecting TCP connection toward IPv6 anycast address
-draft-yamamoto-wideipv6-comm-model-00
+draft-yamamoto-wideipv6-comm-model-00.txt
     * See 1.6 in this document for details.
-draft-ietf-ipngwg-scopedaddr-format-00.txt:
+draft-ietf-ipngwg-scopedaddr-format-??.txt:
 	An Extension of Format for IPv6 Scoped Addresses
 draft-ietf-ipngwg-rfc2292bis-01.txt:
 	A revised version of the advanced API
@@ -216,7 +216,7 @@ in kernels anyway.
 getaddrinfo(3) and getnameinfo(3) are modified to support extended numeric
 IPv6 syntax, as documented in draft-ietf-ipngwg-scopedaddr-format-00.txt.
 You can specify outgoing link, by using name of the outgoing interface
-like "fe80::1@ne0".  This way you will be able to specify link-local scoped
+like "ne0%fe80::1".  This way you will be able to specify link-local scoped
 address without much trouble.
 To use this extension in your program, you'll need to use getaddrinfo(3),
 and getnameinfo(3) with NI_WITHSCOPEID.
@@ -231,7 +231,7 @@ scope identifier.
 Some of the userland tools support extended numeric IPv6 syntax, as
 documented in draft-ietf-ipngwg-scopedaddr-format-00.txt.  In this case,
 you can specify outgoing link, by using name of the outgoing interface like
-"fe80::1@ne0".
+"ne0%fe80::1".
 
 When you specify scoped address to the command line, NEVER write the
 embedded form (such as ff02:1::1 or fe80:2::fedc).  This is not supposed
@@ -272,8 +272,8 @@ Here is an output of netstat command:
 
 Internet6:
 Destination                   Gateway                   Flags      Netif Expire
-fe80::@ed0/64                 link#1                    UC           ed0
-fe80::@ep0/64                 link#2                    UC           ep0
+ed0%fe80::/64                 link#1                    UC           ed0
+ep0%fe80::/64                 link#2                    UC           ep0
 
 Interfaces that has no IEEE802 address (pseudo interfaces like tunnel
 interfaces, or ppp interfaces) will borrow IEEE802 address from other
