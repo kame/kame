@@ -173,7 +173,6 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	extern char *optarg;
 	extern int optind;
 	int ch, lvl1;
 
