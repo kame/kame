@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.269 2002/02/19 13:11:27 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.270 2002/02/19 17:06:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -317,6 +317,8 @@ ip6_init2(dummy)
 	 */
 #ifdef __bsdi__
 	nd6_ifattach(loifp);
+#elif defined(__OpenBSD__)
+	nd6_ifattach(&lo0ifp);
 #else
 	nd6_ifattach(&loif[0]);
 #endif
