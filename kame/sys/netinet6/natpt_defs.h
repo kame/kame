@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.55 2002/07/11 05:29:22 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.56 2002/07/31 04:40:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -156,7 +156,6 @@ struct pcv {
 #define	NATPT_TO		1
 
 	u_char	 flags;
-#define	NATPT_TRACEROUTE	0x01
 #define	NATPT_toIPv4		0x02	/* ipv[46] to ipv4 translation */
 #define	NATPT_REVERSE		0x04	/* reverse direction of "bidir" rule */
 

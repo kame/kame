@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.63 2002/07/11 05:29:22 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.64 2002/07/31 04:40:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -208,7 +208,6 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 	const char	*fn = __FUNCTION__;
 
 	struct pcv	 cv4;
-	struct tSlot	*ats;
 	struct pAddr	*pad;
 
 	if (natpt_initialized == 0)
@@ -252,11 +251,8 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 		/* regular packet */
 		cv4.ats = natpt_lookForHash4(&cv4);
 		if ((cv4.ats == NULL)
-		    && (cv4.ip_p == IPPROTO_ICMP)
-		    && ((ats = natpt_checkICMP(&cv4)) != NULL)) {
-			cv4.fromto = NATPT_TO;
-			cv4.flags |= NATPT_TRACEROUTE;
-			cv4.ats = ats;
+		    && (cv4.ip_p == IPPROTO_ICMP)) {
+			cv4.ats = natpt_checkICMP(&cv4);
 		}
 
 		if (cv4.ats == NULL ) {

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.137 2002/07/25 02:35:59 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.138 2002/07/31 04:40:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1160,8 +1160,8 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 		break;
 
 	case ICMP_UNREACH:
-	case ICMP_TIMXCEED:	/* traceroute return */
-		if (cv6->flags & NATPT_TRACEROUTE) {
+	case ICMP_TIMXCEED:
+		{
 			struct udphdr	*icmpudp6;
 
 			icmpudp6 = (struct udphdr *)((caddr_t)icmpip6 +
