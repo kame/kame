@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.74 2001/08/17 02:28:25 jinmei Exp $	*/
+/*	$KAME: if_gif.c,v 1.75 2001/08/17 05:15:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -385,6 +385,12 @@ gif_output(ifp, m, dst, rt)
 		goto end;
 	}
 #else
+	if (IF_QFULL(&ifp->if_snd)) {
+		m_freem(m);
+		error = ENOBUFS;
+		splx(s);
+		goto end;
+	}
 	IF_ENQUEUE(&ifp->if_snd, m);
 #endif /* ALTQ */
 	splx(s);
