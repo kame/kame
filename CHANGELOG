@@ -1,7 +1,15 @@
-$Id: CHANGELOG,v 1.464 2000/01/18 18:28:10 itojun Exp $
+$Id: CHANGELOG,v 1.465 2000/01/18 21:45:11 sakane Exp $
 
 
 <200001>
+Wed Jan 19 06:44:02 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	  improved the way to define a certificate type.
+	  If signature method as `authentication method' is defined,
+	  `identifier' is defined subjectname.
+	  `certificate_type' is defined certificate type.
+	  XXX why isn't certificate type negotiated in IKE ?
+
 Wed Jan 19 02:39:23 JST 2000  itojun@iijlab.net
 	* netbsd/usr.sbin/lpd: IPv6 and multiple listening socket support.
 	  NetBSD PR 9050 from Feico Dillema.
