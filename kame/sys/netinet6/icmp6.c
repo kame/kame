@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.198 2001/02/11 04:51:12 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.199 2001/02/15 11:01:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3330,6 +3330,8 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 				&icmp6_mtudisc_lowat);
 	case ICMPV6CTL_ND6_DEBUG:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &nd6_debug);
+	case ICMPV6CTL_ND6_DRLIST:
+		return nd6_sysctl(name[0], oldp, oldlenp, newp, newlen);
 	default:
 		return ENOPROTOOPT;
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.47 2001/02/08 16:30:31 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.48 2001/02/15 11:01:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,6 +111,14 @@ struct	in6_drlist {
 		u_long	expire;
 		u_short if_index;
 	} defrouter[DRLSTSIZ];
+};
+
+struct	in6_defrouter {
+	struct	in6_addr rtaddr;
+	u_char	flags;
+	u_short	rtlifetime;
+	u_long	expire;
+	u_short if_index;
 };
 
 struct	in6_prlist {
@@ -342,6 +350,7 @@ int nd6_output __P((struct ifnet *, struct ifnet *, struct mbuf *,
 		    struct sockaddr_in6 *, struct rtentry *));
 int nd6_storelladdr __P((struct ifnet *, struct rtentry *, struct mbuf *,
 			 struct sockaddr *, u_char *));
+int nd6_sysctl __P((int, void *, size_t *, void *, size_t));
 
 /* nd6_nbr.c */
 void nd6_na_input __P((struct mbuf *, int, int));

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.119 2001/02/08 16:30:31 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.120 2001/02/15 11:01:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2293,4 +2293,68 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 
 	bcopy(LLADDR(sdl), desten, sdl->sdl_alen);
 	return(1);
+}
+
+int
+nd6_sysctl(name, oldp, oldlenp, newp, newlen)
+	int name;
+	void *oldp;
+	size_t *oldlenp;
+	void *newp;
+	size_t newlen;
+{
+	struct in6_defrouter *d, *de;
+	struct nd_defrouter *dr;
+	size_t ol, l;
+	int error;
+
+	error = 0;
+	l = 0;
+
+	if (newp)
+		return EPERM;
+	if (oldp && !oldlenp)
+		return EINVAL;
+	ol = oldlenp ? *oldlenp : 0;
+	switch (name) {
+	case ICMPV6CTL_ND6_DRLIST:
+		if (oldp) {
+			d = (struct in6_defrouter *)oldp;
+			de = (struct in6_defrouter *)((caddr_t)oldp + *oldlenp);
+		}
+		l = 0;
+		for (dr = TAILQ_FIRST(&nd_defrouter);
+		     dr;
+		     dr = TAILQ_NEXT(dr, dr_entry)) {
+			if (oldp && d + 1 <= de) {
+				bzero(d, sizeof(*d));
+				d->rtaddr = dr->rtaddr;
+				if (IN6_IS_ADDR_LINKLOCAL(&d->rtaddr))
+					d->rtaddr.s6_addr16[1] = 0;
+				else
+					log(LOG_ERR,
+					    "default router list contains a "
+					    "non-linklocal address(%s)\n",
+					    ip6_sprintf(&dr->rtaddr));
+				d->flags = dr->flags;
+				d->rtlifetime = dr->rtlifetime;
+				d->expire = dr->expire;
+				d->if_index = dr->ifp->if_index;
+			}
+			l += sizeof(*d);
+			if (d)
+				d++;
+		}
+		if (oldp) {
+			*oldlenp = l;	/* (caddr_t)d - (caddr_t)oldp */
+			if (l > ol)
+				error = ENOMEM;
+		} else
+			*oldlenp = l;
+		break;
+	default:
+		error = ENOPROTOOPT;
+		break;
+	}
+	return error;
 }
