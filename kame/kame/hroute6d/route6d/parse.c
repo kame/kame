@@ -1,5 +1,5 @@
 /* 
- * $Id: parse.c,v 1.2 1999/10/26 09:05:44 itojun Exp $
+ * $Id: parse.c,v 1.3 2003/01/21 08:50:09 suz Exp $
  */
 
 /*
@@ -234,7 +234,7 @@ global_part(void)
 		/* interface */
 		get_if_addr(&st->sta_ifp);
 		if (st->sta_ifp == NULL)
-			ERR("unknwon interface");
+			ERR("unknown interface");
 
 		k = keyword();
 
