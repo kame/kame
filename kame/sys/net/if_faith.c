@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.37 2004/05/20 08:15:53 suz Exp $	*/
+/*	$KAME: if_faith.c,v 1.38 2004/05/21 08:46:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -41,7 +41,7 @@
 /*
  * Loopback interface driver for protocol testing and timing.
  */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -49,7 +49,7 @@
 #include "opt_inet.h"
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #ifndef NFAITH
 #include "faith.h"
 #endif
@@ -65,14 +65,14 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/sockio.h>
 #else
 #include <sys/ioctl.h>
 #endif
 #include <sys/time.h>
 #include <sys/queue.h>
-#if defined(__bsdi__) || defined(__NetBSD__)
+#ifdef __NetBSD__
 #include <machine/cpu.h>
 #endif
 
@@ -99,7 +99,7 @@
 #include <netinet6/ip6_var.h>
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #include "bpf.h"
 #define NBPFILTER	NBPF
 #else
@@ -108,18 +108,10 @@
 
 #include <net/net_osdep.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-static int faithioctl __P((struct ifnet *, int, caddr_t));
-#else
 static int faithioctl __P((struct ifnet *, u_long, caddr_t));
-#endif
 int faithoutput __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 	struct rtentry *));
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 static void faithrtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
-#else
-static void faithrtrequest __P((int, struct rtentry *, struct sockaddr *));
-#endif
 
 #if defined(__FreeBSD__)
 void faithattach __P((void *));
@@ -292,17 +284,10 @@ faithoutput(ifp, m, dst, rt)
 
 /* ARGSUSED */
 static void
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 faithrtrequest(cmd, rt, info)
 	int cmd;
 	struct rtentry *rt;
 	struct rt_addrinfo *info;
-#else
-faithrtrequest(cmd, rt, sa)
-	int cmd;
-	struct rtentry *rt;
-	struct sockaddr *sa;
-#endif
 {
 	if (rt) {
 		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu; /* for ISO */
@@ -325,11 +310,7 @@ faithrtrequest(cmd, rt, sa)
 static int
 faithioctl(ifp, cmd, data)
 	struct ifnet *ifp;
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-	int cmd;
-#else
 	u_long cmd;
-#endif
 	caddr_t data;
 {
 	struct ifaddr *ifa;

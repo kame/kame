@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.26 2004/05/20 08:15:53 suz Exp $	*/
+/*	$KAME: if_dummy.c,v 1.27 2004/05/21 08:46:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -44,7 +44,7 @@
 #include "dummy.h"
 #if NDUMMY > 0
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -58,15 +58,12 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/sockio.h>
 #else
 #include <sys/ioctl.h>
 #endif
 #include <sys/time.h>
-#ifdef __bsdi__
-#include <machine/cpu.h>
-#endif
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -109,7 +106,7 @@
 #include <netatalk/at_var.h>
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #include "bpf.h"
 #define NBPFILTER	NBPF
 #else
@@ -118,18 +115,10 @@
 
 #include <net/net_osdep.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-static int dummyioctl __P((struct ifnet *, int, caddr_t));
-#else
 static int dummyioctl __P((struct ifnet *, u_long, caddr_t));
-#endif
 int dummyoutput __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 	struct rtentry *));
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 static void dummyrtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
-#else
-static void dummyrtrequest __P((int, struct rtentry *, struct sockaddr *));
-#endif
 
 #ifdef __FreeBSD__
 void dummyattach __P((void *));
@@ -168,16 +157,14 @@ dummyattach(dummy)
 		ifp->if_name = "dummy";
 		ifp->if_unit = i;
 #endif
-#ifndef __bsdi__
 		ifp->if_softc = NULL;
-#endif
 		ifp->if_mtu = DUMMYMTU;
 		/* Change to BROADCAST experimentaly to announce its prefix. */
 		ifp->if_flags = /* IFF_LOOPBACK */ IFF_BROADCAST | IFF_MULTICAST;
 		ifp->if_ioctl = dummyioctl;
 		ifp->if_output = dummyoutput;
 		ifp->if_type = IFT_DUMMY;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 		ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 #endif
 		ifp->if_hdrlen = 0;
@@ -332,17 +319,10 @@ dummyoutput(ifp, m, dst, rt)
 
 /* ARGSUSED */
 static void
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 dummyrtrequest(cmd, rt, info)
 	int cmd;
 	struct rtentry *rt;
 	struct rt_addrinfo *info;
-#else
-dummyrtrequest(cmd, rt, sa)
-	int cmd;
-	struct rtentry *rt;
-	struct sockaddr *sa;
-#endif
 {
 	if (rt) {
 		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu; /* for ISO */
@@ -365,11 +345,7 @@ dummyrtrequest(cmd, rt, sa)
 static int
 dummyioctl(ifp, cmd, data)
 	struct ifnet *ifp;
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-	int cmd;
-#else
 	u_long cmd;
-#endif
 	caddr_t data;
 {
 	struct ifaddr *ifa;
