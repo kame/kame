@@ -556,6 +556,12 @@ in6_control(so, cmd, data, ifp)
 			else
 				if (addr->s6_addr16[1] != htons(ifp->if_index))
 					return(EINVAL);	/* ifid is contradict */
+			if (addr->sin6_scope_id) {
+				if (addr->sin6_scope_id !=
+				    (u_int32_t)ifp->if_index)
+					return(EINVAL);
+				addr->sin6_scope_id = 0; /* XXX: good way? */
+			}
 		}
 	}
 #if 0
