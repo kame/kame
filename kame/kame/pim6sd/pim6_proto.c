@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.43 2001/08/09 10:27:19 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.44 2001/08/14 06:16:43 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -265,6 +265,7 @@ receive_pim6_hello(src, pim_message, datalen)
 
     new_nbr = (pim_nbr_entry_t *) malloc(sizeof(pim_nbr_entry_t));
     new_nbr->address 		= *src;
+    new_nbr->aux_addrs		= (struct phaddr *) NULL;
     new_nbr->vifi 		= mifi;
     set_pim6_nbr_param(new_nbr, &hopts);
     new_nbr->build_jp_message 	= (build_jp_message_t *) NULL;

@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.21 2001/08/09 08:46:57 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.22 2001/08/14 06:16:43 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -360,6 +360,7 @@ accept_listener_report(src, dst, group)
 			log(LOG_ERR, 0, "ran out of memory");	/* fatal */
 
 		g->al_addr = group_sa;
+		g->sources = NULL;
 
 		/** set a timer for expiration **/
 		g->al_query = 0;
@@ -524,6 +525,7 @@ SetTimer(mifi, g)
 	cbk = (cbk_t *) malloc(sizeof(cbk_t));
 	cbk->mifi = mifi;
 	cbk->g = g;
+	cbk->s = NULL;
 	return timer_setTimer(g->al_timer, DelVif, cbk);
 }
 
@@ -573,6 +575,7 @@ SetQueryTimer(g, mifi, to_expire, q_time)
 
 	cbk = (cbk_t *) malloc(sizeof(cbk_t));
 	cbk->g = g;
+	cbk->s = NULL;
 	cbk->q_time = q_time;
 	cbk->mifi = mifi;
 	return timer_setTimer(to_expire, SendQuery, cbk);

@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.4 2001/08/09 11:03:16 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.5 2001/08/14 06:16:44 suz Exp $
  */
 
 /*
@@ -531,6 +531,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 		    if (s == NULL)
 			log(LOG_ERR, 0, "ran out of memory");	/*fatal */
 		    s->al_addr = source_sa;
+		    s->sources = NULL;
 
 		    /*
 		     * if the group doesn't exist 
@@ -548,6 +549,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 			if (g == NULL)
 			    log(LOG_ERR, 0, "ran out of memory");	/*fatal */
 			g->al_addr = group_sa;
+			g->sources = NULL;
 
 			g->al_next = v->uv_groups;
 			v->uv_groups = g;
@@ -653,6 +655,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 		    if (tmp == NULL)
 			log(LOG_ERR, 0, "ran out of memory");	/*fatal */
 		    tmp->al_addr = s->al_addr;
+		    tmp->sources = NULL;
 		    tmp->al_checklist = TRUE;
 		    /*
 		     * link it 
