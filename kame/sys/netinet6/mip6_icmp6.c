@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.26 2001/12/13 15:41:44 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.27 2001/12/13 15:58:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -279,7 +279,6 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	struct mbuf *n;
 	struct ip6_hdr *ip6, otip6, oip6, *nip6;
 	struct icmp6_hdr *icmp6, *nicmp6;
-	int plen;
 	struct mip6_bc *mbc;
 	int error = 0;
 
@@ -291,6 +290,20 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		return (0);
 	}
 	
+	/* check if we have a enough length icmp payload. */
+	if (icmp6len < sizeof(otip6) + sizeof(oip6)) {
+		/*
+		 * we don't have enough length of icmp payload.  to
+		 * determine that this icmp is against the tunneled
+		 * ip, we at least have two ip header, one is for
+		 * tunneling from the home agent to the correspondent
+		 * node and the other is the original header from the
+		 * mobile node to the correspondent node.
+		 */
+		/* XXX: TODO extention header. */
+		return (0);
+	}
+
 	/*
 	 * check if this icmp is generated on the way to sending from
 	 * a home agent to a mobile node by encapsulating the original
@@ -304,7 +317,6 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	 *     |icmp|ip(src=ha,dst=mnhoa)|ip(src=cn,dst=mnhoa)|payload
 	 */
 	ip6 = mtod(m, struct ip6_hdr *);
-	plen = ntohs(ip6->ip6_plen);
 	icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
 	if (icmp6->icmp6_type >= 128) {
 		/*
@@ -313,18 +325,6 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		 */
 		return (0);
 	} 
-	/* check if we have a enough length icmp payload. */
-	if (plen < (sizeof(*icmp6) + sizeof(otip6) + sizeof(oip6))) {
-		/*
-		 * we have not enough length of icmp payload.  to
-		 * determine that this icmp is against the tunneled
-		 * ip, we at least have two ip header, one is for
-		 * tunneling from the home agent to the correspondent
-		 * node and the other is the original header from the
-		 * mobile node to the correspondent node.
-		 */
-		return (0);
-	}
 	/* the ip6_hdr for encapsulating may not be contiguous. */
 	m_copydata(m, off + sizeof(*icmp6), sizeof(otip6), (caddr_t)&otip6);
 
