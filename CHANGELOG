@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.924 2000/05/24 08:36:01 jinmei Exp $
+$Id: CHANGELOG,v 1.925 2000/05/24 09:11:06 itojun Exp $
 
 <200005>
+Wed May 24 18:09:12 JST 2000  itojun@iijlab.net
+	* sys/netinet6/in6.h: check parameter type to IN6_ARE_ADDR_EQUAL().
+	  this should avoid typecast bugs like below.
+
 2000-05-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* {bsdi4,openbsd}/sys/netinet6/in6_pcb.c (in6_pcbnotify):
 	corrected the 2nd argument IN6_ARE_ADDR_EQUAL(), which was
