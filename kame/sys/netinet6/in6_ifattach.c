@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.139 2001/08/03 10:40:20 keiichi Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.140 2001/08/03 13:19:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,9 @@
  * SUCH DAMAGE.
  */
 
+#ifdef __FreeBSD__ && __FreeBSD__ >= 3
 #include "opt_mip6.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
