@@ -59,7 +59,7 @@ vs ericsson
 
 vs ibm
 	先方で試したところ、agressive modeにinterop issueがあるらしい。
-	13日にv4/v6ともテスト予定。
+	(これは追ってBull側の問題であることが確認された)
 
 	IPv4: ok
 		phase 1 3des/md5/dh1/3600sec
@@ -136,6 +136,39 @@ vs ire
 	いちおう動きそう。再試験予定。
 
 vs cisco
+	IKEはほぼ問題なし。
+	phase 1: pre-shared/3des/sha1/dh2/180sec
+	phase 2: esp transport/3des/sha1/dh2/120sec
+
+	phase 1: pre-shared/3des/sha1/dh2/180sec
+	phase 2: esp tunnel/3des/sha1/dh2/120sec
+
+	ipsec SAをカーネルにいれた後、packet出力時のSA検索に
+	失敗してしまう症状続発。delete payloadをくらったときに消したSAが
+	deadのまま残ってしまい、検索をあきらめる。これは二度と消せない?
+
+>206.175.160.20 206.175.161.114 
+>	esp mode=tunnel spi=372644951(0x16361c57) reqid=0(0x00000000)
+>	E: 3des-cbc  83dfc523 b3b66e28 06222ccf f33d1d4b c039aeef 07b0e7f0
+>	A: hmac-sha1  e30c8e8a d3a8fa30 1985ed93 bdf1ad35 9cd46861
+>	replay=4 flags=0x00000000 state=dead seq=1 pid=495
+>	created: Jan 13 22:24:40 2000	current: Jan 13 22:39:54 2000
+>	diff: 914(s)	hard: 120(s)	soft: 96(s)
+>	last:                     	hard: 0(s)	soft: 0(s)
+>	current: 0(bytes)	hard: 0(bytes)	soft: 515395584(bytes)
+>	allocated: 0	hard: 0	soft: 0
+>	refcnt=1
+>206.175.160.20 206.175.161.114 
+>	esp mode=tunnel spi=205659402(0x0c421d0a) reqid=0(0x00000000)
+>	E: 3des-cbc  b2bec5f2 9a9d7d7c 92a5aea3 0ce5310c 7cedd2bb efdd62b2
+>	A: hmac-sha1  8fff7c61 990fbb3e 6730e2ed c26c06cf 3c75a2c4
+>	replay=4 flags=0x00000000 state=dead seq=0 pid=495
+>	created: Jan 13 22:24:47 2000	current: Jan 13 22:39:54 2000
+>	diff: 907(s)	hard: 120(s)	soft: 96(s)
+>	last:                     	hard: 0(s)	soft: 0(s)
+>	current: 0(bytes)	hard: 0(bytes)	soft: 0(bytes)
+>	allocated: 0	hard: 0	soft: 0
+>	refcnt=1
 
 テストするには
 	psk.txtにエントリ追加。
