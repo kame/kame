@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.66 2000/08/06 16:44:03 itojun Exp $
+$KAME: COVERAGE,v 1.67 2000/08/06 16:44:45 itojun Exp $
 
 
 x: supported/integrated
@@ -83,8 +83,8 @@ advanced API	2292bis	2292	2292	2292	2292	2292	2292
 
 getifaddrs	x	x	x	x	x	x	x
 
-icmp6 nodeinfo	06	06	05	05	05	05-	05
-				(*1)	(*1)	(*1)	(*1)	(*1)
+icmp6 nodeinfo	06	06	05	05	06	05-	05
+			(*1)	(*1)	(*1)	(*1)	(*1)	(*1)
     (all) spec conformance is still low.  "05-" means 05/03 chimera.
     (*1) does not join NI group address
 
