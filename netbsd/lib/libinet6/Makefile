@@ -12,16 +12,16 @@ CPPFLAGS+=-DINET6 -DHAVE_SOCKADDR_SA_LEN \
 CPPFLAGS+=-DUSE_LOG_REORDER
 CFLAGS+=	-g -Wall -Werror -Dlint
 
-SRCS=	getaddrinfo.c getnameinfo.c vars.c rresvport_af.c rcmd.c
-SRCS+=	if_indextoname.c if_nameindex.c if_nametoindex.c
+#SRCS=	getaddrinfo.c getnameinfo.c vars.c rresvport_af.c rcmd.c
+#SRCS+=	if_indextoname.c if_nameindex.c if_nametoindex.c
 SRCS+=	rthdr.c ip6opt.c
-SRCS+=	name6.c
-SRCS+=	base64.c herror.c nsap_addr.c 
-SRCS+=	res_comp.c res_data.c res_debug.c
-SRCS+=	res_init.c res_mkquery.c res_query.c 
-SRCS+=	res_send.c
-SRCS+=	inet_pton.c inet_addr.c
-SRCS+=	bindresvport.c
+#SRCS+=	name6.c
+#SRCS+=	base64.c herror.c nsap_addr.c 
+#SRCS+=	res_comp.c res_data.c res_debug.c
+#SRCS+=	res_init.c res_mkquery.c res_query.c 
+#SRCS+=	res_send.c
+#SRCS+=	inet_pton.c inet_addr.c
+#SRCS+=	bindresvport.c
 SRCS+=	getrrsetbyname.c
 # experimental scope library
 SRCS+=	scope.c
