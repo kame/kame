@@ -45,6 +45,7 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <sys/uio.h>
+#include <sys/queue.h>
 #include <netinet/in.h>
 #include <netinet/udp.h>
 #include <netinet/ip6.h>

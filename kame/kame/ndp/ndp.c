@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.42 2000/07/11 03:24:09 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.43 2000/07/20 10:08:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -83,6 +83,7 @@
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/time.h>
+#include <sys/queue.h>
 
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
