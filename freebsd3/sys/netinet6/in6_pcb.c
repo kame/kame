@@ -883,7 +883,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 	struct in6_addr faddr6;
 	u_short	fport = fport_arg, lport = lport_arg;
 	int errno, s;
-	void (*notify2) __P((struct in6pcb *, int));
+	void (*notify2) __P((struct inpcb *, int));
 
 	notify2 = NULL;
 
