@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.172 2000/12/01 15:57:10 sakane Exp $	*/
+/*	$KAME: key.c,v 1.173 2000/12/01 16:01:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -430,8 +430,6 @@ static int key_ismyaddr6 __P((struct sockaddr_in6 *));
 static int key_cmpsaidx_exactly
 	__P((struct secasindex *, struct secasindex *));
 static int key_cmpsaidx_withmode
-	__P((struct secasindex *, struct secasindex *));
-static int key_cmpsaidx_withoutmode
 	__P((struct secasindex *, struct secasindex *));
 static int key_cmpspidx_exactly
 	__P((struct secpolicyindex *, struct secpolicyindex *));
@@ -3758,42 +3756,6 @@ key_cmpsaidx_withmode(saidx0, saidx1)
 		return 0;
 
 	if (saidx0->mode != IPSEC_MODE_ANY && saidx0->mode != saidx1->mode)
-		return 0;
-
-	if (key_sockaddrcmp((struct sockaddr *)&saidx0->src,
-	    (struct sockaddr *)&saidx1->src, 0) != 0) {
-		return 0;
-	}
-	if (key_sockaddrcmp((struct sockaddr *)&saidx0->dst,
-	    (struct sockaddr *)&saidx1->dst, 0) != 0) {
-		return 0;
-	}
-
-	return 1;
-}
-
-/*
- * compare two secasindex structure without mode.
- * don't compare port.
- * IN:
- *	saidx0: source, it is often in SAD.
- *	saidx1: object, it is often from user.
- * OUT:
- *	1 : equal
- *	0 : not equal
- */
-static int
-key_cmpsaidx_withoutmode(saidx0, saidx1)
-	struct secasindex *saidx0, *saidx1;
-{
-	/* sanity */
-	if (saidx0 == NULL && saidx1 == NULL)
-		return 1;
-
-	if (saidx0 == NULL || saidx1 == NULL)
-		return 0;
-
-	if (saidx0->proto != saidx1->proto)
 		return 0;
 
 	if (key_sockaddrcmp((struct sockaddr *)&saidx0->src,
