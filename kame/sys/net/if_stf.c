@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.5 2000/03/10 15:13:16 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.6 2000/03/10 15:31:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -397,9 +397,15 @@ in_stf_input(m, va_alist)
 	}
 	ip6 = mtod(m, struct ip6_hdr *);
 
-	/* reject packets with multicast inner destination */
+	/* reject packets with 6to4(multicast) inner destination */
 	if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst) &&
 	    IN_MULTICAST(GET_V4(&ip6->ip6_dst)->s_addr)) {
+		m_freem(m);
+		return;
+	}
+	/* reject packets with 6to4(0.0.0.0) inner destination */
+	if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst) &&
+	    GET_V4(&ip6->ip6_dst)->s_addr == INADDR_ANY) {
 		m_freem(m);
 		return;
 	}
