@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.103 2001/05/24 07:14:18 sakane Exp $	*/
+/*	$KAME: ipsec.c,v 1.104 2001/07/06 06:16:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,10 +108,6 @@
 #define in6p_sp	inp_sp
 #define in6p_socket	inp_socket
 #define sotoin6pcb(so)	((struct inpcb *)(so)->so_pcb)
-#endif
-
-#ifdef __NetBSD__
-#define ovbcopy	bcopy
 #endif
 
 #ifdef IPSEC_DEBUG
