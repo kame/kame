@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1993 2001/11/29 09:37:12 itojun Exp $
+$KAME: CHANGELOG,v 1.1994 2001/11/30 12:05:55 kjc Exp $
 
 <200111>
+2001/11/30 20:51:35 JST	kjc@csl.sony.co.jp
+	* ALTQ works again for openbsd-3.0.
+	- the ALTQ base is enabled in "sys/conf/GENERIC" but other ALTQ
+	  options are enabled in "openbsd/sys/arch/i386/conf/GENERIC.KAME".
+
 Thu Nov 29 18:32:39 JST 2001  itojun@iijlab.net
 	* openbsd: switched to openbsd 3.0.  still needs a torture-testing.
 	  ALTQ is unavailable for the moment.
