@@ -588,7 +588,6 @@ udp6_sendup(m, off, src, so)
 {
 	struct mbuf *n, *opts = NULL;
 	struct in6pcb *in6p = NULL;
-	struct sockaddr_in6 fromsa;
 
 	if (!so)
 		return;
@@ -613,8 +612,7 @@ udp6_sendup(m, off, src, so)
 			ip6_savecontrol(in6p, n, &opts);
 
 		m_adj(n, off);
-		if (sbappendaddr(&so->so_rcv, (struct sockaddr *)&fromsa,
-		    n, opts) == 0) {
+		if (sbappendaddr(&so->so_rcv, src, n, opts) == 0) {
 			m_freem(n);
 			if (opts)
 				m_freem(opts);
