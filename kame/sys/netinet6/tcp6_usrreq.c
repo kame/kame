@@ -335,6 +335,16 @@ tcp6_usrreq(so, req, m, nam, control)
 	 * After a receive, possibly send window update to peer.
 	 */
 	case PRU_RCVD:
+		/*
+		 * soreceive() calls this function when a user receives
+		 * ancillary data on a listening socket. We don't call
+		 * tcp6_output in such a case, since there is no header
+		 * template for a listening socket and hence the kernel
+		 * will panic.
+		 */
+		if ((t6p->t_in6pcb->in6p_socket->so_state &
+		     (SS_ISCONNECTED|SS_ISCONNECTING)) == 0)
+			break;
 		(void) tcp6_output(t6p);
 		break;
 
