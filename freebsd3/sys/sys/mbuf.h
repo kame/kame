@@ -114,6 +114,7 @@ struct	pkthdr {
 
 	/* variables for ip and tcp reassembly */
 	void	*header;		/* pointer to packet header */
+	void	*aux;			/* extra data buffer; ipsec/others */
 };
 
 /* description of external storage mapped into mbuf, valid if M_EXT set */

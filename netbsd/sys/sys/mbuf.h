@@ -120,6 +120,7 @@ struct m_hdr {
 struct	pkthdr {
 	struct	ifnet *rcvif;		/* rcv interface */
 	int	len;			/* total packet length */
+	void	*aux;			/* extra data buffer; ipsec/others */
 };
 
 /* description of external storage mapped into mbuf, valid if M_EXT set */
