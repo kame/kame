@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.16 2004/06/11 02:42:05 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.17 2004/06/11 02:43:30 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -519,10 +519,11 @@ keyinfo kame {
 .Ed
 .Pp
 To include an authentication option for DHCPv6 authentication,
+the
 .Ic interface
-statement should be modified and
+statement should be modified and an
 .Ic authentication
-should be added as follows:
+statement should be added as follows:
 .Bd -literal -offset
 interface ppp0 {
         send ia-pd 0;
