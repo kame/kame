@@ -29,7 +29,7 @@
 /*
  * My grandfather said that there's a devil inside tunnelling technology...
  *
- * We have surprisingly many protocol that want packets with IP protocol
+ * We have surprisingly many protocols that want packets with IP protocol
  * #4 or #41.  Here's a list of protocols that want protocol #41:
  *	RFC1933 configured tunnel
  *	RFC1933 automatic tunnel
