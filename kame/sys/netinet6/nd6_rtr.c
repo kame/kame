@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.29 2000/03/18 03:05:43 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.30 2000/03/21 11:37:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -668,10 +668,12 @@ defrouter_select()
 				 */
 				defrouter_addifreq(nd6_defifp);
 			}
+#ifdef ND6_DEBUG
 			else	/* noisy log? */
 				log(LOG_INFO, "defrouter_select: "
 				    "there's no default router and no default"
 				    " interface\n");
+#endif
 		}
 	}
 
