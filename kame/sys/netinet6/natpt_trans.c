@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.15 2000/04/25 07:52:55 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.16 2000/08/18 14:15:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -774,7 +774,7 @@ translatingTCPUDPv4To6(struct _cv *cv4, struct pAddr *pad, struct _cv *cv6)
     struct ip6_hdr	*ip6;
     struct tcp6hdr	*tcp6;
 
-    if (cv4->m->m_flags & M_EXT)
+    if (cv4->m->m_flags & M_EXT) /*XXX false assumption on m_ext.ext_siz*/
     {
 	if (cv4->plen + sizeof(struct ip6_hdr) > MHLEN)
 	{
