@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.112 2000/05/22 08:01:36 itojun Exp $	*/
+/*	$KAME: key.c,v 1.113 2000/05/23 13:19:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -120,9 +120,9 @@
  *   field hits 0 (= no external reference other than from SA header.
  */
 
-#if defined(IPSEC_DEBUG)
+#ifdef IPSEC_DEBUG
 u_int32_t key_debug_level = 0;
-#endif /* defined(IPSEC_DEBUG) */
+#endif
 static u_int key_spi_trycnt = 1000;
 static u_int32_t key_spi_minval = 0x100;
 static u_int32_t key_spi_maxval = 0x0fffffff;	/* XXX */
@@ -211,10 +211,10 @@ static const int maxsize[] = {
 SYSCTL_DECL(_net_key);
 #endif
 
-#if defined(IPSEC_DEBUG)
+#ifdef IPSEC_DEBUG
 SYSCTL_INT(_net_key, KEYCTL_DEBUG_LEVEL,	debug,	CTLFLAG_RW, \
 	&key_debug_level,	0,	"");
-#endif /* defined(IPSEC_DEBUG) */
+#endif
 
 /* max count of trial for the decision of spi value */
 SYSCTL_INT(_net_key, KEYCTL_SPI_TRY,		spi_trycnt,	CTLFLAG_RW, \

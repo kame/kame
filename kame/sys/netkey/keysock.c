@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.21 2000/05/18 07:34:22 sakane Exp $	*/
+/*	$KAME: keysock.c,v 1.22 2000/05/23 13:19:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -250,7 +250,7 @@ key_output(m, va_alist)
 
 #ifdef IPSEC_DEBUG
 	KEYDEBUG(KEYDEBUG_KEY_DUMP, kdebug_mbuf(m));
-#endif /* defined(IPSEC_DEBUG) */
+#endif
 
 	msg = mtod(m, struct sadb_msg *);
 	pfkeystat.out_msgtype[msg->sadb_msg_type]++;
