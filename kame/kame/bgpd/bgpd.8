@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: bgpd.8,v 1.4 1999/12/16 05:33:48 jinmei Exp $
+.\"     $Id: bgpd.8,v 1.5 2000/02/18 06:58:38 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt BGPD 8
@@ -38,6 +38,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl c Ar configfile
+.Op Fl C
 .Op Fl f
 .\"
 .Sh DESCRIPTION
@@ -59,6 +60,10 @@ for configuration file.
 By default,
 .Pa /usr/local/v6/etc/bgpd.conf
 is used.
+.It Fl C
+Just check the configuration and immediately exit. When
+.Nm
+is invoked with this option, super user privilege is not required.
 .It Fl f
 Do not become daemon, run in foreground.
 .El
@@ -105,9 +110,6 @@ command was first appeared in Toshiba IPv6 protocol stack kit.
 No authentication is supported.
 Therfore, OPEN message's optional parameter always consists of nothing.
 .Pp
-No transition of unrecognized optional transitive
-path-attributes is supported.
-.Pp
 Route filtering is supported only for RIPng routes.
 .Nm
 is not capable of filtering BGP routes.
@@ -120,8 +122,8 @@ So after invoking,
 can't handle new routes which are manually added or are added
 by some other routing daemons/commands.
 .Pp
-There are codes to handle OSPFv6 in the
+There is code to handle OSPFv6 in the
 .Nm
 source directory, but OSPFv6 support is just in progress.
 .Nm Bgpd
-is not able to distribute or get IPv6 routing information via OSPFv6.
+is not able to distribute nor get IPv6 routing information via OSPFv6.
