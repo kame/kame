@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.34 2004/02/03 07:25:23 itojun Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.35 2004/05/26 07:41:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -88,12 +88,12 @@
 
 #ifdef INET
 extern struct protosw inetsw[];
-#if defined(__bsdi__) || defined(__NetBSD__)
+#ifdef __NetBSD__
 extern u_char ip_protox[];
 #endif
 
 void
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 ipcomp4_input(m, off)
 	struct mbuf *m;
 	int off;
@@ -117,12 +117,12 @@ ipcomp4_input(m, va_alist)
 	int error;
 	size_t newlen, olen;
 	struct secasvar *sav = NULL;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 	int off, proto;
 	va_list ap;
-#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 	va_start(ap, m);
 	off = va_arg(ap, int);
 	proto = va_arg(ap, int);

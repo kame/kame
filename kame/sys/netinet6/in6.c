@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.370 2004/05/25 01:12:32 suz Exp $	*/
+/*	$KAME: in6.c,v 1.371 2004/05/26 07:41:30 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -209,12 +209,9 @@ const struct sockaddr_in6 sa6_any =
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 static int in6_lifaddr_ioctl(struct socket *, u_long, caddr_t,
 	struct ifnet *, struct thread *);
-#elif !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
-static int in6_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
-	struct ifnet *, struct proc *));
 #else
 static int in6_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
-	struct ifnet *));
+	struct ifnet *, struct proc *));
 #endif
 static int in6_ifinit __P((struct ifnet *, struct in6_ifaddr *,
 	struct sockaddr_in6 *, int));
@@ -447,19 +444,13 @@ in6_control(so, cmd, data, ifp, p)
 	caddr_t	data;
 	struct ifnet *ifp;
 	struct thread *p;
-#elif !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#else
 in6_control(so, cmd, data, ifp, p)
 	struct	socket *so;
 	u_long cmd;
 	caddr_t	data;
 	struct ifnet *ifp;
 	struct proc *p;
-#else
-in6_control(so, cmd, data, ifp)
-	struct	socket *so;
-	u_long cmd;
-	caddr_t	data;
-	struct ifnet *ifp;
 #endif
 {
 	struct	in6_ifreq *ifr = (struct in6_ifreq *)data;
@@ -1674,19 +1665,13 @@ in6_lifaddr_ioctl(so, cmd, data, ifp, p)
 	caddr_t	data;
 	struct ifnet *ifp;
 	struct thread *p;
-#elif !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#else
 in6_lifaddr_ioctl(so, cmd, data, ifp, p)
 	struct socket *so;
 	u_long cmd;
 	caddr_t	data;
 	struct ifnet *ifp;
 	struct proc *p;
-#else
-in6_lifaddr_ioctl(so, cmd, data, ifp)
-	struct socket *so;
-	u_long cmd;
-	caddr_t	data;
-	struct ifnet *ifp;
 #endif
 {
 	struct if_laddrreq *iflr = (struct if_laddrreq *)data;

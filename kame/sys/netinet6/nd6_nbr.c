@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.147 2004/03/12 12:07:22 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.148 2004/05/26 07:41:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1349,16 +1349,10 @@ nd6_dad_start(ifa, tick)
 	} else {
 		int ntick;
 
-#ifdef __bsdi__
-#define arc4random	random
-#endif
 		if (*tick == 0)
 			ntick = arc4random() % (MAX_RTR_SOLICITATION_DELAY * hz);
 		else
 			ntick = *tick + arc4random() % (hz / 2);
-#ifdef __bsdi__
-#undef arc4random
-#endif
 		*tick = ntick;
 		nd6_dad_starttimer(dp, ntick);
 	}

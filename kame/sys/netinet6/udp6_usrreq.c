@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.122 2004/04/10 08:10:33 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.123 2004/05/26 07:41:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -786,32 +786,6 @@ udp6_detach(in6p)
 	in6_pcbdetach(in6p);
 	splx(s);
 }
-
-#ifdef __bsdi__
-int *udp6_sysvars[] = UDP6CTL_VARS;
-
-int
-udp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
-	int	*name;
-	u_int	namelen;
-	void	*oldp;
-	size_t	*oldlenp;
-	void	*newp;
-	size_t	newlen;
-{
-	if (name[0] >= UDP6CTL_MAXID)
-		return (EOPNOTSUPP);
-	switch (name[0]) {
-	case UDP6CTL_STATS:
-		return sysctl_rdtrunc(oldp, oldlenp, newp, &udp6stat,
-		    sizeof(udp6stat));
-
-	default:
-		return (sysctl_int_arr(udp6_sysvars, name, namelen,
-		    oldp, oldlenp, newp, newlen));
-	}
-}
-#endif /* __bsdi__ */
 
 #ifdef __NetBSD__
 #include <sys/sysctl.h>

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.90 2004/04/22 09:40:59 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.91 2004/05/26 07:41:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -72,10 +72,10 @@
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_pcb.h>
-#elif defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#elif defined(__OpenBSD__)
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>
@@ -1045,10 +1045,7 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 			    ntohl(ndopt_pi->nd_opt_pi_valid_time),
 			    ntohl(ndopt_pi->nd_opt_pi_preferred_time));
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-			for (ifa = ((struct ifnet *)hif)->if_addrlist; ifa;
-			     ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 			TAILQ_FOREACH(ifa, &((struct ifnet *)hif)->if_addrlist,
 			    ifa_list)
 #else

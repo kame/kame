@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.34 2004/05/24 11:06:14 itojun Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.35 2004/05/26 07:41:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -375,12 +375,7 @@ iface_match(struct ifnet *ifp, union ip6_fw_if *ifu, int byname)
 	} else if (!IN6_IS_ADDR_UNSPECIFIED(&ifu->fu_via_ip6)) {	/* Zero == wildcard */
 		struct ifaddr *ia;
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for (ia = ifp->if_addrlist; ia; ia = ia->ifa_next)
-#else
-		for (ia = ifp->if_addrlist.tqh_first; ia; ia = ia->ifa_list.tqe_next)
-#endif
-		{
+		for (ia = ifp->if_addrlist.tqh_first; ia; ia = ia->ifa_list.tqe_next) {
 
 			if (ia->ifa_addr == NULL)
 				continue;

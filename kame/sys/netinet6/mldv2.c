@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.22 2004/05/25 02:17:34 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.23 2004/05/26 07:41:31 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -120,10 +120,6 @@
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/protosw.h>
-#ifdef __bsdi__
-#include <vm/vm.h>
-#include <sys/proc.h>
-#endif
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
 #ifdef __FreeBSD__

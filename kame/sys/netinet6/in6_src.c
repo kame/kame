@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.143 2004/02/25 08:54:31 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.144 2004/05/26 07:41:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,7 +106,7 @@
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
-#if !(defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
+#ifndef __OpenBSD__
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet6/ip6_var.h>
@@ -125,10 +125,8 @@
 
 #include <net/net_osdep.h>
 
-#if !defined(__bsdi__) && !defined(__OpenBSD__)
 #include "loop.h"
-#endif
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 extern struct ifnet loif[NLOOP];
 #endif
 
@@ -857,16 +855,12 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 			sa6->sin6_scope_id = 0;
 #endif
 			if (clone) {
-#ifdef __bsdi__
-				rtcalloc((struct route *)ro);
-#else  /* !bsdi */
 #ifdef RADIX_MPATH
 				rtalloc_mpath((struct route *)ro,
 				    ntohl(sa6->sin6_addr.s6_addr32[3]));
 #else
 				rtalloc((struct route *)ro);
 #endif /* RADIX_MPATH */
-#endif /* bsdi */
 			} else {
 #ifdef __FreeBSD__
 				ro->ro_rt = rtalloc1(&((struct route *)ro)

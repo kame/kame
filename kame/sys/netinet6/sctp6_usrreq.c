@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.31 2004/02/24 21:52:28 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.32 2004/05/26 07:41:32 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -77,7 +77,7 @@
 #include <netinet/sctp_asconf.h>
 #include <netinet6/ip6_var.h>
 #include <netinet/ip6.h>
-#if !defined(__OpenBSD__) && !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>

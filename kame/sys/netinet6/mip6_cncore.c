@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.64 2004/04/26 13:07:10 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.65 2004/05/26 07:41:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -86,10 +86,10 @@
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 #include <netinet/in_pcb.h>
 #endif
-#if !((defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
+#ifdef __NetBSD__
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.220 2004/04/20 17:10:49 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.221 2004/05/26 07:41:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -83,7 +83,7 @@
 #endif
 #include <netinet/in_pcb.h>
 #ifdef INET6
-#if !((defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
+#ifdef __NetBSD__
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
@@ -4119,165 +4119,6 @@ ipsec_clearhist(m)
 	mtag = ipsec_findaux(m);
 	ipsec_optaux(m, mtag);
 }
-
-#ifdef __bsdi__
-/*
- * System control for IP
- */
-u_char	ipsecctlerrmap[PRC_NCMDS] = {
-	0,		0,		0,		0,
-	0,		EMSGSIZE,	EHOSTDOWN,	EHOSTUNREACH,
-	EHOSTUNREACH,	EHOSTUNREACH,	ECONNREFUSED,	ECONNREFUSED,
-	EMSGSIZE,	EHOSTUNREACH,	0,		0,
-	0,		0,		0,		0,
-	ENOPROTOOPT
-};
-
-int *ipsec_sysvars[] = IPSECCTL_VARS;
-
-int
-ipsec_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
-	int	*name;
-	u_int	namelen;
-	void	*oldp;
-	size_t	*oldlenp;
-	void	*newp;
-	size_t	newlen;
-{
-	if (name[0] >= IPSECCTL_MAXID)
-		return (EOPNOTSUPP);
-
-	/* common sanity checks */
-	switch (name[0]) {
-	case IPSECCTL_DEF_ESP_TRANSLEV:
-	case IPSECCTL_DEF_ESP_NETLEV:
-	case IPSECCTL_DEF_AH_TRANSLEV:
-	case IPSECCTL_DEF_AH_NETLEV:
-		if (newp != NULL && newlen == sizeof(int)) {
-			switch (*(int *)newp) {
-			case IPSEC_LEVEL_USE:
-			case IPSEC_LEVEL_REQUIRE:
-				break;
-			default:
-				return EINVAL;
-			}
-		}
-		break;
-	case IPSECCTL_DEF_POLICY:
-		if (newp != NULL && newlen == sizeof(int)) {
-			switch (*(int *)newp) {
-			case IPSEC_POLICY_DISCARD:
-			case IPSEC_POLICY_NONE:
-				break;
-			default:
-				return EINVAL;
-			}
-			ipsec_invalpcbcacheall();
-		}
-		break;
-	}
-
-	switch (name[0]) {
-	case IPSECCTL_STATS:
-		return sysctl_rdtrunc(oldp, oldlenp, newp, &ipsecstat,
-		    sizeof(ipsecstat));
-	case IPSECCTL_DEF_POLICY:
-		return sysctl_int(oldp, oldlenp, newp, newlen,
-		    &ip4_def_policy->policy);
-	case IPSECCTL_DEF_ESP_TRANSLEV:
-	case IPSECCTL_DEF_ESP_NETLEV:
-	case IPSECCTL_DEF_AH_TRANSLEV:
-	case IPSECCTL_DEF_AH_NETLEV:
-		if (newp != NULL)
-			ipsec_invalpcbcacheall();
-		return (sysctl_int_arr(ipsec_sysvars, name, namelen,
-		    oldp, oldlenp, newp, newlen));
-	default:
-		return (sysctl_int_arr(ipsec_sysvars, name, namelen,
-		    oldp, oldlenp, newp, newlen));
-	}
-}
-
-#ifdef INET6
-/*
- * System control for IP6
- */
-u_char	ipsec6ctlerrmap[PRC_NCMDS] = {
-	0,		0,		0,		0,
-	0,		EMSGSIZE,	EHOSTDOWN,	EHOSTUNREACH,
-	EHOSTUNREACH,	EHOSTUNREACH,	ECONNREFUSED,	ECONNREFUSED,
-	EMSGSIZE,	EHOSTUNREACH,	0,		0,
-	0,		0,		0,		0,
-	ENOPROTOOPT
-};
-
-int *ipsec6_sysvars[] = IPSEC6CTL_VARS;
-
-int
-ipsec6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
-	int	*name;
-	u_int	namelen;
-	void	*oldp;
-	size_t	*oldlenp;
-	void	*newp;
-	size_t	newlen;
-{
-
-	if (name[0] >= IPSECCTL_MAXID)	/* xxx no 6 in this definition */
-		return (EOPNOTSUPP);
-
-	/* common sanity checks */
-	switch (name[0]) {
-	case IPSECCTL_DEF_ESP_TRANSLEV:
-	case IPSECCTL_DEF_ESP_NETLEV:
-	case IPSECCTL_DEF_AH_TRANSLEV:
-	case IPSECCTL_DEF_AH_NETLEV:
-		if (newp != NULL && newlen == sizeof(int)) {
-			switch (*(int *)newp) {
-			case IPSEC_LEVEL_USE:
-			case IPSEC_LEVEL_REQUIRE:
-				break;
-			default:
-				return EINVAL;
-			}
-		}
-		break;
-	case IPSECCTL_DEF_POLICY:
-		if (newp != NULL && newlen == sizeof(int)) {
-			switch (*(int *)newp) {
-			case IPSEC_POLICY_DISCARD:
-			case IPSEC_POLICY_NONE:
-				break;
-			default:
-				return EINVAL;
-			}
-			ipsec_invalpcbcacheall();
-		}
-		break;
-	}
-
-	switch (name[0]) {
-	case IPSECCTL_STATS:	/* xxx no 6 in this definition */
-		return sysctl_rdtrunc(oldp, oldlenp, newp, &ipsec6stat,
-		    sizeof(ipsec6stat));
-	case IPSECCTL_DEF_POLICY:
-		return sysctl_int(oldp, oldlenp, newp, newlen,
-		    &ip6_def_policy->policy);
-	case IPSECCTL_DEF_ESP_TRANSLEV:
-	case IPSECCTL_DEF_ESP_NETLEV:
-	case IPSECCTL_DEF_AH_TRANSLEV:
-	case IPSECCTL_DEF_AH_NETLEV:
-		if (newp != NULL)
-			ipsec_invalpcbcacheall();
-		return (sysctl_int_arr(ipsec6_sysvars, name, namelen,
-		    oldp, oldlenp, newp, newlen));
-	default:
-		return (sysctl_int_arr(ipsec6_sysvars, name, namelen,
-		    oldp, oldlenp, newp, newlen));
-	}
-}
-#endif /* INET6 */
-#endif /* __bsdi__ */
 
 #ifdef __NetBSD__
 /*

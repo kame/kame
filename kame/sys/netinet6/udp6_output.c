@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.79 2004/05/25 02:03:07 suz Exp $	*/
+/*	$KAME: udp6_output.c,v 1.80 2004/05/26 07:41:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,7 +101,7 @@
 #include <netinet/udp_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
-#if !(defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
+#ifndef __OpenBSD__
 #include <netinet6/in6_pcb.h>
 #include <netinet6/udp6_var.h>
 #endif

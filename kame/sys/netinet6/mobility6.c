@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.33 2004/02/24 21:43:46 t-momose Exp $	*/
+/*	$KAME: mobility6.c,v 1.34 2004/05/26 07:41:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -58,15 +58,15 @@
 #include <netinet/in_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__) && !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#ifdef __NetBSD__
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_pcb.h>
-#elif defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#elif defined(__OpenBSD__)
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>

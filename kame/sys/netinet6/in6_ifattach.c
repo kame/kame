@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.195 2004/05/21 07:44:21 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.196 2004/05/26 07:41:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -951,7 +951,6 @@ in6_ifattach(ifp, altifp)
  * We don't need this function in bsdi, because interfaces are never removed
  * from the ifnet list in bsdi.
  */
-#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 void
 in6_ifdetach(ifp)
 	struct ifnet *ifp;
@@ -1095,7 +1094,6 @@ in6_ifdetach(ifp)
 		mip6_process_movement();
 #endif /* MIP6 && MIP6_MOBILE_NODE */
 }
-#endif
 
 int
 in6_get_tmpifid(ifp, retbuf, baseid, generate)

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.126 2004/05/20 08:15:55 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.127 2004/05/26 07:41:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -178,7 +178,7 @@ struct mrt6stat	mrt6stat;
 
 struct mf6c	*mf6ctable[MF6CTBLSIZ];
 u_char		n6expire[MF6CTBLSIZ];
-#if (defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
+#ifdef __OpenBSD__
 struct mif6 mif6table[MAXMIFS];
 #else
 static struct mif6 mif6table[MAXMIFS];

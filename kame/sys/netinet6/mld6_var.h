@@ -1,4 +1,4 @@
-/*	$KAME: mld6_var.h,v 1.11 2004/03/24 09:03:29 suz Exp $	*/
+/*	$KAME: mld6_var.h,v 1.12 2004/05/26 07:41:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -34,11 +34,7 @@
 
 #ifdef _KERNEL
 
-#ifdef __bsdi__
-#define MLD_RANDOM_DELAY(X) (random() % (X) + 1)
-#else
 #define MLD_RANDOM_DELAY(X) (arc4random() % (X) + 1)
-#endif
 
 /*
  * States for MLD stop-listening processing
