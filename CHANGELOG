@@ -1,8 +1,21 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.900 2000/05/18 14:22:09 jinmei Exp $
+$Id: CHANGELOG,v 1.901 2000/05/18 15:21:59 jinmei Exp $
 
 <200005>
+2000-05-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/scope6.c (scope6_addr2default): was added to
+	get the default scope zone for a specified address.
+
+2000-05-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {bsdi4, openbsd}/sys/netinet6/raw_ipv6.c: 
+	* kame/sys/netinet6/udp6_output.c (udp6_output): 
+	* {bsdi4, openbsd}/sys/netinet6/in6_pcb.c (in6_pcbconnect,
+	  in6_pcbbind):
+	filled default scope zone in sin6_scope_id if unspecified.
+        Currently, these are enabled only with the ENABLE_DEFAULT_SCOPE
+	kernel compilation option.
+
 2000-05-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_forward.c (ip6_forward): zero-cleared
 	embedded link zone IDs in forwarded packets. We forgot this, since
