@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.298 2003/07/22 11:00:11 itojun Exp $	*/
+/*	$KAME: key.c,v 1.299 2003/07/25 08:48:05 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2323,8 +2323,10 @@ key_spdacquire(sp)
 	struct secpolicy *sp;
 {
 	struct mbuf *result = NULL, *m;
+#ifndef IPSEC_NONBLOCK_ACQUIRE
 	struct secspacq *newspacq;
-	int error;
+#endif
+	int error = -1;
 
 	/* sanity check */
 	if (sp == NULL)
@@ -2338,6 +2340,7 @@ key_spdacquire(sp)
 		goto fail;
 	}
 
+#ifndef IPSEC_NONBLOCK_ACQUIRE
 	/* get an entry to check whether sent message or not. */
 	if ((newspacq = key_getspacq(sp->spidx)) != NULL) {
 		if (key_blockacq_count < newspacq->count) {
@@ -2356,6 +2359,7 @@ key_spdacquire(sp)
 		/* add to acqtree */
 		LIST_INSERT_HEAD(&spacqtree, newspacq, chain);
 	}
+#endif
 
 	/* create new sadb_msg to reply. */
 	m = key_setsadbmsg(SADB_X_SPDACQUIRE, 0, 0, 0, 0, 0);
@@ -2365,6 +2369,16 @@ key_spdacquire(sp)
 	}
 	result = m;
 
+	/* set sadb_x_policy */
+	if (sp) {
+		m = key_setsadbxpolicy(sp->policy, sp->dir, sp->id);
+		if (!m) {
+			error = ENOBUFS;
+			goto fail;
+		}
+		m_cat(result, m);
+	}
+
 	result->m_pkthdr.len = 0;
 	for (m = result; m; m = m->m_next)
 		result->m_pkthdr.len += m->m_len;
@@ -2372,7 +2386,7 @@ key_spdacquire(sp)
 	mtod(result, struct sadb_msg *)->sadb_msg_len =
 	    PFKEY_UNIT64(result->m_pkthdr.len);
 
-	return key_sendup_mbuf(NULL, m, KEY_SENDUP_REGISTERED);
+	return key_sendup_mbuf(NULL, result, KEY_SENDUP_REGISTERED);
 
 fail:
 	if (result)
