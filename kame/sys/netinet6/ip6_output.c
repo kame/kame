@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.200 2001/07/23 07:32:06 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.201 2001/07/23 07:45:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -506,7 +506,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 
 		/*
 		 * we treat dest2 specially.  this makes IPsec processing
-		 * much easier.
+		 * much easier.  the goal here is to make mprev point the
+		 * mbuf prior to dest2.
 		 *
 		 * result: IPv6 dest2 payload
 		 * m and mprev will point to IPv6 header.
