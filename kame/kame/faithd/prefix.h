@@ -1,4 +1,4 @@
-/*	$KAME: prefix.h,v 1.2 2000/11/19 10:15:09 itojun Exp $	*/
+/*	$KAME: prefix.h,v 1.3 2000/11/19 11:45:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -47,5 +47,5 @@ struct config {
 
 extern const char *prefix_string __P((const struct prefix *));
 extern int prefix_match __P((const struct prefix *, const struct sockaddr *));
-extern int config_load __P((void));
+extern int config_load __P((const char *));
 extern const struct config *config_match __P((struct sockaddr *, struct sockaddr *));

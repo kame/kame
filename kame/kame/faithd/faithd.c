@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.33 2000/11/19 09:57:13 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.34 2000/11/19 11:45:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -103,6 +103,7 @@ static int sockfd = 0;
 int dflag = 0;
 static int pflag = 0;
 static int inetd = 0;
+static char *configfile = NULL;
 
 int main __P((int, char **));
 static int inetd_main __P((int, char **));
@@ -141,8 +142,6 @@ main(int argc, char **argv)
 	else
 		faithdname = argv[0];
 
-	config_load();
-
 	if (strcmp(faithdname, "faithd") != 0) {
 		inetd = 1;
 		return inetd_main(argc, argv);
@@ -161,6 +160,11 @@ inetd_main(int argc, char **argv)
 	int error;
 	const int on = 1;
 	char sbuf[NI_MAXSERV], snum[NI_MAXSERV];
+
+	if (config_load(configfile) < 0 && configfile) {
+		exit_failure("could not load config file");
+		/*NOTREACHED*/
+	}
 
 	if (strrchr(argv[0], '/') == NULL)
 		snprintf(path, sizeof(path), "%s/%s", DEFAULT_DIR, argv[0]);
@@ -232,10 +236,13 @@ daemon_main(int argc, char **argv)
 	char *ns;
 #endif /* FAITH_NS */
 
-	while ((c = getopt(argc, argv, "dp46")) != -1) {
+	while ((c = getopt(argc, argv, "df:p46")) != -1) {
 		switch (c) {
 		case 'd':
 			dflag++;
+			break;
+		case 'f':
+			configfile = optarg;
 			break;
 		case 'p':
 			pflag++;
@@ -255,6 +262,11 @@ daemon_main(int argc, char **argv)
 	}
 	argc -= optind;
 	argv += optind;
+
+	if (config_load(configfile) < 0 && configfile) {
+		exit_failure("could not load config file");
+		/*NOTREACHED*/
+	}
 
 #ifdef FAITH_NS
 	if ((ns = getenv(FAITH_NS)) != NULL) {
@@ -1029,7 +1041,7 @@ update_myaddrs()
 static void
 usage()
 {
-	fprintf(stderr, "usage: %s [-dp] service [serverpath [serverargs]]\n",
+	fprintf(stderr, "usage: %s [-dp] [-f conf] service [serverpath [serverargs]]\n",
 		faithdname);
 	exit(0);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: prefix.c,v 1.4 2000/11/19 10:15:09 itojun Exp $	*/
+/*	$KAME: prefix.c,v 1.5 2000/11/19 11:45:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -271,7 +271,8 @@ fail:
 }
 
 int
-config_load()
+config_load(configfile)
+	const char *configfile;
 {
 	FILE *fp;
 	char buf[BUFSIZ];
@@ -280,13 +281,11 @@ config_load()
 
 	config_list = NULL;
 
+	if (!configfile)
+		configfile = _PATH_PREFIX_CONF;
 	fp = fopen(configfile, "r");
-	if (fp == NULL) {
-		if (strcmp(configfile, _PATH_PREFIX_CONF) == 0)
-			return 0;
-		else
-			return -1;
-	}
+	if (fp == NULL)
+		return -1;
 
 	p = &sentinel;
 	while (fgets(buf, sizeof(buf), fp) != NULL) {

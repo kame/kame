@@ -1,4 +1,4 @@
-.\"	$KAME: faithd.8,v 1.16 2000/11/19 09:55:29 itojun Exp $
+.\"	$KAME: faithd.8,v 1.17 2000/11/19 11:45:38 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -36,6 +36,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl dp
+.Op Fl f Ar configfile
 .Ar service
 .Op Ar serverpath Op Ar serverargs
 .Nm ""
@@ -215,7 +216,13 @@ To prevent malicious accesses,
 .Nm
 implements a simple address-based access control.
 With
-.Pa /usr/local/v6/etc/faithd.conf ,
+.Pa /usr/local/v6/etc/faithd.conf
+.Po
+or
+.Ar configfile
+specified by
+.Fl f
+.Pc ,
 .Nm
 will avoid relaying unwanted traffic.
 The
