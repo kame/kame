@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: setkey.c,v 1.6 1999/11/04 00:34:18 sakane Exp $ */
+/* KAME $Id: setkey.c,v 1.7 1999/11/16 11:19:58 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -93,7 +93,7 @@ Usage()
 	printf("\t%s [-Pdv] -F\n", pname);
 	printf("\t%s [-h] -x\n", pname);
 	pfkey_close(so);
-	exit(0);
+	exit(1);
 }
 
 int
@@ -102,7 +102,7 @@ main(ac, av)
 	char **av;
 {
 	FILE *fp = stdin;
-	int c;
+	int c, error;
 
 	pname = *av;
 
@@ -168,7 +168,8 @@ main(ac, av)
 			errx(-1, "%s", ipsec_strerror());
 			/*NOTREACHED*/
 		}
-		parse(&fp);
+		if (parse(&fp))
+			exit (1);
 		break;
 	default:
 		Usage();
