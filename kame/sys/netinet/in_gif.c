@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.29 2000/04/14 08:36:02 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.30 2000/04/14 08:42:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -387,7 +387,7 @@ gif_encapcheck4(m, off, proto, arg)
 	/* martian filters on outer address - NOT done in ip_input! */
 	if (IN_CLASSD(&ip.ip_src.s_addr))
 		return 0;
-	switch (ntohl(&ip.ip_src.s_addr) & 0xff000000) {
+	switch ((ntohl(&ip.ip_src.s_addr) & 0xff000000) >> 24) {
 	case 0: case 127: case 255:
 		return 0;
 	}
