@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.154 2002/06/14 14:46:22 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.155 2002/06/16 15:32:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -303,8 +303,7 @@ ipsec_checkpcbcache(m, pcbsp, dir)
 		if (ipsec_setspidx(m, &spidx, 1) != 0)
 			return NULL;
 		if (bcmp(&pcbsp->cacheidx[dir], &spidx, sizeof(spidx))) {
-			if (pcbsp->cache[dir]->policy == IPSEC_POLICY_IPSEC &&
-			    pcbsp->cache[dir]->spidx &&
+			if (pcbsp->cache[dir]->spidx &&
 			    !key_cmpspidx_withmask(pcbsp->cache[dir]->spidx,
 			    &spidx))
 				return NULL;
