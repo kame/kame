@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.865 2000/05/11 10:33:48 sakane Exp $
+$Id: CHANGELOG,v 1.866 2000/05/12 18:31:14 jinmei Exp $
 
 <200005>
+2000-05-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: supported the latest draft (dhcpv6-15).
+	Note that this version is not compatible with the previous one,
+	and thus you should update whole your DHCPv6 system including
+	clients, relays and servers.
+
 Thu May 11 19:28:22 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	- fix to get lifetime/lifebyte from doi attribute.
