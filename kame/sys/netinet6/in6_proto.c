@@ -547,6 +547,7 @@ sysctl_ip6_forwarding SYSCTL_HANDLER_ARGS
 {
 	int error = 0;
 	int old_ip6_forwarding;
+	int changed;
 
 	error = SYSCTL_OUT(req, arg1, sizeof(int));
 	if (error || !req->newptr)
@@ -555,21 +556,21 @@ sysctl_ip6_forwarding SYSCTL_HANDLER_ARGS
 	error = SYSCTL_IN(req, arg1, sizeof(int));
 	if (error != 0)
 		return (error);
-	if (ip6_forwarding != 0) {
-		if (old_ip6_forwarding == 0) {
-			int s = splnet();
-			struct nd_prefix *pr, *next;
+	changed = (ip6_forwarding ? 1 : 0) ^ (old_ip6_forwarding ? 1 : 0);
+	if (changed == 0)
+		return (error);
+	if (ip6_forwarding != 0) {	/* host becomes router */
+		int s = splnet();
+		struct nd_prefix *pr, *next;
 
-			for (pr = nd_prefix.lh_first; pr; pr = next) {
-				next = pr->ndpr_next;
-				if (!IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
-					in6_ifdel(pr->ndpr_ifp,
-						  &pr->ndpr_addr);
-				prelist_remove(pr);
-			}
-			splx(s);
+		for (pr = nd_prefix.lh_first; pr; pr = next) {
+			next = pr->ndpr_next;
+			if (!IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
+				in6_ifdel(pr->ndpr_ifp, &pr->ndpr_addr);
+			prelist_remove(pr);
 		}
-	} else /* ip6_forwarding == 0 */ if (old_ip6_forwarding != 0) {
+		splx(s);
+	} else {			/* router becomes host */
 		struct socket so;
 
 		/* XXX: init dummy so */
