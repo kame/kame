@@ -1,6 +1,12 @@
-$Id: CHANGELOG,v 1.497 2000/01/29 07:23:01 itojun Exp $
+$Id: CHANGELOG,v 1.498 2000/01/30 06:31:39 itojun Exp $
 
 <200001>
+Sun Jan 30 15:30:14 JST 2000  itojun@iijlab.net
+	* kame/libinet6/rcmd.c: fix behavior on non-IPv6 node.  From shin.
+	* kame/libinet6/getaddrinfo: fix AI_ADDRCONFIG concern when
+	  getipnodebyname() is used as backend.
+	* netbsd/pkgsrc/net/echoping: echoping 2.2.0 with IPv6 support.
+
 Sat Jan 29 16:20:31 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet6/ipsec.c (and other ipsec items):
 	  cleanup include file dependencies and namespace polution, like
