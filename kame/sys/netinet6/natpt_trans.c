@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.67 2001/12/11 11:34:10 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.68 2001/12/12 10:35:19 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -550,8 +550,8 @@ natpt_icmp6MimicPayload(struct pcv *cv6, struct pcv *cv4, struct pAddr *pad)
 	case ICMP6_TIME_EXCEEDED:
 		udp4 = (struct udphdr *)icmpip4pyld;
 		if ((pad->port[1] != 0) || (pad->port[0] != 0)) {
-			udp4->uh_sport = pad->port[1];
-			udp4->uh_dport = pad->port[0];
+			udp4->uh_sport = pad->port[0];
+			udp4->uh_dport = pad->port[1];
 		}
 		break;
 	}
