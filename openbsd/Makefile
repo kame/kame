@@ -30,7 +30,6 @@ afterinstall:
 	cp kame/racoon/samples/racoon.conf.sample $(PREFIX)/etc/
 	cp kame/ip6addrctl/ip6addrctl.conf.sample $(PREFIX)/etc/
 	cp kame/racoon/samples/psk.txt.sample $(PREFIX)/etc/
-	cp kame/vrrp6d/vrrp6d.conf.sample $(PREFIX)/etc/
 	if test -x $(PREFIX)/sbin/inet6d; then \
 		cp kame/inet6d/inet6d.conf $(PREFIX)/etc/inet6d.conf.sample; \
 	fi
