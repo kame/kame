@@ -247,7 +247,7 @@ struct ip6protosw inet6sw[] = {
 },
 #endif /*TCP6*/
 { SOCK_RAW,	&inet6domain,	IPPROTO_RAW,	PR_ATOMIC | PR_ADDR,
-#if defined(HAVE_NRL_INPCB) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
   rip6_input,	rip6_output,	0,		rip6_ctloutput,
 #else
   rip6_input,	rip6_output,	rip6_ctlinput,	rip6_ctloutput,
