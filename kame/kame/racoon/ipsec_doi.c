@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.110 2000/09/21 15:12:43 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.111 2000/09/22 08:59:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.110 2000/09/21 15:12:43 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.111 2000/09/22 08:59:33 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2772,6 +2772,26 @@ ipsecdoi_setph2proposal(iph2)
 	}
 
 	return 0;
+}
+
+/*
+ * return 1 if all of the proposed protocols are transport mode.
+ */
+int
+ipsecdoi_transportmode(iph2)
+	struct ph2handle *iph2;
+{
+	struct saprop *pp;
+	struct saproto *pr = NULL;
+
+	for (pp = iph2->proposal; pp; pp = pp->next) {
+		for (pr = pp->head; pr; pr = pr->next) {
+			if (pr->encmode != IPSECDOI_ATTR_ENC_MODE_TRNS)
+				return 0;
+		}
+	}
+
+	return 1;
 }
 
 int

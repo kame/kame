@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.h,v 1.25 2000/09/21 20:00:06 itojun Exp $	*/
+/*	$KAME: ipsec_doi.h,v 1.26 2000/09/22 08:59:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.25 2000/09/21 20:00:06 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.26 2000/09/22 08:59:33 itojun Exp $ */
 
 /* refered to RFC2407 */
 
@@ -185,6 +185,7 @@ extern const char *ipsecdoi_id2str __P((const vchar_t *));
 
 extern vchar_t *ipsecdoi_setph1proposal __P((struct isakmpsa *));
 extern int ipsecdoi_setph2proposal __P((struct ph2handle *));
+extern int ipsecdoi_transportmode __P((struct ph2handle *));
 extern int ipsecdoi_get_defaultlifetime __P((void));
 extern int ipsecdoi_checkalgtypes __P((int, int, int, int));
 extern int ipproto2doi __P((int));
