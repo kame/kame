@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.227 2001/10/29 12:25:41 k-sugyou Exp $	*/
+/*	$KAME: ip6_input.c,v 1.228 2001/10/30 05:40:33 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -240,10 +240,10 @@ static struct mbuf *ip6_pullexthdr __P((struct mbuf *, size_t, int));
 #endif
 
 #ifdef NATPT
-extern	int		ip6_protocol_tr;
+extern int ip6_protocol_tr;
 
-int	natpt_in6	__P((struct mbuf *, struct mbuf **));
-extern void ip_forward	__P((struct mbuf *, int));
+int natpt_in6 __P((struct mbuf *, struct mbuf **));
+extern void ip_forward __P((struct mbuf *, int));
 #endif
 
 
@@ -995,29 +995,32 @@ ip6_input(m)
 	/*
 	 * NAT-PT (Network Address Translation - Protocol Translation)
 	 */
-	if (ip6_protocol_tr)
-	{
-	    struct mbuf *m1 = NULL;
+	if (ip6_protocol_tr) {
+		struct mbuf *m1 = NULL;
 
-	    switch (natpt_in6(m, &m1))
-	    {
-	      case IPPROTO_IP:					goto processpacket;
-	      case IPPROTO_IPV4:	ip_forward(m1, 0);	break;
-	      case IPPROTO_IPV6:	ip6_forward(m1, 0);	break;
-	      case IPPROTO_MAX:			/* discard this packet	*/
-	      default:						break;
+		switch (natpt_in6(m, &m1)) {
+		case IPPROTO_IP:
+			goto processpacket;
+		case IPPROTO_IPV4:
+			ip_forward(m1, 0);
+			break;
+		case IPPROTO_IPV6:
+			ip6_forward(m1, 0);
+			break;
+		case IPPROTO_MAX:		/* discard this packet	*/
+		default:
+			break;
+		case IPPROTO_DONE:		/* discard without free	*/
+			return;
+		}
 
-	      case IPPROTO_DONE:		/* discard without free	*/
+		if (m != m1)
+			m_freem(m);
+
 		return;
-	    }
-
-	    if (m != m1)
-		m_freem(m);
-
-	    return;
 	}
 
-  processpacket:
+ processpacket:
 #endif
 
 #if 0
