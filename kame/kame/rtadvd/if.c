@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.25 2003/01/08 10:30:54 suz Exp $	*/
+/*	$KAME: if.c,v 1.26 2003/02/24 09:51:14 ono Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -211,7 +211,7 @@ if_getifaflag(char *name, struct in6_addr *addr)
 	ifr.ifr_addr.sin6_family = AF_INET6;
 	ifr.ifr_addr.sin6_addr = *addr;
 	if (ioctl(s, SIOCGIFAFLAG_IN6, (caddr_t)&ifr) < 0) {
-		syslog(LOG_ERR, "<%s> ioctl:SIOCGIFALAG_IN6: failed for %s",
+		syslog(LOG_ERR, "<%s> ioctl:SIOCGIFAFLAG_IN6: failed for %s",
 		       __func__, ifr.ifr_name);
 		close(s);
 		return (0);
