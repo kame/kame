@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.25 2000/05/17 09:05:36 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.26 2000/05/29 03:00:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.25 2000/05/17 09:05:36 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.26 2000/05/29 03:00:05 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -180,7 +180,7 @@ int	hflag = 0;	/* don't split horizon */
 int	lflag = 0;	/* exchange site local routes */
 int	sflag = 0;	/* announce static routes w/ split horizon */
 int	Sflag = 0;	/* announce static routes to every interface */
-int	routetag = 0;	/* route tag attached on originating case */
+unsigned long routetag = 0;	/* route tag attached on originating case */
 
 char	*filter[MAXFILTER];
 int	filtertype[MAXFILTER];
@@ -275,6 +275,7 @@ main(argc, argv)
 	sigset_t mask, omask;
 	FILE	*pidfile;
 	char *progname;
+	char *ep;
 
 	progname = strrchr(*argv, '/');
 	if (progname)
@@ -290,21 +291,26 @@ main(argc, argv)
 		case 'O':
 		case 'T':
 		case 'L':
-			if (nfilter >= MAXFILTER)
+			if (nfilter >= MAXFILTER) {
 				fatal("Exceeds MAXFILTER");
+				/*NOTREACHED*/
+			}
 			filtertype[nfilter] = ch;
 			filter[nfilter++] = allocopy(optarg);
 			break;
 		case 't':
-			sscanf(optarg, "%i", &routetag);
-			if (routetag & ~0xffff) {
+			ep = NULL;
+			routetag = strtoul(optarg, &ep, 0);
+			if (!ep || *ep != '\0' || (routetag & ~0xffff) != 0) {
 				fatal("invalid route tag");
 				/*NOTREACHED*/
 			}
 			break;
 		case 'R':
-			if ((rtlog = fopen(optarg, "w")) == NULL)
+			if ((rtlog = fopen(optarg, "w")) == NULL) {
 				fatal("Can not write to routelog");
+				/*NOTREACHED*/
+			}
 			break;
 #define	FLAG(c, flag, n)	case c: flag = n; break
 		FLAG('a', aflag, 1);
@@ -319,6 +325,7 @@ main(argc, argv)
 #undef	FLAG
 		default:
 			fatal("Invalid option specified, terminating");
+			/*NOTREACHED*/
 		}
 	}
 	argc -= optind;
