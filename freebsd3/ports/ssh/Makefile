@@ -3,7 +3,7 @@
 # Date created:		30 Jul 1995
 # Whom:			torstenb@FreeBSD.org
 #
-# $Id: Makefile,v 1.2 1999/12/28 04:24:01 sumikawa Exp $
+# $Id: Makefile,v 1.3 2000/02/08 11:40:55 sumikawa Exp $
 # $FreeBSD: ports/security/ssh/Makefile,v 1.85 1999/11/25 21:26:03 cpiazza Exp $
 #
 # Maximal ssh package requires YES values for
@@ -11,7 +11,6 @@
 #
 
 DISTNAME=	ssh-1.2.27
-PKGNAME=	ssh6-1.2.27
 CATEGORIES=	security net
 MASTER_SITES=	ftp://ftp.cs.hut.fi/pub/ssh/
 
