@@ -1,18 +1,18 @@
 Installation procedure - preparation of the tree
 KAME project
-$Id: INSTALL,v 1.9 1999/10/15 11:55:36 itojun Exp $
+$Id: INSTALL,v 1.10 1999/11/08 13:29:13 kazu Exp $
 
 
-KAME build tree shares part of the tree among operating system
+KAME build tree shares parts of the tree among operating system
 platforms.  The "kame" directory is shared among "netbsd", "freebsd2",
 and other platforms.  You'll first need to make a complete tree from
-distributed tree.
+the distributed tree.
 
-NOTE: On some platforms it is possible to perform "make obj" before the
-build.  However, it is not recommended as it will cause trouble with
-anoncvs operation.  For example, "make update" target in the top-level
-Makefile will become unusable.  Do not perform "make obj" unless you are
-ready to tackle those troubles.
+NOTE: On some platforms it is possible to perform "make obj" before
+the build.  However, it is not recommended since it will cause
+troubles with anoncvs operation.  For example, "make update" target in
+the top-level Makefile will become unusable.  Do not perform "make
+obj" unless you are ready to tackle those troubles.
 
 
 0. If you have installed KAME kit in the past, you may need to remove
