@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.582 2000/02/21 06:27:03 itojun Exp $
+$Id: CHANGELOG,v 1.583 2000/02/21 06:36:24 jinmei Exp $
 
 <200002>
+2000-02-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/net/zlib.[ch]: were (blindly) copied from
+	bsdi3/sys/net/. The kernel will be able to be built with the IPSEC
+	option with these files, but we've not fully tested the KAME IPsec
+	stuff on bsdi4. Please do not try it for now.
+
+2000-02-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/conf/files: removed ptr_xxx functions, which have been
+	obsoleted.
+
 Mon Feb 21 13:42:28 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* {freebsd3/ports,netbsd/pkgsrc/security}/heimdal: upgrade to 0.2p.
 
