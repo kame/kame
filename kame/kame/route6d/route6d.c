@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.61 2001/03/12 04:54:42 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.62 2001/04/06 04:01:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.61 2001/03/12 04:54:42 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.62 2001/04/06 04:01:41 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -1506,7 +1506,8 @@ ifconfig1(name, sa, ifcp, s)
 		ifcp->ifc_metric = ifr.ifr_metric;
 		trace(1, "\tindex: %d, mtu: %d, metric: %d\n",
 			ifcp->ifc_index, ifcp->ifc_mtu, ifcp->ifc_metric);
-	}
+	} else
+		ifcp->ifc_cflags |= IFC_CHANGED;
 }
 
 /*
@@ -1525,6 +1526,7 @@ rtrecv()
 	struct ifc *ifcp, *ic;
 	int iface = 0, rtable = 0;
 	struct sockaddr_in6 *rta[RTAX_MAX];
+	struct sockaddr_in6 mask;
 	int i, addrs;
 	struct riprt *rrt;
 
@@ -1659,12 +1661,23 @@ rtrecv()
 			fatal("rtrecv: never reach here");
 			/*NOTREACHED*/
 		case RTM_DELETE:
-			if (!rta[RTAX_DST] || !rta[RTAX_GATEWAY]
-			 || !rta[RTAX_NETMASK]) {
-				trace(1, "\tsome of dst/gw/netamsk are unavailable, ignored\n");
+			if (!rta[RTAX_DST] || !rta[RTAX_GATEWAY]) {
+				trace(1, "\tsome of dst/gw/netamsk are "
+				    "unavailable, ignored\n");
 				break;
 			}
-			if (rt_del(rta[RTAX_DST], rta[RTAX_GATEWAY], rta[RTAX_NETMASK]) == 0) {
+			if ((rtm->rtm_flags & RTF_HOST) != 0) {
+				mask.sin6_len = sizeof(mask);
+				memset(&mask.sin6_addr, 0xff,
+				    sizeof(mask.sin6_addr));
+				rta[RTAX_NETMASK] = &mask;
+			} else if (!rta[RTAX_NETMASK]) {
+				trace(1, "\tsome of dst/gw/netamsk are "
+				    "unavailable, ignored\n");
+				break;
+			}
+			if (rt_del(rta[RTAX_DST], rta[RTAX_GATEWAY],
+			    rta[RTAX_NETMASK]) == 0) {
 				rtable++;	/*just to be sure*/
 			}
 			break;
@@ -1686,8 +1699,8 @@ rtrecv()
 					ifam->ifam_index);
 				break;
 			}
-			rt_deladdr(ifcp, rta[RTAX_IFA], rta[RTAX_NETMASK]);
-			iface++;
+			if (!rt_deladdr(ifcp, rta[RTAX_IFA], rta[RTAX_NETMASK]))
+				iface++;
 			break;
 		case RTM_OLDADD:
 		case RTM_OLDDEL:
@@ -1785,8 +1798,7 @@ rt_del(sdst, sgw, smask)
 		gw = &in6addr_loopback;
 		prefix = rrt->rrt_info.rip6_plen;
 	} else {
-		trace(1, "\tunsupported af: (gw=%d, mask=%d)\n", 
-			sgw->sin6_family, smask->sin6_family);
+		trace(1, "\tunsupported af: (gw=%d)\n", sgw->sin6_family);
 		return -1;
 	}
 
@@ -1804,9 +1816,12 @@ rt_del(sdst, sgw, smask)
 		trace(1, "\tno route found\n");
 		return -1;
 	}
+#if 0
 	if ((rrt->rrt_flags & RTF_STATIC) == 0) {
 		trace(1, "\tyou can delete static routes only\n");
-	} else if (memcmp(&rrt->rrt_gw, gw, sizeof(rrt->rrt_gw)) != 0) {
+	} else
+#endif
+	if (!IN6_ARE_ADDR_EQUAL(&rrt->rrt_gw, gw)) {
 		trace(1, "\tgw mismatch: %s <-> ",
 			inet6_n2p(&rrt->rrt_gw));
 		trace(1, "%s\n", inet6_n2p(gw));
@@ -1883,8 +1898,9 @@ rt_deladdr(ifcp, sifa, smask)
 	if ((rrt = rtsearch(&ni6, NULL)) != NULL) {
 		struct in6_addr none;
 		memset(&none, 0, sizeof(none));
-		if (rrt->rrt_index == ifcp->ifc_index
-		 && memcmp(&rrt->rrt_gw, &none, sizeof(rrt->rrt_gw)) == 0) {
+		if (rrt->rrt_index == ifcp->ifc_index &&
+		    (IN6_ARE_ADDR_EQUAL(&rrt->rrt_gw, &none) ||
+		     IN6_IS_ADDR_LOOPBACK(&rrt->rrt_gw))) {
 			trace(1, "\troute found, age it\n");
 			if (rrt->rrt_t == 0 || rrt->rrt_t > t_lifetime) {
 				rrt->rrt_t = t_lifetime;
@@ -1909,14 +1925,13 @@ rt_deladdr(ifcp, sifa, smask)
 			inet6_n2p(&ni6.rip6_dest), ni6.rip6_plen,
 			ifcp->ifc_index);
 		if ((rrt = rtsearch(&ni6, NULL)) != NULL) {
-			if (rrt->rrt_index == ifcp->ifc_index
-			 && memcmp(&rrt->rrt_gw, &ifa->ifa_addr,
-					 sizeof(rrt->rrt_gw)) == 0) {
+			if (rrt->rrt_index == ifcp->ifc_index &&
+			    IN6_ARE_ADDR_EQUAL(&rrt->rrt_gw, &ifa->ifa_addr)) {
 				trace(1, "\troute found, age it\n");
 				if (rrt->rrt_t == 0 || rrt->rrt_t > t_lifetime) {
 					rrt->rrt_t = t_lifetime;
 					rrt->rrt_info.rip6_metric =
-						HOPCNT_INFINITY6;
+					    HOPCNT_INFINITY6;
 					updated++;
 				}
 			} else {
@@ -1984,7 +1999,10 @@ ifrt(ifcp, again)
 			rrt->rrt_rflags |= RRTF_CHANGED;
 			applyplen(&rrt->rrt_info.rip6_dest, ifa->ifa_plen);
 			memset(&rrt->rrt_gw, 0, sizeof(struct in6_addr));
+#if 0
+			/* XXX why gateway address == network adddress? */
 			rrt->rrt_gw = ifa->ifa_addr;
+#endif
 			np = &rrt->rrt_info;
 			search_rrt = rtsearch(np, &prev_rrt);
 			if (search_rrt != NULL) {
@@ -2046,7 +2064,7 @@ ifrt_p2p(ifcp, again)
 	int again;
 {
 	struct ifac *ifa;
-	struct riprt *rrt;
+	struct riprt *rrt, *orrt, *prevrrt;
 	struct netinfo6 *np;
 	struct in6_addr addr, dest;
 	int advert, ignore, i;
@@ -2142,11 +2160,13 @@ ifrt_p2p(ifcp, again)
 			case P2PADVERT_ADDR:
 				rrt->rrt_info.rip6_dest = ifa->ifa_addr;
 				rrt->rrt_info.rip6_plen = 128;
+				rrt->rrt_gw = in6addr_loopback;
 				category = "addr";
 				break;
 			case P2PADVERT_DEST:
 				rrt->rrt_info.rip6_dest = ifa->ifa_raddr;
 				rrt->rrt_info.rip6_plen = 128;
+				rrt->rrt_gw = ifa->ifa_addr;
 				category = "dest";
 				break;
 			}
@@ -2166,9 +2186,9 @@ ifrt_p2p(ifcp, again)
 				noadv = "";
 			rrt->rrt_info.rip6_tag = htons(routetag & 0xffff);
 			rrt->rrt_info.rip6_metric = 1 + ifcp->ifc_metric;
-			memset(&rrt->rrt_gw, 0, sizeof(struct in6_addr));
 			np = &rrt->rrt_info;
-			if (rtsearch(np, NULL) == NULL) {
+			orrt = rtsearch(np, &prevrrt);
+			if (!orrt) {
 				/* Attach the route to the list */
 				trace(1, "route: %s/%d: register route "
 				    "(%s on %s%s)\n",
@@ -2176,6 +2196,19 @@ ifrt_p2p(ifcp, again)
 				    category, ifcp->ifc_name, noadv);
 				rrt->rrt_next = riprt;
 				riprt = rrt;
+			} else if (rrt->rrt_index != orrt->rrt_index ||
+			    rrt->rrt_info.rip6_metric != orrt->rrt_info.rip6_metric) {
+				/* swap route */
+				rrt->rrt_next = orrt->rrt_next;
+				if (prevrrt)
+					prevrrt->rrt_next = rrt;
+				else
+					riprt = rrt;
+				free(orrt);
+
+				trace(1, "route: %s/%d: update (%s on %s%s)\n",
+				    inet6_n2p(&np->rip6_dest), np->rip6_plen,
+				    category, ifcp->ifc_name, noadv);
 			} else {
 				/* Already found */
 				if (!again) {
@@ -2446,7 +2479,7 @@ rt_entry(rtm, again)
 	struct	sockaddr_in6 *sin6_dst, *sin6_gw, *sin6_mask;
 	struct	sockaddr_in6 *sin6_genmask, *sin6_ifp;
 	char	*rtmp, *ifname = NULL;
-	struct	riprt *rrt;
+	struct	riprt *rrt, *orrt;
 	struct	netinfo6 *np;
 	int	s;
 
@@ -2532,7 +2565,8 @@ rt_entry(rtm, again)
 	else
 		np->rip6_plen = 0;
 
-	if (rtsearch(np, NULL)) {
+	orrt = rtsearch(np, NULL);
+	if (orrt && orrt->rrt_info.rip6_metric != HOPCNT_INFINITY6) {
 		/* Already found */
 		if (!again) {
 			trace(1, "route: %s/%d flags %s: already registered\n",
@@ -2587,8 +2621,18 @@ rt_entry(rtm, again)
 	}
 
 	/* Put it to the route list */
-	rrt->rrt_next = riprt;
-	riprt = rrt;
+	if (orrt && orrt->rrt_info.rip6_metric == HOPCNT_INFINITY6) {
+		/* replace route list */
+		rrt->rrt_next = orrt->rrt_next;
+		*orrt = *rrt;
+		trace(1, "route: %s/%d flags %s: replace new route\n",
+		    inet6_n2p(&np->rip6_dest), np->rip6_plen,
+		    rtflags(rtm));
+		free(rrt);
+	} else {
+		rrt->rrt_next = riprt;
+		riprt = rrt;
+	}
 }
 
 int
