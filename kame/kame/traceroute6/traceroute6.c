@@ -319,7 +319,7 @@ char	*pr_type __P((int));
 int	packet_ok __P((struct msghdr *, int, int));
 void	print __P((struct msghdr *, int));
 void	tvsub __P((struct timeval *, struct timeval *));
-char	*inetname __P((struct in6_addr *));
+const char *inetname __P((struct sockaddr *));
 void	usage __P((void));
 
 int rcvsock;			/* receive (icmp) socket file descriptor */
@@ -354,8 +354,6 @@ int waittime = 5;		/* time to wait for response (in seconds) */
 int nflag;			/* print addresses numerically */
 int lflag;			/* print both numerical address & hostname */
 
-char ntop_buf[INET6_ADDRSTRLEN]; /* for inet_ntop() */
-
 #ifdef KAME_SCOPEID
 const int niflag = NI_WITHSCOPEID;
 #else
@@ -375,6 +373,7 @@ main(argc, argv)
 	int ch, i, on, probe, seq, hops;
 	static u_char rcvcmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo))
 				+ CMSG_SPACE(sizeof(int))];
+	char hbuf[NI_MAXHOST];
 
 	on = 1;
 	seq = 0;
@@ -714,10 +713,10 @@ main(argc, argv)
 	/*
 	 * Message to users
 	 */
-	if (getnameinfo((struct sockaddr *)&Dst, Dst.sin6_len, ntop_buf,
-			sizeof(ntop_buf), NULL, 0, NI_NUMERICHOST | niflag))
-		strcpy(ntop_buf, "(invalid)");
-	Fprintf(stderr, "traceroute to %s (%s)", hostname, ntop_buf);
+	if (getnameinfo((struct sockaddr *)&Dst, Dst.sin6_len, hbuf,
+			sizeof(hbuf), NULL, 0, NI_NUMERICHOST | niflag))
+		strcpy(hbuf, "(invalid)");
+	Fprintf(stderr, "traceroute to %s (%s)", hostname, hbuf);
 	if (source)
 		Fprintf(stderr, " from %s", source);
 	Fprintf(stderr, ", %d hops max, %d byte packets\n", max_hops, datalen);
@@ -964,6 +963,7 @@ packet_ok(mhdr, cc, seq)
 	char *buf = (char *)mhdr->msg_iov[0].iov_base;
 	struct cmsghdr *cm;
 	int *hlimp;
+	char hbuf[NI_MAXHOST];
 
 #ifdef OLDRAWSOCKET
 	int hlen;
@@ -974,20 +974,27 @@ packet_ok(mhdr, cc, seq)
 	ip = (struct ip6_hdr *) buf;
 	hlen = sizeof(struct ip6_hdr);
 	if (cc < hlen + sizeof(struct icmp6_hdr)) {
-		if (verbose)
+		if (verbose) {
+			if (getnameinfo((struct sockaddr *)from, from->sin6_len,
+			    hbuf, sizeof(hbuf), NULL, 0,
+			    NI_NUMERICHOST | niflag) != 0)
+				strcpy(hbuf, "invalid");
 			Printf("packet too short (%d bytes) from %s\n", cc,
-				inet_ntop(AF_INET6, &from->sin6_addr,
-					   ntop_buf, sizeof(ntop_buf)));
+			    hbuf);
+		}
 		return (0);
 	}
 	cc -= hlen;
 	icp = (struct icmp6_hdr *)(buf + hlen);
 #else
 	if (cc < sizeof(struct icmp6_hdr)) {
-		if (verbose)
-			Printf("data too short (%d bytes) from %s\n", cc,
-			       inet_ntop(AF_INET6, &from->sin6_addr,
-					 ntop_buf, sizeof(ntop_buf)));
+		if (verbose) {
+			if (getnameinfo((struct sockaddr *)from, from->sin6_len,
+			    hbuf, sizeof(hbuf), NULL, 0,
+			    NI_NUMERICHOST | niflag) != 0)
+				strcpy(hbuf, "invalid");
+			Printf("data too short (%d bytes) from %s\n", cc, hbuf);
+		}
 		return(0);
 	}
 	icp = (struct icmp6_hdr *)buf;
@@ -1034,11 +1041,12 @@ packet_ok(mhdr, cc, seq)
 	if (verbose) {
 		int i;
 		u_long *lp = (u_long *)(icp + 1);
-		char sbuf[INET6_ADDRSTRLEN+1], dbuf[INET6_ADDRSTRLEN];
+		char sbuf[NI_MAXHOST+1], dbuf[INET6_ADDRSTRLEN];
 
-		Printf("\n%d bytes from %s to %s", cc,
-			inet_ntop(AF_INET6, &from->sin6_addr,
-				   sbuf, sizeof(sbuf)),
+		if (getnameinfo((struct sockaddr *)from, from->sin6_len,
+		    sbuf, sizeof(sbuf), NULL, 0, NI_NUMERICHOST | niflag) != 0)
+			strcpy(sbuf, "invalid");
+		Printf("\n%d bytes from %s to %s", cc, sbuf,
 			inet_ntop(AF_INET6, &rcvpktinfo->ipi6_addr,
 				   dbuf, sizeof(dbuf)));
 		Printf(": icmp type %d (%s) code %d\n", type, pr_type(type),
@@ -1100,29 +1108,27 @@ print(mhdr, cc)
 	int cc;
 {
 	struct sockaddr_in6 *from = (struct sockaddr_in6 *)mhdr->msg_name;
+	char hbuf[NI_MAXHOST];
 
-	if (nflag) {
-		Printf(" %s", inet_ntop(AF_INET6, &from->sin6_addr,
-					 ntop_buf, sizeof(ntop_buf)));
-	}
-	else if (lflag) {
-		Printf(" %s (%s)", inetname(&from->sin6_addr),
-		       inet_ntop(AF_INET6, &from->sin6_addr,
-				  ntop_buf, sizeof(ntop_buf)));
-	}
-	else {
-		Printf(" %s", inetname(&from->sin6_addr));
-	}
+	if (getnameinfo((struct sockaddr *)from, from->sin6_len,
+	    hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST | niflag) != 0)
+		strcpy(hbuf, "invalid");
+	if (nflag)
+		Printf(" %s", hbuf);
+	else if (lflag)
+		Printf(" %s (%s)", inetname((struct sockaddr *)from), hbuf);
+	else
+		Printf(" %s", inetname((struct sockaddr *)from));
 
 	if (verbose) {
 #ifdef OLDRAWSOCKET
 		Printf(" %d bytes to %s", cc,
 		       inet_ntop(AF_INET6, &rcvpktinfo->ipi6_addr,
-				 ntop_buf, sizeof(ntop_buf)));
+				 hbuf, sizeof(hbuf)));
 #else
 		Printf(" %d bytes of data to %s", cc,
 		       inet_ntop(AF_INET6, &rcvpktinfo->ipi6_addr,
-				 ntop_buf, sizeof(ntop_buf)));
+				 hbuf, sizeof(hbuf)));
 #endif
 	}
 }
@@ -1148,12 +1154,12 @@ tvsub(out, in)
  * If the nflag has been supplied, give
  * numeric value, otherwise try for symbolic name.
  */
-char *
-inetname(in)
-	struct in6_addr *in;
+const char *
+inetname(sa)
+	struct sockaddr *sa;
 {
 	register char *cp;
-	static char line[50];
+	static char line[NI_MAXHOST];
 	struct hostent *hp;
 	static char domain[MAXHOSTNAMELEN + 1];
 	static int first = 1;
@@ -1166,23 +1172,23 @@ inetname(in)
 		else
 			domain[0] = 0;
 	}
-	cp = 0;
+	cp = NULL;
 	if (!nflag) {
-		/* hp = (struct hostent *)addr2hostname(in, sizeof(*in), AF_INET6, &herr); */
-	  hp = (struct hostent *)gethostbyaddr((const char *)in, sizeof(*in), AF_INET6);
-		if (hp) {
-			if ((cp = index(hp->h_name, '.')) &&
+		if (getnameinfo(sa, sa->sa_len, line, sizeof(line), NULL, 0,
+		    NI_NAMEREQD) == 0) {
+			if ((cp = index(line, '.')) &&
 			    !strcmp(cp + 1, domain))
 				*cp = 0;
-			cp = hp->h_name;
+			cp = line;
 		}
 	}
 	if (cp)
-		(void) strcpy(line, cp);
-	else {
-		(void)inet_ntop(AF_INET6, in, line, sizeof(line));
-	}
-	return (line);
+		return cp;
+
+	if (getnameinfo(sa, sa->sa_len, line, sizeof(line), NULL, 0,
+	    NI_NUMERICHOST | niflag) != 0)
+		strcpy(line, "invalid");
+	return line;
 }
 
 void
