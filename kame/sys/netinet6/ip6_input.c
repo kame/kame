@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.339 2004/02/17 11:40:25 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.340 2004/04/16 05:23:42 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -979,9 +979,7 @@ ip6_input(m)
 			return;
 		}
 
-		if (m != m1)
-			m_freem(m);
-
+		m_freem(m);
 		return;
 	}
 
