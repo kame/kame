@@ -1,4 +1,4 @@
-SUBDIR+=libinet6 libipsec libwrap libpfkey
+SUBDIR+=libinet6 libipsec libpfkey
 SUBDIR+=libaltq
 
 .include <bsd.subdir.mk>
