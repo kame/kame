@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: eaytest.c,v 1.7 2000/08/24 11:06:28 sakane Exp $ */
+/* YIPS @(#)$Id: eaytest.c,v 1.8 2000/08/30 04:40:35 sakane Exp $ */
 
 #include <sys/types.h>
 
@@ -51,23 +51,23 @@ u_int32_t debug = 0;
 char *capath = "/usr/local/openssl/certs";
 char *certs[] = {
 /* self signed */
-"-----BEGIN X509 CERTIFICATE-----\n"
-"MIICzDCCAjWgAwIBAgIEOXGTAjANBgkqhkiG9w0BAQUFADBaMQswCQYDVQQGEwJG\n"
-"STEkMCIGA1UEChMbU1NIIENvbW11bmljYXRpb25zIFNlY3VyaXR5MREwDwYDVQQL\n"
-"EwhXZWIgdGVzdDESMBAGA1UEAxMJVGVzdCBDQSAxMB4XDTAwMDcxNjAwMDAwMFoX\n"
-"DTAwMDkwMTAwMDAwMFowgZsxCzAJBgNVBAYTAkpQMREwDwYDVQQIEwhLYW5hZ2F3\n"
-"YTERMA8GA1UEBxMIRnVqaXNhd2ExFTATBgNVBAoTDFdJREUgUHJvamVjdDEVMBMG\n"
-"A1UECxMMS0FNRSBQcm9qZWN0MRcwFQYDVQQDEw5TaG9pY2hpIFNha2FuZTEfMB0G\n"
-"CSqGSIb3DQEJAQwQc2FrYW5lQHlkYy5jby5qcDCBnzANBgkqhkiG9w0BAQEFAAOB\n"
-"jQAwgYkCgYEAuWE1jKVD8AvuM5x8Z6JzJlYeR+V+FZkFxv65Y8TQGyiZPOlvlb9J\n"
-"acaLJFYBjSuuno/t111tu3thggQwC80SUos0irG31i6SSusQMGmkoT1m/QHckZ4d\n"
-"lfxHyFLqwkV97qYGp/h55PuG8WwW+Imcbtd/RJHqD7gEWxPFhy9rmsMCAwEAAaNd\n"
-"MFswCwYDVR0PBAQDAgWgMBoGA1UdEQQTMBGBD3Nha2FuZUBrYW1lLm5ldDAwBgNV\n"
-"HR8EKTAnMCWgI6Ahhh9odHRwOi8vbGRhcC5zc2guZmkvY3Jscy9jYTEuY3JsMA0G\n"
-"CSqGSIb3DQEBBQUAA4GBAFVbX9xotcHmtI96iXGNuzXqAObUBDAg4hDymi2RLitv\n"
-"uVJYPH5t6qDqu499FbwPsatoRc/l62cmc0qmFStmvg0p5s+/dW2gtBeV1+cfdv+O\n"
-"1GrjSmhAPPiwQFarhJzJeNo5PHplcj9ICNzDfcLZtqhiZFLq0wl5pNQM4UqWuFNl\n"
-"-----END X509 CERTIFICATE-----\n\n",
+"-----BEGIN CERTIFICATE-----\n"
+"MIICpTCCAg4CAQAwDQYJKoZIhvcNAQEEBQAwgZoxCzAJBgNVBAYTAkpQMREwDwYD\n"
+"VQQIEwhLYW5hZ2F3YTERMA8GA1UEBxMIRnVqaXNhd2ExFTATBgNVBAoTDFdJREUg\n"
+"UHJvamVjdDEVMBMGA1UECxMMS0FNRSBQcm9qZWN0MRcwFQYDVQQDEw5TaG9pY2hp\n"
+"IFNha2FuZTEeMBwGCSqGSIb3DQEJARYPc2FrYW5lQGthbWUubmV0MB4XDTAwMDgy\n"
+"NDAxMzc0NFoXDTAwMDkyMzAxMzc0NFowgZoxCzAJBgNVBAYTAkpQMREwDwYDVQQI\n"
+"EwhLYW5hZ2F3YTERMA8GA1UEBxMIRnVqaXNhd2ExFTATBgNVBAoTDFdJREUgUHJv\n"
+"amVjdDEVMBMGA1UECxMMS0FNRSBQcm9qZWN0MRcwFQYDVQQDEw5TaG9pY2hpIFNh\n"
+"a2FuZTEeMBwGCSqGSIb3DQEJARYPc2FrYW5lQGthbWUubmV0MIGfMA0GCSqGSIb3\n"
+"DQEBAQUAA4GNADCBiQKBgQCpIQG/H3zn4czAmPBcbkDrYxE1A9vcpghpib3Of0Op\n"
+"SsiWIBOyIMiVAzK/I/JotWp3Vdn5fzGp/7DGAbWXAALas2xHkNmTMPpu6qhmNQ57\n"
+"kJHZHal24mgc1hwbrI9fb5olvIexx9a1riNPnKMRVHzXYizsyMbf+lJJmZ8QFhWN\n"
+"twIDAQABMA0GCSqGSIb3DQEBBAUAA4GBACKs6X/BYycuHI3iop403R3XWMHHnNBN\n"
+"5XTHVWiWgR1cMWkq/dp51gn+nPftpdAaYGpqGkiHGhZcXLoBaX9uON3p+7av+sQN\n"
+"plXwnvUf2Zsgu+fojskS0gKcDlYiq1O8TOaBgJouFZgr1q6PiYjVEJGogAP28+HN\n"
+"M4o+GBFbFoqK\n"
+"-----END CERTIFICATE-----\n\n",
 /* signed by SSH testing CA + CA1 + CA2 */
 "-----BEGIN X509 CERTIFICATE-----\n"
 "MIICtTCCAj+gAwIBAgIEOaR8NjANBgkqhkiG9w0BAQUFADBjMQswCQYDVQQGEwJG\n"
@@ -86,22 +86,66 @@ char *certs[] = {
 "+qjkp5efCiYKhAu1L4WXlMsV/SNdzspui5tHasPBvUw8gzFsU/VW/B2zuQZkimf1\n"
 "u6ZPjUb/vt8vLOPScP5MeH7xrTk9iigsqQ==\n"
 "-----END X509 CERTIFICATE-----\n\n",
+/* VP100 */
+"-----BEGIN CERTIFICATE-----\n"
+"MIICXzCCAcigAwIBAgIEOXGBIzANBgkqhkiG9w0BAQUFADBaMQswCQYDVQQGEwJG\n"
+"STEkMCIGA1UEChMbU1NIIENvbW11bmljYXRpb25zIFNlY3VyaXR5MREwDwYDVQQL\n"
+"EwhXZWIgdGVzdDESMBAGA1UEAxMJVGVzdCBDQSAxMB4XDTAwMDcxNjAwMDAwMFoX\n"
+"DTAwMDkwMTAwMDAwMFowNTELMAkGA1UEBhMCanAxETAPBgNVBAoTCHRhaGl0ZXN0\n"
+"MRMwEQYDVQQDEwpmdXJ1a2F3YS0xMIGdMA0GCSqGSIb3DQEBAQUAA4GLADCBhwKB\n"
+"gQDUmI2RaAuoLvtRDbASwRhbkj/Oq0BBIKgAqbFknc/EanJSQwZQu82gD88nf7gG\n"
+"VEioWmKPLDuEjz5JCuM+k5f7HYHI1wWmz1KFr7UA+avZm4Kp6YKnhuH7soZp7kBL\n"
+"hTiZEpL0jdmCWLW3ZXoro55rmPrBsCd+bt8VU6tRZm5dUwIBKaNZMFcwCwYDVR0P\n"
+"BAQDAgWgMBYGA1UdEQQPMA2CBVZQMTAwhwQKFIaFMDAGA1UdHwQpMCcwJaAjoCGG\n"
+"H2h0dHA6Ly9sZGFwLnNzaC5maS9jcmxzL2NhMS5jcmwwDQYJKoZIhvcNAQEFBQAD\n"
+"gYEAKJ/2Co/KYW65mwpGG3CBvsoRL8xyUMHGt6gQpFLHiiHuAdix1ADTL6uoFuYi\n"
+"4sE5omQm1wKVv2ZhS03zDtUfKoVEv0HZ7IY3AU/FZT/M5gQvbt43Dki/ma3ock2I\n"
+"PPhbLsvXm+GCVh3jvkYGk1zr7VERVeTPtmT+hW63lcxfFp4=\n"
+"-----END CERTIFICATE-----\n\n",
+/* IKED */
+"-----BEGIN CERTIFICATE-----\n"
+"MIIEFTCCA7+gAwIBAgIKYU5X6AAAAAAACTANBgkqhkiG9w0BAQUFADCBljEpMCcG\n"
+"CSqGSIb3DQEJARYaeS13YXRhbmFAc2RsLmhpdGFjaGkuY28uanAxCzAJBgNVBAYT\n"
+"AkpQMREwDwYDVQQIEwhLQU5BR0FXQTERMA8GA1UEBxMIWW9rb2hhbWExEDAOBgNV\n"
+"BAoTB0hJVEFDSEkxDDAKBgNVBAsTA1NETDEWMBQGA1UEAxMNSVBzZWMgVGVzdCBD\n"
+"QTAeFw0wMDA3MTUwMjUxNDdaFw0wMTA3MTUwMzAxNDdaMEUxCzAJBgNVBAYTAkpQ\n"
+"MREwDwYDVQQIEwhLQU5BR0FXQTEQMA4GA1UEChMHSElUQUNISTERMA8GA1UEAxMI\n"
+"V0FUQU5BQkUwXDANBgkqhkiG9w0BAQEFAANLADBIAkEA6Wja5A7Ldzrtx+rMWHEB\n"
+"Cyt+/ZoG0qdFQbuuUiU1vOSq+1f+ZSCYAdTq13Lrr6Xfz3jDVFEZLPID9PSTFwq+\n"
+"yQIDAQABo4ICPTCCAjkwDgYDVR0PAQH/BAQDAgTwMBMGA1UdJQQMMAoGCCsGAQUF\n"
+"CAICMB0GA1UdDgQWBBTkv7/MH5Ra+S1zBAmnUIH5w8ZTUTCB0gYDVR0jBIHKMIHH\n"
+"gBQsF2qoaTl5F3GFLKrttaxPJ8j4faGBnKSBmTCBljEpMCcGCSqGSIb3DQEJARYa\n"
+"eS13YXRhbmFAc2RsLmhpdGFjaGkuY28uanAxCzAJBgNVBAYTAkpQMREwDwYDVQQI\n"
+"EwhLQU5BR0FXQTERMA8GA1UEBxMIWW9rb2hhbWExEDAOBgNVBAoTB0hJVEFDSEkx\n"
+"DDAKBgNVBAsTA1NETDEWMBQGA1UEAxMNSVBzZWMgVGVzdCBDQYIQeccIf4GYDIBA\n"
+"rS6HSUt8XjB7BgNVHR8EdDByMDagNKAyhjBodHRwOi8vZmxvcmEyMjAvQ2VydEVu\n"
+"cm9sbC9JUHNlYyUyMFRlc3QlMjBDQS5jcmwwOKA2oDSGMmZpbGU6Ly9cXGZsb3Jh\n"
+"MjIwXENlcnRFbnJvbGxcSVBzZWMlMjBUZXN0JTIwQ0EuY3JsMIGgBggrBgEFBQcB\n"
+"AQSBkzCBkDBFBggrBgEFBQcwAoY5aHR0cDovL2Zsb3JhMjIwL0NlcnRFbnJvbGwv\n"
+"ZmxvcmEyMjBfSVBzZWMlMjBUZXN0JTIwQ0EuY3J0MEcGCCsGAQUFBzAChjtmaWxl\n"
+"Oi8vXFxmbG9yYTIyMFxDZXJ0RW5yb2xsXGZsb3JhMjIwX0lQc2VjJTIwVGVzdCUy\n"
+"MENBLmNydDANBgkqhkiG9w0BAQUFAANBAG8yZAWHb6g3zba453Hw5loojVDZO6fD\n"
+"9lCsyaxeo9/+7x1JEEcdZ6qL7KKqe7ZBwza+hIN0ITkp2WEWo22gTz4=\n"
+"-----END CERTIFICATE-----\n\n",
 };
 
 /* test */
 
 #include <sys/stat.h>
+#include <unistd.h>
 void
 certtest()
 {
 	vchar_t c;
+	char *text;
+	vchar_t *str;
 	int error;
 	int i;
 
 	printf("\n**Test for Certificate.**\n");
-	printf("CAUTION: the second certificate may be invalid on your "
+	printf("CAUTION: These certificates may be invalid on your "
 		"environment because it was signed by SSH test CA and you "
-		"may not own their certificates.\n");
+		"may not own their issuer's certificates.\n\n");
 
 	eay_init_error();
 
@@ -112,22 +156,29 @@ certtest()
 		c.v = certs[i];
 		c.l = strlen(certs[i]);
 
-	    {
-		char *text;
-
+		/* print text */
 		text = eay_get_x509text(&c);
 		printf("%s", text);
 		free(text);
-	    }
 
-#if 0
-	    {
-		vchar_t *subjectaltname;
-		subjectaltname = eay_get_x509subjectaltname(&c);
-		printf("SubjectAltName: [%s]\n", subjectaltname->v);
-		vfree(subjectaltname);
-	    }
-#endif
+		/* print ASN.1 of subject name */
+		str = eay_get_x509asn1subjectname(&c);
+		if (!str)
+			return;
+		PVDUMP(str);
+		printf("\n");
+		vfree(str);
+
+		/* print subject alt name */
+		str = eay_get_x509subjectaltname(&c);
+		if (!str) {
+			printf("no subjectaltname found.\n");
+		} else {
+			printf("SubjectAltName: ");
+			bindump(str->v, str->l);
+			printf("\n");
+			vfree(str);
+		}
 
 	    {
 		struct stat sb;
@@ -140,7 +191,8 @@ certtest()
 	    }
 
 		error = eay_check_x509cert(&c, capath);
-		printf("cert is %s\n", error ? "bad" : "good");
+		printf("cert is %s\n", error ? "invalid" : "valid");
+		printf("\n");
 	}
 }
 

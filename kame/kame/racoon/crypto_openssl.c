@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.33 2000/08/25 12:12:10 itojun Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.34 2000/08/30 04:40:35 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -77,7 +77,6 @@
 #include "misc.h"
 #include "vmbuf.h"
 #include "plog.h"
-#include "oakley.h"
 #include "crypto_openssl.h"
 #include "debug.h"
 
@@ -88,6 +87,7 @@
 
 #ifdef HAVE_SIGNING_C
 static int cb_check_cert __P((int, X509_STORE_CTX *));
+static X509 *mem2x509 __P((vchar_t *));
 
 /* X509 Certificate */
 /*
@@ -136,26 +136,7 @@ eay_check_x509cert(cert, CApath)
 	error = -1;	/* initialized */
 
 	/* read the certificate to be verified */
-#ifndef EAYDEBUG
-    {
-	u_char *bp;
-
-	bp = cert->v;
-
-	x509 = d2i_X509(NULL, &bp, cert->l);
-    }
-#else
-    {
-	BIO *bio;
-
-	bio = BIO_new(BIO_s_mem());
-	if (bio == NULL)
-		goto end;
-	error = BIO_write(bio, cert->v, cert->l);
-	x509 = PEM_read_bio_X509(bio, NULL, NULL, NULL);
-	BIO_free(bio);
-    }
-#endif
+	x509 = mem2x509(cert);
 	if (x509 == NULL)
 		goto end;
 
@@ -180,7 +161,7 @@ eay_check_x509cert(cert, CApath)
 
 end:
 	if (error)
-		eay_strerror();
+		printf("%s\n", eay_strerror());
 	if (cert_ctx != NULL)
 		X509_STORE_free(cert_ctx);
 	if (x509 != NULL)
@@ -250,31 +231,157 @@ cb_check_cert(ok, ctx)
  * get a subjectAltName from X509 certificate.
  */
 vchar_t *
-eay_get_x509subjectaltname(cert)
+eay_get_x509asn1subjectname(cert)
 	vchar_t *cert;
 {
-return NULL;
-#if 0
-	char *bp;
-	X509_EXTENSION *ext;
-	int i;
+	X509 *x509 = NULL;
+	u_char *bp;
+	vchar_t *name = NULL;
+	int len;
+	int error = -1;
 
 	bp = cert->v;
 
-	x509 = d2i_X509(NULL, &bp, cert->l);
+	x509 = mem2x509(cert);
 	if (x509 == NULL)
-		return -1;
+		goto end;
 
-        i = X509_get_ext_by_NID(x509, NID_subject_alt_name, -1);
-        if (i < 0)
-		return -1;
-        ext = X509_get_ext(x509, i);
-        if(!(ext = X509_get_ext(x509, i)) ||
-                        !(ialt = X509V3_EXT_d2i(ext)) ) {
-                X509V3err(X509V3_F_COPY_ISSUER,X509V3_R_ISSUER_DECODE_ERROR);
-                goto err;
-        }
+	/* get the length of the name */
+	len = i2d_X509_NAME(x509->cert_info->subject, NULL);
+	name = vmalloc(len);
+	if (!name)
+		goto end;
+	/* get the name */
+	bp = name->v;
+	len = i2d_X509_NAME(x509->cert_info->subject, &bp);
+
+	error = 0;
+
+   end:
+	if (error) {
+		if (name) {
+			vfree(name);
+			name = NULL;
+		}
+#ifndef EAYDEBUG
+		plog(logp, LOCATION, NULL, "%s\n", eay_strerror());
+#else
+		printf("%s\n", eay_strerror());
 #endif
+	}
+	if (x509)
+		X509_free(x509);
+
+	return name;
+}
+
+/*
+ * get a subjectAltName from X509 certificate.
+ */
+#include <openssl/x509v3.h>
+vchar_t *
+eay_get_x509subjectaltname(cert)
+	vchar_t *cert;
+{
+	X509 *x509 = NULL;
+	X509_EXTENSION *ext;
+	X509V3_EXT_METHOD *method = NULL;
+	vchar_t *altname = NULL;
+	u_char *bp;
+	int i;
+	int error = -1;
+
+	bp = cert->v;
+
+	x509 = mem2x509(cert);
+	if (x509 == NULL)
+		goto end;
+
+	i = X509_get_ext_by_NID(x509, NID_subject_alt_name, -1);
+	if (i < 0)
+		goto end;
+	ext = X509_get_ext(x509, i);
+	method = X509V3_EXT_get(ext);
+	if(!method)
+		goto end;
+	
+	if(method->i2s) {
+
+		char *str = NULL;
+
+		str = method->i2s(method, ext);
+		if(!str)
+			goto end;
+		altname = vmalloc(strlen(str));
+		if (!altname) {
+			free(str);
+			goto end;
+		}
+		memcpy(altname->v, str, altname->l);
+		free(str);
+
+	} else {
+
+		STACK_OF(GENERAL_NAME) *name;
+		CONF_VALUE *cval = NULL;
+		STACK_OF(CONF_VALUE) *nval = NULL;
+
+		bp = ext->value->data;
+		name = method->d2i(NULL, &bp, ext->value->length);
+		if(!name)
+			goto end;
+
+		nval = method->i2v(method, name, NULL);
+		method->ext_free(name);
+		name = NULL;
+		if(!nval)
+			goto end;
+
+		/*
+		 * XXX What is the subjectAltName which the function should
+		 * return if CERT has multiple subjectlatnames ?
+		 * At this moment, the function only returns 1st subjectaltname.
+		 */
+	    {
+		int i = 0, tlen = 0, len = 0;
+#if 0
+		for(i = 0; i < sk_CONF_VALUE_num(nval); i++) {
+#endif
+			cval = sk_CONF_VALUE_value(nval, i);
+			len = strlen(cval->value);
+			altname = vrealloc(altname, tlen + len);
+			if (!altname) {
+				sk_CONF_VALUE_pop_free(nval, X509V3_conf_free);
+				method->ext_free(name);
+				goto end;
+			}
+			memcpy(altname->v + tlen, cval->value, len);
+#if 0
+			tlen += len;
+		}
+#endif
+	    }
+		sk_CONF_VALUE_pop_free(nval, X509V3_conf_free);
+	}
+
+	error = 0;
+
+   end:
+	if (error) {
+		if (altname) {
+			vfree(altname);
+			altname = NULL;
+		}
+#ifndef EAYDEBUG
+		plog(logp, LOCATION, NULL, "%s\n", eay_strerror());
+#else
+		printf("%s\n", eay_strerror());
+#endif
+	}
+	if (x509)
+		X509_free(x509);
+
+	return altname;
 }
 
 /*
@@ -292,25 +399,7 @@ eay_get_x509text(cert)
 	int len = 0;
 	int error = -1;
 
-#ifndef EAYDEBUG
-    {
-	u_char *bp;
-
-	bp = cert->v;
-
-	x509 = d2i_X509(NULL, &bp, cert->l);
-    }
-#else
-    {
-	bio = BIO_new(BIO_s_mem());
-	if (bio == NULL)
-		goto end;
-	error = BIO_write(bio, cert->v, cert->l);
-	x509 = PEM_read_bio_X509(bio, NULL, NULL, NULL);
-	BIO_free(bio);
-	bio = NULL;
-    }
-#endif
+	x509 = mem2x509(cert);
 	if (x509 == NULL)
 		goto end;
 
@@ -334,6 +423,10 @@ eay_get_x509text(cert)
 
     end:
 	if (error) {
+		if (text) {
+			free(text);
+			text = NULL;
+		}
 #ifndef EAYDEBUG
 		plog(logp, LOCATION, NULL, "%s\n", eay_strerror());
 #else
@@ -346,6 +439,39 @@ eay_get_x509text(cert)
 		X509_free(x509);
 
 	return text;
+}
+
+/* get X509 structure from buffer. */
+static X509 *
+mem2x509(cert)
+	vchar_t *cert;
+{
+	X509 *x509;
+
+#ifndef EAYDEBUG
+    {
+	u_char *bp;
+
+	bp = cert->v;
+
+	x509 = d2i_X509(NULL, &bp, cert->l);
+    }
+#else
+    {
+	BIO *bio;
+	int len;
+
+	bio = BIO_new(BIO_s_mem());
+	if (bio == NULL)
+		return NULL;
+	len = BIO_write(bio, cert->v, cert->l);
+	if (len == -1)
+		return NULL;
+	x509 = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+	BIO_free(bio);
+    }
+#endif
+	return x509;
 }
 
 /*
