@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.149 2004/05/21 07:44:21 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.150 2004/05/21 09:44:50 itojun Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -523,7 +523,7 @@ struct ip6protosw inet6sw[] = {
 #endif
 { SOCK_RAW,     &inet6domain,	IPPROTO_PIM,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   pim6_input,	rip6_output,	0,              rip6_ctloutput,
-#ifdef _FreeBSD__
+#ifdef __FreeBSD__
   0,
 #else
   rip6_usrreq,
