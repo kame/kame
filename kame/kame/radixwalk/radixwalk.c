@@ -1,4 +1,4 @@
-/* $KAME: radixwalk.c,v 1.2 2000/08/19 07:42:43 jinmei Exp $ */
+/* $KAME: radixwalk.c,v 1.3 2000/08/22 08:27:59 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -49,6 +49,11 @@
 #include <string.h>
 #include <err.h>
 
+struct mtree {
+	struct mtree *mt_next;
+	struct sockaddr_storage mt_mask;
+};
+
 struct rdtree {
 	int rd_b;
 	int rd_depth;
@@ -57,6 +62,7 @@ struct rdtree {
 	struct sockaddr_storage rd_key;
 	struct sockaddr_storage rd_mask;
 	struct radix_node *rd_kaddr;
+	struct mtree *rd_mtree;
 	struct rdtree *rd_left;
 	struct rdtree *rd_right;
 	struct rdtree *rd_dup;
@@ -177,6 +183,9 @@ get_tree(rn)
 	struct radix_node *rn;
 {
 	struct radix_node rnode;
+#if 0
+	struct radix_mask *mp;
+#endif
 	struct rdtree *rdt;
 	int depth_l, depth_r;
 	struct sockaddr *sa;
@@ -212,6 +221,31 @@ get_tree(rn)
 	} else {
 		rdt->rd_kaddr = rn;
 		rdt->rd_b = rnode.rn_b;
+
+#if 0
+		if ((mp = rnode.rn_mklist) != NULL) {
+			struct radix_mask m;
+			struct mtree *mt;
+
+			do {
+				kget(mp, m);
+
+				if ((m.rm_flags & RNF_NORMAL) != 0)
+					continue;
+
+				sa = kgetsa((struct sockaddr *)m.rm_mask);
+				if ((mt = (struct mtree *)malloc(sizeof(*mt)))
+				    == NULL)
+					err(1, "get_tree: malloc");
+				memset(mt, 0, sizeof(*mt));
+				memcpy(&mt->mt_mask, sa, sa->sa_len);
+
+				mt->mt_next = rdt->rd_mtree;
+				rdt->rd_mtree = mt;
+			} while ((mp = m.rm_mklist) != NULL);
+		}
+#endif
+
 		rdt->rd_left = get_tree(rnode.rn_l);
 		rdt->rd_right = get_tree(rnode.rn_r);
 
@@ -229,10 +263,12 @@ kgetsa(dst)
 {
 	static struct sockaddr_storage ss;
 	struct sockaddr *sa = (struct sockaddr *)&ss;
+	u_int8_t len;
 
-	kget(dst, ss);
-	if (sa->sa_len > sizeof (*sa))
-		kread((u_long)dst, (char *)sa, sa->sa_len);
+	kget(dst, len);
+	if (len > sizeof(ss))	/* for safety */
+		len = sizeof(ss);
+	kread((u_long)dst, (char *)sa, len);
 	return(sa);
 }
 
@@ -301,7 +337,14 @@ print_tree(tn, depth, rightp)
 			indentbuf[plen] = '\0';
 	}
 	else {			/* internal node */
-		printf("[%d]\n", tn->rd_b - rtoffset);
+		struct mtree *m;
+
+		printf("[%d]", tn->rd_b - rtoffset);
+		for (m = tn->rd_mtree; m != NULL; m = m->mt_next) {
+			print_mask6((struct sockaddr_in6 *)&m->mt_mask);
+			putchar(' ');
+		}
+		putchar('\n');
 		if (indenttype == LINE && indent) {
 			if (rightp)
 				indentbuf[plen] = '\0';
