@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.3 2000/01/09 22:59:33 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.4 2000/01/09 23:11:04 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -113,6 +113,9 @@ struct ph1handle {
 	u_int8_t etype;			/* Exchange type actually for use */
 	u_int8_t flags;			/* Flags */
 	u_int32_t msgid;		/* message id */
+
+	int inuse;			/* received EXPIRE message */
+					/* 0: init, 1: grace, 2: sa require */
 
 	struct sched *sce;		/* schedule for expire */
 	struct sched *scr;		/* schedule for resend */

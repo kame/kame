@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.15 2000/01/09 23:06:14 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.16 2000/01/09 23:11:06 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1149,12 +1149,19 @@ isakmp_ph1restart(iph1)
 	/* XXX to do retry counter */
 
 	if (LIST_FIRST(&iph1->ph2tree) != NULL) {
+		iph1->inuse = 2;	/* sa needed */
 		sched_new(1, isakmp_ph1restart, iph1);
 		return;
 	}
 
 	/* if it's initiator, begin re-negosiation */
-	if (iph1->side == INITIATOR) {
+	if (iph1->side == INITIATOR && iph1->inuse != 1) {
+
+		if (iph1->inuse == 0)
+			iph1->inuse = 1;	/* sa may not needed */
+		else
+			iph1->inuse = 0;	/* reset */
+
 		YIPSDEBUG(DEBUG_STAMP,
 			plog(logp, LOCATION, NULL,
 				"restart phase1 negotiation %s\n",
