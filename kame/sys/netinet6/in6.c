@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.182 2001/04/09 06:29:45 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.183 2001/04/09 09:35:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2475,7 +2475,9 @@ in6_ifawithscope(oifp, dst)
 	struct in6_ifaddr *ifa_best = NULL;
 	
 	if (oifp == NULL) {
+#if 0
 		printf("in6_ifawithscope: output interface is not specified\n");
+#endif
 		return(NULL);
 	}
 
