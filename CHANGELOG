@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.973 2000/06/05 12:57:59 itojun Exp $
+$Id: CHANGELOG,v 1.974 2000/06/06 02:13:53 jinmei Exp $
 
 <200006>
+2000-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/pim6_var.h: renamed macro definitions about
+	pim6 sysctls to avoid possible conflict. We believe this does not
+	cause compatibilty issues, since the macros have not been used
+	yet.
+	Suggested by: Hitoshi Asaeda <asaeda@yamato.ibm.co.jp>
+
 Mon Jun  5 21:56:35 JST 2000  itojun@iijlab.net
 	* traceroute6/traceroute6.c: add -f (skip first hops).  the option
 	  is common to freebsd4/bsdi4/openbsd/netbsd traceroute(8).
