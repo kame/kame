@@ -592,6 +592,7 @@ union mcluster {
 #define PACKET_TAG_VLAN				1  /* VLAN ID */
 #define PACKET_TAG_ENCAP			2  /* encapsulation data */
 #define PACKET_TAG_ESP				3  /* ESP information */
+#define PACKET_TAG_GIF				8  /* GIF processing done */
 #define PACKET_TAG_PF_GENERATED			11 /* PF generated, pass always */
 #define PACKET_TAG_PF_ROUTED			12 /* PF routed, no route loops */
 #define PACKET_TAG_PF_FRAGCACHE			13 /* PF fragment cached */
