@@ -1,4 +1,4 @@
-# YIPS $Id: Makefile.in,v 1.21 2000/06/08 21:28:33 itojun Exp $
+# YIPS $Id: Makefile.in,v 1.22 2000/06/08 21:30:38 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -9,7 +9,8 @@ CPPFLAGS=	@CPPFLAGS@
 OPTFLAG=@OPTFLAG@
 CFLAGS=	@CFLAGS@ $(CPPFLAGS) @DEFS@ $(CPPFLAGS) $(OPTFLAG) -DIPSEC -I. -I$(srcdir) -Dss_family=__ss_family -Dss_len=__ss_len -DSYSCONFDIR=\"${sysconfdir}\"
 CFLAGS+=-DYY_NO_UNPUT
-LIBS=	-L/home/itojun/k/kame/netbsd/lib/libpfkey -lpfkey @LIBS@
+CFLAGS+=-I${srcdir}/../libipsec
+LIBS=	@LIBS@
 YFLAGS+=-d
 
 prefix=	@prefix@
