@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.187 2001/05/24 07:43:59 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.188 2001/06/04 08:53:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -126,13 +126,6 @@
 #if NGIF > 0
 #include <net/if_gif.h>
 #endif
-
-#ifdef MIP6
-#include <netinet6/mip6.h>
-#include <netinet6/mip6_common.h>
-
-struct nd_prefix *(*mip6_get_home_prefix_hook) __P((void));
-#endif /* MIP6 */
 
 #include <net/net_osdep.h>
 
@@ -471,48 +464,6 @@ in6_control(so, cmd, data, ifp)
 	case SIOCGETMIFCNT_IN6:
 		return (mrt6_ioctl(cmd, data));
 	}
-
-#ifdef MIP6
-	/* These require root privileges */
-	switch (cmd) {
-	case SIOCSDEBUG_MIP6:
-	case SIOCSBCFLUSH_MIP6:
-	case SIOCSDEFCONFIG_MIP6:
-	case SIOCSBRUPDATE_MIP6:
-	case SIOCSENABLEBR_MIP6:
-	case SIOCSATTACH_MIP6:
-	case SIOCSRELEASE_MIP6:
-
-	case SIOCSHALISTFLUSH_MIP6:
-	case SIOCSHAPREF_MIP6:
-	case SIOCSFWDSLUNICAST_MIP6:
-	case SIOCSFWDSLMULTICAST_MIP6:
-
-	case SIOCSFORADDRFLUSH_MIP6:
-	case SIOCSHADDRFLUSH_MIP6:
-	case SIOCSBULISTFLUSH_MIP6:
-	case SIOCACOADDR_MIP6:
-	case SIOCAHOMEADDR_MIP6:
-	case SIOCAHOMEPREF_MIP6:
-	case SIOCSBULIFETIME_MIP6:
-	case SIOCSHRLIFETIME_MIP6:
-	case SIOCDCOADDR_MIP6:
-	case SIOCSPROMMODE_MIP6:
-	case SIOCSBU2CN_MIP6:
-	case SIOCSREVTUNNEL_MIP6:
-	case SIOCSAUTOCONFIG_MIP6:
-	case SIOCSEAGERMD_MIP6:
-		if (!privileged)
-			return(EPERM);
-		/* Anyone can use these or the user is root */
-		/* case SIOCXVERYSAFECOMMAND_MIP6:  */
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
-		return mip6_ioctl(so, cmd, data, ifp, p);
-#else
-		return mip6_ioctl(so, cmd, data, ifp);
-#endif
-	}
-#endif /* MIP6 */
 
 	if (ifp == NULL)
 		return(EOPNOTSUPP);

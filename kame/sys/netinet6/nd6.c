@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.147 2001/05/31 23:42:53 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.148 2001/06/04 09:02:35 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,11 +101,6 @@
 #include <netinet6/in6_prefix.h>
 #include <netinet/icmp6.h>
 
-#ifdef MIP6
-#include <netinet6/mip6.h>
-#include <netinet6/mip6_common.h>
-#endif
-
 #ifndef __bsdi__
 #include "loop.h"
 #endif
@@ -157,10 +152,6 @@ static struct sockaddr_in6 all1_sa;
 
 static void nd6_slowtimo __P((void *));
 static int regen_tmpaddr __P((struct in6_ifaddr *));
-
-#ifdef MIP6
-void (*mip6_expired_defrouter_hook)(struct nd_defrouter *dr) = 0;
-#endif
 
 #ifdef __NetBSD__
 struct callout nd6_slowtimo_ch = CALLOUT_INITIALIZER;
@@ -509,20 +500,6 @@ nd6_timer(ignored_arg)
 #else
 	s = splnet();
 #endif
-#ifdef MIP6
-	if (MIP6_EAGER_PREFIX) {
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-		callout_reset(&nd6_timer_ch, nd6_prune * hz / MIP6_EAGER_FREQ,
-		    nd6_timer, NULL);
-#elif defined(__OpenBSD__)
-		timeout_set(&nd6_timer_ch, nd6_timer, NULL);
-		timeout_add(&nd6_timer_ch, nd6_prune * hz / MIP6_EAGER_FREQ);
-#else
-		timeout(nd6_timer, (caddr_t)0, 
-			nd6_prune * hz / MIP6_EAGER_FREQ);
-#endif
-	} else
-#endif
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&nd6_timer_ch, nd6_prune * hz,
 		      nd6_timer, NULL);
@@ -573,22 +550,11 @@ nd6_timer(ignored_arg)
 				ln->ln_asked++;
 				ln->ln_expire = time_second +
 					nd_ifinfo[ifp->if_index].retrans / 1000;
-#if defined(MIP6) && defined(MIP6_DEBUG)
-				printf("INCOMPLETE send ns #%lu to %s\n",
-				    ln->ln_asked, ip6_sprintf(&dst->sin6_addr));
-#endif
 				nd6_ns_output(ifp, NULL, &dst->sin6_addr,
 					ln, 0);
 			} else {
 				struct mbuf *m = ln->ln_hold;
-#if defined(MIP6) && defined(MIP6_DEBUG)
-				printf("INCOMPLETE free %s\n",
-				       ip6_sprintf(&dst->sin6_addr));
-#endif
 				if (m) {
-#if defined(MIP6) && defined(MIP6_DEBUG)
-					printf("Also free mbuf and send icmp6 error...\n");
-#endif
 					if (rt->rt_ifp) {
 						/*
 						 * Fake rcvif to make ICMP error
@@ -626,10 +592,6 @@ nd6_timer(ignored_arg)
 				ln->ln_state = ND6_LLINFO_PROBE;
 				ln->ln_expire = time_second +
 					ndi->retrans / 1000;
-#if defined(MIP6) && defined(MIP6_DEBUG)
-				printf("DELAY send ns #%lu to %s\n",
-				    ln->ln_asked, ip6_sprintf(&dst->sin6_addr));
-#endif
 				nd6_ns_output(ifp, &dst->sin6_addr,
 					      &dst->sin6_addr,
 					      ln, 0);
@@ -643,17 +605,9 @@ nd6_timer(ignored_arg)
 				ln->ln_asked++;
 				ln->ln_expire = time_second +
 					nd_ifinfo[ifp->if_index].retrans / 1000;
-#if defined(MIP6) && defined(MIP6_DEBUG)
-				printf("PROBE send ns #%lu to %s\n",
-				    ln->ln_asked, ip6_sprintf(&dst->sin6_addr));
-#endif
 				nd6_ns_output(ifp, &dst->sin6_addr,
 					       &dst->sin6_addr, ln, 0);
 			} else {
-#if defined(MIP6) && defined(MIP6_DEBUG)
-				printf("PROBE now free %s\n",
-				       ip6_sprintf(&dst->sin6_addr));
-#endif
 				next = nd6_free(rt);
 			}
 			break;
@@ -670,10 +624,6 @@ nd6_timer(ignored_arg)
 			defrtrlist_del(dr);
 			dr = t;
 		} else {
-#ifdef MIP6
-			if (mip6_expired_defrouter_hook)
-				(*mip6_expired_defrouter_hook)(dr);
-#endif /* MIP6 */
 			dr = TAILQ_NEXT(dr, dr_entry);
 		}
 	}
@@ -717,10 +667,6 @@ nd6_timer(ignored_arg)
 
 			ia6->ia6_flags |= IN6_IFF_DEPRECATED;
 
-#ifdef MIP6
-			if (MIP6_IS_MN_ACTIVE)
-				mip6_deprecated_addr(ia6);
-#endif /* MIP6 */
 			/*
 			 * If a temporary address has just become deprecated,
 			 * regenerate a new one if possible.

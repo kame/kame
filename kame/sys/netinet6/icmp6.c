@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.212 2001/06/01 05:35:52 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.213 2001/06/04 08:53:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -125,10 +125,6 @@
 #include "faith.h"
 #if defined(NFAITH) && 0 < NFAITH
 #include <net/if_faith.h>
-#endif
-
-#ifdef MIP6
-#include <netinet6/mip6.h>
 #endif
 
 #include <net/net_osdep.h>
@@ -560,10 +556,6 @@ icmp6_input(mp, offp, proto)
 	switch (icmp6->icmp6_type) {
 	case ICMP6_DST_UNREACH:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_dstunreach);
-#ifdef MIP6
-		if (mip6_icmp6_input(m, off, icmp6len))
-			goto freeit;
-#endif
 		switch (code) {
 		case ICMP6_DST_UNREACH_NOROUTE:
 			code = PRC_UNREACH_NET;
@@ -629,10 +621,6 @@ icmp6_input(mp, offp, proto)
 			break;
 		case ICMP6_PARAMPROB_HEADER:
 		case ICMP6_PARAMPROB_OPTION:
-#ifdef MIP6
-			if (mip6_icmp6_input(m, off, icmp6len))
-				goto freeit;
-#endif
 			code = PRC_PARAMPROB;
 			break;
 		default:
@@ -862,10 +850,6 @@ icmp6_input(mp, offp, proto)
 			m = NULL;
 			goto freeit;
 		}
-#ifdef MIP6
-		if (mip6_icmp6_input(n, off, icmp6len))
-			goto freeit;
-#endif
 		nd6_ra_input(n, off, icmp6len);
 		/* m stays. */
 		break;
@@ -925,18 +909,6 @@ icmp6_input(mp, offp, proto)
 		if (icmp6len < sizeof(struct icmp6_router_renum))
 			goto badlen;
 		break;
-
-#ifdef MIP6
-	case ICMP6_HADISCOV_REQUEST:
-		if (mip6_icmp6_input(m, off, icmp6len))
-			goto freeit;
-		break;
-		
-	case ICMP6_HADISCOV_REPLY:
-		if (mip6_icmp6_input(m, off, icmp6len))
-			goto freeit;
-		break;
-#endif
 
 	default:
 		nd6log((LOG_DEBUG,

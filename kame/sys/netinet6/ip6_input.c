@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.194 2001/05/27 13:28:35 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.195 2001/06/04 08:58:35 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -135,10 +135,6 @@
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 #include <netinet6/ipsec.h>
-#endif
-
-#ifdef MIP6
-#include <netinet6/mip6.h>
 #endif
 
 #if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
@@ -332,11 +328,6 @@ ip6_init()
 
 #ifndef __FreeBSD__
 	ip6_init2((void *)0);
-#endif
-
-#ifdef MIP6
-	/* Initialize the Mobile IPv6 code */
-	mip6_init();
 #endif
 
 #ifdef MEASURE_PERFORMANCE
@@ -1238,18 +1229,6 @@ ip6_input(m)
 		}
 #endif
 		
-#ifdef MIP6
-		/*
-		  Check if the packet was tunneled after all extion
-		  headers have been processed.
-		*/
-		if ((nxt != IPPROTO_HOPOPTS) && (nxt != IPPROTO_DSTOPTS) &&
-		    (nxt != IPPROTO_ROUTING) && (nxt != IPPROTO_FRAGMENT) &&
-		    (nxt != IPPROTO_ESP) && (nxt != IPPROTO_AH)) {
-			if (mip6_route_optimize(m))
-				goto bad;
-		}
-#endif
 		nxt = (*inet6sw[ip6_protox[nxt]].pr_input)(&m, &off, nxt);
 	}
 	return;

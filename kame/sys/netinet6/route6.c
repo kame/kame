@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.24 2001/03/14 03:07:05 itojun Exp $	*/
+/*	$KAME: route6.c,v 1.25 2001/06/04 09:07:56 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -54,11 +54,6 @@
 #include <netinet6/ip6_var.h>
 
 #include <netinet/icmp6.h>
-
-#ifdef MIP6
-#include <netinet6/mip6.h>
-#include <net/if_types.h>
-#endif
 
 static int ip6_rthdr0 __P((struct mbuf *, struct ip6_hdr *,
     struct ip6_rthdr0 *));

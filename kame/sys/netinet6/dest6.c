@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.27 2001/03/29 05:34:30 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.28 2001/06/04 08:52:43 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -59,10 +59,6 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
-
-#ifdef MIP6
-#include <netinet6/mip6.h>
-#endif
 
 /*
  * Destination options header processing.
@@ -179,20 +175,6 @@ dest6_input(mp, offp, proto)
 			 */
 
 			break;
-
-#ifdef MIP6
-		case IP6OPT_BINDING_UPDATE:
-		case IP6OPT_BINDING_ACK:
-		case IP6OPT_BINDING_REQ:
-			if (dstoptlen < IP6OPT_MINLEN) {
-				ip6stat.ip6s_toosmall++;
-				goto bad;
-			}
-			if (mip6_dstopt(m, dstopts, opt, dstoptlen) == -1)
-				goto bad;
-			optlen = *(opt + 1) + 2;
-			break;
-#endif /* MIP6 */
 
 		default:		/* unknown option */
 			optlen = ip6_unknown_opt(opt, m,

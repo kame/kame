@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.37 2001/03/29 05:34:31 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.38 2001/06/04 08:57:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,7 +64,6 @@
  *	@(#)in_pcb.c	8.2 (Berkeley) 1/4/94
  */
 
-/* for MIP6 */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
@@ -86,9 +85,6 @@
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/proc.h>
-#ifdef MIP6
-#include <sys/kernel.h>
-#endif
 
 #include <net/if.h>
 #include <net/route.h>
@@ -116,13 +112,6 @@
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 extern struct ifnet loif[NLOOP];
-#endif
-
-#ifdef MIP6
-#include <netinet6/mip6.h>
-#include <netinet6/mip6_common.h>
-
-extern struct nd_prefix *(*mip6_get_home_prefix_hook) __P((void));
 #endif
 
 /*
@@ -273,106 +262,6 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 			return(&satosin6(&ia6->ia_addr)->sin6_addr);
 		}
 	}
-
-#ifdef MIP6
-	/*
-	 * This is needed to assure that a (primary) Home Address is used
-	 * for outgoing packets when not at home. We can't choose any other
-	 * address if we want to keep connections up during movement.
-	 */
-	if (MIP6_IS_MN_ACTIVE && mip6_hifp) {
-		struct ifaddr *ifa;
-		struct in6_ifaddr *ifa6, *depr_ifa6 = NULL;
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for (ifa = mip6_hifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
-		TAILQ_FOREACH(ifa, &mip6_hifp->if_addrlist, ifa_list)
-#else
-		for (ifa = mip6_hifp->if_addrlist.tqh_first; ifa;
-		     ifa = ifa->ifa_list.tqe_next)
-#endif
-		{
-			int ifa_plen;
-
-			if (ifa->ifa_addr->sa_family != AF_INET6)
-				continue;
-
-			ifa6 = (struct in6_ifaddr *)ifa;
-
-			if ((ifa6->ia6_flags & IN6_IFF_HOME) == 0)
-				continue;
-		
-			if (IFA6_IS_INVALID(ifa6))
-				continue;
-
-			if (in6_addrscope(dst) != 
-			    in6_addrscope(&ifa6->ia_addr.sin6_addr))
-				continue;
-
-			ifa_plen = in6_mask2len(&ifa6->ia_prefixmask.sin6_addr,
-						NULL);
-			if (ifa_plen != mip6_phpl ||
-			    !in6_are_prefix_equal(&ifa6->ia_addr.sin6_addr,
-						  &mip6_php, ifa_plen))
-				continue;
-
-			if (IFA6_IS_DEPRECATED(ifa6) && depr_ifa6 == NULL) {
-				depr_ifa6 = ifa6;
-				continue;
-			}
-
-			/* 
-			 * At least one matched preferred address.
-			 */
-			break;
-		}
-		if ((ifa6  = (struct in6_ifaddr *)ifa) == NULL &&
-		    depr_ifa6 != NULL)
-			/*
-			 * Use deprecated as last resort.
-			 */
-			ifa6 = depr_ifa6;
-
-		if (ifa6) {
-#ifdef MIP6_DEBUG
-			/* Noisy but useful */
-			mip6_debug("%s: Local address %s is chosen for pcb to "
-				   "dest %s.\n", __FUNCTION__,
-				   ip6_sprintf(&ifa6->ia_addr.sin6_addr), 
-				   ip6_sprintf(dst));
-#endif
-			return(&ifa6->ia_addr.sin6_addr);
-		}
-#ifdef MIP6_DEBUG
-		else
-			/* Noisy but useful */
-			mip6_debug("%s: No home address chosen for pcb to "
-				   "dest %s.\n", __FUNCTION__,
-				   ip6_sprintf(dst));
-#endif
-		/* Fall through */
-	}
-#endif /* MIP6 */
-#ifdef OLDMIP6
-	if (mip6_get_home_prefix_hook) {        /* Only Mobile Node */
-		struct nd_prefix *pr;
-		if ((pr = (*mip6_get_home_prefix_hook)()) &&
-		    !IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr)) {
-			if (in6_addrscope(dst) ==
-			    in6_addrscope(&pr->ndpr_addr)) {
-#ifdef MIP6_DEBUG
-				/* Noisy but useful */
-				mip6_debug("%s: Local address %s is chosen "
-					   "for pcb to dest %s.\n",
-					   __FUNCTION__,
-					   ip6_sprintf(&pr->ndpr_addr),
-					   ip6_sprintf(dst));
-#endif
-				return(&pr->ndpr_addr);
-			}
-		}
-	}
-#endif /* OLDMIP6 */
 
 	/*
 	 * If route is known or can be allocated now,

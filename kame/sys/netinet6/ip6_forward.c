@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.69 2001/05/17 03:48:30 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.70 2001/06/04 08:57:48 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,10 +85,6 @@
 
 #if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <netinet6/ip6_fw.h>
-#endif
-
-#ifdef MIP6
-#include <netinet6/mip6.h>
 #endif
 
 #include <net/net_osdep.h>
@@ -347,43 +343,6 @@ ip6_forward(m, srcrt)
     }
     skip_ipsec:
 #endif /* IPSEC */
-
-#ifdef OLDMIP6
-	{
-		struct   mip6_bc   *bc;
-
-		bc = mip6_bc_find(NULL, &ip6->ip6_dst);
-		if ((bc != NULL) && (bc->flags & IP6_BUF_HOME)) {
-			if (mip6_tunnel_output(&m, bc) != 0) {
-				ip6stat.ip6s_cantforward++;
-				if (mcopy) m_freem(mcopy);
-				m_freem(m);
-				return;
-			}
-		}
-		ip6 = mtod(m, struct ip6_hdr *);	/* m has changed */
-	}
-#endif /* OLDMIP6 */
-#ifdef MIP6
-	{
-		struct   mip6_bc   *bc;
-
-		bc = mip6_bc_find(NULL, &ip6->ip6_dst);
-		if ((bc != NULL) && (bc->flags & IP6_BUF_HOME)) {
-			if (mip6_tunnel_output(&m, bc) != 0) {
-#ifdef MIP6_DEBUG
-				mip6_debug("%s: can't forward packet to MN\n",
-					   __FUNCTION__);
-#endif
-				ip6stat.ip6s_cantforward++;
-				if (mcopy)
-					m_freem(mcopy);
-/*				m_freem(m);    Correct? */
-			}
-			return;
-		}
-	}
-#endif /* MIP6 */
 
 	dst = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
 	if (!srcrt) {
