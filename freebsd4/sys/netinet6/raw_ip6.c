@@ -367,6 +367,7 @@ rip6_output(m, so, dstsock, control)
 
 	if ((error = scope6_check_id(dstsock, ip6_use_defzone)) != 0)
 		goto bad;
+	ip6->ip6_dst = dstsock->sin6_addr;
 
 	/* Source address selection. */
 	if ((in6 = in6_selectsrc(dstsock, optp, in6p->in6p_moptions,
