@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.67 2000/06/14 09:48:29 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.68 2000/06/14 16:03:10 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -380,7 +380,8 @@ isakmp_main(msg, remote, local)
 		if (ph1exchange[etypesw(iph1->etype)]
 		               [iph1->side]
 		               [iph1->status] == NULL) {
-			/* inogre it */
+			remph1(iph1);
+			delph1(iph1);
 			return -1;
 		}
 		if ((ph1exchange[etypesw(iph1->etype)]
@@ -389,7 +390,8 @@ isakmp_main(msg, remote, local)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, remote,
 					"failed to pre-process packet.\n"));
-			/* don't release handler */
+			remph1(iph1);
+			delph1(iph1);
 			return -1;
 		}
 
@@ -422,7 +424,8 @@ isakmp_main(msg, remote, local)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, remote,
 					"failed to process packet.\n"));
-			/* don't release handler */
+			remph1(iph1);
+			delph1(iph1);
 			return -1;
 		}
 
@@ -512,7 +515,9 @@ isakmp_main(msg, remote, local)
 		if (ph2exchange[etypesw(isakmp->etype)]
 		               [iph2->side]
 		               [iph2->status] == NULL) {
-			/* ignore it */
+			unbindph12(iph2);
+			remph2(iph2);
+			delph2(iph2);
 			return -1;
 		}
 		error = (ph2exchange[etypesw(isakmp->etype)]
@@ -524,7 +529,9 @@ isakmp_main(msg, remote, local)
 					"failed to pre-process packet.\n"));
 			if (error != ISAKMP_INTERNAL_ERROR)
 				isakmp_info_send_n2(iph2, error, NULL);
-			/* don't release handler */
+			unbindph12(iph2);
+			remph2(iph2);
+			delph2(iph2);
 			return -1;
 		}
 
@@ -559,7 +566,9 @@ isakmp_main(msg, remote, local)
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, remote,
 					"failed to process packet.\n"));
-			/* don't release handler */
+			unbindph12(iph2);
+			remph2(iph2);
+			delph2(iph2);
 			return -1;
 		}
 	    }
