@@ -13,10 +13,10 @@ clean::
 
 # only for developers
 bsdi3:
-	(cd ${.CURDIR}; set CVSROOT=cvs.kame.net/cvsroot/kame-local; export CVSROOT; cvs -d cvs.kame.net:/cvsroot/kame-local co -d bsdi3 -P kame/bsdi3)
+	(cd ${.CURDIR}; set CVSROOT=cvs.kame.net:/cvsroot/kame-local; export CVSROOT; cvs -d cvs.kame.net:/cvsroot/kame-local co -d bsdi3 -P kame/bsdi3)
 
 bsdi4:
-	(cd ${.CURDIR}; set CVSROOT=cvs.kame.net/cvsroot/kame-local; export CVSROOT; cvs -d cvs.kame.net:/cvsroot/kame-local co -d bsdi4 -P kame/bsdi4)
+	(cd ${.CURDIR}; set CVSROOT=cvs.kame.net:/cvsroot/kame-local; export CVSROOT; cvs -d cvs.kame.net:/cvsroot/kame-local co -d bsdi4 -P kame/bsdi4)
 
 DOC=	CHANGELOG CHANGELOG.1998 CHANGELOG.1997 CHANGELOG.1996 \
 	COPYRIGHT COPYRIGHT.jp IMPLEMENTATION INSTALL \
