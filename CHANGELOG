@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.939 2000/05/27 05:05:15 itojun Exp $
+$Id: CHANGELOG,v 1.940 2000/05/27 06:21:53 itojun Exp $
 
 <200005>
+Sat May 27 15:18:58 JST 2000  itojun@iijlab.net
+	* kame/ping6/ping6.c: support -N option to probe NI group address at
+	  ease.  for example:
+	  % ping6 -N -I ne2 lychee
+	  will probe NI group address for nodename "lychee", instead of the
+	  address resolved for "lychee".
+
 Sat May 27 14:01:29 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6_ifattach.c: on in6_ifattach(), join NI group address
 	  specified in icmp-name-lookup-04 and beyond.
