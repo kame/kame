@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.455 2004/07/14 02:23:30 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.456 2004/10/27 07:59:36 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1273,7 +1273,7 @@ skip_ipsec2:;
 	if ((error = ip6_getpmtu(ro_pmtu, ro, ifp, &finaldst, &mtu,
 	    &alwaysfrag)) != 0)
 		goto bad;
-#ifdef IPSEC
+#if defined(IPSEC) && !defined(__OpenBSD__)
 	if (needipsectun)
 		mtu = IPV6_MMTU;
 #endif
