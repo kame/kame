@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.c,v 1.14 2001/04/03 15:51:54 thorpej Exp $	*/
+/*	$KAME: algorithm.c,v 1.15 2001/08/09 07:32:19 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -289,42 +289,4 @@ algclass2doi(class)
 	}
 	/*NOTREACHED*/
 	return -1;
-}
-
-struct algorithm_strength **
-initalgstrength()
-{
-	struct algorithm_strength **new;
-	int i;
-
-	new = racoon_calloc(1, MAXALGCLASS * sizeof(*new));
-	if (new == NULL) {
-		plog(LLV_ERROR, LOCATION, NULL,
-			"failed to get buffer.\n");
-		return NULL;
-	}
-
-	for (i = 0; i < MAXALGCLASS; i++) {
-		new[i] = racoon_calloc(1, sizeof(*new[i]));
-		if (new[i] == NULL) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"failed to get buffer.\n");
-			return NULL;
-		}
-	}
-
-	return new;
-}
-
-void
-flushalgstrength(head)
-	struct algorithm_strength **head;
-{
-	int i;
-
-	for (i = 0; i < MAXALGCLASS; i++)
-		if (head[i])
-			racoon_free(head[i]);
-
-	racoon_free(head);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.60 2001/08/08 10:02:54 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.61 2001/08/09 07:32:19 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -205,10 +205,6 @@ hexstring	0x{hexdigit}+
 <S_PLCYT>mode		{ YYD; return(SECMODE); }
 <S_PLCYT>tunnel		{ YYD; yylval.num = IPSECDOI_ATTR_ENC_MODE_TUNNEL; return(SECMODETYPE); }
 <S_PLCYT>transport	{ YYD; yylval.num = IPSECDOI_ATTR_ENC_MODE_TRNS; return(SECMODETYPE); }
-<S_PLCYT>strength	{ YYD; return(STRENGTH); }
-<S_PLCYT>extra_high	{ YYD; yylval.num = algstrength_ehigh; return(STRENGTHTYPE); }
-<S_PLCYT>high		{ YYD; yylval.num = algstrength_high; return(STRENGTHTYPE); }
-<S_PLCYT>normal		{ YYD; yylval.num = algstrength_normal; return(STRENGTHTYPE); }
 <S_PLCYT>encryption_algorithm { YYD; yylval.num = algclass_ipsec_enc; return(ALGORITHM_CLASS); }
 <S_PLCYT>authentication_algorithm { YYD; yylval.num = algclass_ipsec_auth; return(ALGORITHM_CLASS); }
 <S_PLCYT>compression_algorithm	{ YYD; yylval.num = algclass_ipsec_comp; return(ALGORITHM_CLASS); }
@@ -282,10 +278,6 @@ hexstring	0x{hexdigit}+
 <S_RMTP>lifetime	{ YYD; return(LIFETIME); }
 <S_RMTP>time		{ YYD; return(LIFETYPE_TIME); }
 <S_RMTP>byte		{ YYD; return(LIFETYPE_BYTE); }
-<S_RMTP>strength	{ YYD; return(STRENGTH); }
-<S_RMTP>extra_high	{ YYD; yylval.num = algstrength_ehigh; return(STRENGTHTYPE); }
-<S_RMTP>high		{ YYD; yylval.num = algstrength_high; return(STRENGTHTYPE); }
-<S_RMTP>normal		{ YYD; yylval.num = algstrength_normal; return(STRENGTHTYPE); }
 <S_RMTP>encryption_algorithm { YYD; yylval.num = algclass_isakmp_enc; return(ALGORITHM_CLASS); }
 <S_RMTP>authentication_method { YYD; yylval.num = algclass_isakmp_ameth; return(ALGORITHM_CLASS); }
 <S_RMTP>hash_algorithm	{ YYD; yylval.num = algclass_isakmp_hash; return(ALGORITHM_CLASS); }

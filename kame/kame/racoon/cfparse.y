@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.102 2001/07/09 13:46:48 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.103 2001/08/09 07:32:19 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -1411,8 +1411,6 @@ set_isakmp_proposal(rmconf, prspec)
 		plog(LLV_DEBUG2, LOCATION, NULL,
 			"lifebyte = %d\n",
 			s->lifebyte ? s->lifebyte : p->lifebyte);
-		plog(LLV_DEBUG2, LOCATION, NULL,
-			"strength=%s\n", s_algstrength(s->strength));
 		plog(LLV_DEBUG2, LOCATION, NULL,
 			"encklen=%d\n", s->encklen);
 

@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.h,v 1.12 2001/03/21 22:38:29 sakane Exp $	*/
+/*	$KAME: algorithm.h,v 1.13 2001/08/09 07:32:19 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,22 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-/* algorithm strength */
-enum {
-	algstrength_ehigh,
-	algstrength_high,
-	algstrength_normal,
-#define MAXALGSTRENGTH	3
-};
-
-struct algorithm_strength {
-	/*
-	 * algorithm type N is mapped to 1 << (N - 1).
-	 * N of 0 is not encoded, that is, it means nothing.
-	 */
-	u_int32_t algtype[MAXALGSTRENGTH];
-};
 
 /* algorithm class */
 enum {
@@ -109,5 +93,3 @@ extern int default_keylen __P((int, int));
 extern int check_keylen __P((int, int, int));
 extern int algtype2doi __P((int, int));
 extern int algclass2doi __P((int));
-extern struct algorithm_strength **initalgstrength __P((void));
-extern void flushalgstrength __P((struct algorithm_strength **));
