@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.18 2002/01/26 04:45:22 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.19 2002/01/28 07:01:57 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1043,7 +1043,6 @@ contiguousfail:
 	}
 #endif
 	/* XXX encapsulate to our home link ? */
-	printf("ouch!\n");
 	m_freem(m);
 	return(0);
 
