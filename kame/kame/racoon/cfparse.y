@@ -304,12 +304,12 @@ listen_stmt
 				return -1;
 			}
 			p->addr = dupsaddr($2->ai_addr);
+			freeaddrinfo($2);
 			if (p->addr == NULL) {
 				yyerror("failed to copy sockaddr ");
 				delmyaddr(p);
 				return NULL;
 			}
-			freeaddrinfo($2);
 
 			insmyaddr(p, &lcconf->myaddrs);
 
@@ -701,12 +701,12 @@ remote_index
 		}
 	|	ike_addrinfo_port
 		{
-			$$ = newsaddr($1->ai_addrlen);
+			$$ = dupsaddr($1->ai_addr);
+			freeaddrinfo($1);
 			if ($$ == NULL) {
 				yyerror("failed to allocate sockaddr");
 				return -1;
 			}
-			memcpy($$, $1->ai_addr, $1->ai_addrlen);
 		}
 	;
 remote_specs
