@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.7 2002/06/21 13:55:04 suz Exp $	*/
+/*	$KAME: vif.h,v 1.8 2004/06/15 07:43:53 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -64,7 +64,7 @@ typedef	u_int32 vifbitmap_t;
 /*
  * And <netinet/ip_mroute.h> was missing some required functions anyway
  */
-#if !defined(__NetBSD__) && !defined(__OpenBSD__)
+#ifdef __FreeBSD__
 #define	VIFM_SETALL(m)			((m) = ~0)
 #endif
 #define	VIFM_ISSET_ONLY(n, m)		((m) == (1 << (n)))

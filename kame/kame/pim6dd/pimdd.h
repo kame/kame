@@ -1,4 +1,4 @@
-/*	$KAME: pimdd.h,v 1.2 2000/12/04 06:33:10 itojun Exp $	*/
+/*	$KAME: pimdd.h,v 1.3 2004/06/15 07:43:53 itojun Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Oregon.
@@ -532,7 +532,7 @@ do {                                                                         \
 #define PIM_LEAF_TIMEOUT               (3.5 * IGMP_QUERY_INTERVAL)
 #endif /* NOSUCHDEF */
 
-#if defined(__bsdi__) || defined(__NetBSD__)
+#ifdef __NetBSD__
 /*
  * Struct used to communicate from kernel to multicast router
  * note the convenient similarity to an IP packet

@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.8 2003/09/02 09:57:05 itojun Exp $	*/
+/*	$KAME: timer.c,v 1.9 2004/06/15 07:43:53 itojun Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Oregon.
@@ -196,11 +196,11 @@ age_routes()
     /*
      * Timing out of the global `unicast_routing_timer` and data rate timer
      */
-   IF_TIMEOUT(unicast_routing_timer) {
+    IF_TIMEOUT(unicast_routing_timer) {
 	ucast_flag = TRUE;
 	unicast_routing_timer = unicast_routing_check_interval;
     }
-    ELSE {
+    else {
 	ucast_flag = FALSE;
     }
 

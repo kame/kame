@@ -1,4 +1,4 @@
-/*	$KAME: defs.h,v 1.13 2003/09/02 10:12:24 suz Exp $	*/
+/*	$KAME: defs.h,v 1.14 2004/06/15 07:43:53 itojun Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Oregon.
@@ -65,14 +65,11 @@
 #include <sys/ioctl.h>
 #include <sys/queue.h>
 #include <fcntl.h>
-#if ((defined(SYSV)) || (defined(__bsdi__)) || ((defined SunOS) && (SunOS < 50)))
-#include <sys/sockio.h>
-#endif /* SYSV || __bsdi__ || SunOS 4.x */
 #include <sys/time.h>
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
@@ -84,12 +81,12 @@
 #include <arpa/inet.h>
 #ifdef __FreeBSD__      /* sigh */
 #include <osreldate.h>
-#endif /* __FreeBSD__ */
-#if (defined(__bsdi__)) || (defined(__FreeBSD__) && (__FreeBSD_version >= 220000))
+#endif
+#ifdef __FreeBSD__
 #define rtentry kernel_rtentry
 #include <net/route.h>
 #undef rtentry
-#endif /* __bsdi__ or __FreeBSD_version >= 220000 */
+#endif
 #include <netinet/ip_mroute.h>
 #include <netinet6/ip6_mroute.h>
 #include <strings.h>
@@ -126,8 +123,7 @@ typedef void (*ihfunc_t) __P((int, fd_set *));
 /*
  * Miscellaneous constants and macros
  */
-/* #if (!(defined(__bsdi__)) && !(defined(KERNEL))) */
-#ifndef KERNEL
+#ifndef _KERNEL
 #define max(a, b)               ((a) < (b) ? (b) : (a))
 #define min(a, b)               ((a) > (b) ? (b) : (a))
 #endif
@@ -135,16 +131,8 @@ typedef void (*ihfunc_t) __P((int, fd_set *));
 /*
  * Various definitions to make it working for different platforms
  */
-/* The old style sockaddr definition doesn't have sa_len */
-#if (defined(BSD) && (BSD >= 199006)) /* sa_len was added with 4.3-Reno */ 
 #define HAVE_SA_LEN
-#endif
-
-/* Versions of Solaris older than 2.6 don't have routing sockets. */
-/* XXX TODO: check FreeBSD version and add all other platforms */
-#if ((defined(SunOS) && SunOS >=56) || (defined __FreeBSD__) || (defined IRIX) || (defined __bsdi__) || defined(__NetBSD__) || defined(__OpenBSD__))
 #define HAVE_ROUTING_SOCKETS
-#endif
 
 #define TRUE			1
 #define FALSE			0
@@ -257,16 +245,11 @@ extern char		s2[];
 extern char		s3[];
 extern char		s4[];
 
-#if !(defined(BSD) && (BSD >= 199103))
-extern int		errno;
-extern int		sys_nerr;
-extern char *		sys_errlist[];
-#endif
-
+#include <errno.h>
 
 #ifndef IGMP_MEMBERSHIP_QUERY
 #define IGMP_MEMBERSHIP_QUERY		IGMP_HOST_MEMBERSHIP_QUERY
-#if !(defined(__NetBSD__))
+#ifndef __NetBSD__
 #define IGMP_V1_MEMBERSHIP_REPORT	IGMP_HOST_MEMBERSHIP_REPORT
 #define IGMP_V2_MEMBERSHIP_REPORT	IGMP_HOST_NEW_MEMBERSHIP_REPORT
 #else
@@ -276,7 +259,7 @@ extern char *		sys_errlist[];
 #define IGMP_V2_LEAVE_GROUP		IGMP_HOST_LEAVE_MESSAGE
 #endif
 
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 #define IGMP_MTRACE_RESP                IGMP_MTRACE_REPLY
 #define IGMP_MTRACE                     IGMP_MTRACE_QUERY
 #endif
@@ -298,8 +281,6 @@ extern char *		sys_errlist[];
 
 #define NOT_TIMEOUT(value)    \
      (((value) >= TIMER_INTERVAL) && ((value) -= TIMER_INTERVAL))
-
-#define ELSE else           /* To make emacs cc-mode happy */      
 
 
 /*
