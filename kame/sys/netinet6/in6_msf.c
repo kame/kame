@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.5 2002/10/04 12:00:44 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.6 2002/10/08 03:13:08 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -2138,7 +2138,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	struct group_filter ogrpf;
 	struct group_filter *grpf;
 	struct sockaddr *sa_grp;
-	struct sockaddr_storage *ss, *ss_src = NULL, *old_ss;
+	struct sockaddr_storage *ss, *ss_src, *old_ss;
 	u_int16_t add_num, old_num;
 	u_int old_mode;
 	struct sockaddr *dst;
@@ -2305,7 +2305,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		}
 		for (j = 0; j < grpf->gf_numsrc; j++) {
 			error = copyin((void *)&(*grpfp)->gf_slist[j],
-				       (void *)&ss,
+				       (void *)ss,
 				       (*grpfp)->gf_slist[j].ss_len);
 			if (error != 0) /* EFAULT */
 				break;
@@ -2321,7 +2321,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 					error = EINVAL;
 					break;
 				}
-			} else if (ss_src->ss_family == AF_INET6) {
+			} else if (ss->ss_family == AF_INET6) {
 #if 0
 				IN6_SG_ADDR_SCOPE_CHECK(SIN6_ADDR(sa_grp),
 							SIN6_ADDR(ss));
@@ -2343,7 +2343,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			 * Sort and validate source lists. Duplicate addresses
 			 * can be checked here.
 			 */
-			if (in6_merge_msf_source_addr(iasl, SIN6(&ss),
+			if (in6_merge_msf_source_addr(iasl, SIN6(ss),
 						      IMS_ADD_SOURCE) != 1) {
 				error = EINVAL;
 				break;
