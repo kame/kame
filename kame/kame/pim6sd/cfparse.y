@@ -74,7 +74,8 @@ struct attr_list {
 };
 
 enum {IFA_FLAG, IFA_PREFERENCE, IFA_METRIC, RPA_PRIORITY, RPA_TIME,
-      BSRA_PRIORITY, BSRA_TIME, IN6_PREFIX, THRESA_RATE, THRESA_INTERVAL};
+      BSRA_PRIORITY, BSRA_TIME, BSRA_MASKLEN, IN6_PREFIX, THRESA_RATE,
+      THRESA_INTERVAL};
 
 static int strict;		/* flag if the grammer check is strict */
 static struct attr_list *rp_attr, *bsr_attr, *grp_prefix, *regthres_attr,
@@ -102,7 +103,7 @@ extern int yylex __P((void));
 %token REVERSELOOKUP
 %token PHYINT IFNAME DISABLE PREFERENCE METRIC NOLISTENER
 %token GRPPFX
-%token CANDRP CANDBSR TIME PRIORITY
+%token CANDRP CANDBSR TIME PRIORITY MASKLEN
 %token NUMBER STRING SLASH
 %token REGTHRES DATATHRES RATE INTERVAL
 %token SRCMETRIC SRCPREF HELLOPERIOD GRANULARITY JPPERIOD
@@ -293,6 +294,18 @@ bsr_attributes:
 		{
 			if (($$ = add_attribute_num($1, BSRA_TIME, $3))
 			    == NULL)
+				return(-1);
+		}
+	|	bsr_attributes MASKLEN NUMBER
+		{
+			int masklen = $3;
+
+			if (masklen < 0 || masklen > 128)
+				yywarn("invalid mask length: %d (ignored)",
+				       masklen);
+			else if (($$ = add_attribute_num($1, BSRA_MASKLEN,
+							 masklen))
+				 == NULL)
 				return(-1);
 		}
 	;
@@ -726,10 +739,12 @@ bsr_config()
 {
 	struct sockaddr_in6 *sa6_bsr = NULL;
 	struct attr_list *al;
+	int my_bsr_hash_masklen;
 
 	/* initialization by default values */
 	my_bsr_period = PIM_DEFAULT_BOOTSTRAP_PERIOD;
 	my_bsr_priority = PIM_DEFAULT_BSR_PRIORITY;
+	my_bsr_hash_masklen = RP_DEFAULT_IPV6_HASHMASKLEN;
 
 	if (cand_bsr_ifname) {
 		sa6_bsr = local_iface(cand_bsr_ifname);
@@ -745,6 +760,10 @@ bsr_config()
 		case BSRA_PRIORITY:
 			if (al->attru.number >= 0)
 				my_bsr_priority = al->attru.number;
+			break;
+		case BSRA_MASKLEN:
+			/* validation has been done. */
+			my_bsr_hash_masklen = al->attru.number;
 			break;
 		case BSRA_TIME:
 			if (al->attru.number < 10)
@@ -764,17 +783,17 @@ bsr_config()
 	if (!sa6_bsr)
 		sa6_bsr = max_global_address(); /* this MUST suceed */
 	my_bsr_address = *sa6_bsr;
+	MASKLEN_TO_MASK6(my_bsr_hash_masklen, my_bsr_hash_mask);
 
 	IF_DEBUG(DEBUG_PIM_BOOTSTRAP) {
-		log(LOG_DEBUG, 0,
-		    "Local BSR address: %s",
+		log(LOG_DEBUG, 0, "Local BSR address: %s",
 		    inet6_fmt(&my_bsr_address.sin6_addr));
-		log(LOG_DEBUG, 0,
-		    "Local BSR priority : %u",my_bsr_priority);
-		log(LOG_DEBUG,0,
-		    "Local BSR period is : %u sec.",
+		log(LOG_DEBUG, 0, "Local BSR priority : %u", my_bsr_priority);
+		log(LOG_DEBUG, 0, "Local BSR period is : %u sec.",
 		    my_bsr_period);
-	}  
+		log(LOG_DEBUG, 0, "Local BSR hash mask length: %d",
+		    my_bsr_hash_masklen);
+	}
 
 	return(0);
 }
