@@ -1797,11 +1797,7 @@ phys_status(int force)
 	char psrcaddr[NI_MAXHOST];
 	char pdstaddr[NI_MAXHOST];
 	const char *ver = "";
-#ifdef NI_WITHSCOPEID
-	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else /* NI_WITHSCOPEID */
 	const int niflag = NI_NUMERICHOST;
-#endif /* NI_WITHSCOPEID */
 	struct if_laddrreq req;
 
 	psrcaddr[0] = pdstaddr[0] = '\0';

@@ -475,11 +475,7 @@ routename6(struct sockaddr_in6 *sin6)
 {
 	int	 niflags;
 
-#ifdef NI_WITHSCOPEID
-	niflags = NI_WITHSCOPEID;
-#else
 	niflags = 0;
-#endif
 	if (nflag)
 		niflags |= NI_NUMERICHOST;
 	else
@@ -541,11 +537,7 @@ netname6(struct sockaddr_in6 *sa6, struct sockaddr_in6 *mask)
 	int masklen, final = 0, illegal = 0;
 	int i, lim;
 	char hbuf[NI_MAXHOST];
-#ifdef NI_WITHSCOPEID
-	int flag = NI_WITHSCOPEID;
-#else
 	int flag = 0;
-#endif
 	int error;
 
 	sin6 = *sa6;
