@@ -39,23 +39,22 @@
 #include <sys/socket.h>
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-#include <net/if_var.h>
+# include <net/if_var.h>
+#endif
+#include <net/if_types.h>
 #include <net/if_dl.h>
-#endif /* __FreeBSD__ >= 3 */
 #include <netinet/in.h>
 #ifndef __NetBSD__
-#ifdef	__FreeBSD__
-#define	KERNEL
+# ifdef	__FreeBSD__
+#  define	KERNEL
+# endif
+# include <netinet/if_ether.h>
+# ifdef	__FreeBSD__
+#  undef	KERNEL
+# endif
+#else
+# include <net/if_ether.h>
 #endif
-#include <netinet/if_ether.h>
-#ifdef	__FreeBSD__
-#undef	KERNEL
-#endif
-#else /* __NetBSD__ */
-#include <net/if_ether.h>
-#include <net/if_dl.h>
-#include <net/if_types.h>
-#endif /* __NetBSD__ */
 #include <netinet/in_var.h>
 #include <arpa/inet.h>
 
@@ -70,18 +69,16 @@ struct	nlist nl[] = {
 const char *inet6_n2a __P((struct in6_addr *));
 int main __P((void));
 char *ifname __P((struct ifnet *));
-#ifndef __NetBSD__
-int havearpcom __P((char *));
-#endif /* __NetBSD__ */
 void kread __P((u_long, void *, int));
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 void acmc __P((struct ether_multi *));
-#else
-void ifmamc __P((struct ifmultiaddr *ifma_p));
-#endif /* __FreeBSD__ < 3 */
+#endif
 void if6_addrlist __P((struct ifaddr *));
 void in6_multilist __P((struct in6_multi *));
 struct in6_multi * in6_multientry __P((struct in6_multi *));
+#if !defined(__NetBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+static char *ether_ntoa __P((u_char *));
+#endif
 
 #define	KREAD(addr, buf, type) \
 	kread((u_long)addr, (void *)buf, sizeof(type))
@@ -124,27 +121,7 @@ int main()
 		KREAD(ifp, &ifnet, struct ifnet);
 		printf("%s:\n", if_indextoname(ifnet.if_index, ifname));
 
-#ifndef __NetBSD__
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		if6_addrlist(TAILQ_FIRST(&ifnet.if_addrhead));
-		ifp = ifnet.if_link.tqe_next;
-#else /* __FreeBSD__ >= 3 */
-		if6_addrlist(ifnet.if_addrlist);
-
-		if (havearpcom(ifname)) {
-		  KREAD(ifp, &arpcom, struct arpcom);
-		  printf("\tenaddr %02x:%02x:%02x:%02x:%02x:%02x",
-			 arpcom.ac_enaddr[0], arpcom.ac_enaddr[1],
-			 arpcom.ac_enaddr[2], arpcom.ac_enaddr[3],
-			 arpcom.ac_enaddr[4], arpcom.ac_enaddr[5]);
-		  printf(" multicnt %d", arpcom.ac_multicnt);
-		  acmc(arpcom.ac_multiaddrs);
-		  printf("\n");
-		}
-
-		ifp = ifnet.if_next;
-#endif /* __FreeBSD__ >= 3 */
-#else
+#ifdef __NetBSD__
 		if6_addrlist(ifnet.if_addrlist.tqh_first);
 
 		KREAD(ifnet.if_sadl, &sdl, struct sockaddr_dl);
@@ -158,6 +135,21 @@ int main()
 		}
 
 		ifp = ifnet.if_list.tqe_next;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+		if6_addrlist(TAILQ_FIRST(&ifnet.if_addrhead));
+		ifp = ifnet.if_link.tqe_next;
+#else /* other cases */
+		if6_addrlist(ifnet.if_addrlist);
+
+		if (ifnet.if_type == IFT_ETHER) {
+			KREAD(ifp, &arpcom, struct arpcom);
+			printf("\tenaddr %s", ether_ntoa(arpcom.ac_enaddr));
+			printf(" multicnt %d", arpcom.ac_multicnt);
+			acmc(arpcom.ac_multiaddrs);
+			printf("\n");
+		}
+
+		ifp = ifnet.if_next;
 #endif
 	}
 
@@ -189,36 +181,7 @@ void kread(addr, buf, len)
 	}
 }
 
-#ifndef __NetBSD__
-int havearpcom(p)
-	char *p;
-{
-	if (strncmp(p, "ne", 2) == 0) return 1;
-	if (strncmp(p, "eo", 2) == 0) return 1;
-	if (strncmp(p, "ep", 2) == 0) return 1;
-	if (strncmp(p, "tn", 2) == 0) return 1;
-	if (strncmp(p, "de", 2) == 0) return 1;
-	if (strncmp(p, "hpp", 3) == 0) return 1;
-	if (strncmp(p, "re", 2) == 0) return 1;
-	if (strncmp(p, "ef", 2) == 0) return 1;
-	if (strncmp(p, "di", 2) == 0) return 1;
-	if (strncmp(p, "we", 2) == 0) return 1;
-	if (strncmp(p, "el", 2) == 0) return 1;
-	if (strncmp(p, "ex", 2) == 0) return 1;
-	if (strncmp(p, "pe", 2) == 0) return 1;
-	if (strncmp(p, "xir", 3) == 0) return 1;
-	if (strncmp(p, "fxp", 2) == 0) return 1;
-	if (strncmp(p, "fe", 2) == 0) return 1;
-	if (strncmp(p, "cnw", 2) == 0) return 1;
-/*	if (strncmp(p, "tr", 2) == 0) return 1; ??? */
-/*	if (strncmp(p, "fea", 3) == 0) return 1; ??? */
-/*	if (strncmp(p, "fpa", 3) == 0) return 1; ??? */
-/*	if (strncmp(p, "te", 2) == 0) return 1; ??? */
-	return 0;
-}
-#endif
-
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 void acmc(am)
 	struct ether_multi *am;
 {
@@ -229,25 +192,19 @@ void acmc(am)
 		
 		printf("\n\t\t");
 #ifndef __NetBSD__
-		printf("%02x:%02x:%02x:%02x:%02x:%02x--",
-			em.enm_addrlo[0], em.enm_addrlo[1],
-			em.enm_addrlo[2], em.enm_addrlo[3],
-			em.enm_addrlo[4], em.enm_addrlo[5]);
-		printf("%02x:%02x:%02x:%02x:%02x:%02x",
-			em.enm_addrhi[0], em.enm_addrhi[1],
-			em.enm_addrhi[2], em.enm_addrhi[3],
-			em.enm_addrhi[4], em.enm_addrhi[5]);
-		printf(" %d", em.enm_refcount);
+		printf("%s -- ", ether_ntoa(em.enm_addrlo));
+		printf("%s ", ether_ntoa(em.enm_addrhi));
+		printf("%d", em.enm_refcount);
 		am = em.enm_next;
 #else
-		printf("%s -- ", ether_ntoa((struct ether_addr *)&em.enm_addrlo));
+		printf("%s -- ", ether_ntoa((struct ether_addr *)em.enm_addrlo));
 		printf("%s ", ether_ntoa((struct ether_addr *)&em.enm_addrhi));
 		printf("%d", em.enm_refcount);
 		am = em.enm_list.le_next;
 #endif
 	}
 }
-#endif /* __FreeBSD__ < 3 */
+#endif
 
 void
 if6_addrlist(ifap)
@@ -277,19 +234,17 @@ if6_addrlist(ifap)
 		       inet_ntop(AF_INET6,
 				 (const void *)&if6a.ia_addr.sin6_addr,
 				 in6buf, sizeof(in6buf)));
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		mc = mc ? mc : if6a.ia6_multiaddrs.lh_first;
-#endif /* !__FreeBSD__ || __FreeBSD__ < 3 */
+#endif
 	nextifap:
-#ifndef __NetBSD__
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __NetBSD__
+		ifap = ifa.ifa_list.tqe_next;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
 		ifap = ifa.ifa_link.tqe_next;
 #else
 		ifap = ifa.ifa_next;
 #endif /* __FreeBSD__ >= 3 */
-#else
-		ifap = ifa.ifa_list.tqe_next;
-#endif
 	}
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	if (ifap0) {
@@ -326,7 +281,7 @@ if6_addrlist(ifap)
 #else
 	if (mc)
 		in6_multilist(mc);
-#endif /* !__FreeBSD__ || __FreeBSD__ < 3 */
+#endif
 }
 
 struct in6_multi *
@@ -350,3 +305,16 @@ in6_multilist(mc)
 	while (mc)
 		mc = in6_multientry(mc);
 }
+
+#if !defined(__NetBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+static char *
+ether_ntoa(p)
+	u_char *p;
+{
+	static char buf[20];
+
+	snprintf(buf, sizeof(buf), "%02x:%02x:%02x:%02x:%02x:%02x",
+		p[0], p[1], p[2], p[3], p[4], p[5]);
+	return buf;
+}
+#endif
