@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.9 2000/02/26 17:21:30 itojun Exp $
+$Id: COVERAGE,v 1.10 2000/02/28 11:05:27 itojun Exp $
 
 
 x: supported/integrated
@@ -39,6 +39,17 @@ advanced API	2292	2292	2292	notyet	notyet	notyet
 
 getifaddrs	x	x	-	notyet	notyet	notyet
 
+icmp6 nodeinfo	04	04	04	notyet	notyet	notyet
+
+nd6_proxyall	-	-	x	notyet	notyet	notyet
+
+ndp -s proxy	x	x	-	notyet	notyet	notyet
+
+CMSG_ALIGN	long	long	long	notyet	notyet	notyet
+
+getaddrinfo obeys configured resolv order
+		x	x	-	notyet	notyet	notyet
+
 ALTQ		-	-	-	notyet	notyet	notyet
 
 IPsec		x	(*1)	(*2)	notyet	notyet	notyet
@@ -55,6 +66,12 @@ resolver support for IPv6 transport
     (*1) libc resolver can handle IPv6 transport (IPv6 address in
 	/etc/resolv.conf), but not with userland tools like nslookup or dig.
 
+scoped addr in /etc/hosts (getaddrinfo)
+		x	x	-	notyet	notyet	notyet
+
+scoped addr in /etc/resolv.conf "nameserver" line
+		-	-	-	notyet	notyet	notyet
+
 basic userland	x	x	x	notyet	notyet	notyet
 
 route6d		x	x	x	notyet	notyet	notyet
@@ -70,4 +87,4 @@ rrenumd		-	-	x	notyet	notyet	notyet
 faithd		x	x	x	notyet	notyet	notyet
 
 syslogd		x	-	-	notyet	notyet	notyet
-lpr/lpd		x	-	?	notyet	notyet	notyet
+lpr/lpd		x	-	-	notyet	notyet	notyet
