@@ -516,6 +516,35 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	}
 
 	/*
+	 * If the destination address is a link-local unicast address or
+	 * a multicast address, and if the outgoing interface is specified
+	 * by the sin6_scope_id filed, use an address associated with the
+	 * interface.
+	 * XXX: We're now trying to define more specific semantics of
+	 *      sin6_scope_id field, so this part will be rewritten in
+	 *      the near future.
+	 */
+	if ((IN6_IS_ADDR_LINKLOCAL(dst) || IN6_IS_ADDR_MULTICAST(dst)) &&
+	    dstsock->sin6_scope_id) {
+		/*
+		 * I'm not sure if boundary check for scope_id is done
+		 * somewhere...
+		 */
+		if (dstsock->sin6_scope_id < 0 ||
+		    if_index < dstsock->sin6_scope_id) {
+			*errorp = ENXIO; /* XXX: better error? */
+			return(0);
+		}
+		ia6 = in6_ifawithscope(ifindex2ifnet[dstsock->sin6_scope_id],
+				       dst);
+		if (ia6 == 0) {
+			*errorp = EADDRNOTAVAIL;
+			return(0);
+		}
+		return(&satosin6(&ia6->ia_addr)->sin6_addr);
+	}
+
+	/*
 	 * If the destination address is a multicast address and
 	 * the outgoing interface for the address is specified
 	 * by the caller, use an address associated with the interface.
