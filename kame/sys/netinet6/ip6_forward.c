@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.65 2001/02/06 05:25:28 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.66 2001/02/06 09:05:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -61,6 +61,7 @@
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
+#include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>

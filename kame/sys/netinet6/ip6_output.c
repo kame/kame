@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.157 2001/02/06 04:51:53 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.158 2001/02/06 09:05:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -105,6 +105,7 @@
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #endif
+#include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <netinet6/ip6_var.h>
