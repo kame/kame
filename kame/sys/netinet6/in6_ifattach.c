@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.177 2003/01/08 05:25:57 suz Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.178 2003/01/20 13:39:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -594,7 +594,7 @@ in6_ifattach_linklocal(ifp, altifp)
 {
 	struct in6_ifaddr *ia;
 	struct in6_aliasreq ifra;
-	struct nd_prefix pr0;
+	struct nd_prefixctl pr0;
 	int i, error;
 
 	/*
@@ -711,7 +711,6 @@ in6_ifattach_linklocal(ifp, altifp)
 	pr0.ndpr_ifp = ifp;
 	/* this should be 64 at this moment. */
 	pr0.ndpr_plen = in6_mask2len(&ifra.ifra_prefixmask.sin6_addr, NULL);
-	pr0.ndpr_mask = ifra.ifra_prefixmask.sin6_addr;
 	pr0.ndpr_prefix = ifra.ifra_addr;
 	/* apply the mask for safety. (nd6_prelist_add will apply it again) */
 	for (i = 0; i < 4; i++) {

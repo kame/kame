@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.99 2002/12/10 11:58:58 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.100 2003/01/20 13:39:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -262,6 +262,19 @@ struct	nd_defrouter {
 	int	installed;	/* is installed into kernel routing table */
 };
 
+struct nd_prefixctl {
+	struct ifnet *ndpr_ifp;
+
+	/* prefix */
+	struct sockaddr_in6 ndpr_prefix;
+	u_char	ndpr_plen;
+
+	u_int32_t ndpr_vltime;	/* advertised valid lifetime */
+	u_int32_t ndpr_pltime;	/* advertised preferred lifetime */
+
+	struct prf_ra ndpr_flags;
+};
+
 struct nd_prefix {
 	struct ifnet *ndpr_ifp;
 	LIST_ENTRY(nd_prefix) ndpr_entry;
@@ -441,14 +454,13 @@ void defrouter_reset __P((void));
 void defrouter_select __P((void));
 void defrtrlist_del __P((struct nd_defrouter *));
 void prelist_remove __P((struct nd_prefix *));
-int nd6_prelist_add __P((struct nd_prefix *, struct nd_defrouter *,
+int nd6_prelist_add __P((struct nd_prefixctl *, struct nd_defrouter *,
 	struct nd_prefix **));
 int nd6_prefix_onlink __P((struct nd_prefix *));
 int nd6_prefix_offlink __P((struct nd_prefix *));
 void pfxlist_onlink_check __P((void));
 struct nd_defrouter *defrouter_lookup __P((struct sockaddr_in6 *, struct ifnet *));
-struct nd_prefix *nd6_prefix_lookup __P((struct nd_prefix *));
-int in6_init_prefix_ltimes __P((struct nd_prefix *ndpr));
+struct nd_prefix *nd6_prefix_lookup __P((struct nd_prefixctl *));
 void rt6_flush __P((struct sockaddr_in6 *, struct ifnet *));
 int nd6_setdefaultiface __P((int));
 int in6_tmpifadd __P((const struct in6_ifaddr *, int));

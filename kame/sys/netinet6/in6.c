@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.334 2002/12/05 15:33:26 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.335 2003/01/20 13:39:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -761,7 +761,8 @@ in6_control(so, cmd, data, ifp)
 	case SIOCAIFADDR_IN6:
 	{
 		int i, error = 0;
-		struct nd_prefix pr0, *pr;
+		struct nd_prefixctl pr0;
+		struct nd_prefix *pr;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		long time_second;
 #endif
@@ -820,7 +821,6 @@ in6_control(so, cmd, data, ifp)
 			break;	/* we don't need to install a host route. */
 		}
 		pr0.ndpr_prefix = ifra->ifra_addr;
-		pr0.ndpr_mask = ifra->ifra_prefixmask.sin6_addr;
 		/* apply the mask for safety. */
 		for (i = 0; i < 4; i++) {
 			pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
@@ -838,19 +838,6 @@ in6_control(so, cmd, data, ifp)
 		    ((ifra->ifra_flags & IN6_IFF_AUTOCONF) != 0);
 		pr0.ndpr_vltime = ifra->ifra_lifetime.ia6t_vltime;
 		pr0.ndpr_pltime = ifra->ifra_lifetime.ia6t_pltime;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-		time_second = time.tv_sec;
-#endif
-		pr0.ndpr_lastupdate = time_second;
-		if ((error = in6_init_prefix_ltimes(&pr0)) != 0) {
-			/*
-			 * Validation for lifetimes should have been done, so
-			 * this should always succeed.
-			 */
-			log(LOG_ERR, "in6_control: failed to initialize prefix"
-			    " lifetimes\n");
-			return (error);
-		}
 
 		/* add the prefix if not yet. */
 		if ((pr = nd6_prefix_lookup(&pr0)) == NULL) {

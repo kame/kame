@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.191 2003/01/10 08:53:13 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.192 2003/01/20 13:39:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1296,7 +1296,9 @@ mip6_remove_addr(ifp, ia6)
 	struct in6_ifaddr *ia6;
 {
 	struct in6_aliasreq ifra;
-	int error = 0;
+	int i = 0, purgeprefix = 0;
+	struct nd_prefixctl pr0;
+	struct nd_prefix *pr = NULL;
 
 	bcopy(if_name(ifp), ifra.ifra_name, sizeof(ifra.ifra_name));
 	bcopy(&ia6->ia_addr, &ifra.ifra_addr, sizeof(struct sockaddr_in6));
@@ -1304,53 +1306,47 @@ mip6_remove_addr(ifp, ia6)
 	      sizeof(struct sockaddr_in6));
 
 	/* address purging code is copyed from in6_control(). */
-	{
-		int i = 0, purgeprefix = 0;
-		struct nd_prefix pr0, *pr = NULL;
 
-		/*
-		 * If the address being deleted is the only one that owns
-		 * the corresponding prefix, expire the prefix as well.
-		 * XXX: theoretically, we don't have to worry about such
-		 * relationship, since we separate the address management
-		 * and the prefix management.  We do this, however, to provide
-		 * as much backward compatibility as possible in terms of
-		 * the ioctl operation.
-		 */
-		bzero(&pr0, sizeof(pr0));
-		pr0.ndpr_ifp = ifp;
-		pr0.ndpr_plen = in6_mask2len(&ia6->ia_prefixmask.sin6_addr,
-					     NULL);
-		if (pr0.ndpr_plen == 128)
-			goto purgeaddr;
-		pr0.ndpr_prefix = ia6->ia_addr;
-		pr0.ndpr_mask = ia6->ia_prefixmask.sin6_addr;
-		for (i = 0; i < 4; i++) {
-			pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
-				ia6->ia_prefixmask.sin6_addr.s6_addr32[i];
-		}
-		/*
-		 * The logic of the following condition is a bit complicated.
-		 * We expire the prefix when
-		 * 1. the address obeys autoconfiguration and it is the
-		 *    only owner of the associated prefix, or
-		 * 2. the address does not obey autoconf and there is no
-		 *    other owner of the prefix.
-		 */
-		if ((pr = nd6_prefix_lookup(&pr0)) != NULL &&
-		    (((ia6->ia6_flags & IN6_IFF_AUTOCONF) != 0 &&
-		      pr->ndpr_refcnt == 1) ||
-		     ((ia6->ia6_flags & IN6_IFF_AUTOCONF) == 0 &&
-		      pr->ndpr_refcnt == 0)))
-			purgeprefix = 1;
-
-	purgeaddr:
-		in6_purgeaddr(&ia6->ia_ifa);
-		if (pr && purgeprefix)
-			prelist_remove(pr);
+	/*
+	 * If the address being deleted is the only one that owns
+	 * the corresponding prefix, expire the prefix as well.
+	 * XXX: theoretically, we don't have to worry about such
+	 * relationship, since we separate the address management
+	 * and the prefix management.  We do this, however, to provide
+	 * as much backward compatibility as possible in terms of
+	 * the ioctl operation.
+	 */
+	bzero(&pr0, sizeof(pr0));
+	pr0.ndpr_ifp = ifp;
+	pr0.ndpr_plen = in6_mask2len(&ia6->ia_prefixmask.sin6_addr, NULL);
+	if (pr0.ndpr_plen == 128)
+		goto purgeaddr;
+	pr0.ndpr_prefix = ia6->ia_addr;
+	for (i = 0; i < 4; i++) {
+		pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
+		    ia6->ia_prefixmask.sin6_addr.s6_addr32[i];
 	}
+	/*
+	 * The logic of the following condition is a bit complicated.
+	 * We expire the prefix when
+	 * 1. the address obeys autoconfiguration and it is the
+	 *    only owner of the associated prefix, or
+	 * 2. the address does not obey autoconf and there is no
+	 *    other owner of the prefix.
+	 */
+	if ((pr = nd6_prefix_lookup(&pr0)) != NULL &&
+	    (((ia6->ia6_flags & IN6_IFF_AUTOCONF) != 0 &&
+	    pr->ndpr_refcnt == 1) ||
+	    ((ia6->ia6_flags & IN6_IFF_AUTOCONF) == 0 &&
+	    pr->ndpr_refcnt == 0)))
+		purgeprefix = 1;
 
-	return (error);
+  purgeaddr:
+	in6_purgeaddr(&ia6->ia_ifa);
+	if (pr && purgeprefix)
+		prelist_remove(pr);
+
+	return (0);
 }
 
 int

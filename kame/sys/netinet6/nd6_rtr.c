@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.222 2003/01/06 21:49:50 sumikawa Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.223 2003/01/20 13:39:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -83,9 +83,9 @@
 
 static int rtpref __P((struct nd_defrouter *));
 static struct nd_defrouter *defrtrlist_update __P((struct nd_defrouter *));
-static int prelist_update __P((struct nd_prefix *, struct nd_defrouter *,
+static int prelist_update __P((struct nd_prefixctl *, struct nd_defrouter *,
     struct mbuf *));
-static struct in6_ifaddr *in6_ifadd __P((struct nd_prefix *));
+static struct in6_ifaddr *in6_ifadd __P((struct nd_prefixctl *));
 static struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
 	struct nd_defrouter *));
 static void pfxrtr_add __P((struct nd_prefix *, struct nd_defrouter *));
@@ -97,6 +97,7 @@ static void defrouter_addifreq __P((struct ifnet *));
 static void defrouter_delifreq __P((void));
 static void nd6_rtmsg __P((int, struct rtentry *));
 
+static int in6_init_prefix_ltimes __P((struct nd_prefix *));
 static void in6_init_address_ltimes __P((struct nd_prefix *,
 	struct in6_addrlifetime *));
 
@@ -343,7 +344,7 @@ nd6_ra_input(m, off, icmp6len)
 	if (ndopts.nd_opts_pi) {
 		struct nd_opt_hdr *pt;
 		struct nd_opt_prefix_info *pi = NULL;
-		struct nd_prefix pr;
+		struct nd_prefixctl pr;
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		time_second = time.tv_sec;
@@ -409,10 +410,11 @@ nd6_ra_input(m, off, icmp6len)
 			pr.ndpr_plen = pi->nd_opt_pi_prefix_len;
 			pr.ndpr_vltime = ntohl(pi->nd_opt_pi_valid_time);
 			pr.ndpr_pltime = ntohl(pi->nd_opt_pi_preferred_time);
+#if 0				/* XXX: we'll be able to remove them. */
 			pr.ndpr_lastupdate = time_second;
-
 			if (in6_init_prefix_ltimes(&pr))
 				continue; /* prefix lifetime init failed */
+#endif
 #ifdef MIP6
 			if (MIP6_IS_MN) {
 				if (mip6_prefix_list_update(src_sa6,
@@ -1145,16 +1147,16 @@ pfxrtr_del(pfr)
 }
 
 struct nd_prefix *
-nd6_prefix_lookup(pr)
-	struct nd_prefix *pr;
+nd6_prefix_lookup(key)
+	struct nd_prefixctl *key;
 {
 	struct nd_prefix *search;
 
 	for (search = nd_prefix.lh_first; search; search = search->ndpr_next) {
-		if (pr->ndpr_ifp == search->ndpr_ifp &&
-		    pr->ndpr_plen == search->ndpr_plen &&
-		    in6_are_prefix_equal(&pr->ndpr_prefix.sin6_addr,
-		    &search->ndpr_prefix.sin6_addr, pr->ndpr_plen)) {
+		if (key->ndpr_ifp == search->ndpr_ifp &&
+		    key->ndpr_plen == search->ndpr_plen &&
+		    in6_are_prefix_equal(&key->ndpr_prefix.sin6_addr,
+		    &search->ndpr_prefix.sin6_addr, key->ndpr_plen)) {
 			break;
 		}
 	}
@@ -1164,21 +1166,37 @@ nd6_prefix_lookup(pr)
 
 int
 nd6_prelist_add(pr, dr, newp)
-	struct nd_prefix *pr, **newp;
+	struct nd_prefixctl *pr;
+	struct nd_prefix **newp;
 	struct nd_defrouter *dr;
 {
 	struct nd_prefix *new = NULL;
+	int error = 0;
 	int i, s;
 
 	new = (struct nd_prefix *)malloc(sizeof(*new), M_IP6NDP, M_NOWAIT);
 	if (new == NULL)
-		return ENOMEM;
+		return(ENOMEM);
 	bzero(new, sizeof(*new));
-	*new = *pr;
+	new->ndpr_ifp = pr->ndpr_ifp;
+	new->ndpr_prefix = pr->ndpr_prefix;
+	new->ndpr_plen = pr->ndpr_plen;
+	new->ndpr_vltime = pr->ndpr_vltime;
+	new->ndpr_pltime = pr->ndpr_pltime;
+	new->ndpr_flags = pr->ndpr_flags;
+	if ((error = in6_init_prefix_ltimes(new)) != 0) {
+		free(new, M_IP6NDP);
+		return(error);
+	}
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	new->ndpr_lastupdate = time.tv_sec;
+#else
+	new->ndpr_lastupdate = time_second;
+#endif
 	if (newp != NULL)
 		*newp = new;
 
-	/* initilization */
+	/* initialization */
 	LIST_INIT(&new->ndpr_advrtrs);
 	in6_prefixlen2mask(&new->ndpr_mask, new->ndpr_plen);
 	/* make prefix in the canonical form */
@@ -1268,7 +1286,7 @@ prelist_remove(pr)
 
 static int
 prelist_update(new, dr, m)
-	struct nd_prefix *new;
+	struct nd_prefixctl *new;
 	struct nd_defrouter *dr; /* may be NULL */
 	struct mbuf *m;
 {
@@ -1322,9 +1340,8 @@ prelist_update(new, dr, m)
 		if (new->ndpr_raf_onlink) {
 			pr->ndpr_vltime = new->ndpr_vltime;
 			pr->ndpr_pltime = new->ndpr_pltime;
-			pr->ndpr_preferred = new->ndpr_preferred;
-			pr->ndpr_expire = new->ndpr_expire;
-			pr->ndpr_lastupdate = new->ndpr_lastupdate;
+			(void)in6_init_prefix_ltimes(pr); /* XXX error case? */
+			pr->ndpr_lastupdate = time_second;
 		}
 
 		if (new->ndpr_raf_onlink &&
@@ -1395,10 +1412,11 @@ prelist_update(new, dr, m)
 	 * nd6_ra_input.
 	 */
 
-	/*
-	 * 5.5.3 (c). Consistency check on lifetimes: pltime <= vltime.
-	 * This should have been done in nd6_ra_input.
-	 */
+	/* 5.5.3 (c). Consistency check on lifetimes: pltime <= vltime. */
+	if (new->ndpr_pltime > new->ndpr_vltime) {
+		error = EINVAL;	/* XXX: won't be used */
+		goto end;
+	}
 
 	/*
 	 * 5.5.3 (d). If the prefix advertised does not match the prefix of an
@@ -2027,7 +2045,7 @@ nd6_prefix_offlink(pr)
 
 static struct in6_ifaddr *
 in6_ifadd(pr)
-	struct nd_prefix *pr;
+	struct nd_prefixctl *pr;
 {
 	struct ifnet *ifp = pr->ndpr_ifp;
 	struct ifaddr *ifa;
@@ -2272,6 +2290,7 @@ in6_init_prefix_ltimes(struct nd_prefix *ndpr)
 	long time_second = time.tv_sec;
 #endif
 
+#if 0	/* XXX: we may be able to skip the check here */
 	/* check if preferred lifetime > valid lifetime.  RFC2462 5.5.3 (c) */
 	if (ndpr->ndpr_pltime > ndpr->ndpr_vltime) {
 		nd6log((LOG_INFO, "in6_init_prefix_ltimes: preferred lifetime"
@@ -2279,6 +2298,7 @@ in6_init_prefix_ltimes(struct nd_prefix *ndpr)
 		    (u_int)ndpr->ndpr_pltime, (u_int)ndpr->ndpr_vltime));
 		return (EINVAL);
 	}
+#endif
 	if (ndpr->ndpr_pltime == ND6_INFINITE_LIFETIME)
 		ndpr->ndpr_preferred = 0;
 	else
