@@ -1,7 +1,7 @@
-/*	$KAME: prefixconf.h,v 1.4 2003/01/05 17:12:13 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.h,v 1.1 2003/01/05 17:12:13 jinmei Exp $	*/
 
 /*
- * Copyright (C) 2002 WIDE Project.
+ * Copyright (C) 2003 WIDE Project.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,13 +29,25 @@
  * SUCH DAMAGE.
  */
 
-typedef enum { PREFIX6S_ACTIVE, PREFIX6S_RENEW,
-	       PREFIX6S_REBIND} prefix6state_t;
+struct ia;			/* this is an opaque type */
 
-extern int update_prefix __P((struct ia *, struct dhcp6_prefix *,
-    struct pifc_list *, struct dhcp6_if *, struct iactl **,
-    void (*)__P((struct ia *))));
-extern int prefix6_add __P((struct dhcp6_if *, struct dhcp6_prefix *,
-			       struct duid *));
-extern int prefix6_update __P((struct dhcp6_event *, struct dhcp6_list *,
-				  struct duid *));
+struct iactl {
+	struct ia *iactl_ia;	/* back pointer to IA */
+
+	/* callback function called when something may happen on the IA */
+	void (*callback) __P((struct ia *));
+
+	/* common methods: */
+	int (*isvalid) __P((struct iactl *));
+	u_int32_t (*duration) __P((struct iactl *));
+	int (*renew_data) __P((struct iactl *, struct dhcp6_ia *,
+	    struct dhcp6_eventdata **, struct dhcp6_eventdata *));
+	int (*rebind_data) __P((struct iactl *, struct dhcp6_ia *,
+	    struct dhcp6_eventdata **, struct dhcp6_eventdata *));
+	void (*cleanup) __P((struct iactl *));
+};
+
+extern void init_ia __P((void));
+extern void update_ia __P((iatype_t, struct dhcp6_list *,
+    struct dhcp6_if *, struct duid *));
+extern void remove_all_ia __P((void));

@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.15 2002/09/24 14:20:49 itojun Exp $	*/
+/*	$KAME: cftoken.l,v 1.16 2003/01/05 17:12:12 jinmei Exp $	*/
 
 %{
 /*
@@ -93,6 +93,7 @@ ecl		\}
 %s S_PREF
 %s S_HOST
 %s S_DUID
+%s S_IA
 
 %%
 %{
@@ -142,6 +143,7 @@ ecl		\}
 
 <S_CNF>rapid-commit { DECHO; return (RAPID_COMMIT); }
 <S_CNF>prefix-delegation { DECHO; return (PREFIX_DELEGATION); }
+<S_CNF>ia-pd { DECHO; return (IA_PD); }
 <S_CNF>domain-name-servers { DECHO; return (DNS_SERVERS); }
 
 	/* generic options */
@@ -149,7 +151,17 @@ ecl		\}
 
 <S_CNF>allow { DECHO; return (ALLOW); }
 
-	/* interface parameters for delegated prefix configuration */
+	/* identity association */
+<S_CNF>id-assoc { DECHO; BEGIN S_IA; return(ID_ASSOC); }
+<S_IA>pd { DECHO; return(IA_PD); }
+<S_IA>{number} { DECHO; yylval.str = strdup(yytext); return(IAID); }
+<S_IA>{bcl} { DP("begin of closure"); BEGIN S_CNF; return (BCL); }
+
+	/*
+	 * interface parameters for delegated prefix configuration.
+	 * when lex reads an interface name, the state will be back to
+	 * S_CNF.
+	 */
 <S_CNF>prefix-interface { DECHO; BEGIN S_IFACE; return (PREFIX_INTERFACE); }
 <S_CNF>sla-id { DECHO; return (SLA_ID); }
 <S_CNF>sla-len { DECHO; return (SLA_LEN); }

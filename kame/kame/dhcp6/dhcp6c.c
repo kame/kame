@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.98 2002/12/29 00:36:31 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.99 2003/01/05 17:12:13 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -66,11 +66,12 @@
 #include <err.h>
 #include <ifaddrs.h>
 
-#include <dhcp6.h>
-#include <config.h>
-#include <common.h>
-#include <timer.h>
-#include <prefixconf.h>
+#include "dhcp6.h"
+#include "config.h"
+#include "common.h"
+#include "timer.h"
+#include "dhcp6c_ia.h"
+#include "prefixconf.h"
 
 static int debug = 0;
 static u_long sig_flags = 0;
@@ -373,7 +374,7 @@ client6_init()
 	}
 	ifp->outsock = outsock;
 
-	prefix6_init();
+	init_ia();
 
 	if (signal(SIGHUP, client6_signal) == SIG_ERR) {
 		dprintf(LOG_WARNING, "%s" "failed to set signal: %s",
@@ -415,8 +416,8 @@ free_resources()
 {
 	struct dhcp6_if *ifp;
 
-	/* release delegated prefixes (should send DHCPv6 release?) */
-	prefix6_remove_all();
+	/* release all IAs (should send DHCPv6 release accordingly?) */
+	remove_all_ia();
 
 	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
 		struct dhcp6_event *ev, *ev_next;
@@ -518,6 +519,7 @@ client6_timo(arg)
 			ev->state = DHCP6S_SOLICIT;
 		dhcp6_set_timeoparam(ev); /* XXX */
 		/* fall through */
+	case DHCP6S_REQUEST:
 	case DHCP6S_INFOREQ:
 		client6_send(ev);
 		break;
@@ -530,7 +532,7 @@ client6_timo(arg)
 				client6_send_rebind(ev);
 		} else {
 			dprintf(LOG_INFO, "%s"
-			    "all information to be updated were canceled",
+			    "all information to be updated was canceled",
 			    FNAME);
 			dhcp6_remove_event(ev);
 			return (NULL);
@@ -565,7 +567,7 @@ select_server(ifp)
 	struct dhcp6_serverinfo *s;
 
 	/*
-	 * pick the best server according to dhcpv6-26 Section 17.1.3
+	 * pick the best server according to dhcpv6-28 Section 17.1.3
 	 * XXX: we currently just choose the one that is active and has the
 	 * highest preference.
 	 */
@@ -654,6 +656,7 @@ client6_send(ev)
 	struct dhcp6 *dh6;
 	struct dhcp6_optinfo optinfo;
 	ssize_t optlen, len;
+	struct dhcp6_listval *iapd;
 
 	ifp = ev->ifp;
 
@@ -685,7 +688,7 @@ client6_send(ev)
 		 * each new message it sends.
 		 *
 		 * A client MUST leave the transaction-ID unchanged in
-		 * retransmissions of a message. [dhcpv6-26 15.1]
+		 * retransmissions of a message. [dhcpv6-28 15.1]
 		 */
 #ifdef HAVE_ARC4RANDOM
 		ev->xid = arc4random() & DH6_XIDMASK;
@@ -726,6 +729,44 @@ client6_send(ev)
 		optinfo.rapidcommit = 1;
 	}
 
+	/* IA_PD */
+	switch (ev->state) {
+	case DHCP6S_SOLICIT:
+		if (dhcp6_copy_list(&optinfo.iapd_list, &ifp->iapd_list)) {
+			dprintf(LOG_NOTICE, "%s"
+			    "failed to copy options to be sent",
+			    FNAME);
+			goto end;
+		}
+		break;
+	case DHCP6S_REQUEST:
+		/*
+		 * First check the IA_PD given in the advertise.
+		 * If the server has given an IA_PD for a local IA, include
+		 * the given IA.  Otherwise, include locally configured IA
+		 * anyway.
+		 * (Specification is not clear on this policy.)
+		 */
+		for (iapd = TAILQ_FIRST(&ifp->iapd_list); iapd;
+		    iapd = TAILQ_NEXT(iapd, link)) {
+			struct dhcp6_listval *v;
+
+			if ((v = dhcp6_find_listval(
+			    &ifp->current_server->optinfo.iapd_list,
+			    DHCP6_LISTVAL_IAPD, &iapd->uv, 0)) == NULL)
+				v = iapd;
+
+			if (dhcp6_add_listval(&optinfo.iapd_list,
+			    DHCP6_LISTVAL_IAPD, &v->uv, &v->sublist) == NULL) {
+				dprintf(LOG_NOTICE, "%s"
+				    "failed to construct IA_PD for request",
+				    FNAME);
+				goto end;
+			}
+		}
+		break;
+	}
+
 	/* option request options */
 	if (dhcp6_copy_list(&optinfo.reqopt_list, &ifp->reqopt_list)) {
 		dprintf(LOG_ERR, "%s" "failed to copy requested options",
@@ -746,18 +787,18 @@ client6_send(ev)
 
 	/* set options in the message */
 	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
-					(struct dhcp6opt *)(buf + sizeof(buf)),
-					&optinfo)) < 0) {
+	    (struct dhcp6opt *)(buf + sizeof(buf)), &optinfo)) < 0) {
 		dprintf(LOG_INFO, "%s" "failed to construct options", FNAME);
 		goto end;
 	}
 	len += optlen;
 
 	/*
-	 * Unless otherwise specified, a client sends DHCP messages to the
-	 * All_DHCP_Relay_Agents_and_Servers or the DHCP_Anycast address.
-	 * [dhcpv6-26 Section 13.]
-	 * Our current implementation always follows the case.
+	 * Unless otherwise specified in this document or in a document that
+	 * describes how IPv6 is carried over a specific type of link (for link
+	 * types that do not support multicast), a client sends DHCP messages
+	 * to the All_DHCP_Relay_Agents_and_Servers.
+	 * [dhcpv6-28 Section 13.]
 	 */
 	dst = *sa6_allagent;
 	dst.sin6_scope_id = ifp->linkid;
@@ -790,7 +831,7 @@ client6_send_renew(ev)
 	struct sockaddr_in6 dst;
 
 	ifp = ev->ifp;
-	
+
 	dh6 = (struct dhcp6 *)buf;
 	memset(dh6, 0, sizeof(*dh6));
 	dh6->dh6_msgtype = DH6_RENEW;
@@ -828,12 +869,11 @@ client6_send_renew(ev)
 	for (evd = TAILQ_FIRST(&ev->data_list); evd;
 	     evd = TAILQ_NEXT(evd, link)) {
 		switch(evd->type) {
-		case DHCP6_DATA_PREFIX:
-			if (dhcp6_add_listval(&optinfo.prefix_list,
-			    &((struct dhcp6_siteprefix *)evd->data)->prefix,
-			    DHCP6_LISTVAL_PREFIX6) == NULL) {
-				dprintf(LOG_ERR, "%s" "failed to add a "
-				    "prefix", FNAME);
+		case DHCP6_EVDATA_IAPD:
+			if (dhcp6_copy_list(&optinfo.iapd_list,
+			    (struct dhcp6_list *)evd->data)) {
+				dprintf(LOG_NOTICE, "%s" "failed to add "
+				    "an IAPD", FNAME);
 				goto end;
 			}
 			break;
@@ -854,10 +894,11 @@ client6_send_renew(ev)
 	len += optlen;
 
 	/*
-	 * Unless otherwise specified, a client sends DHCP messages to the
-	 * All_DHCP_Relay_Agents_and_Servers or the DHCP_Anycast address.
-	 * [dhcpv6-26 Section 13.]
-	 * Our current implementation always follows the case.
+	 * Unless otherwise specified in this document or in a document that
+	 * describes how IPv6 is carried over a specific type of link (for link
+	 * types that do not support multicast), a client sends DHCP messages
+	 * to the All_DHCP_Relay_Agents_and_Servers.
+	 * [dhcpv6-28 Section 13.]
 	 */
 	dst = *sa6_allagent;
 	dst.sin6_scope_id = ifp->linkid;
@@ -922,12 +963,11 @@ client6_send_rebind(ev)
 	for (evd = TAILQ_FIRST(&ev->data_list); evd;
 	     evd = TAILQ_NEXT(evd, link)) {
 		switch(evd->type) {
-		case DHCP6_DATA_PREFIX:
-			if (dhcp6_add_listval(&optinfo.prefix_list,
-			    &((struct dhcp6_siteprefix *)evd->data)->prefix,
-			    DHCP6_LISTVAL_PREFIX6) == NULL) {
-				dprintf(LOG_ERR, "%s" "failed to add a "
-				    "prefix", FNAME);
+		case DHCP6_EVDATA_IAPD:
+			if (dhcp6_copy_list(&optinfo.iapd_list,
+			    (struct dhcp6_list *)evd->data)) {
+				dprintf(LOG_NOTICE, "%s" "failed to add "
+				    "an IAPD", FNAME);
 				goto end;
 			}
 			break;
@@ -949,10 +989,11 @@ client6_send_rebind(ev)
 	len += optlen;
 
 	/*
-	 * Unless otherwise specified, a client sends DHCP messages to the
-	 * All_DHCP_Relay_Agents_and_Servers or the DHCP_Anycast address.
-	 * [dhcpv6-26 Section 13.]
-	 * Our current implementation always follows the case.
+	 * Unless otherwise specified in this document or in a document that
+	 * describes how IPv6 is carried over a specific type of link (for link
+	 * types that do not support multicast), a client sends DHCP messages
+	 * to the All_DHCP_Relay_Agents_and_Servers.
+	 * [dhcpv6-28 Section 13.]
 	 */
 	dst = *sa6_allagent;
 	dst.sin6_scope_id = ifp->linkid;
@@ -1078,13 +1119,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 		return (-1);
 	}
 
-	if (ev->state != DHCP6S_SOLICIT ||
-	    (ifp->send_flags & DHCIFF_RAPID_COMMIT)) {
-		dprintf(LOG_INFO, "%s" "unexpected advertise", FNAME);
-		return (-1);
-	}
-
-	/* packet validation based on Section 15.3 of dhcpv6-26. */
+	/* packet validation based on Section 15.3 of dhcpv6-28. */
 	if (optinfo0->serverID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
 		return (-1);
@@ -1103,12 +1138,42 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	}
 
 	/*
+	 * The requesting router MUST ignore any Advertise message that
+	 * includes a Status Code option containing the value NoPrefixAvail.
+	 * [dhc-dhcpv6-opt-prefix-delegation-01 Section 10.1].
+	 * We only apply this when we are requiring prefixes to be delegated.
+	 */
+	if (!TAILQ_EMPTY(&ifp->iapd_list)) {
+		u_int16_t stcode = DH6OPT_STCODE_NOPREFIXAVAIL;
+
+		if (dhcp6_find_listval(&optinfo0->stcode_list,
+		    DHCP6_LISTVAL_STCODE, &stcode, 0)) {
+			dprintf(LOG_INFO, "%s"
+			    "advertise contains NoPrefixAvail status", FNAME);
+			return (-1);
+		}
+	}
+
+	/*
 	 * The client MUST ignore any Advertise message that includes a Status
 	 * Code option containing the value NoAddrsAvail.
-	 * [dhcpv6-26, Section 17.1.3].
+	 * [dhcpv6-28, Section 17.1.3].
 	 * XXX: we should not follow this when we do not need addresses!!
 	 */
 	;
+
+	if (ev->state != DHCP6S_SOLICIT ||
+	    (ifp->send_flags & DHCIFF_RAPID_COMMIT)) {
+		/*
+		 * We expect a reply message, but does actually receives an
+		 * Advertise message.  The server should not be configured to
+		 * allow the Rapid Commit option.
+		 * We process the message as if we expected the Advertise.
+		 * [dhcpv6-28 Section 17.1.3]
+		 */
+		dprintf(LOG_INFO, "%s" "unexpected advertise", FNAME);
+		/* proceed anyway */
+	}
 
 	/* ignore the server if it is known */
 	if (find_server(ifp, &optinfo0->serverID)) {
@@ -1206,6 +1271,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 {
 	struct dhcp6_listval *lv;
 	struct dhcp6_event *ev;
+	struct dhcp6_eventdata *evd, *evd_next;
 
 	/* find the corresponding event based on the received xid */
 	ev = find_event_withid(ifp, ntohl(dh6->dh6_xid) & DH6_XIDMASK);
@@ -1244,14 +1310,28 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	}
 
 	/*
+	 * If the client included a Rapid Commit option in the Solicit message,
+	 * the client discards any Reply messages it receives that do not
+	 * include a Rapid Commit option.
+	 * (should we keep the server otherwise?)
+	 * [dhcpv6-28 Section 17.1.4]
+	 */
+	if (ev->state == DHCP6S_SOLICIT &&
+	    (ifp->send_flags & DHCIFF_RAPID_COMMIT) &&
+	    !optinfo->rapidcommit) {
+		dprintf(LOG_INFO, "%s" "no rapid commit", FNAME);
+		return (-1);
+	}
+
+	/*
 	 * The client MAY choose to report any status code or message from the
 	 * status code option in the Reply message.
-	 * [dhcpv6-26 Section 18.1.8]
+	 * [dhcpv6-28 Section 18.1.8]
 	 */
 	for (lv = TAILQ_FIRST(&optinfo->stcode_list); lv;
 	     lv = TAILQ_NEXT(lv, link)) {
 		dprintf(LOG_INFO, "%s" "status code: %s",
-		    FNAME, dhcp6_stcodestr(lv->val_num));
+		    FNAME, dhcp6_stcodestr(lv->val_num16));
 	}
 
 	if (!TAILQ_EMPTY(&optinfo->dns_list)) {
@@ -1265,19 +1345,8 @@ client6_recvreply(ifp, dh6, len, optinfo)
 		}
 	}
 
-	if (ev->state == DHCP6S_RENEW || ev->state == DHCP6S_REBIND) {
-		/*
-		 * Update configuration information to be renewed or rebound.
-		 * Note that the returned list may be empty, in which case
-		 * the waiting information should be removed.
-		 */
-		prefix6_update(ev, &optinfo->prefix_list, &optinfo->serverID);
-	} else {
-		for (lv = TAILQ_FIRST(&optinfo->prefix_list); lv;
-		     lv = TAILQ_NEXT(lv, link)) {
-			prefix6_add(ifp, &lv->val_prefix6, &optinfo->serverID);
-		}
-	}
+	/* update stateful configuration information */
+	update_ia(IATYPE_PD, &optinfo->iapd_list, ifp, &optinfo->serverID);
 
 	dhcp6_remove_event(ev);
 	dprintf(LOG_DEBUG, "%s" "got an expected reply, sleeping.", FNAME);

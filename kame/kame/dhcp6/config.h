@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.18 2002/06/14 15:32:55 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.19 2003/01/05 17:12:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -54,7 +54,7 @@ struct dhcp6_if {
 
 	int server_pref;	/* server preference (server only) */
 
-	struct dhcp6_optconf *send_options;
+	struct dhcp6_list iapd_list;
 	struct dhcp6_list reqopt_list;
 
 	struct dhcp6_serverinfo *current_server;
@@ -83,7 +83,7 @@ struct dhcp6_event {
 	TAILQ_HEAD(, dhcp6_eventdata) data_list;
 };
 
-typedef enum { DHCP6_DATA_PREFIX } dhcp6_eventdata_t;
+typedef enum { DHCP6_EVDATA_IAPD } dhcp6_eventdata_t;
 
 struct dhcp6_eventdata {
 	TAILQ_ENTRY(dhcp6_eventdata) link;
@@ -91,6 +91,9 @@ struct dhcp6_eventdata {
 	struct dhcp6_event *event;
 	dhcp6_eventdata_t type;
 	void *data;
+
+	void (*destructor) __P((struct dhcp6_eventdata *));
+	void *privdata;
 };
 
 struct dhcp6_serverinfo {
@@ -107,26 +110,9 @@ struct dhcp6_serverinfo {
 /* client status code */
 enum {DHCP6S_INIT, DHCP6S_SOLICIT, DHCP6S_INFOREQ, DHCP6S_REQUEST,
       DHCP6S_RENEW, DHCP6S_REBIND, DHCP6S_IDLE};
-      
-struct dhcp6_ifconf {
-	struct dhcp6_ifconf *next;
-
-	char *ifname;
-
-	/* configuration flags */
-	u_long send_flags;
-	u_long allow_flags;
-
-	int server_pref;	/* server preference (server only) */
-
-	struct dhcp6_optconf *send_options;
-	struct dhcp6_optconf *allow_options;
-
-	struct dhcp6_list reqopt_list;
-};
 
 struct prefix_ifconf {
-	struct prefix_ifconf *next;
+	TAILQ_ENTRY(prefix_ifconf) link;
 
 	char *ifname;		/* interface name such as ne0 */
 	int sla_len;		/* SLA ID length in bits */
@@ -138,25 +124,38 @@ struct prefix_ifconf {
 #define IFID_LEN_DEFAULT 64
 #define SLA_LEN_DEFAULT 16
 
+struct ia_conf {
+	struct ia_conf *next;
+	int type;
+	u_int32_t iaid;
+
+	/* type dependent values follow */
+};
+typedef enum {IATYPE_PD} iatype_t;
+
+TAILQ_HEAD(pifc_list, prefix_ifconf);
+struct iapd_conf {
+	struct ia_conf iapd_ia;
+
+	/* type dependent values follow */
+	struct pifc_list iapd_pif_list;
+};
+#define iapd_next iapd_ia.next
+#define iapd_type iapd_ia.type
+#define iapd_id iapd_ia.iaid
+
 /* per-host configuration */
 struct host_conf {
 	struct host_conf *next;
 
 	char *name;		/* host name to identify the host */
 	struct duid duid;	/* DUID for the host */
-	/* delegated prefixes for the host: */
+	/* delegated prefixes for the host */
+	/* struct dhcp6_list prefix_list; */
 	struct dhcp6_list prefix_list;
 
 	/* bindings of delegated prefixes */
 	struct dhcp6_list prefix_binding_list;
-};
-
-/* DHCP option information */
-struct dhcp6_optconf {
-	struct dhcp6_optconf *next;
-	int type;
-	int len;
-	char *val;
 };
 
 /* structures and definitions used in the config file parser */
@@ -183,7 +182,9 @@ enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
       DECL_PREFIX, DECL_PREFERENCE,
       IFPARAM_SLA_ID, IFPARAM_SLA_LEN,
       DHCPOPT_RAPID_COMMIT, DHCPOPT_PREFIX_DELEGATION, DHCPOPT_DNS,
-      ADDRESS_LIST_ENT };
+      DHCPOPT_IA_PD,
+      ADDRESS_LIST_ENT,
+      IACONF_PIF };
 
 typedef enum {DHCP6_MODE_SERVER, DHCP6_MODE_CLIENT, DHCP6_MODE_RELAY }
 dhcp6_mode_t;
@@ -197,8 +198,8 @@ extern struct dhcp6_list dnslist;
 
 extern void ifinit __P((char *));
 extern int configure_interface __P((struct cf_namelist *));
-extern int configure_prefix_interface __P((struct cf_namelist *));
 extern int configure_host __P((struct cf_namelist *));
+extern int configure_ia __P((struct cf_namelist *, iatype_t));
 extern int configure_global_option __P((void));
 extern void configure_cleanup __P((void));
 extern void configure_commit __P((void));
@@ -209,3 +210,4 @@ extern struct prefix_ifconf *find_prefixifconf __P((char *));
 extern struct host_conf *find_hostconf __P((struct duid *));
 extern struct dhcp6_prefix *find_prefix6 __P((struct dhcp6_list *,
 					      struct dhcp6_prefix *));
+extern struct ia_conf *find_iaconf __P((int, u_int32_t));

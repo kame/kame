@@ -832,8 +832,9 @@ Optional Packages:
   --with-opt-pdel=VALUE   specify DHCP option value for prefix delegation
   --with-opt-pinfo=VALUE  specify DHCP option value for prefix information
   --with-opt-preq=VALUE   specify DHCP option value for prefix request
-  --with-opt-pa-pd=VALUE  specify DHCP option value for IA_PD
-  --with-opt-preq=VALUE   specify DHCP option value for IA_PD prefix
+  --with-opt-ia-pd=VALUE  specify DHCP option value for IA_PD
+  --with-opt-ia-pd-prefix=VALUE   specify DHCP option value for IA_PD prefix
+  --with-stcode-no-prefix=VALUE   specify DHCP status code for NoPrefixAvail
 
 Some influential environment variables:
   CC          C compiler command
@@ -4321,6 +4322,26 @@ echo "${ECHO_T}using $dhcpopt_ia_pd_prefix" >&6
 fi
 
 
+echo "$as_me:$LINENO: checking for DHCP NoPrefixAvail status code" >&5
+echo $ECHO_N "checking for DHCP NoPrefixAvail status code... $ECHO_C" >&6
+
+# Check whether --with-stcode-no-prefix or --without-stcode-no-prefix was given.
+if test "${with_stcode_no_prefix+set}" = set; then
+  withval="$with_stcode_no_prefix"
+  dhcpstcode_no_prefix="$withval"
+else
+  dhcpstcode_no_prefix=0
+fi;
+if test $dhcpstcode_no_prefix = 0 ; then
+	dhcpstcode_no_prefix=6
+	echo "$as_me:$LINENO: result: unspecified and using $dhcpstcode_no_prefix" >&5
+echo "${ECHO_T}unspecified and using $dhcpstcode_no_prefix" >&6
+else
+	echo "$as_me:$LINENO: result: using $dhcpstcode_no_prefix" >&5
+echo "${ECHO_T}using $dhcpstcode_no_prefix" >&6
+fi
+
+
 
 for ac_header in stdarg.h
 do
@@ -5034,6 +5055,7 @@ s,@dhcpopt_pinfo@,$dhcpopt_pinfo,;t t
 s,@dhcpopt_preq@,$dhcpopt_preq,;t t
 s,@dhcpopt_ia_pd@,$dhcpopt_ia_pd,;t t
 s,@dhcpopt_ia_pd_prefix@,$dhcpopt_ia_pd_prefix,;t t
+s,@dhcpstcode_no_prefix@,$dhcpstcode_no_prefix,;t t
 CEOF
 
 _ACEOF

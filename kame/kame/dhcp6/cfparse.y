@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.16 2002/09/24 14:20:49 itojun Exp $	*/
+/*	$KAME: cfparse.y,v 1.17 2003/01/05 17:12:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -36,6 +36,8 @@
 #include <netinet/in.h>
 
 #include <arpa/inet.h>
+
+#include <string.h>
 
 #include "dhcp6.h"
 #include "config.h"
@@ -77,7 +79,8 @@ extern void yyerror __P((char *, ...))
 	l->list = (pl); \
 	} while (0)
 
-static struct cf_namelist *iflist_head, *piflist_head, *hostlist_head; 
+static struct cf_namelist *iflist_head, *piflist_head, *hostlist_head,
+	*iapdlist_head;
 struct cf_list *cf_dns_list;
 
 extern int yylex __P((void));
@@ -88,9 +91,10 @@ static void cleanup_cflist __P((struct cf_list *));
 
 %token INTERFACE IFNAME
 %token PREFIX_INTERFACE SLA_ID SLA_LEN DUID_ID
+%token ID_ASSOC IA_PD IAID
 %token REQUEST SEND ALLOW PREFERENCE
 %token HOST HOSTNAME DUID
-%token OPTION RAPID_COMMIT PREFIX_DELEGATION DNS_SERVERS
+%token OPTION RAPID_COMMIT PREFIX_DELEGATION IA_PD DNS_SERVERS
 %token INFO_ONLY
 %token NUMBER SLASH EOS BCL ECL STRING PREFIX INFINITY
 %token COMMA
@@ -102,10 +106,11 @@ static void cleanup_cflist __P((struct cf_list *));
 	struct dhcp6_prefix *prefix;
 }
 
-%type <str> IFNAME HOSTNAME DUID_ID STRING
+%type <str> IFNAME HOSTNAME DUID_ID STRING IAID
 %type <num> NUMBER duration
 %type <list> declaration declarations dhcpoption ifparam ifparams
 %type <list> address_list address_list_ent
+%type <list> iaconf_list iaconf prefix_interface
 %type <prefix> prefixparam
 
 %%
@@ -116,9 +121,9 @@ statements:
 
 statement:
 		interface_statement
-	|	prefix_interface_statement
 	|	host_statement
 	|	option_statement
+	|	ia_statement
 	;
 
 interface_statement:
@@ -129,18 +134,6 @@ interface_statement:
 		MAKE_NAMELIST(ifl, $2, $4);
 
 		if (add_namelist(ifl, &iflist_head))
-			return (-1);
-	}
-	;
-
-prefix_interface_statement:
-	PREFIX_INTERFACE IFNAME BCL ifparams ECL EOS
-	{
-		struct cf_namelist *ifl;
-
-		MAKE_NAMELIST(ifl, $2, $4);
-
-		if (add_namelist(ifl, &piflist_head))
 			return (-1);
 	}
 	;
@@ -167,6 +160,32 @@ option_statement:
 			cf_dns_list->tail = $3->next;
 		}
 	}
+	;
+
+ia_statement:
+		ID_ASSOC IA_PD IAID BCL iaconf_list ECL EOS
+		{
+			struct cf_namelist *iapd;
+
+			MAKE_NAMELIST(iapd, $3, $5);
+
+			if (add_namelist(iapd, &iapdlist_head))
+				return (-1);
+		}
+	|	ID_ASSOC IA_PD BCL iaconf_list ECL EOS
+		{
+			struct cf_namelist *iapd;
+			char *zero;
+
+			if ((zero = strdup("0")) == NULL) {
+				yywarn("can't allocate memory");
+				return (-1);
+			}
+			MAKE_NAMELIST(iapd, zero, $4);
+
+			if (add_namelist(iapd, &iapdlist_head))
+				return (-1);
+		}
 	;
 
 address_list:
@@ -306,6 +325,14 @@ dhcpoption:
 			/* currently no value */
 			$$ = l;
 		}
+	|	IA_PD NUMBER
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DHCPOPT_IA_PD, NULL, NULL);
+			l->num = $2;
+			$$ = l;
+		}
 	|	DNS_SERVERS	
 		{
 			struct cf_list *l;
@@ -314,6 +341,110 @@ dhcpoption:
 			/* currently no value */
 			$$ = l;
 		}
+	;
+
+prefixparam:
+		STRING SLASH NUMBER duration
+		{
+			struct dhcp6_prefix pconf0, *pconf;		
+
+			memset(&pconf0, 0, sizeof(pconf0));
+			if (inet_pton(AF_INET6, $1, &pconf0.addr) != 1) {
+				yywarn("invalid IPv6 address: %s", $1);
+				free($1);
+				return (-1);
+			}
+			free($1);
+			/* validate other parameters later */
+			pconf0.plen = $3;
+			if ($4 < 0)
+				pconf0.pltime = DHCP6_DURATITION_INFINITE;
+			else
+				pconf0.pltime = (u_int32_t)$4;
+			pconf0.vltime = pconf0.pltime;
+
+			if ((pconf = malloc(sizeof(*pconf))) == NULL) {
+				yywarn("can't allocate memory");
+				return (-1);
+			}
+			*pconf = pconf0;
+
+			$$ = pconf;
+		}
+	|	STRING SLASH NUMBER duration duration
+		{
+			struct dhcp6_prefix pconf0, *pconf;		
+
+			memset(&pconf0, 0, sizeof(pconf0));
+			if (inet_pton(AF_INET6, $1, &pconf0.addr) != 1) {
+				yywarn("invalid IPv6 address: %s", $1);
+				free($1);
+				return (-1);
+			}
+			free($1);
+			/* validate other parameters later */
+			pconf0.plen = $3;
+			if ($4 < 0)
+				pconf0.pltime = DHCP6_DURATITION_INFINITE;
+			else
+				pconf0.pltime = (u_int32_t)$4;
+			if ($5 < 0)
+				pconf0.vltime = DHCP6_DURATITION_INFINITE;
+			else
+				pconf0.vltime = (u_int32_t)$5;
+
+			if ((pconf = malloc(sizeof(*pconf))) == NULL) {
+				yywarn("can't allocate memory");
+				return (-1);
+			}
+			*pconf = pconf0;
+
+			$$ = pconf;
+		}
+	
+
+duration:
+		INFINITY
+		{
+			$$ = -1;
+		}
+	|	NUMBER
+		{
+			$$ = $1;
+		}
+	;
+
+iaconf_list:
+		{ $$ = NULL; }
+	|	iaconf_list iaconf
+		{
+			struct cf_list *head;
+
+			if ((head = $1) == NULL) {
+				$2->next = NULL;
+				$2->tail = $2;
+				head = $2;
+			} else {
+				head->tail->next = $2;
+				head->tail = $2;
+			}
+
+			$$ = head;
+		}
+	;
+
+iaconf:
+	prefix_interface { $$ = $1; }
+	;
+
+prefix_interface:
+	PREFIX_INTERFACE IFNAME BCL ifparams ECL EOS
+	{
+		struct cf_list *ifl;
+
+		MAKE_CFLIST(ifl, IACONF_PIF, $2, $4);
+		$$ = ifl;
+	}
 	;
 
 ifparams:
@@ -354,57 +485,18 @@ ifparam:
 		}
 	;
 
-prefixparam:
-	STRING SLASH NUMBER duration
-	{
-		struct dhcp6_prefix pconf0, *pconf;		
-
-		memset(&pconf0, 0, sizeof(pconf0));
-		if (inet_pton(AF_INET6, $1, &pconf0.addr) != 1) {
-			yywarn("invalid IPv6 address: %s", $1);
-			free($1);
-			return (-1);
-		}
-		free($1);
-		/* validate other parameters later */
-		pconf0.plen = $3;
-		if ($4 < 0)
-			pconf0.duration = DHCP6_DURATITION_INFINITE;
-		else
-			pconf0.duration = (u_int32_t)$4;
-
-		if ((pconf = malloc(sizeof(*pconf))) == NULL) {
-			yywarn("can't allocate memory");
-			return (-1);
-		}
-		*pconf = pconf0;
-
-		$$ = pconf;
-	}
-
-duration:
-		INFINITY
-		{
-			$$ = -1;
-		}
-	|	NUMBER
-		{
-			$$ = $1;
-		}
-	;
-
 %%
 /* supplement routines for configuration */
 static int
 add_namelist(new, headp)
 	struct cf_namelist *new, **headp;
 {
-	struct cf_namelist *ifp;
-
+	struct cf_namelist *n;
+	
 	/* check for duplicated configuration */
-	for (ifp = *headp; ifp; ifp = ifp->next) {
-		if (strcmp(ifp->name, new->name) == 0) {
-			yywarn("duplicated interface: %s (ignored)",
+	for (n = *headp; n; n = n->next) {
+		if (strcmp(n->name, new->name) == 0) {
+			yywarn("duplicated name: %s (ignored)",
 			       new->name);
 			cleanup_namelist(new);
 			return (0);
@@ -422,8 +514,8 @@ static void
 cleanup()
 {
 	cleanup_namelist(iflist_head);
-	cleanup_namelist(piflist_head);
 	cleanup_namelist(hostlist_head);
+	cleanup_namelist(iapdlist_head);
 
 	cleanup_cflist(cf_dns_list);
 }
@@ -467,10 +559,10 @@ cleanup_cflist(p)
 int
 cf_post_config()
 {
-	if (configure_interface(iflist_head))
+	if (configure_ia(iapdlist_head, IATYPE_PD))
 		config_fail();
 
-	if (configure_prefix_interface(piflist_head))
+	if (configure_interface(iflist_head))
 		config_fail();
 
 	if (configure_host(hostlist_head))

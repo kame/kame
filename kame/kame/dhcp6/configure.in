@@ -191,7 +191,7 @@ AC_SUBST(dhcpopt_preq)
 
 AC_MSG_CHECKING(for DHCP IA_PD option)
 AC_ARG_WITH(opt-ia-pd,
-[  --with-opt-pa-pd=VALUE  specify DHCP option value for IA_PD],
+[  --with-opt-ia-pd=VALUE  specify DHCP option value for IA_PD],
     dhcpopt_ia_pd="$withval", dhcpopt_ia_pd=0)
 if test $dhcpopt_ia_pd = 0 ; then
 	dhcpopt_ia_pd=33
@@ -203,7 +203,7 @@ AC_SUBST(dhcpopt_ia_pd)
 
 AC_MSG_CHECKING(for DHCP IA_PD_PREFIX option)
 AC_ARG_WITH(opt-ia-pd-prefix,
-[  --with-opt-preq=VALUE   specify DHCP option value for IA_PD prefix],
+[  --with-opt-ia-pd-prefix=VALUE   specify DHCP option value for IA_PD prefix],
     dhcpopt_ia_pd_prefix="$withval", dhcpopt_ia_pd_prefix=0)
 if test $dhcpopt_ia_pd_prefix = 0 ; then
 	dhcpopt_ia_pd_prefix=34
@@ -212,6 +212,18 @@ else
 	AC_MSG_RESULT(using $dhcpopt_ia_pd_prefix)
 fi
 AC_SUBST(dhcpopt_ia_pd_prefix)
+
+AC_MSG_CHECKING(for DHCP NoPrefixAvail status code)
+AC_ARG_WITH(stcode-no-prefix,
+[  --with-stcode-no-prefix=VALUE   specify DHCP status code for NoPrefixAvail],
+    dhcpstcode_no_prefix="$withval", dhcpstcode_no_prefix=0)
+if test $dhcpstcode_no_prefix = 0 ; then
+	dhcpstcode_no_prefix=6
+	AC_MSG_RESULT(unspecified and using $dhcpstcode_no_prefix)
+else
+	AC_MSG_RESULT(using $dhcpstcode_no_prefix)
+fi
+AC_SUBST(dhcpstcode_no_prefix)
 
 AC_CHECK_HEADERS(stdarg.h)
 

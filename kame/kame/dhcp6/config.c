@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.23 2002/12/29 00:36:31 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.24 2003/01/05 17:12:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -51,26 +51,45 @@ extern int errno;
 
 struct dhcp6_if *dhcp6_if;
 struct prefix_ifconf *prefix_ifconflist;
+struct iapd_conf *iapd_conflist;
 struct dhcp6_list dnslist;
 
 static struct dhcp6_ifconf *dhcp6_ifconflist;
-static struct prefix_ifconf *prefix_ifconflist0;
+static struct iapd_conf *iapd_conflist0;
 static struct host_conf *host_conflist0, *host_conflist;
 static struct dhcp6_list dnslist0; 
 
 enum { DHCPOPTCODE_SEND, DHCPOPTCODE_REQUEST, DHCPOPTCODE_ALLOW };
 
+/* temporary configuration structure for DHCP interface */
+struct dhcp6_ifconf {
+	struct dhcp6_ifconf *next;
+
+	char *ifname;
+
+	/* configuration flags */
+	u_long send_flags;
+	u_long allow_flags;
+
+	int server_pref;	/* server preference (server only) */
+
+	struct dhcp6_list iapd_list;
+	struct dhcp6_list reqopt_list;
+};
+
 extern struct cf_list *cf_dns_list;
 extern char *configfilename;
 
+static int add_pd_pif __P((struct iapd_conf *, struct cf_list *));
 static int add_options __P((int, struct dhcp6_ifconf *, struct cf_list *));
 static int add_prefix __P((struct host_conf *, struct dhcp6_prefix *));
+static void clear_pd_pif __P((struct iapd_conf *));
 static void clear_ifconf __P((struct dhcp6_ifconf *));
-static void clear_prefixifconf __P((struct prefix_ifconf *));
+static void clear_iaconf __P((struct ia_conf *));
 static void clear_hostconf __P((struct host_conf *));
-static void clear_options __P((struct dhcp6_optconf *));
 static int configure_duid __P((char *, struct duid *));
 static int get_default_ifid __P((struct prefix_ifconf *));
+static struct ia_conf *find_iaconf_fromhead __P((struct ia_conf *, u_int32_t));
 
 void
 ifinit(ifname)
@@ -146,6 +165,7 @@ configure_interface(iflist)
 		}
 
 		ifc->server_pref = DH6OPT_PREF_UNDEF;
+		TAILQ_INIT(&ifc->iapd_list);
 		TAILQ_INIT(&ifc->reqopt_list);
 
 		for (cfl = ifp->params; cfl; cfl = cfl->next) {
@@ -221,72 +241,152 @@ configure_interface(iflist)
 }
 
 int
-configure_prefix_interface(iflist)
-	struct cf_namelist *iflist;
+configure_ia(ialist, iatype)
+	struct cf_namelist *ialist;
+	iatype_t iatype;
 {
-	struct cf_namelist *ifp;
-	struct prefix_ifconf *pif;
+	struct cf_namelist *iap;
+	struct ia_conf *iac = NULL, **iac_head;
+	size_t confsize;
 
-	for (ifp = iflist; ifp; ifp = ifp->next) {
+	switch(iatype) {
+	case IATYPE_PD:
+		confsize = sizeof(struct iapd_conf);
+		iac_head = (struct ia_conf **)&iapd_conflist0;
+		break;
+	default:
+		dprintf(LOG_ERR, "%s" "internal error", FNAME);
+		goto bad;
+	}
+
+	for (iap = ialist; iap; iap = iap->next) {
 		struct cf_list *cfl;
 
-		if ((pif = malloc(sizeof(*pif))) == NULL) {
+		if ((iac = malloc(confsize)) == NULL) {
 			dprintf(LOG_ERR, "%s"
-				"memory allocation for %s failed", FNAME,
-				ifp->name);
+				"memory allocation for IA %s failed", FNAME,
+				iap->name);
 			goto bad;
 		}
-		memset(pif, 0, sizeof(*pif));
-		pif->next = prefix_ifconflist0;
-		prefix_ifconflist0 = pif;
+		memset(iac, 0, confsize);
 
-		/* validate and copy ifname */
-		if (if_nametoindex(ifp->name) == 0) {
-			dprintf(LOG_ERR, "%s" "invalid interface (%s): %s",
-				FNAME, ifp->name, strerror(errno));
-			goto bad;
-		}
-		if ((pif->ifname = strdup(ifp->name)) == NULL) {
-			dprintf(LOG_ERR, "%s" "failed to copy ifname", FNAME);
-			goto bad;
-		}
+		/* common initialization */
+		iac->next = *iac_head;
+		*iac_head = iac;
+		iac->type = iatype;
+		iac->iaid = (u_int32_t)atoi(iap->name);
 
-		pif->ifid_len = IFID_LEN_DEFAULT;
-		pif->sla_len = SLA_LEN_DEFAULT;
-		if (get_default_ifid(pif)) {
-			dprintf(LOG_NOTICE, "%s"
-				"failed to get default IF ID for %s",
-				FNAME, pif->ifname);
-			goto bad;
+		/* IA-type specific initialization */
+		switch(iatype) {
+		case IATYPE_PD:
+			TAILQ_INIT(&((struct iapd_conf *)iac)->iapd_pif_list);
+			break;
 		}
 
-		for (cfl = ifp->params; cfl; cfl = cfl->next) {
+		/* set up parameters for the IA */
+		for (cfl = iap->params; cfl; cfl = cfl->next) {
 			switch(cfl->type) {
-			case IFPARAM_SLA_ID:
-				pif->sla_id = (u_int32_t)cfl->num;
-				break;
-			case IFPARAM_SLA_LEN:
-				pif->sla_len = (int)cfl->num;
-				if (pif->sla_len < 0 || pif->sla_len > 128) {
-					dprintf(LOG_ERR, "%s"
-					    "invalid SLA length: %d", FNAME,
-					    pif->sla_len);
-					goto bad;
+			case IACONF_PIF:
+				/* sanity check */
+				if (iatype != IATYPE_PD) {
+					dprintf(LOG_ERR, "%s" "%s:%d "
+					    "internal error "
+					    "(IA type mismatch)",
+					    FNAME, configfilename, cfl->line);
 				}
+				if (add_pd_pif((struct iapd_conf *)iac, cfl))
+					goto bad;
 				break;
 			default:
 				dprintf(LOG_ERR, "%s" "%s:%d "
-					"invalid configuration", FNAME,
-					configfilename, cfl->line);
+				    "invalid configuration", FNAME,
+				    configfilename, cfl->line);
 				goto bad;
 			}
 		}
 	}
-	
+
 	return (0);
 
   bad:
-	/* there is currently nothing special to recover the error */
+	return (-1);
+}
+
+static int
+add_pd_pif(iapdc, cfl0)
+	struct iapd_conf *iapdc;
+	struct cf_list *cfl0;
+{
+	struct cf_list *cfl;
+	struct prefix_ifconf *pif;
+
+	/* duplication check */
+	for (pif = TAILQ_FIRST(&iapdc->iapd_pif_list); pif;
+	    pif = TAILQ_NEXT(pif, link)) {
+		if (strcmp(pif->ifname, cfl0->ptr) == 0) {
+			dprintf(LOG_NOTICE, "%s" "%s:%d "
+			    "duplicated prefix interface: %s",
+			    FNAME, configfilename, cfl0->line, cfl0->ptr);
+			return (0); /* ignore it */
+		}
+	}
+
+	if ((pif = malloc(sizeof(*pif))) == NULL) {
+		dprintf(LOG_ERR, "%s"
+		    "memory allocation for %s failed", FNAME, cfl0->ptr);
+		goto bad;
+	}
+	memset(pif, 0, sizeof(*pif));
+
+	/* validate and copy ifname */
+	if (if_nametoindex(cfl0->ptr) == 0) {
+		dprintf(LOG_ERR, "%s" "%s:%d invalid interface (%s): %s",
+		    FNAME, configfilename, cfl0->line,
+		    cfl0->ptr, strerror(errno));
+		goto bad;
+	}
+	if ((pif->ifname = strdup(cfl0->ptr)) == NULL) {
+		dprintf(LOG_ERR, "%s" "failed to copy ifname", FNAME);
+		goto bad;
+	}
+
+	pif->ifid_len = IFID_LEN_DEFAULT;
+	pif->sla_len = SLA_LEN_DEFAULT;
+	if (get_default_ifid(pif)) {
+		dprintf(LOG_NOTICE, "%s" "failed to get default IF ID for %s",
+		    FNAME, pif->ifname);
+		goto bad;
+	}
+
+	for (cfl = cfl0->list; cfl; cfl = cfl->next) {
+		switch(cfl->type) {
+		case IFPARAM_SLA_ID:
+			pif->sla_id = (u_int32_t)cfl->num;
+			break;
+		case IFPARAM_SLA_LEN:
+			pif->sla_len = (int)cfl->num;
+			if (pif->sla_len < 0 || pif->sla_len > 128) {
+				dprintf(LOG_ERR, "%s" "%s:%d "
+				    "invalid SLA length: %d", FNAME,
+				    configfilename, cfl->line, pif->sla_len); 
+				goto bad;
+			}
+			break;
+		default:
+			dprintf(LOG_ERR, "%s" "%s:%d internal error: "
+			    "invalid configuration", FNAME,
+			    configfilename, cfl->line);
+			goto bad;
+		}
+	}
+
+	TAILQ_INSERT_TAIL(&iapdc->iapd_pif_list, pif, link);
+	return (0);
+
+  bad:
+	if (pif->ifname)
+		free(pif->ifname);
+	free(pif);
 	return (-1);
 }
 
@@ -379,16 +479,16 @@ configure_global_option()
 	TAILQ_INIT(&dnslist0);
 	for (cl = cf_dns_list; cl; cl = cl->next) {
 		/* duplication check */
-		if (dhcp6_find_listval(&dnslist0, cl->ptr,
-		    DHCP6_LISTVAL_ADDR6)) {
+		if (dhcp6_find_listval(&dnslist0, DHCP6_LISTVAL_ADDR6,
+		    cl->ptr, 0)) {
 			dprintf(LOG_INFO, "%s"
 			    "%s:%d duplicated DNS server: %s", FNAME,
 			    configfilename, cl->line,
 			    in6addr2str((struct in6_addr *)cl->ptr, 0));
 			goto bad;
 		}
-		if (dhcp6_add_listval(&dnslist0, cl->ptr,
-		    DHCP6_LISTVAL_ADDR6) == NULL) {
+		if (dhcp6_add_listval(&dnslist0, DHCP6_LISTVAL_ADDR6,
+		    cl->ptr, NULL) == NULL) {
 			dprintf(LOG_ERR, "%s" "failed to add a DNS server");
 			goto bad;
 		}
@@ -523,10 +623,10 @@ get_default_ifid(pif)
 void
 configure_cleanup()
 {
+	clear_iaconf((struct ia_conf *)iapd_conflist0);
+	iapd_conflist0 = NULL;
 	clear_ifconf(dhcp6_ifconflist);
 	dhcp6_ifconflist = NULL;
-	clear_prefixifconf(prefix_ifconflist0);
-	prefix_ifconflist0 = NULL;
 	clear_hostconf(host_conflist0);
 	host_conflist0 = NULL;
 	dhcp6_clear_list(&dnslist0);
@@ -546,10 +646,9 @@ configure_commit()
 
 			ifp->allow_flags = ifc->allow_flags;
 
-			clear_options(ifp->send_options);
-
-			ifp->send_options = ifc->send_options;
-			ifc->send_options = NULL;
+			dhcp6_clear_list(&ifp->iapd_list);
+			ifp->iapd_list = ifc->iapd_list;
+			TAILQ_INIT(&ifc->iapd_list);
 
 			dhcp6_clear_list(&ifp->reqopt_list);
 			ifp->reqopt_list = ifc->reqopt_list;
@@ -560,13 +659,13 @@ configure_commit()
 	}
 	clear_ifconf(dhcp6_ifconflist);
 
-	/* commit prefix configuration */
-	if (prefix_ifconflist) {
+	/* commit IA_PD configuration */
+	if (iapd_conflist) {
 		/* clear previous configuration. (need more work?) */
-		clear_prefixifconf(prefix_ifconflist);
+		clear_pd_pif(iapd_conflist);
 	}
-	prefix_ifconflist = prefix_ifconflist0;
-	prefix_ifconflist0 = NULL;
+	iapd_conflist = iapd_conflist0;
+	iapd_conflist0 = NULL;
 
 	/* commit prefix configuration */
 	if (host_conflist) {
@@ -594,7 +693,7 @@ clear_ifconf(iflist)
 		ifc_next = ifc->next;
 
 		free(ifc->ifname);
-		clear_options(ifc->send_options);
+		dhcp6_clear_list(&ifc->iapd_list);
 		dhcp6_clear_list(&ifc->reqopt_list);
 
 		free(ifc);
@@ -602,16 +701,34 @@ clear_ifconf(iflist)
 }
 
 static void
-clear_prefixifconf(iflist)
-	struct prefix_ifconf *iflist;
+clear_pd_pif(iapdc)
+	struct iapd_conf *iapdc;
 {
 	struct prefix_ifconf *pif, *pif_next;
 
-	for (pif = iflist; pif; pif = pif_next) {
-		pif_next = pif->next;
+	for (pif = TAILQ_FIRST(&iapdc->iapd_pif_list); pif; pif = pif_next) {
+		pif_next = TAILQ_NEXT(pif, link);
 
 		free(pif->ifname);
 		free(pif);
+	}
+}
+
+static void
+clear_iaconf(ialist)
+	struct ia_conf *ialist;
+{
+	struct ia_conf *iac, *iac_next;
+
+	for (iac = ialist; iac; iac = iac_next) {
+		iac_next = iac->next;
+
+		switch(iac->type) {
+		case IATYPE_PD:
+			clear_pd_pif((struct iapd_conf *)iac);
+			break;
+		}
+		free(iac);
 	}
 }
 
@@ -636,20 +753,6 @@ clear_hostconf(hlist)
 	}
 }
 
-static void
-clear_options(opt0)
-	struct dhcp6_optconf *opt0;
-{
-	struct dhcp6_optconf *opt, *opt_next;
-
-	for (opt = opt0; opt; opt = opt_next) {
-		opt_next = opt->next;
-
-		free(opt->val);
-		free(opt);
-	}
-}
-
 static int
 add_options(opcode, ifc, cfl0)
 	int opcode;
@@ -659,6 +762,7 @@ add_options(opcode, ifc, cfl0)
 	struct dhcp6_listval *opt;
 	struct cf_list *cfl;
 	int opttype;
+	struct dhcp6_ia ia;
 
 	for (cfl = cfl0; cfl; cfl = cfl->next) {
 		if (opcode ==  DHCPOPTCODE_REQUEST) {
@@ -690,12 +794,51 @@ add_options(opcode, ifc, cfl0)
 				return (-1);
 			}
 			break;
+		case DHCPOPT_IA_PD:
+			switch(opcode) {
+			case DHCPOPTCODE_SEND:
+				if (find_iaconf_fromhead(
+				    (struct ia_conf *)iapd_conflist0,
+				    (u_int32_t)cfl->num) == NULL) {
+					dprintf(LOG_ERR, "%s" "%s:%d "
+					    "IA_PD (%lu) is not defined",
+					    FNAME, configfilename, cfl->line,
+					    (u_long)cfl->num);
+					return (-1);
+				}
+
+				/*
+				 * Set up IA parameters.  Currently only
+				 * IAID is configurable.
+				 */
+				memset(&ia, 0, sizeof(ia));
+				ia.iaid = (u_int32_t)cfl->num;
+
+				/*
+				 * add the option information to the local
+				 * configuration.
+				 */
+				if (dhcp6_add_listval(&ifc->iapd_list,
+				    DHCP6_LISTVAL_IAPD, &ia, NULL) == NULL) {
+					dprintf(LOG_ERR, "%s" "failed to "
+					    "configure an option", FNAME);
+					return (-1);
+				}
+				break;
+			default:
+				dprintf(LOG_ERR, "%s" "invalid operation (%d) "
+					"for option type (%d)",
+					FNAME, opcode, cfl->type);
+				break;
+			}
+			break;
 		case DHCPOPT_PREFIX_DELEGATION:
 			switch(opcode) {
 			case DHCPOPTCODE_REQUEST:
 				opttype = DH6OPT_PREFIX_DELEGATION;
 				if (dhcp6_add_listval(&ifc->reqopt_list,
-				    &opttype, DHCP6_LISTVAL_NUM) == NULL) {
+				    DHCP6_LISTVAL_NUM, &opttype, NULL)
+				    == NULL) {
 					dprintf(LOG_ERR, "%s" "failed to "
 					    "configure an option", FNAME);
 					return (-1);
@@ -713,7 +856,8 @@ add_options(opcode, ifc, cfl0)
 			case DHCPOPTCODE_REQUEST:
 				opttype = DH6OPT_DNS;
 				if (dhcp6_add_listval(&ifc->reqopt_list,
-				    &opttype, DHCP6_LISTVAL_NUM) == NULL) {
+				    DHCP6_LISTVAL_NUM, &opttype, NULL)
+				    == NULL) {
 					dprintf(LOG_ERR, "%s" "failed to "
 					    "configure an option", FNAME);
 					return (-1);
@@ -727,9 +871,10 @@ add_options(opcode, ifc, cfl0)
 			}
 			break;
 		default:
-			dprintf(LOG_ERR, "%s"
-				"unknown option type: %d", FNAME, cfl->type);
-				return (-1);
+			dprintf(LOG_ERR, "%s" "%s:%d "
+			    "unsupported option type: %d",
+			    FNAME, configfilename, cfl->line, cfl->type);
+			return (-1);
 		}
 
 	  next:
@@ -744,7 +889,6 @@ add_prefix(hconf, prefix0)
 	struct dhcp6_prefix *prefix0;
 {
 	struct dhcp6_prefix oprefix;
-	struct dhcp6_listval *p, *pent;
 
 	oprefix = *prefix0;
 
@@ -775,27 +919,30 @@ add_prefix(hconf, prefix0)
 	}
 
 	/* prefix duplication check */
-	for (p = TAILQ_FIRST(&hconf->prefix_list); p;
-	     p = TAILQ_NEXT(p, link)) {
-		if (IN6_ARE_ADDR_EQUAL(&p->val_prefix6.addr, &oprefix.addr) &&
-		    p->val_prefix6.plen == oprefix.plen) {
-			dprintf(LOG_ERR, "%s"
-				"duplicated prefix: %s/%d for %s", FNAME,
-				in6addr2str(&oprefix.addr, 0), oprefix.plen,
-				hconf->name);
-			return (-1);
-		}
-	}
-
-	/* allocate memory for the new prefix and insert it to the chain */
-	if ((pent = malloc(sizeof(*pent))) == NULL) {
-		dprintf(LOG_ERR, "%s" "memory allocation failed for %s",
-			FNAME, hconf->name);
+	if (dhcp6_find_listval(&hconf->prefix_list, DHCP6_LISTVAL_PREFIX6,
+	    &oprefix, 0)) {
+		dprintf(LOG_NOTICE, "%s"
+		    "duplicated prefix: %s/%d for %s", FNAME,
+		    in6addr2str(&oprefix.addr, 0), oprefix.plen,
+		    hconf->name);
 		return (-1);
 	}
-	memset(pent, 0, sizeof(*pent));
-	pent->val_prefix6 = oprefix;
-	TAILQ_INSERT_TAIL(&hconf->prefix_list, pent, link);
+
+	/* validation about relationship of pltime and vltime */
+	if (oprefix.vltime != DHCP6_DURATITION_INFINITE &&
+	    (oprefix.pltime == DHCP6_DURATITION_INFINITE ||
+	    oprefix.pltime > oprefix.vltime)) {
+		dprintf(LOG_NOTICE, "%s" "%s/%d has larger preferred lifetime "
+		    "than valid lifetime", FNAME,
+		    in6addr2str(&oprefix.addr, 0), oprefix.plen);
+		return (-1);
+	}
+
+	/* insert the new prefix to the chain */
+	if (dhcp6_add_listval(&hconf->prefix_list, DHCP6_LISTVAL_PREFIX6,
+	    &oprefix, NULL) == NULL) {
+		return (-1);
+	}
 
 	return (0);
 }
@@ -828,18 +975,37 @@ find_ifconfbyid(id)
 	return (NULL);
 }
 
-struct prefix_ifconf *
-find_prefixifconf(ifname)
-	char *ifname;
+static struct ia_conf *
+find_iaconf_fromhead(head, iaid)
+	struct ia_conf *head;
+	u_int32_t iaid;
 {
-	struct prefix_ifconf *ifp;
+	struct ia_conf *iac;
 
-	for (ifp = prefix_ifconflist; ifp; ifp = ifp->next) {
-		if (strcmp(ifp->ifname, ifname) == NULL)
-			return (ifp);
+	for (iac = head; iac; iac = iac->next) {
+		if (iac->iaid == iaid)
+			return (iac);
 	}
 
 	return (NULL);
+}
+
+struct ia_conf *
+find_iaconf(type, iaid)
+	int type;
+	u_int32_t iaid;
+{
+	struct ia_conf *iac_head;
+
+	switch(type) {
+	case IATYPE_PD:
+		iac_head = (struct ia_conf *)iapd_conflist;
+		break;
+	default:
+		return (NULL);
+	}
+
+	return (find_iaconf_fromhead(iac_head, iaid));
 }
 
 struct host_conf *

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.33 2002/12/29 00:54:48 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.34 2003/01/05 17:12:13 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -26,9 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
-/*
- * draft-ietf-dhc-dhcpv6-26
  */
 
 #ifndef __DHCP6_H_DEFINED
@@ -76,8 +73,6 @@
 
 #define DHCP6_DURATITION_INFINITE 0xffffffff
 
-/* Internal data structure */
-
 /* DUID: DHCP unique Identifier */
 struct duid {
 	int duid_len;		/* length */
@@ -85,28 +80,45 @@ struct duid {
 };
 
 /* option information */
-struct dhcp6_prefix {		/* delegated prefix information */
-	struct in6_addr addr;
-	int plen;
-	u_int32_t duration;
+struct dhcp6_ia {		/* identity association */
+	u_int32_t iaid;
+	u_int32_t t1;
+	u_int32_t t2;
 };
 
+struct dhcp6_prefix {
+	u_int32_t pltime;
+	u_int32_t vltime;
+	int plen;
+	struct in6_addr addr;
+};
+
+/* Internal data structure */
+typedef enum { DHCP6_LISTVAL_NUM = 1,
+	       DHCP6_LISTVAL_STCODE, DHCP6_LISTVAL_ADDR6,
+	       DHCP6_LISTVAL_IAPD, DHCP6_LISTVAL_PREFIX6 
+} dhcp6_listval_type_t;
+TAILQ_HEAD(dhcp6_list, dhcp6_listval);
 struct dhcp6_listval {
 	TAILQ_ENTRY(dhcp6_listval) link;
 
+	dhcp6_listval_type_t type;
+
 	union {
 		int uv_num;
+		u_int16_t uv_num16;
 		struct in6_addr uv_addr6;
 		struct dhcp6_prefix uv_prefix6;
+		struct dhcp6_ia uv_ia;
 	} uv;
+
+	struct dhcp6_list sublist;
 };
 #define val_num uv.uv_num
+#define val_num16 uv.uv_num16
 #define val_addr6 uv.uv_addr6
+#define val_ia uv.uv_ia
 #define val_prefix6 uv.uv_prefix6
-TAILQ_HEAD(dhcp6_list, dhcp6_listval);
-
-typedef enum { DHCP6_LISTVAL_NUM, DHCP6_LISTVAL_ADDR6,
-	       DHCP6_LISTVAL_PREFIX6 } dhcp6_listval_type_t;
 
 struct dhcp6_optinfo {
 	struct duid clientID;	/* DUID */
@@ -115,7 +127,8 @@ struct dhcp6_optinfo {
 	int rapidcommit;	/* bool */
 	int pref;		/* server preference */
 
-	struct dhcp6_list reqopt_list; /*  options in option request */
+	struct dhcp6_list iapd_list; /* list of IA_PD */
+	struct dhcp6_list reqopt_list; /* options in option request */
 	struct dhcp6_list stcode_list; /* status code */
 	struct dhcp6_list dns_list; /* DNS server list */
 	struct dhcp6_list prefix_list; /* prefix list */
@@ -151,13 +164,13 @@ struct dhcp6 {
 #define DH6OPT_STATUS_CODE 13
 #  define DH6OPT_STCODE_SUCCESS 0
 #  define DH6OPT_STCODE_UNSPECFAIL 1
-#  define DH6OPT_STCODE_AUTHFAILED 2
-#  define DH6OPT_STCODE_ADDRUNAVAIL 3
-#  define DH6OPT_STCODE_NOADDRAVAIL 4
-#  define DH6OPT_STCODE_NOBINDING 5
-#  define DH6OPT_STCODE_CONFNOMATCH 6
-#  define DH6OPT_STCODE_NOTONLINK 7
-#  define DH6OPT_STCODE_USEMULTICAST 8
+#  define DH6OPT_STCODE_NOADDRAVAIL 2
+#  define DH6OPT_STCODE_NOBINDING 3
+#  define DH6OPT_STCODE_NOTONLINK 4
+#  define DH6OPT_STCODE_USEMULTICAST 5
+/* The following code is not yet defined and is currently KAME specific. */
+#  define DH6OPT_STCODE_NOPREFIXAVAIL CONF_DH6OPT_STCODE_NOPREFIXAVAIL
+
 #define DH6OPT_RAPID_COMMIT 14
 #define DH6OPT_USER_CLASS 15
 #define DH6OPT_VENDOR_CLASS 16
@@ -177,6 +190,10 @@ struct dhcp6 {
 #define DH6OPT_PREFIX_INFORMATION CONF_DH6OPT_PREFIX_INFORMATION
 #define DH6OPT_PREFIX_REQUEST CONF_DH6OPT_PREFIX_REQUEST
 
+/* The following two are KAME specific. */
+#define DH6OPT_IA_PD CONF_DH6OPT_IA_PD
+#define DH6OPT_IA_PD_PREFIX CONF_DH6OPT_IA_PD_PREFIX
+
 struct dhcp6opt {
 	u_int16_t dh6opt_type;
 	u_int16_t dh6opt_len;
@@ -184,20 +201,51 @@ struct dhcp6opt {
 } __attribute__ ((__packed__));
 
 /* DUID type 1 */
-struct dhcp6_duid_type1 {
-	u_int16_t dh6duid1_type;
-	u_int16_t dh6duid1_hwtype;
-	u_int32_t dh6duid1_time;
+struct dhcp6opt_duid_type1 {
+	u_int16_t dh6_duid1_type;
+	u_int16_t dh6_duid1_hwtype;
+	u_int32_t dh6_duid1_time;
 	/* link-layer address follows */
 } __attribute__ ((__packed__));
 
+/* Status Code */
+struct dhcp6opt_stcode {
+	u_int16_t dh6_stcode_type;
+	u_int16_t dh6_stcode_len;
+	u_int16_t dh6_stcode_code;
+} __attribute__ ((__packed__));
+
 /* Prefix Information */
-struct dhcp6_prefix_info {
+struct dhcp6opt_prefix_info {
 	u_int16_t dh6_pi_type;
 	u_int16_t dh6_pi_len;
 	u_int32_t dh6_pi_duration;
 	u_int8_t dh6_pi_plen;
 	struct in6_addr dh6_pi_paddr;
+} __attribute__ ((__packed__));
+
+/*
+ * General format of Identity Association.
+ * This format applies to Prefix Delegation (IA_PD) and Non-temporary Addresses
+ * (IA_NA), while our implementation only supports the former.
+ */
+struct dhcp6opt_ia {
+	u_int16_t dh6_ia_type;
+	u_int16_t dh6_ia_len;
+	u_int32_t dh6_ia_iaid;
+	u_int32_t dh6_ia_t1;
+	u_int32_t dh6_ia_t2;
+	/* sub options follow */
+} __attribute__ ((__packed__));
+
+/* IA_PD Prefix */
+struct dhcp6opt_ia_pd_prefix {
+	u_int16_t dh6_iapd_prefix_type;
+	u_int16_t dh6_iapd_prefix_len;
+	u_int32_t dh6_iapd_prefix_preferred_time;
+	u_int32_t dh6_iapd_prefix_valid_time;
+	u_int8_t dh6_iapd_prefix_prefix_len;
+	struct in6_addr dh6_iapd_prefix_prefix_addr;
 } __attribute__ ((__packed__));
 
 #endif /*__DHCP6_H_DEFINED*/

@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.10 2002/12/29 00:36:31 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.11 2003/01/05 17:12:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -55,9 +55,32 @@
 #include "config.h"
 #include "common.h"
 #include "timer.h"
+#include "dhcp6c_ia.h"
 #include "prefixconf.h"
 
-/* should be moved to a header file later */
+TAILQ_HEAD(siteprefix_list, siteprefix);
+struct iactl_pd {
+	struct iactl common;
+	struct pifc_list *pifc_head;
+	struct siteprefix_list siteprefix_head;
+};
+#define iacpd_ia common.iactl_ia
+#define iacpd_callback common.callback
+#define iacpd_isvalid common.isvalid
+#define iacpd_duration common.duration
+#define iacpd_renew_data common.renew_data
+#define iacpd_rebind_data common.rebind_data
+#define iacpd_cleanup common.cleanup
+
+struct siteprefix {
+	TAILQ_ENTRY (siteprefix) link;
+
+	struct dhcp6_prefix prefix;
+	struct dhcp6_timer *timer;
+	struct iactl_pd *ctl;
+	TAILQ_HEAD(, dhcp6_ifprefix) ifprefix_list; /* interface prefixes */
+};
+
 struct dhcp6_ifprefix {
 	TAILQ_ENTRY(dhcp6_ifprefix) plink;
 
@@ -71,402 +94,327 @@ struct dhcp6_ifprefix {
 	/* address assigned on the interface based on the prefix */
 	struct sockaddr_in6 ifaddr;
 };
-static TAILQ_HEAD(, dhcp6_siteprefix) siteprefix_listhead;
 
 typedef enum { IFADDRCONF_ADD, IFADDRCONF_REMOVE } ifaddrconf_cmd_t;
 
+static struct siteprefix *find_siteprefix __P((struct siteprefix_list *,
+    struct dhcp6_prefix *));
+static void remove_siteprefix __P((struct siteprefix *));
+static int isvalid __P((struct iactl *));
+static u_int32_t duration __P((struct iactl *));
+static void cleanup __P((struct iactl *));
+static int renew_data __P((struct iactl *, struct dhcp6_ia *,
+    struct dhcp6_eventdata **, struct dhcp6_eventdata *));
+static void renew_data_free __P((struct dhcp6_eventdata *));
+
+static struct dhcp6_timer *siteprefix_timo __P((void *));
+
 static int ifaddrconf __P((ifaddrconf_cmd_t, struct dhcp6_ifprefix *));
-static struct dhcp6_siteprefix *find_siteprefix6 __P((struct dhcp6_prefix *));
-static struct dhcp6_timer *prefix6_timo __P((void *));
-static int add_ifprefix __P((struct dhcp6_siteprefix *,
+static int add_ifprefix __P((struct siteprefix *,
     struct dhcp6_prefix *, struct prefix_ifconf *));
-static void prefix6_remove __P((struct dhcp6_siteprefix *));
-static int update __P((struct dhcp6_siteprefix *, struct dhcp6_prefix *,
-			  struct duid *));
 
 extern struct dhcp6_timer *client6_timo __P((void *));
 extern void client6_send_renew __P((struct dhcp6_event *));
 extern void client6_send_rebind __P((struct dhcp6_event *));
 
-void
-prefix6_init()
-{
-	TAILQ_INIT(&siteprefix_listhead);
-}
-
-void
-prefix6_remove_all()
-{
-	struct dhcp6_siteprefix *sp, *sp_next;
-
-	for (sp = TAILQ_FIRST(&siteprefix_listhead); sp; sp = sp_next) {
-		sp_next = TAILQ_NEXT(sp, link);
-
-		prefix6_remove(sp);
-	}
-}
-
 int
-prefix6_add(ifp, prefix, serverid)
-	struct dhcp6_if *ifp;
-	struct dhcp6_prefix *prefix;
-	struct duid *serverid;
+update_prefix(ia, pinfo, pifc, dhcpifp, ctlp, callback)
+	struct ia *ia;
+	struct dhcp6_prefix *pinfo;
+	struct pifc_list *pifc;
+	struct dhcp6_if *dhcpifp;
+	struct iactl **ctlp;
+	void (*callback)__P((struct ia *));
 {
+	struct iactl_pd *iac_pd = (struct iactl_pd *)*ctlp;
+	struct siteprefix *sp;
 	struct prefix_ifconf *pif;
-	struct dhcp6_siteprefix *sp;
-
-	dprintf(LOG_DEBUG, "%s" "try to add prefix %s/%d", FNAME,
-		in6addr2str(&prefix->addr, 0), prefix->plen);
-
-	/* ignore meaningless prefix */
-	if (prefix->duration == 0) {
-		dprintf(LOG_INFO, "%s" "zero duration for %s/%d",
-			in6addr2str(&prefix->addr, 0), prefix->plen);
-		return (0);
-	}
-
-	if ((sp = find_siteprefix6(prefix)) != NULL) {
-		dprintf(LOG_INFO, "%s" "duplicated delegated prefix: %s/%d",
-		    FNAME, in6addr2str(&prefix->addr, 0), prefix->plen);
-		return (-1);
-	}
-
-	if ((sp = malloc(sizeof(*sp))) == NULL) {
-		dprintf(LOG_ERR, "%s" "failed to allocate memory"
-			" for a prefix", FNAME);
-		return (-1);
-	}
-	memset(sp, 0, sizeof(*sp));
-	TAILQ_INIT(&sp->ifprefix_list);
-	sp->prefix = *prefix;
-	sp->ifp = ifp;
-	sp->state = PREFIX6S_ACTIVE;
-	if (duidcpy(&sp->serverid, serverid)) {
-		dprintf(LOG_ERR, "%s" "failed to copy server ID");
-		goto fail;
-	}
-
-	/* if a finite lease duration is specified, set up a timer. */
-	if (sp->prefix.duration != DHCP6_DURATITION_INFINITE) {
-		struct timeval timo;
-
-		if ((sp->timer = dhcp6_add_timer(prefix6_timo, sp)) == NULL) {
-			dprintf(LOG_ERR, "%s" "failed to add a timer for "
-				"prefix %s/%d",
-				in6addr2str(&prefix->addr, 0), prefix->plen);
-			goto fail;
-		}
-		
-		timo.tv_sec = sp->prefix.duration >> 1;
-		timo.tv_usec = 0;
-
-		dhcp6_set_timer(&timo, sp->timer);
-	}
-
-	for (pif = prefix_ifconflist; pif; pif = pif->next) {
-		/*
-		 * the requesting router MUST NOT assign any delegated
-		 * prefixes or subnets from the delegated prefix(es) to the
-		 * link through which it received the DHCP message from the
-		 * delegating router.
-		 * [dhcpv6-opt-prefix-delegation-01, Section 11.1]
-		 */
-		if (strcmp(pif->ifname, ifp->ifname) == 0)
-			continue;
-
-		add_ifprefix(sp, prefix, pif);
-	}
-
-	TAILQ_INSERT_TAIL(&siteprefix_listhead, sp, link);
-
-	return (0);
-
-  fail:
-	if (sp) {
-		duidfree(&sp->serverid);
-		free(sp);
-	}
-	return (-1);
-}
-
-static void
-prefix6_remove(sp)
-	struct dhcp6_siteprefix *sp;
-{
-	struct dhcp6_ifprefix *ipf;
-
-	dprintf(LOG_DEBUG, "%s" "removing prefix %s/%d", FNAME,
-	    in6addr2str(&sp->prefix.addr, 0), sp->prefix.plen);
-
-	while ((ipf = TAILQ_FIRST(&sp->ifprefix_list)) != NULL) {
-		TAILQ_REMOVE(&sp->ifprefix_list, ipf, plink);
-		ifaddrconf(IFADDRCONF_REMOVE, ipf);
-		free(ipf);
-	}
-
-	duidfree(&sp->serverid);
-
-	if (sp->timer)
-		dhcp6_remove_timer(&sp->timer);
-
-	if (sp->evdata) {
-		TAILQ_REMOVE(&sp->evdata->event->data_list, sp->evdata, link);
-		free(sp->evdata);
-		sp->evdata = NULL;
-	}
-
-	TAILQ_REMOVE(&siteprefix_listhead, sp, link);
-
-	free(sp);
-}
-
-int
-prefix6_update(ev, prefix_list, serverid)
-	struct dhcp6_event *ev;
-	struct dhcp6_list *prefix_list;
-	struct duid *serverid;
-{
-	struct dhcp6_listval *lv;
-	struct dhcp6_eventdata *evd, *evd_next;
-
-	/* add new prefixes */
-	for (lv = TAILQ_FIRST(prefix_list); lv; lv = TAILQ_NEXT(lv, link)) {
-		if (find_siteprefix6(&lv->val_prefix6) != NULL)
-			continue;
-
-		if (prefix6_add(ev->ifp, &lv->val_prefix6, serverid)) {
-			dprintf(LOG_INFO, "%s" "failed to add a new prefix");
-			/* continue updating */
-		}
-	}
-
-	/* update existing prefixes */
-	for (evd = TAILQ_FIRST(&ev->data_list); evd; evd = evd_next) {
-		evd_next = TAILQ_NEXT(evd, link);
-
-		if (evd->type != DHCP6_DATA_PREFIX)
-			continue;
-
-		lv = dhcp6_find_listval(prefix_list,
-		    &((struct dhcp6_siteprefix *)evd->data)->prefix,
-		    DHCP6_LISTVAL_PREFIX6);
-		if (lv == NULL)
-			continue;
-
-		TAILQ_REMOVE(&ev->data_list, evd, link);
-		((struct dhcp6_siteprefix *)evd->data)->evdata = NULL;
-
-		update((struct dhcp6_siteprefix *)evd->data,
-		    &lv->val_prefix6, serverid);
-
-		free(evd);		    
-	}
-
-	/* remove prefixes that were not updated */
-	for (evd = TAILQ_FIRST(&ev->data_list); evd; evd = evd_next) {
-		evd_next = TAILQ_NEXT(evd, link);
-
-		if (evd->type != DHCP6_DATA_PREFIX)
-			continue;
-
-		TAILQ_REMOVE(&ev->data_list, evd, link);
-		((struct dhcp6_siteprefix *)evd->data)->evdata = NULL;
-
-		prefix6_remove((struct dhcp6_siteprefix *)evd->data);
-
-		free(evd);
-	}
-
-	return (0);
-}
-
-static int
-update(sp, prefix, serverid)
-	struct dhcp6_siteprefix *sp;
-	struct dhcp6_prefix *prefix;
-	struct duid *serverid;
-{
+	int spcreate = 0;
 	struct timeval timo;
 
-	if (prefix->duration == DHCP6_DURATITION_INFINITE) {
-		dprintf(LOG_DEBUG, "%s" "update a prefix %s/%d "
-		    "with infinite duration", FNAME,
-		    in6addr2str(&prefix->addr, 0), prefix->plen,
-		    prefix->duration);
-	} else {
-		dprintf(LOG_DEBUG, "%s" "update a prefix %s/%d "
-		    "with duration %d", FNAME,
-		    in6addr2str(&prefix->addr, 0), prefix->plen,
-		    prefix->duration);
+	/*
+	 * Parameter check: reject prefixes where pltime is larger than vltime,
+	 * though that the spec is silent on this point.
+	 */
+	if (pinfo->vltime != DHCP6_DURATITION_INFINITE &&
+	    (pinfo->pltime == DHCP6_DURATITION_INFINITE ||
+	    pinfo->pltime > pinfo->vltime)) {
+		dprintf(LOG_INFO, "%s" "invalid prefix %s/%d: "
+		    "pltime (%lu) is larger than pltime (%lu)",
+		    FNAME, in6addr2str(&pinfo->addr, 0), pinfo->plen,
+		    pinfo->pltime, pinfo->vltime);
+		return (-1);
 	}
- 
-	sp->prefix.duration = prefix->duration;
 
-	switch(sp->prefix.duration) {
+	if (iac_pd == NULL) {
+		if ((iac_pd = malloc(sizeof(*iac_pd))) == NULL) {
+			dprintf(LOG_NOTICE, "%s" "memory allocation failed",
+			    FNAME);
+			return (-1);
+		}
+		memset(iac_pd, 0, sizeof(*iac_pd));
+		iac_pd->iacpd_ia = ia;
+		iac_pd->iacpd_callback = callback;
+		iac_pd->iacpd_isvalid = isvalid;
+		iac_pd->iacpd_duration = duration;
+		iac_pd->iacpd_cleanup = cleanup;
+		iac_pd->iacpd_renew_data =
+		    iac_pd->iacpd_rebind_data = renew_data;
+
+		iac_pd->pifc_head = pifc;
+		TAILQ_INIT(&iac_pd->siteprefix_head);
+		*ctlp = (struct iactl *)iac_pd;
+	}
+
+	/* search for the given prefix, and make a new one if it fails */
+	if ((sp = find_siteprefix(&iac_pd->siteprefix_head, pinfo)) == NULL) {
+		if ((sp = malloc(sizeof(*sp))) == NULL) {
+			dprintf(LOG_NOTICE, "%s" "memory allocation failed"
+			    FNAME);
+			return (-1);
+		}
+		memset(sp, 0, sizeof(*sp));
+		sp->prefix.addr = pinfo->addr;
+		sp->prefix.plen = pinfo->plen;
+		sp->ctl = iac_pd;
+		TAILQ_INIT(&sp->ifprefix_list);
+
+		TAILQ_INSERT_TAIL(&iac_pd->siteprefix_head, sp, link);
+
+		spcreate = 1;
+	}
+
+	/* update the prefix according to pinfo */
+	sp->prefix.pltime = pinfo->pltime;
+	sp->prefix.vltime = pinfo->vltime;
+	dprintf(LOG_DEBUG, "%s" "%s a prefix %s/%d pltime=%lu, vltime=%lu",
+	    FNAME, spcreate ? "create" : "update",
+	    in6addr2str(&pinfo->addr, 0), pinfo->plen,
+	    pinfo->pltime, pinfo->vltime);
+
+	/* update prefix interfaces if necessary */
+	if (sp->prefix.vltime != 0 && spcreate) {
+		for (pif = TAILQ_FIRST(iac_pd->pifc_head); pif;
+		    pif = TAILQ_NEXT(pif, link)) {
+			/*
+			 * The requesting router MUST NOT assign any delegated
+			 * prefixes or subnets from the delegated prefix(es) to
+			 * the link through which it received the DHCP message
+			 * from the delegating router.
+			 * [dhcpv6-opt-prefix-delegation-01, Section 11.1]
+			 */
+			if (strcmp(pif->ifname, dhcpifp->ifname) == 0) {
+				dprintf(LOG_INFO, "%s"
+				    "skip %s as a prefix interface",
+				    FNAME, dhcpifp->ifname);
+				continue;
+			}
+
+			add_ifprefix(sp, pinfo, pif);
+		}
+	}
+
+	/*
+	 * If the new vltime is 0, this prefix immediatly expires.
+	 * Otherwise, set up or update the associated timer.
+	 */
+	switch(sp->prefix.vltime) {
 	case 0:
-		prefix6_remove(sp);
-		return (0);
+		remove_siteprefix(sp);
+		break;
 	case DHCP6_DURATITION_INFINITE:
 		if (sp->timer)
 			dhcp6_remove_timer(&sp->timer);
 		break;
 	default:
 		if (sp->timer == NULL) {
-			sp->timer = dhcp6_add_timer(prefix6_timo, sp);
+			sp->timer = dhcp6_add_timer(siteprefix_timo, sp);
 			if (sp->timer == NULL) {
-				dprintf(LOG_ERR, "%s" "failed to add prefix "
-				    "timer", FNAME);
-				prefix6_remove(sp); /* XXX */
+				dprintf(LOG_NOTICE,
+				    "%s" "failed to add prefix timer", FNAME);
+				remove_siteprefix(sp); /* XXX */
 				return (-1);
 			}
 		}
 		/* update the timer */
-		timo.tv_sec = sp->prefix.duration >> 1;
+		timo.tv_sec = sp->prefix.vltime;
 		timo.tv_usec = 0;
 
 		dhcp6_set_timer(&timo, sp->timer);
 		break;
 	}
 
-	/* if we're rebinding the prefix, copy the new server ID. */
-	if (sp->state == PREFIX6S_REBIND) {
-		if (duidcpy(&sp->serverid, serverid)) {
-			dprintf(LOG_ERR, "%s" "failed to copy server ID");
-			prefix6_remove(sp); /* XXX */
-			return (-1);
-		}
-	}
-
-	sp->state = PREFIX6S_ACTIVE;
-
 	return (0);
 }
 
-static struct dhcp6_siteprefix *
-find_siteprefix6(prefix)
+static struct siteprefix *
+find_siteprefix(head, prefix)
+	struct siteprefix_list *head;
 	struct dhcp6_prefix *prefix;
 {
-	struct dhcp6_siteprefix *sp;
+	struct siteprefix *sp;
 
-	for (sp = TAILQ_FIRST(&siteprefix_listhead); sp;
-	     sp = TAILQ_NEXT(sp, link)) {
-		if (sp->prefix.plen == prefix->plen &&
-		    IN6_ARE_ADDR_EQUAL(&sp->prefix.addr, &prefix->addr)) {
+	for (sp = TAILQ_FIRST(head); sp; sp = TAILQ_NEXT(sp, link)) {
+		if (IN6_ARE_ADDR_EQUAL(&sp->prefix.addr, &prefix->addr) &&
+		    sp->prefix.plen == prefix->plen)
 			return (sp);
-		}
 	}
 
 	return (NULL);
 }
 
+static void
+remove_siteprefix(sp)
+	struct siteprefix *sp;
+{
+	struct dhcp6_ifprefix *ip;
+
+	dprintf(LOG_DEBUG, "%s" "remove a site prefix %s/%d", FNAME,
+	    in6addr2str(&sp->prefix.addr, 0), sp->prefix.plen);
+
+	if (sp->timer)
+		dhcp6_remove_timer(&sp->timer);
+
+	/* remove all interface prefixes */
+	while ((ip = TAILQ_FIRST(&sp->ifprefix_list)) != NULL) {
+		TAILQ_REMOVE(&sp->ifprefix_list, ip, plink);
+		ifaddrconf(IFADDRCONF_REMOVE, ip);
+		free(ip);
+	}
+
+	TAILQ_REMOVE(&sp->ctl->siteprefix_head, sp, link);
+	free(sp);
+}
+
+static int
+isvalid(iac)
+	struct iactl *iac;
+{
+	struct iactl_pd *iac_pd = (struct iactl_pd *)iac;
+
+	if (TAILQ_EMPTY(&iac_pd->siteprefix_head))
+		return (0);	/* this IA is invalid */
+	return (1);
+}
+
+static u_int32_t
+duration(iac)
+	struct iactl *iac;
+{
+	struct iactl_pd *iac_pd = (struct iactl_pd *)iac;
+	struct siteprefix *sp;
+	u_int32_t base = DHCP6_DURATITION_INFINITE;
+
+	/* determine for the smallest pltime */
+	for (sp = TAILQ_FIRST(&iac_pd->siteprefix_head); sp;
+	    sp = TAILQ_NEXT(sp, link)) {
+		if (base == DHCP6_DURATITION_INFINITE ||
+		    sp->prefix.pltime < base)
+			base = sp->prefix.pltime;
+	}
+
+	return (base);
+}
+
+static void
+cleanup(iac)
+	struct iactl *iac;
+{
+	struct iactl_pd *iac_pd = (struct iactl_pd *)iac;
+	struct siteprefix *sp;
+
+	while ((sp = TAILQ_FIRST(&iac_pd->siteprefix_head)) != NULL) {
+		TAILQ_REMOVE(&iac_pd->siteprefix_head, sp, link);
+		remove_siteprefix(sp);
+	}
+
+	free(iac);
+}
+
+static int
+renew_data(iac, iaparam, evdp, evd)
+	struct iactl *iac;
+	struct dhcp6_ia *iaparam;
+	struct dhcp6_eventdata **evdp, *evd;
+{
+	struct iactl_pd *iac_pd = (struct iactl_pd *)iac;
+	struct siteprefix *sp;
+	struct dhcp6_list *ial = NULL, pl;
+	struct dhcp6_listval *v;
+
+	TAILQ_INIT(&pl);
+	for (sp = TAILQ_FIRST(&iac_pd->siteprefix_head); sp;
+	    sp = TAILQ_NEXT(sp, link)) {
+		if (dhcp6_add_listval(&pl, DHCP6_LISTVAL_PREFIX6,
+		    &sp->prefix, NULL) == NULL)
+			goto fail;
+	}
+
+	if ((ial = malloc(sizeof(*ial))) == NULL)
+		goto fail;
+	TAILQ_INIT(ial);
+	if (dhcp6_add_listval(ial, DHCP6_LISTVAL_IAPD, iaparam, &pl) == NULL)
+		goto fail;
+	dhcp6_clear_list(&pl);
+
+	evd->type = DHCP6_EVDATA_IAPD;
+	evd->data = (void *)ial;
+	evd->privdata = (void *)evdp;
+	evd->destructor = renew_data_free;
+
+	return (0);
+
+  fail:
+	dhcp6_clear_list(&pl);
+	if (ial)
+		free(ial);
+	return (-1);
+}
+
+static void
+renew_data_free(evd)
+	struct dhcp6_eventdata *evd;
+{
+	struct dhcp6_list *ial;
+
+	if (evd->type != DHCP6_EVDATA_IAPD) {
+		dprintf(LOG_ERR, "%s" "assumption failure", FNAME);
+		exit(1);
+	}
+
+	*(struct dhcp6_eventdata **)evd->privdata = NULL;
+	ial = (struct dhcp6_list *)evd->data;
+	dhcp6_clear_list(ial);
+	free(ial);
+}
+
 static struct dhcp6_timer *
-prefix6_timo(arg)
+siteprefix_timo(arg)
 	void *arg;
 {
-	struct dhcp6_siteprefix *sp = (struct dhcp6_siteprefix *)arg;
-	struct dhcp6_event *ev;
-	struct dhcp6_eventdata *evd;
-	struct timeval timeo;
-	int dhcpstate;
-	double d;
+	struct siteprefix *sp = (struct siteprefix *)arg;
+	struct ia *ia;
+	void (*callback)__P((struct ia *));
 
-	dprintf(LOG_DEBUG, "%s" "prefix timeout for %s/%d, state=%d", FNAME,
-		in6addr2str(&sp->prefix.addr, 0), sp->prefix.plen, sp->state);
+	dprintf(LOG_DEBUG, "%s" "prefix timeout for %s/%d",
+	    FNAME, in6addr2str(&sp->prefix.addr, 0), sp->prefix.plen);
 
-	/* cancel the current event for the prefix. */
-	if (sp->evdata) {
-		TAILQ_REMOVE(&sp->evdata->event->data_list, sp->evdata, link);
-		free(sp->evdata);
-		sp->evdata = NULL;
-	}
+	ia = sp->ctl->iacpd_ia;
+	callback = sp->ctl->iacpd_callback;
 
-	if (sp->state == PREFIX6S_REBIND) {
-		dprintf(LOG_INFO, "%s" "failed to rebind a prefix %s/%d",
-		    FNAME, in6addr2str(&sp->prefix.addr, 0), sp->prefix.plen);
-		prefix6_remove(sp);
-		return (NULL);
-	}
+	if (sp->timer)
+		dhcp6_remove_timer(&sp->timer);
 
-	switch(sp->state) {
-	case PREFIX6S_ACTIVE:
-		sp->state = PREFIX6S_RENEW;
-		dhcpstate = DHCP6S_RENEW;
-		d = sp->prefix.duration * 0.3; /* (0.8 - 0.5) * duration */
-		timeo.tv_sec = (long)d;
-		timeo.tv_usec = 0;
-		break;
-	case PREFIX6S_RENEW:
-		sp->state = PREFIX6S_REBIND;
-		dhcpstate = DHCP6S_REBIND;
-		d = sp->prefix.duration * 0.2; /* (1.0 - 0.8) * duration */
-		timeo.tv_sec = (long)d;
-		timeo.tv_usec = 0;
-		duidfree(&sp->serverid);
-		break;
-	default:
-		return (NULL);
-	}
-	dhcp6_set_timer(&timeo, sp->timer);
+	remove_siteprefix(sp);
 
-	if ((ev = dhcp6_create_event(sp->ifp, dhcpstate)) == NULL) {
-		dprintf(LOG_ERR, "%s" "failed to create a new event"
-		    FNAME);
-		exit(1); /* XXX: should try to recover */
-	}
-	if ((ev->timer = dhcp6_add_timer(client6_timo, ev)) == NULL) {
-		dprintf(LOG_ERR, "%s" "failed to create a new event "
-		    "timer", FNAME);
-		free(ev);
-		exit(1); /* XXX */
-	}
-	if ((evd = malloc(sizeof(*evd))) == NULL) {
-		dprintf(LOG_ERR, "%s" "failed to create a new event "
-		    "data", FNAME);
-		free(ev->timer);
-		free(ev);
-		exit(1); /* XXX */
-	}
-	if (sp->state == PREFIX6S_RENEW) {
-		if (duidcpy(&ev->serverid, &sp->serverid)) {
-			dprintf(LOG_ERR, "%s" "failed to copy server ID",
-			    FNAME);
-			free(ev->timer);
-			free(ev);
-			exit(1); /* XXX */
-		}
-	}
-	memset(evd, 0, sizeof(*evd));
-	evd->type = DHCP6_DATA_PREFIX;
-	evd->data = sp;
-	evd->event = ev;
-	TAILQ_INSERT_TAIL(&ev->data_list, evd, link);
+	(*callback)(ia);
 
-	TAILQ_INSERT_TAIL(&sp->ifp->event_list, ev, link);
-
-	ev->timeouts = 0;
-	dhcp6_set_timeoparam(ev);
-	dhcp6_reset_timer(ev);
-
-	sp->evdata = evd;
-
-	switch(sp->state) {
-	case PREFIX6S_RENEW:
-		client6_send_renew(ev);
-		break;
-	case PREFIX6S_REBIND:
-		client6_send_rebind(ev);
-		break;
-	case PREFIX6S_ACTIVE:
-		/* what to do? */
-		break;
-	}
-
-	return (sp->timer);
+	return (NULL);
 }
 
 static int
 add_ifprefix(siteprefix, prefix, pconf)
-	struct dhcp6_siteprefix *siteprefix;
+	struct siteprefix *siteprefix;
 	struct dhcp6_prefix *prefix;
 	struct prefix_ifconf *pconf;
 {
@@ -477,7 +425,7 @@ add_ifprefix(siteprefix, prefix, pconf)
 	int b, i;
 
 	if ((ifpfx = malloc(sizeof(*ifpfx))) == NULL) {
-		dprintf(LOG_ERR, FNAME
+		dprintf(LOG_NOTICE, FNAME
 		    "failed to allocate memory for ifprefix");
 		return (-1);
 	}
@@ -493,7 +441,7 @@ add_ifprefix(siteprefix, prefix, pconf)
 	 * XXX: our current implementation assumes ifid len is a multiple of 8
 	 */
 	if ((pconf->ifid_len % 8) != 0) {
-		dprintf(LOG_NOTICE, FNAME
+		dprintf(LOG_ERR, FNAME
 		    "assumption failure on the length of interface ID");
 		goto bad;
 	}
