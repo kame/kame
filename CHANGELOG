@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1064 2000/06/25 12:12:40 sumikawa Exp $
+$Id: CHANGELOG,v 1.1065 2000/06/26 15:35:28 itojun Exp $
 
 <200006>
+Tue Jun 27 00:32:20 JST 2000  itojun@iijlab.net
+	* netbsd/sys/arch/*/conf/GENERIC.v6: enable PULLDOWN_TEST for all
+	  architectures.  this is done because mbuf pullup code in
+	  sys/net/if_loop.c has been found to be a source of performance hit,
+	  and PULLDOWN_TEST code is found to be stable enough.
+	* netbsd/sys/sys/mbuf.h: recover 4.4BSD MINCLSIZE.
+
 Sun Jun 25 21:11:19 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* start to support FreeBSD 3.5-RELEASE. 3.4-RELEASE is obsolete.
 
