@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.45 2000/11/11 08:13:11 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.46 2000/11/11 16:37:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1080,7 +1080,7 @@ prefix_check(struct nd_opt_prefix_info *pinfo,
 			syslog(LOG_INFO,
 			       "<%s> prefeerred lifetime for %s/%d"
 			       " (decr. in real time) inconsistent on %s:"
-			       " %d from %s, %d from us",
+			       " %d from %s, %ld from us",
 			       __FUNCTION__,
 			       inet_ntop(AF_INET6, &pinfo->nd_opt_pi_prefix,
 					 prefixbuf, INET6_ADDRSTRLEN),
@@ -1117,7 +1117,7 @@ prefix_check(struct nd_opt_prefix_info *pinfo,
 			syslog(LOG_INFO,
 			       "<%s> valid lifetime for %s/%d"
 			       " (decr. in real time) inconsistent on %s:"
-			       " %d from %s, %d from us",
+			       " %d from %s, %ld from us",
 			       __FUNCTION__,
 			       inet_ntop(AF_INET6, &pinfo->nd_opt_pi_prefix,
 					 prefixbuf, INET6_ADDRSTRLEN),

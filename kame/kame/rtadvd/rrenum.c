@@ -1,4 +1,4 @@
-/*	$KAME: rrenum.c,v 1.7 2000/11/11 06:54:56 jinmei Exp $	*/
+/*	$KAME: rrenum.c,v 1.8 2000/11/11 16:37:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -434,12 +434,11 @@ rr_input(int len, struct icmp6_router_renum *rr, struct in6_pktinfo *pi,
 	if (len < sizeof(struct icmp6_router_renum)) {
 		syslog(LOG_NOTICE,
 		       "<%s>: RR short message (size %d) from %s to %s on %s",
-		       __FUNCTION__,
+		       __FUNCTION__, len,
 		       inet_ntop(AF_INET6, &from->sin6_addr,
 				 ntopbuf[0], INET6_ADDRSTRLEN),
 		       inet_ntop(AF_INET6, &dst, ntopbuf[1], INET6_ADDRSTRLEN),
-		       if_indextoname(pi->ipi6_ifindex, ifnamebuf),
-		       len);
+		       if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 		return;
 	}
 
