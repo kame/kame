@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.120 2001/06/18 03:00:05 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.121 2001/06/18 03:10:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1987,7 +1987,7 @@ in6_tmpifadd(ia0, forcegen)
 
 	/* XXX: scope zone ID? */
 
-	ifra.ifra_flags = (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY);
+	ifra.ifra_flags |= (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY);
 
 	/* allocate ifaddr structure, link into chain, etc. */
 	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0)
