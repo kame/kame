@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.660 2000/03/07 02:36:50 sakane Exp $
+$Id: CHANGELOG,v 1.661 2000/03/07 10:12:40 sakane Exp $
 
 <200003>
+Tue Mar  7 19:10:21 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	- Fixed to check OpenSSL version number.  reported by
+	  <stomomi@ebina.hitachi.co.jp>.
+	- Since we don't support pre-0.9.4 any more, drop INCLUDE_PATH_OPENSSL,
+	  SSLVER and HAVE_OPENSSLV_H
+
 Tue Mar  7 11:36:03 JST 2000 sakane@ydc.co.jp
 	* kame/sys/netkey/key.c:
 	enable SADB_X_SPDSETIDX.  It can set a policy index into SPD.
