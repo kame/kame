@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.sample,v 1.1 2000/04/25 06:30:08 sakane Exp $
+# $KAME: racoon.conf.sample,v 1.2 2000/04/26 08:20:51 sakane Exp $
 
 # "path" must be placed before it should be used.
 # You can overwrite which you defined, but it should not use due to confusing.
@@ -16,7 +16,6 @@ path certificate "/usr/local/openssl/certs" ;
 identifier vendor_id "KAME/racoon";
 identifier user_fqdn "foo@kame.net";
 identifier fqdn "foo.kame.net";
-#identifier keyid "/usr/local/v6/etc/keyid.txt";
 
 # "log" specifies logging level.  It is followed by either "info", "notify",
 # "debug" or "debug2".
