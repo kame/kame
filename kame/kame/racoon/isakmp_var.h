@@ -26,9 +26,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_var.h,v 1.7 2000/01/11 02:17:19 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_var.h,v 1.8 2000/04/26 21:03:58 sakane Exp $ */
 
 #define PORT_ISAKMP 500
+
+#define DEFAULT_NONCE_SIZE	16
 
 typedef u_char cookie_t[8];
 typedef u_char msgid_t[4];
