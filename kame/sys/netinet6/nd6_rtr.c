@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.219 2002/12/10 11:59:36 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.220 2002/12/10 12:53:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2096,11 +2096,7 @@ in6_ifadd(pr)
 	bcopy(&mask, &ifra.ifra_prefixmask.sin6_addr,
 	    sizeof(ifra.ifra_prefixmask.sin6_addr));
 
-	/*
-	 * lifetime.
-	 * XXX: in6_init_address_ltimes would override these values later.
-	 * We should reconsider this logic.
-	 */
+	/* lifetimes. */
 	ifra.ifra_lifetime.ia6t_vltime = pr->ndpr_vltime;
 	ifra.ifra_lifetime.ia6t_pltime = pr->ndpr_pltime;
 
