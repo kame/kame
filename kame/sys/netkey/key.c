@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.213 2001/09/21 12:24:22 sakane Exp $	*/
+/*	$KAME: key.c,v 1.214 2001/09/25 15:00:44 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4156,17 +4156,10 @@ key_cmpspidx_withmask(spidx0, spidx1)
 			return 0;
 		break;
 	case AF_INET6:
-		if (spidx0->ul_proto == IPPROTO_ICMPV6) {
-			if (satosin6(&spidx0->src)->sin6_port != (u_int16_t)~0
-			 && satosin6(&spidx0->src)->sin6_port !=
-			    satosin6(&spidx1->src)->sin6_port)
-				return 0;
-		} else {
-			if (satosin6(&spidx0->src)->sin6_port != IPSEC_PORT_ANY
-			 && satosin6(&spidx0->src)->sin6_port !=
-			    satosin6(&spidx1->src)->sin6_port)
-				return 0;
-		}
+		if (satosin6(&spidx0->src)->sin6_port != IPSEC_PORT_ANY
+		 && satosin6(&spidx0->src)->sin6_port !=
+		    satosin6(&spidx1->src)->sin6_port)
+			return 0;
 		/*
 		 * scope_id check. if sin6_scope_id is 0, we regard it
 		 * as a wildcard scope, which matches any scope zone ID. 
@@ -4198,17 +4191,10 @@ key_cmpspidx_withmask(spidx0, spidx1)
 			return 0;
 		break;
 	case AF_INET6:
-		if (spidx0->ul_proto == IPPROTO_ICMPV6) {
-			if (satosin6(&spidx0->dst)->sin6_port != (u_int16_t)~0
-			 && satosin6(&spidx0->dst)->sin6_port !=
-			    satosin6(&spidx1->dst)->sin6_port)
-				return 0;
-		} else {
-			if (satosin6(&spidx0->dst)->sin6_port != IPSEC_PORT_ANY
-			 && satosin6(&spidx0->dst)->sin6_port !=
-			    satosin6(&spidx1->dst)->sin6_port)
-				return 0;
-		}
+		if (satosin6(&spidx0->dst)->sin6_port != IPSEC_PORT_ANY
+		 && satosin6(&spidx0->dst)->sin6_port !=
+		    satosin6(&spidx1->dst)->sin6_port)
+			return 0;
 		/*
 		 * scope_id check. if sin6_scope_id is 0, we regard it
 		 * as a wildcard scope, which matches any scope zone ID. 
