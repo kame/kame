@@ -678,7 +678,7 @@ rip_process_response(ripif, nn)
   byte             lifeyes,    garbageyes;
   char             in6txt[INET6_ADDRSTRLEN];
 
-#ifdef DEBUG_RIP
+#if defined(DEBUG_RIP) || defined(DEBUG)
   char *ifname = ripif->rip_ife->ifi_ifn->if_name; /* for debugging use */
 #endif
 
