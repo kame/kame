@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.24 2002/07/16 17:04:30 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.25 2002/07/17 00:17:43 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1540,7 +1540,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 
 		/* Auth. data */
 		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
-		mopt_auth->ip6moau_len = AUT_SIZE;
+		mopt_auth->ip6moau_len = AUTH_SIZE;
 
 		/* Calculate K_bu */
 		SHA1Init(&sha1_ctx);
