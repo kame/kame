@@ -55,11 +55,11 @@
  * - struct ifnet
  *			use queue.h?	member names	if name
  *			---		---		---
- *	FreeBSD 2	no		?		if_name+unit
+ *	FreeBSD 2	no		old standard	if_name+unit
  *	FreeBSD 3	yes		strange		if_name+unit
  *	OpenBSD		yes		standard	if_xname
  *	NetBSD		yes		standard	if_xname
- *	BSDI 3		no		---		if_name+unit
+ *	BSDI 3		no		old standard	if_name+unit
  * - usrreq
  *	NetBSD, OpenBSD, BSDI 3, FreeBSD 2
  *		single function with PRU_xx, arguments are mbuf 
@@ -86,6 +86,9 @@
  * - ovbcopy()
  *	in NetBSD 1.4 or later, ovbcopy() is not supplied in the kernel.
  *	bcopy() is safe against overwrites.
+ * - splnet()
+ *	NetBSD 1.4 or later requires splsoftnet().
+ *	other operating systems use splnet().
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
