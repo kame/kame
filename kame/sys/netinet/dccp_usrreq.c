@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.35 2004/12/13 03:19:06 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.36 2004/12/16 08:26:28 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -195,6 +195,11 @@ SYSCTL_STRUCT(_net_inet_dccp, DCCPCTL_STATS, stats, CTLFLAG_RW,
 #ifdef __OpenBSD__
 #define M_ZERO 0
 #define sotoin6pcb sotoinpcb
+#define in6p_laddr inp_laddr6
+#define in6p_faddr inp_faddr6
+#define in6p_route inp_route6
+#define in6p_flowinfo inp_flowinfo
+#define in6p_outputopts inp_outputopts6
 #endif
 
 static struct	sockaddr_in dccp_in = { sizeof(dccp_in), AF_INET };
@@ -400,10 +405,10 @@ dccp_input(struct mbuf *m, ...)
 		ipov = (struct ipovly *)ip;
 	}
 
-	if (dh->dh_cslen == 15) {
+	if (dh->dh_cslen == 0) {
 		cslen = len;
 	} else {
-		cslen = dh->dh_off * 4 + dh->dh_cslen * 4;
+		cslen = dh->dh_off * 4 + (dh->dh_cslen - 1) * 4;
 		if (cslen > len)
 			cslen = len;
 	}
@@ -486,10 +491,11 @@ dccp_input(struct mbuf *m, ...)
 		}
 #else /* OpenBSD */
 		inp = in_pcblookup(&dccpbtable, &ip->ip_src,
-		    ntohs(dh->dh_sport), &ip->ip_dst, ntohs(dh->dh_dport),
+		    dh->dh_sport, &ip->ip_dst, dh->dh_dport,
 		    INPLOOKUP_WILDCARD);
 #endif
 	}
+	DCCP_DEBUG((LOG_INFO, "inp=%p\n", inp));
 
 #ifdef __NetBSD__
 	if (isipv6 ? in6p == NULL : inp == NULL) {
@@ -783,8 +789,6 @@ dccp_input(struct mbuf *m, ...)
 			/* Force send reset. */
 			dccp_output(dp, DCCP_TYPE_RESET + 2);
 		}
-
-
 	} else if (dp->state == DCCPS_REQUEST) {
 		switch (dh->dh_type) {
 		case DCCP_TYPE_RESPONSE:
@@ -1522,9 +1526,11 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 again:
 	sendalot = 0;
 
-
-	off = 0; /* off not needed for dccp because we do not need to wait for ACK
-		    before removing the packet	 */
+	/*
+	 * off not needed for dccp because we do not need to wait for ACK
+	 * before removing the packet
+	 */
+	off = 0;
 	len = (long)so->so_snd.sb_cc;
 	optlen = 0;
 
@@ -1622,8 +1628,10 @@ again:
 		    extrah_len + optlen;
 	} else
 #endif
+	{
 		hdrlen = sizeof(struct ip) + sizeof(struct dccphdr) +
 		    extrah_len + optlen;
+	}
 
 	if (len > (dp->d_maxseg - extrah_len - optlen)) {
 		len = dp->d_maxseg - extrah_len - optlen;
@@ -1635,11 +1643,6 @@ again:
 		error = ENOBUFS;
 		goto release;
 	}
-	
-	m->m_data += max_linkhdr;
-	m->m_len = hdrlen;
-
-#ifdef INET6
 	if (MHLEN < hdrlen + max_linkhdr) {
 		MCLGET(m, M_DONTWAIT);
 		if ((m->m_flags & M_EXT) == 0) {
@@ -1647,10 +1650,12 @@ again:
 			goto release;
 		}
 	}
-#endif
+
+	m->m_data += max_linkhdr;
+	m->m_len = hdrlen;
 
 	if (len) { /* We have data to send */
-		if (len <= MHLEN - hdrlen - max_linkhdr) {
+		if (len <= M_TRAILINGSPACE(m) - hdrlen) {
 			m_copydata(so->so_snd.sb_mb, off, (int) len,
 			mtod(m, caddr_t) + hdrlen);
 			m->m_len += len;
@@ -1733,17 +1738,15 @@ again:
 		drqh = (struct dccp_requesthdr *)(dh + 1);
 		drqh->drqh_sname = 0; /* Service name must be 0 if not used */
 		optp = (u_char *)(drqh + 1);
-
 	} else if (dh->dh_type == DCCP_TYPE_RESET) {
 		drth = (struct dccp_resethdr *)(dh + 1);
 		drth->drth_res = 0; /* Reserved field should be zero */
 		drth->drth_ack = htonl(dp->seq_rcv) >> 8;
-		drth->drth_reason = 0; /* FIX, must be able to specify reason  */
+		drth->drth_reason = 0; /* FIX, must be able to specify reason */
 		drth->drth_data1 = 0;
 		drth->drth_data2 = 0;
 		drth->drth_data3 = 0;
 		optp = (u_char *)(drth + 1);
-
 	} else if (extrah_len) {
 		dah = (struct dccp_ackhdr *)(dh + 1);
 		dah->dah_res = 0; /* Reserved field should be zero */
@@ -1755,23 +1758,21 @@ again:
 			dah->dah_ack = htonl(dp->seq_rcv) >> 8;
 		
 		optp = (u_char *)(dah + 1);
-
 	} else {
 		optp = (u_char *)(dh + 1);
-
 	}
 
 	if (optlen)
-		bcopy(options, optp , optlen);
+		bcopy(options, optp, optlen);
 
 	m->m_pkthdr.len = hdrlen + len;
 
-	if (dh->dh_cslen == 15) {
-		cslen = len;
+	if (dh->dh_cslen == 0) {
+		cslen = (hdrlen - sizeof(struct ip6_hdr)) + len;
 	} else {
-		cslen = 4 * dh->dh_cslen;
-		if (cslen > len)
-			cslen = len;
+		cslen = dh->dh_off * 4 + (dh->dh_cslen - 1) * 4;
+		if (cslen > (hdrlen - sizeof(struct ip)) + len)
+			cslen = (hdrlen - sizeof(struct ip)) + len;
 	}
 
 	/*
@@ -1787,22 +1788,12 @@ again:
 
 #ifdef INET6
 	if (isipv6) {
-		dh->dh_sum = in6_cksum(m, IPPROTO_DCCP, sizeof(struct ip6_hdr), sizeof(struct dccphdr) + extrah_len + optlen + cslen);
+		dh->dh_sum = in6_cksum(m, IPPROTO_DCCP, sizeof(struct ip6_hdr),
+		    cslen);
 	} else
 #endif
 	{
-#ifdef __FreeBSD__
-		dh->dh_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
-		    htons((u_short)len + sizeof(struct dccphdr) +
-		    extrah_len + optlen + IPPROTO_DCCP)); 
-		dh->dh_sum = in_cksum_skip(m, hdrlen + cslen, 20);
-#else
-		dh->dh_sum = in_cksum_phdr(ip->ip_src.s_addr,
-		    ip->ip_dst.s_addr, htons((u_short)len +
-		    sizeof(struct dccphdr) + extrah_len + optlen +
-		    IPPROTO_DCCP));
-		dh->dh_sum = in4_cksum(m, 0, 20, hdrlen + cslen - 20);
-#endif
+		dh->dh_sum = in4_cksum(m, 0, 20, cslen);
 #ifndef __OpenBSD__
 		m->m_pkthdr.csum_data = offsetof(struct dccphdr, dh_sum);
 #endif
@@ -2172,7 +2163,7 @@ dccp_bind(struct socket *so, struct mbuf *m, struct proc *td)
 #endif
 	sinp = (struct sockaddr_in *)nam;
 	if (sinp->sin_family == AF_INET &&
-		IN_MULTICAST(ntohl(sinp->sin_addr.s_addr))) {
+	    IN_MULTICAST(ntohl(sinp->sin_addr.s_addr))) {
 		INP_INFO_WUNLOCK(&dccpbinfo);
 		splx(s);
 		return EAFNOSUPPORT;
@@ -2837,7 +2828,7 @@ dccp_newdccpcb(struct inpcb *inp)
 
 	dp->ndp = 0;
 	dp->loss_window = 1000;
-	dp->cslen = 15;
+	dp->cslen = 0;
 	dp->pref_cc = DEFAULT_CCID;
 	dp->who = DCCP_UNDEF;
 	dp->seq_snd = 0;

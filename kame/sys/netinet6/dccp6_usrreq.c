@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_usrreq.c,v 1.7 2004/10/28 04:33:26 itojun Exp $	*/
+/*	$KAME: dccp6_usrreq.c,v 1.8 2004/12/16 08:26:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -109,6 +109,8 @@
 #define	INP_LOCK(x)
 #define INP_UNLOCK(x)
 #endif
+
+#define PULLDOWN_TEST
 
 int
 dccp6_input(struct mbuf **mp, int *offp, int proto)
