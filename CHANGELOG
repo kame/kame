@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.407 2000/01/05 17:29:07 itojun Exp $
+$Id: CHANGELOG,v 1.408 2000/01/06 05:03:32 itojun Exp $
 
 <200001>
+Thu Jan  6 13:49:43 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_input.c: add missing case for net.inet6.ip6.rr_prune
+	  for openbsd and netbsd.
+	* netbsd/pkgsrc/net/zebra, freebsd[23]/ports/zebra: upgrade to 0.83a.
+
 Thu Jan  6 01:40:50 JST 2000  itojun@iijlab.net
 	* sys/netinet6/icmp6.c: avoid panic on getsockopt(ICMPV6_FILTER).
 	  From: shigeya@foretune.co.jp
