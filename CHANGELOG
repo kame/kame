@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.662 2000/03/08 06:48:28 jinmei Exp $
+$Id: CHANGELOG,v 1.663 2000/03/08 13:20:33 jinmei Exp $
 
 <200003>
+2000-03-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/scopedaddrtest: was added to check the precise
+	behavior of KAME's scoped address support in the getXXXinfo
+	functions.
+
 2000-03-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getnameinfo.c (getnameinfo): tried to parse
 	IPv6 scoped addresses according to the new format
