@@ -28,7 +28,7 @@
  */
 
 /*
- *  $Id: mip6.h,v 1.2 2000/02/07 17:48:32 itojun Exp $
+ *  $Id: mip6.h,v 1.3 2000/02/09 13:31:02 itojun Exp $
  */
 
 
@@ -606,7 +606,7 @@ extern int mip6_ioctl __P((struct socket *, u_long, caddr_t, struct ifnet *,
 extern int mip6_ioctl __P((struct socket *, u_long, caddr_t, struct ifnet *));
 #endif
 #if defined(MIP6_DEBUG)
-void mip6_debug(char *, ...));
+void mip6_debug __P((char *, ...));
 #endif
 
 
