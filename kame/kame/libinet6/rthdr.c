@@ -1,4 +1,4 @@
-/*	$KAME: rthdr.c,v 1.14 2003/06/06 06:31:42 itojun Exp $	*/
+/*	$KAME: rthdr.c,v 1.15 2003/06/06 06:34:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,9 +55,6 @@ inet6_rthdr_space(type, seg)
 		    sizeof(struct ip6_rthdr0)));
 #endif 
 	default:
-#ifdef DEBUG
-		fprintf(stderr, "inet6_rthdr_space: unknown type(%d)\n", type);
-#endif 
 		return (0);
 	}
 }
@@ -88,9 +85,6 @@ inet6_rthdr_init(bp, type)
 		    rthdr->ip6r_type = IPV6_RTHDR_TYPE_0;
 		return (ch);
 	default:
-#ifdef DEBUG
-		fprintf(stderr, "inet6_rthdr_init: unknown type(%d)\n", type);
-#endif 
 		return (NULL);
 	}
 }
@@ -110,19 +104,10 @@ inet6_rthdr_add(cmsg, addr, flags)
 	case IPV6_RTHDR_TYPE_0:
 	{
 		struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
-		if (flags != IPV6_RTHDR_LOOSE && flags != IPV6_RTHDR_STRICT) {
-#ifdef DEBUG
-			fprintf(stderr,
-			    "inet6_rthdr_add: unsupported flag(%u)\n", flags);
-#endif 
+		if (flags != IPV6_RTHDR_LOOSE && flags != IPV6_RTHDR_STRICT)
 			return (-1);
-		}
-		if (rt0->ip6r0_segleft == 23) {
-#ifdef DEBUG
-			fprintf(stderr, "inet6_rthdr_add: segment overflow\n");
-#endif 
+		if (rt0->ip6r0_segleft == 23)
 			return (-1);
-		}
 
 #ifdef COMPAT_RFC1883		/* XXX */
 		if (flags == IPV6_RTHDR_STRICT) {
@@ -143,10 +128,6 @@ inet6_rthdr_add(cmsg, addr, flags)
 		break;
 	}
 	default:
-#ifdef DEBUG
-		fprintf(stderr, "inet6_rthdr_add: unknown type(%u)\n",
-		    rthdr->ip6r_type);
-#endif 
 		return (-1);
 	}
 
@@ -168,19 +149,11 @@ inet6_rthdr_lasthop(cmsg, flags)
 	{
 		struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
 #ifdef COMPAT_RFC1883		/* XXX */
-		if (flags != IPV6_RTHDR_LOOSE && flags != IPV6_RTHDR_STRICT) {
-#ifdef DEBUG
-			fprintf(stderr, "inet6_rthdr_lasthop: unsupported flag(%u)\n", flags);
-#endif 
+		if (flags != IPV6_RTHDR_LOOSE && flags != IPV6_RTHDR_STRICT)
 			return (-1);
-		}
 #endif /* COMPAT_RFC1883 */
-		if (rt0->ip6r0_segleft > 23) {
-#ifdef DEBUG
-			fprintf(stderr, "inet6_rthdr_add: segment overflow\n");
-#endif 
+		if (rt0->ip6r0_segleft > 23)
 			return (-1);
-		}
 #ifdef COMPAT_RFC1883		/* XXX */
 		if (flags == IPV6_RTHDR_STRICT) {
 			int c, b;
@@ -195,10 +168,6 @@ inet6_rthdr_lasthop(cmsg, flags)
 		break;
 	}
 	default:
-		#ifdef DEBUG
-		fprintf(stderr, "inet6_rthdr_lasthop: unknown type(%u)\n",
-		    rthdr->ip6r_type);
-		#endif 
 		return (-1);
 	}
 
@@ -211,9 +180,7 @@ inet6_rthdr_reverse(in, out)
 	const struct cmsghdr *in;
 	struct cmsghdr *out;
 {
-#ifdef DEBUG
-	fprintf(stderr, "inet6_rthdr_reverse: not implemented yet\n");
-#endif 
+
 	return -1;
 }
 #endif
@@ -231,22 +198,13 @@ inet6_rthdr_segments(cmsg)
 	{
 		struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
 
-		if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len) {
-#ifdef DEBUG
-			fprintf(stderr, "inet6_rthdr_segments: invalid size(%u)\n",
-			    rt0->ip6r0_len);
-#endif 
+		if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len)
 			return -1;
-		}
 
 		return (rt0->ip6r0_len * 8) / sizeof(struct in6_addr);
 	}
 
 	default:
-#ifdef DEBUG
-		fprintf(stderr, "inet6_rthdr_segments: unknown type(%u)\n",
-		    rthdr->ip6r_type);
-#endif 
 		return -1;
 	}
 }
@@ -266,22 +224,11 @@ inet6_rthdr_getaddr(cmsg, idx)
 		struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
 		int naddr;
 
-		if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len) {
-#ifdef DEBUG
-			fprintf(stderr,
-			    "inet6_rthdr_getaddr: invalid size(%u)\n",
-			    rt0->ip6r0_len);
-#endif 
+		if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len)
 			return NULL;
-		}
 		naddr = (rt0->ip6r0_len * 8) / sizeof(struct in6_addr);
-		if (idx <= 0 || naddr < idx) {
-#ifdef DEBUG
-			fprintf(stderr,
-			    "inet6_rthdr_getaddr: invalid idx(%d)\n", idx);
-#endif 
+		if (idx <= 0 || naddr < idx)
 			return NULL;
-		}
 #ifdef COMPAT_RFC2292
 		return (((struct in6_addr *)(rt0 + 1)) + idx - 1);
 #else
@@ -290,10 +237,6 @@ inet6_rthdr_getaddr(cmsg, idx)
 	}
 
 	default:
-#ifdef DEBUG
-		fprintf(stderr, "inet6_rthdr_getaddr: unknown type(%u)\n",
-		    rthdr->ip6r_type);
-#endif 
 		return NULL;
 	}
 }
@@ -314,21 +257,11 @@ inet6_rthdr_getflags(cmsg, idx)
 		int naddr;
 
 		if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len) {
-#ifdef DEBUG
-			fprintf(stderr,
-			    "inet6_rthdr_getflags: invalid size(%u)\n",
-			    rt0->ip6r0_len);
-#endif 
 			return -1;
 		}
 		naddr = (rt0->ip6r0_len * 8) / sizeof(struct in6_addr);
-		if (idx < 0 || naddr < idx) {
-#ifdef DEBUG
-			fprintf(stderr,
-			    "inet6_rthdr_getflags: invalid idx(%d)\n", idx);
-#endif 
+		if (idx < 0 || naddr < idx)
 			return -1;
-		}
 #ifdef COMPAT_RFC1883		/* XXX */
 		if (rt0->ip6r0_slmap[idx / 8] & (0x80 >> (idx % 8)))
 			return IPV6_RTHDR_STRICT;
@@ -340,10 +273,6 @@ inet6_rthdr_getflags(cmsg, idx)
 	}
 
 	default:
-#ifdef DEBUG
-		fprintf(stderr, "inet6_rthdr_getflags: unknown type(%u)\n",
-		    rthdr->ip6r_type);
-#endif 
 		return -1;
 	}
 }
