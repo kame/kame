@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.94 2003/07/25 08:12:02 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.95 2003/07/30 12:39:41 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -109,9 +109,7 @@ struct mip6_bc {
 };
 LIST_HEAD(mip6_bc_list, mip6_bc);
 
-#define MIP6_BC_STATE_BA_WAITSENT 0x01
-#define MIP6_BC_STATE_BR_WAITSENT 0x02
-#define MIP6_BC_STATE_DAD_WAIT	  0x04
+#define MIP6_IS_BC_DAD_WAIT(mbc) ((mbc)->mbc_dad != NULL)
 
 #define MIP6_BC_TIMEOUT_INTERVAL 1
 #define MIP6_REFRESH_MINLIFETIME 2

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.8 2003/07/28 11:58:14 t-momose Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.9 2003/07/30 12:39:41 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -193,9 +193,8 @@ mip6_process_hrbu(bi)
 			}
 
 			/* start DAD processing. */
-			llmbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
 			mip6_dad_start(llmbc);
-		} else if ((llmbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
+		} else if (MIP6_IS_BC_DAD_WAIT(llmbc)) {
 			llmbc->mbc_pcoa = bi->mbc_pcoa;
 			llmbc->mbc_seqno = bi->mbc_seqno;
 			busy++;
@@ -217,7 +216,6 @@ mip6_process_hrbu(bi)
 			mip6_timeoutentry_update(llmbc->mbc_timeout, llmbc->mbc_expire);
 			mip6_timeoutentry_update(llmbc->mbc_brr_timeout, llmbc->mbc_expire - mbc->mbc_lifetime / 4);
 #endif /* MIP6_CALLOUTTEST */
-			llmbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 			/* modify encapsulation entry */
 			/* XXX */
 			if (mip6_tunnel_control(MIP6_TUNNEL_CHANGE, llmbc,
@@ -244,7 +242,6 @@ mip6_process_hrbu(bi)
 		}
 
 		/* mark that we should do DAD later in this function. */
-		mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
 		prim_mbc = mbc;
 
 		/*
@@ -255,7 +252,7 @@ mip6_process_hrbu(bi)
 			mbc->mbc_llmbc = llmbc;
 			llmbc->mbc_refcnt++;
 		}
-	} else if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
+	} else if (MIP6_IS_BC_DAD_WAIT(mbc)) {
 		mbc->mbc_pcoa = bi->mbc_pcoa;
 		mbc->mbc_seqno = bi->mbc_seqno;
 		busy++;
@@ -272,7 +269,6 @@ mip6_process_hrbu(bi)
 		/* sanity check for overflow. */
 		if (mbc->mbc_expire < time_second)
 			mbc->mbc_expire = 0x7fffffff;
-		mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 #ifdef MIP6_CALLOUTTEST
 		mip6_timeoutentry_update(mbc->mbc_timeout, mbc->mbc_expire);
 		/* mip6_timeoutentry_update(mbc->mbc_brr_timeout, mbc->mbc_expire - mbc->mbc_lifetime / 4); */
@@ -699,7 +695,7 @@ mip6_dad_find(taddr, ifp)
 	for (mbc = LIST_FIRST(&mip6_bc_list);
 	    mbc;
 	    mbc = LIST_NEXT(mbc, mbc_entry)) {
-		if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) == 0)
+		if (!MIP6_IS_BC_DAD_WAIT(mbc))
 			continue;
 		if (mbc->mbc_ifp != ifp || mbc->mbc_dad == NULL)
 			continue;
@@ -728,7 +724,6 @@ mip6_dad_success(ifa)
 
 	FREE(ifa, M_IFADDR);
 	mbc->mbc_dad = NULL;
-	mbc->mbc_state &= ~MIP6_BC_STATE_DAD_WAIT;
 
 	/* create encapsulation entry */
 	mip6_tunnel_control(MIP6_TUNNEL_ADD, mbc, mip6_bc_encapcheck,
@@ -797,9 +792,9 @@ mip6_dad_error(ifa, err)
 			    && ((gmbc->mbc_flags & IP6MU_CLONED) == 0)
 			    && (gmbc->mbc_llmbc == llmbc)) {
 				gmbc_next = LIST_NEXT(gmbc, mbc_entry);
-				if ((gmbc->mbc_state
-					& MIP6_BC_STATE_DAD_WAIT) != 0) {
-					gmbc->mbc_dad = NULL;
+				if (MIP6_IS_BC_DAD_WAIT(gmbc)) {
+					mip6_stop_dad(gmbc);
+					gmbc->mbc_llmbc = NULL;
 					error = mip6_bc_list_remove(
 					    &mip6_bc_list, llmbc);
 					if (error) {

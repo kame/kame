@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.20 2003/07/28 11:58:14 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.21 2003/07/30 12:39:41 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -935,7 +935,7 @@ mip6_bc_list_remove(mbc_list, mbc)
 	LIST_REMOVE(mbc, mbc_entry);
 #ifdef MIP6_HOME_AGENT
 	if (mbc->mbc_flags & IP6MU_HOME) {
-		if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
+		if (MIP6_IS_BC_DAD_WAIT(mbc)) {
 			mip6_dad_stop(mbc);
 		} else {
 			error = mip6_bc_proxy_control(&mbc->mbc_phaddr,
@@ -1039,7 +1039,6 @@ mip6_bc_update(mbc, coa_sa, dst_sa, flags, seqno, lifetime)
 	mip6_timeoutentry_update(mbc->mbc_timeout, mbc->mbc_expire);
 	mip6_timeoutentry_update(mbc->mbc_brr_timeout, mbc->mbc_expire - mbc->mbc_lifetime / 4);
 #endif /* MIP6_CALLOUTTEST */
-	mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 
 	return (0);
 }
@@ -1238,21 +1237,6 @@ mip6_bc_timeout(dummy)
 			mbc_next = LIST_NEXT(mbc, mbc_entry);
 #endif /* MIP6_HOME_AGENT */
 			mip6_bc_list_remove(&mip6_bc_list, mbc);
-		}
-
-		/* XXX send BR if BR_WAITSENT is remained not
-		   piggybacked before */
-
-		/* XXX set BR_WAITSENT when BC is going to expire */
-		if ((mbc->mbc_expire - time_second)
-		    < (mbc->mbc_lifetime / 4)) { /* XXX */
-			mbc->mbc_state |= MIP6_BC_STATE_BR_WAITSENT;
-		}
-
-		/* XXX send BA if BA_WAITSENT is remained not
-		   piggybacked before */
-		if (mbc->mbc_state & MIP6_BC_STATE_BA_WAITSENT) {
-
 		}
 	}
 #endif
