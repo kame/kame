@@ -192,7 +192,7 @@ struct ip6protosw inet6sw[] = {
   udp6_sysctl,
 #else
 # if __FreeBSD__ >= 3
-  &nousrreqs,
+  &udp6_usrreqs,
 # endif
 #endif
 },
@@ -205,7 +205,7 @@ struct ip6protosw inet6sw[] = {
   tcp6_sysctl,
 #else
 # if __FreeBSD__ >= 3
-  &nousrreqs,
+  &tcp6_usrreqs,
 # endif
 #endif
 },
@@ -226,7 +226,7 @@ struct ip6protosw inet6sw[] = {
   tcp_sysctl,
 #else
 # if __FreeBSD__ >= 3
-  &nousrreqs,
+  &tcp6_usrreqs,
 # endif
 #endif
 },
@@ -263,16 +263,25 @@ struct ip6protosw inet6sw[] = {
   dest6_input,	0,	 	0,		0,
   0,	  
   0,		0,		0,		0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &nousrreqs
+#endif
 },
 { SOCK_RAW,	&inet6domain,	IPPROTO_ROUTING,PR_ATOMIC|PR_ADDR,
   route6_input,	0,	 	0,		0,
   0,	  
   0,		0,		0,		0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &nousrreqs
+#endif
 },
 { SOCK_RAW,	&inet6domain,	IPPROTO_FRAGMENT,PR_ATOMIC|PR_ADDR,
   frag6_input,	0,	 	0,		0,
   0,	  
   0,		0,		0,		0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &nousrreqs
+#endif
 },
 #ifdef IPSEC
 { SOCK_RAW,	&inet6domain,	IPPROTO_AH,	PR_ATOMIC|PR_ADDR,
@@ -319,12 +328,18 @@ struct ip6protosw inet6sw[] = {
   in6_gif_input,0,	 	0,		0,
   0,	  
   0,		0,		0,		0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &nousrreqs
+#endif
 },
 #ifdef INET6
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
   in6_gif_input,0,	 	0,		0,
   0,	  
   0,		0,		0,		0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &nousrreqs
+#endif
 },
 #endif /* INET6 */
 #endif /* GIF */
