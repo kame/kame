@@ -1,4 +1,4 @@
-/*	$KAME: yylex.c,v 1.10 2001/10/25 07:18:25 fujisawa Exp $	*/
+/*	$KAME: yylex.c,v 1.11 2001/10/27 10:00:57 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -51,6 +51,7 @@ struct
 }	keyTable[] =
 {
 	{ "any6",	SANY6,		"SANY6",	},
+	{ "bidir",	SBIDIR,		"SBIDIR",	},
 	{ "break",	SBREAK,		"SBREAK",	},
 	{ "daddr",	SDADDR,		"SDADDR",	},
 	{ "disable",	SDISABLE,	"SDISABLE",	},

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.29 2001/10/24 15:33:38 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.30 2001/10/27 09:59:40 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -151,6 +151,17 @@ natpt_lookForRule4(struct pcv *cv4)
 				natpt_logIp4(LOG_DEBUG, cv4->ip.ip4, "%s():", fn);
 			cv4->fromto = NATPT_FROM;
 			return (csl);
+		}
+
+		if (csl->map & NATPT_BIDIR) {
+			struct in_addr	 in4to = cv4->ip.ip4->ip_dst;
+
+			if (in4to.s_addr == csl->Remote.in4Addr.s_addr) {
+				if (isDump(D_MATCHINGRULE4))
+					natpt_logIp4(LOG_DEBUG, cv4->ip.ip4, "%s():", fn);
+				cv4->fromto = NATPT_FROM;
+				return (csl);
+			}
 		}
 	}
 	splx(s);

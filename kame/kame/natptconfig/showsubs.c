@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.8 2001/10/24 15:34:23 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.9 2001/10/27 10:00:57 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -126,6 +126,10 @@ makeCSlotLine(char *wow, int size, struct cSlot *csl)
 				concat(&lmsg, "/");
 			concat(&lmsg, "udp");
 		}
+	}
+
+	if (csl->map & NATPT_BIDIR) {
+		concat(&lmsg, " bidir");
 	}
 
 	if (csl->lifetime != CSLOT_INFINITE_LIFETIME) {

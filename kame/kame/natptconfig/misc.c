@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.17 2001/10/24 15:34:23 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.18 2001/10/27 10:00:57 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -139,6 +139,10 @@ setRules(int type, struct ruletab *ruletab)
 
 	if (ruletab->proto) {
 		f->proto = ruletab->proto;
+	}
+
+	if (ruletab->bidir) {
+		f->map |= NATPT_BIDIR;
 	}
 
 	f->lifetime = CSLOT_INFINITE_LIFETIME;

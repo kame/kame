@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.55 2001/10/24 06:10:44 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.56 2001/10/27 09:59:40 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1218,11 +1218,13 @@ natpt_translatePYLD4To6(struct pcv *cv6)
 struct mbuf *
 natpt_translateIPv4To4(struct pcv *cv4, struct pAddr *pad)
 {
+	const char	*fn = __FUNCTION__;
+
 	struct timeval	 atv;
 	struct mbuf	*m4 = NULL;
 
 	if (isDump(D_TRANSLATEIPV4))
-		natpt_logIp4(LOG_DEBUG, cv4->ip.ip4, NULL);
+		natpt_logIp4(LOG_DEBUG, cv4->ip.ip4, "%s():", fn);
 
 	microtime(&atv);
 	cv4->ats->tstamp = atv.tv_sec;

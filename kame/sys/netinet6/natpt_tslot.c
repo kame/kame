@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.29 2001/10/24 15:33:38 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.30 2001/10/27 09:59:40 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -230,7 +230,18 @@ natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 
 	remote = &ats->remote;
 #ifdef NATPT_NAT
-	if (acs->Remote.sa_family == AF_INET) {
+	if ((acs->map & NATPT_BIDIR)
+	    && (cv4->fromto == NATPT_FROM)
+	    && (acs->Local.sa_family == AF_INET)) {
+		remote->sa_family = AF_INET;
+		remote->in4src = acs->Local.in4Addr;
+		remote->in4dst = cv4->ip.ip4->ip_src;
+		if ((cv4->ip_p == IPPROTO_TCP)
+		    || (cv4->ip_p == IPPROTO_UDP)) {
+			remote->port[0] = cv4->pyld.tcp4->th_dport;
+			remote->port[1] = cv4->pyld.tcp4->th_sport;
+		}
+	} else if (acs->Remote.sa_family == AF_INET) {
 		remote->sa_family = AF_INET;
 		remote->in4src = cv4->ip.ip4->ip_dst;
 		remote->in4dst = acs->Remote.in4Addr;

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.14 2001/10/25 07:18:25 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.15 2001/10/27 10:00:57 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -298,7 +298,8 @@ rules
 			ruletab.from   = $3;
 			ruletab.to     = getAddrs(AF_INET, ADDR_SINGLE, $5, 0);
 			ruletab.sports = $6;
-			ruletab.proto  =  $7;
+			ruletab.proto  = $7;
+			ruletab.bidir  = $8;
 			setRules(NATPT_MAP44, &ruletab);
 		    }
 
