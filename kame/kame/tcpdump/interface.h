@@ -18,7 +18,7 @@
  * WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * @(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/interface.h,v 1.3 1999/09/21 20:29:35 itojun Exp $ (LBL)
+ * @(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/interface.h,v 1.4 1999/10/18 04:43:18 itojun Exp $ (LBL)
  */
 
 #ifndef tcpdump_interface_h
@@ -194,6 +194,7 @@ extern void ipx_print(const u_char *, u_int);
 extern void isoclns_print(const u_char *, u_int, u_int, const u_char *,
 	const u_char *);
 extern void krb_print(const u_char *, u_int);
+extern void l2tp_print(const u_char *dat, u_int length);
 extern void nfsreply_print(const u_char *, u_int, const u_char *);
 extern void nfsreq_print(const u_char *, u_int, const u_char *);
 extern void ns_print(const u_char *, u_int);

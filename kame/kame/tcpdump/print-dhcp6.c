@@ -29,7 +29,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-dhcp6.c,v 1.4 1999/09/13 13:31:56 itojun Exp $";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-dhcp6.c,v 1.5 1999/11/02 14:55:01 itojun Exp $";
 #endif
 
 #include <sys/param.h>
@@ -59,8 +59,8 @@ struct rtentry;
 
 #if 0
 static void dhcp6opttab_init __P((void));
-#endif
 static struct dhcp6_opt *dhcp6opttab_byname __P((char *));
+#endif
 static struct dhcp6_opt *dhcp6opttab_bycode __P((u_int));
 
 static char tstr[] = " [|dhcp6]";
@@ -119,6 +119,7 @@ dhcp6opttab_init()
 }
 #endif
 
+#if 0
 static struct dhcp6_opt *
 dhcp6opttab_byname(name)
 	char *name;
@@ -130,6 +131,7 @@ dhcp6opttab_byname(name)
 			return p;
 	return NULL;
 }
+#endif
 
 static struct dhcp6_opt *
 dhcp6opttab_bycode(code)
@@ -148,7 +150,6 @@ dhcp6ext_print(u_char *cp, u_char *ep)
 {
 	u_int16_t code, len;
 	struct dhcp6_opt *p;
-	char *q;
 	char buf[BUFSIZ];
 	int i;
 

@@ -23,11 +23,12 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/hydrangea-freebsd/kit/src/tcpdump/Attic/print-l2tp.c,v 1.1.2.1 1999/07/26 12:32:51 itojun Exp $";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-l2tp.c,v 1.1.1.1 1999/08/08 23:32:06 itojun Exp $";
 #endif
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <stdio.h>
 
 #include "l2tp.h"
 #include "interface.h"
@@ -149,6 +150,7 @@ static struct l2tp_avp_vec l2tp_avp[] = {
 #define L2TP_MAX_AVP_INDEX	40
 };
 
+#if 0
 static char *l2tp_result_code_StopCCN[] = {
          "Reserved",
          "General request to clear control connection",
@@ -160,7 +162,9 @@ static char *l2tp_result_code_StopCCN[] = {
          "Finite State Machine error"
 #define L2TP_MAX_RESULT_CODE_STOPCC_INDEX	8
 };
+#endif
 
+#if 0
 static char *l2tp_result_code_CDN[] = {
 	"Reserved",
 	"Call disconnected due to loss of carrier",
@@ -178,7 +182,9 @@ static char *l2tp_result_code_CDN[] = {
 	"Call was connected but no appropriate framing was detected"
 #define L2TP_MAX_RESULT_CODE_CDN_INDEX	12
 };
+#endif
 
+#if 0
 static char *l2tp_error_code_general[] = {
 	"No general error",
 	"No control connection exists yet for this LAC-LNS pair",
@@ -191,6 +197,7 @@ static char *l2tp_error_code_general[] = {
 	"Try another"
 #define L2TP_MAX_ERROR_CODE_GENERAL_INDEX	8
 };
+#endif
 
 /******************************/
 /* generic print out routines */
@@ -216,13 +223,13 @@ print_octets(const u_char *dat, u_int length)
 static void
 print_short(const u_short *dat)
 {
-	printf("%d", ntohs(*dat));
+	printf("%u", ntohs(*dat));
 }
 
 static void
 print_int(const u_int *dat)
 {
-	printf("%d", ntohl(*dat));
+	printf("%lu", (u_long)ntohl(*dat));
 }
 
 /**********************************/
@@ -249,7 +256,7 @@ l2tp_result_code_print(const u_char *dat, u_int length)
 	} else if (length == 4) { 	/* result & error code */
 		printf("%d/%d", ntohs(*ptr), ntohs(*(ptr+1)));
 	} else if (length > 4) {	/* result & error code & msg */
-		printf("%d/%d %s", ntohs(*ptr), ntohs(*(ptr+1)));
+		printf("%u/%u ", ntohs(*ptr), ntohs(*(ptr+1)));
 		print_string((u_char *)(ptr+2), length - 4);
 	}
 }
@@ -333,7 +340,7 @@ static void
 l2tp_q931_cc_print(const u_char *dat, u_int length)
 {
 	print_short((u_short *)dat);
-	printf(",%02x", dat+2);
+	print_short((u_short *)(dat + 2));
 	if (length > 3) {
 		printf(" ");
 		print_string(dat+3, length-3);
@@ -595,7 +602,7 @@ l2tp_avp_print(const u_char *dat, u_int length)
 			}
 			printf(")");
 		} else {
-			printf(" invalid AVP %s", ntohs(*ptr));
+			printf(" invalid AVP %u", ntohs(*ptr));
 		}
 
 		l2tp_avp_print(dat + len, length - len);
