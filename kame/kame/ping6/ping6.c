@@ -219,7 +219,7 @@ void	 onalrm __P((int));
 void	 oninfo __P((int));
 void	 onint __P((int));
 void	 pinger __P((void));
-char	*pr_addr __P((struct in6_addr *));
+char	*pr_addr __P((struct sockaddr_in6 *));
 void	 pr_icmph __P((struct icmp6_hdr *, u_char *));
 void	 pr_iph __P((struct ip6_hdr *));
 void	 pr_nodeaddr __P((struct icmp6_nodeinfo *, int));
@@ -603,6 +603,7 @@ main(argc, argv)
 		src.sin6_family = AF_INET6;
 		src.sin6_addr = dst.sin6_addr;
 		src.sin6_port = ntohs(DUMMY_PORT);
+		src.sin6_scope_id = dst.sin6_scope_id;
 
 #ifndef SIN6_IFINDEX
 		if (setsockopt(dummy, IPPROTO_IPV6, IPV6_PKTOPTIONS,
@@ -949,7 +950,7 @@ pr_pack(buf, cc, mhdr)
 			(void)write(STDOUT_FILENO, &BSPACE, 1);
 		else {
 			(void)printf("%d bytes from %s, icmp_seq=%u", cc,
-				     pr_addr(&from->sin6_addr),
+				     pr_addr(from),
 				     icp->icmp6_seq);
 			(void)printf(" hlim=%d", hoplim);
 			if (timing)
@@ -970,7 +971,7 @@ pr_pack(buf, cc, mhdr)
 		struct icmp6_nodeinfo *ni = (struct icmp6_nodeinfo *)(buf + off);
 
 		(void)printf("%d bytes from %s: ", cc,
-			     pr_addr(&from->sin6_addr));
+			     pr_addr(from));
 
 		switch(ntohs(ni->ni_qtype)) {
 		 case NI_QTYPE_NOOP:
@@ -1039,7 +1040,7 @@ pr_pack(buf, cc, mhdr)
 		if (!(options & F_VERBOSE))
 			return;
 		(void)printf("%d bytes from %s: ", cc,
-			     pr_addr(&from->sin6_addr));
+			     pr_addr(from));
 		pr_icmph(icp, end);
 	}
 
@@ -1351,22 +1352,16 @@ pr_iph(ip6)
  */
 char *
 pr_addr(addr)
-	struct in6_addr *addr;
+	struct sockaddr_in6 *addr;
 {
 	static char buf[MAXHOSTNAMELEN];
-	struct sockaddr_in6 sin6;	
 	int flag = 0;
 
 	if (options & F_NUMERIC)
 		flag |= NI_NUMERICHOST;
-	
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_len = sizeof(sin6);
-	sin6.sin6_addr = *addr;
+	flag |= NI_WITHSCOPEID;
 
-	getnameinfo((struct sockaddr *)&sin6, sizeof(sin6),
-		    buf, sizeof(buf), NULL, 0, flag);
+	getnameinfo(addr, sizeof(*addr), buf, sizeof(buf), NULL, 0, flag);
 
 	return (buf);
 }
