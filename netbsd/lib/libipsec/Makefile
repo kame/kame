@@ -4,11 +4,12 @@ LIB=	ipsec
 CFLAGS+=-g
 CPPFLAGS+=-DIPSEC_DEBUG -DIPSEC -DINET6 -I. -DYY_NO_UNPUT
 
-.PATH:	${SRCDIR} ${.CURDIR}/../../sys/netkey
-SRCS=	pfkey.c pfkey_dump.c
+.PATH:	${SRCDIR}
+#${.CURDIR}/../../sys/netkey
+#SRCS=	pfkey.c pfkey_dump.c
+#SRCS+=	key_debug.c
 SRCS+=	ipsec_strerror.c policy_parse.y policy_token.l
 SRCS+=	ipsec_get_policylen.c ipsec_dump_policy.c
-SRCS+=	key_debug.c
 YPREFIX=__libyy
 LPREFIX=__libyy
 YHEADER=1

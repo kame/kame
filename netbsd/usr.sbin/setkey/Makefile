@@ -1,4 +1,5 @@
 SRCDIR=	${.CURDIR}/../../kame/setkey
+LIBPFKEYDIR!=	cd ${.CURDIR}/../../lib/libpfkey; make print-objdir
 
 PROG=	setkey
 SRCS=	setkey.c parse.y token.l
@@ -14,7 +15,9 @@ all: ${PROG} scriptdump
 
 CPPFLAGS+=-DIPSEC_DEBUG -DINET6 -DYY_NO_UNPUT
 CPPFLAGS+=-I${.CURDIR} -I${SRCDIR}
-LDADD+= -L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
+LDADD+=	-L${LIBPFKEYDIR} -lpfkey
+DPADD+=	${LIBPFKEYDIR}/libpfkey.a
+LDADD+=	-L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
 	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -lipsec -linet6
 DPADD+=	${.CURDIR}/../../lib/libipsec/libipsec.a \

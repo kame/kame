@@ -1,4 +1,5 @@
 SRCDIR=	${.CURDIR}/../../../kame/racoon
+LIBPFKEYDIR!=	cd ${.CURDIR}/../../../lib/libpfkey; make print-objdir
 
 CFLAGS=	-g -O2
 OPTFLAG+=-DHAVE_PFKEYV2 -DYIPS_DEBUG
@@ -36,6 +37,8 @@ CPPFLAGS+=-DHAVE_OPENSSL_OPENSSLV_H=1
 
 LDADD+=	-ly -ll
 DPADD+=	${LIBY} ${LIBL}
+LDADD+=	-L${LIBPFKEYDIR} -lpfkey
+DPADD+=	${LIBPFKEYDIR}/libpfkey.a
 LDADD+=	-L${.CURDIR}/../../../lib/libipsec \
 	-L${.CURDIR}/../../../lib/libipsec/obj \
 	-L${.CURDIR}/../../../lib/libinet6 \
