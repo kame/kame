@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* $Id: pim6_var.h,v 1.2 1999/08/01 15:58:13 itojun Exp $ */
+/* $Id: pim6_var.h,v 1.3 1999/12/02 04:45:02 itojun Exp $ */
 
 #ifndef _NETINET6_PIM6_VAR_H_
 #define _NETINET6_PIM6_VAR_H_
@@ -40,13 +40,13 @@
  */
 
 struct pim6stat {
-	u_int	pim6s_rcv_total;	/* total PIM messages received	*/
-	u_int	pim6s_rcv_tooshort;	/* received with too few bytes	*/
-	u_int	pim6s_rcv_badsum;	/* received with bad checksum	*/
-	u_int	pim6s_rcv_badversion;	/* received bad PIM version	*/
-	u_int	pim6s_rcv_registers;	/* received registers		*/
-	u_int	pim6s_rcv_badregisters;	/* received invalid registers	*/
-	u_int	pim6s_snd_registers;	/* sent registers		*/
+	u_quad_t pim6s_rcv_total;	/* total PIM messages received	*/
+	u_quad_t pim6s_rcv_tooshort;	/* received with too few bytes	*/
+	u_quad_t pim6s_rcv_badsum;	/* received with bad checksum	*/
+	u_quad_t pim6s_rcv_badversion;	/* received bad PIM version	*/
+	u_quad_t pim6s_rcv_registers;	/* received registers		*/
+	u_quad_t pim6s_rcv_badregisters; /* received invalid registers	*/
+	u_quad_t pim6s_snd_registers;	/* sent registers		*/
 };
 
 #if (defined(KERNEL)) || (defined(_KERNEL))
