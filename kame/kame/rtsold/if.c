@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.21 2003/01/08 08:47:23 suz Exp $	*/
+/*	$KAME: if.c,v 1.22 2003/01/17 04:15:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,6 +82,7 @@ static int get_llflag __P((const char *));
 static unsigned int if_maxindex __P((void));
 #endif
 static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
+static int get_isatap_mode __P((struct ifinfo *ifinfo));
 
 int
 ifinit()
@@ -461,11 +462,11 @@ get_rtaddrs(int addrs, struct sockaddr *sa, struct sockaddr **rti_info)
 	}
 }
 
-int
-is_isatap(struct ifinfo *ifinfo)
+static int
+get_isatap_mode(struct ifinfo *ifinfo)
 {
 #ifndef ISATAP
-	return 0;
+	return -1;
 #else
 	struct ifreq ifr;
 	int s;
@@ -483,11 +484,23 @@ is_isatap(struct ifinfo *ifinfo)
 		warnmsg(LOG_DEBUG, __func__,
 			"ioctl:SIOCGSTFMODE: failed for %s", ifr.ifr_name);
 		close(s);
-		return 0;
+		return -1;
 	}
 	close(s);
-	return ((int) ifr.ifr_data == STFM_ISATAP);
+	return ((int) ifr.ifr_data);
 #endif /* ISATAP */
+}
+
+int
+is_isatap(struct ifinfo *ifinfo)
+{
+	return (get_isatap_mode(ifinfo) == STFM_ISATAP);
+}
+
+int
+is_6to4(struct ifinfo *ifinfo)
+{
+	return (get_isatap_mode(ifinfo) == STFM_6TO4);
 }
 
 size_t
@@ -496,7 +509,6 @@ get_isatap_router(struct ifinfo *ifinfo, void **buf)
 #ifndef ISATAP
 	return 0;
 #else
-	char *ptr, *lim;
 	size_t needed;
 	int mib[4] = {CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ISATAPRTR};
 

@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.59 2003/01/17 03:49:44 suz Exp $	*/
+/*	$KAME: rtsold.c,v 1.60 2003/01/17 04:15:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -412,6 +412,12 @@ ifconfig(char *ifname)
 	ifinfo->sdl = sdl;
 
 	strncpy(ifinfo->ifname, ifname, sizeof(ifinfo->ifname));
+
+	if (is_6to4(ifinfo)) {
+		warnmsg(LOG_ERR, __func__,
+			"you cannot solicit RA on 6to4 interface");
+		goto bad;
+	}
 
 	/* construct a router solicitation message */
 	if (make_packet(ifinfo))
