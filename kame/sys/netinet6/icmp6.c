@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.288 2002/03/02 05:54:01 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.289 2002/04/06 11:26:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1374,6 +1374,18 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 #endif
 #endif
 
+	/*
+	 * RFC 1981 says that we may receive a Too Big message reporting a
+	 * next-hop MTU that is less than the minimum MTU, but the behavior
+	 * which should be taken in that case is not very clear.
+	 * We can perhaps discard such a message, but we dare to reduce the
+	 * MTU to the minimum MTU; using a too small MTU reduces performance,
+	 * whereas using a too large MTU causes reachability problem.
+	 * The former should be better.
+	 */
+	if (mtu < IPV6_MINMTU)
+		mtu = IPV6_MINMTU;
+
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	/*
 	 * allow non-validated cases if memory is plenty, to make traffic
@@ -1424,16 +1436,10 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 #endif
 #endif
 
-	if (rt && (rt->rt_flags & RTF_HOST)
-	    && !(rt->rt_rmx.rmx_locks & RTV_MTU)) {
-		if (mtu < IPV6_MMTU) {
-				/* xxx */
-			rt->rt_rmx.rmx_locks |= RTV_MTU;
-		} else if (mtu < rt->rt_ifp->if_mtu &&
-			   rt->rt_rmx.rmx_mtu > mtu) {
-			icmp6stat.icp6s_pmtuchg++;
-			rt->rt_rmx.rmx_mtu = mtu;
-		}
+	if (rt && (rt->rt_flags & RTF_HOST) && mtu >= IPV6_MMTU &&
+	    mtu < rt->rt_ifp->if_mtu && mtu < rt->rt_rmx.rmx_mtu) {
+		icmp6stat.icp6s_pmtuchg++;
+		rt->rt_rmx.rmx_mtu = mtu;
 	}
 	if (rt) { /* XXX: need braces to avoid conflict with else in RTFREE. */
 		RTFREE(rt);
@@ -3605,8 +3611,11 @@ icmp6_mtudisc_timeout(rt, r)
 		rtrequest((int) RTM_DELETE, (struct sockaddr *)rt_key(rt),
 		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
 	} else {
-		if ((rt->rt_rmx.rmx_locks & RTV_MTU) == 0)
-			rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu;
+		/*
+		 * we do not have to check the RTV_MTU flag, which should
+		 * always be off for IPv6.
+		 */
+		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu;
 	}
 }
 

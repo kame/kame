@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.290 2002/03/17 19:48:19 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.291 2002/04/06 11:26:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1795,8 +1795,7 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup)
 			 * this case happens with path MTU discovery timeouts.
 			 */
 			 mtu = ifmtu;
-			 if ((ro_pmtu->ro_rt->rt_rmx.rmx_locks & RTV_MTU) == 0)
-				 ro_pmtu->ro_rt->rt_rmx.rmx_mtu = mtu; /* XXX */
+			 ro_pmtu->ro_rt->rt_rmx.rmx_mtu = mtu; /* XXX */
 		}
 	} else if (ifp) {
 		mtu = nd_ifinfo[ifp->if_index].linkmtu;

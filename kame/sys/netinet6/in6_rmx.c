@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.11 2001/07/26 06:53:16 jinmei Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.12 2002/04/06 11:26:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -180,8 +180,7 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 		rt->rt_rmx.rmx_recvpipe = tcp_recvspace;
 #endif
 
-	if (!rt->rt_rmx.rmx_mtu && !(rt->rt_rmx.rmx_locks & RTV_MTU)
-	    && rt->rt_ifp)
+	if (!rt->rt_rmx.rmx_mtu && rt->rt_ifp)
 		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu;
 
 	ret = rn_addroute(v_arg, n_arg, head, treenodes);
