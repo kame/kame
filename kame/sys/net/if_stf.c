@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.40 2000/06/20 19:44:42 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.41 2000/07/12 14:09:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -155,7 +155,9 @@ struct stf_softc {
 	struct ifnet	sc_if;	   /* common area */
 	union {
 		struct route  __sc_ro4;
+#ifndef NEW_STRUCT_ROUTE
 		struct route_in6 __sc_ro6; /* just for safety */
+#endif
 	} __sc_ro46;
 #define sc_ro	__sc_ro46.__sc_ro4
 	const struct encaptab *encap_cookie;
