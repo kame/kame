@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.100 2002/01/17 01:16:41 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.101 2002/01/18 02:03:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1191,8 +1191,7 @@ in6_recoverscope(sin6, in6, ifp)
 }
 
 /*
- * just clear the embedded scope identifer.
- * XXX: currently used for bsdi4 only as a supplement function.
+ * just clear the embedded scope identifier.
  */
 void
 in6_clearscope(addr)
