@@ -11,11 +11,11 @@ fi
 # Since -1 or -2 options would make some TIME_WAIT sockets, tests without the
 # SO_REUSExxx socket options must be done before others.
 ($bindtest -p $port
-$bindtest -p -6 $port
+$bindtest -6 -p $port
 $bindtest -A -p $port
-$bindtest -A -p -6 $port
+$bindtest -A -6 -p $port
 $bindtest -P -p $port
-$bindtest -P -p -6 $port
+$bindtest -P -6 -p $port
 $bindtest -AP -p $port
 $bindtest -AP -6 -p $port
 $bindtest -t -p $port
