@@ -249,6 +249,7 @@ in_control(so, cmd, data, ifp, p)
         if (ifp && ifp->if_type == IFT_GIF) {
                 switch (cmd) {
                 case SIOCSIFPHYADDR:
+		case SIOCDIFPHYADDR:
 			if (p &&
 			    (error = suser(p->p_ucred, &p->p_acflag)) != 0)
         			return(error);

@@ -258,6 +258,7 @@ in_control(so, cmd, data, ifp)
         if (ifp && ifp->if_type == IFT_GIF) {
                 switch (cmd) {
                 case SIOCSIFPHYADDR:
+		case SIOCDIFPHYADDR:
                         if ((so->so_state & SS_PRIV) == 0)
                                 return(EPERM);
                 case SIOCGIFPSRCADDR:
