@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.891 2000/05/17 12:42:05 jinmei Exp $
+$Id: CHANGELOG,v 1.892 2000/05/17 12:53:53 sakane Exp $
 
 <200005>
+Wed May 17 21:50:27 JST 2000 sakane@ydc.co.jp
+	* {freebsd[234],netbsd}/sys/netinet/ip_output.c:
+	call key_spdacquire() if there is no policy entry for IPv4.
+	key_spacquire() sends a setup policy request to the policy
+	negotiating daemon or something.
+
 2000-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_output): 
 	* kame/sys/netinet6/ip6_output.c (ip6_output):
