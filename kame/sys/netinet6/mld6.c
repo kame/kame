@@ -149,7 +149,7 @@ mld6_start_listening(in6m)
 #endif
 
 	/*
-	 * (draft-ietf-ipngwg-mld, page 10)
+	 * RFC2710 page 10:
 	 * The node never sends a Report or Done for the link-scope all-nodes
 	 * address.
 	 * MLD messages are never sent for multicast addresses whose scope is 0
@@ -208,7 +208,7 @@ mld6_input(m, off)
 		    "mld6_input: src %s is not link-local\n",
 		    ip6_sprintf(&ip6->ip6_src));
 		/*
-		 * spec(draft-ietf-ipngwg-mld) does not explicitly
+		 * spec (RFC2710) does not explicitly
 		 * specify to discard the packet from a non link-local
 		 * source address. But we believe it's expected to do so.
 		 */
