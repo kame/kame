@@ -178,3 +178,10 @@ include/omapi/types.h
 @dirrm include/isc
 @dirrm include/lwres
 @dirrm include/omapi
+@comment man/man5/rndc.conf.5
+@comment man/man8/dnssec-keygen.8
+@comment man/man8/dnssec-makekeyset.8
+@comment man/man8/dnssec-signkey.8
+@comment man/man8/lwresd.8
+@comment man/man8/named.8
+@comment man/man8/rndc.8
