@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.106 2002/07/12 06:35:00 k-sugyou Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.107 2002/08/01 01:59:06 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,6 +145,10 @@ ip6_forward(m, srcrt)
 	u_int32_t dstzone;
 #ifdef IPSEC
 	struct secpolicy *sp = NULL;
+	int ipsecrt = 0;
+#endif
+#ifdef MIP6
+	int tunnel_out = 0;
 #endif
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
@@ -356,24 +360,10 @@ ip6_forward(m, srcrt)
 		m_freem(m);
 		return;
 	}
-	if (ip6_forward_rt.ro_rt &&
-#ifdef SCOPEDROUTING
-	    !SA6_ARE_ADDR_EQUAL(sa6_dst, &ip6_forward_rt.ro_dst)
-#else
-	    !IN6_ARE_ADDR_EQUAL(&sa6_dst->sin6_addr,
-		&((struct sockaddr_in6 *)&ip6_forward_rt.ro_dst)->sin6_addr)
-#endif
-	    ) {
-		struct sockaddr_in6 *dst6;
-
-		RTFREE(ip6_forward_rt.ro_rt);
-		ip6_forward_rt.ro_rt = (struct rtentry *)NULL;
-		dst6 = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
-		*dst6 = *sa6_dst;
-#ifndef SCOPEDROUTING
-		dst6->sin6_scope_id = 0; /* XXX */
-#endif
-	}
+	dst = (struct sockaddr_in6 *)&state.dst;
+	rt = state.ro->ro_rt;
+	if (dst != NULL && rt != NULL)
+		ipsecrt = 1;
     }
     skip_ipsec:
 #endif /* IPSEC */
@@ -419,9 +409,18 @@ ip6_forward(m, srcrt)
 				m_freem(mcopy);
 			return;
 		}
+		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, sa6_src);
+		if (mbc &&
+		    (mbc->mbc_flags & IP6MU_HOME) &&
+		    (mbc->mbc_encap != NULL)) {
+			tunnel_out = 1;
+		}
 	}
 #endif /* MIP6 */
 
+#ifdef IPSEC
+    if (!ipsecrt) {
+#endif
 	dst = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
 	if (!srcrt) {
 		/* ip6_forward_rt.ro_dst.sin6_addr is equal to ip6->ip6_dst */
@@ -485,6 +484,9 @@ ip6_forward(m, srcrt)
 		}
 	}
 	rt = ip6_forward_rt.ro_rt;
+#ifdef IPSEC
+    }
+#endif
 
 	/*
 	 * Scope check: if a packet can't be delivered to its destination
@@ -576,6 +578,12 @@ ip6_forward(m, srcrt)
 	 * modified by a redirect.
 	 */
 	if (rt->rt_ifp == m->m_pkthdr.rcvif && !srcrt &&
+#ifdef IPSEC
+	    !ipsecrt &&
+#endif
+#ifdef MIP6
+	    !tunnel_out &&
+#endif
 	    (rt->rt_flags & (RTF_DYNAMIC|RTF_MODIFIED)) == 0) {
 		if ((rt->rt_ifp->if_flags & IFF_POINTOPOINT) &&
 		    nd6_is_addr_neighbor(sa6_dst, rt->rt_ifp)) {
