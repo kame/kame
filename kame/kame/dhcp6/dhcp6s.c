@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.71 2002/05/08 15:53:18 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.72 2002/05/09 01:54:52 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -494,16 +494,13 @@ server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
 	/* DNS server */
 	roptinfo.dnslist = dnslist;
 
-	/*
-	 * If the client has included a Rapid Commit option and the server
-	 * has been configured to respond with committed address assignments
-	 * and other resources, responds to the Solicit with a Reply message.
-	 * [dhcpv6-24 Section 17.2.1]
-	 */
 	if (optinfo->rapidcommit && (ifp->allow_flags & DHCIFF_RAPID_COMMIT)) {
 		/*
-		 * if we're reacting to a solicit with a rapid commit option,
-		 * add the option in the reply as well.
+		 * If the client has included a Rapid Commit option and the
+		 * server has been configured to respond with committed address
+		 * assignments and other resources, responds to the Solicit
+		 * with a Reply message.
+		 * [dhcpv6-24 Section 17.2.1]
 		 */
 		roptinfo.rapidcommit = 1;
 
