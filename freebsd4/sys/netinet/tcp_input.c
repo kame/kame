@@ -90,9 +90,6 @@ struct tcphdr tcp_savetcp;
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#ifdef INET6
-#include <netinet6/ipsec6.h>
-#endif
 #include <netkey/key.h>
 #endif /*IPSEC*/
 

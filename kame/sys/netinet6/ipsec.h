@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.29 2000/03/25 07:23:50 sumikawa Exp $	*/
+/*	$KAME: ipsec.h,v 1.30 2000/04/21 10:35:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -378,8 +378,10 @@ extern int ipsec_chkreplay __P((u_int32_t, struct secasvar *));
 extern int ipsec_updatereplay __P((u_int32_t, struct secasvar *));
 
 extern size_t ipsec4_hdrsiz __P((struct mbuf *, u_int, struct inpcb *));
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if (defined(__FreeBSD__) && __FreeBSD__ == 3) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 extern size_t ipsec_hdrsiz_tcp __P((struct tcpcb *, int));
+#elif  (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+extern size_t ipsec_hdrsiz_tcp __P((struct tcpcb *));
 #else
 extern size_t ipsec4_hdrsiz_tcp __P((struct tcpcb *));
 #endif
