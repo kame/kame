@@ -342,7 +342,7 @@ checkremote()
 		if (error) {
 			(void)snprintf(errbuf, sizeof(errbuf),
 				"unable to get official name for local machine %s: %s",
-				name, gai_strerror(error));
+				RM, gai_strerror(error));
 			return errbuf;
 		}
   
