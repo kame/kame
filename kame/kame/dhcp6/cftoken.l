@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.1 2002/04/30 14:49:08 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.2 2002/04/30 14:56:07 jinmei Exp $	*/
 
 %{
 /*
@@ -47,7 +47,11 @@ int lineno = 1;
 static int yy_first_time = 1;
 static int yyerrorcount = 0;
  
+#ifdef CONFIG_DEBUG
 int cfdebug = 1;
+#else
+int cfdebug = 0;
+#endif
 
 static void cfdebug_print __P((char *, char *, int));
 %}
