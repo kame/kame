@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.91 2002/02/04 08:28:29 keiichi Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.92 2002/02/04 08:37:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -558,9 +558,9 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 			if (ip6_getpktaddrs(ln->ln_hold, &hsrc, NULL))
 				goto bad; /* XXX: impossible */
 		}
-		if (hsrc && in6ifa_ifpwithaddr(ifp, &hsrc->sin6_addr)) {
-				src_sa = *hsrc;
-		} else {
+		if (hsrc && in6ifa_ifpwithaddr(ifp, &hsrc->sin6_addr))
+			src_sa = *hsrc;
+		else {
 			struct sockaddr_in6 *src0;
 			int error;
 
