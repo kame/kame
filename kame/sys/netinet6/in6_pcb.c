@@ -262,47 +262,74 @@ in6_pcbbind(in6p, nam)
 		}
 		in6p->in6p_laddr = sin6->sin6_addr;
 	}
+
 	if (lport == 0) {
-		u_short last_port;
-		void *t;
-
-		/* XXX IN6P_LOWPORT */
-
-		/* value out of range */
-		if (head->in6p_lport < IPV6PORT_ANONMIN)
-			head->in6p_lport = IPV6PORT_ANONMIN;
-		else if (head->in6p_lport > IPV6PORT_ANONMAX)
-			head->in6p_lport = IPV6PORT_ANONMIN;
-		last_port = head->in6p_lport;
-		goto startover;	/*to randomize*/
-		for (;;) {
-			lport = htons(head->in6p_lport);
-			if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)) {
-#if 0
-				t = in_pcblookup_bind(&tcbtable,
-					(struct in_addr *)&in6p->in6p_laddr.s6_addr32[3],
-					lport);
-#else
-				t = NULL;
-#endif
-			} else {
-				t = in6_pcblookup(head, &zeroin6_addr, 0,
-					  &in6p->in6p_laddr, lport, wild);
-			}
-			if (t == 0)
-				break;
-startover:
-			if (head->in6p_lport >= IPV6PORT_ANONMAX)
-				head->in6p_lport = IPV6PORT_ANONMIN;
-			else
-				head->in6p_lport++;
-			if (head->in6p_lport == last_port)
-				return (EADDRINUSE);
-		}
+		int e;
+		if (e = in6_pcbsetport(&in6p->in6p_laddr, in6p))
+			return(e);
 	}
-	in6p->in6p_lport = lport;
+	else
+		in6p->in6p_lport = lport;
+
 	in6p->in6p_flowinfo = sin6 ? sin6->sin6_flowinfo : 0;	/*XXX*/
 	return(0);
+}
+
+/*
+ * Find an empty port and set it to the specified PCB.
+ * XXX IN6P_LOWPORT
+ */
+int
+in6_pcbsetport(laddr, in6p)
+	struct in6_addr *laddr;
+	struct in6pcb *in6p;
+{
+	struct socket *so = in6p->in6p_socket;
+	struct in6pcb *head = in6p->in6p_head;
+	u_short last_port, lport = 0;
+	int wild = 0;
+	void *t;
+
+	/* XXX: this is redundant when called from in6_pcbbind */
+	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
+	   ((so->so_proto->pr_flags & PR_CONNREQUIRED) == 0 ||
+	    (so->so_options & SO_ACCEPTCONN) == 0))
+		wild = IN6PLOOKUP_WILDCARD;
+
+	/* value out of range */
+	if (head->in6p_lport < IPV6PORT_ANONMIN)
+		head->in6p_lport = IPV6PORT_ANONMIN;
+	else if (head->in6p_lport > IPV6PORT_ANONMAX)
+		head->in6p_lport = IPV6PORT_ANONMIN;
+	last_port = head->in6p_lport;
+	goto startover;	/*to randomize*/
+	for (;;) {
+		lport = htons(head->in6p_lport);
+		if (IN6_IS_ADDR_V4MAPPED(laddr)) {
+#if 0
+			t = in_pcblookup_bind(&tcbtable,
+					      (struct in_addr *)&in6p->in6p_laddr.s6_addr32[3],
+					      lport);
+#else
+			t = NULL;
+#endif
+		} else {
+			t = in6_pcblookup(head, &zeroin6_addr, 0, laddr,
+					  lport, wild);
+		}
+		if (t == 0)
+			break;
+	  startover:
+		if (head->in6p_lport >= IPV6PORT_ANONMAX)
+			head->in6p_lport = IPV6PORT_ANONMIN;
+		else
+			head->in6p_lport++;
+		if (head->in6p_lport == last_port)
+			return (EADDRINUSE);
+	}
+
+	in6p->in6p_lport = lport;
+	return(0);		/* success */
 }
 
 /*

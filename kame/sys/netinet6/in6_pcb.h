@@ -156,6 +156,7 @@ struct	in6pcb *
 int	in6_pcbnotify __P((struct in6pcb *, struct sockaddr *,
 			   u_int, struct in6_addr *, u_int, int,
 			   void (*)(struct in6pcb *, int)));
+int	in6_pcbsetport __P((struct in6_addr *, struct in6pcb *));
 void	in6_rtchange __P((struct in6pcb *, int));
 void	in6_setpeeraddr __P((struct in6pcb *, struct mbuf *));
 void	in6_setsockaddr __P((struct in6pcb *, struct mbuf *));
