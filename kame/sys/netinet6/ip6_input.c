@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.78 2000/04/11 16:21:50 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.79 2000/04/12 03:51:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -276,9 +276,9 @@ ip6_init2(dummy)
 	 * assign loopback address first.
 	 */
 #ifdef __bsdi__
-	in6_ifattach(loifp);
+	in6_ifattach(loifp, NULL);
 #else
-	in6_ifattach(&loif[0]);
+	in6_ifattach(&loif[0], NULL);
 #endif
 
 	/* nd6_timer_init */

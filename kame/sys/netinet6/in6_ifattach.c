@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.47 2000/04/12 02:00:44 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.48 2000/04/12 03:51:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,9 +70,9 @@ unsigned long in6_maxmtu = 0;
 
 static int get_rand_ifid __P((struct ifnet *, struct in6_addr *));
 static int get_hw_ifid __P((struct ifnet *, struct in6_addr *));
-static int get_ifid __P((struct ifnet *, struct in6_addr *));
+static int get_ifid __P((struct ifnet *, struct ifnet *, struct in6_addr *));
 static int in6_ifattach_addaddr __P((struct ifnet *, struct in6_ifaddr *));
-static int in6_ifattach_linklocal __P((struct ifnet *));
+static int in6_ifattach_linklocal __P((struct ifnet *, struct ifnet *));
 static int in6_ifattach_loopback __P((struct ifnet *));
 
 #define EUI64_GBIT	0x01
@@ -206,8 +206,11 @@ found:
 			in6->s6_addr[15] = addr[5];
 		}
 		break;
+
 	case IFT_ARCNET:
 		if (addrlen != 1)
+			return -1;
+		if (!addr[0])
 			return -1;
 
 		bzero(&in6->s6_addr[8], 8);
@@ -216,6 +219,16 @@ found:
 		in6->s6_addr[8] &= ~EUI64_GBIT;	/* g bit to "individual" */
 		in6->s6_addr[8] |= EUI64_UBIT;	/* u bit to "local" */
 		break;
+
+	case IFT_GIF:
+	case IFT_STF:
+		/*
+		 * mech-05/6to4-05: use IPv4 address as ifid source.
+		 * the specification does not survive IPv4 renumbering.
+		 * I'd rather not implement it, or make it optional (itojun).
+		 */
+		return -1;
+
 	default:
 		return -1;
 	}
@@ -227,6 +240,15 @@ found:
 	/* convert EUI64 into IPv6 interface identifier */
 	EUI64_TO_IFID(in6);
 
+	/*
+	 * sanity check: ifid must not be all zero, avoid conflict with
+	 * subnet router anycast
+	 */
+	if ((in6->s6_addr[8] & ~(EUI64_GBIT | EUI64_UBIT)) == 0x00 &&
+	    bcmp(&in6->s6_addr[9], allzero, 7) == 0) {
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -236,8 +258,9 @@ found:
  * sources.
  */
 static int
-get_ifid(ifp0, in6)
+get_ifid(ifp0, altifp, in6)
 	struct ifnet *ifp0;
+	struct ifnet *altifp;	/*secondary EUI64 source*/
 	struct in6_addr *in6;
 {
 	struct ifnet *ifp;
@@ -247,6 +270,15 @@ get_ifid(ifp0, in6)
 #ifdef ND6_DEBUG
 		printf("%s: got interface identifier from itself\n",
 		    if_name(ifp0));
+#endif
+		goto success;
+	}
+
+	/* try secondary EUI64 source. this basically is for ATM PVC */
+	if (altifp && get_hw_ifid(altifp, in6) == 0) {
+#ifdef ND6_DEBUG
+		printf("%s: got interface identifier from %s\n",
+		    if_name(ifp0), ifname(altifp));
 #endif
 		goto success;
 	}
@@ -463,8 +495,9 @@ in6_ifattach_addaddr(ifp, ia)
 }
 
 static int
-in6_ifattach_linklocal(ifp)
+in6_ifattach_linklocal(ifp, altifp)
 	struct ifnet *ifp;
+	struct ifnet *altifp;	/*secondary EUI64 source*/
 {
 	struct in6_ifaddr *ia;
 
@@ -501,7 +534,7 @@ in6_ifattach_linklocal(ifp)
 		ia->ia_addr.sin6_addr.s6_addr32[2] = 0;
 		ia->ia_addr.sin6_addr.s6_addr32[3] = htonl(1);
 	} else {
-		if (get_ifid(ifp, &ia->ia_addr.sin6_addr) != 0) {
+		if (get_ifid(ifp, altifp, &ia->ia_addr.sin6_addr) != 0) {
 #ifdef ND6_DEBUG
 			printf("%s: no ifid available\n", if_name(ifp));
 #endif
@@ -576,8 +609,9 @@ in6_ifattach_loopback(ifp)
  * XXX multiple link-local address case
  */
 void
-in6_ifattach(ifp)
+in6_ifattach(ifp, altifp)
 	struct ifnet *ifp;
+	struct ifnet *altifp;	/* secondary EUI64 source */
 {
 	static size_t if_indexlim = 8;
 	struct sockaddr_in6 mltaddr;
@@ -658,13 +692,16 @@ in6_ifattach(ifp)
 	 */
 	ia = in6ifa_ifpforlinklocal(ifp, 0);
 	if (ia == NULL) {
-		if (in6_ifattach_linklocal(ifp) != 0)
+		if (in6_ifattach_linklocal(ifp, altifp) != 0)
 			return;
 		ia = in6ifa_ifpforlinklocal(ifp, 0);
-		/* sanity */
+
 		if (ia == NULL) {
-			panic("in6_ifattach: failed to add link-local address");
-			/*NOTREACHED*/
+			printf("%s: failed to add link-local address",
+			    if_name(ifp));
+
+			/* we can't initialize multicasts without link-local */
+			goto statinit;
 		}
 	}
 
@@ -699,6 +736,13 @@ in6_ifattach(ifp)
 				return;
 		}
 	}
+
+#ifdef DIAGNOSTIC
+	if (!ia) {
+		panic("ia == NULL in in6_ifattach");
+		/*NOTREACHED*/
+	}
+#endif
 
 	/*
 	 * join multicast

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.74 2000/04/11 16:21:49 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.75 2000/04/12 03:51:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2421,7 +2421,7 @@ in6_if_up(ifp)
 	/*
 	 * special cases, like 6to4, are handled in in6_ifattach
 	 */
-	in6_ifattach(ifp);
+	in6_ifattach(ifp, NULL);
 
 	dad_delay = 0;
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
