@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.114 2002/08/01 11:29:12 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.115 2002/08/05 11:49:17 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -226,7 +226,7 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	struct hif_softc *sc;
 {
 	struct mip6_bu *mbu;
-	u_int32_t coa_lifetime;
+	u_int32_t coa_lifetime, cookie;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -282,7 +282,10 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	mbu->mbu_ackexpire = time_second + mbu->mbu_acktimeout;
 	mbu->mbu_hif = sc;
 	/* *mbu->mbu_encap = NULL; */
-	mbu->mbu_mobile_cookie = arc4random();
+	cookie = arc4random();
+	bcopy(&cookie, &mbu->mbu_mobile_cookie[0], 4);
+	cookie = arc4random();
+	bcopy(&cookie, &mbu->mbu_mobile_cookie[4], 4);
 
 	return (mbu);
 }
@@ -872,7 +875,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 	struct sockaddr_in6 *coa;
 	u_int8_t flags;
 	u_int16_t seqno;
-	u_int32_t lifetime;
+	u_int16_t lifetime;
 	struct sockaddr_in6 *haaddr;
 {
 	struct mip6_bc *mbc, *mbc_next;
@@ -1078,7 +1081,7 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 	struct sockaddr_in6 *coa;
 	u_int8_t flags;
 	u_int16_t seqno;
-	u_int32_t lifetime;
+	u_int16_t lifetime;
 	struct sockaddr_in6 *haaddr;
 {
 	struct nd_prefix *pr;
@@ -1857,7 +1860,7 @@ mip6_bc_register(hoa_sa, coa_sa, dst_sa, flags, seqno, lifetime)
 	struct sockaddr_in6 *dst_sa;
 	u_int16_t flags;
 	u_int16_t seqno;
-	u_int32_t lifetime;
+	u_int16_t lifetime;
 {
 	struct mip6_bc *mbc;
 
@@ -1881,7 +1884,7 @@ mip6_bc_update(mbc, coa_sa, dst_sa, flags, seqno, lifetime)
 	struct sockaddr_in6 *dst_sa;
 	u_int16_t flags;
 	u_int16_t seqno;
-	u_int32_t lifetime;
+	u_int16_t lifetime;
 {
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.151 2002/07/30 10:50:15 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.152 2002/08/05 11:49:17 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -45,6 +45,8 @@
 #ifdef __NetBSD__
 #include "opt_ipsec.h"
 #endif
+
+#define HMACSIZE 16
 
 #if defined(MIP6_ALLOW_COA_FALLBACK) && defined(MIP6_BDT)
 #error "you cannot specify both MIP6_ALLOW_COA_FALLBACK and MIP6_BDT"
@@ -1746,7 +1748,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 			goto bad;
 		}
 	}
-
+#if 0	/* I-D 18 */
 	if (mbu->mbu_flags & IP6MU_HOME) {
 		/* to my home agent. */
 		if (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_IDLE)
@@ -1756,7 +1758,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 		if (mbu->mbu_fsm_state != MIP6_BU_FSM_STATE_BOUND)
 			goto noneed;
 	}
-
+#endif
 	/* create haddr destopt. */
 	error = mip6_haddr_destopt_create(&mip6opt->mip6po_haddr,
 					  src, dst, sc);
@@ -2266,6 +2268,7 @@ mip6_add_opt2dh(opt, dh)
 	return pos;
 }
 
+#if 0
 #if defined(IPSEC) && !defined(__OpenBSD__)
 caddr_t
 mip6_add_subopt2dh(subopt, opt, dh)
@@ -2332,6 +2335,7 @@ mip6_add_subopt2dh(subopt, opt, dh)
 	return (subopt_pos);
 }
 #endif /* IPSEC && !__OpenBSD__ */
+#endif
 
 /*
  ******************************************************************************
@@ -2632,12 +2636,12 @@ mip6_get_nodekey(index, nodekey)
  *	Check a Binding Update packet whether it is valid 
  */
 int
-mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
+mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa)
 	struct ip6_hdr *ip6;
 	struct ip6m_binding_update *ip6mu;
 	int ip6mulen;
 	struct mip6_mobility_options *mopt;
-	struct sockaddr_in6 *hoa_sa;
+	struct sockaddr_in6 *hoa_sa, *coa_sa;
 {
 	mip6_nonce_t home_nonce, careof_nonce;
 	mip6_nodekey_t home_nodekey, coa_nodekey;
@@ -2694,14 +2698,14 @@ mip6_hexdump("CN: Careof Nodekey: ", sizeof(coa_nodekey), &coa_nodekey);
 #endif
 
 	/* Calculate home cookie */
-	mip6_create_cookie(&ip6mu->ip6mu_addr,
+	mip6_create_cookie(&hoa_sa->sin6_addr,
 			   &home_nodekey, &home_nonce, &home_cookie);
 #ifdef RR_DBG
 mip6_hexdump("CN: Home Cookie: ", sizeof(home_cookie), (u_int8_t *)&home_cookie);
 #endif
 
 	/* Calculate care-of cookie */
-	mip6_create_cookie(&ip6->ip6_src, 
+	mip6_create_cookie(&coa_sa->sin6_addr,
 			   &coa_nodekey, &careof_nonce, &careof_cookie);
 #ifdef RR_DBG
 mip6_hexdump("CN: Care-of Cookie: ", sizeof(careof_cookie), (u_int8_t *)&careof_cookie);
@@ -2717,10 +2721,10 @@ mip6_hexdump("CN: K_bu: ", sizeof(key_bu), key_bu);
 	ip6mu->ip6mu_cksum = 0;
 	/* Calculate authenticator */
 	hmac_init(&hmac_ctx, key_bu, sizeof(key_bu), HMAC_SHA1);
-	hmac_loop(&hmac_ctx, (u_int8_t *)&ip6->ip6_src,
-		  sizeof(ip6->ip6_src));
+	hmac_loop(&hmac_ctx, (u_int8_t *)&coa_sa->sin6_addr,
+		  sizeof(coa_sa->sin6_addr));
 #ifdef RR_DBG
-mip6_hexdump("CN: Auth: ", sizeof(ip6->ip6_src), &ip6->ip6_src);
+mip6_hexdump("CN: Auth: ", sizeof(coa_sa->sin6_addr), &coa_sa->sin6_addr);
 #endif
 	hmac_loop(&hmac_ctx, (u_int8_t *)&ip6->ip6_dst,
 		  sizeof(ip6->ip6_dst));
@@ -2732,13 +2736,13 @@ mip6_hexdump("CN: Auth: ", sizeof(ip6->ip6_dst), &ip6->ip6_dst);
 #ifdef RR_DBG
 mip6_hexdump("CN: Auth: ", (u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu, ip6mu);
 #endif
-	restlen = ip6mulen - (((u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu) + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len);
+	restlen = ip6mulen - (((u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu) + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len + 2);
 	if (restlen > 0) {
 	    hmac_loop(&hmac_ctx,
 		      mopt->mopt_auth
-		      + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len, restlen); 
+		      + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len + 2, restlen); 
 #ifdef RR_DBG
-mip6_hexdump("CN: Auth: ", restlen, mopt->mopt_auth + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len);
+mip6_hexdump("CN: Auth: ", restlen, mopt->mopt_auth + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len + 2);
 #endif
 	}
 	bzero(authdata, sizeof(authdata));
@@ -2776,18 +2780,18 @@ mip6_get_mobility_options(ip6mu, ip6mulen, mopt)
 			case IP6MOPT_PADN:
 				break;
 			case IP6MOPT_UID:
-				check_mopt_len(4);
+				check_mopt_len(2);
 				valid_option = MOPT_UID;
 				GET_NETVAL_S(mh + 2, mopt->mopt_uid);
 				break;
 			case IP6MOPT_ALTCOA:
-				check_mopt_len(18);
+				check_mopt_len(16);
 				valid_option = MOPT_ALTCOA;
 				bcopy(mh + 2, &mopt->mopt_altcoa,
 				      sizeof(mopt->mopt_altcoa));
 				break;
 			case IP6MOPT_NONCE:
-				check_mopt_len(6);
+				check_mopt_len(4);
 				valid_option = MOPT_NONCE_IDX;
 				GET_NETVAL_S(mh + 2, mopt->mopt_ho_nonce_idx);
 				GET_NETVAL_S(mh + 4, mopt->mopt_co_nonce_idx);
@@ -2795,6 +2799,11 @@ mip6_get_mobility_options(ip6mu, ip6mulen, mopt)
 			case IP6MOPT_AUTHDATA:
 				valid_option = MOPT_AUTHDATA;
 				mopt->mopt_auth = mh;
+				break;
+			case IP6MOPT_REFRESH:
+				check_mopt_len(2);
+				valid_option = MOPT_REFRESH;
+				GET_NETVAL_S(mh + 2, mopt->mopt_refresh);
 				break;
 			default:
 				/*	'... MUST quietly ignore ... (6.2.1)'
@@ -2805,7 +2814,7 @@ mip6_get_mobility_options(ip6mu, ip6mulen, mopt)
 				break;
 		}
 		
-		mh += *(mh + 1);
+		mh += *(mh + 1) + 2;
 		mopt->valid_options |= valid_option;
 	}
 
@@ -2819,17 +2828,20 @@ mip6_create_cookie(addr, nodekey, nonce, cookie)
 	struct in6_addr *addr;
 	mip6_nodekey_t *nodekey;
 	mip6_nonce_t *nonce;
-	void *cookie;
+	void *cookie;		/* 64 bit */
 {
 	/* Generatie cookie */
 	/* cookie = MAC_Kcn(saddr | nonce) */
 	HMAC_CTX hmac_ctx;
+	u_int8_t result[HMACSIZE];
 	
 	hmac_init(&hmac_ctx, (u_int8_t *)nodekey,
 		  sizeof(mip6_nodekey_t), HMAC_SHA1);
 	hmac_loop(&hmac_ctx, (u_int8_t *)addr, sizeof(struct in6_addr));
 	hmac_loop(&hmac_ctx, (u_int8_t *)nonce, sizeof(mip6_nonce_t));
-	hmac_result(&hmac_ctx, (u_int8_t *)cookie);
+	hmac_result(&hmac_ctx, result);
+	/* First64 */
+	bcopy(result, cookie, 8);
 }
 
 void

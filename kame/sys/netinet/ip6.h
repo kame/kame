@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.31 2002/06/19 12:30:05 t-momose Exp $	*/
+/*	$KAME: ip6.h,v 1.32 2002/08/05 11:49:16 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -300,7 +300,7 @@ struct ip6_mobility {
 #define IP6M_BINDING_ERROR	0x0700
 #endif /* BYTE_ORDER == LITTLE_ENDIAN */
 
-/* Binding Request message */
+/* Binding Refresh Request (BRR) message */
 struct ip6m_binding_request {
 	u_int8_t ip6mr_pproto;
 	u_int8_t ip6mr_len;
@@ -317,7 +317,7 @@ struct ip6m_home_test_init {
 	u_int16_t ip6mhi_type;
 	u_int16_t ip6mhi_cksum;
 	u_int16_t ip6mhi_reserved;
-	u_int32_t ip6mhi_mobile_cookie;
+	u_int8_t ip6mhi_hot_cookie[8];
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
@@ -328,7 +328,7 @@ struct ip6m_careof_test_init {
 	u_int16_t ip6mci_type;
 	u_int16_t ip6mci_cksum;
 	u_int16_t ip6mci_reserved;
-	u_int32_t ip6mci_mobile_cookie;
+	u_int8_t ip6mci_cot_cookie[8];
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
@@ -338,11 +338,9 @@ struct ip6m_home_test {
 	u_int8_t ip6mh_len;
 	u_int16_t ip6mh_type;
 	u_int16_t ip6mh_cksum;
-	u_int16_t ip6mh_reserved0;
 	u_int16_t ip6mh_nonce_index;	/* idx of the CN nonce list array */
-	u_int16_t ip6mh_reserved1;
-	u_int32_t ip6mh_mobile_cookie;
-	u_int8_t ip6mh_cookie[16];	/* K0 cookie */
+	u_int8_t ip6mh_hot_cookie[8];
+	u_int8_t ip6mh_cookie[8];	/* K0 cookie */
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
@@ -352,26 +350,22 @@ struct ip6m_careof_test {
 	u_int8_t ip6mc_len;
 	u_int16_t ip6mc_type;
 	u_int16_t ip6mc_cksum;
-	u_int16_t ip6mc_reserved0;
 	u_int16_t ip6mc_nonce_index;	/* idx of the CN nonce list array */
-	u_int16_t ip6mc_reserved1;
-	u_int32_t ip6mc_mobile_cookie;
-	u_int8_t ip6mc_cookie[16];	/* K1 cookie */
+	u_int8_t ip6mc_cot_cookie[8];
+	u_int8_t ip6mc_cookie[8];	/* K1 cookie */
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
-/* Binding Update message */
+/* Binding Update (BU) message */
 struct ip6m_binding_update {
 	u_int8_t ip6mu_pproto;
 	u_int8_t ip6mu_len;
 	u_int16_t ip6mu_type;
 	u_int16_t ip6mu_cksum;
-	u_int8_t ip6mu_flags;
-	u_int8_t ip6mu_reserved0;
 	u_int16_t ip6mu_seqno;
-	u_int16_t ip6mu_reserved1;
-	u_int32_t ip6mu_lifetime;
-	struct in6_addr ip6mu_addr;
+	u_int8_t ip6mu_flags;
+	u_int8_t ip6mu_reserved;
+	u_int16_t ip6mu_lifetime;
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
@@ -380,54 +374,62 @@ struct ip6m_binding_update {
 #define IP6MU_HOME	0x40	/* Home Registration */
 #define IP6MU_SINGLE	0x20	/* Update the specified address only */
 #define IP6MU_DAD	0x10	/* Perform Duplicate Address Detection */
+#define IP6MU_LINK	0x08	/* Link-Local Address Compatibility */
 
-/* Binding Ack message */
+/* Binding Acknowledgement (BA) message */
 struct ip6m_binding_ack {
 	u_int8_t ip6ma_pproto;
 	u_int8_t ip6ma_len;
 	u_int16_t ip6ma_type;
 	u_int16_t ip6ma_cksum;
 	u_int8_t ip6ma_status;
-	u_int8_t ip6ma_reserved0;
+	u_int8_t ip6ma_reserved;
 	u_int16_t ip6ma_seqno;
-	u_int16_t ip6ma_reserved1;
-	u_int32_t ip6ma_lifetime;
-	u_int32_t ip6ma_refresh;
+	u_int16_t ip6ma_lifetime;
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
-/* Binding Error message */
+/* Binding Error (BE) message */
 struct ip6m_binding_error {
 	u_int8_t ip6me_pproto;
 	u_int8_t ip6me_len;
 	u_int16_t ip6me_type;
 	u_int16_t ip6me_cksum;
 	u_int8_t ip6me_status;
-	u_int8_t ip6me_reserved0;
+	u_int8_t ip6me_reserved;
 	struct in6_addr ip6me_addr;
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
 /* Mobility options */
-#define IP6MOPT_PAD1		0
-#define IP6MOPT_PADN		1
-#define IP6MOPT_UID		2
-#define IP6MOPT_ALTCOA		3
-#define IP6MOPT_NONCE		4
-#define IP6MOPT_AUTHDATA	5
+struct ip6m_opt {
+	u_int8_t ip6mo_type;
+	u_int8_t ip6mo_len;
+	/* followed by option data */
+} __attribute__((__packed__));
+
+/* Mobility option type */
+#define IP6MOPT_PAD1		0	/* Pad1 */
+#define IP6MOPT_PADN		1	/* PadN */
+#define IP6MOPT_UID		2	/* Unique Identifier */
+#define IP6MOPT_ALTCOA		3	/* Alternate Care-of Address */
+#define IP6MOPT_NONCE		4	/* Nonce Indices */
+#define IP6MOPT_AUTHDATA	5	/* Binding Authorization Data */
+/*				6	   reserved */
+#define IP6MOPT_REFRESH		7	/* Binding Refresh Advice */
 
 /* Unique Identifier */
 struct ip6m_opt_uid {
 	u_int8_t ip6mou_type;
 	u_int8_t ip6mou_len;
-	u_int8_t ip6mou_id[2];
+	u_int8_t ip6mou_id[2];		/* Unique Identifier */
 } __attribute__((__packed__));
 
 /* Alternate Care-of Address */
 struct ip6m_opt_altcoa {
 	u_int8_t ip6moa_type;
 	u_int8_t ip6moa_len;
-	u_int8_t addr[16];
+	u_int8_t addr[16];		/* Alternate Care-of Address */
 } __attribute__((__packed__));
 
 /* Nonce Indices */
@@ -443,6 +445,13 @@ struct ip6m_opt_authdata {
 	u_int8_t ip6moau_type;
 	u_int8_t ip6moau_len;
 	/* followed by authenticator data */
+} __attribute__((__packed__));
+
+/* Binding Refresh Advice */
+struct ip6m_opt_refresh {
+	u_int8_t ip6mor_type;
+	u_int8_t ip6mor_len;
+	u_int8_t ip6mor_refresh[2];	/* Refresh Interval */
 } __attribute__((__packed__));
 
 /*

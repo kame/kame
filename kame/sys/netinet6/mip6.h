@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.54 2002/06/18 07:35:15 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.55 2002/08/05 11:49:17 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -70,61 +70,28 @@ struct mip6_req {
 #define MIP6_BA_INITIAL_TIMEOUT    1
 #define MIP6_BA_MAX_TIMEOUT        256
 
-/* mobility header options type. */
-#define MIP6OPT_PAD1     0x00
-#define MIP6OPT_PADN     0x01
-#define MIP6OPT_UNIQID   0x02
-#define MIP6OPT_ALTCOA   0x03
-#define MIP6OPT_AUTHDATA 0x04
-
-/* Unique Identifier option format. */
-struct mip6_opt_uniqid {
-	u_int8_t type;		/* 0x02 */
-	u_int8_t len;		/* == 4 */
-	u_int16_t id;		/* Unique Identifier */
-} __attribute__ ((__packed__));
-
-/* Alternate Care-of Address option format. */
-struct mip6_opt_altcoa {
-	u_int8_t type;		/* 0x03 */
-	u_int8_t len;		/* == 18 */
-	u_int8_t coa[16];	/* Alternate Care-of Address */
-} __attribute__ ((__packed__));
-
-/* Nonce Indices */
-struct mip6_opt_nonceix {
-	u_int8_t type;		/* 0x04 */
-	u_int8_t len;		/* == 6 */
-	u_int16_t hoix;		/* Home Nonce Index */
-	u_int16_t coix;		/* Care-of Nonce Index */
-} __attribute__ ((__packed__));
-
-/* Autnentication Data sub-option format. */
-struct mip6_opt_authdata {
-	u_int8_t type;		/* 0x05 */
-	u_int8_t len;		/* 2 + n */
-	/* followed by Authenticator (variable length) */
-} __attribute__ ((__packed__));
-
 /* Binding Ack status code. */
-#define IP6MA_STATUS_ACCEPTED              0
+#define IP6MA_STATUS_ACCEPTED              0	/* Binding Update accepted */
 #define IP6MA_STATUS_ERRORBASE             128
-#define IP6MA_STATUS_UNSPECIFIED           128
-#define IP6MA_STATUS_PROHIBIT              130
-#define IP6MA_STATUS_RESOURCES             131
-#define IP6MA_STATUS_NOT_SUPPORTED         132
-#define IP6MA_STATUS_NOT_HOME_SUBNET       133
-#define IP6MA_STATUS_NOT_HOME_AGENT        137
-#define IP6MA_STATUS_DAD_FAILED            138
-#define IP6MA_STATUS_NO_SA                 139
-#define IP6MA_STATUS_SEQNO_TOO_SMALL       141
-#define IP6MA_STATUS_RO_NOT_DESIRED        142
-#define IP6MA_STATUS_INVAL_AUTHENTICATOR   143
-#define IP6MA_STATUS_HOME_NONCE_EXPIRED    144
-#define IP6MA_STATUS_CAREOF_NONCE_EXPIRED  145
+#define IP6MA_STATUS_UNSPECIFIED           128	/* Reason unspecified */
+#define IP6MA_STATUS_PROHIBIT              129	/* Administratively prohibited */
+#define IP6MA_STATUS_RESOURCES             130	/* Insufficient resources */
+#define IP6MA_STATUS_NOT_SUPPORTED         131	/* ome registration not supported */
+#define IP6MA_STATUS_NOT_HOME_SUBNET       132	/* Not home subnet */
+#define IP6MA_STATUS_NOT_HOME_AGENT        133	/* Not home agent for this mobile node */
+#define IP6MA_STATUS_DAD_FAILED            134	/* Duplicate Address Detection failed */
+#define IP6MA_STATUS_SEQNO_TOO_SMALL       135	/* Sequence number out of window */
+#define IP6MA_STATUS_RO_NOT_DESIRED        136	/* Route optimization unnecessary due to low traffic */
+#define IP6MA_STATUS_INVAL_AUTHENTICATOR   137	/* Invalid authenticator */
+#define IP6MA_STATUS_HOME_NONCE_EXPIRED    138	/* Expired Home Nonce Index */
+#define IP6MA_STATUS_CAREOF_NONCE_EXPIRED  139	/* Expired Care-of Nonce Index */
 
 /* Binding Error status code. */
-#define IP6ME_STATUS_NO_BINDING		1
-#define IP6ME_STATUS_UNKNOWN_MH_TYPE	2
-
+#define IP6ME_STATUS_NO_BINDING		1	/* Home Address destination
+						   option used without a binding
+						 */
+#define IP6ME_STATUS_UNKNOWN_MH_TYPE	2	/* Received message had an
+						   unknown value for the MH Type
+						   field
+						  */
 #endif /* !_MIP6_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.37 2002/08/02 11:27:37 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.38 2002/08/05 11:49:17 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -85,11 +85,11 @@ extern struct mip6_prefix_list mip6_prefix_list;
 static int mip6_ip6mh_create __P((struct ip6_mobility **,
 				  struct sockaddr_in6 *,
 				  struct sockaddr_in6 *,
-				  u_int32_t));
+				  u_int8_t *));
 static int mip6_ip6mc_create __P((struct ip6_mobility **,
 				  struct sockaddr_in6 *,
 				  struct sockaddr_in6 *,
-				  u_int32_t));
+				  u_int8_t *));
 static int mip6_ip6mhi_create __P((struct ip6_mobility **,
 				   struct mip6_bu *));
 static int mip6_ip6mci_create __P((struct ip6_mobility **,
@@ -140,7 +140,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 	}
 
 	error = mip6_ip6mh_create(&opt.ip6po_mobility, dst_sa, src_sa,
-	    ntohl(ip6mhi->ip6mhi_mobile_cookie));
+	    ip6mhi->ip6mhi_hot_cookie);
 	if (error) {
 		mip6log((LOG_ERR,
 		    "%s:%d: HoT creation error (%d)\n",
@@ -168,7 +168,7 @@ int
 mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	struct ip6_mobility **pktopt_mobility;
 	struct sockaddr_in6 *src, *dst;
-	u_int32_t cookie;
+	u_int8_t *cookie;
 {
 	struct ip6m_home_test *ip6mh;
 	int ip6mh_size;
@@ -193,9 +193,9 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	ip6mh->ip6mh_len = ip6mh_size >> 3;
 	ip6mh->ip6mh_type = IP6M_HOME_TEST;
 	ip6mh->ip6mh_nonce_index = htons(nonce_index);
-	ip6mh->ip6mh_mobile_cookie = htonl(cookie);
+	bcopy(cookie, ip6mh->ip6mh_hot_cookie, sizeof(ip6mh->ip6mh_hot_cookie));
 	mip6_create_cookie(&dst->sin6_addr,
-			   &home_nodekey, &home_nonce, &ip6mh->ip6mh_cookie);
+			   &home_nodekey, &home_nonce, ip6mh->ip6mh_cookie);
 
 	/* calculate checksum. */
 	ip6mh->ip6mh_cksum = mip6_cksum(src, dst,
@@ -247,7 +247,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 	}
 
 	error = mip6_ip6mc_create(&opt.ip6po_mobility, dst_sa, src_sa,
-	    ntohl(ip6mci->ip6mci_mobile_cookie));
+	    ip6mci->ip6mci_cot_cookie);
 	if (error) {
 		mip6log((LOG_ERR,
 		    "%s:%d: HoT creation error (%d)\n",
@@ -275,7 +275,7 @@ int
 mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	struct ip6_mobility **pktopt_mobility;
 	struct sockaddr_in6 *src, *dst;
-	u_int32_t cookie;
+	u_int8_t *cookie;
 {
 	struct ip6m_careof_test *ip6mc;
 	int ip6mc_size;
@@ -300,10 +300,10 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	ip6mc->ip6mc_len = ip6mc_size >> 3;
 	ip6mc->ip6mc_type = IP6M_CAREOF_TEST;
 	ip6mc->ip6mc_nonce_index = htons(nonce_index);
-	ip6mc->ip6mc_mobile_cookie = htonl(cookie);
+	bcopy(cookie, ip6mc->ip6mc_cot_cookie, sizeof(ip6mc->ip6mc_cot_cookie));
 	mip6_create_cookie(&dst->sin6_addr,
 			   &careof_nodekey, &careof_nonce,
-			   &ip6mc->ip6mc_cookie);
+			   ip6mc->ip6mc_cookie);
 	
 	/* calculate checksum. */
 	ip6mc->ip6mc_cksum = mip6_cksum(src, dst,
@@ -364,7 +364,8 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 	}
 
 	/* check mobile cookie. */
-	if (mbu->mbu_mobile_cookie != ntohl(ip6mh->ip6mh_mobile_cookie)) {
+	if (bcmp(&mbu->mbu_mobile_cookie, ip6mh->ip6mh_hot_cookie,
+	    sizeof(ip6mh->ip6mh_hot_cookie)) != 0) {
 		mip6log((LOG_INFO,
 		    "%s:%d: HoT mobile cookie mismatch from %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
@@ -435,7 +436,8 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 	}
 
 	/* check mobile cookie. */
-	if (mbu->mbu_mobile_cookie != ntohl(ip6mc->ip6mc_mobile_cookie)) {
+	if (bcmp(&mbu->mbu_mobile_cookie, ip6mc->ip6mc_cot_cookie,
+	    sizeof(ip6mc->ip6mc_cot_cookie)) != 0) {
 		mip6log((LOG_INFO,
 		    "%s:%d: CoT mobile cookie mismatch from %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
@@ -470,7 +472,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	u_int8_t haseen;
 	struct mip6_bc *mbc;
 	u_int16_t seqno;
-	u_int32_t lifetime;
+	u_int16_t lifetime;
 
 	int error = 0;
 	u_int8_t bu_safe = 0;	/* To accept bu always without authentication, this value is set to non-zero */
@@ -518,12 +520,18 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 
 	coa_sa = *src_sa;
 	n = ip6_findaux(m);
-	if (n != NULL) {
-		ip6a = mtod(n, struct ip6aux *);
-		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
-			haseen = 1;
-			coa_sa.sin6_addr = ip6a->ip6a_coa;
-		}
+	if (n == NULL) {
+		m_freem(m);
+		return (EINVAL);
+	}
+	ip6a = mtod(n, struct ip6aux *);
+	if ((ip6a->ip6a_flags & IP6A_HASEEN) == 0) {
+		m_freem(m);
+		return (EINVAL);
+	}
+	if ((ip6a->ip6a_flags & IP6A_SWAP) != 0) {
+		haseen = 1;
+		coa_sa.sin6_addr = ip6a->ip6a_coa;
 	}
 		
 	/*
@@ -544,7 +552,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		bu_safe = 1;
 		goto accept_binding_update;
 	}
-	if ((haseen == 0)
+	if ((haseen == 1)
 	    && ((ip6mu_flags & IP6MU_HOME) == 0))
 		goto accept_binding_update;	/* Must be checked its safety
 						 * with RR later */
@@ -560,7 +568,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		hoa_sa = *src_sa;
 	} else {
 		hoa_sa = *src_sa;
-		hoa_sa.sin6_addr = ip6mu->ip6mu_addr;
+		hoa_sa.sin6_addr = ip6a->ip6a_coa;
 	}
 
 	if ((error = mip6_get_mobility_options(ip6mu, ip6mulen, &mopt))) {
@@ -575,12 +583,12 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		coa_sa.sin6_addr = mopt.mopt_altcoa;
 
 	seqno = ntohs(ip6mu->ip6mu_seqno);
-	lifetime = ntohl(ip6mu->ip6mu_lifetime);
+	lifetime = ntohs(ip6mu->ip6mu_lifetime);
 
 	/* ip6_src and HAO has been already swapped at this point. */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &hoa_sa);
 	if (mbc == NULL) {
-		if (!bu_safe && mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, &hoa_sa)) {
+		if (!bu_safe && mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, &hoa_sa, &coa_sa)) {
 			mip6log((LOG_ERR,
 				 "%s:%d: RR authentication was failed.\n",
 				 __FILE__, __LINE__));
@@ -714,7 +722,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 	u_int16_t seqno;
-	u_int32_t lifetime;
+	u_int16_t lifetime;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -848,13 +856,14 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	mbu->mbu_state &= ~MIP6_BU_STATE_WAITACK;
 
 	/* update lifetime and refresh time. */
-	lifetime = htonl(ip6ma->ip6ma_lifetime);
+	lifetime = htons(ip6ma->ip6ma_lifetime);
 	if (lifetime < mbu->mbu_lifetime) {
 		mbu->mbu_expire -= (mbu->mbu_lifetime - lifetime);
 		if (mbu->mbu_expire < time_second)
 			mbu->mbu_expire = time_second;
 	}
-	mbu->mbu_refresh = htonl(ip6ma->ip6ma_refresh);
+	/* XXX binding refresh advice option */
+	mbu->mbu_refresh = lifetime;		/* XXX */
 	mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
 	/* sanity check for overflow */
         if (mbu->mbu_refexpire < time_second)
@@ -1092,7 +1101,6 @@ int
 mip6_bu_send_cbu(mbu)
 	struct mip6_bu *mbu;
 {
-	struct sockaddr_in6 *busrc_sa;
 	struct mbuf *m;
 	struct ip6_pktopts opt;
 	int error = 0;
@@ -1103,11 +1111,7 @@ mip6_bu_send_cbu(mbu)
 
 	init_ip6pktopts(&opt);
 
-	if (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_BOUND)
-		busrc_sa = &mbu->mbu_haddr;
-	else
-		busrc_sa = &mbu->mbu_coa;
-	m = mip6_create_ip6hdr(busrc_sa, &mbu->mbu_paddr, IPPROTO_NONE, 0);
+	m = mip6_create_ip6hdr(&mbu->mbu_haddr, &mbu->mbu_paddr, IPPROTO_NONE, 0);
 	if (m == NULL) {
 		mip6log((LOG_ERR,
 		    "%s:%d: creating ip6hdr failed.\n", __FILE__, __LINE__));
@@ -1147,8 +1151,8 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 	struct sockaddr_in6 *dstcoa;
 	u_int8_t status;
 	u_int16_t seqno;
-	u_int32_t lifetime;
-	u_int32_t refresh;
+	u_int16_t lifetime;
+	u_int16_t refresh;
 {
 	struct mbuf *m;
 	struct ip6_pktopts opt;
@@ -1236,7 +1240,8 @@ mip6_ip6mhi_create(pktopt_mobility, mbu)
 	ip6mhi->ip6mhi_pproto = IPPROTO_NONE;
 	ip6mhi->ip6mhi_len = ip6mhi_size >> 3;
 	ip6mhi->ip6mhi_type = IP6M_HOME_TEST_INIT;
-	ip6mhi->ip6mhi_mobile_cookie = htonl(mbu->mbu_mobile_cookie);
+	bcopy(mbu->mbu_mobile_cookie, ip6mhi->ip6mhi_hot_cookie,
+	      sizeof(ip6mhi->ip6mhi_hot_cookie));
 
 	/* calculate checksum. */
 	ip6mhi->ip6mhi_cksum = mip6_cksum(&mbu->mbu_haddr, &mbu->mbu_paddr,
@@ -1273,7 +1278,8 @@ mip6_ip6mci_create(pktopt_mobility, mbu)
 	ip6mci->ip6mci_pproto = IPPROTO_NONE;
 	ip6mci->ip6mci_len = ip6mci_size >> 3;
 	ip6mci->ip6mci_type = IP6M_CAREOF_TEST_INIT;
-	ip6mci->ip6mci_mobile_cookie = htonl(mbu->mbu_mobile_cookie);
+	bcopy(mbu->mbu_mobile_cookie, ip6mci->ip6mci_cot_cookie,
+	      sizeof(ip6mci->ip6mci_cot_cookie));
 
 	/* calculate checksum. */
 	ip6mci->ip6mci_cksum = mip6_cksum(&mbu->mbu_coa, &mbu->mbu_paddr,
@@ -1299,7 +1305,6 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	int bu_size, nonce_size, auth_size;
 	struct mip6_bu *mbu, *hrmbu;
 	int need_rr = 0;
-	struct sockaddr_in6 *busrc_sa;
 	HMAC_CTX hmac_ctx;
 	u_int8_t key_bu[SHA1_RESULTLEN]; /* Stated as 'Kbu' in the spec */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -1400,7 +1405,7 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		*((u_int8_t *)ip6mu + sizeof(struct ip6m_binding_update))
 			= IP6MOPT_PADN;
 		*((u_int8_t *)ip6mu + sizeof(struct ip6m_binding_update) + 1)
-			= bu_size - sizeof(struct ip6m_binding_update);
+			= bu_size - sizeof(struct ip6m_binding_update) - 2;
 	}
 
 	ip6mu->ip6mu_pproto = IPPROTO_NONE;
@@ -1443,22 +1448,18 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 				lifetime = sa_lifetime;
 		}
 #endif /* MIP6_SYNC_SA_LIFETIME */
-		mbu->mbu_lifetime = lifetime;
-		mbu->mbu_expire = time_second + lifetime;
+		mbu->mbu_lifetime = (u_int16_t)lifetime;
+		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
 		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
-		ip6mu->ip6mu_lifetime = htonl(mbu->mbu_lifetime);
+		ip6mu->ip6mu_lifetime = htons(mbu->mbu_lifetime);
 	}
-	ip6mu->ip6mu_addr = mbu->mbu_haddr.sin6_addr;
-	in6_clearscope(&ip6mu->ip6mu_addr);
-
-	busrc_sa = src;
 
 	if (need_rr) {
 		/* nonce indices and authdata insersion. */
 		/* Nonce Indicies */
 		mopt_nonce->ip6mon_type = IP6MOPT_NONCE;
-		mopt_nonce->ip6mon_len = sizeof(struct ip6m_opt_nonce);
+		mopt_nonce->ip6mon_len = sizeof(struct ip6m_opt_nonce) - 2;
 		SET_NETVAL_S(&mopt_nonce->ip6mon_home_nonce_index,
 			     mbu->mbu_home_nonce_index);
 		SET_NETVAL_S(&mopt_nonce->ip6mon_careof_nonce_index,
@@ -1466,7 +1467,7 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 
 		/* Auth. data */
 		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
-		mopt_auth->ip6moau_len = AUTH_SIZE;
+		mopt_auth->ip6moau_len = AUTH_SIZE - 2;
 
 #ifdef RR_DBG
 mip6_hexdump("MN: Home Cookie: ", sizeof(mbu->mbu_home_cookie), (caddr_t)&mbu->mbu_home_cookie);
@@ -1478,16 +1479,11 @@ mip6_hexdump("MN: Care-of Cookie: ", sizeof(mbu->mbu_careof_cookie), (caddr_t)&m
 mip6_hexdump("MN: K_bu: ", sizeof(key_bu), key_bu);
 #endif
 
-		if (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_BOUND)
-			busrc_sa = &mbu->mbu_haddr;
-		else
-			busrc_sa = &mbu->mbu_coa;
-
 		/* Calculate authenticator (5.5.6) */
 		/* MAC_Kbu(coa, | cn | BU) */
 		hmac_init(&hmac_ctx, key_bu, sizeof(key_bu), HMAC_SHA1);
-		hmac_loop(&hmac_ctx, (u_int8_t *)&busrc_sa->sin6_addr,
-			  sizeof(busrc_sa->sin6_addr));
+		hmac_loop(&hmac_ctx, (u_int8_t *)&mbu->mbu_coa.sin6_addr,
+			  sizeof(mbu->mbu_coa.sin6_addr));
 #ifdef RR_DBG
 mip6_hexdump("MN: Auth: ", sizeof(mbu->mbu_coa.sin6_addr), &mbu->mbu_coa.sin6_addr);
 #endif
@@ -1506,7 +1502,7 @@ mip6_hexdump("MN: Auth: ", bu_size + nonce_size, ip6mu);
 			*((u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE)
 			    = IP6MOPT_PADN;
 			*((u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE + 1)
-			    = auth_size - AUTH_SIZE;
+			    = auth_size - AUTH_SIZE - 2;
 			hmac_loop(&hmac_ctx,
 				  (u_int8_t *)ip6mu + bu_size + nonce_size
 				  + AUTH_SIZE, auth_size - AUTH_SIZE);
@@ -1521,7 +1517,7 @@ mip6_hexdump("MN: Authdata: ", SHA1_RESULTLEN, (u_int8_t *)(mopt_auth + 1));
 	}
 
 	/* calculate checksum. */
-	ip6mu->ip6mu_cksum = mip6_cksum(busrc_sa, dst, ip6mu_size,
+	ip6mu->ip6mu_cksum = mip6_cksum(&mbu->mbu_haddr, dst, ip6mu_size,
 					IPPROTO_MOBILITY, (char *)ip6mu);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6mu;
@@ -1539,8 +1535,8 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 	struct sockaddr_in6 *dst;
 	u_int8_t status;
 	u_int16_t seqno;
-	u_int32_t lifetime;
-	u_int32_t refresh;
+	u_int16_t lifetime;
+	u_int16_t refresh;
 {
 	struct ip6m_binding_ack *ip6ma;
 	int ip6ma_size, pad;
@@ -1562,16 +1558,17 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 	ip6ma->ip6ma_type = IP6M_BINDING_ACK;
 	ip6ma->ip6ma_status = status;
 	ip6ma->ip6ma_seqno = htons(seqno);
-	ip6ma->ip6ma_lifetime = htonl(lifetime);
-	ip6ma->ip6ma_refresh = htonl(refresh);
+	ip6ma->ip6ma_lifetime = htons(lifetime);
+
+	/* XXX binding refresh advice option */
 
 	/* XXX authorization data processing. */
 
 	/* XXX padN */
 	if (pad > 1) {
 		u_char *p = ((u_char *)ip6ma) + ip6ma_size - pad;
-		*p++ = MIP6OPT_PADN;
-		*p = pad;
+		*p++ = IP6MOPT_PADN;
+		*p = pad - 2;
 	}
 
 	/* calculate checksum. */

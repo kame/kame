@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.99 2002/07/30 04:41:35 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.100 2002/08/05 11:49:17 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -292,7 +292,6 @@ struct ip6aux {
 
 	/* ip6.ip6_src */
 	struct sockaddr_in6 ip6a_src;	/* source address in the IPv6 header */
-#define ip6a_home ip6a_src
 	struct in6_addr ip6a_coa;	/* care of address of the peer */
 
 	/* ip6.ip6_dst */
@@ -473,6 +472,9 @@ int	rip6_usrreq __P((struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
 
 int	dest6_input __P((struct mbuf **, int *, int));
+#ifdef MIP6
+int	dest6_mip6_hao __P((struct mbuf *, int));
+#endif
 int	mobility6_input __P((struct mbuf **, int *, int));
 int	none_input __P((struct mbuf **, int *, int));
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.44 2002/07/29 09:40:33 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.45 2002/08/05 11:49:18 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -51,14 +51,16 @@
 					bcopy(&s, (p), sizeof(s));	\
 				} while (0)
 
-#define HOME_COOKIE_SIZE	16
-#define CAREOF_COOKIE_SIZE	16
-#define MIP6_NONCE_SIZE		16	/* recommended by the spec (5.5.2) */
+#define MIP6_COOKIE_SIZE	8
+#define HOME_COOKIE_SIZE	8
+#define CAREOF_COOKIE_SIZE	8
+#define MIP6_NONCE_SIZE		8	/* recommended by the spec (5.2.2) */
 					/* must be multiple of size of u_short */
-#define MIP6_NODEKEY_SIZE	20	/* This size is specified at 5.5.1 in mip6 spec */
+#define MIP6_NODEKEY_SIZE	20	/* This size is specified at 5.2.1 in mip6 spec */
 #define MIP6_NONCE_HISTORY	32
 typedef u_int8_t mip6_nonce_t[MIP6_NONCE_SIZE];
 typedef u_int8_t mip6_nodekey_t[MIP6_NODEKEY_SIZE];
+typedef u_int8_t mip6_cookie_t[MIP6_COOKIE_SIZE];
 typedef u_int8_t mip6_home_cookie_t[HOME_COOKIE_SIZE];
 typedef u_int8_t mip6_careof_cookie_t[CAREOF_COOKIE_SIZE];
 
@@ -134,15 +136,15 @@ struct mip6_bu {
 	struct sockaddr_in6 mbu_paddr;      /* peer addr of this BU */
 	struct sockaddr_in6 mbu_haddr;      /* HoA */
 	struct sockaddr_in6 mbu_coa;        /* CoA */
-	u_int32_t           mbu_lifetime;   /* BU lifetime */
+	u_int16_t           mbu_lifetime;   /* BU lifetime */
 	time_t              mbu_expire;     /* expiration time of this BU. */
-	u_int32_t           mbu_refresh;    /* refresh frequency */
+	u_int16_t           mbu_refresh;    /* refresh frequency */
 	time_t              mbu_refexpire;  /* expiration time of refresh. */
 	u_int32_t           mbu_acktimeout; /* current ack timo value */
 	time_t              mbu_ackexpire;  /* expiration time of ack. */
 	u_int16_t           mbu_seqno;      /* sequence number */
 	u_int8_t            mbu_flags;      /* BU flags */
-	u_int32_t           mbu_mobile_cookie;
+	mip6_cookie_t       mbu_mobile_cookie;
 	u_int16_t           mbu_home_nonce_index;
 	mip6_home_cookie_t  mbu_home_cookie;
 	u_int16_t           mbu_careof_nonce_index;
@@ -250,14 +252,7 @@ struct mip6_buffer {
 };
 #define MIP6_BUFFER_SIZE 1500 /* XXX 1500 ? */
 
-/* definition of length for different destination options. */
-#define IP6OPT_BULEN   8 /* Length of BU option */
-#define IP6OPT_BALEN  11 /* Length of BA option */
-#define IP6OPT_BRLEN   0 /* Length of BR option */
 #define IP6OPT_HALEN  16 /* Length of HA option */
-#define IP6OPT_UIDLEN  2 /* Length of Unique Identifier sub-option */
-#define IP6OPT_COALEN 16 /* Length of Alternate COA sub-option */
-#define IP6OPT_AUTHDATALEN 4 /* Minimum length of Authentication Data sub-option */
 
 struct mip6_mobility_options {
 	u_int16_t valid_options;	/* shows valid options in this structure */
@@ -266,12 +261,14 @@ struct mip6_mobility_options {
 	u_int16_t	mopt_ho_nonce_idx;	/* Home Nonce Index */
 	u_int16_t	mopt_co_nonce_idx;	/* Care-of Nonce Index */
 	caddr_t mopt_auth;			/* Authenticator */
+	u_int16_t	mopt_refresh;		/*  Refresh Interval */
 };
 
 #define MOPT_UID	0x0001
 #define MOPT_ALTCOA	0x0002
 #define MOPT_NONCE_IDX	0x0004
 #define MOPT_AUTHDATA	0x0008
+#define MOPT_REFRESH	0x0010
 
 /*
  * the list entry to hold the destination addresses which do not use a
@@ -324,8 +321,8 @@ int mip6_ip6ma_create			__P((struct ip6_mobility **,
 					     struct sockaddr_in6 *,
 					     u_int8_t,
 					     u_int16_t,
-					     u_int32_t,
-					     u_int32_t));
+					     u_int16_t,
+					     u_int16_t));
 int mip6_ip6me_create			__P((struct ip6_mobility **,
 					     struct sockaddr_in6 *,
 					     struct sockaddr_in6 *,
@@ -333,11 +330,11 @@ int mip6_ip6me_create			__P((struct ip6_mobility **,
 					     struct sockaddr_in6 *));
 int mip6_process_hrbu __P((struct sockaddr_in6 *,
 			   struct sockaddr_in6 *,
-			   u_int8_t, u_int16_t, u_int32_t,
+			   u_int8_t, u_int16_t, u_int16_t,
 			   struct sockaddr_in6 *));
 int mip6_process_hurbu __P((struct sockaddr_in6 *,
 			    struct sockaddr_in6 *,
-			    u_int8_t, u_int16_t, u_int32_t,
+			    u_int8_t, u_int16_t, u_int16_t,
 			    struct sockaddr_in6 *));
 int mip6_bu_destopt_create		__P((struct ip6_dest **,
 					     struct sockaddr_in6 *,
@@ -542,11 +539,11 @@ void mip6_bc_init			__P((void));
 int mip6_bc_register			__P((struct sockaddr_in6 *,
 					     struct sockaddr_in6 *,
 					     struct sockaddr_in6 *,
-					     u_int16_t, u_int16_t, u_int32_t));
+					     u_int16_t, u_int16_t, u_int16_t));
 int mip6_bc_update			__P((struct mip6_bc *,
 					     struct sockaddr_in6 *,
 					     struct sockaddr_in6 *,
-					     u_int16_t, u_int16_t, u_int32_t));
+					     u_int16_t, u_int16_t, u_int16_t));
 int mip6_bc_delete			__P((struct mip6_bc *));
 int mip6_bc_list_remove			__P((struct mip6_bc_list *,
 					     struct mip6_bc *));
@@ -558,7 +555,7 @@ struct mip6_bc *mip6_bc_list_find_withpcoa
 					     struct sockaddr_in6 *));
 int mip6_bc_send_ba __P((struct sockaddr_in6 *, struct sockaddr_in6 *,
 			 struct sockaddr_in6 *, u_int8_t, u_int16_t,
-			 u_int32_t, u_int32_t));
+			 u_int16_t, u_int16_t));
 int mip6_bc_send_bm			__P((struct mbuf *,
 					     struct in6_addr *));
 int mip6_dad_success			__P((struct ifaddr *));
@@ -575,7 +572,7 @@ int mip6_get_nonce __P((int, mip6_nonce_t *));
 int mip6_get_nodekey __P((int, mip6_nodekey_t *));
 int mip6_is_valid_bu (struct ip6_hdr *, struct ip6m_binding_update *,
 		      int, struct mip6_mobility_options *,
-		      struct sockaddr_in6 *);
+		      struct sockaddr_in6 *, struct sockaddr_in6 *);
 int mip6_get_mobility_options __P((struct ip6m_binding_update *,
 				   int, struct mip6_mobility_options *));
 void mip6_create_cookie __P((struct in6_addr *,

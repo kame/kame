@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.72 2002/06/09 16:29:54 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.73 2002/08/05 11:49:16 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -318,22 +318,20 @@ struct ind_neighbor_advert {	/* inverse neighbor advertisement */
 
 struct ha_discov_req {          /* HA Address Discovery Request */
 	struct icmp6_hdr	ha_dreq_hdr;
-#ifdef MIP6_DRAFT13
-	u_int32_t		ha_dreq_reserved1;
 	u_int32_t		ha_dreq_reserved2;
-	struct in6_addr		ha_dreq_home;	/* MN home address */
-#endif /* MIP6_DRAFT13 */
+	u_int32_t		ha_dreq_reserved3;
 } __attribute__((__packed__));
 
 #define discov_req_type		ha_dreq_hdr.icmp6_type
 #define discov_req_code		ha_dreq_hdr.icmp6_code
 #define discov_req_cksum	ha_dreq_hdr.icmp6_cksum
 #define discov_req_id		ha_dreq_hdr.icmp6_data16[0]
+#define discov_req_reserved1	ha_dreq_hdr.icmp6_data16[1]
 
 struct ha_discov_rep {		/* HA Address Discovery Reply */
 	struct icmp6_hdr	ha_drep_hdr;
-	u_int32_t		ha_drep_reserved1;
 	u_int32_t		ha_drep_reserved2;
+	u_int32_t		ha_drep_reserved3;
 	/* could be followed by Home Agent addresses */
 } __attribute__((__packed__));
 
@@ -341,6 +339,7 @@ struct ha_discov_rep {		/* HA Address Discovery Reply */
 #define discov_rep_code		ha_drep_hdr.icmp6_code
 #define discov_rep_cksum	ha_drep_hdr.icmp6_cksum
 #define discov_rep_id		ha_drep_hdr.icmp6_data16[0]
+#define discov_rep_reserved1	ha_drep_hdr.icmp6_data16[1]
 
 struct mobile_prefix_solicit {	/* Mobile Prefix Solicitation */
 	struct icmp6_hdr	mp_sol_hdr;
@@ -349,7 +348,8 @@ struct mobile_prefix_solicit {	/* Mobile Prefix Solicitation */
 #define mp_sol_type		mp_sol_hdr.icmp6_type
 #define mp_sol_code		mp_sol_hdr.icmp6_code
 #define mp_sol_cksum		mp_sol_hdr.icmp6_cksum
-#define mp_sol_reserved		mp_sol_hdr.icmp6_data32[0]
+#define mp_sol_id		mp_sol_hdr.icmp6_data16[0]
+#define mp_sol_reserved		mp_sol_hdr.icmp6_data16[1]
 
 struct mobile_prefix_advert {	/* Mobile Prefix Advertisement */
 	struct icmp6_hdr	mp_adv_hdr;
@@ -358,7 +358,8 @@ struct mobile_prefix_advert {	/* Mobile Prefix Advertisement */
 #define mp_adv_type		mp_adv_hdr.icmp6_type
 #define mp_adv_code		mp_adv_hdr.icmp6_code
 #define mp_adv_cksum		mp_adv_hdr.icmp6_cksum
-#define mp_adv_opts		mp_adv_hdr.icmp6_data8
+#define mp_adv_id		mp_adv_hdr.icmp6_data16[0]
+#define mp_adv_opts		mp_adv_hdr.icmp6_data16[1]
 
 struct nd_opt_hdr {		/* Neighbor discovery option header */
 	u_int8_t	nd_opt_type;

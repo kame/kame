@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.44 2002/08/02 08:15:34 k-sugyou Exp $	*/
+/*	$KAME: dest6.c,v 1.45 2002/08/05 11:49:16 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,6 +70,9 @@
 #endif /* MIP6 */
 
 #ifdef MIP6
+static int	dest6_swap_hao __P((struct ip6_hdr *, struct ip6aux *,
+				    struct ip6_opt_home_address *));
+static int	dest6_nextopt __P((struct mbuf *, int, struct ip6_opt *));
 static int	dest6_send_be __P((struct sockaddr_in6 *,
 				   struct sockaddr_in6 *,
 				   struct sockaddr_in6 *));
@@ -93,10 +96,12 @@ dest6_input(mp, offp, proto)
 	u_int8_t *opt;
 #ifdef MIP6
 	struct mbuf *n;
-	struct ip6_opt_home_address *haopt = NULL;
 	struct sockaddr_in6 *src_sa, *dst_sa, home_sa;
+	struct ip6_opt_home_address *haopt;
 	struct ip6aux *ip6a = NULL;
 	struct ip6_hdr *ip6;
+	struct mip6_bc *mbc;
+	int verified;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif
@@ -175,44 +180,6 @@ dest6_input(mp, offp, proto)
 			if (scope6_check_id(&home_sa, ip6_use_defzone)
 			    != 0)
 				goto bad;
-
-			/* check whether this HAO is 'verified'. */
-			if (mip6_bc_list_find_withphaddr(
-				&mip6_bc_list, &home_sa) != NULL) {
-				/*
-				 * we have a corresponding binding
-				 * cache entry for the home address
-				 * includes in this HAO.
-				 */
-				goto verified;
-			}
-			/* next, check if we have a ESP header.  */
-#if 0
-			if (dstopts->ip6d_nxt == IPPROTO_ESP) {
-				/*
-				 * this packet is protected by ESP.
-				 * leave the validation to the ESP
-				 * processing routine.
-				 */
-				goto verified;
-			}
-#else
-			goto verified;
-#endif
-			/*
-			 * we have neither a corresponding binding
-			 * cache nor ESP header. we have no clue to
-			 * beleive this HAO is a correct one.
-			 */
-			(void)dest6_send_be(dst_sa, src_sa, &home_sa);
-			goto bad;
-		verified:
-
-			/* store the CoA in a aux. */
-			bcopy(&ip6a->ip6a_src.sin6_addr, &ip6a->ip6a_coa,
-			    sizeof(ip6a->ip6a_coa));
-			ip6a->ip6a_flags |= IP6A_HASEEN;
-
 			/*
 			 * reject invalid home-addresses
 			 */
@@ -226,6 +193,27 @@ dest6_input(mp, offp, proto)
 				goto bad;
 			}
 
+			bcopy(&home_sa.sin6_addr, &ip6a->ip6a_coa,
+			    sizeof(ip6a->ip6a_coa));
+			ip6a->ip6a_flags |= IP6A_HASEEN;
+
+			/* check whether this HAO is 'verified'. */
+			if ((mbc = mip6_bc_list_find_withphaddr(
+				&mip6_bc_list, &home_sa)) != NULL) {
+				/*
+				 * we have a corresponding binding
+				 * cache entry for the home address
+				 * includes in this HAO.
+				 */
+				if (SA6_ARE_ADDR_EQUAL(&mbc->mbc_pcoa,
+				    &home_sa))
+					verified = 1;
+			}
+			/*
+			 * we have neither a corresponding binding
+			 * cache nor ESP header. we have no clue to
+			 * beleive this HAO is a correct one.
+			 */
 			/*
 			 * Currently, no valid sub-options are
 			 * defined for use in a Home Address option.
@@ -245,26 +233,8 @@ dest6_input(mp, offp, proto)
 
 #ifdef MIP6
 	/* if haopt is non-NULL, we are sure we have seen fresh HA option */
-	if (haopt && ip6a &&
-	    (ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) == IP6A_HASEEN) {
-		/* XXX should we do this at all?  do it now or later? */
-		/* XXX interaction with 2292bis IPV6_RECVDSTOPT */
-		/* XXX interaction with ipsec - should be okay */
-		/* XXX icmp6 responses is modified - which is bad */
-		bcopy(haopt->ip6oh_addr, &ip6->ip6_src,
-		    sizeof(ip6->ip6_src));
-		bcopy(haopt->ip6oh_addr, &ip6a->ip6a_src.sin6_addr,
-		    sizeof(ip6a->ip6a_src.sin6_addr));
-		bcopy(&ip6a->ip6a_coa, haopt->ip6oh_addr,
-		    sizeof(haopt->ip6oh_addr));
-#if 0
-		/* XXX linklocal address is (currently) not supported */
-		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
-			ip6->ip6_src.s6_addr16[1]
-				= htons(m->m_pkthdr.rcvif->if_index);
-#endif
-		ip6a->ip6a_flags |= IP6A_SWAP;
-	}
+	if (verified)
+		dest6_swap_hao(ip6, ip6a, haopt);
 #endif /* MIP6 */
 
 	*offp = off;
@@ -276,6 +246,130 @@ dest6_input(mp, offp, proto)
 }
 
 #ifdef MIP6
+static int
+dest6_swap_hao(ip6, ip6a, haopt)
+struct ip6_hdr *ip6;
+struct ip6aux *ip6a;
+struct ip6_opt_home_address *haopt;
+{
+
+	if ((ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) != IP6A_HASEEN)
+		return (EINVAL);
+
+	/* XXX should we do this at all?  do it now or later? */
+	/* XXX interaction with 2292bis IPV6_RECVDSTOPT */
+	/* XXX interaction with ipsec - should be okay */
+	/* XXX icmp6 responses is modified - which is bad */
+	bcopy(&ip6->ip6_src, &ip6a->ip6a_coa, sizeof(ip6a->ip6a_coa));
+	bcopy(haopt->ip6oh_addr, &ip6->ip6_src, sizeof(ip6->ip6_src));
+	bcopy(haopt->ip6oh_addr, &ip6a->ip6a_src.sin6_addr,
+	    sizeof(ip6a->ip6a_src.sin6_addr));
+	bcopy(&ip6a->ip6a_coa, haopt->ip6oh_addr, sizeof(haopt->ip6oh_addr));
+#if 0
+	/* XXX linklocal address is (currently) not supported */
+	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
+		ip6->ip6_src.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+#endif
+	ip6a->ip6a_flags |= IP6A_SWAP;
+
+	return (0);
+}
+
+static int
+dest6_nextopt(m, off, ip6o)
+	struct mbuf *m;
+	int off;
+	struct ip6_opt *ip6o;
+{
+	u_int8_t type;
+
+	if (ip6o->ip6o_type != IP6OPT_PAD1)
+		off += 2 + ip6o->ip6o_len;
+	else
+		off += 1;
+	if (m->m_pkthdr.len < off + 1)
+		return -1;
+	m_copydata(m, off, sizeof(type), (caddr_t)&type);
+
+	switch (type) {
+	case IP6OPT_PAD1:
+		ip6o->ip6o_type = type;
+		ip6o->ip6o_len = 0;
+		return off;
+	default:
+		if (m->m_pkthdr.len < off + 2)
+			return -1;
+		m_copydata(m, off, sizeof(ip6o), (caddr_t)&ip6o);
+		if (m->m_pkthdr.len < off + 2 + ip6o->ip6o_len)
+			return -1;
+		return off;
+	}
+}
+
+int
+dest6_mip6_hao(m, nxt)
+struct mbuf *m;
+int nxt;
+{
+	struct ip6_hdr *ip6;
+	struct ip6aux *ip6a;
+	struct ip6_opt ip6o;
+	struct mbuf *n;
+	struct sockaddr_in6 home_sa;
+	struct ip6_opt_home_address haopt;
+	int newoff, off, proto;
+
+	if (!MIP6_IS_MN)
+		return (0);
+	if ((nxt == IPPROTO_HOPOPTS) || (nxt == IPPROTO_DSTOPTS)) {
+		return (0);
+	}
+	n = ip6_findaux(m);
+	if (!n)
+		return (0);
+	ip6a = mtod(n, struct ip6aux *);
+
+	if ((ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) != IP6A_HASEEN)
+		return (0);
+
+
+	ip6 = mtod(m, struct ip6_hdr *);
+	/* find home address */
+	proto = IPPROTO_IPV6;
+	while (1) {
+		int nxt;
+		newoff = ip6_nexthdr(m, off, proto, &nxt);
+		if (newoff < 0 || newoff < off)
+			return (0);	/* XXX */
+		if (nxt == IPPROTO_DSTOPTS)
+			break;
+
+		off = newoff;
+		proto = nxt;
+	}
+	ip6o.ip6o_type = IP6OPT_PADN;
+	ip6o.ip6o_len = 0;
+	while (1) {
+		newoff = dest6_nextopt(m, off, &ip6o);
+		if (newoff < 0)
+			return (0);	/* XXX */
+		if (ip6o.ip6o_type == IP6OPT_HOME_ADDRESS)
+			break;
+		off = newoff;
+	}
+	m_copydata(m, off, sizeof(haopt), (caddr_t)&haopt);
+
+	if (nxt == IPPROTO_AH || nxt == IPPROTO_ESP || nxt == IPPROTO_MOBILITY)
+		return dest6_swap_hao(ip6, ip6a, &haopt);
+
+	/* reject */
+	home_sa = ip6a->ip6a_src;
+	home_sa.sin6_addr = *(struct in6_addr *)haopt.ip6oh_addr;
+	dest6_send_be(&ip6a->ip6a_dst, &ip6a->ip6a_src, &home_sa);
+
+	return (-1);
+}
+
 /*
  * send a binding error message.
  */
