@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.65 2002/12/06 01:41:29 suz Exp $	*/
+/*	$KAME: common.c,v 1.66 2002/12/29 00:22:55 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1411,10 +1411,10 @@ duidstr(duid)
 {
 	int i;
 	char *cp;
-	static char duidstr[sizeof("xx:") * 256 + sizeof("...")];
+	static char duidstr[sizeof("xx:") * 128 + sizeof("...")];
 
 	cp = duidstr;
-	for (i = 0; i < duid->duid_len && i <= 256; i++) {
+	for (i = 0; i < duid->duid_len && i <= 128; i++) {
 		cp += sprintf(cp, "%s%02x", i == 0 ? "" : ":",
 			      duid->duid_id[i] & 0xff);
 	}

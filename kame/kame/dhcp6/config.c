@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.21 2002/09/24 14:20:49 itojun Exp $	*/
+/*	$KAME: config.c,v 1.22 2002/12/29 00:22:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -419,7 +419,7 @@ configure_duid(str, duid)
 	if ((slen % 3) != 0)
 		goto bad;
 	duidlen += (slen / 3);
-	if (duidlen > 256) {
+	if (duidlen > 128) {
 		dprintf(LOG_ERR, "%s" "too long DUID (%d)", FNAME, duidlen);
 		return (-1);
 	}
