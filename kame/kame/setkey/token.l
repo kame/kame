@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.18 2001/02/16 23:48:46 thorpej Exp $	*/
+/*	$KAME: token.l,v 1.19 2001/03/12 09:02:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -166,6 +166,9 @@ hmac-md5	{ PREPROC; yylval.num = SADB_AALG_MD5HMAC; return(ALG_AUTH); }
 hmac-sha1	{ PREPROC; yylval.num = SADB_AALG_SHA1HMAC; return(ALG_AUTH); }
 keyed-md5	{ PREPROC; yylval.num = SADB_X_AALG_MD5; return(ALG_AUTH); }
 keyed-sha1	{ PREPROC; yylval.num = SADB_X_AALG_SHA; return(ALG_AUTH); }
+hmac-sha2-256	{ PREPROC; yylval.num = SADB_X_AALG_SHA2_256; return(ALG_AUTH); }
+hmac-sha2-384	{ PREPROC; yylval.num = SADB_X_AALG_SHA2_384; return(ALG_AUTH); }
+hmac-sha2-512	{ PREPROC; yylval.num = SADB_X_AALG_SHA2_512; return(ALG_AUTH); }
 null		{ PREPROC; yylval.num = SADB_X_AALG_NULL; return(ALG_AUTH); }
 
 	/* encryption alogorithm */
