@@ -26,10 +26,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.c,v 1.11 2000/01/09 01:31:28 itojun Exp $ */
+/* YIPS @(#)$Id: misc.c,v 1.12 2000/02/23 06:56:39 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/stat.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -160,5 +161,21 @@ debug_location(file, line, func)
 		snprintf(buf, sizeof(buf), "%s:%d", p, line);
 
 	return buf;
+}
+
+/*
+ * get file size.
+ * -1: error occured.
+ */
+int
+getfsize(path)
+	char *path;
+{
+        struct stat st;
+
+        if (stat(path, &st) != 0)
+                return -1;
+        else
+                return st.st_size;
 }
 
