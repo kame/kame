@@ -1,4 +1,4 @@
-$Id: question,v 1.23 2000/09/22 16:53:07 itojun Exp $
+$Id: question,v 1.24 2000/09/23 05:31:24 itojun Exp $
 
 Q: how may policy matters are.  can we interoperate ?
 
@@ -513,3 +513,26 @@ with this:
     (ke: key len=128)
     (id: idtype=IPv6 protoid=tcp port=0 len=16 3ffe:501:ffff:0:250:daff:fe87:4bbe)
     (id: idtype=IPv6 protoid=tcp port=0 len=16 3ffe:501:ffff:0:2a0:ccff:fe3c:4093)
+
+Q: IPComp SA with wellknown CPI in CPI field.  how to handle it?
+  with the current code, wellknown CPI will be installed as is, because:
+  - racoon can negotiate an IPComp SA with wellknown CPI, and installs it as is
+  - the kernel have no check about it
+  however, by doing so we will have CPI (SPI) conflict on rekey, or with
+  multiple peers.
+
+  there could be couple of stragegies from implementation point of view
+  (workaround):
+  (1) do not install IPComp SA if we negotiated it with wellknown CPI.
+      this will introduce another trouble: no trigger for rekey, due to
+      no lifetime management on the IPComp SA.
+  (2) install IPComp SA with fabricated (local) CPI, with RAWCPI option flag
+      raised.  confusing...
+  the problem is not unique to racoon, it is a generic problem.
+  protocol-wise, we could have couple of fixes:
+  (1) never negotiate an IPComp SA with a wellknown CPI.
+  (2) disambiguate IPComp SA by using other attributes, like lifetime,
+      installation timestamp or whatever.
+  (3) always IPComp as a addendum to ESP/AH.  do not treat it as an independent
+      SA.
+  I'm in favor of (1).
