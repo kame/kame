@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.21 2004/05/25 02:11:36 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.22 2004/05/25 02:17:34 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3401,13 +3401,13 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 #if 0
 			if (imm) {
 				LIST_INSERT_HEAD(in6m->, imm,
-				i6mm_chain);
+				    i6mm_chain);
 			} else {
 				nd6log((LOG_WARNING,
-				"in6_modmulti: addmulti failed for "
-				"%s on %s (errno=%d)\n",
-				ip6_sprintf(&in6m->in6m_addr),
-				if_name(in6m->in6m_ifp), *error));
+				    "in6_modmulti: addmulti failed for "
+				    "%s on %s (errno=%d)\n",
+				    ip6_sprintf(&in6m->in6m_addr),
+				    if_name(in6m->in6m_ifp), *error));
 			}
 #endif
 		}
