@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/08 01:33:22 $
+		     $Date: 2000/01/30 12:34:20 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -49,7 +49,7 @@ specify the "alias" argument to keep the link-local address.
 # ifconfig de0 inet6 3ffe:501:808:1:200:f8ff:fe01:6317 alias
 # ifconfig de0
 de0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
-        inet6 fe80:1::200:f8ff:fe01:6317 prefixlen 64 
+        inet6 fe80::200:f8ff:fe01:6317@de0 prefixlen 64 scopeid 0x1
         inet 163.221.202.12 netmask 0xffffff00 broadcast 163.221.202.255
         inet6 3ffe:501:808:1:200:f8ff:fe01:6317 prefixlen 64 
         ether 00:00:f8:01:63:17 
@@ -80,7 +80,7 @@ as follows:
 # prefix de0 3ffe:501:808:1::
 # ifconfig de0
 de0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
-        inet6 fe80:1::200:f8ff:fe01:6317 prefixlen 64 
+        inet6 fe80::200:f8ff:fe01:6317@de0 prefixlen 64 scopeid 0x1
         inet 163.221.202.12 netmask 0xffffff00 broadcast 163.221.202.255
         inet6 3ffe:501:808:1:200:f8ff:fe01:6317 prefixlen 64 
         ether 00:00:f8:01:63:17 
@@ -105,14 +105,14 @@ Suppose that current state of before renumbering as follows:
 
 # ifconfig de0
 de0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
-        inet6 fe80:1::200:f8ff:fe01:6317 prefixlen 64 
+        inet6 fe80::200:f8ff:fe01:6317@de0 prefixlen 64 scopeid 0x1
         inet 163.221.202.12 netmask 0xffffff00 broadcast 163.221.202.255
         inet6 3ffe:501:808:1:200:f8ff:fe01:6317 prefixlen 64 
         ether 00:00:f8:01:63:17 
         media: 100baseTX status: active
 # ifconfig de1
 de1: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
-        inet6 fe80:1::200:f8ff:fe55:7011 prefixlen 64 
+        inet6 fe80::200:f8ff:fe55:7011@de1 prefixlen 64 scopeid 0x2
         inet 163.221.203.12 netmask 0xffffff00 broadcast 163.221.203.255
         inet6 3ffe:501:808:2:200:f8ff:fe55:7011 prefixlen 64 
         ether 00:00:f8:55:70:11
@@ -134,14 +134,14 @@ follows.
 
 # ifconfig de0
 de0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
-        inet6 fe80:1::200:f8ff:fe01:6317 prefixlen 64 
+        inet6 fe80::200:f8ff:fe01:6317@de0 prefixlen 64 scopeid 0x1
         inet 163.221.202.12 netmask 0xffffff00 broadcast 163.221.202.255
         inet6 3ffe:501:4819:1:200:f8ff:fe01:6317 prefixlen 64 
         ether 00:00:f8:01:63:17 
         media: 100baseTX status: active
 # ifconfig de1
 de1: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
-        inet6 fe80:1::200:f8ff:fe55:7011 prefixlen 64 
+        inet6 fe80::200:f8ff:fe55:7011@de1 prefixlen 64 scopeid 0x2
         inet 163.221.203.12 netmask 0xffffff00 broadcast 163.221.203.255
         inet6 3ffe:501:4819:2:200:f8ff:fe55:7011 prefixlen 64 
         ether 00:00:f8:55:70:11
@@ -171,9 +171,11 @@ is assumed for "prefixlen" to get along with the aggregatable address.
 
 Note that, in IPv6, link-local address should be used as gateway
 ("fe80:2::200:a2ff:fe0e:7543" in the above).  If you use global addresses,
-icmp6 redirect may not work properly.  For ease of configuration we recommend
-you to avoid static routes and run a routing daemon (route6d for example)
-instead.
+icmp6 redirect may not work properly.  Also note that we use special form
+of link-local address as gateway.  see chapter 1.3 in IMPLEMENTATION for
+more detail.
+For ease of configuration we recommend you to avoid static routes and run
+a routing daemon (route6d for example) instead.
 
 <<<ping6>>>
 
@@ -183,10 +185,10 @@ for its argument.
 % ping6 -I ed0 ff02::1
 
 PING6(56=40+8+8 bytes) fe80::5254:ff:feda:cb7d --> ff02::1
-56 bytes from fe80::5254:ff:feda:cb7d, icmp_seq=0 hlim=64 time=0.25 ms
-56 bytes from fe80::2a0:c9ff:fe84:ed6c, icmp_seq=0 hlim=64 time=1.333 ms(DUP!)
-56 bytes from fe80::5254:ff:feda:d161, icmp_seq=0 hlim=64 time=1.459 ms(DUP!)
-56 bytes from fe80::260:97ff:fec2:80bf, icmp_seq=0 hlim=64 time=1.538 ms(DUP!)
+56 bytes from fe80::5254:ff:feda:cb7d@lo0, icmp_seq=0 hlim=64 time=0.25 ms
+56 bytes from fe80::2a0:c9ff:fe84:ed6c@ed0, icmp_seq=0 hlim=64 time=1.333 ms(DUP!)
+56 bytes from fe80::5254:ff:feda:d161@ed0, icmp_seq=0 hlim=64 time=1.459 ms(DUP!)
+56 bytes from fe80::260:97ff:fec2:80bf@ed0, icmp_seq=0 hlim=64 time=1.538 ms(DUP!)
 56 bytes from 3ffe:501:4819:2000:5054:ff:fedb:aa46, icmp_seq=0 hlim=255 time=1.615 ms(DUP!)
 
 <<<ping6 -w>>>
@@ -231,9 +233,9 @@ Neighbor                      Linklayer Address   Netif Expire    St Flgs Prbs
 nr60.v6.kame.net              0:60:97:c2:80:bf      ed0  expired   S    R 
 3ffe:501:4819:2000:2c0:cff:fe 0:c0:c:10:3a:53       ed0  permanent R      
 paradise.v6.kame.net          52:54:0:dc:52:17      ed0  expired   S    R 
-fe80:1::200:eff:fe49:f929     0:0:e:49:f9:29        ed0  expired   S    R 
-fe80:1::200:86ff:fe05:80da    0:0:86:5:80:da        ed0  expired   S      
-fe80:1::200:86ff:fe05:c2d8    0:0:86:5:c2:d8        ed0  9s        R      
+fe80::200:eff:fe49:f929@ed0     0:0:e:49:f9:29      ed0  expired   S    R 
+fe80::200:86ff:fe05:80da@ed0    0:0:86:5:80:da      ed0  expired   S      
+fe80::200:86ff:fe05:c2d8@ed0    0:0:86:5:c2:d8      ed0  9s        R      
 
 To flush the all NDP cache, execute the following by root.
 
@@ -265,14 +267,14 @@ addresses, use "rtsol".
 ef0: flags=8863<UP,BROADCAST,NOTRAILERS,RUNNING,SIMPLEX,MULTICAST>
         link type ether 0:a0:24:ab:83:9b mtu 1500 speed 10Mbps
         media 10baseT status active
-        inet6 fe80:2::2a0:24ff:feab:839b prefixlen 64
+        inet6 fe80::2a0:24ff:feab:839b@ef0 prefixlen 64 scopeid 0x2
 
 # rtsol ef0
 # ifconfig ef0
 ef0: flags=8863<UP,BROADCAST,NOTRAILERS,RUNNING,SIMPLEX,MULTICAST>
         link type ether 0:a0:24:ab:83:9b mtu 1500 speed 10Mbps
         media 10baseT status active
-        inet6 fe80:2::2a0:24ff:feab:839b prefixlen 64
+        inet6 fe80::2a0:24ff:feab:839b@ef0 prefixlen 64 scopeid 0x2
         inet6 3ffe:501:4819:2000:2a0:24ff:feab:839b prefixlen 64
 
 <<<rtsold>>>
