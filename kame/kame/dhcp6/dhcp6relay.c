@@ -230,6 +230,7 @@ relay6_init()
 		/* NOTREACHED */
 	}
 	memcpy(&sa6_all_servers, res->ai_addr, sizeof(sa6_all_servers));
+	freeaddrinfo(res);
 
 	/* initialize send/receive buffer */
 	iov[0].iov_base = (caddr_t)rdatabuf;
