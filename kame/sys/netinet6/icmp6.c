@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.285 2002/02/09 05:17:13 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.286 2002/02/28 13:25:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -336,7 +336,7 @@ icmp6_error(m, type, code, param)
 	struct icmp6_hdr *icmp6;
 	struct mbuf *n;
 	struct ip6aux *ip6a;
-	struct in6_addr nip6_src, *nip6_srcp;
+	struct sockaddr_in6 *src_sa, *dst_sa;
 	u_int preplen;
 	int off;
 	int nxt;
@@ -363,6 +363,9 @@ icmp6_error(m, type, code, param)
 	}
 #endif
 	oip6 = mtod(m, struct ip6_hdr *);
+	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
+		goto freeit;
+	}
 
 	/*
 	 * If the destination address of the erroneous packet is a multicast
@@ -386,8 +389,8 @@ icmp6_error(m, type, code, param)
 	 * RFC 2463, 2.4 (e.5): source address check.
 	 * XXX: the case of anycast source?
 	 */
-	if (IN6_IS_ADDR_UNSPECIFIED(&oip6->ip6_src) ||
-	    IN6_IS_ADDR_MULTICAST(&oip6->ip6_src))
+	if (SA6_IS_ADDR_UNSPECIFIED(src_sa) ||
+	    IN6_IS_ADDR_MULTICAST(&src_sa->sin6_addr))
 		goto freeit;
 
 	/*
@@ -438,9 +441,12 @@ icmp6_error(m, type, code, param)
 	}
 
 	oip6 = mtod(m, struct ip6_hdr *); /* adjust pointer */
+	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
+		goto freeit;
+	}
 
 	/* Finally, do rate limitation check. */
-	if (icmp6_ratelimit(&oip6->ip6_src, type, code)) {
+	if (icmp6_ratelimit(&src_sa->sin6_addr, type, code)) {
 		icmp6stat.icp6s_toofreq++;
 		goto freeit;
 	}
@@ -459,14 +465,11 @@ icmp6_error(m, type, code, param)
 	 * icmp6 error packet correct that not swapping ip6_src and
 	 * homeaddr in the dest6 processing.
 	 */
-	nip6_srcp = &oip6->ip6_src;
 	n = ip6_findaux(m);
 	if (n != NULL) {
 		ip6a = mtod(n, struct ip6aux *);
 		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0 &&
 		    (ip6a->ip6a_flags & IP6A_SWAP) != 0) {
-			nip6_src = oip6->ip6_src;
-			nip6_srcp = &nip6_src;
 			if (icmp6_recover_src(m)) {
 				/* mbuf is freed in icmp6_recover_src */
 				return;
@@ -488,8 +491,8 @@ icmp6_error(m, type, code, param)
 	}
 
 	nip6 = mtod(m, struct ip6_hdr *);
-	nip6->ip6_src  = *nip6_srcp;
-	nip6->ip6_dst  = oip6->ip6_dst;
+	nip6->ip6_src  = src_sa->sin6_addr;
+	nip6->ip6_dst  = dst_sa->sin6_addr;
 
 	in6_clearscope(&oip6->ip6_src);
 	in6_clearscope(&oip6->ip6_dst);
@@ -3415,6 +3418,7 @@ icmp6_recover_src(m)
 {
 	int off, nxt, finished = 0;
 	struct ip6_hdr *oip6;
+	struct sockaddr_in6 *src_sa, *dst_sa;
 	struct ip6_ext *exts;
 	struct ip6_dest *dstopts;
 	int dstoptlen;
@@ -3434,6 +3438,10 @@ icmp6_recover_src(m)
 		goto bad;
 	}
 #endif
+	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
+		error = EINVAL; /* XXX ? */
+		goto bad;
+	}
 
 	off = sizeof(struct ip6_hdr);
 	nxt = oip6->ip6_nxt;
@@ -3496,9 +3504,11 @@ icmp6_recover_src(m)
 					/* swap */
 					bcopy(haopt->ip6oh_addr, &t,
 					      sizeof(haopt->ip6oh_addr));
-					bcopy(&oip6->ip6_src,
+					bcopy(&src_sa->sin6_addr,
 					      haopt->ip6oh_addr,
-					      sizeof(oip6->ip6_src));
+					      sizeof(src_sa->sin6_addr));
+					bcopy(&t, &src_sa->sin6_addr,
+					      sizeof(t));
 					bcopy(&t, &oip6->ip6_src,
 					      sizeof(t));
 					finished = 1;
