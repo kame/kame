@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.65 2000/07/16 08:26:47 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.66 2000/07/18 00:36:26 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -975,7 +975,7 @@ pk_recvupdate(mhp)
 	int incomplete = 0;
 	struct saproto *pr;
 
-	/* ignore this message becauase of local test mode. */
+	/* ignore this message because of local test mode. */
 	if (f_local)
 		return 0;
 
