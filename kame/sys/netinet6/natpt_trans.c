@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.20 2001/03/18 10:02:14 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.21 2001/03/20 13:08:56 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -816,7 +816,10 @@ translatingUDPv4To6(struct _cv *cv4, struct pAddr *pad)
 
     bzero(&cv6, sizeof(struct _cv));
     m6 = translatingTCPUDPv4To6(cv4, pad, &cv6);
+    cv6._ip._ip6->ip6_nxt = IPPROTO_UDP;
     cv6.ip_p = cv6.ip_payload = IPPROTO_UDP;
+
+    adjustUpperLayerChecksum(IPPROTO_IPV4, IPPROTO_UDP, &cv6, cv4);
 
     return (m6);
 }
