@@ -93,7 +93,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	struct servent *sp;
 	struct hostent *hp;
 	u_short port;
-	int family, len, i;
+	int family, i;
 	char *addr, *p;
 	u_long v4a;
 	int h_error;
@@ -103,8 +103,10 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	if (sa == NULL)
 		return ENI_NOSOCKET;
 
-	len = sa->sa_len;
-	if (len != salen) return ENI_SALEN;
+#if 1	/*XXX*/
+	if (sa->sa_len != salen)
+		return ENI_SALEN;
+#endif
 	
 	family = sa->sa_family;
 	for (i = 0; afdl[i].a_af; i++)
@@ -115,7 +117,8 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	return ENI_FAMILY;
 	
  found:
-	if (len != afd->a_socklen) return ENI_SALEN;
+	if (salen != afd->a_socklen)
+		return ENI_SALEN;
 	
 	port = ((struct sockinet *)sa)->si_port; /* network byte order */
 	addr = (char *)sa + afd->a_off;
