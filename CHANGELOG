@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.239 1999/11/01 12:39:21 itojun Exp $
+$Id: CHANGELOG,v 1.240 1999/11/01 13:09:17 itojun Exp $
 
 <199911>
 Mon Nov  1 21:29:59 JST 1999  itojun@iijlab.net
-	* netbsd/pkgsrc/net/mrt, freebsd2/ports/mrt: upgrade to 2.0.1a.
+	* netbsd/pkgsrc/net/mrt, freebsd[23]/ports/mrt: upgrade to 2.0.1a.
 
 Mon Nov  1 13:34:07 JST 1999  itojun@iijlab.net
 	* freebsd2/ports/openssl: port directory for OpenSSL 0.9.4.  required
