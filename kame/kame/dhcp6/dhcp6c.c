@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.107 2003/01/23 05:16:57 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.108 2003/01/23 06:13:33 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -445,7 +445,7 @@ free_resources()
 
 			if (ev->state == DHCP6S_RELEASE)
 				continue; /* keep it for now */
-			
+
 			dhcp6_remove_event(ev);
 		}
 
