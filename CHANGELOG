@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1206 2000/08/16 03:03:20 jinmei Exp $
+$KAME: CHANGELOG,v 1.1207 2000/08/16 06:43:37 itojun Exp $
 
 <200008>
+Wed Aug 16 15:41:28 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/wget: upgrade to latest IPv6 patch.
+	  IPv6 FTP is now available.
+
 2000-08-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sbin/ifconfig/ifconfig.c: set some IPv6 related parameters
 	to a correct variable. Without this fix, for example, an IPv6
