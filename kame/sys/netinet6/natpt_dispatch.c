@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.46 2002/03/25 07:21:14 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.47 2002/03/28 07:30:03 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -457,8 +457,10 @@ natpt_config4(struct mbuf *m, struct pcv *cv4)
 	case IPPROTO_UDP:
 		hdrsz = sizeof(struct udphdr);
 		goto wayOut;
+
+	default:
+		goto wayOut;
 	}
-	return (IPPROTO_IP);
 
  wayOut:;
 

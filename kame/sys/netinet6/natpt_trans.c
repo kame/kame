@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.87 2002/03/27 14:06:15 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.88 2002/03/28 07:30:03 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -174,6 +174,7 @@ int		 natpt_icmp4MimicPayload	__P((struct pcv *, struct pcv *,
 					     struct pAddr *));
 struct mbuf	*natpt_translateTCPv4To6	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateUDPv4To6	__P((struct pcv *, struct pAddr *));
+struct mbuf	*natpt_translateUNKNOWNv4To6	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateTCPUDPv4To6 __P((struct pcv *, struct pAddr *,
 					     struct pcv *));
 void		 natpt_translatePYLD4To6	__P((struct pcv *));
@@ -804,6 +805,10 @@ natpt_translateIPv4To6(struct pcv *cv4, struct pAddr *pad)
 	case IPPROTO_UDP:
 		m6 = natpt_translateUDPv4To6(cv4, pad);
 		break;
+
+	default:
+		m6 = natpt_translateUNKNOWNv4To6(cv4, pad);
+		break;
 	}
 
 	if (m6)
@@ -1208,6 +1213,21 @@ natpt_translateUDPv4To6(struct pcv *cv4, struct pAddr *pad)
 
 
 struct mbuf *
+natpt_translateUNKNOWNv4To6(struct pcv *cv4, struct pAddr *pad)
+{
+	struct pcv	cv6;
+	struct mbuf	*m6;
+
+	bzero(&cv6, sizeof(struct pcv));
+	if ((m6 = natpt_translateTCPUDPv4To6(cv4, pad, &cv6)) == NULL)
+		return (NULL);
+
+	cv6.ip_p = cv4->ip_p;
+	return (m6);
+}
+
+
+struct mbuf *
 natpt_translateTCPUDPv4To6(struct pcv *cv4, struct pAddr *pad, struct pcv *cv6)
 {
 	struct mbuf	*m6;
@@ -1258,8 +1278,11 @@ natpt_translateTCPUDPv4To6(struct pcv *cv4, struct pAddr *pad, struct pcv *cv6)
 		cv6->pyld.caddr += sizeof(struct ip6_frag);
 
 	bcopy(cv4->pyld.caddr, cv6->pyld.caddr, cv4->plen);
-	cv6->pyld.tcp6->th_sport = pad->port[1];
-	cv6->pyld.tcp6->th_dport = pad->port[0];
+	if ((cv4->ip_p == IPPROTO_TCP)
+	    || (cv4->ip_p == IPPROTO_UDP)) {
+		cv6->pyld.tcp6->th_sport = pad->port[1];
+		cv6->pyld.tcp6->th_dport = pad->port[0];
+	}
 
 	m6->m_pkthdr.len = m6->m_len = hdrsz + cv4->plen;
 	return (m6);
