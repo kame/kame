@@ -1,4 +1,4 @@
-/*	$KAME: if_sec.c,v 1.2 2001/07/25 09:10:01 itojun Exp $	*/
+/*	$KAME: if_sec.c,v 1.3 2001/07/25 09:23:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -126,7 +126,7 @@ sec_create(unit)
 
 	/* monotonically-increasing unit number */
 	if (i == 0) {
-		if (sec_maxunit < 0)
+		if (0 > sec_maxunit)
 			i = 0;
 		else
 			i = sec_maxunit + 1;
