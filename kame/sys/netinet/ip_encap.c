@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.15 2000/02/26 18:08:36 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.16 2000/03/06 04:34:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -150,10 +150,19 @@ encap4_input(m, va_alist)
 	for (ep = LIST_FIRST(&encaptab); ep; ep = LIST_NEXT(ep, chain)) {
 		if (ep->proto >= 0 && ep->proto != proto)
 			continue;
-		/* it's inbound traffic, we need to match in reverse order */
-		if (mask_match(ep, (struct sockaddr *)&d,
-		    (struct sockaddr *)&s) == 0)
-			continue;
+
+		if (ep->func) {
+			if ((*ep->func)(m, off, proto, ep->arg) == 0)
+				continue;
+		} else {
+			/*
+			 * it's inbound traffic, we need to match in reverse
+			 * order
+			 */
+			if (mask_match(ep, (struct sockaddr *)&d,
+			    (struct sockaddr *)&s) == 0)
+				continue;
+		}
 
 		/* found a match */
 		if (ep->psw && ep->psw->pr_input) {
@@ -210,10 +219,18 @@ encap6_input(mp, offp, proto)
 	for (ep = LIST_FIRST(&encaptab); ep; ep = LIST_NEXT(ep, chain)) {
 		if (ep->proto >= 0 && ep->proto != proto)
 			continue;
-		/* it's inbound traffic, we need to match in reverse order */
-		if (mask_match(ep, (struct sockaddr *)&d,
-		    (struct sockaddr *)&s) == 0)
-			continue;
+		if (ep->func) {
+			if ((*ep->func)(m, *offp, proto, ep->arg) == 0)
+				continue;
+		} else {
+			/*
+			 * it's inbound traffic, we need to match in reverse
+			 * order
+			 */
+			if (mask_match(ep, (struct sockaddr *)&d,
+			    (struct sockaddr *)&s) == 0)
+				continue;
+		}
 
 		/* found a match */
 		psw = (struct ip6protosw *)ep->psw;
@@ -300,6 +317,63 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 	bcopy(sm, &ep->srcmask, sp->sa_len);
 	bcopy(dp, &ep->dst, dp->sa_len);
 	bcopy(dm, &ep->dstmask, dp->sa_len);
+	ep->psw = psw;
+	ep->arg = arg;
+
+	/*
+	 * Order of insertion will determine the priority in lookup.
+	 * We should be careful putting them in specific-one-first order.
+	 * The question is, since we have two "mask" portion, we cannot really
+	 * define total order between entries.
+	 * For example, which of these should be preferred?
+	 *	src=3ffe::/16, dst=3ffe:501::/32
+	 *	src=3ffe:501::/32, dst=3ffe::/16
+	 *
+	 * At this moment we don't care about the ordering.
+	 */
+	LIST_INSERT_HEAD(&encaptab, ep, chain);
+	error = 0;
+	splx(s);
+	return ep;
+
+fail:
+	splx(s);
+	return NULL;
+}
+
+const struct encaptab *
+encap_attach_func(af, proto, func, psw, arg)
+	int af;
+	int proto;
+	int (*func) __P((const struct mbuf *, int, int, void *));
+	const struct protosw *psw;
+	void *arg;
+{
+	struct encaptab *ep;
+	int error;
+	int s;
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+	/* sanity check on args */
+	if (!func) {
+		error = EINVAL;
+		goto fail;
+	}
+
+	ep = malloc(sizeof(*ep), M_NETADDR, M_NOWAIT);	/*XXX*/
+	if (ep == NULL) {
+		error = ENOBUFS;
+		goto fail;
+	}
+	bzero(ep, sizeof(*ep));
+
+	ep->af = af;
+	ep->proto = proto;
+	ep->func = func;
 	ep->psw = psw;
 	ep->arg = arg;
 

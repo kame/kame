@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.h,v 1.5 2000/02/26 18:08:36 itojun Exp $	*/
+/*	$KAME: ip_encap.h,v 1.6 2000/03/06 04:34:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -42,6 +42,7 @@ struct encaptab {
 	struct sockaddr_storage srcmask;
 	struct sockaddr_storage dst;	/* remote addr */
 	struct sockaddr_storage dstmask;
+	int (*func) __P((const struct mbuf *, int, int, void *));
 	const struct protosw *psw;	/* only pr_input will be used */
 	void *arg;			/* passed via m->m_pkthdr.aux */
 };
@@ -50,8 +51,11 @@ void	encap_init __P((void));
 void	encap4_input __P((struct mbuf *, ...));
 int	encap6_input __P((struct mbuf **, int *, int));
 const struct encaptab *encap_attach __P((int, int, const struct sockaddr *,
-		const struct sockaddr *, const struct sockaddr *,
-		const struct sockaddr *, const struct protosw *, void *));
+	const struct sockaddr *, const struct sockaddr *,
+	const struct sockaddr *, const struct protosw *, void *));
+const struct encaptab *encap_attach_func __P((int, int,
+	int (*) __P((const struct mbuf *, int, int, void *)),
+	const struct protosw *, void *));
 int	encap_detach __P((const struct encaptab *));
 void	*encap_getarg __P((struct mbuf *));
 #endif
