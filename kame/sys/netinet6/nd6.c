@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.263 2002/05/29 04:42:18 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.264 2002/05/29 05:08:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,6 +75,7 @@
 #include <netinet/in.h>
 #ifndef __NetBSD__
 #include <netinet/if_ether.h>
+#include <netinet/if_ieee80211.h>
 #ifdef __FreeBSD__
 #include <netinet/if_fddi.h>
 #endif
@@ -270,7 +271,11 @@ nd6_setmtu(ifp, ndi)
 		break;
 #ifdef IFT_IEEE80211
 	case IFT_IEEE80211:	/* XXX should be IEEE80211MTU(1500) */
+#ifdef IEEE80211_MTU
+		ndi->maxmtu = MIN(IEEE80211_MTU, ifp->if_mtu);
+#else
 		ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
+#endif
 		break;
 #endif
 	default:
