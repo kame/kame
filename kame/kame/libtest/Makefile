@@ -10,7 +10,7 @@ LDCC=	${CC}
 .endif
 CFLAGS+=-Wall -Werror
 
-#LDADD+=-L/usr/local/v6/lib -linet6
-#DPADD+=/usr/local/v6/lib/libinet6.a
+LDADD+=-L/usr/local/v6/lib -linet6
+DPADD+=/usr/local/v6/lib/libinet6.a
 
 .include <bsd.prog.mk>
