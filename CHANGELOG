@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.684 2000/03/12 02:22:06 itojun Exp $
+$Id: CHANGELOG,v 1.685 2000/03/12 04:59:30 itojun Exp $
 
 <200003>
+Sun Mar 12 13:58:34 JST 2000  itojun@iijlab.net
+	* netbsd/sys/netinet/in.c: undo interface address addition attempt,
+	  when in_ifinit() fails.
+
 Sun Mar 12 11:06:55 JST 2000  itojun@iijlab.net
 	* {netbsd/pkgsrc,openbsd/ports}/net/zebra, freebsd2/ports/zebra:
 	  upgrade to 0.85.
