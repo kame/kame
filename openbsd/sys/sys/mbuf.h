@@ -605,12 +605,6 @@ void	m_zero(struct mbuf *);
 int	m_apply(struct mbuf *, int, int,
 	    int (*)(caddr_t, caddr_t, unsigned int), caddr_t);
 
-struct mbuf *m_aux_add2 __P((struct mbuf *, int, int, void *));
-struct mbuf *m_aux_find2 __P((struct mbuf *, int, int, void *));
-struct mbuf *m_aux_add __P((struct mbuf *, int, int));
-struct mbuf *m_aux_find __P((struct mbuf *, int, int));
-void m_aux_delete __P((struct mbuf *, struct mbuf *));
-
 /* Packet tag routines */
 struct m_tag *m_tag_get(int, int, int);
 void	m_tag_free(struct m_tag *);
