@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.c,v 1.3 2001/01/24 02:22:01 itojun Exp $	*/
+/*	$KAME: radix_art.c,v 1.4 2001/01/24 02:22:50 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -157,9 +157,9 @@
 /* HUGE amount of kernel printf! */
 #undef RADIX_ART_TRACE
 
-/* statistics - need entries in rtstat */
+/* statistics - need entries in rtstat (netbsd only at this moment) */
 #ifdef __NetBSD__
-#undef RADIX_ART_STAT
+#define RADIX_ART_STAT
 #endif
 
 #include <sys/param.h>
