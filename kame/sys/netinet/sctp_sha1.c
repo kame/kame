@@ -1,7 +1,7 @@
-/*	$KAME: sctp_sha1.c,v 1.7 2003/12/17 02:20:02 itojun Exp $	*/
+/*	$KAME: sctp_sha1.c,v 1.8 2004/02/24 21:52:27 itojun Exp $	*/
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

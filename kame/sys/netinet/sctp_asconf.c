@@ -1,7 +1,7 @@
-/*	$KAME: sctp_asconf.c,v 1.18 2004/01/26 07:46:13 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.19 2004/02/24 21:52:26 itojun Exp $	*/
 
 /*
- * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

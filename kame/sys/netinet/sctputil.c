@@ -1,7 +1,7 @@
-/*	$KAME: sctputil.c,v 1.27 2004/01/26 07:46:13 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.28 2004/02/24 21:52:27 itojun Exp $	*/
 
 /*
- * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

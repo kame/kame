@@ -1,7 +1,7 @@
-/*	$KAME: sctp_hashdriver.c,v 1.5 2004/01/19 09:48:26 itojun Exp $	*/
+/*	$KAME: sctp_hashdriver.c,v 1.6 2004/02/24 21:52:26 itojun Exp $	*/
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

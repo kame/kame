@@ -1,10 +1,10 @@
-/*	$KAME: sctp_structs.h,v 1.10 2004/01/16 09:56:01 itojun Exp $	*/
+/*	$KAME: sctp_structs.h,v 1.11 2004/02/24 21:52:27 itojun Exp $	*/
 
 #ifndef __sctp_structs_h__
 #define __sctp_structs_h__
 
 /*
- * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

@@ -1,7 +1,7 @@
-/*	$KAME: sctp_output.c,v 1.38 2004/02/11 21:06:12 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.39 2004/02/24 21:52:26 itojun Exp $	*/
 
 /*
- * Copyright (C) 2002, 2003 Cisco Systems Inc,
+ * Copyright (C) 2002, 2003, 2004 Cisco Systems Inc,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

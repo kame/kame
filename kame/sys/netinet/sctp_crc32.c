@@ -1,7 +1,7 @@
-/*	$KAME: sctp_crc32.c,v 1.9 2004/01/19 09:48:25 itojun Exp $	*/
+/*	$KAME: sctp_crc32.c,v 1.10 2004/02/24 21:52:26 itojun Exp $	*/
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

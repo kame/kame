@@ -1,10 +1,10 @@
-/*	$KAME: sctputil.h,v 1.12 2004/01/26 03:30:44 itojun Exp $	*/
+/*	$KAME: sctputil.h,v 1.13 2004/02/24 21:52:27 itojun Exp $	*/
 
 #ifndef __sctputil_h__
 #define __sctputil_h__
 
 /*
- * Copyright (C) 2002, 2003 Cisco Systems Inc,
+ * Copyright (C) 2002, 2003, 2004 Cisco Systems Inc,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
