@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.57 2002/08/20 23:01:00 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.58 2002/09/08 01:12:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -138,7 +138,7 @@ inetd_main(int argc, char **argv)
 	char path[MAXPATHLEN];
 	struct sockaddr_storage me;
 	struct sockaddr_storage from;
-	int melen, fromlen;
+	socklen_t melen, fromlen;
 	int i;
 	int error;
 	const int on = 1;
@@ -347,7 +347,7 @@ static void
 play_service(int s_wld)
 {
 	struct sockaddr_storage srcaddr;
-	int len;
+	socklen_t len;
 	int s_src;
 	pid_t child_pid;
 	fd_set rfds;
@@ -431,7 +431,7 @@ play_child(int s_src, struct sockaddr *srcaddr)
 	char src[NI_MAXHOST];
 	char dst6[NI_MAXHOST];
 	char dst4[NI_MAXHOST];
-	int len = sizeof(dstaddr6);
+	socklen_t len = sizeof(dstaddr6);
 	int s_dst, error, hport, nresvport, on = 1;
 	struct timeval tv;
 	struct sockaddr *sa4;

@@ -1,4 +1,4 @@
-/*	$KAME: ftp.c,v 1.19 2002/08/20 23:01:01 itojun Exp $	*/
+/*	$KAME: ftp.c,v 1.20 2002/09/08 01:12:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -226,7 +226,7 @@ ftp_relay(int ctl6, int ctl4)
 static int
 ftp_activeconn()
 {
-	int n;
+	socklen_t n;
 	int error;
 	fd_set set;
 	struct timeval timeout;
@@ -275,7 +275,7 @@ ftp_activeconn()
 static int
 ftp_passiveconn()
 {
-	int n;
+	socklen_t len;
 	int error;
 	fd_set set;
 	struct timeval timeout;
@@ -288,9 +288,9 @@ ftp_passiveconn()
 	FD_SET(wport6, &set);
 	timeout.tv_sec = 120;
 	timeout.tv_usec = 0;
-	n = sizeof(data6);
+	len = sizeof(data6);
 	if (select(wport6 + 1, &set, NULL, NULL, &timeout) == 0
-	 || (port6 = accept(wport6, (struct sockaddr *)&data6, &n)) < 0) {
+	 || (port6 = accept(wport6, (struct sockaddr *)&data6, &len)) < 0) {
 		close(wport6);
 		wport6 = -1;
 		syslog(LOG_INFO, "passive mode data connection failed");
@@ -324,8 +324,7 @@ ftp_passiveconn()
 static int
 ftp_copy(int src, int dst)
 {
-	int error, atmark;
-	int n;
+	int error, atmark, n;
 
 	/* OOB data handling */
 	error = ioctl(src, SIOCATMARK, &atmark);
@@ -362,8 +361,8 @@ ftp_copy(int src, int dst)
 static int
 ftp_copyresult(int src, int dst, enum state state)
 {
-	int error, atmark;
-	int n;
+	int error, atmark, n;
+	socklen_t len;
 	char *param;
 	int code;
 	char *a, *p;
@@ -532,8 +531,8 @@ passivefail:
 		/*
 		 * addr from dst, port from wport6
 		 */
-		n = sizeof(data6);
-		error = getsockname(wport6, (struct sockaddr *)&data6, &n);
+		len = sizeof(data6);
+		error = getsockname(wport6, (struct sockaddr *)&data6, &len);
 		if (error == -1) {
 			close(wport6);
 			wport6 = -1;
@@ -542,8 +541,8 @@ passivefail:
 		sin6 = (struct sockaddr_in6 *)&data6;
 		port = sin6->sin6_port;
 
-		n = sizeof(data6);
-		error = getsockname(dst, (struct sockaddr *)&data6, &n);
+		len = sizeof(data6);
+		error = getsockname(dst, (struct sockaddr *)&data6, &len);
 		if (error == -1) {
 			close(wport6);
 			wport6 = -1;
@@ -591,8 +590,8 @@ passivefail:
 static int
 ftp_copycommand(int src, int dst, enum state *state)
 {
-	int error, atmark;
-	int n;
+	int error, atmark, n;
+	socklen_t len;
 	unsigned int af, hal, ho[16], pal, po[2];
 	char *a, *p, *q;
 	char cmd[5], *param;
@@ -707,8 +706,8 @@ ftp_copycommand(int src, int dst, enum state *state)
 
 sendport:
 		/* get ready for active data connection */
-		n = sizeof(data4);
-		error = getsockname(dst, (struct sockaddr *)&data4, &n);
+		len = sizeof(data4);
+		error = getsockname(dst, (struct sockaddr *)&data4, &len);
 		if (error == -1) {
 lprtfail:
 			n = snprintf(sbuf, sizeof(sbuf),
@@ -740,8 +739,8 @@ lprtfail:
 		}
 
 		/* transmit PORT */
-		n = sizeof(data4);
-		error = getsockname(wport4, (struct sockaddr *)&data4, &n);
+		len = sizeof(data4);
+		error = getsockname(wport4, (struct sockaddr *)&data4, &len);
 		if (error == -1) {
 			close(wport4);
 			wport4 = -1;
