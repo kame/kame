@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.43 2001/02/06 09:05:05 jinmei Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.44 2001/02/06 09:16:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -113,7 +113,9 @@ struct	in6pcb {
 	int	in6p_cksum;		/* IPV6_CHECKSUM setsockopt */
 };
 
+#ifdef _KERNEL
 #define in6p_ip6_nxt in6p_ip6.ip6_nxt  /* for KAME src sync over BSD*'s */
+#endif
 
 /*
  * Flags in in6p_flags
