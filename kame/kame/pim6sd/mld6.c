@@ -439,9 +439,9 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
 	if ((hbhlen = inet6_opt_finish(NULL, 0, hbhlen)) == -1)
 		log(LOG_ERR, 0, "inet6_opt_finish(0) failed");
 #else  /* old advanced API */
-	    hbhlen = inet6_option_space(sizeof(raopt));
+	hbhlen = inet6_option_space(sizeof(raopt));
 #endif
-	    ctllen += CMSG_SPACE(hbhlen);
+	ctllen += CMSG_SPACE(hbhlen);
     }
     /* extend ancillary data space (if necessary) */
     if (ctlbuflen < ctllen) {
