@@ -42,7 +42,7 @@ char const copyright[] =
 static char sccsid[] = "@(#)main.c	8.4 (Berkeley) 3/1/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/main.c,v 1.34 2000/03/11 20:14:08 shin Exp $";
+  "$FreeBSD: src/usr.bin/netstat/main.c,v 1.34.2.2 2000/07/15 07:29:30 kris Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -696,7 +696,7 @@ static void
 usage()
 {
 	(void)fprintf(stderr, "%s\n%s\n%s\n%s\n",
-"usage: netstat [-Aaln] [-f address_family] [-M core] [-N system]",
+"usage: netstat [-AaLln] [-f address_family] [-M core] [-N system]",
 "       netstat [-abdghilmnrs] [-f address_family] [-M core] [-N system]",
 "       netstat [-bdn] [-I interface] [-M core] [-N system] [-w wait]",
 "       netstat [-M core] [-N system] [-p protocol]");
