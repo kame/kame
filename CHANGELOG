@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1895 2001/09/30 21:22:59 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1896 2001/10/02 08:58:52 suz Exp $
 
 <200110>
+2001-10-02	suz@sdl.hitachi.co.jp
+	* freebsd4/lib/libinet6/Makefile
+	- Dynamic DNS Discovery is available on FreeBSD4-KAME, too.
+	(you have to rebuild applications to enjoy this feature)
+
 2001-10-01 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/kame/{natptconfig,natptlog}:
 	- Add contents of manual page.
