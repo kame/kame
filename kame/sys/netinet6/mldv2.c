@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.30 2004/12/31 03:53:03 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.31 2004/12/31 19:56:27 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -256,12 +256,12 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_MLD_VERSION, mld_version, CTLFLAG_RW,
 }
 
 static void mld_sendbuf(struct mbuf *, struct ifnet *);
-int mld_set_timer(struct ifnet *, struct router6_info *, struct mld_hdr *,
+static int mld_set_timer(struct ifnet *, struct router6_info *, struct mld_hdr *,
 		  u_int16_t, u_int8_t);
-void mld_set_hostcompat(struct ifnet *, struct router6_info *, int);
-int mld_record_queried_source(struct in6_multi *, struct mld_hdr *, u_int16_t);
-void mld_send_all_current_state_report(struct ifnet *);
-int mld_send_current_state_report(struct mbuf **, int *, struct in6_multi *);
+static void mld_set_hostcompat(struct ifnet *, struct router6_info *, int);
+static int mld_record_queried_source(struct in6_multi *, struct mld_hdr *, u_int16_t);
+static void mld_send_all_current_state_report(struct ifnet *);
+static int mld_send_current_state_report(struct mbuf **, int *, struct in6_multi *);
 
 static void mld_sendpkt(struct in6_multi *, int, const struct in6_addr *);
 
@@ -1133,7 +1133,7 @@ mld_sendbuf(mh, ifp)
  * Timer adjustment on reception of an MLDv2 Query.
  */
 #define	in6mm_src	in6m->in6m_source
-int
+static int
 mld_set_timer(ifp, rti, mld, mldlen, query_type)
 	struct ifnet *ifp;
 	struct router6_info *rti;
@@ -1317,7 +1317,7 @@ next_multi:
 /*
  * Set MLD Host Compatibility Mode.
  */
-void
+static void
 mld_set_hostcompat(ifp, rti, query_ver)
 	struct ifnet *ifp;
 	struct router6_info *rti;
@@ -1366,7 +1366,7 @@ mld_set_hostcompat(ifp, rti, query_ver)
  * If some source was recorded as a reply for Group-and-Source-Specific Query,
  * return 0.
  */ 
-int
+static int
 mld_record_queried_source(in6m, mld, mldlen)
 	struct in6_multi *in6m;
 	struct mld_hdr *mld;
@@ -1474,7 +1474,7 @@ mld_record_queried_source(in6m, mld, mldlen)
 /*
  * Send Current-State Report for General Query response.
  */
-void
+static void
 mld_send_all_current_state_report(ifp)
 	struct ifnet *ifp;
 {
@@ -1502,7 +1502,7 @@ next_multi:
  * Send Current-State Report for Group- and Group-and-Source-Sepcific Query
  * response.
  */
-int
+static int
 mld_send_current_state_report(m0, buflenp, in6m)
 	struct mbuf **m0;	/* mbuf is inherited to put multiple group
 				 * records in one message */
