@@ -1,7 +1,7 @@
-/*	$OpenBSD: dbm.h,v 1.3 2001/01/28 23:43:15 niklas Exp $	*/
+/*	$OpenBSD: readpassphrase.h,v 1.1 2000/11/21 00:48:38 millert Exp $	*/
 
 /*
- * Copyright (c) 1999 Todd C. Miller <Todd.Miller@courtesan.com>
+ * Copyright (c) 2000 Todd C. Miller <Todd.Miller@courtesan.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,19 +27,20 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _DBM_H_
-#define _DBM_H_
+#ifndef _READPASSPHRASE_H_
+#define _READPASSPHRASE_H_
 
-#include <ndbm.h>
+#define RPP_ECHO_OFF    0x00		/* Turn off echo (default). */
+#define RPP_ECHO_ON     0x01		/* Leave echo on. */
+#define RPP_REQUIRE_TTY 0x02		/* Fail if there is no tty. */
+#define RPP_FORCELOWER  0x04		/* Force input to lower case. */
+#define RPP_FORCEUPPER  0x08		/* Force input to upper case. */
+#define RPP_SEVENBIT    0x10		/* Strip the high bit from input. */
+
+#include <sys/cdefs.h>
 
 __BEGIN_DECLS
-int	dbmclose __P((void));
-int	dbminit __P((const char *));
-int	delete __P((datum));
-datum	fetch __P((datum));
-datum	firstkey __P((void));
-datum	nextkey __P((datum));
-int	store __P((datum, datum));
+char * readpassphrase __P((const char *, char *, size_t, int));
 __END_DECLS
 
-#endif /* _DBM_H_ */
+#endif /* !_READPASSPHRASE_H_ */

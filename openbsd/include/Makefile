@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.86 2000/10/10 12:12:28 hugh Exp $
+#	$OpenBSD: Makefile,v 1.90 2001/03/18 17:39:54 millert Exp $
 #	$NetBSD: Makefile,v 1.59 1996/05/15 21:36:43 jtc Exp $
 
 #	@(#)Makefile	5.45.1.1 (Berkeley) 5/6/91
@@ -8,16 +8,17 @@
 
 # Missing: mp.h
 
-FILES=	a.out.h ar.h assert.h bitstring.h blf.h bm.h cast.h cpio.h \
+FILES=	a.out.h ar.h assert.h bitstring.h blf.h bm.h bsd_auth.h cast.h cpio.h \
 	ctype.h curses.h db.h dbm.h des.h dirent.h disktab.h elf_abi.h err.h \
 	fnmatch.h fstab.h fts.h glob.h grp.h ifaddrs.h inttypes.h \
 	iso646.h kvm.h langinfo.h libgen.h limits.h locale.h login_cap.h \
 	malloc.h math.h md4.h md5.h memory.h mpool.h ndbm.h netdb.h netgroup.h \
-	nlist.h nl_types.h olf_abi.h paths.h poll.h pwd.h ranlib.h re_comp.h \
-	regex.h resolv.h rmd160.h search.h setjmp.h sgtty.h sha1.h skipjack.h \
-	signal.h stab.h stdbool.h stddef.h stdio.h stdlib.h string.h strings.h \
-	struct.h sysexits.h tar.h time.h ttyent.h tzfile.h unistd.h utime.h \
-	utmp.h vis.h
+	nlist.h nl_types.h ohash.h olf_abi.h paths.h poll.h pwd.h \
+	ranlib.h re_comp.h \
+	readpassphrase.h regex.h resolv.h rmd160.h search.h setjmp.h sgtty.h \
+	sha1.h skipjack.h signal.h stab.h stdbool.h stddef.h stdio.h stdlib.h \
+	string.h strings.h struct.h sysexits.h tar.h time.h ttyent.h tzfile.h \
+	unistd.h utime.h utmp.h vis.h
 
 .if (${MACHINE_ARCH} != "alpha") && (${MACHINE_ARCH} != "mips") && \
 	(${MACHINE_ARCH} != "powerpc")
@@ -44,15 +45,16 @@ RDIRS=	../lib/libc_r ../lib/libcom_err ../lib/libcompat ../lib/libcurses \
 	../lib/libcurses++ ../lib/libform ../lib/libmenu ../lib/libocurses \
 	../lib/libossaudio ../lib/libpanel ../lib/librpcsvc ../lib/libskey \
 	../lib/libedit ../lib/libpcap ../lib/libutil ../lib/libwrap \
-	../lib/libz ../lib/libkeynote ../sys/arch/${MACHINE}
+	../lib/libz ../lib/libkeynote ../gnu/lib/libreadline \
+	../sys/arch/${MACHINE}
 
 # Places using Makefile that needs a prerequisite target met before includes
 PRDIRS=
 
 # Directories with an includes target that use Makefile.bsd-wrapper
-WDIRS=	../lib/libssl ../gnu/lib/libgmp ../usr.sbin/httpd
-WDIRS+= ../gnu/egcs/libio ../gnu/egcs/libstdc++ ../gnu/egcs/libf2c \
-	../gnu/egcs/libobjc ../gnu/egcs/gcc
+WDIRS=	../lib/libssl ../usr.sbin/httpd ../gnu/egcs/libio \
+	../gnu/egcs/libstdc++ ../gnu/egcs/libf2c ../gnu/egcs/libobjc \
+	../gnu/egcs/gcc
 
 # Places using Makefile.bsd-wrapper that needs a prerequisite target met
 # before includes

@@ -1,4 +1,4 @@
-/*	$OpenBSD: login_cap.h,v 1.1 2000/08/20 18:37:20 millert Exp $	*/
+/*	$OpenBSD: login_cap.h,v 1.4 2001/01/01 21:50:11 millert Exp $	*/
 
 /*-
  * Copyright (c) 1995,1997 Berkeley Software Design, Inc. All rights reserved.
@@ -34,8 +34,11 @@
  *	BSDI $From: login_cap.h,v 2.11 1999/09/08 18:11:57 prb Exp $
  */
 
+#ifndef _LOGIN_CAP_H_
+#define _LOGIN_CAP_H_
+
 #define	LOGIN_DEFCLASS		"default"
-#define	LOGIN_DEFSTYLE		"passwd"
+#define	LOGIN_DEFSTYLE		"krb-or-pwd"
 #define	LOGIN_DEFSERVICE	"login"
 #define	LOGIN_DEFUMASK		022
 #define	_PATH_LOGIN_CONF	"/etc/login.conf"
@@ -99,22 +102,6 @@ int	secure_path __P((char *));
 int	setclasscontext __P((char *, u_int));
 int	setusercontext __P((login_cap_t *, struct passwd *, uid_t, u_int));
 
-/*
- * Routines for authentication
- * Most of these will be deprecated in a future release
- */
-int	auth_approve __P((login_cap_t *, char *, char *));
-int	auth_cat __P((char *));
-int	auth_check __P((char *, char *, char *, char *, int *));
-void	auth_checknologin __P((login_cap_t *));
-void	auth_env __P((void));
-char	*auth_mkvalue __P((char *));
-int	auth_response __P((char *, char *, char *, char *, int *, char *, char *));
-void	auth_rmfiles __P((void));
-int	auth_scan __P((int));
-int	auth_script __P((char *, ...));
-int	auth_script_data __P((char *, int, char *, ...));
-char	*auth_value __P((char *));
-int	auth_setopt __P((char *, char *));
-void	auth_clropts __P((void));
 __END_DECLS
+
+#endif /* _LOGIN_CAP_H_ */

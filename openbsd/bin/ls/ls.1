@@ -1,4 +1,4 @@
-.\"	$OpenBSD: ls.1,v 1.25 2000/04/19 19:04:21 aaron Exp $
+.\"	$OpenBSD: ls.1,v 1.30 2000/11/09 23:58:55 aaron Exp $
 .\"	$NetBSD: ls.1,v 1.14 1995/12/05 02:44:01 jtc Exp $
 .\"
 .\" Copyright (c) 1980, 1990, 1991, 1993, 1994
@@ -68,7 +68,7 @@ and non-directory operands are sorted separately and in
 lexicographical order.
 .Pp
 The options are as follows:
-.Bl -tag -width indent
+.Bl -tag -width Ds
 .It Fl A
 List all entries except for
 .Dq \&.
@@ -393,6 +393,24 @@ system immutable
 The
 .Nm
 utility exits 0 on success or >0 if an error occurred.
+.Sh EXAMPLES
+.Cm ls -l
+.Pp
+List the contents of the current working directory in long format.
+.Pp
+.Cm ls -lioF
+.Pp
+In addition to listing the contents of the current working directory in
+long format, show inode numbers, file flags (see
+.Xr chflags 1 ) ,
+and suffix each filename with a symbol representing its file type.
+.Pp
+.Cm ls -lt /var/log
+.Pp
+List the files in
+.Pa /var/log ,
+sorting the output such that the mostly recently modified entries are
+printed first.
 .Sh ENVIRONMENT
 The following environment variables affect the execution of
 .Nm ls :
@@ -434,14 +452,14 @@ specification.
 .Xr chmod 1 ,
 .Xr symlink 7 ,
 .Xr sticky 8
-.Sh HISTORY
-An
-.Nm
-utility appeared in
-.At v5 .
 .Sh STANDARDS
 The
 .Nm
 utility is expected to be a superset of the
 .St -p1003.2
 specification.
+.Sh HISTORY
+An
+.Nm
+utility appeared in
+.At v5 .

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ifconfig.c,v 1.40 2000/08/03 07:34:41 angelos Exp $	*/
+/*	$OpenBSD: ifconfig.c,v 1.46 2001/03/01 08:34:37 itojun Exp $	*/
 /*      $NetBSD: ifconfig.c,v 1.40 1997/10/01 02:19:43 enami Exp $      */
 
 /*
@@ -81,7 +81,7 @@ static char copyright[] =
 #if 0
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #else
-static char rcsid[] = "$OpenBSD: ifconfig.c,v 1.40 2000/08/03 07:34:41 angelos Exp $";
+static char rcsid[] = "$OpenBSD: ifconfig.c,v 1.46 2001/03/01 08:34:37 itojun Exp $";
 #endif
 #endif /* not lint */
 
@@ -177,9 +177,6 @@ void	setipxframetype __P((char *, int));
 void    setatrange __P((char *, int));
 void    setatphase __P((char *, int));  
 void    gifsettunnel __P((char *, char *));
-void	dstsa __P((char *));
-void	srcsa __P((char *));
-void	clearsa __P((char *));
 #ifdef INET6
 void 	setia6flags __P((char *, int));
 void	setia6pltime __P((char *, int));
@@ -272,9 +269,6 @@ const struct	cmd {
 	{ "-vlandev",	1,		0,		unsetvlandev },
 #endif	/* INET_ONLY */
 	{ "giftunnel",  NEXTARG2,       0,              gifsettunnel } ,
-	{ "dstsa",	NEXTARG,	0,		dstsa } ,
-	{ "srcsa",	NEXTARG,	0,		srcsa } ,
-	{ "clearsa",	NEXTARG,	0,		clearsa } ,
 	{ "link0",	IFF_LINK0,	0,		setifflags } ,
 	{ "-link0",	-IFF_LINK0,	0,		setifflags } ,
 	{ "link1",	IFF_LINK1,	0,		setifflags } ,
@@ -316,6 +310,7 @@ void	init_current_media __P((void));
  */
 void	in_status __P((int));
 void 	in_getaddr __P((char *, int));
+void 	in_getprefix __P((char *, int));
 #ifdef INET6
 void	in6_fillscopeid __P((struct sockaddr_in6 *sin6));
 void	in6_alias __P((struct in6_ifreq *));
@@ -346,7 +341,7 @@ const struct afswtch {
 	caddr_t af_addreq;
 } afs[] = {
 #define C(x) ((caddr_t) &x)
-	{ "inet", AF_INET, in_status, in_getaddr, NULL,
+	{ "inet", AF_INET, in_status, in_getaddr, in_getprefix,
 	     SIOCDIFADDR, SIOCAIFADDR, C(ridreq), C(addreq) },
 #ifdef INET6
 	{ "inet6", AF_INET6, in6_status, in6_getaddr, in6_getprefix,
@@ -625,7 +620,7 @@ printif(ifrm, ifaliases)
 			continue;
 		}
 
-		if (!strcmp(namep, ifa->ifa_name)) {
+		if (!namep || !strcmp(namep, ifa->ifa_name)) {
 			register const struct afswtch *p;
 
 			if (ifa->ifa_addr->sa_family == AF_INET &&
@@ -645,7 +640,6 @@ printif(ifrm, ifaliases)
 				noinet = 0;
 			continue;
 		}
-
 	}
 	freeifaddrs(ifap);
 	if (count == 0) {
@@ -768,153 +762,38 @@ gifsettunnel(src, dst)
 	char *dst;
 {
 	struct addrinfo hints, *srcres, *dstres;
-	struct ifaliasreq addreq;
 	int ecode;
-#ifdef INET6
-	struct in6_aliasreq in6_addreq;
-#endif /* INET6 */
+	struct if_laddrreq req;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = afp->af_af;
+	hints.ai_socktype = SOCK_DGRAM;	/*dummy*/
 
 	if ((ecode = getaddrinfo(src, NULL, &hints, &srcres)) != 0)
 		errx(1, "error in parsing address string: %s",
-		     gai_strerror(ecode));
+		    gai_strerror(ecode));
 
 	if ((ecode = getaddrinfo(dst, NULL, &hints, &dstres)) != 0)
 		errx(1, "error in parsing address string: %s",
-		     gai_strerror(ecode));
+		    gai_strerror(ecode));
 
 	if (srcres->ai_addr->sa_family != dstres->ai_addr->sa_family)
 		errx(1,
-		     "source and destination address families do not match");
+		    "source and destination address families do not match");
 
-	switch (srcres->ai_addr->sa_family)
-	{
-	    case AF_INET:
-		bzero(&addreq, sizeof(addreq));
-		strncpy(addreq.ifra_name, name, IFNAMSIZ);
-		bcopy(srcres->ai_addr, &addreq.ifra_addr,
-		      srcres->ai_addr->sa_len);
-		bcopy(dstres->ai_addr, &addreq.ifra_dstaddr,
-		      dstres->ai_addr->sa_len);
+	if (srcres->ai_addrlen > sizeof(req.addr) ||
+	    dstres->ai_addrlen > sizeof(req.dstaddr))
+		errx(1, "invalid sockaddr");
 
-		if (ioctl(s, SIOCSIFPHYADDR, (struct ifreq *) &addreq) < 0)
-		  warn("SIOCSIFPHYADDR");
-		break;
-
-#ifdef INET6
-	    case AF_INET6:
-		bzero(&in6_addreq, sizeof(in6_addreq));
-		strncpy(in6_addreq.ifra_name, name, IFNAMSIZ);
-		bcopy(srcres->ai_addr, &in6_addreq.ifra_addr,
-		      srcres->ai_addr->sa_len);
-		bcopy(dstres->ai_addr, &in6_addreq.ifra_dstaddr,
-		      dstres->ai_addr->sa_len);
-
-		if (ioctl(s, SIOCSIFPHYADDR_IN6,
-			  (struct ifreq *) &in6_addreq) < 0)
-		  warn("SIOCSIFPHYADDR");
-		break;
-#endif /* INET6 */
-
-	    default:
-		warn("address family not supported");
-	}
+	memset(&req, 0, sizeof(req));
+	strncpy(req.iflr_name, name, sizeof(req.iflr_name));
+	memcpy(&req.addr, srcres->ai_addr, srcres->ai_addrlen);
+	memcpy(&req.dstaddr, dstres->ai_addr, dstres->ai_addrlen);
+	if (ioctl(s, SIOCSLIFPHYADDR, &req) < 0)
+		warn("SIOCSLIFPHYADDR");
 
 	freeaddrinfo(srcres);
 	freeaddrinfo(dstres);
-}
-
-static void
-handlesa(cmd, sa)
-        int cmd;
-	char *sa;
-{
-	char *p1, *p2, *p;
-	struct ifsa ifsa;
-	struct addrinfo *res;
-	struct protoent *prnt;
-	int ecode;
-
-	bzero(&ifsa, sizeof(ifsa));
-
-	strlcpy(ifsa.sa_ifname, name, sizeof ifsa.sa_ifname);
-
-	p1 = strchr(sa, '/');
-	if (p1 == NULL)
-		errx(1, "invalid SA");
-	else
-		*(p1++) = '\0';
-
-	if (*p1 == '/')
-		errx(1, "missing SPI");
-
-	p2 = strchr(p1, '/');
-	if (p2 == NULL)
-		errx(1, "invalid SA");
-	else
-		*(p2++) = '\0';
-
-	if (*p2 == '\0')
-		errx(1, "invalid security protocol");
-
-	if ((ecode = getaddrinfo(sa, NULL, NULL, &res)) != 0)
-		errx(1, "error in parsing address string: %s",
-		     gai_strerror(ecode));
-
-	bcopy(res->ai_addr, &ifsa.sa_dst, res->ai_addr->sa_len);
-
-	freeaddrinfo(res);
-
-	ifsa.sa_spi = htonl(strtoul(p1, &p, 16));
-	if ((p == NULL) || ((*p != '\0') && (*p != '/')))
-		errx(1, "bad SPI");
-
-	ifsa.sa_proto = strtoul(p2, &p, 10);
-	if ((p == NULL) || (*p != '\0')) {
-		prnt = getprotobyname(p2);
-		if (prnt == NULL)
-			errx(1, "bad security protocol");
-		ifsa.sa_proto = prnt->p_proto;
-	}
-
-	if (ioctl(s, cmd, (caddr_t)&ifsa) < 0) {
-		switch (cmd) {
-	      	case SIOCSENCDSTSA:
-			warn("SIOCSENCDSTSA");
-		  	break;
-
-	      	case SIOCSENCSRCSA:
-		  	warn("SIOCSENCSRCSA");
-		  	break;
-
-	      	case SIOCSENCCLEARSA:
-		  	warn("SIOCSENCCLEARSA");
-		  	break;
-	  	}
-	}
-}
-
-void
-dstsa(sa)
-        char *sa;
-{
-        handlesa(SIOCSENCDSTSA, sa);
-}
-
-void
-srcsa(sa)
-        char *sa;
-{
-        handlesa(SIOCSENCSRCSA, sa);
-}
-
-void
-clearsa(sa)
-        char *sa;
-{
-        handlesa(SIOCSENCCLEARSA, sa);
 }
 
 void
@@ -1086,12 +965,13 @@ setifnwid(val, d)
 	char *val;
 	int d;
 {
-	u_int8_t nwid[IEEE80211_NWID_LEN];
+	struct ieee80211_nwid nwid;
 
 	memset(&nwid, 0, sizeof(nwid));
-	(void)strncpy(nwid, val, sizeof(nwid));
+	(void)strncpy(nwid.i_nwid, val, sizeof(nwid.i_nwid));
+	nwid.i_len = sizeof(nwid.i_nwid);
 	(void)strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
-	ifr.ifr_data = (caddr_t)nwid;
+	ifr.ifr_data = (caddr_t)&nwid;
 	if (ioctl(s, SIOCS80211NWID, (caddr_t)&ifr) < 0)
 		warn("SIOCS80211NWID");
 }
@@ -1099,14 +979,17 @@ setifnwid(val, d)
 void
 ieee80211_status()
 {
-	u_int8_t nwid[IEEE80211_NWID_LEN + 1];
+	struct ieee80211_nwid nwid;
+	char buf[IEEE80211_NWID_LEN + 1];
 
 	memset(&ifr, 0, sizeof(ifr));
-	ifr.ifr_data = (caddr_t)nwid;
+	ifr.ifr_data = (caddr_t)&nwid;
 	(void)strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
-	nwid[IEEE80211_NWID_LEN] = 0;
-	if (ioctl(s, SIOCG80211NWID, (caddr_t)&ifr) == 0)
-		printf("\tnwid %s\n", nwid);
+	if (ioctl(s, SIOCG80211NWID, (caddr_t)&ifr) == 0) {
+		strncpy(buf, nwid.i_nwid, sizeof(buf) - 1);
+		buf[IEEE80211_NWID_LEN] = '\0';
+		printf("\tnwid %s\n", nwid.i_nwid);
+	}
 }
 
 void
@@ -1409,68 +1292,40 @@ phys_status(force)
 {
 	char psrcaddr[NI_MAXHOST];
 	char pdstaddr[NI_MAXHOST];
-	u_long srccmd, dstcmd;
-	struct ifreq *ifrp;
-	char *ver = "";
+	const char *ver = "";
 #ifdef NI_WITHSCOPEID
 	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
 #else
 	const int niflag = NI_NUMERICHOST;
 #endif
-#ifdef INET6
-	struct in6_ifreq in6_ifr;
-	int s6;
-#endif /* INET6 */
+	struct if_laddrreq req;
 
-	force = 0;	/*fool gcc*/
 	psrcaddr[0] = pdstaddr[0] = '\0';
 
+	memset(&req, 0, sizeof(req));
+	strncpy(req.iflr_name, name, IFNAMSIZ);
+	if (ioctl(s, SIOCGLIFPHYADDR, (caddr_t)&req) < 0)
+		return;
 #ifdef INET6
-	bzero(&in6_ifr, sizeof(in6_ifr));
-	strncpy(in6_ifr.ifr_name, name, IFNAMSIZ);
-	s6 = socket(AF_INET6, SOCK_DGRAM, 0);
-	if (s6 < 0) {
-		ifrp = &ifr;
-		srccmd = SIOCGIFPSRCADDR;
-		dstcmd = SIOCGIFPDSTADDR;
-	} else {
-		close(s6);
-		srccmd = SIOCGIFPSRCADDR_IN6;
-		dstcmd = SIOCGIFPDSTADDR_IN6;
-		ifrp = (struct ifreq *) &in6_ifr;
-	}
-#else /* INET6 */
-	ifrp = &ifr;
-	srccmd = SIOCGIFPSRCADDR;
-	dstcmd = SIOCGIFPDSTADDR;
-#endif /* INET6 */
-
-	if (0 <= ioctl(s, srccmd, (caddr_t)ifrp)) {
-#ifdef INET6
-		if (ifrp->ifr_addr.sa_family == AF_INET6)
-			in6_fillscopeid((struct sockaddr_in6 *)&ifrp->ifr_addr);
+	if (req.addr.ss_family == AF_INET6)
+		in6_fillscopeid((struct sockaddr_in6 *)&req.addr);
 #endif
-		getnameinfo(&ifrp->ifr_addr, ifrp->ifr_addr.sa_len,
-			    psrcaddr, NI_MAXHOST, 0, 0, niflag);
+	getnameinfo((struct sockaddr *)&req.addr, req.addr.ss_len,
+	    psrcaddr, sizeof(psrcaddr), 0, 0, niflag);
 #ifdef INET6
-		if (ifrp->ifr_addr.sa_family == AF_INET6)
-			ver = "6";
-#endif /* INET6 */
-
-		if (0 <= ioctl(s, dstcmd, (caddr_t)ifrp)) {
-#ifdef INET6
-			if (ifrp->ifr_addr.sa_family == AF_INET6) {
-				in6_fillscopeid((struct sockaddr_in6 *)
-				    &ifrp->ifr_addr);
-			}
+	if (req.addr.ss_family == AF_INET6)
+		ver = "6";
 #endif
-		        getnameinfo(&ifrp->ifr_addr, ifrp->ifr_addr.sa_len,
-				    pdstaddr, NI_MAXHOST, 0, 0, niflag);
-		}
 
-		printf("\tphysical address inet%s %s --> %s\n", ver,
-		       psrcaddr, pdstaddr);
-	}
+#ifdef INET6
+	if (req.dstaddr.ss_family == AF_INET6)
+		in6_fillscopeid((struct sockaddr_in6 *)&req.dstaddr);
+#endif
+	getnameinfo((struct sockaddr *)&req.dstaddr, req.dstaddr.ss_len,
+	    pdstaddr, sizeof(pdstaddr), 0, 0, niflag);
+
+	printf("\tphysical address inet%s %s --> %s\n", ver,
+	    psrcaddr, pdstaddr);
 }
 
 const int ifm_status_valid_list[] = IFM_STATUS_VALID_LIST;
@@ -1765,6 +1620,8 @@ in6_alias(creq)
 			printf(" duplicated");
 		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DETACHED)
 			printf(" detached");
+		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DEPRECATED)
+			printf(" deprecated");
 	}
 
 	if (scopeid)
@@ -2051,6 +1908,30 @@ in_getaddr(s, which)
 	}
 }
 
+void
+in_getprefix(plen, which)
+	char *plen;
+	int which;
+{
+	register struct sockaddr_in *sin = sintab[which];
+	register u_char *cp;
+	int len = strtol(plen, (char **)NULL, 10);
+
+	if ((len < 0) || (len > 32))
+		errx(1, "%s: bad value", plen);
+	sin->sin_len = sizeof(*sin);
+	if (which != MASK)
+		sin->sin_family = AF_INET;
+	if ((len == 0) || (len == 32)) {
+		memset(&sin->sin_addr, 0xff, sizeof(struct in_addr));
+		return;
+	}
+	memset((void *)&sin->sin_addr, 0x00, sizeof(sin->sin_addr));
+	for (cp = (u_char *)&sin->sin_addr; len > 7; len -= 8)
+		*cp++ = 0xff;
+	*cp = 0xff << (8 - len);
+}
+
 /*
  * Print a value a la the %b format of the kernel's printf
  */
@@ -2096,14 +1977,40 @@ in6_getaddr(s, which)
 	char *s;
 	int which;
 {
-	struct sockaddr_in6 *sin = sin6tab[which];
+#ifndef KAME_SCOPEID
+	struct sockaddr_in6 *sin6 = sin6tab[which];
 
-	sin->sin6_len = sizeof(*sin);
+	sin->sin6_len = sizeof(*sin6);
 	if (which != MASK)
-		sin->sin6_family = AF_INET6;
+		sin6->sin6_family = AF_INET6;
 
-	if (inet_pton(AF_INET6, s, &sin->sin6_addr) != 1)
+	if (inet_pton(AF_INET6, s, &sin6->sin6_addr) != 1)
 		errx(1, "%s: bad value", s);
+#else
+	struct sockaddr_in6 *sin6 = sin6tab[which];
+	struct addrinfo hints, *res;
+	int error;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;	/*dummy*/
+	error = getaddrinfo(s, "0", &hints, &res);
+	if (error)
+		errx(1, "%s: %s", s, gai_strerror(error));
+	if (res->ai_addrlen != sizeof(struct sockaddr_in6))
+		errx(1, "%s: bad value", s);
+	memcpy(sin6, res->ai_addr, res->ai_addrlen);
+#ifdef __KAME__
+	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) &&
+	    *(u_int16_t *)&sin6->sin6_addr.s6_addr[2] == 0 &&
+	    sin6->sin6_scope_id) {
+		*(u_int16_t *)&sin6->sin6_addr.s6_addr[2] =
+		    htons(sin6->sin6_scope_id & 0xffff);
+		sin6->sin6_scope_id = 0;
+	}
+#endif
+	freeaddrinfo(res);
+#endif
 }
 
 void
@@ -2335,9 +2242,6 @@ usage()
 		"\t[ metric n ]\n"
 		"\t[ mtu n ]\n"
 		"\t[ nwid netword_id ]\n"
-		"\t[ dstsa address/spi/protocol ]\n"
-		"\t[ srcsa address/spi/protocol ]\n"
-		"\t[ clearsa address/spi/protocol ]\n"
 		"\t[ giftunnel srcaddress dstaddress ]\n"
 		"\t[ vlan n vlandev interface ]\n"
 		"\t[ arp | -arp ]\n"

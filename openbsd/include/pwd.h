@@ -1,4 +1,4 @@
-/*	$OpenBSD: pwd.h,v 1.8 1999/09/03 18:13:37 deraadt Exp $	*/
+/*	$OpenBSD: pwd.h,v 1.11 2001/02/13 14:48:40 pjanzen Exp $	*/
 /*	$NetBSD: pwd.h,v 1.9 1996/05/15 21:36:45 jtc Exp $	*/
 
 /*-
@@ -66,7 +66,9 @@
 
 #define	_PASSWORD_EFMT1		'_'	/* extended encryption format */
 
-#define	_PASSWORD_LEN		128	/* max length, not counting NULL */
+#define	_PASSWORD_LEN		128	/* max length, not counting NUL */
+#define	_PW_NAME_LEN		31	/* max length, not counting NUL */
+					/* Should be MAXLOGNAME - 1 */
 
 #define _PASSWORD_NOUID		0x01	/* flag for no specified uid. */
 #define _PASSWORD_NOGID		0x02	/* flag for no specified gid. */
@@ -99,6 +101,7 @@ struct passwd	*getpwent __P((void));
 int		 setpassent __P((int));
 char		*user_from_uid __P((uid_t, int));
 char		*bcrypt_gensalt __P((u_int8_t));
+struct passwd	*pw_dup __P((const struct passwd *));
 #endif
 void		 setpwent __P((void));
 void		 endpwent __P((void));

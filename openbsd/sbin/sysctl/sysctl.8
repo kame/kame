@@ -1,4 +1,4 @@
-.\"	$OpenBSD: sysctl.8,v 1.56 2000/10/14 01:06:44 itojun Exp $
+.\"	$OpenBSD: sysctl.8,v 1.61 2001/02/07 11:43:49 itojun Exp $
 .\"	$NetBSD: sysctl.8,v 1.4 1995/09/30 07:12:49 thorpej Exp $
 .\"
 .\" Copyright (c) 1993
@@ -142,6 +142,8 @@ privilege can change the value.
 .It kern.sysvsem	integer	no
 .It kern.sysvshm	integer	no
 .It kern.arandom	u_int	no
+.It kern.malloc.buckets	string	no
+.It kern.malloc.bucket.<sz>	string	no
 .It vm.loadavg	struct	no
 .It vm.psstrings	struct	no
 .It vm.swapencrypt.enable	integer	yes
@@ -223,6 +225,9 @@ privilege can change the value.
 .It net.inet6.icmp6.nodeinfo	integer	yes
 .It net.inet6.icmp6.errppslimit	integer	yes
 .It net.inet6.icmp6.nd6_maxnudhint	integer	yes
+.It net.inet6.icmp6.mtudisc_hiwat	integer	yes
+.It net.inet6.icmp6.mtudisc_lowat	integer	yes
+.It net.inet6.icmp6.nd6_debug	integer	yes
 .It net.ipx.ipx.checksum	integer	yes
 .It net.ipx.ipx.forwarding	integer	yes
 .It net.ipx.ipx.netbios	integer	yes
@@ -244,6 +249,7 @@ privilege can change the value.
 .It hw.pagesize	integer	no
 .It machdep.console_device	dev_t	no
 .It machdep.apmwarn	integer	yes (i386 only)
+.It machdep.apmhalt	integer	yes (i386 only)
 .It machdep.kbdreset	integer	yes (i386 only)
 .It machdep.allowaperture	integer	yes (i386 only, XFree86)
 .It machdep.led_blink	integer	yes (sparc only)
