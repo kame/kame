@@ -898,6 +898,7 @@ process_cache_miss(im)
     source.sin6_scope_id = inet6_uvif2scopeid(&source, &uvifs[im->im6_mif]);
     iif = im->im6_mif;
 
+    uvifs[iif].uv_cache_miss++;
     IF_DEBUG(DEBUG_MFC)
 	log(LOG_DEBUG, 0, "Cache miss, src %s, dst %s, iif %d",
 	    inet6_fmt(&source.sin6_addr), inet6_fmt(&group.sin6_addr), iif);
@@ -911,7 +912,7 @@ process_cache_miss(im)
 
     if (IN6_IS_ADDR_MC_NODELOCAL(&group.sin6_addr) ||/* sanity? */
     	IN6_IS_ADDR_MC_LINKLOCAL(&group.sin6_addr))
-    		return;
+	    goto fail;
 
     /* TODO: check if correct in case the source is one of my addresses */
     /*
@@ -924,7 +925,7 @@ process_cache_miss(im)
 	mrtentry_ptr = find_route(&source, &group, MRTF_SG, CREATE);
 	if (mrtentry_ptr == (mrtentry_t *) NULL)
 	{
-			    return;
+	    goto fail;
 	}
 
 	mrtentry_ptr->flags &= ~MRTF_NEW;
@@ -946,7 +947,7 @@ process_cache_miss(im)
 				  MRTF_SG | MRTF_WC | MRTF_PMBR,
 				  DONT_CREATE);
 	if (mrtentry_ptr == (mrtentry_t *) NULL)
-	    return;
+		goto fail;
     }
 
     /*
@@ -1013,7 +1014,7 @@ process_cache_miss(im)
     {
 	if (mrtentry_ptr->flags & MRTF_SPT)
 	    /* Arrived on wrong interface */
-	    return;
+		goto fail;
 	if ((mrtentry_rp = mrtentry_ptr->group->grp_route) ==
 	    (mrtentry_t *) NULL)
 	    mrtentry_rp =
@@ -1035,10 +1036,15 @@ process_cache_miss(im)
 #ifdef RSRR
 		rsrr_cache_send(mrtentry_rp, RSRR_NOTIFICATION_OK);
 #endif				/* RSRR */
+
+		return;
 	    }
 	}
-	return;
+	goto fail;
     }
+
+  fail:
+    uvifs[iif].uv_cache_notcreated++;
 }
 
 

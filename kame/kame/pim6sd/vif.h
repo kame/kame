@@ -219,6 +219,9 @@ struct uvif {
 	u_quad_t uv_out_mld_query;
 	u_quad_t uv_out_mld_report;
 	u_quad_t uv_out_mld_done;
+	/* statistics about the forwarding cache in kernel */
+	u_quad_t uv_cache_miss;
+	u_quad_t uv_cache_notcreated;
 	/* occurrences of timeouts */
 	u_quad_t uv_pim6_nbr_timo;
 	u_quad_t uv_listener_timo;

@@ -331,6 +331,10 @@ dump_stat()
 		fprintf(fp, "\t%qu MLD report sent\n", v->uv_out_mld_report);
 		fprintf(fp, "\t%qu MLD done sent\n", v->uv_out_mld_done);
 
+		fprintf(fp, "\t%qu forwarding cache miss\n", v->uv_cache_miss);
+		fprintf(fp, "\t%qu forwarding cache miss and not created\n",
+			v->uv_cache_notcreated);
+
 		fprintf(fp, "\t%qu PIM neighbor timeouts\n", v->uv_pim6_nbr_timo);
 		fprintf(fp, "\t%qu MLD listener timeouts\n", v->uv_listener_timo);
 		fprintf(fp, "\t%qu out-I/F timeouts\n", v->uv_outif_timo);
