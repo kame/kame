@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.40 2000/05/31 16:04:04 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.41 2000/05/31 16:14:52 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1382,7 +1382,8 @@ pk_recvacquire(mhp)
 		plog(logp, LOCATION, NULL,
 			"failed to get ID for %s\n",
 			spidx2str(&sp->spidx));
-		goto err;
+		delph2(iph2[n]);
+		return -1;
 	}
 	iddst = ipsecdoi_sockaddr2id((struct sockaddr *)&sp->spidx.dst,
 				sp->spidx.prefd, sp->spidx.ul_proto);
@@ -1391,7 +1392,8 @@ pk_recvacquire(mhp)
 			"failed to get ID for %s\n",
 			spidx2str(&sp->spidx));
 		vfree(idsrc);
-		goto err;
+		delph2(iph2[n]);
+		return -1;
 	}
 	iph2[n]->sainfo = getsainfo(idsrc, iddst);
 	vfree(idsrc);
@@ -1399,7 +1401,8 @@ pk_recvacquire(mhp)
 	if (iph2[n]->sainfo == NULL) {
 		plog(logp, LOCATION, NULL,
 			"failed to get sainfo.\n");
-		goto err;
+		delph2(iph2[n]);
+		return -1;
 		/* XXX should use the algorithm list from register message */
 	}
     }
@@ -1409,7 +1412,8 @@ pk_recvacquire(mhp)
 	if (newpp == NULL) {
 		plog(logp, LOCATION, NULL,
 			"failed to allocate saprop.\n");
-		goto err;
+		delph2(iph2[n]);
+		return -1;
 	}
 	newpp->prop_no = 1;
 	newpp->lifetime = iph2[n]->sainfo->lifetime;
