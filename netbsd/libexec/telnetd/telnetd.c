@@ -1704,6 +1704,7 @@ recv_ayt()
 		return;
 	}
 #endif
+	netflush();
 	(void) strcpy(nfrontp, "\r\n[Yes]\r\n");
 	nfrontp += 9;
 }
