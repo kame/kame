@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.990 2000/06/10 14:24:45 sakane Exp $
+$Id: CHANGELOG,v 1.991 2000/06/11 08:04:35 itojun Exp $
 
 <200006>
+Sun Jun 11 17:03:07 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 2000/6/5 weekly SNAP from
+	  tcpdump.org.
+
 Sat Jun 10 23:11:41 JST 2000 sakane@ydc.co.jp
 	* kame/sys/netkey/key.c:
 	* kame/kame/libipsec/pfkey.c:
