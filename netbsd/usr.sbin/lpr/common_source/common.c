@@ -140,6 +140,7 @@ getport(rhost, rport)
 	int error, s;
 	int timo = 1;
 	int refuse, trial;
+	char pbuf[NI_MAXSERV];
 
 	/*
 	 * Get the host address and port number to connect to.
@@ -149,7 +150,11 @@ getport(rhost, rport)
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
-	error = getaddrinfo(rhost, "printer", &hints, &res);
+	if (rport)
+		snprintf(pbuf, sizeof(pbuf), "%d", rport);
+	else
+		snprintf(pbuf, sizeof(pbuf), "printer");
+	error = getaddrinfo(rhost, pbuf, &hints, &res);
 	if (error)
 		fatal(gai_strerror(error));
 
