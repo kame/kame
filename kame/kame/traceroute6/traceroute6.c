@@ -306,7 +306,11 @@ struct opacket	*outpacket;	/* last output (udp) packet */
 
 int	main __P((int, char *[]));
 int	wait_for_reply __P((int, struct msghdr *));
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
 int	setpolicy __P((int so, char *policy));
+#endif
+#endif
 void	send_probe __P((int, int));
 struct udphdr *get_udphdr __P((struct ip6_hdr *, u_char *));
 int	get_hoplim __P((struct msghdr *));
