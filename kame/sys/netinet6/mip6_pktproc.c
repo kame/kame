@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.96 2003/01/17 12:00:24 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.97 2003/01/20 05:00:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -549,7 +549,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	bzero(&bi, sizeof(bi));
 	bi.mbc_status = IP6MA_STATUS_ACCEPTED;
 	bi.mbc_send_ba = (ip6mu->ip6mu_flags & IP6MU_ACK) &&
-			 !(ip6mu->ip6mu_flags & ~IP6MU_DAD);
+			 !(ip6mu->ip6mu_flags & IP6MU_DAD);
 
 #ifdef IPSEC
 	/*
