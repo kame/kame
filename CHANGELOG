@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1127 2000/07/13 07:11:58 itojun Exp $
+$Id: CHANGELOG,v 1.1128 2000/07/13 13:29:30 itojun Exp $
 
 <200006>
+Thu Jul 13 22:27:18 JST 2000  itojun@iijlab.net
+	* openbsd/sys/netinet6/raw_ipv6.c: enable IPv6 multicast routing
+	  related setsockopt.
+
 Thu Jul 13 16:09:57 JST 2000  itojun@iiljab.net
 	* netbsd/pkgsrc/net/bind9: upgrade to 9.0.0rc1.
 
