@@ -1,4 +1,4 @@
-/*	$KAME: halist.h,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $	*/
+/*	$KAME: halist.h,v 1.3 2002/01/22 16:32:40 karino Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: halist.h,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $
+ * $Id: halist.h,v 1.3 2002/01/22 16:32:40 karino Exp $
  */
 
 /*
@@ -103,6 +103,15 @@ struct hagent_ifinfo {
 	int			ifindex;
 	char			ifname[IF_NAMESIZE];
 	struct ifaddrs		*linklocal;
+	struct hagent_ifa_pair	*haif_gavec;
+	int			gavec_used;
+	int			gavec_size;
+};
+
+#define GAVEC_INIT_SIZE		(16)
+
+
+struct hagent_ifa_pair {
 	struct ifaddrs		*global;
 	struct ifaddrs		*anycast;
 };
@@ -120,7 +129,7 @@ int hal_pick __P((struct in6_addr *, struct in6_addr *, struct in6_addr *,
 		  struct hagent_ifinfo *, int));
 void haif_prefix_add __P((struct hagent_ifinfo *, struct in6_addr *, u_int8_t));
 struct hagent_ifinfo *haif_find __P((int));
-struct hagent_ifinfo *haif_findwithaddr __P((struct in6_addr *));
+struct hagent_ifinfo *haif_findwithaddr __P((struct in6_addr *, int *));
 struct hagent_entry *hal_find __P((struct hagent_ifinfo *, struct in6_addr *));
 void haif_prefix_update __P((struct hagent_ifinfo *, struct in6_addr *,
 			     u_int8_t, u_int32_t));

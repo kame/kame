@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.c,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $	*/
+/*	$KAME: haadisc.c,v 1.3 2002/01/22 16:32:38 karino Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.c,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $
+ * $Id: haadisc.c,v 1.3 2002/01/22 16:32:38 karino Exp $
  */
 
 /*
@@ -145,7 +145,7 @@ static void haad_request_input __P((int, struct ha_discov_req *,
 				    int));
 static void haad_reply_output __P((u_int16_t, struct sockaddr_in6 *,
 				   struct in6_addr *, struct hagent_ifinfo *,
-				   int));
+				   int, int));
 static void haadisc_set_dump_file __P((void));
 static void haadisc_clean_hal __P((void));
 
@@ -888,11 +888,12 @@ haad_request_input(len, haad_req, pi, src, type)
 {
     u_int16_t msgid;
     struct hagent_ifinfo *haif;
+    int ifga_index = -1;
 
     msgid = haad_req->discov_req_id;
 
     /* determine home link by global address */
-    haif = haif_findwithaddr(&pi->ipi6_addr);
+    haif = haif_findwithaddr(&pi->ipi6_addr, &ifga_index);
 
     if (! haif) {
 	syslog(LOG_ERR, __FUNCTION__ "cannt get home agent ifinfo.\n");
@@ -906,7 +907,7 @@ haad_request_input(len, haad_req, pi, src, type)
 #else
 		      &(pi->ipi6_addr),		/* anycast addr. */
 #endif
-		      haif, type);
+		      haif, type, ifga_index);
 err:
 }
 
@@ -914,23 +915,20 @@ err:
  * Send Home Agent Address Discovery Reply Message
  */
 static void
-haad_reply_output(msgid, coaddr, reqaddr, haif, type)
+haad_reply_output(msgid, coaddr, reqaddr, haif, type, ifga_index)
     u_int16_t msgid;
     struct sockaddr_in6 *coaddr;
     struct in6_addr *reqaddr;
     struct hagent_ifinfo *haif;
-    int type;
+    int type, ifga_index;
 {
     struct cmsghdr *cm;
     struct in6_pktinfo *pi;
     struct ha_discov_rep *hap;
-    struct in6_addr src = in6addr_any;
     struct in6_addr *hagent_addr;
+    struct in6_addr src = in6addr_any;
     int len, nhaa, count;
     u_int8_t buf[IPV6_MMTU];
-
-    if (haif->global != NULL)
-    	src = ((struct sockaddr_in6 *)(haif->global->ifa_addr))->sin6_addr;
 
     /*
      * sequence:
@@ -938,6 +936,9 @@ haad_reply_output(msgid, coaddr, reqaddr, haif, type)
      * - source address is home agent global address 
      * - destination address is source address of request packet
      */
+
+    if (haif->haif_gavec[ifga_index].global != NULL)
+	    src = ((struct sockaddr_in6 *)(haif->haif_gavec[ifga_index].global->ifa_addr))->sin6_addr;
 
     /* create ICMPv6 message */
     hap = (struct ha_discov_rep *)buf;

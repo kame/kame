@@ -1,4 +1,4 @@
-/*	$KAME: halist.c,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $	*/
+/*	$KAME: halist.c,v 1.3 2002/01/22 16:32:38 karino Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: halist.c,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $
+ * $Id: halist.c,v 1.3 2002/01/22 16:32:38 karino Exp $
  */
 
 /*
@@ -905,20 +905,24 @@ haif_find(ifindex)
 }
 
 struct hagent_ifinfo *
-haif_findwithaddr(ha_addr)
+haif_findwithaddr(ha_addr, index)
     struct in6_addr *ha_addr;
+    int *index;
 {
-    int i;
+    int i, j;
     struct ifaddrs *ifap;
 
     for (i = 0; i < ifnum; ++i) {
-	ifap = haifinfo_tab[i].anycast;
-	/* find the information on interface anycast address */
-	if (ifap != NULL &&
-	    IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6 *)(ifap->ifa_addr))->sin6_addr,
-			       ha_addr))
-	{
-	    return &haifinfo_tab[i];
+	for (j = 0; j < haifinfo_tab[i].gavec_used; ++j) {
+	    ifap = haifinfo_tab[i].haif_gavec[j].anycast;
+	    /* find the information on interface anycast address */
+	    if (ifap != NULL &&
+	        IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6 *)(ifap->ifa_addr))->sin6_addr,
+				   ha_addr))
+		{
+		    *index = j;
+		    return &haifinfo_tab[i];
+		}
 	}
     }
     return NULL;
@@ -943,7 +947,7 @@ haif_getifaddrs()
 				   0xff, 0xff, 0xff, 0xff, 
 				   0xff, 0xff, 0xff, 0xff, 
 				   0xff, 0xff, 0xff, 0xfe}}};
-    int s;
+    int s, i;
     struct in6_ifreq ifr6;
 
     if (ifalist)
@@ -955,6 +959,20 @@ haif_getifaddrs()
     }
     if ((s = socket(PF_INET6, SOCK_DGRAM, 0)) < 0)
 	return -1;
+
+    for (i = 0; i < ifnum; ++i) {
+	    /* initialize global address vectors */
+	    if (haifinfo_tab[i].haif_gavec) {
+		    free(haifinfo_tab[i].haif_gavec);
+		    haifinfo_tab[i].haif_gavec = NULL;
+	    }
+	    if ((haifinfo_tab[i].haif_gavec = malloc(GAVEC_INIT_SIZE * sizeof(struct hagent_ifa_pair))) == NULL) {
+		    return -1;
+	    }
+	    bzero(haifinfo_tab[i].haif_gavec, GAVEC_INIT_SIZE * sizeof(struct hagent_ifa_pair));
+	    haifinfo_tab[i].gavec_size = GAVEC_INIT_SIZE;
+	    haifinfo_tab[i].gavec_used = 0;
+    }
 
     /* search address list and pick up linklocal/anycast addresses */
     for (ifap = ifalist; ifap; ifap = ifap->ifa_next) {
@@ -979,8 +997,28 @@ haif_getifaddrs()
 	    REVERSE_MASK(mask, ((struct sockaddr_in6 *)(ifap->ifa_netmask))->sin6_addr);
 	    mask.s6_addr[8] &= 0xfd; /* ignore universal bit XXX */
 	    if (IN6_ARE_ADDR_MASKEQUAL(sa6->sin6_addr, mask, haanycast)) {
-		haif->anycast = ifap;
-		anycast_found = 1;
+		    for (i = 0; i < haif->gavec_used; ++i) {
+			    if (haif->haif_gavec[i].global &&
+				IN6_ARE_ADDR_MASKEQUAL(sa6->sin6_addr,
+						       ((struct sockaddr_in6 *)(ifap->ifa_netmask))->sin6_addr,
+						       ((struct sockaddr_in6 *)(haif->haif_gavec[i].global->ifa_addr))->sin6_addr)) {
+				    haif->haif_gavec[i].anycast = ifap;
+				    break;
+			    }
+		    }
+		    if (i == haif->gavec_used) {
+			    if (i >= haif->gavec_size) {
+				    struct hagent_ifa_pair *p;
+				    if ((p = realloc(haif->haif_gavec, haif->gavec_size * 2 * sizeof(struct hagent_ifa_pair))) == NULL) {
+					    return -1;
+				    }
+				    haif->haif_gavec = p;
+				    haif->gavec_size *= 2;
+			    }
+			    haif->haif_gavec[i].anycast = ifap;
+			    haif->gavec_used++;
+		    }
+		    anycast_found = 1;
 	    }
 	    continue;
 	}
@@ -1006,13 +1044,46 @@ haif_getifaddrs()
 	    continue;
 	}
 	else {
-	    haif->global = ifap;
+		for (i = 0; i < haif->gavec_used; ++i) {
+			if (haif->haif_gavec[i].anycast &&
+			    IN6_ARE_ADDR_MASKEQUAL(sa6->sin6_addr,
+						   ((struct sockaddr_in6 *)(ifap->ifa_netmask))->sin6_addr,
+						   ((struct sockaddr_in6 *)(haif->haif_gavec[i].anycast->ifa_addr))->sin6_addr)) {
+				haif->haif_gavec[i].global = ifap;
+				break;
+			}
+		}
+		if (i == haif->gavec_used) {
+			if (i >= haif->gavec_size) {
+				struct hagent_ifa_pair *p;
+				if ((p = realloc(haif->haif_gavec, haif->gavec_size * 2 * sizeof(struct hagent_ifa_pair))) == NULL) {
+					return -1;
+				}
+				haif->haif_gavec = p;
+				haif->gavec_size *= 2;
+			}
+			haif->haif_gavec[i].global = ifap;
+			haif->gavec_used++;
+		}
 	}
     }
     close(s);
 
     if (anycast_found == 0)
 	syslog(LOG_WARNING, __FUNCTION__ "anycast address not found");
+
+    /* remove entries w/o anycast address and pack global address vector */ 
+    for (i = 0; i < ifnum; ++i) {
+	    int j, packed_last;
+	    struct hagent_ifa_pair *p = haifinfo_tab[i].haif_gavec;
+	    for (j = 0, packed_last = 0; j < haifinfo_tab[i].gavec_used; ++j) {
+		    if (p[j].anycast) {
+			    memcpy(p + packed_last, p + j, sizeof(*p));
+			    ++packed_last;
+		    }
+	    }
+	    haifinfo_tab[i].gavec_used = packed_last;
+    }
 
     return 0;
 }
@@ -1115,6 +1186,8 @@ void hal_dump(FILE *fp)
 	}
 #endif
 	for (i = 0; i < ifnum; ++i) {
+		int j;
+		struct hagent_ifa_pair *p;
 		fprintf(fp, "%s:\n", haifinfo_tab[i].ifname);
 #ifdef DEBUG
 		fprintf(fp, "  sentinel entry=%x\n",
@@ -1124,17 +1197,19 @@ void hal_dump(FILE *fp)
 		     halp = halp->hagent_next_pref) {
 			halent_dump(fp, halp);
 		}
-		if (haifinfo_tab[i].global != NULL) {
+		for (p = haifinfo_tab[i].haif_gavec, j = 0;
+		     j < haifinfo_tab[i].gavec_used; ++j) {
+			fprintf(fp, "  entry %d\n", j);
+			if (p[j].global != NULL) {
+				inet_ntop(AF_INET6,
+					  &((struct sockaddr_in6 *)(p[j].global->ifa_addr))->sin6_addr,
+					  ntopbuf, INET6_ADDRSTRLEN);
+				fprintf(fp, "    global addresses=%s\n", ntopbuf);
+			}
 			inet_ntop(AF_INET6,
-				  &((struct sockaddr_in6 *)(haifinfo_tab[i].global->ifa_addr))->sin6_addr,
+				  &((struct sockaddr_in6 *)(p[j].anycast->ifa_addr))->sin6_addr,
 				  ntopbuf, INET6_ADDRSTRLEN);
-			fprintf(fp, "  global addresses=%s\n", ntopbuf);
-		}
-		if (haifinfo_tab[i].anycast != NULL) {
-			inet_ntop(AF_INET6,
-				  &((struct sockaddr_in6 *)(haifinfo_tab[i].anycast->ifa_addr))->sin6_addr,
-				  ntopbuf, INET6_ADDRSTRLEN);
-			fprintf(fp, "  anycast addresses=%s\n", ntopbuf);
+			fprintf(fp, "    anycast addresses=%s\n", ntopbuf);
 		}
 	}
 #ifdef DEBUG
@@ -1171,8 +1246,10 @@ haadisc_hup()
 	/* clean interface addresses */
 	for (i = 0; i < ifnum; ++i) {
 		haifinfo_tab[i].linklocal = NULL;
-		haifinfo_tab[i].global = NULL;
-		haifinfo_tab[i].anycast = NULL;
+		free(haifinfo_tab[i].haif_gavec);
+		haifinfo_tab[i].haif_gavec = NULL;
+		haifinfo_tab[i].gavec_size = 0;
+		haifinfo_tab[i].gavec_used = 0;
 	}
 
 	/* get interface addresses */
