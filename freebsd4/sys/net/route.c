@@ -1460,8 +1460,8 @@ rt_draincache()
 	}
 
 	/*
-	 * if we cannot purge enough entries, do it again with a stronger
-	 * expiration hook.
+	 * if we cannot purge enough entries, do it again with a more
+	 * aggressive policy.
 	 */
 	rtcount = rt_cache_timeout_q->rtq_count;
 	if (!again && rtcount > rt_cache_hiwat) {
