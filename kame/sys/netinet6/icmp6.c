@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.240 2001/08/06 05:52:37 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.241 2001/08/09 10:19:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2003,7 +2003,7 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 				continue;
 			ifa6 = (struct in6_ifaddr *)ifa;
 
-			if ((ifa6->ia6_flags & IN6_IFF_DEPRECATED) != 0 &&
+			if (IFA6_IS_DEPRECATED(ifa6) &&
 			    allow_deprecated == 0) {
 				/*
 				 * prefererred address should be put before
@@ -2016,7 +2016,7 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 
 				continue;
 			}
-			else if ((ifa6->ia6_flags & IN6_IFF_DEPRECATED) == 0 &&
+			else if (!IFA6_IS_DEPRECATED(ifa6) &&
 				 allow_deprecated != 0)
 				continue; /* we now collect deprecated addrs */
 
