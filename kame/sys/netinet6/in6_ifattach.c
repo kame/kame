@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.162 2002/05/27 04:21:26 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.163 2002/05/27 05:49:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -246,9 +246,8 @@ generate_tmp_ifid(seed0, seed1, ret)
 #endif
 			bcopy(&val32, seed + sizeof(val32) * i, sizeof(val32));
 		}
-	} else {
+	} else
 		bcopy(seed0, seed, 8);
-	}
 
 	/* copy the right-most 64-bits of the given address */
 	/* XXX assumption on the size of IFID */
@@ -300,8 +299,7 @@ generate_tmp_ifid(seed0, seed1, ret)
 		struct in6_ifaddr *ia;
 
 		for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
-			if (bcmp(&ia->ia_addr.sin6_addr.s6_addr[8], ret, 8)
-				== 0) {
+			if (!bcmp(&ia->ia_addr.sin6_addr.s6_addr[8], ret, 8)) {
 				badid = 1;
 				break;
 			}
@@ -333,7 +331,7 @@ generate_tmp_ifid(seed0, seed1, ret)
 			 * temporary address.
 			 */
 			nd6log((LOG_NOTICE,
-				"generate_tmp_ifid: never found a good ID\n"));
+			    "generate_tmp_ifid: never found a good ID\n"));
 			bzero(ret, 8);
 		}
 	}
@@ -580,13 +578,10 @@ get_ifid(ifp0, altifp, in6)
 	return -1;
 
 success:
-	nd6log((LOG_INFO, "%s: ifid: "
-		"%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
-		if_name(ifp0),
-		in6->s6_addr[8], in6->s6_addr[9],
-		in6->s6_addr[10], in6->s6_addr[11],
-		in6->s6_addr[12], in6->s6_addr[13],
-		in6->s6_addr[14], in6->s6_addr[15]));
+	nd6log((LOG_INFO, "%s: ifid: %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
+	    if_name(ifp0), in6->s6_addr[8], in6->s6_addr[9], in6->s6_addr[10],
+	    in6->s6_addr[11], in6->s6_addr[12], in6->s6_addr[13],
+	    in6->s6_addr[14], in6->s6_addr[15]));
 	return 0;
 }
 
@@ -706,7 +701,7 @@ in6_ifattach_linklocal(ifp, altifp)
 	/* apply the mask for safety. (nd6_prelist_add will apply it again) */
 	for (i = 0; i < 4; i++) {
 		pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
-			in6mask64.s6_addr32[i];
+		    in6mask64.s6_addr32[i];
 	}
 	/*
 	 * Initialize parameters.  The link-local prefix must always be
@@ -832,7 +827,7 @@ in6_nigroup(ifp, name, namelen, sa6)
 	sa6->sin6_addr.s6_addr32[0] = htonl(0xff020000);
 	sa6->sin6_addr.s6_addr8[11] = 2;
 	bcopy(digest, &sa6->sin6_addr.s6_addr32[3],
-	      sizeof(sa6->sin6_addr.s6_addr32[3]));
+	    sizeof(sa6->sin6_addr.s6_addr32[3]));
 	if (in6_addr2zoneid(ifp, &sa6->sin6_addr, &sa6->sin6_scope_id) ||
 	    in6_embedscope(&sa6->sin6_addr, sa6)) { /* XXX */
 		return -1; /* XXX: should not fail */
@@ -856,7 +851,7 @@ in6_ifattach(ifp, altifp)
 
 	/* some of the interfaces are inherently not IPv6 capable */
 	switch (ifp->if_type) {
-#ifdef IFT_BRIDGE	/* OpenBSD 2.8 */
+#ifdef IFT_BRIDGE	/* OpenBSD 2.8, NetBSD 1.6 */
 	case IFT_BRIDGE:
 		return;
 #endif
@@ -1014,19 +1009,18 @@ in6_ifdetach(ifp)
 		}
 
 		/* remove from the routing table */
-		if ((ia->ia_flags & IFA_ROUTE)
-		 && (rt = rtalloc1((struct sockaddr *)&ia->ia_addr, 0
+		if ((ia->ia_flags & IFA_ROUTE) &&
+		    (rt = rtalloc1((struct sockaddr *)&ia->ia_addr, 0
 #ifdef __FreeBSD__
 				, 0UL
 #endif
 				))) {
 			rtflags = rt->rt_flags;
 			rtfree(rt);
-			rtrequest(RTM_DELETE,
-				(struct sockaddr *)&ia->ia_addr,
-				(struct sockaddr *)&ia->ia_addr,
-				(struct sockaddr *)&ia->ia_prefixmask,
-				rtflags, (struct rtentry **)0);
+			rtrequest(RTM_DELETE, (struct sockaddr *)&ia->ia_addr,
+			    (struct sockaddr *)&ia->ia_addr,
+			    (struct sockaddr *)&ia->ia_prefixmask,
+			    rtflags, (struct rtentry **)0);
 		}
 
 		/* remove from the linked list */
@@ -1051,8 +1045,8 @@ in6_ifdetach(ifp)
 				ia->ia_next = oia->ia_next;
 			else {
 				nd6log((LOG_ERR, 
-				    "%s: didn't unlink in6ifaddr from "
-				    "list\n", if_name(ifp)));
+				    "%s: didn't unlink in6ifaddr from list\n",
+				    if_name(ifp)));
 			}
 		}
 
@@ -1111,7 +1105,7 @@ in6_ifdetach(ifp)
 #endif
 	if (rt && rt->rt_ifp == ifp) {
 		rtrequest(RTM_DELETE, (struct sockaddr *)rt_key(rt),
-			rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
+		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
 		rtfree(rt);
 	}
 }
@@ -1138,7 +1132,7 @@ in6_get_tmpifid(ifp, retbuf, baseid, generate)
 
 		/* generate_tmp_ifid will update seedn and buf */
 		(void)generate_tmp_ifid(ndi->randomseed0, ndi->randomseed1,
-					ndi->randomid);
+		    ndi->randomid);
 	}
 	bcopy(ndi->randomid, retbuf, 8);
 	if (generate && bcmp(retbuf, nullbuf, sizeof(nullbuf)) == 0) {
@@ -1164,9 +1158,8 @@ in6_tmpaddrtimer(ignored_arg)
 
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&in6_tmpaddrtimer_ch,
-		      (ip6_temp_preferred_lifetime - ip6_desync_factor -
-		       ip6_temp_regen_advance) * hz,
-		      in6_tmpaddrtimer, NULL);
+	    (ip6_temp_preferred_lifetime - ip6_desync_factor -
+	    ip6_temp_regen_advance) * hz, in6_tmpaddrtimer, NULL);
 #elif defined(__OpenBSD__)
 	timeout_set(&in6_tmpaddrtimer_ch, in6_tmpaddrtimer, NULL);
 	timeout_add(&in6_tmpaddrtimer_ch, 
@@ -1174,8 +1167,8 @@ in6_tmpaddrtimer(ignored_arg)
 	    ip6_temp_regen_advance) * hz);
 #else
 	timeout(in6_tmpaddrtimer, (caddr_t)0,
-		(ip6_temp_preferred_lifetime - ip6_desync_factor -
-		 ip6_temp_regen_advance) * hz);
+	    (ip6_temp_preferred_lifetime - ip6_desync_factor -
+	    ip6_temp_regen_advance) * hz);
 #endif
 
 	bzero(nullbuf, sizeof(nullbuf));
@@ -1192,8 +1185,7 @@ in6_tmpaddrtimer(ignored_arg)
 			 * Create a new one.
 			 */
 			(void)generate_tmp_ifid(ndi->randomseed0,
-						ndi->randomseed1,
-						ndi->randomid);
+			    ndi->randomseed1, ndi->randomid);
 		}
 	}
 
