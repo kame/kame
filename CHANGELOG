@@ -1,9 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.129 1999/09/22 06:24:35 itojun Exp $
+$Id: CHANGELOG,v 1.130 1999/09/22 11:45:15 sakane Exp $
 
 
 <199909>
+Wed Sep 22 20:42:25 JST 1999 sakane@ydc.co.jp
+	* kame/kame/mchat:
+	Added two new command, /file and /log.  `/file' is to send file
+	specified.  `/log' is to log data received into file specified.
+	If `/log' is typed again, logging will be finished.
+
 Wed Sep 22 15:22:21 JST 1999  itojun@iijlab.net
 	* netbsd/sys/netinet/tcp* (tcp4/6)
 	* bsdi/sys/netinet/tcp* (tcp4)
