@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.175 2002/10/02 06:23:56 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.176 2002/10/02 11:16:00 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -211,6 +211,17 @@ static void mip6_create_nodekey __P((mip6_nodekey_t *));
 static void mip6_update_nonce_nodekey(void *);
 #endif /* MIP6_DRAFT18 */
 
+/* using for return routability */
+/* This macro will be deleted after release of MIP6 */
+#ifdef RR_DBG
+	extern void ipsec_hexdump __P((caddr_t, int));
+#define mip6_hexdump(m,l,a)			\
+		do {				\
+			printf("%s", (m));	\
+			ipsec_hexdump((caddr_t)(a),(l)); \
+			printf("\n");		\
+		} while (0)
+#endif
 #if defined(IPSEC) && !defined(__OpenBSD__)
 struct ipsecrequest *mip6_getipsecrequest __P((struct sockaddr_in6 *,
 					       struct sockaddr_in6 *,
@@ -2688,22 +2699,9 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa)
 	struct mip6_mobility_options *mopt;
 	struct sockaddr_in6 *hoa_sa, *coa_sa;
 {
-	mip6_nonce_t home_nonce, careof_nonce;
-	mip6_nodekey_t home_nodekey, coa_nodekey;
-	mip6_home_cookie_t home_cookie;
-	mip6_careof_cookie_t careof_cookie;
 	u_int8_t key_bu[MIP6_KBU_LEN]; /* Stated as 'Kbu' in the spec */
 	u_int8_t authdata[SHA1_RESULTLEN];
 	u_int16_t cksum_backup;
-#ifdef RR_DBG
-	extern void ipsec_hexdump __P((caddr_t, int));
-#define mip6_hexdump(m,l,a)			\
-		do {				\
-			printf("%s", (m));	\
-			ipsec_hexdump((caddr_t)(a),(l)); \
-			printf("\n");		\
-		} while (0)
-#endif
 
 	/* Nonce index & Auth. data mobility options are required */
 	if ((mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) == 0) {
@@ -2712,53 +2710,10 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa)
 			 __FILE__, __LINE__, mopt->valid_options));
 		return (EINVAL);
 	}
-#ifdef RR_DBG
-printf("CN: Home   Nonce IDX: %d\n", mopt->mopt_ho_nonce_idx);
-printf("CN: Careof Nonce IDX: %d\n", mopt->mopt_co_nonce_idx);
-#endif
-	if ((mip6_get_nonce(mopt->mopt_ho_nonce_idx, &home_nonce) != 0) ||
-	    (mip6_get_nonce(mopt->mopt_co_nonce_idx, &careof_nonce) != 0)) {
-		mip6log((LOG_ERR,
-			 "%s:%d: home or care-of Nonce cannot be acquired.\n",
-			 __FILE__, __LINE__));
+	if (mip6_calculate_kbu_from_index(hoa_sa, coa_sa, mopt->mopt_ho_nonce_idx, 
+			mopt->mopt_co_nonce_idx, key_bu)) {
 		return (EINVAL);
 	}
-#ifdef RR_DBG
-mip6_hexdump("CN: Home   Nonce: ", sizeof(home_nonce), &home_nonce);
-mip6_hexdump("CN: Careof Nonce: ", sizeof(careof_nonce), &careof_nonce);
-#endif
-
-	if ((mip6_get_nodekey(mopt->mopt_ho_nonce_idx, &home_nodekey) != 0) ||
-	    (mip6_get_nodekey(mopt->mopt_co_nonce_idx, &coa_nodekey) != 0)) {
-		mip6log((LOG_ERR,
-			 "%s:%d: home or care-of node key cannot be acquired.\n",
-			 __FILE__, __LINE__));
-		return (EINVAL);
-	}
-#ifdef RR_DBG
-mip6_hexdump("CN: Home   Nodekey: ", sizeof(home_nodekey), &home_nodekey);
-mip6_hexdump("CN: Careof Nodekey: ", sizeof(coa_nodekey), &coa_nodekey);
-#endif
-
-	/* Calculate home cookie */
-	mip6_create_cookie(&hoa_sa->sin6_addr,
-			   &home_nodekey, &home_nonce, &home_cookie);
-#ifdef RR_DBG
-mip6_hexdump("CN: Home Cookie: ", sizeof(home_cookie), (u_int8_t *)&home_cookie);
-#endif
-
-	/* Calculate care-of cookie */
-	mip6_create_cookie(&coa_sa->sin6_addr,
-			   &coa_nodekey, &careof_nonce, &careof_cookie);
-#ifdef RR_DBG
-mip6_hexdump("CN: Care-of Cookie: ", sizeof(careof_cookie), (u_int8_t *)&careof_cookie);
-#endif
-
-	/* Calculate K_bu */
-	mip6_calculate_kbu(&home_cookie, &careof_cookie, key_bu);
-#ifdef RR_DBG
-mip6_hexdump("CN: K_bu: ", sizeof(key_bu), key_bu);
-#endif
 
 	cksum_backup = ip6mu->ip6mu_cksum;
 	ip6mu->ip6mu_cksum = 0;
@@ -2867,11 +2822,72 @@ mip6_create_cookie(addr, nodekey, nonce, cookie)
 	bcopy(result, cookie, 8);
 }
 
+/* For CN side function */
+int
+mip6_calculate_kbu_from_index(hoa_sa, coa_sa, ho_nonce_idx, co_nonce_idx, key_bu)
+	struct sockaddr_in6 *hoa_sa;
+	struct sockaddr_in6 *coa_sa;
+	u_int16_t ho_nonce_idx;	/* Home Nonce Index */
+	u_int16_t co_nonce_idx;	/* Care-of Nonce Index */
+	u_int8_t *key_bu;	/* needs at least MIP6_KBU_LEN bytes */
+{
+	mip6_nonce_t home_nonce, careof_nonce;
+	mip6_nodekey_t home_nodekey, coa_nodekey;
+	mip6_home_cookie_t home_cookie;
+	mip6_careof_cookie_t careof_cookie;
+
+	if ((mip6_get_nonce(ho_nonce_idx, &home_nonce) != 0) ||
+	    (mip6_get_nonce(co_nonce_idx, &careof_nonce) != 0)) {
+		mip6log((LOG_ERR,
+			 "%s:%d: home or care-of Nonce cannot be acquired.\n",
+			 __FILE__, __LINE__));
+		return (EINVAL);
+	}
+#ifdef RR_DBG
+mip6_hexdump("CN: Home   Nonce: ", sizeof(home_nonce), &home_nonce);
+mip6_hexdump("CN: Careof Nonce: ", sizeof(careof_nonce), &careof_nonce);
+#endif
+
+	if ((mip6_get_nodekey(ho_nonce_idx, &home_nodekey) != 0) ||
+	    (mip6_get_nodekey(co_nonce_idx, &coa_nodekey) != 0)) {
+		mip6log((LOG_ERR,
+			 "%s:%d: home or care-of node key cannot be acquired.\n",
+			 __FILE__, __LINE__));
+		return (EINVAL);
+	}
+#ifdef RR_DBG
+mip6_hexdump("CN: Home   Nodekey: ", sizeof(home_nodekey), &home_nodekey);
+mip6_hexdump("CN: Careof Nodekey: ", sizeof(coa_nodekey), &coa_nodekey);
+#endif
+
+	/* Calculate home cookie */
+	mip6_create_cookie(&hoa_sa->sin6_addr,
+			   &home_nodekey, &home_nonce, &home_cookie);
+#ifdef RR_DBG
+mip6_hexdump("CN: Home Cookie: ", sizeof(home_cookie), (u_int8_t *)&home_cookie);
+#endif
+
+	/* Calculate care-of cookie */
+	mip6_create_cookie(&coa_sa->sin6_addr,
+			   &coa_nodekey, &careof_nonce, &careof_cookie);
+#ifdef RR_DBG
+mip6_hexdump("CN: Care-of Cookie: ", sizeof(careof_cookie), (u_int8_t *)&careof_cookie);
+#endif
+
+	/* Calculate K_bu */
+	mip6_calculate_kbu(&home_cookie, &careof_cookie, key_bu);
+#ifdef RR_DBG
+mip6_hexdump("CN: K_bu: ", sizeof(key_bu), key_bu);
+#endif
+
+	return (0);
+}
+
 void
 mip6_calculate_kbu(home_cookie, careof_cookie, key_bu)
 	mip6_home_cookie_t *home_cookie;
 	mip6_careof_cookie_t *careof_cookie;
-	u_int8_t *key_bu;	/* needs at least SHA1_RESULTLEN bytes */
+	u_int8_t *key_bu;	/* needs at least MIP6_KBU_LEN bytes */
 {
 	SHA1_CTX sha1_ctx;
 	u_int8_t result[SHA1_RESULTLEN];

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.139 2002/09/27 11:28:47 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.140 2002/10/02 11:16:00 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1535,7 +1535,7 @@ mip6_dad_success(ifa)
 			    IP6MA_STATUS_ACCEPTED,
 			    prim->mbc_seqno,
 			    prim->mbc_lifetime,
-			    prim->mbc_lifetime / 2 /* XXX */)) {
+			    prim->mbc_lifetime / 2 /* XXX */, NULL)) {
 		mip6log((LOG_ERR,
 			 "%s:%d: sending BA to %s(%s) failed. "
 			 "send it later.\n",
@@ -1613,7 +1613,7 @@ mip6_dad_error(ifa, err)
 			&prim->mbc_pcoa,
 			err,
 			prim->mbc_seqno,
-			0, 0);
+			0, 0, NULL);
 	mip6_bc_list_remove(&mip6_bc_list, prim);
 
 	return (0);

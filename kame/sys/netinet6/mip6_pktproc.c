@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.62 2002/10/02 06:23:57 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.63 2002/10/02 11:16:00 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -602,7 +602,9 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 					       sizeof(*ip6mu),
 					       ip6mulen, &mopt))) {
 		m_freem(m);
-		return (error);
+		bi.mbc_status = IP6MA_STATUS_INVAL_AUTHENTICATOR;
+		bi.mbc_send_ba = 1;
+		goto send_ba;
 	}
 #ifdef __NetBSD__
 {
@@ -748,7 +750,7 @@ send_ba:
 
 		ba_error = mip6_bc_send_ba(&bi.mbc_addr, &bi.mbc_phaddr,
 			    &bi.mbc_pcoa, bi.mbc_status, bi.mbc_seqno,
-			    bi.mbc_lifetime, bi.mbc_refresh);
+			    bi.mbc_lifetime, bi.mbc_refresh, &mopt);
 		if (ba_error) {
 			mip6log((LOG_ERR,
 			    "%s:%d: sending a binding ack failed (%d)\n",
@@ -1271,7 +1273,7 @@ mip6_bu_send_cbu(mbu)
 }
 
 int
-mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
+mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
 	struct sockaddr_in6 *src;
 	struct sockaddr_in6 *dst;
 	struct sockaddr_in6 *dstcoa;
@@ -1279,6 +1281,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 	u_int16_t seqno;
 	u_int32_t lifetime;
 	u_int32_t refresh;
+	struct mip6_mobility_options *mopt;
 {
 	struct mbuf *m;
 	struct ip6_pktopts opt;
@@ -1296,7 +1299,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 	}
 
 	error =  mip6_ip6ma_create(&opt.ip6po_mobility, src, dst,
-				   status, seqno, lifetime, refresh);
+				   status, seqno, lifetime, refresh, mopt);
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s:%d: ba destopt creation error (%d)\n",
@@ -1697,7 +1700,7 @@ mip6_hexdump("MN: Authdata: ", SHA1_RESULTLEN, (u_int8_t *)(mopt_auth + 1));
 }
 
 int
-mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
+mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, mopt)
 	struct ip6_mobility **pktopt_mobility;
 	struct sockaddr_in6 *src;
 	struct sockaddr_in6 *dst;
@@ -1705,12 +1708,15 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 	u_int16_t seqno;
 	u_int32_t lifetime;
 	u_int32_t refresh;
+	struct mip6_mobility_options *mopt;
 {
 	struct ip6m_binding_ack *ip6ma;
 	struct ip6m_opt_refresh *mopt_refresh = NULL;
 	int need_refresh = 0;
+	int need_auth = 0;
 	int ip6ma_size, pad;
-	int ba_size, refresh_size;
+	int ba_size = 0, refresh_size = 0, auth_size = 0;
+	u_int8_t key_bu[MIP6_KBU_LEN]; /* Stated as 'Kbu' in the spec */
 
 	*pktopt_mobility = NULL;
 
@@ -1723,6 +1729,13 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 	} else {
 		ba_size += PADLEN(ba_size, 8, 0);
 		refresh_size = 0;
+	}
+	if (mopt && 
+	    (mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) &&
+	    mip6_calculate_kbu_from_index(dst, src, 
+		mopt->mopt_ho_nonce_idx, mopt->mopt_co_nonce_idx, 
+		key_bu) == 0) {
+		need_auth = 1;
 	}
 	ip6ma_size = ba_size + refresh_size;
 
@@ -1762,7 +1775,9 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 #endif
 	}
 
-	/* XXX authorization data processing. */
+	if (need_auth) {
+		/* XXX authorization data processing. */
+	}
 
 	/* padN */
 	if (refresh_size) {

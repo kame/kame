@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.59 2002/10/02 06:23:57 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.60 2002/10/02 11:16:00 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -379,7 +379,8 @@ int mip6_ip6ma_create			__P((struct ip6_mobility **,
 					     u_int8_t,
 					     u_int16_t,
 					     u_int32_t,
-					     u_int32_t));
+					     u_int32_t,
+					     struct mip6_mobility_options *));
 int mip6_ip6me_create			__P((struct ip6_mobility **,
 					     struct sockaddr_in6 *,
 					     struct sockaddr_in6 *,
@@ -606,7 +607,7 @@ struct mip6_bc *mip6_bc_list_find_withpcoa
 					     struct sockaddr_in6 *));
 int mip6_bc_send_ba __P((struct sockaddr_in6 *, struct sockaddr_in6 *,
 			 struct sockaddr_in6 *, u_int8_t, u_int16_t,
-			 u_int32_t, u_int32_t));
+			 u_int32_t, u_int32_t, struct mip6_mobility_options *));
 int mip6_bc_send_bm			__P((struct mbuf *,
 					     struct in6_addr *));
 int mip6_dad_success			__P((struct ifaddr *));
@@ -630,6 +631,7 @@ void mip6_create_cookie __P((struct in6_addr *,
 			     mip6_nodekey_t *, mip6_nonce_t *,
 			     void *));
 void mip6_calculate_kbu(mip6_home_cookie_t *, mip6_careof_cookie_t *, u_int8_t *);
+int  mip6_calculate_kbu_from_index(struct sockaddr_in6 *, struct sockaddr_in6 *, u_int16_t, u_int16_t, u_int8_t *);
 void mip6_calculate_authenticator(u_int8_t *, u_int8_t *, 
 	struct in6_addr *, struct in6_addr *,
 	caddr_t, size_t, int, size_t);
