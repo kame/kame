@@ -11,4 +11,6 @@ MAN=	pfctl.8
 LDADD+=	-lm
 DPADD+=	${LIBM}
 
+.PATH: ${.CURDIR}/../../../kame/kame/pfctl
+
 .include <bsd.prog.mk>
