@@ -33,7 +33,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/inet.c,v 1.1 1999/08/08 23:30:14 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/inet.c,v 1.2 2000/01/13 17:07:45 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -186,8 +186,13 @@ pcap_lookupnet(device, netp, maskp, errbuf)
 #endif
 	(void)strncpy(ifr.ifr_name, device, sizeof(ifr.ifr_name));
 	if (ioctl(fd, SIOCGIFADDR, (char *)&ifr) < 0) {
-		(void)sprintf(errbuf, "SIOCGIFADDR: %s: %s",
-		    device, pcap_strerror(errno));
+		if (errno == EADDRNOTAVAIL)
+			(void)sprintf(errbuf, "%s: no IPv4 address assigned",
+			    device);
+		else {
+			(void)sprintf(errbuf, "SIOCGIFADDR: %s: %s",
+			    device, pcap_strerror(errno));
+		}
 		(void)close(fd);
 		return (-1);
 	}
