@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.135 2002/06/19 14:37:45 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.136 2002/06/24 10:50:33 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1674,6 +1674,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 	}
 
 #ifdef MIP6XXX
+	/XXX check nxt == IPPROTO_NONE *//* not supported piggyback */
 	/*
 	 * insert BA/BR if pending BA/BR exist.
 	 */
@@ -1711,15 +1712,17 @@ mip6_exthdr_create(m, opt, mip6opt)
 		goto noneed;
 	}
 
-	/* create a binding update mobility header. */
-	error = mip6_ip6mu_create(&mip6opt->mip6po_mobility,
-				  src, dst, sc);
-	if (error) {
-		mip6log((LOG_ERR,
-			 "%s:%d: a binding update mobility header "
-			 "insertion failed.\n",
-			 __FILE__, __LINE__));
-		goto bad;
+	if (ip6->ip6_nxt == IPPROTO_NONE) {
+		/* create a binding update mobility header. */
+		error = mip6_ip6mu_create(&mip6opt->mip6po_mobility,
+				  	src, dst, sc);
+		if (error) {
+			mip6log((LOG_ERR,
+			 	"%s:%d: a binding update mobility header "
+			 	"insertion failed.\n",
+			 	__FILE__, __LINE__));
+			goto bad;
+		}
 	}
 
 	if (mbu->mbu_flags & IP6MU_HOME) {

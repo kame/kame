@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.315 2002/06/18 06:02:05 k-sugyou Exp $	*/
+/*	$KAME: ip6_output.c,v 1.316 2002/06/24 10:50:33 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -438,6 +438,17 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		 * extension headers.
 		 */
 	}
+
+	if (exthdrs.ip6e_mobility) {
+		if (ip6->ip6_nxt != IPPROTO_NONE || m->m_next != NULL)
+			panic("not supported piggyback");
+		exthdrs.ip6e_mobility->m_next = m->m_next;
+		m->m_next = exthdrs.ip6e_mobility;
+		*mtod(exthdrs.ip6e_mobility, u_char *) = ip6->ip6_nxt;
+		ip6->ip6_nxt = IPPROTO_MOBILITY;
+		m->m_pkthdr.len += exthdrs.ip6e_mobility->m_len;
+		exthdrs.ip6e_mobility = NULL;
+	}
 #endif /* MIP6 */
 
 #ifdef IPSEC
@@ -525,7 +536,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		    exthdrs.ip6e_rthdr || exthdrs.ip6e_dest2
 #ifdef MIP6
 		    || exthdrs.ip6e_rthdr2 || exthdrs.ip6e_haddr
-		    || exthdrs.ip6e_mobility
 #endif /* MIP6 */
 		    ) {
 			error = EHOSTUNREACH;
@@ -596,9 +606,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	unfragpartlen = optlen + sizeof(struct ip6_hdr);
 	/* NOTE: we don't add AH/ESP length here. do that later. */
 	if (exthdrs.ip6e_dest2) optlen += exthdrs.ip6e_dest2->m_len;
-#ifdef MIP6
-	if (exthdrs.ip6e_mobility) optlen += exthdrs.ip6e_mobility->m_len;
-#endif /* MIP6 */
 
 	/*
 	 * If we need IPsec, or there is at least one extension header,
@@ -656,9 +663,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	{
 		u_char *nexthdrp = &ip6->ip6_nxt;
 		struct mbuf *mprev = m;
-#ifdef MIP6
-		struct mbuf *lasthdr = m;
-#endif /* MIP6 */
 
 		/*
 		 * we treat dest2 specially.  this makes IPsec processing
@@ -675,21 +679,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			m->m_next = exthdrs.ip6e_dest2;
 			*mtod(exthdrs.ip6e_dest2, u_char *) = ip6->ip6_nxt;
 			ip6->ip6_nxt = IPPROTO_DSTOPTS;
-#ifdef MIP6
-			lasthdr = exthdrs.ip6e_dest2;
-			nexthdrp = mtod(exthdrs.ip6e_dest2, u_char *);
-#endif /* MIP6 */
 		}
-#ifdef MIP6
-		if (exthdrs.ip6e_mobility) {
-			if (!hdrsplit)
-				panic("assumption failed: hdr not split");
-			exthdrs.ip6e_mobility->m_next = lasthdr->m_next;
-			lasthdr->m_next = exthdrs.ip6e_mobility;
-			*mtod(exthdrs.ip6e_mobility, u_char *) = *nexthdrp;
-			*nexthdrp = IPPROTO_MOBILITY;
-		}
-#endif /* MIP6 */
 
 #define MAKE_CHAIN(m, mp, p, i)\
     do {\

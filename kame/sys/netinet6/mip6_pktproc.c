@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.13 2002/06/19 14:37:45 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.14 2002/06/24 10:50:34 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -57,6 +57,15 @@
 #include <netinet6/nd6.h>
 
 #include <net/if_hif.h>
+
+#ifdef __OpenBSD__ /* KAME IPSEC */
+#undef IPSEC
+#endif
+
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#include <netkey/key.h>
+#endif /* IPSEC */
 
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
@@ -434,6 +443,17 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	int error = 0;
 	u_int8_t bu_safe = 0;
 
+#ifdef IPSEC
+	/*
+	 * Check ESP(IPsec)
+	 */
+	if (ipsec6_in_reject(m, NULL)) {
+		ipsec6stat.in_polvio++;
+		m_freem(m);
+		return (EINVAL);	/* XXX */
+	}
+#endif /* IPSEC */
+
 	ip6 = mtod(m, struct ip6_hdr *);
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
 		/* must not happen. */
@@ -652,6 +672,17 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 	u_int16_t seqno;
+
+#ifdef IPSEC
+	/*
+	 * Check ESP(IPsec)
+	 */
+	if (ipsec6_in_reject(m, NULL)) {
+		ipsec6stat.in_polvio++;
+		m_freem(m);
+		return (EINVAL);	/* XXX */
+	}
+#endif /* IPSEC */
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
