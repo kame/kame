@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_script.c,v 1.2 2003/04/11 12:19:56 jinmei Exp $	*/
+/*	$KAME: dhcp6c_script.c,v 1.3 2003/04/11 13:04:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -82,7 +82,7 @@ client6_script(ifp, state, optinfo)
 
 	/* initialize counters */
 	dnsservers = 0;
-	envc = 2;     /* we always include the reason and the terminator*/
+	envc = 2;     /* we always include the reason and the terminator */
 
 	/* count the number of variables */
 	for (v = TAILQ_FIRST(&optinfo->dns_list); v; v = TAILQ_NEXT(v, link))
