@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2317 2003/01/22 10:13:55 jinmei Exp $
+$KAME: CHANGELOG,v 1.2318 2003/01/23 00:32:38 suz Exp $
 
 <200301>
+Thu Jan 23 09:26:35 JST 2003	suz@crl.hitachi.co.jp
+	* kame/kame/pim6sd: 
+	- fixed MLD query advertisement failure
+	- displayes MLD group management info in dump
+
 2003-01-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: supported the elapsed time DHCPv6 option:
 	- the client now includes the option for all messages.
