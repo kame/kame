@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.68 2003/08/07 05:19:57 mickey Exp $	*/
+/*	$OpenBSD: trap.c,v 1.70 2003/12/20 21:49:06 miod Exp $	*/
 
 /*
  * Copyright (c) 1998-2003 Michael Shalayeff
@@ -383,7 +383,8 @@ trap(type, frame)
 		 * the current limit and we need to reflect that as an access
 		 * error.
 		 */
-		if (space != 0 && va < (vaddr_t)vm->vm_minsaddr &&
+		if (space != HPPA_SID_KERNEL &&
+		    va < (vaddr_t)vm->vm_minsaddr &&
 		    va >= (vaddr_t)vm->vm_maxsaddr + ctob(vm->vm_ssize)) {
 			if (ret == 0) {
 				vsize_t nss = btoc(va - USRSTACK + NBPG - 1);
@@ -409,7 +410,7 @@ trap(type, frame)
 #endif
 				} else {
 					panic("trap: "
-					    "uvm_fault(%p, %x, %d, %d): %d",
+					    "uvm_fault(%p, %lx, %d, %d): %d",
 					    map, va, 0, vftype, ret);
 				}
 			}
@@ -566,7 +567,7 @@ syscall(struct trapframe *frame)
 		 * of the arguments on the stack.
 		 * this assumes that none of 'em are called
 		 * by their normal syscall number, maybe a regress
-		 * test should be used, to whatch the behaviour.
+		 * test should be used, to watch the behaviour.
 		 */
 		if (!error && argoff < 4) {
 			int t;

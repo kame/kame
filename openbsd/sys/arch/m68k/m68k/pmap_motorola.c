@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap_motorola.c,v 1.27 2003/06/02 23:27:48 millert Exp $ */
+/*	$OpenBSD: pmap_motorola.c,v 1.33 2004/01/01 01:12:54 miod Exp $ */
 
 /*
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -835,46 +835,27 @@ pmap_page_protect(pg, prot)
 #ifdef DEBUG
 	if ((pmapdebug & (PDB_FOLLOW|PDB_PROTECT)) ||
 	    (prot == VM_PROT_NONE && (pmapdebug & PDB_REMOVE)))
-		printf("pmap_page_protect(%lx, %x)\n", pa, prot);
+		printf("pmap_page_protect(%lx, %x)\n", pg, prot);
 #endif
 
-	switch (prot) {
-	case VM_PROT_READ|VM_PROT_WRITE:
-	case VM_PROT_ALL:
-		return;
-	/* copy_on_write */
-	case VM_PROT_READ:
-	case VM_PROT_READ|VM_PROT_EXECUTE:
-		pmap_changebit(pg, PG_RO, ~0);
-		return;
-	/* remove_all */
-	default:
-		break;
-	}
-	pv = pg_to_pvh(pg);
-	s = splvm();
-	while (pv->pv_pmap != NULL) {
-		pt_entry_t *pte;
+	if ((prot & VM_PROT_READ) == VM_PROT_NONE) {
+		pv = pg_to_pvh(pg);
+		s = splvm();
+		while (pv->pv_pmap != NULL) {
+			pt_entry_t *pte;
 
-		pte = pmap_pte(pv->pv_pmap, pv->pv_va);
+			pte = pmap_pte(pv->pv_pmap, pv->pv_va);
 #ifdef DEBUG
-		if (!pmap_ste_v(pv->pv_pmap, pv->pv_va) ||
-		    pmap_pte_pa(pte) != pa)
-			panic("pmap_page_protect: bad mapping");
+			if (!pmap_ste_v(pv->pv_pmap, pv->pv_va) ||
+			    pmap_pte_pa(pte) != VM_PAGE_TO_PHYS(pg))
+				panic("pmap_page_protect: bad mapping");
 #endif
-		if (!pmap_pte_w(pte))
 			pmap_remove_mapping(pv->pv_pmap, pv->pv_va,
-					    pte, PRM_TFLUSH|PRM_CFLUSH);
-		else {
-			pv = pv->pv_next;
-			PMAP_DPRINTF(PDB_PARANOIA,
-			    ("%s wired mapping for %lx not removed\n",
-			     "pmap_page_protect:", pa));
-			if (pv == NULL)
-				break;
+			    pte, PRM_TFLUSH|PRM_CFLUSH);
 		}
-	}
-	splx(s);
+		splx(s);
+	} else if ((prot & VM_PROT_WRITE) == VM_PROT_NONE)
+		pmap_changebit(pg, PG_RO, ~0);
 }
 
 /*
@@ -891,8 +872,11 @@ pmap_protect(pmap, sva, eva, prot)
 {
 	vaddr_t nssva;
 	pt_entry_t *pte;
-	boolean_t firstpage, needtflush;
+	boolean_t needtflush;
 	int isro;
+#ifdef M68K_MMU_HP
+	boolean_t firstpage;
+#endif
 
 	PMAP_DPRINTF(PDB_FOLLOW|PDB_PROTECT,
 	    ("pmap_protect(%p, %lx, %lx, %x)\n",
@@ -905,7 +889,9 @@ pmap_protect(pmap, sva, eva, prot)
 
 	isro = pte_prot(prot);
 	needtflush = active_pmap(pmap);
+#ifdef M68K_MMU_HP
 	firstpage = TRUE;
+#endif
 	while (sva < eva) {
 		nssva = m68k_trunc_seg(sva) + NBSEG;
 		if (nssva == 0 || nssva > eva)
@@ -952,7 +938,9 @@ pmap_protect(pmap, sva, eva, prot)
 				pmap_pte_set_prot(pte, isro);
 				if (needtflush)
 					TBIS(sva);
+#ifdef M68K_MMU_HP
 				firstpage = FALSE;
+#endif
 			}
 			pte++;
 			sva += PAGE_SIZE;
@@ -1549,29 +1537,6 @@ pmap_extract(pmap, va, pap)
 }
 
 /*
- * pmap_copy:		[ INTERFACE ]
- *
- *	Copy the mapping range specified by src_addr/len
- *	from the source map to the range dst_addr/len
- *	in the destination map.
- *
- *	This routine is only advisory and need not do anything.
- */
-void
-pmap_copy(dst_pmap, src_pmap, dst_addr, len, src_addr)
-	pmap_t		dst_pmap;
-	pmap_t		src_pmap;
-	vaddr_t		dst_addr;
-	vsize_t		len;
-	vaddr_t		src_addr;
-{
-
-	PMAP_DPRINTF(PDB_FOLLOW,
-	    ("pmap_copy(%p, %p, %lx, %lx, %lx)\n",
-	    dst_pmap, src_pmap, dst_addr, len, src_addr));
-}
-
-/*
  * pmap_collect:		[ INTERFACE ]
  *
  *	Garbage collects the physical map system for pages which are no
@@ -1908,22 +1873,6 @@ pmap_is_modified(pg)
 	return(pmap_testbit(pg, PG_M));
 }
 
-/*
- * pmap_phys_address:		[ INTERFACE ]
- *
- *	Return the physical address corresponding to the specified
- *	cookie.  Used by the device pager to decode a device driver's
- *	mmap entry point return value.
- *
- *	Note: no locking is necessary in this function.
- */
-paddr_t
-pmap_phys_address(ppn)
-	int ppn;
-{
-	return(m68k_ptob(ppn));
-}
-
 #ifdef M68K_MMU_HP
 /*
  * pmap_prefer:			[ INTERFACE ]
@@ -2016,7 +1965,7 @@ pmap_remove_mapping(pmap, va, pte, flags)
 {
 	struct vm_page *pg;
 	paddr_t pa;
-	struct pv_entry *pv, *npv;
+	struct pv_entry *pv, *prev, *cur;
 	pmap_t ptpmap;
 	st_entry_t *ste;
 	int s, bits;
@@ -2063,6 +2012,13 @@ pmap_remove_mapping(pmap, va, pte, flags)
 	opte = *pte;
 #endif
 
+#if defined(M68040) || defined(M68060)
+	if ((mmutype <= MMU_68040) && (flags & PRM_CFLUSH)) {
+		DCFP(pa);
+		ICPP(pa);
+	}
+#endif
+
 	/*
 	 * Update statistics
 	 */
@@ -2095,11 +2051,11 @@ pmap_remove_mapping(pmap, va, pte, flags)
 #endif
 
 		/*
-		 * If reference count drops to 1, and we're not instructed
+		 * If reference count drops to zero, and we're not instructed
 		 * to keep it around, free the PT page.
 		 */
 
-		if (refs == 1 && (flags & PRM_KEEPPTPAGE) == 0) {
+		if (refs == 0 && (flags & PRM_KEEPPTPAGE) == 0) {
 #ifdef DIAGNOSTIC
 			struct pv_entry *pv;
 #endif
@@ -2143,7 +2099,6 @@ pmap_remove_mapping(pmap, va, pte, flags)
 	 */
 
 	pv = pg_to_pvh(pg);
-	ste = ST_ENTRY_NULL;
 	s = splvm();
 
 	/*
@@ -2155,29 +2110,28 @@ pmap_remove_mapping(pmap, va, pte, flags)
 	if (pmap == pv->pv_pmap && va == pv->pv_va) {
 		ste = pv->pv_ptste;
 		ptpmap = pv->pv_ptpmap;
-		npv = pv->pv_next;
-		if (npv) {
-			npv->pv_flags = pv->pv_flags;
-			*pv = *npv;
-			pmap_free_pv(npv);
+		cur = pv->pv_next;
+		if (cur != NULL) {
+			cur->pv_flags = pv->pv_flags;
+			*pv = *cur;
+			pmap_free_pv(cur);
 		} else
 			pv->pv_pmap = NULL;
 	} else {
-		for (npv = pv->pv_next; npv; npv = npv->pv_next) {
-			if (pmap == npv->pv_pmap && va == npv->pv_va)
+		prev = pv;
+		for (cur = pv->pv_next; cur != NULL; cur = cur->pv_next) {
+			if (pmap == cur->pv_pmap && va == cur->pv_va)
 				break;
-			pv = npv;
+			prev = cur;
 		}
 #ifdef DEBUG
-		if (npv == NULL)
+		if (cur == NULL)
 			panic("pmap_remove: PA not in pv_tab");
 #endif
-		ste = npv->pv_ptste;
-		ptpmap = npv->pv_ptpmap;
-		pv->pv_next = npv->pv_next;
-		pmap_free_pv(npv);
-		pg = PHYS_TO_VM_PAGE(pa);
-		pv = pg_to_pvh(pg);
+		ste = cur->pv_ptste;
+		ptpmap = cur->pv_ptpmap;
+		prev->pv_next = cur->pv_next;
+		pmap_free_pv(cur);
 	}
 #ifdef M68K_MMU_HP
 
@@ -2302,12 +2256,12 @@ pmap_testbit(pg, bit)
 	struct vm_page *pg;
 	int bit;
 {
-	struct pv_entry *pv;
+	struct pv_entry *pv, *pvl;
 	pt_entry_t *pte;
 	int s;
 
-	pv = pg_to_pvh(pg);
 	s = splvm();
+	pv = pg_to_pvh(pg);
 
 	/*
 	 * Check saved info first
@@ -2329,8 +2283,8 @@ pmap_testbit(pg, bit)
 	 * found.  Cache a hit to speed future lookups.
 	 */
 	if (pv->pv_pmap != NULL) {
-		for (; pv; pv = pv->pv_next) {
-			pte = pmap_pte(pv->pv_pmap, pv->pv_va);
+		for (pvl = pv; pvl != NULL; pvl = pvl->pv_next) {
+			pte = pmap_pte(pvl->pv_pmap, pvl->pv_va);
 			if (*pte & bit) {
 				pv->pv_flags |= bit;
 				splx(s);
@@ -2367,8 +2321,8 @@ pmap_changebit(pg, set, mask)
 	PMAP_DPRINTF(PDB_BITS,
 	    ("pmap_changebit(%lx, %x, %x)\n", pg, set, mask));
 
-	pv = pg_to_pvh(pg);
 	s = splvm();
+	pv = pg_to_pvh(pg);
 
 	/*
 	 * Clear saved attributes (modify, reference)
@@ -2409,7 +2363,7 @@ pmap_changebit(pg, set, mask)
 				 * protection make sure the caches are
 				 * flushed (but only once).
 				 */
-				if (firstpage && (mmutype == MMU_68040) &&
+				if (firstpage && (mmutype <= MMU_68040) &&
 				    ((set == PG_RO) ||
 				     (set & PG_CMASK) ||
 				     (mask & PG_CMASK) == 0)) {
@@ -2604,7 +2558,6 @@ pmap_enter_ptpage(pmap, va)
 		    UVM_PGA_ZERO)) == NULL) {
 			uvm_wait("ptpage");
 		}
-		pg->wire_count = 1;
 		pg->flags &= ~(PG_BUSY|PG_FAKE);
 		UVM_PAGE_OWN(pg, NULL);
 		ptpa = VM_PAGE_TO_PHYS(pg);
@@ -2786,7 +2739,7 @@ pmap_check_wiring(str, va)
 
 	pa = pmap_pte_pa(pmap_pte(pmap_kernel(), va));
 	pg = PHYS_TO_VM_PAGE(pa);
-	if (pg->wire_count < 1) {
+	if (pg->wire_count >= PAGE_SIZE / sizeof(struct pt_entry_t)) {
 		printf("*%s*: 0x%lx: wire count %d\n", str, va, pg->wire_count);
 		return;
 	}
@@ -2796,9 +2749,9 @@ pmap_check_wiring(str, va)
 	    pte++)
 		if (*pte)
 			count++;
-	if ((pg->wire_count - 1) != count)
+	if (pg->wire_count != count)
 		printf("*%s*: 0x%lx: w%d/a%d\n",
-		       str, va, (pg->wire_count - 1), count);
+		       str, va, pg->wire_count, count);
 }
 #endif /* DEBUG */
 

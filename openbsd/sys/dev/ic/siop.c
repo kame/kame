@@ -1,4 +1,4 @@
-/*	$OpenBSD: siop.c,v 1.28 2003/07/01 17:15:06 krw Exp $ */
+/*	$OpenBSD: siop.c,v 1.31.2.1 2004/04/30 22:07:37 brad Exp $ */
 /*	$NetBSD: siop.c,v 1.65 2002/11/08 22:04:41 bouyer Exp $	*/
 
 /*
@@ -53,8 +53,8 @@
 #include <dev/ic/siopvar_common.h>
 #include <dev/ic/siopvar.h>
 
-#ifndef DEBUG
-#undef DEBUG
+#ifndef SIOP_DEBUG
+#undef SIOP_DEBUG
 #endif
 #undef SIOP_DEBUG
 #undef SIOP_DEBUG_DR
@@ -456,7 +456,7 @@ siop_intr(v)
 		if (istat & ISTAT_DIP)
 			delay(10);
 		/*
-		 * Can't read sist0 & sist1 independantly, or we have to
+		 * Can't read sist0 & sist1 independently, or we have to
 		 * insert delay
 		 */
 		sist = bus_space_read_2(sc->sc_c.sc_rt, sc->sc_c.sc_rh,
@@ -465,9 +465,7 @@ siop_intr(v)
 		    SIOP_SSTAT1);
 #ifdef SIOP_DEBUG_INTR
 		printf("scsi interrupt, sist=0x%x sstat1=0x%x "
-		    "DSA=0x%x DSP=0x%lx\n", sist,
-		    bus_space_read_1(sc->sc_c.sc_rt, sc->sc_c.sc_rh,
-			SIOP_SSTAT1),
+		    "DSA=0x%x DSP=0x%lx\n", sist, sstat1,
 		    bus_space_read_4(sc->sc_c.sc_rt, sc->sc_c.sc_rh, SIOP_DSA),
 		    (u_long)(bus_space_read_4(sc->sc_c.sc_rt, sc->sc_c.sc_rh,
 			SIOP_DSP) -
@@ -601,11 +599,10 @@ siop_intr(v)
 			    SIOP_DSP) - 8);
 			return 1;
 		}
-		/* Else it's an unhandled exeption (for now). */
+		/* Else it's an unhandled exception (for now). */
 		printf("%s: unhandled scsi interrupt, sist=0x%x sstat1=0x%x "
-		    "DSA=0x%x DSP=0x%x\n", sc->sc_c.sc_dev.dv_xname, sist,
-		    bus_space_read_1(sc->sc_c.sc_rt, sc->sc_c.sc_rh,
-			SIOP_SSTAT1),
+		    "DSA=0x%x DSP=0x%x\n", sc->sc_c.sc_dev.dv_xname,
+		    sist, sstat1,
 		    bus_space_read_4(sc->sc_c.sc_rt, sc->sc_c.sc_rh, SIOP_DSA),
 		    (int)(bus_space_read_4(sc->sc_c.sc_rt, sc->sc_c.sc_rh,
 			SIOP_DSP) - sc->sc_c.sc_scriptaddr));
@@ -770,6 +767,15 @@ scintr:
 					siop_update_xfer_mode(&sc->sc_c,
 					    target);
 					/* no table to flush here */
+					CALL_SCRIPT(Ent_msgin_ack);
+					return 1;
+				} else if (msg == MSG_EXTENDED &&
+				    extmsg == MSG_EXT_PPR) {
+					/* PPR negotiation rejected */
+					siop_target->target_c.offset = 0;
+					siop_target->target_c.period = 0;
+					siop_target->target_c.status = TARST_ASYNC;
+					siop_target->target_c.flags &= ~(TARF_DT | TARF_ISDT);
 					CALL_SCRIPT(Ent_msgin_ack);
 					return 1;
 				} else if (msg == MSG_SIMPLE_Q_TAG || 
@@ -1175,7 +1181,7 @@ siop_handle_qtag_reject(siop_cmd)
 
 /*
  * handle a bus reset: reset chip, unqueue all active commands, free all
- * target struct and report loosage to upper layer.
+ * target struct and report lossage to upper layer.
  * As the upper layer may requeue immediatly we have to first store
  * all active commands in a temporary queue.
  */
@@ -1196,7 +1202,7 @@ siop_handle_reset(sc)
 	siop_reset(sc);
 	TAILQ_INIT(&reset_list);
 	/*
-	 * Process all commands: first commmands being executed
+	 * Process all commands: first commands being executed
 	 */
 	for (target = 0; target < sc->sc_c.sc_link.adapter_buswidth;
 	    target++) {
@@ -1420,7 +1426,6 @@ siop_scsicmd(xs)
 
 						/* Set TARF_DT here because if it is turned off during PPR, it must STAY off! */
 						if ((lun == 0) && 
-						    (((struct scsi_inquiry_data *)xs->data)->flags2 & SID_CLOCKING) &&
 						    (sc->sc_c.features & SF_BUS_ULTRA3))
  							sc->sc_c.targets[target]->flags |= TARF_DT;
 						/* Can't do lun 0 here, because flags not set yet */
@@ -1656,24 +1661,21 @@ siop_timeout(v)
 	struct siop_softc *sc = (struct siop_softc *)siop_cmd->cmd_c.siop_sc;
 	int s;
 
+	/* deactivate callout */
+	timeout_del(&siop_cmd->cmd_c.xs->stimeout);
+
 	sc_print_addr(siop_cmd->cmd_c.xs->sc_link);
-	printf("timeout on SCSI command 0x%x\n", siop_cmd->cmd_c.xs->cmd->opcode);
+	printf("timeout on SCSI command 0x%x\n",
+	    siop_cmd->cmd_c.xs->cmd->opcode);
 
 	s = splbio();
 	/* reset the scsi bus */
 	siop_resetbus(&sc->sc_c);
-
-	/* deactivate callout */
-	timeout_del(&siop_cmd->cmd_c.xs->stimeout);
-	/*
-	 * mark command has being timed out and just return;
-	 * the bus reset will generate an interrupt,
-	 * it will be handled in siop_intr()
-	 */
 	siop_cmd->cmd_c.flags |= CMDFL_TIMEOUT;
+	siop_handle_reset(sc);
 	splx(s);
-	return;
 
+	return;
 }
 
 void
@@ -1752,7 +1754,7 @@ siop_morecbd(sc)
 		    sc->sc_c.sc_dev.dv_xname, error);
 		goto bad0;
 	}
-#ifdef DEBUG
+#ifdef SIOP_DEBUG
 	printf("%s: alloc newcdb at PHY addr 0x%lx\n", sc->sc_c.sc_dev.dv_xname,
 	    (unsigned long)newcbd->xferdma->dm_segs[0].ds_addr);
 #endif
@@ -1985,7 +1987,7 @@ siop_add_dev(sc, target, lun)
 		 * can't extend this slot. Probably not worth trying to deal
 		 * with this case
 		 */
-#ifdef DEBUG
+#ifdef SIOP_DEBUG
 		printf("%s:%d:%d: can't allocate a lun sw slot\n",
 		    sc->sc_c.sc_dev.dv_xname, target, lun);
 #endif
@@ -1995,7 +1997,7 @@ siop_add_dev(sc, target, lun)
 	ntargets =  (sc->sc_c.sc_link.adapter_buswidth - 1) - 1 - sc->sc_ntargets;
 
 	/*
-	 * we need 8 bytes for the lun sw additionnal entry, and
+	 * we need 8 bytes for the lun sw additional entry, and
 	 * eventually sizeof(tag_switch) for the tag switch entry.
 	 * Keep enough free space for the free targets that could be
 	 * probed later.
@@ -2009,7 +2011,7 @@ siop_add_dev(sc, target, lun)
 		 * not enough space, probably not worth dealing with it.
 		 * We can hold 13 tagged-queuing capable devices in the 4k RAM.
 		 */
-#ifdef DEBUG
+#ifdef SIOP_DEBUG
 		printf("%s:%d:%d: not enough memory for a lun sw slot\n",
 		    sc->sc_c.sc_dev.dv_xname, target, lun);
 #endif

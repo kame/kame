@@ -1,7 +1,7 @@
-/*	$OpenBSD: mainbus.c,v 1.51 2003/08/20 23:33:36 mickey Exp $	*/
+/*	$OpenBSD: mainbus.c,v 1.55 2004/03/02 21:06:15 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998-2003 Michael Shalayeff
+ * Copyright (c) 1998-2004 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -74,7 +74,7 @@ extern struct extent *hppa_ex;
 extern struct pdc_btlb pdc_btlb;
 
 int
-mbus_add_mapping(bus_addr_t bpa, bus_size_t size, int cachable,
+mbus_add_mapping(bus_addr_t bpa, bus_size_t size, int flags,
     bus_space_handle_t *bshp)
 {
 	static u_int32_t bmm[0x4000/32];
@@ -83,11 +83,11 @@ mbus_add_mapping(bus_addr_t bpa, bus_size_t size, int cachable,
 
 #ifdef BTLBDEBUG
 	printf("bus_mem_add_mapping(%x,%x,%scachable,%p)\n",
-	    bpa, size, cachable? "" : "non", bshp);
+	    bpa, size, flags? "" : "non", bshp);
 #endif
 
 	if ((bank = vm_physseg_find(atop(bpa), &off)) >= 0)
-		panic("mbus_add_mapping: mapping real memory @0x%x", bpa);
+		panic("mbus_add_mapping: mapping real memory @0x%lx", bpa);
 
 	/*
 	 * determine if we are mapping IO space, or beyond the physmem
@@ -98,9 +98,9 @@ mbus_add_mapping(bus_addr_t bpa, bus_size_t size, int cachable,
 	 * all mappings are equal mappings.
 	 */
 #ifdef DEBUG
-	if (cachable) {
+	if (flags & BUS_SPACE_MAP_CACHEABLE) {
 		printf("WARNING: mapping I/O space cachable\n");
-		cachable = 0;
+		flags &= ~BUS_SPACE_MAP_CACHEABLE;
 	}
 #endif
 
@@ -165,14 +165,15 @@ mbus_add_mapping(bus_addr_t bpa, bus_size_t size, int cachable,
 
 int
 mbus_map(void *v, bus_addr_t bpa, bus_size_t size,
-    int cachable, bus_space_handle_t *bshp)
+    int flags, bus_space_handle_t *bshp)
 {
 	int error;
 
-	if ((error = extent_alloc_region(hppa_ex, bpa, size, EX_NOWAIT)))
+	if (!(flags & BUS_SPACE_MAP_NOEXTENT) &&
+	    (error = extent_alloc_region(hppa_ex, bpa, size, EX_NOWAIT)))
 		return (error);
 
-	if ((error = mbus_add_mapping(bpa, size, cachable, bshp))) {
+	if ((error = mbus_add_mapping(bpa, size, flags, bshp))) {
 		if (extent_free(hppa_ex, bpa, size, EX_NOWAIT)) {
 			printf("bus_space_map: pa 0x%lx, size 0x%lx\n",
 				bpa, size);
@@ -210,7 +211,7 @@ mbus_unmap(void *v, bus_space_handle_t bsh, bus_size_t size)
 
 int
 mbus_alloc(void *v, bus_addr_t rstart, bus_addr_t rend, bus_size_t size,
-	 bus_size_t align, bus_size_t boundary, int cachable,
+	 bus_size_t align, bus_size_t boundary, int flags,
 	 bus_addr_t *addrp, bus_space_handle_t *bshp)
 {
 	u_long bpa;
@@ -223,7 +224,7 @@ mbus_alloc(void *v, bus_addr_t rstart, bus_addr_t rend, bus_size_t size,
 	    align, 0, boundary, EX_NOWAIT, &bpa)))
 		return (error);
 
-	if ((error = mbus_add_mapping(bpa, size, cachable, bshp))) {
+	if ((error = mbus_add_mapping(bpa, size, flags, bshp))) {
 		if (extent_free(hppa_ex, bpa, size, EX_NOWAIT)) {
 			printf("bus_space_alloc: pa 0x%lx, size 0x%lx\n",
 				bpa, size);
@@ -690,7 +691,7 @@ _bus_dmamap_load_buffer(bus_dma_tag_t t, bus_dmamap_t map, void *buf,
 		if (first) {
 			map->dm_segs[seg].ds_addr = curaddr;
 			map->dm_segs[seg].ds_len = sgsize;
-			map->_dm_va = vaddr;
+			map->dm_segs[seg]._ds_va = vaddr;
 			first = 0;
 		} else {
 			if (curaddr == lastaddr &&
@@ -705,6 +706,7 @@ _bus_dmamap_load_buffer(bus_dma_tag_t t, bus_dmamap_t map, void *buf,
 					break;
 				map->dm_segs[seg].ds_addr = curaddr;
 				map->dm_segs[seg].ds_len = sgsize;
+				map->dm_segs[seg]._ds_va = vaddr;
 			}
 		}
 
@@ -741,6 +743,7 @@ mbus_dmamap_load(void *v, bus_dmamap_t map, void *addr, bus_size_t size,
 		return (EINVAL);
 
 	seg = 0;
+	lastaddr = 0;
 	error = _bus_dmamap_load_buffer(NULL, map, addr, size, p, flags,
 	    &lastaddr, &seg, 1);
 	if (error == 0) {
@@ -772,6 +775,7 @@ mbus_dmamap_load_mbuf(void *v, bus_dmamap_t map, struct mbuf *m0, int flags)
 	first = 1;
 	seg = 0;
 	error = 0;
+	lastaddr = 0;
 	for (m = m0; m != NULL && error == 0; m = m->m_next) {
 		error = _bus_dmamap_load_buffer(NULL, map, m->m_data, m->m_len,
 		    NULL, flags, &lastaddr, &seg, first);
@@ -818,6 +822,7 @@ mbus_dmamap_load_uio(void *v, bus_dmamap_t map, struct uio *uio, int flags)
 	first = 1;
 	seg = 0;
 	error = 0;
+	lastaddr = 0;
 	for (i = 0; i < uio->uio_iovcnt && resid != 0 && error == 0; i++) {
 		/*
 		 * Now at the first iovec to load.  Load each iovec
@@ -865,19 +870,33 @@ mbus_dmamap_load_raw(void *v, bus_dmamap_t map, bus_dma_segment_t *segs,
 	bcopy(segs, map->dm_segs, nsegs * sizeof(*segs));
 	map->dm_nsegs = nsegs;
 	map->dm_mapsize = size;
-	map->_dm_va = segs->ds_addr;
 	return (0);
 }
 
 void
-mbus_dmamap_sync(void *v, bus_dmamap_t map, bus_addr_t offset, bus_size_t len,
+mbus_dmamap_sync(void *v, bus_dmamap_t map, bus_addr_t off, bus_size_t len,
     int ops)
 {
-	/*
-	 * cannot use purge since the data for dma is not
-	 * guarantied to be aligned in any way
-	 */
-	fdcache(HPPA_SID_KERNEL, map->_dm_va + offset, len);
+	bus_dma_segment_t *ps = map->dm_segs,
+	    *es = &map->dm_segs[map->dm_nsegs];
+
+	if (off >= map->_dm_size)
+		return;
+
+	if ((off + len) > map->_dm_size)
+		len = map->_dm_size - off;
+
+	for (; len && ps < es; ps++)
+		if (off > ps->ds_len)
+			off -= ps->ds_len;
+		else {
+			bus_size_t l = ps->ds_len - off;
+			if (l > len)
+				l = len;
+			fdcache(HPPA_SID_KERNEL, ps->_ds_va + off, l);
+			len -= l;
+			off = 0;
+		}
 
 	/* for either operation sync the shit away */
 	__asm __volatile ("sync\n\tsyncdma\n\tsync\n\t"
@@ -901,7 +920,7 @@ mbus_dmamem_alloc(void *v, bus_size_t size, bus_size_t alignment,
 		return (ENOMEM);
 
 	pg = TAILQ_FIRST(&pglist);
-	segs[0].ds_addr = VM_PAGE_TO_PHYS(pg);
+	segs[0]._ds_va = segs[0].ds_addr = VM_PAGE_TO_PHYS(pg);
 	segs[0].ds_len = size;
 	*rsegs = 1;
 
@@ -991,7 +1010,7 @@ mbattach(parent, self, aux)
 	if (pdc_call((iodcio_t)pdc, 0, PDC_HPA, PDC_HPA_DFLT, &pdc_hpa) < 0)
 		panic("mbattach: PDC_HPA failed");
 
-	printf(" [flex %x]\n", pdc_hpa.hpa & HPPA_FLEX_MASK);
+	printf(" [flex %lx]\n", pdc_hpa.hpa & HPPA_FLEX_MASK);
 
 	/* map all the way till the end of the memory */
 	if (bus_space_map(&hppa_bustag, pdc_hpa.hpa,
@@ -1067,7 +1086,7 @@ mbprint(aux, pnp)
 		    ca->ca_type.iodc_revision);
 	if (ca->ca_hpa) {
 		if (~ca->ca_hpamask)
-			printf(" offset %x", ca->ca_hpa & ~ca->ca_hpamask);
+			printf(" offset %lx", ca->ca_hpa & ~ca->ca_hpamask);
 		if (!pnp && ca->ca_irq >= 0)
 			printf(" irq %d", ca->ca_irq);
 	}
@@ -1085,7 +1104,7 @@ mbsubmatch(parent, match, aux)
 	int ret;
 
 	if (autoconf_verbose)
-		printf(">> hpa %x off %x cf_off %x\n",
+		printf(">> hpa %lx off %lx cf_off %x\n",
 		    ca->ca_hpa, ca->ca_hpa & ~ca->ca_hpamask, cf->hppacf_off);
 
 	if (ca->ca_hpa && ~ca->ca_hpamask && cf->hppacf_off != -1 &&

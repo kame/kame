@@ -1,4 +1,4 @@
-/* $OpenBSD: vm_machdep.c,v 1.28 2002/04/28 20:55:14 pvalchev Exp $ */
+/* $OpenBSD: vm_machdep.c,v 1.30 2003/11/17 10:07:53 miod Exp $ */
 /* $NetBSD: vm_machdep.c,v 1.55 2000/03/29 03:49:48 simonb Exp $ */
 
 /*
@@ -236,7 +236,7 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 }
 /*
  * Finish a swapin operation.
- * We neded to update the cached PTEs for the user area in the
+ * We needed to update the cached PTEs for the user area in the
  * machine dependent part of the proc structure.
  */
 void
@@ -254,10 +254,10 @@ cpu_swapin(p)
 
 /*
  * cpu_swapout is called immediately before a process's 'struct user'
- * and kernel stack are unwired (which are in turn done immediately
- * before it's P_INMEM flag is cleared).  If the process is the
- * current owner of the floating point unit, the FP state has to be
- * saved, so that it goes out with the pcb, which is in the user area.
+ * and kernel stack are unwired, and after the process' P_INMEM flag
+ * is cleared).  If the process is the current owner of the floating
+ * point unit, the FP state has to be saved, so that it goes out with
+ * the pcb, which is in the user area.
  */
 void
 cpu_swapout(p)

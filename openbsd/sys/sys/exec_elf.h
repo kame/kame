@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_elf.h,v 1.35 2003/05/13 16:38:34 millert Exp $	*/
+/*	$OpenBSD: exec_elf.h,v 1.39 2004/02/27 17:36:16 deraadt Exp $	*/
 /*
  * Copyright (c) 1995, 1996 Erik Theisen.  All rights reserved.
  *
@@ -122,7 +122,7 @@ typedef u_int16_t	Elf64_Quarter;
                       (ehdr).e_ident[EI_MAG3] == ELFMAG3)
 
 /* ELF Header */
-typedef struct elfhdr{
+typedef struct elfhdr {
 	unsigned char	e_ident[EI_NIDENT]; /* ELF Identification */
 	Elf32_Half	e_type;		/* object file type */
 	Elf32_Half	e_machine;	/* machine */
@@ -187,9 +187,11 @@ typedef struct {
 #define EM_PARISC	15		/* HPPA */
 #define EM_SPARC32PLUS	18		/* Enhanced instruction set SPARC */
 #define EM_PPC		20		/* PowerPC */
+#define EM_ARM		40		/* Advanced RISC Machines ARM */
 #define EM_ALPHA	41		/* DEC ALPHA */
 #define EM_SPARCV9	43		/* SPARC version 9 */
 #define EM_ALPHA_EXP	0x9026		/* DEC ALPHA */
+#define EM_AMD64	62		/* AMD64 architecture */
 #define EM_VAX		75		/* DEC VAX */
 #define EM_NUM		15		/* number of machine types */
 
@@ -335,15 +337,13 @@ typedef struct {
 #define STT_HIPROC	15		/*  specific symbol types */
 
 /* Relocation entry with implicit addend */
-typedef struct 
-{
+typedef struct {
 	Elf32_Addr	r_offset;	/* offset of relocation */
 	Elf32_Word	r_info;		/* symbol table index and type */
 } Elf32_Rel;
 
 /* Relocation entry with explicit addend */
-typedef struct 
-{
+typedef struct {
 	Elf32_Addr	r_offset;	/* offset of relocation */
 	Elf32_Word	r_info;		/* symbol table index and type */
 	Elf32_Sword	r_addend;

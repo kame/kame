@@ -1,4 +1,4 @@
-/*	$OpenBSD: pciide_piix_reg.h,v 1.5 2003/02/21 20:10:34 grange Exp $	*/
+/*	$OpenBSD: pciide_piix_reg.h,v 1.8 2003/11/07 21:34:56 grange Exp $	*/
 /*	$NetBSD: pciide_piix_reg.h,v 1.5 2001/01/05 15:29:40 bouyer Exp $	*/
 
 /*
@@ -22,7 +22,7 @@
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,     
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
  * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
  * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
@@ -38,7 +38,7 @@
  * "82371FB (PIIX) and 82371SB (PIIX3) PCI ISA IDE XCELERATOR"
  * "82371AB PCI-TO-ISA / IDE XCELERATOR (PIIX4)" and
  * "Intel 82801AA (ICH) and Intel 82801AB (ICH0) I/O Controller Hub"
- * available from http://developers.intel.com/
+ * available from http://developer.intel.com/
  */
 
 /*
@@ -50,7 +50,7 @@
 #define PIIX_BMIBA_RTE_IO 0x000000001 /* base addr maps to I/O space */
 
 /*
- * IDE timing register 
+ * IDE timing register
  * 0x40/0x41 is for primary, 0x42/0x43 for secondary channel
  */
 #define PIIX_IDETIM 0x40
@@ -120,3 +120,14 @@ static int8_t piix_isp_dma[] = {0x00, 0x02, 0x02};
 static int8_t piix_rtc_dma[] = {0x00, 0x02, 0x03};
 static int8_t piix4_sct_udma[] = {0x00, 0x01, 0x02, 0x01, 0x02, 0x01};
 
+/*
+ * ICH5/ICH5R SATA registers definitions
+ */
+#define ICH5_SATA_MAP		0x90 /* Address Map Register */
+#define ICH5_SATA_MAP_MV_MASK	0x07 /* Map Value mask */
+
+#define ICH_SATA_PCS		0x92 /* Port Control and Status Register */
+#define ICH_SATA_PCS_P0E	0x01 /* Port 0 enabled */
+#define ICH_SATA_PCS_P1E	0x02 /* Port 1 enabled */
+#define ICH_SATA_PCS_P0P	0x10 /* Port 0 present */
+#define ICH_SATA_PCS_P1P	0x20 /* Port 1 present */

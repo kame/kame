@@ -1,4 +1,4 @@
-/*	$OpenBSD: xy.c,v 1.22 2003/08/15 20:32:14 tedu Exp $	*/
+/*	$OpenBSD: xy.c,v 1.24 2004/02/15 02:45:46 tedu Exp $	*/
 /*	$NetBSD: xy.c,v 1.26 1997/07/19 21:43:56 pk Exp $	*/
 
 /*
@@ -1343,7 +1343,7 @@ xyc_startbuf(xycsc, xysc, bp)
  * [2] we can only be blocked if there is a WAIT type I/O request being
  * run.   since this can only happen when we are crashing, we wait a sec
  * and then steal the IOPB.  for case [3] the process can sleep
- * on the iorq free list until some iopbs are avaliable.
+ * on the iorq free list until some iopbs are available.
  */
 
 
@@ -1644,7 +1644,8 @@ xyc_reset(xycsc, quiet, blastmode, error, xysc)
 			    iorq->xy->xyq.b_actf = iorq->buf->b_actf;
 			    disk_unbusy(&xycsc->reqs[lcv].xy->sc_dk,
 				(xycsc->reqs[lcv].buf->b_bcount -
-				xycsc->reqs[lcv].buf->b_resid));
+				xycsc->reqs[lcv].buf->b_resid),
+				(xycsc->reqs[lcv].buf->b_flags & B_READ));
 			    biodone(iorq->buf);
 			    iorq->mode = XY_SUB_FREE;
 			    break;
@@ -1821,7 +1822,8 @@ xyc_remove_iorq(xycsc)
 				    bp->b_bcount);
 			iorq->xy->xyq.b_actf = bp->b_actf;
 			disk_unbusy(&iorq->xy->sc_dk,
-			    (bp->b_bcount - bp->b_resid));
+			    (bp->b_bcount - bp->b_resid),
+			    (bp->b_flags & B_READ));
 			iorq->mode = XY_SUB_FREE;
 			biodone(bp);
 			break;

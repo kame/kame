@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.27 2003/06/02 23:27:46 millert Exp $	*/
+/*	$OpenBSD: conf.c,v 1.30 2004/02/10 01:31:21 millert Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -82,7 +82,7 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 #define cdev_wscons_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
 	dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
-	dev_init(c,n,tty), ttselect /* ttpoll */, dev_init(c,n,mmap) }
+	dev_init(c,n,tty), ttpoll, dev_init(c,n,mmap) }
 
 #include "audio.h"
 #include "pty.h"
@@ -110,6 +110,11 @@ cdev_decl(com);
 #include "pf.h"
 
 #include "systrace.h"
+
+#ifdef USER_PCICONF
+#include "pci.h"
+cdev_decl(pci);
+#endif
 
 struct cdevsw   cdevsw[] =
 {
@@ -145,8 +150,11 @@ struct cdevsw   cdevsw[] =
 	cdev_mouse_init(NWSKBD,wskbd),	/* 28: keyboards */
 	cdev_mouse_init(NWSMOUSE,wsmouse), /* 29: mice */
 	cdev_mouse_init(NWSMUX,wsmux),	/* 30: mux */
-	cdev_notdef(),			/* 31 */
-
+#ifdef USER_PCICONF
+	cdev_pci_init(NPCI,pci),	/* 31: PCI user */
+#else
+	cdev_notdef(),
+#endif
 #ifdef XFS
 	cdev_xfs_init(NXFS,xfs_dev),	/* 32: xfs communication device */
 #else
@@ -157,6 +165,7 @@ struct cdevsw   cdevsw[] =
 	cdev_audio_init(NAUDIO,audio),	/* 35: /dev/audio */
 	cdev_crypto_init(NCRYPTO,crypto), /* 36: /dev/crypto */
 	cdev_ses_init(NSES,ses),	/* 37: SCSI SES/SAF-TE */
+	cdev_ptm_init(NPTY,ptm),	/* 38: pseudo-tty ptm device */
 	cdev_lkm_dummy(),
 	cdev_lkm_dummy(),
 	cdev_lkm_dummy(),

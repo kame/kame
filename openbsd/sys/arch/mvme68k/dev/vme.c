@@ -1,4 +1,4 @@
-/*	$OpenBSD: vme.c,v 1.15 2003/06/02 05:09:14 deraadt Exp $ */
+/*	$OpenBSD: vme.c,v 1.19 2004/01/14 20:52:49 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -69,12 +69,14 @@ int vmeprint(void *, const char *);
 
 static int vmebustype;
 
+struct vme2reg *sys_vme2;
+
 struct cfattach vme_ca = {
 	sizeof(struct vmesoftc), vmematch, vmeattach
 };
 
 struct cfdriver vme_cd = {
-	NULL, "vme", DV_DULL, 0
+	NULL, "vme", DV_DULL
 };
 
 int
@@ -135,16 +137,22 @@ vmepmap(sc, vmeaddr, len, bustype)
 	case BUS_PCC:
 		switch (bustype) {
 		case BUS_VMES:
-			printf("base 0x%8x/0x%8x len 0x%x\n",
+#ifdef DEBUG
+			printf("base %8p/0x%8x len 0x%x\n",
 				vmeaddr, base, len);
+#endif
 			if (base > VME1_A16BASE &&
 			    (base+len - VME1_A16BASE) < VME1_A16D16LEN) {
 				base = base - VME1_A16BASE + VME1_A16D16BASE;
+#ifdef DEBUG
 				printf("vmes1: base = 0x%8x\n", base); /* 1:1 */
+#endif
 			} else if (base > VME1_A32D16BASE &&
 			    base+len < VME1_A16BASE) {
 				/* 1:1 mapped */
+#ifdef DEBUG
 				printf("vmes2: base = 0x%8x\n", base);
+#endif
 			} else {
 				printf("%s: cannot map pa 0x%x len 0x%x\n",
 				    sc->sc_dev.dv_xname, base, len);
@@ -170,7 +178,9 @@ vmepmap(sc, vmeaddr, len, bustype)
 	case BUS_PCCTWO:
 		switch (bustype) {
 		case BUS_VMES:
-			/*printf("base %x len %d\n", base, len);*/
+#ifdef DEBUG
+			printf("base %x len %d\n", base, len);
+#endif
 			if (base > VME2_A16BASE &&
 			    (base+len-VME2_A16BASE) < VME2_A16D16LEN) {
 				/* XXX busted? */
@@ -182,7 +192,9 @@ vmepmap(sc, vmeaddr, len, bustype)
 				/* XXX busted? */
 				base = base + VME2_A32D16BASE;
 			} else {
+#ifdef DEBUG
 				printf("vme2chip_map\n");
+#endif
 				base = vme2chip_map(base, len, 16);
 				if (base == NULL)
 					return (NULL);
@@ -296,11 +308,6 @@ vmescan(parent, child, args, bustype)
 	struct vmesoftc *sc = (struct vmesoftc *)parent;
 	struct confargs oca;
 
-	if (parent->dv_cfdata->cf_driver->cd_indirect) {
-		printf(" indirect devices not supported\n");
-		return 0;
-	}
-
 	bzero(&oca, sizeof oca);
 	oca.ca_bustype = bustype;
 	oca.ca_paddr = (void *)cf->cf_loc[0];
@@ -344,7 +351,6 @@ vmeattach(parent, self, args)
 #if NMC > 0 || NPCCTWO > 0
 	struct vme2reg *vme2;
 #endif
-	int scon;
 
 	sc->sc_vaddr = ca->ca_vaddr;
 
@@ -353,8 +359,9 @@ vmeattach(parent, self, args)
 #if NPCC > 0
 	case BUS_PCC:
 		vme1 = (struct vme1reg *)sc->sc_vaddr;
-		scon = (vme1->vme1_scon & VME1_SCON_SWITCH);
-		printf(": %sscon\n", scon ? "" : "not ");
+		if (vme1->vme1_scon & VME1_SCON_SWITCH)
+			printf(": system controller");
+		printf("\n");
 		vme1chip_init(sc);
 		break;
 #endif
@@ -362,8 +369,9 @@ vmeattach(parent, self, args)
 	case BUS_MC:
 	case BUS_PCCTWO:
 		vme2 = (struct vme2reg *)sc->sc_vaddr;
-		scon = (vme2->vme2_tctl & VME2_TCTL_SCON);
-		printf(": %ssystem controller\n", scon ? "" : "not ");
+		if (vme2->vme2_tctl & VME2_TCTL_SCON)
+			printf(": system controller");
+		printf("\n");
 		vme2chip_init(sc);
 		break;
 #endif
@@ -445,31 +453,33 @@ vme2chip_init(sc)
 	struct vme2reg *vme2 = (struct vme2reg *)sc->sc_vaddr;
 	u_long ctl;
 
+	sys_vme2 = vme2;
+
 	/* turn off SYSFAIL LED */
 	vme2->vme2_tctl &= ~VME2_TCTL_SYSFAIL;
 
 	ctl = vme2->vme2_masterctl;
 	printf("%s: using BUG parameters\n", sc->sc_dev.dv_xname);
 	/* setup a A32D16 space */
-	printf("%s: 1phys 0x%08x-0x%08x to VME 0x%08x-0x%08x\n",
+	printf("%s: 1phys 0x%08lx-0x%08lx to VME 0x%08lx-0x%08lx\n",
 	    sc->sc_dev.dv_xname,
 	    vme2->vme2_master1 << 16, vme2->vme2_master1 & 0xffff0000,
 	    vme2->vme2_master1 << 16, vme2->vme2_master1 & 0xffff0000);
 
 	/* setup a A32D32 space */
-	printf("%s: 2phys 0x%08x-0x%08x to VME 0x%08x-0x%08x\n",
+	printf("%s: 2phys 0x%08lx-0x%08lx to VME 0x%08lx-0x%08lx\n",
 	    sc->sc_dev.dv_xname,
 	    vme2->vme2_master2 << 16, vme2->vme2_master2 & 0xffff0000,
 	    vme2->vme2_master2 << 16, vme2->vme2_master2 & 0xffff0000);
 
 	/* setup a A24D16 space */
-	printf("%s: 3phys 0x%08x-0x%08x to VME 0x%08x-0x%08x\n",
+	printf("%s: 3phys 0x%08lx-0x%08lx to VME 0x%08lx-0x%08lx\n",
 	    sc->sc_dev.dv_xname,
 	    vme2->vme2_master3 << 16, vme2->vme2_master3 & 0xffff0000,
 	    vme2->vme2_master3 << 16, vme2->vme2_master3 & 0xffff0000);
 
 	/* setup a XXXXXX space */
-	printf("%s: 4phys 0x%08x-0x%08x to VME 0x%08x-0x%08x\n",
+	printf("%s: 4phys 0x%08lx-0x%08lx to VME 0x%08lx-0x%08lx\n",
 	    sc->sc_dev.dv_xname,
 	    vme2->vme2_master4 << 16, vme2->vme2_master4 & 0xffff0000,
 	    (vme2->vme2_master4 << 16) + (vme2->vme2_master4mod << 16),
@@ -500,7 +510,11 @@ vme2chip_init(sc)
 		vme2->vme2_irqen |= VME2_IRQ_AB;
 	}
 #endif
-	vme2->vme2_irqen = vme2->vme2_irqen | VME2_IRQ_ACF;
+	/*
+	 * Enable ACFAIL interrupt, but disable Timer 1 interrupt - we
+	 * prefer it without for delay().
+	 */
+	vme2->vme2_irqen = (vme2->vme2_irqen | VME2_IRQ_ACF) & ~VME2_IRQ_TIC1;
 }
 
 /*

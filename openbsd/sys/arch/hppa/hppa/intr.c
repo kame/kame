@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.c,v 1.11 2003/08/07 19:47:33 mickey Exp $	*/
+/*	$OpenBSD: intr.c,v 1.16 2003/12/30 22:53:54 mickey Exp $	*/
 
 /*
  * Copyright (c) 2002 Michael Shalayeff
@@ -57,10 +57,10 @@ struct hppa_iv {
 	struct hppa_iv *next;
 	struct hppa_iv *share;
 	int pad2[3];
-} __attribute__((__packed__));
+} __packed;
 
 register_t kpsw = PSL_Q | PSL_P | PSL_C | PSL_D;
-volatile int cpl = IPL_NESTED;
+volatile int cpu_inintr, cpl = IPL_NESTED;
 u_long cpu_mask;
 struct hppa_iv *intr_list, intr_store[8*2*CPU_NINTS], *intr_more = intr_store;
 struct hppa_iv intr_table[CPU_NINTS] = {
@@ -137,7 +137,7 @@ cpu_intr_init(void)
 	for (level = 0; level < NIPL - 1; level++)
 		imask[level + 1] |= imask[level];
 
-	printf("biomask 0x%x netmask 0x%x ttymask 0x%x\n",
+	printf("biomask 0x%lx netmask 0x%lx ttymask 0x%lx\n",
 	    imask[IPL_BIO], imask[IPL_NET], imask[IPL_TTY]);
 
 	/* XXX the whacky trick is to prevent hardclock from happenning */
@@ -225,6 +225,9 @@ cpu_intr(void *v)
 	u_long mask;
 	int s = cpl;
 
+	if (cpu_inintr++)
+		frame->tf_flags |= TFF_INTR;
+
 	while ((mask = ipending & ~imask[s])) {
 		int r, bit = ffs(mask) - 1;
 		struct hppa_iv *iv = &intr_table[bit];
@@ -244,8 +247,9 @@ cpu_intr(void *v)
 			cpl = 0;
 			printf("stray interrupt %d\n", bit);
 		}
-		mtctl(0, CR_EIEM);
 #endif
+		mtctl(0, CR_EIEM);
 	}
+	cpu_inintr--;
 	cpl = s;
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: atavar.h,v 1.13 2003/04/09 00:38:08 ho Exp $	*/
+/*	$OpenBSD: atavar.h,v 1.17 2003/10/21 09:57:04 jmc Exp $	*/
 /*	$NetBSD: atavar.h,v 1.13 1999/03/10 13:11:43 bouyer Exp $	*/
 
 /*
@@ -22,7 +22,7 @@
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,     
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
  * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
  * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
@@ -42,10 +42,10 @@ struct ata_drive_datas {
 	u_int16_t drive_flags; /* bitmask for drives present/absent and cap */
 #define DRIVE_ATA	0x0001
 #define DRIVE_ATAPI	0x0002
-#define DRIVE_OLD	0x0004 
+#define DRIVE_OLD	0x0004
 #define DRIVE (DRIVE_ATA|DRIVE_ATAPI|DRIVE_OLD)
 #define DRIVE_CAP32	0x0008
-#define DRIVE_DMA	0x0010 
+#define DRIVE_DMA	0x0010
 #define DRIVE_UDMA	0x0020
 #define DRIVE_MODE	0x0040 /* the drive reported its mode */
 #define DRIVE_RESET	0x0080 /* reset the drive state at next xfer */
@@ -53,6 +53,7 @@ struct ata_drive_datas {
 #define DRIVE_DSCBA	0x0200 /* DSC in buffer availability mode */
 #define DRIVE_DSCWAIT	0x0400 /* In wait for DSC to be asserted */
 #define DRIVE_DEVICE_RESET 0x0800 /* Drive supports DEVICE RESET command */
+#define DRIVE_SATA	0x1000 /* SATA drive */
 	/*
 	 * Current setting of drive's PIO, DMA and UDMA modes.
 	 * Is initialised by the disks drivers at attach time, and may be
@@ -77,7 +78,7 @@ struct ata_drive_datas {
 	u_int8_t atapi_cap;
 
 	/* Keeps track of the number of resets that have occurred in a row
-	   without a succesful command completion. */
+	   without a successful command completion. */
 	u_int8_t n_resets;
 	u_int8_t n_dmaerrs;
 	u_int32_t n_xfers;
@@ -87,7 +88,7 @@ struct ata_drive_datas {
 	char drive_name[31];
 	int  cf_flags;
 	void *chnl_softc; /* channel softc */
-    
+
 	struct ataparams id;
 };
 
@@ -116,7 +117,7 @@ struct ata_atapi_attach {
 #define ATA_CONFIG_UDMA_OFF	8
 
 /*
- * ATA/ATAPI commands description 
+ * ATA/ATAPI commands description
  *
  * This structure defines the interface between the ATA/ATAPI device driver
  * and the controller for short commands. It contains the command's parameter,
@@ -148,9 +149,9 @@ struct wdc_command {
 #define AT_TIMEOU   0x0080 /* command timed out */
 #define AT_DF       0x0100 /* Drive fault */
 #define AT_READREG  0x0200 /* Read registers on completion */
-    int timeout;	 /* timeout (in ms) */
+    int timeout;         /* timeout (in ms) */
     void *data;          /* Data buffer address */
-    int bcount;           /* number of bytes to transfer */
+    int bcount;          /* number of bytes to transfer */
     void (*callback)(void *); /* command to call once command completed */
     void *callback_arg;  /* argument passed to *callback() */
 };
@@ -158,8 +159,8 @@ struct wdc_command {
 extern int at_poll;
 
 int wdc_exec_command(struct ata_drive_datas *, struct wdc_command*);
-#define WDC_COMPLETE 0x01
-#define WDC_QUEUED   0x02
+#define WDC_COMPLETE  0x01
+#define WDC_QUEUED    0x02
 #define WDC_TRY_AGAIN 0x03
 
 void wdc_probe_caps(struct ata_drive_datas*, struct ataparams *);
@@ -173,7 +174,7 @@ void wdc_ata_delref(struct ata_drive_datas *);
 void wdc_ata_kill_pending(struct ata_drive_datas *);
 
 int ata_get_params(struct ata_drive_datas*, u_int8_t,
-	 struct ataparams *);
+	struct ataparams *);
 int ata_set_mode(struct ata_drive_datas*, u_int8_t, u_int8_t);
 /* return code for these cmds */
 #define CMD_OK    0

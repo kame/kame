@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wireg.h,v 1.32 2003/06/25 17:38:55 miod Exp $	*/
+/*	$OpenBSD: if_wireg.h,v 1.34 2004/03/02 21:59:29 millert Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -34,7 +34,8 @@
  *	From: if_wireg.h,v 1.8.2.2 2001/08/25 00:48:25 nsayer Exp $
  */
 
-#define WI_TIMEOUT	50000	/* 10x XXX just a guess at a good value.  */
+#define WI_DELAY	5
+#define WI_TIMEOUT	(500000/WI_DELAY)	/* 500ms */
 
 #define WI_PORT0	0
 #define WI_PORT1	1
@@ -139,7 +140,7 @@
  * - Lucent has created a library called HCF (Hardware Control Functions)
  *   though which it wants developers to interact with the card. The HCF
  *   is needlessly complex, ill conceived and badly documented. Actually,
- *   the comments in the HCP code itself aren't bad, but the publically
+ *   the comments in the HCP code itself aren't bad, but the publicly
  *   available manual that comes with it is awful, probably due largely to
  *   the fact that it has been emasculated in order to hide information
  *   that Lucent wants to keep proprietary. The purpose of the HCF seems
@@ -264,7 +265,7 @@
 #define WI_EV_CMD		0x0010	/* command completed */
 #define WI_EV_ALLOC		0x0008	/* async alloc/reclaim completed */
 #define WI_EV_TX_EXC		0x0004	/* async xmit completed with failure */
-#define WI_EV_TX		0x0002	/* async xmit completed succesfully */
+#define WI_EV_TX		0x0002	/* async xmit completed successfully */
 #define WI_EV_RX		0x0001	/* async rx completed */
 
 #define WI_INTRS	\
@@ -466,7 +467,7 @@ struct wi_ltv_pcf {
 /*
  * Connection control characteristics (0xFC00 == WI_RID_PORTTYPE).
  * 1 == Basic Service Set (BSS)
- * 2 == Wireless Distribudion System (WDS)
+ * 2 == Wireless Distribution System (WDS)
  * 3 == Pseudo IBSS (aka ad-hoc demo)
  * 4 == IBSS
  */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: advnops.c,v 1.25 2003/07/24 22:00:24 mickey Exp $	*/
+/*	$OpenBSD: advnops.c,v 1.30 2003/12/21 15:28:59 miod Exp $	*/
 /*	$NetBSD: advnops.c,v 1.32 1996/10/13 02:52:09 christos Exp $	*/
 
 /*
@@ -44,6 +44,7 @@
 #include <sys/malloc.h>
 #include <sys/stat.h>
 #include <sys/unistd.h>
+#include <sys/poll.h>
 #include <sys/proc.h>
 
 #include <machine/endian.h>
@@ -57,7 +58,7 @@ int	adosfs_getattr(void *);
 int	adosfs_read(void *);
 int	adosfs_write(void *);
 int	adosfs_ioctl(void *);
-int	adosfs_select(void *);
+int	adosfs_poll(void *);
 int	adosfs_strategy(void *);
 int	adosfs_link(void *);
 int	adosfs_symlink(void *);
@@ -107,7 +108,7 @@ struct vnodeopv_entry_desc adosfs_vnodeop_entries[] = {
 	{ &vop_write_desc, adosfs_write },		/* write */
 	{ &vop_lease_desc, adosfs_lease_check },	/* lease */
 	{ &vop_ioctl_desc, adosfs_ioctl },		/* ioctl */
-	{ &vop_select_desc, adosfs_select },		/* select */
+	{ &vop_poll_desc, adosfs_poll },		/* poll */
 	{ &vop_fsync_desc, adosfs_fsync },		/* fsync */
 	{ &vop_remove_desc, adosfs_remove },		/* remove */
 	{ &vop_link_desc, adosfs_link },		/* link */
@@ -131,6 +132,8 @@ struct vnodeopv_entry_desc adosfs_vnodeop_entries[] = {
 	{ &vop_bwrite_desc, adosfs_bwrite },		/* bwrite */
 	{ (struct vnodeop_desc*)NULL, (int(*)(void *))NULL }
 };
+
+int	(**adosfs_vnodeop_p)(void *);
 
 struct vnodeopv_desc adosfs_vnodeop_opv_desc =
 	{ &adosfs_vnodeop_p, adosfs_vnodeop_entries };
@@ -201,7 +204,7 @@ adosfs_getattr(v)
 		vap->va_nlink = 1 + (ap->linkto != 0);
 		/*
 		 * round up to nearest blocks add number of file list 
-		 * blocks needed and mutiply by number of bytes per block.
+		 * blocks needed and multiply by number of bytes per block.
 		 */
 		fblks = howmany(ap->fsize, amp->dbsize);
 		fblks += howmany(fblks, ANODENDATBLKENT(ap));
@@ -290,7 +293,7 @@ adosfs_read(v)
 		/*
 		 * read ahead could possibly be worth something
 		 * but not much as ados makes little attempt to 
-		 * make things contigous
+		 * make things contiguous
 		 */
 		error = bread(sp->a_vp, lbn * amp->secsperblk, amp->bsize,
 		    NOCRED, &bp);
@@ -300,7 +303,7 @@ adosfs_read(v)
 				error = EIO; /* OFS needs the complete block */
 			else if (adoswordn(bp, 0) != BPT_DATA) {
 #ifdef DIAGNOSTIC
-				printf("adosfs: bad primary type blk %ld\n",
+				printf("adosfs: bad primary type blk %d\n",
 				    bp->b_blkno / amp->secsperblk);
 #endif
 				error=EINVAL;
@@ -376,24 +379,23 @@ adosfs_ioctl(v)
 
 /* ARGSUSED */
 int
-adosfs_select(v)
+adosfs_poll(v)
 	void *v;
 {
-#ifdef ADOSFS_DIAGNOSTIC
-	struct vop_select_args /* {
+	struct vop_poll_args /* {
 		struct vnode *a_vp;
-		int  a_which;
-		int  a_fflags;
-		struct ucred *a_cred;
+		int  a_events;
 		struct proc *a_p;
-	} */ *sp = v;
+	} */ *ap = v;
+#ifdef ADOSFS_DIAGNOSTIC
 	/*
 	 * sure there's something to read...
 	 */
 	advopprint(sp);
-	printf(" 1)");
+	printf(" %d",
+	    ap->a_events & (POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM));
 #endif
-	return(1);
+	return(ap->a_events & (POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM));
 }
 
 /*
@@ -666,7 +668,7 @@ reterr:
 }
 
 /*
- * Print out the contents of a adosfs vnode.
+ * Print out the contents of an adosfs vnode.
  */
 /* ARGSUSED */
 int
@@ -758,7 +760,7 @@ adosfs_readdir(v)
 	useri = uoff / sizeof(ad);
 
 	/*
-	 * if no slots available or offset requested is not on a slot boundry
+	 * if no slots available or offset requested is not on a slot boundary
 	 */
 	if (uavail < 1 || uoff % sizeof(ad)) {
 		error = EINVAL;

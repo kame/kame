@@ -1,4 +1,4 @@
-/*	$OpenBSD: siopvar.h,v 1.7 2003/09/06 22:24:14 krw Exp $ */
+/*	$OpenBSD: siopvar.h,v 1.10 2003/11/16 20:30:06 avsm Exp $ */
 /*	$NetBSD: siopvar.h,v 1.18 2002/04/23 20:41:15 bouyer Exp $ */
 
 /*
@@ -43,17 +43,13 @@
 struct siop_xfer {
 	struct siop_common_xfer siop_tables;
 	/* u_int32_t resel[sizeof(load_dsa) / sizeof(load_dsa[0])]; */
-#ifdef __hppa__
-	/* XXX Add some entries to make size 384 bytes (256+128) */
+	/* Add some entries to make size 384 bytes (256+128) */
 	u_int32_t resel[36];
-#else
-	u_int32_t resel[25];
-#endif
-} __attribute__((__packed__));
+} __packed;
 
 /*
- * This decribes a command handled by the SCSI controller
- * These are chained in either a free list or a active list
+ * This describes a command handled by the SCSI controller
+ * These are chained in either a free list or an active list
  * We have one queue per target
  */
 
@@ -141,7 +137,7 @@ struct siop_softc {
 };
 
 /* defs for sc_flags */
-#define SCF_CHAN_NOSLOT	0x0001		/* channel out of sheduler slot */
+#define SCF_CHAN_NOSLOT	0x0001		/* channel out of scheduler slot */
 
 void    siop_attach(struct siop_softc *);
 int	siop_intr(void *);

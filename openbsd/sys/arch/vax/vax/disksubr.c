@@ -1,4 +1,4 @@
-/*	$OpenBSD: disksubr.c,v 1.20 2003/06/26 13:06:26 miod Exp $	*/
+/*	$OpenBSD: disksubr.c,v 1.22 2004/03/17 14:16:04 miod Exp $	*/
 /*	$NetBSD: disksubr.c,v 1.21 1999/06/30 18:48:06 ragge Exp $	*/
 
 /*
@@ -128,6 +128,8 @@ readdisklabel(dev, strat, lp, osdep, spoofonly)
 	int i;
 
 	/* minimal requirements for archetypal disk label */
+	if (lp->d_secsize < DEV_BSIZE)
+		lp->d_secsize = DEV_BSIZE;
 	if (lp->d_secperunit == 0)
 		lp->d_secperunit = 0x1fffffff;
 	lp->d_npartitions = RAW_PART + 1;
@@ -292,7 +294,7 @@ disk_printtype(unit, type)
 void
 disk_reallymapin(bp, map, reg, flag)
 	struct buf *bp;
-	struct pte *map;
+	pt_entry_t *map;
 	int reg, flag;
 {
 	struct proc *p;
@@ -326,7 +328,7 @@ disk_reallymapin(bp, map, reg, flag)
 	 * SHOULDN'T THEY ALWAYS BE MAPPED WHEN DOING THIS???
 	 */
 	for (i = 0; i < (npf - 1); i++) {
-		if ((pte + i)->pg_pfn == 0) {
+		if ((pte[i] & PG_FRAME) == 0) {
 			int rv;
 			rv = uvm_fault(&p->p_vmspace->vm_map,
 			    (unsigned)addr + i * VAX_NBPG, 0,
@@ -338,7 +340,7 @@ disk_reallymapin(bp, map, reg, flag)
 	if (map) {
 		io = &map[reg];
 		while (--npf > 0) {
-			pfnum = pte->pg_pfn;
+			pfnum = (*pte & PG_FRAME);
 			if (pfnum == 0)
 				panic("mapin zero entry");
 			pte++;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: specialreg.h,v 1.16 2003/07/25 21:42:02 mickey Exp $	*/
+/*	$OpenBSD: specialreg.h,v 1.21 2004/02/19 22:33:29 grange Exp $	*/
 /*	$NetBSD: specialreg.h,v 1.7 1994/10/27 04:16:26 cgd Exp $	*/
 
 /*-
@@ -114,8 +114,8 @@
 #define CPUID_MMX	0x00800000	/* has MMX instructions */
 #define CPUID_FXSR	0x01000000	/* has FXRSTOR instruction (Intel) */
 #define CPUID_EMMX	0x01000000	/* has extended MMX (Cyrix; obsolete) */
-#define CPUID_SIMD	0x02000000	/* has SIMD instructions (Intel) */
-#define CPUID_SIMD2	0x04000000	/* has SIMD instructions (Intel) #2 */
+#define CPUID_SSE	0x02000000	/* has SSE instructions */
+#define CPUID_SSE2	0x04000000	/* has SSE2 instructions  */
 #define CPUID_SS	0x08000000	/* self-snoop */
 #define CPUID_HTT	0x10000000	/* hyper-threading tech */
 #define CPUID_TM	0x20000000	/* thermal monitor (TCC) */
@@ -130,6 +130,8 @@
  */
 #define CPUID_3DNOW	0x40000000	/* has 3DNow! instructions (AMD) */
 
+#define CPUIDECX_PNI	0x00000001	/* Prescott New Instructions */
+#define CPUIDECX_MWAIT	0x00000008	/* Monitor/Mwait */
 #define CPUIDECX_EST	0x00000080	/* enhanced SpeedStep */
 #define CPUIDECX_TM2	0x00000100	/* thermal monitor 2 */
 #define CPUIDECX_CNXTID	0x00000400	/* Context ID */
@@ -145,6 +147,7 @@
 #define	P5MSR_CTR1		0x013	/* P5 only (trap on P6) */
 #define MSR_APICBASE		0x01b
 #define MSR_EBL_CR_POWERON	0x02a
+#define MSR_EBC_FREQUENCY_ID	0x02c	/* Pentium 4 only */
 #define	MSR_TEST_CTL		0x033
 #define MSR_BIOS_UPDT_TRIG	0x079
 #define	MSR_BBL_CR_D0		0x088	/* PII+ only */
@@ -168,6 +171,13 @@
 #define MSR_MCG_CTL		0x17b
 #define P6MSR_CTRSEL0		0x186
 #define P6MSR_CTRSEL1		0x187
+#define MSR_PERF_STATUS		0x198	/* Pentium M */
+#define MSR_PERF_CTL		0x199	/* Pentium M */
+#define MSR_THERM_CONTROL	0x19a
+#define MSR_THERM_INTERRUPT	0x19b
+#define MSR_THERM_STATUS	0x19c
+#define MSR_THERM2_CTL		0x19d	/* Pentium M */
+#define MSR_MISC_ENABLE		0x1a0
 #define MSR_DEBUGCTLMSR		0x1d9
 #define MSR_LASTBRANCHFROMIP	0x1db
 #define MSR_LASTBRANCHTOIP	0x1dc
@@ -414,3 +424,25 @@
 #define	PMC6_SEG_RENAME_STALLS		0xd4	/* P-II and P-III only */
 #define	PMC6_SEG_REG_RENAMES		0xd5	/* P-II and P-III only */
 #define	PMC6_RET_SEG_RENAMES		0xd6	/* P-II and P-III only */
+
+/* VIA C3 xcrypt-* instruction context control options */
+#define	C3_CRYPT_CWLO_ROUND_M		0x0000000f
+#define	C3_CRYPT_CWLO_ALG_M		0x00000070
+#define	C3_CRYPT_CWLO_ALG_AES		0x00000000
+#define	C3_CRYPT_CWLO_KEYGEN_M		0x00000080
+#define	C3_CRYPT_CWLO_KEYGEN_HW		0x00000000
+#define	C3_CRYPT_CWLO_KEYGEN_SW		0x00000080
+#define	C3_CRYPT_CWLO_NORMAL		0x00000000
+#define	C3_CRYPT_CWLO_INTERMEDIATE	0x00000100
+#define	C3_CRYPT_CWLO_ENCRYPT		0x00000000
+#define	C3_CRYPT_CWLO_DECRYPT		0x00000200
+#define	C3_CRYPT_CWLO_KEY128		0x0000000a	/* 128bit, 10 rds */
+#define	C3_CRYPT_CWLO_KEY192		0x0000040c	/* 192bit, 12 rds */
+#define	C3_CRYPT_CWLO_KEY256		0x0000080e	/* 256bit, 15 rds */
+
+/* VIA C3 xcrypt-* opcodes */
+#define	VIAC3_CRYPTOP_RNG	0xc0		/* rng */
+#define	VIAC3_CRYPTOP_ECB	0xc8		/* aes-ecb */
+#define	VIAC3_CRYPTOP_CBC	0xd0		/* aes-cbc */
+#define	VIAC3_CRYPTOP_CFB	0xe0		/* aes-cfb */
+#define	VIAC3_CRYPTOP_OFB	0xe8		/* aes-ofb */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmes.c,v 1.11 2003/06/04 04:11:37 deraadt Exp $ */
+/*	$OpenBSD: vmes.c,v 1.17 2004/01/14 20:50:48 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -48,11 +48,11 @@ void vmesattach(struct device *, struct device *, void *);
 int  vmesmatch(struct device *, void *, void *);
 
 struct cfattach vmes_ca = {
-        sizeof(struct vmessoftc), vmesmatch, vmesattach
-}; 
- 
+        sizeof(struct device), vmesmatch, vmesattach
+};
+
 struct cfdriver vmes_cd = {
-        NULL, "vmes", DV_DULL, 0
+        NULL, "vmes", DV_DULL
 };
 
 int vmesscan(struct device *, void *, void *);
@@ -78,11 +78,7 @@ vmesattach(parent, self, args)
 	struct device *parent, *self;
 	void *args;
 {
-	struct vmessoftc *sc = (struct vmessoftc *)self;
-
 	printf("\n");
-
-	sc->sc_vme = (struct vmesoftc *)parent;
 
 	config_search(vmesscan, self, args);
 }
@@ -137,9 +133,9 @@ vmesread(dev, uio, flags)
 	int flags;
 {
 	int unit = minor(dev);
-	struct vmessoftc *sc = (struct vmessoftc *) vmes_cd.cd_devs[unit];
+	struct device *sc = (struct device *)vmes_cd.cd_devs[unit];
 
-	return (vmerw(sc->sc_vme, uio, flags, BUS_VMES));
+	return (vmerw(sc->dv_parent, uio, flags, BUS_VMES));
 }
 
 int
@@ -149,9 +145,9 @@ vmeswrite(dev, uio, flags)
 	int flags;
 {
 	int unit = minor(dev);
-	struct vmessoftc *sc = (struct vmessoftc *) vmes_cd.cd_devs[unit];
+	struct device *sc = (struct device *)vmes_cd.cd_devs[unit];
 
-	return (vmerw(sc->sc_vme, uio, flags, BUS_VMES));
+	return (vmerw(sc->dv_parent, uio, flags, BUS_VMES));
 }
 
 paddr_t
@@ -161,12 +157,53 @@ vmesmmap(dev, off, prot)
 	int prot;
 {
 	int unit = minor(dev);
-	struct vmessoftc *sc = (struct vmessoftc *) vmes_cd.cd_devs[unit];
+	struct device *sc = (struct device *)vmes_cd.cd_devs[unit];
 	void * pa;
 
-	pa = vmepmap(sc->sc_vme, off, NBPG, BUS_VMES);
-	printf("vmes %x pa %x\n", off, pa);
+	pa = vmepmap(sc->dv_parent, off, NBPG, BUS_VMES);
+#ifdef DEBUG
+	printf("vmes %llx pa %p\n", off, pa);
+#endif
 	if (pa == NULL)
 		return (-1);
 	return (atop(pa));
+}
+
+/*
+ * Specific D16 access functions
+ *
+ * D16 cards will trigger bus errors on attempting to read or write more
+ * than 16 bits on the bus. Given how the m88k processor works, this means
+ * basically that all long (D32) accesses must be carefully taken care of.
+ *
+ * Since the kernels bcopy() and bzero() routines will use 32 bit accesses
+ * for performance, here are specific D16-compatible routines. They expect
+ * pointers to be 16-bit aligned.
+ */
+
+void
+d16_bcopy(const void *src, void *dst, size_t len)
+{
+	const u_int16_t *s = (const u_int16_t *)src;
+	u_int16_t *d = (u_int16_t *)dst;
+	size_t l = len;
+
+	l >>= 1;
+	while (l-- != 0)
+		*d++ = *s++;
+	if (len & 1)
+		*(u_int8_t *)d = *(u_int8_t *)s;
+}
+
+void
+d16_bzero(void *dst, size_t len)
+{
+	u_int16_t *d = (u_int16_t *)dst;
+	size_t l = len;
+
+	l >>= 1;
+	while (l-- != 0)
+		*d++ = 0;
+	if (len & 1)
+		*(u_int8_t *)d = 0;
 }

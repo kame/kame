@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysv_shm.c,v 1.38 2003/08/21 05:20:07 kevlo Exp $	*/
+/*	$OpenBSD: sysv_shm.c,v 1.41.2.1 2004/04/30 21:41:40 brad Exp $	*/
 /*	$NetBSD: sysv_shm.c,v 1.50 1998/10/21 22:24:29 tron Exp $	*/
 
 /*
@@ -209,6 +209,12 @@ sys_shmdt(struct proc *p, void *v, register_t *retval)
 int
 sys_shmat(struct proc *p, void *v, register_t *retval)
 {
+	return (sys_shmat1(p, v, retval, 0));
+}
+
+int
+sys_shmat1(struct proc *p, void *v, register_t *retval, int findremoved)
+{
 	struct sys_shmat_args /* {
 		syscallarg(int) shmid;
 		syscallarg(const void *) shmaddr;
@@ -235,7 +241,7 @@ sys_shmat(struct proc *p, void *v, register_t *retval)
 			shmmap_s->shmid = -1;
 		p->p_vmspace->vm_shm = (caddr_t)shmmap_h;
 	}
-	shmseg = shm_find_segment_by_shmid(SCARG(uap, shmid), 0);
+	shmseg = shm_find_segment_by_shmid(SCARG(uap, shmid), findremoved);
 	if (shmseg == NULL)
 		return (EINVAL);
 	error = ipcperm(cred, &shmseg->shm_perm,
@@ -272,8 +278,10 @@ sys_shmat(struct proc *p, void *v, register_t *retval)
 	error = uvm_map(&p->p_vmspace->vm_map, &attach_va, size,
 	    shm_handle->shm_object, 0, 0, UVM_MAPFLAG(prot, prot,
 	    UVM_INH_SHARE, UVM_ADV_RANDOM, 0));
-	if (error)
+	if (error) {
+		uao_detach(shm_handle->shm_object);
 		return (error);
+	}
 
 	shmmap_s->va = attach_va;
 	shmmap_s->shmid = SCARG(uap, shmid);
@@ -607,14 +615,14 @@ sysctl_sysvshm(int *name, u_int namelen, void *oldp, size_t *oldlenp,
 		    shminfo.shmmni * sizeof(struct shmid_ds *));
 		bzero(newsegs + shminfo.shmmni,
 		    (val - shminfo.shmmni) * sizeof(struct shmid_ds *));
+		free(shmsegs, M_SHM);
+		shmsegs = newsegs;
 		newseqs = malloc(val * sizeof(unsigned short), M_SHM, M_WAITOK);
 		bcopy(shmseqs, newseqs,
 		    shminfo.shmmni * sizeof(unsigned short));
 		bzero(newseqs + shminfo.shmmni,
 		    (val - shminfo.shmmni) * sizeof(unsigned short));
-		free(shmsegs, M_SHM);
 		free(shmseqs, M_SHM);
-		shmsegs = newsegs;
 		shmseqs = newseqs;
 		shminfo.shmmni = val;
 		return (0);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci_intr_fixup.c,v 1.28 2003/07/30 05:26:33 mickey Exp $	*/
+/*	$OpenBSD: pci_intr_fixup.c,v 1.32 2004/02/24 19:30:00 markus Exp $	*/
 /*	$NetBSD: pci_intr_fixup.c,v 1.10 2000/08/10 21:18:27 soda Exp $	*/
 
 /*
@@ -148,6 +148,10 @@ const struct pciintr_icu_table {
 	  piix_init },
 	{ PCI_VENDOR_INTEL,     PCI_PRODUCT_INTEL_82801BAM_LPC,
 	  piix_init },
+	{ PCI_VENDOR_INTEL,     PCI_PRODUCT_INTEL_82801CAM_LPC,
+	  piix_init },
+	{ PCI_VENDOR_INTEL,     PCI_PRODUCT_INTEL_82801DB_LPC,
+	  piix_init },
 	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82801EB_LPC,
 	  piix_init },
 
@@ -173,6 +177,9 @@ const struct pciintr_icu_table {
 	  amd756_init },
 	{ PCI_VENDOR_AMD,	PCI_PRODUCT_AMD_766_ISA,
 	  amd756_init },
+
+	{ PCI_VENDOR_ALI,	PCI_PRODUCT_ALI_M1533,
+	  ali1543_init },
 
 	{ PCI_VENDOR_ALI,	PCI_PRODUCT_ALI_M1543,
 	  ali1543_init },
@@ -636,9 +643,10 @@ pci_intr_header_fixup(pc, tag, ihp)
 	}
 
 	ihp->link = l;
-	if (irq == 14 || irq == 15)
+	if (irq == 14 || irq == 15) {
 		p = " WARNING: ignored";
-	else if (l->irq == I386_PCI_INTERRUPT_LINE_NO_CONNECTION) {
+		ihp->link = NULL;
+	} else if (l->irq == I386_PCI_INTERRUPT_LINE_NO_CONNECTION) {
 
 		/* Appropriate interrupt was not found. */
 		if (pciintr_icu_tag == NULL && ihp->line != 0 &&

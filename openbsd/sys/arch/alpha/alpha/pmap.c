@@ -1,4 +1,4 @@
-/* $OpenBSD: pmap.c,v 1.38 2003/06/02 23:27:43 millert Exp $ */
+/* $OpenBSD: pmap.c,v 1.40 2003/12/22 19:59:37 jmc Exp $ */
 /* $NetBSD: pmap.c,v 1.154 2000/12/07 22:18:55 thorpej Exp $ */
 
 /*-
@@ -926,7 +926,7 @@ pmap_bootstrap(paddr_t ptaddr, u_int maxasn, u_long ncpuids)
 	/*
 	 * Set up level three page table (lev3map)
 	 */
-	/* Nothing to do; it's already zero'd */
+	/* Nothing to do; it's already zeroed */
 
 	/*
 	 * Initialize `FYI' variables.  Note we're relying on
@@ -946,7 +946,7 @@ pmap_bootstrap(paddr_t ptaddr, u_int maxasn, u_long ncpuids)
 #endif
 
 	/*
-	 * Intialize the pmap pools and list.
+	 * Initialize the pmap pools and list.
 	 */
 	pmap_ncpuids = ncpuids;
 	pool_init(&pmap_pmap_pool, sizeof(struct pmap), 0, 0, 0, "pmappl",
@@ -2722,7 +2722,7 @@ pmap_remove_mapping(pmap_t pmap, vaddr_t va, pt_entry_t *pte,
 	}
 
 	/*
-	 * If the mapping wasn't enterd on the PV list, we're all done.
+	 * If the mapping wasn't entered on the PV list, we're all done.
 	 */
 	if (onpv == FALSE) {
 #ifdef DIAGNOSTIC
@@ -2773,7 +2773,7 @@ pmap_changebit(paddr_t pa, u_long set, u_long mask, long cpu_id)
 
 	pvh = pa_to_pvh(pa);
 	/*
-	 * Loop over all current mappings setting/clearing as appropos.
+	 * Loop over all current mappings setting/clearing as appropriate.
 	 */
 	for (pv = LIST_FIRST(&pvh->pvh_list); pv != NULL;
 	     pv = LIST_NEXT(pv, pv_list)) {
@@ -3268,7 +3268,7 @@ pmap_physpage_alloc(int usage, paddr_t *pap)
 	paddr_t pa;
 
 	/*
-	 * Don't ask for a zero'd page in the L1PT case -- we will
+	 * Don't ask for a zeroed page in the L1PT case -- we will
 	 * properly initialize it in the constructor.
 	 */
 
@@ -3625,7 +3625,7 @@ pmap_l1pt_ctor(void *arg, void *object, int flags)
 /*
  * pmap_l1pt_alloc:
  *
- *	Page alloctor for L1 PT pages.
+ *	Page allocator for L1 PT pages.
  */
 void *
 pmap_l1pt_alloc(struct pool *pp, int flags)
@@ -4086,7 +4086,7 @@ pmap_asn_alloc(pmap_t pmap, long cpu_id)
 			/*
 			 * The generation number has wrapped.  We could
 			 * handle this scenario by traversing all of
-			 * the pmaps, and invaldating the generation
+			 * the pmaps, and invalidating the generation
 			 * number on those which are not currently
 			 * in use by this processor.
 			 *

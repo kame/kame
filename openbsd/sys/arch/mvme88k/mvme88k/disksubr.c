@@ -1,9 +1,9 @@
-/*	$OpenBSD: disksubr.c,v 1.22 2003/08/21 20:40:33 miod Exp $	*/
+/*	$OpenBSD: disksubr.c,v 1.25 2004/03/17 14:16:04 miod Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1995 Dale Rahn.
  * All rights reserved.
- *   
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -42,21 +42,19 @@
 #define b_cylin b_resid
 
 #ifdef DEBUG
-int disksubr_debug = 0;
+int disksubr_debug;
 #endif
 
-static void bsdtocpulabel(struct disklabel *lp,
-	struct cpu_disklabel *clp);
-static void cputobsdlabel(struct disklabel *lp,
-	struct cpu_disklabel *clp);
+void bsdtocpulabel(struct disklabel *, struct cpu_disklabel *);
+void cputobsdlabel(struct disklabel *, struct cpu_disklabel *);
 int get_target(void);
 
 #ifdef DEBUG
-static void printlp(struct disklabel *lp, char *str);
-static void printclp(struct cpu_disklabel *clp, char *str);
+void printlp(struct disklabel *, char *);
+void printclp(struct cpu_disklabel *, char *);
 #endif
 
-/* 
+/*
  * Returns the ID of the SCSI disk based on Motorola's CLUN/DLUN stuff
  * bootdev == CLUN << 8 | DLUN.
  * This handles SBC SCSI and MVME32[78].
@@ -108,7 +106,7 @@ dk_establish(dk, dev)
 		sbsc = (struct scsibus_softc *)dev->dv_parent;
 		target = get_target(); /* Work the Motorola Magic */
 		lun = 0;
-    		
+    
 		if (sbsc->sc_link[target][lun] != NULL &&
 		    sbsc->sc_link[target][lun]->device_softc == (void *)dev) {
 			bootdv = dev;
@@ -124,7 +122,7 @@ dk_establish(dk, dev)
  * The label must be partly set up before this:
  * secpercyl and anything required in the strategy routine
  * (e.g., sector size) must be filled in before calling us.
- * Returns null on success and an error string on failure.
+ * Returns NULL on success and an error string on failure.
  */
 
 char *
@@ -139,7 +137,7 @@ readdisklabel(dev, strat, lp, clp, spoofonly)
 	int error, i;
 
 	/* minimal requirements for archetypal disk label */
-	if (lp->d_secsize == 0)
+	if (lp->d_secsize < DEV_BSIZE)
 		lp->d_secsize = DEV_BSIZE;
 	if (lp->d_secperunit == 0)
 		lp->d_secperunit = 0x1fffffff;
@@ -188,7 +186,7 @@ readdisklabel(dev, strat, lp, clp, spoofonly)
 		return ("disk label corrupted");
 
 #ifdef DEBUG
-	if (disksubr_debug > 0) {
+	if (disksubr_debug != 0) {
 		printlp(lp, "readdisklabel:bsd label");
 		printclp(clp, "readdisklabel:cpu label");
 	}
@@ -210,7 +208,7 @@ setdisklabel(olp, nlp, openmask, clp)
 	struct partition *opp, *npp;
 
 #ifdef DEBUG
-	if(disksubr_debug > 0) {
+	if (disksubr_debug != 0) {
 		printlp(nlp, "setdisklabel:new disklabel");
 		printlp(olp, "setdisklabel:old disklabel");
 		printclp(clp, "setdisklabel:cpu disklabel");
@@ -258,7 +256,7 @@ setdisklabel(olp, nlp, openmask, clp)
  	nlp->d_checksum = dkcksum(nlp);
 	*olp = *nlp;
 #ifdef DEBUG
-	if(disksubr_debug > 0) {
+	if (disksubr_debug != 0) {
 		printlp(olp, "setdisklabel:old->new disklabel");
 	}
 #endif
@@ -272,14 +270,14 @@ int
 writedisklabel(dev, strat, lp, clp)
 	dev_t dev;
 	void (*strat)(struct buf *);
-	register struct disklabel *lp;
+	struct disklabel *lp;
 	struct cpu_disklabel *clp;
 {
 	struct buf *bp;
 	int error;
 
 #ifdef DEBUG
-	if(disksubr_debug > 0) {
+	if (disksubr_debug != 0) {
 		printlp(lp, "writedisklabel: bsd label");
 	}
 #endif
@@ -311,7 +309,7 @@ writedisklabel(dev, strat, lp, clp)
 	bsdtocpulabel(lp, clp);
 
 #ifdef DEBUG
-	if (disksubr_debug > 0) {
+	if (disksubr_debug != 0) {
 		printclp(clp, "writedisklabel: cpu label");
 	}
 #endif
@@ -336,7 +334,7 @@ writedisklabel(dev, strat, lp, clp)
 		bp->b_flags = B_INVAL | B_AGE | B_READ;
 		brelse(bp);
 	}
-	return (error); 
+	return (error);
 }
 
 
@@ -397,7 +395,7 @@ bad:
 }
 
 
-static void
+void
 bsdtocpulabel(lp, clp)
 	struct disklabel *lp;
 	struct cpu_disklabel *clp;
@@ -470,83 +468,7 @@ bsdtocpulabel(lp, clp)
 	}
 }
 
-struct cpu_disklabel_old {
-	/* VID */
-	u_char		vid_id[4];
-	u_char		vid_0[16];
-	u_int		vid_oss;
-	u_short		vid_osl;
-	u_char		vid_1[4];
-	u_short		vid_osa_u;
-	u_short		vid_osa_l;
-	u_char		vid_2[2];
-	u_short		partitions;
-	u_char		vid_vd[16];
-	u_long		bbsize;
-	u_long		magic1;		/* 4 */
-	u_short		type;		/* 2 */
-	u_short		subtype;	/* 2 */
-	u_char		packname[16];	/* 16 */
-	u_long		flags;		/* 4 */
-	u_long		drivedata[5];	/* 4 */
-	u_long		spare[5];	/* 4 */
-	u_short		checksum;	/* 2 */
-
-	u_long		secpercyl;	/* 4 */
-	u_long		secperunit;	/* 4 */
-	u_long		headswitch;	/* 4 */
-
-	u_char		vid_3[4];
-	u_int		vid_cas;
-	u_char		vid_cal;
-	u_char		vid_4_0[3];
-	u_char		vid_4[64];
-	u_char		vid_4_1[28];
-	u_long		sbsize;
-	u_char		vid_mot[8];
-
-	/* CFG */
-	u_char		cfg_0[4];
-	u_short		cfg_atm;
-	u_short		cfg_prm;
-	u_short		cfg_atw;
-	u_short		cfg_rec;
-
-	u_short		sparespertrack;
-	u_short		sparespercyl;
-	u_long		acylinders;
-	u_short		rpm;
-	u_short		cylskew;
-
-	u_char		cfg_spt;
-	u_char		cfg_hds;
-	u_short		cfg_trk;
-	u_char		cfg_ilv;
-	u_char		cfg_sof;
-	u_short		cfg_psm;
-	u_short		cfg_shd;
-	u_char		cfg_2[2];
-	u_short		cfg_pcom;
-	u_char		cfg_3;
-	u_char		cfg_ssr;
-	u_short		cfg_rwcc;
-	u_short		cfg_ecc;
-	u_short		cfg_eatm;
-	u_short		cfg_eprm;
-	u_short		cfg_eatw;
-	u_char		cfg_gpb1;
-	u_char		cfg_gpb2;
-	u_char		cfg_gpb3;
-	u_char		cfg_gpb4;
-	u_char		cfg_ssc;
-	u_char		cfg_runit;
-	u_short		cfg_rsvc1;
-	u_short		cfg_rsvc2;
-	u_long		magic2;
-	u_char		cfg_4[192];
-};
-
-static void
+void
 cputobsdlabel(lp, clp)
 	struct disklabel *lp;
 	struct cpu_disklabel *clp;
@@ -555,7 +477,7 @@ cputobsdlabel(lp, clp)
 
 	if (clp->version == 0) {
 #ifdef DEBUG
-		if (disksubr_debug > 0) {
+		if (disksubr_debug != 0) {
 			printf("Reading old disklabel\n");
 		}
 #endif
@@ -619,7 +541,7 @@ cputobsdlabel(lp, clp)
 		lp->d_checksum = dkcksum(lp);
 	} else {
 #ifdef DEBUG
-		if (disksubr_debug > 0) {
+		if (disksubr_debug != 0) {
 			printf("Reading new disklabel\n");
 		}
 #endif
@@ -683,14 +605,14 @@ cputobsdlabel(lp, clp)
 		lp->d_checksum = dkcksum(lp);
 	}
 #if defined(DEBUG)
-	if (disksubr_debug > 0) {
+	if (disksubr_debug != 0) {
 		printlp(lp, "translated label read from disk\n");
 	}
 #endif
 }
 
 #ifdef DEBUG
-static void
+void
 printlp(lp, str)
 	struct disklabel *lp;
 	char *str;
@@ -707,14 +629,14 @@ printlp(lp, str)
 	for (i = 0; i < lp->d_npartitions; i++) {
 		struct partition *part = &lp->d_partitions[i];
 		char *fstyp = fstypenames[part->p_fstype];
-		
+
 		printf("%c: size %10x offset %10x type %7s frag %5x cpg %3x\n",
 		    'a' + i, part->p_size, part->p_offset, fstyp,
 		    part->p_frag, part->p_cpg);
 	}
 }
 
-static void
+void
 printclp(clp, str)
 	struct cpu_disklabel *clp;
 	char *str;
@@ -742,7 +664,7 @@ printclp(clp, str)
 		}
 
 		fstyp = fstypenames[part->p_fstype];
-		
+
 		printf("%c: size %10x offset %10x type %7s frag %5x cpg %3x\n",
 		    'a' + i, part->p_size, part->p_offset, fstyp,
 		    part->p_frag, part->p_cpg);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_map.c,v 1.62 2003/09/03 22:52:47 tedu Exp $	*/
+/*	$OpenBSD: uvm_map.c,v 1.65.2.1 2004/05/14 21:34:24 brad Exp $	*/
 /*	$NetBSD: uvm_map.c,v 1.86 2000/11/27 08:40:03 chs Exp $	*/
 
 /* 
@@ -85,9 +85,10 @@
 #include <sys/shm.h>
 #endif
 
-#define RB_AUGMENT(x) uvm_rb_augment(x)
 #define UVM_MAP
 #include <uvm/uvm.h>
+#undef RB_AUGMENT
+#define RB_AUGMENT(x) uvm_rb_augment(x)
 
 #ifdef DDB
 #include <uvm/uvm_ddb.h>
@@ -1095,8 +1096,8 @@ uvm_map_hint(struct proc *p, vm_prot_t prot)
 	}
 #endif
 	addr = (vaddr_t)p->p_vmspace->vm_daddr + MAXDSIZ;
-#if 0
-	addr += arc4random() & (256 * 1024 * 1024 - 1);
+#if !defined(__vax__)
+	addr += arc4random() & (MIN((256 * 1024 * 1024), MAXDSIZ) - 1);
 #endif
 	return (round_page(addr));
 }
@@ -1508,6 +1509,10 @@ uvm_unmap_remove(map, start, end, entry_list)
 		first_entry = entry;
 		entry = next;		/* next entry, please */
 	}
+	/* if ((map->flags & VM_MAP_DYING) == 0) { */
+		pmap_update(vm_map_pmap(map));
+	/* } */
+
 
 	uvm_tree_sanity(map, "unmap_remove leave");
 
@@ -2026,6 +2031,7 @@ uvm_map_extract(srcmap, start, len, dstmap, dstaddrp, flags)
 			/* end of 'while' loop */
 			fudge = 0;
 		}
+		pmap_update(srcmap->pmap);
 
 		/*
 		 * unlock dstmap.  we will dispose of deadentry in
@@ -2213,6 +2219,9 @@ uvm_map_protect(map, start, end, new_prot, set_max)
 
 		if (current->protection != old_prot) {
 			/* update pmap! */
+			if ((current->protection & MASK(entry)) == PROT_NONE &&
+			    VM_MAPENT_ISWIRED(entry))
+				current->wired_count--;
 			pmap_protect(map->pmap, current->start, current->end,
 			    current->protection & MASK(entry));
 		}
@@ -2249,6 +2258,7 @@ uvm_map_protect(map, start, end, new_prot, set_max)
 
 		current = current->next;
 	}
+	pmap_update(map->pmap);
 
  out:
 	vm_map_unlock(map);
@@ -3555,6 +3565,8 @@ uvmspace_fork(vm1)
 					     old_entry->end,
 					     old_entry->protection &
 					     ~VM_PROT_WRITE);
+			        pmap_update(old_map->pmap);
+
 			      }
 			      old_entry->etype |= UVM_ET_NEEDSCOPY;
 			    }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vs.c,v 1.10 2003/06/02 23:27:50 millert Exp $ */
+/*	$OpenBSD: vs.c,v 1.14 2004/01/20 16:48:23 miod Exp $ */
 
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
@@ -64,7 +64,7 @@
 
 void scopy(void *, void *, u_int);
 void szero(void *, u_int);
-int do_vspoll(struct vs_softc *, int);
+int do_vspoll(struct vs_softc *, int, int);
 void thaw_queue(struct vs_softc *, u_int8_t);
 int  vs_checkintr(struct vs_softc *, struct scsi_xfer *, int *);
 void vs_chksense(struct scsi_xfer *);
@@ -139,9 +139,10 @@ vs_minphys(bp)
 }
 
 int
-do_vspoll(sc, to)
+do_vspoll(sc, to, canreset)
 	struct vs_softc *sc;
 	int to;
+	int canreset;
 {
 	int i;
 
@@ -158,8 +159,10 @@ do_vspoll(sc, to)
 			--to;
 			if (to <= 0) {
 				/*splx(s);*/
-				vs_reset(sc);
-				vs_resync(sc);
+				if (canreset) {
+					vs_reset(sc);
+					vs_resync(sc);
+				}
 				printf ("timed out: timeout %d crsw 0x%x\n",
 				    to, CRSW);
 				return 1;
@@ -180,7 +183,7 @@ vs_poll(sc, xs)
 	/*s = splbio();*/
 	to = xs->timeout / 1000;
 	for (;;) {
-		if (do_vspoll(sc, to)) break;
+		if (do_vspoll(sc, to, 1)) break;
 		if (vs_checkintr(sc, xs, &status)) {
 			vs_scsidone(xs, status);
 		}
@@ -253,7 +256,6 @@ vs_scsicmd(xs)
 		scsi_done(xs);
 	}
 
-	slp->quirks |= SDEV_NOLUNS;
 	flags = xs->flags;
 #ifdef SDEBUG
 	printf("scsi_cmd() ");
@@ -433,7 +435,7 @@ vs_chksense(xs)
 	mc->cqe_QECR = M_QECR_GO;
 	/* poll for the command to complete */
 	s = splbio();
-	do_vspoll(sc, 0);
+	do_vspoll(sc, 0, 1);
 	/*
 	if (xs->cmd->opcode != PREVENT_ALLOW) {
 		xs->error = XS_SENSE;
@@ -538,7 +540,7 @@ vs_initialize(sc)
 	mc->cqe_WORK_QUEUE = 0;
 	mc->cqe_QECR = M_QECR_GO;
 	/* poll for the command to complete */
-	do_vspoll(sc, 0);
+	do_vspoll(sc, 0, 1);
 	CRB_CLR_DONE(CRSW);
 
 	/* initialize work queues */
@@ -560,7 +562,7 @@ vs_initialize(sc)
 		mc->cqe_WORK_QUEUE = 0;
 		mc->cqe_QECR = M_QECR_GO;
 		/* poll for the command to complete */
-		do_vspoll(sc, 0);
+		do_vspoll(sc, 0, 1);
 		if (CRSW & M_CRSW_ER) {
 			/*printf("\nerror: queue %d status = 0x%x\n",
 			    i, riopb->iopb_STATUS);*/
@@ -574,7 +576,7 @@ vs_initialize(sc)
 	CRSW = 0;
 	mcsb->mcsb_MCR |= M_MCR_SQM;
 	crsw = CRSW;
-	do_vspoll(sc, 0);
+	do_vspoll(sc, 0, 1);
 	if (CRSW & M_CRSW_ER) {
 		printf("error: status = 0x%x\n", riopb->iopb_STATUS);
 		CRB_CLR_ER(CRSW);
@@ -616,7 +618,7 @@ vs_resync(sc)
 		mc->cqe_WORK_QUEUE = 0;
 		mc->cqe_QECR = M_QECR_GO;
 		/* poll for the command to complete */
-		do_vspoll(sc, 0);
+		do_vspoll(sc, 0, 0);
 		if (riopb->iopb_STATUS) {
 			sc->sc_tinfo[i].avail = 0;
 		} else {
@@ -654,7 +656,7 @@ vs_reset(sc)
 	mc->cqe_QECR = M_QECR_GO;
 	/* poll for the command to complete */
 	for (;;) {
-		do_vspoll(sc, 0);
+		do_vspoll(sc, 0, 0);
 		/* ack & clear scsi error condition cause by reset */
 		if (CRSW & M_CRSW_ER) {
 			CRB_CLR_ER(CRSW);
@@ -934,9 +936,9 @@ vs_build_memory_structure(xs, iopb)
 					    trunc_page(starting_point_virt +
 						MAX_SG_BLOCK_SIZE-1);
 					/* So go back to the beginning of the
-					   last matching page and gererate the
-					   physadress of this location for the
-					   next time. */
+					   last matching page and generate the
+					   physical address of this location
+					   for the next time. */
 					point2_phys = kvtop(point_virt);
 				}
 
@@ -1027,7 +1029,7 @@ vs_build_memory_structure(xs, iopb)
 		LV(iopb->iopb_LENGTH, sg->elements);
 		LV(iopb->iopb_SGTTL, len);
 	} else { 
-		/* no scatter/gather neccessary */
+		/* no scatter/gather necessary */
 		LV(iopb->iopb_BUFF, starting_point_phys);
 		LV(iopb->iopb_LENGTH, len);
 	}

@@ -1,4 +1,4 @@
-.\"	$OpenBSD: boot.8,v 1.33 2003/06/06 21:45:33 jmc Exp $
+.\"	$OpenBSD: boot.8,v 1.38 2004/01/02 09:17:22 jmc Exp $
 .\"
 .\" Copyright (c) 1997-2001 Michael Shalayeff
 .\" All rights reserved.
@@ -125,6 +125,18 @@ If you do not,
 will proceed to load the kernel with the current parameters after the
 timeout period has expired.
 .El
+.Pp
+By default,
+.Nm
+attempts to load the kernel executable
+.Pa /bsd .
+If that fails, it will attempt to load
+.Pa /obsd
+and then
+.Pa /bsd.old .
+If it fails to find any of these files,
+and no alternative kernel image has been specified,
+the system will be unable to boot.
 .Sh COMMANDS
 The following commands are accepted at the
 .Nm
@@ -135,11 +147,28 @@ Boots the kernel image specified by
 .Ar image
 with any options given.
 Image specification consists of a pair
-.Em device : filename ,
-either or both can be omitted (':' is not needed if both are omitted),
+.Ar device : Ns Ar filename ;
+either or both can be omitted (`:' is not needed if both are omitted),
 in which case values from
 .Nm
 variables will be used.
+.Pp
+When selecting the
+.Ar device
+to boot from,
+.Nm
+makes no distinction between SCSI and IDE type drives;
+they are detected as
+.Sq hd
+devices.
+Therefore, to boot kernel
+.Pa /bsd
+from slice
+.Sq a
+on the first hard drive
+.Pq irrespective of device type ,
+specify
+.Dq boot hd0a:/bsd .
 .Bl -tag -width _a_
 .It Fl a
 Causes the kernel to ask for the
@@ -238,9 +267,9 @@ Debug flag if
 .Nm
 was compiled with DEBUG defined.
 .It Nm device
-Boot device name (i.e.,
+Boot device name (e.g.,
 .Li fd0a ,
-.Li sd0a ) .
+.Li hd0a ) .
 .It Nm howto
 Options to pass to the loaded kernel.
 .It Nm image
@@ -249,10 +278,13 @@ File name containing the kernel image.
 Number of seconds boot will wait for human intervention before
 booting the default kernel image.
 .It Nm tty
-Active console device name (i.e.,
+Active console device name (e.g.,
 .Li com0 ,
 .Li com1 ,
 .Li pc0 ) .
+Currently, only the first serial port
+.Pq Li com0
+is supported for console on i386.
 .El
 .It stty Op Ar device Op Ar speed
 Displays or sets the
@@ -288,31 +320,29 @@ system bootstrap's startup file
 kernel image
 .El
 .Sh EXAMPLES
-.Li boot> boot
+Boot the default kernel:
 .Pp
-Boot the default kernel.
-.Pp
-.Li # echo \&"boot\&" > /etc/boot.conf
+.Dl boot> boot
 .Pp
 Remove the 5 second pause at boot-time permanently, causing
 .Nm
-to load the kernel immediately without prompting.
+to load the kernel immediately without prompting:
 .Pp
-.Li boot> set tty com0
+.Dl # echo \&"boot\&" > /etc/boot.conf
 .Pp
 Use serial console.
 A null modem cable should connect the specified serial port to a terminal.
 Useful for debugging.
 .Pp
-.Li # echo \&"set tty com0\&" > /etc/boot.conf
+.Dl boot> set tty com0
 .Pp
-Invoke the serial console at every boot.
+Invoke the serial console at every boot:
 .Pp
-.Li boot> boot wd1a:/bsd -c
+.Dl # echo \&"set tty com0\&" > /etc/boot.conf
 .Pp
 Boot the kernel named
 .Pa /bsd
-from the second IDE disk in
+from the second hard disk in
 .Dq User Kernel Configuration
 mode (see
 .Xr boot_config 8 ) .
@@ -323,10 +353,13 @@ Once booted, such changes can be made permanent by using
 .Xr config 8 Ns 's
 .Fl e
 option.
+.Pp
+.Dl boot> boot hd1a:/bsd -c
 .Sh SEE ALSO
 .Xr gzip 1 ,
 .Xr autoconf 4 ,
 .Xr ddb 4 ,
+.Xr biosboot 8 ,
 .Xr boot_config 8 ,
 .Xr boot_i386 8 ,
 .Xr fdisk 8 ,
@@ -336,7 +369,7 @@ option.
 RFC 1950 describes the zlib library interface.
 .Pp
 The official home page for the version of zlib used in this
-operating system see http://quest.jpl.nasa.gov/zlib/.
+operating system is at http://quest.jpl.nasa.gov/zlib/.
 .Sh HISTORY
 This program was written by Michael Shalayeff for
 .Ox 2.1 .

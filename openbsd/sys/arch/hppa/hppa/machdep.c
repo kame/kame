@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.113 2003/09/04 07:02:37 mickey Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.125 2004/03/10 23:02:53 tom Exp $	*/
 
 /*
  * Copyright (c) 1999-2002 Michael Shalayeff
@@ -134,7 +134,7 @@ struct pdc_btlb pdc_btlb PDC_ALIGNMENT;
 struct pdc_model pdc_model PDC_ALIGNMENT;
 
 	/* w/ a little deviation should be the same for all installed cpus */
-u_int	cpu_itmr, cpu_ticksnum, cpu_ticksdenom, cpu_hzticks;
+u_int	cpu_ticksnum, cpu_ticksdenom;
 
 	/* exported info */
 char	machine[] = MACHINE_ARCH;
@@ -250,12 +250,12 @@ const struct hppa_cpu_typed {
 #ifdef HP7100LC_CPU
 	{ "PCXL",  hpcxl, HPPA_CPU_PCXL, HPPA_FTRS_BTLBU|HPPA_FTRS_HVT,
 	  desidhash_l, itlb_l, itlbna_l, dtlb_l, dtlbna_l, tlbd_l,
-	  ibtlb_g, NULL, pbtlb_g, hpti_l},
+	  ibtlb_g, NULL, pbtlb_g, hpti_g},
 #endif
 #ifdef HP7300LC_CPU
 	{ "PCXL2", hpcxl2,HPPA_CPU_PCXL2, HPPA_FTRS_BTLBU|HPPA_FTRS_HVT,
 	  desidhash_l, itlb_l, itlbna_l, dtlb_l, dtlbna_l, tlbd_l,
-	  ibtlb_g, NULL, pbtlb_g, hpti_l},
+	  ibtlb_g, NULL, pbtlb_g, hpti_g},
 #endif
 #ifdef HP8000_CPU
 	{ "PCXU",  hpcxu, HPPA_CPU_PCXU, HPPA_FTRS_W32B|HPPA_FTRS_BTLBU|HPPA_FTRS_HVT,
@@ -275,10 +275,19 @@ const struct hppa_cpu_typed {
 	{ "", 0 }
 };
 
+int
+hppa_cpuspeed(int *mhz)
+{
+	*mhz = PAGE0->mem_10msec / 10000;
+
+	return (0);
+}
+
 void
 hppa_init(start)
 	paddr_t start;
 {
+	extern u_long cpu_hzticks;
 	extern int kernel_text;
 	vaddr_t v, v1;
 	int error;
@@ -419,6 +428,7 @@ hppa_init(start)
 	pdc_call((iodcio_t)pdc, 0, PDC_CHASSIS, PDC_CHASSIS_DISP,
 	    PDC_OSTAT(PDC_OSTAT_RUN) | 0xCEC0);
 
+	cpu_cpuspeed = &hppa_cpuspeed;
 #ifdef DDB
 	ddb_init();
 #endif
@@ -510,9 +520,13 @@ cpuid()
 	}
 
 	if (!pdc_call((iodcio_t)pdc, 0, PDC_TLB, PDC_TLB_INFO, &pdc_hwtlb) &&
-	    pdc_hwtlb.min_size && pdc_hwtlb.max_size)
+	    pdc_hwtlb.min_size && pdc_hwtlb.max_size) {
 		cpu_features |= HPPA_FTRS_HVT;
-	else {
+		if (pmap_hptsize > pdc_hwtlb.max_size)
+			pmap_hptsize = pdc_hwtlb.max_size;
+		else if (pmap_hptsize && pmap_hptsize < pdc_hwtlb.min_size)
+			pmap_hptsize = pdc_hwtlb.min_size;
+	} else {
 		printf("WARNING: no HPT support, fine!\n");
 		pmap_hptsize = 0;
 	}
@@ -527,8 +541,8 @@ cpuid()
 		printf("WARNING: UNKNOWN CPU TYPE; GOOD LUCK "
 		    "(type 0x%x, features 0x%x)\n", cpu_type, cpu_features);
 		p = cpu_types;
-	} else if (p->type == hpcxl && !fpu_enable)
-		/* we know PCXL does not exist w/o FPU */
+	} else if ((p->type == hpcxl || p->type == hpcxl2) && !fpu_enable)
+		/* we know PCXL and PCXL2 do not exist w/o FPU */
 		fpu_enable = 0xc0;
 
 	cpu_type = p->type;
@@ -604,12 +618,6 @@ cpu_startup(void)
 	vaddr_t minaddr, maxaddr;
 	vsize_t size;
 	int i, base, residual;
-#ifdef DEBUG
-	extern int pmapdebug;
-	int opmapdebug = pmapdebug;
-
-	pmapdebug = 0;
-#endif
 
 	/*
 	 * i won't understand a friend of mine,
@@ -621,7 +629,7 @@ cpu_startup(void)
 
 	printf("%s\n", cpu_model);
 	printf("real mem = %d (%d reserved for PROM, %d used by OpenBSD)\n",
-	    ctob(totalphysmem), ctob(resvmem), ctob(physmem));
+	    ctob(totalphysmem), ctob(resvmem), ctob(physmem - resvmem));
 
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, &minaddr, round_page(size),
@@ -669,9 +677,6 @@ cpu_startup(void)
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 	    VM_PHYS_SIZE, 0, FALSE, NULL);
 
-#ifdef DEBUG
-	pmapdebug = opmapdebug;
-#endif
 	printf("avail mem = %ld\n", ptoa(uvmexp.free));
 	printf("using %d buffers containing %d bytes of memory\n",
 	    nbuf, bufpages * PAGE_SIZE);
@@ -748,19 +753,22 @@ delay(us)
 void
 microtime(struct timeval *tv)
 {
-	u_int itmr;
+	extern u_long cpu_itmr;
+	u_long itmr, mask;
 	int s;
 
 	s = splhigh();
 	tv->tv_sec  = time.tv_sec;
 	tv->tv_usec = time.tv_usec;
 
+	rsm(PSL_I, mask);
 	mfctl(CR_ITMR, itmr);
 	itmr -= cpu_itmr;
+	ssm(PSL_I, mask);
 	splx(s);
 
 	tv->tv_usec += itmr * cpu_ticksdenom / cpu_ticksnum;
-	if (tv->tv_usec > 1000000) {
+	if (tv->tv_usec >= 1000000) {
 		tv->tv_usec -= 1000000;
 		tv->tv_sec++;
 	}
@@ -898,9 +906,13 @@ btlb_insert(space, va, pa, lenp, prot)
 	pa >>= PGSHIFT;
 	va >>= PGSHIFT;
 	/* check address alignment */
-	if (pa & (len - 1))
+	if (pa & (len - 1)) {
+#ifdef BTLBDEBUG
 		printf("WARNING: BTLB address misaligned pa=0x%x, len=0x%x\n",
 		    pa, len);
+#endif
+		return -(ERANGE);
+	}
 
 	/* ensure IO space is uncached */
 	if ((pa & (HPPA_IOBEGIN >> PGSHIFT)) == (HPPA_IOBEGIN >> PGSHIFT))
@@ -923,9 +935,11 @@ boot(howto)
 	int howto;
 {
 	/* If system is cold, just halt. */
-	if (cold)
-		howto |= RB_HALT;
-	else {
+	if (cold) {
+		/* (Unless the user explicitly asked for reboot.) */
+		if ((howto & RB_USERREQ) == 0)
+			howto |= RB_HALT;
+	} else {
 
 		boothowto = howto | (boothowto & RB_HALT);
 
@@ -1185,13 +1199,7 @@ setregs(p, pack, stack, retval)
 	struct trapframe *tf = p->p_md.md_regs;
 	struct pcb *pcb = &p->p_addr->u_pcb;
 	register_t zero;
-#ifdef DEBUG
-	/*extern int pmapdebug;*/
-	/*pmapdebug = 13;
-	printf("setregs(%p, %p, 0x%x, %p), ep=0x%x, cr30=0x%x\n",
-	    p, pack, stack, retval, pack->ep_entry, tf->tf_cr30);
-	*/
-#endif
+
 	tf->tf_flags = TFF_SYS|TFF_LAST;
 	tf->tf_iioq_tail = 4 +
 	    (tf->tf_iioq_head = pack->ep_entry | HPPA_PC_PRIV_USER);

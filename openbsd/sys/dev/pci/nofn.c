@@ -1,4 +1,4 @@
-/*	$OpenBSD: nofn.c,v 1.9 2003/06/02 19:08:58 jason Exp $	*/
+/*	$OpenBSD: nofn.c,v 1.11 2004/02/03 17:17:33 deraadt Exp $	*/
 
 /*
  * Copyright (c) 2002 Jason L. Wright (jason@thought.net)
@@ -44,8 +44,6 @@
 #include <sys/mbuf.h>
 #include <sys/device.h>
 #include <sys/queue.h>
-
-#include <uvm/uvm_extern.h>
 
 #include <crypto/cryptodev.h>
 #include <crypto/cryptosoft.h>
@@ -178,12 +176,12 @@ nofn_attach(parent, self, aux)
 		break;
 	}
 
-	printf(": %s", intrstr);
+	printf(":");
 	if (sc->sc_flags & NOFN_FLAGS_PK)
-		printf(", pk");
+		printf(" PK");
 	if (sc->sc_flags & NOFN_FLAGS_RNG)
-		printf(", rng");
-	printf("\n");
+		printf(" RNG");
+	printf(", %s\n", intrstr);
 
 	REG_WRITE_4(sc, NOFN_PCI_INT_MASK, sc->sc_intrmask);
 

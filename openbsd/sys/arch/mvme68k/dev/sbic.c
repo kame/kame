@@ -1,4 +1,4 @@
-/*	$OpenBSD: sbic.c,v 1.13 2003/06/02 23:27:50 millert Exp $ */
+/*	$OpenBSD: sbic.c,v 1.15 2003/12/20 00:34:28 miod Exp $ */
 /*	$NetBSD: sbic.c,v 1.2 1996/04/23 16:32:54 chuck Exp $	*/
 
 /*
@@ -1084,7 +1084,7 @@ sbicselectbus(dev)
      * We only really need to do anything when the target goes to MSG out
      * If the device ignored ATN, it's probably old and brain-dead,
      * but we'll try to support it anyhow.
-     * If it doesn't support message out, it definately doesn't
+     * If it doesn't support message out, it definitely doesn't
      * support synchronous transfers, so no point in even asking...
      */
     if ( csr == (SBIC_CSR_MIS_2 | MESG_OUT_PHASE) ) {
@@ -1605,7 +1605,7 @@ sbicgo(dev, xs)
     count = acb->sc_kv.dc_count;
 
     if ( count && ((char *)kvtop((vaddr_t)addr) != acb->sc_pa.dc_addr) ) {
-        printf("sbic: DMA buffer mapping changed %x->%x\n",
+        printf("sbic: DMA buffer mapping changed %p->%lx\n",
                 acb->sc_pa.dc_addr, kvtop((vaddr_t)addr));
 #ifdef DDB
         Debugger();
@@ -1748,7 +1748,7 @@ sbicpoll(dev)
 {
     sbic_regmap_p       regs = dev->sc_sbicp;
     u_char              asr,
-                        csr;
+                        csr = 0;
     int                 i;
 
     /*
@@ -2513,7 +2513,7 @@ sbicnextstate(dev, csr, asr)
             }
 
             if ( acb == NULL ) {
-                printf("%s: reselect %s targ %d not in nexus_list %x\n",
+                printf("%s: reselect %s targ %d not in nexus_list %p\n",
                         dev->sc_dev.dv_xname,
                         csr == SBIC_CSR_RSLT_NI ? "NI" : "IFY", newtarget,
                         &dev->nexus_list.tqh_first);

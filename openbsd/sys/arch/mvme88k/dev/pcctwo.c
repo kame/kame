@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcctwo.c,v 1.17 2003/06/02 07:06:56 deraadt Exp $ */
+/*	$OpenBSD: pcctwo.c,v 1.21 2004/01/14 20:52:52 miod Exp $ */
 /*
  * Copyright (c) 1995 Theo de Raadt
  * All rights reserved.
@@ -65,7 +65,7 @@ struct cfattach pcctwo_ca = {
 };
 
 struct cfdriver pcctwo_cd = {
-	NULL, "pcctwo", DV_DULL, 0
+	NULL, "pcctwo", DV_DULL
 };
 
 struct pcctworeg *sys_pcc2 = NULL;
@@ -77,8 +77,8 @@ int pcctwo_scan(struct device *parent, void *child, void *args);
 
 int
 pcctwomatch(parent, vcf, args)
-struct device *parent;
-void *vcf, *args;
+	struct device *parent;
+	void *vcf, *args;
 {
 	struct confargs *ca = args;
 	struct pcctworeg *pcc2;
@@ -86,6 +86,7 @@ void *vcf, *args;
 	/* Bomb if wrong cpu */
 	switch (brdtyp) {
 	case BRD_187:
+	case BRD_8120:
 		pcc2 = (struct pcctworeg *)(IIOV(ca->ca_paddr) + PCC2_PCC2CHIP_OFF);
 		break;
 	case BRD_197: /* pcctwo is a child of buswitch XXX smurph */
@@ -96,7 +97,7 @@ void *vcf, *args;
 		return (0);
 	}
 
-	if (badvaddr((vm_offset_t)pcc2, 4)) {
+	if (badvaddr((vaddr_t)pcc2, 4)) {
 		printf("==> pcctwo: failed address check.\n");
 		return (0);
 	}
@@ -129,11 +130,6 @@ pcctwo_scan(parent, child, args)
 	struct cfdata *cf = child;
 	struct pcctwosoftc *sc = (struct pcctwosoftc *)parent;
 	struct confargs oca;
-
-	if (parent->dv_cfdata->cf_driver->cd_indirect) {
-                printf(" indirect devices not supported\n");
-                return 0;
-        }
 
 	bzero(&oca, sizeof oca);
 	oca.ca_offset = cf->cf_loc[0];
@@ -171,7 +167,7 @@ void *args;
 	 */
 	sc->sc_paddr = ca->ca_paddr;
 	sc->sc_vaddr = (void *)IIOV(sc->sc_paddr);
-	
+
 	pcc2bus = ca->ca_bustype;
 
 	switch (pcc2bus) {
@@ -181,16 +177,16 @@ void *args;
 #if NBUSSW > 0
 	case BUS_BUSSWITCH:
 		sc->sc_pcc2 = (struct pcctworeg *)sc->sc_vaddr;
-		/* 
+		/*
 		 * fake up our address so that pcc2 child devices
 		 * are offeset of 0xFFF00000 - XXX smurph
 		 */
                 sc->sc_paddr -= PCC2_PCC2CHIP_OFF;
                 sc->sc_vaddr -= PCC2_PCC2CHIP_OFF;
                 /* make sure the bus is mc68040 compatible */
-		sc->sc_pcc2->pcc2_genctl |= PCC2_GENCTL_C040;	
+		sc->sc_pcc2->pcc2_genctl |= PCC2_GENCTL_C040;
 		break;
-#endif 
+#endif
 	}
 	sys_pcc2 = sc->sc_pcc2;
 

@@ -1,7 +1,11 @@
+/*	$OpenBSD: aic7xxx.c,v 1.55 2004/02/22 16:06:26 krw Exp $	*/
+/*	$NetBSD: aic7xxx.c,v 1.108 2003/11/02 11:07:44 wiz Exp $	*/
+
 /*
  * Core routines and tables shareable across OS platforms.
  *
- * Copyright (c) 1994-2001 Justin T. Gibbs.
+ * Copyright (c) 1994-2002 Justin T. Gibbs.
+ * Copyright (c) 2000-2002 Adaptec Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -10,40 +14,49 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions, and the following disclaimer,
  *    without modification.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
+ * 2. Redistributions in binary form must reproduce at minimum a disclaimer
+ *    substantially similar to the "NO WARRANTY" disclaimer below
+ *    ("Disclaimer") and any redistribution must be conditioned upon
+ *    including a substantially similar Disclaimer requirement for further
+ *    binary redistribution.
+ * 3. Neither the names of the above-listed copyright holders nor the names
+ *    of any contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
  *
  * Alternatively, this software may be distributed under the terms of the
- * GNU Public License ("GPL").
+ * GNU General Public License ("GPL") version 2 as published by the Free
+ * Software Foundation.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * NO WARRANTY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * HOLDERS OR CONTRIBUTORS BE LIABLE FOR SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: aic7xxx.c,v 1.49 2003/08/12 22:47:02 fgsch Exp $
+ * $Id: aic7xxx.c,v 1.55 2004/02/22 16:06:26 krw Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.c,v 1.80 2001/12/16 17:38:30 gibbs Exp $
- * $OpenBSD: aic7xxx.c,v 1.49 2003/08/12 22:47:02 fgsch Exp $
+ * //depot/aic7xxx/aic7xxx/aic7xxx.c#112 $
+ *
+ * $FreeBSD: /repoman/r/ncvs/src/sys/dev/aic7xxx/aic7xxx.c,v 1.88 2003/01/20 20:44:55 gibbs Exp $
+ */
+/*
+ * Ported from FreeBSD by Pascal Renauld, Network Storage Solutions, Inc. - April 2003
  */
 
-#ifdef __OpenBSD__
+#include <sys/cdefs.h>
+/* __KERNEL_RCSID(0, "$NetBSD: aic7xxx.c,v 1.108 2003/11/02 11:07:44 wiz Exp $"); */
+
 #include <dev/ic/aic7xxx_openbsd.h>
 #include <dev/ic/aic7xxx_inline.h>
-#include <dev/microcode/aic7xxx/sequencer.h>
-#endif
-#ifdef __FreeBSD__
-#include <dev/aic7xxx/aic7xxx_freebsd.h>
-#include <dev/aic7xxx/aic7xxx_inline.h>
-#include <dev/aic7xxx/aicasm/aicasm_insformat.h>
-#endif
+#include <dev/microcode/aic7xxx/aicasm_insformat.h>
+
 /****************************** Softc Data ************************************/
 struct ahc_softc_tailq ahc_tailq = TAILQ_HEAD_INITIALIZER(ahc_tailq);
 
@@ -65,7 +78,6 @@ char *ahc_chip_names[] =
 	"aic7892",
 	"aic7899"
 };
-static const u_int num_chip_names = NUM_ELEMENTS(ahc_chip_names);
 
 /*
  * Hardware error codes.
@@ -109,7 +121,7 @@ static const u_int num_phases = NUM_ELEMENTS(ahc_phase_table) - 1;
 
 /*
  * Valid SCSIRATE values.  (p. 3-17)
- * Provides a mapping of tranfer periods in ns to the proper value to
+ * Provides a mapping of transfer periods in ns to the proper value to
  * stick in the scsixfer reg.
  */
 static struct ahc_syncrate ahc_syncrates[] =
@@ -133,13 +145,10 @@ static struct ahc_syncrate ahc_syncrates[] =
 };
 
 /* Our Sequencer Program */
-#ifdef __OpenBSD__
 #include <dev/microcode/aic7xxx/aic7xxx_seq.h>
-#else
-#include "aic7xxx_seq.h"
-#endif 
 
 /**************************** Function Declarations ***************************/
+static void		ahc_force_renegotiation(struct ahc_softc *);
 static struct ahc_tmode_tstate*
 			ahc_alloc_tstate(struct ahc_softc *ahc,
 					 u_int scsi_id, char channel);
@@ -156,9 +165,6 @@ static struct ahc_syncrate*
 static void		ahc_update_pending_scbs(struct ahc_softc *ahc);
 static void		ahc_fetch_devinfo(struct ahc_softc *ahc,
 					  struct ahc_devinfo *devinfo);
-static void		ahc_scb_devinfo(struct ahc_softc *ahc,
-					struct ahc_devinfo *devinfo,
-					struct scb *scb);
 static void		ahc_assert_atn(struct ahc_softc *ahc);
 static void		ahc_setup_initiator_msgout(struct ahc_softc *ahc,
 						   struct ahc_devinfo *devinfo,
@@ -176,6 +182,7 @@ static void		ahc_construct_ppr(struct ahc_softc *ahc,
 					  u_int period, u_int offset,
 					  u_int bus_width, u_int ppr_options);
 static void		ahc_clear_msg_state(struct ahc_softc *ahc);
+static void		ahc_handle_proto_violation(struct ahc_softc *ahc);
 static void		ahc_handle_message_phase(struct ahc_softc *ahc);
 typedef enum {
 	AHCMSG_1B,
@@ -201,17 +208,10 @@ static void		ahc_setup_target_msgin(struct ahc_softc *ahc,
 					       struct scb *scb);
 #endif
 
-#ifdef __OpenBSD__
-int			ahc_init_scbdata(struct ahc_softc *ahc);
-void			ahc_fini_scbdata(struct ahc_softc *ahc);
-void			ahc_build_free_scb_list(struct ahc_softc *ahc);
-#else
-static bus_dmamap_callback_t	ahc_dmamap_cb;
-static int		ahc_init_scbdata(struct ahc_softc *ahc);
-static void		ahc_fini_scbdata(struct ahc_softc *ahc);
-static void		ahc_build_free_scb_list(struct ahc_softc *ahc);
-#endif 
-
+//static bus_dmamap_callback_t	ahc_dmamap_cb; 
+static void			ahc_build_free_scb_list(struct ahc_softc *ahc);
+static int			ahc_init_scbdata(struct ahc_softc *ahc);
+static void			ahc_fini_scbdata(struct ahc_softc *ahc);
 static void		ahc_qinfifo_requeue(struct ahc_softc *ahc,
 					    struct scb *prev_scb,
 					    struct scb *scb);
@@ -221,9 +221,6 @@ static u_int		ahc_rem_scb_from_disc_list(struct ahc_softc *ahc,
 static void		ahc_add_curscb_to_free_list(struct ahc_softc *ahc);
 static u_int		ahc_rem_wscb(struct ahc_softc *ahc,
 				     u_int scbpos, u_int prev);
-static int		ahc_abort_scbs(struct ahc_softc *ahc, int target,
-				       char channel, int lun, u_int tag,
-				       role_t role, uint32_t status);
 static void		ahc_reset_current_bus(struct ahc_softc *ahc);
 #ifdef AHC_DUMP_SEQ
 static void		ahc_dumpseq(struct ahc_softc *ahc);
@@ -245,6 +242,24 @@ static void		ahc_update_scsiid(struct ahc_softc *ahc,
 static int		ahc_handle_target_cmd(struct ahc_softc *ahc,
 					      struct target_cmd *cmd);
 #endif
+
+/************************** Added for porting to NetBSD ***********************/
+static int ahc_createdmamem(bus_dma_tag_t tag,
+			    int size,
+			    int flags,
+			    bus_dmamap_t *mapp,
+			    caddr_t *vaddr,
+			    bus_addr_t *baddr,
+			    bus_dma_segment_t *seg,
+			    int *nseg,
+			    const char *myname, const char *what);
+static void ahc_freedmamem(bus_dma_tag_t tag,
+			   int size,
+			   bus_dmamap_t map,
+			   caddr_t vaddr,
+			   bus_dma_segment_t *seg,
+			   int nseg);
+
 /************************* Sequencer Execution Control ************************/
 /*
  * Restart the sequencer program from address zero
@@ -255,9 +270,15 @@ ahc_restart(struct ahc_softc *ahc)
 
 	ahc_pause(ahc);
 
+	/* No more pending messages. */
+	ahc_clear_msg_state(ahc);
+
 	ahc_outb(ahc, SCSISIGO, 0);		/* De-assert BSY */
 	ahc_outb(ahc, MSG_OUT, MSG_NOOP);	/* No message to send */
 	ahc_outb(ahc, SXFRCTL1, ahc_inb(ahc, SXFRCTL1) & ~BITBUCKET);
+	ahc_outb(ahc, LASTPHASE, P_BUSFREE);
+	ahc_outb(ahc, SAVED_SCSIID, 0xFF);
+	ahc_outb(ahc, SAVED_LUN, 0xFF);
 
 	/*
 	 * Ensure that the sequencer's idea of TQINPOS
@@ -317,7 +338,7 @@ ahc_run_qoutfifo(struct ahc_softc *ahc)
 			 */
 			modnext = ahc->qoutfifonext & ~0x3;
 			*((uint32_t *)(&ahc->qoutfifo[modnext])) = 0xFFFFFFFFUL;
-			ahc_dmamap_sync(ahc, ahc->shared_data_dmat,
+			ahc_dmamap_sync(ahc, ahc->parent_dmat /*shared_data_dmat*/,
 					ahc->shared_data_dmamap,
 					/*offset*/modnext, /*len*/4,
 					BUS_DMASYNC_PREREAD);
@@ -329,7 +350,7 @@ ahc_run_qoutfifo(struct ahc_softc *ahc)
 			printf("%s: WARNING no command for scb %d "
 			       "(cmdcmplt)\nQOUTPOS = %d\n",
 			       ahc_name(ahc), scb_index,
-			       ahc->qoutfifonext - 1);
+			       (ahc->qoutfifonext - 1) & 0xFF);
 			continue;
 		}
 
@@ -337,7 +358,7 @@ ahc_run_qoutfifo(struct ahc_softc *ahc)
 		 * Save off the residual
 		 * if there is one.
 		 */
-		ahc_update_residual(scb);
+		ahc_update_residual(ahc, scb);
 		ahc_done(ahc, scb);
 	}
 }
@@ -360,7 +381,7 @@ ahc_run_untagged_queue(struct ahc_softc *ahc, struct scb_tailq *queue)
 		return;
 
 	if ((scb = TAILQ_FIRST(queue)) != NULL
-	 && (scb->flags & SCB_ACTIVE) == 0) {
+	    && (scb->flags & SCB_ACTIVE) == 0) {
 		scb->flags |= SCB_ACTIVE;
 		ahc_queue_scb(ahc, scb);
 	}
@@ -387,7 +408,7 @@ ahc_handle_brkadrint(struct ahc_softc *ahc)
 
 	ahc_dump_card_state(ahc);
 
-	/* Tell everyone that this HBA is no longer availible */
+	/* Tell everyone that this HBA is no longer available */
 	ahc_abort_scbs(ahc, CAM_TARGET_WILDCARD, ALL_CHANNELS,
 		       CAM_LUN_WILDCARD, SCB_LIST_NULL, ROLE_UNKNOWN,
 		       CAM_NO_HBA);
@@ -430,16 +451,16 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 		 * the kernel.  This allows us to leave the sequencer
 		 * running in the common case of command completes
 		 * without error.  The sequencer will already have
-		 * dma'd the SCB back up to us, so we can reference
+		 * DMA'd the SCB back up to us, so we can reference
 		 * the in kernel copy directly.
 		 */
 		scb_index = ahc_inb(ahc, SCB_TAG);
 		scb = ahc_lookup_scb(ahc, scb_index);
 		if (scb == NULL) {
-			printf("%s:%c:%d: ahc_intr - referenced scb "
+			ahc_print_devinfo(ahc, &devinfo);
+			printf("ahc_intr - referenced scb "
 			       "not valid during seqint 0x%x scb(%d)\n",
-			       ahc_name(ahc), devinfo.channel,
-			       devinfo.target, intstat, scb_index);
+			       intstat, scb_index);
 			ahc_dump_card_state(ahc);
 			panic("for safety");
 			goto unpause;
@@ -455,17 +476,15 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 			 * complete.
 			 */
 			scb->flags &= ~SCB_SENSE;
-			ahc_set_transaction_status(scb, CAM_AUTOSENSE_FAIL);
 			break;
 		}
-		ahc_set_transaction_status(scb, CAM_SCSI_STATUS_ERROR);
 		/* Freeze the queue until the client sees the error. */
 		ahc_freeze_devq(ahc, scb);
 		ahc_freeze_scb(scb);
 		ahc_set_scsi_status(scb, hscb->shared_data.status.scsi_status);
 		switch (hscb->shared_data.status.scsi_status) {
 		case SCSI_STATUS_OK:
-			printf("%s: Interrupted for staus of 0???\n",
+			printf("%s: Interrupted for status of 0 (?)\n",
 			       ahc_name(ahc));
 			break;
 		case SCSI_STATUS_CMD_TERMINATED:
@@ -477,13 +496,13 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 			struct ahc_tmode_tstate *tstate;
 			struct ahc_transinfo *tinfo;
 #ifdef AHC_DEBUG
-			if (ahc_debug & AHC_SHOWSENSE) {
+			if (ahc_debug & AHC_SHOW_SENSE) {
 				ahc_print_path(ahc, scb);
 				printf("SCB %d: requests Check Status\n",
 				       scb->hscb->tag);
 			}
 #endif
-				
+
 			if (ahc_perform_autosense(scb) == 0)
 				break;
 
@@ -497,10 +516,10 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 			sc = (struct scsi_sense *)(&hscb->shared_data.cdb); 
 			/*
 			 * Save off the residual if there is one.
- 			 */
-			ahc_update_residual(scb);
+			 */
+			ahc_update_residual(ahc, scb);
 #ifdef AHC_DEBUG
-			if (ahc_debug & AHC_SHOWSENSE) {
+			if (ahc_debug & AHC_SHOW_SENSE) {
 				ahc_print_path(ahc, scb);
 				printf("Sending Sense\n");
 			}
@@ -508,7 +527,7 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 			sg->addr = ahc_get_sense_bufaddr(ahc, scb);
 			sg->len = ahc_get_sense_bufsize(ahc, scb);
 			sg->len |= AHC_DMA_LAST_SEG;
-			
+
 			/* Fixup byte order */
 			sg->addr = ahc_htole32(sg->addr);
 			sg->len = ahc_htole32(sg->len);
@@ -516,7 +535,7 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 			sc->opcode = REQUEST_SENSE;
 			sc->byte2 = 0;
 			if (tinfo->protocol_version <= SCSI_REV_2
-			 && SCB_GET_LUN(scb) < 8)
+			    && SCB_GET_LUN(scb) < 8)
 				sc->byte2 = SCB_GET_LUN(scb) << 5;
 			sc->unused[0] = 0;
 			sc->unused[1] = 0;
@@ -527,7 +546,7 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 			 * We can't allow the target to disconnect.
 			 * This will be an untagged transaction and
 			 * having the target disconnect will make this
-			 * transaction indestinguishable from outstanding
+			 * transaction indistinguishable from outstanding
 			 * tagged transactions.
 			 */
 			hscb->control = 0;
@@ -540,17 +559,11 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 			 * errors will be reported before any data
 			 * phases occur.
 			 */
-#ifdef __OpenBSD__
-			if (ahc_get_transfer_length(scb) > 0 &&
-			    ahc_get_residual(scb) == 
-			    ahc_get_transfer_length(scb)) {
-#else 
 			if (ahc_get_residual(scb) 
-			 == ahc_get_transfer_length(scb)) {
-#endif
+			    == ahc_get_transfer_length(scb)) {
 				ahc_update_neg_request(ahc, &devinfo,
 						       tstate, targ_info,
-						       /*force*/TRUE);
+						       AHC_NEG_IF_NON_ASYNC);
 			}
 			if (tstate->auto_negotiate & devinfo.target_mask) {
 				hscb->control |= MK_MESSAGE;
@@ -562,24 +575,31 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 			hscb->datacnt = sg->len;
 			hscb->sgptr = scb->sg_list_phys | SG_FULL_RESID;
 			hscb->sgptr = ahc_htole32(hscb->sgptr);
+#ifdef __OpenBSD__
+			bus_dmamap_sync(ahc->parent_dmat,
+			    ahc->scb_data->sense_dmamap,
+			    (scb - ahc->scb_data->scbarray) *
+			    sizeof(struct scsi_sense_data),
+			    sizeof(struct scsi_sense_data),
+			    BUS_DMASYNC_PREREAD);
+			bus_dmamap_sync(ahc->parent_dmat,
+			    scb->sg_map->sg_dmamap,
+			    0, scb->sg_map->sg_dmamap->dm_mapsize,
+			    BUS_DMASYNC_PREWRITE);
+			bus_dmamap_sync(ahc->parent_dmat,
+			    ahc->scb_data->hscb_dmamap,
+			    0, ahc->scb_data->hscb_dmamap->dm_mapsize,
+			    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
+#endif
 			scb->sg_count = 1;
 			scb->flags |= SCB_SENSE;
 			ahc_qinfifo_requeue_tail(ahc, scb);
 			ahc_outb(ahc, RETURN_1, SEND_SENSE);
-#ifdef __OpenBSD__
-			if (!(scb->io_ctx->flags & SCSI_POLL))
-				timeout_add(&scb->io_ctx->stimeout, 5 * hz);
-#endif 
-#ifdef __FreeBSD__
 			/*
 			 * Ensure we have enough time to actually
 			 * retrieve the sense.
 			 */
-			untimeout(ahc_timeout, (caddr_t)scb,
-				  scb->io_ctx->ccb_h.timeout_ch);
-			scb->io_ctx->ccb_h.timeout_ch =
-			    timeout(ahc_timeout, (caddr_t)scb, 5 * hz);
-#endif
+			ahc_scb_timer_reset(scb, 5 * 1000000);
 			break;
 		}
 		default:
@@ -596,7 +616,7 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 		printf("%s:%c:%d: no active SCB for reconnecting "
 		       "target - issuing BUS DEVICE RESET\n",
 		       ahc_name(ahc), devinfo.channel, devinfo.target);
-		printf("SAVED_SCSIID == 0x%02x, SAVED_LUN == 0x%x, "
+		printf("SAVED_SCSIID == 0x%x, SAVED_LUN == 0x%x, "
 		       "ARG_1 == 0x%x ACCUM = 0x%x\n",
 		       ahc_inb(ahc, SAVED_SCSIID), ahc_inb(ahc, SAVED_LUN),
 		       ahc_inb(ahc, ARG_1), ahc_inb(ahc, ACCUM));
@@ -633,27 +653,10 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 		       ahc_name(ahc), devinfo.channel, devinfo.target, rejbyte);
 		break; 
 	}
-	case NO_IDENT: 
+	case PROTO_VIOLATION:
 	{
-		/*
-		 * The reconnecting target either did not send an identify
-		 * message, or did, but we didn't find an SCB to match and
-		 * before it could respond to our ATN/abort, it hit a dataphase.
-		 * The only safe thing to do is to blow it away with a bus
-		 * reset.
-		 */
-		int found;
-
-		printf("%s:%c:%d: Target did not send an IDENTIFY message. "
-		       "LASTPHASE = 0x%x, SAVED_SCSIID == 0x%x\n",
-		       ahc_name(ahc), devinfo.channel, devinfo.target,
-		       ahc_inb(ahc, LASTPHASE), ahc_inb(ahc, SAVED_SCSIID));
-		found = ahc_reset_channel(ahc, devinfo.channel, 
-					  /*initiate reset*/TRUE);
-		printf("%s: Issued Channel %c Bus Reset. "
-		       "%d SCBs aborted\n", ahc_name(ahc), devinfo.channel,
-		       found);
-		return;
+		ahc_handle_proto_violation(ahc);
+		break;
 	}
 	case IGN_WIDE_RES:
 		ahc_handle_ign_wide_residue(ahc, &devinfo);
@@ -691,7 +694,7 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 		 * that requires host assistance for completion.
 		 * While handling the message phase(s), we will be
 		 * notified by the sequencer after each byte is
-		 * transfered so we can track bus phase changes.
+		 * transferred so we can track bus phase changes.
 		 *
 		 * If this is the first time we've seen a HOST_MSG_LOOP
 		 * interrupt, initialize the state of the host message
@@ -722,7 +725,7 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 			if (devinfo.role == ROLE_INITIATOR) {
 				if (scb == NULL)
 					panic("HOST_MSG_LOOP with "
-					      "invalid SCB %x", scb_index);
+					      "invalid SCB %x\n", scb_index);
 
 				if (bus_phase == P_MESGOUT)
 					ahc_setup_initiator_msgout(ahc,
@@ -733,19 +736,20 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 					    MSG_TYPE_INITIATOR_MSGIN;
 					ahc->msgin_index = 0;
 				}
-			} else {
+			}
+#if AHC_TARGET_MODE
+			else {
 				if (bus_phase == P_MESGOUT) {
 					ahc->msg_type =
 					    MSG_TYPE_TARGET_MSGOUT;
 					ahc->msgin_index = 0;
 				}
-#if AHC_TARGET_MODE
 				else 
 					ahc_setup_target_msgin(ahc,
 							       &devinfo,
 							       scb);
-#endif
 			}
+#endif
 		}
 
 		ahc_handle_message_phase(ahc);
@@ -780,7 +784,44 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 				ahc_outb(ahc, LASTPHASE, curphase);
 				ahc_outb(ahc, SCSISIGO, curphase);
 			}
-			ahc_inb(ahc, SCSIDATL);
+			if ((ahc_inb(ahc, SCSISIGI) & (CDI|MSGI)) == 0) {
+				int wait;
+
+				/*
+				 * In a data phase.  Faster to bitbucket
+				 * the data than to individually ack each
+				 * byte.  This is also the only strategy
+				 * that will work with AUTOACK enabled.
+				 */
+				ahc_outb(ahc, SXFRCTL1,
+					 ahc_inb(ahc, SXFRCTL1) | BITBUCKET);
+				wait = 5000;
+				while (--wait != 0) {
+					if ((ahc_inb(ahc, SCSISIGI)
+					  & (CDI|MSGI)) != 0)
+						break;
+					ahc_delay(100);
+				}
+				ahc_outb(ahc, SXFRCTL1,
+					 ahc_inb(ahc, SXFRCTL1) & ~BITBUCKET);
+				if (wait == 0) {
+					struct	scb *scb;
+					u_int	scb_index;
+
+					ahc_print_devinfo(ahc, &devinfo);
+					printf("Unable to clear parity error.  "
+					       "Resetting bus.\n");
+					scb_index = ahc_inb(ahc, SCB_TAG);
+					scb = ahc_lookup_scb(ahc, scb_index);
+					if (scb != NULL)
+						ahc_set_transaction_status(scb,
+						    CAM_UNCOR_PARITY);
+					ahc_reset_channel(ahc, devinfo.channel, 
+							  /*init reset*/TRUE);
+				}
+			} else {
+				ahc_inb(ahc, SCSIDATL);
+			}
 		}
 		break;
 	}
@@ -829,7 +870,12 @@ ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat)
 		 * target does a command complete.
 		 */
 		ahc_freeze_devq(ahc, scb);
-		ahc_set_transaction_status(scb, CAM_DATA_RUN_ERR);
+		if ((scb->flags & SCB_SENSE) == 0) {
+			ahc_set_transaction_status(scb, CAM_DATA_RUN_ERR);
+		} else {
+			scb->flags &= ~SCB_SENSE;
+			ahc_set_transaction_status(scb, CAM_AUTOSENSE_FAIL);
+		}
 		ahc_freeze_scb(scb);
 
 		if ((ahc->features & AHC_ULTRA2) != 0) {
@@ -945,11 +991,8 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 	char	cur_channel;
 	char	intr_channel;
 
-	/* Make sure the sequencer is in a safe location. */
-	ahc_clear_critical_section(ahc);
-
 	if ((ahc->features & AHC_TWIN) != 0
-	 && ((ahc_inb(ahc, SBLKCTL) & SELBUSB) != 0))
+	    && ((ahc_inb(ahc, SBLKCTL) & SELBUSB) != 0))
 		cur_channel = 'B';
 	else
 		cur_channel = 'A';
@@ -976,10 +1019,13 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 		}
 	}
 
+	/* Make sure the sequencer is in a safe location. */
+	ahc_clear_critical_section(ahc);
+
 	scb_index = ahc_inb(ahc, SCB_TAG);
 	scb = ahc_lookup_scb(ahc, scb_index);
 	if (scb != NULL
-	 && (ahc_inb(ahc, SEQ_FLAGS) & IDENTIFY_SEEN) == 0)
+	 && (ahc_inb(ahc, SEQ_FLAGS) & NOT_IDENTIFIED) != 0)
 		scb = NULL;
 
 	if ((ahc->features & AHC_ULTRA2) != 0
@@ -1026,6 +1072,7 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 		u_int scsirate;
 		u_int i;
 		u_int sstat2;
+		int   silent;
 
 		lastphase = ahc_inb(ahc, LASTPHASE);
 		curphase = ahc_inb(ahc, SCSISIGI) & PHASE_MASK;
@@ -1053,29 +1100,47 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 				break;
 		}
 		mesg_out = ahc_phase_table[i].mesg_out;
-		if (scb != NULL)
-			ahc_print_path(ahc, scb);
-		else
+		silent = FALSE;
+		if (scb != NULL) {
+			if (SCB_IS_SILENT(scb))
+				silent = TRUE;
+			else
+				ahc_print_path(ahc, scb);
+			scb->flags |= SCB_TRANSMISSION_ERROR;
+		} else
 			printf("%s:%c:%d: ", ahc_name(ahc), intr_channel,
 			       SCSIID_TARGET(ahc, ahc_inb(ahc, SAVED_SCSIID)));
 		scsirate = ahc_inb(ahc, SCSIRATE);
-		printf("parity error detected %s. "
-		       "SEQADDR(0x%x) SCSIRATE(0x%x)\n",
-		       ahc_phase_table[i].phasemsg,
-		       ahc_inb(ahc, SEQADDR0) | (ahc_inb(ahc, SEQADDR1) << 8),
-		       scsirate);
+		if (silent == FALSE) {
+			printf("parity error detected %s. "
+			       "SEQADDR(0x%x) SCSIRATE(0x%x)\n",
+			       ahc_phase_table[i].phasemsg,
+			       ahc_inw(ahc, SEQADDR0),
+			       scsirate);
+			if ((ahc->features & AHC_DT) != 0) {
+				if ((sstat2 & CRCVALERR) != 0)
+					printf("\tCRC Value Mismatch\n");
+				if ((sstat2 & CRCENDERR) != 0)
+					printf("\tNo terminal CRC packet "
+					       "recevied\n");
+				if ((sstat2 & CRCREQERR) != 0)
+					printf("\tIllegal CRC packet "
+					       "request\n");
+				if ((sstat2 & DUAL_EDGE_ERR) != 0)
+					printf("\tUnexpected %sDT Data Phase\n",
+					       (scsirate & SINGLE_EDGE)
+					     ? "" : "non-");
+			}
+		}
 
-		if ((ahc->features & AHC_DT) != 0) {
-
-			if ((sstat2 & CRCVALERR) != 0)
-				printf("\tCRC Value Mismatch\n");
-			if ((sstat2 & CRCENDERR) != 0)
-				printf("\tNo terminal CRC packet recevied\n");
-			if ((sstat2 & CRCREQERR) != 0)
-				printf("\tIllegal CRC packet request\n");
-			if ((sstat2 & DUAL_EDGE_ERR) != 0)
-				printf("\tUnexpected %sDT Data Phase\n",
-				       (scsirate & SINGLE_EDGE) ? "" : "non-");
+		if ((ahc->features & AHC_DT) != 0
+		 && (sstat2 & DUAL_EDGE_ERR) != 0) {
+			/*
+			 * This error applies regardless of
+			 * data direction, so ignore the value
+			 * in the phase table.
+			 */
+			mesg_out = MSG_INITIATOR_DET_ERR;
 		}
 
 		/*
@@ -1091,10 +1156,16 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 			else
 				ahc_outb(ahc, MSG_OUT, mesg_out);
 		}
+		/*
+		 * Force a renegotiation with this target just in
+		 * case we are out of sync for some external reason
+		 * unknown (or unreported) by the target.
+		 */
+		ahc_force_renegotiation(ahc);
 		ahc_outb(ahc, CLRINT, CLRSCSIINT);
 		ahc_unpause(ahc);
 	} else if ((status & SELTO) != 0) {
-		u_int scbptr;
+		u_int	scbptr;
 
 		/* Stop the selection */
 		ahc_outb(ahc, SCSISEQ, 0);
@@ -1109,7 +1180,7 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 		/*
 		 * Although the driver does not care about the
 		 * 'Selection in Progress' status bit, the busy
-		 * LED does.  SELINGO is only cleared by a successful
+		 * LED does.  SELINGO is only cleared by a sucessfull
 		 * selection, so we must manually clear it to insure
 		 * the LED turns off just incase no future successful
 		 * selections occur (e.g. no devices on the bus).
@@ -1125,7 +1196,25 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 			printf("%s: ahc_intr - referenced scb not "
 			       "valid during SELTO scb(%d, %d)\n",
 			       ahc_name(ahc), scbptr, scb_index);
+			ahc_dump_card_state(ahc);
 		} else {
+#ifdef AHC_DEBUG
+			if ((ahc_debug & AHC_SHOW_SELTO) != 0) {
+				ahc_print_path(ahc, scb);
+				printf("Saw Selection Timeout for SCB 0x%x\n",
+				       scb_index);
+			}
+#endif
+			/*
+			 * Force a renegotiation with this target just in
+			 * case the cable was pulled and will later be
+			 * re-attached.  The target may forget its negotiation
+			 * settings with us should it attempt to reselect
+			 * during the interruption.  The target will not issue
+			 * a unit attention in this case, so we must always
+			 * renegotiate.
+			 */
+			ahc_force_renegotiation(ahc);
 			ahc_set_transaction_status(scb, CAM_SEL_TIMEOUT);
 			ahc_freeze_devq(ahc, scb);
 		}
@@ -1180,10 +1269,10 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 			ahc_fetch_devinfo(ahc, &devinfo);
 			tag = SCB_LIST_NULL;
 			if (ahc_sent_msg(ahc, AHCMSG_1B, MSG_ABORT_TAG, TRUE)
-			 || ahc_sent_msg(ahc, AHCMSG_1B, MSG_ABORT, TRUE)) {
+			    || ahc_sent_msg(ahc, AHCMSG_1B, MSG_ABORT, TRUE)) {
 				if (ahc->msgout_buf[ahc->msgout_index - 1]
-				 == MSG_ABORT_TAG)
-					tag = scb->hscb->tag;
+				    == MSG_ABORT_TAG)
+				tag = scb->hscb->tag;
 				ahc_print_path(ahc, scb);
 				printf("SCB %d - Abort%s Completed.\n",
 				       scb->hscb->tag, tag == SCB_LIST_NULL ?
@@ -1195,7 +1284,6 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 				printerror = 0;
 			} else if (ahc_sent_msg(ahc, AHCMSG_1B,
 						MSG_BUS_DEV_RESET, TRUE)) {
-				struct ahc_devinfo devinfo;
 #ifdef __FreeBSD__
 				/*
 				 * Don't mark the user's request for this BDR
@@ -1289,13 +1377,19 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 				if (lastphase == ahc_phase_table[i].phase)
 					break;
 			}
+			/*
+			 * Renegotiate with this device at the
+			 * next opportunity just in case this busfree
+			 * is due to a negotiation mismatch with the
+			 * device.
+			 */
+			ahc_force_renegotiation(ahc);
 			printf("Unexpected busfree %s\n"
 			       "SEQADDR == 0x%x\n",
 			       ahc_phase_table[i].phasemsg,
 			       ahc_inb(ahc, SEQADDR0)
 				| (ahc_inb(ahc, SEQADDR1) << 8));
 		}
-		ahc_clear_msg_state(ahc);
 		ahc_outb(ahc, CLRINT, CLRSCSIINT);
 		ahc_restart(ahc);
 	} else {
@@ -1303,6 +1397,27 @@ ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat)
 		       ahc_name(ahc), status);
 		ahc_outb(ahc, CLRINT, CLRSCSIINT);
 	}
+}
+
+/*
+ * Force renegotiation to occur the next time we initiate
+ * a command to the current device.
+ */
+void
+ahc_force_renegotiation(struct ahc_softc *ahc)
+{
+	struct	ahc_devinfo devinfo;
+	struct	ahc_initiator_tinfo *targ_info;
+	struct	ahc_tmode_tstate *tstate;
+
+	ahc_fetch_devinfo(ahc, &devinfo);
+	targ_info = ahc_fetch_transinfo(ahc,
+					devinfo.channel,
+					devinfo.our_scsiid,
+					devinfo.target,
+					&tstate);
+	ahc_update_neg_request(ahc, &devinfo, tstate,
+			       targ_info, AHC_NEG_IF_NON_ASYNC);
 }
 
 #define AHC_MAX_STEPS 2000
@@ -1365,15 +1480,29 @@ ahc_clear_critical_section(struct ahc_softc *ahc)
 			simode0 = ahc_inb(ahc, SIMODE0);
 			ahc_outb(ahc, SIMODE0, 0);
 			simode1 = ahc_inb(ahc, SIMODE1);
-			ahc_outb(ahc, SIMODE1, 0);
+			if ((ahc->features & AHC_DT) != 0)
+				/*
+				 * On DT class controllers, we
+				 * use the enhanced busfree logic.
+				 * Unfortunately we cannot re-enable
+				 * busfree detection within the
+				 * current connection, so we must
+				 * leave it on while single stepping.
+				 */
+				ahc_outb(ahc, SIMODE1, ENBUSFREE);
+			else
+				ahc_outb(ahc, SIMODE1, 0);
 			ahc_outb(ahc, CLRINT, CLRSCSIINT);
 			ahc_outb(ahc, SEQCTL, ahc_inb(ahc, SEQCTL) | STEP);
 			stepping = TRUE;
 		}
+		if ((ahc->features & AHC_DT) != 0) {
+			ahc_outb(ahc, CLRSINT1, CLRBUSFREE);
+			ahc_outb(ahc, CLRINT, CLRSCSIINT);
+		}
 		ahc_outb(ahc, HCNTRL, ahc->unpause);
-		do {
+		while (!ahc_is_paused(ahc))
 			ahc_delay(200);
-		} while (!ahc_is_paused(ahc));
 	}
 	if (stepping) {
 		ahc_outb(ahc, SIMODE0, simode0);
@@ -1395,12 +1524,16 @@ ahc_clear_intstat(struct ahc_softc *ahc)
 				CLRREQINIT);
 	ahc_flush_device_writes(ahc);
 	ahc_outb(ahc, CLRSINT0, CLRSELDO|CLRSELDI|CLRSELINGO);
-	ahc_flush_device_writes(ahc);
+ 	ahc_flush_device_writes(ahc);
 	ahc_outb(ahc, CLRINT, CLRSCSIINT);
 	ahc_flush_device_writes(ahc);
 }
 
 /**************************** Debugging Routines ******************************/
+#ifdef AHC_DEBUG
+uint32_t ahc_debug = 0; /* AHC_SHOW_MISC|AHC_SHOW_SENSE|AHC_DEBUG_OPTS;*/
+#endif
+
 void
 ahc_print_scb(struct scb *scb)
 {
@@ -1452,10 +1585,11 @@ ahc_alloc_tstate(struct ahc_softc *ahc, u_int scsi_id, char channel)
 		master_tstate = ahc->enabled_targets[ahc->our_id_b + 8];
 	}
 	if (ahc->enabled_targets[scsi_id] != NULL
-	 && ahc->enabled_targets[scsi_id] != master_tstate)
+	    && ahc->enabled_targets[scsi_id] != master_tstate)
 		panic("%s: ahc_alloc_tstate - Target already allocated",
 		      ahc_name(ahc));
-	tstate = malloc(sizeof(*tstate), M_DEVBUF, M_NOWAIT);
+	tstate = (struct ahc_tmode_tstate*)malloc(sizeof(*tstate),
+						   M_DEVBUF, M_NOWAIT);
 	if (tstate == NULL)
 		return (NULL);
 
@@ -1469,7 +1603,7 @@ ahc_alloc_tstate(struct ahc_softc *ahc, u_int scsi_id, char channel)
 		memcpy(tstate, master_tstate, sizeof(*tstate));
 		memset(tstate->enabled_luns, 0, sizeof(tstate->enabled_luns));
 		tstate->ultraenb = 0;
-		for (i = 0; i < 16; i++) {
+		for (i = 0; i < AHC_NUM_TARGETS; i++) {
 			memset(&tstate->transinfo[i].curr, 0,
 			      sizeof(tstate->transinfo[i].curr));
 			memset(&tstate->transinfo[i].goal, 0,
@@ -1518,7 +1652,8 @@ ahc_free_tstate(struct ahc_softc *ahc, u_int scsi_id, char channel, int force)
 struct ahc_syncrate *
 ahc_devlimited_syncrate(struct ahc_softc *ahc,
 			struct ahc_initiator_tinfo *tinfo,
-			u_int *period, u_int *ppr_options, role_t role) {
+			u_int *period, u_int *ppr_options, role_t role)
+{
 	struct	ahc_transinfo *transinfo;
 	u_int	maxsync;
 
@@ -1551,6 +1686,10 @@ ahc_devlimited_syncrate(struct ahc_softc *ahc,
 	else 
 		transinfo = &tinfo->goal;
 	*ppr_options &= transinfo->ppr_options;
+	if (transinfo->width == MSG_EXT_WDTR_BUS_8_BIT) {
+		maxsync = MAX(maxsync, AHC_SYNCRATE_ULTRA2);
+		*ppr_options &= ~MSG_EXT_PPR_DT_REQ;
+	}
 	if (transinfo->period == 0) {
 		*period = 0;
 		*ppr_options = 0;
@@ -1720,24 +1859,36 @@ ahc_validate_width(struct ahc_softc *ahc, struct ahc_initiator_tinfo *tinfo,
 
 /*
  * Update the bitmask of targets for which the controller should
- * negotiate with at the next convenient oportunity.  This currently
+ * negotiate with at the next convenient opportunity.  This currently
  * means the next time we send the initial identify messages for
  * a new transaction.
  */
 int
 ahc_update_neg_request(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 		       struct ahc_tmode_tstate *tstate,
-		       struct ahc_initiator_tinfo *tinfo, int force)
+		       struct ahc_initiator_tinfo *tinfo, ahc_neg_type neg_type)
 {
 	u_int auto_negotiate_orig;
 
 	auto_negotiate_orig = tstate->auto_negotiate;
+	if (neg_type == AHC_NEG_ALWAYS) {
+		/*
+		 * Force our "current" settings to be
+		 * unknown so that unless a bus reset
+		 * occurs the need to renegotiate is
+		 * recorded persistently.
+		 */
+		if ((ahc->features & AHC_WIDE) != 0)
+			tinfo->curr.width = AHC_WIDTH_UNKNOWN;
+		tinfo->curr.period = AHC_PERIOD_UNKNOWN;
+		tinfo->curr.offset = AHC_OFFSET_UNKNOWN;
+	}
 	if (tinfo->curr.period != tinfo->goal.period
 	 || tinfo->curr.width != tinfo->goal.width
 	 || tinfo->curr.offset != tinfo->goal.offset
 	 || tinfo->curr.ppr_options != tinfo->goal.ppr_options
-	 || (force
-	  && (tinfo->goal.period != 0
+	 || (neg_type == AHC_NEG_IF_NON_ASYNC
+	  && (tinfo->goal.offset != 0
 	   || tinfo->goal.width != MSG_EXT_WDTR_BUS_8_BIT
 	   || tinfo->goal.ppr_options != 0)))
 		tstate->auto_negotiate |= devinfo->target_mask;
@@ -1851,7 +2002,7 @@ ahc_set_syncrate(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 		tinfo->curr.ppr_options = ppr_options;
 
 		ahc_send_async(ahc, devinfo->channel, devinfo->target,
-			       CAM_LUN_WILDCARD, AC_TRANSFER_NEG, NULL);
+		  CAM_LUN_WILDCARD, AC_TRANSFER_NEG, NULL);
 		if (1 /*bootverbose*/) {
 			if (offset != 0) {
 				printf("%s: target %d synchronous at %sMHz%s, "
@@ -1868,7 +2019,7 @@ ahc_set_syncrate(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 	}
 
 	update_needed += ahc_update_neg_request(ahc, devinfo, tstate,
-						tinfo, /*force*/FALSE);
+						tinfo, AHC_NEG_TO_GOAL);
 
 	if (update_needed)
 		ahc_update_pending_scbs(ahc);
@@ -1922,7 +2073,7 @@ ahc_set_width(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 
 		ahc_send_async(ahc, devinfo->channel, devinfo->target,
 			       CAM_LUN_WILDCARD, AC_TRANSFER_NEG, NULL);
-		if (bootverbose) {
+		if (1 /*bootverbose*/) {
 			printf("%s: target %d using %dbit transfers\n",
 			       ahc_name(ahc), devinfo->target,
 			       8 * (0x01 << width));
@@ -1930,7 +2081,7 @@ ahc_set_width(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 	}
 
 	update_needed += ahc_update_neg_request(ahc, devinfo, tstate,
-						tinfo, /*force*/FALSE);
+						tinfo, AHC_NEG_TO_GOAL);
 	if (update_needed)
 		ahc_update_pending_scbs(ahc);
 }
@@ -1943,8 +2094,6 @@ ahc_set_tags(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 	     ahc_queue_alg alg)
 {
  	ahc_platform_set_tags(ahc, devinfo, alg);
- 	ahc_send_async(ahc, devinfo->channel, devinfo->target,
- 		       devinfo->lun, AC_TRANSFER_NEG, &alg);
 }
 
 /*
@@ -2044,7 +2193,8 @@ ahc_fetch_devinfo(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 
 	if (role == ROLE_TARGET
 	 && (ahc->features & AHC_MULTI_TID) != 0
-	 && (ahc_inb(ahc, SEQ_FLAGS) & CMDPHASE_PENDING) != 0) {
+	 && (ahc_inb(ahc, SEQ_FLAGS)
+ 	   & (CMDPHASE_PENDING|TARG_CMD_PENDING|NO_DISCONNECT)) != 0) {
 		/* We were selected, so pull our id from TARGIDIN */
 		our_id = ahc_inb(ahc, TARGIDIN) & OID;
 	} else if ((ahc->features & AHC_ULTRA2) != 0)
@@ -2094,7 +2244,14 @@ ahc_compile_devinfo(struct ahc_devinfo *devinfo, u_int our_id, u_int target,
 	devinfo->target_mask = (0x01 << devinfo->target_offset);
 }
 
-static void
+void
+ahc_print_devinfo(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
+{
+	printf("%s:%c:%d:%d: ", ahc_name(ahc), devinfo->channel,
+	       devinfo->target, devinfo->lun);
+}
+
+void
 ahc_scb_devinfo(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 		struct scb *scb)
 {
@@ -2103,7 +2260,7 @@ ahc_scb_devinfo(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 
 	our_id = SCSIID_OUR_ID(scb->hscb->scsiid);
 	role = ROLE_INITIATOR;
-	if ((scb->hscb->control & TARGET_SCB) != 0)
+	if ((scb->flags & SCB_TARGET_SCB) != 0)
 		role = ROLE_TARGET;
 	ahc_compile_devinfo(devinfo, our_id, SCB_GET_TARGET(ahc, scb),
 			    SCB_GET_LUN(scb), SCB_GET_CHANNEL(ahc, scb), role);
@@ -2125,18 +2282,18 @@ ahc_assert_atn(struct ahc_softc *ahc)
 /*
  * When an initiator transaction with the MK_MESSAGE flag either reconnects
  * or enters the initial message out phase, we are interrupted.  Fill our
- * outgoing message buffer with the appropriate message and beging handing
+ * outgoing message buffer with the appropriate message and begin handing
  * the message phase(s) manually.
  */
 static void
 ahc_setup_initiator_msgout(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 			   struct scb *scb)
 {
-	/*              
+	/*
 	 * To facilitate adding multiple messages together,
 	 * each routine should increment the index and len
 	 * variables instead of setting them explicitly.
-	 */             
+	 */
 	ahc->msgout_index = 0;
 	ahc->msgout_len = 0;
 
@@ -2217,18 +2374,17 @@ ahc_setup_initiator_msgout(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 static void
 ahc_build_transfer_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 {
-	/*              
+	/*
 	 * We need to initiate transfer negotiations.
 	 * If our current and goal settings are identical,
 	 * we want to renegotiate due to a check condition.
-	 */             
+	 */
 	struct	ahc_initiator_tinfo *tinfo;
 	struct	ahc_tmode_tstate *tstate;
 	struct	ahc_syncrate *rate;
 	int	dowide;
 	int	dosync;
 	int	doppr;
-	int	use_ppr;
 	u_int	period;
 	u_int	ppr_options;
 	u_int	offset;
@@ -2250,23 +2406,37 @@ ahc_build_transfer_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 				       &ppr_options, devinfo->role);
 	dowide = tinfo->curr.width != tinfo->goal.width;
 	dosync = tinfo->curr.period != period;
-	doppr = tinfo->curr.ppr_options != ppr_options;
+	/*
+	 * Only use PPR if we have options that need it, even if the device
+	 * claims to support it.  There might be an expander in the way
+	 * that doesn't.
+	 */
+	doppr = ppr_options != 0;
 
 	if (!dowide && !dosync && !doppr) {
 		dowide = tinfo->goal.width != MSG_EXT_WDTR_BUS_8_BIT;
-		dosync = tinfo->goal.period != 0;
-		doppr = tinfo->goal.ppr_options != 0;
+		dosync = tinfo->goal.offset != 0;
 	}
 
 	if (!dowide && !dosync && !doppr) {
-		panic("ahc_intr: AWAITING_MSG for negotiation, "
-		      "but no negotiation needed");	
+		/*
+		 * Force async with a WDTR message if we have a wide bus,
+		 * or just issue an SDTR with a 0 offset.
+		 */
+		if ((ahc->features & AHC_WIDE) != 0)
+			dowide = 1;
+		else
+			dosync = 1;
+
+		if (bootverbose) {
+			ahc_print_devinfo(ahc, devinfo);
+			printf("Ensuring async\n");
+		}
 	}
 
-	use_ppr = (tinfo->curr.transport_version >= 3) || doppr;
 	/* Target initiated PPR is not allowed in the SCSI spec */
 	if (devinfo->role == ROLE_TARGET)
-		use_ppr = 0;
+		doppr = 0;
 
 	/*
 	 * Both the PPR message and SDTR message require the
@@ -2276,14 +2446,14 @@ ahc_build_transfer_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 	 * Regardless, guarantee that if we are using WDTR and SDTR
 	 * messages that WDTR comes first.
 	 */
-	if (use_ppr || (dosync && !dowide)) {
+	if (doppr || (dosync && !dowide)) {
 
 		offset = tinfo->goal.offset;
 		ahc_validate_offset(ahc, tinfo, rate, &offset,
-				    use_ppr ? tinfo->goal.width
-					    : tinfo->curr.width,
+				    doppr ? tinfo->goal.width
+					  : tinfo->curr.width,
 				    devinfo->role);
-		if (use_ppr) {
+		if (doppr) {
 			ahc_construct_ppr(ahc, devinfo, period, offset,
 					  tinfo->goal.width, ppr_options);
 		} else {
@@ -2302,6 +2472,8 @@ static void
 ahc_construct_sdtr(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 		   u_int period, u_int offset)
 {
+	if (offset == 0)
+		period = AHC_ASYNC_XFER_PERIOD;
 	ahc->msgout_buf[ahc->msgout_index++] = MSG_EXTENDED;
 	ahc->msgout_buf[ahc->msgout_index++] = MSG_EXT_SDTR_LEN;
 	ahc->msgout_buf[ahc->msgout_index++] = MSG_EXT_SDTR;
@@ -2316,7 +2488,7 @@ ahc_construct_sdtr(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 }
 
 /*
- * Build a wide negotiateion message in our message
+ * Build a wide negotiation message in our message
  * buffer based on the input parameters.
  */
 static void
@@ -2344,6 +2516,8 @@ ahc_construct_ppr(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 		  u_int period, u_int offset, u_int bus_width,
 		  u_int ppr_options)
 {
+	if (offset == 0)
+		period = AHC_ASYNC_XFER_PERIOD;
 	ahc->msgout_buf[ahc->msgout_index++] = MSG_EXTENDED;
 	ahc->msgout_buf[ahc->msgout_index++] = MSG_EXT_PPR_LEN;
 	ahc->msgout_buf[ahc->msgout_index++] = MSG_EXT_PPR;
@@ -2378,6 +2552,102 @@ ahc_clear_msg_state(struct ahc_softc *ahc)
 		ahc_outb(ahc, CLRSINT1, CLRATNO);
 	}
 	ahc_outb(ahc, MSG_OUT, MSG_NOOP);
+	ahc_outb(ahc, SEQ_FLAGS2,
+		 ahc_inb(ahc, SEQ_FLAGS2) & ~TARGET_MSG_PENDING);
+}
+
+static void
+ahc_handle_proto_violation(struct ahc_softc *ahc)
+{
+	struct	ahc_devinfo devinfo;
+	struct	scb *scb;
+	u_int	scbid;
+	u_int	seq_flags;
+	u_int	curphase;
+	u_int	lastphase;
+	int	found;
+
+	ahc_fetch_devinfo(ahc, &devinfo);
+	scbid = ahc_inb(ahc, SCB_TAG);
+	scb = ahc_lookup_scb(ahc, scbid);
+	seq_flags = ahc_inb(ahc, SEQ_FLAGS);
+	curphase = ahc_inb(ahc, SCSISIGI) & PHASE_MASK;
+	lastphase = ahc_inb(ahc, LASTPHASE);
+	if ((seq_flags & NOT_IDENTIFIED) != 0) {
+
+		/*
+		 * The reconnecting target either did not send an
+		 * identify message, or did, but we didn't find an SCB
+		 * to match.
+		 */
+		ahc_print_devinfo(ahc, &devinfo);
+		printf("Target did not send an IDENTIFY message. "
+		       "LASTPHASE = 0x%x.\n", lastphase);
+		scb = NULL;
+	} else if (scb == NULL) {
+		/*
+		 * We don't seem to have an SCB active for this
+		 * transaction.  Print an error and reset the bus.
+		 */
+		ahc_print_devinfo(ahc, &devinfo);
+		printf("No SCB found during protocol violation\n");
+		goto proto_violation_reset;
+	} else {
+		ahc_set_transaction_status(scb, CAM_SEQUENCE_FAIL);
+		if ((seq_flags & NO_CDB_SENT) != 0) {
+			ahc_print_path(ahc, scb);
+			printf("No or incomplete CDB sent to device.\n");
+		} else if ((ahc_inb(ahc, SCB_CONTROL) & STATUS_RCVD) == 0) {
+			/*
+			 * The target never bothered to provide status to
+			 * us prior to completing the command.  Since we don't
+			 * know the disposition of this command, we must attempt
+			 * to abort it.  Assert ATN and prepare to send an abort
+			 * message.
+			 */
+			ahc_print_path(ahc, scb);
+			printf("Completed command without status.\n");
+		} else {
+			ahc_print_path(ahc, scb);
+			printf("Unknown protocol violation.\n");
+			ahc_dump_card_state(ahc);
+		}
+	}
+	if ((lastphase & ~P_DATAIN_DT) == 0
+	 || lastphase == P_COMMAND) {
+proto_violation_reset:
+		/*
+		 * Target either went directly to data/command
+		 * phase or didn't respond to our ATN.
+		 * The only safe thing to do is to blow
+		 * it away with a bus reset.
+		 */
+		found = ahc_reset_channel(ahc, 'A', TRUE);
+		printf("%s: Issued Channel %c Bus Reset. "
+		       "%d SCBs aborted\n", ahc_name(ahc), 'A', found);
+	} else {
+		/*
+		 * Leave the selection hardware off in case
+		 * this abort attempt will affect yet to
+		 * be sent commands.
+		 */
+		ahc_outb(ahc, SCSISEQ,
+			 ahc_inb(ahc, SCSISEQ) & ~ENSELO);
+		ahc_assert_atn(ahc);
+		ahc_outb(ahc, MSG_OUT, HOST_MSG);
+		if (scb == NULL) {
+			ahc_print_devinfo(ahc, &devinfo);
+			ahc->msgout_buf[0] = MSG_ABORT_TASK;
+			ahc->msgout_len = 1;
+			ahc->msgout_index = 0;
+			ahc->msg_type = MSG_TYPE_INITIATOR_MSGOUT;
+		} else {
+			ahc_print_path(ahc, scb);
+			scb->flags |= SCB_ABORT;
+		}
+		printf("Protocol violation %s.  Attempting to abort.\n",
+		       ahc_lookup_phase_entry(curphase)->phasemsg);
+	}
 }
 
 /*
@@ -2405,8 +2675,21 @@ reswitch:
 		if (ahc->msgout_len == 0)
 			panic("HOST_MSG_LOOP interrupt with no active message");
 
+#ifdef AHC_DEBUG
+		if ((ahc_debug & AHC_SHOW_MESSAGES) != 0) {
+			ahc_print_devinfo(ahc, &devinfo);
+			printf("INITIATOR_MSG_OUT");
+		}
+#endif
 		phasemis = bus_phase != P_MESGOUT;
 		if (phasemis) {
+#ifdef AHC_DEBUG
+			if ((ahc_debug & AHC_SHOW_MESSAGES) != 0) {
+				printf(" PHASEMIS %s\n",
+				       ahc_lookup_phase_entry(bus_phase)
+							     ->phasemsg);
+			}
+#endif
 			if (bus_phase == P_MESGIN) {
 				/*
 				 * Change gears and see if
@@ -2427,6 +2710,10 @@ reswitch:
 		if (ahc->send_msg_perror) {
 			ahc_outb(ahc, CLRSINT1, CLRATNO);
 			ahc_outb(ahc, CLRSINT1, CLRREQINIT);
+#ifdef AHC_DEBUG
+			if ((ahc_debug & AHC_SHOW_MESSAGES) != 0)
+				printf(" byte 0x%x\n", ahc->send_msg_perror);
+#endif
 			ahc_outb(ahc, SCSIDATL, MSG_PARITY_ERROR);
 			break;
 		}
@@ -2453,6 +2740,11 @@ reswitch:
 		 * the next byte on the bus.
 		 */
 		ahc_outb(ahc, CLRSINT1, CLRREQINIT);
+#ifdef AHC_DEBUG
+		if ((ahc_debug & AHC_SHOW_MESSAGES) != 0)
+			printf(" byte 0x%x\n",
+			       ahc->msgout_buf[ahc->msgout_index]);
+#endif
 		ahc_outb(ahc, SCSIDATL, ahc->msgout_buf[ahc->msgout_index++]);
 		break;
 	}
@@ -2461,9 +2753,21 @@ reswitch:
 		int phasemis;
 		int message_done;
 
+#ifdef AHC_DEBUG
+		if ((ahc_debug & AHC_SHOW_MESSAGES) != 0) {
+			ahc_print_devinfo(ahc, &devinfo);
+			printf("INITIATOR_MSG_IN");
+		}
+#endif
 		phasemis = bus_phase != P_MESGIN;
-
 		if (phasemis) {
+#ifdef AHC_DEBUG
+			if ((ahc_debug & AHC_SHOW_MESSAGES) != 0) {
+				printf(" PHASEMIS %s\n",
+				       ahc_lookup_phase_entry(bus_phase)
+							     ->phasemsg);
+			}
+#endif
 			ahc->msgin_index = 0;
 			if (bus_phase == P_MESGOUT
 			 && (ahc->send_msg_perror == TRUE
@@ -2478,6 +2782,11 @@ reswitch:
 
 		/* Pull the byte in without acking it */
 		ahc->msgin_buf[ahc->msgin_index] = ahc_inb(ahc, SCSIBUSL);
+#ifdef AHC_DEBUG
+		if ((ahc_debug & AHC_SHOW_MESSAGES) != 0)
+			printf(" byte 0x%x\n",
+			       ahc->msgin_buf[ahc->msgin_index]);
+#endif
 
 		message_done = ahc_parse_msg(ahc, &devinfo);
 
@@ -2493,14 +2802,25 @@ reswitch:
 			 * assert ATN so the target takes us to the
 			 * message out phase.
 			 */
-			if (ahc->msgout_len != 0)
+			if (ahc->msgout_len != 0) {
+#ifdef AHC_DEBUG
+				if ((ahc_debug & AHC_SHOW_MESSAGES) != 0) {
+					ahc_print_devinfo(ahc, &devinfo);
+					printf("Asserting ATN for response\n");
+				}
+#endif
 				ahc_assert_atn(ahc);
+			}
 		} else 
 			ahc->msgin_index++;
 
-		/* Ack the byte */
-		ahc_outb(ahc, CLRSINT1, CLRREQINIT);
-		ahc_inb(ahc, SCSIDATL);
+		if (message_done == MSGLOOP_TERMINATED) {
+			end_session = TRUE;
+		} else {
+			/* Ack the byte */
+			ahc_outb(ahc, CLRSINT1, CLRREQINIT);
+			ahc_inb(ahc, SCSIDATL);
+		}
 		break;
 	}
 	case MSG_TYPE_TARGET_MSGIN:
@@ -2569,7 +2889,7 @@ reswitch:
 
 		/*
 		 * Read the latched byte, but turn off SPIOEN first
-		 * so that we don't inadvertantly cause a REQ for the
+		 * so that we don't inadvertently cause a REQ for the
 		 * next byte.
 		 */
 		ahc_outb(ahc, SXFRCTL0, ahc_inb(ahc, SXFRCTL0) & ~SPIOEN);
@@ -2700,9 +3020,9 @@ ahc_parse_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 	targ_scsirate = tinfo->scsirate;
 
 	/*
-	 * Parse as much of the message as is availible,
+	 * Parse as much of the message as is available,
 	 * rejecting it if we don't support it.  When
-	 * the entire message is availible and has been
+	 * the entire message is available and has been
 	 * handled, return MSGLOOP_MSGCOMPLETE, indicating
 	 * that we have parsed an entire message.
 	 *
@@ -2711,6 +3031,17 @@ ahc_parse_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 	 * extended message type.
 	 */
 	switch (ahc->msgin_buf[0]) {
+	case MSG_DISCONNECT:
+	case MSG_SAVEDATAPOINTER:
+	case MSG_CMDCOMPLETE:
+	case MSG_RESTOREPOINTERS:
+	case MSG_IGN_WIDE_RESIDUE:
+		/*
+		 * End our message loop as these are messages
+		 * the sequencer handles on its own.
+		 */
+		done = MSGLOOP_TERMINATED;
+		break;
 	case MSG_MESSAGE_REJECT:
 		response = ahc_handle_msg_reject(ahc, devinfo);
 		/* FALLTHROUGH */
@@ -2764,7 +3095,7 @@ ahc_parse_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 				       ahc->msgin_buf[3], saved_offset,
 				       period, offset);
 			}
-			ahc_set_syncrate(ahc, devinfo,
+			ahc_set_syncrate(ahc, devinfo, 
 					 syncrate, period,
 					 offset, ppr_options,
 					 AHC_TRANS_ACTIVE|AHC_TRANS_GOAL,
@@ -2880,7 +3211,7 @@ ahc_parse_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 					 AHC_TRANS_ACTIVE, /*paused*/TRUE);
 			if (sending_reply == FALSE && reject == FALSE) {
 
-				if (tinfo->goal.period) {
+				if (tinfo->goal.offset) {
 					ahc->msgout_index = 0;
 					ahc->msgout_len = 0;
 					ahc_build_transfer_msg(ahc, devinfo);
@@ -3014,6 +3345,7 @@ ahc_parse_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 		}
 		break;
 	}
+#ifdef AHC_TARGET_MODE
 	case MSG_BUS_DEV_RESET:
 		ahc_handle_devreset(ahc, devinfo,
 				    CAM_BDR_SENT,
@@ -3025,18 +3357,20 @@ ahc_parse_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 	case MSG_ABORT_TAG:
 	case MSG_ABORT:
 	case MSG_CLEAR_QUEUE:
-#ifdef AHC_TARGET_MODE
+	{
+		int tag;
+
 		/* Target mode messages */
 		if (devinfo->role != ROLE_TARGET) {
 			reject = TRUE;
 			break;
 		}
+		tag = SCB_LIST_NULL;
+		if (ahc->msgin_buf[0] == MSG_ABORT_TAG)
+			tag = ahc_inb(ahc, INITIATOR_TAG);
 		ahc_abort_scbs(ahc, devinfo->target, devinfo->channel,
-			       devinfo->lun,
-			       ahc->msgin_buf[0] == MSG_ABORT_TAG
-						  ? SCB_LIST_NULL
-						  : ahc_inb(ahc, INITIATOR_TAG),
-			       ROLE_TARGET, CAM_REQ_ABORTED);
+			       devinfo->lun, tag, ROLE_TARGET,
+			       CAM_REQ_ABORTED);
 
 		tstate = ahc->enabled_targets[devinfo->our_scsiid];
 		if (tstate != NULL) {
@@ -3047,12 +3381,14 @@ ahc_parse_msg(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 				ahc_queue_lstate_event(ahc, lstate,
 						       devinfo->our_scsiid,
 						       ahc->msgin_buf[0],
-						       /*arg*/0);
+						       /*arg*/tag);
 				ahc_send_lstate_events(ahc, lstate);
 			}
 		}
-		done = MSGLOOP_MSGCOMPLETE;
+		ahc_restart(ahc);
+		done = MSGLOOP_TERMINATED;
 		break;
+	}
 #endif
 	case MSG_TERM_IO_PROC:
 	default:
@@ -3140,7 +3476,7 @@ ahc_handle_msg_reject(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 		 * but rejected our response, we already cleared the
 		 * sync rate before sending our WDTR.
 		 */
-		if (tinfo->goal.period) {
+		if (tinfo->goal.offset != tinfo->curr.offset) {
 
 			/* Start the sync negotiation */
 			ahc->msgout_index = 0;
@@ -3210,7 +3546,7 @@ ahc_handle_msg_reject(struct ahc_softc *ahc, struct ahc_devinfo *devinfo)
 
 		/*
 		 * Requeue all tagged commands for this target
-		 * currently in our posession so they can be
+		 * currently in our possession so they can be
 		 * converted to untagged commands.
 		 */
 		ahc_search_qinfifo(ahc, SCB_GET_TARGET(ahc, scb),
@@ -3410,7 +3746,7 @@ ahc_handle_devreset(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 	found = ahc_abort_scbs(ahc, devinfo->target, devinfo->channel,
 			       CAM_LUN_WILDCARD, SCB_LIST_NULL, devinfo->role,
 			       status);
-	
+
 #ifdef AHC_TARGET_MODE
 	/*
 	 * Send an immediate notify ccb to all target mord peripheral
@@ -3442,7 +3778,7 @@ ahc_handle_devreset(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 			 AHC_TRANS_CUR, /*paused*/TRUE);
 	
 	ahc_send_async(ahc, devinfo->channel, devinfo->target,
-		       CAM_LUN_WILDCARD, AC_SENT_BDR, NULL);
+	  CAM_LUN_WILDCARD, AC_SENT_BDR, NULL);
 
 	if (message != NULL
 	 && (verbose_level <= bootverbose))
@@ -3473,52 +3809,6 @@ ahc_setup_target_msgin(struct ahc_softc *ahc, struct ahc_devinfo *devinfo,
 	ahc->msg_type = MSG_TYPE_TARGET_MSGIN;
 }
 #endif
-/**************************** Initialization **********************************/
-/*
- * Allocate a controller structure for a new device
- * and perform initial initializion.
- */
-struct ahc_softc *
-ahc_alloc(void *platform_arg, char *name)
-{
-	struct  ahc_softc *ahc;
-	int	i;
-
-#ifdef __OpenBSD__	/* OpenBSD provides softc! */
-	ahc = (struct ahc_softc *)platform_arg;
-#else 
-#ifndef	__FreeBSD__
-	ahc = malloc(sizeof(*ahc), M_DEVBUF, M_NOWAIT);
-	if (!ahc) {
-		printf("aic7xxx: cannot malloc softc!\n");
-		free(name, M_DEVBUF);
-		return NULL;
-	}
-#else
-	ahc = device_get_softc((device_t)platform_arg);
-#endif
-	memset(ahc, 0, sizeof(*ahc));
-#endif 
-	LIST_INIT(&ahc->pending_scbs);
-	/* We don't know our unit number until the OSM sets it */
-	ahc->name = name;
-	ahc->unit = -1;
-	ahc->description = NULL;
-	ahc->channel = 'A';
-	ahc->channel_b = 'B';
-	ahc->chip = AHC_NONE;
-	ahc->features = AHC_FENONE;
-	ahc->bugs = AHC_BUGNONE;
-	ahc->flags = AHC_FNONE;
-
-	for (i = 0; i < 16; i++)
-		TAILQ_INIT(&ahc->untagged_queues[i]);
-	if (ahc_platform_alloc(ahc, platform_arg) != 0) {
-		ahc_free(ahc);
-		ahc = NULL;
-	}
-	return (ahc);
-}
 
 int
 ahc_softc_init(struct ahc_softc *ahc)
@@ -3598,6 +3888,22 @@ ahc_softc_insert(struct ahc_softc *ahc)
 	ahc->init_level++;
 }
 
+/*
+ * Verify that the passed in softc pointer is for a
+ * controller that is still configured.
+ */
+struct ahc_softc *
+ahc_find_softc(struct ahc_softc *ahc)
+{
+	struct ahc_softc *list_ahc;
+
+	TAILQ_FOREACH(list_ahc, &ahc_tailq, links) {
+		if (list_ahc == ahc)
+			return (ahc);
+	}
+	return (NULL);
+}
+
 void
 ahc_set_unit(struct ahc_softc *ahc, int unit)
 {
@@ -3612,7 +3918,6 @@ ahc_set_name(struct ahc_softc *ahc, char *name)
 	ahc->name = name;
 }
 
-#ifndef __OpenBSD__
 void
 ahc_free(struct ahc_softc *ahc)
 {
@@ -3621,34 +3926,20 @@ ahc_free(struct ahc_softc *ahc)
 	ahc_fini_scbdata(ahc);
 	switch (ahc->init_level) {
 	default:
-	case 5:
-		ahc_shutdown(ahc);
-		TAILQ_REMOVE(&ahc_tailq, ahc, links);
-		/* FALLTHROUGH */
-	case 4:
-		ahc_dmamap_unload(ahc, ahc->shared_data_dmat,
-				  ahc->shared_data_dmamap);
-		/* FALLTHROUGH */
-	case 3:
-		ahc_dmamem_free(ahc, ahc->shared_data_dmat, ahc->qoutfifo,
-				ahc->shared_data_dmamap);
-		ahc_dmamap_destroy(ahc, ahc->shared_data_dmat,
-				   ahc->shared_data_dmamap);
-		/* FALLTHROUGH */
 	case 2:
-		ahc_dma_tag_destroy(ahc, ahc->shared_data_dmat);
+		ahc_shutdown(ahc);
+		/* TAILQ_REMOVE(&ahc_tailq, ahc, links); XXX */
+		/* FALLTHROUGH */
 	case 1:
-#ifndef __linux__
-		ahc_dma_tag_destroy(ahc, ahc->buffer_dmat);
-#endif
+		bus_dmamap_unload(ahc->parent_dmat, ahc->shared_data_dmamap);
+		bus_dmamap_destroy(ahc->parent_dmat, ahc->shared_data_dmamap);
+		bus_dmamem_unmap(ahc->parent_dmat, (caddr_t)ahc->qoutfifo, ahc->shared_data_size);
+		bus_dmamem_free(ahc->parent_dmat, &ahc->shared_data_seg, ahc->shared_data_nseg);
 		break;
 	case 0:
 		break;
 	}
 
-#ifndef __linux__
-	ahc_dma_tag_destroy(ahc, ahc->parent_dmat);
-#endif
 	ahc_platform_free(ahc);
 	for (i = 0; i < AHC_NUM_TARGETS; i++) {
 		struct ahc_tmode_tstate *tstate;
@@ -3663,7 +3954,7 @@ ahc_free(struct ahc_softc *ahc)
 
 				lstate = tstate->enabled_luns[j];
 				if (lstate != NULL) {
-					xpt_free_path(lstate->path);
+					  /*xpt_free_path(lstate->path);*/
 					free(lstate, M_DEVBUF);
 				}
 			}
@@ -3673,18 +3964,21 @@ ahc_free(struct ahc_softc *ahc)
 	}
 #if AHC_TARGET_MODE
 	if (ahc->black_hole != NULL) {
-		xpt_free_path(ahc->black_hole->path);
+	  /*xpt_free_path(ahc->black_hole->path);*/
 		free(ahc->black_hole, M_DEVBUF);
 	}
 #endif
+#ifndef __NetBSD__
 	if (ahc->name != NULL)
 		free(ahc->name, M_DEVBUF);
+#endif
+	if (ahc->seep_config != NULL)
+		free(ahc->seep_config, M_DEVBUF);
 #ifndef __FreeBSD__
 	free(ahc, M_DEVBUF);
 #endif
 	return;
 }
-#endif /* __OpenBSD__ */
 
 void
 ahc_shutdown(void *arg)
@@ -3700,13 +3994,13 @@ ahc_shutdown(void *arg)
 	ahc_outb(ahc, SXFRCTL0, 0);
 	ahc_outb(ahc, DSPCISTATUS, 0);
 
-	for (i = TARG_SCSIRATE; i < HA_274_BIOSCTRL; i++)
+	for (i = TARG_SCSIRATE; i < SCSICONF; i++)
 		ahc_outb(ahc, i, 0);
 }
 
 /*
  * Reset the controller and record some information about it
- * that is only availabel just after a reset.
+ * that is only available just after a reset.
  */
 int
 ahc_reset(struct ahc_softc *ahc)
@@ -3721,6 +4015,14 @@ ahc_reset(struct ahc_softc *ahc)
 	 * to disturb the integrity of the bus.
 	 */
 	ahc_pause(ahc);
+	if ((ahc_inb(ahc, HCNTRL) & CHIPRST) != 0) {
+		/*
+		 * The chip has not been initialized since
+		 * PCI/EISA/VLB bus reset.  Don't trust
+		 * "left over BIOS data".
+		 */
+		ahc->flags |= AHC_NO_BIOS_INIT;
+	}
 	sxfrctl1_b = 0;
 	if ((ahc->chip & AHC_CHIPID_MASK) == AHC_AIC7770) {
 		u_int sblkctl;
@@ -3739,7 +4041,10 @@ ahc_reset(struct ahc_softc *ahc)
 	ahc_outb(ahc, HCNTRL, CHIPRST | ahc->pause);
 
 	/*
-	 * Ensure that the reset has finished
+	 * Ensure that the reset has finished.  We delay 1000us
+	 * prior to reading the register to make sure the chip
+	 * has sufficiently completed its reset to handle register
+	 * accesses.
 	 */
 	wait = 1000;
 	do {
@@ -3770,7 +4075,7 @@ ahc_reset(struct ahc_softc *ahc)
 		ahc->features |= AHC_TWIN;
 		break;
 	default:
-		printf(" Unsupported adapter type.  Ignoring\n");
+		printf(" Unsupported adapter type (0x%x).  Ignoring\n", sblkctl);
 		return(-1);
 	}
 
@@ -3820,7 +4125,7 @@ ahc_probe_scbs(struct ahc_softc *ahc) {
 	return (i);
 }
 
-#ifndef __OpenBSD__
+#if 0
 static void
 ahc_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int error) 
 {
@@ -3829,19 +4134,30 @@ ahc_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 	baddr = (bus_addr_t *)arg;
 	*baddr = segs->ds_addr;
 }
-#endif 
+#endif
 
-#ifndef __OpenBSD__
 static void
-#else
-void
-#endif 
 ahc_build_free_scb_list(struct ahc_softc *ahc)
 {
+	int scbsize;
 	int i;
 
+	scbsize = 32;
+	if ((ahc->flags & AHC_LSCBS_ENABLED) != 0)
+		scbsize = 64;
+
 	for (i = 0; i < ahc->scb_data->maxhscbs; i++) {
+		int j;
+
 		ahc_outb(ahc, SCBPTR, i);
+
+		/*
+		 * Touch all SCB bytes to avoid parity errors
+		 * should one of our debugging routines read
+		 * an otherwise uninitiatlized byte.
+		 */
+		for (j = 0; j < scbsize; j++)
+			ahc_outb(ahc, SCB_BASE+j, 0xFF);
 
 		/* Clear the control byte. */
 		ahc_outb(ahc, SCB_CONTROL, 0);
@@ -3852,20 +4168,17 @@ ahc_build_free_scb_list(struct ahc_softc *ahc)
 		else 
 			ahc_outb(ahc, SCB_NEXT, SCB_LIST_NULL);
 
-		/* Make the tag number invalid */
+		/* Make the tag number, SCSIID, and lun invalid */
 		ahc_outb(ahc, SCB_TAG, SCB_LIST_NULL);
+		ahc_outb(ahc, SCB_SCSIID, 0xFF);
+		ahc_outb(ahc, SCB_LUN, 0xFF);
 	}
 
 	/* Make sure that the last SCB terminates the free list */
 	ahc_outb(ahc, SCBPTR, i-1);
 	ahc_outb(ahc, SCB_NEXT, SCB_LIST_NULL);
-
-	/* Ensure we clear the 0 SCB's control byte. */
-	ahc_outb(ahc, SCBPTR, 0);
-	ahc_outb(ahc, SCB_CONTROL, 0);
 }
 
-#ifndef __OpenBSD__
 static int
 ahc_init_scbdata(struct ahc_softc *ahc)
 {
@@ -3877,11 +4190,11 @@ ahc_init_scbdata(struct ahc_softc *ahc)
 
 	/* Allocate SCB resources */
 	scb_data->scbarray =
-	    (struct scb *)malloc(sizeof(struct scb) * AHC_SCB_MAX,
+	    (struct scb *)malloc(sizeof(struct scb) * AHC_SCB_MAX_ALLOC,
 				 M_DEVBUF, M_NOWAIT);
 	if (scb_data->scbarray == NULL)
 		return (ENOMEM);
-	memset(scb_data->scbarray, 0, sizeof(struct scb) * AHC_SCB_MAX);
+	memset(scb_data->scbarray, 0, sizeof(struct scb) * AHC_SCB_MAX_ALLOC);
 
 	/* Determine the number of hardware SCBs and initialize them */
 
@@ -3910,87 +4223,30 @@ ahc_init_scbdata(struct ahc_softc *ahc)
 	 * use of MAXADDR and MAXSIZE.
 	 */
 
-	/* DMA tag for our hardware scb structures */
-	if (ahc_dma_tag_create(ahc, ahc->parent_dmat, /*alignment*/1,
-			       /*boundary*/BUS_SPACE_MAXADDR_32BIT + 1,
-			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       AHC_SCB_MAX * sizeof(struct hardware_scb),
-			       /*nsegments*/1,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/0, &scb_data->hscb_dmat) != 0) {
+	if (ahc_createdmamem(ahc->parent_dmat,
+	     AHC_SCB_MAX * sizeof(struct hardware_scb), ahc->sc_dmaflags,
+	     &scb_data->hscb_dmamap,
+	     (caddr_t *)&scb_data->hscbs, &scb_data->hscb_busaddr,
+	     &scb_data->hscb_seg, &scb_data->hscb_nseg, ahc_name(ahc),
+	     "hardware SCB structures") < 0)
 		goto error_exit;
-	}
 
 	scb_data->init_level++;
 
-	/* Allocation for our hscbs */
-	if (ahc_dmamem_alloc(ahc, scb_data->hscb_dmat,
-			     (void **)&scb_data->hscbs,
-			     BUS_DMA_NOWAIT, &scb_data->hscb_dmamap) != 0) {
+	if (ahc_createdmamem(ahc->parent_dmat,
+	     AHC_SCB_MAX * sizeof(struct scsi_sense_data), ahc->sc_dmaflags,
+	     &scb_data->sense_dmamap, (caddr_t *)&scb_data->sense,
+	     &scb_data->sense_busaddr, &scb_data->sense_seg,
+	     &scb_data->sense_nseg, ahc_name(ahc), "sense buffers") < 0)
 		goto error_exit;
-	}
-
-	scb_data->init_level++;
-
-	/* And permanently map them */
-	ahc_dmamap_load(ahc, scb_data->hscb_dmat, scb_data->hscb_dmamap,
-			scb_data->hscbs,
-			AHC_SCB_MAX * sizeof(struct hardware_scb),
-			ahc_dmamap_cb, &scb_data->hscb_busaddr, /*flags*/0);
-
-	scb_data->init_level++;
-
-	/* DMA tag for our sense buffers */
-	if (ahc_dma_tag_create(ahc, ahc->parent_dmat, /*alignment*/1,
-			       /*boundary*/BUS_SPACE_MAXADDR_32BIT + 1,
-			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       AHC_SCB_MAX * sizeof(struct scsi_sense_data),
-			       /*nsegments*/1,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/0, &scb_data->sense_dmat) != 0) {
-		goto error_exit;
-	}
-
-	scb_data->init_level++;
-
-	/* Allocate them */
-	if (ahc_dmamem_alloc(ahc, scb_data->sense_dmat,
-			     (void **)&scb_data->sense,
-			     BUS_DMA_NOWAIT, &scb_data->sense_dmamap) != 0) {
-		goto error_exit;
-	}
-
-	scb_data->init_level++;
-
-	/* And permanently map them */
-	ahc_dmamap_load(ahc, scb_data->sense_dmat, scb_data->sense_dmamap,
-			scb_data->sense,
-			AHC_SCB_MAX * sizeof(struct scsi_sense_data),
-			ahc_dmamap_cb, &scb_data->sense_busaddr, /*flags*/0);
-
-	scb_data->init_level++;
-
-	/* DMA tag for our S/G structures.  We allocate in page sized chunks */
-	if (ahc_dma_tag_create(ahc, ahc->parent_dmat, /*alignment*/1,
-			       /*boundary*/BUS_SPACE_MAXADDR_32BIT + 1,
-			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       PAGE_SIZE, /*nsegments*/1,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/0, &scb_data->sg_dmat) != 0) {
-		goto error_exit;
-	}
 
 	scb_data->init_level++;
 
 	/* Perform initial CCB allocation */
-	memset(scb_data->hscbs, 0, AHC_SCB_MAX * sizeof(struct hardware_scb));
+	memset(scb_data->hscbs, 0,
+	       AHC_SCB_MAX_ALLOC * sizeof(struct hardware_scb));
 	ahc_alloc_scbs(ahc);
+	scb_data->init_level++;
 
 	if (scb_data->numscbs == 0) {
 		printf("%s: ahc_init_scbdata - "
@@ -4006,7 +4262,7 @@ ahc_init_scbdata(struct ahc_softc *ahc)
 	ahc_outb(ahc, NEXT_QUEUED_SCB, ahc->next_queued_scb->hscb->tag);
 
 	/*
-	 * Note that we were successful
+	 * Note that we were successfull
 	 */
 	return (0); 
 
@@ -4026,42 +4282,33 @@ ahc_fini_scbdata(struct ahc_softc *ahc)
 
 	switch (scb_data->init_level) {
 	default:
-	case 7:
+	case 5:
 	{
 		struct sg_map_node *sg_map;
 
 		while ((sg_map = SLIST_FIRST(&scb_data->sg_maps))!= NULL) {
 			SLIST_REMOVE_HEAD(&scb_data->sg_maps, links);
-			ahc_dmamap_unload(ahc, scb_data->sg_dmat,
-					  sg_map->sg_dmamap);
-			ahc_dmamem_free(ahc, scb_data->sg_dmat,
-					sg_map->sg_vaddr,
-					sg_map->sg_dmamap);
+			ahc_freedmamem(ahc->parent_dmat, PAGE_SIZE,
+			    sg_map->sg_dmamap, (caddr_t)sg_map->sg_vaddr,
+			    &sg_map->sg_dmasegs, sg_map->sg_nseg);
 			free(sg_map, M_DEVBUF);
 		}
-		ahc_dma_tag_destroy(ahc, scb_data->sg_dmat);
 	}
-	case 6:
-		ahc_dmamap_unload(ahc, scb_data->sense_dmat,
-				  scb_data->sense_dmamap);
-	case 5:
-		ahc_dmamem_free(ahc, scb_data->sense_dmat, scb_data->sense,
-				scb_data->sense_dmamap);
-		ahc_dmamap_destroy(ahc, scb_data->sense_dmat,
-				   scb_data->sense_dmamap);
+	/*FALLTHROUGH*/
 	case 4:
-		ahc_dma_tag_destroy(ahc, scb_data->sense_dmat);
+		ahc_freedmamem(ahc->parent_dmat,
+		    AHC_SCB_MAX * sizeof(struct scsipi_sense_data),
+		    scb_data->sense_dmamap, (caddr_t)scb_data->sense,
+		    &scb_data->sense_seg, scb_data->sense_nseg);
+	/*FALLTHROUGH*/
 	case 3:
-		ahc_dmamap_unload(ahc, scb_data->hscb_dmat,
-				  scb_data->hscb_dmamap);
+		ahc_freedmamem(ahc->parent_dmat,
+		    AHC_SCB_MAX * sizeof(struct hardware_scb),
+		    scb_data->hscb_dmamap, (caddr_t)scb_data->hscbs,
+		    &scb_data->hscb_seg, scb_data->hscb_nseg);
+	/*FALLTHROUGH*/
 	case 2:
-		ahc_dmamem_free(ahc, scb_data->hscb_dmat, scb_data->hscbs,
-				scb_data->hscb_dmamap);
-		ahc_dmamap_destroy(ahc, scb_data->hscb_dmat,
-				   scb_data->hscb_dmamap);
 	case 1:
-		ahc_dma_tag_destroy(ahc, scb_data->hscb_dmat);
-		break;
 	case 0:
 		break;
 	}
@@ -4081,7 +4328,7 @@ ahc_alloc_scbs(struct ahc_softc *ahc)
 	int i;
 
 	scb_data = ahc->scb_data;
-	if (scb_data->numscbs >= AHC_SCB_MAX)
+	if (scb_data->numscbs >= AHC_SCB_MAX_ALLOC)
 		/* Can't allocate any more */
 		return;
 
@@ -4093,32 +4340,34 @@ ahc_alloc_scbs(struct ahc_softc *ahc)
 		return;
 
 	/* Allocate S/G space for the next batch of SCBS */
-	if (ahc_dmamem_alloc(ahc, scb_data->sg_dmat,
-			     (void **)&sg_map->sg_vaddr,
-			     BUS_DMA_NOWAIT, &sg_map->sg_dmamap) != 0) {
+	if (ahc_createdmamem(ahc->parent_dmat, PAGE_SIZE, ahc->sc_dmaflags,
+			     &sg_map->sg_dmamap,
+			     (caddr_t *)&sg_map->sg_vaddr, &sg_map->sg_physaddr,
+			     &sg_map->sg_dmasegs, &sg_map->sg_nseg, ahc_name(ahc),
+			     "SG space") < 0) {
 		free(sg_map, M_DEVBUF);
 		return;
 	}
 
 	SLIST_INSERT_HEAD(&scb_data->sg_maps, sg_map, links);
 
-	ahc_dmamap_load(ahc, scb_data->sg_dmat, sg_map->sg_dmamap,
-			sg_map->sg_vaddr, PAGE_SIZE, ahc_dmamap_cb,
-			&sg_map->sg_physaddr, /*flags*/0);
-
 	segs = sg_map->sg_vaddr;
 	physaddr = sg_map->sg_physaddr;
 
 	newcount = (PAGE_SIZE / (AHC_NSEG * sizeof(struct ahc_dma_seg)));
-	for (i = 0; scb_data->numscbs < AHC_SCB_MAX && i < newcount; i++) {
-		struct scb_platform_data *pdata;
-#ifndef __linux__
+	newcount = MIN(newcount, (AHC_SCB_MAX_ALLOC - scb_data->numscbs));
+	for (i = 0; i < newcount; i++) {
+		struct scb_platform_data *pdata = NULL;
 		int error;
-#endif
-		pdata = (struct scb_platform_data *)malloc(sizeof(*pdata),
-							   M_DEVBUF, M_NOWAIT);
-		if (pdata == NULL)
-			break;
+
+		if (sizeof(*pdata) > 0) { 
+			pdata = (struct scb_platform_data *)
+			    malloc(sizeof(*pdata), M_DEVBUF, M_NOWAIT);
+			if (pdata == NULL)
+				break;
+			bzero(pdata, sizeof(*pdata));
+		}
+
 		next_scb->platform_data = pdata;
 		next_scb->sg_map = sg_map;
 		next_scb->sg_list = segs;
@@ -4129,12 +4378,14 @@ ahc_alloc_scbs(struct ahc_softc *ahc)
 		next_scb->sg_list_phys = physaddr + sizeof(struct ahc_dma_seg);
 		next_scb->ahc_softc = ahc;
 		next_scb->flags = SCB_FREE;
-#ifndef __linux__
-		error = ahc_dmamap_create(ahc, ahc->buffer_dmat, /*flags*/0,
-					  &next_scb->dmamap);
+
+		error = bus_dmamap_create(ahc->parent_dmat, 
+			  AHC_MAXTRANSFER_SIZE, AHC_NSEG, MAXPHYS, 0,
+			  BUS_DMA_NOWAIT|BUS_DMA_ALLOCNOW|ahc->sc_dmaflags,
+			  &next_scb->dmamap);
 		if (error != 0)
 			break;
-#endif
+
 		next_scb->hscb = &scb_data->hscbs[scb_data->numscbs];
 		next_scb->hscb->tag = ahc->scb_data->numscbs;
 		SLIST_INSERT_HEAD(&ahc->scb_data->free_scbs,
@@ -4145,7 +4396,6 @@ ahc_alloc_scbs(struct ahc_softc *ahc)
 		ahc->scb_data->numscbs++;
 	}
 }
-#endif /* __OpenBSD__ */
 
 void
 ahc_controller_info(struct ahc_softc *ahc, char *buf, size_t buf_len)
@@ -4208,9 +4458,9 @@ ahc_init(struct ahc_softc *ahc)
 	size_t	 driver_data_size;
 	uint32_t physaddr;
 
-#define AHC_DEBUG_SEQUENCER
-#ifdef AHC_DEBUG_SEQUENCER
-	ahc->flags |= AHC_SEQUENCER_DEBUG;
+#ifdef AHC_DEBUG
+	if ((ahc_debug & AHC_DEBUG_SEQUENCER) != 0)
+		ahc->flags |= AHC_SEQUENCER_DEBUG;
 #endif
 
 #ifdef AHC_PRINT_SRAM
@@ -4230,8 +4480,15 @@ ahc_init(struct ahc_softc *ahc)
 		}
 	}
 	printf ("\n");
+	/*
+	 * Reading uninitialized scratch ram may
+	 * generate parity errors.
+	 */
+	ahc_outb(ahc, CLRINT, CLRPARERR);
+	ahc_outb(ahc, CLRINT, CLRBRKADRINT);
 #endif
 	max_targ = 15;
+
 	/*
 	 * Assume we have a board at this stage and it has been reset.
 	 */
@@ -4246,76 +4503,32 @@ ahc_init(struct ahc_softc *ahc)
 	/*
 	 * Only allow target mode features if this unit has them enabled.
 	 */
-	if ((AHC_TMODE_ENABLE & (0x1 << ahc->unit)) == 0)
+	//if ((AHC_TMODE_ENABLE & (0x1 << ahc->unit)) == 0)
 		ahc->features &= ~AHC_TARGETMODE;
-
-#if !defined(__linux__) && !defined(__OpenBSD__)
-	/* DMA tag for mapping buffers into device visible space. */
-	if (ahc_dma_tag_create(ahc, ahc->parent_dmat, /*alignment*/1,
-			       /*boundary*/BUS_SPACE_MAXADDR_32BIT + 1,
-			       /*lowaddr*/BUS_SPACE_MAXADDR,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       /*maxsize*/MAXBSIZE, /*nsegments*/AHC_NSEG,
-			       /*maxsegsz*/AHC_MAXTRANSFER_SIZE,
-			       /*flags*/BUS_DMA_ALLOCNOW,
-			       &ahc->buffer_dmat) != 0) {
-		return (ENOMEM);
-	}
-#endif
-
-	ahc->init_level++;
 
 	/*
 	 * DMA tag for our command fifos and other data in system memory
 	 * the card's sequencer must be able to access.  For initiator
-	 * roles, we need to allocate space for the the qinfifo and qoutfifo.
+	 * roles, we need to allocate space for the qinfifo and qoutfifo.
 	 * The qinfifo and qoutfifo are composed of 256 1 byte elements. 
 	 * When providing for the target mode role, we must additionally
 	 * provide space for the incoming target command fifo and an extra
-	 * byte to deal with a dma bug in some chip versions.
+	 * byte to deal with a DMA bug in some chip versions.
 	 */
 	driver_data_size = 2 * 256 * sizeof(uint8_t);
-#ifdef __OpenBSD__
-	if (ahc_createdmamem(ahc, ahc->shared_data_dmat, driver_data_size, 
-	    &ahc->shared_data_dmamap, (caddr_t *)&ahc->qoutfifo,
-	    &ahc->shared_data_busaddr, &ahc->shared_data_seg,
-	    &ahc->shared_data_nseg, "shared data") < 0)
-		return (ENOMEM);
-
-	ahc->init_level++;
-#else
-
 	if ((ahc->features & AHC_TARGETMODE) != 0)
 		driver_data_size += AHC_TMODE_CMDS * sizeof(struct target_cmd)
 				 + /*DMA WideOdd Bug Buffer*/1;
-	if (ahc_dma_tag_create(ahc, ahc->parent_dmat, /*alignment*/1,
-			       /*boundary*/BUS_SPACE_MAXADDR_32BIT + 1,
-			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
-			       /*highaddr*/BUS_SPACE_MAXADDR,
-			       /*filter*/NULL, /*filterarg*/NULL,
-			       driver_data_size,
-			       /*nsegments*/1,
-			       /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-			       /*flags*/0, &ahc->shared_data_dmat) != 0) {
+
+	if (ahc_createdmamem(ahc->parent_dmat, driver_data_size,
+			     ahc->sc_dmaflags,
+			     &ahc->shared_data_dmamap, (caddr_t *)&ahc->qoutfifo,
+			     &ahc->shared_data_busaddr, &ahc->shared_data_seg,
+			     &ahc->shared_data_nseg, ahc_name(ahc), "shared data") < 0)
 		return (ENOMEM);
-	}
 
 	ahc->init_level++;
 
-	/* Allocation of driver data */
-	if (ahc_dmamem_alloc(ahc, ahc->shared_data_dmat,
-			     (void **)&ahc->qoutfifo,
-			     BUS_DMA_NOWAIT, &ahc->shared_data_dmamap) != 0) {
-		return (ENOMEM);
-	}
-
-	ahc->init_level++;
-
-	/* And permanently map it in */
-	ahc_dmamap_load(ahc, ahc->shared_data_dmat, ahc->shared_data_dmamap,
-			ahc->qoutfifo, driver_data_size, ahc_dmamap_cb,
-			&ahc->shared_data_busaddr, /*flags*/0);
 	if ((ahc->features & AHC_TARGETMODE) != 0) {
 		ahc->targetcmds = (struct target_cmd *)ahc->qoutfifo;
 		ahc->qoutfifo = (uint8_t *)&ahc->targetcmds[AHC_TMODE_CMDS];
@@ -4330,7 +4543,6 @@ ahc_init(struct ahc_softc *ahc)
 		ahc_outb(ahc, TQINPOS, ahc->tqinfifonext);
 		ahc->qoutfifo = (uint8_t *)&ahc->targetcmds[256];
 	}
-#endif 
 	ahc->qinfifo = &ahc->qoutfifo[256];
 
 	ahc->init_level++;
@@ -4338,7 +4550,11 @@ ahc_init(struct ahc_softc *ahc)
 	/* Allocate SCB data now that buffer_dmat is initialized */
 	if (ahc->scb_data->maxhscbs == 0)
 		if (ahc_init_scbdata(ahc) != 0)
-			return (ENOMEM);
+		  return (ENOMEM);
+
+	if (bootverbose)
+		printf("%s: found %d SCBs\n", ahc_name(ahc),
+		    ahc->scb_data->maxhscbs);
 
 	/*
 	 * Allocate a tstate to house information for our
@@ -4362,20 +4578,20 @@ ahc_init(struct ahc_softc *ahc)
 	ahc_outb(ahc, SEQ_FLAGS, 0);
 	ahc_outb(ahc, SEQ_FLAGS2, 0);
 
-	if (ahc->scb_data->maxhscbs < AHC_SCB_MAX) {
+	if (ahc->scb_data->maxhscbs < AHC_SCB_MAX_ALLOC) {
 		ahc->flags |= AHC_PAGESCBS;
 	} else {
 		ahc->flags &= ~AHC_PAGESCBS;
 	}
 
 #ifdef AHC_DEBUG
-	if (ahc_debug & AHC_SHOWMISC) {
-		printf("%s: hardware scb %d bytes; kernel scb %d bytes; "
-		       "ahc_dma %d bytes\n",
+	if (ahc_debug & AHC_SHOW_MISC) {
+		printf("%s: hardware scb %lu bytes; kernel scb %lu bytes; "
+		       "ahc_dma %lu bytes\n",
 			ahc_name(ahc),
-		        sizeof(struct hardware_scb),
-			sizeof(struct scb),
-			sizeof(struct ahc_dma_seg));
+			(u_long)sizeof(struct hardware_scb),
+			(u_long)sizeof(struct scb),
+			(u_long)sizeof(struct ahc_dma_seg));
 	}
 #endif /* AHC_DEBUG */
 
@@ -4404,7 +4620,7 @@ ahc_init(struct ahc_softc *ahc)
 		/* Select Channel A */
 		ahc_outb(ahc, SBLKCTL, ahc_inb(ahc, SBLKCTL) & ~SELBUSB);
 	}
-	
+
 	term = (ahc->flags & AHC_TERM_ENB_A) != 0 ? STPWEN : 0;
 	if ((ahc->features & AHC_ULTRA2) != 0)
 		ahc_outb(ahc, SCSIID_ULTRA2, ahc->our_id);
@@ -4431,7 +4647,7 @@ ahc_init(struct ahc_softc *ahc)
 	tagenable = ALL_TARGETS_MASK;
 
 	/* Grab the disconnection disable table and invert it for our needs */
-	if (ahc->flags & AHC_USEDEFAULTS) {
+	if ((ahc->flags & AHC_USEDEFAULTS) != 0) {
 		printf("%s: Host Adapter Bios disabled.  Using default SCSI "
 			"device parameters\n", ahc_name(ahc));
 		ahc->flags |= AHC_EXTENDED_TRANS_A|AHC_EXTENDED_TRANS_B|
@@ -4548,7 +4764,8 @@ ahc_init(struct ahc_softc *ahc)
 			tinfo->curr.protocol_version = 2;
 			tinfo->curr.transport_version = 2;
 		}
-		tstate->ultraenb = ultraenb;
+		tstate->ultraenb = 0;
+		tstate->discenable = discenable;
 	}
 	ahc->user_discenable = discenable;
 	ahc->user_tagenable = tagenable;
@@ -4571,17 +4788,19 @@ ahc_init(struct ahc_softc *ahc)
 	/* All of our queues are empty */
 	for (i = 0; i < 256; i++)
 		ahc->qoutfifo[i] = SCB_LIST_NULL;
-	
+
 	ahc_sync_qoutfifo(ahc, BUS_DMASYNC_PREREAD);
 
 	for (i = 0; i < 256; i++)
 		ahc->qinfifo[i] = SCB_LIST_NULL;
 
+	ahc_sync_qinfifo(ahc, BUS_DMASYNC_PREWRITE);
+
 	if ((ahc->features & AHC_MULTI_TID) != 0) {
 		ahc_outb(ahc, TARGID, 0);
 		ahc_outb(ahc, TARGID + 1, 0);
 	}
-	
+
 	/*
 	 * Tell the sequencer where it can find our arrays in memory.
 	 */
@@ -4627,6 +4846,7 @@ ahc_init(struct ahc_softc *ahc)
 		ahc_outb(ahc, HNSCB_QOFF, 0);
 	}
 
+
 	/* We don't have any waiting selections */
 	ahc_outb(ahc, WAITING_SCBH, SCB_LIST_NULL);
 
@@ -4649,7 +4869,7 @@ ahc_init(struct ahc_softc *ahc)
 	/*
 	 * Load the Sequencer program and Enable the adapter
 	 * in "fast" mode.
-         */
+	 */
 	if (bootverbose)
 		printf("%s: Downloading Sequencer Program...",
 		       ahc_name(ahc));
@@ -4662,7 +4882,7 @@ ahc_init(struct ahc_softc *ahc)
 		/*
 		 * Wait for up to 500ms for our transceivers
 		 * to settle.  If the adapter does not have
-		 * a cable attached, the tranceivers may
+		 * a cable attached, the transceivers may
 		 * never settle, so don't complain if we
 		 * fail here.
 		 */
@@ -4705,21 +4925,34 @@ ahc_pause_and_flushwork(struct ahc_softc *ahc)
 {
 	int intstat;
 	int maxloops;
+	int paused;
 
 	maxloops = 1000;
 	ahc->flags |= AHC_ALL_INTERRUPTS;
 	intstat = 0;
+	paused = FALSE;
 	do {
+		if (paused) {
+			ahc_unpause(ahc);
+			/*
+			 * Give the sequencer some time to service
+			 * any active selections.
+			 */
+			ahc_delay(200);
+		}
 		ahc_intr(ahc);
 		ahc_pause(ahc);
+		paused = TRUE;
+		ahc_outb(ahc, SCSISEQ, ahc_inb(ahc, SCSISEQ) & ~ENSELO);
 		ahc_clear_critical_section(ahc);
 		if (intstat == 0xFF && (ahc->features & AHC_REMOVABLE) != 0)
 			break;
-		maxloops--;
-	} while (((intstat = ahc_inb(ahc, INTSTAT)) & INT_PEND) && --maxloops);
+	} while (--maxloops
+	      && (((intstat = ahc_inb(ahc, INTSTAT)) & INT_PEND) != 0
+	       || (ahc_inb(ahc, SSTAT0) & (SELDO|SELINGO))));
 	if (maxloops == 0) {
 		printf("Infinite interrupt loop, INTSTAT = %x",
-		      ahc_inb(ahc, INTSTAT));
+		       ahc_inb(ahc, INTSTAT));
 	}
 	ahc_platform_flushwork(ahc);
 	ahc->flags &= ~AHC_ALL_INTERRUPTS;
@@ -4745,7 +4978,7 @@ ahc_suspend(struct ahc_softc *ahc)
 	if (ahc->pending_device != NULL)
 		return (EBUSY);
 #endif
-	
+
 	/* Save volatile registers */
 	if ((ahc->features & AHC_TWIN) != 0) {
 		ahc_outb(ahc, SBLKCTL, ahc_inb(ahc, SBLKCTL) | SELBUSB);
@@ -4961,10 +5194,15 @@ int
 ahc_match_scb(struct ahc_softc *ahc, struct scb *scb, int target,
 	      char channel, int lun, u_int tag, role_t role)
 {
-	int targ = SCB_GET_TARGET(ahc, scb);
-	char chan = SCB_GET_CHANNEL(ahc, scb);
-	int slun = SCB_GET_LUN(scb);
-	int match;
+	char chan;
+	int targ, slun, match;
+
+	if (scb == NULL)
+		return 0;
+
+	targ = SCB_GET_TARGET(ahc, scb);
+	chan = SCB_GET_CHANNEL(ahc, scb);
+	slun = SCB_GET_LUN(scb);
 
 	match = ((chan == channel) || (channel == ALL_CHANNELS));
 	if (match != 0)
@@ -5044,7 +5282,11 @@ ahc_qinfifo_requeue(struct ahc_softc *ahc, struct scb *prev_scb,
 		ahc_sync_scb(ahc, prev_scb, 
 			     BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
 	}
-	ahc->qinfifo[ahc->qinfifonext++] = scb->hscb->tag;
+	ahc->qinfifo[ahc->qinfifonext] = scb->hscb->tag;
+	ahc_dmamap_sync(ahc, ahc->parent_dmat, ahc->shared_data_dmamap,
+			/*offset*/ahc->qinfifonext+256, /*len*/1,
+			BUS_DMASYNC_PREWRITE);
+	ahc->qinfifonext++;
 	scb->hscb->next = ahc->next_queued_scb->hscb->tag;
 	ahc_sync_scb(ahc, scb, BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
 }
@@ -5052,8 +5294,8 @@ ahc_qinfifo_requeue(struct ahc_softc *ahc, struct scb *prev_scb,
 static int
 ahc_qinfifo_count(struct ahc_softc *ahc)
 {
-	u_int8_t qinpos;
-	u_int8_t diff;
+	uint8_t qinpos;
+	uint8_t diff;
 
 	if ((ahc->features & AHC_QUEUE_REGS) != 0) {
 		qinpos = ahc_inb(ahc, SNSCB_QOFF);
@@ -5074,11 +5316,10 @@ ahc_search_qinfifo(struct ahc_softc *ahc, int target, char channel,
 	uint8_t qinstart;
 	uint8_t qinpos;
 	uint8_t qintail;
-	uint8_t next, prev;
+	uint8_t next;
+	uint8_t prev;
 	uint8_t curscbptr;
 	int	found;
-	int	maxtarget;
-	int	i;
 	int	have_qregs;
 
 	qintail = ahc->qinfifonext;
@@ -5089,10 +5330,9 @@ ahc_search_qinfifo(struct ahc_softc *ahc, int target, char channel,
 	} else
 		qinstart = ahc_inb(ahc, QINPOS);
 	qinpos = qinstart;
-	next = ahc_inb(ahc, NEXT_QUEUED_SCB);
 	found = 0;
 	prev_scb = NULL;
-	
+
 	if (action == SEARCH_COMPLETE) {
 		/*
 		 * Don't attempt to run any queued untagged transactions
@@ -5129,14 +5369,14 @@ ahc_search_qinfifo(struct ahc_softc *ahc, int target, char channel,
 
 				ostat = ahc_get_transaction_status(scb);
 				if (ostat == CAM_REQ_INPROG)
-					ahc_set_transaction_status(scb,
-								   status);
+					ahc_set_transaction_status(scb, status);
 				cstat = ahc_get_transaction_status(scb);
 				if (cstat != CAM_REQ_CMP)
 					ahc_freeze_scb(scb);
 				if ((scb->flags & SCB_ACTIVE) == 0)
 					printf("Inactive SCB in qinfifo\n");
 				ahc_done(ahc, scb);
+
 				/* FALLTHROUGH */
 			}
 			case SEARCH_REMOVE:
@@ -5163,15 +5403,15 @@ ahc_search_qinfifo(struct ahc_softc *ahc, int target, char channel,
 	 && (found != 0)
 	 && (qinstart != ahc->qinfifonext)) {
 		/*
-		 * The sequencer may be in the process of dmaing
+		 * The sequencer may be in the process of DMA'ing
 		 * down the SCB at the beginning of the queue.
 		 * This could be problematic if either the first,
 		 * or the second SCB is removed from the queue
 		 * (the first SCB includes a pointer to the "next"
-		 * SCB to dma). If we have removed any entries, swap
+		 * SCB to DMA). If we have removed any entries, swap
 		 * the first element in the queue with the next HSCB
 		 * so the sequencer will notice that NEXT_QUEUED_SCB
-		 * has changed during its dma attempt and will retry
+		 * has changed during its DMA attempt and will retry
 		 * the DMA.
 		 */
 		scb = ahc_lookup_scb(ahc, ahc->qinfifo[qinstart]);
@@ -5241,13 +5481,12 @@ ahc_search_qinfifo(struct ahc_softc *ahc, int target, char channel,
 
 				ostat = ahc_get_transaction_status(scb);
 				if (ostat == CAM_REQ_INPROG)
-					ahc_set_transaction_status(scb,
-								   status);
+					ahc_set_transaction_status(scb, status);
 				cstat = ahc_get_transaction_status(scb);
 				if (cstat != CAM_REQ_CMP)
 					ahc_freeze_scb(scb);
 				if ((scb->flags & SCB_ACTIVE) == 0)
-					printf("Inactive SCB in Waiting List\n");
+					printf("Inactive SCB in Wait List\n");
 				ahc_done(ahc, scb);
 				/* FALLTHROUGH */
 			}
@@ -5267,9 +5506,33 @@ ahc_search_qinfifo(struct ahc_softc *ahc, int target, char channel,
 	}
 	ahc_outb(ahc, SCBPTR, curscbptr);
 
-	/*
-	 * And lastly, the untagged holding queues.
-	 */
+	found += ahc_search_untagged_queues(ahc, /*ahc_io_ctx_t*/NULL, target,
+					    channel, lun, status, action);
+
+	if (action == SEARCH_COMPLETE)
+		ahc_release_untagged_queues(ahc);
+	return (found);
+}
+
+int
+ahc_search_untagged_queues(struct ahc_softc *ahc, struct scsi_xfer *xs,
+			   int target, char channel, int lun, uint32_t status,
+			   ahc_search_action action)
+{
+	struct	scb *scb;
+	int	maxtarget;
+	int	found;
+	int	i;
+
+	if (action == SEARCH_COMPLETE) {
+		/*
+		 * Don't attempt to run any queued untagged transactions
+		 * until we are done with the abort process.
+		 */
+		ahc_freeze_untagged_queues(ahc);
+	}
+
+	found = 0;
 	i = 0;
 	if ((ahc->flags & AHC_SCB_BTT) == 0) {
 
@@ -5308,37 +5571,36 @@ ahc_search_qinfifo(struct ahc_softc *ahc, int target, char channel,
 			if ((scb->flags & SCB_ACTIVE) != 0)
 				continue;
 
-			if (ahc_match_scb(ahc, scb, target, channel,
-					  lun, SCB_LIST_NULL, role)) {
-				/*
-				 * We found an scb that needs to be acted on.
-				 */
-				found++;
-				switch (action) {
-				case SEARCH_COMPLETE:
-				{
-					cam_status ostat;
-					cam_status cstat;
+			if (ahc_match_scb(ahc, scb, target, channel, lun,
+					  SCB_LIST_NULL, ROLE_INITIATOR) == 0
+			    /*|| (ctx != NULL && ctx != scb->io_ctx)*/)
+				continue;
 
-					ostat = ahc_get_transaction_status(scb);
-					if (ostat == CAM_REQ_INPROG)
-						ahc_set_transaction_status(scb,
-								   status);
-					cstat = ahc_get_transaction_status(scb);
-					if (cstat != CAM_REQ_CMP)
-						ahc_freeze_scb(scb);
-					if ((scb->flags & SCB_ACTIVE) == 0)
-						printf("Inactive SCB in untaggedQ\n");
-					ahc_done(ahc, scb);
-					break;
-				}
-				case SEARCH_REMOVE:
-					TAILQ_REMOVE(untagged_q, scb,
-						     links.tqe);
-					break;
-				case SEARCH_COUNT:
-					break;
-				}
+			/*
+			 * We found an scb that needs to be acted on.
+			 */
+			found++;
+			switch (action) {
+			case SEARCH_COMPLETE:
+			{
+				cam_status ostat;
+				cam_status cstat;
+
+				ostat = ahc_get_transaction_status(scb);
+				if (ostat == CAM_REQ_INPROG)
+					ahc_set_transaction_status(scb, status);
+				cstat = ahc_get_transaction_status(scb);
+				if (cstat != CAM_REQ_CMP)
+					ahc_freeze_scb(scb);
+				ahc_done(ahc, scb);
+				break;
+			}
+			case SEARCH_REMOVE:
+				scb->flags &= ~SCB_UNTAGGEDQ;
+				TAILQ_REMOVE(untagged_q, scb, links.tqe);
+				break;
+			case SEARCH_COUNT:
+				break;
 			}
 		}
 	}
@@ -5566,24 +5828,40 @@ ahc_abort_scbs(struct ahc_softc *ahc, int target, char channel,
 		maxlun = lun + 1;
 	}
 
-	for (;i < maxtarget; i++) {
-		for (j = minlun;j < maxlun; j++)
-			ahc_unbusy_tcl(ahc, BUILD_TCL(i << 4, j));
+	if (role != ROLE_TARGET) {
+		for (;i < maxtarget; i++) {
+			for (j = minlun;j < maxlun; j++) {
+				u_int scbid;
+				u_int tcl;
+
+				tcl = BUILD_TCL(i << 4, j);
+				scbid = ahc_index_busy_tcl(ahc, tcl);
+				scbp = ahc_lookup_scb(ahc, scbid);
+				if (scbp == NULL
+				 || ahc_match_scb(ahc, scbp, target, channel,
+						  lun, tag, role) == 0)
+					continue;
+				ahc_unbusy_tcl(ahc, BUILD_TCL(i << 4, j));
+			}
+		}
+
+		/*
+		 * Go through the disconnected list and remove any entries we
+		 * have queued for completion, 0'ing their control byte too.
+		 * We save the active SCB and restore it ourselves, so there
+		 * is no reason for this search to restore it too.
+		 */
+		ahc_search_disc_list(ahc, target, channel, lun, tag,
+				     /*stop_on_first*/FALSE, /*remove*/TRUE,
+				     /*save_state*/FALSE);
 	}
 
 	/*
-	 * Go through the disconnected list and remove any entries we
-	 * have queued for completion, 0'ing their control byte too.
-	 * We save the active SCB and restore it ourselves, so there
-	 * is no reason for this search to restore it too.
-	 */
-	ahc_search_disc_list(ahc, target, channel, lun, tag,
-			     /*stop_on_first*/FALSE, /*remove*/TRUE,
-			     /*save_state*/FALSE);
-
-	/*
 	 * Go through the hardware SCB array looking for commands that
-	 * were active but not on any list.
+	 * were active but not on any list.  In some cases, these remnants
+	 * might not still have mappings in the scbindex array (e.g. unexpected
+	 * bus free with the same scb queued for an abort).  Don't hold this
+	 * against them.
 	 */
 	for (i = 0; i < ahc->scb_data->maxhscbs; i++) {
 		u_int scbid;
@@ -5591,8 +5869,9 @@ ahc_abort_scbs(struct ahc_softc *ahc, int target, char channel,
 		ahc_outb(ahc, SCBPTR, i);
 		scbid = ahc_inb(ahc, SCB_TAG);
 		scbp = ahc_lookup_scb(ahc, scbid);
-		if (scbp != NULL
-		 && ahc_match_scb(ahc, scbp, target, channel, lun, tag, role))
+		if ((scbp == NULL && scbid != SCB_LIST_NULL)
+		 || (scbp != NULL
+		  && ahc_match_scb(ahc, scbp, target, channel, lun, tag, role)))
 			ahc_add_curscb_to_free_list(ahc);
 	}
 
@@ -5676,6 +5955,16 @@ ahc_reset_channel(struct ahc_softc *ahc, char channel, int initiate_reset)
 	 */
 	ahc_run_qoutfifo(ahc);
 #if AHC_TARGET_MODE
+	/*
+	 * XXX - In Twin mode, the tqinfifo may have commands
+	 *	 for an unaffected channel in it.  However, if
+	 *	 we have run out of ATIO resources to drain that
+	 *	 queue, we may not get them all out here.  Further,
+	 *	 the blocked transactions for the reset channel
+	 *	 should just be killed off, irrespecitve of whether
+	 *	 we are blocked on ATIO resources.  Write a routine
+	 *	 to compact the tqinfifo appropriately.
+	 */
 	if ((ahc->flags & AHC_TARGETROLE) != 0) {
 		ahc_run_tqinfifo(ahc, /*paused*/TRUE);
 	}
@@ -5697,10 +5986,6 @@ ahc_reset_channel(struct ahc_softc *ahc, char channel, int initiate_reset)
 		 */
 		ahc_outb(ahc, SBLKCTL, sblkctl ^ SELBUSB);
 		simode1 = ahc_inb(ahc, SIMODE1) & ~(ENBUSFREE|ENSCSIRST);
-		ahc_outb(ahc, SIMODE1, simode1);
-		if (initiate_reset)
-			ahc_reset_current_bus(ahc);
-		ahc_clear_intstat(ahc);
 #if AHC_TARGET_MODE
 		/*
 		 * Bus resets clear ENSELI, so we cannot
@@ -5708,19 +5993,18 @@ ahc_reset_channel(struct ahc_softc *ahc, char channel, int initiate_reset)
 		 * if we are in target mode.
 		 */
 		if ((ahc->flags & AHC_TARGETROLE) != 0)
-			ahc_outb(ahc, SIMODE1, simode1 | ENSCSIRST);
+			simode1 |= ENSCSIRST;
 #endif
+		ahc_outb(ahc, SIMODE1, simode1);
+		if (initiate_reset)
+			ahc_reset_current_bus(ahc);
+		ahc_clear_intstat(ahc);
 		ahc_outb(ahc, SCSISEQ, scsiseq & (ENSELI|ENRSELI|ENAUTOATNP));
 		ahc_outb(ahc, SBLKCTL, sblkctl);
 		restart_needed = FALSE;
 	} else {
 		/* Case 2: A command from this bus is active or we're idle */
-		ahc_clear_msg_state(ahc);
 		simode1 = ahc_inb(ahc, SIMODE1) & ~(ENBUSFREE|ENSCSIRST);
-		ahc_outb(ahc, SIMODE1, simode1);
-		if (initiate_reset)
-			ahc_reset_current_bus(ahc);
-		ahc_clear_intstat(ahc);
 #if AHC_TARGET_MODE
 		/*
 		 * Bus resets clear ENSELI, so we cannot
@@ -5728,8 +6012,12 @@ ahc_reset_channel(struct ahc_softc *ahc, char channel, int initiate_reset)
 		 * if we are in target mode.
 		 */
 		if ((ahc->flags & AHC_TARGETROLE) != 0)
-			ahc_outb(ahc, SIMODE1, simode1 | ENSCSIRST);
+			simode1 |= ENSCSIRST;
 #endif
+		ahc_outb(ahc, SIMODE1, simode1);
+		if (initiate_reset)
+			ahc_reset_current_bus(ahc);
+		ahc_clear_intstat(ahc);
 		ahc_outb(ahc, SCSISEQ, scsiseq & (ENSELI|ENRSELI|ENAUTOATNP));
 		restart_needed = TRUE;
 	}
@@ -5743,7 +6031,7 @@ ahc_reset_channel(struct ahc_softc *ahc, char channel, int initiate_reset)
 			       ROLE_UNKNOWN, CAM_SCSI_BUS_RESET);
 
 	max_scsiid = (ahc->features & AHC_WIDE) ? 15 : 7;
-	
+
 #ifdef AHC_TARGET_MODE
 	/*
 	 * Send an immediate notify ccb to all target more peripheral
@@ -5769,10 +6057,6 @@ ahc_reset_channel(struct ahc_softc *ahc, char channel, int initiate_reset)
 		}
 	}
 #endif
-	/* Notify the XPT that a bus reset occurred */
-	ahc_send_async(ahc, devinfo.channel, CAM_TARGET_WILDCARD,
-		       CAM_LUN_WILDCARD, AC_BUS_RESET, NULL);
-
 	/*
 	 * Revert to async/narrow transfers until we renegotiate.
 	 */
@@ -5808,7 +6092,7 @@ ahc_reset_channel(struct ahc_softc *ahc, char channel, int initiate_reset)
  * Calculate the residual for a just completed SCB.
  */
 void
-ahc_calc_residual(struct scb *scb)
+ahc_calc_residual(struct ahc_softc *ahc, struct scb *scb)
 {
 	struct hardware_scb *hscb;
 	struct status_pkt *spkt;
@@ -5852,13 +6136,13 @@ ahc_calc_residual(struct scb *scb)
 		/* Case 4 */
 		return;
 	} else if ((resid_sgptr & ~SG_PTR_MASK) != 0) {
-		panic("Bogus resid sgptr value 0x%x", resid_sgptr);
+		panic("Bogus resid sgptr value 0x%x\n", resid_sgptr);
 	} else {
 		struct ahc_dma_seg *sg;
 
 		/*
 		 * Remainder of the SG where the transfer
-		 * stopped.
+		 * stopped.  
 		 */
 		resid = ahc_le32toh(spkt->residual_datacnt) & AHC_SG_LEN_MASK;
 		sg = ahc_sg_bus_to_virt(scb, resid_sgptr & SG_PTR_MASK);
@@ -5882,9 +6166,10 @@ ahc_calc_residual(struct scb *scb)
 		ahc_set_sense_residual(scb, resid);
 
 #ifdef AHC_DEBUG
-	if (ahc_debug & AHC_SHOWMISC) {
-		ahc_print_path(scb->ahc_softc, scb);
-		printf("Handled Residual of %d bytes\n", resid);
+	if ((ahc_debug & AHC_SHOW_MISC) != 0) {
+		ahc_print_path(ahc, scb);
+		printf("Handled %sResidual of %d bytes\n",
+		       (scb->flags & SCB_SENSE) ? "Sense " : "", resid);
 	}
 #endif
 }
@@ -6099,8 +6384,11 @@ ahc_loadseq(struct ahc_softc *ahc)
 	ahc_outb(ahc, SEQCTL, PERRORDIS|FAILDIS|FASTMODE);
 	ahc_restart(ahc);
 
-	if (bootverbose)
+	if (bootverbose) {
 		printf(" %d instructions downloaded\n", downloaded);
+		printf("%s: Features 0x%x, Bugs 0x%x, Flags 0x%x\n",
+		       ahc_name(ahc), ahc->features, ahc->bugs, ahc->flags);
+	}
 }
 
 static int
@@ -6178,9 +6466,7 @@ ahc_download_instr(struct ahc_softc *ahc, u_int instrptr, uint8_t *dconsts)
 		address = fmt3_ins->address;
 		cur_patch = patches;
 		skip_addr = 0;
-
 		for (i = 0; i < address;) {
-
 			ahc_check_patch(ahc, &cur_patch, i, &skip_addr);
 
 			if (skip_addr > i) {
@@ -6264,14 +6550,74 @@ ahc_download_instr(struct ahc_softc *ahc, u_int instrptr, uint8_t *dconsts)
 	}
 }
 
+int
+ahc_print_register(ahc_reg_parse_entry_t *table, u_int num_entries,
+		   const char *name, u_int address, u_int value,
+		   u_int *cur_column, u_int wrap_point)
+{
+	int	printed;
+	u_int	printed_mask;
+	char    line[1024];
+
+	line[0] = 0;
+
+	if (cur_column != NULL && *cur_column >= wrap_point) {
+		printf("\n");
+		*cur_column = 0;
+	}
+	printed = snprintf(line, sizeof(line), "%s[0x%x]", name, value);
+	if (table == NULL) {
+		printed += snprintf(&line[printed], (sizeof line) - printed,
+		    " ");
+		printf("%s", line);
+		if (cur_column != NULL)
+			*cur_column += printed;
+		return (printed);
+	}
+	printed_mask = 0;
+	while (printed_mask != 0xFF) {
+		int entry;
+
+		for (entry = 0; entry < num_entries; entry++) {
+			if (((value & table[entry].mask)
+			  != table[entry].value)
+			 || ((printed_mask & table[entry].mask)
+			  == table[entry].mask))
+				continue;
+			printed += snprintf(&line[printed],
+			    (sizeof line) - printed, "%s%s", 
+				printed_mask == 0 ? ":(" : "|",
+				table[entry].name);
+			printed_mask |= table[entry].mask;
+			
+			break;
+		}
+		if (entry >= num_entries)
+			break;
+	}
+	if (printed_mask != 0)
+		printed += snprintf(&line[printed],
+		    (sizeof line) - printed, ") ");
+	else
+		printed += snprintf(&line[printed],
+		    (sizeof line) - printed, " ");
+	if (cur_column != NULL)
+		*cur_column += printed;
+	printf("%s", line);
+
+	return (printed);
+}
+
 void
 ahc_dump_card_state(struct ahc_softc *ahc)
 {
-	struct scb *scb;
-	struct scb_tailq *untagged_q;
-	int target;
-	int maxtarget;
-	int i;
+	struct	scb *scb;
+	struct	scb_tailq *untagged_q;
+	u_int	cur_col;
+	int	paused;
+	int	target;
+	int	maxtarget;
+	int	i;
 	uint8_t last_phase;
 	uint8_t qinpos;
 	uint8_t qintail;
@@ -6279,32 +6625,53 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 	uint8_t scb_index;
 	uint8_t saved_scbptr;
 
-	saved_scbptr = ahc_inb(ahc, SCBPTR);
+	if (ahc_is_paused(ahc)) {
+		paused = 1;
+	} else {
+		paused = 0;
+		ahc_pause(ahc);
+	}
 
+	saved_scbptr = ahc_inb(ahc, SCBPTR);
 	last_phase = ahc_inb(ahc, LASTPHASE);
-	printf("%s: Dumping Card State %s, at SEQADDR 0x%x\n",
+	printf(">>>>>>>>>>>>>>>>>> Dump Card State Begins <<<<<<<<<<<<<<<<<\n"
+	       "%s: Dumping Card State %s, at SEQADDR 0x%x\n",
 	       ahc_name(ahc), ahc_lookup_phase_entry(last_phase)->phasemsg,
 	       ahc_inb(ahc, SEQADDR0) | (ahc_inb(ahc, SEQADDR1) << 8));
+	if (paused)
+		printf("Card was paused\n");
 	printf("ACCUM = 0x%x, SINDEX = 0x%x, DINDEX = 0x%x, ARG_2 = 0x%x\n",
 	       ahc_inb(ahc, ACCUM), ahc_inb(ahc, SINDEX), ahc_inb(ahc, DINDEX),
 	       ahc_inb(ahc, ARG_2));
-	printf("HCNT = 0x%x\n", ahc_inb(ahc, HCNT));
-	printf("SCSISEQ = 0x%x, SBLKCTL = 0x%x\n",
-	       ahc_inb(ahc, SCSISEQ), ahc_inb(ahc, SBLKCTL));
-	printf(" DFCNTRL = 0x%x, DFSTATUS = 0x%x\n",
-	       ahc_inb(ahc, DFCNTRL), ahc_inb(ahc, DFSTATUS));
-	printf("LASTPHASE = 0x%x, SCSISIGI = 0x%x, SXFRCTL0 = 0x%x\n",
-	       last_phase, ahc_inb(ahc, SCSISIGI), ahc_inb(ahc, SXFRCTL0));
-	printf("SSTAT0 = 0x%x, SSTAT1 = 0x%x\n",
-	       ahc_inb(ahc, SSTAT0), ahc_inb(ahc, SSTAT1));
+	printf("HCNT = 0x%x SCBPTR = 0x%x\n", ahc_inb(ahc, HCNT),
+	       ahc_inb(ahc, SCBPTR));
+	cur_col = 0;
 	if ((ahc->features & AHC_DT) != 0)
-		printf("SCSIPHASE = 0x%x\n", ahc_inb(ahc, SCSIPHASE));
-	printf("STACK == 0x%x, 0x%x, 0x%x, 0x%x\n",
-		ahc_inb(ahc, STACK) | (ahc_inb(ahc, STACK) << 8),
-		ahc_inb(ahc, STACK) | (ahc_inb(ahc, STACK) << 8),
-		ahc_inb(ahc, STACK) | (ahc_inb(ahc, STACK) << 8),
-		ahc_inb(ahc, STACK) | (ahc_inb(ahc, STACK) << 8));
-	printf("SCB count = %d\n", ahc->scb_data->numscbs);
+		ahc_scsiphase_print(ahc_inb(ahc, SCSIPHASE), &cur_col, 50);
+	ahc_scsisigi_print(ahc_inb(ahc, SCSISIGI), &cur_col, 50);
+	ahc_error_print(ahc_inb(ahc, ERROR), &cur_col, 50);
+	ahc_scsibusl_print(ahc_inb(ahc, SCSIBUSL), &cur_col, 50);
+	ahc_lastphase_print(ahc_inb(ahc, LASTPHASE), &cur_col, 50);
+	ahc_scsiseq_print(ahc_inb(ahc, SCSISEQ), &cur_col, 50);
+	ahc_sblkctl_print(ahc_inb(ahc, SBLKCTL), &cur_col, 50);
+	ahc_scsirate_print(ahc_inb(ahc, SCSIRATE), &cur_col, 50);
+	ahc_seqctl_print(ahc_inb(ahc, SEQCTL), &cur_col, 50);
+	ahc_seq_flags_print(ahc_inb(ahc, SEQ_FLAGS), &cur_col, 50);
+	ahc_sstat0_print(ahc_inb(ahc, SSTAT0), &cur_col, 50);
+	ahc_sstat1_print(ahc_inb(ahc, SSTAT1), &cur_col, 50);
+	ahc_sstat2_print(ahc_inb(ahc, SSTAT2), &cur_col, 50);
+	ahc_sstat3_print(ahc_inb(ahc, SSTAT3), &cur_col, 50);
+	ahc_simode0_print(ahc_inb(ahc, SIMODE0), &cur_col, 50);
+	ahc_simode1_print(ahc_inb(ahc, SIMODE1), &cur_col, 50);
+	ahc_sxfrctl0_print(ahc_inb(ahc, SXFRCTL0), &cur_col, 50);
+	ahc_dfcntrl_print(ahc_inb(ahc, DFCNTRL), &cur_col, 50);
+	ahc_dfstatus_print(ahc_inb(ahc, DFSTATUS), &cur_col, 50);
+	if (cur_col != 0)
+		printf("\n");
+	printf("STACK:");
+	for (i = 0; i < STACK_SIZE; i++)
+	       printf(" 0x%x", ahc_inb(ahc, STACK)|(ahc_inb(ahc, STACK) << 8));
+	printf("\nSCB count = %d\n", ahc->scb_data->numscbs);
 	printf("Kernel NEXTQSCB = %d\n", ahc->next_queued_scb->hscb->tag);
 	printf("Card NEXTQSCB = %d\n", ahc_inb(ahc, NEXT_QUEUED_SCB));
 	/* QINFIFO */
@@ -6361,18 +6728,34 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 	}
 	printf("\n");
 
+	printf("Sequencer SCB Info: ");
+	for (i = 0; i < ahc->scb_data->maxhscbs; i++) {
+		ahc_outb(ahc, SCBPTR, i);
+		/*cur_col =*/ printf("\n%3d ", i);
+
+		ahc_scb_control_print(ahc_inb(ahc, SCB_CONTROL), &cur_col, 60);
+		ahc_scb_scsiid_print(ahc_inb(ahc, SCB_SCSIID), &cur_col, 60);
+		ahc_scb_lun_print(ahc_inb(ahc, SCB_LUN), &cur_col, 60);
+		ahc_scb_tag_print(ahc_inb(ahc, SCB_TAG), &cur_col, 60);
+	}
+	printf("\n");
+
 	printf("Pending list: ");
 	i = 0;
 	LIST_FOREACH(scb, &ahc->pending_scbs, pending_links) {
 		if (i++ > 256)
 			break;
-		if (scb != LIST_FIRST(&ahc->pending_scbs))
-			printf(", ");
-		printf("%d", scb->hscb->tag);
+		/*cur_col =*/ printf("\n%3d ", scb->hscb->tag);
+		ahc_scb_control_print(scb->hscb->control, &cur_col, 60);
+		ahc_scb_scsiid_print(scb->hscb->scsiid, &cur_col, 60);
+		ahc_scb_lun_print(scb->hscb->lun, &cur_col, 60);
 		if ((ahc->flags & AHC_PAGESCBS) == 0) {
 			ahc_outb(ahc, SCBPTR, scb->hscb->tag);
-			printf("(0x%x, 0x%x)", ahc_inb(ahc, SCB_CONTROL),
-			       ahc_inb(ahc, SCB_TAG));
+			printf("(");
+			ahc_scb_control_print(ahc_inb(ahc, SCB_CONTROL),
+					      &cur_col, 60);
+			ahc_scb_tag_print(ahc_inb(ahc, SCB_TAG), &cur_col, 60);
+			printf(")");
 		}
 	}
 	printf("\n");
@@ -6402,7 +6785,10 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 	}
 
 	ahc_platform_dump_card_state(ahc);
+	printf("\n<<<<<<<<<<<<<<<<< Dump Card State Ends >>>>>>>>>>>>>>>>>>\n");
 	ahc_outb(ahc, SCBPTR, saved_scbptr);
+	if (paused == 0)
+		ahc_unpause(ahc);
 }
 
 /************************* Target Mode ****************************************/
@@ -6458,6 +6844,7 @@ ahc_handle_en_lun(struct ahc_softc *ahc, struct cam_sim *sim, union ccb *ccb)
 	u_int	   target;
 	u_int	   lun;
 	u_int	   target_mask;
+	u_int	   our_id;
 	u_long	   s;
 	char	   channel;
 
@@ -6469,15 +6856,33 @@ ahc_handle_en_lun(struct ahc_softc *ahc, struct cam_sim *sim, union ccb *ccb)
 		return;
 	}
 
-	if ((ahc->features & AHC_MULTIROLE) != 0) {
-		u_int	   our_id;
+	if (cam_sim_bus(sim) == 0)
+		our_id = ahc->our_id;
+	else
+		our_id = ahc->our_id_b;
 
-		if (cam_sim_bus(sim) == 0)
-			our_id = ahc->our_id;
-		else
-			our_id = ahc->our_id_b;
+	if (ccb->ccb_h.target_id != our_id) {
+		/*
+		 * our_id represents our initiator ID, or
+		 * the ID of the first target to have an
+		 * enabled lun in target mode.  There are
+		 * two cases that may preclude enabling a
+		 * target id other than our_id.
+		 *
+		 *   o our_id is for an active initiator role.
+		 *     Since the hardware does not support
+		 *     reselections to the initiator role at
+		 *     anything other than our_id, and our_id
+		 *     is used by the hardware to indicate the
+		 *     ID to use for both select-out and
+		 *     reselect-out operations, the only target
+		 *     ID we can support in this mode is our_id.
+		 *
+		 *   o The MULTARGID feature is not available and
+		 *     a previous target mode ID has been enabled.
+		 */
+		if ((ahc->features & AHC_MULTIROLE) != 0) {
 
-		if (ccb->ccb_h.target_id != our_id) {
 			if ((ahc->features & AHC_MULTI_TID) != 0
 		   	 && (ahc->flags & AHC_INITIATORROLE) != 0) {
 				/*
@@ -6499,12 +6904,16 @@ ahc_handle_en_lun(struct ahc_softc *ahc, struct cam_sim *sim, union ccb *ccb)
 				 */
 				status = CAM_TID_INVALID;
 			}
+		} else if ((ahc->features & AHC_MULTI_TID) == 0
+			&& ahc->enabled_luns > 0) {
+
+			status = CAM_TID_INVALID;
 		}
 	}
 
 	if (status != CAM_REQ_CMP) {
 		ccb->ccb_h.status = status;
- 		return;
+		return;
 	}
 
 	/*
@@ -6559,7 +6968,7 @@ ahc_handle_en_lun(struct ahc_softc *ahc, struct cam_sim *sim, union ccb *ccb)
 			return;
 		}
 
-		/*	
+		/*
 		 * Seems to be okay.
 		 * Setup our data structures.
 		 */
@@ -6780,7 +7189,7 @@ ahc_update_scsiid(struct ahc_softc *ahc, u_int targid_mask)
 		panic("ahc_update_scsiid called on non-multitid unit");
 
 	/*
-	 * Since we will rely on the the TARGID mask
+	 * Since we will rely on the TARGID mask
 	 * for selection enables, ensure that OID
 	 * in SCSIID is not set to some other ID
 	 * that we don't want to allow selections on.
@@ -6832,7 +7241,7 @@ ahc_run_tqinfifo(struct ahc_softc *ahc, int paused)
 			break;
 
 		cmd->cmd_valid = 0;
-		ahc_dmamap_sync(ahc, ahc->shared_data_dmat,
+		ahc_dmamap_sync(ahc, ahc->parent_dmat/*shared_data_dmat*/,
 				ahc->shared_data_dmamap,
 				ahc_targetcmd_offset(ahc, ahc->tqinfifonext),
 				sizeof(struct target_cmd),
@@ -6896,6 +7305,8 @@ ahc_handle_target_cmd(struct ahc_softc *ahc, struct target_cmd *cmd)
 		/*
 		 * Wait for more ATIOs from the peripheral driver for this lun.
 		 */
+		if (bootverbose)
+			printf("%s: ATIOs exhausted\n", ahc_name(ahc));
 		return (1);
 	} else
 		ahc->flags &= ~AHC_TQINFIFO_BLOCKED;
@@ -6973,5 +7384,76 @@ ahc_handle_target_cmd(struct ahc_softc *ahc, struct target_cmd *cmd)
 	xpt_done((union ccb*)atio);
 	return (0);
 }
-
 #endif
+
+static int
+ahc_createdmamem(bus_dma_tag_t tag, int size, int flags, bus_dmamap_t *mapp,
+    caddr_t *vaddr, bus_addr_t *baddr, bus_dma_segment_t *seg, int *nseg,
+    const char *myname, const char *what)
+{
+	int error, level = 0;
+
+	if ((error = bus_dmamem_alloc(tag, size, PAGE_SIZE, 0,
+				      seg, 1, nseg, BUS_DMA_NOWAIT)) != 0) {
+		printf("%s: failed to allocate DMA mem for %s, error = %d\n",
+			myname, what, error);
+		goto out;
+	}
+	level++;
+
+	if ((error = bus_dmamem_map(tag, seg, *nseg, size, vaddr,
+				    BUS_DMA_NOWAIT|BUS_DMA_COHERENT)) != 0) {
+		printf("%s: failed to map DMA mem for %s, error = %d\n",
+			myname, what, error);
+		goto out;
+	}
+	level++;
+
+	if ((error = bus_dmamap_create(tag, size, 1, size, 0,
+				       BUS_DMA_NOWAIT | flags, mapp)) != 0) {
+                printf("%s: failed to create DMA map for %s, error = %d\n",
+			myname, what, error);
+		goto out;
+        }
+	level++;
+
+
+	if ((error = bus_dmamap_load(tag, *mapp, *vaddr, size, NULL,
+				     BUS_DMA_NOWAIT)) != 0) {
+                printf("%s: failed to load DMA map for %s, error = %d\n",
+			myname, what, error);
+		goto out;
+        }
+
+	*baddr = (*mapp)->dm_segs[0].ds_addr;
+
+	return 0;
+out:
+	printf("ahc_createdmamem error (%d)\n", level);
+	switch (level) {
+	case 3:
+		bus_dmamap_destroy(tag, *mapp);
+		/* FALLTHROUGH */
+	case 2:
+		bus_dmamem_unmap(tag, *vaddr, size);
+		/* FALLTHROUGH */
+	case 1:
+		bus_dmamem_free(tag, seg, *nseg);
+		break;
+	default:
+		break;
+	}
+
+	return error;
+}
+
+static void
+ahc_freedmamem(bus_dma_tag_t tag, int size, bus_dmamap_t map, caddr_t vaddr,
+    bus_dma_segment_t *seg, int nseg)
+{
+
+	bus_dmamap_unload(tag, map);
+	bus_dmamap_destroy(tag, map);
+	bus_dmamem_unmap(tag, vaddr, size);
+	bus_dmamem_free(tag, seg, nseg);
+}

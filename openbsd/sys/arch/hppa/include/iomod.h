@@ -1,4 +1,4 @@
-/*	$OpenBSD: iomod.h,v 1.13 2003/03/29 01:00:49 mickey Exp $	*/
+/*	$OpenBSD: iomod.h,v 1.15 2004/01/05 09:53:40 jmc Exp $	*/
 
 /*
  * Copyright (c) 2000-2003 Michael Shalayeff
@@ -315,7 +315,7 @@ struct bpa {
 /*
  * All I/O and Memory modules have 4K-bytes of HPA space associated with
  * it (described above), however not all modules implement every register.
- * The first 2K-bytes of registers are "priviliged".
+ * The first 2K-bytes of registers are "privileged".
  *
  * (WO) == Write Only, (RO) == Read Only
  */
@@ -397,8 +397,8 @@ struct iomod {
 #define	IO_ERR_DPARITY_S 5	/* data parity (slave detect) */
 #define	IO_ERR_PROTO_M	 6	/* protocol error (master detect) */
 #define	IO_ERR_ADDRESS	 7	/* no slave acknowledgement in transaction */
-#define	IO_ERR_MORE	 8	/* device transfered more data than expected */
-#define	IO_ERR_LESS	 9	/* device transfered less data than expected */
+#define	IO_ERR_MORE	 8	/* device transferred more data than expected */
+#define	IO_ERR_LESS	 9	/* device transferred less data than expected */
 #define	IO_ERR_SAPARITY	10	/* slave addrss phase parity */
 #define	IO_ERR_MAPARITY	11	/* master address phase parity */
 #define	IO_ERR_MDPARITY	12	/* mode phase parity */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.30 2003/08/10 07:26:33 miod Exp $ */
+/*	$OpenBSD: param.h,v 1.34 2004/01/19 17:18:13 miod Exp $ */
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
  * Copyright (c) 1988 University of Utah.
@@ -51,8 +51,6 @@
 #define  _MACHINE_ARCH  m88k
 #define  MACHINE_ARCH   "m88k"
 #define  MID_MACHINE    MID_M88K
-/* Older value for MID_MACHINE */
-#define	OLD_MID_MACHINE	151
 
 /*
  * Round p (pointer or byte index) down to a correctly-aligned value
@@ -77,9 +75,8 @@
 #define NPTEPG		(PAGE_SIZE / (sizeof(pt_entry_t)))
 
 /*
- * 187 Bug uses the bottom 64k. We allocate ptes to map this into the
- * kernel. But when we link the kernel, we tell it to start linking
- * past this 64k.
+ * The Bug uses the bottom 64KB. The kernel will allocate PTEs to map this
+ * space, but the kernel must be linked with a start address past these 64KB.
  */
 #define KERNBASE	0x00000000	/* start of kernel virtual */
 #define	KERNTEXTOFF	0x00010000	/* start of kernel text */
@@ -92,18 +89,16 @@
 #define SSIZE		1		/* initial stack size/NBPG */
 #define SINCR		1		/* increment of stack/NBPG */
 
-#define UPAGES		8		/* pages of u-area */
+#define UPAGES		3		/* pages of u-area */
 #define USPACE		(UPAGES * NBPG)
 
-#define UADDR		0xEEE00000	/* address of u */
-#define UVPN		(UADDR>>PGSHIFT)	/* virtual page number of u */
-#define KERNELSTACK	(UADDR+UPAGES*NBPG)	/* top of kernel stack */
+#define UADDR		0xeee00000	/* address of u */
 
-#define PHYSIO_MAP_START	0xEEF00000
-#define PHYSIO_MAP_SIZE		0x00100000
-#define IOMAP_MAP_START		0xEF000000	/* VME etc */
-#define IOMAP_SIZE		0x018F0000
-#define NIOPMAP			32
+/*
+ * IO space
+ */
+
+#define	IOMAP_SIZE	0x01000000	/* roughly 0xff000000 - 0xffffffff */
 
 /*
  * Constants related to network buffer management.
@@ -160,7 +155,7 @@
 #include <machine/intr.h>
 
 #ifdef   _KERNEL
-extern int delay(int);
+extern void delay(int);
 #define  DELAY(x)             delay(x)
 
 extern int cputyp;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.93 2003/06/02 23:27:55 millert Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.98 2004/03/10 23:02:54 tom Exp $	*/
 /*	$NetBSD: machdep.c,v 1.85 1997/09/12 08:55:02 pk Exp $ */
 
 /*
@@ -52,7 +52,6 @@
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/file.h>
-#include <sys/clist.h>
 #include <sys/timeout.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -683,7 +682,9 @@ boot(howto)
 
 	/* If system is cold, just halt. */
 	if (cold) {
-		howto |= RB_HALT;
+		/* (Unless the user explicitly asked for reboot.) */
+		if ((howto & RB_USERREQ) == 0)
+			howto |= RB_HALT;
 		goto haltsys;
 	}
 
@@ -729,8 +730,9 @@ haltsys:
 #if NTCTRL > 0
 			tadpole_powerdown();
 #endif
-			printf("WARNING: powerdown failed!\n");
 #endif /* NPOWER || MTCTRL */
+			rominterpret("power-off");
+			printf("WARNING: powerdown failed!\n");
 		}
 #endif /* SUN4M */
 		printf("halted\n\n");
@@ -861,7 +863,7 @@ dumpsys()
 			blkno += btodb(NBPG);
 		}
 
-		printf("@%p:",maddr);
+		printf("@0x%x:", maddr);
 
 		for (; i < mp->len; i += n) {
 			n = mp->len - i;

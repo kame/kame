@@ -1,4 +1,4 @@
-/*      $OpenBSD: if_gre.h,v 1.6 2002/04/03 20:35:58 angelos Exp $ */
+/*      $OpenBSD: if_gre.h,v 1.9 2003/12/03 14:52:23 markus Exp $ */
 /*	$NetBSD: if_gre.h,v 1.5 1999/11/19 20:41:19 thorpej Exp $ */
 
 /*
@@ -42,6 +42,7 @@
 
 struct gre_softc {
 	struct ifnet sc_if;
+	LIST_ENTRY(gre_softc) sc_list;
 	int gre_unit;
 	int gre_flags;
 	struct    in_addr g_src;  /* source address of gre packets */
@@ -76,12 +77,12 @@ struct gre_h {
     struct gre_sre[] routing Routing fileds (see below)
                              Present if (rt_pres == 1)
 */
-} __attribute__((__packed__));
+} __packed;
 
 struct greip {
 	struct ip gi_i;
 	struct gre_h  gi_g;
-} __attribute__((__packed__));
+} __packed;
 
 #define gi_pr           gi_i.ip_p
 #define gi_len          gi_i.ip_len
@@ -101,7 +102,7 @@ struct greip {
  */
 
 struct gre_sre {
-	u_int16_t sre_family;	/* adress family */
+	u_int16_t sre_family;	/* address family */
 	u_char  sre_offset;	/* offset to first octet of active entry */
 	u_char  sre_length;	/* number of octets in the SRE. 
                                sre_lengthl==0 -> last entry. */
@@ -120,12 +121,12 @@ struct mobile_h {
 	u_int16_t hcrc;			/* header checksum */
 	u_int32_t odst;			/* original destination address */
 	u_int32_t osrc;			/* original source addr, if S-bit set */
-} __attribute__((__packed__));
+} __packed;
 
 struct mobip_h {
 	struct ip       mi;
 	struct mobile_h mh;
-} __attribute__((__packed__));
+} __packed;
 
 
 #define MOB_H_SIZ_S		(sizeof(struct mobile_h) - sizeof(u_int32_t))
@@ -138,8 +139,7 @@ struct mobip_h {
  */
 
 #ifdef _KERNEL
-extern	struct gre_softc *gre;
-extern	int ngre;
+extern  LIST_HEAD(gre_softc_head, gre_softc) gre_softc_list;
 extern  int gre_allow;   
 extern  int gre_wccp;
 extern  int ip_mobile_allow;

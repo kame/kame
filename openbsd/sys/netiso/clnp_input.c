@@ -1,4 +1,4 @@
-/*	$OpenBSD: clnp_input.c,v 1.5 2003/06/02 23:28:17 millert Exp $	*/
+/*	$OpenBSD: clnp_input.c,v 1.8 2004/01/03 14:08:54 espie Exp $	*/
 /*	$NetBSD: clnp_input.c,v 1.12 1996/04/13 01:34:26 cgd Exp $	*/
 
 /*-
@@ -86,7 +86,7 @@ SOFTWARE.
 #include <netiso/clnp_stat.h>
 #include <netiso/argo_debug.h>
 
-#include <machine/stdarg.h>
+#include <sys/stdarg.h>
 
 #ifdef ISO
 u_char          clnp_protox[ISOPROTO_MAX];
@@ -114,7 +114,7 @@ void            x25esis_input();
 void
 clnp_init()
 {
-	register struct protosw *pr;
+	struct protosw *pr;
 
 	/*
 	 * CLNP protox initialization
@@ -153,8 +153,8 @@ clnp_init()
 void
 clnlintr()
 {
-	register struct mbuf *m;/* ptr to first mbuf of pkt */
-	register struct clnl_fixed *clnl;	/* ptr to fixed part of clnl
+	struct mbuf *m;/* ptr to first mbuf of pkt */
+	struct clnl_fixed *clnl;	/* ptr to fixed part of clnl
 						 * hdr */
 	int             s;	/* save and restore priority */
 	struct clnl_protosw *clnlsw;	/* ptr to protocol switch */
@@ -176,7 +176,7 @@ next:
 		m_freem(m);
 		goto next;
 	} else {
-		register struct ifaddr *ifa;
+		struct ifaddr *ifa;
 		for (ifa = m->m_pkthdr.rcvif->if_addrlist.tqh_first; ifa != 0;
 		     ifa = ifa->ifa_list.tqe_next)
 			if (ifa->ifa_addr->sa_family == AF_ISO)
@@ -286,7 +286,7 @@ void
 clnp_input(struct mbuf *m, ...)
 {
 	struct snpa_hdr *shp;	/* subnetwork header */
-	register struct clnp_fixed *clnp;	/* ptr to fixed part of
+	struct clnp_fixed *clnp;	/* ptr to fixed part of
 						 * header */
 	struct sockaddr_iso source;	/* source address of pkt */
 	struct sockaddr_iso target;	/* destination address of pkt */
@@ -314,7 +314,7 @@ clnp_input(struct mbuf *m, ...)
 #ifdef ARGO_DEBUG
 	if (argo_debug[D_INPUT]) {
 		printf(
-		       "clnp_input: proccessing dg; First mbuf m_len %d, m_type x%x, %s\n",
+		       "clnp_input: processing dg; First mbuf m_len %d, m_type x%x, %s\n",
 		 m->m_len, m->m_type, IS_CLUSTER(m) ? "cluster" : "normal");
 	}
 #endif

@@ -1,4 +1,4 @@
-/*	$OpenBSD: siopreg.h,v 1.6 2003/02/11 19:20:27 mickey Exp $ */
+/*	$OpenBSD: siopreg.h,v 1.8 2003/11/16 20:30:06 avsm Exp $ */
 /*	$NetBSD: siopreg.h,v 1.13 2002/08/29 16:43:23 bouyer Exp $	*/
 
 /*
@@ -117,7 +117,7 @@ static const struct scf_period dt_scf_period[] __attribute__((__unused__)) = {
 #define SXFER_MO_SHIFT  0
 #define SXFER_MO_MASK  0x3f
 
-#define SIOP_SDID	0x06 /* SCSI destiation ID, R/W */
+#define SIOP_SDID	0x06 /* SCSI destination ID, R/W */
 #define SDID_ENCID_SHIFT 0
 #define SDID_ENCID_MASK	0x07
 
@@ -299,7 +299,7 @@ static const struct scf_period dt_scf_period[] __attribute__((__unused__)) = {
 #define SIST0_RST	0x02
 #define SIST0_PAR	0x01
 
-#define SIOP_SIST1	0x43 /* SCSI interrut status 1, RO */
+#define SIOP_SIST1	0x43 /* SCSI interrupt status 1, RO */
 #define SIST1_SBMC	0x10 /* 895 only */
 #define SIST1_STO	0x04
 #define SIST1_GEN	0x02
@@ -457,7 +457,7 @@ struct nvram_symbios {
 		u_int16_t	flags;
 #define	NVRAM_SYM_HOST_F_SCAN_AT_BOOT	0x0001
 		u_int16_t	io_port;	/* PCI I/O address */
-	} __attribute__((__packed__)) host[4];
+	} __packed host[4];
 
 	/* Targets (8 bytes x 16) */
 	struct nvram_symbios_target {
@@ -471,7 +471,7 @@ struct nvram_symbios {
 		u_int8_t	sync_offset;	/* 8, 16, etc. */
 		u_int16_t	sync_period;	/* 4 * factor */
 		u_int16_t	timeout;
-	} __attribute__((__packed__)) target[16];
+	} __packed target[16];
 
 	/* SCAM table (8 bytes x 4) */
 	struct nvram_symbios_scam {
@@ -488,11 +488,11 @@ struct nvram_symbios {
 #define	NVRAM_SYM_SCAM_ID_VALID		3
 		u_int8_t		target_id;
 		u_int8_t		rsvd;
-	} __attribute__((__packed__)) scam[4];
+	} __packed scam[4];
 
 	u_int8_t	spare_devices[15 * 8];
 	u_int8_t	trailer[6];	/* 0xfe 0xfe 0x00 0x00 0x00 0x00 */
-} __attribute__((__packed__));
+} __packed;
 
 #define	SIOP_NVRAM_TEK_SIZE		64
 #define	SIOP_NVRAM_TEK_93c46_ADDRESS	0
@@ -516,7 +516,7 @@ struct nvram_tekram {
 #define	NVRAM_TEK_TARG_F_WIDE_NEGO	0x20
 		u_int8_t	sync_index;
 		u_int16_t	word2;
-	} __attribute__((__packed__)) target[16];
+	} __packed target[16];
 	u_int8_t	host_id;
 	u_int8_t	flags;
 #define	NVRAM_TEK_F_MORE_THAN_2_DRIVES	0x01
@@ -531,4 +531,4 @@ struct nvram_tekram {
 	u_int16_t	flags1;
 #define	NVRAM_TEK_F_F2_F6_ENABLED	0x0001
 	u_int16_t	spare[29];
-} __attribute__((__packed__));
+} __packed;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ext2fs_vnops.c,v 1.30 2003/08/25 23:26:55 tedu Exp $	*/
+/*	$OpenBSD: ext2fs_vnops.c,v 1.33 2004/03/02 05:52:24 tedu Exp $	*/
 /*	$NetBSD: ext2fs_vnops.c,v 1.1 1997/06/11 09:34:09 bouyer Exp $	*/
 
 /*
@@ -1350,7 +1350,6 @@ ext2fs_reclaim(v)
     cache_purge(vp);
     if (ip->i_devvp) {
         vrele(ip->i_devvp);
-        ip->i_devvp = 0;
     }
 
 	FREE(vp->v_data, M_EXT2FSNODE);
@@ -1374,7 +1373,7 @@ struct vnodeopv_entry_desc ext2fs_vnodeop_entries[] = {
 	{ &vop_write_desc, ext2fs_write },		/* write */
 	{ &vop_lease_desc, ufs_lease_check },	/* lease */
 	{ &vop_ioctl_desc, ufs_ioctl },			/* ioctl */
-	{ &vop_select_desc, ufs_select },		/* select */
+	{ &vop_poll_desc, ufs_poll },		/* poll */
 	{ &vop_kqfilter_desc, vop_generic_kqfilter },	/* kqfilter */
 	{ &vop_fsync_desc, ext2fs_fsync },		/* fsync */
 	{ &vop_remove_desc, ext2fs_remove },	/* remove */
@@ -1435,7 +1434,7 @@ struct vnodeopv_entry_desc ext2fs_fifoop_entries[] = {
 	{ &vop_write_desc, ufsfifo_write },		/* write */
 	{ &vop_fsync_desc, ext2fs_fsync },		/* fsync */
 	{ &vop_inactive_desc, ext2fs_inactive },/* inactive */
-	{ &vop_reclaim_desc, ext2fs_reclaim },	/* reclaim */
+	{ &vop_reclaim_desc, ext2fsfifo_reclaim },	/* reclaim */
 	{ &vop_lock_desc, ufs_lock },			/* lock */
 	{ &vop_unlock_desc, ufs_unlock },		/* unlock */
 	{ &vop_print_desc, ufs_print },			/* print */
@@ -1445,4 +1444,11 @@ struct vnodeopv_entry_desc ext2fs_fifoop_entries[] = {
 };
 struct vnodeopv_desc ext2fs_fifoop_opv_desc =
 	{ &ext2fs_fifoop_p, ext2fs_fifoop_entries };
+
+int
+ext2fsfifo_reclaim(void *v)
+{
+	fifo_reclaim(v);
+	return (ext2fs_reclaim(v));
+}
 #endif /* FIFO */

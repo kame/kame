@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sl.c,v 1.21 2003/08/15 20:32:19 tedu Exp $	*/
+/*	$OpenBSD: if_sl.c,v 1.26 2003/12/16 20:33:25 markus Exp $	*/
 /*	$NetBSD: if_sl.c,v 1.39.4.1 1996/06/02 16:26:31 thorpej Exp $	*/
 
 /*
@@ -92,7 +92,7 @@
 #include <netinet/in_var.h>
 #include <netinet/ip.h>
 #else
-Huh? Slip without inet?
+#error Huh? Slip without inet?
 #endif
 
 #include <net/slcompress.h>
@@ -155,7 +155,7 @@ Huh? Slip without inet?
 #define	SLMTU		296
 #endif
 #if (SLMTU < 3)
-Huh?  SLMTU way too small.
+#error Huh?  SLMTU way too small.
 #endif
 #define	SLIP_HIWAT	roundup(50,CBSIZE)
 #if !(defined(__NetBSD__) || defined(__OpenBSD__))		/* XXX - cgd */
@@ -174,8 +174,6 @@ Huh?  SLMTU way too small.
 #define	ABT_COUNT	3	/* count of escapes for abort */
 #define	ABT_WINDOW	(ABT_COUNT*2+2)	/* in seconds - time to count */
 
-struct sl_softc *sl_softc;
-int nsl;
 
 #define FRAME_END	 	0xc0		/* Frame End */
 #define FRAME_ESCAPE		0xdb		/* Frame Esc */
@@ -185,6 +183,13 @@ int nsl;
 static int slinit(struct sl_softc *);
 static struct mbuf *sl_btom(struct sl_softc *, int);
 
+int	sl_clone_create(struct if_clone *, int);
+int	sl_clone_destroy(struct ifnet *);
+
+LIST_HEAD(, sl_softc) sl_softc_list;
+struct if_clone sl_cloner =
+    IF_CLONE_INITIALIZER("sl", sl_clone_create, sl_clone_destroy);
+
 /*
  * Called from boot code to establish sl interfaces.
  */
@@ -192,39 +197,74 @@ void
 slattach(n)
 	int n;
 {
-	register struct sl_softc *sc;
-	register int i = 0;
-	
-	sl_softc = malloc(n * sizeof(struct sl_softc), M_DEVBUF, M_NOWAIT);
-	if (!sl_softc)
-		return;
-	nsl = n;
-	bzero(sl_softc, n * sizeof(struct sl_softc));
-	for (sc = sl_softc; i < nsl; sc++) {
-		sc->sc_unit = i;		/* XXX */
-		snprintf(sc->sc_if.if_xname, sizeof sc->sc_if.if_xname,
-		    "sl%d", i++);
-		sc->sc_if.if_softc = sc;
-		sc->sc_if.if_mtu = SLMTU;
-		sc->sc_if.if_flags =
-		    IFF_POINTOPOINT | SC_AUTOCOMP | IFF_MULTICAST;
-		sc->sc_if.if_type = IFT_SLIP;
-		sc->sc_if.if_ioctl = slioctl;
-		sc->sc_if.if_output = sloutput;
-		IFQ_SET_MAXLEN(&sc->sc_if.if_snd, 50);
-		sc->sc_fastq.ifq_maxlen = 32;
-		IFQ_SET_READY(&sc->sc_if.if_snd);
-		if_attach(&sc->sc_if);
-		if_alloc_sadl(&sc->sc_if);
+	LIST_INIT(&sl_softc_list);
+	if_clone_attach(&sl_cloner);
+}
+
+int
+sl_clone_create(ifc, unit)
+	struct if_clone *ifc;
+	int unit;
+{
+	struct sl_softc *sc;
+	int s;
+
+	sc = malloc(sizeof(*sc), M_DEVBUF, M_NOWAIT);
+	if (!sc)
+		return (ENOMEM);
+	bzero(sc, sizeof(*sc));
+
+	sc->sc_unit = unit;	/* XXX */
+	snprintf(sc->sc_if.if_xname, sizeof sc->sc_if.if_xname, "%s%d",
+	    ifc->ifc_name, unit);
+	sc->sc_if.if_softc = sc;
+	sc->sc_if.if_mtu = SLMTU;
+	sc->sc_if.if_flags =
+	    IFF_POINTOPOINT | SC_AUTOCOMP | IFF_MULTICAST;
+	sc->sc_if.if_type = IFT_SLIP;
+	sc->sc_if.if_ioctl = slioctl;
+	sc->sc_if.if_output = sloutput;
+	IFQ_SET_MAXLEN(&sc->sc_if.if_snd, 50);
+	sc->sc_fastq.ifq_maxlen = 32;
+	IFQ_SET_READY(&sc->sc_if.if_snd);
+	if_attach(&sc->sc_if);
+	if_alloc_sadl(&sc->sc_if);
 #if NBPFILTER > 0
-		bpfattach(&sc->sc_bpf, &sc->sc_if, DLT_SLIP, SLIP_HDRLEN);
+	bpfattach(&sc->sc_bpf, &sc->sc_if, DLT_SLIP, SLIP_HDRLEN);
 #endif
-	}
+	s = splimp();
+	LIST_INSERT_HEAD(&sl_softc_list, sc, sc_list);
+	splx(s);
+
+	return (0);
+}
+
+int
+sl_clone_destroy(ifp)
+	struct ifnet *ifp;
+{
+	struct sl_softc *sc = ifp->if_softc;
+	int s;
+
+	if (sc->sc_ttyp != NULL)
+		return (EBUSY);
+
+	s = splimp();
+	LIST_REMOVE(sc, sc_list);
+	splx(s);
+
+#if NBPFILTER > 0
+	bpfdetach(ifp);
+#endif
+	if_detach(ifp);
+
+	free(sc, M_DEVBUF);
+	return (0);
 }
 
 static int
 slinit(sc)
-	register struct sl_softc *sc;
+	struct sl_softc *sc;
 {
 	if (sc->sc_ep == (u_char *) 0) {
 		MGETHDR(sc->sc_mbuf, M_WAIT, MT_DATA);
@@ -254,11 +294,11 @@ slinit(sc)
 int
 slopen(dev, tp)
 	dev_t dev;
-	register struct tty *tp;
+	struct tty *tp;
 {
 	struct proc *p = curproc;		/* XXX */
-	register struct sl_softc *sc;
-	int i, error, s;
+	struct sl_softc *sc;
+	int error, s;
 
 	if ((error = suser(p, 0)) != 0)
 		return (error);
@@ -266,7 +306,7 @@ slopen(dev, tp)
 	if (tp->t_line == SLIPDISC)
 		return (0);
 
-	for (i = nsl, sc = sl_softc; i--; sc++)
+	LIST_FOREACH(sc, &sl_softc_list, sc_list)
 		if (sc->sc_ttyp == NULL) {
 			if (slinit(sc) == 0)
 				return (ENOBUFS);
@@ -314,7 +354,7 @@ void
 slclose(tp)
 	struct tty *tp;
 {
-	register struct sl_softc *sc;
+	struct sl_softc *sc;
 	int s;
 
 	ttywflush(tp);
@@ -376,12 +416,12 @@ sltioctl(tp, cmd, data, flag)
 int
 sloutput(ifp, m, dst, rtp)
 	struct ifnet *ifp;
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct sockaddr *dst;
 	struct rtentry *rtp;
 {
-	register struct sl_softc *sc = ifp->if_softc;
-	register struct ip *ip;
+	struct sl_softc *sc = ifp->if_softc;
+	struct ip *ip;
 	int s, error;
 
 	/*
@@ -442,17 +482,17 @@ sloutput(ifp, m, dst, rtp)
  */
 void
 slstart(tp)
-	register struct tty *tp;
+	struct tty *tp;
 {
-	register struct sl_softc *sc = (struct sl_softc *)tp->t_sc;
-	register struct mbuf *m;
-	register u_char *cp;
-	register struct ip *ip;
+	struct sl_softc *sc = (struct sl_softc *)tp->t_sc;
+	struct mbuf *m;
+	u_char *cp;
+	struct ip *ip;
 	int s;
 	struct mbuf *m2;
 #if NBPFILTER > 0
 	u_char bpfbuf[SLMTU + SLIP_HDRLEN];
-	register int len = 0;
+	int len = 0;
 #endif
 #if !(defined(__NetBSD__) || defined(__OpenBSD__))	/* XXX - cgd */
 	extern int cfreecount;
@@ -515,12 +555,12 @@ slstart(tp)
 			 * and/or the copy should be negligible cost compared
 			 * to the packet transmission time).
 			 */
-			register struct mbuf *m1 = m;
-			register u_char *cp = bpfbuf + SLIP_HDRLEN;
+			struct mbuf *m1 = m;
+			u_char *cp = bpfbuf + SLIP_HDRLEN;
 
 			len = 0;
 			do {
-				register int mlen = m1->m_len;
+				int mlen = m1->m_len;
 
 				bcopy(mtod(m1, caddr_t), cp, mlen);
 				cp += mlen;
@@ -570,7 +610,7 @@ slstart(tp)
 		}
 
 		while (m) {
-			register u_char *ep;
+			u_char *ep;
 
 			cp = mtod(m, u_char *); ep = cp + m->m_len;
 			while (cp < ep) {
@@ -578,7 +618,7 @@ slstart(tp)
 				 * Find out how many bytes in the string we can
 				 * handle without doing something special.
 				 */
-				register u_char *bp = cp;
+				u_char *bp = cp;
 
 				while (cp < ep) {
 					switch (*cp++) {
@@ -647,8 +687,8 @@ slstart(tp)
  */
 static struct mbuf *
 sl_btom(sc, len)
-	register struct sl_softc *sc;
-	register int len;
+	struct sl_softc *sc;
+	int len;
 {
 	struct mbuf *m;
 
@@ -687,12 +727,12 @@ sl_btom(sc, len)
  */
 void
 slinput(c, tp)
-	register int c;
-	register struct tty *tp;
+	int c;
+	struct tty *tp;
 {
-	register struct sl_softc *sc;
-	register struct mbuf *m;
-	register int len;
+	struct sl_softc *sc;
+	struct mbuf *m;
+	int len;
 	int s;
 #if NBPFILTER > 0
 	u_char chdr[CHDR_LEN];
@@ -872,14 +912,14 @@ newpack:
  */
 int
 slioctl(ifp, cmd, data)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	u_long cmd;
 	caddr_t data;
 {
-	register struct sl_softc *sc = ifp->if_softc;
-	register struct ifaddr *ifa = (struct ifaddr *)data;
-	register struct ifreq *ifr;
-	register int s = splimp(), error = 0;
+	struct sl_softc *sc = ifp->if_softc;
+	struct ifaddr *ifa = (struct ifaddr *)data;
+	struct ifreq *ifr;
+	int s = splimp(), error = 0;
 	struct sl_stats *slsp;
 
 	switch (cmd) {

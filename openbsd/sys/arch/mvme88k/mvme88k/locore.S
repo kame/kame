@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.S,v 1.30 2003/08/20 20:33:47 miod Exp $	*/
+/*	$OpenBSD: locore.S,v 1.35 2004/01/01 01:11:10 miod Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -65,7 +65,7 @@
 #include <machine/m88100.h>
 #include <machine/psl.h>
 #include <machine/param.h>
-#include <machine/vmparam.h>	/* INTSTACK_SIZE */
+#include <machine/vmparam.h>
 
 /*
  * The memory looks like:
@@ -99,10 +99,15 @@ GLOBAL(doboot)
 	br	8f
 1:
 #endif	/* MVME188 */
-	or.u	r3,r0, 0xfff4
-	ld	r4,r3, 0x0060		/* read offset (LCSR +0x60) */
-	set	r4,r4,1<23>		/* set SYSRST bit - bit 23 */
-	st	r4,r3, 0x0060		/* and store it back  */
+	or.u	r3, r0, 0xfff4
+	ld	r4, r3, 0x0060		/* read offset (LCSR + 0x60) */
+	bb0.n	30, r4, 1f		/* if not SYSCON, don't SYSRST */
+	 set	r4, r4, 1<23>		/* set SYSRST bit - bit 23 */
+	st	r4, r3, 0x0060		/* and store it back  */
+1:
+	ld	r4, r3, 0x0104		/* try local reset, then */
+	set	r4, r4, 1<7>
+	st	r4, r3, 0x0104
 
 	/*
 	 * We will be here if the reset above failed. In this case,
@@ -128,7 +133,7 @@ GLOBAL(start_text)
 	/*
 	 * Args passed by boot loader
 	 * 	r2 howto
-	 *	r3 boot controler address
+	 *	r3 boot controller address
 	 *	r4 esym
 	 *	r5 start of mini
 	 *	r6 end miniroot
@@ -188,7 +193,7 @@ GLOBAL(start_text)
 	 *	shadow registers frozen
 	 *
 	 * The manual says not to disable interrupts and freeze shadowing
-	 * at the same time because interupts are not actually disabled
+	 * at the same time because interrupts are not actually disabled
 	 * until after the next instruction. Well, if an interrupt
 	 * occurs now, we're in deep   anyway, so I'm going to do
 	 * the two together.
@@ -386,7 +391,7 @@ ASLOCAL(slave_start)
 	 subu	r31, r31, 48    		/* allocate frame */
 
 	bsr	_C_LABEL(get_slave_stack)
-	addu	r31, r2, INTSTACK_SIZE + 4096
+	addu	r31, r2, INTSTACK_SIZE
 
 	/*
 	 * SR1 now contains our cpu number. We can now release the
@@ -430,7 +435,7 @@ ASLOCAL(inter_processor_lock)
 
 	.align 4096
 GLOBAL(intstack)
-	space (4 * NBPG)	/* 16K, just to be safe */
+	space (INTSTACK_SIZE)	/* 16K, just to be safe */
 ASGLOBAL(intstack_end)
 ASGLOBAL(slavestack)
 	space (NBPG)		/* 4K, small, interim stack */
@@ -505,13 +510,19 @@ GLOBAL(sigcode)			/* r31 points to sigframe */
 	ld	r2,  r31, 8	/* sigcontext* */
 	or	r13,  r0, SYS_sigreturn
 	tb0	0, r0, 128	/* syscall trap, calling sigreturn */
-	or	r0, r0, 0
-	or	r0, r0, 0
+	NOP			| failure return
+#if 0
+	NOP			| success return
+#endif
 	/* sigreturn will not return unless it fails */
 	or	r13, r0, SYS_exit
 	tb0	0, r0, 128	/* syscall trap, exit */
-	or	r0, r0, 0
-	or	r0, r0, 0
+	/*
+	 * this never returns, but we need to provide fetchable instructions
+	 * for the 88100 pipeline.
+	 */
+	NOP
+	NOP
 GLOBAL(esigcode)
 
 /* interrupt counters */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: spif.c,v 1.16 2003/08/15 20:32:14 tedu Exp $	*/
+/*	$OpenBSD: spif.c,v 1.18 2003/10/03 16:44:50 miod Exp $	*/
 
 /*
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
@@ -97,7 +97,7 @@ int	sbppread(dev_t, struct uio *, int);
 int	sbppwrite(dev_t, struct uio *, int);
 int	sbpp_rw(dev_t, struct uio *);
 int	spifppcintr(void *);
-int	sbppselect(dev_t, int, struct proc *);
+int	sbpppoll(dev_t, int, struct proc *);
 int	sbppioctl(dev_t, u_long, caddr_t, int, struct proc *);
 
 struct cfattach spif_ca = {
@@ -249,9 +249,6 @@ sttyattach(parent, dev, aux)
 		sc->sc_regs->dtrlatch[port] = 1;
 
 		tp = ttymalloc();
-		if (tp == NULL)
-			break;
-		tty_attach(tp);
 
 		tp->t_oproc = stty_start;
 		tp->t_param = stty_param;
@@ -1075,12 +1072,12 @@ sbpp_rw(dev, uio)
 }
 
 int
-sbppselect(dev, rw, p)
+sbpppoll(dev, events, p)
 	dev_t dev;
-	int rw;
+	int events;
 	struct proc *p;
 {
-	return (ENODEV);
+	return (seltrue(dev, events, p));
 }
 
 int

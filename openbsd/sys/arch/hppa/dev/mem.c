@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.20 2003/04/07 20:18:34 mickey Exp $	*/
+/*	$OpenBSD: mem.c,v 1.24 2004/03/20 18:50:36 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998-2002 Michael Shalayeff
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -100,10 +95,50 @@
 
 #define	VIPER_HPA	0xfffbf000
 
+/* registers on the PCXL2 MIOC */
+struct l2_mioc {
+	u_int32_t	pad[0x20];	/* 0x000 */
+	u_int32_t	mioc_control;	/* 0x080 MIOC control bits */
+	u_int32_t	mioc_status;	/* 0x084 MIOC status bits */
+	u_int32_t	pad1[6];	/* 0x088 */
+	u_int32_t	sltcv;		/* 0x0a0 L2 cache control */
+#define	SLTCV_AVWL	0x00002000	/* extra cycle for addr valid write low */
+#define	SLTCV_UP4COUT	0x00001000	/* update cache on CPU castouts */
+#define	SLTCV_EDCEN	0x08000000	/* enable error correction */
+#define	SLTCV_EDTAG	0x10000000	/* enable diagtag */
+#define	SLTCV_CHKTP	0x20000000	/* enable parity checking */
+#define	SLTCV_LOWPWR	0x40000000	/* low power mode */
+#define	SLTCV_ENABLE	0x80000000	/* enable L2 cache */
+#define	SLTCV_BITS	"\020\15avwl\16up4cout\24edcen\25edtag\26chktp\27lowpwr\30l2ena"
+	u_int32_t	tagmask;	/* 0x0a4 L2 cache tag mask */
+	u_int32_t	diagtag;	/* 0x0a8 L2 invalidates tag */
+	u_int32_t	sltestat;	/* 0x0ac L2 last logged tag read */
+	u_int32_t	slteadd;	/* 0x0b0 L2 pa of -- " -- */
+	u_int32_t	pad2[3];	/* 0x0b4 */
+	u_int32_t	mtcv;		/* 0x0c0 MIOC timings */
+	u_int32_t	ref;		/* 0x0cc MIOC refresh timings */
+	u_int32_t	pad3[4];	/* 0x0d0 */
+	u_int32_t	mderradd;	/* 0x0e0 addr of most evil mem error */
+	u_int32_t	pad4;		/* 0x0e4 */
+	u_int32_t	dmaerr;		/* 0x0e8 addr of most evil dma error */
+	u_int32_t	dioerr;		/* 0x0ec addr of most evil dio error */
+	u_int32_t	gsc_timeout;	/* 0x0f0 1-compl of GSC timeout delay */
+	u_int32_t	hidmamem;	/* 0x0f4 amount of phys mem installed */
+	u_int32_t	pad5[2];	/* 0x0f8 */
+	u_int32_t	memcomp[16];	/* 0x100 memory address comparators */
+	u_int32_t	memmask[16];	/* 0x140 masks for -- " -- */
+	u_int32_t	memtest;	/* 0x180 test address decoding */
+	u_int32_t	pad6[0xf];	/* 0x184 */
+	u_int32_t	outchk;		/* 0x1c0 address decoding output */
+	u_int32_t	pad7[0x168];	/* 0x200 */
+	u_int32_t	gsc15x_config;	/* 0x7a0 writev enable */
+};
+
 struct mem_softc {
 	struct device sc_dev;
 
 	volatile struct vi_trs *sc_vp;
+	volatile struct l2_mioc *sc_l2;
 };
 
 int	memmatch(struct device *, void *, void *);
@@ -156,7 +191,26 @@ memattach(parent, self, aux)
 		/* XXX other values seem to blow it up */
 		if (sc->sc_vp->vi_status.hw_rev == 0) {
 			u_int32_t vic;
-			int s;
+			int s, settimeout;
+
+			switch (cpu_hvers) {
+			case HPPA_BOARD_HP715_33:
+			case HPPA_BOARD_HP715S_33:
+			case HPPA_BOARD_HP715T_33:
+			case HPPA_BOARD_HP715_50:
+			case HPPA_BOARD_HP715S_50:
+			case HPPA_BOARD_HP715T_50:
+			case HPPA_BOARD_HP715_75:
+			case HPPA_BOARD_HP725_50:
+			case HPPA_BOARD_HP725_75:
+				settimeout = 1;
+				break;
+			default:
+				settimeout = 0;
+				break;
+			}
+			if (sc->sc_dev.dv_cfdata->cf_flags & 1)
+				settimeout = !settimeout;
 
 			printf(" viper rev %x,", sc->sc_vp->vi_status.hw_rev);
 #ifdef DEBUG
@@ -167,8 +221,14 @@ memattach(parent, self, aux)
 			vic &= ~VI_CTRL_CORE_DEN;
 			vic &= ~VI_CTRL_SGC0_DEN;
 			vic &= ~VI_CTRL_SGC1_DEN;
+			vic |=  VI_CTRL_EISA_DEN;
 			vic |=  VI_CTRL_CORE_PRF;
+
+			if (settimeout && (vic & VI_CTRL_VSC_TOUT) == 0)
+				vic |= (850 << 19);	/* clks */
+
 			sc->sc_vp->vi_control = vic;
+
 			__asm __volatile("stwas %1, 0(%0)"
 			    :: "r" (&VI_CTRL), "r" (vic) : "memory");
 			splx(s);
@@ -187,7 +247,23 @@ memattach(parent, self, aux)
 	printf(" size %d", pdc_minit.max_spa / (1024*1024));
 	if (pdc_minit.max_spa % (1024*1024))
 		printf(".%d", pdc_minit.max_spa % (1024*1024));
-	printf("MB\n");
+	printf("MB");
+
+	/* L2 cache controller is a part of the memory controller on PCXL2 */
+	if (cpu_type == hpcxl2) {
+		sc->sc_l2 = (struct l2_mioc *)ca->ca_hpa;
+#ifdef DEBUG
+		printf(", sltcv %b", sc->sc_l2->sltcv, SLTCV_BITS);
+#endif
+		/* sc->sc_l2->sltcv |= SLTCV_UP4COUT; */
+		if (sc->sc_l2->sltcv & SLTCV_ENABLE) {
+			u_int32_t tagmask = sc->sc_l2->tagmask >> 20;
+
+			printf(", %dMB L2 cache", tagmask + 1);
+		}
+	}
+
+	printf("\n");
 }
 
 void

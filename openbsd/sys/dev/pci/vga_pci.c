@@ -1,4 +1,4 @@
-/* $OpenBSD: vga_pci.c,v 1.14 2002/07/15 13:23:48 mickey Exp $ */
+/* $OpenBSD: vga_pci.c,v 1.16 2004/02/04 20:03:28 drahn Exp $ */
 /* $NetBSD: vga_pci.c,v 1.3 1998/06/08 06:55:58 thorpej Exp $ */
 
 /*-
@@ -176,8 +176,13 @@ vga_pci_match(parent, match, aux)
 	/*
 	 * If we might match, make sure that the card actually looks OK.
 	 */
+#ifdef MD_DISPLAY_ISA_IOT
+	if (!vga_common_probe(MD_DISPLAY_ISA_IOT, MD_DISPLAY_ISA_MEMT))
+		return (0);
+#else
 	if (!vga_common_probe(pa->pa_iot, pa->pa_memt))
 		return (0);
+#endif
 
 	return (1);
 }
@@ -187,7 +192,9 @@ vga_pci_attach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
 {
+#ifndef MD_DISPLAY_ISA_IOT
 	struct pci_attach_args *pa = aux;
+#endif
 #ifdef PCIAGP
 	struct vga_pci_softc *sc = (struct vga_pci_softc *)self;
 	const struct agp_product *ap;
@@ -252,8 +259,13 @@ vga_pci_attach(parent, self, aux)
 	}
 #endif
 	printf("\n");
+#ifdef MD_DISPLAY_ISA_IOT
+	vga_extended_attach(self, MD_DISPLAY_ISA_IOT, ppc_isa_membus_space,
+	    WSDISPLAY_TYPE_PCIVGA, vga_pci_mmap);
+#else
 	vga_common_attach(self, pa->pa_iot, pa->pa_memt,
 	    WSDISPLAY_TYPE_PCIVGA);
+#endif
 }
 
 paddr_t
@@ -272,6 +284,10 @@ vga_pci_mmap(void *v, off_t off, int prot)
 		return i386_btop(sc->sc_apaddr + off);
 #endif
 	}
+#endif
+#ifdef __pegasos__
+	/* XXX */
+		return off;
 #endif
 	return -1;
 }

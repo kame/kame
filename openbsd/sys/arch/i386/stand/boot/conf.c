@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.24 2003/09/11 17:39:33 deraadt Exp $	*/
+/*	$OpenBSD: conf.c,v 1.28 2004/03/19 13:48:19 tom Exp $	*/
 
 /*
  * Copyright (c) 1996 Michael Shalayeff
@@ -41,9 +41,28 @@
 #include <lib/libsa/unixdev.h>
 #include <biosdev.h>
 #include <dev/cons.h>
+#include "debug.h"
 
-const char version[] = "2.02";
+const char version[] = "2.06";
 int	debug = 1;
+
+
+void (*sa_cleanup)(void) = NULL;
+
+
+void (*i386_probe1[])(void) = {
+	ps2probe, gateA20on, debug_init, cninit,
+	apmprobe, pciprobe, /* smpprobe, */ memprobe
+};
+void (*i386_probe2[])(void) = {
+ 	diskprobe
+};
+
+struct i386_boot_probes probe_list[] = {
+	{ "probing", i386_probe1, NENTS(i386_probe1) },
+	{ "disk",    i386_probe2, NENTS(i386_probe2) }
+};
+int nibprobes = NENTS(probe_list);
 
 
 struct fs_ops file_system[] = {
@@ -93,4 +112,3 @@ struct consdev constab[] = {
 	{ NULL }
 };
 struct consdev *cn_tab = constab;
-

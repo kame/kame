@@ -1,4 +1,4 @@
-/*	$OpenBSD: dart.c,v 1.21 2003/08/21 21:48:23 miod Exp $	*/
+/*	$OpenBSD: dart.c,v 1.30 2004/02/11 20:41:07 miod Exp $	*/
 
 /*
  * Mach Operating System
@@ -42,6 +42,7 @@
 #include <machine/conf.h>
 #include <machine/cpu.h>
 #include <machine/cpu_number.h>
+#include <machine/locore.h>
 #include <machine/psl.h>
 
 #include <dev/cons.h>
@@ -49,7 +50,6 @@
 #include <mvme88k/dev/sysconreg.h>
 #include <mvme88k/dev/dartreg.h>
 
-#include "dart.h"
 #define spldart()	spltty()
 
 #ifdef	DDB
@@ -86,20 +86,19 @@ struct dartsoftc {
 int dartmatch(struct device *parent, void *self, void *aux);
 void dartattach(struct device *parent, struct device *self, void *aux);
 
-struct cfattach dart_ca = {       
+struct cfattach dart_ca = {
 	sizeof(struct dartsoftc), dartmatch, dartattach
-};      
-
-struct cfdriver dart_cd = {
-   NULL, "dart", DV_TTY, 0
 };
 
-int dart_cons = -1;
+struct cfdriver dart_cd = {
+	NULL, "dart", DV_TTY
+};
+
+/* console is on the first port */
+#define	CONS_PORT	A_PORT
+
 /* prototypes */
-int dartcnprobe(struct consdev *cp);
-int dartcninit(struct consdev *cp);
-int dartcngetc(dev_t dev);
-void dartcnputc(dev_t dev, char c);
+cons_decl(dart);
 int dart_speed(int);
 struct tty* darttty(dev_t);
 void dartstart(struct tty *);
@@ -154,14 +153,14 @@ dart_speed(speed)
 {
 	struct dart_s *ds = dart_speeds;
 	while (ds->kspeed != 0xFFFF) {
-		if (ds->kspeed == speed) 
+		if (ds->kspeed == speed)
 			return ds->dspeed;
 		ds++;
 	}
 	return NOBAUD;
 }
 
-struct tty* 
+struct tty*
 darttty(dev)
 	dev_t dev;
 {
@@ -169,7 +168,7 @@ darttty(dev)
 	struct dartsoftc *sc;
 
 	port = DART_PORT(dev);
-	if (dart_cd.cd_ndevs == 0 || port > NDARTPORTS)
+	if (dart_cd.cd_ndevs == 0 || port >= NDARTPORTS)
 		return (NULL);
 
 	sc = (struct dartsoftc *) dart_cd.cd_devs[0];
@@ -188,7 +187,7 @@ dartmatch(parent, vcf, args)
 	if (brdtyp != BRD_188) return (0);
 	ca->ca_vaddr = ca->ca_paddr; /* 1:1 */
 	addr = (union dartreg *)ca->ca_vaddr;
-	
+
 	if (badvaddr((vaddr_t)addr, 2)) {
 		printf("==> dart: failed address check.\n");
 		return (0);
@@ -218,7 +217,7 @@ dartattach(parent, self, aux)
 	sc->sc_dart[A_PORT].tty = NULL;
 	sc->sc_dart[B_PORT].tty = NULL;
 	ca->ca_vec = SYSCV_SCC;	/* hard coded vector */
-	sc->sc_vec = ca->ca_vec; 
+	sc->sc_vec = ca->ca_vec;
 
 	addr = sc->dart_reg;
 
@@ -238,10 +237,15 @@ dartattach(parent, self, aux)
 	/* Start out with Tx and RX interrupts disabled */
 	/* Enable input port change interrupt */
 	dart_sv_reg.sv_imr  = IIPCHG;
-	
-	if (dart_cons >= 0) {
-		printf(" console (tty%s) ", dart_cons == 0 ? "a" : "b");
-	}
+
+	/*
+	 * Although we are still running using the BUG routines,
+	 * this device will be elected as the console after
+	 * autoconf.
+	 * We do not even test since we know we are an MVME188 and
+	 * console is always on the first port.
+	 */
+	printf(": console");
 
 	dprintf(("\ndartattach: resetting port A\n"));
 
@@ -321,21 +325,21 @@ dartstart(tp)
 
 	dev = tp->t_dev;
 	port = DART_PORT(dev);
-	if (dart_cd.cd_ndevs == 0 || port > NDARTPORTS)
+	if (dart_cd.cd_ndevs == 0 || port >= NDARTPORTS)
 		return;
-	
+
 	sc = (struct dartsoftc *) dart_cd.cd_devs[0];
 	addr = sc->dart_reg;
 	ptaddr = sc->port_reg[port];
 
 	if ((tp->t_state & TS_ISOPEN) == 0)
 		return;
-	
+
 	s = spltty();
-	
+
 	if (tp->t_state & (TS_TIMEOUT |TS_BUSY | TS_TTSTOP))
 		goto bail;
-	
+
 	if (tp->t_outq.c_cc <= tp->t_lowat) {
 		if (tp->t_state & TS_ASLEEP) {
 			tp->t_state &= ~TS_ASLEEP;
@@ -351,7 +355,7 @@ dartstart(tp)
 
 	dprintf(("dartstart: dev(%d, %d)\n", major(dev), minor(dev)));
 
-	if (port != dart_cons)
+	if (port != CONS_PORT)
 		dprintf(("dartstart: ptaddr = 0x%08x from uart at 0x%08x\n",
 			 ptaddr, addr));
 
@@ -365,12 +369,12 @@ dartstart(tp)
 			c = getc(&tp->t_outq);
 			cc--;
 			if (tp->t_flags & CS8 || c <= 0177) {
-				if (port != dart_cons)
+				if (port != CONS_PORT)
 					dprintf(("dartstart: writing char \"%c\" (0x%02x) to port %d\n",
 						 c & 0xff, c & 0xff, port));
 				ptaddr->write.wr_tb = c & 0xff;
-				
-				if (port != dart_cons)
+
+				if (port != CONS_PORT)
 					dprintf(("dartstart: enabling Tx int\n"));
 				if (port == A_PORT)
 					dart_sv_reg.sv_imr = dart_sv_reg.sv_imr | ITXRDYA;
@@ -380,7 +384,7 @@ dartstart(tp)
 
 			} else {
 				tp->t_state &= ~TS_BUSY;
-				if (port != dart_cons)
+				if (port != CONS_PORT)
 					dprintf(("dartxint: timing out char \"%c\" (0x%02x)\n",
 					 c & 0xff, c % 0xff));
 				timeout_add(&tp->t_rstrt_to, 1);
@@ -443,12 +447,12 @@ dartmctl (dev, flags, how)
 	int newflags = 0;
 	struct dart_info *dart;
 	struct dartsoftc *sc;
-	int s; 
+	int s;
 
 	port = DART_PORT(dev);
-	if (dart_cd.cd_ndevs == 0 || port > NDARTPORTS)
+	if (dart_cd.cd_ndevs == 0 || port >= NDARTPORTS)
 		return (ENODEV);
-	
+
 	sc = (struct dartsoftc *) dart_cd.cd_devs[0];
 	dart = &sc->sc_dart[port];
 	addr = sc->dart_reg;
@@ -463,9 +467,9 @@ dartmctl (dev, flags, how)
 		dartbreak(port, 0);
 		flags &= ~TIOCCBRK;
 	}
-#endif 
+#endif
 	s = spltty();
-	
+
 	HANDLE_FLAG(TIOCM_DTR, port, OPDTRA, OPDTRB);
 	HANDLE_FLAG(TIOCM_RTS, port, OPRTSA, OPRTSB);
 
@@ -476,7 +480,7 @@ dartmctl (dev, flags, how)
 		       HOW2STR(how), flags, FLAGSTRING);
 		panic("dartmctl");
 	}
-#endif 
+#endif
 	dprintf(("dartmctl: action=%s flags=0x%x\n",
 		 HOW2STR(how), newflags));
 
@@ -527,7 +531,7 @@ dartbreak(dev, state)
 	addr = sc->dart_reg;
 
 	ptaddr = sc->port_reg[port];
-	
+
 	if (state == 1) {
 		/* the duart must be enabled with a dummy byte,
 		to prevent the transmitter empty interrupt */
@@ -540,7 +544,7 @@ dartbreak(dev, state)
 	return;
 }
 
-int 
+int
 dartioctl(dev, cmd, data, flag, p)
 	dev_t dev;
 	u_long cmd;
@@ -555,9 +559,9 @@ dartioctl(dev, cmd, data, flag, p)
 	struct dartsoftc *sc;
 
 	port = DART_PORT(dev);
-	if (dart_cd.cd_ndevs == 0 || port > NDARTPORTS)
+	if (dart_cd.cd_ndevs == 0 || port >= NDARTPORTS)
 		return (ENODEV);
-	
+
 	sc = (struct dartsoftc *) dart_cd.cd_devs[0];
 	dart = &sc->sc_dart[port];
 	tp = dart->tty;
@@ -605,17 +609,17 @@ dartioctl(dev, cmd, data, flag, p)
 /*		*(int *)data = dartmctl(dev, 0, DMGET);*/
 		break;
 	case TIOCGFLAGS:
-		if (dart_cons == port)
+		if (CONS_PORT == port)
 			dart->dart_swflags |= TIOCFLAG_SOFTCAR;
 		*(int *)data = dart->dart_swflags;
 		break;
 	case TIOCSFLAGS:
-		error = suser(p, 0); 
+		error = suser(p, 0);
 		if (error != 0)
-			return(EPERM); 
+			return(EPERM);
 
 		dart->dart_swflags = *(int *)data;
-		if (dart_cons == port)
+		if (CONS_PORT == port)
 			dart->dart_swflags |= TIOCFLAG_SOFTCAR;
 		dart->dart_swflags &= /* only allow valid flags */
 			(TIOCFLAG_SOFTCAR | TIOCFLAG_CLOCAL | TIOCFLAG_CRTSCTS);
@@ -630,7 +634,7 @@ dartioctl(dev, cmd, data, flag, p)
 /*
  * To be called at spltty - tty already locked.
  */
-int 
+int
 dartparam(tp, t)
 	struct tty *tp;
 	struct termios *t;
@@ -648,14 +652,14 @@ dartparam(tp, t)
 	dev = tp->t_dev;
 	dprintf(("dartparam: setting param for dev(%d, %d)\n", major(dev), minor(dev)));
 	port = DART_PORT(dev);
-	if (dart_cd.cd_ndevs == 0 || port > NDARTPORTS)
+	if (dart_cd.cd_ndevs == 0 || port >= NDARTPORTS)
 		return (ENODEV);
 
 	sc = (struct dartsoftc *) dart_cd.cd_devs[0];
 	dart = &sc->sc_dart[port];
 	addr = sc->dart_reg;
 	ptaddr = sc->port_reg[port];
-	
+
 	tp->t_ispeed = t->c_ispeed;
 	tp->t_ospeed = t->c_ospeed;
 	tp->t_cflag = t->c_cflag;
@@ -666,7 +670,7 @@ dartparam(tp, t)
 	/* disable Tx and Rx */
 	dprintf(("dartparam: disabling Tx and Rx int\n"));
 
-	if (dart_cons == port) {
+	if (CONS_PORT == port) {
 		dprintf(("dartparam: skipping console init\n"));
 	} else {
 		if (port == A_PORT)
@@ -809,7 +813,7 @@ dartmodemtrans(sc, ip, ipcr)
 	(void) ttymodem(tp, dcdstate);
 }
 
-int 
+int
 dartopen (dev, flag, mode, p)
 	dev_t dev;
 	int flag;
@@ -822,7 +826,7 @@ dartopen (dev, flag, mode, p)
 	struct tty *tp;
 
 	port = DART_PORT(dev);
-	if (dart_cd.cd_ndevs == 0 || port > NDARTPORTS)
+	if (dart_cd.cd_ndevs == 0 || port >= NDARTPORTS)
 		return (ENODEV);
 
 	sc = (struct dartsoftc *) dart_cd.cd_devs[0]; /* the only one */
@@ -848,7 +852,7 @@ dartopen (dev, flag, mode, p)
 		tp->t_lflag = TTYDEF_LFLAG;
 		tp->t_ispeed = tp->t_ospeed = B9600;
 		dartparam(tp, &tp->t_termios);
-		if (port == dart_cons) {
+		if (port == CONS_PORT) {
 			/* console is 8N1 */
 			tp->t_cflag = (CREAD | CS8 | HUPCL);
 		} else {
@@ -872,7 +876,7 @@ dartopen (dev, flag, mode, p)
 	return ((*linesw[tp->t_line].l_open)(dev, tp));
 }
 
-int 
+int
 dartclose (dev, flag, mode, p)
 	dev_t dev;
 	int flag;
@@ -885,19 +889,19 @@ dartclose (dev, flag, mode, p)
 	int port;
 
 	port = DART_PORT(dev);
-	if (dart_cd.cd_ndevs == 0 || port > NDARTPORTS)
+	if (dart_cd.cd_ndevs == 0 || port >= NDARTPORTS)
 		return (ENODEV);
-	
+
 	sc = (struct dartsoftc *) dart_cd.cd_devs[0];
 	dart = &sc->sc_dart[port];
 	tp = dart->tty;
 	(*linesw[tp->t_line].l_close)(tp, flag);
 	ttyclose(tp);
-	
+
 	return 0;
 }
 
-int 
+int
 dartread (dev, uio, flag)
 	dev_t dev;
 	struct uio *uio;
@@ -909,9 +913,9 @@ dartread (dev, uio, flag)
 	struct dartsoftc *sc;
 
 	port = DART_PORT(dev);
-	if (dart_cd.cd_ndevs == 0 || port > NDARTPORTS)
+	if (dart_cd.cd_ndevs == 0 || port >= NDARTPORTS)
 		return (ENODEV);
-	
+
 	sc = (struct dartsoftc *) dart_cd.cd_devs[0];
 	dart = &sc->sc_dart[port];
 	tp = dart->tty;
@@ -921,7 +925,7 @@ dartread (dev, uio, flag)
 	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
 }
 
-int 
+int
 dartwrite(dev, uio, flag)
 	dev_t dev;
 	struct uio *uio;
@@ -933,9 +937,9 @@ dartwrite(dev, uio, flag)
 	struct dartsoftc *sc;
 
 	port = DART_PORT(dev);
-	if (dart_cd.cd_ndevs == 0 || port > NDARTPORTS)
+	if (dart_cd.cd_ndevs == 0 || port >= NDARTPORTS)
 		return (ENODEV);
-	
+
 	sc = (struct dartsoftc *)dart_cd.cd_devs[0];
 	dart = &sc->sc_dart[port];
 
@@ -977,7 +981,7 @@ dartrint(sc, port)
 		dprintf(("dartrint: read char \"%c\" (0x%02x) tp = 0x%x\n",
 			 data, data, tp));
 
-		if ((tp->t_state & (TS_ISOPEN|TS_WOPEN)) == 0 && dart_cons != port) {
+		if ((tp->t_state & (TS_ISOPEN|TS_WOPEN)) == 0 && CONS_PORT != port) {
 			return;
 		}
 
@@ -1022,7 +1026,7 @@ dartrint(sc, port)
 						data &= 0177; /* CS7 */
 					ttyinput(data, tp);
 				}
-#endif 
+#endif
 			}
 		}
 	}
@@ -1092,9 +1096,8 @@ dartintr(arg)
 	addr = sc->dart_reg;
 
 	isr = addr->read.rd_isr;
-	
 	isr &= dart_sv_reg.sv_imr;
-	
+
 	if (isr) {     /* interrupt from this duart */
 		if (isr & IIPCHG) {
 			unsigned int ip = addr->read.rd_ip;
@@ -1142,16 +1145,17 @@ dartintr(arg)
  * supported.
  */
 
-int
+void
 dartcnprobe(cp)
 	struct consdev *cp;
 {
 	int maj;
 
-	if (brdtyp != BRD_188) {
+	if (brdtyp != BRD_188 || badaddr(DART_BASE, 2) != 0) {
 		cp->cn_pri = CN_DEAD;
-		return 0;
+		return;
 	}
+
 	/* locate the major number */
 	for (maj = 0; maj < nchrdev; maj++)
 		if (cdevsw[maj].d_open == dartopen)
@@ -1159,15 +1163,12 @@ dartcnprobe(cp)
 
 	cp->cn_dev = makedev(maj, 0);
 	cp->cn_pri = CN_NORMAL;
-	return (1);
 }
 
-int
+void
 dartcninit(cp)
 	struct consdev *cp;
 {
-	dart_cons = A_PORT;
-	return 0;
 }
 
 void
@@ -1191,13 +1192,13 @@ dartcnputc(dev, c)
 	ptaddr = (union dart_pt_io *) addr + (port * 0x20);
 #else
 	ptaddr = (union dart_pt_io *) addr + ((dev & 1) ? 1 : 0);
-#endif 
+#endif
 
 #if 1
 	s = spltty();
-#else 
+#else
 	psr = disable_interrupts_return_psr();
-#endif 
+#endif
 
 	/* Assume first port initialized if we get here. */
 	/* Assume the bug initializes the port */
@@ -1223,9 +1224,9 @@ dartcnputc(dev, c)
 
 #if 1
 	splx(s);
-#else 
+#else
 	set_psr(psr);
-#endif 
+#endif
 }
 
 int
@@ -1255,7 +1256,7 @@ dartcngetc(dev)
 	ptaddr = (union dart_pt_io *) addr + (port * 0x20);
 #else
 	ptaddr = (union dart_pt_io *) addr + ((dev & 1) ? 1 : 0);
-#endif 
+#endif
 	/* enable receiver */
 	ptaddr->write.wr_cr = RXEN;
 
@@ -1276,9 +1277,9 @@ dartcngetc(dev)
 				ptaddr->write.wr_cr = ERRRESET;
 #if 1
 				splx(s);
-#else 
+#else
 				set_psr(psr);
-#endif 
+#endif
 				return c;
 			}
 
@@ -1291,17 +1292,17 @@ dartcngetc(dev)
 				buf[5] = (char) c;
 #if 1
 				splx(s);
-#else 
+#else
 				set_psr(psr);
-#endif 
+#endif
 				return (c & 0x7f);
 			}
 		}
 	} while (-1);
 #if 1
 	splx(s);
-#else 
+#else
 	set_psr(psr);
-#endif 
+#endif
 	return -1;
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: raw_usrreq.c,v 1.7 2003/06/02 23:28:12 millert Exp $	*/
+/*	$OpenBSD: raw_usrreq.c,v 1.10 2004/01/03 14:08:53 espie Exp $	*/
 /*	$NetBSD: raw_usrreq.c,v 1.11 1996/02/13 22:00:43 christos Exp $	*/
 
 /*
@@ -46,7 +46,7 @@
 #include <net/netisr.h>
 #include <net/raw_cb.h>
 
-#include <machine/stdarg.h>
+#include <sys/stdarg.h>
 /*
  * Initialize raw connection block q.
  */
@@ -69,12 +69,12 @@ raw_init()
 void
 raw_input(struct mbuf *m0, ...)
 {
-	register struct rawcb *rp;
-	register struct mbuf *m = m0;
-	register int sockets = 0;
+	struct rawcb *rp;
+	struct mbuf *m = m0;
+	int sockets = 0;
 	struct socket *last;
 	va_list ap;
-	register struct sockproto *proto;
+	struct sockproto *proto;
 	struct sockaddr *src, *dst;
 	
 	va_start(ap, m0);
@@ -139,7 +139,7 @@ raw_ctlinput(cmd, arg, d)
 	void *d;
 {
 
-	if (cmd < 0 || cmd > PRC_NCMDS)
+	if (cmd < 0 || cmd >= PRC_NCMDS)
 		return NULL;
 	return NULL;
 	/* INCOMPLETE */
@@ -152,8 +152,8 @@ raw_usrreq(so, req, m, nam, control)
 	int req;
 	struct mbuf *m, *nam, *control;
 {
-	register struct rawcb *rp = sotorawcb(so);
-	register int error = 0;
+	struct rawcb *rp = sotorawcb(so);
+	int error = 0;
 	int len;
 
 	if (req == PRU_CONTROL)

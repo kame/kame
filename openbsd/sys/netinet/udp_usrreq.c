@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_usrreq.c,v 1.91 2003/07/09 22:03:16 itojun Exp $	*/
+/*	$OpenBSD: udp_usrreq.c,v 1.99 2004/03/21 20:58:10 markus Exp $	*/
 /*	$NetBSD: udp_usrreq.c,v 1.28 1996/03/16 23:54:03 christos Exp $	*/
 
 /*
@@ -89,6 +89,11 @@
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 
+#ifdef IPSEC
+#include <netinet/ip_ipsp.h>
+#include <netinet/ip_esp.h>
+#endif
+
 #ifdef INET6
 #ifndef INET
 #include <netinet/in.h>
@@ -103,6 +108,12 @@ extern int ip6_defhlim;
  * Per RFC 768, August, 1980.
  */
 int	udpcksum = 1;
+
+u_int	udp_sendspace = 9216;		/* really max datagram size */
+u_int	udp_recvspace = 40 * (1024 + sizeof(struct sockaddr_in));
+					/* 40 1K datagrams */
+
+int *udpctl_vars[UDPCTL_MAXID] = UDPCTL_VARS;
 
 struct	inpcbtable udbtable;
 struct	udpstat udpstat;
@@ -151,9 +162,9 @@ udp6_input(mp, offp, proto)
 void
 udp_input(struct mbuf *m, ...)
 {
-	register struct ip *ip;
-	register struct udphdr *uh;
-	register struct inpcb *inp;
+	struct ip *ip;
+	struct udphdr *uh;
+	struct inpcb *inp;
 	struct mbuf *opts = 0;
 	struct ip save_ip;
 	int iphlen, len;
@@ -282,12 +293,8 @@ udp_input(struct mbuf *m, ...)
 				return;
 			}
 
-			bzero(((struct ipovly *)ip)->ih_x1,
-			    sizeof ((struct ipovly *)ip)->ih_x1);
-			((struct ipovly *)ip)->ih_len = uh->uh_ulen;
-
-			if ((uh->uh_sum = in_cksum(m, len +
-			    sizeof (struct ip))) != 0) {
+			if ((uh->uh_sum = in4_cksum(m, IPPROTO_UDP,
+			    iphlen, len))) {
 				udpstat.udps_badsum++;
 				m_freem(m);
 				return;
@@ -298,6 +305,42 @@ udp_input(struct mbuf *m, ...)
 		}
 	} else
 		udpstat.udps_nosum++;
+
+#ifdef IPSEC
+	if (udpencap_enable && udpencap_port &&
+	    uh->uh_dport == htons(udpencap_port)) {
+		u_int32_t spi;
+		int skip = iphlen + sizeof(struct udphdr);
+
+		if (m->m_pkthdr.len - skip < sizeof(u_int32_t)) {
+			/* packet too short */
+			m_freem(m);
+			return;
+		}
+		m_copydata(m, skip, sizeof(u_int32_t), (caddr_t) &spi);
+		/*
+		 * decapsulate if the SPI is not zero, otherwise pass
+		 * to userland
+		 */
+		if (spi != 0) {
+			if ((m = m_pullup2(m, skip)) == NULL) {
+				udpstat.udps_hdrops++;
+				return;
+			}
+
+			/* remove the UDP header */
+			bcopy(mtod(m, u_char *),
+			    mtod(m, u_char *) + sizeof(struct udphdr), iphlen);
+			m_adj(m, sizeof(struct udphdr));
+			skip -= sizeof(struct udphdr);
+
+			espstat.esps_udpencin++;
+			ipsec_common_input(m, skip, offsetof(struct ip, ip_p),
+			    srcsa.sa.sa_family, IPPROTO_ESP, 1);
+			return;
+		}
+	}
+#endif
 
 	switch (srcsa.sa.sa_family) {
 	case AF_INET:
@@ -369,9 +412,7 @@ udp_input(struct mbuf *m, ...)
 		 * (Algorithm copied from raw_intr().)
 		 */
 		last = NULL;
-		for (inp = udbtable.inpt_queue.cqh_first;
-		    inp != (struct inpcb *)&udbtable.inpt_queue;
-		    inp = inp->inp_queue.cqe_next) {
+		CIRCLEQ_FOREACH(inp, &udbtable.inpt_queue, inp_queue) {
 #ifdef INET6
 			/* don't accept it if AF does not match */
 			if (ip6 && !(inp->inp_flags & INP_IPV6))
@@ -483,14 +524,14 @@ udp_input(struct mbuf *m, ...)
 		++udpstat.udps_pcbhashmiss;
 #ifdef INET6
 		if (ip6) {
-			inp = in_pcblookup(&udbtable,
-			    (struct in_addr *)&(ip6->ip6_src),
-			    uh->uh_sport, (struct in_addr *)&(ip6->ip6_dst),
-			    uh->uh_dport, INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
+			inp = in6_pcblookup_listen(&udbtable,
+			    &ip6->ip6_dst, uh->uh_dport, m_tag_find(m,
+			    PACKET_TAG_PF_TRANSLATE_LOCALHOST, NULL) != NULL);
 		} else
 #endif /* INET6 */
-		inp = in_pcblookup(&udbtable, &ip->ip_src, uh->uh_sport,
-		    &ip->ip_dst, uh->uh_dport, INPLOOKUP_WILDCARD);
+		inp = in_pcblookup_listen(&udbtable,
+		    ip->ip_dst, uh->uh_dport, m_tag_find(m,
+		    PACKET_TAG_PF_TRANSLATE_LOCALHOST, NULL) != NULL);
 		if (inp == 0) {
 			udpstat.udps_noport++;
 			if (m->m_flags & (M_BCAST | M_MCAST)) {
@@ -619,10 +660,10 @@ bad:
 struct mbuf *
 udp_saveopt(p, size, type)
 	caddr_t p;
-	register int size;
+	int size;
 	int type;
 {
-	register struct cmsghdr *cp;
+	struct cmsghdr *cp;
 	struct mbuf *m;
 
 	if ((m = m_get(M_DONTWAIT, MT_CONTROL)) == NULL)
@@ -643,7 +684,7 @@ udp_saveopt(p, size, type)
  */
 static void
 udp_notify(inp, errno)
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	int errno;
 {
 	inp->inp_socket->so_error = errno;
@@ -660,12 +701,11 @@ udp6_ctlinput(cmd, sa, d)
 {
 	struct udphdr uh;
 	struct sockaddr_in6 sa6;
-	register struct ip6_hdr *ip6;
+	struct ip6_hdr *ip6;
 	struct mbuf *m;
 	int off;
 	void *cmdarg;
 	struct ip6ctlparam *ip6cp = NULL;
-	struct in6_addr finaldst;
 	struct udp_portonly {
 		u_int16_t uh_sport;
 		u_int16_t uh_dport;
@@ -770,12 +810,8 @@ udp6_ctlinput(cmd, sa, d)
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (in6_pcbhashlookup(&udbtable, &finaldst,
+			if (in6_pcbhashlookup(&udbtable, &sa6.sin6_addr,
 			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport))
-				valid = 1;
-			else if (in_pcblookup(&udbtable, &sa6.sin6_addr,
-			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport,
-			    INPLOOKUP_IPV6))
 				valid = 1;
 #if 0
 			/*
@@ -785,9 +821,8 @@ udp6_ctlinput(cmd, sa, d)
 			 * We should at least check if the local address (= s)
 			 * is really ours.
 			 */
-			else if (in_pcblookup(&udbtable, &sa6.sin6_addr,
-			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport,
-			    INPLOOKUP_WILDCARD | INPLOOKUP_IPV6))
+			else if (in6_pcblookup_listen(&udbtable,
+			    &sa6_src.sin6_addr, uh.uh_sport, 0);
 				valid = 1;
 #endif
 
@@ -825,8 +860,8 @@ udp_ctlinput(cmd, sa, v)
 	struct sockaddr *sa;
 	void *v;
 {
-	register struct ip *ip = v;
-	register struct udphdr *uhp;
+	struct ip *ip = v;
+	struct udphdr *uhp;
 	extern int inetctlerrmap[];
 	void (*notify)(struct inpcb *, int) = udp_notify;
 	int errno;
@@ -848,7 +883,7 @@ udp_ctlinput(cmd, sa, v)
 		return NULL;
 	if (ip) {
 		uhp = (struct udphdr *)((caddr_t)ip + (ip->ip_hl << 2));
-		in_pcbnotify(&udbtable, sa, uhp->uh_dport, ip->ip_src,
+		(void) in_pcbnotify(&udbtable, sa, uhp->uh_dport, ip->ip_src,
 		    uhp->uh_sport, errno, notify);
 	} else
 		in_pcbnotifyall(&udbtable, sa, errno, notify);
@@ -858,10 +893,10 @@ udp_ctlinput(cmd, sa, v)
 int
 udp_output(struct mbuf *m, ...)
 {
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	struct mbuf *addr, *control;
-	register struct udpiphdr *ui;
-	register int len = m->m_pkthdr.len;
+	struct udpiphdr *ui;
+	int len = m->m_pkthdr.len;
 	struct in_addr laddr;
 	int s = 0, error = 0;
 	va_list ap;
@@ -975,10 +1010,6 @@ release:
 		m_freem(control);
 	return (error);
 }
-
-u_int	udp_sendspace = 9216;		/* really max datagram size */
-u_int	udp_recvspace = 40 * (1024 + sizeof(struct sockaddr_in));
-					/* 40 1K datagrams */
 
 #ifdef INET6
 /*ARGSUSED*/
@@ -1228,16 +1259,13 @@ udp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return (ENOTDIR);
 
 	switch (name[0]) {
-	case UDPCTL_CHECKSUM:
-		return (sysctl_int(oldp, oldlenp, newp, newlen, &udpcksum));
 	case UDPCTL_BADDYNAMIC:
 		return (sysctl_struct(oldp, oldlenp, newp, newlen,
 		    baddynamicports.udp, sizeof(baddynamicports.udp)));
-	case UDPCTL_RECVSPACE:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,&udp_recvspace));
-	case UDPCTL_SENDSPACE:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,&udp_sendspace));
 	default:
+		if (name[0] < UDPCTL_MAXID)
+			return (sysctl_int_arr(udpctl_vars, name, namelen,
+			    oldp, oldlenp, newp, newlen));
 		return (ENOPROTOOPT);
 	}
 	/* NOTREACHED */

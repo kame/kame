@@ -1,9 +1,9 @@
-/*	$OpenBSD: vxreg.h,v 1.2 2001/01/14 20:25:23 smurph Exp $ */
+/*	$OpenBSD: vxreg.h,v 1.6 2003/12/27 21:58:20 miod Exp $ */
 
 /*
  * Copyright (c) 1999 Steve Murphree, Jr. All rights reserved.
  *
- *   
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -28,7 +28,7 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */  
+ */
 
 /* IPC - Intelligent Peripheral Controller */
 
@@ -36,19 +36,15 @@ struct vxreg {
 /*0x0*/volatile u_short ipc_addrh;	 /* IPC addr reg, most significant */
 /*0x2*/volatile u_short ipc_addrl;	 /* IPC addr reg, least significant */
 /*0x4*/volatile u_char  ipc_amr;	  /* IPC address modifier reg */
-/*0x5*/volatile u_char  unused1;   
-/*0x6*/volatile u_short ipc_cr;	 /* IPC control ceg */
+/*0x5*/volatile u_char  unused1;
+/*0x6*/volatile u_short ipc_cr;	 /* IPC control reg */
 /*0x8*/volatile u_short ipc_sr;	 /* IPC status reg */
 /*0xA*/volatile u_char  ipc_mdbp;	/* IPC model data byte pointer */
-/*0xB*/volatile u_char  reserved3;   
+/*0xB*/volatile u_char  reserved3;
 /*0xC*/volatile u_char  ipc_avrp;	/* IPC abort vector reg pointer */
-/*0xD*/volatile u_char  unused2;   
+/*0xD*/volatile u_char  unused2;
 /*0xE*/volatile u_short ipc_tas;		 /* IPC test and set reg */
 };
-
-#define NOWAIT                0
-#define WAIT                  1
-#define WAIT_POLL             2
 
 #define IPC_CR_SYSFI          0x1000   /* inhibit sysfail */
 #define IPC_CR_ATTEN          0x2000   /* attention bit */
@@ -76,7 +72,7 @@ struct vxreg {
 #define CMD_IOCTL             0x0004
 #define CMD_CLOSE             0x0005
 #define CMD_EVENT             0x0006
-#define CMD_PROCCESED         0x00FF
+#define CMD_PROCESSED         0x00FF
 
 #define IOCTL_LDOPEN          0x4400
 #define IOCTL_LDCLOSE         0x4401
@@ -259,18 +255,22 @@ struct packet {      /* 68 bytes */
 	volatile short   command;
 	volatile char    filler1[1];
 	volatile char    command_dependent;
-	volatile char    filler2[2];
+	volatile char    filler2[1];
+	volatile char	 interrupt_level;	/* init only */
 	volatile u_char  device_number;
 	volatile char    filler3[1];
 	volatile short   ioctl_cmd_h;
 	volatile short   ioctl_cmd_l;
+#define	init_info_ptr_h	ioctl_cmd_h
+#define	init_info_ptr_l	ioctl_cmd_l
 	volatile short   ioctl_arg_h;
 	volatile short   ioctl_arg_l;
 	volatile short   ioctl_mode_h;
 	volatile short   ioctl_mode_l;
+#define	interrupt_vec	ioctl_mode_l
 	volatile char    filler4[6];
-	volatile short   error_h;   
-	volatile short   error_l;   
+	volatile short   error_h;
+	volatile short   error_l;
 	volatile short   event_code;
 	volatile char    filler5[6];
 	union {
@@ -279,40 +279,9 @@ struct packet {      /* 68 bytes */
 		struct  vx_sgttyb  sgt;
 		struct  dl_info dl;
 		long    param;
-	} parameter_block;
+	} pb;
 	short   reserved;    /* for alignment */
 } packet;
-
-struct ioctl_a_packet {      /* 68 bytes */
-	volatile u_long  link;       /* was eyecatcher */
-	volatile u_char  command_pipe_number;
-	volatile u_char  status_pipe_number;
-	volatile char    filler0[4];
-	volatile short   command;
-	volatile char    filler1[1];
-	volatile char    command_dependent;
-	volatile char    filler2[2];
-	volatile u_char  device_number;
-	volatile char    filler3[1];
-	volatile short   ioctl_cmd_h;
-	volatile short   ioctl_cmd_l;
-	volatile short   ioctl_arg_h;
-	volatile short   ioctl_arg_l;
-	volatile short   ioctl_mode_h;
-	volatile short   ioctl_mode_l;
-	volatile char    filler4[6];
-	volatile short   error_h;   
-	volatile short   error_l;   
-	volatile short   event_code;
-	volatile char    filler5[6];
-	volatile unsigned short c_iflag;
-	volatile unsigned short c_oflag;
-	volatile unsigned short c_cflag;
-	volatile unsigned short c_lflag;
-	volatile char           c_line;
-	volatile unsigned char  c_cc[VNCC];
-	short   reserved;    /* for alignment */
-};
 
 struct envelope {	      /* 12 bytes */
 	volatile u_long          link;
@@ -379,35 +348,7 @@ struct init_info {      /* 88 bytes */
 	volatile char           init_data[56];
 };
 
-struct init_packet {
-	volatile char              eye_catcher[4];
-	volatile unsigned char     command_pipe_number;
-	volatile unsigned char     status_pipe_number;
-	volatile char              filler_0[4];
-	volatile short             command;
-	volatile char              filler_1[3];
-	volatile char              interrupt_level;
-	volatile char              filler_2[2];
-	volatile short             init_info_ptr_h;
-	volatile short             init_info_ptr_l;
-	volatile char              filler_3[7];
-	volatile char              interrupt_vec;
-	volatile char              filler_4[6];
-	volatile short             error_h;   
-	volatile short             error_l;   
-};
-
-struct event_packet {
-	volatile char              eye_catcher[4];
-	volatile unsigned char     command_pipe_number;
-	volatile unsigned char     status_pipe_number;
-	volatile char              filler_0[4];
-	volatile short             command;
-	volatile char              filler_1[4];
-	volatile char              device_number;
-	volatile char              filler_2[19];
-	volatile short             error_h;   
-	volatile short             error_l;   
+/* IPC event codes */
 #define  E_INTR      0x0001
 #define  E_QUIT      0x0002
 #define  E_HUP       0x0004
@@ -422,65 +363,9 @@ struct event_packet {
 #define  E_PR_SELECT 0x0800
 #define  E_SWITCH    0x4000
 #define  E_BREAK     0x8000
-	volatile unsigned short    event_code;		/* returned from IPC */
-};
-
-struct open_packet {
-	volatile char              eye_catcher[4];
-	volatile unsigned char     command_pipe_number;
-	volatile unsigned char     status_pipe_number;
-	volatile char              filler_0[4];
-	volatile short             command;
-	volatile char              filler_1[4];
-	volatile char              device_number;
-   volatile char              filler_2[19];
-	volatile short             error_h;   
-	volatile short             error_l;   
-	volatile unsigned short    event_code;		/* returned from IPC */
-};
-
-struct close_packet {
-	volatile char              eye_catcher[4];
-	volatile unsigned char     command_pipe_number;
-	volatile unsigned char     status_pipe_number;
-	volatile char              filler_0[4];
-	volatile short             command;
-	volatile char              filler_1[4];
-	volatile char              device_number;
-   volatile char              filler_2[19];
-	volatile short             error_h;   
-	volatile short             error_l;   
-	volatile unsigned short    event_code;		/* returned from IPC */
-};
-
-struct read_wakeup_packet {
-	volatile char              eye_catcher[4];
-	volatile unsigned char     command_pipe_number;
-	volatile unsigned char     status_pipe_number;
-	volatile char              filler_0[4];
-	volatile short             command;
-	volatile char              filler_1[4];
-	volatile char              device_number;
-   volatile char              filler_2[19];
-	volatile short             error_h;   
-	volatile short             error_l;   
-};
-
-struct write_wakeup_packet {
-	volatile char              eye_catcher[4];
-	volatile unsigned char     command_pipe_number;
-	volatile unsigned char     status_pipe_number;
-	volatile char              filler_0[4];
-	volatile short             command;
-	volatile char              filler_1[4];
-	volatile char              device_number;
-   volatile char              filler_2[19];
-	volatile short             error_h;   
-	volatile short             error_l;   
-};
 
 /*
- * All structures must reside in dual port user memory. 
+ * All structures must reside in dual port user memory.
  * ($FFxx0100 to $FFxxFFF0)
  * All structures must be word aligned (see byte counts above)
  *
@@ -506,7 +391,8 @@ struct write_wakeup_packet {
  *       |          (16 bytes)            |
  *       +--------------------------------+
  */
-#define  ALIGNIT(p)           (((u_int)(p) + 7) & ~7)
+
+#define	NVXPORTS	9
 
 #define  NENVELOPES           30
 #define  NPACKETS             NENVELOPES
@@ -517,14 +403,12 @@ struct write_wakeup_packet {
 #define  PACKET_AREA          (ENVELOPE_AREA + ENVELOPE_AREA_SIZE)
 #define  PACKET_AREA_SIZE     (NPACKETS * sizeof(struct packet))
 #define  INIT_INFO_AREA       (PACKET_AREA + PACKET_AREA_SIZE)
-#define  INIT_INFO_AREA_SIZE  (9 * sizeof(struct init_info))
-#define  WRING_AREA           ALIGNIT(INIT_INFO_AREA + INIT_INFO_AREA_SIZE)
-#define  WRING_AREA_SIZE      (9 * sizeof(struct wring))
+#define  INIT_INFO_AREA_SIZE  (NVXPORTS * sizeof(struct init_info))
+#define  WRING_AREA           roundup(INIT_INFO_AREA + INIT_INFO_AREA_SIZE, 8)
+#define  WRING_AREA_SIZE      (NVXPORTS * sizeof(struct wring))
 #define  RRING_AREA           (WRING_AREA + WRING_AREA_SIZE)
-#define  RRING_AREA_SIZE      (9 * sizeof(struct rring))
+#define  RRING_AREA_SIZE      (NVXPORTS * sizeof(struct rring))
 #define  USER_AREA_SIZE       (RRING_AREA + RRING_AREA_SIZE - USER_AREA)
 
 #define  LO(x) (u_short)((unsigned long)x & 0x0000FFFF)
 #define  HI(x) (u_short)((unsigned long)x >> 16)
-
-

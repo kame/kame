@@ -1,4 +1,4 @@
-/*	$OpenBSD: init_main.c,v 1.107 2003/09/01 18:06:03 henning Exp $	*/
+/*	$OpenBSD: init_main.c,v 1.112 2004/03/14 23:12:11 tedu Exp $	*/
 /*	$NetBSD: init_main.c,v 1.84.4.1 1996/06/02 09:08:06 mrg Exp $	*/
 
 /*
@@ -57,6 +57,7 @@
 #include <sys/buf.h>
 #include <sys/device.h>
 #include <sys/socketvar.h>
+#include <sys/lockf.h>
 #include <sys/protosw.h>
 #include <sys/reboot.h>
 #include <sys/user.h>
@@ -99,7 +100,7 @@ extern void nfs_init(void);
 const char	copyright[] =
 "Copyright (c) 1982, 1986, 1989, 1991, 1993\n"
 "\tThe Regents of the University of California.  All rights reserved.\n"
-"Copyright (c) 1995-2003 OpenBSD. All rights reserved.  http://www.OpenBSD.org\n";
+"Copyright (c) 1995-2004 OpenBSD. All rights reserved.  http://www.OpenBSD.org\n";
 
 /* Components of the first process -- never freed. */
 struct	session session0;
@@ -181,9 +182,6 @@ main(framep)
 	quad_t lim;
 	int s, i;
 	register_t rval[2];
-#if !defined(NO_PROPOLICE)
-	int *guard = (int *)&__guard[0];
-#endif
 	extern struct pdevinit pdevinit[];
 	extern void scheduler_start(void);
 	extern void disk_init(void);
@@ -197,13 +195,17 @@ main(framep)
 	curproc = p = &proc0;
 
 	/*
+	 * Initialize timeouts.
+	 */
+	timeout_startup();
+
+	/*
 	 * Attempt to find console and initialize
 	 * in case of early panic or other messages.
 	 */
 	config_init();		/* init autoconfiguration data structures */
 	consinit();
-	printf(copyright);
-	printf("\n");
+	printf("%s\n", copyright);
 
 	uvm_init();
 	disk_init();		/* must come before autoconfiguration */
@@ -219,11 +221,6 @@ main(framep)
 	/* Initalize sockets. */
 	soinit();
 
-	/*
-	 * Initialize timeouts.
-	 */
-	timeout_startup();
-
 	/* Initialize sysctls (must be done before any processes run) */
 	sysctl_init();
 
@@ -231,6 +228,9 @@ main(framep)
 	 * Initialize process and pgrp structures.
 	 */
 	procinit();
+
+	/* Initialize file locking. */
+	lf_init();
 
 	/*
 	 * Initialize filedescriptors.
@@ -372,8 +372,7 @@ main(framep)
 #endif
 
 #if !defined(NO_PROPOLICE)
-	for (i = 0; i < sizeof(__guard) / 4; i++)
-		guard[i] = arc4random();
+	arc4random_bytes(__guard, sizeof(__guard));
 #endif
 
 	/* init exec and emul */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cmmu.c,v 1.20 2002/03/14 01:26:39 millert Exp $	*/
+/*	$OpenBSD: cmmu.c,v 1.27 2004/01/20 14:35:54 miod Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -61,31 +61,18 @@
 #include <sys/types.h>
 #include <sys/simplelock.h>
 #include <machine/cmmu.h>
-#include <machine/cpus.h>
 #include <machine/cpu_number.h>
 
-/* 
- * This lock protects the cmmu SAR and SCR's; other ports 
- * can be accessed without locking it 
+/*
+ * This lock protects the cmmu SAR and SCR's; other ports
+ * can be accessed without locking it.
  *
  * May be used from "db_interface.c".
  */
 struct simplelock cmmu_cpu_lock;
-unsigned cache_policy = /*CACHE_INH*/ 0;
+
 unsigned cpu_sets[MAX_CPUS];
-unsigned number_cpus = 0;
 unsigned master_cpu = 0;
 int      max_cpus, max_cmmus;
-int      cpu_cmmu_ratio;
 
 struct cmmu_p *cmmu;
-
-void md_cmmu_flush_tlb(unsigned kernel, vm_offset_t vaddr, int size);
-
-/* This is here so that process.S doesn't have to decide the CPU type */
-void 
-md_cmmu_flush_tlb(unsigned kernel, vm_offset_t vaddr, int size)
-{
-	cmmu_flush_tlb(kernel, vaddr, size);
-}
-

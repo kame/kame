@@ -1,4 +1,4 @@
-/*	$OpenBSD: qv.c,v 1.6 2003/06/02 23:27:58 millert Exp $	*/
+/*	$OpenBSD: qv.c,v 1.11 2004/02/19 18:46:18 miod Exp $	*/
 /*	$NetBSD: qv.c,v 1.2 1996/09/02 06:44:28 mycroft Exp $	*/
 
 /*-
@@ -137,11 +137,11 @@
 #include "sys/map.h"
 #include "sys/buf.h"
 #include "sys/vm.h"
-#include "sys/clist.h"
 #include "sys/file.h"
 #include "sys/uio.h"
 #include "sys/kernel.h"
 #include "sys/syslog.h"
+#include "sys/poll.h"
 #include "../include/cpu.h"
 #include "../include/mtpr.h"
 #include "ubareg.h"
@@ -165,7 +165,7 @@ struct	uba_driver qvdriver =
 	{ qvprobe, 0, qvattach, 0, qvstd, "qv", qvinfo };
 
 extern	char qvmem[][512*NBPG];
-extern	struct pte QVmap[][512];
+extern	pt_entry_t QVmap[][512];
 
 /*
  * Local variables for the driver. Initialized for 15' screen
@@ -298,7 +298,7 @@ qvprobe(reg, ctlr)
 	/*
 	 * Turn on the keyboard and vertical interrupt vectors.
 	 */
-	qvaddr->qv_intcsr = 0;		/* init the interrupt controler */
+	qvaddr->qv_intcsr = 0;		/* init the interrupt controller */
 	qvaddr->qv_intcsr = 0x40;	/* reset irr			*/
 	qvaddr->qv_intcsr = 0x80;	/* specify individual vectors	*/
 	qvaddr->qv_intcsr = 0xc0;	/* preset autoclear data	*/
@@ -494,33 +494,31 @@ qvwrite(dev, uio)
 
 
 /*
- * Mouse activity select routine
+ * Mouse activity poll routine
  */
-qvselect(dev, rw)
-dev_t dev;
+int
+qvpoll(dev, events, p)
+	dev_t dev;
+	int events;
+	struct proc *p;
 {
-	register int s = spl5();
-	register struct qv_info *qp = qv_scn;
+	struct qv_info *qp = qv_scn;
+	int revents = 0;
+	int s = spl5();
 
-	if( QVCHAN(minor(dev)) == QVMOUSECHAN )
-		switch(rw) {
-		case FREAD:			/* if events okay */
-			if(qp->ihead != qp->itail) {
-				splx(s);
-				return(1);
-			}
-			qvrsel = u.u_procp;
-			splx(s);
-			return(0);
-		default:			/* can never write */
-			splx(s);
-			return(0);
-		}
-	else {
+	if (QVCHAN(minor(dev)) != QVMOUSECHAN) {
 		splx(s);
-		return( ttselect(dev, rw) );
+		return(ttpoll(dev, events, p));
 	}
-	/*NOTREACHED*/
+
+	if (events & (POLLIN | POLLRDNORM)) {
+		if (qp->ihead != qp->itail)
+			revents |= events & (POLLIN | POLLRDNORM);
+		else
+			qvrsel = u.u_procp;
+	}
+	splx(s);
+	return(revents);
 }
 		
 /*
@@ -581,7 +579,7 @@ qvkint(qv)
 		default:
 		/*
 		 * Test for control characters. If set, see if the character
-		 * is elligible to become a control character.
+		 * is eligible to become a control character.
 		 */
 			if( qv_keyboard.cntrl ) {
 				c = q_key[ key ];
@@ -981,7 +979,7 @@ char c;
 
 /*
  * Routine to display a character on the screen.  The model used is a 
- * glass tty.  It is assummed that the user will only use this emulation
+ * glass tty.  It is assumed that the user will only use this emulation
  * during system boot and that the screen will be eventually controlled
  * by a window manager.
  *

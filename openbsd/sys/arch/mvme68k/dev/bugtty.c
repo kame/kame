@@ -1,4 +1,4 @@
-/*	$OpenBSD: bugtty.c,v 1.10 2003/08/15 20:32:14 tedu Exp $ */
+/*	$OpenBSD: bugtty.c,v 1.12 2004/01/14 20:50:48 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Dale Rahn.
@@ -51,7 +51,7 @@ struct cfattach bugtty_ca = {
 };
 
 struct cfdriver bugtty_cd = {
-	NULL, "bugtty", DV_TTY, 0
+	NULL, "bugtty", DV_TTY
 };
 
 /* prototypes */
@@ -171,7 +171,6 @@ bugttyopen(dev, flag, mode, p)
 		tp = bugtty_tty[unit];
 	} else {
 		tp = bugtty_tty[unit] = ttymalloc();
-		tty_attach(tp);
 	}
 	tp->t_oproc = bugttyoutput;
 	tp->t_param = NULL;

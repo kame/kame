@@ -1,4 +1,4 @@
-/*	$OpenBSD: opendev.c,v 1.5 2002/03/15 18:19:52 millert Exp $	*/
+/*	$OpenBSD: opendev.c,v 1.8 2004/01/07 22:45:59 brad Exp $	*/
 /*	$NetBSD: openfirm.c,v 1.1 1996/09/30 16:34:52 ws Exp $	*/
 
 /*
@@ -32,9 +32,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <sys/param.h>
-
+#include <sys/stdarg.h>
 #include <machine/psl.h>
-#include <machine/stdarg.h>
 
 #include <dev/ofw/openfirm.h>
 #include <lib/libkern/libkern.h>
@@ -43,8 +42,7 @@ extern void ofw_stack(void);
 extern void ofbcopy(const void *, void *, size_t);
 
 int
-OF_instance_to_package(ihandle)
-	int ihandle;
+OF_instance_to_package(int ihandle)
 {
 	static struct {
 		char *name;
@@ -66,10 +64,7 @@ OF_instance_to_package(ihandle)
 }
 
 int
-OF_package_to_path(phandle, buf, buflen)
-	int phandle;
-	char *buf;
-	int buflen;
+OF_package_to_path(int phandle, char *buf, int buflen)
 {
 	static struct {
 		char *name;
@@ -84,7 +79,7 @@ OF_package_to_path(phandle, buf, buflen)
 		3,
 		1,
 	};
-	
+
 	ofw_stack();
 	if (buflen > PAGE_SIZE)
 		return -1;
@@ -116,7 +111,7 @@ OF_call_method(char *method, int ihandle, int nargs, int nreturns, ...)
 		1,
 	};
 	int *ip, n;
-	
+
 	if (nargs > 6)
 		return -1;
 	args.nargs = nargs + 2;
@@ -157,7 +152,7 @@ OF_call_method_1(char *method, int ihandle, int nargs, ...)
 		2,
 	};
 	int *ip, n;
-	
+
 	if (nargs > 6)
 		return -1;
 	args.nargs = nargs + 2;
@@ -176,8 +171,7 @@ OF_call_method_1(char *method, int ihandle, int nargs, ...)
 }
 
 int
-OF_open(dname)
-	char *dname;
+OF_open(char *dname)
 {
 	static struct {
 		char *name;
@@ -191,7 +185,7 @@ OF_open(dname)
 		1,
 	};
 	int l;
-	
+
 	ofw_stack();
 	if ((l = strlen(dname)) >= PAGE_SIZE)
 		return -1;
@@ -203,8 +197,7 @@ OF_open(dname)
 }
 
 void
-OF_close(handle)
-	int handle;
+OF_close(int handle)
 {
 	static struct {
 		char *name;
@@ -222,14 +215,11 @@ OF_close(handle)
 	openfirmware(&args);
 }
 
-/* 
+/*
  * This assumes that character devices don't read in multiples of PAGE_SIZE.
  */
 int
-OF_read(handle, addr, len)
-	int handle;
-	void *addr;
-	int len;
+OF_read(int handle, void *addr, int len)
 {
 	static struct {
 		char *name;
@@ -245,7 +235,7 @@ OF_read(handle, addr, len)
 		1,
 	};
 	int l, act = 0;
-	
+
 	ofw_stack();
 	args.ihandle = handle;
 	args.addr = OF_buf;
@@ -263,17 +253,13 @@ OF_read(handle, addr, len)
 				return act;
 			else
 				return args.actual;
-			
 		}
 	}
 	return act;
 }
 
 int
-OF_write(handle, addr, len)
-	int handle;
-	void *addr;
-	int len;
+OF_write(int handle, void *addr, int len)
 {
 	static struct {
 		char *name;
@@ -289,7 +275,7 @@ OF_write(handle, addr, len)
 		1,
 	};
 	int l, act = 0;
-	
+
 	ofw_stack();
 	args.ihandle = handle;
 	args.addr = OF_buf;
@@ -306,9 +292,7 @@ OF_write(handle, addr, len)
 }
 
 int
-OF_seek(handle, pos)
-	int handle;
-	u_quad_t pos;
+OF_seek(int handle, u_quad_t pos)
 {
 	static struct {
 		char *name;

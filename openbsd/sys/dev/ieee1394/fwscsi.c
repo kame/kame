@@ -1,4 +1,4 @@
-/*	$OpenBSD: fwscsi.c,v 1.13 2003/05/17 03:55:06 itojun Exp $	*/
+/*	$OpenBSD: fwscsi.c,v 1.14.2.1 2004/04/30 22:07:37 brad Exp $	*/
 
 /*
  * Copyright (c) 2002 Thierry Deval.  All rights reserved.
@@ -301,9 +301,7 @@ fwscsi_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_adapter_link.adapter_softc = sc;
 	sc->sc_adapter_link.flags = 0;
 	sc->sc_adapter_link.inquiry_flags = 0;
-	sc->sc_adapter_link.inquiry_flags2 = 0;
-	sc->sc_adapter_link.quirks |=
-	    SDEV_NOLUNS | SDEV_NOTAGS | SDEV_ONLYBIG;
+	sc->sc_adapter_link.quirks |= SDEV_NOTAGS | SDEV_ONLYBIG;
 
 	sc->sc_speed = fwsc->sc_sc1394.sc1394_link_speed;
 	sc->sc_maxpayload = fwsc->sc_sc1394.sc1394_max_receive - 1;
@@ -393,7 +391,6 @@ fwscsi_config_thread(void *arg)
 	dev = config_found((void *)sc, &sc->sc_adapter_link, scsiprint);
 	sc->sc_bus = (struct scsibus_softc *)dev;
 	if (sc->sc_bus != NULL) {
-		sc->sc_bus->moreluns = 0;
 		sc->sc_bus->sc_buswidth = 8;
 	}
 

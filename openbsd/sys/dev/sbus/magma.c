@@ -1,4 +1,4 @@
-/*	$OpenBSD: magma.c,v 1.11 2003/08/15 20:32:17 tedu Exp $	*/
+/*	$OpenBSD: magma.c,v 1.13 2003/10/03 16:44:51 miod Exp $	*/
 /*
  * magma.c
  *
@@ -814,9 +814,6 @@ mtty_attach(struct device *parent, struct device *dev, void *args)
 		mp->mp_channel = chan;
 
 		tp = ttymalloc();
-		if (tp == NULL)
-			break;
-		tty_attach(tp);
 		tp->t_oproc = mtty_start;
 		tp->t_param = mtty_param;
 
@@ -1357,7 +1354,7 @@ mtty_param(struct tty *tp, struct termios *t)
  *	mbppread	read from mbpp
  *	mbppwrite	write to mbpp
  *	mbppioctl	do ioctl on mbpp
- *	mbppselect	do select on mbpp
+ *	mbpppoll	do poll on mbpp
  *	mbpp_rw		general rw routine
  *	mbpp_timeout	rw timeout
  *	mbpp_start	rw start after delay
@@ -1525,12 +1522,12 @@ mbppioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct proc *p)
 }
 
 /*
- * select routine
+ * poll routine
  */
 int
-mbppselect(dev_t dev, int rw, struct proc *p)
+mbpppoll(dev_t dev, int events, struct proc *p)
 {
-	return (ENODEV);
+	return (seltrue(dev, events, p));
 }
 
 int

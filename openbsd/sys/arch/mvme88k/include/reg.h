@@ -1,4 +1,4 @@
-/*	$OpenBSD: reg.h,v 1.11 2001/12/20 06:20:26 smurph Exp $ */
+/*	$OpenBSD: reg.h,v 1.14 2004/01/13 20:05:49 miod Exp $ */
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -30,69 +30,61 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
+
 #ifndef _M88K_REG_H_
 #define _M88K_REG_H_
 
-/* This must always be an even number of words long */
 struct reg {
-    unsigned r[32];  /* 0 - 31 */
-#define   tf_sp r[31]
-    unsigned epsr;   /* 32 */
-    unsigned fpsr;
-    unsigned fpcr;
-    unsigned sxip;
+	unsigned int	r[32];  /* 0 - 31 */
+	unsigned int	epsr;   /* 32 */
+	unsigned int	fpsr;
+	unsigned int	fpcr;
+	unsigned int	sxip;
 #define exip sxip	/* mc88110 */
-    unsigned snip;
+	unsigned int	snip;
 #define enip snip	/* mc88110 */
-    unsigned sfip;
-    unsigned ssbr;
+	unsigned int	sfip;
+	unsigned int	ssbr;
 #define duap ssbr	/* mc88110 */
-    unsigned dmt0;
+	unsigned int	dmt0;
 #define dsr dmt0	/* mc88110 */
-    unsigned dmd0;
+	unsigned int	dmd0;
 #define dlar dmd0	/* mc88110 */
-    unsigned dma0;
+	unsigned int	dma0;
 #define dpar dma0	/* mc88110 */
-    unsigned dmt1;
+	unsigned int	dmt1;
 #define isr dmt1	/* mc88110 */
-    unsigned dmd1;
+	unsigned int	dmd1;
 #define ilar dmd1	/* mc88110 */
-    unsigned dma1;
+	unsigned int	dma1;
 #define ipar dma1	/* mc88110 */
-    unsigned dmt2;
+	unsigned int	dmt2;
 #define isap dmt2	/* mc88110 */
-    unsigned dmd2;
+	unsigned int	dmd2;
 #define dsap dmd2	/* mc88110 */
-    unsigned dma2;
+	unsigned int	dma2;
 #define iuap dma2	/* mc88110 */
-    unsigned fpecr;
-    unsigned fphs1;
-    unsigned fpls1;
-    unsigned fphs2;
-    unsigned fpls2;
-    unsigned fppt;
-    unsigned fprh;
-    unsigned fprl;
-    unsigned fpit;
-    unsigned vector;	      /* exception vector number */
-    unsigned mask;	      /* interrupt mask level */
-    unsigned mode;	      /* interrupt mode */
-    unsigned scratch1;	   /* used by locore trap handling code */
-    unsigned ipfsr;        /* P BUS status - used in inst fault handling */
-    unsigned dpfsr;        /* P BUS status - used in data fault handling */
-    unsigned cpu;          /* cpu number */
+	unsigned int	fpecr;
+	unsigned int	fphs1;
+	unsigned int	fpls1;
+	unsigned int	fphs2;
+	unsigned int	fpls2;
+	unsigned int	fppt;
+	unsigned int	fprh;
+	unsigned int	fprl;
+	unsigned int	fpit;
 };
 
 struct fpreg {
-    unsigned fp_fpecr;
-    unsigned fp_fphs1;
-    unsigned fp_fpls1;
-    unsigned fp_fphs2;
-    unsigned fp_fpls2;
-    unsigned fp_fppt;
-    unsigned fp_fprh;
-    unsigned fp_fprl;
-    unsigned fp_fpit;
+	unsigned int	fp_fpecr;
+	unsigned int	fp_fphs1;
+	unsigned int	fp_fpls1;
+	unsigned int	fp_fphs2;
+	unsigned int	fp_fpls2;
+	unsigned int	fp_fppt;
+	unsigned int	fp_fprh;
+	unsigned int	fp_fprl;
+	unsigned int	fp_fpit;
 };
 
 #endif /* _M88K_REG_H_ */

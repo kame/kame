@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_output.c,v 1.58 2003/07/09 22:03:16 itojun Exp $	*/
+/*	$OpenBSD: tcp_output.c,v 1.65 2004/02/16 21:51:03 markus Exp $	*/
 /*	$NetBSD: tcp_output.c,v 1.16 1997/06/03 16:17:09 kml Exp $	*/
 
 /*
@@ -100,6 +100,7 @@
 
 #ifdef INET6
 #include <netinet6/tcpipv6.h>
+#include <netinet6/in6_var.h>
 #endif /* INET6 */
 
 #ifdef TCP_SIGNATURE
@@ -142,7 +143,8 @@ struct sackhole *
 tcp_sack_output(struct tcpcb *tp)
 {
 	struct sackhole *p;
-	if (tp->sack_disable)
+
+	if (!tp->sack_enable)
 		return (NULL);
 	p = tp->snd_holes;
 	while (p) {
@@ -213,13 +215,13 @@ tcp_sack_adjust(struct tcpcb *tp)
  */
 int
 tcp_output(tp)
-	register struct tcpcb *tp;
+	struct tcpcb *tp;
 {
-	register struct socket *so = tp->t_inpcb->inp_socket;
-	register long len, win, txmaxseg;
+	struct socket *so = tp->t_inpcb->inp_socket;
+	long len, win, txmaxseg;
 	int off, flags, error;
-	register struct mbuf *m;
-	register struct tcphdr *th;
+	struct mbuf *m;
+	struct tcphdr *th;
 	u_char opt[MAX_TCPOPTLEN];
 	unsigned int optlen, hdrlen;
 	int idle, sendalot = 0;
@@ -238,7 +240,7 @@ tcp_output(tp)
 #endif
 
 #if defined(TCP_SACK) && defined(TCP_SIGNATURE) && defined(DIAGNOSTIC)
-	if (!tp->sack_disable && (tp->t_flags & TF_SIGNATURE))
+	if (tp->sack_enable && (tp->t_flags & TF_SIGNATURE))
 		return (EINVAL);
 #endif /* defined(TCP_SACK) && defined(TCP_SIGNATURE) && defined(DIAGNOSTIC) */
 
@@ -263,7 +265,7 @@ again:
 	 * snd_nxt.  There may be SACK information that allows us to avoid
 	 * resending already delivered data.  Adjust snd_nxt accordingly.
 	 */
-	if (!tp->sack_disable && SEQ_LT(tp->snd_nxt, tp->snd_max))
+	if (tp->sack_enable && SEQ_LT(tp->snd_nxt, tp->snd_max))
 		tcp_sack_adjust(tp);
 #endif
 	off = tp->snd_nxt - tp->snd_una;
@@ -272,7 +274,7 @@ again:
 	 * But in FACK, sendable data is limited by snd_awnd < snd_cwnd,
 	 * regardless of offset.
 	 */
-	if (!tp->sack_disable && (tp->t_dupacks > tcprexmtthresh))
+	if (tp->sack_enable && (tp->t_dupacks > tcprexmtthresh))
 		win = tp->snd_wnd;
 	else
 #endif
@@ -288,7 +290,7 @@ again:
 	 * we're replacing a (future) new transmission with a retransmission
 	 * now, and we previously incremented snd_cwnd in tcp_input().
 	 */
-	if (!tp->sack_disable && !sendalot) {
+	if (tp->sack_enable && !sendalot) {
 		if (tp->t_dupacks >= tcprexmtthresh &&
 		    (p = tcp_sack_output(tp))) {
 			off = p->rxmit - tp->snd_una;
@@ -351,7 +353,7 @@ again:
 	 * amount of outstanding data (snd_awnd) is >= snd_cwnd, then
 	 * do not send data (like zero window conditions)
 	 */
-	if (!tp->sack_disable && len && SEQ_GT(tp->snd_last, tp->snd_una) &&
+	if (tp->sack_enable && len && SEQ_GT(tp->snd_last, tp->snd_una) &&
 	    (tp->snd_awnd >= tp->snd_cwnd))
 		len = 0;
 #endif /* TCP_FACK */
@@ -559,7 +561,7 @@ send:
 			 * SYN ACK, include SACK_PERMIT_HDR option if peer has
 			 * already done so.
 			 */
-			if (!tp->sack_disable && ((flags & TH_ACK) == 0 ||
+			if (tp->sack_enable && ((flags & TH_ACK) == 0 ||
 			    (tp->t_flags & TF_SACK_PERMIT))) {
 				*((u_int32_t *) (opt + optlen)) =
 				    htonl(TCPOPT_SACK_PERMIT_HDR);
@@ -614,14 +616,14 @@ send:
 				*(bp++) = 0;
 		}
 
-		optlen += TCPOLEN_SIGNATURE;
 
 		/* Pad options list to the next 32 bit boundary and
 		 * terminate it.
 		 */
 		*bp++ = TCPOPT_NOP;
 		*bp++ = TCPOPT_EOL;
-		optlen += 2;
+
+		optlen += TCPOLEN_SIGLEN;
 	}
 #endif /* TCP_SIGNATURE */
 
@@ -631,7 +633,7 @@ send:
 	 * Only as many SACKs are sent as are permitted by the maximum options
 	 * size.  No more than three SACKs are sent.
 	 */
-	if (!tp->sack_disable && tp->t_state == TCPS_ESTABLISHED &&
+	if (tp->sack_enable && tp->t_state == TCPS_ESTABLISHED &&
 	    (tp->t_flags & (TF_SACK_PERMIT|TF_NOOPT)) == TF_SACK_PERMIT &&
 	    tp->rcv_numsacks) {
 		u_int32_t *lp = (u_int32_t *)(opt + optlen);
@@ -703,7 +705,7 @@ send:
 		m->m_data -= hdrlen;
 #else
 		MGETHDR(m, M_DONTWAIT, MT_HEADER);
-		if (m != NULL) {
+		if (m != NULL && max_linkhdr + hdrlen > MHLEN) {
 			MCLGET(m, M_DONTWAIT);
 			if ((m->m_flags & M_EXT) == 0) {
 				m_freem(m);
@@ -716,7 +718,7 @@ send:
 		}
 		m->m_data += max_linkhdr;
 		m->m_len = hdrlen;
-		if (len <= MCLBYTES - hdrlen - max_linkhdr) {
+		if (len <= M_TRAILINGSPACE(m)) {
 			m_copydata(so->so_snd.sb_mb, off, (int) len,
 			    mtod(m, caddr_t) + hdrlen);
 			m->m_len += len;
@@ -748,7 +750,7 @@ send:
 			tcpstat.tcps_sndwinup++;
 
 		MGETHDR(m, M_DONTWAIT, MT_HEADER);
-		if (m != NULL) {
+		if (m != NULL && max_linkhdr + hdrlen > MHLEN) {
 			MCLGET(m, M_DONTWAIT);
 			if ((m->m_flags & M_EXT) == 0) {
 				m_freem(m);
@@ -889,32 +891,39 @@ send:
 #ifdef TCP_SIGNATURE
 	if (tp->t_flags & TF_SIGNATURE) {
 		MD5_CTX ctx;
-		union sockaddr_union sa;
+		union sockaddr_union src, dst;
 		struct tdb *tdb;
 
-		bzero(&sa, sizeof(union sockaddr_union));
+		bzero(&src, sizeof(union sockaddr_union));
+		bzero(&dst, sizeof(union sockaddr_union));
 
 		switch (tp->pf) {
 		case 0:	/*default to PF_INET*/
 #ifdef INET
 		case AF_INET:
-			sa.sa.sa_len = sizeof(struct sockaddr_in);
-			sa.sa.sa_family = AF_INET;
-			sa.sin.sin_addr = mtod(m, struct ip *)->ip_dst;
+			src.sa.sa_len = sizeof(struct sockaddr_in);
+			src.sa.sa_family = AF_INET;
+			src.sin.sin_addr = mtod(m, struct ip *)->ip_src;
+			dst.sa.sa_len = sizeof(struct sockaddr_in);
+			dst.sa.sa_family = AF_INET;
+			dst.sin.sin_addr = mtod(m, struct ip *)->ip_dst;
 			break;
 #endif /* INET */
 #ifdef INET6
 		case AF_INET6:
-			sa.sa.sa_len = sizeof(struct sockaddr_in6);
-			sa.sa.sa_family = AF_INET6;
-			sa.sin6.sin6_addr = mtod(m, struct ip6_hdr *)->ip6_dst;
+			src.sa.sa_len = sizeof(struct sockaddr_in6);
+			src.sa.sa_family = AF_INET6;
+			src.sin6.sin6_addr = mtod(m, struct ip6_hdr *)->ip6_src;
+			dst.sa.sa_len = sizeof(struct sockaddr_in6);
+			dst.sa.sa_family = AF_INET6;
+			dst.sin6.sin6_addr = mtod(m, struct ip6_hdr *)->ip6_dst;
 			break;
 #endif /* INET6 */
 		}
 
-		/* XXX gettdb() should really be called at spltdb().      */
+		/* XXX gettdbbysrcdst() should really be called at spltdb().      */
 		/* XXX this is splsoftnet(), currently they are the same. */
-		tdb = gettdb(0, &sa, IPPROTO_TCP);
+		tdb = gettdbbysrcdst(0, &src, &dst, IPPROTO_TCP);
 		if (tdb == NULL)
 			return (EPERM);
 
@@ -934,33 +943,48 @@ send:
 				ippseudo.ippseudo_dst = ipovly->ih_dst;
 				ippseudo.ippseudo_pad = 0;
 				ippseudo.ippseudo_p   = IPPROTO_TCP;
-				ippseudo.ippseudo_len = ipovly->ih_len + len +
+				ippseudo.ippseudo_len = ntohs(ipovly->ih_len) + len +
 				    optlen;
+				ippseudo.ippseudo_len = htons(ippseudo.ippseudo_len);
 				MD5Update(&ctx, (char *)&ippseudo,
-					sizeof(struct ippseudo));
-				MD5Update(&ctx, mtod(m, caddr_t) +
-					sizeof(struct ip),
-					sizeof(struct tcphdr));
+				    sizeof(struct ippseudo));
 			}
 			break;
 #endif /* INET */
 #ifdef INET6
 		case AF_INET6:
 			{
-				static int printed = 0;
+				struct ip6_hdr_pseudo ip6pseudo;
+				struct ip6_hdr *ip6;
 
-				if (!printed) {
-					printf("error: TCP MD5 support for "
-						"IPv6 not yet implemented.\n");
-					printed = 1;
-				}
+				ip6 = mtod(m, struct ip6_hdr *);
+				bzero(&ip6pseudo, sizeof(ip6pseudo));
+				ip6pseudo.ip6ph_src = ip6->ip6_src;
+				ip6pseudo.ip6ph_dst = ip6->ip6_dst;
+				in6_clearscope(&ip6pseudo.ip6ph_src);
+				in6_clearscope(&ip6pseudo.ip6ph_dst);
+				ip6pseudo.ip6ph_nxt = IPPROTO_TCP;
+				ip6pseudo.ip6ph_len =
+				    htonl(sizeof(struct tcphdr) + len + optlen);
+ 
+				MD5Update(&ctx, (char *)&ip6pseudo,
+				    sizeof(ip6pseudo));
 			}
 			break;
 #endif /* INET6 */
 		}
 
+		{
+			u_int16_t thsum = th->th_sum;
+
+			/* RFC 2385 requires th_sum == 0 */
+			th->th_sum = 0;
+			MD5Update(&ctx, (char *)th, sizeof(struct tcphdr));
+			th->th_sum = thsum;
+		}
+
 		if (len && m_apply(m, hdrlen, len, tcp_signature_apply,
-				(caddr_t)&ctx))
+		    (caddr_t)&ctx))
 			return (EINVAL);
 
 		MD5Update(&ctx, tdb->tdb_amxkey, tdb->tdb_amxkeylen);
@@ -1011,7 +1035,7 @@ send:
 			}
 		}
 #ifdef TCP_SACK
-		if (!tp->sack_disable) {
+		if (tp->sack_enable) {
 			if (sack_rxmit && (p->rxmit != tp->snd_nxt)) {
 				goto timer;
 			}
@@ -1041,7 +1065,7 @@ send:
 		 */
 #ifdef TCP_SACK
  timer:
-		if (!tp->sack_disable && sack_rxmit &&
+		if (tp->sack_enable && sack_rxmit &&
 		    TCP_TIMER_ISARMED(tp, TCPT_REXMT) == 0 &&
 		    tp->snd_nxt != tp->snd_max) {
 			TCP_TIMER_ARM(tp, TCPT_REXMT, tp->t_rxtcur);

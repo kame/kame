@@ -1,4 +1,4 @@
-/*	$OpenBSD: iha.h,v 1.13 2003/03/30 00:32:48 krw Exp $ */
+/*	$OpenBSD: iha.h,v 1.15 2004/01/19 00:44:33 krw Exp $ */
 /*-------------------------------------------------------------------------
  *
  * Device driver for the INI-9XXXU/UW or INIC-940/950  PCI SCSI Controller.
@@ -249,9 +249,9 @@ struct iha_nvram {
 #define TUL_PNVPG	0x5A	       /* R/W Data port to external BIOS     */
 #define TUL_EPDATA	0x5C	       /* R/W EEPROM Data port		     */
 #define TUL_NVRAM	0x5D	       /* R/W Non-volatile RAM port	     */
-#define     READ	    0x80       /*     Read from given NVRAM addr     */
-#define     WRITE           0x40       /*     Write to given NVRAM addr	     */
-#define     ENABLE_ERASE    0x30       /*     Enable NVRAM Erase/Write       */
+#define     NVREAD	    0x80       /*     Read from given NVRAM addr     */
+#define     NVWRITE         0x40       /*     Write to given NVRAM addr	     */
+#define     NVENABLE_ERASE  0x30       /*     Enable NVRAM Erase/Write       */
 #define	    NVRCS	    0x08       /*     Select external NVRAM	     */
 #define	    NVRCK	    0x04       /*     NVRAM Clock		     */
 #define	    NVRDO	    0x02       /*     NVRAM Write Data		     */
@@ -347,17 +347,17 @@ struct iha_nvram {
 #define TUL_SCMD	0x91	       /* R/W SCSI Command		     */
 #define	    NO_OP	    0x00       /*     Place Holder for tulip_wait()  */
 #define	    SEL_NOATN	    0x01       /*     Select w/o ATN Sequence	     */
-#define	    XF_FIFO_OUT	    0x03       /*     FIFO Xfer Infomation out	     */
+#define	    XF_FIFO_OUT	    0x03       /*     FIFO Xfer Information out	     */
 #define	    MSG_ACCEPT	    0x0F       /*     Message Accept		     */
 #define	    SEL_ATN	    0x11       /*     Select w ATN Sequence	     */
 #define	    SEL_ATNSTOP	    0x12       /*     Select w ATN & Stop Sequence   */
 #define	    SELATNSTOP	    0x1E       /*     Select w ATN & Stop Sequence   */
 #define	    SEL_ATN3	    0x31       /*     Select w ATN3 Sequence	     */
-#define	    XF_DMA_OUT	    0x43       /*     DMA Xfer Infomation out	     */
+#define	    XF_DMA_OUT	    0x43       /*     DMA Xfer Information out	     */
 #define	    EN_RESEL	    0x80       /*     Enable Reselection	     */
-#define	    XF_FIFO_IN	    0x83       /*     FIFO Xfer Infomation in	     */
+#define	    XF_FIFO_IN	    0x83       /*     FIFO Xfer Information in	     */
 #define	    CMD_COMP	    0x84       /*     Command Complete Sequence	     */
-#define	    XF_DMA_IN	    0xC3       /*     DMA Xfer Infomation in	     */
+#define	    XF_DMA_IN	    0xC3       /*     DMA Xfer Information in	     */
 #define TUL_STEST0	0x92	       /* R/W Test0			     */
 #define TUL_STEST1	0x93	       /* R/W Test1			     */
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sti.c,v 1.33 2003/08/21 18:06:56 mickey Exp $	*/
+/*	$OpenBSD: sti.c,v 1.35 2003/12/16 06:07:13 mickey Exp $	*/
 
 /*
  * Copyright (c) 2000-2003 Michael Shalayeff
@@ -277,7 +277,7 @@ sti_attach_common(sc)
 			else
 				*(u_int *)&r = bus_space_read_4(sc->memt, sc->romh, i), i += 4;
 
-			*p = (p == cc->regions? sc->romh : sc->ioh) +
+			*p = (p == cc->regions? sc->romh : sc->base) +
 			    (r.offset << PGSHIFT);
 #ifdef STIDEBUG
 			printf("%x @ 0x%x%s%s%s%s\n",
@@ -293,8 +293,13 @@ sti_attach_common(sc)
 #ifdef STIDEBUG
 					printf("already mapped region\n");
 #endif
-				} else if (p - cc->regions == 1)
-					sc->fbh = fbh;
+				} else {
+					if (p - cc->regions == 1) {
+						sc->fbaddr = *p;
+						sc->fblen = r.length << PGSHIFT;
+					}
+					*p = fbh;
+				}
 			}
 		}
 	}
@@ -343,7 +348,7 @@ sti_attach_common(sc)
 	 * parse screen descriptions:
 	 *	figure number of fonts supported;
 	 *	allocate wscons structures;
-	 *	calculate dimentions.
+	 *	calculate dimensions.
 	 */
 
 	sti_default_screen.ncols = cfg.width / sc->sc_curfont.width;

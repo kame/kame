@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.h,v 1.42 2003/08/25 08:18:54 fgsch Exp $	*/
+/*	$OpenBSD: if.h,v 1.49 2004/01/15 10:47:55 markus Exp $	*/
 /*	$NetBSD: if.h,v 1.23 1996/05/07 02:40:27 thorpej Exp $	*/
 
 /*
@@ -81,6 +81,30 @@ struct arpcom;
 struct rt_addrinfo;
 
 /*
+ * Structure describing a `cloning' interface.
+ */
+struct if_clone {
+	LIST_ENTRY(if_clone) ifc_list;	/* on list of cloners */
+	const char *ifc_name;		/* name of device, e.g. `gif' */
+	size_t ifc_namelen;		/* length of name */
+
+	int	(*ifc_create)(struct if_clone *, int);
+	int	(*ifc_destroy)(struct ifnet *);
+};
+
+#define	IF_CLONE_INITIALIZER(name, create, destroy)			\
+	{ { 0 }, name, sizeof(name) - 1, create, destroy }
+
+/*
+ * Structure used to query names of interface cloners.
+ */
+struct if_clonereq {
+	int	ifcr_total;		/* total cloners (out) */
+	int	ifcr_count;		/* room for this many in user buffer */
+	char	*ifcr_buffer;		/* buffer for cloner names */
+};
+
+/*
  * Structure defining statistics and other data kept regarding a network
  * interface.
  */
@@ -149,6 +173,7 @@ struct ifnet {				/* and the entries */
 	int	if_pcount;		/* number of promiscuous listeners */
 	caddr_t	if_bpf;			/* packet filter structure */
 	caddr_t	if_bridge;		/* bridge structure */
+	caddr_t	if_carp;		/* carp structure */
 	u_short	if_index;		/* numeric abbreviation for this if */
 	short	if_timer;		/* time 'til if_watchdog called */
 	short	if_flags;		/* up/down, broadcast, etc. */
@@ -331,6 +356,22 @@ struct ifa_msghdr {
 	u_short	ifam_index;	/* index for associated ifp */
 	int	ifam_metric;	/* value of ifa_metric */
 };
+
+
+/*
+ * Message format announcing the arrival or departure of a network interface.
+ */
+struct if_announcemsghdr {
+	u_short	ifan_msglen;	/* to skip over non-understood messages */
+	u_char	ifan_version;	/* future binary compatibility */
+	u_char	ifan_type;	/* message type */
+	u_short	ifan_index;	/* index for associated ifp */
+	char	ifan_name[IFNAMSIZ];	/* if name, e.g. "en0" */
+	u_short	ifan_what;	/* what type of announcement */
+};
+
+#define IFAN_ARRIVAL	0	/* interface arrival */
+#define IFAN_DEPARTURE	1	/* interface departure */
 
 /*
  * Interface request structure used for socket
@@ -529,7 +570,7 @@ do {									\
 extern struct ifnet_head ifnet;
 extern struct ifnet **ifindex2ifnet;
 extern struct ifnet *lo0ifp;
-extern int if_index;
+extern int if_indexlim;
 
 void	ether_ifattach(struct ifnet *);
 void	ether_ifdetach(struct ifnet *);
@@ -555,7 +596,7 @@ int	ifconf(u_long, caddr_t);
 void	ifinit(void);
 int	ifioctl(struct socket *, u_long, caddr_t, struct proc *);
 int	ifpromisc(struct ifnet *, int);
-struct	ifnet *ifunit(char *);
+struct	ifnet *ifunit(const char *);
 
 struct	ifaddr *ifa_ifwithaddr(struct sockaddr *);
 struct	ifaddr *ifa_ifwithaf(int);
@@ -566,6 +607,12 @@ struct	ifaddr *ifa_ifwithroute(int, struct sockaddr *,
 struct	ifaddr *ifaof_ifpforaddr(struct sockaddr *, struct ifnet *);
 void	ifafree(struct ifaddr *);
 void	link_rtrequest(int, struct rtentry *, struct rt_addrinfo *);
+
+void	if_clone_attach(struct if_clone *);
+void	if_clone_detach(struct if_clone *);
+
+int	if_clone_create(const char *);
+int	if_clone_destroy(const char *);
 
 int	loioctl(struct ifnet *, u_long, caddr_t);
 void	loopattach(int);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: raw_ip.c,v 1.30 2003/07/09 22:03:16 itojun Exp $	*/
+/*	$OpenBSD: raw_ip.c,v 1.32 2003/12/21 14:57:19 markus Exp $	*/
 /*	$NetBSD: raw_ip.c,v 1.25 1996/02/18 18:58:33 christos Exp $	*/
 
 /*
@@ -119,14 +119,12 @@ struct sockaddr_in ripsrc = { sizeof(ripsrc), AF_INET };
 void
 rip_input(struct mbuf *m, ...)
 {
-	register struct ip *ip = mtod(m, struct ip *);
-	register struct inpcb *inp;
+	struct ip *ip = mtod(m, struct ip *);
+	struct inpcb *inp;
 	struct socket *last = 0;
 
 	ripsrc.sin_addr = ip->ip_src;
-	for (inp = rawcbtable.inpt_queue.cqh_first;
-	    inp != (struct inpcb *)&rawcbtable.inpt_queue;
-	    inp = inp->inp_queue.cqe_next) {
+	CIRCLEQ_FOREACH(inp, &rawcbtable.inpt_queue, inp_queue) {
 #ifdef INET6
 		if (inp->inp_flags & INP_IPV6)
 			continue;
@@ -178,8 +176,8 @@ rip_output(struct mbuf *m, ...)
 {
 	struct socket *so;
 	u_long dst;
-	register struct ip *ip;
-	register struct inpcb *inp;
+	struct ip *ip;
+	struct inpcb *inp;
 	int flags;
 	va_list ap;
 
@@ -259,8 +257,8 @@ rip_ctloutput(op, so, level, optname, m)
 	int level, optname;
 	struct mbuf **m;
 {
-	register struct inpcb *inp = sotoinpcb(so);
-	register int error;
+	struct inpcb *inp = sotoinpcb(so);
+	int error;
 
 	if (level != IPPROTO_IP) {
 		if (op == PRCO_SETOPT && *m)
@@ -324,12 +322,12 @@ u_long	rip_recvspace = RIPRCVQ;
 /*ARGSUSED*/
 int
 rip_usrreq(so, req, m, nam, control)
-	register struct socket *so;
+	struct socket *so;
 	int req;
 	struct mbuf *m, *nam, *control;
 {
-	register int error = 0;
-	register struct inpcb *inp = sotoinpcb(so);
+	int error = 0;
+	struct inpcb *inp = sotoinpcb(so);
 #ifdef MROUTING
 	extern struct socket *ip_mrouter;
 #endif
@@ -435,7 +433,7 @@ rip_usrreq(so, req, m, nam, control)
 	 */
 	case PRU_SEND:
 	    {
-		register u_int32_t dst;
+		u_int32_t dst;
 
 		if (so->so_state & SS_ISCONNECTED) {
 			if (nam) {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: disksubr.c,v 1.7 2003/06/02 23:27:50 millert Exp $	*/
+/*	$OpenBSD: disksubr.c,v 1.10 2004/03/17 14:16:04 miod Exp $	*/
 /*	$NetBSD: disksubr.c,v 1.21 1996/05/03 19:42:03 christos Exp $	*/
 
 /*
@@ -47,9 +47,7 @@
 #define BOOT_MAGIC_OFF (DOSPARTOFF+NDOSPART*sizeof(struct dos_partition))
 
 void
-dk_establish(dk, dev)
-	struct disk *dk;
-	struct device *dev;
+dk_establish(struct disk *dk, struct device *dev)
 {
 }
 
@@ -73,12 +71,8 @@ dk_establish(dk, dev)
  * Returns null on success and an error string on failure.
  */
 char *
-readdisklabel(dev, strat, lp, osdep, spoofonly)
-	dev_t dev;
-	void (*strat)(struct buf *);
-	register struct disklabel *lp;
-	struct cpu_disklabel *osdep;
-	int spoofonly;
+readdisklabel(dev_t dev, void (*strat)(struct buf *),
+    struct disklabel *lp, struct cpu_disklabel *osdep, int spoofonly)
 {
 	struct dos_partition *dp = osdep->dosparts, *dp2;
 	struct dkbad *bdp = &DKBAD(osdep);
@@ -93,7 +87,7 @@ readdisklabel(dev, strat, lp, osdep, spoofonly)
 
 
 	/* minimal requirements for archtypal disk label */
-	if (lp->d_secsize == 0)
+	if (lp->d_secsize < DEV_BSIZE)
 		lp->d_secsize = DEV_BSIZE;
 	if (lp->d_secperunit == 0)
 		lp->d_secperunit = 0x1fffffff;
@@ -112,7 +106,7 @@ readdisklabel(dev, strat, lp, osdep, spoofonly)
 
 	/* DPME (HFS) disklabel */
 
-	bp->b_blkno = 1; 
+	bp->b_blkno = 1;
 	bp->b_bcount = lp->d_secsize;
 	bp->b_flags = B_BUSY | B_READ;
 	bp->b_cylin = 1 / lp->d_secpercyl;
@@ -136,7 +130,7 @@ readdisklabel(dev, strat, lp, osdep, spoofonly)
 	for (i = 0; i < part_cnt; i++) {
 		struct partition *pp = &lp->d_partitions[8+n];
 
-		bp->b_blkno = 1+i; 
+		bp->b_blkno = 1+i;
 		bp->b_bcount = lp->d_secsize;
 		bp->b_flags = B_BUSY | B_READ;
 		bp->b_cylin = 1+i / lp->d_secpercyl;
@@ -152,20 +146,16 @@ readdisklabel(dev, strat, lp, osdep, spoofonly)
 			if ((*s >= 'a') && (*s <= 'z'))
 				*s = (*s - 'a' + 'A');
 
-		if (0 == strcmp(part->pmPartType, PART_TYPE_OPENBSD)) {
+		if (strcmp(part->pmPartType, PART_TYPE_OPENBSD) == 0) {
 			hfspartoff = part->pmPyPartStart;
 			osdep->macparts[1] = *part;
 		}
 		/* currently we ignore all but HFS partitions */
-		if (0 == strcmp(part->pmPartType, PART_TYPE_MAC)) {
+		if (strcmp(part->pmPartType, PART_TYPE_MAC) == 0) {
 			pp->p_offset = part->pmPyPartStart;
 			pp->p_size = part->pmPartBlkCnt;
 			pp->p_fstype = FS_HFS;
 			n++;
-#if 0
-			printf("found DPME HFS partition [%s], adding to fake\n",
-				part->pmPartName);
-#endif
 		}
 	}
 	lp->d_npartitions = MAXPARTITIONS;
@@ -217,13 +207,14 @@ hfs_done:
 			bp->b_flags = B_BUSY | B_READ;
 			bp->b_cylin = part_blkno / lp->d_secpercyl;
 			(*strat)(bp);
-		     
+
 			/* if successful, wander through dos partition table */
 			if (biowait(bp)) {
 				msg = "dos partition I/O error";
 				goto done;
 			}
-			bcopy(bp->b_data + DOSPARTOFF, dp, NDOSPART * sizeof(*dp));
+			bcopy(bp->b_data + DOSPARTOFF, dp,
+			    NDOSPART * sizeof(*dp));
 
 			if (ourpart == -1) {
 				/* Search for our MBR partition */
@@ -245,17 +236,20 @@ hfs_done:
 				if (ourpart == -1)
 					goto donot;
 				/*
-				 * This is our MBR partition. need sector address
-				 * for SCSI/IDE, cylinder for ESDI/ST506/RLL
+				 * This is our MBR partition.
+				 * need sector address * for SCSI/IDE,
+				 * cylinder for ESDI/ST506/RLL
 				 */
 				dp2 = &dp[ourpart];
-				dospartoff = get_le(&dp2->dp_start) + part_blkno;
+				dospartoff = get_le(&dp2->dp_start) +
+				    part_blkno;
 				cyl = DPCYL(dp2->dp_scyl, dp2->dp_ssect);
 
 				/* XXX build a temporary disklabel */
-				lp->d_partitions[0].p_size = get_le(&dp2->dp_size);
+				lp->d_partitions[0].p_size =
+				    get_le(&dp2->dp_size);
 				lp->d_partitions[0].p_offset =
-					get_le(&dp2->dp_start) + part_blkno;
+				    get_le(&dp2->dp_start) + part_blkno;
 				if (lp->d_ntracks == 0)
 					lp->d_ntracks = dp2->dp_ehd + 1;
 				if (lp->d_nsectors == 0)
@@ -353,7 +347,8 @@ donot:
 
 found_disklabel:
 	for (dlp = (struct disklabel *)bp->b_data;
-	    dlp <= (struct disklabel *)(bp->b_data + lp->d_secsize - sizeof(*dlp));
+	    dlp <= (struct disklabel *)(bp->b_data +
+	        lp->d_secsize - sizeof(*dlp));
 	    dlp = (struct disklabel *)((char *)dlp + sizeof(long))) {
 		if (dlp->d_magic != DISKMAGIC || dlp->d_magic2 != DISKMAGIC) {
 			if (msg == NULL)
@@ -422,13 +417,11 @@ done:
  * before setting it.
  */
 int
-setdisklabel(olp, nlp, openmask, osdep)
-	register struct disklabel *olp, *nlp;
-	u_long openmask;
-	struct cpu_disklabel *osdep;
+setdisklabel(struct disklabel *olp, struct disklabel *nlp, u_long openmask,
+    struct cpu_disklabel *osdep)
 {
-	register int i;
-	register struct partition *opp, *npp;
+	int i;
+	struct partition *opp, *npp;
 
 	/* sanity clause */
 	if (nlp->d_secpercyl == 0 || nlp->d_secsize == 0 ||
@@ -479,11 +472,8 @@ setdisklabel(olp, nlp, openmask, osdep)
  * XXX cannot handle OpenBSD partitions in extended partitions!
  */
 int
-writedisklabel(dev, strat, lp, osdep)
-	dev_t dev;
-	void (*strat)(struct buf *);
-	register struct disklabel *lp;
-	struct cpu_disklabel *osdep;
+writedisklabel(dev_t dev, void (*strat)(struct buf *), struct disklabel *lp,
+    struct cpu_disklabel *osdep)
 {
 	struct dos_partition *dp = osdep->dosparts, *dp2;
 	struct buf *bp;
@@ -497,7 +487,6 @@ writedisklabel(dev, strat, lp, osdep)
 
 	/* try DPME partition */
 	if (osdep->macparts[0].pmSig == PART_ENTRY_MAGIC) {
-		
 		/* only write if a valid "OpenBSD" partition type exists */
 		if (osdep->macparts[1].pmSig == PART_ENTRY_MAGIC) {
 			bp->b_blkno = osdep->macparts[1].pmPyPartStart;
@@ -511,7 +500,7 @@ writedisklabel(dev, strat, lp, osdep)
 		}
 
 		/* SHOULD FAIL TO WRITE LABEL IF VALID HFS partition exists
-		 * and no OpenBSD partition exists 
+		 * and no OpenBSD partition exists
 		 */
 		error = 1; /* EPERM? */
 		goto done;
@@ -536,13 +525,16 @@ writedisklabel(dev, strat, lp, osdep)
 		    NDOSPART * sizeof(*dp));
 
 		for (dp2=dp, i=0; i < NDOSPART && ourpart == -1; i++, dp2++)
-			if (get_le(&dp2->dp_size) && dp2->dp_typ == DOSPTYP_OPENBSD)
+			if (get_le(&dp2->dp_size) && dp2->dp_typ ==
+			    DOSPTYP_OPENBSD)
 				ourpart = i;
 		for (dp2=dp, i=0; i < NDOSPART && ourpart == -1; i++, dp2++)
-			if (get_le(&dp2->dp_size) && dp2->dp_typ == DOSPTYP_FREEBSD)
+			if (get_le(&dp2->dp_size) && dp2->dp_typ ==
+			    DOSPTYP_FREEBSD)
 				ourpart = i;
 		for (dp2=dp, i=0; i < NDOSPART && ourpart == -1; i++, dp2++)
-			if (get_le(&dp2->dp_size) && dp2->dp_typ == DOSPTYP_NETBSD)
+			if (get_le(&dp2->dp_size) && dp2->dp_typ ==
+			    DOSPTYP_NETBSD)
 				ourpart = i;
 
 		if (ourpart != -1) {
@@ -568,7 +560,8 @@ writedisklabel(dev, strat, lp, osdep)
 	if ((error = biowait(bp)) != 0)
 		goto done;
 	for (dlp = (struct disklabel *)bp->b_data;
-	    dlp <= (struct disklabel *)(bp->b_data + lp->d_secsize - sizeof(*dlp));
+	    dlp <= (struct disklabel *)(bp->b_data + lp->d_secsize -
+		sizeof(*dlp));
 	    dlp = (struct disklabel *)((char *)dlp + sizeof(long))) {
 		if (dlp->d_magic == DISKMAGIC && dlp->d_magic2 == DISKMAGIC &&
 		    dkcksum(dlp) == 0) {
@@ -599,11 +592,8 @@ done:
  * if needed, and signal errors or early completion.
  */
 int
-bounds_check_with_label(bp, lp, osdep, wlabel)
-	struct buf *bp;
-	struct disklabel *lp;
-	struct cpu_disklabel *osdep;
-	int wlabel;
+bounds_check_with_label(struct buf *bp, struct disklabel *lp,
+    struct cpu_disklabel *osdep, int wlabel)
 {
 #define blockpersec(count, lp) ((count) * (((lp)->d_secsize) / DEV_BSIZE))
 	struct partition *p = lp->d_partitions + DISKPART(bp->b_dev);

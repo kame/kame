@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.29 2003/01/24 09:57:41 miod Exp $ */
+/*	$OpenBSD: pmap.h,v 1.33 2003/12/19 21:25:02 miod Exp $ */
 /*
  * Mach Operating System
  * Copyright (c) 1991 Carnegie Mellon University
@@ -15,8 +15,8 @@
 #ifndef _MACHINE_PMAP_H_
 #define _MACHINE_PMAP_H_
 
-#include <machine/mmu.h>		/* batc_template_t, BATC_MAX, etc.*/
-#include <machine/pcb.h>		/* pcb_t, etc.*/
+#include <machine/mmu.h>
+#include <machine/pcb.h>
 
 /*
  * PMAP structure
@@ -24,20 +24,18 @@
 
 /* #define PMAP_USE_BATC */
 struct pmap {
-	sdt_entry_t		*pm_stpa;	/* physical pointer to sdt */
 	sdt_entry_t		*pm_stab;	/* virtual pointer to sdt */
+	u_int32_t		pm_apr;
 	int			pm_count;	/* reference count */
-	struct simplelock	pm_lock;
-	struct pmap_statistics	pm_stats;	/* pmap statistics */
-
 	/* cpus using of this pmap; NCPU must be <= 32 */
 	u_int32_t		pm_cpus;
-
+	struct simplelock	pm_lock;
+	struct pmap_statistics	pm_stats;	/* pmap statistics */
 #ifdef	PMAP_USE_BATC
-	batc_template_t		pm_ibatc[BATC_MAX];	/* instruction BATCs */
-	batc_template_t		pm_dbatc[BATC_MAX];	/* data BATCs */
+	u_int32_t		pm_ibatc[BATC_MAX];	/* instruction BATCs */
+	u_int32_t		pm_dbatc[BATC_MAX];	/* data BATCs */
 #endif
-}; 
+};
 
 #define PMAP_NULL ((pmap_t) 0)
 
@@ -65,10 +63,14 @@ extern	caddr_t		vmmap;
 #define pmap_phys_address(frame)        ((paddr_t)(ptoa(frame)))
 
 #define pmap_copy(dp,sp,d,l,s)		do { /* nothing */ } while (0)
-#define pmap_update(pmap)	do { /* nothing (yet) */ } while (0)
+#define pmap_update(pmap)		do { /* nothing (yet) */ } while (0)
+
+#define	pmap_clear_modify(pg)		pmap_unsetbit(pg, PG_M)
+#define	pmap_clear_reference(pg)	pmap_unsetbit(pg, PG_U)
 
 void pmap_bootstrap(vaddr_t, paddr_t *, paddr_t *, vaddr_t *, vaddr_t *);
 void pmap_cache_ctrl(pmap_t, vaddr_t, vaddr_t, u_int);
+boolean_t pmap_unsetbit(struct vm_page *, int);
 
 #endif	/* _KERNEL */
 

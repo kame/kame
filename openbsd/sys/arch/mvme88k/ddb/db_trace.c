@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_trace.c,v 1.18 2003/08/06 21:08:06 millert Exp $	*/
+/*	$OpenBSD: db_trace.c,v 1.27 2004/01/29 21:39:05 deraadt Exp $	*/
 /*
  * Mach Operating System
  * Copyright (c) 1993-1991 Carnegie Mellon University
@@ -29,13 +29,15 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 
-#include <machine/db_machdep.h> /* lots of stuff                  */
+#include <machine/db_machdep.h>
 #include <machine/locore.h>
 
 #include <ddb/db_variables.h>	/* db_variable, DB_VAR_GET, etc.  */
 #include <ddb/db_output.h>	/* db_printf                      */
 #include <ddb/db_sym.h>		/* DB_STGY_PROC, etc.             */
 #include <ddb/db_command.h>	/* db_recover                     */
+#include <ddb/db_access.h>
+#include <ddb/db_interface.h>
 
 union instruction {
 	unsigned rawbits;
@@ -95,12 +97,9 @@ static inline unsigned br_dest(unsigned addr, union instruction inst)
 
 #define TRACE_DEBUG	/* undefine to disable debugging */
 
-extern void db_read_bytes(vm_offset_t addr, int size, char *data);
-int frame_is_sane(db_regs_t *regs);
+int frame_is_sane(db_regs_t *regs, int);
 char *m88k_exception_name(unsigned vector);
-unsigned db_trace_get_val(vm_offset_t addr, unsigned *ptr);
-void db_stack_trace_print(db_regs_t *addr, int have_addr,
-    db_expr_t count, char *modif, int (*pr)(const char *, ...));
+unsigned db_trace_get_val(vaddr_t addr, unsigned *ptr);
 
 /*
  * Some macros to tell if the given text is the instruction.
@@ -117,7 +116,7 @@ void db_stack_trace_print(db_regs_t *addr, int have_addr,
 /* st r1, r31, IMM */
 #define ST_R1_R31_IMM(I)    (((I) & 0xffff0000U) == 0x243f0000U)
 
-static int trace_flags = 0;
+static int trace_flags;
 #define TRACE_DEBUG_FLAG		0x01
 #define TRACE_SHOWCALLPRESERVED_FLAG	0x02
 #define TRACE_SHOWADDRESS_FLAG		0x04
@@ -139,7 +138,7 @@ static int trace_flags = 0;
 #endif
 
 extern label_t *db_recover;
-extern int quiet_db_read_bytes;
+
 /*
  * m88k trace/register state interface for ddb.
  */
@@ -150,7 +149,7 @@ db_setf_regs(struct db_variable      *vp,
 	db_expr_t		*valuep,
 	int			op)		/* read/write */
 {
-	register int   *regp = (int *) ((char *) DDB_REGS + (int) (vp->valuep));
+	int   *regp = (int *) ((char *) DDB_REGS + (int) (vp->valuep));
 
 	if (op == DB_VAR_GET)
 		*valuep = *regp;
@@ -177,9 +176,6 @@ struct db_variable db_regs[] = {
 	N("dma2", dma2),   N("fpecr", fpecr),N("fphs1", fphs1),N("fpls1", fpls1),
 	N("fphs2", fphs2), N("fpls2", fpls2),N("fppt", fppt),  N("fprh", fprh),
 	N("fprl", fprl),   N("fpit", fpit),  N("fpsr", fpsr),  N("fpcr", fpcr),
-	N("mask", mask), /* interrupt mask */
-	N("mode", mode), /* interrupt mode */
-	N("exvc", vector), /* exception vector */
 };
 #undef N
 
@@ -202,7 +198,7 @@ struct db_variable *db_eregs = db_regs + sizeof(db_regs)/sizeof(db_regs[0]);
 static unsigned
 m88k_instruction_info(unsigned instruction)
 {
-	static struct {
+	static const struct {
 		unsigned mask, value, flags;
 	} *ptr, control[] = {
 		/* runs in the same order as 2nd Ed 88100 manual Table 3-14 */
@@ -251,7 +247,7 @@ hex_value_needs_0x(unsigned value)
 {
 	int i;
 	unsigned last = 0;
-	unsigned char c; 
+	unsigned char c;
 	unsigned have_a_hex_digit = 0;
 
 	if (value <= 9)
@@ -280,26 +276,26 @@ hex_value_needs_0x(unsigned value)
  *   0 if this looks like neither.
  */
 int
-frame_is_sane(db_regs_t *regs)
+frame_is_sane(db_regs_t *regs, int quiet)
 {
 	/* no good if we can't read the whole frame */
-	if (badwordaddr((vm_offset_t)regs) || badwordaddr((vm_offset_t)&regs->mode)) {
-		db_printf("[WARNING: frame at 0x%x : unreadable]\n", regs);
+	if (badwordaddr((vaddr_t)regs) || badwordaddr((vaddr_t)&regs->fpit)) {
+		if (quiet == 0)
+			db_printf("[WARNING: frame at %p : unreadable]\n", regs);
 		return 0;
 	}
 
-#ifndef DIAGNOSTIC
-	/* disabled for now  -- see fpu_enable in luna88k/eh.s */
 	/* r0 must be 0 (obviously) */
 	if (regs->r[0] != 0) {
-		db_printf("[WARNING: frame at 0x%x : r[0] != 0]\n", regs);
+		if (quiet == 0)
+			db_printf("[WARNING: frame at %p : r[0] != 0]\n", regs);
 		return 0;
 	}
-#endif
 
-	/* stack sanity ... r31 must be nonzero, but must be word aligned */
+	/* stack sanity ... r31 must be nonzero, and must be word aligned */
 	if (regs->r[31] == 0 || (regs->r[31] & 3) != 0) {
-		db_printf("[WARNING: frame at 0x%x : r[31] == 0 or not word aligned]\n", regs);
+		if (quiet == 0)
+			db_printf("[WARNING: frame at %p : r[31] == 0 or not word aligned]\n", regs);
 		return 0;
 	}
 
@@ -320,17 +316,16 @@ frame_is_sane(db_regs_t *regs)
 	/* epsr sanity */
 	if ((regs->epsr & PSR_MODE)) { /* kernel mode */
 		if (regs->epsr & PSR_BO)
-			db_printf("[WARNING: byte order in kernel frame at %x "
-				  "is little-endian!]\n", regs);
+			return 0;
 		return 1;
 	}
 	if (!(regs->epsr & PSR_MODE)) {	/* user mode */
 		if (regs->epsr & PSR_BO)
-			db_printf("[WARNING: byte order in user frame at %x "
-				  "is little-endian!]\n", regs);
+			return 0;
 		return 2;
 	}
-	db_printf("[WARNING: not an exception frame?]\n");
+	if (quiet == 0)
+		db_printf("[WARNING: not an exception frame?]\n");
 	return 0;
 }
 
@@ -368,26 +363,20 @@ m88k_exception_name(unsigned vector)
  * Return 1 if was able to read, 0 otherwise.
  */
 unsigned
-db_trace_get_val(vm_offset_t addr, unsigned *ptr)
+db_trace_get_val(vaddr_t addr, unsigned *ptr)
 {
 	label_t db_jmpbuf;
 	label_t *prev = db_recover;
-	boolean_t old_quiet_db_read_bytes = quiet_db_read_bytes;
-
-	quiet_db_read_bytes = 1;
 
 	if (setjmp((db_recover = &db_jmpbuf)) != 0) {
 		db_recover = prev;
-		quiet_db_read_bytes = old_quiet_db_read_bytes;
 		return 0;
 	} else {
 		db_read_bytes(addr, 4, (char *)ptr);
 		db_recover = prev;
-		quiet_db_read_bytes = old_quiet_db_read_bytes;
 		return 1;
 	}
 }
-
 
 #define FIRST_CALLPRESERVED_REG 14
 #define LAST_CALLPRESERVED_REG  29
@@ -452,7 +441,7 @@ print_args(void)
 			db_printf("?");
 		else {
 			unsigned value = saved_reg_value(reg);
-			db_printf("%s%x", hex_value_needs_0x(value) ? 
+			db_printf("%s%x", hex_value_needs_0x(value) ?
 				  "0x" : "", value);
 		}
 		if (reg == last_arg)
@@ -493,7 +482,7 @@ static int
 is_jump_source_ok(unsigned return_to, unsigned jump_to)
 {
 	unsigned flags;
-	union instruction instruction; 
+	union instruction instruction;
 
 	/*
 	 * Delayed branches are most common... look two instructions before
@@ -559,13 +548,13 @@ static int next_address_likely_wrong = 0;
  *
  */
 static int
-stack_decode(unsigned addr, unsigned *stack, int (*pr)(const char *, ...))
+stack_decode(db_addr_t addr, unsigned *stack, int (*pr)(const char *, ...))
 {
 	db_sym_t proc;
-	unsigned offset_from_proc;
+	db_expr_t offset_from_proc;
 	unsigned instructions_to_search;
-	unsigned check_addr;
-	unsigned function_addr;	    /* start of function */
+	db_addr_t check_addr;
+	db_addr_t function_addr;    /* start of function */
 	unsigned r31 = *stack;	    /* the r31 of the function */
 	unsigned inst;		    /* text of an instruction */
 	unsigned ret_addr;	    /* address to which we return */
@@ -809,8 +798,8 @@ db_stack_trace_cmd2(db_regs_t *regs, int (*pr)(const char *, ...))
 	 *      (in the current task).
 	 *   0 if this looks like neither.
 	 */
-	if (ft = frame_is_sane(regs), ft == 0) {
-		(*pr)("Register frame 0x%x is suspicous; skipping trace\n", regs);
+	if ((ft = frame_is_sane(regs, 1)) == 0) {
+		(*pr)("Register frame 0x%x is suspicious; skipping trace\n", regs);
 		return;
 	}
 
@@ -930,30 +919,30 @@ db_stack_trace_cmd2(db_regs_t *regs, int (*pr)(const char *, ...))
 		 * Here we are just looking for kernel exception frames.
 		 */
 
-		if (badwordaddr((vm_offset_t)stack) ||
-		    badwordaddr((vm_offset_t)(stack+4)))
+		if (badwordaddr((vaddr_t)stack) ||
+		    badwordaddr((vaddr_t)(stack+4)))
 			break;
 
-		db_read_bytes((vm_offset_t)stack, 2*sizeof(int), (char *)pair);
+		db_read_bytes((vaddr_t)stack, 2*sizeof(int), (char *)pair);
 
 		/* the pairs should match and equal stack+8 */
 		if (pair[0] == pair[1]) {
 			if (pair[0] != stack+8) {
 				/*
-				if (!badwordaddr((vm_offset_t)pair[0]) && (pair[0]!=0))
+				if (!badwordaddr((vaddr_t)pair[0]) && (pair[0]!=0))
 				(*pr)("stack_trace:found pair 0x%x but != to stack+8\n",
 				pair[0]);
 				*/
-				
 			}
 
-			else if (frame_is_sane((db_regs_t*)pair[0])) {
-				db_regs_t *frame = (db_regs_t *) pair[0];
-				char *cause = m88k_exception_name(frame -> vector);
+			else if (frame_is_sane((db_regs_t*)pair[0], 1) != 0) {
+				struct trapframe *frame =
+				    (struct trapframe *)pair[0];
 
 				(*pr)("-------------- %s [EF: 0x%x] -------------\n",
-					  cause, frame);
-				db_stack_trace_cmd2(frame, pr);
+				    m88k_exception_name(frame->tf_vector),
+				    frame);
+				db_stack_trace_cmd2(&frame->tf_regs, pr);
 				return;
 			}
 #ifdef TRACE_DEBUG
@@ -973,28 +962,28 @@ db_stack_trace_cmd2(db_regs_t *regs, int (*pr)(const char *, ...))
 	 * if the "u" option was specified.
 	 */
 	if (trace_flags & TRACE_USER_FLAG) {
-		db_regs_t *user;
+		struct trapframe *user;
 
 		/* Make sure we are back on the right page */
 		stack -= 4*FRAME_PLAY;
 		stack = stack & ~(KERNEL_STACK_SIZE-1);	/* point to the bottom */
 		stack += KERNEL_STACK_SIZE - 8;
 
-		if (badwordaddr((vm_offset_t)stack) ||
-		    badwordaddr((vm_offset_t)stack))
+		if (badwordaddr((vaddr_t)stack) ||
+		    badwordaddr((vaddr_t)stack))
 			return;
 
-		db_read_bytes((vm_offset_t)stack, 2*sizeof(int), (char *)pair);
+		db_read_bytes((vaddr_t)stack, 2*sizeof(int), (char *)pair);
 		if (pair[0] != pair[1])
 			return;
 
 		/* have a hit */
-		user = *((db_regs_t **) stack);
+		user = *((struct trapframe **)stack);
 
-		if (frame_is_sane(user) == 2) {
+		if (frame_is_sane(&user->tf_regs, 1) == 2) {
 			(*pr)("---------------- %s [EF : 0x%x] -------------\n",
-				  m88k_exception_name(user->vector), user);
-			db_stack_trace_cmd2(user, pr);
+			    m88k_exception_name(user->tf_vector), user);
+			db_stack_trace_cmd2(&user->tf_regs, pr);
 		}
 	}
 }
@@ -1006,23 +995,23 @@ db_stack_trace_cmd2(db_regs_t *regs, int (*pr)(const char *, ...))
  * printed.
  */
 void
-db_stack_trace_print(db_regs_t *addr,
+db_stack_trace_print(db_expr_t addr,
 		   int have_addr,
 		   db_expr_t count,
 		   char *modif,
 		   int (*pr)(const char *, ...))
 {
 	enum {
-		Default, Stack, Proc, Frame
+		Default, Stack, Frame
 	} style = Default;
-	db_regs_t frame; /* a m88100_saved_state */
+	db_regs_t frame;
 	db_regs_t *regs;
 	union {
 		db_regs_t *frame;
-		struct proc *proc;
-		unsigned num;
+		db_expr_t num;
 	} arg;
-	arg.frame = addr;
+
+	arg.num = addr;
 
 	trace_flags = 0; /* flags will be set via modifers */
 
@@ -1065,7 +1054,7 @@ db_stack_trace_print(db_regs_t *addr,
 		return;
 	}
 	if (have_addr && style == Default)
-		style = Proc;
+		style = Frame;
 
 	switch (style) {
 	case Default:
@@ -1073,8 +1062,6 @@ db_stack_trace_print(db_regs_t *addr,
 		break;
 	case Frame:
 		regs = arg.frame;
-		break;
-	case Proc:
 		break;
 	case Stack:
 		{
@@ -1154,4 +1141,3 @@ db_stack_trace_print(db_regs_t *addr,
 	}
 	db_stack_trace_cmd2(regs, pr);
 }
-

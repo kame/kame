@@ -1,4 +1,4 @@
-/*	$OpenBSD: sram.c,v 1.10 2003/06/02 07:06:56 deraadt Exp $ */
+/*	$OpenBSD: sram.c,v 1.15 2004/01/14 20:50:48 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -38,6 +38,8 @@
 #include <machine/cpu.h>
 #include <machine/mioctl.h>
 
+#include <mvme88k/dev/memdevs.h>
+
 #include <uvm/uvm_extern.h>
 
 struct sramsoftc {
@@ -55,7 +57,7 @@ struct cfattach sram_ca = {
 };
 
 struct cfdriver sram_cd = {
-	NULL, "sram", DV_DULL, 0
+	NULL, "sram", DV_DULL
 };
 
 int
@@ -63,27 +65,15 @@ srammatch(parent, vcf, args)
 	struct device *parent;
 	void *vcf, *args;
 {
-	struct cfdata *cf = vcf;
 	struct confargs *ca = args;
-	int ret;
 
-	if (brdtyp != BRD_187)	/* The only one... */
+	if (brdtyp != BRD_187 && brdtyp != BRD_8120)	/* The only one... */
 		return (0);
 
 	ca->ca_paddr = (void *)0xffe00000;
 	ca->ca_vaddr = (void *)0xffe00000;
 
-	if (ca->ca_vaddr == (void *)-1){
-	    if (badvaddr(ca->ca_vaddr, 4) <= 0){
-		printf("==> sram: failed physical address check.\n");
-		return (0);
-	    }
-	}
-	if (badvaddr(ca->ca_vaddr, 1) <= 0){
-	    printf("==> sram: failed virtual address check.\n");
-	    return (0);
-	}
-	return (1);
+	return (!badvaddr((vaddr_t)ca->ca_vaddr, 1));
 }
 
 void
@@ -93,23 +83,11 @@ sramattach(parent, self, args)
 {
 	struct confargs *ca = args;
 	struct sramsoftc *sc = (struct sramsoftc *)self;
-	struct mcreg *mc;
-	int i;
 
 	switch (brdtyp) {
-#ifdef MVME167
-	case BRD_167:
-	case BRD_166:
-		sc->sc_len = 128*1024;		/* always 128K */
-		break;
-#endif
-#ifdef MVME177
-	case BRD_177:
-		sc->sc_len = 128*1024;		/* always 128K */
-		break;
-#endif
 #ifdef MVME187
 	case BRD_187:
+	case BRD_8120:
 		sc->sc_len = 128*1024;		/* always 128K */
 		break;
 #endif
@@ -165,7 +143,7 @@ sramioctl(dev, cmd, data, flag, p)
 	int unit = minor(dev);
 	struct sramsoftc *sc = (struct sramsoftc *) sram_cd.cd_devs[unit];
 	int error = 0;
-	
+
 	switch (cmd) {
 	case MIOCGSIZ:
 		*(int *)data = sc->sc_len;

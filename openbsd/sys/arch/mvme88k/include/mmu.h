@@ -1,4 +1,4 @@
-/*	$OpenBSD: mmu.h,v 1.20 2003/09/07 13:52:17 miod Exp $ */
+/*	$OpenBSD: mmu.h,v 1.25 2003/12/19 18:08:20 miod Exp $ */
 
 /*
  * This file bears almost no resemblance to the original m68k file,
@@ -65,33 +65,18 @@
 #define	PG_PFNUM(x)	(((x) & PG_FRAME) >> PG_SHIFT)
 
 /* cache control bits */
-#define	CACHE_DFL	0x0000000
-#define	CACHE_INH	0x0000040	/* cache inhibit */
-#define	CACHE_GLOBAL	0x0000080	/* global scope */
-#define	CACHE_WT	0x0000200	/* write through */
+#define	CACHE_DFL	0x00000000
+#define	CACHE_INH	0x00000040	/* cache inhibit */
+#define	CACHE_GLOBAL	0x00000080	/* global scope */
+#define	CACHE_WT	0x00000200	/* write through */
 
-#define	CACHE_MASK	(~(CACHE_INH | CACHE_GLOBAL | CACHE_WT))
+#define	CACHE_MASK	(CACHE_INH | CACHE_GLOBAL | CACHE_WT)
 
 /*
  * Area descriptors
  */
 
-typedef struct cmmu_apr {
-	unsigned long
-			st_base:20,	/* segment table base address */
-			rsvA:2,		/* reserved */
-			wt:1,		/* writethrough (cache control) */
-			rsvB:1,		/* reserved */
-			g:1,		/* global (cache control) */
-			ci:1,		/* cache inhibit */
-			rsvC:5,		/* reserved */
-			te:1;		/* translation enable */
-} cmmu_apr_t;
-
-typedef union apr_template {
-	cmmu_apr_t	field;
-	unsigned long	bits;
-} apr_template_t;
+#define	APR_V		0x00000001	/* valid bit */
 
 /*
  * 88200 PATC (TLB)
@@ -103,22 +88,13 @@ typedef union apr_template {
  * BATC entries
  */
 
-typedef struct {
-	unsigned long
-			lba:13,		/* logical block address */
-			pba:13,		/* physical block address */
-			sup:1,		/* supervisor mode bit */
-			wt:1,		/* writethrough (cache control) */
-			g:1,		/* global (cache control) */
-			ci:1,		/* cache inhibit */
-			wp:1,		/* write protect */
-			v:1;		/* valid */
-} batc_entry_t;
+#define	BATC_V		0x00000001
+#define	BATC_PROT	0x00000002
+#define	BATC_INH	0x00000004
+#define	BATC_GLOBAL	0x00000008
+#define	BATC_WT		0x00000010
+#define	BATC_SO		0x00000020
 
-typedef union batc_template {
-	batc_entry_t	field;
-	unsigned long	bits;
-} batc_template_t;
 
 /*
  * Segment table entries
@@ -196,17 +172,14 @@ typedef	u_int32_t	pt_ind_entry_t;
 #define PDT_SIZE	(sizeof(pt_entry_t) * PDT_ENTRIES)
 
 /*
- * Shifts and masks 
+ * Shifts and masks
  */
 
 #define SDT_SHIFT	(PDT_BITS + PG_BITS)
 #define PDT_SHIFT	(PG_BITS)
 
-#define SDT_MASK	(((1<<SDT_BITS)-1) << SDT_SHIFT)
-#define PDT_MASK	(((1<<PDT_BITS)-1) << PDT_SHIFT)
-
-#define SDT_NEXT(va)	(((va) + (1<<SDT_SHIFT)) & SDT_MASK)
-#define PDT_NEXT(va)	(((va) + (1<<PDT_SHIFT)) & (SDT_MASK|PDT_MASK))
+#define SDT_MASK	(((1 << SDT_BITS) - 1) << SDT_SHIFT)
+#define PDT_MASK	(((1 << PDT_BITS) - 1) << PDT_SHIFT)
 
 #define	SDTIDX(va)	(((va) & SDT_MASK) >> SDT_SHIFT)
 #define	PDTIDX(va)	(((va) & PDT_MASK) >> PDT_SHIFT)
@@ -215,21 +188,10 @@ typedef	u_int32_t	pt_ind_entry_t;
 #define SDTENT(map, va)	((sdt_entry_t *)((map)->pm_stab + SDTIDX(va)))
 
 /*
- * Size of a PDT table group.
- */
-
-#define LOG2_PDT_SIZE			(PDT_BITS + 2)
-#define LOG2_PDT_TABLE_GROUP_SIZE	(PAGE_SHIFT - LOG2_PDT_SIZE)
-#define PDT_TABLE_GROUP_SIZE		(1 << LOG2_PDT_TABLE_GROUP_SIZE)
-
-#define PT_FREE(tbl)	uvm_km_free(kernel_map, (vaddr_t)tbl, PAGE_SIZE)
-
-/*
  * Va spaces mapped by tables and PDT table group.
  */
 
 #define PDT_VA_SPACE			(PDT_ENTRIES * PAGE_SIZE)
-#define PDT_TABLE_GROUP_VA_SPACE	(PDT_VA_SPACE * PDT_TABLE_GROUP_SIZE)
 
 /*
  * Number of sdt entries used to map user and kernel space.
@@ -251,6 +213,10 @@ typedef	u_int32_t	pt_ind_entry_t;
 /* number of BATC entries */
 #define BATC_MAX	8
 
+/* physical and logical block address */
+#define	BATC_PSHIFT	6
+#define	BATC_VSHIFT	(BATC_PSHIFT + (32 - BATC_BLKSHIFT))
+
 #define BATC_BLK_ALIGNED(x)	((x & BATC_BLKMASK) == 0)
 
 #define M88K_BTOBLK(x)	(x >> BATC_BLKSHIFT)
@@ -262,26 +228,25 @@ typedef	u_int32_t	pt_ind_entry_t;
 #define DMA_CACHE_SYNC_INVAL	0x2
 #define DMA_CACHE_INV		0x3
 
-void dma_cachectl(vm_offset_t, int, int);
+static pt_entry_t invalidate_pte(pt_entry_t *);
+static __inline__ pt_entry_t
+invalidate_pte(pt_entry_t *pte)
+{
+	pt_entry_t oldpte;
 
-/*
- * Alignment checks for pages (must lie on page boundaries).
- */
+	oldpte = PG_NV;
+	__asm__ __volatile__
+	    ("xmem %0, %2, r0" : "=r"(oldpte) : "0"(oldpte), "r"(pte));
+	__asm__ __volatile__ ("tb1 0, r0, 0");
+	return oldpte;
+}
 
-#define PAGE_ALIGNED(ad)	(((vm_offset_t)(ad) & PAGE_MASK) == 0)
-#define	CHECK_PAGE_ALIGN(ad,who)	\
-    if (!PAGE_ALIGNED(ad))		\
-    	printf("%s: addr  %x not page aligned.\n", who, ad)
-
-unsigned invalidate_pte(pt_entry_t *);
-
-extern vm_offset_t kmapva;
+extern vaddr_t kmapva;
 
 #define kvtopte(va)	\
 	((pt_entry_t *)(PG_PFNUM(*((sdt_entry_t *)kmapva + \
 	    SDTIDX(va) + SDT_ENTRIES)) << PDT_SHIFT) + PDTIDX(va))
 
-u_int kvtop(vm_offset_t);
+u_int kvtop(vaddr_t);
 
 #endif /* __MACHINE_MMU_H__ */
-

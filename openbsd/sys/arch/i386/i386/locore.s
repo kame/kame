@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.73 2003/07/29 18:24:36 mickey Exp $	*/
+/*	$OpenBSD: locore.s,v 1.77 2004/02/01 19:05:23 deraadt Exp $	*/
 /*	$NetBSD: locore.s,v 1.145 1996/05/03 19:41:19 christos Exp $	*/
 
 /*-
@@ -138,6 +138,7 @@
 	.data
 
 	.globl	_C_LABEL(cpu), _C_LABEL(cpu_id), _C_LABEL(cpu_vendor)
+	.globl	_C_LABEL(cpu_brandstr)
 	.globl	_C_LABEL(cpuid_level)
 	.globl	_C_LABEL(cpu_feature), _C_LABEL(cpu_ecxfeature)
 	.globl	_C_LABEL(cpu_cache_eax), _C_LABEL(cpu_cache_ebx)
@@ -158,6 +159,7 @@ _C_LABEL(cpu_cache_ebx):.long	0
 _C_LABEL(cpu_cache_ecx):.long	0
 _C_LABEL(cpu_cache_edx):.long	0
 _C_LABEL(cpu_vendor): .space 16	# vendor string returned by 'cpuid' instruction
+_C_LABEL(cpu_brandstr):	.space 48 # brand string returned by 'cpuid'
 _C_LABEL(cold):		.long	1	# cold till we are not
 _C_LABEL(esym):		.long	0	# ptr to end of syms
 _C_LABEL(boothowto):	.long	0	# boot flags
@@ -379,19 +381,45 @@ try586:	/* Use the `cpuid' instruction. */
 
 	movl	$RELOC(_C_LABEL(cpuid_level)),%eax
 	cmp	$2,%eax
-	jl	2f
+	jl	1f
 
 	movl	$2,%eax
 	cpuid
 /*
 	cmp	$1,%al
-	jne	2f
+	jne	1f
 */
 
 	movl	%eax,RELOC(_C_LABEL(cpu_cache_eax))
 	movl	%ebx,RELOC(_C_LABEL(cpu_cache_ebx))
 	movl	%ecx,RELOC(_C_LABEL(cpu_cache_ecx))
 	movl	%edx,RELOC(_C_LABEL(cpu_cache_edx))
+
+1:
+	/* Check if brand identification string is supported */
+	movl	$0x80000000,%eax
+	cpuid
+	cmpl	$0x80000000,%eax
+	jbe	2f
+	movl	$0x80000002,%eax
+	cpuid
+	movl	%eax,RELOC(_C_LABEL(cpu_brandstr))
+	movl	%ebx,RELOC(_C_LABEL(cpu_brandstr))+4
+	movl	%ecx,RELOC(_C_LABEL(cpu_brandstr))+8
+	movl	%edx,RELOC(_C_LABEL(cpu_brandstr))+12
+	movl	$0x80000003,%eax
+	cpuid
+	movl	%eax,RELOC(_C_LABEL(cpu_brandstr))+16
+	movl	%ebx,RELOC(_C_LABEL(cpu_brandstr))+20
+	movl	%ecx,RELOC(_C_LABEL(cpu_brandstr))+24
+	movl	%edx,RELOC(_C_LABEL(cpu_brandstr))+28
+	movl	$0x80000004,%eax
+	cpuid
+	movl	%eax,RELOC(_C_LABEL(cpu_brandstr))+32
+	movl	%ebx,RELOC(_C_LABEL(cpu_brandstr))+36
+	movl	%ecx,RELOC(_C_LABEL(cpu_brandstr))+40
+	andl	$0x00ffffff,%edx	/* Shouldn't be necessary */
+	movl	%edx,RELOC(_C_LABEL(cpu_brandstr))+44
 
 2:
 	/*
@@ -1719,7 +1747,7 @@ IDTVEC(dna)
 	pushl	$T_DNA
 	INTRENTRY
 	pushl	_C_LABEL(curproc)
-	call	_C_LABEL(npxdna)
+	call	*_C_LABEL(npxdna_func)
 	addl	$4,%esp
 	testl	%eax,%eax
 	jz	calltrap
@@ -1944,3 +1972,70 @@ ENTRY(bzero)
 
 	popl	%edi
 	ret
+
+#if defined(I686_CPU) && !defined(SMALL_KERNEL)
+ENTRY(sse2_pagezero)
+	pushl	%ebx
+	movl	8(%esp),%ecx
+	movl	%ecx,%eax
+	addl	$4096,%eax
+	xor	%ebx,%ebx
+1:
+	movnti	%ebx,(%ecx)
+	addl	$4,%ecx
+	cmpl	%ecx,%eax
+	jne	1b
+	sfence
+	popl	%ebx
+	ret
+
+ENTRY(i686_pagezero)
+	pushl	%edi
+	pushl	%ebx
+
+	movl	12(%esp), %edi
+	movl	$1024, %ecx
+	cld
+
+	ALIGN_TEXT
+1:
+	xorl	%eax, %eax
+	repe
+	scasl
+	jnz	2f
+
+	popl	%ebx
+	popl	%edi
+	ret
+
+	ALIGN_TEXT
+
+2:
+	incl	%ecx
+	subl	$4, %edi
+
+	movl	%ecx, %edx
+	cmpl	$16, %ecx
+
+	jge	3f
+
+	movl	%edi, %ebx
+	andl	$0x3f, %ebx
+	shrl	%ebx
+	shrl	%ebx
+	movl	$16, %ecx
+	subl	%ebx, %ecx
+
+3:
+	subl	%ecx, %edx
+	rep
+	stosl
+
+	movl	%edx, %ecx
+	testl	%edx, %edx
+	jnz	1b
+
+	popl	%ebx
+	popl	%edi
+	ret
+#endif

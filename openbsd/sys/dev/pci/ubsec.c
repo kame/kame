@@ -1,4 +1,4 @@
-/*	$OpenBSD: ubsec.c,v 1.131 2003/09/03 15:55:41 jason Exp $	*/
+/*	$OpenBSD: ubsec.c,v 1.133 2004/02/03 17:17:33 deraadt Exp $	*/
 
 /*
  * Copyright (c) 2000 Jason L. Wright (jason@thought.net)
@@ -47,8 +47,6 @@
 #include <sys/mbuf.h>
 #include <sys/device.h>
 #include <sys/queue.h>
-
-#include <uvm/uvm_extern.h>
 
 #include <crypto/cryptodev.h>
 #include <crypto/cryptosoft.h>
@@ -290,7 +288,7 @@ ubsec_attach(struct device *parent, struct device *self, void *aux)
 	 */
 	ubsec_init_board(sc);
 
-	printf(": %s", intrstr);
+	printf(": 3DES MD5 SHA1");
 
 #ifndef UBSEC_NO_RNG
 	if (sc->sc_flags & UBS_FLAGS_RNG) {
@@ -319,7 +317,7 @@ ubsec_attach(struct device *parent, struct device *self, void *aux)
 		else
 			sc->sc_rnghz = 1;
 		timeout_add(&sc->sc_rngto, sc->sc_rnghz);
-		printf(", rng");
+		printf(" RNG");
 skip_rng:
 	;
 	}
@@ -335,9 +333,10 @@ skip_rng:
 #endif
 
 		crypto_kregister(sc->sc_cid, kalgs, ubsec_kprocess);
+		printf(" PK");
 	}
 
-	printf("\n");
+	printf(", %s\n", intrstr);
 }
 
 /*

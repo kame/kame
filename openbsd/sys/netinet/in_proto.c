@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_proto.c,v 1.36 2003/06/02 23:28:14 millert Exp $	*/
+/*	$OpenBSD: in_proto.c,v 1.38 2003/12/15 07:11:30 mcbride Exp $	*/
 /*	$NetBSD: in_proto.c,v 1.14 1996/02/18 18:58:32 christos Exp $	*/
 
 /*
@@ -176,6 +176,17 @@
 #include <net/if_gre.h>
 #endif
 
+#include "carp.h"
+#if NCARP > 0
+#include <netinet/ip_carp.h>
+#endif
+
+#include "pfsync.h"
+#if NPFSYNC > 0
+#include <net/pfvar.h>
+#include <net/if_pfsync.h>
+#endif
+
 extern	struct domain inetdomain;
 
 struct protosw inetsw[] = {
@@ -299,6 +310,20 @@ struct protosw inetsw[] = {
   0,            0,              0,              0,		ipmobile_sysctl
 },
 #endif /* NGRE > 0 */
+#if NCARP > 0
+{ SOCK_RAW,	&inetdomain,	IPPROTO_CARP,	PR_ATOMIC|PR_ADDR,
+  carp_input,	rip_output,	0,		rip_ctloutput,
+  rip_usrreq,
+  0,		0,		0,		0,		carp_sysctl
+},
+#endif /* NCARP > 0 */
+#if NPFSYNC > 0
+{ SOCK_RAW,	&inetdomain,	IPPROTO_PFSYNC,	PR_ATOMIC|PR_ADDR,
+  pfsync_input,	rip_output,	0,		rip_ctloutput,
+  rip_usrreq,
+  0,		0,		0,		0,
+},
+#endif /* NPFSYNC > 0 */
 /* raw wildcard */
 { SOCK_RAW,	&inetdomain,	0,		PR_ATOMIC|PR_ADDR,
   rip_input,	rip_output,	0,		rip_ctloutput,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.51 2003/07/28 21:15:28 jason Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.58 2004/02/14 15:09:22 grange Exp $	*/
 /*	$NetBSD: cpu.h,v 1.35 1996/05/05 19:29:26 christos Exp $	*/
 
 /*-
@@ -143,6 +143,7 @@ struct cpu_cpuid_feature {
 extern int cpu;
 extern int cpu_class;
 extern int cpu_feature;
+extern int cpu_ecxfeature;
 extern int cpu_apmwarn;
 extern int cpu_apmhalt;
 extern int cpuid_level;
@@ -161,6 +162,10 @@ void fix_f00f(void);
 
 /* dkcsum.c */
 void	dkcsumattach(void);
+
+extern int i386_use_fxsave;
+extern int i386_has_sse;
+extern int i386_has_sse2;
 
 /* machdep.c */
 void	dumpconf(void);
@@ -183,6 +188,26 @@ void	initrtclock(void);
 void	startrtclock(void);
 void	rtcdrain(void *);
 
+/* est.c */
+#if !defined(SMALL_KERNEL) && defined(I686_CPU)
+void	est_init(const char *);
+int     est_cpuspeed(int *);
+int     est_setperf(int);
+#endif
+
+/* longrun.c */
+#if !defined(SMALL_KERNEL) && defined(I586_CPU)
+void	longrun_init(void);
+int	longrun_cpuspeed(int *);
+int	longrun_setperf(int);
+#endif
+
+/* p4tcc.c */
+#if !defined(SMALL_KERNEL) && defined(I686_CPU)
+void	p4tcc_init(int, int);
+int     p4tcc_setperf(int);
+#endif
+
 /* npx.c */
 void	npxdrop(void);
 void	npxsave(void);
@@ -195,7 +220,6 @@ int	math_emulate(struct trapframe *);
 #ifdef USER_LDT
 /* sys_machdep.h */
 extern int user_ldt_enable;
-void	i386_user_cleanup(struct pcb *);
 int	i386_get_ldt(struct proc *, void *, register_t *);
 int	i386_set_ldt(struct proc *, void *, register_t *);
 #endif
@@ -237,8 +261,11 @@ void	setconf(void);
 #define CPU_KBDRESET		10	/* keyboard reset under pcvt */
 #define CPU_APMHALT		11	/* halt -p hack */
 #define CPU_USERLDT		12
-#define	CPU_LONGRUN		13	/* LongRun status */
-#define	CPU_MAXID		14	/* number of valid machdep ids */
+#define CPU_OSFXSR		13	/* uses FXSAVE/FXRSTOR */
+#define CPU_SSE			14	/* supports SSE */
+#define CPU_SSE2		15	/* supports SSE2 */
+#define CPU_XCRYPT		16	/* supports VIA xcrypt in userland */
+#define CPU_MAXID		17	/* number of valid machdep ids */
 
 #define	CTL_MACHDEP_NAMES { \
 	{ 0, 0 }, \
@@ -254,7 +281,10 @@ void	setconf(void);
 	{ "kbdreset", CTLTYPE_INT }, \
 	{ "apmhalt", CTLTYPE_INT }, \
 	{ "userldt", CTLTYPE_INT }, \
-	{ "longrun", CTLTYPE_STRUCT }, \
+	{ "osfxsr", CTLTYPE_INT }, \
+	{ "sse", CTLTYPE_INT }, \
+	{ "sse2", CTLTYPE_INT }, \
+	{ "xcrypt", CTLTYPE_INT }, \
 }
 
 #endif /* !_I386_CPU_H_ */

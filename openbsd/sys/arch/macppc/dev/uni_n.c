@@ -1,10 +1,9 @@
-/*	$OpenBSD: uni_n.c,v 1.7 2003/06/03 01:35:30 drahn Exp $	*/
+/*	$OpenBSD: uni_n.c,v 1.9 2003/10/16 03:54:48 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1998-2001 Dale Rahn.
  * All rights reserved.
  *
- *   
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -24,7 +23,7 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */  
+ */
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -54,27 +53,21 @@ struct cfattach memc_ca = {
 void *uni_n_config(int handle);
 
 int
-memcmatch(parent, cf, aux)
-	struct device *parent;
-	void *cf;
-	void *aux;
+memcmatch(struct device *parent, void *cf, void *aux)
 {
 	struct confargs *ca = aux;
 	static int memc_attached = 0;
 
 	/* allow only one instance */
 	if (memc_attached == 0) {
-		if (0 == strcmp (ca->ca_name, "memc")) {
+		if (0 == strcmp (ca->ca_name, "memc"))
 			return 1;
-		}
 	}
 	return 0;
 }
 
 static void
-memcattach(parent, self, aux)
-	struct device *parent, *self;
-	void   *aux;
+memcattach(struct device *parent, struct device *self, void *aux)
 {
 	struct confargs *ca = aux;
 	int len;
@@ -82,14 +75,15 @@ memcattach(parent, self, aux)
 	struct memc_softc *sc = (struct memc_softc *)self;
 
 	len = OF_getprop(ca->ca_node, "name", name, sizeof name);
-	if (len > 0) {
+	if (len > 0)
 		name[len] = 0;
-	}
-	if (strcmp (name, "uni-n")== 0) {
+
+	if (strcmp (name, "uni-n")== 0)
 		sc->baseaddr = uni_n_config(ca->ca_node);
-	}
+
 	printf (": %s\n", name);
 }
+
 void *
 uni_n_config(int handle)
 {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.244 2003/09/11 21:48:56 deraadt Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.287 2004/03/26 04:00:59 drahn Exp $	*/
 /*	$NetBSD: machdep.c,v 1.214 1996/11/10 03:16:17 thorpej Exp $	*/
 
 /*-
@@ -103,6 +103,7 @@
 
 #ifdef CRYPTO
 #include <crypto/cryptodev.h>
+#include <crypto/rijndael.h>
 #endif
 
 #ifdef KGDB
@@ -113,8 +114,6 @@
 #include <stand/boot/bootarg.h>
 
 #include <uvm/uvm_extern.h>
-
-#include <sys/sysctl.h>
 
 #define _I386_BUS_DMA_PRIVATE
 #include <machine/bus.h>
@@ -238,6 +237,11 @@ int	i386_fpu_present;
 int	i386_fpu_exception;
 int	i386_fpu_fdivbug;
 
+int	i386_use_fxsave;
+int	i386_has_sse;
+int	i386_has_sse2;
+int	i386_has_xcrypt;
+
 bootarg_t *bootargp;
 paddr_t avail_end;
 
@@ -245,6 +249,8 @@ struct vm_map *exec_map = NULL;
 struct vm_map *phys_map = NULL;
 
 int kbd_reset;
+int p4_model;
+int setperf_prio = 0;		/* for concurrent handlers */
 
 /*
  * Extent maps to manage I/O and ISA memory hole space.  Allocate
@@ -271,13 +277,12 @@ int	cpu_dump(void);
 void	identifycpu(void);
 void	init386(paddr_t);
 void	consinit(void);
+void	(*cpuresetfn)(void);
 
 int	bus_mem_add_mapping(bus_addr_t, bus_size_t,
 	    int, bus_space_handle_t *);
 int	_bus_dmamap_load_buffer(bus_dma_tag_t, bus_dmamap_t, void *,
     bus_size_t, struct proc *, int, paddr_t *, int *, int);
-
-int	longrun_sysctl(void *, size_t *, void *, size_t);
 
 #ifdef KGDB
 #ifndef KGDB_DEVNAME
@@ -315,15 +320,21 @@ int allowaperture = 0;
 
 void	winchip_cpu_setup(const char *, int, int);
 void	amd_family5_setup(const char *, int, int);
+void	amd_family6_setup(const char *, int, int);
 void	cyrix3_cpu_setup(const char *, int, int);
 void	cyrix6x86_cpu_setup(const char *, int, int);
 void	natsem6x86_cpu_setup(const char *, int, int);
 void	intel586_cpu_setup(const char *, int, int);
+void	intel686_common_cpu_setup(const char *, int, int);
 void	intel686_cpu_setup(const char *, int, int);
+void	intel686_p4_cpu_setup(const char *, int, int);
 void	tm86_cpu_setup(const char *, int, int);
 char *	intel686_cpu_name(int);
 char *	cyrix3_cpu_name(int, int);
+char *	tm86_cpu_name(int);
 void	viac3_rnd(void *);
+int	p4_cpuspeed(int *);
+int	pentium_cpuspeed(int *);
 
 #if defined(I486_CPU) || defined(I586_CPU) || defined(I686_CPU)
 static __inline u_char
@@ -339,6 +350,7 @@ cyrix_write_reg(u_char reg, u_char data)
 	outb(0x22, reg);
 	outb(0x23, data);
 }
+#endif
 
 /*
  * cpuid instruction.  request in eax, result in eax, ebx, ecx, edx.
@@ -357,7 +369,6 @@ cpuid(u_int32_t ax, u_int32_t *regs)
 	    :"0" (ax), "S" (regs)
 	    :"bx", "cx", "dx");
 }
-#endif
 
 /*
  * Machine-dependent startup code
@@ -453,7 +464,6 @@ i386_proc0_tss_ldt_init()
 	int x;
 
 	curpcb = pcb = &proc0.p_addr->u_pcb;
-	pcb->pcb_flags = 0;
 	pcb->pcb_tss.tss_ioopt =
 	    ((caddr_t)pcb->pcb_iomap - (caddr_t)&pcb->pcb_tss) << 16;
 	for (x = 0; x < sizeof(pcb->pcb_iomap) / 4; x++)
@@ -680,7 +690,7 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 			CPUCLASS_486, 
 			{
 				"486DX", "486DX", "486SX", "486DX2", "486SL",
-				"486SX2", 0, "486DX2 W/B Enhanced",
+				"486SX2", 0, "486DX2 W/B",
 				"486DX4", 0, 0, 0, 0, 0, 0, 0,
 				"486"		/* Default */
 			},
@@ -690,10 +700,10 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 		{
 			CPUCLASS_586,
 			{
-				"Pentium (P5 A-step)", "Pentium (P5)",
+				"Pentium (A-step)", "Pentium (P5)",
 				"Pentium (P54C)", "Pentium (P24T)",
 				"Pentium/MMX", "Pentium", 0,
-				"Pentium (P54C)", "Pentium/MMX (Tillamook)",
+				"Pentium (P54C)", "Pentium/MMX",
 				0, 0, 0, 0, 0, 0, 0,
 				"Pentium"	/* Default */
 			},
@@ -703,15 +713,15 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 		{
 			CPUCLASS_686,
 			{
-				"Pentium Pro (A-step)", "Pentium Pro", 0,
-				"Pentium II (Klamath)", "Pentium Pro",
-				"Pentium II/Celeron (Deschutes)",
-				"Celeron (Mendocino)",
-				"Pentium III (Katmai)",
-				"Pentium III (Coppermine)",
+				"Pentium Pro", "Pentium Pro", 0,
+				"Pentium II", "Pentium Pro",
+				"Pentium II/Celeron",
+				"Celeron",
+				"Pentium III",
+				"Pentium III",
 				"Pentium M",
-				"Pentium III Xeon (Cascades)",
-				"Pentium III (Tualatin)", 0, 0,
+				"Pentium III Xeon",
+				"Pentium III", 0, 0,
 				0, 0,
 				"Pentium Pro, II or III"	/* Default */
 			},
@@ -759,7 +769,7 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 				0, 0, 0, 0,
 				"Pentium 4"	/* Default */
 			},
-			intel686_cpu_setup
+			intel686_p4_cpu_setup
 		} }
 	},
 	{
@@ -796,16 +806,59 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 			CPUCLASS_686,
 			{
 				0, "Athlon Model 1", "Athlon Model 2",
-				"Duron Model 3 (Spitfire)",
-				"Athlon Model 4 (Thunderbird)",
-				0, "Athlon XP Model 6 (Palomino)",
-				"Duron Model 7 (Morgan)", 
-				"Athlon XP Model 8 (Thoroughbred)",
-				0, "Athlon XP Model 10 (Barton)",
+				"Duron Model 3",
+				"Athlon Model 4",
+				0, "Athlon XP Model 6",
+				"Duron Model 7", 
+				"Athlon XP Model 8",
+				0, "Athlon XP Model 10",
 				0, 0, 0, 0, 0,
-				"K7 (Athlon)"		/* Default */
+				"K7"		/* Default */
 			},
-			NULL
+			amd_family6_setup
+		},
+		/* Family 7 */
+		{
+			CPUCLASS_686,
+		} ,
+		/* Family 8 */
+		{
+			CPUCLASS_686,
+		} ,
+		/* Family 9 */
+		{
+			CPUCLASS_686,
+		} ,
+		/* Family A */
+		{
+			CPUCLASS_686,
+		} ,
+		/* Family B */
+		{
+			CPUCLASS_686,
+		} ,
+		/* Family C */
+		{
+			CPUCLASS_686,
+		} ,
+		/* Family D */
+		{
+			CPUCLASS_686,
+		} ,
+		/* Family E */
+		{
+			CPUCLASS_686,
+		} ,
+		/* Family F */
+		{
+			CPUCLASS_686,
+			{
+				0, 0, 0, 0, "Athlon64",
+				"Opteron or Athlon64FX", 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+				"AMD64"			/* DEFAULT */
+			},
+			amd_family6_setup
 		} }
 	},
 	{
@@ -826,9 +879,9 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 		{
 			CPUCLASS_586,
 			{
-				0, 0, "6x86 (M1)", 0, "GXm", 0, 0, 0, 0, 0,
+				0, 0, "6x86", 0, "GXm", 0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 0,
-				"M1 class"	/* Default */
+				"586 class"	/* Default */
 			},
 			cyrix6x86_cpu_setup
 		},
@@ -836,9 +889,9 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 		{
 			CPUCLASS_686,
 			{
-				"6x86MX (M2)", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				"6x86MX", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 				0, 0, 0, 0,
-				"M2 class"	/* Default */
+				"686 class"	/* Default */
 			},
 			NULL
 		} }
@@ -871,9 +924,11 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 		{
 			CPUCLASS_686,
 			{
-				0, 0, 0, 0, 0, 0, "C3 Samuel 1",
-				"C3 Samule 2/Ezra",
-				"C3 Ezra-T", 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0,
+				"C3 Samuel",
+				"C3 Samuel 2/Ezra",
+				"C3 Ezra-T",
+				"C3 Nehemiah", 0, 0, 0, 0, 0, 0,
 				"C3"		/* Default */
 			},
 			cyrix3_cpu_setup
@@ -932,8 +987,8 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 		{
 			CPUCLASS_586,
 			{
-				0, 0, 0, "TMS5400", "TMS5600", 0, 0, 0,
-				0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, "TMS5x00", 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0, 0,
 				"TMS5x00"		/* Default */
 			},
 			tm86_cpu_setup
@@ -969,9 +1024,34 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 			{
 				0, 0, 0, 0, "Geode GX1", 0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 0,
-				"M1 class"	/* Default */
+				"586 class"	/* Default */
 			},
 			natsem6x86_cpu_setup
+		} }
+	},
+	{
+		"SiS SiS SiS ",
+		CPUVENDOR_SIS,
+		"SiS",
+		/* Family 4, not available from SiS */
+		{ {
+			CPUCLASS_486,
+			{
+				0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+				"486 class"	/* Default */
+			},
+			NULL
+		},
+		/* Family 5 */
+		{
+			CPUCLASS_586,
+			{
+				"SiS55x", 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0,
+				"586 class"	/* Default */
+			},
+			NULL
 		} }
 	}
 };
@@ -1000,8 +1080,8 @@ const struct cpu_cpuid_feature i386_cpuid_features[] = {
 	{ CPUID_ACPI,	"ACPI" },
 	{ CPUID_MMX,	"MMX" },
 	{ CPUID_FXSR,	"FXSR" },
-	{ CPUID_SIMD,	"SIMD" },
-	{ CPUID_SIMD2,	"SIMD2" },
+	{ CPUID_SSE,	"SSE" },
+	{ CPUID_SSE2,	"SSE2" },
 	{ CPUID_SS,	"SS" },
 	{ CPUID_HTT,	"HTT" },
 	{ CPUID_TM,	"TM" },
@@ -1010,6 +1090,8 @@ const struct cpu_cpuid_feature i386_cpuid_features[] = {
 };
 
 const struct cpu_cpuid_feature i386_cpuid_ecxfeatures[] = {
+	{ CPUIDECX_PNI,		"PNI" },
+	{ CPUIDECX_MWAIT,	"MWAIT" },
 	{ CPUIDECX_EST,		"EST" },
 	{ CPUIDECX_TM2,		"TM2" },
 	{ CPUIDECX_CNXTID,	"CNXT-ID" },
@@ -1021,7 +1103,6 @@ winchip_cpu_setup(cpu_device, model, step)
 	int model, step;
 {
 #if defined(I586_CPU)
-	extern int cpu_feature;
 
 	switch (model) {
 	case 4: /* WinChip C6 */
@@ -1029,7 +1110,7 @@ winchip_cpu_setup(cpu_device, model, step)
 		/* Disable RDTSC instruction from user-level. */
 		lcr4(rcr4() | CR4_TSD);
 
-		printf("%s: broken TSC disabled\n", cpu_device);
+		printf("%s: TSC disabled\n", cpu_device);
 		break;
 	}
 #endif
@@ -1037,7 +1118,7 @@ winchip_cpu_setup(cpu_device, model, step)
 
 #if defined(I686_CPU)
 /*
- * Note, the VIA C3 Nehemia provides 4 internal 8-byte buffers, which
+ * Note, the VIA C3 Nehemiah provides 4 internal 8-byte buffers, which
  * store random data, and can be accessed a lot quicker than waiting
  * for new data to be generated.  As we are using every 8th bit only
  * due to whitening. Since the RNG generates in excess of 21KB/s at
@@ -1065,44 +1146,47 @@ void
 viac3_rnd(void *v)
 {
 	struct timeout *tmo = v;
-	unsigned int *p, i, rv, creg0, creg4, len = VIAC3_RNG_BUFSIZ;
-	static int buffer[VIAC3_RNG_BUFSIZ + 2];
-	int s;
+	unsigned int *p, i, rv, creg0, len = VIAC3_RNG_BUFSIZ;
+	static int buffer[VIAC3_RNG_BUFSIZ + 2];	/* XXX why + 2? */
 
-	s = splhigh();
-	/* XXX - should not be needed, but we need FXSR & FPU set to access RNG */
-	creg0 = rcr0();
+	creg0 = rcr0();		/* Permit access to SIMD/FPU path */
 	lcr0(creg0 & ~(CR0_EM|CR0_TS));
-	creg4 = rcr4();
-	lcr4(creg4 | CR4_OSFXSR);
 
 	/*
 	 * Here we collect the random data from the VIA C3 RNG.  We make
 	 * sure that we turn on maximum whitening (%edx[0,1] == "11"), so
 	 * that we get the best random data possible.
 	 */
-	__asm __volatile ("rep;.byte 0x0F,0xA7,0xC0"
+	__asm __volatile("rep xstore-rng"
 	    : "=a" (rv) : "d" (3), "D" (buffer), "c" (len*sizeof(int))
 	    : "memory", "cc");
 
-	/* XXX - should not be needed */
 	lcr0(creg0);
-	lcr4(creg4);
 
 	for (i = 0, p = buffer; i < VIAC3_RNG_BUFSIZ; i++, p++)
 		add_true_randomness(*p);
 
-	timeout_add(tmo, (hz>100)?(hz/100):1);
-	splx(s);
+	timeout_add(tmo, (hz > 100) ? (hz / 100) : 1);
 }
 
 #ifdef CRYPTO
+
 struct viac3_session {
-	u_int8_t ses_iv[16];
-	int ses_klen, ses_used;
+	u_int32_t	ses_ekey[4 * (MAXNR + 1) + 4];	/* 128 bit aligned */
+	u_int32_t	ses_dkey[4 * (MAXNR + 1) + 4];	/* 128 bit aligned */
+	u_int8_t	ses_iv[16];			/* 128 bit aligned */
+	u_int32_t	ses_cw0;
+	int		ses_klen;
+	int		ses_used;
+	int		ses_pad;			/* to multiple of 16 */
 };
 
 struct viac3_softc {
+	u_int32_t		op_cw[4];		/* 128 bit aligned */
+	u_int8_t		op_iv[16];		/* 128 bit aligned */
+	void			*op_buf;
+
+	/* normal softc stuff */
 	int32_t			sc_cid;
 	int			sc_nsessions;
 	struct viac3_session	*sc_sessions;
@@ -1111,44 +1195,14 @@ struct viac3_softc {
 #define VIAC3_SESSION(sid)		((sid) & 0x0fffffff)
 #define	VIAC3_SID(crd,ses)		(((crd) << 28) | ((ses) & 0x0fffffff))
 
-#define	C3_CRYPT_CWLO_ROUND_M		0x0000000f
-#define	C3_CRYPT_CWLO_ALG_M		0x00000070
-#define	C3_CRYPT_CWLO_ALG_AES		0x00000000
-#define	C3_CRYPT_CWLO_KEYGEN_M		0x00000080
-#define	C3_CRYPT_CWLO_KEYGEN_HW		0x00000000
-#define	C3_CRYPT_CWLO_KEYGEN_SW		0x00000080
-#define	C3_CRYPT_CWLO_NORMAL		0x00000000
-#define	C3_CRYPT_CWLO_INTERMEDIATE	0x00000100
-#define	C3_CRYPT_CWLO_ENCRYPT		0x00000000
-#define	C3_CRYPT_CWLO_DECRYPT		0x00000200
-#define	C3_CRYPT_CWLO_KEY128		0x0000000a	/* 128bit, 10 rds */
-#define	C3_CRYPT_CWLO_KEY192		0x0000040c	/* 192bit, 12 rds */
-#define	C3_CRYPT_CWLO_KEY256		0x0000080e	/* 256bit, 15 rds */
-
-struct viac3_crypto_op {
-	u_int32_t		op_cw[4];
-	u_int8_t		op_iv[16];
-	u_int8_t		op_key[32];
-	void			*op_src;
-	void			*op_dst;
-	u_int32_t		pad[2];
-};
-
 static struct viac3_softc *vc3_sc;
 int viac3_crypto_present;
-
-/* Opcodes */
-#define	VIAC3_CRYPTOP_RNG	0xc0		/* rng */
-#define	VIAC3_CRYPTOP_ECB	0xc8		/* aes-ecb */
-#define	VIAC3_CRYPTOP_CBC	0xd0		/* aes-cbc */
-#define	VIAC3_CRYPTOP_CFB	0xe0		/* aes-cfb */
-#define	VIAC3_CRYPTOP_OFB	0xe8		/* aes-ofb */
 
 void viac3_crypto_setup(void);
 int viac3_crypto_newsession(u_int32_t *, struct cryptoini *);
 int viac3_crypto_process(struct cryptop *);
 int viac3_crypto_freesession(u_int64_t);
-void viac3_crypto(void *, void *, void *, void *, int, void *, int);
+static __inline void viac3_cbc(void *, void *, void *, void *, int, void *);
 
 void
 viac3_crypto_setup(void)
@@ -1168,6 +1222,7 @@ viac3_crypto_setup(void)
 
 	crypto_register(vc3_sc->sc_cid, algs, viac3_crypto_newsession,
 	    viac3_crypto_freesession, viac3_crypto_process);
+	i386_has_xcrypt = 1;
 }
 
 int
@@ -1175,15 +1230,28 @@ viac3_crypto_newsession(u_int32_t *sidp, struct cryptoini *cri)
 {
 	struct viac3_softc *sc = vc3_sc;
 	struct viac3_session *ses = NULL;
-	int sesn;
+	int sesn, i, cw0;
 
-	if (sc == NULL || sidp == NULL || cri == NULL)
+	if (sc == NULL || sidp == NULL || cri == NULL ||
+	    cri->cri_next != NULL || cri->cri_alg != CRYPTO_AES_CBC)
 		return (EINVAL);
-	if (cri->cri_next != NULL || cri->cri_alg != CRYPTO_AES_CBC)
+
+	switch (cri->cri_klen) {
+	case 128:
+		cw0 = C3_CRYPT_CWLO_KEY128;
+		break;
+	case 192:
+		cw0 = C3_CRYPT_CWLO_KEY192;
+		break;
+	case 256:
+		cw0 = C3_CRYPT_CWLO_KEY256;
+		break;
+	default:
 		return (EINVAL);
-	/* Initial version doesn't work for 192/256 */
-	if (cri->cri_klen != 128)
-		return (EINVAL);
+	}
+	cw0 |= C3_CRYPT_CWLO_ALG_AES | C3_CRYPT_CWLO_KEYGEN_SW |
+	    C3_CRYPT_CWLO_NORMAL;
+
 	if (sc->sc_sessions == NULL) {
 		ses = sc->sc_sessions = (struct viac3_session *)malloc(
 		    sizeof(*ses), M_DEVBUF, M_NOWAIT);
@@ -1219,7 +1287,15 @@ viac3_crypto_newsession(u_int32_t *sidp, struct cryptoini *cri)
 
 	get_random_bytes(ses->ses_iv, sizeof(ses->ses_iv));
 	ses->ses_klen = cri->cri_klen;
-	bcopy(cri->cri_key, cri->cri_key, ses->ses_klen / 8);
+	ses->ses_cw0 = cw0;
+
+	/* Build expanded keys for both directions */
+	rijndaelKeySetupEnc(ses->ses_ekey, cri->cri_key, cri->cri_klen);
+	rijndaelKeySetupDec(ses->ses_dkey, cri->cri_key, cri->cri_klen);
+	for (i = 0; i < 4 * (MAXNR + 1); i++) {
+		ses->ses_ekey[i] = ntohl(ses->ses_ekey[i]);
+		ses->ses_dkey[i] = ntohl(ses->ses_dkey[i]);
+	}
 
 	*sidp = VIAC3_SID(0, sesn);
 	return (0);
@@ -1241,19 +1317,45 @@ viac3_crypto_freesession(u_int64_t tid)
 	return (0);
 }
 
+static __inline void
+viac3_cbc(void *cw, void *src, void *dst, void *key, int rep,
+    void *iv)
+{
+	unsigned int creg0;
+
+	creg0 = rcr0();		/* Permit access to SIMD/FPU path */
+	lcr0(creg0 & ~(CR0_EM|CR0_TS));
+
+	/* Do the deed */
+	__asm __volatile("pushfl; popfl");
+	__asm __volatile("rep xcrypt-cbc" :
+	    : "a" (iv), "b" (key), "c" (rep), "d" (cw), "S" (src), "D" (dst)
+	    : "memory", "cc");
+
+	lcr0(creg0);
+}
+
 int
 viac3_crypto_process(struct cryptop *crp)
 {
 	struct viac3_softc *sc = vc3_sc;
-	struct viac3_crypto_op *op = NULL;
-	int sesn, err = 0;
-	struct cryptodesc *crd;
 	struct viac3_session *ses;
+	struct cryptodesc *crd;
+	int sesn, err = 0;
+	u_int32_t *key;
 
 	if (crp == NULL || crp->crp_callback == NULL) {
 		err = EINVAL;
 		goto out;
 	}
+	crd = crp->crp_desc;
+	if (crd == NULL || crd->crd_next != NULL ||
+	    crd->crd_alg != CRYPTO_AES_CBC || 
+	    (crd->crd_len % 16) != 0) {
+		err = EINVAL;
+		goto out;
+	}
+
 	sesn = VIAC3_SESSION(crp->crp_sid);
 	if (sesn >= sc->sc_nsessions) {
 		err = EINVAL;
@@ -1261,96 +1363,70 @@ viac3_crypto_process(struct cryptop *crp)
 	}
 	ses = &sc->sc_sessions[sesn];
 
-	crd = crp->crp_desc;
-	if (crd == NULL || crd->crd_next != NULL ||
-	    crd->crd_alg != CRYPTO_AES_CBC || crd->crd_klen != 128) {
-		err = EINVAL;
-		goto out;
-	}
-
-	op = (struct viac3_crypto_op *)malloc(sizeof(*op), M_DEVBUF, M_NOWAIT);
-	if (op == NULL) {
+	sc->op_buf = (char *)malloc(crd->crd_len, M_DEVBUF, M_NOWAIT);
+	if (sc->op_buf == NULL) {
 		err = ENOMEM;
 		goto out;
 	}
 
-	bcopy(crd->crd_key, op->op_key, crd->crd_klen / 8);
-
-	if ((crd->crd_len % 16) != 0) {
-		err = EINVAL;
-		goto out;
-	}
-
-	op->op_src = (char *)malloc(crd->crd_len, M_DEVBUF, M_NOWAIT);
-	if (op->op_src == NULL) {
-		err = ENOMEM;
-		goto out;
-	}
-
-	op->op_dst = (char *)malloc(crd->crd_len, M_DEVBUF, M_NOWAIT);
-	if (op->op_dst == NULL) {
-		err = ENOMEM;
-		goto out;
-	}
-
-	op->op_cw[0] = C3_CRYPT_CWLO_ALG_AES | C3_CRYPT_CWLO_KEYGEN_HW |
-	    C3_CRYPT_CWLO_NORMAL | C3_CRYPT_CWLO_KEY128;
-	op->op_cw[1] = op->op_cw[2] = op->op_cw[3] = 0;
 	if (crd->crd_flags & CRD_F_ENCRYPT) {
-		op->op_cw[0] |= C3_CRYPT_CWLO_ENCRYPT;
+		sc->op_cw[0] = ses->ses_cw0 | C3_CRYPT_CWLO_ENCRYPT;
+		key = ses->ses_ekey;
 		if (crd->crd_flags & CRD_F_IV_EXPLICIT)
-			bcopy(crd->crd_iv, op->op_iv, 16);
+			bcopy(crd->crd_iv, sc->op_iv, 16);
 		else
-			bcopy(ses->ses_iv, op->op_iv, 16);
+			bcopy(ses->ses_iv, sc->op_iv, 16);
 
 		if ((crd->crd_flags & CRD_F_IV_PRESENT) == 0) {
 			if (crp->crp_flags & CRYPTO_F_IMBUF)
 				m_copyback((struct mbuf *)crp->crp_buf,
-				    crd->crd_inject, 16, op->op_iv);
+				    crd->crd_inject, 16, sc->op_iv);
 			else if (crp->crp_flags & CRYPTO_F_IOV)
 				cuio_copyback((struct uio *)crp->crp_buf,
-				    crd->crd_inject, 16, op->op_iv);
+				    crd->crd_inject, 16, sc->op_iv);
 			else
-				bcopy(op->op_iv,
+				bcopy(sc->op_iv,
 				    crp->crp_buf + crd->crd_inject, 16);
 		}
 	} else {
-		op->op_cw[0] |= C3_CRYPT_CWLO_DECRYPT;
+		sc->op_cw[0] = ses->ses_cw0 | C3_CRYPT_CWLO_DECRYPT;
+		key = ses->ses_dkey;
 		if (crd->crd_flags & CRD_F_IV_EXPLICIT)
-			bcopy(crd->crd_iv, op->op_iv, 16);
+			bcopy(crd->crd_iv, sc->op_iv, 16);
 		else {
 			if (crp->crp_flags & CRYPTO_F_IMBUF)
 				m_copydata((struct mbuf *)crp->crp_buf,
-				    crd->crd_inject, 16, op->op_iv);
+				    crd->crd_inject, 16, sc->op_iv);
 			else if (crp->crp_flags & CRYPTO_F_IOV)
 				cuio_copydata((struct uio *)crp->crp_buf,
-				    crd->crd_inject, 16, op->op_iv);
+				    crd->crd_inject, 16, sc->op_iv);
 			else
 				bcopy(crp->crp_buf + crd->crd_inject,
-				    op->op_iv, 16);
+				    sc->op_iv, 16);
 		}
 	}
 
 	if (crp->crp_flags & CRYPTO_F_IMBUF)
 		m_copydata((struct mbuf *)crp->crp_buf,
-		    crd->crd_skip, crd->crd_len, op->op_src);
+		    crd->crd_skip, crd->crd_len, sc->op_buf);
 	else if (crp->crp_flags & CRYPTO_F_IOV)
 		cuio_copydata((struct uio *)crp->crp_buf,
-		    crd->crd_skip, crd->crd_len, op->op_src);
+		    crd->crd_skip, crd->crd_len, sc->op_buf);
 	else
-		bcopy(crp->crp_buf + crd->crd_skip, op->op_src, crd->crd_len);
+		bcopy(crp->crp_buf + crd->crd_skip, sc->op_buf, crd->crd_len);
 
-	viac3_crypto(&op->op_cw, op->op_src, op->op_dst, op->op_key,
-	    crd->crd_len / 16, op->op_iv, VIAC3_CRYPTOP_CBC);
+	sc->op_cw[1] = sc->op_cw[2] = sc->op_cw[3] = 0;
+	viac3_cbc(&sc->op_cw, sc->op_buf, sc->op_buf, key,
+	    crd->crd_len / 16, sc->op_iv);
 
 	if (crp->crp_flags & CRYPTO_F_IMBUF)
 		m_copyback((struct mbuf *)crp->crp_buf,
-		    crd->crd_skip, crd->crd_len, op->op_dst);
+		    crd->crd_skip, crd->crd_len, sc->op_buf);
 	else if (crp->crp_flags & CRYPTO_F_IOV)
 		cuio_copyback((struct uio *)crp->crp_buf,
-		    crd->crd_skip, crd->crd_len, op->op_dst);
+		    crd->crd_skip, crd->crd_len, sc->op_buf);
 	else
-		bcopy(op->op_dst, crp->crp_buf + crd->crd_skip, crd->crd_len);
+		bcopy(sc->op_buf, crp->crp_buf + crd->crd_skip, crd->crd_len);
 
 	/* copy out last block for use as next session IV */
 	if (crd->crd_flags & CRD_F_ENCRYPT) {
@@ -1359,75 +1435,23 @@ viac3_crypto_process(struct cryptop *crp)
 			    crd->crd_skip + crd->crd_len - 16, 16, ses->ses_iv);
 		else if (crp->crp_flags & CRYPTO_F_IOV)
 			cuio_copydata((struct uio *)crp->crp_buf,
-			    crd->crd_skip + crd->crd_len - 16, 16, op->op_iv);
+			    crd->crd_skip + crd->crd_len - 16, 16, sc->op_iv);
 		else
 			bcopy(crp->crp_buf + crd->crd_skip + crd->crd_len - 16,
-			    op->op_iv, 16);
+			    sc->op_iv, 16);
 	}
 
 out:
-	if (op != NULL) {
-		if (op->op_src != NULL)
-			free(op->op_src, M_DEVBUF);
-		if (op->op_dst != NULL)
-			free(op->op_dst, M_DEVBUF);
-		free(op, M_DEVBUF);
+	if (sc->op_buf != NULL) {
+		bzero(sc->op_buf, crd->crd_len);
+		free(sc->op_buf, M_DEVBUF);
+		sc->op_buf = NULL;
 	}
 	crp->crp_etype = err;
 	crypto_done(crp);
 	return (err);
 }
 
-void
-viac3_crypto(void *cw, void *src, void *dst, void *key, int rep,
-    void *iv, int type)
-{
-	unsigned int creg0, creg4;
-	int s;
-        
-	s = splhigh();
-        
-	/* XXX - should not be needed, but we might need FXSR & FPU for XUnit */
-	creg0 = rcr0();
-	lcr0(creg0 & ~(CR0_EM|CR0_TS));
-	creg4 = rcr4();
-	lcr4(creg4 | CR4_OSFXSR);
-
-	/* Do the deed */
-	switch (type) {
-	case VIAC3_CRYPTOP_RNG:
-		__asm __volatile("rep;.byte 0x0F,0xA7,0xC0" :
-		    : "a" (iv), "b" (key), "c" (rep), "d" (cw), "S" (src), "D" (dst)
-		    : "memory", "cc");
-		break;
-	case VIAC3_CRYPTOP_ECB:
-		__asm __volatile("rep;.byte 0x0F,0xA7,0xC8" :
-		    : "a" (iv), "b" (key), "c" (rep), "d" (cw), "S" (src), "D" (dst)
-		    : "memory", "cc");
-		break;
-	case VIAC3_CRYPTOP_CBC:
-		__asm __volatile("rep;.byte 0x0F,0xA7,0xD0" :
-		    : "a" (iv), "b" (key), "c" (rep), "d" (cw), "S" (src), "D" (dst)
-		    : "memory", "cc");
-		break;
-	case VIAC3_CRYPTOP_CFB:
-		__asm __volatile("rep;.byte 0x0F,0xA7,0xE0" :
-		    : "a" (iv), "b" (key), "c" (rep), "d" (cw), "S" (src), "D" (dst)
-		    : "memory", "cc");
-		break;
-	case VIAC3_CRYPTOP_OFB:
-		__asm __volatile("rep;.byte 0x0F,0xA7,0xE8" :
-		    : "a" (iv), "b" (key), "c" (rep), "d" (cw), "S" (src), "D" (dst)
-		    : "memory", "cc");
-		break;
-	}
-
-	/* XXX - should not be neeeded */
-	lcr0(creg0);
-	lcr4(creg4);
-
-	splx(s);
-}
 #endif /* CRYPTO */
 
 #endif /* defined(I686_CPU) */
@@ -1438,8 +1462,14 @@ cyrix3_cpu_setup(cpu_device, model, step)
 	int model, step;
 {
 #if defined(I686_CPU)
-	extern int cpu_feature;
 	unsigned int val;
+#if !defined(SMALL_KERNEL)
+	extern void (*pagezero)(void *, size_t);
+	extern void i686_pagezero(void *, size_t);
+
+	pagezero = i686_pagezero;
+#endif
+
 
 	switch (model) {
 	case 6: /* C3 Samuel 1 */
@@ -1459,7 +1489,7 @@ cyrix3_cpu_setup(cpu_device, model, step)
 			break;
 
 		/* 
-		 * C3 Nehemia:
+		 * C3 Nehemiah:
 		 * First we check for extended feature flags, and then
 		 * (if present) retrieve the ones at 0xC0000001.  In this
 		 * bit 2 tells us if the RNG is present.  Bit 3 tells us
@@ -1504,7 +1534,8 @@ cyrix3_cpu_setup(cpu_device, model, step)
 			viac3_crypto_present = 1;
 			printf(" AES");
 		}
-#endif
+#endif /* CRYPTO */
+
 		printf("\n");
 		break;
 	}
@@ -1540,10 +1571,24 @@ cyrix6x86_cpu_setup(cpu_device, model, step)
 	case 4:
 		clock_broken_latch = 1;
 		cpu_feature &= ~CPUID_TSC;
+		printf("%s: TSC disabled\n", cpu_device);
 		break;
 	}
 #endif
 }
+
+#if defined(I586_CPU) || defined(I686_CPU)
+void	natsem6x86_cpureset(void);
+
+void
+natsem6x86_cpureset(void)
+{
+	/* reset control SC1100 (datasheet page 170) */
+	outl(0xCF8, 0x80009044UL);
+	/* system wide reset */
+	outb(0xCFC, 0x0F);
+}
+#endif
 
 void
 natsem6x86_cpu_setup(cpu_device, model, step)
@@ -1554,8 +1599,16 @@ natsem6x86_cpu_setup(cpu_device, model, step)
 	extern int clock_broken_latch;
 
 	clock_broken_latch = 1;
+	switch (model) {
+	case 4:
+		cpu_feature &= ~CPUID_TSC;
+		printf("%s: TSC disabled\n", cpu_device);
+		break;
+	}
+	cpuresetfn = natsem6x86_cpureset;
 #endif
 }
+
 
 void
 intel586_cpu_setup(cpu_device, model, step)
@@ -1574,7 +1627,7 @@ amd_family5_setup(cpu_device, model, step)
 	int model, step;
 {
 	switch (model) {
-	case 0:         /* AMD-K5 Model 0 */
+	case 0:		/* AMD-K5 Model 0 */
 		/*
 		 * According to the AMD Processor Recognition App Note,
 		 * the AMD-K5 Model 0 uses the wrong bit to indicate
@@ -1592,12 +1645,62 @@ amd_family5_setup(cpu_device, model, step)
 }
 
 void
-intel686_cpu_setup(cpu_device, model, step)
+amd_family6_setup(cpu_device, model, step)
 	const char *cpu_device;
 	int model, step;
 {
-	extern int cpu_feature, cpuid_level;
+#if !defined(SMALL_KERNEL) && defined(I686_CPU)
+	extern void (*pagezero)(void *, size_t);
+	extern void sse2_pagezero(void *, size_t);
+	extern void i686_pagezero(void *, size_t);
+
+	if (cpu_feature & CPUID_SSE2)
+		pagezero = sse2_pagezero;
+	else
+		pagezero = i686_pagezero;
+#endif
+}
+
+void
+intel686_common_cpu_setup(const char *cpu_device, int model, int step)
+{
+	/*
+	 * Make sure SYSENTER is disabled.
+	 */
+	if (cpu_feature & CPUID_SEP)
+		wrmsr(MSR_SYSENTER_CS, 0);
+
+#if !defined(SMALL_KERNEL) && defined(I686_CPU)
+	if (cpu_ecxfeature & CPUIDECX_EST) {
+		if (rdmsr(MSR_MISC_ENABLE) & (1 << 16))
+			est_init(cpu_device);
+		else
+			printf("%s: Enhanced SpeedStep disabled by BIOS\n",
+			    cpu_device);
+	} else if ((cpu_feature & (CPUID_ACPI | CPUID_TM)) ==
+	    (CPUID_ACPI | CPUID_TM))
+		p4tcc_init(model, step);
+
+	{
+	extern void (*pagezero)(void *, size_t);
+	extern void sse2_pagezero(void *, size_t);
+	extern void i686_pagezero(void *, size_t);
+
+	if (cpu_feature & CPUID_SSE2)
+		pagezero = sse2_pagezero;
+	else
+		pagezero = i686_pagezero;
+	pagezero = bzero;
+	}
+#endif
+}
+
+void
+intel686_cpu_setup(const char *cpu_device, int model, int step)
+{
 	u_quad_t msr119;
+
+	intel686_common_cpu_setup(cpu_device, model, step);
 
 	/*
 	 * Original PPro returns SYSCALL in CPUID but is non-functional.
@@ -1605,12 +1708,6 @@ intel686_cpu_setup(cpu_device, model, step)
 	 */
 	if ((model == 1) && (step < 3))
 		cpu_feature &= ~CPUID_SEP;
-
-	/*
-	 * Make sure SYSENTER is disabled.
-	 */
-	if (cpu_feature & CPUID_SEP)
-		wrmsr(MSR_SYSENTER_CS, 0);
 
 	/*
 	 * Disable the Pentium3 serial number.
@@ -1627,14 +1724,25 @@ intel686_cpu_setup(cpu_device, model, step)
 }
 
 void
+intel686_p4_cpu_setup(const char *cpu_device, int model, int step)
+{
+	intel686_common_cpu_setup(cpu_device, model, step);
+
+#if !defined(SMALL_KERNEL) && defined(I686_CPU)
+	if (cpu_cpuspeed == NULL) {
+		p4_model = model;
+		cpu_cpuspeed = p4_cpuspeed;
+	}
+#endif
+}
+
+void
 tm86_cpu_setup(cpu_device, model, step)
 	const char *cpu_device;
 	int model, step;
 {
-#ifndef SMALL_KERNEL
-	extern int longrun_enabled;
-
-	longrun_enabled = 1;
+#if !defined(SMALL_KERNEL) && defined(I586_CPU)
+	longrun_init();
 #endif
 }
 
@@ -1692,14 +1800,27 @@ cyrix3_cpu_name(model, step)
 		else
 			name = "C3 Ezra";
 		break;
-	case 8:
-		if (step < 8)
-			name = "C3 Ezra-T";
-		break;
-	case 9:
-		name = "C3 Nehemia";
-		break;
 	}
+	return name;
+}
+
+char *
+tm86_cpu_name(model)
+	int model;
+{
+	u_int32_t regs[4];
+	char *name = NULL;
+
+	cpuid(0x80860001, regs);
+
+	switch(model) {
+	case 4:
+		if (((regs[1] >> 16) & 0xff) >= 0x3)
+			name = "TMS5800";
+		else 
+			name = "TMS5600";
+	}
+
 	return name;
 }
 
@@ -1707,9 +1828,8 @@ void
 identifycpu()
 {
 	extern char cpu_vendor[];
+	extern char cpu_brandstr[];
 	extern int cpu_id;
-	extern int cpu_feature;
-	extern int cpu_ecxfeature;
 #ifdef CPUDEBUG
 	extern int cpu_cache_eax, cpu_cache_ebx, cpu_cache_ecx, cpu_cache_edx;
 #else
@@ -1721,6 +1841,8 @@ identifycpu()
 	int family, model, step, modif, cachesize;
 	const struct cpu_cpuid_nameclass *cpup = NULL;
 	void (*cpu_setup)(const char *, int, int);
+	char *brandstr_from, *brandstr_to;
+	int skipspace;
 
 	if (cpuid_level == -1) {
 #ifdef DIAGNOSTIC
@@ -1780,7 +1902,12 @@ identifycpu()
 			token = cpup->cpu_id;
 			vendor = cpup->cpu_vendor;
 			vendorname = cpup->cpu_vendorname;
-			/* Special hack for the VIA C3 series. */
+			/*
+			 * Special hack for the VIA C3 series.
+			 *
+			 * VIA bought Centaur Technology from IDT in Aug 1999
+			 * and marketed the processors as VIA Cyrix III/C3.
+			 */
 			if (vendor == CPUVENDOR_IDT && family >= 6) {
 				vendor = CPUVENDOR_VIA;
 				vendorname = "VIA";
@@ -1799,8 +1926,12 @@ identifycpu()
 				name = intel686_cpu_name(model);
 			/* Special hack for the VIA C3 series. */
 			} else if (vendor == CPUVENDOR_VIA && family == 6 &&
-				   model >= 7 && model <= 8) {
+				   model == 7) {
 				name = cyrix3_cpu_name(model, step);
+			/* Special hack for the TMS5x00 series. */
+			} else if (vendor == CPUVENDOR_TRANSMETA && 
+				  family == 5 && model == 4) {
+				name = tm86_cpu_name(model);
 			} else
 				name = cpup->cpu_family[i].cpu_models[model];
 			if (name == NULL) {
@@ -1822,28 +1953,43 @@ identifycpu()
 			cachesize = intel_cachetable[(cpu_cache_edx & 0xFF) - 0x40];
 	}
 
+	/* Remove leading and duplicated spaces from cpu_brandstr */
+	brandstr_from = brandstr_to = cpu_brandstr;
+	skipspace = 1;
+	while (*brandstr_from != '\0') {
+		if (!skipspace || *brandstr_from != ' ') {
+			skipspace = 0;
+			*(brandstr_to++) = *brandstr_from;
+		}
+		if (*brandstr_from == ' ')
+			skipspace = 1;
+		brandstr_from++;
+	}
+	*brandstr_to = '\0';
+
+	if (cpu_brandstr[0] == '\0') {
+		snprintf(cpu_brandstr, 48 /* sizeof(cpu_brandstr) */,
+		    "%s %s%s", vendorname, modifier, name);
+	}
+
 	if (cachesize > -1) {
 		snprintf(cpu_model, sizeof(cpu_model),
-		    "%s %s%s (%s%s%s%s-class, %dKB L2 cache)",
-		    vendorname, modifier, name,
+		    "%s (%s%s%s%s-class, %dKB L2 cache)",
+		    cpu_brandstr,
 		    ((*token) ? "\"" : ""), ((*token) ? token : ""),
 		    ((*token) ? "\" " : ""), classnames[class], cachesize);
 	} else {
 		snprintf(cpu_model, sizeof(cpu_model),
-		    "%s %s%s (%s%s%s%s-class)",
-		    vendorname, modifier, name,
+		    "%s (%s%s%s%s-class)",
+		    cpu_brandstr,
 		    ((*token) ? "\"" : ""), ((*token) ? token : ""),
 		    ((*token) ? "\" " : ""), classnames[class]);
 	}
 
-	/* configure the CPU if needed */
-	if (cpu_setup != NULL)
-		cpu_setup(cpu_device, model, step);
-
 	printf("%s: %s", cpu_device, cpu_model);
 
 #if defined(I586_CPU) || defined(I686_CPU)
-	if (cpu_feature && (cpu_feature & CPUID_TSC)) {	/* Has TSC */
+	if (cpu_feature & CPUID_TSC) {			/* Has TSC */
 		calibrate_cyclecounter();
 		if (pentium_mhz > 994) {
 			int ghz, fr;
@@ -1885,6 +2031,17 @@ identifycpu()
 		}
 		printf("\n");
 	}
+
+	/* configure the CPU if needed */
+	if (cpu_setup != NULL)
+		cpu_setup(cpu_device, model, step);
+
+#ifndef SMALL_KERNEL
+#if defined(I586_CPU) || defined(I686_CPU)
+	if (cpu_cpuspeed == NULL && pentium_mhz != 0)
+		cpu_cpuspeed = pentium_cpuspeed;
+#endif
+#endif
 
 	cpu_class = class;
 
@@ -1951,7 +2108,84 @@ identifycpu()
 	if (cpu_class >= CPUCLASS_486)
 		lcr0(rcr0() | CR0_WP);
 #endif
+
+#if defined(I686_CPU)
+	/*
+	 * If we have FXSAVE/FXRESTOR, use them.
+	 */
+	if (cpu_feature & CPUID_FXSR) {
+		i386_use_fxsave = 1;
+		lcr4(rcr4() | CR4_OSFXSR);
+
+		/*
+		 * If we have SSE/SSE2, enable XMM exceptions, and
+		 * notify userland.
+		 */
+		if (cpu_feature & (CPUID_SSE|CPUID_SSE2)) {
+			if (cpu_feature & CPUID_SSE)
+				i386_has_sse = 1;
+			if (cpu_feature & CPUID_SSE2)
+				i386_has_sse2 = 1;
+			lcr4(rcr4() | CR4_OSXMMEXCPT);
+		}
+	} else
+		i386_use_fxsave = 0;
+#endif /* I686_CPU */
+
 }
+
+#ifndef SMALL_KERNEL
+#ifdef I686_CPU
+int
+p4_cpuspeed(int *freq)
+{
+	u_int64_t msr;
+	int bus, mult;
+
+	msr = rdmsr(MSR_EBC_FREQUENCY_ID);
+	if (p4_model < 2) {
+		bus = (msr >> 21) & 0x7;
+		switch (bus) {
+		case 0:
+			bus = 100;
+			break;
+		case 1:
+			bus = 133;
+			break;
+		}
+	} else {
+		bus = (msr >> 16) & 0x7;
+		switch (bus) {
+		case 0:
+			bus = 100;
+			break;
+		case 1:
+			bus = 133;
+			break;
+		case 2:
+			bus = 200;
+			break;
+		}
+	}
+	mult = ((msr >> 24) & 0xff);
+	*freq = bus * mult;
+	/* 133MHz actually means 133.(3)MHz */
+	if (bus == 133)
+		*freq += mult / 3;
+
+	return (0);
+}
+#endif	/* I686_CPU */
+
+#if defined(I586_CPU) || defined(I686_CPU)
+int
+pentium_cpuspeed(int *freq)
+{
+	*freq = pentium_mhz;
+	return (0);
+}
+#endif
+#endif	/* !SMALL_KERNEL */
 
 #ifdef COMPAT_IBCS2
 void ibcs2_sendsig(sig_t, int, int, u_long, int, union sigval);
@@ -2175,7 +2409,12 @@ boot(howto)
 	int howto;
 {
 	if (cold) {
-		howto |= RB_HALT;
+		/*
+		 * If the system is cold, just halt, unless the user
+		 * explicitly asked for reboot.
+		 */
+		if ((howto & RB_USERREQ) == 0)
+			howto |= RB_HALT;
 		goto haltsys;
 	}
 
@@ -2468,12 +2707,15 @@ setregs(p, pack, stack, retval)
 #endif
 
 #ifdef USER_LDT
-	if (pcb->pcb_flags & PCB_USER_LDT)
-		i386_user_cleanup(pcb);
+	pmap_ldt_cleanup(p);
 #endif
 
 	p->p_md.md_flags &= ~MDP_USEDFPU;
-	pcb->pcb_flags = 0;
+	if (i386_use_fxsave) {
+		pcb->pcb_savefpu.sv_xmm.sv_env.en_cw = __OpenBSD_NPXCW__;
+		pcb->pcb_savefpu.sv_xmm.sv_env.en_mxcsr = __INITIAL_MXCSR__;
+	} else
+		pcb->pcb_savefpu.sv_87.sv_env.en_cw = __OpenBSD_NPXCW__;
 
 	__asm("movw %w0,%%gs" : : "r" (LSEL(LUDATA_SEL, SEL_UPL)));
 	__asm("movw %w0,%%fs" : : "r" (LSEL(LUDATA_SEL, SEL_UPL)));
@@ -2680,11 +2922,24 @@ init386(paddr_t first_avail)
 	consinit();	/* XXX SHOULD NOT BE DONE HERE */
 			/* XXX here, until we can use bios for printfs */
 
+	/*
+	 * Saving SSE registers won't work if the save area isn't
+	 * 16-byte aligned.
+	 */
+	if (offsetof(struct user, u_pcb.pcb_savefpu) & 0xf)
+		panic("init386: pcb_savefpu not 16-byte aligned");
+
 	/* call pmap initialization to make new kernel address space */
 	pmap_bootstrap((vaddr_t)atdevbase + IOM_SIZE);
 
-	/* Boot arguments are in a single page specified by /boot */
-	if (bootapiver & BAPIV_VECTOR) {
+	/*
+	 * Boot arguments are in a single page specified by /boot.
+	 *
+	 * We require the "new" vector form, as well as memory ranges
+	 * to be given in bytes rather than KB.
+	 */
+	if ((bootapiver & (BAPIV_VECTOR | BAPIV_BMEMMAP)) ==
+	    (BAPIV_VECTOR | BAPIV_BMEMMAP)) {
 		if (bootargc > NBPG)
 			panic("too many boot args");
 
@@ -2952,6 +3207,9 @@ cpu_reset()
 
 	disable_intr();
 
+	if (cpuresetfn)
+		(*cpuresetfn)();
+
 	/* Toggle the hardware reset line on the keyboard controller. */
 	outb(IO_KBD + KBCMDP, KBC_PULSE0);
 	delay(100000);
@@ -2994,7 +3252,6 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 {
 	extern char cpu_vendor[];
 	extern int cpu_id;
-	extern int cpu_feature;
 #if NAPM > 0
 	extern int cpu_apmwarn;
 #endif
@@ -3060,10 +3317,14 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		return (sysctl_int(oldp, oldlenp, newp, newlen,
 		    &user_ldt_enable));
 #endif
-#ifndef SMALL_KERNEL
-	case CPU_LONGRUN:
-		return (longrun_sysctl(oldp, oldlenp, newp, newlen));
-#endif
+	case CPU_OSFXSR:
+		return (sysctl_rdint(oldp, oldlenp, newp, i386_use_fxsave));
+	case CPU_SSE:
+		return (sysctl_rdint(oldp, oldlenp, newp, i386_has_sse));
+	case CPU_SSE2:
+		return (sysctl_rdint(oldp, oldlenp, newp, i386_has_sse2));
+	case CPU_XCRYPT:
+		return (sysctl_rdint(oldp, oldlenp, newp, i386_has_xcrypt));
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -3242,22 +3503,26 @@ bus_mem_add_mapping(bpa, size, cacheable, bshp)
 	u_long pa, endpa;
 	vaddr_t va;
 	pt_entry_t *pte;
+	bus_size_t map_size;
 
 	pa = i386_trunc_page(bpa);
 	endpa = i386_round_page(bpa + size);
 
 #ifdef DIAGNOSTIC
-	if (endpa <= pa)
+	if (endpa <= pa && endpa != 0)
 		panic("bus_mem_add_mapping: overflow");
 #endif
 
-	va = uvm_km_valloc(kernel_map, endpa - pa);
+	map_size = endpa - pa;
+
+	va = uvm_km_valloc(kernel_map, map_size);
 	if (va == 0)
 		return (ENOMEM);
 
 	*bshp = (bus_space_handle_t)(va + (bpa & PGOFSET));
 
-	for (; pa < endpa; pa += PAGE_SIZE, va += PAGE_SIZE) {
+	for (; map_size > 0;
+	    pa += PAGE_SIZE, va += PAGE_SIZE, map_size -= PAGE_SIZE) {
 		pmap_kenter_pa(va, pa, VM_PROT_READ | VM_PROT_WRITE);
 
 		/*

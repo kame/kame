@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wi_hostap.c,v 1.26 2003/08/15 20:32:17 tedu Exp $	*/
+/*	$OpenBSD: if_wi_hostap.c,v 1.29 2004/03/15 21:53:28 millert Exp $	*/
 
 /*
  * Copyright (c) 2002
@@ -543,8 +543,7 @@ wihap_check_rates(struct wihap_sta_info *sta, u_int8_t rates[], int rates_len)
 
 /* wihap_auth_req()
  *
- *	Handle incoming authentication request.  Only handle OPEN
- *	requests.
+ *	Handle incoming authentication request.
  */
 void
 wihap_auth_req(struct wi_softc *sc, struct wi_frame *rxfrm,
@@ -562,21 +561,27 @@ wihap_auth_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 
 	struct wi_80211_hdr	*resp_hdr;
 
-	if (len < 6)
+	if (len < 6) {
+		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
+			printf("wihap_auth_req: station %s short request\n",
+			    ether_sprintf(rxfrm->wi_addr2));
 		return;
+	}
 
 	/* Break open packet. */
 	algo = take_hword(&pkt, &len);
 	seq = take_hword(&pkt, &len);
 	status = take_hword(&pkt, &len);
-	challenge_len = 0;
-	if (len > 0 && (challenge_len = take_tlv(&pkt, &len,
-	    IEEE80211_ELEMID_CHALLENGE, challenge, sizeof(challenge))) < 0)
-		return;
-
 	if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
 		printf("wihap_auth_req: station %s algo=0x%x seq=0x%x\n",
 		    ether_sprintf(rxfrm->wi_addr2), algo, seq);
+
+	challenge_len = 0;
+	if (len > 0 && (challenge_len = take_tlv(&pkt, &len,
+	    IEEE80211_ELEMID_CHALLENGE, challenge, sizeof(challenge))) < 0) {
+		status = IEEE80211_STATUS_CHALLENGE;
+		goto fail;
+	}
 
 	/* Find or create station info. */
 	sta = wihap_sta_find(whi, rxfrm->wi_addr2);
@@ -592,7 +597,7 @@ wihap_auth_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 		/* Check for too many stations.
 		 */
 		if (whi->n_stations >= WIHAP_MAX_STATIONS) {
-			status = IEEE80211_STATUS_TOO_MANY_STATIONS;
+			status = IEEE80211_STATUS_TOOMANY;
 			goto fail;
 		}
 
@@ -605,7 +610,7 @@ wihap_auth_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 		splx(s);
 		if (sta == NULL) {
 			/* Out of memory! */
-			status = IEEE80211_STATUS_TOO_MANY_STATIONS;
+			status = IEEE80211_STATUS_TOOMANY;
 			goto fail;
 		}
 	}
@@ -617,22 +622,18 @@ wihap_auth_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 	switch (algo) {
 	case IEEE80211_AUTH_ALG_OPEN:
 		if (sc->wi_authtype != IEEE80211_AUTH_OPEN) {
-			seq = 2;
 			status = IEEE80211_STATUS_ALG;
 			goto fail;
 		}
 		if (seq != 1) {
-			seq = 2;
 			status = IEEE80211_STATUS_SEQUENCE;
 			goto fail;
 		}
 		challenge_len = 0;
-		seq = 2;
 		sta->flags |= WI_SIFLAGS_AUTHEN;
 		break;
 	case IEEE80211_AUTH_ALG_SHARED:
 		if (sc->wi_authtype != IEEE80211_AUTH_SHARED) {
-			seq = 2;
 			status = IEEE80211_STATUS_ALG;
 			goto fail;
 		}
@@ -653,7 +654,6 @@ wihap_auth_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 				printf("\tchallenge: 0x%x 0x%x ...\n",
 				   challenge[0], challenge[1]);
 			challenge_len = 128;
-			seq = 2;
 			break;
 		case 3:
 			if (challenge_len != 128 || !sta->challenge ||
@@ -672,10 +672,8 @@ wihap_auth_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 			FREE(sta->challenge, M_TEMP);
 			sta->challenge = NULL;
 			challenge_len = 0;
-			seq = 4;
 			break;
 		default:
-			seq = 2;
 			status = IEEE80211_STATUS_SEQUENCE;
 			goto fail;
 		} /* switch (seq) */
@@ -704,7 +702,7 @@ fail:
 
 	pkt = (caddr_t)&sc->wi_txbuf + sizeof(struct wi_80211_hdr);
 	put_hword(&pkt, algo);
-	put_hword(&pkt, seq);
+	put_hword(&pkt, seq + 1);
 	put_hword(&pkt, status);
 	if (challenge_len > 0)
 		put_tlv(&pkt, IEEE80211_ELEMID_CHALLENGE,
@@ -787,7 +785,7 @@ wihap_assoc_req(struct wi_softc *sc, struct wi_frame *rxfrm,
 	if (wihap_check_rates(sta, rates, rates_len) < 0) {
 		if (sc->sc_arpcom.ac_if.if_flags & IFF_DEBUG)
 			printf("wihap_assoc_req: rates mismatch.\n");
-		status = IEEE80211_STATUS_RATES;
+		status = IEEE80211_STATUS_BASIC_RATE;
 		goto fail;
 	}
 
@@ -1108,12 +1106,19 @@ wihap_data_input(struct wi_softc *sc, struct wi_frame *rxfrm, struct mbuf *m)
 	struct wihap_info	*whi = &sc->wi_hostap_info;
 	struct wihap_sta_info	*sta;
 	int			mcast, s;
+	u_int16_t		fctl;
 
-	/* TODS flag must be set. */
-	if (!(rxfrm->wi_frame_ctl & htole16(WI_FCTL_TODS))) {
+	/*
+	 * TODS flag must be set.  However, Lucent cards set NULLFUNC but
+	 * not TODS when probing an AP to see if it is alive after it has
+	 * been down for a while.  We accept these probe packets and send a
+	 * disassoc packet later on if the station is not already associated.
+	 */
+	fctl = letoh16(rxfrm->wi_frame_ctl);
+	if (!(fctl & WI_FCTL_TODS) && !(fctl & WI_STYPE_NULLFUNC)) {
 		if (ifp->if_flags & IFF_DEBUG)
-			printf("wihap_data_input: no TODS src=%s\n",
-			    ether_sprintf(rxfrm->wi_addr2));
+			printf("wihap_data_input: no TODS src=%s, fctl=0x%x\n",
+			    ether_sprintf(rxfrm->wi_addr2), fctl);
 		m_freem(m);
 		return (1);
 	}

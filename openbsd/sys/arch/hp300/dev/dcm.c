@@ -1,4 +1,4 @@
-/*	$OpenBSD: dcm.c,v 1.15 2003/08/15 20:32:13 tedu Exp $	*/
+/*	$OpenBSD: dcm.c,v 1.17 2003/12/22 20:38:07 jmc Exp $	*/
 /*	$NetBSD: dcm.c,v 1.41 1997/05/05 20:59:16 thorpej Exp $	*/
 
 /*
@@ -452,7 +452,6 @@ dcmopen(dev, flag, mode, p)
 	s = spltty();
 	if (sc->sc_tty[port] == NULL) {
 		tp = sc->sc_tty[port] = ttymalloc();
-		tty_attach(tp);
 	} else
 		tp = sc->sc_tty[port];
 	splx(s);
@@ -587,7 +586,6 @@ dcmclose(dev, flag, mode, p)
 	splx(s);
 	ttyclose(tp);
 #if 0
-	tty_detach(tp);
 	ttyfree(tp);
 	sc->sc_tty[port] == NULL;
 #endif
@@ -1360,7 +1358,7 @@ dcmsetischeme(brd, flags)
 		       sc->sc_dev.dv_xname, perchar, dis->dis_perchar,
 		       dis->dis_intr, dis->dis_char);
 	if ((flags & DIS_RESET) == 0 && perchar == dis->dis_perchar) {
-		printf("%s: dcmsetischeme: redundent request %d\n",
+		printf("%s: dcmsetischeme: redundant request %d\n",
 		       sc->sc_dev.dv_xname, perchar);
 		return;
 	}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.107 2003/06/02 23:27:49 millert Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.112 2004/03/10 23:02:53 tom Exp $	*/
 /*	$NetBSD: machdep.c,v 1.207 1998/07/08 04:39:34 thorpej Exp $	*/
 
 /*
@@ -86,7 +86,6 @@
 #include <sys/reboot.h>
 #include <sys/conf.h>
 #include <sys/file.h>
-#include <sys/clist.h>
 #include <sys/timeout.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -436,8 +435,8 @@ cpu_startup(void)
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 	    VM_PHYS_SIZE, 0, FALSE, NULL);
 
-	printf("avail mem = %lu (%uK)\n", ptoa(uvmexp.free),
-	    ptoa(uvmexp.free)/1024);
+	printf("avail mem = %lu (%luK)\n", ptoa(uvmexp.free),
+	    ptoa(uvmexp.free) / 1024);
 	printf("using %d buffers containing %u bytes (%uK) of memory\n",
 	    nbuf, bufpages * PAGE_SIZE, bufpages * PAGE_SIZE / 1024);
 
@@ -523,6 +522,9 @@ initcpu()
 #ifdef M68040
 	void buserr40(void);
 #endif
+#ifdef FPSP
+	extern u_long fpvect_tab, fpvect_end, fpsp_tab;
+#endif
 
 	switch (cputype) {
 #ifdef M68060
@@ -535,11 +537,16 @@ initcpu()
 	case CPU_68040:
 		vectab[2] = buserr40;
 		vectab[3] = addrerr4060;
+#ifdef FPSP
+		bcopy(&fpsp_tab, &fpvect_tab,
+		    (&fpvect_end - &fpvect_tab) * sizeof (fpvect_tab));
+#endif
 		break;
 #endif
 	default:
 		break;
 	}
+
 	DCIS();
 }
 
@@ -617,7 +624,9 @@ boot(howto)
 
 	/* If system is cold, just halt. */
 	if (cold) {
-		howto |= RB_HALT;
+		/* (Unless the user explicitly asked for reboot.) */
+		if ((howto & RB_USERREQ) == 0)
+			howto |= RB_HALT;
 		goto haltsys;
 	}
 
@@ -1020,6 +1029,8 @@ badladdr(addr)
 	nofault = (int *)0;
 	return (0);
 }
+
+int netisr;
 
 void
 netintr()

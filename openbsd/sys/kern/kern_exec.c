@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_exec.c,v 1.82 2003/09/01 18:06:03 henning Exp $	*/
+/*	$OpenBSD: kern_exec.c,v 1.84 2004/03/12 09:32:55 tedu Exp $	*/
 /*	$NetBSD: kern_exec.c,v 1.75 1996/02/09 18:59:28 christos Exp $	*/
 
 /*-
@@ -272,6 +272,7 @@ sys_execve(p, v, retval)
 	pack.ep_hdrlen = exec_maxhdrsz;
 	pack.ep_hdrvalid = 0;
 	pack.ep_ndp = &nid;
+	pack.ep_interp = NULL;
 	pack.ep_emul_arg = NULL;
 	VMCMDSET_INIT(&pack.ep_vmcmds);
 	pack.ep_vap = &attr;
@@ -584,7 +585,7 @@ sys_execve(p, v, retval)
 
 	/* map the process's signal trampoline code */
 	if (exec_sigcode_map(p, pack.ep_emul))
-		goto exec_abort;
+		goto free_pack_abort;
 
 	if (p->p_flag & P_TRACED)
 		psignal(p, SIGTRAP);
@@ -630,6 +631,10 @@ bad:
 		pack.ep_flags &= ~EXEC_HASFD;
 		(void) fdrelease(p, pack.ep_fd);
 	}
+	if (pack.ep_interp != NULL)
+		FREE(pack.ep_interp, M_TEMP);
+	if (pack.ep_emul_arg != NULL)
+		FREE(pack.ep_emul_arg, M_TEMP);
 	/* close and put the exec'd file */
 	vn_close(pack.ep_vp, FREAD, cred, p);
 	FREE(nid.ni_cnd.cn_pnbuf, M_NAMEI);
@@ -648,7 +653,9 @@ exec_abort:
 	 */
 	uvm_deallocate(&vm->vm_map, VM_MIN_ADDRESS,
 		VM_MAXUSER_ADDRESS - VM_MIN_ADDRESS);
-	if (pack.ep_emul_arg)
+	if (pack.ep_interp != NULL)
+		FREE(pack.ep_interp, M_TEMP);
+	if (pack.ep_emul_arg != NULL)
 		FREE(pack.ep_emul_arg, M_TEMP);
 	FREE(nid.ni_cnd.cn_pnbuf, M_NAMEI);
 	vn_close(pack.ep_vp, FREAD, cred, p);
@@ -738,6 +745,7 @@ exec_sigcode_map(struct proc *p, struct emul *e)
 		    0, 0, UVM_MAPFLAG(UVM_PROT_RW, UVM_PROT_RW,
 		    UVM_INH_SHARE, UVM_ADV_RANDOM, 0)))) {
 			printf("kernel mapping failed %d\n", r);
+			uao_detach(e->e_sigobject);
 			return (ENOMEM);
 		}
 		memcpy((void *)va, e->e_sigcode, sz);
@@ -751,6 +759,7 @@ exec_sigcode_map(struct proc *p, struct emul *e)
 	    e->e_sigobject, 0, 0, UVM_MAPFLAG(UVM_PROT_RX, UVM_PROT_RX,
 	    UVM_INH_SHARE, UVM_ADV_RANDOM, 0))) {
 		printf("user mapping failed\n");
+		uao_detach(e->e_sigobject);
 		return (ENOMEM);
 	}
 

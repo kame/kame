@@ -1,4 +1,4 @@
-/* $OpenBSD: cpu.c,v 1.15 2003/05/11 19:41:08 deraadt Exp $ */
+/* $OpenBSD: cpu.c,v 1.17 2004/01/13 06:21:09 deraadt Exp $ */
 /* $NetBSD: cpu.c,v 1.44 2000/05/23 05:12:53 thorpej Exp $ */
 
 /*-
@@ -158,6 +158,9 @@ struct cputable_struct {
 	{ PCS_PROC_PCA56,	"PCA56",	pca56minor	},
 	{ PCS_PROC_PCA57,	"PCA57",	NULL		},
 	{ PCS_PROC_EV67,	"21264A",	NULL		},
+	{ PCS_PROC_EV68CB,	"21264C",	NULL		},
+	{ PCS_PROC_EV68AL,	"21264B",	NULL		},
+	{ PCS_PROC_EV68CX,	"21264D",	NULL		},
 };
 
 /*
@@ -289,7 +292,7 @@ recognized:
 
 #if defined(MULTIPROCESSOR)
 	if (ma->ma_slot > ALPHA_WHAMI_MAXID) {
-		printf("%s: procssor ID too large, ignoring\n", dev->dv_xname);
+		printf("%s: processor ID too large, ignoring\n", dev->dv_xname);
 		return;
 	}
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty.h,v 1.14 2003/06/02 23:28:22 millert Exp $	*/
+/*	$OpenBSD: tty.h,v 1.18 2004/02/10 01:31:21 millert Exp $	*/
 /*	$NetBSD: tty.h,v 1.30.4.1 1996/06/02 09:08:13 mrg Exp $	*/
 
 /*-
@@ -46,8 +46,10 @@
 #define KERN_TTY_TKNOUT		2	/* quad: output chars */
 #define KERN_TTY_TKRAWCC	3	/* quad: input chars, raw mode */
 #define KERN_TTY_TKCANCC	4	/* quad: input char, cooked mode */
-#define KERN_TTY_INFO		5
-#define KERN_TTY_MAXID		6
+#define KERN_TTY_INFO		5	/* struct: tty stats */
+#define KERN_TTY_MAXPTYS	6	/* int: max ptys */
+#define KERN_TTY_NPTYS		7	/* int: number of allocated ptys */
+#define KERN_TTY_MAXID		8
 
 #define CTL_KERN_TTY_NAMES { \
 	{ 0, 0 }, \
@@ -56,7 +58,21 @@
 	{ "tk_rawcc", CTLTYPE_QUAD }, \
 	{ "tk_cancc", CTLTYPE_QUAD }, \
 	{ "ttyinfo", CTLTYPE_STRUCT }, \
+	{ "maxptys", CTLTYPE_INT }, \
+	{ "nptys", CTLTYPE_INT }, \
 }
+
+/* ptmget, for /dev/ptm pty getting ioctl PTMGET */
+
+struct ptmget {
+	int	cfd;
+	int	sfd;
+	char	cn[16];
+	char	sn[16];
+};
+#define PTMGET _IOR('t', 1, struct ptmget) /* get ptys */
+#define PATH_PTMDEV	"/dev/ptm"
+#define TTY_GID		4	/* XXX evil hardcoding of tty gid */
 
 /*
  * Clists are actually ring buffers. The c_cc, c_cf, c_cl fields have
@@ -227,6 +243,7 @@ extern	struct ttychars ttydefaults;
 extern	 char ttyin[], ttyout[], ttopen[], ttclos[], ttybg[], ttybuf[];
 
 int	sysctl_tty(int *, u_int, void *, size_t *, void *, size_t);
+int	sysctl_pty(int *, u_int, void *, size_t *, void *, size_t);
 
 int	 b_to_q(u_char *cp, int cc, struct clist *q);
 void	 catq(struct clist *from, struct clist *to);
@@ -245,7 +262,7 @@ int	 ttioctl(struct tty *tp, u_long com, caddr_t data, int flag,
 	    struct proc *p);
 int	 ttread(struct tty *tp, struct uio *uio, int flag);
 void	 ttrstrt(void *tp);
-int	 ttselect(dev_t device, int rw, struct proc *p);
+int	 ttpoll(dev_t device, int events, struct proc *p);
 int	 ttkqfilter(dev_t dev, struct knote *kn);
 void	 ttsetwater(struct tty *tp);
 int	 ttspeedtab(int speed, struct speedtab *table);
@@ -271,8 +288,6 @@ int	 ttywait(struct tty *tp);
 int	 ttywflush(struct tty *tp);
 
 void	tty_init(void);
-void	tty_attach(struct tty *);
-void	tty_detach(struct tty *);
 struct tty *ttymalloc(void);
 void	 ttyfree(struct tty *);
 u_char	*firstc(struct clist *clp, int *c);
@@ -281,7 +296,7 @@ int	cttyopen(dev_t, int, int, struct proc *);
 int	cttyread(dev_t, struct uio *, int);
 int	cttywrite(dev_t, struct uio *, int);
 int	cttyioctl(dev_t, u_long, caddr_t, int, struct proc *);
-int	cttyselect(dev_t, int, struct proc *);
+int	cttypoll(dev_t, int, struct proc *);
 
 int	clalloc(struct clist *, int, int);
 void	clfree(struct clist *);

@@ -1,4 +1,4 @@
-/* $OpenBSD: rf_openbsdkintf.c,v 1.24 2003/06/02 23:28:03 millert Exp $	*/
+/* $OpenBSD: rf_openbsdkintf.c,v 1.26 2004/02/15 02:45:47 tedu Exp $	*/
 /* $NetBSD: rf_netbsdkintf.c,v 1.109 2001/07/27 03:30:07 oster Exp $	*/
 
 /*-
@@ -202,7 +202,7 @@ struct raidbuf {
  * compatible with such practice.
  */
 struct cfdriver raid_cd = {
-	NULL, "raid", DV_DISK, NULL, 0
+	NULL, "raid", DV_DISK
 };
 
 /*
@@ -3563,5 +3563,6 @@ rf_disk_unbusy(RF_RaidAccessDesc_t *desc)
 
 	bp = (struct buf *)desc->bp;
 	disk_unbusy(&raid_softc[desc->raidPtr->raidid].sc_dkdev,
-			    (bp->b_bcount - bp->b_resid));
+			    (bp->b_bcount - bp->b_resid),
+			    (bp->b_flags & B_READ));
 }

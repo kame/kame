@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.h,v 1.23 2003/07/14 19:23:52 drahn Exp $ */
+/*	$OpenBSD: intr.h,v 1.25 2003/10/31 03:04:16 drahn Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom, Opsycon AB and RTMX Inc, USA.
@@ -35,14 +35,15 @@
 #ifndef _POWERPC_INTR_H_
 #define _POWERPC_INTR_H_
 
-#define	IPL_BIO		0
+#define	IPL_NONE	0
+#define	IPL_BIO		1
 #define	IPL_AUDIO	IPL_BIO /* XXX - was defined this val in audio_if.h */
-#define	IPL_NET		1
-#define	IPL_TTY		2
-#define	IPL_IMP		3
-#define	IPL_CLOCK	4
-#define	IPL_NONE	5
+#define	IPL_NET		2
+#define	IPL_TTY		3
+#define	IPL_IMP		4
+#define	IPL_CLOCK	5
 #define	IPL_HIGH	6
+#define	IPL_NUM		7
 
 #define	IST_NONE	0
 #define	IST_PULSE	1
@@ -67,7 +68,7 @@ void do_pending_int(void);
 
 
 volatile extern int cpl, ipending, astpending;
-extern int imask[7];
+extern int imask[IPL_NUM];
 
 /* SPL asserts */
 #define	splassert(wantipl)	/* nothing */
@@ -171,6 +172,4 @@ extern struct intrhand ppc_configed_intr[MAX_PRECONF_INTR];
 void softnet(int isr);
 
 #endif /* _LOCORE */
-
-
 #endif /* _POWERPC_INTR_H_ */

@@ -1,4 +1,4 @@
-/* $OpenBSD: longrun.c,v 1.4 2003/07/07 03:07:19 tedu Exp $ */
+/* $OpenBSD: longrun.c,v 1.8 2004/02/14 15:09:22 grange Exp $ */
 /*
  * Copyright (c) 2003 Ted Unangst
  * Copyright (c) 2001 Tamotsu Hattori
@@ -30,15 +30,13 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
+#include <sys/timeout.h>
+#include <sys/sensors.h>
+
+
 #include <machine/cpufunc.h>
-
-#include <machine/longrun.h>
-
-static void	longrun_getmode(u_int32_t *, u_int32_t *, u_int32_t *);
-static void	longrun_setmode(u_int32_t, u_int32_t, u_int32_t);
-int		longrun_sysctl(void *, size_t *, void *, size_t);
-
-int longrun_enabled;
 
 union msrinfo {
 	u_int64_t msr;
@@ -54,68 +52,50 @@ union msrinfo {
 #define LONGRUN_MODE_MASK(x) ((x) & 0x000000007f)
 #define LONGRUN_MODE_RESERVED(x) ((x) & 0xffffff80)
 #define LONGRUN_MODE_WRITE(x, y) (LONGRUN_MODE_RESERVED(x) | LONGRUN_MODE_MASK(y))
-#define read_eflags()           ({register u_long ef; \
-                                  __asm("pushfl; popl %0" : "=r" (ef)); \
-                                  ef;}) 
-#define write_eflags(x)         ({register u_long ef = (x); \
-                                  __asm("pushl %0; popfl" : : "r" (ef));})
 
-/* 
- * sysctl handler and entry point.  Just call the right function
- */
-int longrun_sysctl(void *oldp, size_t *oldlenp, void *newp, size_t newlen)
+void	longrun_update(void *);
+
+struct timeout longrun_timo;
+
+void
+longrun_init(void)
 {
-	struct longrun oinfo;
-	struct longrun ninfo;
-	int error;
+	cpu_cpuspeed = longrun_cpuspeed;
+	cpu_setperf = longrun_setperf;
 
-	if (!longrun_enabled)
-		return (EINVAL);
-
-	if (oldp && *oldlenp < sizeof(oinfo))
-		return (ENOMEM);
-	*oldlenp = sizeof(oinfo);
-
-	if (newp != NULL) {
-		error = copyin(newp, &ninfo, sizeof(ninfo));
-		if (error)
-			return (error);
-		longrun_setmode(ninfo.low, ninfo.high, ninfo.mode);
-	}
-	
-	if (oldp != NULL) {
-		memset(&oinfo, 0, sizeof(oinfo));
-		longrun_getmode(&oinfo.freq, &oinfo.voltage, &oinfo.percent);
-		error = copyout(&oinfo, oldp, sizeof(oinfo));
-	}
-
-	return (error);
-
+	timeout_set(&longrun_timo, longrun_update, NULL);
+	timeout_add(&longrun_timo, hz);
 }
 
 /*
  * These are the instantaneous values used by the CPU.
- * Frequency is self-evident.
- * Voltage is returned in millivolts.
- * Percent is amount of performance window being used, not percentage
- * of top megahertz.  (0 values are typical.)
+ * regs[0] = Frequency is self-evident.
+ * regs[1] = Voltage is returned in millivolts.
+ * regs[2] = Percent is amount of performance window being used, not
+ * percentage of top megahertz.  (0 values are typical.)
  */
-static void
-longrun_getmode(u_int32_t *freq, u_int32_t *voltage, u_int32_t *percent)
+void
+longrun_update(void *arg)
 {
-	u_long eflags;
-	u_int32_t regs[4];
+	uint32_t eflags, regs[4];
 
 	eflags = read_eflags();
 	disable_intr();
-
 	cpuid(0x80860007, regs);
-	*freq = regs[0];
-	*voltage = regs[1];
-	*percent = regs[2];
-
 	enable_intr();
 	write_eflags(eflags);
+
+	pentium_mhz = regs[0];
+
+	timeout_add(&longrun_timo, hz);
+}
+
+int
+longrun_cpuspeed(int *freq)
+{
+	longrun_update(NULL);	/* force update */
+	*freq = pentium_mhz;
+	return (0);
 }
 
 /*
@@ -126,21 +106,22 @@ longrun_getmode(u_int32_t *freq, u_int32_t *voltage, u_int32_t *percent)
  * limits it handles.  Typically, there are about 5 performance
  * levels selectable.
  */
-static void 
-longrun_setmode(u_int32_t low, u_int32_t high, u_int32_t mode)
+int
+longrun_setperf(int high)
 {
- 	u_long		eflags;
- 	union msrinfo	msrinfo;
+	uint32_t eflags, mode;
+ 	union msrinfo msrinfo;
 
-	if (low > 100 || high > 100 || low > high)
-		return;
-	if (mode != 0 && mode != 1)
-		return;
+	if (high >= 50)
+		mode = 1;	/* power */
+	else
+		mode = 0;	/* battery */
 
 	eflags = read_eflags();
 	disable_intr();
+
 	msrinfo.msr = rdmsr(MSR_TMx86_LONGRUN);
-	msrinfo.regs[0] = LONGRUN_MODE_WRITE(msrinfo.regs[0], low);
+	msrinfo.regs[0] = LONGRUN_MODE_WRITE(msrinfo.regs[0], 0); /* low */
 	msrinfo.regs[1] = LONGRUN_MODE_WRITE(msrinfo.regs[1], high);
 	wrmsr(MSR_TMx86_LONGRUN, msrinfo.msr);
 
@@ -150,5 +131,7 @@ longrun_setmode(u_int32_t low, u_int32_t high, u_int32_t mode)
 
 	enable_intr();
 	write_eflags(eflags);
+
+	return (0);
 }
 

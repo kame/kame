@@ -1,4 +1,4 @@
-/*	$OpenBSD: ufs_vnops.c,v 1.49 2003/08/15 20:32:21 tedu Exp $	*/
+/*	$OpenBSD: ufs_vnops.c,v 1.54 2003/12/28 17:20:16 tedu Exp $	*/
 /*	$NetBSD: ufs_vnops.c,v 1.18 1996/05/11 18:28:04 mycroft Exp $	*/
 
 /*
@@ -53,6 +53,7 @@
 #include <sys/dirent.h>
 #include <sys/lockf.h>
 #include <sys/event.h>
+#include <sys/poll.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -65,6 +66,9 @@
 #include <ufs/ufs/dir.h>
 #include <ufs/ufs/ufsmount.h>
 #include <ufs/ufs/ufs_extern.h>
+#ifdef UFS_DIRHASH
+#include <ufs/ufs/dirhash.h>
+#endif
 #include <ufs/ext2fs/ext2fs_extern.h>
 
 static int ufs_chmod(struct vnode *, int, struct ucred *, struct proc *);
@@ -349,6 +353,8 @@ ufs_setattr(v)
 	struct ucred *cred = ap->a_cred;
 	struct proc *p = ap->a_p;
 	int error;
+	long hint = NOTE_ATTRIB;
+	u_quad_t oldsize;
 
 	/*
 	 * Check for unsettable attributes.
@@ -394,6 +400,7 @@ ufs_setattr(v)
 			return (error);
 	}
 	if (vap->va_size != VNOVAL) {
+		oldsize = ip->i_ffs_size;
 		/*
 		 * Disallow write attempts on read-only file systems;
 		 * unless the file is a socket, fifo, or a block or
@@ -412,6 +419,8 @@ ufs_setattr(v)
 		}
  		if ((error = UFS_TRUNCATE(ip, vap->va_size, 0, cred)) != 0)
  			return (error);
+		if (vap->va_size < oldsize)
+			hint |= NOTE_TRUNCATE;
 	}
 	if (vap->va_atime.tv_sec != VNOVAL || vap->va_mtime.tv_sec != VNOVAL) {
 		if (vp->v_mount->mnt_flag & MNT_RDONLY)
@@ -435,7 +444,7 @@ ufs_setattr(v)
 			return (EROFS);
 		error = ufs_chmod(vp, (int)vap->va_mode, cred, p);
 	}
-	VN_KNOTE(vp, NOTE_ATTRIB);
+	VN_KNOTE(vp, hint);
 	return (error);
 }
 
@@ -582,23 +591,19 @@ ufs_ioctl(v)
 
 /* ARGSUSED */
 int
-ufs_select(v)
+ufs_poll(v)
 	void *v;
 {
-#if 0
-	struct vop_select_args /* {
+	struct vop_poll_args /* {
 		struct vnode *a_vp;
-		int  a_which;
-		int  a_fflags;
-		struct ucred *a_cred;
+		int  a_events;
 		struct proc *a_p;
 	} */ *ap = v;
-#endif
 
 	/*
 	 * We should really check to see if I/O is possible.
 	 */
-	return (1);
+	return (ap->a_events & (POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM));
 }
 
 /*
@@ -1481,6 +1486,12 @@ ufs_rmdir(v)
 		error = UFS_TRUNCATE(ip, (off_t)0, ioflag, cnp->cn_cred);
 	}
 	cache_purge(vp);
+#ifdef UFS_DIRHASH
+	/* Kill any active hash; i_effnlink == 0, so it will not come back. */
+	if (ip->i_dirhash != NULL)
+		ufsdirhash_free(ip);
+#endif
+
 out:
 	VN_KNOTE(vp, NOTE_DELETE);
         vput(dvp);
@@ -2218,9 +2229,13 @@ filt_ufsread(struct knote *kn, long hint)
 	}
 
         kn->kn_data = ip->i_ffs_size - kn->kn_fp->f_offset;
+	if (kn->kn_data == 0 && kn->kn_sfflags & NOTE_EOF) {
+		kn->kn_fflags |= NOTE_EOF;
+		return (1);
+	}
+
         return (kn->kn_data != 0);
 }
-
 
 int
 filt_ufswrite(struct knote *kn, long hint)
@@ -2241,7 +2256,6 @@ filt_ufswrite(struct knote *kn, long hint)
 int
 filt_ufsvnode(struct knote *kn, long hint)
 {
-
 	if (kn->kn_sfflags & hint)
 		kn->kn_fflags |= hint;
 	if (hint == NOTE_REVOKE) {
@@ -2250,6 +2264,3 @@ filt_ufsvnode(struct knote *kn, long hint)
 	}
 	return (kn->kn_fflags != 0);
 }
-
-
-

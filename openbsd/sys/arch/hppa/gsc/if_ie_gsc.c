@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ie_gsc.c,v 1.21 2003/08/07 19:47:33 mickey Exp $	*/
+/*	$OpenBSD: if_ie_gsc.c,v 1.23 2004/02/13 21:28:19 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998,1999 Michael Shalayeff
@@ -31,8 +31,8 @@
  */
 
 /*
- * Referencies:
- * 1. 82596DX and 82596SX High-Perfomance 32-bit Local Area Network Coprocessor
+ * References:
+ * 1. 82596DX and 82596SX High-Performance 32-bit Local Area Network Coprocessor
  *    Intel Corporation, November 1996, Order Number: 290219-006
  *
  * 2. 712 I/O Subsystem ERS Rev 1.0
@@ -393,6 +393,6 @@ ie_gsc_attach(parent, self, aux)
 	i82596_attach(sc, sc->sc_type, (char *)sc->sc_arpcom.ac_enaddr,
 		      ie_gsc_media, IE_NMEDIA, ie_gsc_media[0]);
 
-	sc->sc_ih = gsc_intr_establish((struct gsc_softc *)parent, IPL_NET,
-	    ga->ga_irq, i82596_intr, sc, sc->sc_dev.dv_xname);
+	sc->sc_ih = gsc_intr_establish((struct gsc_softc *)parent,
+	    ga->ga_irq, IPL_NET, i82596_intr, sc, sc->sc_dev.dv_xname);
 }

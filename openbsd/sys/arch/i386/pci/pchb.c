@@ -1,4 +1,4 @@
-/*	$OpenBSD: pchb.c,v 1.39 2003/06/03 20:10:32 mickey Exp $	*/
+/*	$OpenBSD: pchb.c,v 1.41 2003/11/07 16:43:08 mickey Exp $	*/
 /*	$NetBSD: pchb.c,v 1.6 1997/06/06 23:29:16 thorpej Exp $	*/
 
 /*
@@ -357,8 +357,10 @@ pchbattach(parent, self, aux)
 			timersub(&tv2, &tv1, &tv1);
 			if (tv1.tv_sec)
 				tv1.tv_usec += 1000000 * tv1.tv_sec;
-			printf(": rng active, %dKb/sec",
-			    8 * 1000000 / tv1.tv_usec);
+			printf(": rng active");
+			if (tv1.tv_usec != 0)
+				printf(", %dKb/sec",
+				    8 * 1000000 / tv1.tv_usec);
 
 			timeout_set(&sc->sc_tmo, pchb_rnd, sc);
 			sc->i = 4;
@@ -387,7 +389,7 @@ pchb_print(aux, pnp)
 
 /*
  * Should do FIPS testing as per:
- *	http://csrc.nist.gov/fips/fips1401.htm
+ *	http://csrc.nist.gov/publications/fips/fips140-1/fips1401.htm
  */
 void
 pchb_rnd(v)

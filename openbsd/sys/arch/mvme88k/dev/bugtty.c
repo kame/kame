@@ -1,9 +1,9 @@
-/*	$OpenBSD: bugtty.c,v 1.16 2003/09/01 19:14:01 miod Exp $ */
+/*	$OpenBSD: bugtty.c,v 1.21 2004/02/10 10:06:48 miod Exp $ */
 
-/* Copyright (c) 1998 Steve Murphree, Jr. 
+/* Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1995 Dale Rahn.
  * All rights reserved.
- *   
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -25,7 +25,7 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */  
+ */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,17 +51,14 @@ void bugttyattach(struct device *parent, struct device *self, void *aux);
 
 struct cfattach bugtty_ca = {
         sizeof(struct device), bugttymatch, bugttyattach
-};      
+};
 
 struct cfdriver bugtty_cd = {
-        NULL, "bugtty", DV_TTY, 0
+        NULL, "bugtty", DV_TTY
 };
 
 /* prototypes */
-int bugttycnprobe(struct consdev *cp);
-int bugttycninit(struct consdev *cp);
-int bugttycngetc(dev_t dev);
-void bugttycnputc(dev_t dev, char c);
+cons_decl(bugtty);
 
 struct tty *bugttytty(dev_t dev);
 int bugttymctl(dev_t dev, int bits, int how);
@@ -75,19 +72,8 @@ char bugtty_ibuffer[BUGBUF+1];
 volatile char *pinchar = bugtty_ibuffer;
 char bug_obuffer[BUGBUF+1];
 
-struct tty *bugtty_tty[NBUGTTY];
-int needprom = 1;
-/*
-	int	ca_bustype;
-	void	*ca_vaddr;
-	void	*ca_paddr;
-	int	ca_offset;
-	int	ca_len;
-	int	ca_ipl;
-	int	ca_vec;
-	char	*ca_name;
-	void	*ca_master;	 points to bus-dependent data 
-*/
+#define	BUGTTYS	4
+struct tty *bugtty_tty[BUGTTYS];
 
 int
 bugttymatch(parent, self, aux)
@@ -96,14 +82,14 @@ bugttymatch(parent, self, aux)
 	void *aux;
 {
 	struct confargs *ca = aux;
-	
-	if (needprom == 0)
+
+	/*
+	 * Do not attach if a suitable console driver has been attached.
+	 */
+	if (cn_tab != NULL && cn_tab->cn_probe != bugttycnprobe)
 		return (0);
-	ca->ca_paddr = (void *)0xfff45000;
-	ca->ca_vaddr = (void *)0xfff45000;
-	ca->ca_len = 0x200;
+
 	ca->ca_ipl = IPL_TTY;
-	ca->ca_name = "bugtty\0";
 	return (1);
 }
 
@@ -122,13 +108,13 @@ void bugttyoutput(struct tty *tp);
 int bugttydefaultrate = TTYDEF_SPEED;
 int bugttyswflags;
 
-struct tty * 
+struct tty *
 bugttytty(dev)
 	dev_t dev;
 {
 	int unit;
 	unit = BUGTTYUNIT(dev);
-	if (unit >= 4) {
+	if (unit >= BUGTTYS) {
 		return (NULL);
 	}
 	return bugtty_tty[unit];
@@ -178,10 +164,6 @@ bugttyopen(dev, flag, mode, p)
 {
 	int s, unit = BUGTTYUNIT(dev);
 	struct tty *tp;
-	extern int needprom;
-
-	if (needprom == 0)
-		return (ENODEV);
 
 	s = spltty();
 	if (bugtty_tty[unit]) {
@@ -308,7 +290,7 @@ bugttyread(dev, uio, flag)
 	struct tty *tp;
 
 	if ((tp = bugtty_tty[BUGTTYUNIT(dev)]) == NULL)
-		return (ENXIO); 
+		return (ENXIO);
 	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
 }
 
@@ -378,7 +360,7 @@ bugttyioctl(dev, cmd, data, flag, p)
 		return (ENXIO);
 
 	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error >= 0) 
+	if (error >= 0)
 		return (error);
 
 	error = ttioctl(tp, cmd, data, flag, p);
@@ -421,9 +403,9 @@ bugttyioctl(dev, cmd, data, flag, p)
 		*(int *)data = SWFLAGS(dev);
 		break;
 	case TIOCSFLAGS:
-		error = suser(p, 0); 
+		error = suser(p, 0);
 		if (error != 0)
-			return (EPERM); 
+			return (EPERM);
 
 		bugttyswflags = *(int *)data;
 		bugttyswflags &= /* only allow valid flags */
@@ -455,18 +437,12 @@ bugttystop(tp, flag)
 /*
  * bugtty is the last possible choice for a console device.
  */
-int
+void
 bugttycnprobe(cp)
 	struct consdev *cp;
 {
 	int maj;
-	int needprom = 1;
-	
-	if (needprom == 0) {
-		cp->cn_pri = CN_DEAD;
-		return (0);
-	}
-		
+
 	/* locate the major number */
 	for (maj = 0; maj < nchrdev; maj++)
 		if (cdevsw[maj].d_open == bugttyopen)
@@ -474,15 +450,13 @@ bugttycnprobe(cp)
 
 	cp->cn_dev = makedev(maj, 0);
 	cp->cn_pri = CN_NORMAL;
-	return (1);
 }
 
-int
+void
 bugttycninit(cp)
 	struct consdev *cp;
 {
 	/* Nothing to do */
-	return 0;
 }
 
 int

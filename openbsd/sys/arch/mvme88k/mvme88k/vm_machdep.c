@@ -1,9 +1,9 @@
-/*	$OpenBSD: vm_machdep.c,v 1.53 2003/08/08 13:47:36 miod Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.61 2004/03/03 22:23:58 miod Exp $	*/
 
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
- * Copyright (c) 1993 Adam Glass 
+ * Copyright (c) 1993 Adam Glass
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1986, 1990 The Regents of the University of California.
  * All rights reserved.
@@ -60,19 +60,17 @@
 #include <machine/board.h>
 #include <machine/cmmu.h>
 #include <machine/cpu.h>
+#include <machine/cpu_number.h>
 #include <machine/locore.h>
 #include <machine/trap.h>
 
 extern struct extent *iomap_extent;
 extern struct vm_map *iomap_map;
 
-vm_offset_t iomap_mapin(vm_offset_t, vm_size_t, boolean_t);
-void iomap_mapout(vm_offset_t, vm_size_t);
+vaddr_t iomap_mapin(paddr_t, psize_t, boolean_t);
+void iomap_mapout(vaddr_t, vsize_t);
 void *mapiodev(void *, int);
 void unmapiodev(void *, int);
-vm_offset_t mapiospace(caddr_t, int);
-void unmapiospace(vm_offset_t);
-int badpaddr(caddr_t, int);
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -99,7 +97,7 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 	} *ksfp;
 	extern struct pcb *curpcb;
 	extern void proc_trampoline(void);
-        extern void save_u_area(struct proc *, vm_offset_t);
+        extern void save_u_area(struct proc *, vaddr_t);
 
 	/* Copy pcb from p1 to p2. */
 	if (p1 == curproc) {
@@ -110,13 +108,13 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 	else if (p1 != &proc0)
 		panic("cpu_fork: curproc");
 #endif
-	
+
 	bcopy(&p1->p_addr->u_pcb, &p2->p_addr->u_pcb, sizeof(struct pcb));
 	p2->p_addr->u_pcb.kernel_state.pcb_ipl = IPL_NONE;	/* XXX */
-	p2->p_md.md_tf = USER_REGS(p2);
+	p2->p_md.md_tf = (struct trapframe *)USER_REGS(p2);
 
 	/*XXX these may not be necessary nivas */
-	save_u_area(p2, (vm_offset_t)p2->p_addr);
+	save_u_area(p2, (vaddr_t)p2->p_addr);
 
 	/*
 	 * Create a switch frame for proc 2
@@ -161,7 +159,9 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 void
 cpu_exit(struct proc *p)
 {
-	(void) splimp();
+	pmap_deactivate(p);
+
+	splhigh();
 
 	uvmexp.swtch++;
 	switch_exit(p);
@@ -221,9 +221,9 @@ cpu_coredump(p, vp, cred, chdr)
 void
 cpu_swapin(struct proc *p)
 {
-        extern void save_u_area(struct proc *, vm_offset_t);
+        extern void save_u_area(struct proc *, vaddr_t);
 
-	save_u_area(p, (vm_offset_t)p->p_addr);
+	save_u_area(p, (vaddr_t)p->p_addr);
 }
 
 /*
@@ -251,11 +251,11 @@ cpu_swapin(struct proc *p)
 void
 vmapbuf(bp, len)
 	struct buf *bp;
-	vm_size_t len;
+	vsize_t len;
 {
-	register caddr_t addr;
-	register vm_offset_t kva, off;
-	vm_offset_t pa;
+	caddr_t addr;
+	vaddr_t kva, off;
+	paddr_t pa;
 	struct pmap *pmap;
 
 #ifdef DIAGNOSTIC
@@ -264,7 +264,7 @@ vmapbuf(bp, len)
 #endif
 
 	addr = (caddr_t)trunc_page((vaddr_t)(bp->b_saveaddr = bp->b_data));
-	off = (vm_offset_t)bp->b_saveaddr & PGOFSET;
+	off = (vaddr_t)bp->b_saveaddr & PGOFSET;
 	len = round_page(off + len);
 	pmap = vm_map_pmap(&bp->b_proc->p_vmspace->vm_map);
 
@@ -276,22 +276,25 @@ vmapbuf(bp, len)
 	 */
 
 	kva = uvm_km_valloc_wait(phys_map, len);
-	
+
 	/*
 	 * Flush the TLB for the range [kva, kva + off]. Strictly speaking,
 	 * we should do this in vunmapbuf(), but we do it lazily here, when
 	 * new pages get mapped in.
 	 */
 
-	cmmu_flush_tlb(1, kva, len);
+	cmmu_flush_tlb(cpu_number(), 1, kva, len);
 
 	bp->b_data = (caddr_t)(kva + off);
 	while (len > 0) {
-		if (pmap_extract(pmap, (vm_offset_t)addr, &pa) == FALSE)
+		if (pmap_extract(pmap, (vaddr_t)addr, &pa) == FALSE)
 			panic("vmapbuf: null page frame");
 		pmap_enter(vm_map_pmap(phys_map), kva, pa,
 			   VM_PROT_READ | VM_PROT_WRITE,
 			   VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
+		/* make sure snooping will be possible... */
+		pmap_cache_ctrl(pmap_kernel(), kva, kva + PAGE_SIZE,
+		    CACHE_GLOBAL);
 		addr += PAGE_SIZE;
 		kva += PAGE_SIZE;
 		len -= PAGE_SIZE;
@@ -306,9 +309,9 @@ vmapbuf(bp, len)
 void
 vunmapbuf(bp, len)
 	struct buf *bp;
-	vm_size_t len;
+	vsize_t len;
 {
-	register vm_offset_t addr, off;
+	vaddr_t addr, off;
 
 #ifdef DIAGNOSTIC
 	if ((bp->b_flags & B_PHYS) == 0)
@@ -316,7 +319,7 @@ vunmapbuf(bp, len)
 #endif
 
 	addr = trunc_page((vaddr_t)bp->b_data);
-	off = (vm_offset_t)bp->b_data & PGOFSET;
+	off = (vaddr_t)bp->b_data & PGOFSET;
 	len = round_page(off + len);
 	uvm_km_free_wakeup(phys_map, addr, len);
 	bp->b_data = bp->b_saveaddr;
@@ -332,15 +335,16 @@ vunmapbuf(bp, len)
  * of pa. However, it is advisable to have pa page aligned since otherwise,
  * we might have several mappings for a given chunk of the IO page.
  */
-vm_offset_t
-iomap_mapin(vm_offset_t pa, vm_size_t len, boolean_t canwait)
+vaddr_t
+iomap_mapin(paddr_t pa, psize_t len, boolean_t canwait)
 {
-	vm_offset_t	iova, tva, off, ppa;
-	int 		s, error;
+	vaddr_t	iova, tva, off;
+	paddr_t ppa;
+	int s, error;
 
 	if (len == 0)
 		return NULL;
-	
+
 	ppa = pa;
 	off = (u_long)ppa & PGOFSET;
 
@@ -353,8 +357,8 @@ iomap_mapin(vm_offset_t pa, vm_size_t len, boolean_t canwait)
 
 	if (error != 0)
 		return NULL;
-	
-	cmmu_flush_tlb(1, iova, len);
+
+	cmmu_flush_tlb(cpu_number(), 1, iova, len);	/* necessary? */
 
 	ppa = trunc_page(ppa);
 
@@ -362,11 +366,11 @@ iomap_mapin(vm_offset_t pa, vm_size_t len, boolean_t canwait)
 	tva = iova;
 #else
 	tva = ppa;
-#endif 
+#endif
 
 	while (len>0) {
 		pmap_enter(vm_map_pmap(iomap_map), tva, ppa,
-			   VM_PROT_WRITE | VM_PROT_READ |(CACHE_INH << 16),
+			   VM_PROT_WRITE | VM_PROT_READ,
 			   VM_PROT_WRITE | VM_PROT_READ | PMAP_WIRED);
 		len -= PAGE_SIZE;
 		tva += PAGE_SIZE;
@@ -377,7 +381,7 @@ iomap_mapin(vm_offset_t pa, vm_size_t len, boolean_t canwait)
 	return (iova + off);
 #else
 	return (pa + off);
-#endif 
+#endif
 
 }
 
@@ -385,9 +389,9 @@ iomap_mapin(vm_offset_t pa, vm_size_t len, boolean_t canwait)
  * Free up the mapping in iomap.
  */
 void
-iomap_mapout(vm_offset_t kva, vm_size_t len)
+iomap_mapout(vaddr_t kva, vsize_t len)
 {
-	vm_offset_t 	off;
+	vaddr_t 	off;
 	int 		s, error;
 
 	off = kva & PGOFSET;
@@ -414,8 +418,8 @@ mapiodev(pa, size)
 	void *pa;
 	int size;
 {
-	vm_offset_t ppa;
-	ppa = (vm_offset_t)pa;
+	paddr_t ppa;
+	ppa = (paddr_t)pa;
 	return ((void *)iomap_mapin(ppa, size, 0));
 }
 
@@ -424,49 +428,16 @@ unmapiodev(kva, size)
 	void *kva;
 	int size;
 {
-	vm_offset_t va;
-	va = (vm_offset_t)kva;
+	vaddr_t va;
+	va = (vaddr_t)kva;
 	iomap_mapout(va, size);
 }
 
-/*
- * Map the given physical IO address into the kernel temporarily.
- * Maps one page.
- * Should have some sort of lockig for the use of phys_map_vaddr. XXX nivas
- */
-
-vm_offset_t
-mapiospace(caddr_t pa, int len)
-{
-	int off = (u_long)pa & PGOFSET;
-	extern vm_offset_t phys_map_vaddr1;
-
-	pa = (caddr_t)trunc_page((paddr_t)pa);
-
-	pmap_kenter_pa(phys_map_vaddr1, (vm_offset_t)pa,
-	    VM_PROT_READ|VM_PROT_WRITE);
-	pmap_update(pmap_kernel());
-	
-	return (phys_map_vaddr1 + off);
-}
-
-/*
- * Unmap the address from above.
- */
-
-void
-unmapiospace(vm_offset_t va)
-{
-	va = trunc_page(va);
-
-	pmap_kremove(va, PAGE_SIZE);
-	pmap_update(pmap_kernel());
-}
-
 int
-badvaddr(vm_offset_t va, int size)
+badvaddr(vaddr_t va, int size)
 {
-	register int 	x;
+	volatile int x;
+
 	if (badaddr(va, size)) {
 		return -1;
 	}
@@ -484,26 +455,7 @@ badvaddr(vm_offset_t va, int size)
 	default:
                 return -1;
 	}
-	return(0);
-}
-
-int
-badpaddr(caddr_t pa, int size)
-{
-	vm_offset_t va;
-	int val;
-
-	/*
-	 * Do not allow crossing a page boundary.
-	 */
-	if (((int)pa & PGOFSET) + size > NBPG) {
-		return -1;
-	}
-
-	va = mapiospace(pa, NBPG);
-	val = badvaddr(va, size);
-	unmapiospace(va);
-	return (val);
+	return (0);
 }
 
 /*
@@ -540,10 +492,11 @@ pagemove(from, to, size)
 
 u_int
 kvtop(va)
-	vm_offset_t va;
+	vaddr_t va;
 {
-	vm_offset_t pa;
+	paddr_t pa;
 
 	pmap_extract(pmap_kernel(), va, &pa);
+	/* XXX check for failure */
 	return ((u_int)pa);
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: yds.c,v 1.19 2003/05/14 09:04:59 jason Exp $	*/
+/*	$OpenBSD: yds.c,v 1.22 2004/02/19 20:11:33 markus Exp $	*/
 /*	$NetBSD: yds.c,v 1.5 2001/05/21 23:55:04 minoura Exp $	*/
 
 /*
@@ -253,6 +253,7 @@ const static struct {
 #define YDS_CAP_LEGACY_SELECTABLE	0x0004
 #define YDS_CAP_LEGACY_FLEXIBLE		0x0008
 #define YDS_CAP_HAS_P44			0x0010
+#define YDS_CAP_LEGACY_SMOD_DISABLE	0x1000
 } yds_chip_capability_list[] = {
 	{ PCI_PRODUCT_YAMAHA_YMF724,
 	  YDS_CAP_MCODE_1|YDS_CAP_LEGACY_SELECTABLE },
@@ -572,9 +573,10 @@ yds_configure_legacy (arg)
 
 	reg = pci_conf_read(sc->sc_pc, sc->sc_pcitag, YDS_PCI_LEGACY);
 	reg &= ~0x8133c03f;	/* these bits are out of interest */
-	reg |= YDS_PCI_EX_LEGACY_SBMOD_XXX | ((YDS_PCI_EX_LEGACY_IMOD) |
-		(YDS_PCI_LEGACY_FMEN |
-		 YDS_PCI_LEGACY_MEN /*| YDS_PCI_LEGACY_MIEN*/));
+	reg |= (YDS_PCI_EX_LEGACY_IMOD | YDS_PCI_LEGACY_FMEN |
+		YDS_PCI_LEGACY_MEN /*| YDS_PCI_LEGACY_MIEN*/);
+	if (sc->sc_flags & YDS_CAP_LEGACY_SMOD_DISABLE)
+		reg |= YDS_PCI_EX_LEGACY_SMOD_DISABLE;
 	if (FLEXIBLE) {
 		pci_conf_write(sc->sc_pc, sc->sc_pcitag, YDS_PCI_LEGACY, reg);
 		delay(100*1000);
@@ -703,6 +705,8 @@ yds_attach(parent, self, aux)
 	sc->sc_id = pa->pa_id;
 	sc->sc_revision = PCI_REVISION(pa->pa_class);
 	sc->sc_flags = yds_get_dstype(sc->sc_id);
+	if (sc->sc_dev.dv_cfdata->cf_flags & YDS_CAP_LEGACY_SMOD_DISABLE)
+		sc->sc_flags |= YDS_CAP_LEGACY_SMOD_DISABLE;
 #ifdef AUDIO_DEBUG
 	if (ydsdebug)
 		printf("%s: chip has %b\n", sc->sc_dev.dv_xname,
@@ -1837,7 +1841,7 @@ yds_init(sc_)
 		delay(1);
 	}
 	if (to == AC97_TIMEOUT) {
-		printf("%s: no AC97 avaliable\n", sc->sc_dev.dv_xname);
+		printf("%s: no AC97 available\n", sc->sc_dev.dv_xname);
 		return -1;
 	}
 

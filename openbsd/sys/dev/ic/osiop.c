@@ -1,4 +1,4 @@
-/*	$OpenBSD: osiop.c,v 1.16 2003/08/11 06:20:57 mickey Exp $	*/
+/*	$OpenBSD: osiop.c,v 1.20 2004/03/15 13:03:44 miod Exp $	*/
 /*	$NetBSD: osiop.c,v 1.9 2002/04/05 18:27:54 bouyer Exp $	*/
 
 /*
@@ -68,7 +68,7 @@
  *
  * bus_space/bus_dma'fied by Izumi Tsutsui <tsutsui@ceres.dti.ne.jp>
  *
- * The 53c710 datasheet is avaliable at:
+ * The 53c710 datasheet is available at:
  * http://www.lsilogic.com/techlib/techdocs/storage_stand_prod/index.html
  */
 
@@ -81,8 +81,6 @@
 #include <sys/malloc.h>
 #include <sys/buf.h>
 #include <sys/kernel.h>
-
-#include <uvm/uvm_extern.h>
 
 #include <scsi/scsi_all.h>
 #include <scsi/scsiconf.h>
@@ -114,7 +112,7 @@ void osiop_update_xfer_mode(struct osiop_softc *, int);
 void scsi_period_to_osiop(struct osiop_softc *, int);
 void osiop_timeout(void *);
 
-int osiop_reset_delay = 250;	/* delay after reset, in milleseconds */
+int osiop_reset_delay = 250;	/* delay after reset, in milliseconds */
 
 /* #define OSIOP_DEBUG */
 #ifdef OSIOP_DEBUG
@@ -350,7 +348,6 @@ osiop_attach(sc)
 	sc->sc_link.openings = 4;
 	sc->sc_link.adapter_buswidth = OSIOP_NTGT;
 	sc->sc_link.adapter_target = sc->sc_id;
-	sc->sc_link.quirks = ADEV_NODOORLOCK;
 
 	/*
 	 * Now try to attach all the sub devices.
@@ -1010,7 +1007,7 @@ osiop_start(sc)
 	/*
 	 * Negotiate wide is the initial negotiation state;  since the 53c710
 	 * doesn't do wide transfers, just begin the synchronous transfer
-	 * negotation here.
+	 * negotiation here.
 	 */
 	if (ti->state == NEG_INIT) {
 		if ((ti->flags & TI_NOSYNC) != 0) {

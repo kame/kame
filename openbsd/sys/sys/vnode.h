@@ -1,4 +1,4 @@
-/*	$OpenBSD: vnode.h,v 1.56 2003/08/05 21:27:15 tedu Exp $	*/
+/*	$OpenBSD: vnode.h,v 1.58 2004/01/09 03:01:03 tedu Exp $	*/
 /*	$NetBSD: vnode.h,v 1.38 1996/02/29 20:59:05 cgd Exp $	*/
 
 /*

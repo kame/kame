@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsi_all.h,v 1.14 2002/12/15 20:53:33 krw Exp $	*/
+/*	$OpenBSD: scsi_all.h,v 1.16 2004/02/21 00:47:42 krw Exp $	*/
 /*	$NetBSD: scsi_all.h,v 1.10 1996/09/12 01:57:17 thorpej Exp $	*/
 
 /*
@@ -226,6 +226,8 @@ struct scsi_inquiry_data {
 #define SID_ISO		0xC0
 	u_int8_t response_format;
 	u_int8_t additional_length;
+#define SID_INQUIRY_HDR	5	/* Bytes up to & including additional_length */
+#define SID_SCSI2_ALEN	31	/* Additional bytes of basic SCSI2 info */
 	u_int8_t unused[2];
 	u_int8_t flags;
 #define	SID_SftRe	0x01
@@ -268,7 +270,11 @@ struct scsi_sense_data {
 /*14*/	u_int8_t add_sense_code_qual;
 /*15*/	u_int8_t fru;
 /*16*/	u_int8_t sense_key_spec_1;
-#define	SSD_SCS_VALID	0x80
+#define	SSD_SCS_VALID		0x80
+#define SSD_SCS_CDB_ERROR	0x40
+#define SSD_SCS_SEGMENT_DESC	0x20
+#define SSD_SCS_VALID_BIT_INDEX	0x08
+#define SSD_SCS_BIT_INDEX	0x07
 /*17*/	u_int8_t sense_key_spec_2;
 /*18*/	u_int8_t sense_key_spec_3;
 /*32*/	u_int8_t extra_bytes[14];

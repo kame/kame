@@ -1,4 +1,4 @@
-/*	$OpenBSD: process_machdep.c,v 1.6 2003/06/02 23:27:55 millert Exp $	*/
+/*	$OpenBSD: process_machdep.c,v 1.8 2004/03/02 23:45:27 miod Exp $	*/
 /*	$NetBSD: process_machdep.c,v 1.6 1996/03/14 21:09:26 christos Exp $ */
 
 /*
@@ -103,6 +103,10 @@ process_write_regs(p, regs)
 	struct reg *regs;
 {
 	int	psr = p->p_md.md_tf->tf_psr & ~PSR_ICC;
+
+	if (((regs->r_pc | regs->r_npc) & 0x03) != 0)
+		return (EINVAL);
+
 	bcopy((caddr_t)regs, p->p_md.md_tf, sizeof(struct reg));
 	p->p_md.md_tf->tf_psr = psr | (regs->r_psr & PSR_ICC);
 	return (0);
@@ -123,6 +127,9 @@ process_set_pc(p, addr)
 	struct proc *p;
 	caddr_t addr;
 {
+	if (((u_int)addr & 0x03) != 0)
+		return (EINVAL);
+
 	p->p_md.md_tf->tf_pc = (u_int)addr;
 	p->p_md.md_tf->tf_npc = (u_int)addr + 4;
 	return (0);
@@ -138,6 +145,13 @@ process_write_fpregs(p, regs)
 
 	bcopy(regs, p->p_md.md_fpstate, sizeof(struct fpreg));
 	return 0;
+}
+
+register_t
+process_get_wcookie(p)
+	struct proc *p;
+{
+	return p->p_addr->u_pcb.pcb_wcookie;
 }
 
 #endif	/* PTRACE */

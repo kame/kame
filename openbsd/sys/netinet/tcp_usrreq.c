@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_usrreq.c,v 1.71 2003/06/09 07:40:25 itojun Exp $	*/
+/*	$OpenBSD: tcp_usrreq.c,v 1.81 2004/03/02 12:51:12 markus Exp $	*/
 /*	$NetBSD: tcp_usrreq.c,v 1.20 1996/02/13 23:44:16 christos Exp $	*/
 
 /*
@@ -107,6 +107,17 @@ extern int tcp_rst_ppslim;
 /* from in_pcb.c */
 extern	struct baddynamicports baddynamicports;
 
+#ifndef TCP_SENDSPACE
+#define	TCP_SENDSPACE	1024*16
+#endif
+u_int	tcp_sendspace = TCP_SENDSPACE;
+#ifndef TCP_RECVSPACE
+#define	TCP_RECVSPACE	1024*16
+#endif
+u_int	tcp_recvspace = TCP_RECVSPACE;
+
+int *tcpctl_vars[TCPCTL_MAXID] = TCPCTL_VARS;
+
 struct	inpcbtable tcbtable;
 
 int tcp_ident(void *, size_t *, void *, size_t);
@@ -137,8 +148,8 @@ tcp_usrreq(so, req, m, nam, control)
 	struct mbuf *m, *nam, *control;
 {
 	struct sockaddr_in *sin;
-	register struct inpcb *inp;
-	register struct tcpcb *tp = NULL;
+	struct inpcb *inp;
+	struct tcpcb *tp = NULL;
 	int s;
 	int error = 0;
 	int ostate;
@@ -498,9 +509,9 @@ tcp_ctloutput(op, so, level, optname, mp)
 {
 	int error = 0, s;
 	struct inpcb *inp;
-	register struct tcpcb *tp;
-	register struct mbuf *m;
-	register int i;
+	struct tcpcb *tp;
+	struct mbuf *m;
+	int i;
 
 	s = splsoftnet();
 	inp = sotoinpcb(so);
@@ -563,7 +574,7 @@ tcp_ctloutput(op, so, level, optname, mp)
 			break;
 
 #ifdef TCP_SACK
-		case TCP_SACK_DISABLE:
+		case TCP_SACK_ENABLE:
 			if (m == NULL || m->m_len < sizeof (int)) {
 				error = EINVAL;
 				break;
@@ -580,13 +591,13 @@ tcp_ctloutput(op, so, level, optname, mp)
 			}
 
 			if (*mtod(m, int *))
-				tp->sack_disable = 1;
+				tp->sack_enable = 1;
 			else
-				tp->sack_disable = 0;
+				tp->sack_enable = 0;
 			break;
 #endif
 #ifdef TCP_SIGNATURE
-		case TCP_SIGNATURE_ENABLE:
+		case TCP_MD5SIG:
 			if (m == NULL || m->m_len < sizeof (int)) {
 				error = EINVAL;
 				break;
@@ -600,7 +611,7 @@ tcp_ctloutput(op, so, level, optname, mp)
 			if (*mtod(m, int *)) {
 				tp->t_flags |= TF_SIGNATURE;
 #ifdef TCP_SACK
-				tp->sack_disable = 1;
+				tp->sack_enable = 0;
 #endif /* TCP_SACK */
 			} else
 				tp->t_flags &= ~TF_SIGNATURE;
@@ -626,8 +637,13 @@ tcp_ctloutput(op, so, level, optname, mp)
 			*mtod(m, int *) = tp->t_maxseg;
 			break;
 #ifdef TCP_SACK
-		case TCP_SACK_DISABLE:
-			*mtod(m, int *) = tp->sack_disable;
+		case TCP_SACK_ENABLE:
+			*mtod(m, int *) = tp->sack_enable;
+			break;
+#endif
+#ifdef TCP_SIGNATURE
+		case TCP_MD5SIG:
+			*mtod(m, int *) = tp->t_flags & TF_SIGNATURE;
 			break;
 #endif
 		default:
@@ -640,15 +656,6 @@ tcp_ctloutput(op, so, level, optname, mp)
 	return (error);
 }
 
-#ifndef TCP_SENDSPACE
-#define	TCP_SENDSPACE	1024*16
-#endif
-u_int	tcp_sendspace = TCP_SENDSPACE;
-#ifndef TCP_RECVSPACE
-#define	TCP_RECVSPACE	1024*16
-#endif
-u_int	tcp_recvspace = TCP_RECVSPACE;
-
 /*
  * Attach TCP protocol to socket, allocating
  * internet protocol control block, tcp control block,
@@ -658,7 +665,7 @@ int
 tcp_attach(so)
 	struct socket *so;
 {
-	register struct tcpcb *tp;
+	struct tcpcb *tp;
 	struct inpcb *inp;
 	int error;
 
@@ -703,7 +710,7 @@ tcp_attach(so)
  */
 struct tcpcb *
 tcp_disconnect(tp)
-	register struct tcpcb *tp;
+	struct tcpcb *tp;
 {
 	struct socket *so = tp->t_inpcb->inp_socket;
 
@@ -733,7 +740,7 @@ tcp_disconnect(tp)
  */
 struct tcpcb *
 tcp_usrclosed(tp)
-	register struct tcpcb *tp;
+	struct tcpcb *tp;
 {
 
 	switch (tp->t_state) {
@@ -834,15 +841,13 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 		switch (tir.faddr.ss_family) {
 #ifdef INET6
 		case AF_INET6:
-			inp = in_pcblookup(&tcbtable, &f6,
-			    fin6->sin6_port, &l6, lin6->sin6_port,
-			    INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
+			inp = in6_pcblookup_listen(&tcbtable,
+			    &l6, lin6->sin6_port, 0);
 			break;
 #endif
 		case AF_INET:
-			inp = in_pcblookup(&tcbtable, &fin->sin_addr,
-			    fin->sin_port, &lin->sin_addr, lin->sin_port,
-			    INPLOOKUP_WILDCARD);
+			inp = in_pcblookup_listen(&tcbtable, 
+			    lin->sin_addr, lin->sin_port, 0);
 			break;
 		}
 	}
@@ -873,35 +878,18 @@ tcp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	void *newp;
 	size_t newlen;
 {
+	int error, nval;
 
 	/* All sysctl names at this level are terminal. */
 	if (namelen != 1)
 		return (ENOTDIR);
 
 	switch (name[0]) {
-	case TCPCTL_RFC1323:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &tcp_do_rfc1323));
 #ifdef TCP_SACK
 	case TCPCTL_SACK:
 		return (sysctl_int(oldp, oldlenp, newp, newlen,
 		    &tcp_do_sack));
 #endif
-	case TCPCTL_MSSDFLT:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &tcp_mssdflt));
-	case TCPCTL_KEEPINITTIME:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &tcptv_keep_init));
-
-	case TCPCTL_KEEPIDLE:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &tcp_keepidle));
-
-	case TCPCTL_KEEPINTVL:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &tcp_keepintvl));
-
 	case TCPCTL_SLOWHZ:
 		return (sysctl_rdint(oldp, oldlenp, newp, PR_SLOWHZ));
 
@@ -909,25 +897,29 @@ tcp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return (sysctl_struct(oldp, oldlenp, newp, newlen,
 		    baddynamicports.tcp, sizeof(baddynamicports.tcp)));
 
-	case TCPCTL_RECVSPACE:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,&tcp_recvspace));
-
-	case TCPCTL_SENDSPACE:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,&tcp_sendspace));
 	case TCPCTL_IDENT:
 		return (tcp_ident(oldp, oldlenp, newp, newlen));
-	case TCPCTL_RSTPPSLIMIT:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &tcp_rst_ppslim));
-	case TCPCTL_ACK_ON_PUSH:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &tcp_ack_on_push));
 #ifdef TCP_ECN
 	case TCPCTL_ECN:
 		return (sysctl_int(oldp, oldlenp, newp, newlen,
 		   &tcp_do_ecn));
 #endif
+	case TCPCTL_REASS_LIMIT:
+		nval = tcp_reass_limit;
+		error = sysctl_int(oldp, oldlenp, newp, newlen, &nval);
+		if (error)
+			return (error);
+		if (nval != tcp_reass_limit) {
+			error = pool_sethardlimit(&tcpqe_pool, nval, NULL, 0);
+			if (error)
+				return (error);
+			tcp_reass_limit = nval;
+		}
+		return (0);
 	default:
+		if (name[0] < TCPCTL_MAXID)
+			return (sysctl_int_arr(tcpctl_vars, name, namelen,
+			    oldp, oldlenp, newp, newlen));
 		return (ENOPROTOOPT);
 	}
 	/* NOTREACHED */

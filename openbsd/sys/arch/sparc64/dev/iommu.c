@@ -1,4 +1,4 @@
-/*	$OpenBSD: iommu.c,v 1.32 2003/06/11 04:00:11 henric Exp $	*/
+/*	$OpenBSD: iommu.c,v 1.35 2004/03/19 21:04:00 miod Exp $	*/
 /*	$NetBSD: iommu.c,v 1.47 2002/02/08 20:03:45 eeh Exp $	*/
 
 /*
@@ -259,7 +259,7 @@ iommu_reset(struct iommu_state *is)
 }
 
 /*
- * Inititalize one STC.
+ * Initialize one STC.
  */
 void
 strbuf_reset(struct strbuf_ctl *sb)
@@ -695,7 +695,7 @@ iommu_dvmamap_load(bus_dma_tag_t t, bus_dma_tag_t t0, bus_dmamap_t map,
 		bus_addr_t addr = (vaddr_t)buf;
 		int seg_len = buflen;
 
-		aend = round_page(addr + seg_len - 1);
+		aend = round_page(addr + seg_len);
 		for (a = trunc_page(addr); a < aend; a += PAGE_SIZE) {
 			paddr_t pa;
 
@@ -771,7 +771,7 @@ iommu_dvmamap_load(bus_dma_tag_t t, bus_dma_tag_t t0, bus_dmamap_t map,
 		bus_addr_t addr = (vaddr_t)buf;
 		int seg_len = buflen;
 
-		aend = round_page(addr + seg_len - 1);
+		aend = round_page(addr + seg_len);
 		for (a = trunc_page(addr); a < aend; a += PAGE_SIZE) {
 			bus_addr_t pgstart;
 			bus_addr_t pgend;
@@ -911,7 +911,7 @@ iommu_dvmamap_load_raw(bus_dma_tag_t t, bus_dma_tag_t t0, bus_dmamap_t map,
 			if (len < 1)
 				continue;
 
-			aend = round_page(addr + seg_len - 1);
+			aend = round_page(addr + seg_len);
 			for (a = trunc_page(addr); a < aend; a += PAGE_SIZE) {
 
 				err = iommu_iomap_insert_page(ims, a);
@@ -1194,9 +1194,8 @@ iommu_dvmamap_load_seg(bus_dma_tag_t t, struct iommu_state *is,
 		if (len < 1)
 			continue;
 
-		aend = addr + seg_len - 1;
-		for (a = trunc_page(addr); a < round_page(aend);
-		    a += PAGE_SIZE) {
+		aend = round_page(addr + seg_len);
+		for (a = trunc_page(addr); a < aend; a += PAGE_SIZE) {
 			bus_addr_t pgstart;
 			bus_addr_t pgend;
 			int pglen;
@@ -1488,7 +1487,7 @@ _iommu_dvmamap_sync(bus_dma_tag_t t, bus_dma_tag_t t0, bus_dmamap_t map,
 	}
 
 	if (i == map->dm_nsegs)
-		panic("iommu_dvmamap_sync: too short %lu", offset);
+		panic("iommu_dvmamap_sync: too short %llu", offset);
 
 	for (; len > 0 && i < map->dm_nsegs; i++) {
 		count = MIN(map->dm_segs[i].ds_len - offset, len);
@@ -1500,7 +1499,7 @@ _iommu_dvmamap_sync(bus_dma_tag_t t, bus_dma_tag_t t0, bus_dmamap_t map,
 
 #ifdef DIAGNOSTIC
 	if (i == map->dm_nsegs && len > 0)
-		panic("iommu_dvmamap_sync: leftover %lu", len);
+		panic("iommu_dvmamap_sync: leftover %llu", len);
 #endif
 
 	if (needsflush)

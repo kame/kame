@@ -1,4 +1,4 @@
-#	$OpenBSD: files,v 1.279 2003/08/21 19:12:07 frantzen Exp $
+#	$OpenBSD: files,v 1.292 2004/03/12 00:35:02 miod Exp $
 #	$NetBSD: files,v 1.87 1996/05/19 17:17:50 jonathan Exp $
 
 #	@(#)files.newconf	7.5 (Berkeley) 5/10/93
@@ -54,6 +54,7 @@ define	fddi
 define	ieee1394
 define	sppp
 define	token
+define	wlan
 
 # "Chipset" attributes.  These are the machine-independent portions
 # of device drivers.
@@ -110,6 +111,7 @@ file	dev/ic/wdc.c wdc_base
 device	ahc: scsi, smc93cx6
 file	dev/ic/aic7xxx.c		ahc
 file	dev/ic/aic7xxx_openbsd.c	ahc
+file	dev/ic/aic7xxx_seeprom.c	ahc
 
 # Adaptec AIC-6[23]60 SCSI controllers
 device	aic: scsi
@@ -156,6 +158,13 @@ device	isp: scsi
 file	dev/ic/isp.c			isp
 file	dev/ic/isp_openbsd.c		isp
 
+# LSILogic Fusion-MPT I/O Processor SCSI/FC Controllers
+#
+device  mpt: scsi
+file    dev/ic/mpt.c			mpt
+file    dev/ic/mpt_debug.c		mpt
+file    dev/ic/mpt_openbsd.c		mpt
+
 # UltraStor SCSI controllers
 device	uha: scsi
 file	dev/ic/uha.c		uha
@@ -173,9 +182,13 @@ file	dev/ic/siop_common.c		siop_common
 device	siop: scsi,siop_common
 file	dev/ic/siop.c			siop
 
-# Symbios/NCR 53c720/53c8xx SCSI controllers
+# Symbios/NCR 53c710 SCSI controllers
 device	osiop: scsi
 file	dev/ic/osiop.c			osiop & (osiop_gsc | osiop_eisa)
+
+# Symbios/NCR 53c700 SCSI controllers
+device	oosiop: scsi
+file	dev/ic/oosiop.c			oosiop & (oosiop_gsc)
 
 # 3Com Etherlink-III Ethernet controller
 device	ep: ether, ifnet, ifmedia, mii
@@ -213,7 +226,7 @@ file	dev/ic/fxp.c		fxp
 
 # Myson MTD803
 device	mtd: ether, ifnet, ifmedia, mii
-file	dev/ic/mtd803.c		mtd
+file	dev/ic/mtd8xx.c		mtd
 
 # RealTek 8129/8139
 device	rl: ether, ifnet, ifmedia, mii
@@ -252,7 +265,7 @@ file	dev/ic/tropic.c		tr
 
 # 8250/16[45]50-based "com" ports
 device	com: tty
-file	dev/ic/com.c		com & (com_isa | com_isapnp | com_commulti | com_pcmcia | com_pica | com_algor | com_gsc | com_puc | com_ebus) needs-flag
+file	dev/ic/com.c		com & (com_isa | com_isapnp | com_commulti | com_pcmcia | com_pica | com_algor | com_gsc | com_puc | com_ebus | com_dino) needs-flag
 
 # PC-like keyboard controller
 device	pckbc { [slot = -1] }
@@ -360,6 +373,7 @@ pseudo-device strip: ifnet
 pseudo-device enc: ifnet
 pseudo-device bridge: ifnet, ether
 pseudo-device vlan: ifnet, ether
+pseudo-device carp: ifnet, ether
 pseudo-device sppp: ifnet
 pseudo-device faith: ifnet
 pseudo-device gif: ifnet
@@ -378,6 +392,7 @@ file	net/pf_norm.c		pf
 file	net/pf_ioctl.c		pf
 file	net/pf_table.c		pf
 file	net/pf_osfp.c		pf
+file	net/pf_if.c		pf
 pseudo-device pflog: ifnet
 file	net/if_pflog.c		pflog	needs-flag
 pseudo-device pfsync: ifnet
@@ -529,6 +544,7 @@ file kern/kern_lock.c
 file kern/kern_lkm.c			lkm
 file kern/kern_malloc.c
 file kern/kern_malloc_debug.c		malloc_debug
+file kern/kern_rwlock.c
 file kern/kern_physio.c
 file kern/kern_proc.c
 file kern/kern_prot.c
@@ -539,7 +555,7 @@ file kern/kern_sysctl.c
 file kern/kern_synch.c
 file kern/kern_time.c
 file kern/kern_timeout.c
-file kern/kern_watchdog.c
+file kern/kern_watchdog.c		!small_kernel
 file kern/kern_xxx.c
 file kern/kgdb_stub.c			kgdb
 file kern/subr_autoconf.c
@@ -661,6 +677,7 @@ file net/slcompress.c			sl | ppp | strip
 file net/if_enc.c			enc			needs-count
 file net/if_gre.c			gre			needs-count
 #file net/if_ieee1394subr.c		ieee1394
+file net/if_ieee80211subr.c		wlan
 file netccitt/ccitt_proto.c		ccitt
 file netccitt/hd_debug.c		hdlc
 file netccitt/hd_input.c		hdlc
@@ -710,6 +727,7 @@ file netinet/ipsec_input.c		(inet | inet6) & ipsec
 file netinet/ipsec_output.c		(inet | inet6) & ipsec
 file netinet/ip_esp.c			inet & ipsec
 file netinet/ip_ah.c			inet & ipsec
+file netinet/ip_carp.c			carp			needs-count
 file netinet/ip_ipcomp.c		inet & ipsec
 file crypto/rijndael.c			(inet & ipsec) | crypto | uvm_swap_encrypt
 file crypto/rmd160.c			(inet & ipsec) | crypto
@@ -727,6 +745,7 @@ file crypto/criov.c			(inet & ipsec) | crypto
 file crypto/cryptosoft.c		(inet & ipsec) | crypto
 file crypto/xform.c			(inet & ipsec) | crypto
 file crypto/deflate.c			(inet & ipsec) | crypto
+file crypto/arc4.c			wi | wlan
 file netatalk/aarp.c			netatalk
 file netatalk/at_control.c		netatalk
 file netatalk/at_proto.c		netatalk
@@ -817,6 +836,7 @@ file ufs/ffs/ffs_softdep.c		ffs_softupdates
 file ufs/mfs/mfs_vfsops.c		mfs
 file ufs/mfs/mfs_vnops.c		mfs
 file ufs/ufs/ufs_bmap.c			ffs | mfs | ext2fs
+file ufs/ufs/ufs_dirhash.c		ufs_dirhash & (ffs | mfs)
 file ufs/ufs/ufs_extattr.c		ffs | mfs
 file ufs/ufs/ufs_ihash.c		ffs | mfs | ext2fs
 file ufs/ufs/ufs_inode.c		ffs | mfs | ext2fs
@@ -858,7 +878,7 @@ file uvm/uvm_glue.c
 file uvm/uvm_init.c
 file uvm/uvm_io.c
 file uvm/uvm_km.c
-file uvm/uvm_loan.c
+#file uvm/uvm_loan.c
 file uvm/uvm_map.c
 file uvm/uvm_meter.c
 file uvm/uvm_mmap.c
@@ -874,35 +894,22 @@ file uvm/uvm_user.c
 file uvm/uvm_vnode.c
 file dev/rd.c				ramdisk_hooks
 
-# ... NRL IPv6
-#file netinet6/in6.c			inet6
-#file netinet6/ipv6_icmp.c		inet6
-#file netinet6/in6_cksum.c		inet6
-file netinet6/in6_pcb.c			inet6
-#file netinet6/raw_ipv6.c		inet6
-#file netinet6/ipv6_input.c		inet6
-#file netinet6/ipv6_discovery.c		inet6
-#file netinet6/ipv6_addrconf.c		inet6
-#file netinet6/ipv6_rtrequest.c		inet6
-#file netinet6/ipv6_output.c		inet6
-#file netinet6/in6_proto.c		inet6
-#file netinet6/ipv6_trans.c		inet6
-
-# ... KAME IPv6
+# IPv6
 file net/if_faith.c			faith			needs-count
 file net/if_gif.c			gif			needs-count
 file netinet/ip_ecn.c			inet | inet6
 file netinet/in_gif.c			gif & inet
 file netinet6/in6_gif.c			gif & inet6
+file netinet6/in6_pcb.c			inet6
 file netinet6/in6.c			inet6
 file netinet6/in6_ifattach.c		inet6
 file netinet6/in6_cksum.c		inet6
-#file netinet6/in6_pcb.c		inet6
 file netinet6/in6_src.c			inet6
 file netinet6/in6_proto.c		inet6
 file netinet6/dest6.c			inet6
 file netinet6/frag6.c			inet6
 file netinet6/icmp6.c			inet6
+file netinet6/ip6_id.c			inet6
 file netinet6/ip6_input.c		inet6
 file netinet6/ip6_forward.c		inet6
 file netinet6/ip6_mroute.c		inet6
@@ -913,13 +920,6 @@ file netinet6/nd6.c			inet6
 file netinet6/nd6_nbr.c			inet6
 file netinet6/nd6_rtr.c			inet6
 file netinet6/raw_ip6.c			inet6
-#file netinet6/tcp6_debug.c		inet6 & tcp6
-#file netinet6/tcp6_input.c		inet6 & tcp6
-#file netinet6/tcp6_output.c		inet6 & tcp6
-#file netinet6/tcp6_subr.c		inet6 & tcp6
-#file netinet6/tcp6_timer.c		inet6 & tcp6
-#file netinet6/tcp6_usrreq.c		inet6 & tcp6
-#file netinet6/udp6_usrreq.c		inet6
 file netinet6/udp6_output.c		inet6
 
 # ... PF_KEY

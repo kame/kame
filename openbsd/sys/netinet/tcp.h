@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp.h,v 1.12 2003/06/02 23:28:14 millert Exp $	*/
+/*	$OpenBSD: tcp.h,v 1.15 2004/02/10 10:30:24 markus Exp $	*/
 /*	$NetBSD: tcp.h,v 1.8 1995/04/17 05:32:58 cgd Exp $	*/
 
 /*
@@ -85,6 +85,7 @@ struct tcphdr {
 #define	   TCPOLEN_TSTAMP_APPA		(TCPOLEN_TIMESTAMP+2) /* appendix A */
 #define	TCPOPT_SIGNATURE	19
 #define	   TCPOLEN_SIGNATURE		18
+#define	   TCPOLEN_SIGLEN		(TCPOLEN_SIGNATURE+2) /* padding */
 
 #define	MAX_TCPOPTLEN		40	/* Absolute maximum TCP options len */
 
@@ -118,7 +119,7 @@ struct tcphdr {
  */
 #define	TCP_NODELAY		0x01   /* don't delay send to coalesce pkts */
 #define	TCP_MAXSEG		0x02   /* set maximum segment size */
-#define	TCP_SIGNATURE_ENABLE	0x04   /* enable TCP MD5 signature option */
-#define	TCP_SACK_DISABLE	0x300  /* disable SACKs (if enabled by def.) */
+#define	TCP_MD5SIG		0x04   /* enable TCP MD5 signature option */
+#define	TCP_SACK_ENABLE		0x08   /* enable SACKs (if disabled by def.) */
 
 #endif /* _NETINET_TCP_H_ */

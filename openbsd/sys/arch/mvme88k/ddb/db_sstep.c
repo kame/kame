@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_sstep.c,v 1.11 2002/03/14 01:26:38 millert Exp $	*/
+/*	$OpenBSD: db_sstep.c,v 1.14 2004/01/07 17:52:30 miod Exp $	*/
 /*
  * Mach Operating System
  * Copyright (c) 1993-1991 Carnegie Mellon University
@@ -28,7 +28,9 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+
 #include <machine/db_machdep.h>
+
 #include <ddb/db_access.h>	/* db_get_value() */
 #include <ddb/db_break.h>	/* db_breakpoint_t */
 
@@ -44,7 +46,7 @@ boolean_t inst_delayed(unsigned int ins);
 #ifdef INTERNAL_SSTEP
 db_breakpoint_t db_not_taken_bkpt = 0;
 db_breakpoint_t db_taken_bkpt = 0;
-#endif 
+#endif
 
 /*
  * Returns TRUE is the instruction a branch or jump instruction
@@ -70,7 +72,7 @@ inst_branch(ins)
 	return FALSE;
 }
 
-/* 
+/*
  * inst_load(ins)
  * Returns the number of words the instruction loads. byte,
  * half and word count as 1; double word as 2
@@ -268,7 +270,7 @@ branch_taken(inst, pc, func, func_data)
  *              frame. Only makes sense for general registers.
  */
 
-register_t
+db_expr_t
 getreg_val(frame, regno)
 	db_regs_t *frame;
 	int regno;
@@ -277,16 +279,14 @@ getreg_val(frame, regno)
 		return 0;
 	else if (regno < 31)
 		return frame->r[regno];
-	else {
+	else
 		panic("bad register number (%d) to getreg_val.", regno);
-		return 0;/*to make compiler happy */
-	}
 }
 
 #ifdef INTERNAL_SSTEP
 void
 db_set_single_step(regs)
-	register db_regs_t *regs;
+	db_regs_t *regs;
 {
 	if (cputyp == CPU_88110) {
 		((regs)->epsr |= (PSR_TRACE | PSR_SER));
@@ -334,4 +334,4 @@ db_clear_single_step(regs)
 		}
 	}
 }
-#endif 
+#endif

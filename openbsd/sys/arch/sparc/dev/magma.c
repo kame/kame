@@ -1,4 +1,4 @@
-/*	$OpenBSD: magma.c,v 1.15 2003/08/15 20:32:14 tedu Exp $	*/
+/*	$OpenBSD: magma.c,v 1.17 2003/10/03 16:44:50 miod Exp $	*/
 /*
  * magma.c
  *
@@ -845,8 +845,6 @@ int port, chip, chan;
 		mp->mp_channel = chan;
 
 		tp = ttymalloc();
-		if( tp == NULL ) break;
-		tty_attach(tp);
 		tp->t_oproc = mtty_start;
 		tp->t_param = mtty_param;
 
@@ -1398,7 +1396,7 @@ int s, opt;
  *	mbppread	read from mbpp
  *	mbppwrite	write to mbpp
  *	mbppioctl	do ioctl on mbpp
- *	mbppselect	do select on mbpp
+ *	mbpppoll	do poll on mbpp
  *	mbpp_rw		general rw routine
  *	mbpp_timeout	rw timeout
  *	mbpp_start	rw start after delay
@@ -1589,15 +1587,15 @@ int s;
 }
 
 /*
- * select routine
+ * poll routine
  */
 int
-mbppselect(dev, rw, p)
+mbpppoll(dev, events, p)
 dev_t dev;
-int rw;
+int events;
 struct proc *p;
 {
-	return(ENODEV);
+	return(seltrue(dev, events, p));
 }
 
 int

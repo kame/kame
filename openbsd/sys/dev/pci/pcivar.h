@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcivar.h,v 1.30 2003/04/27 11:22:54 ho Exp $	*/
+/*	$OpenBSD: pcivar.h,v 1.35 2004/01/31 15:22:26 drahn Exp $	*/
 /*	$NetBSD: pcivar.h,v 1.23 1997/06/06 23:48:05 thorpej Exp $	*/
 
 /*
@@ -54,8 +54,8 @@ struct pcibus_attach_args;
 /*
  * Machine-dependent definitions.
  */
-#if (__alpha__ + __atari__ + __i386__ + __arc__ + __powerpc__ + __galileo__ + __sparc64__ != 1)
-ERROR: COMPILING FOR UNSUPPORTED MACHINE, OR MORE THAN ONE.
+#if (__alpha__ + __atari__ + __i386__ + __cats__ + __powerpc__ + __galileo__ + __sparc64__ + __hppa__ +__amd64__ != 1)
+#error COMPILING FOR UNSUPPORTED MACHINE, OR MORE THAN ONE.
 #endif
 #if __alpha__
 #include <alpha/pci/pci_machdep.h>
@@ -69,14 +69,23 @@ ERROR: COMPILING FOR UNSUPPORTED MACHINE, OR MORE THAN ONE.
 #if __arc__
 #include <arc/pci/pci_machdep.h>
 #endif
+#if __cats__
+#include <cats/pci/pci_machdep.h>
+#endif
 #if __powerpc__
 #include <powerpc/pci/pci_machdep.h>
 #endif
 #if __galileo__
 #include <galileo/pci/pci_machdep.h>
 #endif
+#if __hppa__
+#include <hppa/include/pci_machdep.h>
+#endif
 #if __sparc64__
 #include <sparc64/include/pci_machdep.h>
+#endif
+#if __amd64__
+#include <amd64/include/pci_machdep.h>
 #endif
 
 /*
@@ -136,6 +145,10 @@ struct pci_attach_args {
  */
 #define	PCI_FLAGS_IO_ENABLED	0x01		/* I/O space is enabled */
 #define	PCI_FLAGS_MEM_ENABLED	0x02		/* memory space is enabled */
+#define	PCI_FLAGS_MRL_OKAY	0x04		/* Memory Read Line okay */
+#define	PCI_FLAGS_MRM_OKAY	0x08		/* Memory Read Multiple okay */
+#define	PCI_FLAGS_MWI_OKAY	0x10		/* Memory Write and Invalidate
+						   okay */
 
 /*
  *

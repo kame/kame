@@ -1,4 +1,4 @@
-# 	$OpenBSD: RAMDISK,v 1.46 2003/06/18 17:40:31 miod Exp $
+# 	$OpenBSD: RAMDISK,v 1.51 2004/03/12 06:04:01 deraadt Exp $
 # 	$NetBSD: GENERIC,v 1.28.2.1 1996/07/02 23:55:22 jtc Exp $
 
 # Machine architecture; required by config(8)
@@ -25,6 +25,7 @@ option		CD9660		# ISO 9660 + Rock Ridge file system
 #option		FDESC		# /dev/fd
 #option		FIFO		# FIFOs; RECOMMENDED
 option		INET		# IP + ICMP + TCP + UDP
+#option		INET6		# IPv6 (needs INET)
 option		BOOT_CONFIG	# add support for boot -c
 
 # Options for variants of the Sun SPARC architecture.
@@ -194,6 +195,21 @@ xyc0	at vmes0 addr 0xffffee40 level 3 vect 0x48
 xyc1	at vmes0 addr 0xffffee48 level 3 vect 0x49
 xy*	at xyc? drive ?
 
+# Sun PCMCIA bridge
+#stp*	at sbus?
+#pcmcia* at stp? socket ?
+
+# PCMCIA controller found on Tadpole SPARCbook
+#tslot*	at sbus?
+#pcmcia* at tslot? socket ?
+
+# PCMCIA devices
+#wi*	at pcmcia? function ?			# WaveLAN IEEE 802.11DS
+#an*	at pcmcia? function ?			# Aironet IEEE 802.11DS
+#ne*	at pcmcia? function ?			# NE2000-compat ethernet
+#ep*	at pcmcia? function ?			# PCMCIA based 3C5xx ethernet
+#com*	at pcmcia? function ?			# PCMCIA modems/serial ports
+
 # NCR5380-based "Sun SCSI 3" VME SCSI controller.
 # This driver has several flags which may be enabled by OR'ing
 # the values and using the "flags" directive.
@@ -271,7 +287,7 @@ wsdisplay* at zx?
 vigra*	at sbus?
 wsdisplay* at vigra?
 
-# Weitex P9000 found on Tadpole SPARCbook 3, with external ``Chameleon'' RAMDAC
+# Weitek P9000 found on Tadpole SPARCbook 3, with external ``Chameleon'' RAMDAC
 pninek0	at sbus?
 btcham0	at obio?
 wsdisplay* at pninek?
@@ -291,6 +307,10 @@ wsdisplay* at agten?
 # Southland Media Systems MGX/MGXPlus framebuffer.
 mgx* at sbus?
 wsdisplay* at mgx?
+
+# Vitec/Connectware/AP&D RasterFlex framebuffer series.
+rfx* at sbus?
+wsdisplay* at rfx?
 
 # SCSI bus layer.  SCSI devices attach to the SCSI bus, which attaches
 # to the underlying hardware controller.

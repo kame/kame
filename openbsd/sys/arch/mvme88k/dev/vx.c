@@ -1,6 +1,6 @@
-/*	$OpenBSD: vx.c,v 1.22 2003/08/15 20:32:14 tedu Exp $ */
+/*	$OpenBSD: vx.c,v 1.27 2003/12/27 21:58:20 miod Exp $ */
 /*
- * Copyright (c) 1999 Steve Murphree, Jr. 
+ * Copyright (c) 1999 Steve Murphree, Jr.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,7 +24,7 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */  
+ */
 
 #include <sys/param.h>
 #include <sys/ioctl.h>
@@ -46,20 +46,7 @@
 #include <mvme88k/dev/vme.h>
 #include <mvme88k/dev/vxreg.h>
 
-#include "pcctwo.h"
-#if NPCCTWO > 0
-#include <mvme88k/dev/pcctworeg.h>
-#endif
-
-#ifdef	DDB
-#include <ddb/db_var.h>
-#endif
-
 #define splvx()	spltty()
-
-#ifdef DEBUG
-#undef DEBUG
-#endif
 
 struct vx_info {
 	struct   tty *tty;
@@ -67,7 +54,6 @@ struct vx_info {
 	int      vx_linestatus;
 	int      open;
 	int      waiting;
-	u_char   vx_consio;
 	u_char   vx_speed;
 	u_char   read_pending;
 	struct   wring  *wringp;
@@ -77,8 +63,7 @@ struct vx_info {
 struct vxsoftc {
 	struct device     sc_dev;
 	struct evcnt      sc_intrcnt;
-	struct evcnt      sc_sintrcnt;
-	struct vx_info  sc_info[9];
+	struct vx_info  sc_info[NVXPORTS];
 	struct vxreg    *vx_reg;
 	unsigned int      board_addr;
 	struct channel    *channel;
@@ -87,9 +72,6 @@ struct vxsoftc {
 	void              *sc_bppwait_pktp;
 	struct intrhand   sc_ih_c;
 	struct intrhand   sc_ih_s;
-#if defined(MVME187) || defined(MVME197)
-	struct vme2reg    *sc_vme2;
-#endif
 	int               sc_ipl;
 	int               sc_vec;
 	int               sc_flags;
@@ -97,136 +79,110 @@ struct vxsoftc {
 	struct packet     *plist_head, *plist_tail;
 };
 
-/* prototypes */
+int  vxmatch(struct device *, void *, void *);
+void vxattach(struct device *, struct device *, void *);
 
-void *get_next_envelope(struct envelope *thisenv);
-struct envelope *get_status_head(struct vxsoftc *sc);
-void set_status_head(struct vxsoftc *sc, void *envp);
-struct packet *get_packet(struct vxsoftc *sc, struct envelope *thisenv);
-struct envelope *find_status_packet(struct vxsoftc *sc, struct packet * pktp);
-
-void read_wakeup(struct vxsoftc *sc, int port);
-int  bpp_send(struct vxsoftc *sc, void *pkt, int wait_flag);
-
-int  create_channels(struct vxsoftc *sc);
-int  env_isvalid(struct envelope *thisenv);
-void memcpy2(void *dest, const void *src, size_t size);
-void *get_free_envelope(struct vxsoftc *sc);
-void put_free_envelope(struct vxsoftc *sc, void *envp);
-void *get_free_packet(struct vxsoftc *sc);
-void put_free_packet(struct vxsoftc *sc, void *pktp);
-
-int  vx_init(struct vxsoftc *sc);
-int  vx_event(struct vxsoftc *sc, struct packet *evntp);
-
-void vx_unblock(struct tty *tp);
-int  vx_ccparam(struct vxsoftc *sc, struct termios *par, int port);
-
-int  vx_param(struct tty *tp, struct termios *t);
-int  vx_intr(void * arg);
-int  vx_sintr(struct vxsoftc *sc);
-int  vx_poll(struct vxsoftc *sc, struct packet *wpktp);
-void vx_overflow(struct vxsoftc *sc, int port, long *ptime, u_char *msg);
-void vx_frame(struct vxsoftc *sc, int port);
-void vx_break( struct vxsoftc *sc, int port);
-int  vx_mctl(dev_t dev, int bits, int how);
-
-int  vxmatch(struct device *parent, void *self, void *aux);
-void vxattach(struct device *parent, struct device *self, void *aux);
-
-void vxstart(struct tty *tp);
-
-void   vxputc(struct vxsoftc *sc, int port, u_char c);
-
-struct tty * vxtty(dev_t);
-short dtr_ctl(struct vxsoftc *, int, int);
-short rts_ctl(struct vxsoftc *, int, int);
-short flush_ctl(struct vxsoftc *, int, int);
-u_short vxtspeed(int);
-void read_chars(struct vxsoftc *, int);
-void ccode(struct vxsoftc *, int, char);
-void wzero(void *, size_t);
-int create_free_queue(struct vxsoftc *);
-void print_dump(struct vxsoftc *);
-struct envelope *get_cmd_tail(struct vxsoftc *);
-
-struct cfattach vx_ca = {       
+struct cfattach vx_ca = {
 	sizeof(struct vxsoftc), vxmatch, vxattach
-};      
+};
 
 struct cfdriver vx_cd = {
-	NULL, "vx", DV_TTY, 0
-}; 
-      
-#define VX_UNIT(x) (int)(minor(x) / 9)
-#define VX_PORT(x) (int)(minor(x) % 9)
+	NULL, "vx", DV_TTY
+};
 
-struct envelope *bpp_wait;
-unsigned int board_addr;
+void	bpp_send(struct vxsoftc *, void *, int);
+void	ccode(struct vxsoftc *, int, char);
+int	create_channels(struct vxsoftc *);
+void	create_free_queue(struct vxsoftc *);
+short	dtr_ctl(struct vxsoftc *, int, int);
+int	env_isvalid(struct envelope *);
+struct envelope *find_status_packet(struct vxsoftc *, struct packet *);
+short	flush_ctl(struct vxsoftc *, int, int);
+struct envelope *get_cmd_tail(struct vxsoftc *);
+void	*get_free_envelope(struct vxsoftc *);
+void	*get_free_packet(struct vxsoftc *);
+struct envelope *get_next_envelope(struct envelope *);
+struct packet *get_packet(struct vxsoftc *, struct envelope *);
+struct envelope *get_status_head(struct vxsoftc *);
+void	put_free_envelope(struct vxsoftc *, void *);
+void	put_free_packet(struct vxsoftc *, void *);
+void	read_chars(struct vxsoftc *, int);
+void	read_wakeup(struct vxsoftc *, int);
+short	rts_ctl(struct vxsoftc *, int, int);
+void	set_status_head(struct vxsoftc *, void *);
+void	vx_break(struct vxsoftc *, int);
+int	vx_ccparam(struct vxsoftc *, struct termios *, int);
+int	vx_event(struct vxsoftc *, struct packet *);
+void	vx_frame(struct vxsoftc *, int);
+int	vx_init(struct vxsoftc *);
+int	vx_intr(void *);
+int	vx_mctl(dev_t, int, int);
+void	vx_overflow(struct vxsoftc *, int, long *, u_char *);
+int	vx_param(struct tty *, struct termios *);
+int	vx_poll(struct vxsoftc *, struct packet *);
+void	vxputc(struct vxsoftc *, int, u_char);
+int	vx_sintr(struct vxsoftc *);
+void	vxstart(struct tty *tp);
+u_short	vxtspeed(int);
+void	vx_unblock(struct tty *);
 
-struct tty * vxtty(dev)
-	dev_t dev;
+/* flags for bpp_send() */
+#define	NOWAIT 0
+#define	WAIT 1
+
+#define VX_UNIT(x) (minor(x) / NVXPORTS)
+#define VX_PORT(x) (minor(x) % NVXPORTS)
+
+struct tty *
+vxtty(dev_t dev)
 {
 	int unit, port;
 	struct vxsoftc *sc;
+
 	unit = VX_UNIT(dev);
-	if (unit >= vx_cd.cd_ndevs || 
-	    (sc = (struct vxsoftc *) vx_cd.cd_devs[unit]) == NULL) {
+	if (unit >= vx_cd.cd_ndevs ||
+	    (sc = (struct vxsoftc *)vx_cd.cd_devs[unit]) == NULL) {
 		return (NULL);
 	}
 	port = VX_PORT(dev);
 	return sc->sc_info[port].tty;
 }
 
-int   
-vxmatch(parent, self, aux)
-	struct device *parent;
-	void *self;
-	void *aux;
+int
+vxmatch(struct device *parent, void *self, void *aux)
 {
 	struct vxreg *vx_reg;
 	struct confargs *ca = aux;
-   
-#ifdef OLD_MAPPINGS
-	ca->ca_vaddr = ca->ca_paddr;
-#endif
-	ca->ca_len = 0x10000; /* we know this. */
-	ca->ca_ipl = 3;	/* we need interrupts for this board to work */
+
+	ca->ca_ipl = IPL_TTY;
+	ca->ca_len = 0x10000;	/* we know this */
 
 	vx_reg = (struct vxreg *)ca->ca_vaddr;
-	board_addr = (unsigned int)ca->ca_vaddr;
-	if (badvaddr((unsigned)&vx_reg->ipc_cr, 1))
-			return (0);
-		return (1);
+
+	return (!badvaddr((vaddr_t)&vx_reg->ipc_cr, 1));
 }
 
 void
-vxattach(parent, self, aux)
-	struct device *parent;
-	struct device *self;
-	void *aux;
+vxattach(struct device *parent, struct device *self, void *aux)
 {
 	struct vxsoftc *sc = (struct vxsoftc *)self;
 	struct confargs *ca = aux;
-	
-	/* set up dual port memory and registers and init*/
+
+	/* set up dual port memory and registers and init */
 	sc->vx_reg = (struct vxreg *)ca->ca_vaddr;
 	sc->channel = (struct channel *)(ca->ca_vaddr + 0x0100);
-#if defined(MVME187) || defined(MVME197)
-	sc->sc_vme2 = ca->ca_master;
-#endif 
-	sc->sc_ipl = ca->ca_ipl; 
-	sc->sc_vec = ca->ca_vec; 
+	sc->sc_ipl = ca->ca_ipl;
+	sc->sc_vec = ca->ca_vec;
 	sc->board_addr = (unsigned int)ca->ca_vaddr;
 
 	printf("\n");
 
-	if (create_channels(sc)) {
-		printf("%s: failed to create channel %d\n", sc->sc_dev.dv_xname, 
-		       sc->channel->channel_number);
+	if (create_channels(sc) != 0) {
+		printf("%s: failed to create channel %d\n",
+		    sc->sc_dev.dv_xname, sc->channel->channel_number);
 		return;
 	}
-	if (vx_init(sc)) {
+	if (vx_init(sc) != 0) {
 		printf("%s: failed to initialize\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -241,15 +197,11 @@ vxattach(parent, self, aux)
 	evcnt_attach(&sc->sc_dev, "intr", &sc->sc_intrcnt);
 }
 
-int vxtdefaultrate = TTYDEF_SPEED;
-
 short
-dtr_ctl(sc, port, on)
-	struct vxsoftc *sc;
-	int port;
-	int on;
+dtr_ctl(struct vxsoftc *sc, int port, int on)
 {
 	struct packet pkt;
+
 	bzero(&pkt, sizeof(struct packet));
 	pkt.command = CMD_IOCTL;
 	pkt.ioctl_cmd_l = IOCTL_TCXONC;
@@ -262,16 +214,15 @@ dtr_ctl(sc, port, on)
 		pkt.ioctl_arg_l = 7;  /* negate DTR */
 	}
 	bpp_send(sc, &pkt, NOWAIT);
+
 	return (pkt.error_l);
 }
 
 short
-rts_ctl(sc, port, on)
-	struct vxsoftc *sc;
-	int port;
-	int on;
+rts_ctl(struct vxsoftc *sc, int port, int on)
 {
 	struct packet pkt;
+
 	bzero(&pkt, sizeof(struct packet));
 	pkt.command = CMD_IOCTL;
 	pkt.ioctl_cmd_l = IOCTL_TCXONC;
@@ -284,16 +235,16 @@ rts_ctl(sc, port, on)
 		pkt.ioctl_arg_l = 5;  /* negate RTS */
 	}
 	bpp_send(sc, &pkt, NOWAIT);
+
 	return (pkt.error_l);
 }
 
+#if 0
 short
-flush_ctl(sc, port, which)
-	struct vxsoftc *sc;
-	int port;
-	int which;
+flush_ctl(struct vxsoftc *sc, int port, int which)
 {
 	struct packet pkt;
+
 	bzero(&pkt, sizeof(struct packet));
 	pkt.command = CMD_IOCTL;
 	pkt.ioctl_cmd_l = IOCTL_TCFLSH;
@@ -302,13 +253,13 @@ flush_ctl(sc, port, which)
 	pkt.device_number = port;
 	pkt.ioctl_arg_l = which; /* 0=input, 1=output, 2=both */
 	bpp_send(sc, &pkt, NOWAIT);
+
 	return (pkt.error_l);
 }
+#endif
 
-int vx_mctl (dev, bits, how)
-	dev_t dev;
-	int bits;
-	int how;
+int
+vx_mctl(dev_t dev, int bits, int how)
 {
 	int s, unit, port;
 	struct vxsoftc *sc;
@@ -317,21 +268,20 @@ int vx_mctl (dev, bits, how)
 
 	unit = VX_UNIT(dev);
 	port = VX_PORT(dev);
-	sc = (struct vxsoftc *) vx_cd.cd_devs[unit];
+	sc = (struct vxsoftc *)vx_cd.cd_devs[unit];
 	vxt = &sc->sc_info[port];
 
 	s = splvx();
 	switch (how) {
 	case DMSET:
-		if( bits & TIOCM_RTS) {
+		if (bits & TIOCM_RTS) {
 			rts_ctl(sc, port, 1);
 			vxt->vx_linestatus |= TIOCM_RTS;
 		} else {
 			rts_ctl(sc, port, 0);
-
 			vxt->vx_linestatus &= ~TIOCM_RTS;
 		}
-		if ( bits & TIOCM_DTR) {
+		if (bits & TIOCM_DTR) {
 			dtr_ctl(sc, port, 1);
 			vxt->vx_linestatus |= TIOCM_DTR;
 		} else {
@@ -340,22 +290,22 @@ int vx_mctl (dev, bits, how)
 		}
 		break;
 	case DMBIC:
-		if ( bits & TIOCM_RTS) {
+		if (bits & TIOCM_RTS) {
 			rts_ctl(sc, port, 0);
 			vxt->vx_linestatus &= ~TIOCM_RTS;
 		}
-		if ( bits & TIOCM_DTR) {
+		if (bits & TIOCM_DTR) {
 			dtr_ctl(sc, port, 0);
 			vxt->vx_linestatus &= ~TIOCM_DTR;
 		}
 		break;
 
 	case DMBIS:
-		if ( bits & TIOCM_RTS) {
+		if (bits & TIOCM_RTS) {
 			rts_ctl(sc, port, 1);
 			vxt->vx_linestatus |= TIOCM_RTS;
 		}
-		if ( bits & TIOCM_DTR) {
+		if (bits & TIOCM_DTR) {
 			dtr_ctl(sc, port, 1);
 			vxt->vx_linestatus |= TIOCM_DTR;
 		}
@@ -364,85 +314,83 @@ int vx_mctl (dev, bits, how)
 	case DMGET:
 		bits = 0;
 		msvr = vxt->vx_linestatus;
-		if ( msvr & TIOCM_DSR) {
+		if (msvr & TIOCM_DSR) {
 			bits |= TIOCM_DSR;
 		}
-		if ( msvr & TIOCM_CD) {
+		if (msvr & TIOCM_CD) {
 			bits |= TIOCM_CD;
 		}
-		if ( msvr & TIOCM_CTS) {
+		if (msvr & TIOCM_CTS) {
 			bits |= TIOCM_CTS;
 		}
-		if ( msvr & TIOCM_DTR) {
+		if (msvr & TIOCM_DTR) {
 			bits |= TIOCM_DTR;
 		}
-		if ( msvr & TIOCM_RTS) {
+		if (msvr & TIOCM_RTS) {
 			bits |= TIOCM_RTS;
 		}
 		break;
 	}
 
 	splx(s);
+
+#if 0
 	bits = 0;
 	bits |= TIOCM_DTR;
 	bits |= TIOCM_RTS;
 	bits |= TIOCM_CTS;
 	bits |= TIOCM_CD;
 	bits |= TIOCM_DSR;
+#endif
 	return (bits);
 }
 
-int vxopen (dev, flag, mode, p)
-	dev_t dev;
-	int flag;
-	int mode;
-	struct proc *p;
+int
+vxopen(dev_t dev, int flag, int mode, struct proc *p)
 {
 	int s, unit, port;
 	struct vx_info *vxt;
 	struct vxsoftc *sc;
 	struct tty *tp;
-	struct open_packet opkt;
+	struct packet opkt;
 	u_short code;
 
 	unit = VX_UNIT(dev);
 	port = VX_PORT(dev);
-
-	if (unit >= vx_cd.cd_ndevs || 
+	if (unit >= vx_cd.cd_ndevs ||
 	    (sc = (struct vxsoftc *) vx_cd.cd_devs[unit]) == NULL) {
 		return (ENODEV);
 	}
+	vxt = &sc->sc_info[port];
 
-	/*flush_ctl(sc, port, 2);*/
+#if 0
+	flush_ctl(sc, port, 2);
+#endif
 
 	bzero(&opkt, sizeof(struct packet));
-	opkt.eye_catcher[0] = 0x33;
-	opkt.eye_catcher[1] = 0x33;
-	opkt.eye_catcher[2] = 0x33;
-	opkt.eye_catcher[3] = 0x33;
+	opkt.link = 0x33333333;	/* eye catcher */
 	opkt.command_pipe_number = sc->channel_number;
 	opkt.status_pipe_number = sc->channel_number;
 	opkt.command = CMD_OPEN;
 	opkt.device_number = port;
 
-	bpp_send(sc, &opkt, WAIT_POLL);
+	bpp_send(sc, &opkt, WAIT);
 
 	if (opkt.error_l) {
 #ifdef DEBUG_VXT
 		printf("unit %d, port %d, ", unit, port);
 		printf("error = %d\n", opkt.error_l);
-#endif 
-		return (ENODEV);
+#endif
+		return (ENXIO);
 	}
 
 	code = opkt.event_code;
-	s = splvx();
 
-	vxt = &sc->sc_info[port];
+	s = splvx();
 	if (vxt->tty) {
 		tp = vxt->tty;
 	} else {
-		tp = vxt->tty = ttymalloc();  
+		tp = vxt->tty = ttymalloc();
 	}
 
 	/* set line status */
@@ -472,7 +420,7 @@ int vxopen (dev, flag, mode, p)
 			tp->t_iflag = TTYDEF_IFLAG;
 			tp->t_oflag = TTYDEF_OFLAG;
 			tp->t_lflag = TTYDEF_LFLAG;
-			tp->t_ispeed = tp->t_ospeed = vxtdefaultrate;
+			tp->t_ispeed = tp->t_ospeed = TTYDEF_SPEED;
 			tp->t_cflag = TTYDEF_CFLAG;
 		}
 		/*
@@ -500,16 +448,13 @@ int vxopen (dev, flag, mode, p)
 	 * use of the tty with a dialin open waiting.
 	 */
 	tp->t_dev = dev;
-	sc->sc_info[port].open = 1;
-	read_wakeup(sc, port);
+	vxt->open = 1;
 	splx(s);
-	return ((*linesw[tp->t_line].l_open)(dev, tp));
+	return (*linesw[tp->t_line].l_open)(dev, tp);
 }
 
-int 
-vx_param(tp, t)
-	struct tty *tp;
-	struct termios *t;
+int
+vx_param(struct tty *tp, struct termios *t)
 {
 	int unit, port;
 	struct vxsoftc *sc;
@@ -517,7 +462,7 @@ vx_param(tp, t)
 
 	dev = tp->t_dev;
 	unit = VX_UNIT(dev);
-	if (unit >= vx_cd.cd_ndevs || 
+	if (unit >= vx_cd.cd_ndevs ||
 	    (sc = (struct vxsoftc *) vx_cd.cd_devs[unit]) == NULL) {
 		return (ENODEV);
 	}
@@ -530,78 +475,70 @@ vx_param(tp, t)
 	return 0;
 }
 
-int 
-vxclose (dev, flag, mode, p)
-	dev_t dev;
-	int flag;
-	int mode;
-	struct proc *p;
+int
+vxclose(dev_t dev, int flag, int mode, struct proc *p)
 {
 	int unit, port;
 	struct tty *tp;
 	struct vx_info *vxt;
 	struct vxsoftc *sc;
 	int s;
-	struct close_packet cpkt;
+	struct packet cpkt;
+
 	unit = VX_UNIT(dev);
-	if (unit >= vx_cd.cd_ndevs || 
+	if (unit >= vx_cd.cd_ndevs ||
 	    (sc = (struct vxsoftc *) vx_cd.cd_devs[unit]) == NULL) {
 		return (ENODEV);
 	}
 	port = VX_PORT(dev);
-/*   flush_ctl(sc, port, 2);   flush both input and output */
-
 	vxt = &sc->sc_info[port];
+#if 0
+	flush_ctl(sc, port, 2);	/* flush both input and output */
+#endif
+
 	tp = vxt->tty;
 	(*linesw[tp->t_line].l_close)(tp, flag);
+
+	s = splvx();
 
 	if ((tp->t_cflag & HUPCL) != 0) {
 		rts_ctl(sc, port, 0);
 		dtr_ctl(sc, port, 0);
 	}
 
-	s = splvx();
-
 	bzero(&cpkt, sizeof(struct packet));
-	cpkt.eye_catcher[0] = 0x55;
-	cpkt.eye_catcher[1] = 0x55;
-	cpkt.eye_catcher[2] = 0x55;
-	cpkt.eye_catcher[3] = 0x55;
+	cpkt.link = 0x55555555;	/* eye catcher */
 	cpkt.command_pipe_number = sc->channel_number;
 	cpkt.status_pipe_number = sc->channel_number;
 	cpkt.command = CMD_CLOSE;
 	cpkt.device_number = port;
-
 	bpp_send(sc, &cpkt, NOWAIT);
+
+	vxt->open = 0;
 	splx(s);
 	ttyclose(tp);
-	sc->sc_info[port].open = 0;
+
 	return (0);
 }
 
-void 
-read_wakeup(sc, port)
-	struct vxsoftc *sc;
-	int port;
+void
+read_wakeup(struct vxsoftc *sc, int port)
 {
-	struct read_wakeup_packet rwp;
+	struct packet rwp;
 	struct vx_info *volatile vxt;
+
 	vxt = &sc->sc_info[port];
-	/* 
-	 * If we already have a read_wakeup paket 
+	/*
+	 * If we already have a read_wakeup paket
 	 * for this port, do nothing.
 	 */
-	if (vxt->read_pending) {
+	if (vxt->read_pending != 0)
 		return;
-	} else {
+	else
 		vxt->read_pending = 1;
-	}
 
 	bzero(&rwp, sizeof(struct packet));
-	rwp.eye_catcher[0] = 0x11;
-	rwp.eye_catcher[1] = 0x11;
-	rwp.eye_catcher[2] = 0x11;
-	rwp.eye_catcher[3] = 0x11;
+	rwp.link = 0x11111111;	/* eye catcher */
 	rwp.command_pipe_number = sc->channel_number;
 	rwp.status_pipe_number = sc->channel_number;
 	rwp.command = CMD_READW;
@@ -609,17 +546,14 @@ read_wakeup(sc, port)
 
 	/*
 	 * Do not wait.  Characters will be transferred
-	 * to (*linesw[tp->t_line].l_rint)(c,tp); by 
+	 * to (*linesw[tp->t_line].l_rint)(c, tp); by
 	 * vx_intr()  (IPC will notify via interrupt)
 	 */
 	bpp_send(sc, &rwp, NOWAIT);
 }
 
-int 
-vxread (dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+int
+vxread(dev_t dev, struct uio *uio, int flag)
 {
 	int unit, port;
 	struct tty *tp;
@@ -627,102 +561,70 @@ vxread (dev, uio, flag)
 	struct vxsoftc *volatile sc;
 
 	unit = VX_UNIT(dev);
-	if (unit >= vx_cd.cd_ndevs || 
+	if (unit >= vx_cd.cd_ndevs ||
 	    (sc = (struct vxsoftc *) vx_cd.cd_devs[unit]) == NULL) {
 		return (ENODEV);
 	}
 	port = VX_PORT(dev);
 	vxt = &sc->sc_info[port];
 	tp = vxt->tty;
-	if (!tp) return ENXIO;
+	if (!tp)
+		return ENXIO;
 	return ((*linesw[tp->t_line].l_read)(tp, uio, flag));
 }
 
-int 
-vxwrite (dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+int
+vxwrite(dev_t dev, struct uio *uio, int flag)
 {
 	int unit, port;
 	struct tty *tp;
 	struct vx_info *vxt;
 	struct vxsoftc *sc;
 	struct wring *wp;
-	struct write_wakeup_packet wwp;
+	struct packet wwp;
 	u_short get, put;
 
 	unit = VX_UNIT(dev);
-	if (unit >= vx_cd.cd_ndevs || 
+	if (unit >= vx_cd.cd_ndevs ||
 	    (sc = (struct vxsoftc *) vx_cd.cd_devs[unit]) == NULL) {
 		return (ENODEV);
 	}
-
 	port = VX_PORT(dev);
 	vxt = &sc->sc_info[port];
 	tp = vxt->tty;
-	if (!tp) return ENXIO;
+	if (!tp)
+		return ENXIO;
 
 	wp = sc->sc_info[port].wringp;
 	get = wp->get;
 	put = wp->put;
-
 	if ((put + 1) == get) {
 		bzero(&wwp, sizeof(struct packet));
-		wwp.eye_catcher[0] = 0x22;
-		wwp.eye_catcher[1] = 0x22;
-		wwp.eye_catcher[2] = 0x22;
-		wwp.eye_catcher[3] = 0x22;
+		wwp.link = 0x22222222;	/* eye catcher */
 		wwp.command_pipe_number = sc->channel_number;
 		wwp.status_pipe_number = sc->channel_number;
 		wwp.command = CMD_WRITEW;
 		wwp.device_number = port;
+		bpp_send(sc, &wwp, WAIT);
 
-		port = VX_PORT(dev);
-		vxt = &sc->sc_info[port];
-		tp = vxt->tty;
-		if (!tp) return ENXIO;
-
-		wp = sc->sc_info[port].wringp;
-		get = wp->get;
-		put = wp->put;
-
-		if ((put + 1) == get) {
-			bzero(&wwp, sizeof(struct packet));
-			wwp.eye_catcher[0] = 0x22;
-			wwp.eye_catcher[1] = 0x22;
-			wwp.eye_catcher[2] = 0x22;
-			wwp.eye_catcher[3] = 0x22;
-			wwp.command_pipe_number = sc->channel_number;
-			wwp.status_pipe_number = sc->channel_number;
-			wwp.command = CMD_WRITEW;
-			wwp.device_number = port;
-
-			bpp_send(sc, &wwp, WAIT_POLL);
-
-			if (wwp.error_l) {
-				return (ENXIO);
-			}
-		}
+		if (wwp.error_l != 0)
+			return (ENXIO);
 	}
+
 	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
-}  
+}
 
 int
-vxioctl (dev, cmd, data, flag, p)
-	dev_t dev;
-	u_long cmd;
-	caddr_t data;
-	int flag;
-	struct proc *p;
+vxioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 {
 	int error;
 	int unit, port;
 	struct tty *tp;
 	struct vx_info *vxt;
 	struct vxsoftc *sc;
+
 	unit = VX_UNIT(dev);
-	if (unit >= vx_cd.cd_ndevs || 
+	if (unit >= vx_cd.cd_ndevs ||
 	    (sc = (struct vxsoftc *) vx_cd.cd_devs[unit]) == NULL) {
 		return (ENODEV);
 	}
@@ -750,23 +652,23 @@ vxioctl (dev, cmd, data, flag, p)
 		break;
 
 	case TIOCSDTR:
-		(void) vx_mctl(dev, TIOCM_DTR | TIOCM_RTS, DMBIS);
+		vx_mctl(dev, TIOCM_DTR | TIOCM_RTS, DMBIS);
 		break;
 
 	case TIOCCDTR:
-		(void) vx_mctl(dev, TIOCM_DTR | TIOCM_RTS, DMBIC);
+		vx_mctl(dev, TIOCM_DTR | TIOCM_RTS, DMBIC);
 		break;
 
 	case TIOCMSET:
-		(void) vx_mctl(dev, *(int *) data, DMSET);
+		vx_mctl(dev, *(int *)data, DMSET);
 		break;
 
 	case TIOCMBIS:
-		(void) vx_mctl(dev, *(int *) data, DMBIS);
+		vx_mctl(dev, *(int *)data, DMBIS);
 		break;
 
 	case TIOCMBIC:
-		(void) vx_mctl(dev, *(int *) data, DMBIC);
+		vx_mctl(dev, *(int *)data, DMBIC);
 		break;
 
 	case TIOCMGET:
@@ -778,25 +680,24 @@ vxioctl (dev, cmd, data, flag, p)
 		break;
 
 	case TIOCSFLAGS:
-		error = suser(p, 0); 
+		error = suser(p, 0);
 		if (error != 0)
 			return (EPERM);
 
 		vxt->vx_swflags = *(int *)data;
 		vxt->vx_swflags &= /* only allow valid flags */
-				   (TIOCFLAG_SOFTCAR | TIOCFLAG_CLOCAL | TIOCFLAG_CRTSCTS);
+		    (TIOCFLAG_SOFTCAR | TIOCFLAG_CLOCAL | TIOCFLAG_CRTSCTS);
 		break;
 
 	default:
 		return (ENOTTY);
 	}
+
 	return 0;
 }
 
 int
-vxstop(tp, flag)
-	struct tty *tp;
-	int flag;
+vxstop(struct tty *tp, int flag)
 {
 	int s;
 
@@ -810,109 +711,81 @@ vxstop(tp, flag)
 }
 
 void
-vxputc(sc, port, c)
-	struct vxsoftc *sc;
-	int port;
-	u_char c;
+vxputc(struct vxsoftc *sc, int port, u_char c)
 {
 	struct wring *wp;
 
 	wp = sc->sc_info[port].wringp;
-	wp->data[wp->put++ & (WRING_BUF_SIZE-1)] = c;
-	wp->put &= (WRING_BUF_SIZE-1);
-	return;
+	wp->data[wp->put++ & (WRING_BUF_SIZE - 1)] = c;
+	wp->put &= (WRING_BUF_SIZE - 1);
 }
 
 u_short
-vxtspeed(speed)
-	int speed;
+vxtspeed(int speed)
 {
 	switch (speed) {
 	case B0:
 		return VB0;
-		break;
 	case B50:
 		return VB50;
-		break;
 	case B75:
 		return VB75;
-		break;
 	case B110:
 		return VB110;
-		break;
 	case B134:
 		return VB134;
-		break;
 	case B150:
 		return VB150;
-		break;
 	case B200:
 		return VB200;
-		break;
 	case B300:
 		return VB300;
-		break;
 	case B600:
 		return VB600;
-		break;
 	case B1200:
 		return VB1200;
-		break;
 	case B1800:
 		return VB1800;
-		break;
 	case B2400:
 		return VB2400;
-		break;
 	case B4800:
 		return VB4800;
-		break;
 	case B9600:
 		return VB9600;
-		break;
 	case B19200:
 		return VB19200;
-		break;
 	case B38400:
 		return VB38400;
-		break;
 	default:
 		return VB9600;
-		break;
 	}
 }
 
 int
-vx_ccparam(sc, par, port)
-	struct vxsoftc *sc;
-	struct termios *par;
-	int port;
+vx_ccparam(struct vxsoftc *sc, struct termios *par, int port)
 {
-	int imask=0, s;
-	int cflag /*, iflag, oflag, lflag*/;
-	struct ioctl_a_packet pkt;
-	bzero(&pkt, sizeof(struct packet));
+	int imask = 0, s;
+	int cflag;
+	struct packet pkt;
 
 	if (par->c_ospeed == 0) {
 		s = splvx();
-		/* dont kill the console */
-		if (sc->sc_info[port].vx_consio == 0) {
-			/* disconnect, drop RTS DTR stop receiver */
-			rts_ctl(sc, port, 0);
-			dtr_ctl(sc, port, 0);
-		}
+		/* disconnect, drop RTS DTR stop receiver */
+		rts_ctl(sc, port, 0);
+		dtr_ctl(sc, port, 0);
 		splx(s);
 		return (0xff);
 	}
 
+	bzero(&pkt, sizeof(struct packet));
 	pkt.command = CMD_IOCTL;
 	pkt.ioctl_cmd_l = IOCTL_TCGETA;
 	pkt.command_pipe_number = sc->channel_number;
 	pkt.status_pipe_number = sc->channel_number;
 	pkt.device_number = port;
-	bpp_send(sc, &pkt, WAIT_POLL);
+	bpp_send(sc, &pkt, WAIT);
 
-	cflag = pkt.c_cflag;
+	cflag = pkt.pb.tio.c_cflag;
 	cflag |= vxtspeed(par->c_ospeed);
 
 	switch (par->c_cflag & CSIZE) {
@@ -943,51 +816,20 @@ vx_ccparam(sc, par, port)
 	else cflag &= ~VCLOCAL;
 	if (par->c_cflag & HUPCL) cflag |= VHUPCL;
 	else cflag &= ~VHUPCL;
-#if 0
-	if (par->c_iflag & BRKINT) iflag |= VBRKINT;
-	else iflag &= ~VBRKINT;
-	if (par->c_iflag & ISTRIP) iflag |= VISTRIP;
-	else iflag &= ~VISTRIP;
-	if (par->c_iflag & ICRNL) iflag |= VICRNL;
-	else iflag &= ~VICRNL;
-	if (par->c_iflag & IXON) iflag |= VIXON;
-	else iflag &= ~VIXON;
-	if (par->c_iflag & IXANY) iflag |= VIXANY;
-	else iflag &= ~VIXANY;
-	if (par->c_oflag & OPOST) oflag |= VOPOST;
-	else oflag &= ~VOPOST;
-	if (par->c_oflag & ONLCR) oflag |= VONLCR;
-	else oflag &= ~VONLCR;
-	if (par->c_oflag & OXTABS) oflag |= VOXTABS;
-	else oflag &= ~VOXTABS;
-	if (par->c_lflag & ECHO) lflag |= VECHO;
-	else lflag &= ~VECHO;
-	if (par->c_lflag & ECHOE) lflag |= VECHOE;
-	else lflag &= ~VECHOE;
-	if (par->c_lflag & ICANON) lflag |= VICANON;
-	else lflag &= ~VICANON;
-	if (par->c_lflag & ISIG) lflag |= VISIG;
-	else lflag &= ~VISIG;
-#endif 
+
 	pkt.command = CMD_IOCTL;
 	pkt.ioctl_cmd_l = IOCTL_TCSETA;
 	pkt.command_pipe_number = sc->channel_number;
 	pkt.status_pipe_number = sc->channel_number;
 	pkt.device_number = port;
-	pkt.c_cflag = cflag;
-#if 0
-	pkt.c_iflag = iflag;
-	pkt.c_oflag = oflag;
-	pkt.c_lflag = lflag;
-#endif
+	pkt.pb.tio.c_cflag = cflag;
+	bpp_send(sc, &pkt, WAIT);
 
-	bpp_send(sc, &pkt, WAIT_POLL);
 	return imask;
 }
 
 void
-vx_unblock(tp)
-	struct tty *tp;
+vx_unblock(struct tty *tp)
 {
 	tp->t_state &= ~TS_FLUSH;
 	if (tp->t_outq.c_cc != 0)
@@ -995,8 +837,7 @@ vx_unblock(tp)
 }
 
 void
-vxstart(tp)
-	struct tty *tp;
+vxstart(struct tty *tp)
 {
 	dev_t dev;
 	struct vxsoftc *sc;
@@ -1008,7 +849,7 @@ vxstart(tp)
 	dev = tp->t_dev;
 	port = VX_PORT(dev);
 	unit = VX_UNIT(dev);
-	if (unit >= vx_cd.cd_ndevs || 
+	if (unit >= vx_cd.cd_ndevs ||
 	    (sc = (struct vxsoftc *) vx_cd.cd_devs[unit]) == NULL) {
 		return;
 	}
@@ -1027,7 +868,7 @@ vxstart(tp)
 			cnt = min(WRING_BUF_SIZE, cc);
 			cnt = q_to_b(&tp->t_outq, buffer, cnt);
 			buffer[cnt] = 0;
-			for (i=0; i<cnt; i++) {
+			for (i = 0; i < cnt; i++) {
 				vxputc(sc, port, buffer[i]);
 			}
 			cc -= cnt;
@@ -1035,19 +876,16 @@ vxstart(tp)
 		tp->t_state &= ~TS_BUSY;
 	}
 	splx(s);
-	return;
 }
 
-void 
-read_chars(sc, port)
-	struct vxsoftc *sc;
-	int port;
+void
+read_chars(struct vxsoftc *sc, int port)
 {
-	/* 
+	/*
 	 * This routine is called by vx_intr() when there are
-	 * characters in the read ring.  It will process one 
+	 * characters in the read ring.  It will process one
 	 * cooked line, put the chars in the line disipline ring,
-	 * and then return.  The characters may then 
+	 * and then return.  The characters may then
 	 * be read by vxread.
 	 */
 	struct vx_info *vxt;
@@ -1066,20 +904,20 @@ read_chars(sc, port)
 #ifdef DEBUG_VXT
 	printf("read_chars() get=%d, put=%d ", get, put);
 	printf("open = %d ring at 0x%x\n", open, rp);
-#endif 
+#endif
 	while (get != put) {
 		frame_count = rp->data[rp->get++ & (RRING_BUF_SIZE - 1)];
 		rp->get &= (RRING_BUF_SIZE - 1);
-		for (i=0; i<frame_count; i++) {
+		for (i = 0; i < frame_count; i++) {
 			c = rp->data[rp->get++ & (RRING_BUF_SIZE - 1)];
 			rp->get &= (RRING_BUF_SIZE - 1);
 			if (open)
-				(*linesw[tp->t_line].l_rint)(c,tp);
+				(*linesw[tp->t_line].l_rint)(c, tp);
 		}
 		c = rp->data[rp->get++ & (RRING_BUF_SIZE - 1)];
 		rp->get &= (RRING_BUF_SIZE - 1);
 		if (!(c & DELIMITER)) {
-			vx_frame (sc, port);
+			vx_frame(sc, port);
 			break;
 		} else {
 			break;
@@ -1089,55 +927,43 @@ read_chars(sc, port)
 	}
 	vxt->read_pending = 0;
 	read_wakeup(sc, port);
-	return;
 }
 
 void
-ccode(sc, port, c)
-	struct vxsoftc *sc;
-	int port;
-	char c;
+ccode(struct vxsoftc *sc, int port, char c)
 {
 	struct vx_info *vxt;
 	struct tty *tp;
+
 	tp = vxt->tty;
-	vxt = &sc->sc_info[port];
-	tp = vxt->tty;
-	(*linesw[tp->t_line].l_rint)(c,tp);
+	(*linesw[tp->t_line].l_rint)(c, tp);
 }
 
 int
-vx_intr(arg)
-	void *arg;
+vx_intr(void *arg)
 {
 	struct vxsoftc *sc = arg;
 	struct envelope *envp, *next_envp;
 	struct packet *pktp, pkt;
 	int valid;
-	short  cmd;
-	u_char  port;
+	short cmd;
+	u_char port;
 
-#if defined(MVME187) || defined(MVME197)
-	struct vme2reg *vme2 = (struct vme2reg *)sc->sc_vme2;
-
-	if (vme2->vme2_vbr & VME2_SYSFAIL) {
-		/* do something... print_dump(sc); */
-		
-	}
-#endif /* defined(MVME187) || defined(MVME197) */
-	if (!cold) sc->sc_intrcnt.ev_count++;
+	sc->sc_intrcnt.ev_count++;
 
 	while (env_isvalid(get_status_head(sc))) {
 		pktp = get_packet(sc, get_status_head(sc));
 		valid = env_isvalid(get_status_head(sc));
 		cmd = pktp->command;
 		port = pktp->device_number;
-		/* if we are waiting on this packet, strore the info so bpp_send 
-		   can process the packet  */
+		/*
+		 * If we are waiting on this packet, store the info
+		 * so bpp_send can process the packet
+		 */
 		if (sc->sc_bppwait_pktp == pktp)
-			memcpy2(&sc->sc_bppwait_pkt, pktp, sizeof(struct packet));
+			d16_bcopy(pktp, &sc->sc_bppwait_pkt, sizeof(struct packet));
 
-		memcpy2(&pkt, pktp, sizeof(struct packet));
+		d16_bcopy(pktp, &pkt, sizeof(struct packet));
 		next_envp = get_next_envelope(get_status_head(sc));
 		envp = get_status_head(sc);
 		/* return envelope and packet to the free queues */
@@ -1149,48 +975,41 @@ vx_intr(arg)
 		switch (cmd) {
 		case CMD_READW:
 #ifdef DEBUG_VXT
-			printf("READW Packet\n");  
-#endif 
-			read_chars(sc, port);          
-			return 1;
+			printf("READW Packet\n");
+#endif
+			read_chars(sc, port);
 			break;
 		case CMD_WRITEW:
 #ifdef DEBUG_VXT
 			printf("WRITEW Packet\n");  /* Still don't know XXXsmurph */
-#endif 
-			return 1;
+#endif
 			break;
 		case CMD_EVENT:
 #ifdef DEBUG_VXT
-			printf("EVENT Packet\n");  
-#endif 
+			printf("EVENT Packet\n");
+#endif
 			vx_event(sc, &pkt);
-			return 1;
 			break;
-		case CMD_PROCCESED:
+		case CMD_PROCESSED:
 #ifdef DEBUG_VXT
-			printf("CMD_PROCCESED Packet\n");
-#endif 
-			return 1;
+			printf("CMD_PROCESSED Packet\n");
+#endif
 			break;
 		default:
 #ifdef DEBUG_VXT
-			printf("Other packet 0x%x\n", cmd);  
-#endif 
-			return 1;
+			printf("Other packet 0x%x\n", cmd);
+#endif
 			break;
 		}
 	}
 	return 1;
 }
 
-int 
-vx_event(sc, evntp)
-	struct vxsoftc *sc;
-	struct packet *evntp;
+int
+vx_event(struct vxsoftc *sc, struct packet *evntp)
 {
 	u_short code = evntp->event_code;
-	struct event_packet evnt;
+	struct packet evnt;
 	struct vx_info *vxt;
 
 	vxt = &sc->sc_info[evntp->device_number];
@@ -1225,26 +1044,22 @@ vx_event(sc, evntp)
 	}
 	if (code & E_PR_FAULT) {
 		/* do something... */
-		
 	}
 	if (code & E_PR_POUT) {
 		/* do something... */
-		
 	}
 	if (code & E_PR_SELECT) {
 		/* do something... */
-		
 	}
 	if (code & E_SWITCH) {
 		/* do something... */
-		
 	}
 	if (code & E_BREAK) {
-		vx_break (sc, evntp->device_number);
+		vx_break(sc, evntp->device_number);
 	}
 
-	/* send and event packet backe to the device */
-	bzero(&evnt, sizeof(struct event_packet));
+	/* send an event packet back to the device */
+	bzero(&evnt, sizeof(struct packet));
 	evnt.command = CMD_EVENT;
 	evnt.device_number = evntp->device_number;
 	evnt.command_pipe_number = sc->channel_number;
@@ -1252,172 +1067,147 @@ vx_event(sc, evntp)
 	evnt.status_pipe_number = sc->channel_number;
 	/* send packet to the firmware */
 	bpp_send(sc, &evnt, NOWAIT);
+
 	return 1;
 }
 
 void
-vx_overflow (sc, port, ptime, msg)
-	struct vxsoftc *sc;
-	int port;
-	long *ptime;
-	u_char *msg;
+vx_overflow(struct vxsoftc *sc, int port, long *ptime, u_char *msg)
 {
-	log(LOG_WARNING, "%s port %d: overrun\n", sc->sc_dev.dv_xname, port);
-	return;
+	log(LOG_WARNING, "%s port %d: overrun\n",
+	    sc->sc_dev.dv_xname, port);
 }
 
 void
-vx_frame (sc, port)
-	struct vxsoftc *sc;
-	int port;
+vx_frame(struct vxsoftc *sc, int port)
 {
-	log(LOG_WARNING, "%s port %d: frame error\n", sc->sc_dev.dv_xname, port);
-	return;
+	log(LOG_WARNING, "%s port %d: frame error\n",
+	    sc->sc_dev.dv_xname, port);
 }
 
 void
-vx_break (sc, port)
-	struct vxsoftc *sc;
-	int port;
+vx_break(struct vxsoftc *sc, int port)
 {
-#ifdef DDB
-	if (db_console != 0)
-		Debugger();
-#else
-	log(LOG_WARNING, "%s port %d: break detected\n", sc->sc_dev.dv_xname, port);
-#endif
-	return;
+	/*
+	 * No need to check for a ddb break, as the console can never be on
+	 * this hardware.
+	 */
+	log(LOG_WARNING, "%s port %d: break detected\n",
+	    sc->sc_dev.dv_xname, port);
 }
 
 /*
  *	Initialization and Buffered Pipe Protocol (BPP) code
  */
 
-/* special function for 16 bit data transfer */
-/* Not needed now that I figured out VME bus */
-/* mappings and address modifiers, but I don't */
-/* want to change them :) */
 void
-memcpy2(void *dest, const void *src, size_t size)
+create_free_queue(struct vxsoftc *sc)
 {
 	int i;
-	short *d, *s;
-	d = (short *) dest;
-	s = (short *) src;
-	for (i=0; i<(size/2); i++) {
-		*d = *s;
-		d++;
-		s++;
-	}
-}
-
-void
-wzero(void *addr, size_t size)
-{
-	int i;
-	short *d;
-	d = (short *) addr;
-	for (i=0; i<(size/2); i++) {
-		*d = 0;
-		d++;
-	}
-}
-
-int
-create_free_queue(sc)
-	struct vxsoftc *sc;
-{
-	int i;
-	struct envelope *envp;
-	struct packet   *pktp;
+	struct envelope *envp, env;
+	struct packet *pktp, pkt;
 
 	envp = (struct envelope *)ENVELOPE_AREA;
 	sc->elist_head = envp;
-	for (i=0; i < NENVELOPES; i++) {
-		bzero(envp, sizeof(struct envelope));
-		if (i==(NENVELOPES - 1)) {
-			envp->link = NULL;
-		} else {
-			envp->link = (u_long)envp + sizeof(struct envelope);
-		}
-		envp->packet_ptr = NULL;
-		envp->valid_flag = 0;
+	for (i = 0; i < NENVELOPES; i++) {
+		bzero(&env, sizeof(struct envelope));
+		if (i == NENVELOPES - 1)
+			env.link = NULL;
+		else
+			env.link = (u_long)envp + sizeof(struct envelope);
+		env.packet_ptr = NULL;
+		env.valid_flag = 0;
+		d16_bcopy(&env, envp, sizeof(struct envelope));
 		envp++;
 	}
 	sc->elist_tail = --envp;
 
 	pktp = (struct packet *)PACKET_AREA;
 	sc->plist_head = pktp;
-	for (i=0; i < NPACKETS; i++) {
-		bzero(pktp, sizeof(struct packet));
-		if (i==(NPACKETS - 1)) {
-			pktp->link = NULL;
-		} else {
-			pktp->link = (u_long)pktp + sizeof(struct packet);
-		}
+	for (i = 0; i < NPACKETS; i++) {
+		bzero(&pkt, sizeof(struct packet));
+		if (i == NPACKETS - 1)
+			pkt.link = NULL;
+		else
+			pkt.link = (u_long)pktp + sizeof(struct packet);
+		d16_bcopy(&pkt, pktp, sizeof(struct packet));
 		pktp++;
 	}
 	sc->plist_tail = --pktp;
-	return 0; /* no error */
 }
 
 void *
-get_free_envelope(sc) 
-	struct vxsoftc *sc;
+get_free_envelope(struct vxsoftc *sc)
 {
 	void *envp;
+	u_long link;
 
 	envp = sc->elist_head;
-	sc->elist_head = (struct envelope *)sc->elist_head->link;
-	bzero(envp, sizeof(struct envelope));
+	/* pick envelope next pointer from the envelope itself */
+	d16_bcopy((const void *)&sc->elist_head->link, &link, sizeof link);
+	sc->elist_head = (struct envelope *)link;
+	d16_bzero(envp, sizeof(struct envelope));
+
 	return envp;
 }
 
-void 
-put_free_envelope(sc, ep)
-	struct vxsoftc *sc;
-	void * ep;
+void
+put_free_envelope(struct vxsoftc *sc, void *ep)
 {
 	struct envelope *envp = (struct envelope *)ep;
-	bzero(envp, sizeof(struct envelope));
-	sc->elist_tail->link = (ulong)envp;
-	envp->link = NULL;
+	u_long link;
+
+#if 0
+	d16_bzero(envp, sizeof(struct envelope));
+#endif
+	/* put envelope next pointer in the envelope itself */
+	link = (u_long)envp;
+	d16_bcopy(&link, (void *)&sc->elist_tail->link, sizeof link);
+	d16_bzero((void *)&envp->link, sizeof envp->link);
+
 	sc->elist_tail = envp;
 }
 
-void * 
-get_free_packet(sc)
-	struct vxsoftc *sc;
+void *
+get_free_packet(struct vxsoftc *sc)
 {
 	struct packet *pktp;
+	u_long link;
 
 	pktp = sc->plist_head;
-	sc->plist_head = (struct packet *)sc->plist_head->link;
-	bzero(pktp, sizeof(struct packet));
+	/* pick packet next pointer from the packet itself */
+	d16_bcopy((const void *)&sc->plist_head->link, &link, sizeof link);
+	sc->plist_head = (struct packet *)link;
+	d16_bzero(pktp, sizeof(struct packet));
+
 	return pktp;
 }
 
-void 
-put_free_packet(sc, pp)
-	struct vxsoftc *sc;
-	void *pp;
+void
+put_free_packet(struct vxsoftc *sc, void *pp)
 {
 	struct packet *pktp = (struct packet *)pp;
-	/*bzero(pktp, sizeof(struct packet));*/
-	pktp->command = CMD_PROCCESED;
-	sc->plist_tail->link = (u_long)pktp;
-	pktp->link = NULL;
+	u_long link;
+
+#if 0
+	d16_bzero(pktp, sizeof(struct packet));
+#endif
+	pktp->command = CMD_PROCESSED;
+	/* put packet next pointer in the packet itself */
+	link = (u_long)pktp;
+	d16_bcopy(&link, (void *)&sc->plist_tail->link, sizeof link);
+	d16_bzero((void *)&pktp->link, sizeof pktp->link);
+
 	sc->plist_tail = pktp;
 }
 
-/* 
+/*
  * This is the nitty gritty.  All the rest if this code
- * was hell to come by.  Getting this right from the 
- * Moto manual took *time*!  
+ * was hell to come by.  Getting this right from the
+ * Moto manual took *time*!
  */
-int 
-create_channels(sc)
-	struct vxsoftc *sc;
+int
+create_channels(struct vxsoftc *sc)
 {
 	struct envelope *envp;
 	u_short status;
@@ -1426,44 +1216,50 @@ create_channels(sc)
 
 	ipc_csr = sc->vx_reg;
 	/* wait for busy bit to clear */
-	while ((ipc_csr->ipc_cr & IPC_CR_BUSY));
+	while ((ipc_csr->ipc_cr & IPC_CR_BUSY)) ;
+
 	create_free_queue(sc);
-	/* set up channel header.  we only want one */
+	/* set up channel header. we only want one */
 	tas = ipc_csr->ipc_tas;
 	while (!(tas & IPC_TAS_VALID_STATUS)) {
 		envp = get_free_envelope(sc);
 		sc->channel->command_pipe_head_ptr_h = HI(envp);
 		sc->channel->command_pipe_head_ptr_l = LO(envp);
-		sc->channel->command_pipe_tail_ptr_h = sc->channel->command_pipe_head_ptr_h;
-		sc->channel->command_pipe_tail_ptr_l = sc->channel->command_pipe_head_ptr_l;
+		sc->channel->command_pipe_tail_ptr_h =
+		    sc->channel->command_pipe_head_ptr_h;
+		sc->channel->command_pipe_tail_ptr_l =
+		    sc->channel->command_pipe_head_ptr_l;
 		envp = get_free_envelope(sc);
 		sc->channel->status_pipe_head_ptr_h = HI(envp);
 		sc->channel->status_pipe_head_ptr_l = LO(envp);
-		sc->channel->status_pipe_tail_ptr_h = sc->channel->status_pipe_head_ptr_h;
-		sc->channel->status_pipe_tail_ptr_l = sc->channel->status_pipe_head_ptr_l;
-		sc->channel->interrupt_level =  sc->sc_ipl;
+		sc->channel->status_pipe_tail_ptr_h =
+		    sc->channel->status_pipe_head_ptr_h;
+		sc->channel->status_pipe_tail_ptr_l =
+		    sc->channel->status_pipe_head_ptr_l;
+		sc->channel->interrupt_level = sc->sc_ipl;
 		sc->channel->interrupt_vec = sc->sc_vec;
 		sc->channel->channel_priority = 0;
 		sc->channel->channel_number = 0;
 		sc->channel->valid = 1;
-		sc->channel->address_modifier = 0x8D; /* A32/D16 supervisor data access */
+		sc->channel->address_modifier = 0x8d; /* A32/D16 supervisor data access */
 		sc->channel->datasize = 0; /* 32 bit data mode */
 
 		/* loop until TAS bit is zero */
-		while ((ipc_csr->ipc_tas & IPC_TAS_TAS)); 
+		while ((ipc_csr->ipc_tas & IPC_TAS_TAS)) ;
 		ipc_csr->ipc_tas |= IPC_TAS_TAS;
 		/* load address of channel header */
 		ipc_csr->ipc_addrh = HI(sc->channel);
 		ipc_csr->ipc_addrl = LO(sc->channel);
 		/* load address modifier reg (supervisor data access) */
-		ipc_csr->ipc_amr = 0x8D;
+		ipc_csr->ipc_amr = 0x8d;
 		/* load tas with create channel command */
 		ipc_csr->ipc_tas |= IPC_CSR_CREATE;
 		/* set vaild command bit */
 		ipc_csr->ipc_tas |= IPC_TAS_VALID_CMD;
 		/* notify IPC of the CSR command */
 		ipc_csr->ipc_cr |= IPC_CR_ATTEN;
-		/* loop until IPC sets vaild status bit */
+
+		/* loop until IPC sets valid status bit */
 		delay(5000);
 		tas = ipc_csr->ipc_tas;
 	}
@@ -1477,212 +1273,195 @@ create_channels(sc)
 	/* check and see if the channel was created */
 	if (!status && sc->channel->valid) {
 		sc->channel_number = sc->channel->channel_number;
-		printf("%s: created channel %d\n", sc->sc_dev.dv_xname, 
+		printf("%s: created channel %d\n", sc->sc_dev.dv_xname,
 		       sc->channel->channel_number);
 		return 0;
 	} else {
 		switch (status) {
 		case 0x0000:
-			printf("%s: channel not valid\n", 
+			printf("%s: channel not valid\n",
 			       sc->sc_dev.dv_xname);
 			break;
 		case 0xFFFF:
-			printf("%s: invalid CSR command\n", 
+			printf("%s: invalid CSR command\n",
 			       sc->sc_dev.dv_xname);
 			break;
 		case 0xC000:
-			printf("%s: could not read channel structure\n", 
+			printf("%s: could not read channel structure\n",
 			       sc->sc_dev.dv_xname);
 			break;
 		case 0x8000:
-			printf("%s: could not write channel structure\n", 
+			printf("%s: could not write channel structure\n",
 			       sc->sc_dev.dv_xname);
 			break;
 		default:
-			printf("%s: unknown IPC CSR command error 0x%x\n", 
+			printf("%s: unknown IPC CSR command error 0x%x\n",
 			       sc->sc_dev.dv_xname, status);
 			break;
 		}
-		return status; /* error */
+		return 1;
 	}
 }
 
-void
-print_dump(sc)
-	struct vxsoftc *sc;
+struct envelope *
+get_next_envelope(struct envelope *thisenv)
 {
-	char *dump_area;
-	char dump[209];
-	bzero(&dump, 209);
+	u_long ptr;
 
-	dump_area = (char *)0xff780030;
-	memcpy2(&dump, dump_area, 208);
+	d16_bcopy((const void*)&thisenv->link, &ptr, sizeof ptr);
 
-	printf("%s", dump);
+	return ((struct envelope *)ptr);
 }
 
-void *
-get_next_envelope(thisenv)
-	struct envelope *thisenv;
+int
+env_isvalid(struct envelope *thisenv)
 {
-	return ((void *)thisenv->link);
-}
-
-int 
-env_isvalid(thisenv)
-	struct envelope *thisenv;
-{
-	return thisenv->valid_flag;
+	return (int)thisenv->valid_flag;
 }
 
 struct envelope *
-get_cmd_tail(sc)
-	struct vxsoftc *sc; 
+get_cmd_tail(struct vxsoftc *sc)
 {
 	unsigned long retaddr;
+
 	retaddr = (unsigned long)sc->vx_reg;
 	retaddr += sc->channel->command_pipe_tail_ptr_l;
 	return ((struct envelope *)retaddr);
 }
 
 struct envelope *
-get_status_head(sc)
-	struct vxsoftc *sc;
+get_status_head(struct vxsoftc *sc)
 {
 	unsigned long retaddr;
+
 	retaddr = (unsigned long)sc->vx_reg;
 	retaddr += sc->channel->status_pipe_head_ptr_l;
 	return ((struct envelope *)retaddr);
 }
 
 void
-set_status_head(sc, envp)
-	struct vxsoftc *sc;
-	void *envp;
+set_status_head(struct vxsoftc *sc, void *envp)
 {
 	sc->channel->status_pipe_head_ptr_h = HI(envp);
 	sc->channel->status_pipe_head_ptr_l = LO(envp);
-	return;   
 }
 
 struct packet *
-get_packet(sc, thisenv)
-	struct vxsoftc *sc;
-	struct envelope *thisenv;
+get_packet(struct vxsoftc *sc, struct envelope *thisenv)
 {
-	unsigned long baseaddr; 
+	u_long baseaddr;
 
-	if (thisenv == NULL) return NULL;
-	baseaddr = (unsigned long)sc->vx_reg;
-	/* 
+	if (thisenv == NULL)
+		return NULL;
+
+	/*
 	 * packet ptr returned on status pipe is only last two bytes
 	 * so we must supply the full address based on the board address.
 	 * This also works for all envelopes because every address is an
-	 * offset to the board address 
+	 * offset to the board address.
 	 */
-	baseaddr |= thisenv->packet_ptr;
-	return ((void *)baseaddr);
+	d16_bcopy((const void *)&thisenv->packet_ptr, &baseaddr, sizeof baseaddr);
+	baseaddr |= (u_long)sc->vx_reg;
+
+	return ((struct packet *)baseaddr);
 }
 
 /*
  *	Send a command via BPP
  */
-int 
+void
 bpp_send(struct vxsoftc *sc, void *pkt, int wait_flag)
 {
 	struct envelope *envp;
 	struct packet *pktp;
-	unsigned long newenv;
-
+	u_long ptr;
 
 	/* load up packet in dual port mem */
 	pktp = get_free_packet(sc);
-	memcpy2(pktp, pkt, sizeof(struct packet));
+	d16_bcopy(pkt, pktp, sizeof(struct packet));
 
 	envp = get_cmd_tail(sc);
-	newenv = (unsigned long)get_free_envelope(sc); /* put a NULL env on the tail */
-	envp->link = newenv;
-	sc->channel->command_pipe_tail_ptr_h = HI(newenv);
-	sc->channel->command_pipe_tail_ptr_l = LO(newenv);
-	envp->packet_ptr = (u_long)pktp;   /* add the command packet */
-	envp->valid_flag = 1;		   /* set valid command flag */
+	ptr = (unsigned long)get_free_envelope(sc); /* put a NULL env on the tail */
+	d16_bcopy(&ptr, (void *)&envp->link, sizeof envp->link);
+	sc->channel->command_pipe_tail_ptr_h = HI(ptr);
+	sc->channel->command_pipe_tail_ptr_l = LO(ptr);
+	ptr = (u_long)pktp;
+	d16_bcopy(&ptr, (void *)&envp->packet_ptr, sizeof envp->packet_ptr);
+	envp->valid_flag = 1;
 
 	sc->vx_reg->ipc_cr |= IPC_CR_ATTEN;
-	if (wait_flag) {		    /* wait for a packet to return */
-		while (pktp->command != CMD_PROCCESED) {
+
+	/* wait for a packet to return */
+	if (wait_flag != NOWAIT) {
+		while (pktp->command != CMD_PROCESSED) {
 #ifdef DEBUG_VXT
 			printf("Polling for packet 0x%x in envelope 0x%x...\n", pktp, envp);
-#endif 
+#endif
 			vx_intr(sc);
 			delay(5000);
 		}
-		memcpy2(pkt, pktp, sizeof(struct packet));
-		return 0;
+		d16_bcopy(pktp, pkt, sizeof(struct packet));
 	}
-	return 0; /* no error */
 }
 
 /*
  *	BPP commands
  */
 
-int 
-vx_init(sc)
-	struct vxsoftc *sc;
+int
+vx_init(struct vxsoftc *sc)
 {
 	int i;
 	struct init_info *infp, inf;
 	struct wring *wringp;
 	struct rring *rringp;
 	struct termio def_termio;
-	struct init_packet init;
-	struct event_packet evnt;
+	struct packet init;
+	struct packet evnt;
 
 	bzero(&def_termio, sizeof(struct termio));
 	/* init wait queue */
-	bzero(&sc->sc_bppwait_pkt, sizeof(struct packet));
+	d16_bzero(&sc->sc_bppwait_pkt, sizeof(struct packet));
 	sc->sc_bppwait_pktp = NULL;
 	/* set up init_info array */
 	wringp = (struct wring *)WRING_AREA;
 	rringp = (struct rring *)RRING_AREA;
 	infp = (struct init_info *)INIT_INFO_AREA;
-	for (i=0; i<9; i++) {
+	for (i = 0; i < NVXPORTS; i++) {
 		bzero(&inf, sizeof(struct init_info));
-		infp->write_ring_ptr_h = HI(wringp);
-		infp->write_ring_ptr_l = LO(wringp);
+		inf.write_ring_ptr_h = HI(wringp);
+		inf.write_ring_ptr_l = LO(wringp);
 		sc->sc_info[i].wringp = wringp;
-		infp->read_ring_ptr_h = HI(rringp);
-		infp->read_ring_ptr_l = LO(rringp);
+		inf.read_ring_ptr_h = HI(rringp);
+		inf.read_ring_ptr_l = LO(rringp);
 		sc->sc_info[i].rringp = rringp;
 #ifdef DEBUG_VXT
 		printf("write at 0x%8x, read at 0x%8x\n", wringp, rringp);
-#endif 
-		infp->write_ring_size = WRING_DATA_SIZE;
-		infp->read_ring_size = RRING_DATA_SIZE;
-		infp->def_termio.c_iflag = VBRKINT;
-		infp->def_termio.c_oflag = 0;
-		infp->def_termio.c_cflag = (VB9600 | VCS8);
+#endif
+		inf.write_ring_size = WRING_DATA_SIZE;
+		inf.read_ring_size = RRING_DATA_SIZE;
+		inf.def_termio.c_iflag = VBRKINT;
+		inf.def_termio.c_oflag = 0;
+		inf.def_termio.c_cflag = (VB9600 | VCS8);
 
-		infp->def_termio.c_lflag = VISIG; /* enable signal processing */
-		infp->def_termio.c_line = 1; /* raw line disipline, we want to control it! */
-		infp->def_termio.c_cc[0] = CINTR;
-		infp->def_termio.c_cc[1] = CQUIT;
-		infp->def_termio.c_cc[2] = CERASE;
-		infp->def_termio.c_cc[3] = CKILL;
-		infp->def_termio.c_cc[4] = 20;
-		infp->def_termio.c_cc[5] = 2;
-		infp->reserved1 = 0;  /* Must be Zero */
-		infp->reserved2 = 0;
-		infp->reserved3 = 0;
-		infp->reserved4 = 0;
+		inf.def_termio.c_lflag = VISIG; /* enable signal processing */
+		inf.def_termio.c_line = 1; /* raw line discipline */
+		inf.def_termio.c_cc[0] = CINTR;
+		inf.def_termio.c_cc[1] = CQUIT;
+		inf.def_termio.c_cc[2] = CERASE;
+		inf.def_termio.c_cc[3] = CKILL;
+		inf.def_termio.c_cc[4] = 20;
+		inf.def_termio.c_cc[5] = 2;
+		inf.reserved1 = 0;  /* Must Be Zero */
+		inf.reserved2 = 0;
+		inf.reserved3 = 0;
+		inf.reserved4 = 0;
+		d16_bcopy(&inf, infp, sizeof(struct init_info));
 		wringp++; rringp++; infp++;
 	}
 	/* set up init_packet */
-	bzero(&init, sizeof(struct init_packet));
-	init.eye_catcher[0] = 0x12;
-	init.eye_catcher[1] = 0x34;
-	init.eye_catcher[2] = 0x56;
-	init.eye_catcher[3] = 0x78;
+	bzero(&init, sizeof(struct packet));
+	init.link = 0x12345678;	/* eye catcher */
 	init.command = CMD_INIT;
 	init.command_pipe_number = sc->channel_number;
 	/* return status on the same channel */
@@ -1693,23 +1472,20 @@ vx_init(sc)
 	init.init_info_ptr_l = LO(INIT_INFO_AREA);
 
 	/* send packet to the firmware and wait for completion */
-	bpp_send(sc, &init, WAIT_POLL);
-
-	/* check for error */
-	if (init.error_l !=0) {
+	bpp_send(sc, &init, WAIT);
+	if (init.error_l != 0)
 		return init.error_l;
-	} else {
-		/* send one event packet to each device; */
-		for (i=0; i<9; i++) {
-			bzero(&evnt, sizeof(struct event_packet));
-			evnt.command = CMD_EVENT;
-			evnt.device_number = i;
-			evnt.command_pipe_number = sc->channel_number;
-			/* return status on same channel */
-			evnt.status_pipe_number = sc->channel_number;
-			/* send packet to the firmware */
-			bpp_send(sc, &evnt, NOWAIT);
-		}
-		return 0;
+
+	/* send one event packet to each device */
+	for (i = 0; i < NVXPORTS; i++) {
+		bzero(&evnt, sizeof(struct packet));
+		evnt.command = CMD_EVENT;
+		evnt.device_number = i;
+		evnt.command_pipe_number = sc->channel_number;
+		/* return status on same channel */
+		evnt.status_pipe_number = sc->channel_number;
+		/* send packet to the firmware */
+		bpp_send(sc, &evnt, NOWAIT);
 	}
+	return 0;
 }

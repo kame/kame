@@ -1,4 +1,4 @@
-/* $OpenBSD: trap.c,v 1.41 2003/08/10 00:03:21 miod Exp $ */
+/* $OpenBSD: trap.c,v 1.43 2003/11/13 08:19:20 miod Exp $ */
 /* $NetBSD: trap.c,v 1.52 2000/05/24 16:48:33 thorpej Exp $ */
 
 /*-
@@ -392,7 +392,7 @@ trap(a0, a1, a2, entry, framep)
 				ucode =  a0;	/* exception summary */
 				break;
 			}
-			/* FALLTHROUTH */
+			/* FALLTHROUGH */
 		case ALPHA_IF_CODE_BPT:
 		case ALPHA_IF_CODE_BUGCHK:
 #ifdef PTRACE
@@ -980,14 +980,13 @@ struct unaligned_fixup_data {
 	const char *type;	/* opcode name */
 	int fixable;		/* fixable, 0 if fixup not supported */
 	int size;		/* size, 0 if unknown */
-	int acc;		/* useracc type; B_READ or B_WRITE */
 };
 
-#define	UNKNOWN()	{ "0x%lx", 0, 0, 0 }
-#define	FIX_LD(n,s)	{ n, 1, s, B_READ }
-#define	FIX_ST(n,s)	{ n, 1, s, B_WRITE }
-#define	NOFIX_LD(n,s)	{ n, 0, s, B_READ }
-#define	NOFIX_ST(n,s)	{ n, 0, s, B_WRITE }
+#define	UNKNOWN()	{ "0x%lx", 0, 0 }
+#define	FIX_LD(n,s)	{ n, 1, s }
+#define	FIX_ST(n,s)	{ n, 1, s }
+#define	NOFIX_LD(n,s)	{ n, 0, s }
+#define	NOFIX_ST(n,s)	{ n, 0, s }
 
 int
 unaligned_fixup(va, opcode, reg, p)

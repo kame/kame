@@ -1,4 +1,4 @@
-/*	$OpenBSD: sab.c,v 1.14 2003/08/15 20:32:15 tedu Exp $	*/
+/*	$OpenBSD: sab.c,v 1.16 2003/12/16 15:08:50 jason Exp $	*/
 
 /*
  * Copyright (c) 2001 Jason L. Wright (jason@thought.net)
@@ -243,8 +243,8 @@ sab_attach(parent, self, aux)
 			return;
 		}
 	} else if (ebus_bus_map(sc->sc_bt, 0,
-	    EBUS_PADDR_FROM_REG(&ea->ea_regs[0]), ea->ea_regs[0].size,
-	    BUS_SPACE_MAP_LINEAR, 0, &sc->sc_bh) != 0) {
+	    EBUS_PADDR_FROM_REG(&ea->ea_regs[0]), ea->ea_regs[0].size, 0, 0,
+	    &sc->sc_bh) != 0) {
 		printf(": can't map register space\n");
 		return;
 	}
@@ -377,11 +377,6 @@ sabtty_attach(parent, self, aux)
 	int r;
 
 	sc->sc_tty = ttymalloc();
-	if (sc->sc_tty == NULL) {
-		printf(": failed to allocate tty\n");
-		return;
-	}
-	tty_attach(sc->sc_tty);
 	sc->sc_tty->t_oproc = sabtty_start;
 	sc->sc_tty->t_param = sabtty_param;
 

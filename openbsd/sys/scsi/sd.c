@@ -1,4 +1,4 @@
-/*	$OpenBSD: sd.c,v 1.62 2003/06/24 22:42:07 mickey Exp $	*/
+/*	$OpenBSD: sd.c,v 1.67 2004/02/21 00:47:42 krw Exp $	*/
 /*	$NetBSD: sd.c,v 1.111 1997/04/02 02:29:41 mycroft Exp $	*/
 
 /*-
@@ -218,12 +218,9 @@ sdattach(parent, self, aux)
 	 */
 	printf("\n");
 
-	if ((sd->sc_link->quirks & SDEV_NOSTARTUNIT) == 0) {
-		error = scsi_start(sd->sc_link, SSS_START,
-				   scsi_autoconf | SCSI_IGNORE_ILLEGAL_REQUEST |
-				   SCSI_IGNORE_MEDIA_CHANGE | SCSI_SILENT);
-	} else
-		error = 0;
+	error = scsi_test_unit_ready(sd->sc_link, TEST_READY_RETRIES_DEFAULT,
+	    scsi_autoconf | SCSI_IGNORE_ILLEGAL_REQUEST |
+	    SCSI_IGNORE_MEDIA_CHANGE | SCSI_SILENT);
 
 	/* Fill in name struct for spoofed label */
 	viscpy(sd->name.vendor, sa->sa_inqbuf->vendor, 8);
@@ -234,12 +231,12 @@ sdattach(parent, self, aux)
 		result = SDGP_RESULT_OFFLINE;
 	else
 		result = (*sd->sc_ops->sdo_get_parms)(sd, &sd->params,
-		    scsi_autoconf | SCSI_IGNORE_MEDIA_CHANGE);
+		    scsi_autoconf | SCSI_SILENT | SCSI_IGNORE_MEDIA_CHANGE);
 
 	printf("%s: ", sd->sc_dev.dv_xname);
 	switch (result) {
 	case SDGP_RESULT_OK:
-		printf("%ldMB, %d cyl, %d head, %d sec, %d bytes/sec, %ld sec total",
+		printf("%luMB, %lu cyl, %lu head, %lu sec, %lu bytes/sec, %lu sec total",
 		    dp->disksize / (1048576 / dp->blksize), dp->cyls,
 		    dp->heads, dp->sectors, dp->blksize, dp->disksize);
 		break;
@@ -392,27 +389,25 @@ sdopen(dev, flag, fmt, p)
 		error = scsi_test_unit_ready(sc_link,
 		    TEST_READY_RETRIES_DEFAULT,
 		    SCSI_IGNORE_ILLEGAL_REQUEST |
-		    SCSI_IGNORE_MEDIA_CHANGE |
-		    SCSI_IGNORE_NOT_READY);
-		if (error)
-			goto bad3;
+		    SCSI_IGNORE_MEDIA_CHANGE);
 
 		/* Start the pack spinning if necessary. */
-		if ((sc_link->quirks & SDEV_NOSTARTUNIT) == 0) {
-			error = scsi_start(sc_link, SSS_START,
-			    SCSI_IGNORE_ILLEGAL_REQUEST |
-			    SCSI_IGNORE_MEDIA_CHANGE | SCSI_SILENT);
-			if (error)
-				goto bad3;
-		}
+		if (error == EIO)
+			error = scsi_start(sc_link, SSS_START, 0);
+
+		if (error)
+			goto bad3;
 
 		sc_link->flags |= SDEV_OPEN;
 
 		/* Lock the pack in. */
-		error = scsi_prevent(sc_link, PR_PREVENT,
-		    SCSI_IGNORE_ILLEGAL_REQUEST | SCSI_IGNORE_MEDIA_CHANGE);
-		if (error)
-			goto bad;
+		if ((sc_link->flags & SDEV_REMOVABLE) != 0) {
+			error = scsi_prevent(sc_link, PR_PREVENT,
+			    SCSI_IGNORE_ILLEGAL_REQUEST |
+			        SCSI_IGNORE_MEDIA_CHANGE);
+			if (error)
+				goto bad;
+		}
 
 		if ((sc_link->flags & SDEV_MEDIA_LOADED) == 0) {
 			sc_link->flags |= SDEV_MEDIA_LOADED;
@@ -461,9 +456,11 @@ bad2:
 
 bad:
 	if (sd->sc_dk.dk_openmask == 0) {
+	    if ((sd->sc_link->flags & SDEV_REMOVABLE) != 0)
 		scsi_prevent(sc_link, PR_ALLOW,
-		    SCSI_IGNORE_ILLEGAL_REQUEST | SCSI_IGNORE_MEDIA_CHANGE);
-		sc_link->flags &= ~SDEV_OPEN;
+		    SCSI_IGNORE_ILLEGAL_REQUEST |
+		    SCSI_IGNORE_MEDIA_CHANGE);
+	    sc_link->flags &= ~SDEV_OPEN;
 	}
 
 bad3:
@@ -508,8 +505,9 @@ sdclose(dev, flag, fmt, p)
 		    sd->sc_ops->sdo_flush != NULL)
 			(*sd->sc_ops->sdo_flush)(sd, 0);
 
-		scsi_prevent(sd->sc_link, PR_ALLOW,
-		    SCSI_IGNORE_ILLEGAL_REQUEST | SCSI_IGNORE_NOT_READY);
+		if ((sd->sc_link->flags & SDEV_REMOVABLE) != 0)
+			scsi_prevent(sd->sc_link, PR_ALLOW,
+			    SCSI_IGNORE_ILLEGAL_REQUEST | SCSI_IGNORE_NOT_READY);
 		sd->sc_link->flags &= ~(SDEV_OPEN|SDEV_MEDIA_LOADED);
 
 		if (sd->sc_link->flags & SDEV_EJECTING) {
@@ -745,7 +743,7 @@ sdstart(v)
 		    SDRETRIES, 60000, bp, SCSI_NOSLEEP |
 		    ((bp->b_flags & B_READ) ? SCSI_DATA_IN : SCSI_DATA_OUT));
 		if (error) {
-			disk_unbusy(&sd->sc_dk, 0);
+			disk_unbusy(&sd->sc_dk, 0, 0);
 			printf("%s: not queued, error %d\n",
 			    sd->sc_dev.dv_xname, error);
 		}
@@ -764,7 +762,8 @@ sddone(xs)
 	}
 
 	if (xs->bp != NULL)
-		disk_unbusy(&sd->sc_dk, (xs->bp->b_bcount - xs->bp->b_resid));
+		disk_unbusy(&sd->sc_dk, (xs->bp->b_bcount - xs->bp->b_resid),
+		    (xs->bp->b_flags & B_READ));
 }
 
 void
@@ -1129,8 +1128,7 @@ sd_interpret_sense(xs)
 			 */
 			delay(1000000 * 5);	/* 5 seconds */
 			retval = SCSIRET_RETRY;
-		} else if ((sense->add_sense_code_qual == 0x2) &&
-		    (sd->sc_link->quirks & SDEV_NOSTARTUNIT) == 0) {
+		} else if (sense->add_sense_code_qual == 0x2) {
 			if (sd->sc_link->flags & SDEV_REMOVABLE) {
 				printf(
 				"%s: removable disk stopped - not restarting\n",

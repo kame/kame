@@ -1,9 +1,9 @@
-/*	$OpenBSD: cpu.c,v 1.13 2003/07/02 21:30:13 drahn Exp $ */
+/*	$OpenBSD: cpu.c,v 1.19 2004/02/14 15:09:22 grange Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom
  * Copyright (c) 1997 RTMX Inc
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -79,7 +79,7 @@ struct cfattach cpu_ca = {
 };
 
 struct cfdriver cpu_cd = {
-	NULL, "cpu", DV_DULL, NULL, 0
+	NULL, "cpu", DV_DULL
 };
 
 void config_l2cr(int cpu);
@@ -99,11 +99,20 @@ cpumatch(parent, cfdata, aux)
 	return (1);
 }
 
+static u_int32_t ppc_curfreq;
+
+
+int
+ppc_cpuspeed(int *freq)
+{
+	*freq = ppc_curfreq;
+
+	return (0);
+}
+
+
 void
-cpuattach(parent, dev, aux)
-	struct device *parent;
-	struct device *dev;
-	void *aux;
+cpuattach(struct device *parent, struct device *dev, void *aux)
 {
 	unsigned int cpu, pvr, hid0;
 	char name[32];
@@ -167,7 +176,7 @@ cpuattach(parent, dev, aux)
                 if (OF_getprop(qhandle, "device_type", name, sizeof name) >= 0
                     && !strcmp(name, "cpu")
                     && OF_getprop(qhandle, "clock-frequency",
-                                  &clock_freq , sizeof clock_freq ) >= 0)
+                        &clock_freq , sizeof clock_freq ) >= 0)
 		{
 			break;
 		}
@@ -184,7 +193,8 @@ cpuattach(parent, dev, aux)
 		/* Openfirmware stores clock in Hz, not MHz */
 		clock_freq /= 1000000;
 		printf(": %d MHz", clock_freq);
-
+		ppc_curfreq = clock_freq;
+		cpu_cpuspeed = ppc_cpuspeed;
 	}
 	/* power savings mode */
 	hid0 = ppc_mfhid0();
@@ -197,23 +207,24 @@ cpuattach(parent, dev, aux)
 	case MPC7410:
 		/* select DOZE mode */
 		hid0 &= ~(HID0_NAP | HID0_SLEEP);
-		hid0 |= HID0_DOZE | HID0_DPM; 
+		hid0 |= HID0_DOZE | HID0_DPM;
 		break;
 	case MPC7450:
 	case MPC7455:
 		/* select NAP mode */
 		hid0 &= ~(HID0_DOZE | HID0_SLEEP);
-		hid0 |= HID0_NAP | HID0_DPM; 
+		hid0 |= HID0_NAP | HID0_DPM;
 		/* try some other flags */
 		hid0 |= HID0_SGE | HID0_BTIC;
 		hid0 |= HID0_LRSTK | HID0_FOLD | HID0_BHT;
 		/* Disable BTIC on 7450 Rev 2.0 or earlier */
 		if (cpu == MPC7450 && (pvr & 0xffff) < 0x0200)
 			hid0 &= ~HID0_BTIC;
+		break;
 	}
 	ppc_mthid0(hid0);
 
-	/* if processor is G3 or G4, configure l2 cache */ 
+	/* if processor is G3 or G4, configure l2 cache */
 	if ( (cpu == MPC750) || (cpu == MPC7400) || (cpu == IBM750FX)
 	    || (cpu == MPC7410) || (cpu == MPC7450) || (cpu == MPC7455)) {
 		config_l2cr(cpu);
@@ -290,7 +301,7 @@ config_l2cr(int cpu)
 		do {
 			x = ppc_mfl2cr();
 		} while (x & L2CR_L2IP);
-				      
+
 		/* Enable L2 cache. */
 		l2cr &= ~L2CR_L2I;
 		l2cr |= L2CR_L2E;
@@ -317,7 +328,7 @@ config_l2cr(int cpu)
 			case L2SIZ_512K:
 				printf(": 512KB");
 				break;
-			case L2SIZ_1M:  
+			case L2SIZ_1M:
 				printf(": 1MB");
 				break;
 			default:
@@ -339,11 +350,10 @@ config_l2cr(int cpu)
 		default:
 			printf(" unknown type");
 		}
-		
+
 		if (l2cr & L2CR_L2PE)
-			printf(" with parity");  
+			printf(" with parity");
 #endif
 	} else
 		printf(": L2 cache not enabled");
-		
 }

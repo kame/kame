@@ -1,4 +1,4 @@
-/*	$OpenBSD: ccd.c,v 1.53 2003/06/02 23:28:01 millert Exp $	*/
+/*	$OpenBSD: ccd.c,v 1.55 2004/02/15 02:45:46 tedu Exp $	*/
 /*	$NetBSD: ccd.c,v 1.33 1996/05/05 04:21:14 thorpej Exp $	*/
 
 /*-
@@ -111,8 +111,6 @@
 #include <sys/conf.h>
 
 #include <dev/ccdvar.h>
-
-#include <uvm/uvm_extern.h>
 
 #ifdef __GNUC__
 #define INLINE static __inline
@@ -1015,7 +1013,8 @@ ccdintr(cs, bp)
 	 */
 	if (bp->b_flags & B_ERROR)
 		bp->b_resid = bp->b_bcount;
-	disk_unbusy(&cs->sc_dkdev, (bp->b_bcount - bp->b_resid));
+	disk_unbusy(&cs->sc_dkdev, (bp->b_bcount - bp->b_resid),
+	    (bp->b_flags & B_READ));
 	biodone(bp);
 }
 

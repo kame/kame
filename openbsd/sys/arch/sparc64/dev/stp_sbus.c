@@ -1,4 +1,4 @@
-/*	$OpenBSD: stp_sbus.c,v 1.4 2003/06/25 17:36:51 miod Exp $	*/
+/*	$OpenBSD: stp_sbus.c,v 1.6 2004/03/02 23:10:17 miod Exp $	*/
 /*	$NetBSD: stp4020.c,v 1.23 2002/06/01 23:51:03 lukem Exp $	*/
 
 /*-
@@ -38,7 +38,8 @@
  */
 
 /*
- * STP4020: SBus/PCMCIA bridge supporting two Type-3 PCMCIA cards.
+ * STP4020: SBus/PCMCIA bridge supporting one Type-3 PCMCIA card, or up to
+ * two Type-1 and Type-2 PCMCIA cards..
  */
 
 #include <sys/param.h>
@@ -137,8 +138,8 @@ stpattach(parent, self, aux)
 			continue;
 
 		if (sbus_bus_map(sa->sa_bustag, sa->sa_reg[i].sbr_slot,
-		    sa->sa_reg[i].sbr_offset, sa->sa_reg[i].sbr_size,
-		    BUS_SPACE_MAP_LINEAR, 0, &bh) != 0) {
+		    sa->sa_reg[i].sbr_offset, sa->sa_reg[i].sbr_size, 0, 0,
+		    &bh) != 0) {
 			printf(": attach: cannot map registers\n");
 			return;
 		}

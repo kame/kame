@@ -1,4 +1,4 @@
-/* $OpenBSD: machdep.c,v 1.83 2003/08/10 00:03:21 miod Exp $ */
+/* $OpenBSD: machdep.c,v 1.86 2004/03/10 23:02:53 tom Exp $ */
 /* $NetBSD: machdep.c,v 1.210 2000/06/01 17:12:38 thorpej Exp $ */
 
 /*-
@@ -1093,7 +1093,9 @@ boot(howto)
 
 	/* If system is cold, just halt. */
 	if (cold) {
-		howto |= RB_HALT;
+		/* (Unless the user explicitly asked for reboot.) */
+		if ((howto & RB_USERREQ) == 0)
+			howto |= RB_HALT;
 		goto haltsys;
 	}
 
@@ -1891,7 +1893,6 @@ fpusave_proc(struct proc *p, int save)
 #endif
 
 	KDASSERT(p->p_addr != NULL);
-	KDASSERT(p->p_flag & P_INMEM);
 
 	oci = p->p_addr->u_pcb.pcb_fpcpu;
 	if (oci == NULL) {
@@ -2134,25 +2135,3 @@ alpha_XXX_dmamap(v)						/* XXX */
 	return (vtophys(v) | alpha_XXX_dmamap_or);		/* XXX */
 }								/* XXX */
 /* XXX XXX END XXX XXX */
-
-char *
-dot_conv(x)
-	unsigned long x;
-{
-	int i;
-	char *xc;
-	static int next;
-	static char space[2][20];
-
-	xc = space[next ^= 1] + sizeof space[0];
-	*--xc = '\0';
-	for (i = 0;; ++i) {
-		if (i && (i & 3) == 0)
-			*--xc = '.';
-		*--xc = "0123456789abcdef"[x & 0xf];
-		x >>= 4;
-		if (x == 0)
-			break;
-	}
-	return xc;
-}

@@ -1,7 +1,7 @@
-/*	$OpenBSD: sensors.h,v 1.1 2003/04/25 20:06:41 grange Exp $	*/
+/*	$OpenBSD: sensors.h,v 1.4 2004/02/10 19:53:34 grange Exp $	*/
 
 /*
- * Copyright (c) 2003 Alexander Yurchenko <grange@openbsd.org>
+ * Copyright (c) 2003, 2004 Alexander Yurchenko <grange@openbsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,7 +32,15 @@
 enum sensor_type {
 	SENSOR_TEMP,			/* temperature */
 	SENSOR_FANRPM,			/* fan revolution speed */
-	SENSOR_VOLTS_DC			/* voltage */
+	SENSOR_VOLTS_DC,		/* voltage */
+	SENSOR_VOLTS_AC,		/* voltage (alternating-current) */
+	SENSOR_OHMS,			/* resistance */
+	SENSOR_WATTS,			/* power */
+	SENSOR_AMPS,			/* current */
+	SENSOR_WATTHOUR,		/* power capacity */
+	SENSOR_AMPHOUR,			/* power capacity */
+	SENSOR_INDICATOR,		/* boolean indicator */
+	SENSOR_INTEGER			/* generic interger value */
 };
 
 /* Sensor data */
@@ -44,8 +52,20 @@ struct sensor {
 	char desc[32];			/* sensor description */
 	int64_t value;			/* current value */
 	u_int rfact;			/* resistor factor */
+	int flags;			/* sensor flags */
+#define SENSOR_FINVALID		0x0001	/* sensor is invalid */
 };
 
 SLIST_HEAD(sensors_head, sensor);
+
+#ifdef _KERNEL
+extern int nsensors;
+extern struct sensors_head sensors;
+
+#define SENSOR_ADD(s) do { \
+	(s)->num = nsensors++;				\
+	SLIST_INSERT_HEAD(&sensors, (s), list);		\
+} while (0)
+#endif	/* _KERNEL */
 
 #endif	/* !_SYS_SENSORS_H_ */

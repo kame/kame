@@ -1,4 +1,4 @@
-/*      $OpenBSD: ata.c,v 1.19 2003/04/14 22:51:54 grange Exp $      */
+/*      $OpenBSD: ata.c,v 1.24 2004/01/15 21:37:57 grange Exp $      */
 /*      $NetBSD: ata.c,v 1.9 1999/04/15 09:41:09 bouyer Exp $      */
 /*
  * Copyright (c) 1998, 2001 Manuel Bouyer.  All rights reserved.
@@ -61,16 +61,14 @@ extern int wdcdebug_mask; /* init'ed in wdc.c */
 
 /* Get the disk's parameters */
 int
-ata_get_params(drvp, flags, prms)
-	struct ata_drive_datas *drvp;
-	u_int8_t flags;
-	struct ataparams *prms;
+ata_get_params(struct ata_drive_datas *drvp, u_int8_t flags,
+    struct ataparams *prms)
 {
 	char tb[ATAPARAMS_SIZE];
 	struct wdc_command wdc_c;
-
 	int i;
 	u_int16_t *p;
+	int ret;
 
 	WDCDEBUG_PRINT(("ata_get_parms\n"), DEBUG_FUNCS);
 
@@ -81,31 +79,31 @@ ata_get_params(drvp, flags, prms)
 	if (drvp->drive_flags & DRIVE_ATA) {
 		wdc_c.r_command = WDCC_IDENTIFY;
 		wdc_c.r_st_bmask = WDCS_DRDY;
-		wdc_c.r_st_pmask = WDCS_DRQ;
+		wdc_c.r_st_pmask = 0;
 		wdc_c.timeout = 3000; /* 3s */
 	} else if (drvp->drive_flags & DRIVE_ATAPI) {
 		wdc_c.r_command = ATAPI_IDENTIFY_DEVICE;
 		wdc_c.r_st_bmask = 0;
-		wdc_c.r_st_pmask = WDCS_DRQ;
+		wdc_c.r_st_pmask = 0;
 		wdc_c.timeout = 10000; /* 10s */
 	} else {
+		WDCDEBUG_PRINT(("wdc_ata_get_parms: no disks\n"),
+		    DEBUG_FUNCS|DEBUG_PROBE);
 		return CMD_ERR;
 	}
 	wdc_c.flags = AT_READ | flags;
 	wdc_c.data = tb;
 	wdc_c.bcount = ATAPARAMS_SIZE;
 
-	{
-		int ret;
-		if ((ret = wdc_exec_command(drvp, &wdc_c)) != WDC_COMPLETE) {
-			printf ("WDC_EXEC_COMMAND: %d\n", ret);
-			return CMD_AGAIN;
-		}
+	if ((ret = wdc_exec_command(drvp, &wdc_c)) != WDC_COMPLETE) {
+		WDCDEBUG_PRINT(("%s: wdc_exec_command failed: %d\n",
+		    __func__, ret), DEBUG_PROBE);
+		return CMD_AGAIN;
 	}
 
 	if (wdc_c.flags & (AT_ERROR | AT_TIMEOU | AT_DF)) {
-		WDCDEBUG_PRINT(("IDENTIFY failed: 0x%x\n", wdc_c.flags)
-		    , DEBUG_PROBE);
+		WDCDEBUG_PRINT(("%s: IDENTIFY failed: 0x%x\n", __func__,
+		    wdc_c.flags), DEBUG_PROBE);
 
 		return CMD_ERR;
 	} else {
@@ -119,7 +117,7 @@ ata_get_params(drvp, flags, prms)
 
 		   The swaps below avoid touching the char strings.
 		*/
-		  
+
 		swap16_multi((u_int16_t *)tb, 10);
 		swap16_multi((u_int16_t *)tb + 20, 3);
 		swap16_multi((u_int16_t *)tb + 47, ATAPARAMS_SIZE / 2 - 47);
@@ -156,14 +154,13 @@ ata_get_params(drvp, flags, prms)
 }
 
 int
-ata_set_mode(drvp, mode, flags)
-	struct ata_drive_datas *drvp;
-	u_int8_t mode;
-	u_int8_t flags;
+ata_set_mode(struct ata_drive_datas *drvp, u_int8_t mode, u_int8_t flags)
 {
 	struct wdc_command wdc_c;
 
-	WDCDEBUG_PRINT(("ata_set_mode=0x%x\n", mode), DEBUG_FUNCS);
+	WDCDEBUG_PRINT(("%s: mode=0x%x, flags=0x%x\n", __func__,
+	    mode, flags), DEBUG_PROBE);
+
 	bzero(&wdc_c, sizeof(struct wdc_command));
 
 	wdc_c.r_command = SET_FEATURES;
@@ -171,10 +168,14 @@ ata_set_mode(drvp, mode, flags)
 	wdc_c.r_st_pmask = 0;
 	wdc_c.r_precomp = WDSF_SET_MODE;
 	wdc_c.r_count = mode;
-	wdc_c.flags = AT_READ | flags;
+	wdc_c.flags = flags;
 	wdc_c.timeout = 1000; /* 1s */
 	if (wdc_exec_command(drvp, &wdc_c) != WDC_COMPLETE)
 		return CMD_AGAIN;
+
+	WDCDEBUG_PRINT(("%s: after wdc_exec_command() wdc_c.flags=0x%x\n",
+	    __func__, wdc_c.flags), DEBUG_PROBE);
+
 	if (wdc_c.flags & (AT_ERROR | AT_TIMEOU | AT_DF)) {
 		return CMD_ERR;
 	}
@@ -182,8 +183,7 @@ ata_set_mode(drvp, mode, flags)
 }
 
 void
-ata_dmaerr(drvp)
-	struct ata_drive_datas *drvp;
+ata_dmaerr(struct ata_drive_datas *drvp)
 {
 	/*
 	 * Downgrade decision: if we get NERRS_MAX in NXFER.

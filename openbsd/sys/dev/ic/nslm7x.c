@@ -1,4 +1,4 @@
-/*	$OpenBSD: nslm7x.c,v 1.3 2003/08/05 13:42:36 couderc Exp $	*/
+/*	$OpenBSD: nslm7x.c,v 1.6 2004/02/10 19:58:16 grange Exp $	*/
 /*	$NetBSD: nslm7x.c,v 1.17 2002/11/15 14:55:41 ad Exp $ */
 
 /*-
@@ -151,8 +151,6 @@ void
 lm_attach(struct lm_softc *lmsc)
 {
 	u_int i;
-	extern int nsensors;
-	extern struct sensors_head sensors;
 
 	/* Install default bank selection routine, if none given. */
 	if (lmsc->lm_banksel == NULL)
@@ -169,8 +167,7 @@ lm_attach(struct lm_softc *lmsc)
 	for (i = 0; i < lmsc->numsensors; ++i) {
 		strlcpy(lmsc->sensors[i].device, lmsc->sc_dev.dv_xname,
 		    sizeof(lmsc->sensors[i].device));
-		lmsc->sensors[i].num = nsensors++;
-		SLIST_INSERT_HEAD(&sensors, &lmsc->sensors[i], list);
+		SENSOR_ADD(&lmsc->sensors[i]);
 	}
 
 	/* Refresh sensors data every 1.5 seconds */
@@ -211,7 +208,7 @@ def_match(struct lm_softc *sc)
 	int i;
 
 	i = (*sc->lm_readreg)(sc, LMD_CHIPID) & LM_ID_MASK;
-	printf(": Unknown chip (ID %d)\n", i);
+	printf(": unknown chip (ID %d)\n", i);
 	lm_common_match(sc);
 	return 1;
 }
@@ -302,7 +299,7 @@ wb_match(struct lm_softc *sc)
 		printf(": W83627THF\n");
 		break;
 	default:
-		printf(": unknow winbond chip ID 0x%x\n", j);
+		printf(": unknown winbond chip ID 0x%x\n", j);
 		/* handle as a standart lm7x */
 		lm_common_match(sc);
 		return 1;
@@ -662,7 +659,9 @@ generic_fanrpm(struct lm_softc *sc, struct sensor *sensors)
 			divisor = ((*sc->lm_readreg)(sc,
 			    LMD_VIDFAN) >> 4) & 0x3;
 
-		if (sdata == 0xff || sdata == 0x00) {
+		if (sdata == 0xff) {
+			sensors[i].flags |= SENSOR_FINVALID;
+		} else if (sdata == 0x00) {
 			sensors[i].value = 0;
 		} else {
 			sensors[i].value = 1350000 / (sdata << divisor);
@@ -732,9 +731,7 @@ wb_stemp(struct lm_softc *sc, struct sensor *sensors, int n)
 	sensors[0].value = sdata * 1000000 + 273150000;
 	/* from bank1 */
 	if ((*sc->lm_banksel)(sc, 1)) {
-#if 0
-		sensors[1].validflags &= ~ENVSYS_FCURVALID;
-#endif
+		sensors[1].flags |= SENSOR_FINVALID;
 	} else {
 		sdata = (*sc->lm_readreg)(sc, WB_BANK1_T2H) << 1;
 		sdata |=  ((*sc->lm_readreg)(sc, WB_BANK1_T2L) & 0x80) >> 7;
@@ -745,9 +742,7 @@ wb_stemp(struct lm_softc *sc, struct sensor *sensors, int n)
 		return;
 	/* from bank2 */
 	if ((*sc->lm_banksel)(sc, 2)) {
-#if 0
-		sensors[2].validflags &= ~ENVSYS_FCURVALID;
-#endif
+		sensors[2].flags |= SENSOR_FINVALID;
 	} else {
 		sdata = (*sc->lm_readreg)(sc, WB_BANK2_T3H) << 1;
 		sdata |=  ((*sc->lm_readreg)(sc, WB_BANK2_T3L) & 0x80) >> 7;
@@ -775,7 +770,9 @@ wb781_fanrpm(struct lm_softc *sc, struct sensor *sensors)
 			divisor = ((*sc->lm_readreg)(sc, WB_PIN) >> 6) & 0x3;
 
 		DPRINTF(("sdata[%d] 0x%x div 0x%x\n", i, sdata, divisor));
-		if (sdata == 0xff || sdata == 0x00) {
+		if (sdata == 0xff) {
+			sensors[i].flags |= SENSOR_FINVALID;
+		} else if (sdata == 0x00) {
 			sensors[i].value = 0;
 		} else {
 			sensors[i].value = 1350000 / (sdata << divisor);
@@ -804,7 +801,9 @@ wb_fanrpm(struct lm_softc *sc, struct sensor *sensors, int n)
 		    WB_BANK0_FANBAT) >> (i + 3)) & 0x4;
 
 		DPRINTF(("sdata[%d] 0x%x div 0x%x\n", i, sdata, divisor));
-		if (sdata == 0xff || sdata == 0x00) {
+		if (sdata == 0xff) {
+			sensors[i].flags |= SENSOR_FINVALID;
+		} else if (sdata == 0x00) {
 			sensors[i].value = 0;
 		} else {
 			sensors[i].value = 1350000 / (sdata << divisor);

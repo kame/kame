@@ -1,4 +1,4 @@
-#	$OpenBSD: files.isa,v 1.84 2003/05/20 20:26:27 grange Exp $
+#	$OpenBSD: files.isa,v 1.86 2004/01/05 17:27:30 markus Exp $
 #	$NetBSD: files.isa,v 1.21 1996/05/16 03:45:55 mycroft Exp $
 #
 # Config file and device description for machine-independent ISA code.
@@ -131,16 +131,6 @@ file	dev/isa/opti.c			opti
 device	mcd: disk, opti
 attach	mcd at isa
 file	dev/isa/mcd.c			mcd needs-flag
-
-# Sony CDU-3[13]A CD-ROM controllers
-device	scd: disk, opti
-attach	scd at isa
-file	dev/isa/scd.c			scd needs-flag
-
-# Panasonic/Creative CD-ROM controllers
-device	pcd: disk, opti
-attach	pcd at isa
-file	dev/isa/pcd.c			pcd needs-flag
 
 # ISA "wd" (ESDI/IDE/etc.) controllers, ATAPI bus
 attach wdc at isa with wdc_isa: isa_dma
@@ -387,6 +377,11 @@ file	dev/isa/lpt_isa.c		lpt_isa needs-flag
 # National Semiconductor LM7[89] and compatible hardware monitors
 attach	lm at isa with lm_isa
 file	dev/isa/lm_isa.c		lm_isa
+
+# NSC PC87366 Super IO / monitor chip
+device	nsclpcsio
+attach	nsclpcsio at isa with nsclpcsio_isa
+file	dev/isa/nsclpcsio_isa.c		nsclpcsio_isa
 
 # IT8705F, IT8712F and SiS970 hardware monitors
 device	it

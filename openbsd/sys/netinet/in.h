@@ -1,4 +1,4 @@
-/*	$OpenBSD: in.h,v 1.57 2003/06/02 23:28:13 millert Exp $	*/
+/*	$OpenBSD: in.h,v 1.61 2004/02/15 11:16:08 markus Exp $	*/
 /*	$NetBSD: in.h,v 1.20 1996/02/13 23:41:47 christos Exp $	*/
 
 /*
@@ -72,6 +72,8 @@
 #define	IPPROTO_ENCAP		98		/* encapsulation header */
 #define IPPROTO_PIM		103		/* Protocol indep. multicast */
 #define IPPROTO_IPCOMP		108		/* IP Payload Comp. Protocol */
+#define	IPPROTO_CARP		112		/* CARP */
+#define	IPPROTO_PFSYNC		240		/* PFSYNC */
 #define	IPPROTO_RAW		255		/* raw IP packet */
 
 #define	IPPROTO_MAX		256
@@ -198,6 +200,8 @@ struct in_addr {
 #define	INADDR_UNSPEC_GROUP	__IPADDR(0xe0000000)	/* 224.0.0.0 */
 #define	INADDR_ALLHOSTS_GROUP	__IPADDR(0xe0000001)	/* 224.0.0.1 */
 #define	INADDR_ALLROUTERS_GROUP __IPADDR(0xe0000002)	/* 224.0.0.2 */
+#define	INADDR_CARP_GROUP	__IPADDR(0xe0000012)	/* 224.0.0.18 */
+#define	INADDR_PFSYNC_GROUP	__IPADDR(0xe00000f0)	/* 224.0.0.240 */
 #define INADDR_MAX_LOCAL_GROUP	__IPADDR(0xe00000ff)	/* 224.0.0.255 */
 
 #define	IN_LOOPBACKNET		127			/* official! */
@@ -312,7 +316,7 @@ struct ip_mreq {
  * Third level is protocol number.
  * Fourth level is desired variable within that protocol.
  */
-#define	IPPROTO_MAXID	(IPPROTO_IPCOMP + 1)	/* don't list to IPPROTO_MAX */
+#define	IPPROTO_MAXID	(IPPROTO_CARP + 1)	/* don't list to IPPROTO_MAX */
 
 #define	CTL_IPPROTO_NAMES { \
 	{ "ip", CTLTYPE_NODE }, \
@@ -424,6 +428,10 @@ struct ip_mreq {
 	{ 0, 0 }, \
 	{ 0, 0 }, \
 	{ "ipcomp", CTLTYPE_NODE }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ "carp", CTLTYPE_NODE }, \
 }
 
 /*
@@ -495,6 +503,38 @@ struct ip_mreq {
 	{ "mtudisc", CTLTYPE_INT }, \
 	{ "mtudisctimeout", CTLTYPE_INT }, \
 	{ "ipsec-comp-alg", CTLTYPE_STRING }, \
+}
+#define	IPCTL_VARS { \
+	NULL, \
+	&ipforwarding, \
+	&ipsendredirects, \
+	&ip_defttl, \
+	NULL, \
+	NULL, \
+	&ip_directedbcast, \
+	&ipport_firstauto, \
+	&ipport_lastauto, \
+	&ipport_hifirstauto, \
+	&ipport_hilastauto, \
+	&ip_maxqueue, \
+	&encdebug, \
+	NULL, \
+	&ipsec_expire_acquire, \
+	&ipsec_keep_invalid, \
+	&ipsec_require_pfs, \
+	&ipsec_soft_allocations, \
+	&ipsec_exp_allocations, \
+	&ipsec_soft_bytes, \
+	&ipsec_exp_bytes, \
+	&ipsec_exp_timeout, \
+	&ipsec_soft_timeout, \
+	&ipsec_soft_first_use, \
+	&ipsec_exp_first_use, \
+	NULL, \
+	NULL, \
+	NULL, \
+	NULL, \
+	NULL, \
 }
 
 /* INET6 stuff */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_vnops.c,v 1.55 2003/06/02 23:28:20 millert Exp $	*/
+/*	$OpenBSD: nfs_vnops.c,v 1.58 2004/03/02 05:46:00 tedu Exp $	*/
 /*	$NetBSD: nfs_vnops.c,v 1.62.4.1 1996/07/08 20:26:52 jtc Exp $	*/
 
 /*
@@ -97,7 +97,7 @@ struct vnodeopv_entry_desc nfsv2_vnodeop_entries[] = {
 	{ &vop_write_desc, nfs_write },		/* write */
 	{ &vop_lease_desc, nfs_lease_check },	/* lease */
 	{ &vop_ioctl_desc, nfs_ioctl },		/* ioctl */
-	{ &vop_select_desc, nfs_select },	/* select */
+	{ &vop_poll_desc, nfs_poll },		/* poll */
 	{ &vop_kqfilter_desc, vop_generic_kqfilter },	/* kqfilter */
 	{ &vop_revoke_desc, nfs_revoke },	/* revoke */
 	{ &vop_fsync_desc, nfs_fsync },		/* fsync */
@@ -163,7 +163,7 @@ struct vnodeopv_entry_desc fifo_nfsv2nodeop_entries[] = {
 	{ &vop_write_desc, nfsfifo_write },	/* write */
 	{ &vop_fsync_desc, nfs_fsync },		/* fsync */
 	{ &vop_inactive_desc, nfs_inactive },	/* inactive */
-	{ &vop_reclaim_desc, nfs_reclaim },	/* reclaim */
+	{ &vop_reclaim_desc, nfsfifo_reclaim },	/* reclaim */
 	{ &vop_lock_desc, nfs_lock },		/* lock */
 	{ &vop_unlock_desc, nfs_unlock },	/* unlock */
 	{ &vop_print_desc, nfs_print },		/* print */
@@ -1611,8 +1611,7 @@ nfs_link(v)
 	caddr_t bpos, dpos, cp2;
 	int error = 0, wccflag = NFSV3_WCCRATTR, attrflag = 0;
 	struct mbuf *mreq, *mrep, *md, *mb, *mb2;
-	int v3 = NFS_ISV3(vp);
-
+	int v3;
 
 	if (dvp->v_mount != vp->v_mount) {
 		FREE(cnp->cn_pnbuf, M_NAMEI);
@@ -1630,6 +1629,7 @@ nfs_link(v)
 	 */
 	VOP_FSYNC(vp, cnp->cn_cred, MNT_WAIT, cnp->cn_proc);
 
+	v3 = NFS_ISV3(vp);
 	nfsstats.rpccnt[NFSPROC_LINK]++;
 	nfsm_reqhead(vp, NFSPROC_LINK,
 		NFSX_FH(v3)*2 + NFSX_UNSIGNED + nfsm_rndup(cnp->cn_namelen));
@@ -3238,5 +3238,12 @@ nfsfifo_close(v)
 		}
 	}
 	return (VOCALL(fifo_vnodeop_p, VOFFSET(vop_close), ap));
+}
+
+int
+nfsfifo_reclaim(void *v)
+{
+	fifo_reclaim(v);
+	return (nfs_reclaim(v));
 }
 #endif /* ! FIFO */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: gem.c,v 1.34 2003/07/15 03:52:30 jason Exp $	*/
+/*	$OpenBSD: gem.c,v 1.37 2004/02/02 08:40:48 brad Exp $	*/
 /*	$NetBSD: gem.c,v 1.1 2001/09/16 00:11:43 eeh Exp $ */
 
 /*
@@ -51,8 +51,6 @@
 
 #include <machine/endian.h>
 
-#include <uvm/uvm_extern.h>
- 
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_media.h>
@@ -116,12 +114,9 @@ int		gem_mediachange(struct ifnet *);
 void		gem_mediastatus(struct ifnet *, struct ifmediareq *);
 
 struct mbuf	*gem_get(struct gem_softc *, int, int);
-int		gem_put(struct gem_softc *, int, struct mbuf *);
-void		gem_read(struct gem_softc *, int, int);
 int		gem_eint(struct gem_softc *, u_int);
 int		gem_rint(struct gem_softc *);
 int		gem_tint(struct gem_softc *, u_int32_t);
-void		gem_power(int, void *);
 
 #ifdef GEM_DEBUG
 #define	DPRINTF(sc, x)	if ((sc)->sc_arpcom.ac_if.if_flags & IFF_DEBUG) \
@@ -674,42 +669,29 @@ gem_meminit(struct gem_softc *sc)
 static int
 gem_ringsize(int sz)
 {
-	int v;
-
 	switch (sz) {
 	case 32:
-		v = GEM_RING_SZ_32;
-		break;
+		return GEM_RING_SZ_32;
 	case 64:
-		v = GEM_RING_SZ_64;
-		break;
+		return GEM_RING_SZ_64;
 	case 128:
-		v = GEM_RING_SZ_128;
-		break;
+		return GEM_RING_SZ_128;
 	case 256:
-		v = GEM_RING_SZ_256;
-		break;
+		return GEM_RING_SZ_256;
 	case 512:
-		v = GEM_RING_SZ_512;
-		break;
+		return GEM_RING_SZ_512;
 	case 1024:
-		v = GEM_RING_SZ_1024;
-		break;
+		return GEM_RING_SZ_1024;
 	case 2048:
-		v = GEM_RING_SZ_2048;
-		break;
+		return GEM_RING_SZ_2048;
 	case 4096:
-		v = GEM_RING_SZ_4096;
-		break;
+		return GEM_RING_SZ_4096;
 	case 8192:
-		v = GEM_RING_SZ_8192;
-		break;
+		return GEM_RING_SZ_8192;
 	default:
-		v = GEM_RING_SZ_32;
-		printf("gem: invalid Receive Descriptor ring size\n");
-		break;
+		printf("gem: invalid Receive Descriptor ring size %d\n", sz);
+		return GEM_RING_SZ_32;
 	}
-	return (v);
 }
 
 /*
@@ -1211,7 +1193,7 @@ gem_mii_readreg(self, phy, reg)
 	int n;
 	u_int32_t v;
 
-#ifdef GEM_DEBUG1
+#ifdef GEM_DEBUG
 	if (sc->sc_debug)
 		printf("gem_mii_readreg: phy %d reg %d\n", phy, reg);
 #endif
@@ -1243,7 +1225,7 @@ gem_mii_writereg(self, phy, reg, val)
 	int n;
 	u_int32_t v;
 
-#ifdef GEM_DEBUG1
+#ifdef GEM_DEBUG
 	if (sc->sc_debug)
 		printf("gem_mii_writereg: phy %d reg %d val %x\n", 
 			phy, reg, val);

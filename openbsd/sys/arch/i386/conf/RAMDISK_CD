@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISK_CD,v 1.64 2003/08/20 00:07:04 deraadt Exp $
+#	$OpenBSD: RAMDISK_CD,v 1.68 2004/03/10 01:23:25 deraadt Exp $
 
 machine		i386		# architecture, used by config; REQUIRED
 
@@ -29,6 +29,7 @@ option		MSDOSFS		# MS-DOS file system
 option		FIFO		# FIFOs; RECOMMENDED
 
 option		INET		# IP + ICMP + TCP + UDP
+option		INET6		# IPv6 (needs INET)
 
 option		BOOT_CONFIG	# boot-time kernel config
 
@@ -164,6 +165,8 @@ ahc0	at isa? port ? irq ?		# Adaptec 284x SCSI controllers
 ahc*	at eisa? slot ?			# Adaptec 274x, aic7770 SCSI controllers
 ahc*	at pci? dev ? function ?	# Adaptec 2940 SCSI controllers
 scsibus* at ahc?
+mpt*	at pci? dev ? function ?	# LSI Fusion-MPT SCSI/Fibre
+scsibus* at mpt?
 dpt*	at pci? dev ? function ?        # DPT SmartCache/SmartRAID PCI
 dpt*	at eisa? slot ?			# DPT SmartCache/SmartRAID EISA
 scsibus* at dpt?
@@ -297,6 +300,7 @@ nge*	at pci? dev ? function ?		# NS DP83820/DP83821 GigE
 bge*	at pci? dev ? function ?		# Broadcom BCM570x (aka Tigon3)
 #lge*	at pci? dev ? function ?		# Level1 LXT1001 GigE
 mtd*	at pci? dev ? function ?		# Myson MTD803
+bce*	at pci? dev ? function ?		# Broadcom BCM4401
 
 # Wireless network cards
 wi*	at pci? dev ? function ?		# WaveLAN IEEE 802.11DS
@@ -333,3 +337,4 @@ pseudo-device	loop	1		# network loopback
 #pseudo-device	ppp	1		# PPP
 pseudo-device	bpfilter 1		# packet filter
 pseudo-device	rd	1		# ramdisk
+pseudo-device	ccd	4		# concatenated disk devices

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ie.c,v 1.22 2003/06/02 05:09:14 deraadt Exp $ */
+/*	$OpenBSD: if_ie.c,v 1.24 2004/01/14 20:50:48 miod Exp $ */
 
 /*-
  * Copyright (c) 1999 Steve Murphree, Jr. 
@@ -288,7 +288,7 @@ struct cfattach ie_ca = {
 };
 
 struct cfdriver ie_cd = {
-	NULL, "ie", DV_IFNET, 0
+	NULL, "ie", DV_IFNET
 };
 
 /*
@@ -426,7 +426,7 @@ ieattach(parent, self, aux)
         if (ca->ca_paddr == bootaddr)
                 bootdv = self;
 
-	/* get the first avaliable etherbuf */
+	/* get the first available etherbuf */
 	sc->sc_maddr = etherbuf;	/* maddr = vaddr */
 	if (sc->sc_maddr == NULL) panic("ie: too many ethernet boards");
 	if (pmap_extract(pmap_kernel(), (vm_offset_t)sc->sc_maddr, &pa) == FALSE)

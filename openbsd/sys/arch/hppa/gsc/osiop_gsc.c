@@ -1,4 +1,4 @@
-/*	$OpenBSD: osiop_gsc.c,v 1.7 2003/08/07 19:47:33 mickey Exp $	*/
+/*	$OpenBSD: osiop_gsc.c,v 1.11 2004/03/12 00:04:57 miod Exp $	*/
 /*	$NetBSD: osiop_gsc.c,v 1.6 2002/10/02 05:17:50 thorpej Exp $	*/
 
 /*
@@ -79,7 +79,7 @@
 #include <hppa/gsc/gscbusvar.h>
 /* #include <hppa/hppa/machdep.h> */
 
-#define OSIOP_GSC_RESET         0x0000
+#define	OSIOP_GSC_RESET		0x0000
 #define	OSIOP_GSC_OFFSET	0x0100
 
 int osiop_gsc_match(struct device *, void *, void *);
@@ -98,8 +98,7 @@ osiop_gsc_match(parent, match, aux)
 	struct gsc_attach_args *ga = aux;
 
 	if (ga->ga_type.iodc_type != HPPA_TYPE_FIO ||
-	    (ga->ga_type.iodc_sv_model != HPPA_FIO_GSCSI &&
-	     ga->ga_type.iodc_sv_model != HPPA_FIO_SCSI))
+	    ga->ga_type.iodc_sv_model != HPPA_FIO_GSCSI)
 		return 0;
 
 	return 1;
@@ -117,27 +116,20 @@ osiop_gsc_attach(parent, self, aux)
 	sc->sc_bst = ga->ga_iot;
 	sc->sc_dmat = ga->ga_dmatag;
 	if (bus_space_map(sc->sc_bst, ga->ga_hpa,
-			  OSIOP_GSC_OFFSET + OSIOP_NREGS, 0, &ioh))
+	    OSIOP_GSC_OFFSET + OSIOP_NREGS, 0, &ioh))
 		panic("osiop_gsc_attach: couldn't map I/O ports");
 	if (bus_space_subregion(sc->sc_bst, ioh, 
-				OSIOP_GSC_OFFSET, OSIOP_NREGS, &sc->sc_reg))
+	    OSIOP_GSC_OFFSET, OSIOP_NREGS, &sc->sc_reg))
 		panic("osiop_gsc_attach: couldn't get chip ports");
 
 	sc->sc_clock_freq = ga->ga_ca.ca_pdc_iodc_read->filler2[14] / 1000000;
 	if (!sc->sc_clock_freq)
 		sc->sc_clock_freq = 50;
 
-	if (ga->ga_ca.ca_type.iodc_sv_model == HPPA_FIO_GSCSI) {
-		sc->sc_dcntl = OSIOP_DCNTL_EA;
-		/* XXX set burst mode to 8 words (32 bytes) */
-		sc->sc_ctest7 = OSIOP_CTEST7_CDIS;
-		sc->sc_dmode = OSIOP_DMODE_BL8; /* | OSIOP_DMODE_FC2 */
-	} else {
-		sc->sc_dcntl = 0;
-		sc->sc_ctest7 = 0;
-		sc->sc_dmode = 0; /* | OSIOP_DMODE_FC2 */
-	}
-
+	sc->sc_dcntl = OSIOP_DCNTL_EA;
+	/* XXX set burst mode to 8 words (32 bytes) */
+	sc->sc_ctest7 = OSIOP_CTEST7_CDIS;
+	sc->sc_dmode = OSIOP_DMODE_BL8; /* | OSIOP_DMODE_FC2 */
 	sc->sc_flags = 0;
 	sc->sc_id = 7;	/* XXX */
 
@@ -158,8 +150,8 @@ osiop_gsc_attach(parent, self, aux)
 #endif /* OSIOP_DEBUG */
 	osiop_attach(sc);
 
-	(void)gsc_intr_establish((struct gsc_softc *)parent, IPL_BIO,
-	    ga->ga_irq, osiop_gsc_intr, sc, sc->sc_dev.dv_xname);
+	(void)gsc_intr_establish((struct gsc_softc *)parent,
+	    ga->ga_irq, IPL_BIO, osiop_gsc_intr, sc, sc->sc_dev.dv_xname);
 }
 
 /*
@@ -196,7 +188,9 @@ osiop_gsc_intr(arg)
 	/* Deal with the interrupt */
 	osiop_intr(sc);
 
+#ifdef USELEDS
 	ledctl(PALED_DISK, 0, 0);
+#endif
 
 	return (1);
 }

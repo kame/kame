@@ -1,4 +1,4 @@
-/*	$OpenBSD: xd.c,v 1.25 2003/08/15 20:32:14 tedu Exp $	*/
+/*	$OpenBSD: xd.c,v 1.28 2004/02/15 02:45:46 tedu Exp $	*/
 /*	$NetBSD: xd.c,v 1.37 1997/07/29 09:58:16 fair Exp $	*/
 
 /*
@@ -1491,7 +1491,7 @@ xdc_startbuf(xdcsc, xdsc, bp)
  * picked up later by the interrupt routine.  for case [2] the
  * programmed i/o driver is called with a special flag that says
  * return when one iopb is free.  for case [3] the process can sleep
- * on the iorq free list until some iopbs are avaliable.
+ * on the iorq free list until some iopbs are available.
  */
 
 
@@ -1738,7 +1738,8 @@ xdc_reset(xdcsc, quiet, blastmode, error, xdsc)
 				    iorq->buf->b_bcount);
 			    disk_unbusy(&xdcsc->reqs[lcv].xd->sc_dk,
 				(xdcsc->reqs[lcv].buf->b_bcount -
-				xdcsc->reqs[lcv].buf->b_resid));
+				xdcsc->reqs[lcv].buf->b_resid),
+				(xdcsc->reqs[lcv].buf->b_flags & B_READ));
 			    biodone(iorq->buf);
 			    XDC_FREE(xdcsc, lcv);	/* add to free list */
 			    break;
@@ -1943,7 +1944,8 @@ xdc_remove_iorq(xdcsc)
 				    (vaddr_t) bp->b_un.b_addr,
 				    bp->b_bcount);
 			disk_unbusy(&iorq->xd->sc_dk,
-			    (bp->b_bcount - bp->b_resid));
+			    (bp->b_bcount - bp->b_resid),
+			    (bp->b_flags & B_READ));
 			XDC_FREE(xdcsc, rqno);
 			biodone(bp);
 			break;
@@ -2364,13 +2366,13 @@ xdc_e2str(no)
 	case XD_ERR_RVFY:
 		return ("Read verify");
 	case XD_ERR_VFER:
-		return ("Fatail VMEDMA error");
+		return ("Fatal VMEDMA error");
 	case XD_ERR_VBUS:
 		return ("VMEbus error");
 	case XD_ERR_DFLT:
 		return ("Drive faulted");
 	case XD_ERR_HECY:
-		return ("Header error/cyliner");
+		return ("Header error/cylinder");
 	case XD_ERR_HEHD:
 		return ("Header error/head");
 	case XD_ERR_NOCY:

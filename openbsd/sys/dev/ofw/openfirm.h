@@ -1,4 +1,4 @@
-/*	$OpenBSD: openfirm.h,v 1.7 2002/03/14 03:16:06 millert Exp $	*/
+/*	$OpenBSD: openfirm.h,v 1.9 2004/01/11 16:20:01 drahn Exp $	*/
 /*	$NetBSD: openfirm.h,v 1.1 1996/09/30 16:35:10 ws Exp $	*/
 
 /*
@@ -59,13 +59,14 @@ void OF_close(int handle);
 int OF_read(int handle, void *addr, int len);
 int OF_write(int handle, void *addr, int len);
 int OF_seek(int handle, u_quad_t pos);
-void OF_boot(char *bootspec) __attribute__((__noreturn__));
+void OF_boot(char *bootspec);
 void OF_enter(void);
 void OF_exit(void) __attribute__((__noreturn__));
 int OF_interpret(char *cmd, int nreturns, ...);
 #if 0
 void (*OF_set_callback(void (*newfunc)(void *))) ();
 #endif
+int OF_getnodebyname(int, const char *);
 
 /*
  * Some generic routines for OpenFirmware handling.

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pm_direct.c,v 1.11 2003/07/02 22:03:08 drahn Exp $	*/
+/*	$OpenBSD: pm_direct.c,v 1.13 2003/10/16 03:54:48 deraadt Exp $	*/
 /*	$NetBSD: pm_direct.c,v 1.9 2000/06/08 22:10:46 tsubai Exp $	*/
 
 /*
@@ -243,8 +243,7 @@ pm_setup_adb()
  * Check the existent ADB devices
  */
 void
-pm_check_adb_devices(id)
-	int id;
+pm_check_adb_devices(int id)
 {
 	u_short ed = 0x1;
 
@@ -257,8 +256,7 @@ pm_check_adb_devices(id)
  * Wait until PM IC is busy
  */
 int
-pm_wait_busy(delay)
-	int delay;
+pm_wait_busy(int delay)
 {
 	while (PM_IS_ON) {
 #ifdef PM_GRAB_SI
@@ -275,8 +273,7 @@ pm_wait_busy(delay)
  * Wait until PM IC is free
  */
 int
-pm_wait_free(delay)
-	int delay;
+pm_wait_free(int delay)
 {
 	while (PM_IS_OFF) {
 #ifdef PM_GRAB_SI
@@ -296,8 +293,7 @@ pm_wait_free(delay)
  * Receive data from PM for the PB Duo series and the PB 5XX series
  */
 int
-pm_receive_pm2(data)
-	u_char *data;
+pm_receive_pm2(u_char *data)
 {
 	int i;
 	int rval;
@@ -330,9 +326,7 @@ pm_receive_pm2(data)
 	via_reg_or(VIA1, vACR, 0x1c);
 
 	return rval;
-}	
-
-
+}
 
 /*
  * Send data to PM for the PB Duo series and the PB 5XX series
@@ -350,10 +344,8 @@ pm_send_pm2(data)
 	rval = 0xffffcd36;
 	if (pm_wait_busy((int)ADBDelay*32) != 0) {
 		PM_SET_STATE_ACKON();
-
 		via_reg_or(VIA1, vACR, 0x1c);
-
-		return rval;		
+		return rval;
 	}
 
 	PM_SET_STATE_ACKON();
@@ -373,15 +365,14 @@ pm_send_pm2(data)
  * My PMgrOp routine for the PB Duo series and the PB 5XX series
  */
 int
-pm_pmgrop_pm2(pmdata)
-	PMData *pmdata;
+pm_pmgrop_pm2(PMData *pmdata)
 {
 	int i;
 	int s;
 	u_char via1_vIER;
 	int rval = 0;
 	int num_pm_data = 0;
-	u_char pm_cmd;	
+	u_char pm_cmd;
 	short pm_num_rx_data;
 	u_char pm_data;
 	u_char *pm_buf;
@@ -413,7 +404,7 @@ pm_pmgrop_pm2(pmdata)
 			if ((rval = pm_send_pm2((u_char)(num_pm_data & 0xff))) != 0)
 				break;		/* timeout */
 			pmdata->command = 0;
-		}			
+		}
 		/* send PM data */
 		pm_buf = (u_char *)pmdata->s_buf;
 		for (i = 0 ; i < num_pm_data; i++)
@@ -532,8 +523,7 @@ pm_intr_pm2()
  * My PMgrOp routine
  */
 int
-pmgrop(pmdata)
-	PMData *pmdata;
+pmgrop(PMData *pmdata)
 {
 	switch (pmHardware) {
 	case PM_HW_PB5XX:
@@ -566,11 +556,7 @@ pm_intr()
  * Synchronous ADBOp routine for the Power Manager
  */
 int
-pm_adb_op(buffer, compRout, data, command)
-	u_char *buffer;
-	void *compRout;
-	void *data;
-	int command;
+pm_adb_op(u_char *buffer, void *compRout, void *data, int command)
 {
 	int i;
 	int s;
@@ -593,19 +579,22 @@ pm_adb_op(buffer, compRout, data, command)
 	pmdata.s_buf = pmdata.data;
 	pmdata.r_buf = pmdata.data;
 
-	/* if the command is LISTEN, add number of ADB data to number of PM data */
+	/*
+	 * if the command is LISTEN,
+	 * add number of ADB data to number of PM data
+	 */
 	if ((command & 0xc) == 0x8) {
 		if (buffer != (u_char *)0)
 			pmdata.num_data = buffer[0] + 3;
-	} else {
+	} else
 		pmdata.num_data = 3;
-	}
 
 	pmdata.data[0] = (u_char)(command & 0xff);
 	pmdata.data[1] = 0;
-	if ((command & 0xc) == 0x8) {		/* if the command is LISTEN, copy ADB data to PM buffer */
+	/* if the command is LISTEN, copy ADB data to PM buffer */
+	if ((command & 0xc) == 0x8) {
 		if ((buffer != (u_char *)0) && (buffer[0] <= 24)) {
-			pmdata.data[2] = buffer[0];		/* number of data */
+			pmdata.data[2] = buffer[0];	/* number of data */
 			for (i = 0; i < buffer[0]; i++)
 				pmdata.data[3 + i] = buffer[1 + i];
 		} else
@@ -613,7 +602,7 @@ pm_adb_op(buffer, compRout, data, command)
 	} else
 		pmdata.data[2] = 0;
 
-	if ((command & 0xc) != 0xc) {		/* if the command is not TALK */
+	if ((command & 0xc) != 0xc) {	/* if the command is not TALK */
 		/* set up stuff for adb_pass_up */
 		packet.data[0] = 1 + pmdata.data[2];
 		packet.data[1] = command;
@@ -663,9 +652,9 @@ pm_adb_op(buffer, compRout, data, command)
 	pmdata.num_data = 4;
 	pmdata.s_buf = pmdata.data;
 	pmdata.r_buf = pmdata.data;
-	pmdata.data[0] = 0x00;	
+	pmdata.data[0] = 0x00;
 	pmdata.data[1] = 0x86;	/* magic spell for awaking the PM */
-	pmdata.data[2] = 0x00;	
+	pmdata.data[2] = 0x00;
 	pmdata.data[3] = 0x0c;	/* each bit may express the existent ADB device */
 	rval = pmgrop(&pmdata);
 
@@ -675,8 +664,7 @@ pm_adb_op(buffer, compRout, data, command)
 
 
 void
-pm_adb_get_TALK_result(pmdata)
-	PMData *pmdata;
+pm_adb_get_TALK_result(PMData *pmdata)
 {
 	int i;
 	struct adbCommand packet;
@@ -704,8 +692,7 @@ pm_adb_get_TALK_result(pmdata)
 
 
 void
-pm_adb_get_ADB_data(pmdata)
-	PMData *pmdata;
+pm_adb_get_ADB_data(PMData *pmdata)
 {
 	int i;
 	struct adbCommand packet;
@@ -747,8 +734,7 @@ pm_adb_poweroff()
 }
 
 void
-pm_read_date_time(time)
-	u_long *time;
+pm_read_date_time(u_long *time)
 {
 	PMData p;
 
@@ -762,8 +748,7 @@ pm_read_date_time(time)
 }
 
 void
-pm_set_date_time(time)
-	u_long time;
+pm_set_date_time(u_long time)
 {
 	PMData p;
 
@@ -789,8 +774,7 @@ pm_read_brightness()
 }
 
 void
-pm_set_brightness(val)
-	int val;
+pm_set_brightness(int val)
 {
 	PMData p;
 
@@ -817,8 +801,7 @@ pm_init_brightness()
 }
 
 void
-pm_eject_pcmcia(slot)
-	int slot;
+pm_eject_pcmcia(int slot)
 {
 	PMData p;
 
@@ -880,8 +863,7 @@ pm_battery_info(int battery, struct pmu_battery_info *info)
 
 
 int
-pm_read_nvram(addr)
-	int addr;
+pm_read_nvram(int addr)
 {
 	PMData p;
 
@@ -896,8 +878,7 @@ pm_read_nvram(addr)
 }
 
 void
-pm_write_nvram(addr, val)
-	int addr, val;
+pm_write_nvram(int addr, int val)
 {
 	PMData p;
 

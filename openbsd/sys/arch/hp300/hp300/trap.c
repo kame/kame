@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.42 2003/06/02 23:27:45 millert Exp $	*/
+/*	$OpenBSD: trap.c,v 1.44 2004/01/15 17:22:25 miod Exp $	*/
 /*	$NetBSD: trap.c,v 1.57 1998/02/16 20:58:31 thorpej Exp $	*/
 
 /*
@@ -409,7 +409,7 @@ dopanic:
 		break;
 
 #ifdef M68040
-	case T_FPEMULI|T_USER:	/* unimplemented FP instuction */
+	case T_FPEMULI|T_USER:	/* unimplemented FP instruction */
 	case T_FPEMULD|T_USER:	/* unimplemented FP data type */
 		/* XXX need to FSAVE */
 		printf("pid %d(%s): unimplemented FP %s at %x (EA %x)\n",
@@ -689,9 +689,9 @@ dopanic:
 	}
 	sv.sival_ptr = (caddr_t)v;
 	trapsignal(p, i, ucode, typ, sv);
+out:
 	if ((type & T_USER) == 0)
 		return;
-out:
 	userret(p, &frame, sticks, v, 1);
 }
 

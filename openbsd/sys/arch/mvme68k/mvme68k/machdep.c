@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.77 2003/06/02 23:27:51 millert Exp $ */
+/*	$OpenBSD: machdep.c,v 1.83 2004/03/10 23:02:54 tom Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -71,7 +71,6 @@
 #include <sys/reboot.h>
 #include <sys/conf.h>
 #include <sys/file.h>
-#include <sys/clist.h>
 #include <sys/timeout.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -396,7 +395,7 @@ again:
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
 #endif
-	printf("avail mem = %ld (%ld pages)\n", ptoa(uvmexp.free), uvmexp.free);
+	printf("avail mem = %ld (%d pages)\n", ptoa(uvmexp.free), uvmexp.free);
 	printf("using %d buffers containing %d bytes of memory\n",
 			 nbuf, bufpages * PAGE_SIZE);
 
@@ -506,8 +505,7 @@ identifycpu()
 	switch (cputyp) {
 #ifdef MVME147
 	case CPU_147:
-		bcopy(&brdid.suffix, suffix, sizeof brdid.suffix);
-		snprintf(suffix, sizeof suffix, "MVME%x", brdid.model, suffix);
+		snprintf(suffix, sizeof suffix, "MVME%x", brdid.model);
 		cpuspeed = pccspeed((struct pccreg *)IIOV(0xfffe1000));
 		snprintf(speed, sizeof speed, "%02d", cpuspeed);
 		break;
@@ -541,14 +539,14 @@ identifycpu()
 	    "Motorola %s: %sMHz MC680%c0 CPU", suffix, speed, mc);
 	switch (mmutype) {
 #if defined(M68060) || defined(M68040)
-	case MMU_68060:
 	case MMU_68040:
 #ifdef FPSP
 		bcopy(&fpsp_tab, &fpvect_tab,
-				(&fpvect_end - &fpvect_tab) * sizeof (fpvect_tab));
+		    (&fpvect_end - &fpvect_tab) * sizeof (fpvect_tab));
 #endif
-		strlcat(cpu_model, "+MMU", sizeof cpu_model);
-		break;
+		/* FALLTHROUGH */
+	case MMU_68060:
+		/* FALLTHROUGH */
 #endif
 	case MMU_68030:
 		strlcat(cpu_model, "+MMU", sizeof cpu_model);
@@ -681,11 +679,13 @@ halt_establish(fn, pri)
 
 __dead void
 boot(howto)
-	register int howto;
+	int howto;
 {
 	/* If system is cold, just halt. */
 	if (cold) {
-		howto |= RB_HALT;
+		/* (Unless the user explicitly asked for reboot.) */
+		if ((howto & RB_USERREQ) == 0)
+			howto |= RB_HALT;
 		goto haltsys;
 	}
 
@@ -941,11 +941,7 @@ initvectors()
 		asm volatile ("movl %0,d0; .word 0x4e7b,0x0808" : : 
 						  "d"(m68060_pcr_init):"d0" );
 
-		/* bus/addrerr vectors */
-		vectab[2] = buserr60;
-		vectab[3] = addrerr4060;
 #if defined(M060SP)
-
 		/* integer support */
 		vectab[61] = intemu60/*(trapfun *)&I_CALL_TOP[128 + 0x00]*/;
 
@@ -1029,6 +1025,8 @@ badvaddr(addr, size)
 	nofault = (int *)0;
 	return (0);
 }
+
+int netisr;
 
 void
 netintr(arg)

@@ -32,7 +32,7 @@ POSSIBILITY OF SUCH DAMAGE.
 ***************************************************************************/
 
 /*$FreeBSD: if_em.c,v 1.26 2003/06/05 17:51:37 pdeuskar Exp $*/
-/* $OpenBSD: if_em.c,v 1.11 2003/08/23 18:52:18 fgsch Exp $ */
+/* $OpenBSD: if_em.c,v 1.17 2004/02/12 21:21:06 markus Exp $ */
 
 #include "bpfilter.h"
 #include "vlan.h"
@@ -123,7 +123,17 @@ const struct pci_matchid em_devices[] = {
 	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82541EP },
 	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82547EI },
 	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82546EB_QUAD },
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82540EP_LP }
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82540EP_LP },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82546GB_COPPER },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82546GB_FIBER },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82546GB_SERDES },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82545GM_COPPER },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82545GM_FIBER },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82545GM_SERDES },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82547GI },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82541GI },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82541GI_MOBILE },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82541ER }
 };
 
 /*********************************************************************
@@ -746,7 +756,7 @@ em_init(void *arg)
 		return;
 	}
 
-	em_enable_vlans(sc);
+	/* em_enable_vlans(sc); */
 
 	/* Prepare transmit descriptors and buffers */
 	if (em_setup_transmit_structures(sc)) {
@@ -796,6 +806,9 @@ em_init(void *arg)
         else
 #endif /* DEVICE_POLLING */
 		em_enable_intr(sc);
+
+	/* Don't reset the phy next time init gets called */
+	sc->hw.phy_reset_disable = TRUE;
 
 	splx(s);
 	return;
@@ -999,6 +1012,11 @@ em_media_change(struct ifnet *ifp)
 	default:
 		printf("%s: Unsupported media type\n", sc->sc_dv.dv_xname);
 	}
+
+	/* As the speed/duplex settings my have changed we need to
+	 * reset the PHY.
+	 */
+	sc->hw.phy_reset_disable = FALSE;
 
 	em_init(sc);
 
@@ -1325,13 +1343,11 @@ em_set_multi(struct em_softc * sc)
 {
 	u_int32_t reg_rctl = 0;
 	u_int8_t  mta[MAX_NUM_MULTICAST_ADDRESSES * ETH_LENGTH_OF_ADDRESS];
-#ifdef __FreeBSD__
-	struct ifmultiaddr  *ifma;
-#endif
+	struct arpcom *ac = &sc->interface_data;
+	struct ether_multi *enm;
+	struct ether_multistep step;
 	int mcnt = 0;
-#ifdef __FreeBSD__
-	struct ifnet   *ifp = &sc->interface_data.ac_if;
-#endif
+	struct ifnet *ifp = &sc->interface_data.ac_if;
 
 	IOCTL_DEBUGOUT("em_set_multi: begin");
 
@@ -1345,22 +1361,19 @@ em_set_multi(struct em_softc * sc)
 		msec_delay(5);
 	}
 
-#ifdef __FreeBSD__
-#if __FreeBSD_version < 500000 
-	LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-#else
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-#endif
-		if (ifma->ifma_addr->sa_family != AF_LINK)
-			continue;
-
-		if (mcnt == MAX_NUM_MULTICAST_ADDRESSES) break;
-
-		bcopy(LLADDR((struct sockaddr_dl *)ifma->ifma_addr),
-		      &mta[mcnt*ETH_LENGTH_OF_ADDRESS], ETH_LENGTH_OF_ADDRESS);
+	ETHER_FIRST_MULTI(step, ac, enm);
+	while (enm != NULL) {
+		if (bcmp(enm->enm_addrlo, enm->enm_addrhi, ETHER_ADDR_LEN)) {
+			ifp->if_flags |= IFF_ALLMULTI;
+			mcnt = MAX_NUM_MULTICAST_ADDRESSES;
+		}
+		if (mcnt == MAX_NUM_MULTICAST_ADDRESSES)
+			break;
+		bcopy(enm->enm_addrlo, &mta[mcnt*ETH_LENGTH_OF_ADDRESS],
+		      ETH_LENGTH_OF_ADDRESS);
 		mcnt++;
+		ETHER_NEXT_MULTI(step, enm);
 	}
-#endif /* __FreeBSD__ */
 
 	if (mcnt >= MAX_NUM_MULTICAST_ADDRESSES) {
 		reg_rctl = E1000_READ_REG(&sc->hw, RCTL);
@@ -1692,6 +1705,9 @@ em_setup_interface(struct em_softc * sc)
 #endif
 #endif /* __FreeBSD__ */
 
+#ifdef __OpenBSD__
+	ifp->if_capabilities |= IFCAP_VLAN_MTU;
+#endif
 
 	/* 
 	 * Specify the media types supported by this adapter and register
@@ -2727,6 +2743,21 @@ em_receive_checksum(struct em_softc *sc,
 	}
 
 	return;
+#else /* __FreeBSD__ */
+	/* 82543 or newer only */
+	if ((sc->hw.mac_type < em_82543) ||
+	    /* Ignore Checksum bit is set */
+	    (rx_desc->status & E1000_RXD_STAT_IXSM))
+		return;
+
+	if ((rx_desc->status & (E1000_RXD_STAT_IPCS|E1000_RXD_ERR_IPE)) ==
+	    E1000_RXD_STAT_IPCS)
+		mp->m_pkthdr.csum |= M_IPV4_CSUM_IN_OK;
+
+	if ((rx_desc->status & (E1000_RXD_STAT_IPCS|E1000_RXD_ERR_IPE|
+	    E1000_RXD_STAT_TCPCS|E1000_RXD_ERR_TCPE)) ==
+	    (E1000_RXD_STAT_TCPCS | E1000_RXD_STAT_IPCS))
+		mp->m_pkthdr.csum |= M_TCP_CSUM_IN_OK | M_UDP_CSUM_IN_OK;
 #endif /* __FreeBSD__ */
 }
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.20 2003/06/02 23:27:52 millert Exp $ */
+/*	$OpenBSD: cpu.h,v 1.24 2004/01/12 07:46:16 miod Exp $ */
 /*
  * Copyright (c) 1996 Nivas Madhur
  * Copyright (c) 1992, 1993
@@ -77,11 +77,9 @@ struct clockframe {
 	struct trapframe tf;
 };
 
-extern int intstack;
-
-#define	CLKF_USERMODE(framep)	((((struct trapframe *)(framep))->epsr & PSR_MODE) == 0)
-#define	CLKF_PC(framep)		(((struct trapframe *)(framep))->sxip & ~3)
-#define	CLKF_INTR(framep)	(((struct trapframe *)(framep))->r[31] > intstack)
+#define	CLKF_USERMODE(framep)	((((struct trapframe *)(framep))->tf_epsr & PSR_MODE) == 0)
+#define	CLKF_PC(framep)		(((struct trapframe *)(framep))->tf_sxip & XIP_ADDR)
+#define	CLKF_INTR(framep)	(((struct trapframe *)(framep))->tf_r[31] >= UADDR)
 
 /*
  * Get interrupt glue.
@@ -96,7 +94,7 @@ extern int intstack;
  * conversion between physical and kernel virtual addresses is easy.
  */
 
-#ifdef VIRTMAP 
+#ifdef VIRTMAP
 /* This will do non 1:1 phys/virt memory mapping in the future - SPM */
 #define	ISIIOVA(va) \
 	((char *)(va) >= intiobase && (char *)(va) < intiolimit)
@@ -133,7 +131,7 @@ extern int	want_resched;		/* resched() was called */
 
 /*
  * Give a profiling tick to the current process when the user profiling
- * buffer pages are invalid.  On the sparc, request an ast to send us 
+ * buffer pages are invalid.  On the sparc, request an ast to send us
  * through trap(), marking the proc as needing a profiling tick.
  */
 #define	need_proftick(p)	((p)->p_flag |= P_OWEUPC, want_ast = 1)
@@ -179,13 +177,13 @@ struct switchframe {
 	void	*sf_proc;		/* proc pointer */
 };
 
-/* This struct defines the machine dependant pointers */
+/* This struct defines the machine dependent pointers */
 struct md_p {
 	void (*clock_init_func)(void);      /* interval clock init function */
 	void (*statclock_init_func)(void);  /* statistics clock init function */
 	void (*delayclock_init_func)(void); /* delay clock init function */
 	void (*delay_func)(void);           /* delay clock function */
-	void (*interrupt_func)(u_int, struct m88100_saved_state *);       /* interrupt func */
+	void (*interrupt_func)(u_int, struct trapframe *);       /* interrupt func */
 	u_char *volatile intr_mask;
 	u_char *volatile intr_ipl;
 	u_char *volatile intr_src;
@@ -193,9 +191,8 @@ struct md_p {
 
 extern struct md_p md;
 
-
-int badvaddr(vm_offset_t va, int size);
-void nmihand(void *framep);
+int badvaddr(vaddr_t, int);
+void nmihand(void *);
 
 #endif /* _KERNEL */
 #endif /* __MACHINE_CPU_H__ */

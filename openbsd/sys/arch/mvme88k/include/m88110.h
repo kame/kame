@@ -1,12 +1,7 @@
-/*	$OpenBSD: m88110.h,v 1.13 2003/08/20 20:33:44 miod Exp $ */
+/*	$OpenBSD: m88110.h,v 1.16 2004/01/13 23:24:10 miod Exp $ */
 
 #ifndef	__MACHINE_M88110_H__
 #define	__MACHINE_M88110_H__
-
-#include <uvm/uvm_extern.h>
-#ifndef _LOCORE
-# include <machine/mmu.h>		 /* batc_template_t */
-#endif
 
 /*
  *	88110 CMMU definitions
@@ -42,8 +37,8 @@
 #define CMMU_ICMD_INV_LINE       0x005    /* Invalidate Inst Cache Line */
 #define CMMU_ICMD_PRB_SUPR       0x008    /* MMU Probe Supervisor */
 #define CMMU_ICMD_PRB_USER       0x009    /* MMU Probe User */
-#define CMMU_ICMD_INV_SATC       0x00A    /* Invalidate All Supervisor ATCs */
-#define CMMU_ICMD_INV_UATC       0x00B    /* Invalidate All User ATCs */
+#define CMMU_ICMD_INV_SATC       0x00a    /* Invalidate All Supervisor ATCs */
+#define CMMU_ICMD_INV_UATC       0x00b    /* Invalidate All User ATCs */
 
 #define CMMU_ICTL_DID            0x8000   /* Double instruction disable */
 #define CMMU_ICTL_PREN           0x4000   /* Branch Prediction Enable */
@@ -116,69 +111,19 @@
 #define CMMU_INST 0
 
 /* definitions for use of the BATC */
-#define BATC_512K	(0x00 << 19)
-#define BATC_1M		(0x01 << 19)
-#define BATC_2M		(0x03 << 19)
-#define BATC_4M		(0x07 << 19)
-#define BATC_8M		(0x0F << 19)
-#define BATC_16M	(0x1F << 19)
-#define BATC_32M	(0x3F << 19)
-#define BATC_64M	(0x7F << 19)
-#define BATC_ADDR_MASK	0xFFF80000
-#define BATC_ADDR_SHIFT	13
-#define BATC_LBA_SHIFT	19
-#define BATC_PBA_SHIFT	6
-#define BATC_SU		0x20
-#define BATC_WT		0x10
-#define BATC_G		0x08
-#define BATC_CI		0x04
-#define BATC_WP		0x02
-#define BATC_V		0x01
+#define BATC_512K	(0x00 << BATC_BLKSHIFT)
+#define BATC_1M		(0x01 << BATC_BLKSHIFT)
+#define BATC_2M		(0x03 << BATC_BLKSHIFT)
+#define BATC_4M		(0x07 << BATC_BLKSHIFT)
+#define BATC_8M		(0x0f << BATC_BLKSHIFT)
+#define BATC_16M	(0x1f << BATC_BLKSHIFT)
+#define BATC_32M	(0x3f << BATC_BLKSHIFT)
+#define BATC_64M	(0x7f << BATC_BLKSHIFT)
 
-#define CLINE_MASK	0x1F
+#define CLINE_MASK	0x1f
 #define CLINE_SIZE	(8 * 32)
 
 #ifndef	_LOCORE
-
-/*
- * Prototypes from "mvme88k/mvme88k/m88110_cmmu.c"
- */
-void m88110_show_apr(unsigned);
-void m88110_show_sctr(unsigned);
-void m88110_setup_board_config(void);
-void m88110_setup_cmmu_config(void);
-void m88110_cmmu_dump_config(void);
-void m88110_cpu_configuration_print(int);
-void m88110_cmmu_shutdown_now(void);
-void m88110_cmmu_parity_enable(void);
-unsigned m88110_cmmu_cpu_number(void);
-unsigned m88110_cmmu_get_idr(unsigned);
-void m88110_cmmu_set_sapr(unsigned);
-void m88110_cmmu_remote_set_sapr(unsigned, unsigned);
-void m88110_cmmu_set_uapr(unsigned);
-void m88110_cmmu_set_batc_entry(unsigned, unsigned, unsigned, unsigned);
-void m88110_cmmu_set_pair_batc_entry(unsigned, unsigned, unsigned);
-void m88110_cmmu_flush_remote_tlb(unsigned, unsigned, vm_offset_t, int);
-void m88110_cmmu_flush_tlb(unsigned, vm_offset_t, int);
-void m88110_cmmu_pmap_activate(unsigned, unsigned, 
-				  batc_template_t i_batc[BATC_MAX],
-				  batc_template_t d_batc[BATC_MAX]);
-void m88110_cmmu_flush_remote_cache(int, vm_offset_t, int);
-void m88110_cmmu_flush_cache(vm_offset_t, int);
-void m88110_cmmu_flush_remote_inst_cache(int, vm_offset_t, int);
-void m88110_cmmu_flush_inst_cache(vm_offset_t, int);
-void m88110_cmmu_flush_remote_data_cache(int, vm_offset_t, int);
-void m88110_cmmu_flush_data_cache(vm_offset_t, int);
-void m88110_dma_cachectl(vm_offset_t, int, int);
-
-#if DDB
-unsigned m88110_cmmu_get_by_mode(int, int);
-void m88110_cmmu_show_translation(unsigned, unsigned, unsigned, int);
-void m88110_cmmu_cache_state(unsigned, unsigned);
-void m88110_show_cmmu_info(unsigned);
-#endif
-
-void m88110_cmmu_init(void);
 
 void set_icmd(unsigned value);
 void set_ictl(unsigned value);
@@ -233,23 +178,23 @@ unsigned get_dpar(void);
 
 /* Cache inlines */
 
-#define line_addr(x)	(vm_offset_t)((x) & ~CLINE_MASK)
-#define page_addr(x)	(vm_offset_t)((x) & ~PAGE_MASK)
+#define line_addr(x)	(paddr_t)((x) & ~CLINE_MASK)
+#define page_addr(x)	(paddr_t)((x) & ~PAGE_MASK)
 
-static __inline__ void mc88110_flush_data_line(vm_offset_t x)
+static __inline__ void mc88110_flush_data_line(paddr_t x)
 {
 	unsigned dctl = get_dctl();
-	if (dctl & CMMU_DCTL_CEN){
-		set_dsar(line_addr(x)); 
+	if (dctl & CMMU_DCTL_CEN) {
+		set_dsar(line_addr(x));
 		set_dcmd(CMMU_DCMD_FLUSH_LINE);
 	}
 }
 
-static __inline__ void mc88110_flush_data_page(vm_offset_t x)
+static __inline__ void mc88110_flush_data_page(paddr_t x)
 {
 	unsigned dctl = get_dctl();
-	if (dctl & CMMU_DCTL_CEN){
-		set_dsar(page_addr(x)); 
+	if (dctl & CMMU_DCTL_CEN) {
+		set_dsar(page_addr(x));
 		set_dcmd(CMMU_DCMD_FLUSH_PG);
 	}
 }
@@ -257,13 +202,12 @@ static __inline__ void mc88110_flush_data_page(vm_offset_t x)
 static __inline__ void mc88110_flush_data(void)
 {
 	unsigned dctl = get_dctl();
-	if (dctl & CMMU_DCTL_CEN){
-		set_dsar(0x00);
+	if (dctl & CMMU_DCTL_CEN) {
 		set_dcmd(CMMU_DCMD_FLUSH_ALL);
 	}
 }
 
-static __inline__ void mc88110_inval_data_line(vm_offset_t x)
+static __inline__ void mc88110_inval_data_line(paddr_t x)
 {
 	set_dsar(line_addr(x));
 	set_dcmd(CMMU_DCMD_INV_LINE);
@@ -271,24 +215,23 @@ static __inline__ void mc88110_inval_data_line(vm_offset_t x)
 
 static __inline__ void mc88110_inval_data(void)
 {
-	set_dsar(0x00);
 	set_dcmd(CMMU_DCMD_INV_ALL);
 }
 
-static __inline__ void mc88110_sync_data_line(vm_offset_t x)
+static __inline__ void mc88110_sync_data_line(paddr_t x)
 {
 	unsigned dctl = get_dctl();
-	if (dctl & CMMU_DCTL_CEN){
-		set_dsar(line_addr(x)); 
+	if (dctl & CMMU_DCTL_CEN) {
+		set_dsar(line_addr(x));
 		set_dcmd(CMMU_DCMD_FLUSH_LINE_INV);
 	}
 }
 
-static __inline__ void mc88110_sync_data_page(vm_offset_t x)
+static __inline__ void mc88110_sync_data_page(paddr_t x)
 {
 	unsigned dctl = get_dctl();
-	if (dctl & CMMU_DCTL_CEN){
-		set_dsar(page_addr(x)); 
+	if (dctl & CMMU_DCTL_CEN) {
+		set_dsar(page_addr(x));
 		set_dcmd(CMMU_DCMD_FLUSH_PG_INV);
 	}
 }
@@ -296,13 +239,12 @@ static __inline__ void mc88110_sync_data_page(vm_offset_t x)
 static __inline__ void mc88110_sync_data(void)
 {
 	unsigned dctl = get_dctl();
-	if (dctl & CMMU_DCTL_CEN){
-		set_dsar(0x00);
+	if (dctl & CMMU_DCTL_CEN) {
 		set_dcmd(CMMU_DCMD_FLUSH_ALL_INV);
 	}
 }
 
-static __inline__ void mc88110_inval_inst_line(vm_offset_t x)
+static __inline__ void mc88110_inval_inst_line(paddr_t x)
 {
 	set_isar(line_addr(x));
 	set_icmd(CMMU_ICMD_INV_LINE);
@@ -310,9 +252,8 @@ static __inline__ void mc88110_inval_inst_line(vm_offset_t x)
 
 static __inline__ void mc88110_inval_inst(void)
 {
-	set_isar(0x00);
 	set_icmd(CMMU_ICMD_INV_ITIC);
 }
 
 #endif	/* _LOCORE */
-#endif /* __MACHINE_M88110_H__ */
+#endif	/* __MACHINE_M88110_H__ */

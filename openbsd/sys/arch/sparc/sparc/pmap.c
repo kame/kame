@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.134 2003/04/06 22:50:37 miod Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.136 2003/12/20 00:49:46 miod Exp $	*/
 /*	$NetBSD: pmap.c,v 1.118 1998/05/19 19:00:18 thorpej Exp $ */
 
 /*
@@ -2281,7 +2281,7 @@ pv_changepte4m(pv0, bis, bic)
 		tpte = *ptep;
 #ifdef DIAGNOSTIC
 		if ((tpte & SRMMU_TETYPE) != SRMMU_TEPTE)
-			panic("pv_changepte: invalid PTE for 0x%x", va);
+			panic("pv_changepte: invalid PTE for 0x%lx", va);
 #endif
 
 		pv0->pv_flags |= MR4M(tpte);
@@ -2341,8 +2341,8 @@ pv_syncflags4m(pv0)
 		 * XXX - This can't happen?!?
 		 */
 		if (ptep == NULL) {	/* invalid */
-			printf("pv_syncflags4m: no pte pmap: 0x%x, va: 0x%x\n",
-			       pm, va);
+			printf("pv_syncflags4m: no pte pmap: %p, va: 0x%x\n",
+			    pm, va);
 			continue;
 		}
 
@@ -2702,7 +2702,7 @@ pmap_bootstrap4_4c(nctx, nregion, nsegment)
 #endif
 
 	/*
-	 * Intialize the kernel pmap.
+	 * Initialize the kernel pmap.
 	 */
 	/* kernel_pmap_store.pm_ctxnum = 0; */
 	simple_lock_init(&kernel_pmap_store.pm_lock);
@@ -3004,7 +3004,7 @@ pmap_bootstrap4m(void)
 #endif /* defined Sun4/Sun4c */
 
 	/*
-	 * Intialize the kernel pmap.
+	 * Initialize the kernel pmap.
 	 */
 	/* kernel_pmap_store.pm_ctxnum = 0; */
 	simple_lock_init(&kernel_pmap_store.pm_lock);

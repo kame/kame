@@ -1,4 +1,4 @@
-/*	$OpenBSD: bpf.h,v 1.23 2003/08/25 08:16:41 fgsch Exp $	*/
+/*	$OpenBSD: bpf.h,v 1.25 2004/02/06 22:38:58 tedu Exp $	*/
 /*	$NetBSD: bpf.h,v 1.15 1996/12/13 07:57:33 mikel Exp $	*/
 
 /*
@@ -53,7 +53,7 @@ typedef u_int32_t	bpf_u_int32;
 #define BPF_WORDALIGN(x) (((x) + (BPF_ALIGNMENT - 1)) & ~(BPF_ALIGNMENT - 1))
 
 #define BPF_MAXINSNS 512
-#define BPF_MAXBUFSIZE 0x80000
+#define BPF_MAXBUFSIZE (2 * 1024 * 1024)
 #define BPF_MINBUFSIZE 32
 
 /*
@@ -111,6 +111,8 @@ struct bpf_version {
 #define BIOCGRSIG	_IOR('B',115, u_int)
 #define BIOCGHDRCMPLT	_IOR('B',116, u_int)
 #define BIOCSHDRCMPLT	_IOW('B',117, u_int)
+#define	BIOCLOCK	_IO('B',118)
+#define	BIOCSETWF	_IOW('B',119, struct bpf_program)
 
 struct bpf_timeval {
 	u_int32_t	tv_sec;

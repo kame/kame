@@ -1,4 +1,4 @@
-/*	$OpenBSD: ansi.h,v 1.15 2003/08/01 07:44:05 miod Exp $	*/
+/*	$OpenBSD: ansi.h,v 1.17 2004/01/03 14:08:53 espie Exp $	*/
 /*-
  * Copyright (c) 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -48,7 +48,11 @@
 #define	_BSD_SSIZE_T_	int			/* byte count or error */
 #define	_BSD_TIME_T_	int			/* time() */
 struct __va_list_tag;
-#define _BSD_VA_LIST_   struct __va_list_tag * /* va_list */
+#if defined(__GNUC__) && __GNUC__ >= 3
+#define _BSD_VA_LIST_	__builtin_va_list
+#else
+#define	_BSD_VA_LIST_	struct __va_list_tag *	/* va_list */
+#endif
 #define _BSD_CLOCKID_T_	int
 #define _BSD_TIMER_T_	int
 
@@ -61,7 +65,7 @@ struct __va_list_tag;
  * chosen over a long is that the is*() and to*() routines take ints (says
  * ANSI C), but they use _RUNE_T_ instead of int.  By changing it here, you
  * lose a bit of ANSI conformance, but your programs will still work.
- *    
+ *
  * Note that _WCHAR_T_ and _RUNE_T_ must be of the same type.  When wchar_t
  * and rune_t are typedef'd, _WCHAR_T_ will be undef'd, but _RUNE_T remains
  * defined for ctype.h.

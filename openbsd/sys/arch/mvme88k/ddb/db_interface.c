@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_interface.c,v 1.26 2002/03/14 03:15:56 millert Exp $	*/
+/*	$OpenBSD: db_interface.c,v 1.42 2004/01/23 17:26:02 miod Exp $	*/
 /*
  * Mach Operating System
  * Copyright (c) 1993-1991 Carnegie Mellon University
@@ -42,9 +42,14 @@
 #include <machine/trap.h>		/* current_thread()	*/
 #include <machine/db_machdep.h>		/* local ddb stuff	*/
 #include <machine/bugio.h>		/* bug routines		*/
-#include <machine/locore.h>		 
+#include <machine/locore.h>
 #include <machine/cpu_number.h>
+#ifdef M88100
+#include <machine/m88100.h>
+#include <machine/m8820x.h>
+#endif
 
+#include <ddb/db_access.h>
 #include <ddb/db_command.h>
 #include <ddb/db_extern.h>
 #include <ddb/db_interface.h>
@@ -52,21 +57,16 @@
 #include <ddb/db_sym.h>
 
 extern label_t *db_recover;
-extern unsigned int db_maxoff;
-extern unsigned db_trace_get_val(vm_offset_t addr, unsigned *ptr);
-extern int frame_is_sane(db_regs_t *);
+extern unsigned db_trace_get_val(vaddr_t, unsigned *);
+extern int frame_is_sane(db_regs_t *, int);
 extern void cnpollc(int);
-void kdbprinttrap(int type, int code);
+void kdbprinttrap(int, int);
 
-void m88k_db_trap(int type, struct m88100_saved_state *regs);
-int ddb_nmi_trap(int level, db_regs_t *eframe);
-void ddb_error_trap(char *error, db_regs_t *eframe);
-void db_read_bytes(vm_offset_t addr, int size, char *data);
-void db_write_bytes(char *addr, int size, char *data);
-void db_putc(int c);
+void m88k_db_trap(int, struct trapframe *);
+int ddb_nmi_trap(int, db_regs_t *);
+void ddb_error_trap(char *, db_regs_t *);
+void db_putc(int);
 int db_getc(void);
-void cpu_interrupt_to_db(int cpu_no);
-char *db_task_name(void);
 int m88k_dmx_print(unsigned, unsigned, unsigned, unsigned);
 void m88k_db_pause(unsigned);
 void m88k_db_print_frame(db_expr_t, int, db_expr_t, char *);
@@ -81,13 +81,8 @@ void m88k_db_translate(db_expr_t, int, db_expr_t, char *);
 void m88k_db_cmmucfg(db_expr_t, int, db_expr_t, char *);
 void m88k_db_prom_cmd(db_expr_t, int, db_expr_t, char *);
 
-int 	db_active = 0;
-int 	db_noisy = 0;
-int	quiet_db_read_bytes = 0;
-
-/************************/
-/* 	DB_REGISTERS ****/
-/************************/
+int 	db_active;
+int 	db_noisy;
 
 db_regs_t	ddb_regs;
 
@@ -96,7 +91,7 @@ db_regs_t	ddb_regs;
  * If you really feel like understanding the following procedure and
  * macros, see pages 6-22 to 6-30 (Section 6.7.3) of
  *
- * MC881000 RISC Microprocessor User's Manual Second Edition
+ * MC88100 RISC Microprocessor User's Manual Second Edition
  * (Motorola Order: MC88100UM/AD REV 1)
  *
  * and ERRATA-5 (6-23, 6-24, 6-24) of
@@ -107,83 +102,77 @@ db_regs_t	ddb_regs;
  *
  */
 
+#ifdef M88100
 /* macros for decoding dmt registers */
 
-#define XMEM(x)  ((x) & (1<<12))
-#define XMEM_MODE(x) ((((x)>>2 & 0xf) == 0xf) ? "" : ".bu")
-#define MODE(x) ((x)>>2 & 0xf)
-#define DOUB(x) ((x) & (1<<13))
-#define SIGN(x) ((x) & (1<<6))
-#define DAS(x) (((x) & (1<<14)) ? "" : ".usr")
-#define REG(x) (((x)>>7) & 0x1f)
-#define STORE(x) ((x) & 0x2)
-
 /*
- * return 1 if the printing of the next stage should be surpressed
+ * return 1 if the printing of the next stage should be suppressed
  */
 int
 m88k_dmx_print(t, d, a, no)
 	unsigned t, d, a, no;
 {
-	static unsigned addr_mod[16] = {
+	static const unsigned addr_mod[16] = {
 		0, 3, 2, 2, 1, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0
 	};
-	static char *mode[16]  = {
+	static const char *mode[16]  = {
 		"?", ".b", ".b", ".h", ".b", "?", "?", "?",
-		".b", ".h", "?" , "?" , "?" , "?", "?", ""
+		".b", "?", "?" , "?" , ".h" , "?", "?", ""
 	};
-	static unsigned mask[16] = {
-		0,           0xff,        0xff00,     0xffff,
-		0xff0000,    0,           0,          0,
-		0xff000000U, 0xffff0000U, 0,          0,
-		0,           0,           0,          0xffffffffU
+	static const unsigned mask[16] = {
+		0, 0xff, 0xff00, 0xffff,
+		0xff0000, 0, 0, 0,
+		0xff000000, 0, 0, 0,
+		0xffff0000, 0, 0, 0xffffffff
 	};
-	static unsigned shift[16] = {
+	static const unsigned shift[16] = {
 		0,  0, 8, 0, 16, 0, 0, 0,
-		24, 16, 0, 0,  0, 0, 0, 0
+		24, 0, 0, 0, 16, 0, 0, 0
 	};
-	int reg = REG(t);
+	int reg = DMT_DREGBITS(t);
 
-	if (XMEM(t)) {
+	if (ISSET(t, DMT_LOCKBAR)) {
 		db_printf("xmem%s%s r%d(0x%x) <-> mem(0x%x),",
-			  XMEM_MODE(t), DAS(t), reg,
+			  DMT_ENBITS(t) == 0x0f ? "" : ".bu", ISSET(t, DMT_DAS) ? "" : ".usr", reg,
 			  (((t)>>2 & 0xf) == 0xf) ? d : (d & 0xff), a);
 		return 1;
 	} else {
-		if (MODE(t) == 0xf) {
+		if (DMT_ENBITS(t) == 0xf) {
 			/* full or double word */
-			if (STORE(t)) {
-				if (DOUB(t) && no == 2)
+			if (ISSET(t, DMT_WRITE)) {
+				if (ISSET(t, DMT_DOUB1) && no == 2)
 					db_printf("st.d%s -> mem(0x%x) (** restart sxip **)",
-						  DAS(t), a);
+						  ISSET(t, DMT_DAS) ? "" : ".usr", a);
 				else
 					db_printf("st%s (0x%x) -> mem(0x%x)",
-						  DAS(t), d, a);
+						  ISSET(t, DMT_DAS) ? "" : ".usr", d, a);
 			} else {
 				/* load */
-				if (DOUB(t) && no == 2)
+				if (ISSET(t, DMT_DOUB1) && no == 2)
 					db_printf("ld.d%s r%d <- mem(0x%x), r%d <- mem(0x%x)",
-						  DAS(t), reg, a, reg+1, a+4);
+						  ISSET(t, DMT_DAS) ? "" : ".usr", reg, a, reg+1, a+4);
 				else
 					db_printf("ld%s r%d <- mem(0x%x)",
-						  DAS(t), reg, a);
+						  ISSET(t, DMT_DAS) ? "" : ".usr", reg, a);
 			}
 		} else {
 			/* fractional word - check if load or store */
-			a += addr_mod[MODE(t)];
-			if (STORE(t))
+			a += addr_mod[DMT_ENBITS(t)];
+			if (ISSET(t, DMT_WRITE))
 				db_printf("st%s%s (0x%x) -> mem(0x%x)",
-					  mode[MODE(t)], DAS(t),
-					  (d & mask[MODE(t)]) >> shift[MODE(t)], a);
+					  mode[DMT_ENBITS(t)], ISSET(t, DMT_DAS) ? "" : ".usr",
+					  (d & mask[DMT_ENBITS(t)]) >> shift[DMT_ENBITS(t)], a);
 			else
 				db_printf("ld%s%s%s r%d <- mem(0x%x)",
-					  mode[MODE(t)], SIGN(t) ? "" : "u",
-					  DAS(t), reg, a);
+				    mode[DMT_ENBITS(t)],
+				    ISSET(t, DMT_SIGNED) ? "" : "u",
+				    ISSET(t, DMT_DAS) ? "" : ".usr", reg, a);
 		}
 	}
 	return 0;
 }
+#endif	/* M88100 */
 
 void
 m88k_db_print_frame(addr, have_addr, count, modif)
@@ -192,10 +181,12 @@ m88k_db_print_frame(addr, have_addr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-	struct m88100_saved_state *s = (struct m88100_saved_state *)addr;
+	struct trapframe *s = (struct trapframe *)addr;
 	char *name;
 	db_expr_t offset;
-	int surpress1 = 0, surpress2 = 0;
+#ifdef M88100
+	int suppress1 = 0, suppress2 = 0;
+#endif
 	int c, force = 0, help = 0;
 
 	if (!have_addr) {
@@ -224,24 +215,18 @@ m88k_db_print_frame(addr, have_addr, count, modif)
 		return;
 	}
 
-	if (badwordaddr((vm_offset_t)s) ||
-	    badwordaddr((vm_offset_t)(&((db_regs_t*)s)->mode))) {
-		db_printf("frame at 0x%08x is unreadable\n", s);
+	if (badwordaddr((vaddr_t)s) ||
+	    badwordaddr((vaddr_t)(&((db_regs_t*)s)->fpit))) {
+		db_printf("frame at %8p is unreadable\n", s);
 		return;
 	}
 
-	if (!frame_is_sane((db_regs_t *)s)) {  /* see db_trace.c */
-		db_printf("frame seems insane (");
-
-		if (force)
-			db_printf("forging ahead anyway...)\n");
-		else {
-			db_printf("use /f to force)\n");
+	if (frame_is_sane((db_regs_t *)s, 0) == 0) {	/* see db_trace.c */
+		if (force == 0)
 			return;
-		}
 	}
 
-#define R(i) s->r[i]
+#define R(i) s->tf_r[i]
 #define IPMASK(x) ((x) &  ~(3))
 	db_printf("R00-05: 0x%08x  0x%08x  0x%08x  0x%08x  0x%08x  0x%08x\n",
 		  R(0), R(1), R(2), R(3), R(4), R(5));
@@ -255,44 +240,46 @@ m88k_db_print_frame(addr, have_addr, count, modif)
 		  R(24), R(25), R(26), R(27), R(28), R(29));
 	db_printf("R30-31: 0x%08x  0x%08x\n", R(30), R(31));
 
-	db_printf("%sxip: 0x%08x ", cputyp == CPU_88110 ? "e" : "s", s->sxip & ~3);
-	db_find_xtrn_sym_and_offset((db_addr_t)IPMASK(s->sxip),
-				    &name, &offset);
-	if (name != 0 && (unsigned)offset <= db_maxoff)
+	db_printf("%cxip: 0x%08x ",
+	    cputyp == CPU_88110 ? 'e' : 's', s->tf_sxip & ~3);
+	db_find_xtrn_sym_and_offset((db_addr_t)IPMASK(s->tf_sxip),
+	    &name, &offset);
+	if (name != NULL && (unsigned)offset <= db_maxoff)
 		db_printf("%s+0x%08x", name, (unsigned)offset);
 	db_printf("\n");
 
-	if (s->snip != s->sxip + 4) {
-		db_printf("%snip: 0x%08x ", cputyp == CPU_88110 ? "e" : "s", s->snip);
-		db_find_xtrn_sym_and_offset((db_addr_t)IPMASK(s->snip),
-					    &name, &offset);
-		if (name != 0 && (unsigned)offset <= db_maxoff)
+	if (s->tf_snip != s->tf_sxip + 4) {
+		db_printf("%cnip: 0x%08x ",
+		    cputyp == CPU_88110 ? 'e' : 's', s->tf_snip);
+		db_find_xtrn_sym_and_offset((db_addr_t)IPMASK(s->tf_snip),
+		    &name, &offset);
+		if (name != NULL && (unsigned)offset <= db_maxoff)
 			db_printf("%s+0x%08x", name, (unsigned)offset);
 		db_printf("\n");
 	}
 
 	if (cputyp != CPU_88110) {
-		if (s->sfip != s->snip + 4) {
-			db_printf("sfip: 0x%08x ", s->sfip);
-			db_find_xtrn_sym_and_offset((db_addr_t)IPMASK(s->sfip),
-						    &name, &offset);
-			if (name != 0 && (unsigned)offset <= db_maxoff)
+		if (s->tf_sfip != s->tf_snip + 4) {
+			db_printf("sfip: 0x%08x ", s->tf_sfip);
+			db_find_xtrn_sym_and_offset((db_addr_t)IPMASK(s->tf_sfip),
+			    &name, &offset);
+			if (name != NULL && (unsigned)offset <= db_maxoff)
 				db_printf("%s+0x%08x", name, (unsigned)offset);
 			db_printf("\n");
 		}
 	} else {
 		db_printf("fpsr: 0x%08x fpcr: 0x%08x fpecr: 0x%08x\n",
-			  s->fpsr, s->fpcr, s->fpecr);
+			  s->tf_fpsr, s->tf_fpcr, s->tf_fpecr);
 		db_printf("dsap 0x%08x duap 0x%08x dsr 0x%08x dlar 0x%08x dpar 0x%08x\n",
-			  s->dsap, s->duap, s->dsr, s->dlar, s->dpar);
+			  s->tf_dsap, s->tf_duap, s->tf_dsr, s->tf_dlar, s->tf_dpar);
 		db_printf("isap 0x%08x iuap 0x%08x isr 0x%08x ilar 0x%08x ipar 0x%08x\n",
-			  s->isap, s->iuap, s->isr, s->ilar, s->ipar);
+			  s->tf_isap, s->tf_iuap, s->tf_isr, s->tf_ilar, s->tf_ipar);
 	}
 
-	db_printf("epsr: 0x%08x                current process: 0x%x\n",
-		  s->epsr, curproc);
+	db_printf("epsr: 0x%08x                current process: %p\n",
+		  s->tf_epsr, curproc);
 	db_printf("vector: 0x%02x                    interrupt mask: 0x%08x\n",
-		  s->vector, s->mask);
+		  s->tf_vector, s->tf_mask);
 
 	/*
 	 * If the vector indicates trap, instead of an exception or
@@ -301,57 +288,66 @@ m88k_db_print_frame(addr, have_addr, count, modif)
 	 * Interrupt and exceptions are vectored at 0-10 and 114-127.
 	 */
 
-	if (!(s->vector <= 10 || (114 <= s->vector && s->vector <= 127))) {
+	if (!(s->tf_vector <= 10 || (114 <= s->tf_vector && s->tf_vector <= 127))) {
 		db_printf("\n");
 		return;
 	}
 
+#ifdef M88100
 	if (cputyp != CPU_88110) {
-		if (s->vector == /*data*/3 || s->dmt0 & 1) {
+		if (s->tf_vector == /*data*/3 || s->tf_dmt0 & DMT_VALID) {
 			db_printf("dmt,d,a0: 0x%08x  0x%08x  0x%08x ",
-				  s->dmt0, s->dmd0, s->dma0);
-			db_find_xtrn_sym_and_offset((db_addr_t)s->dma0, &name, &offset);
-			if (name != 0 && (unsigned)offset <= db_maxoff)
+			    s->tf_dmt0, s->tf_dmd0, s->tf_dma0);
+			db_find_xtrn_sym_and_offset((db_addr_t)s->tf_dma0, &name, &offset);
+			if (name != NULL && (unsigned)offset <= db_maxoff)
 				db_printf("%s+0x%08x", name, (unsigned)offset);
 			db_printf("\n          ");
-			surpress1 = m88k_dmx_print(s->dmt0|0x01, s->dmd0, s->dma0, 0);
+
+			suppress1 = m88k_dmx_print(s->tf_dmt0, s->tf_dmd0, s->tf_dma0, 0);
 			db_printf("\n");
 
-			if ((s->dmt1 & 1) && (!surpress1)) {
+			if ((s->tf_dmt1 & DMT_VALID) && (!suppress1)) {
 				db_printf("dmt,d,a1: 0x%08x  0x%08x  0x%08x ",
-					  s->dmt1, s->dmd1, s->dma1);
-				db_find_xtrn_sym_and_offset((db_addr_t)s->dma1,
-							    &name, &offset);
-				if (name != 0 && (unsigned)offset <= db_maxoff)
+				    s->tf_dmt1, s->tf_dmd1, s->tf_dma1);
+				db_find_xtrn_sym_and_offset((db_addr_t)s->tf_dma1,
+				    &name, &offset);
+				if (name != NULL &&
+				    (unsigned)offset <= db_maxoff)
 					db_printf("%s+0x%08x", name, (unsigned)offset);
 				db_printf("\n          ");
-				surpress2 = m88k_dmx_print(s->dmt1, s->dmd1, s->dma1, 1);
+				suppress2 = m88k_dmx_print(s->tf_dmt1, s->tf_dmd1, s->tf_dma1, 1);
 				db_printf("\n");
 
-				if ((s->dmt2 & 1) && (!surpress2)) {
+				if ((s->tf_dmt2 & DMT_VALID) && (!suppress2)) {
 					db_printf("dmt,d,a2: 0x%08x  0x%08x  0x%08x ",
-						  s->dmt2, s->dmd2, s->dma2);
-					db_find_xtrn_sym_and_offset((db_addr_t)s->dma2,
+						  s->tf_dmt2, s->tf_dmd2, s->tf_dma2);
+					db_find_xtrn_sym_and_offset((db_addr_t)s->tf_dma2,
 								    &name, &offset);
 					if (name != 0 && (unsigned)offset <= db_maxoff)
 						db_printf("%s+0x%08x", name, (unsigned)offset);
 					db_printf("\n          ");
-					m88k_dmx_print(s->dmt2, s->dmd2, s->dma2, 2);
+					m88k_dmx_print(s->tf_dmt2, s->tf_dmd2, s->tf_dma2, 2);
 					db_printf("\n");
 				}
 			}
+
+			db_printf("fault code %d\n",
+			    CMMU_PFSR_FAULT(s->tf_dpfsr));
 		}
 	}
+#endif	/* M88100 */
 
-	if (s->fpecr & 255) { /* floating point error occurred */
+	if (s->tf_fpecr & 255) { /* floating point error occurred */
 		db_printf("fpecr: 0x%08x fpsr: 0x%08x fpcr: 0x%08x\n",
-			  s->fpecr, s->fpsr, s->fpcr);
+			  s->tf_fpecr, s->tf_fpsr, s->tf_fpcr);
+#ifdef M88100
 		if (cputyp != CPU_88110) {
 			db_printf("fcr1-4: 0x%08x  0x%08x  0x%08x  0x%08x\n",
-				  s->fphs1, s->fpls1, s->fphs2, s->fpls2);
+				  s->tf_fphs1, s->tf_fpls1, s->tf_fphs2, s->tf_fpls2);
 			db_printf("fcr5-8: 0x%08x  0x%08x  0x%08x  0x%08x\n",
-				  s->fppt, s->fprh, s->fprl, s->fpit);
+				  s->tf_fppt, s->tf_fprh, s->tf_fprl, s->tf_fpit);
 		}
+#endif
 	}
 	db_printf("\n");
 }
@@ -360,15 +356,11 @@ void
 m88k_db_registers(addr, have_addr, count, modif)
 	db_expr_t addr;
 	int have_addr;
-	int count;
+	db_expr_t count;
 	char *modif;
 {
 	m88k_db_print_frame((db_expr_t)DDB_REGS, TRUE, 0, modif);
 }
-
-/************************/
-/* PAUSE ****************/
-/************************/
 
 /*
  * pause for 2*ticks many cycles
@@ -382,25 +374,20 @@ m88k_db_pause(ticks)
 }
 
 /*
- *  m88k_db_trap - field a TRACE or BPT trap
+ * m88k_db_trap - field a TRACE or BPT trap
+ * Note that only the tf_regs part of the frame is valid - some ddb routines
+ * invoke this function with a promoted struct reg!
  */
 void
-m88k_db_trap(type, regs)
+m88k_db_trap(type, frame)
 	int type;
-	register struct m88100_saved_state *regs;
+	struct trapframe *frame;
 {
-#if 0
-	int i;
 
-	if ((i = db_spl()) != 7)
-		db_printf("WARNING: spl is not high in m88k_db_trap (spl=%x)\n", i);
-#endif /* 0 */
-
-	if (db_are_interrupts_disabled())
+	if (get_psr() & (1 << PSR_INTERRUPT_DISABLE_BIT))
 		db_printf("WARNING: entered debugger with interrupts disabled\n");
 
 	switch(type) {
-    
 	case T_KDB_BREAK:
 	case T_KDB_TRACE:
 	case T_KDB_ENTRY:
@@ -414,24 +401,20 @@ m88k_db_trap(type, regs)
 			/*NOTREACHED*/
 		}
 	}
-    
-	ddb_regs = *regs;
-    
+
+	ddb_regs = frame->tf_regs;
+
 	db_active++;
 	cnpollc(TRUE);
 	db_trap(type, 0);
 	cnpollc(FALSE);
 	db_active--;
 
-	*regs = ddb_regs;
-
-#if 0
-	(void) spl7();
-#endif
+	frame->tf_regs = ddb_regs;
 }
 
-extern char *trap_type[];
-extern int trap_types;
+extern const char *trap_type[];
+extern const int trap_types;
 
 /*
  * Print trap reason.
@@ -439,14 +422,14 @@ extern int trap_types;
 void
 kdbprinttrap(type, code)
 	int type, code;
-{       
+{
 	printf("kernel: ");
 	if (type >= trap_types || type < 0)
-		printf("type %d", type); 
-	else    
+		printf("type %d", type);
+	else
 		printf("%s", trap_type[type]);
 	printf(" trap\n");
-}       
+}
 
 void
 Debugger()
@@ -461,8 +444,9 @@ ddb_nmi_trap(level, eframe)
 	int level;
 	db_regs_t *eframe;
 {
-	NOISY(db_printf("kernel: nmi interrupt\n");)
-	m88k_db_trap(T_KDB_ENTRY, eframe);
+	if (db_noisy)
+		db_printf("kernel: nmi interrupt\n");
+	m88k_db_trap(T_KDB_ENTRY, (struct trapframe *)eframe);
 
 	return 0;
 }
@@ -480,13 +464,13 @@ ddb_break_trap(type, eframe)
 	int type;
 	db_regs_t *eframe;
 {
-	m88k_db_trap(type, eframe);
+	m88k_db_trap(type, (struct trapframe *)eframe);
 
 	if (type == T_KDB_BREAK) {
 		/*
 		 * back up an instruction and retry the instruction
-		 * at the breakpoint address.  mc88110's exip reg 
-		 * already has the adress of the exception instruction.
+		 * at the breakpoint address.  mc88110's exip reg
+		 * already has the address of the exception instruction.
 		 */
 		if (cputyp != CPU_88110) {
 		eframe->sfip = eframe->snip;
@@ -503,7 +487,7 @@ ddb_entry_trap(level, eframe)
 	int level;
 	db_regs_t *eframe;
 {
-	m88k_db_trap(T_KDB_ENTRY, eframe);
+	m88k_db_trap(T_KDB_ENTRY, (struct trapframe *)eframe);
 
 	return 0;
 }
@@ -514,32 +498,29 @@ ddb_entry_trap(level, eframe)
  */
 /* error trap - unreturnable */
 void
-ddb_error_trap(error, eframe)
+ddb_error_trap(error, regs)
 	char *error;
-	db_regs_t *eframe;
+	db_regs_t *regs;
 {
-	db_printf("KERNEL:  terminal error [%s]\n",(int)error);
+	db_printf("KERNEL:  terminal error [%s]\n", error);
 	db_printf("KERNEL:  Exiting debugger will cause abort to rom\n");
-	db_printf("at 0x%x ", eframe->sxip & ~3);
-	db_printf("dmt0 0x%x dma0 0x%x", eframe->dmt0, eframe->dma0);
+	db_printf("at 0x%x ", regs->sxip & XIP_ADDR);
+	db_printf("dmt0 0x%x dma0 0x%x", regs->dmt0, regs->dma0);
 	m88k_db_pause(1000000);
-	m88k_db_trap(T_KDB_BREAK, eframe);
+	m88k_db_trap(T_KDB_BREAK, (struct trapframe *)regs);
 }
 
 /*
  * Read bytes from kernel address space for debugger.
  */
 void
-db_read_bytes(addr, size, data)
-	vm_offset_t     addr;
-	register int    size;
-	register char   *data;
+db_read_bytes(db_addr_t addr, size_t size, char *data)
 {
-	register char	*src;
+	char *src;
 
 	src = (char *)addr;
 
-	while(--size >= 0) {
+	while(size-- > 0) {
 		*data++ = *src++;
 	}
 }
@@ -551,25 +532,20 @@ db_read_bytes(addr, size, data)
  * write access in pmap_bootstrap()). XXX nivas
  */
 void
-db_write_bytes(addr, size, data)
-	char *addr;
-	int size;
-	char *data;
+db_write_bytes(db_addr_t addr, size_t size, char *data)
 {
-	register char *dst;
-	vm_offset_t physaddr;
-	int i = size;
+	char *dst;
+	paddr_t physaddr;
+	psize_t psize = size;
 
 	dst = (char *)addr;
-	
-	while (--size >= 0) {
-#if 0
-		db_printf("byte %x\n", *data);
-#endif
-		*dst++ = *data++;    
+
+	while (size-- > 0) {
+		*dst++ = *data++;
 	}
-	pmap_extract(pmap_kernel(), (vm_offset_t)addr, &physaddr);
-	cmmu_flush_cache(physaddr, i); 
+	/* XXX test return value */
+	pmap_extract(pmap_kernel(), (vaddr_t)addr, &physaddr);
+	cmmu_flush_cache(cpu_number(), physaddr, psize);
 }
 
 /* to print a character to the console */
@@ -598,20 +574,17 @@ m88k_db_where(addr, have_addr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-	struct m88100_saved_state *s;
 	char *name;
-	int *offset;
-	int l;
+	db_expr_t offset;
+	db_addr_t l;
 
-	s = DDB_REGS;
+	l = PC_REGS(DDB_REGS); /* clear low bits */
 
-	l = m88k_pc(s); /* clear low bits */
-
-	db_find_xtrn_sym_and_offset((db_addr_t) l,&name, (db_expr_t*)&offset);
+	db_find_xtrn_sym_and_offset(l, &name, &offset);
 	if (name && (unsigned)offset <= db_maxoff)
-		db_printf("stopped at 0x%x  (%s+0x%x)\n", l, name, offset);
+		db_printf("stopped at 0x%lx  (%s+0x%x)\n", l, name, offset);
 	else
-		db_printf("stopped at 0x%x\n", l);
+		db_printf("stopped at 0x%lx\n", l);
 }
 
 /*
@@ -630,9 +603,6 @@ m88k_db_frame_search(addr, have_addr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-#if 1
-	db_printf("sorry, frame search currently disabled.\n");
-#else
 	if (have_addr)
 		addr &= ~3; /* round to word */
 	else
@@ -640,15 +610,12 @@ m88k_db_frame_search(addr, have_addr, count, modif)
 
 	/* walk back up stack until 8k boundry, looking for 0 */
 	while (addr & ((8 * 1024) - 1)) {
-		int i;
-		db_read_bytes(addr, 4, &i);
-		if (i == 0 && frame_is_sane((db_regs_t *)i))
-			db_printf("frame found at 0x%x\n", i);
+		if (frame_is_sane((db_regs_t *)addr, 1) != 0)
+			db_printf("frame found at 0x%x\n", addr);
 		addr += 4;
 	}
 
 	db_printf("(Walked back until 0x%x)\n",addr);
-#endif
 }
 
 /* flush icache */
@@ -662,7 +629,7 @@ m88k_db_iflush(addr, have_addr, count, modif)
 	addr = 0;
 #ifdef may_be_removed
 	cmmu_remote_set(addr, CMMU_SCR, 0, CMMU_FLUSH_CACHE_CBI_ALL);
-#endif 
+#endif
 }
 
 /* flush dcache */
@@ -677,7 +644,7 @@ m88k_db_dflush(addr, have_addr, count, modif)
 	addr = 0;
 #ifdef may_be_removed
 	cmmu_remote_set(addr, CMMU_SCR, 1, CMMU_FLUSH_CACHE_CBI_ALL);
-#endif 
+#endif
 }
 
 /* probe my cache */
@@ -715,7 +682,7 @@ m88k_db_peek(addr, have_addr, count, modif)
 		  (unsigned)cmmu_remote_get(0, CMMU_CTP1, 0),
 		  (unsigned)cmmu_remote_get(0, CMMU_CTP2, 0),
 		  (unsigned)cmmu_remote_get(0, CMMU_CTP3, 0));
-#endif 
+#endif
 }
 
 
@@ -773,7 +740,7 @@ m88k_db_translate(addr, have_addr, count, modif)
 		while (c = *modif++, c != 0) {
 			switch (c) {
 			default:
-				db_printf("bad modifier [%c]\n", c); 
+				db_printf("bad modifier [%c]\n", c);
 				wanthelp = 1;
 				break;
 			case 'h':
@@ -817,11 +784,6 @@ m88k_db_cmmucfg(addr, have_addr, count, modif)
 	cmmu_dump_config();
 }
 
-void cpu_interrupt_to_db(cpu_no)
-	int cpu_no;
-{
-}
-
 void
 m88k_db_prom_cmd(addr, have_addr, count, modif)
 	db_expr_t addr;
@@ -836,88 +798,28 @@ m88k_db_prom_cmd(addr, have_addr, count, modif)
 /* COMMAND TABLE / INIT */
 /************************/
 
-struct db_command m88k_cache_cmds[] =
-{
-	{ "iflush",    m88k_db_iflush, 0, 0},
-	{ "dflush",    m88k_db_dflush, 0, 0},
-	{ "peek",      m88k_db_peek, 0, 0},
-	{ (char *) 0,}
+struct db_command m88k_cache_cmds[] = {
+	{ "iflush",	m88k_db_iflush,	0,	NULL },
+	{ "dflush",	m88k_db_dflush,	0,	NULL },
+	{ "peek",	m88k_db_peek,	0,	NULL },
+	{ NULL,		NULL,		0,	NULL }
 };
 
-struct db_command db_machine_cmds[] =
-{
-	{"cache",           0,                      0, m88k_cache_cmds},
-	{"frame",           m88k_db_print_frame,    0, 0},
-	{"regs",            m88k_db_registers,      0, 0},
-	{"noise",           m88k_db_noise,          0, 0},
-	{"searchframe",     m88k_db_frame_search,   0, 0},
-	{"translate",       m88k_db_translate,      0, 0},
-	{"cmmucfg",         m88k_db_cmmucfg,        0, 0},
-	{"where",           m88k_db_where,          0, 0},
-	{"prom",            m88k_db_prom_cmd,       0, 0},
-	{(char  *) 0,}
+struct db_command db_machine_cmds[] = {
+	{ "cache",	NULL,			0,	m88k_cache_cmds },
+	{ "frame",	m88k_db_print_frame,	0,	NULL },
+	{ "regs",	m88k_db_registers,	0,	NULL },
+	{ "noise",	m88k_db_noise,		0,	NULL },
+	{ "searchframe",m88k_db_frame_search,	0,	NULL },
+	{ "translate",	m88k_db_translate,	0,	NULL },
+	{ "cmmucfg",	m88k_db_cmmucfg,	0,	NULL },
+	{ "where",	m88k_db_where,		0,	NULL },
+	{ "prom",	m88k_db_prom_cmd,	0,	NULL },
+	{ NULL,		NULL,			0,	NULL }
 };
 
-/*
- * Called from "m88k/m1x7_init.c"
- */
 void
 db_machine_init()
 {
 	db_machine_commands_install(db_machine_cmds);
 }
-
-/*
- * Attempt to figure out the UX name of the task.
- * This is kludgy at best... we can't even be sure the task is a UX task...
- */
-#define TOP_OF_USER_STACK USRSTACK
-#define MAX_DISTANCE_TO_LOOK (1024 * 10)
-
-#define DB_TASK_NAME_LEN 50
-
-char *
-db_task_name()
-{
-	static unsigned buffer[(DB_TASK_NAME_LEN + 5) / sizeof(unsigned)];
-	unsigned ptr = (vm_offset_t)(TOP_OF_USER_STACK - 4);
-	unsigned limit = ptr - MAX_DISTANCE_TO_LOOK;
-	unsigned word;
-	int i;
-
-	/* skip zeros at the end */
-	while (ptr > limit &&
-	       (i = db_trace_get_val((vm_offset_t)ptr, &word)) && (word == 0)) {
-		ptr -= 4; /* continue looking for a non-null word */
-	}
-
-	if (ptr <= limit) {
-		db_printf("bad name at line %d\n", __LINE__);
-		return "<couldn't find 1>";
-	} else if (i != 1) {
-		return "<nostack>";
-	}
-
-	/* skip looking for null before all the text */
-	while (ptr > limit &&
-	       (i = db_trace_get_val(ptr, &word)) && (word != 0)) {
-		ptr -= 4; /* continue looking for a null word */
-	}
-
-	if (ptr <= limit) {
-		db_printf("bad name at line %d\n", __LINE__);
-		return "<couldn't find 2>";
-	} else if (i != 1) {
-		db_printf("bad name read of %x at line %d\n", ptr, __LINE__);
-		return "<bad read 2>";
-	}
-
-	ptr += 4; /* go back to the non-null word after this one */
-
-	for (i = 0; i < sizeof(buffer); i++, ptr += 4) {
-		buffer[i] = 0; /* just in case it's not read */
-		db_trace_get_val((vm_offset_t)ptr, &buffer[i]);
-	}
-	return (char *)buffer;
-}
-

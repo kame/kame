@@ -1,7 +1,7 @@
-/*	$OpenBSD: gdt_common.c,v 1.26 2003/06/28 23:56:40 avsm Exp $	*/
+/*	$OpenBSD: gdt_common.c,v 1.27.2.1 2004/04/30 21:54:27 brad Exp $	*/
 
 /*
- * Copyright (c) 1999, 2000 Niklas Hallqvist.  All rights reserved.
+ * Copyright (c) 1999, 2000, 2003 Niklas Hallqvist.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -58,7 +58,7 @@ int gdt_maxcmds = GDT_MAXCMDS;
 #endif
 
 #define GDT_DRIVER_VERSION 1
-#define GDT_DRIVER_SUBVERSION 1
+#define GDT_DRIVER_SUBVERSION 2
 
 int	gdt_async_event(struct gdt_softc *, int);
 void	gdt_chain(struct gdt_softc *);
@@ -157,8 +157,7 @@ gdt_attach(gdt)
 	gdt->sc_link.adapter_softc = gdt;
 	gdt->sc_link.adapter = &gdt_switch;
 	gdt->sc_link.device = &gdt_dev;
-	/* XXX what is optimal? */
-	gdt->sc_link.openings = GDT_MAXCMDS;
+	/* openings will be filled in later. */
 	gdt->sc_link.adapter_buswidth =
 	    (gdt->sc_class & GDT_FC) ? GDT_MAXID : GDT_MAX_HDRIVES;
 	gdt->sc_link.adapter_target = gdt->sc_link.adapter_buswidth;
@@ -176,19 +175,6 @@ gdt_attach(gdt)
 		return (1);
 	}
 
-	if (!gdt_internal_cmd(gdt, GDT_CACHESERVICE, GDT_MOUNT, 0xffff, 1,
-	    0)) {
-		printf("cache service mount error %d\n",
-		    gdt->sc_status);
-		return (1);
-	}
-
-	if (!gdt_internal_cmd(gdt, GDT_CACHESERVICE, GDT_INIT, GDT_LINUX_OS, 0,
-	    0)) {
-		printf("cache service post-mount initialization error %d\n",
-		    gdt->sc_status);
-		return (1);
-	}
 	cdev_cnt = (u_int16_t)gdt->sc_info;
 
 	/* Detect number of busses */
@@ -348,12 +334,16 @@ gdt_attach(gdt)
 
 	/* XXX Linux reserve drives here, potentially */
 
+	gdt->sc_ndevs = 0;
 	/* Scan for cache devices */
 	for (i = 0; i < cdev_cnt && i < GDT_MAX_HDRIVES; i++)
 		if (gdt_internal_cmd(gdt, GDT_CACHESERVICE, GDT_INFO, i, 0,
 		    0)) {
 			gdt->sc_hdr[i].hd_present = 1;
 			gdt->sc_hdr[i].hd_size = gdt->sc_info;
+
+			if (gdt->sc_hdr[i].hd_size > 0)
+				gdt->sc_ndevs++;
 
 			/*
 			 * Evaluate mapping (sectors per head, heads per cyl)
@@ -377,6 +367,12 @@ gdt_attach(gdt)
 			    GDT_DEVTYPE, i, 0, 0))
 				gdt->sc_hdr[i].hd_devtype = gdt->sc_info;
 		}
+
+	if (gdt->sc_ndevs == 0)
+		gdt->sc_link.openings = 0;
+	else
+		gdt->sc_link.openings = (GDT_MAXCMDS - GDT_CMD_RESERVE) /
+		    gdt->sc_ndevs;
 
 	printf("dpmem %x %d-bus %d cache device%s\n", gdt->sc_dpmembase,
 	    gdt->sc_bus_cnt, cdev_cnt, cdev_cnt == 1 ? "" : "s");
@@ -714,7 +710,12 @@ gdt_exec_ccb(ccb)
 	u_int32_t sg_canz;
 	bus_dmamap_t xfer;
 	int i;
+#if 1 /* XXX */
+	static int __level = 0;
 
+	if (__level++ > 0)
+		panic("level > 0");
+#endif
 	GDT_DPRINTF(GDT_D_CMD, ("gdt_exec_ccb(%p, %p) ", xs, ccb));
 
 	gdt->sc_cmd_cnt = 0;
@@ -808,6 +809,9 @@ gdt_exec_ccb(ccb)
 		printf("%s: DPMEM overflow\n", gdt->sc_dev.dv_xname);
 		gdt_free_ccb(gdt, ccb);
 		xs->error = XS_BUSY;
+#if 1 /* XXX */
+		__level--;
+#endif
 		return (0);
 	}
 
@@ -816,6 +820,9 @@ gdt_exec_ccb(ccb)
 
 	xs->error = XS_NOERROR;
 	xs->resid = 0;
+#if 1 /* XXX */
+	__level--;
+#endif
 	return (1);
 }
 

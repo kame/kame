@@ -1,4 +1,4 @@
-/*	$OpenBSD: gidt.S,v 1.26 2003/06/03 20:22:12 mickey Exp $	*/
+/*	$OpenBSD: gidt.S,v 1.28 2004/03/19 13:48:18 tom Exp $	*/
 
 /*
  * Copyright (c) 1997 Michael Shalayeff
@@ -36,11 +36,7 @@
 #undef _LOCORE
 #include <assym.h>
 
-#define	SNULL	0x00
-#define S32TEXT	0x08
-#define	S32DATA	0x10
-#define S16TEXT	0x18
-#define	S16DATA	0x20
+#include "gidt.h"
 
 #ifdef GIDT_DEBUG
 #define	gidt_debug0		; \
@@ -167,8 +163,13 @@ pmm_init:
 	ret
 
 
+#ifdef __STDC__
+#define IPROC(n)	X##n
+#define IEMU(n)		IPROC(emu##n)
+#else
 #define IPROC(n)	X/**/n
 #define IEMU(n)		IPROC(emu/**/n)
+#endif
 	.align 8, 0x90
 idt:
 #define idte(e)	\
@@ -185,7 +186,11 @@ idt:
 		/* Maskable interrupts (32-255) */
 		/* BIOS entry points (32-63) */
 		/* DOS entry points (64-80) */
+#ifdef __STDC__
+#define idtb(b)	idte(emu##b)
+#else
 #define idtb(b)	idte(emu/**/b)
+#endif
 	idtb(0);  idtb(1);  idtb(2);  idtb(3);  idtb(4);  idtb(5)
 	idtb(6);  idtb(7);  idtb(8);  idtb(9);  idtb(10); idtb(11)
 	idtb(12); idtb(13); idtb(14); idtb(15); idtb(16); idtb(17)
@@ -195,11 +200,13 @@ idt:
 	idtb(36); idtb(37); idtb(38); idtb(39); idtb(40); idtb(41)
 	idtb(42); idtb(43); idtb(44); idtb(45); idtb(46); idtb(47)
 #undef idte
+	.globl	Idtr
 Idtr:	.word	. - idt - 1
 	.long	idt
 	.word	0
 
 	.align	8
+	.globl	Idtr_real
 Idtr_real:	.word	1023
 		.long	0
 		.word	0

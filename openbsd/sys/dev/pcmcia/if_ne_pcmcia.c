@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ne_pcmcia.c,v 1.72 2003/06/25 17:35:37 miod Exp $	*/
+/*	$OpenBSD: if_ne_pcmcia.c,v 1.74 2003/11/17 19:48:51 fgsch Exp $	*/
 /*	$NetBSD: if_ne_pcmcia.c,v 1.17 1998/08/15 19:00:04 thorpej Exp $	*/
 
 /*
@@ -208,6 +208,10 @@ const struct ne2000dev {
       PCMCIA_CIS_GVC_NP0335,
       0, -1, { 0x00, 0x40, 0x05 } },
 
+    { PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID,
+      PCMCIA_CIS_RELIA_RE2408T,
+      0, -1, { 0x00, 0xc0, 0x0c } },
+
     /*
      * You have to add new entries which contains
      * PCMCIA_VENDOR_INVALID and/or PCMCIA_PRODUCT_INVALID
@@ -360,6 +364,10 @@ const struct ne2000dev {
 
     { PCMCIA_VENDOR_COREGA, PCMCIA_PRODUCT_COREGA_ETHER_II_PCC_T,
       PCMCIA_CIS_COREGA_ETHER_II_PCC_T,
+      0, -1, { 0x00, 0x00, 0xf4 } },
+
+    { PCMCIA_VENDOR_COREGA, PCMCIA_PRODUCT_COREGA_ETHER_II_PCC_TD,
+      PCMCIA_CIS_COREGA_ETHER_II_PCC_TD,
       0, -1, { 0x00, 0x00, 0xf4 } },
 
     { PCMCIA_VENDOR_COREGA, PCMCIA_PRODUCT_COREGA_FAST_ETHER_PCC_TX,

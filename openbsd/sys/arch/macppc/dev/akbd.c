@@ -1,4 +1,4 @@
-/*	$OpenBSD: akbd.c,v 1.14 2002/09/15 09:01:58 deraadt Exp $	*/
+/*	$OpenBSD: akbd.c,v 1.16 2003/10/16 03:54:48 deraadt Exp $	*/
 /*	$NetBSD: akbd.c,v 1.13 2001/01/25 14:08:55 tsubai Exp $	*/
 
 /*
@@ -115,10 +115,7 @@ struct wskbd_mapdata akbd_keymapdata = {
 static int akbd_is_console;
 
 static int
-akbdmatch(parent, cf, aux)
-	struct device *parent;
-	void *cf;
-	void   *aux;
+akbdmatch(struct device *parent, void *cf, void *aux)
 {
 	struct adb_attach_args *aa_args = aux;
 
@@ -129,9 +126,7 @@ akbdmatch(parent, cf, aux)
 }
 
 static void
-akbdattach(parent, self, aux)
-	struct device *parent, *self;
-	void   *aux;
+akbdattach(struct device *parent, struct device *self, void *aux)
 {
 	ADBSetInfoBlock adbinfo;
 	struct akbd_softc *sc = (struct akbd_softc *)self;
@@ -266,11 +261,8 @@ akbdattach(parent, self, aux)
  * Handle putting the keyboard data received from the ADB into
  * an ADB event record.
  */
-void 
-kbd_adbcomplete(buffer, data_area, adb_command)
-	caddr_t buffer;
-	caddr_t data_area;
-	int adb_command;
+void
+kbd_adbcomplete(caddr_t buffer, caddr_t data_area, int adb_command)
 {
 	adb_event_t event;
 	struct akbd_softc *ksc;
@@ -307,14 +299,12 @@ kbd_adbcomplete(buffer, data_area, adb_command)
 }
 
 /*
- * Given a keyboard ADB event, record the keycodes and call the key 
+ * Given a keyboard ADB event, record the keycodes and call the key
  * repeat handler, optionally passing the event through the mouse
  * button emulation handler first.
  */
 static void
-kbd_processevent(event, ksc)
-        adb_event_t *event;
-        struct akbd_softc *ksc;
+kbd_processevent(adb_event_t *event, struct akbd_softc *ksc)
 {
         adb_event_t new_event;
 
@@ -342,8 +332,7 @@ kbd_processevent(event, ksc)
  * Get the actual hardware LED state and convert it to softc format.
  */
 static u_char
-getleds(addr)
-	int	addr;
+getleds(int addr)
 {
 	short cmd;
 	u_char buffer[9], leds;
@@ -362,14 +351,12 @@ getleds(addr)
 
 /*
  * Set the keyboard LED's.
- * 
+ *
  * Automatically translates from ioctl/softc format to the
  * actual keyboard register format
  */
-static int 
-setleds(ksc, leds)
-	struct akbd_softc *ksc;
-	u_char	leds;
+static int
+setleds(struct akbd_softc *ksc, u_char leds)
 {
 	int addr;
 	short cmd;
@@ -401,15 +388,14 @@ setleds(ksc, leds)
 	if ((buffer[2] & 0xf8) != leds)
 		return (EIO);
 	else
-		return (0); 
+		return (0);
 }
 
 /*
  * Toggle all of the LED's on and off, just for show.
  */
-static void 
-blinkleds(ksc)
-	struct akbd_softc *ksc;
+static void
+blinkleds(struct akbd_softc *ksc)
 {
 	int addr, i;
 	u_char blinkleds, origleds;
@@ -427,34 +413,25 @@ blinkleds(ksc)
 	i = 10;
 	do {
 		(void)setleds(ksc, (u_char)0x00);
-	} while (setleds(ksc, (u_char)0x00) && (i-- > 0)); 
+	} while (setleds(ksc, (u_char)0x00) && (i-- > 0));
 
 	return;
 }
 #endif
 
 int
-akbd_enable(v, on)
-	void *v;
-	int on;
+akbd_enable(void *v, int on)
 {
 	return 0;
 }
 
 void
-akbd_set_leds(v, on)
-	void *v;
-	int on;
+akbd_set_leds(void *v, int on)
 {
 }
 
 int
-akbd_ioctl(v, cmd, data, flag, p)
-	void *v;
-	u_long cmd;
-	caddr_t data;
-	int flag;
-	struct proc *p;
+akbd_ioctl(void *v, u_long cmd, caddr_t data, int flag, struct proc *p)
 {
 #ifdef WSDISPLAY_COMPAT_RAWKBD
 	struct akbd_softc *sc = v;
@@ -490,7 +467,7 @@ akbd_rawrepeat(void *v)
 	struct akbd_softc *sc = v;
 	int s;
 
-	s = spltty();   
+	s = spltty();
 	wskbd_rawinput(sc->sc_wskbddev, sc->sc_rep, sc->sc_nrep);
 	splx(s);
 	timeout_add(&sc->sc_rawrepeat_ch, hz * REP_DELAYN / 1000);
@@ -501,8 +478,7 @@ akbd_rawrepeat(void *v)
 static int polledkey;
 
 int
-akbd_intr(event)
-	adb_event_t *event;
+akbd_intr(adb_event_t *event)
 {
 	int key, press, val;
 	int type;
@@ -554,7 +530,7 @@ akbd_intr(event)
 #ifdef WSDISPLAY_COMPAT_RAWKBD
 	} else if (sc->sc_rawkbd) {
 		char cbuf[MAXKEYS *2];
-		int c, j, s; 
+		int c, j, s;
 		int npress;
 
 		j = npress = 0;
@@ -601,10 +577,7 @@ akbd_cnattach()
 }
 
 void
-akbd_cngetc(v, type, data)
-	void *v;
-	u_int *type;
-	int *data;
+akbd_cngetc(void *v, u_int *type, int *data)
 {
 	int key, press, val;
 	int s;
@@ -631,8 +604,6 @@ akbd_cngetc(v, type, data)
 }
 
 void
-akbd_cnpollc(v, on)
-	void *v;
-	int on;
+akbd_cnpollc(void *v, int on)
 {
 }

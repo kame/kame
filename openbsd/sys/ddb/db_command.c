@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_command.c,v 1.31 2003/05/12 19:56:03 mickey Exp $	*/
+/*	$OpenBSD: db_command.c,v 1.34 2004/03/15 12:56:29 aaron Exp $	*/
 /*	$NetBSD: db_command.c,v 1.20 1996/03/30 22:30:05 christos Exp $	*/
 
 /* 
@@ -36,6 +36,7 @@
 #include <sys/reboot.h>
 #include <sys/extent.h>
 #include <sys/pool.h>
+#include <sys/msgbuf.h>
 
 #include <uvm/uvm_extern.h>
 #include <machine/db_machdep.h>		/* type definitions */
@@ -467,6 +468,7 @@ struct db_command db_command_table[] = {
 	{ "boot",	NULL,			0,		db_boot_cmds },
 	{ "help",	db_help_cmd,		0,		NULL },
 	{ "hangman",	db_hangman,		0,		NULL },
+	{ "dmesg",	db_dmesg_cmd,		0,		NULL },
 	{ NULL, 	NULL,			0,		NULL }
 };
 
@@ -609,7 +611,7 @@ db_boot_sync_cmd(addr, haddr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-	boot(RB_AUTOBOOT | RB_TIMEBAD);
+	boot(RB_AUTOBOOT | RB_TIMEBAD | RB_USERREQ);
 }
 
 void
@@ -619,7 +621,7 @@ db_boot_crash_cmd(addr, haddr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-	boot(RB_NOSYNC | RB_DUMP | RB_TIMEBAD);
+	boot(RB_NOSYNC | RB_DUMP | RB_TIMEBAD | RB_USERREQ);
 }
 
 void
@@ -629,7 +631,7 @@ db_boot_dump_cmd(addr, haddr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-	boot(RB_DUMP | RB_TIMEBAD);
+	boot(RB_DUMP | RB_TIMEBAD | RB_USERREQ);
 }
 
 void
@@ -639,7 +641,7 @@ db_boot_halt_cmd(addr, haddr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-	boot(RB_NOSYNC | RB_HALT | RB_TIMEBAD);
+	boot(RB_NOSYNC | RB_HALT | RB_TIMEBAD | RB_USERREQ);
 }
 
 void
@@ -649,7 +651,7 @@ db_boot_reboot_cmd(addr, haddr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-	boot(RB_AUTOBOOT | RB_NOSYNC | RB_TIMEBAD);
+	boot(RB_AUTOBOOT | RB_NOSYNC | RB_TIMEBAD | RB_USERREQ);
 }
 
 void
@@ -659,7 +661,32 @@ db_boot_poweroff_cmd(addr, haddr, count, modif)
 	db_expr_t count;
 	char *modif;
 {
-	boot(RB_NOSYNC | RB_HALT | RB_POWERDOWN | RB_TIMEBAD);
+	boot(RB_NOSYNC | RB_HALT | RB_POWERDOWN | RB_TIMEBAD | RB_USERREQ);
+}
+
+void
+db_dmesg_cmd(addr, haddr, count, modif)
+	db_expr_t addr;
+	int	haddr;
+	db_expr_t count;
+	char	*modif;
+{
+	int i, off;
+	char *p;
+
+	if (!msgbufp || msgbufp->msg_magic != MSG_MAGIC)
+		return;
+	off = msgbufp->msg_bufx;
+	if (off > msgbufp->msg_bufs)
+		off = 0;
+	for (i = 0, p = msgbufp->msg_bufc + off;
+	    i < msgbufp->msg_bufs; i++, p++) {
+		if (p > msgbufp->msg_bufc + msgbufp->msg_bufs)
+			p = msgbufp->msg_bufc;
+		if (*p != '\0')
+			db_putchar(*p);
+	}
+	db_putchar('\n');
 }
 
 void

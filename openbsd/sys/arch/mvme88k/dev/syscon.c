@@ -1,4 +1,4 @@
-/*	$OpenBSD: syscon.c,v 1.11 2003/06/02 07:06:56 deraadt Exp $ */
+/*	$OpenBSD: syscon.c,v 1.15 2004/01/14 20:52:52 miod Exp $ */
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
  * All rights reserved.
@@ -67,17 +67,17 @@ struct sysconreg syscon_reg = {
    (unsigned int *volatile)RMAD_REG,	(unsigned int *volatile)WVAD_REG,
    (unsigned int *volatile)RVAD_REG,	(unsigned int *volatile)CIO_PORTC,
    (unsigned int *volatile)CIO_PORTB,	(unsigned int *volatile)CIO_PORTA,
-   (unsigned int *volatile)CIO_CTRL 
+   (unsigned int *volatile)CIO_CTRL
    };
-  
+
 struct sysconsoftc {
 	struct device	sc_dev;
 	void		*sc_vaddr;	/* Utility I/O space */
 	void		*sc_paddr;
 	struct sysconreg *sc_syscon;	/* the actual registers */
 	struct intrhand sc_abih;	/* `abort' switch */
-	struct intrhand sc_acih;	/* `ac fial' */
-	struct intrhand sc_sfih;	/* `sys fial' */
+	struct intrhand sc_acih;	/* `ac fail' */
+	struct intrhand sc_sfih;	/* `sys fail' */
 	struct intrhand sc_m188ih;	/* `m188 interrupt' */
 };
 
@@ -94,10 +94,10 @@ struct cfattach syscon_ca = {
 };
 
 struct cfdriver syscon_cd = {
-	NULL, "syscon", DV_DULL, 0
+	NULL, "syscon", DV_DULL
 };
 
-struct sysconreg *sys_syscon = NULL;
+struct sysconreg *sys_syscon;
 
 int syscon_print(void *args, const char *bus);
 int syscon_scan(struct device *parent, void *child, void *args);
@@ -111,9 +111,17 @@ sysconmatch(parent, vcf, args)
 	struct sysconreg *syscon;
 
 	/* Don't match if wrong cpu */
-	if (brdtyp != BRD_188) return (0);  /* The only one... */
-	/* Uh, MVME188 better have on of these, so always match if it 
-	 * is a MVME188... */
+	if (brdtyp != BRD_188)
+		return (0);
+
+	/* Only allow one instance */
+	if (sys_syscon != NULL)
+		return (0);
+
+	/*
+	 * Uh, MVME188 better have on of these, so always match if it
+	 * is a MVME188...
+	 */
 	syscon = (struct sysconreg *)(IIOV(ca->ca_paddr));
 	return (1);
 }
@@ -140,11 +148,6 @@ syscon_scan(parent, child, args)
 	struct cfdata *cf = child;
 	struct sysconsoftc *sc = (struct sysconsoftc *)parent;
 	struct confargs oca;
-
-	if (parent->dv_cfdata->cf_driver->cd_indirect) {
-		printf(" indirect devices not supported\n");
-		return 0;
-	}
 
 	bzero(&oca, sizeof oca);
 	oca.ca_offset = cf->cf_loc[0];
@@ -174,9 +177,6 @@ sysconattach(parent, self, args)
 	struct confargs *ca = args;
 	struct sysconsoftc *sc = (struct sysconsoftc *)self;
 
-	if (sys_syscon)
-		panic("syscon already attached!");
-
 	/*
 	 * since we know ourself to land in intiobase land,
 	 * we must adjust our address
@@ -188,7 +188,7 @@ sysconattach(parent, self, args)
 
 	printf(": rev %d\n", 1);
 
-	/* 
+	/*
 	 * pseudo driver, abort interrupt handler
 	 */
 	sc->sc_abih.ih_fn = sysconabort;

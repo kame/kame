@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ipsp.c,v 1.152 2003/05/09 14:59:19 deraadt Exp $	*/
+/*	$OpenBSD: ip_ipsp.c,v 1.156 2004/02/15 12:44:24 markus Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr),
@@ -298,6 +298,36 @@ gettdb(u_int32_t spi, union sockaddr_union *dst, u_int8_t proto)
 
 	return tdbp;
 }
+
+#ifdef TCP_SIGNATURE
+/*
+ * Same as gettdb() but compare SRC as well, so we
+ * use the tdbsrc[] hash table.  Setting spi to 0
+ * matches all SPIs.
+ */
+struct tdb *
+gettdbbysrcdst(u_int32_t spi, union sockaddr_union *src,
+    union sockaddr_union *dst, u_int8_t proto)
+{
+	u_int32_t hashval;
+	struct tdb *tdbp;
+
+	if (tdbsrc == NULL)
+		return (struct tdb *) NULL;
+
+	hashval = tdb_hash(0, src, proto);
+
+	for (tdbp = tdbsrc[hashval]; tdbp != NULL; tdbp = tdbp->tdb_snext)
+		if (tdbp->tdb_sproto == proto &&
+		    (spi == 0 || tdbp->tdb_spi == spi) &&
+		    ((tdbp->tdb_flags & TDBF_INVALID) == 0) &&
+		    !bcmp(&tdbp->tdb_dst, dst, SA_LEN(&dst->sa)) &&
+		    !bcmp(&tdbp->tdb_src, src, SA_LEN(&src->sa)))
+			break;
+
+	return tdbp;
+}
+#endif
 
 /*
  * Check that credentials and IDs match. Return true if so. The t*
@@ -860,6 +890,7 @@ ipsp_print_tdb(struct tdb *tdb, char *buffer, size_t buflen)
 		{ "random padding", TDBF_RANDOMPADDING },
 		{ "skipcrypto", TDBF_SKIPCRYPTO },
 		{ "usedtunnel", TDBF_USEDTUNNEL },
+		{ "udpencap", TDBF_UDPENCAP },
 	};
 	int l, i, k;
 
@@ -945,6 +976,12 @@ ipsp_print_tdb(struct tdb *tdb, char *buffer, size_t buflen)
 	snprintf(buffer + l, buflen - l,
 	    "\tCrypto ID: %llu\n", tdb->tdb_cryptoid);
 	l += strlen(buffer + l);
+
+	if (tdb->tdb_udpencap_port) {
+		snprintf(buffer + l, buflen - l,
+		    "\tudpencap_port = <%u>\n", ntohs(tdb->tdb_udpencap_port));
+		l += strlen(buffer + l);
+	}
 
 	if (tdb->tdb_xform) {
 		snprintf(buffer + l, buflen - l,

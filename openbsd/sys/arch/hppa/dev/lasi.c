@@ -1,4 +1,4 @@
-/*	$OpenBSD: lasi.c,v 1.17 2003/08/28 15:24:19 mickey Exp $	*/
+/*	$OpenBSD: lasi.c,v 1.19 2003/12/01 21:19:56 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998-2003 Michael Shalayeff
@@ -195,6 +195,9 @@ lasiattach(parent, self, aux)
 		break;
 
 	case HPPA_BOARD_HP800_A180C:
+	case HPPA_BOARD_HP778_B132L:
+	case HPPA_BOARD_HP778_B132LP:
+	case HPPA_BOARD_HP778_B160L:
 	case HPPA_BOARD_HP778_B180L:
 	case HPPA_BOARD_HP780_C100:
 	case HPPA_BOARD_HP780_C110:
@@ -202,8 +205,6 @@ lasiattach(parent, self, aux)
 	case HPPA_BOARD_HP779_C160L:
 	case HPPA_BOARD_HP779_C180L:
 	case HPPA_BOARD_HP779_C160L1:
-	case HPPA_BOARD_HP770_J200:
-	case HPPA_BOARD_HP770_J210:
 		if (bus_space_map(ca->ca_iot, 0xf0190000,
 		    4, 0, (bus_space_handle_t *)&machine_ledaddr))
 			machine_ledaddr = NULL;

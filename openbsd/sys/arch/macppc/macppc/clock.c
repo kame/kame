@@ -1,4 +1,4 @@
-/*	$OpenBSD: clock.c,v 1.10 2003/07/29 12:13:32 drahn Exp $	*/
+/*	$OpenBSD: clock.c,v 1.13 2004/01/04 21:07:43 drahn Exp $	*/
 /*	$NetBSD: clock.c,v 1.1 1996/09/30 16:34:40 ws Exp $	*/
 
 /*
@@ -79,7 +79,7 @@ static u_int32_t chiptotime(int sec, int min, int hour, int day, int mon,
     int year);
 
 /* event tracking variables, when the next events of each time should occur */
-u_int64_t nexttimerevent, nextstatevent;
+u_int64_t nexttimerevent, prevtb, nextstatevent;
 
 /* vars for stats */
 int statint;
@@ -170,14 +170,14 @@ static u_int32_t
 chiptotime(int sec, int min, int hour, int day, int mon, int year)
 {
 	int days, yr;
-		
+
 	sec = FROMBCD(sec);
 	min = FROMBCD(min);
 	hour = FROMBCD(hour);
 	day = FROMBCD(day);
 	mon = FROMBCD(mon);
 	year = FROMBCD(year) + YEAR0;
-		
+
 	/* simple sanity checks */
 	if (year < 1970 || mon < 1 || mon > 12 || day < 1 || day > 31)
 		return (0);
@@ -208,14 +208,13 @@ resettodr(void)
 	}
 }
 
-volatile int tickspending, statspending;
+volatile int statspending;
 
 void
 decr_intr(struct clockframe *frame)
 {
 	u_int64_t tb;
 	u_int64_t nextevent;
-	int nticks;
 	int nstats;
 	int s;
 
@@ -232,8 +231,10 @@ decr_intr(struct clockframe *frame)
 	 */
 
 	tb = ppc_mftb();
-	for (nticks = 0; nexttimerevent <= tb; nticks++)
+	while (nexttimerevent <= tb)
 		nexttimerevent += ticks_per_intr;
+
+	prevtb = nexttimerevent - ticks_per_intr;
 
 	for (nstats = 0; nextstatevent <= tb; nstats++) {
 		int r;
@@ -244,7 +245,6 @@ decr_intr(struct clockframe *frame)
 	}
 
 	/* only count timer ticks for CLK_IRQ */
-	intrcnt[PPC_CLK_IRQ] += nticks;
 	intrcnt[PPC_STAT_IRQ] += nstats;
 
 	if (nexttimerevent < nextstatevent)
@@ -258,54 +258,48 @@ decr_intr(struct clockframe *frame)
 	 */
 	ppc_mtdec(nextevent - tb);
 
-	/*
-	 * lasttb is used during microtime. Set it to the virtual
-	 * start of this tick interval.
-	 */
-	lasttb = nexttimerevent - ticks_per_intr;
-
 	if (cpl & SPL_CLOCK) {
-		tickspending += nticks;
 		statspending += nstats;
 	} else {
-		do {
-			nticks += tickspending;
-			nstats += statspending;
-			tickspending = 0;
-			statspending = 0;
+		nstats += statspending;
+		statspending = 0;
 
-			s = splclock();
+		s = splclock();
 
-			/*
-			 * Reenable interrupts
-			 */
-			ppc_intr_enable(1);
-			
-			/*
-			 * Do standard timer interrupt stuff.
-			 * Do softclock stuff only on the last iteration.
-			 */
-			frame->pri = s | SINT_CLOCK;
-			if (nticks > 1)
-				while (--nticks > 1)
-					hardclock(frame);
+		/*
+		 * Reenable interrupts
+		 */
+		ppc_intr_enable(1);
 
-			frame->pri = s;
-			if (nticks)
-				hardclock(frame);
+		/*
+		 * Do standard timer interrupt stuff.
+		 * Do softclock stuff only on the last iteration.
+		 */
+		frame->pri = s | SINT_CLOCK;
+		while (lasttb < prevtb - ticks_per_intr) {
+			/* sync lasttb with hardclock */
+			lasttb += ticks_per_intr;
+			intrcnt[PPC_CLK_IRQ] ++;
+			hardclock(frame);
+		}
 
-			while (nstats-- > 0)
-				statclock(frame);
+		frame->pri = s;
+		while (lasttb < prevtb) {
+			/* sync lasttb with hardclock */
+			lasttb += ticks_per_intr;
+			intrcnt[PPC_CLK_IRQ] ++;
+			hardclock(frame);
+		}
 
-			splx(s);
-			(void) ppc_intr_disable();
+		while (nstats-- > 0)
+			statclock(frame);
 
-			/* if a tick has occurred while dealing with these,
-			 * service it now, do not delay until the next tick.
-			 */
-			nstats = 0;
-			nticks = 0;
-		} while (tickspending != 0 || statspending != 0);
+		splx(s);
+		(void) ppc_intr_disable();
+
+		/* if a tick has occurred while dealing with these,
+		 * dont service it now, delay until the next tick.
+		 */
 	}
 }
 
@@ -355,7 +349,7 @@ calc_delayconst(void)
 	int qhandle, phandle;
 	char name[32];
 	int s;
-	
+
 	/*
 	 * Get this info during autoconf?				XXX
 	 */
@@ -395,13 +389,12 @@ microtime(struct timeval *tvp)
 	u_int64_t tb;
 	u_int32_t ticks;
 	int s;
-	
+
 	s = ppc_intr_disable();
 	tb = ppc_mftb();
-	ticks = (tb - lasttb) * ns_per_tick;
+	ticks = ((tb - lasttb) * ns_per_tick) / 1000;
 	*tvp = time;
 	ppc_intr_enable(s);
-	ticks /= 1000;
 	tvp->tv_usec += ticks;
 	while (tvp->tv_usec >= 1000000) {
 		tvp->tv_usec -= 1000000;
@@ -417,7 +410,7 @@ delay(unsigned n)
 {
 	u_int64_t tb;
 	u_int32_t tbh, tbl, scratch;
-	
+
 	tb = ppc_mftb();
 	tb += (n * 1000 + ns_per_tick - 1) / ns_per_tick;
 	tbh = tb >> 32;

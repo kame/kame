@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.h,v 1.14 2002/12/17 21:54:25 mickey Exp $	*/
+/*	$OpenBSD: intr.h,v 1.16 2003/12/24 01:24:15 mickey Exp $	*/
 
 /*
  * Copyright (c) 2002 Michael Shalayeff
@@ -37,7 +37,6 @@
 #include <machine/psl.h>
 
 #define	CPU_NINTS	32
-#define	CPU_INTITMR	0x80000000
 #define	NIPL		16
 
 #define	IPL_NONE	0
@@ -48,7 +47,6 @@
 #define	IPL_SOFTTTY	5
 #define	IPL_TTY		6
 #define	IPL_VM		7
-#define	IPL_IMP		IPL_VM
 #define	IPL_AUDIO	8
 #define	IPL_CLOCK	9
 #define	IPL_STATCLOCK	10
@@ -117,12 +115,12 @@ splx(int ncpl)
 #define	splnet()	splraise(IPL_NET)
 #define	splsofttty()	splraise(IPL_SOFTTTY)
 #define	spltty()	splraise(IPL_TTY)
-#define	splvm()		splimp()
-#define	splimp()	splraise(IPL_IMP)
+#define	splvm()		splraise(IPL_VM)
+#define	splimp()	splvm()
 #define	splaudio()	splraise(IPL_AUDIO)
 #define	splclock()	splraise(IPL_CLOCK)
+#define	splstatclock()	splraise(IPL_STATCLOCK)
 #define	splhigh()	splraise(IPL_HIGH)
-#define	splstatclock()	splhigh()
 #define	spl0()		spllower(IPL_NONE)
 
 static __inline void

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ibcs2_exec.c,v 1.14 2002/08/22 22:04:42 art Exp $	*/
+/*	$OpenBSD: ibcs2_exec.c,v 1.17 2003/11/18 06:26:15 tedu Exp $	*/
 /*	$NetBSD: ibcs2_exec.c,v 1.12 1996/10/12 02:13:52 thorpej Exp $	*/
 
 /*
@@ -425,10 +425,13 @@ n	 */
 		size_t resid;
 		struct coff_slhdr *slhdr;
 		char buf[128], *bufp;	/* FIXME */
-		int len = sh.s_size, path_index, entry_len;
+		unsigned int len = sh.s_size, entry_len;
 		
 		/* DPRINTF(("COFF shlib size %d offset %d\n",
 			 sh.s_size, sh.s_scnptr)); */
+
+		if (len > sizeof(buf))
+			return (ENOEXEC);
 
 		error = vn_rdwr(UIO_READ, epp->ep_vp, (caddr_t) buf,
 				len, sh.s_scnptr,
@@ -441,11 +444,16 @@ n	 */
 		bufp = buf;
 		while (len) {
 			slhdr = (struct coff_slhdr *)bufp;
+#ifdef notyet
 			path_index = slhdr->path_index * sizeof(long);
+#endif
 			entry_len = slhdr->entry_len * sizeof(long);
 
 			/* DPRINTF(("path_index: %d entry_len: %d name: %s\n",
 				 path_index, entry_len, slhdr->sl_name)); */
+
+			if (entry_len > len)
+				return (ENOEXEC);
 
 			error = coff_load_shlib(p, slhdr->sl_name, epp);
 			if (error)
@@ -616,6 +624,8 @@ exec_ibcs2_xout_prep_nmagic(p, epp, xp, xep)
 	struct xseg *xs;
 
 	/* read in segment table */
+	if (xep->xe_segsize > 16 * sizeof(*xs))
+		return (ENOEXEC);
 	xs = (struct xseg *)malloc(xep->xe_segsize, M_TEMP, M_WAITOK);
 	error = vn_rdwr(UIO_READ, epp->ep_vp, (caddr_t)xs,
 			xep->xe_segsize, xep->xe_segpos,

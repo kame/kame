@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.23 2003/09/02 20:14:08 miod Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.25 2004/02/11 20:41:08 miod Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -61,7 +61,8 @@ void	swapconf(void);
 char	buginchr(void);
 void	dumpconf(void);
 int	findblkmajor(struct device *);
-struct device	*getdisk(char *, int, int, dev_t *);
+struct device *getdisk(char *, int, int, dev_t *);
+struct device *getdevunit(char *name, int unit);
 
 int cold = 1;   /* 1 if still booting */
 
@@ -75,8 +76,6 @@ struct device *bootdv;	/* set by device drivers (if found) */
 void
 cpu_configure()
 {
-	struct consdev *temp;
-	extern struct consdev bootcons;
 
 	if (config_rootfound("mainbus", "mainbus") == 0)
 		panic("no mainbus found");
@@ -85,19 +84,19 @@ cpu_configure()
 	 * Turn external interrupts on.
 	 *
 	 * XXX We have a race here. If we enable interrupts after setroot(),
-	 * the kernel dies. If we enable interrupts here, console on cl does
-	 * not work (for boot -a). So we switch to the boot console for the
-	 * time being...
+	 * the kernel dies.
 	 */
-	temp = cn_tab;
-	cn_tab = &bootcons;
-
 	enable_interrupt();
 	spl0();
 	setroot();
 	swapconf();
 
-	cn_tab = temp;
+	/*
+	 * Finally switch to the real console driver,
+	 * and say goodbye to the BUG!
+	 */
+	cn_tab = NULL;
+	cninit();
 
 	cold = 0;
 }
@@ -108,8 +107,8 @@ cpu_configure()
 void
 swapconf()
 {
-	register struct swdevt *swp;
-	register int nblks;
+	struct swdevt *swp;
+	int nblks;
 
 	for (swp = swdevt; swp->sw_dev != NODEV; swp++)
 		if (bdevsw[major(swp->sw_dev)].d_psize) {
@@ -124,7 +123,7 @@ swapconf()
 }
 
 /*
- * the rest of this file was adapted from Theo de Raadt's code in the 
+ * the rest of this file was adapted from Theo de Raadt's code in the
  * sparc port to nuke the "options GENERIC" stuff.
  */
 
@@ -142,7 +141,7 @@ findblkmajor(dv)
 	struct device *dv;
 {
 	char *name = dv->dv_xname;
-	register int i;
+	int i;
 
 	for (i = 0; i < sizeof(nam2blk)/sizeof(nam2blk[0]); ++i)
 		if (strncmp(name, nam2blk[i].name, strlen(nam2blk[0].name)) == 0)
@@ -156,7 +155,7 @@ getdisk(str, len, defpart, devp)
 	int len, defpart;
 	dev_t *devp;
 {
-	register struct device *dv;
+	struct device *dv;
 
 	if ((dv = parsedisk(str, len, defpart, devp)) == NULL) {
 		printf("use one of:");
@@ -180,8 +179,8 @@ parsedisk(str, len, defpart, devp)
 	int len, defpart;
 	dev_t *devp;
 {
-	register struct device *dv;
-	register char *cp, c;
+	struct device *dv;
+	char *cp, c;
 	int majdev, unit, part;
 
 	if (len == 0)
@@ -229,9 +228,9 @@ parsedisk(str, len, defpart, devp)
 void
 setroot()
 {
-	register struct swdevt *swp;
-	register struct device *dv;
-	register int len, majdev, unit;
+	struct swdevt *swp;
+	struct device *dv;
+	int len, majdev, unit;
 	dev_t nrootdev, nswapdev = NODEV;
 	char buf[128];
 	dev_t temp;

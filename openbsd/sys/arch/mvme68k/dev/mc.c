@@ -1,4 +1,4 @@
-/*	$OpenBSD: mc.c,v 1.11 2003/06/02 05:09:14 deraadt Exp $ */
+/*	$OpenBSD: mc.c,v 1.14 2004/01/14 20:52:49 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -65,7 +65,7 @@ struct cfattach mc_ca = {
 };
 
 struct cfdriver mc_cd = {
-	NULL, "mc", DV_DULL, 0
+	NULL, "mc", DV_DULL
 };
 
 struct mcreg *sys_mc = NULL;
@@ -106,11 +106,6 @@ mc_scan(parent, child, args)
 	struct cfdata *cf = child;
 	struct mcsoftc *sc = (struct mcsoftc *)parent;
 	struct confargs oca;
-
-	if (parent->dv_cfdata->cf_driver->cd_indirect) {
-                printf(" indirect devices not supported\n");
-                return 0;
-        }
 
 	bzero(&oca, sizeof oca);
 	oca.ca_offset = cf->cf_loc[0];
@@ -222,7 +217,7 @@ mc_enableflashwrite(on)
 }
 /*
  * Function to check if we booted from flash or prom.
- * If we booted from PROM, flash mem is avaliable.
+ * If we booted from PROM, flash mem is available.
  */
 int 
 mc_hasflash(void)

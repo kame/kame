@@ -1,4 +1,4 @@
-/*	$OpenBSD: cardbus.c,v 1.7 2003/04/27 11:22:52 ho Exp $ */
+/*	$OpenBSD: cardbus.c,v 1.9 2004/01/26 19:12:52 fgsch Exp $ */
 /*	$NetBSD: cardbus.c,v 1.24 2000/04/02 19:11:37 mycroft Exp $	*/
 
 /*
@@ -372,7 +372,7 @@ parse_tuple(u_int8_t *tuple, int len, void *data)
  * int cardbus_attach_card(struct cardbus_softc *sc)
  *
  *    This function attaches the card on the slot: turns on power,
- *    reads and analyses tuple, sets consifuration index.
+ *    reads and analyses tuple, sets configuration index.
  *
  *    This function returns the number of recognised device functions.
  *    If no functions are recognised, return 0.
@@ -589,6 +589,13 @@ cardbusprint(aux, pnp)
 	printf(" %s at %s", devinfo, pnp);
     }
     printf(" dev %d function %d", ca->ca_device, ca->ca_function);
+
+    if (!pnp) {
+	pci_devinfo(ca->ca_id, ca->ca_class, 1, devinfo, sizeof devinfo);
+	for (i = 0; i < 3 && ca->ca_cis.cis1_info[i]; i++)
+		printf("%s%s", i ? ", " : " \"", ca->ca_cis.cis1_info[i]);
+	printf("\"");
+    }
 
     return UNCONF;
 }

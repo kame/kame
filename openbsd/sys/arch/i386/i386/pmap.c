@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.73 2003/05/23 16:33:35 mpech Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.75 2004/02/01 12:26:45 grange Exp $	*/
 /*	$NetBSD: pmap.c,v 1.91 2000/06/02 17:46:37 thorpej Exp $	*/
 
 /*
@@ -1881,6 +1881,9 @@ pmap_release(pmap)
 		/*
 		 * no need to switch the LDT; this address space is gone,
 		 * nothing is using it.
+		 *
+		 * No need to lock the pmap for ldt_free (or anything else),
+		 * we're the last one to use it.
 		 */
 		ldt_free(pmap);
 		uvm_km_free(kernel_map, (vaddr_t)pmap->pm_ldt,
@@ -2057,6 +2060,7 @@ pmap_virtual_space(startp, endp)
 /*
  * pmap_zero_page: zero a page
  */
+void (*pagezero)(void *, size_t) = bzero;
 
 void
 pmap_zero_page(struct vm_page *pg)
@@ -2070,7 +2074,7 @@ pmap_zero_page(struct vm_page *pg)
 #endif
 
 	*zero_pte = (pa & PG_FRAME) | PG_V | PG_RW;	/* map in */
-	bzero(zerop, NBPG);				/* zero */
+	pagezero(zerop, PAGE_SIZE);				/* zero */
 	*zero_pte = 0;				/* zap! */
 	pmap_update_pg((vaddr_t)zerop);		/* flush TLB */
 	simple_unlock(&pmap_zero_page_lock);
@@ -2090,7 +2094,7 @@ pmap_zero_phys(paddr_t pa)
 #endif
 
 	*zero_pte = (pa & PG_FRAME) | PG_V | PG_RW;	/* map in */
-	bzero(zerop, NBPG);				/* zero */
+	pagezero(zerop, PAGE_SIZE);				/* zero */
 	*zero_pte = 0;				/* zap! */
 	pmap_update_pg((vaddr_t)zerop);		/* flush TLB */
 	simple_unlock(&pmap_zero_page_lock);
@@ -2112,7 +2116,7 @@ pmap_zero_page_uncached(pa)
 
 	*zero_pte = (pa & PG_FRAME) | PG_V | PG_RW |	/* map in */
 	    ((cpu_class != CPUCLASS_386) ? PG_N : 0);
-	memset(zerop, 0, NBPG);				/* zero */
+	pagezero(zerop, PAGE_SIZE);				/* zero */
 	*zero_pte = 0;					/* zap! */
 	pmap_update_pg((vaddr_t)zerop);			/* flush TLB */
 	simple_unlock(&pmap_zero_page_lock);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsiconf.h,v 1.39 2003/05/18 16:06:35 mickey Exp $	*/
+/*	$OpenBSD: scsiconf.h,v 1.42.2.1 2004/04/30 22:07:37 brad Exp $	*/
 /*	$NetBSD: scsiconf.h,v 1.35 1997/04/02 02:29:38 mycroft Exp $	*/
 
 /*
@@ -96,6 +96,21 @@ struct scsi_link;
 extern int scsi_autoconf;
 
 /*
+ * Specify which buses and targets must scan all LUNs, even when IDENTIFY does
+ * not seem to be working. Some devices (e.g. some external RAID devices) may
+ * seem to have non-functional IDENTIFY because they return identical INQUIRY
+ * data for all LUNs.
+ */
+#ifndef SCSIFORCELUN_BUSES
+#define SCSIFORCELUN_BUSES	0
+#endif
+#ifndef SCSIFORCELUN_TARGETS
+#define	SCSIFORCELUN_TARGETS	0
+#endif
+
+extern int scsiforcelun_buses, scsiforcelun_targets;
+
+/*
  * These entrypoints are called by the high-end drivers to get services from
  * whatever low-end drivers they are attached to.  Each adapter type has one
  * of these statically allocated.
@@ -175,10 +190,7 @@ struct scsi_link {
 #define	SDEV_NOSYNC		0x0002	/* does not grok SDTR */
 #define	SDEV_NOWIDE		0x0004	/* does not grok WDTR */
 #define	SDEV_NOTAGS		0x0008	/* lies about having tagged queueing */
-#define	SDEV_NOLUNS		0x0010	/* does not grok LUNs */
-#define	SDEV_FORCELUNS		0x0020	/* prehistoric drive/ctlr groks LUNs */
 #define	SDEV_NOMODESENSE	0x0040	/* removable media/optical drives */
-#define	SDEV_NOSTARTUNIT	0x0080	/* do not issue start unit requests in sd.c */
 #define	SDEV_NOSYNCCACHE	0x0100	/* no SYNCHRONIZE_CACHE */
 #define	ADEV_NOSENSE		0x0200	/* No request sense - ATAPI */
 #define	ADEV_LITTLETOC		0x0400	/* little-endian TOC - ATAPI */
@@ -187,7 +199,6 @@ struct scsi_link {
 #define	ADEV_NODOORLOCK		0x2000	/* can't lock door */
 #define SDEV_ONLYBIG		0x4000  /* always use READ_BIG and WRITE_BIG */
 	u_int8_t inquiry_flags;		/* copy of flags from probe INQUIRY */
-	u_int8_t inquiry_flags2;	/* copy of flags2 from probe INQUIRY */
 	struct	scsi_device *device;	/* device entry points etc. */
 	void	*device_softc;		/* needed for call to foo_start */
 	struct	scsi_adapter *adapter;	/* adapter entry points etc. */
@@ -221,7 +232,6 @@ struct scsibus_softc {
 	struct device sc_dev;
 	struct scsi_link *adapter_link;		/* prototype supplied by adapter */
 	struct scsi_link ***sc_link;
-	u_int16_t moreluns;
 	u_int16_t sc_buswidth;
 };
 

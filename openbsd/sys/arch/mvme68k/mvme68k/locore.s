@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.36 2003/06/02 23:27:51 millert Exp $ */
+/*	$OpenBSD: locore.s,v 1.39 2004/03/09 00:08:13 xsa Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -264,6 +264,10 @@ is162:
 	RELOC(fputype, a0)
 	movl	#FPU_68040,a0@		| and a 68040 FPU
 
+	RELOC(vectab, a1)
+	movl	#_C_LABEL(buserr40),a1@(8)
+	movl	#_C_LABEL(addrerr4060),a1@(12)
+
 	bra	is16x
 #endif
 
@@ -283,6 +287,10 @@ is167:
 
 	RELOC(fputype, a0)
 	movl	#FPU_68040,a0@		| and a 68040 FPU
+
+	RELOC(vectab, a1)
+	movl	#_C_LABEL(buserr40),a1@(8)
+	movl	#_C_LABEL(addrerr4060),a1@(12)
 
 	bra	is16x
 #endif
@@ -307,6 +315,10 @@ is172:
 
 	RELOC(fputype, a0)
 	movl	#FPU_68060,a0@		| and a 68060 FPU
+
+	RELOC(vectab, a1)
+	movl	#_C_LABEL(buserr60),a1@(8)
+	movl	#_C_LABEL(addrerr4060),a1@(12)
 
 	bra	is16x
 #endif
@@ -333,6 +345,10 @@ is177:
 	
 	RELOC(fputype, a0)
 	movl	#FPU_68060,a0@		| and a 68060 FPU
+
+	RELOC(vectab, a1)
+	movl	#_C_LABEL(buserr60),a1@(8)
+	movl	#_C_LABEL(addrerr4060),a1@(12)
 
 	bra	is16x
 #endif
@@ -548,7 +564,7 @@ Lnocache0:
  
 /*
  * Create a fake exception frame so that cpu_fork() can copy it.
- * main() nevers returns; we exit to user mode from a forked process
+ * main() never returns; we exit to user mode from a forked process
  * later on.
  */
 	clrw	sp@-			| vector offset/frame type
@@ -648,11 +664,6 @@ ENTRY_NOPROFILE(addrerr4060)
 
 #if defined(M68060)
 ENTRY_NOPROFILE(buserr60)
-	tstl	_C_LABEL(nofault)	| device probe?
-	jeq	Lbuserr60		| no, handle as usual
-	movl	_C_LABEL(nofault),sp@-	| yes,
-	jbsr	_C_LABEL(longjmp)	|  longjmp(nofault)
-Lbuserr60:
 	clrl	sp@-			| stack adjust count
 	moveml	#0xFFFF,sp@-		| save user registers
 	movl	usp,a0			| save the user SP
@@ -680,17 +691,17 @@ Lberr3:
 	movl	d1,sp@-
 	movl	d0,sp@-			| code is FSLW now.
 	andw	#0x1f80,d0 
+	jeq	Lbuserr60		| no, handle as usual
+	movl	#T_MMUFLT,sp@-		| show that we are an MMU fault
+	jra	_ASM_LABEL(faultstkadj)	| and deal with it
+Lbuserr60:
+	tstl	_C_LABEL(nofault)	| device probe?
 	jeq	Lisberr			| Bus Error?
-	jra	Lismerr			| no, MMU fault.
+	movl	_C_LABEL(nofault),sp@-	| yes,
+	jbsr	_C_LABEL(longjmp)	|  longjmp(nofault)
 #endif
 #if defined(M68040)
 ENTRY_NOPROFILE(buserr40)
-	tstl	_C_LABEL(nofault)	| device probe?
-	jeq	Lbuserr40		| no, handle as usual
-	movl	_C_LABEL(nofault),sp@-	| yes,
-	jbsr	_C_LABEL(longjmp)	|  longjmp(nofault)
-	/* NOTREACHED */
-Lbuserr40:        
         clrl	sp@-			| stack adjust count
 	moveml	#0xFFFF,sp@-		| save user registers
 	movl	usp,a0			| save the user SP
@@ -706,61 +717,23 @@ Lbe1stpg:
 	movl	d1,sp@-			| pass fault address.
 	movl	d0,sp@-			| pass SSW as code
 	btst	#10,d0			| test ATC
-	jeq	Lisberr			| it is a bus error
+	jeq	Lbuserr40		| no, handle as usual
 	movl	#T_MMUFLT,sp@-		| show that we are an MMU fault
 	jra	_ASM_LABEL(faultstkadj)	| and deal with it
-#endif
-
-_C_LABEL(buserr):
+Lbuserr40:        
 	tstl	_C_LABEL(nofault)	| device probe?
-	jeq	Lberr			| no, handle as usual
+	jeq	Lisberr			| it is a bus error
 	movl	_C_LABEL(nofault),sp@-	| yes,
 	jbsr	_C_LABEL(longjmp)	|  longjmp(nofault)
 	/* NOTREACHED */
-Lberr:
-#if defined(M68040) || defined(M68060)
-	cmpl	#MMU_68040,_C_LABEL(mmutype) | 68040?
-	jgt	_C_LABEL(addrerr)	| no, skip
+#endif
+
+ENTRY_NOPROFILE(busaddrerr2030)
 	clrl	sp@-			| stack adjust count
 	moveml	#0xFFFF,sp@-		| save user registers
 	movl	usp,a0			| save the user SP
 	movl	a0,sp@(FR_SP)		|   in the savearea
 	lea	sp@(FR_HW),a1		| grab base of HW berr frame
-	moveq	#0,d0
-	movw	a1@(12),d0		| grab SSW
-	movl	a1@(20),d1		| and fault VA
-	btst	#11,d0			| check for mis-aligned access
-	jeq	Lberr2			| no, skip
-	addl	#3,d1			| yes, get into next page
-	andl	#PG_FRAME,d1		| and truncate
-Lberr2:
-	movl	d1,sp@-			| push fault VA
-	movl	d0,sp@-			| and padded SSW
-	btst	#10,d0			| ATC bit set?
-	jeq	Lisberr			| no, must be a real bus error
-	movc	dfc,d1			| yes, get MMU fault
-	movc	d0,dfc			| store faulting function code
-	movl	sp@(4),a0		| get faulting address
-	.word	0xf568			| ptestr a0@
-	movc	d1,dfc
-	.long	0x4e7a0805		| movc mmusr,d0
-	movw	d0,sp@			| save (ONLY LOW 16 BITS!)
-	jra	Lismerr
-#endif
-_C_LABEL(addrerr):
-	clrl	sp@-			| stack adjust count
-	moveml	#0xFFFF,sp@-		| save user registers
-	movl	usp,a0			| save the user SP
-	movl	a0,sp@(FR_SP)		|   in the savearea
-	lea	sp@(FR_HW),a1		| grab base of HW berr frame
-#if defined(M68040) || defined(M68060)
-	cmpl	#MMU_68040,_C_LABEL(mmutype) | 68040?
-	jgt	Lbenot040		| no, skip
-	movl	a1@(8),sp@-		| yes, push fault address
-	clrl	sp@-			| no SSW for address fault
-	jra	Lisaerr			| go deal with it
-Lbenot040:
-#endif
 	moveq	#0,d0
 	movw	a1@(10),d0		| grab SSW for fault processing
 	btst	#12,d0			| RB set?

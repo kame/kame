@@ -1,4 +1,4 @@
-/*	$OpenBSD: pucdata.c,v 1.30 2003/08/06 22:07:37 deraadt Exp $	*/
+/*	$OpenBSD: pucdata.c,v 1.32 2004/03/10 00:47:50 deraadt Exp $	*/
 /*	$NetBSD: pucdata.c,v 1.6 1999/07/03 05:55:23 cgd Exp $	*/
 
 /*
@@ -511,6 +511,20 @@ const struct puc_device_description puc_devices[] = {
 	},
 
 	/*
+	 * VScom PCI-400S, based on PLX 9050 Chip, 16k buffer
+	 */
+	{ /* "VScom PCI-400S", */
+	    { PCI_VENDOR_PLX, PCI_PRODUCT_PLX_1077, 0x10b5, 0x1077 },
+	    { 0xffff, 0xffff, 0xffff, 0xffff },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x10, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x18, COM_FREQ * 8 },
+	    },
+	},
+
+	/*
 	 * VScom PCI-800, as sold on http://www.swann.com.au/isp/titan.html.
 	 * Some PLX chip.  Note: This board has a software selectable(?)
 	 * clock multiplier which this driver doesn't support, so you'll
@@ -897,6 +911,18 @@ const struct puc_device_description puc_devices[] = {
 	/* Moxa Technologies Co., Ltd. PCI I/O Card 4S RS232/422/485 */
 	{   /* "Moxa Technologies, SmartIO C104H/PCI" */
 	    {	PCI_VENDOR_MOXA, PCI_PRODUCT_MOXA_C104H,	0, 0	},
+	    {	0xffff,	0xffff,					0, 0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x08, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x10, COM_FREQ * 8 },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x18, COM_FREQ * 8 },
+	    },
+	},
+
+	/* Moxa Technologies Co., Ltd. PCI I/O Card 4S RS232 */
+	{   /* "Moxa Technologies, SmartIO CP104/PCI" */
+	    {	PCI_VENDOR_MOXA, PCI_PRODUCT_MOXA_CP104,	0, 0	},
 	    {	0xffff,	0xffff,					0, 0	},
 	    {
 		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ * 8 },

@@ -1,4 +1,4 @@
-/*	$OpenBSD: m88110.c,v 1.7 2003/08/20 20:33:47 miod Exp $	*/
+/*	$OpenBSD: m88110.c,v 1.13 2004/01/02 17:08:57 miod Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * All rights reserved.
@@ -59,13 +59,18 @@
 
 #include <sys/param.h>
 #include <sys/types.h>
+#include <sys/systm.h>
 #include <sys/simplelock.h>
+
 #include <machine/board.h>
-#include <machine/cpus.h>
 #include <machine/cpu_number.h>
 #include <machine/cmmu.h>
+#include <machine/m88110.h>
+#include <machine/m88410.h>
 #include <machine/locore.h>
 #include <machine/trap.h>
+
+#include <uvm/uvm_extern.h>
 
 #ifdef DEBUG
 #define DB_CMMU		0x4000	/* MMU debug */
@@ -73,7 +78,7 @@ unsigned int debuglevel = 0;
 #define dprintf(_L_,_X_) { if (debuglevel & (_L_)) { unsigned int psr = disable_interrupts_return_psr(); printf("%d: ", cpu_number()); printf _X_;  set_psr(psr); } }
 #else
 #define dprintf(_L_,_X_)
-#endif 
+#endif
 
 #ifdef DDB
 #include <ddb/db_output.h>		/* db_printf()		*/
@@ -84,218 +89,110 @@ unsigned int debuglevel = 0;
 #define STATIC	static
 #endif /* DDB */
 
-/* kernel copy of PATC entries */
-unsigned patc_data_u[32];
-unsigned patc_data_l[32];
-unsigned patc_inst_u[32];
-unsigned patc_inst_l[32];
-
-#define INST	0
-#define DATA	1
-#define BOTH    2
-#define KERN	1
-#define USER	0
-
-/* FORWARDS */
-void patc_insert(unsigned upper, unsigned lower, int which);
-void patc_clear(void);
-void patc_sync(int which);
-void patc_load(int index, unsigned upper, unsigned lower, int which);
-void m88110_cmmu_sync_cache(vm_offset_t physaddr, int size);
-void m88110_cmmu_sync_inval_cache(vm_offset_t physaddr, int size);
-void m88110_cmmu_inval_cache(vm_offset_t physaddr, int size);
+void m88110_cmmu_init(void);
+void m88110_setup_board_config(void);
+void m88110_cpu_configuration_print(int);
+void m88110_cmmu_shutdown_now(void);
+void m88110_cmmu_parity_enable(void);
+unsigned m88110_cmmu_cpu_number(void);
+void m88110_cmmu_set_sapr(unsigned, unsigned);
+void m88110_cmmu_set_uapr(unsigned);
+void m88110_cmmu_set_pair_batc_entry(unsigned, unsigned, unsigned);
+void m88110_cmmu_flush_tlb(unsigned, unsigned, vaddr_t, vsize_t);
+void m88110_cmmu_pmap_activate(unsigned, unsigned,
+    u_int32_t i_batc[BATC_MAX], u_int32_t d_batc[BATC_MAX]);
+void m88110_cmmu_flush_cache(int, paddr_t, psize_t);
+void m88110_cmmu_flush_inst_cache(int, paddr_t, psize_t);
+void m88110_cmmu_flush_data_cache(int, paddr_t, psize_t);
+void m88110_dma_cachectl(vaddr_t, vsize_t, int);
+void m88110_cmmu_dump_config(void);
+void m88110_cmmu_show_translation(unsigned, unsigned, unsigned, int);
+void m88110_show_apr(unsigned);
 
 /* This is the function table for the mc88110 built-in CMMUs */
 struct cmmu_p cmmu88110 = {
         m88110_cmmu_init,
-        m88110_show_apr,
 	m88110_setup_board_config,
-	m88110_setup_cmmu_config,
-	m88110_cmmu_dump_config,
 	m88110_cpu_configuration_print,
 	m88110_cmmu_shutdown_now,
 	m88110_cmmu_parity_enable,
 	m88110_cmmu_cpu_number,
-	m88110_cmmu_get_idr,
 	m88110_cmmu_set_sapr,
-	m88110_cmmu_remote_set_sapr,
 	m88110_cmmu_set_uapr,
-	m88110_cmmu_set_batc_entry,
 	m88110_cmmu_set_pair_batc_entry,
-	m88110_cmmu_flush_remote_tlb,
 	m88110_cmmu_flush_tlb,
 	m88110_cmmu_pmap_activate,
-	m88110_cmmu_flush_remote_cache,
 	m88110_cmmu_flush_cache,
-	m88110_cmmu_flush_remote_inst_cache,
 	m88110_cmmu_flush_inst_cache,
-	m88110_cmmu_flush_remote_data_cache,
 	m88110_cmmu_flush_data_cache,
 	m88110_dma_cachectl,
 #ifdef DDB
-	m88110_cmmu_get_by_mode,
+	m88110_cmmu_dump_config,
 	m88110_cmmu_show_translation,
-	m88110_cmmu_cache_state,
-	m88110_show_cmmu_info,
+#else
+	NULL,
+	NULL,
+#endif
+#ifdef DEBUG
+        m88110_show_apr,
+#else
+	NULL,
 #endif
 };
 
-void
-patc_load(int index, unsigned upper, unsigned lower, int which)
-{
-#ifdef DEBUG
-	if (index > 31)
-		panic("invalid PATC index %d!", index);
-#endif
-
-	index = index << 5;
-	switch (which) {
-	case INST:
-		set_iir(index);
-		set_ippu(upper);
-		set_ippl(lower);
-		break;
-	case DATA:
-		set_dir(index);
-		set_dppu(upper);
-		set_dppl(lower);
-		break;
-#ifdef DEBUG
-	default:
-		panic("invalid PATC! Choose DATA or INST...");
-#endif
-	}
-}
+void patc_clear(void);
+void m88110_cmmu_sync_cache(paddr_t, psize_t);
+void m88110_cmmu_sync_inval_cache(paddr_t, psize_t);
+void m88110_cmmu_inval_cache(paddr_t, psize_t);
 
 void
-patc_sync(int which)
-{
-	int i;
-
-	switch (which) {
-	case BOTH:
-		for (i = 0; i < 32; i++) {
-			patc_load(i, patc_data_u[i], patc_data_l[i], DATA);
-			patc_load(i, patc_inst_u[i], patc_inst_l[i], INST);
-		}
-		break;
-	case INST:
-		for (i = 0; i < 32; i++) {
-			patc_load(i, patc_inst_u[i], patc_inst_l[i], INST);
-		}
-		break;
-	case DATA:
-		for (i = 0; i < 32; i++) {
-			patc_load(i, patc_data_u[i], patc_data_l[i], DATA);
-		}
-		break;
-	}
-}
-
-void 
 patc_clear(void)
 {
 	int i;
 
 	for (i = 0; i < 32; i++) {
-		patc_data_u[i] = 0;
-		patc_data_l[i] = 0;
-		patc_inst_u[i] = 0;
-		patc_inst_l[i] = 0;
+		set_dir(i << 5);
+		set_dppu(0);
+		set_dppl(0);
+
+		set_iir(i << 5);
+		set_ippu(0);
+		set_ippl(0);
 	}
-	patc_sync(BOTH);
 }
 
-/* implement a FIFO on the PATC entries */
-void 
-patc_insert(unsigned upper, unsigned lower, int which)
-{
-	int i;
-
-	switch(which) {
-	case INST:
-		for (i = 31; i > 0; i--) {
-			patc_inst_u[i] = patc_inst_u[i - 1];
-			patc_inst_l[i] = patc_inst_l[i - 1];
-		}
-		patc_inst_u[0] = upper;
-		patc_inst_l[0] = lower;
-		patc_sync(INST);
-		break;
-	case DATA:
-		for (i = 31; i > 0; i--) {
-			patc_data_u[i] = patc_data_u[i - 1];
-			patc_data_l[i] = patc_data_l[i - 1];
-		}
-		patc_data_u[0] = upper;
-		patc_data_l[0] = lower;
-		patc_sync(DATA);
-		break;
 #ifdef DEBUG
-	case BOTH:
-		panic("patc_insert(): can't insert both INST and DATA.");
-#endif
-	}
-}
-
 void
 m88110_show_apr(unsigned value)
 {
-	union apr_template apr_template;
-
-	apr_template.bits = value;
-
-	printf("table @ 0x%x000", apr_template.field.st_base);
-	if (apr_template.field.wt)
+	printf("table @ 0x%x000", PG_PFNUM(value));
+	if (value & CACHE_WT)
 		printf(", writethrough");
-	if (apr_template.field.g)
+	if (value & CACHE_GLOBAL)
 		printf(", global");
-	if (apr_template.field.ci)
+	if (value & CACHE_INH)
 		printf(", cache inhibit");
-	if (apr_template.field.te)
+	if (value & APR_V)
 		printf(", valid");
 	else
 		printf(", not valid");
 	printf("\n");
 }
+#endif
 
-void 
+void
 m88110_setup_board_config(void)
 {
-	/* dummy routine */
-	m88110_setup_cmmu_config();
-}
-
-void 
-m88110_setup_cmmu_config(void)
-{
-	/* we can print something here... */
+	/* we could print something here... */
 	cpu_sets[0] = 1;   /* This cpu installed... */
 }
-
-void m88110_cmmu_dump_config(void)
-{
-	/* dummy routine */
-}
-
-#ifdef DDB
-/*
- * Used by DDB for cache probe functions
- */
-unsigned m88110_cmmu_get_by_mode(int cpu, int mode)
-{
-	CMMU_LOCK;
-	CMMU_UNLOCK;
-	return 0;
-}
-#endif
 
 /*
  * Should only be called after the calling cpus knows its cpu
  * number and master/slave status . Should be called first
  * by the master, before the slaves are started.
-*/
-void 
+ */
+void
 m88110_cpu_configuration_print(int master)
 {
 	int pid = read_processor_identification_register();
@@ -310,12 +207,18 @@ m88110_cpu_configuration_print(int master)
 
 	simple_lock(&print_lock);
 
-	printf("Processor %d: ", cpu);
-	if (proctype)
-		printf("Architectural Revision 0x%x UNKNOWN CPU TYPE Version 0x%x\n",
-		       proctype, procvers);
-	else
-		printf("M88110 Version 0x%x\n", procvers);
+	printf("cpu%d: ", cpu);
+	if (proctype != 1) {
+		printf("unknown model arch 0x%x version 0x%x\n",
+		    proctype, procvers);
+		simple_unlock(&print_lock);
+		return;
+	}
+
+	printf("M88110 version 0x%x", procvers);
+	if (mc88410_present())
+		printf(", external M88410 cache controller");
+	printf("\n");
 
 	simple_unlock(&print_lock);
         CMMU_UNLOCK;
@@ -336,22 +239,22 @@ m88110_cmmu_init(void)
 
 	/* clear PATCs */
 	patc_clear();
-	
+
 	/* Do NOT enable ICTL_PREN (branch prediction) */
-	set_ictl(BATC_32M 
+	set_ictl(BATC_32M
 		 | CMMU_ICTL_DID	/* Double instruction disable */
 		 | CMMU_ICTL_MEN
-		 | CMMU_ICTL_CEN 
+		 | CMMU_ICTL_CEN
 		 | CMMU_ICTL_BEN
 		 | CMMU_ICTL_HTEN);
 
-	set_dctl(BATC_32M 
+	set_dctl(BATC_32M
                  | CMMU_DCTL_RSVD1	/* Data Matching Disable */
                  | CMMU_DCTL_MEN
-		 | CMMU_DCTL_CEN 
+		 | CMMU_DCTL_CEN
 		 | CMMU_DCTL_SEN
 		 | CMMU_DCTL_ADS
-		 | CMMU_DCTL_HTEN);      
+		 | CMMU_DCTL_HTEN);
 
 	mc88110_inval_inst();		/* clear instruction cache & TIC */
 	mc88110_inval_data();		/* clear data cache */
@@ -374,20 +277,22 @@ m88110_cmmu_init(void)
 void
 m88110_cmmu_shutdown_now(void)
 {
+#if 0
 	CMMU_LOCK;
         CMMU_UNLOCK;
+#endif
 }
 
 /*
- * enable parity
+ * Enable parity
  */
-void 
+void
 m88110_cmmu_parity_enable(void)
 {
-#ifdef	PARITY_ENABLE
+#if 0
 	CMMU_LOCK;
         CMMU_UNLOCK;
-#endif  /* PARITY_ENABLE */
+#endif
 }
 
 /*
@@ -396,23 +301,17 @@ m88110_cmmu_parity_enable(void)
  * disabled.
  */
 
-unsigned 
+unsigned
 m88110_cmmu_cpu_number(void)
 {
 	return 0; /* to make compiler happy */
 }
 
-/* Needs no locking - read only registers */
-unsigned
-m88110_cmmu_get_idr(unsigned data)
-{
-	return 0; /* todo */
-}
-
 void
-m88110_cmmu_set_sapr(unsigned ap)
+m88110_cmmu_set_sapr(unsigned cpu, unsigned ap)
 {
 	unsigned ictl, dctl;
+
 	CMMU_LOCK;
 
 	set_icmd(CMMU_ICMD_INV_SATC);
@@ -427,25 +326,19 @@ m88110_cmmu_set_sapr(unsigned ap)
 
 	set_isap(ap);
 	set_dsap(ap);
-	
+
 	patc_clear();
-	
+
 	set_icmd(CMMU_ICMD_INV_UATC);
 	set_icmd(CMMU_ICMD_INV_SATC);
 	set_dcmd(CMMU_DCMD_INV_UATC);
 	set_dcmd(CMMU_DCMD_INV_SATC);
-	
+
 	/* restore MMU settings */
 	set_ictl(ictl);
 	set_dctl(dctl);
-	
-	CMMU_UNLOCK;
-}
 
-void
-m88110_cmmu_remote_set_sapr(unsigned cpu, unsigned ap)
-{
-	m88110_cmmu_set_sapr(ap);
+	CMMU_UNLOCK;
 }
 
 void
@@ -461,53 +354,40 @@ m88110_cmmu_set_uapr(unsigned ap)
 }
 
 /*
- * Set batc entry number entry_no to value in 
- * the data or instruction cache depending on data.
- *
- * Except for the cmmu_init, this function, m88110_cmmu_set_pair_batc_entry,
- * and m88110_cmmu_pmap_activate are the only functions which may set the
- * batc values.
- */
-void
-m88110_cmmu_set_batc_entry(unsigned cpu, unsigned entry_no, unsigned data,
-    unsigned value)
-{
-	CMMU_LOCK;
-	if (data) {
-		set_dir(entry_no);
-		set_dbp(value);
-	} else {
-		set_iir(entry_no);
-		set_ibp(value);
-	}
-	CMMU_UNLOCK;
-}
-
-/*
- * Set batc entry number entry_no to value in 
+ * Set batc entry number entry_no to value in
  * the data and instruction cache for the named CPU.
+ *
+ * Except for the cmmu_init, this function and m88110_cmmu_pmap_activate
+ * are the only functions which may set the batc values.
  */
 void
 m88110_cmmu_set_pair_batc_entry(unsigned cpu, unsigned entry_no, unsigned value)
 {
-	m88110_cmmu_set_batc_entry(cpu, entry_no, 1, value);
-	m88110_cmmu_set_batc_entry(cpu, entry_no, 0, value);
+	CMMU_LOCK;
+
+	set_dir(entry_no);
+	set_dbp(value);
+
+	set_iir(entry_no);
+	set_ibp(value);
+
+	CMMU_UNLOCK;
 }
 
-/**
- **	Functions that invalidate TLB entries.
- **/
+/*
+ *	Functions that invalidate TLB entries.
+ */
 
 /*
  *	flush any tlb
  *	Some functionality mimiced in m88110_cmmu_pmap_activate.
  */
 void
-m88110_cmmu_flush_remote_tlb(unsigned cpu, unsigned kernel, vm_offset_t vaddr,
-    int size)
+m88110_cmmu_flush_tlb(unsigned cpu, unsigned kernel, vaddr_t vaddr,
+    vsize_t size)
 {
 	int s = splhigh();	/* XXX really disable interrupts? */
-	
+
 	CMMU_LOCK;
 	if (kernel) {
 		set_icmd(CMMU_ICMD_INV_SATC);
@@ -517,19 +397,8 @@ m88110_cmmu_flush_remote_tlb(unsigned cpu, unsigned kernel, vm_offset_t vaddr,
 		set_dcmd(CMMU_DCMD_INV_UATC);
 	}
 	CMMU_UNLOCK;
-	
+
 	splx(s);
-}
-
-/*
- *	flush my personal tlb
- */
-void
-m88110_cmmu_flush_tlb(unsigned kernel, vm_offset_t vaddr, int size)
-{
-	int cpu = cpu_number();
-
-	m88110_cmmu_flush_remote_tlb(cpu, kernel, vaddr, size);
 }
 
 /*
@@ -539,14 +408,14 @@ m88110_cmmu_flush_tlb(unsigned kernel, vm_offset_t vaddr, int size)
  */
 void
 m88110_cmmu_pmap_activate(unsigned cpu, unsigned uapr,
-    batc_template_t i_batc[BATC_MAX], batc_template_t d_batc[BATC_MAX])
+    u_int32_t i_batc[BATC_MAX], u_int32_t d_batc[BATC_MAX])
 {
 	m88110_cmmu_set_uapr(uapr);
 
 	/*
 	for (entry_no = 0; entry_no < 8; entry_no++) {
-	   m88110_cmmu_set_batc_entry(cpu, entry_no, 0, i_batc[entry_no].bits);
-	   m88110_cmmu_set_batc_entry(cpu, entry_no, 1, d_batc[entry_no].bits);
+	   m88110_cmmu_set_batc_entry(cpu, entry_no, 0, i_batc[entry_no]);
+	   m88110_cmmu_set_batc_entry(cpu, entry_no, 1, d_batc[entry_no]);
 	}
 	*/
 	/*
@@ -558,57 +427,52 @@ m88110_cmmu_pmap_activate(unsigned cpu, unsigned uapr,
 	set_dcmd(CMMU_DCMD_INV_UATC);
 }
 
-/**
- **	Functions that invalidate caches.
- **
- ** Cache invalidates require physical addresses.  Care must be exercised when
- ** using segment invalidates.  This implies that the starting physical address
- ** plus the segment length should be invalidated.  A typical mistake is to
- ** extract the first physical page of a segment from a virtual address, and
- ** then expecting to invalidate when the pages are not physically contiguous.
- **
- ** We don't push Instruction Caches prior to invalidate because they are not
- ** snooped and never modified (I guess it doesn't matter then which form
- ** of the command we use then).
- **/
+/*
+ *	Functions that invalidate caches.
+ *
+ * Cache invalidates require physical addresses.  Care must be exercised when
+ * using segment invalidates.  This implies that the starting physical address
+ * plus the segment length should be invalidated.  A typical mistake is to
+ * extract the first physical page of a segment from a virtual address, and
+ * then expecting to invalidate when the pages are not physically contiguous.
+ *
+ * We don't push Instruction Caches prior to invalidate because they are not
+ * snooped and never modified (I guess it doesn't matter then which form
+ * of the command we use then).
+ */
 
-/* 
- * Care must be taken to avoid flushing the data cache when 
+/*
+ * Care must be taken to avoid flushing the data cache when
  * the data cache is not on!  From the 0F92L Errata Documentation
  * Package, Version 1.1
  */
 
 /*
- *	flush both Instruction and Data caches
+ * XXX These routines are really suboptimal because they invalidate
+ * way too much...
+ * Improve them once the 197 support is really working...
  */
-void
-m88110_cmmu_flush_remote_cache(int cpu, vm_offset_t physaddr, int size)
-{
-	int s = splhigh();	/* XXX really disable interrupts? */
-	
-	mc88110_inval_inst();
-	mc88110_flush_data();
-	if (mc88410_present())
-		mc88410_flush();
-	splx(s);
-}
 
 /*
  *	flush both Instruction and Data caches
  */
 void
-m88110_cmmu_flush_cache(vm_offset_t physaddr, int size)
+m88110_cmmu_flush_cache(int cpu, paddr_t physaddr, psize_t size)
 {
-	int cpu = cpu_number();
-	
-	m88110_cmmu_flush_remote_cache(cpu, physaddr, size);
+	int s = splhigh();	/* XXX really disable interrupts? */
+
+	mc88110_inval_inst();
+	mc88110_flush_data();
+	if (mc88410_present())
+		mc88410_flush();
+	splx(s);
 }
 
 /*
  *	flush Instruction caches
  */
 void
-m88110_cmmu_flush_remote_inst_cache(int cpu, vm_offset_t physaddr, int size)
+m88110_cmmu_flush_inst_cache(int cpu, paddr_t physaddr, psize_t size)
 {
 	int s = splhigh();	/* XXX really disable interrupts? */
 
@@ -616,41 +480,25 @@ m88110_cmmu_flush_remote_inst_cache(int cpu, vm_offset_t physaddr, int size)
 	splx(s);
 }
 
-void
-m88110_cmmu_flush_inst_cache(vm_offset_t physaddr, int size)
-{
-	int cpu = cpu_number();
-
-	m88110_cmmu_flush_remote_inst_cache(cpu, physaddr, size);
-}
-
 /*
  * flush data cache
- */ 
+ */
 void
-m88110_cmmu_flush_remote_data_cache(int cpu, vm_offset_t physaddr, int size)
-{ 
+m88110_cmmu_flush_data_cache(int cpu, paddr_t physaddr, psize_t size)
+{
 	int s = splhigh();	/* XXX really disable interrupts? */
 
 	mc88110_flush_data();
 	if (mc88410_present())
 		mc88410_flush();
 	splx(s);
-}
-
-void
-m88110_cmmu_flush_data_cache(vm_offset_t physaddr, int size)
-{ 
-	int cpu = cpu_number();
-
-	m88110_cmmu_flush_remote_data_cache(cpu, physaddr, size);
 }
 
 /*
  * sync dcache (and icache too)
  */
 void
-m88110_cmmu_sync_cache(vm_offset_t physaddr, int size)
+m88110_cmmu_sync_cache(paddr_t physaddr, psize_t size)
 {
 	int s = splhigh();	/* XXX really disable interrupts? */
 
@@ -662,7 +510,7 @@ m88110_cmmu_sync_cache(vm_offset_t physaddr, int size)
 }
 
 void
-m88110_cmmu_sync_inval_cache(vm_offset_t physaddr, int size)
+m88110_cmmu_sync_inval_cache(paddr_t physaddr, psize_t size)
 {
 	int s = splhigh();	/* XXX really disable interrupts? */
 
@@ -673,10 +521,10 @@ m88110_cmmu_sync_inval_cache(vm_offset_t physaddr, int size)
 }
 
 void
-m88110_cmmu_inval_cache(vm_offset_t physaddr, int size)
+m88110_cmmu_inval_cache(paddr_t physaddr, psize_t size)
 {
 	int s = splhigh();	/* XXX really disable interrupts? */
-	
+
 	mc88110_inval_inst();
 	mc88110_inval_data();
 	if (mc88410_present())
@@ -685,42 +533,35 @@ m88110_cmmu_inval_cache(vm_offset_t physaddr, int size)
 }
 
 void
-m88110_dma_cachectl(vm_offset_t va, int size, int op)
+m88110_dma_cachectl(vaddr_t va, vsize_t size, int op)
 {
+	paddr_t pa;
+
+	if (pmap_extract(pmap_kernel(), va, &pa) == FALSE)
+		return;	/* XXX */
+
 	switch (op) {
 	case DMA_CACHE_SYNC:
-		m88110_cmmu_sync_cache(kvtop(va), size);
+		m88110_cmmu_sync_cache(pa, size);
 		break;
 	case DMA_CACHE_SYNC_INVAL:
-		m88110_cmmu_sync_inval_cache(kvtop(va), size);
+		m88110_cmmu_sync_inval_cache(pa, size);
 		break;
 	default:
-		m88110_cmmu_inval_cache(kvtop(va), size);
+		m88110_cmmu_inval_cache(pa, size);
 		break;
 	}
 }
 
 #ifdef DDB
+void
+m88110_cmmu_dump_config(void)
+{
+	/* dummy routine */
+}
 
-   #define VV_EX_UNMOD		0
-   #define VV_EX_MOD		1
-   #define VV_SHARED_UNMOD		2
-   #define VV_INVALID		3
-
-   #define D(UNION, LINE) \
-	((LINE) == 3 ? (UNION).field.d3 : \
-	 ((LINE) == 2 ? (UNION).field.d2 : \
-	  ((LINE) == 1 ? (UNION).field.d1 : \
-	   ((LINE) == 0 ? (UNION).field.d0 : ~0))))
-   #define VV(UNION, LINE) \
-	((LINE) == 3 ? (UNION).field.vv3 : \
-	 ((LINE) == 2 ? (UNION).field.vv2 : \
-	  ((LINE) == 1 ? (UNION).field.vv1 : \
-	   ((LINE) == 0 ? (UNION).field.vv0 : ~0))))
-
-
-   #undef VEQR_ADDR
-   #define  VEQR_ADDR 0
+#undef	VEQR_ADDR
+#define	VEQR_ADDR	0
 
 /*
  * Show (for debugging) how the given CMMU translates the given ADDRESS.
@@ -781,36 +622,34 @@ m88110_cmmu_show_translation(unsigned address,
 		if (result & CMMU_DSR_PH) DEBUG_MSG(", PATC");
 		if (result & CMMU_DSR_BH) DEBUG_MSG(", BATC");
 	} else {
-		DEBUG_MSG("probe of 0x%08x missed the ATCs");
-}
+		DEBUG_MSG("probe of 0x%08x missed the ATCs", address);
+	}
 	DEBUG_MSG(".\n");
 
 	/******* INTERPRET AREA DESCRIPTOR *********/
 	{
-		union apr_template apr_template;
-		apr_template.bits = value;
 		if (verbose_flag > 1) {
 			DEBUG_MSG(" %cAPR is 0x%08x\n",
-				  supervisor_flag ? 'S' : 'U', apr_template.bits);
+				  supervisor_flag ? 'S' : 'U', value);
 		}
 		DEBUG_MSG(" %cAPR: SegTbl: 0x%x000p",
-			  supervisor_flag ? 'S' : 'U', apr_template.field.st_base);
-		if (apr_template.field.wt) DEBUG_MSG(", WTHRU");
-		else			   DEBUG_MSG(", !wthru");
-		if (apr_template.field.g)  DEBUG_MSG(", GLOBAL");
-		else			   DEBUG_MSG(", !global");
-		if (apr_template.field.ci) DEBUG_MSG(", $INHIBIT");
-		else			   DEBUG_MSG(", $ok");
-		if (apr_template.field.te) DEBUG_MSG(", VALID");
-		else			   DEBUG_MSG(", !valid");
-		DEBUG_MSG(".\n");
+			  supervisor_flag ? 'S' : 'U', PG_PFNUM(value));
+		if (value & CACHE_WT)
+			DEBUG_MSG(", WTHRU");
+		if (value & CACHE_GLOBAL)
+			DEBUG_MSG(", GLOBAL");
+		if (value & CACHE_INH)
+			DEBUG_MSG(", INHIBIT");
+		if (value & APR_V)
+			DEBUG_MSG(", VALID");
+		DEBUG_MSG("\n");
 
 		/* if not valid, done now */
-		if (apr_template.field.te == 0) {
+		if ((value & APR_V) == 0) {
 			DEBUG_MSG("<would report an error, valid bit not set>\n");
 			return;
 		}
-		value = apr_template.field.st_base << PG_BITS; /* now point to seg page */
+		value &= PG_FRAME;	/* now point to seg page */
 	}
 
 	/* translate value from physical to virtual */
@@ -829,7 +668,7 @@ m88110_cmmu_show_translation(unsigned address,
 		value |= virtual_address.field.segment_table_index *
 			 sizeof(sdt_entry_t);
 
-		if (badwordaddr((vm_offset_t)value)) {
+		if (badwordaddr((vaddr_t)value)) {
 			DEBUG_MSG("ERROR: unable to access page at 0x%08x.\n", value);
 			return;
 		}
@@ -875,7 +714,7 @@ m88110_cmmu_show_translation(unsigned address,
 		value |= virtual_address.field.page_table_index *
 			 sizeof(pt_entry_t);
 
-		if (badwordaddr((vm_offset_t)value)) {
+		if (badwordaddr((vaddr_t)value)) {
 			DEBUG_MSG("error: unable to access page at 0x%08x.\n", value);
 			return;
 		}
@@ -917,7 +756,7 @@ m88110_cmmu_show_translation(unsigned address,
 				  virtual_address.field.page_offset, value);
 		value |= virtual_address.field.page_offset;
 
-		if (badwordaddr((vm_offset_t)value)) {
+		if (badwordaddr((vaddr_t)value)) {
 			DEBUG_MSG("error: unable to access page at 0x%08x.\n", value);
 			return;
 		}
@@ -929,22 +768,5 @@ m88110_cmmu_show_translation(unsigned address,
 	value += VEQR_ADDR;
 
 	DEBUG_MSG("WORD at 0x%x is 0x%08x.\n", value, *(unsigned *)value);
-}
-
-
-void
-m88110_cmmu_cache_state(unsigned addr, unsigned supervisor_flag)
-{
-#ifdef not_yet
-	static char *vv_name[4] =
-	{"exclu-unmod", "exclu-mod", "shared-unmod", "invalid"};
-	int cmmu_num;
-#endif 
-}
-
-void
-m88110_show_cmmu_info(unsigned addr)
-{
-	m88110_cmmu_cache_state(addr, 1);
 }
 #endif /* DDB */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: siop_common.c,v 1.16 2003/07/01 17:15:06 krw Exp $ */
+/*	$OpenBSD: siop_common.c,v 1.19 2004/01/15 17:51:42 miod Exp $ */
 /*	$NetBSD: siop_common.c,v 1.31 2002/09/27 15:37:18 provos Exp $	*/
 
 /*
@@ -268,8 +268,10 @@ siop_setuptables(siop_cmd)
 		*targ_flags &= TARF_DT; /* Save TARF_DT 'cuz we don't set it here */
 		quirks = xs->sc_link->quirks;
 
+#ifndef __hppa__
 		if ((quirks & SDEV_NOTAGS) == 0)
 			*targ_flags |= TARF_TAG;
+#endif
 		if (((quirks & SDEV_NOWIDE) == 0) &&
 		    (sc->features & SF_BUS_WIDE))
 			*targ_flags |= TARF_WIDE;
@@ -314,6 +316,8 @@ siop_setuptables(siop_cmd)
 
 	if ((xs->flags & (SCSI_DATA_IN | SCSI_DATA_OUT)) ||
 	    siop_cmd->status == CMDST_SENSE) {
+		bzero(siop_cmd->siop_tables->data,
+		    sizeof(siop_cmd->siop_tables->data));
 		for (i = 0; i < siop_cmd->dmamap_data->dm_nsegs; i++) {
 			siop_cmd->siop_tables->data[i].count =
 			    htole32(siop_cmd->dmamap_data->dm_segs[i].ds_len);
@@ -670,6 +674,7 @@ void
 siop_wdtr_msg(siop_cmd, offset, wide)
 	struct siop_common_cmd *siop_cmd;
 	int offset;
+	int wide;
 {
 	siop_cmd->siop_tables->msg_out[offset + 0] = MSG_EXTENDED;
 	siop_cmd->siop_tables->msg_out[offset + 1] = MSG_EXT_WDTR_LEN;

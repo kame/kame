@@ -1,4 +1,4 @@
-/*	$OpenBSD: elan520.c,v 1.3 2003/09/01 18:17:10 markus Exp $	*/
+/*	$OpenBSD: elan520.c,v 1.6 2004/02/14 15:09:22 grange Exp $	*/
 /*	$NetBSD: elan520.c,v 1.4 2002/10/02 05:47:15 thorpej Exp $	*/
 
 /*-
@@ -47,6 +47,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
+#include <sys/sysctl.h>
 
 #include <machine/bus.h>
 
@@ -59,10 +60,12 @@ struct elansc_softc {
 	struct device		sc_dev;
 	bus_space_tag_t		sc_memt;
 	bus_space_handle_t	sc_memh;
-};
+} *elansc;
 
 int	elansc_match(struct device *, void *, void *);
 void	elansc_attach(struct device *, struct device *, void *);
+int	elansc_cpuspeed(int *);
+int	elansc_setperf(int);
 
 void	elansc_wdogctl(struct elansc_softc *, int, uint16_t);
 #define elansc_wdogctl_reset(sc)	elansc_wdogctl(sc, 1, 0)
@@ -106,8 +109,6 @@ elansc_attach(struct device *parent, struct device *self, void *aux)
 	uint16_t rev;
 	uint8_t ressta, cpuctl;
 
-	printf("\n");
-
 	sc->sc_memt = pa->pa_memt;
 	if (bus_space_map(sc->sc_memt, MMCR_BASE_ADDR, NBPG, 0,
 	    &sc->sc_memh) != 0) {
@@ -142,6 +143,9 @@ elansc_attach(struct device *parent, struct device *self, void *aux)
 	elansc_wdogctl_reset(sc);
 
 	wdog_register(sc, elansc_wdogctl_cb);
+	elansc = sc;
+	cpu_cpuspeed = elansc_cpuspeed;
+	cpu_setperf = elansc_setperf;
 }
 
 void
@@ -213,4 +217,40 @@ elansc_wdogctl_cb(void *self, int period)
 		elansc_wdogctl_reset(sc);
 	}
 	return (period);
+}
+
+int
+elansc_cpuspeed(int *freq)
+{
+	static const int elansc_mhz[] = { 0, 100, 133, 999 };
+	uint8_t cpuctl;
+
+	cpuctl = bus_space_read_1(elansc->sc_memt, elansc->sc_memh,
+	    MMCR_CPUCTL);
+	*freq = elansc_mhz[cpuctl & CPUCTL_CPU_CLK_SPD_MASK];
+	return (0);
+}
+
+int
+elansc_setperf(int level)
+{
+	uint32_t eflags;
+	uint8_t cpuctl, speed;
+
+	level = (level > 50) ? 100 : 0;
+
+	cpuctl = bus_space_read_1(elansc->sc_memt, elansc->sc_memh,
+	    MMCR_CPUCTL);
+	speed = (level == 100) ? 2 : 1;
+	if ((cpuctl & CPUCTL_CPU_CLK_SPD_MASK) == speed)
+		return (0);
+
+	eflags = read_eflags();
+	disable_intr();
+	bus_space_write_1(elansc->sc_memt, elansc->sc_memh, MMCR_CPUCTL,
+	    (cpuctl & ~CPUCTL_CPU_CLK_SPD_MASK) | speed);
+	enable_intr();
+	write_eflags(eflags);
+
+	return (0);
 }

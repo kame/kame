@@ -1,4 +1,4 @@
-/* $OpenBSD: locore_asm_routines.S,v 1.24 2003/08/13 08:52:44 miod Exp $	*/
+/* $OpenBSD: locore_asm_routines.S,v 1.28 2004/01/23 17:26:06 miod Exp $	*/
 /*
  * Mach Operating System
  * Copyright (c) 1993-1992 Carnegie Mellon University
@@ -41,7 +41,7 @@
  * DO_LOAD_ADDRESS
  *
  * 	unsigned int do_load_word(address, supervisor_mode)
- *	vm_offset_t address;		\\ in r2
+ *	vaddr_t address;		\\ in r2
  *	boolean_t supervisor_mode;	\\ in r3
  *
  * Return the word at ADDRESS (from user space if SUPERVISOR_MODE is zero,
@@ -169,14 +169,6 @@ ENTRY(do_xmem_byte)	/* do_xmem_byte(address, data, supervisor) */
 1:	xmem.bu	r3,r2,r0
 2:	jmp	r1
 
-#ifdef DDB
-ENTRY(db_are_interrupts_disabled)
-	ldcr	r2, PSR
-	set	r3, r0, 1<PSR_INTERRUPT_DISABLE_BIT>
-	jmp.n	r1
-	 and	r2, r2, r3
-#endif /* DDB */
-
 /*
  * Copy specified amount of data from user space into the kernel
  * copyin(from, to, len)
@@ -209,7 +201,7 @@ ENTRY(copyin)
 	cmp	r9,   LEN,  8
 	bb1	lt,   r9,   _ASM_LABEL(copyin_byte_only)
 
-	/* If they're not aligned similiarly, use byte only... */
+	/* If they're not aligned similarly, use byte only... */
 	xor	r9,   SRC,  DEST
 	mask	r8,   r9,   0x3
 	bcnd	ne0,  r8,   _ASM_LABEL(copyin_byte_only)
@@ -473,7 +465,7 @@ ENTRY(copyout)
 	cmp	r9,   LEN,  8
 	bb1	lt,   r9,   _ASM_LABEL(copyout_byte_only)
 
-	/* If they're not aligned similiarly, use byte only... */
+	/* If they're not aligned similarly, use byte only... */
 	xor	r9,   SRC,  DEST
 	mask	r8,   r9,   0x3
 	bcnd	ne0,  r8,   _ASM_LABEL(copyout_byte_only)
@@ -1541,41 +1533,12 @@ ENTRY(longjmp)
 	jmp.n	r1
 	 or	r2,r0,1
 
-/*
- *       invalidate_pte(pte)
- *
- *       This function will invalidate specified pte indivisibly
- *       to avoid the write-back of used-bit and/or modify-bit into
- *       that pte.  It also returns the pte found in the table.
- */
-ENTRY(invalidate_pte)
-	or	r3,r0,r0
-	xmem	r3,r2,r0
-	tb1	0,r0,0
-	jmp.n	r1
-	 or	r2,r3,r0
-
-#ifdef DDB
-ENTRY(db_flush_pipeline)
-	FLUSH_PIPELINE
-	jmp	r1
-#endif /* DDB */
-
 ENTRY(read_processor_identification_register)
 	jmp.n	r1
 	 ldcr	r2, PID
 
-ENTRY(safe_byte_access)
-	ld.b	 r9,r0,r2
-	tb1	 0,r0,0
-	br	 @L1
-	or	r0,r0,r0
-@L1:
-	st.b	 r9,r0,r3
-	jmp	r1
-
-ENTRY(guarded_access)
 GLOBAL(guarded_access_start)
+ENTRY(guarded_access)
 	cmp	 r9,r3,4
 	bb1	 eq,r9,@L145
 	cmp	 r9,r3,2
@@ -1602,11 +1565,12 @@ GLOBAL(guarded_access_start)
 GLOBAL(guarded_access_bad)
 	jmp.n	 r1
 	 or	 r2,r0,EFAULT
-@L142:
 
-GLOBAL(guarded_access_end)
+@L142:
 	jmp.n	 r1
 	 or	 r2,r0,0
+
+GLOBAL(guarded_access_end)
 
 /*
  * void set_cpu_number(unsigned number);
@@ -1623,17 +1587,18 @@ GLOBAL(guarded_access_end)
  *	r5	temporary new PSR
  */
 ENTRY(set_cpu_number)
+#ifdef DEBUG
 	/* make sure the CPU number is valid */
 	clr	r3, r2, FLAG_CPU_FIELD_WIDTH<0>
 	bcnd	ne0, r3, 1f	/* bad cpu number */
+#endif
 
 	/* going to change a control register -- disable interrupts */
 	ldcr	r4, PSR
 	set	r5, r4, 1<PSR_INTERRUPT_DISABLE_BIT>
 	stcr	r5, PSR
 	FLUSH_PIPELINE
-	tcnd	ne0,r0,10 /* make sure interrupts are really disabled */
-			  /* if they are not, branch to error_handler() */
+
 	/* put in the cpu number */
 	ldcr	r3, SR1				/* get the flags */
 	clr	r3, r3, FLAG_CPU_FIELD_WIDTH<0>	/* clean the slate */
@@ -1645,10 +1610,12 @@ ENTRY(set_cpu_number)
 	FLUSH_PIPELINE
 	jmp	r1
 
+#ifdef DEBUG
 1:	/* bad cpu number*/
 	or.u	r2, r0, hi16(9f)
 	bsr.n	_C_LABEL(panic)
 	 or	r2, r2, lo16(9f)
 
 	data
-9:	string "set_cpu_number: bad CPU number\0"
+9:	string "set_cpu_number: bad CPU number %x\0"
+#endif

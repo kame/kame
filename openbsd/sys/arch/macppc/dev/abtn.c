@@ -1,4 +1,4 @@
-/*	$OpenBSD: abtn.c,v 1.7 2003/07/07 22:05:40 pvalchev Exp $	*/
+/*	$OpenBSD: abtn.c,v 1.9 2003/10/16 03:54:48 deraadt Exp $	*/
 /*	$NetBSD: abtn.c,v 1.1 1999/07/12 17:48:26 tsubai Exp $	*/
 
 /*-
@@ -61,10 +61,7 @@ struct cfdriver abtn_cd = {
 };
 
 int
-abtn_match(parent, cf, aux)
-	struct device *parent;
-	void *cf;
-	void *aux;
+abtn_match(struct device *parent, void *cf, void *aux)
 {
 	struct adb_attach_args *aa = aux;
 
@@ -76,9 +73,7 @@ abtn_match(parent, cf, aux)
 }
 
 void
-abtn_attach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+abtn_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct abtn_softc *sc = (struct abtn_softc *)self;
 	struct adb_attach_args *aa = aux;
@@ -96,10 +91,8 @@ abtn_attach(parent, self, aux)
 	SetADBInfo(&adbinfo, sc->adbaddr);
 }
 
-void 
-abtn_adbcomplete(buffer, data, adb_command)
-	caddr_t buffer, data;
-	int adb_command;
+void
+abtn_adbcomplete(caddr_t buffer, caddr_t data, int adb_command)
 {
 	u_int cmd, brightness;
 

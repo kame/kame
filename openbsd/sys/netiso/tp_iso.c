@@ -1,4 +1,4 @@
-/*	$OpenBSD: tp_iso.c,v 1.6 2003/06/02 23:28:18 millert Exp $	*/
+/*	$OpenBSD: tp_iso.c,v 1.9 2004/01/03 14:08:54 espie Exp $	*/
 /*	$NetBSD: tp_iso.c,v 1.8 1996/03/16 23:13:54 christos Exp $	*/
 
 /*-
@@ -108,7 +108,7 @@ SOFTWARE.
 #include <netiso/tuba_table.h>
 #endif
 
-#include <machine/stdarg.h>
+#include <sys/stdarg.h>
 
 /*
  * CALLED FROM:
@@ -125,7 +125,7 @@ iso_getsufx(v, lenp, data_out, which)
 	int             which;
 {
 	struct isopcb  *isop = v;
-	register struct sockaddr_iso *addr = 0;
+	struct sockaddr_iso *addr = 0;
 
 	switch (which) {
 	case TP_LOCAL:
@@ -155,7 +155,7 @@ iso_putsufx(v, sufxloc, sufxlen, which)
 {
 	struct isopcb  *isop = v;
 	struct sockaddr_iso **dst, *backup;
-	register struct sockaddr_iso *addr;
+	struct sockaddr_iso *addr;
 	struct mbuf    *m;
 	int             len;
 
@@ -227,14 +227,14 @@ iso_recycle_tsuffix(v)
  */
 void
 iso_putnetaddr(v, nm, which)
-	register void *v;
+	void *v;
 	struct sockaddr *nm;
 	int             which;
 {
-	register struct isopcb *isop = v;
+	struct isopcb *isop = v;
 	struct sockaddr_iso *name = (struct sockaddr_iso *) nm;
 	struct sockaddr_iso **sisop, *backup;
-	register struct sockaddr_iso *siso;
+	struct sockaddr_iso *siso;
 
 	switch (which) {
 	default:
@@ -270,14 +270,14 @@ iso_putnetaddr(v, nm, which)
  */
 int
 iso_cmpnetaddr(v, nm, which)
-	register void *v;
+	void *v;
 	struct sockaddr *nm;
 	int             which;
 {
-	register struct isopcb *isop = v;
+	struct isopcb *isop = v;
 	struct sockaddr_iso *name = (struct sockaddr_iso *) nm;
 	struct sockaddr_iso **sisop, *backup;
-	register struct sockaddr_iso *siso;
+	struct sockaddr_iso *siso;
 
 	switch (which) {
 	default:
@@ -315,12 +315,12 @@ iso_cmpnetaddr(v, nm, which)
 
 void
 iso_getnetaddr(v, name, which)
-	register void *v;
+	void *v;
 	struct mbuf    *name;
 	int             which;
 {
-	register struct inpcb *inp = v;
-	register struct isopcb *isop = (struct isopcb *) inp;
+	struct inpcb *inp = v;
+	struct isopcb *isop = (struct isopcb *) inp;
 	struct sockaddr_iso *siso =
 	(which == TP_LOCAL ? isop->isop_laddr : isop->isop_faddr);
 	if (siso)
@@ -351,7 +351,7 @@ int
 tpclnp_mtu(v)
 	void *v;
 {
-	register struct tp_pcb *tpcb = v;
+	struct tp_pcb *tpcb = v;
 	struct isopcb  *isop = (struct isopcb *) tpcb->tp_npcb;
 
 #ifdef ARGO_DEBUG
@@ -649,7 +649,7 @@ tpclnp_ctlinput(cmd, saddr, dummy)
 	}
 #endif
 
-	if (cmd < 0 || cmd > PRC_NCMDS)
+	if (cmd < 0 || cmd >= PRC_NCMDS)
 		return NULL;
 	if (siso->siso_family != AF_ISO)
 		return NULL;

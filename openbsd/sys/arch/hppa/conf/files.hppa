@@ -1,4 +1,4 @@
-#	$OpenBSD: files.hppa,v 1.48 2003/08/20 21:44:03 mickey Exp $
+#	$OpenBSD: files.hppa,v 1.51 2004/03/12 00:04:57 miod Exp $
 #
 # hppa-specific configuration info
 
@@ -32,8 +32,8 @@ include "dev/i2o/files.i2o"
 #
 # MI ATAPI drivers
 #
-#include "dev/atapiscsi/files.atapiscsi"
-#include "dev/ata/files.ata"
+include "dev/atapiscsi/files.atapiscsi"
+include "dev/ata/files.ata"
 
 #
 # ISA Bus support
@@ -50,6 +50,16 @@ include "dev/eisa/files.eisa"
 # PCI Bus support
 #
 include "dev/pci/files.pci"
+
+#
+# CardBus support
+#
+include	"dev/cardbus/files.cardbus"
+
+#
+# Machine-independent PCMCIA drivers
+#
+include	"dev/pcmcia/files.pcmcia"
 
 #
 # HIL Human Interface Loop devices
@@ -118,11 +128,16 @@ device	mongoose: isabus, eisabus
 attach	mongoose at mainbus
 file	arch/hppa/dev/mongoose.c	mongoose
 
+define	dinobus {[offset = -1], [irq = -1]}
+
 # Dino, GSC to PCI bridge. Includes ps/2, serial, and flying toaster interfaces
 # Cujo is a 64-bit data path Dino
-device	dino: pcibus
+device	dino: pcibus, dinobus
 attach	dino at phantomas
 file	arch/hppa/dev/dino.c		dino
+
+attach	com at dinobus with com_dino
+file	arch/hppa/dev/com_dino.c	com_dino
 
 # EPIC, Excalibur PCI Interface Chip. Integrated IOA
 # SAGA is a 64-bit data path EPIC
@@ -175,6 +190,9 @@ file	arch/hppa/gsc/if_ie_gsc.c	ie_gsc
 
 attach	osiop at gsc with osiop_gsc
 file	arch/hppa/gsc/osiop_gsc.c	osiop_gsc
+
+attach	oosiop at gsc with oosiop_gsc
+file	arch/hppa/gsc/oosiop_gsc.c	oosiop_gsc
 
 attach	hil at gsc with hil_gsc
 file	arch/hppa/gsc/hil_gsc.c		hil_gsc

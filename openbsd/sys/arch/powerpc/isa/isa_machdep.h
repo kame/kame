@@ -1,4 +1,4 @@
-/*	$OpenBSD: isa_machdep.h,v 1.6 1999/11/09 04:51:35 rahnds Exp $ */
+/*	$OpenBSD: isa_machdep.h,v 1.8 2003/10/31 03:55:06 drahn Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom
@@ -42,17 +42,18 @@ typedef struct ppc_isa_bus *isa_chipset_tag_t;
  *      However, the cpu executes an instruction every <10 ns
  *      so the bus is much slower so it doesn't matter, really.
  */
-#define isa_outb(x,y)   outb(ppc_isa_io.bus_base + (x), y)
-#define isa_inb(x)      inb(ppc_isa_io.bus_base + (x))
+extern bus_space_handle_t ppc_isa_io_vaddr;
+#define isa_outb(x,y)   outb(ppc_isa_io_vaddr + (x), (y))
+#define isa_inb(x)   inb(ppc_isa_io_vaddr + (x))
  
 struct ppc_isa_bus {
         void    *ic_data;
 
-        void    (*ic_attach_hook) __P((struct device *, struct device *,
-                    struct isabus_attach_args *));
-        void    *(*ic_intr_establish) __P((isa_chipset_tag_t, int, int, int,
-                    int (*)(void *), void *, char *));
-        void    (*ic_intr_disestablish) __P((isa_chipset_tag_t, void *));
+        void    (*ic_attach_hook) (struct device *, struct device *,
+                    struct isabus_attach_args *);
+        void    *(*ic_intr_establish) (void *, int, int, int,
+                    int (*)(void *), void *, char *);
+        void    (*ic_intr_disestablish) (void *, void *);
 };
 
 
@@ -70,13 +71,5 @@ struct ppc_isa_bus {
 
 #define ICU_LEN	16		/* Number of possible interrupt sources */
 
-/*
- * Let com.c know where our console is!
- */
-extern u_int32_t ppc_console_addr;
-extern u_int32_t ppc_console_serfreq;
-#define	CONADDR		(ppc_console_addr)
-#define	COM_FREQ	(ppc_console_serfreq)
-
-extern void * isabr_intr_establish(isa_chipset_tag_t, int, int, int,                             int (*ih_fun) __P((void *)), void *, char *);                              
+extern void * isabr_intr_establish(void *, int, int, int,                             int (*ih_fun) (void *), void *, char *);                              
 #endif /* _ISA_MACHDEP_H_ */

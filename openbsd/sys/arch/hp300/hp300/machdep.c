@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.87 2003/06/02 23:27:45 millert Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.91 2004/03/10 23:02:53 tom Exp $	*/
 /*	$NetBSD: machdep.c,v 1.121 1999/03/26 23:41:29 mycroft Exp $	*/
 
 /*
@@ -43,7 +43,6 @@
 #include <sys/systm.h>
 #include <sys/buf.h>
 #include <sys/timeout.h>
-#include <sys/clist.h>
 #include <sys/conf.h>
 #include <sys/exec.h>
 #include <sys/file.h>
@@ -342,8 +341,8 @@ cpu_startup()
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
 #endif
-	printf("avail mem = %lu (%uK)\n", ptoa(uvmexp.free),
-	    ptoa(uvmexp.free)/1024);
+	printf("avail mem = %lu (%luK)\n", ptoa(uvmexp.free),
+	    ptoa(uvmexp.free) / 1024);
 	printf("using %d buffers containing %u bytes (%uK) of memory\n",
 		nbuf, bufpages * PAGE_SIZE, bufpages * PAGE_SIZE / 1024);
 
@@ -515,6 +514,9 @@ identifycpu()
 	const char *t;
 	char mc, *td;
 	int len;
+#ifdef FPSP
+	extern u_long fpvect_tab, fpvect_end, fpsp_tab;
+#endif
 
 	/*
 	 * Map machineid to model name.
@@ -678,6 +680,13 @@ identifycpu()
 		break;
 	}
 
+#ifdef FPSP
+	if (cputype == CPU_68040) {
+		bcopy(&fpsp_tab, &fpvect_tab,
+		    (&fpvect_end - &fpvect_tab) * sizeof (fpvect_tab));
+	}
+#endif
+
 	return;
 lose:
 	panic("startup");
@@ -734,7 +743,9 @@ boot(howto)
 
 	/* If system is cold, just halt. */
 	if (cold) {
-		howto |= RB_HALT;
+		/* (Unless the user explicitly asked for reboot.) */
+		if ((howto & RB_USERREQ) == 0)
+			howto |= RB_HALT;
 		goto haltsys;
 	}
 

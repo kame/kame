@@ -1,4 +1,4 @@
-/*	$OpenBSD: vectors.s,v 1.8 2003/06/02 05:09:14 deraadt Exp $ */
+/*	$OpenBSD: vectors.s,v 1.10 2004/03/02 22:55:55 miod Exp $ */
 
 | Copyright (c) 1995 Theo de Raadt
 |
@@ -72,8 +72,8 @@
 GLOBAL(vectab)
 	.long	0x12345678	/* 0: jmp 0x7400:w (unused reset SSP) */
 	VECTOR_UNUSED		/* 1: NOT USED (reset PC) */
-	VECTOR(buserr)		/* 2: bus error */
-	VECTOR(addrerr)		/* 3: address error */
+	VECTOR(busaddrerr2030)	/* 2: bus error */
+	VECTOR(busaddrerr2030)	/* 3: address error */
 	VECTOR(illinst)		/* 4: illegal instruction */
 	VECTOR(zerodiv)		/* 5: zero divide */
 	VECTOR(chkinst)		/* 6: CHK instruction */
@@ -161,11 +161,11 @@ GLOBAL(fpvect_end)
 	 * 68040: this chunk of vectors is copied into the fpfault zone
 	 */
 GLOBAL(fpsp_tab)
-	ASVECTOR(bsun)		/* 48: FPCP branch/set on unordered cond */
+	ASVECTOR(fpsp_bsun)	/* 48: FPCP branch/set on unordered cond */
 	ASVECTOR(inex)		/* 49: FPCP inexact result */
 	ASVECTOR(dz)		/* 50: FPCP divide by zero */
-	ASVECTOR(unfl)		/* 51: FPCP underflow */
-	ASVECTOR(operr)		/* 52: FPCP operand error */
-	ASVECTOR(ovfl)		/* 53: FPCP overflow */
-	ASVECTOR(snan)		/* 54: FPCP signalling NAN */
+	ASVECTOR(fpsp_unfl)	/* 51: FPCP underflow */
+	ASVECTOR(fpsp_operr)	/* 52: FPCP operand error */
+	ASVECTOR(fpsp_ovfl)	/* 53: FPCP overflow */
+	ASVECTOR(fpsp_snan)	/* 54: FPCP signalling NAN */
 #endif /* FPSP */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: isavar.h,v 1.45 2002/12/20 01:56:32 mickey Exp $	*/
+/*	$OpenBSD: isavar.h,v 1.51 2004/02/03 09:25:02 mickey Exp $	*/
 /*	$NetBSD: isavar.h,v 1.26 1997/06/06 23:43:57 thorpej Exp $	*/
 
 /*-
@@ -122,7 +122,7 @@
  */
 struct isabus_attach_args;
 
-#if (__alpha__ + amiga + __i386__ + arc + __wgrisc__ + __powerpc__ + __hppa__ != 1)
+#if (__alpha__ + amiga + __cats__ + __i386__ + arc + __wgrisc__ + __powerpc__ + __hppa__ + __amd64__ != 1)
 #error "COMPILING ISA FOR UNSUPPORTED MACHINE, OR MORE THAN ONE."
 #endif
 #ifdef __alpha__
@@ -130,6 +130,9 @@ struct isabus_attach_args;
 #endif
 #ifdef amiga
 #include <amiga/isa/isa_machdep.h>
+#endif
+#ifdef __cats__
+#include <cats/isa/isa_machdep.h>
 #endif
 #ifdef __i386__
 #include <i386/isa/isa_machdep.h>
@@ -150,6 +153,9 @@ struct isabus_attach_args;
 #ifdef __hppa__
 #include <hppa/include/isa_machdep.h>
 #endif
+#ifdef __amd64__
+#include <amd64/include/isa_machdep.h>
+#endif
 
 #include "isapnp.h"
 
@@ -160,7 +166,7 @@ struct isabus_attach_args;
 struct isapnp_softc;
 
 #if (__i386__ != 1 && __alpha__ != 1)
-ERROR: COMPILING ISAPNP FOR UNSUPPORTED MACHINE, OR MORE THAN ONE.
+#error COMPILING ISAPNP FOR UNSUPPORTED MACHINE, OR MORE THAN ONE.
 #endif
 #if __i386__
 #include <i386/isa/isapnp_machdep.h>
@@ -442,6 +448,7 @@ isapnp_write_reg(sc, r, v)
 static __inline u_char
 isapnp_read_reg(sc, r)
 	struct isapnp_softc *sc;
+	int r;
 {
 	ISAPNP_WRITE_ADDR(sc, r);
 	return ISAPNP_READ_DATA(sc);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vnd.c,v 1.39 2003/08/15 20:32:16 tedu Exp $	*/
+/*	$OpenBSD: vnd.c,v 1.45 2004/03/04 01:22:50 tedu Exp $	*/
 /*	$NetBSD: vnd.c,v 1.26 1996/03/30 23:06:11 christos Exp $	*/
 
 /*
@@ -87,18 +87,24 @@
 #ifdef DEBUG
 int dovndcluster = 1;
 int vnddebug = 0x00;
-#define VDB_FOLLOW	0x01
-#define VDB_INIT	0x02
-#define VDB_IO		0x04
+#define	VDB_FOLLOW	0x01
+#define	VDB_INIT	0x02
+#define	VDB_IO		0x04
 #endif
 
-#define b_cylin	b_resid
+#define	b_cylin	b_resid
 
-#define	vndunit(x)	DISKUNIT((x) & 0x7f)
-#define vndsimple(x)	((x) & 0x80)
-#define	MAKEVNDDEV(maj, unit, part)	MAKEDISKDEV(maj, unit, part)
+/*
+ * vndunit is a bit weird.  have to reconstitute the dev_t for
+ * DISKUNIT(), but with the minor masked off.
+ */
+#define	vndunit(x)	DISKUNIT(makedev(major(x), minor(x) & 0x7ff))
+#define	vndsimple(x)	(minor(x) & 0x800)
 
-#define	VNDLABELDEV(dev) (MAKEVNDDEV(major(dev), vndunit(dev), RAW_PART))
+/* same as MAKEDISKDEV, preserving the vndsimple() property */
+#define	VNDLABELDEV(dev)	\
+	makedev(major(dev), DISKMINOR(vndunit(dev), RAW_PART) | \
+	    (vndsimple(dev) ? 0x800 : 0))
 
 struct vndbuf {
 	struct buf	vb_buf;
@@ -107,7 +113,7 @@ struct vndbuf {
 
 #define	getvndbuf()	\
 	((struct vndbuf *)malloc(sizeof(struct vndbuf), M_DEVBUF, M_WAITOK))
-#define putvndbuf(vbp)	\
+#define	putvndbuf(vbp)	\
 	free((caddr_t)(vbp), M_DEVBUF)
 
 struct vnd_softc {
@@ -125,14 +131,14 @@ struct vnd_softc {
 
 /* sc_flags */
 #define	VNF_ALIVE	0x0001
-#define VNF_INITED	0x0002
-#define VNF_WANTED	0x0040
-#define VNF_LOCKED	0x0080
+#define	VNF_INITED	0x0002
+#define	VNF_WANTED	0x0040
+#define	VNF_LOCKED	0x0080
 #define	VNF_LABELLING	0x0100
 #define	VNF_WLABEL	0x0200
 #define	VNF_HAVELABEL	0x0400
-#define VNF_BUSY	0x0800
-#define VNF_SIMPLE	0x1000
+#define	VNF_BUSY	0x0800
+#define	VNF_SIMPLE	0x1000
 
 struct vnd_softc *vnd_softc;
 int numvnd = 0;
@@ -156,15 +162,15 @@ void	vndunlock(struct vnd_softc *);
 
 void
 vndencrypt(vnd, addr, size, off, encrypt)
-     struct vnd_softc *vnd;
-     caddr_t addr;
-     size_t size;
-     daddr_t off;
-     int encrypt;
+	struct vnd_softc *vnd;
+	caddr_t addr;
+	size_t size;
+	daddr_t off;
+	int encrypt;
 {
 	int i, bsize;
 	u_char iv[8];
-	
+
 	bsize = dbtob(1);
 	for (i = 0; i < size/bsize; i++) {
 		bzero(iv, sizeof(iv));
@@ -474,21 +480,18 @@ vndstrategy(bp)
 				    vnd->sc_cred);
 				if (vnd->sc_keyctx)
 					vndencrypt(vnd,	bp->b_data,
-						   bp->b_bcount,
-						   bp->b_blkno, 0);
+					   bp->b_bcount, bp->b_blkno, 0);
 			} else {
 				if (vnd->sc_keyctx)
 					vndencrypt(vnd, bp->b_data,
-						   bp->b_bcount, 
-						   bp->b_blkno, 1);
+					   bp->b_bcount, bp->b_blkno, 1);
 				auio.uio_rw = UIO_WRITE;
 				bp->b_error = VOP_WRITE(vnd->sc_vp, &auio, 0,
 				    vnd->sc_cred);
 				/* Data in buffer cache needs to be in clear */
 				if (vnd->sc_keyctx)
 					vndencrypt(vnd, bp->b_data,
-						   bp->b_bcount,
-						   bp->b_blkno, 0);
+					   bp->b_bcount, bp->b_blkno, 0);
 			}
 			vnd->sc_flags &= ~VNF_BUSY;
 			VOP_UNLOCK(vnd->sc_vp, 0, p);
@@ -518,7 +521,7 @@ vndstrategy(bp)
 	/* The old-style buffercache bypassing method.  */
 	bn += vnd->sc_dk.dk_label->d_partitions[DISKPART(bp->b_dev)].p_offset;
 	bn = dbtob(bn);
- 	bsize = vnd->sc_vp->v_mount->mnt_stat.f_iosize;
+	bsize = vnd->sc_vp->v_mount->mnt_stat.f_iosize;
 	addr = bp->b_data;
 	flags = bp->b_flags | B_CALL;
 	for (resid = bp->b_resid; resid; resid -= sz) {
@@ -546,7 +549,7 @@ vndstrategy(bp)
 #ifdef DEBUG
 		if (vnddebug & VDB_IO)
 			printf("vndstrategy: vp %p/%p bn %x/%x sz %x\n",
-			       vnd->sc_vp, vp, bn, nbn, sz);
+			    vnd->sc_vp, vp, bn, nbn, sz);
 #endif
 
 		nbp = getvndbuf();
@@ -647,7 +650,6 @@ vndiodone(bp)
 	struct vndbuf *vbp = (struct vndbuf *) bp;
 	struct buf *pbp = vbp->vb_obp;
 	struct vnd_softc *vnd = &vnd_softc[vndunit(pbp->b_dev)];
-	long count;
 
 	splassert(IPL_BIO);
 
@@ -669,7 +671,14 @@ vndiodone(bp)
 	}
 	pbp->b_resid -= vbp->vb_buf.b_bcount;
 	putvndbuf(vbp);
-	count = pbp->b_bcount - pbp->b_resid;
+	if (vnd->sc_tab.b_active) {
+		disk_unbusy(&vnd->sc_dk, (pbp->b_bcount - pbp->b_resid),
+		    (pbp->b_flags & B_READ));
+		if (vnd->sc_tab.b_actf)
+			vndstart(vnd);
+		else
+			vnd->sc_tab.b_active--;
+	}
 	if (pbp->b_resid == 0) {
 #ifdef DEBUG
 		if (vnddebug & VDB_IO)
@@ -677,13 +686,7 @@ vndiodone(bp)
 #endif
 		biodone(pbp);
 	}
-	if (vnd->sc_tab.b_active) {
-		disk_unbusy(&vnd->sc_dk, count);
-		if (vnd->sc_tab.b_actf)
-			vndstart(vnd);
-		else
-			vnd->sc_tab.b_active--;
-	}
+
 }
 
 /* ARGSUSED */
@@ -811,26 +814,27 @@ vndioctl(dev, cmd, addr, flag, p)
 			return (error);
 		}
 
-		if (vio->vnd_keylen) {
-			char *key;
+		if (vio->vnd_keylen > 0) {
+			char key[128];
 
-			key = malloc(vio->vnd_keylen, M_TEMP, M_WAITOK);
-			if ((error = copyin((caddr_t)vio->vnd_key, key,
-					    vio->vnd_keylen)) != 0) {
+			if (vio->vnd_keylen > sizeof(key))
+				vio->vnd_keylen = sizeof(key);
+
+			if ((error = copyin(vio->vnd_key, key,
+			    vio->vnd_keylen)) != 0) {
 				(void) vn_close(nd.ni_vp, FREAD|FWRITE,
-						p->p_ucred, p);
+				    p->p_ucred, p);
 				vndunlock(vnd);
 				return (error);
 			}
 
 			vnd->sc_keyctx = malloc(sizeof(blf_ctx), M_DEVBUF,
-						M_WAITOK);
+			    M_WAITOK);
 			blf_key(vnd->sc_keyctx, key, vio->vnd_keylen);
 			bzero(key, vio->vnd_keylen);
-			free((caddr_t)key, M_TEMP);
 		} else
 			vnd->sc_keyctx = NULL;
-			
+
 		vndthrottle(vnd, vnd->sc_vp);
 		vio->vnd_size = dbtob((off_t)vnd->sc_size);
 		vnd->sc_flags |= VNF_INITED;
@@ -878,8 +882,8 @@ vndioctl(dev, cmd, addr, flag, p)
 #endif
 		/* Free crypto key */
 		if (vnd->sc_keyctx) {
-			bzero(vnd->sc_keyctx, vio->vnd_keylen);
-			free((caddr_t)vnd->sc_keyctx, M_DEVBUF);
+			bzero(vnd->sc_keyctx, sizeof(*vnd->sc_keyctx));
+			free(vnd->sc_keyctx, M_DEVBUF);
 		}
 
 		/* Detatch the disk. */

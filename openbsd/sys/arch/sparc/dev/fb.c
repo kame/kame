@@ -1,4 +1,4 @@
-/*	$OpenBSD: fb.c,v 1.26 2003/06/28 17:05:33 miod Exp $	*/
+/*	$OpenBSD: fb.c,v 1.28 2004/02/29 21:24:36 miod Exp $	*/
 /*	$NetBSD: fb.c,v 1.23 1997/07/07 23:30:22 pk Exp $ */
 
 /*
@@ -353,9 +353,15 @@ fbwscons_console_init(struct sunfb *sf, struct wsscreen_descr *wsc, int row,
 			/* assume last row */
 			sf->sf_ro.ri_crow = sf->sf_ro.ri_rows - 1;
 	} else {
+		/*
+		 * If we force the display row, this is because the screen
+		 * has been cleared or the font has been changed.
+		 * In this case, choose not to keep pointers to the PROM
+		 * cursor position, as the values are likely to be inaccurate
+		 * upon shutdown...
+		 */
+		sf->sf_crowp = sf->sf_ccolp = NULL;
 		sf->sf_ro.ri_crow = row;
-		if (sf->sf_crowp != NULL)
-			*sf->sf_crowp = row;
 	}
 
 	/*
@@ -406,10 +412,15 @@ fbwscons_setcolormap(struct sunfb *sf,
 			color = (u_char *)&rasops_cmap[i * 3];
 			setcolor(sf, i, color[0], color[1], color[2]);
 		}
+		for (i = 240; i < 256; i++) {
+			color = (u_char *)&rasops_cmap[i * 3];
+			setcolor(sf, i, color[0], color[1], color[2]);
+		}
 		/* compensate for BoW palette */
 		setcolor(sf, WSCOL_BLACK, 0, 0, 0);
-		setcolor(sf, 255, 0, 0, 0);	/* cursor */
+		setcolor(sf, 0xff ^ WSCOL_BLACK, 255, 255, 255);
 		setcolor(sf, WSCOL_WHITE, 255, 255, 255);
+		setcolor(sf, 0xff ^ WSCOL_WHITE, 0, 0, 0);
 	}
 }
 

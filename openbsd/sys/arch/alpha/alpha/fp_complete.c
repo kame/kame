@@ -1,4 +1,4 @@
-/*	$OpenBSD: fp_complete.c,v 1.1 2002/04/28 20:55:14 pvalchev Exp $	*/
+/*	$OpenBSD: fp_complete.c,v 1.3 2003/12/22 19:59:37 jmc Exp $	*/
 /*	$NetBSD: fp_complete.c,v 1.5 2002/01/18 22:15:56 ross Exp $	*/
 
 /*-
@@ -404,7 +404,7 @@ u_int64_t
 alpha_read_fp_c(struct proc *p)
 {
 	/*
-	 * A possibly-desireable EV6-specific optimization would deviate from
+	 * A possibly desirable EV6-specific optimization would deviate from
 	 * the Alpha Architecture spec and keep some FP_C bits in the FPCR,
 	 * but in a transparent way. Some of the code for that would need to
 	 * go right here.
@@ -627,7 +627,7 @@ alpha_fp_complete(u_long a0, u_long a1, struct proc *p, u_int64_t *ucode)
 	if (!(a0 & 1))
 		return sig;
 /*
- * At this point we are somwhere in the trap shadow of one or more instruc-
+ * At this point we are somewhere in the trap shadow of one or more instruc-
  * tions that have trapped with software completion specified.  We have a mask
  * of the registers written by trapping instructions.
  * 

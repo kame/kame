@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_xl_cardbus.c,v 1.12 2002/10/12 01:09:44 krw Exp $ */
+/*	$OpenBSD: if_xl_cardbus.c,v 1.14 2003/10/30 03:16:58 itojun Exp $ */
 /*	$NetBSD: if_xl_cardbus.c,v 1.13 2000/03/07 00:32:52 mycroft Exp $	*/
 
 /*
@@ -170,6 +170,7 @@ const struct xl_cardbus_product {
 	{ 0,
 	  0,
 	  0,
+	  0,
 	  NULL },
 };
 
@@ -275,7 +276,7 @@ xl_cardbus_attach(parent, self, aux)
 	    command);
   
  	/*
-	 * set latency timmer
+	 * set latency timer
 	 */
 	bhlc = cardbus_conf_read(cc, cf, ca->ca_tag, CARDBUS_BHLC_REG);
 	if (CARDBUS_LATTIMER(bhlc) < 0x20) {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: lofn.c,v 1.23 2003/06/02 19:08:58 jason Exp $	*/
+/*	$OpenBSD: lofn.c,v 1.25 2004/02/03 17:17:33 deraadt Exp $	*/
 
 /*
  * Copyright (c) 2001-2002 Jason L. Wright (jason@thought.net)
@@ -43,8 +43,6 @@
 #include <sys/kernel.h>
 #include <sys/mbuf.h>
 #include <sys/device.h>
-
-#include <uvm/uvm_extern.h>
 
 #include <crypto/cryptodev.h>
 #include <dev/rndvar.h>
@@ -169,7 +167,7 @@ lofn_attach(parent, self, aux)
 
 	crypto_kregister(sc->sc_cid, algs, lofn_kprocess);
 
-	printf(": %s\n", intrstr);
+	printf(": PK, %s\n", intrstr);
 
 	return;
 

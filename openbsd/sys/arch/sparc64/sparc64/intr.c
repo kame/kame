@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.c,v 1.17 2003/06/12 01:07:31 deraadt Exp $	*/
+/*	$OpenBSD: intr.c,v 1.20 2004/01/10 09:10:07 deraadt Exp $	*/
 /*	$NetBSD: intr.c,v 1.39 2001/07/19 23:38:11 eeh Exp $ */
 
 /*
@@ -103,7 +103,7 @@ strayintr(fp, vectored)
 	if ((fp->tf_pil == PIL_SER) /* && swallow_zsintrs */) return;
 
 	printf("stray interrupt ipl %u pc=%llx npc=%llx pstate=%b "
-	    "vecttored=%d\n", fp->tf_pil, (unsigned long long)fp->tf_pc,
+	    "vectored=%d\n", fp->tf_pil, (unsigned long long)fp->tf_pc,
 	    (unsigned long long)fp->tf_npc, fp->tf_tstate>>TSTATE_PSTATE_SHIFT,
 	    PSTATE_BITS, vectored);
 
@@ -137,6 +137,8 @@ softintr(fp)
 #endif
 	return (1);
 }
+
+int netisr;
 
 int
 softnet(fp)
@@ -236,7 +238,7 @@ intr_establish(level, ih)
 	}
 #endif
 
-	if (ih->ih_number <= 0 || ih->ih_number > MAXINTNUM)
+	if (ih->ih_number <= 0 || ih->ih_number >= MAXINTNUM)
 		panic("intr_establish: bad intr number %x", ih->ih_number);
 
 	q = intrlev[ih->ih_number];

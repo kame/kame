@@ -1,4 +1,4 @@
-/*	$OpenBSD: aed.c,v 1.6 2002/09/15 09:01:58 deraadt Exp $	*/
+/*	$OpenBSD: aed.c,v 1.8 2003/10/16 03:54:48 deraadt Exp $	*/
 /*	$NetBSD: aed.c,v 1.5 2000/03/23 06:40:33 thorpej Exp $	*/
 
 /*
@@ -78,10 +78,7 @@ struct cfattach aed_ca = {
 };
 
 int
-aedmatch(parent, cf, aux)
-	struct device *parent;
-	void *cf;
-	void *aux;
+aedmatch(struct device *parent, void *cf, void *aux)
 {
 	struct adb_attach_args *aa_args = (struct adb_attach_args *)aux;
 	static int aed_matched = 0;
@@ -95,9 +92,7 @@ aedmatch(parent, cf, aux)
 }
 
 void
-aedattach(parent, self, aux)
-	struct device *parent, *self;
-	void   *aux;
+aedattach(struct device *parent, struct device *self, void *aux)
 {
 	struct adb_attach_args *aa_args = (struct adb_attach_args *)aux;
 	struct aed_softc *sc = (struct aed_softc *)self;
@@ -117,11 +112,11 @@ aedattach(parent, self, aux)
 	sc->sc_rptinterval = 6;
 	sc->sc_repeating = -1;          /* not repeating */
 
-	/* Pull in the options flags. */ 
+	/* Pull in the options flags. */
 	sc->sc_options = (sc->sc_dev.dv_cfdata->cf_flags | aed_options);
 
 	sc->sc_ioproc = NULL;
-	
+
 	sc->sc_buttons = 0;
 
 	sc->sc_open = 0;
@@ -130,14 +125,13 @@ aedattach(parent, self, aux)
 }
 
 /*
- * Given a keyboard ADB event, record the keycode and call the key 
+ * Given a keyboard ADB event, record the keycode and call the key
  * repeat handler, optionally passing the event through the mouse
  * button emulation handler first.  Pass mouse events directly to
  * the handoff function.
  */
 void
-aed_input(event)
-        adb_event_t *event;
+aed_input(adb_event_t *event)
 {
         adb_event_t new_event = *event;
 
@@ -167,9 +161,8 @@ aed_input(event)
  * 3rd mouse button events while the 1, 2, and 3 keys will generate
  * the corresponding mouse button event.
  */
-void 
-aed_emulate_mouse(event)
-	adb_event_t *event;
+void
+aed_emulate_mouse(adb_event_t *event)
 {
 	static int emulmodkey_down = 0;
 	adb_event_t new_event;
@@ -304,9 +297,8 @@ aed_emulate_mouse(event)
  * for the repeating key and schedules the next call at sc_rptinterval
  * ticks in the future.
  */
-void 
-aed_kbdrpt(kstate)
-	void *kstate;
+void
+aed_kbdrpt(void *kstate)
 {
 	struct aed_softc *aed_sc = (struct aed_softc *)kstate;
 
@@ -329,18 +321,17 @@ aed_kbdrpt(kstate)
  * a new repeating key event if needed, and hands the event off to the
  * appropriate subsystem.
  */
-void 
-aed_dokeyupdown(event)
-	adb_event_t *event;
+void
+aed_dokeyupdown(adb_event_t *event)
 {
 	int     kbd_key;
 
 	kbd_key = ADBK_KEYVAL(event->u.k.key);
 	if (ADBK_PRESS(event->u.k.key) && keyboard[kbd_key][0] != 0) {
 		/* ignore shift & control */
-		if (aed_sc->sc_repeating != -1) {
+		if (aed_sc->sc_repeating != -1)
 			timeout_del(&aed_sc->sc_repeat_ch);
-		}
+
 		aed_sc->sc_rptevent = *event;
 		aed_sc->sc_repeating = kbd_key;
 		timeout_add(&aed_sc->sc_repeat_ch, aed_sc->sc_rptdelay);
@@ -359,8 +350,7 @@ aed_dokeyupdown(event)
  * and we are not polling.
  */
 void
-aed_handoff(event)
-	adb_event_t *event;
+aed_handoff(adb_event_t *event)
 {
 	if (aed_sc->sc_open && !adb_polling)
 		aed_enqevent(event);
@@ -369,9 +359,8 @@ aed_handoff(event)
 /*
  * Place the event in the event queue and wakeup any waiting processes.
  */
-void 
-aed_enqevent(event)
-	adb_event_t *event;
+void
+aed_enqevent(adb_event_t *event)
 {
 	int     s;
 
@@ -400,11 +389,8 @@ aed_enqevent(event)
 	splx(s);
 }
 
-int 
-aedopen(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+int
+aedopen(dev_t dev, int flag, int mode, struct proc *p)
 {
 	int unit;
 	int error = 0;
@@ -430,11 +416,8 @@ aedopen(dev, flag, mode, p)
 }
 
 
-int 
-aedclose(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+int
+aedclose(dev_t dev, int flag, int mode, struct proc *p)
 {
 	int s = spladb();
 
@@ -446,11 +429,8 @@ aedclose(dev, flag, mode, p)
 }
 
 
-int 
-aedread(dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
-	int flag;
+int
+aedread(dev_t dev, struct uio *uio, int flag)
 {
 	int s, error;
 	int willfit;
@@ -495,7 +475,7 @@ aedread(dev, uio, flag)
 }
 
 
-int 
+int
 aedwrite(dev, uio, flag)
 	dev_t dev;
 	struct uio *uio;
@@ -505,13 +485,8 @@ aedwrite(dev, uio, flag)
 }
 
 
-int 
-aedioctl(dev, cmd, data, flag, p)
-	dev_t dev;
-	u_long cmd;
-	caddr_t data;
-	int flag;
-	struct proc *p;
+int
+aedioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 {
 	switch (cmd) {
 	case ADBIOCDEVSINFO:

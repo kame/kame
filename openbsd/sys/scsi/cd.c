@@ -1,4 +1,4 @@
-/*	$OpenBSD: cd.c,v 1.72 2003/07/30 16:57:54 tedu Exp $	*/
+/*	$OpenBSD: cd.c,v 1.74 2004/02/15 02:45:47 tedu Exp $	*/
 /*	$NetBSD: cd.c,v 1.100 1997/04/02 02:29:30 mycroft Exp $	*/
 
 /*
@@ -705,7 +705,7 @@ cdstart(v)
 		    (u_char *) bp->b_data, bp->b_bcount,
 		    CDRETRIES, 30000, bp, SCSI_NOSLEEP |
 		    ((bp->b_flags & B_READ) ? SCSI_DATA_IN : SCSI_DATA_OUT))) {
-			disk_unbusy(&cd->sc_dk, 0);
+			disk_unbusy(&cd->sc_dk, 0, 0);
 			printf("%s: not queued", cd->sc_dev.dv_xname);
 		}
 	}
@@ -718,7 +718,8 @@ cddone(xs)
 	struct cd_softc *cd = xs->sc_link->device_softc;
 
 	if (xs->bp != NULL)
-		disk_unbusy(&cd->sc_dk, xs->bp->b_bcount - xs->bp->b_resid);
+		disk_unbusy(&cd->sc_dk, xs->bp->b_bcount - xs->bp->b_resid,
+		    (xs->bp->b_flags & B_READ));
 }
 
 void
@@ -774,8 +775,8 @@ cdwrite(dev, uio, ioflag)
 }
 
 /*
- * conversion between minute-seconde-frame and logical block adress
- * adresses format
+ * conversion between minute-seconde-frame and logical block address
+ * addresses format
  */
 void
 lba2msf (lba, m, s, f)

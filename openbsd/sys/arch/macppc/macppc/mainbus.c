@@ -1,21 +1,21 @@
-/*	$OpenBSD: mainbus.c,v 1.7 2002/09/15 09:01:58 deraadt Exp $	*/
+/*	$OpenBSD: mainbus.c,v 1.10 2003/10/30 03:17:32 itojun Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
  * All rights reserved.
  *
  * Author: Chris G. Demetriou
- * 
+ *
  * Permission to use, copy, modify and distribute this software and
  * its documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
- * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" 
- * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND 
+ *
+ * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+ * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND
  * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
  *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
@@ -49,7 +49,7 @@ struct cfattach mainbus_ca = {
 	sizeof(struct mainbus_softc), mbmatch, mbattach
 };
 struct cfdriver mainbus_cd = {
-	NULL, "mainbus", DV_DULL, NULL, 0
+	NULL, "mainbus", DV_DULL
 };
 
 void	mb_intr_establish(struct confargs *, int (*)(void *), void *);
@@ -59,10 +59,7 @@ int	mb_matchname(struct confargs *, char *);
 
 /*ARGSUSED*/
 static int
-mbmatch(parent, cfdata, aux)
-	struct device *parent;
-	void *cfdata;
-	void *aux;
+mbmatch(struct device *parent, void *cfdata, void *aux)
 {
 
 	/*
@@ -72,10 +69,7 @@ mbmatch(parent, cfdata, aux)
 }
 
 static void
-mbattach(parent, self, aux)
-	struct device *parent;
-	struct device *self;
-	void *aux;
+mbattach(struct device *parent, struct device *self, void *aux)
 {
 	struct mainbus_softc *sc = (struct mainbus_softc *)self;
 	struct confargs nca;
@@ -103,8 +97,7 @@ mbattach(parent, self, aux)
 		nca.ca_name = "ofroot";
 		nca.ca_bus = &sc->sc_bus;
 		config_found(self, &nca, mbprint);
-	} 
-
+	}
 
 	/* The following machines have an ISA bus */
 	/* Do ISA first so the interrupt controller is set up! */
@@ -139,8 +132,7 @@ mbattach(parent, self, aux)
 				nca.ca_node = node;
 				nca.ca_bus = &sc->sc_bus;
 				config_found(self, &nca, mbprint);
-			} 
-
+			}
 		}
 	} else if (system_type != OFWMACH) {
 		nca.ca_name = "mpcpcibr";
@@ -151,9 +143,7 @@ mbattach(parent, self, aux)
 }
 
 static int
-mbprint(aux, pnp)
-	void *aux;
-	const char *pnp;
+mbprint(void *aux, const char *pnp)
 {
 	if (pnp)
 		return (QUIET);
@@ -161,33 +151,25 @@ mbprint(aux, pnp)
 }
 
 void
-mb_intr_establish(ca, handler, val)
-	struct confargs *ca;
-	int (*handler)(void *);
-	void *val;
+mb_intr_establish(struct confargs *ca, int (*handler)(void *), void *val)
 {
 	panic("can never mb_intr_establish");
 }
 
 void
-mb_intr_disestablish(ca)
-	struct confargs *ca;
+mb_intr_disestablish(struct confargs *ca)
 {
 	panic("can never mb_intr_disestablish");
 }
 
 caddr_t
-mb_cvtaddr(ca)
-	struct confargs *ca;
+mb_cvtaddr(struct confargs *ca)
 {
-
 	return (NULL);
 }
 
 int
-mb_matchname(ca, name)
-	struct confargs *ca;
-	char *name;
+mb_matchname(struct confargs *ca, char *name)
 {
 	return (strcmp(name, ca->ca_name) == 0);
 }
