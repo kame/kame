@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.36 2001/11/14 09:07:51 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.37 2001/11/14 11:42:54 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -122,6 +122,7 @@ natpt_lookForRule6(struct pcv *cv6)
 			if (isDump(D_MATCHINGRULE6))
 				natpt_logIp6(LOG_DEBUG, cv6->ip.ip6, "%s():", fn);
 			cv6->fromto = NATPT_FROM;
+			splx(s);
 			return (csl);
 		}
 	}
@@ -174,6 +175,7 @@ natpt_lookForRule4(struct pcv *cv4)
 			if (isDump(D_MATCHINGRULE4))
 				natpt_logIp4(LOG_DEBUG, cv4->ip.ip4, "%s():", fn);
 			cv4->fromto = NATPT_FROM;
+			splx(s);
 			return (csl);
 		}
 
@@ -184,6 +186,7 @@ natpt_lookForRule4(struct pcv *cv4)
 				if (isDump(D_MATCHINGRULE4))
 					natpt_logIp4(LOG_DEBUG, cv4->ip.ip4, "%s():", fn);
 				cv4->fromto = NATPT_TO;
+				splx(s);
 				return (csl);
 			}
 		}
