@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.878 2000/05/15 10:20:48 jinmei Exp $
+$Id: CHANGELOG,v 1.879 2000/05/15 13:48:59 itojun Exp $
 
 <200005>
+Mon May 15 22:39:20 JST 2000  itojun@iijlab.net
+	* openbsd/usr.bin/ftp/fetch.c: parse RFC2372 ftp URL correctly.
+
 2000-05-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/v6test/conf/ext.conf (jumbolack): added to see if the
 	target is coformant to the 1st validation in Section 3. of rfc
