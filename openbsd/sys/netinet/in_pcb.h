@@ -185,9 +185,6 @@ struct inpcbtable {
 
 #if 1	/*KAME*/
 /* flags in in6p_flags */
-#define IN6P_RECVOPTS		INP_RECVOPTS	/* recv incoming IP6 options */
-#define IN6P_RECVRETOPTS	INP_RECVRETOPTS /* recv IP6 options for reply */
-#define IN6P_RECVDSTADDR	INP_RECVDSTADDR /* recv IP6 dst address */
 #define IN6P_HIGHPORT		INP_HIGHPORT	/* user wants "high" port */
 #define IN6P_LOWPORT		INP_LOWPORT	/* user wants "low" port */
 #define IN6P_ANONPORT		0x40		/* port chosen for user */
