@@ -182,6 +182,7 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 	struct ifnet *ifp;
 	int size;
 	int iphlen;
+	int ipseclen;
 
 	switch (tp->t_family) {
 	case AF_INET:
@@ -238,28 +239,23 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 	 * XXX tp->t_ourmss should have the right size, but without this code
 	 * fragmentation will occur... need more investigation
 	 */
+	ipseclen = 0;
 	if (inp) {
 #ifdef IPSEC
-		size_t t = ipsec4_hdrsiz_tcp(tp);
-		if (t < size)
-			size -= t;
+		ipseclen = ipsec4_hdrsiz_tcp(tp);
 #endif
 		size -= ip_optlen(inp);
 	}
 #ifdef INET6
 	else if (in6p && tp->t_family == AF_INET) {
 #ifdef IPSEC
-		size_t t = ipsec4_hdrsiz_tcp(tp);
-		if (t < size)
-			size -= t;
+		ipseclen = ipsec4_hdrsiz_tcp(tp);
 #endif
 		/* XXX size -= ip_optlen(in6p); */
 	}
 	else if (in6p && tp->t_family == AF_INET6) {
 #if defined(IPSEC) && !defined(TCP6)
-		size_t t = ipsec6_hdrsiz_tcp(tp);
-		if (t < size)
-			size -= t;
+		ipseclen = ipsec6_hdrsiz_tcp(tp);
 #endif
 		size -= ip6_optlen(in6p);
 	}
@@ -270,8 +266,11 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 	 * *rxsegsizep holds *estimated* inbound segment size (estimation
 	 * assumes that path MTU is the same for both ways).  this is only
 	 * for silly window avoidance, do not use the value for other purposes.
+	 *
+	 * ipseclen is subtracted from outbound segment size only, as we
+	 * do not know about ipsec policy configured on the peer.
 	 */
-	*txsegsizep = min(tp->t_peermss, size);
+	*txsegsizep = min(tp->t_peermss, size - ipseclen);
 	*rxsegsizep = min(tp->t_ourmss, size);
 
 	if (*txsegsizep != tp->t_segsz) {
