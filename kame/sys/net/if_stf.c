@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.38 2000/05/22 06:57:09 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.39 2000/06/07 23:35:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * 6to4 interface, based on draft-ietf-ngtrans-6to4-05.txt.
+ * 6to4 interface, based on draft-ietf-ngtrans-6to4-06.txt.
  *
  * 6to4 interface is NOT capable of link-layer (I mean, IPv4) multicasting.
  * There is no address mapping defined from IPv6 multicast address to IPv4
