@@ -1,4 +1,4 @@
-/*	$KAME: route.c,v 1.14 2000/12/04 06:45:31 itojun Exp $	*/
+/*	$KAME: route.c,v 1.15 2000/12/22 09:17:46 jinmei Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Southern California.
@@ -294,7 +294,7 @@ add_leaf(vifi, source, group)
     if_set     new_oifs;
     if_set     new_leaves;
 
-    if ((uvifs[vifi].uv_flags & VIFF_DR) != 0) {
+    if ((uvifs[vifi].uv_flags & VIFF_DR) == 0) {
 	    /*
 	     * I am not the DR on the subnet on which the report is received.
 	     * Ignore the report.
