@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.52 2001/03/01 08:54:34 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.53 2001/03/01 09:12:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -587,13 +587,11 @@ ah4_input(m, va_alist)
 		}
 
 		if (nxt != IPPROTO_DONE) {
-#ifdef PR_LASTHDR
 			if ((inetsw[ip_protox[nxt]].pr_flags & PR_LASTHDR) != 0 &&
 			    ipsec4_in_reject(m, NULL)) {
 				ipsecstat.in_polvio++;
 				goto fail;
 			}
-#endif
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);
 		} else
 			m_freem(m);
