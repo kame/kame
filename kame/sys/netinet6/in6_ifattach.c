@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.174 2002/09/17 05:28:13 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.175 2002/10/29 09:59:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -687,7 +687,7 @@ in6_ifattach_linklocal(ifp, altifp)
 	}
 
 	/*
-	 * Make the link-local prefix (fe80::/64%link) as on-link.
+	 * Make the link-local prefix (fe80::%link/64) as on-link.
 	 * Since we'd like to manage prefixes separately from addresses,
 	 * we make an ND6 prefix structure for the link-local prefix,
 	 * and add it to the prefix list as a never-expire prefix.
