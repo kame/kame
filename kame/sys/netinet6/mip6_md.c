@@ -33,7 +33,7 @@
  *
  * Author:  Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  *
- * $Id: mip6_md.c,v 1.8 2000/02/19 13:11:41 itojun Exp $
+ * $Id: mip6_md.c,v 1.9 2000/02/20 08:29:43 itojun Exp $
  *
  */
 
@@ -71,6 +71,8 @@
 #endif
 #include <netinet6/in6_pcb.h>
 #include <netinet6/mip6.h>
+
+#include <net/net_osdep.h>
 
 struct nd_prefix *mip6_home_prefix;
 struct nd_prefix *mip6_primary_prefix;
@@ -1015,8 +1017,8 @@ mip6_delete_ifaddr(struct in6_addr *addr,
 		} else
 			ifp->if_addrlist = &ia->ia_ifa;
 #else
-		TAILQ_INSERT_TAIL(&ifp->if_addrhead, &ia->ia_ifa,
-				  ifa_link);
+		TAILQ_INSERT_TAIL(&ifp->if_addrlist, &ia->ia_ifa,
+				  ifa_list);
 #endif
 		ia->ia_ifa.ifa_refcnt++;
 	}
