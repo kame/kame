@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.3 2003/01/06 06:45:02 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.4 2003/01/14 07:36:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -112,7 +112,7 @@ update_ia(iatype, ialist, ifp, serverid)
 			continue;
 
 		/* validate parameters */
-		if (iav->val_ia.t1 > iav->val_ia.t2) {
+		if (iav->val_ia.t2 != 0 && iav->val_ia.t1 > iav->val_ia.t2) {
 			dprintf(LOG_INFO, "%s" "invalid IA: T1(%lu) > T2(%lu)",
 			    FNAME, iav->val_ia.t1, iav->val_ia.t2);
 			continue; /* XXX: or should we try to recover? */
