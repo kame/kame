@@ -56,7 +56,7 @@ static char rcsid[] = "$OpenBSD: telnetd.c,v 1.16 1998/12/19 01:27:07 deraadt Ex
 #include <sys/cdefs.h>
 #define P __P
 
-void doit P((struct sockaddr_in *));
+void doit P((struct sockaddr *));
 void startslave P((char *, int, char *));
 int terminaltypeok P((char *));
 
@@ -96,6 +96,7 @@ int	auth_level = 0;
 #include <libtelnet/encrypt.h>
 #include <libtelnet/misc-proto.h>
 #endif
+#include <netdb.h>
 
 extern	int utmp_len;
 int	registerd_host_only = 0;
@@ -106,6 +107,7 @@ int	registerd_host_only = 0;
 /* make sure we don't get the bsd version */
 # include "/usr/include/sys/tty.h"
 # include <sys/ptyvar.h>
+
 
 /*
  * Because of the way ptyibuf is used with streams messages, we need
@@ -178,7 +180,7 @@ char valid_opts[] = {
 main(argc, argv)
 	char *argv[];
 {
-	struct sockaddr_in from;
+	struct sockaddr_storage from;
 	int on = 1, fromlen;
 	register int ch;
 	extern char *optarg;
@@ -529,7 +531,7 @@ main(argc, argv)
 	}
 #endif	/* defined(IPPROTO_IP) && defined(IP_TOS) */
 	net = 0;
-	doit(&from);
+	doit((struct sockaddr *)&from);
 	/* NOTREACHED */
 	return (0);
 }  /* end of main */
@@ -798,13 +800,16 @@ extern void telnet P((int, int, char *));
  */
 	void
 doit(who)
-	struct sockaddr_in *who;
+	struct sockaddr *who;
 {
 	char *host = NULL, *inet_ntoa();
 	struct hostent *hp;
 	int level;
 	int ptynum;
 	char user_name[256];
+	char *ap;
+	size_t alen;
+	char hbuf[MAXHOSTNAMELEN];
 
 	/*
 	 * Find an available pty to use.
@@ -847,8 +852,24 @@ doit(who)
 #endif	/* _SC_CRAY_SECURE_SYS */
 
 	/* get name of connected client */
-	hp = gethostbyaddr((char *)&who->sin_addr, sizeof (struct in_addr),
-		who->sin_family);
+	switch (who->sa_family) {
+	case AF_INET:
+		ap = (char *)&((struct sockaddr_in *)who)->sin_addr;
+		alen = sizeof(struct in_addr);
+		break;
+	case AF_INET6:
+		ap = (char *)&((struct sockaddr_in6 *)who)->sin6_addr;
+		alen = sizeof(struct in6_addr);
+		break;
+	default:
+		ap = NULL;
+		alen = 0;
+		break;
+	}
+	if (ap)
+		hp = gethostbyaddr(ap, alen, who->sa_family);
+	else
+		hp = NULL;
 
 	if (hp == NULL && registerd_host_only) {
 		fatal(net, "Couldn't resolve your address into a host name.\r\n\
@@ -858,7 +879,9 @@ doit(who)
 								 : utmp_len))) {
 		host = hp->h_name;
 	} else {
-		host = inet_ntoa(who->sin_addr);
+		getnameinfo(who, who->sa_len, hbuf, sizeof(hbuf), NULL, 0,
+			NI_NUMERICHOST);
+		host = hbuf;
 	}
 	/*
 	 * We must make a copy because Kerberos is probably going

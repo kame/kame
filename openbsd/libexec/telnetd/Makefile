@@ -15,10 +15,17 @@ MAN=	telnetd.8
 
 .include <bsd.own.mk> # for KERBEROS
 
-.if (${KERBEROS} == "yes")
-CFLAGS+=-DENCRYPTION -DAUTHENTICATION -DKRB4 -I${.CURDIR}/../../lib
-LDADD+= -lkrb -ldes
-DPADD+= ${LIBDES} ${LIBKRB}
-.endif
+#.if (${KERBEROS} == "yes")
+#CFLAGS+=-DENCRYPTION -DAUTHENTICATION -DKRB4 -I${.CURDIR}/../../lib
+#LDADD+= -lkrb -ldes
+#DPADD+= ${LIBDES} ${LIBKRB}
+#.endif
+
+LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
+	-L${.CURDIR}/../../lib/libinet6/obj \
+	-L/usr/local/v6/lib -linet6
+DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
+	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
 
 .include <bsd.prog.mk>
