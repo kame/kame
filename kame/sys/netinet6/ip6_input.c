@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.307 2003/02/19 03:19:16 keiichi Exp $	*/
+/*	$KAME: ip6_input.c,v 1.308 2003/04/02 10:06:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1153,8 +1153,6 @@ ip6_input(m)
 		ip6_forward(m, 0);
 		return;
 	}
-
-	ip6 = mtod(m, struct ip6_hdr *);
 
 	/*
 	 * Tell launch routine the next header
