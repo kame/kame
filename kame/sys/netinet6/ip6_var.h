@@ -347,6 +347,7 @@ void	frag6_drain __P((void));
 
 void	rip6_init __P((void));
 int	rip6_input __P((struct mbuf **mp, int *offp, int proto));
+void	rip6_ctlinput __P((int, struct sockaddr *, void *));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 int	rip6_ctloutput __P((struct socket *so, struct sockopt *sopt));
 #else

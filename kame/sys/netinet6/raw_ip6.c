@@ -90,6 +90,7 @@
 #include <netinet/icmp6.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/nd6.h>
+#include <netinet6/ip6protosw.h>
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -229,6 +230,61 @@ rip6_input(mp, offp, proto)
 		ip6stat.ip6s_delivered--;
 	}
 	return IPPROTO_DONE;
+}
+
+void
+rip6_ctlinput(cmd, sa, d)
+	int cmd;
+	struct sockaddr *sa;
+	void *d;
+{
+	struct sockaddr_in6 sa6;
+	register struct ip6_hdr *ip6;
+	struct mbuf *m;
+	int off;
+
+	if (sa->sa_family != AF_INET6 ||
+	    sa->sa_len != sizeof(struct sockaddr_in6))
+		return;
+
+	if (!PRC_IS_REDIRECT(cmd) &&
+	    ((unsigned)cmd >= PRC_NCMDS || inet6ctlerrmap[cmd] == 0))
+		return;
+
+	/* if the parameter is from icmp6, decode it. */
+	if (d != NULL) {
+		struct ip6ctlparam *ip6cp = (struct ip6ctlparam *)d;
+		m = ip6cp->ip6c_m;
+		ip6 = ip6cp->ip6c_ip6;
+		off = ip6cp->ip6c_off;
+	} else {
+		m = NULL;
+		ip6 = NULL;
+	}
+
+	/* translate addresses into internal form */
+	sa6 = *(struct sockaddr_in6 *)sa;
+	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) && m && m->m_pkthdr.rcvif)
+		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+
+	if (ip6) {
+		/*
+		 * XXX: We assume that when IPV6 is non NULL,
+		 * M and OFF are valid.
+		 */
+		struct in6_addr s;
+
+		/* translate addresses into internal form */
+		memcpy(&s, &ip6->ip6_src, sizeof(s));
+		if (IN6_IS_ADDR_LINKLOCAL(&s))
+			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+
+		(void) in6_pcbnotify(&rawin6pcb, (struct sockaddr *)&sa6,
+					0, &s, 0, cmd, in6_rtchange);
+	} else {
+		(void) in6_pcbnotify(&rawin6pcb, (struct sockaddr *)&sa6, 0,
+					&zeroin6_addr, 0, cmd, in6_rtchange);
+	}
 }
 
 /*
