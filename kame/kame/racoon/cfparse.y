@@ -154,7 +154,7 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 %type <num> LIFETYPE UNITTYPE
 %type <num> SECLEVELTYPE SECMODETYPE 
 %type <num> EXCHANGETYPE DOITYPE SITUATIONTYPE CERTTYPE
-%type <val> QUOTEDSTRING HEXSTRING ADDRSTRING
+%type <val> QUOTEDSTRING HEXSTRING ADDRSTRING STATICSA_STATEMENT
 %type <res> ike_addrinfo_port
 %type <spidx> policy_index
 %type <saddr> remote_index
@@ -219,6 +219,7 @@ identifier_stmt
 	:	VENDORID QUOTEDSTRING EOS
 		{
 			lcconf->vendorid = vdup(&$2);
+			free($2.v);
 			if (lcconf->vendorid == NULL) {
 				yyerror("failed to set vendorid: %s",
 					strerror(errno));
@@ -249,8 +250,8 @@ log_level
 				u_long v;
 				v = strtoul($1.v, NULL, 0);
 				debug |= v;
-				free($1.v);
 			}
+			free($1.v);
 		}
 	|	LOGLEV
 		{
@@ -831,6 +832,7 @@ staticsa_statement
 		{
 			/* execute static sa */
 			/* system("setkey $2.v"); */
+			free($2.v);
 		}
 	;
 
