@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.7 2001/01/27 00:39:59 thorpej Exp $	*/
+/*	$KAME: gssapi.c,v 1.8 2001/01/27 19:43:11 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -71,11 +71,9 @@
 
 gss_cred_id_t gss_racoon_cred;
 
-static int gssapi_init(struct ph1handle *);
 static int gssapi_get_default_name(struct ph1handle *, int, gss_name_t *);
 
-
-void
+static void
 gssapi_error(OM_uint32 status_code, const char *where,
 	     const char *fmt, ...)
 {
@@ -136,13 +134,23 @@ gssapi_init(struct ph1handle *iph1)
 	    &canon_princ);
 	if (GSS_ERROR(maj_stat)) {
 		gssapi_error(maj_stat, LOCATION, "canonicalize name\n");
+		maj_stat = gss_release_name(&min_stat, &princ);
+		if (GSS_ERROR(maj_stat))
+			gssapi_error(maj_stat, LOCATION, "release princ\n");
 		gssapi_free_state(iph1);
 		return -1;
 	}
+	maj_stat = gss_release_name(&min_stat, &princ);
+	if (GSS_ERROR(maj_stat))
+		gssapi_error(maj_stat, LOCATION, "release princ\n");
 
 	maj_stat = gss_export_name(&min_stat, canon_princ, cred);
 	if (GSS_ERROR(maj_stat)) {
 		gssapi_error(maj_stat, LOCATION, "export name\n");
+		maj_stat = gss_release_name(&min_stat, &canon_princ);
+		if (GSS_ERROR(maj_stat))
+			gssapi_error(maj_stat, LOCATION,
+			    "release canon_princ\n");
 		gssapi_free_state(iph1);
 		return -1;
 	}
@@ -150,13 +158,20 @@ gssapi_init(struct ph1handle *iph1)
 	plog(LLV_DEBUG, LOCATION, NULL, "will try to acquire '%*s' creds\n",
 	    cred->length, cred->value);
 
-	maj_stat = gss_acquire_cred(&min_stat, princ, GSS_C_INDEFINITE,
+	maj_stat = gss_acquire_cred(&min_stat, canon_princ, GSS_C_INDEFINITE,
 	    GSS_C_NO_OID_SET, GSS_C_BOTH, &gps->gss_cred, NULL, NULL);
 	if (GSS_ERROR(maj_stat)) {
 		gssapi_error(maj_stat, LOCATION, "acquire cred\n");
+		maj_stat = gss_release_name(&min_stat, &canon_princ);
+		if (GSS_ERROR(maj_stat))
+			gssapi_error(maj_stat, LOCATION,
+			    "release canon_princ\n");
 		gssapi_free_state(iph1);
 		return -1;
 	}
+	maj_stat = gss_release_name(&min_stat, &canon_princ);
+	if (GSS_ERROR(maj_stat))
+		gssapi_error(maj_stat, LOCATION, "release canon_princ\n");
 
 	return 0;
 }

@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.h,v 1.1 2000/12/12 16:59:35 thorpej Exp $	*/
+/*	$KAME: gssapi.h,v 1.2 2001/01/27 19:43:11 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -69,7 +69,6 @@ extern gss_cred_id_t gss_racoon_cred;
 #define gssapi_more_tokens(ph) \
   ((gssapi_get_state(ph)->gss_status & GSS_S_CONTINUE_NEEDED) != 0)
 
-void gssapi_error __P((OM_uint32, const char *, const char *, ...));
 int gssapi_get_itoken __P((struct ph1handle *, int *));
 int gssapi_get_rtoken __P((struct ph1handle *, int *));
 int gssapi_vm2gssbuf __P((vchar_t *, gss_buffer_t *));
