@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.97 2000/09/05 15:31:05 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.98 2000/09/06 14:17:15 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2146,7 +2146,6 @@ doit:
 }
 #endif /*HAVE_PRINT_ISAKMP_C*/
 
-/* XXX for anonymous configuration. */
 int
 copy_ph1addresses(iph1, rmconf, remote, local)
 	struct ph1handle *iph1;
