@@ -1,4 +1,4 @@
-.\"	$OpenBSD: ifconfig.8,v 1.28 1999/09/23 22:42:11 deraadt Exp $
+.\"	$OpenBSD: ifconfig.8,v 1.43 2000/04/26 19:03:46 chris Exp $
 .\"	$NetBSD: ifconfig.8,v 1.11 1996/01/04 21:27:29 pk Exp $
 .\"     $FreeBSD: ifconfig.8,v 1.16 1998/02/01 07:03:29 steve Exp $
 .\"
@@ -50,6 +50,16 @@
 .Oc
 .Op Ar parameters
 .Nm ifconfig
+.Ar gif-interface
+.Cm giftunnel
+.Ar src_address dest_address
+.Nm ifconfig
+.Ar vlan-interface
+.Cm vlan
+.Ar vlan-tag
+.Cm vlandev
+.Ar parent-interface
+.Nm ifconfig
 .Ar interface
 .Op Ar address_family
 .Nm ifconfig
@@ -63,22 +73,21 @@
 .Op Fl A | Am
 .Op Ar address_family
 .Sh DESCRIPTION
+The
 .Nm
-is used to assign an address
+utility is used to assign an address
 to a network interface and/or configure
 network interface parameters.
 .Nm
-must be used at boot time to define the network address
+must be used at boot-time to define the network address
 of each interface present on a machine; it may also be used at
 a later time to redefine an interface's address
-or other operating parameters.  To configure a bridge interface,
-use the
+or other operating parameters.
+To configure a bridge interface, use the
 .Xr brconfig 8
-program instead of
-.Nm ifconfig .
+program instead.
 .Pp
-Available operands for
-.Nm ifconfig :
+The operands are as follows:
 .Bl -tag -width Ds
 .It Ar address
 For the
@@ -108,14 +117,16 @@ and on interfaces other than the first.
 For the
 .Tn ISO
 family, addresses are specified as a long hexadecimal string,
-as in the Xerox family.  However, two consecutive dots imply a zero
+as in the Xerox family.
+However, two consecutive dots imply a zero
 byte, and the dots are optional, if the user wishes to (carefully)
 count out long strings of digits in network byte order.
 .Tn AppleTalk
 (LLAP) addresses are specified as nn.na (Network Number.Node Address).
 Node addresses are divided into 2 classes: User Node IDs and Server
 Node IDs. 1-127($01-$7F) are for User Node IDs while 128-254($80-$FE)
-are used for Server Node IDs. Node 0($00) is not allowed (unknown)
+are used for Server Node IDs.
+Node 0($00) is not allowed (unknown)
 while Node 255($FF) is reserved for the AppleTalk broadcast Hardware
 address (broadcast ID).
 .It Ar address_family
@@ -133,7 +144,7 @@ supported are
 .Dq ipx ,
 and
 .Dq ns .
-.It Ar Interface
+.It Ar interface
 The
 .Ar interface
 parameter is a string of the form
@@ -167,10 +178,19 @@ Set the IPv6 anycast address bit.
 (inet6 only)
 Clear the IPv6 anycast address bit.
 .It Cm broadcast Ar addr
-(Inet only)
+(inet only)
 Specify the address to use to represent broadcasts to the
 network.
 The default broadcast address is the address with a host part of all 1's.
+.It Cm clearsa
+Remove the binding between an SA and an
+.Xr enc 4
+interface, such as established with the
+.Cm srcsa
+or
+.Cm dstsa
+flags.
+If the all-zeroes SA is specified, the sending SA is cleared by default.
 .It Cm debug
 Enable driver dependent debugging code; usually, this turns on
 extra console error logging.
@@ -195,6 +215,52 @@ the system will not attempt to
 transmit messages through that interface.
 If possible, the interface will be reset to disable reception as well.
 This action does not automatically disable routes using the interface.
+.It Cm dstsa
+Bind an
+.Xr ipsec 4
+Security Association (SA) to an
+.Xr enc 4
+interface.
+The interface can then be used in conjunction with the
+.Xr bridge 4
+to establish virtual Local Area Networks (LANs).
+The SA is specified as
+.Ar address/SPI/protocol ,
+where
+.Ar address
+is an IPv4 or IPv6 address,
+.Ar SPI
+is a hexadecimal number, and
+.Ar protocol
+is a decimal number identifying the security protocol (typically 50
+for ESP, 51 for AH, or 4 for IP-in-IP).
+The SA must exist for the operation to be successfully completed.
+Typically, such SAs would be
+established via
+.Xr ipsecadm 1 .
+This SA will be used to send packets to a remote host via
+.Xr ipsec 4 .
+If the
+.Ar 0.0.0.0/0/0
+or
+.Ar ::/0/0
+SA is specified, any existing binding between the corresponding
+.Xr enc 4
+interface and the SA is cleared (in fact, just the SPI and the protocol
+part of the SA have to be set to zero).
+Only one SA may be bound to an
+.Xr enc 4
+interface at a time.
+SAs may not be bound to the
+.Dq enc0
+interface.
+.It Cm giftunnel
+Set the source and destination tunnel addresses on a
+.Xr gif 4
+interface.
+Packets routed to this interface will be encapsulated in
+IPv4 or IPv6, depending on the source and destination address families.
+Both addresses must be of the same family.
 .It Cm ipdst
 This is used to specify an Internet host who is willing to receive
 ip packets encapsulating NS packets bound for a remote network.
@@ -204,14 +270,25 @@ of the destination.
 IP encapsulation of
 .Tn CLNP
 packets is done differently.
+.It Cm link[0-2]
+Enable special processing of the link level of the interface.
+These three options are interface specific in actual effect; however,
+they are in general used to select special modes of operation.
+An example
+of this is to enable SLIP compression, or to select the connector type
+for some Ethernet cards.
+Refer to the man page for the specific driver for more information.
+.It Fl link[0-2]
+Disable special processing at the link level with the specified interface.
 .It Cm media Ar type
 Set the media type of the interface to
 .Ar type .
 Some interfaces support the mutually exclusive use of one of several
-different physical media connectors.  For example, a 10Mb/s Ethernet
-interface might support the use of either
+different physical media connectors.
+For example, a 10Mb/s Ethernet interface might support the use of either
 .Tn AUI
-or twisted pair connectors.  Setting the media type to
+or twisted pair connectors.
+Setting the media type to
 .Dq 10base5
 or
 .Dq AUI
@@ -220,7 +297,8 @@ Setting it to
 .Dq 10baseT
 or
 .Dq UTP
-would activate twisted pair.  Refer to the interfaces' driver
+would activate twisted pair.
+Refer to the interfaces' driver
 specific man page for a complete list of the available types.
 .It Cm mediaopt Ar opts
 Set the specified media options on the interface.
@@ -234,9 +312,52 @@ Disable the specified media options on the interface.
 Set the media instance to
 .Ar minst .
 This is useful for devices which have multiple physical layer interfaces
-(PHYs).  Setting the instance on such devices may not be strictly required
+(PHYs).
+Setting the instance on such devices may not be strictly required
 by the network interface driver as the driver may take care of this
 automatically; see the driver's manual page for more information.
+.It Cm vlan Ar vlan_tag
+If the interface is a vlan pseudo interface, set the vlan tag value
+to
+.Ar vlan_tag .
+This value is a 16-bit number which is used to create an 802.1Q
+vlan header for packets sent from the vlan interface. Note that
+.Cm vlan
+and
+.Cm vlandev
+must both be set at the same time.
+.It Cm vlandev Ar iface
+If the interface is a vlan pseudo device, associate physical interface
+.Ar iface
+with it. Packets transmitted through the vlan interface will be
+diverted to the specified physical interface
+.Ar iface
+with 802.1Q vlan encapsulation. Packets with 802.1Q encapsulation received
+by the parent interface with the correct vlan tag will be diverted to
+the associated vlan pseudo-interface. The vlan interface is assigned a
+copy of the parent interface's flags and the parent's ethernet address.
+The
+.Cm vlandev
+and
+.Cm vlan
+must both be set at the same time. If the vlan interface already has
+a physical interface associated with it, this command will fail. To
+change the association to another physical interface, the existing
+association must be cleared first.
+.Pp
+Note: if the
+.Ar link0
+flag is set on the vlan interface, the vlan pseudo
+interface's behavior changes: the
+.Ar link0
+tells the vlan interface that the
+parent interface supports insertion and extraction of vlan tags on its
+own (usually in firmware) and that it should pass packets to and from
+the parent unaltered.
+.It Fl vlandev
+If the driver is a vlan pseudo device, disassociate the physical interface
+from it. This breaks the link between the vlan interface and its parent,
+clears its vlan tag, flags and its link address and shuts the interface down.
 .It Cm metric Ar n
 Set the routing metric of the interface to
 .Ar n ,
@@ -247,7 +368,7 @@ Higher metrics have the effect of making a route
 less favorable; metrics are counted as addition hops
 to the destination network or host.
 .It Cm netmask Ar mask
-(inet, inet6 and ISO)
+(inet, inet6 and iso)
 Specify how much of the address to reserve for subdividing
 networks into sub-networks.
 The mask includes the network part of the local address
@@ -289,14 +410,10 @@ There is some evidence that a number different from 1 may be useful
 for
 .Tn AFI
 37 type addresses.
-.It Cm range
-Under AppleTalk, set the interface to respond to a
-.Em netrange
-of the form startnet-endnet. AppleTalk uses this scheme instead of
-netmasks though OpenBSD implements it internally as a set of netmasks.
 .It Cm phase
 The argument following this specifies the version (phase) of the
-AppleTalk network attached to the interface. Values of 1 or 2 are permitted.
+AppleTalk network attached to the interface.
+Values of 1 or 2 are permitted.
 .It Cm pltime Ar n
 (inet6 only)
 Set preferred lifetime for the address.
@@ -305,6 +422,39 @@ Set preferred lifetime for the address.
 Effect is similar to
 .Cm netmask ,
 but you can specify by prefix length by digits.
+.It Cm range
+Under AppleTalk, set the interface to respond to a
+.Em netrange
+of the form startnet-endnet.
+AppleTalk uses this scheme instead of
+netmasks though
+.Ox
+implements it internally as a set of netmasks.
+.It Cm srcsa
+Similar to
+.Cm dstsa ,
+this operation binds an
+.Xr ipsec 4
+SA to an
+.Xr enc 4
+interface.
+The SAs bound via this operation are receiving SAs.
+Any packets received over one of these SAs, will be made to appear as if
+it arrived by the corresponding
+.Xr enc 4
+interface.
+If the interface is part of a bridge, the packets will be
+delivered to the bridge.
+Contrary to the
+.Cm dstsa
+flag, multiple SAs may be bound to an
+.Xr enc 4
+interface via this operation.
+Similar to the
+.Cm dstsa
+flag, no SAs may be bound to the
+.Dq enc0
+interface.
 .It Cm tentative
 (inet6 only)
 Set the IPv6 tentative address bit.
@@ -333,15 +483,6 @@ Currently used by Internet protocols only.
 Disable the use of a
 .Dq trailer
 link level encapsulation.
-.It Cm link[0-2]
-Enable special processing of the link level of the interface.
-These three options are interface specific in actual effect; however,
-they are in general used to select special modes of operation. An example
-of this is to enable SLIP compression, or to select the connector type
-for some Ethernet cards.  Refer to the man page for the specific driver
-for more information.
-.It Fl link[0-2]
-Disable special processing at the link level with the specified interface.
 .It Cm up
 Mark an interface
 .Dq up .
@@ -367,14 +508,16 @@ Using
 causes
 .Nm
 to print information on all interfaces.
-The protocol family may be specified as well.  Additionally, if
+The protocol family may be specified as well.
+Additionally, if
 .Fl am ,
 is used, interface media information is printed.
 .Pp
 If
 .Fl A
 is used, it causes full interface alias information for each interface to
-be displayed. If
+be displayed.
+If
 .Fl Am
 is used, interface media information is printed for all interfaces
 as well.
@@ -384,7 +527,7 @@ If
 followed by an interface name is specified, then the media information
 for that interface will be printed.
 .Pp
-Only the super-user may modify the configuration of a network interface.
+Only the superuser may modify the configuration of a network interface.
 .Sh EXAMPLES
 .Bl -tag -width ifconfig
 .It Cm ifconfig fxp0 inet 192.168.1.10 netmask 255.255.255.0
@@ -403,6 +546,10 @@ Configure the xl0 interface to use 10baseT.
 .Pp
 .It Cm ifconfig xl0 media 100baseTX mediaopt full-duplex
 Configure the xl0 interface to use 100baseTX, full duplex.
+.Pp
+.It Cm ifconfig vlan0 192.168.254.1 vlan 4 vlandev fxp0
+Configure the vlan0 interface for IP address 192.168.254.1, vlan tag 4,
+and vlan parent device fxp0.
 .El
 .Sh DIAGNOSTICS
 Messages indicating the specified interface does not exist, the
