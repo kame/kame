@@ -55,6 +55,9 @@ static int pfkey_send_x1 __P((int so, u_int type, u_int satype, u_int mode,
 static int pfkey_send_x2 __P((int so, u_int type, u_int satype, u_int mode,
 	struct sockaddr *src, struct sockaddr *dst, u_int32_t spi));
 static int pfkey_send_x3 __P((int so, u_int type, u_int satype));
+static int pfkey_send_x4 __P((int so, u_int type,
+	struct sockaddr *src, u_int prefs, struct sockaddr *dst, u_int prefd,
+	u_int proto, char *policy, int policylen, u_int32_t seq));
 
 static caddr_t pfkey_setsadbmsg __P((caddr_t buf, u_int type, u_int tlen,
 	u_int satype, u_int mode, u_int32_t reqid, u_int32_t seq, pid_t pid));
@@ -552,65 +555,17 @@ pfkey_send_spdadd(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
 	int so;
 	struct sockaddr *src, *dst;
 	u_int prefs, prefd, proto;
-	char *policy;
+	caddr_t policy;
 	int policylen;
 	u_int32_t seq;
 {
-	struct sadb_msg *newmsg;
 	int len;
-	caddr_t p;
 
-	/* validity check */
-	if (src == NULL || dst == NULL) {
-		ipsec_errcode = EIPSEC_INVAL_ARGUMENT;
-		return -1;
-	}
-	if (src->sa_family != dst->sa_family) {
-		ipsec_errcode = EIPSEC_FAMILY_MISMATCH;
-		return -1;
-	}
-	if (prefs > (_INALENBYAF(src->sa_family) << 3)
-	 || prefd > (_INALENBYAF(dst->sa_family) << 3)) {
-		ipsec_errcode = EIPSEC_INVAL_PREFIXLEN;
-		return -1;
-	}
-
-	/* create new sadb_msg to reply. */
-	len = sizeof(struct sadb_msg)
-		+ sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(_SALENBYAF(src->sa_family))
-		+ sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(_SALENBYAF(src->sa_family))
-		+ policylen;
-
-	if ((newmsg = CALLOC(len, struct sadb_msg *)) == NULL) {
-		ipsec_set_strerror(strerror(errno));
-		return -1;
-	}
-
-	p = pfkey_setsadbmsg((caddr_t)newmsg, SADB_X_SPDADD, len,
-	                     SADB_SATYPE_UNSPEC, IPSEC_MODE_ANY, 0,
-			     seq, getpid());
-	p = pfkey_setsadbaddr(p,
-	                      SADB_EXT_ADDRESS_SRC,
-	                      src,
-	                      prefs,
-	                      proto);
-	p = pfkey_setsadbaddr(p,
-	                      SADB_EXT_ADDRESS_DST,
-	                      dst,
-	                      prefd,
-	                      proto);
-	memcpy(p, policy, policylen);
-
-	/* send message */
-	len = pfkey_send(so, newmsg, len);
-	free(newmsg);
-
-	if (len < 0)
+	if ((len = pfkey_send_x4(so, SADB_X_SPDADD,
+				src, prefs, dst, prefd, proto,
+				policy, policylen, seq)) < 0)
 		return -1;
 
-	ipsec_errcode = EIPSEC_NO_ERROR;
 	return len;
 }
 
@@ -622,65 +577,21 @@ pfkey_send_spdadd(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
  *	-1	: error occured, and set errno.
  */
 int
-pfkey_send_spddelete(so, src, prefs, dst, prefd, proto, seq)
+pfkey_send_spddelete(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
 	int so;
 	struct sockaddr *src, *dst;
 	u_int prefs, prefd, proto;
+	caddr_t policy;
+	int policylen;
 	u_int32_t seq;
 {
-	struct sadb_msg *newmsg;
 	int len;
-	caddr_t p;
 
-	/* validity check */
-	if (src == NULL || dst == NULL) {
-		ipsec_errcode = EIPSEC_INVAL_ARGUMENT;
-		return -1;
-	}
-	if (src->sa_family != dst->sa_family) {
-		ipsec_errcode = EIPSEC_FAMILY_MISMATCH;
-		return -1;
-	}
-	if (prefs > (_INALENBYAF(src->sa_family) << 3)
-	 || prefd > (_INALENBYAF(dst->sa_family) << 3)) {
-		ipsec_errcode = EIPSEC_INVAL_PREFIXLEN;
-		return -1;
-	}
-
-	/* create new sadb_msg to reply. */
-	len = sizeof(struct sadb_msg)
-		+ sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(_SALENBYAF(src->sa_family))
-		+ sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(_SALENBYAF(src->sa_family));
-
-	if ((newmsg = CALLOC(len, struct sadb_msg *)) == NULL) {
-		ipsec_set_strerror(strerror(errno));
-		return -1;
-	}
-
-	p = pfkey_setsadbmsg((caddr_t)newmsg, SADB_X_SPDDELETE, len,
-	                     SADB_SATYPE_UNSPEC, IPSEC_MODE_ANY, 0,
-			     seq, getpid());
-	p = pfkey_setsadbaddr(p,
-	                      SADB_EXT_ADDRESS_SRC,
-	                      src,
-	                      prefs,
-	                      proto);
-	p = pfkey_setsadbaddr(p,
-	                      SADB_EXT_ADDRESS_DST,
-	                      dst,
-	                      prefd,
-	                      proto);
-
-	/* send message */
-	len = pfkey_send(so, newmsg, len);
-	free(newmsg);
-
-	if (len < 0)
+	if ((len = pfkey_send_x4(so, SADB_X_SPDDELETE,
+				src, prefs, dst, prefd, proto,
+				policy, policylen, seq)) < 0)
 		return -1;
 
-	ipsec_errcode = EIPSEC_NO_ERROR;
 	return len;
 }
 
@@ -931,6 +842,74 @@ pfkey_send_x3(so, type, satype)
 	}
 
 	(void)pfkey_setsadbmsg((caddr_t)newmsg, type, len, satype, 0, 0, 0, getpid());
+
+	/* send message */
+	len = pfkey_send(so, newmsg, len);
+	free(newmsg);
+
+	if (len < 0)
+		return -1;
+
+	ipsec_errcode = EIPSEC_NO_ERROR;
+	return len;
+}
+
+/* sending SADB_X_SPDADD or SADB_X_SPDDELETE message to the kernel */
+static int
+pfkey_send_x4(so, type, src, prefs, dst, prefd, proto, policy, policylen, seq)
+	int so;
+	struct sockaddr *src, *dst;
+	u_int type, prefs, prefd, proto;
+	char *policy;
+	int policylen;
+	u_int32_t seq;
+{
+	struct sadb_msg *newmsg;
+	int len;
+	caddr_t p;
+
+	/* validity check */
+	if (src == NULL || dst == NULL) {
+		ipsec_errcode = EIPSEC_INVAL_ARGUMENT;
+		return -1;
+	}
+	if (src->sa_family != dst->sa_family) {
+		ipsec_errcode = EIPSEC_FAMILY_MISMATCH;
+		return -1;
+	}
+	if (prefs > (_INALENBYAF(src->sa_family) << 3)
+	 || prefd > (_INALENBYAF(dst->sa_family) << 3)) {
+		ipsec_errcode = EIPSEC_INVAL_PREFIXLEN;
+		return -1;
+	}
+
+	/* create new sadb_msg to reply. */
+	len = sizeof(struct sadb_msg)
+		+ sizeof(struct sadb_address)
+		+ PFKEY_ALIGN8(_SALENBYAF(src->sa_family))
+		+ sizeof(struct sadb_address)
+		+ PFKEY_ALIGN8(_SALENBYAF(src->sa_family))
+		+ policylen;
+
+	if ((newmsg = CALLOC(len, struct sadb_msg *)) == NULL) {
+		ipsec_set_strerror(strerror(errno));
+		return -1;
+	}
+
+	p = pfkey_setsadbmsg((caddr_t)newmsg, type, len,
+	                     SADB_SATYPE_UNSPEC, IPSEC_MODE_ANY, 0,
+			     seq, getpid());
+	p = pfkey_setsadbaddr(p,
+	                      SADB_EXT_ADDRESS_SRC,
+	                      src,
+	                      prefs,
+	                      proto);
+	p = pfkey_setsadbaddr(p,
+	                      SADB_EXT_ADDRESS_DST,
+	                      dst,
+	                      prefd,
+	                      proto);
+	memcpy(p, policy, policylen);
 
 	/* send message */
 	len = pfkey_send(so, newmsg, len);
