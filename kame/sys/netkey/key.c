@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.164 2000/10/05 03:25:23 itojun Exp $	*/
+/*	$KAME: key.c,v 1.165 2000/10/05 03:37:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4349,7 +4349,7 @@ key_randomfill(p, l)
 	/* last resort - should we warn? */
 	while (n < l) {
 		v = random();
-		memcpy((u_int8_t *)p + n, &v,
+		bcopy(&v, (u_int8_t *)p + n,
 		    l - n < sizeof(v) ? l - n : sizeof(v));
 		n += sizeof(v);
 
