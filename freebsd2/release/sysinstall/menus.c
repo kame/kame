@@ -1396,9 +1396,9 @@ DMenu MenuKameFTP = {
     { { "KAME (IPv4/IPv6)", "ftp.v6.kame.net", NULL, dmenuSetVariable, NULL,
         VAR_KAME_FTP_PATH "=ftp://ftp.v6.kame.net/pub/kame/installer-imasy/FreeBSD-IPv6/"},
       { "ITNet(IPv4/IPv6)", "ftp.itjit.ad.jp", NULL, dmenuSetVariable, NULL,
-        VAR_FTP_PATH "=ftp://ftp.itjit.ad.jp/pub/IPv6/installer/FreeBSD-IPv6/" },
+        VAR_KAME_FTP_PATH "=ftp://ftp.itjit.ad.jp/pub/IPv6/installer/FreeBSD-IPv6/" },
       { "NTTv6(IPv4/IPv6)", "ftp.nttv6.net", NULL, dmenuSetVariable, NULL,
-	VAR_FTP_PATH "=ftp://ftp.nttv6.net/ipv6/IPv6_installer/FreeBSD-IPv6/"},
+	VAR_KAME_FTP_PATH "=ftp://ftp.nttv6.net/ipv6/IPv6_installer/FreeBSD-IPv6/"},
       { "URL", "Specify some other ftp site by URL", NULL, dmenuSetVariable, NULL,
 	VAR_KAME_FTP_PATH "=other" },
       { NULL } }
