@@ -285,7 +285,7 @@ udp_input(m, off, proto)
 		udp_in6.uin6_init_done = udp_ip6.uip6_init_done = 0;
 #endif
 		LIST_FOREACH(inp, &udb, inp_list) {
-			if ((inp->inp_vflag & INP_IPV4) == NULL)
+			if ((inp->inp_vflag & INP_IPV4) == 0)
 				continue;
 			if (inp->inp_lport != uh->uh_dport)
 				continue;
