@@ -162,7 +162,10 @@ static void	 tcp_xmit_timer __P((struct tcpcb *, int));
 		flags = (ti)->ti_flags & TH_FIN; \
 		tcpstat.tcps_rcvpack++;\
 		tcpstat.tcps_rcvbyte += (ti)->ti_len;\
-		sbappend(&(so)->so_rcv, (m)); \
+		if ((so)->so_state & SS_CANTRCVMORE) \
+			m_freem((m)); \
+		else \
+			sbappend(&(so)->so_rcv, (m)); \
 		sorwakeup(so); \
 	} else { \
 		(flags) = tcp_reass((tp), (ti), (m)); \
@@ -179,7 +182,10 @@ static void	 tcp_xmit_timer __P((struct tcpcb *, int));
 		flags = (ti)->ti_flags & TH_FIN; \
 		tcpstat.tcps_rcvpack++;\
 		tcpstat.tcps_rcvbyte += (ti)->ti_len;\
-		sbappend(&(so)->so_rcv, (m)); \
+		if ((so)->so_state & SS_CANTRCVMORE) \
+			m_freem((m)); \
+		else \
+			sbappend(&(so)->so_rcv, (m)); \
 		sorwakeup(so); \
 	} else { \
 		(flags) = tcp_reass((tp), (ti), (m)); \
@@ -675,8 +681,12 @@ findpcb:
 			/*
 			 * Add data to socket buffer.
 			 */
-			m_adj(m, hdroptlen);
-			sbappend(&so->so_rcv, m);
+			if (so->so_state & SS_CANTRCVMORE)
+				m_freem(m);
+			else {
+				m_adj(m, hdroptlen);
+				sbappend(&so->so_rcv, m);
+			}
 			sorwakeup(so);
 #ifdef TCP_ACK_HACK
 			/*

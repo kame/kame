@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.58 2002/06/11 21:52:24 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.59 2002/09/09 07:53:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -313,7 +313,10 @@ tcp6_start2msl(in6p, t6p)
 		tcp6stat.tcp6s_rcvpack++;\
 		tcp6stat.tcp6s_rcvbyte += (len);\
 		ND6_HINT(t6p);\
-		sbappend(&(so)->so_rcv, (m)); \
+		if ((so)->so_state & SS_CANTRCVMORE) \
+			m_freem((m)); \
+		else \
+			sbappend(&(so)->so_rcv, (m)); \
 		sorwakeup(so); \
 	} else { \
 		(flags) = tcp6_reass((t6p), (i6tr), (th), (m), (len)); \
@@ -876,8 +879,12 @@ after_listen:
 			 * data to socket buffer.
 			 */
 			ND6_HINT(t6p);
-			m_adj(m, hdroptlen);
-			sbappend(&so->so_rcv, m);
+			if (so->so_state & SS_CANTRCVMORE)
+				m_freem(m);
+			else {
+				m_adj(m, hdroptlen);
+				sbappend(&so->so_rcv, m);
+			}
 			sorwakeup(so);
 			tcp6_delack(t6p);
 			return IPPROTO_DONE;

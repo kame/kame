@@ -206,7 +206,10 @@ static void	 tcp_xmit_timer __P((struct tcpcb *, int));
 		tcpstat.tcps_rcvpack++;\
 		tcpstat.tcps_rcvbyte += (tilen);\
 		_ONLY_IF_INET6_(ND6_HINT(tp);) \
-		sbappend(&(so)->so_rcv, (m)); \
+		if ((so)->so_state & SS_CANTRCVMORE) \
+			m_freem((m)); \
+		else \
+			sbappend(&(so)->so_rcv, (m)); \
 		sorwakeup(so); \
 	} else { \
 		(flags) = tcp_reass((tp), (th), (tilen), (m), (isipv6)); \
@@ -1086,10 +1089,14 @@ findpcb:
 			if (isipv6)
 				ND6_HINT(tp);
 #endif
+			if (so->so_state & SS_CANTRCVMORE)
+				m_freem(m);
+			else {
 #ifdef DEFER_MADJ
-			m_adj(m, hdroptlen);
+				m_adj(m, hdroptlen);
 #endif
-			sbappend(&so->so_rcv, m);
+				sbappend(&so->so_rcv, m);
+			}
 			sorwakeup(so);
 			if (tcp_delack_enabled) {
 				tp->t_flags |= TF_DELACK;
