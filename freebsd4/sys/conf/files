@@ -115,7 +115,7 @@ crypto/blowfish/bf_skey.c	optional ipsec ipsec_esp
 crypto/cast128/cast128.c	optional ipsec ipsec_esp
 crypto/des/des_ecb.c	optional ipsec ipsec_esp
 crypto/des/des_setkey.c	optional ipsec ipsec_esp
-crypto/rijndael/rijndael-alg-fst.c	optional ipsec_esp
+crypto/rijndael/rijndael-alg-fst.c	optional ipsec
 crypto/sha1.c		optional ipsec
 crypto/sha2/sha2.c	optional ipsec
 crypto/twofish/twofish2.c	optional ipsec_esp
@@ -964,9 +964,11 @@ netinet/tcp_syncache.c	optional inet
 netinet/tcp_timer.c	optional inet
 netinet/tcp_usrreq.c	optional inet
 netinet/udp_usrreq.c	optional inet
+netinet6/ah_aesxcbcmac.c	optional ipsec
 netinet6/ah_core.c	optional ipsec
 netinet6/ah_input.c	optional ipsec
 netinet6/ah_output.c	optional ipsec
+netinet6/esp_aesctr.c	optional ipsec ipsec_esp
 netinet6/esp_core.c	optional ipsec ipsec_esp
 netinet6/esp_rijndael.c	optional ipsec ipsec_esp
 netinet6/esp_twofish.c	optional ipsec ipsec_esp
