@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.158 2003/05/08 05:17:19 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.159 2003/05/08 05:19:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1307,6 +1307,14 @@ explore_numeric(pai, hostname, servname, res, canonname)
 			    pai->ai_family == PF_UNSPEC /*?*/) {
 				GET_AI(cur->ai_next, afd, pton);
 				GET_PORT(cur->ai_next, servname);
+				if ((pai->ai_flags & AI_CANONNAME)) {
+					/*
+					 * Set the numeric address itself as
+					 * the canonical name, based on a
+					 * clarification in rfc2553bis-03.
+					 */
+					GET_CANONNAME(cur->ai_next, canonname);
+				}
 				while (cur && cur->ai_next)
 					cur = cur->ai_next;
 			} else
