@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.49 2002/05/30 05:59:02 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.50 2002/07/25 02:35:59 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -360,6 +360,45 @@ natpt_setRules(caddr_t addr)
 	splx(s);
 
 	return (0);
+}
+
+
+int
+natpt_openIncomingV4Rule(int proto, struct pAddr *local, struct pAddr *remote)
+{
+	struct cSlot	*cst;
+
+	MALLOC(cst, struct cSlot *, sizeof(struct cSlot), M_NATPT, M_NOWAIT);
+	if (cst == NULL)
+		return (0);
+
+	bzero(cst, sizeof(struct cSlot));
+
+	if (proto == IPPROTO_TCP)
+		cst->proto = NATPT_TCP;
+	else if (proto == IPPROTO_UDP)
+		cst->proto = NATPT_UDP;
+	else
+		return (0);
+
+	cst->map   = NATPT_REDIRECT_PORT;
+	cst->lifetime = 32;
+
+	/* session initiator */
+	cst->local.saddr.sa_family = local->sa_family;
+	cst->local.saddr.addr[0] = local->addr[0];	/* initiator address */
+	cst->local.dport   = local->port[1];		/* destination port */
+	cst->Local.aType   = ADDR_SINGLE;
+
+	/* address and port after translation */
+	cst->remote.saddr.sa_family = remote->sa_family;
+	cst->remote.saddr.addr[0] = remote->addr[0];
+	cst->remote.dport   = remote->port[0];
+	cst->Remote.aType   = ADDR_SINGLE;
+
+	natpt_prependRule(cst);
+
+	return (1);
 }
 
 

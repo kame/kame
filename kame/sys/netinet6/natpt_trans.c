@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.136 2002/07/24 05:31:35 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.137 2002/07/25 02:35:59 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2055,9 +2055,14 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 			    return (0);
 		    }
 
+#if useOpenTSlot
 		    /* This connection is established from v4 side. */
 		    if (natpt_openIncomingV4Conn(IPPROTO_TCP, &remote, &local) == NULL)
 			    return (0);
+#else
+		    if (natpt_openIncomingV4Rule(IPPROTO_TCP, &remote, &local) == 0)
+			    return (0);
+#endif
 
 		    h = (u_char *)&remote.addr[1];
 		    p = (u_char *)&remote.port[1];
