@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.18 2001/03/29 05:34:30 itojun Exp $	*/
+/*	$KAME: ip6.h,v 1.19 2001/07/03 15:34:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -221,8 +221,11 @@ struct ip6_opt_binding_update {
 	u_int8_t ip6ou_len;
 	u_int8_t ip6ou_flags;
 	u_int8_t ip6ou_prefixlen;
-	u_int8_t ip6ou_seqno[2];
+	u_int8_t ip6ou_authdatalen;
+	u_int8_t ip6ou_seqno;
 	u_int8_t ip6ou_lifetime[4];
+	u_int8_t ip6ou_spi[4];
+	/* followed by authentication data */
 	/* followed by sub-options */
 } __attribute__((__packed__));
 
@@ -237,9 +240,12 @@ struct ip6_opt_binding_ack {
 	u_int8_t ip6oa_type;
 	u_int8_t ip6oa_len;
 	u_int8_t ip6oa_status;
-	u_int8_t ip6oa_seqno[2];
+	u_int8_t ip6oa_authdatalen;
+	u_int8_t ip6oa_seqno;
 	u_int8_t ip6oa_lifetime[4];
+	u_int8_t ip6oa_spi[4];
 	u_int8_t ip6oa_refresh[4];
+	/* followed by authentication data */
 	/* followed by sub-options */
 } __attribute__((__packed__));
 

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.55 2001/06/27 17:43:19 sumikawa Exp $	*/
+/*	$KAME: icmp6.h,v 1.56 2001/07/03 15:34:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -129,8 +129,10 @@ struct icmp6_hdr {
 
 #define ICMP6_HADISCOV_REQUEST		202	/* XXX To be defined */
 #define ICMP6_HADISCOV_REPLY		203	/* XXX To be defined */
+#define ICMP6_MOBILEPREFIX_SOLICIT	204	/* XXX To be defined */
+#define ICMP6_MOBILEPREFIX_ADVERT	205	/* XXX To be defined */
   
-#define ICMP6_MAXTYPE			203
+#define ICMP6_MAXTYPE			205
 
 #define ICMP6_DST_UNREACH_NOROUTE	0	/* no route to destination */
 #define ICMP6_DST_UNREACH_ADMIN	 	1	/* administratively prohibited */
@@ -309,6 +311,24 @@ struct ha_discov_rep {		/* HA Address Discovery Reply */
 #define discov_rep_code		ha_drep_hdr.icmp6_code
 #define discov_rep_cksum	ha_drep_hdr.icmp6_cksum
 #define discov_rep_id		ha_drep_hdr.icmp6_data16[0]
+
+struct mobile_prefix_solicit {	/* Mobile Prefix Solicitation */
+	struct icmp6_hdr	mp_sol_hdr;
+} __attribute__((__packed__));
+
+#define mp_sol_type		mp_sol_hdr.icmp6_type
+#define mp_sol_code		mp_sol_hdr.icmp6_code
+#define mp_sol_cksum		mp_sol_hdr.icmp6_cksum
+#define mp_sol_reserved		mp_sol_hdr.icmp6_data32[0]
+
+struct mobile_prefix_advert {	/* Mobile Prefix Advertisement */
+	struct icmp6_hdr	mp_adv_hdr;
+} __attribute__((__packed__));
+
+#define mp_adv_type		mp_adv_hdr.icmp6_type
+#define mp_adv_code		mp_adv_hdr.icmp6_code
+#define mp_adv_cksum		mp_adv_hdr.icmp6_cksum
+#define mp_adv_opts		mp_adv_hdr.icmp6_data8
 
 struct nd_opt_hdr {		/* Neighbor discovery option header */
 	u_int8_t	nd_opt_type;
