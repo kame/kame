@@ -94,3 +94,7 @@ vs intel
 	生成されたconfig fileを適宜いじる。
 
 	tunnel modeの場合はけっこいろいろいじらないと駄目かも。
+
+kame
+	kernelのmbuf/key management memoryのleakはほとんど皆無。いくらでも
+	続けられます。racoonは太ったりふんづけたり? とにぎやか。
