@@ -1,0 +1,83 @@
+.\"	$OpenBSD: bindresvport.3,v 1.13 1999/12/30 20:50:13 deraadt Exp $
+.\"
+.Dd August 9, 1997
+.Dt BINDRESVPORT 3
+.Os
+.Sh NAME
+.Nm bindresvport ,
+.Nm bindresvport_af
+.Nd bind a socket to a privileged IP port
+.Sh SYNOPSIS
+.Fd #include <sys/types.h>
+.Fd #include <netinet/in.h>
+.Ft int
+.Fn bindresvport "int sd" "struct sockaddr_in *sin"
+.Ft int
+.Fn bindresvport_af "int sd" "struct sockaddr *sa" "int af"
+.Sh DESCRIPTION
+.Fn bindresvport
+and
+.Fn bindresvport_af
+are used to bind a socket descriptor to a privileged
+.Tn IP
+port, that is, a port number in the range 0-1023.
+.Fa sd
+is a socket descriptor that was returned by a call to
+.Xr socket 2 .
+.Pp
+Only root can bind to a privileged port; this call will fail for any
+other users.
+.Pp
+If the value of
+.Va sin->sin_port
+is non-zero,
+.Fn bindresvport
+attempts to use the specified port.  If that fails, it
+chooses another privileged port number automatically.
+.Pp
+.Fn bindresvport_af
+acts in a similar way, but supports other protocols as well, such
+as
+.Va AF_INET6 .
+.Sh RETURN VALUES
+.Fn bindresvport
+returns 0 if it is successful, otherwise \-1 is returned and
+.Va errno
+set to reflect the cause of the error.
+.Sh ERRORS
+The
+.Fn bindresvport
+function fails if:
+.Bl -tag -width Er
+.It Bq Er EBADF
+.Fa sd
+is not a valid descriptor.
+.It Bq Er ENOTSOCK
+.Fa sd
+is not a socket.
+.It Bq Er EADDRNOTAVAIL
+The specified address is not available from the local machine.
+.It Bq Er EADDRINUSE
+The specified address is already in use.
+.It Bq Er EINVAL
+The socket is already bound to an address.
+.It Bq Er EACCES
+The requested address is protected, and the current user
+has inadequate permission to access it.
+.It Bq Er EFAULT
+The
+.Fa name
+parameter is not in a valid part of the user
+address space.
+.It Bq Er ENOBUFS
+Insufficient resources were available in the system
+to perform the operation.
+.It Bq Er EPFNOSUPPORT
+The protocol family has not been configured into the
+system or no implementation for it exists.
+.El
+.Sh SEE ALSO
+.Xr bind 2 ,
+.Xr socket 2 ,
+.Xr rresvport 3 ,
+.Xr rresvport_af 3
