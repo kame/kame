@@ -1,4 +1,4 @@
-/*	$KAME: parser.c,v 1.5 2000/10/18 09:15:18 kjc Exp $	*/
+/*	$KAME: parser.c,v 1.6 2001/05/30 10:30:44 kjc Exp $	*/
 /*******************************************************************
 
   Copyright (c) 1996 by the University of Southern California
@@ -174,13 +174,25 @@ qdisc_class_parser(const char *qname, const char *ifname,
 		   int argc, char **argv)
 {
 	struct qdisc_parser *qp;
-	
+	struct ifinfo	*ifinfo;
+
 	for (qp = qdisc_parser; qp->qname != NULL; qp++)
 		if (strncmp(qp->qname, qname, strlen(qp->qname)) == 0) {
 			if (qp->class_parser == NULL) {
 				LOG(LOG_ERR, 0,
-				    "class can't be specified for %s",
-				    qp->qname);
+				    "class can't be specified for %s", qp->qname);
+				return (0);
+			}
+			if ((ifinfo = ifname2ifinfo(ifname)) == NULL) {
+				LOG(LOG_ERR, 0,
+				    "no such interface, line %d\n", line_no);
+				return (0);
+			}
+			if (strncmp(ifinfo->qdisc->qname, qname,
+				    strlen(ifinfo->qdisc->qname)) != 0) {
+				LOG(LOG_ERR, 0,
+				    "qname doesn't match the interface, line %d\n",
+				    line_no);
 				return (0);
 			}
 			return (*qp->class_parser)(ifname, class_name,
