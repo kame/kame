@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.64 2000/08/03 16:32:17 itojun Exp $
+$KAME: COVERAGE,v 1.65 2000/08/06 16:43:25 itojun Exp $
 
 
 x: supported/integrated
@@ -8,7 +8,7 @@ x: supported/integrated
 
 
 		KAME
-		net142	open27	free228	free35	free4	bsdi31	bsdi41
+		net142	open27	free228	free35	free41	bsdi31	bsdi41
 		--	--	--	--	--	--	--
 TCP/UDP		see IMPLEMENTATION for details
 
@@ -33,81 +33,83 @@ getaddrinfo obeys configured resolv order
 KAME extended resolver (IPv6 transport, EDNS0, bogus address filtering)
 		x	x	x	x	-	x	-
 
+CMSG passing in unix domain socket obeys CMSG_xx
+		-	-	-	-	x	-	-
+
 
 (+): see above for KAME/*BSD differences
 
-
 		KAME	merged *-current	merged
-		*BSD	net	open	free	net15	open27	free40	bsdi42
+		*BSD	net	open	free	net15	open27	free41	bsdi42
 		--	--	--	--	--	--	--	---
-KAME IPv6 as of	latest	early	early	early	notyet	late	early
-			jun00	jun00	jul00		may00	nov99
+KAME IPv6 as of	latest	early	early	early	early	late	early
+			jun00	jun00	jul00	jun00	may00	jun00
 
 KAME IPsec as of
-		latest	12jun00	-	early	notyet	-	early
-					jul00			nov99
+		latest	12jun00	-	early	12jun00	-	early
+					jul00			jul00
 
-IPv4 IPsec	KAME	KAME	openbsd	KAME	notyet	openbsd	KAME
+IPv4 IPsec	KAME	KAME	openbsd	KAME	KAME	openbsd	KAME
 
-IPv6 IPsec	KAME	KAME	openbsd	KAME	notyet	-	KAME
+IPv6 IPsec	KAME	KAME	openbsd	KAME	KAME	-	KAME
 				(*1)
     (*1) no extension header support yet (fragment header is supported),
 	hardware acceleration is available.
 
 IPsec ESP, rc5-cbc
-		x	-	?	x	notyet	?	x
-			(*1)
+		x	-	?	x	-	?	x
+			(*1)			(*1)
     (*1) rc5-cbc omitted for possible patent issues
 
 RFC2367 conformance: sadb_msg
-		x	x	-	x	notyet	-	(*1)
+		x	x	-	x	x	-	x
     (*1) very old KAME declaration, violates RFC2367 (sadb_msg_mode)
 
 RFC2367 conformance: SADB_[EAC]ALG
-		x	x	-	(*1)	notyet	-	(*1)
+		x	x	-	(*1)	x	-	(*1)
     (*1) old KAME declaration, violates RFC2367 namespace
 
 TCP/UDP		see IMPLEMENTATION for details
 
 TCP6 drops packets with unspecified IPv6 source
-		x	x	x	-	notyet	-	-
+		x	x	x	-	x	-	-
 
 ip6_forward rejects packets with unspecified IPv6 source
-		x	x	x	-	notyet	-	-
+		x	x	x	-	x	-	-
 
-advanced API	2292bis	2292	2292	2292	notyet	2292	2292
+advanced API	2292bis	2292	2292	2292	2292	2292	2292
 		(*1)
     (*1) 2292 API is supplied for binary backward compatibility
 
-getifaddrs	x	x	x	x	notyet	x	-
+getifaddrs	x	x	x	x	x	x	x
 
-icmp6 nodeinfo	06	06	05	05	notyet	05-	05-
-			(*1)	(*1)	(*1)		(*1)	(*1)
+icmp6 nodeinfo	06	06	05	05	05	05-	05
+				(*1)	(*1)	(*1)	(*1)	(*1)
     (all) spec conformance is still low.  "05-" means 05/03 chimera.
     (*1) does not join NI group address
 
-nd6_proxyall	-	-	-	-	notyet	-	x
+nd6_proxyall	-	-	-	-	-	-	-
 
-ndp -s proxy	x	x	x	x	notyet	x	-
+ndp -s proxy	x	x	x	x	x	x	x
 
-ndp -I		x	x	x	x	notyet	x	-
+ndp -I		x	x	x	x	x	x	x
 
-NUD on p2p	x	x	x	x	notyet	x	-
+NUD on p2p	x	x	x	x	x	x	x
   (ndp -i)
 
 NUD on p2p only if real neighbor
-		x	x	x	x	notyet	(*1)	-
+		x	x	x	x	x	(*1)	x
      (*1) temporary workaround (no NUD on p2p by default)
 
 icmp6 beyondscope
-		x	x	x	x	notyet	(*1)	-
+		x	x	x	x	x	(*1)	x
     (*1) supports it, but has bug in link-local address check.
 
 old/new mrt6msg (old: overlay with ip6 header, new: with MLD6 header)
-		new	(*1)	(*1)	(*1)	notyet	old	old
+		new	(*1)	(*1)	(*1)	(*1)	old	(*1)
     (*1) supports both new/old mrt6msg, to provide binary backward compat
 
-CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	notyet	ALIGN	ALIGN
+CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	sysctl	ALIGN	ALIGN
 		(*1)		(*1)	(*2)		(*1)	(*2)
     (*1) has namespace pollution bug, KAME PR 230.
     (*2) requires separate inclusion of machine/param.h.
@@ -115,76 +117,79 @@ CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	notyet	ALIGN	ALIGN
 	  is not provided (yet).
 
 CMSG passing in unix domain socket obeys CMSG_xx
-		-	x	-	x	notyet	-	x
+		(+)	x	-	x	x	-	x
 
 getaddrinfo obeys configured resolv order
-		(+)	x	x	x	notyet	x	-
+		(+)	x	x	x	x	x	x
 
 getaddrinfo supports AI_ADDRCONFIG (2553bis)
-		-	-	-	x	notyet	-	?
+		-	-	-	x	-	-	?
 
 getnameinfo uses addr%numeric for scopeid > maxifindex
-		x	x	x	x	notyet	x	-
+		x	x	x	x	x	x	x
 
 getnameinfo, 2nd arg type is socklen_t
-		x	x	x	-	notyet	-	-
+		x	x	x	-	x	-	-
 
 getnameinfo uses EAI_xx as return value (2553bis)
-		x	x	x	x	notyet	x	-
+		x	x	x	x	x	x	x
 
-ALTQ		(+)	-	-	-	notyet	-	-
+ALTQ		(+)	-	-	-	-	-	-
 
-NAT/PT		(+)	-	-	-	notyet	-	-
+NAT/PT		(+)	-	-	-	-	-	-
 
-mobile-ip6	(+)	-	-	-	notyet	-	-
+mobile-ip6	(+)	-	-	-	-	-	-
 
-IPv6 RPC	-	x	-	-	notyet	-	-
+IPv6 RPC	-	x	-	-	x	-	-
 
-IPv6 NFS	-	x	-	-	notyet	-	-
+IPv6 NFS	-	x	-	-	x	-	-
+
+NIS ipnodes map support for hostname lookup
+		-	x	-	-	-	-	-
 
 resolver support for IPv6 transport
-		(+)	(*1)	-	x	notyet	-	-
+		(+)	(*1)	(*1)	x	(*1)	-	x
     (*1) libc resolver can handle IPv6 transport (IPv6 address in
 	/etc/resolv.conf), but not with userland tools like nslookup or dig.
 
 scoped addr in /etc/hosts (getaddrinfo)
-		(+)	x	x	x	notyet	x	-
+		(+)	x	x	x	x	x	x
 
 scoped addr in /etc/resolv.conf "nameserver" line
-		(+)	x	-	x	notyet	-	-
+		(+)	x	-	x	x	-	x
 
 ipsec socket passing to ip{6,}_output
-		aux	aux	-	aux	notyet	-	rcvif
-								+ flags
+		aux	aux	-	aux	aux	-	aux
 
 router renumbering declaration does not use bitfield (sys/netinet/icmp6.h)
-		x	-	x	x	notyet	-	x
+		x	x	x	x	x	-	x
 
 source address selection
-		latest	may00	may00	may00	notyet	feb00	nov99
-								+ sitelocal
+		latest	may00	may00	may00	may00	feb00	may00
 
-6to4 intface	x	x	-	x	notyet	-	gifhack
+6to4 intface	x	x	-	x	x	-	x
 
-basic userland	x	x	x	x	notyet	x	x
+basic userland	x	x	x	x	x	x	x
 
-route6d		x	x	x	x	notyet	x	x
-hroute6d	x	-	-	-	notyet	-	-
-bgpd		x	-	-	-	notyet	-	-
-pim6dd		x	x	-	x	notyet	-	x
-pim6sd		x	x	-	x	notyet	-	x
+route6d		x	x	x	x	x	x	x
+hroute6d	x	-	-	-	-	-	-
+bgpd		x	-	-	-	-	-	-
+pim6dd		x	x	-	x	x	-	x
+pim6sd		x	x	-	x	x	-	x
 
-rtsol/rtsold	x	x	x	x	notyet	x	x
-rtadvd		x	x	x	x	notyet	x	x
-rrenumd		x	-	-	x	notyet	-	x
+rtsol/rtsold	x	x	x	x	x	x	x
+rtadvd		x	x	x	x	x	x	x
+rrenumd		x	-	-	x	-	-	x
 
-faithd		x	x	x	x	notyet	x	x
+faithd		x	x	x	x	x	x	x
+		(*1)	(*1)
+    (*1) inetd support
 
-syslogd		x	x	-	-	notyet	-	-
-lpr/lpd		x	x	-	-	notyet	-	-
+syslogd		x	x	-	-	x	-	-
+lpr/lpd		x	x	-	-	x	-	-
 
-racoon		latest	pkgsrc	-	ports	notyet	-	-
-			000719a		000718a
+racoon		latest	pkgsrc	-	ports	pkgsrc	-	-
+			000730a		000718a	000730a
 
 
 CAVEATS:
