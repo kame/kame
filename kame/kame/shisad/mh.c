@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.4 2004/12/27 10:50:33 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.5 2004/12/28 07:50:46 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -878,6 +878,15 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	} else {
 		/* Requesitng to cache binding (registration) */
 		bc = mip6_bc_add(hoa, coa, dst, lifetime, flags, seqno, bid);
+		if (flags & IP6_MH_BU_LLOCAL) {
+			struct in6_addr llhoa;
+
+			memset(&llhoa, 0, sizeof(llhoa));
+			llhoa.s6_addr[0] = 0xfe;
+			llhoa.s6_addr[1] = 0x80;
+			memcpy(&llhoa.s6_addr[8], &hoa->s6_addr[8], 8);
+			bc->bc_llmbc = mip6_bc_add(&llhoa, coa, dst, lifetime, flags, seqno, bid);
+		}
 	}
 	retcode = 0;
 

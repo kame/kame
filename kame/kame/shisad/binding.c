@@ -1,4 +1,4 @@
-/*      $KAME: binding.c,v 1.2 2004/12/27 10:50:33 t-momose Exp $	*/
+/*      $KAME: binding.c,v 1.3 2004/12/28 07:50:45 t-momose Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -162,7 +162,11 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid)
 	bc->bc_expire = now + bc->bc_lifetime;
 	
 	/* refreshment is called after the half of BC's lifetime */
-	mip6_bc_set_refresh_timer(bc, bc->bc_lifetime / 2); 
+	/* The linklocal entries are handled along with the original
+	   binding cache entry. Thus it doesn't need to have 
+	   a independent timer. */
+	if (!IN6_IS_ADDR_LINKLOCAL(hoa))
+		mip6_bc_set_refresh_timer(bc, bc->bc_lifetime / 2); 
 
 	return (bc);
 };
@@ -184,7 +188,10 @@ mip6_bc_delete(bcreq)
 	if (bc == NULL)
 		return;
 #endif /* 1 */
-	/* Fist stop timer */ /* XXX Fist ?? */
+	if (bc->bc_llmbc)
+		mip6_bc_delete(bc->bc_llmbc);
+	
+	/* stop timer */
 	mip6_bc_stop_refresh_timer(bc);
 
 	/* delete BC into the kernel via mipsock */
@@ -285,7 +292,6 @@ static void
 mip6_bc_stop_refresh_timer(bc)
 	struct binding_cache *bc;
 {
-
 	remove_callout_entry(bc->bc_refresh);
 }
 
