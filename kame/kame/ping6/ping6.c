@@ -234,6 +234,10 @@ void	 pr_icmph __P((struct icmp6_hdr *, u_char *));
 void	 pr_iph __P((struct ip6_hdr *));
 void	 pr_nodeaddr __P((struct icmp6_nodeinfo *, int));
 void	 pr_pack __P((u_char *, int, struct msghdr *));
+void	 pr_exthdrs __P((struct msghdr *));
+#ifdef USE_RFC2292BIS
+void	 pr_ip6opt __P((void *));
+#endif 
 void	 pr_retip __P((struct ip6_hdr *, u_char *));
 void	 summary __P((void));
 void	 tvsub __P((struct timeval *, struct timeval *));
@@ -1095,9 +1099,101 @@ pr_pack(buf, cc, mhdr)
 
 	if (!(options & F_FLOOD)) {
 		(void)putchar('\n');
+		if (options & F_VERBOSE)
+			pr_exthdrs(mhdr);
 		(void)fflush(stdout);
 	}
 }
+
+void
+pr_exthdrs(mhdr)
+	struct msghdr *mhdr;
+{
+	struct cmsghdr *cm;
+
+	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(mhdr); cm;
+	     cm = (struct cmsghdr *)CMSG_NXTHDR(mhdr, cm)) {
+		if (cm->cmsg_level != IPPROTO_IPV6)
+			continue;
+
+		switch(cm->cmsg_type) {
+		case IPV6_HOPOPTS:
+			printf("  HbH Options: ");
+			pr_ip6opt(CMSG_DATA(cm));
+			break;
+		case IPV6_DSTOPTS:
+#ifdef IPV6_RTHDRDSTOPTS
+		case IPV6_RTHDRDSTOPTS:
+#endif
+			printf("  Dst Options: ");
+			pr_ip6opt(CMSG_DATA(cm));
+			break;
+		case IPV6_RTHDR:
+			printf("  Routing: ");
+			printf("\n"); /* XXX to be implemented */
+			break;
+		}
+	}
+}
+
+#ifdef USE_RFC2292BIS
+void
+pr_ip6opt(void *extbuf)
+{
+	struct ip6_hbh *ext;
+	int currentlen;
+	u_int8_t type;
+	size_t extlen, len;
+	void *databuf;
+	size_t offset;
+	u_int16_t value2;
+	u_int32_t value4;
+
+	ext = (struct ip6_hbh *)extbuf;
+	extlen = (ext->ip6h_len + 1) * 8;
+	printf("nxt %u, len %u (%d bytes)\n", ext->ip6h_nxt,
+	       ext->ip6h_len, extlen);
+
+	currentlen = 0;
+	while (1) {
+		currentlen = inet6_opt_next(extbuf, extlen, currentlen,
+					    &type, &len, &databuf);
+		if (currentlen == -1)
+			break;
+		switch (type) {
+		/*
+		 * Note that inet6_opt_next automatically skips any padding
+		 * optins.
+		 */
+		case IP6OPT_JUMBO:
+			offset = 0;
+			offset = inet6_opt_get_val(databuf, offset,
+						   &value4, sizeof(value4));
+			printf("    Jumbo Payload Opt: Length %u\n",
+			       (unsigned int)ntohl(value4));
+			break;
+		case IP6OPT_ROUTER_ALERT:
+			offset = 0;
+			offset = inet6_opt_get_val(databuf, offset,
+						   &value2, sizeof(value2));
+			printf("    Router Alert Opt: Type %u\n",
+			       ntohs(value2));
+			break;
+		default:
+			printf("    Received Opt %u len %u\n", type, len);
+			break;
+		}
+	}
+	return;
+}
+#else  /* !USE_RFC2292BIS */
+/* ARGSUSED */
+void
+pr_ip6opt(void *extbuf)
+{
+	return;
+}
+#endif /* USE_RFC2292BIS */
 
 void
 pr_nodeaddr(ni, nilen)
@@ -1270,23 +1366,23 @@ pr_icmph(icp, end)
 	case ICMP6_DST_UNREACH:
 		switch(icp->icmp6_code) {
 		case ICMP6_DST_UNREACH_NOROUTE:
-			(void)printf("No Route to Destination\n");
+			(void)printf("No Route to Destination");
 			break;
 		case ICMP6_DST_UNREACH_ADMIN:
 			(void)printf("Destination Administratively "
 				     "Unreachable\n");
 			break;
 		case ICMP6_DST_UNREACH_BEYONDSCOPE:
-			(void)printf("Destination Unreachable Beyond Scope\n");
+			(void)printf("Destination Unreachable Beyond Scope");
 			break;
 		case ICMP6_DST_UNREACH_ADDR:
-			(void)printf("Destination Host Unreachable\n");
+			(void)printf("Destination Host Unreachable");
 			break;
 		case ICMP6_DST_UNREACH_NOPORT:
-			(void)printf("Destination Port Unreachable\n");
+			(void)printf("Destination Port Unreachable");
 			break;
 		default:
-			(void)printf("Destination Unreachable, Bad Code: %d\n",
+			(void)printf("Destination Unreachable, Bad Code: %d",
 			    icp->icmp6_code);
 			break;
 		}
@@ -1294,19 +1390,19 @@ pr_icmph(icp, end)
 		pr_retip((struct ip6_hdr *)(icp + 1), end);
 		break;
 	case ICMP6_PACKET_TOO_BIG:
-		(void)printf("Packet too big mtu = %d\n",
+		(void)printf("Packet too big mtu = %d",
 			     (int)ntohl(icp->icmp6_mtu));
 		break;
 	case ICMP6_TIME_EXCEEDED:
 		switch(icp->icmp6_code) {
 		case ICMP6_TIME_EXCEED_TRANSIT:
-			(void)printf("Time to live exceeded\n");
+			(void)printf("Time to live exceeded");
 			break;
 		case ICMP6_TIME_EXCEED_REASSEMBLY:
-			(void)printf("Frag reassembly time exceeded\n");
+			(void)printf("Frag reassembly time exceeded");
 			break;
 		default:
-			(void)printf("Time exceeded, Bad Code: %d\n",
+			(void)printf("Time exceeded, Bad Code: %d",
 			    icp->icmp6_code);
 			break;
 		}
@@ -1328,62 +1424,62 @@ pr_icmph(icp, end)
 			 (void)printf("Bad code(%d) ", icp->icmp6_code);
 			 break;
 		}
-		(void)printf("pointer = 0x%02x\n",
+		(void)printf("pointer = 0x%02x",
 			     (int)ntohl(icp->icmp6_pptr));
 		pr_retip((struct ip6_hdr *)(icp + 1), end);
 		break;
 	case ICMP6_ECHO_REQUEST:
-		(void)printf("Echo Request\n");
+		(void)printf("Echo Request");
 		/* XXX ID + Seq + Data */
 		break;
 	case ICMP6_ECHO_REPLY:
-		(void)printf("Echo Reply\n");
+		(void)printf("Echo Reply");
 		/* XXX ID + Seq + Data */
 		break;
 	case ICMP6_MEMBERSHIP_QUERY:
-		(void)printf("Membership Query\n");
+		(void)printf("Listener Query");
 		break;
 	case ICMP6_MEMBERSHIP_REPORT:
-		(void)printf("Membership Report\n");
+		(void)printf("Listener Report");
 		break;
 	case ICMP6_MEMBERSHIP_REDUCTION:
-		(void)printf("Membership Reduction\n");
+		(void)printf("Listener Done");
 		break;
 	case ND_ROUTER_SOLICIT:
-		(void)printf("Router Solicitation\n");
+		(void)printf("Router Solicitation");
 		break;
 	case ND_ROUTER_ADVERT:
-		(void)printf("Router Advertisement\n");
+		(void)printf("Router Advertisement");
 		break;
 	case ND_NEIGHBOR_SOLICIT:
-		(void)printf("Neighbor Solicitation\n");
+		(void)printf("Neighbor Solicitation");
 		break;
 	case ND_NEIGHBOR_ADVERT:
-		(void)printf("Neighbor Advertisement\n");
+		(void)printf("Neighbor Advertisement");
 		break;
 	case ND_REDIRECT:
 	{
 		struct nd_redirect *red = (struct nd_redirect *)icp;
 
 		(void)printf("Redirect\n");
-		(void)printf("Destination: %s\n",
+		(void)printf("Destination: %s",
 			     inet_ntop(AF_INET6, &red->nd_rd_dst,
 				       ntop_buf, sizeof(ntop_buf)));
-		(void)printf("New Target: %s\n",
+		(void)printf("New Target: %s",
 			     inet_ntop(AF_INET6, &red->nd_rd_target,
 				       ntop_buf, sizeof(ntop_buf)));
 		break;
 	}
 	case ICMP6_NI_QUERY:
-		(void)printf("Node Information Query\n");
+		(void)printf("Node Information Query");
 		/* XXX ID + Seq + Data */
 		break;
 	case ICMP6_NI_REPLY:
-		(void)printf("Node Information Reply\n");
+		(void)printf("Node Information Reply");
 		/* XXX ID + Seq + Data */
 		break;
 	default:
-		(void)printf("Bad ICMP type: %d\n", icp->icmp6_type);
+		(void)printf("Bad ICMP type: %d", icp->icmp6_type);
 	}
 }
 
