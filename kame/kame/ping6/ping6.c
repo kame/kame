@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.166 2003/03/27 21:27:37 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.167 2003/06/11 05:30:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1535,7 +1535,7 @@ pr_pack(buf, cc, mhdr)
 		return;
 	}
 	if ((pktinfo = get_rcvpktinfo(mhdr)) == NULL) {
-		warnx("failed to get receiving pakcet information");
+		warnx("failed to get receiving packet information");
 		return;
 	}
 
