@@ -595,9 +595,6 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, cmdarg, notify)
 			dst6 = (struct sockaddr_in6 *)&inp->inp_route6.ro_dst;
 			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr, faddr))
 				in_rtchange(inp, errno);
-
-			if (notify == in_rtchange)
-				continue; /* there's nothing to do any more */
 		}
 
 		/*
@@ -617,6 +614,10 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, cmdarg, notify)
 			ip6_notify_pmtu(inp, (struct sockaddr_in6 *)dst,
 			    (u_int32_t *)cmdarg);
 		}
+
+		/* we've already handled this case */
+		if (do_rtchange)
+			continue;
 
 		if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr) ||
 		    !inp->inp_socket ||
