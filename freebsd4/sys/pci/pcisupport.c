@@ -1,6 +1,6 @@
 /**************************************************************************
 **
-** $FreeBSD: src/sys/pci/pcisupport.c,v 1.154 2000/03/12 21:55:15 cpiazza Exp $
+** $FreeBSD: src/sys/pci/pcisupport.c,v 1.154.2.10 2001/12/23 08:17:47 pirzyk Exp $
 **
 **  Device driver for DEC/INTEL PCI chipsets.
 **
@@ -43,7 +43,6 @@
 
 #include "opt_bus.h"
 #include "opt_pci.h"
-#include "opt_smp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -98,13 +97,13 @@ fixwsc_natoma(device_t dev)
 	if (pmccfg & 0x8000) {
 		printf("Correcting Natoma config for SMP\n");
 		pmccfg &= ~0x8000;
-		pci_write_config(dev, 0x50, 2, pmccfg);
+		pci_write_config(dev, 0x50, pmccfg, 2);
 	}
 #else
 	if ((pmccfg & 0x8000) == 0) {
 		printf("Correcting Natoma config for non-SMP\n");
 		pmccfg |= 0x8000;
-		pci_write_config(dev, 0x50, 2, pmccfg);
+		pci_write_config(dev, 0x50, pmccfg, 2);
 	}
 #endif
 }
@@ -683,12 +682,20 @@ pcib_match(device_t dev)
 		return ("Intel 82443GX (440 GX) PCI-PCI (AGP) bridge");
 	case 0x84cb8086:
 		return ("Intel 82454NX PCI Expander Bridge");
+	case 0x11318086:
+		return ("Intel 82801BA/BAM (ICH2) PCI-PCI (AGP) bridge");
 	case 0x124b8086:
 		return ("Intel 82380FB mobile PCI to PCI bridge");
 	case 0x24188086:
 		return ("Intel 82801AA (ICH) Hub to PCI bridge");
 	case 0x24288086:
 		return ("Intel 82801AB (ICH0) Hub to PCI bridge");
+	case 0x244e8086:
+		return ("Intel 82801BA/BAM (ICH2) Hub to PCI bridge");
+	case 0x24488086:
+		return ("Intel 82801CA/CAM (ICH3) PCI to PCI bridge");
+	case 0x35768086:
+		return ("Intel 82830MP Host to AGP bridge");
 	
 	/* VLSI -- vendor 0x1004 */
 	case 0x01021004:
@@ -697,6 +704,8 @@ pcib_match(device_t dev)
 		return ("VLSI 82C538 Eagle II PCI Docking bridge");
 
 	/* VIA Technologies -- vendor 0x1106 */
+	case 0x83051106:
+		return ("VIA 8363 (Apollo KT133) PCI-PCI (AGP) bridge");
 	case 0x85981106:
 		return ("VIA 82C598MVP (Apollo MVP3) PCI-PCI (AGP) bridge");
 
@@ -710,7 +719,9 @@ pcib_match(device_t dev)
 
 	/* AMD -- vendor 0x1022 */
 	case 0x70071022:
-		return ("AMD-751 PCI-PCI (AGP) bridge");
+		return ("AMD-751 PCI-PCI (1x/2x AGP) bridge");
+	case 0x700f1022:
+		return ("AMD-761 PCI-PCI (4x AGP) bridge");
 
 	/* DEC -- vendor 0x1011 */
 	case 0x00011011:
@@ -781,6 +792,43 @@ pcib_read_ivar(device_t dev, device_t child, int which, u_long *result)
 	return ENOENT;
 }
 
+/*
+ * Route an interrupt across a PCI bridge.
+ */
+static int
+pcib_route_interrupt(device_t pcib, device_t dev, int pin)
+{
+	device_t	bus;
+	int		parent_intpin;
+	int		intnum;
+
+	device_printf(pcib, "Hi!\n");
+
+	/*	
+	 *
+	 * The PCI standard defines a swizzle of the child-side device/intpin
+	 * to the parent-side intpin as follows.
+	 *
+	 * device = device on child bus
+	 * child_intpin = intpin on child bus slot (0-3)
+	 * parent_intpin = intpin on parent bus slot (0-3)
+	 *
+	 * parent_intpin = (device + child_intpin) % 4
+	 */
+	parent_intpin = (pci_get_slot(pcib) + (pin - 1)) % 4;
+
+	/*
+	 * Our parent is a PCI bus.  Its parent must export the pci interface
+	 * which includes the ability to route interrupts.
+	 */
+	bus = device_get_parent(pcib);
+	intnum = PCI_ROUTE_INTERRUPT(device_get_parent(bus), pcib,
+	    parent_intpin + 1);
+	device_printf(pcib, "routed slot %d INT%c to irq %d\n",
+	    pci_get_slot(dev), 'A' + pin - 1, intnum);
+	return(intnum);
+}
+
 static device_method_t pcib_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		pcib_probe),
@@ -799,6 +847,8 @@ static device_method_t pcib_methods[] = {
 	DEVMETHOD(bus_setup_intr,	bus_generic_setup_intr),
 	DEVMETHOD(bus_teardown_intr,	bus_generic_teardown_intr),
 
+	/* pci interface */
+	DEVMETHOD(pci_route_interrupt,	pcib_route_interrupt),
 	{ 0, 0 }
 };
 
@@ -844,10 +894,16 @@ isab_match(device_t dev)
 		return ("Intel 82371SB PCI to ISA bridge");
 	case 0x71108086:
 		return ("Intel 82371AB PCI to ISA bridge");
+	case 0x71988086:
+		return ("Intel 82443MX PCI to ISA bridge");
 	case 0x24108086:
 		return ("Intel 82801AA (ICH) PCI to LPC bridge");
 	case 0x24208086:
 		return ("Intel 82801AB (ICH0) PCI to LPC bridge");
+	case 0x24408086:
+		return ("Intel 82801BA/BAM (ICH2) PCI to LPC bridge");
+	case 0x248C8086:
+		return ("Intel 82801CA/CAM (ICH3) PCI to LPC bridge");
 	
 	/* VLSI -- vendor 0x1004 */
 	case 0x00061004:
@@ -896,6 +952,11 @@ isab_match(device_t dev)
 		if (pci_get_class(dev) == PCIC_BRIDGE
 		    && pci_get_subclass(dev) == PCIS_BRIDGE_ISA)
 			return ("Cypress 82C693 PCI-ISA bridge");
+		break;
+
+	/* ServerWorks -- vendor 0x1166 */
+	case 0x02001166:
+		return ("ServerWorks IB6566 PCI to ISA bridge");
 	}
 
 	if (pci_get_class(dev) == PCIC_BRIDGE
@@ -984,6 +1045,16 @@ pci_usb_match(device_t dev)
 		return ("Intel 82801AA (ICH) USB controller");
 	case 0x24228086:
 		return ("Intel 82801AB (ICH0) USB controller");
+	case 0x24428086:
+		return ("Intel 82801BA/BAM (ICH2) USB controller USB-A");
+	case 0x24448086:
+		return ("Intel 82801BA/BAM (ICH2) USB controller USB-B");
+	case 0x24828086:
+		return ("Intel 82801CA/CAM (ICH3) USB controller USB-A");
+	case 0x24848086:
+		return ("Intel 82801CA/CAM (ICH3) USB controller USB-B");
+	case 0x24878086:
+		return ("Intel 82801CA/CAM (ICH3) USB controller USB-C");
 
 	/* VIA Technologies -- vendor 0x1106 (0x1107 on the Apollo Master) */
 	case 0x30381106:
@@ -1147,6 +1218,8 @@ chip_match(device_t dev)
 		return ("Intel 82439TX System controller (MTXC)");
 	case 0x71138086:
 		return ("Intel 82371AB Power management controller");
+	case 0x719b8086:
+		return ("Intel 82443MX Power management controller");
 	case 0x12378086:
 		fixwsc_natoma(dev);
 		return ("Intel 82440FX (Natoma) PCI and memory controller");
@@ -1162,6 +1235,9 @@ chip_match(device_t dev)
 		return ("Intel 82801AA (ICH) AC'97 Audio Controller");
 	case 0x24258086:
 		return ("Intel 82801AB (ICH0) AC'97 Audio Controller");
+	case 0x24858086:
+		return ("Intel 82801CA (ICH3) AC'97 Audio Controller");
+		break;
 
 	/* Sony -- vendor 0x104d */
 	case 0x8009104d:
@@ -1216,6 +1292,8 @@ chip_match(device_t dev)
 	/* AMD -- vendor 0x1022 */
 	case 0x70061022:
 		return ("AMD-751 host to PCI bridge");
+	case 0x700e1022:
+		return ("AMD-761 host to PCI bridge");
 
 	/* NEC -- vendor 0x1033 */
 	case 0x00021033:
@@ -1409,6 +1487,8 @@ const char* pci_vga_match(device_t dev)
 			chip = "MGA G100"; break;
 		case 0x1001:
 			chip = "MGA G100 AGP"; break;
+		case 0x2527:
+			chip = "MGA G550 AGP"; break;
 
 		}
 		break;
@@ -1459,6 +1539,10 @@ const char* pci_vga_match(device_t dev)
 			chip = "Mach64-GX"; break;
 		case 0x4c4d:
 			chip = "Mobility-1"; break;
+		case 0x4c52:
+			chip = "RageMobility-P/M"; break;
+		case 0x4c59:
+			chip = "RadeonMobility"; break;
 		case 0x475a:
 			chip = "Mach64-GZ"; break;
 		case 0x5245:
@@ -1728,6 +1812,12 @@ const char* pci_vga_match(device_t dev)
 			chip = "GeForce DDR"; break;
 		case 0x0103:
 			chip = "Quadro"; break;
+		case 0x0150:
+		case 0x0151:
+		case 0x0152:
+			chip = "GeForce2 GTS"; break;
+		case 0x0153:
+			chip = "Quadro2"; break;
 		}
 		break;
 	case 0x12d2:
