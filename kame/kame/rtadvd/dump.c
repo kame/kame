@@ -48,6 +48,7 @@
 #include <errno.h>
 
 #include "rtadvd.h"
+#include "timer.h"
 
 static FILE *fp;
 
@@ -88,15 +89,20 @@ if_dump()
 	struct prefix *pfx;
 	char prefixbuf[INET6_ADDRSTRLEN];
 	int first;
-	time_t lastsent;
 
 	for (rai = ralist; rai; rai = rai->next) {
 		fprintf(fp, "%s:\n", rai->ifname);
 
 		/* control information */
-		lastsent = (time_t)rai->lastsent.tv_sec;
-		if (lastsent) /* ctime() appends CR by itself */
-			fprintf(fp, "  Last RA sent: %s", ctime(&lastsent));
+		if (rai->lastsent.tv_sec) {
+			/* note that ctime() appends CR by itself */
+			fprintf(fp, "  Last RA sent: %s",
+				ctime((time_t *)&rai->lastsent.tv_sec));
+		}
+		if (rai->timer) {
+			fprintf(fp, "  Next RA will be sent: %s",
+				ctime((time_t *)&rai->timer->tm.tv_sec));
+		}
 		fprintf(fp, "  waits: %d, initcount: %d\n",
 			rai->waiting, rai->initcounter);
 
