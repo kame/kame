@@ -913,17 +913,13 @@ tcp6_mtudisc_callback(faddr)
 	struct in6_addr *faddr;
 {
 	struct sockaddr_in6 sin6;
-	struct sockaddr_in6 zero;
 
 	bzero(&sin6, sizeof(sin6));
 	sin6.sin6_family = AF_INET6;
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_addr = *faddr;
-	bzero(&zero, sizeof(sin6));
-	zero.sin6_family = AF_INET6;
-	zero.sin6_len = sizeof(struct sockaddr_in6);
 	(void) in6_pcbnotify(&tcbtable, (struct sockaddr *)&sin6, 0,
-	    (struct sockaddr *)&zero, 0, EMSGSIZE, NULL, tcp6_mtudisc);
+	    (struct sockaddr *)&sa6_any, 0, EMSGSIZE, NULL, tcp6_mtudisc);
 }
 
 void

@@ -849,13 +849,8 @@ udp6_ctlinput(cmd, sa, d)
 		     uh.uh_dport, (struct sockaddr *)&sa6_src,
 		     uh.uh_sport, cmd, cmdarg, notify);
 	} else {
-		struct sockaddr_in6 zero;
-
-		bzero(&zero, sizeof(zero));
-		zero.sin6_family = AF_INET6;
-		zero.sin6_len = sizeof(zero);
 		(void) in6_pcbnotify(&udbtable, (struct sockaddr *)&sa6, 0,
-		     (struct sockaddr *)&zero, 0, cmd, cmdarg, notify);
+		     (struct sockaddr *)&sa6_any, 0, cmd, cmdarg, notify);
 	}
 }
 #endif
