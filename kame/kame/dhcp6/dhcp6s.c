@@ -106,7 +106,7 @@ main(argc, argv)
 		case 'n':
 			if (inet_pton(AF_INET6, optarg, &a) != 1) {
 				errx(1, "invalid DNS server %s", optarg);
-				/*NOTREACHED*/
+				/* NOTREACHED */
 			}
 			dnsserv = optarg;
 			break;
@@ -115,7 +115,7 @@ main(argc, argv)
 			break;
 		default:
 			usage();
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		}
 	}
 	argc -= optind;
@@ -123,7 +123,7 @@ main(argc, argv)
 
 	if (argc != 1) {
 		usage();
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	device = argv[0];
 
@@ -158,11 +158,11 @@ callback_register(fd, cap, func)
 	if (MAXCALLBACK <= ncallbacks) {
 		errx(1, "callback exceeds limit(%d), try increase MAXCALLBACK",
 			MAXCALLBACK);
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	if (fd && cap) {
 		errx(1, "internal error: both fd and cap are present");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 
 	if (maxfd < fd)
@@ -198,16 +198,16 @@ server6_init()
 	error = getaddrinfo(NULL, DH6PORT_UPSTREAM, &hints, &res);
 	if (error) {
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	insock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (insock < 0) {
 		err(1, "socket(insock)");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	if (bind(insock, res->ai_addr, res->ai_addrlen) < 0) {
 		err(1, "bind(insock)");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	freeaddrinfo(res);
 
@@ -215,7 +215,7 @@ server6_init()
 	error = getaddrinfo(DH6ADDR_ALLAGENT, DH6PORT_UPSTREAM, &hints, &res2);
 	if (error) {
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	memset(&mreq6, 0, sizeof(mreq6));
 	mreq6.ipv6mr_interface = ifidx;
@@ -232,7 +232,7 @@ server6_init()
 	error = getaddrinfo(DH6ADDR_ALLSERVER, DH6PORT_UPSTREAM, &hints, &res2);
 	if (error) {
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	memset(&mreq6, 0, sizeof(mreq6));
 	mreq6.ipv6mr_interface = ifidx;
@@ -249,18 +249,18 @@ server6_init()
 	error = getaddrinfo(NULL, DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	outsock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (outsock < 0) {
 		err(1, "socket(outsock)");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	/* set outgoing interface of multicast packets for DHCP reconfig */
 	if (setsockopt(outsock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
 			&ifidx, sizeof(ifidx)) < 0) {
 		err(1, "setsockopt(outsock, IPV6_MULTICAST_IF)");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	/* make the socket write-only */
 	if (shutdown(outsock, 0)) {
@@ -298,7 +298,7 @@ server6_mainloop()
 		case -1:
 		case 0:
 			err(1, "select");
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		default:
 			break;
 		}
@@ -323,7 +323,7 @@ server6_recv(s, buf, siz)
 	if ((len = recvfrom(s, buf, siz, 0,
 			(struct sockaddr *)&from, &fromlen)) < 0) {
 		err(1, "recvfrom(inbound)");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	return len;
 }
@@ -420,7 +420,7 @@ server6_react_solicit(agent, buf, siz)
 	error = getaddrinfo("::", DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	memcpy(&dst, res->ai_addr, res->ai_addrlen);
 	freeaddrinfo(res);
@@ -437,16 +437,16 @@ server6_react_solicit(agent, buf, siz)
 		dst.sin6_addr = dh6a->dh6adv_relayaddr;
 		if (inet_pton(AF_INET6, "2000::", &target) != 1) {
 			errx(1, "inet_pton failed");
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		}
 		if (getifaddr(&myaddr, device, &target, 3) != 0) {
 			if (inet_pton(AF_INET6, "fec0::", &target) != 1) {
 				errx(1, "inet_pton failed");
-				/*NOTREACHED*/
+				/* NOTREACHED */
 			}
 			if (getifaddr(&myaddr, device, &target, 10) != 0) {
 				errx(1, "no matching address on %s", device);
-				/*NOTREACHED*/
+				/* NOTREACHED */
 			}
 		}
 		hlim = 0;
@@ -456,11 +456,11 @@ server6_react_solicit(agent, buf, siz)
 		dh6a->dh6adv_flags = DH6ADV_SERVPRESENT;
 		if (inet_pton(AF_INET6, "fe80::", &target) != 1) {
 			errx(1, "inet_pton failed");
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		}
 		if (getifaddr(&myaddr, device, &target, 10) != 0) {
 			errx(1, "no matching address on %s", device);
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		}
 		hlim = 1;
 	}
@@ -473,7 +473,7 @@ server6_react_solicit(agent, buf, siz)
 
 	if (transmit_sa(outsock, (struct sockaddr *)&dst, hlim, sbuf, len) != 0) {
 		err(1, "transmit failed");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 }
 
@@ -542,7 +542,7 @@ server6_react_request(agent, buf, siz)
 	error = getaddrinfo("::", DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	memcpy(&dst, res->ai_addr, res->ai_addrlen);
 	freeaddrinfo(res);
@@ -555,16 +555,16 @@ server6_react_request(agent, buf, siz)
 		dst.sin6_addr = dh6r->dh6req_relayaddr;
 		if (inet_pton(AF_INET6, "fec0::", &target) != 1) {
 			errx(1, "inet_pton failed");
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		}
 		if (getifaddr(&myaddr, device, &target, 10) != 0) {
 			if (inet_pton(AF_INET6, "2000::", &target) != 1) {
 				errx(1, "inet_pton failed");
-				/*NOTREACHED*/
+				/* NOTREACHED */
 			}
 			if (getifaddr(&myaddr, device, &target, 3) != 0) {
 				errx(1, "no matching address on %s", device);
-				/*NOTREACHED*/
+				/* NOTREACHED */
 			}
 		}
 		hlim = 64;
@@ -574,11 +574,11 @@ server6_react_request(agent, buf, siz)
 		dst.sin6_scope_id = if_nametoindex(device);
 		if (inet_pton(AF_INET6, "fe80::", &target) != 1) {
 			errx(1, "inet_pton failed");
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		}
 		if (getifaddr(&myaddr, device, &target, 10) != 0) {
 			errx(1, "no matching address on %s", device);
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		}
 		hlim = 1;
 	}
@@ -599,7 +599,7 @@ server6_react_request(agent, buf, siz)
 		memcpy(ext, &extbuf, sizeof(extbuf));
 		if (inet_pton(AF_INET6, dnsserv, ext + sizeof(extbuf)) != 1) {
 			errx(1, "inet_pton failed");
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		}
 		ext += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
 		len += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
@@ -659,6 +659,6 @@ server6_react_request(agent, buf, siz)
 
 	if (transmit_sa(outsock, (struct sockaddr *)&dst, hlim, sbuf, len) != 0) {
 		err(1, "transmit failed");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 }
