@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.10 1999/11/05 04:49:50 itojun Exp $");
+__RCSID("$Id: inet6.c,v 1.11 1999/11/05 04:51:00 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -650,6 +650,7 @@ ip6_stats(off, name)
 	printf("\t\t%lu two or more ext mbuf\n", ip6stat.ip6s_mext2m);	
 	p(ip6s_exthdrtoolong, "\t%lu packet%s whose headers are not continuous\n");
 	p(ip6s_nogif, "\t%lu tunneling packet%s that can't find gif\n");
+	p(ip6s_toomanyhdr, "\t%lu packet%s discarded due to too may headers\n");
 	p(ip6s_pulldown, "\t%lu call%s to m_pulldown\n");
 	p(ip6s_pulldown_alloc, "\t%lu mbuf allocation%s in m_pulldown\n");
 	if (ip6stat.ip6s_pulldown_copy != 1) {
