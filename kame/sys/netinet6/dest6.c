@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.65 2004/02/13 02:52:09 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.66 2004/03/17 09:54:17 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -165,21 +165,6 @@ dest6_input(mp, offp, proto)
 
 			bcopy(haopt->ip6oh_addr, &home,
 			    sizeof(struct in6_addr));
-
-			/*
-			 * reject invalid home-addresses
-			 */
-			if (IN6_IS_ADDR_MULTICAST(&home) ||
-			    IN6_IS_ADDR_LINKLOCAL(&home) ||
-			    IN6_IS_ADDR_V4MAPPED(&home)  ||
-			    IN6_IS_ADDR_UNSPECIFIED(&home) ||
-			    IN6_IS_ADDR_LOOPBACK(&home)) {
-				ip6stat.ip6s_badscope++;
-				(void)mobility6_send_be(&ip6->ip6_dst,
-				    &ip6->ip6_src, IP6_MH_BES_UNKNOWN_HAO,
-				    &home);
-				goto bad;
-			}
 
 			bcopy(&home, &ip6a->ip6a_coa, sizeof(ip6a->ip6a_coa));
 			ip6a->ip6a_flags |= IP6A_HASEEN;
@@ -362,6 +347,25 @@ dest6_mip6_hao(m, mhoff, nxt)
 			swap = 1;	/* must be sent BE with UNRECOGNIZED_TYPE */
 	}
 
+	home = *(struct in6_addr *)haopt.ip6oh_addr;
+	/*
+	 * reject invalid home-addresses
+	 */
+	if (IN6_IS_ADDR_MULTICAST(&home) ||
+	    IN6_IS_ADDR_LINKLOCAL(&home) ||
+	    IN6_IS_ADDR_V4MAPPED(&home)  ||
+	    IN6_IS_ADDR_UNSPECIFIED(&home) ||
+	    IN6_IS_ADDR_LOOPBACK(&home)) {
+		ip6stat.ip6s_badscope++;
+		if (!(nxt == IPPROTO_MH && mh.ip6mh_type == IP6_MH_TYPE_BU)) {
+			/* BE is sent only when the received packet is 
+			   not BU */
+			(void)mobility6_send_be(&ip6->ip6_dst, &ip6->ip6_src, 
+			    IP6_MH_BES_UNKNOWN_HAO, &home);
+		}
+		return (-1);
+	}
+
 	if (swap) {
 		int error;
 		error = dest6_swap_hao(ip6, ip6a, &haopt);
@@ -374,7 +378,6 @@ dest6_mip6_hao(m, mhoff, nxt)
 
 	/* reject */
 	mip6stat.mip6s_unverifiedhao++;
-	home = *(struct in6_addr *)haopt.ip6oh_addr;
 	mobility6_send_be(&ip6->ip6_dst, &ip6->ip6_src,
 	    IP6_MH_BES_UNKNOWN_HAO, &home);
 
