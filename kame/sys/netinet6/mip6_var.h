@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.25 2002/02/13 14:52:01 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.26 2002/02/18 14:00:27 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -220,6 +220,7 @@ struct mip6_buffer {
 #define IP6OPT_HALEN  16 /* Length of HA option */
 #define IP6OPT_UIDLEN  2 /* Length of Unique Identifier sub-option */
 #define IP6OPT_COALEN 16 /* Length of Alternate COA sub-option */
+#define IP6OPT_AUTHDATALEN 4 /* Minimum length of Authentication Data sub-option */
 
 /*
  * the list entry to hold the destination addresses which do not use a

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.115 2002/02/13 03:37:03 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.116 2002/02/18 14:00:27 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2926,8 +2926,8 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 
 	return (0);
  bad:
-	m_freem(m);
-	return (IPPROTO_DONE);
+
+	return (-1);
 }
 
 u_int8_t *

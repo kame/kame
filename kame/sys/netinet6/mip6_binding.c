@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.84 2002/02/18 07:22:59 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.85 2002/02/18 14:00:27 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -975,13 +975,27 @@ mip6_validate_bu(m, opt)
 			case MIP6SUBOPT_ALTCOA:
 				/* XXX */
 				optlen = *(opt + 1) + 2;
+				if (optlen != IP6OPT_COALEN) {
+					mip6log((LOG_ERR,
+						 "%s:%d: "
+						 "alt coa sub-option too small\n",
+						 __FILE__, __LINE__));
+					return (-1);
+				}
 				break;
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
 			case MIP6SUBOPT_AUTHDATA:
-				authdata = (struct mip6_subopt_authdata *)opt;
 				optlen = *(opt + 1) + 2;
+				if (optlen < IP6OPT_AUTHDATALEN) {
+					mip6log((LOG_ERR,
+						 "%s:%d: "
+						 "auth data sub-option too small\n",
+						 __FILE__, __LINE__));
+					return (-1);
+				}
+				authdata = (struct mip6_subopt_authdata *)opt;
 				break;
 #endif /* !MIP6_DRAFT13 */
 #endif /* IPSEC && !__OpenBSD__ */
@@ -1224,7 +1238,7 @@ mip6_process_bu(m, opt)
 				/* this is not HA.  return BA with error. */
 				if (mip6_bc_send_ba(&ip6->ip6_dst,
 						    &ip6a->ip6a_home, pcoa,
-						    MIP6_BA_STATUS_NOT_HOME_AGENT,
+						    MIP6_BA_STATUS_NOT_SUPPORTED,
 						    seqno,
 						    0,
 						    0)) {
@@ -1861,6 +1875,7 @@ mip6_dad_success(ifa)
 		mip6_bc_proxy_control(&mbc->mbc_phaddr, &mbc->mbc_addr, RTM_ADD);
 	}
 	free(ifa, M_IFADDR);
+	mbc->mbc_dad = NULL;
 	/* return BA */
 	if (mip6_bc_send_ba(&prim->mbc_addr, &prim->mbc_phaddr,
 			    &prim->mbc_pcoa,
@@ -1896,6 +1911,7 @@ mip6_dad_duplicated(ifa)
 
 	prim = mbc;
 	free(ifa, M_IFADDR);
+	mbc->mbc_dad = NULL;
 	for(mbc = LIST_FIRST(&mip6_bc_list);
 	    mbc;
 	    mbc = mbc_next) {
@@ -1934,7 +1950,7 @@ struct ifnet *ifp;
 	    mbc = LIST_NEXT(mbc, mbc_entry)) {
 		if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) == 0)
 			continue;
-		if (mbc->mbc_ifp != ifp)
+		if (mbc->mbc_ifp != ifp || mbc->mbc_dad == NULL)
 			continue;
 		ia = (struct in6_ifaddr *)mbc->mbc_dad;
 		if (IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr, taddr))
@@ -2468,8 +2484,15 @@ mip6_validate_ba(m, opt)
 #if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
 			case MIP6SUBOPT_AUTHDATA:
-				authdata = (struct mip6_subopt_authdata *)opt;
 				optlen = *(opt + 1) + 2;
+				if (optlen < IP6OPT_AUTHDATALEN) {
+					mip6log((LOG_ERR,
+						 "%s:%d: "
+						 "auth data sub-option too small\n",
+						 __FILE__, __LINE__));
+					return (-1);
+				}
+				authdata = (struct mip6_subopt_authdata *)opt;
 				break;
 #endif /* !MIP6_DRAFT13 */
 #endif /* IPSEC && !__OpenBSD__ */
