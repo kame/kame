@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.5 2003/10/18 08:16:17 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.6 2003/10/18 08:18:32 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -227,7 +227,7 @@ dccp_init()
 int
 dccp6_input(struct mbuf **mp, int *offp, int proto)
 {
-	register struct mbuf *m = *mp;
+	struct mbuf *m = *mp;
 	DCCP_DEBUG((LOG_INFO, "In dccp6_input!\n"));
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, *offp, sizeof(struct dccphdr), IPPROTO_DONE);
@@ -239,14 +239,14 @@ dccp6_input(struct mbuf **mp, int *offp, int proto)
 #endif
 
 void
-dccp_input(register struct mbuf *m, int off)
+dccp_input(struct mbuf *m, int off)
 {
 	int iphlen = off;
-	register struct ip *ip = NULL;
-	register struct dccphdr *dh;
-	register struct inpcb *inp, *oinp;
-	register struct dccpcb *dp;
-	register struct ipovly *ipov = NULL;
+	struct ip *ip = NULL;
+	struct dccphdr *dh;
+	struct inpcb *inp, *oinp;
+	struct dccpcb *dp;
+	struct ipovly *ipov = NULL;
 	struct dccp_requesthdr *drqh;
 	struct dccp_ackhdr *dah = NULL;
 	struct dccp_resethdr *drth;
@@ -903,7 +903,7 @@ struct inpcb *
 #else
 void
 #endif
-dccp_notify(register struct inpcb *inp, int errno)
+dccp_notify(struct inpcb *inp, int errno)
 {
 	inp->inp_socket->so_error = errno;
 	sorwakeup(inp->inp_socket);
@@ -1097,14 +1097,14 @@ dccp_ctloutput(struct socket *so, struct sockopt *sopt)
 }
 
 int
-dccp_output(register struct dccpcb *dp, u_int8_t extra)
+dccp_output(struct dccpcb *dp, u_int8_t extra)
 {
 	struct inpcb *inp = dp->d_inpcb;
 	struct socket *so = inp->inp_socket;
 	struct mbuf *m;
 
-	register struct dccpiphdr *di = NULL;
-	register struct dccphdr *dh;
+	struct dccpiphdr *di = NULL;
+	struct dccphdr *dh;
 	struct dccp_requesthdr *drqh;
 	struct dccp_ackhdr *dah;
 	struct dccp_resethdr *drth;
@@ -1116,7 +1116,7 @@ dccp_output(register struct dccpcb *dp, u_int8_t extra)
 	char options[DCCP_MAX_OPTIONS *2];
 	long len;
 #ifdef INET6
-	register struct dccpip6hdr *di6 = NULL;
+	struct dccpip6hdr *di6 = NULL;
 	int isipv6;
 
 	isipv6 = (dp->d_inpcb->inp_vflag & INP_IPV6) != 0;
@@ -1460,7 +1460,7 @@ static int
 dccp_abort(struct socket *so)
 {
 	struct inpcb *inp;
-	register struct dccpcb *dp;
+	struct dccpcb *dp;
 	int s = splnet();
 
 	DCCP_DEBUG((LOG_INFO, "Entering dccp_abort!\n"));
@@ -1517,7 +1517,7 @@ dccp_attach(struct socket *so, int proto, struct proc *td)
 #endif
 {
 	struct inpcb *inp;
-	register struct dccpcb *dp;
+	struct dccpcb *dp;
 	int error = 0;
 	int s = splnet();
 
@@ -2293,7 +2293,7 @@ struct dccpcb *
 dccp_newdccpcb(struct inpcb *inp)
 {
 	struct inp_dp		*id;
-	register struct dccpcb	*dp;
+	struct dccpcb	*dp;
 
 	DCCP_DEBUG((LOG_INFO, "Creating a new dccpcb!\n"));
 
