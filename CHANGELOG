@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1353 2000/10/24 09:51:19 jinmei Exp $
+$KAME: CHANGELOG,v 1.1354 2000/10/25 05:16:30 jinmei Exp $
 
 <200010>
+2000-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd/if.c (if_getmtu): made some clarifications:
+	  - first try getifaddrs(), and then do SIOCGIFMTU for safety. The
+	    revised logic will safe environments with poor getifaddrs()
+	    implementation.
+	  - avoid referring to freed data by delaying to call freeifaddrs().
+	* kame/kame/rtadvd/rtadvd.conf.5: insistently noted the
+	configuration file can be omitted for those who do not read
+	rtadvd(8).
+
 2000-10-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (defrouter_select): do not install a
 	route to the default interface as default route if the node acts
