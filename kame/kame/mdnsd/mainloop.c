@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.50 2001/05/02 11:51:30 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.51 2001/05/02 11:58:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -918,10 +918,10 @@ getans(buf, len, from)
 	if (dflag)
 		dnsdump("getans O", buf, len, (struct sockaddr *)&qc->from);
 	if (qc->sd->type == S_TCP) {
-		u_int16_t l;
+		u_int16_t l16;
 
-		l = htons(len & 0xffff);
-		(void)write(qc->sd->s, &l, sizeof(l));
+		l16 = htons(len & 0xffff);
+		(void)write(qc->sd->s, &l16, sizeof(l16));
 	} else if (len > PACKETSZ) {
 		len = PACKETSZ;
 		hp->tc = 1;
@@ -1040,10 +1040,10 @@ relay(sd, buf, len, from)
 			if (dflag)
 				dnsdump("relay O", buf, len, sa);
 			if (sd->type == S_TCP) {
-				u_int16_t l;
+				u_int16_t l16;
 
-				l = htons(len & 0xffff);
-				(void)write(sd->s, &l, sizeof(l));
+				l16 = htons(len & 0xffff);
+				(void)write(sd->s, &l16, sizeof(l16));
 			}
 			if (sendto(sd->s, buf, len, 0, sa, sa->sa_len) == len) {
 #if 0
@@ -1147,10 +1147,10 @@ serve(sd, buf, len, from)
 			dnsdump("serve O", replybuf, p - replybuf, from);
 
 		if (sd->type == S_TCP) {
-			u_int16_t l;
+			u_int16_t l16;
 
-			l = htons((p - replybuf) & 0xffff);
-			(void)write(sd->s, &l, sizeof(l));
+			l16 = htons((p - replybuf) & 0xffff);
+			(void)write(sd->s, &l16, sizeof(l16));
 		} else if (p - replybuf > PACKETSZ) {
 			p -= l;
 			hp->ancount = 0;
@@ -1199,10 +1199,10 @@ serve(sd, buf, len, from)
 			dnsdump("serve P", replybuf, p - replybuf, from);
 
 		if (sd->type == S_TCP) {
-			u_int16_t l;
+			u_int16_t l16;
 
-			l = htons((p - replybuf) & 0xffff);
-			(void)write(sd->s, &l, sizeof(l));
+			l16 = htons((p - replybuf) & 0xffff);
+			(void)write(sd->s, &l16, sizeof(l16));
 		} else if (p - replybuf > PACKETSZ) {
 			p = replybuf + PACKETSZ;
 			hp->tc = 1;
