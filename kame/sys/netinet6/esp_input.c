@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.47 2000/12/12 10:54:05 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.48 2000/12/12 17:29:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,7 +74,7 @@
 
 #ifdef INET6
 #include <netinet/ip6.h>
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>
