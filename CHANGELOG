@@ -1,12 +1,32 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1287 2000/09/21 06:11:49 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1288 2000/09/22 05:14:37 itojun Exp $
 
 <200009>
+Fri Sep 22 14:00:17 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ipsec.c: clarify policy lookup.  always pull port
+	  number from the packet.  previous code looked up port number from
+	  pcb, and did not work right on sendto() with explicit address.
+	* sys/netinet6/ip6_forwarding.c: do not try to look at port numbers,
+	  as we are forwarding and the packet could be a fragment.
+	* sys/netinet6/ipcomp_*.c: (1) stabilize deflate engine.  (2) remove
+	  too strong assumption on mbuf chain, make it friendly with
+	  m_pulldown cases.  (3) compute outbound byte lifetime based on
+	  uncompressed packet.  the behavior now meets inbound behavior.
+	  RFC2401 page 23.  (4) fix mbuf leak (compression error cases).
+	* racoon: (1) support short phase 2 SPI (16bit instead of 32bit) for
+	  IPComp, to meet the latest IPComp draft.  need more checks.
+	  (2) stabilize behavior when many phase 1 proposals are presetned.
+
 Thu Sep 21 03:18:11 JST 2000  itojun@iijlab.net
 	* sys/netinet6/esp_core.c: make it possible to use rijndael and twofish
 	  at the same time.  this obsoletes kernel compile option
 	  IPSEC_ESP_TWOFISH.
+	* sys/netkey/key.c: relax SPI boundary check for IPComp.  at this
+	  moment no check is made against wellknown IPComp CPI.
+	  need to revisit.
+	* sys/netinet6/route6.c: repair cut and paste bug in address validation.
+	  from francis dupont.
 
 Wed Sep 20 22:21:57 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/freebsd3/ports/bind9: upgrade to official release 9.0.0
