@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/ipsec.h,v 1.4.2.1 2000/07/15 07:14:35 kris Exp $	*/
-/*	$KAME: ipsec.h,v 1.39 2000/12/27 11:47:10 sakane Exp $	*/
+/*	$KAME: ipsec.h,v 1.41 2001/01/23 04:42:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -149,9 +149,9 @@ struct secspacq {
 
 /* Policy level */
 /*
- * IPSEC, ENTRUST and BYPASS are allowd for setsockopt() in PCB,
- * DISCARD, IPSEC and NONE are allowd for setkey() in SPD.
- * DISCARD and NONE are allowd for system default.
+ * IPSEC, ENTRUST and BYPASS are allowed for setsockopt() in PCB,
+ * DISCARD, IPSEC and NONE are allowed for setkey() in SPD.
+ * DISCARD and NONE are allowed for system default.
  */
 #define IPSEC_POLICY_DISCARD	0	/* discarding packet */
 #define IPSEC_POLICY_NONE	1	/* through IPsec engine */
@@ -270,8 +270,8 @@ struct ipsec_output_state {
 };
 
 struct ipsec_history {
-        int ih_proto;
-        u_int32_t ih_spi;
+	int ih_proto;
+	u_int32_t ih_spi;
 };
 
 extern int ipsec_debug;
