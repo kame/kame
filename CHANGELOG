@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1687 2001/05/23 12:23:56 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1688 2001/05/24 08:23:17 itojun Exp $
 
 <200105>
+Thu May 24 17:21:05 JST 2001  itojun@iijlab.net
+	* sys/netinet6/in6_rmx.c (freebsd[34]): do not configure tcp
+	  send/receive buffer size onto routing table.  honor socket buffer
+	  size.  not tested.
+
 2001-05-23  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{defs.h,trans.c}
 	- Fix a bug in calculation of TCP ack.
