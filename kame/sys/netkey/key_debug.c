@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.24 2000/07/07 09:30:04 itojun Exp $	*/
+/*	$KAME: key_debug.c,v 1.25 2000/07/24 13:23:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -45,6 +45,7 @@
 #ifdef _KERNEL
 #include <sys/systm.h>
 #include <sys/mbuf.h>
+#include <sys/queue.h>
 #endif
 #include <sys/socket.h>
 
