@@ -1045,6 +1045,7 @@ pass:
 	 * Packet filter
 	 */
 #if NPF > 0
+	m->m_pkthdr.csum_flags |= sw_csum;
 	if (pf_test(PF_OUT, ifp, &m) != PF_PASS) {
 		error = EHOSTUNREACH;
 		m_freem(m);
@@ -1052,6 +1053,7 @@ pass:
 	}
 	if (m == NULL)
 		goto done;
+	m->m_pkthdr.csum_flags &= ifp->if_hwassist;
 
 	ip = mtod(m, struct ip *);
 	hlen = IP_VHL_HL(ip->ip_vhl) << 2;
