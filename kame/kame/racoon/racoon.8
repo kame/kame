@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.8,v 1.12 2000/09/13 04:46:13 itojun Exp $
+.\"	$KAME: racoon.8,v 1.13 2000/09/22 18:04:19 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -38,7 +38,7 @@
 .Sh SYNOPSIS
 .Nm racoon
 .Bk -words
-.Op Fl 46v
+.Op Fl 46Fv
 .Ek
 .Bk -words
 .Op Fl a Ar admin-port
@@ -55,9 +55,6 @@
 .Bk -words
 .Op Fl d Ar dlevel
 .Ek
-.Bk -words
-.Op Fl F
-.Ek
 .\"
 .Sh DESCRIPTION
 .Nm
@@ -71,6 +68,8 @@ Set the default address family to
 or
 .Dv AF_INET6 .
 Currently they have no effect.
+.It Fl F
+Force running in foreground.
 .It Fl v
 Be verbose.
 .It Fl a Ar admin-port
@@ -90,8 +89,6 @@ Set debugging level to
 See
 .Pa debug.h
 for debug levels available.
-.It Fl F
-Force running in foreground.
 .El
 .\"
 .Sh FILES
