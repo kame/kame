@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2742 2005/04/04 09:14:57 suz Exp $
+$KAME: CHANGELOG,v 1.2743 2005/04/05 05:23:01 suz Exp $
 
 <200504>
+2005-04-05  SUZUKI, Shinsuke <suz@kame.net>
+	* freebsd5/sys/ufs/ffs/ffs_inode.c: FreeBSD Security Advisory
+	 FreeBSD-SA-05:02.sendfile
+
 2005-04-04  SUZUKI, Shinsuke <suz@kame.net>
 	* kame/sys/netinet6/nd6.c: when the number of the packets queued in
 	  a NDP cache exceed the limit, discard the oldest packet, 

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,8 +27,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_inode.c	8.13 (Berkeley) 4/21/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_inode.c,v 1.83 2002/09/25 02:49:48 jeff Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_inode.c,v 1.93 2004/07/28 06:41:26 kan Exp $");
 
 #include "opt_quota.h"
 
@@ -82,6 +80,10 @@ ffs_update(vp, waitfor)
 	struct inode *ip;
 	int error;
 
+#ifdef DEBUG_VFS_LOCKS
+	if ((vp->v_iflag & VI_XLOCK) == 0)
+		ASSERT_VOP_LOCKED(vp, "ffs_update");
+#endif
 	ufs_itimes(vp);
 	ip = VTOI(vp);
 	if ((ip->i_flag & IN_MODIFIED) == 0 && waitfor == 0)
@@ -227,7 +229,7 @@ ffs_truncate(vp, length, flags, cred, td)
 #endif
 		bzero(SHORTLINK(oip), (u_int)oip->i_size);
 		oip->i_size = 0;
-		DIP(oip, i_size) = 0;
+		DIP_SET(oip, i_size, 0);
 		oip->i_flag |= IN_CHANGE | IN_UPDATE;
 		if (needextclean)
 			softdep_setup_freeblocks(oip, length, IO_EXT);
@@ -272,6 +274,7 @@ ffs_truncate(vp, length, flags, cred, td)
 			    IO_EXT | IO_NORMAL : IO_NORMAL);
 			vinvalbuf(ovp, needextclean ? 0 : V_NORMAL,
 			    cred, td, 0, 0);
+			vnode_pager_setsize(vp, 0);
 			oip->i_flag |= IN_CHANGE | IN_UPDATE;
 			return (ffs_update(ovp, 0));
 		}
@@ -289,7 +292,7 @@ ffs_truncate(vp, length, flags, cred, td)
 		if (error)
 			return (error);
 		oip->i_size = length;
-		DIP(oip, i_size) = length;
+		DIP_SET(oip, i_size, length);
 		if (bp->b_bufsize == fs->fs_bsize)
 			bp->b_flags |= B_CLUSTEROK;
 		if (flags & IO_SYNC)
@@ -310,7 +313,7 @@ ffs_truncate(vp, length, flags, cred, td)
 	offset = blkoff(fs, length);
 	if (offset == 0) {
 		oip->i_size = length;
-		DIP(oip, i_size) = length;
+		DIP_SET(oip, i_size, length);
 	} else {
 		lbn = lblkno(fs, length);
 		flags |= BA_CLRBUF;
@@ -331,7 +334,7 @@ ffs_truncate(vp, length, flags, cred, td)
 		    (error = VOP_FSYNC(ovp, cred, MNT_WAIT, td)) != 0)
 			return (error);
 		oip->i_size = length;
-		DIP(oip, i_size) = length;
+		DIP_SET(oip, i_size, length);
 		size = blksize(fs, oip, lbn);
 		if (ovp->v_type != VDIR)
 			bzero((char *)bp->b_data + offset,
@@ -365,14 +368,14 @@ ffs_truncate(vp, length, flags, cred, td)
 	for (level = TRIPLE; level >= SINGLE; level--) {
 		oldblks[NDADDR + level] = DIP(oip, i_ib[level]);
 		if (lastiblock[level] < 0) {
-			DIP(oip, i_ib[level]) = 0;
+			DIP_SET(oip, i_ib[level], 0);
 			lastiblock[level] = -1;
 		}
 	}
 	for (i = 0; i < NDADDR; i++) {
 		oldblks[i] = DIP(oip, i_db[i]);
 		if (i > lastblock)
-			DIP(oip, i_db[i]) = 0;
+			DIP_SET(oip, i_db[i], 0);
 	}
 	oip->i_flag |= IN_CHANGE | IN_UPDATE;
 	allerror = UFS_UPDATE(ovp, 1);
@@ -385,14 +388,14 @@ ffs_truncate(vp, length, flags, cred, td)
 	 */
 	for (i = 0; i < NDADDR; i++) {
 		newblks[i] = DIP(oip, i_db[i]);
-		DIP(oip, i_db[i]) = oldblks[i];
+		DIP_SET(oip, i_db[i], oldblks[i]);
 	}
 	for (i = 0; i < NIADDR; i++) {
 		newblks[NDADDR + i] = DIP(oip, i_ib[i]);
-		DIP(oip, i_ib[i]) = oldblks[NDADDR + i];
+		DIP_SET(oip, i_ib[i], oldblks[NDADDR + i]);
 	}
 	oip->i_size = osize;
-	DIP(oip, i_size) = osize;
+	DIP_SET(oip, i_size, osize);
 
 	error = vtruncbuf(ovp, cred, td, length, fs->fs_bsize);
 	if (error && (allerror == 0))
@@ -413,7 +416,7 @@ ffs_truncate(vp, length, flags, cred, td)
 				allerror = error;
 			blocksreleased += count;
 			if (lastiblock[level] < 0) {
-				DIP(oip, i_ib[level]) = 0;
+				DIP_SET(oip, i_ib[level], 0);
 				ffs_blkfree(fs, oip->i_devvp, bn, fs->fs_bsize,
 				    oip->i_number);
 				blocksreleased += nblocks;
@@ -432,7 +435,7 @@ ffs_truncate(vp, length, flags, cred, td)
 		bn = DIP(oip, i_db[i]);
 		if (bn == 0)
 			continue;
-		DIP(oip, i_db[i]) = 0;
+		DIP_SET(oip, i_db[i], 0);
 		bsize = blksize(fs, oip, i);
 		ffs_blkfree(fs, oip->i_devvp, bn, bsize, oip->i_number);
 		blocksreleased += btodb(bsize);
@@ -454,7 +457,7 @@ ffs_truncate(vp, length, flags, cred, td)
 		 */
 		oldspace = blksize(fs, oip, lastblock);
 		oip->i_size = length;
-		DIP(oip, i_size) = length;
+		DIP_SET(oip, i_size, length);
 		newspace = blksize(fs, oip, lastblock);
 		if (newspace == 0)
 			panic("ffs_truncate: newspace");
@@ -490,11 +493,11 @@ done:
 	 * Put back the real size.
 	 */
 	oip->i_size = length;
-	DIP(oip, i_size) = length;
-	DIP(oip, i_blocks) -= blocksreleased;
+	DIP_SET(oip, i_size, length);
+	DIP_SET(oip, i_blocks, DIP(oip, i_blocks) - blocksreleased);
 
 	if (DIP(oip, i_blocks) < 0)			/* sanity */
-		DIP(oip, i_blocks) = 0;
+		DIP_SET(oip, i_blocks, 0);
 	oip->i_flag |= IN_CHANGE;
 #ifdef QUOTA
 	(void) chkdq(oip, -blocksreleased, NOCRED, 0);
@@ -549,7 +552,7 @@ ffs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 	 * explicitly instead of letting bread do everything for us.
 	 */
 	vp = ITOV(ip);
-	bp = getblk(vp, lbn, (int)fs->fs_bsize, 0, 0);
+	bp = getblk(vp, lbn, (int)fs->fs_bsize, 0, 0, 0);
 	if ((bp->b_flags & B_CACHE) == 0) {
 		curproc->p_stats->p_ru.ru_inblock++;	/* pay for read */
 		bp->b_iocmd = BIO_READ;
@@ -559,7 +562,8 @@ ffs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 			panic("ffs_indirtrunc: bad buffer size");
 		bp->b_blkno = dbn;
 		vfs_busy_pages(bp, 0);
-		BUF_STRATEGY(bp);
+		bp->b_iooffset = dbtob(bp->b_blkno);
+		VOP_STRATEGY(bp->b_vp, bp);
 		error = bufwait(bp);
 	}
 	if (error) {
@@ -576,7 +580,10 @@ ffs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 		MALLOC(copy, caddr_t, fs->fs_bsize, M_TEMP, M_WAITOK);
 		bcopy((caddr_t)bp->b_data, copy, (u_int)fs->fs_bsize);
 		for (i = last + 1; i < NINDIR(fs); i++)
-			BAP(ip, i) = 0;
+			if (ip->i_ump->um_fstype == UFS1)
+				bap1[i] = 0;
+			else
+				bap2[i] = 0;
 		if (DOINGASYNC(vp)) {
 			bawrite(bp);
 		} else {
