@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2187 2002/06/20 07:40:33 itojun Exp $
+$KAME: CHANGELOG,v 1.2188 2002/06/21 10:29:35 jinmei Exp $
 
 <200206>
+2002-06-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6c: improved signal handling; the client now
+	released all stateful resources when receiving SIGHUP or SIGTERM.
+	In the former case dhcp6c would then restart.
+	A bug that could produce dangling pointers was fixed, too.  It is
+	recommended to upgrade the client to the latest version.
+
 Thu Jun 20 16:37:57 JST 2002  itojun@iijlab.net
 	* sys/net/if_stf.c: reject packets with private IPv4 address
 	  (or 6to4 address derived from private IPv4 address).  from hitachi
