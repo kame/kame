@@ -1,4 +1,4 @@
-/*	$KAME: db.h,v 1.5 2000/05/31 11:29:57 itojun Exp $	*/
+/*	$KAME: mediator_compat.h,v 1.1 2000/05/31 11:29:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -29,55 +29,12 @@
  * SUCH DAMAGE.
  */
 
-struct qcache {
-	LIST_ENTRY(qcache) link;
-	struct sockaddr_storage from;
-	char *qbuf;	/* original query packet */
-	int qlen;
-	u_int16_t id;	/* id on relayed query - net endian */
+#define MEDIATOR_CTRL_PORT	"13863"
+#define MEDIATOR_CTRL_VERSION	1
+
+/* control structure to communicate with mediator */
+struct mediator_control_msg {
+	int32_t version;
+	int32_t lifetime;
+	char serveraddr[128];
 };
-
-struct acache {
-	LIST_ENTRY(acache) link;
-};
-
-struct scache {
-	LIST_ENTRY(scache) link;
-	struct timeval tts;	/* time to send */
-	char *sbuf;		/* answer to send */
-	int slen;
-	struct sockaddr_storage from;
-	struct sockaddr_storage to;
-	int sockidx;
-};
-
-struct nsdb {
-	LIST_ENTRY(nsdb) link;
-	struct sockaddr_storage addr;
-	char *comment;
-	int flags;
-	int prio;
-	struct timeval lasttx;	/* last packet transmit */
-	struct timeval lastrx;	/* last packet delivery */
-};
-
-extern LIST_HEAD(qchead, qcache) qcache;
-#if 0
-extern LIST_HEAD(achead, acache) acache;
-#endif
-extern LIST_HEAD(schead, scache) scache;
-extern LIST_HEAD(nshead, nsdb) nsdb;
-
-/* nsdb->flags */
-#define NSDB_ANY	0
-#define NSDB_UNICAST	1
-#define NSDB_MULTICAST	2
-
-extern int dbtimeo __P((void));
-extern struct qcache *newqcache __P((const struct sockaddr *, char *, int));
-extern void delqcache __P((struct qcache *));
-extern struct scache *newscache __P((int, const struct sockaddr *,
-	const struct sockaddr *, char *, int));
-extern void delscache __P((struct scache *));
-extern struct nsdb *newnsdb __P((const struct sockaddr *, const char *, int));
-extern void delnsdb __P((struct nsdb *));

@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.4 2000/05/31 10:54:02 itojun Exp $	*/
+/*	$KAME: db.c,v 1.5 2000/05/31 11:29:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -42,9 +42,6 @@
 #include <err.h>
 #include <errno.h>
 #include <string.h>
-#include <ifaddrs.h>
-
-#include <arpa/nameser.h>
 
 #include "mdnsd.h"
 #include "db.h"

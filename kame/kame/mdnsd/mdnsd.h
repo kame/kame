@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.h,v 1.6 2000/05/31 10:40:24 itojun Exp $	*/
+/*	$KAME: mdnsd.h,v 1.7 2000/05/31 11:29:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -40,6 +40,7 @@ extern const char *dnsserv;
 extern const char *intface;
 extern int sock[];
 extern int sockaf[];
+extern int sockflag[];
 extern int nsock;
 extern int family;
 extern const char *hostname;
@@ -47,7 +48,11 @@ extern int dflag;
 extern struct timeval hz;
 extern int probeinterval;
 
+/* sockflag[] */
+#define SOCK_MEDIATOR	1
+
 /* mdnsd.c */
+extern int addserv __P((const char *));
 extern int ismyaddr __P((const struct sockaddr *));
 extern int dprintf __P((const char *, ...));
 

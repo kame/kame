@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.11 2000/05/31 10:40:24 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.12 2000/05/31 11:29:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -50,6 +50,7 @@
 
 #include "mdnsd.h"
 #include "db.h"
+#include "mediator_compat.h"
 
 #define MAXSOCK		20
 
@@ -60,6 +61,7 @@ const char *dnsserv = NULL;
 const char *intface = NULL;
 int sockaf[MAXSOCK];
 int sock[MAXSOCK];
+int sockflag[MAXSOCK];
 int nsock = 0;
 int family = PF_UNSPEC;
 static char hostnamebuf[MAXHOSTNAMELEN];
@@ -69,6 +71,7 @@ static int mcastloop = 0;
 int dflag = 1;
 struct timeval hz = { 1, 0 };	/* timeout every 1 second */
 int probeinterval = 300;	/* probe reachability every 5min */
+static int mflag;
 
 static void usage __P((void));
 static int getsock __P((int, const char *, const char *, int, int));
@@ -77,7 +80,6 @@ static int join __P((int, int, const char *));
 static int join0 __P((int, const struct addrinfo *));
 static int setif __P((int, int, const char *));
 static int iscanon __P((const char *));
-static int addserv __P((const char *));
 
 int
 main(argc, argv)
@@ -88,7 +90,7 @@ main(argc, argv)
 	int i;
 	int ready4, ready6;
 
-	while ((ch = getopt(argc, argv, "46d:h:i:p:P:")) != EOF) {
+	while ((ch = getopt(argc, argv, "46d:h:i:mp:P:")) != EOF) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -110,6 +112,9 @@ main(argc, argv)
 			break;
 		case 'i':
 			intface = optarg;
+			break;
+		case 'm':
+			mflag++;
 			break;
 		case 'p':
 			srcport = optarg;
@@ -153,8 +158,30 @@ main(argc, argv)
 	}
 	dprintf("%d sockets available\n", nsock);
 
+	if (mflag) {
+		int i;
+
+		i = nsock;
+		if (getsock(AF_INET, NULL, MEDIATOR_CTRL_PORT, SOCK_DGRAM, 0)
+		    != 0) {
+			err(1, "getsock(mediator)");
+			/*NOTREACHED*/
+		}
+		if (i == nsock) {
+			errx(1, "no mediator socket");
+			/*NOTREACHED*/
+		}
+		for (/*nothing*/; i < nsock; i++) {
+			sockflag[i] |= SOCK_MEDIATOR;
+			dprintf("%d: mediator socket\n", i);
+		}
+	}
+
 	ready4 = ready6 = 0;
 	for (i = 0; i < nsock; i++) {
+		if ((sockflag[i] & SOCK_MEDIATOR) != 0)
+			continue;
+
 		switch (sockaf[i]) {
 		case AF_INET6:
 			ready6++;
@@ -170,7 +197,7 @@ main(argc, argv)
 #endif
 		}
 
-		if (setif(sock[0], sockaf[i], intface) < 0) {
+		if (setif(sock[i], sockaf[i], intface) < 0) {
 			errx(1, "setif");
 			/*NOTREACHED*/
 		}
@@ -203,7 +230,7 @@ static void
 usage()
 {
 	fprintf(stderr,
-"usage: mdnsd [-46D] [-d server] [-h hostname] [-p srcport] [-P dstport]\n"
+"usage: mdnsd [-46Dm] [-d server] [-h hostname] [-p srcport] [-P dstport]\n"
 "             -i iface [userv...]\n");
 }
 
@@ -439,7 +466,7 @@ iscanon(n)
 #endif
 }
 
-static int
+int
 addserv(n)
 	const char *n;
 {

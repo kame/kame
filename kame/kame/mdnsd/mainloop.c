@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.16 2000/05/31 10:54:02 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.17 2000/05/31 11:29:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -60,13 +60,16 @@
 #include <errno.h>
 #include <string.h>
 #include <ifaddrs.h>
+#include <ctype.h>
 
 #include <arpa/nameser.h>
 
 #include "mdnsd.h"
 #include "db.h"
+#include "mediator_compat.h"
 
 static int mainloop0 __P((int));
+static int conf_mediator __P((int));
 static char *encode_name __P((char **, int, const char *));
 static char *decode_name __P((const char **, int));
 static int hexdump __P((const char *, const char *, int,
@@ -112,8 +115,12 @@ mainloop()
 		}
 
 		for (i = 0; i < nsock; i++) {
-			if (FD_ISSET(sock[i], &rfds))
-				mainloop0(i);
+			if (FD_ISSET(sock[i], &rfds)) {
+				if (sockflag[i] & SOCK_MEDIATOR)
+					conf_mediator(i);
+				else
+					mainloop0(i);
+			}
 		}
 	}
 }
@@ -139,8 +146,11 @@ mainloop0(i)
 	fromlen = sizeof(from);
 	l = recvfrom(sock[i], buf, sizeof(buf), 0, (struct sockaddr *)&from,
 	    &fromlen);
-	if (l < 0)
-		err(1, "recvfrom");
+	if (l < 0) {
+		if (dflag)
+			warn("recvfrom");
+		return -1;
+	}
 
 	/* reachability confirmation statistics */
 	for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
@@ -172,6 +182,46 @@ mainloop0(i)
 			getans(sock[0], buf, l, (struct sockaddr *)&from);
 	}
 
+	return 0;
+}
+
+static int
+conf_mediator(i)
+	int i;
+{
+	struct sockaddr_storage from;
+	int fromlen;
+	char buf[8 * 1024];
+	int l;
+	struct mediator_control_msg *msg;
+	char *p;
+
+	fromlen = sizeof(from);
+	l = recvfrom(sock[i], buf, sizeof(buf), 0, (struct sockaddr *)&from,
+	    &fromlen);
+	if (l < 0) {
+		if (dflag)
+			warn("recvfrom");
+		return -1;
+	}
+
+	if (l != sizeof(*msg))
+		return -1;
+	msg = (struct mediator_control_msg *)buf;
+	if (ntohl(msg->version) != MEDIATOR_CTRL_VERSION)
+		return -1;
+	for (p = msg->serveraddr;
+	     p < &msg->serveraddr[sizeof(msg->serveraddr)];
+	     p++) {
+		if (*p == '\0')
+			break;
+		if (!isprint(*p))
+			return -1;
+	}
+	if (*p != '\0')
+		return -1;
+
+	(void)addserv(msg->serveraddr);
 	return 0;
 }
 
