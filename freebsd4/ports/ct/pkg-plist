@@ -277,6 +277,7 @@ ct/nd/hostRecvRs.seq
 ct/nd/hostSendRs.seq
 ct/nd/hostSendRsAfterSolicitedRa.seq
 ct/nd/hostSendRsAfterUnsolicitedRa.seq
+ct/nd/kame-freebsd4.rtadvd.tmpl
 ct/nd/ncStateByNa4Incomplete.seq
 ct/nd/ncStateByNa4Nonce.seq
 ct/nd/recvNaRFlag.seq
