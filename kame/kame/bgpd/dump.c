@@ -836,7 +836,7 @@ show_bgp_peer(FILE *fp, struct rpcb *bnp, char *indent)
 		if (abnp->rp_stat.last_closed) {
 			/* ctime appends \n */
 			fprintf(fp, "%s Last closed: %s", indent,
-				ctime(&abnp->rp_stat.last_established));
+				ctime(&abnp->rp_stat.last_closed));
 			if (bnp->rp_state != BGPSTATE_ESTABLISHED)
 				fprintf(fp,
 					"%s   hasn't been established for %s\n",
