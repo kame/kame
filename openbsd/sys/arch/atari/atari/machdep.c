@@ -1146,7 +1146,7 @@ netintr()
 		pppintr();
 	}
 #endif
-#ifdef NBRIDGE > 0
+#if NBRIDGE > 0
 	if (netisr & (1 << NETISR_BRIDGE)) {
 		netisr &= ~(1 << NETISR_BRIDGE);
 		bridgeintr();
