@@ -1357,7 +1357,9 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
      int nexthdr;
 #endif /* IPSEC */
 {
-  register struct inpcb *inp, *oinp;
+#define in6_rtchange in_rtchange /* XXX: openbsd does not have in6_rtchange */
+
+  register struct inpcb *inp, *ninp;
   struct in6_addr *faddr,laddr = *la;
   u_short fport = fport_arg, lport = lport_arg;
   int errno;
@@ -1402,7 +1404,7 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
        * Keep the old notify function to store a soft error
        * in each PCB.
        */
-      if (cmd == PRC_HOSTDEAD)
+      if (cmd == PRC_HOSTDEAD && notify != in6_rtchange)
 	notify2 = notify;
 
       notify = in6_rtchange;
@@ -1428,72 +1430,87 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 
 #if __NetBSD__ || __OpenBSD__
   for (inp = head->inpt_queue.cqh_first;
-       inp != (struct inpcb *)&head->inpt_queue;)
+       inp != (struct inpcb *)&head->inpt_queue; inp = ninp)
 #else /* __NetBSD__ || __OpenBSD__ */
 #if __FreeBSD__
-  for (inp = head->lh_first; inp != NULL;)
+  for (inp = head->lh_first; inp != NULL; inp = ninp)
 #else /* __FreeBSD__ */
-  for (inp = head->inp_next; inp != head;)
+  for (inp = head->inp_next; inp != head; inp = ninp)
 #endif /* __FreeBSD__ */
 #endif /* __NetBSD__ || __OpenBSD__ */
     {
+#if __NetBSD__ || __OpenBSD__
+      ninp = inp->inp_queue.cqe_next;
+#else /* __NetBSD__ || __OpenBSD__ */
+#if __FreeBSD__
+      ninp = inp->inp_list.le_next;
+#else /* __FreeBSD__ */
+      ninp = inp->inp_next;
+#endif /* __FreeBSD__ */
+#endif /* __NetBSD__ || __OpenBSD__ */
+
+      if (notify == in6_rtchange) {
+	/*
+	 * Since a non-connected PCB might have a cached route,
+	 * we always call in6_rtchange without matching
+	 * the PCB to the src/dst pair.
+	 *
+	 * XXX: we assume in6_rtchange does not free the PCB.
+	 */
+	if (IN6_ARE_ADDR_EQUAL(&inp->inp_route6.ro_dst.sin6_addr,
+			       &faddr))
+#ifdef IPSEC
+	  /* Pretend the packet came in for this source/destination port pair,
+	     since that's what we care about for policy. If the passed in
+	     fport and/or lport were nonzero, the comparison will make sure
+	     they match that of the PCB and the right thing will happen.
+	     -cmetz */
+	  srcsa.sin6_port = inp->inp_fport;
+	  dstsa.sin6_port = inp->inp_lport;
+
+	  /* XXX - state arg should not be NULL */
+	  if (!netproc_inputpolicy(inp->inp_socket, (struct sockaddr *)&srcsa,
+			          (struct sockaddr *)&dstsa, nexthdr, m, NULL,
+				   NULL))
+#endif /* IPSEC */
+	    {
+	      in6_rtchange(inp, errno);
+	    }
+
+	if (notify2 != NULL)
+	  continue;
+      }
+
       if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr) ||
 	  !inp->inp_socket ||
 	  (lport && inp->inp_lport != lport) ||
 	  (!IN6_IS_ADDR_UNSPECIFIED(&laddr) && !IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6, &laddr)) ||
 	  (fport && inp->inp_fport != fport))
 	{
-#if __NetBSD__ || __OpenBSD__
-	  inp = inp->inp_queue.cqe_next;
-#else /* __NetBSD__ || __OpenBSD__ */
-#if __FreeBSD__
-	  inp = inp->inp_list.le_next;
-#else /* __FreeBSD__ */
-	  inp = inp->inp_next;
-#endif /* __FreeBSD__ */
-#endif /* __NetBSD__ || __OpenBSD__ */
 	  continue;
 	}
-      oinp = inp;
 
-#if __NetBSD__ || __OpenBSD__
-      inp = inp->inp_queue.cqe_next;
-#else /* __NetBSD__ || __OpenBSD__ */
-#if __FreeBSD__
-      inp = inp->inp_list.le_next;
-#else /* __FreeBSD__ */
-      inp = inp->inp_next;
-#endif /* __FreeBSD__ */
-#endif /* __NetBSD__ || __OpenBSD__ */
-
-      if (notify || notify2)
+      if (notify2)
 #ifdef IPSEC
 	{
-	  /* Pretend the packet came in for this source/destination port pair,
-	     since that's what we care about for policy. If the passed in
-	     fport and/or lport were nonzero, the comparison will make sure
-	     they match that of the PCB and the right thing will happen.
-	     -cmetz */
-	  srcsa.sin6_port = oinp->inp_fport;
-	  dstsa.sin6_port = oinp->inp_lport;
+	  /* See the above comment */
+	  srcsa.sin6_port = inp->inp_fport;
+	  dstsa.sin6_port = inp->inp_lport;
 
 	  /* XXX - state arg should not be NULL */
-	  if (!netproc_inputpolicy(oinp->inp_socket, (struct sockaddr *)&srcsa,
+	  if (!netproc_inputpolicy(inp->inp_socket, (struct sockaddr *)&srcsa,
 			          (struct sockaddr *)&dstsa, nexthdr, m, NULL,
 				   NULL))
 #endif /* IPSEC */
 	    {
-	      if (notify)
-		(*notify)(oinp, errno);
-
-	      if (notify2)
-		(*notify2)(oinp, errno);
+	      (*notify2)(inp, errno);
 	    }
 #ifdef IPSEC
 	}
 #endif /* IPSEC */
     }
    return 0;
+#undef in6_rtchange
 }
 
 /*----------------------------------------------------------------------
