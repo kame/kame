@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.4 2000/05/05 16:17:55 sumikawa Exp $	*/
+/*	$KAME: udp6_output.c,v 1.5 2000/05/18 15:04:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,6 +103,9 @@
 #endif
 #include <netinet/icmp6.h>
 #include <netinet6/ip6protosw.h>
+#ifdef ENABLE_DEFAULT_SCOPE
+#include <netinet6/scope6_var.h>
+#endif
 
 #ifdef __OpenBSD__
 #undef IPSEC
@@ -206,6 +209,12 @@ udp6_output(in6p, m, addr6, control)
 
 		faddr = &sin6->sin6_addr;
 		fport = sin6->sin6_port; /* allow 0 port */
+#ifdef ENABLE_DEFAULT_SCOPE
+		if (sin6->sin6_scope_id == 0)
+			sin6->sin6_scope_id =
+				scope6_addr2default(&sin6->sin6_addr);
+#endif
+
 		/*
 		 * If the scope of the destination is link-local,
 		 * embed the interface index in the address.
