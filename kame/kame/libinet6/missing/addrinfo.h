@@ -102,5 +102,5 @@ extern int getnameinfo __P((const struct sockaddr *, size_t, char *,
 extern struct hostent *getipnodebyaddr __P((const void *, size_t, int, int *));
 extern struct hostent *getipnodebyname __P((const char *, int, int, int *));
 extern int inet_pton __P((int, const char *, void *));
-extern char *inet_ntop __P((int, const void *, char *, size_t));
+extern const char *inet_ntop __P((int, const void *, char *, size_t));
 #endif /* HAVE_ADDRINFO */
