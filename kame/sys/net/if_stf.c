@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.9 2000/03/11 13:10:07 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.10 2000/03/11 14:07:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -70,6 +70,9 @@
 #include <sys/ioctl.h>
 #endif
 #include <sys/protosw.h>
+#ifdef __FreeBSD__
+#include <sys/kernel.h>
+#endif
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <sys/malloc.h>
@@ -271,9 +274,14 @@ stf_getsrcifa6(ifp)
 	struct sockaddr_in6 *sin6;
 	struct in_addr in;
 
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ia = ifp->if_addrlist; ia; ia = ia->ifa_next)
+#else
 	for (ia = ifp->if_addrlist.tqh_first;
 	     ia;
-	     ia = ia->ifa_list.tqe_next) {
+	     ia = ia->ifa_list.tqe_next)
+#endif
+	{
 		if (ia->ifa_addr == NULL)
 			continue;
 		if (ia->ifa_addr->sa_family != AF_INET6)
@@ -286,7 +294,13 @@ stf_getsrcifa6(ifp)
 #ifdef __NetBSD__
 		INADDR_TO_IA(in, ia4);
 #else
-# error the operating system is not supported yet
+
+		for (ia4 = in_ifaddr; ia4 != NULL; ia4 = ia4->ia_next) {
+			if (ia4->ia_ifp != ifp)
+				continue;
+			if (ia4->ia_addr.sin_addr.s_addr == in.s_addr)
+				break;
+		}
 #endif
 		if (ia4 == NULL)
 			continue;
@@ -491,7 +505,7 @@ in_stf_input(m, va_alist)
 		m0.m_data = (char *)&af;
 		
 #ifdef HAVE_OLD_BPF
-		bpf_mtap(gifp, &m0);
+		bpf_mtap(ifp, &m0);
 #else
 		bpf_mtap(ifp->if_bpf, &m0);
 #endif
