@@ -190,7 +190,7 @@ bgp_enable_rte(rte)
 	      if (addroute(rte, &rte->rt_bgw, ifep) != 0) {
 		      /* If the next hop is inaccessible, do not consider it. */
 		      /*                                             [cisco]  */
-		      return 0; /* continue to next rte */
+		      return 0;
 	      }
 	      rte->rt_flags |= RTF_INSTALLED;
       } else {                          /* iBGP */
@@ -221,45 +221,21 @@ bgp_enable_rte(rte)
 				 ip6str(&rte->rt_gw,
 					rte->rt_gwif->ifi_ifn->if_index),
 				 rte->rt_gwif->ifi_ifn->if_name);
-			  return 0; /* continue to next rte */
+			  return 1; /* keep this route anyway */
 		  }
 	      }
 	      else {
 		      syslog(LOG_ERR,
 			     "<%s>: failed to set a gateway for nexthop %s",
 			     __FUNCTION__, ip6str(&rte->rt_bgw, 0));
-		      return 0;
+		      /* but keep it anyway */
+		      return 1;
 	      }
-#if 0				/* 991013 */
-	      if (in6_is_addr_onlink(&rte->rt_bgw, &ifep)) {
-		      if (ifep == NULL)
-			      ifep = bnp->rp_ife;
-		      if (addroute(rte, &rte->rt_bgw, ifep)) {
-			      syslog(LOG_ERR,
-				     "<%s>: failed to add a route dst: %s/%d, gw: %s",
-				     __FUNCTION__,
-				     ip6str(&rte->rt_ripinfo.rip6_dest, 0),
-				     rte->rt_ripinfo.rip6_plen,
-				     ip6str(&rte->rt_bgw,
-					    ifep->ifi_ifn ? ifep->ifi_ifn->if_index : 0));
-			      rte->rt_flags &= ~RTF_UP;
-			      return 0; /* continue to next rte */
-		      }
-	      }
-	      else {
-		      if ((set_nexthop(rte) == 1) &&
-			  (addroute(rte, &rte->rt_gw, &ife) == 0)) {
-#ifdef DEBUG
-			      syslog(LOG_DEBUG, "<%s>:succeed (maybe third-party)",
-				     __FUNCTION__);
-#endif
-		      }
-	      }
-#endif /* 0 991013 */
       }
   }
 
-  if (!IN6_IS_ADDR_LINKLOCAL(&rte->rt_gw))
+  if (!IN6_IS_ADDR_UNSPECIFIED(&rte->rt_gw) &&
+      !IN6_IS_ADDR_LINKLOCAL(&rte->rt_gw))
     rte->rt_flags |= RTF_NH_NOT_LLADDR;
 
   /* (1998/06/30) */
