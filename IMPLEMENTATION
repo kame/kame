@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.219 2001/05/28 00:07:43 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.220 2001/05/28 00:36:27 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1041,7 +1041,7 @@ number duplicate and other twists.
 
 1.12.3.2 KAME/NetBSD, initiating side
 
-When getsockopt(IPV6_V6ONLY) is 0 for a socket, you can make a outgoing
+When getsockopt(IPV6_V6ONLY) is 0 for a socket, you can make an outgoing
 traffic to IPv4 destination over AF_INET6 socket, using IPv4 mapped
 address destination (::ffff:10.1.1.1).
 
