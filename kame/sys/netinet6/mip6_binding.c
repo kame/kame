@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.137 2002/09/26 06:45:21 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.138 2002/09/27 01:39:53 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1233,6 +1233,8 @@ mip6_process_hrbu(bi)
 			/* create a BC entry. */
 			mbc = mip6_bc_create(&haddr, &bi->mbc_pcoa, &bi->mbc_addr, bi->mbc_flags,
 					     bi->mbc_seqno, bi->mbc_lifetime, hifp);
+			if (mbc == NULL)
+				return (-1);
 			if (mip6_bc_list_insert(&mip6_bc_list, mbc))
 				return (-1);
 
@@ -1300,6 +1302,8 @@ mip6_process_hrbu(bi)
 						     bi->mbc_seqno,
 						     bi->mbc_lifetime,
 						     hifp);
+				if (mbc == NULL)
+					return (-1);
 				if (mip6_bc_list_insert(&mip6_bc_list, mbc))
 					return (-1);
 
