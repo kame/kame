@@ -332,6 +332,8 @@ void	 rt_timer_queue_destroy __P((struct rttimer_queue *, int));
 void	 rt_timer_remove_all __P((struct rtentry *));
 unsigned long rt_timer_count __P((struct rttimer_queue *));
 void	 rt_timer_timer __P((void *));
+void	 rt_add_cache __P((struct rtentry *,
+			   void(*) __P((struct rtentry *, struct rttimer *))));
 void	 rtalloc __P((struct route *));
 void	 rtalloc_ign __P((struct route *, u_long));
 struct rtentry *
