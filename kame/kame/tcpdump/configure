@@ -2981,103 +2981,255 @@ EOF
 
     fi
 
-echo $ac_n "checking for SSLeay""... $ac_c" 1>&6
-echo "configure:2986: checking for SSLeay" >&5
-ac_cv_ssleay_path=no
-incdir=no
-for dir in /usr/local /usr/local/ssl /usr/pkg; do
-	if test -d $dir/lib -a -f $dir/lib/libcrypto.a; then
-		ac_cv_ssleay_path=$dir
-	fi
-	if test -d $dir/include -a -f $dir/include/des.h; then
-		incdir="-I$dir/include"
-	else
-		if test -d $dir/include/ssleay -a -f $dir/include/ssleay/des.h; then
-			incdir="-I$dir/include/ssleay"
-		elif test -d $dir/include/openssl -a -f $dir/include/openssl/des.h; then
-			incdir="-I$dir/include -I$dir/include/openssl"
+if test "x$crypto_dir" = "x"; then
+	case $host_os in
+	netbsd*)	crypto_dir="/usr/pkg";;
+	freebsd*)
+		if test -d /usr/local/ssl; then
+			crypto_dir="/usr/local/ssl"
+		else
+			crypto_dir="/usr/local"
 		fi
-	fi
-	if test "$ac_cv_ssleay_path" != "no" -a "$incdir" != "no"; then
-		break;
-	else
-		ac_cv_ssleay_path=no
-		incdir=no
-	fi
-done
-echo "$ac_t""$ac_cv_ssleay_path" 1>&6
-if test "$ac_cv_ssleay_path" != no; then
-	V_INCLS="$V_INCLS $incdir"
-	LIBS="$LIBS -L$dir/lib"
-	echo $ac_n "checking for des_cbc_encrypt in -lcrypto""... $ac_c" 1>&6
-echo "configure:3014: checking for des_cbc_encrypt in -lcrypto" >&5
-ac_lib_var=`echo crypto'_'des_cbc_encrypt | sed 'y%./+-%__p_%'`
-if eval "test \"`echo '$''{'ac_cv_lib_$ac_lib_var'+set}'`\" = set"; then
+		;;
+	esac
+fi
+
+echo $ac_n "checking for crypto containing CAST_cfb64_encrypt""... $ac_c" 1>&6
+echo "configure:2999: checking for crypto containing CAST_cfb64_encrypt" >&5
+if eval "test \"`echo '$''{'ac_cv_search_CAST_cfb64_encrypt'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
-  ac_save_LIBS="$LIBS"
-LIBS="-lcrypto  $LIBS"
+  ac_func_search_save_LIBS="$LIBS"
+ac_cv_search_CAST_cfb64_encrypt="no"
 cat > conftest.$ac_ext <<EOF
-#line 3022 "configure"
+#line 3006 "configure"
 #include "confdefs.h"
 /* Override any gcc2 internal prototype to avoid an error.  */
 /* We use char because int might match the return type of a gcc2
     builtin and then its argument prototype would still apply.  */
-char des_cbc_encrypt();
+char CAST_cfb64_encrypt();
 
 int main() {
-des_cbc_encrypt()
+CAST_cfb64_encrypt()
 ; return 0; }
 EOF
-if { (eval echo configure:3033: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+if { (eval echo configure:3017: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
   rm -rf conftest*
-  eval "ac_cv_lib_$ac_lib_var=yes"
+  ac_cv_search_CAST_cfb64_encrypt="none required"
 else
   echo "configure: failed program was:" >&5
   cat conftest.$ac_ext >&5
   rm -rf conftest*
-  eval "ac_cv_lib_$ac_lib_var=no"
+  LIBS="-lcrypto $LIBS"
+	cat > conftest.$ac_ext <<EOF
+#line 3026 "configure"
+#include "confdefs.h"
+/* Override any gcc2 internal prototype to avoid an error.  */
+/* We use char because int might match the return type of a gcc2
+    builtin and then its argument prototype would still apply.  */
+char CAST_cfb64_encrypt();
+
+int main() {
+CAST_cfb64_encrypt()
+; return 0; }
+EOF
+if { (eval echo configure:3037: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+  rm -rf conftest*
+  ac_cv_search_CAST_cfb64_encrypt="-lcrypto"
+else
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
 fi
 rm -f conftest*
-LIBS="$ac_save_LIBS"
-
 fi
-if eval "test \"`echo '$ac_cv_lib_'$ac_lib_var`\" = yes"; then
-  echo "$ac_t""yes" 1>&6
-    ac_tr_lib=HAVE_LIB`echo crypto | sed -e 's/[^a-zA-Z0-9_]/_/g' \
-    -e 'y/abcdefghijklmnopqrstuvwxyz/ABCDEFGHIJKLMNOPQRSTUVWXYZ/'`
-  cat >> confdefs.h <<EOF
-#define $ac_tr_lib 1
-EOF
+rm -f conftest*
+LIBS="$ac_func_search_save_LIBS"
+test "$ac_cv_search_CAST_cfb64_encrypt" = "no" && for i in ${crypto_dir}/lib ${crypto_dir}/lib ${crypto_dir}/lib; do
+LIBS="-L$i -lcrypto $ac_func_search_save_LIBS"
+cat > conftest.$ac_ext <<EOF
+#line 3051 "configure"
+#include "confdefs.h"
+/* Override any gcc2 internal prototype to avoid an error.  */
+/* We use char because int might match the return type of a gcc2
+    builtin and then its argument prototype would still apply.  */
+char CAST_cfb64_encrypt();
 
-  LIBS="-lcrypto $LIBS"
+int main() {
+CAST_cfb64_encrypt()
+; return 0; }
+EOF
+if { (eval echo configure:3062: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+  rm -rf conftest*
+  ac_cv_search_CAST_cfb64_encrypt="-L$i -lcrypto"
+break
+else
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+fi
+rm -f conftest*
+done
+LIBS="$ac_func_search_save_LIBS"
+fi
+
+echo "$ac_t""$ac_cv_search_CAST_cfb64_encrypt" 1>&6
+if test "$ac_cv_search_CAST_cfb64_encrypt" != "no"; then
+  test "$ac_cv_search_CAST_cfb64_encrypt" = "none required" || LIBS="$ac_cv_search_CAST_cfb64_encrypt $LIBS"
+  
+else :
+  
+fi
+
+echo $ac_n "checking for openssl include path""... $ac_c" 1>&6
+echo "configure:3084: checking for openssl include path" >&5
+cat > conftest.$ac_ext <<EOF
+#line 3086 "configure"
+#include "confdefs.h"
+#include <openssl/opensslv.h>
+EOF
+ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+{ (eval echo configure:3091: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+if test -z "$ac_err"; then
+  rm -rf conftest*
+  cat > conftest.$ac_ext <<EOF
+#line 3096 "configure"
+#include "confdefs.h"
+#include <openssl/opensslv.h>
+#if OPENSSL_VERSION_NUMBER >= 0x0940
+yes
+#endif
+EOF
+if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
+  egrep "yes" >/dev/null 2>&1; then
+  rm -rf conftest*
+  include_path_openssl=yes
+fi
+rm -f conftest*
 
 else
-  echo "$ac_t""no" 1>&6
+  echo "$ac_err" >&5
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  
+ac_func_search_save_CPPFLAGS="$CPPFLAGS"
+ac_add_path="no"
+for i in ${crypto_dir}/include; do
+	CPPFLAGS="-I$i $CPPFLAGS"
+	cat > conftest.$ac_ext <<EOF
+#line 3121 "configure"
+#include "confdefs.h"
+#include <openssl/opensslv.h>
+EOF
+ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
+{ (eval echo configure:3126: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
+if test -z "$ac_err"; then
+  rm -rf conftest*
+  cat > conftest.$ac_ext <<EOF
+#line 3131 "configure"
+#include "confdefs.h"
+#include <openssl/opensslv.h>
+#if OPENSSL_VERSION_NUMBER >= 0x0940
+yes
+#endif
+EOF
+if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
+  egrep "yes" >/dev/null 2>&1; then
+  rm -rf conftest*
+  ac_add_path=$i
+fi
+rm -f conftest*
+
+else
+  echo "$ac_err" >&5
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+fi
+rm -f conftest*
+	CPPFLAGS="$ac_func_search_save_CPPFLAGS"
+	if test "$ac_add_path" != "no"; then
+		break
+	fi
+done
+if test "$ac_add_path" != "no"; then
+	CPPFLAGS="-I$ac_add_path $CPPFLAGS"
+	include_path_openssl=yes
 fi
 
+fi
+rm -f conftest*
+if test "x$include_path_openssl" = "xyes"; then
+	echo "$ac_t""include path needs openssl" 1>&6
 	cat >> confdefs.h <<\EOF
-#define CRYPTO 1
+#define INCLUDE_PATH_OPENSSL 1
 EOF
 
+else
+	echo "$ac_t""pre-0.94 include path" 1>&6
+fi
 
-	bak_CPPFLAGS=$CPPFLAGS
-	CPPFLAGS="$CPPFLAGS $V_INCLS"
-	for ac_hdr in cast.h rc5.h
+if test "x$include_path_openssl" = "x"; then
+	echo "Fatal: your openssl/ssleay is too old."
+	exit 1
+fi
+
+cat > conftest.$ac_ext <<EOF
+#line 3179 "configure"
+#include "confdefs.h"
+#include <sys/types.h>
+#include <stdio.h>
+#include <openssl/bn.h>
+#include <openssl/dh.h>
+#include <openssl/md5.h>
+#include <openssl/sha.h>
+#include <openssl/des.h>
+int main() {
+
+; return 0; }
+EOF
+if { (eval echo configure:3192: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+  :
+else
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  openssl_compile_failed=yes
+fi
+rm -f conftest*
+if test "x$openssl_compile_failed" = "xyes"; then
+	echo
+	echo "Fatal: crypto library and headers not found."
+	echo Specify proper directory by using --with-ssleay.
+	case $host_os in
+	freebsd*)
+		echo Use ports/security/SSLeay to install SSLeay, or visit
+		;;
+	netbsd*)
+		echo Use pkgsrc/security/SSLeay to install SSLeay, or visit
+		;;
+	*)
+		echo -n "Visit "
+	esac
+	echo ftp://psych.psy.uq.oz.au/pub/Crypto/SSL/, or visit
+	echo http://www.openssl.org/
+	exit 1
+fi
+for ac_hdr in openssl/idea.h openssl/rc5.h openssl/rsa.h openssl/cast.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:3071: checking for $ac_hdr" >&5
+echo "configure:3223: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 3076 "configure"
+#line 3228 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:3081: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:3233: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -3103,58 +3255,6 @@ else
 fi
 done
 
-
-	if test "$ac_cv_header_cast_h" = "yes"; then
-		echo $ac_n "checking for buggy CAST128""... $ac_c" 1>&6
-echo "configure:3110: checking for buggy CAST128" >&5
-		if test "$cross_compiling" = yes; then
-  buggy_cast128="cross-compiling, assume yes"
-else
-  cat > conftest.$ac_ext <<EOF
-#line 3115 "configure"
-#include "confdefs.h"
-
-#include <cast.h>
-main()
-{
-	unsigned char key[] = {0x01,0x23,0x45,0x67,0x12};
-	unsigned char in[] = {0x01,0x23,0x45,0x67,0x89,0xAB,0xCD,0xEF};
-	unsigned char out[sizeof(in)];
-	unsigned char ok[] = {0x7A,0xC8,0x16,0xD1,0x6E,0x9B,0x30,0x2E};
-	CAST_KEY ks;
-	CAST_set_key(&ks, sizeof(key), key);
-	CAST_ecb_encrypt(in, out, &ks, CAST_ENCRYPT);
-	if (memcmp(out, ok, sizeof(ok)) != 0)
-		return 0;
-	else
-		return 1;
-}
-EOF
-if { (eval echo configure:3134: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext} && (./conftest; exit) 2>/dev/null
-then
-  buggy_cast128=yes
-else
-  echo "configure: failed program was:" >&5
-  cat conftest.$ac_ext >&5
-  rm -fr conftest*
-  buggy_cast128=no
-fi
-rm -fr conftest*
-fi
-
-		echo "$ac_t""$buggy_cast128" 1>&6
-		if test "$buggy_cast128" != no; then
-			echo "NOTE: SSLeay 0.9.0b has a bug in CAST128 en/decoding routine."
-			echo "disabling CAST128 support."
-			cat >> confdefs.h <<\EOF
-#define HAVE_BUGGY_CAST128 1
-EOF
-
-		fi
-	fi
-
-	CPPFLAGS=$bak_CPPFLAGS
-fi
 
 if test "${srcdir}" = "." ; then
 	srcdirprefix=""
@@ -3185,7 +3285,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:3189: checking for a BSD compatible install" >&5
+echo "configure:3289: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6

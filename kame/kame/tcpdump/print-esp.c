@@ -53,10 +53,10 @@ static const char rcsid[] =
 #ifdef CRYPTO
 #include <openssl/des.h>
 #include <openssl/blowfish.h>
-#ifdef HAVE_RC5_H
+#ifdef HAVE_OPENSSL_RC5_H
 #include <openssl/rc5.h>
 #endif
-#ifdef HAVE_CAST_H
+#ifdef HAVE_OPENSSL_CAST_H
 #include <openssl/cast.h>
 #endif
 #endif

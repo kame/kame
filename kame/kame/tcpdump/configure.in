@@ -1,4 +1,4 @@
-dnl @(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/configure.in,v 1.3 1999/12/22 16:01:53 itojun Exp $ (LBL)
+dnl @(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/configure.in,v 1.4 2000/01/19 04:48:20 itojun Exp $ (LBL)
 dnl
 dnl Copyright (c) 1994, 1995, 1996, 1997
 dnl	The Regents of the University of California.  All rights reserved.
@@ -200,72 +200,54 @@ fi
 
 AC_LBL_UNALIGNED_ACCESS
 
-AC_MSG_CHECKING(for SSLeay)
-ac_cv_ssleay_path=no
-incdir=no
-for dir in /usr/local /usr/local/ssl /usr/pkg; do
-	if test -d $dir/lib -a -f $dir/lib/libcrypto.a; then
-		ac_cv_ssleay_path=$dir
-	fi
-	if test -d $dir/include -a -f $dir/include/des.h; then
-		incdir="-I$dir/include"
-	else
-		if test -d $dir/include/ssleay -a -f $dir/include/ssleay/des.h; then
-			incdir="-I$dir/include/ssleay"
-		elif test -d $dir/include/openssl -a -f $dir/include/openssl/des.h; then
-			incdir="-I$dir/include -I$dir/include/openssl"
+if test "x$crypto_dir" = "x"; then
+	case $host_os in
+	netbsd*)	crypto_dir="/usr/pkg";;
+	freebsd*)
+		if test -d /usr/local/ssl; then
+			crypto_dir="/usr/local/ssl"
+		else
+			crypto_dir="/usr/local"
 		fi
-	fi
-	if test "$ac_cv_ssleay_path" != "no" -a "$incdir" != "no"; then
-		break;
-	else
-		ac_cv_ssleay_path=no
-		incdir=no
-	fi
-done
-AC_MSG_RESULT($ac_cv_ssleay_path)
-if test "$ac_cv_ssleay_path" != no; then
-	V_INCLS="$V_INCLS $incdir"
-	LIBS="$LIBS -L$dir/lib"
-	AC_CHECK_LIB(crypto, des_cbc_encrypt)
-	AC_DEFINE(CRYPTO)
-
-	bak_CPPFLAGS=$CPPFLAGS
-	CPPFLAGS="$CPPFLAGS $V_INCLS"
-	AC_CHECK_HEADERS(cast.h rc5.h)
-
-	if test "$ac_cv_header_cast_h" = "yes"; then
-		AC_MSG_CHECKING(for buggy CAST128)
-		AC_TRY_RUN(dnl
-[
-#include <cast.h>
-main()
-{
-	unsigned char key[] = {0x01,0x23,0x45,0x67,0x12};
-	unsigned char in[] = {0x01,0x23,0x45,0x67,0x89,0xAB,0xCD,0xEF};
-	unsigned char out[sizeof(in)];
-	unsigned char ok[] = {0x7A,0xC8,0x16,0xD1,0x6E,0x9B,0x30,0x2E};
-	CAST_KEY ks;
-	CAST_set_key(&ks, sizeof(key), key);
-	CAST_ecb_encrypt(in, out, &ks, CAST_ENCRYPT);
-	if (memcmp(out, ok, sizeof(ok)) != 0)
-		return 0;
-	else
-		return 1;
-}],
-			[buggy_cast128=yes],
-			[buggy_cast128=no],
-			[buggy_cast128="cross-compiling, assume yes"])
-		AC_MSG_RESULT($buggy_cast128)
-		if test "$buggy_cast128" != no; then
-			echo "NOTE: SSLeay 0.9.0b has a bug in CAST128 en/decoding routine."
-			echo "disabling CAST128 support."
-			AC_DEFINE(HAVE_BUGGY_CAST128)
-		fi
-	fi
-
-	CPPFLAGS=$bak_CPPFLAGS
+		;;
+	esac
 fi
+dnl for some reason, past version of freebsd port requires us to set -I for
+dnl BOTH openssl/cast.h and cast.h.  who should I blame (or am I mistaken?)
+RACOON_PATH_LIBS(CAST_cfb64_encrypt, crypto,
+	${crypto_dir}/lib ${crypto_dir}/lib ${crypto_dir}/lib)
+RACOON_SEARCH_OPENSSL(${crypto_dir}/include)
+if test "x$include_path_openssl" = "x"; then
+	echo "Fatal: your openssl/ssleay is too old."
+	exit 1
+fi
+
+AC_TRY_COMPILE([#include <sys/types.h>
+#include <stdio.h>
+#include <openssl/bn.h>
+#include <openssl/dh.h>
+#include <openssl/md5.h>
+#include <openssl/sha.h>
+#include <openssl/des.h>], [], [], [openssl_compile_failed=yes])
+if test "x$openssl_compile_failed" = "xyes"; then
+	echo
+	echo "Fatal: crypto library and headers not found."
+	echo Specify proper directory by using --with-ssleay.
+	case $host_os in
+	freebsd*)
+		echo Use ports/security/SSLeay to install SSLeay, or visit
+		;;
+	netbsd*)
+		echo Use pkgsrc/security/SSLeay to install SSLeay, or visit
+		;;
+	*)
+		echo -n "Visit "
+	esac
+	echo ftp://psych.psy.uq.oz.au/pub/Crypto/SSL/, or visit
+	echo http://www.openssl.org/
+	exit 1
+fi
+AC_CHECK_HEADERS(openssl/idea.h openssl/rc5.h openssl/rsa.h openssl/cast.h)
 
 if test "${srcdir}" = "." ; then
 	srcdirprefix=""
