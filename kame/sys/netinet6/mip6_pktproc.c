@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.16 2002/06/26 02:33:36 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.17 2002/07/09 04:50:04 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -451,7 +451,6 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	 */
 	if (ipsec6_in_reject(m, NULL)) {
 		ipsec6stat.in_polvio++;
-		m_freem(m);
 		return (EINVAL);	/* XXX */
 	}
 #endif /* IPSEC */
@@ -715,7 +714,6 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	 */
 	if (ipsec6_in_reject(m, NULL)) {
 		ipsec6stat.in_polvio++;
-		m_freem(m);
 		return (EINVAL);	/* XXX */
 	}
 #endif /* IPSEC */

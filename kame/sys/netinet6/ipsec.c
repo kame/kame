@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.162 2002/07/08 07:03:05 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.163 2002/07/09 04:50:04 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2275,7 +2275,10 @@ ipsec6_encapsulate(m, sav)
 	 */
 	if (m->m_len != sizeof(struct ip6_hdr))
 		panic("ipsec6_encapsulate: assumption failed (first mbuf length)");
-	if (M_LEADINGSPACE(m->m_next) < sizeof(struct ip6_hdr)) {
+#ifndef MIP6
+	if (M_LEADINGSPACE(m->m_next) < sizeof(struct ip6_hdr))
+#endif
+	{
 		struct mbuf *n;
 		MGET(n, M_DONTWAIT, MT_DATA);
 		if (!n) {
@@ -2287,12 +2290,15 @@ ipsec6_encapsulate(m, sav)
 		m->m_next = n;
 		m->m_pkthdr.len += sizeof(struct ip6_hdr);
 		oip6 = mtod(n, struct ip6_hdr *);
-	} else {
+	}
+#ifndef MIP6
+	else {
 		m->m_next->m_len += sizeof(struct ip6_hdr);
 		m->m_next->m_data -= sizeof(struct ip6_hdr);
 		m->m_pkthdr.len += sizeof(struct ip6_hdr);
 		oip6 = mtod(m->m_next, struct ip6_hdr *);
 	}
+#endif
 	ip6 = mtod(m, struct ip6_hdr *);
 	ovbcopy((caddr_t)ip6, (caddr_t)oip6, sizeof(struct ip6_hdr));
 
@@ -2301,38 +2307,6 @@ ipsec6_encapsulate(m, sav)
 	in6_clearscope(&oip6->ip6_dst);
 
 #ifdef MIP6
-	/*
-	 * check if this tunnel is from the home agent to the mobile
-	 * node or not.  if the packet is from the home agent to the
-	 * mobile node, the packet must have a RTHDR type 2.
-	 */
-	need_rthdr2 = 0;
-	*m_rthdr2 = NULL;
-	mbc = NULL;
-	if (MIP6_IS_HA) {
-		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
-		    (struct sockaddr_in6 *)&sav->sah->saidx.dst);
-		if ((mbc != NULL)
-		    && ((mbc->mbc_flags & IP6MU_HOME) != 0)) {
-			/*
-			 * this is a tunnel from a home agent to a
-			 * mobile node.
-			 */
-			need_rthdr2 = 1;
-
-			/* allocate mbuf for RTHDR. */
-			MGET(*m_rthdr2, M_NOWAIT, MT_DATA);
-			if (!*m_rthdr2) {
-				m_freem(m);
-				return ENOBUFS;
-			}
-			(*m_rthdr2)->m_len = sizeof(struct ip6_rthdr2)
-			    + sizeof(struct in6_addr);
-			(*m_rthdr2)->m_next = m->m_next;
-			m->m_next = *m_rthdr2;
-		}
-	}
-		    
 	/*
 	 * check if this tunnel is from the mobile node to the home
 	 * agent or not.  if the packet if from the mobile node to the
@@ -2364,10 +2338,47 @@ ipsec6_encapsulate(m, sav)
 				}
 				(*m_hao)->m_len = sizeof(struct ip6_dest)
 				    + 4 /* pad 4. */
+				    /* XXX + 2 type, len */
 				    + sizeof(struct ip6_opt_home_address);
 				(*m_hao)->m_next = m->m_next;
 				m->m_next = *m_hao;
+				m->m_pkthdr.len += (*m_hao)->m_len;
+				plen += (*m_hao)->m_len;
 			}
+		}
+	}
+
+	/*
+	 * check if this tunnel is from the home agent to the mobile
+	 * node or not.  if the packet is from the home agent to the
+	 * mobile node, the packet must have a RTHDR type 2.
+	 */
+	need_rthdr2 = 0;
+	*m_rthdr2 = NULL;
+	mbc = NULL;
+	if (MIP6_IS_HA) {
+		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
+		    (struct sockaddr_in6 *)&sav->sah->saidx.dst);
+		if ((mbc != NULL)
+		    && ((mbc->mbc_flags & IP6MU_HOME) != 0)) {
+			/*
+			 * this is a tunnel from a home agent to a
+			 * mobile node.
+			 */
+			need_rthdr2 = 1;
+
+			/* allocate mbuf for RTHDR. */
+			MGET(*m_rthdr2, M_NOWAIT, MT_DATA);
+			if (!*m_rthdr2) {
+				m_freem(m);
+				return ENOBUFS;
+			}
+			(*m_rthdr2)->m_len = sizeof(struct ip6_rthdr2)
+			    + sizeof(struct in6_addr);
+			(*m_rthdr2)->m_next = m->m_next;
+			m->m_next = *m_rthdr2;
+			m->m_pkthdr.len += (*m_rthdr2)->m_len;
+			plen += (*m_rthdr2)->m_len;
 		}
 	}
 #endif /* MIP6 */
@@ -2378,24 +2389,6 @@ ipsec6_encapsulate(m, sav)
 	encap_hdr_len = sizeof(struct ip6_hdr);
 	ip6->ip6_nxt = IPPROTO_IPV6;
 #ifdef MIP6
-	if (need_rthdr2 != 0) {
-		struct ip6_rthdr2 *rthdr2;
-
-		/* add the size of RTHDR type 2. */
-		encap_hdr_len += (*m_rthdr2)->m_len;
-
-		rthdr2 = mtod(*m_rthdr2, struct ip6_rthdr2 *);
-		bzero((caddr_t)rthdr2, (*m_rthdr2)->m_len);
-		rthdr2->ip6r2_nxt = ip6->ip6_nxt;
-		ip6->ip6_nxt = IPPROTO_ROUTING;
-		rthdr2->ip6r2_len = 2;
-		rthdr2->ip6r2_type = 2;
-		rthdr2->ip6r2_segleft = 1;
-		rthdr2->ip6r2_reserved = 0;
-		bcopy((caddr_t)&mbc->mbc_pcoa.sin6_addr,
-		    (caddr_t)(rthdr2 + 1), sizeof(struct in6_addr));
-		in6_clearscope((struct in6_addr *)(rthdr2 + 1));
-	}
 	if (need_hao != 0) {
 		struct ip6_dest *dest;
 		unsigned char pad4[4] = {IP6OPT_PADN, 2, 0, 0};
@@ -2409,7 +2402,7 @@ ipsec6_encapsulate(m, sav)
 		bzero((caddr_t)dest, (*m_hao)->m_len);
 		dest->ip6d_nxt = ip6->ip6_nxt;
 		ip6->ip6_nxt = IPPROTO_DSTOPTS;
-		dest->ip6d_len = 3;
+		dest->ip6d_len = 2;
 		/* insert pad4. */
 		ptr = (caddr_t)(dest + 1);
 		bcopy((caddr_t)&pad4[0], ptr, 4);
@@ -2420,6 +2413,24 @@ ipsec6_encapsulate(m, sav)
 		bcopy((caddr_t)&mbu->mbu_coa.sin6_addr, ptr,
 		    sizeof(struct in6_addr));
 		in6_clearscope((struct in6_addr *)ptr);
+	}
+	if (need_rthdr2 != 0) {
+		struct ip6_rthdr2 *rthdr2;
+
+		/* add the size of RTHDR type 2. */
+		encap_hdr_len += (*m_rthdr2)->m_len;
+
+		rthdr2 = mtod(*m_rthdr2, struct ip6_rthdr2 *);
+		bzero((caddr_t)rthdr2, (*m_rthdr2)->m_len);
+		rthdr2->ip6r2_nxt = ip6->ip6_nxt;
+		ip6->ip6_nxt = IPPROTO_ROUTING;
+		rthdr2->ip6r2_len = 2;
+		rthdr2->ip6r2_type = 2;
+		rthdr2->ip6r2_segleft = 0;	/* = 1 */
+		rthdr2->ip6r2_reserved = 0;
+		bcopy((caddr_t)&mbc->mbc_pcoa.sin6_addr,
+		    (caddr_t)(rthdr2 + 1), sizeof(struct in6_addr));
+		in6_clearscope((struct in6_addr *)(rthdr2 + 1));
 	}
 #endif /* MIP6 */
 	if (plen < IPV6_MAXPACKET - encap_hdr_len)
@@ -3209,7 +3220,8 @@ ipsec6_output_tunnel(state, sp, flags)
 	struct sockaddr_in6 *dst6, *sa_src, *sa_dst;
 	int s;
 #ifdef MIP6
-	struct mbuf *m_hao, *m_rthdr2;
+	u_char *nxt;
+	struct mbuf *m_hao, *m_rthdr2, *m_nxt;
 #endif /* MIP6 */
 
 	if (!state)
@@ -3364,19 +3376,39 @@ ipsec6_output_tunnel(state, sp, flags)
 			goto bad;
 		}
 		ip6 = mtod(state->m, struct ip6_hdr *);
+#ifdef MIP6
+		if (m_hao != NULL) {
+			nxt = mtod((m_hao), u_int8_t *);
+			m_nxt = m_hao->m_next;
+		} else if (m_rthdr2 != NULL) {
+			nxt = mtod((m_rthdr2), u_int8_t *);
+			m_nxt = m_rthdr2->m_next;
+		} else {
+			nxt = &ip6->ip6_nxt;
+			m_nxt = state->m->m_next;
+		}
+#endif
 		switch (isr->saidx.proto) {
 		case IPPROTO_ESP:
 #ifdef IPSEC_ESP
+#ifdef MIP6
+			error = esp6_output(state->m, nxt, m_nxt, isr);
+#else
 			error = esp6_output(state->m, &ip6->ip6_nxt,
 					    state->m->m_next, isr);
+#endif /* MIP6 */
 #else
 			m_freem(state->m);
 			error = EINVAL;
 #endif
 			break;
 		case IPPROTO_AH:
+#ifdef MIP6
+			error = ah6_output(state->m, nxt, m_nxt, isr);
+#else
 			error = ah6_output(state->m, &ip6->ip6_nxt,
 					   state->m->m_next, isr);
+#endif /* MIP6 */
 			break;
 		case IPPROTO_IPCOMP:
 			/* XXX code should be here */
@@ -3417,6 +3449,8 @@ ipsec6_output_tunnel(state, sp, flags)
 			rthdr2 = mtod(m_rthdr2, struct ip6_rthdr2 *);
 			if (rthdr2->ip6r2_type != IPV6_RTHDR_TYPE_2)
 				goto bad;
+
+			rthdr2->ip6r2_segleft = 1;
 
 			finaldst = ip6->ip6_dst;
 			addr = (struct in6_addr *)(rthdr2 + 1);
