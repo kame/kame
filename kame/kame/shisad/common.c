@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.1 2004/12/09 02:18:32 t-momose Exp $  */
+/*      $KAME: common.c,v 1.2 2004/12/27 10:50:33 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -111,15 +111,13 @@ int
 mipsock_input_common(fd)
      int fd;
 {
-  int n, err = 0;	/* XXX What is 'err' used for ? */
+	int n;
         char msg[1280];
 	struct mip_msghdr *miphdr;
 
-	/*	memset(msg, 0, sizeof(msg));*/	/* XXX Is this necessary ? */
         n = read(mipsock, msg, sizeof(msg));
 	if (n < 0) {
-		err = errno;
-		return (err);
+		return (errno);
 	}
 	
         miphdr = (struct mip_msghdr *)msg;
@@ -137,7 +135,6 @@ icmp6sock_open()
 	int error = 0;
 	struct icmp6_filter filter;	
 
-	icmp6sock = -1;
 	icmp6sock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
 	if (icmp6sock < 0) {
 		perror("socket for ICMPv6");
@@ -526,7 +523,7 @@ icmp6_input_common(fd)
 		rth2 = (struct ip6_rthdr2 *)ext;
 		if (rth2->ip6r2_type != 2)
 			break;
-		bc = mip6_bc_lookup((struct in6_addr *)(rth2 + 1), &iip6->ip6_src);
+		bc = mip6_bc_lookup((struct in6_addr *)(rth2 + 1), &iip6->ip6_src, 0);
 		if (bc)  {
 			mip6_bc_delete(bc);
 			syslog(LOG_INFO, 

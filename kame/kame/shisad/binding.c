@@ -1,4 +1,4 @@
-/*      $KAME: binding.c,v 1.1 2004/12/09 02:18:27 t-momose Exp $	*/
+/*      $KAME: binding.c,v 1.2 2004/12/27 10:50:33 t-momose Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -86,7 +86,6 @@ static void mip6_bc_stop_refresh_timer(struct binding_cache *);
 void
 mip6_bc_init()
 {
-
 	LIST_INIT(&bchead);
 	mip6_flush_kernel_bc();
 }
@@ -106,21 +105,12 @@ mip6_flush_kernel_bc()
 	}
 }
 
-#ifndef MIP_MCOA
-struct binding_cache *
-mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno)
-	struct in6_addr *hoa, *coa, *recvaddr;
-        u_int32_t lifetime;
-	u_int16_t flags;
-        u_int16_t seqno;
-#else
 struct binding_cache *
 mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid)
 	struct in6_addr *hoa, *coa, *recvaddr;
         u_int32_t lifetime;
 	u_int16_t flags;
         u_int16_t seqno, bid;
-#endif /* MIP_MCOA */
 {
 	struct binding_cache *bc;
 	time_t now;
@@ -132,11 +122,7 @@ mip6_bc_add(hoa, coa, recvaddr, lifetime, flags, seqno, bid)
 	 * entry. If the requesting entry has larger sequence number,
 	 * add_bc() updates the exisitng entry with the bcreq.
 	 */
-#ifndef MIP_MCOA
-	bc = mip6_bc_lookup(hoa, recvaddr);
-#else
 	bc = mip6_bc_lookup(hoa, recvaddr, bid);
-#endif /* MIP_MCOA */
 	if (bc) {
 		bc->bc_myaddr = *recvaddr;
 		bc->bc_lifetime = lifetime;
@@ -186,14 +172,15 @@ mip6_bc_delete(bcreq)
 	struct binding_cache *bcreq;
 {
 	struct binding_cache *bc = NULL;
+	u_int16_t bid = 0;
+
+#ifdef MIP_MCOA
+	bid = bcreq->bc_bid;
+#endif /* MIP_MCOA */
 
 #if 1	/* Why does it try to re-find the same bce ? */
 	/* if no BC is found, nothing need to be done here */
-#ifndef MIP_MCOA
-	bc = mip6_bc_lookup(&bcreq->bc_hoa, &bcreq->bc_myaddr);
-#else
-	bc = mip6_bc_lookup(&bcreq->bc_hoa, &bcreq->bc_myaddr, bcreq->bc_bid);
-#endif /* MIP_MCOA */
+	bc = mip6_bc_lookup(&bcreq->bc_hoa, &bcreq->bc_myaddr, bid);
 	if (bc == NULL)
 		return;
 #endif /* 1 */
@@ -213,16 +200,10 @@ mip6_bc_delete(bcreq)
 
 /* src can be wildcard */
 struct binding_cache *
-#ifndef MIP_MCOA
-mip6_bc_lookup(hoa, src) 
-	struct in6_addr *hoa;
-	struct in6_addr *src;
-#else
 mip6_bc_lookup(hoa, src, bid) 
 	struct in6_addr *hoa;
 	struct in6_addr *src;
 	u_int16_t bid;
-#endif /* MIP_MCOA */
 {
 	struct binding_cache *bc, *bc_nxt = NULL;
 

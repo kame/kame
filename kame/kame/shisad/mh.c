@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.3 2004/12/16 12:47:07 keiichi Exp $  */
+/*      $KAME: mh.c,v 1.4 2004/12/27 10:50:33 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -562,9 +562,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
         u_int32_t lifetime;
 	int retcode = -1;
 	int statuscode = IP6_MH_BAS_ACCEPTED;
-#ifdef MIP_MCOA
 	u_int16_t bid = 0;
-#endif /* MIP_MCOA */
 
 	/* 
 	 * If home address option is not present, home address
@@ -734,20 +732,12 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	   in an exsiting Binding Cache entry, ...
 	 */
 	if (!IN6_ARE_ADDR_EQUAL(coa, hoa) &&
-#ifndef MIP_MCOA
-	    mip6_bc_lookup(coa, NULL)
-#else
 	    mip6_bc_lookup(coa, NULL, bid)
-#endif
 	)
 		return (-1);
 
 	/* Get Binding Cache entry */
-#ifndef MIP_MCOA
-	bc = mip6_bc_lookup(hoa, dst);
-#else
 	bc = mip6_bc_lookup(hoa, dst, bid);
-#endif /* MIP_MCOA */
 
 	/* sequence number comparison */
 	if (bc && MIP6_LEQ(seqno, bc->bc_seqno)) {
@@ -790,9 +780,9 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			return (-1);
 
 	} else if (flags & IP6_MH_BU_LLOCAL) {
-		;
+		/* Not Implemented yet */
 	} else if (flags & IP6_MH_BU_KEYM) {
-		;
+		/* Not Implemented yet */
 	} 
 #ifdef MIP_NEMO
 	else if (flags & IP6_MH_BU_ROUTER) {
@@ -887,24 +877,15 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		lifetime = 0;	/* Returned lifetime in BA must be zero */
 	} else {
 		/* Requesitng to cache binding (registration) */
-#ifndef MIP_MCOA
-		bc = mip6_bc_add(hoa, coa, dst, lifetime, flags, seqno);
-#else 
 		bc = mip6_bc_add(hoa, coa, dst, lifetime, flags, seqno, bid);
-#endif /* MIP_MCOA */
 	}
 	retcode = 0;
 
  sendba:
 	if (statuscode != IP6_MH_BAS_ACCEPTED ||
 	    (flags & (IP6_MH_BU_ACK | IP6_MH_BU_HOME))) {
-#ifndef MIP_MCOA 
-		send_ba(dst, retcoa, coa, hoa, bu, kbm, 
-			statuscode, seqno, lifetime, 0 /* refresh */);
-#else
 		send_ba(dst, retcoa, coa, hoa, bu, kbm, 
 			statuscode, seqno, lifetime, 0 /* refresh */, bid);
-#endif /* MIP_MCOA */ 
 	}
 
 	return (retcode);
@@ -1365,16 +1346,6 @@ send_bu(bul)
 
 #ifndef MIP_MN
 int
-#ifndef MIP_MCOA 
-send_ba(src, coa, acoa, hoa, recv_bu, kbm_p, status, seqno, lifetime, refresh) 
-        struct in6_addr *src, *coa, *acoa, *hoa;
-	struct ip6_mh_binding_update *recv_bu;
-	mip6_kbm_t *kbm_p;
-	u_int8_t status;
-	u_int16_t seqno;
-	u_int16_t lifetime;
-	int refresh;
-#else
 send_ba(src, coa, acoa, hoa, recv_bu, kbm_p, status, seqno, lifetime, refresh, bid) 
         struct in6_addr *src, *coa, *acoa, *hoa;
 	struct ip6_mh_binding_update *recv_bu;
@@ -1384,7 +1355,6 @@ send_ba(src, coa, acoa, hoa, recv_bu, kbm_p, status, seqno, lifetime, refresh, b
 	u_int16_t lifetime;
 	int refresh;
 	u_int16_t bid;
-#endif /*MIP_MCOA */
 {
 	char buf[1024];
 	int buflen = 0;

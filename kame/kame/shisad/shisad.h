@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.2 2004/12/21 02:21:16 keiichi Exp $	*/
+/*	$KAME: shisad.h,v 1.3 2004/12/27 10:50:33 t-momose Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -378,13 +378,8 @@ int  send_hot(struct ip6_mh_home_test_init *, struct in6_addr *,
 	     struct in6_addr *);
 int  send_cot(struct ip6_mh_careof_test_init *, struct in6_addr *, 
 	     struct in6_addr *);
-#ifndef MIP_MCOA
-int  send_ba(struct in6_addr *, struct in6_addr *, struct in6_addr *, struct in6_addr *, 
-	    struct ip6_mh_binding_update *, mip6_kbm_t *, u_int8_t, u_int16_t, u_int16_t, int);
-#else
 int  send_ba(struct in6_addr *, struct in6_addr *, struct in6_addr *, struct in6_addr *, 
 	    struct ip6_mh_binding_update *, mip6_kbm_t *, u_int8_t, u_int16_t, u_int16_t, int, u_int16_t);
-#endif /* MIP_MCOA */
 void mip6_calculate_kbm(mip6_token_t *, mip6_token_t *, mip6_kbm_t *);
 void mip6_calculate_authenticator(mip6_kbm_t *, struct in6_addr *, 
     struct in6_addr *, caddr_t, size_t, int, size_t, mip6_authenticator_t *);
@@ -423,16 +418,10 @@ void command_show_kbc(int);
 
 void command_show_bul(int);
 void command_show_kbul(int);
-#ifndef MIP_MCOA
-struct binding_cache *mip6_bc_add(struct in6_addr *, struct in6_addr *, 
-    struct in6_addr *, u_int32_t, u_int16_t, u_int16_t);
-struct binding_cache *mip6_bc_lookup(struct in6_addr *, struct in6_addr *);
-#else /* MIP_MCOA */
 struct binding_cache *mip6_bc_lookup(struct in6_addr *, struct in6_addr *, 
     u_int16_t);
 struct binding_cache *mip6_bc_add(struct in6_addr *, struct in6_addr *, 
     struct in6_addr *, u_int32_t, u_int16_t, u_int16_t, u_int16_t);
-#endif /* MIP_MCOA */
 
 /* network.c */
 int set_ip6addr(char *, struct in6_addr *, int, int);
