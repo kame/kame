@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.15 2000/06/14 15:53:19 sakane Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.16 2000/08/31 06:26:38 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -67,6 +67,7 @@
 #include "schedule.h"
 #include "isakmp_var.h"
 #include "isakmp.h"
+#include "oakley.h"
 #include "handler.h"
 #include "pfkey.h"
 #include "admin_var.h"
