@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.241 2001/11/26 08:56:11 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.242 2001/11/26 11:31:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1284,8 +1284,8 @@ skip_ipsec2:;
 	 */
 	if (exthdrs.ip6e_hbh) {
 		struct ip6_hbh *hbh = mtod(exthdrs.ip6e_hbh, struct ip6_hbh *);
-		u_int32_t dummy1; /* XXX unused */
-		u_int32_t dummy2; /* XXX unused */
+		u_int32_t dummy; /* XXX unused */
+		u_int32_t plen = 0; /* XXX: ip6_process will check the value */
 
 #ifdef DIAGNOSTIC
 		if ((hbh->ip6h_len + 1) << 3 > exthdrs.ip6e_hbh->m_len)
@@ -1303,7 +1303,7 @@ skip_ipsec2:;
 					(u_int8_t *)(hbh + 1),
 					((hbh->ip6h_len + 1) << 3) -
 					sizeof(struct ip6_hbh),
-					&dummy1, &dummy2) < 0) {
+					&dummy, &plen) < 0) {
 			/* m was already freed at this point */
 			error = EINVAL;/* better error? */
 			goto done;
