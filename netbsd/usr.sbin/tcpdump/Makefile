@@ -43,6 +43,12 @@ CPPFLAGS+=-DCRYPTO=1 -DHAVE_RC5_H=1
 CPPFLAGS+=-I/usr/pkg/include/ssleay
 LDADD+=	-L/usr/pkg/lib -lcrypto
 DPADD+=	/usr/pkg/lib/libcrypto.a
+.elif exists(/usr/local/ssl/lib/libcrypto.a)
+CPPFLAGS+=-DCRYPTO=1 -DHAVE_RC5_H=1
+#CPPFLAGS+=-DHAVE_CAST_H=1 
+CPPFLAGS+=-I/usr/local/ssl/include/openssl -I/usr/local/ssl/include
+LDADD+=	-L/usr/local/ssl/lib -lcrypto
+DPADD+=	/usr/local/ssl/lib/libcrypto.a
 .endif
 
 version.c: VERSION
