@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.81 2001/02/20 08:31:07 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.82 2001/02/21 00:08:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -416,7 +416,7 @@ struct ip6protosw inet6sw[] = {
 #if defined(__NetBSD__) && defined(ISO)
 { SOCK_RAW,	&inet6domain,	IPPROTO_EON,	0,
   encap6_input,	rip6_output,	0,		rip6_ctloutput,
-  rip_usrreq,	/*XXX*/
+  rip6_usrreq,	/*XXX*/
   0,		0,		0,		0,
 },
 #endif
