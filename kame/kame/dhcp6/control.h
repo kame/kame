@@ -1,4 +1,4 @@
-/*	$KAME: control.h,v 1.1 2004/06/11 12:22:55 jinmei Exp $	*/
+/*	$KAME: control.h,v 1.2 2004/06/12 10:43:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -41,6 +41,9 @@
 
 #define DHCP6CTL_IA_PD 1
 
+/*
+ * Packet formats of command protocol
+ */
 struct dhcp6ctl {
 	u_int16_t command;
 	u_int16_t len;
