@@ -64,6 +64,9 @@ struct rp_addr {
 	LIST_ENTRY(rp_addr)	ra_entry;
 	struct in6_addr		ra_ifid;
 	struct in6_ifaddr	*ra_addr;
+	struct ra_flags {
+		u_char anycast : 1;
+	} ra_flags;
 };
 
 #define ifpr2rp(ifpr)	((struct rr_prefix *)(ifpr))

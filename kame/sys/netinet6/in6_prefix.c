@@ -98,6 +98,9 @@ extern struct proc *curproc;	/*XXX*/
 #endif
 
 static int create_ra_entry __P((struct rp_addr **rapp));
+static int add_each_prefix __P((struct socket *so, struct rr_prefix *rpp));
+static void free_rp_entries __P((struct rr_prefix *rpp));
+static int link_stray_ia6s __P((struct rr_prefix *rpp));
 
 /*
  * Copy bits from src to tgt, from off bit for len bits.
@@ -419,8 +422,57 @@ in6_prefix_add_ifid(int iilen, struct in6_ifaddr *ia)
 	int error = 0;
 
 	ifpr = in6_prefixwithifp(ia->ia_ifp, plen, IA6_IN6(ia));
-	if (ifpr == NULL)
-		return 0;
+	if (ifpr == NULL) {
+		struct rr_prefix rp;
+		struct socket so;
+		int pplen = (plen == 128) ? 64 : plen;
+
+		/* allocate a prefix for ia, with default properties */
+
+		/* init rp */
+		bzero(&rp, sizeof(rp));
+		rp.rp_type = IN6_PREFIX_RR;
+		rp.rp_ifp = ia->ia_ifp;
+		rp.rp_plen = pplen;
+		rp.rp_prefix.sin6_len = sizeof(rp.rp_prefix);
+		rp.rp_prefix.sin6_family = AF_INET6;
+		bit_copy((char *)RP_IN6(&rp), sizeof(*RP_IN6(&rp)) << 3,
+			 (char *)&ia->ia_addr.sin6_addr,
+			 sizeof(ia->ia_addr.sin6_addr) << 3,
+			 0, pplen);
+		rp.rp_vltime = rp.rp_pltime = RR_INFINITE_LIFETIME;
+		rp.rp_raf_onlink = 1;
+		rp.rp_raf_auto = 1;
+		/* Is some FlagMasks for rrf necessary? */
+		rp.rp_rrf_decrvalid = rp.rp_rrf_decrprefd = 0;
+		rp.rp_origin = PR_ORIG_RR; /* can be renumbered */
+
+		/* create ra_entry */
+		error = link_stray_ia6s(&rp);
+		if (error != 0) {
+			free_rp_entries(&rp);
+			return error;
+		}
+
+		/* XXX: init dummy so */
+		bzero(&so, sizeof(so));
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__NetBSD__)
+			so.so_state |= SS_PRIV;
+#endif
+
+		error = add_each_prefix(&so, &rp);
+
+		/* free each rp_addr entry */
+		free_rp_entries(&rp);
+
+		if (error != 0)
+			return error;
+
+		/* search again */
+		ifpr = in6_prefixwithifp(ia->ia_ifp, pplen, IA6_IN6(ia));
+		if (ifpr == NULL)
+			return 0;
+	}
 	rap = search_ifidwithprefix(ifpr2rp(ifpr), IA6_IN6(ia));
 	if (rap != NULL) {
 		if (rap->ra_addr == NULL)
@@ -515,6 +567,9 @@ add_each_addr(struct socket *so, struct rr_prefix *rpp, struct rp_addr *rap)
 		    in6_mask2len(&ia6->ia_prefixmask.sin6_addr));
 		return;
 	}
+	/* propagate ANYCAST flag if it is set for ancestor addr */
+	if (rap->ra_flags.anycast != 0)
+		ifra.ifra_flags |= IN6_IFF_ANYCAST;
 	error = in6_control(so, SIOCAIFADDR_IN6, (caddr_t)&ifra, rpp->rp_ifp
 #if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 			    , curproc
@@ -747,6 +802,9 @@ init_newprefix(struct in6_rrenumreq *irr, struct ifprefix *ifpr,
 		if ((error = create_ra_entry(&rap)) != 0)
 			return error;
 		rap->ra_ifid = orap->ra_ifid;
+		rap->ra_flags.anycast = (orap->ra_addr != NULL &&
+					 (orap->ra_addr->ia_flags &
+					  IN6_IFF_ANYCAST) != 0) ? 1 : 0;
 		LIST_INSERT_HEAD(&rpp->rp_addrhead, rap, ra_entry);
 	}
 	rpp->rp_vltime = irr->irr_vltime;
@@ -1038,6 +1096,10 @@ in6_prefix_ioctl(struct socket *so, u_long cmd, caddr_t data,
 		}
 
 		error = add_each_prefix(so, &rp_tmp);
+
+		/* free each rp_addr entry */
+		free_rp_entries(&rp_tmp);
+
 		break;
 	case SIOCDIFPREFIX_IN6:
 		rpp = search_matched_prefix(ifp, ipr);
