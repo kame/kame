@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.170 2003/02/07 09:34:39 jinmei Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.171 2003/02/07 09:51:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1882,7 +1882,7 @@ mip6_process_br(m, opt)
 		return (EINVAL);
 	br_opt = (struct ip6_opt_binding_request *)opt;
 
-	sc = hif_list_find_withhaddr(sin6dst);
+	sc = hif_list_find_withhaddr(&sin6dst);
 	if (sc == NULL) {
 		/* this BR is not for our home address. */
 		return (0);

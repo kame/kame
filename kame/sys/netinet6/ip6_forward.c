@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.115 2003/02/07 09:34:38 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.116 2003/02/07 09:51:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -178,7 +178,7 @@ ip6_forward(m, srcrt)
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 		if ((ia->ia6_flags & IN6_IFF_NOTREADY) == 0 &&
 		    IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
-			&sa6_dst->sin6_addr))
+			&sa6_dst.sin6_addr))
 			goto skip_ipsec6_in_reject;
 	}
     }
@@ -402,7 +402,7 @@ ip6_forward(m, srcrt)
 		 */
 		struct mip6_bc *mbc;
 
-		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, sa6_dst);
+		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &sa6_dst);
 		if (mbc &&
 		    (mbc->mbc_flags & IP6MU_HOME) &&
 		    (mbc->mbc_encap != NULL)) {
@@ -447,7 +447,7 @@ ip6_forward(m, srcrt)
 				m_freem(mcopy);
 			return;
 		}
-		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, sa6_src);
+		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &sa6_src);
 		if (mbc &&
 		    (mbc->mbc_flags & IP6MU_HOME) &&
 		    (mbc->mbc_encap != NULL)) {
