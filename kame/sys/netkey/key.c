@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.272 2003/06/04 02:40:09 keiichi Exp $	*/
+/*	$KAME: key.c,v 1.273 2003/06/26 05:54:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1724,9 +1724,9 @@ key_spdadd(so, m, mhp)
 	}
 
 	/* policy requests are mandatory when action is ipsec. */
-        if (mhp->msg->sadb_msg_type != SADB_X_SPDSETIDX
-	 && xpl0->sadb_x_policy_type == IPSEC_POLICY_IPSEC
-	 && mhp->extlen[SADB_X_EXT_POLICY] <= sizeof(*xpl0)) {
+        if (mhp->msg->sadb_msg_type != SADB_X_SPDSETIDX &&
+            xpl0->sadb_x_policy_type == IPSEC_POLICY_IPSEC &&
+            mhp->extlen[SADB_X_EXT_POLICY] <= sizeof(*xpl0)) {
 		ipseclog((LOG_DEBUG, "key_spdadd: some policy requests part required.\n"));
 		return key_senderror(so, m, EINVAL);
 	}
@@ -3243,8 +3243,8 @@ key_mature(sav)
 	switch (sav->sah->saidx.proto) {
 	case IPPROTO_ESP:
 		/* check flags */
-		if ((sav->flags & SADB_X_EXT_OLD)
-		 && (sav->flags & SADB_X_EXT_DERIV)) {
+		if ((sav->flags & SADB_X_EXT_OLD) &&
+		    (sav->flags & SADB_X_EXT_DERIV)) {
 			ipseclog((LOG_DEBUG, "key_mature: "
 			    "invalid flag (derived) given to old-esp.\n"));
 			return EINVAL;
@@ -3276,8 +3276,8 @@ key_mature(sav)
 				"protocol and algorithm mismated.\n"));
 			return (EINVAL);
 		}
-		if ((sav->flags & SADB_X_EXT_RAWCPI) == 0
-		 && ntohl(sav->spi) >= 0x10000) {
+		if ((sav->flags & SADB_X_EXT_RAWCPI) == 0 &&
+		    ntohl(sav->spi) >= 0x10000) {
 			ipseclog((LOG_DEBUG, "key_mature: invalid cpi for IPComp.\n"));
 			return (EINVAL);
 		}
@@ -4055,14 +4055,14 @@ key_cmpspidx_withmask(spidx0, spidx1)
 		return 0;
 
 	/* if spidx.ul_proto == IPSEC_ULPROTO_ANY, ignore. */
-	if (spidx0->ul_proto != (u_int16_t)IPSEC_ULPROTO_ANY
-	 && spidx0->ul_proto != spidx1->ul_proto)
+	if (spidx0->ul_proto != (u_int16_t)IPSEC_ULPROTO_ANY &&
+	    spidx0->ul_proto != spidx1->ul_proto)
 		return 0;
 
 	switch (spidx0->src.ss_family) {
 	case AF_INET:
-		if (satosin(&spidx0->src)->sin_port != IPSEC_PORT_ANY
-		 && satosin(&spidx0->src)->sin_port !=
+		if (satosin(&spidx0->src)->sin_port != IPSEC_PORT_ANY &&
+		    satosin(&spidx0->src)->sin_port !=
 		    satosin(&spidx1->src)->sin_port)
 			return 0;
 		if (!key_bbcmp((caddr_t)&satosin(&spidx0->src)->sin_addr,
@@ -4070,8 +4070,8 @@ key_cmpspidx_withmask(spidx0, spidx1)
 			return 0;
 		break;
 	case AF_INET6:
-		if (satosin6(&spidx0->src)->sin6_port != IPSEC_PORT_ANY
-		 && satosin6(&spidx0->src)->sin6_port !=
+		if (satosin6(&spidx0->src)->sin6_port != IPSEC_PORT_ANY &&
+		    satosin6(&spidx0->src)->sin6_port !=
 		    satosin6(&spidx1->src)->sin6_port)
 			return 0;
 		/*
@@ -4096,8 +4096,8 @@ key_cmpspidx_withmask(spidx0, spidx1)
 
 	switch (spidx0->dst.ss_family) {
 	case AF_INET:
-		if (satosin(&spidx0->dst)->sin_port != IPSEC_PORT_ANY
-		 && satosin(&spidx0->dst)->sin_port !=
+		if (satosin(&spidx0->dst)->sin_port != IPSEC_PORT_ANY &&
+		    satosin(&spidx0->dst)->sin_port !=
 		    satosin(&spidx1->dst)->sin_port)
 			return 0;
 		if (!key_bbcmp((caddr_t)&satosin(&spidx0->dst)->sin_addr,
@@ -4105,8 +4105,8 @@ key_cmpspidx_withmask(spidx0, spidx1)
 			return 0;
 		break;
 	case AF_INET6:
-		if (satosin6(&spidx0->dst)->sin6_port != IPSEC_PORT_ANY
-		 && satosin6(&spidx0->dst)->sin6_port !=
+		if (satosin6(&spidx0->dst)->sin6_port != IPSEC_PORT_ANY &&
+		    satosin6(&spidx0->dst)->sin6_port !=
 		    satosin6(&spidx1->dst)->sin6_port)
 			return 0;
 		/*
@@ -4326,8 +4326,8 @@ key_timehandler(arg)
 			}
 
 			/* check SOFT lifetime */
-			if (sav->lft_s->sadb_lifetime_addtime != 0
-			 && tv.tv_sec - sav->created > sav->lft_s->sadb_lifetime_addtime) {
+			if (sav->lft_s->sadb_lifetime_addtime != 0 &&
+			    tv.tv_sec - sav->created > sav->lft_s->sadb_lifetime_addtime) {
 				/*
 				 * check the SA if it has been used.
 				 * when it hasn't been used, delete it.
@@ -4385,8 +4385,8 @@ key_timehandler(arg)
 				continue;
 			}
 
-			if (sav->lft_h->sadb_lifetime_addtime != 0
-			 && tv.tv_sec - sav->created > sav->lft_h->sadb_lifetime_addtime) {
+			if (sav->lft_h->sadb_lifetime_addtime != 0 &&
+			    tv.tv_sec - sav->created > sav->lft_h->sadb_lifetime_addtime) {
 				key_sa_chgstate(sav, SADB_SASTATE_DEAD);
 				key_freesav(sav);
 				sav = NULL;
@@ -4453,8 +4453,8 @@ key_timehandler(arg)
 
 		nextacq = LIST_NEXT(acq, chain);
 
-		if (tv.tv_sec - acq->created > key_blockacq_lifetime
-		 && __LIST_CHAINED(acq)) {
+		if (tv.tv_sec - acq->created > key_blockacq_lifetime &&
+		    __LIST_CHAINED(acq)) {
 			LIST_REMOVE(acq, chain);
 			KFREE(acq);
 		}
@@ -4472,8 +4472,8 @@ key_timehandler(arg)
 
 		nextacq = LIST_NEXT(acq, chain);
 
-		if (tv.tv_sec - acq->created > key_blockacq_lifetime
-		 && __LIST_CHAINED(acq)) {
+		if (tv.tv_sec - acq->created > key_blockacq_lifetime &&
+		    __LIST_CHAINED(acq)) {
 			LIST_REMOVE(acq, chain);
 			KFREE(acq);
 		}
@@ -4982,8 +4982,8 @@ key_update(so, m, mhp)
 
 	/* find a SA with sequence number. */
 #ifdef IPSEC_DOSEQCHECK
-	if (mhp->msg->sadb_msg_seq != 0
-	 && (sav = key_getsavbyseq(sah, mhp->msg->sadb_msg_seq)) == NULL) {
+	if (mhp->msg->sadb_msg_seq != 0 &&
+	    (sav = key_getsavbyseq(sah, mhp->msg->sadb_msg_seq)) == NULL) {
 		ipseclog((LOG_DEBUG,
 		    "key_update: no larval SA with sequence %u exists.\n",
 		    mhp->msg->sadb_msg_seq));
@@ -6475,8 +6475,7 @@ key_freereg(so)
 	 */
 	for (i = 0; i <= SADB_SATYPE_MAX; i++) {
 		LIST_FOREACH(reg, &regtree[i], chain) {
-			if (reg->so == so
-			 && __LIST_CHAINED(reg)) {
+			if (reg->so == so && __LIST_CHAINED(reg)) {
 				LIST_REMOVE(reg, chain);
 				KFREE(reg);
 				break;
@@ -6661,8 +6660,8 @@ key_flush(so, m, mhp)
 	     sah = nextsah) {
 		nextsah = LIST_NEXT(sah, chain);
 
-		if (mhp->msg->sadb_msg_satype != SADB_SATYPE_UNSPEC
-		 && proto != sah->saidx.proto)
+		if (mhp->msg->sadb_msg_satype != SADB_SATYPE_UNSPEC &&
+		    proto != sah->saidx.proto)
 			continue;
 
 		for (stateidx = 0;
@@ -6741,8 +6740,8 @@ key_dump(so, m, mhp)
 	/* count sav entries to be sent to the userland. */
 	cnt = 0;
 	LIST_FOREACH(sah, &sahtree, chain) {
-		if (mhp->msg->sadb_msg_satype != SADB_SATYPE_UNSPEC
-		 && proto != sah->saidx.proto)
+		if (mhp->msg->sadb_msg_satype != SADB_SATYPE_UNSPEC &&
+		    proto != sah->saidx.proto)
 			continue;
 
 		for (stateidx = 0;
@@ -6761,8 +6760,8 @@ key_dump(so, m, mhp)
 	/* send this to the userland, one at a time. */
 	newmsg = NULL;
 	LIST_FOREACH(sah, &sahtree, chain) {
-		if (mhp->msg->sadb_msg_satype != SADB_SATYPE_UNSPEC
-		 && proto != sah->saidx.proto)
+		if (mhp->msg->sadb_msg_satype != SADB_SATYPE_UNSPEC &&
+		    proto != sah->saidx.proto)
 			continue;
 
 		/* map proto to satype */
@@ -7039,8 +7038,8 @@ key_parse(m, so)
 	}
 
 	/* check field of upper layer protocol and address family */
-	if (mh.ext[SADB_EXT_ADDRESS_SRC] != NULL
-	 && mh.ext[SADB_EXT_ADDRESS_DST] != NULL) {
+	if (mh.ext[SADB_EXT_ADDRESS_SRC] != NULL &&
+	    mh.ext[SADB_EXT_ADDRESS_DST] != NULL) {
 		struct sadb_address *src0, *dst0;
 		u_int plen;
 
@@ -7551,8 +7550,8 @@ key_sa_routechange(dst)
 
 	LIST_FOREACH(sah, &sahtree, chain) {
 		ro = &sah->sa_route;
-		if (ro->ro_rt && dst->sa_len == ro->ro_dst.sa_len
-		 && bcmp(dst, &ro->ro_dst, dst->sa_len) == 0) {
+		if (ro->ro_rt && dst->sa_len == ro->ro_dst.sa_len &&
+		    bcmp(dst, &ro->ro_dst, dst->sa_len) == 0) {
 			RTFREE(ro->ro_rt);
 			ro->ro_rt = (struct rtentry *)NULL;
 		}
