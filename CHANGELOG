@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.703 2000/03/18 07:18:54 jinmei Exp $
+$Id: CHANGELOG,v 1.704 2000/03/20 12:17:22 itojun Exp $
 
 <200003>
+Mon Mar 20 21:16:30 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}: upgrade to weekly snapshot
+	  as of 2000/03/20.
+
 2000-03-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_output): just sent packets on a p2p
 	interface where NUD is disabled. Withtout this fix, the following
