@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.143 2000/08/15 23:39:19 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.144 2000/08/16 07:56:20 itojun Exp $
 
 1. IPv6
 
@@ -159,7 +159,10 @@ Some of network drivers loop multicast packets back to themselves,
 even if instructed not to do so (especially in promiscuous mode).
 In such cases DAD may fail, because DAD engine sees inbound NS packet
 (actually from the node itself) and considers it as a sign of duplicate.
-You may want to look at #if condition marked "heuristics" in
+In this case, drivers should be corrected to honor IFF_SIMPLEX behavior.
+For example, you may need to check source MAC address on a inbound packet,
+and reject it if it is from the node itself.
+You may also want to look at #if condition marked "heuristics" in
 sys/netinet6/nd6_nbr.c:nd6_dad_timer() as workaround (note that the code
 fragment in "heuristics" section is not spec conformant).
 
