@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.20 2001/07/13 01:49:54 itojun Exp $
+$KAME: FAQ,v 1.21 2001/07/13 02:05:12 itojun Exp $
 
 
 GENERAL
@@ -55,7 +55,7 @@ Q: Why does KAME separate ping6 from ping (for IPv4), and traceroute6 from
 	convenient to uniform the ping command for both IPv4 and
 	IPv6.  The followings are an answer to the request.
 
-	From a developer's point of view:  since the underling raw socket API
+	From a developer's point of view: since the underling raw socket API
 	is totally different between IPv4 and IPv6, we would end
 	up having two types of code base.  There would actually be
 	less benefit to uniform the two commands into a single
@@ -82,6 +82,7 @@ Q: Are there other documents/FAQ lists I may want to check?
 	- http://www.kame.net/ has links to a set of good documents.
 	- http://www.ipv6.org/, and http://www.jp.ipv6.org/ (if you can read
 	  Japanese texts).
+	- http://www.netbsd.org/Documentation/network/ipv6/
 
 
 INSTALLATION
@@ -127,11 +128,11 @@ Q: Is anything special required for network interface card drivers?
 	in the driver, change that to MHLEN.  In this way you can avoid two
 	linked internal mbufs.
 
-
 	Multicast support is required for IPv6, since IPv6 uses
 	multicast for hardware address (MAC address) resolution.
 	Therefore, your network driver has to have multicast support,
-	and have IFF_MULTICAST properly set.
+	and have IFF_MULTICAST properly set.  Also be sure to check if
+	the driver handles multicast ioctls, like SIOCADDMULTI.
 
 	Even though it is better to have hardware multicast packet
 	filter, it is not mandatory; in most cases it is just fine
@@ -146,6 +147,13 @@ kernel.
 	/etc/rc scripts usually use tools in /sbin, like /sbin/ifconfig.
 	In some cases, they do not work on KAME kernel.  Be very sure to
 	use tools in /usr/local/v6 instead.
+
+	Note, however, depending on the ordering of /etc/rc initialization,
+	/usr may not be ready when the network interfaces get initialized
+	(for NFS-mounted /usr support).
+	It may be safer to put network interface initialization into
+	/etc/rc.local, and remove all network configurations from /etc/rc.conf
+	and/or /etc/netstart.
 
 Q: Why link-local address in the kernel structure have s6_addr16[1] filled?
 	Due to the "scoped address" design in the IPv6 spec, the
@@ -173,15 +181,19 @@ Q: Does KAME support site-local addresses?
 	router.
 
 	Site-local address itself (the spec itself, not KAME) has
-	bunch of issues/twists to be solved in the future, such as
-	site-border management and nameservers.  We are trying very
-	hard to solve it.
+	bunch of issues/twists to be solved, such as site-border management
+	and nameservers.  We are trying very hard to solve it.
 
 Q: How can I implement address-family independent applications?
 Q: How can I modify my application to support IPv6 as well as IPv4?
 	We have a short newsletter for that, titled "implementing AF-
 	independent application".  Please visit
 	http://www.kame.net/newsletter/19980604/.
+
+	Craig Metz, "Protocol Independence Using the Sockets API",
+	Proceedings of the freenix track: 2000 USENIX annual
+	technical conference, June 2000.
+	http://www.usenix.org/event/usenix2000/freenix/metzprotocol.html
 
 Q: route6d dies with "IPV6_ADD_MEMBERSHIP" failure.
 	This error occurs when you have configured an interface
@@ -255,6 +267,11 @@ Q: IPv6 ping from other OSes do not seem to work.
 
 	fe80::x:y:z:u
 
+	Also, on many of existing operating systems, it is suggested (or even
+	mandatory) to specify outgoing interface, when you try to ping
+	(or ping6) link-local addresses.  This is to disambiguate link-local
+	addresses on multiple interfaces.
+
 Q: How do I configure IPv6-over-IPv4 tunnel?
 	Simplest way to do this is to configure outer IPv4 address only, by the
 	following command:
@@ -268,6 +285,8 @@ Q: How do I configure IPv6-over-IPv4 tunnel?
 	daemons will work just fine and packets will get forwarded
 	between two routers.  If you are to configure global IPv6
 	address to these hosts, configure that to ethernet interface.
+
+	NOTE: on netbsd and openbsd, gifconfig is integrated into ifconfig(8).
 
 Q: Some of my IPv6-ready programs show strange behavior after kernel update.
 	As IPv6 socket API is still an moving target, we KAME team
@@ -303,7 +322,7 @@ Q: How can I enable FAITH IPv6-to-IPv4 tcp relay?
 
 Q: How do I configure ATM PVC?
 	KAME includes ATM PVC support, from ALTQ package.  No SVC support is
-	implemented.
+	implemented.  Very limited variety of ATM cards are supported.
 
 	http://www.kame.net/newsletter/19980701/ covers this topic
 	(though it is a bit dated).
@@ -334,6 +353,21 @@ Q: my operating system does not have gifconfig(8).
 
 Q: would like to know the merge status of KAME kit to *BSD.
 	See http://www.kame.net/dev/cvsweb.cgi/kame/COVERAGE.
+
+Q: How can I differentiate IPv6 http connections from IPv4 ones on my
+web page?  (In other words, how can I provide dancing stuff for IPv6
+users only, like www.kame.net?)
+	If you are using apache webserver, you can refer to environment
+	variable REMOTE_ADDR to know the address of the client (in textual
+	numeric representation).  For example, the following perl script
+	fragment would print "IPv6 <address>" or "not IPv6 <address>"
+	depending on the clients' address.
+
+		if ($ENV{'REMOTE_ADDR'} =~ /^[a-fA-F0-9:]+$/) {
+			print "IPv6 " . $ENV{'REMOTE_ADDR'} . "\n";
+		} else {
+			print "not IPv6 " . $ENV{'REMOTE_ADDR'} . "\n";
+		}
 
 
 LICENSE AND CRYPTO EXPORT
@@ -431,18 +465,3 @@ Q: What is "KAME"?  Why did you choose the name?
 	turtle please help me debug my code...".
 	(http://www.itojun.org/diary/19970930-1005/kame.html) This
 	is the real reason for the name.
-
-Q: How can I differentiate IPv6 http connections from IPv4 ones on my
-web page?  (In other words, how can I provide dancing stuff for IPv6
-users only, like www.kame.net?)
-	If you are using apache webserver, you can refer to environment
-	variable REMOTE_ADDR to know the address of the client (in textual
-	numeric representation).  For example, the following perl script
-	fragment would print "IPv6 <address>" or "not IPv6 <address>"
-	depending on the clients' address.
-
-		if ($ENV{'REMOTE_ADDR'} =~ /^[a-fA-F0-9:]+$/) {
-			print "IPv6 " . $ENV{'REMOTE_ADDR'} . "\n";
-		} else {
-			print "not IPv6 " . $ENV{'REMOTE_ADDR'} . "\n";
-		}
