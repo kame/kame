@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.342 2004/05/21 07:44:21 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.343 2004/05/21 09:42:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -359,10 +359,6 @@ ip6intr()
 		ip6_input(m);
 	}
 }
-
-#ifdef __FreeBSD__
-NETISR_SET(NETISR_IPV6, ip6intr);
-#endif
 
 #ifdef NEW_STRUCT_ROUTE
 extern struct	route ip6_forward_rt;
