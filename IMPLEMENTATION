@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/01/30 08:49:24 $
+			$Date: 2000/01/30 08:52:17 $
 
 1. IPv6
 
@@ -82,6 +82,9 @@ RFC2675: IPv6 Jumbograms
     * See 1.7 in this document for details.
 RFC2710: Multicast Listener Discovery for IPv6
 RFC2711: IPv6 router alert option
+RFC2732: Format for Literal IPv6 Addresses in URL's
+    * The spec is implemented in programs that handle URLs
+      (like freebsd ftpio(3) and fetch(1), or netbsd ftp(1))
 draft-ietf-ipngwg-router-renum-08: Router renumbering for IPv6
 draft-ietf-ipngwg-icmp-namelookups-02: IPv6 Name Lookups Through ICMP
 draft-ietf-ipngwg-icmp-name-lookups-03: IPv6 Name Lookups Through ICMP
