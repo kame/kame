@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.125 2001/01/26 00:09:06 thorpej Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.126 2001/01/26 04:02:46 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -264,10 +264,10 @@ found:
 	}
 
 saok:
+#ifdef HAVE_GSSAPI
 	if (sa->gssid != NULL)
 		plog(LLV_DEBUG, LOCATION, NULL, "gss id in new sa '%s'\n",
 		    sa->gssid->v);
-#ifdef HAVE_GSSAPI
 	if (iph1-> side == INITIATOR) {
 		if (iph1->rmconf->proposal->gssid != NULL)
 			iph1->gi_i = vdup(iph1->rmconf->proposal->gssid);
@@ -587,6 +587,7 @@ t2isakmpsa(trns, sa)
 		case OAKLEY_ATTR_GRP_ORDER:
 			sa->dhgrp->order = val;
 			break;
+#ifdef HAVE_GSSAPI
 		case OAKLEY_ATTR_GSS_ID:
 		{
 			int len = ntohs(d->lorv);
@@ -598,6 +599,7 @@ t2isakmpsa(trns, sa)
 			    sa->gssid->l);
 			break;
 		}
+#endif
 
 		default:
 			break;
@@ -2556,6 +2558,7 @@ setph1attr(sa, buf)
 		break;
 	}
 
+#ifdef HAVE_GSSAPI
 	if (sa->authmethod == OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB &&
 	    sa->gssid != NULL) {
 		attrlen += sizeof(struct isakmp_data);
@@ -2568,6 +2571,7 @@ setph1attr(sa, buf)
 				sa->gssid->l);
 		}
 	}
+#endif
 
 	return attrlen;
 }
