@@ -453,14 +453,16 @@ int pim6_cksum(u_short *addr, struct in6_addr *src ,struct in6_addr *dst , int l
     
     /* IPv6 source address */
     sum += w[0];
-    if (!IN6_IS_SCOPE_LINKLOCAL(src)) /* XXX: necessary? */
+    /* XXX: necessary? */
+    if (!(IN6_IS_ADDR_LINKLOCAL(src) || IN6_IS_ADDR_MC_LINKLOCAL(src)))
         sum += w[1];
     sum += w[2]; sum += w[3]; sum += w[4]; sum += w[5];
     sum += w[6]; sum += w[7];
     /* IPv6 destination address */
     w = (u_short *)dst;
     sum += w[0];
-    if (!IN6_IS_SCOPE_LINKLOCAL(dst)) /* XXX: necessary? */
+    /* XXX: necessary? */
+    if (!(IN6_IS_ADDR_LINKLOCAL(dst) || IN6_IS_ADDR_MC_LINKLOCAL(dst)))
         sum += w[1];
     sum += w[2]; sum += w[3]; sum += w[4]; sum += w[5];
     sum += w[6]; sum += w[7];

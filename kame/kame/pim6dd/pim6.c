@@ -62,7 +62,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: pim6.c,v 1.1 1999/08/08 23:30:52 itojun Exp $
+ *  $Id: pim6.c,v 1.2 1999/08/17 10:47:27 itojun Exp $
  */
 
 #include "defs.h"
@@ -395,14 +395,16 @@ pim6_cksum(addr, src, dst, len)
 
 	/* IPv6 source address */
 	sum += w[0];
-	if (!IN6_IS_SCOPE_LINKLOCAL(src)) /* XXX: necessary? */
+	/* XXX: necessary? */
+	if (!(IN6_IS_ADDR_LINKLOCAL(src) || IN6_IS_ADDR_MC_LINKLOCAL(src)))
 		sum += w[1];
 	sum += w[2]; sum += w[3]; sum += w[4]; sum += w[5];
 	sum += w[6]; sum += w[7];
 	/* IPv6 destination address */
 	w = (u_short *)dst;
 	sum += w[0];
-	if (!IN6_IS_SCOPE_LINKLOCAL(dst)) /* XXX: necessary? */
+	/* XXX: necessary? */
+	if (!(IN6_IS_ADDR_LINKLOCAL(dst) || IN6_IS_ADDR_MC_LINKLOCAL(dst)))
 		sum += w[1];
 	sum += w[2]; sum += w[3]; sum += w[4]; sum += w[5];
 	sum += w[6]; sum += w[7];

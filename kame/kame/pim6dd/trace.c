@@ -62,7 +62,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: trace.c,v 1.1 1999/08/08 23:30:55 itojun Exp $
+ *  $Id: trace.c,v 1.2 1999/08/17 10:47:27 itojun Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -151,10 +151,12 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 	qry = (struct tr_query *)data;
 	src_sa6.sin6_addr = qry->tr_src;
 	src_sa6.sin6_scope_id =
-		(IN6_IS_SCOPE_LINKLOCAL(&qry->tr_src)) ? ifindex : 0;
+		(IN6_IS_ADDR_LINKLOCAL(&qry->tr_src)
+		 || IN6_IS_ADDR_MC_LINKLOCAL(&qry->tr_src)) ? ifindex : 0;
 	dst_sa6.sin6_addr = qry->tr_dst;
 	src_sa6.sin6_scope_id =
-		(IN6_IS_SCOPE_LINKLOCAL(&qry->tr_dst)) ? ifindex : 0;
+		(IN6_IS_ADDR_LINKLOCAL(&qry->tr_dst)
+		 || IN6_IS_ADDR_MC_LINKLOCAL(&qry->tr_dst)) ? ifindex : 0;
 	grp_sa6.sin6_addr = *group;
 	grp_sa6.sin6_scope_id = 0;
 
@@ -448,7 +450,8 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 			resptype = MLD6_MTRACE;
 		}
 	}
-	if (IN6_IS_SCOPE_LINKLOCAL(&resp_sa6.sin6_addr))
+	if (IN6_IS_ADDR_LINKLOCAL(&resp_sa6.sin6_addr)
+	 || IN6_IS_ADDR_MC_LINKLOCAL(&resp_sa6.sin6_addr))
 		resp_sa6.sin6_scope_id = ifindex;
 	else
 		resp_sa6.sin6_scope_id = 0;
