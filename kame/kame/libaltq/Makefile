@@ -1,5 +1,6 @@
 PREFIX?=	/usr/local
 SYS_INCLUDES?=	-I/usr/src/sys-altq
+SYS_DEFINES?=	-DINET6
 
 LIB=	libaltq.a
 
@@ -18,7 +19,7 @@ all: $(LIB)
 install: $(LIB)
 	$(INSTALL) $(COPY) -m 0444 $(LIB) $(PREFIX)/lib
 
-libaltq.a: libaltq.a($(OBJS))
+libaltq.a:: $(OBJS)
 	rm -f $@
 	ar cq $@ `lorder $(OBJS) | tsort -q`
 	ranlib $@

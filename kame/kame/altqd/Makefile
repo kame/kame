@@ -1,8 +1,9 @@
 PREFIX?=	/usr/local
 SYS_INCLUDES?=	-I/usr/src/sys-altq
+SYS_DEFINES?=	-DINET6
 
 PROGS=		altqd
-ALTQD_OBJS= 	altqd.o if_nameindex.o libaltq2.o ../libaltq/libaltq.a
+ALTQD_OBJS= 	altqd.o libaltq2.o ../libaltq/libaltq.a
 MAN5=		altq.conf.5
 MAN8=		altqd.8
 
@@ -14,7 +15,7 @@ INCLUDES=	-I. -I../libaltq $(SYS_INCLUDES)
 all: $(PROGS)
 
 install: $(PROGS)
-	$(INSTALL) $(COPY) -m 0755 $(PROGS) $(PREFIX)/bin
+	$(INSTALL) $(COPY) -m 0755 $(PROGS) $(PREFIX)/sbin
 	$(INSTALL) $(COPY) -m 0644 $(MAN5) $(PREFIX)/man/man5
 	$(INSTALL) $(COPY) -m 0644 $(MAN8) $(PREFIX)/man/man8
 

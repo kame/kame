@@ -1,5 +1,6 @@
 PREFIX?=	/usr/local
 SYS_INCLUDES?=	-I/usr/src/sys-altq
+SYS_DEFINES?=	-DINET6
 
 PROG=		altqstat
 OBJS= 		altqstat.o quip_client.o qdisc_conf.o \
