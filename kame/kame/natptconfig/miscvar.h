@@ -1,4 +1,4 @@
-/*	$KAME: miscvar.h,v 1.9 2002/02/01 15:05:42 fujisawa Exp $	*/
+/*	$KAME: miscvar.h,v 1.10 2002/12/16 09:23:04 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -37,6 +37,8 @@ void		 flushRules		__P((int));
 void		 setOnOff		__P((int));
 void		 setValue		__P((char *, int));
 int		 getValue		__P((int, caddr_t));
+caddr_t		 prepareTQH		__P((int));
+void		 releaseTQH		__P((void));
 void		 testLog		__P((char *));
 void		 debugBreak		__P((void));
 int		 soctl			__P((int, u_long, ...));

@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.29 2002/12/16 04:41:19 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.30 2002/12/16 09:23:04 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -309,6 +309,39 @@ getValue(int ctlName, caddr_t val)
 	}
 
 	return (1);
+}
+
+
+caddr_t
+prepareTQH(int flags)
+{
+	const char *fn = __FUNCTION__;
+
+	struct natpt_msgBox	mBox;
+
+	bzero(&mBox, sizeof(struct natpt_msgBox));
+	mBox.flags = flags;
+	if (soctl(sfd, NATPT_XLATE, &mBox) < 0) {
+		soctlFailure(fn);
+		return (NULL);
+	}
+
+	return (mBox.m_caddr);
+}
+
+
+void
+releaseTQH()
+{
+	const char *fn = __FUNCTION__;
+
+	struct natpt_msgBox	mBox;
+
+	bzero(&mBox, sizeof(struct natpt_msgBox));
+	mBox.flags = NATPT_releaseXLate;
+	if (soctl(sfd, NATPT_XLATE, &mBox) < 0) {
+		soctlFailure(fn);
+	}
 }
 
 

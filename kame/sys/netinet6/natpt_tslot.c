@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.69 2002/12/16 04:37:36 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.70 2002/12/16 09:21:50 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -68,6 +68,7 @@ static int		 tSlotEntryPeak;
 static time_t		 maxFragment;
 static time_t		 frgmntTimer;		/* [sec] */
 static time_t		 tSlotTimer;		/* [sec] */
+static time_t		 xlateTimer;
 static time_t		 maxTTLany;
 static time_t		 maxTTLicmp;
 static time_t		 maxTTLudp;
@@ -86,6 +87,7 @@ struct tslhash
 
 
 TAILQ_HEAD(,tSlot)	 tsl_head;
+TAILQ_HEAD(,tSlot)	 tsl_xlate_head;
 struct tslhash		 tslhashl[NATPTHASHSZ];
 struct tslhash		 tslhashr[NATPTHASHSZ];
 
@@ -112,7 +114,11 @@ static int	 natpt_hashPJW		__P((u_char *, int));
 static void	 natpt_expireFragment	__P((void *));
 static void	 natpt_appendTSlot	__P((struct tSlot *));
 static void	 natpt_expireTSlot	__P((void *));
-static void	 natpt_removeTSlotEntry	__P((struct tSlot *));
+static void	 natpt_removeTSlotEntry	__P((struct tSlot *, int));
+
+static caddr_t	 natpt_duplicateXLate	__P((void));
+static void	 natpt_releaseXLate	__P((void));
+void		 natpt_clearXLate	__P((void *));
 
 
 /*
@@ -944,6 +950,130 @@ natpt_hashPJW(u_char *s, int len)
 
 
 /*
+ * These routines are for when translation table became huge.
+ *
+ * "natptconfig show xlate" subcommand (shortened to xlate) may cause
+ * an unexpected stop when tSlot table size is huge.
+ *
+ * "xlate" reads kernel memory when "xlate" traverses tSlot links,
+ * but tSlot links may change when "xlate" reads tSlot links.  If the
+ * link was changed and If "xlate" just read its link address in the
+ * very moment, "xlate" stops because pointer points wrong address and
+ * "xlate" can not read appropriate data.
+ *
+ * Actually, there is a possibility and as a table becomes big,
+ * possibility becomes big but I believe that this is a rare
+ * case.
+ */
+
+int
+natpt_xlate(caddr_t addr)
+{
+	struct natpt_msgBox	*mbox = (struct natpt_msgBox *)addr;
+
+	switch (mbox->flags) {
+	case NATPT_originalXLate:
+		mbox->m_caddr = (caddr_t)&tsl_head;
+		break;
+
+	case NATPT_duplicateXLate:
+		natpt_error = 0;
+		if ((mbox->m_caddr = natpt_duplicateXLate()) == NULL)
+			return (natpt_error);
+		break;
+
+	case NATPT_releaseXLate:
+		natpt_releaseXLate();
+		break;
+	}
+
+	return (0);
+}
+
+
+static caddr_t
+natpt_duplicateXLate()
+{
+	int		 s;
+	struct tSlot	*tslq, *tsln;
+	struct tcpstate	*ts;
+
+	if (!TAILQ_EMPTY(&tsl_xlate_head)) {
+		natpt_error = EBUSY;
+		return (NULL);
+	}
+
+	TAILQ_INIT(&tsl_xlate_head);
+
+	s = splnet();
+	for (tslq = TAILQ_FIRST(&tsl_head); tslq; tslq = TAILQ_NEXT(tslq, tsl_list)) {
+		MALLOC(tsln, struct tSlot *, sizeof(struct tSlot),
+		       M_NATPT, M_NOWAIT);
+		if (tsln == NULL)
+			return (NULL);
+
+		bcopy(tslq, tsln, sizeof(struct tSlot));
+		tsln->csl = NULL;
+		tsln->frg = NULL;
+
+		if ((tslq->ip_p == IPPROTO_TCP)
+		    && (tslq->suit.tcps != NULL)) {
+			MALLOC(ts, struct tcpstate *, sizeof(struct tcpstate),
+			       M_NATPT, M_NOWAIT);
+			if (ts == NULL)
+				return (NULL);
+
+			bcopy(tslq->suit.tcps, ts, sizeof(struct tcpstate));
+			ts->pkthdr[0] = NULL;
+			ts->pkthdr[1] = NULL;
+		}
+
+		TAILQ_INSERT_TAIL(&tsl_xlate_head, tsln, tsl_list);
+	}
+	splx(s);
+
+	if (!TAILQ_EMPTY(&tsl_xlate_head))
+		timeout(natpt_clearXLate, (caddr_t)0, xlateTimer * hz);
+
+	return ((caddr_t)&tsl_xlate_head);
+}
+
+
+static void
+natpt_releaseXLate()
+{
+	struct tSlot *tsl, *tsln;
+
+	tsl = TAILQ_FIRST(&tsl_xlate_head);
+	while (tsl) {
+		tsln = TAILQ_NEXT(tsl, tsl_list);
+
+		natpt_removeTSlotEntry(tsl, FALSE);
+		tsl = tsln;
+	}
+
+	TAILQ_INIT(&tsl_xlate_head);
+}
+
+
+void
+natpt_clearXLate(void *ignored_arg)
+{
+	struct tSlot *tsl, *tsln;
+
+	tsl = TAILQ_FIRST(&tsl_xlate_head);
+	while (tsl) {
+		tsln = TAILQ_NEXT(tsl, tsl_list);
+
+		natpt_removeTSlotEntry(tsl, FALSE);
+		tsl = tsln;
+	}
+
+	TAILQ_INIT(&tsl_xlate_head);
+}
+
+
+/*
  *
  */
 
@@ -1036,53 +1166,53 @@ natpt_expireTSlot(void *ignored_arg)
 		case IPPROTO_ICMP:
 		case IPPROTO_ICMPV6:
 			if ((atv.tv_sec - tsl->tstamp) >= maxTTLicmp)
-				natpt_removeTSlotEntry(tsl);
+				natpt_removeTSlotEntry(tsl, TRUE);
 			break;
 
 		case IPPROTO_UDP:
 			if ((atv.tv_sec - tsl->tstamp) >= maxTTLudp)
-				natpt_removeTSlotEntry(tsl);
+				natpt_removeTSlotEntry(tsl, TRUE);
 			break;
 
 		case IPPROTO_TCP:
 			switch (tsl->suit.tcps->state) {
 			case TCPS_CLOSED:
 				if ((atv.tv_sec - tsl->tstamp) >= natpt_TCPT_2MSL)
-					natpt_removeTSlotEntry(tsl);
+					natpt_removeTSlotEntry(tsl, TRUE);
 				break;
 
 			case TCPS_SYN_SENT:
 			case TCPS_SYN_RECEIVED:
 				if ((atv.tv_sec - tsl->tstamp) >= natpt_tcp_maxidle)
-					natpt_removeTSlotEntry(tsl);
+					natpt_removeTSlotEntry(tsl, TRUE);
 				break;
 
 			case TCPS_ESTABLISHED:
 				if ((atv.tv_sec - tsl->tstamp) >= maxTTLtcp)
-					natpt_removeTSlotEntry(tsl);
+					natpt_removeTSlotEntry(tsl, TRUE);
 				break;
 
 			case TCPS_FIN_WAIT_1:
 			case TCPS_FIN_WAIT_2:
 				if ((atv.tv_sec - tsl->tstamp) >= natpt_tcp_maxidle)
-					natpt_removeTSlotEntry(tsl);
+					natpt_removeTSlotEntry(tsl, TRUE);
 				break;
 
 			case TCPS_TIME_WAIT:
 				if ((atv.tv_sec - tsl->tstamp) >= natpt_TCPT_2MSL)
-					natpt_removeTSlotEntry(tsl);
+					natpt_removeTSlotEntry(tsl, TRUE);
 				break;
 
 			default:
 				if ((atv.tv_sec - tsl->tstamp) >= maxTTLtcp)
-					natpt_removeTSlotEntry(tsl);
+					natpt_removeTSlotEntry(tsl, TRUE);
 				break;
 			}
 			break;
 
 		default:
 			if ((atv.tv_sec - tsl->tstamp) >= maxTTLany)
-				natpt_removeTSlotEntry(tsl);
+				natpt_removeTSlotEntry(tsl, TRUE);
 		}
 
 		tsl = tsln;
@@ -1091,7 +1221,7 @@ natpt_expireTSlot(void *ignored_arg)
 
 
 static void
-natpt_removeTSlotEntry(struct tSlot *ats)
+natpt_removeTSlotEntry(struct tSlot *ats, int original)
 {
 	int	s;
 
@@ -1108,14 +1238,16 @@ natpt_removeTSlotEntry(struct tSlot *ats)
 	if (ats->frg)
 		natpt_removeFragmentEntry(ats->frg);
 
-	s = splnet();
-	TAILQ_REMOVE(&tsl_head, ats, tsl_list);
-	TAILQ_REMOVE(&tslhashl[ats->hvl].tslhead, ats, tsl_hashl);
-	TAILQ_REMOVE(&tslhashr[ats->hvr].tslhead, ats, tsl_hashr);
-	splx(s);
+	if (original) {
+		s = splnet();
+		TAILQ_REMOVE(&tsl_head, ats, tsl_list);
+		TAILQ_REMOVE(&tslhashl[ats->hvl].tslhead, ats, tsl_hashl);
+		TAILQ_REMOVE(&tslhashr[ats->hvr].tslhead, ats, tsl_hashr);
+		splx(s);
 
-	tSlotEntryUsed--;
-	natpt_logTSlot(LOG_INFO, ats, '-', tSlotEntryUsed);
+		tSlotEntryUsed--;
+		natpt_logTSlot(LOG_INFO, ats, '-', tSlotEntryUsed);
+	}
 
 	FREE(ats, M_NATPT);
 }
@@ -1133,6 +1265,8 @@ natpt_init_tslot()
 	tSlotEntry = NULL;
 	tSlotEntryMax = MAXTSLOTENTRY;
 	tSlotEntryUsed = 0;
+
+	xlateTimer = 8;
 
 	tSlotTimer = 10;
 	frgmntTimer = 10;

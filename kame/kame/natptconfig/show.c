@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.35 2002/12/16 07:43:18 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.36 2002/12/16 09:23:04 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -52,6 +52,7 @@
 #include <arpa/inet.h>
 
 #include <netinet6/natpt_defs.h>
+#include <netinet6/natpt_soctl.h>
 
 #include "defs.h"
 #include "miscvar.h"
@@ -69,7 +70,7 @@
 kvm_t		*kd;
 
 
-int		 readTQH	__P((void *, int, int));
+int		 readTQH	__P((void *, int, int, int));
 int		 openKvm	__P((void));
 int		 readKvm	__P((void *, int, void *));
 void		 closeKvm	__P((void));
@@ -111,7 +112,7 @@ showRules(int cui)
 	TAILQ_HEAD(,cSlot)	 csl_head;
 	char			 Wow[BUFSIZ];
 
-	if (readTQH(&csl_head, sizeof(csl_head), NATPTCTL_CSLHEAD) <= 0)
+	if (readTQH(&csl_head, sizeof(csl_head), NATPTCTL_CSLHEAD, 0) <= 0)
 		err(1, "%s(): failure on read csl_head", fn);
 
 	if ((csl_head.tqh_first == NULL)
@@ -160,7 +161,7 @@ showSessions()
 
 
 void
-showXlate(int type, int interval)
+showXlate(int type, int copy, int interval)
 {
 	const char *fn = __FUNCTION__;
 
@@ -169,7 +170,7 @@ showXlate(int type, int interval)
 	TAILQ_HEAD(,tSlot)	tsl_head;
 	char			Wow[BUFSIZ];
 
-	if (readTQH(&tsl_head, sizeof(tsl_head), NATPTCTL_TSLHEAD) <= 0)
+	if (readTQH(&tsl_head, sizeof(tsl_head), NATPTCTL_TSLHEAD, copy) <= 0)
 		err(1, "%s(): line %d: failure on read tsl_head",
 		    fn, __LINE__);
 
@@ -202,11 +203,16 @@ showXlate(int type, int interval)
 			}
 		}
 
+#if 0
+		if (copy)
+			releaseTQH();
+#endif
+
 		if (interval <= 0)
 			break;
 
 		sleep(interval);
-		if (readTQH(&tsl_head, sizeof(tsl_head), NATPTCTL_TSLHEAD) <= 0)
+		if (readTQH(&tsl_head, sizeof(tsl_head), NATPTCTL_TSLHEAD, copy) <= 0)
 			err(1, "%s(): line %d: failure on read tsl_head",
 			    fn, __LINE__);
 	}
@@ -438,7 +444,7 @@ showVariableSubsid(int idx, int type)
  */
 
 int
-readTQH(void *buf, int nbytes, int n_idx)
+readTQH(void *buf, int nbytes, int n_idx, int copy)
 {
 	const char *fn = __FUNCTION__;
 
@@ -447,8 +453,28 @@ readTQH(void *buf, int nbytes, int n_idx)
 	if ((kd == NULL) && (openKvm() < 0))
 		return (-1);
 
-	if (getValue(n_idx, (caddr_t)&addr) <= 0)
-		err(errno, "%s(): getvalue failure", fn);
+	switch (n_idx) {
+	case NATPTCTL_CSLHEAD:
+		if (getValue(n_idx, (caddr_t)&addr) <= 0)
+			err(errno, "%s(): getvalue failure", fn);
+		break;
+
+	case NATPTCTL_TSLHEAD:
+		if (copy)
+			addr = prepareTQH(NATPT_duplicateXLate);
+		else
+			addr = prepareTQH(NATPT_originalXLate);
+
+		printf("%s(): %p\n", fn, addr);
+
+		if (addr == NULL)
+			return (0);
+		break;
+
+	default:
+		err(0, "%s(): invalid n_idx: %d\n", fn, n_idx);
+		break;
+	}
 
 	return (readKvm(buf, nbytes, addr));
 }

@@ -1,4 +1,4 @@
-/*	$KAME: yylex.c,v 1.22 2002/12/16 04:41:19 fujisawa Exp $	*/
+/*	$KAME: yylex.c,v 1.23 2002/12/16 09:23:04 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -53,6 +53,7 @@ struct
 	{ "any4",	SANY4,		"SANY4",	},
 	{ "any6",	SANY6,		"SANY6",	},
 	{ "bidir",	SBIDIR,		"SBIDIR",	},
+	{ "copy",	SCOPY,		"SCOPY",	},
 	{ "cui",	SCUI,		"SCUI",		},
 	{ "break",	SBREAK,		"SBREAK",	},
 	{ "daddr",	SDADDR,		"SDADDR",	},

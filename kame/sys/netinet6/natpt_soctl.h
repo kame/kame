@@ -1,4 +1,4 @@
-/*	$KAME: natpt_soctl.h,v 1.21 2002/12/16 04:37:36 fujisawa Exp $	*/
+/*	$KAME: natpt_soctl.h,v 1.22 2002/12/16 09:21:50 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -52,6 +52,7 @@
 #define NATPT_TESTLOG	_IOW ('n', 12, struct natpt_msgBox) /* Test log */
 
 #define NATPT_SESSIONS	_IOWR('n', 13, struct natpt_msgBox) /* show sessions */
+#define NATPT_XLATE	_IOWR('n', 14, struct natpt_msgBox) /* show xlate */
 
 #define NATPT_BREAK	_IO  ('n', 255)			/* stop */
 
@@ -64,6 +65,11 @@ struct natpt_msgBox {
 #define NATPT_FLUSH	0
 #define NATPT_FLUSHALL	1
 #define NATPT_FLUSHPREFIX	2
+
+/* for NATPT_XLATE */
+#define	NATPT_originalXLate	(-1)
+#define	NATPT_duplicateXLate	(1)
+#define	NATPT_releaseXLate	(0)
 
 #define NATPT_DEBUG	1
 #define NATPT_DUMP	2
