@@ -174,7 +174,7 @@ __KERNEL_RCSID(0, "$NetBSD: ip_input.c,v 1.150.4.1 2002/06/07 19:39:21 thorpej E
 #include <netinet/ip_var.h>
 #include <netinet/ip_icmp.h>
 
-#ifdef IGMPV3
+#if defined(IGMPV3) || defined(MROUTING)
 #include <netinet/igmp_var.h>
 #endif
 

@@ -389,9 +389,9 @@ igmp_input(m, va_alist)
 	int timer;
 	va_list ap;
 
-#ifdef MROUTING
+#if defined(IGMPV3) && defined(MROUTING)
 	extern struct socket *ip_mrouter;
-#endif /* MROUTING */
+#endif /* IGMPV3 && MROUTING */
 
 	va_start(ap, m);
 	iphlen = va_arg(ap, int);
