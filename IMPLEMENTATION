@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.235 2001/07/21 05:50:52 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.236 2001/07/21 05:52:06 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1921,7 +1921,7 @@ cost multipath routing, as described in the following two RFCs:
 Multipath support will be enabled for inet and inet6 radix table,
 if "options RADIX_MPATH" is specified.  Even with multipath support
 enabled, there's no behavior change if you operate it normally with
-single routing entries per rt_key.
+single routing entry per rt_key.
 
 If you issue multiple RTM_ADD requests with the same rt_key, they
 will coexist in the routing table (4.4BSD behavior: the latter one
