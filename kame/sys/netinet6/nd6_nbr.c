@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.65 2001/06/19 14:24:41 sumikawa Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.66 2001/06/27 08:53:08 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -179,7 +179,7 @@ nd6_ns_input(m, off, icmp6len)
 	}
 
 	if (ndopts.nd_opts_src_lladdr) {
-		lladdr = (char *)(ndopts.nd_opts_src_lladdr +1);
+		lladdr = (char *)(ndopts.nd_opts_src_lladdr + 1);
 		lladdrlen = ndopts.nd_opts_src_lladdr->nd_opt_len << 3;
 	}
 	
