@@ -1,11 +1,10 @@
-/*	$KAME: sctp_indata.h,v 1.4 2003/06/24 05:36:49 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_indata.h,v 1.12 2002/04/01 21:59:20 randall Exp	*/
+/*	$KAME: sctp_indata.h,v 1.5 2003/11/25 06:40:53 ono Exp $	*/
 
 #ifndef __sctp_indata_h__
 #define __sctp_indata_h__
 
 /*
- * Copyright (C) 2002 Cisco Systems Inc,
+ * Copyright (C) 2002, 2003 Cisco Systems Inc,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,7 +37,7 @@
 void sctp_set_rwnd(struct sctp_tcb *, struct sctp_association *);
 
 void sctp_handle_sack(struct sctp_sack_chunk *, struct sctp_tcb *,
-	struct sctp_nets *);
+	struct sctp_nets *, int *abort_now);
 
 /* draft-ietf-tsvwg-usctp */
 void sctp_handle_forward_tsn(struct sctp_tcb *,
@@ -50,7 +49,7 @@ sctp_try_advance_peer_ack_point(struct sctp_tcb *,struct sctp_association *);
 void sctp_service_queues(struct sctp_tcb *, struct sctp_association *);
 
 void sctp_update_acked(struct sctp_tcb *, struct sctp_shutdown_chunk *,
-	struct sctp_nets *);
+	struct sctp_nets *, int *abort_now);
 
 int sctp_process_data(struct mbuf **, struct sctp_inpcb *, struct sctp_tcb *,
 	struct sctp_nets *, int, int *, int *, u_int32_t *);

@@ -1213,18 +1213,12 @@ sctp_peeloff(p, v, retval)
 	short fflag;		/* type must match fp->f_flag */
 
 	uap = (struct sctp_peeloff_args *)v;
-
-	error = copyin((caddr_t)SCARG(uap, name), &assoc_id,
-		 sizeof (assoc_id));
-	if (error) {
-		return(error);
-	}
 	error = getsock(fdp, SCARG(uap, sd), &lfp);
 	if (error)
 		return (error);
 	s = splnet();
 	head = (struct socket *)lfp->f_data;
-	error = sctp_can_peel_off(head,assoc_id);
+	error = sctp_can_peel_off(head,SCARG(uap, name));
 	if (error) {
 		splx(s);
 		goto done;
@@ -1252,7 +1246,7 @@ sctp_peeloff(p, v, retval)
 #endif
 	*retval = fd;
 
-	so = sctp_get_peeloff(head, assoc_id, &error);
+	so = sctp_get_peeloff(head, SCARG(uap, name), &error);
 	if (so == NULL) {
 		/*
 		 * Either someone else peeled it off OR

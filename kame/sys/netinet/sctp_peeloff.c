@@ -1,8 +1,7 @@
-/*	$KAME: sctp_peeloff.c,v 1.9 2003/04/15 06:01:30 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_peeloff.c,v 1.16 2002/04/04 19:12:45 randall Exp	*/
+/*	$KAME: sctp_peeloff.c,v 1.10 2003/11/25 06:40:53 ono Exp $	*/
 
 /*
- * Copyright (C) 2002 Cisco Systems Inc,
+ * Copyright (C) 2002, 2003 Cisco Systems Inc,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

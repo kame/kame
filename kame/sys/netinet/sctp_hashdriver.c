@@ -1,5 +1,4 @@
-/*	$KAME: sctp_hashdriver.c,v 1.3 2002/07/30 04:12:34 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_hashdriver.c,v 1.11 2002/04/03 21:10:19 lei Exp	*/
+/*	$KAME: sctp_hashdriver.c,v 1.4 2003/11/25 06:40:52 ono Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Cisco Systems, Inc.

@@ -1,5 +1,4 @@
-/*	$KAME: sctp_input.h,v 1.3 2002/10/09 18:01:21 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_input.h,v 1.8 2002/04/01 21:59:20 randall Exp	*/
+/*	$KAME: sctp_input.h,v 1.4 2003/11/25 06:40:53 ono Exp $	*/
 
 #ifndef __sctp_input_h__
 #define __sctp_input_h__

@@ -1,11 +1,10 @@
-/*	$KAME: sctputil.h,v 1.9 2003/06/24 05:36:50 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctputil.h,v 1.36 2002/04/01 21:59:20 randall Exp	*/
+/*	$KAME: sctputil.h,v 1.10 2003/11/25 06:40:54 ono Exp $	*/
 
 #ifndef __sctputil_h__
 #define __sctputil_h__
 
 /*
- * Copyright (C) 2002 Cisco Systems Inc,
+ * Copyright (C) 2002, 2003 Cisco Systems Inc,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -98,7 +97,7 @@ const char *sctp_ntop6(const u_char *, char *, size_t);
 void sctp_print_address(struct sockaddr *);
 
 int sbappendaddr_nocheck __P((struct sockbuf *, struct sockaddr *,
-	struct mbuf *, struct mbuf *, u_int32_t));
+	struct mbuf *, struct mbuf *, u_int32_t, struct sctp_inpcb *));
 
 struct rtentry *rtalloc_alternate __P((struct sockaddr *, struct rtentry *,
 	int));
@@ -117,6 +116,10 @@ struct mbuf *sctp_generate_invmanparam(int);
  * it part of the sockets layer (along with
  * all of the peeloff code :<
  */
+u_int32_t
+sctp_get_last_vtag_from_sb(struct socket *so);
+
+
 void sctp_grub_through_socket_buffer(struct sctp_inpcb *,
 	struct socket *, struct socket *, struct sctp_tcb *);
 
@@ -124,9 +127,23 @@ void sctp_grub_through_socket_buffer(struct sctp_inpcb *,
 void sctp_free_bufspace(struct sctp_tcb *, struct sctp_association *,
 	struct sctp_tmit_chunk *);
 
-#ifdef SCTP_CWND_LOGGING
+#ifdef SCTP_STAT_LOGGING
+void
+sctp_log_strm_del_alt(u_int32_t tsn, u_int16_t sseq,
+	int from);
+
+void
+sctp_log_strm_del(struct sctp_tmit_chunk *chk, 
+	struct sctp_tmit_chunk *poschk,
+	int from);
 void sctp_log_cwnd(struct sctp_nets *, int, uint8_t);
-int sctp_fill_cwnd_log(struct mbuf *);
+void sctp_log_block(uint8_t, struct socket *, struct sctp_association *);
+int sctp_fill_stat_log(struct mbuf *);
+void sctp_log_fr(uint32_t biggest_tsn, uint32_t biggest_new_tsn, uint32_t tsn, int from);
+void sctp_log_map(uint32_t map, uint32_t cum, uint32_t high, int from);
+
+void sctp_clr_stat_log(void);
+
 #endif
 
 #ifdef SCTP_AUDITING_ENABLED

@@ -1,11 +1,10 @@
-/*    $KAME: sctp_header.h,v 1.8 2003/06/24 05:36:49 itojun Exp $     */
-/*	Header: /home/sctpBsd/netinet/sctp_header.h,v 1.34 2002/04/03 21:10:19 lei Exp	*/
+/*    $KAME: sctp_header.h,v 1.9 2003/11/25 06:40:52 ono Exp $     */
 
 #ifndef __sctp_header_h__
 #define __sctp_header_h__
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -82,21 +81,10 @@ struct sctp_heartbeat_info_param {
 };
 
 
-/* draft-ietf-tsvwg-usctp */
-/* unreliable streams parameter */
-struct sctp_unrel_streams {
-	u_int16_t start;		/* starting unrel stream id in range */
-	u_int16_t end;			/* ending unrel stream id in range */
-};
-
-struct sctp_unrel_streams_param {
+/* draft-ietf-tsvwg-prsctp */
+/* PR-SCTP supported parameter */
+struct sctp_prsctp_supported_param {
 	struct sctp_paramhdr ph;
-	struct sctp_unrel_streams unrel[0];	/* list of ranges */
-};
-
-struct sctp_strseq {
-	u_int16_t stream;
-	u_int16_t sequence;
 };
 
 
@@ -153,12 +141,15 @@ struct sctp_state_cookie {		/* this is our definition... */
         u_int32_t tie_tag_my_vtag;	/* my tag in old association */
         u_int32_t tie_tag_peer_vtag;    /* peers tag in old association */
         u_int32_t peers_vtag;		/* peers tag in INIT (for quick ref) */
+        u_int32_t my_vtag;		/* my tag in INIT-ACK (for quick ref) */
 	struct timeval time_entered;	/* the time I built cookie */
 	u_int32_t address[4];		/* 4 ints/128 bits */
 	u_int32_t addr_type;		/* address type */
 	u_int32_t laddress[4];          /* my local from address */
 	u_int32_t laddr_type;           /* my local from address type */
 	u_int32_t scope_id;		/* v6 scope id for link-locals */
+	u_int16_t peerport;		/* port address of the peer in the INIT */
+	u_int16_t myport;		/* my port address used in the INIT */
         u_int8_t ipv4_addr_legal;	/* Are V4 addr legal? */
         u_int8_t ipv6_addr_legal;	/* Are V6 addr legal? */
 	u_int8_t local_scope;		/* IPv6 local scope flag */
@@ -348,11 +339,17 @@ struct sctp_asconf_ack_chunk {
 	/* asconf parameters follow */
 };
 
-/* draft-ietf-tsvwg-usctp */
+/* draft-ietf-tsvwg-prsctp */
 /* Forward Cumulative TSN (FORWARD TSN) */
 struct sctp_forward_tsn_chunk {
 	struct sctp_chunkhdr ch;
 	u_int32_t new_cumulative_tsn;
+	/* stream/sequence pairs (sctp_strseq) follow */
+};
+
+struct sctp_strseq {
+	u_int16_t stream;
+	u_int16_t sequence;
 };
 
 struct sctp_forward_tsn_msg {
@@ -360,9 +357,13 @@ struct sctp_forward_tsn_msg {
 	struct sctp_forward_tsn_chunk msg;
 };
 
+/* should be a multiple of 4 - 1 aka 3/7/11 etc. */
+
+#define SCTP_NUM_DB_TO_VERIFY 3
+
 struct sctp_chunk_desc {
 	u_int8_t chunk_type;
-	u_int8_t  data_bytes[3];
+	u_int8_t data_bytes[SCTP_NUM_DB_TO_VERIFY];
 	u_int32_t tsn_ifany;
 };
 

@@ -1,8 +1,7 @@
-/*	$KAME: sctp_var.h,v 1.16 2003/06/24 05:36:50 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_var.h,v 1.46 2002/04/04 16:53:46 randall Exp	*/
+/*	$KAME: sctp_var.h,v 1.17 2003/11/25 06:40:54 ono Exp $	*/
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -123,7 +122,7 @@ int sctp_ingetaddr(struct socket *,
 #if defined(__FreeBSD__)
 		   struct sockaddr **
 #else
-		   struct sockaddr *
+		   struct mbuf *
 #endif
 );
 
@@ -131,7 +130,7 @@ int sctp_peeraddr(struct socket *,
 #if defined(__FreeBSD__)
 		  struct sockaddr **
 #else
-		  struct sockaddr *
+		  struct mbuf *
 #endif
 );
 

@@ -1,8 +1,7 @@
-/*	$KAME: sctp_pcb.c,v 1.24 2003/10/22 09:02:47 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
+/*	$KAME: sctp_pcb.c,v 1.25 2003/11/25 06:40:53 ono Exp $	*/
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -125,7 +124,7 @@
 #include <netinet/sctp_header.h>
 #include <netinet/sctp_asconf.h>
 #include <netinet/sctp_output.h>
-
+#include <netinet/sctp_timer.h>
 
 #ifndef SCTP_PCBHASHSIZE
 /* default number of association hash buckets in each endpoint */
@@ -859,6 +858,68 @@ sctp_findassociation_special_addr(struct sctp_inpcb **ep,
 	return (NULL);
 }
 
+static struct sctp_tcb *
+sctp_findassoc_by_vtag(struct sockaddr *from,
+		       uint32_t vtag, 
+		       struct sctp_inpcb **inp,
+		       struct sctp_nets **netp,
+		       uint16_t port,
+		       uint16_t myport)
+{
+	/* Use my vtag to hash. If we find
+	 * it we then verify the source addr is
+	 * in the assoc. If all goes well we save
+	 * a bit on rec of a packet.
+	 */
+	struct sctpasochead *head;
+	struct sctp_nets *tnet;
+	struct sctp_tcb *tcb;
+
+	head = &sctppcbinfo.sctp_asochash[SCTP_PCBHASH_ASOC(vtag, sctppcbinfo.hashasocmark)];
+	if(head == NULL) {
+		/* invalid vtag */
+		return(NULL);
+	}
+	LIST_FOREACH(tcb, head, sctp_asocs) {
+		if(tcb->asoc.my_vtag == vtag) {
+			/* candidate */
+			if(tcb->rport != port) {
+				/* we could remove this if vtags are 
+				 * unique across the system.
+				 */
+				continue;
+			}
+			if(tcb->sctp_ep->sctp_lport != myport) {
+				/* we could remove this if vtags are 
+				 * unique across the system.
+				 */
+				continue;
+			}
+
+			tnet = sctp_findnet(tcb, from);
+			if(tnet) {
+				/* yep its him. */
+				*netp = tnet;
+				sctp_pegs[SCTP_VTAG_EXPR]++;
+				*inp = tcb->sctp_ep;
+				return(tcb);
+			} else {
+				/* bogus 
+				sctp_pegs[SCTP_VTAG_BOGUS]++;
+				return(NULL);
+				*/
+				/* we could uncomment the above
+				 * if vtags were unique across
+				 * the system.
+				 */
+				continue;
+			}
+		}
+	}
+	return(NULL);
+}
+
+
 /*
  * Find an association with the pointer to the inbound IP packet. This
  * can be a IPv4 or IPv6 packet, it is assumed that a pullup was done up
@@ -867,7 +928,8 @@ sctp_findassociation_special_addr(struct sctp_inpcb **ep,
 struct sctp_tcb *
 sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 			  struct sctp_inpcb **inp,
-			  struct sctp_nets **netp)
+			  struct sctp_nets **netp,
+			  uint32_t vtag)
 {
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	int to_tcp_pool;
@@ -928,6 +990,14 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 		sctp_print_address(from);
 	}
 #endif
+	if(vtag) {
+		/* we only go down this path if vtag is non-zero */
+		ret = sctp_findassoc_by_vtag(from, ntohl(vtag), inp, netp, port, my_port);
+		if(ret) {
+			return(ret);
+		}
+	}
+
 	if (inp) {
 		ret = sctp_findassociation_addr_sa(to, from, inp, netp);
 		linp = *inp;
@@ -1011,25 +1081,6 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 	return (ret);
 }
 
-
-static u_int32_t
-sctp_find_largest_possible_mtu(void)
-{
-	/*
-	 * Go through all networks and find the largest possible MTU that we
-	 * can support outbound.
-	 */
-	struct ifnet *ifn;
-	u_int32_t cur;
-
-	cur = 0x0;
-	TAILQ_FOREACH(ifn, &ifnet, if_list) {
-		if (cur > ifn->if_mtu) {
-			cur = ifn->if_mtu;
-		}
-	}
-	return (cur);
-}
 
 /*
  * allocate a sctp_inpcb and setup a temporary binding to a port/all
@@ -1190,8 +1241,6 @@ sctp_inpcb_alloc(struct socket *so)
 	m->initial_init_rto_max = SCTP_RTO_UPPER_BOUND;
 
 	m->max_open_streams_intome = MAX_SCTP_STREAMS;
-
-	m->max_mtu = sctp_find_largest_possible_mtu();
 
 	m->max_init_times = SCTP_DEF_MAX_INIT;
 	m->max_send_times = SCTP_DEF_MAX_SEND;
@@ -2276,6 +2325,8 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 		if (from == 1) {
 			tasoc->asoc.smallest_mtu = netp->mtu;
 		}
+		/* start things off to match mtu of interface please. */
+		netp->ra.ro_rt->rt_rmx.rmx_mtu = netp->ra.ro_rt->rt_ifp->if_mtu;
 	} else {
 		netp->mtu = tasoc->asoc.smallest_mtu;
 	}
@@ -2283,9 +2334,9 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 		tasoc->asoc.smallest_mtu = netp->mtu;
 	}
 	if (netp->addr_is_local) {
-		netp->cwnd = netp->mtu * 4;
+		netp->cwnd = max((netp->mtu * 4), SCTP_INITIAL_CWND);
 	} else {
-		netp->cwnd = netp->mtu * 2;
+		netp->cwnd = min((netp->mtu * 4), max((2*netp->mtu), SCTP_INITIAL_CWND));
 	}
 	netp->ssthresh = tasoc->asoc.peers_rwnd;
 
@@ -2347,6 +2398,9 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 		/* No route to current primary adopt new primary */
 		tasoc->asoc.primary_destination = netp;
 	}
+	sctp_timer_start(SCTP_TIMER_TYPE_PATHMTURAISE, tasoc->sctp_ep,
+			 tasoc, netp);
+
 	return (0);
 }
 
@@ -2511,6 +2565,11 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 	/* and the port */
 	tasoc->rport = rport;
 
+	/* now that my_vtag is set, add it to the  hash */
+	head = &sctppcbinfo.sctp_asochash[SCTP_PCBHASH_ASOC(tasoc->asoc.my_vtag, sctppcbinfo.hashasocmark)];
+	/* put it in the bucket in the vtag hash of assoc's for the system */
+	LIST_INSERT_HEAD(head, tasoc, sctp_asocs);
+
 	if ((imp_ret = sctp_add_remote_addr(tasoc, firstaddr, 1, 1))) {
 		/* failure.. memory error? */
 		if (asoc->strmout)
@@ -2547,7 +2606,6 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 	}
 
 	/* Init all the timers */
-	callout_init(&asoc->pmtu.timer);
 	callout_init(&asoc->hb_timer.timer);
 	callout_init(&asoc->dack_timer.timer);
 	callout_init(&asoc->asconf_timer.timer);
@@ -2578,6 +2636,7 @@ sctp_free_remote_addr(struct sctp_nets *net)
 	if (net->ref_count <= 0) {
 		/* stop timer if running */
 		callout_stop(&net->rxt_timer.timer);
+		callout_stop(&net->pmtu_timer.timer);
 		net->dest_state = SCTP_ADDR_NOT_REACHABLE;
 #if defined(__FreeBSD__)
 		zfreei(sctppcbinfo.ipi_zone_raddr, net);
@@ -2625,7 +2684,10 @@ sctp_del_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *rem)
 			sctp_free_remote_addr(net);
 			if (net == asoc->primary_destination) {
 				/* Reset primary */
-				asoc->primary_destination = TAILQ_FIRST(&asoc->nets);
+				struct sctp_nets *lnet;
+				lnet = TAILQ_FIRST(&asoc->nets);
+				/* Try to find a confirmed primary */
+				asoc->primary_destination = sctp_find_alternate_net(tasoc,lnet);
 			}
 			if (net == asoc->last_data_chunk_from) {
 				/* Reset primary */
@@ -2729,6 +2791,12 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 #else
 	s = splnet();
 #endif
+	if (tasoc->asoc.state == 0) {
+		printf("Freeing already free association:%x - huh??\n",
+		       (u_int)tasoc);
+		splx(s);
+		return;
+	}
 	/* Null all of my entry's on the socket q */
 	TAILQ_FOREACH(sq, &ep->sctp_queue_list, next_sq) {
 		if (sq->tcb == tasoc) {
@@ -2742,6 +2810,9 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 	if (ep->sctp_tcbhash) {
 		LIST_REMOVE(tasoc, sctp_tcbhash);
 	}
+	/* pull it from the vtag hash */
+	LIST_REMOVE(tasoc, sctp_asocs);
+
 	/* Now lets remove it from the list of ALL associations in the EP */
 	LIST_REMOVE(tasoc, sctp_tcblist);
 
@@ -2755,7 +2826,6 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 
 	sctp_add_vtag_to_timewait(ep, asoc->my_vtag);
 	/* now clean up any other timers */
-	callout_stop(&asoc->pmtu.timer);
 	callout_stop(&asoc->hb_timer.timer);
 	callout_stop(&asoc->dack_timer.timer);
 	callout_stop(&asoc->asconf_timer.timer);
@@ -3196,6 +3266,8 @@ sctp_select_primary_destination(struct sctp_tcb *tcb)
 
 	TAILQ_FOREACH(net, &tcb->asoc.nets, sctp_next) {
 		/* for now, we'll just pick the first reachable one we find */
+		if(net->dest_state & SCTP_ADDR_UNCONFIRMED)
+			continue;
 		if (sctp_destination_is_reachable(tcb, (struct sockaddr *)&net->ra._l_addr)) {
 			/* found a reachable destination */
 			tcb->asoc.primary_destination = net;
@@ -3538,6 +3610,17 @@ sctp_pcb_init()
 			  sctp_chunkscale);
 #endif
 #endif
+
+	sctppcbinfo.sctp_asochash = hashinit((hashtblsize * 31),
+#ifdef __NetBSD__
+					     HASH_LIST,
+#endif
+					     M_PCB,
+#ifndef __FreeBSD__
+					     M_WAITOK,
+#endif
+					     &sctppcbinfo.hashasocmark);
+
 
 	sctppcbinfo.sctp_ephash = hashinit(hashtblsize,
 #ifdef __NetBSD__
@@ -3938,9 +4021,9 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 					sctp_set_primary_addr(stcb, lsa);
 				}
 			}
-		} else if (ptype == SCTP_UNRELIABLE_STREAM) {
+		} else if (ptype == SCTP_PRSCTP_SUPPORTED) {
 			/* Peer supports pr-sctp */
-			stcb->asoc.peer_supports_usctp = 1;
+			stcb->asoc.peer_supports_prsctp = 1;
 		}
 		at += SCTP_SIZE32(plen);
 		if (at >= limit) {
@@ -4010,6 +4093,17 @@ sctp_is_vtag_good(struct sctp_inpcb *m, u_int32_t tag, struct timeval *now)
 		 * Block(s) are present, lets see if we have this tag in
 		 * the list
 		 */
+
+		/*** FIX ME? if a tag is in use/ it would still be good?
+		 * This means that even if we setup the compile options to
+		 * have the vtag time-wait across the system it is still possible
+		 * that two assoc's will have the same tag. To fix this we would
+		 * need to add code to this module to assure that a vtag was
+		 * not in use. Presumably by hashing the vtag cache in a new
+		 * way to assure it is not in use and then doing the stuff below
+		 * to verify its not in timed wait...
+		 */
+
 		LIST_FOREACH(twait_block, chain, sctp_nxt_tagblock) {
 			for (i = 0; i < SCTP_NUMBER_IN_VTAG_BLOCK; i++) {
 				if (twait_block->vtag_block[i].v_tag == 0) {

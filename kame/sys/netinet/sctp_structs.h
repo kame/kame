@@ -1,11 +1,10 @@
-/*	$KAME: sctp_structs.h,v 1.8 2003/06/24 05:36:50 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_structs.h,v 1.67 2002/04/03 21:10:19 lei Exp	*/
+/*	$KAME: sctp_structs.h,v 1.9 2003/11/25 06:40:54 ono Exp $	*/
 
 #ifndef __sctp_structs_h__
 #define __sctp_structs_h__
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -80,12 +79,12 @@ union sctp_sockstore {
 };
 
 struct sctp_nets {
-	/* This is used for SHUTDOWN/SHUTDOWN-ACK/SEND or INIT timers */
-	struct sctp_timer rxt_timer;
-	/* Ip address and port */
 	TAILQ_ENTRY(sctp_nets) sctp_next;	/* next link */
-	/* last time in seconds I sent to it */
-	struct timeval last_sent_time;
+
+        /* Things on the top half may be able to be split
+	 * into a common structure shared by all.
+	 */
+	struct sctp_timer pmtu_timer;
 
 	/*
 	 * The following two in combination equate to a route entry for
@@ -96,12 +95,23 @@ struct sctp_nets {
 		union sctp_sockstore _l_addr;	/* remote peer addr */
 		union sctp_sockstore _s_addr;	/* our selected source address */
 	} ra;
-	int ref_count;
+	/* mtu discovered so far */
+	int mtu;
+        int ssthresh;		/* not sure about this one for split */
+
 
 	/* smoothed average things for RTT and RTO itself */
 	int lastsa;
 	int lastsv;
 	int RTO;
+
+	/* This is used for SHUTDOWN/SHUTDOWN-ACK/SEND or INIT timers */    
+	struct sctp_timer rxt_timer;
+
+	/* last time in seconds I sent to it */
+	struct timeval last_sent_time;
+	int ref_count;
+
 
 	/* Congestion stats per destination */
 	/*
@@ -111,10 +121,6 @@ struct sctp_nets {
 	int flight_size;
 	int cwnd; /* actual cwnd */
 	int partial_bytes_acked; /* in CA tracks when to increment a MTU */
-	int ssthresh;
-
-	/* mtu discovered so far */
-	int mtu;
 
 	/* tracking variables to avoid the aloc/free in sack processing */
 	int net_ack;
@@ -134,12 +140,12 @@ struct sctp_nets {
 	unsigned short error_count;
 
 	/* Flags that probably can be combined into dest_state */
-	u_int8_t rto_pending;		/* is segment marked for RTO update */
+	u_int8_t rto_pending;		/* is segment marked for RTO update  ** if we split?*/
 	u_int8_t fast_retran_ip;	/* fast retransmit in progress */
 	u_int8_t hb_responded;
 	u_int8_t cacc_saw_newack;	/* CACC algorithm flag */
-	u_int8_t src_addr_selected;
-	u_int8_t addr_is_local;		/* its a local address (if known) */
+        u_int8_t src_addr_selected;	/* if we split we move */
+	u_int8_t addr_is_local;		/* its a local address (if known) could move in split */
 #ifdef SCTP_HIGH_SPEED
 	u_int8_t last_hs_used;		/* index into the last HS table entry we used */
 #endif
@@ -184,6 +190,7 @@ struct sctp_tmit_chunk {
 	struct mbuf *data;		/* pointer to mbuf chain of data */
 	struct sctp_nets *whoTo;
 	TAILQ_ENTRY(sctp_tmit_chunk) sctp_next;	/* next link */
+	uint8_t do_rtt;
 };
 
 
@@ -236,7 +243,6 @@ struct sctp_association {
 	struct sctp_sndrcvinfo def_send;	/* default send parameters */
 
 	/* timers and such */
-	struct sctp_timer pmtu;			/* p-mtu raise timer */
 	struct sctp_timer hb_timer;		/* hb timer */
 	struct sctp_timer dack_timer;		/* Delayed ack timer */
 	struct sctp_timer asconf_timer;		/* Asconf */
@@ -319,6 +325,10 @@ struct sctp_association {
 				 */
 	u_int32_t peer_vtag;	/* The peers last tag */
 
+	u_int32_t my_vtag_nonce;
+	u_int32_t peer_vtag_nonce;
+
+
 	/* This is the SCTP fragmentation threshold */
 	u_int32_t smallest_mtu;
 
@@ -396,9 +406,10 @@ struct sctp_association {
 	 * and then await sending. The stream seq comes when it
 	 * is first put in the individual str queue
 	 */
-	int send_queue_cnt;  /* could be removed REM */
+	int stream_queue_cnt;
+	int send_queue_cnt;  
 	int sent_queue_cnt;
-	int sent_queue_cnt_removeable; /* could be removed REM */
+	int sent_queue_cnt_removeable;
 	/*
 	 * Number on sent queue that are marked for retran until this
 	 * value is 0 we only send one packet of retran'ed data.
@@ -484,7 +495,7 @@ struct sctp_association {
 	u_int16_t mapping_array_size;
 
 	u_int16_t chunks_on_out_queue; /* total chunks floating around */
-
+	int16_t num_send_timers_up;
 	/*
 	 * This flag indicates that we need to send the first SACK. If
 	 * in place it says we have NOT yet sent a SACK and need to.
@@ -515,8 +526,8 @@ struct sctp_association {
 	/* flag to indicate if peer can do asconf */
 	uint8_t peer_supports_asconf;
 	uint8_t peer_supports_asconf_setprim; /* possibly removable REM */
-	/* u-sctp support flag */
-	uint8_t peer_supports_usctp;
+	/* pr-sctp support flag */
+	uint8_t peer_supports_prsctp;
 
 	/* Do we allow V6/V4? */
 	u_int8_t ipv4_addr_legal;

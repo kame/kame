@@ -346,6 +346,12 @@ SCTP_TCP_MODEL_SUPPORT	opt_sctp.h
 SCTP_USE_ADLER32	opt_sctp.h
 SCTP_ALTERNATE_ROUTE	opt_sctp.h
 SCTP_HIGH_SPEED		opt_sctp.h
+SCTP_STAT_LOGGING 	opt_sctp.h
+SCTP_CWND_LOGGING       opt_sctp.h
+SCTP_BLK_LOGGING        opt_sctp.h
+SCTP_STR_LOGGING        opt_sctp.h
+SCTP_FR_LOGGING         opt_sctp.h
+SCTP_MAP_LOGGING        opt_sctp.h
 #
 DCCP			opt_dccp.h
 DCCP_TFRC		opt_dccp.h

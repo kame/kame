@@ -1,11 +1,10 @@
-/*	$KAME: sctp_pcb.h,v 1.11 2003/06/24 05:36:50 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_pcb.h,v 1.92 2002/04/04 16:53:46 randall Exp	*/
+/*	$KAME: sctp_pcb.h,v 1.12 2003/11/25 06:40:53 ono Exp $	*/
 
 #ifndef __sctp_pcb_h__
 #define __sctp_pcb_h__
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -112,6 +111,7 @@ LIST_HEAD(sctpvtaghead, sctp_tagblock);
 
 #define SCTP_PCBHASH_ALLADDR(port, mask) (port & mask)
 
+#define SCTP_PCBHASH_ASOC(tag, mask) (tag & mask)
 
 struct sctp_laddr {
 	LIST_ENTRY(sctp_laddr) sctp_nxt_addr;	/* next in list */
@@ -129,6 +129,9 @@ struct sctp_tagblock {
 };
 
 struct sctp_epinfo {
+	struct sctpasochead *sctp_asochash;
+	u_long hashasocmark;
+
 	struct sctppcbhead *sctp_ephash;
 	u_long hashmark;
 
@@ -228,7 +231,6 @@ struct sctp_pcb {
 	int initial_rto;
 
 	int initial_init_rto_max;
-	int32_t max_mtu;
 
 	int32_t sctp_sws_sender;
 	int32_t sctp_sws_receiver;
@@ -338,6 +340,7 @@ struct sctp_tcb {
 	struct sctp_inpcb *sctp_ep;		/* back pointer to ep */
 	LIST_ENTRY(sctp_tcb) sctp_tcbhash;	/* next link in hash table */
 	LIST_ENTRY(sctp_tcb) sctp_tcblist;	/* list of all of the TCB's */
+	LIST_ENTRY(sctp_tcb) sctp_asocs;
 	struct sctp_association asoc;
 	uint16_t rport;			/* remote port in network format */
 	uint16_t resv;
@@ -366,7 +369,7 @@ struct sctp_inpcb *sctp_pcb_findep(struct sockaddr *);
 int sctp_inpcb_bind(struct socket *, struct sockaddr *, struct proc *);
 
 struct sctp_tcb *sctp_findassociation_addr(struct mbuf *, int,
-	struct sctp_inpcb **, struct sctp_nets **);
+	struct sctp_inpcb **, struct sctp_nets **, uint32_t vtag);
 
 struct sctp_tcb *sctp_findassociation_addr_sa(struct sockaddr *,
 	struct sockaddr *, struct sctp_inpcb **, struct sctp_nets **);

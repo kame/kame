@@ -1,11 +1,10 @@
-/*	$KAME: sctp_constants.h,v 1.10 2003/06/24 05:36:49 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_constants.h,v 1.61 2002/04/04 16:53:46 randall Exp	*/
+/*	$KAME: sctp_constants.h,v 1.11 2003/11/25 06:40:52 ono Exp $	*/
 
 #ifndef __sctp_constants_h__
 #define __sctp_constants_h__
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,8 +37,8 @@
 
 /*#define SCTP_AUDITING_ENABLED 1 used for debug/auditing */
 #define SCTP_AUDIT_SIZE 256
+#define SCTP_STAT_LOG_SIZE 80000
 
-#define SCTP_CWND_LOG_SIZE 127	/* can only get one mclusters worth */ 
 /* Places that CWND log can happen from */
 #define SCTP_CWND_LOG_FROM_FR	1
 #define SCTP_CWND_LOG_FROM_RTX	2
@@ -47,7 +46,49 @@
 #define SCTP_CWND_LOG_FROM_SS	4
 #define SCTP_CWND_LOG_FROM_CA	5
 #define SCTP_CWND_LOG_FROM_SAT	6
+#define SCTP_BLOCK_LOG_INTO_BLK 7
+#define SCTP_BLOCK_LOG_OUTOF_BLK 8
+#define SCTP_BLOCK_LOG_CHECK     9
+#define SCTP_STR_LOG_FROM_INTO_STRD 10
+#define SCTP_STR_LOG_FROM_IMMED_DEL 11
+#define SCTP_STR_LOG_FROM_INSERT_HD 12
+#define SCTP_STR_LOG_FROM_INSERT_MD 13
+#define SCTP_STR_LOG_FROM_INSERT_TL 14
+#define SCTP_STR_LOG_FROM_MARK_TSN  15
+#define SCTP_STR_LOG_FROM_EXPRS_DEL 16
+#define SCTP_FR_LOG_BIGGEST_TSNS    17
+#define SCTP_FR_LOG_STRIKE_TEST     18
+#define SCTP_FR_LOG_STRIKE_CHUNK    19
+#define SCTP_FR_T3_TIMEOUT          20
+#define SCTP_MAP_PREPARE_SLIDE      21
+#define SCTP_MAP_SLIDE_FROM         22
+#define SCTP_MAP_SLIDE_RESULT       23
+#define SCTP_MAP_SLIDE_CLEARED	    24
+#define SCTP_MAP_SLIDE_NONE         25
+#define SCTP_FR_T3_MARK_TIME        26
+#define SCTP_FR_T3_MARKED           27
+#define SCTP_FR_T3_STOPPED          28
+#define SCTP_FR_MARKED              30
+/*
+ * To turn on various logging, you must first
+ * define SCTP_STAT_LOGGING. Then to get
+ * something to log you define one of
+ * the logging defines i.e.
+ *
+ * SCTP_CWND_LOGGING
+ * SCTP_BLK_LOGGING
+ * SCTP_STR_LOGGING
+ * SCTP_FR_LOGGING
+ *
+ * Any one or a combination of the logging
+ * can be turned on.
+ */
 
+#define SCTP_LOG_EVENT_CWND  1
+#define SCTP_LOG_EVENT_BLOCK 2
+#define SCTP_LOG_EVENT_STRM  3
+#define SCTP_LOG_EVENT_FR    4
+#define SCTP_LOG_EVENT_MAP   5
 /* if you want to support the TCP model, uncomment the following define */
 #define SCTP_TCP_MODEL_SUPPORT	1
 
@@ -165,9 +206,8 @@
 
 /* Packet dropped flags */
 #define SCTP_FROM_MIDDLE_BOX	SCTP_HAD_NO_TCB
-#define SCTP_SUMMARY_PRESENT	0x02
-#define SCTP_BADCRC		0x04
-#define SCTP_PACKET_TRUNCATED	0x08
+#define SCTP_BADCRC		0x02
+#define SCTP_PACKET_TRUNCATED	0x04
 
 #define SCTP_SAT_NETWORK_MIN	     400	/* min ms for RTT to set satellite time */
 #define SCTP_SAT_NETWORK_BURST_INCR  2		/* how many times to multiply maxburst in sat */
@@ -197,8 +237,8 @@
 #define SCTP_HOSTNAME_ADDRESS	0x000b
 #define SCTP_SUPPORTED_ADDRTYPE	0x000c
 #define SCTP_ECN_CAPABLE	0x8000
-/* draft-ietf-tsvwg-usctp */
-#define SCTP_UNRELIABLE_STREAM	0xc000
+/* draft-ietf-tsvwg-prsctp */
+#define SCTP_PRSCTP_SUPPORTED	0xc000
 /* draft-ietf-tsvwg-addip-sctp */
 #define SCTP_ADD_IP_ADDRESS	0xc001
 #define SCTP_DEL_IP_ADDRESS	0xc002
@@ -279,8 +319,8 @@
 
 
 /* SCTP reachability state for each address */
-#define SCTP_ADDR_NOT_REACHABLE		0x001
-#define SCTP_ADDR_REACHABLE		0x002
+#define SCTP_ADDR_REACHABLE		0x001
+#define SCTP_ADDR_NOT_REACHABLE		0x002
 #define SCTP_ADDR_NOHB			0x004
 #define SCTP_ADDR_BEING_DELETED		0x008
 #define SCTP_ADDR_NOT_IN_ASSOC		0x010
@@ -290,8 +330,6 @@
 #define SCTP_ADDR_DOUBLE_SWITCH		0x100
 #define SCTP_ADDR_UNCONFIRMED		0x200
 
-#define SCTP_ACTIVE     SCTP_ADDR_REACHABLE
-#define SCTP_INACTIVE   SCTP_ADDR_NOT_REACHABLE
 #define SCTP_REACHABLE_MASK		0x203
 
 /* bound address types (e.g. valid address types to allow) */
@@ -303,9 +341,6 @@
 
 /* resource limit of streams */
 #define MAX_SCTP_STREAMS	2048
-
-/* max number of unreliable streams sets */
-#define MAX_UNRELSTREAM_SETS	10
 
 /* Maximum the mapping array will  grow to (TSN mapping array) */
 #define SCTP_MAPPING_ARRAY	512
@@ -397,7 +432,11 @@
  * the count can run over this if the user sends a large
  * message down .. the fragmented chunks don't count until
  * AFTER the message is on queue.. it would be the next
- * send that blocks things.
+ * send that blocks things. This number will get tuned
+ * up at boot in the sctp_init and use the number
+ * of clusters as a base. This way high bandwidth
+ * environments will not get impacted by the lower
+ * bandwidth sending a bunch of 1 byte chunks
  */
 #define SCTP_ASOC_MAX_CHUNKS_ON_QUEUE 512
 
@@ -498,6 +537,8 @@
 #define SCTP_SWS_RECEIVER_DEF	3000
 
 
+#define SCTP_INITIAL_CWND 4380
+
 /* amount peer is obligated to have in rwnd or I will abort */
 #define SCTP_MIN_RWND	1500
 
@@ -515,15 +556,8 @@
 #define SCTP_DEFAULT_MAXMSGREASM 1048576
 
 #define SCTP_DEFAULT_MAXWINDOW	32768	/* default rwnd size */
-#define SCTP_DEFAULT_MAXSEGMENT 1500	/* MTU size, this is the default
-                                         * to which we set the smallestMTU
-					 * size to. This governs what is the
-					 * largest size we will use, of course
-					 * PMTU will raise this up to
-					 * the largest interface MTU or the
-					 * ceiling below if there is no
-					 * SIOCGIFMTU.
-					 */
+#define SCTP_DEFAULT_MAXSEGMENT 65535
+
 #define DEFAULT_CHUNK_BUFFER	2048
 #define DEFAULT_PARAM_BUFFER	512
 
@@ -592,7 +626,7 @@
 #define SCTP_UNSET_TSN_PRESENT(arry, gap) (arry[(gap>>3)] &= ((~(0x01 << ((gap&0x07)))) & 0xff))
 
 /* pegs */
-#define SCTP_NUMBER_OF_PEGS 64
+#define SCTP_NUMBER_OF_PEGS 80
 /* peg index's */
 #define SCTP_PEG_SACKS_SEEN 0 /* XX */
 #define SCTP_PEG_SACKS_SENT 1 /* XX */
@@ -655,9 +689,27 @@
 #define SCTP_NAGLE_NOQ     58
 #define SCTP_NAGLE_OFF     59
 #define SCTP_OUTPUT_FRM_SND 60
-#define SCTP_RESV1         61
-#define SCTP_RESV2         62
-#define SCTP_RESV3         63
+#define SCTP_SOS_NOSNT     61   /* some on stream queues when none sent */
+#define SCTP_NOS_NOSNT     62   /* none on stream queues when none sent */
+#define SCTP_SOSE_NOSNT    63   /* some on send queue when none sent */
+#define SCTP_NOSE_NOSNT    64   /* none on send queue when none sent */
+#define SCTP_DATA_OUT_ERR  65
+#define SCTP_DUP_SSN_RCVD  66
+#define SCTP_DUP_FR        67
+#define SCTP_VTAG_EXPR     68
+#define SCTP_VTAG_BOGUS    69
+#define SCTP_T3_SAFEGRD    70
+#define SCTP_PDRP_FMBOX    71
+#define SCTP_PDRP_FEHOS    72
+#define SCTP_PDRP_MB_DA	   73
+#define SCTP_PDRP_MB_CT	   74
+#define SCTP_PDRP_BWRPT	   75
+#define SCTP_PDRP_CRUPT	   76
+#define SCTP_PDRP_NEDAT    77
+#define SCTP_PDRP_PDBRK    78
+#define SCTP_RESV1
+
+
 /*
  * This value defines the number of vtag block time wait entry's
  * per list element.  Each entry will take 2 4 byte ints (and of
@@ -694,12 +746,6 @@
  */
 #define SCTP_TIME_WAIT 480
 
-/*
- * For U-SCTP
- */
-#define SCTP_STRM_RELIABLE   0
-#define SCTP_STRM_UNRELIABLE 1
-
 #define IN4_ISPRIVATE_ADDRESS(a) \
    ((((u_char *)&(a)->s_addr)[0] == 10) || \
     ((((u_char *)&(a)->s_addr)[0] == 172) && \
@@ -735,7 +781,7 @@ do { \
 	} else { \
 		sowwakeup(so); \
 	} \
-} while(0)
+} while (0)
 
 #define sctp_sorwakeup(inp, so) \
 do { \
@@ -744,18 +790,18 @@ do { \
 	} else { \
 		sorwakeup(so); \
 	} \
-} while(0)
+} while (0)
 #else
 
 #define sctp_sowwakeup(inp, so) \
 do { \
 	sowwakeup(so); \
-} while(0)
+} while (0)
 
 #define sctp_sorwakeup(inp, so) \
 do { \
 	sorwakeup(so); \
-} while(0)
+} while (0)
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 
 #endif /* _KERNEL */

@@ -1,8 +1,7 @@
-/*	$KAME: sctp6_usrreq.c,v 1.21 2003/09/21 09:33:43 jinmei Exp $	*/
-/*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
+/*	$KAME: sctp6_usrreq.c,v 1.22 2003/11/25 06:40:55 ono Exp $	*/
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -191,7 +190,9 @@ sctp6_input(mp, offp, proto)
 
 	iphlen = off;
 
+#ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct sctphdr), IPPROTO_DONE);
+#endif
 
 	ip6 = mtod(m, struct ip6_hdr *);
 
@@ -258,7 +259,7 @@ sctp6_input(mp, offp, proto)
 	 * Locate pcb and tcb for datagram
 	 * sctp_findassociation_addr() wants IP/SCTP/first chunk header...
 	 */
-	stcb = sctp_findassociation_addr(m, iphlen, &in6p, &netp);
+	stcb = sctp_findassociation_addr(m, iphlen, &in6p, &netp, sh->v_tag);
 	if (in6p == NULL) {
 		sctp_pegs[SCTP_NOPORTS]++;
 		sctp6_send_abort(m, ip6, sh, off, 0, NULL);
@@ -1194,7 +1195,7 @@ sctp6_getaddr(struct socket *so,
 #ifdef __FreeBSD__
 	      struct sockaddr **nam
 #else
-	      struct sockaddr *nam
+	      struct mbuf *nam
 #endif
 	      )
 {
@@ -1207,7 +1208,8 @@ sctp6_getaddr(struct socket *so,
 	MALLOC(sin6, struct sockaddr_in6 *, sizeof *sin6, M_SONAME,
 	       M_WAITOK | M_ZERO);
 #else
-	sin6 = (struct sockaddr_in6 *)nam;
+	nam->m_len = sizeof(*sin6);
+	sin6 = mtod(nam, struct sockaddr_in6 *);
 #endif
 	bzero(sin6, sizeof(*sin6));
 	sin6->sin6_family = AF_INET6;
@@ -1293,12 +1295,12 @@ sctp6_peeraddr(struct socket *so,
 #ifdef __FreeBSD__
 	       struct sockaddr **nam
 #else
-	       struct sockaddr *nam
+	       struct mbuf *nam
 #endif
 	       )
 {
 	int fnd;
-	register struct sockaddr_in6 *sin6, *sin_a;
+	register struct sockaddr_in6 *sin6, *sin_a6;
 	struct sctp_inpcb *inp;
 	struct sctp_tcb *tcb;
 	struct sctp_nets *net;
@@ -1314,9 +1316,10 @@ sctp6_peeraddr(struct socket *so,
 	MALLOC(sin6, struct sockaddr_in6 *, sizeof *sin6, M_SONAME,
 	       M_WAITOK | M_ZERO);
 #else
-	sin6 = (struct sockaddr_in6 *)nam;
-	bzero(sin6, sizeof(*sin6));
+	nam->m_len = sizeof(*sin6);
+	sin6 = mtod(nam, struct sockaddr_in6 *);
 #endif
+	bzero(sin6, sizeof(*sin6));
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_len = sizeof(*sin6);
 
@@ -1337,11 +1340,11 @@ sctp6_peeraddr(struct socket *so,
 	}
 	fnd = 0;
 	TAILQ_FOREACH(net, &tcb->asoc.nets, sctp_next) {
-		sin_a = (struct sockaddr_in6 *)&net->ra._l_addr;
-		if (sin_a->sin6_family == AF_INET) {
+		sin_a6 = (struct sockaddr_in6 *)&net->ra._l_addr;
+		if (sin_a6->sin6_family == AF_INET6) {
 			fnd = 1;
 			sin6->sin6_port = tcb->rport;
-			sin6->sin6_addr = sin_a->sin6_addr;
+			sin6->sin6_addr = sin_a6->sin6_addr;
 			break;
 		}
 	}
@@ -1369,7 +1372,7 @@ sctp6_in6getaddr(struct socket *so,
 #ifdef __FreeBSD__
 		 struct sockaddr **nam
 #else
-		 struct sockaddr *nam
+		 struct mbuf *nam
 #endif
 		 )
 {
@@ -1408,10 +1411,21 @@ sctp6_in6getaddr(struct socket *so,
 			in6_sin_2_v4mapsin6((struct sockaddr_in *)*nam, &sin6);
 			memcpy(*nam, &sin6, sizeof(struct sockaddr_in6));
 #else
-			in6_sin_2_v4mapsin6((struct sockaddr_in *)nam, &sin6);
-			memcpy(nam, &sin6, sizeof(struct sockaddr_in6));
+			nam->m_len = sizeof(sin6);
+			in6_sin_2_v4mapsin6(mtod(nam, struct sockaddr_in *),
+			    &sin6);
+			memcpy(mtod(nam, struct sockaddr_in6 *),
+			    &sin6, sizeof(struct sockaddr_in6));
+#endif
+#ifndef __FreeBSD__
+		} else {
+			nam->m_len = sizeof(struct sockaddr_in);
 #endif
 		}
+#ifndef __FreeBSD__
+	} else {
+		nam->m_len = sizeof(struct sockaddr_in6);
+#endif
 	}
 	splx(s);
 	return (error);
@@ -1423,7 +1437,7 @@ sctp6_getpeeraddr(struct socket *so,
 #ifdef __FreeBSD__
 		  struct sockaddr **nam
 #else
-		  struct sockaddr *nam
+		  struct mbuf *nam
 #endif
 		  )
 {
@@ -1462,10 +1476,21 @@ sctp6_getpeeraddr(struct socket *so,
 			in6_sin_2_v4mapsin6((struct sockaddr_in *)*nam, &sin6);
 			memcpy(*nam, &sin6, sizeof(struct sockaddr_in6));
 #else
-			in6_sin_2_v4mapsin6((struct sockaddr_in *)nam, &sin6);
-			memcpy(nam, &sin6, sizeof(struct sockaddr_in6));
+			nam->m_len = sizeof(sin6);
+			in6_sin_2_v4mapsin6(mtod(nam, struct sockaddr_in *),
+			    &sin6);
+			memcpy(mtod(nam, struct sockaddr_in6 *),
+			    &sin6, sizeof(struct sockaddr_in6));
+#endif
+#ifndef __FreeBSD__
+		} else {
+			nam->m_len = sizeof(struct sockaddr_in);
 #endif
 		}
+#ifndef __FreeBSD__
+	} else {
+		nam->m_len = sizeof(struct sockaddr_in6);
+#endif
 	}
 	splx(s);
 	return error;
@@ -1658,23 +1683,10 @@ sctp6_usrreq(so, req, m, nam, control)
 		error = EAFNOSUPPORT;
 		break;
 	case PRU_PEERADDR:
-		{
-			struct sockaddr *name;
-			if (nam == NULL)
-				return (EINVAL);
-			name = mtod(nam, struct sockaddr *);
-			error = sctp6_getpeeraddr(so, name);
-		}
+		error = sctp6_getpeeraddr(so, nam);
 		break;
 	case PRU_SOCKADDR:
-		{
-			struct sockaddr *name;
-			if (nam == NULL)
-				return (EINVAL);
-
-			name = mtod(nam, struct sockaddr *);
-			error = sctp6_in6getaddr(so, name);
-		}
+		error = sctp6_in6getaddr(so, nam);
 		break;
 	case PRU_SLOWTIMO:
 		error = 0;

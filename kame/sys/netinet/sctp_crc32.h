@@ -1,5 +1,4 @@
-/*	$KAME: sctp_crc32.h,v 1.3 2002/10/09 18:01:21 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_crc32.h,v 1.9 2002/04/02 15:34:44 lei Exp	*/
+/*	$KAME: sctp_crc32.h,v 1.4 2003/11/25 06:40:52 ono Exp $	*/
 
 #ifndef __crc32c_h__
 #define __crc32c_h__

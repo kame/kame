@@ -1,11 +1,10 @@
-/*	$KAME: sctp_output.h,v 1.8 2003/06/24 05:36:50 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_output.h,v 1.33 2002/04/01 21:59:20 randall Exp	*/
+/*	$KAME: sctp_output.h,v 1.9 2003/11/25 06:40:53 ono Exp $	*/
 
 #ifndef __sctp_output_h__
 #define __sctp_output_h__
 
 /*
- * Copyright (C) 2002 Cisco Systems Inc,
+ * Copyright (C) 2002, 2003 Cisco Systems Inc,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -65,8 +64,23 @@ struct in6_addr sctp_ipv6_source_address_selection(register struct sctp_inpcb *,
 
 int sctp_send_shutdown_complete(struct sctp_tcb *, struct sctp_nets *);
 
-int sctp_send_shutdown_complete2(struct sctp_inpcb *, struct sockaddr *,
-	u_int32_t);
+int sctp_send_shutdown_complete2_v6(
+	struct mbuf *m,
+        struct sctp_inpcb *ep,
+	struct ip6_hdr *oip,
+	struct sctphdr *osh,
+	int off);
+int
+sctp_get_frag_point(struct sctp_tcb *tcb,
+		    struct sctp_association *asoc);
+
+
+int sctp_send_shutdown_complete2(struct sctp_inpcb *ep,
+        struct ip *oip,
+        struct sctphdr *osh,
+        int off);
+
+
 
 int sctp_send_shutdown_ack(struct sctp_tcb *, struct sctp_nets *);
 

@@ -1,12 +1,10 @@
-/*    $KAME: sctp.h,v 1.13 2003/08/29 06:37:38 itojun Exp $    */
-/*	Header: /home/sctpBsd/netinet/sctp.h,v 1.43 2002/04/02 15:34:44 lei Exp	*/
-
+/*    $KAME: sctp.h,v 1.14 2003/11/25 06:40:52 ono Exp $    */
 
 #ifndef _NETINET_SCTP_H_
 #define _NETINET_SCTP_H_
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -74,25 +72,25 @@ struct sctp_paramhdr {
 /* read-write options */
 #define SCTP_NODELAY			0x00000001
 #define SCTP_MAXSEG			0x00000002
-#define SCTP_ASSOCINFO			0x00000004
+#define SCTP_ASSOCINFO			0x00000003
 
-#define SCTP_INITMSG			0x00000008
-#define SCTP_AUTOCLOSE			0x00000010
-#define SCTP_SET_PEER_PRIMARY_ADDR	0x00000020
-#define SCTP_PRIMARY_ADDR		0x00000040
+#define SCTP_INITMSG			0x00000004
+#define SCTP_AUTOCLOSE			0x00000005
+#define SCTP_SET_PEER_PRIMARY_ADDR	0x00000006
+#define SCTP_PRIMARY_ADDR		0x00000007
 
 /* read-only options */
-#define SCTP_STATUS			0x00000080
-#define SCTP_PCB_STATUS			0x00000100
+#define SCTP_STATUS			0x00000008
+#define SCTP_PCB_STATUS			0x00000009
 
 /* ancillary data/notification interest options */
-#define SCTP_EVENTS			0x00000200
+#define SCTP_EVENTS			0x0000000a
 /* sctp_opt_info params */
-#define SCTP_PEER_ADDR_PARAMS 		0x00000400
-#define SCTP_GET_PEER_ADDR_INFO		0x00001000
+#define SCTP_PEER_ADDR_PARAMS 		0x0000000b
+#define SCTP_GET_PEER_ADDR_INFO		0x0000000c
 /* Hidden socket option that gets the addresses */
-#define SCTP_GET_PEER_ADDRESSES		0x00002000
-#define SCTP_GET_LOCAL_ADDRESSES	0x00004000
+#define SCTP_GET_PEER_ADDRESSES		0x0000000d
+#define SCTP_GET_LOCAL_ADDRESSES	0x0000000e
 /*
  * Blocking I/O is enabled on any TCP type socket by default.
  * For the UDP model if this is turned on then the socket buffer is
@@ -111,31 +109,33 @@ struct sctp_paramhdr {
 /* Blocking I/O is controled by the SS_NBIO flag on the
  * socket state so_state field.
  */
-#define SCTP_GET_SNDBUF_USE		0x00008000
+#define SCTP_GET_SNDBUF_USE		0x0000000f
 /* latter added read/write */
-#define SCTP_ADAPTION_LAYER		0x00010000
-#define SCTP_DISABLE_FRAGMENTS		0x00020000
+#define SCTP_ADAPTION_LAYER		0x00000010
+#define SCTP_DISABLE_FRAGMENTS		0x00000011
 /* sctp_bindx() flags as socket options */
-#define SCTP_BINDX_ADD_ADDR		0x00040000
-#define SCTP_BINDX_REM_ADDR		0x00080000
+#define SCTP_BINDX_ADD_ADDR		0x00000012
+#define SCTP_BINDX_REM_ADDR		0x00000013
 /* return the total count in bytes needed to hold all local addresses bound */
-#define SCTP_GET_LOCAL_ADDR_SIZE	0x00100000
+#define SCTP_GET_LOCAL_ADDR_SIZE	0x00000014
 /* Without this applied we will give V4 and V6 addresses on a V6 socket */
-#define SCTP_I_WANT_MAPPED_V4_ADDR	0x00200000
+#define SCTP_I_WANT_MAPPED_V4_ADDR	0x00000015
 /* Return the total count in bytes needed to hold the remote address */
-#define SCTP_GET_REMOTE_ADDR_SIZE	0x00400000
-#define SCTP_GET_PEGS			0x00800000
-#define SCTP_DEFAULT_SEND_PARAM		0x01000000
-#define SCTP_SET_DEBUG_LEVEL		0x02000000
-#define SCTP_RTOINFO			0x04000000
-#define SCTP_AUTO_ASCONF		0x08000000
-#define SCTP_MAXBURST			0x10000000
-#define SCTP_GET_CWND_LOG		0x20000000
-#define SCTP_CONNECT_X			0x40000000	/* hidden opt for connectx */
+#define SCTP_GET_REMOTE_ADDR_SIZE	0x00000016
+#define SCTP_GET_PEGS			0x00000017
+#define SCTP_DEFAULT_SEND_PARAM		0x00000018
+#define SCTP_SET_DEBUG_LEVEL		0x00000019
+#define SCTP_RTOINFO			0x0000001a
+#define SCTP_AUTO_ASCONF		0x0000001b
+#define SCTP_MAXBURST			0x0000001c
+#define SCTP_GET_STAT_LOG		0x0000001d
+#define SCTP_CONNECT_X			0x0000001e	/* hidden opt for connectx */
 /* Test/debug get a route */
 
 /* Debug things that need to be purged */
-#define SCTP_SET_INITIAL_DBG_SEQ	0x80000000
+#define SCTP_SET_INITIAL_DBG_SEQ	0x0000001f
+#define SCTP_RESET_PEGS                 0x00000020
+#define SCTP_CLR_STAT_LOG               0x00000021
 
 /*
  * user state values

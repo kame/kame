@@ -1,4 +1,4 @@
-/*	$Header: /usr/home/sumikawa/kame/kame/kame/kame/sctp/libsctp/sctp_sys_calls.c,v 1.5 2003/08/29 06:40:32 itojun Exp $ */
+/*	$Header: /usr/home/sumikawa/kame/kame/kame/kame/sctp/libsctp/sctp_sys_calls.c,v 1.6 2003/11/25 06:40:52 ono Exp $ */
 
 /*
  * Copyright (C) 2002 Cisco Systems Inc,
@@ -292,9 +292,8 @@ sctp_sendmsg(int s,
 
 	cmsg->cmsg_level = IPPROTO_SCTP;
 	cmsg->cmsg_type = SCTP_SNDRCV;
-	cmsg->cmsg_len = CMSG_LEN(sizeof(struct sctp_sndrcvinfo));
+	cmsg->cmsg_len = CMSG_LEN (sizeof(struct sctp_sndrcvinfo) );
 	s_info = (struct sctp_sndrcvinfo *)CMSG_DATA(cmsg);
-
 
 	s_info->sinfo_stream = stream_no;
 	s_info->sinfo_ssn = 0;
@@ -309,17 +308,17 @@ sctp_sendmsg(int s,
 	return(sz);
 }
 
-int
+ssize_t
 sctp_recvmsg (int s, 
 	      void *dbuf, 
-	      size_t *len,
+	      size_t len,
 	      struct sockaddr *from,
 	      socklen_t *fromlen,
 	      struct sctp_sndrcvinfo *sinfo,
 	      int *msg_flags)
 {
 	struct sctp_sndrcvinfo *s_info;
-	int sz;
+	ssize_t sz;
 	struct msghdr msg;
 	struct iovec iov[2];
 	char controlVector[65535];
@@ -327,7 +326,7 @@ sctp_recvmsg (int s,
 
 	
 	iov[0].iov_base = dbuf;
-	iov[0].iov_len = *len;
+	iov[0].iov_len = len;
 	iov[1].iov_base = NULL;
 	iov[1].iov_len = 0;
 	msg.msg_name = (caddr_t)from;
@@ -338,7 +337,6 @@ sctp_recvmsg (int s,
 	msg.msg_controllen = sizeof(controlVector);
 	errno = 0;
 	sz = recvmsg(s,&msg,0);
-	*len = sz;
 	s_info = NULL;
 	*msg_flags = msg.msg_flags;
 	*fromlen = msg.msg_namelen;
@@ -367,7 +365,7 @@ sctp_recvmsg (int s,
 int
 sctp_peeloff(sd, assoc_id)
       int sd;
-      sctp_assoc_t *assoc_id;
+      sctp_assoc_t assoc_id;
 {
 	return (syscall(SYS_sctp_peeloff, sd, assoc_id));
 }

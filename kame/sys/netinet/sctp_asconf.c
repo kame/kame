@@ -1,8 +1,7 @@
-/*	$KAME: sctp_asconf.c,v 1.13 2003/06/24 05:36:49 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_asconf.c,v 1.72 2002/04/04 15:40:35 randall Exp	*/
+/*	$KAME: sctp_asconf.c,v 1.14 2003/11/25 06:40:52 ono Exp $	*/
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

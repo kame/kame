@@ -1913,13 +1913,11 @@ sctp_peeloff(p, uap)
 	int fd;
 	short fflag;		/* type must match fp->f_flag */
 
-	error = copyin((caddr_t)uap->name, &assoc_id, sizeof (assoc_id));
-	if (error) {
-		return(error);
-	}
+	assoc_id = uap->name;
 	error = holdsock(fdp, uap->sd, &lfp);
-	if (error)
+	if (error) {
 		return (error);
+	}
 	s = splnet();
 	head = (struct socket *)lfp->f_data;
 	error = sctp_can_peel_off(head, assoc_id);
@@ -1973,13 +1971,13 @@ sctp_peeloff(p, uap)
 	 * out from under us.
 	 */
 	if (error) {
+		
 		if (fdp->fd_ofiles[fd] == nfp) {
 			fdp->fd_ofiles[fd] = NULL;
 			fdrop(nfp, p);
 		}
 	}
 	splx(s);
-
 	/*
 	 * Release explicitly held references before returning.
 	 */

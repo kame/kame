@@ -1,5 +1,4 @@
-/*	$KAME: sctp_crc32.c,v 1.6 2002/10/09 18:01:21 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_crc32.c,v 1.12 2002/04/02 15:34:44 lei Exp	*/
+/*	$KAME: sctp_crc32.c,v 1.7 2003/11/25 06:40:52 ono Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Cisco Systems, Inc.
@@ -41,6 +40,7 @@
 
 #define SCTP_CRC32C_POLY 0x1EDC6F41
 #define SCTP_CRC32C(c, d) (c=(c>>8)^sctp_crc_c[(c^(d))&0xFF])
+
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /* Copyright 2001, D. Otis.  Use this program, code or tables    */
 /* extracted from it, as desired without restriction.            */
@@ -139,6 +139,7 @@ update_crc32(u_int32_t crc32,
 	}
 	return (crc32);
 }
+
 
 u_int32_t
 sctp_csum_finalize(u_int32_t crc32)

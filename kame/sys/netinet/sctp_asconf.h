@@ -1,5 +1,4 @@
-/*	$KAME: sctp_asconf.h,v 1.5 2002/10/09 18:01:20 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_asconf.h,v 1.15 2002/04/02 15:34:44 lei Exp	*/
+/*	$KAME: sctp_asconf.h,v 1.6 2003/11/25 06:40:52 ono Exp $	*/
 
 #ifndef _NETINET_SCTP_ASCONF_H_
 #define _NETINET_SCTP_ASCONF_H_

@@ -1,5 +1,4 @@
-/*	$KAME: sctp_peeloff.h,v 1.3 2002/10/09 18:01:22 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_peeloff.h,v 1.5 2002/04/03 21:10:19 lei Exp	*/
+/*	$KAME: sctp_peeloff.h,v 1.4 2003/11/25 06:40:53 ono Exp $	*/
 
 #ifndef __sctp_peeloff_h__
 #define __sctp_peeloff_h__

@@ -1,8 +1,7 @@
-/*	$KAME: sctp_usrreq.c,v 1.30 2003/08/29 06:37:38 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
+/*	$KAME: sctp_usrreq.c,v 1.31 2003/11/25 06:40:54 ono Exp $	*/
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -124,11 +123,44 @@ extern struct sctp_epinfo sctppcbinfo;
 
 static int sctp_detach __P((struct socket *so));
 
+/* we use the number of mbufs and clusters
+ * to tune our initial send and receive windows
+ * and the limit of chunks allocated.
+ */
+int     sctp_max_chunks_on_queue = SCTP_ASOC_MAX_CHUNKS_ON_QUEUE;
+int	sctp_sendspace = (128 * 1024);	
+int	sctp_recvspace = 128 * (1024 +
+#ifdef INET6
+			       sizeof(struct sockaddr_in6)
+#else
+			       sizeof(struct sockaddr_in)
+#endif
+			       );
+
+
+
 void
 sctp_init()
 {
 	/* Init the SCTP pcb in sctp_pcb.c */
+	u_long sb_max_adj;
+
 	sctp_pcb_init();
+	if (nmbclusters >  SCTP_ASOC_MAX_CHUNKS_ON_QUEUE)
+		sctp_max_chunks_on_queue = nmbclusters;
+	/* Allow a user to take no more than 1/2
+	 * the number of clusters or the SB_MAX whichever
+	 * is smaller for the send window.
+	 */
+	sb_max_adj = (u_long)((u_quad_t)(SB_MAX) * MCLBYTES / (MSIZE + MCLBYTES));
+	sctp_sendspace = min((min(SB_MAX, sb_max_adj)),
+			     ((nmbclusters/2) * SCTP_DEFAULT_MAXSEGMENT));
+	/* Now for the recv window, should we take the same
+	 * amount? or should I do 1/2 the SB_MAX instead in the SB_MAX min
+	 * above. For now I will just copy.
+	 */
+	sctp_recvspace = sctp_sendspace;
+
 }
 
 #ifdef INET6
@@ -149,7 +181,9 @@ ip_2_ip6_hdr(struct ip6_hdr *ip6, struct ip *ip)
 #endif /* INET6 */
 
 static void
-sctp_split_chunks(struct sctp_stream_out *strm, struct sctp_tmit_chunk *chk)
+sctp_split_chunks(struct sctp_association *asoc, 
+		  struct sctp_stream_out *strm, 
+		  struct sctp_tmit_chunk *chk)
 {
 	struct sctp_tmit_chunk *new_chk;
 
@@ -208,6 +242,7 @@ sctp_split_chunks(struct sctp_stream_out *strm, struct sctp_tmit_chunk *chk)
 		new_chk->whoTo->ref_count++;
 	}
 	/* now drop it on the end of the list*/
+	asoc->stream_queue_cnt++;
 	TAILQ_INSERT_AFTER(&strm->outqueue, chk, new_chk, sctp_next);
 }
 
@@ -287,8 +322,7 @@ sctp_notify_mbuf(struct sctp_inpcb *inp,
 				chk->rec.data.doing_fast_retransmit = 0;
 
 				/* Clear any time so NO RTT is being done */
-				chk->sent_rcv_time.tv_sec = 0;
-				chk->sent_rcv_time.tv_usec = 0;
+				chk->do_rtt = 0;
 				stcb->asoc.total_flight -= chk->send_size;
 				if (stcb->asoc.total_flight < 0) {
 					stcb->asoc.total_flight = 0;
@@ -312,7 +346,7 @@ sctp_notify_mbuf(struct sctp_inpcb *inp,
 			while (chk) {
 				nchk = TAILQ_NEXT(chk, sctp_next);
 				if ((chk->send_size+SCTP_MED_OVERHEAD) > nxtsz) {
-					sctp_split_chunks(strm, chk);
+					sctp_split_chunks(&stcb->asoc, strm, chk);
 				}
 				chk = nchk;
 			}
@@ -344,43 +378,39 @@ sctp_notify(struct sctp_inpcb *inp,
 	if (ntohl(sh->v_tag) != (tcb->asoc.peer_vtag)) {
 		return;
 	}
+
+/* FIX ME FIX ME PROTOPT i.e. no SCTP should ALWAYS be an ABORT */
+
 	if ((errno == EHOSTUNREACH) ||  /* Host is not reachable */
 	    (errno == EHOSTDOWN) ||	/* Host is down */
 	    (errno == ECONNREFUSED) ||	/* Host refused the connection, (not an abort?) */
 	    (errno == ENOPROTOOPT)	/* SCTP is not present on host */
 		) {
 		/*
-		 * Here we will either abort the INIT (if we are forming
-		 * an association) or mark the destination as down.
+		 * Hmm reachablity problems we must examine closely.
+		 * If its not reachable, we may have lost
+		 * a network. Or if there is NO protocol at the other
+		 * end named SCTP.. well we consider it a OOTB abort.
 		 */
-		if (((tcb->asoc.state & SCTP_STATE_MASK) ==
-		     SCTP_STATE_COOKIE_WAIT) ||
-		    ((tcb->asoc.state & SCTP_STATE_MASK) ==
-		     SCTP_STATE_COOKIE_ECHOED)) {
-			/*
-			 * We have no alternative... the association can't
-			 * be setup with the address we were given.
-			 */
+		if ((errno == EHOSTUNREACH) || (errno == EHOSTDOWN)) {
+			if (net->dest_state & SCTP_ADDR_REACHABLE) {
+				/* Ok that destination is NOT reachable */
+				net->dest_state &= ~SCTP_ADDR_REACHABLE;
+				net->dest_state |= SCTP_ADDR_NOT_REACHABLE;
+				net->error_count = net->failure_threshold + 1;
+				sctp_ulp_notify(SCTP_NOTIFY_INTERFACE_DOWN,
+						tcb, SCTP_FAILED_THRESHOLD,
+						(void *)net);
+			}
+		} else if (errno == ENOPROTOOPT) {
+				/* Here the peer is either playing tricks on
+				 * us, including an address in its that belongs to
+				 * someone who does not support SCTP OR was a userland
+				 * implementation that shutdown and now is dead. In either
+				 * case we treat it like a OOTB abort with no TCB.
+				 */
 			sctp_abort_notification(tcb, SCTP_PEER_FAULTY);
 			sctp_free_assoc(inp, tcb);
-		} else {
-			/*
-			 * Hmm the association was up, so if
-			 * its not reachable, we may have lost
-			 * a network. Or if not, it is a bogus
-			 * icmp.
-			 */
-			if ((errno == EHOSTUNREACH) || (errno == EHOSTDOWN)) {
-				if (net->dest_state & SCTP_ADDR_REACHABLE) {
-					/* Ok that destination is NOT reachable */
-					net->dest_state &= ~SCTP_ADDR_REACHABLE;
-					net->dest_state |= SCTP_ADDR_NOT_REACHABLE;
-					net->error_count = net->failure_threshold + 1;
-					sctp_ulp_notify(SCTP_NOTIFY_INTERFACE_DOWN,
-					    tcb, SCTP_FAILED_THRESHOLD,
-					    (void *)net);
-				}
-			}
 		}
 	} else {
 		/* Send all others to the app */
@@ -525,20 +555,12 @@ SYSCTL_PROC(_net_inet_sctp, OID_AUTO, getcred, CTLTYPE_OPAQUE|CTLFLAG_RW,
 
 #endif /* #if defined(__FreeBSD__) */
 
-int	sctp_sendspace = (128 * 1024);	/* really max datagram size */
 /* 64 1K datagrams */
 #if defined(__FreeBSD__)
 SYSCTL_INT(_net_inet_sctp, SCTPCTL_MAXDGRAM, maxdgram, CTLFLAG_RW,
 	   &sctp_sendspace, 0, "Maximum outgoing SCTP datagram size");
 #endif
 
-int	sctp_recvspace = 128 * (1024 +
-#ifdef INET6
-			       sizeof(struct sockaddr_in6)
-#else
-			       sizeof(struct sockaddr_in)
-#endif
-			       );
 
 #if defined(__FreeBSD__)
 SYSCTL_INT(_net_inet_sctp, SCTPCTL_RECVSPACE, recvspace, CTLFLAG_RW,
@@ -847,8 +869,10 @@ sctp_disconnect(struct socket *so)
 			    TAILQ_EMPTY(&asoc->sent_queue) &&
 			    (some_on_streamwheel == 0)) {
 				/* there is nothing queued to send, so done */
-				if ((asoc->state & SCTP_STATE_MASK) !=
-				    SCTP_STATE_SHUTDOWN_SENT) {
+				if (((asoc->state & SCTP_STATE_MASK) != 
+				     SCTP_STATE_SHUTDOWN_SENT) &&
+				    ((asoc->state & SCTP_STATE_MASK) != 
+				     SCTP_STATE_SHUTDOWN_ACK_SENT)) {
 				/* only send SHUTDOWN 1st time thru */
 					sctp_send_shutdown(tcb,
 							   tcb->asoc.primary_destination);
@@ -999,6 +1023,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 	struct ifnet *ifn;
 	struct ifaddr *ifa;
 	int loopback_scope, ipv4_local_scope, local_scope, site_scope, actual;
+	int ipv4_addr_legal, ipv6_addr_legal;
 	actual = 0;
 	if (limit <= 0)
 		return (actual);
@@ -1013,6 +1038,23 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 		/* Turn on ALL scope, since we look at the EP */
 		loopback_scope = ipv4_local_scope = local_scope =
 			site_scope = 1;
+	}
+	ipv4_addr_legal = ipv6_addr_legal = 0;
+	if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
+		ipv6_addr_legal = 1;
+		if (
+#if defined(__OpenBSD__)
+		(0) /* we always do dual bind */
+#elif defined (__NetBSD__)
+		(((struct in6pcb *)inp)->in6p_flags & IN6P_IPV6_V6ONLY)
+#else
+		(((struct in6pcb *)inp)->inp_flags & IN6P_IPV6_V6ONLY)
+#endif
+		== 0) {
+			ipv4_addr_legal = 1;
+		}
+	} else {
+		ipv4_addr_legal = 1;
 	}
 
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) {
@@ -1038,7 +1080,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 					}
 				}
 				if ((ifa->ifa_addr->sa_family == AF_INET) &&
-				    (tcb->asoc.ipv4_addr_legal)) {
+				    (ipv4_addr_legal)) {
 					struct sockaddr_in *sin;
 					sin = (struct sockaddr_in *)ifa->ifa_addr;
 					if (sin->sin_addr.s_addr == 0) {
@@ -1057,7 +1099,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 						return (actual);
 					}
 				} else if ((ifa->ifa_addr->sa_family == AF_INET6) &&
-					   (tcb->asoc.ipv6_addr_legal)) {
+					   (ipv6_addr_legal)) {
 					struct sockaddr_in6 *sin6, lsa6;
 					sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 					if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
@@ -1475,9 +1517,32 @@ sctp_optsget(struct socket *so,
 	case SCTP_MAXSEG:
 	{
 		u_int32_t *segsize;
+		int ovh;
 		segsize = mtod(m, u_int32_t *);
-		*segsize = inp->sctp_frag_point - SCTP_MAX_OVERHEAD;
 		m->m_len = sizeof(u_int32_t);
+#ifdef SCTP_TCP_MODEL_SUPPORT
+		if (((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) &&
+		     (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED)) ||
+		    (inp->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL)) {
+			struct sctp_tcb *tcb;
+			tcb = LIST_FIRST(&inp->sctp_asoc_list);
+			if(tcb)
+				*segsize = sctp_get_frag_point(tcb,&tcb->asoc);
+			else
+				goto skipit;
+		} else {
+		skipit:
+#endif
+
+			if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
+				ovh = SCTP_MED_OVERHEAD;
+			} else {
+				ovh = SCTP_MED_V4_OVERHEAD;
+			}
+			*segsize = inp->sctp_frag_point - ovh;
+#ifdef SCTP_TCP_MODEL_SUPPORT
+		}
+#endif
 	}
 	break;
 
@@ -1500,9 +1565,9 @@ sctp_optsget(struct socket *so,
 	error = EOPNOTSUPP;
 #endif
 	break;
-	case SCTP_GET_CWND_LOG:
-#ifdef SCTP_CWND_LOGGING
-		error = sctp_fill_cwnd_log(m);
+	case SCTP_GET_STAT_LOG:
+#ifdef SCTP_STAT_LOGGING
+		error = sctp_fill_stat_log(m);
 #else /* SCTP_DEBUG */
 		error = EOPNOTSUPP;
 #endif
@@ -1756,10 +1821,6 @@ sctp_optsget(struct socket *so,
 			tcb = LIST_FIRST(&inp->sctp_asoc_list);			
 		}
 #endif /* SCTP_TCP_MODEL_SUPPORT */				
-		if (tcb == NULL) {
-			error = EADDRNOTAVAIL;
-			break;
-		}
 		sas = (struct sockaddr_storage *)&saddr->addr[0];
 		limit = m->m_len - sizeof(sctp_assoc_t);
 		actual = sctp_fill_up_addresses(inp, tcb, limit, sas);
@@ -2253,6 +2314,17 @@ sctp_optsset(struct socket *so,
 			inp->sctp_flags &= ~set_opt;
 		}
 		break;
+	case SCTP_CLR_STAT_LOG:
+#ifdef SCTP_STAT_LOGGING
+		sctp_clr_stat_log();
+#else
+		error = EOPNOTSUPP;
+#endif
+		break;
+	case SCTP_RESET_PEGS:
+		memset(sctp_pegs,0,sizeof(sctp_pegs));
+		error = 0;
+		break;
 	case SCTP_CONNECT_X:
 		if (m->m_len < (sizeof(int) + sizeof(struct sockaddr_in))) {
 			error = EINVAL;
@@ -2269,12 +2341,24 @@ sctp_optsset(struct socket *so,
 			inp->sctp_ep.max_burst = *burst;
 		}
 	}
+	break;
 	case SCTP_MAXSEG:
 	{
 		u_int32_t *segsize;
+		int ovh;
+		if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
+			ovh = SCTP_MED_OVERHEAD;
+		} else {
+			ovh = SCTP_MED_V4_OVERHEAD;
+		}
 		segsize = mtod(m, u_int32_t *);
-		if (*segsize > (SCTP_MAX_OVERHEAD + 4)) {
-			inp->sctp_frag_point = (*segsize+SCTP_MAX_OVERHEAD);
+		if (*segsize < 1) {
+			error = EINVAL;
+			break;
+		}
+		inp->sctp_frag_point = (*segsize+ovh);
+		if (inp->sctp_frag_point < MHLEN) {
+			inp->sctp_frag_point = MHLEN;
 		}
 	}
 	break;
@@ -2641,7 +2725,8 @@ sctp_optsset(struct socket *so,
 				break;
 			}
 		}
-		if (net != tcb->asoc.primary_destination) {
+		if ((net != tcb->asoc.primary_destination) &&
+		    (!(net->dest_state & SCTP_ADDR_UNCONFIRMED))){
 				/* Ok we need to set it */
 			lnet = tcb->asoc.primary_destination;
 			lnet->next_tsn_at_change = net->next_tsn_at_change = tcb->asoc.sending_seq;
@@ -3037,38 +3122,7 @@ sctp_usr_recvd(struct socket *so, int flags)
 		 * We must update the next vtag pending on the
 		 * socket buffer (if any).
 		 */
-		inp->sctp_vtag_last = 0;
-		if (so->so_rcv.sb_mb) {
-			/* grubbing time */
-			struct mbuf *this;
-			this = so->so_rcv.sb_mb;
-			while (this) {
-				if (this->m_flags & M_PKTHDR) {
-				/* check it */
-					if (
-#if defined(__FreeBSD__) || defined(__NetBSD__)
-						(u_int32_t)this->m_pkthdr.csum_data
-#else
-/* OpenBSD */
-						(u_int32_t)this->m_pkthdr.csum
-#endif
-						!= 0) {
-						/* its the one */
-						inp->sctp_vtag_last =
-#if defined(__FreeBSD__) || defined(__NetBSD__)
-							(u_int32_t)this->m_pkthdr.csum_data
-#else
-/* OpenBSD */
-							(u_int32_t)this->m_pkthdr.csum
-#endif
-							;
-						break;
-					}
-				}
-				this = this->m_nextpkt;
-			}
-
-		}
+		inp->sctp_vtag_last = sctp_get_last_vtag_from_sb(so);
 	}
 #endif
 	sq = TAILQ_FIRST(&inp->sctp_queue_list);
@@ -3288,7 +3342,7 @@ sctp_ingetaddr(struct socket *so,
 #if defined(__FreeBSD__)
 	       struct sockaddr **nam
 #else
-	       struct sockaddr *nam
+	       struct mbuf *nam
 #endif
 	       )
 {
@@ -3302,7 +3356,8 @@ sctp_ingetaddr(struct socket *so,
 	MALLOC(sin, struct sockaddr_in *, sizeof *sin, M_SONAME, M_WAITOK |
 	       M_ZERO);
 #else
-	sin = (struct sockaddr_in *)nam;
+	nam->m_len = sizeof(*sin);
+	sin = mtod(nam, struct sockaddr_in *);
 	memset(sin, 0, sizeof(*sin));
 #endif
 	sin->sin_family = AF_INET;
@@ -3391,7 +3446,7 @@ sctp_peeraddr(struct socket *so,
 #if defined(__FreeBSD__)
 	      struct sockaddr **nam
 #else
-	      struct sockaddr *nam
+	      struct mbuf *nam
 #endif
 	      )
 {
@@ -3417,7 +3472,8 @@ sctp_peeraddr(struct socket *so,
 	MALLOC(sin, struct sockaddr_in *, sizeof *sin, M_SONAME, M_WAITOK |
 	       M_ZERO);
 #else
-	sin = (struct sockaddr_in *)nam;
+	nam->m_len = sizeof(*sin);
+	sin = mtod(nam, struct sockaddr_in *);
 	memset(sin, 0, sizeof(*sin));
 #endif
 	sin->sin_family = AF_INET;
@@ -3680,30 +3736,11 @@ sctp_usrreq(so, req, m, nam, control)
 		error = EAFNOSUPPORT;
 		break;
 	case PRU_PEERADDR:
-	{
-		struct sockaddr *name;
-		if (nam)
-			name = mtod(nam, struct sockaddr *);
-		else {
-			splx(s);
-			return (EINVAL);
-		}
-		error = sctp_peeraddr(so, name);
-	}
-	break;
+		error = sctp_peeraddr(so, nam);
+		break;
 	case PRU_SOCKADDR:
-	{
-		struct sockaddr *name;
-		if (nam)
-			name = mtod(nam, struct sockaddr *);
-		else {
-			splx(s);
-			return (EINVAL);
-		}
-
-		error = sctp_ingetaddr(so, name);
-	}
-	break;
+		error = sctp_ingetaddr(so, nam);
+		break;
 	case PRU_SLOWTIMO:
 		error = 0;
 		break;

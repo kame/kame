@@ -1,5 +1,4 @@
-/*	$KAME: sctp_timer.h,v 1.3 2002/10/09 18:01:22 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_timer.h,v 1.7 2002/04/01 21:59:20 randall Exp	*/
+/*	$KAME: sctp_timer.h,v 1.4 2003/11/25 06:40:54 ono Exp $	*/
 
 #ifndef __sctp_timer_h__
 #define __sctp_timer_h__

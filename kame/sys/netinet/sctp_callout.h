@@ -1,11 +1,10 @@
-/*	$KAME: sctp_callout.h,v 1.3 2003/04/23 10:26:51 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_callout.h,v 1.3 2002/04/04 16:35:21 randall Exp	*/
+/*	$KAME: sctp_callout.h,v 1.4 2003/11/25 06:40:52 ono Exp $	*/
 
 #ifndef __SCTP_CALLOUT__
 #define __SCTP_CALLOUT__
 
 /*
- * Copyright (C) 2002 Cisco Systems Inc,
+ * Copyright (C) 2002, 2003 Cisco Systems Inc,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

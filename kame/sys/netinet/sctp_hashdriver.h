@@ -1,5 +1,4 @@
-/*	$KAME: sctp_hashdriver.h,v 1.3 2002/10/09 18:01:21 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_hashdriver.h,v 1.5 2002/04/02 15:34:44 lei Exp	*/
+/*	$KAME: sctp_hashdriver.h,v 1.4 2003/11/25 06:40:52 ono Exp $	*/
 
 #ifndef __sctp_hashdriver_h__
 #define __sctp_hashdriver_h__

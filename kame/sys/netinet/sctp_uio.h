@@ -1,11 +1,10 @@
-/*	$KAME: sctp_uio.h,v 1.8 2003/08/29 06:37:38 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_uio.h,v 1.40 2002/04/04 16:34:41 lei Exp	*/
+/*	$KAME: sctp_uio.h,v 1.9 2003/11/25 06:40:54 ono Exp $	*/
 
 #ifndef __sctp_uio_h__
 #define __sctp_uio_h__
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -145,6 +144,19 @@ struct sctp_paddr_change {
 #define SCTP_ADDR_MADE_PRIM	0x0005
 #define SCTP_ADDR_CONFIRMED	0x0006
 
+/*
+ * CAUTION: these are user exposed SCTP addr reachability states
+ *          must be compatible with SCTP_ADDR states in sctp_constants.h
+ */
+#ifndef SCTP_ACTIVE
+#define SCTP_ACTIVE		0x0001	/* SCTP_ADDR_REACHABLE */
+#endif
+#ifndef SCTP_INACTIVE
+#define SCTP_INACTIVE		0x0002	/* SCTP_ADDR_NOT_REACHABLE */
+#endif
+#ifdef SCTP_UNCONFIRMED
+#define SCTP_UNCONFIRMED	0x0200
+#endif
 
 struct sctp_remote_error {
 	u_int16_t sre_type;
@@ -303,13 +315,52 @@ struct sctp_status {
 	struct sctp_paddrinfo sstat_primary;
 };
 
+struct sctp_cwnd_args {
+	struct sctp_nets *net;		/* network to */
+	u_int16_t cwnd_new_value;	/* cwnd in k */
+	u_int16_t inflight;		/* flightsize in k */
+	int cwnd_augment;		/* increment to it */
+};
+
+struct sctp_blk_args {
+	u_int16_t maxmb;		/* in 1k bytes */
+	u_int16_t onmb;			/* in 1k bytes */
+	u_int16_t maxsb;		/* in 1k bytes */
+	u_int16_t onsb;			/* in 1k bytes */
+	u_int16_t send_sent_qcnt;	/* chnk cnt */
+	u_int16_t stream_qcnt;		/* chnk cnt */
+};
+
+struct sctp_str_log{
+	u_int32_t n_tsn;
+	u_int32_t e_tsn;
+	u_int16_t n_sseq;
+	u_int16_t e_sseq;
+};
+
+struct sctp_fr_log {
+	u_int32_t largest_tsn;
+	u_int32_t largest_new_tsn;
+	u_int32_t tsn;
+};
+
+struct sctp_fr_map {
+	u_int32_t base;
+	u_int32_t cum;
+	u_int32_t high;
+};
 
 struct sctp_cwnd_log{
-	struct sctp_nets *net;
-	u_int32_t cwnd_new_value;
-	int cwnd_augment;
+	union {
+		struct sctp_blk_args blk;
+		struct sctp_cwnd_args cwnd;
+		struct sctp_str_log strlog;
+		struct sctp_fr_log fr;
+		struct sctp_fr_map map;
+	}x;
 	u_int8_t from;
-	u_int8_t resv[3];
+	u_int8_t event_type;
+
 };
 
 struct sctp_cwnd_log_req{
@@ -320,13 +371,15 @@ struct sctp_cwnd_log_req{
 	struct sctp_cwnd_log log[0];
 };
 
+
+
 /*
  * API system calls
  */
 #ifndef _KERNEL
 
 __BEGIN_DECLS
-int	sctp_peeloff	__P((int, sctp_assoc_t *));
+int	sctp_peeloff	__P((int, sctp_assoc_t));
 int	sctp_bindx	__P((int, struct sockaddr *, int, int));
 int     sctp_connectx   __P((int, struct sockaddr *, int));
 int	sctp_getpaddrs	__P((int, sctp_assoc_t, struct sockaddr **));
@@ -336,8 +389,8 @@ void	sctp_freeladdrs	__P((struct sockaddr *));
 int     sctp_opt_info   __P((int, sctp_assoc_t, int, void *, size_t *));
 int     sctp_sendmsg    __P((int, void *, size_t, struct sockaddr *,
 	socklen_t, uint32_t, uint32_t, uint16_t, uint32_t, uint32_t));
-int     sctp_recvmsg	__P((int, void *, size_t *, struct sockaddr *,
-	socklen_t *, struct sctp_sndrcvinfo *, int *));
+ssize_t sctp_recvmsg	__P((int, void *, size_t, struct sockaddr *,
+        socklen_t *, struct sctp_sndrcvinfo *, int *));
 
 __END_DECLS
 

@@ -1,5 +1,4 @@
-/*	$KAME: sctp6_var.h,v 1.5 2002/10/09 18:01:23 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet6/sctp6_var.h,v 1.13 2002/04/04 19:23:44 randall Exp	*/
+/*	$KAME: sctp6_var.h,v 1.6 2003/11/25 06:40:55 ono Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Cisco Systems, Inc.

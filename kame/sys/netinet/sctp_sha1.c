@@ -1,5 +1,4 @@
-/*	$KAME: sctp_sha1.c,v 1.5 2002/09/25 11:41:22 itojun Exp $	*/
-/*	Header: /home/sctpBsd/netinet/sctp_sha1.c,v 1.6 2002/04/04 17:43:19 randall Exp	*/
+/*	$KAME: sctp_sha1.c,v 1.6 2003/11/25 06:40:53 ono Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Cisco Systems, Inc.
