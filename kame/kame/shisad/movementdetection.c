@@ -1,4 +1,4 @@
-/*      $Id: movementdetection.c,v 1.1 2005/01/25 02:41:38 ryuji Exp $  */
+/*      $Id: movementdetection.c,v 1.2 2005/01/25 11:41:11 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -78,6 +78,7 @@ static void mdd_initif();
 static int mdd_md_scan(struct if_info *);
 static int mdd_md_reg(struct sockaddr_in6 *, u_int16_t);
 static void mdd_md_dereg(struct if_info *);
+static void mdd_md_home(struct sockaddr_in6 *, struct sockaddr_in6 *, int);
 int mdd_mipmsg(struct mip_msghdr *, int);
 
 void get_rtaddrs(int, struct sockaddr *, struct sockaddr **);
@@ -93,6 +94,7 @@ struct mdd_info mddinfo;
 
 #define storage2sin6(x) ((struct sockaddr_in6 *)(x))
 
+#if 0
 static char *msgtypes[] = {
         "",
         "RTM_ADD: Add Route",
@@ -115,6 +117,8 @@ static char *msgtypes[] = {
 	"RTM_ADDRINFO: change address flags",
         0,
 };
+#endif
+
 
 int debug = 0;
 int numerichost = 0;
@@ -207,6 +211,14 @@ main (argc, argv)
         signal(SIGINT, mdd_terminate);
         signal(SIGKILL, mdd_terminate);
         signal(SIGTERM, mdd_terminate);
+
+        if (!mddinfo.nondaemon) {
+                if (daemon(0, 0) < 0) {
+                        perror("daemon");
+			mdd_terminate();
+                        exit(-1);
+                }
+        }
 
 	mdd_selection();
 
@@ -374,6 +386,10 @@ mdd_md_reg(coa, bid)
 	hoa.sin6_addr = mddinfo.hoa;
 	hoa.sin6_len = sizeof(struct sockaddr_in6);
 
+	/* do not send md_info msg including the home link */
+	if (mip6_are_prefix_equal(&mddinfo.hoa, &coa->sin6_addr, 64)) 
+		return (0);
+
 	len = sizeof(*mdinfo) + sizeof(hoa) + sizeof(*coa);
 	mdinfo = (struct mipm_md_info *) malloc(len);
 	if (mdinfo == NULL)
@@ -425,11 +441,21 @@ mdd_mipmsg(mipm, msglen)
 		ifinfo = mdd_ifindex2ifinfo(miphome->mipmhh_ifindex);
 		if (ifinfo == NULL)                        
 			break;
+		
+		if (miphome->mipmhh_prefix && 
+		    mip6_are_prefix_equal(&((struct sockaddr_in6 *)miphome->mipmhh_prefix)->sin6_addr,
+					  &mddinfo.hoa, miphome->mipmhh_prefixlen)) {
 
-		/* compare home prefix with the (struct sockaddr_in6 *)m->mipmhh_prefix,
-		   (int) m->mipmhh_prefixlen */
+			mddinfo.whereami = IAMHOME;
 
-		/* set as home */
+			storage2sin6(&ifinfo->coa)->sin6_addr = mddinfo.hoa;
+			storage2sin6(&ifinfo->coa)->sin6_family = AF_INET6;
+			storage2sin6(&ifinfo->coa)->sin6_len = sizeof(struct sockaddr_in6);
+
+			mddinfo.coaif = NULL;
+
+			return (1);
+		}
 		break;
 	case MIPM_MD_INFO:
                 mipmd = (struct mipm_md_info *)mipm;
@@ -462,10 +488,12 @@ mdd_rtmsg(rtm, msglen)
 	struct sockaddr_in6 *sin6;
 	char buf[265];
 
+#if 0
 	if (DEBUGHIGH) {
 		if (msgtypes[rtm->rtm_type])
-			fprintf(stderr, "\t%s:\n", msgtypes[rtm->rtm_type]);
+			syslog(LOG_INFO, "\t%s:\n", msgtypes[rtm->rtm_type]);
 	}
+#endif
 	
 	switch(rtm->rtm_type) {
 	case RTM_NEWADDR:
@@ -520,6 +548,7 @@ mdd_rtmsg(rtm, msglen)
 				if ((ifinfo == mddinfo.coaif) && 
 				    (mip6_are_prefix_equal(&mddinfo.hoa, 
 						 &sin6->sin6_addr, 64))) {
+
 					memset(&ifinfo->coa, 0, 
 					       sizeof(ifinfo->coa));
 					memset(&ifinfo->pcoa, 0, 
@@ -536,13 +565,20 @@ mdd_rtmsg(rtm, msglen)
 						mdd_md_dereg(ifinfo);
 				
 				} 
+				memset(&ifinfo->coa, 0, sizeof(ifinfo->coa));
 			} else {
-				if (mddinfo.coaif == ifinfo)
+				if (mddinfo.coaif == ifinfo) {
 					mddinfo.coaif = NULL;
-			}
-			memset(&ifinfo->coa, 0, sizeof(ifinfo->coa));
-			memset(&ifinfo->pcoa, 0, sizeof(ifinfo->coa));
 
+                                	if (mddinfo.whereami != IAMHOME && 
+					    IN6_ARE_ADDR_EQUAL(&storage2sin6(&ifinfo->coa)->sin6_addr,
+						    &sin6->sin6_addr)) {
+						mdd_getifinfo(ifinfo); 	
+					} 
+				} else {
+					memset(&ifinfo->coa, 0, sizeof(ifinfo->coa));
+				}
+			}
 			break;
 		default:
 			return (0);
@@ -584,7 +620,21 @@ mdd_rtmsg(rtm, msglen)
 			if (DEBUGHIGH)
 				syslog(LOG_INFO, "%s is detached\n", 
 				       ip6_sprintf(&sin6->sin6_addr)); 
-			delete_ip6addr(ifinfo->ifname, &sin6->sin6_addr, 128);
+
+			if (!IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &mddinfo.hoa)) 
+				delete_ip6addr(ifinfo->ifname, &sin6->sin6_addr, 128);
+			else {
+
+				memset(&ifinfo->coa, 0, 
+				       sizeof(ifinfo->coa));
+				memset(&ifinfo->pcoa, 0, 
+				       sizeof(ifinfo->coa));
+				mddinfo.whereami = 0; /* reset */
+
+				mdd_getifinfo(ifinfo);
+
+				return (1);
+			}
 		}
 		break;
 	default:
@@ -938,7 +988,7 @@ mdd_getifinfo(ifinfo)
 		return;
 	}
  
-	memcpy(&ifinfo->pcoa, &ifinfo->coa, sizeof(ifinfo->coa));
+/*	memcpy(&ifinfo->pcoa, &ifinfo->coa, sizeof(ifinfo->coa));*/
 	memset(&ifinfo->coa, 0, sizeof(ifinfo->coa));
         
 	limit = ifmsg +  len;
@@ -1059,8 +1109,6 @@ mdd_selection() {
 		fprintf(stderr, "%s: v4 %d v6 %d\n", __FUNCTION__, inet_n, inet6_n);
 
 	if (mddinfo.whereami == IAMHOME) {
-		/* XXX */
-
 		/* 
 		 * if movement detection to home link message is not
 		 * sent to mobile network daemon, it must send it
@@ -1070,27 +1118,24 @@ mdd_selection() {
 		 * re-selects a CoA and moves to foreign link!. 
 		 */
 
-		if (!IN6_ARE_ADDR_EQUAL(&(storage2sin6(&mddinfo.coaif->coa))->sin6_addr, 
-					&mddinfo.hoa)) {
+		
+		for (ifinfo = LIST_FIRST(&mddinfo.ifinfo_head); 
+		     ifinfo; ifinfo = ifinfo_next) {
+			ifinfo_next = LIST_NEXT(ifinfo, ifinfo_entry);
 			
-			for (ifinfo = LIST_FIRST(&mddinfo.ifinfo_head); 
-			     ifinfo; ifinfo = ifinfo_next) {
-				ifinfo_next = LIST_NEXT(ifinfo, ifinfo_entry);
-				
-				if (IN6_ARE_ADDR_EQUAL(&(storage2sin6(&ifinfo->coa)->sin6_addr), &mddinfo.hoa)) 
-					break;
-			}
-			if (ifinfo == NULL) {
-				mddinfo.whereami = IAMFOREIGN;
-				/* Go through to reselction of CoA */
-			} else {
-				mddinfo.coaif = ifinfo;
-				/* send return home message to mobile network */
-				return;
-			}
-		} else { /* home address is still active */
-			return;
+			if (IN6_ARE_ADDR_EQUAL(&(storage2sin6(&ifinfo->coa)->sin6_addr), 
+					       &mddinfo.hoa)) 
+				break;
 		}
+		if (ifinfo && mddinfo.coaif != ifinfo) {
+
+			/* send return home message to mobile network */
+			return mdd_md_home(storage2sin6(&ifinfo->coa), 
+					   storage2sin6(&ifinfo->coa), 
+					   ifinfo->ifindex);
+		}
+
+		return;
 	}
 	
 	if (mddinfo.multiplecoa) {
@@ -1134,7 +1179,6 @@ mdd_selection() {
 		}
 	} else { /* regular Mobile IPv6 */
 		if (inet6_n > 0) {
-
 			if (mddinfo.whereami == IAMV4) {
 				/* XXX dereg v4 */
 			}
@@ -1146,12 +1190,15 @@ mdd_selection() {
 
 				if (ifinfo->coa.ss_family != AF_INET6) 
 					continue;
-				if (((mddinfo.coaif == NULL) || 
+				if ((((mddinfo.coaif == NULL) && !mdd_coa_equal(ifinfo)) 
+				     || 
 				     (mddinfo.coaif && mddinfo.coaif->priority <= 
 				      ifinfo->priority && !mdd_coa_equal(ifinfo)))) {
+
 					mdd_md_reg((struct sockaddr_in6 *)&ifinfo->coa, 0); 
 					memcpy(&ifinfo->pcoa, &ifinfo->coa, 
 					       sizeof(ifinfo->coa));
+
 					mddinfo.coaif = ifinfo;
 					mddinfo.whereami = IAMFOREIGN;
 					
@@ -1195,13 +1242,15 @@ int
 mdd_coa_equal(struct if_info *ifinfo) {
 
 	if ((ifinfo->coa.ss_family != 0) && 
-	    (ifinfo->coa.ss_family != ifinfo->pcoa.ss_family))
+	    (ifinfo->coa.ss_family != ifinfo->pcoa.ss_family)) 
 		return (0);
+
 
 	switch (ifinfo->coa.ss_family) {
 	case AF_INET:
 		if ((memcmp(&((struct sockaddr_in *)&ifinfo->coa)->sin_addr, 
-			    &((struct sockaddr_in *)&ifinfo->pcoa)->sin_addr, sizeof(struct in_addr)) == 0))
+			    &((struct sockaddr_in *)&ifinfo->pcoa)->sin_addr, 
+			    sizeof(struct in_addr)) == 0))
 			return (1);
 		break;
 	case AF_INET6:
@@ -1300,6 +1349,51 @@ send_rs(struct if_info  *ifinfo) {
 
 
 static void
+mdd_md_home(hoa, coa, ifindex)
+        struct sockaddr_in6 *hoa;
+        struct sockaddr_in6 *coa;
+        int ifindex;
+{
+        int len;
+        struct mipm_md_info *mdinfo;
+
+        len = sizeof(*mdinfo) + sizeof(*hoa) + sizeof(*coa);
+        mdinfo = (struct mipm_md_info *) malloc(len);
+        if (mdinfo == NULL)
+                return;
+
+        memset(mdinfo, 0, len);
+        mdinfo->mipm_md_hdr.miph_msglen = len;
+        mdinfo->mipm_md_hdr.miph_version = MIP_VERSION;
+        mdinfo->mipm_md_hdr.miph_type   = MIPM_MD_INFO;
+        mdinfo->mipm_md_hdr.miph_seq    = random();
+        mdinfo->mipm_md_hint            = MIPM_MD_ADDR;
+        mdinfo->mipm_md_command         = MIPM_MD_DEREGHOME;
+        mdinfo->mipm_md_ifindex         = ifindex;
+        memcpy(MIPD_HOA(mdinfo), hoa, sizeof(*hoa));
+        memcpy(MIPD_COA(mdinfo), hoa, sizeof(*hoa));
+
+	if (write(mddinfo.mipsock, mdinfo, len) < 0) {
+		if (DEBUGNORM) {
+			syslog(LOG_ERR, "%s write: %s\n", 
+			       __FUNCTION__, strerror(errno));
+		}
+		return;
+	}
+
+	if (mdinfo)
+		free(mdinfo);
+
+	if (DEBUGNORM) {
+                syslog(LOG_INFO, "Returning HOME: %s\n",
+		       ip6_sprintf(&hoa->sin6_addr));
+        }
+
+        return;
+}
+
+
+static void
 mdd_md_dereg(struct if_info *dereg_ifinfo) {
 	struct if_info *ifinfo, *ifinfo_next; 
 	int len;
@@ -1391,3 +1485,5 @@ mdd_ifindex2ifinfo(u_int16_t ifindex) {
 
 	return ifinfo;
 }
+
+
