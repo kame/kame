@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.65 2000/05/17 11:29:28 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.66 2000/05/17 12:37:23 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2871,63 +2871,42 @@ ipsecdoi_id2sockaddr(
 	case IPSECDOI_ID_IPV4_ADDR:
 		plen = sizeof(struct in_addr) << 3;
 		break;
-	case IPSECDOI_ID_IPV4_ADDR_SUBNET:
-	    {
-		u_char *p;
-		u_int max;
-
-		/* sanity check */
-		if (buf->l < (sizeof(struct in_addr) <<3))
-			return -1;
-
-		/* get subnet mask length */
-		plen = 0;
-		max = sizeof(struct in_addr) <<3;
-
-		p = buf->v
-			+ sizeof(struct ipsecdoi_id_b)
-			+ sizeof(struct in_addr);
-
-		for (; *p == 0xff; p++) {
-			if (plen >= max)
-				break;
-			plen += 8;
-		}
-
-		if (plen < max) {
-			u_int l = 0;
-			u_char b = ~(*p);
-
-			while (b) {
-				b >>= 1;
-				l++;
-			}
-
-			l = 8 - l;
-			plen += l;
-		}
-	    }
-		break;
 #ifdef INET6
 	case IPSECDOI_ID_IPV6_ADDR:
 		plen = sizeof(struct in_addr) << 3;
 		break;
+#endif
+	case IPSECDOI_ID_IPV4_ADDR_SUBNET:
+#ifdef INET6
 	case IPSECDOI_ID_IPV6_ADDR_SUBNET:
+#endif
 	    {
 		u_char *p;
 		u_int max;
+		int alen;
+
+		switch (id_b->type) {
+		case IPSECDOI_ID_IPV4_ADDR_SUBNET:
+			alen = sizeof(struct in_addr);
+			break;
+#ifdef INET6
+		case IPSECDOI_ID_IPV6_ADDR_SUBNET:
+			alen = sizeof(struct in6_addr);
+			break;
+#endif
+		}
 
 		/* sanity check */
-		if (buf->l < (sizeof(struct in6_addr) <<3))
+		if (buf->l < (alen <<3))
 			return -1;
 
 		/* get subnet mask length */
 		plen = 0;
-		max = sizeof(struct in6_addr) <<3;
+		max = alen <<3;
 
 		p = buf->v
 			+ sizeof(struct ipsecdoi_id_b)
-			+ sizeof(struct in6_addr);
+			+ alen;
 
 		for (; *p == 0xff; p++) {
 			if (plen >= max)
@@ -2949,7 +2928,6 @@ ipsecdoi_id2sockaddr(
 		}
 	    }
 		break;
-#endif
 	}
 
 	*prefixlen = plen;
