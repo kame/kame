@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.54 2002/06/04 05:05:54 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.55 2002/09/10 01:49:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -209,9 +209,9 @@ main(argc, argv)
 
 	if (!fflag) {
 		daemon(0, 0);
-		syslog(LOG_INFO, "started with %d listening sockets\n", nsock);
+		syslog(LOG_INFO, "started\n");
 	} else
-		dprintf("started with %d listening sockets\n", nsock);
+		dprintf("started\n");
 
 	if (getsock(family, NULL, srcport, SOCK_DGRAM, AI_PASSIVE,
 	    S_MULTICAST) != 0) {
