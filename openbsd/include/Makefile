@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.98 2001/09/03 16:45:08 deraadt Exp $
+#	$OpenBSD: Makefile,v 1.102 2002/04/08 04:53:57 fgsch Exp $
 #	$NetBSD: Makefile,v 1.59 1996/05/15 21:36:43 jtc Exp $
 
 #	@(#)Makefile	5.45.1.1 (Berkeley) 5/6/91
@@ -20,7 +20,7 @@ FILES=	a.out.h ar.h assert.h bitstring.h blf.h bm.h bsd_auth.h cast.h cpio.h \
 	string.h strings.h struct.h sysexits.h tar.h time.h ttyent.h tzfile.h \
 	unistd.h utime.h utmp.h vis.h
 
-.if (${MACHINE_ARCH} != "powerpc")
+.if (${MACHINE_ARCH} != "powerpc") && (${MACHINE_ARCH} != "sparc64")
 FILES+=	dlfcn.h link.h
 .endif
 
@@ -31,13 +31,13 @@ FILES+= ieeefp.h
 MFILES=	float.h frame.h stdarg.h varargs.h
 LFILES=	errno.h fcntl.h syslog.h termios.h
 
-.if (${MACHINE_ARCH} == "powerpc")
+.if (${MACHINE_ARCH} == "powerpc") || (${MACHINE_ARCH} == "sparc64")
 MFILES+= link.h dlfcn.h
 .endif
 
 DIRS=	arpa protocols rpc rpcsvc
 LDIRS=	crypto ddb dev isofs miscfs net netatalk netccitt netinet altq \
-	netinet6 netipx netiso netnatm netns nfs scsi sys ufs uvm vm xfs
+	netinet6 netipx netiso netnatm netns nfs scsi sys ufs uvm xfs
 
 # Directories with an includes target
 RDIRS=
@@ -45,7 +45,7 @@ RDIRS=
 #	../lib/libcurses++ ../lib/libform ../lib/libmenu ../lib/libocurses \
 #	../lib/libossaudio ../lib/libpanel ../lib/librpcsvc ../lib/libskey \
 #	../lib/libsectok ../lib/libedit ../lib/libpcap ../lib/libutil \
-#	../lib/libusb ../lib/libwrap ../lib/libz ../lib/libkeynote \
+#	../lib/libusbhid ../lib/libwrap ../lib/libz ../lib/libkeynote \
 #	../gnu/lib/libreadline ../sys/arch/${MACHINE}
 
 # Places using Makefile that needs a prerequisite target met before includes
@@ -135,9 +135,8 @@ copies:
 	done
 	cd ../sys; \
 	pax -rw -pa -L \
-	    `find ${LDIRS} -follow -type f -name '*.h' '!' -path \
-	    'netiso/xebec/*' '!' -path 'dev/microcode/*' \
-	    -print` ${DESTDIR}/usr/include
+	    `find ${LDIRS} -follow -type f -name '*.h' \
+	    '!' -path 'dev/microcode/*' -print` ${DESTDIR}/usr/include
 	cd ${DESTDIR}/usr/include && rm -rf ${MACHINE} ${MACHINE_ARCH} machine
 	${INSTALL} -d -o ${BINOWN} -g ${BINGRP} -m 755 \
 		${DESTDIR}/usr/include/${MACHINE}
