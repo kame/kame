@@ -507,12 +507,7 @@ ip6_input(m)
 	    IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
 			       &rt6_key(ip6_forward_rt.ro_rt)->sin6_addr) &&
 #endif
-#if defined(__bsdi__) || defined(__OpenBSD__)
-	    ip6_forward_rt.ro_rt->rt_ifp == &loif
-#else
-	    ip6_forward_rt.ro_rt->rt_ifp == &loif[0]
-#endif
-		) {
+	    ip6_forward_rt.ro_rt->rt_ifp->if_type == IFT_LOOP) {
 		struct in6_ifaddr *ia6 =
 			(struct in6_ifaddr *)ip6_forward_rt.ro_rt->rt_ifa;
 		/* packet to tentative address must not be received */
