@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 Jun-ichiro Hagino, KAME project
-$Id: TODO,v 1.16 1999/10/06 09:33:14 itojun Exp $
+$Id: TODO,v 1.17 1999/10/06 09:33:56 itojun Exp $
 
 
 Things we can do with the current code:
@@ -28,7 +28,7 @@ Things we can't do with the current code:
 - enable KAME "goto ours" hack (check routing table code)
 - ip6_output() does not consult /128 routes, and will not obey icmp6 redir.
 - if you login via ssh over AF_INET6 socket, login(1) or some other program
-  dies with SEGV (string too long on wtmp?)
+  *sometimes* dies with SEGV (string too long on wtmp?)
 
 Cleanup todo:
 - move in6_select{src,hlim} out of kame/sys/netinet6/in6_pcb.c, put somewhere
