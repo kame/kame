@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: show.c,v 1.8 2000/03/13 18:01:46 fujisawa Exp $
+ *	$Id: show.c,v 1.9 2000/03/21 04:47:40 itojun Exp $
  */
 
 #include <stdio.h>
@@ -66,10 +66,6 @@
 
 #ifdef readKMEM
 
-#ifdef __NetBSD__
-#include <i386/cpu.h>
-#endif
-
 #include <kvm.h>
 
 kvm_t	*kd;
@@ -97,10 +93,6 @@ static void	_showRuleFaith		__P((int, struct _cSlot *));
 #endif /* notyet */	
 static void	_showXlate		__P((int, u_long));
 static void	_writeXlateHeader	__P((void));
-
-#if defined(__NetBSD__) || defined(__bsdi__)
-const char	*getbootfile		__P((void));
-#endif
 
 /*
  *
@@ -384,13 +376,8 @@ u_long
 openKvm()
 {
     int		rv;
-    char	Wow[MAXPATHLEN];
 
-    bzero(Wow, sizeof(Wow));
-
-    strcpy(Wow, getbootfile());
-
-    if ((kd = kvm_open(Wow, NULL, NULL, O_RDONLY, "kvm_open")) <= (kvm_t *)0)
+    if ((kd = kvm_open(NULL, NULL, NULL, O_RDONLY, "kvm_open")) <= (kvm_t *)0)
 	err(errno, "Open failure on kvm_open");
 
     if ((rv = kvm_nlist(kd, nl)) < 0)
@@ -423,36 +410,4 @@ closeKvm()
 {
     kvm_close(kd);
 }
-
-
-#ifdef __NetBSD__
-const char *
-getbootfile(void)
-{
-    static char	Bow[MAXPATHLEN];
-    static char	Wow[MAXPATHLEN];
-    int		mib[2];
-    size_t	len = sizeof(Wow);
-
-    mib[0] = CTL_MACHDEP;
-    mib[1] = CPU_BOOTED_KERNEL;
-    if (sysctl(mib, 2, Wow, &len, NULL, 0) == ERROR)
-	return ("/netbsd");
-
-    if (Wow[0] == '/')
-	return (Wow);
-    else
-	sprintf(Bow, "/%s", Wow);
-
-    return (Bow);
-}
-#endif	/* __NetBSD */
-
-#ifdef __bsdi__
-const char *
-getbootfile(void)
-{
-    return (_PATH_KERNEL);
-}
-#endif	/* __bsdi__ */
 #endif	/* ifdef readKMEM	*/
