@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.138 2000/07/04 04:21:43 sakane Exp $	*/
+/*	$KAME: key.c,v 1.139 2000/07/04 04:22:04 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -5845,7 +5845,7 @@ key_getspacq(spidx)
  *   <base, address(SD), (address(P),) (identity(SD),) (sensitivity,) proposal>
  * to the socket.
  *
- * m will always e freed.
+ * m will always be freed.
  */
 static int
 key_acquire2(so, m, mhp)
