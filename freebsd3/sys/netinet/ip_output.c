@@ -1264,7 +1264,7 @@ ip_ctloutput(so, sopt)
 			break;
 
 #ifdef IPSEC
-		case IP_IPSEC_POLICY_IN:
+		case IP_IPSEC_POLICY:
 		{
 			struct mbuf *m;
 			caddr_t req = NULL;

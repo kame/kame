@@ -397,7 +397,10 @@ tcp_respond(tp, iph, th, m, ack, seq, flags, isipv6)
 		m->m_pkthdr.rcvif = (struct ifnet *) 0;
  		ip6->ip6_plen = htons((u_short)tlen);
 		ip6->ip6_nxt = IPPROTO_TCP;
-		ip6->ip6_hlim = tp->t_inpcb->in6p_ip6_hlim;
+		ip6->ip6_hlim = in6_selecthlim(tp ? tp->t_inpcb : NULL,
+					       ro6 ?
+					       ro6->ro_rt->rt_ifp :
+					       NULL);
 		nth->th_sum = in6_cksum(m, IPPROTO_TCP,
 					 sizeof(struct ip6_hdr), tlen);
 		ip6->ip6_flow &= ~IPV6_FLOWLABEL_MASK;
@@ -489,7 +492,16 @@ tcp_newtcpcb(inp)
 	tp->t_rxtcur = TCPTV_RTOBASE;
 	tp->snd_cwnd = TCP_MAXWIN << TCP_MAX_WINSHIFT;
 	tp->snd_ssthresh = TCP_MAXWIN << TCP_MAX_WINSHIFT;
+#ifdef INET6
+	if (isipv6 != 0)
+		inp->in6p_ip6_hlim = in6_selecthlim(inp,
+						    inp->in6p_route.ro_rt ?
+						    inp->in6p_route.ro_rt->rt_ifp :
+						    NULL);
+	else
+#else
 	inp->inp_ip_ttl = ip_defttl;
+#endif
 	inp->inp_ppcb = (caddr_t)tp;
 	return (tp);		/* XXX */
 }
