@@ -1,12 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1285 2000/09/20 18:19:55 itojun Exp $
+$KAME: CHANGELOG,v 1.1286 2000/09/21 06:11:39 sumikawa Exp $
 
 <200009>
 Thu Sep 21 03:18:11 JST 2000  itojun@iijlab.net
 	* sys/netinet6/esp_core.c: make it possible to use rijndael and twofish
 	  at the same time.  this obsoletes kernel compile option
 	  IPSEC_ESP_TWOFISH.
+
+Wed Sep 20 22:21:57 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/freebsd3/ports/bind9: upgrade to official release m9.0.0
 
 Wed Sep 20 03:10:09 JST 2000  itojun@iijlab.net
 	* sys/netkey/key.c: make proposal/combination payload on SADB_ACQUIRE
