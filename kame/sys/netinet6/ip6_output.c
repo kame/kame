@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.89 2000/03/30 06:26:45 sumikawa Exp $	*/
+/*	$KAME: ip6_output.c,v 1.90 2000/03/30 07:16:44 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1304,8 +1304,10 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 	error = optval = 0;
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
 	privileged = (p == 0 || suser(p->p_ucred, &p->p_acflag)) ? 0 : 1;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+	privileged = (p == 0 || suser(p)) ? 0 : 1;
 #else
 #ifdef HAVE_NRL_INPCB
 	privileged = (inp->inp_socket->so_state & SS_PRIV);
@@ -2124,8 +2126,13 @@ ip6_pcbopts(pktopt, m, so)
 	}
 
 	/*  set options specified by user. */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+	if (p && !suser(p))
+		priv = 1;
+#else
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		priv = 1;
+#endif
 	if ((error = ip6_setpktoptions(m, opt, priv, 1)) != 0) {
 		ip6_clearpktopts(opt, 1, -1); /* XXX: discard all options */
 		return(error);
@@ -2653,7 +2660,12 @@ ip6_setmoptions(optname, im6op, m)
 			 * all multicast addresses. Only super user is allowed
 			 * to do this.
 			 */
-			if (suser(p->p_ucred, &p->p_acflag)) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+			if (suser(p))
+#else
+			if (suser(p->p_ucred, &p->p_acflag))
+#endif
+			{
 				error = EACCES;
 				break;
 			}
@@ -2763,7 +2775,12 @@ ip6_setmoptions(optname, im6op, m)
 		}
 		mreq = mtod(m, struct ipv6_mreq *);
 		if (IN6_IS_ADDR_UNSPECIFIED(&mreq->ipv6mr_multiaddr)) {
-			if (suser(p->p_ucred, &p->p_acflag)) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+			if (suser(p))
+#else
+			if (suser(p->p_ucred, &p->p_acflag))
+#endif
+			{
 				error = EACCES;
 				break;
 			}
