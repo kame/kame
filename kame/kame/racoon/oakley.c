@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.57 2000/09/19 18:29:05 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.58 2000/09/19 21:20:29 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.57 2000/09/19 18:29:05 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.58 2000/09/19 21:20:29 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1437,13 +1437,29 @@ oakley_check_certid(iph1)
 		 */
 		struct addrinfo hints, *res;
 		caddr_t a = NULL;
+		int pos;
 
-		if (eay_get_x509subjectaltname(&iph1->cert_p->cert,
-				&altname, &type, 1) !=0) {
-			plog(logp, LOCATION, NULL,
-				"ERROR: Invalid SubjectAltName.\n");
+		for (pos = 1; ; pos++) {
+			if (eay_get_x509subjectaltname(&iph1->cert_p->cert,
+					&altname, &type, pos) !=0) {
+				plog(logp, LOCATION, NULL,
+					"ERROR: Invalid SubjectAltName.\n");
+				return -1;
+			}
+
+			/* it's the end condition of the loop. */
+			if (!altname) {
+				plog(logp, LOCATION, NULL,
+					"ERROR: no proper SubjectAltName.\n");
+				return -1;
+			}
+
+			if (check_typeofcertname(id_b->type, type) == 0)
+				break;
+
+			/* next name */
 			free(altname);
-			return -1;
+			altname = NULL;
 		}
 		memset(&hints, 0, sizeof(hints));
 		hints.ai_family = PF_UNSPEC;
@@ -1479,12 +1495,30 @@ oakley_check_certid(iph1)
 	}
 	case IPSECDOI_ID_FQDN:
 	case IPSECDOI_ID_USER_FQDN:
-		if (eay_get_x509subjectaltname(&iph1->cert_p->cert,
-				&altname, &type, 1) !=0){
-			plog(logp, LOCATION, NULL,
-				"ERROR: Invalid SubjectAltName.\n");
+	{
+		int pos;
+
+		for (pos = 1; ; pos++) {
+			if (eay_get_x509subjectaltname(&iph1->cert_p->cert,
+					&altname, &type, pos) != 0){
+				plog(logp, LOCATION, NULL,
+					"ERROR: Invalid SubjectAltName.\n");
+				return -1;
+			}
+
+			/* it's the end condition of the loop. */
+			if (!altname) {
+				plog(logp, LOCATION, NULL,
+					"ERROR: no proper SubjectAltName.\n");
+				return -1;
+			}
+
+			if (check_typeofcertname(id_b->type, type) == 0)
+				break;
+
+			/* next name */
 			free(altname);
-			return -1;
+			altname = NULL;
 		}
 		if (idlen != strlen(altname)) {
 			plog(logp, LOCATION, NULL,
@@ -1503,6 +1537,7 @@ oakley_check_certid(iph1)
 		error = memcmp(id_b + 1, altname, idlen);
 		free(altname);
 		return error == 0 ? 0 : -1;
+	}
 	default:
 		plog(logp, LOCATION, NULL,
 			"ERROR: Inpropper ID type passed: %s.\n",

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.103 2000/09/19 19:00:21 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.104 2000/09/19 21:20:29 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.103 2000/09/19 19:00:21 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.104 2000/09/19 21:20:29 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2971,6 +2971,7 @@ ipsecdoi_setid1(iph1)
 	case LC_IDENTTYPE_CERTALTNAME:
 		if (oakley_getmycert(iph1) < 0)
 			goto err;
+		/* XXX fix it to get any position of altname. */
 		if (eay_get_x509subjectaltname(&iph1->cert->cert,
 				&altname, &type, 1) < 0)
 			goto err;
