@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.143 2000/09/15 07:45:59 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.144 2000/09/15 08:10:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2274,7 +2274,7 @@ icmp6_redirect_input(m, off)
 		      );
 	if (rt) {
 		if (rt->rt_gateway == NULL ||
-		    rt->rt_gateway->sa_family == AF_INET6) {
+		    rt->rt_gateway->sa_family != AF_INET6) {
 			log(LOG_ERR,
 			    "ICMP6 redirect rejected; no route "
 			    "with inet6 gateway found for redirect dst: %s\n",
