@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.339 2002/10/04 12:00:44 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.340 2002/10/09 12:14:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4094,7 +4094,7 @@ ip6_setmoptions(optname, im6op, m)
 				error = EINVAL;
 				break;
 			}
-			if (imm->i6mm_msf->msf_blknumsrc >= igmpsomaxsrc) {
+			if (imm->i6mm_msf->msf_blknumsrc >= mldsomaxsrc) {
 				error = ENOBUFS;
 				break;
 			}
