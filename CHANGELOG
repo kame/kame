@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2092 2002/02/26 05:19:35 jinmei Exp $
+$KAME: CHANGELOG,v 1.2093 2002/02/26 10:44:41 jinmei Exp $
 
 <200202>
+2002-02-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet6/in6_pcb.c (in6_mapped_sockaddr,
+	in6_mapped_peeraddr): do not convert the unspecified address (::)
+	to the mapped address form.  Otherwise, get{peer, sock}name(2) for
+	an AF_INET6 wildcard address would return ::ffff:0.0.0.0.
+
 2002-02-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/netinet/tcp_syncache.c (syncache_socket): when
 	making a PCB entry from a syn cache, do not forget to copy
