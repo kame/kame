@@ -42,6 +42,7 @@ rtsol=/usr/local/v6/sbin/rtsol
 rtadvd=/usr/local/v6/sbin/rtadvd
 gifconfig=/usr/local/v6/sbin/gifconfig
 route=/usr/local/v6/sbin/route
+ndp=/usr/local/v6/sbin/ndp
 if [ -x /usr/local/v6/sbin/sysctl ]; then
 	sysctl=/usr/local/v6/sbin/sysctl
 else
@@ -51,6 +52,13 @@ fi
 # just to make sure
 $ifconfig lo0 up
 
+#determine the "default interface" used below
+if [ X"$defaultiface" = X"" ]; then
+    for i in $iface; do # use the 1st interface in the list
+	defaultiface=$iface
+	break
+    done
+fi
 # disallow unicast packets without outgoing scope identifiers.
 # if you instead want to route such packets to a "default" interface,
 # comment out the 1st two lines, and enable the lines after them.
@@ -64,7 +72,7 @@ $route add -inet6 fec0:: -prefixlen 10 ::1 -reject
 #fi
 #if [ X"$defaultiface" != X"" ]; then
 #    $route add -inet6 fe80:: -prefixlen 10 -interface $defaultiface -cloning
-#    $route add -inet6 fec0:: -prefixlen 10 -interface $deafultiface -cloning
+#    $route add -inet6 fec0:: -prefixlen 10 -interface $defaultiface -cloning
 #fi
 
 # disallow "internal" addresses to appear on the wire
@@ -144,6 +152,10 @@ else
 
 	$ifconfig $iface up
 	$rtsol $iface
+
+	# install the "default interface" to kernel, which will be used 
+	# as the default route when there's no router.
+	[ -x $ndp ] && $ndp -I $defaultiface
 
 	# wait for DAD's completion (for global addrs)
 	sleep `$sysctl net.inet6.ip6.dad_count | awk '{print $NF}'`
