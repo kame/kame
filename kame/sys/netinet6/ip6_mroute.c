@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.32 2000/09/10 06:47:13 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.33 2000/10/19 02:23:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -123,10 +123,10 @@ struct mrt6stat	mrt6stat;
 
 struct mf6c	*mf6ctable[MF6CTBLSIZ];
 u_char		nexpire[MF6CTBLSIZ];
-#ifndef __OpenBSD__
-static struct mif6 mif6table[MAXMIFS];
-#else
+#if (defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)) 
 struct mif6 mif6table[MAXMIFS];
+#else
+static struct mif6 mif6table[MAXMIFS];
 #endif
 #ifdef MRT6DEBUG
 u_int		mrt6debug = 0;	  /* debug level 	*/
@@ -916,6 +916,7 @@ add_m6fc(mfccp)
 				rt->mf6c_origin     = mfccp->mf6cc_origin;
 				rt->mf6c_mcastgrp   = mfccp->mf6cc_mcastgrp;
 				rt->mf6c_parent     = mfccp->mf6cc_parent;
+				rt->mf6c_ifset	    = mfccp->mf6cc_ifset;
 				/* initialize pkt counters per src-grp */
 				rt->mf6c_pkt_cnt    = 0;
 				rt->mf6c_byte_cnt   = 0;
@@ -939,6 +940,7 @@ add_m6fc(mfccp)
 			rt->mf6c_origin     = mfccp->mf6cc_origin;
 			rt->mf6c_mcastgrp   = mfccp->mf6cc_mcastgrp;
 			rt->mf6c_parent     = mfccp->mf6cc_parent;
+			rt->mf6c_ifset	    = mfccp->mf6cc_ifset;
 			/* initialize pkt counters per src-grp */
 			rt->mf6c_pkt_cnt    = 0;
 			rt->mf6c_byte_cnt   = 0;
