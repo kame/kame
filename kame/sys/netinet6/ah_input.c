@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.28 2000/05/29 08:05:03 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.29 2000/05/29 08:33:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -195,6 +195,27 @@ ah4_input(m, va_alist)
 
 	sizoff = (sav->flags & SADB_X_EXT_OLD) ? 0 : 4;
 
+	/*
+	 * Here, we do not do "siz1 == siz".  This is because the way
+	 * RFC240[34] section 2 is written.  They do not require truncation
+	 * to 96 bits.
+	 * For example, Microsoft IPsec stack attaches 160 bits of
+	 * authentication data for both hmac-md5 and hmac-sha1.  For hmac-sha1,
+	 * 32 bits of padding is attached.
+	 *
+	 * There are two downsides to this specification.
+	 * They have no real harm, however, they leave us fuzzy feeling.
+	 * - if we attach more than 96 bits of authentication data onto AH,
+	 *   we will never notice about possible modification by rogue
+	 *   intermediate nodes.
+	 *   Since extra bits in AH checksum is never used, this constitutes
+	 *   no real issue, however, it is wacky.
+	 * - even if the peer attaches big authentication data, we will never
+	 *   notice the difference, since longer authentication data will just
+	 *   work.
+	 *
+	 * We may need some clarification in the spec.
+	 */
 	if (siz1 < siz) {
 		ipseclog((LOG_NOTICE, "sum length too short in IPv4 AH input "
 		    "(%lu, should be at least %lu): %s\n",
@@ -653,6 +674,10 @@ ah6_input(mp, offp, proto)
 
 	sizoff = (sav->flags & SADB_X_EXT_OLD) ? 0 : 4;
 
+	/*
+	 * Here, we do not do "siz1 == siz".  See ah4_input() for complete
+	 * description.
+	 */
 	if (siz1 < siz) {
 		ipseclog((LOG_NOTICE, "sum length too short in IPv6 AH input "
 		    "(%lu, should be at least %lu): %s\n",
