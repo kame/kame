@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.79 2000/09/13 14:57:57 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.80 2000/09/16 06:11:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.79 2000/09/13 14:57:57 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.80 2000/09/16 06:11:02 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1416,7 +1416,7 @@ pk_recvacquire(mhp)
     {
 	struct policyindex spidx;
 
-	spidx.dir = IPSEC_DIR_OUTBOUND;
+	spidx.dir = IPSEC_DIR_INBOUND;
 	memcpy(&spidx.src, &sp->spidx.src, sizeof(spidx.src));
 	memcpy(&spidx.dst, &sp->spidx.dst, sizeof(spidx.dst));
 	spidx.prefs = sp->spidx.prefs;
