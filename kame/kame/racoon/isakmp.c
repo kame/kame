@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.70 2000/06/14 17:52:08 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.71 2000/06/14 18:03:35 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -91,19 +91,24 @@ static int nostate2 __P((struct ph2handle *, vchar_t *));
 
 static int (*ph1exchange[][2][PHASE1ST_MAX])
 	__P((struct ph1handle *, vchar_t *)) = {
- { /* Identity Protection exchange */
+ /* error */
+ { {}, {}, },
+ /* Identity Protection exchange */
+ {
   { nostate1, ident_i1send, nostate1, ident_i2recv, ident_i2send,
     ident_i3recv, ident_i3send, ident_i4recv, ident_i4send, nostate1, },
   { nostate1, ident_r1recv, ident_r1send, ident_r2recv, ident_r2send,
     ident_r3recv, ident_r3send, nostate1, nostate1, nostate1, },
  },
- { /* Aggressive exchange */
+ /* Aggressive exchange */
+ {
   { nostate1, agg_i1send, nostate1, agg_i2recv, agg_i2send,
     nostate1, nostate1, nostate1, nostate1, nostate1, },
   { nostate1, agg_r1recv, agg_r1send, agg_r2recv, agg_r2send,
     nostate1, nostate1, nostate1, nostate1, nostate1, },
  },
- { /* Base exchange */
+ /* Base exchange */
+ {
   { nostate1, base_i1send, nostate1, base_i2recv, base_i2send,
     base_i3recv, nostate1, nostate1, nostate1, nostate1, },
   { nostate1, base_r1recv, base_r1send, base_r2recv, base_r2send,
@@ -113,7 +118,10 @@ static int (*ph1exchange[][2][PHASE1ST_MAX])
 
 static int (*ph2exchange[][2][PHASE2ST_MAX])
 	__P((struct ph2handle *, vchar_t *)) = {
- { /* Quick mode for IKE*/
+ /* error */
+ { {}, {}, },
+ /* Quick mode for IKE*/
+ {
   { nostate2, nostate2, quick_i1prep, nostate2, quick_i1send,
     quick_i2recv, quick_i2send, quick_i3recv, nostate2, nostate2, },
   { nostate2, quick_r1recv, quick_r1prep, nostate2, quick_r2send,
@@ -1795,15 +1803,15 @@ etypesw(etype)
 {
 	switch (etype) {
 	case ISAKMP_ETYPE_IDENT:
-		return 0;
+		return 1;
 	case ISAKMP_ETYPE_AGG:
-		return 1;
-	case ISAKMP_ETYPE_BASE:
 		return 2;
+	case ISAKMP_ETYPE_BASE:
+		return 3;
 	case ISAKMP_ETYPE_QUICK:
-		return 0;
-	case ISAKMP_ETYPE_NEWGRP:
 		return 1;
+	case ISAKMP_ETYPE_NEWGRP:
+		return 2;
 	default:
 		return 0;
 	}
