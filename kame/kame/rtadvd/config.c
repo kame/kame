@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.44 2001/06/02 18:34:16 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.45 2001/06/02 18:38:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -228,7 +228,7 @@ getconfig(intface)
 	tmp->reachabletime = (u_int32_t)val;
 
 	MAYHAVE(val64, "retrans", DEF_ADVRETRANSTIMER);
-	if (val64 < 0 || val64 > 0xffffffff) {
+	if (val64 > 0xffffffff) {
 		syslog(LOG_ERR,
 		       "<%s> retrans time out of range", __FUNCTION__);
 		exit(1);
@@ -341,7 +341,7 @@ getconfig(intface)
 
 			makeentry(entbuf, i, "vltime", added);
 			MAYHAVE(val64, entbuf, DEF_ADVVALIDLIFETIME);
-			if (val64 < 0 || val64 > 0xffffffff) {
+			if (val64 > 0xffffffff) {
 				syslog(LOG_ERR,
 				       "<%s> vltime out of range",
 				       __FUNCTION__);
@@ -359,7 +359,7 @@ getconfig(intface)
 
 			makeentry(entbuf, i, "pltime", added);
 			MAYHAVE(val64, entbuf, DEF_ADVPREFERREDLIFETIME);
-			if (val64 < 0 || val64 > 0xffffffff) {
+			if (val64 > 0xffffffff) {
 				syslog(LOG_ERR,
 				       "<%s> pltime out of range",
 				       __FUNCTION__);
