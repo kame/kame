@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1444 2000/12/21 01:48:59 jinmei Exp $
+$KAME: CHANGELOG,v 1.1445 2000/12/21 01:58:56 jinmei Exp $
 
 <200012>
+2000-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_input): all *BSD called
+	icmp6_rip6_input(). rip6_input(), which was used by bsdi4 and
+	openbsd, was not suitable, because it would return unexpected
+	"unknown next header" errors upon receiving (e.g.) icmp6 echo
+	request.
+	* kame/sys/netinet6/raw_ip6.c (rip6_input): removed icmp6 cases
+	according to the above change.
+
 2000-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (init_ip6pktopts): added to avoid
 	forgetting initialization of packet options. This function is
