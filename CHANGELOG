@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2472 2003/09/12 12:52:21 t-momose Exp $
+$KAME: CHANGELOG,v 1.2473 2003/09/17 16:42:53 kjc Exp $
 
 <200309>
+2003/09/17 23:37:38 JST	kjc@csl.sony.co.jp
+	* eliminate reserved qids (class handles).
+	  allow cbq, hfsc and priq to use arbitrary non-zero qids.
+	* make the qid assignment similar to the pf_tag assignment.
+	  this is a step to share the logic with pf_tag.
+
 2003-09-12  Tsuyoshi MOMOSE  <t-momose@netlab.nec.co.jp>
 	* kame/kame/sys/net/if_hif.[ch], kame/kame/sys/netinet6/mip6_var.h,
 	  kame/kame/kame/mip6control/mip6control.c:
