@@ -398,7 +398,7 @@ tcp_respond(tp, iph, th, m, ack, seq, flags, isipv6)
  		ip6->ip6_plen = htons((u_short)tlen);
 		ip6->ip6_nxt = IPPROTO_TCP;
 		ip6->ip6_hlim = in6_selecthlim(tp ? tp->t_inpcb : NULL,
-					       ro6 ?
+					       ro6 && ro6->ro_rt ?
 					       ro6->ro_rt->rt_ifp :
 					       NULL);
 		nth->th_sum = in6_cksum(m, IPPROTO_TCP,
