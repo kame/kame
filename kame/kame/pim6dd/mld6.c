@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.17 2000/12/04 06:33:10 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.18 2000/12/04 06:37:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -311,7 +311,7 @@ int recvlen;
 	}
 
 	/* TODO: too noisy. Remove it? */
-//#define NOSUCHDEF
+#undef NOSUCHDEF
 #ifdef NOSUCHDEF
 	IF_DEBUG(DEBUG_PKT | debug_kind(IPPROTO_ICMPV6, mldh->mld6_type,
 					mldh->mld6_code))
