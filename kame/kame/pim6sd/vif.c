@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.36 2003/05/21 06:47:39 suz Exp $	*/
+/*	$KAME: vif.c,v 1.37 2003/05/21 06:54:34 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -168,8 +168,11 @@ void init_vifs()
 
 	for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
 		struct phaddr *p;
+		if (v->uv_flags & (VIFF_DISABLED | MIFF_REGISTER))
+			continue;
 
-		if (v->uv_flags & (VIFF_DISABLED | VIFF_DOWN | MIFF_REGISTER))
+		enabled_vifs++;
+		if (v->uv_flags & VIFF_DOWN)
 			continue;
 		if (v->uv_linklocal == NULL)
 			log(LOG_ERR, 0,
@@ -179,7 +182,6 @@ void init_vifs()
 		/* If this vif has a global address, set its id to phys_vif */
 		if (phys_vif != -1)
 			continue;
-
 		for (p = v->uv_addrs; p; p = p->pa_next) {
 			if (!IN6_IS_ADDR_LINKLOCAL(&p->pa_addr.sin6_addr) &&
 			    !IN6_IS_ADDR_SITELOCAL(&p->pa_addr.sin6_addr)) {
@@ -187,7 +189,6 @@ void init_vifs()
 				break;
 			}
 		}
-		enabled_vifs++;
 	}
 	if (enabled_vifs < 2)
 		log(LOG_ERR, 0, "can't forward: %s",
@@ -928,6 +929,7 @@ find_vif(ifname, create, default_policy)
 	v = &uvifs[numvifs++];
 	strncpy(v->uv_name, ifname, IFNAMSIZ);
 	v->uv_ifindex = ifindex;
+	v->uv_flags = VIFF_DOWN | default_policy;
 	return v;
 }
 

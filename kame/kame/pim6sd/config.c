@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.33 2003/02/05 15:30:32 suz Exp $	*/
+/*	$KAME: config.c,v 1.34 2003/05/21 06:54:34 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -136,7 +136,6 @@ config_vifs_from_kernel()
 
 		flags = ifa->ifa_flags;
 
-
 		/*
 		 * Get netmask of the address.
 		 */
@@ -210,7 +209,7 @@ config_vifs_from_kernel()
 		v = find_vif(ifa->ifa_name, DONT_CREATE, default_vif_status);
 		if (v != NULL) {
 			add_phaddr(v, &addr, &mask, rmt);
-			continue;
+			goto bypass_initial_addrconf;
 		}
 
 		total_interfaces++;
@@ -225,7 +224,6 @@ config_vifs_from_kernel()
 			     ifa->ifa_name);
 			continue;
 		}
-
 		v->uv_dst_addr = allpim6routers_group;
 		v->uv_subnetmask = mask;
 		strncpy(v->uv_name, ifa->ifa_name, IFNAMSIZ);
@@ -237,7 +235,8 @@ config_vifs_from_kernel()
 			v->uv_prefix.sin6_addr.s6_addr[i] =
 				addr.sin6_addr.s6_addr[i] & mask.s6_addr[i];
 	
-		if(flags & IFF_POINTOPOINT)
+	bypass_initial_addrconf:
+		if (flags & IFF_POINTOPOINT)
 			v->uv_flags |=(VIFF_REXMIT_PRUNES | VIFF_POINT_TO_POINT);
 
 		/*
@@ -258,8 +257,9 @@ config_vifs_from_kernel()
 			    net6name(&v->uv_prefix.sin6_addr,&mask),
 			    numvifs,v->uv_rate_limit);
 
-		if( !(flags & IFF_UP)) 
-		{
+		if (flags & IFF_UP) {
+			v->uv_flags &= ~VIFF_DOWN;
+		} else {
 			v->uv_flags |= VIFF_DOWN;
 			vifs_down = TRUE;
 		}
