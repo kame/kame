@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.148 2005/03/20 07:50:54 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.149 2005/03/20 07:54:24 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2142,8 +2142,8 @@ release_binding_ia(iap, retlist, optinfo)
 		 * the IAs and makes the addresses available for assignment to
 		 * other clients.
 		 * [RFC3315 Section 18.2.6]
-		 * (Though we do not support address assignment, we apply the
-		 * same logic to prefixes)
+		 * RFC3633 is not very clear about the similar case for IA_PD,
+		 * but we apply the same logic.
 		 */
 		for (lv = TAILQ_FIRST(&iap->sublist); lv;
 		    lv = TAILQ_NEXT(lv, link)) {
