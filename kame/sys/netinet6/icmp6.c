@@ -1747,10 +1747,11 @@ icmp6_redirect_output(m0, rt)
 	rt_router = nd6_lookup(router_ll6, 0, ifp);
 	if (!rt_router)
 		goto nolladdropt;
-	if (!(rt_router->rt_flags & RTF_GATEWAY)
-	 && (rt_router->rt_flags & RTF_LLINFO)
-	 && (rt_router->rt_gateway->sa_family == AF_LINK)
-	 && (sdl = (struct sockaddr_dl *)rt_router->rt_gateway)) {
+	if (!(rt_router->rt_flags & RTF_GATEWAY) &&
+	    (rt_router->rt_flags & RTF_LLINFO) &&
+	    (rt_router->rt_gateway->sa_family == AF_LINK) &&
+	    (sdl = (struct sockaddr_dl *)rt_router->rt_gateway) &&
+	    sdl->sdl_alen) {
 		nd_opt = (struct nd_opt_hdr *)p;
 		nd_opt->nd_opt_type = ND_OPT_TARGET_LINKADDR;
 		len = 2 + ifp->if_addrlen;
