@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.301 2002/10/08 09:25:11 k-sugyou Exp $	*/
+/*	$KAME: nd6.c,v 1.302 2002/10/09 20:21:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -955,10 +955,10 @@ nd6_lookup(addr6, create, ifp)
 	    rt->rt_gateway->sa_family != AF_LINK || rt->rt_llinfo == NULL ||
 	    (ifp && rt->rt_ifa->ifa_ifp != ifp)) {
 		if (create) {
-			log(LOG_DEBUG,
+			nd6log((LOG_DEBUG,
 			    "nd6_lookup: failed to lookup %s (if = %s)\n",
 			    ip6_sprintf(&addr6->sin6_addr),
-			    ifp ? if_name(ifp) : "unspec");
+			    ifp ? if_name(ifp) : "unspec"));
 		}
 		return (NULL);
 	}
