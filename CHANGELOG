@@ -1,9 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.92 1999/09/02 16:11:29 itojun Exp $
+$Id: CHANGELOG,v 1.93 1999/09/03 03:12:44 itojun Exp $
 
 
 <199909>
+Fri Sep  3 11:19:45 JST 1999  itojun@iijlab.net
+	* kame/traceroute, kame/traceroute6: do not bark even if IPsec
+	  configuration (for bypassing IPsec) is failed.  now both programs
+	  should work fine on kernel without IPsec support compiled in.
+
 Fri Sep  3 01:06:47 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/mtr, freebsd[23]/ports/mtr:
 	  mtr network diagnose tool, version 0.41 with IPv6 support.
