@@ -288,22 +288,22 @@ struct in6pcb;
 #endif
 extern int ipsec_init_policy __P((struct secpolicy **));
 extern struct secpolicy *ipsec_copy_policy __P((struct secpolicy *));
-extern int ipsec_set_policy __P((struct secpolicy **, int, caddr_t, int, int));
-extern int ipsec_get_policy __P((struct secpolicy *, struct mbuf **));
-extern int ipsec4_delete_pcbpolicy __P((struct inpcb *));
-#ifdef INET6
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-extern int ipsec6_delete_pcbpolicy __P((struct inpcb *));
-#else
-extern int ipsec6_delete_pcbpolicy __P((struct in6pcb *));
-#endif
-#endif
 extern u_int ipsec_get_reqlevel __P((struct ipsecrequest *));
 
+extern int ipsec4_set_policy __P((struct inpcb *inp, int optname,
+	caddr_t request, int priv));
+extern int ipsec4_get_policy
+	__P((struct inpcb *inpcb, caddr_t request, struct mbuf **mp));
+extern int ipsec4_delete_pcbpolicy __P((struct inpcb *));
 extern int ipsec4_in_reject_so __P((struct mbuf *, struct socket *));
 extern int ipsec4_in_reject __P((struct mbuf *, struct inpcb *));
 
 #ifdef INET6
+extern int ipsec6_set_policy __P((struct in6pcb *in6p, int optname,
+	caddr_t request, int priv));
+extern int ipsec6_get_policy
+	__P((struct in6pcb *in6p, caddr_t request, struct mbuf **mp));
+extern int ipsec6_delete_pcbpolicy __P((struct in6pcb *));
 extern int ipsec6_in_reject_so __P((struct mbuf *, struct socket *));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 extern int ipsec6_in_reject __P((struct mbuf *, struct inpcb *));

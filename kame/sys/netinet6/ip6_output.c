@@ -1229,7 +1229,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 	register struct mbuf *m = *mp;
 	int error, optval;
 	int optlen;
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 	struct proc *p = curproc;	/* XXX */
+#endif
 
 	optlen = m ? m->m_len : 0;
 #endif
@@ -1458,12 +1460,10 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 
 #ifdef IPSEC
-			case IPV6_IPSEC_POLICY_IN:
-			case IPV6_IPSEC_POLICY_OUT:
+			case IPV6_IPSEC_POLICY:
 			    {
 				caddr_t req = NULL;
 				int len = 0;
-				struct secpolicy **spp = NULL;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				struct mbuf *m;
 #endif
@@ -1478,16 +1478,8 @@ ip6_ctloutput(op, so, level, optname, mp)
 					req = mtod(m, caddr_t);
 					len = m->m_len;
 				}
-				switch (optname) {
-				case IPV6_IPSEC_POLICY_IN:
-					spp = &in6p->in6p_sp_in;
-					break;
-				case IPV6_IPSEC_POLICY_OUT:
-					spp = &in6p->in6p_sp_out;
-					break;
-				}
-				error = ipsec_set_policy(spp, optname, req, len,
-				                         privileged);
+				error = ipsec6_set_policy(in6p, optname, req,
+				                          privileged);
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				m_freem(m);
 #endif
@@ -1716,23 +1708,19 @@ ip6_ctloutput(op, so, level, optname, mp)
 				break;
 
 #ifdef IPSEC
-			case IPV6_IPSEC_POLICY_IN:
-			case IPV6_IPSEC_POLICY_OUT:
+			case IPV6_IPSEC_POLICY:
 			  {
-				struct secpolicy *sp = NULL;
+				caddr_t req = NULL;
+				int len = 0;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				struct mbuf *m;
 				struct mbuf **mp = &m;
 #endif
-				switch (optname) {
-				case IPV6_IPSEC_POLICY_IN:
-					sp = in6p->in6p_sp_in;
-					break;
-				case IPV6_IPSEC_POLICY_OUT:
-					sp = in6p->in6p_sp_out;
-					break;
+				if (m != 0) {
+					req = mtod(m, caddr_t);
+					len = m->m_len;
 				}
-				error = ipsec_get_policy(sp, mp);
+				error = ipsec6_get_policy(in6p, req, mp);
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (error == 0)
 					error = soopt_mcopyout(sopt, m); /*XXX*/

@@ -165,6 +165,9 @@ static int ipsec_setspidx_mbuf
 	__P((struct secpolicyindex *, u_int, u_int, struct mbuf *, int));
 static void ipsec_setspidx_inpcb __P((struct inpcb *pcb));
 static void ipsec_setspidx_in6pcb __P((struct in6pcb *pcb));
+static int ipsec_set_policy __P((struct secpolicy **pcb_sp,
+	int optname, caddr_t request, int priv));
+static int ipsec_get_policy __P((struct secpolicy *pcb_sp, struct mbuf **mp));
 static void vshiftl __P((unsigned char *, int, int));
 static int ipsec_in_reject __P((struct secpolicy *, struct mbuf *));
 static size_t ipsec_hdrsiz __P((struct secpolicy *));
@@ -1046,10 +1049,10 @@ fail:
 }
 
 /* set policy and ipsec request if present. */
-int
-ipsec_set_policy(pcb_sp, optname, request, reqlen, priv)
+static int
+ipsec_set_policy(pcb_sp, optname, request, priv)
 	struct secpolicy **pcb_sp;
-	int optname, reqlen;
+	int optname;
 	caddr_t request;
 	int priv;
 {
@@ -1090,7 +1093,7 @@ ipsec_set_policy(pcb_sp, optname, request, reqlen, priv)
 	return 0;
 }
 
-int
+static int
 ipsec_get_policy(pcb_sp, mp)
 	struct secpolicy *pcb_sp;
 	struct mbuf **mp;
@@ -1122,6 +1125,67 @@ ipsec_get_policy(pcb_sp, mp)
 	return 0;
 }
 
+int
+ipsec4_set_policy(inp, optname, request, priv)
+	struct inpcb *inp;
+	int optname;
+	caddr_t request;
+	int priv;
+{
+	struct sadb_x_policy *xpl = (struct sadb_x_policy *)request;
+	struct secpolicy **pcb_sp;
+
+	/* sanity check. */
+	if (inp == NULL || xpl == NULL)
+		return EINVAL;
+
+	/* select direction */
+	switch (xpl->sadb_x_policy_dir) {
+	case IPSEC_DIR_INBOUND:
+		pcb_sp = &inp->inp_sp_in;
+		break;
+	case IPSEC_DIR_OUTBOUND:;
+		pcb_sp = &inp->inp_sp_out;
+		break;
+	default:
+		printf("ipsec6_set_policy: invalid direction=%u\n",
+			xpl->sadb_x_policy_dir);
+		return EINVAL;
+	}
+
+	return ipsec_set_policy(pcb_sp, optname, request, priv);
+}
+
+int
+ipsec4_get_policy(inp, request, mp)
+	struct inpcb *inp;
+	caddr_t request;
+	struct mbuf **mp;
+{
+	struct sadb_x_policy *xpl = (struct sadb_x_policy *)request;
+	struct secpolicy *pcb_sp;
+
+	/* sanity check. */
+	if (inp == NULL || mp == NULL)
+		return EINVAL;
+
+	/* select direction */
+	switch (xpl->sadb_x_policy_dir) {
+	case IPSEC_DIR_INBOUND:
+		pcb_sp = inp->inp_sp_in;
+		break;
+	case IPSEC_DIR_OUTBOUND:;
+		pcb_sp = inp->inp_sp_out;
+		break;
+	default:
+		printf("ipsec6_set_policy: invalid direction=%u\n",
+			xpl->sadb_x_policy_dir);
+		return EINVAL;
+	}
+
+	return ipsec_get_policy(pcb_sp, mp);
+}
+
 /* delete policy in PCB */
 int
 ipsec4_delete_pcbpolicy(inp)
@@ -1145,6 +1209,67 @@ ipsec4_delete_pcbpolicy(inp)
 }
 
 #ifdef INET6
+int
+ipsec6_set_policy(in6p, optname, request, priv)
+	struct in6pcb *in6p;
+	int optname;
+	caddr_t request;
+	int priv;
+{
+	struct sadb_x_policy *xpl = (struct sadb_x_policy *)request;
+	struct secpolicy **pcb_sp;
+
+	/* sanity check. */
+	if (in6p == NULL || xpl == NULL)
+		return EINVAL;
+
+	/* select direction */
+	switch (xpl->sadb_x_policy_dir) {
+	case IPSEC_DIR_INBOUND:
+		pcb_sp = &in6p->in6p_sp_in;
+		break;
+	case IPSEC_DIR_OUTBOUND:;
+		pcb_sp = &in6p->in6p_sp_out;
+		break;
+	default:
+		printf("ipsec6_set_policy: invalid direction=%u\n",
+			xpl->sadb_x_policy_dir);
+		return EINVAL;
+	}
+
+	return ipsec_set_policy(pcb_sp, optname, request, priv);
+}
+
+int
+ipsec6_get_policy(in6p, request, mp)
+	struct in6pcb *in6p;
+	caddr_t request;
+	struct mbuf **mp;
+{
+	struct sadb_x_policy *xpl = (struct sadb_x_policy *)request;
+	struct secpolicy *pcb_sp;
+
+	/* sanity check. */
+	if (in6p == NULL || mp == NULL)
+		return EINVAL;
+
+	/* select direction */
+	switch (xpl->sadb_x_policy_dir) {
+	case IPSEC_DIR_INBOUND:
+		pcb_sp = in6p->in6p_sp_in;
+		break;
+	case IPSEC_DIR_OUTBOUND:;
+		pcb_sp = in6p->in6p_sp_out;
+		break;
+	default:
+		printf("ipsec6_set_policy: invalid direction=%u\n",
+			xpl->sadb_x_policy_dir);
+		return EINVAL;
+	}
+
+	return ipsec_get_policy(pcb_sp, mp);
+}
+
 int
 ipsec6_delete_pcbpolicy(in6p)
 	struct in6pcb *in6p;
@@ -1422,11 +1547,7 @@ ipsec6_in_reject_so(m, so)
 int
 ipsec6_in_reject(m, in6p)
 	struct mbuf *m;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	struct inpcb *in6p;
-#else
 	struct in6pcb *in6p;
-#endif
 {
 	if (in6p == NULL)
 		return ipsec6_in_reject_so(m, NULL);

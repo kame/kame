@@ -390,17 +390,16 @@ struct route_in6 {
 #define IPV6_BINDV6ONLY		27 /* bool; only bind INET6 at null bind */
 
 #if 1 /*IPSEC*/
-#define IPV6_IPSEC_POLICY_IN	28 /* struct; get/set security policy */
-#define IPV6_IPSEC_POLICY_OUT	29 /* struct; get/set security policy */
+#define IPV6_IPSEC_POLICY	28 /* struct; get/set security policy */
 #endif
-#define IPV6_FAITH		30 /* bool; accept FAITH'ed connections */
+#define IPV6_FAITH		29 /* bool; accept FAITH'ed connections */
 
 #if 1 /*IPV6FIREWALL*/
-#define IPV6_FW_ADD		31 /* add a firewall rule to chain */
-#define IPV6_FW_DEL		32 /* delete a firewall rule from chain */
-#define IPV6_FW_FLUSH		33 /* flush firewall rule chain */
-#define IPV6_FW_ZERO		34 /* clear single/all firewall counter(s) */
-#define IPV6_FW_GET		35 /* get entire firewall rule chain */
+#define IPV6_FW_ADD		30 /* add a firewall rule to chain */
+#define IPV6_FW_DEL		31 /* delete a firewall rule from chain */
+#define IPV6_FW_FLUSH		32 /* flush firewall rule chain */
+#define IPV6_FW_ZERO		33 /* clear single/all firewall counter(s) */
+#define IPV6_FW_GET		34 /* get entire firewall rule chain */
 #endif
 
 #define IPV6_RTHDR_LOOSE     0 /* this hop need not be a neighbor. XXX old spec */
