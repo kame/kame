@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/01/24 02:25:13 $
+			$Date: 2000/01/25 11:32:33 $
 
 1. IPv6
 
@@ -1126,6 +1126,8 @@ Here are some points to be noted:
 - Tunnel mode IPComp is not working right.  KAME box can generate tunnelled
   IPComp packet, however, cannot accept tunneled IPComp packet.
 - You can negotiate IPComp association with racoon IKE daemon.
+- KAME code does not attach Adler32 checksum to compressed data.
+  see ipsec wg mailing list discussion in Jan 2000 for details.
 
 4.5 Conformance to RFCs and IDs
 
