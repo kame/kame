@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.55 2000/10/12 00:33:17 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.56 2000/10/12 00:42:17 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -172,11 +172,11 @@ directives.
 .Ss Timer Specification
 .Bl -tag -width Ds -compact
 .It Ic timer { Ar statements Ic }
-specifys various timer.
+specifies various timer.
 .Pp
 .Bl -tag -width Ds -compact
 .It Ic counter Ar number ;
-maximun trying count to send.
+maximum trying count to send.
 Default count is 5.
 .It Ic interval Ar number Ar timeunit ;
 interval to resend.  This unit is second.
@@ -203,10 +203,10 @@ will listen to all available interface addresses.
 The followings are the list of statements.
 .Pp
 .Bl -tag -width Ds -compact
-.\" How do I exress bold brackets; `[' and `]' .
+.\" How do I express bold brackets; `[' and `]' .
 .\" Is the "Bq Ic [ Ar port ] ;" buggy ?
 .It Ic isakmp Ar address Bq Bq Ar port ;
-If it is specifyed,
+If it is specified,
 .Xr racoon 8
 will only listen to its address.
 Default port is 500 as IANA defines.
@@ -228,7 +228,7 @@ It will be ignored when you don't specify any addresses.
 .Bq Bq Ar port
 .Ic { Ar statements Ic }
 .Xc
-definies the parameters of IKE phase 1 per remote node.
+defines the parameters of IKE phase 1 per remote node.
 Default port is 500.
 The followings are the list of statements.
 .Pp
@@ -238,11 +238,11 @@ The followings are the list of statements.
 defined exchange mode of phase 1.
 .\"
 .It Ic doi Ic ipsec_doi ;
-means to use IPSEC-DOI specifyed RFC 2407.
+means to use IPSEC-DOI specified RFC 2407.
 You can omit it.
 .\"
 .It Ic situation Ic identity_only ;
-means to use SIT_IDENTITY_ONLY specifyed RFC 2407.
+means to use SIT_IDENTITY_ONLY specified RFC 2407.
 You can omit it.
 .\"
 .It Ic identifier Ar idtype ;
@@ -329,13 +329,13 @@ is;
 the responder obey the initiator anytime.
 .It Ic strict
 If the responder's length is longer than the initiator's one, the
-responder uses the intitiator's one.  Otherwise rejects the proposal.
+responder uses the initiator's one.  Otherwise rejects the proposal.
 If PFS is not required by the responder, the responder obeys the proposal.
 If PFS is required by both sides and if the responder's group is not equal to
 the initiator's one, then the responder reject the proposal.
 .It Ic claim
 If the responder's length is longer than the initiator's one, the
-responder use the intitiator's one.  If the responder's length is
+responder use the initiator's one.  If the responder's length is
 shorter than the initiator's one, the responder uses own length
 AND send RESPONDER-LIFETIME notify message to a initiator in the
 case of lifetime.
@@ -356,7 +356,7 @@ Default is off.
 .It Ic nonce_size Ar number ;
 define the byte size of nonce value.
 Racoon can send any value although
-RFC2409 specifys that the value MUST be between 8 and 256 bytes.
+RFC2409 specifies that the value MUST be between 8 and 256 bytes.
 Default size is 16 bytes.
 .\"
 .It Xo
@@ -400,7 +400,7 @@ you must define same DH group in each proposals.
 .It Ic lifetime time Ar number Ar timeunit ;
 .It Ic lifetime byte Ar number Ar byteunit ;
 define lifetime of phase 1 SA eay proposal.
-Refer to the avobe description of
+Refer to the above description of
 .Ic lifetime
 directive immediately defined in
 .Ic remote
@@ -448,7 +448,7 @@ For example, if you define 3ffe:501:4819::/48 as
 .\"
 .It Ic pfs_group Ar group ;
 define the group of Diffie-Hellman exponentiations.
-If you don't require PFS then you can omit this direcitive.
+If you don't require PFS then you can omit this directive.
 Any proposal will be accepted if you don't specify it.
 .Ar group
 is one of following:
@@ -461,7 +461,7 @@ Any proposal will be accepted, and the attribute(s) will be not proposed to
 the peer if you don't specify it(them).
 See
 .Ic proposal_check
-direcitive.
+directive.
 .\"
 .It Ic identifier Ar idtype ;
 specifies ID type to use phase 2 negotiation.
@@ -529,7 +529,7 @@ It is debugging use.
 .Ss Specifying the way to pad
 .Bl -tag -width Ds -compact
 .It Ic padding { Ar statements Ic }
-specifyed padding format.
+specified padding format.
 The followings are the list of statements.
 .Bl -tag -width Ds -compact
 .It Ic randomize (on \(ba off) ;
