@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.64 2001/12/04 06:28:45 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.65 2001/12/04 07:44:40 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -207,9 +207,9 @@ int		 natpt_updateTcpStatus		__P((struct pcv *));
 int		 natpt_tcpfsm			__P((short state, int, u_char flags));
 struct mbuf	*natpt_mgethdr			__P((int, int));
 void		 natpt_composeIPv6Hdr		__P((struct pcv *, struct pAddr *,
-						     struct pcv *));
+						     struct ip6_hdr *));
 void		 natpt_composeIPv4Hdr		__P((struct pcv *, struct pAddr *,
-						     struct pcv *));
+						     struct ip *));
 void		 natpt_adjustMBuf		__P((struct mbuf *, struct mbuf *));
 void		 natpt_fixTCPUDP64cksum		__P((int, int, struct pcv *, struct pcv *));
 void		 natpt_fixTCPUDP44cksum		__P((int, struct pcv *, struct pcv *));
@@ -276,7 +276,7 @@ natpt_translateICMPv6To4(struct pcv *cv6, struct pAddr *pad)
 	cv4.pyld.caddr = (caddr_t)cv4.ip.ip4 + sizeof(struct ip);
 	cv4.fromto = cv6->fromto;
 
-	natpt_composeIPv4Hdr(cv6, pad, &cv4);
+	natpt_composeIPv4Hdr(cv6, pad, ip4);
 
 	switch (cv6->pyld.icmp6->icmp6_type) {
 	case ICMP6_DST_UNREACH:
@@ -649,7 +649,7 @@ natpt_translateTCPUDPv6To4(struct pcv *cv6, struct pAddr *pad, struct pcv *cv4)
 
 	ip4 = mtod(m4, struct ip *);
 	ip6 = mtod(cv6->m, struct ip6_hdr *);
-	natpt_composeIPv4Hdr(cv6, pad, cv4);
+	natpt_composeIPv4Hdr(cv6, pad, ip4);
 
 	th = (struct tcphdr *)(ip4 + 1);
 	th->th_sport = pad->port[1];
@@ -752,7 +752,7 @@ natpt_translateFragment6(struct pcv *cv6, struct pAddr *pad)
 	cv4.pyld.caddr = (caddr_t)cv4.ip.ip4 + sizeof(struct ip);
 	cv4.fromto = cv6->fromto;
 
-	natpt_composeIPv4Hdr(cv6, pad, &cv4);
+	natpt_composeIPv4Hdr(cv6, pad, ip4);
 
 	bcopy(cv6->pyld.caddr, cv4.pyld.caddr, frag6len);
 	cv4.m->m_len = ip4->ip_len;
@@ -828,7 +828,7 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	cv6.flags  = cv4->flags;
 
 	ip6->ip6_nxt  = IPPROTO_ICMPV6;
-	natpt_composeIPv6Hdr(cv4, pad, &cv6);
+	natpt_composeIPv6Hdr(cv4, pad, ip6);
 	ip6->ip6_src.s6_addr32[0] = natpt_prefix.s6_addr32[0];
 	ip6->ip6_src.s6_addr32[1] = natpt_prefix.s6_addr32[1];
 	ip6->ip6_src.s6_addr32[2] = natpt_prefix.s6_addr32[2];
@@ -1178,7 +1178,7 @@ natpt_translateTCPUDPv4To6(struct pcv *cv4, struct pAddr *pad, struct pcv *cv6)
 	cv6->fromto = cv4->fromto;
 
 	ip4 = mtod(cv4->m, struct ip *);
-	natpt_composeIPv6Hdr(cv4, pad, cv6);
+	natpt_composeIPv6Hdr(cv4, pad, ip6);
 
 	tcp6 = cv6->pyld.tcp6;
 	tcp6->th_sport = pad->port[1];
@@ -2243,10 +2243,9 @@ natpt_mgethdr(int hlen, int len)
 
 
 void
-natpt_composeIPv6Hdr(struct pcv *cv4, struct pAddr *pad, struct pcv *cv6)
+natpt_composeIPv6Hdr(struct pcv *cv4, struct pAddr *pad, struct ip6_hdr *ip6)
 {
 	struct ip	*ip4 = cv4->ip.ip4;
-	struct ip6_hdr	*ip6 = cv6->ip.ip6;
 
 	ip6->ip6_flow = 0;
 	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
@@ -2259,10 +2258,9 @@ natpt_composeIPv6Hdr(struct pcv *cv4, struct pAddr *pad, struct pcv *cv6)
 
 
 void
-natpt_composeIPv4Hdr(struct pcv *cv6, struct pAddr *pad, struct pcv *cv4)
+natpt_composeIPv4Hdr(struct pcv *cv6, struct pAddr *pad, struct ip *ip4)
 {
 	struct ip6_hdr	*ip6 = cv6->ip.ip6;
-	struct ip	*ip4 = cv4->ip.ip4;
 
 #ifdef _IP_VHL
 	ip4->ip_vhl = IP_MAKE_VHL(IPVERSION, (sizeof(struct ip) >> 2));
