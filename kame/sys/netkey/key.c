@@ -2055,7 +2055,11 @@ key_spdadd(so, m, mhp)
 		/*
 		 * port spec is not permitted for tunnel mode
 		 */
-		if (isr->saidx.mode == IPSEC_MODE_TUNNEL && src0 && dst0) {
+		if (isr->saidx.mode == IPSEC_MODE_TUNNEL && src0 && dst0
+#ifdef MIP6
+		    && (src0->sadb_address_proto != IPPROTO_MH)
+#endif
+			) {
 			sa = (struct sockaddr *)(src0 + 1);
 			switch (sa->sa_family) {
 			case AF_INET:
