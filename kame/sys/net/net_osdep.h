@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.64 2001/09/03 08:27:53 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.65 2001/10/03 13:14:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -270,7 +270,11 @@
  *	therefore, opt_hoge.h is mandatory on freebsd4 only.
  *
  * - MALLOC() macro
- *	use it only if the size of the allocation is constant.
+ *	Use it only if the size of the allocation is constant.
+ *	When we do NOT collect statistics about kernel memory usage, the result
+ *	of macro expansion contains a large set of condition branches.  If the
+ *	size is not constant, compilation optimization cannot be applied, and
+ *	a bunch of the large branch will be embedded in the kernel code.
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
