@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.35 2001/12/04 04:16:53 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.36 2001/12/04 04:24:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1470,9 +1470,11 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 		tld = tld6;
 		break;
 #endif
-	default:
+	case AF_INET:
 		tld = tld4;
 		break;
+	default:
+		return NULL;
 	}
 
 	if ((_res.options & RES_INIT) == 0) {
@@ -1488,7 +1490,10 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 	na = 0;
 
 	for (/* nothing */; *tld; tld++) {
-		/* XXX assumes that MAXDNAME is big enough */
+		/*
+		 * XXX assumes that MAXDNAME is big enough - error checks
+		 * has been made by callers
+		 */
 		n = 0;
 		bp = qbuf;
 		cp = (u_char *)addr+addrlen-1;
@@ -1505,7 +1510,7 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 			strcpy(bp, *tld);
 			break;
 #endif
-		default:
+		case AF_INET:
 			for (; n < addrlen; n++, cp--) {
 				c = *cp;
 				if (c >= 100)
