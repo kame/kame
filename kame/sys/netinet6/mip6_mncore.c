@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.2 2003/05/06 07:00:14 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.3 2003/05/11 20:56:46 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -3512,10 +3512,25 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 
 	bu_size = sizeof(struct ip6m_binding_update);
 	if (need_rr) {
+		/*
+		  |<- bu_size -> <- nonce_size -> <- auth_size ->
+		  +-------------+----------------+---------------+
+		  |  bind. up.  |   nonce opt.   |   auth. opt.  |
+		  +-------------+----------------+---------------+
+		   <------->
+		   sizeof(struct ip6m_binding_update)
+		            <-->
+			  Padding for nonce opt. alignment
+		 */
 		bu_size += MIP6_PADLEN(bu_size, 2, 0);
 		nonce_size = sizeof(struct ip6m_opt_nonce);
-		/* Binding Auth Option no longer require any alignment.
-		   (6.2.7) */
+		nonce_size += MIP6_PADLEN(nonce_size, 8, 2);
+		/* (6.2.7)
+		   The Binding Authorization Data option does not
+		   have alignment requirements as such.  However,
+		   since this option must be the last mobility option,
+		   an implicit alignment requirement is 8n + 2. 
+		*/
 		auth_size = AUTH_SIZE;
 		auth_size += MIP6_PADLEN(bu_size + nonce_size + auth_size, 8, 0);
 #ifdef RR_DBG

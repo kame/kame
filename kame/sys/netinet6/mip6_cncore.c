@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.2 2003/05/06 06:59:17 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.3 2003/05/11 20:56:46 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1850,6 +1850,14 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		/* discard. */
 		m_freem(m);
 		mip6stat.mip6s_invalidcoa++;
+		return (EINVAL);
+	}
+
+	if ((mopt.valid_options & MOPT_AUTHDATA) &&
+	    (ip6mu->ip6mu_flags & IP6MU_HOME)) {
+		/* discard. */
+		m_freem(m);
+		mip6stat.mip6s_invalidopt++;	/* XXX */
 		return (EINVAL);
 	}
 
