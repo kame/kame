@@ -17,7 +17,9 @@ MAINTAINER=		itojun@kame.net
 HOMEPAGE=		http://solidpop3d.pld.org.pl/download.html
 
 GNU_CONFIGURE=		yes
-CONFIGURE_ARGS+=	--enable-ipv6 --enable-apop --disable-bulletins
+# disable standalone behavior as it listens to single AF_INET6 socket only
+CONFIGURE_ARGS+=	--enable-ipv6 --enable-apop --disable-bulletins \
+			--disable-standalone
 
 post-install:
 	${INSTALL_DATA} ${WRKSRC}/doc/config.example \
