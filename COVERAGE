@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.117 2001/09/25 11:34:25 itojun Exp $
+$KAME: COVERAGE,v 1.118 2001/09/26 16:41:05 sumikawa Exp $
 
 
 x: supported/integrated
@@ -8,7 +8,7 @@ x: supported/integrated
 
 
 		KAME
-		net15	open29	free228	free35	free43	bsdi31	bsdi42
+		net15	open29	free228	free35	free44	bsdi31	bsdi42
 		--	--	--	--	--	--	--
 TCP/UDP		see IMPLEMENTATION for details
 
@@ -59,7 +59,7 @@ ART routing table lookup algorithm
 		x	x	-	-	-	x	(*1)
     (*1) IPv6 only
 
-Userland PPP	-	?	x	x	-	?	?
+Userland PPP	-	?	x	x	x	?	?
 Kernel PPP	x	?	-	-	x	?	?
 
 
@@ -67,14 +67,14 @@ Kernel PPP	x	?	-	-	x	?	?
 (+): see above for KAME/*BSD differences
 
 		KAME	merged *-current	merged
-		*BSD	net	open	free	net152	open29	free43	bsdi42
+		*BSD	net	open	free	net152	open29	free44	bsdi42
 		--	--	--	--	--	--	--	---
-KAME IPv6 as of	latest	early	early	0528	early	early	early	apr00
-			jun00	jun00	2001	jun00	jun00	jun00
+KAME IPv6 as of	latest	early	early	0528	early	early	0528	apr00
+			jun00	jun00	2001	jun00	jun00	2001
 
 KAME IPsec as of
-		latest	12jun00	-	0528	12jun00	-	early	apr00
-					2001			jul00
+		latest	12jun00	-	0528	12jun00	-	0528	apr00
+					2001			2001
 
 IPv4 IPsec	KAME	KAME	openbsd	KAME	KAME	openbsd	KAME	KAME
 
@@ -84,19 +84,19 @@ IPv6 IPsec	KAME	KAME	openbsd	KAME	KAME	openbsd	KAME	KAME
 	hardware acceleration is available.  tunnel mode may need more work.
 
 IPsec ESP, rc5-cbc
-		-	-	(*1)	-	-	(*1)	x	-
+		-	-	(*1)	-	-	(*1)	-	-
     (*1) not based on kame
 
 IPsec ESP, blowfish/des on LP64
-		x	x	(*1)	x	x	(*1)	-	?
+		x	x	(*1)	x	x	(*1)	x	?
     (*1) not based on kame
 
 IPsec ESP, des on big endian
-		x	x	(*1)	x	x	(*1)	-	?
+		x	x	(*1)	x	x	(*1)	x	?
     (*1) not based on kame
 
 IPsec ESP, crypto backend uses block cipher (esp_cbc_encrypt)
-		x	x	(*1)	x	x	(*1)	-	-
+		x	x	(*1)	x	x	(*1)	x	-
     (*1) not based on kame
 
 RFC2367 conformance: sadb_msg
@@ -104,20 +104,19 @@ RFC2367 conformance: sadb_msg
     (*1) not based on kame
 
 RFC2367 conformance: SADB_[EAC]ALG
-		x	x	(*2)	x	x	(*2)	(*1)	-
-    (*1) old KAME declaration, violates RFC2367 namespace and numbers
-    (*2) not based on kame
+		x	x	(*1)	x	x	(*1)	x	-
+    (*1) not based on kame
 
 TCP/UDP		see IMPLEMENTATION for details
 
 TCP6 drops packets with unspecified IPv6 source
-		x	x	x	x	x	x	-	-
+		x	x	x	x	x	x	x	-
 
 ip6_forward rejects packets with unspecified IPv6 source
-		x	x	x	x	x	x	-	-
+		x	x	x	x	x	x	x	-
 
 ip6_mforward rejects packets with unspecified IPv6 source
-		x	x	x	x	x	x	-	-
+		x	x	x	x	x	x	x	-
 
 draft-ietf-ipngwg-p2p-pingpong-00.txt
 		x	x	x	-	-	-	-	-
@@ -131,16 +130,16 @@ CMSG_FIRSTHDR validates msg_controllen
 
 getifaddrs	x	x	x	x	x	x	x	x
 
-icmp6 nodeinfo	07	07	07	07	06	06	05	?
+icmp6 nodeinfo	07	07	07	07	06	06	07	?
 					(*1/2)	(*1/2)	(*1)	(*1/2)
     (all) spec conformance is still low.
     (*1) does not join NI group address
     (*2) node addresses reply does not have TTL attached
 
 net.inet6.icmp6.nodeinfo is a bitmap
-		x	-	x	x	-	x	-	-
+		x	-	x	x	-	x	x	-
 
-nd6_proxyall	-	-	-	x	-	-	-	-
+nd6_proxyall	-	-	-	x	-	-	x	-
 
 ndp -s proxy	x	x	x	x	x	x	x	x
 
@@ -156,19 +155,19 @@ ND6 WAITDELETE state (should be removed)
 		-	-	-	x	x	-	x	x
 
 expiration of ND6 STALE entries (nd6_gctimer)
-		x	x	x	x	-	x	-	-
+		x	x	x	x	-	x	x	-
 
-pfctlinput2	(*1)	x	-	?	-	-	-	-
+pfctlinput2	(*1)	x	-	?	-	-	?	-
     (*1) in ip6_input.c
 
 xx_ctlinput scope friendliness
-		x	x	x	x	-	x	-	-
+		x	x	x	x	-	x	x	-
 
 icmp6 beyondscope
 		x	x	x	x	x	x	x	x
 
 ping6 with short -s
-		x	x	x	x	x	x	-	?
+		x	x	x	x	x	x	x	?
 
 CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	sysctl	ALIGN	ALIGN	ALIGN
 		(*1)		(*1)	(*2)		(*1)	(*2)	(*2)
@@ -184,7 +183,7 @@ getaddrinfo obeys configured resolv order
 		(+)	x	x	x	x	x	x	-
 
 getaddrinfo supports AI_ADDRCONFIG (2553bis)
-		-	-	-	x	-	-	(*1)	-
+		-	-	-	x	-	-	x	-
     (*1) enabled by default, cannot turn it off
 
 getaddrinfo returns official hostname in hosts(5) (leftmost) in ai_canonname
@@ -232,21 +231,21 @@ ipsec socket passing to ip{6,}_output
 		aux	aux	-	aux	aux	-	aux	aux
 
 ipsec esp, encryption logic
-		new	new	(*1)	new	new	(*1)	old	old
+		new	new	(*1)	new	new	(*1)	new	old
     new: unified cbc logic, old: per-algorithm cbc logic
     (*1): not based on kame
 
 ipsec esp, blowfish-cbc codebase (before/after aug28, 2000)
-		new	new	(*1)	new	new	(*1)	old	old
+		new	new	(*1)	new	new	(*1)	new	old
     (*1): not based on kame
 
 ipsec esp, rijndael support
-		(*1)	x	(*2)	x	x	(*2)	-	-
+		(*1)	x	(*2)	x	x	(*2)	x	-
     (*1) except openbsd
     (*2): not based on kame
 
 ipsec esp, twofish support
-		(*1)	-	(*2)	x	-	(*2)	-	-
+		(*1)	-	(*2)	x	-	(*2)	x	-
     (*1) experimental, based on draft-ietf-ipsec-ciph-aes-cbc-00.txt
     (*2): not based on kame
 
@@ -254,7 +253,7 @@ router renumbering declaration does not use bitfield (sys/netinet/icmp6.h)
 		x	x	x	x	x	x	x	-
 
 router renumbering bit declaration conforms RFC2894/2292bis-02
-		x	x	x	x	x	x	-	-
+		x	x	x	x	x	x	x	-
 
 source address selection
 		latest	may00	may00	may00	may00	may00	may00	apr00?
@@ -297,5 +296,5 @@ default sendmail.cf is IPv6 ready
 racoon		x	x	-	-	-	-	-	x
 racoon version	latest	001229	-	ports	pkgsrc	-	ports	?
 
-Userland PPP	(+)	-	?	-	-	?	-	?
-Kernel PPP	(+)	x	?	x	x	?	-	?
+Userland PPP	(+)	-	?	x	-	?	-	?
+Kernel PPP	(+)	x	?	x	x	?	x	?
