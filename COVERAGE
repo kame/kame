@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.7 2000/02/25 05:45:59 itojun Exp $
+$Id: COVERAGE,v 1.8 2000/02/26 17:17:36 itojun Exp $
 
 
 x: supported/integrated
@@ -36,6 +36,8 @@ KAME as of	late	early	early	notyet	notyet	notyet
 TCP/UDP		see IMPLEMENTATION for details
 
 advanced API	2292	2292	2292	notyet	notyet	notyet
+
+getifaddrs	x	x	-	notyet	notyet	notyet
 
 ALTQ		-	-	-	notyet	notyet	notyet
 
