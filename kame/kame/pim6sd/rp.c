@@ -1020,7 +1020,7 @@ rp_grp_match(group)
     if (grp_mask_list == (grp_mask_t *) NULL)
 	return (rp_grp_entry_t *) NULL;
  
-    /* XXX :I compare on the adresses , inet6_equal use the scope too */
+    /* XXX: I compare on the adresses, inet6_equal use the scope too */
     prefix_h.sin6_scope_id = prefix_h2.sin6_scope_id = 0;
 
     for (grp_mask_ptr = grp_mask_list; grp_mask_ptr != (grp_mask_t *) NULL;
