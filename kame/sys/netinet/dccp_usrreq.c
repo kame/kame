@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.6 2003/10/18 08:18:32 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.7 2003/10/18 08:23:35 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -1103,7 +1103,7 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 	struct socket *so = inp->inp_socket;
 	struct mbuf *m;
 
-	struct dccpiphdr *di = NULL;
+	struct ip *ip;
 	struct dccphdr *dh;
 	struct dccp_requesthdr *drqh;
 	struct dccp_ackhdr *dah;
@@ -1115,9 +1115,9 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 	u_int8_t type;
 	char options[DCCP_MAX_OPTIONS *2];
 	long len;
+	int isipv6 = 0;
 #ifdef INET6
-	struct dccpip6hdr *di6 = NULL;
-	int isipv6;
+	struct ip6_hdr *ip6;
 
 	isipv6 = (dp->d_inpcb->inp_vflag & INP_IPV6) != 0;
 #endif
@@ -1231,10 +1231,12 @@ again:
 #ifdef INET6
 	if (isipv6) {
 		DCCP_DEBUG((LOG_INFO, "Sending ipv6 packet...\n"));
-		hdrlen = sizeof(struct dccpip6hdr) + extrah_len + optlen;
+		hdrlen = sizeof(struct ip6_hdr) + sizeof(struct dccphdr) +
+		    extrah_len + optlen;
 	} else
 #endif
-		hdrlen = sizeof(struct dccpiphdr) + extrah_len + optlen;
+		hdrlen = sizeof(struct ip) + sizeof(struct dccphdr) +
+		    extrah_len + optlen;
 
 	if (len > (dp->d_maxseg - extrah_len - optlen)) {
 		len = dp->d_maxseg - extrah_len - optlen;
@@ -1279,7 +1281,7 @@ again:
 
 	m->m_pkthdr.rcvif = (struct ifnet *)0;
 
-	if ((len + hdrlen) > IP_MAXPACKET) {
+	if (!isipv6 && (len + hdrlen) > IP_MAXPACKET) {
 		error = EMSGSIZE;
 		goto release;
 	}
@@ -1290,24 +1292,24 @@ again:
 	 */
 #ifdef INET6
 	if (isipv6) {
-		di6 = mtod(m, struct dccpip6hdr *);
-		di6->di6_flow = (di6->di6_flow & ~IPV6_FLOWINFO_MASK) |
+		ip6 = mtod(m, struct ip6_hdr *);
+		dh = (struct dccphdr *)(ip6 + 1)
+		ip6->ip6_flow = (ip6->di6_flow & ~IPV6_FLOWINFO_MASK) |
 			(inp->in6p_flowinfo & IPV6_FLOWINFO_MASK);
-		di6->di6_vfc = (di6->di6_vfc & ~IPV6_VERSION_MASK) |
+		ip6->ip6_vfc = (ip6->ip6_vfc & ~IPV6_VERSION_MASK) |
 			 (IPV6_VERSION & IPV6_VERSION_MASK);
-		di6->di6_nxt = IPPROTO_DCCP;
-		di6->di6_src = inp->in6p_laddr;
-		di6->di6_dst = inp->in6p_faddr;
-		dh = &di6->di_d;
+		ip6->ip6_nxt = IPPROTO_DCCP;
+		ip6->ip6_src = inp->in6p_laddr;
+		ip6->ip6_dst = inp->in6p_faddr;
 	} else 
 #endif
 	{
-		di = mtod(m, struct dccpiphdr *);
-		bzero(di->di_x1, sizeof(di->di_x1));
-		di->di_pr = IPPROTO_DCCP;
-		di->di_src = inp->inp_laddr;
-		di->di_dst = inp->inp_faddr;
-		dh = &di->di_d;
+		ip = mtod(m, struct ip *);
+		dh = (struct dccphdr *)(ip6 + 1)
+		bzero(ip, sizeof(ip));
+		ip->ip_p = IPPROTO_DCCP;
+		ip->ip_src = inp->inp_laddr;
+		ip->ip_dst = inp->inp_faddr;
 	}
 
 	dh->dh_sport = inp->inp_lport;
@@ -1400,14 +1402,14 @@ again:
 	} else
 #endif
 	{
-	      	dh->dh_sum = in_pseudo(di->di_src.s_addr, di->di_dst.s_addr,
+	      	ip->ip_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
 		    htons((u_short)len + sizeof(struct dccphdr) + extrah_len + optlen + IPPROTO_DCCP)); 
 		dh->dh_sum = in_cksum_skip(m, hdrlen + cslen, 20);
 		m->m_pkthdr.csum_data = offsetof(struct dccphdr, dh_sum);
 
-		((struct ip *)di)->ip_len = hdrlen + len;
-		((struct ip *)di)->ip_ttl = inp->inp_ip_ttl;	/* XXX */
-		((struct ip *)di)->ip_tos = inp->inp_ip_tos;	/* XXX */
+		ip->ip_len = hdrlen + len;
+		ip->ip_ttl = inp->inp_ip_ttl;	/* XXX */
+		ip->ip_tos = inp->inp_ip_tos;	/* XXX */
 	}
 
 	DCCP_DEBUG((LOG_INFO, "Calculated checksum,  dh->dh_cslen = %u, cslen = %u, len = %li hdrlen = %u, dh->dh_sum = 0x%04x\n", dh->dh_cslen, cslen, len, hdrlen, dh->dh_sum));

@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_var.h,v 1.3 2003/10/18 08:16:17 itojun Exp $	*/
+/*	$KAME: dccp6_var.h,v 1.4 2003/10/18 08:23:35 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark
@@ -32,18 +32,6 @@
 
 #ifndef _NETINET_DCCP6_VAR_H_
 #define _NETINET_DCCP6_VAR_H_
-
-struct	dccpip6hdr {
-	struct 	ip6_hdr di_i6;		/* ip6 structure */
-	struct	dccphdr di_d;		/* dccp header */
-};
-
-#define di6_src		di_i6.ip6_src
-#define di6_dst		di_i6.ip6_dst
-#define di6_nxt		di_i6.ip6_nxt
-#define di6_len		di_i6.ip6_plen
-#define di6_flow	di_i6.ip6_flow
-#define di6_vfc		di_i6.ip6_vfc
 
 #ifdef _KERNEL
 SYSCTL_DECL(_net_inet6_dccp6);

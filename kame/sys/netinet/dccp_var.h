@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.4 2003/10/18 08:16:18 itojun Exp $	*/
+/*	$KAME: dccp_var.h,v 1.5 2003/10/18 08:23:35 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -83,11 +83,6 @@ struct dccpcb {
 	u_int8_t remote_ackvector; /* Is recv side using AckVector? */
 };
 
-struct	dccpiphdr {
-	struct 	ipovly	di_i;		/* overlaid ip structure */
-	struct	dccphdr di_d;		/* dccp header */
-};
-
 struct inp_dp {
 	struct inpcb inp;
 	struct dccpcb dp;
@@ -101,12 +96,6 @@ struct xdccpcb {
 	struct	xsocket	xd_socket;
 };
 #endif
-
-#define di_x1           di_i.ih_x1
-#define di_pr           di_i.ih_pr
-#define di_len          di_i.ih_len
-#define di_src          di_i.ih_src
-#define di_dst          di_i.ih_dst
 
 struct	dccpstat {
 	u_long	dccps_connattempt;	/* Initiated connections */
