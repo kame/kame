@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.28 2000/05/24 09:56:52 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.29 2000/05/29 11:42:25 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -164,6 +164,7 @@ ident_i2recv(iph1, msg)
 {
 	vchar_t *pbuf = NULL;
 	struct isakmp_parse_t *pa;
+	vchar_t *satmp = NULL;
 	int error = -1;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
@@ -198,7 +199,7 @@ ident_i2recv(iph1, msg)
 			pa->type, ISAKMP_NPTYPE_SA);
 		goto end;
 	}
-	if (isakmp_p2ph(&iph1->sa, pa->ptr) < 0)
+	if (isakmp_p2ph(&satmp, pa->ptr) < 0)
 		goto end;
 	pa++;
 
@@ -224,7 +225,7 @@ ident_i2recv(iph1, msg)
 	}
 
 	/* check SA payload and set approval SA for use */
-	if (ipsecdoi_checkph1proposal(iph1->sa, iph1) < 0) {
+	if (ipsecdoi_checkph1proposal(satmp, iph1) < 0) {
 		plog(logp, LOCATION, iph1->remote,
 			"failed to get valid proposal.\n");
 		/* XXX send information */
@@ -242,6 +243,8 @@ ident_i2recv(iph1, msg)
 end:
 	if (pbuf)
 		vfree(pbuf);
+	if (satmp)
+		vfree(satmp);
 	return error;
 }
 
