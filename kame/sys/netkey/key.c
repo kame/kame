@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.148 2000/08/05 17:58:38 sumikawa Exp $	*/
+/*	$KAME: key.c,v 1.149 2000/08/11 08:58:04 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -5928,7 +5928,7 @@ key_acquire2(so, m, mhp)
  * to KMD by PF_KEY.
  * If socket is detached, must free from regnode.
  *
- * m will always e freed.
+ * m will always be freed.
  */
 static int
 key_register(so, m, mhp)

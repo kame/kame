@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.69 2000/07/21 15:51:20 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.70 2000/08/11 08:58:40 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1170,7 +1170,7 @@ pk_recvadd(mhp)
 	struct ph2handle *iph2;
 	u_int sa_mode;
 
-	/* ignore this message becauase of local test mode. */
+	/* ignore this message because of local test mode. */
 	if (f_local)
 		return 0;
 
