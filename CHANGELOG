@@ -1,8 +1,29 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.305 1999/11/30 15:55:37 sumikawa Exp $
+$Id: CHANGELOG,v 1.306 1999/12/01 01:59:01 itojun Exp $
 
-<199911>
+<199912>
+Wed Dec  1 10:29:16 JST 1999
+	* openbsd/sys/socket.h: remove #define for __ss_len and __ss_family.
+	  add some comments.
+	* use sa_len, not ss_len nor __ss_len, when touching "length" member
+	  of sockaddr_storage.  affected files are:
+		kame/libinet6
+		kame/tcpdump/print-isakmp.c
+		kame/faithd
+
+	due to the following reasons, I would make userland code to (1) have
+	"-Dss_len=__ss_len" into CPPFLAGS, or (2) make it never touch ss_len
+	nor __ss_len.  this should be the most portable approach.
+
+	- I believe RFC2553 ss_len/__ss_len issue is not very clarified (need
+	  to ask on ipngwg mailing list).
+	- Theo (of OpenBSD) is *very* opposed of having __ss_len, even backward
+	  compat #define.  I can understand his point (programmers will never
+	  notice if compilation goes fine) so I would make kame/openbsd to
+	  define sockaddr_storage with ss_{len,family}.
+	- for non-openbsd other platforms, I would just obey RFC2553.
+
 Wed Dec  1 00:47:16 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/sys/netinet6/{ip6_input.c, in6_ifattach.c}: removed
 	in6_ifattach_p2p(). GIF does not have linklocal address unless it
@@ -12,6 +33,7 @@ Wed Dec  1 00:47:16 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	initialize when auto-generated linklocal address is assigned to
 	P-to-P IF.
 
+<199911>
 Tue Nov 30 22:14:58 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/sock5: add new port, SOCKS based translator by NEC.
 
