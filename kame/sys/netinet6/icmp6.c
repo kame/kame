@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.160 2000/11/30 03:36:40 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.161 2000/11/30 08:16:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -183,6 +183,7 @@ static int ni6_addrs __P((struct icmp6_nodeinfo *, struct mbuf *,
 			  struct ifnet **, char *));
 static int ni6_store_addrs __P((struct icmp6_nodeinfo *, struct icmp6_nodeinfo *,
 				struct ifnet *, int));
+static int icmp6_notify_error __P((struct mbuf *, int, int, int));
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct rtentry *icmp6_mtudisc_clone __P((struct sockaddr *));
 static void icmp6_mtudisc_timeout __P((struct rtentry *, struct rttimer *));
@@ -446,8 +447,6 @@ icmp6_input(mp, offp, proto)
 	int off = *offp;
 	int icmp6len = m->m_pkthdr.len - *offp;
 	int code, sum, noff;
-	struct sockaddr_in6 icmp6src;
-	u_int32_t notifymtu;
 
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct icmp6_hdr), IPPROTO_DONE);
@@ -907,30 +906,66 @@ icmp6_input(mp, offp, proto)
 			break;
 		}
 	deliver:
-		if (icmp6len < sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr)) {
-			icmp6stat.icp6s_tooshort++;
-			goto freeit;
+		if (icmp6_notify_error(m, off, icmp6len, code)) {
+			/* In this case, m should've been freed. */
+			return(IPPROTO_DONE);
 		}
-#ifndef PULLDOWN_TEST
-		IP6_EXTHDR_CHECK(m, off,
-			sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr),
-			IPPROTO_DONE);
-		icmp6 = (struct icmp6_hdr *)(mtod(m, caddr_t) + off);
-#else
-		IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, off,
-			sizeof(*icmp6) + sizeof(struct ip6_hdr));
-		if (icmp6 == NULL) {
-			icmp6stat.icp6s_tooshort++;
-			return IPPROTO_DONE;
-		}
-#endif
-		bzero(&icmp6src, sizeof(icmp6src));
-		icmp6src.sin6_len = sizeof(struct sockaddr_in6);
-		icmp6src.sin6_family = AF_INET6;
-		icmp6src.sin6_addr = ((struct ip6_hdr *)(icmp6 + 1))->ip6_dst;
+		break;
 
-		/* Detect the upper level protocol */
-	    {
+	badcode:
+		icmp6stat.icp6s_badcode++;
+		break;
+
+	badlen:
+		icmp6stat.icp6s_badlen++;
+		break;
+	}
+
+#ifdef HAVE_NRL_INPCB
+	rip6_input(&m, offp, IPPROTO_ICMPV6);
+#else
+	icmp6_rip6_input(&m, *offp);
+#endif
+	return IPPROTO_DONE;
+
+ freeit:
+	m_freem(m);
+	return IPPROTO_DONE;
+}
+
+static int
+icmp6_notify_error(m, off, icmp6len, code)
+	struct mbuf *m;
+	int off, icmp6len;
+{
+	struct icmp6_hdr *icmp6;
+	u_int32_t notifymtu;
+	struct sockaddr_in6 icmp6src;
+
+	if (icmp6len < sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr)) {
+		icmp6stat.icp6s_tooshort++;
+		goto freeit;
+	}
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off,
+			 sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr),
+			 -1);
+	icmp6 = (struct icmp6_hdr *)(mtod(m, caddr_t) + off);
+#else
+	IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, off,
+		       sizeof(*icmp6) + sizeof(struct ip6_hdr));
+	if (icmp6 == NULL) {
+		icmp6stat.icp6s_tooshort++;
+		return(-1);
+	}
+#endif
+	bzero(&icmp6src, sizeof(icmp6src));
+	icmp6src.sin6_len = sizeof(struct sockaddr_in6);
+	icmp6src.sin6_family = AF_INET6;
+	icmp6src.sin6_addr = ((struct ip6_hdr *)(icmp6 + 1))->ip6_dst;
+
+	/* Detect the upper level protocol */
+	{
 		void (*ctlfunc) __P((int, struct sockaddr *, void *));
 		struct ip6_hdr *eip6 = (struct ip6_hdr *)(icmp6 + 1);
 		u_int8_t nxt = eip6->ip6_nxt;
@@ -954,15 +989,15 @@ icmp6_input(mp, offp, proto)
 #ifndef PULLDOWN_TEST
 				IP6_EXTHDR_CHECK(m, 0, eoff +
 						 sizeof(struct ip6_ext),
-						 IPPROTO_DONE);
+						 -1);
 				eh = (struct ip6_ext *)(mtod(m, caddr_t)
 							+ eoff);
 #else
 				IP6_EXTHDR_GET(eh, struct ip6_ext *, m,
-					eoff, sizeof(*eh));
+					       eoff, sizeof(*eh));
 				if (eh == NULL) {
 					icmp6stat.icp6s_tooshort++;
-					return IPPROTO_DONE;
+					return(-1);
 				}
 #endif
 				
@@ -983,15 +1018,15 @@ icmp6_input(mp, offp, proto)
 				 */
 #ifndef PULLDOWN_TEST
 				IP6_EXTHDR_CHECK(m, 0, eoff + sizeof(*rth),
-						 IPPROTO_DONE);
+						 -1);
 				rth = (struct ip6_rthdr *)(mtod(m, caddr_t)
 							   + eoff);
 #else
 				IP6_EXTHDR_GET(rth, struct ip6_rthdr *, m,
-					eoff, sizeof(*rth));
+					       eoff, sizeof(*rth));
 				if (rth == NULL) {
 					icmp6stat.icp6s_tooshort++;
-					return IPPROTO_DONE;
+					return(-1);
 				}
 #endif
 				rthlen = (rth->ip6r_len + 1) << 3;
@@ -1009,7 +1044,7 @@ icmp6_input(mp, offp, proto)
 
 #ifndef PULLDOWN_TEST
 					IP6_EXTHDR_CHECK(m, 0, eoff + rthlen,
-							 IPPROTO_DONE);
+							 -1);
 					rth0 = (struct ip6_rthdr0 *)(mtod(m, caddr_t) + eoff);
 #else
 					IP6_EXTHDR_GET(rth0,
@@ -1017,7 +1052,7 @@ icmp6_input(mp, offp, proto)
 						       eoff, rthlen);
 					if (rth0 == NULL) {
 						icmp6stat.icp6s_tooshort++;
-						return IPPROTO_DONE;
+						return(-1);
 					}
 #endif
 					/* just ignore a bogus header */
@@ -1032,15 +1067,15 @@ icmp6_input(mp, offp, proto)
 #ifndef PULLDOWN_TEST
 				IP6_EXTHDR_CHECK(m, 0, eoff +
 						 sizeof(struct ip6_frag),
-						 IPPROTO_DONE);
+						 -1);
 				fh = (struct ip6_frag *)(mtod(m, caddr_t)
 							 + eoff);
 #else
 				IP6_EXTHDR_GET(fh, struct ip6_frag *, m,
-					eoff, sizeof(*fh));
+					       eoff, sizeof(*fh));
 				if (fh == NULL) {
 					icmp6stat.icp6s_tooshort++;
-					return IPPROTO_DONE;
+					return(-1);
 				}
 #endif
 				/*
@@ -1067,15 +1102,15 @@ icmp6_input(mp, offp, proto)
 				goto notify;
 			}
 		}
-	    notify:
+	  notify:
 #ifndef PULLDOWN_TEST
 		icmp6 = (struct icmp6_hdr *)(mtod(m, caddr_t) + off);
 #else
 		IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, off,
-			sizeof(*icmp6) + sizeof(struct ip6_hdr));
+			       sizeof(*icmp6) + sizeof(struct ip6_hdr));
 		if (icmp6 == NULL) {
 			icmp6stat.icp6s_tooshort++;
-			return IPPROTO_DONE;
+			return(-1);
 		}
 #endif
 		if (finaldst == NULL)
@@ -1098,30 +1133,14 @@ icmp6_input(mp, offp, proto)
 			(inet6sw[ip6_protox[nxt]].pr_ctlinput);
 		if (ctlfunc) {
 			(void) (*ctlfunc)(code, (struct sockaddr *)&icmp6src,
-			    &ip6cp);
+					  &ip6cp);
 		}
-	    }
-		break;
-
-	badcode:
-		icmp6stat.icp6s_badcode++;
-		break;
-
-	badlen:
-		icmp6stat.icp6s_badlen++;
-		break;
 	}
+	return(0);
 
-#ifdef HAVE_NRL_INPCB
-	rip6_input(&m, offp, IPPROTO_ICMPV6);
-#else
-	icmp6_rip6_input(&m, *offp);
-#endif
-	return IPPROTO_DONE;
-
- freeit:
+  freeit:
 	m_freem(m);
-	return IPPROTO_DONE;
+	return(-1);
 }
 
 void
