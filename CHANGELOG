@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1690 2001/05/26 14:44:26 sakane Exp $
+$KAME: CHANGELOG,v 1.1691 2001/05/26 15:25:37 itojun Exp $
 
 <200105>
 Sat May 26 23:40:50 JST 2001 sakane@ydc.co.jp
 	* freebsd4/sys/netinet6/raw_ip6.c:
-	Fixed IPV6_MINMTU behavior in rip6_output().
+	Fixed IPV6_USE_MIN_MTU behavior in rip6_output().
 
 Thu May 24 18:18:24 JST 2001 sakane@ydc.co.jp
 	* kame/racoon:
