@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.26 1999/11/10 13:42:37 sakane Exp $ */
+/* KAME $Id: key.c,v 1.27 1999/11/17 14:10:25 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -453,8 +453,8 @@ key_checkrequest(isr, saidx)
 				printf("DP checkrequest calls free SA:%p\n",
 					isr->sav));
 			key_freesav(isr->sav);
+			isr->sav = NULL;
 		}
-		isr->sav = NULL;
 	}
 
 	/* new SA allocation if no SA found. */
@@ -1848,9 +1848,11 @@ key_delsav(sav)
 		KFREE(sav->misc3);
 #endif
 
+#if 0
 	sav->sah = NULL;
 		/* XXX for making sure.  See key_checkrequest(),
 		 * Refcnt may be suspicious. */
+#endif
 
 	KFREE(sav);
 
