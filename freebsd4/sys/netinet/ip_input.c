@@ -404,17 +404,6 @@ tooshort:
 			m_adj(m, ip->ip_len - m->m_pkthdr.len);
 	}
 
-	/*
-	 * Don't accept packets with a loopback destination address
-	 * unless they arrived via the loopback interface.
-	 */
-	if ((ntohl(ip->ip_dst.s_addr) & IN_CLASSA_NET) ==
-	    (IN_LOOPBACKNET << IN_CLASSA_NSHIFT) && 
-	    (m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0) {
-		ipstat.ips_badaddr++;
-		goto bad;
-	}
-
 #ifdef IPSEC
 	if (ipsec_gethist(m, NULL))
 		goto pass;
