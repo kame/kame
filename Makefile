@@ -11,7 +11,8 @@ bsdi4:
 	(set CVSROOT=cvs.kame.net/cvsroot/kame-local; export CVSROOT; cvs -d cvs.kame.net:/cvsroot/kame-local co -d bsdi4 -P kame/bsdi4)
 
 DOC=	CHANGELOG COPYRIGHT COPYRIGHT.jp IMPLEMENTATION INSTALL \
-	INSTALL.anoncvs Makefile PORTABILITY VERSION prepare.pl
+	INSTALL.anoncvs Makefile PORTABILITY VERSION prepare.pl \
+	TODO.new-repository
 PLAT=	freebsd2 freebsd3 kame netbsd openbsd
 
 update: update-doc update-plat
