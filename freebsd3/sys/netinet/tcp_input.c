@@ -142,19 +142,6 @@ int tcp_delack_enabled = 1;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, delayed_ack, CTLFLAG_RW, 
 	&tcp_delack_enabled, 0, "");
 
-#ifdef ALTQ_ECN
-/*
- * experimental ECN support based on 
- *	draft-kksjf-ecn-03.txt and http://www-nrg.ee.lbl.gov/floyd/ECN-IP.txt
- *
- * NOTE: this is an experimental implementation.
- *
- */
-int tcp_ecn = 1;
-SYSCTL_INT(_net_inet_tcp, TCPCTL_ECN, ecn,
-	CTLFLAG_RW, &tcp_ecn , 0, "");
-#endif /* ALTQ_ECN */
-
 #ifdef TCP_DROP_SYNFIN
 static int drop_synfin = 0;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, drop_synfin, CTLFLAG_RW,
@@ -428,9 +415,6 @@ tcp_input(m, off, proto)
 	struct tcpopt to;		/* options in this segment */
 	struct rmxp_tao *taop;		/* pointer to our TAO cache entry */
 	struct rmxp_tao	tao_noncached;	/* in case there's no cached entry */
-#ifdef ALTQ_ECN
-	u_char ip_tos;
-#endif
 #ifdef TCPDEBUG
 	short ostate = 0;
 #endif
@@ -472,10 +456,6 @@ tcp_input(m, off, proto)
 	if (isipv6) {
 		IP6_EXTHDR_CHECK(m, off, sizeof(struct tcphdr), );
 		ip6 = mtod(m, struct ip6_hdr *);
-#ifdef ALTQ_ECN
-		/* save ip_tos */
-		ip_tos = ntohl(ip6->ip6_flow) >> 20;
-#endif
 		tilen = ntohs(ip6->ip6_plen) - off + sizeof(*ip6);
 
 		if (in6_cksum(m, IPPROTO_TCP, off, tilen)) {
@@ -503,10 +483,6 @@ tcp_input(m, off, proto)
 		}
 		ip = mtod(m, struct ip *);
 		ipov = (struct ipovly *)ip;
-#ifdef ALTQ_ECN
-		/* save ip_tos before clearing it for checksum */
-		ip_tos = ip->ip_tos;
-#endif
 
 		/*
 		 * Checksum extended TCP header and data.
@@ -674,11 +650,6 @@ findpcb:
 #endif
 #endif /*IPSEC*/
 
-#ifdef ALTQ_ECN
-	/* if congestion experienced, set ECN bit in the next output. */
-	if ((ip_tos & (IPTOS_ECT|IPTOS_CE)) == (IPTOS_ECT|IPTOS_CE))
-		tp->t_flags |= TF_RCVD_CE;
-#endif
 	/*
 	 * If the state is CLOSED (i.e., TCB does not exist) then
 	 * all data in the incoming segment is discarded.
@@ -974,11 +945,6 @@ findpcb:
 	if (th->th_flags & TH_SYN)
 		tcp_mss(tp, to.to_maxseg, isipv6);	/* sets t_maxseg */
 
-#ifdef ALTQ_ECN
-	/* if congestion experienced, set ECN bit in the next output. */
-	if ((ip_tos & (IPTOS_ECT|IPTOS_CE)) == (IPTOS_ECT|IPTOS_CE))
-		tp->t_flags |= TF_RCVD_CE;
-#endif
 	/*
 	 * Header prediction: check for the two common cases
 	 * of a uni-directional data xfer.  If the packet has
@@ -997,11 +963,7 @@ findpcb:
 	 * be TH_NEEDSYN.
 	 */
 	if (tp->t_state == TCPS_ESTABLISHED &&
-#ifdef ALTQ_ECN
-	    (thflags & (TH_SYN|TH_FIN|TH_RST|TH_URG|TH_ECNECHO|TH_CWR|TH_ACK)) == TH_ACK &&
-#else
 	    (thflags & (TH_SYN|TH_FIN|TH_RST|TH_URG|TH_ACK)) == TH_ACK &&
-#endif
 	    ((tp->t_flags & (TF_NEEDSYN|TF_NEEDFIN)) == 0) &&
 	    ((to.to_flag & TOF_TS) == 0 ||
 	     TSTMP_GEQ(to.to_tsval, tp->ts_recent)) &&
@@ -1048,11 +1010,6 @@ findpcb:
 				tcpstat.tcps_rcvackbyte += acked;
 				sbdrop(&so->so_snd, acked);
 				tp->snd_una = th->th_ack;
-#ifdef ALTQ_ECN
-				/* sync snc_rcvr with snd_una */
-				if (SEQ_GT(tp->snd_una, tp->snd_rcvr))
-					tp->snd_rcvr = tp->snd_una;
-#endif
 				m_freem(m);
 #ifdef INET6
 				/* some progress has been done */
@@ -1261,18 +1218,6 @@ findpcb:
 		tp->irs = th->th_seq;
 		tcp_sendseqinit(tp);
 		tcp_rcvseqinit(tp);
-#ifdef ALTQ_ECN
-		tp->snd_rcvr = tp->snd_una;
-		/*
-		 * if both ECNECHO and CWR flag bits are set,
-		 * peer is ECN capable
-		 */
-		if (tcp_ecn &&
-		    (thflags & (TH_ECNECHO|TH_CWR)) == (TH_ECNECHO|TH_CWR)) {
-			tp->t_flags |= TF_REQ_ECN;
-			thflags &= ~(TH_ECNECHO|TH_CWR);
-		}
-#endif
 		/*
 		 * Initialization of the tcpcb for transaction;
 		 *   set SND.WND = SEG.WND,
@@ -1419,23 +1364,6 @@ findpcb:
 
 		tp->irs = th->th_seq;
 		tcp_rcvseqinit(tp);
-#ifdef ALTQ_ECN
-		tp->snd_rcvr = tp->snd_una;
-		/*
-		 * peer is ECN capable
-		 *  - if ECNECHO is set but CWR is not set for SYN-ACK
-		 *  - if both ECNECHO and CWR are set for simultaneous open
-		 */
-		if (tcp_ecn) {
-			if ((thflags & (TH_ACK|TH_ECNECHO|TH_CWR))
-			    == (TH_ACK|TH_ECNECHO) ||
-			    (thflags & (TH_ACK|TH_ECNECHO|TH_CWR))
-			    == (TH_ECNECHO|TH_CWR)) {
-				tp->t_flags |= TF_REQ_ECN;
-				thflags &= ~(TH_ECNECHO|TH_CWR);
-			}
-		}
-#endif
 		if (thflags & TH_ACK) {
 			/*
 			 * Our SYN was acked.  If segment contains CC.ECHO
@@ -1927,37 +1855,6 @@ trimthenstep6:
 	case TCPS_LAST_ACK:
 	case TCPS_TIME_WAIT:
 
-#ifdef ALTQ_ECN
-		/*
-		 * if we receive ECN notify and we are not already in
-		 * receovery phase, reduce cwnd by half but don't slow-
-		 * start.
-		 */
-		if (tcp_ecn && (thflags & TH_ECNECHO)) {
-			if (SEQ_GEQ(tp->snd_una, tp->snd_rcvr)) {
-				u_int win = min(tp->snd_wnd, tp->snd_cwnd) / 2 /
-					tp->t_maxseg;
-				if (win < 2)
-					win = 2;
-				tp->snd_ssthresh = win * tp->t_maxseg;
-				tp->snd_cwnd = tp->snd_ssthresh;
-				tp->t_flags |= TF_SENDCWR;
-				/*
-				 * advance snd_rcvr to snd_max not to
-				 * reduce cwnd again until all outstanding
-				 * packets are acked.
-				 */
-				tp->snd_rcvr = tp->snd_max;
-			}
-		}
-		/*
-		 * if we receive CWR, we know that the peer has reduced
-		 * its congestion window.  stop sending ecn-echo.
-		 */
-		if (thflags & TH_CWR)
-			tp->t_flags &= ~TF_RCVD_CE;
-#endif /* ALTQ_ECN */
-
 		if (SEQ_LEQ(th->th_ack, tp->snd_una)) {
 			if (tilen == 0 && tiwin == tp->snd_wnd) {
 				tcpstat.tcps_rcvdupack++;
@@ -1990,17 +1887,6 @@ trimthenstep6:
 					tp->t_dupacks = 0;
 				else if (++tp->t_dupacks == tcprexmtthresh) {
 					tcp_seq onxt = tp->snd_nxt;
-#ifdef ALTQ_ECN
-					if (SEQ_LT(tp->snd_una, tp->snd_rcvr)) {
-						/*
-						 * we are in recovery phase
-						 * and have already halved
-						 * cwnd within a roundtrip.
-						 * don't reduce cwnd again.
-						 */
-					}
-					else {
-#endif /* ALTQ_ECN */
 					u_int win =
 					    min(tp->snd_wnd, tp->snd_cwnd) / 2 /
 						tp->t_maxseg;
@@ -2008,12 +1894,6 @@ trimthenstep6:
 					if (win < 2)
 						win = 2;
 					tp->snd_ssthresh = win * tp->t_maxseg;
-#ifdef ALTQ_ECN
-					tp->t_flags |= TF_SENDCWR;
-					/* mark we are in recovery phase */
-					tp->snd_rcvr = tp->snd_max;
-				        }
-#endif
 					tp->t_timer[TCPT_REXMT] = 0;
 					tp->t_rtt = 0;
 					tp->snd_nxt = th->th_ack;
@@ -2131,11 +2011,6 @@ process_ACK:
 		}
 		sowwakeup(so);
 		tp->snd_una = th->th_ack;
-#ifdef ALTQ_ECN
-		/* sync snc_rcvr with snd_una */
-		if (SEQ_GT(tp->snd_una, tp->snd_rcvr))
-			tp->snd_rcvr = tp->snd_una;
-#endif
 		if (SEQ_LT(tp->snd_nxt, tp->snd_una))
 			tp->snd_nxt = tp->snd_una;
 

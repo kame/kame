@@ -129,11 +129,6 @@ struct tcpcb {
 #define	TF_RCVD_CC	0x04000		/* a CC was received in SYN */
 #define	TF_SENDCCNEW	0x08000		/* send CCnew instead of CC in SYN */
 #define	TF_MORETOCOME	0x10000		/* More data to be appended to sock */
-#ifdef ALTQ_ECN
-#define TF_REQ_ECN	0x20000		/* peer is ECN capable */
-#define TF_RCVD_CE	0x40000		/* send ECN in next seg */
-#define TF_SENDCWR	0x80000		/* send CWR in next seg */
-#endif
 	int	t_force;		/* 1 if forcing out a byte */
 
 	tcp_seq	snd_una;		/* send unacknowledged */
@@ -148,9 +143,6 @@ struct tcpcb {
 	tcp_seq	iss;			/* initial send sequence number */
 	tcp_seq	irs;			/* initial receive sequence number */
 
-/* #ifdef ALTQ_ECN */ /* usr.bin/netstat is confused by this ifdef */
-	tcp_seq snd_rcvr;		/* outstanding seg at fastrecovery */
-/* #endif */
 	tcp_seq	rcv_nxt;		/* receive next */
 	tcp_seq	rcv_adv;		/* advertised window */
 	u_long	rcv_wnd;		/* receive window */
@@ -375,12 +367,7 @@ struct	xtcpcb {
 #define	TCPCTL_KEEPINIT		10	/* receive buffer space */
 #define	TCPCTL_PCBLIST		11	/* list of all outstanding PCBs */
 #define	TCPCTL_V6MSSDFLT	12	/* MSS default for IPv6 */
-#ifdef ALTQ_ECN
-#define	TCPCTL_ECN		13	/* explicit congestion notification */
-#define TCPCTL_MAXID		14
-#else
 #define TCPCTL_MAXID		13
-#endif
 
 #define TCPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -491,9 +478,6 @@ extern	struct pr_usrreqs tcp6_usrreqs;
 #endif /* INET6 */
 extern	u_long tcp_sendspace;
 extern	u_long tcp_recvspace;
-#ifdef ALTQ_ECN
-extern	int tcp_ecn;
-#endif
 
 #endif /* KERNEL */
 

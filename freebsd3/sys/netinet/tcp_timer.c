@@ -305,10 +305,6 @@ tcp_timers(tp, timer)
 		tp->snd_cwnd = tp->t_maxseg;
 		tp->snd_ssthresh = win * tp->t_maxseg;
 		tp->t_dupacks = 0;
-#ifdef ALTQ_ECN
-		tp->t_flags |= TF_SENDCWR;
-		tp->snd_rcvr = tp->snd_max;
-#endif
 		}
 		(void)tcp_output(tp);
 		break;

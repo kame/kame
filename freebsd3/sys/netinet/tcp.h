@@ -67,13 +67,7 @@ struct tcphdr {
 #define	TH_PUSH	0x08
 #define	TH_ACK	0x10
 #define	TH_URG	0x20
-#if 1 /* ALTQ_ECN */
-#define	TH_ECNECHO	0x40		/* ecn echo */
-#define	TH_CWR		0x80		/* congestion window reduced */
-#define TH_FLAGS (TH_FIN|TH_SYN|TH_RST|TH_ACK|TH_URG|TH_ECNECHO|TH_CWR)
-#else
 #define TH_FLAGS (TH_FIN|TH_SYN|TH_RST|TH_ACK|TH_URG)
-#endif
 
 	u_short	th_win;			/* window */
 	u_short	th_sum;			/* checksum */

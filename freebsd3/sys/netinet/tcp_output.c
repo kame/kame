@@ -537,30 +537,6 @@ send:
 		panic("tcphdr too big");
 /*#endif*/
 
-#ifdef ALTQ_ECN
-	if (tcp_ecn) {
-		/*
-		 * if we have received congestion experienced segs,
-		 * set ECNECHO bit.
-		 * if this is a SYN seg, set ECNECHO and CWR for a pure SYN,
-		 * set only ECNECHO for SYN-ACK.
-		 */
-		if (tp->t_flags & TF_RCVD_CE)
-			flags |= TH_ECNECHO;
-		if ((flags & (TH_SYN|TH_ACK)) == TH_SYN)
-			flags |= (TH_ECNECHO|TH_CWR);
-		else if ((flags & (TH_SYN|TH_ACK)) == (TH_SYN|TH_ACK))
-			flags |= TH_ECNECHO;
-		/*
-		 * if we have reduced the congestion window, notify
-		 * the peer by setting CWR bit.
-		 */
-		if (tp->t_flags & TF_SENDCWR) {
-			flags |= TH_CWR;
-			tp->t_flags &= ~TF_SENDCWR;
-		}
-	}
-#endif
 	/*
 	 * Grab a header mbuf, attaching a copy of data to
 	 * be transmitted, and initialize the header from
@@ -686,30 +662,6 @@ send:
 	}
 #endif /* INET6 */
 
-#ifdef ALTQ_ECN
-	if (tcp_ecn) {
-		/*
-		 * if we have received congestion experienced segs,
-		 * set ECNECHO bit.
-		 * if this is a SYN seg, set ECNECHO and CWR for a pure SYN,
-		 * set only ECNECHO for SYN-ACK.
-		 */
-		if (tp->t_flags & TF_RCVD_CE)
-			flags |= TH_ECNECHO;
-		if ((flags & (TH_SYN|TH_ACK)) == TH_SYN)
-			flags |= (TH_ECNECHO|TH_CWR);
-		else if ((flags & (TH_SYN|TH_ACK)) == (TH_SYN|TH_ACK))
-			flags |= TH_ECNECHO;
-		/*
-		 * if we have reduced the congestion window, notify
-		 * the peer by setting CWR bit.
-		 */
-		if (tp->t_flags & TF_SENDCWR) {
-			flags |= TH_CWR;
-			tp->t_flags &= ~TF_SENDCWR;
-		}
-	}
-#endif
 	/*
 	 * Fill in fields, remembering maximum advertised
 	 * window for use in delaying messages about window sizes.
@@ -907,14 +859,6 @@ send:
 #endif /* INET6 */
 	ip->ip_ttl = tp->t_inpcb->inp_ip_ttl;	/* XXX */
 	ip->ip_tos = tp->t_inpcb->inp_ip_tos;	/* XXX */
-#ifdef ALTQ_ECN
-	/*
-	 * if peer is ECN capable and this is not a pure ack seg,
-	 * set ECN capable bit in IP header.
-	 */
-	if ((tp->t_flags & TF_REQ_ECN) && len > 0)
-		ip->ip_tos |= IPTOS_ECT;
-#endif
 #if 1
 	/*
 	 * See if we should do MTU discovery.  We do it only if the following
