@@ -1023,12 +1023,12 @@ ip_optcopy(ip, jp)
 			continue;
 		}
 #ifdef DIAGNOSTIC
-		if (cnt < IPOPT_OLEN + sizoef(*cp))
+		if (cnt < IPOPT_OLEN + sizeof(*cp))
 			panic("malformed IPv4 option passed to ip_optcopy");
 #endif
 		optlen = cp[IPOPT_OLEN];
 #ifdef DIAGNOSTIC
-		if (optlen < IPOPT_OLEN + sizoef(*cp) || optlen > cnt)
+		if (optlen < IPOPT_OLEN + sizeof(*cp) || optlen > cnt)
 			panic("malformed IPv4 option passed to ip_optcopy");
 #endif
 		/* bogus lengths should have been caught by ip_dooptions */
