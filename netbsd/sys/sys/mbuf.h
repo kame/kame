@@ -251,6 +251,7 @@ struct mbuf {
 		(m)->m_nextpkt = (struct mbuf *)NULL; \
 		(m)->m_data = (m)->m_pktdat; \
 		(m)->m_flags = M_PKTHDR; \
+		(m)->m_pkthdr.aux = (void *)NULL; \
 	} else \
 		(m) = m_retryhdr((how), (type)); \
 } while (0)
