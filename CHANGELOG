@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.287 1999/11/22 22:23:43 itojun Exp $
+$Id: CHANGELOG,v 1.288 1999/11/24 05:58:51 itojun Exp $
 
 <199911>
+Wed Nov 24 14:58:07 JST 1999  itojun@iijlab.net
+	* freebsd3/sys/netinet/tcp_input.c: do not remove ip header and tcp
+	  header/option until we pass the mbuf to socket layer, or tcp reass
+	  queue.  see entry on Tue Nov 23 07:22:45 JST 1999.
+
 Tue Nov 23 07:22:45 JST 1999  itojun@iijlab.net
 	* netbsd/sys/netinet/tcp_input.c: do not remove ip header and tcp
 	  header/option until we pass the mbuf to socket layer, or tcp reass
