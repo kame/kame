@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.234 2001/10/23 11:00:59 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.235 2001/11/04 12:15:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -791,37 +791,7 @@ skip_ipsec2:;
 	}
 #endif /* MIP6 */
 	dst = (struct sockaddr_in6 *)&ro->ro_dst;
-	/*
-	 * If there is a cached route,
-	 * check that it is to the same destination
-	 * and is still up. If not, free it and try again.
-	 */
-	if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
-			 !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &ip6->ip6_dst))) {
-		RTFREE(ro->ro_rt);
-		ro->ro_rt = (struct rtentry *)0;
-	}
-	if (ro->ro_rt == 0) {
-		bzero(dst, sizeof(*dst));
-		dst->sin6_family = AF_INET6;
-		dst->sin6_len = sizeof(struct sockaddr_in6);
-		dst->sin6_addr = ip6->ip6_dst;
-#ifdef SCOPEDROUTING
-		/* XXX: sin6_scope_id should already be fixed at this point */
-		if (dst->sin6_scope_id == 0) {
-			struct sockaddr_in6 dst0 = *dst;
 
-			/* XXX: in6_recoverscope will clear the embedded ID */
-			error = in6_recoverscope(&dst0, &dst->sin6_addr, NULL);
-			if (error != 0) {
-				ip6stat.ip6s_badscope++;
-				in6_ifstat_inc(ifp, ifs6_out_discard);
-				goto bad;
-			}
-			dst->sin6_scope_id = dst0.sin6_scope_id;
-		}
-#endif
-	}
 #ifdef IPSEC
 #ifdef __OpenBSD__
 	/*
@@ -949,9 +919,28 @@ skip_ipsec2:;
 		 */
 		struct ifnet *ifp0 = NULL;
 		struct sockaddr_in6 src;
-		struct sockaddr_in6 dst0 = *dst;
+		struct sockaddr_in6 dst0;
 		int clone = 0;
 		int64_t zone;
+
+		/*
+		 * XXX: sockaddr_in6 for the destination should be passed
+		 * from the upper layer with a proper scope zone ID, in order
+		 * to make a copy here. 
+		 */
+		bzero(&dst0, sizeof(dst0));
+		dst0.sin6_family = AF_INET6;
+		dst0.sin6_len = sizeof(dst0);
+		dst0.sin6_addr = ip6->ip6_dst;
+#ifdef SCOPEDROUTING
+		/* XXX: in6_recoverscope will clear the embedded ID */
+		error = in6_recoverscope(&dst0, &dst0.sin6_addr, NULL);
+		if (error != 0) {
+			ip6stat.ip6s_badscope++;
+			in6_ifstat_inc(ifp, ifs6_out_discard);
+			goto bad;
+		}
+#endif
 
 #if defined(__bsdi__) || defined(__FreeBSD__)
 		if (ro != &ip6route && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
@@ -971,6 +960,13 @@ skip_ipsec2:;
 			if (ifp != NULL)
 				in6_ifstat_inc(ifp, ifs6_out_discard);
 			goto bad;
+		}
+		if (rt == NULL) {
+			/*
+			 * If in6_selectroute() does not return a route entry,
+			 * dst may not have been updated. 
+			 */
+			*dst = dst0;	/* XXX */
 		}
 
 		/*
