@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.29 2000/04/19 02:48:26 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.30 2000/04/19 04:29:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -238,18 +238,21 @@ encap4_input(m, va_alist)
 
 	/* for backward compatibility */
 #ifdef __OpenBSD__
-#error baa
 # if defined(MROUTING) || defined(IPSEC)
 #  define COMPATFUNC	ip4_input
 # endif
 #elif defined(__NetBSD__)
+	if (proto == IPPROTO_IPV4) {
 # if NIPIP > 0
-#  define COMPATFUNC	ipip_input
+		ipip_input(m, off, proto);
+		return;
 # else
 #  ifdef MROUTING
-#   define COMPATFUNC	mrt_ipip_input
+		if (mrt_ipip_input(m, off))
+			return;
 #  endif
 # endif
+	}
 #else
 # ifdef MROUTING
 #  define COMPATFUNC	ipip_input
