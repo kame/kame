@@ -179,7 +179,7 @@ ip_output(m0, opt, ro, flags, imo, inp)
 	struct ip_moptions *imo;
 	struct inpcb *inp;
 {
-	struct ip *ip, *mhip;
+	struct ip *ip;
 	struct ifnet *ifp = NULL;	/* keep compiler happy */
 	struct mbuf *m;
 	int hlen = sizeof (struct ip);
@@ -1110,11 +1110,80 @@ pass:
 		ipstat.ips_cantfrag++;
 		goto bad;
 	}
-	len = (ifp->if_mtu - hlen) &~ 7;
-	if (len < 8) {
-		error = EMSGSIZE;
+
+	error = ip_fragment(m, ifp, ifp->if_mtu);
+	if (error == EMSGSIZE)
 		goto bad;
+
+	for (m = m0; m; m = m0) {
+		m0 = m->m_nextpkt;
+		m->m_nextpkt = 0;
+#ifdef IPSEC
+		/* clean ipsec history once it goes out of the node */
+		ipsec_delaux(m);
+#endif
+		if (error == 0) {
+			/* Record statistics for this interface address. */
+			if (ia != NULL) {
+				ia->ia_ifa.if_opackets++;
+				ia->ia_ifa.if_obytes += m->m_pkthdr.len;
+			}
+			
+			error = (*ifp->if_output)(ifp, m,
+			    (struct sockaddr *)dst, ro->ro_rt);
+		} else
+			m_freem(m);
 	}
+
+	if (error == 0)
+		ipstat.ips_fragmented++;
+done:
+#ifdef IPSEC
+	if (ro == &iproute && ro->ro_rt) {
+		RTFREE(ro->ro_rt);
+		ro->ro_rt = NULL;
+	}
+	if (sp != NULL) {
+		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
+			printf("DP ip_output call free SP:%p\n", sp));
+		key_freesp(sp);
+	}
+#endif /* IPSEC */
+#ifdef FAST_IPSEC
+	if (ro == &iproute && ro->ro_rt) {
+		RTFREE(ro->ro_rt);
+		ro->ro_rt = NULL;
+	}
+	if (sp != NULL)
+		KEY_FREESP(&sp);
+#endif /* FAST_IPSEC */
+	return (error);
+bad:
+	m_freem(m);
+	goto done;
+}
+
+int
+ip_fragment(struct mbuf *m, struct ifnet *ifp, u_long mtu)
+{
+	struct ip *ip, *mhip;
+	struct mbuf *m0;
+	int len, hlen, off;
+	int mhlen, firstlen;
+	struct mbuf **mnext;
+	int s;
+	int error = 0;
+	int nfrags = 1;
+	int sw_csum;
+
+	ip = mtod(m, struct ip *);
+	hlen = IP_VHL_HL(ip->ip_vhl) << 2;
+	sw_csum = m->m_pkthdr.csum_flags & ~ifp->if_hwassist;
+	sw_csum &= ~CSUM_DELAY_DATA;
+
+	len = (ifp->if_mtu - hlen) &~ 7;
+	if (len < 8)
+		return (EMSGSIZE);
 
 	/*
 	 * if the interface will not calculate checksums on
@@ -1125,11 +1194,6 @@ pass:
 		in_delayed_cksum(m);
 		m->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA;
 	}
-
-    {
-	int mhlen, firstlen = len;
-	struct mbuf **mnext = &m->m_nextpkt;
-	int nfrags = 1;
 
 	/*
 	 * Loop through length of segment after first fragment,
@@ -1208,53 +1272,8 @@ pass:
 		}
 	}
 sendorfree:
-	for (m = m0; m; m = m0) {
-		m0 = m->m_nextpkt;
-		m->m_nextpkt = 0;
-#ifdef IPSEC
-		/* clean ipsec history once it goes out of the node */
-		ipsec_delaux(m);
-#endif
-		if (error == 0) {
-			/* Record statistics for this interface address. */
-			if (ia != NULL) {
-				ia->ia_ifa.if_opackets++;
-				ia->ia_ifa.if_obytes += m->m_pkthdr.len;
-			}
-			
-			error = (*ifp->if_output)(ifp, m,
-			    (struct sockaddr *)dst, ro->ro_rt);
-		} else
-			m_freem(m);
-	}
-
-	if (error == 0)
-		ipstat.ips_fragmented++;
-    }
-done:
-#ifdef IPSEC
-	if (ro == &iproute && ro->ro_rt) {
-		RTFREE(ro->ro_rt);
-		ro->ro_rt = NULL;
-	}
-	if (sp != NULL) {
-		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-			printf("DP ip_output call free SP:%p\n", sp));
-		key_freesp(sp);
-	}
-#endif /* IPSEC */
-#ifdef FAST_IPSEC
-	if (ro == &iproute && ro->ro_rt) {
-		RTFREE(ro->ro_rt);
-		ro->ro_rt = NULL;
-	}
-	if (sp != NULL)
-		KEY_FREESP(&sp);
-#endif /* FAST_IPSEC */
+	
 	return (error);
-bad:
-	m_freem(m);
-	goto done;
 }
 
 void
