@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.386 1999/12/28 07:13:00 itojun Exp $
+$Id: CHANGELOG,v 1.387 1999/12/29 07:10:22 itojun Exp $
 
 <199912>
+Wed Dec 29 16:09:41 JST 1999  itojun@iijlab.net
+	* generated first kame/bsdi4 snapshot, for BSDI BSD/OS 4.1.
+	  Will be generated regularly.  see bsdi4/TODO for twists and issues.
+
 Tue Dec 28 16:11:42 JST 1999  itojun@iijlab.net
 	* openbsd/sys/igmp.c, kame/sys/in_gif.c: remove kame patches that
 	  does not fit openbsd well.  openbsd ip_input() uses different args
