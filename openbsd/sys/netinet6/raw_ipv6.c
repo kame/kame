@@ -398,7 +398,7 @@ rip6_output(struct mbuf *m, ...)
 #if 0
 	struct ifnet *forceif = NULL;
 #endif
-	struct ip6_pktopts opt, *optp = NULL;
+	struct ip6_pktopts opt, *optp = NULL, *origoptp;
 	struct ifnet *oifp = NULL;
 	va_list ap;
 	struct socket *so;
@@ -451,10 +451,13 @@ rip6_output(struct mbuf *m, ...)
 	/* ip6_src will be filled in later */
 
 	/* KAME hack: embed scopeid */
+	origoptp = inp->inp_outputopts6;
+	inp->inp_outputopts6 = optp;
 	if (in6_embedscope(&ip6->ip6_dst, dst, inp, &oifp) != 0) {
 		error = EINVAL;
 		goto bad;
 	}
+	inp->inp_outputopts6 = origoptp;
 
 	/* source address selection */
 	in6a = in6_selectsrc(dst, optp, inp->inp_moptions6, &inp->inp_route6,
