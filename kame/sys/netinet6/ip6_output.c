@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.133 2000/11/27 14:18:52 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.134 2000/11/29 17:04:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -209,7 +209,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct sockaddr_in6 *dst;
 	int error = 0;
 	struct in6_ifaddr *ia;
-	u_long mtu;
+	u_int32_t mtu;
 	u_int32_t optlen = 0, plen = 0, unfragpartlen = 0;
 	struct ip6_exthdrs exthdrs;
 	struct in6_addr finaldst;
