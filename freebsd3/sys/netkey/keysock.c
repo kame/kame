@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: keysock.c,v 1.1 1999/08/12 12:38:54 shin Exp $ */
+/* KAME @(#)$Id: keysock.c,v 1.2 1999/08/16 19:30:36 shin Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
@@ -165,7 +165,10 @@ key_attach(struct socket *so, int proto, struct proc *p)
 	if (kp->kp_raw.rcb_proto.sp_protocol == PF_KEY) /* XXX: AF_KEY */
 		key_cb.key_count++;
 	key_cb.any_count++;
-
+#ifndef __bsdi__
+	kp->kp_raw.rcb_laddr = &key_src;
+	kp->kp_raw.rcb_faddr = &key_dst;
+#else
 	/*
 	 * XXX rcb_faddr must be dynamically allocated, otherwise
 	 * raw_disconnect() will be angry.
@@ -174,21 +177,21 @@ key_attach(struct socket *so, int proto, struct proc *p)
 		struct mbuf *m, *n;
 		MGET(m, M_WAITOK, MT_DATA);
 		if (!m) {
+			error = ENOBUFS;
+			printf("key_usrreq: key_usrreq results %d\n", error);
 			free((caddr_t)kp, M_PCB);
 			so->so_pcb = (caddr_t) 0;
 			splx(s);
-			error = ENOBUFS;
-			printf("key_usrreq: key_usrreq results %d\n", error);
 			return(error);
 		}
 		MGET(n, M_WAITOK, MT_DATA);
 		if (!n) {
+			error = ENOBUFS;
+			m_freem(m);
+			printf("key_usrreq: key_usrreq results %d\n", error);
 			free((caddr_t)kp, M_PCB);
 			so->so_pcb = (caddr_t) 0;
 			splx(s);
-			m_freem(m);
-			error = ENOBUFS;
-			printf("key_usrreq: key_usrreq results %d\n", error);
 			return(error);
 		}
 		m->m_len = sizeof(key_src);
@@ -197,10 +200,10 @@ key_attach(struct socket *so, int proto, struct proc *p)
 		n->m_len = sizeof(key_dst);
 		kp->kp_raw.rcb_faddr = mtod(n, struct sockaddr *);
 		bcopy(&key_dst, kp->kp_raw.rcb_faddr, sizeof(key_dst));
-
-		soisconnected(so);
-		so->so_options |= SO_USELOOPBACK;
 	}
+#endif
+	soisconnected(so);
+	so->so_options |= SO_USELOOPBACK;
 
 	splx(s);
 	return 0;
@@ -400,7 +403,12 @@ key_output(m, va_alist)
 	}
 	m_copydata(m, 0, len, (caddr_t)msg);
 
-	s = splnet();	/*XXX giant lock*/
+	/*XXX giant lock*/
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
 	if ((len = key_parse(&msg, so, &target)) == 0) {
 		/* discard. i.e. no need to reply. */
 		error = 0;
@@ -512,7 +520,7 @@ key_sendup(so, msg, len, target)
 
 		if (tlen < n->m_len)
 			n->m_len = tlen;
-	n->m_next = NULL;
+		n->m_next = NULL;
 		if (m == NULL)
 			m = mprev = n;
 		else {
@@ -572,11 +580,11 @@ key_sendup(so, msg, len, target)
 		if (!sendup)
 			continue;
 
- 		if ((n = m_copy(m, 0, (int)M_COPYALL)) == NULL) {
+		if ((n = m_copy(m, 0, (int)M_COPYALL)) == NULL) {
 			printf("key_sendup: m_copy fail\n");
- 			m_freem(m);
- 			return ENOBUFS;
- 		}
+			m_freem(m);
+			return ENOBUFS;
+		}
 
 		if ((error = key_sendup0(rp, n, 0)) != 0) {
 			m_freem(m);
