@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.72 2001/07/24 03:25:17 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.73 2001/07/24 17:52:50 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -869,8 +869,10 @@ rtmsg(cmd)
 		exit(1);
 	case RTM_ADD:
 		rtm->rtm_addrs |= RTA_GATEWAY;
-		rtm->rtm_rmx.rmx_expire = expire_time;
-		rtm->rtm_inits = RTV_EXPIRE;
+		if (expire_time) {
+			rtm->rtm_rmx.rmx_expire = expire_time;
+			rtm->rtm_inits = RTV_EXPIRE;
+		}
 		rtm->rtm_flags |= (RTF_HOST | RTF_STATIC);
 		if (rtm->rtm_flags & RTF_ANNOUNCE) {
 			rtm->rtm_flags &= ~RTF_HOST;
