@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.95 2002/04/17 09:54:49 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.96 2002/04/18 06:03:57 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -868,6 +868,8 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	ip6->ip6_src.s6_addr32[2] = natpt_prefix.s6_addr32[2];
 	ip6->ip6_src.s6_addr32[3] = ip4->ip_src.s_addr;
 
+	cv6.pyld.icmp6->icmp6_data32[0] = 0;	/* clear unused (maybe) field */
+
 	switch (cv4->pyld.icmp4->icmp_type) {
 	case ICMP_ECHOREPLY:
 		icmp6len = natpt_icmp4EchoReply(cv4, &cv6);
@@ -933,9 +935,6 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 			off   += sizeof(struct ip6_frag);
 		}
 
-		icmp6->icmp6_id  = cv4->pyld.icmp4->icmp_id;
-		icmp6->icmp6_seq = cv4->pyld.icmp4->icmp_seq;
-
 		ip6->ip6_plen = hdrsz + len;
 		cv6.m->m_pkthdr.len
 			= cv6.m->m_len
@@ -957,6 +956,8 @@ natpt_icmp4EchoReply(struct pcv *cv4, struct pcv *cv6)
 
 	icmp6->icmp6_type = ICMP6_ECHO_REPLY;
 	icmp6->icmp6_code = 0;
+	icmp6->icmp6_id  = cv4->pyld.icmp4->icmp_id;
+	icmp6->icmp6_seq = cv4->pyld.icmp4->icmp_seq;
 
     {
 	int		dlen;
@@ -1040,6 +1041,8 @@ natpt_icmp4Echo(struct pcv *cv4, struct pcv *cv6)
 
 	icmp6->icmp6_type = ICMP6_ECHO_REQUEST;
 	icmp6->icmp6_code = 0;
+	icmp6->icmp6_id  = cv4->pyld.icmp4->icmp_id;
+	icmp6->icmp6_seq = cv4->pyld.icmp4->icmp_seq;
 
 	{
 		int		dlen;
