@@ -6,5 +6,6 @@ SUBDIR+=natptconfig
 SUBDIR+=natptlog
 #SUBDIR+=ifmcstat
 SUBDIR+=racoon
+SUBDIR+=mip6control
 
 .include <bsd.subdir.mk>
