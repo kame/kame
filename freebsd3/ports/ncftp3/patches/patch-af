@@ -1,5 +1,5 @@
---- Strn/Makefile.orig	Mon Feb  8 18:10:17 1999
-+++ Strn/Makefile	Thu Feb 18 01:23:16 1999
+--- Strn/Makefile.in.orig	Thu Sep 30 11:22:31 1999
++++ Strn/Makefile.in	Wed Oct 20 19:37:09 1999
 @@ -42,7 +42,7 @@
  
  $(LIBSO): $(SOBJS)
