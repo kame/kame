@@ -255,7 +255,7 @@ udp_input(m, va_alist)
 
 		*ip = save_ip;
 #else
-		if (in_cksum4(m, IPPROTO_UDP, iphlen, len) != 0) {
+		if (in4_cksum(m, IPPROTO_UDP, iphlen, len) != 0) {
 			udpstat.udps_badsum++;
 			m_freem(m);
 			return;

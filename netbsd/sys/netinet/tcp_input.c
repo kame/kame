@@ -194,6 +194,18 @@ int	tcprexmtthresh = 3;
 #define TSTMP_LT(a,b)	((int)((a)-(b)) < 0)
 #define TSTMP_GEQ(a,b)	((int)((a)-(b)) >= 0)
 
+#ifdef INET6
+/*
+ * Neighbor Discovery, Neighbor Unreachability Detection
+ * Upper layer hint.
+ */
+#define ND6_HINT(tp) \
+do { \
+	if (tp && tp->t_in6pcb && tp->t_in6pcb->in6p_route.ro_rt) \
+		nd6_nud_hint(t6p->t_in6pcb->in6p_route.ro_rt, NULL); \
+} while (0)
+#endif
+
 /*
  * Macro to compute ACK transmission behavior.  Delay the ACK unless
  * we have already delayed an ACK (must send an ACK every two segments).
@@ -615,7 +627,7 @@ tcp_input(m, va_alist)
 			goto drop;
 		}
 #else
-		if (in_cksum4(m, IPPROTO_TCP, toff, tlen) != 0) {
+		if (in4_cksum(m, IPPROTO_TCP, toff, tlen) != 0) {
 			tcpstat.tcps_rcvbadsum++;
 			goto drop;
 		}

@@ -545,7 +545,7 @@ file net/if_faith.c			faith			needs-count
 file net/if_gif.c			gif			needs-count
 file netinet/ip_ecn.c			inet | inet6
 file netinet/in_gif.c			gif & inet
-file netinet/in_cksum4.c		inet
+file netinet/in4_cksum.c		inet
 file netinet6/in6_gif.c			gif & inet6
 file netinet6/in6.c			inet6
 file netinet6/in6_ifattach.c		inet6
