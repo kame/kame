@@ -82,13 +82,13 @@ int	in6_pcbconnect __P((struct inpcb *, struct sockaddr *, struct thread *));
 void	in6_pcbdetach __P((struct inpcb *));
 void	in6_pcbdisconnect __P((struct inpcb *));
 int	in6_pcbladdr __P((struct inpcb *, struct sockaddr *,
-			  struct sockaddr_in6 **));
+			  struct in6_addr **));
 struct	inpcb *
 	in6_pcblookup_local __P((struct inpcbinfo *,
-				 struct sockaddr_in6 *, u_int, int));
+				 struct in6_addr *, u_int, int));
 struct	inpcb *
-	in6_pcblookup_hash __P((struct inpcbinfo *, struct sockaddr_in6 *,
-				u_int, struct sockaddr_in6 *,
+	in6_pcblookup_hash __P((struct inpcbinfo *, struct in6_addr *,
+				u_int, struct in6_addr *,
 				u_int, int, struct ifnet *));
 void	in6_pcbnotify __P((struct inpcbhead *, struct sockaddr *,
 			   u_int, const struct sockaddr *, u_int, int, void *,
@@ -104,12 +104,7 @@ int	in6_setsockaddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_mapped_sockaddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_mapped_peeraddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_selecthlim __P((struct in6pcb *, struct ifnet *));
-#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
-int	in6_pcbsetport(struct sockaddr_in6 *, struct inpcb *, struct thread *);
-#else
-int	in6_pcbsetport __P((struct sockaddr_in6 *, struct inpcb *,
-			    struct proc *));
-#endif
+int	in6_pcbsetport(struct in6_addr *, struct inpcb *, struct thread *);
 void	init_sin6 __P((struct sockaddr_in6 *sin6, struct mbuf *m));
 #endif /* _KERNEL */
 

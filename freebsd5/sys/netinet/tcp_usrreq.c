@@ -282,7 +282,7 @@ tcp6_usr_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
 	if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0) {
-		if (SA6_IS_ADDR_UNSPECIFIED(sin6p))
+		if (IN6_IS_ADDR_UNSPECIFIED(&sin6p->sin6_addr))
 			inp->inp_vflag |= INP_IPV4;
 		else if (IN6_IS_ADDR_V4MAPPED(&sin6p->sin6_addr)) {
 			struct sockaddr_in sin;
@@ -931,10 +931,7 @@ tcp6_connect(tp, nam, td)
 	struct socket *so = inp->inp_socket;
 	struct tcptw *otw;
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)nam;
-	struct sockaddr_in6 *addr6;
-#ifndef SCOPEDROUTING
-	struct sockaddr_in6 addr6_storage;
-#endif
+	struct in6_addr *addr6;
 	struct rmxp_tao *taop;
 	struct rmxp_tao tao_noncached;
 	int error;
@@ -956,20 +953,10 @@ tcp6_connect(tp, nam, td)
 	error = in6_pcbladdr(inp, nam, &addr6);
 	if (error)
 		return error;
-#ifndef SCOPEDROUTING	 /* XXX: addr6 may not have a valid zone id */
-	addr6_storage = *addr6;
-	if ((error = in6_recoverscope(&addr6_storage,
-				      &addr6->sin6_addr, NULL)) != 0) {
-		return (error);
-	}
-	/* XXX: also recover the embedded zone ID */
-	addr6_storage.sin6_addr = addr6->sin6_addr;
-	addr6 = &addr6_storage;
-#endif
 	oinp = in6_pcblookup_hash(inp->inp_pcbinfo,
-				  sin6, sin6->sin6_port,
-				  SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa)
-				  ? addr6 : &inp->in6p_lsa,
+				  &sin6->sin6_addr, sin6->sin6_port,
+				  IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)
+				  ? addr6 : &inp->in6p_laddr,
 				  inp->inp_lport,  0, NULL);
 	if (oinp) {
 		if (oinp != inp &&
@@ -982,12 +969,9 @@ tcp6_connect(tp, nam, td)
 		} else
 			return EADDRINUSE;
 	}
-	if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa)) {
-		inp->in6p_lsa.sin6_addr = addr6->sin6_addr;
-		inp->in6p_lsa.sin6_scope_id = addr6->sin6_scope_id;
-	}
+	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
+		inp->in6p_laddr = *addr6;
 	inp->in6p_faddr = sin6->sin6_addr;
-	inp->in6p_fsa.sin6_scope_id = sin6->sin6_scope_id;
 	inp->inp_fport = sin6->sin6_port;
 	/* update flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
 	inp->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;

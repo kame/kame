@@ -176,7 +176,7 @@ tcp_output(struct tcpcb *tp)
 		 */      
 		if (
 #ifdef INET6
-		    (isipv6 && in6_localaddr(&tp->t_inpcb->in6p_fsa)) ||
+		    (isipv6 && in6_localaddr(&tp->t_inpcb->in6p_faddr)) ||
 		    (!isipv6 &&
 #endif
 		     in_localaddr(tp->t_inpcb->inp_faddr)
@@ -955,24 +955,11 @@ send:
 		if (needect)
 			ip6->ip6_flow |= htonl(IPTOS_ECN_ECT0 << 20);
 #endif
-		if (!ip6_setpktaddrs(m, &tp->t_inpcb->in6p_lsa,
-				     &tp->t_inpcb->in6p_fsa)) {
-			m_freem(m);
-			error = ENOBUFS;
-			goto out;
-		}
-#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
 		error = ip6_output(m,
 			    tp->t_inpcb->in6p_outputopts,
 			    &tp->t_inpcb->in6p_route,
 			    (so->so_options & SO_DONTROUTE), NULL, NULL,
 			    tp->t_inpcb);
-#else
-		error = ip6_output(m,
-			    tp->t_inpcb->in6p_outputopts,
-			    &tp->t_inpcb->in6p_route,
-			    (so->so_options & SO_DONTROUTE), NULL, NULL);
-#endif
 	} else
 #endif /* INET6 */
     {
