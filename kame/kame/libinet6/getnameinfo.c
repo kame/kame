@@ -1,9 +1,9 @@
-/*	$KAME: getnameinfo.c,v 1.39 2000/05/05 15:29:14 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.40 2000/05/11 03:02:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -45,7 +45,7 @@
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
-#endif 
+#endif
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -61,7 +61,7 @@
 
 #ifndef HAVE_PORTABLE_PROTOTYPE
 #include "cdecl_ext.h"
-#endif 
+#endif
 
 #ifdef NEED_ADDRINFO_H
 #include "addrinfo.h"
@@ -97,7 +97,7 @@ struct sockinet {
 static int ip6_parsenumeric __P((const struct sockaddr *, const char *, char *,
 				 size_t, int));
 static int ip6_sa2str __P((const struct sockaddr_in6 *, char *, size_t, int));
-#endif 
+#endif
 
 #define ENI_NOSOCKET 	0
 #define ENI_NOSERVNAME	1
@@ -403,7 +403,7 @@ ip6_sa2str(sa6, buf, bufsiz, flags)
 		return(snprintf(buf, bufsiz, "%d", sa6->sin6_scope_id));
 	}
 #endif
- 
+
 	/* if_indextoname() does not take buffer size.  not a good api... */
 	if ((IN6_IS_ADDR_LINKLOCAL(a6) || IN6_IS_ADDR_MC_LINKLOCAL(a6)) &&
 	    bufsiz >= IF_NAMESIZE) {
