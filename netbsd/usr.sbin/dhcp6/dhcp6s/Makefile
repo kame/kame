@@ -5,12 +5,6 @@ PROG=	dhcp6s
 SRCS=	dhcp6s.c common.c dhcp6opt.c
 MAN=	dhcp6s.8
 
-LDADD+= -L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
-	-L/usr/local/v6/lib -linet6
-DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
-	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
-	/usr/local/v6/lib/libinet6.a
-
 .include <bsd.prog.mk>
 
 .PATH:	${SRCDIR}
