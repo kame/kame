@@ -24,6 +24,7 @@ main(argc, argv)
 		exit(1);
 	}
 
+	memset(&ai, 0, sizeof(ai));
 	ai.ai_flags |= AI_CANONNAME;
 	ai.ai_family = PF_UNSPEC;
 #if 0
