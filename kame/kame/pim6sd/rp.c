@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.29 2003/08/15 04:09:03 suz Exp $	*/
+/*	$KAME: rp.c,v 1.30 2003/08/15 06:02:27 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -1220,6 +1220,7 @@ rp_grp_match(group)
 
 	    best_entry = grp_rp_entry_ptr;
 	    best_priority = best_entry->priority;
+	    best_origin = best_entry->origin;
 	    best_address_h = curr_address_h;
 	    best_hash_value = curr_hash_value;
 	}
