@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.9 2000/06/22 20:16:13 itojun Exp $	*/
+/*	$KAME: rtadvd.h,v 1.10 2000/11/07 14:14:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -30,7 +30,8 @@
  */
 
 #define ALLNODES "ff02::1"
-#define ALLROUTERS "ff02::2"
+#define ALLROUTERS_LINK "ff02::2"
+#define ALLROUTERS_SITE "ff05::2"
 #define ANY "::"
 #define RTSOLLEN 8
 
