@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.82 2004/08/10 06:27:05 itojun Exp $
+$KAME: FAQ,v 1.83 2004/12/09 09:55:39 jinmei Exp $
 
 
 GENERAL
@@ -184,7 +184,7 @@ Q: Is anything special required for network interface card drivers?
 	in the driver, change that to MHLEN.  In this way you can avoid two
 	linked internal mbufs.
 
-	(all operationg systems) Multicast support is required for IPv6,
+	(all operating systems) Multicast support is required for IPv6,
 	since IPv6 uses multicast for hardware address (MAC address) resolution.
 	Therefore, your network driver has to have multicast support,
 	and have IFF_MULTICAST properly set.  Also be sure to check if
@@ -433,13 +433,13 @@ users only, like www.kame.net?)
 		}
 
 Q: Won't you release new IPv6 patch for apache1.3.x?
-	We focuse on developing/enhancing apache2.x.  Our IPv6 patch
+	We focus on developing/enhancing apache2.x.  Our IPv6 patch
 	will never be merged into the apache1.3.x original distribution
 	since some include files for mod_xxx highly depend on IPv4
 	and our IPv6 patch strongly affects modules from 3rd parties.
 	Apache2.x already supports IPv6 and changes its APIs.
 
-	martti.kuparinen@iki.fi takes over the maintainance. Latest
+	martti.kuparinen@iki.fi takes over the maintenance. Latest
 	IPv6 patch are available at ftp://ftp.piuha.net/pub/misc/.
 
 Q: Why don't KAME's getaddrinfo/getnameinfo support PF_LOCAL?
@@ -482,7 +482,8 @@ remote host)?
 	to convert textual policy representation into binary).  This way, you
 	can make sure that inbound packet is always encrypted (non-encrypted
 	packets get dropped).  See sbin/ping for usage example.
-	This is a KAME-only API.  There's no standard API for this, AFAIK.
+	This is a KAME-only API.  There's no standard API for this, as
+	far as we know.
 
 Q: I see a lot of messages like follows when I try to throw packets to
 a gif tunnel interface:
@@ -513,7 +514,7 @@ Q: I see a lot of messages like follows:
 	The message gets generated only with older KAME SNAP kit, or *BSD
 	releases.  Kernel upgrade is suggested if you are using KAME SNAP kit.
 
-Q: I have problem dianosing IPsec issues.  Are there any good tools?
+Q: I have problem diagnosing IPsec issues.  Are there any good tools?
 	tcpdump and netstat -sn are your friend.  Always try to take packet
 	dumps during your tests.  Also, you can reveal many things with the
 	following operations:
