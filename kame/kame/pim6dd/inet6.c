@@ -1,4 +1,4 @@
-/*	$KAME: inet6.c,v 1.5 2002/06/19 16:58:37 itojun Exp $	*/
+/*	$KAME: inet6.c,v 1.6 2002/06/26 10:40:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -214,6 +214,11 @@ inet6_fmt(struct in6_addr *addr)
 	static int ip6round = 0;
 	struct sockaddr_in6 sin6;
 	char *cp;
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST;
+#endif
 	
 	ip6round = (ip6round + 1) & 7;
 	cp = ip6buf[ip6round];
@@ -228,7 +233,7 @@ inet6_fmt(struct in6_addr *addr)
 	}
 
 	if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len, cp,
-	    sizeof(ip6buf[ip6round]), NULL, 0, NI_NUMERICHOST))
+	    sizeof(ip6buf[ip6round]), NULL, 0, niflags))
 		return (NULL);
 	else
 		return (cp);
