@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.2 1999/08/17 12:14:50 itojun Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.3 1999/08/19 15:09:41 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1528,16 +1528,21 @@ grab_myaddrs()
 #ifdef INET6
 		case AF_INET6:
 #endif
-			p = (struct myaddrs *)malloc(sizeof(struct myaddrs)
-				+ ifr->ifr_addr.sa_len);
+			p = (struct myaddrs *)malloc(sizeof(struct myaddrs));
 			if (!p) {
 				plog(LOCATION, "not enough core\n");
 				exit(1);
 				/*NOTREACHED*/
 			}
-			memcpy(p + 1, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
+			p->addr = (struct sockaddr *)
+				malloc(ifr->ifr_addr.sa_len);
+			if (!p->addr) {
+				plog(LOCATION, "not enough core\n");
+				exit(1);
+				/*NOTREACHED*/
+			}
+			memcpy(p->addr, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
 			p->next = myaddrs;
-			p->addr = (struct sockaddr *)(p + 1);
 #ifdef INET6
 #ifdef __KAME__
 			sin6 = (struct sockaddr_in6 *)p->addr;

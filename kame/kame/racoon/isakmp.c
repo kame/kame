@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.3 1999/08/16 16:27:24 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.4 1999/08/19 15:09:42 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -491,7 +491,7 @@ isakmp_begin_phase1(cfp, local, remote)
 
 	/* create isakmp index */
 	memset((char *)&index, 0, sizeof(index));
-	isakmp_set_cookie((char *)&index, remote);
+	isakmp_set_cookie((char *)&index, local, remote);
 
 	/* add new entry to isakmp status table */
 	if ((iph1 = isakmp_new_ph1(&index)) == NULL)
@@ -3233,7 +3233,7 @@ isakmp_ident_r1(msg, from, iph1)
 
 	/* set responder's cookie */
 	isakmp = (struct isakmp *)buf->v;
-	isakmp_set_cookie((char *)&isakmp->r_ck, from);
+	isakmp_set_cookie((char *)&isakmp->r_ck, iph1->remote, from);
 
 	/* modify index of the isakmp status record */
 	memcpy((caddr_t)&iph1->index.r_ck, (caddr_t)&isakmp->r_ck,
@@ -4034,7 +4034,7 @@ isakmp_aggressive_r1(msg, from, iph1)
 		goto end;
 
 	/* set responder's cookie */
-	isakmp_set_cookie((char *)&iph1->index.r_ck, from);
+	isakmp_set_cookie((char *)&iph1->index.r_ck, iph1->remote, from);
 
 	/* modify index of the isakmp status record */
 	memcpy(&isakmp->r_ck, &iph1->index.r_ck, sizeof(cookie_t));
@@ -5445,8 +5445,9 @@ isakmp_padlen(len)
  * calculate cookie and set.
  */
 int
-isakmp_set_cookie(place, to)
+isakmp_set_cookie(place, from, to)
 	char *place;
+	struct sockaddr *from;
 	struct sockaddr *to;
 {
 	vchar_t *buf, *buf2;
@@ -5456,7 +5457,7 @@ isakmp_set_cookie(place, to)
 	int error = -1;
 	u_short port;
 
-	blen = _INALENBYAF(myaddrs->addr->sa_family) + sizeof(u_short)
+	blen = _INALENBYAF(from->sa_family) + sizeof(u_short)
 		+ _INALENBYAF(to->sa_family) + sizeof(u_short)
 		+ sizeof(time_t) + local_secret_size;
 	if ((buf = vmalloc(blen)) == 0) {
@@ -5466,10 +5467,10 @@ isakmp_set_cookie(place, to)
 	p = buf->v;
 
 	/* copy my address */
-	memcpy(p, _INADDRBYSA(myaddrs->addr),
-		_INALENBYAF(myaddrs->addr->sa_family));
-	p += _INALENBYAF(myaddrs->addr->sa_family);
-	port = _INPORTBYSA(myaddrs->addr);
+	memcpy(p, _INADDRBYSA(from),
+		_INALENBYAF(from->sa_family));
+	p += _INALENBYAF(from->sa_family);
+	port = _INPORTBYSA(from);
 	memcpy(p, &port, sizeof(u_short));
 	p += sizeof(u_short);
 

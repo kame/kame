@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_var.h,v 1.1 1999/08/08 23:31:23 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_var.h,v 1.2 1999/08/19 15:09:43 itojun Exp $ */
 
 struct cipher_algorithm {
 	char *name;
@@ -86,4 +86,4 @@ extern void isakmp_printpacket __P((vchar_t *msg, struct sockaddr *from,
 #endif
 extern int isakmp_newgroup_r __P((vchar_t *, struct sockaddr *,
 	struct isakmp_ph1 *));
-extern int isakmp_set_cookie __P((char *, struct sockaddr *));
+extern int isakmp_set_cookie __P((char *, struct sockaddr *, struct sockaddr *));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.1 1999/08/08 23:31:22 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.2 1999/08/19 15:09:42 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -338,7 +338,7 @@ isakmp_info_send_nx(isakmp, remote, local, type, data)
 		return -1;
 
 	memcpy(&iph1->index.i_ck, &isakmp->i_ck, sizeof(cookie_t));
-	isakmp_set_cookie((char *)&iph1->index.r_ck, remote);
+	isakmp_set_cookie((char *)&iph1->index.r_ck, iph1->local, remote);
 	iph1->status = ISAKMP_STATE_1;
 	iph1->dir = INITIATOR;
 	iph1->version = isakmp->v_number;
