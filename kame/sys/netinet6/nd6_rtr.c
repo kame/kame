@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.97 2001/02/07 11:09:13 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.98 2001/02/10 01:05:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2003,8 +2003,7 @@ in6_init_prefix_ltimes(struct nd_prefix *ndpr)
 }
 
 static void
-in6_init_address_ltimes(struct nd_prefix *new,
-			struct in6_addrlifetime *lt6)
+in6_init_address_ltimes(struct nd_prefix *new, struct in6_addrlifetime *lt6)
 {
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
