@@ -6,7 +6,7 @@ PROG=		altqstat
 OBJS= 		altqstat.o quip_client.o qdisc_conf.o \
 		qdisc_cbq.o qdisc_hfsc.o qdisc_cdnr.o \
 		qdisc_wfq.o qdisc_fifoq.o \
-		qdisc_red.o qdisc_rio.o qdisc_blue.o qdisc_priq.o
+		qdisc_red.o qdisc_rio.o qdisc_blue.o qdisc_priq.o qdisc_jobs.o
 MAN1=		altqstat.1
 
 CFLAGS=		-g -Wall
@@ -21,7 +21,7 @@ install: $(PROG)
 	$(INSTALL) $(COPY) -m 0644 $(MAN1) $(PREFIX)/man/man1
 
 altqstat: $(OBJS)
-	$(CC) $(CFLAGS) $(INCLUDES) $(DEFINES) -o $@ $(OBJS) $(SYS_LIBS) -lcurses
+	$(CC) $(CFLAGS) $(INCLUDES) $(DEFINES) -o $@ $(OBJS) $(SYS_LIBS) -lm -lcurses
 
 .c.o: 
 	$(CC) $(CFLAGS) $(INCLUDES) $(DEFINES) -c $*.c

@@ -1,4 +1,4 @@
-/*	$KAME: qop.c,v 1.11 2001/10/26 04:57:59 kjc Exp $	*/
+/*	$KAME: qop.c,v 1.12 2002/10/26 06:59:53 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -1412,11 +1412,15 @@ open_module(const char *devname, int flags)
 #endif
 	struct stat sbuf;
 
+#if (__FreeBSD_version > 500000)
+	/* the device is dynamically created by devfs */
+#else
 	/* check if the altq device exists */
 	if (stat(devname, &sbuf) < 0) {
 		LOG(LOG_ERR, errno, "can't access %s!", devname);
 		return (-1);
 	}
+#endif
 
 #if defined(__FreeBSD__) && (__FreeBSD_version > 300000)
 	/* turn discipline name into module name */
@@ -1426,7 +1430,11 @@ open_module(const char *devname, int flags)
 	strlcat(modname, cp + 1, sizeof(modname));
 
 	/* check if the kld module exists */
+#if (__FreeBSD_version > 500000)
+	snprintf(filename, sizeof(filename), "/boot/kernel/%s.ko", modname);
+#else
 	snprintf(filename, sizeof(filename), "/modules/%s.ko", modname);
+#endif
 	if (stat(filename, &sbuf) < 0) {
 		/* module file doesn't exist */
 		return (-1);

@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_conf.c,v 1.4 2001/08/15 12:51:59 kjc Exp $	*/
+/*	$KAME: qdisc_conf.c,v 1.5 2002/10/26 06:59:54 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -55,6 +55,7 @@ struct qdisc_conf qdisc_table[] = {
 	{"rio",		ALTQT_RIO,	rio_stat_loop},
 	{"blue",	ALTQT_BLUE,	blue_stat_loop},
 	{"priq",	ALTQT_PRIQ,	priq_stat_loop},
+	{"jobs",	ALTQT_JOBS,	jobs_stat_loop},
 	{NULL, 		0,		NULL}
 };
 
