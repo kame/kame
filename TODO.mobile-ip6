@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.13 2001/10/03 07:22:40 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.14 2001/10/04 06:06:17 itojun Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -28,6 +28,9 @@ todo
 - some timeout routines.
 - BSD/OS support.
 - draft-15.
+- think again about home/care-of address swap.  at least the current code in
+  sys/netinet6/dest6.c is not friendly with (1) icmp6 error generator, (2)
+  tunnels used for PIM, and maybe others.
 - may be others.
 
 MN side
