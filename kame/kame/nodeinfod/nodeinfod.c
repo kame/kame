@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.15 2001/10/23 07:29:20 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.16 2001/10/23 07:31:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1116,25 +1116,25 @@ getflags6(ifname, sa, salen)
 {
 	const struct sockaddr_in6 *sin6;
 	struct in6_ifreq ifr6;
-	int s;
+	int sock;
 
 	if (sa->sa_family != AF_INET6)
 		return -1;
 	sin6 = (const struct sockaddr_in6 *)sa;
 
-	s = socket(AF_INET6, SOCK_DGRAM, 0);
-	if (s < 0)
+	sock = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (sock < 0)
 		return -1;
 
 	memset(&ifr6, 0, sizeof(ifr6));
 	strncpy(ifr6.ifr_name, ifname, sizeof(ifr6.ifr_name));
 	ifr6.ifr_addr = *sin6;
-	if (ioctl(s, SIOCGIFAFLAG_IN6, (caddr_t)&ifr6) < 0) {
-		close(s);
+	if (ioctl(sock, SIOCGIFAFLAG_IN6, (caddr_t)&ifr6) < 0) {
+		close(sock);
 		return -1;
 	}
 
-	close(s);
+	close(sock);
 	return ifr6.ifr_ifru.ifru_flags6;
 }
 
@@ -1146,25 +1146,25 @@ getlifetime(ifname, sa, salen)
 {
 	const struct sockaddr_in6 *sin6;
 	struct in6_ifreq ifr6;
-	int s;
+	int sock;
 
 	if (sa->sa_family != AF_INET6)
 		return -1;
 	sin6 = (const struct sockaddr_in6 *)sa;
 
-	s = socket(AF_INET6, SOCK_DGRAM, 0);
-	if (s < 0)
+	sock = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (sock < 0)
 		return -1;
 
 	memset(&ifr6, 0, sizeof(ifr6));
 	strncpy(ifr6.ifr_name, ifname, sizeof(ifr6.ifr_name));
 	ifr6.ifr_addr = *sin6;
-	if (ioctl(s, SIOCGIFALIFETIME_IN6, (caddr_t)&ifr6) < 0) {
-		close(s);
+	if (ioctl(sock, SIOCGIFALIFETIME_IN6, (caddr_t)&ifr6) < 0) {
+		close(sock);
 		return -1;
 	}
 
-	close(s);
+	close(sock);
 	return ifr6.ifr_ifru.ifru_lifetime.ia6t_expire;
 }
 
