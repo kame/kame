@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.79 2003/06/27 06:02:07 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.80 2003/06/27 07:15:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -882,6 +882,8 @@ setkeymsg_spdaddr_tag(type, tag, policy)
 		return -1;
 	memcpy(buf + l, &m_tag, sizeof(m_tag));
 	l += sizeof(m_tag);
+
+	msg->sadb_msg_len = PFKEY_UNIT64(l);
 
 	sendkeymsg(buf, l);
 
