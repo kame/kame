@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.250 2001/10/16 03:17:35 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.251 2001/10/17 05:08:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3356,10 +3356,10 @@ icmp6_recover_src(m)
 					}
 
 					/* swap */
-					bcopy(&haopt->ip6oh_addr, &t,
+					bcopy(haopt->ip6oh_addr, &t,
 					      sizeof(haopt->ip6oh_addr));
 					bcopy(&oip6->ip6_src,
-					      &haopt->ip6oh_addr,
+					      haopt->ip6oh_addr,
 					      sizeof(oip6->ip6_src));
 					bcopy(&t, &oip6->ip6_src,
 					      sizeof(t));
