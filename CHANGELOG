@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.20 1999/08/16 02:30:23 jinmei Exp $
+$Id: CHANGELOG,v 1.21 1999/08/16 05:06:37 jinmei Exp $
 
 <199908>
+1999-08-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/libinet6/name6.c (gethostbyname2): reinitilized saved_hp
+	right after freehostent() in order to avoid possible duplicate
+	free the variable.
+	Suggested by Frederic SOULIER.
+
 Mon Aug 16 01:34:36 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/zebra, freebsd2/ports/zebra: upgrade to 0.77.
 
