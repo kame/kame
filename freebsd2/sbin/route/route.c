@@ -94,7 +94,7 @@ union	sockunion {
 	struct	sockaddr_ns sns;
 #endif
 	struct	sockaddr_dl sdl;
-	struct	sockaddr_storage ss;
+	struct	sockaddr_storage ss; /* added to avoid memory overrun */
 } so_dst, so_gate, so_mask, so_genmask, so_ifa, so_ifp;
 
 typedef union sockunion *sup;
@@ -848,7 +848,6 @@ getaddr(which, s, hpp)
 		if (iflag) {
 			struct ifaddrs *ifap, *ifa;
 			struct sockaddr_dl *sdl = NULL;
-			static struct sockaddr_storage ss;
 
 			if (getifaddrs(&ifap))
 				err(1, "getifaddrs");
@@ -861,21 +860,21 @@ getaddr(which, s, hpp)
 				    (ifa->ifa_flags & IFF_POINTOPOINT) == 0)
 					continue;
 
-				/*
-				 * we need a static copy, since the ifaddr
-				 * list will be freed after the loop.
-				 */
-				memcpy(&ss, ifa->ifa_addr,
-				       ifa->ifa_addr->sa_len);
-				sdl = (struct sockaddr_dl *)&ss;
-				
+				sdl = (struct sockaddr_dl *)ifa->ifa_addr;
 			}
-			freeifaddrs(ifap);
 			/* If we found it, then use it */
 			if (sdl) {
-				su->sdl = *sdl;
+				/*
+				 * Copy is safe since we have a
+				 * sockaddr_storage member in sockunion{}.
+				 * Note that we need to copy before calling
+				 * freeifaddrs().
+				 */
+				memcpy(&su->sdl, sdl, sdl->sdl_len);
 				return(1);
 			}
+
+			freeifaddrs(ifap);
 		}
 		break;
 	case RTA_NETMASK:
