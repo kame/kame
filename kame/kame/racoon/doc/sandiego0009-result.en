@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.28 2000/09/21 23:19:28 itojun Exp $
+$KAME: sandiego0009-result.en,v 1.29 2000/09/21 23:32:12 sakane Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -277,7 +277,19 @@ vs Pivotal
 		route add -inet -net 10.33.134.0/24 206.175.32.1
 
 vs Cisco
-	I had not sent CR, then cisco did not CERT even though rsasig
-	was negotiated.
+	phase 1: main, initiator
+	    rsasig, 3des-cbc, sha1, DH group 2
+		entrust, subjectaltname = ipaddress
+	Notes:
+	- I had not sent CR, then cisco did not CERT even though rsasig
+	  was negotiated.  In this caes, I SHOULD send CR.
+	- negotiation failed because ID and subjectaltname in Cisco's CERT
+	  mismatched.
+
+	phase 1: main, responder
+	    rsasig, 3des-cbc, sha1, DH group 2
+		entrust, subjectaltname = ipaddress
+	phase 2: PFS group 2
+	    ESP 3des-cbc, hmac-sha1, transport mode, PFS 2
 
 vs RSA
