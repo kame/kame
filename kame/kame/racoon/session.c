@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.21 2000/12/15 16:04:58 sakane Exp $	*/
+/*	$KAME: session.c,v 1.22 2000/12/15 16:46:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,6 +78,7 @@
 #include "localconf.h"
 #include "remoteconf.h"
 
+static void close_session __P((void));
 static void check_rtsock __P((void *));
 static void initfds __P((void));
 static void init_signal __P((void));
@@ -168,7 +169,7 @@ session(void)
 }
 
 /* clear all status and exit program. */
-void
+static void
 close_session()
 {
 	flushph1();
