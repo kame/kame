@@ -1,4 +1,4 @@
-/*	$KAME: altq_var.h,v 1.15 2003/07/10 12:07:49 kjc Exp $	*/
+/*	$KAME: altq_var.h,v 1.16 2003/10/03 05:05:15 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2003
@@ -210,28 +210,26 @@ typedef void (timeout_t)(void *);
 
 #define	m_pktlen(m)		((m)->m_pkthdr.len)
 
-extern int pfaltq_running;
-
 struct ifnet; struct mbuf;
 struct pf_altq;
 #ifdef ALTQ3_CLFIER_COMPAT
 struct flowinfo;
 #endif
 
-void *altq_lookup(char *, int);
+void	*altq_lookup(char *, int);
 #ifdef ALTQ3_CLFIER_COMPAT
-int altq_extractflow(struct mbuf *, int, struct flowinfo *, u_int32_t);
-int acc_add_filter(struct acc_classifier *, struct flow_filter *,
-    void *, u_long *);
-int acc_delete_filter(struct acc_classifier *, u_long);
-int acc_discard_filters(struct acc_classifier *, void *, int);
-void *acc_classify(void *, struct mbuf *, int);
+int	altq_extractflow(struct mbuf *, int, struct flowinfo *, u_int32_t);
+int	acc_add_filter(struct acc_classifier *, struct flow_filter *,
+	    void *, u_long *);
+int	acc_delete_filter(struct acc_classifier *, u_long);
+int	acc_discard_filters(struct acc_classifier *, void *, int);
+void	*acc_classify(void *, struct mbuf *, int);
 #endif
 u_int8_t read_dsfield(struct mbuf *, struct altq_pktattr *);
-void write_dsfield(struct mbuf *, struct altq_pktattr *, u_int8_t);
-void altq_assert(const char *, int, const char *);
-int tbr_set(struct ifaltq *, struct tb_profile *);
-int tbr_get(struct ifaltq *, struct tb_profile *);
+void	write_dsfield(struct mbuf *, struct altq_pktattr *, u_int8_t);
+void	altq_assert(const char *, int, const char *);
+int	tbr_set(struct ifaltq *, struct tb_profile *);
+int	tbr_get(struct ifaltq *, struct tb_profile *);
 
 int	altq_pfattach(struct pf_altq *);
 int	altq_pfdetach(struct pf_altq *);

@@ -1,4 +1,4 @@
-/*	$KAME: altq_priq.h,v 1.6 2003/09/17 14:23:25 kjc Exp $	*/
+/*	$KAME: altq_priq.h,v 1.7 2003/10/03 05:05:15 kjc Exp $	*/
 /*
  * Copyright (C) 2000-2003
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -98,13 +98,13 @@ struct priq_classstats {
 
 	u_int			qlength;
 	u_int			qlimit;
-	u_int 			period;
+	u_int			period;
 	struct pktcntr		xmitcnt;  /* transmitted packet counter */
 	struct pktcntr		dropcnt;  /* dropped packet counter */
 
 	/* red and rio related info */
-	int		qtype;
-	struct redstats	red[3];		/* rio has 3 red stats */
+	int			qtype;
+	struct redstats		red[3];	/* rio has 3 red stats */
 };
 
 #ifdef ALTQ3_COMPAT

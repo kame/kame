@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.h,v 1.11 2003/09/17 14:23:25 kjc Exp $	*/
+/*	$KAME: altq_cbq.h,v 1.12 2003/10/03 05:05:15 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -38,15 +38,13 @@
 #include <altq/altq_red.h>
 #include <altq/altq_rio.h>
 
-/* #pragma ident "@(#)cbq.h  1.18     98/05/13 SMI" */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #define	NULL_CLASS_HANDLE	0
 
-/* class flags shoud be same as class flags in rm_class.h */
+/* class flags should be same as class flags in rm_class.h */
 #define	CBQCLF_RED		0x0001	/* use RED */
 #define	CBQCLF_ECN		0x0002  /* use RED/ECN */
 #define	CBQCLF_RIO		0x0004  /* use RIO */
@@ -184,7 +182,7 @@ struct cbq_getstats {
 /*
  * Define macros only good for kernel drivers and modules.
  */
-#define	CBQ_WATCHDOG    	(hz / 20)
+#define	CBQ_WATCHDOG		(hz / 20)
 #define	CBQ_TIMEOUT		10
 #define	CBQ_LS_TIMEOUT		(20 * hz / 1000)
 
