@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.13 2002/11/06 08:28:40 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.14 2002/11/11 03:53:58 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -103,7 +103,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/mld6_var.h>
 #include <netinet6/in6_msf.h>
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4) || defined(__NetBSD__)
 #include <netinet6/in6_pcb.h>
 #endif
 #include <net/net_osdep.h>
