@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.170 2004/09/10 03:50:24 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.171 2004/12/09 03:53:53 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2984,14 +2984,18 @@ ipsecdoi_checkid1(iph1)
 
 	id_b = (struct ipsecdoi_id_b *)iph1->id_p->v;
 
-	/* In main mode with pre-shared key, only address type can be used. */
+	/*
+	 * In main mode with pre-shared key, the address type is only allowed
+	 * in the Interop consensus.  however Cisco PIX uses the FQDN type.
+	 */
 	if (iph1->etype == ISAKMP_ETYPE_IDENT &&
 	    iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_PSKEY) {
-		 if (id_b->type != IPSECDOI_ID_IPV4_ADDR
-		  && id_b->type != IPSECDOI_ID_IPV6_ADDR) {
+		if (id_b->type != IPSECDOI_ID_IPV4_ADDR &&
+		    id_b->type != IPSECDOI_ID_IPV6_ADDR &&
+		    id_b->type != IPSECDOI_ID_FQDN) {
 			plog(LLV_ERROR, LOCATION, NULL,
-				"Expecting IP address type in main mode, "
-				"but %s.\n", s_ipsecdoi_ident(id_b->type));
+				"%s is not expected type in main mode.\n",
+				s_ipsecdoi_ident(id_b->type));
 			return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 		}
 	}
