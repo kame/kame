@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.117 2001/02/08 12:12:17 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.118 2001/02/08 12:14:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1045,7 +1045,7 @@ nd6_free(rt)
 
 	/*
 	 * we used to have pfctlinput(PRC_HOSTDEAD) here. 
-	 * even though it is not harmful, it was not really eecessary.
+	 * even though it is not harmful, it was not really necessary.
 	 */
 
 	if (!ip6_forwarding && ip6_accept_rtadv) { /* XXX: too restrictive? */
