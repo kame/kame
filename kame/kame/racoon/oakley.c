@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.120 2004/08/24 06:52:41 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.121 2004/12/09 08:31:39 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1949,6 +1949,10 @@ oakley_savecr(iph1, gen)
 			"No supported such CR type %d\n", type);
 		return -1;
 	case ISAKMP_CERT_CRL:
+		plog(LLV_WARNING, LOCATION, NULL,
+			"dont supported CRL type, just ignore\n");
+		return -1;
+		return 0;	/* just ignore the CRL */
 	default:
 		plog(LLV_ERROR, LOCATION, NULL,
 			"Invalid CR type %d\n", type);
