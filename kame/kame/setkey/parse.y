@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.60 2001/08/17 06:17:35 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.61 2001/08/17 06:19:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -74,7 +74,7 @@ static int setkeymsg_spdaddr __P((unsigned int, unsigned int, vchar_t *,
 static int setkeymsg_addr __P((unsigned int, unsigned int,
 	struct addrinfo *, struct addrinfo *, int));
 static int setkeymsg_add __P((unsigned int, unsigned int,
-	struct addrinfo *, struct addrinfo *, int));
+	struct addrinfo *, struct addrinfo *));
 extern int setkeymsg __P((char *, size_t *));
 extern int sendkeymsg __P((char *, size_t));
 
@@ -148,7 +148,7 @@ add_command
 		{
 			int status;
 
-			status = setkeymsg_add(SADB_ADD, $5, $3, $4, 0);
+			status = setkeymsg_add(SADB_ADD, $5, $3, $4);
 			if (status < 0)
 				return -1;
 		}
@@ -783,7 +783,7 @@ setkeymsg_addr(type, satype, srcs, dsts, no_spi)
 	setkeymsg0(msg, type, satype, 0);
 	l = sizeof(struct sadb_msg);
 
-	if (no_spi == 0) {
+	if (!no_spi) {
 		len = sizeof(struct sadb_sa);
 		m_sa.sadb_sa_len = PFKEY_UNIT64(len);
 		m_sa.sadb_sa_exttype = SADB_EXT_SA;
@@ -873,12 +873,11 @@ setkeymsg_addr(type, satype, srcs, dsts, no_spi)
 
 /* XXX NO BUFFER OVERRUN CHECK! BAD BAD! */
 static int
-setkeymsg_add(type, satype, srcs, dsts, no_spi)
+setkeymsg_add(type, satype, srcs, dsts)
 	unsigned int type;
 	unsigned int satype;
 	struct addrinfo *srcs;
 	struct addrinfo *dsts;
-	int no_spi;
 {
 	struct sadb_msg *msg;
 	char buf[BUFSIZ];
