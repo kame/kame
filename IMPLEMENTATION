@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/05/30 02:06:51 $
+			$Date: 2000/05/30 05:28:37 $
 
 1. IPv6
 
@@ -939,6 +939,15 @@ Here we would like to summarize couple of items we came to notice.
   getsockopt to get the "real" peername/sockname.  In the former case the
   getsockopt would return an AF_INET address.  In the latter case the
   getsockopt would return an AF_INET6 address.
+
+Due to the above twists, some of KAME userland programs has restrictions on
+the use of IPv4 mapped addresses:
+- rshd/rlogind do not accept connections from IPv4 mapped address.
+  This is to avoid malicious use of IPv4 mapped address in IPv6 native
+  packet, to bypass source-address based authentication.
+- ftpd/ftp assume that an IPv4 mapped address identifies IPv4 node, not a
+  native IPv6 node.  Hence, ftpd/ftp does not support network environment
+  with SIIT translator.
 
 1.13 sockaddr_storage
 
