@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.154 2001/06/29 05:23:25 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.155 2001/06/29 09:36:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1610,15 +1610,8 @@ nd6_ioctl(cmd, data, ifp)
 		nd_ifinfo[ifp->if_index].flags = ndi->ndi.flags;
 		break;
 	case SIOCSNDFLUSH_IN6:	/* XXX: the ioctl name is confusing... */
-		/* flush default router list */
-		/*
-		 * xxx sumikawa: should not delete route if default
-		 * route equals to the top of default router list
-		 */
-		bzero(&any, sizeof(any));
-		defrouter_delreq(&any, 0);
+		/* sync kernel routing table with the default router list */
 		defrouter_select();
-		/* xxx sumikawa: flush prefix list */
 		break;
 	case SIOCSPFXFLUSH_IN6:
 	    {
