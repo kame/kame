@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.199 2003/09/05 23:17:05 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.200 2003/09/06 05:15:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2511,6 +2511,8 @@ ipsec6_encapsulate(m, sav)
  * 0 (zero) is returned if packet disallowed, 1 if packet permitted.
  *
  * based on RFC 2401.
+ *
+ * XXX need to update for 64bit sequence number - 2401bis
  */
 int
 ipsec_chkreplay(seq, sav)
@@ -2570,6 +2572,7 @@ ipsec_chkreplay(seq, sav)
  * check replay counter whether to update or not.
  * OUT:	0:	OK
  *	1:	NG
+ * XXX need to update for 64bit sequence number - 2401bis
  */
 int
 ipsec_updatereplay(seq, sav)
@@ -2577,7 +2580,7 @@ ipsec_updatereplay(seq, sav)
 	struct secasvar *sav;
 {
 	struct secreplay *replay;
-	u_int32_t diff;
+	u_int64_t diff;
 	int fr;
 	u_int32_t wsizeb;	/* constant: bits of window size */
 	int frlast;		/* constant: last frame */

@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.37 2003/07/12 09:51:42 itojun Exp $	*/
+/*	$KAME: key_debug.c,v 1.38 2003/09/06 05:15:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -170,6 +170,9 @@ kdebug_sadb_ext_typestr(type)
 		TYPESTR(X_EXT_SA2),
 #ifdef SADB_X_EXT_TAG
 		TYPESTR(X_EXT_TAG),
+#endif
+#ifdef SADB_X_EXT_SA3
+		TYPESTR(X_EXT_SA3),
 #endif
 		{ NULL }
 	};
@@ -728,8 +731,9 @@ kdebug_secreplay(rpl)
 	if (rpl == NULL)
 		panic("kdebug_secreplay: NULL pointer was passed.");
 
-	printf(" secreplay{ count=%u wsize=%u seq=%u lastseq=%u",
-	    rpl->count, rpl->wsize, rpl->seq, rpl->lastseq);
+	printf(" secreplay{ count=%llu wsize=%u seq=%llu lastseq=%llu",
+	    (unsigned long long)rpl->count, rpl->wsize,
+	    (unsigned long long)rpl->seq, (unsigned long long)rpl->lastseq);
 
 	if (rpl->bitmap == NULL) {
 		printf(" }\n");

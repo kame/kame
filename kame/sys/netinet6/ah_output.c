@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.37 2003/08/22 21:25:57 itojun Exp $	*/
+/*	$KAME: ah_output.c,v 1.38 2003/09/06 05:15:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -274,7 +274,7 @@ ah4_output(m, isr)
 		 * XXX sequence number must not be cycled, if the SA is
 		 * installed by IKE daemon.
 		 */
-		ahdr->ah_seq = htonl(sav->replay->count);
+		ahdr->ah_seq = htonl(sav->replay->count & 0xffffffff);
 		bzero(ahdr + 1, plen);
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.36 2003/07/25 09:33:37 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.37 2003/09/06 05:15:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -212,9 +212,18 @@ struct sadb_x_sa2 {
   u_int8_t sadb_x_sa2_mode;
   u_int8_t sadb_x_sa2_reserved1;
   u_int16_t sadb_x_sa2_reserved2;
-  u_int32_t sadb_x_sa2_sequence;
+  u_int32_t sadb_x_sa2_sequence;	/* lowermost 32bit of sequence number */
   u_int32_t sadb_x_sa2_reqid;
 };
+
+#if 0	/* not fixed yet */
+struct sadb_x_sa3 {
+  u_int16_t sadb_x_sa3_len;
+  u_int16_t sadb_x_sa3_exttype;
+  u_int32_t sadb_x_sa3_id;		/* SA id */
+  u_int64_t sadb_x_sa3_sequence;	/* 64bit sequence number */
+};
+#endif
 
 /* XXX Policy Extension */
 /* sizeof(struct sadb_x_policy) == 16 */
@@ -285,7 +294,8 @@ struct sadb_x_tag {
 #define SADB_X_EXT_POLICY             18
 #define SADB_X_EXT_SA2                19
 #define SADB_X_EXT_TAG                20
-#define SADB_EXT_MAX                  20
+#define SADB_X_EXT_SA3                21
+#define SADB_EXT_MAX                  21
 
 #define SADB_SATYPE_UNSPEC	0
 #define SADB_SATYPE_AH		2

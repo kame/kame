@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.48 2003/06/13 11:36:30 keiichi Exp $	*/
+/*	$KAME: esp_output.c,v 1.49 2003/09/06 05:15:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -409,7 +409,7 @@ esp_output(m, nexthdrp, md, isr, af)
 		 * XXX sequence number must not be cycled, if the SA is
 		 * installed by IKE daemon.
 		 */
-		nesp->esp_seq = htonl(sav->replay->count);
+		nesp->esp_seq = htonl(sav->replay->count & 0xffffffff);
 	}
 
     {

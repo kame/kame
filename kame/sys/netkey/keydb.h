@@ -1,4 +1,4 @@
-/*	$KAME: keydb.h,v 1.20 2003/06/30 10:02:15 sakane Exp $	*/
+/*	$KAME: keydb.h,v 1.21 2003/09/06 05:15:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,18 +99,20 @@ struct secasvar {
 	struct sadb_lifetime *lft_h;	/* HARD lifetime */
 	struct sadb_lifetime *lft_s;	/* SOFT lifetime */
 
-	u_int32_t seq;			/* sequence number */
+	u_int64_t seq;			/* sequence number */
 	pid_t pid;			/* message's pid */
 
 	struct secashead *sah;		/* back pointer to the secashead */
+
+	u_int32_t id;			/* SA id */
 };
 
 /* replay prevention */
 struct secreplay {
-	u_int32_t count;
+	u_int64_t count;
 	u_int wsize;		/* window size, i.g. 4 bytes */
-	u_int32_t seq;		/* used by sender */
-	u_int32_t lastseq;	/* used by receiver */
+	u_int64_t seq;		/* used by sender */
+	u_int64_t lastseq;	/* used by receiver */
 	u_int8_t *bitmap;	/* used by receiver */
 	int overflow;		/* what round does the counter take. */
 };

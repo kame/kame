@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.78 2003/07/03 05:21:18 itojun Exp $	*/
+/*	$KAME: keydb.c,v 1.79 2003/09/06 05:15:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -181,11 +181,15 @@ struct secasvar *
 keydb_newsecasvar()
 {
 	struct secasvar *p;
+	u_int32_t said = 0;
 
 	p = (struct secasvar *)malloc(sizeof(*p), M_SECA, M_NOWAIT);
 	if (!p)
 		return p;
 	bzero(p, sizeof(*p));
+	p->id = ++said;
+	if (said + 1 == 0)
+		said++;
 	p->refcnt = 1;
 	return p;
 }

@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.299 2003/07/25 08:48:05 sakane Exp $	*/
+/*	$KAME: key.c,v 1.300 2003/09/06 05:15:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -210,6 +210,7 @@ static const int minsize[] = {
 	sizeof(struct sadb_x_policy),	/* SADB_X_EXT_POLICY */
 	sizeof(struct sadb_x_sa2),	/* SADB_X_SA2 */
 	sizeof(struct sadb_x_tag),	/* SADB_X_TAG */
+	0 /*sizeof(struct sadb_x_sa3)*/, /* SADB_X_SA3 */
 };
 static const int maxsize[] = {
 	sizeof(struct sadb_msg),	/* SADB_EXT_RESERVED */
@@ -233,6 +234,7 @@ static const int maxsize[] = {
 	0,				/* SADB_X_EXT_POLICY */
 	sizeof(struct sadb_x_sa2),	/* SADB_X_SA2 */
 	sizeof(struct sadb_x_tag),	/* SADB_X_TAG */
+	0 /*sizeof(struct sadb_x_sa3)*/, /* SADB_X_SA3 */
 };
 
 static int ipsec_esp_keymin = 256;
@@ -3593,8 +3595,8 @@ key_setdumpsa(sav, type, satype, seq, pid)
 
 		case SADB_X_EXT_SA2:
 			m = key_setsadbxsa2(sav->sah->saidx.mode,
-					sav->replay ? sav->replay->count : 0,
-					sav->sah->saidx.reqid);
+			    sav->replay ? (sav->replay->count & 0xffffffff) : 0,
+			    sav->sah->saidx.reqid);
 			if (!m)
 				goto fail;
 			break;
@@ -6749,8 +6751,8 @@ key_expire(sav)
 
 	/* create SA extension */
 	m = key_setsadbxsa2(sav->sah->saidx.mode,
-			sav->replay ? sav->replay->count : 0,
-			sav->sah->saidx.reqid);
+	    sav->replay ? (sav->replay->count & 0xffffffff) : 0,
+	    sav->sah->saidx.reqid);
 	if (!m) {
 		error = ENOBUFS;
 		goto fail;
