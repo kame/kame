@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: pfkeyv2.h,v 1.2 2000/02/07 09:03:56 itojun Exp $ */
+/* $Id: pfkeyv2.h,v 1.3 2000/02/08 09:01:30 itojun Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -373,9 +373,48 @@ struct sadb_x_ipsecrequest {
 #define	PFKEY_UNIT64(a)		(a)
 #endif
 
-/* backward compatibility - pathname under debate */
-#define __KAME_NET_PFKEYV2_H_INCLUDED_
-#include <netkey/keyv2.h>
+#ifndef _KERNEL
+extern void pfkey_sadump __P((struct sadb_msg *));
+extern void pfkey_spdump __P((struct sadb_msg *));
+
+struct sockaddr;
+int ipsec_check_keylen __P((u_int, u_int, u_int));
+u_int pfkey_set_softrate __P((u_int, u_int));
+u_int pfkey_get_softrate __P((u_int));
+int pfkey_send_getspi __P((int, u_int, u_int, struct sockaddr *,
+	struct sockaddr *, u_int32_t, u_int32_t, u_int32_t, u_int32_t));
+int pfkey_send_update __P((int, u_int, u_int, struct sockaddr *,
+	struct sockaddr *, u_int32_t, u_int32_t, u_int,
+	caddr_t, u_int, u_int, u_int, u_int, u_int, u_int32_t, u_int64_t,
+	u_int64_t, u_int64_t, u_int32_t));
+int pfkey_send_add __P((int, u_int, u_int, struct sockaddr *,
+	struct sockaddr *, u_int32_t, u_int32_t, u_int,
+	caddr_t, u_int, u_int, u_int, u_int, u_int, u_int32_t, u_int64_t,
+	u_int64_t, u_int64_t, u_int32_t));
+int pfkey_send_delete __P((int, u_int, u_int,
+	struct sockaddr *, struct sockaddr *, u_int32_t));
+int pfkey_send_get __P((int, u_int, u_int,
+	struct sockaddr *, struct sockaddr *, u_int32_t));
+int pfkey_send_register __P((int, u_int));
+int pfkey_recv_register __P((int));
+int pfkey_send_flush __P((int, u_int));
+int pfkey_send_dump __P((int, u_int));
+int pfkey_send_promisc_toggle __P((int, int));
+int pfkey_send_spdadd __P((int, struct sockaddr *, u_int,
+	struct sockaddr *, u_int, u_int, caddr_t, int, u_int32_t));
+int pfkey_send_spddelete __P((int, struct sockaddr *, u_int,
+	struct sockaddr *, u_int, u_int, u_int32_t));
+int pfkey_send_spdflush __P((int));
+int pfkey_send_spddump __P((int));
+
+int pfkey_open __P((void));
+void pfkey_close __P((int));
+struct sadb_msg *pfkey_recv __P((int));
+int pfkey_send __P((int, struct sadb_msg *, int));
+int pfkey_align __P((struct sadb_msg *, caddr_t *));
+int pfkey_check __P((caddr_t *));
+
+#endif /*!_KERNEL*/
 
 #endif /* __PFKEY_V2_H */
 
