@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.96 2001/02/03 18:25:55 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.97 2001/02/04 17:13:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -950,6 +950,7 @@ in6_ifattach(ifp, altifp)
 		 * (But, is it really correct?)
 		 */
 		if ((ifp->if_flags & IFF_LOOPBACK) == 0 &&
+		    (ifp->if_flags & IFF_POINTOPOINT) == 0 &&
 		    (ifp->if_flags & (IFF_UP|IFF_RUNNING)) ==
 		    (IFF_UP|IFF_RUNNING)) {
 			ia->ia6_flags &= ~IN6_IFF_NODAD;
