@@ -582,7 +582,7 @@ int	icmp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 /* XXX: is this the right place for these macros? */
 #define icmp6_ifstat_inc(ifp, tag) \
 do {								\
-	if ((ifp) && (ifp)->if_index < if_index			\
+	if ((ifp) && (ifp)->if_index <= if_index			\
 	 && (ifp)->if_index < icmp6_ifstatmax			\
 	 && icmp6_ifstat && icmp6_ifstat[(ifp)->if_index]) {	\
 		icmp6_ifstat[(ifp)->if_index]->tag++;		\
