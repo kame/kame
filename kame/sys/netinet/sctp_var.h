@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.12 2003/04/18 07:06:50 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.13 2003/04/18 08:08:47 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_var.h,v 1.46 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -45,12 +45,8 @@
 /*
  * Names for SCTP sysctl objects
  */
-#define SCTPCTL_STATS		1	/* statistics (read-only) */
 #define	SCTPCTL_MAXDGRAM	2	/* max datagram size */
 #define	SCTPCTL_RECVSPACE	3	/* default receive buffer space */
-#if 0
-#define	SCTPCTL_PCBLIST		4	/* list of PCBs for SCTP sockets */
-#endif
 #if 0 /* skip 5 and 6 for now */
 #define SCTPCTL_ASOC_CNT	5	/* number of assoc for zinit */
 #define SCTPCTL_SCALE_VAL	6	/* how to scale up for addr's */
@@ -61,7 +57,7 @@
 #if 0
 #define SCTPCTL_NAMES { \
 	{ 0, 0 }, \
-	{ "stats", CTLTYPE_STRUCT }, \
+	{ 0, 0 }, \
 	{ "maxdgram", CTLTYPE_INT }, \
 	{ "recvspace", CTLTYPE_INT }, \
 	{ 0, 0 }, \
@@ -72,7 +68,7 @@
 #else
 #define SCTPCTL_NAMES { \
 	{ 0, 0 }, \
-	{ "stats", CTLTYPE_STRUCT }, \
+	{ 0, 0 }, \
 	{ "maxdgram", CTLTYPE_INT }, \
 	{ "recvspace", CTLTYPE_INT }, \
 	{ 0, 0 }, \
