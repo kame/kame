@@ -1,0 +1,3 @@
+Just type make install
+configure file /usr/local/etc/vrrpd.conf
+and run vrrpd with /usr/local/libexec/vrrpd

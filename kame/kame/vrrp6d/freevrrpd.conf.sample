@@ -1,0 +1,37 @@
+# This is a simple configuration file for freevrrpd
+# Please read the documentation before modifying these parameters
+# I recommend to not set addr to the unique and real ip of your server because
+# if freevrrpd will shutdown, your server will don't have any IP address.
+# a good utilization is to set a real IP address not managed by freevrrpd and
+# then choosing an alias for the virtual IP address managed by freevrrpd
+#
+# Each VRID Section must begin with [VRID] keyword
+[VRID]
+# serverid is needed to specify the number of the VRID, here VRID = 1
+serverid = 1 
+# you must set interface with a real interface name of your system
+interface = rl0
+# priority = 255 is a MASTER of the VRID
+# priority < 255 is a BACKUP with a priority 0 to 254
+# 254 is a higher BACKUP priority
+priority = 255
+# addr option is need to specify ip address(es) associated with the VRID
+# you can specify multiple addresses separated by ','
+# netmask is specified with CIDR notation so number after '/' represent the
+# number of bits set to 1 for the netmask.
+# eg: /24 is 11111111 11111111 11111111 00000000 = 255.255.255.0
+addr = 192.168.1.1/32
+# if you want to authentificate your VRRP packets you can set a password
+# associated with this VRID. this is not required but is you don't set a
+# password, everybody in your LAN can generate VRRP packets without
+# authentification. If you set this, you must set it to BACKUP VRID too, if you
+# don't all BACKUP VRRP packets will be rejected.
+password = vrid1
+[VRID]
+# specify a second VRID number 2
+serverid = 2
+interface = rl0
+# priority = 100 so it's a backup
+priority = 100
+addr = 192.168.1.2/32
+password = vrid2

@@ -1,0 +1,5 @@
+# $Id: TODO,v 1.1 2002/07/09 07:19:20 ono Exp $
+
+* Cryptographic Authentification Data
+* Possiblity to set netmask for VIP address(es)
+* Add more configuration parameters in the configuration file
