@@ -18,6 +18,12 @@ CPPFLAGS+=-I${SRCDIR}/../tcpdump -I${SRCDIR}/../tcpdump/lbl \
 #LDADD+=-L/usr/pkg/lib -lefence
 #.endif
 
+# with boehm garbage collector
+#.if exists(/usr/pkg/lib/libgc.a)
+#CPPFLAGS+=-I/usr/pkg/include -DGC
+#LDADD+=	-L/usr/pkg/lib -lgc
+#.endif
+
 MAN=	racoon.8 racoon.conf.5
 
 .include <bsd.prog.mk>
