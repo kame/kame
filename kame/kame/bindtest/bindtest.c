@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.12 2000/10/22 13:58:43 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.13 2000/11/04 10:16:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI Project.
@@ -98,6 +98,8 @@ static int test __P((struct testitem *, struct testitem *));
 static char *port = NULL;
 static int socktype = SOCK_DGRAM;
 static int summary = 0;
+static int reuseaddr = 0;
+static int reuseport = 0;
 
 int
 main(argc, argv)
@@ -108,8 +110,14 @@ main(argc, argv)
 	extern char *optarg;
 	struct testitem *testi, *testj;
 
-	while ((ch = getopt(argc, argv, "p:st")) != EOF) {
+	while ((ch = getopt(argc, argv, "APp:st")) != EOF) {
 		switch (ch) {
+		case 'A':
+			reuseaddr = 1;
+			break;
+		case 'P':
+			reuseport = 1;
+			break;
 		case 'p':
 			port = strdup(optarg);
 			break;
@@ -138,8 +146,10 @@ main(argc, argv)
 	for (testi = testitems; testi->name; testi++)
 		testi->res = getres(testi->family, testi->host, port);
 
-	printf("starting tests, socktype = %s\n",
-		socktype == SOCK_DGRAM ? "SOCK_DGRAM" : "SOCK_STREAM");
+	printf("starting tests, socktype = %s%s%s\n",
+	    socktype == SOCK_DGRAM ? "SOCK_DGRAM" : "SOCK_STREAM",
+	    reuseaddr ? ", SO_REUSEADDR" : "",
+	    reuseport ? ", SO_REUSEPORT" : "");
 	if (summary) {
 		for (testi = testitems; testi->name; testi++)
 			printf("\t%s", testi->name);
@@ -161,7 +171,7 @@ static void
 usage()
 {
 
-	fprintf(stderr, "usage: bindtest [-st] -p port\n");
+	fprintf(stderr, "usage: bindtest [-APst] -p port\n");
 }
 
 static struct addrinfo *
@@ -202,6 +212,7 @@ test(t1, t2)
 	struct addrinfo *a = t1->res;
 	struct addrinfo *b = t2->res;
 	int sa = -1, sb = -1;
+	const int yes = 1;
 
 	if (!summary)
 		printf("%s then %s\n", t1->name, t2->name);
@@ -231,6 +242,52 @@ test(t1, t2)
 		else
 			printf("\t!2");
 		goto fail;
+	}
+
+	if (reuseaddr) {
+		if (setsockopt(sa, SOL_SOCKET, SO_REUSEADDR, &yes,
+		    sizeof(yes)) < 0) {
+			if (!summary)
+				printf("\tfailed setsockopt(SO_REUSEADDR) "
+				    "for %s, %s\n", printres(a),
+				    strerror(errno));
+			else
+				printf("\t?A");
+			goto fail;
+		}
+		if (setsockopt(sb, SOL_SOCKET, SO_REUSEADDR, &yes,
+		    sizeof(yes)) < 0) {
+			if (!summary)
+				printf("\tfailed setsockopt(SO_REUSEADDR) "
+				    "for %s, %s\n", printres(b),
+				    strerror(errno));
+			else
+				printf("\t!A");
+			goto fail;
+		}
+	}
+
+	if (reuseport) {
+		if (setsockopt(sa, SOL_SOCKET, SO_REUSEPORT, &yes,
+		    sizeof(yes)) < 0) {
+			if (!summary)
+				printf("\tfailed setsockopt(SO_REUSEPORT) "
+				    "for %s, %s\n", printres(a),
+				    strerror(errno));
+			else
+				printf("\t?P");
+			goto fail;
+		}
+		if (setsockopt(sb, SOL_SOCKET, SO_REUSEPORT, &yes,
+		    sizeof(yes)) < 0) {
+			if (!summary)
+				printf("\tfailed setsockopt(SO_REUSEPORT) "
+				    "for %s, %s\n", printres(b),
+				    strerror(errno));
+			else
+				printf("\t!P");
+			goto fail;
+		}
 	}
 
 	if (!summary)

@@ -1,4 +1,4 @@
-.\"	$KAME: bindtest.1,v 1.8 2000/10/20 16:53:31 itojun Exp $
+.\"	$KAME: bindtest.1,v 1.9 2000/11/04 10:16:38 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -37,7 +37,7 @@
 .\"
 .Sh SYNOPSIS
 .Nm
-.Op Fl st
+.Op Fl APst
 .Fl p Ar port
 .\"
 .Sh DESCRIPTION
@@ -84,6 +84,15 @@ TCP/UDP port number must be specified with
 The
 .Ar port
 needs to be vacant.
+.Pp
+.Fl A
+sets 
+.Dv SO_REUSEADDR
+socket option for all the sockets.
+.Fl P
+sets
+.Dv SO_REUSEPORT
+socket option for all the sockets.
 .Pp
 With
 .Fl s ,
