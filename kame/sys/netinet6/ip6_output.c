@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.289 2002/03/02 09:56:16 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.290 2002/03/17 19:48:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1088,7 +1088,7 @@ skip_ipsec2:;
 	goto bad;
 
   routefound:
-	if (rt) {
+	if (rt && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 		if (opt && opt->ip6po_nextroute.ro_rt) {
 			/*
 			 * The nexthop is explicitly specified by the
