@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.49 2002/08/01 08:20:31 ono Exp $	*/
+/*	$KAME: mld6.c,v 1.50 2002/08/23 10:18:25 ono Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -491,6 +491,8 @@ mld6_sendpkt(in6m, type, dst)
 #ifdef IFT_VRRP
 	if (ifp->if_type == IFT_VRRP) {
 		ifp = ((struct ifvrrp *)ifp->if_softc)->ifv_p;
+		if (ifp == NULL)
+		    return;
 	}
 #endif
 	/*
