@@ -71,11 +71,17 @@
 
 #include <sys/param.h>
 #include <sys/socket.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <sys/socketvar.h>
+#endif
 #include <sys/protosw.h>
 #include <sys/kernel.h>
 #include <sys/domain.h>
 #include <sys/mbuf.h>
 #ifdef __FreeBSD__
+# if __FreeBSD__ >= 3
+# include <sys/systm.h>
+# endif
 #include <sys/sysctl.h>
 #endif
 
@@ -130,6 +136,9 @@
 #include <netinet6/pim6_var.h>
 
 #include <netinet6/nd6.h>
+#ifdef __FreeBSD__
+#include <netinet6/in6_prefix.h>
+#endif
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -533,8 +542,49 @@ SYSCTL_NODE(_net_inet6,	IPPROTO_ESP,	ipsec6,	CTLFLAG_RW, 0,	"IPSEC6");
 #endif /* IPSEC */
 
 /* net.inet6.ip6 */
-SYSCTL_INT(_net_inet6_ip6, IPV6CTL_FORWARDING,
-	forwarding, CTLFLAG_RW,		&ip6_forwarding,	0, "");
+static int
+sysctl_ip6_forwarding SYSCTL_HANDLER_ARGS
+{
+	int error = 0;
+	int old_ip6_forwarding;
+
+	error = SYSCTL_OUT(req, arg1, sizeof(int));
+	if (error || !req->newptr)
+		return (error);
+	old_ip6_forwarding = ip6_forwarding;
+	error = SYSCTL_IN(req, arg1, sizeof(int));
+	if (error != 0)
+		return (error);
+	if (ip6_forwarding != 0) {
+		if (old_ip6_forwarding == 0) {
+			int s = splnet();
+			struct nd_prefix *pr, *next;
+
+			for (pr = nd_prefix.lh_first; pr; pr = next) {
+				next = pr->ndpr_next;
+				if (!IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
+					in6_ifdel(pr->ndpr_ifp,
+						  &pr->ndpr_addr);
+				prelist_remove(pr);
+			}
+			splx(s);
+		}
+	} else /* ip6_forwarding == 0 */ if (old_ip6_forwarding != 0) {
+		struct socket so;
+
+		/* XXX: init dummy so */
+		bzero(&so, sizeof(so));
+		while(!LIST_EMPTY(&rr_prefix))
+			delete_each_prefix(&so, LIST_FIRST(&rr_prefix),
+					   PR_ORIG_KERNEL);
+	}
+
+	return (error);
+}
+
+SYSCTL_OID(_net_inet6_ip6, IPV6CTL_FORWARDING, forwarding,
+	   CTLTYPE_INT|CTLFLAG_RW, &ip6_forwarding, 0, sysctl_ip6_forwarding,
+	   "I", "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_SENDREDIRECTS,
 	redirect, CTLFLAG_RW,		&ip6_sendredirects,	0, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_DEFHLIM,

@@ -72,12 +72,11 @@
 #endif
 #include <sys/errno.h>
 #include <sys/malloc.h>
-#include <sys/proc.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/sockio.h>
 #include <sys/systm.h>
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/proc.h>
 #endif
 #include <sys/time.h>
