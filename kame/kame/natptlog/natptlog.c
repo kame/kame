@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptlog.c,v 1.9 2000/04/19 08:15:31 fujisawa Exp $
+ *	$Id: natptlog.c,v 1.10 2000/05/16 16:26:30 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -87,13 +87,13 @@
 #define	_PATH_PIDFILE		"/var/run/natptlog.pid"
 #define	_PATH_STATSFILE		"/var/tmp/natptlog.stats"
 
-#define	isOn(name)		(__op.b.name == 1)
-#define	isOff(name)		(__op.b.name == 0)
+#define	isOn(name)		(u_opt.b.name == 1)
+#define	isOff(name)		(u_opt.b.name == 0)
 
-#define	isDebug(d)		(__debug & (d))
+#define	isDebug(d)		(u_debug & (d))
 
 
-u_long		 __debug;
+u_long		 u_debug;
 sigset_t	 mask;
 int		 signals[] = { SIGINT, SIGTERM, };
 
@@ -108,7 +108,7 @@ struct options
     }	b;
     char	*pidFilename;
     char	*statsFilename;
-}		__op;
+}		u_opt;
 
 
 void	 parseArgument		__P((int, char *[]));
@@ -187,14 +187,14 @@ parseArgument(int argc, char *argv[])
 	switch (ch)
 	{
 	  case 'b':
-	    __op.b.daemon = 1;
-	    __op.b.logsyslog = 1;
-	    __op.b.logstderr = 0;
+	    u_opt.b.daemon = 1;
+	    u_opt.b.logsyslog = 1;
+	    u_opt.b.logstderr = 0;
 	    openLog();
 	    break;
 
 	  case 'd':
-	    __debug = strtoul(optarg, (char **)NULL, 0);
+	    u_debug = strtoul(optarg, (char **)NULL, 0);
 	    break;
 
 	  default:
@@ -574,8 +574,8 @@ hexdump16(int priority, char *buffer, int len)
 void
 quitting(int status)
 {
-    if (__op.pidFilename != NULL)
-	unlink(__op.pidFilename);
+    if (u_opt.pidFilename != NULL)
+	unlink(u_opt.pidFilename);
 
     exit(status);
 }
@@ -590,7 +590,7 @@ openLog()
 {
     if (isOff(logopened))
     {
-	__op.b.logopened = 1;
+	u_opt.b.logopened = 1;
 
 	if (isOn(logsyslog))
 	{
@@ -736,14 +736,14 @@ setFileName(char *filename, int type)
     switch (type)
     {
       case OPT_PIDFILE:
-	__op.pidFilename = xmalloc(ROUNDUP(strlen(filename)+1));
-	strcpy(__op.pidFilename, filename);
+	u_opt.pidFilename = xmalloc(ROUNDUP(strlen(filename)+1));
+	strcpy(u_opt.pidFilename, filename);
 	log(LOG_INFO, "	     PidFile: %s", filename);
 	break;
 
       case OPT_STATSFILE:
-	__op.statsFilename = xmalloc(ROUNDUP(strlen(filename)+1));
-	strcpy(__op.statsFilename, filename);
+	u_opt.statsFilename = xmalloc(ROUNDUP(strlen(filename)+1));
+	strcpy(u_opt.statsFilename, filename);
 	log(LOG_INFO, "	    StatFile: %s", filename);
 	break;
     }
@@ -802,10 +802,10 @@ sighandler(int sig)
 void
 preinit()
 {
-    __op.b.daemon = 0;
-    __op.b.logsyslog = 0;
-    __op.b.logstderr = 1;
-    __op.b.logopened = 0;
+    u_opt.b.daemon = 0;
+    u_opt.b.logsyslog = 0;
+    u_opt.b.logstderr = 1;
+    u_opt.b.logopened = 0;
 }
 
 
@@ -821,9 +821,9 @@ init_main()
 	exit(errno);
     }
 
-    if (__op.pidFilename == NULL)
+    if (u_opt.pidFilename == NULL)
 	setFileName(_PATH_PIDFILE, OPT_PIDFILE);
 
     initSignal();
-    updatePidFile(__op.pidFilename);
+    updatePidFile(u_opt.pidFilename);
 }

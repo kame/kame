@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: misc.c,v 1.4 2000/02/29 00:56:30 itojun Exp $
+ *	$Id: misc.c,v 1.5 2000/05/16 16:25:35 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -1215,7 +1215,7 @@ sighandler(int sig)
 	{
 	    FILE	*fp;
 
-	    if ((fp = writeOpen(__op.dumpFilename, 0)) != NULL)
+	    if ((fp = writeOpen(u_opt.dumpFilename, 0)) != NULL)
 	    {
 		xmallocShow(fp);
 		fclose(fp);

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: main.c,v 1.4 2000/04/16 18:00:56 itojun Exp $
+ *	$Id: main.c,v 1.5 2000/05/16 16:25:35 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -63,8 +63,8 @@
  *
  */
 
-u_long		__debug;
-struct options	__op;
+u_long		u_debug;
+struct options	u_opt;
 
 
 char		*parseArgument		__P((int, char *[]));
@@ -130,14 +130,14 @@ parseArgument(int argc, char *argv[])
 	switch (ch)
 	{
 	  case 'b':
-	    __op.b.daemon = 1;
+	    u_opt.b.daemon = 1;
 	    break;
 
 	  case 'd':
-	    __debug = strtoul(optarg, (char **)NULL, 0);
-	    if (isDebug(NOSYSLOG))		__op.b.logsyslog = 0;
+	    u_debug = strtoul(optarg, (char **)NULL, 0);
+	    if (isDebug(NOSYSLOG))		u_opt.b.logsyslog = 0;
 	    if ((isDebug(LOGTOSTDERR))
-		&& (!isOn(daemon)))		__op.b.logstderr = 1;
+		&& (!isOn(daemon)))		u_opt.b.logstderr = 1;
 	    break;
 
 	  case 'f':
@@ -286,20 +286,20 @@ setFileName(char *filename, int type)
     switch (type)
     {
       case OPT_DUMPFILE:
-	__op.dumpFilename = xmalloc(ROUNDUP(strlen(filename)+1));
-	strcpy(__op.dumpFilename, filename);
+	u_opt.dumpFilename = xmalloc(ROUNDUP(strlen(filename)+1));
+	strcpy(u_opt.dumpFilename, filename);
 	log(LOG_INFO, "	    DumpFile: %s", filename);
 	break;
 
       case OPT_PIDFILE:
-	__op.pidFilename = xmalloc(ROUNDUP(strlen(filename)+1));
-	strcpy(__op.pidFilename, filename);
+	u_opt.pidFilename = xmalloc(ROUNDUP(strlen(filename)+1));
+	strcpy(u_opt.pidFilename, filename);
 	log(LOG_INFO, "	     PidFile: %s", filename);
 	break;
 
       case OPT_STATSFILE:
-	__op.statsFilename = xmalloc(ROUNDUP(strlen(filename)+1));
-	strcpy(__op.statsFilename, filename);
+	u_opt.statsFilename = xmalloc(ROUNDUP(strlen(filename)+1));
+	strcpy(u_opt.statsFilename, filename);
 	log(LOG_INFO, "	    StatFile: %s", filename);
 	break;
     }
@@ -350,14 +350,14 @@ updatePidFile()
 {
     FILE	*fp;
 
-    if ((fp = writeOpen(__op.pidFilename, O_EXCL)) != NULL)
+    if ((fp = writeOpen(u_opt.pidFilename, O_EXCL)) != NULL)
     {
 	fprintf(fp, "%ld\n", (long)getpid());
 	fclose(fp);
     }
     else
     {
-	log(LOG_ERR, "couldn't create pid file '%s'\n", __op.pidFilename);
+	log(LOG_ERR, "couldn't create pid file '%s'\n", u_opt.pidFilename);
 	exit(errno);
     }
 }
@@ -415,8 +415,8 @@ writeOpen(char *filename, int flag)
 void
 quitting(int status)
 {
-    if (__op.pidFilename != NULL)
-	unlink(__op.pidFilename);
+    if (u_opt.pidFilename != NULL)
+	unlink(u_opt.pidFilename);
 
     exit(status);
 }
@@ -490,10 +490,10 @@ closeLog()
 void
 preinit()
 {
-    __op.b.useTAny = 1;
-    __op.b.supportA1A4 = 1;
-    __op.b.logsyslog = 1;
-    __op.b.logstderr = 0;
+    u_opt.b.useTAny = 1;
+    u_opt.b.supportA1A4 = 1;
+    u_opt.b.logsyslog = 1;
+    u_opt.b.logstderr = 0;
 
     openLog();
     log(LOG_INFO, "starting daemon");
@@ -520,13 +520,13 @@ init_main()
 	exit(errno);
     }
 
-    if (__op.dumpFilename == NULL)
+    if (u_opt.dumpFilename == NULL)
 	setFileName(_PATH_DUMPFILE, OPT_DUMPFILE);
 
-    if (__op.pidFilename == NULL)
+    if (u_opt.pidFilename == NULL)
 	setFileName(_PATH_PIDFILE, OPT_PIDFILE);
 
-    if (__op.statsFilename == NULL)
+    if (u_opt.statsFilename == NULL)
 	setFileName(_PATH_STATSFILE, OPT_STATSFILE);
 
     initSignal();

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: defs.h,v 1.2 2000/02/29 00:56:30 itojun Exp $
+ *	$Id: defs.h,v 1.3 2000/05/16 16:25:35 fujisawa Exp $
  */
 
 #ifndef TRUE
@@ -46,10 +46,10 @@
 
 #define	INADDRARPA		"255.255.255.255.in-addr.arpa."
 
-#define	isOn(name)		(__op.b.name == 1)
-#define	isOff(name)		(__op.b.name == 0)
+#define	isOn(name)		(u_opt.b.name == 1)
+#define	isOff(name)		(u_opt.b.name == 0)
 
-#define	isDebug(d)		(__debug & (d))
+#define	isDebug(d)		(u_debug & (d))
 
 #define	DEBUG_IFADDR		0x00000100
 #define	DEBUG_RESOLVER		0x00000200
@@ -258,8 +258,8 @@ struct options
  */
 
 extern	int		 errno;
-extern	u_long		 __debug;
-extern	struct options	 __op;
+extern	u_long		 u_debug;
+extern	struct options	 u_opt;
 
 /*	main.c									*/
 FILE		*writeOpen		__P((char *, int));
