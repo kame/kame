@@ -141,12 +141,12 @@ union sockunion {
 #define su_family	su_si.si_family
 #define su_port		su_si.si_port
 
-void	doit __P((int, union sockunion *));
+void	doit __P((int, struct sockaddr *));
 int	control __P((int, char *, int));
 void	protocol __P((int, int));
 void	cleanup __P((int));
 void	fatal __P((int, char *, int));
-int	do_rlogin __P((union sockunion *, char *));
+int	do_rlogin __P((struct sockaddr *, char *));
 void	getstr __P((char *, int, char *));
 void	setup_term __P((int));
 int	do_krb_login __P((union sockunion *));
@@ -161,7 +161,7 @@ main(argc, argv)
 	char *argv[];
 {
 	extern int __check_rhosts_file;
-	union sockunion from;
+	struct sockaddr_storage from;
 	int ch, fromlen, on;
 
 	openlog("rlogind", LOG_PID, LOG_AUTH);
@@ -199,13 +199,13 @@ main(argc, argv)
 	    setsockopt(0, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof (on)) < 0)
 		syslog(LOG_WARNING, "setsockopt (SO_KEEPALIVE): %m");
 #if defined(IP_TOS)
-	if (from.su_family == AF_INET) {
+	if (((struct sockaddr *)&from)->sa_family == AF_INET) {
 		on = IPTOS_LOWDELAY;
 		if (setsockopt(0, IPPROTO_IP, IP_TOS, (char *)&on, sizeof(int)) < 0)
 			syslog(LOG_WARNING, "setsockopt (IP_TOS): %m");
 	}
 #endif
-	doit(0, &from);
+	doit(0, (struct sockaddr *)&from);
 	/* NOTREACHED */
 #ifdef __GNUC__
 	exit(0);
@@ -223,7 +223,7 @@ struct winsize win = { 0, 0, 0, 0 };
 void
 doit(f, fromp)
 	int f;
-	union sockunion *fromp;
+	struct sockaddr *fromp;
 {
 	int master, pid, on = 1;
 	int authenticated = 0;
@@ -233,9 +233,14 @@ doit(f, fromp)
 	char *hostname;
 	char hostnamebuf[2 * MAXHOSTNAMELEN + 1];
 	char c;
-	char nameinfo[INET6_ADDRSTRLEN];
-	int af = fromp->su_family, alen;
+	char naddr[NI_MAXHOST];
+	char saddr[NI_MAXHOST];
+	char raddr[NI_MAXHOST];
+	int af = fromp->sa_family, alen;
+	u_int16_t *portp;
 	char *addr;
+	struct addrinfo hints, *res, *res0;
+	int gaierror;
 
 	alarm(60);
 	read(f, &c, 1);
@@ -244,63 +249,74 @@ doit(f, fromp)
 		exit(1);
 
 	alarm(0);
-	fromp->su_port = ntohs((u_short)fromp->su_port);
 	switch (af) {
 	case AF_INET:
-		alen = sizeof(struct in_addr);
-		addr = (char *)&fromp->su_sin.sin_addr;
+		portp = &((struct sockaddr_in *)fromp)->sin_port;
 		break;
 	case AF_INET6:
-		alen = sizeof(struct in6_addr);
-		addr = (char *)&fromp->su_sin6.sin6_addr;
+		portp = &((struct sockaddr_in6 *)fromp)->sin6_port;
 		break;
 	default:
 		syslog(LOG_ERR, "malformed \"from\" address (af %d)\n", af);
 		exit(1);
 	}
-	getnameinfo((struct sockaddr *)fromp, fromp->su_len,
-		    nameinfo, sizeof(nameinfo), NULL, 0, NI_NUMERICHOST);
+	getnameinfo((struct sockaddr *)fromp, fromp->sa_len,
+		    naddr, sizeof(naddr), NULL, 0, NI_NUMERICHOST);
 
-	hp = gethostbyaddr(addr, alen, af);
-	if (hp) {
+	if (getnameinfo((struct sockaddr *)fromp, fromp->sa_len,
+		    saddr, sizeof(saddr), NULL, 0, NI_NAMEREQD) == 0) {
 		/*
 		 * If name returned by gethostbyaddr is in our domain,
 		 * attempt to verify that we haven't been fooled by someone
 		 * in a remote net; look up the name and check that this
 		 * address corresponds to the name.
 		 */
-		hostname = hp->h_name;
-		if (check_all || local_domain(hp->h_name)) {
-			strncpy(hostnamebuf, hp->h_name,
-			    sizeof(hostnamebuf) - 1);
+		hostname = saddr;
+		if (check_all || local_domain(saddr)) {
+			strncpy(hostnamebuf, saddr, sizeof(hostnamebuf) - 1);
 			hostnamebuf[sizeof(hostnamebuf) - 1] = 0;
-			hp = gethostbyname2(hostnamebuf, af);
-			if (hp == NULL) {
+			memset(&hints, 0, sizeof(hints));
+			hints.ai_family = fromp->sa_family;
+			hints.ai_socktype = SOCK_STREAM;
+			hints.ai_flags = AI_CANONNAME;
+			gaierror = getaddrinfo(hostnamebuf, "0", &hints, &res0);
+			if (gaierror) {
 				syslog(LOG_INFO,
-				    "Couldn't look up address for %s",
-				    hostnamebuf);
-				hostname = nameinfo;
-			} else for (; ; hp->h_addr_list++) {
-				if (hp->h_addr_list[0] == NULL) {
+				    "Couldn't look up address for %s: %s",
+				    hostnamebuf, gai_strerror(gaierror));
+				hostname = naddr;
+			} else {
+				for (res = res0; res; res = res->ai_next) {
+					if (res->ai_family != fromp->sa_family)
+						continue;
+					if (res->ai_addrlen != fromp->sa_len)
+						continue;
+					if (getnameinfo(res->ai_addr,
+						res->ai_addrlen,
+						raddr, sizeof(raddr), NULL, 0,
+						NI_NUMERICHOST) == 0
+					 && strcmp(naddr, raddr) == 0) {
+						hostname = res->ai_canonname
+							? res->ai_canonname
+							: saddr;
+						break;
+					}
+				}
+				if (res == NULL) {
 					syslog(LOG_NOTICE,
 					  "Host addr %s not listed for host %s",
-					    nameinfo,
-					    hp->h_name);
-					hostname = nameinfo;
-					break;
+					    naddr, res0->ai_canonname
+						    ? res0->ai_canonname
+						    : saddr);
+					hostname = naddr;
 				}
-				if (!memcmp(hp->h_addr_list[0],
-				    addr,
-				    alen)) {
-					hostname = hp->h_name;
-					break;
-				}
+				freeaddrinfo(res0);
 			}
 		}
 		hostname = strncpy(hostnamebuf, hostname,
 				   sizeof(hostnamebuf) - 1);
 	} else
-		hostname = strncpy(hostnamebuf, nameinfo,
+		hostname = strncpy(hostnamebuf, naddr,
 				   sizeof(hostnamebuf) - 1);
 
 	hostnamebuf[sizeof(hostnamebuf) - 1] = '\0';
@@ -311,18 +327,15 @@ doit(f, fromp)
 		(void)strncpy(utmphost, hostname, sizeof(utmphost));
 	utmphost[sizeof(utmphost) - 1] = '\0';
 
-	if ((fromp->su_family != AF_INET && fromp->su_family != AF_INET6) ||
-	    fromp->su_port >= IPPORT_RESERVED ||
-	    fromp->su_port < IPPORT_RESERVED/2) {
-		error = getnameinfo((struct sockaddr *)fromp, fromp->su_len,
-				  nameinfo, sizeof(nameinfo), NULL, 0,
-				  NI_NUMERICHOST);
+	if ((fromp->sa_family != AF_INET && fromp->sa_family != AF_INET6) ||
+	    ntohs(*portp) >= IPPORT_RESERVED ||
+	    ntohs(*portp) < IPPORT_RESERVED/2) {
 		syslog(LOG_NOTICE, "Connection from %s on illegal port",
-		       nameinfo);
+		       naddr);
 		fatal(f, "Permission denied", 0);
 	}
 #ifdef IP_OPTIONS
-	if (fromp->su_family == AF_INET) {
+	if (fromp->sa_family == AF_INET) {
 		u_char optbuf[BUFSIZ/3], *cp;
 		char lbuf[BUFSIZ], *lp;
 		int optsize = sizeof(optbuf), ipproto;
@@ -609,13 +622,11 @@ fatal(f, msg, syserr)
 
 int
 do_rlogin(dest, host)
-	union sockunion *dest;
+	struct sockaddr *dest;
 	char *host;
 {
 	extern char *__rcmd_errstr;	/* syslog hook from libc/net/rcmd.c */
 	int retval;
-	int af;
-	char *addr = NULL;
 
 	getstr(rusername, sizeof(rusername), "remuser too long");
 	getstr(lusername, sizeof(lusername), "locuser too long");
@@ -628,16 +639,7 @@ do_rlogin(dest, host)
 		return (-1);
 	}
 
-	af = dest->su_family;
-	switch (af) {
-	case AF_INET:
-		addr = (char *)&dest->su_sin.sin_addr;
-		break;
-	case AF_INET6:
-		addr = (char *)&dest->su_sin6.sin6_addr;
-		break;
-	}
-	retval = iruserok_af(addr, pwd->pw_uid == 0, rusername, lusername, af);
+	retval = iruserok_sa(dest, pwd->pw_uid == 0, rusername, lusername);
 /* XXX put inet_ntoa(dest->sin_addr.s_addr) into all messages below */
 	if (retval == 0) {
 		if (log_success)
