@@ -707,7 +707,7 @@ netname6(sa6, mask)
 	struct in6_addr *mask;
 {
 	static char line[MAXHOSTNAMELEN + 1];
-	struct in6_addr net6;
+	struct sockaddr_in6 sin6;
 	u_char *p;
 	u_char *lim;
 	int masklen, final = 0, illegal = 0;
@@ -718,17 +718,16 @@ netname6(sa6, mask)
 #else
 	int flag = 0;
 #endif
-	struct sockaddr_in6 sin6;
 
 	sin6 = *sa6;
-	for (i = 0; i < sizeof(net6); i++)
-		sin6.sin6_addr.s6_addr[i] &= mask->s6_addr[i];
 	
 	masklen = 0;
-	lim = (u_char *)mask + 16;
+	lim = (u_char *)(mask + 1);
+	i = 0;
 	for (p = (u_char *)mask; p < lim; p++) {
 		if (final && *p) {
 			illegal++;
+			sin6.sin6_addr.s6_addr[i++] = 0x00;
 			continue;
 		}
 
@@ -772,6 +771,11 @@ netname6(sa6, mask)
 			illegal++;
 			break;
 		}
+
+		if (!illegal)
+			sin6.sin6_addr.s6_addr[i++] &= *p;
+		else
+			sin6.sin6_addr.s6_addr[i++] = 0x00;
 	}
 
 	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr))
