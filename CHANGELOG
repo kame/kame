@@ -1,7 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1964 2001/11/06 07:51:06 itojun Exp $
+$KAME: CHANGELOG,v 1.1965 2001/11/06 08:07:54 sakane Exp $
 
 <200111>
+Tue Nov  6 17:03:39 JST 2001 sakane@kame.net
+	* kame/sys/netinet6/ipsec.c:
+	fixed the behavior when there is no inbound policy for the ipsec
+	tunneled packet.
+	when there is no suitable inbound policy for the packet of the ipsec
+	tunnel mode, the kernel never decapsulate the tunneled packet
+	as the ipsec tunnel mode even when the system wide policy is "none".
+	then the kernel leaves the generic tunnel module to process this
+	packet.  if there is no rule of the generic tunnel, the packet
+	is rejected and the statistics will be counted up.
+
 Tue Nov  6 16:47:45 JST 2001  itojun@iijlab.net
 	* kame/sys/netinet6/udp6_usrreq.c, netbsd/sys/netinet/udp_usrreq.c:
 	  remove in6_mcmatch().  now sockets after bind(2) won't grab packets
