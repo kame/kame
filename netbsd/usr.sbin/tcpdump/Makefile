@@ -27,8 +27,8 @@ CPPFLAGS+=	${DEFS} ${INCLS}
 
 LDADD+=	-lz
 DPADD+=	${LIBZ}
-LDADD+=	-L${SRCDIR}/../libpcap -lpcap
-DPADD+=	${SRCDIR}/../libpcap/libpcap.a
+LDADD+=	-L${.CURDIR}/../../lib/libpcap -lpcap
+DPADD+=	${.CURDIR}/../../lib/libpcap/libpcap.a
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
