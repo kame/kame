@@ -752,6 +752,7 @@ netinet6/mld6.c		optional inet6
 netinet6/nd6.c		optional inet6
 netinet6/nd6_nbr.c	optional inet6
 netinet6/nd6_rtr.c	optional inet6
+netinet6/scope6.c	optional inet6
 netinet6/raw_ip6.c	optional inet6
 netinet6/route6.c	optional inet6
 netinet6/udp6_usrreq.c	optional inet6
