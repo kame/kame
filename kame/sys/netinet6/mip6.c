@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.65 2001/10/18 08:16:46 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.66 2001/10/18 09:04:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1570,7 +1570,7 @@ mip6_destopt_discard(mip6opt)
 	if (mip6opt->mip6po_dest2)
 		free(mip6opt->mip6po_dest2, M_TEMP);
 
-	return (0);
+	return;
 }
 
 int
