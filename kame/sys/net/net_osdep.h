@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.69 2002/05/30 06:18:29 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.70 2002/05/30 06:55:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -285,6 +285,9 @@
  *	openbsd30: M_COPY_PKTHDR is deprecated.  use M_MOVE_PKTHDR or
  *		M_DUP_PKTHDR, depending on how you want to handle m_tag.
  *	others: M_COPY_PKTHDR is available as usual.
+ *
+ * - M_READONLY() macro
+ *	OpenBSD 3.0 and NetBSD 1.6 has it.  KAME tree has it for all platforms.
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
