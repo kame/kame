@@ -1,10 +1,14 @@
-#	$OpenBSD: Makefile,v 1.3 2000/05/31 19:52:59 mickey Exp $
+#	$OpenBSD: Makefile,v 1.5 2003/01/30 05:36:18 mickey Exp $
 
-PROG=	mkboot
-CC=	${HOSTCC}
-CFLAGS=-g -O
-LDSTATIC=	-static
 MAN=	mkboot.8
 MANSUBDIR=/hppa
+
+.if ${MACHINE} == "hppa"
+PROG=	mkboot
+CC=	${HOSTCC}
+LDSTATIC=	-static
+.else
+NOPROG=
+.endif
 
 .include <bsd.prog.mk>

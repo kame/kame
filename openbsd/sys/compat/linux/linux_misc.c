@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_misc.c,v 1.45 2002/08/23 15:39:31 art Exp $	*/
+/*	$OpenBSD: linux_misc.c,v 1.48 2003/01/30 03:29:49 millert Exp $	*/
 /*	$NetBSD: linux_misc.c,v 1.27 1996/05/20 01:59:21 fvdl Exp $	*/
 
 /*
@@ -84,6 +84,7 @@
 static void bsd_to_linux_statfs(struct statfs *, struct linux_statfs *);
 int	linux_select1(struct proc *, register_t *, int, fd_set *,
      fd_set *, fd_set *, struct timeval *);
+static int getdents_common(struct proc *, void *, register_t *, int);
 
 /*
  * The information on a terminated (or stopped) process needs
@@ -216,64 +217,21 @@ linux_sys_setresgid16(p, v, retval)
 	register_t *retval;
 {
 	struct linux_sys_setresgid16_args /* {
-		syscallarg(gid_t) rgid;
-		syscallarg(gid_t) egid;
-		syscallarg(gid_t) sgid;
+		syscallarg(u_int16_t) rgid;
+		syscallarg(u_int16_t) egid;
+		syscallarg(u_int16_t) sgid;
 	} */ *uap = v;
-	struct pcred *pc = p->p_cred;
-	gid_t rgid, egid, sgid;
-	int error;
+	struct sys_setresgid_args nuap;
+	u_int16_t rgid, egid, sgid;
 
 	rgid = SCARG(uap, rgid);
+	SCARG(&nuap, rgid) = (rgid == (u_int16_t)-1) ? (gid_t)-1 : rgid;
 	egid = SCARG(uap, egid);
+	SCARG(&nuap, egid) = (egid == (u_int16_t)-1) ? (gid_t)-1 : egid;
 	sgid = SCARG(uap, sgid);
+	SCARG(&nuap, sgid) = (sgid == (u_int16_t)-1) ? (gid_t)-1 : sgid;
 
-	/*
-	 * Note: These checks are a little different than the OpenBSD
-	 * setregid(2) call performs.  This precisely follows the
-	 * behavior of the Linux kernel.
-	 */
-	if (rgid != (gid_t)-1 &&
-	    rgid != pc->p_rgid &&
-	    rgid != pc->pc_ucred->cr_gid &&
-	    rgid != pc->p_svgid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
-		return (error);
-
-	if (egid != (gid_t)-1 &&
-	    egid != pc->p_rgid &&
-	    egid != pc->pc_ucred->cr_gid &&
-	    egid != pc->p_svgid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
-		return (error);
-
-	if (sgid != (gid_t)-1 &&
-	    sgid != pc->p_rgid &&
-	    sgid != pc->pc_ucred->cr_gid &&
-	    sgid != pc->p_svgid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
-		return (error);
-
-	/*
-	 * Now assign the real, effective, and saved GIDs.
-	 * Note that Linux, unlike OpenBSD in setregid(2), does not
-	 * set the saved UID in this call unless the user specifies
-	 * it.
-	 */
-	if (rgid != (gid_t)-1)
-		pc->p_rgid = rgid;
-
-	if (egid != (gid_t)-1) {
-		pc->pc_ucred = crcopy(pc->pc_ucred);
-		pc->pc_ucred->cr_gid = egid;
-	}
-
-	if (sgid != (gid_t)-1)
-		pc->p_svgid = sgid;
-
-	if (rgid != (gid_t)-1 && egid != (gid_t)-1 && sgid != (gid_t)-1)
-		p->p_flag |= P_SUGID;
-	return (0);
+	return sys_setresgid(p, &nuap, retval);
 }
 
 int
@@ -283,29 +241,61 @@ linux_sys_getresgid16(p, v, retval)
 	register_t *retval;
 {
 	struct linux_sys_getresgid16_args /* {
-		syscallarg(gid_t *) rgid;
-		syscallarg(gid_t *) egid;
-		syscallarg(gid_t *) sgid;
+		syscallarg(u_int16_t *) rgid;
+		syscallarg(u_int16_t *) egid;
+		syscallarg(u_int16_t *) sgid;
 	} */ *uap = v;
-	struct pcred *pc = p->p_cred;
-	int error;
+	struct sys_getresgid_args nuap;
 
-	/*
-	 * Linux copies these values out to userspace like so:
-	 *
-	 *	1. Copy out rgid.
-	 *	2. If that succeeds, copy out egid.
-	 *	3. If both of those succeed, copy out sgid.
-	 */
-	if ((error = copyout(&pc->p_rgid, SCARG(uap, rgid),
-			     sizeof(gid_t))) != 0)
-		return (error);
+	SCARG(&nuap, rgid) = (gid_t *)SCARG(uap, rgid);
+	SCARG(&nuap, egid) = (gid_t *)SCARG(uap, egid);
+	SCARG(&nuap, sgid) = (gid_t *)SCARG(uap, sgid);
 
-	if ((error = copyout(&pc->pc_ucred->cr_uid, SCARG(uap, egid),
-			     sizeof(gid_t))) != 0)
-		return (error);
+	return sys_getresgid(p, &nuap, retval);
+}
 
-	return (copyout(&pc->p_svgid, SCARG(uap, sgid), sizeof(gid_t)));
+int
+linux_sys_setresuid16(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct linux_sys_setresuid16_args /* {
+		syscallarg(u_int16_t) ruid;
+		syscallarg(u_int16_t) euid;
+		syscallarg(u_int16_t) suid;
+	} */ *uap = v;
+	struct sys_setresuid_args nuap;
+	u_int16_t ruid, euid, suid;
+
+	ruid = SCARG(uap, ruid);
+	SCARG(&nuap, ruid) = (ruid == (u_int16_t)-1) ? (uid_t)-1 : ruid;
+	euid = SCARG(uap, euid);
+	SCARG(&nuap, euid) = (euid == (u_int16_t)-1) ? (uid_t)-1 : euid;
+	suid = SCARG(uap, suid);
+	SCARG(&nuap, suid) = (suid == (u_int16_t)-1) ? (uid_t)-1 : suid;
+
+	return sys_setresuid(p, &nuap, retval);
+}
+
+int
+linux_sys_getresuid16(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct linux_sys_getresuid16_args /* {
+		syscallarg(u_int16_t *) ruid;
+		syscallarg(u_int16_t *) euid;
+		syscallarg(u_int16_t *) suid;
+	} */ *uap = v;
+	struct sys_getresuid_args nuap;
+
+	SCARG(&nuap, ruid) = (uid_t *)SCARG(uap, ruid);
+	SCARG(&nuap, euid) = (uid_t *)SCARG(uap, euid);
+	SCARG(&nuap, suid) = (uid_t *)SCARG(uap, suid);
+
+	return sys_getresuid(p, &nuap, retval);
 }
 
 /*
@@ -940,6 +930,7 @@ struct linux_readdir_callback_args {
 	caddr_t outp;
 	int     resid;
 	int     oldcall;
+	int	is64bit;
 };
 
 int
@@ -948,6 +939,7 @@ linux_readdir_callback(arg, bdp, cookie)
 	struct dirent *bdp;
 	off_t cookie;
 {
+	struct linux_dirent64 idb64;
 	struct linux_dirent idb;
 	struct linux_readdir_callback_args *cb = arg;
 	int linux_reclen;
@@ -956,30 +948,37 @@ linux_readdir_callback(arg, bdp, cookie)
 	if (cb->oldcall == 2) 
 		return (ENOMEM);
 
-	linux_reclen = LINUX_RECLEN(&idb, bdp->d_namlen);
+	linux_reclen = (cb->is64bit) ?
+	     LINUX_RECLEN(&idb64, bdp->d_namlen) :
+	     LINUX_RECLEN(&idb, bdp->d_namlen);
+
 	if (cb->resid < linux_reclen)
 		return (ENOMEM);
 
-	/*
-	 * Massage in place to make a Linux-shaped dirent (otherwise
-	 * we have to worry about touching user memory outside of
-	 * the copyout() call).
-	 */
-	idb.d_ino = (linux_ino_t)bdp->d_fileno;
-	
-	/*
-	 * The old readdir() call misuses the offset and reclen fields.
-	 */
-	if (cb->oldcall) {
-		idb.d_off = (linux_off_t)linux_reclen;
-		idb.d_reclen = (u_short)bdp->d_namlen;
+	if (cb->is64bit) {
+		idb64.d_ino = (linux_ino64_t)bdp->d_fileno;
+		idb64.d_off = (linux_off64_t)cookie;
+		idb64.d_reclen = (u_short)linux_reclen;
+		idb64.d_type = bdp->d_type;
+		strlcpy(idb64.d_name, bdp->d_name, sizeof(idb64.d_name));
+		error = copyout((caddr_t)&idb64, cb->outp, linux_reclen);
 	} else {
-		idb.d_off = (linux_off_t)cookie;
-		idb.d_reclen = (u_short)linux_reclen;
+		idb.d_ino = (linux_ino_t)bdp->d_fileno;
+		if (cb->oldcall) {
+			/*
+			 * The old readdir() call misuses the offset
+			 * and reclen fields.
+			 */
+			idb.d_off = (linux_off_t)linux_reclen;
+			idb.d_reclen = (u_short)bdp->d_namlen;
+		} else {
+			idb.d_off = (linux_off_t)cookie;
+			idb.d_reclen = (u_short)linux_reclen;
+		}
+		strlcpy(idb.d_name, bdp->d_name, sizeof(idb.d_name));
+		error = copyout((caddr_t)&idb, cb->outp, linux_reclen);
 	}
-	
-	strlcpy(idb.d_name, bdp->d_name, sizeof(idb.d_name));
-	if ((error = copyout((caddr_t)&idb, cb->outp, linux_reclen)))
+	if (error)
 		return (error);
 
 	/* advance output past Linux-shaped entry */
@@ -993,10 +992,29 @@ linux_readdir_callback(arg, bdp, cookie)
 }
 
 int
+linux_sys_getdents64(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	return getdents_common(p, v, retval, 1);
+}
+
+int
 linux_sys_getdents(p, v, retval)
 	struct proc *p;
 	void *v;
 	register_t *retval;
+{
+	return getdents_common(p, v, retval, 0);
+}
+
+static int
+getdents_common(p, v, retval, is64bit)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+	int is64bit;
 {
 	struct linux_sys_getdents_args /* {
 		syscallarg(int) fd;
@@ -1012,6 +1030,11 @@ linux_sys_getdents(p, v, retval)
 		return (error);
 
 	if (nbytes == 1) {	/* emulating old, broken behaviour */
+		/* readdir(2) case. Always struct dirent. */
+		if (is64bit) {
+			FRELE(fp);
+			return (EINVAL);
+		}
 		nbytes = sizeof(struct linux_dirent);
 		args.oldcall = 1;
 	} else {
@@ -1020,6 +1043,7 @@ linux_sys_getdents(p, v, retval)
 
 	args.resid = nbytes;
 	args.outp = (caddr_t)SCARG(uap, dirent);
+	args.is64bit = is64bit;
 
 	if ((error = readdir_with_callback(fp, &fp->f_offset, nbytes,
 	    linux_readdir_callback, &args)) != 0)
@@ -1227,14 +1251,14 @@ linux_sys_setreuid16(p, v, retval)
 		syscallarg(int) ruid;
 		syscallarg(int) euid;
 	} */ *uap = v;
-	struct compat_43_sys_setreuid_args bsa;
+	struct sys_setreuid_args bsa;
 	
 	SCARG(&bsa, ruid) = ((linux_uid_t)SCARG(uap, ruid) == (linux_uid_t)-1) ?
 		(uid_t)-1 : SCARG(uap, ruid);
 	SCARG(&bsa, euid) = ((linux_uid_t)SCARG(uap, euid) == (linux_uid_t)-1) ?
 		(uid_t)-1 : SCARG(uap, euid);
 
-	return compat_43_sys_setreuid(p, &bsa, retval);
+	return sys_setreuid(p, &bsa, retval);
 }
 
 int
@@ -1247,14 +1271,14 @@ linux_sys_setregid16(p, v, retval)
 		syscallarg(int) rgid;
 		syscallarg(int) egid;
 	} */ *uap = v;
-	struct compat_43_sys_setregid_args bsa;
+	struct sys_setregid_args bsa;
 	
 	SCARG(&bsa, rgid) = ((linux_gid_t)SCARG(uap, rgid) == (linux_gid_t)-1) ?
 		(uid_t)-1 : SCARG(uap, rgid);
 	SCARG(&bsa, egid) = ((linux_gid_t)SCARG(uap, egid) == (linux_gid_t)-1) ?
 		(uid_t)-1 : SCARG(uap, egid);
 
-	return compat_43_sys_setregid(p, &bsa, retval);
+	return sys_setregid(p, &bsa, retval);
 }
 
 int
@@ -1307,108 +1331,6 @@ linux_sys___sysctl(p, v, retval)
 	SCARG(&bsa, newlen) = ls.newlen;
 
 	return sys___sysctl(p, &bsa, retval);
-}
-
-int
-linux_sys_setresuid16(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
-{
-	struct linux_sys_setresuid16_args /* {
-		syscallarg(uid_t) ruid;
-		syscallarg(uid_t) euid;
-		syscallarg(uid_t) suid;
-	} */ *uap = v;
-	struct pcred *pc = p->p_cred;
-	uid_t ruid, euid, suid;
-	int error;
-
-	ruid = SCARG(uap, ruid);
-	euid = SCARG(uap, euid);
-	suid = SCARG(uap, suid);
-
-	/*
-	 * Note: These checks are a little different than the OpenBSD
-	 * setreuid(2) call performs.  This precisely follows the
-	 * behavior of the Linux kernel.
-	 */
-	if (ruid != (uid_t)-1 &&
-	    ruid != pc->p_ruid &&
-	    ruid != pc->pc_ucred->cr_uid &&
-	    ruid != pc->p_svuid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
-		return (error);
-
-	if (euid != (uid_t)-1 &&
-	    euid != pc->p_ruid &&
-	    euid != pc->pc_ucred->cr_uid &&
-	    euid != pc->p_svuid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
-		return (error);
-
-	if (suid != (uid_t)-1 &&
-	    suid != pc->p_ruid &&
-	    suid != pc->pc_ucred->cr_uid &&
-	    suid != pc->p_svuid &&
-	    (error = suser(pc->pc_ucred, &p->p_acflag)))
-		return (error);
-
-	/*
-	 * Now assign the new real, effective, and saved UIDs.
-	 * Note that Linux, unlike OpenBSD in setreuid(2), does not
-	 * set the saved UID in this call unless the user specifies
-	 * it.
-	 */
-	if (ruid != (uid_t)-1) {
-		(void)chgproccnt(pc->p_ruid, -1);
-		(void)chgproccnt(ruid, 1);
-		pc->p_ruid = ruid;
-	}
-
-	if (euid != (uid_t)-1) {
-		pc->pc_ucred = crcopy(pc->pc_ucred);
-		pc->pc_ucred->cr_uid = euid;
-	}
-
-	if (suid != (uid_t)-1)
-		pc->p_svuid = suid;
-
-	if (ruid != (uid_t)-1 && euid != (uid_t)-1 && suid != (uid_t)-1)
-		p->p_flag |= P_SUGID;
-	return (0);
-}
-
-int
-linux_sys_getresuid(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
-{
-	struct linux_sys_getresuid_args /* {
-		syscallarg(uid_t *) ruid;
-		syscallarg(uid_t *) euid;
-		syscallarg(uid_t *) suid;
-	} */ *uap = v;
-	struct pcred *pc = p->p_cred;
-	int error;
-
-	/*
-	 * Linux copies these values out to userspace like so:
-	 *
-	 *	1. Copy out ruid.
-	 *	2. If that succeeds, copy out euid.
-	 *	3. If both of those succeed, copy out suid.
-	 */
-	if ((error = copyout(&pc->p_ruid, SCARG(uap, ruid),
-			     sizeof(uid_t))) != 0)
-		return (error);
-
-	if ((error = copyout(&pc->pc_ucred->cr_uid, SCARG(uap, euid),
-			     sizeof(uid_t))) != 0)
-		return (error);
-
-	return (copyout(&pc->p_svuid, SCARG(uap, suid), sizeof(uid_t)));
 }
 
 /*

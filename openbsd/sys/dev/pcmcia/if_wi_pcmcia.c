@@ -1,4 +1,4 @@
-/* $OpenBSD: if_wi_pcmcia.c,v 1.38 2002/07/09 11:00:27 fgsch Exp $ */
+/* $OpenBSD: if_wi_pcmcia.c,v 1.40 2003/02/26 18:58:32 millert Exp $ */
 /* $NetBSD: if_wi_pcmcia.c,v 1.14 2001/11/26 04:34:56 ichiro Exp $ */
 
 /*
@@ -269,6 +269,11 @@ static const struct wi_pcmcia_product {
 	  PCMCIA_CIS_NETGEAR2_MA401RA,
 	  "Netgear MA401RA Wireless LAN PC CARD",
 	},
+	{ PCMCIA_VENDOR_AIRVAST,
+	  PCMCIA_PRODUCT_AIRVAST_WN_100,
+	  PCMCIA_CIS_AIRVAST_WN_100,
+	  "AirVast WN-100 Wireless LAN PC CARD",
+	},
 	{ 0,
 	  0,
 	  { NULL, NULL, NULL, NULL },
@@ -331,7 +336,7 @@ wi_pcmcia_attach(parent, self, aux)
 	struct wi_softc		*sc = &psc->sc_wi;
 	struct pcmcia_attach_args *pa = aux;
 	struct pcmcia_function	*pf = pa->pf;
-	struct pcmcia_config_entry *cfe = pf->cfe_head.sqh_first;
+	struct pcmcia_config_entry *cfe = SIMPLEQ_FIRST(&pf->cfe_head);
 	int			state = 0;
 
 	psc->sc_pf = pf;

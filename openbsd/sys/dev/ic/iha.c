@@ -1,9 +1,13 @@
-/*	$OpenBSD: iha.c,v 1.14 2002/06/09 02:11:47 jsyn Exp $ */
-/*
- * Initio INI-9xxxU/UW SCSI Device Driver
+/*	$OpenBSD: iha.c,v 1.16 2002/11/14 02:31:46 krw Exp $ */
+/*-------------------------------------------------------------------------
  *
- * Copyright (c) 2000-2001 Ken Westerback
- * All rights reserved.
+ * Device driver for the INI-9XXXU/UW or INIC-940/950  PCI SCSI Controller.
+ *
+ * Written for 386bsd and FreeBSD by
+ *	Winston Hung		<winstonh@initio.com>
+ *
+ * Copyright (c) 1997-1999 Initio Corp
+ * Copyright (c) 2000-2002 Ken Westerback
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,19 +29,6 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- *-------------------------------------------------------------------------
- *
- * Ported from i91u.c, provided by Initio Corporation, which credits:
- *
- * Device driver for the INI-9XXXU/UW or INIC-940/950  PCI SCSI Controller.
- *
- * FreeBSD
- *
- *  Written for 386bsd and FreeBSD by
- *	Winston Hung		<winstonh@initio.com>
- *
- * Copyright (c) 1997-99 Initio Corp.  All rights reserved.
  *
  *-------------------------------------------------------------------------
  */
@@ -2686,7 +2677,7 @@ iha_read_eeprom(iot, ioh, nvram)
 	if ((nvram->NVM_Signature != SIGNATURE)
 	    ||
 	    (nvram->NVM_CheckSum  != chksum))
-		panic("iha: invalid EEPROM,  bad signature or checksum\n");
+		panic("iha: invalid EEPROM,  bad signature or checksum");
 }
 
 /*

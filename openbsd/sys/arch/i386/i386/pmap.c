@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.63 2002/09/11 22:39:00 art Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.65 2002/10/13 18:26:12 krw Exp $	*/
 /*	$NetBSD: pmap.c,v 1.91 2000/06/02 17:46:37 thorpej Exp $	*/
 
 /*
@@ -655,7 +655,7 @@ pmap_kremove(va, len)
 		pte = vtopte(va);
 #ifdef DIAGNOSTIC
 		if (*pte & PG_PVLIST)
-			panic("pmap_kremove: PG_PVLIST mapping for 0x%lx\n",
+			panic("pmap_kremove: PG_PVLIST mapping for 0x%lx",
 			      va);
 #endif
 		*pte = 0;		/* zap! */
@@ -3148,7 +3148,7 @@ pmap_transfer(dstpmap, srcpmap, daddr, len, saddr, move)
 			panic("pmap_transfer: dstvalid non-zero after drain");
 		if ((dstl.addr & (NBPD-1)) != 0)
 			panic("pmap_transfer: dstaddr not on PD boundary "
-			      "(0x%lx)\n", dstl.addr);
+			      "(0x%lx)", dstl.addr);
 #endif
 
 		if (dstptes == NULL && dstl.pte != NULL) {

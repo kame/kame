@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.33 2002/09/10 18:29:43 art Exp $	*/
+/*	$OpenBSD: pmap.h,v 1.35 2003/01/24 00:51:54 miod Exp $	*/
 /*	$NetBSD: pmap.h,v 1.30 1997/08/04 20:00:47 pk Exp $ */
 
 /*
@@ -187,12 +187,7 @@ typedef struct pmap *pmap_t;
  *
  * THIS SHOULD BE PART OF THE CORE MAP
  */
-struct pvlist {
-	struct		pvlist *pv_next;	/* next pvlist, if any */
-	struct		pmap *pv_pmap;		/* pmap of this va */
-	vaddr_t		pv_va;			/* virtual address */
-	int		pv_flags;		/* flags (below) */
-};
+/* XXX - struct pvlist moved to vmparam.h because of include ordering issues */
 
 /*
  * Flags in pv_flags.  Note that PV_MOD must be 1 and PV_REF must be 2
@@ -266,8 +261,6 @@ int             pmap_dumpmmu(int (*)(dev_t, daddr_t, caddr_t, size_t), daddr_t);
 #define	pmap_kernel()	(&kernel_pmap_store)
 #define	pmap_resident_count(pmap)	pmap_count_ptes(pmap)
 
-#define PMAP_ACTIVATE(pmap, pcb, iscurproc)
-#define PMAP_DEACTIVATE(pmap, pcb)
 #define PMAP_PREFER(fo, ap)		pmap_prefer((fo), (ap))
 
 #define PMAP_EXCLUDE_DECLS	/* tells MI pmap.h *not* to include decls */

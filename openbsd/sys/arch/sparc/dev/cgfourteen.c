@@ -1,4 +1,4 @@
-/*	$OpenBSD: cgfourteen.c,v 1.17 2002/10/01 07:09:59 miod Exp $	*/
+/*	$OpenBSD: cgfourteen.c,v 1.21 2002/12/12 20:21:34 miod Exp $	*/
 /*	$NetBSD: cgfourteen.c,v 1.7 1997/05/24 20:16:08 pk Exp $ */
 
 /*
@@ -156,7 +156,6 @@ void cgfourteen_free_screen(void *, void *);
 int cgfourteen_show_screen(void *, void *, int, void (*cb)(void *, int, int),
     void *);
 paddr_t cgfourteen_mmap(void *, off_t, int);
-int cgfourteen_is_console(int);
 void cgfourteen_reset(struct cgfourteen_softc *);
 void cgfourteen_burner(void *, u_int, u_int);
 void cgfourteen_prom(void *);
@@ -245,12 +244,16 @@ cgfourteenattach(parent, self, args)
 	/*
 	 * Sanity checks
 	 */
-	if (ca->ca_ra.ra_len < 0x10000)
-		panic("\ncgfourteen: expected %x bytes of control "
+	if (ca->ca_ra.ra_len < 0x10000) {
+		printf("\n");
+		panic("cgfourteen: expected %x bytes of control "
 		    "registers, got %x", 0x10000, ca->ca_ra.ra_len);
-	if (ca->ca_ra.ra_nreg < CG14_NREG)
-		panic("\ncgfourteen: expected %d registers, got %d",
+	}
+	if (ca->ca_ra.ra_nreg < CG14_NREG) {
+		printf("\n");
+		panic("cgfourteen: expected %d registers, got %d",
 		    CG14_NREG, ca->ca_ra.ra_nreg);
+	}
 
 	printf(", %dMB", ca->ca_ra.ra_reg[CG14_REG_VRAM].rr_len >> 20);
 
@@ -328,6 +331,7 @@ cgfourteenattach(parent, self, args)
 
 	sc->sc_sunfb.sf_ro.ri_hw = sc;
 	fbwscons_init(&sc->sc_sunfb, isconsole);
+	fbwscons_setcolormap(&sc->sc_sunfb, cgfourteen_setcolor);
 
 	cgfourteen_stdscreen.capabilities = sc->sc_sunfb.sf_ro.ri_caps;
 	cgfourteen_stdscreen.nrows = sc->sc_sunfb.sf_ro.ri_rows;
@@ -337,7 +341,8 @@ cgfourteenattach(parent, self, args)
 	if (isconsole) {
 		fbwscons_console_init(&sc->sc_sunfb, &cgfourteen_stdscreen,
 		    sc->sc_sunfb.sf_depth == 8 ? -1 : 0,
-		    cgfourteen_setcolor, cgfourteen_burner);
+		    cgfourteen_burner);
+		shutdownhook_establish(cgfourteen_prom, sc);
 	}
 
 	waa.console = isconsole;

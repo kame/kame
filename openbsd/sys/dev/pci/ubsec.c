@@ -1,4 +1,4 @@
-/*	$OpenBSD: ubsec.c,v 1.115 2002/09/24 18:33:26 jason Exp $	*/
+/*	$OpenBSD: ubsec.c,v 1.123 2003/02/14 01:28:20 jason Exp $	*/
 
 /*
  * Copyright (c) 2000 Jason L. Wright (jason@thought.net)
@@ -132,26 +132,26 @@ void ubsec_dump_ctx2(struct ubsec_ctx_keyop *);
 
 struct ubsec_stats ubsecstats;
 
+const struct pci_matchid ubsec_devices[] = {
+	{ PCI_VENDOR_BLUESTEEL, PCI_PRODUCT_BLUESTEEL_5501 },
+	{ PCI_VENDOR_BLUESTEEL, PCI_PRODUCT_BLUESTEEL_5601 },
+	{ PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_5801 },
+	{ PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_5802 },
+	{ PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_5805 },
+	{ PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_5820 },
+	{ PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_5821 },
+	{ PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_5822 },
+	{ PCI_VENDOR_SUN, PCI_PRODUCT_SUN_SCA1K },
+};
+
 int
 ubsec_probe(parent, match, aux)
 	struct device *parent;
 	void *match;
 	void *aux;
 {
-	struct pci_attach_args *pa = (struct pci_attach_args *)aux;
-
-	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_BLUESTEEL &&
-	    (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_BLUESTEEL_5501 ||
-	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_BLUESTEEL_5601))
-		return (1);
-	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_BROADCOM &&
-	    (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_BROADCOM_5801 ||
-	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_BROADCOM_5802 ||
-	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_BROADCOM_5805 ||
-	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_BROADCOM_5820 ||
-	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_BROADCOM_5821))
-		return (1);
-	return (0);
+	return (pci_matchbyid((struct pci_attach_args *)aux, ubsec_devices,
+	    sizeof(ubsec_devices)/sizeof(ubsec_devices[0])));
 }
 
 void
@@ -167,6 +167,8 @@ ubsec_attach(parent, self, aux)
 	struct ubsec_dma *dmap;
 	bus_size_t iosize;
 	u_int32_t cmd, i;
+	int algs[CRYPTO_ALGORITHM_MAX + 1];
+	int kalgs[CRK_ALGORITHM_MAX + 1];
 
 	SIMPLEQ_INIT(&sc->sc_queue);
 	SIMPLEQ_INIT(&sc->sc_qchip);
@@ -191,8 +193,10 @@ ubsec_attach(parent, self, aux)
 		sc->sc_flags |= UBS_FLAGS_KEY | UBS_FLAGS_RNG |
 		    UBS_FLAGS_LONGCTX | UBS_FLAGS_HWNORM | UBS_FLAGS_BIGKEY;
 
-	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_BROADCOM &&
-	    (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_BROADCOM_5821)) {
+	if ((PCI_VENDOR(pa->pa_id) == PCI_VENDOR_BROADCOM &&
+	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_BROADCOM_5821) ||
+	    (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_SUN &&
+	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_SUN_SCA1K)) {
 		sc->sc_statmask |= BS_STAT_MCR1_ALLEMPTY |
 		    BS_STAT_MCR2_ALLEMPTY;
 		sc->sc_flags |= UBS_FLAGS_KEY | UBS_FLAGS_RNG |
@@ -271,11 +275,13 @@ ubsec_attach(parent, self, aux)
 		SIMPLEQ_INSERT_TAIL(&sc->sc_freequeue, q, q_next);
 	}
 
-	crypto_register(sc->sc_cid, CRYPTO_3DES_CBC, 0, 0,
-	    ubsec_newsession, ubsec_freesession, ubsec_process);
-	crypto_register(sc->sc_cid, CRYPTO_DES_CBC, 0, 0, NULL, NULL, NULL);
-	crypto_register(sc->sc_cid, CRYPTO_MD5_HMAC, 0, 0, NULL, NULL, NULL);
-	crypto_register(sc->sc_cid, CRYPTO_SHA1_HMAC, 0, 0, NULL, NULL, NULL);
+	bzero(algs, sizeof(algs));
+	algs[CRYPTO_3DES_CBC] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_DES_CBC] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_MD5_HMAC] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_SHA1_HMAC] = CRYPTO_ALG_FLAG_SUPPORTED;
+	crypto_register(sc->sc_cid, algs, ubsec_newsession,
+	    ubsec_freesession, ubsec_process);
 
 	/*
 	 * Reset Broadcom chip
@@ -330,10 +336,13 @@ skip_rng:
 	if (sc->sc_flags & UBS_FLAGS_KEY) {
 		sc->sc_statmask |= BS_STAT_MCR2_DONE;
 
-		crypto_kregister(sc->sc_cid, CRK_MOD_EXP, 0, ubsec_kprocess);
+		bzero(kalgs, sizeof(kalgs));
+		kalgs[CRK_MOD_EXP] = CRYPTO_ALG_FLAG_SUPPORTED;
 #if 0
-		crypto_kregister(sc->sc_cid, CRK_MOD_EXP_CRT, 0, ubsec_kprocess);
+		kalgs[CRK_MOD_EXP_CRT] = CRYPTO_ALG_FLAG_SUPPORTED;
 #endif
+
+		crypto_kregister(sc->sc_cid, kalgs, ubsec_kprocess);
 	}
 
 	printf("\n");
@@ -551,7 +560,8 @@ feed1:
 		WRITE_REG(sc, BS_MCR1, q->q_dma->d_alloc.dma_paddr +
 		    offsetof(struct ubsec_dmachunk, d_mcr));
 #ifdef UBSEC_DEBUG
-		printf("feed: q->chip %p %08x\n", q, (u_int32_t)vtophys(&q->q_dma->d_dma->d_mcr));
+		printf("feed: q->chip %p %08x\n", q,
+		    (u_int32_t)q->q_dma->d_alloc.dma_paddr);
 #endif /* UBSEC_DEBUG */
 		SIMPLEQ_REMOVE_HEAD(&sc->sc_queue, q, q_next);
 		--sc->sc_nqueue;
@@ -1021,9 +1031,9 @@ ubsec_process(crp)
 		    offsetof(struct ubsec_dmachunk, d_macbuf[0]));
 #ifdef UBSEC_DEBUG
 		printf("opkt: %x %x %x\n",
-		    dmap->d_mcr->mcr_opktbuf.pb_addr,
-		    dmap->d_mcr->mcr_opktbuf.pb_len,
-		    dmap->d_mcr->mcr_opktbuf.pb_next);
+		    dmap->d_dma->d_mcr.mcr_opktbuf.pb_addr,
+		    dmap->d_dma->d_mcr.mcr_opktbuf.pb_len,
+		    dmap->d_dma->d_mcr.mcr_opktbuf.pb_next);
 #endif
 	} else {
 		if (crp->crp_flags & CRYPTO_F_IOV) {
@@ -1385,6 +1395,7 @@ ubsec_callback2(sc, q)
 
 	switch (q->q_type) {
 #ifndef UBSEC_NO_RNG
+	case UBS_CTXOP_RNGSHA1:
 	case UBS_CTXOP_RNGBYPASS: {
 		struct ubsec_q2_rng *rng = (struct ubsec_q2_rng *)q;
 		u_int32_t *p;
@@ -1511,8 +1522,8 @@ ubsec_rng(vsc)
 	mcr->mcr_opktbuf.pb_next = 0;
 
 	ctx->rbp_len = htole16(sizeof(struct ubsec_ctx_rngbypass));
-	ctx->rbp_op = htole16(UBS_CTXOP_RNGBYPASS);
-	rng->rng_q.q_type = UBS_CTXOP_RNGBYPASS;
+	ctx->rbp_op = htole16(UBS_CTXOP_RNGSHA1);
+	rng->rng_q.q_type = UBS_CTXOP_RNGSHA1;
 
 	bus_dmamap_sync(sc->sc_dmat, rng->rng_buf.dma_map, 0,
 	    rng->rng_buf.dma_map->dm_mapsize, BUS_DMASYNC_PREREAD);
@@ -1964,10 +1975,10 @@ ubsec_kprocess_modexp_sw(sc, krp)
 #ifdef DIAGNOSTIC
 	/* Misaligned output buffer will hang the chip. */
 	if ((letoh32(mcr->mcr_opktbuf.pb_addr) & 3) != 0)
-		panic("%s: modexp invalid addr 0x%x\n",
+		panic("%s: modexp invalid addr 0x%x",
 		    sc->sc_dv.dv_xname, letoh32(mcr->mcr_opktbuf.pb_addr));
 	if ((letoh32(mcr->mcr_opktbuf.pb_len) & 3) != 0)
-		panic("%s: modexp invalid len 0x%x\n",
+		panic("%s: modexp invalid len 0x%x",
 		    sc->sc_dv.dv_xname, letoh32(mcr->mcr_opktbuf.pb_len));
 #endif
 
@@ -2166,10 +2177,10 @@ ubsec_kprocess_modexp_hw(sc, krp)
 #ifdef DIAGNOSTIC
 	/* Misaligned output buffer will hang the chip. */
 	if ((letoh32(mcr->mcr_opktbuf.pb_addr) & 3) != 0)
-		panic("%s: modexp invalid addr 0x%x\n",
+		panic("%s: modexp invalid addr 0x%x",
 		    sc->sc_dv.dv_xname, letoh32(mcr->mcr_opktbuf.pb_addr));
 	if ((letoh32(mcr->mcr_opktbuf.pb_len) & 3) != 0)
-		panic("%s: modexp invalid len 0x%x\n",
+		panic("%s: modexp invalid len 0x%x",
 		    sc->sc_dv.dv_xname, letoh32(mcr->mcr_opktbuf.pb_len));
 #endif
 

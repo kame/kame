@@ -1,4 +1,4 @@
-#	$OpenBSD: SUN4M,v 1.44 2002/09/20 11:17:55 fgsch Exp $
+#	$OpenBSD: SUN4M,v 1.48 2003/03/09 02:30:45 miod Exp $
 # 	$NetBSD: GENERIC,v 1.28.2.1 1996/07/02 23:55:22 jtc Exp $
 
 # Machine architecture; required by config(8)
@@ -8,7 +8,7 @@ include "../../../conf/GENERIC"
 
 # This is a 4m specific kernel.
 # NOTE: Cypress mbus cpus are not pure 4m, and require
-#       either SUN4C or SUN4M to be specified as well
+#       both SUN4C and SUN4M to be specified as well
 option		SUN4M		# sun4m - SS10, SS20, Classic, etc.
 
 #option		KGDB		# support for kernel gdb
@@ -152,6 +152,10 @@ wsdisplay* at cgfourteen?
 cgtwelve*	at sbus? slot ? offset ? flags 0x0000
 wsdisplay* at cgtwelve?
 
+# Sun "leo" (ZX) accelerated 24-bit framebuffer.
+zx*	at sbus? slot ? offset ?
+wsdisplay* at zx?
+
 # Vigra VS10 or VS12 framebuffer.
 vigra*	at sbus? slot ? offset ?
 wsdisplay* at vigra?
@@ -159,6 +163,14 @@ wsdisplay* at vigra?
 # Weitek p9100 found on Tadpole 3GS/3GX
 pnozz0	at sbus? slot ? offset ?
 wsdisplay* at pnozz?
+
+# Parallax XVideo and PowerVideo
+tvtwo* at sbus? slot ? offset ?
+wsdisplay* at tvtwo?
+
+# Fujitsu AG-10e framebuffer.
+agten* at sbus? slot ? offset ?
+wsdisplay* at agten?
 
 # Microcontroller found on Tadpole
 tctrl0  at obio0

@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_vnops.c,v 1.51 2002/05/21 21:07:09 art Exp $	*/
+/*	$OpenBSD: nfs_vnops.c,v 1.53 2003/01/31 17:37:50 art Exp $	*/
 /*	$NetBSD: nfs_vnops.c,v 1.62.4.1 1996/07/08 20:26:52 jtc Exp $	*/
 
 /*
@@ -126,7 +126,7 @@ struct vnodeopv_entry_desc nfsv2_vnodeop_entries[] = {
 	{ &vop_advlock_desc, nfs_advlock },	/* advlock */
 	{ &vop_reallocblks_desc, nfs_reallocblks },	/* reallocblks */
 	{ &vop_bwrite_desc, nfs_bwrite },
-	{ (struct vnodeop_desc*)NULL, (int(*)(void *))NULL }
+	{ NULL, NULL }
 };
 struct vnodeopv_desc nfsv2_vnodeop_opv_desc =
 	{ &nfsv2_vnodeop_p, nfsv2_vnodeop_entries };
@@ -136,44 +136,21 @@ struct vnodeopv_desc nfsv2_vnodeop_opv_desc =
  */
 int (**spec_nfsv2nodeop_p)(void *);
 struct vnodeopv_entry_desc spec_nfsv2nodeop_entries[] = {
-	{ &vop_default_desc, vn_default_error },
-	{ &vop_lookup_desc, spec_lookup },	/* lookup */
-	{ &vop_create_desc, spec_create },	/* create */
-	{ &vop_mknod_desc, spec_mknod },	/* mknod */
-	{ &vop_open_desc, spec_open },		/* open */
+	{ &vop_default_desc, spec_vnoperate },
 	{ &vop_close_desc, nfsspec_close },	/* close */
 	{ &vop_access_desc, nfsspec_access },	/* access */
 	{ &vop_getattr_desc, nfs_getattr },	/* getattr */
 	{ &vop_setattr_desc, nfs_setattr },	/* setattr */
 	{ &vop_read_desc, nfsspec_read },	/* read */
 	{ &vop_write_desc, nfsspec_write },	/* write */
-	{ &vop_lease_desc, spec_lease_check },	/* lease */
-	{ &vop_ioctl_desc, spec_ioctl },	/* ioctl */
-	{ &vop_select_desc, spec_select },	/* select */
-	{ &vop_revoke_desc, spec_revoke },	/* revoke */
 	{ &vop_fsync_desc, nfs_fsync },		/* fsync */
-	{ &vop_remove_desc, spec_remove },	/* remove */
-	{ &vop_link_desc, spec_link },		/* link */
-	{ &vop_rename_desc, spec_rename },	/* rename */
-	{ &vop_mkdir_desc, spec_mkdir },	/* mkdir */
-	{ &vop_rmdir_desc, spec_rmdir },	/* rmdir */
-	{ &vop_symlink_desc, spec_symlink },	/* symlink */
-	{ &vop_readdir_desc, spec_readdir },	/* readdir */
-	{ &vop_readlink_desc, spec_readlink },	/* readlink */
-	{ &vop_abortop_desc, spec_abortop },	/* abortop */
 	{ &vop_inactive_desc, nfs_inactive },	/* inactive */
 	{ &vop_reclaim_desc, nfs_reclaim },	/* reclaim */
 	{ &vop_lock_desc, nfs_lock },		/* lock */
 	{ &vop_unlock_desc, nfs_unlock },	/* unlock */
-	{ &vop_bmap_desc, spec_bmap },		/* bmap */
-	{ &vop_strategy_desc, spec_strategy },	/* strategy */
 	{ &vop_print_desc, nfs_print },		/* print */
 	{ &vop_islocked_desc, nfs_islocked },	/* islocked */
-	{ &vop_pathconf_desc, spec_pathconf },	/* pathconf */
-	{ &vop_advlock_desc, spec_advlock },	/* advlock */
-	{ &vop_reallocblks_desc, spec_reallocblks },	/* reallocblks */
-	{ &vop_bwrite_desc, vop_generic_bwrite },
-	{ (struct vnodeop_desc*)NULL, (int(*)(void *))NULL }
+	{ NULL, NULL }
 };
 struct vnodeopv_desc spec_nfsv2nodeop_opv_desc =
 	{ &spec_nfsv2nodeop_p, spec_nfsv2nodeop_entries };
@@ -181,44 +158,22 @@ struct vnodeopv_desc spec_nfsv2nodeop_opv_desc =
 #ifdef FIFO
 int (**fifo_nfsv2nodeop_p)(void *);
 struct vnodeopv_entry_desc fifo_nfsv2nodeop_entries[] = {
-	{ &vop_default_desc, vn_default_error },
-	{ &vop_lookup_desc, fifo_lookup },	/* lookup */
-	{ &vop_create_desc, fifo_create },	/* create */
-	{ &vop_mknod_desc, fifo_mknod },	/* mknod */
-	{ &vop_open_desc, fifo_open },		/* open */
+	{ &vop_default_desc, fifo_vnoperate },
 	{ &vop_close_desc, nfsfifo_close },	/* close */
 	{ &vop_access_desc, nfsspec_access },	/* access */
 	{ &vop_getattr_desc, nfs_getattr },	/* getattr */
 	{ &vop_setattr_desc, nfs_setattr },	/* setattr */
 	{ &vop_read_desc, nfsfifo_read },	/* read */
 	{ &vop_write_desc, nfsfifo_write },	/* write */
-	{ &vop_lease_desc, fifo_lease_check },	/* lease */
-	{ &vop_ioctl_desc, fifo_ioctl },	/* ioctl */
-	{ &vop_select_desc, fifo_select },	/* select */
-	{ &vop_revoke_desc, fifo_revoke },	/* revoke */
 	{ &vop_fsync_desc, nfs_fsync },		/* fsync */
-	{ &vop_remove_desc, fifo_remove },	/* remove */
-	{ &vop_link_desc, fifo_link },		/* link */
-	{ &vop_rename_desc, fifo_rename },	/* rename */
-	{ &vop_mkdir_desc, fifo_mkdir },	/* mkdir */
-	{ &vop_rmdir_desc, fifo_rmdir },	/* rmdir */
-	{ &vop_symlink_desc, fifo_symlink },	/* symlink */
-	{ &vop_readdir_desc, fifo_readdir },	/* readdir */
-	{ &vop_readlink_desc, fifo_readlink },	/* readlink */
-	{ &vop_abortop_desc, fifo_abortop },	/* abortop */
 	{ &vop_inactive_desc, nfs_inactive },	/* inactive */
 	{ &vop_reclaim_desc, nfs_reclaim },	/* reclaim */
 	{ &vop_lock_desc, nfs_lock },		/* lock */
 	{ &vop_unlock_desc, nfs_unlock },	/* unlock */
-	{ &vop_bmap_desc, fifo_bmap },		/* bmap */
-	{ &vop_strategy_desc, fifo_badop },	/* strategy */
 	{ &vop_print_desc, nfs_print },		/* print */
 	{ &vop_islocked_desc, nfs_islocked },	/* islocked */
-	{ &vop_pathconf_desc, fifo_pathconf },	/* pathconf */
-	{ &vop_advlock_desc, fifo_advlock },	/* advlock */
-	{ &vop_reallocblks_desc, fifo_reallocblks },	/* reallocblks */
 	{ &vop_bwrite_desc, vop_generic_bwrite },
-	{ (struct vnodeop_desc*)NULL, (int(*)(void *))NULL }
+	{ NULL, NULL }
 };
 struct vnodeopv_desc fifo_nfsv2nodeop_opv_desc =
 	{ &fifo_nfsv2nodeop_p, fifo_nfsv2nodeop_entries };
@@ -681,7 +636,7 @@ nfs_lookup(v)
 	struct vnode *dvp = ap->a_dvp;
 	struct vnode **vpp = ap->a_vpp;
 	struct proc *p = cnp->cn_proc;
-	int flags = cnp->cn_flags;
+	int flags;
 	struct vnode *newvp;
 	u_int32_t *tl;
 	caddr_t cp;
@@ -695,6 +650,9 @@ nfs_lookup(v)
 	int lockparent, wantparent, error = 0, attrflag, fhsize;
 	int v3 = NFS_ISV3(dvp);
 
+	cnp->cn_flags &= ~PDIRUNLOCK;
+	flags = cnp->cn_flags;
+
 	*vpp = NULLVP;
 	if ((flags & ISLASTCN) && (dvp->v_mount->mnt_flag & MNT_RDONLY) &&
 	    (cnp->cn_nameiop == DELETE || cnp->cn_nameiop == RENAME))
@@ -705,38 +663,76 @@ nfs_lookup(v)
 	wantparent = flags & (LOCKPARENT|WANTPARENT);
 	nmp = VFSTONFS(dvp->v_mount);
 	np = VTONFS(dvp);
-	if ((error = cache_lookup(dvp, vpp, cnp)) != 0 && error != ENOENT) {
+
+	/*
+	 * Before tediously performing a linear scan of the directory,
+	 * check the name cache to see if the directory/name pair
+	 * we are looking for is known already.
+	 * If the directory/name pair is found in the name cache,
+	 * we have to ensure the directory has not changed from
+	 * the time the cache entry has been created. If it has,
+	 * the cache entry has to be ignored.
+	 */
+	if ((error = cache_lookup(dvp, vpp, cnp)) >= 0) {
 		struct vattr vattr;
-		int vpid;
+		int err2;
+
+		if (error && error != ENOENT) {
+			*vpp = NULLVP;
+			return (error);
+		}
+
+		if (cnp->cn_flags & PDIRUNLOCK) {
+			err2 = vn_lock(dvp, LK_EXCLUSIVE | LK_RETRY, p);
+			if (err2 != 0) {
+				*vpp = NULLVP;
+				return (err2);
+			}
+			cnp->cn_flags &= ~PDIRUNLOCK;
+		}
+
+		err2 = VOP_ACCESS(dvp, VEXEC, cnp->cn_cred, cnp->cn_proc);
+		if (err2 != 0) {
+			if (error == 0) {
+				if (*vpp != dvp)
+					vput(*vpp);
+				else
+					vrele(*vpp);
+			}
+			*vpp = NULLVP;
+			return (err2);
+		}
+
+		if (error == ENOENT) {
+			if (!VOP_GETATTR(dvp, &vattr, cnp->cn_cred,
+			    cnp->cn_proc) && vattr.va_mtime.tv_sec ==
+			    VTONFS(dvp)->n_ctime)
+				return (ENOENT);
+			cache_purge(dvp);
+			np->n_ctime = 0;
+			goto dorpc;
+		}
 
 		newvp = *vpp;
-		vpid = newvp->v_id;
-		/*
-		 * See the comment starting `Step through' in ufs/ufs_lookup.c
-		 * for an explanation of the locking protocol
-		 */
-		if (dvp == newvp) {
-			VREF(newvp);
-			error = 0;
-		} else
-			error = vget(newvp, LK_EXCLUSIVE, p);
-
-		if (!error) {
-			if (vpid == newvp->v_id) {
-			   if (!VOP_GETATTR(newvp, &vattr, cnp->cn_cred, cnp->cn_proc)
-			    && vattr.va_ctime.tv_sec == VTONFS(newvp)->n_ctime) {
-				nfsstats.lookupcache_hits++;
-				if (cnp->cn_nameiop != LOOKUP &&
-				    (flags & ISLASTCN))
-					cnp->cn_flags |= SAVENAME;
-				return (0);
-			   }
-			   cache_purge(newvp);
-			}
-			vrele(newvp);
+		if (!VOP_GETATTR(newvp, &vattr, cnp->cn_cred, cnp->cn_proc)
+			&& vattr.va_ctime.tv_sec == VTONFS(newvp)->n_ctime)
+		{
+			nfsstats.lookupcache_hits++;
+			if (cnp->cn_nameiop != LOOKUP && (flags & ISLASTCN))
+				cnp->cn_flags |= SAVENAME;
+			if ((!lockparent || !(flags & ISLASTCN)) &&
+			     newvp != dvp)
+				VOP_UNLOCK(dvp, 0, p);
+			return (0);
 		}
+		cache_purge(newvp);
+		if (newvp != dvp)
+			vput(newvp);
+		else
+			vrele(newvp);
 		*vpp = NULLVP;
 	}
+dorpc:
 	error = 0;
 	newvp = NULLVP;
 	nfsstats.lookupcache_misses++;
@@ -776,25 +772,72 @@ nfs_lookup(v)
 		*vpp = newvp;
 		m_freem(mrep);
 		cnp->cn_flags |= SAVENAME;
+		if (!lockparent) {
+			VOP_UNLOCK(dvp, 0, p);
+			cnp->cn_flags |= PDIRUNLOCK;
+		}
 		return (0);
 	}
+
+	/*
+	 * The postop attr handling is duplicated for each if case,
+	 * because it should be done while dvp is locked (unlocking
+	 * dvp is different for each case).
+	 */
 
 	if (NFS_CMPFH(np, fhp, fhsize)) {
 		VREF(dvp);
 		newvp = dvp;
-	} else {
+		if (v3) {
+			nfsm_postop_attr(newvp, attrflag);
+			nfsm_postop_attr(dvp, attrflag);
+		} else
+			nfsm_loadattr(newvp, (struct vattr *)0);
+	} else if (flags & ISDOTDOT) {
+		VOP_UNLOCK(dvp, 0, p);
+		cnp->cn_flags |= PDIRUNLOCK;
+
 		error = nfs_nget(dvp->v_mount, fhp, fhsize, &np);
 		if (error) {
+			if (vn_lock(dvp, LK_EXCLUSIVE | LK_RETRY, p) == 0)
+				cnp->cn_flags &= ~PDIRUNLOCK;
 			m_freem(mrep);
 			return (error);
 		}
 		newvp = NFSTOV(np);
+
+		if (v3) {
+			nfsm_postop_attr(newvp, attrflag);
+			nfsm_postop_attr(dvp, attrflag);
+		} else
+			nfsm_loadattr(newvp, (struct vattr *)0);
+
+		if (lockparent && (flags & ISLASTCN)) {
+			if ((error = vn_lock(dvp, LK_EXCLUSIVE, p))) {
+				m_freem(mrep);
+				vput(newvp);
+				return error;
+			}
+			cnp->cn_flags &= ~PDIRUNLOCK;
+		}
+
+	} else {
+		error = nfs_nget(dvp->v_mount, fhp, fhsize, &np);
+		if (error) {
+			m_freem(mrep);
+			return error;
+		}
+		newvp = NFSTOV(np);
+		if (v3) {
+			nfsm_postop_attr(newvp, attrflag);
+			nfsm_postop_attr(dvp, attrflag);
+		} else
+			nfsm_loadattr(newvp, (struct vattr *)0);
+		if (!lockparent || !(flags & ISLASTCN)) {
+			VOP_UNLOCK(dvp, 0, p);
+			cnp->cn_flags |= PDIRUNLOCK;
+		}
 	}
-	if (v3) {
-		nfsm_postop_attr(newvp, attrflag);
-		nfsm_postop_attr(dvp, attrflag);
-	} else
-		nfsm_loadattr(newvp, (struct vattr *)0);
 	if (cnp->cn_nameiop != LOOKUP && (flags & ISLASTCN))
 		cnp->cn_flags |= SAVENAME;
 	if ((cnp->cn_flags & MAKEENTRY) &&
@@ -805,8 +848,24 @@ nfs_lookup(v)
 	*vpp = newvp;
 	nfsm_reqdone;
 	if (error) {
-		if (newvp != NULLVP)
+		/*
+		 * We get here only because of errors returned by
+		 * the RPC. Otherwise we'll have returned above
+		 * (the nfsm_* macros will jump to nfsm_reqdone
+		 * on error).
+		 */
+		if (error == ENOENT && (cnp->cn_flags & MAKEENTRY) &&
+		    cnp->cn_nameiop != CREATE) {
+			if (VTONFS(dvp)->n_ctime == 0)
+				VTONFS(dvp)->n_ctime =
+				    VTONFS(dvp)->n_vattr.va_mtime.tv_sec;
+			cache_enter(dvp, NULL, cnp);
+		}
+		if (newvp != NULLVP) {
 			vrele(newvp);
+			if (newvp != dvp)
+				VOP_UNLOCK(newvp, 0, p);
+		}
 		if ((cnp->cn_nameiop == CREATE || cnp->cn_nameiop == RENAME) &&
 		    (flags & ISLASTCN) && error == ENOENT) {
 			if (dvp->v_mount->mnt_flag & MNT_RDONLY)
@@ -816,6 +875,7 @@ nfs_lookup(v)
 		}
 		if (cnp->cn_nameiop != LOOKUP && (flags & ISLASTCN))
 			cnp->cn_flags |= SAVENAME;
+		*vpp = NULL;
 	}
 	return (error);
 }

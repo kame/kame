@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tireg.h,v 1.9 2000/11/21 03:50:48 jason Exp $	*/
+/*	$OpenBSD: if_tireg.h,v 1.13 2003/02/26 19:02:50 nate Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -44,51 +44,14 @@
  * configuration space registers.
  */
 
-#define TI_PCI_ID			0x000 /* PCI device/vendor ID */
-#define TI_PCI_CMDSTAT			0x004
-#define TI_PCI_CLASSCODE		0x008
-#define TI_PCI_BIST			0x00C
-#define TI_PCI_LOMEM			0x010 /* Shared memory base address */
-#define TI_PCI_SUBSYS			0x02C
+#define TI_PCI_ID			PCI_ID_REG /* PCI device/vendor ID */
+#define TI_PCI_CMDSTAT			PCI_COMMAND_STATUS_REG
+#define TI_PCI_CLASSCODE		PCI_CLASS_REG
+#define TI_PCI_BIST			PCI_BHLC_REG
+#define TI_PCI_LOMEM			PCI_MAPS /* Shared memory base address */
+#define TI_PCI_SUBSYS			PCI_SUBVEND_0
 #define TI_PCI_ROMBASE			0x030
-#define TI_PCI_INT			0x03C
-
-#ifndef PCIM_CMD_MWIEN
-#define PCIM_CMD_MWIEN			0x0010
-#endif
-
-/*
- * Alteon AceNIC PCI vendor/device ID.
- */
-#define ALT_VENDORID			0x12AE
-#define ALT_DEVICEID_ACENIC		0x0001
-#define ALT_DEVICEID_ACENIC_COPPER	0x0002
-
-/*
- * 3Com 3c985 PCI vendor/device ID.
- */
-#define TC_VENDORID			0x10B7
-#define TC_DEVICEID_3C985		0x0001
-
-/*
- * Netgear GA620 PCI vendor/device ID.
- */
-#define NG_VENDORID			0x1385
-#define NG_DEVICEID_GA620		0x620A
-#define NG_DEVICEID_GA620T		0x630A
-
-/*
- * SGI device/vendor ID.
- */
-#define SGI_VENDORID			0x10A9
-#define SGI_DEVICEID_TIGON		0x0009
-
-/*
- * DEC vendor ID, Farallon device ID. Apparently, Farallon used
- * the DEC vendor ID in their cards by mistake.
- */
-#define DEC_VENDORID			0x1011
-#define DEC_DEVICEID_FARALLON_PN9000SX	0x001a
+#define TI_PCI_INT			PCI_INTLINE
 
 /*
  * Tigon configuration and control registers.
@@ -316,7 +279,7 @@
 #define TI_GCR_RXRETURNCONS_IDX		0x680
 #define TI_GCR_CMDRING			0x700
 
-#define TI_GCR_NIC_ADDR(x)		(x - TI_GCR_BASE);
+#define TI_GCR_NIC_ADDR(x)		(x - TI_GCR_BASE)
 
 /*
  * Local memory window. The local memory window is a 2K shared
@@ -423,18 +386,11 @@
  * Even on the alpha, pci addresses are 32-bit quantities
  */
 
-#ifdef __64_bit_pci_addressing__ 
-typedef struct {
-	u_int64_t		ti_addr;
-} ti_hostaddr;
-#define TI_HOSTADDR(x)	x.ti_addr
-#else
 typedef struct {
 	u_int32_t		ti_addr_hi;
 	u_int32_t		ti_addr_lo;
 } ti_hostaddr;
 #define TI_HOSTADDR(x)	x.ti_addr_lo
-#endif
 
 /*
  * Ring control block structure. The rules for the max_len field
@@ -884,16 +840,12 @@ struct ti_tx_desc {
  * Tigon command structure.
  */
 struct ti_cmd_desc {
-#if BYTE_ORDER == BIG_ENDIAN
-	u_int32_t		ti_cmd:8;
-	u_int32_t		ti_code:12;
-	u_int32_t		ti_idx:12;
-#else
-	u_int32_t		ti_idx:12;
-	u_int32_t		ti_code:12;
-	u_int32_t		ti_cmd:8;
-#endif
+	u_int32_t		ti_cmdx;
 };
+
+#define TI_CMD_CMD(cmd) (((((cmd)->ti_cmdx)) >> 24) & 0xff)
+#define TI_CMD_CODE(cmd) (((((cmd)->ti_cmdx)) >> 12) & 0xfff)
+#define TI_CMD_IDX(cmd) ((((cmd)->ti_cmdx)) & 0xfff)
 
 #define TI_CMD_HOST_STATE		0x01
 #define TI_CMD_CODE_STACK_UP		0x01
@@ -942,15 +894,11 @@ struct ti_cmd_desc {
  * that 'sc' and 'cmd' are in local scope.
  */
 #define TI_DO_CMD(x, y, z)		\
-	cmd.ti_cmd = x;			\
-	cmd.ti_code = y;		\
-	cmd.ti_idx = z;			\
+	cmd.ti_cmdx = (((x) << 24) | ((y) << 12) | ((z))); \
 	ti_cmd(sc, &cmd);
 
 #define TI_DO_CMD_EXT(x, y, z, v, w)	\
-	cmd.ti_cmd = x;			\
-	cmd.ti_code = y;		\
-	cmd.ti_idx = z;			\
+	cmd.ti_cmdx = (((x) << 24) | ((y) << 12) | ((z))); \
 	ti_cmd_ext(sc, &cmd, v, w);
 
 /*
@@ -980,17 +928,13 @@ struct ti_cmd_desc {
  * Tigon event structure.
  */
 struct ti_event_desc {
-#if BYTE_ORDER == BIG_ENDIAN
-	u_int32_t		ti_event:8;
-	u_int32_t		ti_code:12;
-	u_int32_t		ti_idx:12;
-#else
-	u_int32_t		ti_idx:12;
-	u_int32_t		ti_code:12;
-	u_int32_t		ti_event:8;
-#endif
+	u_int32_t		ti_eventx;
 	u_int32_t		ti_rsvd;
 };
+
+#define TI_EVENT_EVENT(e) (((((e)->ti_eventx)) >> 24) & 0xff)
+#define TI_EVENT_CODE(e) (((((e)->ti_eventx)) >> 12) & 0xfff)
+#define TI_EVENT_IDX(e) (((((e)->ti_eventx))) & 0xfff)
 
 /*
  * Tigon events.
@@ -1019,15 +963,15 @@ struct ti_event_desc {
  */
 
 #define CSR_WRITE_4(sc, reg, val)	\
-	bus_space_write_4(sc->ti_btag, sc->ti_bhandle, reg, val)
+	bus_space_write_4(sc->ti_btag, sc->ti_bhandle, (reg), (val))
 
 #define CSR_READ_4(sc, reg)		\
-	bus_space_read_4(sc->ti_btag, sc->ti_bhandle, reg)
+	bus_space_read_4(sc->ti_btag, sc->ti_bhandle, (reg))
 
 #define TI_SETBIT(sc, reg, x)	\
-	CSR_WRITE_4(sc, reg, (CSR_READ_4(sc, reg) | x))
+	CSR_WRITE_4(sc, (reg), (CSR_READ_4(sc, (reg)) | (x)))
 #define TI_CLRBIT(sc, reg, x)	\
-	CSR_WRITE_4(sc, reg, (CSR_READ_4(sc, reg) & ~x))
+	CSR_WRITE_4(sc, (reg), (CSR_READ_4(sc, (reg)) & ~(x)))
 
 /*
  * Memory management stuff. Note: the SSLOTS, MSLOTS and JSLOTS
@@ -1040,7 +984,8 @@ struct ti_event_desc {
 #define TI_JSLOTS	384
 
 #define TI_JRAWLEN	(TI_JUMBO_FRAMELEN + ETHER_ALIGN)
-#define TI_JLEN		TI_JRAWLEN
+#define TI_JLEN		(TI_JRAWLEN + (sizeof(u_int64_t) - \
+       (TI_JRAWLEN % sizeof(u_int64_t))))
 #define TI_JPAGESZ	PAGE_SIZE
 #define TI_RESID	(TI_JPAGESZ - (TI_JLEN * TI_JSLOTS) % TI_JPAGESZ)
 #define TI_JMEM		((TI_JLEN * TI_JSLOTS) + TI_RESID)
@@ -1063,6 +1008,7 @@ struct ti_ring_data {
 	struct ti_rx_desc	ti_rx_return_ring[TI_RETURN_RING_CNT];
 	struct ti_event_desc	ti_event_ring[TI_EVENT_RING_CNT];
 	struct ti_tx_desc	ti_tx_ring[TI_TX_RING_CNT];
+
 	/*
 	 * Make sure producer structures are aligned on 32-byte cache
 	 * line boundaries.
@@ -1073,9 +1019,34 @@ struct ti_ring_data {
 	u_int32_t		ti_pad1[6];
 	struct ti_producer	ti_tx_considx_r;
 	u_int32_t		ti_pad2[6];
-	struct ti_tx_desc	*ti_tx_ring_nic;/* pointer to shared mem */
-	struct ti_cmd_desc	*ti_cmd_ring;	/* pointer to shared mem */
 	struct ti_gib		ti_info;
+};
+
+#define TI_RING_DMA_ADDR(sc, offset) \
+	((sc)->ti_ring_map->dm_segs[0].ds_addr + \
+	offsetof(struct ti_ring_data, offset))
+
+#define TI_RING_DMASYNC(sc, offset, op) \
+	bus_dmamap_sync((sc)->sc_dmatag, (sc)->ti_ring_map, \
+			offsetof(struct ti_ring_data, offset), \
+			sizeof(((struct ti_ring_data *)0)->offset), (op))
+
+/*
+ * Number of DMA segments in a TxCB. Note that this is carefully
+ * chosen to make the total struct size an even power of two. It's
+ * critical that no TxCB be split across a page boundry since
+ * no attempt is made to allocate physically contiguous memory.
+ * 
+ */
+#ifdef __alpha__ /* XXX - should be conditional on pointer size */
+#define TI_NTXSEG      30
+#else
+#define TI_NTXSEG      31
+#endif
+
+struct ti_txmap_entry {
+	bus_dmamap_t			dmamap;
+	SLIST_ENTRY(ti_txmap_entry)	link;
 };
 
 /*
@@ -1088,10 +1059,20 @@ struct ti_chain_data {
 	struct mbuf		*ti_rx_std_chain[TI_STD_RX_RING_CNT];
 	struct mbuf		*ti_rx_jumbo_chain[TI_JUMBO_RX_RING_CNT];
 	struct mbuf		*ti_rx_mini_chain[TI_MINI_RX_RING_CNT];
+
+	struct ti_txmap_entry	*ti_tx_map[TI_TX_RING_CNT];
+	bus_dmamap_t		ti_rx_std_map[TI_STD_RX_RING_CNT];
+	bus_dmamap_t		ti_rx_jumbo_map;
+	bus_dmamap_t		ti_rx_mini_map[TI_MINI_RX_RING_CNT];
+
 	/* Stick the jumbo mem management stuff here too. */
 	struct ti_jslot		ti_jslots[TI_JSLOTS];
 	void			*ti_jumbo_buf;
 };
+
+#define TI_JUMBO_DMA_ADDR(sc, m) \
+	((sc)->ti_cdata.ti_rx_jumbo_map->dm_segs[0].ds_addr + \
+	 (mtod((m), char *) - (char *)(sc)->ti_cdata.ti_jumbo_buf))
 
 struct ti_type {
 	u_int16_t		ti_vid;
@@ -1106,12 +1087,12 @@ struct ti_type {
 
 struct ti_mc_entry {
 	struct ether_addr		mc_addr;
-	LIST_ENTRY(ti_mc_entry)		mc_entries;
+	SLIST_ENTRY(ti_mc_entry)	mc_entries;
 };
 
 struct ti_jpool_entry {
 	int                             slot;
-	LIST_ENTRY(ti_jpool_entry)	jpool_entries;
+	SLIST_ENTRY(ti_jpool_entry)	jpool_entries;
 };
 
 struct ti_softc {
@@ -1130,6 +1111,8 @@ struct ti_softc {
 #define ti_ev_prodidx		ti_rdata->ti_ev_prodidx_r
 #define ti_return_prodidx	ti_rdata->ti_return_prodidx_r
 #define ti_tx_considx		ti_rdata->ti_tx_considx_r
+	struct ti_tx_desc	*ti_tx_ring_nic;/* pointer to shared mem */
+	bus_dmamap_t		ti_ring_map;
 	u_int16_t		ti_tx_saved_considx;
 	u_int16_t		ti_rx_saved_considx;
 	u_int16_t		ti_ev_saved_considx;
@@ -1137,9 +1120,10 @@ struct ti_softc {
 	u_int16_t		ti_std;		/* current std ring head */
 	u_int16_t		ti_mini;	/* current mini ring head */
 	u_int16_t		ti_jumbo;	/* current jumo ring head */
-	LIST_HEAD(__ti_mchead, ti_mc_entry)	ti_mc_listhead;
-	LIST_HEAD(__ti_jfreehead, ti_jpool_entry)	ti_jfree_listhead;
-	LIST_HEAD(__ti_jinusehead, ti_jpool_entry)	ti_jinuse_listhead;
+	SLIST_HEAD(__ti_mchead, ti_mc_entry)	ti_mc_listhead;
+	SLIST_HEAD(__ti_jfreehead, ti_jpool_entry)	ti_jfree_listhead;
+	SLIST_HEAD(__ti_jinusehead, ti_jpool_entry)	ti_jinuse_listhead;
+	SLIST_HEAD(__ti_txmaphead, ti_txmap_entry)	ti_tx_map_listhead;
 	u_int32_t		ti_stat_ticks;
 	u_int32_t		ti_rx_coal_ticks;
 	u_int32_t		ti_tx_coal_ticks;

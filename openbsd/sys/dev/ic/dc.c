@@ -1,4 +1,4 @@
-/*	$OpenBSD: dc.c,v 1.51 2002/07/05 13:45:21 aaron Exp $	*/
+/*	$OpenBSD: dc.c,v 1.55 2003/02/25 17:29:09 tedu Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -574,10 +574,8 @@ int dc_mii_readreg(sc, frame)
 	}
 
 	for (i = 0x8000; i; i >>= 1) {
-		if (!ack) {
-			if (dc_mii_readbit(sc))
-				frame->mii_data |= i;
-		}
+		if (dc_mii_readbit(sc))
+			frame->mii_data |= i;
 	}
 
 fail:
@@ -1432,6 +1430,9 @@ void dc_reset(sc)
 		CSR_WRITE_4(sc, DC_WATCHDOG, 0);
 	}
 
+	if (sc->dc_type == DC_TYPE_21145)
+		dc_setcfg(sc, IFM_10_T);
+
 	return;
 }
 
@@ -1637,6 +1638,7 @@ void dc_attach(sc)
 		break;
 	case DC_TYPE_DM9102:
 	case DC_TYPE_21143:
+	case DC_TYPE_21145:
 	case DC_TYPE_ASIX:
 		dc_read_eeprom(sc, (caddr_t)&sc->sc_arpcom.ac_enaddr,	
 		    DC_EE_NODEADDR, 3, 0);
@@ -1759,6 +1761,8 @@ hasmac:
 		error = ENXIO;
 		ifmedia_add(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE, 0, NULL);
 		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_NONE);
+	} else if (sc->dc_type == DC_TYPE_21145) {
+		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_10_T);
 	} else
 		ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER|IFM_AUTO);
 
@@ -2500,7 +2504,9 @@ int dc_intr(arg)
 #endif
 				DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_STORENFWD);
 			} else if (sc->dc_flags & DC_TX_STORENFWD) {
+#if 0
 				printf("resetting\n");
+#endif
 			} else {
 				sc->dc_txthresh += 0x4000;
 #if 0

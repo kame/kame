@@ -1,4 +1,4 @@
-#	$OpenBSD: files.i386,v 1.99 2002/08/05 19:02:19 mickey Exp $
+#	$OpenBSD: files.i386,v 1.102 2003/02/10 22:32:33 jason Exp $
 #	$NetBSD: files.i386,v 1.73 1996/05/07 00:58:36 thorpej Exp $
 #
 # new style config file for i386 architecture
@@ -105,10 +105,20 @@ device	pchb:	pcibus
 attach	pchb at pci
 file	arch/i386/pci/pchb.c		pchb
 
+# AMD Elan SC520 System Controller (PCI-Host bridge)
+device	elansc
+attach	elansc at pci
+file	arch/i386/pci/elan520.c		elansc
+
 # PCI-ISA bridge chipsets
 device	pcib:	isabus
 attach	pcib at pci
 file	arch/i386/pci/pcib.c		pcib
+
+device	hme: ether, ifnet, mii, ifmedia
+file	dev/ic/hme.c			hme
+attach	hme at pci with hme_pci
+file	dev/pci/if_hme_pci.c		hme_pci
 
 #
 # ISA and mixed ISA+EISA or ISA+PCI or ISA+PCMCIA drivers
@@ -287,7 +297,7 @@ attach	pcic at isapnp with pcic_isapnp
 file	dev/isa/i82365_isapnp.c	pcic_isapnp
 
 # Code common to ISA and ISAPnP attachments
-file	dev/isa/i82365_isasubr.c	pcic_isa | pcic_isapnp
+file	dev/isa/i82365_isasubr.c	pcic_isa | pcic_isapnp | pcic_pci
 
 # Databook TCIC/2 pcmcia/isa bridge
 device	tcic: pcmciabus

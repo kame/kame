@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_esp.c,v 1.75 2002/07/30 19:09:36 jason Exp $ */
+/*	$OpenBSD: ip_esp.c,v 1.80 2003/02/28 21:42:56 jason Exp $ */
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -73,6 +73,8 @@
 #else
 #define DPRINTF(x)
 #endif
+
+struct espstat espstat;
 
 /*
  * esp_attach() is called from the transformation initialization code.
@@ -274,13 +276,20 @@ esp_input(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 	else
 		alen = 0;
 
+	plen = m->m_pkthdr.len - (skip + hlen + alen);
+	if (plen <= 0) {
+		DPRINTF(("esp_input: invalid payload length\n"));
+		espstat.esps_badilen++;
+		m_freem(m);
+		return EINVAL;
+	}
+
 	if (espx) {
 		/*
 		 * Verify payload length is multiple of encryption algorithm
 		 * block size.
 		 */
-		plen = m->m_pkthdr.len - (skip + hlen + alen);
-		if ((plen & (espx->blocksize - 1)) || (plen <= 0)) {
+		if (plen & (espx->blocksize - 1)) {
 			DPRINTF(("esp_input(): payload of %d octets not a multiple of %d octets, SA %s/%08x\n", plen, espx->blocksize, ipsp_address(tdb->tdb_dst), ntohl(tdb->tdb_spi)));
 			espstat.esps_badilen++;
 			m_freem(m);
@@ -446,21 +455,17 @@ int
 esp_input_cb(void *op)
 {
 	u_int8_t lastthree[3], aalg[AH_HMAC_HASHLEN];
-	int hlen, roff, skip, protoff, error;
+	int s, hlen, roff, skip, protoff, error;
 	struct mbuf *m1, *mo, *m;
-	struct cryptodesc *crd;
 	struct auth_hash *esph;
-	struct enc_xform *espx;
 	struct tdb_crypto *tc;
 	struct cryptop *crp;
 	struct m_tag *mtag;
 	struct tdb *tdb;
 	u_int32_t btsx;
-	int s, err = 0;
 	caddr_t ptr;
 
 	crp = (struct cryptop *) op;
-	crd = crp->crp_desc;
 
 	tc = (struct tdb_crypto *) crp->crp_opaque;
 	skip = tc->tc_skip;
@@ -475,11 +480,11 @@ esp_input_cb(void *op)
 		FREE(tc, M_XDATA);
 		espstat.esps_notdb++;
 		DPRINTF(("esp_input_cb(): TDB is expired while in crypto"));
+		error = EPERM;
 		goto baddone;
 	}
 
 	esph = (struct auth_hash *) tdb->tdb_authalgxform;
-	espx = (struct enc_xform *) tdb->tdb_encalgxform;
 
 	/* Check for crypto errors */
 	if (crp->crp_etype) {
@@ -662,9 +667,9 @@ esp_input_cb(void *op)
 	m_copyback(m, protoff, sizeof(u_int8_t), lastthree + 2);
 
 	/* Back to generic IPsec input processing */
-	err = ipsec_common_input_cb(m, tdb, skip, protoff, mtag);
+	error = ipsec_common_input_cb(m, tdb, skip, protoff, mtag);
 	splx(s);
-	return err;
+	return (error);
 
  baddone:
 	splx(s);
@@ -674,7 +679,7 @@ esp_input_cb(void *op)
 
 	crypto_freereq(crp);
 
-	return error;
+	return (error);
 }
 
 /*
@@ -686,7 +691,7 @@ esp_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 {
 	struct enc_xform *espx = (struct enc_xform *) tdb->tdb_encalgxform;
 	struct auth_hash *esph = (struct auth_hash *) tdb->tdb_authalgxform;
-	int ilen, hlen, rlen, plen, padding, blks, alen;
+	int ilen, hlen, rlen, padding, blks, alen;
 	struct mbuf *mi, *mo = (struct mbuf *) NULL;
 	struct tdb_crypto *tc;
 	unsigned char *pad;
@@ -733,7 +738,6 @@ esp_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 		blks = 4; /* If no encryption, we have to be 4-byte aligned. */
 
 	padding = ((blks - ((rlen + 2) % blks)) % blks) + 2;
-	plen = rlen + padding; /* Padded payload length. */
 
 	if (esph)
 		alen = AH_HMAC_HASHLEN;
@@ -984,6 +988,7 @@ esp_output_cb(void *op)
 		FREE(tc, M_XDATA);
 		espstat.esps_notdb++;
 		DPRINTF(("esp_output_cb(): TDB is expired while in crypto\n"));
+		error = EPERM;
 		goto baddone;
 	}
 
@@ -1110,6 +1115,7 @@ m_pad(struct mbuf *m, int n)
 
 	if (n <= 0) {  /* No stupid arguments. */
 		DPRINTF(("m_pad(): pad length invalid (%d)\n", n));
+		m_freem(m);
 		return NULL;
 	}
 

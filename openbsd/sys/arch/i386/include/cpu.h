@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.43 2002/09/24 00:06:23 nordin Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.45 2003/01/16 04:16:00 art Exp $	*/
 /*	$NetBSD: cpu.h,v 1.35 1996/05/05 19:29:26 christos Exp $	*/
 
 /*-
@@ -175,8 +175,6 @@ void	i386_proc0_tss_ldt_init(void);
 struct region_descriptor;
 void	lgdt(struct region_descriptor *);
 void	fillw(short, void *, size_t);
-short	fusword(u_short *);
-int	susword(u_short *t, u_short);
 
 struct pcb;
 void	savectx(struct pcb *);
@@ -209,7 +207,7 @@ void	isa_defaultirq(void);
 int	isa_nmi(void);
 
 /* pmap.c */
-void	pmap_bootstrap(vm_offset_t);
+void	pmap_bootstrap(vaddr_t);
 
 /* vm_machdep.c */
 int	kvtop(caddr_t);

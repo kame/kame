@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap_motorola.h,v 1.6 2002/04/27 23:21:02 miod Exp $	*/
+/*	$OpenBSD: pmap_motorola.h,v 1.8 2003/03/01 00:28:45 miod Exp $	*/
 
 /* 
  * Copyright (c) 1987 Carnegie-Mellon University
@@ -88,21 +88,7 @@ typedef struct pmap	*pmap_t;
                 loadustp(m68k_btop((paddr_t)(pmap)->pm_stpa));		\
 }
 
-/*
- * For each vm_page_t, there is a list of all currently valid virtual
- * mappings of that page.  An entry is a pv_entry, the list is pv_table.
- */
-struct pv_entry {
-	struct pv_entry	*pv_next;	/* next pv_entry */
-	struct pmap	*pv_pmap;	/* pmap where mapping lies */
-	vaddr_t		pv_va;		/* virtual address for mapping */
-	st_entry_t	*pv_ptste;	/* non-zero if VA maps a PT page */
-	struct pmap	*pv_ptpmap;	/* if pv_ptste, pmap for PT page */
-	int		pv_flags;	/* flags */
-};
-
-#define	PV_CI		0x01	/* header: all entries are cache inhibited */
-#define PV_PTPAGE	0x02	/* header: entry maps a page table page */
+/* XXX - struct pv_entry moved to vmparam.h because of include ordering issues */
 
 struct pv_page;
 
@@ -152,8 +138,6 @@ extern char		*vmmap;		/* map for mem, dumps, etc. */
 void	pmap_prefer(vaddr_t, vaddr_t *);
 #define	PMAP_PREFER(foff, vap)	pmap_prefer((foff), (vap))
 #endif
-
-vaddr_t	pmap_map(vaddr_t, paddr_t, paddr_t, int);
 
 #ifdef COMPAT_HPUX
 int	pmap_mapmulti(pmap_t, vaddr_t);

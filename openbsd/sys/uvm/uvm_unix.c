@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_unix.c,v 1.21 2002/08/23 11:26:57 art Exp $	*/
+/*	$OpenBSD: uvm_unix.c,v 1.26 2003/03/04 18:24:05 mickey Exp $	*/
 /*	$NetBSD: uvm_unix.c,v 1.18 2000/09/13 15:00:25 thorpej Exp $	*/
 
 /*
@@ -77,8 +77,7 @@ sys_obreak(p, v, retval)
 	} */ *uap = v;
 	struct vmspace *vm = p->p_vmspace;
 	vaddr_t new, old;
-	ssize_t diff;
-	int rv;
+	int error;
 
 	old = (vaddr_t)vm->vm_daddr;
 	new = round_page((vaddr_t)SCARG(uap, nsize));
@@ -86,35 +85,31 @@ sys_obreak(p, v, retval)
 		return (ENOMEM);
 
 	old = round_page(old + ptoa(vm->vm_dsize));
-	diff = new - old;
 
-	if (diff == 0)
+	if (new == old)
 		return (0);
 
 	/*
 	 * grow or shrink?
 	 */
-	if (diff > 0) {
-		rv = uvm_map(&vm->vm_map, &old, diff, NULL, UVM_UNKNOWN_OFFSET,
-		    0, UVM_MAPFLAG(UVM_PROT_RW, UVM_PROT_RWX, UVM_INH_COPY,
+	if (new > old) {
+		error = uvm_map(&vm->vm_map, &old, new - old, NULL,
+		    UVM_UNKNOWN_OFFSET, 0,
+		    UVM_MAPFLAG(UVM_PROT_RW, UVM_PROT_RWX, UVM_INH_COPY,
 		    UVM_ADV_NORMAL, UVM_FLAG_AMAPPAD|UVM_FLAG_FIXED|
 		    UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW));
-		if (rv == KERN_SUCCESS) {
-			vm->vm_dsize += atop(diff);
-			return (0);
+		if (error) {
+			uprintf("sbrk: grow %ld failed, error = %d\n",
+			    new - old, error);
+			return (ENOMEM);
 		}
+		vm->vm_dsize += atop(new - old);
 	} else {
-		rv = uvm_deallocate(&vm->vm_map, new, -diff);
-		if (rv == KERN_SUCCESS) {
-			vm->vm_dsize -= atop(-diff);
-			return (0);
-		}
+		uvm_deallocate(&vm->vm_map, new, old - new);
+		vm->vm_dsize -= atop(old - new);
 	}
 
-	uprintf("sbrk: %s %ld failed, return = %d\n",
-	    diff > 0 ? "grow" : "shrink",
-	    (long)(diff > 0 ? diff : -diff), rv);
-	return (ENOMEM);
+	return (0);
 }
 
 /*
@@ -132,11 +127,7 @@ uvm_grow(p, sp)
 	/*
 	 * For user defined stacks (from sendsig).
 	 */
-#ifdef MACHINE_STACK_GROWS_UP
-	if (sp > (vaddr_t)vm->vm_maxsaddr)
-#else
 	if (sp < (vaddr_t)vm->vm_maxsaddr)
-#endif
 		return (0);
 
 	/*
@@ -197,13 +188,12 @@ uvm_coredump(p, vp, cred, chdr)
 	struct vmspace *vm = p->p_vmspace;
 	vm_map_t map = &vm->vm_map;
 	vm_map_entry_t entry;
-	vaddr_t start, end, maxstack;
+	vaddr_t start, end;
 	struct coreseg cseg;
 	off_t offset;
 	int flag, error = 0;
 
 	offset = chdr->c_hdrsize + chdr->c_seghdrsize + chdr->c_cpusize;
-	maxstack = trunc_page(USRSTACK - ctob(vm->vm_ssize));
 
 	for (entry = map->header.next; entry != &map->header;
 	    entry = entry->next) {
@@ -226,15 +216,19 @@ uvm_coredump(p, vp, cred, chdr)
 			end = VM_MAXUSER_ADDRESS;
 
 #ifdef MACHINE_STACK_GROWS_UP
-		if (start >= USRSTACK) {
+		if (USRSTACK <= start && start < (USRSTACK + MAXSSIZ)) {
+			end = round_page(USRSTACK + ctob(vm->vm_ssize));
+			if (start >= end)
+				continue;
 			start = USRSTACK;
 #else
 		if (start >= (vaddr_t)vm->vm_maxsaddr) {
 			start = trunc_page(USRSTACK - ctob(vm->vm_ssize));
-#endif
-			flag = CORE_STACK;
+
 			if (start >= end)
 				continue;
+#endif
+			flag = CORE_STACK;
 		} else
 			flag = CORE_DATA;
 

@@ -1,19 +1,25 @@
-#	$OpenBSD: Makefile,v 1.10 2000/05/31 19:56:51 mickey Exp $
+#	$OpenBSD: Makefile,v 1.16 2003/01/27 23:56:44 miod Exp $
 
 MAN=	boot.8
 MANSUBDIR=/hppa
 MLINKS=	boot.8 boot.conf.8
 S	=${.CURDIR}/../../../..
-CLEANFILES+=	boot.gdb boot.map boot.lif bsd
+CLEANFILES+=	boot.gdb boot.map boot.lif
 
 .if ${MACHINE} == "hppa"
 PROG=	boot
-SRCS=	srt0.S boot.c cmd.c vars.c bootarg.c conf.c
+SRCS=	srt0.S exec.c boot.c cmd.c vars.c bootarg.c conf.c
 LD?=	ld
 LDFLAGS+=-Bstatic -nostartfiles -nostdlib -N -Ttext $(LINKADDR)
 LDFLAGS+=-T ${.CURDIR}/ld.script -Map boot.map
 SIZE?=	size
+STRIP?=	strip
 SADIR=	${.CURDIR}/..
+CRTBEGIN=
+CRTEND=
+LINKS=	${BINDIR}/boot.lif ${BINDIR}/sdboot \
+	${BINDIR}/boot.lif ${BINDIR}/stboot \
+	${BINDIR}/boot.lif ${BINDIR}/xxboot
 
 LDADD=	${LIBSA} ${LIBZ} ${LIBKERN}
 DPADD=	${LIBSA} ${LIBZ} ${LIBKERN}
@@ -22,18 +28,9 @@ DPADD=	${LIBSA} ${LIBZ} ${LIBKERN}
 
 all:	boot.lif
 
-# enable this when SHEPHERD dies
-#.if exists(${.CURDIR}/../../compile/DISKLESS/bsd)
-#bsd: ${.CURDIR}/../../compile/DISKLESS/bsd
-#	gzip -9 -c ${.CURDIR}/../../compile/DISKLESS/bsd > bsd
-#ADDBOOT+=bsd
-#.endif
-
-.if exists(${.CURDIR}/../../compile/SHEPHERD_PIE/bsd)
-bsd: ${.CURDIR}/../../compile/SHEPHERD_PIE/bsd
-	gzip -9 -c ${.CURDIR}/../../compile/SHEPHERD_PIE/bsd > bsd
-ADDBOOT+=bsd
-.endif
+realinstall:
+	${INSTALL} ${INSTALL_COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+	    boot.lif ${DESTDIR}${BINDIR}
 
 # probably we should check for 256k limit for ISL
 boot.lif:	${PROG} ${ADDBOOT}

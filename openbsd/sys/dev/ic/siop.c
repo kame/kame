@@ -1,5 +1,5 @@
-/*	$OpenBSD: siop.c,v 1.22 2002/09/16 00:53:12 krw Exp $ */
-/*	$NetBSD: siop.c,v 1.64 2002/07/26 01:00:43 wiz Exp $	*/
+/*	$OpenBSD: siop.c,v 1.25 2003/01/21 00:48:55 krw Exp $ */
+/*	$NetBSD: siop.c,v 1.65 2002/11/08 22:04:41 bouyer Exp $	*/
 
 /*
  * Copyright (c) 2000 Manuel Bouyer.
@@ -175,6 +175,7 @@ siop_attach(sc)
 	sc->sc_currschedslot = 0;
 	sc->sc_c.sc_link.adapter = &siop_adapter;
 	sc->sc_c.sc_link.device = &siop_dev;
+	sc->sc_c.sc_link.openings = SIOP_NTAG;
 
 	/* Start with one page worth of commands */
 	siop_morecbd(sc);
@@ -263,6 +264,7 @@ siop_reset(sc)
 	}
 	sc->script_free_lo = sizeof(siop_script) / sizeof(siop_script[0]);
 	sc->script_free_hi = sc->sc_c.ram_size / 4;
+	sc->sc_ntargets = 0;
 
 	/* free used and unused lun switches */
 	while((lunsw = TAILQ_FIRST(&sc->lunsw_list)) != NULL) {
@@ -1331,6 +1333,7 @@ siop_scsicmd(xs)
 			splx(s);
 			return(TRY_AGAIN_LATER);
 		}
+		bzero(sc->sc_c.targets[target], sizeof(struct siop_target));
 		siop_target =
 		    (struct siop_target*)sc->sc_c.targets[target];
 		siop_target->target_c.status = TARST_PROBING;
@@ -1859,7 +1862,6 @@ siop_morecbd(sc)
 	}
 	s = splbio();
 	TAILQ_INSERT_TAIL(&sc->cmds, newcbd, next);
-	sc->sc_c.sc_link.openings += SIOP_NCMDPB;
 	splx(s);
 	return;
 bad0:
@@ -1928,7 +1930,7 @@ siop_add_reselsw(sc, target)
 	struct siop_softc *sc;
 	int target;
 {
-	int i;
+	int i,j;
 	struct siop_target *siop_target;
 	struct siop_lun *siop_lun;
 
@@ -1965,6 +1967,8 @@ siop_add_reselsw(sc, target)
 			continue;
 		if (siop_lun->reseloff > 0) {
 			siop_lun->reseloff = 0;
+			for (j = 0; j < SIOP_NTAG; j++)
+				siop_lun->siop_tag[j].reseloff = 0;
 			siop_add_dev(sc, target, i);
 		}
 	}

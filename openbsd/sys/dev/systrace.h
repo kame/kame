@@ -1,3 +1,4 @@
+/*	$OpenBSD: systrace.h,v 1.12 2002/12/04 17:37:39 mickey Exp $	*/
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * All rights reserved.
@@ -33,12 +34,18 @@
 
 #include <sys/ioccom.h>
 
+	/* XXX kill this after a major release */
 #define	SYSTR_CLONE	_IOR('s', 1, int)
 
 #define SYSTR_EMULEN	8	/* sync with sys proc */
 
 struct str_msg_emul {
 	char emul[SYSTR_EMULEN];
+};
+
+struct str_msg_ugid {
+	uid_t uid;
+	gid_t gid;
 };
 
 #define SYSTR_MAX_POLICIES	64
@@ -62,6 +69,7 @@ struct str_msg_child {
 #define SYSTR_MSG_RES	2
 #define SYSTR_MSG_EMUL	3
 #define SYSTR_MSG_CHILD	4
+#define SYSTR_MSG_UGID	5
 
 #define SYSTR_MSG_NOPROCESS(x) \
 	((x)->msg.msg_type == SYSTR_MSG_CHILD)
@@ -73,6 +81,7 @@ struct str_message {
 	short msg_policy;
 	union {
 		struct str_msg_emul msg_emul;
+		struct str_msg_ugid msg_ugid;
 		struct str_msg_ask msg_ask;
 		struct str_msg_child msg_child;
 	} msg_data;
@@ -82,6 +91,8 @@ struct systrace_answer {
 	pid_t stra_pid;
 	u_int16_t stra_seqnr;
 	short reserved;
+	uid_t stra_seteuid;	/* elevated privileges for system call */
+	uid_t stra_setegid;
 	int stra_policy;
 	int stra_error;
 	int stra_flags;
@@ -130,6 +141,7 @@ struct systrace_replace {
 	size_t strr_offlen[SYSTR_MAXARGS];
 };
 
+#define STRIOCCLONE	_IOR('s', 100, int)
 #define STRIOCATTACH	_IOW('s', 101, pid_t)
 #define STRIOCDETACH	_IOW('s', 102, pid_t)
 #define STRIOCANSWER	_IOW('s', 103, struct systrace_answer)
@@ -145,6 +157,8 @@ struct systrace_replace {
 #define SYSTR_POLICY_NEVER	2
 
 #define SYSTR_FLAGS_RESULT	0x001
+#define SYSTR_FLAGS_SETEUID	0x002
+#define SYSTR_FLAGS_SETEGID	0x004
 
 #ifdef _KERNEL
 struct str_process;

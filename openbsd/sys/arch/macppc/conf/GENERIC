@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.32 2002/09/24 19:08:14 nate Exp $g
+#	$OpenBSD: GENERIC,v 1.42 2003/03/21 15:06:43 drahn Exp $g
 #
 # PPC GENERIC config file
 #
@@ -42,14 +42,14 @@ ppb*		at pci? dev ? function ?	# PCI-PCI bridges
 pci*		at ppb? bus ?
 
 siop*		at pci? dev ? function ?
-#fxp*		at pci? dev ? function ?
+fxp*		at pci? dev ? function ?
 de*		at pci? dev ? function ?
 #vme*		at pci? dev ? function ?
 vgafb0		at pci? dev ? function ?	# PCI VGA graphics 
 #ep*		at pci? dev ? function ?	# 3Com 3c59x
 #ne*		at pci? dev ? function ?	# NE2000-compatible Ethernet
 #adv*		at pci? dev ? function ?	# AdvanSys 1200[A,B], 9xx[U,UA] SCSI
-#ahc*		at pci? dev ? function ?	# Adaptec 294x, aic78x0 SCSI
+ahc*		at pci? dev ? function ?	# Adaptec 294x, aic78x0 SCSI
 #bha*		at pci? dev ? function ?	# BusLogic 9xx SCSI
 #ami*		at pci? dev ? function ?
 #pcscp*		at pci? dev ? function ?	# AMD Am53c974 PCscsi-PCI SCSI
@@ -58,7 +58,9 @@ macobio0	at pci? dev ? function ?
 gem*		at pci? dev ? function ?	# GMAC ethernet
 hme*		at pci? dev ? function ?	# HME ethernet
 dc*		at pci? dev ? function ?	# DEC Tulip 21143 clones
+xl*		at pci? dev ? function ?	# 3C9xx ethernet
 em*		at pci? dev ? function ?	# Intel Pro/1000 ethernet
+ti*		at pci? dev ? function ?	# Alteon Tigon 1Gb ethernet
 an*		at pci? dev ? function ?	# Cisco/Aironet
 wi*		at pci? dev ? function ?	# WaveLAN IEEE 802.11DS
 iop*		at pci? dev ? function ?	# I2O processor
@@ -83,7 +85,10 @@ bmtphy*		at mii? phy ?			# Broadcom 10/100 PHYs
 eephy*		at mii? phy ?			# Marvell 88E1000 Gigabit PHYs
 ukphy*		at mii? phy ?			# generic unknown PHYs
 
-hifn*		at pci? dev ? function ?	# Hifn7751
+# crypto
+lofn*		at pci? dev ? function ?	# Hifn6500
+hifn*		at pci? dev ? function ?	# Hifn7751/7811/7951
+ubsec*		at pci? dev ? function ?	# Broadcom 58xx
 
 macintr0	at macobio?			# old interrupt controller
 openpic0	at macobio?			# openpic interrupt controller
@@ -100,10 +105,21 @@ gpio*		at gpio?			# GPIO, PMU interrupt router.
 aed*		at adb?				# ADB Event Device
 akbd*		at adb?				# ADB keyboard
 
-fwohci*		at pci? dev ? function ?	# FireWire on ohci
+# FireWire Controllers
+#fwohci*	at pci? dev ? function ?	# PCI FireWire adapter
+#fwohci*	at cardbus? dev ? function ?	# CardBus FireWire adapter
+
 #fw*		at fwbus?			# IPv4/v6 over FireWire
-fwnode*		at fwbus? idhi ? idlo ?
-#fwscsi*	at fwnode?
+#fwnode*	at fwbus? idhi ? idlo ?
+
+#fwscsi*	at fwnode?			# SCSI over FireWire
+#scsibus* at fwscsi?
+
+#option	FWOHCI_DEBUG
+#option	FWNODE_DEBUG
+#option	P1212_DEBUG
+#option	SBP2_DEBUG
+#option	FWSCSI_DEBUG
 
 wskbd*		at akbd? console ? mux 1
 ams*		at adb?				# ADB mouse
@@ -119,8 +135,11 @@ awacs*		at macobio?			# Apple audio device
 audio*		at awacs?
 audio*		at uaudio?
 
+bktr0		at pci? dev ? function ?	# Bt8[47][89] tv/fmradio/video
+radio*		at bktr?
+
 #scsibus*	at adv?
-#scsibus*	at ahc?
+scsibus*	at ahc?
 #scsibus*	at ami?
 #scsibus*	at bha?
 #scsibus*	at esp?
@@ -171,11 +190,11 @@ pcmcia*		at cardslot?
 cbb*		at pci? dev ? function ?
 cardslot*	at cbb?
 wi*		at pcmcia? function ?		# WaveLAN IEEE 802.11DS
-#dc*		at cardbus? dev ? function ?	# 21143, "tulip" clone ethernet
+dc*		at cardbus? dev ? function ?	# 21143, "tulip" clone ethernet
 #fxp*		at cardbus? dev ? function ?	# Intel PRO/100 ethernet
-#xl*		at cardbus? dev ? function ?	# 3C575/3C656 ethernet
+xl*		at cardbus? dev ? function ?	# 3C575/3C656 ethernet
 #rl*		at cardbus? dev ? function ?	# RealTek 81[23]9 ethernet
-#wdc*		at pcmcia? function ?
+wdc*		at pcmcia? function ?
 
 wsdisplay*	at vgafb?
 wskbd*		at ukbd? console ? mux 1

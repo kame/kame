@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wi_hostap.h,v 1.6 2002/06/08 22:19:47 millert Exp $	*/
+/*	$OpenBSD: if_wi_hostap.h,v 1.8 2003/01/21 20:09:39 millert Exp $	*/
 
 /*
  * Copyright (c) 2002
@@ -51,7 +51,7 @@ struct hostap_sta {
 #define HOSTAP_FLAGS_AUTHEN	0x0001
 #define HOSTAP_FLAGS_ASSOC	0x0002
 #define HOSTAP_FLAGS_PERM	0x0004
-#define	HOSTAP_FLAGS_BITS	"\20\01ASSOC\02AUTH\03PERM"
+#define	HOSTAP_FLAGS_BITS	"\20\01AUTH\02ASSOC\03PERM"
 
 #define SIOCHOSTAP_GET		_IOWR('i', 210, struct ifreq)
 #define SIOCHOSTAP_ADD		_IOWR('i', 211, struct ifreq)
@@ -77,7 +77,7 @@ struct hostap_getall {
 
 #ifdef _KERNEL
 struct wihap_sta_info {
-	LIST_ENTRY(wihap_sta_info) list;
+	TAILQ_ENTRY(wihap_sta_info) list;
 	LIST_ENTRY(wihap_sta_info) hash;
 
 	struct wi_softc	*sc;
@@ -97,6 +97,7 @@ struct wihap_sta_info {
 #define WI_SIFLAGS_ASSOC	HOSTAP_FLAGS_ASSOC
 #define WI_SIFLAGS_AUTHEN	HOSTAP_FLAGS_AUTHEN
 #define WI_SIFLAGS_PERM		HOSTAP_FLAGS_PERM
+#define WI_SIFLAGS_DEAD		0x1000
 
 #define WI_STA_HASH_SIZE	113
 
@@ -108,7 +109,7 @@ struct wihap_sta_info {
 #endif
 
 struct wihap_info {
-	LIST_HEAD(sta_list, wihap_sta_info)	sta_list;
+	TAILQ_HEAD(sta_list, wihap_sta_info)	sta_list;
 	LIST_HEAD(sta_hash, wihap_sta_info)	sta_hash[WI_STA_HASH_SIZE];
 
 	u_int16_t		apflags;
@@ -117,6 +118,7 @@ struct wihap_info {
 	u_int16_t		asid_inuse_mask[WI_STA_HASH_SIZE];
 
 	int			inactivity_time;
+	struct timeout		tmo;
 };
 
 #define WIHAP_DFLT_INACTIVITY_TIME	(120) /* 2 minutes */

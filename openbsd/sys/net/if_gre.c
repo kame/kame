@@ -1,4 +1,4 @@
-/*      $OpenBSD: if_gre.c,v 1.24 2002/08/28 15:43:02 pefo Exp $ */
+/*      $OpenBSD: if_gre.c,v 1.26 2003/03/25 18:10:06 millert Exp $ */
 /*	$NetBSD: if_gre.c,v 1.9 1999/10/25 19:18:11 drochner Exp $ */
 
 /*
@@ -448,7 +448,8 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ifp->if_flags &= ~IFF_LINK0;
 			break;
 		default:
-			return EPROTONOSUPPORT;
+			error = EPROTONOSUPPORT;
+			break;
 		}
 		break;
 	case GREGPROTO:
@@ -555,7 +556,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
  * which would be taken by ip_output(), as this one will loop back to
  * us. If the interface is p2p as  a--->b, then a routing entry exists
  * If we now send a packet to b (e.g. ping b), this will come down here
- * gets src=a, dst=b tacked on and would from ip_ouput() sent back to
+ * gets src=a, dst=b tacked on and would from ip_output() sent back to
  * if_gre.
  * Goal here is to compute a route to b that is less specific than
  * a-->b. We know that this one exists as in normal operation we have

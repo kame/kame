@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: aic7xxx_inline.h,v 1.1.1.1 2002/11/05 04:24:21 itojun Exp $
+ * $Id: aic7xxx_inline.h,v 1.1.1.2 2003/05/01 05:35:15 itojun Exp $
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_inline.h,v 1.17 2001/07/18 21:39:47 gibbs Exp $
  */
@@ -372,7 +372,7 @@ ahc_queue_scb(struct ahc_softc *ahc, struct scb *scb)
 
 	if (scb->hscb->tag == SCB_LIST_NULL
 	 || scb->hscb->next == SCB_LIST_NULL)
-		panic("Attempt to queue invalid SCB tag %x:%x\n",
+		panic("Attempt to queue invalid SCB tag %x:%x",
 		      scb->hscb->tag, scb->hscb->next);
 
 	/*

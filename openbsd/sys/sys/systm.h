@@ -1,4 +1,4 @@
-/*	$OpenBSD: systm.h,v 1.52 2002/07/12 13:31:20 art Exp $	*/
+/*	$OpenBSD: systm.h,v 1.54 2003/01/21 16:59:23 markus Exp $	*/
 /*	$NetBSD: systm.h,v 1.50 1996/06/09 04:55:09 briggs Exp $	*/
 
 /*-
@@ -203,19 +203,6 @@ int	copyoutstr(const void *, void *, size_t, size_t *);
 int	copyin(const void *, void *, size_t);
 int	copyout(const void *, void *, size_t);
 
-int	fubyte(void *);
-#ifdef notdef
-int	fuibyte(void *);
-#endif
-int	subyte(void *, int);
-int	suibyte(void *, int);
-long	fuword(void *);
-long	fuiword(void *);
-int	suword(void *, long);
-int	suiword(void *, long);
-int	fuswintr(caddr_t);
-int	suswintr(caddr_t, u_int);
-
 struct timeval;
 int	hzto(struct timeval *);
 int	tvtohz(struct timeval *);
@@ -234,6 +221,8 @@ void	cpu_initclocks(void);
 void	startprofclock(struct proc *);
 void	stopprofclock(struct proc *);
 void	setstatclockrate(int);
+
+void	wdog_register(void *, int (*)(void *, int));
 
 /*
  * Startup/shutdown hooks.  Startup hooks are functions running after

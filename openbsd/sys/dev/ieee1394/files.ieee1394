@@ -1,3 +1,4 @@
+#	$OpenBSD: files.ieee1394,v 1.3 2002/12/30 12:54:05 tdeval Exp $
 #	$NetBSD: files.ieee1394,v 1.6 2002/02/27 05:02:25 jmc Exp $
 
 file	dev/ieee1394/fwlynx.c	fwlynx
@@ -7,9 +8,9 @@ device	fwnode { }
 attach	fwnode at fwbus: ieee1212
 file	dev/ieee1394/fwnode.c		fwnode
 
-#device  fwscsi: scsi
-#attach  fwscsi at fwnode
-#file    dev/ieee1394/fwscsi.c           fwscsi
+device	fwscsi: scsi
+attach	fwscsi at fwnode: sbp2
+file	dev/ieee1394/fwscsi.c		fwscsi
 
 #device	fw: ieee1394, ifnet
 #attach	fw at fwbus

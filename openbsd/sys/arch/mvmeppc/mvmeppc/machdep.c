@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.27 2002/07/20 19:24:56 art Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.30 2003/02/26 21:54:44 drahn Exp $	*/
 /*	$NetBSD: machdep.c,v 1.4 1996/10/16 19:33:11 ws Exp $	*/
 
 /*
@@ -54,12 +54,6 @@
 
 #include <uvm/uvm_extern.h>
 
-#ifdef SYSVSHM
-#include <sys/shm.h>
-#endif
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
 #ifdef SYSVMSG
 #include <sys/msg.h>
 #endif
@@ -620,17 +614,6 @@ allocsys(v)
 #define	valloc(name, type, num) \
 	v = (caddr_t)(((name) = (type *)v) + (num))
 
-#ifdef	SYSVSHM
-	shminfo.shmmax = shmmaxpgs;
-	shminfo.shmall = shmmaxpgs;
-	shminfo.shmseg = shmseg;
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
-#ifdef	SYSVSEM
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns);
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
 #ifdef	SYSVMSG
 	valloc(msgpool, char, msginfo.msgmax);
 	valloc(msgmaps, struct msgmap, msginfo.msgseg);
@@ -1010,7 +993,7 @@ ppc_intr_establish(lcv, ih, type, level, func, arg, name)
 		ppc_configed_intr_cnt++;
 	} else {
 		panic("ppc_intr_establish called before interrupt controller"
-			" configured: driver %s too many interrupts\n", name);
+			" configured: driver %s too many interrupts", name);
 	}
 	/* disestablish is going to be tricky to supported for these :-) */
 	return (void *)ppc_configed_intr_cnt;
@@ -1396,7 +1379,7 @@ kcopy(from, to, size)
 	faultbuf env;
 	register void *oldh = curproc->p_addr->u_pcb.pcb_onfault;
 
-	if (setfault(env)) {
+	if (setfault(&env)) {
 		curproc->p_addr->u_pcb.pcb_onfault = oldh;
 		return EFAULT;
 	}

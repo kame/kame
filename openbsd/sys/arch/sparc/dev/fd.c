@@ -1,4 +1,4 @@
-/*	$OpenBSD: fd.c,v 1.29 2002/05/29 08:28:36 art Exp $	*/
+/*	$OpenBSD: fd.c,v 1.32 2002/11/24 18:17:58 miod Exp $	*/
 /*	$NetBSD: fd.c,v 1.51 1997/05/24 20:16:19 pk Exp $	*/
 
 /*-
@@ -262,10 +262,10 @@ static void fdconf(struct fdc_softc *);
 	if (CPU_ISSUN4M)		\
 		raise(0, IPL_FDSOFT);	\
 	else				\
-		ienab_bis(IE_L4);	\
+		ienab_bis(IE_FDSOFT);	\
 } while(0)
 #else
-#define AUDIO_SET_SWINTR ienab_bis(IE_FDSOFT)
+#define FD_SET_SWINTR ienab_bis(IE_FDSOFT)
 #endif /* defined(SUN4M) */
 #endif /* FDC_C_HANDLER */
 
@@ -1035,7 +1035,7 @@ fdcstatus(dv, n, s)
 		printf("\n");
 		break;
 	case 2:
-		printf(" (st0 %s cyl %d)\n",
+		printf(" (st0 %b cyl %d)\n",
 		    fdc->sc_status[0], NE7_ST0BITS,
 		    fdc->sc_status[1]);
 		break;
@@ -1131,7 +1131,7 @@ fdchwintr(fdc)
 		if ((msr & NE7_NDM) == 0) {
 			fdcresult(fdc);
 			fdc->sc_istate = ISTATE_IDLE;
-			ienab_bis(IE_FDSOFT);
+			FD_SET_SWINTR;
 			printf("fdc: overrun: tc = %d\n", fdc->sc_tc);
 			break;
 		}
@@ -1150,7 +1150,7 @@ fdchwintr(fdc)
 		}
 	}
 done:
-	sc->sc_intrcnt.ev_count++;
+	fdc->sc_intrcnt.ev_count++;
 	return (1);
 }
 #endif

@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile.vax,v 1.19 2002/08/09 20:24:43 miod Exp $
+#	$OpenBSD: Makefile.vax,v 1.21 2002/12/25 21:10:26 miod Exp $
 #	$NetBSD: Makefile.vax,v 1.49 1999/07/26 05:20:49 cgd Exp $
 
 # Makefile for OpenBSD/vax
@@ -39,33 +39,21 @@ CROSSDIR?=  /usr/cross/vax
 CBIN=${CROSSDIR}/usr/bin
 MACHINE=vax 
 MACHINE_ARCH=vax 
-AR=${CBIN}/ar 
 AS=${CBIN}/as 
 CC=${CBIN}/cc 
 CPP=${CBIN}/cpp
 HOSTCC=cc 
 LD=${CBIN}/ld 
-NM=${CBIN}/nm 
-RANLIB=${CBIN}/ranlib 
 STRIP=${CBIN}/strip 
 SIZE=${CBIN}/size 
 
 .else
 
-AR?=	ar
-AS?=	as
-CC?=	cc
-CPP?=	cpp
-LORDER?=lorder
-LD?=	ld
-NM?=	nm
-RANLIB?=ranlib
 STRIP?=	strip
 SIZE?=	size
 
 .endif
 
-TSORT?=	tsort -q
 COPTS?= -O2
 
 # source tree is located via $S relative to the compilation directory
@@ -78,7 +66,8 @@ INCLUDES=	-I. -I$S/arch -I$S -nostdinc
 CPPFLAGS=	${INCLUDES} ${IDENT} ${PARAM} -D_KERNEL \
 		-D_VAX_INLINE_
 CWARNFLAGS?=	-Werror -Wall -Wno-main -Wno-format -Wno-uninitialized
-CFLAGS=		${DEBUG} ${COPTS} ${CWARNFLAGS} ${PIPE}
+CMACHFLAGS=	-fno-stack-protector
+CFLAGS=		${DEBUG} ${COPTS} ${CWARNFLAGS} ${CMACHFLAGS} ${PIPE}
 AFLAGS=		-x assembler-with-cpp -traditional-cpp -D_LOCORE
 LINKFLAGS=	-N -Ttext 80000000 -e start
 STRIPFLAGS=	-d

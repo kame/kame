@@ -1,4 +1,4 @@
-/*	$OpenBSD: dpt.c,v 1.6 2002/03/14 01:26:54 millert Exp $	*/
+/*	$OpenBSD: dpt.c,v 1.8 2002/12/11 18:43:14 henning Exp $	*/
 /*	$NetBSD: dpt.c,v 1.12 1999/10/23 16:26:33 ad Exp $	*/
 
 /*-
@@ -145,7 +145,7 @@ static char *dpt_cname[] = {
 	"PM2021", "SmartCache III",
 	"SK2012", "SmartCache Plus", 
 	"SK2011", "SmartCache Plus",
-	NULL,     "unknown adapter, please report using send-pr(1)",
+	NULL,     "unknown adapter, please report using sendbug(1)",
 };
 
 /*
@@ -525,7 +525,7 @@ dpt_poll(sc, ccb)
 
 #ifdef DEBUG
 	if ((ccb->ccb_flg & CCB_PRIVATE) == 0)
-		panic("dpt_poll: called for non-CCB_PRIVATE request\n");
+		panic("dpt_poll: called for non-CCB_PRIVATE request");
 #endif
 
  	if ((ccb->ccb_flg & CCB_INTR) != 0)
@@ -819,7 +819,7 @@ dpt_done_ccb(sc, ccb)
 	 */
 #ifdef DIAGNOSTIC
 	if ((ccb->ccb_flg & CCB_ALLOC) == 0) {
-		panic("%s: done ccb not allocated!\n", sc->sc_dv.dv_xname);
+		panic("%s: done ccb not allocated!", sc->sc_dv.dv_xname);
 		return;
 	}
 #endif

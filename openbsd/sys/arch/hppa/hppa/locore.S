@@ -1,7 +1,7 @@
-/*	$OpenBSD: locore.S,v 1.89 2002/09/15 09:39:36 mickey Exp $	*/
+/*	$OpenBSD: locore.S,v 1.105 2003/02/18 21:06:43 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998-2002 Michael Shalayeff
+ * Copyright (c) 1998-2003 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,19 +34,6 @@
  * the copyrights and acknowledgements below.
  */
 /*
- * Copyright (c) 1990,1991,1992,1994 The University of Utah and
- * the Computer Systems Laboratory (CSL).  All rights reserved.
- *
- * THE UNIVERSITY OF UTAH AND CSL PROVIDE THIS SOFTWARE IN ITS "AS IS"
- * CONDITION, AND DISCLAIM ANY LIABILITY OF ANY KIND FOR ANY DAMAGES
- * WHATSOEVER RESULTING FROM ITS USE.
- *
- * CSL requests users of this software to return to csl-dist@cs.utah.edu any
- * improvements that they make and grant CSL redistribution rights.
- *
- *	Utah $Hdr: locore.s 1.62 94/12/15$
- */
-/*
  *  (c) Copyright 1988 HEWLETT-PACKARD COMPANY
  *
  *  To anyone who acknowledges that this file is provided "AS IS"
@@ -60,6 +47,27 @@
  *  Hewlett-Packard Company makes no representations about the
  *  suitability of this software for any purpose.
  */
+/*
+ * Copyright (c) 1990,1991,1992,1994 The University of Utah and
+ * the Computer Systems Laboratory (CSL).  All rights reserved.
+ *
+ * Permission to use, copy, modify and distribute this software is hereby
+ * granted provided that (1) source code retains these copyright, permission,
+ * and disclaimer notices, and (2) redistributions including binaries
+ * reproduce the notices in supporting documentation, and (3) all advertising
+ * materials mentioning features or use of this software display the following
+ * acknowledgement: ``This product includes software developed by the
+ * Computer Systems Laboratory at the University of Utah.''
+ *
+ * THE UNIVERSITY OF UTAH AND CSL ALLOW FREE USE OF THIS SOFTWARE IN ITS "AS
+ * IS" CONDITION.  THE UNIVERSITY OF UTAH AND CSL DISCLAIM ANY LIABILITY OF
+ * ANY KIND FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+ *
+ * CSL requests users of this software to return to csl-dist@cs.utah.edu any
+ * improvements that they make and grant CSL redistribution rights.
+ *
+ *	Utah $Hdr: locore.s 1.63 95/01/20$
+ */
 
 #include <sys/errno.h>
 #include <sys/reboot.h>
@@ -69,12 +77,8 @@
 #include <machine/trap.h>
 #include <machine/iomod.h>
 #include <machine/pdc.h>
-#include <machine/intr.h>
 #include <machine/frame.h>
 #include <machine/reg.h>
-#ifdef	GPROF
-#include <machine/gprof.h>
-#endif
 #include "assym.h"
 
 /*
@@ -102,12 +106,43 @@
 
 #define	EXIT_STACKSIZE	(2*NBPG)
 #define	EMRG_STACKSIZE	(2*NBPG)
-#define	FPEMU_STACKSIZE	(2*NBPG)
+#define	FPEMU_STACKSIZE	(4*NBPG)
 
 	.data
 $trap_tmp_save			/* XXX assumed to be aligned on 2048 */
 	.block	TF_PHYS		/* XXX must be aligned to 64 */
-	.align	NBPG
+
+	.globl	intrcnt, eintrcnt, intrnames, eintrnames
+	.export	intrcnt, data
+intrcnt
+	.block	16 * 4
+	.export	eintrcnt, data
+eintrcnt
+	.export	intrnames, data
+intrnames
+	.asciz	"spur"
+	.asciz	"lev1"
+	.asciz	"lev2"
+	.asciz	"lev3"
+	.asciz	"lev4"
+	.asciz	"lev5"
+	.asciz	"lev6"
+	.asciz	"lev7"
+	.asciz	"lev8"
+	.asciz	"clock"
+	.asciz	"lev10"
+	.asciz	"lev11"
+	.asciz	"lev12"
+	.asciz	"lev13"
+	.asciz	"lev14"
+	.asciz	"lev15"
+	.export	eintrnames, data
+eintrnames
+	.export netisr, data
+	.align 16
+netisr
+	.word	0
+	.align	16
 
 	BSS(pdc_stack, 4)	/* temp stack for PDC call */
 	BSS(emrg_stack, 4)	/* stack for HPMC/TOC/PWRF */
@@ -123,14 +158,6 @@ $trap_tmp_save			/* XXX assumed to be aligned on 2048 */
 	BSS(fpu_enable, 4)	/* bits to set in the ccr to enable fpu */
 	.export hppa_vtop, data
 	BSS(hppa_vtop, 4)	/* a vtop translation table addr (pa=va) */
-	.export netisr, data
-	.align 16
-netisr
-	.word	0
-	.export sir, data
-	.align 16
-sir
-	.word	0
 
 	.text
 	.import	$kernel_setup, entry
@@ -220,7 +247,7 @@ $start_zero_tf
 	ldil	L%$qisnowon, rp
 	ldo	R%$qisnowon(rp), rp
 	b	$kernel_setup
-	ldi	PSW_Q|PSW_I, arg2
+	ldi	PSL_Q|PSL_I, arg2
 
 $qisnowon
 	/*
@@ -237,7 +264,7 @@ $qisnowon
 	/*
 	 * Cannot change the queues or IPSW with the Q-bit on
 	 */
-	rsm	RESET_PSW, r0
+	rsm	RESET_PSL, r0
 	nop ! nop ! nop ! nop ! nop ! nop ! nop
 
 	/*
@@ -269,7 +296,6 @@ $virtual_mode
 	nop
 
 	break	HPPA_BREAK_KERNEL, HPPA_BREAK_KGDB
-	nop
 $noddb
 #endif
 
@@ -293,7 +319,7 @@ LEAF_ENTRY($kernel_setup)
 	 * disable interrupts and turn off all bits in the psw so that
 	 * we start in a known state.
 	 */
-	rsm	RESET_PSW, r0
+	rsm	RESET_PSL, r0
 	nop ! nop ! nop ! nop ! nop ! nop
 
 	/* get things ready for the kernel to run in virtual mode */
@@ -318,7 +344,7 @@ LEAF_ENTRY($kernel_setup)
 	 * spl level into eiem, and reset any pending interrupts
 	 */
 	ldi	-1, r1
-	mtctl	r0, eiem	/* IPL_NONE */
+	mtctl	r0, eiem
 	mtctl	r1, eirr
 
 	/*
@@ -433,9 +459,8 @@ pdc_call_unmapped1
 	nop
 
 	copy	arg0, t4
-	ldi	PSW_Q, arg0 /* (!pdc_flag && args[0] == PDC_PIM)? PSW_M:0) */
+	ldi	PSL_Q, arg0 /* (!pdc_flag && args[0] == PDC_PIM)? PSL_M:0) */
 	break	HPPA_BREAK_KERNEL, HPPA_BREAK_SET_PSW
-	nop
 	stw	ret0, HPPA_FRAME_ARG(23)(sp)
 	copy	t4, arg0
 
@@ -471,7 +496,6 @@ pdc_call_unmapped2
 	copy	ret0, t3
 	ldw	HPPA_FRAME_ARG(23)(sp), arg0
 	break	HPPA_BREAK_KERNEL, HPPA_BREAK_SET_PSW
-	nop
 	copy	t3, ret0
 
 pdc_call_unmapped3
@@ -714,7 +738,6 @@ $syscall
 	.entry
 $syscall_return
 	/* t3 == VA trapframe */
-	/* check for AST ? XXX */
 
 	/* splhigh(), just in case */
 	mtctl	r0, eiem
@@ -811,7 +834,7 @@ $syscall_return
 	 * sp will be left in virtual until restored from trapframe,
 	 * since we don't use it anyway.
 	 */
-	rsm	RESET_PSW, r0
+	rsm	RESET_PSL, r0
 	nop ! nop ! nop ! nop ! nop ! nop ! nop
 $syscall_return_phys
 
@@ -917,7 +940,7 @@ LDILDO(dtlbna_t)
 LDILDO(tlbd_t)
 #endif
 
-#ifdef HP7100LC_CPU
+#if defined(HP7100LC_CPU) || defined(HP7300LC_CPU)
 LDILDO(itlb_l)
 LDILDO(itlbna_l)
 LDILDO(dtlb_l)
@@ -945,7 +968,7 @@ hpmc_v
 	CTRAP(hpmc,T_HPMC,HPMCPRE)	/*  1. high priority machine check */
 	ATRAP(power,T_POWERFAIL)	/*  2. power failure */
 	ATRAP(recnt,T_RECOVERY)		/*  3. recovery counter trap */
-	ATRAP(intr,T_INTERRUPT)		/*  4. external interrupt */
+	CTRAP(intr,T_INTERRUPT,)	/*  4. external interrupt */
 	ATRAP(lpmc,T_LPMC)		/*  5. low-priority machine check */
 	STRAP(itlb,T_ITLBMISS,ITLBPRE)	/*  6. instruction TLB miss fault */
 	ATRAP(iprot,T_IPROT)		/*  7. instruction protection trap */
@@ -955,7 +978,7 @@ hpmc_v
 	ATRAP(privr,T_PRIV_REG)		/* 11. privileged register trap */
 	ATRAP(ovrfl,T_OVERFLOW)		/* 12. overflow trap */
 	ATRAP(cond,T_CONDITION)		/* 13. conditional trap */
-	ATRAP(excpt,T_EXCEPTION)	/* 14. assist exception trap */
+	CTRAP(excpt,T_EXCEPTION,)	/* 14. assist exception trap */
 	STRAP(dtlb,T_DTLBMISS,DTLBPRE)	/* 15. data TLB miss fault */
 	STRAP(itlbna,T_ITLBMISSNA,DTLBPRE)/* 16. ITLB non-access miss fault */
 	STRAP(dtlbna,T_DTLBMISSNA,DTLBPRE)/* 17. DTLB non-access miss fault */
@@ -1008,8 +1031,46 @@ hpmc_v
 	ATRAP(unk63,63)
 					/* 64 */
 
+	.export TLABEL(excpt), entry
+ENTRY(TLABEL(excpt),0)
+	/* assume we never get this one w/o fpu [enabled] */
+	copy	rp, r1
+	copy	arg0, r8
+	mfctl	cr30, r9
+	.import	fpu_save, code
+	.call
+	bl	fpu_save, rp
+	copy	r9, arg0
+	copy	r1, rp
+	copy	r8, arg0
+	mtctl	r0, ccr		/* cause a reload after exception */
+	ldil	L%fpu_curpcb, r1
+	stw	r0, R%fpu_curpcb(r1)
+
+	/* now, check for trap */
+	ldw	0(r9), r1
+	bb,>=,n	r1, HPPA_FPU_T_POS, excpt_notrap
+	ldw	8(r9), r1
+	extru	r1, 5, 6, r1
+	comib,<>,n HPPA_FPU_UNMPL, r1, excpt_notrap
+
+	ldw	0(r9), r1
+	depi	0, HPPA_FPU_T_POS, 1, r1
+	stw	r1, 0(r9)
+	ldw	8(r9), r1
+	stw	r0, 8(r9)
+	.import	$fpu_emulate, code
+	b	$fpu_emulate
+	fdc	r0(r9)
+
+excpt_notrap
+	sync
+	b	TLABEL(all)
+	ldi	T_EXCEPTION, r1
+EXIT(TLABEL(excpt))
+
 	.export TLABEL(emu), entry
-LEAF_ENTRY(TLABEL(emu))
+ENTRY(TLABEL(emu),0)
 
 	/*
 	 * Switch FPU/SFU context
@@ -1023,77 +1084,113 @@ LEAF_ENTRY(TLABEL(emu))
 	 *
 	 */
 
+	mfctl	iir, r8
+	extru	r8, 5, 6, r9	/* no sfu implementation right now */
+	comib,=	4, r9, TLABEL(all)
+	ldi	T_ILLEGAL, r1
+
+	/*
+	 * pass through for all coprocessors now and
+	 * do not check the uid here.
+	 * in case that piece does not exist emulate
+	 * or the trap will be generted later.
+	 */
+
+	/* if we are already enabled and hit again, emulate */
 	mfctl	ccr, r1
+	extru,<> r1, 25, 2, r0
+	b,n	$fpusw_set
+	nop
+
+	mtctl	r0, ccr		/* cause a reload after exception */
+	ldil	L%fpu_curpcb, r1
+	stw	r0, R%fpu_curpcb(r1)
+#if 0
+	/* here we emulate the fld/fst */
+	mfctl	iir, r1
+	extru	r1, 5, 6, r1
+	comib,=	0xb, r9, TLABEL(all)
+	ldi	T_ILLEGAL, r1
+
+	mfctl	iir, r1
+	extru	r1, 5, 6, r1
+	comib,=	0x9, r9, TLABEL(all)
+	ldi	T_ILLEGAL, r1
+#endif
+	mfctl	iir, r1
+	.import	$fpu_emulate, code
+	b	$fpu_emulate
+	nop
+
+$fpusw_set
 	/* enable coprocessor */
 	depi	3, 25, 2, r1
 	mtctl	r1, ccr
 
-	mtctl	arg0, tr5
-	ldil	L%fpu_curpcb, arg0
-	mfctl	cr30, r1
-	ldw	R%fpu_curpcb(arg0), arg0
+	ldil	L%fpu_curpcb, r16
+	mfctl	cr30, r9
+	ldw	R%fpu_curpcb(r16), r16
 
-	comb,=,n arg0, r1, $fpusw_done
-	comb,=,n r0, arg0, $fpusw_nosave
+	comb,=,n r16, r9, $fpusw_done
+	comb,=,n r16, r0, $fpusw_nosave
 
+	copy	arg0, r17
 	copy	rp, r1
-	.import	fpu_save, entry
+	copy	r16, arg0
+	.import	fpu_save, code
 	.call
 	bl	fpu_save, rp
 	ldo	PCB_FPREGS+U_PCB(arg0), arg0
 	copy	r1, rp
+	copy	r17, arg0
 
 $fpusw_nosave
 
 	/* count switches */
 	ldil	L%fpu_csw, r1
-	ldw	R%fpu_csw(r1), arg0
-	ldo	1(arg0), arg0
-	stw	arg0, R%fpu_csw(r1)
+	ldw	R%fpu_csw(r1), r16
+	ldo	1(r16), r16
+	ldo	31*8+PCB_FPREGS+U_PCB(r9), r17
+	stw	r16, R%fpu_csw(r1)
 
-	mfctl	cr30, r1
-	ldo	31*8+PCB_FPREGS+U_PCB(r1), arg0
-
-	fldds,ma -8(arg0), fr31
-	fldds,ma -8(arg0), fr30
-	fldds,ma -8(arg0), fr29
-	fldds,ma -8(arg0), fr28
-	fldds,ma -8(arg0), fr27
-	fldds,ma -8(arg0), fr26
-	fldds,ma -8(arg0), fr25
-	fldds,ma -8(arg0), fr24
-	fldds,ma -8(arg0), fr23
-	fldds,ma -8(arg0), fr22
-	fldds,ma -8(arg0), fr21
-	fldds,ma -8(arg0), fr20
-	fldds,ma -8(arg0), fr19
-	fldds,ma -8(arg0), fr18
-	fldds,ma -8(arg0), fr17
-	fldds,ma -8(arg0), fr16
-	fldds,ma -8(arg0), fr15
-	fldds,ma -8(arg0), fr14
-	fldds,ma -8(arg0), fr13
-	fldds,ma -8(arg0), fr12
-	fldds,ma -8(arg0), fr11
-	fldds,ma -8(arg0), fr10
-	fldds,ma -8(arg0), fr9
-	fldds,ma -8(arg0), fr8
-	fldds,ma -8(arg0), fr7
-	fldds,ma -8(arg0), fr6
-	fldds,ma -8(arg0), fr5
-	fldds,ma -8(arg0), fr4
-	fldds,ma -8(arg0), fr3
-	fldds,ma -8(arg0), fr2
-	fldds,ma -8(arg0), fr1
-	fldds     0(arg0), fr0	/* fr0 must be restored last */
+	fldds,ma -8(r17), fr31
+	fldds,ma -8(r17), fr30
+	fldds,ma -8(r17), fr29
+	fldds,ma -8(r17), fr28
+	fldds,ma -8(r17), fr27
+	fldds,ma -8(r17), fr26
+	fldds,ma -8(r17), fr25
+	fldds,ma -8(r17), fr24
+	fldds,ma -8(r17), fr23
+	fldds,ma -8(r17), fr22
+	fldds,ma -8(r17), fr21
+	fldds,ma -8(r17), fr20
+	fldds,ma -8(r17), fr19
+	fldds,ma -8(r17), fr18
+	fldds,ma -8(r17), fr17
+	fldds,ma -8(r17), fr16
+	fldds,ma -8(r17), fr15
+	fldds,ma -8(r17), fr14
+	fldds,ma -8(r17), fr13
+	fldds,ma -8(r17), fr12
+	fldds,ma -8(r17), fr11
+	fldds,ma -8(r17), fr10
+	fldds,ma -8(r17), fr9
+	fldds,ma -8(r17), fr8
+	fldds,ma -8(r17), fr7
+	fldds,ma -8(r17), fr6
+	fldds,ma -8(r17), fr5
+	fldds,ma -8(r17), fr4
+	fldds,ma -8(r17), fr3
+	fldds,ma -8(r17), fr2
+	fldds,ma -8(r17), fr1
+	fldds     0(r17), fr0	/* fr0 must be restored last */
 
 	ldil	L%fpu_curpcb, r1
-	stw	arg0, R%fpu_curpcb(r1)
+	stw	r17, R%fpu_curpcb(r1)
 
 $fpusw_done
-	mfctl	tr7, r1
-	mfctl	tr5, arg0
-	rfi
+	rfir
 	nop
 EXIT(TLABEL(emu))
 
@@ -1159,8 +1256,9 @@ EXIT(TLABEL(emu))
 	ldwax,s	r16(r24), r17		/* va -> pa:prot */		! \
 	sh2addl	r16, r24, r25						! \
 	combt,=,n r0, r17, TLABEL(all)					! \
+	copy	r17, r16						! \
 	depi	(bits), 21+bits, 1+bits, r17				! \
-	mfctl	tr7, r1							! \
+	sub,=	r16, r17, r0		/* do not store if unchanged */	! \
 	stwas	r17, 0(r25)		/* store back w/ the bits */	! \
 	shd	r17, r0, 13, r25					! \
 	dep	r8, 30, 15, r25		/* mix0r the pid from the sid */! \
@@ -1224,7 +1322,7 @@ $dtlbna_t
 	nop
 #endif /*  defined(HP7000_CPU) || defined(HP7100_CPU) || defined(HP7200_CPU) */
 
-#ifdef HP7100LC_CPU
+#if defined(HP7100LC_CPU) || defined(HP7300LC_CPU)
 
 #define	IITLBAF(r)	.word	0x04000440 | ((r) << 16)
 #define	IITLBPF(r)	.word	0x04000400 | ((r) << 16)
@@ -1250,7 +1348,6 @@ $dtlbna_t
 	combt,=,n r0, r17, TLABEL(all)					! \
 	copy	r17, r16						! \
 	depi	(bits), 21+bits, 1+bits, r17				! \
-	mfctl	tr7, r1							! \
 	sub,=	r16, r17, r0		/* do not store if unchanged */	! \
 	stws	r17, 0(r25)		/* store back w/ the bits */	! \
 	shd	r17, r0, 13, r25					! \
@@ -1411,7 +1508,6 @@ $trap_from_kernel
 	mfctl	iir, t2
 	stw	t2, TF_CR19(t3)
 	stw	r1, TF_FLAGS(t3)
-	mfctl	tr7, r1
 
 	copy	sp, t3
 	ldo	HPPA_FRAME_SIZE+TRAPFRAME_SIZEOF(sp), sp
@@ -1521,8 +1617,9 @@ $trapnowvirt
 	 */
 
 	mfctl	rctr, t1
+	mfctl	ccr, t2
 	stw	t1, TF_CR0(t3)
-	/* XXX save ccr here w/ rctr */
+	stw	t2, TF_CR10(t3)
 
 #ifdef DDB
 	/*
@@ -1632,14 +1729,14 @@ LEAF_ENTRY(desidhash_t)
 EXIT(desidhash_t)
 #endif /* HP7200_CPU */
 
-#ifdef HP7100LC_CPU
+#if defined(HP7100LC_CPU) || defined(HP7300LC_CPU)
 
 /*
  * int
  * ibtlb_l(int i, pa_space_t sp, vaddr_t va, paddr_t pa, vsize_t sz, u_int prot)
  */
 LEAF_ENTRY(ibtlb_l)
-	rsm	(PSW_R|PSW_I), t4
+	rsm	(PSL_R|PSL_I), t4
 	nop ! nop ! nop ! nop ! nop ! nop ! nop
 
 	bv	0(rp)
@@ -1667,7 +1764,7 @@ EXIT(hpti_l)
  */
 LEAF_ENTRY(pbtlb_l)
 	; DR_PAGE0
-	rsm	(PSW_R|PSW_I), t4
+	rsm	(PSL_R|PSL_I), t4
 	nop ! nop ! nop ! nop
 	ldil	L%0xc041, t1
 	ldo	R%0xc041(t1), t1
@@ -1727,7 +1824,7 @@ ENTRY(TLABEL(hpmc),0)
 	ldo	R%hpmc_dump(rp), rp
 	ldil	L%kpsw, %arg2
 	ldw	R%kpsw(%arg2), %arg2
-	depi	0, PSW_I_POS, 1, %arg2
+	depi	0, PSL_I_POS, 1, %arg2
 	stw	%arg2, R%kpsw(t1)
 	ldil	L%emrg_stack, arg1
 	b	$kernel_setup
@@ -1759,7 +1856,7 @@ ENTRY(hppa_toc,0)
 	ldo	R%boot(rp), rp
 	ldil	L%kpsw, %arg2
 	ldw	R%kpsw(%arg2), %arg2
-	depi	0, PSW_I_POS, 1, %arg2
+	depi	0, PSL_I_POS, 1, %arg2
 	stw	%arg2, R%kpsw(t1)
 	ldi	0, arg0
 	ldil	L%emrg_stack, arg1
@@ -1787,7 +1884,7 @@ ENTRY(hppa_pfr,0)
 	ldo	R%boot(rp), rp
 	ldil	L%kpsw, %arg2
 	ldw	R%kpsw(%arg2), %arg2
-	depi	0, PSW_I_POS, 1, %arg2
+	depi	0, PSL_I_POS, 1, %arg2
 	stw	%arg2, R%kpsw(t1)
 	ldi	RB_HALT|RB_POWERDOWN, arg0
 	ldil	L%emrg_stack, arg1
@@ -1798,37 +1895,126 @@ ALTENTRY(hppa_pfr_end)
 	.word	0
 EXIT(hppa_pfr)
 
-	.align	32
+	.export	TLABEL(intr), entry
+	.import	cpl, data
+	.import	ipending, data
+	.import	imask, data
+	.import	intr_table, data
+ENTRY(TLABEL(intr),0)
+
+	mfctl	eirr, r8
+	mtctl	r8, eirr	/* ack now */
+
+	ldil	L%ipending, r17
+	ldw	R%ipending(r17), r24
+	ldil	L%intr_table, r1
+	ldo	R%intr_table(r1), r1
+$intr_ffs
+	addi	16, r1, r1
+	bb,>=	r8, 31, $intr_ffs
+	shd	r0, r8, 1, r8
+
+	ldb	2-16(r1), r17
+	ldw	4-16(r1), r9
+	subi,<>	1, r17, r0
+	bv,n	r0(r9)
+	nop
+
+	mfctl	sar, r25
+	ldb	1-16(r1), r9
+	mtsar	r9
+	vdepi	1, 1, r24
+	mtsar	r25
+
+	ldb	0-16(r1), r9
+	ldil	L%intrcnt, r25
+	ldo	R%intrcnt(r25), r25
+	sh2add	r9, r25, r25
+	ldw	0(r25), r17
+	addi	1, r17, r17
+	stw	r17, 0(r25)
+
+$intr_cont
+	comb,<>	r0, r8, $intr_ffs
+	nop
+
+	ldil	L%ipending, r17
+	stw	r24, R%ipending(r17)
+	ldil	L%cpl, r17
+	ldw	R%cpl(r17), r17
+	ldil	L%imask, r9
+	ldo	R%imask(r9), r9
+	ldwx,s	r17(r9), r16
+	ldi	T_INTERRUPT, r1
+	andcm,=	r24, r16, r0
+	b	TLABEL(all)
+	nop
+
+	rfir
+	nop
+EXIT(TLABEL(intr))
+
+	.export	gsc_intr, entry
+LEAF_ENTRY(gsc_intr)
+
+	ldw	8-16(r1), r9	/* arg: ioreg */
+	mtctl	r1, tr7
+	ldw	0(r9), r16	/* irr */
+
+	ldw	12-16(r1), r1	/* next: sub-intr_table */
+$gsc_ffs
+	addi	16, r1, r1
+	bb,>=	r16, 31, $gsc_ffs
+	shd	r0, r16, 1, r16
+
+	mfctl	sar, r25
+	ldb	1-16(r1), r17
+	mtsar	r17
+	vdepi	1, 1, r24
+	mtsar	r25
+
+	ldb	0-16(r1), r17
+	ldil	L%intrcnt, r25
+	ldo	R%intrcnt(r25), r25
+	sh2add	r17, r25, r25
+	ldw	0(r25), r17
+	addi	1, r17, r17
+	stw	r17, 0(r25)
+
+	comb,<>	r0, r16, $gsc_ffs
+	nop
+
+	b	$intr_cont
+	mfctl	tr7, r1
+EXIT(gsc_intr)
+
 	.export	TLABEL(ibrk), entry
 ENTRY(TLABEL(ibrk),0)
-	mtctl	t1, tr2
-	mtctl	t2, tr3
-
 	/* If called by a user process then always pass it to trap() */
-	mfctl	pcoq, t1
-	extru,=	t1, 31, 2, r0
+	mfctl	pcoq, r8
+	extru,=	r8, 31, 2, r0
 	b,n	$ibrk_bad
 
 	/* don't accept breaks from data segments */
 	.import etext
-	ldil	L%etext, t2
-	ldo	R%etext(t2), t2
-	comb,>>=,n t1, t2, $ibrk_bad
+	ldil	L%etext, r9
+	ldo	R%etext(r9), r9
+	comb,>>=,n r8, r9, $ibrk_bad
 
-	mfctl	iir, t1
-	extru	t1, 31, 5, t2
-	comib,<>,n HPPA_BREAK_KERNEL, t2, $ibrk_bad
+	mfctl	iir, r8
+	extru	r8, 31, 5, r9
+	comib,<>,n HPPA_BREAK_KERNEL, r9, $ibrk_bad
 
 	/* now process all those `break' calls we make */
-	extru	t1, 18, 13, t2
-	comib,=,n HPPA_BREAK_GET_PSW, t2, $ibrk_getpsw
-	comib,=,n HPPA_BREAK_SET_PSW, t2, $ibrk_setpsw
+	extru	r8, 18, 13, r9
+	comib,=,n HPPA_BREAK_GET_PSW, r9, $ibrk_getpsw
+	comib,=,n HPPA_BREAK_SET_PSW, r9, $ibrk_setpsw
+	comib,=,n HPPA_BREAK_SPLLOWER, r9, $ibrk_spllower
 
 $ibrk_bad
 	/* illegal (unimplemented) break entry point */
-	mfctl	tr3, t2
 	b	TLABEL(all)
-	mfctl	tr2, t1
+	nop
 
 $ibrk_getpsw
 	b	$ibrk_exit
@@ -1839,10 +2025,28 @@ $ibrk_setpsw
 	b	$ibrk_exit
 	mtctl	arg0, ipsw
 
-$ibrk_setpsw_tovirt
+$ibrk_spllower
+	/* skip the break */
+	mtctl	r0, pcoq
+	mfctl	pcoq, r9
+	mtctl	r9, pcoq
+	ldo	4(r9), r9
+	mtctl	r9, pcoq
 
-	b	$ibrk_exit
-	ldw	HPPA_FRAME_PSP(sp), sp
+	ldil	L%ipending, r8
+	ldw	R%ipending(r8), r8
+	ldil	L%imask, r9
+	ldo	R%imask(r9), r9
+	ldil	L%cpl, r17
+	ldw	R%cpl(r17), ret0
+	ldwx,s	arg0(r9), r16
+	stw	arg0, R%cpl(r17)
+	ldi	T_INTERRUPT, r1
+	andcm,=	r8, r16, r0
+	b	TLABEL(all)
+	nop
+	rfir
+	nop
 
 	/* insert other fast breaks here */
 	nop ! nop
@@ -1850,14 +2054,12 @@ $ibrk_setpsw_tovirt
 $ibrk_exit
 	/* skip the break */
 	mtctl	r0, pcoq
-	mfctl	pcoq, t1
-	mtctl	t1, pcoq
-	ldo	4(t1), t1
-	mtctl	t1, pcoq
-	mfctl	tr3, t2
-	mfctl	tr2, t1
-	mfctl	tr7, r1
-	rfi
+	mfctl	pcoq, r9
+	mtctl	r9, pcoq
+	ldo	4(r9), r9
+	mtctl	r9, pcoq
+
+	rfir
 	nop
 EXIT(TLABEL(ibrk))
 
@@ -1895,7 +2097,7 @@ LEAF_ENTRY(fpu_save)
 	fstds,ma %fr30, 8(arg0)
 	fstds    %fr31, 0(arg0)
 	fdc	r0(arg0)
-	ldo	-60(arg0), arg0
+	ldo	-56(arg0), arg0
 	fdc	r0(arg0)
 	ldo	-32(arg0), arg0
 	fdc	r0(arg0)
@@ -1915,87 +2117,131 @@ EXIT(fpu_save)
 
 #ifdef FPEMUL
 	/*
-	 * Emulate FPU/SFU if none/disabled
+	 * Emulate FPU
 	 *
 	 * iisq:iioq - exception triggered instruction
 	 */
-ENTRY($fpu_emulate,0)
-	mtctl	sp, tr3
-	mtctl	r31, tr2
+ENTRY($fpu_emulate,320)
+	copy	r31, r9
 
 	ldil	L%fpemu_stack, r31
 	ldw	R%fpemu_stack(r31), r31
-	ldo	R%TRAPFRAME_SIZEOF+HPPA_FRAME_SIZE(r31), sp
 
+	/* stw	r1 , TF_R1 (r31) shadowed */
 	stw	r2 , TF_R2 (r31)
-	stw	r3 , TF_R2 (r31)
+	stw	r3 , TF_R3 (r31)
+#ifdef DDB
+	stw	r4 , TF_R4 (r31)
+	stw	r5 , TF_R5 (r31)
+	stw	r6 , TF_R6 (r31)
+	stw	r7 , TF_R7 (r31)
+	/* stw	r8 , TF_R8 (r31) shadowed */
+	/* stw	r9 , TF_R9 (r31) shadowed */
+	stw	r10, TF_R10(r31)
+	stw	r11, TF_R11(r31)
+	stw	r12, TF_R12(r31)
+	stw	r13, TF_R13(r31)
+	stw	r14, TF_R14(r31)
+	stw	r15, TF_R15(r31)
+	/* stw	r16, TF_R16(r31) shadowed */
+	/* stw	r17, TF_R17(r31) shadowed */
+	stw	r18, TF_R18(r31)
+#endif
 	stw	r19, TF_R19(r31)
 	stw	r20, TF_R20(r31)
 	stw	r21, TF_R21(r31)
 	stw	r22, TF_R22(r31)
 	stw	r23, TF_R23(r31)
-	stw	r24, TF_R24(r31)
-	stw	r25, TF_R25(r31)
+	/* stw	r24, TF_R24(r31) shadowed */
+	/* stw	r25, TF_R25(r31) shadowed */
 	stw	r26, TF_R26(r31)
 	stw	r27, TF_R27(r31)
 	stw	r28, TF_R28(r31)
 	stw	r29, TF_R29(r31)
+	stw	sp, TF_R30(r31)
+	stw	r9, TF_R31(r31)
+	copy	r1, arg0
 	mfctl	sar, r1
-	mfctl	iir, arg0
 	stw	r1, TF_CR11(r31)
 	stw	arg0, TF_CR19(r31)
 
-	extru,<> arg0, 10, 1, r0
-	extru,= arg0, 11, 1, r0
-	or,tr	r0, r0, r0
-	.call
-	bl,n	$sfu_emu, rp
+	ldo	TRAPFRAME_SIZEOF(r31), r3
+	ldo	TRAPFRAME_SIZEOF+HPPA_FRAME_SIZE(r31), sp
+
+	ldil	L%$global$, dp
+	ldo	R%$global$(dp), dp
 
 	.import	fpu_emulate, code
 	ldil	L%fpu_emulate,t1
 	ldo	R%fpu_emulate(t1),t1
-	mfctl	iir, arg0
-	/* arg3 -- regs */
+	mfctl	cr30, arg2
 	.call
 	blr	r0,rp
 	bv,n	0(t1)
 	nop
 
+	mfctl	cr30, arg0
+	fdc	r0(arg0)
+	ldo	32(arg0), arg0
+	fdc	r0(arg0)
+	ldo	32(arg0), arg0
+	fdc	r0(arg0)
+	ldo	32(arg0), arg0
+	fdc	r0(arg0)
+	ldo	32(arg0), arg0
+	fdc	r0(arg0)
+	ldo	32(arg0), arg0
+	fdc	r0(arg0)
+	ldo	32(arg0), arg0
+	fdc	r0(arg0)
+	ldo	32(arg0), arg0
+	fdc	r0(arg0)
+
 	ldil	L%fpemu_stack, r31
 	ldw	R%fpemu_stack(r31), r31
 
 	ldw	TF_CR11(r31), r1
-	mtsar	r1
-	ldw	TF_R29(r31), r29
-	ldw	TF_R28(r31), r27
-	mtctl	r27, tr5
-	ldw	TF_R27(r31), r27
-	ldw	TF_R26(r31), r26
-	ldw	TF_R25(r31), r25
-	ldw	TF_R24(r31), r24
-	ldw	TF_R23(r31), r23
-	ldw	TF_R22(r31), r22
-	ldw	TF_R21(r31), r21
-	ldw	TF_R20(r31), r20
-	ldw	TF_R19(r31), r19
-	ldw	TF_R3 (r31), r3
 	ldw	TF_R2 (r31), r2
-	mfctl	tr3, sp
-	mfctl	tr2, r31
+	ldw	TF_R3 (r31), r3
+	mtsar	r1
+	copy	ret0, r1
+#ifdef DDB
+	ldw	TF_R4 (r31), r4
+	ldw	TF_R5 (r31), r5
+	ldw	TF_R6 (r31), r6
+	ldw	TF_R7 (r31), r7
+	/* ldw	TF_R8 (r31), r8 shadowed */
+	/* ldw	TF_R9 (r31), r9 shadowed */
+	ldw	TF_R10(r31), r10
+	ldw	TF_R11(r31), r11
+	ldw	TF_R12(r31), r12
+	ldw	TF_R13(r31), r13
+	ldw	TF_R14(r31), r14
+	ldw	TF_R15(r31), r15
+	/* ldw	TF_R16(r31), r16 shadowed */
+	/* ldw	TF_R17(r31), r17 shadowed */
+	ldw	TF_R18(r31), r18
+#endif
+	ldw	TF_R19(r31), r19
+	ldw	TF_R20(r31), r20
+	ldw	TF_R21(r31), r21
+	ldw	TF_R22(r31), r22
+	ldw	TF_R23(r31), r23
+	/* ldw	TF_R24(r31), r24 shadowed */
+	/* ldw	TF_R25(r31), r25 shadowed */
+	ldw	TF_R26(r31), r26
+	ldw	TF_R27(r31), r27
+	ldw	TF_R28(r31), r28
+	ldw	TF_R29(r31), r29
+	ldw	TF_R30(r31), r30
+	ldw	TF_R31(r31), r31
 
-	comb,<>	r0, ret0, TLABEL(all)
-	mfctl	tr5, ret0
+	comb,<>	r0, r1, TLABEL(all)
+	ldi	T_EXCEPTION, r1
 
-	mfctl	tr7, r1
-	rfi
+	rfir
 	nop
 EXIT($fpu_emulate)
-
-	.export	$sfu_emu, entry
-ENTRY($sfu_emu,0)
-	bv	r0(rp)
-	ldo	1(r0), ret0	/* none supported by now */
-EXIT($sfu_emu)
 
 #endif /* FPEMUL */
 
@@ -2201,56 +2447,7 @@ LEAF_ENTRY(longjmp)
 EXIT(longjmp)
 
 
-	.align	NBPG	/* let's fit 'em on a single page */
-
-#define	FUSUX(name)				  \
-LEAF_ENTRY(name)				! \
-	ldil	L%VM_MAXUSER_ADDRESS, t1	! \
-	comb,>>= arg0, t1, fusubadaddr		! \
-	ldil	L%curproc, t1			! \
-	ldw	R%curproc(t1), t1		! \
-	ldw	P_ADDR(t1), t1			! \
-	ldil	L%fusufault, t2			! \
-	ldo	R%fusufault(t2), t2		! \
-	ldw	U_PCB+PCB_ONFAULT(t1), r1	! \
-	stw	t2, U_PCB+PCB_ONFAULT(t1)	! \
-	ldw	U_PCB+PCB_SPACE(t1), t2		! \
-	mtsp	t2, sr1
-
-#define	FUX(name,insn)				  \
-	FUSUX(name)				! \
-	insn	0(sr1, arg0), ret0		! \
-	mtsp	r0, sr1				! \
-	bv	r0(rp)				! \
-	stw	r1, U_PCB+PCB_ONFAULT(t1)	! \
-EXIT(name)
-
-#define	SUX(name,insn)				  \
-	FUSUX(name)				! \
-	insn	arg1, 0(sr1, arg0)		! \
-	mtsp	r0, sr1				! \
-	bv	r0(rp)				! \
-	stw	r1, U_PCB+PCB_ONFAULT(t1)	! \
-EXIT(name)
-
-LEAF_ENTRY(fusufault)
-	mtsp	r0, sr1
-	stw	r1, U_PCB+PCB_ONFAULT(t1)
-ALTENTRY(fusubadaddr)
-	bv	0(rp)
-	ldi	-1, ret0
-EXIT(fusuexit)
-
-FUX(fubyte,   ldb)
-FUX(fusword,  ldh)
-FUX(fuword,   ldw)
-FUX(fuswintr, ldh)
-SUX(subyte,   stb)
-SUX(susword,  sth)
-SUX(suword,   stw)
-SUX(suswintr, sth)
-
-	.align	64
+	.align	32
 
 LEAF_ENTRY(copy_on_fault)
 	mtsp	r0, sr1
@@ -2305,41 +2502,6 @@ $spstrcpy_exit
 	bv	0(rp)
 	copy	r0, ret0
 EXIT(spstrcpy)
-
-/*
- * adjust the time value
- * XXX: do it the easy way, later we will calculate actual fuzz from itmr
- */
-LEAF_ENTRY(microtime)
-
-	/* t4 = splhigh() */
-	mfctl	eiem, t4
-	mtctl	r0, eiem
-
-	.import time, data
-	ldil	L%time, t3
-	ldo	R%time(t3), t3
-	ldw	0(t3), t1
-	ldw	4(t3), t2
-
-	/* splx(t4) */
-	mtctl	t4, eiem
-
-	ldil	L%-1000000, t3
-	ldo	R%-1000000(t3), t3
-
-	addi	1, t2, t2
-	addb,<,n t2, t3, microtime_no
-
-	addi	1, t1, t1
-	copy	t3, t2
-
-microtime_no
-	stwm	t1, 4(arg0)
-	bv	(rp)
-	stw	t2, 0(arg0)
-
-EXIT(microtime)
 
 	.import	whichqs, data
 	.import	qs, data
@@ -2438,6 +2600,10 @@ EXIT(remrunqueue)
  */
 	.align	32
 ENTRY(cpu_switch,128)
+	ldil	L%cpl, t1
+	ldw	R%cpl(t1), ret0
+	stw	ret0, HPPA_FRAME_SL(sp)
+	stw	rp, HPPA_FRAME_CRP(sp)
 
 	/*
 	 * Clear curproc so that we don't accumulate system time while idle.
@@ -2448,31 +2614,26 @@ ENTRY(cpu_switch,128)
 	/* remain on the old (curproc)'s stack until we have a better choice */
 
 	/*
-	 * arg3: spl
-	 * t1:	&whichqs
-	 * t2:	old curproc
+	 * t1:   &whichqs
+	 * arg2: old curproc
 	 *
 	 */
 
 switch_search
-	/* arg3 = splhigh() */
-	mfctl	eiem, arg3
 	ldil	L%whichqs, t1
-	ldi	-1, t2
-idle_loop
-	mtctl	r0, eiem
 	ldw	R%whichqs(t1), t3
-
 	comb,<>	r0, t3, gotprocs
 	nop
 
-	mtctl	t2, eiem
+	copy	r0, arg0
+	break	HPPA_BREAK_KERNEL, HPPA_BREAK_SPLLOWER
 
 	/* XXX do idle work here */
 	nop ! nop ! nop ! nop ! nop ! nop ! nop ! nop
 
-	b	idle_loop
-	nop
+	ldil	L%cpl, arg0
+	b	switch_search
+	stw	ret0, R%cpl(arg0)
 
 gotprocs
 	ldi	0, t4
@@ -2555,7 +2716,6 @@ kstack_ok
 	 * arg2: old proc
 	 */
 	ldw	P_MD_REGS(arg2), t1
-	stw	rp, HPPA_FRAME_CRP(sp)
 	ldw	TF_R30(t1), t3
 	copy	sp, t2
 	stw,ma	r3, HPPA_FRAME_SIZE+20*4(sp)
@@ -2598,6 +2758,7 @@ switch_exited
 	ldw	HPPA_FRAME_ARG(0)(sp), t3
 	ldw	HPPA_FRAME_ARG(1)(sp), t4 /* in case we're on trampoline */
 	ldw	HPPA_FRAME_ARG(2)(sp), arg0
+	ldw	HPPA_FRAME_SL(t2), ret0
 	ldw	HPPA_FRAME_CRP(t2), rp
 	ldw	 0*4(t2), r3
 	ldw	 1*4(t2), r4
@@ -2617,9 +2778,10 @@ switch_exited
 	ldw	15*4(t2), r18
 	stw	t3, TF_R30(t1)
 	copy	t2, sp
+	ldil	L%cpl, t1
+	stw	ret0, R%cpl(t1)
 
 switch_return
-	mtctl	arg3, eiem
 	ldil	L%curproc, t1
 	bv	0(rp)
 	stw	arg1, R%curproc(t1)

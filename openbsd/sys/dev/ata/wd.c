@@ -1,8 +1,8 @@
-/*	$OpenBSD: wd.c,v 1.25 2002/05/24 09:34:25 art Exp $ */
+/*	$OpenBSD: wd.c,v 1.27 2003/02/21 20:10:33 grange Exp $ */
 /*	$NetBSD: wd.c,v 1.193 1999/02/28 17:15:27 explorer Exp $ */
 
 /*
- * Copyright (c) 1998 Manuel Bouyer.  All rights reserved.
+ * Copyright (c) 1998, 2001 Manuel Bouyer.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -122,9 +122,10 @@
 #define DEBUG_PROBE  0x10
 #ifdef WDCDEBUG
 extern int wdcdebug_wd_mask; /* init'ed in ata_wdc.c */
-#define WDCDEBUG_PRINT(args, level) \
-	if (wdcdebug_wd_mask & (level)) \
-		printf args
+#define WDCDEBUG_PRINT(args, level) do {	\
+	if ((wdcdebug_wd_mask & (level)) != 0)	\
+		printf args;			\
+} while (0)
 #else
 #define WDCDEBUG_PRINT(args, level)
 #endif

@@ -1,7 +1,7 @@
-/*	$OpenBSD: stivar.h,v 1.5 2002/03/14 01:26:55 millert Exp $	*/
+/*	$OpenBSD: stivar.h,v 1.9 2003/02/18 09:39:45 miod Exp $	*/
 
 /*
- * Copyright (c) 2000 Michael Shalayeff
+ * Copyright (c) 2000-2003 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,17 +45,21 @@ struct sti_softc {
 #define	STI_CLEARSCR	0x0002
 #define	STI_CONSOLE	0x0004
 	int	sc_devtype;
+	int	sc_nscreens;
 	
 	bus_space_tag_t iot, memt;
 	bus_space_handle_t ioh, romh, fbh;
 
 	struct sti_dd sc_dd;		/* in word format */
-	struct sti_font *sc_fonts;	/* in word format */
+	struct sti_font sc_curfont;
 	struct sti_cfg sc_cfg;
 	struct sti_ecfg sc_ecfg;
-	struct sti_fontcfg sc_fontcfg;
 
-	vaddr_t sc_code;
+	void	*sc_romfont;		/* ROM font copy, either in memory... */
+	u_int	sc_fontmaxcol;		/* ...or in off-screen frame buffer */
+	u_int	sc_fontbase;
+
+	vaddr_t	sc_code;
 
 	sti_init_t	init;
 	sti_mgmt_t	mgmt;

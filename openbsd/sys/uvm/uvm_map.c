@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_map.c,v 1.52 2002/09/17 13:01:20 mpech Exp $	*/
+/*	$OpenBSD: uvm_map.c,v 1.56 2002/12/09 02:35:21 art Exp $	*/
 /*	$NetBSD: uvm_map.c,v 1.86 2000/11/27 08:40:03 chs Exp $	*/
 
 /* 
@@ -189,7 +189,7 @@ static void		uvm_map_unreference_amap(vm_map_entry_t, int);
 
 int			uvm_map_spacefits(vm_map_t, vaddr_t *, vsize_t, vm_map_entry_t, voff_t, vsize_t);
 
-int _uvm_tree_sanity(vm_map_t map, char *name);
+int _uvm_tree_sanity(vm_map_t map, const char *name);
 static vsize_t		uvm_rb_subtree_space(vm_map_entry_t);
 
 static __inline int
@@ -290,10 +290,14 @@ uvm_rb_remove(vm_map_t map, vm_map_entry_t entry)
 		uvm_rb_fixup(map, parent);
 }
 
+#ifdef DEBUG
+#define uvm_tree_sanity(x,y) _uvm_tree_sanity(x,y)
+#else
 #define uvm_tree_sanity(x,y)
+#endif
 
 int
-_uvm_tree_sanity(vm_map_t map, char *name)
+_uvm_tree_sanity(vm_map_t map, const char *name)
 {
 	vm_map_entry_t tmp, trtmp;
 	int n = 0, i = 1;
@@ -417,8 +421,10 @@ uvm_mapent_free(me)
 		simple_unlock(&uvm.kentry_lock);
 		splx(s);
 	} else if (me->flags & UVM_MAP_KMEM) {
+		splassert(IPL_NONE);
 		pool_put(&uvm_map_entry_kmem_pool, me);
 	} else {
+		splassert(IPL_NONE);
 		pool_put(&uvm_map_entry_pool, me);
 	}
 }
@@ -597,7 +603,7 @@ void uvm_map_clip_start(map, entry, start)
 
 /*
  * uvm_map_clip_end: ensure that the entry ends at or before
- *	the ending address, if it does't we split the reference
+ *	the ending address, if it doesn't we split the reference
  * 
  * => caller should use UVM_MAP_CLIP_END macro rather than calling
  *    this directly
@@ -1310,7 +1316,7 @@ uvm_map_findspace(map, hint, length, result, uobj, uoffset, align, flags)
  *    in "entry_list"
  */
 
-int
+void
 uvm_unmap_remove(map, start, end, entry_list)
 	vm_map_t map;
 	vaddr_t start,end;
@@ -1437,7 +1443,7 @@ uvm_unmap_remove(map, start, end, entry_list)
 				    entry->end - vm_map_min(kernel_map));
 			} else {
 				pmap_remove(pmap_kernel(), entry->start,
-				    entry->start + len);
+				    entry->end);
 				uvm_km_pgremove(entry->object.uvm_obj,
 				    entry->start - vm_map_min(kernel_map),
 				    entry->end - vm_map_min(kernel_map));
@@ -1482,7 +1488,6 @@ uvm_unmap_remove(map, start, end, entry_list)
 
 	*entry_list = first_entry;
 	UVMHIST_LOG(maphist,"<- done!", 0, 0, 0, 0);
-	return(KERN_SUCCESS);
 }
 
 /*
@@ -3267,7 +3272,7 @@ uvmspace_free(vm)
 #endif
 		vm_map_lock(&vm->vm_map);
 		if (vm->vm_map.nentries) {
-			(void)uvm_unmap_remove(&vm->vm_map,
+			uvm_unmap_remove(&vm->vm_map,
 			    vm->vm_map.min_offset, vm->vm_map.max_offset,
 			    &dead_entries);
 			if (dead_entries != NULL)

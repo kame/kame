@@ -1,4 +1,4 @@
-/*	$OpenBSD: pdc.h,v 1.20 2002/05/20 03:27:42 mickey Exp $	*/
+/*	$OpenBSD: pdc.h,v 1.22 2002/12/15 21:07:26 mickey Exp $	*/
 
 /*
  * Copyright (c) 1990 mt Xinu, Inc.  All rights reserved.
@@ -68,7 +68,7 @@
  *			|                    |
  *              	|    Console IODC    |
  *			|                    |
- *	MEM_FREE+16k	+--------------------+
+ *	MEM_FREE+64k	+--------------------+
  *			|                    |
  *              	|  Boot Device IODC  |
  *			|                    |
@@ -87,7 +87,7 @@
  * "../stand/Makefile") to make way for the Kernel.
  */
 
-#define	IODC_MAXSIZE	(16 * 1024)	/* maximum size of IODC */
+#define	IODC_MAXSIZE	(16 * 4 * 1024)	/* maximum size of IODC */
 #define	IODC_MINIOSIZ	64		/* minimum buffer size for IODC call */
 #define	IODC_MAXIOSIZ	(64 * 1024)	/* maximum buffer size for IODC call */
 
@@ -226,7 +226,12 @@
 #define	PDC_PSW_DEFAULTS	1	/* get default bits values */
 #define	PDC_PSW_SETDEFAULTS	2	/* set default bits values */
 
-#define	PDC_SOFT_POWER		23	/* support for soft power switch */
+#define	PDC_SYSMAP	22	/* map system modules */
+#define	PDC_SYSMAP_FIND		0	/* find module by index */
+#define	PDC_SYSMAP_ADDR		1
+#define	PDC_SYSMAP_HPA		2	/* same as PDC_MEMMAP_HPA */
+
+#define	PDC_SOFT_POWER	23	/* support for soft power switch */
 #define	PDC_SOFT_POWER_INFO	0	/* get info about soft power switch */
 #define	PDC_SOFT_POWER_ENABLE	1	/* enable/disable soft power switch */
 
@@ -450,6 +455,19 @@ struct pdc_hwtlb {	/* PDC_TLB */
 	u_int	filler[30];
 };
 
+struct pdc_sysmap_find {	/* PDC_SYSMAP_FIND */
+	u_int	hpa;
+	u_int	size;		/* pages */
+	u_int	naddrs;
+	u_int	filler[29];
+};
+
+struct pdc_sysmap_addrs {	/* PDC_SYSMAP_ADDR */
+	u_int	hpa;
+	u_int	size;		/* pages */
+	u_int	filler[30];
+};
+
 struct pdc_pat_io_num {	/* PDC_PAT_IO */
 	u_int	num;
 	u_int	filler[31];
@@ -594,6 +612,7 @@ struct pz_device {
 #define	PCL_DUPLEX	7	/* full-duplex point-to-point (RS-232, Net) */
 #define	PCL_KEYBD	8	/* half-duplex input (HIL Keyboard) */
 #define	PCL_DISPL	9	/* half-duplex ouptput (display) */
+#define	PCL_FC		10	/* fibre channel access media */
 #define	PCL_CLASS_MASK	0xf	/* XXX class mask */
 #define	PCL_NET_MASK	0x1000	/* mask for bootp/tftp device */
 

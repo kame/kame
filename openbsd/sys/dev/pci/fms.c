@@ -1,4 +1,4 @@
-/*	$OpenBSD: fms.c,v 1.12 2002/05/29 14:30:21 mickey Exp $ */
+/*	$OpenBSD: fms.c,v 1.14 2002/11/19 18:40:17 jason Exp $ */
 /*	$NetBSD: fms.c,v 1.5.4.1 2000/06/30 16:27:50 simonb Exp $	*/
 
 /*-
@@ -166,12 +166,10 @@ fms_match(parent, match, aux)
 {
 	struct pci_attach_args *pa = (struct pci_attach_args *) aux;
 
-	if (PCI_VENDOR(pa->pa_id) != PCI_VENDOR_FORTEMEDIA)
-		return 0;
-	if (PCI_PRODUCT(pa->pa_id) != PCI_PRODUCT_FORTEMEDIA_FM801)
-		return 0;
-	
-	return 1;
+	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_FORTEMEDIA &&
+	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_FORTEMEDIA_FM801)
+		return (1);
+	return (0);
 }
 
 void
@@ -860,7 +858,7 @@ fms_trigger_output(addr, start, end, blksize, intr, arg, param)
 	
 	if (!p)
 		panic("fms_trigger_output: request with bad start "
-		      "address (%p)\n", start);
+		      "address (%p)", start);
 
 	sc->sc_play_start = p->map->dm_segs[0].ds_addr;
 	sc->sc_play_end = sc->sc_play_start + ((char *)end - (char *)start);
@@ -898,7 +896,7 @@ fms_trigger_input(addr, start, end, blksize, intr, arg, param)
 	
 	if (!p)
 		panic("fms_trigger_input: request with bad start "
-		      "address (%p)\n", start);
+		      "address (%p)", start);
 
 	sc->sc_rec_start = p->map->dm_segs[0].ds_addr;
 	sc->sc_rec_end = sc->sc_rec_start + ((char *)end - (char *)start);

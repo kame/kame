@@ -1,4 +1,4 @@
-/*	$OpenBSD: iommureg.h,v 1.4 2002/07/24 19:03:19 jason Exp $	*/
+/*	$OpenBSD: iommureg.h,v 1.6 2003/03/06 08:26:08 henric Exp $	*/
 /*	$NetBSD: iommureg.h,v 1.6 2001/07/20 00:07:13 eeh Exp $	*/
 
 /*
@@ -67,6 +67,9 @@ struct iommu_strbuf {
 	volatile u_int64_t	strbuf_flushsync;/* streaming buffer flush sync */
 };
 
+#define IOMMUREG(x)     (offsetof(struct iommureg, x))
+#define STRBUFREG(x)    (offsetof(struct iommu_strbuf, x))
+
 /* streaming buffer control register */
 #define STRBUF_EN		0x000000000000000001LL
 #define STRBUF_D		0x000000000000000002LL
@@ -94,9 +97,11 @@ struct iommu_strbuf {
 #define IOTTE_8K	0x0000000000000000LL
 #define IOTTE_STREAM	0x1000000000000000LL	/* Is page streamable? */
 #define	IOTTE_LOCAL	0x0800000000000000LL	/* Accesses to same bus segment? */
-#define IOTTE_PAMASK	0x000001ffffffe000LL	/* Let's assume this is correct */
+#define IOTTE_PAMASK	0x000007ffffffe000LL	/* Let's assume this is correct (bits 42..12) */
 #define IOTTE_C		0x0000000000000010LL	/* Accesses to cacheable space */
 #define IOTTE_W		0x0000000000000002LL	/* Writeable */
+#define IOTTE_SOFTWARE	0x0000000000001f80LL	/* For software use (bits 12..7) */
+
 
 /*
  * On sun4u each bus controller has a separate IOMMU.  The IOMMU has 
@@ -154,6 +159,8 @@ struct iommu_strbuf {
 #define INTSLOT(x)	(((x)>>3)&0x7)
 #define	INTPRI(x)	((x)&0x7)
 #define	INTINO(x)	((x)&INTMAP_INO)
+#define INTTID_SHIFT	26
+#define INTTID(x)	(((x) & INTMAP_TID) >> INTTID_SHIFT)
 
 #define	INTPCI_MAXOBINO	0x16		/* maximum OBIO INO value for PCI */
 #define	INTPCIOBINOX(x)	((x)&0x1f)	/* OBIO ino index (for PCI machines) */

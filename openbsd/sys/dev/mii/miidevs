@@ -1,4 +1,4 @@
-$OpenBSD: miidevs,v 1.30 2002/04/08 20:54:09 nate Exp $
+$OpenBSD: miidevs,v 1.33 2003/02/19 10:12:55 miod Exp $
 /* $NetBSD: miidevs,v 1.3 1998/11/05 03:43:43 thorpej Exp $ */
 
 /*-
@@ -106,9 +106,11 @@ model xxBROADCOM BCM5401	0x0005 BCM5401 10/100/1000baseTX PHY
 model xxBROADCOM BCM5411	0x0007 BCM5411 10/100/1000baseTX PHY
 model xxBROADCOM BCM5421S	0x000e BCM5421S 10/100/1000baseTX PHY
 model xxBROADCOM BCM5701	0x0011 BCM5701 10/100/1000baseTX PHY
+model xxBROADCOM BCM5703	0x0016 BCM5703 10/100/1000baseTX PHY
 model BROADCOM BCM5400		0x0004 BCM5400 1000baseTX PHY
 model BROADCOM BCM5401		0x0005 BCM5401 1000baseTX PHY
 model BROADCOM BCM5411		0x0007 BCM5411 1000baseTX PHY
+model BROADCOM 3C905B		0x0012 Broadcom 3C905B internal PHY
 model BROADCOM 3C905C		0x0017 Broadcom 3C905C internal PHY
 model BROADCOM BCM5221		0x001e BCM5221 100baseTX PHY
 model BROADCOM BCM5201		0x0021 BCM5201 10/100 media interface
@@ -133,7 +135,8 @@ model xxDEC xxDC		0x0001 DC
 
 /* Integrated Circuit Systems PHYs */
 model xxICS 1890		0x0002 ICS1890 10/100 media interface
-model xxICS 1892               0x0003 ICS1892 10/100 media interface
+model xxICS 1892		0x0003 ICS1892 10/100 media interface
+model xxICS 1893		0x0004 ICS1893 10/100 media interface
 
 /* Intel PHYs */
 model xxINTEL I82553		0x0000 i82553 10/100 media interface

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcx.c,v 1.12 2002/10/01 20:55:14 miod Exp $	*/
+/*	$OpenBSD: tcx.c,v 1.15 2002/12/10 20:32:57 miod Exp $	*/
 /*	$NetBSD: tcx.c,v 1.8 1997/07/29 09:58:14 fair Exp $ */
 
 /*
@@ -218,7 +218,7 @@ tcxattach(parent, self, args)
 	sc->sc_sunfb.sf_flags = self->dv_cfdata->cf_flags & FB_USERMASK;
 
 	if (ca->ca_ra.ra_nreg < TCX_NREG)
-		panic("\ntcx: expected %d registers, got %d", TCX_NREG,
+		panic("tcx: expected %d registers, got %d", TCX_NREG,
 		    ca->ca_ra.ra_nreg);
 
 	/* Copy register address spaces */
@@ -276,6 +276,7 @@ tcxattach(parent, self, args)
 
 	sc->sc_sunfb.sf_ro.ri_hw = sc;
 	fbwscons_init(&sc->sc_sunfb, isconsole);
+	fbwscons_setcolormap(&sc->sc_sunfb, tcx_setcolor);
 
 	tcx_stdscreen.capabilities = sc->sc_sunfb.sf_ro.ri_caps;
 	tcx_stdscreen.nrows = sc->sc_sunfb.sf_ro.ri_rows;
@@ -291,14 +292,14 @@ tcxattach(parent, self, args)
 
 	if (isconsole) {
 		fbwscons_console_init(&sc->sc_sunfb, &tcx_stdscreen, -1,
-		    tcx_setcolor, tcx_burner);
+		    tcx_burner);
+		shutdownhook_establish(tcx_prom, sc);
 	}
 
 	sbus_establish(&sc->sc_sd, &sc->sc_sunfb.sf_dev);
 
-	printf("%s: %dx%d, depth %d, id %d, rev %d, sense %d\n",
+	printf("%s: %dx%d, id %d, rev %d, sense %d\n",
 	    self->dv_xname, sc->sc_sunfb.sf_width, sc->sc_sunfb.sf_height,
-	    sc->sc_sunfb.sf_depth,
 	    (sc->sc_thc->thc_config & THC_CFG_FBID) >> THC_CFG_FBID_SHIFT,
 	    (sc->sc_thc->thc_config & THC_CFG_REV) >> THC_CFG_REV_SHIFT,
 	    (sc->sc_thc->thc_config & THC_CFG_SENSE) >> THC_CFG_SENSE_SHIFT

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ie.c,v 1.19 2002/04/27 23:21:05 miod Exp $ */
+/*	$OpenBSD: if_ie.c,v 1.21 2003/01/28 01:37:52 jason Exp $ */
 
 /*-
  * Copyright (c) 1999 Steve Murphree, Jr. 
@@ -1319,7 +1319,13 @@ iestart(ifp)
 		  printf("%s: tbuf overflow\n", sc->sc_dev.dv_xname);
 
 		m_freem(m0);
-		len = max(len, ETHER_MIN_LEN);
+
+		if (len < ETHER_MIN_LEN - ETHER_CRC_LEN) {
+			bzero(buffer, ETHER_MIN_LEN - ETHER_CRC_LEN - len);
+			len = ETHER_MIN_LEN - ETHER_CRC_LEN;
+			buffer += ETHER_MIN_LEN - ETHER_CRC_LEN;
+		}
+
 		sc->xmit_buffs[sc->xchead]->ie_xmit_flags = len;
 
 		sc->xmit_free--;
@@ -1398,7 +1404,7 @@ iereset(sc)
 
 #ifdef notdef
 	if (!check_ie_present(sc, sc->sc_maddr, sc->sc_msize))
-		panic("ie disappeared!\n");
+		panic("ie disappeared!");
 #endif
 
 	sc->sc_arpcom.ac_if.if_flags |= IFF_UP;
@@ -1584,7 +1590,7 @@ setup_bufs(sc)
 
 	sc->nframes = n / r;
 	if (sc->nframes <= 0)
-		panic("ie: bogus buffer calc\n");
+		panic("ie: bogus buffer calc");
 	if (sc->nframes > MXFRAMES)
 		sc->nframes = MXFRAMES;
 

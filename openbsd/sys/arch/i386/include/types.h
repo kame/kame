@@ -1,5 +1,5 @@
 /*	$NetBSD: types.h,v 1.12 1995/12/24 01:08:03 mycroft Exp $	*/
-/*	$OpenBSD: types.h,v 1.10 2002/07/23 14:19:46 art Exp $	*/
+/*	$OpenBSD: types.h,v 1.12 2003/01/21 00:46:46 art Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -47,9 +47,6 @@ typedef struct label_t {
 } label_t;
 #endif
 
-typedef	unsigned long	vm_offset_t;
-typedef	unsigned long	vm_size_t;
-
 typedef unsigned long	vaddr_t;
 typedef unsigned long	paddr_t;
 typedef unsigned long	vsize_t;
@@ -79,6 +76,5 @@ typedef	unsigned long long	 uint64_t;
 typedef int32_t			register_t;
 
 #define __HAVE_NWSCONS
-#define __HAVE_SPLASSERT
 
 #endif	/* _MACHTYPES_H_ */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: mpu401.c,v 1.6 2002/03/14 01:26:56 millert Exp $	*/
+/*	$OpenBSD: mpu401.c,v 1.8 2002/11/28 23:24:53 mickey Exp $	*/
 /*	$NetBSD: mpu401.c,v 1.3 1998/11/25 22:17:06 augustss Exp $	*/
 
 /*
@@ -71,23 +71,15 @@ int	mpu401debug = 0;
 #define DPRINTFN(n,x)
 #endif
 
-#define MPU401_NPORT	2
-#define MPU_DATA		0
-#define MPU_COMMAND	1
-#define  MPU_RESET	0xff
-#define  MPU_UART_MODE	0x3f
-#define  MPU_ACK		0xfe
-#define MPU_STATUS	1
-#define  MPU_OUTPUT_BUSY	0x40
-#define  MPU_INPUT_EMPTY	0x80
-
-#define MPU_MAXWAIT	10000	/* usec/10 to wait */
-
 #define MPU_GETSTATUS(iot, ioh) (bus_space_read_1(iot, ioh, MPU_STATUS))
 
 int	mpu_reset(struct mpu_softc *);
 static	__inline int mpu_waitready(struct mpu_softc *);
 void	mpu_readinput(struct mpu_softc *);
+
+struct cfdriver mpu_cd = {
+	NULL, "mpu", DV_DULL
+};
 
 struct midi_hw_if mpu_midi_hw_if = {
 	mpu_open,

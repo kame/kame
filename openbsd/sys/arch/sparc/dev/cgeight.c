@@ -1,4 +1,4 @@
-/*	$OpenBSD: cgeight.c,v 1.16 2002/09/23 18:13:38 miod Exp $	*/
+/*	$OpenBSD: cgeight.c,v 1.18 2002/12/12 20:21:34 miod Exp $	*/
 /*	$NetBSD: cgeight.c,v 1.13 1997/05/24 20:16:04 pk Exp $	*/
 
 /*
@@ -112,7 +112,6 @@ void cgeight_free_screen(void *, void *);
 int cgeight_show_screen(void *, void *, int, void (*cb)(void *, int, int),
     void *);
 paddr_t cgeight_mmap(void *, off_t, int);
-int cgeight_is_console(int);
 void cgeight_reset(struct cgeight_softc *);
 void cgeight_burner(void *, u_int, u_int);
 
@@ -244,7 +243,7 @@ cgeightattach(parent, self, args)
 
 	if (isconsole) {
 		fbwscons_console_init(&sc->sc_sunfb, &cgeight_stdscreen, -1,
-		    NULL, cgeight_burner);
+		    cgeight_burner);
 	}
 
 	waa.console = isconsole;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: hme.c,v 1.38 2002/07/17 02:46:52 jason Exp $	*/
+/*	$OpenBSD: hme.c,v 1.40 2002/11/09 22:22:35 fgsch Exp $	*/
 
 /*
  * Copyright (c) 1998 Jason L. Wright (jason@thought.net)
@@ -621,7 +621,7 @@ hme_poll_stop(sc)
 	    (HME_FLAG_POLLENABLE | HME_FLAG_POLL))
 		return;
 
-	/* Turn off MIF interrupts, and diable polling */
+	/* Turn off MIF interrupts, and disable polling */
 	tcvr->int_mask = 0xffff;
 	tcvr->cfg &= ~(TCVR_CFG_PENABLE);
 	sc->sc_flags &= ~(HME_FLAG_POLL);
@@ -1127,8 +1127,11 @@ hme_mii_statchg(self)
 	struct hme_softc *sc = (struct hme_softc *)self;
 	struct hme_cr *cr = sc->sc_cr;
 
-	if (sc->sc_mii.mii_media_active & IFM_FDX)
+	if ((IFM_OPTIONS(sc->sc_mii.mii_media_active) & IFM_FDX) != 0) {
 		cr->tx_cfg |= CR_TXCFG_FULLDPLX;
-	else
+		sc->sc_arpcom.ac_if.if_flags |= IFF_SIMPLEX;
+	} else {
 		cr->tx_cfg &= ~CR_TXCFG_FULLDPLX;
+		sc->sc_arpcom.ac_if.if_flags &= ~IFF_SIMPLEX;
+	}
 }

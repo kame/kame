@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.18 2002/09/18 10:36:50 art Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.22 2003/02/17 01:29:20 henric Exp $	*/
 /*	$NetBSD: pmap.c,v 1.107 2001/08/31 16:47:41 eeh Exp $	*/
 #undef	NO_VCACHE /* Don't forget the locked TLB in dostart */
 /*
@@ -83,16 +83,16 @@ pseg_check(struct pmap *pm, vaddr_t addr, int64_t tte, paddr_t spare)
 	if (!spare) return pseg_set(pm, addr, tte, spare);
 
 	s = splvm();
-	if ((paddr_t)pm->pm_segs == spare) panic("pseg_check: pm_segs == %llx\n", spare);
+	if ((paddr_t)pm->pm_segs == spare) panic("pseg_check: pm_segs == %llx", spare);
 	for (i=0; i<STSZ; i++) {
 		if ((pdir = (paddr_t *)(u_long)ldxa((vaddr_t)&pm->pm_segs[i], ASI_PHYS_CACHED))) {
 			if ((paddr_t)pdir == spare)
-				panic("pseg_check: pdir %d == %llx\n", i,
+				panic("pseg_check: pdir %d == %llx", i,
 					spare);
 			for (k=0; k<PDSZ; k++) {
 				if ((ptbl = (paddr_t *)(u_long)ldxa((vaddr_t)&pdir[k], ASI_PHYS_CACHED))) {
 					if ((paddr_t)ptbl == spare)
-				panic("pseg_check: ptbl %d:%d == %llx\n", i, k,
+				panic("pseg_check: ptbl %d:%d == %llx", i, k,
 					spare);
 				}
 			}
@@ -134,17 +134,17 @@ static int pseg_set(struct pmap* pm, vaddr_t addr, int64_t tte, paddr_t spare) {
 	if (!(pdir = (paddr_t *)ldda(&pm->pm_segs[va_to_seg(addr)],
 	    ASI_PHYS_CACHED))) {
 		if (!spare) return (1);
-		stda(&pm->pm_segs[va_to_seg(addr)], ASI_PHYS_CACHED, spare);
+		stxa_sync(&pm->pm_segs[va_to_seg(addr)], ASI_PHYS_CACHED, spare);
 		pdir = spare;
 		spare = NULL;
 	}
 	if (!(ptbl = (paddr_t *)ldda(&pdir[va_to_dir(addr)], ASI_PHYS_CACHED))) {
 		if (!spare) return (1);
-		stda(&pdir[va_to_dir(addr)], ASI_PHYS_CACHED, spare);
+		stxa_sync(&pdir[va_to_dir(addr)], ASI_PHYS_CACHED, spare);
 		ptbl = spare;
 		spare = NULL;
 	}
-	stda(&ptbl[va_to_pte(addr)], ASI_PHYS_CACHED, tte);
+	stxa_sync(&ptbl[va_to_pte(addr)], ASI_PHYS_CACHED, tte);
 	return (0);
 }
 
@@ -155,13 +155,13 @@ static paddr_t pseg_find(struct pmap* pm, vaddr_t addr, paddr_t spare) {
 	if (!(pdir = (paddr_t *)ldda(&pm->pm_segs[va_to_seg(addr)],
 	    ASI_PHYS_CACHED))) {
 		if (!spare) return (1);
-		stda(&pm->pm_segs[va_to_seg(addr)], ASI_PHYS_CACHED, spare);
+		stxa_sync(&pm->pm_segs[va_to_seg(addr)], ASI_PHYS_CACHED, spare);
 		pdir = spare;
 		spare = NULL;
 	}
 	if (!(ptbl = (paddr_t *)ldda(&pdir[va_to_dir(addr)], ASI_PHYS_CACHED))) {
 		if (!spare) return (1);
-		stda(&pdir[va_to_dir(addr)], ASI_PHYS_CACHED, spare);
+		stxa_sync(&pdir[va_to_dir(addr)], ASI_PHYS_CACHED, spare);
 		ptbl = spare;
 		spare = NULL;
 	}
@@ -181,10 +181,10 @@ void pmap_copy_phys(paddr_t src, paddr_t dst);
 #ifdef DEBUG
 #ifdef __STDC__
 #define	ASSERT(x)	\
-	if (!(x)) panic("%s at line %d: assertion failed\n", #x, __LINE__);
+	if (!(x)) panic("%s at line %d: assertion failed", #x, __LINE__);
 #else
 #define	ASSERT(x)	\
-	if (!(x)) panic("%s at line %d: assertion failed\n", "x", __LINE__);
+	if (!(x)) panic("%s at line %d: assertion failed", "x", __LINE__);
 #endif
 #else
 #define ASSERT(x)
@@ -909,7 +909,7 @@ remap_data:
 		if (prom_map[i].vstart == ktext)
 			break;
 	if (i == prom_map_size) 
-		panic("No kernel text segment!\r\n");
+		panic("No kernel text segment!");
 	ktsize = prom_map[i].vsize;
 	ektext = ktext + ktsize;
 
@@ -1088,7 +1088,7 @@ remap_data:
 		prom_printf("TSB alloc fixup failed\r\n");
 		prom_printf("frobbed i, firstaddr before TSB=%x, %lx\r\n",
 		    (int)i, (u_long)firstaddr);
-		panic("TSB alloc\n");
+		panic("TSB alloc");
 		OF_exit();
 	}
 #endif
@@ -1100,7 +1100,7 @@ remap_data:
 	bzero(tsb_immu, TSBSIZE);
 
 	BDPRINTF(PDB_BOOT1, ("firstaddr after TSB=%lx\r\n", (u_long)firstaddr));
-	BDPRINTF(PDB_BOOT1, ("TSB allocated at %p size %08x\r\n", (void *)tsb,
+	BDPRINTF(PDB_BOOT1, ("TSB allocated at %p size %08x\r\n", (void *)tsb_dmmu,
 	    (int)TSBSIZE));
 
 	first_phys_addr = mem->start;
@@ -2091,7 +2091,7 @@ pmap_kremove(va, size)
 #ifdef DIAGNOSTIC
 		if (pm == pmap_kernel() && 
 			(va >= ktext && va < roundup(ekdata, 4*MEG)))
-			panic("pmap_kremove: va=%08x in locked TLB\r\n", 
+			panic("pmap_kremove: va=%08x in locked TLB", 
 				(u_int)va);
 #endif
 		/* Shouldn't need to do this if the entry's not valid. */
@@ -2190,7 +2190,8 @@ pmap_enter(pm, va, pa, prot, flags)
 	 */
 	s = splvm();
 	simple_lock(&pm->pm_lock);
-	if ((tte.data = pseg_get(pm, va))<0) {
+	tte.data = pseg_get(pm, va);
+	if (tte.data & TLB_V) {
 		simple_unlock(&pm->pm_lock);
 		pmap_remove(pm, va, va+NBPG-1);
 		simple_lock(&pm->pm_lock);
@@ -2335,7 +2336,7 @@ pmap_remove(pm, va, endva)
 #ifdef DIAGNOSTIC
 		if (pm == pmap_kernel() && va >= ktext && 
 			va < roundup(ekdata, 4*MEG))
-			panic("pmap_remove: va=%08x in locked TLB\r\n", (u_int)va);
+			panic("pmap_remove: va=%08x in locked TLB", (u_int)va);
 #endif
 		/* We don't really need to do this if the valid bit is not set... */
 		if ((data = pseg_get(pm, va))) {

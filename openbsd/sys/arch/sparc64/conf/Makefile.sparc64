@@ -2,10 +2,6 @@
 
 .include <bsd.own.mk>
 
-AS?=	as
-CC?=	cc
-CPP?=	cpp
-LD?=	ld
 MKDEP?=	mkdep
 SIZE?=	size
 STRIP?=	strip
@@ -22,11 +18,11 @@ CPPFLAGS=	${INCLUDES} ${IDENT} -D_KERNEL
 CDIAGFLAGS=	-Werror -Wall -Wstrict-prototypes -Wmissing-prototypes \
 		-Wno-uninitialized -Wno-format -Wno-main
 
-CMACHFLAGS=	-Wa,-Av9a, -mno-fpu
+CMACHFLAGS=	-Wa,-Av9a, -mno-fpu -fno-stack-protector
 
 CFLAGS=		${DEBUG} -O2 ${CDIAGFLAGS} ${CMACHFLAGS} ${COPTS} ${PIPE}
 AFLAGS=		-x assembler-with-cpp -traditional-cpp -D_LOCORE -Wa,-Av9a
-LINKFLAGS=	-n -Ttext 01000000 -Tdata 01800000 -e start
+LINKFLAGS=	-n -Ttext 01000000 -Tdata 01800000 -e start -N
 STRIPFLAGS=	-g -X -x
 
 HOSTCC=	${CC}
@@ -161,8 +157,5 @@ install-kernel-${MACHINE_NAME}:
 	cp bsd /nbsd
 	mv /nbsd /bsd
 .endif
-
-sha1.o: $S/crypto/sha1.c
-	${NORMAL_C} -O0
 
 %RULES

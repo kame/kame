@@ -1,4 +1,4 @@
-/*	$OpenBSD: cgsix.c,v 1.21 2002/09/23 18:13:38 miod Exp $	*/
+/*	$OpenBSD: cgsix.c,v 1.23 2002/12/12 23:35:32 miod Exp $	*/
 /*	$NetBSD: cgsix.c,v 1.33 1997/08/07 19:12:30 pk Exp $ */
 
 /*
@@ -257,7 +257,7 @@ cgsixattach(parent, self, args)
 	sc->sc_sunfb.sf_flags = self->dv_cfdata->cf_flags;
 
 	/*
-	 * May just BT, FHC, FBC, THC, and video RAM.
+	 * Map just BT, FHC, FBC, THC, and video RAM.
 	 */
 	sc->sc_phys = ca->ca_ra.ra_reg[0];
 	sc->sc_bt = bt = (volatile struct bt_regs *)
@@ -346,6 +346,7 @@ cgsixattach(parent, self, args)
 	    CGSIX_VID_OFFSET, round_page(sc->sc_sunfb.sf_fbsize));
 	sc->sc_sunfb.sf_ro.ri_hw = sc;
 	fbwscons_init(&sc->sc_sunfb, isconsole);
+	fbwscons_setcolormap(&sc->sc_sunfb, cgsix_setcolor);
 
 	/*
 	 * Old rev. cg6 cards do not like the current acceleration code.
@@ -372,7 +373,7 @@ cgsixattach(parent, self, args)
 
 	if (isconsole) {
 		fbwscons_console_init(&sc->sc_sunfb, &cgsix_stdscreen, -1,
-		    cgsix_setcolor, cgsix_burner);
+		    cgsix_burner);
 	}
 
 #if defined(SUN4C) || defined(SUN4M)

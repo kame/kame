@@ -1,7 +1,7 @@
-/*	$OpenBSD: gscbusvar.h,v 1.7 2002/03/14 03:15:53 millert Exp $	*/
+/*	$OpenBSD: gscbusvar.h,v 1.9 2002/12/18 23:52:45 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998 Michael Shalayeff
+ * Copyright (c) 1998-2002 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,18 +33,14 @@
 struct gscbus_ic {
 	enum {gsc_unknown = 0, gsc_lasi, gsc_wax, gsc_asp} gsc_type;
 	void *gsc_dv;
-
-	void (*gsc_intr_establish)(void *v, u_int32_t mask);
-	void (*gsc_intr_disestablish)(void *v, u_int32_t mask);
-	u_int32_t (*gsc_intr_check)(void *v);
-	void (*gsc_intr_ack)(void *v, u_int32_t mask);
+	volatile void *gsc_base;
 };
 
 struct gsc_attach_args {
 	struct confargs ga_ca;
 #define	ga_name		ga_ca.ca_name
 #define	ga_iot		ga_ca.ca_iot
-#define	ga_mod		ga_ca.ca_mod
+#define	ga_dp		ga_ca.ca_dp
 #define	ga_type		ga_ca.ca_type
 #define	ga_hpa		ga_ca.ca_hpa
 #define	ga_hpamask	ga_ca.ca_hpamask
@@ -58,6 +54,8 @@ struct gscbus_intr {
 	int pri;
 	int (*handler)(void *);
 	void *arg;
+	void *softc;
+	void *cpuiv;
 	struct evcnt evcnt;
 };
 

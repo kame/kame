@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.54 2002/09/15 09:01:59 deraadt Exp $	*/
+/*	$OpenBSD: trap.c,v 1.58 2003/03/04 19:11:37 deraadt Exp $	*/
 /*	$NetBSD: trap.c,v 1.3 1996/10/13 03:31:37 christos Exp $	*/
 
 /*
@@ -63,6 +63,7 @@
 
 static int fix_unaligned(struct proc *p, struct trapframe *frame);
 int badaddr(char *addr, u_int32_t len);
+static __inline void userret(struct proc *, int, u_quad_t);
 void trap(struct trapframe *frame);
 
 /* These definitions should probably be somewhere else				XXX */
@@ -241,6 +242,36 @@ enable_vec(struct proc *p)
 }
 #endif /* ALTIVEC */
 
+static __inline void
+userret(register struct proc *p, int pc, u_quad_t oticks)
+{
+	int sig;
+
+	/* take pending signals */
+	while ((sig = CURSIG(p)) != 0)
+		postsig(sig);
+	p->p_priority = p->p_usrpri;
+	if (want_resched) {
+
+		/*
+		 * We're being preempted.
+		 */
+		preempt(NULL);
+		while ((sig = CURSIG(p)))
+			postsig(sig);
+	}
+
+	/*
+	 * If profiling, charge recent system time to the trapped pc.
+	 */
+	if (p->p_flag & P_PROFIL) {
+		extern int psratio;
+
+		addupc_task(p, pc, (int)(p->p_sticks - oticks) * psratio);
+	}
+
+	curpriority = p->p_priority;
+}
 
 void
 trap(frame)
@@ -533,7 +564,7 @@ mpc_print_pci_stat();
 			name = "0";
 			offset = frame->srr0;
 		}
-		panic ("trap type %x at %x (%s+0x%x) lr %x\n",
+		panic ("trap type %x at %x (%s+0x%x) lr %x",
 			type, frame->srr0, name, offset, frame->lr);
 
 
@@ -631,35 +662,8 @@ for (i = 0; i < errnum; i++) {
 		ADDUPROF(p);
 	}
 
-	/* take pending signals */
-	{
-		int sig;
+	userret(p, frame->srr0, sticks);
 
-		while ((sig = CURSIG(p)))
-			postsig(sig);
-	}
-
-	p->p_priority = p->p_usrpri;
-	if (want_resched) {
-		int sig;
-
-		/*
-		 * We're being preempted.
-		 */
-		preempt(NULL);
-		while ((sig = CURSIG(p)))
-			postsig(sig);
-	}
-
-	/*
-	 * If profiling, charge recent system time to the trapped pc.
-	 */
-	if (p->p_flag & P_PROFIL) {
-		extern int psratio;
-
-		addupc_task(p, frame->srr0,
-			    (int)(p->p_sticks - sticks) * psratio);
-	}
 	/*
 	 * If someone stole the fpu while we were away, disable it
 	 */
@@ -679,8 +683,6 @@ for (i = 0; i < errnum; i++) {
 		frame->srr1 |= PSL_VEC;
 	}
 #endif /* ALTIVEC */
-
-	curpriority = p->p_priority;
 }
 
 void
@@ -696,12 +698,13 @@ child_return(arg)
 	tf->cr &= ~0x10000000;
 	/* Disable FPU, VECT, as we can't be fpuproc */
 	tf->srr1 &= ~(PSL_FP|PSL_VEC);
+
+	userret(p, tf->srr0, 0);
+
 #ifdef	KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
 		ktrsysret(p, SYS_fork, 0, 0);
 #endif
-	/* Profiling?							XXX */
-	curpriority = p->p_priority;
 }
 
 int
@@ -713,7 +716,7 @@ badaddr(addr, len)
 	u_int32_t v;
 	register void *oldh = curpcb->pcb_onfault;
 
-	if (setfault(env)) {
+	if (setfault(&env)) {
 		curpcb->pcb_onfault = oldh;
 		return EFAULT;
 	}

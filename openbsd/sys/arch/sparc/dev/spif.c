@@ -1,4 +1,4 @@
-/*	$OpenBSD: spif.c,v 1.12 2002/04/30 01:12:29 art Exp $	*/
+/*	$OpenBSD: spif.c,v 1.14 2003/02/14 22:04:23 jason Exp $	*/
 
 /*
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
@@ -203,7 +203,7 @@ spifattach(parent, self, aux)
 	sc->sc_regs->stc.gscr1 = 0;
 	sc->sc_regs->stc.gscr2 = 0;
 	sc->sc_regs->stc.gscr3 = 0;
-	printf(": rev %x chiprev %x osc %sMhz stcpri %d ppcpri %d softpri %d\n",
+	printf(": rev %x chiprev %x osc %sMHz stcpri %d ppcpri %d softpri %d\n",
 	    sc->sc_rev, sc->sc_rev2, clockfreq(sc->sc_osc),
 	    stcpri, ppcpri, IPL_TTY);
 
@@ -724,7 +724,6 @@ spifstcintr_rxexception(sc, needsoftp)
 {
 	struct stty_port *sp;
 	u_int8_t channel, *ptr;
-	int cnt;
 
 	channel = CD180_GSCR_CHANNEL(sc->sc_regs->stc.gscr1);
 	sp = &sc->sc_ttys->sc_port[channel];
@@ -740,10 +739,8 @@ spifstcintr_rxexception(sc, needsoftp)
 		SET(sp->sp_flags, STTYF_RING_OVERFLOW);
 	}
 	sc->sc_regs->stc.eosrr = 0;
-	if (cnt) {
-		*needsoftp = 1;
-		sp->sp_rput = ptr;
-	}
+	*needsoftp = 1;
+	sp->sp_rput = ptr;
 	return (1);
 }
 

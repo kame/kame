@@ -1,4 +1,4 @@
-	$OpenBSD: pcmciadevs,v 1.95 2002/08/17 21:55:10 fgsch Exp $
+	$OpenBSD: pcmciadevs,v 1.99 2003/03/18 23:13:26 mickey Exp $
 /* $NetBSD: pcmciadevs,v 1.13 1998/08/17 23:10:12 thorpej Exp $ */
 
 /*
@@ -74,6 +74,7 @@ vendor DAYNA			0x0194	Dayna
 vendor RAYTHEON			0x01a6	Raytheon
 vendor BAY			0x01eb	Bay Networks
 vendor IODATA			0x01bf	I-O DATA
+vendor BELKIN			0x01bf	Belkin
 vendor FARALLON			0x0200	Farallon Communications
 vendor TELECOMDEVICE		0x021b	Telecom Device
 vendor NOKIA			0x023d	Nokia Communications
@@ -88,6 +89,7 @@ vendor NEWMEDIA2		0x10cd	NewMedia
 vendor ACTIONTEC		0x1668	ACTIONTEC
 vendor LASAT			0x3401	Lasat
 vendor LEXARMEDIA		0x4e01	Lexar Media
+vendor AIRVAST			0x50c2	AirVast Technology
 vendor ARCHOS			0x5241	Archos
 vendor DUAL			0x890f	Dual
 vendor COMPEX			0x8a01	Compex
@@ -130,6 +132,9 @@ product AIRONET PC4500		0x0005 Aironet PC4500
 product AIRONET PC4800		0x0007 Aironet PC4800
 product AIRONET 350		0x000a Aironet 350
 
+/* AirVast */
+product AIRVAST WN_100		0x7300 AirVast WN-100 
+
 /* Allied Telesis K.K. */
 product ALLIEDTELESIS LA_PCM	0x0002 Allied Telesis LA-PCM
 
@@ -140,6 +145,9 @@ product	ARCHOS ARC_ATAPI	0x0043 MiniCD
 product BAY STACK_650		0x0804 BayStack 650
 product BAY SURFER_PRO		0x0806 AirSurfer Pro
 product BAY STACK_660		0x0807 BayStack 660
+
+/* Belkin */
+product BELKIN F5D5020		0x2328 F5D5020
 
 /* BreezeCOM */
 product BREEZECOM BREEZENET	0x0102 BreezeCOM BreezeNET
@@ -358,6 +366,7 @@ vendor EDIMAX			-1	Edimax
 vendor EPSON			-1	Seiko Epson Corporation
 vendor EXP			-1	EXP Computer Inc
 vendor GEMTEK			-1	GEMTEK
+vendor GVC			-1	GVC
 vendor ICOM			-1	ICOM Inc
 vendor INTERSIL			-1	Intersil
 vendor PLANET			-1	Planet
@@ -433,6 +442,7 @@ product ADDTRON AWP100		{ "Addtron", "AWP-100&spWireless&spPCMCIA", "Version&sp0
 product NEC CMZ_RT_WP		{ "NEC", "Wireless&spCard&spCMZ-RT-WP", "Version&sp01.01", NULL }
 product NTT_ME WLAN		{ "NTT-ME", "11Mbps&spWireless&spLAN&spPC&spCard", NULL, NULL }
 product SMC 2632W		{ "SMC", "SMC2632W", "Version&sp01.02", NULL }
+product SMC 8041		{ "SMC", "8041TX-10/100-PC-Card-V2", NULL, NULL } SMC 8041TX 10/100 PC Card
 product NANOSPEED PRISM2	{ "NANOSPEED", "HFA384x/IEEE", "Version&sp01.02", NULL }
 product CABLETRON ROAMABOUT	{ "Cabletron", "RoamAbout&sp802.11&spDS", "Version&sp01.01", NULL }
 product GVC NIC2000P		{ "GVC", "NIC-2000p", "ETHERNET", "R01" }
@@ -442,3 +452,4 @@ product WISECOM IPORT		{ "iPort", "10/100&spEthernet&spCard", NULL, NULL }
 product GEMTEK WLAN		{ "Intersil", "PRISM&sp2_5&spPCMCIA&spADAPTER", "ISL37300P", "Eval-RevA" }
 product SIMPLETECH SPECTRUM24_ALT	{ "Symbol&spTechnologies", "LA4111&spSpectrum24&spWireless&spLAN&spPC&spCard", NULL, NULL }
 product AROWANA FE		{ "PCMCIA", "Fast-Ethernet", NULL, NULL }
+product GVC NP0335		{ "ETHER-C16", "ETHER-C16", "Fast&spEthernet", NULL }

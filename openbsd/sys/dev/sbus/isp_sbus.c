@@ -1,4 +1,4 @@
-/*	$OpenBSD: isp_sbus.c,v 1.3 2002/05/17 01:19:49 mjacob Exp $	*/
+/*	$OpenBSD: isp_sbus.c,v 1.5 2003/02/17 01:29:21 henric Exp $	*/
 /* $NetBSD: isp_sbus.c,v 1.46 2001/09/26 20:53:14 eeh Exp $ */
 
 /*
@@ -169,7 +169,13 @@ isp_sbus_attach(struct device *parent, struct device *self, void *aux)
 	sbc->sbus_mdvec = mdvec;
 
 	if (sa->sa_npromvaddrs != 0) {
-		sbc->sbus_reg = (bus_space_handle_t)sa->sa_promvaddrs[0];
+		if (bus_space_map(sa->sa_bustag, sa->sa_promvaddrs[0],
+		    sa->sa_size,
+		    BUS_SPACE_MAP_PROMADDRESS | BUS_SPACE_MAP_LINEAR,
+		    &sbc->sbus_reg) == 0) {
+			printf("%s: cannot map registers\n", self->dv_xname);
+			return;
+		}
 	} else {
 		if (sbus_bus_map(sa->sa_bustag, sa->sa_slot, sa->sa_offset,
 				 sa->sa_size, BUS_SPACE_MAP_LINEAR, 0,
@@ -525,7 +531,7 @@ isp_sbus_dmasetup(struct ispsoftc *isp, XS_T *xs, ispreq_t *rq,
 
 	dmap = sbc->sbus_dmamap[isp_handle_index(rq->req_handle)];
 	if (dmap->dm_nsegs != 0) {
-		panic("%s: dma map already allocated\n", isp->isp_name);
+		panic("%s: dma map already allocated", isp->isp_name);
 		/* NOTREACHED */
 	}
 	if (bus_dmamap_load(isp->isp_dmatag, dmap, xs->data, xs->datalen,
@@ -590,7 +596,7 @@ isp_sbus_dmateardown(struct ispsoftc *isp, XS_T *xs, u_int16_t handle)
 	dmap = sbc->sbus_dmamap[isp_handle_index(handle)];
 
 	if (dmap->dm_nsegs == 0) {
-		panic("%s: dma map not already allocated\n", isp->isp_name);
+		panic("%s: dma map not already allocated", isp->isp_name);
 		/* NOTREACHED */
 	}
 	bus_dmamap_sync(isp->isp_dmatag, dmap, 0,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.81 2002/09/23 17:43:20 mickey Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.102 2003/02/18 19:01:50 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1999-2002 Michael Shalayeff
@@ -56,12 +56,6 @@
 #ifdef SYSVMSG
 #include <sys/msg.h>
 #endif
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
-#ifdef SYSVSHM
-#include <sys/shm.h>
-#endif
 
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
@@ -115,8 +109,8 @@ int bufcachepercent = BUFCACHEPERCENT;
 /*
  * Different kinds of flags used throughout the kernel.
  */
-int cold = 1;		/* unset when engine is up to go */
-int msgbufmapped;	/* set when safe to use msgbuf */
+int cold = 1;			/* unset when engine is up to go */
+extern int msgbufmapped;	/* set when safe to use msgbuf */
 
 /*
  * cache configuration, for most machines is the same
@@ -139,7 +133,7 @@ struct pdc_cache pdc_cache PDC_ALIGNMENT;
 struct pdc_btlb pdc_btlb PDC_ALIGNMENT;
 
 	/* w/ a little deviation should be the same for all installed cpus */
-u_int	cpu_ticksnum, cpu_ticksdenom, cpu_hzticks;
+u_int	cpu_itmr, cpu_ticksnum, cpu_ticksdenom, cpu_hzticks;
 
 	/* exported info */
 char	machine[] = MACHINE_ARCH;
@@ -162,6 +156,7 @@ int (*cpu_dbtlb_ins)(int i, pa_space_t sp, vaddr_t va, paddr_t pa,
 
 dev_t	bootdev;
 int	totalphysmem, resvmem, physmem, esym;
+paddr_t	avail_end;
 
 /*
  * Things for MI glue to stick on.
@@ -184,9 +179,7 @@ void hppa_user2frame(struct trapframe *sf, struct trapframe *tf);
 /*
  * wide used hardware params
  */
-#if defined(HP7100LC_CPU) || defined(HP7300LC_CPU)
 struct pdc_hwtlb pdc_hwtlb PDC_ALIGNMENT;
-#endif
 struct pdc_coproc pdc_coproc PDC_ALIGNMENT;
 struct pdc_coherence pdc_coherence PDC_ALIGNMENT;
 struct pdc_spidb pdc_spidbits PDC_ALIGNMENT;
@@ -237,19 +230,17 @@ const struct hppa_cpu_typed {
 	int (*hptinit)(vaddr_t hpt, vsize_t hptsize);
 } cpu_types[] = {
 #ifdef HP7000_CPU
-	{ "PCX",   hpcx,  0x10, 0,
-	  desidhash_x, itlb_x, itlbna_l, dtlb_x, dtlbna_x, tlbd_x,
+	{ "PCXS",   hpcx,  0x10, 0,
+	  desidhash_s, itlb_s, itlbna_s, dtlb_s, dtlbna_s, tlbd_s,
 	  ibtlb_g, NULL, pbtlb_g},
 #endif
 #ifdef HP7100_CPU
-	{ "PCXS",  hpcxs, 0x11, 0,
-	  desidhash_s, itlb_s, itlbna_l, dtlb_s, dtlbna_s, tlbd_s,
+	{ "PCXT",  hpcxs, 0x11, HPPA_FTRS_BTLBU,
+	  desidhash_t, itlb_t, itlbna_t, dtlb_t, dtlbna_t, tlbd_t,
 	  ibtlb_g, NULL, pbtlb_g},
 #endif
 #ifdef HP7200_CPU
-	{ "PCXT",  hpcxt, 0x11, HPPA_FTRS_BTLBU,
-	  desidhash_t, itlb_t, itlbna_l, dtlb_t, dtlbna_t, tlbd_t,
-	  ibtlb_g, NULL, pbtlb_g},
+/* these seem to support the cpu model pdc call */
 /* HOW?	{ "PCXT'", hpcxta,0x11, HPPA_FTRS_BTLBU,
 	  desidhash_t, itlb_t, itlbna_l, dtlb_t, dtlbna_t, tlbd_t,
 	  ibtlb_g, NULL, pbtlb_g}, */
@@ -295,8 +286,6 @@ hppa_init(start)
 	extern int kernel_text;
 	vaddr_t v, v1;
 	int error, cpu_features = 0;
-
-	boothowto |= RB_SINGLE;	/* XXX always go into single-user while debug */
 
 	pdc_init();	/* init PDC iface, so we can call em easy */
 
@@ -408,16 +397,18 @@ hppa_init(start)
 	ptlball();
 	fcacheall();
 
-	totalphysmem = PAGE0->imm_max_mem / NBPG;
-	resvmem = ((vaddr_t)&kernel_text) / NBPG;
+	totalphysmem = btoc(PAGE0->imm_max_mem);
+	resvmem = btoc(((vaddr_t)&kernel_text));
+	avail_end = ctob(totalphysmem);
 
 #if defined(HP7100LC_CPU) || defined(HP7300LC_CPU)
-	if (pdc_call((iodcio_t)pdc, 0, PDC_TLB, PDC_TLB_INFO, &pdc_hwtlb) &&
-	    !pdc_hwtlb.min_size && !pdc_hwtlb.max_size) {
+	if (!pdc_call((iodcio_t)pdc, 0, PDC_TLB, PDC_TLB_INFO, &pdc_hwtlb) &&
+	    pdc_hwtlb.min_size && pdc_hwtlb.max_size)
+		cpu_features |= HPPA_FTRS_HVT;
+	else {
 		printf("WARNING: no HPT support, fine!\n");
 		pmap_hptsize = 0;
-	} else
-		cpu_features |= HPPA_FTRS_HVT;
+	}
 #endif
 
 	/*
@@ -427,7 +418,7 @@ hppa_init(start)
 		const struct hppa_cpu_typed *p;
 
 		for (p = cpu_types;
-		     p->arch && p->features != cpu_features; p++);
+		    p->arch && p->features != cpu_features; p++);
 
 		if (!p->arch) {
 			printf("WARNING: UNKNOWN CPU TYPE; GOOD LUCK (%x)\n",
@@ -447,11 +438,11 @@ hppa_init(start)
 			extern u_int trap_ep_T_ITLBMISS[];
 			extern u_int trap_ep_T_ITLBMISSNA[];
 
-			cpu_type      = p->type;
-			cpu_typename  = p->name;
+			cpu_type = p->type;
+			cpu_typename = p->name;
 			cpu_ibtlb_ins = p->ibtlbins;
 			cpu_dbtlb_ins = p->dbtlbins;
-			cpu_hpt_init  = p->hptinit;
+			cpu_hpt_init = p->hptinit;
 			cpu_desidhash = p->desidhash;
 
 #define	LDILDO(t,f) ((t)[0] = (f)[0], (t)[1] = (f)[1])
@@ -496,6 +487,9 @@ hppa_init(start)
 #endif
 				/* this one is just a 100MHz pcxl */
 				if (lev == 0x10)
+					lev = 0xc;
+				/* this one is a pcxl2 */
+				if (lev == 0x16)
 					lev = 0xe;
 				break;
 			case 8:
@@ -539,24 +533,12 @@ hppa_init(start)
 	/* More buffer pages than fits into the buffers is senseless. */
 	if (bufpages > nbuf * MAXBSIZE / PAGE_SIZE)
 		bufpages = nbuf * MAXBSIZE / PAGE_SIZE;
-	
+
 	v1 = v = hppa_round_page(start);
 #define valloc(name, type, num) (name) = (type *)v; v = (vaddr_t)((name)+(num))
 
 	valloc(buf, struct buf, nbuf);
 
-#ifdef SYSVSHM
-	shminfo.shmmax = shmmaxpgs;
-	shminfo.shmall = shmmaxpgs;
-	shminfo.shmseg = shmseg;
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
-#ifdef SYSVSEM
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns);
-	/* This is pretty disgusting! */
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
 #ifdef SYSVMSG
 	valloc(msgpool, char, msginfo.msgmax);
 	valloc(msgmaps, struct msgmap, msginfo.msgseg);
@@ -569,12 +551,14 @@ hppa_init(start)
 	bzero ((void *)v1, (v - v1));
 
 	msgbufp = (struct msgbuf *)v;
-	v += hppa_round_page(MSGBUFSIZE);
+	v += round_page(MSGBUFSIZE);
 	bzero(msgbufp, MSGBUFSIZE);
-	msgbufmapped = 1;
 
 	/* sets physmem */
 	pmap_bootstrap(v);
+
+	msgbufmapped = 1;
+	initmsgbuf((caddr_t)msgbufp, round_page(MSGBUFSIZE));
 
 	/* locate coprocessors and SFUs */
 	if ((error = pdc_call((iodcio_t)pdc, 0, PDC_COPROC, PDC_COPROC_DFLT,
@@ -600,7 +584,7 @@ hppa_init(start)
 }
 
 void
-cpu_startup()
+cpu_startup(void)
 {
 	vaddr_t minaddr, maxaddr;
 	vsize_t size;
@@ -652,7 +636,7 @@ cpu_startup()
 				panic("cpu_startup: not enough memory for "
 				    "buffer cache");
 			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
-			    VM_PROT_READ|VM_PROT_WRITE);
+			    UVM_PROT_RW);
 			curbuf += PAGE_SIZE;
 		}
 	}
@@ -742,9 +726,30 @@ delay(us)
 		while (start < end);
 
 		us -= n;
-		mfctl(CR_ITMR, start);
 	}
 }
+
+void
+microtime(struct timeval *tv)
+{
+	u_int itmr;
+	int s;
+
+	s = splhigh();
+	tv->tv_sec  = time.tv_sec;
+	tv->tv_usec = time.tv_usec;
+
+	mfctl(CR_ITMR, itmr);
+	itmr -= cpu_itmr;
+	splx(s);
+
+	tv->tv_usec += itmr * cpu_ticksdenom / cpu_ticksnum;
+	if (tv->tv_usec > 1000000) {
+		tv->tv_usec -= 1000000;
+		tv->tv_sec++;
+	}
+}
+
 
 static __inline void
 fall(c_base, c_count, c_loop, c_stride, data)
@@ -761,7 +766,7 @@ fall(c_base, c_count, c_loop, c_stride, data)
 }
 
 void
-fcacheall()
+fcacheall(void)
 {
 	/*
 	 * Flush the instruction, then data cache.
@@ -775,7 +780,7 @@ fcacheall()
 }
 
 void
-ptlball()
+ptlball(void)
 {
 	register pa_space_t sp;
 	register int i, j, k;
@@ -806,7 +811,7 @@ ptlball()
 }
 
 int
-desidhash_g()
+desidhash_g(void)
 {
 	/* TODO call PDC to disable SID hashing in the cache index */
 
@@ -939,11 +944,13 @@ boot(howto)
 	if (howto & RB_HALT) {
 		if (howto & RB_POWERDOWN && cold_hook) {
 			printf("Powering off...");
-			(*cold_hook)(HPPA_COLD_COLD);
+			DELAY(1000000);
+			(*cold_hook)(HPPA_COLD_OFF);
 			DELAY(1000000);
 		}
 
 		printf("System halted!\n");
+		DELAY(1000000);
 		__asm __volatile("stwas %0, 0(%1)"
 		    :: "r" (CMD_STOP), "r" (LBCAST_ADDR + iomod_command));
 	} else {
@@ -967,7 +974,7 @@ long	dumplo = 0;		/* blocks */
  * cpu_dumpsize: calculate size of machine-dependent kernel core dump headers.
  */
 int
-cpu_dumpsize()
+cpu_dumpsize(void)
 {
 	int size;
 
@@ -982,7 +989,7 @@ cpu_dumpsize()
  * Called from HPMC handler in locore
  */
 void
-hpmc_dump()
+hpmc_dump(void)
 {
 	printf("HPMC\n");
 
@@ -991,7 +998,7 @@ hpmc_dump()
 }
 
 int
-cpu_dump()
+cpu_dump(void)
 {
 	long buf[dbtob(1) / sizeof (long)];
 	kcore_seg_t	*segp;
@@ -1021,7 +1028,7 @@ cpu_dump()
 #define	BYTES_PER_DUMP	NBPG
 
 void
-dumpsys()
+dumpsys(void)
 {
 	int psize, bytes, i, n;
 	register caddr_t maddr;
@@ -1055,7 +1062,7 @@ dumpsys()
 		dump = bdevsw[major(dumpdev)].d_dump;
 		/* TODO block map the whole physical memory */
 		for (i = 0; i < bytes; i += n) {
-		
+
 			/* Print out how many MBs we are to go. */
 			n = bytes - i;
 			if (n && (n % (1024*1024)) == 0)
@@ -1153,13 +1160,15 @@ copyout(src, dst, size)
  */
 void
 setregs(p, pack, stack, retval)
-	register struct proc *p;
+	struct proc *p;
 	struct exec_package *pack;
 	u_long stack;
 	register_t *retval;
 {
-	register struct trapframe *tf = p->p_md.md_regs;
-	register struct pcb *pcb = &p->p_addr->u_pcb;
+	extern paddr_t fpu_curpcb;	/* from locore.S */
+	struct trapframe *tf = p->p_md.md_regs;
+	struct pcb *pcb = &p->p_addr->u_pcb;
+	register_t zero;
 #ifdef DEBUG
 	/*extern int pmapdebug;*/
 	/*pmapdebug = 13;
@@ -1167,7 +1176,6 @@ setregs(p, pack, stack, retval)
 	    p, pack, stack, retval, pack->ep_entry, tf->tf_cr30);
 	*/
 #endif
-
 	tf->tf_flags = TFF_SYS|TFF_LAST;
 	tf->tf_iioq_tail = 4 +
 	    (tf->tf_iioq_head = pack->ep_entry | HPPA_PC_PRIV_USER);
@@ -1175,19 +1183,25 @@ setregs(p, pack, stack, retval)
 	tf->tf_arg0 = (u_long)PS_STRINGS;
 	tf->tf_arg1 = tf->tf_arg2 = 0; /* XXX dynload stuff */
 
+	/* setup terminal stack frame */
+	stack = (stack + 0x1f) & ~0x1f;
+	tf->tf_r3 = stack;
+	tf->tf_sp = stack += HPPA_FRAME_SIZE;
+	zero = 0;
+	copyout(&zero, (caddr_t)(stack - HPPA_FRAME_SIZE), sizeof(register_t));
+	copyout(&zero, (caddr_t)(stack + HPPA_FRAME_CRP), sizeof(register_t));
+
 	/* reset any of the pending FPU exceptions */
-	pcb->pcb_fpregs[0] = HPPA_FPU_INIT;
+	pcb->pcb_fpregs[0] = ((u_int64_t)HPPA_FPU_INIT) << 32;
 	pcb->pcb_fpregs[1] = 0;
 	pcb->pcb_fpregs[2] = 0;
 	pcb->pcb_fpregs[3] = 0;
-
-	/* setup terminal stack frame */
-	stack = hppa_round_page(stack);
-	tf->tf_r3 = stack;
-	suword((caddr_t)(stack), 0);
-	stack += HPPA_FRAME_SIZE;
-	suword((caddr_t)(stack + HPPA_FRAME_CRP), 0);
-	tf->tf_sp = stack;
+	fdcache(HPPA_SID_KERNEL, (vaddr_t)pcb->pcb_fpregs, 8 * 4);
+	if (tf->tf_cr30 == fpu_curpcb) {
+		fpu_curpcb = 0;
+		/* force an fpu ctxsw, we'll not be hugged by the cpu_switch */
+		mtctl(0, CR_CCR);
+	}
 
 	retval[1] = 0;
 }
@@ -1204,11 +1218,12 @@ sendsig(catcher, sig, mask, code, type, val)
 	union sigval val;
 {
 	struct proc *p = curproc;
-	struct sigcontext *scp, ksc;
 	struct trapframe *tf = p->p_md.md_regs;
 	struct sigacts *psp = p->p_sigacts;
-	siginfo_t ksi, *sip = NULL;
+	struct sigcontext ksc, *scp;
+	siginfo_t ksi, *sip;
 	int sss;
+	register_t zero;
 
 #ifdef DEBUG
 	if ((sigdebug & SDB_FOLLOW) && (!sigpid || p->p_pid == sigpid))
@@ -1229,10 +1244,11 @@ sendsig(catcher, sig, mask, code, type, val)
 		scp = (struct sigcontext *)tf->tf_sp;
 
 	sss = sizeof(*scp);
+	sip = NULL;
 	if (psp->ps_siginfo & sigmask(sig)) {
 		initsiginfo(&ksi, sig, code, type, val);
-		sip = (void *)(scp + 1);
-		if (copyout((caddr_t)&ksi, sip, sizeof(*sip)))
+		sip = (siginfo_t *)(scp + 1);
+		if (copyout((caddr_t)&ksi, sip, sizeof(ksi)))
 			sigexit(p, SIGILL);
 		sss += sizeof(*sip);
 	}
@@ -1248,8 +1264,11 @@ sendsig(catcher, sig, mask, code, type, val)
 		sigexit(p, SIGILL);
 
 	sss += HPPA_FRAME_SIZE;
-	if (suword((caddr_t)scp + sss, 0) ||
-	    suword((caddr_t)scp + sss + HPPA_FRAME_CRP, 0))
+	zero = 0;
+	if (copyout(&zero, (caddr_t)scp + sss - HPPA_FRAME_SIZE,
+	    sizeof(register_t)) ||
+	    copyout(&zero, (caddr_t)scp + sss + HPPA_FRAME_CRP,
+	    sizeof(register_t)))
 		sigexit(p, SIGILL);
 
 #ifdef DEBUG
@@ -1287,6 +1306,7 @@ sys_sigreturn(p, v, retval)
 	} */ *uap = v;
 	struct sigcontext *scp, ksc;
 	struct trapframe *tf = p->p_md.md_regs;
+	int error;
 
 	scp = SCARG(uap, sigcntxp);
 #ifdef DEBUG
@@ -1294,13 +1314,12 @@ sys_sigreturn(p, v, retval)
 		printf("sigreturn: pid %d, scp %p\n", p->p_pid, scp);
 #endif
 
-	if (uvm_useracc((caddr_t)scp, sizeof (*scp), B_WRITE) == 0 ||
-	    copyin((caddr_t)scp, (caddr_t)&ksc, sizeof ksc))
-		return (EINVAL);
+	if ((error = copyin((caddr_t)scp, (caddr_t)&ksc, sizeof ksc)))
+		return (error);
 
-#define PSW_MBS (PSW_C|PSW_Q|PSW_P|PSW_D|PSW_I)
-#define PSW_MBZ (PSW_Y|PSW_Z|PSW_S|PSW_X|PSW_M|PSW_R)
-	if ((ksc.sc_ps & (PSW_MBS|PSW_MBZ)) != PSW_MBS)
+#define PSL_MBS (PSL_C|PSL_Q|PSL_P|PSL_D|PSL_I)
+#define PSL_MBZ (PSL_Y|PSL_Z|PSL_S|PSL_X|PSL_M|PSL_R)
+	if ((ksc.sc_ps & (PSL_MBS|PSL_MBZ)) != PSL_MBS)
 		return (EINVAL);
 
 	if (ksc.sc_onstack)
@@ -1402,7 +1421,7 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
  * initialize the system console.
  */
 void
-consinit()
+consinit(void)
 {
 	static int initted;
 

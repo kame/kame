@@ -1,4 +1,4 @@
-/*	$OpenBSD: iopsp.c,v 1.5 2002/03/14 01:26:53 millert Exp $	*/
+/*	$OpenBSD: iopsp.c,v 1.7 2003/01/13 03:56:47 mickey Exp $	*/
 /*	$NetBSD$	*/
 
 /*-
@@ -435,7 +435,7 @@ iopsp_scsi_cmd(xs)
 		return (COMPLETE);
 	}
 
-	SC_DEBUG(periph, SDEV_DB2, ("iopsp_scsi_cmd: run_xfer\n"));
+	SC_DEBUG(xs->sc_link, SDEV_DB2, ("iopsp_scsi_cmd: run_xfer\n"));
 
 	/* Need to reset the target? */
 	if ((xs->flags & XS_RESET) != 0) {
@@ -455,7 +455,7 @@ iopsp_scsi_cmd(xs)
 
 #if defined(I2ODEBUG) || defined(SCSIDEBUG)
 	if (xs->cmdlen > sizeof(mf->cdb))
-		panic("%s: CDB too large\n", sc->sc_dv.dv_xname);
+		panic("%s: CDB too large", sc->sc_dv.dv_xname);
 #endif
 
 	im = iop_msg_alloc(iop, &sc->sc_ii, IM_POLL_INTR |
@@ -569,7 +569,7 @@ iopsp_intr(struct device *dv, struct iop_msg *im, void *reply)
 	iop = (struct iop_softc *)dv->dv_parent;
 	rb = reply;
 
-	SC_DEBUG(xs->xs_periph, SDEV_DB2, ("iopsp_intr\n"));
+	SC_DEBUG(xs->sc_link, SDEV_DB2, ("iopsp_intr\n"));
 
 	if ((rb->msgflags & I2O_MSGFLAGS_FAIL) != 0) {
 		xs->error = XS_DRIVER_STUFFUP;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: types.h,v 1.11 2002/07/23 14:19:46 art Exp $	*/
+/*	$OpenBSD: types.h,v 1.13 2003/01/13 06:08:08 art Exp $	*/
 /*	$NetBSD: types.h,v 1.11 1996/12/10 23:19:38 pk Exp $	*/
 
 /*
@@ -56,9 +56,6 @@ typedef struct label_t {
 } label_t;
 #endif
 
-typedef	unsigned long	vm_offset_t;
-typedef	unsigned long	vm_size_t;
-
 typedef unsigned long	vaddr_t;
 typedef unsigned long	paddr_t;
 typedef unsigned long	vsize_t;
@@ -84,6 +81,5 @@ typedef	unsigned long long	 uint64_t;
 
 typedef int32_t			register_t;
 
-#define __HAVE_SPLASSERT
 
 #endif	/* _MACHTYPES_H_ */

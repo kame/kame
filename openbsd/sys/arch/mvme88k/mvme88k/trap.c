@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.36 2002/05/16 21:11:16 miod Exp $	*/
+/*	$OpenBSD: trap.c,v 1.39 2003/01/13 20:12:18 miod Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -251,34 +251,34 @@ m88100_trap(unsigned type, struct m88100_saved_state *frame)
 		/*FALLTHRU*/
 	case T_KDB_BREAK+T_USER:
 		{
-			int s = db_splhigh();
+			int s = splhigh();
 			db_enable_interrupt();
 			ddb_break_trap(T_KDB_BREAK,(db_regs_t*)frame);
 			db_disable_interrupt();
-			db_splx(s);
+			splx(s);
 			return;
 		}
 	case T_KDB_ENTRY:
 		/*FALLTHRU*/
 	case T_KDB_ENTRY+T_USER:
 		{
-			int s = db_splhigh();
+			int s = splhigh();
 			db_enable_interrupt();
 			ddb_entry_trap(T_KDB_ENTRY,(db_regs_t*)frame);
 			db_disable_interrupt();
-			db_splx(s);
+			splx(s);
 			return;
 		}
 
 #if 0
 	case T_ILLFLT:
 		{
-			int s = db_splhigh();
+			int s = splhigh();
 			db_enable_interrupt();
 			ddb_error_trap(type == T_ILLFLT ? "unimplemented opcode" :
 				       "error fault", (db_regs_t*)frame);
 			db_disable_interrupt();
-			db_splx(s);
+			splx(s);
 			return;
 		}
 #endif /* 0 */
@@ -336,19 +336,6 @@ m88100_trap(unsigned type, struct m88100_saved_state *frame)
 		/* data fault on a kernel address... */
 		if (frame->dmt0 & DMT_DAS)
 			map = kernel_map;
-
-		/* 
-		 * We don't want to call vm_fault() if it is fuwintr() or
-		 * suwintr(). These routines are for copying from interrupt
-		 * context and vm_fault() can potentially sleep. You may
-		 * wonder if it isn't bad karma for an interrupt handler to	
-		 * touch the current process. Indeed it is, but clock interrupt
-		 * does it while doing profiling. It is OK in that context.
-		 */
-
-		if (p->p_addr->u_pcb.pcb_onfault == (int)fubail ||
-		    p->p_addr->u_pcb.pcb_onfault == (int)subail)
-			goto outtahere;
 
 		/* data fault on the user address */
 		if (type == T_DATAFLT && (frame->dmt0 & DMT_DAS) == 0) {
@@ -452,7 +439,6 @@ m88100_trap(unsigned type, struct m88100_saved_state *frame)
 		if (!p->p_addr->u_pcb.pcb_onfault)
 			panictrap(frame->vector, frame);
 
-outtahere:
 		frame->snip = ((unsigned)p->p_addr->u_pcb.pcb_onfault    ) | FIP_V;
 		frame->sfip = ((unsigned)p->p_addr->u_pcb.pcb_onfault + 4) | FIP_V;
 		frame->sxip = 0;
@@ -591,7 +577,7 @@ outtahere:
 			va = pc;
 
 			/* read break instruction */
-			instr = fuiword((caddr_t)pc);
+			copyin((caddr_t)pc, &instr, sizeof(unsigned));
 #if 0
 			printf("trap: %s (%d) breakpoint %x at %x: (adr %x ins %x)\n",
 			       p->p_comm, p->p_pid, instr, pc,
@@ -760,49 +746,44 @@ m88110_trap(unsigned type, struct m88100_saved_state *frame)
 		/*NOTREACHED*/
    #if defined(DDB)
 	case T_KDB_TRACE:
-		frame->mask = spl(); /* get current spl for reg dump */
-		s = db_splhigh();
+		s = splhigh();
 		db_enable_interrupt();
 		ddb_break_trap(T_KDB_TRACE,(db_regs_t*)frame);
 		db_disable_interrupt();
-		db_splx(s);
+		splx(s);
 		return;
 	case T_KDB_BREAK:
 		/*FALLTHRU*/
 	case T_KDB_BREAK+T_USER:
-		frame->mask = spl(); /* get current spl for reg dump */
-		s = db_splhigh();
-			db_enable_interrupt();
-			ddb_break_trap(T_KDB_BREAK,(db_regs_t*)frame);
-			db_disable_interrupt();
-			db_splx(s);
-			return;
+		s = splhigh();
+		db_enable_interrupt();
+		ddb_break_trap(T_KDB_BREAK,(db_regs_t*)frame);
+		db_disable_interrupt();
+		splx(s);
+		return;
 	case T_KDB_ENTRY:
 		/*FALLTHRU*/
 	case T_KDB_ENTRY+T_USER:
-		frame->mask = spl(); /* get current spl for reg dump */
-		s = db_splhigh();
-			db_enable_interrupt();
-			ddb_entry_trap(T_KDB_ENTRY,(db_regs_t*)frame);
-			db_disable_interrupt();
+		s = splhigh();
+		db_enable_interrupt();
+		ddb_entry_trap(T_KDB_ENTRY,(db_regs_t*)frame);
+		db_disable_interrupt();
 		if (frame->enip) {
 			frame->exip = frame->enip;
 		} else {
                                frame->exip += 4;
 		}
-			db_splx(s);
-			return;
+		splx(s);
+		return;
 #if 0
 	case T_ILLFLT:
-		{
-			int s = db_splhigh();
-			db_enable_interrupt();
-			ddb_error_trap(type == T_ILLFLT ? "unimplemented opcode" :
-				       "error fault", (db_regs_t*)frame);
-			db_disable_interrupt();
-			db_splx(s);
-			return;
-		}
+		s = splhigh();
+		db_enable_interrupt();
+		ddb_error_trap(type == T_ILLFLT ? "unimplemented opcode" :
+		       "error fault", (db_regs_t*)frame);
+		db_disable_interrupt();
+		splx(s);
+		return;
 #endif /* 0 */
 #endif /* DDB */
 	case T_ILLFLT:
@@ -867,19 +848,6 @@ m88110_trap(unsigned type, struct m88100_saved_state *frame)
 			}
 		}
 
-		/* 
-		 * We don't want to call vm_fault() if it is fuwintr() or
-		 * suwintr(). These routines are for copying from interrupt
-		 * context and vm_fault() can potentially sleep. You may
-		 * wonder if it isn't bad karma for an interrupt handler to	
-		 * touch the current process. Indeed it is, but clock interrupt
-		 * does it while doing profiling. It is OK in that context.
-		 */
-
-		if (p->p_addr->u_pcb.pcb_onfault == (int)fubail ||
-		    p->p_addr->u_pcb.pcb_onfault == (int)subail)
-			goto m88110_outtahere;
-
 		/* data fault on the user address */
 		if (type == T_DATAFLT && (frame->dsr & CMMU_DSR_SU) == 0) {
 			type = T_DATAFLT + T_USER;
@@ -941,7 +909,6 @@ m88110_trap(unsigned type, struct m88100_saved_state *frame)
 		if (!p->p_addr->u_pcb.pcb_onfault)
 			panictrap(frame->vector, frame);
 
-m88110_outtahere:
 		frame->exip = ((unsigned)p->p_addr->u_pcb.pcb_onfault);
 		return;
 	case T_INSTFLT+T_USER:
@@ -1095,7 +1062,7 @@ m88110_user_fault:
 			va = pc;
 
 			/* read break instruction */
-			instr = fuiword((caddr_t)pc);
+			copyin((caddr_t)pc, &instr, sizeof(unsigned));
 #if 1
 			printf("trap: %s (%d) breakpoint %x at %x: (adr %x ins %x)\n",
 			       p->p_comm, p->p_pid, instr, pc,
@@ -1832,3 +1799,22 @@ register struct proc *p;
 	return (0);
 }
 
+
+#ifdef DIAGNOSTIC
+void
+splassert_check(int wantipl, const char *func)
+{
+	int oldipl;
+
+	oldipl = getipl();
+
+	if (oldipl < wantipl) {
+		splassert_fail(wantipl, oldipl, func);
+		/*
+		 * If the splassert_ctl is set to not panic, raise the ipl
+		 * in a feeble attempt to reduce damage.
+		 */
+		setipl(wantipl);
+	}
+}
+#endif

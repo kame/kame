@@ -1,4 +1,4 @@
-/*	$OpenBSD: sd.c,v 1.26 2002/06/09 05:23:26 miod Exp $	*/
+/*	$OpenBSD: sd.c,v 1.28 2002/12/25 20:56:59 miod Exp $	*/
 /*	$NetBSD: sd.c,v 1.34 1997/07/10 18:14:10 kleink Exp $	*/
 
 /*
@@ -58,6 +58,8 @@
 
 #include <ufs/ffs/fs.h>			/* for BBSIZE and SBSIZE */
 
+#include <sys/conf.h>
+
 #include <hp300/dev/scsireg.h>
 #include <hp300/dev/scsivar.h>
 #include <hp300/dev/sdvar.h>
@@ -65,13 +67,6 @@
 #ifdef USELEDS
 #include <hp300/hp300/leds.h>
 #endif
-
-/*
-extern void disksort();
-extern void biodone();
-extern int physio();
-extern void TBIS();
-*/
 
 int	sdmatch(struct device *, void *, void *);
 void	sdattach(struct device *, struct device *, void *);
@@ -119,20 +114,10 @@ static char legal_cmds[256] = {
 /*f0*/	0,  0,  0,  0,  0,  0,  0,  0,    0,  0,  0,  0,  0,  0,  0,  0,
 };
 
-/* bdev_decl(sd); */
-/* cdev_decl(sd); */
-/* XXX we should use macros to do these... */
-int	sdopen(dev_t, int, int, struct proc *);
-int	sdclose(dev_t, int, int, struct proc *);
+bdev_decl(sd);
+cdev_decl(sd);
 
-int	sdioctl(dev_t, u_long, caddr_t, int, struct proc *);
-int	sdread(dev_t, struct uio *, int);
 void	sdreset(struct sd_softc *);
-int	sdwrite(dev_t, struct uio *, int);
-
-void	sdstrategy(struct buf *);
-int	sddump(dev_t, daddr_t, caddr_t, size_t);
-int	sdsize(dev_t);
 
 static void 	sdgetgeom(struct sd_softc *);
 static void	sdlblkstrat(struct buf *, int);
@@ -498,7 +483,7 @@ sdgetinfo(dev, sc, lp, spoofonly)
 		lp->d_magic2 = DISKMAGIC;
 		lp->d_checksum = dkcksum(lp);
 
-		errstring = readdisklabel(sdlabdev(dev), sdstrategy, lp, NULL,
+		errstring = readdisklabel(SDLABELDEV(dev), sdstrategy, lp, NULL,
 		    spoofonly);
 	}
 
@@ -524,7 +509,7 @@ sdopen(dev, flags, mode, p)
 	int flags, mode;
 	struct proc *p;
 {
-	int unit = sdunit(dev);
+	int unit = SDUNIT(dev);
 	struct sd_softc *sc;
 	int error, mask, part;
 
@@ -553,7 +538,7 @@ sdopen(dev, flags, mode, p)
 			return(error);
 	}
 
-	part = sdpart(dev);
+	part = SDPART(dev);
 	mask = 1 << part;
 
 	/* Check that the partition exists. */
@@ -583,12 +568,12 @@ sdclose(dev, flag, mode, p)
 	int flag, mode;
 	struct proc *p;
 {
-	int unit = sdunit(dev);
+	int unit = SDUNIT(dev);
 	struct sd_softc *sc = sd_cd.cd_devs[unit];
 	struct disk *dk = &sc->sc_dkdev;
 	int mask, s;
 
-	mask = 1 << sdpart(dev);
+	mask = 1 << SDPART(dev);
 	if (mode == S_IFCHR)
 		dk->dk_copenmask &= ~mask;
 	else
@@ -630,7 +615,7 @@ sdlblkstrat(bp, bsize)
 	struct buf *bp;
 	int bsize;
 {
-	struct sd_softc *sc = sd_cd.cd_devs[sdunit(bp->b_dev)];
+	struct sd_softc *sc = sd_cd.cd_devs[SDUNIT(bp->b_dev)];
 	struct buf *cbp = (struct buf *)malloc(sizeof(struct buf),
 							M_DEVBUF, M_WAITOK);
 	caddr_t cbuf = (caddr_t)malloc(bsize, M_DEVBUF, M_WAITOK);
@@ -720,7 +705,7 @@ void
 sdstrategy(bp)
 	struct buf *bp;
 {
-	int unit = sdunit(bp->b_dev);
+	int unit = SDUNIT(bp->b_dev);
 	struct sd_softc *sc = sd_cd.cd_devs[unit];
 	struct buf *dp = &sc->sc_tab;
 	struct partition *pinfo;
@@ -741,12 +726,12 @@ sdstrategy(bp)
 		}
 		bn = bp->b_blkno;
 		sz = howmany(bp->b_bcount, DEV_BSIZE);
-		pinfo = &sc->sc_dkdev.dk_label->d_partitions[sdpart(bp->b_dev)];
+		pinfo = &sc->sc_dkdev.dk_label->d_partitions[SDPART(bp->b_dev)];
 
 		/* Don't perform partition translation on RAW_PART. */
-		offset = (sdpart(bp->b_dev) == RAW_PART) ? 0 : pinfo->p_offset;
+		offset = (SDPART(bp->b_dev) == RAW_PART) ? 0 : pinfo->p_offset;
 
-		if (sdpart(bp->b_dev) != RAW_PART) {
+		if (SDPART(bp->b_dev) != RAW_PART) {
 			/*
 			 * XXX This block of code belongs in
 			 * XXX bounds_check_with_label()
@@ -1036,7 +1021,7 @@ sdread(dev, uio, flags)
 	struct uio *uio;
 	int flags;
 {
-	int unit = sdunit(dev);
+	int unit = SDUNIT(dev);
 	struct sd_softc *sc = sd_cd.cd_devs[unit];
 	int pid;
 
@@ -1053,7 +1038,7 @@ sdwrite(dev, uio, flags)
 	struct uio *uio;
 	int flags;
 {
-	int unit = sdunit(dev);
+	int unit = SDUNIT(dev);
 	struct sd_softc *sc = sd_cd.cd_devs[unit];
 	int pid;
 
@@ -1072,7 +1057,7 @@ sdioctl(dev, cmd, data, flag, p)
 	int flag;
 	struct proc *p;
 {
-	int unit = sdunit(dev);
+	int unit = SDUNIT(dev);
 	struct sd_softc *sc = sd_cd.cd_devs[unit];
 	struct disklabel *lp = sc->sc_dkdev.dk_label;
 	int error, flags;
@@ -1089,7 +1074,7 @@ sdioctl(dev, cmd, data, flag, p)
 	case DIOCGPART:
 		((struct partinfo *)data)->disklab = lp;
 		((struct partinfo *)data)->part =
-			&lp->d_partitions[sdpart(dev)];
+			&lp->d_partitions[SDPART(dev)];
 		return (0);
 
 	case DIOCWLABEL:
@@ -1121,7 +1106,7 @@ sdioctl(dev, cmd, data, flag, p)
 			return (error);
 		flags = sc->sc_flags;
 		sc->sc_flags = SDF_ALIVE | SDF_WLABEL;
-		error = writedisklabel(sdlabdev(dev), sdstrategy, lp,
+		error = writedisklabel(SDLABELDEV(dev), sdstrategy, lp,
 				      (struct cpu_disklabel *)0);
 		sc->sc_flags = flags;
 		return (error);
@@ -1175,7 +1160,7 @@ int
 sdsize(dev)
 	dev_t dev;
 {
-	int unit = sdunit(dev);
+	int unit = SDUNIT(dev);
 	struct sd_softc *sc = sd_cd.cd_devs[unit];
 	int psize, didopen = 0;
 
@@ -1194,7 +1179,7 @@ sdsize(dev)
 			return(-1);
 		didopen = 1;
 	}
-	psize = sc->sc_dkdev.dk_label->d_partitions[sdpart(dev)].p_size *
+	psize = sc->sc_dkdev.dk_label->d_partitions[SDPART(dev)].p_size *
 	    (sc->sc_dkdev.dk_label->d_secsize / DEV_BSIZE);
 	if (didopen)
 		(void) sdclose(dev, FREAD|FWRITE, S_IFBLK, NULL);
@@ -1229,8 +1214,8 @@ sddump(dev, blkno, va, size)
 	sddoingadump = 1;
 
 	/* Decompose unit and partition. */
-	unit = sdunit(dev);
-	part = sdpart(dev);
+	unit = SDUNIT(dev);
+	part = SDPART(dev);
 
 	/* Make sure device is ok. */
 	if (unit >= sd_cd.cd_ndevs ||

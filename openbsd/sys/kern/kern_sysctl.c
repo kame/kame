@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_sysctl.c,v 1.75 2002/09/01 11:35:52 art Exp $	*/
+/*	$OpenBSD: kern_sysctl.c,v 1.79 2003/01/21 16:59:23 markus Exp $	*/
 /*	$NetBSD: kern_sysctl.c,v 1.17 1996/05/20 17:49:05 mrg Exp $	*/
 
 /*-
@@ -93,6 +93,7 @@ extern  long numvnodes;
 
 int sysctl_diskinit(int, struct proc *);
 int sysctl_proc_args(int *, u_int, void *, size_t *, struct proc *);
+int sysctl_intrcnt(int *, u_int, void *, size_t *);
 
 /*
  * Lock to avoid too many processes vslocking a large amount of memory
@@ -142,7 +143,7 @@ sys___sysctl(p, v, retval)
 	 */
 	if (SCARG(uap, namelen) > CTL_MAXNAME || SCARG(uap, namelen) < 2)
 		return (EINVAL);
-	error = copyin(SCARG(uap, name), &name,
+	error = copyin(SCARG(uap, name), name,
 		       SCARG(uap, namelen) * sizeof(int));
 	if (error)
 		return (error);
@@ -201,7 +202,7 @@ sys___sysctl(p, v, retval)
 		}
 		savelen = oldlen;
 	}
-	error = (*fn)(name + 1, SCARG(uap, namelen) - 1, SCARG(uap, old),
+	error = (*fn)(&name[1], SCARG(uap, namelen) - 1, SCARG(uap, old),
 	    &oldlen, SCARG(uap, new), SCARG(uap, newlen), p);
 	if (SCARG(uap, old) != NULL) {
 		if (dolock)
@@ -256,11 +257,24 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 #endif
 
 	/* all sysctl names at this level are terminal except a ton of them */
-	if (namelen != 1 && !(name[0] == KERN_PROC || name[0] == KERN_PROF ||
-	    name[0] == KERN_MALLOCSTATS || name[0] == KERN_TTY ||
-	    name[0] == KERN_POOL || name[0] == KERN_SYSVIPC_INFO ||
-	    name[0] == KERN_PROC_ARGS))
-		return (ENOTDIR);		/* overloaded */
+	if (namelen != 1) {
+		switch (name[0]) {
+		case KERN_PROC:
+		case KERN_PROF:
+		case KERN_MALLOCSTATS:
+		case KERN_TTY:
+		case KERN_POOL:
+		case KERN_PROC_ARGS:
+		case KERN_SYSVIPC_INFO:
+		case KERN_SEMINFO:
+		case KERN_SHMINFO:
+		case KERN_INTRCNT:
+		case KERN_WATCHDOG:
+			break;
+		default:
+			return (ENOTDIR);	/* overloaded */
+		}
+	}
 
 	switch (name[0]) {
 	case KERN_OSTYPE:
@@ -455,6 +469,21 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	case KERN_SPLASSERT:
 		return (sysctl_int(oldp, oldlenp, newp, newlen,
 		    &splassert_ctl));
+#ifdef SYSVSEM
+	case KERN_SEMINFO:
+		return (sysctl_sysvsem(name + 1, namelen - 1, oldp, oldlenp,
+		    newp, newlen));
+#endif
+#ifdef SYSVSHM
+	case KERN_SHMINFO:
+		return (sysctl_sysvshm(name + 1, namelen - 1, oldp, oldlenp,
+		    newp, newlen));
+#endif
+	case KERN_INTRCNT:
+		return (sysctl_intrcnt(name + 1, namelen - 1, oldp, oldlenp));
+	case KERN_WATCHDOG:
+		return (sysctl_wdog(name + 1, namelen - 1, oldp, oldlenp,
+		    newp, newlen));
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -1395,12 +1424,20 @@ sysctl_sysvipc(name, namelen, where, sizep)
 #endif
 #ifdef SYSVSEM
 			case KERN_SYSVIPC_SEM_INFO:
-				bcopy(&sema[i], &semsi->semids[i], dssize);
+				if (sema[i] != NULL)
+					bcopy(sema[i], &semsi->semids[i],
+					    dssize);
+				else
+					bzero(&semsi->semids[i], dssize);
 				break;
 #endif
 #ifdef SYSVSHM
 			case KERN_SYSVIPC_SHM_INFO:
-				bcopy(&shmsegs[i], &shmsi->shmids[i], dssize);
+				if (shmsegs[i] != NULL)
+					bcopy(shmsegs[i], &shmsi->shmids[i],
+					    dssize);
+				else
+					bzero(&shmsi->shmids[i], dssize);
 				break;
 #endif
 			}
@@ -1414,3 +1451,41 @@ sysctl_sysvipc(name, namelen, where, sizep)
 	return (error ? error : ret);
 }
 #endif /* SYSVMSG || SYSVSEM || SYSVSHM */
+
+int
+sysctl_intrcnt(int *name, u_int namelen, void *oldp, size_t *oldlenp)
+{
+	extern int intrcnt[], eintrcnt[];
+	extern char intrnames[], eintrnames[];
+	char *intrname;
+	int nintr, i;
+
+	nintr = (off_t)(eintrcnt - intrcnt);
+
+	if (name[0] != KERN_INTRCNT_NUM) {
+		if (namelen != 2)
+			return (ENOTDIR);
+		if (name[1] < 0 || name[1] >= nintr)
+			return (EINVAL);
+		i = name[1];
+	}
+
+	switch (name[0]) {
+	case KERN_INTRCNT_NUM:
+		return (sysctl_rdint(oldp, oldlenp, NULL, nintr));
+		break;
+	case KERN_INTRCNT_CNT:
+		return (sysctl_rdint(oldp, oldlenp, NULL, intrcnt[i]));
+	case KERN_INTRCNT_NAME:
+		intrname = intrnames;
+		while (i > 0) {
+			intrname += strlen(intrname) + 1;
+			i--;
+			if (intrname > eintrnames)
+				return (EINVAL);
+		}
+		return (sysctl_rdstring(oldp, oldlenp, NULL, intrname));
+	default:
+		return (EOPNOTSUPP);
+	}
+}

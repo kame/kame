@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.25 2002/09/10 18:29:44 art Exp $	*/
+/*	$OpenBSD: locore.s,v 1.31 2003/03/21 22:59:10 jason Exp $	*/
 /*	$NetBSD: locore.s,v 1.137 2001/08/13 06:10:10 jdolecek Exp $	*/
 
 /*
@@ -70,6 +70,9 @@
 #undef	DCACHE_BUG		/* Flush D$ around ASI_PHYS accesses */
 #undef	NO_TSB			/* Don't use TSB */
 #undef	SCHED_DEBUG
+
+.register %g2,
+.register %g3,
 
 #include "assym.h"
 #include "ksyms.h"
@@ -844,7 +847,7 @@ _C_LABEL(trapbase):
 	VTRAP(0x060, interrupt_vector); ! 060 = interrupt vector
 	TRAP(T_PA_WATCHPT)		! 061 = physical address data watchpoint
 	TRAP(T_VA_WATCHPT)		! 062 = virtual address data watchpoint
-	UTRAP(T_ECCERR)			! We'll implement this one later
+	VTRAP(T_ECCERR, cecc_catch)	! 063 = Correctable ECC error
 ufast_IMMU_miss:			! 064 = fast instr access MMU miss
 	TRACEFLT			! DEBUG
 	ldxa	[%g0] ASI_IMMU_8KPTR, %g2	! Load IMMU 8K TSB pointer
@@ -1080,7 +1083,7 @@ kdatafault:
 	VTRAP(0x060, interrupt_vector); ! 060 = interrupt vector
 	TRAP(T_PA_WATCHPT)		! 061 = physical address data watchpoint
 	TRAP(T_VA_WATCHPT)		! 062 = virtual address data watchpoint
-	UTRAP(T_ECCERR)			! We'll implement this one later
+	VTRAP(T_ECCERR, cecc_catch)	! 063 = Correctable ECC error
 kfast_IMMU_miss:			! 064 = fast instr access MMU miss
 	TRACEFLT			! DEBUG
 	ldxa	[%g0] ASI_IMMU_8KPTR, %g2	! Load IMMU 8K TSB pointer
@@ -2805,8 +2808,9 @@ winfixsave:
 	/* Did we save a user or kernel window ? */
 !	srax	%g3, 48, %g7				! User or kernel store? (TAG TARGET)
 	sllx	%g3, (64-13), %g7			! User or kernel store? (TAG ACCESS)
+	sethi	%hi((2*NBPG)-8), %g7
 	brnz,pt	%g7, 1f					! User fault -- save windows to pcb
-	 set	(2*NBPG)-8, %g7
+	 or	%g7, %lo((2*NBPG)-8), %g7
 
 	and	%g4, CWP, %g4				! %g4 = %cwp of trap
 	wrpr	%g4, 0, %cwp				! Kernel fault -- restore %cwp and force and trap to debugger
@@ -3967,7 +3971,8 @@ interrupt_vector:
 
 setup_sparcintr:
 #ifdef	INTR_INTERLOCK
-	LDPTR	[%g5+IH_PEND], %g6	! Read pending flag
+	ldstub  [%g5+IH_BUSY], %g6	! Check if already in use
+	membar #LoadLoad | #LoadStore
 	brnz,pn	%g6, ret_from_intr_vector ! Skip it if it's running
 #endif
 	 ldub	[%g5+IH_PIL], %g6	! Read interrupt mask
@@ -4008,7 +4013,7 @@ setup_sparcintr:
 	LOCTOGLOB
 	 restore
 97:
-#endif
+#endif	/* DEBUG */ 
 	 dec	%g7
 	brgz,pt	%g7, 1b
 	 inc	PTRSZ, %g1		! Next slot
@@ -4029,9 +4034,10 @@ setup_sparcintr:
 	ta	1
 	LOCTOGLOB
 	restore
-#endif
-#endif	/* INTRLIST */
 2:
+#endif	/* DIAGNOSTIC */
+#endif	/* INTRLIST */
+
 #ifdef DEBUG
 	set	_C_LABEL(intrdebug), %g7
 	ld	[%g7], %g7
@@ -4052,7 +4058,7 @@ setup_sparcintr:
 	LOCTOGLOB
 	restore
 97:
-#endif
+#endif	/* DEBUG */
 	mov	1, %g7
 	sll	%g7, %g6, %g6
 	wr	%g6, 0, SET_SOFTINT	! Invoke a softint
@@ -4221,15 +4227,15 @@ _C_LABEL(sparc_interrupt):
 	sethi	%hi(_C_LABEL(intrcnt)), %l4
 	stb	%l6, [%sp + CC64FSZ + STKB + TF_PIL]	! set up intrframe/clockframe
 	rdpr	%pil, %o1
-	sll	%l6, LNGSHFT, %l3
+	sll	%l6, 2, %l3
 	or	%l4, %lo(_C_LABEL(intrcnt)), %l4	! intrcnt[intlev]++;
 	stb	%o1, [%sp + CC64FSZ + STKB + TF_OLDPIL]	! old %pil
-	LDULNG	[%l4 + %l3], %o0
+	ld	[%l4 + %l3], %o0
 	add	%l4, %l3, %l4
 	clr	%l5			! Zero handled count
 	mov	1, %l3			! Ack softint
 	inc	%o0	
-	STULNG	%o0, [%l4]
+	st	%o0, [%l4]
 	sll	%l3, %l6, %l3		! Generate IRQ mask
 	
 	sethi	%hi(_C_LABEL(handled_intr_level)), %l4
@@ -4266,21 +4272,37 @@ sparc_intr_retry:
 	bne,pn	%icc, 1b
 	 add	%sp, CC64FSZ+STKB, %o2	! tf = %sp + CC64FSZ + STKB
 2:
+	LDPTR	[%l2 + IH_PEND], %l7	! Load next pending
 	LDPTR	[%l2 + IH_FUN], %o4	! ih->ih_fun
 	LDPTR	[%l2 + IH_ARG], %o0	! ih->ih_arg
+	LDPTR	[%l2 + IH_CLR], %l1	! ih->ih_clear
+
+	STPTR	%g0, [%l2 + IH_PEND]	! Unlink from list
+
+	! Note that the function handler itself or an interrupt
+	! may add handlers to the pending pending. This includes
+	! the current entry in %l2 and entries held on our local
+	! pending list in %l7.  The former is ok because we are
+	! done with it now and the latter because they are still
+	! marked busy. We may also be able to do this by having
+	! the soft interrupts use a variation of the hardware
+	! interrupts' ih_clr scheme.  Note:  The busy flag does
+	! not itself prevent the handler from being entered
+	! recursively.  It only indicates that the handler is
+	! about to be invoked and that it should not be added
+	! to the pending table.
+	membar	#StoreStore | #LoadStore
+	stb	%g0, [%l2 + IH_BUSY]	! Allow the ih to be reused
+
+	! At this point, the current ih could already be added
+	! back to the pending table.
 
 	jmpl	%o4, %o7		! handled = (*ih->ih_fun)(...)
 	 movrz	%o0, %o2, %o0		! arg = (arg == 0) ? arg : tf
-	LDPTR	[%l2 + IH_PEND], %l7	! Clear pending flag
-	LDPTR	[%l2 + IH_CLR], %l1
-	membar	#LoadStore
-	STPTR	%g0, [%l2 + IH_PEND]	! Clear pending flag
-	membar	#Sync
 
 	brz,pn	%l1, 0f
-	 add	%l5, %o0, %l5
+	 add	%l5, %o0, %l5		! Add handler return value
 	stx	%g0, [%l1]		! Clear intr source
-	membar	#Sync			! Should not be needed
 0:
 	brnz,pn	%l7, 2b			! 'Nother?
 	 mov	%l7, %l2
@@ -7749,30 +7771,9 @@ ENTRY(proc_trampoline)
 	ba,a,pt	%icc, return_from_trap
 	 nop
 
-/*
- * {fu,su}{,i}{byte,word}
- */
-ALTENTRY(fuiword)
-ENTRY(fuword)
-	btst	3, %o0			! has low bits set...
-	bnz	Lfsbadaddr		!	go return -1
-	EMPTY
-	sethi	%hi(CPCB), %o2		! cpcb->pcb_onfault = Lfserr;
-	set	Lfserr, %o3
-	LDPTR	[%o2 + %lo(CPCB)], %o2
-	membar	#LoadStore
-	STPTR	%o3, [%o2 + PCB_ONFAULT]
-	membar	#Sync
-	LDPTRA	[%o0] ASI_AIUS, %o0	! fetch the word
-	membar	#Sync
-	STPTR	%g0, [%o2 + PCB_ONFAULT]! but first clear onfault
-	retl				! phew, made it, return the word
-	 membar	#StoreStore|#StoreLoad
-
 Lfserr:
 	STPTR	%g0, [%o2 + PCB_ONFAULT]! error in r/w, clear pcb_onfault
 	membar	#StoreStore|#StoreLoad
-Lfsbadaddr:
 #ifndef _LP64
 	mov	-1, %o1
 #endif
@@ -7790,104 +7791,6 @@ _C_LABEL(Lfsbail):
 	membar	#StoreStore|#StoreLoad
 	retl				! and return error indicator
 	 mov	-1, %o0
-
-	/*
-	 * Like fusword but callable from interrupt context.
-	 * Fails if data isn't resident.
-	 */
-ENTRY(fuswintr)
-	sethi	%hi(CPCB), %o2		! cpcb->pcb_onfault = _Lfsbail;
-	LDPTR	[%o2 + %lo(CPCB)], %o2
-	set	_C_LABEL(Lfsbail), %o3
-	STPTR	%o3, [%o2 + PCB_ONFAULT]
-	membar	#Sync
-	lduha	[%o0] ASI_AIUS, %o0	! fetch the halfword
-	membar	#Sync
-	STPTR	%g0, [%o2 + PCB_ONFAULT]! but first clear onfault
-	retl				! made it
-	 membar	#StoreStore|#StoreLoad
-
-ENTRY(fusword)
-	sethi	%hi(CPCB), %o2		! cpcb->pcb_onfault = Lfserr;
-	LDPTR	[%o2 + %lo(CPCB)], %o2
-	set	Lfserr, %o3
-	STPTR	%o3, [%o2 + PCB_ONFAULT]
-	membar	#Sync
-	lduha	[%o0] ASI_AIUS, %o0		! fetch the halfword
-	membar	#Sync
-	STPTR	%g0, [%o2 + PCB_ONFAULT]! but first clear onfault
-	retl				! made it
-	 membar	#StoreStore|#StoreLoad
-
-ALTENTRY(fuibyte)
-ENTRY(fubyte)
-	sethi	%hi(CPCB), %o2		! cpcb->pcb_onfault = Lfserr;
-	LDPTR	[%o2 + %lo(CPCB)], %o2
-	set	Lfserr, %o3
-	STPTR	%o3, [%o2 + PCB_ONFAULT]
-	membar	#Sync
-	lduba	[%o0] ASI_AIUS, %o0	! fetch the byte
-	membar	#Sync
-	STPTR	%g0, [%o2 + PCB_ONFAULT]! but first clear onfault
-	retl				! made it
-	 membar	#StoreStore|#StoreLoad
-
-ALTENTRY(suiword)
-ENTRY(suword)
-	btst	3, %o0			! or has low bits set ...
-	bnz	Lfsbadaddr		!	go return error
-	EMPTY
-	sethi	%hi(CPCB), %o2		! cpcb->pcb_onfault = Lfserr;
-	LDPTR	[%o2 + %lo(CPCB)], %o2
-	set	Lfserr, %o3
-	STPTR	%o3, [%o2 + PCB_ONFAULT]
-	membar	#Sync
-	STPTRA	%o1, [%o0] ASI_AIUS	! store the word
-	membar	#Sync
-	STPTR	%g0, [%o2 + PCB_ONFAULT]! made it, clear onfault
-	membar	#StoreStore|#StoreLoad
-	retl				! and return 0
-	 clr	%o0
-
-ENTRY(suswintr)
-	sethi	%hi(CPCB), %o2		! cpcb->pcb_onfault = _Lfsbail;
-	LDPTR	[%o2 + %lo(CPCB)], %o2
-	set	_C_LABEL(Lfsbail), %o3
-	STPTR	%o3, [%o2 + PCB_ONFAULT]
-	membar	#Sync
-	stha	%o1, [%o0] ASI_AIUS	! store the halfword
-	membar	#Sync
-	STPTR	%g0, [%o2 + PCB_ONFAULT]! made it, clear onfault
-	membar	#StoreStore|#StoreLoad
-	retl				! and return 0
-	 clr	%o0
-
-ENTRY(susword)
-	sethi	%hi(CPCB), %o2		! cpcb->pcb_onfault = Lfserr;
-	LDPTR	[%o2 + %lo(CPCB)], %o2
-	set	Lfserr, %o3
-	STPTR	%o3, [%o2 + PCB_ONFAULT]
-	membar	#Sync
-	stha	%o1, [%o0] ASI_AIUS	! store the halfword
-	membar	#Sync
-	STPTR	%g0, [%o2 + PCB_ONFAULT]! made it, clear onfault
-	membar	#StoreStore|#StoreLoad
-	retl				! and return 0
-	 clr	%o0
-
-ALTENTRY(suibyte)
-ENTRY(subyte)
-	sethi	%hi(CPCB), %o2		! cpcb->pcb_onfault = Lfserr;
-	LDPTR	[%o2 + %lo(CPCB)], %o2
-	set	Lfserr, %o3
-	STPTR	%o3, [%o2 + PCB_ONFAULT]
-	membar	#Sync
-	stba	%o1, [%o0] ASI_AIUS	! store the byte
-	membar	#Sync
-	STPTR	%g0, [%o2 + PCB_ONFAULT]! made it, clear onfault
-	membar	#StoreStore|#StoreLoad
-	retl				! and return 0
-	 clr	%o0
 
 /* probeget and probeset are meant to be used during autoconfiguration */
 /*
@@ -11573,6 +11476,60 @@ ENTRY(loadfpstate)
 	ta	1
 	retl
 	 nop
+
+/* XXX belongs elsewhere (ctlreg.h?) */
+#define	AFSR_CECC_ERROR		0x100000	/* AFSR Correctable ECC err */
+#define	DATAPATH_CE		0x100		/* Datapath Correctable Err */
+
+	.data
+	_ALIGN
+	.globl	_C_LABEL(cecclast), _C_LABEL(ceccerrs)
+_C_LABEL(cecclast):
+	.xword 0
+_C_LABEL(ceccerrs):
+	.word 0
+	_ALIGN
+	.text
+
+/*
+ * ECC Correctable Error handler - this doesn't do much except intercept
+ * the error and reset the status bits.
+ */
+ENTRY(cecc_catch)
+	ldxa	[%g0] ASI_AFSR, %g1			! g1 = AFSR
+	ldxa	[%g0] ASI_AFAR, %g2			! g2 = AFAR
+
+	sethi	%hi(cecclast), %g1			! cecclast = AFAR
+	or	%g1, %lo(cecclast), %g1
+	stx	%g2, [%g1]
+
+	sethi	%hi(ceccerrs), %g1			! get current count
+	or	%g1, %lo(ceccerrs), %g1
+	lduw	[%g1], %g2				! g2 = ceccerrs
+
+	ldxa	[%g0] ASI_DATAPATH_ERR_REG_READ, %g3	! Read UDB-Low status
+	andcc	%g3, DATAPATH_CE, %g4			! Check CE bit
+	be,pn	%xcc, 1f				! Don't clear unless
+	 nop						!  necessary
+	stxa	%g4, [%g0] ASI_DATAPATH_ERR_REG_WRITE	! Clear CE bit in UDBL
+	membar	#Sync					! sync store
+	inc	%g2					! ceccerrs++
+1:	mov	0x18, %g5
+	ldxa	[%g5] ASI_DATAPATH_ERR_REG_READ, %g3	! Read UDB-High status
+	andcc	%g3, DATAPATH_CE, %g4			! Check CE bit
+	be,pn	%xcc, 1f				! Don't clear unless
+	 nop						!  necessary
+	stxa	%g4, [%g5] ASI_DATAPATH_ERR_REG_WRITE	! Clear CE bit in UDBH
+	membar	#Sync					! sync store
+	inc	%g2					! ceccerrs++
+1:	set	AFSR_CECC_ERROR, %g3
+	stxa	%g3, [%g0] ASI_AFSR			! Clear CE in AFSR
+	stw	%g2, [%g1]				! set ceccerrs
+	membar	#Sync					! sync store
+        CLRTT
+        retry
+        NOTREACHED
+
 /*
  * ienab_bis(bis) int bis;
  * ienab_bic(bic) int bic;
@@ -11608,15 +11565,17 @@ ENTRY(ienab_bic)
  */
 ENTRY(send_softint)
 	rdpr	%pil, %g1	! s = splx(level)
-	cmp	%g1, %o1
-	bge,pt	%icc, 1f
-	 nop
-	wrpr	%o1, 0, %pil
+	!cmp	%g1, %o1
+	!bge,pt	%icc, 1f
+	! nop
+	wrpr	%g0, PIL_HIGH, %pil
 1:
 	brz,pn	%o2, 1f
-	 set	intrpending, %o3
-	LDPTR	[%o2 + IH_PEND], %o5
-	mov	8, %o4			! Number of slots to search
+	 mov	8, %o4			! Number of slots to search
+	set	intrpending, %o3
+
+	ldstub	[%o2 + IH_BUSY], %o5
+	membar #LoadLoad | #LoadStore
 #ifdef INTR_INTERLOCK
 	brnz	%o5, 1f
 #endif
@@ -12030,7 +11989,7 @@ _C_LABEL(intrnames):
 _C_LABEL(eintrnames):
 	_ALIGN
 _C_LABEL(intrcnt):
-	.space	16 * LNGSZ
+	.space	16 * 4
 _C_LABEL(eintrcnt):
 
 	.comm	_C_LABEL(curproc), PTRSZ

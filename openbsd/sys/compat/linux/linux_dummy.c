@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_dummy.c,v 1.8 2002/06/02 22:49:59 deraadt Exp $ */
+/*	$OpenBSD: linux_dummy.c,v 1.10 2002/10/30 20:10:48 millert Exp $ */
 
 /*-
  * Copyright (c) 1994-1995 Søren Schmidt
@@ -113,12 +113,8 @@ DUMMY(lchown);			/* #198 */
 DUMMY(setreuid);		/* #203 */
 DUMMY(setregid);		/* #204 */
 DUMMY(fchown);			/* #207 */
-DUMMY(setresuid);		/* #208 */
-DUMMY(setresgid);		/* #210 */
-DUMMY(getresgid);		/* #211 */
 DUMMY(chown);			/* #212 */
 DUMMY(setfsgid);		/* #216 */
 DUMMY(pivot_root);		/* #217 */
 DUMMY(mincore);			/* #218 */
 DUMMY(madvise);			/* #219 */
-DUMMY(getdents64);		/* #220 */

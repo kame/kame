@@ -1,4 +1,4 @@
-/*	$OpenBSD: mpcpcibus.c,v 1.14 2002/09/15 09:01:59 deraadt Exp $ */
+/*	$OpenBSD: mpcpcibus.c,v 1.18 2003/02/26 21:54:44 drahn Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom
@@ -239,7 +239,7 @@ mpcpcibrattach(parent, self, aux)
 			if ( bus_space_map(&(sc->sc_iobus_space), 0, NBPG, 0,
 				&lcp->ioh_cf8) != 0 )
 			{
-				panic("mpcpcibus: unable to map self\n");
+				panic("mpcpcibus: unable to map self");
 			}
 			lcp->ioh_cfc = lcp->ioh_cf8;
 		} else {
@@ -252,12 +252,12 @@ mpcpcibrattach(parent, self, aux)
 			if ( bus_space_map(&(sc->sc_iobus_space), 0xfec00000,
 				NBPG, 0, &lcp->ioh_cf8) != 0 )
 			{
-				panic("mpcpcibus: unable to map self\n");
+				panic("mpcpcibus: unable to map self");
 			}
 			if ( bus_space_map(&(sc->sc_iobus_space), 0xfee00000,
 				NBPG, 0, &lcp->ioh_cfc) != 0 )
 			{
-				panic("mpcpcibus: unable to map self\n");
+				panic("mpcpcibus: unable to map self");
 			}
 		}
 
@@ -367,8 +367,10 @@ mpcpcibrattach(parent, self, aux)
 
 				sc->sc_membus_space.bus_base = 0;
 				sc->sc_membus_space.bus_reverse = 1;
+				sc->sc_membus_space.bus_io = 0;
 				sc->sc_iobus_space.bus_base = 0;
 				sc->sc_iobus_space.bus_reverse = 1;
+				sc->sc_iobus_space.bus_io = 1;
 
 				/* find io(config) base, flag == 0x01000000 */
 				found = 0;
@@ -460,12 +462,12 @@ mpcpcibrattach(parent, self, aux)
 			if ( bus_space_map(&(sc->sc_iobus_space), addr_offset,
 				NBPG, 0, &lcp->ioh_cf8) != 0 )
 			{
-				panic("mpcpcibus: unable to map self\n");
+				panic("mpcpcibus: unable to map self");
 			}
 			if ( bus_space_map(&(sc->sc_iobus_space), data_offset,
 				NBPG, 0, &lcp->ioh_cfc) != 0 )
 			{
-				panic("mpcpcibus: unable to map self\n");
+				panic("mpcpcibus: unable to map self");
 			}
 			of_node = ca->ca_node;
 
@@ -638,7 +640,7 @@ fix_node_irq(node, pba)
 	}
 
 	/* if this node has a AAPL,interrupts property, firmware
-	 * has intialized the register correctly.
+	 * has initialized the register correctly.
 	 */
 	len = OF_getprop(node, "AAPL,interrupts", &intr, 4);
 	if (len != 4) {
@@ -872,7 +874,7 @@ mpc_conf_read(cpv, tag, offset)
 	s = splhigh();
 
 	oldh = curpcb->pcb_onfault;
-	if (setfault(env)) {
+	if (setfault(&env)) {
 		/* we faulted during the read? */
 		curpcb->pcb_onfault = oldh;
 		return 0xffffffff;

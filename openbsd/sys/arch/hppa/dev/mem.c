@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.14 2002/09/05 21:36:28 mickey Exp $	*/
+/*	$OpenBSD: mem.c,v 1.17 2003/01/22 14:44:55 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998-2002 Michael Shalayeff
@@ -151,7 +151,7 @@ memattach(parent, self, aux)
 	if (ca->ca_hpa == (hppa_hpa_t)VIPER_HPA) {
 
 		sc->sc_vp = (struct vi_trs *)
-			&((struct iomod *)ca->ca_hpa)->priv_trs;
+		    &((struct iomod *)ca->ca_hpa)->priv_trs;
 
 		printf(" viper rev %x,", sc->sc_vp->vi_status.hw_rev);
 #if 0
@@ -169,20 +169,20 @@ memattach(parent, self, aux)
 			sc->sc_vp->vi_control = VI_CTRL;
 			splx(s);
 
-			printf (" >> %b, ", VI_CTRL, VIPER_BITS);
+			printf (" >> %b,", VI_CTRL, VIPER_BITS);
 		}
 #endif
 	} else
 		sc->sc_vp = NULL;
 
 	if ((err = pdc_call((iodcio_t)pdc, 0, PDC_IODC, PDC_IODC_NINIT,
-			    &pdc_minit, ca->ca_hpa, PAGE0->imm_spa_size)) < 0)
+	    &pdc_minit, ca->ca_hpa, PAGE0->imm_spa_size)) < 0)
 		pdc_minit.max_spa = PAGE0->imm_max_mem;
 
-	printf (" size %d", pdc_minit.max_spa / (1024*1024));
+	printf(" size %d", pdc_minit.max_spa / (1024*1024));
 	if (pdc_minit.max_spa % (1024*1024))
-		printf (".%d", pdc_minit.max_spa % (1024*1024));
-	printf ("MB\n");
+		printf(".%d", pdc_minit.max_spa % (1024*1024));
+	printf("MB\n");
 }
 
 void
@@ -271,7 +271,8 @@ mmrw(dev, uio, flags)
 			o = v & PGOFSET;
 			c = min(uio->uio_resid, (int)(PAGE_SIZE - o));
 			rw = (uio->uio_rw == UIO_READ) ? B_READ : B_WRITE;
-			if (!uvm_kernacc((caddr_t)v, c, rw)) {
+			if (btoc(v) > totalphysmem &&
+			    !uvm_kernacc((caddr_t)v, c, rw)) {
 				error = EFAULT;
 				/* this will break us out of the loop */
 				continue;

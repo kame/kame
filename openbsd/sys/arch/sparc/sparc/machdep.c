@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.85 2002/08/12 16:35:40 miod Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.91 2003/01/09 22:27:10 miod Exp $	*/
 /*	$NetBSD: machdep.c,v 1.85 1997/09/12 08:55:02 pk Exp $ */
 
 /*
@@ -65,12 +65,6 @@
 #include <sys/syscallargs.h>
 #ifdef SYSVMSG
 #include <sys/msg.h>
-#endif
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
-#ifdef SYSVSHM
-#include <sys/shm.h>
 #endif
 #include <sys/exec.h>
 #include <sys/sysctl.h>
@@ -250,6 +244,8 @@ cpu_startup()
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
+
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
@@ -264,7 +260,8 @@ cpu_startup()
 	 */
 	dvma_base = CPU_ISSUN4M ? DVMA4M_BASE : DVMA_BASE;
 	dvma_end = CPU_ISSUN4M ? DVMA4M_END : DVMA_END;
-	phys_map = uvm_map_create(pmap_kernel(), dvma_base, dvma_end, 1);
+	phys_map = uvm_map_create(pmap_kernel(), dvma_base, dvma_end,
+	    VM_MAP_INTRSAFE);
 	if (phys_map == NULL)
 		panic("unable to create DVMA map");
 	/*
@@ -308,18 +305,6 @@ allocsys(v)
 
 #define	valloc(name, type, num) \
 	    v = (caddr_t)(((name) = (type *)v) + (num))
-#ifdef SYSVSHM
-	shminfo.shmmax = shmmaxpgs;
-	shminfo.shmall = shmmaxpgs;
-	shminfo.shmseg = shmseg;
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
-#ifdef SYSVSEM
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns);
-	/* This is pretty disgusting! */
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
 #ifdef SYSVMSG
 	valloc(msgpool, char, msginfo.msgmax);
 	valloc(msgmaps, struct msgmap, msginfo.msgseg);
@@ -463,6 +448,7 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	int oldval;
 #endif
 	int ret;
+	extern int v8mul;
 
 	/* all sysctl names are this level are terminal */
 	if (namelen != 1)
@@ -497,6 +483,8 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 #endif
 	case CPU_CPUTYPE:
 		return (sysctl_rdint(oldp, oldlenp, newp, cputyp));
+	case CPU_V8MUL:
+		return (sysctl_rdint(oldp, oldlenp, newp, v8mul));
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -590,7 +578,8 @@ sendsig(catcher, sig, mask, code, type, val)
 	write_user_windows();
 	/* XXX do not copyout siginfo if not needed */
 	if (rwindow_save(p) || copyout((caddr_t)&sf, (caddr_t)fp, sizeof sf) ||
-	    suword(&((struct rwindow *)newsp)->rw_in[6], oldsp)) {
+	    copyout(&oldsp, &((struct rwindow *)newsp)->rw_in[6],
+	      sizeof(register_t)) != 0) {
 		/*
 		 * Process has trashed its stack; give it an illegal
 		 * instruction to halt it in its tracks.
@@ -648,8 +637,9 @@ sys_sigreturn(p, v, retval)
 	struct sys_sigreturn_args /* {
 		syscallarg(struct sigcontext *) sigcntxp;
 	} */ *uap = v;
-	struct sigcontext *scp;
+	struct sigcontext ksc;
 	struct trapframe *tf;
+	int error;
 
 	/* First ensure consistent stack state (see sendsig). */
 	write_user_windows();
@@ -660,29 +650,28 @@ sys_sigreturn(p, v, retval)
 		printf("sigreturn: %s[%d], sigcntxp %p\n",
 		    p->p_comm, p->p_pid, SCARG(uap, sigcntxp));
 #endif
-	scp = SCARG(uap, sigcntxp);
-	if ((int)scp & 3 || uvm_useracc((caddr_t)scp, sizeof *scp, B_WRITE) == 0)
-		return (EINVAL);
+	if ((error = copyin(SCARG(uap, sigcntxp), &ksc, sizeof(ksc))) != 0)
+		return (error);
 	tf = p->p_md.md_tf;
 	/*
 	 * Only the icc bits in the psr are used, so it need not be
 	 * verified.  pc and npc must be multiples of 4.  This is all
 	 * that is required; if it holds, just do it.
 	 */
-	if (((scp->sc_pc | scp->sc_npc) & 3) != 0)
+	if (((ksc.sc_pc | ksc.sc_npc) & 3) != 0)
 		return (EINVAL);
 	/* take only psr ICC field */
-	tf->tf_psr = (tf->tf_psr & ~PSR_ICC) | (scp->sc_psr & PSR_ICC);
-	tf->tf_pc = scp->sc_pc;
-	tf->tf_npc = scp->sc_npc;
-	tf->tf_global[1] = scp->sc_g1;
-	tf->tf_out[0] = scp->sc_o0;
-	tf->tf_out[6] = scp->sc_sp;
-	if (scp->sc_onstack & 1)
+	tf->tf_psr = (tf->tf_psr & ~PSR_ICC) | (ksc.sc_psr & PSR_ICC);
+	tf->tf_pc = ksc.sc_pc;
+	tf->tf_npc = ksc.sc_npc;
+	tf->tf_global[1] = ksc.sc_g1;
+	tf->tf_out[0] = ksc.sc_o0;
+	tf->tf_out[6] = ksc.sc_sp;
+	if (ksc.sc_onstack & 1)
 		p->p_sigacts->ps_sigstk.ss_flags |= SS_ONSTACK;
 	else
 		p->p_sigacts->ps_sigstk.ss_flags &= ~SS_ONSTACK;
-	p->p_sigmask = scp->sc_mask & ~sigcantmask;
+	p->p_sigmask = ksc.sc_mask & ~sigcantmask;
 	return (EJUSTRETURN);
 }
 
@@ -995,6 +984,7 @@ mapdev(phys, virt, offset, size)
 		va += PAGE_SIZE;
 		pa += PAGE_SIZE;
 	} while ((size -= PAGE_SIZE) > 0);
+	pmap_update(pmap_kernel());
 	return (ret);
 }
 

@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.91 2002/09/26 21:44:37 deraadt Exp $
+#	$OpenBSD: GENERIC,v 1.93 2003/02/28 21:29:08 tedu Exp $
 #
 #	Machine-independent option; used by all architectures for their
 #	GENERIC kernel
@@ -50,11 +50,12 @@ option		MSDOSFS		# MS-DOS file system
 option		FDESC		# /dev/fd
 option		FIFO		# FIFOs; RECOMMENDED
 option		KERNFS		# /kern
-option		NULLFS		# loopback file system
 option		PORTAL		# dynamically created filesystem objects
 option		PROCFS		# /proc
-option		UMAPFS		# NULLFS + uid and gid remapping
-option		UNION		# union file system
+# layer filesystems.  not yet functional
+#option		NULLFS		# loopback file system
+#option		UMAPFS		# NULLFS + uid and gid remapping
+#option		UNION		# union file system
 
 #option		GATEWAY		# packet forwarding
 option		INET		# IP + ICMP + TCP + UDP
@@ -75,8 +76,9 @@ option		PPP_BSDCOMP	# PPP BSD compression
 option		PPP_DEFLATE
 #option		MROUTING	# Multicast router
 
-pseudo-device	pf	1	# packet filter
-pseudo-device	pflog	1	# pf log if
+pseudo-device	pf		# packet filter
+pseudo-device	pflog		# pf log if
+pseudo-device	pfsync		# pf sync if
 pseudo-device	loop	2	# network loopback
 pseudo-device	bpfilter 8	# packet filter
 pseudo-device	sl	2	# CSLIP

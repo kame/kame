@@ -1,7 +1,7 @@
-/*      $OpenBSD: ata.c,v 1.13 2001/09/21 17:55:43 miod Exp $      */
+/*      $OpenBSD: ata.c,v 1.16 2003/02/28 19:22:37 grange Exp $      */
 /*      $NetBSD: ata.c,v 1.9 1999/04/15 09:41:09 bouyer Exp $      */
 /*
- * Copyright (c) 1998 Manuel Bouyer.  All rights reserved.
+ * Copyright (c) 1998, 2001 Manuel Bouyer.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -49,9 +49,10 @@
 #define DEBUG_PROBE  0x10
 #ifdef WDCDEBUG
 extern int wdcdebug_mask; /* init'ed in wdc.c */
-#define WDCDEBUG_PRINT(args, level) \
-        if (wdcdebug_mask & (level)) \
-		printf args
+#define WDCDEBUG_PRINT(args, level) do {	\
+	if ((wdcdebug_mask & (level)) != 0)	\
+		printf args;			\
+} while (0)
 #else
 #define WDCDEBUG_PRINT(args, level)
 #endif
@@ -81,7 +82,7 @@ ata_get_params(drvp, flags, prms)
 		wdc_c.r_command = WDCC_IDENTIFY;
 		wdc_c.r_st_bmask = WDCS_DRDY;
 		wdc_c.r_st_pmask = WDCS_DRQ;
-		wdc_c.timeout = 1000; /* 1s */
+		wdc_c.timeout = 3000; /* 3s */
 	} else if (drvp->drive_flags & DRIVE_ATAPI) {
 		wdc_c.r_command = ATAPI_IDENTIFY_DEVICE;
 		wdc_c.r_st_bmask = 0;

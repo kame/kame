@@ -1,4 +1,4 @@
-/*	$OpenBSD: xform.c,v 1.19 2002/08/16 22:47:25 dhartmei Exp $	*/
+/*	$OpenBSD: xform.c,v 1.22 2003/02/19 02:38:42 jason Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -84,6 +84,10 @@ void blf_zerokey(u_int8_t **);
 void cast5_zerokey(u_int8_t **);
 void skipjack_zerokey(u_int8_t **);
 void rijndael128_zerokey(u_int8_t **);
+void null_encrypt(caddr_t, u_int8_t *);
+void null_zerokey(u_int8_t **);
+void null_setkey(u_int8_t **, u_int8_t *, int);
+void null_decrypt(caddr_t, u_int8_t *);
 
 int MD5Update_int(void *, u_int8_t *, u_int16_t);
 int SHA1Update_int(void *, u_int8_t *, u_int16_t);
@@ -91,6 +95,7 @@ int RMD160Update_int(void *, u_int8_t *, u_int16_t);
 
 u_int32_t deflate_compress(u_int8_t *, u_int32_t, u_int8_t **);
 u_int32_t deflate_decompress(u_int8_t *, u_int32_t, u_int8_t **);
+u_int32_t lzs_dummy(u_int8_t *, u_int32_t, u_int8_t **);
 
 /* Encryption instances */
 struct enc_xform enc_xform_des = {
@@ -156,6 +161,15 @@ struct enc_xform enc_xform_arc4 = {
 	NULL,
 };
 
+struct enc_xform enc_xform_null = {
+	CRYPTO_NULL, "NULL",
+	8, 24, 24,
+	null_encrypt,
+	null_decrypt,
+	null_setkey,
+	null_zerokey,
+};
+
 /* Authentication instances */
 struct auth_hash auth_hash_hmac_md5_96 = {
 	CRYPTO_MD5_HMAC, "HMAC-MD5",
@@ -211,6 +225,12 @@ struct comp_algo comp_algo_deflate = {
 	CRYPTO_DEFLATE_COMP, "Deflate",
 	90, deflate_compress,
 	deflate_decompress
+};
+
+struct comp_algo comp_algo_lzs = {
+	CRYPTO_LZS_COMP, "LZS",
+	90, lzs_dummy,
+	lzs_dummy
 };
 
 /*
@@ -300,6 +320,26 @@ blf_zerokey(u_int8_t **sched)
 	bzero(*sched, sizeof(blf_ctx));
 	FREE(*sched, M_CRYPTO_DATA);
 	*sched = NULL;
+}
+
+void
+null_setkey(u_int8_t **sched, u_int8_t *key, int len)
+{
+}
+
+void
+null_zerokey(u_int8_t **sched)
+{
+}
+
+void
+null_encrypt(caddr_t key, u_int8_t *blk)
+{
+}
+
+void
+null_decrypt(caddr_t key, u_int8_t *blk)
+{
 }
 
 void
@@ -444,4 +484,14 @@ deflate_decompress(data, size, out)
 	u_int8_t **out;
 {
 	return deflate_global(data, size, 1, out);
+}
+
+u_int32_t
+lzs_dummy(data, size, out)
+	u_int8_t *data;
+	u_int32_t size;
+	u_int8_t **out;
+{
+	*out = NULL;
+	return (0);
 }

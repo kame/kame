@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tx.c,v 1.23 2002/06/03 20:01:36 deraadt Exp $	*/
+/*	$OpenBSD: if_tx.c,v 1.26 2002/12/15 13:18:50 henning Exp $	*/
 /* $FreeBSD: src/sys/pci/if_tx.c,v 1.45 2001/02/07 20:11:02 semenu Exp $ */
 
 /*-
@@ -205,13 +205,11 @@ epic_openbsd_probe(
     void *aux )
 {
 	struct pci_attach_args *pa = aux;
-	if( PCI_VENDOR(pa->pa_id) != SMC_VENDORID )
-		return 0;
 
-	if( PCI_PRODUCT(pa->pa_id) == SMC_DEVICEID_83C170 )
-		return 1;
-
-	return 0;
+	if (PCI_VENDOR(pa->pa_id) == SMC_VENDORID &&
+	    PCI_PRODUCT(pa->pa_id) == SMC_DEVICEID_83C170)
+		return (1);
+	return (0);
 }
 
 void
@@ -261,6 +259,7 @@ epic_openbsd_attach(
 	ifp->if_ioctl = epic_ifioctl;
 	ifp->if_start = epic_ifstart;
 	ifp->if_watchdog = epic_ifwatchdog;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Fetch card id */
 	sc->cardvend = pci_conf_read(pc, pa->pa_tag, PCI_SUBVEND_0);
@@ -1118,7 +1117,7 @@ epic_ifwatchdog(ifp)
 		epic_init(sc);
 
 	} else 
-		printf("seems we can continue normaly\n");
+		printf("seems we can continue normally\n");
 
 	/* Start output */
 	if( !IFQ_IS_EMPTY( &ifp->if_snd ) ) epic_ifstart( ifp );

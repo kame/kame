@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_mmap.c,v 1.35 2002/08/23 00:53:51 pvalchev Exp $	*/
+/*	$OpenBSD: uvm_mmap.c,v 1.38 2003/01/09 22:27:12 miod Exp $	*/
 /*	$NetBSD: uvm_mmap.c,v 1.49 2001/02/18 21:19:08 chs Exp $	*/
 
 /*
@@ -158,14 +158,12 @@ sys_mincore(p, v, retval)
 
 	npgs = len >> PAGE_SHIFT;
 
-	if (uvm_useracc(vec, npgs, B_WRITE) == FALSE)
-		return (EFAULT);
-
 	/*
 	 * Lock down vec, so our returned status isn't outdated by
 	 * storing the status byte for a page.
 	 */
-	uvm_vslock(p, vec, npgs, VM_PROT_WRITE);
+	if ((error = uvm_vslock(p, vec, npgs, VM_PROT_WRITE)) != 0)
+		return (error);
 
 	vm_map_lock_read(map);
 
@@ -198,9 +196,10 @@ sys_mincore(p, v, retval)
 			KASSERT(!UVM_OBJ_IS_KERN_OBJECT(entry->object.uvm_obj));
 			if (entry->object.uvm_obj->pgops->pgo_releasepg
 			    == NULL) {
+				pgi = 1;
 				for (/* nothing */; start < lim;
 				     start += PAGE_SIZE, vec++)
-					subyte(vec, 1);
+					copyout(&pgi, vec, sizeof(char));
 				continue;
 			}
 		}
@@ -242,7 +241,7 @@ sys_mincore(p, v, retval)
 				}
 			}
 
-			(void) subyte(vec, pgi);
+			copyout(&pgi, vec, sizeof(char));
 		}
 
 		if (uobj != NULL)
@@ -685,7 +684,7 @@ sys_munmap(p, v, retval)
 	/*
 	 * doit!
 	 */
-	(void) uvm_unmap_remove(map, addr, addr + size, &dead_entries);
+	uvm_unmap_remove(map, addr, addr + size, &dead_entries);
 
 	vm_map_unlock(map);	/* and unlock */
 
@@ -1098,7 +1097,7 @@ uvm_mmap(map, addr, size, prot, maxprot, flags, handle, foff, locklimit)
 		if (*addr & PAGE_MASK)
 			return(EINVAL);
 		uvmflag |= UVM_FLAG_FIXED;
-		(void) uvm_unmap(map, *addr, *addr + size);	/* zap! */
+		uvm_unmap(map, *addr, *addr + size);	/* zap! */
 	}
 
 	/*
@@ -1221,7 +1220,7 @@ uvm_mmap(map, addr, size, prot, maxprot, flags, handle, foff, locklimit)
 				retval = KERN_RESOURCE_SHORTAGE;
 				vm_map_unlock(map);
 				/* unmap the region! */
-				(void) uvm_unmap(map, *addr, *addr + size);
+				uvm_unmap(map, *addr, *addr + size);
 				goto bad;
 			}
 			/*
@@ -1232,7 +1231,7 @@ uvm_mmap(map, addr, size, prot, maxprot, flags, handle, foff, locklimit)
 			    FALSE, UVM_LK_ENTER);
 			if (retval != KERN_SUCCESS) {
 				/* unmap the region! */
-				(void) uvm_unmap(map, *addr, *addr + size);
+				uvm_unmap(map, *addr, *addr + size);
 				goto bad;
 			}
 			return (0);

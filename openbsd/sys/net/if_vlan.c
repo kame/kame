@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_vlan.c,v 1.32 2002/06/12 01:42:29 chris Exp $ */
+/*	$OpenBSD: if_vlan.c,v 1.35 2003/03/24 17:59:48 jason Exp $ */
 /*
  * Copyright 1998 Massachusetts Institute of Technology
  *
@@ -110,6 +110,7 @@ vlanattach(int count)
 	bzero(ifv_softc, nifvlan * sizeof(struct ifvlan));
 
 	for (i = 0; i < nifvlan; i++) {
+		LIST_INIT(&ifv_softc[i].vlan_mc_listhead);
 		ifp = &ifv_softc[i].ifv_if;
 		ifp->if_softc = &ifv_softc[i];
 		sprintf(ifp->if_xname, "vlan%d", i);
@@ -137,11 +138,9 @@ vlan_start(struct ifnet *ifp)
 	struct ifnet *p;
 	struct mbuf *m, *m0;
 	int error;
-	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	ifv = ifp->if_softc;
 	p = ifv->ifv_p;
-	LIST_INIT(&ifv->vlan_mc_listhead);
 
 	ifp->if_flags |= IFF_OACTIVE;
 	for (;;) {
@@ -157,26 +156,6 @@ vlan_start(struct ifnet *ifp)
 			m_freem(m);
 			continue;
 		}
-
-#ifdef ALTQ
-		/*
-		 * If ALTQ is enabled on the parent interface, do
-		 * classification; the queueing discipline might
-		 * not require classification, but might require
-		 * the address family/header pointer in the pktattr.
-		 */
-		if (ALTQ_IS_ENABLED(&p->if_snd)) {
-			switch (p->if_type) {
-			case IFT_ETHER:
-				altq_etherclassify(&p->if_snd, m, &pktattr);
-				break;
-#ifdef DIAGNOSTIC
-			default:
-				panic("vlan_start: impossible (altq)");
-#endif
-			}
-		}
-#endif /* ALTQ */
 
 #if NBPFILTER > 0
 		if (ifp->if_bpf)
@@ -239,7 +218,7 @@ vlan_start(struct ifnet *ifp)
 		p->if_obytes += m->m_pkthdr.len;
 		if (m->m_flags & M_MCAST)
 			p->if_omcasts++;
-		IFQ_ENQUEUE(&p->if_snd, m, &pktattr, error);
+		IFQ_ENQUEUE(&p->if_snd, m, NULL, error);
 		if (error) {
 			/* mbuf is already freed */
 			ifp->if_oerrors++;
@@ -262,6 +241,7 @@ vlan_input_tag(struct mbuf *m, u_int16_t t)
 	struct ifvlan *ifv;
 	struct ether_vlan_header vh;
 
+	t = EVL_VLANOFTAG(t);
 	for (i = 0; i < nifvlan; i++) {
 		ifv = &ifv_softc[i];
 		if (m->m_pkthdr.rcvif == ifv->ifv_p && t == ifv->ifv_tag)
@@ -269,14 +249,21 @@ vlan_input_tag(struct mbuf *m, u_int16_t t)
 	}
 
 	if (i >= nifvlan) {
-		if (m->m_pkthdr.len < sizeof(struct ether_header))
+		if (m->m_pkthdr.len < sizeof(struct ether_header)) {
+			m_freem(m);
 			return (-1);
+		}
 		m_copydata(m, 0, sizeof(struct ether_header), (caddr_t)&vh);
 		vh.evl_proto = vh.evl_encap_proto;
 		vh.evl_tag = htons(t);
 		vh.evl_encap_proto = htons(ETHERTYPE_8021Q);
-		M_PREPEND(m, EVL_ENCAPLEN, M_DONTWAIT);
+		m_adj(m, sizeof(struct ether_header));
+		m = m_prepend(m, sizeof(struct ether_vlan_header), M_DONTWAIT);
 		if (m == NULL)
+			return (-1);
+		m->m_pkthdr.len += sizeof(struct ether_vlan_header);
+		if (m->m_len < sizeof(struct ether_vlan_header) &&
+		    (m = m_pullup(m, sizeof(struct ether_vlan_header))) == NULL)
 			return (-1);
 		m_copyback(m, 0, sizeof(struct ether_vlan_header), (caddr_t)&vh);
 		ether_input_mbuf(m->m_pkthdr.rcvif, m);
@@ -640,6 +627,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 int
 vlan_ether_addmulti(struct ifvlan *ifv, struct ifreq *ifr)
 {
+	struct ifnet *ifp = ifv->ifv_p;		/* Parent. */
 	struct vlan_mc_entry *mc;
 	u_int8_t addrlo[ETHER_ADDR_LEN], addrhi[ETHER_ADDR_LEN];
 	int error;
@@ -672,10 +660,10 @@ vlan_ether_addmulti(struct ifvlan *ifv, struct ifreq *ifr)
 	memcpy(&mc->mc_addr, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
 	LIST_INSERT_HEAD(&ifv->vlan_mc_listhead, mc, mc_entries);
 
-	error = ether_ioctl(ifv->ifv_p, &ifv->ifv_ac, SIOCADDMULTI,
-	    (caddr_t)ifr);
+	error = (*ifp->if_ioctl)(ifp, SIOCADDMULTI, (caddr_t)ifr);
 	if (error != 0)
 		goto ioctl_failed;
+
 	return (error);
 
  ioctl_failed:
@@ -683,12 +671,14 @@ vlan_ether_addmulti(struct ifvlan *ifv, struct ifreq *ifr)
 	FREE(mc, M_DEVBUF);
  alloc_failed:
 	(void)ether_delmulti(ifr, (struct arpcom *)&ifv->ifv_ac);
+
 	return (error);
 }
 
 int
 vlan_ether_delmulti(struct ifvlan *ifv, struct ifreq *ifr)
 {
+	struct ifnet *ifp = ifv->ifv_p;		/* Parent. */
 	struct ether_multi *enm;
 	struct vlan_mc_entry *mc;
 	u_int8_t addrlo[ETHER_ADDR_LEN], addrhi[ETHER_ADDR_LEN];
@@ -707,8 +697,7 @@ vlan_ether_delmulti(struct ifvlan *ifv, struct ifreq *ifr)
 		return (error);
 
 	/* We no longer use this multicast address.  Tell parent so. */
-	error = ether_ioctl(ifv->ifv_p, &ifv->ifv_ac, SIOCDELMULTI,
-	    (caddr_t)ifr);
+	error = (*ifp->if_ioctl)(ifp, SIOCDELMULTI, (caddr_t)ifr);
 	if (error == 0) {
 		/* And forget about this address. */
 		for (mc = LIST_FIRST(&ifv->vlan_mc_listhead); mc != NULL;
@@ -745,7 +734,7 @@ vlan_ether_purgemulti(struct ifvlan *ifv)
 
 	memcpy(ifr->ifr_name, ifp->if_xname, IFNAMSIZ);
 	while ((mc = LIST_FIRST(&ifv->vlan_mc_listhead)) != NULL) {
-		memcpy(&ifr->ifr_addr, &mc->mc_addr, ETHER_ADDR_LEN);
+		memcpy(&ifr->ifr_addr, &mc->mc_addr, mc->mc_addr.ss_len);
 		(void)(*ifp->if_ioctl)(ifp, SIOCDELMULTI, (caddr_t)ifr);
 		LIST_REMOVE(mc, mc_entries);
 		FREE(mc, M_DEVBUF);

@@ -1,3 +1,4 @@
+/*	$OpenBSD: fwohci_pci.c,v 1.4 2003/01/09 15:28:53 mickey Exp $	*/
 /*	$NetBSD: fwohci_pci.c,v 1.13 2002/01/26 16:30:00 ichiro Exp $	*/
 
 /*-
@@ -63,11 +64,11 @@ struct fwohci_pci_softc {
 };
 
 #ifdef __NetBSD__
-static int fwohci_pci_match(struct device *, struct cfdata *, void *);
+int fwohci_pci_match(struct device *, struct cfdata *, void *);
 #else
-static int fwohci_pci_match(struct device *, void *, void *);
+int fwohci_pci_match(struct device *, void *, void *);
 #endif
-static void fwohci_pci_attach(struct device *, struct device *, void *);
+void fwohci_pci_attach(struct device *, struct device *, void *);
 
 struct cfattach fwohci_pci_ca = {
 	sizeof(struct fwohci_pci_softc), fwohci_pci_match, fwohci_pci_attach,
@@ -77,10 +78,10 @@ struct cfattach fwohci_pci_ca = {
 };
 
 #ifdef __NetBSD__
-static int
+int
 fwohci_pci_match(struct device *parent, struct cfdata *match, void *aux)
 #else
-static int
+int
 fwohci_pci_match(struct device *parent, void *match, void *aux)
 #endif
 {
@@ -89,23 +90,19 @@ fwohci_pci_match(struct device *parent, void *match, void *aux)
 	if (PCI_CLASS(pa->pa_class) == PCI_CLASS_SERIALBUS &&
 	    PCI_SUBCLASS(pa->pa_class) == PCI_SUBCLASS_SERIALBUS_FIREWIRE &&
 	    PCI_INTERFACE(pa->pa_class) == PCI_INTERFACE_OHCI)
-		return 1;
+		return (1);
  
-	return 0;
+	return (0);
 }
 
-static void
+void
 fwohci_pci_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct pci_attach_args *pa = (struct pci_attach_args *) aux;
 	struct fwohci_pci_softc *psc = (struct fwohci_pci_softc *) self;
-	char devinfo[256];
 	char const *intrstr;
 	pci_intr_handle_t ih;
 	u_int32_t csr;
-
-	pci_devinfo(pa->pa_id, pa->pa_class, 0, devinfo);
-	printf(": %s (rev. 0x%02x)\n", devinfo, PCI_REVISION(pa->pa_class));
 
 	psc->psc_sc.sc_dmat = pa->pa_dmat;
 	psc->psc_pc = pa->pa_pc;
@@ -121,7 +118,7 @@ fwohci_pci_attach(struct device *parent, struct device *self, void *aux)
 	    NULL, &psc->psc_sc.sc_memsize, 0))
 #endif
 	{
-		printf("%s: can't map OHCI register space\n", self->dv_xname);
+		printf(": can't map OHCI register space\n");
 		return;
 	}
 
@@ -142,7 +139,9 @@ fwohci_pci_attach(struct device *parent, struct device *self, void *aux)
 
 	/* Map and establish the interrupt. */
 	if (pci_intr_map(pa, &ih)) {
-		printf("%s: couldn't map interrupt\n", self->dv_xname);
+		printf(": couldn't map interrupt\n");
+		bus_space_unmap(psc->psc_sc.sc_memt, psc->psc_sc.sc_memh,
+		    psc->psc_sc.sc_memsize);
 		return;
 	}
 	intrstr = pci_intr_string(pa->pa_pc, ih);
@@ -154,13 +153,15 @@ fwohci_pci_attach(struct device *parent, struct device *self, void *aux)
 	    &psc->psc_sc, self->dv_xname);
 #endif
 	if (psc->psc_ih == NULL) {
-		printf("%s: couldn't establish interrupt", self->dv_xname);
+		printf(": couldn't establish interrupt");
 		if (intrstr != NULL)
 			printf(" at %s", intrstr);
 		printf("\n");
+		bus_space_unmap(psc->psc_sc.sc_memt, psc->psc_sc.sc_memh,
+		    psc->psc_sc.sc_memsize);
 		return;
 	}
-	printf("%s: interrupting at %s\n", self->dv_xname, intrstr);
+	printf(": %s\n", intrstr);
 
 #ifdef __NetBSD__
 	if (fwohci_init(&psc->psc_sc, pci_intr_evcnt(pa->pa_pc, ih)) != 0)

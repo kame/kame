@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.22 2002/10/01 21:03:30 mickey Exp $	*/
+/*	$OpenBSD: conf.c,v 1.25 2003/02/08 12:34:27 todd Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -94,6 +94,10 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 #include "wskbd.h"
 #include "wsmouse.h"
 #include "wsmux.h"
+#ifdef XFS
+#include <xfs/nxfs.h>
+cdev_decl(xfs_dev);
+#endif
 
 #include "inet.h"
 #include "bpfilter.h"
@@ -108,8 +112,6 @@ cdev_decl(lpt);
 cdev_decl(com);
 
 #include "pf.h"
-
-#include <altq/altqconf.h>
 
 #include "systrace.h"
 
@@ -147,13 +149,14 @@ struct cdevsw   cdevsw[] =
 	cdev_mouse_init(NWSKBD,wskbd),	/* 28: keyboards */
 	cdev_mouse_init(NWSMOUSE,wsmouse), /* 29: mice */
 	cdev_mouse_init(NWSMUX,wsmux),	/* 30: mux */
-					/* 31 */
+	cdev_notdef(),			/* 31 */
+
 #ifdef XFS
 	cdev_xfs_init(NXFS,xfs_dev),	/* 32: xfs communication device */
 #else
 	cdev_notdef(),			/* 32 */
 #endif
-	cdev_altq_init(NALTQ,altq),	/* 33: ALTQ control interface */
+	cdev_notdef(),			/* 33: ALTQ (deprecated) */
 	cdev_systrace_init(NSYSTRACE,systrace),	/* 34: system call tracing */
 	cdev_audio_init(NAUDIO,audio),	/* 35: /dev/audio */
 	cdev_crypto_init(NCRYPTO,crypto), /* 36: /dev/crypto */

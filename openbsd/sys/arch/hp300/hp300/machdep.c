@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.81 2002/03/23 13:28:33 espie Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.84 2003/01/04 22:11:44 miod Exp $	*/
 /*	$NetBSD: machdep.c,v 1.121 1999/03/26 23:41:29 mycroft Exp $	*/
 
 /*
@@ -72,12 +72,6 @@
 #include <sys/syscallargs.h>
 #ifdef SYSVMSG
 #include <sys/msg.h>
-#endif
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
-#ifdef SYSVSHM
-#include <sys/shm.h>
 #endif
 
 #include <machine/db_machdep.h>
@@ -286,7 +280,7 @@ cpu_startup()
 
 	/*
 	 * Find out how much space we need, allocate it,
-	 * and the give everything true virtual addresses.
+	 * and then give everything true virtual addresses.
 	 */
 	size = (vsize_t)allocsys((caddr_t)0);
 	if ((v = (caddr_t)uvm_km_zalloc(kernel_map, round_page(size))) == 0)
@@ -404,7 +398,7 @@ cpu_startup()
  * address; along the way we set each data structure pointer.
  *
  * We call allocsys() with 0 to find out how much space we want,
- * allocate that much and fill it with zeroes, and the call
+ * allocate that much and fill it with zeroes, and then call
  * allocsys() again with the correct base virtual address.
  */
 caddr_t
@@ -417,18 +411,6 @@ allocsys(v)
 #define	valloclim(name, type, num, lim) \
 	    (name) = (type *)v; v = (caddr_t)((lim) = ((name)+(num)))
 
-#ifdef SYSVSHM
-	shminfo.shmmax = shmmaxpgs;
-	shminfo.shmall = shmmaxpgs;
-	shminfo.shmseg = shmseg;
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
-#ifdef SYSVSEM 
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns); 
-	/* This is pretty disgusting! */
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
 #ifdef SYSVMSG
 	valloc(msgpool, char, msginfo.msgmax);
 	valloc(msgmaps, struct msgmap, msginfo.msgseg);
@@ -441,8 +423,7 @@ allocsys(v)
 	 * to be long on memory and short on disk speed, we allocate
 	 * more buffer space than the BSD standard of 10% of memory
 	 * for the first 2 Meg, 5% of the remaining.  We just allocate
-	 * a flag 10%.  Insure a minimum of 16 buffers.  We allocate
-	 * 1/2 as many swap buffer headers as file i/o buffers.
+	 * a flag 10%.  Insure a minimum of 16 buffers.
 	 */
 	if (bufpages == 0)
 		bufpages = physmem / 10;
@@ -1222,18 +1203,13 @@ done:
  * 
  * Determine of the given exec package refers to something which we
  * understand and, if so, set up the vmcmds for it.
- *
- * XXX what are the special cases for the hp300?
- * XXX why is this COMPAT_NOMID?  was something generating
- *	hp300 binaries with an a_mid of 0?  i thought that was only
- *	done on little-endian machines...  -- cgd
  */
 int
 cpu_exec_aout_makecmds(p, epp)
 	struct proc *p;
 	struct exec_package *epp;
 {
-#if defined(COMPAT_NOMID) || defined(COMPAT_44) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_44) || defined(COMPAT_SUNOS)
 	u_long midmag, magic;
 	u_short mid;
 	int error;
@@ -1249,11 +1225,6 @@ cpu_exec_aout_makecmds(p, epp)
 	midmag = mid << 16 | magic;
 
 	switch (midmag) {
-#ifdef COMPAT_NOMID
-	case (MID_ZERO << 16) | ZMAGIC:
-		error = exec_aout_prep_oldzmagic(p, epp);
-		break;
-#endif
 #ifdef COMPAT_44
 	case (MID_HP300 << 16) | ZMAGIC:
 		error = exec_aout_prep_oldzmagic(p, epp);
@@ -1269,7 +1240,7 @@ cpu_exec_aout_makecmds(p, epp)
 	}
 
 	return error;
-#else /* !(defined(COMPAT_NOMID) || defined(COMPAT_44)) */
+#else /* !(defined(COMPAT_44) || defined(COMPAT_SUNOS)) */
 	return ENOEXEC;
 #endif
 }

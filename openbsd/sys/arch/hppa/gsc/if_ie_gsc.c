@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ie_gsc.c,v 1.13 2002/07/17 22:18:38 mickey Exp $	*/
+/*	$OpenBSD: if_ie_gsc.c,v 1.17 2003/01/25 07:22:01 jason Exp $	*/
 
 /*
  * Copyright (c) 1998,1999 Michael Shalayeff
@@ -106,24 +106,22 @@ ie_gsc_reset(sc, what)
 	struct ie_softc *sc;
 	int what;
 {
-	register volatile struct ie_gsc_regs *r = (struct ie_gsc_regs *)sc->ioh;
-	register int i;
+	volatile struct ie_gsc_regs *r = (struct ie_gsc_regs *)sc->ioh;
+	int i;
+
+	r->ie_reset = 0;
+	/*
+	 * per [2] 4.6.2.1
+	 * delay for 10 system clocks + 5 transmit clocks,
+	 * NB: works for system clocks over 10MHz
+	 */
+	DELAY(1000);
 
 	switch (what) {
 	case IE_CHIP_PROBE:
-		r->ie_reset = 0;
 		break;
 
 	case IE_CARD_RESET:
-		r->ie_reset = 0;
-
-		/*
-		 * per [2] 4.6.2.1
-		 * delay for 10 system clocks + 5 transmit clocks,
-		 * NB: works for system clocks over 10MHz
-		 */
-		DELAY(1000);
-
 		/*
 		 * after the hardware reset:
 		 * inform i825[89]6 about new SCP address,
@@ -152,10 +150,12 @@ void
 ie_gsc_attend(sc)
 	struct ie_softc *sc;
 {
-	register volatile struct ie_gsc_regs *r = (struct ie_gsc_regs *)sc->ioh;
+	volatile struct ie_gsc_regs *r = (struct ie_gsc_regs *)sc->ioh;
 
 	fdcache(0, (vaddr_t)ie_mem, IE_SIZE);
+	DELAY(1);
 	r->ie_attn = 0;
+	DELAY(1);
 }
 
 void
@@ -185,13 +185,13 @@ ie_gsc_port(sc, cmd)
 	}
 
 	if (sc->sc_flags & IEGSC_GECKO) {
-		register volatile struct ie_gsc_regs *r = (struct ie_gsc_regs *)sc->ioh;
+		volatile struct ie_gsc_regs *r = (struct ie_gsc_regs *)sc->ioh;
 		r->ie_port = cmd & 0xffff;
 		DELAY(1000);
 		r->ie_port = cmd >> 16;
 		DELAY(1000);
 	} else {
-		register volatile struct ie_gsc_regs *r = (struct ie_gsc_regs *)sc->ioh;
+		volatile struct ie_gsc_regs *r = (struct ie_gsc_regs *)sc->ioh;
 		r->ie_port = cmd >> 16;
 		DELAY(1000);
 		r->ie_port = cmd & 0xffff;
@@ -206,14 +206,14 @@ ie_gsc_intrhook(sc, where)
 	int where;
 {
 	switch (where) {
-	case IE_INTR_ENTER:
-		/* turn it on */
+	case IE_INTR_ENRCV:
+		ledctl(PALED_NETRCV, 0, 0);
 		break;
-	case IE_INTR_LOOP:
-		/* quick drop and raise */
+	case IE_INTR_ENSND:
+		ledctl(PALED_NETSND, 0, 0);
 		break;
 	case IE_INTR_EXIT:
-		/* drop it */
+	case IE_INTR_LOOP:
 		break;
 	}
 	return 0;
@@ -225,7 +225,7 @@ ie_gsc_read16(sc, offset)
 	struct ie_softc *sc;
 	int offset;
 {
-	pdcache(0, sc->bh + offset, 2);
+	fdce(0, sc->bh + offset);
 	return *(volatile u_int16_t *)(sc->bh + offset);
 }
 
@@ -236,7 +236,7 @@ ie_gsc_write16(sc, offset, v)
 	u_int16_t v;
 {
 	*(volatile u_int16_t *)(sc->bh + offset) = v;
-	fdcache(0, sc->bh + offset, 2);
+	fdce(0, sc->bh + offset);
 }
 
 void
@@ -247,7 +247,8 @@ ie_gsc_write24(sc, offset, addr)
 {
 	*(volatile u_int16_t *)(sc->bh + offset + 0) = (addr      ) & 0xffff;
 	*(volatile u_int16_t *)(sc->bh + offset + 2) = (addr >> 16) & 0xffff;
-	fdcache(0, sc->bh + offset, 4);
+	fdce(0, sc->bh + offset + 0);
+	fdce(0, sc->bh + offset + 2);
 }
 
 void
@@ -272,13 +273,12 @@ ie_gsc_memcopyout(sc, p, offset, size)
 	fdcache(0, sc->bh + offset, size);
 }
 
-
 int
 ie_gsc_probe(parent, match, aux)
 	struct device *parent;
 	void *match, *aux;
 {
-	register struct gsc_attach_args *ga = aux;
+	struct gsc_attach_args *ga = aux;
 
 	if (ga->ga_type.iodc_type != HPPA_TYPE_FIO ||
 	    (ga->ga_type.iodc_sv_model != HPPA_FIO_LAN &&
@@ -294,8 +294,8 @@ ie_gsc_attach(parent, self, aux)
 	void *aux;
 {
 	struct pdc_lan_station_id pdc_mac PDC_ALIGNMENT;
-	register struct ie_softc *sc = (struct ie_softc *)self;
-	register struct gsc_attach_args *ga = aux;
+	struct ie_softc *sc = (struct ie_softc *)self;
+	struct gsc_attach_args *ga = aux;
 	/*bus_dma_segment_t seg;
 	int rseg;*/
 	int rv;
@@ -374,12 +374,12 @@ ie_gsc_attach(parent, self, aux)
 	else
 		bcopy(pdc_mac.addr, sc->sc_arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
-	printf(": ");
+	printf(":");
 
 	sc->iscp = 0;
-	sc->scp = sc->iscp + IE_ISCP_SZ;
-	sc->scb = sc->scp + IE_SCP_SZ;
-	sc->buf_area = sc->scb + 256;
+	sc->scp = 32;
+	sc->scb = 94;
+	sc->buf_area = 256;
 	sc->buf_area_sz = sc->sc_msize - sc->buf_area;
 	sc->sc_type = sc->sc_flags & IEGSC_GECKO? "LASI/i82596CA" : "i82596DX";
 	sc->sc_vers = ga->ga_type.iodc_model * 10 + ga->ga_type.iodc_sv_rev;

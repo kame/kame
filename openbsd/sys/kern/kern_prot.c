@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_prot.c,v 1.20 2002/01/23 15:46:48 art Exp $	*/
+/*	$OpenBSD: kern_prot.c,v 1.23 2003/01/30 03:29:49 millert Exp $	*/
 /*	$NetBSD: kern_prot.c,v 1.33 1996/02/09 18:59:42 christos Exp $	*/
 
 /*
@@ -230,7 +230,7 @@ sys_getgroups(p, v, retval)
 	register_t *retval;
 {
 	struct sys_getgroups_args /* {
-		syscallarg(u_int) gidsetsize;
+		syscallarg(int) gidsetsize;
 		syscallarg(gid_t *) gidset;
 	} */ *uap = v;
 	struct pcred *pc = p->p_cred;
@@ -322,6 +322,278 @@ sys_setpgid(curp, v, retval)
 		    pgrp->pg_session != curp->p_session)
 			return (EPERM);
 	return (enterpgrp(targp, pgid, 0));
+}
+
+/* ARGSUSED */
+int
+sys_getresuid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct sys_getresuid_args /* {
+		syscallarg(uid_t *) ruid;
+		syscallarg(uid_t *) euid;
+		syscallarg(uid_t *) suid;
+	} */ *uap = v;
+	struct pcred *pc = p->p_cred;
+	uid_t *ruid, *euid, *suid;
+	int error1 = 0, error2 = 0, error3 = 0;
+
+	ruid = SCARG(uap, ruid);
+	euid = SCARG(uap, euid);
+	suid = SCARG(uap, suid);
+
+	if (ruid != NULL)
+		error1 = copyout(&pc->p_ruid, ruid, sizeof(*ruid));
+	if (euid != NULL)
+		error2 = copyout(&pc->pc_ucred->cr_uid, euid, sizeof(*euid));
+	if (suid != NULL)
+		error3 = copyout(&pc->p_svuid, suid, sizeof(*suid));
+
+	return (error1 ? error1 : error2 ? error2 : error3);
+}
+
+/* ARGSUSED */
+int
+sys_setresuid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct sys_setresuid_args /* {
+		syscallarg(uid_t) ruid;
+		syscallarg(uid_t) euid;
+		syscallarg(uid_t) suid;
+	} */ *uap = v;
+	struct pcred *pc = p->p_cred;
+	uid_t ruid, euid, suid;
+	int error;
+
+	ruid = SCARG(uap, ruid);
+	euid = SCARG(uap, euid);
+	suid = SCARG(uap, suid);
+
+	if ((ruid == -1 || ruid == pc->p_ruid) &&
+	    (euid == -1 || euid == pc->pc_ucred->cr_uid) &&
+	    (suid == -1 || suid == pc->p_svuid))
+		return (0);			/* no change */
+
+	/*
+	 * Any of the real, effective, and saved uids may be changed
+	 * to the current value of one of the three (root is not limited).
+	 */
+	if (ruid != (uid_t)-1 &&
+	    ruid != pc->p_ruid &&
+	    ruid != pc->pc_ucred->cr_uid &&
+	    ruid != pc->p_svuid &&
+	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+		return (error);
+
+	if (euid != (uid_t)-1 &&
+	    euid != pc->p_ruid &&
+	    euid != pc->pc_ucred->cr_uid &&
+	    euid != pc->p_svuid &&
+	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+		return (error);
+
+	if (suid != (uid_t)-1 &&
+	    suid != pc->p_ruid &&
+	    suid != pc->pc_ucred->cr_uid &&
+	    suid != pc->p_svuid &&
+	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+		return (error);
+
+	/*
+	 * Note that unlike the other set*uid() calls, each
+	 * uid type is set independently of the others.
+	 */
+	if (ruid != (uid_t)-1 && ruid != pc->p_ruid) {
+		/*
+		 * Transfer proc count to new user.
+		 */
+		(void)chgproccnt(pc->p_ruid, -1);
+		(void)chgproccnt(ruid, 1);
+		pc->p_ruid = ruid;
+	}
+	if (euid != (uid_t)-1 && euid != pc->pc_ucred->cr_uid) {
+		/*
+		 * Copy credentials so other references do not see our changes.
+		 */
+		pc->pc_ucred = crcopy(pc->pc_ucred);
+		pc->pc_ucred->cr_uid = euid;
+	}
+	if (suid != (uid_t)-1 && suid != pc->p_svuid)
+		pc->p_svuid = suid;
+
+	p->p_flag |= P_SUGID;
+	return (0);
+}
+
+/* ARGSUSED */
+int
+sys_getresgid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct sys_getresgid_args /* {
+		syscallarg(gid_t *) rgid;
+		syscallarg(gid_t *) egid;
+		syscallarg(gid_t *) sgid;
+	} */ *uap = v;
+	struct pcred *pc = p->p_cred;
+	gid_t *rgid, *egid, *sgid;
+	int error1 = 0, error2 = 0, error3 = 0;
+
+	rgid = SCARG(uap, rgid);
+	egid = SCARG(uap, egid);
+	sgid = SCARG(uap, sgid);
+
+	if (rgid != NULL)
+		error1 = copyout(&pc->p_rgid, rgid, sizeof(*rgid));
+	if (egid != NULL)
+		error2 = copyout(&pc->pc_ucred->cr_gid, egid, sizeof(*egid));
+	if (sgid != NULL)
+		error3 = copyout(&pc->p_svgid, sgid, sizeof(*sgid));
+
+	return (error1 ? error1 : error2 ? error2 : error3);
+}
+
+/* ARGSUSED */
+int
+sys_setresgid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct sys_setresgid_args /* {
+		syscallarg(gid_t) rgid;
+		syscallarg(gid_t) egid;
+		syscallarg(gid_t) sgid;
+	} */ *uap = v;
+	struct pcred *pc = p->p_cred;
+	gid_t rgid, egid, sgid;
+	int error;
+
+	rgid = SCARG(uap, rgid);
+	egid = SCARG(uap, egid);
+	sgid = SCARG(uap, sgid);
+
+	if ((rgid == -1 || rgid == pc->p_rgid) &&
+	    (egid == -1 || egid == pc->pc_ucred->cr_gid) &&
+	    (sgid == -1 || sgid == pc->p_svgid))
+		return (0);			/* no change */
+
+	/*
+	 * Any of the real, effective, and saved gids may be changed
+	 * to the current value of one of the three (root is not limited).
+	 */
+	if (rgid != (gid_t)-1 &&
+	    rgid != pc->p_rgid &&
+	    rgid != pc->pc_ucred->cr_gid &&
+	    rgid != pc->p_svgid &&
+	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+		return (error);
+
+	if (egid != (gid_t)-1 &&
+	    egid != pc->p_rgid &&
+	    egid != pc->pc_ucred->cr_gid &&
+	    egid != pc->p_svgid &&
+	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+		return (error);
+
+	if (sgid != (gid_t)-1 &&
+	    sgid != pc->p_rgid &&
+	    sgid != pc->pc_ucred->cr_gid &&
+	    sgid != pc->p_svgid &&
+	    (error = suser(pc->pc_ucred, &p->p_acflag)))
+		return (error);
+
+	/*
+	 * Note that unlike the other set*gid() calls, each
+	 * gid type is set independently of the others.
+	 */
+	if (rgid != (gid_t)-1)
+		pc->p_rgid = rgid;
+	if (egid != (gid_t)-1) {
+		/*
+		 * Copy credentials so other references do not see our changes.
+		 */
+		pc->pc_ucred = crcopy(pc->pc_ucred);
+		pc->pc_ucred->cr_gid = egid;
+	}
+	if (sgid != (gid_t)-1)
+		pc->p_svgid = sgid;
+
+	p->p_flag |= P_SUGID;
+	return (0);
+}
+
+/* ARGSUSED */
+int
+sys_setregid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct sys_setregid_args /* {
+		syscallarg(gid_t) rgid;
+		syscallarg(gid_t) egid;
+	} */ *uap = v;
+	struct pcred *pc = p->p_cred;
+	struct sys_setresgid_args sresgidargs;
+	gid_t rgid, egid;
+
+	rgid = SCARG(&sresgidargs, rgid) = SCARG(uap, rgid);
+	egid = SCARG(&sresgidargs, egid) = SCARG(uap, egid);
+
+	/*
+	 * The saved gid presents a bit of a dilemma, as it did not
+	 * exist when setregid(2) was conceived.  We only set the saved
+	 * gid when the real gid is specified and either its value would
+	 * change, or where the saved and effective gids are different.
+	 */
+	if (rgid != (gid_t)-1 && (rgid != pc->p_rgid ||
+	    pc->p_svgid != (egid != (gid_t)-1 ? egid : pc->pc_ucred->cr_gid)))
+		SCARG(&sresgidargs, sgid) = rgid;
+	else
+		SCARG(&sresgidargs, sgid) = (gid_t)-1;
+
+	return (sys_setresgid(p, &sresgidargs, retval));
+}
+
+/* ARGSUSED */
+int
+sys_setreuid(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct sys_setreuid_args /* {
+		syscallarg(uid_t) ruid;
+		syscallarg(uid_t) euid;
+	} */ *uap = v;
+	struct pcred *pc = p->p_cred;
+	struct sys_setresuid_args sresuidargs;
+	uid_t ruid, euid;
+
+	ruid = SCARG(&sresuidargs, ruid) = SCARG(uap, ruid);
+	euid = SCARG(&sresuidargs, euid) = SCARG(uap, euid);
+
+	/*
+	 * The saved uid presents a bit of a dilemma, as it did not
+	 * exist when setreuid(2) was conceived.  We only set the saved
+	 * uid when the real uid is specified and either its value would
+	 * change, or where the saved and effective uids are different.
+	 */
+	if (ruid != (uid_t)-1 && (ruid != pc->p_ruid ||
+	    pc->p_svuid != (euid != (uid_t)-1 ? euid : pc->pc_ucred->cr_uid)))
+		SCARG(&sresuidargs, suid) = ruid;
+	else
+		SCARG(&sresuidargs, suid) = (uid_t)-1;
+
+	return (sys_setresuid(p, &sresuidargs, retval));
 }
 
 /* ARGSUSED */
@@ -490,7 +762,7 @@ sys_setgroups(p, v, retval)
 	register_t *retval;
 {
 	struct sys_setgroups_args /* {
-		syscallarg(u_int) gidsetsize;
+		syscallarg(int) gidsetsize;
 		syscallarg(gid_t *) gidset;
 	} */ *uap = v;
 	struct pcred *pc = p->p_cred;

@@ -98,29 +98,20 @@ char em_driver_version[] = "1.3.14";
 /*********************************************************************
  *  PCI Device ID Table
  *********************************************************************/
-struct em_device
-{
-	u_int16_t	vendor_id;
-	u_int16_t	device_id;
-	int		match;
-};
-
-struct em_device em_devs[] =
-{
-	/* Intel(R) PRO/1000 Network Connection */
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82542,		2},
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82543GC_SC,	2},
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82543GC,		2},
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544EI,		2},
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544EI_SC,	2},
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544GC,		2},
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544GC_LX,	2},
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82540EM,		2},
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82545EM,		2},
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82546EB,		2},
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82545EM_SC,	2},
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82546EB_SC,	2},
-	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82545EM_LX,	2},
+const struct pci_matchid em_devices[] = {
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82542 },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82543GC_SC },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82543GC },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544EI },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544EI_SC },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544GC },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82544GC_LX },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82540EM },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82545EM },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82546EB },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82545EM_SC },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82546EB_SC },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82545EM_LX },
 };
 
 /*********************************************************************
@@ -208,18 +199,10 @@ struct cfdriver em_cd = {
 int
 em_probe(struct device *parent, void *match, void *aux)
 {
-	struct pci_attach_args *pa = (struct pci_attach_args *)aux;
-	int i;
-
 	INIT_DEBUGOUT("em_probe: begin");
 
-	for (i = 0; i < sizeof(em_devs) / sizeof(em_devs[0]); i++) {
-		if (PCI_VENDOR(pa->pa_id) == em_devs[i].vendor_id &&
-		    PCI_PRODUCT(pa->pa_id) == em_devs[i].device_id)
-			return (em_devs[i].match);
-	}
-
-	return (0);
+	return (pci_matchbyid((struct pci_attach_args *)aux, em_devices,
+	    sizeof(em_devices)/sizeof(em_devices[0])));
 }
 
 /*********************************************************************
@@ -344,6 +327,8 @@ em_attach(struct device *parent, struct device *self, void *aux)
 
 	memcpy((char *)&sc->arpcom.ac_enaddr, sc->hw.mac_addr,
 	       ETH_LENGTH_OF_ADDRESS);
+
+	printf(", address: %s\n", ether_sprintf(sc->arpcom.ac_enaddr));
 
 	/* Setup OS specific network interface */
 	em_setup_interface(sc);
@@ -902,18 +887,12 @@ em_print_link_status(struct em_softc * sc)
 			em_get_speed_and_duplex(&sc->hw, 
 						&sc->link_speed, 
 						&sc->link_duplex);
-			printf("%s: Link is up %d Mbps %s\n",
-			       sc->sc_dv.dv_xname,
-			       sc->link_speed,
-			       ((sc->link_duplex == FULL_DUPLEX) ?
-				"Full Duplex" : "Half Duplex"));
 			sc->link_active = 1;
 		}
 	} else {
 		if (sc->link_active == 1) {
 			sc->link_speed = 0;
 			sc->link_duplex = 0;
-			printf("%s: Link is Down\n", sc->sc_dv.dv_xname);
 			sc->link_active = 0;
 		}
 	}
@@ -1123,11 +1102,7 @@ em_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 			ifmr->ifm_active |= IFM_100_TX;
 			break;
 		case 1000:
-#if __FreeBSD_version < 500000 
-			ifmr->ifm_active |= IFM_1000_TX;
-#else
 			ifmr->ifm_active |= IFM_1000_T;
-#endif
 			break;
 		}
 		if (sc->link_duplex == FULL_DUPLEX)
@@ -1163,11 +1138,7 @@ em_media_change(struct ifnet *ifp)
 		sc->hw.autoneg_advertised = AUTONEG_ADV_DEFAULT;
 		break;
 	case IFM_1000_SX:
-#if __FreeBSD_version < 500000 
-	case IFM_1000_TX:
-#else
 	case IFM_1000_T:
-#endif
 		sc->hw.autoneg = DO_AUTO_NEG;
 		sc->hw.autoneg_advertised = ADVERTISE_1000_FULL;
 		break;
@@ -1336,7 +1307,7 @@ em_allocate_pci_resources(struct em_softc * sc)
                 printf("\n");
 		return (ENXIO);
         }
-        printf(": %s\n", intrstr);
+        printf(": %s", intrstr);
 		
 	sc->hw.back = &sc->osdep;
 
@@ -1471,15 +1442,9 @@ em_setup_interface(struct em_softc * sc)
 			    0, NULL);
 		ifmedia_add(&sc->media, IFM_ETHER | IFM_100_TX | IFM_FDX, 
 			    0, NULL);
-#if __FreeBSD_version < 500000 
-		ifmedia_add(&sc->media, IFM_ETHER | IFM_1000_TX | IFM_FDX, 
-			    0, NULL);
-		ifmedia_add(&sc->media, IFM_ETHER | IFM_1000_TX, 0, NULL);
-#else
 		ifmedia_add(&sc->media, IFM_ETHER | IFM_1000_T | IFM_FDX, 
 			    0, NULL);
 		ifmedia_add(&sc->media, IFM_ETHER | IFM_1000_T, 0, NULL);
-#endif
 	}
 	ifmedia_add(&sc->media, IFM_ETHER | IFM_AUTO, 0, NULL);
 	ifmedia_set(&sc->media, IFM_ETHER | IFM_AUTO);
@@ -1664,6 +1629,11 @@ em_free_transmit_structures(struct em_softc* sc)
 			if (tx_buffer->m_head != NULL)
 				m_freem(tx_buffer->m_head);
 			tx_buffer->m_head = NULL;
+
+			bus_dmamap_unload(sc->osdep.em_pa.pa_dmat,
+			    tx_buffer->dmamap);
+			bus_dmamap_destroy(sc->osdep.em_pa.pa_dmat,
+			    tx_buffer->dmamap);
 		}
 	}
 	if (sc->tx_buffer_area != NULL) {
@@ -2002,6 +1972,11 @@ em_free_receive_structures(struct em_softc * sc)
 			if (rx_buffer->m_head != NULL)
 				m_freem(rx_buffer->m_head);
 			rx_buffer->m_head = NULL;
+
+			bus_dmamap_unload(sc->osdep.em_pa.pa_dmat,
+			    rx_buffer->dmamap);
+			bus_dmamap_destroy(sc->osdep.em_pa.pa_dmat,
+			    rx_buffer->dmamap);
 		}
 	}
 	if (sc->rx_buffer_area != NULL) {

@@ -1,4 +1,4 @@
-/* $OpenBSD: ip_ipcomp.c,v 1.9 2002/09/12 10:11:39 ho Exp $ */
+/* $OpenBSD: ip_ipcomp.c,v 1.11 2003/02/18 18:47:40 jason Exp $ */
 
 /*
  * Copyright (c) 2001 Jean-Jacques Bernard-Gundol (jj@wabbitt.org)
@@ -69,6 +69,8 @@
 #define DPRINTF(x)
 #endif
 
+struct ipcompstat ipcompstat;
+
 /*
  * ipcomp_attach() is called from the transformation code
  */
@@ -94,8 +96,9 @@ ipcomp_init(tdbp, xsp, ii)
 	case SADB_X_CALG_DEFLATE:
 		tcomp = &comp_algo_deflate;
 		break;
-
-		/* Only deflate is implemented */
+	case SADB_X_CALG_LZS:
+		tcomp = &comp_algo_lzs;
+		break;
 
 	default:
 		DPRINTF(("ipcomp_init(): unsupported compression algorithm %d specified\n",

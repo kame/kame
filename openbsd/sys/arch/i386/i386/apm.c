@@ -1,4 +1,4 @@
-/*	$OpenBSD: apm.c,v 1.54 2002/06/19 02:43:40 mickey Exp $	*/
+/*	$OpenBSD: apm.c,v 1.58 2003/01/29 00:00:44 tedu Exp $	*/
 
 /*-
  * Copyright (c) 1998-2001 Michael Shalayeff. All rights reserved.
@@ -146,6 +146,7 @@ u_char apm_majver;
 u_char apm_minver;
 int apm_dobusy = 1;
 int apm_doidle = 1;
+int apm_bebatt = 0;
 
 struct {
 	u_int32_t entry;
@@ -307,7 +308,7 @@ apm_power_print (sc, regs)
 				printf(", charging");
 			if (BATT_REM_VALID(regs)) {
 				int life = BATT_REMAINING(regs);
-				if (sc->sc_flags & APM_BEBATT)
+				if (apm_bebatt)
 					life = swap16(life);
 				printf(", estimated %d:%02d hours",
 				    life / 60, life % 60);
@@ -685,7 +686,7 @@ apm_set_ver(self)
 			/* fix version for some endianess-challenged compaqs */
 			if (!apm_majver) {
 				apm_majver = 1;
-				apm_majver = 0;
+				apm_minver = 0;
 			}
 		}
 	}
@@ -801,6 +802,8 @@ apmattach(parent, self, aux)
 			extern int apm_cli; /* from apmcall.S */
 			apm_cli = 0;
 		}
+		if (sc->sc_dev.dv_cfdata->cf_flags & APM_BEBATT)
+			apm_bebatt = 1;
 		apm_ep.seg = GSEL(GAPM32CODE_SEL,SEL_KPL);
 		apm_ep.entry = ap->apm_entry;
 		cbase = min(ap->apm_code32_base, ap->apm_code16_base);
@@ -1086,7 +1089,7 @@ apmioctl(dev, cmd, data, flag, p)
 					powerp->battery_state = APM_BATT_UNKNOWN;
 				if (BATT_REM_VALID(&regs)) {
 					powerp->minutes_left = BATT_REMAINING(&regs);
-					if (sc->sc_flags & APM_BEBATT)
+					if (apm_bebatt)
 						powerp->minutes_left =
 						    swap16(powerp->minutes_left);
 				}
@@ -1121,9 +1124,11 @@ filt_apmread(kn, hint)
 	struct knote *kn;
 	long hint;
 {
-	kn->kn_data = (int)hint;
+	/* XXX weird kqueue_scan() semantics */
+	if (hint && !kn->kn_data)
+		kn->kn_data = (int)hint;
 
-	return (hint != 0);
+	return (1);
 }
 
 int

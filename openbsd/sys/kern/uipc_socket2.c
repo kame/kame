@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_socket2.c,v 1.31 2002/08/26 16:39:25 dhartmei Exp $	*/
+/*	$OpenBSD: uipc_socket2.c,v 1.33 2002/10/12 01:09:45 krw Exp $	*/
 /*	$NetBSD: uipc_socket2.c,v 1.11 1996/02/04 02:17:55 christos Exp $	*/
 
 /*
@@ -54,10 +54,10 @@
  */
 
 /* strings for sleep message: */
-char	netcon[] = "netcon";
-char	netcls[] = "netcls";
-char	netio[] = "netio";
-char	netlck[] = "netlck";
+const char	netcon[] = "netcon";
+const char	netcls[] = "netcls";
+const char	netio[] = "netio";
+const char	netlck[] = "netlck";
 
 u_long	sb_max = SB_MAX;		/* patchable */
 
@@ -450,7 +450,7 @@ sblastrecordchk(struct sockbuf *sb, const char *where)
 		printf("packet chain:\n");
 		for (m = sb->sb_mb; m != NULL; m = m->m_nextpkt)
 			printf("\t%p\n", m);
-		panic("sblastrecordchk from %s\n", where);
+		panic("sblastrecordchk from %s", where);
 	}
 }
 

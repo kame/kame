@@ -1,4 +1,4 @@
-/*	$OpenBSD: hifn7751var.h,v 1.45 2002/07/23 17:50:33 jason Exp $	*/
+/*	$OpenBSD: hifn7751var.h,v 1.48 2003/02/24 20:36:02 jason Exp $	*/
 
 /*
  * Invertex AEON / Hifn 7751 driver
@@ -93,7 +93,7 @@ struct hifn_dma {
 	u_int64_t		test_src, test_dst;
 
 	/*
-	 *  Our current positions for insertion and removal from the desriptor
+	 *  Our current positions for insertion and removal from the descriptor
 	 *  rings. 
 	 */
 	int			cmdi, srci, dsti, resi;
@@ -106,6 +106,11 @@ struct hifn_session {
 	int hs_prev_op; /* XXX collapse into hs_flags? */
 	u_int8_t hs_iv[HIFN_IV_LENGTH];
 };
+
+/* We use a state machine on sessions */
+#define	HS_STATE_FREE	0		/* unused session entry */
+#define	HS_STATE_USED	1		/* allocated, but key not on card */
+#define	HS_STATE_KEY	2		/* allocated and key is on card */
 
 #define	HIFN_RING_SYNC(sc, r, i, f)					\
 	bus_dmamap_sync((sc)->sc_dmat, (sc)->sc_dmamap,		\
@@ -125,11 +130,6 @@ struct hifn_session {
 	bus_dmamap_sync((sc)->sc_dmat, (sc)->sc_dmamap,		\
 	    offsetof(struct hifn_dma, result_bufs[(i)][0]),		\
 	    HIFN_MAX_RESULT, (f))
-
-/* We use a state machine to on sessions */
-#define	HS_STATE_FREE	0		/* unused session entry */
-#define	HS_STATE_USED	1		/* allocated, but key not on card */
-#define	HS_STATE_KEY	2		/* allocated and key is on card */
 
 /*
  * Holds data specific to a single HIFN board.
@@ -183,7 +183,7 @@ struct hifn_softc {
 		    READ_REG_1(sc, HIFN_1_7811_MIPSRST) & ~(v))
 
 /*
- *  hifn_command_t
+ *  struct hifn_command
  *
  *  This is the control structure used to pass commands to hifn_encrypt().
  *
@@ -249,7 +249,7 @@ struct hifn_softc {
  */
 struct hifn_command {
 	u_int16_t session_num;
-	u_int16_t base_masks, cry_masks, mac_masks;
+	u_int16_t base_masks, cry_masks, mac_masks, comp_masks;
 	u_int8_t iv[HIFN_IV_LENGTH], *ck, mac[HIFN_MAC_KEY_LENGTH];
 	int cklen;
 	int sloplen, slopidx;
@@ -268,7 +268,9 @@ struct hifn_command {
 
 	struct hifn_softc *softc;
 	struct cryptop *crp;
-	struct cryptodesc *enccrd, *maccrd;
+	struct cryptodesc *enccrd, *maccrd, *compcrd;
+	void (*cmd_callback)(struct hifn_softc *, struct hifn_command *,
+	    u_int8_t *);
 };
 
 /*

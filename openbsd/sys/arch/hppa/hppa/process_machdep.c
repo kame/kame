@@ -1,7 +1,7 @@
-/*	$OpenBSD: process_machdep.c,v 1.6 2002/09/20 19:06:26 mickey Exp $	*/
+/*	$OpenBSD: process_machdep.c,v 1.9 2003/01/16 00:33:14 mickey Exp $	*/
 
 /*
- * Copyright (c) 1999-2002 Michael Shalayeff
+ * Copyright (c) 1999-2003 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,42 +44,44 @@ process_read_regs(p, regs)
 	struct proc *p;
 	struct reg *regs;
 {
-	regs->r_regs[ 0] = p->p_md.md_regs->tf_sar;
-	regs->r_regs[ 1] = p->p_md.md_regs->tf_r1;
-	regs->r_regs[ 2] = p->p_md.md_regs->tf_rp;
-	regs->r_regs[ 3] = p->p_md.md_regs->tf_r3;
-	regs->r_regs[ 4] = p->p_md.md_regs->tf_r4;
-	regs->r_regs[ 5] = p->p_md.md_regs->tf_r5;
-	regs->r_regs[ 6] = p->p_md.md_regs->tf_r6;
-	regs->r_regs[ 7] = p->p_md.md_regs->tf_r7;
-	regs->r_regs[ 8] = p->p_md.md_regs->tf_r8;
-	regs->r_regs[ 9] = p->p_md.md_regs->tf_r9;
-	regs->r_regs[10] = p->p_md.md_regs->tf_r10;
-	regs->r_regs[11] = p->p_md.md_regs->tf_r11;
-	regs->r_regs[12] = p->p_md.md_regs->tf_r12;
-	regs->r_regs[13] = p->p_md.md_regs->tf_r13;
-	regs->r_regs[14] = p->p_md.md_regs->tf_r14;
-	regs->r_regs[15] = p->p_md.md_regs->tf_r15;
-	regs->r_regs[16] = p->p_md.md_regs->tf_r16;
-	regs->r_regs[17] = p->p_md.md_regs->tf_r17;
-	regs->r_regs[18] = p->p_md.md_regs->tf_r18;
-	regs->r_regs[19] = p->p_md.md_regs->tf_t4;
-	regs->r_regs[20] = p->p_md.md_regs->tf_t3;
-	regs->r_regs[21] = p->p_md.md_regs->tf_t2;
-	regs->r_regs[22] = p->p_md.md_regs->tf_t1;
-	regs->r_regs[23] = p->p_md.md_regs->tf_arg3;
-	regs->r_regs[24] = p->p_md.md_regs->tf_arg2;
-	regs->r_regs[25] = p->p_md.md_regs->tf_arg1;
-	regs->r_regs[26] = p->p_md.md_regs->tf_arg0;
-	regs->r_regs[27] = p->p_md.md_regs->tf_dp;
-	regs->r_regs[28] = p->p_md.md_regs->tf_ret0;
-	regs->r_regs[29] = p->p_md.md_regs->tf_ret1;
-	regs->r_regs[30] = p->p_md.md_regs->tf_sp;
-	regs->r_regs[31] = p->p_md.md_regs->tf_r31;
-	regs->r_pc	 = p->p_md.md_regs->tf_iioq_head;
-	regs->r_npc	 = p->p_md.md_regs->tf_iioq_tail;
+	struct trapframe *tf = p->p_md.md_regs;
 
-	return 0;
+	regs->r_regs[ 0] = tf->tf_sar;
+	regs->r_regs[ 1] = tf->tf_r1;
+	regs->r_regs[ 2] = tf->tf_rp;
+	regs->r_regs[ 3] = tf->tf_r3;
+	regs->r_regs[ 4] = tf->tf_r4;
+	regs->r_regs[ 5] = tf->tf_r5;
+	regs->r_regs[ 6] = tf->tf_r6;
+	regs->r_regs[ 7] = tf->tf_r7;
+	regs->r_regs[ 8] = tf->tf_r8;
+	regs->r_regs[ 9] = tf->tf_r9;
+	regs->r_regs[10] = tf->tf_r10;
+	regs->r_regs[11] = tf->tf_r11;
+	regs->r_regs[12] = tf->tf_r12;
+	regs->r_regs[13] = tf->tf_r13;
+	regs->r_regs[14] = tf->tf_r14;
+	regs->r_regs[15] = tf->tf_r15;
+	regs->r_regs[16] = tf->tf_r16;
+	regs->r_regs[17] = tf->tf_r17;
+	regs->r_regs[18] = tf->tf_r18;
+	regs->r_regs[19] = tf->tf_t4;
+	regs->r_regs[20] = tf->tf_t3;
+	regs->r_regs[21] = tf->tf_t2;
+	regs->r_regs[22] = tf->tf_t1;
+	regs->r_regs[23] = tf->tf_arg3;
+	regs->r_regs[24] = tf->tf_arg2;
+	regs->r_regs[25] = tf->tf_arg1;
+	regs->r_regs[26] = tf->tf_arg0;
+	regs->r_regs[27] = tf->tf_dp;
+	regs->r_regs[28] = tf->tf_ret0;
+	regs->r_regs[29] = tf->tf_ret1;
+	regs->r_regs[30] = tf->tf_sp;
+	regs->r_regs[31] = tf->tf_r31;
+	regs->r_pc	 = tf->tf_iioq_head;
+	regs->r_npc	 = tf->tf_iioq_tail;
+
+	return (0);
 }
 
 int
@@ -93,7 +95,7 @@ process_read_fpregs(p, fpregs)
 		fpu_save((vaddr_t)p->p_addr->u_pcb.pcb_fpregs);
 	bcopy(p->p_addr->u_pcb.pcb_fpregs, fpregs, 32*8);
 
-	return 0;
+	return (0);
 }
 
 #ifdef PTRACE
@@ -103,42 +105,44 @@ process_write_regs(p, regs)
 	struct proc *p;
 	struct reg *regs;
 {
-	p->p_md.md_regs->tf_sar  = regs->r_regs[ 0];
-	p->p_md.md_regs->tf_r1   = regs->r_regs[ 1];
-	p->p_md.md_regs->tf_rp   = regs->r_regs[ 2];
-	p->p_md.md_regs->tf_r3   = regs->r_regs[ 3];
-	p->p_md.md_regs->tf_r4   = regs->r_regs[ 4];
-	p->p_md.md_regs->tf_r5   = regs->r_regs[ 5];
-	p->p_md.md_regs->tf_r6   = regs->r_regs[ 6];
-	p->p_md.md_regs->tf_r7   = regs->r_regs[ 7];
-	p->p_md.md_regs->tf_r8   = regs->r_regs[ 8];
-	p->p_md.md_regs->tf_r9   = regs->r_regs[ 9];
-	p->p_md.md_regs->tf_r10  = regs->r_regs[10];
-	p->p_md.md_regs->tf_r11  = regs->r_regs[11];
-	p->p_md.md_regs->tf_r12  = regs->r_regs[12];
-	p->p_md.md_regs->tf_r13  = regs->r_regs[13];
-	p->p_md.md_regs->tf_r14  = regs->r_regs[14];
-	p->p_md.md_regs->tf_r15  = regs->r_regs[15];
-	p->p_md.md_regs->tf_r16  = regs->r_regs[16];
-	p->p_md.md_regs->tf_r17  = regs->r_regs[17];
-	p->p_md.md_regs->tf_r18  = regs->r_regs[18];
-	p->p_md.md_regs->tf_t4   = regs->r_regs[19];
-	p->p_md.md_regs->tf_t3   = regs->r_regs[20];
-	p->p_md.md_regs->tf_t2   = regs->r_regs[21];
-	p->p_md.md_regs->tf_t1   = regs->r_regs[22];
-	p->p_md.md_regs->tf_arg3 = regs->r_regs[23];
-	p->p_md.md_regs->tf_arg2 = regs->r_regs[24];
-	p->p_md.md_regs->tf_arg1 = regs->r_regs[25];
-	p->p_md.md_regs->tf_arg0 = regs->r_regs[26];
-	p->p_md.md_regs->tf_dp   = regs->r_regs[27];
-	p->p_md.md_regs->tf_ret0 = regs->r_regs[28];
-	p->p_md.md_regs->tf_ret1 = regs->r_regs[29];
-	p->p_md.md_regs->tf_sp   = regs->r_regs[30];
-	p->p_md.md_regs->tf_r31  = regs->r_regs[31];
-	p->p_md.md_regs->tf_iioq_head = regs->r_pc;
-	p->p_md.md_regs->tf_iioq_tail = regs->r_npc;
+	struct trapframe *tf = p->p_md.md_regs;
 
-	return 0;
+	tf->tf_sar  = regs->r_regs[ 0];
+	tf->tf_r1   = regs->r_regs[ 1];
+	tf->tf_rp   = regs->r_regs[ 2];
+	tf->tf_r3   = regs->r_regs[ 3];
+	tf->tf_r4   = regs->r_regs[ 4];
+	tf->tf_r5   = regs->r_regs[ 5];
+	tf->tf_r6   = regs->r_regs[ 6];
+	tf->tf_r7   = regs->r_regs[ 7];
+	tf->tf_r8   = regs->r_regs[ 8];
+	tf->tf_r9   = regs->r_regs[ 9];
+	tf->tf_r10  = regs->r_regs[10];
+	tf->tf_r11  = regs->r_regs[11];
+	tf->tf_r12  = regs->r_regs[12];
+	tf->tf_r13  = regs->r_regs[13];
+	tf->tf_r14  = regs->r_regs[14];
+	tf->tf_r15  = regs->r_regs[15];
+	tf->tf_r16  = regs->r_regs[16];
+	tf->tf_r17  = regs->r_regs[17];
+	tf->tf_r18  = regs->r_regs[18];
+	tf->tf_t4   = regs->r_regs[19];
+	tf->tf_t3   = regs->r_regs[20];
+	tf->tf_t2   = regs->r_regs[21];
+	tf->tf_t1   = regs->r_regs[22];
+	tf->tf_arg3 = regs->r_regs[23];
+	tf->tf_arg2 = regs->r_regs[24];
+	tf->tf_arg1 = regs->r_regs[25];
+	tf->tf_arg0 = regs->r_regs[26];
+	tf->tf_dp   = regs->r_regs[27];
+	tf->tf_ret0 = regs->r_regs[28];
+	tf->tf_ret1 = regs->r_regs[29];
+	tf->tf_sp   = regs->r_regs[30];
+	tf->tf_r31  = regs->r_regs[31];
+	tf->tf_iioq_head = regs->r_pc | 3;
+	tf->tf_iioq_tail = regs->r_npc | 3;
+
+	return (0);
 }
 
 int
@@ -148,8 +152,6 @@ process_write_fpregs(p, fpregs)
 {
 	extern paddr_t fpu_curpcb;
 
-	if (p->p_md.md_regs->tf_cr30 == fpu_curpcb)
-		fpu_save((vaddr_t)p->p_addr->u_pcb.pcb_fpregs);
 	bcopy(fpregs, p->p_addr->u_pcb.pcb_fpregs, 32 * 8);
 
 	if (p->p_md.md_regs->tf_cr30 == fpu_curpcb) {
@@ -157,7 +159,7 @@ process_write_fpregs(p, fpregs)
 		fpu_curpcb = 0;
 	}
 
-	return 0;
+	return (0);
 }
 
 int
@@ -165,8 +167,10 @@ process_sstep(p, sstep)
 	struct proc *p;
 	int sstep;
 {
-	/* TODO */
-	return EINVAL;
+	if (sstep)
+		return (EINVAL);
+
+	return (0);
 }
 
 int
@@ -174,10 +178,10 @@ process_set_pc(p, addr)
 	struct proc *p;
 	caddr_t addr;
 {
-	if (!USERMODE(addr))	/* XXX */
-		return EINVAL;
-	p->p_md.md_regs->tf_iioq_head = (register_t)addr;
-	return 0;
+	p->p_md.md_regs->tf_iioq_tail = 4 +
+	    (p->p_md.md_regs->tf_iioq_head = (register_t)addr | 3);
+
+	return (0);
 }
 
 #endif	/* PTRACE */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.26 2002/09/04 18:25:31 jason Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.30 2003/02/17 01:29:20 henric Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.51 2001/07/24 19:32:11 eeh Exp $ */
 
 /*
@@ -106,7 +106,7 @@ extern	int kgdb_debug_panic;
 #endif
 
 static	int rootnode;
-char platform_type[32];
+char platform_type[64];
 
 static	char *str2hex(char *, int *);
 static	int mbprint(void *, const char *);
@@ -1005,7 +1005,7 @@ mainbus_attach(parent, dev, aux)
 	void *aux;
 {
 extern struct sparc_bus_dma_tag mainbus_dma_tag;
-extern struct sparc_bus_space_tag mainbus_space_tag;
+extern bus_space_tag_t mainbus_space_tag;
 
 	struct mainbus_attach_args ma;
 	char buf[32];
@@ -1028,7 +1028,10 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 		NULL
 	};
 
-	OF_getprop(findroot(), "name", platform_type, sizeof(platform_type));
+	if (OF_getprop(findroot(), "banner-name", platform_type,
+	    sizeof(platform_type)) <= 0)
+		OF_getprop(findroot(), "name", platform_type,
+		    sizeof(platform_type));
 	printf(": %s\n", platform_type);
 
 
@@ -1058,7 +1061,7 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 				continue;
 			if (strcmp(buf, "cpu") == 0) {
 				bzero(&ma, sizeof(ma));
-				ma.ma_bustag = &mainbus_space_tag;
+				ma.ma_bustag = mainbus_space_tag;
 				ma.ma_dmatag = &mainbus_dma_tag;
 				ma.ma_node = node;
 				ma.ma_name = "cpu";
@@ -1067,7 +1070,7 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 			}
 		}
 		if (node == 0)
-			panic("None of the CPUs found\n");
+			panic("None of the CPUs found");
 	}
 
 
@@ -1100,7 +1103,7 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 			continue; /* an "early" device already configured */
 
 		bzero(&ma, sizeof ma);
-		ma.ma_bustag = &mainbus_space_tag;
+		ma.ma_bustag = mainbus_space_tag;
 		ma.ma_dmatag = &mainbus_dma_tag;
 		ma.ma_name = buf;
 		ma.ma_node = node;
@@ -1573,10 +1576,13 @@ device_register(dev, aux)
 			if (strcmp(bp->name, "ide") == 0 &&
 			    strcmp((bp + 1)->name, "ata") == 0 &&
 			    strcmp((bp + 2)->name, "cmdk") == 0) {
-				if (((bp + 2)->val[0] == (bp + 1)->val[0]) &&
-				    ((bp + 1)->val[1] == 0)) {
+				if ((bp + 2)->val[1] == 0 &&
+				    (bp + 1)->val[1] == 0) {
 					(bp + 1)->dev = dev;
 					bootpath_store(1, bp + 2);
+					(bp + 2)->val[0] +=
+					    2 * ((bp + 1)->val[0]);
+					(bp + 2)->val[1] = 0;
 				}
 			}
 			return;

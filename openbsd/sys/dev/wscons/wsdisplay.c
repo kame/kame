@@ -1,4 +1,4 @@
-/* $OpenBSD: wsdisplay.c,v 1.48 2002/08/21 16:51:27 miod Exp $ */
+/* $OpenBSD: wsdisplay.c,v 1.50 2003/02/23 19:08:11 tedu Exp $ */
 /* $NetBSD: wsdisplay.c,v 1.37.4.1 2000/06/30 16:27:53 simonb Exp $ */
 
 /*
@@ -680,7 +680,7 @@ wsdisplay_common_attach(sc, console, scrdata, accessops, accesscookie)
 
 	sc->sc_muxdv = wsmux_create("dmux", sc->sc_dv.dv_unit);
 	if (!sc->sc_muxdv)
-		panic("wsdisplay_common_attach: no memory\n");
+		panic("wsdisplay_common_attach: no memory");
 	sc->sc_muxdv->sc_displaydv = &sc->sc_dv;
 #endif
 
@@ -2301,13 +2301,11 @@ ctrl_event(u_int type, int value, struct wsdisplay_softc *ws_sc, struct proc *p)
 	if (type == WSCONS_EVENT_WSMOUSED_SLEEP) {
 		/* sleeping until next switch to text mode */
 		ws_sc->wsmoused_sleep = 1;
+		error = 0;
 		while (ws_sc->wsmoused_sleep && error == 0)
 			error = tsleep(&ws_sc->wsmoused_sleep, PPAUSE,
 			    "wsmoused_sleep", 0);
-		if (error)
-			return error;
-		else
-			return (0);
+		return (error);
 	}
 	for (i = 0 ; i < WSDISPLAY_DEFAULTSCREENS ; i++)
 		if (sc->sc_scr[i]) {

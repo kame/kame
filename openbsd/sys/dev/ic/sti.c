@@ -1,7 +1,7 @@
-/*	$OpenBSD: sti.c,v 1.15 2002/07/19 17:35:07 mickey Exp $	*/
+/*	$OpenBSD: sti.c,v 1.23 2003/02/18 09:39:45 miod Exp $	*/
 
 /*
- * Copyright (c) 2000-2001 Michael Shalayeff
+ * Copyright (c) 2000-2003 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -119,7 +119,10 @@ enum sti_bmove_funcs {
 int sti_init(struct sti_softc *sc, int mode);
 int sti_inqcfg(struct sti_softc *sc, struct sti_inqconfout *out);
 void sti_bmove(struct sti_softc *sc, int, int, int, int, int, int,
-	enum sti_bmove_funcs);
+    enum sti_bmove_funcs);
+int sti_fetchfonts(struct sti_softc *sc, struct sti_inqconfout *cfg,
+    u_int32_t addr);
+void sti_attach_deferred(void *);
 
 void
 sti_attach_common(sc)
@@ -129,7 +132,6 @@ sti_attach_common(sc)
 	bus_space_handle_t fbh;
 	struct sti_dd *dd;
 	struct sti_cfg *cc;
-	struct sti_fontcfg *ff;
 	int error, size, i;
 
 	/* { extern int pmapdebug; pmapdebug = 0xfffff; } */
@@ -193,7 +195,7 @@ sti_attach_common(sc)
 	    "end=%x, mmap=%x, msto=%x, timo=%d, mont=%x, ua=%x\n"
 	    "memrq=%x, pwr=%d, bus=%x, ebus=%x, altt=%x, cfb=%x\n"
 	    "code=",
-	    dd->dd_type, dd->dd_grrev, dd->dd_lrrev,
+	    dd->dd_type & 0xff, dd->dd_grrev, dd->dd_lrrev,
 	    dd->dd_grid[0], dd->dd_grid[1],
 	    dd->dd_fntaddr, dd->dd_maxst, dd->dd_romend,
 	    dd->dd_reglst, dd->dd_maxreent,
@@ -224,8 +226,8 @@ sti_attach_common(sc)
 
 	/* copy code into memory */
 	if (sc->sc_devtype == STI_DEVTYPE1) {
-		register u_int8_t *p = (u_int8_t *)sc->sc_code;
-		register u_int32_t addr, eaddr;
+		u_int8_t *p = (u_int8_t *)sc->sc_code;
+		u_int32_t addr, eaddr;
 
 		for (addr = dd->dd_pacode[STI_BEGIN], eaddr = addr + size * 4;
 		    addr < eaddr; addr += 4 )
@@ -261,12 +263,12 @@ sti_attach_common(sc)
 	cc = &sc->sc_cfg;
 	bzero(cc, sizeof (*cc));
 	{
-		register int i = dd->dd_reglst;
-		register u_int32_t *p;
+		int i = dd->dd_reglst;
+		u_int32_t *p;
 		struct sti_region r;
 
 #ifdef STIDEBUG
-		printf ("stiregions @%p:\n", i);
+		printf("stiregions @%p:\n", i);
 #endif
 		r.last = 0;
 		for (p = cc->regions; !r.last &&
@@ -280,10 +282,10 @@ sti_attach_common(sc)
 			*p = (p == cc->regions? sc->romh : sc->ioh) +
 			    (r.offset << PGSHIFT);
 #ifdef STIDEBUG
-			printf("%x @ 0x%x %s%s%s%s\n",
-			    r.length << PGSHIFT, *p, r.sys_only? "sys " : "",
-			    r.cache? "cache " : "", r.btlb? "btlb " : "",
-			    r.last? "last" : "");
+			printf("%x @ 0x%x%s%s%s%s\n",
+			    r.length << PGSHIFT, *p, r.sys_only? " sys" : "",
+			    r.cache? " cache" : "", r.btlb? " btlb" : "",
+			    r.last? " last" : "");
 #endif
 
 			/* rom has already been mapped */
@@ -300,43 +302,31 @@ sti_attach_common(sc)
 	}
 
 	if ((error = sti_init(sc, 0))) {
-		printf (": can not initialize (%d)\n", error);
+		printf(": can not initialize (%d)\n", error);
 		return;
 	}
 
 	if ((error = sti_inqcfg(sc, &cfg))) {
-		printf (": error %d inquiring config\n", error);
+		printf(": error %d inquiring config\n", error);
 		return;
 	}
 
 	if ((error = sti_init(sc, STI_TEXTMODE))) {
-		printf (": can not initialize (%d)\n", error);
+		printf(": can not initialize (%d)\n", error);
 		return;
 	}
 
-	ff = &sc->sc_fontcfg;
-	if (sc->sc_devtype == STI_DEVTYPE1) {
-		i = dd->dd_fntaddr;
-		ff->first  = parseshort(i + 0x00);
-		ff->last   = parseshort(i + 0x08);
-		ff->width  = bus_space_read_1(sc->memt, sc->romh, i + 0x13);
-		ff->height = bus_space_read_1(sc->memt, sc->romh, i + 0x17);
-		ff->type   = bus_space_read_1(sc->memt, sc->romh, i + 0x1b);
-		ff->bpc    = bus_space_read_1(sc->memt, sc->romh, i + 0x1f);
-		ff->uheight= bus_space_read_1(sc->memt, sc->romh, i + 0x33);
-		ff->uoffset= bus_space_read_1(sc->memt, sc->romh, i + 0x37);
-	} else	/* STI_DEVTYPE4 */
-		bus_space_read_region_4(sc->memt, sc->romh, dd->dd_fntaddr,
-		    (u_int32_t *)ff, sizeof(*ff) / 4);
-
 	printf(": %s rev %d.%02d;%d\n"
-	    "%s: %dx%d frame buffer, %dx%dx%d display, offset %dx%d\n"
-	    "%s: %dx%d font type %d, %d bpc, charset %d-%d\n", cfg.name,
-	    dd->dd_grrev >> 4, dd->dd_grrev & 0xf, dd->dd_lrrev,
+	    "%s: %dx%d frame buffer, %dx%dx%d display, offset %dx%d\n",
+	    cfg.name, dd->dd_grrev >> 4, dd->dd_grrev & 0xf, dd->dd_lrrev,
 	    sc->sc_dev.dv_xname, cfg.fbwidth, cfg.fbheight,
-	    cfg.width, cfg.height, cfg.bpp, cfg.owidth, cfg.oheight,
-	    sc->sc_dev.dv_xname,
-	    ff->width, ff->height, ff->type,  ff->bpc, ff->first, ff->last);
+	    cfg.width, cfg.height, cfg.bpp, cfg.owidth, cfg.oheight);
+
+	if ((error = sti_fetchfonts(sc, &cfg, dd->dd_fntaddr))) {
+		printf("%s: cannot fetch fonts (%d)\n",
+		    sc->sc_dev.dv_xname, error);
+		return;
+	}
 
 	/*
 	 * parse screen descriptions:
@@ -345,26 +335,129 @@ sti_attach_common(sc)
 	 *	calculate dimentions.
 	 */
 
-	sti_default_screen.ncols = cfg.width / ff->width;
-	sti_default_screen.nrows = cfg.height / ff->height;
-	sti_default_screen.fontwidth = ff->width;
-	sti_default_screen.fontheight = ff->height;
+	sti_default_screen.ncols = cfg.width / sc->sc_curfont.width;
+	sti_default_screen.nrows = cfg.height / sc->sc_curfont.height;
+	sti_default_screen.fontwidth = sc->sc_curfont.width;
+	sti_default_screen.fontheight = sc->sc_curfont.height;
 
 #if NWSDISPLAY > 0
-	{
-		struct wsemuldisplaydev_attach_args waa;
-
-		/* attach WSDISPLAY */
-		bzero(&waa, sizeof(waa));
-		waa.console = sc->sc_flags & STI_CONSOLE? 1 : 0;
-		waa.scrdata = &sti_default_screenlist;
-		waa.accessops = &sti_accessops;
-		waa.accesscookie = sc;
-
-		config_found(&sc->sc_dev, &waa, wsemuldisplaydevprint);
-	}
+	startuphook_establish(sti_attach_deferred, sc);
 #endif
+
 	/* { extern int pmapdebug; pmapdebug = 0; } */
+}
+
+void
+sti_attach_deferred(void *v)
+{
+	struct sti_softc *sc = v;
+	struct wsemuldisplaydev_attach_args waa;
+
+	waa.console = sc->sc_flags & STI_CONSOLE? 1 : 0;
+	waa.scrdata = &sti_default_screenlist;
+	waa.accessops = &sti_accessops;
+	waa.accesscookie = sc;
+
+	/* attach as console if required */
+	if (waa.console) {
+		long defattr;
+
+		sti_alloc_attr(sc, 0, 0, 0, &defattr);
+		wsdisplay_cnattach(&sti_default_screen, sc,
+		    0, sti_default_screen.nrows - 1, defattr);
+	}
+
+	config_found(&sc->sc_dev, &waa, wsemuldisplaydevprint);
+}
+
+int
+sti_fetchfonts(struct sti_softc *sc, struct sti_inqconfout *cfg, u_int32_t addr)
+{
+	struct sti_font *fp = &sc->sc_curfont;
+	int uc, size;
+	struct {
+		struct sti_unpmvflags flags;
+		struct sti_unpmvin in;
+		struct sti_unpmvout out;
+	} a;
+
+	/*
+	 * Get the first PROM font in memory
+	 */
+	do {
+		if (sc->sc_devtype == STI_DEVTYPE1) {
+			fp->first  = parseshort(addr + 0x00);
+			fp->last   = parseshort(addr + 0x08);
+			fp->width  = bus_space_read_1(sc->memt, sc->romh,
+			    addr + 0x13);
+			fp->height = bus_space_read_1(sc->memt, sc->romh,
+			    addr + 0x17);
+			fp->type   = bus_space_read_1(sc->memt, sc->romh,
+			    addr + 0x1b);
+			fp->bpc    = bus_space_read_1(sc->memt, sc->romh,
+			    addr + 0x1f);
+			fp->next   = parseword(addr + 0x23);
+			fp->uheight= bus_space_read_1(sc->memt, sc->romh,
+			    addr + 0x33);
+			fp->uoffset= bus_space_read_1(sc->memt, sc->romh,
+			    addr + 0x37);
+		} else	/* STI_DEVTYPE4 */
+			bus_space_read_region_4(sc->memt, sc->romh, addr,
+			    (u_int32_t *)fp, sizeof(struct sti_font) / 4);
+
+		printf("%s: %dx%d font type %d, %d bpc, charset %d-%d\n",
+		    sc->sc_dev.dv_xname, fp->width, fp->height,
+		    fp->type,  fp->bpc, fp->first, fp->last);
+
+		size = sizeof(struct sti_font) +
+		    (fp->last - fp->first + 1) * fp->bpc;
+		if (sc->sc_devtype == STI_DEVTYPE1)
+			size *= 4;
+		sc->sc_romfont = malloc(size, M_DEVBUF, M_NOWAIT);
+		if (sc->sc_romfont == NULL)
+			return (ENOMEM);
+
+		bus_space_read_region_4(sc->memt, sc->romh, addr,
+		    (u_int32_t *)sc->sc_romfont, size / 4);
+
+		addr = NULL; /* fp->next */
+	} while (addr);
+
+	/*
+	 * If there is enough room in the off-screen framebuffer memory,
+	 * display all the characters there in order to display them
+	 * faster with blkmv operations rather than unpmv later on.
+	 */
+	if (size <= cfg->fbheight *
+	    (cfg->fbwidth - cfg->width - cfg->owidth)) {
+		bzero(&a, sizeof(a));
+		a.flags.flags = STI_UNPMVF_WAIT;
+		a.in.fg_colour = STI_COLOUR_WHITE;
+		a.in.bg_colour = STI_COLOUR_BLACK;
+		a.in.font_addr = sc->sc_romfont;
+
+		sc->sc_fontmaxcol = cfg->fbheight / fp->height;
+		sc->sc_fontbase = cfg->width + cfg->owidth;
+		for (uc = fp->first; uc <= fp->last; uc++) {
+			a.in.x = ((uc - fp->first) / sc->sc_fontmaxcol) *
+			    fp->width + sc->sc_fontbase;
+			a.in.y = ((uc - fp->first) % sc->sc_fontmaxcol) *
+			    fp->height;
+			a.in.index = uc;
+
+			(*sc->unpmv)(&a.flags, &a.in, &a.out, &sc->sc_cfg);
+			if (a.out.errno) {
+				printf("%s: unpmv %d returned %d\n",
+				    sc->sc_dev.dv_xname, uc, a.out.errno);
+				return (0);
+			}
+		}
+
+		free(sc->sc_romfont, M_DEVBUF);
+		sc->sc_romfont = NULL;
+	}
+
+	return (0);
 }
 
 int
@@ -429,16 +522,17 @@ sti_bmove(sc, x1, y1, x2, y2, h, w, f)
 	switch (f) {
 	case bmf_clear:
 		a.flags.flags |= STI_BLKMVF_CLR;
-		a.in.bg_colour = 0;
+		a.in.bg_colour = STI_COLOUR_BLACK;
 		break;
 	case bmf_underline:
 	case bmf_copy:
-		a.in.fg_colour = 1;
-		a.in.bg_colour = 0;
+		a.in.fg_colour = STI_COLOUR_WHITE;
+		a.in.bg_colour = STI_COLOUR_BLACK;
 		break;
 	case bmf_invert:
-		a.in.fg_colour = 0;
-		a.in.bg_colour = 1;
+		a.flags.flags |= STI_BLKMVF_COLR;
+		a.in.fg_colour = STI_COLOUR_BLACK;
+		a.in.bg_colour = STI_COLOUR_WHITE;
 		break;
 	}
 	a.in.srcx = x1;
@@ -451,8 +545,8 @@ sti_bmove(sc, x1, y1, x2, y2, h, w, f)
 	(*sc->blkmv)(&a.flags, &a.in, &a.out, &sc->sc_cfg);
 #ifdef STIDEBUG
 	if (a.out.errno)
-		printf ("%s: blkmv returned %d\n",
-			sc->sc_dev.dv_xname, a.out.errno);
+		printf("%s: blkmv returned %d\n",
+		    sc->sc_dev.dv_xname, a.out.errno);
 #endif
 }
 
@@ -464,9 +558,40 @@ sti_ioctl(v, cmd, data, flag, p)
 	int flag;
 	struct proc *p;
 {
-	/* register struct sti_softc *sc; */
+	struct sti_softc *sc = v;
+	struct wsdisplay_fbinfo *wdf;
 
-	return -1;
+	switch (cmd) {
+	case WSDISPLAYIO_GTYPE:
+		*(u_int *)data = WSDISPLAY_TYPE_STI;
+		break;
+
+	case WSDISPLAYIO_GINFO:
+		wdf = (struct wsdisplay_fbinfo *)data;
+		wdf->height = sc->sc_cfg.scr_height;
+		wdf->width  = sc->sc_cfg.scr_width;
+		wdf->depth  = 8;	/* XXX */
+		wdf->cmsize = 256;
+		break;
+
+	case WSDISPLAYIO_LINEBYTES:
+		*(u_int *)data = sc->sc_cfg.fb_width;
+		break;
+
+	case WSDISPLAYIO_GETCMAP:
+	case WSDISPLAYIO_PUTCMAP:
+	case WSDISPLAYIO_SVIDEO:
+	case WSDISPLAYIO_GVIDEO:
+	case WSDISPLAYIO_GCURPOS:
+	case WSDISPLAYIO_SCURPOS:
+	case WSDISPLAYIO_GCURMAX:
+	case WSDISPLAYIO_GCURSOR:
+	case WSDISPLAYIO_SCURSOR:
+	default:
+		return (-1);	/* not supported yet */
+	}
+
+	return (0);
 }
 
 paddr_t
@@ -476,7 +601,7 @@ sti_mmap(v, offset, prot)
 	int prot;
 {
 	/* XXX not finished */
-	return offset;
+	return -1;
 }
 
 int
@@ -487,7 +612,17 @@ sti_alloc_screen(v, type, cookiep, cxp, cyp, defattr)
 	int *cxp, *cyp;
 	long *defattr;
 {
-	return -1;
+	struct sti_softc *sc = v;
+
+	if (sc->sc_nscreens > 0)
+		return ENOMEM;
+
+	*cookiep = sc;
+	*cxp = 0;
+	*cyp = 0;
+	sti_alloc_attr(sc, 0, 0, 0, defattr);
+	sc->sc_nscreens++;
+	return 0;
 }
 
 void
@@ -495,6 +630,9 @@ sti_free_screen(v, cookie)
 	void *v;
 	void *cookie;
 {
+	struct sti_softc *sc = v;
+
+	sc->sc_nscreens--;
 }
 
 int
@@ -522,11 +660,13 @@ sti_cursor(v, on, row, col)
 	void *v;
 	int on, row, col;
 {
-	register struct sti_softc *sc = v;
+	struct sti_softc *sc = v;
+	struct sti_font *fp = &sc->sc_curfont;
 
-	sti_bmove(sc, row * sc->sc_fontcfg.height, col * sc->sc_fontcfg.width,
-		  row * sc->sc_fontcfg.height, col * sc->sc_fontcfg.width,
-		  sc->sc_fontcfg.width, sc->sc_fontcfg.height, bmf_invert);
+	sti_bmove(sc,
+	    col * fp->width, row * fp->height,
+	    col * fp->width, row * fp->height,
+	    fp->height, fp->width, bmf_invert);
 }
 
 int
@@ -548,24 +688,59 @@ sti_putchar(v, row, col, uc, attr)
 	u_int uc;
 	long attr;
 {
-	register struct sti_softc *sc = v;
-	struct {
-		struct sti_unpmvflags flags;
-		struct sti_unpmvin in;
-		struct sti_unpmvout out;
-	} a;
+	struct sti_softc *sc = v;
+	struct sti_font *fp = &sc->sc_curfont;
 
-	bzero(&a, sizeof(a));
+	if (sc->sc_romfont != NULL) {
+		/*
+		 * Font is in memory, use unpmv
+		 */
+		struct {
+			struct sti_unpmvflags flags;
+			struct sti_unpmvin in;
+			struct sti_unpmvout out;
+		} a;
 
-	a.flags.flags = STI_UNPMVF_WAIT;
-	/* XXX does not handle text attributes */
-	a.in.fg_colour = 1;
-	a.in.bg_colour = 0;
-	a.in.x = col * sc->sc_fontcfg.width;
-	a.in.y = row * sc->sc_fontcfg.height;
-	a.in.font_addr = 0/*STI_FONTAD(sc->sc_devtype, sc->sc_rom)*/;
-	a.in.index = uc;
-	(*sc->unpmv)(&a.flags, &a.in, &a.out, &sc->sc_cfg);
+		bzero(&a, sizeof(a));
+
+		a.flags.flags = STI_UNPMVF_WAIT;
+		/* XXX does not handle text attributes */
+		a.in.fg_colour = STI_COLOUR_WHITE;
+		a.in.bg_colour = STI_COLOUR_BLACK;
+		a.in.x = col * fp->width;
+		a.in.y = row * fp->height;
+		a.in.font_addr = sc->sc_romfont;
+		a.in.index = uc;
+
+		(*sc->unpmv)(&a.flags, &a.in, &a.out, &sc->sc_cfg);
+	} else {
+		/*
+		 * Font is in frame buffer, use blkmv
+		 */
+		struct {
+			struct sti_blkmvflags flags;
+			struct sti_blkmvin in;
+			struct sti_blkmvout out;
+		} a;
+
+		bzero(&a, sizeof(a));
+
+		a.flags.flags = STI_BLKMVF_WAIT;
+		/* XXX does not handle text attributes */
+		a.in.fg_colour = STI_COLOUR_WHITE;
+		a.in.bg_colour = STI_COLOUR_BLACK;
+
+		a.in.srcx = ((uc - fp->first) / sc->sc_fontmaxcol) *
+		    fp->width + sc->sc_fontbase;
+		a.in.srcy = ((uc - fp->first) % sc->sc_fontmaxcol) *
+		    fp->height;
+		a.in.dstx = col * fp->width;
+		a.in.dsty = row * fp->height;
+		a.in.height = fp->height;
+		a.in.width = fp->width;
+
+		(*sc->blkmv)(&a.flags, &a.in, &a.out, &sc->sc_cfg);
+	}
 }
 
 void
@@ -573,13 +748,13 @@ sti_copycols(v, row, srccol, dstcol, ncols)
 	void *v;
 	int row, srccol, dstcol, ncols;
 {
-	register struct sti_softc *sc = v;
+	struct sti_softc *sc = v;
+	struct sti_font *fp = &sc->sc_curfont;
 
 	sti_bmove(sc,
-	    row * sc->sc_fontcfg.height, srccol * sc->sc_fontcfg.width,
-	    row * sc->sc_fontcfg.height, dstcol * sc->sc_fontcfg.width,
-	    ncols * sc->sc_fontcfg.width, sc->sc_fontcfg.height,
-	    bmf_copy);
+	    srccol * fp->width, row * fp->height,
+	    dstcol * fp->width, row * fp->height,
+	    fp->height, ncols * fp->width, bmf_copy);
 }
 
 void
@@ -588,13 +763,13 @@ sti_erasecols(v, row, startcol, ncols, attr)
 	int row, startcol, ncols;
 	long attr;
 {
-	register struct sti_softc *sc = v;
+	struct sti_softc *sc = v;
+	struct sti_font *fp = &sc->sc_curfont;
 
 	sti_bmove(sc,
-	    row * sc->sc_fontcfg.height, startcol * sc->sc_fontcfg.width,
-	    row * sc->sc_fontcfg.height, startcol * sc->sc_fontcfg.width,
-	    ncols * sc->sc_fontcfg.width, sc->sc_fontcfg.height,
-	    bmf_clear);
+	    startcol * fp->width, row * fp->height,
+	    startcol * fp->width, row * fp->height,
+	    fp->height, ncols * fp->width, bmf_clear);
 }
 
 void
@@ -602,13 +777,12 @@ sti_copyrows(v, srcrow, dstrow, nrows)
 	void *v;
 	int srcrow, dstrow, nrows;
 {
-	register struct sti_softc *sc = v;
+	struct sti_softc *sc = v;
+	struct sti_font *fp = &sc->sc_curfont;
 
-	sti_bmove(sc,
-	    srcrow * sc->sc_fontcfg.height, 0,
-	    dstrow * sc->sc_fontcfg.height, 0,
-	    sc->sc_cfg.fb_width, nrows + sc->sc_fontcfg.height,
-	    bmf_copy);
+	sti_bmove(sc, sc->sc_cfg.oscr_width, srcrow * fp->height,
+	    sc->sc_cfg.oscr_width, dstrow * fp->height,
+	    nrows * fp->height, sc->sc_cfg.scr_width, bmf_copy);
 }
 
 void
@@ -617,13 +791,12 @@ sti_eraserows(v, srcrow, nrows, attr)
 	int srcrow, nrows;
 	long attr;
 {
-	register struct sti_softc *sc = v;
+	struct sti_softc *sc = v;
+	struct sti_font *fp = &sc->sc_curfont;
 
-	sti_bmove(sc,
-	    srcrow * sc->sc_fontcfg.height, 0,
-	    srcrow * sc->sc_fontcfg.height, 0,
-	    sc->sc_cfg.fb_width, nrows + sc->sc_fontcfg.height,
-	    bmf_clear);
+	sti_bmove(sc, sc->sc_cfg.oscr_width, srcrow * fp->height,
+	    sc->sc_cfg.oscr_width, srcrow * fp->height,
+	    nrows * fp->height, sc->sc_cfg.scr_width, bmf_clear);
 }
 
 int
@@ -632,7 +805,7 @@ sti_alloc_attr(v, fg, bg, flags, pattr)
 	int fg, bg, flags;
 	long *pattr;
 {
-	/* register struct sti_softc *sc = v; */
+	/* struct sti_softc *sc = v; */
 
 	*pattr = 0;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: hifn7751reg.h,v 1.39 2002/07/25 15:27:20 jason Exp $	*/
+/*	$OpenBSD: hifn7751reg.h,v 1.42 2003/02/19 19:59:14 jason Exp $	*/
 
 /*
  * Invertex AEON / Hifn 7751 driver
@@ -59,22 +59,22 @@
  *
  * MAX_COMMAND = base command + mac command + encrypt command +
  *			mac-key + rc4-key
- * MAX_RESULT  = base result + mac result + mac + encrypt result
+ * MAX_RESULT  = base result + comp result + mac result + mac + encrypt result
  *			
  *
  */
 #define	HIFN_MAX_COMMAND	(8 + 8 + 8 + 64 + 260)
-#define	HIFN_MAX_RESULT		(8 + 4 + 20 + 4)
+#define	HIFN_MAX_RESULT		(8 + 4 + 4 + 20 + 4)
 
 /*
  * hifn_desc_t
  *
  * Holds an individual descriptor for any of the rings.
  */
-typedef struct hifn_desc {
+struct hifn_desc {
 	volatile u_int32_t l;		/* length and status bits */
 	volatile u_int32_t p;
-} hifn_desc_t;
+};
 
 /*
  * Masks for the "length" field of struct hifn_desc.
@@ -365,15 +365,17 @@ typedef struct hifn_desc {
 /*
  * Structure to help build up the command data structure.
  */
-typedef struct hifn_base_command {
+struct hifn_base_command {
 	volatile u_int16_t masks;
 	volatile u_int16_t session_num;
 	volatile u_int16_t total_source_count;
 	volatile u_int16_t total_dest_count;
-} hifn_base_command_t;
+};
 
-#define	HIFN_BASE_CMD_MAC		0x0400
-#define	HIFN_BASE_CMD_CRYPT		0x0800
+#define	HIFN_BASE_CMD_COMP		0x0100	/* enable compression engine */
+#define	HIFN_BASE_CMD_PAD		0x0200	/* enable padding engine */
+#define	HIFN_BASE_CMD_MAC		0x0400	/* enable MAC engine */
+#define	HIFN_BASE_CMD_CRYPT		0x0800	/* enable crypt engine */
 #define	HIFN_BASE_CMD_DECODE		0x2000
 #define	HIFN_BASE_CMD_SRCLEN_M		0xc000
 #define	HIFN_BASE_CMD_SRCLEN_S		14
@@ -385,12 +387,12 @@ typedef struct hifn_base_command {
 /*
  * Structure to help build up the command data structure.
  */
-typedef struct hifn_crypt_command {
+struct hifn_crypt_command {
 	volatile u_int16_t masks;
 	volatile u_int16_t header_skip;
 	volatile u_int16_t source_count;
 	volatile u_int16_t reserved;
-} hifn_crypt_command_t;
+};
 
 #define	HIFN_CRYPT_CMD_ALG_MASK		0x0003		/* algorithm: */
 #define	HIFN_CRYPT_CMD_ALG_DES		0x0000		/*   DES */
@@ -411,12 +413,12 @@ typedef struct hifn_crypt_command {
 /*
  * Structure to help build up the command data structure.
  */
-typedef struct hifn_mac_command {
+struct hifn_mac_command {
 	volatile u_int16_t masks;
 	volatile u_int16_t header_skip;
 	volatile u_int16_t source_count;
 	volatile u_int16_t reserved;
-} hifn_mac_command_t;
+};
 
 #define	HIFN_MAC_CMD_ALG_MASK		0x0001
 #define	HIFN_MAC_CMD_ALG_SHA1		0x0000
@@ -438,6 +440,64 @@ typedef struct hifn_mac_command {
  */
 #define	HIFN_MAC_CMD_POS_IPSEC		0x0200
 #define	HIFN_MAC_CMD_NEW_KEY		0x0800
+
+struct hifn_comp_command {
+	volatile u_int16_t masks;
+	volatile u_int16_t header_skip;
+	volatile u_int16_t source_count;
+	volatile u_int16_t reserved;
+};
+
+#define	HIFN_COMP_CMD_SRCLEN_M		0xc000
+#define	HIFN_COMP_CMD_SRCLEN_S		14
+#define	HIFN_COMP_CMD_ONE		0x0100	/* must be one */
+#define	HIFN_COMP_CMD_CLEARHIST		0x0010	/* clear history */
+#define	HIFN_COMP_CMD_UPDATEHIST	0x0008	/* update history */
+#define	HIFN_COMP_CMD_LZS_STRIP0	0x0004	/* LZS: strip zero */
+#define	HIFN_COMP_CMD_MPPC_RESTART	0x0004	/* MPPC: restart */
+#define	HIFN_COMP_CMD_ALG_MASK		0x0001	/* compression mode: */
+#define	HIFN_COMP_CMD_ALG_MPPC		0x0001	/*   MPPC */
+#define	HIFN_COMP_CMD_ALG_LZS		0x0000	/*   LZS */
+
+struct hifn_base_result {
+	volatile u_int16_t flags;
+	volatile u_int16_t session;
+	volatile u_int16_t src_cnt;		/* 15:0 of source count */
+	volatile u_int16_t dst_cnt;		/* 15:0 of dest count */
+};
+
+#define	HIFN_BASE_RES_DSTOVERRUN	0x0200	/* destination overrun */
+#define	HIFN_BASE_RES_SRCLEN_M		0xc000	/* 17:16 of source count */
+#define	HIFN_BASE_RES_SRCLEN_S		14
+#define	HIFN_BASE_RES_DSTLEN_M		0x3000	/* 17:16 of dest count */
+#define	HIFN_BASE_RES_DSTLEN_S		12
+
+struct hifn_comp_result {
+	volatile u_int16_t flags;
+	volatile u_int16_t crc;
+};
+
+#define	HIFN_COMP_RES_LCB_M		0xff00	/* longitudinal check byte */
+#define	HIFN_COMP_RES_LCB_S		8
+#define	HIFN_COMP_RES_RESTART		0x0004	/* MPPC: restart */
+#define	HIFN_COMP_RES_ENDMARKER		0x0002	/* LZS: end marker seen */
+#define	HIFN_COMP_RES_SRC_NOTZERO	0x0001	/* source expired */
+
+struct hifn_mac_result {
+	volatile u_int16_t flags;
+	volatile u_int16_t reserved;
+	/* followed by 0, 6, 8, or 10 u_int16_t's of the MAC, then crypt */
+};
+
+#define	HIFN_MAC_RES_MISCOMPARE		0x0002	/* compare failed */
+#define	HIFN_MAC_RES_SRC_NOTZERO	0x0001	/* source expired */
+
+struct hifn_crypt_result {
+	volatile u_int16_t flags;
+	volatile u_int16_t reserved;
+};
+
+#define	HIFN_CRYPT_RES_SRC_NOTZERO	0x0001	/* source expired */
 
 /*
  * The poll frequency and poll scalar defines are unshifted values used

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wireg.h,v 1.28 2002/09/12 03:48:31 millert Exp $	*/
+/*	$OpenBSD: if_wireg.h,v 1.31 2003/01/10 22:10:19 millert Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -301,10 +301,15 @@
 #define WI_PLX_LINT1STAT	0x04	/* Local interrupt 1 status bit */
 #define WI_PLX_COR_OFFSET	0x3E0	/* COR attribute offset of card */
 
-#define	WI_DRVR_MAGIC		0x4A2D	/* Magic number for card detection */
+#define	WI_ACEX_CMDRES		0x10	/* BAR0 (I/O) for ACEX-based bridge */
+#define	WI_ACEX_LOCALRES	0x14	/* BAR1 (I/O) for ACEX-based bridge */
+#define	WI_ACEX_IORES		0x18	/* BAR2 (I/O) for ACEX-based bridge */
+#define	WI_ACEX_COR_OFFSET	0xe0	/* COR attribute offset of card */
 
 #define WI_TMD_LOCALRES		0x14	/* TMD chip's local registers */
 #define WI_TMD_IORES		0x18	/* Prism I/O space (TMD) */
+
+#define	WI_DRVR_MAGIC		0x4A2D	/* Magic number for card detection */
 
 /*
  * PCI Host Interface Registers (HFA3842 Specific)
@@ -402,19 +407,6 @@ struct wi_ltv_ver {
 	u_int16_t	wi_len;
 	u_int16_t	wi_type;
 	u_int16_t	wi_ver[4];
-#define	WI_NIC_LUCENT		0x0001
-#define	WI_NIC_SONY		0x0002
-#define	WI_NIC_LUCENT_EM	0x0005
-#define	WI_NIC_EVB2		0x8000
-#define	WI_NIC_HWB3763		0x8001
-#define	WI_NIC_HWB3163		0x8002
-#define	WI_NIC_HWB3163B		0x8003
-#define	WI_NIC_EVB3		0x8004
-#define	WI_NIC_HWB1153		0x8007
-#define	WI_NIC_P2_SST		0x8008  /* Prism2 with SST flush */
-#define	WI_NIC_PRISM2_5		0x800C
-#define	WI_NIC_3874A		0x8013	/* Prism2.5 Mini-PCI */
-#define	WI_NIC_37300P		0x801a
 };
 
 /*
@@ -612,3 +604,4 @@ struct wi_frame {
 #define WI_SNAPHDR_LEN		0x6
 #define WI_FCS_LEN		0x4
 
+#define	WI_ETHERTYPE_LEN	0x2

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_timer.c,v 1.30 2002/06/09 16:26:11 itojun Exp $	*/
+/*	$OpenBSD: tcp_timer.c,v 1.32 2003/02/21 20:52:06 tedu Exp $	*/
 /*	$NetBSD: tcp_timer.c,v 1.14 1996/02/13 23:44:09 christos Exp $	*/
 
 /*
@@ -204,7 +204,7 @@ tcp_timer_rexmt(void *arg)
 	if (++tp->t_rxtshift > TCP_MAXRXTSHIFT) {
 		tp->t_rxtshift = TCP_MAXRXTSHIFT;
 		tcpstat.tcps_timeoutdrop++;
-		tp = tcp_drop(tp, tp->t_softerror ?
+		(void)tcp_drop(tp, tp->t_softerror ?
 		    tp->t_softerror : ETIMEDOUT);
 		goto out;
 	}
@@ -299,6 +299,15 @@ tcp_timer_rexmt(void *arg)
 	 * If timing a segment in this window, stop the timer.
 	 */
 	tp->t_rtttime = 0;
+#ifdef TCP_ECN
+	/*
+	 * if ECN is enabled, there might be a broken firewall which
+	 * blocks ecn packets.  fall back to non-ecn.
+	 */
+	if ((tp->t_state == TCPS_SYN_SENT || tp->t_state == TCPS_SYN_RECEIVED)
+	    && tcp_do_ecn && !(tp->t_flags & TF_DISABLE_ECN))
+		tp->t_flags |= TF_DISABLE_ECN;
+#endif
 	/*
 	 * Close the congestion window down to one segment
 	 * (we'll open it by one segment for each ack we get).

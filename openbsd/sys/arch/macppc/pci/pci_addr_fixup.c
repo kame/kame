@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci_addr_fixup.c,v 1.4 2002/09/23 04:24:58 drahn Exp $	*/
+/*	$OpenBSD: pci_addr_fixup.c,v 1.6 2002/10/17 02:47:05 drahn Exp $	*/
 /*	$NetBSD: pci_addr_fixup.c,v 1.7 2000/08/03 20:10:45 nathanw Exp $	*/
 
 /*-
@@ -99,12 +99,7 @@ pci_addr_fixup(sc, pc, maxbus)
 	    M_DEVBUF, 0, 0, EX_NOWAIT);
 	KASSERT(sc->extent_mem);
 	sc->extent_port = extent_create("PCI I/O port space",
-#if 1
-	    sc->sc_iobus_space.bus_base, 
-	    sc->sc_iobus_space.bus_base + sc->sc_iobus_space.bus_size,
-#else
 	    PCIADDR_PORT_START, PCIADDR_PORT_END,
-#endif
 	    M_DEVBUF, 0, 0, EX_NOWAIT);
 	KASSERT(sc->extent_port);
 
@@ -228,9 +223,7 @@ pciaddr_resource_manage(sc, pc, tag, func)
 			ex = sc->extent_mem;
 		} else {
 			/* XXX some devices give 32bit value */
-			addr = (PCI_MAPREG_IO_ADDR(val) & PCIADDR_PORT_END) |
-			    sc->sc_iobus_space.bus_base, 
-
+			addr = PCI_MAPREG_IO_ADDR(val) & PCIADDR_PORT_END;
 			size = PCI_MAPREG_IO_SIZE(mask);
 			ex = sc->extent_port;
 		}
@@ -283,7 +276,7 @@ pciaddr_do_resource_allocate(sc, pc, tag, mapreg, ex, type, addr, size)
 		return (0);
 	
 	start = (type == PCI_MAPREG_TYPE_MEM ? sc->sc_membus_space.bus_base
-		: sc->sc_iobus_space.bus_base);
+	    : PCIADDR_PORT_START);
 	if (start < ex->ex_start || start + size - 1 >= ex->ex_end) {
 		PCIBIOS_PRINTV(("No available resources. fixup failed\n"));
 		return (1);

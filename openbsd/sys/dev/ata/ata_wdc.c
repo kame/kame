@@ -1,8 +1,8 @@
-/*      $OpenBSD: ata_wdc.c,v 1.15 2002/05/03 09:18:46 gluk Exp $	*/
+/*      $OpenBSD: ata_wdc.c,v 1.20 2003/02/21 20:10:33 grange Exp $	*/
 /*	$NetBSD: ata_wdc.c,v 1.21 1999/08/09 09:43:11 bouyer Exp $	*/
 
 /*
- * Copyright (c) 1998 Manuel Bouyer.
+ * Copyright (c) 1998, 2001 Manuel Bouyer.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -14,23 +14,21 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
+ *	This product includes software developed by Manuel Bouyer.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,     
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
@@ -99,9 +97,10 @@
 
 #ifdef WDCDEBUG
 int wdcdebug_wd_mask = 0;
-#define WDCDEBUG_PRINT(args, level) \
-	if (wdcdebug_wd_mask & (level)) \
-		printf args
+#define WDCDEBUG_PRINT(args, level) do {	\
+	if ((wdcdebug_wd_mask & (level)) != 0)	\
+		printf args;			\
+} while (0)
 #else
 #define WDCDEBUG_PRINT(args, level)
 #endif
@@ -127,7 +126,7 @@ int   wdc_ata_err(struct ata_drive_datas *, struct ata_bio *);
 
 /*
  * Handle block I/O operation. Return WDC_COMPLETE, WDC_QUEUED, or
- * WDC_TRY_AGAIN. Must be called at splio().
+ * WDC_TRY_AGAIN. Must be called at splbio().
  */
 int
 wdc_ata_bio(drvp, ata_bio)
@@ -413,7 +412,7 @@ wdc_ata_bio_intr(chp, xfer, irq)
 		printf("%s:%d:%d: bad state %d in wdc_ata_bio_intr\n",
 		    chp->wdc->sc_dev.dv_xname, chp->channel, xfer->drive,
 		    drvp->state);
-		panic("wdc_ata_bio_intr: bad state\n");
+		panic("wdc_ata_bio_intr: bad state");
 	}
 
 	/*
@@ -606,6 +605,9 @@ again:
 			goto geometry;
 		/* Also don't try if the drive didn't report its mode */
 		if ((drvp->drive_flags & DRIVE_MODE) == 0)
+			goto geometry;
+		/* SET FEATURES 0x08 is only for PIO mode > 2 */
+		if (drvp->PIO_mode <= 2)
 			goto geometry;
 		wdccommand(chp, drvp->drive, SET_FEATURES, 0, 0, 0,
 		    0x08 | drvp->PIO_mode, WDSF_SET_MODE);

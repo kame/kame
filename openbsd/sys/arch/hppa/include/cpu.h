@@ -1,7 +1,7 @@
-/*	$OpenBSD: cpu.h,v 1.32 2002/09/17 03:51:49 mickey Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.36 2002/11/27 21:47:14 mickey Exp $	*/
 
 /*
- * Copyright (c) 2000-2001 Michael Shalayeff
+ * Copyright (c) 2000-2002 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -82,6 +82,7 @@ extern const char *cpu_typename;
 #define	HPPA_FPUS	0xc0
 #define	HPPA_FPUVER(w)	(((w) & 0x003ff800) >> 11)
 #define	HPPA_FPU_OP(w)	((w) >> 26)
+#define	HPPA_FPU_UNMPL	0x9
 #define	HPPA_FPU_I	0x01
 #define	HPPA_FPU_U	0x02
 #define	HPPA_FPU_O	0x04
@@ -89,11 +90,14 @@ extern const char *cpu_typename;
 #define	HPPA_FPU_V	0x10
 #define	HPPA_FPU_D	0x20
 #define	HPPA_FPU_T	0x40
+#define	HPPA_FPU_XMASK	0x7f
+#define	HPPA_FPU_T_POS	25
 #define	HPPA_FPU_RM	0x00000600
 #define	HPPA_FPU_CQ	0x00fff800
 #define	HPPA_FPU_C	0x04000000
 #define	HPPA_FPU_FLSH	27
-#define	HPPA_FPU_INIT	(HPPA_FPU_I | HPPA_FPU_U | HPPA_FPU_O | HPPA_FPU_Z | HPPA_FPU_V)
+#define	HPPA_FPU_INIT	(0)
+#define	HPPA_FPU_FORK(s) ((s) & ~((u_int64_t)(HPPA_FPU_XMASK)<<32))
 #define	HPPA_PMSFUS	0x20	/* ??? */
 
 /*
@@ -116,6 +120,14 @@ extern const char *cpu_typename;
 #define	HPPA_SPA_ENABLE	0x00000020
 #define	HPPA_NMODSPBUS	64
 
+#define	CPU_CLOCKUPDATE() do {					\
+	register_t __itmr;					\
+	__asm __volatile("mfctl	%%cr16, %0" : "=r" (__itmr));	\
+	cpu_itmr = __itmr;					\
+	__itmr += cpu_hzticks;					\
+	__asm __volatile("mtctl	%0, %%cr16" :: "r" (__itmr));	\
+} while (0)
+
 #define	clockframe		trapframe
 #define	CLKF_PC(framep)		((framep)->tf_iioq_head)
 #define	CLKF_INTR(framep)	((framep)->tf_flags & TFF_INTR)
@@ -134,6 +146,7 @@ extern const char *cpu_typename;
 	(((t)? pdcache : fdcache) (HPPA_SID_KERNEL,(vaddr_t)(a),(s)))
 
 extern int want_resched;
+extern u_int cpu_itmr, cpu_hzticks;
 
 #define DELAY(x) delay(x)
 

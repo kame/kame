@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.43 2002/02/20 22:28:23 deraadt Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.45 2002/12/10 23:45:02 miod Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.30 1997/03/10 23:55:40 pk Exp $ */
 
 /*
@@ -267,7 +267,7 @@ dvma_mapout(kva, va, len)
 	klen = round_page(len + off);
 
 #if defined(SUN4M)
-	if (cputyp == CPU_SUN4M)
+	if (CPU_ISSUN4M)
 		iommu_remove(kva, klen);
 	else
 #endif
@@ -290,14 +290,12 @@ dvma_mapout(kva, va, len)
  * Map an IO request into kernel virtual address space.
  */
 void
-vmapbuf(bp, sz)
-	struct buf *bp;
-	vsize_t sz;
+vmapbuf(struct buf *bp, vsize_t sz)
 {
 	vaddr_t uva, kva;
-	paddr_t pa;
 	vsize_t size, off;
 	struct pmap *pmap;
+	paddr_t pa;
 
 #ifdef DIAGNOSTIC
 	if ((bp->b_flags & B_PHYS) == 0)
@@ -315,14 +313,7 @@ vmapbuf(bp, sz)
 	 * We do it on our own here to be able to specify an offset to uvm_map
 	 * so that we can get all benefits of PMAP_PREFER.
 	 */
-	while (1) {
-		kva = vm_map_min(kernel_map);
-		if (uvm_map(kernel_map, &kva, size, NULL, uva, 0,
-		    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL,
-		    UVM_INH_NONE, UVM_ADV_RANDOM, 0)) == 0)
-			break;
-		tsleep(kernel_map, PVM, "vallocwait", 0);
-	}
+	kva = uvm_km_valloc_prefer_wait(kernel_map, size, uva);
 	bp->b_data = (caddr_t)(kva + off);
 
 	while (size > 0) {

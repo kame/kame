@@ -1,4 +1,4 @@
-/*	$OpenBSD: ncr53c9x.c,v 1.15 2002/09/04 22:08:06 fgsch Exp $	*/
+/*	$OpenBSD: ncr53c9x.c,v 1.18 2003/02/11 19:20:27 mickey Exp $	*/
 /*     $NetBSD: ncr53c9x.c,v 1.56 2000/11/30 14:41:46 thorpej Exp $    */
 
 /*
@@ -781,11 +781,7 @@ ncr53c9x_scsi_cmd(xs)
 	ti = &sc->sc_tinfo[sc_link->target];
 	li = TINFO_LUN(ti, lun);
 	if (li == NULL) {
-		int wait = M_NOWAIT;
-
 		/* Initialize LUN info and add to list. */
-		if ((curproc != NULL) && ((flags & SCSI_NOSLEEP) == 0))
-			wait = M_WAITOK;
 		if ((li = malloc(sizeof(*li), M_DEVBUF, M_NOWAIT)) == NULL) {
 			return (TRY_AGAIN_LATER);
 		}
@@ -924,12 +920,7 @@ ncr53c9x_sched(sc)
 		s = splbio();
 		li = TINFO_LUN(ti, lun);
 		if (!li) {
-			int wait = M_NOWAIT;
-			int flags = ecb->flags;
-
 			/* Initialize LUN info and add to list. */
-			if ((curproc != NULL) && ((flags & SCSI_NOSLEEP) == 0))
-				wait = M_WAITOK;
 			if ((li = malloc(sizeof(*li), M_DEVBUF, M_NOWAIT)) == NULL) {
 				splx(s);
 				continue;
@@ -984,7 +975,7 @@ ncr53c9x_sched(sc)
 			}
 #ifdef DIAGNOSTIC
 			if (i == 256)
-				panic("ncr53c9x_sched: tag alloc failure\n");
+				panic("ncr53c9x_sched: tag alloc failure");
 #endif
 
 			/* Save where to start next time. */
@@ -1160,7 +1151,7 @@ ncr53c9x_dequeue(sc, ecb)
 	li = TINFO_LUN(ti, lun);
 #ifdef DIAGNOSTIC
 	if ((!li) || (li->lun != lun))
-		panic("ncr53c9x_dequeue: lun %qx for ecb %p does not exist\n",
+		panic("ncr53c9x_dequeue: lun %qx for ecb %p does not exist",
 		    (long long)lun, ecb);
 #endif
 	if (li->untagged == ecb) {
@@ -1171,7 +1162,7 @@ ncr53c9x_dequeue(sc, ecb)
 #ifdef DIAGNOSTIC
 		if (li->queued[ecb->tag[1]] && (li->queued[ecb->tag[1]] != ecb))
 			panic("ncr53c9x_dequeue: slot %d for lun %qx has %p "
-			    "instead of ecb %p\n", ecb->tag[1],
+			    "instead of ecb %p", ecb->tag[1],
 			    (long long)lun,
 			    li->queued[ecb->tag[1]], ecb);
 #endif
@@ -1229,7 +1220,7 @@ ncr53c9x_rdfifo(struct ncr53c9x_softc *sc, int how)
 		buf = sc->sc_imess + sc->sc_imlen;
 		break;
 	default:
-		panic("ncr53c9x_rdfifo: bad flag\n");
+		panic("ncr53c9x_rdfifo: bad flag");
 		break;
 	}
 
@@ -2677,8 +2668,8 @@ shortcut:
 	 * overhead to pay. For example, selecting, sending a message
 	 * and command and then doing some work can be done in one "pass".
 	 *
-	 * The delay is a heuristic. It is 2 when at 20Mhz, 2 at 25Mhz and 1
-	 * at 40Mhz. This needs testing.
+	 * The delay is a heuristic. It is 2 when at 20MHz, 2 at 25MHz and 1
+	 * at 40MHz. This needs testing.
 	 */
 	{
 		struct timeval wait, cur;

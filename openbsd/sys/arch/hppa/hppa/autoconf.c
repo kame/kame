@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.21 2002/09/23 06:11:47 mickey Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.29 2003/02/18 19:01:50 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1998-2001 Michael Shalayeff
@@ -67,9 +67,14 @@ void	dumpconf(void);
 
 int findblkmajor(struct device *dv);
 const char *findblkname(int maj);
+struct device *parsedisk(char *str, int len, int defpart, dev_t *devp);
+struct device *getdisk(char *str, int len, int defpart, dev_t *devp);
+int getstr(char *cp, int size);
 
 void (*cold_hook)(int); /* see below */
-register_t	kpsw = PSW_Q | PSW_P | PSW_C | PSW_D;
+
+/* device we booted from */
+struct device *bootdv;
 
 /*
  * LED blinking thing
@@ -82,26 +87,31 @@ void heartbeat(void *);
 extern int hz;
 #endif
 
+#include "cd.h"
+#include "sd.h"
+#include "st.h"
+#if NCD > 0 || NSD > 0 || NST > 0
+#include <scsi/scsi_all.h>
+#include <scsi/scsiconf.h>
+#endif
+
 /*
  * cpu_configure:
  * called at boot time, configure all devices on system
  */
 void
-cpu_configure()
+cpu_configure(void)
 {
 	splhigh();
 	if (config_rootfound("mainbus", "mainbus") == NULL)
 		panic("no mainbus found");
 
-	/* in spl*() we trust */
-	__asm __volatile("ssm %0, %%r0" :: "i" (PSW_I));
-	kpsw |= PSW_I;
+	cpu_intr_init();
 	spl0();
 
 	setroot();
 	swapconf();
 	dumpconf();
-	cold = 0;
 	if (cold_hook)
 		(*cold_hook)(HPPA_COLD_HOT);
 
@@ -109,6 +119,7 @@ cpu_configure()
 	timeout_set(&heartbeat_tmo, heartbeat, NULL);
 	heartbeat(NULL);
 #endif
+	cold = 0;
 }
 
 #ifdef USELEDS
@@ -128,7 +139,7 @@ heartbeat(v)
 	int toggle, cp_mask, cp_total;
 
 	cp_total = cp_time[CP_USER] + cp_time[CP_NICE] + cp_time[CP_SYS] +
-	     cp_time[CP_INTR] + cp_time[CP_IDLE];
+	    cp_time[CP_INTR] + cp_time[CP_IDLE];
 	if (!cp_total)
 		cp_total = 1;
 	cp_mask = 0xf0 >> (cp_time[CP_IDLE] - ocp_idle) * 4 /
@@ -155,7 +166,7 @@ heartbeat(v)
  * Configure swap space and related parameters.
  */
 void
-swapconf()
+swapconf(void)
 {
 	struct swdevt *swp;
 	int nblks, maj;
@@ -182,7 +193,7 @@ swapconf()
  * reduce the chance that swapping trashes it.
  */
 void
-dumpconf()
+dumpconf(void)
 {
 	extern int dumpsize;
 	int nblks, dumpblks;	/* size of dump area */
@@ -219,22 +230,22 @@ bad:
 	return;
 }
 
-static const struct nam2blk {
+const struct nam2blk {
 	char name[4];
 	int maj;
 } nam2blk[] = {
-	{ "st",		2 },
-	{ "cd",		3 },
-	{ "rd",		6 },
-	{ "sd",		8 },
+	{ "rd",		3 },
+	{ "sd",		4 },
+	{ "st",		5 },
+	{ "cd",		6 },
 #if 0
-	{ "wd",		0 },
-	{ "fd",		XXX },
+	{ "wd",		? },
+	{ "fd",		7 },
 #endif
 };
 
 #ifdef RAMDISK_HOOKS
-/*static struct device fakerdrootdev = { DV_DISK, {}, NULL, 0, "rd0", NULL };*/
+struct device fakerdrootdev = { DV_DISK, {}, NULL, 0, "rd0", NULL };
 #endif
 
 int
@@ -242,7 +253,7 @@ findblkmajor(dv)
 	struct device *dv;
 {
 	char *name = dv->dv_xname;
-	register int i;
+	int i;
 
 	for (i = 0; i < sizeof(nam2blk)/sizeof(nam2blk[0]); ++i)
 		if (!strncmp(name, nam2blk[i].name, strlen(nam2blk[0].name)))
@@ -254,14 +265,95 @@ const char *
 findblkname(maj)
 	int maj;
 {
-	register int i;
+	int i;
 
 	for (i = 0; i < sizeof(nam2blk) / sizeof(nam2blk[0]); ++i)
 		if (maj == nam2blk[i].maj)
 			return (nam2blk[i].name);
 	return (NULL);
-} 
+}
 
+struct device *
+getdisk(str, len, defpart, devp)
+	char *str;
+	int len, defpart;
+	dev_t *devp;
+{
+	struct device *dv;
+
+	if ((dv = parsedisk(str, len, defpart, devp)) == NULL) {
+		printf("use one of:");
+#ifdef RAMDISK_HOOKS
+		printf(" %s[a-p]", fakerdrootdev.dv_xname);
+#endif
+		for (dv = alldevs.tqh_first; dv != NULL;
+		    dv = dv->dv_list.tqe_next) {
+			if (dv->dv_class == DV_DISK)
+				printf(" %s[a-p]", dv->dv_xname);
+#ifdef NFSCLIENT
+			if (dv->dv_class == DV_IFNET)
+				printf(" %s", dv->dv_xname);
+#endif
+		}
+		printf(" halt\n");
+	}
+	return (dv);
+}
+
+struct device *
+parsedisk(str, len, defpart, devp)
+	char *str;
+	int len, defpart;
+	dev_t *devp;
+{
+	struct device *dv;
+	char *cp, c;
+	int majdev, part;
+
+	if (len == 0)
+		return (NULL);
+
+	if (len == 4 && !strcmp(str, "halt"))
+		boot(RB_HALT);
+
+	cp = str + len - 1;
+	c = *cp;
+	if (c >= 'a' && c <= ('a' + MAXPARTITIONS - 1)) {
+		part = c - 'a';
+		*cp = '\0';
+	} else
+		part = defpart;
+
+#ifdef RAMDISK_HOOKS
+	if (strcmp(str, fakerdrootdev.dv_xname) == 0) {
+		dv = &fakerdrootdev;
+		goto gotdisk;
+	}
+#endif
+	for (dv = alldevs.tqh_first; dv != NULL; dv = dv->dv_list.tqe_next) {
+		if (dv->dv_class == DV_DISK &&
+		    strcmp(str, dv->dv_xname) == 0) {
+#ifdef RAMDISK_HOOKS
+gotdisk:
+#endif
+			majdev = findblkmajor(dv);
+			if (majdev < 0)
+				panic("parsedisk");
+			*devp = MAKEDISKDEV(majdev, dv->dv_unit, part);
+			break;
+		}
+#ifdef NFSCLIENT
+		if (dv->dv_class == DV_IFNET &&
+		    strcmp(str, dv->dv_xname) == 0) {
+			*devp = NODEV;
+			break;
+		}
+#endif
+	}
+
+	*cp = c;
+	return (dv);
+}
 
 /*
  * Attempt to find the device from which we were booted.
@@ -273,20 +365,27 @@ findblkname(maj)
  * That should be fixed.
  */
 void
-setroot()
+setroot(void)
 {
 	struct swdevt *swp;
-	dev_t temp, nswapdev;
+	struct device *dv;
+	int len, majdev, unit, part;
+	dev_t nrootdev, nswapdev = NODEV;
+	char buf[128];
+	dev_t temp;
 	const char *rootdevname;
-	struct device *bootdv;
-	struct device *swapdv;
-	int majdev, unit, part;
+	struct device *rootdv, *swapdv;
 #ifdef NFSCLIENT
 	extern char *nfsbootdevname;
 #endif
 
+#ifdef RAMDISK_HOOKS
+	bootdv = &fakerdrootdev;
+#endif
+	part = 0;
+
 	/*
-	 * If 'swap generic' and we couldn't determine root device,
+	 * If 'swap generic' and we couldn't determine boot device,
 	 * ask the user.
 	 */
 	if (mountroot == NULL && bootdv == NULL)
@@ -295,8 +394,79 @@ setroot()
 	if (boothowto & RB_ASKNAME) {
 		for (;;) {
 			printf("root device? ");
-
+			if (bootdv != NULL) {
+				printf(" (default %s", bootdv->dv_xname);
+				if (bootdv->dv_class == DV_DISK)
+					printf("%c", part + 'a');
+				printf(")");
+			}
+			printf(": ");
+			len = getstr(buf, sizeof(buf));
+			if (len == 0 && bootdv != NULL) {
+				strcpy(buf, bootdv->dv_xname);
+				len = strlen(buf);
+			}
+			if (len > 0 && buf[len - 1] == '*') {
+				buf[--len] = '\0';
+				dv = getdisk(buf, len, 1, &nrootdev);
+				if (dv != NULL) {
+					rootdv = swapdv = dv;
+					nswapdev = nrootdev;
+					goto gotswap;
+				}
+			}
+			dv = getdisk(buf, len, part, &nrootdev);
+			if (dv != NULL) {
+				rootdv = dv;
+				break;
+			}
 		}
+
+		/*
+		 * because swap must be on same device type as root, for
+		 * network devices this is easy.
+		 */
+		if (rootdv->dv_class == DV_IFNET) {
+			swapdv = NULL;
+			goto gotswap;
+		}
+		for (;;) {
+			printf("swap device (default %s", rootdv->dv_xname);
+			if (rootdv->dv_class == DV_DISK)
+				printf("b");
+			printf("): ");
+			len = getstr(buf, sizeof(buf));
+			if (len == 0) {
+				switch (rootdv->dv_class) {
+				case DV_IFNET:
+					nswapdev = NODEV;
+					break;
+				case DV_DISK:
+					nswapdev = MAKEDISKDEV(major(nrootdev),
+					    DISKUNIT(nrootdev), 1);
+					break;
+				case DV_TAPE:
+				case DV_TTY:
+				case DV_DULL:
+				case DV_CPU:
+					break;
+				}
+				swapdv = rootdv;
+				break;
+			}
+			dv = getdisk(buf, len, 1, &nswapdev);
+			if (dv) {
+				if (dv->dv_class == DV_IFNET)
+					nswapdev = NODEV;
+				swapdv = dv;
+				break;
+			}
+		}
+gotswap:
+		rootdev = nrootdev;
+		dumpdev = nswapdev;
+		swdevt[0].sw_dev = nswapdev;
+		swdevt[1].sw_dev = NODEV;
 	} else if (mountroot == NULL) {
 
 		/*
@@ -306,53 +476,42 @@ setroot()
 		if (majdev >= 0) {
 			/*
 			 * Root and swap are on a disk.
-			 * val[2] of the boot device is the partition number.
 			 * Assume swap is on partition b.
 			 */
-			/* part = bp->val[2]; */
-			unit = bootdv->dv_unit;
-			rootdev = MAKEDISKDEV(majdev, unit, part);
-			nswapdev = dumpdev = MAKEDISKDEV(major(rootdev),
-			    DISKUNIT(rootdev), 1);
+			rootdv = swapdv = bootdv;
+			rootdev = MAKEDISKDEV(majdev, bootdv->dv_unit, part);
+			nswapdev = dumpdev =
+			    MAKEDISKDEV(majdev, bootdv->dv_unit, 1);
 		} else {
 			/*
 			 * Root and swap are on a net.
 			 */
+			rootdv = swapdv = bootdv;
 			nswapdev = dumpdev = NODEV;
 		}
 		swdevt[0].sw_dev = nswapdev;
 		swdevt[1].sw_dev = NODEV;
-		rootdevname = findblkname(major(rootdev));
-		if (rootdevname == NULL) {
-			return;
-		}
-
 	} else {
-
 		/*
 		 * `root DEV swap DEV': honour rootdev/swdevt.
 		 * rootdev/swdevt/mountroot already properly set.
 		 */
-		majdev = major(rootdev);
-		unit = DISKUNIT(rootdev);
-		part = DISKPART(rootdev);
+
+		rootdevname = findblkname(major(rootdev));
 		return;
 	}
 
-	switch (bootdv->dv_class) {
+	switch (rootdv->dv_class) {
 #ifdef NFSCLIENT
 	case DV_IFNET:
 		mountroot = nfs_mountroot;
-		nfsbootdevname = bootdv->dv_xname;
+		nfsbootdevname = rootdv->dv_xname;
 		return;
 #endif
 #ifndef DISKLESS
 	case DV_DISK:
 		mountroot = dk_mountroot;
-		majdev = major(rootdev);
-		unit = DISKUNIT(rootdev);
-		part = DISKPART(rootdev);
-		printf("root on %s%c", bootdv->dv_xname,
+		printf("root on %s%c", rootdv->dv_xname,
 		    DISKPART(rootdev) + 'a');
 		if (nswapdev != NODEV)
 			printf(" swap on %s%c", swapdv->dv_xname,
@@ -378,58 +537,122 @@ setroot()
 			break;
 		}
 	}
-	if (swp->sw_dev != NODEV) {
-		/*
-		 * If dumpdev was the same as the old primary swap device,
-		 * move it to the new primary swap device.
-		 */
-		if (temp == dumpdev)
-			dumpdev = swdevt[0].sw_dev;
+	if (swp->sw_dev == NODEV)
+		return;
+
+	/*
+	 * If dumpdev was the same as the old primary swap device,
+	 * move it to the new primary swap device.
+	 */
+	if (temp == dumpdev)
+		dumpdev = swdevt[0].sw_dev;
+}
+
+int
+getstr(cp, size)
+	char *cp;
+	int size;
+{
+	char *lp;
+	int c;
+	int len;
+
+	lp = cp;
+	len = 0;
+	for (;;) {
+		c = cngetc();
+		switch (c) {
+		case '\n':
+		case '\r':
+			printf("\n");
+			*lp++ = '\0';
+			return (len);
+		case '\b':
+		case '\177':
+		case '#':
+			if (len) {
+				--len;
+				--lp;
+				printf("\b \b");
+			}
+			continue;
+		case '@':
+		case 'u'&037:
+			len = 0;
+			lp = cp;
+			printf("\n");
+			continue;
+		default:
+			if (len + 1 >= size || c < ' ') {
+				printf("\007");
+				continue;
+			}
+			printf("%c", c);
+			++len;
+			*lp++ = c;
+		}
 	}
 }
 
 void
-pdc_scanbus(self, ca, bus, maxmod)
+pdc_scanbus(self, ca, maxmod)
 	struct device *self;
 	struct confargs *ca;
-	int bus, maxmod;
+	int maxmod;
 {
-	struct pdc_memmap pdc_memmap;
-	struct device_path dp;
-	register int i;
+	int i;
 
 	for (i = maxmod; i--; ) {
-		struct confargs nca;
 		struct pdc_iodc_read pdc_iodc_read;
+		struct pdc_memmap pdc_memmap;
+		struct confargs nca;
+		hppa_hpa_t hpa;
+		int error;
 
-		dp.dp_bc[0] = dp.dp_bc[1] = dp.dp_bc[2] = dp.dp_bc[3] = -1;
-		dp.dp_bc[4] = bus;
-		dp.dp_bc[5] = bus < 0? -1 : 0;
-		dp.dp_mod = i;
-
-		if (pdc_call((iodcio_t)pdc, 0, PDC_MEMMAP,
-			     PDC_MEMMAP_HPA, &pdc_memmap, &dp) < 0)
-			continue;
-
+		hpa = 0;
 		nca = *ca;
-		if (pdc_call((iodcio_t)pdc, 0, PDC_IODC, PDC_IODC_READ,
-			     &pdc_iodc_read, pdc_memmap.hpa, IODC_DATA,
-			     &nca.ca_type, sizeof(nca.ca_type)) < 0)
+		nca.ca_dp.dp_bc[0] = ca->ca_dp.dp_bc[1];
+		nca.ca_dp.dp_bc[1] = ca->ca_dp.dp_bc[2];
+		nca.ca_dp.dp_bc[2] = ca->ca_dp.dp_bc[3];
+		nca.ca_dp.dp_bc[3] = ca->ca_dp.dp_bc[4];
+		nca.ca_dp.dp_bc[4] = ca->ca_dp.dp_bc[5];
+		nca.ca_dp.dp_bc[5] = ca->ca_dp.dp_mod;
+		nca.ca_dp.dp_mod = i;
+
+		if ((error = pdc_call((iodcio_t)pdc, 0, PDC_MEMMAP,
+		    PDC_MEMMAP_HPA, &pdc_memmap, &nca.ca_dp)) == 0)
+			hpa = pdc_memmap.hpa;
+		else if ((error = pdc_call((iodcio_t)pdc, 0, PDC_SYSMAP,
+		    PDC_SYSMAP_HPA, &pdc_memmap, &nca.ca_dp)) == 0)
+			hpa = pdc_memmap.hpa;
+
+		if (!hpa)
 			continue;
 
-		nca.ca_mod = i;
-		nca.ca_hpa = pdc_memmap.hpa;
+		if (autoconf_verbose)
+			printf(">> HPA 0x%x\n", hpa);
+
+		if ((error = pdc_call((iodcio_t)pdc, 0, PDC_IODC,
+		    PDC_IODC_READ, &pdc_iodc_read, hpa, IODC_DATA,
+		    &nca.ca_type, sizeof(nca.ca_type))) < 0) {
+			if (autoconf_verbose)
+				printf(">> iodc_data error %d\n", error);
+			continue;
+		}
+
+		nca.ca_hpa = hpa;
 		nca.ca_pdc_iodc_read = &pdc_iodc_read;
 		nca.ca_name = hppa_mod_info(nca.ca_type.iodc_type,
 					    nca.ca_type.iodc_sv_model);
 
 		if (autoconf_verbose) {
 			printf(">> probing: flags %b bc %d/%d/%d/%d/%d/%d ",
-			    dp.dp_flags, PZF_BITS,
-			    dp.dp_bc[0], dp.dp_bc[1], dp.dp_bc[2],
-			    dp.dp_bc[3], dp.dp_bc[4], dp.dp_bc[5]);
+			    nca.ca_dp.dp_flags, PZF_BITS,
+			    nca.ca_dp.dp_bc[0], nca.ca_dp.dp_bc[1],
+			    nca.ca_dp.dp_bc[2], nca.ca_dp.dp_bc[3],
+			    nca.ca_dp.dp_bc[4], nca.ca_dp.dp_bc[5]);
 			printf("mod %x hpa %x type %x sv %x\n",
-			    dp.dp_mod, pdc_memmap.hpa,
+			    nca.ca_dp.dp_mod, hpa,
 			    nca.ca_type.iodc_type, nca.ca_type.iodc_sv_model);
 		}
 
@@ -437,7 +660,7 @@ pdc_scanbus(self, ca, bus, maxmod)
 	}
 }
 
-static const struct hppa_mod_info hppa_knownmods[] = {
+const struct hppa_mod_info hppa_knownmods[] = {
 #include <hppa/dev/cpudevs_data.h>
 };
 
@@ -445,11 +668,11 @@ const char *
 hppa_mod_info(type, sv)
 	int type, sv;
 {
-	register const struct hppa_mod_info *mi;
+	const struct hppa_mod_info *mi;
 	static char fakeid[32];
 
 	for (mi = hppa_knownmods; mi->mi_type >= 0 &&
-	     (mi->mi_type != type || mi->mi_sv != sv); mi++);
+	    (mi->mi_type != type || mi->mi_sv != sv); mi++);
 
 	if (mi->mi_type < 0) {
 		sprintf(fakeid, "type %x, sv %x", type, sv);
@@ -458,3 +681,91 @@ hppa_mod_info(type, sv)
 		return mi->mi_name;
 }
 
+void
+device_register(struct device *dev, void *aux)
+{
+	struct confargs *ca = aux;
+	char *basename;
+	static struct device *elder = NULL;
+
+	if (bootdv != NULL)
+		return;	/* We already have a winner */
+
+	if (ca->ca_hpa == (hppa_hpa_t)PAGE0->mem_boot.pz_hpa) {
+		/*
+		 * If hpa matches, the only thing we know is that the
+		 * booted device is either this one or one of its children.
+		 * And the children will not necessarily have the correct
+		 * hpa value.
+		 * Save this elder for now.
+		 */
+		elder = dev;
+	} else if (elder == NULL) {
+		return;	/* not the device we booted from */
+	}
+
+	/*
+	 * Unfortunately, we can not match on pz_class vs dv_class on
+	 * older snakes netbooting using the rbootd protocol.
+	 * In this case, we'll end up with pz_class == PCL_RANDOM...
+	 * Instead, trust the device class from what the kernel attached
+	 * now...
+	 */
+	switch (dev->dv_class) {
+	case DV_IFNET:
+		/*
+		 * Netboot is the top elder
+		 */
+		if (elder == dev) {
+			bootdv = dev;
+		}
+		return;
+	case DV_DISK:
+		if ((PAGE0->mem_boot.pz_class & PCL_CLASS_MASK) != PCL_RANDOM)
+			return;
+		break;
+	case DV_TAPE:
+		if ((PAGE0->mem_boot.pz_class & PCL_CLASS_MASK) != PCL_SEQU)
+			return;
+		break;
+	default:
+		/* No idea what we were booted from, but better ask the user */
+		return;
+	}
+
+	/*
+	 * If control goes here, we are booted from a block device and we
+	 * matched a block device.
+	 */
+	basename = dev->dv_cfdata->cf_driver->cd_name;
+
+	/*
+	 * We only grok SCSI boot currently. Match on proper device hierarchy,
+	 * name and unit/lun values.
+	 */
+#if NCD > 0 || NSD > 0 || NST > 0
+	if (strcmp(basename, "sd") == 0 || strcmp(basename, "cd") == 0 ||
+	    strcmp(basename, "st") == 0) {
+		struct scsibus_attach_args *sa = aux;
+		struct scsi_link *sl = sa->sa_sc_link;
+
+		/*
+		 * sd/st/cd is attached to scsibus which is attached to
+		 * the controller. Hence the grandparent here should be
+		 * the elder.
+		 */
+		if (dev->dv_parent == NULL ||
+		    dev->dv_parent->dv_parent != elder) {
+			return;
+		}
+
+		/*
+		 * And now check for proper target and lun values
+		 */
+		if (sl->target == PAGE0->mem_boot.pz_layers[0] &&
+		    sl->lun == PAGE0->mem_boot.pz_layers[1]) {
+			bootdv = dev;
+		}
+	}
+#endif
+}

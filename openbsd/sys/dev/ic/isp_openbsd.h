@@ -1,4 +1,4 @@
-/*      $OpenBSD: isp_openbsd.h,v 1.21 2002/05/17 01:33:24 mjacob Exp $ */
+/*      $OpenBSD: isp_openbsd.h,v 1.23 2003/03/06 07:45:59 mjacob Exp $ */
 /*
  * OpenBSD Specific definitions for the Qlogic ISP Host Adapter
  */
@@ -45,7 +45,6 @@
 #include <machine/bus.h>
 #endif
 
-#include <scsi/scsi_all.h>
 #include <scsi/scsi_all.h>
 #include <scsi/scsiconf.h>
 
@@ -118,7 +117,6 @@ struct isposinfo {
 #define	MEMZERO			bzero
 #define	MEMCPY(dst, src, amt)	bcopy((src), (dst), (amt))
 #define	SNPRINTF		snprintf
-#define	STRNCAT			strncat
 #define	USEC_DELAY(x)		delay(x)
 #define	USEC_SLEEP(isp, x)		\
 	if (!MUST_POLL(isp))		\

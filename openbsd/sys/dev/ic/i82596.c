@@ -1,4 +1,4 @@
-/*	$OpenBSD: i82596.c,v 1.12 2002/09/23 06:11:50 mickey Exp $	*/
+/*	$OpenBSD: i82596.c,v 1.20 2003/01/27 20:03:35 jason Exp $	*/
 /*	$NetBSD: i82586.c,v 1.18 1998/08/15 04:42:42 mycroft Exp $	*/
 
 /*-
@@ -144,8 +144,6 @@ Mode of operation:
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
-#include <sys/buf.h>
-#include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/errno.h>
@@ -177,14 +175,7 @@ Mode of operation:
 #include <dev/ic/i82596reg.h>
 #include <dev/ic/i82596var.h>
 
-/* So far only hppa, but in case other archs */
-#ifdef MD_CACHE_CTL
-#define	FLUSH(addr,size)	MD_CACHE_CTL((vaddr_t)addr,size,MD_CACHE_FLUSH)
-#define	PURGE(addr,size)	MD_CACHE_CTL((vaddr_t)addr,size,MD_CACHE_PURGE)
-#else
-#define	FLUSH(addr,size)
-#define	PURGE(addr,size)
-#endif
+static	char *padbuf;
 
 void	i82596_reset(struct ie_softc *, int);
 void	i82596_watchdog(struct ifnet *);
@@ -245,13 +236,11 @@ i82596_probe(sc)
 	(sc->ie_bus_write24)(sc, IE_SCP_ISCP(sc->scp), sc->sc_maddr);
 	(sc->ie_bus_write16)(sc, IE_SCP_BUS_USE(sc->scp), sc->sysbus);
 
-	FLUSH(sc->sc_maddr, sc->sc_msize);
 	(sc->hwreset)(sc, IE_CARD_RESET);
 
-	PURGE(sc->sc_maddr, sc->sc_msize);
 	if ((sc->ie_bus_read16)(sc, IE_ISCP_BUSY(sc->iscp))) {
 #ifdef I82596_DEBUG
-		printf ("%s: ISCP set failed\n", sc->sc_dev.dv_xname);
+		printf("%s: ISCP set failed\n", sc->sc_dev.dv_xname);
 #endif
 		return 0;
 	}
@@ -259,18 +248,11 @@ i82596_probe(sc)
 	if (sc->port) {
 		(sc->ie_bus_write24)(sc, sc->scp, 0);
 		(sc->ie_bus_write24)(sc, IE_SCP_TEST(sc->scp), -1);
-		FLUSH(sc->sc_maddr, sc->sc_msize);
 		(sc->port)(sc, IE_PORT_TEST);
 		for (i = 9000; i-- &&
 			     (sc->ie_bus_read16)(sc, IE_SCP_TEST(sc->scp));
 		     DELAY(100))
-			PURGE(sc->sc_maddr, sc->sc_msize);
-
-#ifdef I82596_DEBUG
-		printf ("%s: test %x:%x\n", sc->sc_dev.dv_xname,
-			*((volatile int32_t *)(sc->bh + sc->scp)),
-			*(int32_t *)(sc->bh + IE_SCP_TEST(sc->scp)));
-#endif
+			;
 	}
 
 	return 1;
@@ -314,9 +296,7 @@ i82596_attach(sc, name, etheraddr, media, nmedia, defmedia)
 	(sc->ie_bus_write24)(sc, IE_ISCP_BASE(sc->iscp), sc->sc_maddr);
 	(sc->ie_bus_write24)(sc, IE_SCP_ISCP(sc->scp), sc->sc_maddr +sc->iscp);
 	(sc->ie_bus_write16)(sc, IE_SCP_BUS_USE(sc->scp), sc->sysbus);
-	FLUSH(sc->sc_maddr, sc->sc_msize);
 	(sc->hwreset)(sc, IE_CARD_RESET);
-	PURGE(sc->sc_maddr, sc->sc_msize);
 
 	/* Setup Iface */
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
@@ -341,6 +321,16 @@ i82596_attach(sc, name, etheraddr, media, nmedia, defmedia)
                 ifmedia_add(&sc->sc_media, IFM_ETHER|IFM_MANUAL, 0, NULL);
                 ifmedia_set(&sc->sc_media, IFM_ETHER|IFM_MANUAL);
         }
+
+	if (padbuf == NULL) {
+		padbuf = malloc(ETHER_MIN_LEN - ETHER_CRC_LEN, M_DEVBUF,
+		    M_NOWAIT);
+		if (padbuf == NULL) {
+			printf("%s: can't allocate pad buffer\n");
+			return;
+		}
+		bzero(padbuf, ETHER_MIN_LEN - ETHER_CRC_LEN);
+	}
 
 	/* Attach the interface. */
 	if_attach(ifp);
@@ -373,29 +363,26 @@ i82596_cmd_wait(sc)
 	struct ie_softc *sc;
 {
 	/* spin on i82596 command acknowledge; wait at most 0.9 (!) seconds */
-	register int i, off;
+	int i, off;
 
-	for (i = 0; i < 90000; i++) {
+	for (i = 180000; i--; DELAY(5)) {
 		/* Read the command word */
 		off = IE_SCB_CMD(sc->scb);
 		bus_space_barrier(sc->bt, sc->bh, off, 2,
 				  BUS_SPACE_BARRIER_READ);
-		PURGE(sc->sc_maddr, sc->sc_msize);
 		if ((sc->ie_bus_read16)(sc, off) == 0) {
-#ifdef I82596_DEBUG1
+#ifdef I82596_DEBUG
 			if (sc->sc_debug & IED_CMDS)
-				printf ("%s: cmd_wait after %d usec\n",
-					sc->sc_dev.dv_xname, (90000 - i) * 10);
+				printf("%s: cmd_wait after %d usec\n",
+				    sc->sc_dev.dv_xname, (180000 - i) * 5);
 #endif
 			return (0);
 		}
-		delay(10);
 	}
 
-	printf ("i82596_cmd_wait: timo(%ssync): scb status: %b\n",
-		sc->async_cmd_inprogress?"a":"",
-		sc->ie_bus_read16(sc, off), IE_STAT_BITS);
-	PURGE(sc->sc_maddr, sc->sc_msize);
+	printf("i82596_cmd_wait: timo(%ssync): scb status: %b\n",
+	    sc->async_cmd_inprogress?"a":"",
+	    sc->ie_bus_read16(sc, IE_SCB_STATUS(sc->scb)), IE_STAT_BITS);
 	return (1);	/* Timeout */
 }
 
@@ -417,7 +404,7 @@ i82596_start_cmd(sc, cmd, iecmdbuf, mask, async)
 	int mask;
 	int async;
 {
-	register int i, off;
+	int i, off;
 
 #ifdef I82596_DEBUG
 	if (sc->sc_debug & IED_CMDS)
@@ -436,7 +423,6 @@ i82596_start_cmd(sc, cmd, iecmdbuf, mask, async)
 
 	off = IE_SCB_CMD(sc->scb);
 	(sc->ie_bus_write16)(sc, off, cmd);
-	FLUSH(sc->bh + off, 2);
 	bus_space_barrier(sc->bt, sc->bh, off, 2, BUS_SPACE_BARRIER_WRITE);
 	(sc->chan_attn)(sc);
 
@@ -453,23 +439,21 @@ i82596_start_cmd(sc, cmd, iecmdbuf, mask, async)
 		 * According to the packet driver, the minimum timeout
 		 * should be .369 seconds.
 		 */
-		for (i = 0; i < 36900; i++) {
+		for (i = 73800; i--; DELAY(5)) {
 			/* Read the command status */
 			off = IE_CMD_COMMON_STATUS(iecmdbuf);
-			PURGE(sc->bh + off, 2);
 			bus_space_barrier(sc->bt, sc->bh, off, 2,
-					  BUS_SPACE_BARRIER_READ);
+			    BUS_SPACE_BARRIER_READ);
 			status = (sc->ie_bus_read16)(sc, off);
 			if (status & mask) {
 #ifdef I82596_DEBUG
 				if (sc->sc_debug & IED_CMDS)
-					printf ("%s: cmd status %b\n",
-						sc->sc_dev.dv_xname,
-						status, IE_STAT_BITS);
+					printf("%s: cmd status %b\n",
+					    sc->sc_dev.dv_xname,
+					    status, IE_STAT_BITS);
 #endif
 				return (0);
 			}
-			delay(10);
 		}
 
 	} else {
@@ -502,7 +486,6 @@ i82596_count_errors(struct ie_softc *sc)
 	sc->ie_bus_write16(sc, IE_SCB_ERRALN(scb), 0);
 	sc->ie_bus_write16(sc, IE_SCB_ERRRES(scb), 0);
 	sc->ie_bus_write16(sc, IE_SCB_ERROVR(scb), 0);
-	FLUSH(sc->bh + sc->scb, IE_SCB_SZ);
 }
 
 static __inline void
@@ -524,7 +507,6 @@ i82596_intr(v)
 	register int off;
 
 	off = IE_SCB_STATUS(sc->scb);
-	PURGE(sc->bh + off, 2);
 	bus_space_barrier(sc->bt, sc->bh, off, 2, BUS_SPACE_BARRIER_READ);
 	status = sc->ie_bus_read16(sc, off) /* & IE_ST_WHENCE */;
 
@@ -537,9 +519,6 @@ i82596_intr(v)
 
 loop:
 	/* Ack interrupts FIRST in case we receive more during the ISR. */
-#if 0
-	ie_ack(sc, status & IE_ST_WHENCE);
-#endif
 	i82596_start_cmd(sc, status & IE_ST_WHENCE, 0, 0, 1);
 
 	if (status & (IE_ST_FR | IE_ST_RNR)) {
@@ -569,11 +548,13 @@ loop:
 	/*
 	 * Interrupt ACK was posted asynchronously; wait for
 	 * completion here before reading SCB status again.
+	 *
+	 * If ACK fails, try to reset the chip, in hopes that
+	 * it helps.
 	 */
 	if (i82596_cmd_wait(sc))
-		goto out;
+		goto reset;
 
-	PURGE(sc->bh + off, 2);
 	bus_space_barrier(sc->bt, sc->bh, off, 2, BUS_SPACE_BARRIER_READ);
 	status = sc->ie_bus_read16(sc, off);
 	if ((status & IE_ST_WHENCE) != 0)
@@ -613,7 +594,6 @@ i82596_rint(sc, scbstatus)
 
 		i = sc->rfhead;
 		off = IE_RFRAME_STATUS(sc->rframes, i);
-		PURGE(sc->bh + off, 2);
 		bus_space_barrier(sc->bt, sc->bh, off, 2,
 				  BUS_SPACE_BARRIER_READ);
 		status = sc->ie_bus_read16(sc, off);
@@ -652,7 +632,6 @@ i82596_rint(sc, scbstatus)
 				sc->sc_dev.dv_xname, i, status, IE_ST_BITS);
 #endif
 
-
 		/*
 		 * Advance the RFD list, since we're done with
 		 * this descriptor.
@@ -660,7 +639,6 @@ i82596_rint(sc, scbstatus)
 
 		/* Clear frame status */
 		sc->ie_bus_write16(sc, off, 0);
-		PURGE(sc->bh + off, 2);
 
 		/* Put fence at this frame (the head) */
 		off = IE_RFRAME_LAST(sc->rframes, i);
@@ -673,7 +651,6 @@ i82596_rint(sc, scbstatus)
 		/* Remove fence from current tail */
 		off = IE_RFRAME_LAST(sc->rframes, sc->rftail);
 		sc->ie_bus_write16(sc, off, 0);
-		PURGE(sc->bh + off, 2);
 
 		if (++sc->rftail == sc->nframes)
 			sc->rftail = 0;
@@ -776,7 +753,6 @@ i82596_tint(sc, scbstatus)
 
 	off = IE_CMD_XMIT_STATUS(sc->xmit_cmds, sc->xctail);
 	status = sc->ie_bus_read16(sc, off);
-	PURGE(sc->bh + off, 2);
 
 #ifdef I82596_DEBUG
 	if (sc->sc_debug & IED_TINT)
@@ -860,7 +836,6 @@ i82596_get_rbd_list(sc, start, end, pktlen)
 		bus_space_barrier(sc->bt, sc->bh, off, 2,
 				  BUS_SPACE_BARRIER_READ);
 		rbdstatus = sc->ie_bus_read16(sc, off);
-		PURGE(sc->bh + off, 2);
 		if ((rbdstatus & IE_RBD_USED) == 0) {
 			/*
 			 * This means we are somehow out of sync.  So, we
@@ -911,12 +886,10 @@ i82596_release_rbd_list(sc, start, end)
 	rbindex = ((rbindex == 0) ? sc->nrxbuf : rbindex) - 1;
 	off = IE_RBD_BUFLEN(rbbase, rbindex);
 	sc->ie_bus_write16(sc, off, IE_RBUF_SIZE|IE_RBD_EOL);
-	FLUSH(sc->bh + off, 2);
 
 	/* Remove EOL from current tail */
 	off = IE_RBD_BUFLEN(rbbase, sc->rbtail);
 	sc->ie_bus_write16(sc, off, IE_RBUF_SIZE);
-	FLUSH(sc->bh + off, 2);
 
 	/* New head & tail pointer */
 /* hmm, why have both? head is always (tail + 1) % NRXBUF */
@@ -961,7 +934,6 @@ i82596_chk_rx_ring(sc)
 	for (n = 0; n < sc->nrxbuf; n++) {
 		off = IE_RBD_BUFLEN(sc->rbds, n);
 		val = sc->ie_bus_read16(sc, off);
-		PURGE(sc->bh + off, 2);
 		if ((n == sc->rbtail) ^ ((val & IE_RBD_EOL) != 0)) {
 			/* `rbtail' and EOL flag out of sync */
 			log(LOG_ERR,
@@ -976,7 +948,6 @@ i82596_chk_rx_ring(sc)
 	for (n = 0; n < sc->nframes; n++) {
 		off = IE_RFRAME_LAST(sc->rframes, n);
 		val = sc->ie_bus_read16(sc, off);
-		PURGE(sc->bh + off, 2);
 		if ((n == sc->rftail) ^ ((val & (IE_FD_EOL|IE_FD_SUSP)) != 0)) {
 			/* `rftail' and EOL flag out of sync */
 			log(LOG_ERR,
@@ -1002,7 +973,7 @@ i82596_chk_rx_ring(sc)
 static __inline__ struct mbuf *
 i82596_get(struct ie_softc *sc, int head, int totlen)
 {
-	struct mbuf *top, **mp, *m;
+	struct mbuf *m, *m0, *newm;
 	int off, len, resid;
 	int thisrboff, thismboff;
 	struct ether_header eh;
@@ -1015,50 +986,47 @@ i82596_get(struct ie_softc *sc, int head, int totlen)
 
 	resid = totlen;
 
-	MGETHDR(m, M_DONTWAIT, MT_DATA);
-	if (m == 0)
+	MGETHDR(m0, M_DONTWAIT, MT_DATA);
+	if (m0 == 0)
 		return (0);
-	m->m_pkthdr.rcvif = &sc->sc_arpcom.ac_if;
-	m->m_pkthdr.len = totlen;
+	m0->m_pkthdr.rcvif = &sc->sc_arpcom.ac_if;
+	m0->m_pkthdr.len = totlen;
 	len = MHLEN;
-	top = 0;
-	mp = &top;
+	m = m0;
 
 	/*
 	 * This loop goes through and allocates mbufs for all the data we will
 	 * be copying in.  It does not actually do the copying yet.
 	 */
 	while (totlen > 0) {
-		if (top) {
-			MGET(m, M_DONTWAIT, MT_DATA);
-			if (m == 0) {
-				m_freem(top);
-				return (0);
-			}
-			len = MLEN;
-		}
 		if (totlen >= MINCLSIZE) {
 			MCLGET(m, M_DONTWAIT);
-			if ((m->m_flags & M_EXT) == 0) {
-				m_freem(top);
-				return (0);
-			}
+			if ((m->m_flags & M_EXT) == 0)
+				goto bad;
 			len = MCLBYTES;
 		}
-		if (mp == &top) {
+
+		if (m == m0) {
 			caddr_t newdata = (caddr_t)
 			    ALIGN(m->m_data + sizeof(struct ether_header)) -
 			    sizeof(struct ether_header);
 			len -= newdata - m->m_data;
 			m->m_data = newdata;
 		}
+
 		m->m_len = len = min(totlen, len);
+
 		totlen -= len;
-		*mp = m;
-		mp = &m->m_next;
+		if (totlen > 0) {
+			MGET(newm, M_DONTWAIT, MT_DATA);
+			if (newm == 0)
+				goto bad;
+			len = MLEN;
+			m = m->m_next = newm;
+		}
 	}
 
-	m = top;
+	m = m0;
 	thismboff = 0;
 
 	/*
@@ -1082,7 +1050,6 @@ i82596_get(struct ie_softc *sc, int head, int totlen)
 		off = IE_RBUF_ADDR(sc,head) + thisrboff;
 		(sc->memcopyin)(sc, mtod(m, caddr_t) + thismboff, off, len);
 		resid -= len;
-		PURGE(sc->bh + off, len);
 
 		if (len == thismblen) {
 			m = m->m_next;
@@ -1103,7 +1070,11 @@ i82596_get(struct ie_softc *sc, int head, int totlen)
 	 * we have now copied everything in from the shared memory.
 	 * This means that we are done.
 	 */
-	return (top);
+	return (m0);
+
+bad:
+	m_freem(m0);
+	return (NULL);
 }
 
 /*
@@ -1253,11 +1224,10 @@ i82596_start(ifp)
 	struct mbuf *m0, *m;
 	int	buffer, head, xbase;
 	u_short	len;
-	int	s;
 
 #ifdef I82596_DEBUG
 	if (sc->sc_debug & IED_ENQ)
-		printf ("i82596_start(%p)\n", ifp);
+		printf("i82596_start(%p)\n", ifp);
 #endif
 
 	if ((ifp->if_flags & (IFF_RUNNING | IFF_OACTIVE)) != IFF_RUNNING)
@@ -1315,12 +1285,19 @@ i82596_start(ifp)
 			buffer += m->m_len;
 		}
 
+		len = m0->m_pkthdr.len;
+		if (len < ETHER_MIN_LEN - ETHER_CRC_LEN) {
+			(sc->memcopyout)(sc, padbuf, buffer,
+			    ETHER_MIN_LEN - ETHER_CRC_LEN - len);
+			buffer += ETHER_MIN_LEN - ETHER_CRC_LEN - len;
+			len = ETHER_MIN_LEN - ETHER_CRC_LEN;
+		}
+
 #ifdef I82596_DEBUG
 		if (sc->sc_debug & IED_ENQ)
 			printf("\n");
 #endif
 
-		len = max(m0->m_pkthdr.len, ETHER_MIN_LEN);
 		m_freem(m0);
 
 		/*
@@ -1334,13 +1311,9 @@ i82596_start(ifp)
 		sc->ie_bus_write24(sc, IE_XBD_BUF(xbase, head),
 				       sc->sc_maddr + IE_XBUF_ADDR(sc, head));
 
-		s = splnet();
 		/* Start the first packet transmitting. */
-		if (sc->xmit_busy == 0)
+		if (sc->xmit_busy++ == 0)
 			i82596_xmit(sc);
-
-		sc->xmit_busy++;
-		splx(s);
 	}
 }
 
@@ -1356,25 +1329,25 @@ i82596_proberam(sc)
 
 	/* Put in 16-bit mode */
 	off = IE_SCP_BUS_USE(sc->scp);
-	bus_space_write_1(sc->bt, sc->bh, off, 0);
-	bus_space_barrier(sc->bt, sc->bh, off, 1, BUS_SPACE_BARRIER_WRITE);
+	(sc->ie_bus_write16)(sc, off, 0);
+	bus_space_barrier(sc->bt, sc->bh, off, 2, BUS_SPACE_BARRIER_WRITE);
 
 	/* Set the ISCP `busy' bit */
 	off = IE_ISCP_BUSY(sc->iscp);
-	bus_space_write_1(sc->bt, sc->bh, off, 1);
-	bus_space_barrier(sc->bt, sc->bh, off, 1, BUS_SPACE_BARRIER_WRITE);
+	(sc->ie_bus_write16)(sc, off, 1);
+	bus_space_barrier(sc->bt, sc->bh, off, 2, BUS_SPACE_BARRIER_WRITE);
 
 	if (sc->hwreset)
 		(sc->hwreset)(sc, IE_CHIP_PROBE);
 
 	(sc->chan_attn) (sc);
 
-	delay(100);		/* wait a while... */
+	DELAY(100);		/* wait a while... */
 
 	/* Read back the ISCP `busy' bit; it should be clear by now */
 	off = IE_ISCP_BUSY(sc->iscp);
 	bus_space_barrier(sc->bt, sc->bh, off, 1, BUS_SPACE_BARRIER_READ);
-	result = bus_space_read_1(sc->bt, sc->bh, off) == 0;
+	result = (sc->ie_bus_read16)(sc, off) == 0;
 
 	/* Acknowledge any interrupts we may have caused. */
 	ie_ack(sc, IE_ST_WHENCE);
@@ -1410,7 +1383,7 @@ i82596_reset(sc, hard)
 	if (hard && sc->hwreset)
 		(sc->hwreset)(sc, IE_CARD_RESET);
 
-	delay(100);
+	DELAY(100);
 	ie_ack(sc, IE_ST_WHENCE);
 
 	if ((sc->sc_arpcom.ac_if.if_flags & IFF_UP) != 0) {
@@ -1446,7 +1419,7 @@ ie_run_tdr(sc, cmd)
 	struct ie_softc *sc;
 	int cmd;
 {
-	int result;
+	int result, clocks;
 
 	i82596_simple_command(sc, IE_CMD_TDR, cmd);
 	(sc->ie_bus_write16)(sc, IE_CMD_TDR_TIME(cmd), 0);
@@ -1463,21 +1436,21 @@ ie_run_tdr(sc, cmd)
 	if (result & IE_TDR_SUCCESS)
 		return;
 
+	clocks = result & IE_TDR_TIME;
 	if (result & 0x10000)
 		printf("%s: TDR command failed\n", sc->sc_dev.dv_xname);
 	else if (result & IE_TDR_XCVR)
 		printf("%s: transceiver problem\n", sc->sc_dev.dv_xname);
 	else if (result & IE_TDR_OPEN)
-		printf("%s: TDR detected an open %d clocks away\n",
-			sc->sc_dev.dv_xname, result & IE_TDR_TIME);
+		printf("%s: TDR detected an open %d clock%s away\n",
+		    sc->sc_dev.dv_xname, clocks, clocks == 1? "":"s");
 	else if (result & IE_TDR_SHORT)
-		printf("%s: TDR detected a short %d clocks away\n",
-			sc->sc_dev.dv_xname, result & IE_TDR_TIME);
+		printf("%s: TDR detected a short %d clock%s away\n",
+		    sc->sc_dev.dv_xname, clocks, clocks == 1? "":"s");
 	else
 		printf("%s: TDR returned unknown status 0x%x\n",
-			sc->sc_dev.dv_xname, result);
+		    sc->sc_dev.dv_xname, result);
 }
-
 
 /*
  * i82596_setup_bufs: set up the buffers
@@ -1495,7 +1468,7 @@ i82596_setup_bufs(sc)
 	struct ie_softc *sc;
 {
 	int n, r, ptr = sc->buf_area;	/* memory pool */
-	int cl = 16;
+	int cl = 32;
 
 	/*
 	 * step 0: zero memory and figure out how many recv buffers and
@@ -1532,19 +1505,19 @@ i82596_setup_bufs(sc)
 	n = sc->buf_area_sz - (ptr - sc->buf_area);
 
 	/* Compute size of one RECV frame */
-	r = 48 + ((32 + IE_RBUF_SIZE) * B_PER_F);
+	r = 64 + ((32 + IE_RBUF_SIZE) * B_PER_F);
 
 	sc->nframes = n / r;
 
-	if (sc->nframes <= 0)
-		panic("ie: bogus buffer calc\n");
+	if (sc->nframes <= 8)
+		panic("ie: bogus buffer calc");
 
 	sc->nrxbuf = sc->nframes * B_PER_F;
 
 	/* The receice frame descriptors */
 	ptr += cl;
 	sc->rframes = ptr - 2;
-	ptr += sc->nframes * 48;
+	ptr += sc->nframes * 64;
 
 	/* The receive buffer descriptors */
 	ptr += cl;
@@ -2006,9 +1979,9 @@ again:
 	if (size > sc->mcast_addrs_size) {
 		/* Need to allocate more space */
 		if (sc->mcast_addrs_size)
-			free(sc->mcast_addrs, M_IPMADDR);
+			free(sc->mcast_addrs, M_IFMADDR);
 		sc->mcast_addrs = (char *)
-			malloc(size, M_IPMADDR, M_WAITOK);
+			malloc(size, M_IFMADDR, M_WAITOK);
 		sc->mcast_addrs_size = size;
 	}
 

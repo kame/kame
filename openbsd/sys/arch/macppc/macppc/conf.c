@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.19 2002/09/15 09:01:58 deraadt Exp $ */
+/*	$OpenBSD: conf.c,v 1.21 2002/12/05 02:49:55 kjc Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom
@@ -140,9 +140,10 @@ cdev_decl(pci);
 
 #include "pf.h"
 
-#include <altq/altqconf.h>
-
 #include "systrace.h"
+
+#include "radio.h"
+#include "bktr.h"
 
 struct cdevsw cdevsw[] = {
 	cdev_cn_init(1,cn),		/* 0: virtual console */
@@ -229,9 +230,11 @@ struct cdevsw cdevsw[] = {
 #else
 	cdev_notdef(),
 #endif
-	cdev_altq_init(NALTQ,altq),	/* 72: ALTQ control interface */
+	cdev_notdef(),			/* 72: ALTQ (deprecated) */
 	cdev_iop_init(NIOP,iop),	/* 73: I2O IOP control interface */
 	cdev_usbdev_init(NUSCANNER,uscanner), /* 74: usb scanner */
+	cdev_bktr_init(NBKTR,bktr),	/* 75: Bt848 video capture device */
+	cdev_radio_init(NRADIO, radio),	/* 76: generic radio I/O */
 };
 int nchrdev = sizeof cdevsw / sizeof cdevsw[0];
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_exec.c,v 1.71 2002/09/23 01:41:09 art Exp $	*/
+/*	$OpenBSD: kern_exec.c,v 1.76 2003/03/09 01:27:50 millert Exp $	*/
 /*	$NetBSD: kern_exec.c,v 1.75 1996/02/09 18:59:28 christos Exp $	*/
 
 /*-
@@ -98,7 +98,7 @@ int stackgap_random = 1024;
  *	ok:	return 0, filled exec package, one locked vnode.
  *	error:	destructive:
  *			everything deallocated execept exec header.
- *		non-descructive:
+ *		non-destructive:
  *			error code, locked vnode, exec header unmodified
  */
 int
@@ -252,7 +252,6 @@ sys_execve(p, v, retval)
 	struct vmspace *vm = p->p_vmspace;
 	char **tmpfap;
 	extern struct emul emul_native;
-	struct exec_vmcmd *base_vc;
 
 	/*
 	 * Cheap solution to complicated problems.
@@ -349,7 +348,7 @@ sys_execve(p, v, retval)
 	}
 
 	envc = 0;
-	/* environment need not be there */
+	/* environment does not need to be there */
 	if ((cpp = SCARG(uap, envp)) != NULL ) {
 		while (1) {
 			len = argp + ARG_MAX - dp;
@@ -407,27 +406,7 @@ sys_execve(p, v, retval)
 	if (pack.ep_vmcmds.evs_used == 0)
 		panic("execve: no vmcmds");
 #endif
-	base_vc = NULL;
-	for (i = 0; i < pack.ep_vmcmds.evs_used && !error; i++) {
-		struct exec_vmcmd *vcp;
-
-		vcp = &pack.ep_vmcmds.evs_cmds[i];
-
-		if (vcp->ev_flags & VMCMD_RELATIVE) {
-#ifdef DIAGNOSTIC
-			if (base_vc == NULL)
-				panic("sys_execve: RELATIVE without base");
-#endif
-			vcp->ev_addr += base_vc->ev_addr;
-		}
-
-		error = (*vcp->ev_proc)(p, vcp);
-		if (vcp->ev_flags & VMCMD_BASE)
-			base_vc = vcp;
-	}
-
-	/* free the vmspace-creation commands, and release their references */
-	kill_vmcmds(&pack.ep_vmcmds);
+	error = exec_process_vmcmds(p, &pack);
 
 	/* if an error happened, deallocate and punt */
 	if (error)
@@ -474,11 +453,15 @@ sys_execve(p, v, retval)
 	}
 
 	/*
-	 * If process does execve() while it has euid/uid or egid/gid
-	 * which are mismatched, it remains P_SUGIDEXEC.
+	 * If process does execve() while it has a mismatched real,
+	 * effective, or saved uid/gid, we set P_SUGIDEXEC.
 	 */
-	if (p->p_ucred->cr_uid == p->p_cred->p_ruid &&
-	    p->p_ucred->cr_gid == p->p_cred->p_rgid)
+	if (p->p_ucred->cr_uid != p->p_cred->p_ruid ||
+	    p->p_ucred->cr_uid != p->p_cred->p_svuid ||
+	    p->p_ucred->cr_gid != p->p_cred->p_rgid ||
+	    p->p_ucred->cr_gid != p->p_cred->p_svgid)
+		p->p_flag |= P_SUGIDEXEC;
+	else
 		p->p_flag &= ~P_SUGIDEXEC;
 
 	/*
@@ -661,7 +644,6 @@ exec_abort:
 free_pack_abort:
 	free(pack.ep_hdr, M_EXEC);
 	exit1(p, W_EXITCODE(0, SIGABRT));
-	exit1(p, -1);
 
 	/* NOTREACHED */
 	p->p_flag &= ~P_INEXEC;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: malloc.h,v 1.61 2002/08/28 08:28:03 tdeval Exp $	*/
+/*	$OpenBSD: malloc.h,v 1.65 2003/01/30 16:38:39 art Exp $	*/
 /*	$NetBSD: malloc.h,v 1.39 1998/07/12 19:52:01 augustss Exp $	*/
 
 /*
@@ -65,7 +65,7 @@
 #define	M_FREE		0	/* should be on free list */
 #define	M_MBUF		1	/* mbuf */
 #define	M_DEVBUF	2	/* device driver memory */
-/* 3 - free */
+#define M_DEBUG		3	/* debug chunk */
 #define	M_PCB		4	/* protocol control block */
 #define	M_RTABLE	5	/* routing tables */
 /* 6 - free */
@@ -90,18 +90,17 @@
 #define	M_UFSMNT	28	/* UFS mount structure */
 #define	M_SHM		29	/* SVID compatible shared memory segments */
 #define	M_VMMAP		30	/* VM map structures */
-/* 31-33 - free */
+#define	M_SEM		31	/* SVID compatible semaphores */
+/* 32-33 - free */
 #define	M_VMPMAP	34	/* VM pmap */
-#define	M_VMPVENT	35	/* VM phys-virt mapping entry */
-/* 36-37 - free */
+/* 35-37 - free */
 #define	M_FILE		38	/* Open file structure */
 #define	M_FILEDESC	39	/* Open file descriptor table */
 #define	M_LOCKF		40	/* Byte-range locking structures */
 #define	M_PROC		41	/* Proc structures */
 #define	M_SUBPROC	42	/* Proc sub-structures */
-#define	M_SEGMENT	43	/* Segment for LFS */
-#define	M_LFSNODE	44	/* LFS vnode private part */
-/* 45 - free */
+#define	M_VCLUSTER	43	/* Cluster for VFS */
+/* 45-46 - free */
 #define	M_MFSNODE	46	/* MFS vnode private part */
 /* 47-48 - free */
 #define	M_NETADDR	49	/* Export host address structure */
@@ -172,7 +171,7 @@
 	"free",		/* 0 M_FREE */ \
 	"mbuf",		/* 1 M_MBUF */ \
 	"devbuf",	/* 2 M_DEVBUF */ \
-	NULL, \
+	"debug", 	/* 3 M_DEBUG */ \
 	"pcb",		/* 4 M_PCB */ \
 	"routetbl",	/* 5 M_RTABLE */ \
 	NULL,		/* 6 */ \
@@ -200,11 +199,11 @@
 	"UFS mount",	/* 28 M_UFSMNT */ \
 	"shm",		/* 29 M_SHM */ \
 	"VM map",	/* 30 M_VMMAP */ \
-	NULL, \
+	"sem",		/* 31 M_SEM */ \
 	NULL, \
 	NULL, \
 	"VM pmap",	/* 34 M_VMPMAP */ \
-	"VM pvmap",	/* 35 M_VMPVENT */ \
+	NULL,	/* 35 */ \
 	NULL,	/* 36 */ \
 	NULL,	/* 37 */ \
 	"file",		/* 38 M_FILE */ \
@@ -212,8 +211,8 @@
 	"lockf",	/* 40 M_LOCKF */ \
 	"proc",		/* 41 M_PROC */ \
 	"subproc",	/* 42 M_SUBPROC */ \
-	"LFS segment",	/* 43 M_SEGMENT */ \
-	"LFS node",	/* 44 M_LFSNODE */ \
+	"VFS cluster",	/* 43 M_VCLUSTER */ \
+	NULL, \
 	NULL, \
 	"MFS node",	/* 46 M_MFSNODE */ \
 	NULL, \

@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.320 2002/09/26 21:44:37 deraadt Exp $
+#	$OpenBSD: GENERIC,v 1.331 2003/03/09 01:54:20 tedu Exp $
 #	$NetBSD: GENERIC,v 1.48 1996/05/20 18:17:23 mrg Exp $
 #
 #	GENERIC -- everything that's currently supported
@@ -17,7 +17,7 @@ option		GPL_MATH_EMULATE	# floating point emulation.
 option		USER_PCICONF	# user-space PCI configuration
 
 #option		VM86		# Virtual 8086 emulation
-#option		USER_LDT	# user-settable LDT; used by WINE
+#option		USER_LDT	# user-settable LDT; see i386_set_ldt(2)
 option		APERTURE	# in-kernel aperture driver for XFree86
 
 #option		KGDB		# Remote debugger support; exclusive of DDB
@@ -58,6 +58,7 @@ pcib*	at pci? dev ? function ?	# PCI-ISA bridge
 
 # power management and other environmental stuff
 #amdpm*	at pci? dev ? function ?	# AMD768MPX
+elansc*	at pci? dev ? function ?	# AMD Elan SC520 System Controller
 
 # ISA PCMCIA controllers
 #option PCMCIAVERBOSE
@@ -97,6 +98,10 @@ umodem*	at uhub? port ? configuration ?	# USB Modems/Serial
 ucom*	at umodem?
 uvisor*	at uhub? port ? configuration ?	# Handspring Visor
 ucom*	at uvisor?
+#uvscom*	at uhub? port ?			# SUNTAC Slipper U VS-10U serial
+#ucom*	at uvscom? portno ?
+ubsa*	at uhub? port ?			# Belkin serial adapter
+ucom*	at ubsa? portno ?
 uftdi*	at uhub? port ?			# FTDI FT8U100AX serial adapter
 ucom*	at uftdi? portno ?
 uplcom* at uhub? port ?			# I/O DATA USB-RSAQ2 serial adapter
@@ -127,6 +132,21 @@ scsibus* at usscanner?
 #udsbr*	at uhub? port ?			# D-Link DSB-R100 radio
 #radio*	at udsbr?
 ugen*	at uhub? port ? configuration ? # USB Generic driver
+
+# FireWire Controllers
+#fwohci*	at pci? dev ? function ?	# PCI FireWire adapter
+#fwohci*	at cardbus? dev ? function ?	# CardBus FireWire adapter
+
+#fwnode*	at fwbus? idhi ? idlo ?
+
+#fwscsi*	at fwnode?			# SCSI over FireWire
+#scsibus* at fwscsi?
+
+#option	FWOHCI_DEBUG
+#option	FWNODE_DEBUG
+#option	P1212_DEBUG
+#option	SBP2_DEBUG
+#option	FWSCSI_DEBUG
 
 puc*	at pci?				# PCI "universal" communication device
 
@@ -353,6 +373,7 @@ nge*	at pci? dev ? function ?		# NS DP83820/DP83821 GigE
 bge*	at pci? dev ? function ?		# Broadcom BCM570x (aka Tigon3)
 stge*	at pci? dev ? function ?		# Sundance TC9021 GigE
 #lge*	at pci? dev ? function ?		# Level1 LXT1001 GigE
+hme*	at pci? dev ? function ?		# Sun Happy Meal
 
 # Wireless network cards
 wi*	at pci? dev ? function ?		# WaveLAN IEEE 802.11DS
@@ -395,7 +416,7 @@ sv*	at pci? dev ? function ?		# S3 SonicVibes (S3 617)
 neo*	at pci? dev ? function ?		# NeoMagic 256AV/ZX
 cmpci*	at pci? dev ? function ?		# C-Media CMI8338/8738
 auich*	at pci? dev ? function ?		# i82801 ICH AC'97 audio
-autri*	at pci? dev ? function ?		# Trident 4D WAVE
+autri*	at pci? dev ? function ? flags 0x0000	# Trident 4D WAVE
 auvia*	at pci? dev ? function ?		# VIA VT82C686A
 clcs*	at pci? dev ? function ?		# CS4280 CrystalClear audio
 clct*	at pci? dev ? function ?		# CS4281 CrystalClear audio
@@ -413,9 +434,10 @@ pas0	at isa? port 0x220 irq 7 drq 1		# ProAudio Spectrum
 gus0	at isa? disable port 0x220 irq 7 drq 1 drq2 6 # Gravis (drq2 is record drq)
 ym*	at isapnp?
 mpu*	at isapnp?
+mpu*	at isa? port 0x300 			# generic MPU, Yamaha SW60XG
 #aria0	at isa? port 0x280 irq 10 drq 0 flags 0x1 # Prometheus Aria 16
 
-# OPL[23] FM syntheziers
+# OPL[23] FM synthesizers
 #opl0	at isa? port 0x388	# use only if not attached to sound card
 opl*	at eso?
 opl*	at sb?

@@ -1,4 +1,4 @@
-/*	$OpenBSD: bktr_audio.c,v 1.1 2001/03/28 03:27:09 fgsch Exp $	*/
+/*	$OpenBSD: bktr_audio.c,v 1.3 2003/02/11 19:20:28 mickey Exp $	*/
 /* $FreeBSD: src/sys/dev/bktr/bktr_audio.c,v 1.8 2000/10/31 13:09:56 roger Exp $ */
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -490,7 +490,7 @@ void msp_autodetect( bktr_ptr_t bktr ) {
   }
 
 
-  /* MSP3415D SPECIAL CASE Use the Tuner's Mono audio ouput for the MSP */
+  /* MSP3415D SPECIAL CASE Use the Tuner's Mono audio output for the MSP */
   /* (for Hauppauge 44xxx card with Tuner Type 0x2a) */
   else if (  ( (strncmp("3415D", bktr->msp_version_string, 5) == 0)
                &&(bktr->msp_use_mono_source == 1)
@@ -596,7 +596,7 @@ void msp_autodetect( bktr_ptr_t bktr ) {
   }
 
 
-  /* uncomment the following line to enable the MSP34xx 1Khz Tone Generator */
+  /* uncomment the following line to enable the MSP34xx 1KHz Tone Generator */
   /* turn your speaker volume down low before trying this */
   /* msp_dpl_write(bktr, bktr->msp_addr, 0x12, 0x0014, 0x7f40); */
 }

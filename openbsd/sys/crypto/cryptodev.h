@@ -1,4 +1,4 @@
-/*	$OpenBSD: cryptodev.h,v 1.33 2002/07/17 23:52:39 art Exp $	*/
+/*	$OpenBSD: cryptodev.h,v 1.37 2003/02/15 22:57:58 jason Exp $	*/
 
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
@@ -93,7 +93,11 @@
 #define CRYPTO_MD5		13
 #define CRYPTO_SHA1		14
 #define CRYPTO_DEFLATE_COMP	15 /* Deflate compression algorithm */
-#define CRYPTO_ALGORITHM_MAX	15 /* Keep updated - see below */
+#define CRYPTO_NULL		16
+#define CRYPTO_LZS_COMP		17 /* LZS compression algorithm */
+#define CRYPTO_ALGORITHM_MAX	17 /* Keep updated - see below */
+
+#define	CRYPTO_ALGORITHM_ALL	(CRYPTO_ALGORITHM_MAX + 1)
 
 /* Algorithm flags */
 #define	CRYPTO_ALG_FLAG_SUPPORTED	0x01 /* Algorithm is supported */
@@ -122,7 +126,7 @@ struct cryptodesc {
 					   place, so don't copy. */
 #define	CRD_F_IV_EXPLICIT	0x04	/* IV explicitly provided */
 #define	CRD_F_DSA_SHA_NEEDED	0x08	/* Compute SHA-1 of buffer for DSA */
-#define CRD_F_COMP		0x0f    /* Set when doing compression */
+#define CRD_F_COMP		0x10    /* Set when doing compression */
 
 	struct cryptoini	CRD_INI; /* Initialization/context data */
 #define crd_iv		CRD_INI.cri_iv
@@ -215,21 +219,25 @@ struct cryptkop {
 
 /* Crypto capabilities structure */
 struct cryptocap {
-	u_int32_t	cc_sessions;
+	u_int64_t	cc_operations;	/* Counter of how many ops done */
+	u_int64_t	cc_bytes;	/* Counter of how many bytes done */
+	u_int64_t	cc_koperations;	/* How many PK ops done */
 
-	/*
-	 * Largest possible operator length (in bits) for each type of
-	 * encryption algorithm.
-	 */
-	u_int16_t	cc_max_op_len[CRYPTO_ALGORITHM_MAX + 1];
+	u_int32_t	cc_sessions;	/* How many sessions allocated */
 
-	u_int8_t	cc_alg[CRYPTO_ALGORITHM_MAX + 1];
+	/* Symmetric/hash algorithms supported */
+	int		cc_alg[CRYPTO_ALGORITHM_MAX + 1];
 
-	u_int8_t	cc_kalg[CRK_ALGORITHM_MAX + 1];
+	/* Asymmetric algorithms supported */
+	int		cc_kalg[CRK_ALGORITHM_MAX + 1];
+
+	int		cc_queued;	/* Operations queued */
 
 	u_int8_t	cc_flags;
-#define CRYPTOCAP_F_CLEANUP   0x1
-#define CRYPTOCAP_F_SOFTWARE  0x02
+#define CRYPTOCAP_F_CLEANUP     0x01
+#define CRYPTOCAP_F_SOFTWARE    0x02
+#define CRYPTOCAP_F_ENCRYPT_MAC 0x04 /* Can do encrypt-then-MAC (IPsec) */
+#define CRYPTOCAP_F_MAC_ENCRYPT 0x08 /* Can do MAC-then-encrypt (TLS) */
 
 	int		(*cc_newsession) (u_int32_t *, struct cryptoini *);
 	int		(*cc_process) (struct cryptop *);
@@ -289,11 +297,10 @@ int	crypto_newsession(u_int64_t *, struct cryptoini *, int);
 int	crypto_freesession(u_int64_t);
 int	crypto_dispatch(struct cryptop *);
 int	crypto_kdispatch(struct cryptkop *);
-int	crypto_register(u_int32_t, int, u_int16_t, u_int32_t,
+int	crypto_register(u_int32_t, int *,
 	    int (*)(u_int32_t *, struct cryptoini *), int (*)(u_int64_t),
 	    int (*)(struct cryptop *));
-int	crypto_kregister(u_int32_t, int, u_int32_t,
-	    int (*)(struct cryptkop *));
+int	crypto_kregister(u_int32_t, int *, int (*)(struct cryptkop *));
 int	crypto_unregister(u_int32_t, int);
 int32_t	crypto_get_driverid(u_int8_t);
 void	crypto_thread(void);

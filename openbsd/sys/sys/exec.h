@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec.h,v 1.17 2002/09/23 01:41:09 art Exp $	*/
+/*	$OpenBSD: exec.h,v 1.20 2002/12/03 21:27:05 markus Exp $	*/
 /*	$NetBSD: exec.h,v 1.59 1996/02/09 18:25:09 christos Exp $	*/
 
 /*-
@@ -75,14 +75,8 @@ struct ps_strings {
  * Below the PS_STRINGS and sigtramp, we may require a gap on the stack
  * (used to copyin/copyout various emulation data structures).
  */
-#if defined(COMPAT_SUNOS) || defined(COMPAT_ULTRIX) || \
-    defined(COMPAT_IBCS2) || defined(COMPAT_SVR4) || defined(COMPAT_OSF1) || \
-    defined(COMPAT_LINUX) || defined(COMPAT_FREEBSD) || \
-    defined(COMPAT_HPUX)  || defined(COMPAT_NETBSD) || defined(__sparc64__)
 #define	STACKGAPLEN	512	/* plenty enough for now */
-#else
-#define	STACKGAPLEN	0
-#endif
+
 #ifdef MACHINE_STACK_GROWS_UP
 #define	STACKGAPBASE_UNALIGNED	\
 	((caddr_t)PS_STRINGS + sizeof(struct ps_strings))
@@ -176,7 +170,6 @@ struct exec_package {
  * funtions used either by execve() or the various cpu-dependent execve()
  * hooks.
  */
-void	kill_vmcmd(struct exec_vmcmd **);
 int	exec_makecmds(struct proc *, struct exec_package *);
 int	exec_runcmds(struct proc *, struct exec_package *);
 void	vmcmdset_extend(struct exec_vmcmd_set *);
@@ -191,6 +184,7 @@ void	setregs(struct proc *, struct exec_package *,
 				    u_long, register_t *);
 int	check_exec(struct proc *, struct exec_package *);
 int	exec_setup_stack(struct proc *, struct exec_package *);
+int	exec_process_vmcmds(struct proc *, struct exec_package *);
 
 #ifdef DEBUG
 void	new_vmcmd(struct exec_vmcmd_set *evsp,

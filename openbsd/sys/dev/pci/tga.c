@@ -1,4 +1,4 @@
-/* $OpenBSD: tga.c,v 1.17 2002/07/04 00:34:28 miod Exp $ */
+/* $OpenBSD: tga.c,v 1.19 2002/11/09 22:51:48 miod Exp $ */
 /* $NetBSD: tga.c,v 1.40 2002/03/13 15:05:18 ad Exp $ */
 
 /*
@@ -895,10 +895,6 @@ tga_builtin_set_cursor(dc, cursorp)
 		if ((u_int)cursorp->size.x != 64 ||
 		    (u_int)cursorp->size.y > 64)
 			return (EINVAL);
-		/* The cursor is 2 bits deep, and there is no mask */
-		count = (cursorp->size.y * 64 * 2) / NBBY;
-		if (!uvm_useracc(cursorp->image, count, B_READ))
-			return (EFAULT);
 	}
 	if (v & WSDISPLAY_CURSOR_DOHOT)		/* not supported */
 		return EINVAL;
@@ -921,12 +917,13 @@ tga_builtin_set_cursor(dc, cursorp)
 		dcrf->ramdac_set_curcmap(dcrc, cursorp);
 	}
 	if (v & WSDISPLAY_CURSOR_DOSHAPE) {
-		count = ((64 * 2) / NBBY) * cursorp->size.y;
+		/* The cursor is 2 bits deep, and there is no mask */
+		count = (cursorp->size.y * 64 * 2) / NBBY;
 		TGAWREG(dc, TGA_REG_CCBR,
 		    (TGARREG(dc, TGA_REG_CCBR) & ~0xfc00) | (cursorp->size.y << 10));
-		copyin(cursorp->image, (char *)(dc->dc_vaddr +
-		    (TGARREG(dc, TGA_REG_CCBR) & 0x3ff)),
-		    count);				/* can't fail. */
+		if ((error = copyin(cursorp->image,(char *)(dc->dc_vaddr +
+		    (TGARREG(dc, TGA_REG_CCBR) & 0x3ff)), count)) != 0)
+			return (error);
 	}
 	return (0);
 }
@@ -1461,7 +1458,7 @@ tga_ramdac_wr(v, btreg, val)
 	struct tga_devconfig *dc = v;
 
 	if (btreg > BT485_REG_MAX)
-		panic("tga_ramdac_wr: reg %d out of range\n", btreg);
+		panic("tga_ramdac_wr: reg %d out of range", btreg);
 
 	TGAWREG(dc, TGA_REG_EPDR, (btreg << 9) | (0 << 8 ) | val); /* XXX */
 	TGAREGWB(dc, TGA_REG_EPDR, 1);
@@ -1477,7 +1474,7 @@ tga2_ramdac_wr(v, btreg, val)
 	bus_space_handle_t ramdac;
 
 	if (btreg > BT485_REG_MAX)
-		panic("tga_ramdac_wr: reg %d out of range\n", btreg);
+		panic("tga_ramdac_wr: reg %d out of range", btreg);
 
 	bus_space_subregion(dc->dc_memt, dc->dc_memh, TGA2_MEM_RAMDAC + 
 		(0xe << 12) + (btreg << 8), 4, &ramdac);
@@ -1548,7 +1545,7 @@ tga_ramdac_rd(v, btreg)
 	tga_reg_t rdval;
 
 	if (btreg > BT485_REG_MAX)
-		panic("tga_ramdac_rd: reg %d out of range\n", btreg);
+		panic("tga_ramdac_rd: reg %d out of range", btreg);
 
 	TGAWREG(dc, TGA_REG_EPSR, (btreg << 1) | 0x1); /* XXX */
 	TGAREGWB(dc, TGA_REG_EPSR, 1);
@@ -1567,7 +1564,7 @@ tga2_ramdac_rd(v, btreg)
 	u_int8_t retval;
 
 	if (btreg > BT485_REG_MAX)
-		panic("tga_ramdac_rd: reg %d out of range\n", btreg);
+		panic("tga_ramdac_rd: reg %d out of range", btreg);
 
 	bus_space_subregion(dc->dc_memt, dc->dc_memh, TGA2_MEM_RAMDAC + 
 		(0xe << 12) + (btreg << 8), 4, &ramdac);
@@ -1677,7 +1674,7 @@ tga2_ics9110_wr(dc, dotclock)
        case  14300000:         /* this one is just a ref clock */
                N = 0x03; M = 0x03; V = 0x1; X = 0x1; R = 0x3; break;
 	default:
-		panic("unrecognized clock rate %d\n", dotclock);
+		panic("unrecognized clock rate %d", dotclock);
 	}
 
 	/* XXX -- hard coded, bad */

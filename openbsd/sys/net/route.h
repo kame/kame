@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.h,v 1.14 2002/03/14 03:16:10 millert Exp $	*/
+/*	$OpenBSD: route.h,v 1.16 2003/02/12 14:41:07 jason Exp $	*/
 /*	$NetBSD: route.h,v 1.9 1996/02/13 22:00:49 christos Exp $	*/
 
 /*
@@ -67,8 +67,8 @@ struct rt_metrics {
 	u_long	rmx_mtu;	/* MTU for this path */
 	u_long	rmx_hopcount;	/* max hops expected */
 	u_long	rmx_expire;	/* lifetime for route, e.g. redirect */
-	u_long	rmx_recvpipe;	/* inbound delay-bandwith product */
-	u_long	rmx_sendpipe;	/* outbound delay-bandwith product */
+	u_long	rmx_recvpipe;	/* inbound delay-bandwidth product */
+	u_long	rmx_sendpipe;	/* outbound delay-bandwidth product */
 	u_long	rmx_ssthresh;	/* outbound gateway buffer limit */
 	u_long	rmx_rtt;	/* estimated round trip time */
 	u_long	rmx_rttvar;	/* estimated rtt variance */
@@ -284,9 +284,9 @@ struct rttimer_queue {
 #define	ONNET_CLONING 1
 #define	NO_CLONING 2
 
-struct	route_cb route_cb;
-struct	rtstat	rtstat;
-struct	radix_node_head *rt_tables[AF_MAX+1];
+extern struct route_cb route_cb;
+extern struct rtstat rtstat;
+extern struct radix_node_head *rt_tables[];
 
 struct	socket;
 void	 route_init(void);

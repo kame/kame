@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_fork.c,v 1.55 2002/05/16 16:16:51 provos Exp $	*/
+/*	$OpenBSD: kern_fork.c,v 1.59 2002/10/31 01:33:27 art Exp $	*/
 /*	$NetBSD: kern_fork.c,v 1.29 1996/02/09 18:59:34 christos Exp $	*/
 
 /*
@@ -76,30 +76,21 @@ int pidtaken(pid_t);
 
 /*ARGSUSED*/
 int
-sys_fork(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+sys_fork(struct proc *p, void *v, register_t *retval)
 {
 	return (fork1(p, SIGCHLD, FORK_FORK, NULL, 0, NULL, NULL, retval));
 }
 
 /*ARGSUSED*/
 int
-sys_vfork(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+sys_vfork(struct proc *p, void *v, register_t *retval)
 {
 	return (fork1(p, SIGCHLD, FORK_VFORK|FORK_PPWAIT, NULL, 0, NULL,
 	    NULL, retval));
 }
 
 int
-sys_rfork(p, v, retval)
-	struct proc *p;
-	void *v;
-	register_t *retval;
+sys_rfork(struct proc *p, void *v, register_t *retval)
 {
 	struct sys_rfork_args /* {
 		syscallarg(int) flags;
@@ -137,19 +128,11 @@ sys_rfork(p, v, retval)
 }
 
 int
-fork1(p1, exitsig, flags, stack, stacksize, func, arg, retval)
-	struct proc *p1;
-	int exitsig;
-	int flags;
-	void *stack;
-	size_t stacksize;
-	void (*func)(void *);
-	void *arg;
-	register_t *retval;
+fork1(struct proc *p1, int exitsig, int flags, void *stack, size_t stacksize,
+    void (*func)(void *), void *arg, register_t *retval)
 {
 	struct proc *p2;
 	uid_t uid;
-	struct proc *newproc;
 	struct vmspace *vm;
 	int count;
 	vaddr_t uaddr;
@@ -168,6 +151,7 @@ fork1(p1, exitsig, flags, stack, stacksize, func, arg, retval)
 		tablefull("proc");
 		return (EAGAIN);
 	}
+	nprocs++;
 
 	/*
 	 * Increment the count of procs running with this uid. Don't allow
@@ -176,6 +160,7 @@ fork1(p1, exitsig, flags, stack, stacksize, func, arg, retval)
 	count = chgproccnt(uid, 1);
 	if (uid != 0 && count > p1->p_rlimit[RLIMIT_NPROC].rlim_cur) {
 		(void)chgproccnt(uid, -1);
+		nprocs--;
 		return (EAGAIN);
 	}
 
@@ -183,25 +168,22 @@ fork1(p1, exitsig, flags, stack, stacksize, func, arg, retval)
 	 * Allocate a pcb and kernel stack for the process
 	 */
 	uaddr = uvm_km_valloc(kernel_map, USPACE);
-	if (uaddr == 0)
-		return ENOMEM;
+	if (uaddr == 0) {
+		chgproccnt(uid, -1);
+		nprocs--;
+		return (ENOMEM);
+	}
+
+	/*
+	 * From now on, we're comitted to the fork and cannot fail.
+	 */
 
 	/* Allocate new proc. */
-	newproc = pool_get(&proc_pool, PR_WAITOK);
+	p2 = pool_get(&proc_pool, PR_WAITOK);
 
-	/* Find an unused pid satisfying 1 <= lastpid <= PID_MAX */
-	do {
-		lastpid = 1 + (randompid ? arc4random() : lastpid) % PID_MAX;
-	} while (pidtaken(lastpid));
-
-	nprocs++;
-	p2 = newproc;
 	p2->p_stat = SIDL;			/* protect against others */
-	p2->p_pid = lastpid;
 	p2->p_exitsig = exitsig;
-	LIST_INSERT_HEAD(&allproc, p2, p_list);
-	p2->p_forw = p2->p_back = NULL;		/* shouldn't be necessary */
-	LIST_INSERT_HEAD(PIDHASH(p2->p_pid), p2, p_hash);
+	p2->p_forw = p2->p_back = NULL;
 
 	/*
 	 * Make a proc table entry for the new process.
@@ -281,10 +263,6 @@ fork1(p1, exitsig, flags, stack, stacksize, func, arg, retval)
 			VREF(p2->p_tracep);
 	}
 #endif
-#if NSYSTRACE > 0
-	if (ISSET(p1->p_flag, P_SYSTRACE))
-		systrace_fork(p1, p2);
-#endif
 
 	/*
 	 * set priority of child to be that of parent
@@ -348,6 +326,20 @@ fork1(p1, exitsig, flags, stack, stacksize, func, arg, retval)
 		forkstat.cntkthread++;
 		forkstat.sizkthread += vm->vm_dsize + vm->vm_ssize;
 	}
+
+	/* Find an unused pid satisfying 1 <= lastpid <= PID_MAX */
+	do {
+		lastpid = 1 + (randompid ? arc4random() : lastpid) % PID_MAX;
+	} while (pidtaken(lastpid));
+	p2->p_pid = lastpid;
+
+	LIST_INSERT_HEAD(&allproc, p2, p_list);
+	LIST_INSERT_HEAD(PIDHASH(p2->p_pid), p2, p_hash);
+
+#if NSYSTRACE > 0
+	if (ISSET(p1->p_flag, P_SYSTRACE))
+		systrace_fork(p1, p2);
+#endif
 
 	/*
 	 * Make child runnable, set start time, and add to run queue.

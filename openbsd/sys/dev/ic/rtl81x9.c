@@ -1,4 +1,4 @@
-/*	$OpenBSD: rtl81x9.c,v 1.18 2002/07/02 19:38:55 nate Exp $ */
+/*	$OpenBSD: rtl81x9.c,v 1.20 2003/02/11 19:20:27 mickey Exp $ */
 
 /*
  * Copyright (c) 1997, 1998
@@ -68,7 +68,7 @@
  * levels.
  *
  * It's impossible given this rotten design to really achieve decent
- * performance at 100Mbps, unless you happen to have a 400Mhz PII or
+ * performance at 100Mbps, unless you happen to have a 400MHz PII or
  * some equally overmuscled CPU to drive it.
  *
  * On the bright side, the 8139 does have a built-in PHY, although
@@ -133,6 +133,7 @@
 
 void rl_tick(void *);
 void rl_shutdown(void *);
+void rl_powerhook(int, void *);
 
 int rl_encap(struct rl_softc *, struct mbuf * );
 
@@ -1302,6 +1303,7 @@ rl_attach(sc)
 	ether_ifattach(ifp);
 
 	sc->sc_sdhook = shutdownhook_establish(rl_shutdown, sc);
+	sc->sc_pwrhook = powerhook_establish(rl_powerhook, sc);
 
 	return (0);
 }
@@ -1326,16 +1328,27 @@ rl_detach(sc)
 	if_detach(ifp);
 
 	shutdownhook_disestablish(sc->sc_sdhook);
+	powerhook_disestablish(sc->sc_pwrhook);
 
 	return (0);
 }
 
-void rl_shutdown(arg)
+void
+rl_shutdown(arg)
 	void			*arg;
 {
 	struct rl_softc		*sc = (struct rl_softc *)arg;
 
 	rl_stop(sc);
+}
+
+void
+rl_powerhook(why, arg)
+	int why;
+	void *arg;
+{
+	if (why == PWR_RESUME)
+		rl_init(arg);
 }
 
 int

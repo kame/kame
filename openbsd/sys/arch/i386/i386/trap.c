@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.50 2002/05/16 16:16:52 provos Exp $	*/
+/*	$OpenBSD: trap.c,v 1.53 2003/01/16 04:15:17 art Exp $	*/
 /*	$NetBSD: trap.c,v 1.95 1996/05/05 06:50:02 mycroft Exp $	*/
 
 /*-
@@ -181,8 +181,7 @@ trap(frame)
 	int type = frame.tf_trapno;
 	u_quad_t sticks;
 	struct pcb *pcb = NULL;
-	extern char fusubail[],
-		    resume_iret[], resume_pop_ds[], resume_pop_es[];
+	extern char resume_iret[], resume_pop_ds[], resume_pop_es[];
 	struct trapframe *vframe;
 	int resume;
 	vm_prot_t vftype, ftype;
@@ -406,12 +405,6 @@ trap(frame)
 		if (p == 0 || p->p_addr == 0)
 			goto we_re_toast;
 		pcb = &p->p_addr->u_pcb;
-		/*
-		 * fusubail is used by [fs]uswintr() to prevent page faulting
-		 * from inside the profiling interrupt.
-		 */
-		if (pcb->pcb_onfault == fusubail)
-			goto copyfault;
 #if 0
 		/* XXX - check only applies to 386's and 486's with WP off */
 		if (frame.tf_err & PGEX_P)
@@ -420,16 +413,15 @@ trap(frame)
 		/* FALLTHROUGH */
 
 	case T_PAGEFLT|T_USER: {	/* page fault */
-		vm_offset_t va, fa;
+		vaddr_t va, fa;
 		struct vmspace *vm = p->p_vmspace;
 		struct vm_map *map;
 		int rv;
-		extern struct vm_map *kernel_map;
 		unsigned nss;
 
 		if (vm == NULL)
 			goto we_re_toast;
-		fa = (vm_offset_t)rcr2();
+		fa = (vaddr_t)rcr2();
 		va = trunc_page(fa);
 		/*
 		 * It is only a kernel address space fault iff:
@@ -549,15 +541,14 @@ out:
  * Compensate for 386 brain damage (missing URKR)
  */
 int
-trapwrite(addr)
-	unsigned addr;
+trapwrite(unsigned int addr)
 {
-	vm_offset_t va;
+	vaddr_t va;
 	unsigned nss;
 	struct proc *p;
 	struct vmspace *vm;
 
-	va = trunc_page((vm_offset_t)addr);
+	va = trunc_page((vaddr_t)addr);
 	if (va >= VM_MAXUSER_ADDRESS)
 		return 1;
 
@@ -640,7 +631,7 @@ syscall(frame)
 		/*
 		 * Code is first argument, followed by actual args.
 		 */
-		code = fuword(params);
+		copyin(params, &code, sizeof(int));
 		params += sizeof(int);
 		break;
 	case SYS___syscall:
@@ -658,7 +649,7 @@ syscall(frame)
 #endif
 		    )
 			break;
-		code = fuword(params + _QUAD_LOWWORD * sizeof(int));
+		copyin(params + _QUAD_LOWWORD * sizeof(int), &code, sizeof(int));
 		params += sizeof(quad_t);
 		break;
 	default:
@@ -673,10 +664,12 @@ syscall(frame)
 	/* XXX extra if() for every emul type.. */
 	if (p->p_emul == &emul_linux_aout || p->p_emul == &emul_linux_elf) {
 		/*
-		 * Linux passes the args in ebx, ecx, edx, esi, edi, in
+		 * Linux passes the args in ebx, ecx, edx, esi, edi, ebp, in
 		 * increasing order.
 		 */
 		switch (argsize) {
+		case 24:
+			args[5] = frame.tf_ebp;
 		case 20:
 			args[4] = frame.tf_edi;
 		case 16:

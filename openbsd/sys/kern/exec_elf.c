@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_elf.c,v 1.41 2002/09/23 01:41:09 art Exp $	*/
+/*	$OpenBSD: exec_elf.c,v 1.44 2003/02/18 03:54:40 drahn Exp $	*/
 
 /*
  * Copyright (c) 1996 Per Fogelstrom
@@ -242,8 +242,9 @@ void
 ELFNAME(load_psection)(struct exec_vmcmd_set *vcset, struct vnode *vp,
 	Elf_Phdr *ph, Elf_Addr *addr, Elf_Addr *size, int *prot, int flags)
 {
-	u_long uaddr, msize, psize, rm, rf;
-	long diff, offset;
+	u_long uaddr, msize, lsize, psize, rm, rf;
+	long diff, offset, bdiff;
+	Elf_Addr base;
 
 	/*
 	 * If the user specified an address, then we load there.
@@ -252,12 +253,20 @@ ELFNAME(load_psection)(struct exec_vmcmd_set *vcset, struct vnode *vp,
 		if (ph->p_align > 1) {
 			*addr = ELF_TRUNC(*addr, ph->p_align);
 			diff = ph->p_vaddr - ELF_TRUNC(ph->p_vaddr, ph->p_align);
+			/* page align vaddr */
+			base = *addr + trunc_page(ph->p_vaddr) 
+			    - ELF_TRUNC(ph->p_vaddr, ph->p_align);
+
+			bdiff = ph->p_vaddr - trunc_page(ph->p_vaddr);
+
 		} else
 			diff = 0;
 	} else {
 		*addr = uaddr = ph->p_vaddr;
 		if (ph->p_align > 1)
 			*addr = ELF_TRUNC(uaddr, ph->p_align);
+		base = trunc_page(uaddr);
+		bdiff = uaddr - base;
 		diff = uaddr - *addr;
 	}
 
@@ -265,40 +274,40 @@ ELFNAME(load_psection)(struct exec_vmcmd_set *vcset, struct vnode *vp,
 	*prot |= (ph->p_flags & PF_W) ? VM_PROT_WRITE : 0;
 	*prot |= (ph->p_flags & PF_X) ? VM_PROT_EXECUTE : 0;
 
-	offset = ph->p_offset - diff;
-	*size = ph->p_filesz + diff;
 	msize = ph->p_memsz + diff;
-	psize = round_page(*size);
+	offset = ph->p_offset - bdiff;
+	lsize = ph->p_filesz + bdiff;
+	psize = round_page(lsize);
 
 	/*
 	 * Because the pagedvn pager can't handle zero fill of the last
 	 * data page if it's not page aligned we map the last page readvn.
 	 */
 	if (ph->p_flags & PF_W) {
-		psize = trunc_page(*size);
+		psize = trunc_page(lsize);
 		if (psize > 0)
-			NEW_VMCMD2(vcset, vmcmd_map_pagedvn, psize, *addr, vp,
+			NEW_VMCMD2(vcset, vmcmd_map_pagedvn, psize, base, vp,
 			    offset, *prot, flags);
-		if (psize != *size) {
-			NEW_VMCMD2(vcset, vmcmd_map_readvn, *size - psize,
-			    *addr + psize, vp, offset + psize, *prot, flags);
+		if (psize != lsize) {
+			NEW_VMCMD2(vcset, vmcmd_map_readvn, lsize - psize,
+			    base + psize, vp, offset + psize, *prot, flags);
 		}
 	} else {
-		NEW_VMCMD2(vcset, vmcmd_map_pagedvn, psize, *addr, vp, offset,
+		NEW_VMCMD2(vcset, vmcmd_map_pagedvn, psize, base, vp, offset,
 		    *prot, flags);
 	}
 
 	/*
 	 * Check if we need to extend the size of the segment
 	 */
-	rm = round_page(*addr + msize);
-	rf = round_page(*addr + *size);
+	rm = round_page(*addr + ph->p_memsz + diff);
+	rf = round_page(*addr + ph->p_filesz + diff);
 
 	if (rm != rf) {
 		NEW_VMCMD2(vcset, vmcmd_map_zero, rm - rf, rf, NULLVP, 0,
 		    *prot, flags);
-		*size = msize;
 	}
+	*size = msize;
 }
 
 /*
@@ -444,7 +453,7 @@ ELFNAME2(exec,makecmds)(struct proc *p, struct exec_package *epp)
 	Elf_Ehdr *eh = epp->ep_hdr;
 	Elf_Phdr *ph, *pp;
 	Elf_Addr phdr = 0;
-	int error, i, nload;
+	int error, i;
 	char interp[MAXPATHLEN];
 	u_long pos = 0, phsize;
 	u_int8_t os = OOS_NULL;
@@ -537,7 +546,7 @@ native:
 	/*
 	 * Load all the necessary sections
 	 */
-	for (i = nload = 0; i < eh->e_phnum; i++) {
+	for (i = 0; i < eh->e_phnum; i++) {
 		Elf_Addr addr = ELFDEFNNAME(NO_ADDR), size = 0;
 		int prot = 0;
 
@@ -546,28 +555,50 @@ native:
 		switch (ph[i].p_type) {
 		case PT_LOAD:
 			/*
-			 * XXX
-			 * Can handle only 2 sections: text and data
+			 * Calcuates size of text and data segments
+			 * by starting at first and going to end of last.
+			 * 'rwx' sections are treated as data.
+			 * this is correct for BSS_PLT, but may not be
+			 * for DATA_PLT, is fine for TEXT_PLT.
 			 */
-			if (nload++ == 2)
-				goto bad;
 			ELFNAME(load_psection)(&epp->ep_vmcmds, epp->ep_vp,
 			    &ph[i], &addr, &size, &prot, 0);
 			/*
 			 * Decide whether it's text or data by looking
-			 * at the entry point.
+			 * at the protection of the section
 			 */
-			if (eh->e_entry >= addr &&
-			    eh->e_entry < (addr + size)) {
-				epp->ep_taddr = addr;
-				epp->ep_tsize = size;
-				if (epp->ep_daddr == ELFDEFNNAME(NO_ADDR)) {
+			if (prot & VM_PROT_WRITE) {
+				/* data section */
+				if (epp->ep_dsize == ELFDEFNNAME(NO_ADDR)) {
 					epp->ep_daddr = addr;
 					epp->ep_dsize = size;
+				} else {
+					if (addr < epp->ep_daddr) {
+						epp->ep_dsize =
+						    epp->ep_dsize +
+						    epp->ep_daddr -
+						    addr;
+						epp->ep_daddr = addr;
+					} else
+						epp->ep_dsize = addr+size -
+						    epp->ep_daddr;
 				}
-			} else {
-				epp->ep_daddr = addr;
-				epp->ep_dsize = size;
+			} else if (prot & VM_PROT_EXECUTE) {
+				/* text section */
+				if (epp->ep_tsize == ELFDEFNNAME(NO_ADDR)) {
+					epp->ep_taddr = addr;
+					epp->ep_tsize = size;
+				} else {
+					if (addr < epp->ep_taddr) {
+						epp->ep_tsize =
+						    epp->ep_tsize +
+						    epp->ep_taddr -
+						    addr;
+						epp->ep_taddr = addr;
+					} else
+						epp->ep_tsize = addr+size -
+						    epp->ep_taddr;
+				}
 			}
 			break;
 
@@ -661,13 +692,12 @@ int
 ELFNAME2(exec,fixup)(struct proc *p, struct exec_package *epp)
 {
 	char	*interp;
-	int	error, i;
+	int	error;
 	struct	elf_args *ap;
 	AuxInfo ai[ELF_AUX_ENTRIES], *a;
 	Elf_Addr	pos = epp->ep_interp_pos;
-	struct exec_vmcmd *base_vc;
 
-	if (epp->ep_interp == 0) {
+	if (epp->ep_interp == NULL) {
 		return (0);
 	}
 
@@ -683,23 +713,7 @@ ELFNAME2(exec,fixup)(struct proc *p, struct exec_package *epp)
 	/*
 	 * We have to do this ourselves...
 	 */
-	base_vc = NULL;
-	for (i = 0; i < epp->ep_vmcmds.evs_used && !error; i++) {
-		struct exec_vmcmd *vcp;
-		vcp = &epp->ep_vmcmds.evs_cmds[i];
-
-		if (vcp->ev_flags & VMCMD_RELATIVE) {
-#ifdef DIAGNOSTIC
-			if (base_vc == NULL)
-				panic("sys_execve: RELATIVE without base");
-#endif
-			vcp->ev_addr += base_vc->ev_addr;
-		}
-		error = (*vcp->ev_proc)(p, vcp);
-		if (vcp->ev_flags & VMCMD_BASE)
-			base_vc = vcp;
-	}
-	kill_vmcmds(&epp->ep_vmcmds);
+	error = exec_process_vmcmds(p, epp);
 
 	/*
 	 * Push extra arguments on the stack needed by dynamically

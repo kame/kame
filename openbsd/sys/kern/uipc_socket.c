@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_socket.c,v 1.46 2002/08/08 19:18:12 provos Exp $	*/
+/*	$OpenBSD: uipc_socket.c,v 1.49 2003/02/03 21:22:09 deraadt Exp $	*/
 /*	$NetBSD: uipc_socket.c,v 1.21 1996/02/04 02:17:52 christos Exp $	*/
 
 /*
@@ -462,14 +462,14 @@ restart:
 		mp = &top;
 		space -= clen;
 		do {
-		    if (uio == NULL) {
-			/*
-			 * Data is prepackaged in "top".
-			 */
-			resid = 0;
-			if (flags & MSG_EOR)
-				top->m_flags |= M_EOR;
-		    } else do {
+			if (uio == NULL) {
+				/*
+				 * Data is prepackaged in "top".
+				 */
+				resid = 0;
+				if (flags & MSG_EOR)
+					top->m_flags |= M_EOR;
+			} else do {
 				if (top == 0) {
 					MGETHDR(m, M_WAIT, MT_DATA);
 					mlen = MHLEN;
@@ -1079,11 +1079,13 @@ sosetopt(so, level, optname, m0)
 				goto bad;
 			}
 			tv = mtod(m, struct timeval *);
-			if (tv->tv_sec * hz + tv->tv_usec / tick > SHRT_MAX) {
+			if (tv->tv_sec > (SHRT_MAX - tv->tv_usec / tick) / hz) {
 				error = EDOM;
 				goto bad;
 			}
 			val = tv->tv_sec * hz + tv->tv_usec / tick;
+			if (val == 0 && tv->tv_usec != 0)
+				val = 1;
 
 			switch (optname) {
 

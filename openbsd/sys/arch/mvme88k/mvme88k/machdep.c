@@ -1,4 +1,4 @@
-/* $OpenBSD: machdep.c,v 1.95 2002/07/20 19:24:56 art Exp $	*/
+/* $OpenBSD: machdep.c,v 1.100 2003/01/13 20:12:18 miod Exp $	*/
 /*
  * Copyright (c) 1998, 1999, 2000, 2001 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -62,12 +62,6 @@
 #include <sys/syscallargs.h>
 #ifdef SYSVMSG
 #include <sys/msg.h>
-#endif
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
-#ifdef SYSVSHM
-#include <sys/shm.h>
 #endif
 #include <sys/ioctl.h>
 #include <sys/exec.h>
@@ -133,6 +127,7 @@ void regdump(struct trapframe *f);
 void dumpsys(void);
 void consinit(void);
 vm_offset_t size_memory(void);
+vm_offset_t memsize187(void);
 int getcpuspeed(void);
 int getscsiid(void);
 void identifycpu(void);
@@ -185,7 +180,7 @@ int longformat = 1;  /* for regdump() */
  * safepri is a safe priority for sleep to set for a spin-wait
  * during autoconfiguration or after a panic.
  */
-int   safepri = PSR_SUPERVISOR;
+int   safepri = IPL_NONE;
 
 struct vm_map *exec_map = NULL;
 struct vm_map *phys_map = NULL;
@@ -310,6 +305,29 @@ consinit()
 #endif
 }
 
+#ifdef MVME187
+/*
+ * Figure out how much memory is available, by querying the memory controllers
+ */
+#include <mvme88k/dev/memcreg.h>
+vm_offset_t
+memsize187()
+{
+	struct memcreg *memc;
+	vm_offset_t x;
+
+	memc = (struct memcreg *)0xfff43000;
+	x = MEMC_MEMCONF_RTOB(memc->memc_memconf);
+
+	memc = (struct memcreg *)0xfff43100;
+	if (!badaddr((vm_offset_t)&memc->memc_memconf, 1))
+		x += MEMC_MEMCONF_RTOB(memc->memc_memconf);
+
+	return x;
+}
+#endif
+
+#if defined(MVME188) || defined(MVME197)
 /*
  * Figure out how much real memory is available.
  * Start looking from the megabyte after the end of the kernel data,
@@ -358,9 +376,9 @@ size_memory()
 		look = (unsigned int *)0x01FFF000; 
 	}
 	
-	physmem = btoc(trunc_page((unsigned)look)); /* in pages */
 	return (trunc_page((unsigned)look));
 }
+#endif	/* defined(MVME188) || defined(MVME197) */
 
 int
 getcpuspeed()
@@ -400,7 +418,8 @@ void
 identifycpu()
 {
 	cpuspeed = getcpuspeed();
-	printf("\nModel: Motorola MVME%x %dMhz\n", brdtyp, cpuspeed);
+	sprintf(cpu_model, "Motorola MVME%x, %dMHz", brdtyp, cpuspeed);
+	printf("\nModel: %s\n", cpu_model);
 }
 
 /*
@@ -704,18 +723,6 @@ allocsys(v)
 #define	valloc(name, type, num) \
 	    v = (caddr_t)(((name) = (type *)v) + (num))
 
-#ifdef SYSVSHM
-	shminfo.shmmax = shmmaxpgs;
-	shminfo.shmall = shmmaxpgs;
-	shminfo.shmseg = shmseg;
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
-#ifdef SYSVSEM
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns);
-	/* This is pretty disgusting! */
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
 #ifdef SYSVMSG
 	valloc(msgpool, char, msginfo.msgmax);
 	valloc(msgmaps, struct msgmap, msginfo.msgseg);
@@ -1678,7 +1685,7 @@ m188_ext_int(u_int v, struct m88100_saved_state *eframe)
 			    level, intbit, 1 << intbit, IST_STRING);
 		}
 		if (vec > 0xFF) {
-			panic("interrupt vector 0x%x greater than 255!\n"
+			panic("interrupt vector 0x%x greater than 255!"
 			    "level = %d iack = 0x%x", 
 			    vec, level, ivec[level]);
 		}
@@ -1731,7 +1738,7 @@ m188_ext_int(u_int v, struct m88100_saved_state *eframe)
 	 * Restore the mask level to what it was when the interrupt
 	 * was taken.
 	 */
-	setipl((u_char)eframe->mask);
+	setipl(eframe->mask);
 	flush_pipeline();
 }
 
@@ -1756,8 +1763,8 @@ m187_ext_int(u_int v, struct m88100_saved_state *eframe)
 	u_char vec;
 
 	/* get level and mask */
-	mask = *md.intr_mask;
-	level = *md.intr_ipl;
+	mask = *md.intr_mask & 0x07;
+	level = *md.intr_ipl & 0x07;
 
 	/*
 	 * It is really bizarre for the mask and level to the be the same.
@@ -1767,7 +1774,7 @@ m187_ext_int(u_int v, struct m88100_saved_state *eframe)
 	 */
 
 	if ((mask == level) && level) {
-		panic("mask == level, %d\n", level);
+		panic("mask == level, %d", level);
 	}
 
 	/*
@@ -1776,30 +1783,26 @@ m187_ext_int(u_int v, struct m88100_saved_state *eframe)
 	 */
 
 	if (level == 0) {
-		panic("Bogons... level %x and mask %x\n", level, mask);
+		panic("Bogons... level %x and mask %x", level, mask);
 	}
 
 	/* and block interrupts at level or lower */
-	setipl((u_char)level);
+	setipl(level);
 	/* and stash it away in the trap frame */
 	eframe->mask = mask;
 
 	uvmexp.intrs++;
 
-	if (level > 7 || (char)level < 0) {
-		panic("int level (%x) is not between 0 and 7", level);
-	}
-
 	/* generate IACK and get the vector */
 	flush_pipeline();
 	if (guarded_access(ivec[level], 1, &vec) == EFAULT) {
-		panic("Unable to get vector for this interrupt (level %x)\n", level);
+		panic("Unable to get vector for this interrupt (level %x)", level);
 	}
 	flush_pipeline();
 	flush_pipeline();
 	flush_pipeline();
 
-	if (vec > 0xFF) {
+	if (vec > 0xff) {
 		panic("interrupt vector %x greater than 255", vec);
 	}
 
@@ -1852,13 +1855,14 @@ m187_ext_int(u_int v, struct m88100_saved_state *eframe)
 		data_access_emulation((unsigned *)eframe);
 		eframe->dmt0 &= ~DMT_VALID;
 	}
+
 	mask = eframe->mask;
 
 	/*
 	 * Restore the mask level to what it was when the interrupt
 	 * was taken.
 	 */
-	setipl((u_char)mask);
+	setipl(mask);
 }
 #endif /* MVME187 */
 
@@ -1872,7 +1876,7 @@ m197_ext_int(u_int v, struct m88100_saved_state *eframe)
 	u_char vec;
 
 	/* get src and mask */
-	mask = *md.intr_mask;
+	mask = *md.intr_mask & 0x07;
 	src = *md.intr_src;
 	
 	if (v == T_NON_MASK) {
@@ -1881,7 +1885,7 @@ m197_ext_int(u_int v, struct m88100_saved_state *eframe)
 		vec = BS_ABORTVEC;
 	} else {
 		/* get level  */
-		level = *md.intr_ipl;
+		level = *md.intr_ipl & 0x07;
 	}
 
 	/*
@@ -1890,32 +1894,28 @@ m197_ext_int(u_int v, struct m88100_saved_state *eframe)
 	 */
 
 	if (level == 0) {
-		panic("Bogons... level %x and mask %x\n", level, mask);
+		panic("Bogons... level %x and mask %x", level, mask);
 	}
 
 	/* and block interrupts at level or lower */
-	setipl((u_char)level);
+	setipl(level);
 	/* and stash it away in the trap frame */
 	eframe->mask = mask;
 
 	uvmexp.intrs++;
 
-	if (level > 7 || (char)level < 0) {
-		panic("int level (%x) is not between 0 and 7", level);
-	}
-
 	if (v != T_NON_MASK) {
 		/* generate IACK and get the vector */
 		flush_pipeline();
 		if (guarded_access(ivec[level], 1, &vec) == EFAULT) {
-			panic("Unable to get vector for this interrupt (level %x)\n", level);
+			panic("Unable to get vector for this interrupt (level %x)", level);
 		}
 		flush_pipeline();
 		flush_pipeline();
 		flush_pipeline();
 	}
 
-	if (vec > 0xFF) {
+	if (vec > 0xff) {
 		panic("interrupt vector %x greater than 255", vec);
 	}
 
@@ -1964,7 +1964,7 @@ m197_ext_int(u_int v, struct m88100_saved_state *eframe)
 	 * Restore the mask level to what it was when the interrupt
 	 * was taken.
 	 */
-	setipl((u_char)mask);
+	setipl(mask);
 }
 #endif 
 
@@ -2392,7 +2392,22 @@ mvme_bootstrap()
 	uvm_setpagesize();
 	first_addr = round_page(first_addr);
 
-	last_addr = size_memory();
+	switch (brdtyp) {
+#ifdef MVME187
+	case BRD_187:
+		last_addr = memsize187();
+		break;
+#endif
+#ifdef MVME188
+	case BRD_188:
+#endif
+#ifdef MVME197
+	case BRD_197:
+#endif
+		last_addr = size_memory();
+		break;
+	}
+	physmem = btoc(last_addr);
 
 	cmmu_parity_enable();
 

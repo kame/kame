@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.56 2002/09/20 11:17:55 fgsch Exp $
+#	$OpenBSD: GENERIC,v 1.62 2003/03/09 02:30:45 miod Exp $
 # 	$NetBSD: GENERIC,v 1.48 1997/08/23 19:19:01 mjacob Exp $
 
 # Machine architecture; required by config(8)
@@ -7,7 +7,7 @@ machine		sparc
 include "../../../conf/GENERIC"
 
 
-# Options for variants of the Sun SPARC architecure.
+# Options for variants of the Sun SPARC architecture.
 # At least one is required.
 option		SUN4		# sun4/100, sun4/200, sun4/300
 option		SUN4C		# sun4c - SS1, 1+, 2, ELC, SLC, IPC, IPX, etc.
@@ -146,6 +146,7 @@ esp*	at dma? flags 0xff0f				# depending on model
 
 #sun4c, sun4m
 isp*	at sbus? slot ? offset ?
+options ISP_COMPILE_1000_FW=1
 
 # sun4m Ethernet - an AMD 7990 LANCE behind
 # specialized DMA glue
@@ -174,7 +175,7 @@ ie2	at vmes0 addr 0xff31ff02 level 5 vect 0x76
 ie3	at vmes0 addr 0xff35ff02 level 5 vect 0x77
 ie4	at vmes0 addr 0xff2dff02 level 5 vect 0x7c
 
-# HappyMeal ethernet
+# HappyMeal ethernet (will not work on sun4c)
 hme*	at sbus? slot ? offset ?
 # Media Independent Interface (mii) drivers (required by hme)
 nsphy*	at mii? phy ?				# NS and compatible PHYs
@@ -268,6 +269,10 @@ wsdisplay* at cgfourteen?
 cgtwelve*	at sbus? slot ? offset ? flags 0x0000
 wsdisplay* at cgtwelve?
 
+# Sun "leo" (ZX) accelerated 24-bit framebuffer.
+zx*	at sbus? slot ? offset ?
+wsdisplay* at zx?
+
 # Vigra VS10 or VS12 framebuffer.
 vigra*	at sbus? slot ? offset ?
 wsdisplay* at vigra?
@@ -275,6 +280,14 @@ wsdisplay* at vigra?
 # Weitek p9100 found on Tadpole 3GS/3GX
 pnozz0	at sbus? slot ? offset ?
 wsdisplay* at pnozz?
+
+# Parallax XVideo and PowerVideo
+tvtwo* at sbus? slot ? offset ?
+wsdisplay* at tvtwo?
+
+# Fujitsu AG-10e framebuffer.
+agten* at sbus? slot ? offset ?
+wsdisplay* at agten?
 
 # Microcontroller found on Tadpole
 tctrl0	at obio0

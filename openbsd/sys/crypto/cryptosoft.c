@@ -1,4 +1,4 @@
-/*	$OpenBSD: cryptosoft.c,v 1.35 2002/04/26 08:43:50 deraadt Exp $	*/
+/*	$OpenBSD: cryptosoft.c,v 1.38 2003/02/21 20:33:35 jason Exp $	*/
 
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
@@ -612,6 +612,9 @@ swcr_newsession(u_int32_t *sid, struct cryptoini *cri)
 		case CRYPTO_RIJNDAEL128_CBC:
 			txf = &enc_xform_rijndael128;
 			goto enccommon;
+		case CRYPTO_NULL:
+			txf = &enc_xform_null;
+			goto enccommon;
 		enccommon:
 			txf->setkey(&((*swd)->sw_kschedule), cri->cri_key,
 			    cri->cri_klen / 8);
@@ -738,7 +741,6 @@ swcr_freesession(u_int64_t tid)
 	struct swcr_data *swd;
 	struct enc_xform *txf;
 	struct auth_hash *axf;
-	struct comp_algo *cxf;
 	u_int32_t sid = ((u_int32_t) tid) & 0xffffffff;
 
 	if (sid > swcr_sesnum || swcr_sessions == NULL ||
@@ -759,6 +761,7 @@ swcr_freesession(u_int64_t tid)
 		case CRYPTO_CAST_CBC:
 		case CRYPTO_SKIPJACK_CBC:
 		case CRYPTO_RIJNDAEL128_CBC:
+		case CRYPTO_NULL:
 			txf = swd->sw_exf;
 
 			if (swd->sw_kschedule)
@@ -800,10 +803,6 @@ swcr_freesession(u_int64_t tid)
 
 			if (swd->sw_ictx)
 				free(swd->sw_ictx, M_CRYPTO_DATA);
-			break;
-
-		case CRYPTO_DEFLATE_COMP:
-			cxf = swd->sw_cxf;
 			break;
 		}
 
@@ -873,6 +872,7 @@ swcr_process(struct cryptop *crp)
 		case CRYPTO_CAST_CBC:
 		case CRYPTO_SKIPJACK_CBC:
 		case CRYPTO_RIJNDAEL128_CBC:
+		case CRYPTO_NULL:
 			if ((crp->crp_etype = swcr_encdec(crd, sw,
 			    crp->crp_buf, type)) != 0)
 				goto done;
@@ -915,38 +915,34 @@ done:
 void
 swcr_init(void)
 {
-	swcr_id = crypto_get_driverid(CRYPTOCAP_F_SOFTWARE);
+	int algs[CRYPTO_ALGORITHM_MAX + 1];
+	int flags = CRYPTOCAP_F_SOFTWARE | CRYPTOCAP_F_ENCRYPT_MAC |
+	    CRYPTOCAP_F_MAC_ENCRYPT;
+
+	swcr_id = crypto_get_driverid(flags);
 	if (swcr_id < 0) {
 		/* This should never happen */
 		panic("Software crypto device cannot initialize!");
 	}
 
-	crypto_register(swcr_id, CRYPTO_DES_CBC, 0, 0, swcr_newsession,
+	bzero(algs, sizeof(algs));
+
+	algs[CRYPTO_DES_CBC] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_3DES_CBC] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_BLF_CBC] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_CAST_CBC] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_SKIPJACK_CBC] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_MD5_HMAC] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_SHA1_HMAC] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_RIPEMD160_HMAC] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_MD5_KPDK] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_SHA1_KPDK] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_MD5] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_SHA1] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_RIJNDAEL128_CBC] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_DEFLATE_COMP] = CRYPTO_ALG_FLAG_SUPPORTED;
+	algs[CRYPTO_NULL] = CRYPTO_ALG_FLAG_SUPPORTED;
+
+	crypto_register(swcr_id, algs, swcr_newsession,
 	    swcr_freesession, swcr_process);
-	crypto_register(swcr_id, CRYPTO_3DES_CBC, 0, 0,
-	    NULL, NULL, NULL);
-	crypto_register(swcr_id, CRYPTO_BLF_CBC, 0, 0,
-	    NULL, NULL, NULL);
-	crypto_register(swcr_id, CRYPTO_CAST_CBC, 0, 0,
-	    NULL, NULL, NULL);
-	crypto_register(swcr_id, CRYPTO_SKIPJACK_CBC, 0, 0,
-	    NULL, NULL, NULL);
-	crypto_register(swcr_id, CRYPTO_MD5_HMAC, 0, 0,
-	    NULL, NULL, NULL);
-	crypto_register(swcr_id, CRYPTO_SHA1_HMAC, 0, 0,
-	    NULL, NULL, NULL);
-	crypto_register(swcr_id, CRYPTO_RIPEMD160_HMAC, 0, 0,
-	    NULL, NULL, NULL);
-	crypto_register(swcr_id, CRYPTO_MD5_KPDK, 0, 0,
-	    NULL, NULL, NULL);
-	crypto_register(swcr_id, CRYPTO_SHA1_KPDK, 0, 0,
-	    NULL, NULL, NULL);
-	crypto_register(swcr_id, CRYPTO_MD5, 0, 0,
-	    NULL, NULL, NULL);
-	crypto_register(swcr_id, CRYPTO_SHA1, 0, 0,
-	    NULL, NULL, NULL);
-	crypto_register(swcr_id, CRYPTO_RIJNDAEL128_CBC, 0, 0,
-	    NULL, NULL, NULL);
-	crypto_register(swcr_id, CRYPTO_DEFLATE_COMP, 0, 0,
-	    NULL, NULL, NULL);
 }

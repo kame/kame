@@ -1,4 +1,4 @@
-# 	$OpenBSD: RAMDISK,v 1.17 2002/07/28 01:39:14 krw Exp $
+# 	$OpenBSD: RAMDISK,v 1.21 2003/02/12 20:54:45 jason Exp $
 
 # Machine architecture; required by config(8)
 machine		sparc64
@@ -20,7 +20,7 @@ option		DST=0		# daylight saving time used by RTC
 option		SMALL_KERNEL
 option		DIAGNOSTIC	# internal consistency checks
 option		FFS		# UFS
-#option		NFSCLIENT	# Network File System client
+option		NFSCLIENT	# Network File System client
 option		CD9660		# ISO 9660 + Rock Ridge file system
 option		INET		# IP + ICMP + TCP + UDP
 option		BOOT_CONFIG	# add support for boot -c
@@ -42,6 +42,7 @@ ebus*	at pci?
 
 hme*	at pci? dev ? function ?
 gem*	at pci? dev ? function ?
+#ti*	at pci? dev ? function ?
 dc*	at pci? dev ? function ?
 
 auxio*	at ebus?
@@ -85,10 +86,12 @@ dma*	at sbus? slot ? offset ?		# SBus
 esp*	at dma? flags 0x0000			# SBus
 esp*	at sbus? slot ? offset ?
 isp*	at sbus? slot ? offset ?
+option ISP_COMPILE_1000_FW=1
 scsibus* at esp?
 
 siop*	at pci? dev ? function ?
 isp*	at pci? dev ? function ?
+option ISP_COMPILE_FW=1
 scsibus*	at siop?
 
 scsibus*	at isp?

@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsi_base.c,v 1.37 2002/09/04 23:11:10 tdeval Exp $	*/
+/*	$OpenBSD: scsi_base.c,v 1.40 2003/02/20 04:02:06 krw Exp $	*/
 /*	$NetBSD: scsi_base.c,v 1.43 1997/04/02 02:29:36 mycroft Exp $	*/
 
 /*
@@ -132,9 +132,8 @@ scsi_get_xs(sc_link, flags)
  * If another process is waiting for an xs, do a wakeup, let it proceed
  */
 void 
-scsi_free_xs(xs, flags)
+scsi_free_xs(xs)
 	struct scsi_xfer *xs;
-	int flags;
 {
 	struct scsi_link *sc_link = xs->sc_link;
 
@@ -247,8 +246,9 @@ scsi_size(sc_link, flags)
  * Get scsi driver to send a "are you ready?" command
  */
 int 
-scsi_test_unit_ready(sc_link, flags)
+scsi_test_unit_ready(sc_link, retries, flags)
 	struct scsi_link *sc_link;
+	int retries;
 	int flags;
 {
 	struct scsi_test_unit_ready scsi_cmd;
@@ -257,7 +257,7 @@ scsi_test_unit_ready(sc_link, flags)
 	scsi_cmd.opcode = TEST_UNIT_READY;
 
 	return scsi_scsi_cmd(sc_link, (struct scsi_generic *) &scsi_cmd,
-	    sizeof(scsi_cmd), 0, 0, 5, 10000, NULL, flags);
+	    sizeof(scsi_cmd), 0, 0, retries, 10000, NULL, flags);
 }
 
 /*
@@ -309,6 +309,9 @@ scsi_prevent(sc_link, type, flags)
 	int type, flags;
 {
 	struct scsi_prevent scsi_cmd;
+
+	if (sc_link->quirks & ADEV_NODOORLOCK)
+		return 0;
 
 	bzero(&scsi_cmd, sizeof(scsi_cmd));
 	scsi_cmd.opcode = PREVENT_ALLOW;
@@ -368,7 +371,7 @@ scsi_done(xs)
 		scsi_user_done(xs); /* to take a copy of the sense etc. */
 		SC_DEBUG(sc_link, SDEV_DB3, ("returned from user done()\n "));
 
-		scsi_free_xs(xs, SCSI_NOSLEEP); /* restarts queue too */
+		scsi_free_xs(xs); /* restarts queue too */
 		SC_DEBUG(sc_link, SDEV_DB3, ("returning to adapter\n"));
 		return;
 	}
@@ -421,7 +424,7 @@ retry:
 		 */
 		(*sc_link->device->done)(xs);
 	}
-	scsi_free_xs(xs, SCSI_NOSLEEP);
+	scsi_free_xs(xs);
 	if (bp)
 		biodone(bp);
 }
@@ -531,7 +534,7 @@ scsi_scsi_cmd(sc_link, scsi_cmd, cmdlen, data_addr, datalen,
 	 * we have finished with the xfer stuct, free it and
 	 * check if anyone else needs to be started up.
 	 */
-	scsi_free_xs(xs, flags);
+	scsi_free_xs(xs);
 	splx(s);
 	return error;
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: dk.c,v 1.6 2002/03/15 18:19:52 millert Exp $	*/
+/*	$OpenBSD: dk.c,v 1.8 2003/01/14 19:32:23 mickey Exp $	*/
 
 /*
  * Copyright 1996 1995 by Open Software Foundation, Inc.   
@@ -66,24 +66,25 @@ dkopen(struct open_file *f, ...)
 
 	lp = dp->label;
 	st = NULL;
-#if 0	
+
 #ifdef DEBUG
 	if (debug)
 		printf ("disklabel\n");
-#endif
+
 	if ((st = dk_disklabel(dp, lp)) != NULL) {
 #ifdef DEBUG
 		if (debug)
 			printf ("dkopen: %s\n", st);
 #endif
-		return ERDLAB;
+		/* we do not know if it's a disk or net, but do not fail */
 	} else {
 		register u_int i;
 
 		i = B_PARTITION(dp->bootdev);
-		if (i >= lp->d_npartitions || !lp->d_partitions[i].p_size) {
+		if (i >= lp->d_npartitions || !lp->d_partitions[i].p_size)
 			return (EPART);
-		}
+
+		dp->fsoff = lp->d_partitions[i].p_offset;
 	}
 #endif
 #ifdef DEBUGBUG

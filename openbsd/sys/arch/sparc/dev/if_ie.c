@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ie.c,v 1.24 2002/04/30 01:12:29 art Exp $	*/
+/*	$OpenBSD: if_ie.c,v 1.26 2003/02/03 19:45:53 jason Exp $	*/
 /*	$NetBSD: if_ie.c,v 1.33 1997/07/29 17:55:38 fair Exp $	*/
 
 /*-
@@ -536,7 +536,7 @@ ieattach(parent, self, aux)
 		 */
 
 		ie_map = uvm_map_create(pmap_kernel(), (vaddr_t)IEOB_ADBASE,
-			(vaddr_t)IEOB_ADBASE + sc->sc_msize, 1);
+		    (vaddr_t)IEOB_ADBASE + sc->sc_msize, VM_MAP_INTRSAFE);
 		if (ie_map == NULL) panic("ie_map");
 		sc->sc_maddr = (caddr_t) uvm_km_alloc(ie_map, sc->sc_msize);
 		if (sc->sc_maddr == NULL) panic("ie kmem_alloc");
@@ -1444,7 +1444,12 @@ iestart(ifp)
 		  printf("%s: tbuf overflow\n", sc->sc_dev.dv_xname);
 
 		m_freem(m0);
-		len = max(len, ETHER_MIN_LEN);
+
+		if (len < ETHER_MIN_LEN - ETHER_CRC_LEN) {
+			bzero(buffer, ETHER_MIN_LEN - ETHER_CRC_LEN - len);
+			len = ETHER_MIN_LEN - ETHER_CRC_LEN;
+			buffer += ETHER_MIN_LEN - ETHER_CRC_LEN;
+		}
 		sc->xmit_buffs[sc->xchead]->ie_xmit_flags = SWAP(len);
 
 		sc->xmit_free--;
