@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.55 2004/04/06 12:19:54 suz Exp $	*/
+/*	$KAME: ip6.h,v 1.56 2004/04/26 05:13:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,6 +111,7 @@ struct ip6_hdr {
 #define IP6TOS_ECT		0x02	/* ECN-capable transport */
 #endif
 
+#ifdef _KERNEL
 /*
  * for IPv6 pseudo header checksum
  * XXX nonstandard
@@ -122,6 +123,7 @@ struct ip6_hdr_pseudo {
 	u_int8_t	ip6ph_zero[3];
 	u_int8_t	ip6ph_nxt;
 } __packed;
+#endif
 
 /*
  * Extension Headers
