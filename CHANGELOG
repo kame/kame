@@ -1,9 +1,9 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1722 2001/06/14 05:55:17 suz Exp $
+$KAME: CHANGELOG,v 1.1723 2001/06/14 06:12:54 suz Exp $
 
 <200106>
 Thu Jun 14 13:42:55 JST 2001	suz@sdl.hitachi.co.jp
-	* kame/sys/netinet6/ip6_mroute.h
+	* bsdi3/usr.sbin/netstat/mroute6.c
 	+ fixed a bug that bsdi3's "netstat -gn" does not display multicast 
 	I/F list due to a lack of NEW_STRUCT_ROUTE macro.
 
