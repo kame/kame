@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1236 2000/08/28 14:28:47 itojun Exp $
+$KAME: CHANGELOG,v 1.1237 2000/08/28 16:51:44 itojun Exp $
 
 <200008>
+Tue Aug 29 01:45:33 JST 2000  itojun@iijlab.net
+	* sys/netinet6/esp_core.c: experimental twofish/rijndael (AES
+	  candidate) support in kernel IPsec, based on
+	  draft-ietf-ipsec-ciph-aes-cbc-00.txt.  only either of them can be
+	  enabled.  by default, rijndael is used.  if you define
+	  IPSEC_ESP_TWOFISH in your kernel configuration file, twofish is used.
+	  (this is due to library namespace issue - we are using the sample
+	  code submitted to AES, and they use conflicting symbols)
+	  TODO: racoon support
+
 Mon Aug 28 23:22:59 JST 2000  itojun@iijlab.net
 	* sys/netinet6/esp_core.c: revisit ESP crypto algorithm handling.
 	  use block cipher code from esp_cbc_{en,de}crypt(), so that we can
