@@ -4,14 +4,14 @@
 PROG=	netstat
 SRCS=	atalk.c if.c inet.c iso.c main.c mbuf.c mroute.c ns.c route.c \
 	tp_astring.c unix.c mroute6.c
-SRCS+=	inet6.c ipsec.c
+SRCS+=	inet6.c
 .PATH:	${.CURDIR}/../../sys/netiso
 BINGRP=	kmem
 BINMODE=2555
 LDADD=	-lkvm
 DPADD=	${LIBKVM}
 CPPFLAGS+= -I${.CURDIR}/../../sys -I${.CURDIR}/../../include
-CPPFLAGS+= -DINET6 -DIPSEC
+CPPFLAGS+= -DINET6
 LDFLAGS+= -static
 
 CFLAGS+=	-g -Wall
@@ -23,6 +23,10 @@ LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
 DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
 	${.CURDIR}/../../lib/libinet6.obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
+
+CPPFLAGS+=-DIPSEC -I${.CURDIR}
+SRCS+=	ipsec.c
+.PATH:	${.CURDIR}/../../kame/netstat
 
 # KAME scope id hack
 CPPFLAGS+=-DKAME_SCOPEID
