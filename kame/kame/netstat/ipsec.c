@@ -89,8 +89,20 @@ __RCSID("$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $");
 #include <unistd.h>
 #include "netstat.h"
 
+/*
+ * portability issues:
+ * - bsdi3 uses PLURAL(), not plural().
+ * - freebsd2 can't print "unsigned long long" properly.
+ */
 #ifdef __bsdi__
 #define plural(x)	PLURAL(x)
+#endif
+#ifdef __FreeBSD__
+#define LLU	"%qu"
+#define CAST	u_quad_t
+#else
+#define LLU	"%llu"
+#define CAST	unsigned long long
 #endif
 
 #ifdef IPSEC
@@ -154,11 +166,11 @@ ipsec_hist(hist, histmax, name, namemax, title)
 			first = 0;
 		}
 		if (proto < namemax && name[proto]) {
-			printf("\t\t%s: %llu\n", name[proto],
-				(unsigned long long)hist[proto]);
+			printf("\t\t%s: " LLU "\n", name[proto],
+				(CAST)hist[proto]);
 		} else {
-			printf("\t\t#%d: %llu\n", proto,
-				(unsigned long long)hist[proto]);
+			printf("\t\t#%d: " LLU "\n", proto,
+				(CAST)hist[proto]);
 		}
 	}
 }
@@ -176,32 +188,32 @@ ipsec_stats(off, name)
 	kread(off, (char *)&ipsecstat, sizeof (ipsecstat));
 
 #define	p(f, m) if (ipsecstat.f || sflag <= 1) \
-    printf(m, (unsigned long long)ipsecstat.f, plural(ipsecstat.f))
+    printf(m, (CAST)ipsecstat.f, plural(ipsecstat.f))
 #define hist(f, n, t) \
     ipsec_hist((f), sizeof(f)/sizeof(f[0]), (n), sizeof(n)/sizeof(n[0]), (t));
 
-	p(in_success, "\t%llu inbound packet%s processed successfully\n");
-	p(in_polvio, "\t%llu inbound packet%s violated process security "
+	p(in_success, "\t" LLU " inbound packet%s processed successfully\n");
+	p(in_polvio, "\t" LLU " inbound packet%s violated process security "
 		"policy\n");
-	p(in_nosa, "\t%llu inbound packet%s with no SA available\n");
-	p(in_inval, "\t%llu invalid inbound packet%s\n");
-	p(in_nomem, "\t%llu inbound packet%s failed due to insufficient memory\n");
-	p(in_badspi, "\t%llu inbound packet%s failed getting SPI\n");
-	p(in_ahreplay, "\t%llu inbound packet%s failed on AH replay check\n");
-	p(in_espreplay, "\t%llu inbound packet%s failed on ESP replay check\n");
-	p(in_ahauthsucc, "\t%llu inbound packet%s considered authentic\n");
-	p(in_ahauthfail, "\t%llu inbound packet%s failed on authentication\n");
+	p(in_nosa, "\t" LLU " inbound packet%s with no SA available\n");
+	p(in_inval, "\t" LLU " invalid inbound packet%s\n");
+	p(in_nomem, "\t" LLU " inbound packet%s failed due to insufficient memory\n");
+	p(in_badspi, "\t" LLU " inbound packet%s failed getting SPI\n");
+	p(in_ahreplay, "\t" LLU " inbound packet%s failed on AH replay check\n");
+	p(in_espreplay, "\t" LLU " inbound packet%s failed on ESP replay check\n");
+	p(in_ahauthsucc, "\t" LLU " inbound packet%s considered authentic\n");
+	p(in_ahauthfail, "\t" LLU " inbound packet%s failed on authentication\n");
 	hist(ipsecstat.in_ahhist, ipsec_ahnames, "AH input");
 	hist(ipsecstat.in_esphist, ipsec_espnames, "ESP input");
 	hist(ipsecstat.in_comphist, ipsec_compnames, "IPComp input");
 
-	p(out_success, "\t%llu outbound packet%s processed successfully\n");
-	p(out_polvio, "\t%llu outbound packet%s violated process security "
+	p(out_success, "\t" LLU " outbound packet%s processed successfully\n");
+	p(out_polvio, "\t" LLU " outbound packet%s violated process security "
 		"policy\n");
-	p(out_nosa, "\t%llu outbound packet%s with no SA available\n");
-	p(out_inval, "\t%llu invalid outbound packet%s\n");
-	p(out_nomem, "\t%llu outbound packet%s failed due to insufficient memory\n");
-	p(out_noroute, "\t%llu outbound packet%s with no route\n");
+	p(out_nosa, "\t" LLU " outbound packet%s with no SA available\n");
+	p(out_inval, "\t" LLU " invalid outbound packet%s\n");
+	p(out_nomem, "\t" LLU " outbound packet%s failed due to insufficient memory\n");
+	p(out_noroute, "\t" LLU " outbound packet%s with no route\n");
 	hist(ipsecstat.out_ahhist, ipsec_ahnames, "AH output");
 	hist(ipsecstat.out_esphist, ipsec_espnames, "ESP output");
 	hist(ipsecstat.out_comphist, ipsec_compnames, "IPComp output");
@@ -237,11 +249,11 @@ pfkey_stats(off, name)
 	kread(off, (char *)&pfkeystat, sizeof(pfkeystat));
 
 #define	p(f, m) if (pfkeystat.f || sflag <= 1) \
-    printf(m, (unsigned long long)pfkeystat.f, plural(pfkeystat.f))
+    printf(m, (CAST)pfkeystat.f, plural(pfkeystat.f))
 
 	/* kernel -> userland */
-	p(out_total, "\t%llu request%s sent to userland\n");
-	p(out_bytes, "\t%llu byte%s sent to userland\n");
+	p(out_total, "\t" LLU " request%s sent to userland\n");
+	p(out_bytes, "\t" LLU " byte%s sent to userland\n");
 	for (first = 1, type = 0;
 	     type < sizeof(pfkeystat.out_msgtype)/sizeof(pfkeystat.out_msgtype[0]);
 	     type++) {
@@ -251,22 +263,22 @@ pfkey_stats(off, name)
 			printf("\thistogram by message type:\n");
 			first = 0;
 		}
-		printf("\t\t%s: %llu\n", pfkey_msgtype_names(type),
-			(unsigned long long)pfkeystat.out_msgtype[type]);
+		printf("\t\t%s: " LLU "\n", pfkey_msgtype_names(type),
+			(CAST)pfkeystat.out_msgtype[type]);
 	}
-	p(out_invlen, "\t%llu message%s with invalid length field\n");
-	p(out_invver, "\t%llu message%s with invalid version field\n");
-	p(out_invmsgtype, "\t%llu message%s with invalid message type field\n");
-	p(out_tooshort, "\t%llu message%s too short\n");
-	p(out_nomem, "\t%llu message%s with memory allocation failure\n");
-	p(out_dupext, "\t%llu message%s with duplicate extension\n");
-	p(out_invexttype, "\t%llu message%s with invalid extension type\n");
-	p(out_invsatype, "\t%llu message%s with invalid sa type\n");
-	p(out_invaddr, "\t%llu message%s with invalid address extension\n");
+	p(out_invlen, "\t" LLU " message%s with invalid length field\n");
+	p(out_invver, "\t" LLU " message%s with invalid version field\n");
+	p(out_invmsgtype, "\t" LLU " message%s with invalid message type field\n");
+	p(out_tooshort, "\t" LLU " message%s too short\n");
+	p(out_nomem, "\t" LLU " message%s with memory allocation failure\n");
+	p(out_dupext, "\t" LLU " message%s with duplicate extension\n");
+	p(out_invexttype, "\t" LLU " message%s with invalid extension type\n");
+	p(out_invsatype, "\t" LLU " message%s with invalid sa type\n");
+	p(out_invaddr, "\t" LLU " message%s with invalid address extension\n");
 
 	/* userland -> kernel */
-	p(in_total, "\t%llu request%s sent from userland\n");
-	p(in_bytes, "\t%llu byte%s sent from userland\n");
+	p(in_total, "\t" LLU " request%s sent from userland\n");
+	p(in_bytes, "\t" LLU " byte%s sent from userland\n");
 	for (first = 1, type = 0;
 	     type < sizeof(pfkeystat.in_msgtype)/sizeof(pfkeystat.in_msgtype[0]);
 	     type++) {
@@ -276,16 +288,16 @@ pfkey_stats(off, name)
 			printf("\thistogram by message type:\n");
 			first = 0;
 		}
-		printf("\t\t%s: %llu\n", pfkey_msgtype_names(type),
-			(unsigned long long)pfkeystat.in_msgtype[type]);
+		printf("\t\t%s: " LLU "\n", pfkey_msgtype_names(type),
+			(CAST)pfkeystat.in_msgtype[type]);
 	}
 	p(in_msgtarget[KEY_SENDUP_ONE],
-	    "\t%llu message%s toward single socket\n");
+	    "\t" LLU " message%s toward single socket\n");
 	p(in_msgtarget[KEY_SENDUP_ALL],
-	    "\t%llu message%s toward all sockets\n");
+	    "\t" LLU " message%s toward all sockets\n");
 	p(in_msgtarget[KEY_SENDUP_REGISTERED],
-	    "\t%llu message%s toward registered sockets\n");
-	p(in_nomem, "\t%llu message%s with memory allocation failure\n");
+	    "\t" LLU " message%s toward registered sockets\n");
+	p(in_nomem, "\t" LLU " message%s with memory allocation failure\n");
 #undef p
 }
 #endif /*IPSEC*/
