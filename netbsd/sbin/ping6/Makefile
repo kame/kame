@@ -2,7 +2,7 @@ PROG=	ping6
 MAN=	ping6.8
 
 CPPFLAGS+=-DINET6 -DIPSEC
-CFLAGS+=-Wall -Werror -Dlint
+#CFLAGS+=-Wall -Werror -Dlint -g
 
 BINOWN=	root
 BINGRP=	bin
