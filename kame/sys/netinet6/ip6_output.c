@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.446 2004/04/06 13:15:14 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.447 2004/04/21 13:22:23 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2366,6 +2366,9 @@ do { \
 			{
 				/* new advanced API (2292bis) */
 				u_char *optbuf;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				u_char optbuf_storage[MCLBYTES];
+#endif
 				int optlen;
 				struct ip6_pktopts **optp;
 
@@ -2376,44 +2379,17 @@ do { \
 				}
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-				/* privilege check before sooptcopyin() */
-				switch (optname) {
-				case IPV6_HOPOPTS:
-				case IPV6_DSTOPTS:
-				case IPV6_RTHDRDSTOPTS:
-				case IPV6_NEXTHOP:
-					if (!privileged)
-						error = EPERM;
-					break;
-				}
+				/*
+				 * We only ensure valsize is not too large
+				 * here.  Further validation will be done
+				 * later.
+				 */
+				error = sooptcopyin(sopt, optbuf_storage,
+				    sizeof(optbuf_storage), 0);
 				if (error)
 					break;
-
-				/* sanity check before memory allocation */
-				switch (optname) {
-				case IPV6_PKTINFO:
-					optlen = sizeof(struct in6_pktinfo);
-					break;
-				case IPV6_NEXTHOP:
-					optlen = SOCK_MAXADDRLEN;
-					break;
-				default:
-					optlen = IPV6_MAXOPTHDR;
-					break;
-				}
-				if (sopt->sopt_valsize > optlen) {
-					error = EINVAL;
-					break;
-				}
-
 				optlen = sopt->sopt_valsize;
-				optbuf = malloc(optlen, M_TEMP, M_WAITOK);
-				error = sooptcopyin(sopt, optbuf, optlen,
-				    optlen);
-				if (error) {
-					free(optbuf, M_TEMP);
-					break;
-				}
+				optbuf = optbuf_storage;
 #else  /* !fbsd3 */
 				if (m && m->m_next) {
 					error = EINVAL;	/* XXX */
@@ -2431,9 +2407,6 @@ do { \
 				error = ip6_pcbopt(optname,
 						   optbuf, optlen,
 						   optp, privileged, uproto);
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-				free(optbuf, M_TEMP);
-#endif
 				break;
 			}
 #undef OPTSET
