@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.114 2001/05/31 04:25:08 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.115 2001/05/31 08:18:58 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -939,7 +939,7 @@ rtpref(struct nd_defrouter *dr)
 	}
 	/* NOT REACH HERE */
 }
-#endf	/* RTPREF */
+#endif	/* RTPREF */
 
 static struct nd_defrouter *
 defrtrlist_update(new)
