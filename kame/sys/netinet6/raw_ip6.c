@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.109 2001/12/21 06:43:27 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.110 2001/12/21 07:54:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -626,10 +626,6 @@ rip6_ctloutput(op, so, level, optname, mp)
 	struct mbuf **mp;
 {
 	int error = 0;
-	int optval;
-	struct in6pcb *in6p;
-	struct mbuf *m;
-	const int icmp6off = offsetof(struct icmp6_hdr, icmp6_cksum);
 
 	switch (level) {
 	case IPPROTO_IPV6:
@@ -651,42 +647,7 @@ rip6_ctloutput(op, so, level, optname, mp)
 				error = EINVAL;
 			return (error);
 		case IPV6_CHECKSUM:
-			/*
-			 * for ICMPv6 sockets, no modification allowed for
-			 * checksum offset, permit "no change" values to
-			 * help existing apps.
-			 *
-			 * XXX 2292bis says: "An attempt to set IPV6_CHECKSUM
-			 * for an ICMPv6 socket will fail."
-			 * The current behavior does not meet 2292bis.
-			 */
-			in6p = sotoin6pcb(so);
-			error = 0;
-			if (op == PRCO_SETOPT) {
-				m = *mp;
-				if (m && m->m_len == sizeof(int)) {
-					optval = *mtod(m, int *);
-					if (so->so_proto->pr_protocol ==
-					    IPPROTO_ICMPV6) {
-						if (optval != icmp6off)
-							error = EINVAL;
-					} else
-						in6p->in6p_cksum = optval;
-				} else
-					error = EINVAL;
-				if (m)
-					m_free(m);
-			} else if (op == PRCO_GETOPT) {
-				if (so->so_proto->pr_protocol == IPPROTO_ICMPV6)
-					optval = icmp6off;
-				else
-					optval = in6p->in6p_cksum;
-				*mp = m = m_get(M_WAIT, MT_SOOPTS);
-				m->m_len = sizeof(int);
-				*mtod(m, int *) = optval;
-			} else
-				error = EINVAL;
-			return error;
+			return(ip6_raw_ctloutput(op, so, level, optname, mp));
 		default:
 			return (ip6_ctloutput(op, so, level, optname, mp));
 		}
