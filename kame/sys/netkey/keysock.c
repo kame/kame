@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.18 2000/05/11 17:02:30 itojun Exp $	*/
+/*	$KAME: keysock.c,v 1.19 2000/05/12 13:10:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,7 +77,6 @@
 
 struct sockaddr key_dst = { 2, PF_KEY, };
 struct sockaddr key_src = { 2, PF_KEY, };
-struct sockproto key_proto = { PF_KEY, PF_KEY_V2 };
 
 static int key_sendup0 __P((struct rawcb *, struct mbuf *, int));
 
@@ -357,7 +356,7 @@ key_sendup(so, msg, len, target)
 	/*
 	 * Get mbuf chain whenever possible (not clusters),
 	 * to save socket buffer.  We'll be generating many SADB_ACQUIRE
-	 * messages to listening key sockets.  If we simmply allocate clusters,
+	 * messages to listening key sockets.  If we simply allocate clusters,
 	 * sbappendaddr() will raise ENOBUFS due to too little sbspace().
 	 * sbspace() computes # of actual data bytes AND mbuf region.
 	 *
