@@ -248,7 +248,7 @@ form_ether()
 		ether->ether_dhost[5] = ip->ip6_dst.s6_addr[15];
 	}		
 
-	cksum6();
+	cksum6(sizeof(struct ether_header));
 }
 
 static void
@@ -258,4 +258,6 @@ form_null()
 
 	af = (u_int *)buf;
 	*af = AF_INET6;
+
+	cksum6(sizeof(*af));
 }

@@ -42,7 +42,7 @@ int debug;
 static u_short in_cksum __P((u_short *, u_short *, int));
 
 void
-cksum6()
+cksum6(int linkhdrlen)
 {
 	int len = 0;
 	int off, nh;
@@ -55,7 +55,7 @@ cksum6()
 	struct udphdr *udp;
 	struct icmp6_hdr *icmp;
 	struct ip6_rthdr0 *rh0;
-	u_char *packet = (u_char *)(buf) + sizeof(struct ether_header);
+	u_char *packet = (u_char *)(buf) + linkhdrlen;
 	u_char nxt = packet[6];
 	
 	ip = (struct ip6_hdr *)packet;

@@ -69,4 +69,4 @@ extern u_char buf[];
 
 extern int getconfig __P((char *, u_char *));
 /* cksum.c */
-extern void cksum6 __P((void));
+extern void cksum6 __P((int));
