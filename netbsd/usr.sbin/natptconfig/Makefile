@@ -5,7 +5,7 @@ SRCS=	main.c natptconfig.y.c natptconfig.l.c misc.c show.c yylex.c showsubs.c
 
 MAN=	natptconfig.8
 
-CPPFLAGS+=	-I. -DYYDEBUG -DreadKMEM
+CPPFLAGS+=	-I. -I${SRCDIR} -DYYDEBUG -DreadKMEM
 CFLAGS+=	-g -Wall
 CLEANFILES+=	natptconfig.y.c natptconfig.y.h natptconfig.l.c
 
