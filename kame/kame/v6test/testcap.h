@@ -35,7 +35,7 @@ __BEGIN_DECLS
 
 extern int tgetent __P((char *, const char *));
 extern int tgetflag __P((const char *, char *));
-extern int tgetnum __P((const char *, char *, int*));
+extern int tgetnum __P((const char *, char *, int *, int));
 extern char *tgetstr __P((const char *, char **, char *));
 
 __END_DECLS

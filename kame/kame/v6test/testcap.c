@@ -175,7 +175,7 @@ getent(char *bp, const char *name, char *cp)
 				break;
 			}
 			if (cp >= bp+TESTBUFSIZ) {
-				write(2,"Remcap entry too long\n", 23);
+				fprintf(stderr, "Remcap entry too long\n");
 				break;
 			} else
 				*cp++ = c;
@@ -337,11 +337,27 @@ nexthdr(char **bufp)
  * Note that we handle octal numbers beginning with 0.
  */
 int
-tgetnum(const char *id, char *pbuf, int *ptr)
+tgetnum(const char *id, char *pbuf, int *ptr, int size)
 {
 	register long int i;
 	register int base;
 	register char *bp = pbuf;
+	int64_t maxval;
+
+	switch(size) {
+	case 1:
+		maxval = 0xff;
+		break;
+	case 2:
+		maxval = 0xffff;
+		break;
+	case 4:
+		maxval = 0xffffffff;
+		break;
+	default:
+		fprintf(stderr, "unknown size of variable: %d\n", size);
+		return(-1);
+	}
 
 	for (;;) {
 		bp = tskip(bp);
@@ -361,6 +377,10 @@ tgetnum(const char *id, char *pbuf, int *ptr)
 		i = 0;
 		while (isdigit(*bp))
 			i *= base, i += *bp++ - '0';
+		if (i > maxval) {
+			fprintf(stderr, "too big value: %i\n", i);
+			return(-1);
+		}
 		*ptr = i;
 		return (0);
 	}

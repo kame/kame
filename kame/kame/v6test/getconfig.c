@@ -32,7 +32,7 @@
 #define MUSTHAVE(var, cap, pb)	\
     {								\
 	int t;							\
-	if (tgetnum(cap,pb,&t) < 0) {				\
+	if (tgetnum(cap, pb, &t, sizeof(var)) < 0) {		\
 		fprintf(stderr, "v6test: need %s\n", cap);	\
 		exit(1);					\
 	}							\
@@ -42,7 +42,7 @@
 #define MAYHAVE(var, cap, def, pb)			\
      {							\
 	int t;						\
-	if (tgetnum(cap,pb,&t) < 0) 			\
+	if (tgetnum(cap, pb, &t, sizeof(var)) < 0) 	\
 		t = def;				\
 	var = t;					\
      }
@@ -131,6 +131,7 @@ make_ip6(char *name)
 	char val8;
 	short val16;
 	long val32;		/* XXX */
+	int val;
 	extern char *optsrc, *optdst;
 	extern struct in6_addr *optsrcn, *optdstn;
 
@@ -148,7 +149,7 @@ make_ip6(char *name)
 		     "IPv6 version traffic class must be between 0 and 255");
 	ip6->ip6_vfc |= (val32 >> 4) & 0x0f;
 	*(&ip6->ip6_vfc + 1) |= (val32 & 0x0f) << 4; /* XXX: ugly... */
-	if (tgetnum("ip6_plen", ip6buf, (int *) &val16) < 0) {
+	if (tgetnum("ip6_plen", ip6buf, &val, sizeof(val16)) < 0) {
 		if ((addr = tgetstr("ip6_plen", &bp, ip6buf)) &&
 		    strcmp(addr, "auto") == 0)
 			ip6plenauto = 1;
@@ -157,9 +158,9 @@ make_ip6(char *name)
 			exit(1);
 		}
 	} else
-		ip6->ip6_plen = (u_int16_t)val16;
+		ip6->ip6_plen = val;
 	HTONS(ip6->ip6_plen);
-	if (tgetnum("ip6_nxt", ip6buf, (int *)&val8) < 0) {
+	if (tgetnum("ip6_nxt", ip6buf, &val, sizeof(val8)) < 0) {
 		if ((addr = tgetstr("ip6_nxt", &bp, ip6buf)) &&
 		    strcmp(addr, "auto") == 0)
 			nxthdrp = &ip6->ip6_nxt;
@@ -168,7 +169,7 @@ make_ip6(char *name)
 			exit(1);
 		}
 	} else
-		ip6->ip6_nxt = (u_int8_t)val8;
+		ip6->ip6_nxt = val;
 	MAYHAVE(val16, "ip6_hlim", 64, ip6buf);
 	ip6->ip6_hlim = (u_char)val16;
 	if (optsrcn)
@@ -1057,9 +1058,9 @@ make_raw(char *name)
 	 * fulfills next header field in previous option only when raw_proto
 	 * is specified
 	 */
-	tgetnum("raw_proto", rawbuf, &val);
+	tgetnum("raw_proto", rawbuf, &val, sizeof(u_int8_t));
 	if (nxthdrp && val >= 0)
-		*nxthdrp = (uint8_t) (val & 0xff);
+		*nxthdrp = val;
 	nxthdrp = 0;
 	if ((upper_data = tgetstr("raw_data", &bp, rawbuf)) != NULL) {
 		gethex(upper_data);
