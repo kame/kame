@@ -832,7 +832,7 @@ routename6(sa6)
 	if (nflag)
 		flag |= NI_NUMERICHOST;
 
-	getnameinfo((struct sockaddr *)sa6_local, sa6_local->sin6_len,
+	getnameinfo((struct sockaddr *)&sa6_local, sa6_local.sin6_len,
 		    line, sizeof(line), NULL, 0, flag);
 
 	return line;
