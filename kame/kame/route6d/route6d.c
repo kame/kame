@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.13 2000/02/25 06:15:05 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.14 2000/02/25 06:15:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$Id: route6d.c,v 1.13 2000/02/25 06:15:05 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.14 2000/02/25 06:15:57 itojun Exp $";
 #endif
 
 #include <stdio.h>
