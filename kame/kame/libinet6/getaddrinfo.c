@@ -815,7 +815,7 @@ explore_numeric_scope(pai, hostname, servname, res)
 	if (cp == NULL)
 		return explore_numeric(pai, hostname, servname, res);
 
-#if 1
+#if 0
 	/*
 	 * Handle special case of <scope id><delimiter><scoped_address>
 	 */

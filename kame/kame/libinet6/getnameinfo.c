@@ -246,7 +246,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 				if (scopelen + 1 + numaddrlen + 1 > hostlen)
 					return ENI_MEMORY;
 
-#if 1
+#if 0
 				/*
 				 * construct <scopeid><delim><numeric-addr>
 				 */
