@@ -1513,6 +1513,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_HOPOPTS:
 			case IPV6_RTHDR:
 			case IPV6_DSTOPTS:
+			case IPV6_RTHDRDSTOPTS:
 				if (optlen == sizeof(int)) {
 					/* RFC 2292 */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
