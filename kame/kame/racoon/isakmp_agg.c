@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.8 2000/01/11 15:56:03 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.9 2000/01/12 15:09:05 itojun Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -219,7 +219,7 @@ agg_i2recv(iph1, msg)
 
 	iph1->pl_hash = NULL;
 
-	/* SA paylad is fixed postion */
+	/* SA payload is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_SA) {
 		plog(logp, LOCATION, iph1->remote,
 			"received invalid next payload type %d, "
@@ -447,7 +447,7 @@ agg_r1recv(iph1, msg)
 		goto end;
 	pa = (struct isakmp_parse_t *)pbuf->v;
 
-	/* SA paylad is fixed postion */
+	/* SA payload is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_SA) {
 		plog(logp, LOCATION, iph1->remote,
 			"received invalid next payload type %d, "

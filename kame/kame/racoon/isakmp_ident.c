@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.9 2000/01/11 15:56:03 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.10 2000/01/12 15:09:06 itojun Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -194,7 +194,7 @@ ident_i2recv(iph1, msg)
 		goto end;
 	pa = (struct isakmp_parse_t *)pbuf->v;
 
-	/* SA paylad is fixed postion */
+	/* SA payload is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_SA) {
 		plog(logp, LOCATION, iph1->remote,
 			"received invalid next payload type %d, "
@@ -652,7 +652,7 @@ ident_r1recv(iph1, msg)
 		goto end;
 	pa = (struct isakmp_parse_t *)pbuf->v;
 
-	/* check the position of SA paylad */
+	/* check the position of SA payload */
 	if (pa->type != ISAKMP_NPTYPE_SA) {
 		plog(logp, LOCATION, iph1->remote,
 			"received invalid next payload type %d, "

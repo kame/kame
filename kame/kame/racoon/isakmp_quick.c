@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.15 2000/01/11 22:26:13 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.16 2000/01/12 15:09:06 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -322,7 +322,7 @@ quick_i2recv(iph2, msg0)
 		goto end;
 	pa = (struct isakmp_parse_t *)pbuf->v;
 
-	/* HASH paylad is fixed postion */
+	/* HASH payload is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_HASH) {
 		plog(logp, LOCATION, iph2->ph1->remote,
 			"received invalid next payload type %d, "
@@ -339,7 +339,7 @@ quick_i2recv(iph2, msg0)
 	 * we do not check this for backward compatibility.
 	 * TODO: command line/config file option to enable/disable this code
 	 */
-	/* HASH paylad is fixed postion */
+	/* HASH payload is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_SA) {
 		plog(logp, LOCATION, iph2->ph1->remote,
 			"received invalid next payload type %d, "
@@ -848,7 +848,7 @@ quick_r1recv(iph2, msg0)
 		goto end;
 	pa = (struct isakmp_parse_t *)pbuf->v;
 
-	/* HASH paylad is fixed postion */
+	/* HASH payload is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_HASH) {
 		plog(logp, LOCATION, iph2->ph1->remote,
 			"received invalid next payload type %d, "
@@ -866,7 +866,7 @@ quick_r1recv(iph2, msg0)
 	 * we do not check this for backward compatibility.
 	 * TODO: command line/config file option to enable/disable this code
 	 */
-	/* HASH paylad is fixed postion */
+	/* HASH payload is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_SA) {
 		plog(logp, LOCATION, iph2->ph1->remote,
 			"received invalid next payload type %d, "
