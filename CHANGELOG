@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1997 2001/12/03 13:47:10 jinmei Exp $
+$KAME: CHANGELOG,v 1.1998 2001/12/04 01:15:19 itojun Exp $
 
 <200112>
+Tue Dec  4 10:14:02 JST 2001  itojun@iijlab.net
+	* libinet6/name6.c: on IPv6 reverse name lookup, query ip6.arpa
+	  then ip6.int (both using nibble format).
+
 2001-12-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* netbsd/sys/netinet/tcp_subr.c (ipsec4_hdrsiz_tcp): corrected
 	IP+TCP headers to calculate the header size.
