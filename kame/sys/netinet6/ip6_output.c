@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.124 2000/08/22 07:31:25 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.125 2000/10/02 04:55:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3257,8 +3257,9 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 
 		case IPV6_2292DSTOPTS:
 		case IPV6_DSTOPTS:
+		case IPV6_RTHDRDSTOPTS:
 		{
-			struct ip6_dest *dest;
+			struct ip6_dest *dest, **newdest;
 			int destlen;
 
 			if (cm->cmsg_len < CMSG_LEN(sizeof(struct ip6_dest)))
@@ -3269,28 +3270,44 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 				return(EINVAL);
 
 			/*
-			 * If there is no routing header yet, the destination
-			 * options header should be put on the 1st part.
-			 * Otherwise, the header should be on the 2nd part.
-			 * (See RFC 2460, section 4.1)
+			 * Determine the position that the destination options
+			 * header should be inserted; before or after the
+			 * routing header.
 			 */
-			if (opt->ip6po_rthdr == NULL) {
-				if (needcopy) {
-					opt->ip6po_dest1 =
-						malloc(destlen, M_IP6OPT,
-						       M_WAITOK);
-					bcopy(dest, opt->ip6po_dest1, destlen);
-				} else
-					opt->ip6po_dest1 = dest;
-			} else {
-				if (needcopy) {
-					opt->ip6po_dest2 =
-						malloc(destlen, M_IP6OPT,
-						       M_WAITOK);
-					bcopy(dest, opt->ip6po_dest2, destlen);
-				} else
-					opt->ip6po_dest2 = dest;
+			switch(cm->cmsg_type) {
+			case IPV6_2292DSTOPTS:
+				/* 
+				 * The old advacned API is ambiguous on this
+				 * point. Our approach is to determine the
+				 * position based according to the existence
+				 * of a routing header. Note, however, that
+				 * this depends on the order of the extension
+				 * headers in the ancillary data; the 1st part
+				 * of the destination options header must
+				 * appear before the routing header in the
+				 * ancillary data, too.
+				 * RFC2292bis solved the ambiguity by
+				 * introducing separate cmsg types.
+				 */
+				if (opt->ip6po_rthdr == NULL)
+					newdest = &opt->ip6po_dest1;
+				else
+					newdest = &opt->ip6po_dest2;
+				break;
+			case IPV6_RTHDRDSTOPTS:
+				newdest = &opt->ip6po_dest1;
+				break;
+			case IPV6_DSTOPTS:
+				newdest = &opt->ip6po_dest2;
+				break;
 			}
+
+			if (needcopy) {
+				*newdest = malloc(destlen, M_IP6OPT, M_WAITOK);
+				bcopy(dest, *newdest, destlen);
+			} else
+				*newdest = dest;
+
 			break;
 		}
 
