@@ -1,4 +1,4 @@
-/*	$KAME: db.h,v 1.17 2001/08/02 15:54:49 itojun Exp $	*/
+/*	$KAME: db.h,v 1.18 2001/08/21 12:34:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -44,10 +44,6 @@ struct qcache {
 	enum nstype type;	/* mcast or unicast */
 };
 
-struct acache {
-	LIST_ENTRY(acache) link;
-};
-
 struct scache {
 	LIST_ENTRY(scache) link;
 	struct timeval tts;	/* time to send */
@@ -84,9 +80,6 @@ struct sockdb {
 };
 
 extern LIST_HEAD(qchead, qcache) qcache;
-#if 0
-extern LIST_HEAD(achead, acache) acache;
-#endif
 extern LIST_HEAD(schead, scache) scache;
 extern LIST_HEAD(nshead, nsdb) nsdb;
 extern LIST_HEAD(sockhead, sockdb) sockdb;

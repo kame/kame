@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.13 2001/08/02 15:54:49 itojun Exp $	*/
+/*	$KAME: db.c,v 1.14 2001/08/21 12:34:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -50,9 +50,6 @@
 #include "db.h"
 
 struct qchead qcache;
-#if 0
-struct achead acache;
-#endif
 struct schead scache;
 struct nshead nsdb;
 struct sockhead sockdb;
