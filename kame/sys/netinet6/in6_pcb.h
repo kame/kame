@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.31 2000/07/12 13:50:42 itojun Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.32 2000/07/24 00:16:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -136,7 +136,8 @@ struct	in6pcb {
 #define IN6P_RFC2292		0x40000000 /* used RFC2292 API on the socket */
 
 #define IN6P_CONTROLOPTS	(IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_HOPOPTS|\
-				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS)
+				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS|\
+				 IN6P_RFC2292)
 
 #define IN6PLOOKUP_WILDCARD	1
 #define IN6PLOOKUP_SETLOCAL	2

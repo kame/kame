@@ -240,10 +240,12 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define	IN6P_RTHDRDSTOPTS	0x200000 /* receive dstoptions before rthdr */
 #define	IN6P_BINDV6ONLY		0x400000 /* do not grab IPv4 traffic */
 #define IN6P_MINMTU		0x20000000 /* use minimum MTU */
+#define IN6P_RFC2292		0x40000000 /* used RFC2292 API on the socket */
 #define	INP_CONTROLOPTS		(INP_RECVOPTS|INP_RECVRETOPTS|INP_RECVDSTADDR|\
 					INP_RECVIF|\
 				 IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_HOPOPTS|\
-				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS)
+				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS|\
+				 IN6P_RFC2292)
 #define	INP_UNMAPPABLEOPTS	(IN6P_HOPOPTS|IN6P_DSTOPTS|IN6P_RTHDR)
 
  /* for KAME src sync over BSD*'s */
