@@ -1,4 +1,4 @@
-.\"	$KAME: bindtest.1,v 1.11 2001/06/25 06:42:37 itojun Exp $
+.\"	$KAME: bindtest.1,v 1.12 2001/06/25 17:51:25 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -134,7 +134,21 @@ With
 .Fl s ,
 .Nm
 generates summarized output instead of verbose output.
-Here are legends for summarized output.
+Here is a sample output, and the legends for summarized output.
+.Pp
+.Ds
+starting tests, socktype = SOCK_DGRAM
+        wild4   wild6   loop4   loop6   wildm   loopm   onem    one4
+wild4:  x       o[---]  x       o[-2-]  ?2(49)  ?2(49)  ?2(49)  ?2(49)
+wild6:  o[---]  x       o[-2-]  x       ?2(49)  ?2(49)  ?2(49)  ?2(49)
+loop4:  x       o[1--]  x       o[12-]  ?2(49)  ?2(49)  ?2(49)  ?2(49)
+loop6:  o[1--]  x       o[12-]  x       ?2(49)  ?2(49)  ?2(49)  ?2(49)
+wildm:  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)
+loopm:  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)
+onem:   ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)
+one4:   ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)  ?1(49)
+.De
+.Pp
 .Nm
 will make a two set of
 .Xr socket 2
@@ -148,6 +162,32 @@ The second
 .Xr bind 2
 attempt was successful after the first
 .Xr bind 2 .
+.Dq o
+is followed by three letters enclosed in square brackets.
+First letter shows the test result after
+.Xr sendto 2
+to the first socket address
+.Pq listed on the topmost row .
+Second letter shows the test result after
+.Xr sendto 2
+to the second socket address
+.Pq listed on the leftmost column .
+.Bl -tag -width "xxxx"
+.It -
+The address is wildcard
+.Po
+.Li ::
+or
+.Li 0.0.0.0
+.Pc
+and no attempts were made to test send/recv behavior.
+.It 1
+The first socket received the packet.
+.It 2
+The second socket received the packet.
+.It b
+Both sockets received the packet.
+.El
 .It x
 .Xr bind 2
 failed for the second set, with
@@ -158,19 +198,31 @@ failed for the first set.
 Normally you will not see this, unless you run
 .Nm
 on IPv4-only/IPv6-only kernel.
+Will be followed by
+.Xr errno 2
+in paren.
 .It !2
 .Xr socket 2
 failed for the second set.
 Normally you will not see this, unless you run
 .Nm
 on IPv4-only/IPv6-only kernel.
+Will be followed by
+.Xr errno 2
+in paren.
 .It ?1
 .Xr bind 2
 failed for the first set.
+Will be followed by
+.Xr errno 2
+in paren.
 .It ?2
 .Xr bind 2
 failed for the second set, with some error other than
 .Dv EADDRINUSE .
+Will be followed by
+.Xr errno 2
+in paren.
 .El
 .Pp
 With
