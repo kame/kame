@@ -369,8 +369,6 @@ ifa_ifwithaddr(addr)
 	    for (ifa = ifp->if_addrlist.tqh_first; ifa != 0; ifa = ifa->ifa_list.tqe_next) {
 		if (ifa->ifa_addr->sa_family != addr->sa_family)
 			continue;
-		if (ifa->ifa_dstaddr == NULL)
-			continue;
 		if (equal(addr, ifa->ifa_addr))
 			return (ifa);
 		if ((ifp->if_flags & IFF_BROADCAST) && ifa->ifa_broadaddr &&
