@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1147 2000/07/24 00:34:27 itojun Exp $
+$Id: CHANGELOG,v 1.1148 2000/07/24 14:39:18 itojun Exp $
 
 <200006>
+Mon Jul 24 23:34:26 JST 2000  itojun@iijlab.net
+	* *bsd*/usr.bin/telnet/commands.c: do not use IPV6_PKTOPTIONS in
+	  2292bis API environment.  IPv6 source route is temporarily disabled.
+	* libinet6/if_nameindex.c: malloc length computation bug.  from kjc.
+
 Mon Jul 24 09:31:25 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6.h: try to provide binary backward compatibility for
 	  RFC2292 API, deployed into freebsd40/netbsd15/openbsd27.
