@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.44 2000/08/24 04:50:27 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.45 2000/08/24 05:14:36 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2026,6 +2026,9 @@ oakley_newiv2(iph1, msgid)
 	/* compute IV */
 	if ((newivm->iv = oakley_hash(buf, iph1)) == NULL)
 		goto end;
+
+	/* adjust length of iv */
+	newivm->iv->l = CBC_BLOCKLEN;
 
 	/* create buffer to save new iv */
 	if ((newivm->ive = vdup(newivm->iv)) == NULL
