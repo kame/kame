@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.895 2000/05/17 17:18:22 sumikawa Exp $
+$Id: CHANGELOG,v 1.896 2000/05/17 17:20:02 itojun Exp $
 
 <200005>
 Wed May 17 23:58:14 JST 2000  itojun@iijlab.net
-	* {netbsd/pkgsrc, freebsd3/ports}/net/{libpcap,tcpdump}: use 5/15
+	* {netbsd/pkgsrc, freebsd[23]/ports}/net/{libpcap,tcpdump}: use 5/15
 	  weekly snap.
 
 Wed May 17 21:50:27 JST 2000 sakane@ydc.co.jp
