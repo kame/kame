@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2543 2004/02/06 11:56:36 suz Exp $
+$KAME: CHANGELOG,v 1.2544 2004/02/13 03:06:25 keiichi Exp $
 
 <200402>
+Fri Feb 13 12:03:32 JST 2004	keiichi@iij.ad.jp
+	draft-ietf-mip6-mipext-advapi-00 support.
+
 2004-02-06  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* freebsd[45]/sys/kern/sysv_shm.c: 
 	  FreeBSD Security Advisory: FreeBSD-SA-04:02.shmat
