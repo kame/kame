@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.84 2004/01/16 02:24:56 itojun Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.85 2004/09/10 04:39:36 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -677,6 +677,9 @@ isakmp_info_send_common(iph1, payload, np, flags)
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(iph2->sendbuf, iph1->local, iph1->remote, 1);
 #endif
+
+	plog(LLV_DEBUG, LOCATION, NULL, "outgoing packet dump\n");
+	plogdump(LLV_DEBUG, iph2->sendbuf->v, iph2->sendbuf->l);
 
 	/* encoding */
 	if (ISSET(isakmp->flags, ISAKMP_FLAG_E)) {
