@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.15 2000/04/24 21:01:25 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.16 2000/04/24 21:13:54 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -227,8 +227,9 @@ base_i2recv(iph1, msg)
 			}
 			break;
 		case ISAKMP_NPTYPE_VID:
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n");
+			YIPSDEBUG(DEBUG_NOTIFY,
+				plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Vendor ID.\n"));
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
 			break;
 		default:
@@ -382,8 +383,9 @@ base_i3recv(iph1, msg)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_VID:
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n");
+			YIPSDEBUG(DEBUG_NOTIFY,
+				plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Vendor ID.\n"));
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
 			break;
 		default:
@@ -522,8 +524,9 @@ base_r1recv(iph1, msg)
 			}
 			break;
 		case ISAKMP_NPTYPE_VID:
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n");
+			YIPSDEBUG(DEBUG_NOTIFY,
+				plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Vendor ID.\n"));
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
 			break;
 		default:
@@ -704,8 +707,9 @@ base_r2recv(iph1, msg)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_VID:
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n");
+			YIPSDEBUG(DEBUG_NOTIFY,
+				plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Vendor ID.\n"));
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
 			break;
 		default:

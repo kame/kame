@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_newg.c,v 1.1 2000/01/09 01:31:26 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_newg.c,v 1.2 2000/04/24 21:13:54 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -116,8 +116,9 @@ isakmp_newgroup_r(iph1, msg)
 			sa = (struct isakmp_pl_sa *)pa->ptr;
 			break;
 		case ISAKMP_NPTYPE_VID:
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n");
+			YIPSDEBUG(DEBUG_NOTIFY,
+				plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Vendor ID.\n"));
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
 			break;
 		default:

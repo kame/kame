@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.22 2000/04/24 21:01:25 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.23 2000/04/24 21:13:54 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -251,8 +251,9 @@ agg_i2recv(iph1, msg)
 			break;
 		case ISAKMP_NPTYPE_CR:
 			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Certificate Request.\n");
+			YIPSDEBUG(DEBUG_NOTIFY,
+				plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Certificate Request.\n"));
 			break;
 		case ISAKMP_NPTYPE_CERT:
 			if (oakley_savecert(iph1, pa->ptr) < 0)
@@ -263,13 +264,15 @@ agg_i2recv(iph1, msg)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_VID:
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n");
+			YIPSDEBUG(DEBUG_NOTIFY,
+				plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Vendor ID.\n"));
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
 			break;
 		case ISAKMP_NPTYPE_N:
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Notify Message.\n");
+			YIPSDEBUG(DEBUG_NOTIFY,
+				plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Notify Message.\n"));
 			isakmp_check_notify(pa->ptr, iph1);
 			break;
 		default:
@@ -535,14 +538,16 @@ agg_r1recv(iph1, msg)
 			}
 			break;
 		case ISAKMP_NPTYPE_VID:
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n");
+			YIPSDEBUG(DEBUG_NOTIFY,
+				plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Vendor ID.\n"));
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
 			break;
 		case ISAKMP_NPTYPE_CR:
 			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Certificate Request.\n");
+			YIPSDEBUG(DEBUG_NOTIFY,
+				plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Certificate Request.\n"));
 			break;
 		default:
 			/* don't send information, see isakmp_ident_r1() */
@@ -835,8 +840,9 @@ agg_r2recv(iph1, msg0)
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
 		case ISAKMP_NPTYPE_VID:
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n");
+			YIPSDEBUG(DEBUG_NOTIFY,
+				plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Vendor ID.\n"));
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
 			break;
 		case ISAKMP_NPTYPE_CERT:
@@ -848,8 +854,9 @@ agg_r2recv(iph1, msg0)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_N:
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Notify Message.\n");
+			YIPSDEBUG(DEBUG_NOTIFY,
+				plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Notify Message.\n"));
 			isakmp_check_notify(pa->ptr, iph1);
 			break;
 		default:

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.29 2000/04/24 07:37:43 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.30 2000/04/24 21:13:54 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1104,7 +1104,9 @@ oakley_validate_auth(iph1)
 			return ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
 		}
 
-		plog(logp, LOCATION, NULL, "HASH for PSK validated.\n");
+		YIPSDEBUG(DEBUG_MISC,
+			plog(logp, LOCATION, NULL,
+				"HASH for PSK validated.\n"));
 	    }
 		break;
 #ifdef HAVE_SIGNING_C
