@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2727 2005/03/01 03:30:42 suz Exp $
+$KAME: CHANGELOG,v 1.2728 2005/03/02 03:06:34 ryuji Exp $
 
 <200503>
+2005-03-01  ryuji <ryuji@sfc.wide.ad.jp>
+	* "mdd" is replaced by "babymdd". please see man page for details.
+
 2005-03-01  SUZUKI, Shinsuke <suz@kame.net>
 	* integrated dhcp6lc functionality into dhcp6c ('i' option)
 
