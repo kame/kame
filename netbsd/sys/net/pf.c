@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf.c,v 1.360 2003/05/18 19:58:56 henning Exp $ */
+/*	$OpenBSD: pf.c,v 1.369 2003/06/24 13:55:13 henning Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -92,6 +92,7 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
+#include <netinet6/nd6.h>
 #endif /* INET6 */
 
 #ifdef ALTQ
@@ -157,7 +158,7 @@ void			 pf_change_icmp(struct pf_addr *, u_int16_t *,
 void			 pf_send_tcp(const struct pf_rule *, sa_family_t,
 			    const struct pf_addr *, const struct pf_addr *,
 			    u_int16_t, u_int16_t, u_int32_t, u_int32_t,
-			    u_int8_t, u_int16_t, u_int8_t);
+			    u_int8_t, u_int16_t, u_int16_t, u_int8_t);
 void			 pf_send_icmp(struct mbuf *, u_int8_t, u_int8_t,
 			    sa_family_t, struct pf_rule *);
 struct pf_rule		*pf_match_translation(int, struct ifnet *, u_int8_t,
@@ -205,8 +206,6 @@ struct pf_tag		*pf_get_tag(struct mbuf *);
 int			 pf_match_tag(struct mbuf *, struct pf_rule *,
 			     struct pf_rule *, struct pf_rule *,
 			     struct pf_tag *, int *);
-int			 pf_tag_packet(struct mbuf *, struct pf_tag *,
-			     int);
 
 #ifdef INET6
 void			 pf_poolmask(struct pf_addr *, struct pf_addr*,
@@ -230,6 +229,10 @@ int			 pf_socket_lookup(uid_t *, gid_t *, int, sa_family_t,
 			    int, struct pf_pdesc *);
 u_int8_t		 pf_get_wscale(struct mbuf *, int, u_int16_t,
 			    sa_family_t);
+u_int16_t		 pf_get_mss(struct mbuf *, int, u_int16_t,
+			    sa_family_t);
+u_int16_t		 pf_calc_mss(struct pf_addr *, sa_family_t,
+				u_int16_t);
 int			 pf_check_proto_cksum(struct mbuf *, int, int,
 			    u_int8_t, sa_family_t);
 
@@ -525,6 +528,7 @@ pf_purge_expired_states(void)
 				    cur->state->lan.port,
 				    cur->state->src.seqhi,
 				    cur->state->src.seqlo + 1,
+					0,
 				    TH_RST|TH_ACK, 0, 0);
 			RB_REMOVE(pf_state_tree, &tree_ext_gwy, cur);
 
@@ -1125,11 +1129,11 @@ void
 pf_send_tcp(const struct pf_rule *r, sa_family_t af,
     const struct pf_addr *saddr, const struct pf_addr *daddr,
     u_int16_t sport, u_int16_t dport, u_int32_t seq, u_int32_t ack,
-    u_int8_t flags, u_int16_t win, u_int8_t ttl)
+    u_int8_t flags, u_int16_t win, u_int16_t mss, u_int8_t ttl)
 {
 	struct mbuf	*m;
 	struct m_tag	*mtag;
-	int		 len;
+	int		 len, tlen;
 #ifdef INET
 	struct ip	*h;
 #endif /* INET */
@@ -1137,16 +1141,22 @@ pf_send_tcp(const struct pf_rule *r, sa_family_t af,
 	struct ip6_hdr	*h6;
 #endif /* INET6 */
 	struct tcphdr	*th;
+	char *opt;
+
+	/* maximum segment size tcp option */
+	tlen = sizeof(struct tcphdr);
+	if (mss)
+		tlen += 4;
 
 	switch (af) {
 #ifdef INET
 	case AF_INET:
-		len = sizeof(struct ip) + sizeof(struct tcphdr);
+		len = sizeof(struct ip) + tlen;
 		break;
 #endif /* INET */
 #ifdef INET6
 	case AF_INET6:
-		len = sizeof(struct ip6_hdr) + sizeof(struct tcphdr);
+		len = sizeof(struct ip6_hdr) + tlen;
 		break;
 #endif /* INET6 */
 	}
@@ -1187,7 +1197,7 @@ pf_send_tcp(const struct pf_rule *r, sa_family_t af,
 
 		/* IP header fields included in the TCP checksum */
 		h->ip_p = IPPROTO_TCP;
-		h->ip_len = htons(sizeof(*th));
+		h->ip_len = htons(tlen);
 		h->ip_src.s_addr = saddr->v4.s_addr;
 		h->ip_dst.s_addr = daddr->v4.s_addr;
 
@@ -1200,7 +1210,7 @@ pf_send_tcp(const struct pf_rule *r, sa_family_t af,
 
 		/* IP header fields included in the TCP checksum */
 		h6->ip6_nxt = IPPROTO_TCP;
-		h6->ip6_plen = htons(sizeof(*th));
+		h6->ip6_plen = htons(tlen);
 		memcpy(&h6->ip6_src, &saddr->v6, sizeof(struct in6_addr));
 		memcpy(&h6->ip6_dst, &daddr->v6, sizeof(struct in6_addr));
 
@@ -1214,9 +1224,17 @@ pf_send_tcp(const struct pf_rule *r, sa_family_t af,
 	th->th_dport = dport;
 	th->th_seq = htonl(seq);
 	th->th_ack = htonl(ack);
-	th->th_off = sizeof(*th) >> 2;
+	th->th_off = tlen >> 2;
 	th->th_flags = flags;
 	th->th_win = htons(win);
+
+	if (mss) {
+		opt = (char *)(th + 1);
+		opt[0] = TCPOPT_MAXSEG;
+		opt[1] = 4;
+		HTONS(mss);
+		bcopy((caddr_t)&mss, (caddr_t)(opt + 2), 2);
+	}
 
 	switch (af) {
 #ifdef INET
@@ -1240,7 +1258,7 @@ pf_send_tcp(const struct pf_rule *r, sa_family_t af,
 	case AF_INET6:
 		/* TCP checksum */
 		th->th_sum = in6_cksum(m, IPPROTO_TCP,
-		    sizeof(struct ip6_hdr), sizeof(*th));
+		    sizeof(struct ip6_hdr), tlen);
 
 		h6->ip6_vfc |= IPV6_VERSION;
 		h6->ip6_hlim = IPV6_DEFHLIM;
@@ -1706,26 +1724,21 @@ pf_get_sport(sa_family_t af, u_int8_t proto, struct pf_pool *rpool,
 			key.port[1] = 0;
 			if (pf_find_state(&tree_ext_gwy, &key) == NULL)
 				return (0);
-		} else if (rpool->opts & PF_POOL_STATICPORT) {
-			key.port[1] = *nport;
-			if (pf_find_state(&tree_ext_gwy, &key) == NULL)
-				return (0);
 		} else if (low == 0 && high == 0) {
 			key.port[1] = *nport;
 			if (pf_find_state(&tree_ext_gwy, &key) == NULL) {
-				NTOHS(*nport);
 				return (0);
 			}
 		} else if (low == high) {
 			key.port[1] = htons(low);
 			if (pf_find_state(&tree_ext_gwy, &key) == NULL) {
-				*nport = low;
+				*nport = htons(low);
 				return (0);
 			}
 		} else {
-			if (low > high) {
-				u_int16_t tmp;
+			u_int16_t tmp;
 
+			if (low > high) {
 				tmp = low;
 				low = high;
 				high = tmp;
@@ -1733,15 +1746,21 @@ pf_get_sport(sa_family_t af, u_int8_t proto, struct pf_pool *rpool,
 			/* low < high */
 			cut = arc4random() % (1 + high - low) + low;
 			/* low <= cut <= high */
-			for (*nport = cut; *nport <= high; ++(*nport)) {
-				key.port[1] = htons(*nport);
-				if (pf_find_state(&tree_ext_gwy, &key) == NULL)
+			for (tmp = cut; tmp <= high; ++(tmp)) {
+				key.port[1] = htons(tmp);
+				if (pf_find_state(&tree_ext_gwy, &key) ==
+				    NULL) {
+					*nport = htons(tmp);
 					return (0);
+				}
 			}
-			for (*nport = cut - 1; *nport >= low; --(*nport)) {
-				key.port[1] = htons(*nport);
-				if (pf_find_state(&tree_ext_gwy, &key) == NULL)
+			for (tmp = cut - 1; tmp >= low; --(tmp)) {
+				key.port[1] = htons(tmp);
+				if (pf_find_state(&tree_ext_gwy, &key) ==
+				    NULL) {
+					*nport = htons(tmp);
 					return (0);
+				}
 			}
 		}
 
@@ -2065,6 +2084,102 @@ pf_get_wscale(struct mbuf *m, int off, u_int16_t th_off, sa_family_t af)
 	return (wscale);
 }
 
+u_int16_t
+pf_get_mss(struct mbuf *m, int off, u_int16_t th_off, sa_family_t af)
+{
+	int		 hlen;
+	u_int8_t	 hdr[60];
+	u_int8_t	*opt, optlen;
+	u_int16_t	 mss = tcp_mssdflt;
+
+	hlen = th_off << 2;	/* hlen <= sizeof(hdr) */
+	if (hlen <= sizeof(struct tcphdr))
+		return (0);
+	if (!pf_pull_hdr(m, off, hdr, hlen, NULL, NULL, af))
+		return (0);
+	opt = hdr + sizeof(struct tcphdr);
+	hlen -= sizeof(struct tcphdr);
+	while (hlen >= TCPOLEN_MAXSEG) {
+		switch (*opt) {
+		case TCPOPT_EOL:
+		case TCPOPT_NOP:
+			++opt;
+			--hlen;
+			break;
+		case TCPOPT_MAXSEG:
+			bcopy((caddr_t)(opt + 2), (caddr_t)&mss, 2);
+			/* fallthrough */
+		default:
+			optlen = opt[1];
+			if (optlen < 2)
+				optlen = 2;
+			hlen -= optlen;
+			opt += optlen;
+		}
+	}
+	return (mss);
+}
+
+u_int16_t
+pf_calc_mss(struct pf_addr *addr, sa_family_t af, u_int16_t offer)
+{
+#ifdef INET
+	struct sockaddr_in	*dst;
+	struct route		 ro;
+#endif /* INET */
+#ifdef INET6
+	struct sockaddr_in6	*dst6;
+	struct route_in6	 ro6;
+#endif /* INET6 */
+	struct rtentry		*rt = NULL;
+	int			 hlen;
+	u_int16_t		 mss = tcp_mssdflt;
+
+	switch (af) {
+#ifdef INET
+	case AF_INET:
+		hlen = sizeof(struct ip);
+		bzero(&ro, sizeof(ro));
+		dst = (struct sockaddr_in *)&ro.ro_dst;
+		dst->sin_family = AF_INET;
+		dst->sin_len = sizeof(*dst);
+		dst->sin_addr = addr->v4;
+#ifdef __OpenBSD__
+		rtalloc_noclone(&ro, NO_CLONING);
+#else
+		rtalloc(&ro);
+#endif
+		rt = ro.ro_rt;
+		break;
+#endif /* INET */
+#ifdef INET6
+	case AF_INET6:
+		hlen = sizeof(struct ip6_hdr);
+		bzero(&ro6, sizeof(ro6));
+		dst6 = (struct sockaddr_in6 *)&ro6.ro_dst;
+		dst6->sin6_family = AF_INET6;
+		dst6->sin6_len = sizeof(*dst6);
+		dst6->sin6_addr = addr->v6;
+#ifdef __OpenBSD__
+		rtalloc_noclone((struct route *)&ro6, NO_CLONING);
+#else
+		rtalloc((struct route *)&ro6);
+#endif
+		rt = ro6.ro_rt;
+		break;
+#endif /* INET6 */
+	}
+
+	if (rt && rt->rt_ifp) {
+		mss = rt->rt_ifp->if_mtu - hlen - sizeof(struct tcphdr);
+		mss = max(tcp_mssdflt, mss);
+		RTFREE(rt);
+	}
+	mss = min(mss, offer);
+	mss = max(mss, 64);		/* sanity - at least max opt space */
+	return (mss);
+}
+
 int
 pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
     struct ifnet *ifp, struct mbuf *m, int ipoff, int off, void *h,
@@ -2085,6 +2200,7 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 	int			 rewrite = 0;
 	struct pf_tag		*pftag = NULL;
 	int			 tag = -1;
+	u_int16_t		 mss = tcp_mssdflt;
 
 	if (direction == PF_OUT) {
 		bport = nport = th->th_sport;
@@ -2216,7 +2332,7 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 				ack++;
 			pf_send_tcp(r, af, pd->dst,
 			    pd->src, th->th_dport, th->th_sport,
-			    ntohl(th->th_ack), ack, TH_RST|TH_ACK, 0,
+			    ntohl(th->th_ack), ack, TH_RST|TH_ACK, 0, 0,
 			    r->return_ttl);
 		} else if ((af == AF_INET) && r->return_icmp)
 			pf_send_icmp(m, r->return_icmp >> 8,
@@ -2326,8 +2442,8 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		s->creation = time.tv_sec;
 		s->expire = time.tv_sec;
 		s->timeout = PFTM_TCP_FIRST_PACKET;
-		s->packets = 1;
-		s->bytes = pd->tot_len;
+		s->packets[0] = 1;
+		s->bytes[0] = pd->tot_len;
 
 		if ((pd->flags & PFDESC_TCP_NORM) && pf_normalize_tcp_init(m,
 		    off, pd, th, &s->src, &s->dst)) {
@@ -2361,9 +2477,14 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 				    pd->ip_sum, &th->th_sum, &baddr,
 				    bport, 0, af);
 			s->src.seqhi = arc4random();
+			/* Find mss option */
+			mss = pf_get_mss(m, off, th->th_off, af);
+			mss = pf_calc_mss(saddr, af, mss);
+			mss = pf_calc_mss(daddr, af, mss);
+			s->src.mss = mss;
 			pf_send_tcp(r, af, daddr, saddr, th->th_dport,
 			    th->th_sport, s->src.seqhi,
-			    ntohl(th->th_seq) + 1, TH_SYN|TH_ACK, 0, 0);
+			    ntohl(th->th_seq) + 1, TH_SYN|TH_ACK, 0, s->src.mss, 0);
 			return (PF_SYNPROXY_DROP);
 		}
 	}
@@ -2592,8 +2713,8 @@ pf_test_udp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		s->creation = time.tv_sec;
 		s->expire = time.tv_sec;
 		s->timeout = PFTM_UDP_FIRST_PACKET;
-		s->packets = 1;
-		s->bytes = pd->tot_len;
+		s->packets[0] = 1;
+		s->bytes[0] = pd->tot_len;
 		if (pf_insert_state(s)) {
 			REASON_SET(&reason, PFRES_MEMORY);
 			pool_put(&pf_state_pl, s);
@@ -2841,8 +2962,8 @@ pf_test_icmp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		s->creation = time.tv_sec;
 		s->expire = time.tv_sec;
 		s->timeout = PFTM_ICMP_FIRST_PACKET;
-		s->packets = 1;
-		s->bytes = pd->tot_len;
+		s->packets[0] = 1;
+		s->bytes[0] = pd->tot_len;
 		if (pf_insert_state(s)) {
 			REASON_SET(&reason, PFRES_MEMORY);
 			pool_put(&pf_state_pl, s);
@@ -3073,8 +3194,8 @@ pf_test_other(struct pf_rule **rm, struct pf_state **sm, int direction,
 		s->creation = time.tv_sec;
 		s->expire = time.tv_sec;
 		s->timeout = PFTM_OTHER_FIRST_PACKET;
-		s->packets = 1;
-		s->bytes = pd->tot_len;
+		s->packets[0] = 1;
+		s->bytes[0] = pd->tot_len;
 		if (pf_insert_state(s)) {
 			REASON_SET(&reason, PFRES_MEMORY);
 			if (r->log)
@@ -3178,7 +3299,7 @@ pf_test_state_tcp(struct pf_state **state, int direction, struct ifnet *ifp,
 	u_int16_t		 win = ntohs(th->th_win);
 	u_int32_t		 ack, end, seq;
 	u_int8_t		 sws, dws;
-	int			 ackskew;
+	int			 ackskew, dirndx;
 	int			 copyback = 0;
 	struct pf_state_peer	*src, *dst;
 
@@ -3194,9 +3315,11 @@ pf_test_state_tcp(struct pf_state **state, int direction, struct ifnet *ifp,
 	if (direction == (*state)->direction) {
 		src = &(*state)->src;
 		dst = &(*state)->dst;
+		dirndx = 0;
 	} else {
 		src = &(*state)->dst;
 		dst = &(*state)->src;
+		dirndx = 1;
 	}
 
 	if ((*state)->src.state == PF_TCPS_PROXY_SRC) {
@@ -3208,7 +3331,7 @@ pf_test_state_tcp(struct pf_state **state, int direction, struct ifnet *ifp,
 			pf_send_tcp((*state)->rule.ptr, pd->af, pd->dst,
 			    pd->src, th->th_dport, th->th_sport,
 			    (*state)->src.seqhi, ntohl(th->th_seq) + 1,
-			    TH_SYN|TH_ACK, 0, 0);
+			    TH_SYN|TH_ACK, 0, (*state)->src.mss, 0);
 			return (PF_SYNPROXY_DROP);
 		} else if (!(th->th_flags & TH_ACK) ||
 		    (ntohl(th->th_ack) != (*state)->src.seqhi + 1) ||
@@ -3237,7 +3360,7 @@ pf_test_state_tcp(struct pf_state **state, int direction, struct ifnet *ifp,
 				(*state)->dst.seqhi = arc4random();
 			pf_send_tcp((*state)->rule.ptr, pd->af, &src->addr,
 			    &dst->addr, src->port, dst->port,
-			    (*state)->dst.seqhi, 0, TH_SYN, 0, 0);
+			    (*state)->dst.seqhi, 0, TH_SYN, 0, (*state)->src.mss, 0);
 			return (PF_SYNPROXY_DROP);
 		} else if (((th->th_flags & (TH_SYN|TH_ACK)) !=
 		    (TH_SYN|TH_ACK)) ||
@@ -3249,11 +3372,11 @@ pf_test_state_tcp(struct pf_state **state, int direction, struct ifnet *ifp,
 			pf_send_tcp((*state)->rule.ptr, pd->af, pd->dst,
 			    pd->src, th->th_dport, th->th_sport,
 			    ntohl(th->th_ack), ntohl(th->th_seq) + 1,
-			    TH_ACK, (*state)->src.max_win, 0);
+			    TH_ACK, (*state)->src.max_win, 0, 0);
 			pf_send_tcp((*state)->rule.ptr, pd->af, &src->addr,
 			    &dst->addr, src->port, dst->port,
 			    (*state)->src.seqhi + 1, (*state)->src.seqlo + 1,
-			    TH_ACK, (*state)->dst.max_win, 0);
+			    TH_ACK, (*state)->dst.max_win, 0, 0);
 			(*state)->src.seqdiff = (*state)->dst.seqhi -
 			    (*state)->src.seqlo;
 			(*state)->dst.seqdiff = (*state)->src.seqhi -
@@ -3391,11 +3514,11 @@ pf_test_state_tcp(struct pf_state **state, int direction, struct ifnet *ifp,
 	    /* Retrans: not more than one window back */
 	    (ackskew >= -MAXACKWINDOW) &&
 	    /* Acking not more than one reassembled fragment backwards */
-	    (ackskew <= (MAXACKWINDOW << dws))) {
+	    (ackskew <= (MAXACKWINDOW << sws))) {
 	    /* Acking not more than one window forward */
 
-		(*state)->packets++;
-		(*state)->bytes += pd->tot_len;
+		(*state)->packets[dirndx]++;
+		(*state)->bytes[dirndx] += pd->tot_len;
 
 		/* update max window */
 		if (src->max_win < win)
@@ -3476,12 +3599,13 @@ pf_test_state_tcp(struct pf_state **state, int direction, struct ifnet *ifp,
 			printf("pf: loose state match: ");
 			pf_print_state(*state);
 			pf_print_flags(th->th_flags);
-			printf(" seq=%u ack=%u len=%u ackskew=%d pkts=%d\n",
-			    seq, ack, pd->p_len, ackskew, (*state)->packets);
+			printf(" seq=%u ack=%u len=%u ackskew=%d pkts=%d:%d\n",
+			    seq, ack, pd->p_len, ackskew,
+			    (*state)->packets[0], (*state)->packets[1]);
 		}
 
-		(*state)->packets++;
-		(*state)->bytes += pd->tot_len;
+		(*state)->packets[dirndx]++;
+		(*state)->bytes[dirndx] += pd->tot_len;
 
 		/* update max window */
 		if (src->max_win < win)
@@ -3520,7 +3644,7 @@ pf_test_state_tcp(struct pf_state **state, int direction, struct ifnet *ifp,
 				pf_send_tcp((*state)->rule.ptr, pd->af,
 				    pd->dst, pd->src, th->th_dport,
 				    th->th_sport, ntohl(th->th_ack), ack,
-				    TH_RST|TH_ACK, 0,
+				    TH_RST|TH_ACK, 0, 0,
 				    (*state)->rule.ptr->return_ttl);
 			}
 			src->seqlo = 0;
@@ -3530,9 +3654,9 @@ pf_test_state_tcp(struct pf_state **state, int direction, struct ifnet *ifp,
 			printf("pf: BAD state: ");
 			pf_print_state(*state);
 			pf_print_flags(th->th_flags);
-			printf(" seq=%u ack=%u len=%u ackskew=%d pkts=%d "
+			printf(" seq=%u ack=%u len=%u ackskew=%d pkts=%d:%d "
 			    "dir=%s,%s\n", seq, ack, pd->p_len, ackskew,
-			    ++(*state)->packets,
+			    (*state)->packets[0], (*state)->packets[1],
 			    direction == PF_IN ? "in" : "out",
 			    direction == (*state)->direction ? "fwd" : "rev");
 			printf("pf: State failure on: %c %c %c %c | %c %c\n",
@@ -3540,7 +3664,7 @@ pf_test_state_tcp(struct pf_state **state, int direction, struct ifnet *ifp,
 			    SEQ_GEQ(seq, src->seqlo - (dst->max_win << dws)) ?
 			    ' ': '2',
 			    (ackskew >= -MAXACKWINDOW) ? ' ' : '3',
-			    (ackskew <= MAXACKWINDOW) ? ' ' : '4',
+			    (ackskew <= (MAXACKWINDOW << sws)) ? ' ' : '4',
 			    SEQ_GEQ(src->seqhi + MAXACKWINDOW, end) ?' ' :'5',
 			    SEQ_GEQ(seq, src->seqlo - MAXACKWINDOW) ?' ' :'6');
 		}
@@ -3591,6 +3715,7 @@ pf_test_state_udp(struct pf_state **state, int direction, struct ifnet *ifp,
 	struct pf_state_peer	*src, *dst;
 	struct pf_tree_node	 key;
 	struct udphdr		*uh = pd->hdr.udp;
+	int			dirndx;
 
 	key.af = pd->af;
 	key.proto = IPPROTO_UDP;
@@ -3604,13 +3729,15 @@ pf_test_state_udp(struct pf_state **state, int direction, struct ifnet *ifp,
 	if (direction == (*state)->direction) {
 		src = &(*state)->src;
 		dst = &(*state)->dst;
+		dirndx = 0;
 	} else {
 		src = &(*state)->dst;
 		dst = &(*state)->src;
+		dirndx = 1;
 	}
 
-	(*state)->packets++;
-	(*state)->bytes += pd->tot_len;
+	(*state)->packets[dirndx]++;
+	(*state)->bytes[dirndx] += pd->tot_len;
 
 	/* update states */
 	if (src->state < PFUDPS_SINGLE)
@@ -3658,7 +3785,7 @@ pf_test_state_icmp(struct pf_state **state, int direction, struct ifnet *ifp,
 	struct pf_addr	*saddr = pd->src, *daddr = pd->dst;
 	u_int16_t	 icmpid, *icmpsum;
 	u_int8_t	 icmptype;
-	int		 state_icmp = 0;
+	int		 state_icmp = 0, dirndx;
 
 	switch (pd->proto) {
 #ifdef INET
@@ -3707,8 +3834,9 @@ pf_test_state_icmp(struct pf_state **state, int direction, struct ifnet *ifp,
 
 		STATE_LOOKUP();
 
-		(*state)->packets++;
-		(*state)->bytes += pd->tot_len;
+		dirndx = (direction == (*state)->direction) ? 0 : 1;
+		(*state)->packets[dirndx]++;
+		(*state)->bytes[dirndx] += pd->tot_len;
 		(*state)->expire = time.tv_sec;
 		(*state)->timeout = PFTM_ICMP_ERROR_REPLY;
 
@@ -3911,7 +4039,12 @@ pf_test_state_icmp(struct pf_state **state, int direction, struct ifnet *ifp,
 			if (!SEQ_GEQ(src->seqhi, seq) ||
 			    !SEQ_GEQ(seq, src->seqlo - (dst->max_win << dws))) {
 				if (pf_status.debug >= PF_DEBUG_MISC) {
-					printf("pf: BAD ICMP state: ");
+					printf("pf: BAD ICMP %d:%d ",
+					    icmptype, pd->hdr.icmp->icmp_code);
+					pf_print_host(pd->src, 0, pd->af);
+					printf(" -> ");
+					pf_print_host(pd->dst, 0, pd->af);
+					printf(" state: ");
 					pf_print_state(*state);
 					printf(" seq=%u\n", seq);
 				}
@@ -4176,6 +4309,7 @@ pf_test_state_other(struct pf_state **state, int direction, struct ifnet *ifp,
 {
 	struct pf_state_peer	*src, *dst;
 	struct pf_tree_node	 key;
+	int			dirndx;
 
 	key.af = pd->af;
 	key.proto = pd->proto;
@@ -4189,13 +4323,15 @@ pf_test_state_other(struct pf_state **state, int direction, struct ifnet *ifp,
 	if (direction == (*state)->direction) {
 		src = &(*state)->src;
 		dst = &(*state)->dst;
+		dirndx = 0;
 	} else {
 		src = &(*state)->dst;
 		dst = &(*state)->src;
+		dirndx = 1;
 	}
 
-	(*state)->packets++;
-	(*state)->bytes += pd->tot_len;
+	(*state)->packets[dirndx]++;
+	(*state)->bytes[dirndx] += pd->tot_len;
 
 	/* update states */
 	if (src->state < PFOTHERS_SINGLE)
@@ -4450,9 +4586,24 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 	if (ip->ip_len <= ifp->if_mtu) {
 		ip->ip_len = htons((u_int16_t)ip->ip_len);
 		ip->ip_off = htons((u_int16_t)ip->ip_off);
+#ifdef __OpenBSD__
+		if ((ifp->if_capabilities & IFCAP_CSUM_IPv4) &&
+		    ifp->if_bridge == NULL) {
+			m0->m_pkthdr.csum |= M_IPV4_CSUM_OUT;
+			ipstat.ips_outhwcsum++;
+		} else {
+			ip->ip_sum = 0;
+			ip->ip_sum = in_cksum(m0, ip->ip_hl << 2);
+		}
+		/* Update relevant hardware checksum stats for TCP/UDP */
+		if (m0->m_pkthdr.csum & M_TCPV4_CSUM_OUT)
+			tcpstat.tcps_outhwcsum++;
+		else if (m0->m_pkthdr.csum & M_UDPV4_CSUM_OUT)
+			udpstat.udps_outhwcsum++;
+#else
 		ip->ip_sum = 0;
 		ip->ip_sum = in_cksum(m0, ip->ip_hl << 2);
-		/* Update relevant hardware checksum stats for TCP/UDP */
+#endif
 		error = (*ifp->if_output)(ifp, m0, sintosa(dst), NULL);
 		goto done;
 	}
@@ -4617,9 +4768,10 @@ pf_route6(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 	 * If the packet is too large for the outgoing interface,
 	 * send back an icmp6 error.
 	 */
+	if (IN6_IS_ADDR_LINKLOCAL(&dst->sin6_addr))
+		dst->sin6_addr.s6_addr16[1] = htons(ifp->if_index);
 	if ((u_long)m0->m_pkthdr.len <= ifp->if_mtu) {
-		error = (*ifp->if_output)(ifp, m0, (struct sockaddr *)dst,
-		    NULL);
+		error = nd6_output(ifp, ifp, m0, dst, NULL);
 	} else {
 		in6_ifstat_inc(ifp, ifs6_in_toobig);
 		if (r->rt != PF_DUPTO)
@@ -4800,6 +4952,7 @@ pf_test(int dir, struct ifnet *ifp, struct mbuf **m0)
 		goto done;
 	}
 
+	memset(&pd, 0, sizeof(pd));
 	pd.src = (struct pf_addr *)&h->ip_src;
 	pd.dst = (struct pf_addr *)&h->ip_dst;
 	pd.ip_sum = &h->ip_sum;
@@ -5009,6 +5162,7 @@ pf_test6(int dir, struct ifnet *ifp, struct mbuf **m0)
 	m = *m0;
 	h = mtod(m, struct ip6_hdr *);
 
+	memset(&pd, 0, sizeof(pd));
 	pd.src = (struct pf_addr *)&h->ip6_src;
 	pd.dst = (struct pf_addr *)&h->ip6_dst;
 	pd.ip_sum = NULL;

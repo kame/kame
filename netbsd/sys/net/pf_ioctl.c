@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf_ioctl.c,v 1.65 2003/05/14 01:39:51 frantzen Exp $ */
+/*	$OpenBSD: pf_ioctl.c,v 1.70 2003/06/23 02:33:39 cedric Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -85,15 +85,9 @@ struct pf_pool		*pf_get_pool(char *, char *, u_int32_t,
 			    u_int8_t, u_int8_t, u_int8_t, u_int8_t, u_int8_t);
 int			 pf_get_ruleset_number(u_int8_t);
 void			 pf_init_ruleset(struct pf_ruleset *);
-struct pf_anchor	*pf_find_anchor(const char *);
-struct pf_ruleset	*pf_find_ruleset(char *, char *);
-struct pf_ruleset	*pf_find_or_create_ruleset(char *, char *);
-void			 pf_remove_if_empty_ruleset(struct pf_ruleset *);
 void			 pf_mv_pool(struct pf_palist *, struct pf_palist *);
 void			 pf_empty_pool(struct pf_palist *);
 int			 pfioctl(dev_t, u_long, caddr_t, int, struct proc *);
-u_int16_t		 pf_tagname2tag(char *);
-void			 pf_tag_unref(u_int16_t);
 void			 pf_tag_purge(void);
 
 #ifdef __OpenBSD__
@@ -375,7 +369,7 @@ pf_remove_if_empty_ruleset(struct pf_ruleset *ruleset)
 	struct pf_anchor	*anchor;
 	int			 i;
 
-	if (ruleset == NULL || ruleset->anchor == NULL)
+	if (ruleset == NULL || ruleset->anchor == NULL || ruleset->tables > 0)
 		return;
 	for (i = 0; i < PF_RULESET_MAX; ++i)
 		if (!TAILQ_EMPTY(ruleset->rules[i].active.ptr) ||
@@ -419,6 +413,15 @@ void
 pf_rm_rule(struct pf_rulequeue *rulequeue, struct pf_rule *rule)
 {
 	if (rulequeue != NULL) {
+		if (rule->states <= 0) {
+			/*
+			 * XXX - we need to remove the table *before* detaching
+			 * the rule to make sure the table code does not delete
+			 * the anchor under our feet.
+			 */
+			pf_tbladdr_remove(&rule->src.addr);
+			pf_tbladdr_remove(&rule->dst.addr);
+		}
 		TAILQ_REMOVE(rulequeue, rule, entries);
 		rule->entries.tqe_prev = NULL;
 		rule->nr = -1;
@@ -429,8 +432,10 @@ pf_rm_rule(struct pf_rulequeue *rulequeue, struct pf_rule *rule)
 		return;
 	pf_dynaddr_remove(&rule->src.addr);
 	pf_dynaddr_remove(&rule->dst.addr);
-	pf_tbladdr_remove(&rule->src.addr);
-	pf_tbladdr_remove(&rule->dst.addr);
+	if (rulequeue == NULL) {
+		pf_tbladdr_remove(&rule->src.addr);
+		pf_tbladdr_remove(&rule->dst.addr);
+	}
 	pf_empty_pool(&rule->rpool.list);
 	pool_put(&pf_rule_pl, rule);
 }
@@ -470,6 +475,18 @@ pf_tagname2tag(char *tagname)
 	tag->ref++;
 	TAILQ_INSERT_TAIL(&pf_tags, tag, entries);
 	return (tag->tag);
+}
+
+void
+pf_tag2tagname(u_int16_t tagid, char *p)
+{
+	struct pf_tagname	*tag;
+
+	TAILQ_FOREACH(tag, &pf_tags, entries)
+		if (tag->tag == tagid) {
+			strlcpy(p, tag->name, PF_TAG_NAME_SIZE);
+			return;
+		}
 }
 
 void
@@ -588,10 +605,9 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			pf_status.running = 1;
 			pf_status.states = states;
 			pf_status.since = time.tv_sec;
-			if (status_ifp != NULL) {
+			if (status_ifp != NULL)
 				strlcpy(pf_status.ifname,
 				    status_ifp->if_xname, IFNAMSIZ);
-			}
 			DPFPRINTF(PF_DEBUG_MISC, ("pf: started\n"));
 		}
 		break;
@@ -1099,8 +1115,8 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		state->anchor.ptr = NULL;
 		state->rt_ifp = NULL;
 		state->creation = time.tv_sec;
-		state->packets = 0;
-		state->bytes = 0;
+		state->packets[0] = state->packets[1] = 0;
+		state->bytes[0] = state->bytes[1] = 0;
 		if (pf_insert_state(state)) {
 			pool_put(&pf_state_pl, state);
 			error = ENOMEM;
@@ -1898,7 +1914,8 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = ENODEV;
 			break;
 		}
-		error = pfr_clr_tables(&io->pfrio_ndel, io->pfrio_flags);
+		error = pfr_clr_tables(&io->pfrio_table, &io->pfrio_ndel,
+		    io->pfrio_flags);
 		break;
 	}
 
@@ -1933,8 +1950,8 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = ENODEV;
 			break;
 		}
-		error = pfr_get_tables(io->pfrio_buffer, &io->pfrio_size,
-		    io->pfrio_flags);
+		error = pfr_get_tables(&io->pfrio_table, io->pfrio_buffer,
+		    &io->pfrio_size, io->pfrio_flags);
 		break;
 	}
 
@@ -1945,8 +1962,8 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = ENODEV;
 			break;
 		}
-		error = pfr_get_tstats(io->pfrio_buffer, &io->pfrio_size,
-		    io->pfrio_flags);
+		error = pfr_get_tstats(&io->pfrio_table, io->pfrio_buffer,
+		    &io->pfrio_size, io->pfrio_flags);
 		break;
 	}
 
