@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.44 2004/06/12 10:43:34 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.45 2004/06/17 13:10:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -47,6 +47,7 @@
 #include <config.h>
 #include <common.h>
 #include <auth.h>
+#include <base64.h>
 
 extern int errno;
 
@@ -89,8 +90,6 @@ extern struct cf_list *cf_dns_list, *cf_dns_name_list, *cf_ntp_list;
 extern struct cf_list *cf_sip_list, *cf_sip_name_list;
 extern long long cf_lifetime;
 extern char *configfilename;
-
-extern int base64_decodestring __P((const char *, char *, size_t));
 
 static struct keyinfo *find_keybyname __P((struct keyinfo *, char *));
 static int add_pd_pif __P((struct iapd_conf *, struct cf_list *));
