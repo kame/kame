@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.84 2002/09/24 14:23:30 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.85 2002/10/10 03:04:00 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -569,8 +569,8 @@ struct	in6_multi {
 	u_int	in6m_refcount;		/* # membership claims by sockets */
 	u_int	in6m_state;		/* state of the membership */
 	u_int	in6m_timer;		/* MLD6 listener report timer */
-	struct router6_info *in6m_rti;	/* router info */
-	struct in6_multi_source *in6m_source;	/* filtered source list */
+	struct	router6_info *in6m_rti;	/* router info */
+	struct	in6_multi_source *in6m_source;	/* filtered source list */
 };
 
 #ifdef _KERNEL
