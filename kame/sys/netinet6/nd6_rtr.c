@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.254 2004/07/05 06:24:29 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.255 2004/07/05 07:46:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1421,7 +1421,7 @@ prelist_update(new, dr, m, mcast)
 #endif
 	{
 		struct in6_ifaddr *ifa6;
-		u_int32_t storedlifetime;
+		u_int32_t remaininglifetime;
 #ifndef __FreeBSD__
 		long time_second = time.tv_sec;
 #endif
@@ -1458,61 +1458,39 @@ prelist_update(new, dr, m, mcast)
 		 * are sure there is at least one matched address, we can
 		 * proceed to 5.5.3. (e): update the lifetimes according to the
 		 * "two hours" rule and the privacy extension.
+		 * We apply some clarifications in rfc2462bis:
+		 * - use remaininglifetime instead of storedlifetime as a
+		 *   variable name
+		 * - remove the dead code in the "two-hour" rule
 		 */
 #define TWOHOUR		(120*60)
-		/*
-		 * RFC2462 introduces the notion of StoredLifetime to the
-		 * "two hours" rule as follows:
-		 *   the Lifetime associated with the previously autoconfigured
-		 *   address.
-		 * Our interpretation of this definition is "the remaining
-		 * lifetime to expiration at the evaluation time".  One might
-		 * be wondering if this interpretation is really conform to the
-		 * RFC, because the text can read that "Lifetimes" are never
-		 * decreased, and our definition of the "storedlifetime" below
-		 * essentially reduces the "Valid Lifetime" advertised in the
-		 * previous RA.  But, this is due to the wording of the text,
-		 * and our interpretation is the same as an author's intention.
-		 * See the discussion in the IETF ipngwg ML in August 2001,
-		 * with the Subject "StoredLifetime in RFC 2462".
-		 */
 		lt6_tmp = ifa6->ia6_lifetime;
 		if (lt6_tmp.ia6t_vltime == ND6_INFINITE_LIFETIME)
-			storedlifetime = ND6_INFINITE_LIFETIME;
+			remaininglifetime = ND6_INFINITE_LIFETIME;
 		else if (time_second - ifa6->ia6_updatetime >
 			 lt6_tmp.ia6t_vltime) {
 			/*
 			 * The case of "invalid" address.  We should usually
 			 * not see this case.
 			 */
-			storedlifetime = 0;
+			remaininglifetime = 0;
 		} else
-			storedlifetime = lt6_tmp.ia6t_vltime -
+			remaininglifetime = lt6_tmp.ia6t_vltime -
 			    (time_second - ifa6->ia6_updatetime);
 
 		/* when not updating, keep the current stored lifetime. */
-		lt6_tmp.ia6t_vltime = storedlifetime;
+		lt6_tmp.ia6t_vltime = remaininglifetime;
 
 		if (TWOHOUR < new->ndpr_vltime ||
-		    storedlifetime < new->ndpr_vltime) {
+		    remaininglifetime < new->ndpr_vltime) {
 			lt6_tmp.ia6t_vltime = new->ndpr_vltime;
-		} else if (storedlifetime <= TWOHOUR
-#if 0
-			   /*
-			    * This condition is logically redundant, so we just
-			    * omit it.
-			    * See IPng 6712, 6717, and 6721.
-			    */
-			   && new->ndpr_vltime <= storedlifetime
-#endif
-			) {
-			if (auth) {
+		} else if (remaininglifetime <= TWOHOUR) {
+			if (auth)
 				lt6_tmp.ia6t_vltime = new->ndpr_vltime;
-			}
 		} else {
 			/*
 			 * new->ndpr_vltime <= TWOHOUR &&
-			 * TWOHOUR < storedlifetime
+			 * TWOHOUR < remaininglifetime
 			 */
 			lt6_tmp.ia6t_vltime = TWOHOUR;
 		}
