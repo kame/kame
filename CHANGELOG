@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2072 2002/02/04 10:10:02 jinmei Exp $
+$KAME: CHANGELOG,v 1.2073 2002/02/09 07:36:55 jinmei Exp $
 
 <200202>
+2002-02-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/{netinet6, netkey}/: changed the definition of
+	in6_multi{} to contain a full sockaddr_in6 of the multicast
+	address.  Related functions were also modified accordingly.
+
+	* kame/kame/ifmcstat/ifmcstat.c (in6_multientry):
+	* netbsd/usr.bin/netstat/if.c (intpr):
+	Modified according to the change above.  These tools should
+	be rebuilt as well as the kernel.
+
 2002-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet6/in6_pcb.c (in6_pcbbind): correctly separated
 	IPv4-mapped address case in in6_pcbbind().  Reported from bsdi.
