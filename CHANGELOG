@@ -1,5 +1,17 @@
+2002-04-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+
+
+
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2110 2002/03/31 17:21:30 jinmei Exp $
+$KAME: CHANGELOG,v 1.2111 2002/04/01 05:22:46 jinmei Exp $
+
+<200204>
+2002-04-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_lookup): checked if rt_llinfo is
+	non-NULL to avoid returning an entry that has the LLINFO flag but
+	is not a neighbor cache entry.
+	* kame/sys/netinet6/nd6.c (nd6_is_addr_neighbor): removed the
+	check for the pointer, because the check is now done in nd6_lookup().
 
 <200203>
 2002-03-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
