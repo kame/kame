@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.377 2004/03/10 09:10:38 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.378 2004/03/10 10:25:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2553,7 +2553,6 @@ icmp6_reflect(m, off)
 	int plen;
 	int type, code;
 	struct ifnet *outif = NULL;
-	struct sockaddr_in6 sa6_src;
 	struct in6_addr origdst, *src = NULL;
 
 	/* too short to reflect */
@@ -2608,11 +2607,6 @@ icmp6_reflect(m, off)
 	 */
 	ip6->ip6_dst = ip6->ip6_src;
 
-	bzero(&sa6_src, sizeof(sa6_src));
-	sa6_src.sin6_family = AF_INET6;
-	sa6_src.sin6_len = sizeof(sa6_src);
-	in6_recoverscope(&sa6_src, &ip6->ip6_src, m->m_pkthdr.rcvif);
-
 	/*
 	 * If the incoming packet was addressed directly to us (i.e. unicast),
 	 * use dst as the src for the reply.
@@ -2646,6 +2640,7 @@ icmp6_reflect(m, off)
 	}
 
 	if (src == NULL) {
+		struct sockaddr_in6 sin6;
 		int e;
 #ifdef NEW_STRUCT_ROUTE
 		struct route ro;
@@ -2658,9 +2653,13 @@ icmp6_reflect(m, off)
 		 * that we do not own.  Select a source address based on the
 		 * source address of the erroneous packet.
 		 */
+		bzero(&sin6, sizeof(sin6));
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_len = sizeof(sin6);
+		sin6.sin6_addr = ip6->ip6_dst; /* zone ID should be embedded */
+
 		bzero(&ro, sizeof(ro));
-		src = in6_selectsrc(&sa6_src, NULL, NULL, &ro, NULL,
-		    &outif, &e);
+		src = in6_selectsrc(&sin6, NULL, NULL, &ro, NULL, &outif, &e);
 		if (ro.ro_rt) { /* XXX: see comments in icmp6_mtudisc_update */
 			RTFREE(ro.ro_rt); /* XXX: we could use this */
 		}
@@ -2668,7 +2667,7 @@ icmp6_reflect(m, off)
 			nd6log((LOG_DEBUG,
 			    "icmp6_reflect: source can't be determined: "
 			    "dst=%s, error=%d\n",
-			    ip6_sprintf(&ip6->ip6_dst), e));
+			    ip6_sprintf(&sin6.sin6_addr), e));
 			goto bad;
 		}
 	}
