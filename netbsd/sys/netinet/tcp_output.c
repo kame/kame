@@ -184,6 +184,7 @@ __KERNEL_RCSID(0, "$NetBSD: tcp_output.c,v 1.79.4.3 2002/11/30 14:31:59 he Exp $
 #endif
 
 #if defined(INET6) && defined(MIP6)
+#include <netinet/ip6mh.h>
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6_cncore.h>
