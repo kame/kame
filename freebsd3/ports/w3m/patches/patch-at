@@ -1,0 +1,12 @@
+--- file.c.orig	Fri Jul  7 19:08:32 2000
++++ file.c	Fri Jul  7 19:08:44 2000
+@@ -5239,7 +5239,9 @@
+ 	    Strcat(tmp, lineBuf2);
+ 	    lineBuf2 = tmp;
+ 	}
++#ifdef JP_CHARSET
+ 	lineBuf2 = convertLine(&uf, lineBuf2, &code);
++#endif
+ 	lineBuf2 = checkType(lineBuf2->ptr, propBuffer, LINELEN);
+ 	len = lineBuf2->length;
+ 	l = New(Line);
