@@ -1,5 +1,5 @@
 /*
- * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.8 1999/12/30 08:48:24 itojun Exp $
+ * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.9 2000/01/29 06:23:43 itojun Exp $
  */
 
 /*
@@ -32,7 +32,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$Id: route6d.c,v 1.8 1999/12/30 08:48:24 itojun Exp $";
+static char _rcsid[] = "$Id: route6d.c,v 1.9 2000/01/29 06:23:43 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -66,8 +66,10 @@ static char _rcsid[] = "$Id: route6d.c,v 1.8 1999/12/30 08:48:24 itojun Exp $";
 #include <net/if_var.h>
 #endif /* __FreeBSD__ >= 3 */
 #define	KERNEL	1
+#define	_KERNEL	1
 #include <net/route.h>
 #undef KERNEL
+#undef _KERNEL
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netinet/ip6.h>
