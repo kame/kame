@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.81 2004/02/20 02:48:56 jinmei Exp $
+$KAME: FAQ,v 1.82 2004/08/10 06:27:05 itojun Exp $
 
 
 GENERAL
@@ -527,6 +527,8 @@ Q: How can I configure NAT-PT?
 	The manual for the command is natptconfig(8), and the manual
 	for the configuration file is natpt.conf(5).
 	kame/kame/natptconfig/natpt.conf is a simple configuration sample.
+
+	note that NAT-PT code works on freebsd4 only.
 
 Q: When I configure an IPv6 address by ifconfig(8) on a node doing
 stateless autoconfiguration, the interface route corresponding to the

@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.370 2004/06/10 18:20:39 suz Exp $
+	$KAME: IMPLEMENTATION,v 1.371 2004/08/10 06:27:05 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -166,6 +166,7 @@ RFC2732: Format for Literal IPv6 Addresses in URL's
       (like freebsd ftpio(3) and fetch(1), or netbsd ftp(1))
 RFC2766: Network Address Translation - Protocol Translation (NAT-PT)
     * Section 4.2 is implemented by totd (see ports/totd, or pkgsrc/net/totd).
+    * works on freebsd4 only.
 RFC2874: DNS Extensions to Support IPv6 Address Aggregation and Renumbering
     * KAME/bsdi4 supports A6, DNAME and binary label to some extent.
     * KAME apps/bind8 repository has resolver library with partial A6, DNAME
