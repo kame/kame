@@ -1,4 +1,4 @@
-.\"	$KAME: natpt.conf.5,v 1.5 2001/11/08 06:05:54 fujisawa Exp $
+.\"	$KAME: natpt.conf.5,v 1.6 2001/11/08 07:50:40 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -125,11 +125,12 @@ same as
 .Ar v6addr
 .Op Sy dport Ar num
 .Xc
-Translate IPv4 packet coming from specified IPv4 address into
-specified IPv6 address.  If both
-.Sy dport
-directive is specified, convert destination port number also.  Address
-and both port number must appoint it exactly.
+Translate IPv4 packet to IPv6 packet.
+.Pp
+This format was changed to the format using
+.Sy daddr/dport .
+It is recommended not to use this format because this format may be
+abolished in the future.
 .\"	map from 10.0.0.3/8 to 202.249.11.252 port 28672 - 32767
 .It Xo Sy map from
 .Ar v4addr Op Sy \&/ Ar num
