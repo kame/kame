@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.314 2002/06/09 14:43:58 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.315 2002/07/10 05:03:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1910,9 +1910,10 @@ ni6_nametodns(name, namelen, old)
 			while (i > 0) {
 				if (!isalnum(*p) && *p != '-')
 					goto fail;
-				if (isupper(*p))
-					*cp++ = tolower(*p++);
-				else
+				if (isupper(*p)) {
+					*cp++ = tolower(*p);
+					p++;
+				} else
 					*cp++ = *p++;
 				i--;
 			}
