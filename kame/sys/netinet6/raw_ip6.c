@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.80 2001/07/02 08:56:39 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.81 2001/07/23 15:17:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -884,7 +884,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 		in6p->in6p_laddr = addr->sin6_addr;
 		break;
 	    }
-		
+
 	case PRU_CONNECT:
 	    {
 		struct sockaddr_in6 *addr = mtod(nam, struct sockaddr_in6 *);
