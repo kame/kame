@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.27 2001/08/16 06:13:04 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.28 2001/08/16 21:44:50 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -309,7 +309,8 @@ ciphertest()
 	", 16, &data.l);
 	key.v = str2val("f59bd70f 81b9b9cc 2a32c7fd 229a4b37", 16, &key.l);
 	iv0.v = str2val("26b68c90 9467b4ab 7ec29fa0 0b696b55", 16, &iv0.l);
-	iv = vmalloc(16);
+
+	iv = vmalloc(8);
 
 	/* des */
 	printf("DES\n");
@@ -438,6 +439,8 @@ ciphertest()
 	vfree(res2);
 
 	/* aes */
+	iv = vrealloc(iv, 16);
+
 	printf("AES\n");
 	printf("data:\n");
 	PVDUMP(&data);
