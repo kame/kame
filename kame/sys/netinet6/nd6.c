@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.152 2001/06/27 09:08:39 sumikawa Exp $	*/
+/*	$KAME: nd6.c,v 1.153 2001/06/27 17:30:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -854,10 +854,12 @@ nd6_purge(ifp)
 	if (nd6_defifindex == ifp->if_index)
 		nd6_setdefaultiface(0);
 
-	/* refresh default router list */
-	bzero(&drany, sizeof(drany));
-	defrouter_delreq(&drany, 0);
-	defrouter_select();
+	if (!ip6_forwarding && ip6_accept_rtadv) { /* XXX: too restrictive? */
+		/* refresh default router list */
+		bzero(&drany, sizeof(drany));
+		defrouter_delreq(&drany, 0);
+		defrouter_select();
+	}
 
 	/*
 	 * Nuke neighbor cache entries for the ifp.
