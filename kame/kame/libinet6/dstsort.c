@@ -168,15 +168,11 @@ do { \
 			continue;
 		in6 = &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
 		if (IN6_IS_ADDR_LINKLOCAL(in6)) {
-			GETPOLICYTAB(p, "::", 10, 40, matchid, matchid);
-			p->prefix.sin6_addr.s6_addr[0] = 0xfe;
-			p->prefix.sin6_addr.s6_addr[1] = 0x80;
+			GETPOLICYTAB(p, "fe80::", 10, 40, matchid, matchid);
 			p->prefix.sin6_scope_id =
 			    *(u_int16_t *)(&in6->s6_addr[2]);
 		} else if (IN6_IS_ADDR_SITELOCAL(in6)) {
-			GETPOLICYTAB(p, "::", 10, 30, matchid, matchid);
-			p->prefix.sin6_addr.s6_addr[0] = 0xfe;
-			p->prefix.sin6_addr.s6_addr[1] = 0xc0;
+			GETPOLICYTAB(p, "fec0::", 10, 30, matchid, matchid);
 			p->prefix.sin6_scope_id =
 			    *(u_int16_t *)(&in6->s6_addr[2]);
 		}
