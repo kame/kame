@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.36 2001/12/13 06:06:48 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.37 2001/12/17 11:38:23 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -256,11 +256,20 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 		}
 	}
 
+	if (cv4.fromto == NATPT_FROM) {
+		pad = &cv4.ats->remote;
+		cv4.ats->fromto++;
+	} else {
+		pad = &cv4.ats->local;
+		cv4.ats->tofrom++;
+	}
+
 	/*
 	 * If IPv4 packet is too big to translate into IPv6, return
 	 * icmp "packet too big" error.
 	 */
-	if (needFragment(&cv4)
+	if ((pad->sa_family == IPPROTO_IPV6)
+	    && needFragment(&cv4)
 	    && isDFset(&cv4)) {
 		n_long		dest = 0;
 		struct ifnet	destif;
@@ -270,14 +279,6 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 
 		icmp_error(cv4.m, ICMP_UNREACH, ICMP_UNREACH_NEEDFRAG, dest, &destif);
 		return (IPPROTO_DONE);	/* discard this packet without free. */
-	}
-
-	if (cv4.fromto == NATPT_FROM) {
-		pad = &cv4.ats->remote;
-		cv4.ats->fromto++;
-	} else {
-		pad = &cv4.ats->local;
-		cv4.ats->tofrom++;
 	}
 
 #ifdef NATPT_NAT
