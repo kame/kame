@@ -956,9 +956,8 @@ udp6_realinput(af, src, dst, m, off)
 			    (SO_REUSEPORT|SO_REUSEADDR)) == 0)
 				break;
 #ifdef MLDV2
-		next_inp:
+		next_inp:;
 #endif
-		
 		}
 	} else {
 		/*

@@ -482,7 +482,9 @@ udp_input(m, off)
 			if ((last->inp_socket->so_options&(SO_REUSEPORT|SO_REUSEADDR)) == 0)
 				break;
 
-		next_inp:
+#ifdef IGMPV3
+		next_inp:;
+#endif
 		}
 
 		if (last == NULL) {

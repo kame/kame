@@ -692,7 +692,7 @@ udp_input(struct mbuf *m, ...)
 			if ((last->so_options&(SO_REUSEPORT|SO_REUSEADDR)) == 0)
 				break;
 #ifdef IGMPV3		
-		next_inp:
+		next_inp:;
 #endif
 		}
 
