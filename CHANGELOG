@@ -1,8 +1,9 @@
-$Id: CHANGELOG,v 1.486 2000/01/26 14:00:56 sumikawa Exp $
+$Id: CHANGELOG,v 1.487 2000/01/26 15:03:00 itojun Exp $
 
 <200001>
 Wed Jan 26 23:00:30 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
-	* freebsd3/ports/pchar: upgrade to 1.1.1.
+	* freebsd[23]/ports/pchar, netbsd/pkgsrc/net/pchar,
+	  openbsd/ports/net/pchar: upgrade to 1.1.1.
 
 Wed Jan 26 14:16:00 JST 2000  itojun@iijlab.net
 	* kame/libinet6/getaddrinfo.c: from the specification, AI_CANONNAME
