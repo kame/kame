@@ -264,7 +264,7 @@ intpr(interval, ifnetaddr)
 					while (multiaddr != 0) {
 						kread(multiaddr, (char *)&inm,
 						    sizeof inm);
-						inet_ntop(AF_INET6, &inm.in6m_addr,
+						inet_ntop(AF_INET6, &inm.in6m_sa.sin6_addr,
 							hbuf, sizeof(hbuf));
 						if (vflag)
 							n = strlen(hbuf) < 17 ? 17 : strlen(hbuf);
