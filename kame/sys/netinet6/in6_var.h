@@ -107,6 +107,43 @@ struct	in6_ifaddr {
 	struct ifprefix *ia6_ifpr; /* back pointer to ifprefix */
 };
 
+/*
+ * IPv6 interface statistics, as defined in RFC2465 Ipv6IfStatsEntry (p12).
+ */
+struct in6_ifstat {
+	int32_t	ifs6_in_receive;	/* # of total input datagram */
+	int32_t	ifs6_in_hdrerror;	/* # of datagrams with invalid hdr */
+	int32_t ifs6_in_toobig;		/* # of datagrams exceeded MTU */
+	int32_t	ifs6_in_noroute;	/* # of datagrams with no route */
+	int32_t ifs6_in_addrerr;	/* # of datagrams with invalid dst */
+	int32_t ifs6_in_protounknown;	/* # of datagrams with unknown proto */
+					/* NOTE: increment on final dst if */
+	int32_t ifs6_in_truncated;	/* # of truncated datagrams */
+	int32_t ifs6_in_discard;	/* # of discarded datagrams */
+					/* NOTE: fragment timeout is not here */
+	int32_t ifs6_in_deliver;	/* # of datagrams delivered to ULP */
+					/* NOTE: increment on final dst if */
+	int32_t ifs6_out_forward;	/* # of datagrams forwarded */
+					/* NOTE: increment on outgoing if */
+	int32_t ifs6_out_request;	/* # of outgoing datagrams from ULP */
+					/* NOTE: does not include forwrads */
+	int32_t ifs6_out_discard;	/* # of discarded datagrams */
+	int32_t ifs6_out_fragok;	/* # of datagrams fragmented */
+	int32_t ifs6_out_fragfail;	/* # of datagrams failed on fragment */
+	int32_t ifs6_out_fragcreat;	/* # of fragment datagrams */
+					/* NOTE: this is # after fragment */
+	int32_t ifs6_reass_reqd;	/* # of incoming fragmented packets */
+					/* NOTE: increment on final dst if */
+	int32_t ifs6_reass_ok;		/* # of reassembled packets */
+					/* NOTE: this is # after reass */
+					/* NOTE: increment on final dst if */
+	int32_t ifs6_reass_fail;	/* # of reass failures */
+					/* NOTE: may not be packet count */
+					/* NOTE: increment on final dst if */
+	int32_t ifs6_in_mcast;		/* # of inbound multicast datagrams */
+	int32_t ifs6_out_mcast;		/* # of outbound multicast datagrams */
+};
+
 struct	in6_ifreq {
 	char	ifr_name[IFNAMSIZ];
 	union {
