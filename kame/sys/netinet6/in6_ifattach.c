@@ -273,31 +273,29 @@ in6_ifattach(ifp, type, laddr, noloop)
 	 */
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	ifa = ifp->if_addrlist;
+	if (ifa != NULL) {
+		for ( ; ifa; ifa = ifa->ifa_next) {
+			ifap = &ifa->ifa_next;
+			if (ifa->ifa_addr->sa_family != AF_INET6)
+				continue;
+			if (IN6_IS_ADDR_LINKLOCAL(&satosin6(ifa->ifa_addr)->sin6_addr))
+				return;
+		}
+	} else
+		ifap = &ifp->if_addrlist;
 #else
 	ifa = TAILQ_FIRST(&ifp->if_addrlist);
-#endif
 	if (ifa != NULL) {
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for ( ; ifa; ifa = ifa->ifa_next)
-#else
-		for ( ; ifa; ifa = TAILQ_NEXT(ifa, ifa_list))
-#endif
-		{
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-			ifap = &ifa->ifa_next;
-#endif
+		for ( ; ifa; ifa = TAILQ_NEXT(ifa, ifa_list)) {
 			if (ifa->ifa_addr->sa_family != AF_INET6)
 				continue;
 			if (IN6_IS_ADDR_LINKLOCAL(&satosin6(ifa->ifa_addr)->sin6_addr))
 				return;
 		}
 	} else {
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		ifap = &ifp->if_addrlist;
-#else
 		TAILQ_INIT(&ifp->if_addrlist);
-#endif
 	}
+#endif
 
 	/*
 	 * link-local address
