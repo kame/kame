@@ -1,4 +1,4 @@
-/*	$KAME: sha2.c,v 1.3 2001/08/09 06:22:15 itojun Exp $	*/
+/*	$KAME: sha2.c,v 1.4 2001/09/02 08:59:55 itojun Exp $	*/
 
 /*
  * sha2.c
@@ -43,6 +43,7 @@
 #include <openssl/evp.h>
 
 #include <err.h>
+#include <string.h>
 #define bcopy(a, b, c) memcpy((b), (a), (c))
 #define bzero(a, b) memset((a), 0, (b))
 #define panic(a) err(1, (a))
