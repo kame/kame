@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.321 2002/12/12 10:23:37 keiichi Exp $
+	$KAME: IMPLEMENTATION,v 1.322 2003/01/05 17:15:30 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -200,7 +200,7 @@ RFC3376: Internet Group Management Protocol, Version 3
     * host-side implementation on kame/freebsd4, kame/netbsd, and kame/openbsd.
     * Multicast Source Filter works only for UDP packets.
 draft-ietf-ipngwg-icmp-name-lookups-09: IPv6 Name Lookups Through ICMP
-draft-ietf-dhc-dhcpv6-26.txt: DHCPv6
+draft-ietf-dhc-dhcpv6-28.txt: DHCPv6
 draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
     * kame/dhcp6 has test implementation, which will not be compiled in
       default compilation.
@@ -243,6 +243,8 @@ draft-ietf-ipv6-default-addr-select-08.txt: Default Address Selection for IPv6
 draft-ietf-ipngwg-icmp-v3-02.txt: ICMPv6 for IPv6 specification (revised)
     * See 1.9 in this document for details.
 draft-ietf-vrrp-ipv6-spec-02.txt: Virtual Router Redundancy Protocol for IPv6
+draft-ietf-dhc-dhcpv6-opt-prefix-delegation-01.txt:
+	IPv6 Prefix Options for DHCPv6
 draft-itojun-ipv6-tcp-to-anycast-01.txt:
 	Disconnecting TCP connection toward IPv6 anycast address
 draft-itojun-ipv6-transition-abuse-01.txt:
@@ -257,7 +259,6 @@ draft-itojun-ipv6-transition-abuse-01.txt:
     * See section 1.12.6 and 1.14 for more details.
 draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
     * no consideration is made against the use of routing headers and such.
-draft-troan-dhcpv6-opt-prefix-delegation-01.txt: IPv6 Prefix Options for DHCPv6
 draft-vida-mld-v2-05.txt: Multicast Listener Discovery Version 2 (MLDv2) for IPv6
     * host-side & router-side implementation on kame/freebsd4 and kame/netbsd.
     * Multicast Source Filter works only for UDP packets.
