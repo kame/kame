@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_agg.c,v 1.55 2001/12/12 15:29:13 sakane Exp $	*/
+/*	$KAME: isakmp_agg.c,v 1.56 2003/11/13 02:30:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -367,10 +367,7 @@ agg_i2recv(iph1, msg)
 		/* XXX send information */
 		goto end;
 	}
-	if (iph1->sa_ret) {
-		vfree(iph1->sa_ret);
-		iph1->sa_ret = NULL;
-	}
+	VPTRINIT(iph1->sa_ret);
 
 	/* fix isakmp index */
 	memcpy(&iph1->index.r_ck, &((struct isakmp *)msg->v)->r_ck,

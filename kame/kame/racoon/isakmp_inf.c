@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.81 2002/04/15 01:58:37 itojun Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.82 2003/11/13 02:30:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -615,19 +615,15 @@ isakmp_info_send_common(iph1, payload, np, flags)
 
 		tmp = oakley_do_encrypt(iph2->ph1, iph2->sendbuf, iph2->ivm->ive,
 				iph2->ivm->iv);
-		if (tmp == NULL) {
-			vfree(iph2->sendbuf);
-			iph2->sendbuf = NULL;
+		VPTRINIT(iph2->sendbuf);
+		if (tmp == NULL)
 			goto err;
-		}
-		vfree(iph2->sendbuf);
 		iph2->sendbuf = tmp;
 	}
 
 	/* HDR*, HASH(1), N */
 	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0) {
-		vfree(iph2->sendbuf);
-		iph2->sendbuf = NULL;
+		VPTRINIT(iph2->sendbuf);
 		goto err;
 	}
 
@@ -641,8 +637,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 
 	/* XXX If Acknowledged Informational required, don't delete ph2handle */
 	error = 0;
-	vfree(iph2->sendbuf);
-	iph2->sendbuf = NULL;
+	VPTRINIT(iph2->sendbuf);
 	goto err;	/* XXX */
 
 end:

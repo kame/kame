@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_base.c,v 1.48 2001/12/12 15:29:13 sakane Exp $	*/
+/*	$KAME: isakmp_base.c,v 1.49 2003/11/13 02:30:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -253,10 +253,7 @@ base_i2recv(iph1, msg)
 		/* XXX send information */
 		goto end;
 	}
-	if (iph1->sa_ret) {
-		vfree(iph1->sa_ret);
-		iph1->sa_ret = NULL;
-	}
+	VPTRINIT(iph1->sa_ret);
 
 	iph1->status = PHASE1ST_MSG2RECEIVED;
 
@@ -776,10 +773,7 @@ base_r1send(iph1, msg)
 	error = 0;
 
 end:
-	if (iph1->sa_ret) {
-		vfree(iph1->sa_ret);
-		iph1->sa_ret = NULL;
-	}
+	VPTRINIT(iph1->sa_ret);
 
 	return error;
 }

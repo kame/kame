@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.63 2001/12/12 17:57:26 sakane Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.64 2003/11/13 02:30:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -231,10 +231,7 @@ ident_i2recv(iph1, msg)
 		/* XXX send information */
 		goto end;
 	}
-	if (iph1->sa_ret) {
-		vfree(iph1->sa_ret);
-		iph1->sa_ret = NULL;
-	}
+	VPTRINIT(iph1->sa_ret);
 
 	iph1->status = PHASE1ST_MSG2RECEIVED;
 

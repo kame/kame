@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.178 2003/11/11 05:00:15 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.179 2003/11/13 02:30:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -611,8 +611,7 @@ ph1_main(iph1, msg)
 			"no buffer found as sendbuf\n"); 
 		return -1;
 	}
-	vfree(iph1->sendbuf);
-	iph1->sendbuf = NULL;
+	VPTRINIT(iph1->sendbuf);
 
 	/* turn off schedule */
 	if (iph1->scr)
@@ -725,8 +724,7 @@ quick_main(iph2, msg)
 			"no buffer found as sendbuf\n"); 
 		return -1;
 	}
-	vfree(iph2->sendbuf);
-	iph2->sendbuf = NULL;
+	VPTRINIT(iph2->sendbuf);
 
 	/* turn off schedule */
 	if (iph2->scr)

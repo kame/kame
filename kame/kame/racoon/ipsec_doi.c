@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.165 2003/11/13 02:21:21 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.166 2003/11/13 02:30:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -823,7 +823,7 @@ ipsecdoi_checkph2proposal(iph2)
 		goto end;
 
 	/* make a SA to be replayed. */
-	vfree(iph2->sa_ret);
+	VPTRINIT(iph2->sa_ret);
 	iph2->sa_ret = get_sabyproppair(p, iph2->ph1);
 	free_proppair0(p);
 	if (iph2->sa_ret == NULL)
@@ -2823,7 +2823,7 @@ ipsecdoi_setph2proposal(iph2)
 		for (b = a->head; b; b = b->next) {
 			q = setph2proposal0(iph2, a, b);
 			if (q == NULL) {
-				vfree(iph2->sa);
+				VPTRINIT(iph2->sa);
 				return -1;
 			}
 
@@ -3352,8 +3352,7 @@ ipsecdoi_setid2(iph2)
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get ID for %s\n",
 			spidx2str(&sp->spidx));
-		vfree(iph2->id);
-		iph2->id = NULL;
+		VPTRINIT(iph2->id);
 		return -1;
 	}
 	plog(LLV_DEBUG, LOCATION, NULL,
