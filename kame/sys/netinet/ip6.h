@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.14 2000/10/09 01:04:09 itojun Exp $	*/
+/*	$KAME: ip6.h,v 1.15 2001/01/23 05:26:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -151,11 +151,11 @@ struct ip6_dest {
 #define IP6OPT_RTALERT_ACTNET	2 	/* contains an Active Networks msg */
 #define IP6OPT_MINLEN		2
 
-#define IP6OPT_BINDING_UPDATE	0xc6 /* 11 0 00110 */
-#define IP6OPT_BINDING_ACK	0x07 /* 00 0 00111 */
-#define IP6OPT_BINDING_REQ	0x08 /* 00 0 01000 */
-#define IP6OPT_HOME_ADDRESS	0xc9 /* 11 0 01001 */
-#define IP6OPT_EID		0x8a /* 10 0 01010 */
+#define IP6OPT_BINDING_UPDATE	0xc6	/* 11 0 00110 */
+#define IP6OPT_BINDING_ACK	0x07	/* 00 0 00111 */
+#define IP6OPT_BINDING_REQ	0x08	/* 00 0 01000 */
+#define IP6OPT_HOME_ADDRESS	0xc9	/* 11 0 01001 */
+#define IP6OPT_EID		0x8a	/* 10 0 01010 */
 
 #define IP6OPT_TYPE(o)		((o) & 0xC0)
 #define IP6OPT_TYPE_SKIP	0x00
