@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.38 2003/08/11 04:46:56 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.39 2003/11/12 17:17:49 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -12,12 +12,10 @@ KAME project
 	  communicating mobile node has moved.
 
 - Missing features
-	- The mobile prefix sol/adv.
 	- Processing the advertisement intervap ND option.
 		- Sending is supported by rtadvd.
 	- The rapid router solicitation by a mobile node.
 	- Sending a binding update with A=1 to correspondent nodes.
-	- Sending a binding update with S=0.
 	- Regenerating a new IID when a DAD for a CoA failed.
 	- Multicast.
 	- mipv6-ha-ipsec dynamic keying.
