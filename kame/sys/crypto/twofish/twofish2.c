@@ -115,7 +115,7 @@ static		fullSbox _sBox_;		/* permuted MDStab based on keys */
 		MDStab[3][p8(31)[p8(32)[p8(33)[p8(34)[_b(x,R+3)]^b3(SKEY[3])]^b3(SKEY[2])]^b3(SKEY[1])]^b3(SKEY[0])] )
 
 #define	GetSboxKey	DWORD SKEY[4];	/* local copy */ \
-					memcpy(SKEY,key->sboxKeys,sizeof(SKEY));
+					bcopy(key->sboxKeys,SKEY,sizeof(SKEY));
 /*----------------------------------------------------------------*/
 #elif defined(MIN_KEY)
 #define	MOD_STRING	"(Minimal keying)"
@@ -932,7 +932,7 @@ int twofish_blockEncrypt(cipherInstance *cipher, keyInstance *key,CONST BYTE *in
   #endif
 #endif
 	/* make local copy of subkeys for speed */
-	memcpy(sk,key->subKeys,sizeof(DWORD)*(ROUND_SUBKEYS+2*rounds));
+	bcopy(key->subKeys,sk,sizeof(DWORD)*(ROUND_SUBKEYS+2*rounds));
 	if (mode == MODE_CBC)
 		BlockCopy(IV,cipher->iv32)
 	else
@@ -1101,7 +1101,7 @@ int twofish_blockDecrypt(cipherInstance *cipher, keyInstance *key,CONST BYTE *in
   #endif
 #endif
 	/* make local copy of subkeys for speed */
-	memcpy(sk,key->subKeys,sizeof(DWORD)*(ROUND_SUBKEYS+2*rounds));
+	bcopy(key->subKeys,sk,sizeof(DWORD)*(ROUND_SUBKEYS+2*rounds));
 	if (mode == MODE_CBC)
 		BlockCopy(IV,cipher->iv32)
 	else
