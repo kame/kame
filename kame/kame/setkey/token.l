@@ -117,19 +117,19 @@ hostname	{name}(({dot}{name})+{dot}?)?
 
 %%
 
-add		{ PREPROC; yylval.num = SADB_ADD; return(ADD); }
-delete		{ PREPROC; yylval.num = SADB_DELETE; return(DELETE); }
-get		{ PREPROC; yylval.num = SADB_GET; return(GET); }
-flush		{ PREPROC; yylval.num = SADB_FLUSH; return(FLUSH); }
-dump		{ PREPROC; yylval.num = SADB_DUMP; return(DUMP); }
+add		{ PREPROC; return(ADD); }
+delete		{ PREPROC; return(DELETE); }
+get		{ PREPROC; return(GET); }
+flush		{ PREPROC; return(FLUSH); }
+dump		{ PREPROC; return(DUMP); }
 
 	/* for management SPD */
-spdadd		{ PREPROC; yylval.num = SADB_X_SPDADD; return(SPDADD); }
-spddelete	{ PREPROC; yylval.num = SADB_X_SPDDELETE; return(SPDDELETE); }
-spddump		{ PREPROC; yylval.num = SADB_X_SPDDUMP; return(SPDDUMP); }
-spdflush	{ PREPROC; yylval.num = SADB_X_SPDFLUSH; return(SPDFLUSH); }
+spdadd		{ PREPROC; return(SPDADD); }
+spddelete	{ PREPROC; return(SPDDELETE); }
+spddump		{ PREPROC; return(SPDDUMP); }
+spdflush	{ PREPROC; return(SPDFLUSH); }
 {hyphen}P	{ BEGIN S_PL; PREPROC; return(F_POLICY); }
-<S_PL>[a-zA-Z0-9:\._/ \n\t][a-zA-Z0-9:\._/ \n\t]* {
+<S_PL>[a-zA-Z0-9:\.\-_/ \n\t][a-zA-Z0-9:\.\-_/ \n\t]* {
 		yymore();
 
 		/* count up for nl */
@@ -147,21 +147,6 @@ spdflush	{ PREPROC; yylval.num = SADB_X_SPDFLUSH; return(SPDFLUSH); }
 }
 <S_PL>{semi}	{ PREPROC; BEGIN INITIAL; return(EOT); }
 
-	/* flags */
-{hyphen}p	{ PREPROC; return(F_PROTOCOL); }
-{hyphen}r	{ PREPROC; return(F_REPLAY); }
-{hyphen}E	{ PREPROC; return(F_ENC); }
-{hyphen}A	{ PREPROC; return(F_AUTH); }
-{hyphen}C	{ PREPROC; return(F_COMP); }
-{hyphen}R	{ PREPROC; return(F_RAWCPI); }
-
-	/* upper layer protocols */
-any		{ PREPROC; yylval.num = IPPROTO_IP; return(UP_PROTO); }
-icmp		{ PREPROC; yylval.num = IPPROTO_ICMP; return(UP_PROTO); }
-icmp6		{ PREPROC; yylval.num = IPPROTO_ICMPV6; return(UP_PROTO); }
-tcp		{ PREPROC; yylval.num = IPPROTO_TCP; return(UP_PROTO); }
-udp		{ PREPROC; yylval.num = IPPROTO_UDP; return(UP_PROTO); }
-
 	/* security protocols */
 ah		{ PREPROC; yylval.num = 0; return(PR_AH); }
 esp		{ PREPROC; yylval.num = 0; return(PR_ESP); }
@@ -170,6 +155,7 @@ esp-old		{ PREPROC; yylval.num = 1; return(PR_ESP); }
 ipcomp		{ PREPROC; yylval.num = 0; return(PR_IPCOMP); }
 
 	/* authentication alogorithm */
+{hyphen}A	{ PREPROC; return(F_AUTH); }
 hmac-md5	{ PREPROC; yylval.num = SADB_AALG_MD5HMAC; return(ALG_AUTH); }
 hmac-sha1	{ PREPROC; yylval.num = SADB_AALG_SHA1HMAC; return(ALG_AUTH); }
 keyed-md5	{ PREPROC; yylval.num = SADB_AALG_MD5; return(ALG_AUTH); }
@@ -177,6 +163,7 @@ keyed-sha1	{ PREPROC; yylval.num = SADB_AALG_SHA; return(ALG_AUTH); }
 null		{ PREPROC; yylval.num = SADB_AALG_NULL; return(ALG_AUTH); }
 
 	/* encryption alogorithm */
+{hyphen}E	{ PREPROC; return(F_ENC); }
 des-cbc		{ PREPROC; yylval.num = SADB_EALG_DESCBC; return(ALG_ENC); }
 3des-cbc	{ PREPROC; yylval.num = SADB_EALG_3DESCBC; return(ALG_ENC); }
 simple		{ PREPROC; yylval.num = SADB_EALG_NULL; return(ALG_ENC); }
@@ -187,21 +174,34 @@ des-deriv	{ PREPROC; yylval.num = SADB_EALG_DESCBC; return(ALG_ENC_DESDERIV); }
 des-32iv	{ PREPROC; yylval.num = SADB_EALG_DESCBC; return(ALG_ENC_DES32IV); }
 
 	/* compression algorithms */
+{hyphen}C	{ PREPROC; return(F_COMP); }
 oui		{ PREPROC; yylval.num = SADB_X_CALG_OUI; return(ALG_COMP); }
 deflate		{ PREPROC; yylval.num = SADB_X_CALG_DEFLATE; return(ALG_COMP); }
 lzs		{ PREPROC; yylval.num = SADB_X_CALG_LZS; return(ALG_COMP); }
+{hyphen}R	{ PREPROC; return(F_RAWCPI); }
 
 	/* extension */
+{hyphen}m	{ PREPROC; return(F_MODE); }
+transport	{ PREPROC; yylval.num = IPSEC_MODE_TRANSPORT; return(MODE); }
+tunnel		{ PREPROC; yylval.num = IPSEC_MODE_TUNNEL; return(MODE); }
+{hyphen}f	{ PREPROC; return(F_EXT); }
 random-pad	{ PREPROC; yylval.num = SADB_X_EXT_PRAND; return(EXTENSION); }
 seq-pad		{ PREPROC; yylval.num = SADB_X_EXT_PSEQ; return(EXTENSION); }
 zero-pad	{ PREPROC; yylval.num = SADB_X_EXT_PZERO; return(EXTENSION); }
 cyclic-seq	{ PREPROC; yylval.num = SADB_X_EXT_CYCSEQ; return(EXTENSION); }
-
-	/* SA dependent */
+{hyphen}r	{ PREPROC; return(F_REPLAY); }
 {hyphen}lh	{ PREPROC; return(F_LIFETIME_HARD); }
 {hyphen}ls	{ PREPROC; return(F_LIFETIME_SOFT); }
 
+
+	/* upper layer protocols */
+icmp		{ PREPROC; yylval.num = IPPROTO_ICMP; return(UP_PROTO); }
+icmp6		{ PREPROC; yylval.num = IPPROTO_ICMPV6; return(UP_PROTO); }
+tcp		{ PREPROC; yylval.num = IPPROTO_TCP; return(UP_PROTO); }
+udp		{ PREPROC; yylval.num = IPPROTO_UDP; return(UP_PROTO); }
+
 	/* ... */
+any		{ PREPROC; return(ANY); }
 {ws}		{ PREPROC; }
 {nl}		{ lineno++; }
 {comment}
@@ -225,7 +225,7 @@ cyclic-seq	{ PREPROC; yylval.num = SADB_X_EXT_CYCSEQ; return(EXTENSION); }
 			PREPROC;
 
 			yylval.val.len = sizeof(struct sockaddr_in);
-			yylval.val.buf = yytext;
+			yylval.val.buf = strdup(yytext);
 
 			return(IP4_ADDRESS);
 		}
@@ -235,7 +235,7 @@ cyclic-seq	{ PREPROC; yylval.num = SADB_X_EXT_CYCSEQ; return(EXTENSION); }
 			PREPROC;
 
 			yylval.val.len = sizeof(struct sockaddr_in6);
-			yylval.val.buf = yytext;
+			yylval.val.buf = strdup(yytext);
 
 			return(IP6_ADDRESS);
 #else
@@ -260,19 +260,22 @@ cyclic-seq	{ PREPROC; yylval.num = SADB_X_EXT_CYCSEQ; return(EXTENSION); }
 			return(PORT);
 		}
 
+{blcl}any{elcl}	{
+			char *p = yytext;
+			PREPROC;
+			return(PORTANY);
+		}
+
 {hexstring}	{
 			int len = yyleng - 2; /* (str - "0x") */
-
-			PREPROC; 
-
+			PREPROC;
 			yylval.val.len = (len & 1) + (len / 2);
-
 			/* fixed string if length is odd. */
 			if (len & 1) {
 				yytext[1] = '0';
-				yylval.val.buf = yytext + 1;
+				yylval.val.buf = strdup(yytext + 1);
 			} else
-				yylval.val.buf = yytext + 2;
+				yylval.val.buf = strdup(yytext + 2);
 
 			return(HEXSTRING);
 		}
@@ -283,16 +286,10 @@ cyclic-seq	{ PREPROC; yylval.num = SADB_X_EXT_CYCSEQ; return(EXTENSION); }
 			while (*++p != '"') ;
 			*p = NULL;
 			yytext++;
-			yylval.val.len = yyleng-2;
-			yylval.val.buf = yytext;
-			return(QUOTEDSTRING);
-		}
+			yylval.val.len = yyleng - 2;
+			yylval.val.buf = strdup(yytext);
 
-{hostname}	{
-			PREPROC;
-			yylval.val.len = yyleng;
-			yylval.val.buf = yytext;
-			return(HOSTNAME);
+			return(QUOTEDSTRING);
 		}
 
 .		{ yyerror("Syntax error"); }
