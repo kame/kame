@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.113 2000/11/30 11:13:35 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.114 2000/12/01 16:09:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -248,7 +248,7 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 	 */
 	if (cmd == RTM_ADD && nrt && ifa != nrt->rt_ifa) {
 		IFAFREE(nrt->rt_ifa);
-		ifa->ifa_refcnt++;
+		IFAREF(ifa);
 		nrt->rt_ifa = ifa;
 	}
 	if (nrt)
@@ -826,7 +826,7 @@ in6_update_ifa(ifp, ifra, ia)
 		} else
 			in6_ifaddr = ia;
 		/* gain a refcnt for the link from in6_ifaddr */
-		ia->ia_ifa.ifa_refcnt++;
+		IFAREF(&ia->ia_ifa);
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 		if ((ifa = ifp->if_addrlist) != NULL) {
@@ -840,7 +840,7 @@ in6_update_ifa(ifp, ifra, ia)
 				  ifa_list);
 #endif
 		/* gain another refcnt for the link from if_addrlist */
-		ia->ia_ifa.ifa_refcnt++;
+		IFAREF(&ia->ia_ifa);
 
 #ifdef MEASURE_PERFORMANCE
 		new_ifa = 1;
@@ -1623,7 +1623,7 @@ in6_savemkludge(oia)
 		for (in6m = oia->ia6_multiaddrs.lh_first; in6m; in6m = next){
 			next = in6m->in6m_entry.le_next;
 			IFAFREE(&in6m->in6m_ia->ia_ifa);
-			ia->ia_ifa.ifa_refcnt++;
+			IFAREF(&ia->ia_ifa);
 			in6m->in6m_ia = ia;
 			LIST_INSERT_HEAD(&ia->ia6_multiaddrs, in6m, in6m_entry);
 		}
@@ -1669,7 +1669,7 @@ in6_restoremkludge(ia, ifp)
 			for (in6m = mk->mk_head.lh_first; in6m; in6m = next){
 				next = in6m->in6m_entry.le_next;
 				in6m->in6m_ia = ia;
-				ia->ia_ifa.ifa_refcnt++;
+				IFAREF(&ia->ia_ifa);
 				LIST_INSERT_HEAD(&ia->ia6_multiaddrs,
 						 in6m, in6m_entry);
 			}
@@ -1752,7 +1752,7 @@ in6_addmulti(maddr6, ifp, errorp)
 			return(NULL);
 		}
 		in6m->in6m_ia = ia;
-		ia->ia_ifa.ifa_refcnt++; /* gain a reference */
+		IFAREF(&ia->ia_ifa); /* gain a reference */
 		LIST_INSERT_HEAD(&ia->ia6_multiaddrs, in6m, in6m_entry);
 
 		/*

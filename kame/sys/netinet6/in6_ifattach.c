@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.70 2000/11/30 06:25:02 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.71 2000/12/01 16:09:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -392,7 +392,7 @@ in6_ifattach_addaddr(ifp, ia)
 	TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 #endif
 	/* gain a refcnt for the link from if_addrlist */
-	ia->ia_ifa.ifa_refcnt++;
+	IFAREF(&ia->ia_ifa);
 
 	/*
 	 * Also link into the IPv6 address chain beginning with in6_ifaddr.
@@ -405,7 +405,7 @@ in6_ifattach_addaddr(ifp, ia)
 	} else
 		in6_ifaddr = ia;
 	/* gain another refcnt for the link from in6_ifaddr */
-	ia->ia_ifa.ifa_refcnt++;
+	IFAREF(&ia->ia_ifa);
 
 	/*
 	 * give the interface a chance to initialize, in case this

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.56 2000/11/09 07:32:26 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.57 2000/12/01 16:09:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1480,7 +1480,7 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 		in6_ifaddr = ia;
 	}
 	/* gain a refcnt for the link from in6_ifaddr */
-	ia->ia_ifa.ifa_refcnt++;
+	IFAREF(&ia->ia_ifa);
 
 	/* link to if_addrlist */
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
@@ -1498,7 +1498,7 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 	TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 #endif
 	/* gain another refcnt for the link from if_addrlist */
-	ia->ia_ifa.ifa_refcnt++;
+	IFAREF(&ia->ia_ifa);
 
 	/* new address */
 	ia->ia_addr.sin6_len = sizeof(struct sockaddr_in6);

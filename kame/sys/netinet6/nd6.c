@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.80 2000/12/01 07:33:15 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.81 2000/12/01 16:09:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1274,7 +1274,7 @@ nd6_rtrequest(req, rt, sa)
 				 */
 				if (ifa != rt->rt_ifa) {
 					IFAFREE(rt->rt_ifa);
-					ifa->ifa_refcnt++;
+					IFAREF(ifa);
 					rt->rt_ifa = ifa;
 				}
 			}

@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.c,v 1.31 2000/07/12 12:58:03 jinmei Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.32 2000/12/01 16:09:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -448,7 +448,7 @@ assign_ra_entry(struct rr_prefix *rpp, int iilen, struct in6_ifaddr *ia)
 		 sizeof(*IA6_IN6(ia)) << 3, rpp->rp_plen, iilen);
 	/* link to ia, and put into list */
 	rap->ra_addr = ia;
-	rap->ra_addr->ia_ifa.ifa_refcnt++;
+	IFAREF(&rap->ra_addr->ia_ifa);
 #if 0 /* Can't do this now, because rpp may be on th stack. should fix it? */
 	ia->ia6_ifpr = rp2ifpr(rpp);
 #endif
@@ -574,7 +574,7 @@ in6_prefix_add_ifid(int iilen, struct in6_ifaddr *ia)
 	if (rap != NULL) {
 		if (rap->ra_addr == NULL) {
 			rap->ra_addr = ia;
-			rap->ra_addr->ia_ifa.ifa_refcnt++;
+			IFAREF(&rap->ra_addr->ia_ifa);
 		} else if (rap->ra_addr != ia) {
 			/* There may be some inconsistencies between addrs. */
 			log(LOG_ERR, "ip6_prefix.c: addr %s/%d matched prefix"
@@ -681,14 +681,14 @@ add_each_addr(struct socket *so, struct rr_prefix *rpp, struct rp_addr *rap)
 			/* link this addr and the prefix each other */
 			IFAFREE(&rap->ra_addr->ia_ifa);
 			rap->ra_addr = ia6;
-			rap->ra_addr->ia_ifa.ifa_refcnt++;
+			IFAREF(&rap->ra_addr->ia_ifa);
 			ia6->ia6_ifpr = rp2ifpr(rpp);
 			return;
 		}
 		if (ia6->ia6_ifpr == rp2ifpr(rpp)) {
 			IFAFREE(&rap->ra_addr->ia_ifa);
 			rap->ra_addr = ia6;
-			rap->ra_addr->ia_ifa.ifa_refcnt++;
+			IFAREF(&rap->ra_addr->ia_ifa);
 			return;
 		}
 		/*
