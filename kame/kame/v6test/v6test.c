@@ -30,12 +30,13 @@
 #include "common.h"
 
 u_char buf[65536];
-u_char *conffile = NULL;
+char *conffile = NULL;
 char *iface = NULL;
 char *optsrc, *optdst, *srceaddr, *dsteaddr;
 static struct in6_addr ip6src, ip6dst;
 struct in6_addr *optsrcn, *optdstn;
 int iflag = 0, sflag = 0, dflag = 0, nflag = 0;
+static void usage __P((void));
 static int linkhdrlen __P((int, char *));
 static void form __P((int, char *));
 static void form_ether __P((void));
@@ -64,7 +65,7 @@ main(argc, argv)
 	while ((ch = getopt(argc, argv, "d:f:i:ns:")) != EOF)
 		switch(ch) {
 		case 's':
-			if(inet_pton(AF_INET6, optarg, &ip6src) != 1) {
+			if (inet_pton(AF_INET6, optarg, &ip6src) != 1) {
 				optdst = optarg;
 			} else
 				optsrcn = &ip6src;
@@ -82,16 +83,20 @@ main(argc, argv)
 			iface = optarg;
 			iflag++;
 			break;
-		 case 'n':
+		case 'n':
 			nflag++;
 			break;
 		default:
 			usage();
+			/*NOTREACHED*/
 		}
 	argc -= optind;
 	argv += optind;
-	if (argc == 0)
+
+	if (/*iface == NULL || */ argc == 0) {
 		usage();
+		/*NOTREACHED*/
+	}
 
 	bzero(buf, sizeof(buf));
 	if (nflag == 0)
