@@ -1,7 +1,20 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1953 2001/10/26 13:30:47 keiichi Exp $
+$KAME: CHANGELOG,v 1.1954 2001/10/27 10:07:22 fujisawa Exp $
 
 <200110>
+2001-10-25 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_{defs,rule,transtslot}.[ch]:
+	  kame/kame/natptconfig/{cfparse,misc,showsubs,yylex}.[cy]:
+	- Support bi-directional IPv4 NAT.
+	    This NAT binds global address to private address
+	    one-on-one statically.  Sessions can be initiated from
+	    hosts in the public network as well as the private
+	    network.  So, if you can set nat session as bidirectional,
+	    you can connect to the host located behind this NAT from
+	    public IPv4 network.
+	    You need several IPv4 address, an equal number of host to
+	    be connected to.  Sorry, manual page is not ready yet.
+
 Fri Oct 26 22:29:15 JST 2001 keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6.c
         - add a binding request sending code.
