@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.25 2000/03/25 07:23:59 sumikawa Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.26 2000/05/15 09:30:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -425,8 +425,10 @@ rip6_output(m, va_alist)
 			goto bad;
 		}
 		ip6->ip6_src = *in6a;
-		if (in6p->in6p_route.ro_rt)
+		if (in6p->in6p_route.ro_rt) {
+			/* what if oifp contradicts ? */
 			oifp = ifindex2ifnet[in6p->in6p_route.ro_rt->rt_ifp->if_index];
+		}
 	}
 
 	ip6->ip6_flow = in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK;
