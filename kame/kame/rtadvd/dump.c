@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.16 2001/03/21 17:41:13 jinmei Exp $	*/
+/*	$KAME: dump.c,v 1.17 2001/06/01 17:41:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -102,6 +102,7 @@ if_dump()
 {
 	struct rainfo *rai;
 	struct prefix *pfx;
+	struct rtinfo *rti;
 	char prefixbuf[INET6_ADDRSTRLEN];
 	int first;
 	struct timeval now;
@@ -166,10 +167,9 @@ if_dump()
 		fprintf(fp, "  HAPreference: %d, HALifetime: %d\n",
 			rai->hapref, rai->hatime);
 #endif 
-
 		if (rai->clockskew)
 			fprintf(fp, "  Clock skew: %ldsec\n",
-				rai->clockskew);  
+				rai->clockskew);
 		for (first = 1, pfx = rai->prefix.next; pfx != &rai->prefix;
 		     pfx = pfx->next) {
 			if (first) {
@@ -220,6 +220,24 @@ if_dump()
 				pfx->routeraddr ? "R" :
 #endif
 				"");
+			fprintf(fp, ")\n");
+		}
+		for (first = 1, rti = rai->route.next; rti != &rai->route;
+		     rti = rti->next) {
+			if (first) {
+				fprintf(fp, "  Route Information:\n");
+				first = 0;
+			}
+			fprintf(fp, "    %s/%d (",
+				inet_ntop(AF_INET6, &rti->prefix,
+					  prefixbuf, sizeof(prefixbuf)),
+				rti->prefixlen);
+			fprintf(fp, "Preference: %s, ",
+				rtpref_str[0xff & (rti->rtpref >> 3)]);
+			if (rti->ltime == ND6_INFINITE_LIFETIME)
+				fprintf(fp, "lifetime: infinity");
+			else
+				fprintf(fp, "lifetime: %ld", (long)rti->ltime);
 			fprintf(fp, ")\n");
 		}
 	}
