@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.354 2004/04/09 06:54:29 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.355 2004/04/12 14:12:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2204,7 +2204,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		goto sendpkt;
 
 	/*
-	 * next hop determination.  This routine is derived from ether_outpout.
+	 * next hop determination.  This routine is derived from ether_output.
 	 */
 	if (rt) {
 		if ((rt->rt_flags & RTF_UP) == 0) {
