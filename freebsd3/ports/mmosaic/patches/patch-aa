@@ -1,219 +1,152 @@
-*** Makefile.orig	Thu Mar 30 19:19:13 2000
---- Makefile	Thu Apr 13 20:55:32 2000
-***************
-*** 19,24 ****
---- 19,25 ----
-  
-  # for building a shared lib
-  #ldflags = -G
-+ ldflags = -static
-  
-  #### Linux Intel optimised (does not work well)
-  #prereleaseflags = -O3 -fomit-frame-pointer -funroll-loops -finline-functions -m486 -malign-double
-***************
-*** 26,31 ****
---- 27,33 ----
-  #prereleaseflags = -Wall -g -fno-builtin -fwritable-strings -Wwrite-strings
-  #prereleaseflags = -Wall -g -fwritable-strings  -O0
-  #prereleaseflags = -Wall -g
-+ prereleaseflags = -O
-  # for building a shared lib
-  # prereleaseflags = $prereleaseflags -fPIC
-  #### Qnx
-***************
-*** 33,47 ****
-  #### Sun Workshop C Compiler
-  #prereleaseflags = -v -g -xstrconst
-  #### Sun Workshop C++ Compiler
-! prereleaseflags = +w -g
-  
-  # for building a shared lib
-  # prereleaseflags = $prereleaseflags -fPIC
-  
-  #### On NetBSD, FreeBSD, BSDI, OSF1, IBM , SunOS4this should be ranlib.
-! #RANLIB = ranlib
-  #### ranlib for SVR4, indy , linux Qnx, Solaris2.x
-! RANLIB = /bin/true
-  
-  
-  #### Random system configuration flags.
---- 35,49 ----
-  #### Sun Workshop C Compiler
-  #prereleaseflags = -v -g -xstrconst
-  #### Sun Workshop C++ Compiler
-! #prereleaseflags = +w -g
-  
-  # for building a shared lib
-  # prereleaseflags = $prereleaseflags -fPIC
-  
-  #### On NetBSD, FreeBSD, BSDI, OSF1, IBM , SunOS4this should be ranlib.
-! RANLIB = ranlib
-  #### ranlib for SVR4, indy , linux Qnx, Solaris2.x
-! #RANLIB = /bin/true
-  
-  
-  #### Random system configuration flags.
-***************
-*** 55,65 ****
-  #### For OSF1 -std1 -DDECOSF1
-  #### For Qnx  -DQNX
-  #### for FreeBSD
-! #sysconfigflags = -DFreeBSD -DMOTIF1_2
-  #### for NetBSD
-  #sysconfigflags = -DNETBSD -DMOTIF1_2
-  #### For Solaris2.5 & 2.5.1, do
-! sysconfigflags = -DSOLARIS -DSVR4 -DMOTIF1_2 -DSOLARIS25
-  
-  #### Add some debug option for developper
-  #### -DHTMLTRACE for verbose about html tag
---- 57,67 ----
-  #### For OSF1 -std1 -DDECOSF1
-  #### For Qnx  -DQNX
-  #### for FreeBSD
-! sysconfigflags = -DFreeBSD -DMOTIF1_2
-  #### for NetBSD
-  #sysconfigflags = -DNETBSD -DMOTIF1_2
-  #### For Solaris2.5 & 2.5.1, do
-! #sysconfigflags = -DSOLARIS -DSVR4 -DMOTIF1_2 -DSOLARIS25
-  
-  #### Add some debug option for developper
-  #### -DHTMLTRACE for verbose about html tag
-***************
-*** 75,81 ****
-  #### For most other Motif platforms:
-  # syslibs = -lPW
-  #### For Sun's Ultrix HP BSD/386 FreeBSD and Linux:
-! # syslibs =
-  #### For SCO ODT:
-  # syslibs = -lPW -lsocket -lmalloc
-  #### For Dell SVR4:
---- 77,83 ----
-  #### For most other Motif platforms:
-  # syslibs = -lPW
-  #### For Sun's Ultrix HP BSD/386 FreeBSD and Linux:
-! syslibs =
-  #### For SCO ODT:
-  # syslibs = -lPW -lsocket -lmalloc
-  #### For Dell SVR4:
-***************
-*** 85,91 ****
-  #### For QNX 4.XX
-  #syslibs = -lsocket
-  #### For Solaris (2.x) and Motorola SVR4  .
-! syslibs = -lsocket -lnsl
-  
-  #### X include file locations -- if your platform puts the X include
-  #### files in a strange place, set this variable appropriately.  Else
---- 87,93 ----
-  #### For QNX 4.XX
-  #syslibs = -lsocket
-  #### For Solaris (2.x) and Motorola SVR4  .
-! #syslibs = -lsocket -lnsl
-  
-  #### X include file locations -- if your platform puts the X include
-  #### files in a strange place, set this variable appropriately.  Else
-***************
-*** 94,102 ****
-  # xinc = -I/usr/include/X11
-  # xinc = -I/usr/X11/include
-  #### Linux Debian and FreeBSD
-! #xinc = -I/usr/X11R6/include
-  #### Solaris 2.x (Patched X11R5 and Motif libs)
-! xinc = -I/usr/openwin/include -I/usr/dt/include
-  
-  #### X library locations.
-  #### For nearly everyone:
---- 96,104 ----
-  # xinc = -I/usr/include/X11
-  # xinc = -I/usr/X11/include
-  #### Linux Debian and FreeBSD
-! xinc = -I/usr/X11R6/include
-  #### Solaris 2.x (Patched X11R5 and Motif libs)
-! #xinc = -I/usr/openwin/include -I/usr/dt/include
-  
-  #### X library locations.
-  #### For nearly everyone:
-***************
-*** 113,133 ****
-  #xlibs =  -L/usr/X11/lib -lXm_s -lXt_s -lX11_s -lXqnx_s  -lXt -lXmu -lXext
-  #### Linux Debian, FreeBSD, NetBSD with Lesstif
-  #xlibs = -L/usr/X11R6/lib -lXm -lXmu -lXt -lXext -lX11 -lm 
-  #### For Solaris (2.x) (Use static to go from machine to machine)
-! xlibs = -L/usr/openwin/lib -R/usr/openwin/lib -L/usr/dt/lib -R/usr/dt/lib
-! xlibs += -lXm -lXmu -lXt -lXext -lX11 -lm
-  
-  #### PNG SUPPORT
-  #### For inline PNG support, the following should be defined:
-  #### The libraries currently used are PNGLIB 0.99d and ZLIB 1.0.9
-  
-  # linux Mandrake
-! #zlibdir = /usr/lib
-  #pngdir = /usr
-  #jpegdir = /usr
-  
-  # Solaris
-! zlibdir = /usr/local/lib
-  pngdir = /usr/local
-  jpegdir = /usr/local
-  
---- 115,136 ----
-  #xlibs =  -L/usr/X11/lib -lXm_s -lXt_s -lX11_s -lXqnx_s  -lXt -lXmu -lXext
-  #### Linux Debian, FreeBSD, NetBSD with Lesstif
-  #xlibs = -L/usr/X11R6/lib -lXm -lXmu -lXt -lXext -lX11 -lm 
-+ xlibs = -L/usr/X11R6/lib -lXm -lXmu -lXt -lXext -lX11 -lSM -lICE -lm 
-  #### For Solaris (2.x) (Use static to go from machine to machine)
-! #xlibs = -L/usr/openwin/lib -R/usr/openwin/lib -L/usr/dt/lib -R/usr/dt/lib
-! #xlibs += -lXm -lXmu -lXt -lXext -lX11 -lm
-  
-  #### PNG SUPPORT
-  #### For inline PNG support, the following should be defined:
-  #### The libraries currently used are PNGLIB 0.99d and ZLIB 1.0.9
-  
-  # linux Mandrake
-! zlibdir = /usr/lib
-  #pngdir = /usr
-  #jpegdir = /usr
-  
-  # Solaris
-! #zlibdir = /usr/local/lib
-  pngdir = /usr/local
-  jpegdir = /usr/local
-  
-***************
-*** 166,174 ****
-  krblibs   = $(krb4libs) $(krb5libs) 
-  
-  #### MULTICAST support
-! mcdir = $(PWD)/libmc
-! mcflag = -I$(mcdir) -DMULTICAST
-! mclib = $(mcdir)/libmc.a
-  
-  #### APROG support (obsolete)
-  #adir = $(PWD)/libaprog
---- 169,177 ----
-  krblibs   = $(krb4libs) $(krb5libs) 
-  
-  #### MULTICAST support
-! #mcdir = $(PWD)/libmc
-! #mcflag = -I$(mcdir) -DMULTICAST
-! #mclib = $(mcdir)/libmc.a
-  
-  #### APROG support (obsolete)
-  #adir = $(PWD)/libaprog
-***************
-*** 193,199 ****
-  
-  #### customflags = -DLOOSE_PACKET -DDEBUG_MULTICAST -DDEBUG_FRAME
-  
-! customflags = 
-  
-  
-  # ---------------------- END OF CUSTOMIZABLE OPTIONS -------------------------
---- 196,202 ----
-  
-  #### customflags = -DLOOSE_PACKET -DDEBUG_MULTICAST -DDEBUG_FRAME
-  
-! customflags = -DIPV6
-  
-  
-  # ---------------------- END OF CUSTOMIZABLE OPTIONS -------------------------
+--- Makefile.orig	Mon Jun 19 17:47:54 2000
++++ Makefile	Thu Jun 22 21:41:05 2000
+@@ -22,7 +22,7 @@
+ 
+ #CC = gcc
+ #CC = cc
+-CC = CC
++CC = gcc295
+ 
+ ##
+ ## Linker options
+@@ -33,7 +33,7 @@
+ #ldflags = -shared
+ #ldflags = -Bshared
+ # For building a static lib
+-#ldflags = -static
++ldflags = -static
+ #ldflags = -Bstatic
+ 
+ ##
+@@ -43,7 +43,7 @@
+ # GCC : Linux Intel optimised (does not work well)
+ #prereleaseflags = -O3 -fomit-frame-pointer -funroll-loops -finline-functions -m486 -malign-double
+ # GCC : Linux, FreeBSD, NetBSD compiler flags (recommended)
+-#prereleaseflags = -Wall -g
++prereleaseflags = -g
+ # Qnx
+ #prereleaseflags = -Oeax
+ # SGI Mipspro
+@@ -51,7 +51,7 @@
+ # Sun Workshop C Compiler
+ #prereleaseflags = -v -g -xstrconst
+ # Sun Workshop C++ Compiler
+-prereleaseflags = +w -g
++#prereleaseflags = +w -g
+ 
+ # For building a shared lib add this	(don't use: experimental)
+ #prereleaseflags = $prereleaseflags -fPIC
+@@ -61,9 +61,9 @@
+ ##
+ 
+ # Linux, NetBSD, FreeBSD, BSDI, OSF1, SunOS4this 
+-#RANLIB = ranlib
++RANLIB = ranlib
+ # SVR4, Irix, AIX, Qnx, Solaris 2.x
+-RANLIB = /bin/true
++#RANLIB = /bin/true
+ 
+ ##
+ ## System configuration flags
+@@ -84,13 +84,13 @@
+ # Qnx
+ #sysconfigflags = -DQNX
+ # FreeBSD
+-#sysconfigflags = -DFreeBSD
++sysconfigflags = -DFreeBSD
+ # NetBSD
+ #sysconfigflags = -DNETBSD
+ # Irix
+ #sysconfigflags = -DSVR4 -DIRIX
+ # Solaris2.5 & 2.5.1
+-sysconfigflags = -DSOLARIS -DSVR4
++#sysconfigflags = -DSOLARIS -DSVR4
+ 
+ # Use Motif 1.2.x
+ sysconfigflags += -DMOTIF1_2
+@@ -110,7 +110,7 @@
+ # AIX 3.2
+ #syslibs = -lPW -lbsd
+ # Ultrix, HP-UX, BSD/386, FreeBSD, Linux
+-#syslibs =
++syslibs = -L/usr/local/v6/lib -linet6 -lc_r
+ # SCO ODT
+ #syslibs = -lPW -lsocket -lmalloc
+ # Dell SVR4
+@@ -122,7 +122,7 @@
+ # Irix
+ #syslibs = -lPW
+ # Solaris 2.x, Motorola SVR4
+-syslibs = -lsocket -lnsl
++#syslibs = -lsocket -lnsl
+ 
+ ##
+ ## X11 includes
+@@ -133,11 +133,11 @@
+ #xinc	= -I/usr/include/X11
+ #xinc	= -I/usr/X11/include
+ # Linux, FreeBSD
+-#xinc	= -I/usr/X11R6/include
++xinc	= -I/usr/X11R6/include
+ # Irix
+ #xinc	= -I/usr/include
+ # Solaris 2.x
+-xinc	= -I/usr/openwin/include -I/usr/dt/include
++#xinc	= -I/usr/openwin/include -I/usr/dt/include
+ 
+ 
+ ##
+@@ -157,12 +157,12 @@
+ # QNX
+ #xlibs	= -L/usr/X11/lib -lXm_s -lXt_s -lX11_s -lXqnx_s -lXt -lXmu -lXext
+ # Linux, FreeBSD, NetBSD with Lesstif
+-#xlibs	= -L/usr/X11R6/lib -lXm -lXmu -lXt -lXext -lX11 -lm 
++xlibs	= -L/usr/X11R6/lib -lXm -lXmu -lXt -lXext -lX11 -lm -lSM -lICE
+ # Irix
+ #xlibs	= -L/usr/lib32 -lXm -lXmu -lXt -lXext -lX11 -lm 
+ # Solaris 2.x
+-xlibs	= -L/usr/openwin/lib -R/usr/openwin/lib -L/usr/dt/lib -R/usr/dt/lib
+-xlibs	+= -lXm -lXmu -lXt -lXext -lX11 -lm
++#xlibs	= -L/usr/openwin/lib -R/usr/openwin/lib -L/usr/dt/lib -R/usr/dt/lib
++#xlibs	+= -lXm -lXmu -lXt -lXext -lX11 -lm
+ 
+ ##
+ ## PNG support (PNGLIB 0.99d and ZLIB 1.0.9)
+@@ -175,11 +175,11 @@
+ #pnginc   = /usr/local/include
+ #pnglibs  = /usr/local/lib/libpng.a /usr/lib32/libz.a
+ # FreeBSD
+-#pnginc  = /usr/local/include
+-#pnglibs = /usr/local/lib/libpng.a /usr/lib/libz.a
+-# Solaris
+ pnginc  = /usr/local/include
+-pnglibs = /usr/local/lib/libpng.a /usr/local/lib/libz.a
++pnglibs = /usr/local/lib/libpng.a /usr/lib/libz.a
++# Solaris
++#pnginc  = /usr/local/include
++#pnglibs = /usr/local/lib/libpng.a /usr/local/lib/libz.a
+ 
+ # To disable PNG support comment this.
+ 
+@@ -231,9 +231,9 @@
+ ## MULTICAST support
+ ## 
+ 
+-mcdir = $(PWD)/libmc
+-mcflag = -I$(mcdir) -DMULTICAST
+-mclib = $(mcdir)/libmc.a
++#mcdir = $(PWD)/libmc
++#mcflag = -I$(mcdir) -DMULTICAST
++#mclib = $(mcdir)/libmc.a
+ 
+ ##
+ ## APROG support (obsolete)
+@@ -266,7 +266,7 @@
+ #
+ # Common
+ 
+-customflags = 
++customflags = -DIPV6
+ 
+ ##
+ ## ---------------------- END OF CUSTOMIZABLE OPTIONS -------------------------
