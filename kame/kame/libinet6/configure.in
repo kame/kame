@@ -42,7 +42,7 @@ AC_ARG_ENABLE(inet6,
 
 dnl Checks for library functions.
 AC_FUNC_MEMCMP
-AC_CHECK_FUNCS(gethostname gettimeofday select socket strdup strerror)
+AC_CHECK_FUNCS(gethostname gettimeofday select socket strdup strerror gethostbyname2)
 
 dnl
 dnl Check for sa_len
