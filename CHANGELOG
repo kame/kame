@@ -1,18 +1,29 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1871 2001/09/12 16:54:20 jinmei Exp $
+$KAME: CHANGELOG,v 1.1872 2001/09/12 23:17:40 sakane Exp $
 
 <200109>
+Thu Sep 13 08:15:21 JST 2001 sakane@kame.net
+	* kame/sys/netkey/key.c:
+	newer SA is prefered for a out-bound packet than old one
+	when net.key.prefered_oldsa is set to zero.
+
+Thu Sep 13 08:12:46 JST 2001 sakane@kame.net
+	* kame/sys/netinet6/ipsec.c:
+	fixed to process a IPv6 packet when ah transport after esp tunnel
+	should be applied.  the SA of AH transport could not be selected
+	from the SAD because of this bug. 
+
+Wed Sep 12 16:19:42 JST 2001 sakane@kame.net
+	* kame/racoon/proposal.c:
+	fixed to compare pfs values in two proposals in the case of
+	"claim" mode.  reported by <vanhu@free.fr>
+
 2001-09-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/scope6.c (in6_addr2zoneid): changed the return
 	value type from u_int32_t to int64_t, so that the caller can tell
 	an error from valid "4+28" ID values.  All the callers of this
 	function were also modified accordingly, with stricter validation
 	checks.
-
-Wed Sep 12 16:19:42 JST 2001 sakane@kame.net
-	* kame/racoon/proposal.c:
-	fixed to compare pfs values in two proposals in the case of
-	"claim" mode.  reported by <vanhu@free.fr>
 
 2001-09-03 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{rule.h,trans.c,var.h}:
