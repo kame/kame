@@ -475,6 +475,9 @@ rip6_ctloutput(so, sopt)
 		case MRT6_PIM:
 			error = ip6_mrouter_get(so, sopt);
 			break;
+		case IPV6_CHECKSUM:
+			error = ip6_raw_ctloutput(so, sopt);
+			break;
 		default:
 			error = ip6_ctloutput(so, sopt);
 			break;
@@ -491,6 +494,9 @@ rip6_ctloutput(so, sopt)
 		case MRT6_DEL_MFC:
 		case MRT6_PIM:
 			error = ip6_mrouter_set(so, sopt);
+			break;
+		case IPV6_CHECKSUM:
+			error = ip6_raw_ctloutput(so, sopt);
 			break;
 		default:
 			error = ip6_ctloutput(so, sopt);
