@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1672 2001/05/14 14:03:40 itojun Exp $
+$KAME: CHANGELOG,v 1.1673 2001/05/16 03:06:24 sakane Exp $
 
 <200105>
+Wed May 16 12:04:57 JST 2001 sakane@ydc.co.jp
+	* sys/netinet6/ah_input.c:
+	don't flip ip_id *back* in freebsd4.x case.
+	reported by <ume@mahoroba.org>.
+
 Mon May 14 23:01:30 JST 2001  itojun@iijlab.net
 	* sys/netinet/in_gif.c, sys/netinet6/in6_gif.c: drop IFF_LINK0
 	  (multi destination mode) support.
