@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.20 2002/06/07 02:06:09 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.21 2002/06/07 02:40:03 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -507,7 +507,7 @@ appendpAddrXL6short(struct logmsg *lmsg, struct in6_addr *addr, u_short port)
 		s = miaow;
 		d = Bow;
 		for (iter = 0; iter <= 3; iter++)	*d++ = *s++;
-		*d++ = '=';
+		*d++ = XLATE_ELLIPSIS;
 		while (*s++ != '\0')			;
 		s -= 10;
 		for (iter = 0; iter <= 9; iter++)	*d++ = *s++;

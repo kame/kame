@@ -1,4 +1,4 @@
-/*	$KAME: defs.h,v 1.12 2002/06/07 02:06:08 fujisawa Exp $	*/
+/*	$KAME: defs.h,v 1.13 2002/06/07 02:40:03 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -46,6 +46,7 @@
 #define	NATPT_MAP46		2
 #define	NATPT_MAP44		3
 
+#define	XLATE_ELLIPSIS		'*'
 #define	XLATE_REGULAR		0
 #define	XLATE_LONG		1
 #define	XLATE_SHORT		2
