@@ -106,6 +106,7 @@
 #include <syslog.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "defs.h"
 #include "mld6.h"
 #include "vif.h"
