@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.16 2005/03/01 19:18:57 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.17 2005/03/03 01:20:56 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2181,6 +2181,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 		    "bul_fsm_back_preprocess:"
 		    "received an error status %d.\n",
 		    ip6mhba->ip6mhba_status);
+		bul_fsm_try_other_home_agent(bul);
 		return (-1);
 	}
 
@@ -2551,10 +2552,17 @@ bul_fsm_try_other_home_agent(bul)
 	struct binding_update_list *bul;
 {
 	struct home_agent_list *hal;
+	struct mip6_hpfxl *hpfx;
+	struct mip6_mipif *mif;
 	int error;
 
-	/* XXX remove the current HA entry. */
-	/* mip6_remove_hal(bul->bul_peeraddr) */
+	/*
+	 * remove the unavailable home agent from the home agent list.
+	 */
+	mif = mnd_get_mipif(bul->bul_hoainfo->hinfo_ifindex);
+	LIST_FOREACH(hpfx, &mif->mipif_hprefx_head, hpfx_entry) {
+		mip6_delete_hal(hpfx, &bul->bul_peeraddr);
+	}
 
 	/* 
 	 * pick an address of one of our home agent from the home
