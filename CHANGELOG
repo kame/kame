@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1604 2001/03/15 08:49:42 itojun Exp $
+$KAME: CHANGELOG,v 1.1605 2001/03/15 11:44:43 sakane Exp $
 
 <200103>
+Thu Mar 15 20:39:03 JST 2001 sakane@ydc.co.jp
+	* racoon:
+	- fixed a phase 2 handler deletion.  racoon will delete a phase2
+	  handler immediately when hard lifetime expires.
+	- check a unit of the timer in the configuration file.
+
 Thu Mar 15 17:48:54 JST 2001  itojun@iijlab.net
 	* sys/netinet/ip_mroute.c: use sys/netinet/ip_encap.c framework
 	  for inbound packet dispatch.
