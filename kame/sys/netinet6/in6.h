@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.51 2000/07/12 12:58:03 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.52 2000/07/15 15:28:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,10 +70,6 @@
 
 #ifndef _NETINET6_IN6_H_
 #define _NETINET6_IN6_H_
-
-#ifndef _XOPEN_SOURCE
-#include <sys/queue.h>
-#endif
 
 /*
  * Identification of the network protocol stack
