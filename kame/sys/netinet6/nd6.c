@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.178 2001/07/24 17:54:27 sumikawa Exp $	*/
+/*	$KAME: nd6.c,v 1.179 2001/07/25 06:47:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -236,6 +236,10 @@ nd6_ifattach(ifp)
 	if (ND.basereachable)
 		return;
 
+#ifdef DIAGNOSTIC
+	if (!ifindex2ifnet[ifp->if_index])
+		panic("nd6_ifattach: ifindex2ifnet is NULL");
+#endif
 	ND.linkmtu = ifindex2ifnet[ifp->if_index]->if_mtu;
 	ND.chlim = IPV6_DEFHLIM;
 	ND.basereachable = REACHABLE_TIME;

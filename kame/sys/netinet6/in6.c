@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.220 2001/07/25 05:18:01 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.221 2001/07/25 06:47:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -349,6 +349,8 @@ in6_ifindex2scopeid(idx)
 	if (idx < 0 || if_index < idx)
 		return -1;
 	ifp = ifindex2ifnet[idx];
+	if (!ifp)
+		return -1;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
