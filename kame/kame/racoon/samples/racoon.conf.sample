@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.sample,v 1.12 2000/09/13 06:32:19 itojun Exp $
+# $KAME: racoon.conf.sample,v 1.13 2000/09/20 07:28:53 itojun Exp $
 
 # "path" affects "include" directive.  "path" must be specified before any
 # "include" directive with relative file path.
@@ -34,6 +34,8 @@ remote anonymous
 	lifetime time 24 hour ;	# sec,min,hour
 	lifetime byte 100 MB ;	# B,KB,GB
 
+	#initial_contact off
+
 	# phase 1 proposal (for ISAKMP SA)
 	proposal {
 		encryption_algorithm 3des;
@@ -43,7 +45,10 @@ remote anonymous
 	}
 }
 
-# phase 2 proposal (for IPsec SA)
+# phase 2 proposal (for IPsec SA).
+# actual phase 2 proposal will obey the following items:
+# - kernel IPsec policy configuration (like "esp/transport//use)
+# - permutation of the crypto/hash/compression algorithms presented below
 sainfo anonymous
 {
 	pfs_group 1;
