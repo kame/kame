@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.172 2004/04/15 15:10:23 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.173 2004/04/15 15:15:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1219,12 +1219,6 @@ explore_null(pai, servname, res)
 
 	*res = NULL;
 	ai = NULL;
-
-	/*
-	 * if the servname does not match socktype/protocol, ignore it.
-	 */
-	if (get_portmatch(pai, servname) != 0)
-		return 0;
 
 	afd = find_afd(pai->ai_family);
 	if (afd == NULL)
