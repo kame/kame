@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.10 2001/10/24 04:44:18 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.11 2001/11/06 09:43:11 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -152,7 +152,6 @@ struct mip6_bc {
 #define MIP6_BA_STATUS_NOT_HOME_AGENT        137
 #define MIP6_BA_STATUS_DAD_FAILED            138
 #define MIP6_BA_STATUS_NO_SA                 139
-#define MIP6_BA_STATUS_SUBOPT_MRP_REJECTED   140
 #define MIP6_BA_STATUS_SEQNO_TOO_SMALL       141
 
 LIST_HEAD(mip6_bc_list, mip6_bc);

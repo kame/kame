@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.26 2001/10/26 08:48:55 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.27 2001/11/06 09:43:11 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -59,7 +59,11 @@ struct mip6_req {
 #define MIP6_DHAAD_RETRIES         3
 
 #define IP6SUBOPT_UNIQID 0x02
+#ifdef MIP6_DRAFT13
 #define IP6SUBOPT_ALTCOA 0x04
+#else
+#define IP6SUBOPT_ALTCOA 0x03
+#endif
 
 /* Alternate Care-of Address sub-option format */
 struct mip6_subopt_altcoa {
