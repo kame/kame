@@ -50,7 +50,11 @@ int yy_first_time = 1;
 
 extern char configfilename[];
 
+#if 0
 static void cfdebug_print __P((char *, char *, int));
+#endif
+
+extern int yylex __P((void));
 %}
 
 /* common seciton */
@@ -586,6 +590,7 @@ slash		\/
 		}
 %%
 
+#if 0
 static void
 cfdebug_print(w, t, l)
 	char *w, *t;
@@ -593,6 +598,7 @@ cfdebug_print(w, t, l)
 {
 	printf("<%d>%s [%s] (%d)\n", yy_start, w, t, l);
 }
+#endif
 
 static void
 yyerror0(char *s, va_list ap)

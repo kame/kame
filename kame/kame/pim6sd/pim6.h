@@ -59,7 +59,7 @@ extern struct sockaddr_in6 allpim6routers_group;
 extern char *pim6_send_buf;
 extern int 	pim6_socket;
 
-void init_pim6();
+void init_pim6 __P((void));
 extern void send_pim6        __P((char *buf, struct sockaddr_in6 *src,
                          struct sockaddr_in6 *dst, int type, 
                          int datalen));

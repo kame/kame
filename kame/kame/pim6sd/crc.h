@@ -41,6 +41,6 @@
 #ifndef CRC_H
 #define CRC_H
 
-extern long    crc               __P((unsigned char *buf, int len));
+extern unsigned long crc __P((unsigned char *buf, int len));
 
 #endif

@@ -47,7 +47,7 @@
 #ifndef ROUTESOCK_H
 #define ROUTESOCK_H
 
-void init_routesock();
+int init_routesock __P((void));
 extern int pid;
 extern int    k_req_incoming         __P((struct sockaddr_in6 *source,
                       struct rpfctl *rpfp)); 

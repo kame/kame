@@ -39,6 +39,9 @@
  */
 /* CRC implantation : stolen from RFC 2083 section 15.*/
 
+#include <sys/cdefs.h>
+#include "crc.h"
+
 /* Table of CRCs of all 8-bit messages. */
 	unsigned long crc_table[256];
    
@@ -48,8 +51,11 @@
 
 /* Make the table for a fast CRC. */ 
 
-void make_crc_table(void)
-{       
+static void make_crc_table __P((void));
+static unsigned long update_crc __P((unsigned long, unsigned char *, int));
+
+static void make_crc_table(void)
+{
 	unsigned long c; 
 	int n, k;
 	for (n = 0; n < 256; n++) 
@@ -72,7 +78,7 @@ void make_crc_table(void)
    is the 1's complement of the final running CRC (see the
    crc() routine below)). */
    
-unsigned long update_crc(unsigned long crc, unsigned char *buf,
+static unsigned long update_crc(unsigned long crc, unsigned char *buf,
                                int len)
 {       
 	unsigned long c = crc;

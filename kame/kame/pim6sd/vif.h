@@ -259,13 +259,13 @@ struct rpfctl {
 
 
 
-extern void    init_vifs               __P(());
-extern void    stop_all_vifs           __P(());
-extern void    check_vif_state         __P(());
-struct sockaddr_in6 * max_global_address();
-struct sockaddr_in6 * uv_global __P(());
+extern void    init_vifs __P((void));
+extern void    stop_all_vifs __P((void));
+extern void    check_vif_state __P((void));
+struct sockaddr_in6 * max_global_address __P((void));
+struct sockaddr_in6 * uv_global __P((vifi_t));
 extern vifi_t   local_address       __P((struct sockaddr_in6 *src));
-struct sockaddr_in6 * local_iface( char *ifname );
+struct sockaddr_in6 * local_iface __P((char *ifname));
 extern vifi_t   find_vif_direct     __P((struct sockaddr_in6 *src));
 extern vifi_t  find_vif_direct_local   __P((struct sockaddr_in6 *src));
 extern int vif_forwarder __P((if_set *p1 ,if_set *p2));

@@ -94,8 +94,8 @@ extern int  receive_pim6_cand_rp_adv __P((struct sockaddr_in6 *src, struct socka
                          char *pim_message, int datalen));
 extern int  receive_pim6_bootstrap   __P((struct sockaddr_in6 *src, struct sockaddr_in6 *dst,
                          char *pim_message, int datalen));
-extern int  send_pim6_cand_rp_adv    __P(());
-extern void send_pim6_bootstrap  __P(());
+extern int  send_pim6_cand_rp_adv    __P((void));
+extern void send_pim6_bootstrap  __P((void));
 
 
 #endif

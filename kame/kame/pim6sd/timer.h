@@ -90,11 +90,11 @@ extern u_int32 pim_register_suppression_timeout;
 extern u_int32 pim_register_probe_time;
 extern u_int32 pim_assert_timeout;
 
-extern void init_timers     __P(());
-extern void init_timers     __P(()); 
-extern void age_vifs        __P(()); 
-extern void age_routes      __P(()); 
-extern void age_misc        __P(());
+extern void init_timers     __P((void));
+extern void init_timers     __P((void)); 
+extern void age_vifs        __P((void)); 
+extern void age_routes      __P((void)); 
+extern void age_misc        __P((void));
 
 
 #endif

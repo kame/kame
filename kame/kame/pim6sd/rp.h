@@ -80,9 +80,9 @@ extern struct cand_rp_adv_message_ {
 } cand_rp_adv_message;
 
 
-extern void      init_rp6_and_bsr6         __P(());
+extern void      init_rp6_and_bsr6         __P((void));
 void delete_rp_list( cand_rp_t **used_cand_rp_list , grp_mask_t **used_grp_mask_list );
-u_int16 bootstrap_initial_delay();
+u_int16 bootstrap_initial_delay __P((void));
 extern rpentry_t *rp_match      __P((struct sockaddr_in6 *group));
 extern rp_grp_entry_t *rp_grp_match __P((struct sockaddr_in6 *group));
 extern int  create_pim6_bootstrap_message __P((char *send_buff));

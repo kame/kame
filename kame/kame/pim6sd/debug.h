@@ -146,6 +146,6 @@ extern void dump_vifs       __P((FILE *fp));
 extern void dump_nbrs       __P((FILE *fp));
 extern void dump_pim_mrt        __P((FILE *fp));
 extern int  dump_rp_set     __P((FILE *fp));
-extern void dump_stat __P(());
+extern void dump_stat __P((void));
 
 #endif

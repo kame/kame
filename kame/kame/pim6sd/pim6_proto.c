@@ -136,7 +136,7 @@ static int send_pim6_register_stop 		__P((struct sockaddr_in6 *reg_src , struct 
 	                       		     	     struct sockaddr_in6 *inner_source,
 		                	             struct sockaddr_in6 *inner_grp));
 
-static build_jp_message_t *get_jp6_working_buff __P(());
+static build_jp_message_t *get_jp6_working_buff __P((void));
 static void return_jp6_working_buff 		__P((pim_nbr_entry_t * pim_nbr));
 static void pack_jp6_message 			__P((pim_nbr_entry_t * pim_nbr));
 static void send_jp6_message 			__P((pim_nbr_entry_t * pim_nbr));

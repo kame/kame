@@ -111,6 +111,8 @@
 #include "callout.h"
 #include "timer.h"
 
+#include "mld6_proto.h"
+
 extern struct in6_addr in6addr_any;
 
 typedef struct

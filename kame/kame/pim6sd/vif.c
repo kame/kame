@@ -85,13 +85,13 @@ int total_interfaces;
 if_set			if_nullset;
 if_set			if_result;
 
-int init_reg_vif();
-void start_all_vifs();
-void start_vif( vifi_t vifi );
-void stop_vif( vifi_t vivi );
-int update_reg_vif( vifi_t register_vifi);
+int init_reg_vif __P((void));
+void start_all_vifs __P((void));
+void start_vif __P((vifi_t vifi));
+void stop_vif __P((vifi_t vivi));
+int update_reg_vif __P((vifi_t register_vifi));
 
-extern int cfparse(int, int);
+extern int cfparse __P((int, int));
 
 void init_vifs()
 {

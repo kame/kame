@@ -85,6 +85,8 @@ static int srcmetric, srcpref, helloperiod, jpperiod, granularity,
 static double helloperiod_coef, jpperiod_coef;
 
 static int debugonly;
+
+extern int yylex __P((void));
 %}
 
 %union {
@@ -431,6 +433,19 @@ param_statement:
 	;
 %%
 
+static struct attr_list *add_attribute_flag __P((struct attr_list *, int,
+	unsigned int));
+static struct attr_list *add_attribute_num __P((struct attr_list *, int,
+	double));
+static void free_attr_list __P((struct attr_list *));
+static int param_config __P((void));
+static int phyint_config __P((void));
+static int rp_config __P((void));
+static int bsr_config __P((void));
+static int grp_prefix_config __P((void));
+static int regthres_config __P((void));
+static int datathres_config __P((void));
+
 static struct attr_list *
 add_attribute_flag(list, type, flag)
 	struct attr_list *list;
@@ -484,7 +499,7 @@ free_attr_list(list)
 	}
 }
 
-int
+static int
 param_config()
 {
 	struct uvif *v;
@@ -535,7 +550,7 @@ param_config()
 	return(0);
 }
 
-int
+static int
 phyint_config()
 {
 	struct uvif *v;
@@ -585,7 +600,7 @@ phyint_config()
 	return(0);
 }
 
-int
+static int
 rp_config()
 {
 	struct sockaddr_in6 *sa6_rp = NULL;
@@ -684,7 +699,7 @@ rp_config()
 	return(0);
 }
 
-int
+static int
 bsr_config()
 {
 	struct sockaddr_in6 *sa6_bsr = NULL;
@@ -742,7 +757,7 @@ bsr_config()
 	return(0);
 }
 
-int
+static int
 grp_prefix_config()
 {
 	struct attr_list *pl;
@@ -784,7 +799,7 @@ grp_prefix_config()
 	return(0);
 }
 
-int
+static int
 regthres_config()
 {
 	struct attr_list *al;
@@ -834,7 +849,7 @@ regthres_config()
 	return(0);
 }
 
-int
+static int
 datathres_config()
 {
 	struct attr_list *al;

@@ -80,7 +80,7 @@ extern struct sockaddr_in6 allrouters_group;
 extern struct sockaddr_in6 allnodes_group;
 extern char *mld6_send_buf;
 
-void init_mld6 __P(());
+void init_mld6 __P((void));
 void send_mld6 __P((int type, int code, struct sockaddr_in6 *src,
 		    struct sockaddr_in6 *dst, struct in6_addr *group,
 		    int index, int delay, int datalen, int alert));

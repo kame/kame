@@ -67,6 +67,7 @@
 #include "vif.h"
 #include "mrt.h"
 #include "debug.h"
+#include "kern.h"
 
 
 /*  

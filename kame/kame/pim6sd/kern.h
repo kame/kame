@@ -57,8 +57,8 @@ extern void     k_join          __P((int socket, struct in6_addr *grp,
                      u_int ifindex));
 extern void     k_leave         __P((int socket, struct in6_addr *grp,
                      u_int ifindex));
-extern void     k_init_pim     __P(());
-extern void     k_stop_pim      __P(());
+extern void     k_init_pim     __P((int));
+extern void     k_stop_pim      __P((int));
 extern int      k_del_mfc       __P((int socket, struct sockaddr_in6 *source,
                      struct sockaddr_in6 *group));
 extern int      k_chg_mfc       __P((int socket, struct sockaddr_in6 *source,

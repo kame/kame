@@ -409,13 +409,15 @@ send_pim6(char *buf, struct sockaddr_in6 *src,
 		memcpy(&sndpktinfo->ipi6_addr, &src->sin6_addr,
 		       sizeof(sndpktinfo->ipi6_addr));
 	}
-	if( sendmsg(pim6_socket, &sndmhpim, 0) <0 )
-        if (errno == ENETDOWN)
-            check_vif_state();
-        else
-            log(LOG_WARNING, errno, "sendmsg from %s to %s",
-                inet6_fmt(&src->sin6_addr),
-                inet6_fmt(&dst->sin6_addr));
+	if (sendmsg(pim6_socket, &sndmhpim, 0) < 0) {
+		if (errno == ENETDOWN)
+			check_vif_state();
+		else {
+			log(LOG_WARNING, errno, "sendmsg from %s to %s",
+			    inet6_fmt(&src->sin6_addr),
+			    inet6_fmt(&dst->sin6_addr));
+		}
+	}
 
 	if(setloop)
 		k_set_loop(pim6_socket, FALSE);

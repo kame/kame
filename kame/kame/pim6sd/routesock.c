@@ -76,6 +76,7 @@
 #include <syslog.h>
 #include "vif.h"
 #include "debug.h"
+#include "routesock.h"
 
 #ifdef HAVE_ROUTING_SOCKETS
 union sockunion

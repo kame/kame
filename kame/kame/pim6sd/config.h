@@ -66,7 +66,7 @@
 
 #define EQUAL(s1, s2)            (strcmp((s1), (s2)) == 0)
 
-void config_vifs_from_kernel();
-void config_vifs_from_file();
+void config_vifs_from_kernel __P((void));
+void config_vifs_from_file __P((void));
 
 #endif
