@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.144 2001/08/16 20:24:59 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.145 2001/08/16 20:27:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2593,7 +2593,7 @@ setph2proposal0(iph2, pp, pr)
 	size_t trnsoff;
 	caddr_t x0, x;
 	u_int8_t *np_t; /* pointer next trns type in previous header */
-	u_int8_t *spi;
+	const u_int8_t *spi;
 
 	p = vmalloc(sizeof(*prop) + sizeof(pr->spi));
 	if (p == NULL)
@@ -2606,7 +2606,7 @@ setph2proposal0(iph2, pp, pr)
 	prop->proto_id = pr->proto_id;
 	prop->num_t = 1;
 
-	spi = (u_int8_t *)&pr->spi;
+	spi = (const u_int8_t *)&pr->spi;
 	switch (pr->proto_id) {
 	case IPSECDOI_PROTO_IPCOMP:
 		/*
