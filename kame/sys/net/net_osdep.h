@@ -38,17 +38,17 @@
  *		struct proc *p;
  *		if (p && !suser(p->p_ucred, &p->p_acflag))
  *			privileged;
- *	OpenBSD, BSDI 3, FreeBSD 2
+ *	OpenBSD, BSDI [34], FreeBSD 2
  *		struct socket *so;
  *		if (so->so_state & SS_PRIV)
  *			privileged;
  * - foo_control
  *	NetBSD, FreeBSD 3
  *		needs to give struct proc * as argument
- *	OpenBSD, BSDI 3, FreeBSD 2
+ *	OpenBSD, BSDI [34], FreeBSD 2
  *		do not need struct proc *
  * - bpf:
- *	OpenBSD, NetBSD, BSDI 3
+ *	OpenBSD, NetBSD, BSDI [34]
  *		need caddr_t * (= if_bpf **) and struct ifnet *
  *	FreeBSD 2, FreeBSD 3
  *		need only struct ifnet * as argument
@@ -59,32 +59,32 @@
  *	FreeBSD 3	yes		strange		if_name+unit
  *	OpenBSD		yes		standard	if_xname
  *	NetBSD		yes		standard	if_xname
- *	BSDI 3		no		old standard	if_name+unit
+ *	BSDI [34]	no		old standard	if_name+unit
  * - usrreq
- *	NetBSD, OpenBSD, BSDI 3, FreeBSD 2
+ *	NetBSD, OpenBSD, BSDI [34], FreeBSD 2
  *		single function with PRU_xx, arguments are mbuf 
  *	FreeBSD 3
  *		separates functions, non-mbuf arguments
  * - {set,get}sockopt
- *	NetBSD, OpenBSD, BSDI 3, FreeBSD 2
+ *	NetBSD, OpenBSD, BSDI [34], FreeBSD 2
  *		manipulation based on mbuf
  *	FreeBSD 3
  *		non-mbuf manipulation using sooptcopy{in,out}()
  * - timeout() and untimeout()
- *	NetBSD, OpenBSD, BSDI 3, FreeBSD 2
+ *	NetBSD, OpenBSD, BSDI [34], FreeBSD 2
  *		timeout() is a void function
  *	FreeBSD 3
  *		timeout() is non-void, must keep returned value for untimeuot()
  * - sysctl
  *	NetBSD, OpenBSD
  *		foo_sysctl()
- *	BSDI 3
+ *	BSDI [34]
  *		foo_sysctl() but with different style
  *	FreeBSD 2, FreeBSD 3
  *		linker hack
  *
  * - if_ioctl
- *	NetBSD, FreeBSD 3
+ *	NetBSD, FreeBSD 3, BSDI [34]
  *		2nd argument is u_long cmd
  *	FreeBSD 2
  *		2nd argument is int cmd
@@ -131,7 +131,7 @@ extern char *if_name __P((struct ifnet *));
 #define ovbcopy		bcopy
 #endif
 
-#if defined(__OpenBSD__)
+#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION > 199802)
 #define HAVE_NRL_INPCB
 #endif
 
