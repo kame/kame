@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)unistd.h	8.12 (Berkeley) 4/27/95
- * $FreeBSD: src/include/unistd.h,v 1.35.2.7 2001/12/27 20:35:34 mike Exp $
+ * $FreeBSD: src/include/unistd.h,v 1.35.2.10 2002/04/15 12:52:28 nectar Exp $
  */
 
 #ifndef _UNISTD_H_
@@ -117,7 +117,7 @@ struct timeval;				/* select(2) */
 #endif
 int	 acct __P((const char *));
 int	 async_daemon __P((void));
-char	*brk __P((const char *));
+int	 brk __P((const void *));
 int	 chroot __P((const char *));
 size_t	 confstr __P((int, char *, size_t));
 char	*crypt __P((const char *, const char *));
@@ -146,6 +146,7 @@ int	 getlogin_r __P((char *, int));
 mode_t	 getmode __P((const void *, mode_t));
 int	 getpagesize __P((void)) __pure2;
 char	*getpass __P((const char *));
+int	 getpeereid __P((int, uid_t *, gid_t *));
 int	 getpgid __P((pid_t _pid));
 int	 getresgid __P((gid_t *, gid_t *, gid_t *));
 int	 getresuid __P((uid_t *, uid_t *, uid_t *));
@@ -172,6 +173,8 @@ int	 rcmd __P((char **, int, const char *,
 		const char *, const char *, int *));
 int	 rcmd_af __P((char **, int, const char *,
 		const char *, const char *, int *, int));
+int	 rcmdsh __P((char **, int, const char *,
+		const char *, const char *, const char *));
 char	*re_comp __P((const char *));
 int	 re_exec __P((const char *));
 int	 readlink __P((const char *, char *, int));
@@ -182,7 +185,7 @@ pid_t	 rfork_thread __P((int, void *, int (*) __P((void *)), void *));
 int	 rresvport __P((int *));
 int	 rresvport_af __P((int *, int));
 int	 ruserok __P((const char *, int, const char *, const char *));
-char	*sbrk __P((int));
+void	*sbrk __P((intptr_t));
 int	 select __P((int, fd_set *, fd_set *, fd_set *, struct timeval *));
 int	 setdomainname __P((const char *, int));
 int	 setegid __P((gid_t));

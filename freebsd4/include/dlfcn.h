@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/dlfcn.h,v 1.10.2.1 2000/09/22 02:22:44 jdp Exp $
+ * $FreeBSD: src/include/dlfcn.h,v 1.10.2.2 2002/02/18 08:47:50 sobomax Exp $
  */
 
 #ifndef _DLFCN_H_
@@ -45,6 +45,7 @@
 #define RTLD_MODEMASK	0x3
 #define RTLD_GLOBAL	0x100	/* Make symbols globally available */
 #define RTLD_LOCAL	0	/* Opposite of RTLD_GLOBAL, and the default */
+#define RTLD_TRACE	0x200	/* Trace loaded objects and exit */
 
 /*
  * Special handle arguments for dlsym().
