@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.54 2002/10/09 17:24:46 itojun Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.53 2002/10/09 17:24:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -349,7 +349,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 #endif
 	otip6off = off + sizeof(*icmp6) + sizeof(*otip6);
 	nxt = otip6->ip6_nxt;
-	while (nxt != IPPROTO_IPV6) {
+	while(nxt != IPPROTO_IPV6) {
 		int off;
 
 		off = otip6off;
