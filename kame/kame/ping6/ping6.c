@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.63 2000/08/03 16:41:52 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.64 2000/08/03 16:42:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1838,7 +1838,7 @@ pr_addr(addr)
 
 	if ((options & F_HOSTNAME) == 0)
 		flag |= NI_NUMERICHOST;
-#ifdef KAME_SCOPEID
+#ifdef NI_WITHSCOPEID
 	flag |= NI_WITHSCOPEID;
 #endif
 
