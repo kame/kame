@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1045.2.1 2000/06/20 12:36:29 jinmei Exp $
+$Id: CHANGELOG,v 1.1045.2.2 2000/06/20 19:55:00 itojun Exp $
 
 <200006>
+Wed Jun 21 03:00:16 JST 2000  itojun@iijlab.net
+	* openbsd/sys/dev/pcmcia/if_wi.c: make IPv6 work on wavelan cards.
+
 2000-06-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/net/if_gif.c (gif_ioctl): made sure to cast the
 	argument to in6_aliasreq{} for the SIOCSIFPHYADDR_IN6 command.
