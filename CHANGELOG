@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.31 1999/08/19 07:47:14 itojun Exp $
+$Id: CHANGELOG,v 1.32 1999/08/19 09:02:22 itojun Exp $
 
 <199908>
 Thu Aug 19 15:02:35 JST 1999  itojun@iijlab.net
@@ -24,8 +24,6 @@ Wed Aug 18 22:02:14 JST 1999  itojun@iijlab.net
 
 	  NOTE: rebuild all userland tools as struct in6_ifreq is changed
 	  its size.
-	  NOTE: for forwarding case, we count on wrong interface (to fix this
-	  we need to do an extra routing table lookup).
 	  NOTE: in some cases we are unable to increment counter, because
 	  there's no route for packet (hence interface).
 
