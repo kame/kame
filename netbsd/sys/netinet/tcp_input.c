@@ -503,16 +503,6 @@ tcp6_input(mp, offp, proto)
 {
 	struct mbuf *m = *mp;
 
-#if 0 /*defined(NFAITH) && 0 < NFAITH*/
-	if (m->m_pkthdr.rcvif) {
-		if (m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
-			/* XXX send icmp6 host/port unreach? */
-			m_freem(m);
-			return IPPROTO_DONE;
-		}
-	}
-#endif
-
 	/*
 	 * draft-itojun-ipv6-tcp-to-anycast
 	 * better place to put this in?
