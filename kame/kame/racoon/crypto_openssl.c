@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.23 2000/02/23 08:06:32 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.24 2000/02/23 12:24:28 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -180,13 +180,11 @@ eay_get_x509sign(source, privkey, cert)
 	vchar_t *privkey;
 	vchar_t *cert;
 {
-	EVP_MD_CTX md_ctx;
 	EVP_PKEY *evp;
 	u_char *bp;
-	char sigbuf[BUFSIZE];
-	int siglen;
 	vchar_t *sig = NULL;
-	int error;
+	int len;
+	char xbuf[4096];	/* XXX */
 
 	bp = privkey->v;
 
@@ -197,21 +195,18 @@ eay_get_x509sign(source, privkey, cert)
 
 	/* XXX: to be handled EVP_dss() */
 	/* XXX: Where can I get such parameters ?  From my cert ? */
-	/* XXX: How can I get a length of signed buffer */
-	EVP_SignInit(&md_ctx, EVP_sha1());
-	EVP_SignUpdate(&md_ctx, source->v, source->l);
-	siglen = sizeof(sigbuf);
-	error = EVP_SignFinal(&md_ctx, sigbuf, &siglen, evp);
+	/* XXX: How can I get encrypted buffer length ? */
 
+	len = RSA_private_encrypt(source->l, source->v, xbuf,
+				evp->pkey.rsa, RSA_PKCS1_PADDING);
 	EVP_PKEY_free(evp);
-
-	if (error != 1)
+	if (len == 0)
 		return NULL;
 
-	sig = vmalloc(siglen);
+	sig = vmalloc(len);
 	if (sig == NULL)
 		return NULL;
-	memcpy(sig->v, sigbuf, siglen);
+	memcpy(sig->v, xbuf, sig->l);
 
 	return sig;
 }
@@ -230,12 +225,13 @@ eay_check_x509sign(source, sig, cert)
 	vchar_t *cert;
 {
 	X509 *x509;
-	EVP_MD_CTX md_ctx;
 	EVP_PKEY *evp;
 	u_char *bp;
-	int error;
+	int error, len;
+	char xbuf[4096];	/* XXX */
 
 	bp = cert->v;
+
 	x509 = d2i_X509(NULL, &bp, cert->l);
 	if (x509 == NULL)
 		return -1;
@@ -247,13 +243,15 @@ eay_check_x509sign(source, sig, cert)
 
 	/* Verify the signature */
 	/* XXX: to be handled EVP_dss() */
-	EVP_VerifyInit(&md_ctx, EVP_sha1());
-	EVP_VerifyUpdate(&md_ctx, source->v, source->l);
-	error = EVP_VerifyFinal(&md_ctx, sig->v, sig->l, evp);
 
+	len = RSA_public_decrypt(sig->l, sig->v, xbuf,
+				evp->pkey.rsa, RSA_PKCS1_PADDING);
 	EVP_PKEY_free(evp);
+	if (len == 0 || len != source->l)
+		return NULL;
 
-	if (error != 1)
+	error = memcmp(source->v, xbuf, len);
+	if (error != 0)
 		return -1;
 
 	return 0;
