@@ -144,7 +144,7 @@ if test "x$krb5_libs" = "x"; then
 	netbsd*)	krb5_libs="-lgssapi -lkrb5 -lcom_err -lroken -lasn1";;
 	esac
 fi
-if test $enable_gssapi = "yes"; then
+if test "$enable_gssapi" = "yes"; then
 	LIBS="$LIBS $krb5_libs"
 	CPPFLAGS="-I$krb5_incdir $CPPFLAGS"
 fi
