@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.35 2000/04/26 14:48:22 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.36 2000/04/26 15:47:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -268,6 +268,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 			 * implemented here - see RFC2553 p30
 			 */
 			if (flags & NI_NOFQDN) {
+				char *p;
 				p = strchr(hp->h_name, '.');
 				if (p)
 					*p = '\0';
