@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.35 2003/09/24 18:03:53 jinmei Exp $	*/
+/*	$KAME: setkey.c,v 1.36 2003/09/24 23:52:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -589,7 +589,7 @@ sysctldump(type, satype)
 		return (EINVAL);
 
 	if (sysctl(mib, l, NULL, &len, NULL, 0) < 0)
-		return (-1);
+		return (1);	/* try PF_KEY socket instead */
 	buf = malloc(len);
 	if (!buf)
 		return (ENOBUFS);
