@@ -959,6 +959,7 @@ pinger()
 	int i, cc;
 
 	icp = (struct icmp6_hdr *)outpack;
+	memset(icp, 0, sizeof(*icp));
 	icp->icmp6_code = 0;
 	icp->icmp6_cksum = 0;
 	icp->icmp6_seq = ntransmitted++;		/* htons later */
@@ -971,7 +972,8 @@ pinger()
 		icp->icmp6_type = ICMP6_NI_QUERY;
 		icp->icmp6_code = ICMP6_NI_SUBJ_IPV6;
 		/* XXX: overwrite icmp6_id */
-		icp->icmp6_data16[0] = htons(NI_QTYPE_FQDN);
+		((struct icmp6_nodeinfo *)icp)->ni_qtype = htons(NI_QTYPE_FQDN);
+		((struct icmp6_nodeinfo *)icp)->ni_flags = htons(0);
 		if (timing)
 			(void)gettimeofday((struct timeval *)
 					   &outpack[ICMP6ECHOLEN], NULL);
@@ -984,7 +986,8 @@ pinger()
 		icp->icmp6_type = ICMP6_NI_QUERY;
 		/* code field is always 0 */
 		/* XXX: overwrite icmp6_id */
-		icp->icmp6_data16[0] = htons(NI_QTYPE_FQDN);
+		((struct icmp6_nodeinfo *)icp)->ni_qtype = htons(NI_QTYPE_FQDN);
+		((struct icmp6_nodeinfo *)icp)->ni_flags = htons(0);
 		if (timing)
 			(void)gettimeofday((struct timeval *)
 					   &outpack[ICMP6ECHOLEN], NULL);
@@ -994,7 +997,9 @@ pinger()
 		icp->icmp6_type = ICMP6_NI_QUERY;
 		icp->icmp6_code = ICMP6_NI_SUBJ_IPV6;
 		/* XXX: overwrite icmp6_id */
-		icp->icmp6_data16[0] = htons(NI_QTYPE_NODEADDR);
+		((struct icmp6_nodeinfo *)icp)->ni_qtype =
+		    htons(NI_QTYPE_NODEADDR);
+		((struct icmp6_nodeinfo *)icp)->ni_flags = htons(0);
 		if (timing)
 			(void)gettimeofday((struct timeval *)
 					   &outpack[ICMP6ECHOLEN], NULL);
