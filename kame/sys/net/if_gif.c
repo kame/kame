@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.59 2001/07/25 02:38:42 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.60 2001/07/25 08:42:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -758,22 +758,7 @@ gif_ioctl(ifp, cmd, data)
 
 #ifdef SIOCDIFPHYADDR
 	case SIOCDIFPHYADDR:
-		if (sc->gif_psrc) {
-			free((caddr_t)sc->gif_psrc, M_IFADDR);
-			sc->gif_psrc = NULL;
-		}
-		if (sc->gif_pdst) {
-			free((caddr_t)sc->gif_pdst, M_IFADDR);
-			sc->gif_pdst = NULL;
-		}
-		/* it is safe to detach from both */
-#ifdef INET
-		(void)in_gif_detach(sc);
-#endif
-#ifdef INET6
-		(void)in6_gif_detach(sc);
-#endif
-		/* change the IFF_{UP, RUNNING} flag as well? */
+		gif_delete_tunnel(&sc->gif_if);
 		break;
 #endif
 			
@@ -876,6 +861,39 @@ gif_ioctl(ifp, cmd, data)
 	}
  bad:
 	return error;
+}
+
+void
+gif_delete_tunnel(ifp)
+	struct ifnet *ifp;
+{
+	struct gif_softc *sc = (struct gif_softc *)ifp;
+	int s;
+
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
+	if (sc->gif_psrc) {
+		free((caddr_t)sc->gif_psrc, M_IFADDR);
+		sc->gif_psrc = NULL;
+	}
+	if (sc->gif_pdst) {
+		free((caddr_t)sc->gif_pdst, M_IFADDR);
+		sc->gif_pdst = NULL;
+	}
+	/* it is safe to detach from both */
+#ifdef INET
+	(void)in_gif_detach(sc);
+#endif
+#ifdef INET6
+	(void)in6_gif_detach(sc);
+#endif
+	/* change the IFF_{UP, RUNNING} flag as well? */
+
+	splx(s);
 }
 
 #if defined(__NetBSD__) && defined(ISO)
