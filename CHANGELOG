@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2077 2002/02/17 15:12:01 fujisawa Exp $
+$KAME: CHANGELOG,v 1.2078 2002/02/18 12:30:19 jinmei Exp $
 
 <200202>
+2002-02-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.h: stopped defining the route_in6{}
+	structure for bsdi4 regardless of local configuration options.
+	We'll never need this because BSD/OS has merged the "new" route{}
+	structure, which can store all socket addresses.
+	* kame/sys/netinet6/{mld6.c, route6.h}: always included route.h
+	based on the change above.
+
 2002-02-18 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_*.[ch]:
 	* kame/kame/natptconfig/*.[chly58]:
