@@ -510,6 +510,7 @@ in6_control(so, cmd, data, ifp)
 	case SIOCSNDFLUSH_IN6:
 	case SIOCSPFXFLUSH_IN6:
 	case SIOCSRTRFLUSH_IN6:
+	case SIOCSDEFIFACE_IN6:
 		if (!privileged)
 			return(EPERM);
 		/*fall through*/

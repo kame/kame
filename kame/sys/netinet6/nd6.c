@@ -1390,6 +1390,10 @@ nd6_ioctl(cmd, data, ifp)
 		
 		break;
 	    }
+	case SIOCSDEFIFACE_IN6:	/* XXX: should be implemented as a sysctl? */
+		/* not care about the data */
+		return(nd6_setdefaultiface(ifp));
+		break;
 	}
 	return(error);
 }

@@ -302,6 +302,7 @@ struct nd_defrouter *defrouter_lookup __P((struct in6_addr *,
 int in6_ifdel __P((struct ifnet *, struct in6_addr *));
 int in6_init_prefix_ltimes __P((struct nd_prefix *ndpr));
 void rt6_flush __P((struct in6_addr *, struct ifnet *));
+int nd6_setdefaultiface __P((struct ifnet *));
 
 #endif /* _KERNEL */
 

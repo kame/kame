@@ -70,6 +70,7 @@ static void pfxrtr_del __P((struct nd_pfxrouter *));
 static struct nd_pfxrouter *find_pfxlist_reachable_router __P((struct nd_prefix *));
 static void nd6_detach_prefix __P((struct nd_prefix *));
 static void nd6_attach_prefix __P((struct nd_prefix *));
+static void defrouter_addifreq __P((struct ifnet *));
 
 static void in6_init_address_ltimes __P((struct nd_prefix *ndpr,
 					 struct in6_addrlifetime *lt6,
@@ -87,6 +88,8 @@ static u_char bmask [] = {
 	0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe,
 };
 #endif
+
+struct ifnet *nd6_defifp;
 
 /*
  * Receive Router Solicitation Message - just for routers.
@@ -462,6 +465,43 @@ bad:
 #endif
 }
 
+/* Add a route to a given interface as default */
+static void
+defrouter_addifreq(ifp)
+	struct ifnet *ifp;
+{
+	struct sockaddr_in6 def, mask;
+	struct ifaddr *ifa;
+	int flags = 0, error;
+
+	bzero(&def, sizeof(def));
+	bzero(&mask, sizeof(mask));
+
+	def.sin6_len = mask.sin6_len = sizeof(struct sockaddr_in6);
+	def.sin6_family = mask.sin6_family = AF_INET6;
+
+	/*
+	 * Search for an ifaddr beloging to the specified interface.
+	 * XXX: An IPv6 address are required to be assigned on the interface.
+	 */
+	if ((ifa = ifaof_ifpforaddr((struct sockaddr *)&def, ifp)) == NULL) {
+		log(LOG_ERR,	/* better error? */
+		    "defrouter_addifreq: failed to find an ifaddr "
+		    "to install a route to interface %s\n",
+		    if_name(ifp));
+		return;
+	}
+
+	if ((error = rtrequest(RTM_ADD, (struct sockaddr *)&def,
+			       ifa->ifa_addr, (struct sockaddr *)&mask,
+			       ifa->ifa_flags, NULL)) != 0) {
+		log(LOG_ERR,
+		    "defrouter_addifreq: failed to install a route to "
+		    "interface %s (errno = %d)\n",
+		    if_name(ifp), error);
+	}
+}
+
 struct nd_defrouter *
 defrouter_lookup(addr, ifp)
 	struct in6_addr *addr;
@@ -594,12 +634,34 @@ defrouter_select()
 		defrouter_delreq(&anydr, 0);
 		defrouter_addreq(dr);
 	}
-	else {			/* The Default Router List is empty. */
+	else {
 		/*
-		 * Install the default route to an inteface.
-		 * XXX: notyet, but will soon be implemented.
+		 * The Default Router List is empty, so install the default
+		 * route to an inteface.
+		 * XXX: The specification does not say this mechanism should
+		 * be restricted to hosts, but this would be not useful
+		 * (even harmful) for routers.
 		 */
-		printf("Default router list becomes empty\n");
+		if (!ip6_forwarding) {
+			if (nd6_defifp) {
+				/*
+				 * De-install the current default route
+				 * in advance.
+				 */
+				bzero(&anydr, sizeof(anydr));
+				defrouter_delreq(&anydr, 0);
+
+				/*
+				 * Install a route to the default interface
+				 * as default route.
+				 */
+				defrouter_addifreq(nd6_defifp);
+			}
+			else	/* noisy log? */
+				log(LOG_INFO, "defrouter_select: "
+				    "there's no default router and no default"
+				    " interface\n");
+		}
 	}
 
 	splx(s);
@@ -1015,12 +1077,13 @@ find_pfxlist_reachable_router(pr)
 
 /*
  * Check if each prefix in the prefix list has at least one available router
- * that advertised the prefix.
- * If the check fails, the prefix may be off-link because, for example,
+ * that advertised the prefix (A router is "available" if its neighbor cache
+ * entry has reachable or probably reachable).
+ * If the check fails, the prefix may be off-link, because, for example,
  * we have moved from the network but the lifetime of the prefix has not
  * been expired yet. So we should not use the prefix if there is another
  * prefix that has an available router.
- * But if there is no prefix that has an availble router, we still regards
+ * But if there is no prefix that has an available router, we still regards
  * all the prefixes as on-link. This is because we can't tell if all the
  * routers are simply dead or if we really moved from the network and there
  * is no router around us.
@@ -1537,3 +1600,30 @@ rt6_deleteroute(rn, arg)
 			 rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0));
 #undef SIN6
 }
+
+int
+nd6_setdefaultiface(ifp)
+	struct ifnet *ifp;
+{
+	int error = 0;
+
+	if (ifp == NULL)
+		return(EINVAL);
+
+	if (nd6_defifp != ifp) {
+		nd6_defifp = ifp;
+
+		/*
+		 * If the Default Router List is empty, install a route
+		 * to the specified interface as default.
+		 * The check for the queue is actually redundant, but
+		 * we do this here to avoid re-install the default route
+		 * if the list is NOT empty.
+		 */
+		if (TAILQ_FIRST(&nd_defrouter) == NULL)
+			defrouter_select();
+	}
+
+	return(error);
+}
+	
