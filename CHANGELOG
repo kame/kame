@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1575 2001/03/01 09:49:53 itojun Exp $
+$KAME: CHANGELOG,v 1.1576 2001/03/01 10:01:05 itojun Exp $
 
 <200103>
 Thu Mar  1 18:28:48 JST 2001  itojun@iijlab.net
@@ -9,6 +9,7 @@ Thu Mar  1 18:28:48 JST 2001  itojun@iijlab.net
 	  previously, inbound policy is enforced only for udp/tcp/icmp.
 	  basically the fix is for transport mode case.
 	  XXX ipsec policy engine still needs a great amount of updates.
+	* freebsd4/sys/netinet/in_proto.c: add ipcomp input support.
 
 <200102>
 Wed Feb 28 23:26:26 JST 2001  itojun@iijlab.net
