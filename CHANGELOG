@@ -1,7 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1800 2001/07/21 06:03:50 itojun Exp $
+$KAME: CHANGELOG,v 1.1801 2001/07/22 02:10:25 itojun Exp $
 
 <200107>
+Sun Jul 22 11:07:17 JST 2001  itojun@iijlab.net
+	* netbsd/sys/netinet/in.c: improve IFA_ROUTE management, to make sure
+	  multiple interface addresses with the same prefix (10.0.0.1/24 and
+	  10.0.0.2/24) works right.  i bothered as it is mandatory with
+	  RADIX_MPATH environment, and netbsd-current is moving toward this
+	  direction.  netbsd only.
+	  - on interface address addition, check if there's the same prefix
+	    already installed, and if so, don't install another one
+	  - on removal, check if there's other interface address which has the
+	    same prefix, and if so, move IFA_ROUTE to him
+
 Sat Jul 21 13:30:21 JST 2001  itojun@iijlab.net
 	* sys/netinet6/nd6_rtr.c: simplify default router list manipulation.
 	  try to install multiple default routes into routing table, if
