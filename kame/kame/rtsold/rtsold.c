@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.23 2000/08/13 18:07:07 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.24 2000/08/13 18:08:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -202,7 +202,7 @@ main(argc, argv)
 	/* warn if accept_rtadv is down */
 	if (!getinet6sysctl(IPV6CTL_ACCEPT_RTADV))
 		warnx("kernel is configured not to accept RAs");
-	/* warn if forwarding is up */
+	/* die if forwarding is up */
 	if (getinet6sysctl(IPV6CTL_FORWARDING)) {
 		errx(1, "kernel is configured as a router, not a host");
 		/*NOTREACHED*/
