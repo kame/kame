@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.219 2001/06/26 19:49:16 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.220 2001/06/28 04:09:11 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1824,6 +1824,8 @@ ni6_addrs(ni6, m, ifpp, subj)
 		addrsofif = 0;
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #else
 		for (ifa = ifp->if_addrlist.tqh_first; ifa;
 		     ifa = ifa->ifa_list.tqe_next)
