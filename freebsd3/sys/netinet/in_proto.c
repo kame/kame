@@ -306,7 +306,7 @@ struct protosw in_stf_protosw =
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
   in_stf_input, rip_output,	0,		rip_ctloutput,
   0,
-  0,            0,              0,              0
+  0,            0,              0,              0,
   &rip_usrreqs
 };
 #endif /*NSTF*/
