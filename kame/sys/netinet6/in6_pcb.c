@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.41 2000/03/25 07:23:44 sumikawa Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.42 2000/05/19 05:48:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -178,6 +178,16 @@ in6_pcbbind(in6p, nam)
 		 */
 		if (sin6->sin6_family != AF_INET6)
 			return(EAFNOSUPPORT);
+
+#ifdef __NetBSD__
+		/*
+		 * since we do not check port number duplicate with IPv4 space,
+		 * we reject it at this moment.  If we leave it, we make normal
+		 * user to hijack port number from other users.
+		 */
+		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
+			return(EADDRNOTAVAIL);
+#endif
 
 #ifdef ENABLE_DEFAULT_SCOPE
 		if (sin6->sin6_scope_id == 0)

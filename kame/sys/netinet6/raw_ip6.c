@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.27 2000/05/19 05:48:43 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.28 2000/05/28 23:25:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -671,6 +671,16 @@ rip6_usrreq(so, req, m, nam, control, p)
 		if (addr->sin6_scope_id == 0) {	/* not change if specified  */
 			addr->sin6_scope_id =
 				scope6_addr2default(&addr->sin6_addr);
+		}
+#endif
+#ifdef __NetBSD__
+		/*
+		 * we don't support mapped address here, it would confuse
+		 * users so reject it
+		 */
+		if (IN6_IS_ADDR_V4MAPPED(&addr->sin6_addr)) {
+			error = EADDRNOTAVAIL;
+			break;
 		}
 #endif
 		/*
