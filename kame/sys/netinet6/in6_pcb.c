@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.42 2000/05/19 05:48:43 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.43 2000/05/28 23:25:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -562,9 +562,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 	u_int16_t fport = fport_arg, lport = lport_arg;
 	int errno;
 	int nmatch = 0;
-	void (*notify2) __P((struct in6pcb *, int));
-
-	notify2 = NULL;
+	int do_rtchange = (notify == in6_rtchange);
 
 	if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET6)
 		return 0;
@@ -585,14 +583,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 		lport = 0;
 		bzero((caddr_t)laddr6, sizeof(*laddr6));
 
-		/*
-		 * Keep the old notify function to store a soft error
-		 * in each PCB.
-		 */
-		if (cmd == PRC_HOSTDEAD && notify != in6_rtchange)
-			notify2 = notify;
-
-		notify = in6_rtchange;
+		do_rtchange = 1;
 	}
 
 	if (notify == NULL)
@@ -602,7 +593,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 	for (in6p = head->in6p_next; in6p != head; in6p = nin6p) {
 		nin6p = in6p->in6p_next;
 
-		if (notify == in6_rtchange) {
+		if (do_rtchange) {
 			/*
 			 * Since a non-connected PCB might have a cached route,
 			 * we always call in6_rtchange without matching
@@ -614,10 +605,8 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 					       &faddr6))
 				in6_rtchange(in6p, errno);
 
-			if (notify2 == NULL)
-				continue;
-
-			notify = notify2;
+			if (notify == in6_rtchange)
+				continue; /* there's nothing to do any more */
 		}
 
 		/* at this point, we can assume that NOTIFY is not NULL. */
