@@ -101,4 +101,7 @@
 #define	IFT_FAITH	0x38
 #define IFT_DUMMY       0x39
 
+/* KAME experimental additions */
+#define	IFT_STF		0xf0
+
 #endif
