@@ -1522,6 +1522,8 @@ in6_alias(creq)
 			printf(" duplicated");
 		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DETACHED)
 			printf(" detached");
+		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DEPRECATED)
+			printf(" deprecated");
 	}
 
 	if (scopeid)
