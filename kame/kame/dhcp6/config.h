@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.5 2002/05/01 15:20:30 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.6 2002/05/02 12:07:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -112,9 +112,9 @@ struct cf_list {
 	void *ptr;
 };
 
-enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY};
-enum {IFPARAM_SLA_ID};
-enum {DHCPOPT_RAPID_COMMIT};
+enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY,
+      IFPARAM_SLA_ID,
+      DHCPOPT_RAPID_COMMIT};
 
 extern struct dhcp6_ifconf *dhcp6_iflist;
 
