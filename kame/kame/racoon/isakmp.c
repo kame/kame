@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.118 2000/12/18 04:15:12 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.119 2001/01/06 06:34:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1191,13 +1191,6 @@ isakmp_open()
 		if ((p->sock = socket(p->addr->sa_family, SOCK_DGRAM, 0)) < 0) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"socket (%s)\n", strerror(errno));
-			goto err_and_next;
-		}
-
-		if (setsockopt(p->sock, SOL_SOCKET, SO_REUSEPORT,
-		               (void *)&yes, sizeof(yes)) < 0) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"setsockopt (%s)\n", strerror(errno));
 			goto err_and_next;
 		}
 
