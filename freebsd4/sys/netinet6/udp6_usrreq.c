@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.2 2000/07/15 07:14:38 kris Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.19 2000/11/05 18:25:23 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.20 2000/11/08 01:38:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -644,11 +644,6 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		return EISCONN;
 	s = splnet();
 	error = in6_pcbconnect(inp, nam, p);
-	if (inp->inp_flags & IN6P_AUTOFLOWLABEL) {
-		inp->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
-		inp->in6p_flowinfo |= 
-			(htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
-	}
 	splx(s);
 	if (error == 0) {
 		if (ip6_mapped_addr_on) { /* should be non mapped addr */

@@ -213,7 +213,6 @@ in6_pcbbind(inp, nam, p)
 			return (EAGAIN);
 		}
 	}
-	inp->in6p_flowinfo = sin6 ? sin6->sin6_flowinfo : 0;	/*XXX*/
 	return(0);
 }
 
@@ -329,11 +328,10 @@ in6_pcbconnect(inp, nam, p)
 	}
 	inp->in6p_faddr = sin6->sin6_addr;
 	inp->inp_fport = sin6->sin6_port;
-	/*
-	 * xxx kazu flowlabel is necessary for connect?
-	 * but if this line is missing, the garbage value remains.
-	 */
-	inp->in6p_flowinfo = sin6->sin6_flowinfo;
+	/* update flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
+	if (inp->inp_flags & IN6P_AUTOFLOWLABEL)
+		inp->in6p_flowinfo |=
+		    (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 
 	in_pcbrehash(inp);
 	return (0);
@@ -589,6 +587,8 @@ in6_pcbdisconnect(inp)
 {
 	bzero((caddr_t)&inp->in6p_faddr, sizeof(inp->in6p_faddr));
 	inp->inp_fport = 0;
+	/* clear flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
+	inp->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
 	in_pcbrehash(inp);
 	if (inp->inp_socket->so_state & SS_NOFDREF)
 		in6_pcbdetach(inp);
