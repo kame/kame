@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.15 2000/10/04 17:41:01 itojun Exp $	*/
+/*	$KAME: main.c,v 1.16 2000/10/05 06:34:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -59,6 +59,7 @@
 #include "oakley.h"
 #include "pfkey.h"
 #include "crypto_openssl.h"
+#include "random.h"
 
 /* debug flags */
 u_int32_t debug = 0;
@@ -113,6 +114,7 @@ main(ac, av)
 	parse(ac, av);
 
 	ploginit();
+	random_init();
 
 	plog(logp, LOCATION, NULL,
 		"%s\n", version);

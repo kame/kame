@@ -1,4 +1,4 @@
-/*	$KAME: random.c,v 1.2 2000/10/05 06:34:56 itojun Exp $	*/
+/*	$KAME: random.h,v 1.1 2000/10/05 06:34:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -28,45 +28,5 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * a stub function to make random() to return good random numbers.
- */
 
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/uio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <err.h>
-
-#include "random.h"
-
-static int fd = -1;
-
-void
-random_init()
-{
-	fd = open("/dev/urandom", O_RDONLY, 0600);
-	if (fd < 0) {
-		err(1, "open");
-		/*NOTREACHED*/
-	}
-}
-
-long
-random()
-{
-	long v;
-
-	read(fd, &v, sizeof(v));
-	return v;
-}
-
-void
-srandom(seed)
-	unsigned long seed;
-{
-
-	/* nothing to do */
-}
+extern void random_init __P((void));
