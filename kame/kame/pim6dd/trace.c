@@ -62,7 +62,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: trace.c,v 1.4 1999/09/12 17:00:10 jinmei Exp $
+ *  $Id: trace.c,v 1.5 1999/09/16 08:46:00 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -231,8 +231,10 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 				log(LOG_DEBUG, 0,
 				    "Mcast traceroute: no route entry %s",
 				    inet6_fmt(&qry->tr_src));
+#if 0
 			if (IN6_IS_ADDR_MULTICAST(dst))
 				return;
+#endif
 		}
 		vifi = find_vif_direct(&dst_sa6);
 	
