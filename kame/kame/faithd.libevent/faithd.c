@@ -284,6 +284,12 @@ doaccept(parent, event, arg)
 	    sbuf, sizeof(sbuf), NI_NUMERICHOST);
 	logmsg(LOG_INFO, "relaying %s -> %s, service %s", h1, h2, sbuf);
 
+	if (IN6_IS_ADDR_V4MAPPED(&from.sin6_addr)) {
+		close(relay->r.s);
+		free(relay);
+		return;
+	}
+
 	conf = config_match((struct sockaddr *)&from,
 	    (struct sockaddr *)&relayto);
 	if (!conf || !conf->permit) {
