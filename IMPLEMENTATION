@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/09/23 06:28:05 $
+			$Date: 1999/10/04 15:05:34 $
 
 1. IPv6
 
@@ -72,7 +72,8 @@ RFC2553: Basic Socket Interface Extensions for IPv6
     * IPv4 mapped address (3.7) and special behavior of IPv6 wildcard bind
       socket (3.8) are,
 	- supported on KAME/FreeBSD3x,
-	- supported only for tcp on KAME/NetBSD,
+	- supported on KAME/NetBSD,
+	- supported on KAME/OpenBSD,
 	- not supported on KAME/FreeBSD228 and KAME/BSDI3.
       see 1.12 in this document for details.
 draft-ietf-ipngwg-ipv6router-alert-04: IPv6 router alert option
@@ -509,6 +510,7 @@ different between them.  To summarize:
   and kernel compile configuration.
   (you can't enable only one of them: they come together)
 - KAME/NetBSD supports both.  This is always enabled.
+- KAME/OpenBSD supports both.  This is always enabled.
 
 The following sections will give you the details, and how you can
 configure the behavior.
@@ -633,7 +635,14 @@ while KAME/FreeBSD3x uses merged inpcb structure.
 Supports for IPv4 mapped address/special AF_INET6 wildcard bind are
 enabled by default.  At this moment there is no way to disable it.
 
-1.12.5 configuration and implementation
+1.12.5 KAME/OpenBSD
+
+KAME/OpenBSD uses OpenBSD-based TCP/UDP stack and inpcb source code, which
+was derived from NRL IPv6/IPsec stack.  I guess it supports IPv4 mapped
+address and speical AF_INET6 wildcard bind.  The implementation is, again,
+different from other KAME/*BSDs.
+
+1.12.6 configuration and implementation
 
 On KAME/FreeBSD3x, the behavior is configurable by following procedure.
 To enable it:
