@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.230 2001/07/24 03:36:35 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.231 2001/07/24 05:17:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2310,7 +2310,7 @@ icmp6_reflect(m, off)
 	if (ia == NULL && IN6_IS_ADDR_LINKLOCAL(&t) && (m->m_flags & M_LOOP)) {
 		/*
 		 * This is the case if the dst is our link-local address
-		 * and the sender is also ourseleves.
+		 * and the sender is also ourselves.
 		 */
 		src = &t;
 	}
