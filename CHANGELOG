@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2612 2004/05/27 09:08:18 itojun Exp $
+$KAME: CHANGELOG,v 1.2613 2004/05/28 12:52:55 suz Exp $
 
 <200405>
+2004-05-28  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
+	* freebsd[45]/sys: FreeBSD Security Advisory: FreeBSD-SA-04:11.msync
+
 Thu May 27 17:55:28 JST 2004  itojun@iijlab.net
 	* openbsd: switch to 3.5.  there are a lot more work to do (ALTQ, PF,
 	  CARP, PFSYNC)

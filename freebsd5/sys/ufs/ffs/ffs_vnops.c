@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002 Networks Associates Technology, Inc.
+ * Copyright (c) 2002, 2003 Networks Associates Technology, Inc.
  * All rights reserved.
  *
  * This software was developed for the FreeBSD Project by Marshall
@@ -40,8 +40,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vnops.c	8.15 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_vnops.c,v 1.100 2002/10/18 22:52:40 dillon Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_vnops.c,v 1.119 2003/10/04 20:38:32 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/bio.h>
@@ -50,6 +52,7 @@
 #include <sys/conf.h>
 #include <sys/extattr.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>
 #include <sys/proc.h>
@@ -58,8 +61,6 @@
 #include <sys/stat.h>
 #include <sys/vmmeter.h>
 #include <sys/vnode.h>
-
-#include <machine/limits.h>
 
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
@@ -76,7 +77,11 @@
 
 #include <ufs/ffs/fs.h>
 #include <ufs/ffs/ffs_extern.h>
+#include "opt_directio.h"
 
+#ifdef DIRECTIO
+extern int	ffs_rawread(struct vnode *vp, struct uio *uio, int *workdone);
+#endif
 static int	ffs_fsync(struct vop_fsync_args *);
 static int	ffs_getpages(struct vop_getpages_args *);
 static int	ffs_read(struct vop_read_args *);
@@ -86,7 +91,9 @@ static int	ffs_extwrite(struct vnode *vp, struct uio *uio, int ioflag,
 		    struct ucred *cred);
 static int	ffsext_strategy(struct vop_strategy_args *);
 static int	ffs_closeextattr(struct vop_closeextattr_args *);
+static int	ffs_deleteextattr(struct vop_deleteextattr_args *);
 static int	ffs_getextattr(struct vop_getextattr_args *);
+static int	ffs_listextattr(struct vop_listextattr_args *);
 static int	ffs_openextattr(struct vop_openextattr_args *);
 static int	ffs_setextattr(struct vop_setextattr_args *);
 
@@ -101,7 +108,9 @@ static struct vnodeopv_entry_desc ffs_vnodeop_entries[] = {
 	{ &vop_reallocblks_desc,	(vop_t *) ffs_reallocblks },
 	{ &vop_write_desc,		(vop_t *) ffs_write },
 	{ &vop_closeextattr_desc,	(vop_t *) ffs_closeextattr },
+	{ &vop_deleteextattr_desc,	(vop_t *) ffs_deleteextattr },
 	{ &vop_getextattr_desc,		(vop_t *) ffs_getextattr },
+	{ &vop_listextattr_desc,	(vop_t *) ffs_listextattr },
 	{ &vop_openextattr_desc,	(vop_t *) ffs_openextattr },
 	{ &vop_setextattr_desc,		(vop_t *) ffs_setextattr },
 	{ NULL, NULL }
@@ -116,7 +125,9 @@ static struct vnodeopv_entry_desc ffs_specop_entries[] = {
 	{ &vop_reallocblks_desc,	(vop_t *) ffs_reallocblks },
 	{ &vop_strategy_desc,		(vop_t *) ffsext_strategy },
 	{ &vop_closeextattr_desc,	(vop_t *) ffs_closeextattr },
+	{ &vop_deleteextattr_desc,	(vop_t *) ffs_deleteextattr },
 	{ &vop_getextattr_desc,		(vop_t *) ffs_getextattr },
+	{ &vop_listextattr_desc,	(vop_t *) ffs_listextattr },
 	{ &vop_openextattr_desc,	(vop_t *) ffs_openextattr },
 	{ &vop_setextattr_desc,		(vop_t *) ffs_setextattr },
 	{ NULL, NULL }
@@ -131,7 +142,9 @@ static struct vnodeopv_entry_desc ffs_fifoop_entries[] = {
 	{ &vop_reallocblks_desc,	(vop_t *) ffs_reallocblks },
 	{ &vop_strategy_desc,		(vop_t *) ffsext_strategy },
 	{ &vop_closeextattr_desc,	(vop_t *) ffs_closeextattr },
+	{ &vop_deleteextattr_desc,	(vop_t *) ffs_deleteextattr },
 	{ &vop_getextattr_desc,		(vop_t *) ffs_getextattr },
+	{ &vop_listextattr_desc,	(vop_t *) ffs_listextattr },
 	{ &vop_openextattr_desc,	(vop_t *) ffs_openextattr },
 	{ &vop_setextattr_desc,		(vop_t *) ffs_setextattr },
 	{ NULL, NULL }
@@ -184,7 +197,7 @@ ffs_fsync(ap)
 	VI_LOCK(vp);
 loop:
 	TAILQ_FOREACH(bp, &vp->v_dirtyblkhd, b_vnbufs)
-		bp->b_flags &= ~B_SCANNED;
+		bp->b_vflags &= ~BV_SCANNED;
 	for (bp = TAILQ_FIRST(&vp->v_dirtyblkhd); bp; bp = nbp) {
 		nbp = TAILQ_NEXT(bp, b_vnbufs);
 		/* 
@@ -195,22 +208,21 @@ loop:
 		 * it to be redirtied and it has not already been deferred,
 		 * or it is already being written.
 		 */
-		if ((bp->b_flags & B_SCANNED) != 0)
+		if ((bp->b_vflags & BV_SCANNED) != 0)
 			continue;
-		bp->b_flags |= B_SCANNED;
+		bp->b_vflags |= BV_SCANNED;
 		if ((skipmeta == 1 && bp->b_lblkno < 0))
+			continue;
+		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT, NULL))
 			continue;
 		if (!wait && LIST_FIRST(&bp->b_dep) != NULL &&
 		    (bp->b_flags & B_DEFERRED) == 0 &&
 		    buf_countdeps(bp, 0)) {
 			bp->b_flags |= B_DEFERRED;
+			BUF_UNLOCK(bp);
 			continue;
 		}
 		VI_UNLOCK(vp);
-		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_NOWAIT)) {
-			VI_LOCK(vp);
-			continue;
-		}
 		if ((bp->b_flags & B_DELWRI) == 0)
 			panic("ffs_fsync: not dirty");
 		if (vp != bp->b_vp)
@@ -228,7 +240,6 @@ loop:
 			 */
 			if (passes > 0 || !wait) {
 				if ((bp->b_flags & B_CLUSTEROK) && !wait) {
-					BUF_UNLOCK(bp);
 					(void) vfs_bio_awrite(bp);
 				} else {
 					bremfree(bp);
@@ -253,10 +264,9 @@ loop:
 			splx(s);
 			brelse(bp);
 			s = splbio();
-		} else {
-			BUF_UNLOCK(bp);
+		} else
 			vfs_bio_awrite(bp);
-		}
+
 		/*
 		 * Since we may have slept during the I/O, we need 
 		 * to start from a known point.
@@ -338,7 +348,6 @@ ffs_read(ap)
 	off_t bytesinfile;
 	long size, xfersize, blkoffset;
 	int error, orig_resid;
-	mode_t mode;
 	int seqcount;
 	int ioflag;
 	vm_object_t object;
@@ -352,12 +361,20 @@ ffs_read(ap)
 #else
 		panic("ffs_read+IO_EXT");
 #endif
+#ifdef DIRECTIO
+	if ((ioflag & IO_DIRECT) != 0) {
+		int workdone;
+
+		error = ffs_rawread(vp, uio, &workdone);
+		if (error != 0 || workdone != 0)
+			return error;
+	}
+#endif
 
 	GIANT_REQUIRED;
 
 	seqcount = ap->a_ioflag >> 16;
 	ip = VTOI(vp);
-	mode = ip->i_mode;
 
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_READ)
@@ -390,45 +407,6 @@ ffs_read(ap)
 		vm_object_reference(object);
 	}
 
-#ifdef ENABLE_VFS_IOOPT
-	/*
-	 * If IO optimisation is turned on,
-	 * and we are NOT a VM based IO request, 
-	 * (i.e. not headed for the buffer cache)
-	 * but there IS a vm object associated with it.
-	 */
-	if ((ioflag & IO_VMIO) == 0 && (vfs_ioopt > 1) && object) {
-		int nread, toread;
-
-		toread = uio->uio_resid;
-		if (toread > bytesinfile)
-			toread = bytesinfile;
-		if (toread >= PAGE_SIZE) {
-			/*
-			 * Then if it's at least a page in size, try 
-			 * get the data from the object using vm tricks
-			 */
-			error = uioread(toread, uio, object, &nread);
-			if ((uio->uio_resid == 0) || (error != 0)) {
-				/*
-				 * If we finished or there was an error
-				 * then finish up (the reference previously
-				 * obtained on object must be released).
-				 */
-				if ((error == 0 ||
-				    uio->uio_resid != orig_resid) &&
-				    (vp->v_mount->mnt_flag & MNT_NOATIME) == 0)
-					ip->i_flag |= IN_ACCESS;
-
-				if (object) {
-					vm_object_vndeallocate(object);
-				}
-				return error;
-			}
-		}
-	}
-#endif
-
 	/*
 	 * Ok so we couldn't do it all in one vm trick...
 	 * so cycle around trying smaller bites..
@@ -436,52 +414,6 @@ ffs_read(ap)
 	for (error = 0, bp = NULL; uio->uio_resid > 0; bp = NULL) {
 		if ((bytesinfile = ip->i_size - uio->uio_offset) <= 0)
 			break;
-#ifdef ENABLE_VFS_IOOPT
-		if ((ioflag & IO_VMIO) == 0 && (vfs_ioopt > 1) && object) {
-			/*
-			 * Obviously we didn't finish above, but we
-			 * didn't get an error either. Try the same trick again.
-			 * but this time we are looping.
-			 */
-			int nread, toread;
-			toread = uio->uio_resid;
-			if (toread > bytesinfile)
-				toread = bytesinfile;
-
-			/*
-			 * Once again, if there isn't enough for a
-			 * whole page, don't try optimising.
-			 */
-			if (toread >= PAGE_SIZE) {
-				error = uioread(toread, uio, object, &nread);
-				if ((uio->uio_resid == 0) || (error != 0)) {
-					/*
-					 * If we finished or there was an 
-					 * error then finish up (the reference
-					 * previously obtained on object must 
-					 * be released).
-					 */
-					if ((error == 0 ||
-					    uio->uio_resid != orig_resid) &&
-					    (vp->v_mount->mnt_flag &
-					    MNT_NOATIME) == 0)
-						ip->i_flag |= IN_ACCESS;
-					if (object) {
-						vm_object_vndeallocate(object);
-					}
-					return error;
-				}
-				/*
-				 * To get here we didnt't finish or err.
-				 * If we did get some data,
-				 * loop to try another bite.
-				 */
-				if (nread > 0) {
-					continue;
-				}
-			}
-		}
-#endif
 
 		lbn = lblkno(fs, uio->uio_offset);
 		nextlbn = lbn + 1;
@@ -576,22 +508,6 @@ ffs_read(ap)
 			xfersize = size;
 		}
 
-#ifdef ENABLE_VFS_IOOPT
-		if (vfs_ioopt && object &&
-		    (bp->b_flags & B_VMIO) &&
-		    ((blkoffset & PAGE_MASK) == 0) &&
-		    ((xfersize & PAGE_MASK) == 0)) {
-			/*
-			 * If VFS IO  optimisation is turned on,
-			 * and it's an exact page multiple
-			 * And a normal VM based op,
-			 * then use uiomiveco()
-			 */
-			error =
-				uiomoveco((char *)bp->b_data + blkoffset,
-					(int)xfersize, uio, object, 0);
-		} else 
-#endif
 		{
 			/*
 			 * otherwise use the general form
@@ -641,6 +557,7 @@ ffs_read(ap)
 	}
 
 	if (object) {
+		VM_OBJECT_LOCK(object);
 		vm_object_vndeallocate(object);
 	}
 	if ((error == 0 || uio->uio_resid != orig_resid) &&
@@ -705,6 +622,7 @@ ffs_write(ap)
 			uio->uio_offset = ip->i_size;
 		if ((ip->i_flags & APPEND) && uio->uio_offset != ip->i_size) {
 			if (object) {
+				VM_OBJECT_LOCK(object);
 				vm_object_vndeallocate(object);
 			}
 			return (EPERM);
@@ -726,6 +644,7 @@ ffs_write(ap)
 	if (uio->uio_offset < 0 ||
 	    (u_int64_t)uio->uio_offset + uio->uio_resid > fs->fs_maxfilesize) {
 		if (object) {
+			VM_OBJECT_LOCK(object);
 			vm_object_vndeallocate(object);
 		}
 		return (EFBIG);
@@ -742,6 +661,7 @@ ffs_write(ap)
 		psignal(td->td_proc, SIGXFSZ);
 		PROC_UNLOCK(td->td_proc);
 		if (object) {
+			VM_OBJECT_LOCK(object);
 			vm_object_vndeallocate(object);
 		}
 		return (EFBIG);
@@ -756,13 +676,6 @@ ffs_write(ap)
 	if ((ioflag & IO_SYNC) && !DOINGASYNC(vp))
 		flags |= IO_SYNC;
 
-#ifdef ENABLE_VFS_IOOPT
-	if (object && (object->flags & OBJ_OPT)) {
-		vm_freeze_copyopts(object,
-			OFF_TO_IDX(uio->uio_offset),
-			OFF_TO_IDX(uio->uio_offset + uio->uio_resid + PAGE_MASK));
-	}
-#endif
 	for (error = 0; uio->uio_resid > 0;) {
 		lbn = lblkno(fs, uio->uio_offset);
 		blkoffset = blkoff(fs, uio->uio_offset);
@@ -797,8 +710,8 @@ ffs_write(ap)
 			vfs_bio_clrbuf(bp);
 		if (ioflag & IO_DIRECT)
 			bp->b_flags |= B_DIRECT;
-		if (ioflag & IO_NOWDRAIN)
-			bp->b_flags |= B_NOWDRAIN;
+		if ((ioflag & (IO_SYNC|IO_INVAL)) == (IO_SYNC|IO_INVAL))
+			bp->b_flags |= B_NOCACHE;
 
 		if (uio->uio_offset + xfersize > ip->i_size) {
 			ip->i_size = uio->uio_offset + xfersize;
@@ -873,6 +786,7 @@ ffs_write(ap)
 		error = UFS_UPDATE(vp, 1);
 
 	if (object) {
+		VM_OBJECT_LOCK(object);
 		vm_object_vndeallocate(object);
 	}
 
@@ -890,7 +804,7 @@ ffs_getpages(ap)
 	int i, size, bsize;
 	struct vnode *dp, *vp;
 	vm_object_t obj;
-	vm_pindex_t pindex, firstindex;
+	vm_pindex_t pindex;
 	vm_page_t mreq;
 	int bbackwards, bforwards;
 	int pbackwards, pforwards;
@@ -905,7 +819,6 @@ ffs_getpages(ap)
 
 	pcount = round_page(ap->a_count) / PAGE_SIZE;
 	mreq = ap->a_m[ap->a_reqpage];
-	firstindex = ap->a_m[0]->pindex;
 
 	/*
 	 * if ANY DEV_BSIZE blocks are valid on a large filesystem block,
@@ -913,6 +826,7 @@ ffs_getpages(ap)
 	 * user programs might reference data beyond the actual end of file
 	 * occuring within the page.  We have to zero that data.
 	 */
+	VM_OBJECT_LOCK(mreq->object);
 	if (mreq->valid) {
 		if (mreq->valid != VM_PAGE_BITS_ALL)
 			vm_page_zero_invalid(mreq, TRUE);
@@ -923,9 +837,10 @@ ffs_getpages(ap)
 			}
 		}
 		vm_page_unlock_queues();
+		VM_OBJECT_UNLOCK(mreq->object);
 		return VM_PAGER_OK;
 	}
-
+	VM_OBJECT_UNLOCK(mreq->object);
 	vp = ap->a_vp;
 	obj = vp->v_object;
 	bsize = vp->v_mount->mnt_stat.f_iosize;
@@ -948,6 +863,7 @@ ffs_getpages(ap)
 	dp = VTOI(vp)->i_devvp;
 	if (ufs_bmaparray(vp, reqlblkno, &reqblkno, 0, &bforwards, &bbackwards)
 	    || (reqblkno == -1)) {
+		VM_OBJECT_LOCK(obj);
 		vm_page_lock_queues();
 		for(i = 0; i < pcount; i++) {
 			if (i != ap->a_reqpage)
@@ -959,8 +875,10 @@ ffs_getpages(ap)
 				pmap_zero_page(mreq);
 			vm_page_undirty(mreq);
 			mreq->valid = VM_PAGE_BITS_ALL;
+			VM_OBJECT_UNLOCK(obj);
 			return VM_PAGER_OK;
 		} else {
+			VM_OBJECT_UNLOCK(obj);
 			return VM_PAGER_ERROR;
 		}
 	}
@@ -977,10 +895,12 @@ ffs_getpages(ap)
 		pbackwards = poff + bbackwards * pagesperblock;
 		if (ap->a_reqpage > pbackwards) {
 			firstpage = ap->a_reqpage - pbackwards;
+			VM_OBJECT_LOCK(obj);
 			vm_page_lock_queues();
 			for(i=0;i<firstpage;i++)
 				vm_page_free(ap->a_m[i]);
 			vm_page_unlock_queues();
+			VM_OBJECT_UNLOCK(obj);
 		}
 
 	/*
@@ -990,10 +910,12 @@ ffs_getpages(ap)
 		pforwards = (pagesperblock - (poff + 1)) +
 			bforwards * pagesperblock;
 		if (pforwards < (pcount - (ap->a_reqpage + 1))) {
+			VM_OBJECT_LOCK(obj);
 			vm_page_lock_queues();
 			for( i = ap->a_reqpage + pforwards + 1; i < pcount; i++)
 				vm_page_free(ap->a_m[i]);
 			vm_page_unlock_queues();
+			VM_OBJECT_UNLOCK(obj);
 			pcount = ap->a_reqpage + pforwards + 1;
 		}
 
@@ -1036,14 +958,12 @@ ffs_extread(struct vnode *vp, struct uio *uio, int ioflag)
 	off_t bytesinfile;
 	long size, xfersize, blkoffset;
 	int error, orig_resid;
-	mode_t mode;
 
 	GIANT_REQUIRED;
 
 	ip = VTOI(vp);
 	fs = ip->i_fs;
 	dp = ip->i_din2;
-	mode = ip->i_mode;
 
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_READ || fs->fs_magic != FS_UFS2_MAGIC)
@@ -1257,8 +1177,6 @@ ffs_extwrite(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *ucred)
 			vfs_bio_clrbuf(bp);
 		if (ioflag & IO_DIRECT)
 			bp->b_flags |= B_DIRECT;
-		if (ioflag & IO_NOWDRAIN)
-			bp->b_flags |= B_NOWDRAIN;
 
 		if (uio->uio_offset + xfersize > dp->di_extsize)
 			dp->di_extsize = uio->uio_offset + xfersize;
@@ -1324,7 +1242,7 @@ ffs_extwrite(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *ucred)
  * the length of the EA, and possibly the pointer to the entry and to the data.
  */
 static int
-ffs_findextattr(u_char *ptr, uint length, int nspace, const char *name, u_char **eap, u_char **eac)
+ffs_findextattr(u_char *ptr, u_int length, int nspace, const char *name, u_char **eap, u_char **eac)
 {
 	u_char *p, *pe, *pn, *p0;
 	int eapad1, eapad2, ealength, ealen, nlen;
@@ -1370,7 +1288,6 @@ static int
 ffs_rdextattr(u_char **p, struct vnode *vp, struct thread *td, int extra)
 {
 	struct inode *ip;
-	struct fs *fs;
 	struct ufs2_dinode *dp;
 	struct uio luio;
 	struct iovec liovec;
@@ -1378,7 +1295,6 @@ ffs_rdextattr(u_char **p, struct vnode *vp, struct thread *td, int extra)
 	u_char *eae;
 
 	ip = VTOI(vp);
-	fs = ip->i_fs;
 	dp = ip->i_din2;
 	easize = dp->di_extsize;
 
@@ -1407,12 +1323,10 @@ static int
 ffs_open_ea(struct vnode *vp, struct ucred *cred, struct thread *td)
 {
 	struct inode *ip;
-	struct fs *fs;
 	struct ufs2_dinode *dp;
 	int error;
 
 	ip = VTOI(vp);
-	fs = ip->i_fs;
 
 	if (ip->i_ea_area != NULL)
 		return (EBUSY);
@@ -1432,14 +1346,12 @@ static int
 ffs_close_ea(struct vnode *vp, int commit, struct ucred *cred, struct thread *td)
 {
 	struct inode *ip;
-	struct fs *fs;
 	struct uio luio;
 	struct iovec liovec;
 	int error;
 	struct ufs2_dinode *dp;
 
 	ip = VTOI(vp);
-	fs = ip->i_fs;
 	if (ip->i_ea_area == NULL)
 		return (EINVAL);
 	dp = ip->i_din2;
@@ -1487,6 +1399,8 @@ struct vop_strategy_args {
 	struct vnode *vp;
 	daddr_t lbn;
 
+	KASSERT(ap->a_vp == ap->a_bp->b_vp, ("%s(%p != %p)",
+	    __func__, ap->a_vp, ap->a_bp->b_vp));
 	vp = ap->a_vp;
 	lbn = ap->a_bp->b_lblkno;
 	if (VTOI(vp)->i_fs->fs_magic == FS_UFS2_MAGIC &&
@@ -1518,6 +1432,10 @@ struct vop_openextattr_args {
 	fs = ip->i_fs;
 	if (fs->fs_magic == FS_UFS1_MAGIC)
 		return (ufs_vnoperate((struct vop_generic_args *)ap));
+
+	if (ap->a_vp->v_type == VCHR)
+		return (EOPNOTSUPP);
+
 	return (ffs_open_ea(ap->a_vp, ap->a_cred, ap->a_td));
 }
 
@@ -1544,10 +1462,101 @@ struct vop_closeextattr_args {
 	fs = ip->i_fs;
 	if (fs->fs_magic == FS_UFS1_MAGIC)
 		return (ufs_vnoperate((struct vop_generic_args *)ap));
+
+	if (ap->a_vp->v_type == VCHR)
+		return (EOPNOTSUPP);
+
 	return (ffs_close_ea(ap->a_vp, ap->a_commit, ap->a_cred, ap->a_td));
 }
 
+/*
+ * Vnode operation to remove a named attribute.
+ */
+static int
+ffs_deleteextattr(struct vop_deleteextattr_args *ap)
+/*
+vop_deleteextattr {
+	IN struct vnode *a_vp;
+	IN int a_attrnamespace;
+	IN const char *a_name;
+	IN struct ucred *a_cred;
+	IN struct thread *a_td;
+};
+*/
+{
+	struct inode *ip;
+	struct fs *fs;
+	uint32_t ealength, ul;
+	int ealen, olen, eapad1, eapad2, error, i, easize;
+	u_char *eae, *p;
+	int stand_alone;
 
+	ip = VTOI(ap->a_vp);
+	fs = ip->i_fs;
+
+	if (fs->fs_magic == FS_UFS1_MAGIC)
+		return (ufs_vnoperate((struct vop_generic_args *)ap));
+
+	if (ap->a_vp->v_type == VCHR)
+		return (EOPNOTSUPP);
+
+	if (strlen(ap->a_name) == 0)
+		return (EINVAL);
+
+	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
+	    ap->a_cred, ap->a_td, IWRITE);
+	if (error) {
+		if (ip->i_ea_area != NULL && ip->i_ea_error == 0)
+			ip->i_ea_error = error;
+		return (error);
+	}
+
+	if (ip->i_ea_area == NULL) {
+		error = ffs_open_ea(ap->a_vp, ap->a_cred, ap->a_td);
+		if (error)
+			return (error);
+		stand_alone = 1;
+	} else {
+		stand_alone = 0;
+	}
+
+	ealength = eapad1 = ealen = eapad2 = 0;
+
+	eae = malloc(ip->i_ea_len, M_TEMP, M_WAITOK);
+	bcopy(ip->i_ea_area, eae, ip->i_ea_len);
+	easize = ip->i_ea_len;
+
+	olen = ffs_findextattr(eae, easize, ap->a_attrnamespace, ap->a_name,
+	    &p, NULL);
+	if (olen == -1) {
+		/* delete but nonexistent */
+		free(eae, M_TEMP);
+		if (stand_alone)
+			ffs_close_ea(ap->a_vp, 0, ap->a_cred, ap->a_td);
+		return(ENOATTR);
+	}
+	bcopy(p, &ul, sizeof ul);
+	i = p - eae + ul;
+	if (ul != ealength) {
+		bcopy(p + ul, p + ealength, easize - i);
+		easize += (ealength - ul);
+	}
+	if (easize > NXADDR * fs->fs_bsize) {
+		free(eae, M_TEMP);
+		if (stand_alone)
+			ffs_close_ea(ap->a_vp, 0, ap->a_cred, ap->a_td);
+		else if (ip->i_ea_error == 0)
+			ip->i_ea_error = ENOSPC;
+		return(ENOSPC);
+	}
+	p = ip->i_ea_area;
+	ip->i_ea_area = eae;
+	ip->i_ea_len = easize;
+	free(p, M_TEMP);
+	if (stand_alone)
+		error = ffs_close_ea(ap->a_vp, 1, ap->a_cred, ap->a_td);
+	return(error);
+}
 
 /*
  * Vnode operation to retrieve a named extended attribute.
@@ -1568,10 +1577,8 @@ vop_getextattr {
 {
 	struct inode *ip;
 	struct fs *fs;
-	u_char *eae, *p, *pe, *pn;
-	struct ufs2_dinode *dp;
+	u_char *eae, *p;
 	unsigned easize;
-	uint32_t ul;
 	int error, ealen, stand_alone;
 
 	ip = VTOI(ap->a_vp);
@@ -1579,6 +1586,9 @@ vop_getextattr {
 
 	if (fs->fs_magic == FS_UFS1_MAGIC)
 		return (ufs_vnoperate((struct vop_generic_args *)ap));
+
+	if (ap->a_vp->v_type == VCHR)
+		return (EOPNOTSUPP);
 
 	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
 	    ap->a_cred, ap->a_td, IREAD);
@@ -1593,41 +1603,90 @@ vop_getextattr {
 	} else {
 		stand_alone = 0;
 	}
-	dp = ip->i_din2;
 	eae = ip->i_ea_area;
 	easize = ip->i_ea_len;
-	if (strlen(ap->a_name) > 0) {
-		ealen = ffs_findextattr(eae, easize,
-		    ap->a_attrnamespace, ap->a_name, NULL, &p);
-		if (ealen >= 0) {
-			error = 0;
-			if (ap->a_size != NULL)
-				*ap->a_size = ealen;
-			else if (ap->a_uio != NULL)
-				error = uiomove(p, ealen, ap->a_uio);
-		} else {
-			error = ENOATTR;
-		}
-	} else {
+
+	ealen = ffs_findextattr(eae, easize, ap->a_attrnamespace, ap->a_name,
+	    NULL, &p);
+	if (ealen >= 0) {
 		error = 0;
 		if (ap->a_size != NULL)
-			*ap->a_size = 0;
-		pe = eae + easize;
-		for(p = eae; error == 0 && p < pe; p = pn) {
-			bcopy(p, &ul, sizeof(ul));
-			pn = p + ul;
-			if (pn > pe)
-				break;
-			p += sizeof(ul);
-			if (*p++ != ap->a_attrnamespace)
-				continue;
-			p++;	/* pad2 */
-			ealen = *p;
-			if (ap->a_size != NULL) {
-				*ap->a_size += ealen + 1;
-			} else if (ap->a_uio != NULL) {
-				error = uiomove(p, ealen + 1, ap->a_uio);
-			}
+			*ap->a_size = ealen;
+		else if (ap->a_uio != NULL)
+			error = uiomove(p, ealen, ap->a_uio);
+	} else
+		error = ENOATTR;
+	if (stand_alone)
+		ffs_close_ea(ap->a_vp, 0, ap->a_cred, ap->a_td);
+	return(error);
+}
+
+/*
+ * Vnode operation to retrieve extended attributes on a vnode.
+ */
+static int
+ffs_listextattr(struct vop_listextattr_args *ap)
+/*
+vop_listextattr {
+	IN struct vnode *a_vp;
+	IN int a_attrnamespace;
+	INOUT struct uio *a_uio;
+	OUT size_t *a_size;
+	IN struct ucred *a_cred;
+	IN struct thread *a_td;
+};
+*/
+{
+	struct inode *ip;
+	struct fs *fs;
+	u_char *eae, *p, *pe, *pn;
+	unsigned easize;
+	uint32_t ul;
+	int error, ealen, stand_alone;
+
+	ip = VTOI(ap->a_vp);
+	fs = ip->i_fs;
+
+	if (fs->fs_magic == FS_UFS1_MAGIC)
+		return (ufs_vnoperate((struct vop_generic_args *)ap));
+
+	if (ap->a_vp->v_type == VCHR)
+		return (EOPNOTSUPP);
+
+	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
+	    ap->a_cred, ap->a_td, IREAD);
+	if (error)
+		return (error);
+
+	if (ip->i_ea_area == NULL) {
+		error = ffs_open_ea(ap->a_vp, ap->a_cred, ap->a_td);
+		if (error)
+			return (error);
+		stand_alone = 1;
+	} else {
+		stand_alone = 0;
+	}
+	eae = ip->i_ea_area;
+	easize = ip->i_ea_len;
+
+	error = 0;
+	if (ap->a_size != NULL)
+		*ap->a_size = 0;
+	pe = eae + easize;
+	for(p = eae; error == 0 && p < pe; p = pn) {
+		bcopy(p, &ul, sizeof(ul));
+		pn = p + ul;
+		if (pn > pe)
+			break;
+		p += sizeof(ul);
+		if (*p++ != ap->a_attrnamespace)
+			continue;
+		p++;	/* pad2 */
+		ealen = *p;
+		if (ap->a_size != NULL) {
+			*ap->a_size += ealen + 1;
+		} else if (ap->a_uio != NULL) {
+			error = uiomove(p, ealen + 1, ap->a_uio);
 		}
 	}
 	if (stand_alone)
@@ -1654,10 +1713,8 @@ vop_setextattr {
 	struct inode *ip;
 	struct fs *fs;
 	uint32_t ealength, ul;
-	int ealen, olen, eacont, eapad1, eapad2, error, i, easize;
+	int ealen, olen, eapad1, eapad2, error, i, easize;
 	u_char *eae, *p;
-	struct ufs2_dinode *dp;
-	struct ucred *cred;
 	int stand_alone;
 
 	ip = VTOI(ap->a_vp);
@@ -1666,6 +1723,16 @@ vop_setextattr {
 	if (fs->fs_magic == FS_UFS1_MAGIC)
 		return (ufs_vnoperate((struct vop_generic_args *)ap));
 
+	if (ap->a_vp->v_type == VCHR)
+		return (EOPNOTSUPP);
+
+	if (strlen(ap->a_name) == 0)
+		return (EINVAL);
+
+	/* XXX Now unsupported API to delete EAs using NULL uio. */
+	if (ap->a_uio == NULL)
+		return (EOPNOTSUPP);
+
 	error = extattr_check_cred(ap->a_vp, ap->a_attrnamespace,
 	    ap->a_cred, ap->a_td, IWRITE);
 	if (error) {
@@ -1673,13 +1740,6 @@ vop_setextattr {
 			ip->i_ea_error = error;
 		return (error);
 	}
-
-	if (ap->a_cred != NOCRED)
-		cred = ap->a_cred;
-	else
-		cred = ap->a_vp->v_mount->mnt_cred;
-
-	dp = ip->i_din2;
 
 	if (ip->i_ea_area == NULL) {
 		error = ffs_open_ea(ap->a_vp, ap->a_cred, ap->a_td);
@@ -1690,22 +1750,15 @@ vop_setextattr {
 		stand_alone = 0;
 	}
 
-	/* Calculate the length of the EA entry */
-	if (ap->a_uio == NULL) {
-		/* delete */
-		ealength = eapad1 = ealen = eapad2 = eacont = 0;
-	} else {
-		ealen = ap->a_uio->uio_resid;
-		ealength = sizeof(uint32_t) + 3 + strlen(ap->a_name);
-		eapad1 = 8 - (ealength % 8);
-		if (eapad1 == 8)
-			eapad1 = 0;
-		eacont = ealength + eapad1;
-		eapad2 = 8 - (ealen % 8);
-		if (eapad2 == 8)
-			eapad2 = 0;
-		ealength += eapad1 + ealen + eapad2;
-	}
+	ealen = ap->a_uio->uio_resid;
+	ealength = sizeof(uint32_t) + 3 + strlen(ap->a_name);
+	eapad1 = 8 - (ealength % 8);
+	if (eapad1 == 8)
+		eapad1 = 0;
+	eapad2 = 8 - (ealen % 8);
+	if (eapad2 == 8)
+		eapad2 = 0;
+	ealength += eapad1 + ealen + eapad2;
 
 	eae = malloc(ip->i_ea_len + ealength, M_TEMP, M_WAITOK);
 	bcopy(ip->i_ea_area, eae, ip->i_ea_len);
@@ -1713,13 +1766,6 @@ vop_setextattr {
 
 	olen = ffs_findextattr(eae, easize,
 	    ap->a_attrnamespace, ap->a_name, &p, NULL);
-	if (olen == -1 && ealength == 0) {
-		/* delete but nonexistent */
-		free(eae, M_TEMP);
-		if (stand_alone)
-			ffs_close_ea(ap->a_vp, 0, ap->a_cred, ap->a_td);
-		return(ENOATTR);
-	}
         if (olen == -1) {
 		/* new, append at end */
 		p = eae + easize;
@@ -1740,28 +1786,27 @@ vop_setextattr {
 			ip->i_ea_error = ENOSPC;
 		return(ENOSPC);
 	}
-	if (ealength != 0) {
-		bcopy(&ealength, p, sizeof(ealength));
-		p += sizeof(ealength);
-		*p++ = ap->a_attrnamespace;
-		*p++ = eapad2;
-		*p++ = strlen(ap->a_name);
-		strcpy(p, ap->a_name);
-		p += strlen(ap->a_name);
-		bzero(p, eapad1);
-		p += eapad1;
-		error = uiomove(p, ealen, ap->a_uio);
-		if (error) {
-			free(eae, M_TEMP);
-			if (stand_alone)
-				ffs_close_ea(ap->a_vp, 0, ap->a_cred, ap->a_td);
-			else if (ip->i_ea_error == 0)
-				ip->i_ea_error = error;
-			return(error);
-		}
-		p += ealen;
-		bzero(p, eapad2);
+	bcopy(&ealength, p, sizeof(ealength));
+	p += sizeof(ealength);
+	*p++ = ap->a_attrnamespace;
+	*p++ = eapad2;
+	*p++ = strlen(ap->a_name);
+	strcpy(p, ap->a_name);
+	p += strlen(ap->a_name);
+	bzero(p, eapad1);
+	p += eapad1;
+	error = uiomove(p, ealen, ap->a_uio);
+	if (error) {
+		free(eae, M_TEMP);
+		if (stand_alone)
+			ffs_close_ea(ap->a_vp, 0, ap->a_cred, ap->a_td);
+		else if (ip->i_ea_error == 0)
+			ip->i_ea_error = error;
+		return(error);
 	}
+	p += ealen;
+	bzero(p, eapad2);
+
 	p = ip->i_ea_area;
 	ip->i_ea_area = eae;
 	ip->i_ea_len = easize;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_readwrite.c	8.11 (Berkeley) 5/8/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_readwrite.c,v 1.65 1999/09/20 23:27:58 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_readwrite.c,v 1.65.2.14 2003/04/04 22:21:29 tegge Exp $
  */
 
 #define	BLKSIZE(a, b, c)	blksize(a, b, c)
@@ -47,7 +47,16 @@
 #include <vm/vm_pager.h>
 #include <vm/vm_map.h>
 #include <vm/vnode_pager.h>
-#include <sys/poll.h>
+#include <sys/event.h>
+#include <sys/vmmeter.h>
+#include "opt_directio.h"
+
+#define VN_KNOTE(vp, b) \
+	KNOTE((struct klist *)&vp->v_pollinfo.vpi_selinfo.si_note, (b))
+
+#ifdef DIRECTIO
+extern int ffs_rawread(struct vnode *vp, struct uio *uio, int *workdone);
+#endif
 
 /*
  * Vnode op for reading.
@@ -82,6 +91,15 @@ READ(ap)
 	mode = ip->i_mode;
 	uio = ap->a_uio;
 	ioflag = ap->a_ioflag;
+#ifdef DIRECTIO
+	if ((ioflag & IO_DIRECT) != 0) {
+		int workdone;
+
+		error = ffs_rawread(vp, uio, &workdone);
+		if (error || workdone)
+			return error;
+	}
+#endif
 
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_READ)
@@ -233,12 +251,12 @@ READ(ap)
 		if (bytesinfile < xfersize)
 			xfersize = bytesinfile;
 
-		if (lblktosize(fs, nextlbn) >= ip->i_size)
+		if (lblktosize(fs, nextlbn) >= ip->i_size) {
 			/*
 			 * Don't do readahead if this is the end of the file.
 			 */
 			error = bread(vp, lbn, size, NOCRED, &bp);
-		else if ((vp->v_mount->mnt_flag & MNT_NOCLUSTERR) == 0)
+		} else if ((vp->v_mount->mnt_flag & MNT_NOCLUSTERR) == 0) {
 			/* 
 			 * Otherwise if we are allowed to cluster,
 			 * grab as much as we can.
@@ -248,7 +266,7 @@ READ(ap)
 			 */
 			error = cluster_read(vp, ip->i_size, lbn,
 				size, NOCRED, uio->uio_resid, seqcount, &bp);
-		else if (seqcount > 1) {
+		} else if (seqcount > 1) {
 			/*
 			 * If we are NOT allowed to cluster, then
 			 * if we appear to be acting sequentially,
@@ -260,13 +278,14 @@ READ(ap)
 			int nextsize = BLKSIZE(fs, ip, nextlbn);
 			error = breadn(vp, lbn,
 			    size, &nextlbn, &nextsize, 1, NOCRED, &bp);
-		} else
+		} else {
 			/*
 			 * Failing all of the above, just read what the 
 			 * user asked for. Interestingly, the same as
 			 * the first option above.
 			 */
 			error = bread(vp, lbn, size, NOCRED, &bp);
+		}
 		if (error) {
 			brelse(bp);
 			bp = NULL;
@@ -274,12 +293,27 @@ READ(ap)
 		}
 
 		/*
+		 * If IO_DIRECT then set B_DIRECT for the buffer.  This
+		 * will cause us to attempt to release the buffer later on
+		 * and will cause the buffer cache to attempt to free the
+		 * underlying pages.
+		 */
+		if (ioflag & IO_DIRECT)
+			bp->b_flags |= B_DIRECT;
+
+		/*
 		 * We should only get non-zero b_resid when an I/O error
 		 * has occurred, which should cause us to break above.
 		 * However, if the short read did not cause an error,
 		 * then we want to ensure that we do not uiomove bad
 		 * or uninitialized data.
+		 *
+		 * XXX b_resid is only valid when an actual I/O has occured
+		 * and may be incorrect if the buffer is B_CACHE or if the
+		 * last op on the buffer was a failed write.  This KASSERT
+		 * is a precursor to removing it from the UFS code.
 		 */
+		KASSERT(bp->b_resid == 0, ("bp->b_resid != 0"));
 		size -= bp->b_resid;
 		if (size < xfersize) {
 			if (size == 0)
@@ -315,12 +349,12 @@ READ(ap)
 		if (error)
 			break;
 
-		if ((ioflag & IO_VMIO) &&
-		   (LIST_FIRST(&bp->b_dep) == NULL)) {
+		if ((ioflag & (IO_VMIO|IO_DIRECT)) && 
+		    (LIST_FIRST(&bp->b_dep) == NULL)) {
 			/*
-			 * If there are no dependencies, and
-			 * it's VMIO, then we don't need the buf,
-			 * mark it available for freeing. The VM has the data.
+			 * If there are no dependencies, and it's VMIO,
+			 * then we don't need the buf, mark it available
+			 * for freeing. The VM has the data.
 			 */
 			bp->b_flags |= B_RELBUF;
 			brelse(bp);
@@ -342,8 +376,8 @@ READ(ap)
 	 * so it must have come from a 'break' statement
 	 */
 	if (bp != NULL) {
-		if ((ioflag & IO_VMIO) &&
-		   (LIST_FIRST(&bp->b_dep) == NULL)) {
+		if ((ioflag & (IO_VMIO|IO_DIRECT)) && 
+		    (LIST_FIRST(&bp->b_dep) == NULL)) {
 			bp->b_flags |= B_RELBUF;
 			brelse(bp);
 		} else {
@@ -379,10 +413,12 @@ WRITE(ap)
 	struct proc *p;
 	ufs_daddr_t lbn;
 	off_t osize;
+	int seqcount;
 	int blkoffset, error, extended, flags, ioflag, resid, size, xfersize;
 	vm_object_t object;
 
 	extended = 0;
+	seqcount = ap->a_ioflag >> 16;
 	ioflag = ap->a_ioflag;
 	uio = ap->a_uio;
 	vp = ap->a_vp;
@@ -442,9 +478,17 @@ WRITE(ap)
 
 	resid = uio->uio_resid;
 	osize = ip->i_size;
-	flags = 0;
+
+	/*
+	 * NOTE! These B_ flags are actually balloc-only flags, not buffer
+	 * flags.  They are similar to the BA_ flags in -current.
+	 */
+	if (seqcount > B_SEQMAX)
+		flags = B_SEQMAX << B_SEQSHIFT;
+	else
+		flags = seqcount << B_SEQSHIFT;
 	if ((ioflag & IO_SYNC) && !DOINGASYNC(vp))
-		flags = B_SYNC;
+		flags |= B_SYNC;
 
 	if (object && (object->flags & OBJ_OPT)) {
 		vm_freeze_copyopts(object,
@@ -462,6 +506,10 @@ WRITE(ap)
 		if (uio->uio_offset + xfersize > ip->i_size)
 			vnode_pager_setsize(vp, uio->uio_offset + xfersize);
 
+		/*      
+		 * We must perform a read-before-write if the transfer
+		 * size does not cover the entire buffer.
+		 */
 		if (fs->fs_bsize > xfersize)
 			flags |= B_CLRBUF;
 		else
@@ -471,6 +519,21 @@ WRITE(ap)
 		    ap->a_cred, flags, &bp);
 		if (error != 0)
 			break;
+		/*
+		 * If the buffer is not valid and we did not clear garbage
+		 * out above, we have to do so here even though the write
+		 * covers the entire buffer in order to avoid a mmap()/write
+		 * race where another process may see the garbage prior to
+		 * the uiomove() for a write replacing it.
+		 */
+		if ((bp->b_flags & B_CACHE) == 0 && fs->fs_bsize <= xfersize)
+			vfs_bio_clrbuf(bp);
+		if (ioflag & IO_DIRECT)
+			bp->b_flags |= B_DIRECT;
+		if (ioflag & IO_NOWDRAIN)
+			bp->b_flags |= B_NOWDRAIN;
+		if ((ioflag & (IO_SYNC|IO_INVAL)) == (IO_SYNC|IO_INVAL))
+			bp->b_flags |= B_NOCACHE;
 
 		if (uio->uio_offset + xfersize > ip->i_size) {
 			ip->i_size = uio->uio_offset + xfersize;
@@ -483,19 +546,36 @@ WRITE(ap)
 
 		error =
 		    uiomove((char *)bp->b_data + blkoffset, (int)xfersize, uio);
-		if ((ioflag & IO_VMIO) &&
-		   (LIST_FIRST(&bp->b_dep) == NULL))
+		if ((ioflag & (IO_VMIO|IO_DIRECT)) && 
+		    (LIST_FIRST(&bp->b_dep) == NULL)) {
 			bp->b_flags |= B_RELBUF;
+		}
+
+		/*
+		 * If IO_SYNC each buffer is written synchronously.  Otherwise
+		 * if we have a severe page deficiency write the buffer 
+		 * asynchronously.  Otherwise try to cluster, and if that
+		 * doesn't do it then either do an async write (if O_DIRECT),
+		 * or a delayed write (if not).
+		 */
 
 		if (ioflag & IO_SYNC) {
 			(void)bwrite(bp);
+		} else if (vm_page_count_severe() || 
+			    buf_dirty_count_severe() ||
+			    (ioflag & IO_ASYNC)) {
+			bp->b_flags |= B_CLUSTEROK;
+			bawrite(bp);
 		} else if (xfersize + blkoffset == fs->fs_bsize) {
 			if ((vp->v_mount->mnt_flag & MNT_NOCLUSTERW) == 0) {
 				bp->b_flags |= B_CLUSTEROK;
-				cluster_write(bp, ip->i_size);
+				cluster_write(bp, ip->i_size, seqcount);
 			} else {
 				bawrite(bp);
 			}
+		} else if (ioflag & IO_DIRECT) {
+			bp->b_flags |= B_CLUSTEROK;
+			bawrite(bp);
 		} else {
 			bp->b_flags |= B_CLUSTEROK;
 			bdwrite(bp);
@@ -511,6 +591,8 @@ WRITE(ap)
 	 */
 	if (resid > uio->uio_resid && ap->a_cred && ap->a_cred->cr_uid != 0)
 		ip->i_mode &= ~(ISUID | ISGID);
+	if (resid > uio->uio_resid)
+		VN_KNOTE(vp, NOTE_WRITE | (extended ? NOTE_EXTEND : 0));
 	if (error) {
 		if (ioflag & IO_UNIT) {
 			(void)UFS_TRUNCATE(vp, osize,
@@ -520,8 +602,6 @@ WRITE(ap)
 		}
 	} else if (resid > uio->uio_resid && (ioflag & IO_SYNC))
 		error = UFS_UPDATE(vp, 1);
-	if (!error)
-		VN_POLLEVENT(vp, POLLWRITE | (extended ? POLLEXTEND : 0));
 
 	if (object)
 		vm_object_vndeallocate(object);
