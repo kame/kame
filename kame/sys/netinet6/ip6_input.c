@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.201 2001/07/23 05:10:38 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.202 2001/07/23 05:17:48 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -479,7 +479,7 @@ ip6_input(m)
 	ip6_delaux(m);
 
 	/*
-	 * mbuf statistics by kazu
+	 * mbuf statistics
 	 */
 	if (m->m_flags & M_EXT) {
 		if (m->m_next)
