@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.735 2000/03/29 07:36:04 sumikawa Exp $
+$Id: CHANGELOG,v 1.736 2000/03/30 14:49:12 sumikawa Exp $
 
 <200003>
+Thu Mar 30 14:10:35 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd4: turn off gif and faith temporally.
+	  basic catching up was done. I checked ping[46]/telnet6/ssh[46]
+	  work on KAME-current/FreeBSD4.
+	  (Now I have alpha box only. I do not check it on x86 environment)
+	  TODO:
+	    gif, faith, altq, IPsec(encap4_input), mip6, natpt
+
 Wed Mar 29 16:34:20 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/ncftp3: upgrade to 3.0.0.
 	* freebsd3: remove MAPPED_ADDR_ENABLED option to easily code
