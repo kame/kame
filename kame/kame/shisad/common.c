@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.8 2005/01/28 02:07:10 ryuji Exp $  */
+/*      $KAME: common.c,v 1.9 2005/01/31 11:35:51 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -1814,6 +1814,8 @@ command_show_stat(s)
 	}
 	PS("DHAAD request", mip6stat.mip6s_odhreq);
 	PS("DHAAD reply", mip6stat.mip6s_odhreply);
+	PS("MPA", mip6stat.mip6s_ompa);
+	PS("MPS", mip6stat.mip6s_omps);
 	PS("Home Address Option", mip6stat.mip6s_ohao);
 	PS("Routing Header type 2", mip6stat.mip6s_orthdr2);
 	PS("reverse tunneled output", mip6stat.mip6s_orevtunnel);

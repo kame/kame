@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.12 2005/01/31 08:25:28 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.13 2005/01/31 11:35:51 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -880,6 +880,11 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	if (lifetime == 0 
 	    || IN6_ARE_ADDR_EQUAL(coa, hoa)) {
 		if (bc) {
+			bc->bc_coa = *coa;
+			/* The above hack is necessary to pass the new CoA.
+			   the address is used for updating tunnel SA 
+			   Does it work on MCOA case ?
+			 */
 			mip6_bc_delete(bc);
 			syslog(LOG_INFO,
 			       "binding cache has been deleted\n");

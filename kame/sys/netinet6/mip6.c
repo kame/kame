@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.211 2005/01/31 09:42:56 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.212 2005/01/31 11:35:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -566,11 +566,12 @@ mip6_bce_remove_addr(cnaddr, hoa, coa, flags, bid)
 	u_int16_t flags, bid;
 {
 	struct mip6_bc_internal *mbc;
-	
+
 	mbc = mip6_bce_get(&hoa->sin6_addr, &cnaddr->sin6_addr, NULL, bid);
 	if (!mbc)
 		return (0);
 
+	mbc->mbc_coa = coa->sin6_addr;
 	return (mip6_bce_remove_bc(mbc));
 }
 
