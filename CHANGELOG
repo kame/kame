@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2722 2005/02/07 03:09:16 keiichi Exp $
+$KAME: CHANGELOG,v 1.2723 2005/02/15 19:06:49 jinmei Exp $
 
 <200502>
+2005-02-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ipsec.c: (ipsec[46]_in_reject): fixed
+	unexpected panic on freebsd5.
+
 Mon Feb  7 12:02:16 JST 2005	keiichi@iijlab.net
 	* freebsd4: Upgrade to 4.11-RELEASE
 
