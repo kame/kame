@@ -1,12 +1,11 @@
---- etc.c-	Wed Dec  1 19:49:48 1999
-+++ etc.c	Wed Dec  8 00:43:40 1999
-@@ -1526,6 +1526,9 @@
- 		   sec);
- }
- 
-+#ifdef INET6
-+#include <sys/socket.h>
-+#endif /* INET6 */
- #include <netdb.h>
- char *
- FQDN(char *host)
+--- config.h~	Tue Jan 11 03:49:52 2000
++++ config.h	Tue Jan 11 03:50:56 2000
+@@ -55,7 +55,7 @@
+ HELP_DIR_JA = %%PREFIX%%/share/doc/ja/w3m
+ HELP_FILE = w3mhelp_en.html
+ SYS_LIBRARIES = -lncurses
+-LOCAL_LIBRARIES = 
++LOCAL_LIBRARIES = -L/usr/local/v6/lib -linet6
+ #CC = gcc
+ #MYCFLAGS = -g -I./gc
+ KEYBIND_SRC = keybind.c

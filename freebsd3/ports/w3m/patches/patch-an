@@ -1,0 +1,12 @@
+--- etc.c-	Wed Dec  1 19:49:48 1999
++++ etc.c	Wed Dec  8 00:43:40 1999
+@@ -1526,6 +1526,9 @@
+ 		   sec);
+ }
+ 
++#ifdef INET6
++#include <sys/socket.h>
++#endif /* INET6 */
+ #include <netdb.h>
+ char *
+ FQDN(char *host)

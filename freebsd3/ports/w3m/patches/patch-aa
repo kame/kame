@@ -1,14 +1,5 @@
 --- config.h.orig	Thu Dec  2 13:12:36 1999
-+++ config.h	Wed Dec  8 00:39:36 1999
-@@ -23,7 +23,7 @@
- /*
-    If you want to use IPv6, define this symbol.
-  */
--#undef INET6
-+#define INET6
- 
- /*
-    If you want to load and save URL history.
++++ config.h	Mon Dec  6 03:21:06 1999
 @@ -49,18 +49,20 @@
  /**********************************************************/
  #ifdef makefile_parameter
@@ -17,16 +8,15 @@
 -HELP_DIR = /usr/local/lib/w3m
 -HELP_FILE = w3mhelp_ja.html
 -SYS_LIBRARIES = -lgpm  -lbsd -lncurses 
--LOCAL_LIBRARIES = 
--CC = gcc
--MYCFLAGS = -g -I./gc
 +BIN_DIR = %%PREFIX%%/bin
 +LIB_DIR = %%PREFIX%%/libexec/w3m
 +HELP_DIR = %%PREFIX%%/share/doc/w3m
 +HELP_DIR_JA = %%PREFIX%%/share/doc/ja/w3m
 +HELP_FILE = w3mhelp_en.html
 +SYS_LIBRARIES = -lncurses
-+LOCAL_LIBRARIES = -L/usr/local/v6/lib -linet6
+ LOCAL_LIBRARIES = 
+-CC = gcc
+-MYCFLAGS = -g -I./gc
 +#CC = gcc
 +#MYCFLAGS = -g -I./gc
  KEYBIND_SRC = keybind.c
@@ -61,13 +51,12 @@
 -#define DEF_EDITOR "/bin/vi"
 -#define DEF_MAILER "/bin/mail"
 -#define DEF_EXT_BROWSER "/usr/local/bin/netscape"
--
--#define LIB_DIR      "/usr/local/lib/w3m"
--#define HELP_FILE    "w3mhelp.html"
 +#define DEF_EDITOR "/usr/bin/vi"
 +#define DEF_MAILER "/usr/bin/mail"
 +#define DEF_EXT_BROWSER "%%PREFIX%%/bin/netscape"
-+
+ 
+-#define LIB_DIR      "/usr/local/lib/w3m"
+-#define HELP_FILE    "w3mhelp.html"
 +#define LIB_DIR      "%%PREFIX%%/libexec/w3m"
 +#ifdef JAPANESE
 +#define HELP_FILE    "%%PREFIX%%/share/doc/ja/w3m/w3mhelp_ja.html"

@@ -1,10 +1,9 @@
 # New ports collection makefile for:   w3m
-# Version required:		991203
+# Version required:		991028-2
 # Date Created:			7 Oct 1999
 # Whom:				MANTANI Nobutaka <nobutaka@nobutaka.com>
 #
-# $FreeBSD: ports/www/w3m/Makefile,v 1.3 1999/11/18 21:56:34 sada Exp $
-# $Id: Makefile,v 1.4 1999/12/27 12:37:19 sumikawa Exp $
+# $FreeBSD: ports/www/w3m/Makefile,v 1.5 2000/01/10 14:48:37 sumikawa Exp $
 #
 
 DISTNAME=	w3m-${W3M_DIST_VER}
@@ -17,7 +16,7 @@ MASTER_SITES=	ftp://ei5nazha.yz.yamagata-u.ac.jp/w3m/ \
 		http://www.instinct.org/~pgl/w3m/ \
 		http://grilli.net/mirrors/w3m/download/
 
-MAINTAINER=	sumikawa@kame.net
+MAINTAINER=	nobutaka@nobutaka.com
 
 RESTRICTED=     "Contains cryptography"
 
@@ -33,6 +32,10 @@ DOCS=		FAQ.html MANUAL.html MANUAL_lynx.html README \
 		keymap.lynx menu.default menu.submenu
 SED_CMD=	-e "s,%%PREFIX%%,${PREFIX},g" \
 		-e "s,%%LOCALBASE%%,${LOCALBASE},g"
+
+#.if defined(USE_INET6)
+SED_CMD+=	-e "s,undef INET6,define INET6,g"
+#.endif
 
 .if defined(JAPANESE)
 SED_CMD+=	-e "s,undef JAPANESE,define JAPANESE,g" \
