@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1008 2000/06/13 10:17:52 jinmei Exp $
+$Id: CHANGELOG,v 1.1009 2000/06/13 10:19:13 jinmei Exp $
 
 <200006>
 2000-06-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -8,7 +8,7 @@ $Id: CHANGELOG,v 1.1008 2000/06/13 10:17:52 jinmei Exp $
 	interface direct route if we have an address that shares the same
 	prefix with the deleted address.
 	This would improve behavior in multi-address environments;
-	if you assigned multple addresses that shared a same prefix and
+	if you assigned multiple addresses that shared a same prefix and
 	then remove one of them, the interface direct route corresponding
 	to the address would still remain.
 
