@@ -107,6 +107,65 @@ main(argc, argv)
 				       &hlim, sizeof(hlim)))
 				warn("setsockopt(IPV6_HOPLIMIT %d)", hlim);
 		}
+		if (strncasecmp(readbuf, "hbh", 3) == 0) {
+			struct ip6_hbh *hbh = NULL;
+			int optlen = atoi(&readbuf[3]), hbhlen = 0, curlen;
+			void *optp = NULL;
+			static char optbuf[128]; /* XXX */
+
+			if (optlen == 0)
+				goto sethbh;
+
+			if ((hbhlen = inet6_opt_init(NULL, 0)) == -1) {
+				warnx("inet6_opt_init(NULL) failed");
+				goto sendbuf;
+			}
+			if ((hbhlen = inet6_opt_append(NULL, 0, hbhlen,
+						       10, /* dummy opt */
+						       optlen, 1,
+						       NULL)) == -1) {
+				warnx("inet6_opt_append(NULL, %d)", optlen);
+				goto sendbuf;
+			}
+			if ((hbhlen = inet6_opt_finish(NULL, 0, hbhlen)) == -1) {
+				warnx("inet6_opt_finish(NULL, %d)", hbhlen);
+				goto sendbuf;
+			}
+			if ((hbh = malloc(hbhlen)) == NULL) {
+				warnx("malloc %d bytes for hbhopt failed",
+				      hbhlen);
+				goto sendbuf;
+			}
+			if ((curlen = inet6_opt_init(hbh, hbhlen)) == -1) {
+				warnx("inet6_opt_init(hbh, %d)", hbhlen);
+				free(hbh);
+				goto sendbuf;
+			}
+			if ((curlen = inet6_opt_append(hbh, hbhlen, curlen,
+						       10, /* dummy */
+						       optlen, 1,
+						       &optp)) == -1) {
+				warnx("inet6_opt_append"
+				      "(cur=%d, optlen=%d, hbhlen=%d)",
+				      curlen, optlen, hbhlen);
+				free(hbh);
+				goto sendbuf;
+			}
+			(void)inet6_opt_set_val(optp, 0, (void *)optbuf,
+						optlen);
+			if (inet6_opt_finish(hbh, hbhlen, curlen) == -1) {
+				warnx("inet6_opt_finish(hbhlen=%d, curlen=%d)",
+				      hbhlen, curlen);
+				free(hbh);
+				goto sendbuf;
+			}
+
+		  sethbh:
+			if (setsockopt(s, IPPROTO_IPV6, IPV6_HOPOPTS,
+				       (void *)hbh, hbhlen))
+				warn("setsockopt(IPV6_HOPOPTS)");
+			free(hbh);
+		}
 		if (strncasecmp(readbuf, "rthdr", 5) == 0) {
 			struct ip6_rthdr *rthdr = NULL;
 			int i, hops = atoi(&readbuf[5]), rthlen = 0;

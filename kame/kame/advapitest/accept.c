@@ -45,9 +45,10 @@
 
 static u_char rcvmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo)) +
 		       CMSG_SPACE(sizeof(int))
-		       + 2064];	/* XXX for rthdr */
+		       + 4096];	/* XXX hardcoding */
 
 void print_options __P((struct msghdr *));
+void print_opthdr __P((void *));
 void print_rthdr __P((void *));
 
 int
@@ -73,11 +74,6 @@ main(argc, argv)
 	local.sin6_family = AF_INET6;
 	local.sin6_len = sizeof(local);
 	local.sin6_port = htons(port);
-	if (bind(s, (struct sockaddr *)&local, sizeof(local)) < 0)
-		err(1, "bind");
-
-	if (listen(s, 5) < 0)
-		err(1, "listen");
 
 	on = 1;
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
@@ -87,13 +83,32 @@ main(argc, argv)
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
 		       sizeof(on)) < 0)
 		err(1, "setsockopt(IPV6_RECVHOPLIMIT)");
-	/* specify received routing headers (if any) */
+	/* specify to show a received hop-by-hop options header (if any) */
+	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPOPTS, &on, sizeof(on)) < 0)
+		err(1, "setsockopt(IPV6_RECVHOPOPTS)");
+	/* specify to show received routing headers (if any) */
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDR, &on, sizeof(on)) < 0)
 		err(1, "setsockopt(IPV6_RECVRTHDR)");
 
+	if (bind(s, (struct sockaddr *)&local, sizeof(local)) < 0)
+		err(1, "bind");
+
+	if (listen(s, 5) < 0)
+		err(1, "listen");
+
 	if ((s0 = accept(s, (struct sockaddr *)&remote, &remotelen)) < 0)
 		err(1, "accept");
+	/* purge ancillary data on the listening socket */
+#if 1
+	memset(&rcvmh, 0, sizeof(rcvmh));
+	if (recvmsg(s, &rcvmh, 0) < 0)
+		warn("recvmsg");
+#else
+	if (read(s, NULL, 0) < 0)
+		warn("read");
+#endif
 	close(s);
+
 	s = s0;
 
 	optlen = sizeof(rcvmsgbuf);
@@ -149,7 +164,7 @@ print_options(mh)
 	struct in6_pktinfo *pi = NULL;
 	int *hlimp = NULL;
 	char ntop_buf[INET6_ADDRSTRLEN];
-	void *rthdr = NULL;
+	void *rthdr = NULL, *hbh = NULL;
 
 	if (mh->msg_controllen == 0) {
 		printf("No IPv6 option is received\n");
@@ -163,15 +178,26 @@ print_options(mh)
 		if (cm->cmsg_level != IPPROTO_IPV6)
 			continue;
 
-		if (cm->cmsg_type == IPV6_PKTINFO &&
-		    cm->cmsg_len == CMSG_LEN(sizeof(struct in6_pktinfo))) {
-			pi = (struct in6_pktinfo *)(CMSG_DATA(cm));
-		}
-		if (cm->cmsg_type == IPV6_HOPLIMIT &&
-		    cm->cmsg_len == CMSG_LEN(sizeof(int)))
-			hlimp = (int *)CMSG_DATA(cm);
-		if (cm->cmsg_type == IPV6_RTHDR)
+		switch(cm->cmsg_type) {
+		case IPV6_PKTINFO:
+			if (cm->cmsg_len ==
+			    CMSG_LEN(sizeof(struct in6_pktinfo)))
+				pi = (struct in6_pktinfo *)(CMSG_DATA(cm));
+		break;
+
+		case IPV6_HOPLIMIT:
+			if (cm->cmsg_len == CMSG_LEN(sizeof(int)))
+				hlimp = (int *)CMSG_DATA(cm);
+			break;
+
+		case IPV6_RTHDR:
 			rthdr = CMSG_DATA(cm);
+			break;
+
+		case IPV6_HOPOPTS:
+			hbh = CMSG_DATA(cm);
+			break;
+		}
 	}
 
 	printf("Received IPv6 options (size %d):\n", mh->msg_controllen);
@@ -187,6 +213,60 @@ print_options(mh)
 		printf("  Routing Header\n");
 		print_rthdr(rthdr);
 	}
+	if (hbh) {
+		printf("  HbH Options Header\n");
+		print_opthdr(hbh);
+	}
+}
+
+void
+print_opthdr(void *extbuf)
+{
+	struct ip6_hbh *ext;
+	int currentlen;
+	u_int8_t type;
+	size_t extlen, len;
+	void *databuf;
+	size_t offset;
+	u_int16_t value2;
+	u_int32_t value4;
+
+	ext = (struct ip6_hbh *)extbuf;
+	extlen = (ext->ip6h_len + 1) * 8;
+	printf("nxt %u, len %u (%d bytes)\n", ext->ip6h_nxt,
+	       ext->ip6h_len, extlen);
+
+	currentlen = 0;
+	while (1) {
+		currentlen = inet6_opt_next(extbuf, extlen, currentlen,
+					    &type, &len, &databuf);
+		if (currentlen == -1)
+			break;
+		switch (type) {
+		/*
+		 * Note that inet6_opt_next automatically skips any padding
+		 * optins.
+		 */
+		case IP6OPT_JUMBO:
+			offset = 0;
+			offset = inet6_opt_get_val(databuf, offset,
+						   &value4, sizeof(value4));
+			printf("    Jumbo Payload Opt: Length %u\n",
+			       (unsigned int)ntohl(value4));
+			break;
+		case IP6OPT_ROUTER_ALERT:
+			offset = 0;
+			offset = inet6_opt_get_val(databuf, offset,
+						   &value2, sizeof(value2));
+			printf("    Router Alert Opt: Type %u\n",
+			       ntohs(value2));
+			break;
+		default:
+			printf("    Received Opt %u len %u\n", type, len);
+			break;
+		}
+	}
+	return;
 }
 
 void
