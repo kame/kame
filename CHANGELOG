@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1470 2001/01/06 17:37:49 jinmei Exp $
+$KAME: CHANGELOG,v 1.1471 2001/01/09 07:51:50 itojun Exp $
 
 <200101>
+Tue Jan  9 16:50:07 JST 2001  itojun@iijlab.net
+	* kame/libinet6/getaddrinfo.c: share getaddrinfo source code (again)
+	  across all platforms we have.  though we have a jumbo #ifdef at the
+	  bottom for DNS lookup portion, it is good to share the core logic.
+	  while we are at it, simplify lots of things.
+	  freebsd4 behavior change: $GAI support is dropped.  classful notation
+	  (127.1) is dropped.
+
 2001-01-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_pcb.c (in6_pcbnotify):
 	* {bsdi4,freebsd[34],openbsd}/sys/netinet6/in6_pcb.c (in6_pcbbind):
