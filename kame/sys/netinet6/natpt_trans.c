@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.82 2002/03/14 03:12:28 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.83 2002/03/22 05:19:32 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2507,7 +2507,7 @@ natpt_composeIPv6Hdr(struct pcv *cv4, struct pAddr *pad, struct ip6_hdr *ip6)
 	ip6->ip6_flow = 0;
 	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
 	ip6->ip6_vfc |= IPV6_VERSION;
-	ip6->ip6_plen = htons(ip4->ip_len - sizeof(struct ip));
+	ip6->ip6_plen = htons(cv4->plen);
 	ip6->ip6_nxt  = (cv4->ip_p == IPPROTO_ICMP)
 		? IPPROTO_ICMPV6
 		: cv4->ip_p;
