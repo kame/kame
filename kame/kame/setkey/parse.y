@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.50 2001/08/16 20:44:06 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.51 2001/08/16 20:59:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -114,9 +114,9 @@ extern void yyerror __P((const char *));
 %type <num> UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
 %type <num> DECSTRING
-%type <intnum> prefix port protocol_spec upper_spec
+%type <intnum> prefix port protocol_spec upper_spec key_string
 %type <val> PORT PL_REQUESTS portstr
-%type <val> key_string policy_requests
+%type <val> policy_requests
 %type <val> QUOTEDSTRING HEXSTRING STRING
 %type <val> F_AIFLAGS
 %type <val> policy_spec
@@ -256,34 +256,22 @@ spi
 	:	DECSTRING { p_spi = $1; }
 	|	HEXSTRING
 		{
-			caddr_t bp;
-			caddr_t yp = $1.buf;
-			char buf0[4], buf[4];
-			int i, j;
+			char *ep;
+			unsigned long v;
 
-			/* sanity check */
-			if ($1.len > 4) {
+			ep = NULL;
+			v = strtoul($1.buf, &ep, 16);
+			if (!ep || *ep) {
+				yyerror("invalid SPI");
+				return -1;
+			}
+			if (v & ~0xffffffff) {
 				yyerror("SPI too big.");
 				free($1.buf);
 				return -1;
 			}
 
-			bp = buf0;
-			while (*yp) {
-				*bp = (ATOX(yp[0]) << 4) | ATOX(yp[1]);
-				yp += 2, bp++;
-			}
-
-			/* initialize */
-			for (i = 0; i < 4; i++) buf[i] = 0;
-
-			for (j = $1.len - 1, i = 3; j >= 0; j--, i--)
-				buf[i] = buf0[j];
-
-			/* XXX: endian */
-			p_spi = ntohl(*(u_int32_t *)buf);
-
-			free($1.buf);
+			p_spi = v;
 		}
 	;
 
@@ -340,7 +328,7 @@ enc_key
 		}
 	|	key_string
 		{
-			p_key_enc_len = $1.len;
+			p_key_enc_len = $1;
 			p_key_enc = pp_key;
 
 			if (ipsec_check_keylen(SADB_EXT_SUPPORTED_ENCRYPT,
@@ -366,7 +354,7 @@ auth_key
 		}
 	|	key_string
 		{
-			p_key_auth_len = $1.len;
+			p_key_auth_len = $1;
 			p_key_auth = pp_key;
 
 			if (ipsec_check_keylen(SADB_EXT_SUPPORTED_AUTH,
@@ -382,27 +370,33 @@ key_string
 	:	QUOTEDSTRING
 		{
 			pp_key = $1.buf;
+			$$ = $1.len;
 			/* free pp_key later */
 		}
 	|	HEXSTRING
 		{
 			caddr_t bp;
 			caddr_t yp = $1.buf;
+			int l;
 
-			if ((pp_key = malloc($1.len)) == 0) {
-				free($1.buf);
+			l = strlen(yp) % 2 + strlen(yp) / 2;
+			if ((pp_key = malloc(l)) == 0) {
 				yyerror("not enough core");
 				return -1;
 			}
-			memset(pp_key, 0, $1.len);
+			memset(pp_key, 0, l);
 
 			bp = pp_key;
+			if (strlen(yp) % 2) {
+				*bp = ATOX(yp[0]);
+				yp++, bp++;
+			}
 			while (*yp) {
 				*bp = (ATOX(yp[0]) << 4) | ATOX(yp[1]);
 				yp += 2, bp++;
 			}
 
-			free($1.buf);
+			$$ = l;
 		}
 	;
 

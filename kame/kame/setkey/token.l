@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.28 2001/08/16 20:44:06 itojun Exp $	*/
+/*	$KAME: token.l,v 1.29 2001/08/16 20:59:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -74,32 +74,19 @@ ws		[ \t]+
 digit		[0-9]
 letter		[0-9A-Za-z]
 hexdigit	[0-9A-Fa-f]
-/*octet		(([01]?{digit}?{digit})|((2([0-4]{digit}))|(25[0-5])))*/
-special		[()+\|\?\*,]
 dot		\.
-comma		\,
 hyphen		\-
-colon		\:
 slash		\/
-bcl		\{
-ecl		\}
 blcl		\[
 elcl		\]
-percent		\%
 semi		\;
-usec		{dot}{digit}{1,6}
 comment		\#.*
-ccomment	"/*"
-bracketstring	\<[^>]*\>
 quotedstring	\"[^"]*\"
 decstring	{digit}+
-hexpair		{hexdigit}{hexdigit}
 hexstring	0[xX]{hexdigit}+
-octetstring	{octet}({dot}{octet})+
 ipaddress	[a-fA-F0-9:]([a-fA-F0-9:\.]*|[a-fA-F0-9:\.]*%[a-zA-Z0-9]*)
 ipaddrmask	{slash}{digit}{1,3}
 ipaddrport	{blcl}([a-z0-9]+){elcl}
-keyword		{letter}{letter}+
 name		{letter}(({letter}|{digit}|{hyphen})*({letter}|{digit}))*
 hostname	{name}(({dot}{name})+{dot}?)?
 
@@ -230,14 +217,8 @@ any		{ return(ANY); }
 		}
 
 {hexstring}	{
-			int len = yyleng - 2; /* (str - "0x") */
-			yylval.val.len = (len & 1) + (len / 2);
-			/* fixed string if length is odd. */
-			if (len & 1) {
-				yytext[1] = '0';
-				yylval.val.buf = strdup(yytext + 1);
-			} else
-				yylval.val.buf = strdup(yytext + 2);
+			yylval.val.buf = strdup(yytext + 2);
+			yylval.val.len = strlen(yylval.val.buf);
 
 			return(HEXSTRING);
 		}
