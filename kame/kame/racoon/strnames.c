@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.c,v 1.10 2000/06/28 07:04:33 sakane Exp $ */
+/* YIPS @(#)$Id: strnames.c,v 1.11 2000/07/04 14:15:22 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -36,6 +36,10 @@
 #include "var.h"
 #include "strnames.h"
 #include "algorithm.h"
+
+#include "vmbuf.h"
+#include "isakmp_var.h"
+#include "isakmp.h"
 
 static char *num2str __P((int n));
 
@@ -645,8 +649,19 @@ static char *name_isakmp_notify_msg[] = {
 
 char *
 s_isakmp_notify_msg(type)
-	u_int8_t type;
+	u_int16_t type;
 {
+	switch (type) {
+	case ISAKMP_NTYPE_CONNECTED:
+		return "CONNECTED";
+	case ISAKMP_NTYPE_RESPONDER_LIFETIME:
+		return "RESPONDER-LIFETIME";
+	case ISAKMP_NTYPE_REPLAY_STATUS:
+		return "REPLAY-STATUS";
+	case ISAKMP_NTYPE_INITIAL_CONTACT:
+		return "INITIAL-CONTACT";
+	}
+
 	if (ARRAYLEN(name_isakmp_notify_msg) > type)
 		return name_isakmp_notify_msg[type];
 
