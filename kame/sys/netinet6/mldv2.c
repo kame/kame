@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.16 2004/04/20 08:05:31 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.17 2004/04/20 08:42:25 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3182,7 +3182,6 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 	struct mbuf *m = NULL;
 	struct in6_multi *in6m;
 	struct ifmultiaddr *ifma = NULL;
-	struct in6_ifreq ifr;
 	struct i6as_head *newhead = NULL;/* this becomes new i6ms_cur->head */
 	u_int curmode;			/* current filter mode */
 	u_int newmode;			/* newly calculated filter mode */
