@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.203 2001/04/24 19:05:35 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.204 2001/04/24 19:07:57 jinmei Exp $
 
 1. IPv6
 
@@ -133,6 +133,11 @@ draft-ietf-ngtrans-tcpudp-relay-02.txt:
 draft-ietf-ipngwg-router-selection-01.txt:
 	Default Router Preferences and More-Specific Routes
     * router-side, router preferences only.
+draft-ietf-ipngwg-scoping-arch-02.txt:
+	The architecture, text representation, and usage of IPv6
+	scoped addresses.
+    * some part of the documentation (especially about the routing
+      model) is not supported yet.
 draft-itojun-ipv6-transition-abuse-01.txt:
 	Possible abuse against IPv6 transition technologies
     * KAME does not implement RFC1933/2893 automatic tunnel.
