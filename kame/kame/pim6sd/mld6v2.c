@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.1 2001/07/11 09:13:26 suz Exp $
+ * $KAME: mld6v2.c,v 1.2 2001/07/11 14:41:30 itojun Exp $
  */
 
 /*
@@ -208,6 +208,9 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 #ifdef USE_RFC2292BIS
 	    int             currentlen;
 	    void           *hbhbuf, *optp = NULL;
+	    u_int16_t rtalert_code;
+
+	    rtalert_code = htons(IP6OPT_RTALERT_MLD);
 
 	    cmsgp->cmsg_len = CMSG_LEN(hbhlen);
 	    cmsgp->cmsg_level = IPPROTO_IPV6;
