@@ -341,9 +341,9 @@ extern int ipsec6_in_reject_so __P((struct mbuf *, struct socket *));
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 extern int ipsec6_delete_pcbpolicy __P((struct inpcb *));
 extern int ipsec6_set_policy __P((struct inpcb *inp, int optname,
-	caddr_t request, int priv));
+	caddr_t request, size_t len, int priv));
 extern int ipsec6_get_policy
-	__P((struct inpcb *inp, caddr_t request, struct mbuf **mp));
+	__P((struct inpcb *inp, caddr_t request, size_t len, struct mbuf **mp));
 extern int ipsec6_in_reject __P((struct mbuf *, struct inpcb *));
 #else
 extern int ipsec6_delete_pcbpolicy __P((struct in6pcb *));
