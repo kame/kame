@@ -293,7 +293,7 @@ if_detach(ifp)
 #ifdef INET6
 	/*
 	 * Remove all IPv6 kernel structs related to ifp.  This should be done
-	 * before removing routing entries below, before IPv6 interface direct
+	 * before removing routing entries below, since IPv6 interface direct
 	 * routes are expected to be removed by the IPv6-specific kernel API.
 	 * Otherwise, the kernel will detect some inconsistency and bark it.
 	 */
