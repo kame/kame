@@ -22,7 +22,7 @@
  * Turned inside out. Now returns xfers as new file ids, not as a special
  * `state' of FTP_t
  *
- * $Id: ftpio.h,v 1.14 1997/12/20 04:06:06 jb Exp $
+ * $FreeBSD: src/lib/libftpio/ftpio.h,v 1.14.2.1 1999/08/29 14:56:57 peter Exp $
  */
 
 /* Internal housekeeping data structure for FTP sessions */
@@ -63,6 +63,9 @@ extern FILE	*ftpGetURL(char	*url, char *user, char *passwd,	int *retcode);
 extern FILE	*ftpPutURL(char	*url, char *user, char *passwd,	int *retcode);
 extern time_t	ftpGetModtime(FILE *fp, char *s);
 extern const	char *ftpErrString(int error);
+extern FILE	*ftpLoginAf(char *host, int af, char *user, char *passwd,	int port, int verbose, int *retcode);
+extern FILE	*ftpGetURLAf(char *url, int af, char *user, char *passwd, int *retcode);
+extern FILE	*ftpPutURLAf(char *url, int af, char *user, char *passwd, int *retcode);
 __END_DECLS
 
 #endif	/* _FTP_H_INCLUDE */
