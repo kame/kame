@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.347 1999/12/17 14:26:23 itojun Exp $
+$Id: CHANGELOG,v 1.348 1999/12/19 01:55:42 itojun Exp $
 
 <199912>
+Sun Dec 19 10:57:37 JST 1999  itojun@iijlab.net
+	* {net,open}bsd/sys/netinet/ip_output.c: avoid kernel panic on
+	  multicast loopback.  shared cluster mbuf will be overwritten
+	  by HTONS().
+
 Sat Dec 18 08:21:50 JST 1999  itojun@iijlab.net
 	* share/man/man4/icmp6.4: manpage for ICMPv6 socket.
 	* netbsd/pkgsrc/security/heimdal: upgrade to 0.2h.
