@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.142 1999/09/29 07:25:51 jinmei Exp $
+$Id: CHANGELOG,v 1.143 1999/09/29 07:31:40 jinmei Exp $
 
 <199909>
 1999-09-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -20,7 +20,7 @@ Mon Sep 27 04:33:31 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 
 1999-09-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6: made the code as much portable as possible.
-	Some macros were added and were used in configure.in to aclocal.m4
+	Some macros were added to aclocal.m4 and were used in configure.in 
 	for compilation on other platforms than KAME.
 
 Sun Sep 26 12:08:28 JST 1999  itojun@iijlab.net
