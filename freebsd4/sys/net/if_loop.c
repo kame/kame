@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_loop.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_loop.c,v 1.47.2.7 2003/01/23 21:06:44 sam Exp $
+ * $FreeBSD: src/sys/net/if_loop.c,v 1.47.2.8 2003/06/01 01:46:11 silby Exp $
  */
 
 /*
@@ -141,6 +141,8 @@ looutput(ifp, m, dst, rt)
 	struct sockaddr *dst;
 	register struct rtentry *rt;
 {
+	struct mbuf *n;
+
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("looutput no HDR");
 
@@ -153,29 +155,21 @@ looutput(ifp, m, dst, rt)
 	 * KAME requires that the packet to be contiguous on the
 	 * mbuf.  We need to make that sure.
 	 * this kind of code should be avoided.
-	 * XXX: fails to join if interface MTU > MCLBYTES.  jumbogram?
+	 *
+	 * XXX: KAME may no longer need contiguous packets.  Once
+	 * that has been verified, the following code _should_ be
+	 * removed.
 	 */
-	if (m && m->m_next != NULL && m->m_pkthdr.len < MCLBYTES) {
-		struct mbuf *n;
+	if (m && m->m_next != NULL) {
 
-		MGETHDR(n, M_DONTWAIT, MT_HEADER);
-		if (!n)
-			goto contiguousfail;
-		M_MOVE_PKTHDR(n, m);
-		MCLGET(n, M_DONTWAIT);
-		if (! (n->m_flags & M_EXT)) {
-			m_freem(n);
-			goto contiguousfail;
+		n = m_defrag(m, M_DONTWAIT);
+
+		if (n == NULL) {
+			m_freem(m);
+			return (ENOBUFS);
+		} else {
+			m = n;
 		}
-
-		m_copydata(m, 0, n->m_pkthdr.len, mtod(n, caddr_t));
-		n->m_len = n->m_pkthdr.len;
-		m_freem(m);
-		m = n;
-	}
-	if (0) {
-contiguousfail:
-		printf("looutput: mbuf allocation failed\n");
 	}
 
 	ifp->if_opackets++;

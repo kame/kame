@@ -31,10 +31,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_mbuf.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.51.2.21 2003/01/23 21:06:44 sam Exp $
+ * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.51.2.34 2003/09/13 05:52:47 silby Exp $
  */
 
 #include "opt_param.h"
+#include "opt_mbuf_stress_test.h"
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -56,6 +57,7 @@ static void mbinit __P((void *));
 SYSINIT(mbuf, SI_SUB_MBUF, SI_ORDER_FIRST, mbinit, NULL)
 
 struct mbuf *mbutl;
+struct mbuf *mbutltop;
 char	*mclrefcnt;
 struct mbstat mbstat;
 u_long	mbtypes[MT_NTYPES];
@@ -65,6 +67,15 @@ int	max_linkhdr;
 int	max_protohdr;
 int	max_hdr;
 int	max_datalen;
+#ifdef MBUF_STRESS_TEST
+int	m_defragpackets;
+int	m_defragbytes;
+int	m_defraguseless;
+int	m_defragfailure;
+int	m_defragrandomfailures;
+#endif
+int	m_clreflimithits;
+
 int	nmbclusters;
 int	nmbufs;
 u_int	m_mballoc_wid = 0;
@@ -87,8 +98,23 @@ SYSCTL_INT(_kern_ipc, KIPC_NMBCLUSTERS, nmbclusters, CTLFLAG_RD,
 	   &nmbclusters, 0, "Maximum number of mbuf clusters available");
 SYSCTL_INT(_kern_ipc, OID_AUTO, nmbufs, CTLFLAG_RD, &nmbufs, 0,
 	   "Maximum number of mbufs available"); 
+#ifdef MBUF_STRESS_TEST
+SYSCTL_INT(_kern_ipc, OID_AUTO, m_defragpackets, CTLFLAG_RD,
+	   &m_defragpackets, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, m_defragbytes, CTLFLAG_RD,
+	   &m_defragbytes, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, m_defraguseless, CTLFLAG_RD,
+	   &m_defraguseless, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, m_defragfailure, CTLFLAG_RD,
+	   &m_defragfailure, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, m_defragrandomfailures, CTLFLAG_RW,
+	   &m_defragrandomfailures, 0, "");
+#endif
+SYSCTL_INT(_kern_ipc, OID_AUTO, m_clreflimithits, CTLFLAG_RD,
+	   &m_clreflimithits, 0, "");
 
 static void	m_reclaim __P((void));
+static struct mbuf *m_clreflimit(struct mbuf *m0, int how);
 
 #ifndef NMBCLUSTERS
 #define NMBCLUSTERS	(512 + maxusers * 16)
@@ -204,6 +230,7 @@ m_mballoc(nmb, how)
 	if (p == NULL)
 		return (0);
 
+	mbutltop = (struct mbuf *)((char *)mbutltop + nbytes);
 	nmb = nbytes / MSIZE;
 	for (i = 0; i < nmb; i++) {
 		((struct mbuf *)p)->m_next = mmbfree;
@@ -353,6 +380,8 @@ m_clalloc_fail:
 		}
 		return (0);
 	}
+
+	mbutltop = (struct mbuf *)((char *)mbutltop + ctob(npg));
 
 	for (i = 0; i < ncl; i++) {
 		((union mcluster *)p)->mcl_next = mclfree;
@@ -740,7 +769,10 @@ m_prepend(m, len, how)
 {
 	struct mbuf *mn;
 
-	MGET(mn, how, m->m_type);
+	if (m->m_flags & M_PKTHDR)
+		MGETHDR(mn, how, m->m_type);
+	else
+		MGET(mn, how, m->m_type);
 	if (mn == (struct mbuf *)NULL) {
 		m_freem(m);
 		return ((struct mbuf *)NULL);
@@ -794,7 +826,10 @@ m_copym(m, off0, len, wait)
 			    ("m_copym, length > size of mbuf chain"));
 			break;
 		}
-		MGET(n, wait, m->m_type);
+		if (copyhdr)
+			MGETHDR(n, wait, m->m_type);
+		else
+			MGET(n, wait, m->m_type);
 		*np = n;
 		if (n == 0)
 			goto nospace;
@@ -831,6 +866,7 @@ m_copym(m, off0, len, wait)
 		m = m->m_next;
 		np = &n->m_next;
 	}
+	top = m_clreflimit(top, wait);
 	if (top == 0)
 		MCFail++;
 	return (top);
@@ -912,6 +948,7 @@ m_copypacket(m, how)
 
 		m = m->m_next;
 	}
+	top = m_clreflimit(top, how);
 	return top;
 nospace:
 	m_freem(top);
@@ -1270,6 +1307,7 @@ extpacket:
 	m->m_len = len;
 	n->m_next = m->m_next;
 	m->m_next = 0;
+	n = m_clreflimit(n, wait);
 	return (n);
 }
 /*
@@ -1435,11 +1473,243 @@ m_move_pkthdr(struct mbuf *to, struct mbuf *from)
 int
 m_dup_pkthdr(struct mbuf *to, struct mbuf *from)
 {
-	KASSERT((to->m_flags & M_EXT) == 0, ("m_dup_pkthdr: to has cluster"));
-
-	to->m_flags = from->m_flags & M_COPYFLAGS;
-	to->m_data = to->m_pktdat;
+	to->m_flags = (from->m_flags & M_COPYFLAGS) | (to->m_flags & M_EXT);
+	if ((to->m_flags & M_EXT) == 0)
+		to->m_data = to->m_pktdat;
 	to->m_pkthdr = from->m_pkthdr;
 	SLIST_INIT(&to->m_pkthdr.tags);
 	return (m_tag_copy_chain(to, from));
+}
+
+u_int
+m_fixhdr(struct mbuf *m0)
+{
+        u_int len;
+
+        len = m_length(m0, NULL);
+        m0->m_pkthdr.len = len;
+        return (len);
+}
+
+u_int
+m_length(struct mbuf *m0, struct mbuf **last)
+{
+        struct mbuf *m;
+        u_int len;
+
+        len = 0;
+        for (m = m0; m != NULL; m = m->m_next) {
+                len += m->m_len;
+                if (m->m_next == NULL)
+                        break;
+        }
+        if (last != NULL)
+                *last = m;
+        return (len);
+}
+
+/*
+ * Defragment a mbuf chain, returning the shortest possible
+ * chain of mbufs and clusters.  If allocation fails and
+ * this cannot be completed, NULL will be returned, but
+ * the passed in chain will be unchanged.  Upon success,
+ * the original chain will be freed, and the new chain
+ * will be returned.
+ *
+ * If a non-packet header is passed in, the original
+ * mbuf (chain?) will be returned unharmed.
+ */
+struct mbuf *
+m_defrag(struct mbuf *m0, int how)
+{
+	struct mbuf	*m_new = NULL, *m_final = NULL;
+	int		progress = 0, length;
+
+	if (!(m0->m_flags & M_PKTHDR))
+		return (m0);
+
+	m_fixhdr(m0); /* Needed sanity check */
+
+#ifdef MBUF_STRESS_TEST
+	if (m_defragrandomfailures) {
+		int temp = arc4random() & 0xff;
+		if (temp == 0xba)
+			goto nospace;
+	}
+#endif
+	
+	if (m0->m_pkthdr.len > MHLEN)
+		m_final = m_getcl(how, MT_DATA, M_PKTHDR);
+	else
+		m_final = m_gethdr(how, MT_DATA);
+
+	if (m_final == NULL)
+		goto nospace;
+
+	if (m_dup_pkthdr(m_final, m0) == NULL)
+		goto nospace;
+
+	m_new = m_final;
+
+	while (progress < m0->m_pkthdr.len) {
+		length = m0->m_pkthdr.len - progress;
+		if (length > MCLBYTES)
+			length = MCLBYTES;
+
+		if (m_new == NULL) {
+			if (length > MLEN)
+				m_new = m_getcl(how, MT_DATA, 0);
+			else
+				m_new = m_get(how, MT_DATA);
+			if (m_new == NULL)
+				goto nospace;
+		}
+
+		m_copydata(m0, progress, length, mtod(m_new, caddr_t));
+		progress += length;
+		m_new->m_len = length;
+		if (m_new != m_final)
+			m_cat(m_final, m_new);
+		m_new = NULL;
+	}
+#ifdef MBUF_STRESS_TEST
+	if (m0->m_next == NULL)
+		m_defraguseless++;
+#endif
+	m_freem(m0);
+	m0 = m_final;
+#ifdef MBUF_STRESS_TEST
+	m_defragpackets++;
+	m_defragbytes += m0->m_pkthdr.len;
+#endif
+	return (m0);
+nospace:
+#ifdef MBUF_STRESS_TEST
+	m_defragfailure++;
+#endif
+	if (m_new)
+		m_free(m_new);
+	if (m_final)
+		m_freem(m_final);
+	return (NULL);
+}
+
+#ifdef MBUF_STRESS_TEST
+
+/*
+ * Fragment an mbuf chain.  There's no reason you'd ever want to do
+ * this in normal usage, but it's great for stress testing various
+ * mbuf consumers.
+ *
+ * If fragmentation is not possible, the original chain will be
+ * returned.
+ *
+ * Possible length values:
+ * 0	 no fragmentation will occur
+ * > 0	each fragment will be of the specified length
+ * -1	each fragment will be the same random value in length
+ * -2	each fragment's length will be entirely random
+ * (Random values range from 1 to 256)
+ */
+struct mbuf *
+m_fragment(struct mbuf *m0, int how, int length)
+{
+	struct mbuf	*m_new = NULL, *m_final = NULL;
+	int		progress = 0;
+
+	if (!(m0->m_flags & M_PKTHDR))
+		return (m0);
+	
+	if ((length == 0) || (length < -2))
+		return (m0);
+
+	m_fixhdr(m0); /* Needed sanity check */
+
+	m_final = m_getcl(how, MT_DATA, M_PKTHDR);
+
+	if (m_final == NULL)
+		goto nospace;
+
+	if (m_dup_pkthdr(m_final, m0, how) == NULL)
+		goto nospace;
+
+	m_new = m_final;
+
+	if (length == -1)
+		length = 1 + (arc4random() & 255);
+
+	while (progress < m0->m_pkthdr.len) {
+		int fraglen;
+
+		if (length > 0)
+			fraglen = length;
+		else
+			fraglen = 1 + (arc4random() & 255);
+		if (fraglen > m0->m_pkthdr.len - progress)
+			fraglen = m0->m_pkthdr.len - progress;
+
+		if (fraglen > MCLBYTES)
+			fraglen = MCLBYTES;
+
+		if (m_new == NULL) {
+			m_new = m_getcl(how, MT_DATA, 0);
+			if (m_new == NULL)
+				goto nospace;
+		}
+
+		m_copydata(m0, progress, fraglen, mtod(m_new, caddr_t));
+		progress += fraglen;
+		m_new->m_len = fraglen;
+		if (m_new != m_final)
+			m_cat(m_final, m_new);
+		m_new = NULL;
+	}
+	m_freem(m0);
+	m0 = m_final;
+	return (m0);
+nospace:
+	if (m_new)
+		m_free(m_new);
+	if (m_final)
+		m_freem(m_final);
+	/* Return the original chain on failure */
+	return (m0);
+}
+
+#endif
+
+#define MAX_CLREFCOUNT	32
+
+/*
+ * Ensure that the number of mbuf cluster references stays less than our
+ * desired amount by making a new copy of the entire chain.
+ *
+ * If a reference count has already gone negative, panic.
+ */
+static struct mbuf *
+m_clreflimit(struct mbuf *m0, int how)
+{
+	struct mbuf *m;
+	int maxrefs = 0;
+
+	for (m = m0; m != NULL; m = m->m_next) {
+		if ((m->m_flags & M_EXT) && (m->m_ext.ext_ref == NULL)) {
+			maxrefs = max(maxrefs,
+				mclrefcnt[mtocl(m->m_ext.ext_buf)]);
+			KASSERT(mclrefcnt[mtocl(m->m_ext.ext_buf)] > 0,
+			("m_clreflimit: bad reference count: %d",
+			 mclrefcnt[mtocl(m->m_ext.ext_buf)]));
+		}
+	}
+
+	if (maxrefs < MAX_CLREFCOUNT)
+		return (m0);
+
+	m_clreflimithits++;
+	m = m_defrag(m0, how);
+	/* Avoid returning NULL at all costs, m_split won't like it. */
+	if (m == NULL)
+		return (m0);
+	else
+		return (m);
 }

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/if_kue.c,v 1.17.2.8 2002/11/06 14:23:20 joe Exp $
+ * $FreeBSD: src/sys/dev/usb/if_kue.c,v 1.17.2.9 2003/04/13 02:39:25 murray Exp $
  */
 
 /*
@@ -95,7 +95,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/usb/if_kue.c,v 1.17.2.8 2002/11/06 14:23:20 joe Exp $";
+  "$FreeBSD: src/sys/dev/usb/if_kue.c,v 1.17.2.9 2003/04/13 02:39:25 murray Exp $";
 #endif
 
 /*
@@ -116,6 +116,7 @@ Static struct kue_type kue_devs[] = {
 	{ USB_VENDOR_SMC, USB_PRODUCT_SMC_2102USB },
 	{ USB_VENDOR_LINKSYS, USB_PRODUCT_LINKSYS_USB10T },
 	{ USB_VENDOR_KLSI, USB_PRODUCT_KLSI_DUH3E10BT },
+	{ USB_VENDOR_KLSI, USB_PRODUCT_KLSI_DUH3E10BTN },
 	{ USB_VENDOR_PERACOM, USB_PRODUCT_PERACOM_ENET3 },
 	{ 0, 0 }
 };

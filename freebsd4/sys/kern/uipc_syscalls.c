@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_syscalls.c	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.65.2.15 2002/08/31 22:11:56 archie Exp $
+ * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.65.2.17 2003/04/04 17:11:16 tegge Exp $
  */
 
 #include "opt_compat.h"
@@ -51,6 +51,7 @@
 #include <sys/proc.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
+#include <sys/filio.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
@@ -202,7 +203,8 @@ accept1(p, uap, compat)
 	int namelen, error, s;
 	struct socket *head, *so;
 	int fd;
-	short fflag;		/* type must match fp->f_flag */
+	u_int fflag;		/* type must match fp->f_flag */
+	int tmp;
 
 	if (uap->name) {
 		error = copyin((caddr_t)uap->anamelen, (caddr_t)&namelen,
@@ -286,6 +288,11 @@ accept1(p, uap, compat)
 	nfp->f_flag = fflag;
 	nfp->f_ops = &socketops;
 	nfp->f_type = DTYPE_SOCKET;
+	/* Sync socket nonblocking/async state with file flags */
+	tmp = fflag & FNONBLOCK;
+	(void) fo_ioctl(nfp, FIONBIO, (caddr_t)&tmp, p);
+	tmp = fflag & FASYNC;
+	(void) fo_ioctl(nfp, FIOASYNC, (caddr_t)&tmp, p);
 	sa = 0;
 	error = soaccept(so, &sa);
 	if (error) {

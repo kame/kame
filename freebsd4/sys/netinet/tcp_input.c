@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_input.c	8.12 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.107.2.37 2003/02/03 02:31:55 hsu Exp $
+ * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.107.2.38 2003/05/21 04:46:41 cjc Exp $
  */
 
 #include "opt_ipfw.h"		/* for ipfw_fwd		*/
@@ -626,17 +626,12 @@ findpcb:
 			}
 			switch (log_in_vain) {
 			case 1:
-				if (thflags & TH_SYN)
-					log(LOG_INFO,
-			    		    "Connection attempt to TCP %s:%d "
-			    		    "from %s:%d\n",
-			    		    dbuf, ntohs(th->th_dport), sbuf,
-			    		    ntohs(th->th_sport));
-				break;
+				if ((thflags & TH_SYN) == 0)
+					break;
 			case 2:
 				log(LOG_INFO,
 				    "Connection attempt to TCP %s:%d "
-				    "from %s:%d flags:0x%x\n",
+				    "from %s:%d flags:0x%02x\n",
 				    dbuf, ntohs(th->th_dport), sbuf,
 				    ntohs(th->th_sport), thflags);
 				break;

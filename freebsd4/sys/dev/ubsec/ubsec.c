@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/ubsec/ubsec.c,v 1.6.2.10 2003/03/19 23:39:18 sam Exp $ */
+/* $FreeBSD: src/sys/dev/ubsec/ubsec.c,v 1.6.2.13 2003/07/02 17:04:51 sam Exp $ */
 /*	$OpenBSD: ubsec.c,v 1.115 2002/09/24 18:33:26 jason Exp $	*/
 
 /*
@@ -40,11 +40,11 @@
  *
  */
 
-#define UBSEC_DEBUG
-
 /*
  * uBsec 5[56]01, 58xx hardware crypto accelerator
  */
+
+#include "opt_ubsec.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -87,6 +87,9 @@
 #define	letoh16(x)		le16toh(x)
 #define	letoh32(x)		le32toh(x)
 
+#ifdef UBSEC_RNDTEST
+#include <dev/rndtest/rndtest.h>
+#endif
 #include <dev/ubsec/ubsecreg.h>
 #include <dev/ubsec/ubsecvar.h>
 
@@ -124,6 +127,9 @@ static devclass_t ubsec_devclass;
 
 DRIVER_MODULE(ubsec, pci, ubsec_driver, ubsec_devclass, 0, 0);
 MODULE_DEPEND(ubsec, crypto, 1, 1, 1);
+#ifdef UBSEC_RNDTEST
+MODULE_DEPEND(ubsec, rndtest, 1, 1, 1);
+#endif
 
 static	void ubsec_intr(void *);
 static	int ubsec_newsession(void *, u_int32_t *, struct cryptoini *);
@@ -187,6 +193,10 @@ SYSCTL_STRUCT(_hw_ubsec, OID_AUTO, stats, CTLFLAG_RD, &ubsecstats,
 static int
 ubsec_probe(device_t dev)
 {
+	if (pci_get_vendor(dev) == PCI_VENDOR_SUN &&
+	    (pci_get_device(dev) == PCI_PRODUCT_SUN_5821 ||
+	     pci_get_device(dev) == PCI_PRODUCT_SUN_SCA1K))
+		return (0);
 	if (pci_get_vendor(dev) == PCI_VENDOR_BLUESTEEL &&
 	    (pci_get_device(dev) == PCI_PRODUCT_BLUESTEEL_5501 ||
 	     pci_get_device(dev) == PCI_PRODUCT_BLUESTEEL_5601))
@@ -198,7 +208,8 @@ ubsec_probe(device_t dev)
 	     pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5820 ||
 	     pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5821 ||
 	     pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5822 ||
-	     pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5823))
+	     pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5823
+	     ))
 		return (0);
 	return (ENXIO);
 }
@@ -224,8 +235,22 @@ ubsec_partname(struct ubsec_softc *sc)
 		case PCI_PRODUCT_BLUESTEEL_5601: return "Bluesteel 5601";
 		}
 		return "Bluesteel unknown-part";
+	case PCI_VENDOR_SUN:
+		switch (pci_get_device(sc->sc_dev)) {
+		case PCI_PRODUCT_SUN_5821: return "Sun Crypto 5821";
+		case PCI_PRODUCT_SUN_SCA1K: return "Sun Crypto 1K";
+		}
+		return "Sun unknown-part";
 	}
 	return "Unknown-vendor unknown-part";
+}
+
+static void
+default_harvest(struct rndtest_state *rsp, void *buf, u_int count)
+{
+	u_int32_t *p = (u_int32_t *)buf;
+	for (count /= sizeof (u_int32_t); count; count--)
+		add_true_randomness(*p++);
 }
 
 static int
@@ -255,7 +280,8 @@ ubsec_attach(device_t dev)
 		sc->sc_flags |= UBS_FLAGS_KEY | UBS_FLAGS_RNG;
 
 	if (pci_get_vendor(dev) == PCI_VENDOR_BROADCOM &&
-	    pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5805)
+	    (pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5802 ||
+	     pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5805))
 		sc->sc_flags |= UBS_FLAGS_KEY | UBS_FLAGS_RNG;
 
 	if (pci_get_vendor(dev) == PCI_VENDOR_BROADCOM &&
@@ -263,10 +289,13 @@ ubsec_attach(device_t dev)
 		sc->sc_flags |= UBS_FLAGS_KEY | UBS_FLAGS_RNG |
 		    UBS_FLAGS_LONGCTX | UBS_FLAGS_HWNORM | UBS_FLAGS_BIGKEY;
 
-	if (pci_get_vendor(dev) == PCI_VENDOR_BROADCOM &&
-	    (pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5821 ||
-	     pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5822 ||
-	     pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5823)) {
+	if ((pci_get_vendor(dev) == PCI_VENDOR_BROADCOM &&
+	     (pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5821 ||
+	      pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5822 ||
+	      pci_get_device(dev) == PCI_PRODUCT_BROADCOM_5823)) ||
+	    (pci_get_vendor(dev) == PCI_VENDOR_SUN &&
+	     (pci_get_device(dev) == PCI_PRODUCT_SUN_SCA1K ||
+	      pci_get_device(dev) == PCI_PRODUCT_SUN_5821))) {
 		/* NB: the 5821/5822 defines some additional status bits */
 		sc->sc_statmask |= BS_STAT_MCR1_ALLEMPTY |
 		    BS_STAT_MCR2_ALLEMPTY;
@@ -399,6 +428,15 @@ ubsec_attach(device_t dev)
 #ifndef UBSEC_NO_RNG
 	if (sc->sc_flags & UBS_FLAGS_RNG) {
 		sc->sc_statmask |= BS_STAT_MCR2_DONE;
+#ifdef UBSEC_RNDTEST
+		sc->sc_rndtest = rndtest_attach(dev);
+		if (sc->sc_rndtest)
+			sc->sc_harvest = rndtest_harvest;
+		else
+			sc->sc_harvest = default_harvest;
+#else
+		sc->sc_harvest = default_harvest;
+#endif
 
 		if (ubsec_dma_malloc(sc, sizeof(struct ubsec_mcr),
 		    &sc->sc_rng.rng_q.q_mcr, 0))
@@ -469,6 +507,11 @@ ubsec_detach(device_t dev)
 	callout_stop(&sc->sc_rngto);
 
 	crypto_unregister_all(sc->sc_cid);
+
+#ifdef UBSEC_RNDTEST
+	if (sc->sc_rndtest)
+		rndtest_detach(sc->sc_rndtest);
+#endif
 
 	while (!SIMPLEQ_EMPTY(&sc->sc_freequeue)) {
 		struct ubsec_q *q;
@@ -927,7 +970,7 @@ ubsec_freesession(void *arg, u_int64_t tid)
 {
 	struct ubsec_softc *sc = arg;
 	int session;
-	u_int32_t sid = ((u_int32_t) tid) & 0xffffffff;
+	u_int32_t sid = CRYPTO_SESID2LID(tid);
 
 	KASSERT(sc != NULL, ("ubsec_freesession: null softc"));
 	if (sc == NULL)
@@ -1637,13 +1680,11 @@ ubsec_callback2(struct ubsec_softc *sc, struct ubsec_q2 *q)
 #ifndef UBSEC_NO_RNG
 	case UBS_CTXOP_RNGBYPASS: {
 		struct ubsec_q2_rng *rng = (struct ubsec_q2_rng *)q;
-		u_int32_t *p;
-		int i;
 
 		ubsec_dma_sync(&rng->rng_buf, BUS_DMASYNC_POSTREAD);
-		p = (u_int32_t *)rng->rng_buf.dma_vaddr;
-		for (i = 0; i < UBSEC_RNG_BUFSIZ; p++, i++)
-			add_true_randomness(*p);
+		(*sc->sc_harvest)(sc->sc_rndtest,
+			rng->rng_buf.dma_vaddr,
+			UBSEC_RNG_BUFSIZ*sizeof (u_int32_t));
 		rng->rng_used = 0;
 		callout_reset(&sc->sc_rngto, sc->sc_rnghz, ubsec_rng, sc);
 		break;

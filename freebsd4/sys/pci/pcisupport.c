@@ -1,6 +1,6 @@
 /**************************************************************************
 **
-** $FreeBSD: src/sys/pci/pcisupport.c,v 1.154.2.14 2002/11/27 18:28:26 imp Exp $
+** $FreeBSD: src/sys/pci/pcisupport.c,v 1.154.2.15 2003/04/29 15:55:06 simokawa Exp $
 **
 **  Device driver for DEC/INTEL PCI chipsets.
 **
@@ -1233,7 +1233,7 @@ chip_match(device_t dev)
 
 	/* Sony -- vendor 0x104d */
 	case 0x8009104d:
-		return ("Sony CXD1847A FireWire Host Controller");
+		return ("Sony CXD1947A FireWire Host Controller");
 
 	/* SiS -- vendor 0x1039 */
 	case 0x04961039:

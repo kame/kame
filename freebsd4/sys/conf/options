@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options,v 1.191.2.47.2.2 2003/03/28 21:26:40 scottl Exp $
+# $FreeBSD: src/sys/conf/options,v 1.191.2.58 2003/08/24 08:24:37 hsu Exp $
 #
 #        On the handling of kernel options
 #
@@ -73,6 +73,11 @@ AHD_REG_PRETTY_PRINT	opt_aic79xx.h	# Print register bitfields in debug
 ADW_ALLOW_MEMIO		opt_adw.h	# Allow PCI devices to use memory
 					# mapped I/O
 
+# options for ACPI support
+ACPI_DEBUG		opt_acpi.h
+ACPI_NO_SEMAPHORES	opt_acpi.h
+ACPI_MAX_THREADS	opt_acpi.h
+
 # Miscellaneous options.
 COMPAT_43	opt_compat.h
 COMPAT_SUNOS	opt_compat.h
@@ -91,6 +96,7 @@ MFS_ROOT	opt_mfs.h
 MFS_ROOT_SIZE	opt_mfs.h
 NTIMECOUNTER	opt_ntp.h
 NSWAPDEV	opt_swap.h
+NSWBUF_MIN	opt_swap.h
 PPS_SYNC	opt_ntp.h
 QUOTA
 SPX_HACK
@@ -119,6 +125,7 @@ MSGTQL		opt_sysvipc.h
 UCONSOLE
 ICMP_BANDLIM
 VFS_AIO
+DIRECTIO	opt_directio.h
 
 # POSIX kernel options
 P1003_1B			opt_posix.h
@@ -205,6 +212,8 @@ SCSI_NO_OP_STRINGS	opt_scsi.h
 CHANGER_MIN_BUSY_SECONDS	opt_cd.h
 CHANGER_MAX_BUSY_SECONDS	opt_cd.h
 
+DA_OLD_QUIRKS		opt_da.h
+
 # Options used only in cam/scsi/scsi_sa.c.
 SA_IO_TIMEOUT		opt_sa.h
 SA_SPACE_TIMEOUT	opt_sa.h
@@ -276,6 +285,7 @@ ETHER_8023		opt_ef.h
 ETHER_8022		opt_ef.h
 ETHER_SNAP		opt_ef.h
 MROUTING		opt_mrouting.h
+PIM			opt_mrouting.h
 INET			opt_inet.h
 RTPREF			opt_inet.h
 INET6			opt_inet6.h
@@ -345,6 +355,7 @@ TCPDEBUG
 TCP_DROP_SYNFIN		opt_tcp_input.h
 TCP_ECN			opt_global.h
 XBONEHACK
+MBUF_STRESS_TEST	opt_mbuf_stress_test.h
 
 # Netgraph(4). Use option NETGRAPH to enable the base netgraph code.
 # Each netgraph node type can be either be compiled into the kernel
@@ -376,6 +387,9 @@ NETGRAPH_TEE		opt_netgraph.h
 NETGRAPH_TTY		opt_netgraph.h
 NETGRAPH_UI		opt_netgraph.h
 NETGRAPH_VJC		opt_netgraph.h
+
+# DRM options
+DRM_DEBUG		opt_drm.h
 
 # ATM (HARP version)
 ATM_CORE		opt_atm.h
@@ -524,6 +538,7 @@ UKBD_DEBUG		opt_usb.h
 ULPT_DEBUG		opt_usb.h
 UMASS_DEBUG		opt_usb.h
 UMS_DEBUG		opt_usb.h
+UVSCOM_DEFAULT_OPKTSIZE	opt_uvscom.h
 
 # Vinum options
 VINUMDEBUG		opt_vinum.h
@@ -540,3 +555,18 @@ PCFCLOCK_MAX_RETRIES	opt_pcfclock.h
 
 # Polling device handling
 DEVICE_POLLING		opt_global.h
+
+# options for ubsec driver
+UBSEC_DEBUG		opt_ubsec.h
+UBSEC_RNDTEST		opt_ubsec.h
+UBSEC_NO_RNG		opt_ubsec.h
+
+# options for hifn driver
+HIFN_DEBUG		opt_hifn.h
+HIFN_RNDTEST		opt_hifn.h
+HIFN_NO_RNG		opt_hifn.h
+
+# options for safe driver
+SAFE_DEBUG		opt_safe.h
+SAFE_RNDTEST		opt_safe.h
+SAFE_NO_RNG		opt_safe.h

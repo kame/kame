@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_var.h,v 1.18.2.15 2002/06/28 12:36:54 luigi Exp $
+ * $FreeBSD: src/sys/net/if_var.h,v 1.18.2.16 2003/04/15 18:11:19 fjoe Exp $
  */
 
 #ifndef	_NET_IF_VAR_H_
@@ -520,6 +520,7 @@ void	if_attach(struct ifnet *);
 int	if_delmulti(struct ifnet *, struct sockaddr *);
 void	if_detach(struct ifnet *);
 void	if_down(struct ifnet *);
+int	if_printf(struct ifnet *, const char *, ...) __printflike(2, 3);
 void	if_route(struct ifnet *, int flag, int fam);
 int	if_setlladdr(struct ifnet *, const u_char *, int);
 void	if_unroute(struct ifnet *, int flag, int fam);

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket.c	8.3 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.68.2.22 2002/12/15 09:24:23 maxim Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.68.2.23 2003/08/24 08:24:38 hsu Exp $
  */
 
 #include "opt_inet.h"
@@ -1302,10 +1302,7 @@ bad:
 
 /* Helper routine for getsockopt */
 int
-sooptcopyout(sopt, buf, len)
-	struct	sockopt *sopt;
-	void	*buf;
-	size_t	len;
+sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 {
 	int	error;
 	size_t	valsize;

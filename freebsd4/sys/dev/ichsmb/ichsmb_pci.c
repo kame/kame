@@ -1,4 +1,3 @@
-
 /*
  * ichsmb_pci.c
  *
@@ -36,12 +35,12 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/dev/ichsmb/ichsmb_pci.c,v 1.1.2.3 2002/10/20 14:57:19 nyan Exp $
+ * $FreeBSD: src/sys/dev/ichsmb/ichsmb_pci.c,v 1.1.2.4 2003/08/31 19:22:10 njl Exp $
  */
 
 /*
  * Support for the SMBus controller logical device which is part of the
- * Intel 81801AA (ICH) and 81801AB (ICH0) I/O controller hub chips.
+ * Intel 81801AA/AB/BA/CA/DC/EB (ICH/ICH[02345]) I/O controller hub chips.
  */
 
 #include <sys/param.h>
@@ -68,6 +67,8 @@
 #define ID_82801AB			0x24238086
 #define ID_82801BA			0x24438086
 #define ID_82801CA			0x24838086
+#define ID_82801DC			0x24C38086
+#define ID_82801EB			0x24D38086
 
 #define PCIS_SERIALBUS_SMBUS_PROGIF	0x00
 
@@ -125,6 +126,12 @@ ichsmb_pci_probe(device_t dev)
 		break;
 	case ID_82801CA:
 		device_set_desc(dev, "Intel 82801CA (ICH3) SMBus controller");
+		break;
+	case ID_82801DC:
+		device_set_desc(dev, "Intel 82801DC (ICH4) SMBus controller");
+		break;
+	case ID_82801EB:
+		device_set_desc(dev, "Intel 82801EB (ICH5) SMBus controller");
 		break;
 	default:
 		if (pci_get_class(dev) == PCIC_SERIALBUS

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/if_aue.c,v 1.19.2.17 2003/03/05 17:12:22 shiba Exp $
+ * $FreeBSD: src/sys/dev/usb/if_aue.c,v 1.19.2.18 2003/06/14 15:56:48 trhodes Exp $
  */
 
 /*
@@ -97,7 +97,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/usb/if_aue.c,v 1.19.2.17 2003/03/05 17:12:22 shiba Exp $";
+  "$FreeBSD: src/sys/dev/usb/if_aue.c,v 1.19.2.18 2003/06/14 15:56:48 trhodes Exp $";
 #endif
 
 /*
@@ -119,6 +119,7 @@ Static struct aue_type aue_devs[] = {
     { USB_VENDOR_ACCTON,	USB_PRODUCT_ACCTON_SS1001,	  PII },
     { USB_VENDOR_ADMTEK,	USB_PRODUCT_ADMTEK_PEGASUS,	  PNA },
     { USB_VENDOR_ADMTEK,	USB_PRODUCT_ADMTEK_PEGASUSII,	  PII },
+    { USB_VENDOR_BELKIN,	USB_PRODUCT_BELKIN_USB2LAN,       PII },
     { USB_VENDOR_BILLIONTON,	USB_PRODUCT_BILLIONTON_USB100,	  0 },
     { USB_VENDOR_BILLIONTON,	USB_PRODUCT_BILLIONTON_USBLP100,  PNA },
     { USB_VENDOR_BILLIONTON,	USB_PRODUCT_BILLIONTON_USBEL100,  0 },

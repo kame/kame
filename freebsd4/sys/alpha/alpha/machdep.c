@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.68.2.16 2002/01/22 15:12:46 gallatin Exp $
+ * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.68.2.17 2003/08/10 21:51:40 silby Exp $
  */
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -388,6 +388,7 @@ again:
 		mb_map = kmem_suballoc(kmem_map, (vm_offset_t *)&mbutl, &maxaddr,
 			mb_map_size);
 		mb_map->system_map = 1;
+		mbutltop = mbutl;
 	}
 
 	/*
