@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.h,v 1.4 2000/08/23 06:18:44 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.h,v 1.5 2000/08/23 13:39:40 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -147,14 +147,17 @@ struct prop_pair {
  *     "strict"
  *         If the responder's length is longer than the initiator's one, the
  *         responder uses the intitiator's one.  Otherwise rejects the proposal.
- *         About PFS, this directive is same as exact.
+ *         If PFS is not required by the responder, the responder obeys the
+ *         proposal.  If PFS is required by both sides and if the responder's
+ *         group is not equal to the initiator's one, then the responder reject
+ *         the proposal.
  *     "claim"
  *         If the responder's length is longer than the initiator's one, the
  *         responder use the intitiator's one.  If the responder's length is
  *         shorter than the initiator's one, the responder uses own length
  *         AND send RESPONDER-LIFETIME notify message to a initiator in the
  *         case of lifetime.
- *         About PFS, this directive is same as exact.
+ *         About PFS, this directive is same as "strict".
  *     "exact"
  *         If the initiator's length is not equal to the responder's one, the
  *         responder rejects the proposal.

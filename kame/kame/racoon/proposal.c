@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.9 2000/08/23 06:18:44 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.10 2000/08/23 13:39:39 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -208,7 +208,17 @@ cmpsaprop_alloc(ph1, pp1, pp2)
 		}
 		newpp->lifetime = pp1->lifetime;
 		newpp->lifebyte = pp1->lifebyte;
-    		goto prop_pfs_check;
+
+    prop_pfs_check:
+		if (pp2->pfs_group != 0 && pp1->pfs_group != pp2->pfs_group) {
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+					"ERROR: pfs group mismatched: "
+					"my:%d peer:%d\n",
+					pp2->pfs_group, pp1->pfs_group));
+			goto err;
+		}
+		newpp->pfs_group = pp1->pfs_group;
 		break;
 	case PROP_CHECK_CLAIM:
 		/* lifetime */
@@ -257,7 +267,6 @@ cmpsaprop_alloc(ph1, pp1, pp2)
 					pp2->lifebyte, pp1->lifebyte));
 			goto err;
 		}
-    prop_pfs_check:
 		if (pp1->pfs_group != pp2->pfs_group) {
 			YIPSDEBUG(DEBUG_SA,
 				plog(logp, LOCATION, NULL,
