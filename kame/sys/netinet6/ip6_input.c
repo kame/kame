@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.252 2002/01/17 14:29:44 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.253 2002/01/17 14:30:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -726,7 +726,7 @@ ip6_input(m)
 
 #ifndef SCOPEDROUTING
 	/*
-	 * Drop packets if interface ID portion is already filled.
+	 * Drop packets if the link ID portion is already filled.
 	 * XXX: this is technically not a good behavior.  But, we internally
 	 * use the field to disambiguate link-local addresses, so we cannot
 	 * be generous against those a bit strange addresses.
