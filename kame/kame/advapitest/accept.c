@@ -1,4 +1,4 @@
-/*	$KAME: accept.c,v 1.17 2001/09/18 02:29:53 jinmei Exp $ */
+/*	$KAME: accept.c,v 1.18 2001/09/18 03:01:59 jinmei Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -115,8 +115,7 @@ main(argc, argv)
 	if (protostr) {
 		struct protoent *ent;
 
-		if ((ent = getprotobyname(protostr)) == NULL &&
-		    (ent = getprotobynumber(protostr)) == NULL) {
+		if ((ent = getprotobyname(protostr)) == NULL) {
 			proto = atoi(protostr); /* XXX: last resort */
 		} else
 			proto = ent->p_proto;
