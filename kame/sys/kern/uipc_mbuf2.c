@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.24 2000/11/24 16:32:01 kawa Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.25 2001/02/14 07:57:40 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -72,6 +72,20 @@
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+
+#ifdef __bsdi__
+#define M_SHAREDCLUSTER(m) \
+	(((m)->m_flags & M_EXT) != 0 && \
+	 ((m)->m_ext.ext_func || mclrefcnt[mtocl((m)->m_ext.ext_buf)] > 1))
+#elif defined(__NetBSD__)
+#define M_SHAREDCLUSTER(m) \
+	(((m)->m_flags & M_EXT) != 0 && \
+	 ((m)->m_ext.ext_free || MCLISREFERENCED((m))))
+#else
+#define M_SHAREDCLUSTER(m) \
+	(((m)->m_flags & M_EXT) != 0 && \
+	 ((m)->m_ext.ext_free || mclrefcnt[mtocl((m)->m_ext.ext_buf)] > 1))
+#endif
 
 /*
  * ensure that [off, off + len) is contiguous on the mbuf chain "m".
@@ -253,24 +267,7 @@ m_pulldown(m, off, len, offp)
 	 * easy cases first.
 	 * we need to use m_copydata() to get data from <n->m_next, 0>.
 	 */
-	if ((n->m_flags & M_EXT) == 0)
-		sharedcluster = 0;
-	else {
-#ifdef __bsdi__
-		if (n->m_ext.ext_func)
-#else
-		if (n->m_ext.ext_free)
-#endif
-			sharedcluster = 1;
-#ifdef __NetBSD__
-		else if (MCLISREFERENCED(n))
-#else
-		else if (mclrefcnt[mtocl(n->m_ext.ext_buf)] > 1)
-#endif
-			sharedcluster = 1;
-		else
-			sharedcluster = 0;
-	}
+	sharedcluster = M_SHAREDCLUSTER(n);
 	if ((off == 0 || offp) && M_TRAILINGSPACE(n) >= tlen
 	 && !sharedcluster) {
 		m_copydata(n->m_next, 0, tlen, mtod(n, caddr_t) + n->m_len);
