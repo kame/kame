@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.12 2000/01/18 19:32:22 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.13 2000/01/18 20:15:49 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -254,6 +254,10 @@ agg_i2recv(iph1, msg)
 			break;
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
+			break;
+		case ISAKMP_NPTYPE_CR:
+			plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Certificate Request.\n");
 			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
@@ -489,7 +493,7 @@ agg_r1recv(iph1, msg)
 			break;
 		case ISAKMP_NPTYPE_CR:
 			plog(logp, LOCATION, iph1->remote,
-				"certificate request received.\n");
+				"peer transmitted Certificate Request.\n");
 			break;
 		default:
 			/* don't send information, see isakmp_ident_r1() */

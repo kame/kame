@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.13 2000/01/18 19:32:22 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.14 2000/01/18 20:15:50 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -355,6 +355,10 @@ ident_i3recv(iph1, msg)
 			plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n");
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			break;
+		case ISAKMP_NPTYPE_CR:
+			plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Certificate Request.\n");
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
@@ -1004,6 +1008,10 @@ ident_r3recv(iph1, msg0)
 			break;
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
+			break;
+		case ISAKMP_NPTYPE_CR:
+			plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Certificate Request.\n");
 			break;
 		case ISAKMP_NPTYPE_CERT:
 			iph1->pl_cert = (struct isakmp_pl_cert *)pa->ptr;
