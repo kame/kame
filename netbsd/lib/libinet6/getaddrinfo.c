@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.17 2000/05/01 00:21:37 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.18 2000/05/01 00:24:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -532,8 +532,7 @@ getaddrinfo(hostname, servname, hints, res)
 		 * If AI_ADDRCONFIG is specified, check if we are expected to
 		 * return the address family or not.
 		 */
-		if ((pai->ai_flags & AI_ADDRCONFIG) != 0 &&
-		     pai->ai_family == PF_UNSPEC) {
+		if ((pai->ai_flags & AI_ADDRCONFIG) != 0) {
 			struct addrinfo *prev, *next, *p;
 
 			prev = NULL;
