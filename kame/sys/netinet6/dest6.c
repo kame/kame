@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.15 2001/01/23 06:47:50 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.16 2001/01/23 06:51:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -167,6 +167,7 @@ dest6_input(mp, offp, proto)
 		case IP6OPT_BINDING_UPDATE:
 		case IP6OPT_BINDING_ACK:
 		case IP6OPT_BINDING_REQ:
+		case IP6OPT_HOME_ADDRESS:
 			if (mip6_store_dstopt_pre_hook) {
 				if ((*mip6_store_dstopt_pre_hook)(m, opt,
 				    off, dstoptlen) != 0)
