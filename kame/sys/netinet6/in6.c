@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.265 2002/02/09 06:49:45 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.266 2002/02/09 06:57:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2214,7 +2214,7 @@ in6_addmulti(maddr6, ifp, errorp)
 			*errorp = ENOBUFS;
 			return(NULL);
 		}
-		in6m->in6m_addr = *maddr6;
+		in6m->in6m_sa = *maddr6;
 		in6m->in6m_ifp = ifp;
 		in6m->in6m_refcount = 1;
 		IFP_TO_IA6(ifp, ia);
@@ -2233,14 +2233,12 @@ in6_addmulti(maddr6, ifp, errorp)
 		 * filter appropriately for the new address.
 		 */
 		bzero(&ifr.ifr_addr, sizeof(struct sockaddr_in6));
-		ifr.ifr_addr.sin6_len = sizeof(struct sockaddr_in6);
-		ifr.ifr_addr.sin6_family = AF_INET6;
-		ifr.ifr_addr.sin6_addr = *maddr6;
+		ifr.ifr_addr = *maddr6;
 		if (ifp->if_ioctl == NULL)
 			*errorp = ENXIO; /* XXX: appropriate? */
 		else
 			*errorp = (*ifp->if_ioctl)(ifp, SIOCADDMULTI,
-						    (caddr_t)&ifr);
+						   (caddr_t)&ifr);
 		if (*errorp) {
 			LIST_REMOVE(in6m, in6m_entry);
 			free(in6m, M_IPMADDR);
@@ -2292,9 +2290,7 @@ in6_delmulti(in6m)
 		 * reception filter.
 		 */
 		bzero(&ifr.ifr_addr, sizeof(struct sockaddr_in6));
-		ifr.ifr_addr.sin6_len = sizeof(struct sockaddr_in6);
-		ifr.ifr_addr.sin6_family = AF_INET6;
-		ifr.ifr_addr.sin6_addr = in6m->in6m_addr;
+		ifr.ifr_addr = in6m->in6m_sa;
 		(*in6m->in6m_ifp->if_ioctl)(in6m->in6m_ifp,
 					    SIOCDELMULTI, (caddr_t)&ifr);
 		free(in6m, M_IPMADDR);
