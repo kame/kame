@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.141 2002/10/09 17:24:00 itojun Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.142 2002/10/15 11:43:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2424,8 +2424,15 @@ mip6_tunnel_control(action, entry, func, ep)
 		return (EINVAL);
 	}
 
-	if ((action == MIP6_TUNNEL_CHANGE) && *ep) {
-		encap_detach(*ep);
+	/* before doing anything, remove an existing encap entry. */
+	switch (action) {
+	case MIP6_TUNNEL_ADD:
+	case MIP6_TUNNEL_CHANGE:
+	case MIP6_TUNNEL_DELETE:
+		if (*ep != NULL) {
+			encap_detach(*ep);
+			*ep = NULL;
+		}
 	}
 
 	switch (action) {
