@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.25 2000/12/22 08:48:00 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.26 2000/12/25 12:19:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -72,7 +72,7 @@
 
 static void makeentry __P((char *, int, char *, int));
 static void get_prefix __P((struct rainfo *));
-static getinet6sysctl __P((int));
+static int getinet6sysctl __P((int));
 
 extern struct rainfo *ralist;
 
