@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: main.c,v 1.4 2000/04/16 18:01:54 itojun Exp $
+ *	$Id: main.c,v 1.5 2000/05/16 16:22:33 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -48,7 +48,7 @@
  *
  */
 
-u_int		_debug;
+u_int		u_debug;
 
 
 char		*parseArgument		__P((int, char *[]));
@@ -142,7 +142,7 @@ parseArgument(int argc, char *argv[])
 	switch (ch)
 	{
 	  case 'd':
-	    _debug = strtoul(optarg, NULL, 0);
+	    u_debug = strtoul(optarg, NULL, 0);
 #ifdef YYDEBUG
 	    {
 		extern	int	yydebug;
@@ -158,7 +158,7 @@ parseArgument(int argc, char *argv[])
 
 	  case 'n':
 	    if (strcmp(optarg, "osocket") == SAME)
-		_debug |= D_NOSOCKET;
+		u_debug |= D_NOSOCKET;
 	    break;
 	}
     }

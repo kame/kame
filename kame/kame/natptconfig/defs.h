@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: defs.h,v 1.4 2000/03/09 02:59:54 fujisawa Exp $
+ *	$Id: defs.h,v 1.5 2000/05/16 16:22:33 fujisawa Exp $
  */
 
 /*
@@ -52,8 +52,8 @@
 #endif
 
 
-#define	isDebug(d)		(_debug & (d))
-extern	u_int	_debug;
+#define	isDebug(d)		(u_debug & (d))
+extern	u_int	u_debug;
 
 
 /* Bit assign for _debug						*/
