@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.116 2001/05/31 20:39:09 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.117 2001/05/31 21:05:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -857,7 +857,7 @@ defrouter_select()
 		    ND6_IS_LLINFO_PROBREACH(ln)) {
 			/* Got it, and move it to the head */
 #ifdef	RTPREF
-			nd_defrouter_primary =  dr;
+			nd_defrouter_primary = dr;
 #else
 			TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
 			TAILQ_INSERT_HEAD(&nd_defrouter, dr, dr_entry);
