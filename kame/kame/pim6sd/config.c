@@ -159,10 +159,9 @@ config_vifs_from_kernel()
 		n=sizeof(*ifrp);
 #endif 
 
-    /*
-     * Ignore any interface for an address family other than IPv6.
-     */
-
+		/*
+		 * Ignore any interface for an address family other than IPv6.
+		 */
 		if ( ifrp->ifr_addr.sa_family != AF_INET6)
 		{
 			/* Eventually may have IP address later */
@@ -221,11 +220,11 @@ config_vifs_from_kernel()
 		 * already installed in the uvifs array, just add the address
 		 * to the list of addresses of the uvif.
 		 */
-		for(vifi = 0,v=uvifs;vifi < numvifs ; ++vifi,++v)
+		for(vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v)
 		{
 			if( strcmp(v->uv_name , ifr.ifr_name) == 0 )
 			{
-				add_phaddr(v,&addr,&mask);
+				add_phaddr(v, &addr,&mask);
 				break;
 			}
 		}	
