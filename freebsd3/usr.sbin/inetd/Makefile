@@ -1,9 +1,9 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/6/93
 #	$Id: Makefile,v 1.5.2.2 1999/05/07 06:50:28 markm Exp $
 
-PROG=	inetd
-MAN8=	inetd.8
-MLINKS=	inetd.8 inetd.conf.5
+PROG=	inet46d
+MAN8=	inet46d.8
+MLINKS=	inet46d.8 inet46d.conf.5
 COPTS+=	-Wall -DLOGIN_CAP -DLIBWRAP
 COPTS+=	-DIPSEC
 #COPTS+=	-DSANITY_CHECK
