@@ -114,7 +114,7 @@ struct radix_node_head {
 		     struct radix_node_head *head, struct radix_node nodes[]);
 					/* remove based on sockaddr */
 	struct	radix_node *(*rnh_deladdr)(void *v, void *mask,
-		    struct radix_node_head *head);
+		    struct radix_node_head *head, struct radix_node *rn);
 					/* remove based on packet hdr */
 	struct	radix_node *(*rnh_delpkt)(void *v, void *mask,
 		    struct radix_node_head *head);
@@ -159,7 +159,8 @@ struct radix_node
 	 *rn_addmask(void *, int, int),
 	 *rn_addroute(void *, void *, struct radix_node_head *,
 			struct radix_node [2]),
-	 *rn_delete(void *, void *, struct radix_node_head *),
+	 *rn_delete(void *, void *, struct radix_node_head *,
+			struct radix_node *),
 	 *rn_insert(void *, struct radix_node_head *, int *,
 			struct radix_node [2]),
 	 *rn_lookup(void *, void *, struct radix_node_head *),

@@ -704,7 +704,7 @@ rtrequest1(req, info, ret_nrt)
 				senderr(ESRCH);
 		}
 #endif
-		if ((rn = rnh->rnh_deladdr(dst, netmask, rnh)) == NULL)
+		if ((rn = rnh->rnh_deladdr(dst, netmask, rnh, rn)) == NULL)
 			senderr(ESRCH);
 		rt = (struct rtentry *)rn;
 		if ((rt->rt_flags & RTF_CLONING) != 0) {

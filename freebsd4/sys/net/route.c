@@ -620,7 +620,7 @@ rtrequest1(req, info, ret_nrt)
 				senderr(ESRCH);
 		}
 #endif
-		if ((rn = rnh->rnh_deladdr(dst, netmask, rnh)) == 0)
+		if ((rn = rnh->rnh_deladdr(dst, netmask, rnh, rn)) == 0)
 			senderr(ESRCH);
 		if (rn->rn_flags & (RNF_ACTIVE | RNF_ROOT))
 			panic ("rtrequest delete");

@@ -116,15 +116,16 @@ at_lookup(void *v_arg, void *m_arg, struct radix_node_head *head)
 }
 
 static struct radix_node *  
-at_delroute(void *v_arg, void *netmask_arg, struct radix_node_head *head)
+at_delroute(void *v_arg, void *netmask_arg, struct radix_node_head *head,
+    struct radix_node *rn)
 {
-	struct radix_node *rn;
 
 	printf("at_delroute: v=%s\n", prsockaddr(v_arg));
 	printf("at_delroute: n=%s\n", prsockaddr(netmask_arg));
 	printf("at_delroute: head=%p\n", (void *)head);
+	printf("at_delroute: rn=%p\n", (void *)rn);
 
-	rn = rn_delete(v_arg, netmask_arg, head);
+	rn = rn_delete(v_arg, netmask_arg, head, rn);
 
 	printf("at_delroute: returns rn=%p\n", (void *)rn);
 

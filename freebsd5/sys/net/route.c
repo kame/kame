@@ -608,7 +608,7 @@ rtrequest1(req, info, ret_nrt)
 		 * Remove the item from the tree and return it.
 		 * Complain if it is not there and do no more processing.
 		 */
-		if ((rn = rnh->rnh_deladdr(dst, netmask, rnh)) == 0)
+		if ((rn = rnh->rnh_deladdr(dst, netmask, rnh, NULL)) == 0)
 			senderr(ESRCH);
 		if (rn->rn_flags & (RNF_ACTIVE | RNF_ROOT))
 			panic ("rtrequest delete");

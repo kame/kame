@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.c,v 1.14 2002/10/10 06:19:58 itojun Exp $	*/
+/*	$KAME: radix_art.c,v 1.15 2004/02/10 12:34:57 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -1018,15 +1018,15 @@ rn_art_addroute(v_arg, n_arg, head, treenodes)
 }
 
 struct radix_node *
-rn_art_delete(v_arg, netmask_arg, head)
+rn_art_delete(v_arg, netmask_arg, head, rn)
 	void *v_arg, *netmask_arg;
 	struct radix_node_head *head;
+	struct radix_node *rn;
 {
 	u_int8_t *p;
 	int prefixlen;
-	struct radix_node *rn;
 
-	rn = rn_delete(v_arg, netmask_arg, head);
+	rn = rn_delete(v_arg, netmask_arg, head, rn);
 
 	if (rn) {
 		/*

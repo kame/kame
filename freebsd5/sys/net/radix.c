@@ -719,9 +719,10 @@ on2:
 }
 
 struct radix_node *
-rn_delete(v_arg, netmask_arg, head)
+rn_delete(v_arg, netmask_arg, head, rn)
 	void *v_arg, *netmask_arg;
 	struct radix_node_head *head;
+	struct radix_node *rn;
 {
 	register struct radix_node *t, *p, *x, *tt;
 	struct radix_mask *m, *saved_m, **mp;

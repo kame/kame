@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_subr.c	8.31 (Berkeley) 5/26/95
- * $FreeBSD: src/sys/kern/vfs_export.c,v 1.319 2002/06/30 05:23:58 alfred Exp $
+ * $FreeBSD: src/sys/kern/vfs_export.c,v 1.322 2003/02/19 05:47:26 imp Exp $
  */
 
 #include <sys/param.h>
@@ -137,7 +137,7 @@ vfs_hang_addrlist(mp, nep, argp)
 			smask->sa_len = argp->ex_masklen;
 	}
 	i = saddr->sa_family;
-	if ((rnh = nep->ne_rtable[i]) == 0) {
+	if ((rnh = nep->ne_rtable[i]) == NULL) {
 		/*
 		 * Seems silly to initialize every AF when most are not used,
 		 * do so on demand here
@@ -148,13 +148,15 @@ vfs_hang_addrlist(mp, nep, argp)
 				    dom->dom_rtoffset);
 				break;
 			}
-		if ((rnh = nep->ne_rtable[i]) == 0) {
+		if ((rnh = nep->ne_rtable[i]) == NULL) {
 			error = ENOBUFS;
 			goto out;
 		}
 	}
+	RADIX_NODE_HEAD_LOCK(rnh);
 	rn = (*rnh->rnh_addaddr)(saddr, smask, rnh, np->netc_rnodes);
-	if (rn == 0 || np != (struct netcred *)rn) {	/* already exists */
+	RADIX_NODE_HEAD_UNLOCK(rnh);
+	if (rn == NULL || np != (struct netcred *)rn) {	/* already exists */
 		error = EPERM;
 		goto out;
 	}
@@ -180,7 +182,7 @@ vfs_free_netcred(rn, w)
 {
 	register struct radix_node_head *rnh = (struct radix_node_head *) w;
 
-	(*rnh->rnh_deladdr) (rn->rn_key, rn->rn_mask, rnh);
+	(*rnh->rnh_deladdr) (rn->rn_key, rn->rn_mask, rnh, NULL);
 	free(rn, M_NETADDR);
 	return (0);
 }
@@ -197,9 +199,11 @@ vfs_free_addrlist(nep)
 
 	for (i = 0; i <= AF_MAX; i++)
 		if ((rnh = nep->ne_rtable[i])) {
+			RADIX_NODE_HEAD_LOCK(rnh);
 			(*rnh->rnh_walktree) (rnh, vfs_free_netcred, rnh);
+			RADIX_NODE_HEAD_DESTROY(rnh);
 			free(rnh, M_RTABLE);
-			nep->ne_rtable[i] = 0;
+			nep->ne_rtable[i] = NULL;	/* not SMP safe XXX */
 		}
 }
 
@@ -355,8 +359,10 @@ vfs_export_lookup(mp, nam)
 			saddr = nam;
 			rnh = nep->ne_rtable[saddr->sa_family];
 			if (rnh != NULL) {
+				RADIX_NODE_HEAD_LOCK(rnh);
 				np = (struct netcred *)
 				    (*rnh->rnh_matchaddr)(saddr, rnh);
+				RADIX_NODE_HEAD_UNLOCK(rnh);
 				if (np && np->netc_rnodes->rn_flags & RNF_ROOT)
 					np = NULL;
 			}
