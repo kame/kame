@@ -1,12 +1,19 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.39 1999/08/20 00:02:19 itojun Exp $
+$Id: CHANGELOG,v 1.40 1999/08/20 00:13:46 itojun Exp $
 
 <199908>
+Fri Aug 20 09:11:20 JST 1999  itojun@iijlab.net
+	* freebsd[23]/ports/apache13, netbsd/pkgsrc/www/apache13:
+	  upgrade to new IPv6 patch.
+
 Fri Aug 20 08:57:01 JST 1999  itojun@iijlab.net
 	* sys/netinet6/in6.h: remove, or hide nonstandard macros/struct defs
 	  from the userland programmers.  if your code breaks with this change,
 	  your program assumes something outside of RFC2553.
+
+	  some of programs under "ports" or "packages" directory may fail to
+	  compile.  Please report if you find one.
 
 Fri Aug 20 04:16:11 JST 1999  sumikawa@ebina.hitachi.co.jp
 	* freebsd[23]/ports/newbie, netbsd/pkgsrc/net/newbie: update to 0.22.
