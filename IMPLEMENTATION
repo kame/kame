@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.255 2001/07/30 07:05:23 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.256 2001/08/04 01:35:59 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -2253,7 +2253,7 @@ to make the distributed develoment smooth.
 	       (c-set-style "bsd")
 	       (setq c-basic-offset 8)  ; for Emacs 20 only
 	       )))
-  The "bsd" style in GNU Emacs 21 sets 8 to the variable by default, so this
+  The "bsd" style in GNU Emacs 21 sets the variable to 8 by default, so this
   configuration is not necessary if you only use GNU Emacs 21.
 - each line should be within 80 characters.
 - keep a single open/close bracket in a comment such as in the following
