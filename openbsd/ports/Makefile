@@ -1,5 +1,6 @@
-# $Id: Makefile,v 1.1 1999/10/07 16:35:24 itojun Exp $
+# $Id: Makefile,v 1.2 1999/10/07 17:10:42 itojun Exp $
 
+SUBDIR += mail
 SUBDIR += security
 
 PORTSTOP?=	yes
