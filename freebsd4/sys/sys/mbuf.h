@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.10 2001/07/03 11:02:01 ume Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.11 2001/10/26 06:44:51 luigi Exp $
  */
 
 #ifndef _SYS_MBUF_H_
@@ -489,8 +489,11 @@ union mcluster {
 /*
  * Check if we can write to an mbuf.
  */
+#define M_EXT_WRITABLE(m)	\
+    ((m)->m_ext.ext_free == NULL && mclrefcnt[mtocl((m)->m_ext.ext_buf)] == 1)
+
 #define M_WRITABLE(m) (!((m)->m_flags & M_EXT) || \
-    ((m)->m_ext.ext_free == NULL && mclrefcnt[mtocl((m)->m_ext.ext_buf)] == 1))
+    M_EXT_WRITABLE(m) )
 
 /*
  * Compute the amount of space available
@@ -498,7 +501,7 @@ union mcluster {
  */
 #define	M_LEADINGSPACE(m)						\
 	((m)->m_flags & M_EXT ?						\
-	    /* (m)->m_data - (m)->m_ext.ext_buf */ 0 :			\
+	    (M_EXT_WRITABLE(m) ? (m)->m_data - (m)->m_ext.ext_buf : 0):	\
 	    (m)->m_flags & M_PKTHDR ? (m)->m_data - (m)->m_pktdat :	\
 	    (m)->m_data - (m)->m_dat)
 

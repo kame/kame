@@ -1,5 +1,5 @@
-/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.6 2001/07/29 19:32:40 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.47 2002/02/02 09:35:37 jinmei Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.7 2001/12/15 01:06:28 brooks Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.48 2002/02/07 12:46:13 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,11 +106,6 @@
 #include <netinet6/ipsec.h>
 #endif /* IPSEC */
 
-#include "faith.h"
-#if defined(NFAITH) && NFAITH > 0
-#include <net/if_faith.h>
-#endif
-
 /*
  * UDP protocol inplementation.
  * Per RFC 768, August, 1980.
@@ -137,13 +132,11 @@ udp6_input(mp, offp, proto)
 
 	ip6 = mtod(m, struct ip6_hdr *);
 
-#if defined(NFAITH) && 0 < NFAITH
-	if (faithprefix(&ip6->ip6_dst)) {
+	if (faithprefix_p != NULL && (*faithprefix_p)(&ip6->ip6_dst)) {
 		/* XXX send icmp6 host/port unreach? */
 		m_freem(m);
 		return IPPROTO_DONE;
 	}
-#endif
 
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);

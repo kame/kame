@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_output.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/netinet/ip_output.c,v 1.99.2.16 2001/07/19 06:37:26 kris Exp $
+ * $FreeBSD: src/sys/netinet/ip_output.c,v 1.99.2.24 2001/12/28 10:08:33 yar Exp $
  */
 
 #define _IP_VHL
@@ -63,11 +63,6 @@
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
 
-#include "faith.h"
-
-#ifdef vax
-#include <machine/mtpr.h>
-#endif
 #include <machine/in_cksum.h>
 
 static MALLOC_DEFINE(M_IPMOPTS, "ip_moptions", "internet multicast options");
@@ -83,10 +78,7 @@ static MALLOC_DEFINE(M_IPMOPTS, "ip_moptions", "internet multicast options");
 #endif /*IPSEC*/
 
 #include <netinet/ip_fw.h>
-
-#ifdef DUMMYNET
 #include <netinet/ip_dummynet.h>
-#endif
 
 #ifdef IPFIREWALL_FORWARD_DEBUG
 #define print_ip(a)	 printf("%ld.%ld.%ld.%ld",(ntohl(a.s_addr)>>24)&0xFF,\
@@ -132,11 +124,11 @@ ip_output(m0, opt, ro, flags, imo)
 	struct mbuf *m = m0;
 	int hlen = sizeof (struct ip);
 	int len, off, error = 0;
+	struct route iproute;
 	struct sockaddr_in *dst;
 	struct in_ifaddr *ia = NULL;
 	int isbroadcast, sw_csum;
 #ifdef IPSEC
-	struct route iproute;
 	struct socket *so = NULL;
 	struct secpolicy *sp = NULL;
 #endif
@@ -144,7 +136,7 @@ ip_output(m0, opt, ro, flags, imo)
 #ifdef IPFIREWALL_FORWARD
 	int fwd_rewrite_src = 0;
 #endif
-	struct ip_fw_chain *rule = NULL;
+	struct ip_fw *rule = NULL;
   
 #ifdef IPDIVERT
 	/* Get and reset firewall cookie */
@@ -154,7 +146,6 @@ ip_output(m0, opt, ro, flags, imo)
 	divert_cookie = 0;
 #endif
 
-#if defined(IPFIREWALL) && defined(DUMMYNET)
         /*  
          * dummynet packet are prepended a vestigial mbuf with
          * m_type = MT_DUMMYNET and m_data pointing to the matching
@@ -166,7 +157,7 @@ ip_output(m0, opt, ro, flags, imo)
              * processing was already done, and we need to go down.
              * Get parameters from the header.
              */
-            rule = (struct ip_fw_chain *)(m->m_data) ;
+            rule = (struct ip_fw *)(m->m_data) ;
 	    opt = NULL ;
 	    ro = & ( ((struct dn_pkt *)m)->ro ) ;
 	    imo = NULL ;
@@ -182,11 +173,10 @@ ip_output(m0, opt, ro, flags, imo)
             ip = mtod(m, struct ip *);
             hlen = IP_VHL_HL(ip->ip_vhl) << 2 ;
             if (ro->ro_rt != NULL)
-                ia = (struct in_ifaddr *)ro->ro_rt->rt_ifa;
+                ia = ifatoia(ro->ro_rt->rt_ifa);
             goto sendit;
         } else
             rule = NULL ;
-#endif
 #ifdef IPSEC
 	so = ipsec_getsocket(m);
 	(void)ipsec_setsocket(m, NULL);
@@ -195,9 +185,6 @@ ip_output(m0, opt, ro, flags, imo)
 #ifdef	DIAGNOSTIC
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("ip_output no HDR");
-	if (!ro)
-		panic("ip_output no route, proto = %d",
-		      mtod(m, struct ip *)->ip_p);
 #endif
 	if (opt) {
 		m = ip_insertoptions(m, opt, &len);
@@ -220,6 +207,11 @@ ip_output(m0, opt, ro, flags, imo)
 		hlen = IP_VHL_HL(ip->ip_vhl) << 2;
 	}
 
+	/* Route packet. */
+	if (ro == NULL) {
+		ro = &iproute;
+		bzero(ro, sizeof(*ro));
+	}
 	dst = (struct sockaddr_in *)&ro->ro_dst;
 	/*
 	 * If there is a cached route,
@@ -244,8 +236,6 @@ ip_output(m0, opt, ro, flags, imo)
 	 * If routing to interface only,
 	 * short circuit routing lookup.
 	 */
-#define ifatoia(ifa)	((struct in_ifaddr *)(ifa))
-#define sintosa(sin)	((struct sockaddr *)(sin))
 	if (flags & IP_ROUTETOIF) {
 		if ((ia = ifatoia(ifa_ifwithdstaddr(sintosa(dst)))) == 0 &&
 		    (ia = ifatoia(ifa_ifwithnet(sintosa(dst)))) == 0) {
@@ -256,6 +246,15 @@ ip_output(m0, opt, ro, flags, imo)
 		ifp = ia->ia_ifp;
 		ip->ip_ttl = 1;
 		isbroadcast = in_broadcast(dst->sin_addr, ifp);
+	} else if (IN_MULTICAST(ntohl(ip->ip_dst.s_addr)) &&
+	    imo != NULL && imo->imo_multicast_ifp != NULL) {
+		/*
+		 * Bypass the normal routing lookup for multicast
+		 * packets if the interface is specified.
+		 */
+		ifp = imo->imo_multicast_ifp;
+		IFP_TO_IA(ifp, ia);
+		isbroadcast = 0;	/* fool gcc */
 	} else {
 		/*
 		 * If this is the case, we probably don't want to allocate
@@ -298,8 +297,6 @@ ip_output(m0, opt, ro, flags, imo)
 		 */
 		if (imo != NULL) {
 			ip->ip_ttl = imo->imo_multicast_ttl;
-			if (imo->imo_multicast_ifp != NULL)
-				ifp = imo->imo_multicast_ifp;
 			if (imo->imo_multicast_vif != -1)
 				ip->ip_src.s_addr =
 				    ip_mcast_src(imo->imo_multicast_vif);
@@ -320,13 +317,9 @@ ip_output(m0, opt, ro, flags, imo)
 		 * of outgoing interface.
 		 */
 		if (ip->ip_src.s_addr == INADDR_ANY) {
-			register struct in_ifaddr *ia1;
-
-			TAILQ_FOREACH(ia1, &in_ifaddrhead, ia_link)
-				if (ia1->ia_ifp == ifp) {
-					ip->ip_src = IA_SIN(ia1)->sin_addr;
-					break;
-				}
+			/* Interface may have no addresses. */
+			if (ia != NULL)
+				ip->ip_src = IA_SIN(ia)->sin_addr;
 		}
 
 		IN_LOOKUP_MULTI(ip->ip_dst, ifp, inm);
@@ -389,15 +382,18 @@ ip_output(m0, opt, ro, flags, imo)
 	 * of outgoing interface.
 	 */
 	if (ip->ip_src.s_addr == INADDR_ANY) {
-		ip->ip_src = IA_SIN(ia)->sin_addr;
+		/* Interface may have no addresses. */
+		if (ia != NULL) {
+			ip->ip_src = IA_SIN(ia)->sin_addr;
 #ifdef IPFIREWALL_FORWARD
-		/* Keep note that we did this - if the firewall changes
-		 * the next-hop, our interface may change, changing the
-		 * default source IP. It's a shame so much effort happens
-		 * twice. Oh well. 
-		 */
-		fwd_rewrite_src++;
+			/* Keep note that we did this - if the firewall changes
+		 	* the next-hop, our interface may change, changing the
+		 	* default source IP. It's a shame so much effort happens
+		 	* twice. Oh well. 
+		 	*/
+			fwd_rewrite_src++;
 #endif /* IPFIREWALL_FORWARD */
+		}
 	}
 #endif /* notdef */
 #ifdef ALTQ
@@ -413,6 +409,7 @@ ip_output(m0, opt, ro, flags, imo)
 	if ((ifp->if_snd.ifq_len + ip->ip_len / ifp->if_mtu + 1) >=
 		ifp->if_snd.ifq_maxlen) {
 			error = ENOBUFS;
+			ipstat.ips_odropped++;
 			goto bad;
 	}
 #endif /* !ALTQ */
@@ -589,10 +586,10 @@ skip_ipsec:
 	/*
 	 * Check with the firewall...
 	 */
-	if (fw_enable && ip_fw_chk_ptr) {
+	if (fw_enable && IPFW_LOADED) {
 		struct sockaddr_in *old = dst;
 
-		off = (*ip_fw_chk_ptr)(&ip,
+		off = ip_fw_chk_ptr(&ip,
 		    hlen, ifp, &divert_cookie, &m, &rule, &dst);
                 /*
                  * On return we must do the following:
@@ -617,8 +614,7 @@ skip_ipsec:
 		ip = mtod(m, struct ip *);
 		if (off == 0 && dst == old) /* common case */
 			goto pass ;
-#ifdef DUMMYNET
-                if ((off & IP_FW_PORT_DYNT_FLAG) != 0) {
+                if (DUMMYNET_LOADED && (off & IP_FW_PORT_DYNT_FLAG) != 0) {
                     /*
                      * pass the pkt to dummynet. Need to include
                      * pipe number, m, ifp, ro, dst because these are
@@ -628,11 +624,10 @@ skip_ipsec:
                      * XXX note: if the ifp or ro entry are deleted
                      * while a pkt is in dummynet, we are in trouble!
                      */ 
-		    error = dummynet_io(off & 0xffff, DN_TO_IP_OUT, m,
+		    error = ip_dn_io_ptr(off & 0xffff, DN_TO_IP_OUT, m,
 				ifp,ro,dst,rule, flags);
 		    goto done;
 		}
-#endif   
 #ifdef IPDIVERT
 		if (off != 0 && (off & IP_FW_PORT_DYNT_FLAG) == 0) {
 			struct mbuf *clone = NULL;
@@ -703,7 +698,8 @@ skip_ipsec:
 			 * as the packet runs through ip_input() as
 			 * it is done through a ISR.
 			 */
-			TAILQ_FOREACH(ia, &in_ifaddrhead, ia_link) {
+			LIST_FOREACH(ia,
+			    INADDR_HASH(dst->sin_addr.s_addr), ia_hash) {
 				/*
 				 * If the addr to forward to is one
 				 * of ours, we pretend to
@@ -757,7 +753,8 @@ skip_ipsec:
 				    (ro_fwd->ro_rt->rt_flags & RTF_BROADCAST);
 			else
 				isbroadcast = in_broadcast(dst->sin_addr, ifp);
-			RTFREE(ro->ro_rt);
+			if (ro->ro_rt)
+				RTFREE(ro->ro_rt);
 			ro->ro_rt = ro_fwd->ro_rt;
 			dst = (struct sockaddr_in *)&ro_fwd->ro_dst;
 
@@ -979,7 +976,7 @@ done:
 #endif /* IPSEC */
 	return (error);
 bad:
-	m_freem(m0);
+	m_freem(m);
 	goto done;
 }
 
@@ -1154,9 +1151,7 @@ ip_ctloutput(so, sopt)
 		case IP_RECVRETOPTS:
 		case IP_RECVDSTADDR:
 		case IP_RECVIF:
-#if defined(NFAITH) && NFAITH > 0
 		case IP_FAITH:
-#endif
 			error = sooptcopyin(sopt, &optval, sizeof optval,
 					    sizeof optval);
 			if (error)
@@ -1192,11 +1187,9 @@ ip_ctloutput(so, sopt)
 				OPTSET(INP_RECVIF);
 				break;
 
-#if defined(NFAITH) && NFAITH > 0
 			case IP_FAITH:
 				OPTSET(INP_FAITH);
 				break;
-#endif
 			}
 			break;
 #undef OPTSET
@@ -1288,9 +1281,7 @@ ip_ctloutput(so, sopt)
 		case IP_RECVDSTADDR:
 		case IP_RECVIF:
 		case IP_PORTRANGE:
-#if defined(NFAITH) && NFAITH > 0
 		case IP_FAITH:
-#endif
 			switch (sopt->sopt_name) {
 
 			case IP_TOS:
@@ -1328,11 +1319,9 @@ ip_ctloutput(so, sopt)
 					optval = 0;
 				break;
 
-#if defined(NFAITH) && NFAITH > 0
 			case IP_FAITH:
 				optval = OPTBIT(INP_FAITH);
 				break;
-#endif
 			}
 			error = sooptcopyout(sopt, &optval, sizeof optval);
 			break;

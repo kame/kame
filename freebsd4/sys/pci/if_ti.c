@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.10 2001/08/01 01:08:25 fenner Exp $
+ * $FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.13 2001/12/16 15:46:08 luigi Exp $
  */
 
 /*
@@ -78,8 +78,6 @@
  * - Andrew Gallatin for providing FreeBSD/Alpha support.
  */
 
-#include "vlan.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -94,13 +92,10 @@
 #include <net/ethernet.h>
 #include <net/if_dl.h>
 #include <net/if_media.h>
-
-#include <net/bpf.h>
-
-#if NVLAN > 0
 #include <net/if_types.h>
 #include <net/if_vlan_var.h>
-#endif
+
+#include <net/bpf.h>
 
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
@@ -138,7 +133,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.10 2001/08/01 01:08:25 fenner Exp $";
+  "$FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.13 2001/12/16 15:46:08 luigi Exp $";
 #endif
 
 /*
@@ -782,16 +777,11 @@ static int ti_newbuf_std(sc, i, m)
 
 	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("ti%d: mbuf allocation failed "
-			    "-- packet dropped!\n", sc->ti_unit);
+		if (m_new == NULL)
 			return(ENOBUFS);
-		}
 
 		MCLGET(m_new, M_DONTWAIT);
 		if (!(m_new->m_flags & M_EXT)) {
-			printf("ti%d: cluster allocation failed "
-			    "-- packet dropped!\n", sc->ti_unit);
 			m_freem(m_new);
 			return(ENOBUFS);
 		}
@@ -1217,7 +1207,10 @@ static int ti_chipinit(sc)
 	/* Initialize link to down state. */
 	sc->ti_linkstat = TI_EV_CODE_LINK_DOWN;
 
-	sc->arpcom.ac_if.if_hwassist = TI_CSUM_FEATURES;
+	if (sc->arpcom.ac_if.if_capenable & IFCAP_HWCSUM)
+		sc->arpcom.ac_if.if_hwassist = TI_CSUM_FEATURES;
+	else
+		sc->arpcom.ac_if.if_hwassist = 0;
 
 	/* Set endianness before we access any non-PCI registers. */
 #if BYTE_ORDER == BIG_ENDIAN
@@ -1414,9 +1407,7 @@ static int ti_gibinit(sc)
 	if (sc->arpcom.ac_if.if_hwassist)
 		rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM |
 		     TI_RCB_FLAG_IP_CKSUM | TI_RCB_FLAG_NO_PHDR_CKSUM;
-#if NVLAN > 0
 	rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
-#endif
 
 	/* Set up the jumbo receive ring. */
 	rcb = &sc->ti_rdata->ti_info.ti_jumbo_rx_rcb;
@@ -1427,9 +1418,7 @@ static int ti_gibinit(sc)
 	if (sc->arpcom.ac_if.if_hwassist)
 		rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM |
 		     TI_RCB_FLAG_IP_CKSUM | TI_RCB_FLAG_NO_PHDR_CKSUM;
-#if NVLAN > 0
 	rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
-#endif
 
 	/*
 	 * Set up the mini ring. Only activated on the
@@ -1447,9 +1436,7 @@ static int ti_gibinit(sc)
 	if (sc->arpcom.ac_if.if_hwassist)
 		rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM |
 		     TI_RCB_FLAG_IP_CKSUM | TI_RCB_FLAG_NO_PHDR_CKSUM;
-#if NVLAN > 0
 	rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
-#endif
 
 	/*
 	 * Set up the receive return ring.
@@ -1483,9 +1470,7 @@ static int ti_gibinit(sc)
 		rcb->ti_flags = 0;
 	else
 		rcb->ti_flags = TI_RCB_FLAG_HOST_RING;
-#if NVLAN > 0
 	rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
-#endif
 	if (sc->arpcom.ac_if.if_hwassist)
 		rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM |
 		     TI_RCB_FLAG_IP_CKSUM | TI_RCB_FLAG_NO_PHDR_CKSUM;
@@ -1557,6 +1542,8 @@ static int ti_attach(dev)
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
 	bzero(sc, sizeof(struct ti_softc));
+	sc->arpcom.ac_if.if_capabilities = IFCAP_HWCSUM;
+	sc->arpcom.ac_if.if_capenable = sc->arpcom.ac_if.if_capabilities;
 
 	/*
 	 * Map control/status registers.
@@ -1834,22 +1821,18 @@ static void ti_rxeof(sc)
 		u_int32_t		rxidx;
 		struct ether_header	*eh;
 		struct mbuf		*m = NULL;
-#if NVLAN > 0
 		u_int16_t		vlan_tag = 0;
 		int			have_tag = 0;
-#endif
 
 		cur_rx =
 		    &sc->ti_rdata->ti_rx_return_ring[sc->ti_rx_saved_considx];
 		rxidx = cur_rx->ti_idx;
 		TI_INC(sc->ti_rx_saved_considx, TI_RETURN_RING_CNT);
 
-#if NVLAN > 0
 		if (cur_rx->ti_flags & TI_BDFLAG_VLAN_TAG) {
 			have_tag = 1;
 			vlan_tag = cur_rx->ti_vlan_tag & 0xfff;
 		}
-#endif
 
 		if (cur_rx->ti_flags & TI_BDFLAG_JUMBO_RING) {
 			TI_INC(sc->ti_jumbo, TI_JUMBO_RX_RING_CNT);
@@ -1911,17 +1894,15 @@ static void ti_rxeof(sc)
 			m->m_pkthdr.csum_data = cur_rx->ti_tcp_udp_cksum;
 		}
 
-#if NVLAN > 0
 		/*
 		 * If we received a packet with a vlan tag, pass it
 		 * to vlan_input() instead of ether_input().
 		 */
 		if (have_tag) {
-			vlan_input_tag(eh, m, vlan_tag);
+			VLAN_INPUT_TAG(eh, m, vlan_tag);
 			have_tag = vlan_tag = 0;
 			continue;
 		}
-#endif
 		ether_input(ifp, eh, m);
 	}
 
@@ -2054,14 +2035,12 @@ static int ti_encap(sc, m_head, txidx)
 	struct mbuf		*m;
 	u_int32_t		frag, cur, cnt = 0;
 	u_int16_t		csum_flags = 0;
-#if NVLAN > 0
 	struct ifvlan		*ifv = NULL;
 
 	if ((m_head->m_flags & (M_PROTO1|M_PKTHDR)) == (M_PROTO1|M_PKTHDR) &&
 	    m_head->m_pkthdr.rcvif != NULL &&
 	    m_head->m_pkthdr.rcvif->if_type == IFT_L2VLAN)
 		ifv = m_head->m_pkthdr.rcvif->if_softc;
-#endif
 
 	m = m_head;
 	cur = frag = *txidx;
@@ -2104,14 +2083,14 @@ static int ti_encap(sc, m_head, txidx)
 			TI_HOSTADDR(f->ti_addr) = vtophys(mtod(m, vm_offset_t));
 			f->ti_len = m->m_len;
 			f->ti_flags = csum_flags;
-#if NVLAN > 0
+
 			if (ifv != NULL) {
 				f->ti_flags |= TI_BDFLAG_VLAN_TAG;
 				f->ti_vlan_tag = ifv->ifv_tag & 0xfff;
 			} else {
 				f->ti_vlan_tag = 0;
 			}
-#endif
+
 			/*
 			 * Sanity check: avoid coming within 16 descriptors
 			 * of the end of the ring.
@@ -2446,7 +2425,7 @@ static int ti_ioctl(ifp, command, data)
 {
 	struct ti_softc		*sc = ifp->if_softc;
 	struct ifreq		*ifr = (struct ifreq *) data;
-	int			s, error = 0;
+	int			s, mask, error = 0;
 	struct ti_cmd_desc	cmd;
 
 	s = splimp();
@@ -2504,6 +2483,18 @@ static int ti_ioctl(ifp, command, data)
 	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
+		break;
+	case SIOCSIFCAP:
+		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		if (mask & IFCAP_HWCSUM) {
+			if (IFCAP_HWCSUM & ifp->if_capenable)
+				ifp->if_capenable &= ~IFCAP_HWCSUM;
+                        else
+                                ifp->if_capenable |= IFCAP_HWCSUM;
+			if (ifp->if_flags & IFF_RUNNING)
+				ti_init(sc);
+                }
+		error = 0;
 		break;
 	default:
 		error = EINVAL;

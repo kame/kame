@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/ip_var.h,v 1.50.2.4 2001/07/19 06:37:26 kris Exp $
+ * $FreeBSD: src/sys/netinet/ip_var.h,v 1.50.2.5 2001/12/07 09:23:14 ru Exp $
  */
 
 #ifndef _NETINET_IP_VAR_H_
@@ -163,6 +163,8 @@ extern int	 (*ip_mforward) __P((struct ip *, struct ifnet *, struct mbuf *,
 			  struct ip_moptions *));
 int	 ip_output __P((struct mbuf *,
 	    struct mbuf *, struct route *, int, struct ip_moptions *));
+struct in_ifaddr *
+	 ip_rtaddr __P((struct in_addr, struct route *));
 void	 ip_savecontrol __P((struct inpcb *, struct mbuf **, struct ip *,
 		struct mbuf *));
 void	 ip_slowtimo __P((void));

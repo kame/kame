@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.c	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/in.c,v 1.44.2.5 2001/08/13 16:26:17 ume Exp $
+ * $FreeBSD: src/sys/netinet/in.c,v 1.44.2.7 2001/12/14 19:59:55 jlemon Exp $
  */
 
 #include <sys/param.h>
@@ -196,11 +196,11 @@ in_control(so, cmd, data, ifp, p)
 	register struct ifreq *ifr = (struct ifreq *)data;
 	register struct in_ifaddr *ia = 0, *iap;
 	register struct ifaddr *ifa;
+	struct in_addr dst;
 	struct in_ifaddr *oia;
 	struct in_aliasreq *ifra = (struct in_aliasreq *)data;
 	struct sockaddr_in oldaddr;
 	int error, hostIsNew, maskIsNew, s;
-	u_long i;
 
 	switch (cmd) {
 	case SIOCALIFADDR:
@@ -218,22 +218,25 @@ in_control(so, cmd, data, ifp, p)
 	 * Find address for this interface, if it exists.
 	 *
 	 * If an alias address was specified, find that one instead of
-	 * the first one on the interface.
+	 * the first one on the interface, if possible
 	 */
-	if (ifp)
-		for (iap = in_ifaddrhead.tqh_first; iap; 
-		     iap = iap->ia_link.tqe_next)
-			if (iap->ia_ifp == ifp) {
-				if (((struct sockaddr_in *)&ifr->ifr_addr)->sin_addr.s_addr ==
-				    iap->ia_addr.sin_addr.s_addr) {
+	if (ifp) {
+		dst = ((struct sockaddr_in *)&ifr->ifr_addr)->sin_addr;
+		LIST_FOREACH(iap, INADDR_HASH(dst.s_addr), ia_hash)
+			if (iap->ia_ifp == ifp &&
+			    iap->ia_addr.sin_addr.s_addr == dst.s_addr) {
+				ia = iap;
+				break;
+			}
+		if (ia == NULL)
+			TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+				iap = ifatoia(ifa);
+				if (iap->ia_addr.sin_family == AF_INET) {
 					ia = iap;
 					break;
-				} else if (ia == NULL) {
-					ia = iap;
-					if (ifr->ifr_addr.sa_family != AF_INET)
-						break;
 				}
 			}
+	}
 
 	switch (cmd) {
 
@@ -286,6 +289,7 @@ in_control(so, cmd, data, ifp, p)
 			ifa->ifa_dstaddr = (struct sockaddr *)&ia->ia_dstaddr;
 			ifa->ifa_netmask = (struct sockaddr *)&ia->ia_sockmask;
 			ia->ia_sockmask.sin_len = 8;
+			ia->ia_sockmask.sin_family = AF_INET;
 			if (ifp->if_flags & IFF_BROADCAST) {
 				ia->ia_broadaddr.sin_len = sizeof(ia->ia_addr);
 				ia->ia_broadaddr.sin_family = AF_INET;
@@ -362,8 +366,8 @@ in_control(so, cmd, data, ifp, p)
 		    (struct sockaddr_in *) &ifr->ifr_addr, 1));
 
 	case SIOCSIFNETMASK:
-		i = ifra->ifra_addr.sin_addr.s_addr;
-		ia->ia_subnetmask = ntohl(ia->ia_sockmask.sin_addr.s_addr = i);
+		ia->ia_sockmask.sin_addr = ifra->ifra_addr.sin_addr;
+		ia->ia_subnetmask = ntohl(ia->ia_sockmask.sin_addr.s_addr);
 		break;
 
 	case SIOCAIFADDR:
@@ -381,6 +385,7 @@ in_control(so, cmd, data, ifp, p)
 		if (ifra->ifra_mask.sin_len) {
 			in_ifscrub(ifp, ia);
 			ia->ia_sockmask = ifra->ifra_mask;
+			ia->ia_sockmask.sin_family = AF_INET;
 			ia->ia_subnetmask =
 			     ntohl(ia->ia_sockmask.sin_addr.s_addr);
 			maskIsNew = 1;
@@ -428,9 +433,9 @@ in_control(so, cmd, data, ifp, p)
 
 		ifa = &ia->ia_ifa;
 		TAILQ_REMOVE(&ifp->if_addrhead, ifa, ifa_link);
-		oia = ia;
-		TAILQ_REMOVE(&in_ifaddrhead, oia, ia_link);
-		IFAFREE(&oia->ia_ifa);
+		TAILQ_REMOVE(&in_ifaddrhead, ia, ia_link);
+		LIST_REMOVE(ia, ia_hash);
+		IFAFREE(&ia->ia_ifa);
 		splx(s);
 		break;
 
@@ -666,6 +671,11 @@ in_ifinit(ifp, ia, sin, scrub)
 		ia->ia_addr = oldaddr;
 		return (error);
 	}
+	if (oldaddr.sin_family == AF_INET)
+		LIST_REMOVE(ia, ia_hash);
+	if (ia->ia_addr.sin_family == AF_INET)
+		LIST_INSERT_HEAD(INADDR_HASH(ia->ia_addr.sin_addr.s_addr),
+		    ia, ia_hash);
 	splx(s);
 	if (scrub) {
 		ia->ia_ifa.ifa_addr = (struct sockaddr *)&oldaddr;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_var.h,v 1.18.2.7 2001/07/24 19:10:18 brooks Exp $
+ * $FreeBSD: src/sys/net/if_var.h,v 1.18.2.11 2001/12/20 10:30:17 ru Exp $
  */
 
 #ifndef	_NET_IF_VAR_H_
@@ -69,6 +69,7 @@
 struct	mbuf;
 struct	proc;
 struct	rtentry;
+struct	rt_addrinfo;
 struct	socket;
 struct	ether_header;
 #endif
@@ -99,12 +100,39 @@ struct	ifqueue {
  *
  * (Would like to call this struct ``if'', but C isn't PL/1.)
  */
+
+/*
+ * NB: For FreeBSD, it is assumed that each NIC driver's softc starts with  
+ * one of these structures, typically held within an arpcom structure.   
+ * 
+ *	struct <foo>_softc {
+ *		struct arpcom {
+ *			struct  ifnet ac_if;
+ *			...
+ *		} <arpcom> ;
+ *		...   
+ *	};
+ *
+ * The assumption is used in a number of places, including many
+ * files in sys/net, device drivers, and sys/dev/mii.c:miibus_attach().
+ * 
+ * Unfortunately devices' softc are opaque, so we depend on this layout
+ * to locate the struct ifnet from the softc in the generic code.
+ *
+ * Note that not all fields are used by drivers in the FreeBSD source
+ * tree. However, who knows what third party software does with fields
+ * marked as "unused", such as if_ipending, if_done, and if_poll*,
+ * so any attemt to redefine their meaning might end up in binary
+ * compatibility problems, even if the size of struct ifnet, and
+ * the size and position of its fields do not change.
+ * We just have to live with that.
+ */
 struct ifnet {
 	void	*if_softc;		/* pointer to driver state */
 	char	*if_name;		/* name, e.g. ``en'' or ``lo'' */
 	TAILQ_ENTRY(ifnet) if_link; 	/* all struct ifnets are chained */
 	struct	ifaddrhead if_addrhead;	/* linked list of addresses per if */
-        int	if_pcount;		/* number of promiscuous listeners */
+	int	if_pcount;		/* number of promiscuous listeners */
 	struct	bpf_if *if_bpf;		/* packet filter structure */
 	u_short	if_index;		/* numeric abbreviation for this if  */
 	short	if_unit;		/* sub-unit for lower level driver */
@@ -122,14 +150,20 @@ struct ifnet {
 		     struct rtentry *));
 	void	(*if_start)		/* initiate output routine */
 		__P((struct ifnet *));
-	int	(*if_done)		/* output complete routine */
-		__P((struct ifnet *));	/* (XXX not used; fake prototype) */
+	union {
+		int	(*if_done)		/* output complete routine */
+			__P((struct ifnet *));	/* (XXX not used) */
+		int	uif_capabilities;	/* interface capabilities */
+	} _u1;
 	int	(*if_ioctl)		/* ioctl routine */
 		__P((struct ifnet *, u_long, caddr_t));
 	void	(*if_watchdog)		/* timer routine */
 		__P((struct ifnet *));
-	int	(*if_poll_recv)		/* polled receive routine */
-		__P((struct ifnet *, int *));
+	union {
+		int	(*if_poll_recv)		/* polled receive routine */
+			__P((struct ifnet *, int *));
+		int	uif_capenable;		/* enabled features */
+	} _u2;
 	int	(*if_poll_xmit)		/* polled transmit routine */
 		__P((struct ifnet *, int *));
 	void	(*if_poll_intren)	/* polled interrupt reenable routine */
@@ -149,6 +183,12 @@ struct ifnet {
 	struct	ifprefixhead if_prefixhead; /* list of prefixes per if */
 };
 typedef void if_init_f_t __P((void *));
+
+/*
+ * Binary compatability gunk for 4.x ONLY.
+ */
+#define if_capabilities	_u1.uif_capabilities
+#define if_capenable	_u2.uif_capenable
 
 #define	if_mtu		if_data.ifi_mtu
 #define	if_type		if_data.ifi_type
@@ -385,7 +425,7 @@ struct ifaddr {
 	struct	ifnet *ifa_ifp;		/* back-pointer to interface */
 	TAILQ_ENTRY(ifaddr) ifa_link;	/* queue macro glue */
 	void	(*ifa_rtrequest)	/* check or clean routes (+ or -)'d */
-		__P((int, struct rtentry *, struct sockaddr *));
+		__P((int, struct rtentry *, struct rt_addrinfo *));
 	u_short	ifa_flags;		/* mostly rt_flags for cloning */
 	u_int	ifa_refcnt;		/* references to this structure */
 	int	ifa_metric;		/* cost of going out this interface */

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket2.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.55.2.9 2001/07/26 18:53:02 peter Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.55.2.10 2001/12/27 18:36:10 jlemon Exp $
  */
 
 #include "opt_param.h"
@@ -231,6 +231,8 @@ sonewconn3(head, connstatus, p)
 	so = soalloc(0);
 	if (so == NULL)
 		return ((struct socket *)0);
+	if ((head->so_options & SO_ACCEPTFILTER) != 0)
+		connstatus = 0;
 	so->so_head = head;
 	so->so_type = head->so_type;
 	so->so_options = head->so_options &~ SO_ACCEPTCONN;

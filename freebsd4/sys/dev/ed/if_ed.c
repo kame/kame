@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed.c,v 1.173.2.11 2001/07/25 18:06:00 iedowse Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed.c,v 1.173.2.13 2001/11/03 00:36:07 luigi Exp $
  */
 
 /*
@@ -64,9 +64,7 @@
 
 #include <net/bpf.h>
 #include "opt_bdg.h"
-#ifdef BRIDGE
 #include <net/bridge.h>
-#endif
 
 #include <machine/clock.h>
 #include <machine/md_var.h>
@@ -1422,7 +1420,7 @@ ed_probe_HP_pclanp(dev, port_rid, flags)
 			return ENXIO;
 	}
 
-	return (ED_HPP_IO_PORTS);
+	return (0);
 
 }
 
@@ -2685,17 +2683,15 @@ ed_get_packet(sc, buf, len)
 	m->m_data += 2;
 	eh = mtod(m, struct ether_header *);
 
-#ifdef BRIDGE
 	/*
 	 * Don't read in the entire packet if we know we're going to drop it
 	 * and no bpf is active.
 	 */
-	if (!sc->arpcom.ac_if.if_bpf &&
-			do_bridge && BDG_USED( (&sc->arpcom.ac_if) ) ) {
+	if (!sc->arpcom.ac_if.if_bpf && BDG_ACTIVE( (&sc->arpcom.ac_if) ) ) {
 		struct ifnet *bif;
 
 		ed_ring_copy(sc, buf, (char *)eh, ETHER_HDR_LEN);
-		bif = bridge_in(&sc->arpcom.ac_if, eh) ;
+		bif = bridge_in_ptr(&sc->arpcom.ac_if, eh) ;
 		if (bif == BDG_DROP) {
 			m_freem(m);
 			return;
@@ -2704,11 +2700,10 @@ ed_get_packet(sc, buf, len)
 			ed_ring_copy(sc, buf + ETHER_HDR_LEN,
 				(char *)(eh + 1), len - ETHER_HDR_LEN);
 	} else
-#endif
-	/*
-	 * Get packet, including link layer address, from interface.
-	 */
-	ed_ring_copy(sc, buf, (char *)eh, len);
+		/*
+		 * Get packet, including link layer address, from interface.
+		 */
+		ed_ring_copy(sc, buf, (char *)eh, len);
 
 	/*
 	 * Remove link layer address.

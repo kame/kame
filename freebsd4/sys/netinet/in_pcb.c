@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.17 2001/08/13 16:26:17 ume Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.20 2001/12/20 10:30:18 ru Exp $
  */
 
 #include "opt_ipsec.h"
@@ -66,8 +66,6 @@
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #endif /* INET6 */
-
-#include "faith.h"
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -403,9 +401,6 @@ in_pcbladdr(inp, nam, plocal_sin)
 		 * and the primary interface supports broadcast,
 		 * choose the broadcast address for that interface.
 		 */
-#define	satosin(sa)	((struct sockaddr_in *)(sa))
-#define sintosa(sin)	((struct sockaddr *)(sin))
-#define ifatoia(ifa)	((struct in_ifaddr *)(ifa))
 		if (sin->sin_addr.s_addr == INADDR_ANY)
 		    sin->sin_addr = IA_SIN(TAILQ_FIRST(&in_ifaddrhead))->sin_addr;
 		else if (sin->sin_addr.s_addr == (u_long)INADDR_BROADCAST &&
@@ -570,7 +565,6 @@ in_pcbdetach(inp)
 {
 	struct socket *so = inp->inp_socket;
 	struct inpcbinfo *ipi = inp->inp_pcbinfo;
-	struct rtentry *rt  = inp->inp_route.ro_rt;
 
 #ifdef IPSEC
 	ipsec4_delete_pcbpolicy(inp);
@@ -581,22 +575,8 @@ in_pcbdetach(inp)
 	sofree(so);
 	if (inp->inp_options)
 		(void)m_free(inp->inp_options);
-	if (rt) {
-		/* 
-		 * route deletion requires reference count to be <= zero 
-		 */
-		if ((rt->rt_flags & RTF_DELCLONE) &&
-		    (rt->rt_flags & RTF_WASCLONED) &&
-		    (rt->rt_refcnt <= 1)) {
-			rt->rt_refcnt--;
-			rt->rt_flags &= ~RTF_UP;
-			rtrequest(RTM_DELETE, rt_key(rt),
-				  rt->rt_gateway, rt_mask(rt),
-				  rt->rt_flags, (struct rtentry **)0);
-		}
-		else
-			rtfree(rt);
-	}
+	if (inp->inp_route.ro_rt)
+		rtfree(inp->inp_route.ro_rt);
 	ip_freemoptions(inp->inp_moptions);
 	inp->inp_vflag = 0;
 	zfreei(ipi->ipi_zone, inp);
@@ -753,16 +733,14 @@ in_losing(inp)
 
 	if ((rt = inp->inp_route.ro_rt)) {
 		bzero((caddr_t)&info, sizeof(info));
-		info.rti_info[RTAX_DST] =
-			(struct sockaddr *)&inp->inp_route.ro_dst;
+		info.rti_flags = rt->rt_flags;
+		info.rti_info[RTAX_DST] = rt_key(rt);
 		info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
 		info.rti_info[RTAX_NETMASK] = rt_mask(rt);
 		rt_missmsg(RTM_LOSING, &info, rt->rt_flags, 0);
 		if (rt->rt_flags & RTF_DYNAMIC)
-			(void) rtrequest(RTM_DELETE, rt_key(rt),
-				rt->rt_gateway, rt_mask(rt), rt->rt_flags,
-				(struct rtentry **)0);
-		inp->inp_route.ro_rt = 0;
+			(void) rtrequest1(RTM_DELETE, &info, NULL);
+		inp->inp_route.ro_rt = NULL;
 		rtfree(rt);
 		/*
 		 * A new route can be allocated
@@ -938,11 +916,9 @@ in_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard,
 #endif
 			if (inp->inp_faddr.s_addr == INADDR_ANY &&
 			    inp->inp_lport == lport) {
-#if defined(NFAITH) && NFAITH > 0
 				if (ifp && ifp->if_type == IFT_FAITH &&
 				    (inp->inp_flags & INP_FAITH) == 0)
 					continue;
-#endif
 				if (inp->inp_laddr.s_addr == laddr.s_addr)
 					return (inp);
 				else if (inp->inp_laddr.s_addr == INADDR_ANY) {

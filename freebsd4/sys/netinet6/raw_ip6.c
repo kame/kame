@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet6/raw_ip6.c,v 1.7.2.4 2001/07/29 19:32:40 ume Exp $
+ * $FreeBSD: src/sys/netinet6/raw_ip6.c,v 1.7.2.5 2001/12/15 01:06:28 brooks Exp $
  */
 
 /*
@@ -102,11 +102,6 @@
 
 #include <machine/stdarg.h>
 
-#include "faith.h"
-#if defined(NFAITH) && 0 < NFAITH
-#include <net/if_faith.h>
-#endif
-
 #define	satosin6(sa)	((struct sockaddr_in6 *)(sa))
 #define	ifatoia6(ifa)	((struct in6_ifaddr *)(ifa))
 
@@ -163,13 +158,11 @@ rip6_input(mp, offp, proto)
 	in6_clearscope(&fromsa.sin6_addr);
 #endif
 
-#if defined(NFAITH) && 0 < NFAITH
-	if (faithprefix(&ip6->ip6_dst)) {
+	if (faithprefix_p != NULL && (*faithprefix_p)(&ip6->ip6_dst)) {
 		/* XXX send icmp6 host/port unreach? */
 		m_freem(m);
 		return IPPROTO_DONE;
 	}
-#endif
 
 	bzero(&opts, sizeof(opts));
 

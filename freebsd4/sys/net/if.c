@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/net/if.c,v 1.85.2.9 2001/07/24 19:10:17 brooks Exp $
+ * $FreeBSD: src/sys/net/if.c,v 1.85.2.11 2001/12/20 10:30:16 ru Exp $
  */
 
 #include "opt_compat.h"
@@ -82,7 +82,7 @@ static void if_qflush __P((struct ifaltq *));
 static void if_qflush __P((struct ifqueue *));
 #endif
 static void if_slowtimo __P((void *));
-static void link_rtrequest __P((int, struct rtentry *, struct sockaddr *));
+static void link_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 static int  if_rtdel __P((struct radix_node *, void *));
 
 SYSINIT(interfaces, SI_SUB_PROTO_IF, SI_ORDER_FIRST, ifinit, NULL)
@@ -743,10 +743,10 @@ ifaof_ifpforaddr(addr, ifp)
  * This should be moved to /sys/net/link.c eventually.
  */
 static void
-link_rtrequest(cmd, rt, sa)
+link_rtrequest(cmd, rt, info)
 	int cmd;
 	register struct rtentry *rt;
-	struct sockaddr *sa;
+	struct rt_addrinfo *info;
 {
 	register struct ifaddr *ifa;
 	struct sockaddr *dst;
@@ -761,7 +761,7 @@ link_rtrequest(cmd, rt, sa)
 		rt->rt_ifa = ifa;
 		ifa->ifa_refcnt++;
 		if (ifa->ifa_rtrequest && ifa->ifa_rtrequest != link_rtrequest)
-			ifa->ifa_rtrequest(cmd, rt, sa);
+			ifa->ifa_rtrequest(cmd, rt, info);
 	}
 }
 
@@ -1006,6 +1006,11 @@ ifioctl(so, cmd, data, p)
 		ifr->ifr_flags = ifp->if_flags;
 		break;
 
+	case SIOCGIFCAP:
+		ifr->ifr_reqcap = ifp->if_capabilities;
+		ifr->ifr_curcap = ifp->if_capenable;
+		break;
+
 	case SIOCGIFMETRIC:
 		ifr->ifr_metric = ifp->if_metric;
 		break;
@@ -1041,6 +1046,15 @@ ifioctl(so, cmd, data, p)
 		if (ifp->if_ioctl)
 			(void) (*ifp->if_ioctl)(ifp, cmd, data);
 		getmicrotime(&ifp->if_lastchange);
+		break;
+
+	case SIOCSIFCAP:
+		error = suser(p);
+		if (error)
+			return (error);
+		if (ifr->ifr_reqcap & ~ifp->if_capabilities)
+			return (EINVAL);
+		(void) (*ifp->if_ioctl)(ifp, cmd, data);
 		break;
 
 	case SIOCSIFMETRIC:

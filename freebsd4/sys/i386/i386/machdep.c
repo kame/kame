@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.385.2.16 2001/08/15 01:23:50 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.385.2.22 2002/01/12 11:03:29 bde Exp $
  */
 
 #include "apm.h"
@@ -163,7 +163,7 @@ sysctl_hw_physmem(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_hw, HW_PHYSMEM, physmem, CTLTYPE_INT|CTLFLAG_RD,
-	0, 0, sysctl_hw_physmem, "I", "");
+	0, 0, sysctl_hw_physmem, "IU", "");
 
 static int
 sysctl_hw_usermem(SYSCTL_HANDLER_ARGS)
@@ -174,7 +174,7 @@ sysctl_hw_usermem(SYSCTL_HANDLER_ARGS)
 }
 
 SYSCTL_PROC(_hw, HW_USERMEM, usermem, CTLTYPE_INT|CTLFLAG_RD,
-	0, 0, sysctl_hw_usermem, "I", "");
+	0, 0, sysctl_hw_usermem, "IU", "");
 
 static int
 sysctl_hw_availpages(SYSCTL_HANDLER_ARGS)
@@ -324,18 +324,23 @@ again:
 	 * The nominal buffer size (and minimum KVA allocation) is BKVASIZE.
 	 * For the first 64MB of ram nominally allocate sufficient buffers to
 	 * cover 1/4 of our ram.  Beyond the first 64MB allocate additional
-	 * buffers to cover 1/20 of our ram over 64MB.
+	 * buffers to cover 1/20 of our ram over 64MB.  When auto-sizing
+	 * the buffer cache we limit the eventual kva reservation to
+	 * maxbcache bytes.
 	 *
 	 * factor represents the 1/4 x ram conversion.
 	 */
 	if (nbuf == 0) {
-		int factor = 4 * BKVASIZE / PAGE_SIZE;
+		int factor = 4 * BKVASIZE / 1024;
+		int kbytes = physmem * (PAGE_SIZE / 1024);
 
 		nbuf = 50;
-		if (physmem > 1024)
-			nbuf += min((physmem - 1024) / factor, 16384 / factor);
-		if (physmem > 16384)
-			nbuf += (physmem - 16384) * 2 / (factor * 5);
+		if (kbytes > 4096)
+			nbuf += min((kbytes - 4096) / factor, 65536 / factor);
+		if (kbytes > 65536)
+			nbuf += (kbytes - 65536) * 2 / (factor * 5);
+		if (maxbcache && nbuf > maxbcache / BKVASIZE)
+			nbuf = maxbcache / BKVASIZE;
 	}
 
 	/*
@@ -583,7 +588,7 @@ osendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 			    (tf->tf_eflags & ~(PSL_VIF | PSL_VIP))
 			    | (vm86->vm86_eflags & (PSL_VIF | PSL_VIP));
 		/* see sendsig for comment */
-		tf->tf_eflags &= ~(PSL_VM|PSL_NT|PSL_T|PSL_VIF|PSL_VIP);
+		tf->tf_eflags &= ~(PSL_VM | PSL_NT | PSL_VIF | PSL_VIP);
 	}
 
 	/* Copy the sigframe out to the user's stack. */
@@ -597,6 +602,7 @@ osendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 
 	regs->tf_esp = (int)fp;
 	regs->tf_eip = PS_STRINGS - szosigcode;
+	regs->tf_eflags &= ~PSL_T;
 	regs->tf_cs = _ucodesel;
 	regs->tf_ds = _udatasel;
 	regs->tf_es = _udatasel;
@@ -712,17 +718,13 @@ sendsig(catcher, sig, mask, code)
 			    (vm86->vm86_eflags & (PSL_VIF | PSL_VIP));
 
 		/*
-		 * We should never have PSL_T set when returning from vm86
-		 * mode.  It may be set here if we deliver a signal before
-		 * getting to vm86 mode, so turn it off.
-		 *
 		 * Clear PSL_NT to inhibit T_TSSFLT faults on return from
 		 * syscalls made by the signal handler.  This just avoids
 		 * wasting time for our lazy fixup of such faults.  PSL_NT
 		 * does nothing in vm86 mode, but vm86 programs can set it
 		 * almost legitimately in probes for old cpu types.
 		 */
-		tf->tf_eflags &= ~(PSL_VM|PSL_NT|PSL_T|PSL_VIF|PSL_VIP);
+		tf->tf_eflags &= ~(PSL_VM | PSL_NT | PSL_VIF | PSL_VIP);
 	}
 
 	/*
@@ -738,6 +740,7 @@ sendsig(catcher, sig, mask, code)
 
 	regs->tf_esp = (int)sfp;
 	regs->tf_eip = PS_STRINGS - *(p->p_sysent->sv_szsigcode);
+	regs->tf_eflags &= ~PSL_T;
 	regs->tf_cs = _ucodesel;
 	regs->tf_ds = _udatasel;
 	regs->tf_es = _udatasel;
@@ -1798,14 +1801,12 @@ void
 init386(first)
 	int first;
 {
-	int x;
 	struct gate_descriptor *gdp;
-	int gsel_tss;
+	int gsel_tss, metadata_missing, off, x;
 #ifndef SMP
 	/* table descriptors - used to load tables by microp */
 	struct region_descriptor r_gdt, r_idt;
 #endif
-	int off;
 
 	/*
 	 * Prevent lowering of the ipl if we call tsleep() early.
@@ -1816,15 +1817,18 @@ init386(first)
 
 	atdevbase = ISA_HOLE_START + KERNBASE;
 
+	metadata_missing = 0;
 	if (bootinfo.bi_modulep) {
 		preload_metadata = (caddr_t)bootinfo.bi_modulep + KERNBASE;
 		preload_bootstrap_relocate(KERNBASE);
+	} else {
+		metadata_missing = 1;
 	}
 	if (bootinfo.bi_envp)
 		kern_envp = (caddr_t)bootinfo.bi_envp + KERNBASE;
 
 	/* Init basic tunables, hz etc */
-	init_param();
+	init_param1();
 
 	/*
 	 * make gdt memory segments, the code segment goes up to end of the
@@ -1835,17 +1839,17 @@ init386(first)
 	 * XXX text protection is temporarily (?) disabled.  The limit was
 	 * i386_btop(round_page(etext)) - 1.
 	 */
-	gdt_segs[GCODE_SEL].ssd_limit = i386_btop(0) - 1;
-	gdt_segs[GDATA_SEL].ssd_limit = i386_btop(0) - 1;
+	gdt_segs[GCODE_SEL].ssd_limit = atop(0 - 1);
+	gdt_segs[GDATA_SEL].ssd_limit = atop(0 - 1);
 #ifdef SMP
 	gdt_segs[GPRIV_SEL].ssd_limit =
-		i386_btop(sizeof(struct privatespace)) - 1;
+		atop(sizeof(struct privatespace) - 1);
 	gdt_segs[GPRIV_SEL].ssd_base = (int) &SMP_prvspace[0];
 	gdt_segs[GPROC0_SEL].ssd_base =
 		(int) &SMP_prvspace[0].globaldata.gd_common_tss;
 	SMP_prvspace[0].globaldata.gd_prvspace = &SMP_prvspace[0];
 #else
-	gdt_segs[GPRIV_SEL].ssd_limit = i386_btop(0) - 1;
+	gdt_segs[GPRIV_SEL].ssd_limit = atop(0 - 1);
 	gdt_segs[GPROC0_SEL].ssd_base = (int) &common_tss;
 #endif
 
@@ -1864,25 +1868,11 @@ init386(first)
 
 	/* make ldt memory segments */
 	/*
-	 * The data segment limit must not cover the user area because we
-	 * don't want the user area to be writable in copyout() etc. (page
-	 * level protection is lost in kernel mode on 386's).  Also, we
-	 * don't want the user area to be writable directly (page level
-	 * protection of the user area is not available on 486's with
-	 * CR0_WP set, because there is no user-read/kernel-write mode).
-	 *
 	 * XXX - VM_MAXUSER_ADDRESS is an end address, not a max.  And it
 	 * should be spelled ...MAX_USER...
 	 */
-#define VM_END_USER_RW_ADDRESS	VM_MAXUSER_ADDRESS
-	/*
-	 * The code segment limit has to cover the user area until we move
-	 * the signal trampoline out of the user area.  This is safe because
-	 * the code segment cannot be written to directly.
-	 */
-#define VM_END_USER_R_ADDRESS	(VM_END_USER_RW_ADDRESS + UPAGES * PAGE_SIZE)
-	ldt_segs[LUCODE_SEL].ssd_limit = i386_btop(VM_END_USER_R_ADDRESS) - 1;
-	ldt_segs[LUDATA_SEL].ssd_limit = i386_btop(VM_END_USER_RW_ADDRESS) - 1;
+	ldt_segs[LUCODE_SEL].ssd_limit = atop(VM_MAXUSER_ADDRESS - 1);
+	ldt_segs[LUDATA_SEL].ssd_limit = atop(VM_MAXUSER_ADDRESS - 1);
 	for (x = 0; x < sizeof ldt_segs / sizeof ldt_segs[0]; x++)
 		ssdtosd(&ldt_segs[x], &ldt[x].sd);
 
@@ -1927,6 +1917,9 @@ init386(first)
 	 */
 	cninit();
 
+	if (metadata_missing)
+		printf("WARNING: loader(8) metadata is missing!\n");
+
 #include	"isa.h"
 #if	NISA >0
 	isa_defaultirq();
@@ -1969,6 +1962,7 @@ init386(first)
 
 	vm86_initialize();
 	getmemsize(first);
+	init_param2(physmem);
 
 	/* now running on new page tables, configured,and u/iom is accessible */
 

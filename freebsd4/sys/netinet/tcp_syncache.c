@@ -76,9 +76,6 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#ifdef INET6
-#include <netinet6/ipsec6.h>
-#endif
 #include <netkey/key.h>
 #endif /*IPSEC*/
 
@@ -1167,12 +1164,16 @@ no_options:
 
 #ifdef INET6
 	if (sc->sc_inc.inc_isipv6) {
+#if 1 /* def NEW_STRUCT_ROUTE */
+		struct route *ro6 = &sc->sc_route6;
+#else
 		struct route_in6 *ro6 = &sc->sc_route6;
+#endif
 
 		th->th_sum = 0;
 		th->th_sum = in6_cksum(m, IPPROTO_TCP, hlen, tlen - hlen);
 		ip6->ip6_hlim = in6_selecthlim(NULL,
-		    ro6->ro_rt ? ro6->ro_rt->rt_ifp : NULL);
+		    ro6->ro_rt ?  ro6->ro_rt->rt_ifp : NULL);
 		error = ip6_output(m, NULL, ro6, 0, NULL, NULL);
 	} else
 #endif

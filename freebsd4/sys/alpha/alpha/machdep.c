@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.68.2.12 2001/07/30 23:27:58 peter Exp $
+ * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.68.2.16 2002/01/22 15:12:46 gallatin Exp $
  */
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -92,6 +92,7 @@
 #include "opt_ddb.h"
 #include "opt_simos.h"
 #include "opt_msgbuf.h"
+#include "opt_maxmem.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -322,17 +323,22 @@ again:
 	 * The nominal buffer size (and minimum KVA allocation) is BKVASIZE.
 	 * For the first 64MB of ram nominally allocate sufficient buffers to
 	 * cover 1/4 of our ram.  Beyond the first 64MB allocate additional
-	 * buffers to cover 1/20 of our ram over 64MB.
+	 * buffers to cover 1/20 of our ram over 64MB.  When auto-sizing
+	 * the buffer cache we limit the eventual kva reservation to
+	 * maxbcache bytes.
 	 */
 
 	if (nbuf == 0) {
-		int factor = 4 * BKVASIZE / PAGE_SIZE;
+		int factor = 4 * BKVASIZE / 1024;
+		int kbytes = physmem * (PAGE_SIZE / 1024);
 
 		nbuf = 50;
-		if (physmem > 1024)
-			nbuf += min((physmem - 1024) / factor, 16384 / factor);
-		if (physmem > 16384)
-			nbuf += (physmem - 16384) * 2 / (factor * 5);
+		if (kbytes > 4096)
+			nbuf += min((kbytes - 4096) / factor, 65536 / factor);
+		if (kbytes > 65536)
+			nbuf += (kbytes - 65536) * 2 / (factor * 5);
+		if (maxbcache && nbuf > maxbcache / BKVASIZE)
+			nbuf = maxbcache / BKVASIZE;
 	}
 	nswbuf = max(min(nbuf/4, 64), 16);
 
@@ -693,7 +699,7 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	kern_envp = bootinfo.envp;
 
 	/* Do basic tuning, hz etc */
-	init_param();
+	init_param1();
 
 	/*
 	 * Initalize the (temporary) bootstrap console interface, so
@@ -945,6 +951,61 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	}
 
 	Maxmem = physmem;
+
+#ifdef MAXMEM
+	/*
+	 * MAXMEM define is in kilobytes.
+	 */
+	Maxmem = alpha_btop(MAXMEM * 1024);
+#endif
+
+	/*
+	 * hw.physmem is a size in bytes; we also allow k, m, and g suffixes
+	 * for the appropriate modifiers.  This overrides MAXMEM.
+	 */
+	if ((p = getenv("hw.physmem")) != NULL) {
+		u_int64_t AllowMem, sanity;
+		char *ep;
+
+		sanity = AllowMem = strtouq(p, &ep, 0);
+		if ((ep != p) && (*ep != 0)) {
+			switch(*ep) {
+			case 'g':
+			case 'G':
+				AllowMem <<= 10;
+			case 'm':
+			case 'M':
+				AllowMem <<= 10;
+			case 'k':
+			case 'K':
+				AllowMem <<= 10;
+				break;
+			default:
+				AllowMem = sanity = 0;
+			}
+			if (AllowMem < sanity)
+				AllowMem = 0;
+		}
+		if (AllowMem == 0)
+			printf("Ignoring invalid memory size of '%s'\n", p);
+		else
+			Maxmem = alpha_btop(AllowMem);
+	}
+
+	while (physmem > Maxmem) {
+		int i = phys_avail_cnt - 2;
+		size_t sz = alpha_btop(phys_avail[i+1] - phys_avail[i]);
+		size_t nsz;
+		if (physmem - sz > Maxmem) {
+			phys_avail[i] = 0;
+			phys_avail_cnt -= 2;
+		} else {
+			nsz = sz - (physmem - Maxmem);
+			phys_avail[i+1] = phys_avail[i] + alpha_ptob(nsz);
+			physmem -= (sz - nsz);
+		}
+	}
+	init_param2(physmem);
 
 	/*
 	 * Initialize error message buffer (at end of core).
@@ -1509,9 +1570,6 @@ sigreturn(struct proc *p,
 	struct pcb *pcb;
 	unsigned long val;
 
-	if (((struct osigcontext*)uap->sigcntxp)->sc_regs[R_ZERO] == 0xACEDBADE)
-		return osigreturn(p, (struct osigreturn_args *)uap);
-
 	ucp = uap->sigcntxp;
 	pcb = &p->p_addr->u_pcb;
 
@@ -1522,9 +1580,19 @@ sigreturn(struct proc *p,
 
 	/*
 	 * Fetch the entire context structure at once for speed.
+	 * Note that struct osigcontext is smaller than a ucontext_t,
+	 * so even if copyin() faults, we may have actually gotten a complete
+	 * struct osigcontext.
 	 */
-	if (copyin((caddr_t)ucp, (caddr_t)&uc, sizeof(ucontext_t)))
-		return (EFAULT);
+	if (copyin((caddr_t)ucp, (caddr_t)&uc, sizeof(ucontext_t))) {
+		if (((struct osigcontext*)&uc)->sc_regs[R_ZERO] == 0xACEDBADE)
+			return osigreturn(p, (struct osigreturn_args *)uap);
+		else
+			return (EFAULT);
+	}
+
+	if (((struct osigcontext*)&uc)->sc_regs[R_ZERO] == 0xACEDBADE)
+		return osigreturn(p, (struct osigreturn_args *)uap);
 
 	/*
 	 * Restore the user-supplied information

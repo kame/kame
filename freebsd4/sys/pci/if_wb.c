@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_wb.c,v 1.26.2.3 2000/08/04 23:45:28 peter Exp $
+ * $FreeBSD: src/sys/pci/if_wb.c,v 1.26.2.4 2001/12/16 15:46:08 luigi Exp $
  */
 
 /*
@@ -127,7 +127,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_wb.c,v 1.26.2.3 2000/08/04 23:45:28 peter Exp $";
+  "$FreeBSD: src/sys/pci/if_wb.c,v 1.26.2.4 2001/12/16 15:46:08 luigi Exp $";
 #endif
 
 /*
@@ -1096,11 +1096,8 @@ static int wb_newbuf(sc, c, m)
 
 	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("wb%d: no memory for rx "
-			    "list -- packet dropped!\n", sc->wb_unit);
+		if (m_new == NULL)
 			return(ENOBUFS);
-		}
 
 		m_new->m_data = m_new->m_ext.ext_buf = c->wb_buf;
 		m_new->m_flags |= M_EXT;
@@ -1453,16 +1450,12 @@ static int wb_encap(sc, c, m_head)
 		struct mbuf		*m_new = NULL;
 
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("wb%d: no memory for tx list", sc->wb_unit);
+		if (m_new == NULL)
 			return(1);
-		}
 		if (m_head->m_pkthdr.len > MHLEN) {
 			MCLGET(m_new, M_DONTWAIT);
 			if (!(m_new->m_flags & M_EXT)) {
 				m_freem(m_new);
-				printf("wb%d: no memory for tx list",
-						sc->wb_unit);
 				return(1);
 			}
 		}

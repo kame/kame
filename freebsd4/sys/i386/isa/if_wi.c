@@ -116,7 +116,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.12 2001/08/28 06:21:14 imp Exp $";
+  "$FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.13 2002/01/21 01:26:09 brooks Exp $";
 #endif
 
 #ifdef foo
@@ -212,6 +212,7 @@ static struct {
 } pci_ids[] = {
 	{0x1638, 0x1100,	"PRISM2STA PCI WaveLAN/IEEE 802.11"},
 	{0x1385, 0x4100,	"Netgear MA301 PCI IEEE 802.11b"},
+	{0x16ab, 0x1102,	"Linksys WDT11 PCI IEEE 802.11b"},
 	{0,	 0,	NULL}
 };
 #endif

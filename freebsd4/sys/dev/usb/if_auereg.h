@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/if_auereg.h,v 1.5 2000/01/28 02:15:30 wpaul Exp $
+ * $FreeBSD: src/sys/dev/usb/if_auereg.h,v 1.5.2.1 2001/12/11 14:57:04 sumikawa Exp $
  */
 
 /*

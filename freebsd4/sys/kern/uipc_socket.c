@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket.c	8.3 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.68.2.16 2001/06/14 20:46:06 ume Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.68.2.17 2001/12/01 21:32:42 dillon Exp $
  */
 
 #include "opt_inet.h"
@@ -910,6 +910,14 @@ dontblock:
 		    !sosendallatonce(so) && !nextrecord) {
 			if (so->so_error || so->so_state & SS_CANTRCVMORE)
 				break;
+			/*
+			 * The window might have closed to zero, make
+			 * sure we send an ack now that we've drained
+			 * the buffer or we might end up blocking until
+			 * the idle takes over (5 seconds).
+			 */
+			if (pr->pr_flags & PR_WANTRCVD && so->so_pcb)
+				(*pr->pr_usrreqs->pru_rcvd)(so, flags);
 			error = sbwait(&so->so_rcv);
 			if (error) {
 				sbunlock(&so->so_rcv);

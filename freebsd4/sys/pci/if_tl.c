@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_tl.c,v 1.51.2.4 2000/11/02 00:04:28 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_tl.c,v 1.51.2.5 2001/12/16 15:46:08 luigi Exp $
  */
 
 /*
@@ -224,7 +224,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_tl.c,v 1.51.2.4 2000/11/02 00:04:28 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_tl.c,v 1.51.2.5 2001/12/16 15:46:08 luigi Exp $";
 #endif
 
 /*
@@ -1442,16 +1442,11 @@ static int tl_newbuf(sc, c)
 	struct mbuf		*m_new = NULL;
 
 	MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-	if (m_new == NULL) {
-		printf("tl%d: no memory for rx list -- packet dropped!\n",
-				sc->tl_unit);
+	if (m_new == NULL)
 		return(ENOBUFS);
-	}
 
 	MCLGET(m_new, M_DONTWAIT);
 	if (!(m_new->m_flags & M_EXT)) {
-		printf("tl%d: no memory for rx list -- packet dropped!\n",
-				 sc->tl_unit);
 		m_freem(m_new);
 		return(ENOBUFS);
 	}

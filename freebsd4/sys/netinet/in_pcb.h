@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.32.2.4 2001/08/13 16:26:17 ume Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.32.2.5 2001/12/14 20:21:12 jlemon Exp $
  */
 
 #ifndef _NETINET_IN_PCB_H_
@@ -39,7 +39,7 @@
 
 #include <sys/queue.h>
 
-
+#include <net/route.h>
 #include <netinet6/ipsec.h> /* for IPSEC */
 
 #define	in6pcb		inpcb	/* for KAME src sync over BSD*'s */
@@ -71,6 +71,62 @@ struct sa_4in6 {
 };
 
 /*
+ * NOTE: ipv6 addrs should be 64-bit aligned, per RFC 2553.
+ * in_conninfo has some extra padding to accomplish this.
+ */
+struct in_endpoints {
+	u_int16_t	ie_fport;		/* foreign port */
+	u_int16_t	ie_lport;		/* local port */
+	/* protocol dependent part, local and foreign addr */
+	union {
+		/* foreign host table entry */
+		struct	sa_4in6 ie46_foreign;
+		struct	sockaddr_in6 ie6_foreign;
+	} ie_dependfaddr;
+	union {
+		/* local host table entry */
+		struct	sa_4in6 ie46_local;
+		struct	sockaddr_in6 ie6_local;
+	} ie_dependladdr;
+#define	ie_faddr	ie_dependfaddr.ie46_foreign.sa46_addr4
+#define	ie_laddr	ie_dependladdr.ie46_local.sa46_addr4
+#define	ie6_faddr	ie_dependfaddr.ie6_foreign.sin6_addr
+#define	ie6_laddr	ie_dependladdr.ie6_local.sin6_addr
+};
+
+/*
+ * XXX
+ * At some point struct route should possibly change to:
+ *   struct rtentry *rt
+ *   struct in_endpoints *ie; 
+ */
+struct in_conninfo {
+	u_int8_t	inc_flags;
+	u_int8_t	inc_len;
+	u_int16_t	inc_pad;	/* XXX alignment for in_endpoints */
+	/* protocol dependent part; cached route */
+	struct	in_endpoints inc_ie;
+	union {
+		/* placeholder for routing entry */
+		struct	route inc4_route;
+#if 1 /* def NEW_STRUCT_ROUTE */
+		struct  route inc6_route;
+#else
+		struct  route_in6 inc6_route;
+#endif
+	} inc_dependroute;
+};
+#define	inc_isipv6	inc_flags	/* temp compatability */
+#define	inc_fport	inc_ie.ie_fport
+#define	inc_lport	inc_ie.ie_lport
+#define	inc_faddr	inc_ie.ie_faddr
+#define	inc_laddr	inc_ie.ie_laddr
+#define	inc_route	inc_dependroute.inc4_route
+#define	inc6_faddr	inc_ie.ie6_faddr
+#define	inc6_laddr	inc_ie.ie6_laddr
+#define	inc6_route	inc_dependroute.inc6_route
+
+/*
  * NB: the zone allocator is type-stable EXCEPT FOR THE FIRST TWO LONGS
  * of the structure.  Therefore, it is important that the members in
  * that position not contain any information which is required to be
@@ -83,32 +139,14 @@ struct inpcb {
 	LIST_ENTRY(inpcb) inp_list; /* list for all PCBs of this proto */
 	u_int32_t	inp_flow;
 
-	/* protocol dependent part, local and foreign addr */
-	union {
-		struct sa_4in6 sa46_foreign;
-		struct sockaddr_in6 sa6_foreign;
-	} inp_dependfsa;
-	union {
-		struct sa_4in6 sa46_local;
-		struct sockaddr_in6 sa6_local;
-	} inp_dependlsa;
+	/* local and foreign ports, local and foreign addr */
+	struct	in_conninfo inp_inc;
 
 	caddr_t	inp_ppcb;		/* pointer to per-protocol pcb */
 	struct	inpcbinfo *inp_pcbinfo;	/* PCB list info */
 	struct	socket *inp_socket;	/* back pointer to socket */
 					/* list for this PCB's local port */
 	int	inp_flags;		/* generic IP/datagram flags */
-
-	/* protocol dependent part; cached route */
-	union {
-		/* placeholder for routing entry */
-		struct	route inp4_route;
-#if 1 /* def NEW_STRUCT_ROUTE */
-		struct	route inp6_route;
-#else
-		struct	route_in6 inp6_route;
-#endif
-	} inp_dependroute;
 
 	struct	inpcbpolicy *inp_sp; /* for IPSEC */
 	u_char	inp_vflag;
@@ -123,11 +161,11 @@ struct inpcb {
 		struct	mbuf *inp4_options;	/* IP options */
 		struct	ip_moptions *inp4_moptions; /* IP multicast options */
 	} inp_depend4;
-#define	inp_faddr	inp_dependfsa.sa46_foreign.sa46_addr4
-#define	inp_laddr	inp_dependlsa.sa46_local.sa46_addr4
-#define	inp_fport	inp_dependfsa.sa6_foreign.sin6_port
-#define	inp_lport	inp_dependlsa.sa6_local.sin6_port
-#define	inp_route	inp_dependroute.inp4_route
+#define inp_fport	inp_inc.inc_fport
+#define inp_lport	inp_inc.inc_lport
+#define	inp_faddr	inp_inc.inc_faddr
+#define	inp_laddr	inp_inc.inc_laddr
+#define	inp_route	inp_inc.inc_route
 #define	inp_ip_tos	inp_depend4.inp4_ip_tos
 #define	inp_options	inp_depend4.inp4_options
 #define	inp_moptions	inp_depend4.inp4_moptions
@@ -153,11 +191,12 @@ struct inpcb {
 	LIST_ENTRY(inpcb) inp_portlist;
 	struct	inpcbport *inp_phd;	/* head of this list */
 	inp_gen_t	inp_gencnt;	/* generation count of this instance */
-#define in6p_fsa	inp_dependfsa.sa6_foreign
-#define in6p_lsa	inp_dependlsa.sa6_local
-#define	in6p_faddr	inp_dependfsa.sa6_foreign.sin6_addr
-#define	in6p_laddr	inp_dependlsa.sa6_local.sin6_addr
-#define	in6p_route	inp_dependroute.inp6_route
+#define	in6p_fsa	inp_inc.inc_ie.ie_dependfaddr.ie6_foreign
+#define	in6p_lsa	inp_inc.inc_ie.ie_dependladdr.ie6_local
+#define	in6p_faddr	inp_inc.inc6_faddr
+#define	in6p_laddr	inp_inc.inc6_faddr
+#define	in6p_route	inp_inc.inc6_route
+#define	in6p_ip6_hlim	inp_depend6.inp6_hlim
 #define	in6p_hops	inp_depend6.inp6_hops	/* default hop limit */
 #define	in6p_ip6_nxt	inp_ip_p
 #define	in6p_flowinfo	inp_flow
@@ -323,6 +362,7 @@ void	in_pcbrehash __P((struct inpcb *));
 int	in_setpeeraddr __P((struct socket *so, struct sockaddr **nam));
 int	in_setsockaddr __P((struct socket *so, struct sockaddr **nam));
 void	in_pcbremlists __P((struct inpcb *inp));
+int	prison_xinpcb __P((struct proc *, struct inpcb *));
 #endif /* _KERNEL */
 
 #endif /* !_NETINET_IN_PCB_H_ */
