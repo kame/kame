@@ -1011,7 +1011,7 @@ skip:
 		    "%s: anonymous/%.*s", remotehost,
 		    (int)(sizeof(proctitle) - sizeof(remotehost) -
 		    sizeof(": anonymous/")), passwd);
-		setproctitle(proctitle);
+		setproctitle("%s", proctitle);
 #endif /* HASSETPROCTITLE */
 		if (logging)
 			syslog(LOG_INFO, "ANONYMOUS FTP LOGIN FROM %s, %s",
@@ -1021,7 +1021,7 @@ skip:
 #ifdef HASSETPROCTITLE
 		snprintf(proctitle, sizeof(proctitle),
 		    "%s: %s", remotehost, pw->pw_name);
-		setproctitle(proctitle);
+		setproctitle("%s", proctitle);
 #endif /* HASSETPROCTITLE */
 		if (logging)
 			syslog(LOG_INFO, "FTP LOGIN FROM %s as %s",
@@ -2009,7 +2009,7 @@ dolog(sa)
 	remotehost[sizeof(remotehost)-1] = '\0';
 #ifdef HASSETPROCTITLE
 	snprintf(proctitle, sizeof(proctitle), "%s: connected", remotehost);
-	setproctitle(proctitle);
+	setproctitle("%s", proctitle);
 #endif /* HASSETPROCTITLE */
 
 	if (logging)
