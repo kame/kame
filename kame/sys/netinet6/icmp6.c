@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.249 2001/10/16 03:15:23 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.250 2001/10/16 03:17:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3391,8 +3391,11 @@ icmp6_recover_src(m)
 				goto bad;
 			}
 #endif
+			if (nxt == IPPROTO_AH)
+				off += (exts->ip6e_len + 2) << 2;
+			else
+				off += (exts->ip6e_len + 1) << 3;
 			nxt = exts->ip6e_nxt;
-			off += (exts->ip6e_len + 1) << 3;
 			break;
 		}
 		if (finished)
