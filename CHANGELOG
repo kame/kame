@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1749 2001/06/28 01:28:49 itojun Exp $
+$KAME: CHANGELOG,v 1.1750 2001/06/28 06:16:43 sakane Exp $
 
 <200106>
+Thu Jun 28 15:12:09 JST 2001 sakane@kame.net
+	* sys/netkey/key.c:
+	the behavior of SPDUPDATE has been changed.  the kernel always add
+	a new policy in the case of SPDUPDATE.  when there is a policy to be
+	updated, the kernel will move the state of the policy to be dead, and
+	then will add new policy.  hence, SPDUPDATE doesn't depend on whether
+	there is a SP or not.
+
 Thu Jun 28 10:23:01 JST 2001  itojun@iijlab.net
 	* netbsd/sys/netinet/udp_usrreq.c: correct UDP over IPv6 reception
 	  when the packet is destined to a linklocal address.
