@@ -1,4 +1,4 @@
-/*	$NetBSD: telnetd.c,v 1.20.4.2 2001/07/29 04:13:09 jhawk Exp $	*/
+/*	$NetBSD: telnetd.c,v 1.32 2002/01/31 07:54:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -69,7 +69,7 @@ __COPYRIGHT("@(#) Copyright (c) 1989, 1993\n\
 #if 0
 static char sccsid[] = "@(#)telnetd.c	8.4 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: telnetd.c,v 1.20.4.2 2001/07/29 04:13:09 jhawk Exp $");
+__RCSID("$NetBSD: telnetd.c,v 1.32 2002/01/31 07:54:50 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -120,12 +120,7 @@ struct	socket_security ss;
 #endif
 
 #if	defined(AUTHENTICATION)
-#include <libtelnet/auth.h>
 int	auth_level = 0;
-#endif
-
-#if defined(ENCRYPTION)
-#include <libtelnet/encrypt.h>
 #endif
 
 #if	defined(AUTHENTICATION) || defined(ENCRYPTION)
@@ -137,6 +132,10 @@ int	require_secure_login = 0;
 #endif
 
 extern	int utmp_len;
+extern int require_hwpreauth;
+#ifdef KRB5
+extern krb5_context telnet_context;
+#endif
 int	registerd_host_only = 0;
 
 #ifdef	STREAMSPTY
@@ -148,7 +147,7 @@ int	registerd_host_only = 0;
 
 /*
  * Because of the way ptyibuf is used with streams messages, we need
- * ptyibuf+1 to be on a full-word boundary.  The following wierdness
+ * ptyibuf+1 to be on a full-word boundary.  The following weirdness
  * is simply to make that happen.
  */
 long	ptyibufbuf[BUFSIZ/sizeof(long)+1];
@@ -183,7 +182,6 @@ int keepalive = 1;
 char *gettyname = "default";
 char *progname;
 
-extern void usage P((void));
 int main __P((int, char *[]));
 void usage __P((void));
 int getterminaltype __P((char *));
@@ -212,9 +210,6 @@ char valid_opts[] = {
 #endif
 #ifdef DIAGNOSTICS
 	'D', ':',
-#endif
-#if	defined(CRAY) && defined(NEWINIT)
-	'I', ':',
 #endif
 #ifdef	LINEMODE
 	'l',
@@ -271,7 +266,6 @@ main(argc, argv)
 			 * Check for required authentication level
 			 */
 			if (strcmp(optarg, "debug") == 0) {
-				extern int auth_debug_mode;
 				auth_debug_mode = 1;
 			} else if (strcasecmp(optarg, "none") == 0) {
 				auth_level = 0;
@@ -333,7 +327,6 @@ main(argc, argv)
 #ifdef	ENCRYPTION
 		case 'e':
 			if (strcmp(optarg, "debug") == 0) {
-				extern int encrypt_debug_mode;
 				encrypt_debug_mode = 1;
 				break;
 			}
@@ -353,20 +346,11 @@ main(argc, argv)
 #ifdef	KRB5
 		case 'H':
 		    {
-			extern int require_hwpreauth;
 			require_hwpreauth = 1;
 			break;
 		    }
 #endif	/* KRB5 */
 
-#if	defined(CRAY) && defined(NEWINIT)
-		case 'I':
-		    {
-			extern char *gen_id;
-			gen_id = optarg;
-			break;
-		    }
-#endif	/* defined(CRAY) && defined(NEWINIT) */
 
 #ifdef	LINEMODE
 		case 'l':
@@ -417,7 +401,6 @@ main(argc, argv)
 #ifdef	KRB5
 		case 'R':
 		    {
-			extern krb5_context telnet_context;
 			krb5_error_code retval;
 
 			if (telnet_context == 0) {
@@ -601,7 +584,7 @@ main(argc, argv)
 	}
 #endif	/* _SC_CRAY_SECURE_SYS */
 
-	openlog("telnetd", LOG_PID | LOG_ODELAY, LOG_DAEMON);
+	openlog("telnetd", LOG_PID, LOG_DAEMON);
 	fromlen = sizeof (from);
 	if (getpeername(0, (struct sockaddr *)&from, &fromlen) < 0) {
 		fprintf(stderr, "%s: ", progname);
@@ -653,13 +636,10 @@ usage()
 #ifdef DIAGNOSTICS
 	fprintf(stderr, " [-D (options|report|exercise|netdata|ptydata)]\n\t");
 #endif
-#ifdef	AUTHENTICATION
+#ifdef	ENCRYPTION
 	fprintf(stderr, " [-edebug]");
 #endif
 	fprintf(stderr, " [-h]");
-#if	defined(CRAY) && defined(NEWINIT)
-	fprintf(stderr, " [-Iinitid]");
-#endif
 #if	defined(LINEMODE) && defined(KLUDGELINEMODE)
 	fprintf(stderr, " [-k]");
 #endif
@@ -737,7 +717,7 @@ getterminaltype(name)
 	static unsigned char sb[] =
 			{ IAC, SB, TELOPT_TSPEED, TELQUAL_SEND, IAC, SE };
 
-	output_datalen(sb, sizeof sb);
+	output_datalen((const char *)sb, sizeof sb);
 	DIAG(TD_OPTIONS, printsub('>', sb + 2, sizeof sb - 2););
     }
 #ifdef	ENCRYPTION
@@ -753,26 +733,26 @@ getterminaltype(name)
 	static unsigned char sb[] =
 			{ IAC, SB, TELOPT_XDISPLOC, TELQUAL_SEND, IAC, SE };
 
-	output_datalen(sb, sizeof sb);
+	output_datalen((const char *)sb, sizeof sb);
 	DIAG(TD_OPTIONS, printsub('>', sb + 2, sizeof sb - 2););
     }
     if (his_state_is_will(TELOPT_NEW_ENVIRON)) {
 	static unsigned char sb[] =
 			{ IAC, SB, TELOPT_NEW_ENVIRON, TELQUAL_SEND, IAC, SE };
 
-	output_datalen(sb, sizeof sb);
+	output_datalen((const char *)sb, sizeof sb);
 	DIAG(TD_OPTIONS, printsub('>', sb + 2, sizeof sb - 2););
     }
     else if (his_state_is_will(TELOPT_OLD_ENVIRON)) {
 	static unsigned char sb[] =
 			{ IAC, SB, TELOPT_OLD_ENVIRON, TELQUAL_SEND, IAC, SE };
 
-	output_datalen(sb, sizeof sb);
+	output_datalen((const char *)sb, sizeof sb);
 	DIAG(TD_OPTIONS, printsub('>', sb + 2, sizeof sb - 2););
     }
     if (his_state_is_will(TELOPT_TTYPE)) {
 
-	output_datalen(ttytype_sbbuf, sizeof ttytype_sbbuf);
+	output_datalen((const char *)ttytype_sbbuf, sizeof ttytype_sbbuf);
 	DIAG(TD_OPTIONS, printsub('>', ttytype_sbbuf + 2,
 					sizeof ttytype_sbbuf - 2););
     }
@@ -851,7 +831,7 @@ _gettermname()
     if (his_state_is_wont(TELOPT_TTYPE))
 	return;
     settimer(baseline);
-    output_datalen(ttytype_sbbuf, sizeof ttytype_sbbuf);
+    output_datalen((const char *)ttytype_sbbuf, sizeof ttytype_sbbuf);
     DIAG(TD_OPTIONS, printsub('>', ttytype_sbbuf + 2,
 					sizeof ttytype_sbbuf - 2););
     while (sequenceIs(ttypesubopt, baseline))
@@ -916,13 +896,12 @@ doit(who)
 #else
 	for (;;) {
 		char *lp;
-		extern char *line;
 
 		if ((lp = getpty()) == NULL)
 			fatal(net, "Out of ptys");
 
 		if ((pty = open(lp, 2)) >= 0) {
-			strcpy(line,lp);
+			(void)strlcpy(line, lp, sizeof(NULL16STR));
 			line[5] = 't';
 			break;
 		}
@@ -946,8 +925,12 @@ doit(who)
 #endif	/* _SC_CRAY_SECURE_SYS */
 
 	/* get name of connected client */
-	error = getnameinfo(who, who->sa_len, remote_host_name, 
-			    sizeof(remote_host_name), NULL, 0, 0);
+	error = getnameinfo(who, who->sa_len, remote_host_name,
+	    sizeof(remote_host_name), NULL, 0, 0);
+
+	if (!error && strlen(remote_host_name) > utmp_len)
+		error = getnameinfo(who, who->sa_len, remote_host_name,
+		    sizeof(remote_host_name), NULL, 0, NI_NUMERICHOST);
 
 	if (error) {
 		fatal(net, "Couldn't resolve your address into a host name.\r\n\
@@ -998,20 +981,6 @@ doit(who)
 	/*NOTREACHED*/
 }  /* end of doit */
 
-#if	defined(CRAY2) && defined(UNICOS5) && defined(UNICOS50)
-	int
-Xterm_output(ibufp, obuf, icountp, ocount)
-	char **ibufp, *obuf;
-	int *icountp, ocount;
-{
-	int ret;
-	ret = term_output(*ibufp, obuf, *icountp, ocount);
-	*ibufp += *icountp;
-	*icountp = 0;
-	return(ret);
-}
-#define	term_output	Xterm_output
-#endif	/* defined(CRAY2) && defined(UNICOS5) && defined(UNICOS50) */
 
 /*
  * Main loop.  Select from pty and network, and
@@ -1158,9 +1127,6 @@ telnet(f, p, host)
 
 	(void) ioctl(f, FIONBIO, (char *)&on);
 	(void) ioctl(p, FIONBIO, (char *)&on);
-#if	defined(CRAY2) && defined(UNICOS5)
-	init_termdriver(f, p, interrupt, sendbrk);
-#endif
 
 #if	defined(SO_OOBINLINE)
 	(void) setsockopt(net, SOL_SOCKET, SO_OOBINLINE,
@@ -1180,20 +1146,6 @@ telnet(f, p, host)
 
 	(void) signal(SIGCHLD, cleanup);
 
-#if	defined(CRAY2) && defined(UNICOS5)
-	/*
-	 * Cray-2 will send a signal when pty modes are changed by slave
-	 * side.  Set up signal handler now.
-	 */
-	if ((int)signal(SIGUSR1, termstat) < 0)
-		perror("signal");
-	else if (ioctl(p, TCSIGME, (char *)SIGUSR1) < 0)
-		perror("ioctl:TCSIGME");
-	/*
-	 * Make processing loop check terminal characteristics early on.
-	 */
-	termstat();
-#endif
 
 #ifdef  TIOCNOTTY
 	{
@@ -1206,10 +1158,6 @@ telnet(f, p, host)
 	}
 #endif
 
-#if	defined(CRAY) && defined(NEWINIT) && defined(TIOCSCTTY)
-	(void) setsid();
-	ioctl(p, TIOCSCTTY, 0);
-#endif
 
 	/*
 	 * Show banner that getty never gave.
@@ -1219,10 +1167,8 @@ telnet(f, p, host)
 	 * other pty --> client data.
 	 */
 
-#if	!defined(CRAY) || !defined(NEWINIT)
 	if (getenv("USER"))
 		hostinfo = 0;
-#endif
 
 	if (getent(defent, gettyname) == 1) {
 		char *cp=defstrs;
@@ -1232,7 +1178,7 @@ telnet(f, p, host)
 		IM = getstr("im", &cp);
 		IF = getstr("if", &cp);
 		if (HN && *HN)
-			(void) strcpy(host_name, HN);
+			(void)strlcpy(host_name, HN, sizeof(host_name));
 		if (IM == 0)
 			IM = "";
 	} else {
@@ -1283,10 +1229,6 @@ telnet(f, p, host)
 		if (ncc < 0 && pcc < 0)
 			break;
 
-#if	defined(CRAY2) && defined(UNICOS5)
-		if (needtermstat)
-			_termstat();
-#endif	/* defined(CRAY2) && defined(UNICOS5) */
 		FD_ZERO(&ibits);
 		FD_ZERO(&obits);
 		FD_ZERO(&xbits);
@@ -1428,7 +1370,6 @@ telnet(f, p, host)
 			} else {
 				if (pcc <= 0)
 					break;
-#if	!defined(CRAY2) || !defined(UNICOS5)
 #ifdef	LINEMODE
 				/*
 				 * If ioctl from pty, pass it through net
@@ -1475,16 +1416,6 @@ telnet(f, p, host)
 				}
 				pcc--;
 				ptyip = ptyibuf+1;
-#else	/* defined(CRAY2) && defined(UNICOS5) */
-				if (!uselinemode) {
-					unpcc = pcc;
-					unptyip = ptyibuf;
-					pcc = term_output(&unptyip, ptyibuf2,
-								&unpcc, BUFSIZ);
-					ptyip = ptyibuf2;
-				} else
-					ptyip = ptyibuf;
-#endif	/* defined(CRAY2) && defined(UNICOS5) */
 			}
 		}
 
@@ -1494,11 +1425,6 @@ telnet(f, p, host)
 			c = *ptyip++ & 0377, pcc--;
 			if (c == IAC)
 				output_data("%c", c);
-#if	defined(CRAY2) && defined(UNICOS5)
-			else if (c == '\n' &&
-				     my_state_is_wont(TELOPT_BINARY) && newmap)
-				otput_data("\r");
-#endif	/* defined(CRAY2) && defined(UNICOS5) */
 			output_data("%c", c);
 			if ((c == '\r') && (my_state_is_wont(TELOPT_BINARY))) {
 				if (pcc > 0 && ((*ptyip & 0377) == '\n')) {
@@ -1508,17 +1434,6 @@ telnet(f, p, host)
 					output_datalen("\0", 1);
 			}
 		}
-#if	defined(CRAY2) && defined(UNICOS5)
-		/*
-		 * If chars were left over from the terminal driver,
-		 * note their existence.
-		 */
-		if (!uselinemode && unpcc) {
-			pcc = unpcc;
-			unpcc = 0;
-			ptyip = unptyip;
-		}
-#endif	/* defined(CRAY2) && defined(UNICOS5) */
 
 		if (FD_ISSET(f, &obits) && (nfrontp - nbackp) > 0)
 			netflush();

@@ -2,6 +2,8 @@
 
 .include <bsd.own.mk>
 
+MKKERBEROS=no
+
 PROG=	racoon
 SRCS=	main.c session.c isakmp.c handler.c arc4random.c \
 	isakmp_ident.c isakmp_agg.c isakmp_base.c \

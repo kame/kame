@@ -1,4 +1,4 @@
-/*	$NetBSD: inet.c,v 1.51 2002/02/27 02:33:51 lukem Exp $	*/
+/*	$NetBSD: inet.c,v 1.51.2.2 2003/10/22 06:06:23 jmc Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$NetBSD: inet.c,v 1.51 2002/02/27 02:33:51 lukem Exp $");
+__RCSID("$NetBSD: inet.c,v 1.51.2.2 2003/10/22 06:06:23 jmc Exp $");
 #endif
 #endif /* not lint */
 
@@ -295,6 +295,7 @@ tcp_stats(off, name)
 	p2(tcps_closed, tcps_drops,
 		"\t%llu connection%s closed (including %llu drop%s)\n");
 	p(tcps_conndrops, "\t%llu embryonic connection%s dropped\n");
+	p(tcps_delayed_free, "\t%llu delayed free%s of tcpcb\n");
 	p2(tcps_rttupdated, tcps_segstimed,
 		"\t%llu segment%s updated rtt (of %llu attempt%s)\n");
 	p(tcps_rexmttimeo, "\t%llu retransmit timeout%s\n");
@@ -312,7 +313,7 @@ tcp_stats(off, name)
 	ps(tcps_noport, "\t%llu dropped due to no socket\n");
 	p(tcps_connsdrained, "\t%llu connection%s drained due to memory "
 		"shortage\n");
-	p(tcps_connsdrained, "\t%llu PMTUD blackhole%s detected\n");
+	p(tcps_pmtublackhole, "\t%llu PMTUD blackhole%s detected\n");
 
 	p(tcps_badsyn, "\t%llu bad connection attempt%s\n");
 	ps(tcps_sc_added, "\t%llu SYN cache entries added\n");
@@ -324,6 +325,8 @@ tcp_stats(off, name)
 	ps(tcps_sc_bucketoverflow, "\t\t%llu dropped due to bucket overflow\n");
 	ps(tcps_sc_reset, "\t\t%llu dropped due to RST\n");
 	ps(tcps_sc_unreach, "\t\t%llu dropped due to ICMP unreachable\n");
+	ps(tcps_sc_delayed_free, "\t\t%llu delayed free of SYN cache "
+		"entries\n");
 	p(tcps_sc_retransmitted, "\t%llu SYN,ACK%s retransmitted\n");
 	p(tcps_sc_dupesyn, "\t%llu duplicate SYN%s received for entries "
 		"already in the cache\n");
