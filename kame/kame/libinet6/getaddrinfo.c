@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.111 2001/07/04 02:45:28 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.112 2001/07/04 07:47:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -115,6 +115,10 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
+#ifdef USE_LOG_REORDER
+#include <sys/un.h>
+#include <time.h>
+#endif
 
 #if defined(__bsdi__) && _BSDI_VERSION >= 199802
 #include <irs.h>
@@ -249,13 +253,16 @@ static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
 static int addrconfig __P((int));
-static void reorder __P((struct addrinfo *));
+static int reorder __P((struct addrinfo *));
 static void set_source __P((struct ai_order *));
 static int comp_dst __P((const void *, const void *));
 #ifdef INET6
 static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
 #endif
 static int gai_addr2scopetype __P((struct sockaddr *));
+#ifdef USE_LOG_REORDER
+static void log_reorder __P((struct timeval *, struct timeval *, int));
+#endif
 
 /* functions in OS dependent portion */
 static int explore_fqdn __P((const struct addrinfo *, const char *,
@@ -658,8 +665,21 @@ globcopy:
 	 */
 	if (error == 0) {
 		if (sentinel.ai_next) {
-			if (getenv("GAI_USE_ORDERING") != NULL)
-				reorder(&sentinel);
+			if (getenv("GAI_USE_ORDERING") != NULL) {
+				int n;
+#ifdef USE_LOG_REORDER
+				struct timeval start, end;
+#endif
+
+#ifdef USE_LOG_REORDER
+				gettimeofday(&start, NULL);
+#endif
+				n = reorder(&sentinel);
+#ifdef USE_LOG_REORDER
+				gettimeofday(&end, NULL);
+				log_reorder(&start, &end, n);
+#endif
+			}
 			*res = sentinel.ai_next;
 			error = 0;
 		} else
@@ -679,7 +699,7 @@ bad:
 	return error;
 }
 
-static void
+static int
 reorder(sentinel)
 	struct addrinfo *sentinel;
 {
@@ -695,11 +715,11 @@ reorder(sentinel)
 	 * If the number is small enough, we can skip the reordering process.
 	 */
 	if (n <= 1)
-		return;
+		return(n);
 
 	/* allocate a temporary array for sort and initialize it. */
 	if ((aio = malloc(sizeof(*aio) * n)) == NULL)
-		return;		/* give up reordering */
+		return(n);	/* give up reordering */
 	memset(aio, 0, sizeof(*aio) * n);
 	for (i = 0, ai = sentinel->ai_next; i < n; ai = ai->ai_next, i++) {
 		aio[i].aio_ai = ai;
@@ -719,7 +739,7 @@ reorder(sentinel)
 
 	/* cleanup and return */
 	free(aio);
-	return;
+	return(n);
 }
 
 static void
@@ -834,6 +854,42 @@ comp_dst(arg1, arg2)
 	/* Rule 9: Otherwise, leave the order unchanged. */
 	return(-1);
 }
+
+#ifdef USE_LOG_REORDER
+struct gai_orderstat
+{
+	struct timeval start;
+	struct timeval end;
+	pid_t pid;
+	int entries;
+};
+#define PATH_STATFILE "/var/run/gaistat"
+
+static void
+log_reorder(start, end, n)
+	struct timeval *start, *end;
+	int n;
+{
+	struct gai_orderstat stat;
+	struct sockaddr_un sun;
+	int s;
+
+	memset(&stat, 0, sizeof(stat));
+	stat.start = *start;
+	stat.end = *end;
+	stat.pid = getpid();
+	stat.entries = n;
+
+	if ((s = socket(AF_LOCAL, SOCK_DGRAM, 0)) < 0)
+		return;
+	memset(&sun, 0, sizeof(sun));
+	sun.sun_family = AF_LOCAL;
+	sun.sun_len = sizeof(sun);
+	strncpy(sun.sun_path, PATH_STATFILE, sizeof(sun.sun_path));
+	sendto(s, &stat, sizeof(stat), 0, (struct sockaddr *)&sun,
+	       sizeof(sun));
+}
+#endif /* USE_LOG_REORDER */
 
 /*
  * Copy from scope.c.
