@@ -326,7 +326,7 @@ p_sockaddr(sa, flags, width)
 	    {
 		u_char *s = (u_char *)sa->sa_data, *slim;
 
-		slim = ROUNDUP(sa->sa_len) + (u_char *) sa;
+		slim = sa->sa_len + (u_char *) sa;
 		cplim = cp + sizeof(workbuf) - 6;
 		cp += snprintf(cp, cplim - cp, "(%d)", sa->sa_family);
 		while (s < slim && cp < cplim) {
