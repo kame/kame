@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1364 2000/11/05 18:33:22 jinmei Exp $
+$KAME: CHANGELOG,v 1.1365 2000/11/06 06:47:24 itojun Exp $
 
 <200011>
+Mon Nov  6 15:46:39 JST 2000  itojun@iijlab.net
+	* sys/net/if_stf.c, sys/netinet*/in*gif.c: IFF_LINK2 now controls
+	  the use of ingress filter on tunnel outer/inner source address.
+
 2000-11-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* {bsdi4,freebsd[34]}/sys/netinet/tcp_subr.c (tcp6_ctlinput):
 	* {bsdi4,openbsd}/sys/netinet/udp_usrreq.c (udp6_ctlinput):
