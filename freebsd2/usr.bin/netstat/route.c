@@ -122,8 +122,8 @@ static void p_flags __P((int, char *));
 static void p_rtentry __P((struct rtentry *));
 
 #ifdef INET6
-char *routename6 __P((struct in6_addr *));
-char *netname6 __P((struct in6_addr *, struct in6_addr *));
+char *routename6 __P((struct sockaddr_in6 *));
+char *netname6 __P((struct sockaddr_in6 *, struct in6_addr *));
 static char ntop_buf[INET6_ADDRSTRLEN];
 #endif /*INET6*/
 
@@ -217,8 +217,8 @@ pr_family(af)
 #define	WID_DST 	18	/* width of destination column */
 #define	WID_GW		18	/* width of gateway column */
 #else
-#define	WID_DST	(lflag ? 39 : (nflag ? 29 : 18)) /* width of dest column */
-#define	WID_GW	(lflag ? 27 : (nflag ? 25 : 18)) /* width of gateway column */
+#define	WID_DST	(lflag ? 39 : (nflag ? 33: 18)) /* width of dest column */
+#define	WID_GW	(lflag ? 31 : (nflag ? 29 : 18)) /* width of gateway column */
 #endif /*INET6*/
 
 /*
@@ -430,15 +430,27 @@ p_sockaddr(sa, mask, flags, width)
 #ifdef INET6
 	case AF_INET6:
 	    {
-		struct in6_addr *in6 = &((struct sockaddr_in6 *)sa)->sin6_addr;
+		struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
+		struct in6_addr *in6 = &sa6->sin6_addr;
+
+		/*
+		 * XXX: This is a special workaround for KAME kernels.
+		 * sin6_scope_id field of SA should be set in the future.
+		 */
+		if (IN6_IS_ADDR_LINKLOCAL(in6) ||
+		    IN6_IS_ADDR_MC_LINKLOCAL(in6)) {
+		    /* XXX: override is ok? */
+		    sa6->sin6_scope_id = (u_int32_t)ntohs(*(u_short *)&in6->s6_addr[2]);
+		    *(u_short *)&in6->s6_addr[2] = 0;
+		}
 
 		if (flags & RTF_HOST)
-			cp = routename6(in6);
+		    cp = routename6(sa6);
 		else if (mask)
-			cp = netname6(in6,
-				&((struct sockaddr_in6 *)mask)->sin6_addr);
+		    cp = netname6(sa6,
+				  &((struct sockaddr_in6 *)mask)->sin6_addr);
 		else {
-			cp = netname6(in6, NULL);
+		    cp = netname6(sa6, NULL);
 		}
 		break;
 	    }
@@ -739,16 +751,14 @@ netname(in, mask)
 
 #ifdef INET6
 char *
-netname6(in6, mask)
-	struct in6_addr *in6;
+netname6(sa6, mask)
+	struct sockaddr_in6 *sa6;
 	struct in6_addr *mask;
 {
 	static char line[MAXHOSTNAMELEN + 1];
 	u_char *p = (u_char *)mask;
 	u_char *lim;
-	char *cp = 0;
-	int masklen, illegal = 0;
-	struct hostent *hp;
+	int masklen, illegal = 0, flag = NI_WITHSCOPEID;
 
 	if (mask) {
 		for (masklen = 0, lim = p + 16; p < lim; p++) {
@@ -790,46 +800,32 @@ netname6(in6, mask)
 	else
 		masklen = 128;
 
-	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(in6))
+	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr))
 		return("default");
 
-	if (!nflag) {
-		hp = gethostbyaddr((char *)in6, sizeof(*in6), AF_INET6);
-		if (hp) {
-			cp = hp->h_name;
-			trimdomain(cp);
-		}
-	}
-	if (cp)
-		strncpy(line, cp, sizeof(line) - 1);
-	else
-		sprintf(line, "%s/%d", inet_ntop(AF_INET6, in6, ntop_buf,
-						 sizeof(ntop_buf)),
-			masklen);
+	if (nflag)
+		flag |= NI_NUMERICHOST;
+	getnameinfo((struct sockaddr *)sa6, sa6->sin6_len, line, sizeof(line),
+		    NULL, 0, flag);
+
+	if (nflag)
+		sprintf(&line[strlen(line)], "/%d", masklen);
 	return line;
 }
 
 char *
-routename6(in6)
-	struct in6_addr *in6;
+routename6(sa6)
+	struct sockaddr_in6 *sa6;
 {
-	register char *cp = 0;
 	static char line[MAXHOSTNAMELEN + 1];
-	struct hostent *hp;
+	int flag = NI_WITHSCOPEID;
 
-	if (!nflag) {
-		hp = gethostbyaddr((char *)in6, sizeof(*in6), AF_INET6);
-		if (hp) {
-			cp = hp->h_name;
-			trimdomain(cp);
-		}
-	}
-	if (cp)
-		strncpy(line, cp, sizeof(line) - 1);
-	else
-		sprintf(line, "%s", inet_ntop(AF_INET6, in6, ntop_buf,
-					      sizeof(ntop_buf)));
-		
+	if (nflag)
+		flag |= NI_NUMERICHOST;
+
+	getnameinfo((struct sockaddr *)sa6, sa6->sin6_len, line, sizeof(line),
+		    NULL, 0, flag);
+
 	return line;
 }
 #endif /*INET6*/
