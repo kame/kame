@@ -2156,10 +2156,15 @@ ip6_pcbopt(optname, buf, len, pktopt, priv)
 		opt->ip6po_hlim = *hlimp;
 		break;
 	}
-	case IPV6_NEXTHOP:	/* XXX: how to remove this option? */
+	case IPV6_NEXTHOP:
 		if (!priv)
 			return(EPERM);
-	
+
+		if (len == 0) {	/* just remove the option */
+			ip6_clearpktopts(opt, 1, IPV6_NEXTHOP);
+			break;
+		}
+
 		/* check if cmsg_len is large enough for sa_len */
 		if (len < sizeof(u_char) ||
 		    len < *buf)
