@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.12 2002/05/08 05:41:36 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.13 2002/05/16 11:02:58 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -481,8 +481,23 @@ hfsc_class_modify(cl, rsc, fsc)
 	struct hfsc_class *cl;
 	struct service_curve *rsc, *fsc;
 {
-	struct internal_sc *tmp;
+	struct internal_sc *rsc_tmp, *fsc_tmp;
 	int s;
+
+	if (rsc != NULL && (rsc->m1 != 0 || rsc->m2 != 0) &&
+	    cl->cl_rsc == NULL) {
+		MALLOC(rsc_tmp, struct internal_sc *,
+		       sizeof(struct internal_sc), M_DEVBUF, M_WAITOK);
+		if (rsc_tmp == NULL)
+			return (ENOMEM);
+	}
+	if (fsc != NULL && (fsc->m1 != 0 || fsc->m2 != 0) &&
+	    cl->cl_fsc == NULL) {
+		MALLOC(fsc_tmp, struct internal_sc *,
+		       sizeof(struct internal_sc), M_DEVBUF, M_WAITOK);
+		if (fsc_tmp == NULL)
+			return (ENOMEM);
+	}
 
 	s = splimp();
 	if (!qempty(cl->cl_q))
@@ -495,16 +510,8 @@ hfsc_class_modify(cl, rsc, fsc)
 				cl->cl_rsc = NULL;
 			}
 		} else {
-			if (cl->cl_rsc == NULL) {
-				MALLOC(tmp, struct internal_sc *,
-				       sizeof(struct internal_sc),
-				       M_DEVBUF, M_WAITOK);
-				if (tmp == NULL) {
-					splx(s);
-					return (ENOMEM);
-				}
-				cl->cl_rsc = tmp;
-			}
+			if (cl->cl_rsc == NULL)
+				cl->cl_rsc = rsc_tmp;
 			bzero(cl->cl_rsc, sizeof(struct internal_sc));
 			sc2isc(rsc, cl->cl_rsc);
 			rtsc_init(&cl->cl_deadline, cl->cl_rsc, 0, 0);
@@ -519,16 +526,8 @@ hfsc_class_modify(cl, rsc, fsc)
 				cl->cl_fsc = NULL;
 			}
 		} else {
-			if (cl->cl_fsc == NULL) {
-				MALLOC(tmp, struct internal_sc *,
-				       sizeof(struct internal_sc),
-				       M_DEVBUF, M_WAITOK);
-				if (tmp == NULL) {
-					splx(s);
-					return (ENOMEM);
-				}
-				cl->cl_fsc = tmp;
-			}
+			if (cl->cl_fsc == NULL)
+				cl->cl_fsc = fsc_tmp;
 			bzero(cl->cl_fsc, sizeof(struct internal_sc));
 			sc2isc(fsc, cl->cl_fsc);
 			rtsc_init(&cl->cl_virtual, cl->cl_fsc, 0, 0);
