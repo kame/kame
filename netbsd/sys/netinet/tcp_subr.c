@@ -1381,7 +1381,7 @@ tcp6_mtudisc_callback(faddr)
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_addr = *faddr;
 	(void) in6_pcbnotify(&tcb6, (struct sockaddr *)&sin6, 0,
-	    (struct sockaddr *)&sa6_any, 0, EMSGSIZE, NULL, tcp6_mtudisc);
+	    (struct sockaddr *)&sa6_any, 0, PRC_MSGSIZE, NULL, tcp6_mtudisc);
 }
 
 void
