@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.712 2000/03/22 07:18:45 sakane Exp $
+$Id: CHANGELOG,v 1.713 2000/03/22 07:20:08 jinmei Exp $
 
 <200003>
+2000-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd/dump.c: supported to let rtadvd dump its
+	internal status into a file upon receipt of the SIGUSR1 signal.
+
 Wed Mar 22 16:12:02 JST 2000 sakane@ydc.co.jp
 	* kame/sys/netkey/key.c:
 	- improve key_spdget() to get a policy by policy id.
