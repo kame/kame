@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.88 2001/02/03 16:23:19 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.89 2001/02/03 18:25:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -112,7 +112,7 @@ u_int32_t ip6_temp_valid_lifetime = DEF_TEMP_VALID_LIFETIME;
 int ip6_temp_preferred_lifetime = 800;
 static int ip6_temp_valid_lifetime = 1800;
 */
-int ip6_anon_regen_advance = ANON_REGEN_ADVANCE;
+int ip6_temp_regen_advance = ANON_REGEN_ADVANCE;
 
 #ifdef MIP6
 void (*mip6_select_defrtr_hook)(struct nd_prefix *,
@@ -1947,7 +1947,7 @@ in6_tmpifadd(ia0, forcegen)
 	 * A temporary address is created only if this calculated Preferred
 	 * Lifetime is greater than REGEN_ADVANCE time units.
 	 */
-	if (ifra.ifra_lifetime.ia6t_pltime <= ip6_anon_regen_advance)
+	if (ifra.ifra_lifetime.ia6t_pltime <= ip6_temp_regen_advance)
 		return(0);
 
 	/* XXX: scope zone ID? */

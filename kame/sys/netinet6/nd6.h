@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.38 2001/02/03 16:23:19 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.39 2001/02/03 18:25:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -272,7 +272,7 @@ extern int nd6_defifindex;
 extern int ip6_desync_factor;	/* seconds */
 extern u_int32_t ip6_temp_preferred_lifetime; /* seconds */
 extern u_int32_t ip6_temp_valid_lifetime; /* seconds */
-extern int ip6_anon_regen_advance; /* seconds */
+extern int ip6_temp_regen_advance; /* seconds */
 
 union nd_opts {
 	struct nd_opt_hdr *nd_opt_array[9];	/*max = home agent info*/

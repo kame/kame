@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.157 2001/02/03 16:30:51 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.158 2001/02/03 18:25:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -379,12 +379,12 @@ ip6_init2(dummy)
 #ifdef __NetBSD__
 	callout_reset(&in6_tmpaddrtimer_ch,
 		      (ip6_temp_preferred_lifetime - ip6_desync_factor -
-		       ip6_anon_regen_advance) * hz,
+		       ip6_temp_regen_advance) * hz,
 		      in6_tmpaddrtimer, NULL);
 #else
 	timeout(in6_tmpaddrtimer, (caddr_t)0,
 		(ip6_temp_preferred_lifetime - ip6_desync_factor -
-			ip6_anon_regen_advance) * hz);
+			ip6_temp_regen_advance) * hz);
 #endif
 }
 
@@ -2599,7 +2599,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
 				   &ip6_temp_preferred_lifetime);
 		if (ip6_temp_preferred_lifetime <
-		    ip6_desync_factor + ip6_anon_regen_advance) {
+		    ip6_desync_factor + ip6_temp_regen_advance) {
 			ip6_temp_preferred_lifetime = old;
 			return(EINVAL);
 		}
@@ -2647,7 +2647,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		error = sysctl_int_arr(ip6_sysvars, name, namelen,
 				       oldp, oldlenp, newp, newlen);
 		if (ip6_temp_preferred_lifetime <
-		    ip6_desync_factor + ip6_anon_regen_advance) {
+		    ip6_desync_factor + ip6_temp_regen_advance) {
 			ip6_temp_preferred_lifetime = *(int *)oldp;
 			return(EINVAL);
 		}
