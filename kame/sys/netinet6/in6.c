@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.243 2001/10/16 05:01:13 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.244 2001/10/25 08:25:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2468,8 +2468,8 @@ ip6_sprintf(addr)
 	static char ip6buf[8][48];
 	int i;
 	char *cp;
-	u_short *a = (u_short *)addr;
-	u_char *d;
+	const u_short *a = (const u_short *)addr;
+	const u_char *d;
 	int dcolon = 0;
 
 	ip6round = (ip6round + 1) & 7;
@@ -2498,7 +2498,7 @@ ip6_sprintf(addr)
 			a++;
 			continue;
 		}
-		d = (u_char *)a;
+		d = (const u_char *)a;
 		*cp++ = digits[*d >> 4];
 		*cp++ = digits[*d++ & 0xf];
 		*cp++ = digits[*d >> 4];
