@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.88 2004/05/24 11:29:08 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.89 2004/05/25 01:17:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -58,6 +58,9 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <net/netisr.h>
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#include <net/pfil.h>
+#endif
 #include <machine/cpu.h>
 
 #include <netinet/in.h>
