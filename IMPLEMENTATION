@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.275 2001/09/13 01:51:48 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.276 2001/09/19 11:21:51 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -245,6 +245,9 @@ draft-itojun-ipv6-transition-abuse-01.txt:
     * Latest attack scirpt is available in v6test/conf/transition-abuse.conf.
     * See section 1.12.6 and 1.14 for more details.
 draft-itojun-ipv6-tclass-api-03.txt: Socket API for IPv6 traffic class field
+    * the current implementation uses int, not u_int8_t, for passing sockopt
+      values.  the document is planned to be integrated into 
+      draft-ietf-ipngwg-rfc2292bis-xx.txt.
 draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
     * no consideration is made against the use of routing headers and such.
 
