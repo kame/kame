@@ -52,9 +52,6 @@ struct socket {
 	short	so_linger;		/* time to linger while closing */
 	short	so_state;		/* internal state flags SS_*, below */
 	caddr_t	so_pcb;			/* protocol control block */
-#ifdef MAPPED_ADDR_ENABLED
-	caddr_t so_pcb2;
-#endif /* MAPPED_ADDR_ENABLED */
 	struct	protosw *so_proto;	/* protocol handle */
 /*
  * Variables for connection queuing.
