@@ -547,20 +547,25 @@ in6_control(so, cmd, data, ifp)
 	 * Find address for this interface, if it exists.
 	 */
 	{
-		struct in6_addr *addr = &ifra->ifra_addr.sin6_addr;
-		if (IN6_IS_ADDR_LINKLOCAL(addr)) {
-			if (addr->s6_addr16[1] == 0) {
+
+		struct sockaddr_in6 *sa6 =
+			(struct sockaddr_in6 *)&ifra->ifra_addr;
+
+		if (IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr)) {
+			if (sa6->sin6_addr.s6_addr16[1] == 0) {
 				/* interface ID is not embedded by the user */
-				addr->s6_addr16[1] = htons(ifp->if_index);
+				sa6->sin6_addr.s6_addr16[1] =
+					htons(ifp->if_index);
 			}
 			else
-				if (addr->s6_addr16[1] != htons(ifp->if_index))
+				if (sa6->sin6_addr.s6_addr16[1] !=
+				    htons(ifp->if_index))
 					return(EINVAL);	/* ifid is contradict */
-			if (addr->sin6_scope_id) {
-				if (addr->sin6_scope_id !=
+			if (sa6->sin6_scope_id) {
+				if (sa6->sin6_scope_id !=
 				    (u_int32_t)ifp->if_index)
 					return(EINVAL);
-				addr->sin6_scope_id = 0; /* XXX: good way? */
+				sa6->sin6_scope_id = 0; /* XXX: good way? */
 			}
 		}
 	}
