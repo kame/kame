@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.50 2000/06/20 02:11:24 itojun Exp $
+$Id: COVERAGE,v 1.51 2000/06/20 03:41:11 itojun Exp $
 
 
 x: supported/integrated
@@ -46,6 +46,9 @@ KAME IPv6 as of	latest	early	early	early	notyet	late	early
 IPv4 IPsec	KAME	KAME	openbsd	KAME	notyet	openbsd	KAME
 
 IPv6 IPsec	KAME	KAME	openbsd	KAME	notyet	-	KAME
+				(*1)
+    (*1) no extension header support yet (fragment header is supported),
+	hardware acceleration is available.
 
 KAME IPsec as of
 		latest	12jun00	-	early	notyet	-	early
