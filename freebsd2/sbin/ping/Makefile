@@ -8,8 +8,8 @@ BINMODE=4555
 #CFLAGS+=	-g
 CFLAGS+=	-DIPSEC
 COPTS+=	-Wall -Wmissing-prototypes
-DPADD=	${LIBM}
-LDADD=	-lm
+LDADD+=	-lm
+DPADD+=	${LIBM}
 LDADD+=	-L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
 	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -lipsec -linet6
