@@ -1315,12 +1315,18 @@ rip_config()
 	struct attr_list *attr;
 	struct ifinfo *ifp;
 	struct ripif *ripif;
+	extern int rip_use_sitelocal;
 
 	if (ripyes == 0)
 		return(0);
 	rip_init();
 
 	cprint("RIP config\n");
+
+	if (yy_rip_sitelocal >= 0) {
+		cprint("Use site-local addresses in RIPng\n");
+		rip_use_sitelocal = yy_rip_sitelocal;
+	}
 
 	for (info = yy_ripifinfo_head; info; info = info->next) {
 		cprint("  %s: ", info->ifname);
