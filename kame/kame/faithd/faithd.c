@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.21 2000/07/04 03:18:35 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.22 2000/07/05 17:58:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -379,7 +379,7 @@ play_service(int s_wld)
 	 * Wait, accept, fork, faith....
 	 */
 again:
-	setproctitle(procname);
+	setproctitle("%s", procname);
 
 	FD_ZERO(&rfds);
 	FD_SET(s_wld, &rfds);
