@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.365 2004/01/26 09:46:42 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.366 2004/03/21 14:55:06 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -270,6 +270,7 @@ draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
 draft-vida-mld-v2-05.txt: Multicast Listener Discovery Version 2 (MLDv2) for IPv6
     * host-side & router-side implementation on kame/freebsd4 and kame/netbsd.
     * Multicast Source Filter works only for UDP packets.
+draft-ietf-dhc-lifetime-00.txt: Lifetime Option for DHCPv6
 
 1.2 Neighbor Discovery
 
