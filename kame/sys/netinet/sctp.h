@@ -1,4 +1,4 @@
-/*	$KAME: sctp.h,v 1.5 2002/05/24 07:40:23 itojun Exp $	*/
+/*	$KAME: sctp.h,v 1.6 2002/06/09 16:29:54 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp.h,v 1.43 2002/04/02 15:34:44 lei Exp	*/
 
 #ifndef _NETINET_SCTP_H_
@@ -108,7 +108,7 @@ struct sctp_paramhdr {
  * the normal syscall to toggle SS_NBIO the way you want.
  */
 /* Blocking I/O is controled by the SS_NBIO flag on the
- * socket state so_state field. 
+ * socket state so_state field.
  */
 #define SCTP_GET_SNDBUF_USE		 0x00008000
 /* latter added read/write */
@@ -203,7 +203,7 @@ struct sctp_error_out_of_resource {
 
 struct sctp_error_unresolv_addr {
 	struct sctp_error_cause cause;	/* code=SCTP_ERROR_UNRESOLVABLE_ADDR */
-	
+
 };
 
 struct sctp_error_unrecognized_chunk {

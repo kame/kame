@@ -1,4 +1,4 @@
-/*	$KAME: sctp_peeloff.c,v 1.4 2002/05/24 07:40:23 itojun Exp $	*/
+/*	$KAME: sctp_peeloff.c,v 1.5 2002/06/09 16:29:55 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_peeloff.c,v 1.16 2002/04/04 19:12:45 randall Exp	*/
 
 /*
@@ -119,7 +119,7 @@ sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error)
 	struct sctp_inpcb *inp, *n_inp;
 	struct sctp_tcb *tcb;
 
-#ifdef SCTP_DEBUG	
+#ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PEEL1) {
 		printf("SCTP peel-off called\n");
 	}
@@ -141,9 +141,9 @@ sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error)
 		return(newso);
 	}
 	n_inp = (struct sctp_inpcb *)newso->so_pcb;
-	n_inp->sctp_flags = (SCTP_PCB_FLAGS_UDPTYPE | 
-			     SCTP_PCB_FLAGS_CONNECTED | 
-			     SCTP_PCB_FLAGS_IN_TCPPOOL | 
+	n_inp->sctp_flags = (SCTP_PCB_FLAGS_UDPTYPE |
+			     SCTP_PCB_FLAGS_CONNECTED |
+			     SCTP_PCB_FLAGS_IN_TCPPOOL |
 			     /* Turn on Blocking IO */
 			     (SCTP_PCB_COPY_FLAGS & inp->sctp_flags));
 	n_inp->sctp_socket = newso;

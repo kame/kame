@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.c,v 1.4 2002/06/08 21:42:38 itojun Exp $	*/
+/*	$KAME: sctp_input.c,v 1.5 2002/06/09 16:29:54 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_input.c,v 1.189 2002/04/04 18:37:12 randall Exp	*/
 
 /*
@@ -38,7 +38,7 @@
 #include "opt_inet6.h"
 #include "opt_inet.h"
 #endif
-#if defined(__NetBSD__) 
+#if defined(__NetBSD__)
 #include "opt_inet.h"
 #endif
 #ifndef __OpenBSD__
@@ -157,7 +157,7 @@ static void
 sctp_handle_init(struct mbuf *m, struct sctp_init_chunk *cp,
 		 struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 		 struct sctp_nets *netp,
-		 int iphlen) 
+		 int iphlen)
 {
 	struct sctp_init *init;
 	struct sctp_association *assoc;
@@ -184,25 +184,25 @@ sctp_handle_init(struct mbuf *m, struct sctp_init_chunk *cp,
 	/* validate parameters */
 	if (init->initiate_tag == 0) {
 		/* protocol error... send abort */
- 	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
+	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
 		sctp_abort_association(inp, stcb, m, iphlen, op_err);
 		return;
 	}
 	if (ntohl(init->a_rwnd) < SCTP_MIN_RWND) {
 		/* invalid parameter... send abort */
- 	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
+	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
 		sctp_abort_association(inp, stcb, m, iphlen, op_err);
 		return;
 	}
 	if (init->num_inbound_streams == 0) {
 		/* protocol error... send abort */
- 	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
+	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
 		sctp_abort_association(inp, stcb, m, iphlen, op_err);
 		return;
 	}
 	if (init->num_outbound_streams == 0) {
 		/* protocol error... send abort */
- 	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
+	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
 		sctp_abort_association(inp, stcb, m, iphlen, op_err);
 		return;
 	}
@@ -241,7 +241,7 @@ extern struct sctp_epinfo sctppcbinfo;
 
 static int
 sctp_process_init(struct sctp_init_chunk *cp, struct sctp_tcb *stcb,
-		  struct sctp_nets *netp) 
+		  struct sctp_nets *netp)
 {
 	struct sctp_init *init;
 	struct sctp_association *assoc;
@@ -266,7 +266,7 @@ sctp_process_init(struct sctp_init_chunk *cp, struct sctp_tcb *stcb,
 				outs = &assoc->strmout[i];
 				chk = TAILQ_FIRST(&outs->outqueue);
 				while (chk) {
-					TAILQ_REMOVE(&outs->outqueue, chk, 
+					TAILQ_REMOVE(&outs->outqueue, chk,
 						     sctp_next);
 					sctp_ulp_notify(SCTP_NOTIFY_DG_FAIL, stcb, SCTP_NOTIFY_DATAGRAM_UNSENT, chk);
 					if (chk->data) {
@@ -274,7 +274,7 @@ sctp_process_init(struct sctp_init_chunk *cp, struct sctp_tcb *stcb,
 						chk->data = NULL;
 					}
 					sctp_free_remote_addr(chk->whoTo);
-					chk->whoTo = NULL;		      
+					chk->whoTo = NULL;
 					chk->asoc = NULL;
 					/* Free the chunk */
 #if defined(__FreeBSD__)
@@ -313,7 +313,7 @@ sctp_process_init(struct sctp_init_chunk *cp, struct sctp_tcb *stcb,
 		free(assoc->strmin,M_PCB);
 	}
 	assoc->strmin = (struct sctp_stream_in *)malloc(
-		(assoc->streamincnt * 
+		(assoc->streamincnt *
 		 sizeof(struct sctp_stream_in)),
 		M_PCB,
 		M_NOWAIT);
@@ -363,7 +363,7 @@ static int
 sctp_process_init_ack(struct mbuf *m, int offset,
 		      struct sctp_init_ack_chunk *cp,
 		      struct sctp_tcb *stcb, struct sctp_nets *netp,
-		      int iphlen) 
+		      int iphlen)
 {
 	struct sctp_association *assoc;
 	struct mbuf *op_err;
@@ -373,11 +373,11 @@ sctp_process_init_ack(struct mbuf *m, int offset,
 	abort_flag = 0;
 	op_err = NULL;
 	op_err = sctp_arethere_unrecognized_parameters(m,
-						       (offset + 
+						       (offset +
 							sizeof(struct sctp_init_chunk)),
 						       &abort_flag);
 	if (abort_flag) {
-		/* Send an abort and notify peer */	
+		/* Send an abort and notify peer */
 		if(op_err != NULL){
 			sctp_abort_association(stcb->sctp_ep,
 					       stcb,
@@ -386,7 +386,7 @@ sctp_process_init_ack(struct mbuf *m, int offset,
 			/* Just notify (abort_assoc does this if
 			 * we send an abort).
 			 */
-			sctp_abort_notification(stcb,0);	
+			sctp_abort_notification(stcb,0);
 		}
 		/* No sense in further INIT's since
 		 * we will get the same param back
@@ -400,7 +400,7 @@ sctp_process_init_ack(struct mbuf *m, int offset,
 	if (retval < 0) {
 		return(retval);
 	}
-	sz_of_initack = (unsigned int)(ntohs(cp->ch.chunk_length) + 
+	sz_of_initack = (unsigned int)(ntohs(cp->ch.chunk_length) +
 				       iphlen +
 				       sizeof(struct sctphdr));
 
@@ -410,9 +410,9 @@ sctp_process_init_ack(struct mbuf *m, int offset,
 					 (struct sockaddr *)NULL,(int)sz_of_initack)
 		){
 		/* Huh, we should abort */
-		sctp_abort_notification(stcb,0);	
+		sctp_abort_notification(stcb,0);
 		sctp_free_assoc(stcb->sctp_ep,stcb);
-		return(-1);	  
+		return(-1);
 	}
 	if (op_err) {
 		sctp_queue_op_err(stcb,op_err);
@@ -428,7 +428,7 @@ sctp_process_init_ack(struct mbuf *m, int offset,
 		 * the INIT-ACK, we can abandon the peer, its broke.
 		 */
 		if(retval == -3){
-			/* We abort with an error of 
+			/* We abort with an error of
 			 * missing mandatory param.
 			 */
 			struct mbuf *op_err;
@@ -530,7 +530,7 @@ sctp_handle_heartbeat_ack(struct sctp_heartbeat_chunk *hb,
 
 static void
 sctp_handle_abort(struct sctp_abort_chunk *cp, struct sctp_tcb *stcb,
-		  struct sctp_nets *netp) 
+		  struct sctp_nets *netp)
 {
 #ifdef SCTP_DEBUG
 	if(sctp_debug_on & SCTP_DEBUG_INPUT2){
@@ -541,7 +541,7 @@ sctp_handle_abort(struct sctp_abort_chunk *cp, struct sctp_tcb *stcb,
 		return;
 	/* verify that the destination addr is in the association */
 	/* ignore abort for addresses being deleted */
-	
+
 	/* stop any receive timers */
 	sctp_timer_stop(SCTP_TIMER_TYPE_RECV, stcb->sctp_ep, stcb, netp);
 	/* notify user of the abort and clean up... */
@@ -553,7 +553,7 @@ sctp_handle_abort(struct sctp_abort_chunk *cp, struct sctp_tcb *stcb,
 		if(LIST_FIRST(&stcb->sctp_ep->sctp_asoc_list) == NULL){
 			/* finish the job now */
 			sctp_inpcb_free(stcb->sctp_ep,1);
-		} 
+		}
 	}
 
 #ifdef SCTP_DEBUG
@@ -565,7 +565,7 @@ sctp_handle_abort(struct sctp_abort_chunk *cp, struct sctp_tcb *stcb,
 
 static void
 sctp_handle_shutdown(struct sctp_shutdown_chunk *cp, struct sctp_tcb *stcb,
-		     struct sctp_nets *netp) 
+		     struct sctp_nets *netp)
 {
 	struct sctp_association *assoc;
 	int some_on_streamwheel;
@@ -576,7 +576,7 @@ sctp_handle_shutdown(struct sctp_shutdown_chunk *cp, struct sctp_tcb *stcb,
 #endif
 	if (stcb == NULL)
 		return;
-  
+
 	if(ntohs(cp->ch.chunk_length) != sizeof(struct sctp_shutdown_chunk)){
 		/* update current data status */
 #ifdef SCTP_DEBUG
@@ -642,7 +642,7 @@ sctp_handle_shutdown(struct sctp_shutdown_chunk *cp, struct sctp_tcb *stcb,
 
 static void
 sctp_handle_shutdown_ack(struct sctp_shutdown_ack_chunk *cp,
-			 struct sctp_tcb *stcb, struct sctp_nets *netp) 
+			 struct sctp_tcb *stcb, struct sctp_nets *netp)
 {
 	struct sctp_association *assoc;
 #ifdef SCTP_DEBUG
@@ -663,7 +663,7 @@ sctp_handle_shutdown_ack(struct sctp_shutdown_ack_chunk *cp,
 	/* notify upper layer protocol */
 	sctp_ulp_notify(SCTP_NOTIFY_ASSOC_DOWN, stcb, 0, NULL);
 	/* are the queues empty? */
-	if (!TAILQ_EMPTY(&assoc->send_queue) || 
+	if (!TAILQ_EMPTY(&assoc->send_queue) ||
 	    !TAILQ_EMPTY(&assoc->sent_queue) ||
 	    !TAILQ_EMPTY(&assoc->out_wheel)) {
 		sctp_report_all_outbound(stcb);
@@ -680,7 +680,7 @@ sctp_handle_shutdown_ack(struct sctp_shutdown_ack_chunk *cp,
 		if(LIST_FIRST(&stcb->sctp_ep->sctp_asoc_list) == NULL){
 			/* finish the job now */
 			sctp_inpcb_free(stcb->sctp_ep,1);
-		} 
+		}
 	}
 }
 
@@ -695,7 +695,7 @@ sctp_process_unrecog_chunk(struct sctp_tcb *tcb,
 	 * other than that and our peer must be broken.
 	 */
 	struct sctp_chunkhdr *chk;
-  
+
 	chk = (struct sctp_chunkhdr *)((caddr_t)phdr + sizeof(*phdr));
 	switch(chk->chunk_type){
 	case SCTP_ASCONF_ACK:
@@ -735,7 +735,7 @@ sctp_process_unrecog_param(struct sctp_tcb *tcb,
 	 * OR the u-stream param these will turn of specific features.
 	 */
 	struct sctp_paramhdr *pbad;
-  
+
 	pbad = phdr + 1;
 	switch(ntohs(pbad->param_type)){
 		/* u-sctp draft */
@@ -893,7 +893,7 @@ sctp_unpack_usctp_streams(struct sctp_tcb *stcb,
 	int len,augment,at;
 	int my_len;
 
-  
+
 	phdr = (struct sctp_paramhdr *)((caddr_t)initack_cp + sizeof(struct sctp_init_chunk));
 	len = ntohs(initack_cp->ch.chunk_length) - sizeof(struct sctp_init_chunk);
 	at = sizeof(struct sctp_init_chunk);
@@ -926,7 +926,7 @@ sctp_unpack_usctp_streams(struct sctp_tcb *stcb,
 static int
 sctp_handle_init_ack(struct mbuf *m, struct sctp_init_ack_chunk *cp,
 		     struct sctp_tcb *stcb, struct sctp_nets *netp,
-		     int offset, int iphlen) 
+		     int offset, int iphlen)
 {
 	struct sctp_init_ack *init_ack;
 	int *state;
@@ -955,25 +955,25 @@ sctp_handle_init_ack(struct mbuf *m, struct sctp_init_ack_chunk *cp,
 	/* validate parameters */
 	if (init_ack->initiate_tag == 0) {
 		/* protocol error... send an abort */
- 	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
+	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
 		sctp_abort_association(stcb->sctp_ep, stcb, m, iphlen,op_err);
 		return(-1);
 	}
 	if (ntohl(init_ack->a_rwnd) < SCTP_MIN_RWND) {
 		/* protocol error... send an abort */
- 	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
+	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
 		sctp_abort_association(stcb->sctp_ep, stcb, m, iphlen,op_err);
 		return(-1);
 	}
 	if (init_ack->num_inbound_streams == 0) {
 		/* protocol error... send an abort */
- 	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
+	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
 		sctp_abort_association(stcb->sctp_ep, stcb, m, iphlen,op_err);
 		return(-1);
 	}
 	if (init_ack->num_outbound_streams == 0) {
 		/* protocol error... send an abort */
- 	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
+	        op_err = sctp_generate_invmanparam(SCTP_CAUSE_INVALID_PARAM);
 		sctp_abort_association(stcb->sctp_ep, stcb, m, iphlen,op_err);
 		return(-1);
 	}
@@ -1007,7 +1007,7 @@ sctp_handle_init_ack(struct mbuf *m, struct sctp_init_ack_chunk *cp,
 
 		/* reset the RTO calc */
 		stcb->asoc.overall_error_count = 0;
-		SCTP_GETTIME_TIMEVAL(&stcb->asoc.time_entered);  
+		SCTP_GETTIME_TIMEVAL(&stcb->asoc.time_entered);
 		if (stcb->asoc.peer_supports_usctp) {
 			sctp_unpack_usctp_streams(stcb,cp,m,offset);
 		}
@@ -1052,7 +1052,7 @@ sctp_process_cookie_existing(struct mbuf *m, int offset, int iphlen,
 			     struct sctp_nets *netp,
 			     struct sctp_state_cookie *cookie, int length,
 			     int *notification,
-			     struct sockaddr *to) 
+			     struct sockaddr *to)
 {
 	struct sctp_association *assoc;
 	struct sctp_init_chunk *init_cp, tmp_init;
@@ -1075,7 +1075,7 @@ sctp_process_cookie_existing(struct mbuf *m, int offset, int iphlen,
 		if(sctp_debug_on & SCTP_DEBUG_INPUT2){
 			printf("sctp_handle_cookie: got a cookie, while shutting down!\n");
 		}
-#endif 
+#endif
 		MGETHDR(op_err,M_DONTWAIT, MT_HEADER);
 		if(op_err == NULL)
 			/* FOOBAR */
@@ -1188,7 +1188,7 @@ sctp_process_cookie_existing(struct mbuf *m, int offset, int iphlen,
 			/* start the path MTU raise and heartbeat timers */
 			sctp_timer_start(SCTP_TIMER_TYPE_PATHMTURAISE, inp, stcb, netp);
 			sctp_timer_start(SCTP_TIMER_TYPE_HEARTBEAT, inp, stcb, netp);
-			if(stcb->asoc.sctp_autoclose_ticks && 
+			if(stcb->asoc.sctp_autoclose_ticks &&
 			   (inp->sctp_flags & SCTP_PCB_FLAGS_AUTOCLOSE)){
 				sctp_timer_start(SCTP_TIMER_TYPE_AUTOCLOSE, inp, stcb, NULL);
 			}
@@ -1252,7 +1252,7 @@ sctp_process_cookie_existing(struct mbuf *m, int offset, int iphlen,
 		/* start the path MTU raise and heartbeat timers */
 		sctp_timer_start(SCTP_TIMER_TYPE_PATHMTURAISE, inp, stcb, netp);
 		sctp_timer_start(SCTP_TIMER_TYPE_HEARTBEAT, inp, stcb, netp);
-		if(stcb->asoc.sctp_autoclose_ticks && 
+		if(stcb->asoc.sctp_autoclose_ticks &&
 		   (inp->sctp_flags & SCTP_PCB_FLAGS_AUTOCLOSE)){
 			sctp_timer_start(SCTP_TIMER_TYPE_AUTOCLOSE, inp, stcb, NULL);
 		}
@@ -1403,7 +1403,7 @@ sctp_process_cookie_new(struct mbuf *m, int offset, int iphlen,
 			struct sctp_state_cookie *cookie, int length,
 			struct sockaddr *to,
 			struct sockaddr *dest,
-			int *notification) 
+			int *notification)
 {
 	struct sctp_tcb *stcb;
 	struct sctp_init_chunk *init_cp, tmp_init;
@@ -1575,7 +1575,7 @@ sctp_process_cookie_new(struct mbuf *m, int offset, int iphlen,
 		return(NULL);
 	}
 	/* now do we enable u-sctp? */
-  	if (stcb->asoc.peer_supports_usctp) {
+	if (stcb->asoc.peer_supports_usctp) {
 		/* Yes, we must set all the streams that we told him
 		 * about in the INIT-ACK.
 		 */
@@ -1629,7 +1629,7 @@ sctp_process_cookie_new(struct mbuf *m, int offset, int iphlen,
 	 * do the correct asconf processing.
 	 * else, make sure we have the correct addresses in our lists
 	 */
-	addrlen = offset + length - 
+	addrlen = offset + length -
 		(initack_offset + sizeof(struct sctp_init_ack_chunk));
 	offset = initack_offset + sizeof(struct sctp_init_ack_chunk);
 	sctp_check_address_list(stcb, m, offset, addrlen,
@@ -1643,7 +1643,7 @@ sctp_process_cookie_new(struct mbuf *m, int offset, int iphlen,
 	/* start the path MTU raise and heartbeat timers */
 	sctp_timer_start(SCTP_TIMER_TYPE_PATHMTURAISE, inp, stcb, *netp);
 	sctp_timer_start(SCTP_TIMER_TYPE_HEARTBEAT, inp, stcb, *netp);
-	if (stcb->asoc.sctp_autoclose_ticks && 
+	if (stcb->asoc.sctp_autoclose_ticks &&
 	    (inp->sctp_flags & SCTP_PCB_FLAGS_AUTOCLOSE)) {
 		sctp_timer_start(SCTP_TIMER_TYPE_AUTOCLOSE, inp, stcb, NULL);
 	}
@@ -1739,7 +1739,7 @@ sctp_handle_cookie_echo(struct mbuf *m, int offset, int iphlen,
 	cookie = &cookie_cp->cookie;
 	cookie_offset = offset + sizeof(struct sctp_chunkhdr);
 	cookie_len = ntohs(cookie_cp->ch.chunk_length);
-	
+
 	/* compute size of packet */
 	if (m->m_flags & M_PKTHDR) {
 		size_of_pkt = m->m_pkthdr.len;
@@ -1870,7 +1870,7 @@ sctp_handle_cookie_echo(struct mbuf *m, int offset, int iphlen,
 	}
 
 	if (cookie_ok == 0) {
-#ifdef SCTP_DEBUG	
+#ifdef SCTP_DEBUG
 		if(sctp_debug_on & SCTP_DEBUG_INPUT2){
 			printf("handle_cookie_echo: cookie signature validation failed!\n");
 			printf("offset = %u, cookie_offset = %u, sig_offset = %u\n",
@@ -1902,7 +1902,7 @@ sctp_handle_cookie_echo(struct mbuf *m, int offset, int iphlen,
 		if(sctp_debug_on & SCTP_DEBUG_INPUT3){
 			printf("sctp_handle_cookie: got a STALE cookie!\n");
 		}
-#endif 
+#endif
 		MGETHDR(op_err,M_DONTWAIT, MT_HEADER);
 		if (op_err == NULL)
 			/* FOOBAR */
@@ -1928,8 +1928,8 @@ sctp_handle_cookie_echo(struct mbuf *m, int offset, int iphlen,
 				   cookie->peers_vtag);
 		return(NULL);
 	}
-	/* 
-	 * Now we must see with the lookup address if we have an existing 
+	/*
+	 * Now we must see with the lookup address if we have an existing
 	 * asoc. This will only happen if we were in the COOKIE-WAIT state
 	 * and a INIT collided with us and somewhere the peer sent the
 	 * cookie on another address besides the single address our assoc
@@ -1969,9 +1969,9 @@ sctp_handle_cookie_echo(struct mbuf *m, int offset, int iphlen,
 			printf("sctp_handle_cookie: processing NEW cookie\n");
 		}
 #endif
-		*stcb = sctp_process_cookie_new(m, offset, iphlen, 
+		*stcb = sctp_process_cookie_new(m, offset, iphlen,
 						*inp, netp,
-						cookie, cookie_len, 
+						cookie, cookie_len,
 						to, localep_sa,
 						&notification);
 	} else {
@@ -2001,7 +2001,7 @@ sctp_handle_cookie_echo(struct mbuf *m, int offset, int iphlen,
 	}
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	if((*inp)->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE){
-		if(!had_a_existing_tcb || 
+		if(!had_a_existing_tcb ||
 		   (((*inp)->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) == 0)){
 			/* If we have a NEW cookie or the connect never reaced
 			 * the connected state during collision we must do the
@@ -2032,9 +2032,9 @@ sctp_handle_cookie_echo(struct mbuf *m, int offset, int iphlen,
 				return(NULL);
 			}
 			n_inp = (struct sctp_inpcb *)so->so_pcb;
-			n_inp->sctp_flags = (SCTP_PCB_FLAGS_TCPTYPE | 
-					     SCTP_PCB_FLAGS_CONNECTED | 
-					     SCTP_PCB_FLAGS_IN_TCPPOOL | 
+			n_inp->sctp_flags = (SCTP_PCB_FLAGS_TCPTYPE |
+					     SCTP_PCB_FLAGS_CONNECTED |
+					     SCTP_PCB_FLAGS_IN_TCPPOOL |
 					     (SCTP_PCB_COPY_FLAGS & (*inp)->sctp_flags) |
 					     SCTP_PCB_FLAGS_DONT_WAKE);
 			n_inp->sctp_socket = so;
@@ -2059,7 +2059,7 @@ sctp_handle_cookie_echo(struct mbuf *m, int offset, int iphlen,
 
 static void
 sctp_handle_cookie_ack(struct sctp_cookie_ack_chunk *cp, struct sctp_tcb *stcb,
-		       struct sctp_nets *netp) 
+		       struct sctp_nets *netp)
 {
 	struct sctp_association *assoc;
 #ifdef SCTP_DEBUG
@@ -2091,7 +2091,7 @@ sctp_handle_cookie_ack(struct sctp_cookie_ack_chunk *cp, struct sctp_tcb *stcb,
 		/* update RTO */
 		if (assoc->overall_error_count == 0){
 			netp->RTO = sctp_calculate_rto(stcb,assoc, netp,
-						       &assoc->time_entered); 
+						       &assoc->time_entered);
 		}
 		SCTP_GETTIME_TIMEVAL(&assoc->time_entered);
 		sctp_ulp_notify(SCTP_NOTIFY_ASSOC_UP, stcb, 0, NULL);
@@ -2100,7 +2100,7 @@ sctp_handle_cookie_ack(struct sctp_cookie_ack_chunk *cp, struct sctp_tcb *stcb,
 				 stcb, netp);
 		sctp_timer_start(SCTP_TIMER_TYPE_HEARTBEAT, stcb->sctp_ep,
 				 stcb, netp);
-		if (stcb->asoc.sctp_autoclose_ticks && 
+		if (stcb->asoc.sctp_autoclose_ticks &&
 		    (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_AUTOCLOSE)) {
 			sctp_timer_start(SCTP_TIMER_TYPE_AUTOCLOSE,
 					 stcb->sctp_ep, stcb, NULL);
@@ -2162,7 +2162,7 @@ sctp_handle_ecn_echo(struct sctp_ecne_chunk *ecne,
 		net->cwnd = net->ssthresh;
 		tcb->asoc.last_cwr_tsn = ntohl(ecne->tsn);
 	}
-	/* 
+	/*
 	 * We always send a CWR this way if our previous one was lost
 	 * our peer will get an update.
 	 */
@@ -2172,7 +2172,7 @@ sctp_handle_ecn_echo(struct sctp_ecne_chunk *ecne,
 
 static void
 sctp_handle_shutdown_complete(struct sctp_shutdown_complete_chunk *cp,
-			      struct sctp_tcb *stcb, struct sctp_nets *netp) 
+			      struct sctp_tcb *stcb, struct sctp_nets *netp)
 {
 	struct sctp_association *assoc;
 #ifdef SCTP_DEBUG
@@ -2192,7 +2192,7 @@ sctp_handle_shutdown_complete(struct sctp_shutdown_complete_chunk *cp,
 	/* notify upper layer protocol */
 	sctp_ulp_notify(SCTP_NOTIFY_ASSOC_DOWN, stcb, 0, NULL);
 	/* are the queues empty? */
-	if (!TAILQ_EMPTY(&assoc->send_queue) || 
+	if (!TAILQ_EMPTY(&assoc->send_queue) ||
 	    !TAILQ_EMPTY(&assoc->sent_queue) ||
 	    !TAILQ_EMPTY(&assoc->out_wheel)) {
 		sctp_report_all_outbound(stcb);
@@ -2206,7 +2206,7 @@ sctp_handle_shutdown_complete(struct sctp_shutdown_complete_chunk *cp,
 		if(LIST_FIRST(&stcb->sctp_ep->sctp_asoc_list) == NULL){
 			/* finish the job now */
 			sctp_inpcb_free(stcb->sctp_ep,1);
-		} 
+		}
 	}
 	return;
 }
@@ -2228,7 +2228,7 @@ sctp_handle_shutdown_complete(struct sctp_shutdown_complete_chunk *cp,
 static struct sctp_tcb *
 sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 		     struct sctp_tcb *stcb, struct sctp_nets **netp,
-		     int iphlen, int *offset, int *length) 
+		     int iphlen, int *offset, int *length)
 {
 	struct sctphdr *sctphdr;
 	struct sctp_chunkhdr *ch;
@@ -2237,16 +2237,16 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 	int num_chunks = 0;	/* number of control chunks processed */
 	int chk_length, ret;
 
-	/* How big should this be, and should it be alloc'd? 
+	/* How big should this be, and should it be alloc'd?
 	 * Lets try the d-mtu-ceiling for now (2k) and that should
-	 * hopefully work ... until we get into jumbo grams and such.. 
+	 * hopefully work ... until we get into jumbo grams and such..
 	 */
 	static u_int8_t chunk_buf[DEFAULT_CHUNK_BUFFER];
 
 
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_INPUT1) {
-		printf("sctp_process_control: iphlen=%u, offset=%u, length=%u stcb:%x\n", 
+		printf("sctp_process_control: iphlen=%u, offset=%u, length=%u stcb:%x\n",
 		       iphlen, *offset, *length, (u_int)stcb);
 	}
 #endif /* SCTP_DEBUG */
@@ -2408,7 +2408,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 		if ((ch->chunk_type == SCTP_ABORT_ASSOCIATION) ||
 		    (ch->chunk_type == SCTP_SHUTDOWN_COMPLETE)) {
 			if ((vtag_in == assoc->my_vtag) ||
-			    ((ch->chunk_flags & SCTP_HAD_NO_TCB) && 
+			    ((ch->chunk_flags & SCTP_HAD_NO_TCB) &&
 			     (vtag_in == assoc->peer_vtag))) {
 				/* this is valid */
 			} else {
@@ -2465,7 +2465,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 		    (*length < chk_length)) {
 #ifdef SCTP_DEBUG
 			if (sctp_debug_on & SCTP_DEBUG_INPUT3) {
-				printf("sctp_process_control: length issue *length:%u < chk_length:%u\n", *length, 
+				printf("sctp_process_control: length issue *length:%u < chk_length:%u\n", *length,
 				       chk_length);
 			}
 #endif /* SCTP_DEBUG */
@@ -2519,7 +2519,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 				*length = 0;
 				return(NULL);
 			}
-			if ((num_chunks > 1) || 
+			if ((num_chunks > 1) ||
 			    (*length > SCTP_SIZE32(chk_length))) {
 				*length = 0;
 				return(NULL);
@@ -2542,7 +2542,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 				return(NULL);
 			}
 
-			if ((num_chunks > 1) || 
+			if ((num_chunks > 1) ||
 			    (*length > SCTP_SIZE32(chk_length))) {
 #ifdef SCTP_DEBUG
 				if(sctp_debug_on & SCTP_DEBUG_INPUT3){
@@ -2555,7 +2555,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 			}
 			ret = sctp_handle_init_ack(m, (struct sctp_init_ack_chunk *)ch, stcb, *netp, *offset, iphlen);
 			/* Special case, I must call the output routine
-			 * to get the cookie echoed 
+			 * to get the cookie echoed
 			 */
 			if((stcb) && ret == 0)
 				sctp_chunk_output(stcb->sctp_ep, stcb, 2);
@@ -2564,7 +2564,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 			if(sctp_debug_on & SCTP_DEBUG_INPUT3){
 				printf("All done INIT-ACK processing\n");
 			}
-#endif      
+#endif
 			return(NULL);
 			break;
 		case SCTP_SELECTIVE_ACK:
@@ -2728,7 +2728,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 			}
 #endif /* SCTP_DEBUG */
 			/* must be first and only chunk */
-			if ((num_chunks > 1) || 
+			if ((num_chunks > 1) ||
 			    (*length > SCTP_SIZE32(chk_length))) {
 				*length = 0;
 				return(NULL);
@@ -2800,7 +2800,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 							printf("Gak can't copy the chunk into operr %d bytes\n",
 							       chk_length);
 						}
-#endif 
+#endif
 					}
 #ifdef SCTP_DEBUG
 				}else{
@@ -2856,7 +2856,7 @@ sctp_process_ecn_marked(struct sctp_tcb *stcb,
 			stcb->asoc.last_echo_tsn = high_tsn;
 		}
 	}else if((ecn_bits & SCTP_ECT1_BIT) == SCTP_ECT1_BIT){
-		/* we only add to the nonce sum for ECT1, ECT0 
+		/* we only add to the nonce sum for ECT1, ECT0
 		 * does not change the NS bit (that we have
 		 * yet to find a way to send it yet).
 		 */
@@ -2913,7 +2913,7 @@ sctp_common_input_processing(struct sctp_inpcb *inp,
 			/* out of the blue DATA chunk */
 			sctp_handle_ootb(inp, m, iphlen, offset, length,
 					 NULL);
-      
+
 			return(1);
 		}
 		if (stcb->asoc.my_vtag != ntohl(sh->v_tag)) {
@@ -2943,7 +2943,7 @@ sctp_common_input_processing(struct sctp_inpcb *inp,
 	/* plow through the data chunks while length > 0 */
 	if (length > 0) {
 		int ret_v;
-		/* 
+		/*
 		 * First check to make sure our state is correct.
 		 * We would not get here unless we really did have a
 		 * tag, so we don't abort if this happens, just
@@ -2967,14 +2967,14 @@ sctp_common_input_processing(struct sctp_inpcb *inp,
 		case SCTP_STATE_OPEN:
 		case SCTP_STATE_SHUTDOWN_SENT:
 			break;
-		} 
+		}
 		/* take care of ECN */
 		/* plow through the data chunks while length > 0 */
-		ret_v = sctp_process_data(m, inp, stcb, netp, iphlen, &offset, 
+		ret_v = sctp_process_data(m, inp, stcb, netp, iphlen, &offset,
 					  &length, &high_tsn);
 		/* Anything important needs to have been m_copy'ed in process_data */
 		if(ret_v == 0){
-			if (stcb->asoc.ecn_allowed && 
+			if (stcb->asoc.ecn_allowed &&
 			    (ecn_bits & (SCTP_ECT0_BIT|SCTP_ECT1_BIT))) {
 				/* The packet is marked for congestion */
 				sctp_process_ecn_marked(stcb, netp, high_tsn,
@@ -3120,7 +3120,7 @@ sctp_input(m, va_alist)
 	if (inp == NULL) {
 		sctp_pegs[SCTP_NOPORTS]++;
 #ifdef ICMP_BANDLIM
-		/* 
+		/*
 		 * we use the bandwidth limiting to protect against
 		 * sending too many ABORTS all at once. In this case
 		 * these count the same as an ICMP message.
@@ -3222,7 +3222,7 @@ sctp_input(m, va_alist)
 	length = ip->ip_len - (sizeof(struct sctphdr) + (ip->ip_hl << 2));
 #endif
 	offset -= sizeof(struct sctp_chunkhdr);
-	
+
 	ecn_bits = ip->ip_tos;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();

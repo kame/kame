@@ -1,4 +1,4 @@
-/*	$KAME: sctp_structs.h,v 1.3 2002/05/20 05:50:03 itojun Exp $	*/
+/*	$KAME: sctp_structs.h,v 1.4 2002/06/09 16:29:55 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_structs.h,v 1.67 2002/04/03 21:10:19 lei Exp	*/
 
 #ifndef __sctp_structs_h__
@@ -92,7 +92,7 @@ struct sctp_nets {
 	int flight_size;
 	int cwnd; /* actual cwnd */
 	int partial_bytes_acked; /* in CA tracks when to increment a MTU */
-	int ssthresh;  
+	int ssthresh;
 
 	/* mtu discovered so far */
 	int mtu;
@@ -132,7 +132,7 @@ struct sctp_data_chunkrec {
 	struct timeval timetodrop;	/* time we drop it from queue */
 	u_char doing_fast_retransmit;
 	u_char rcv_flags; /* flags pulled from data chunk on inbound
-			   * for outbound holds sending flags.	
+			   * for outbound holds sending flags.
 			   */
 	u_char ect_nonce;
 	u_char state_flags;
@@ -191,11 +191,11 @@ struct sctp_asconf_addr {
 };
 
 
-/* 
+/*
  * Here we have information about each individual association that we
  * track. We probably in production would be more dynamic. But for ease
  * of implementation we will have a fixed array that we hunt for in a
- * linear fashion. 
+ * linear fashion.
  */
 struct sctp_association {
 	/* association state */
@@ -236,7 +236,7 @@ struct sctp_association {
 	/* amount of data (bytes) currently in flight (on all destinations) */
 	int total_flight;
 
-	/* count of destinaton nets and list of destination nets */ 
+	/* count of destinaton nets and list of destination nets */
 	int numnets;
 	struct sctpnetlisthead nets;
 
@@ -321,13 +321,13 @@ struct sctp_association {
 	 */
 	u_int32_t highest_tsn_inside_map;
 
-	/* 
+	/*
 	 * Control chunk queue
 	 */
 	struct sctpchunk_listhead control_send_queue;
 	int ctrl_queue_cnt;
 
-	/* 
+	/*
 	 * All outbound datagrams queue into this list from the
 	 * individual stream queue. Here they get assigned a TSN
 	 * and then await sending. The stream seq comes when it
@@ -335,16 +335,16 @@ struct sctp_association {
 	 */
 	struct sctpchunk_listhead send_queue;
 
-	/* Once a TSN hits the wire it is moved to the sent_queue. We 
+	/* Once a TSN hits the wire it is moved to the sent_queue. We
 	 * maintain two counts here (don't know if any but retran_cnt
-	 * is needed). The idea is that the sent_queue_retran_cnt 
+	 * is needed). The idea is that the sent_queue_retran_cnt
 	 * reflects how many chunks have been marked for retranmission
 	 * by either T3-rxt or FR.
 	 */
 	struct sctpchunk_listhead sent_queue;
 	int sent_queue_cnt;
 	int sent_queue_cnt_removeable;
-	/* 
+	/*
 	 * Number on sent queue that are marked for retran until this
 	 * value is 0 we only send one packet of retran'ed data.
 	 */
@@ -481,7 +481,7 @@ struct sctp_association {
 	u_int8_t ipv4_local_scope;
 	/* scope values for IPv6 */
 	u_int8_t local_scope;
-	u_int8_t site_scope;	
+	u_int8_t site_scope;
 	/* loopback scope */
 	u_int8_t loopback_scope;
 	/* flags to handle send alternate net tracking */

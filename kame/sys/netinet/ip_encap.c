@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.78 2002/03/14 08:21:32 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.79 2002/06/09 16:29:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -215,7 +215,7 @@ encap_init()
 
 #ifdef USE_RADIX
 	/*
-	 * initialize radix lookup table.  
+	 * initialize radix lookup table.
 	 * max_keylen initialization should happen before the call to rn_init().
 	 */
 	rn_inithead((void **)&encap_head[0], sizeof(struct sockaddr_pack) << 3);

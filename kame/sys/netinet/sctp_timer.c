@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.5 2002/06/07 01:41:08 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.6 2002/06/09 16:29:55 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_timer.c,v 1.60 2002/04/04 17:47:19 randall Exp	*/
 
 /*
@@ -303,7 +303,7 @@ sctp_find_alternate_net(struct sctp_tcb *tcb,
 	return(alt);
 }
 
-static void 
+static void
 sctp_backoff_on_timeout(struct sctp_inpcb *ep,
 			struct sctp_nets *net,
 			int win_probe)
@@ -353,7 +353,7 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 	orig_rwnd = tcb->asoc.peers_rwnd;
 	orig_flight = net->flight_size;
 	tcb->asoc.peers_rwnd += net->flight_size;
-	net->flight_size = 0;  
+	net->flight_size = 0;
 	net->rto_pending = 0;
 	net->fast_retran_ip= 0;
 	win_probes = non_win_probes = 0;
@@ -561,7 +561,7 @@ sctp_t3rxt_timer(struct sctp_inpcb *ep,
 	if ((tcb->asoc.state&SCTP_STATE_MASK) == SCTP_STATE_COOKIE_ECHOED) {
 		/*
 		 * Here we just reset the timer and start again since we
-		 * have not established the asoc 
+		 * have not established the asoc
 		 */
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_TIMER1) {
@@ -617,7 +617,7 @@ void sctp_cookie_timer(struct sctp_inpcb *ep,
 		       struct sctp_nets *net)
 {
 	struct sctp_nets *alt;
-	struct sctp_tmit_chunk *cookie;  
+	struct sctp_tmit_chunk *cookie;
 	/* first before all else we must find the cookie */
 	TAILQ_FOREACH(cookie, &tcb->asoc.control_send_queue, sctp_next) {
 		if (cookie->rec.chunk_id == SCTP_COOKIE_ECHO) {
@@ -654,7 +654,7 @@ void sctp_cookie_timer(struct sctp_inpcb *ep,
 		tcb->asoc.sent_queue_retran_cnt++;
 	cookie->sent = SCTP_DATAGRAM_RESEND;
 	/*
-	 * Now call the output routine to kick out the cookie again, Note we 
+	 * Now call the output routine to kick out the cookie again, Note we
 	 * don't mark any chunks for retran so that FR will need to kick in
 	 * to move these (or a send timer).
 	 */
@@ -665,7 +665,7 @@ void sctp_asconf_timer(struct sctp_inpcb *ep,
 		       struct sctp_nets *net)
 {
 	struct sctp_nets *alt;
-	struct sctp_tmit_chunk *asconf,*chk;  
+	struct sctp_tmit_chunk *asconf,*chk;
 
 	/* is this the first send, or a retransmission? */
 	if (tcb->asoc.asconf_sent == 0) {
@@ -690,7 +690,7 @@ void sctp_asconf_timer(struct sctp_inpcb *ep,
 			return;
 		}
 		/* do threshold management */
-		if (sctp_threshold_management(ep, tcb, asconf->whoTo, 
+		if (sctp_threshold_management(ep, tcb, asconf->whoTo,
 					      tcb->asoc.max_send_times)) {
 			/* Assoc is over */
 			return;
@@ -711,7 +711,7 @@ void sctp_asconf_timer(struct sctp_inpcb *ep,
 			return;
 		}
 		/*
-		 * cleared theshold management 
+		 * cleared theshold management
 		 * now lets backoff the address & select an alternate
 		 */
 		sctp_backoff_on_timeout(ep, asconf->whoTo,0);
@@ -727,13 +727,13 @@ void sctp_asconf_timer(struct sctp_inpcb *ep,
 				sctp_free_remote_addr(chk->whoTo);
 				chk->whoTo = alt;
 				alt->ref_count++;
-		    
+
 			}
 		}
 		if (net->dest_state & SCTP_ADDR_NOT_REACHABLE) {
 			/*
 			 * If the address went un-reachable, we need to move
-			 * to alternates for ALL chk's in queue 
+			 * to alternates for ALL chk's in queue
 			 */
 			sctp_move_all_chunks_to_alt(tcb, net, alt);
 		}
@@ -900,7 +900,7 @@ void sctp_autoclose_timer(struct sctp_inpcb *ep,
 	int ticks_gone_by;
 
 	SCTP_GETTIME_TIMEVAL(&tn);
-	if (tcb->asoc.sctp_autoclose_ticks && 
+	if (tcb->asoc.sctp_autoclose_ticks &&
 	    (ep->sctp_flags & SCTP_PCB_FLAGS_AUTOCLOSE)) {
 		/* Auto close is on */
 		asoc = &tcb->asoc;

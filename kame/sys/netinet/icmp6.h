@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.71 2002/05/27 04:18:29 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.72 2002/06/09 16:29:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -141,7 +141,7 @@ struct icmp6_hdr {
 #define MLD_MTRACE			201	/* mtrace messages */
 
 #define MLDV2_LISTENER_REPORT		206	/* MLDv2 report */
- 
+
 #ifndef _KERNEL
 #define MLD6_MTRACE_RESP	MLD_MTRACE_RESP
 #define MLD6_MTRACE		MLD_MTRACE
@@ -670,7 +670,7 @@ struct icmp6stat {
 	 * for netinet6 code, it is already available in icp6s_outhist[].
 	 */
 	u_quad_t icp6s_reflect;
-	u_quad_t icp6s_inhist[256];	
+	u_quad_t icp6s_inhist[256];
 	u_quad_t icp6s_nd_toomanyopt;	/* too many ND options */
 	struct icmp6errstat icp6s_outerrhist;
 #define icp6s_odst_unreach_noroute \
@@ -803,7 +803,7 @@ int	icmp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 struct	ip6ctlparam;
 void	icmp6_mtudisc_update __P((struct ip6ctlparam *,
 				  struct sockaddr_in6 *, int));
-				  
+
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 void	icmp6_mtudisc_callback_register __P((void (*)(struct in6_addr *)));
 #endif

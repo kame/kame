@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.h,v 1.2 2002/05/20 05:50:03 itojun Exp $	*/
+/*	$KAME: sctp_output.h,v 1.3 2002/06/09 16:29:54 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.h,v 1.33 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctp_output_h__
@@ -55,8 +55,8 @@ void
 sctp_queue_op_err(struct sctp_tcb *stcb,struct mbuf *op_err);
 
 int
-sctp_send_cookie_echo(struct mbuf *m, 
-		      int offset, 
+sctp_send_cookie_echo(struct mbuf *m,
+		      int offset,
 		      struct sctp_tcb *stcb,
 		      struct sctp_nets *netp);
 int
@@ -152,7 +152,7 @@ sctp6_send_abort(struct mbuf *m,
 		 u_int32_t vtag,
 		 struct mbuf *operr);
 void
-sctp_send_operr_to(struct mbuf *m,int iphlen, 
+sctp_send_operr_to(struct mbuf *m,int iphlen,
 		   struct mbuf *scm,
 		   struct sctphdr *ohdr,
 		   u_int32_t vtag);

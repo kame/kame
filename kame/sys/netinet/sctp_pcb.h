@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.3 2002/05/20 05:50:03 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.4 2002/06/09 16:29:55 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.h,v 1.92 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_pcb_h__
@@ -143,7 +143,7 @@ struct sctp_epinfo {
 	 * UDP model socket we then must complete the lookup. If this fails,
 	 * i.e. no association can be found then we must continue to see if
 	 * a sctp_peeloff()'d socket is in the tcpephash (a spun off socket
-	 * acts like a TCP model connected socket). 
+	 * acts like a TCP model connected socket).
 	 */
 	struct sctppcbhead *sctp_tcpephash;
 	u_long hashtcpmark;
@@ -239,7 +239,7 @@ struct sctp_pcb {
 	u_short max_open_streams_intome;
 
 	/* random number generator */
-	unsigned int random_counter;	
+	unsigned int random_counter;
 	unsigned char random_numbers[SCTP_SIGNATURE_ALOC_SIZE];
 	unsigned char random_store[SCTP_SIGNATURE_ALOC_SIZE];
 
@@ -343,20 +343,20 @@ void sctp_fill_pcbinfo(struct sctp_pcbinfo *spcb);
 struct sctp_nets *
 sctp_findnet(struct sctp_tcb *tcb,struct sockaddr *addr);
 
-struct sctp_inpcb * 
+struct sctp_inpcb *
 sctp_pcb_findep(struct sockaddr *nam);
 
 int sctp_inpcb_bind(struct socket *so, struct sockaddr *nam, struct proc *p);
 
-struct sctp_tcb * 
+struct sctp_tcb *
 sctp_findassociation_addr(struct mbuf *pkt,int iphlen,
-			  struct sctp_inpcb **inp,      
+			  struct sctp_inpcb **inp,
 			  struct sctp_nets **netp);
 
-struct sctp_tcb * 
-sctp_findassociation_addr_sa(struct sockaddr *to, 
+struct sctp_tcb *
+sctp_findassociation_addr_sa(struct sockaddr *to,
 			     struct sockaddr *from,
-			     struct sctp_inpcb **inp,      
+			     struct sctp_inpcb **inp,
 			     struct sctp_nets **netp);
 
 #ifdef SCTP_TCP_MODEL_SUPPORT
@@ -374,10 +374,10 @@ sctp_move_pcb_and_assoc(struct sctp_inpcb *old_inp,
  * this is why it is passed.
  */
 struct sctp_tcb *
-sctp_findassociation_ep_addr(struct sctp_inpcb **ep, 
-			     struct sockaddr *to,	
+sctp_findassociation_ep_addr(struct sctp_inpcb **ep,
+			     struct sockaddr *to,
 			     struct sctp_nets **netp,
-			     struct sockaddr *from);	
+			     struct sockaddr *from);
 
 struct sctp_tcb *
 sctp_findassociation_ep_asocid(struct sctp_inpcb *ep, caddr_t asoc_id);

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.4 2002/05/24 07:40:23 itojun Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.5 2002/06/09 16:29:54 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_indata.c,v 1.124 2002/04/04 18:48:39 randall Exp	*/
 
 /*
@@ -135,10 +135,10 @@ sctp_set_rwnd(struct sctp_tcb *stcb,
 		       asoc->size_on_delivery_queue,
 		       asoc->size_on_reasm_queue,
 		       asoc->size_on_all_streams);
-	}  
+	}
 #endif
-	asoc->my_rwnd = sctp_sbspace(&stcb->sctp_socket->so_rcv) - 
-		(asoc->size_on_delivery_queue + 
+	asoc->my_rwnd = sctp_sbspace(&stcb->sctp_socket->so_rcv) -
+		(asoc->size_on_delivery_queue +
 		 asoc->size_on_reasm_queue +
 		 asoc->size_on_all_streams);
 	if(asoc->my_rwnd < 0)
@@ -183,9 +183,9 @@ sctp_build_ctl(struct sctp_tcb *stcb,
 	outinfo = (struct sctp_sndrcvinfo *)((caddr_t)cmh + CMSG_ALIGN(sizeof(struct cmsghdr)));
 	cmh->cmsg_level = IPPROTO_SCTP;
 	cmh->cmsg_type = SCTP_SNDRCV;
-	cmh->cmsg_len = (sizeof(struct sctp_sndrcvinfo) + 
+	cmh->cmsg_len = (sizeof(struct sctp_sndrcvinfo) +
 			 CMSG_ALIGN(sizeof(struct cmsghdr)));
-	outinfo->sinfo_stream = chk->rec.data.stream_number; 
+	outinfo->sinfo_stream = chk->rec.data.stream_number;
 	outinfo->sinfo_ssn = chk->rec.data.stream_seq;
 	if (chk->rec.data.rcv_flags & SCTP_DATA_UNORDERED) {
 		outinfo->sinfo_flags = MSG_UNORDERED;
@@ -285,9 +285,9 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 		TAILQ_INSERT_TAIL(&asoc->delivery_queue,chk,sctp_next);
 		asoc->size_on_delivery_queue += chk->send_size;
 		asoc->cnt_on_delivery_queue++;
-	} 
+	}
 	if(asoc->fragmented_delivery_inprogress){
-		/* oh oh, fragmented delivery in progress 
+		/* oh oh, fragmented delivery in progress
 		 * return out of here.
 		 */
 #ifdef SCTP_DEBUG
@@ -310,9 +310,9 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 		asoc->cnt_on_delivery_queue = 0;
 		return(0);
 	}
-		
-	if((!stcb->on_toqueue) && 
-	   (stcb->sctp_socket->so_rcv.sb_cc >= 
+
+	if((!stcb->on_toqueue) &&
+	   (stcb->sctp_socket->so_rcv.sb_cc >=
 	    (stcb->sctp_ep->sctp_ep.sctp_sws_receiver >> 1))){
 		/* no room for anything. */
 #ifdef SCTP_DEBUG
@@ -369,7 +369,7 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 			chk->data->m_flags |= M_EOR;
 		}else{
 			/* Add the flag to the LAST mbuf in the chain */
-			m = chk->data;	
+			m = chk->data;
 			while(m->m_next != NULL){
 				m = m->m_next;
 			}
@@ -405,7 +405,7 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 			}
 			goto skip;
 		}
-		if (!sbappendaddr_nocheck(&stcb->sctp_socket->so_rcv, 
+		if (!sbappendaddr_nocheck(&stcb->sctp_socket->so_rcv,
 					  to, chk->data, control)) {
 			/* Gak not enough room */
 			if(control){
@@ -505,8 +505,8 @@ sctp_service_reassembly(struct sctp_tcb *stcb,
 		return;
 	}
 	do{
-		if((!stcb->on_toqueue) && 
-		   (stcb->sctp_socket->so_rcv.sb_cc >= 
+		if((!stcb->on_toqueue) &&
+		   (stcb->sctp_socket->so_rcv.sb_cc >=
 		    (stcb->sctp_ep->sctp_ep.sctp_sws_receiver >> 1))){
 			TAILQ_INSERT_TAIL(&stcb->sctp_ep->sctp_queue_list,stcb,sctp_toqueue);
 			stcb->on_toqueue = 1;
@@ -534,7 +534,7 @@ sctp_service_reassembly(struct sctp_tcb *stcb,
 		}
 		stream_no = chk->rec.data.stream_number;
 		nxt_todel = asoc->strmin[stream_no].last_sequence_delivered + 1;
-		if((nxt_todel != chk->rec.data.stream_seq) && 
+		if((nxt_todel != chk->rec.data.stream_seq) &&
 		   ((chk->rec.data.rcv_flags & SCTP_DATA_UNORDERED) == 0)){
 			/* Not the next sequence to deliver in its stream OR unordered*/
 			if(cntDel){
@@ -578,7 +578,7 @@ sctp_service_reassembly(struct sctp_tcb *stcb,
 				chk->data->m_flags |= M_EOR;
 			}else{
 				/* Add the flag to the LAST mbuf in the chain */
-				m = chk->data;	
+				m = chk->data;
 				while(m->m_next != NULL){
 					m = m->m_next;
 				}
@@ -615,7 +615,7 @@ sctp_service_reassembly(struct sctp_tcb *stcb,
 				sctp_sorwakeup(stcb->sctp_ep,stcb->sctp_socket);
 				return;
 			}
-			if (!sbappendaddr_nocheck(&stcb->sctp_socket->so_rcv, 
+			if (!sbappendaddr_nocheck(&stcb->sctp_socket->so_rcv,
 						  to, chk->data, control)) {
 				/* Gak not enough room */
 				if(control){
@@ -661,7 +661,7 @@ sctp_service_reassembly(struct sctp_tcb *stcb,
 		if(asoc->fragmented_delivery_inprogress == 0){
 			/* Now lets see if we can deliver the next one on the stream */
 			u_int16_t nxt_todel;
-			struct sctp_stream_in *strm;      
+			struct sctp_stream_in *strm;
 
 			strm = &asoc->strmin[stream_no];
 			nxt_todel = strm->last_sequence_delivered + 1;
@@ -706,7 +706,7 @@ sctp_service_reassembly(struct sctp_tcb *stcb,
 
 
 
-static void 
+static void
 sctp_queue_data_to_stream(struct sctp_tcb *stcb,
 			  struct sctp_association *asoc,
 			  struct sctp_tmit_chunk *chk,
@@ -715,7 +715,7 @@ sctp_queue_data_to_stream(struct sctp_tcb *stcb,
 	/* Queue the chunk either right into the socket
 	 * buffer if it is the next one to go OR put it
 	 * in the correct place in the delivery queue.
-	 * If we do append to the so_buf, keep doing so 
+	 * If we do append to the so_buf, keep doing so
 	 * until we are out of order.
 	 * One big question still remains, what do I do
 	 * when the socket buffer is FULL??
@@ -759,7 +759,7 @@ sctp_queue_data_to_stream(struct sctp_tcb *stcb,
 
 		*abort_flag = 1;
 		return;
-    
+
 	}
 	if (nxt_todel == chk->rec.data.stream_seq) {
 		/* can be delivered right away */
@@ -859,7 +859,7 @@ sctp_queue_data_to_stream(struct sctp_tcb *stcb,
 		   (strm->next_spoke.tqe_prev == NULL)){
 			/* Insert the pr-stream on the wheel of unrel streams with
 			 * pending data
-			 */	
+			 */
 			TAILQ_INSERT_HEAD(&asoc->unrel_wheel,strm,next_spoke);
 		}
 	}else{
@@ -940,7 +940,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb,
 	prev = next = NULL;
 	cum_ackp1 = asoc->tsn_last_delivered + 1;
 
-	if(TAILQ_EMPTY(&asoc->reasmqueue)){ 
+	if(TAILQ_EMPTY(&asoc->reasmqueue)){
 		/* This is the first one on the queue */
 		TAILQ_INSERT_HEAD(&asoc->reasmqueue,chk,sctp_next);
 		/* we do not check for delivery of anything when
@@ -1136,7 +1136,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb,
 			 */
 			if(next->rec.data.rcv_flags & SCTP_DATA_FIRST_FRAG){
 				/* Insert chk MUST be a last fragment */
-				if((chk->rec.data.rcv_flags&SCTP_DATA_FRAG_MASK) 
+				if((chk->rec.data.rcv_flags&SCTP_DATA_FRAG_MASK)
 				   != SCTP_DATA_LAST_FRAG){
 #ifdef SCTP_DEBUG
 					if(sctp_debug_on & SCTP_DEBUG_INDATA1){
@@ -1221,7 +1221,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb,
 		   ((nxt_todel == chk->rec.data.stream_seq) ||
 		    (chk->rec.data.rcv_flags & SCTP_DATA_UNORDERED))){
 			/* Yep the first one is here and its
-			 * ok to deliver but should we? 
+			 * ok to deliver but should we?
 			 */
 			if((TAILQ_EMPTY(&asoc->delivery_queue)) &&
 			   ((sctp_is_all_msg_on_reasm(asoc,&tsize)) ||
@@ -1259,7 +1259,7 @@ sctp_does_chk_belong_to_reasm(struct sctp_association *asoc,
 {
 	struct sctp_tmit_chunk *at;
 	u_int32_t tsn_est;
-	TAILQ_FOREACH(at,&asoc->reasmqueue,sctp_next){  
+	TAILQ_FOREACH(at,&asoc->reasmqueue,sctp_next){
 		if(compare_with_wrap(chk->rec.data.TSN_seq,at->rec.data.TSN_seq,MAX_TSN)){
 			/* is it one bigger? */
 			tsn_est = at->rec.data.TSN_seq + 1;
@@ -1282,7 +1282,7 @@ sctp_does_chk_belong_to_reasm(struct sctp_association *asoc,
 			/* Software error since I have a dup? */
 			return(1);
 		}else{
-			/* Ok, 'at' is larger than new chunk but does it 
+			/* Ok, 'at' is larger than new chunk but does it
 			 * need to be right before it.
 			 */
 			tsn_est = chk->rec.data.TSN_seq + 1;
@@ -1316,7 +1316,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 	u_int32_t tsn,gap;
 	int full_queue_flag=0;
 	u_int16_t strmno, strmseq;
-  
+
 	tsn = ntohl(ch->dp.tsn);
 	if(compare_with_wrap(asoc->cumulative_tsn,tsn,MAX_TSN)){
 		/* It is a duplicate */
@@ -1372,11 +1372,11 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 		full_queue_flag = 1;
 	}
 	/* now do the tests */
-	if((asoc->my_rwnd <= 0) && 
-	   (sctp_sbspace(&stcb->sctp_socket->so_rcv) >= 
+	if((asoc->my_rwnd <= 0) &&
+	   (sctp_sbspace(&stcb->sctp_socket->so_rcv) >=
 	    (chk_length - sizeof(struct sctp_data_chunk))) &&
 	   (full_queue_flag == 0)
-		){  
+		){
 		/* When we have NO room in the rwnd but room
 		 * in the socket buffer for more data we will
 		 * only accept the NEXT sequence number above
@@ -1409,7 +1409,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 	if(ntohs(ch->dp.stream_id) >= asoc->streamincnt){
 		struct sctp_paramhdr *phdr;
 		struct mbuf *mb;
-    
+
 		MGETHDR(mb,M_DONTWAIT,MT_DATA);
 		if(mb != NULL){
 			/* add some space up front so prepend will work well */
@@ -1418,7 +1418,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 			/* Error causes are just param's and this one
 			 * has two back to back phdr, one with the
 			 * error type and size, the other with
-			 * the streamid and a rsvd 
+			 * the streamid and a rsvd
 			 */
 			mb->m_pkthdr.len = mb->m_len = (sizeof(struct sctp_paramhdr) * 2);
 			phdr->param_type = htons(SCTP_CAUSE_INV_STRM);
@@ -1441,7 +1441,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 	 * We of course only validate the FIRST fragment so the
 	 * bit must be set.
 	 */
-	strmno = ntohs(ch->dp.stream_id); 
+	strmno = ntohs(ch->dp.stream_id);
 	strmseq = ntohs(ch->dp.stream_sequence);;
 	if((ch->ch.chunk_flags & SCTP_DATA_FIRST_FRAG) &&
 	   ((ch->ch.chunk_flags & SCTP_DATA_UNORDERED) == 0) &&
@@ -1546,7 +1546,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 		if((chk->rec.data.rcv_flags & SCTP_DATA_NOT_FRAG) == SCTP_DATA_NOT_FRAG){
 			/* First a sanity check */
 			if(asoc->fragmented_delivery_inprogress){
-				/* Ok, we have a fragmented delivery in progress 
+				/* Ok, we have a fragmented delivery in progress
 				 * if this chunk is next to deliver OR belongs in
 				 * our view to the reassembly, the peer is evil
 				 * or broken.
@@ -1574,7 +1574,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 				}
 			}else{
 				if(!TAILQ_EMPTY(&asoc->reasmqueue)){
-				/* Reassembly queue is NOT empty 
+				/* Reassembly queue is NOT empty
 				 * validate that this chk does not need to
 				 * be in reasembly queue. If it does then
 				 * our peer is broken or evil.
@@ -1591,7 +1591,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 			}
 			if(chk->rec.data.rcv_flags & SCTP_DATA_UNORDERED){
 				/* queue directly into socket buffer */
-				sctp_deliver_data(stcb,asoc,chk); 
+				sctp_deliver_data(stcb,asoc,chk);
 				sctp_sorwakeup(stcb->sctp_ep,stcb->sctp_socket);
 			}else{
 				sctp_queue_data_to_stream(stcb,asoc,chk,abort_flag);
@@ -1621,9 +1621,9 @@ static void
 sctp_sack_check(struct sctp_tcb *stcb,int ok_to_sack)
 {
 	/* Now we also need to check the mapping array
-	 * in a couple of ways. 
+	 * in a couple of ways.
 	 * 1) Did we move the cum-ack point?
-	 */  
+	 */
 	struct sctp_association *asoc;
 	int i,at;
 	asoc = &stcb->asoc;
@@ -1670,14 +1670,14 @@ sctp_sack_check(struct sctp_tcb *stcb,int ok_to_sack)
 		}
 		asoc->mapping_array_base_tsn += (slide_from << 3);
 	}
-	/* Now we need to see if we need to 
+	/* Now we need to see if we need to
 	 * queue a sack or just start the timer (if allowed).
 	 */
 	if(ok_to_sack){
 		if((asoc->state&SCTP_STATE_MASK) == SCTP_STATE_SHUTDOWN_SENT){
 			/* Ok special case, in SHUTDOWN-SENT case.
 			 * here we maker sure SACK timer is off and
-			 * instead send a SHUTDOWN and a SACK 
+			 * instead send a SHUTDOWN and a SACK
 			 */
 			if(callout_pending(&stcb->asoc.dack_timer.timer)){
 				sctp_timer_stop(SCTP_TIMER_TYPE_RECV,
@@ -1731,7 +1731,7 @@ sctp_service_queues(struct sctp_tcb *stcb,
 	 */
 	do{
 		if((!stcb->on_toqueue) &&
-		   (stcb->sctp_socket->so_rcv.sb_cc >= 
+		   (stcb->sctp_socket->so_rcv.sb_cc >=
 		    (stcb->sctp_ep->sctp_ep.sctp_sws_receiver >> 1))){
 			/* no room */
 			TAILQ_INSERT_TAIL(&stcb->sctp_ep->sctp_queue_list,stcb,sctp_toqueue);
@@ -1769,7 +1769,7 @@ sctp_service_queues(struct sctp_tcb *stcb,
 		 * just in case we can't deliver.
 		 */
 
-		/* Before we start though either all of the 
+		/* Before we start though either all of the
 		 * message should be here or 1/4 the socket buffer
 		 * max or nothing on the delivery queue and something
 		 * can be delivered.
@@ -1820,7 +1820,7 @@ sctp_process_data(struct mbuf *m,
 	/*
 	 * process all DATA chunks...
 	 */
-  
+
 #ifdef SCTP_DEBUG
 	if(sctp_debug_on & SCTP_DEBUG_INPUT1){
 		printf("In process data off:%d length:%d iphlen:%d ch->type:%d\n",
@@ -1892,14 +1892,14 @@ sctp_process_data(struct mbuf *m,
 		SCTP_GETTIME_TIMEVAL(&stcb->asoc.time_last_rcvd);
 	}
 	/* now service all of the reassm queue and delivery queue */
-	sctp_service_queues(stcb,asoc);  
+	sctp_service_queues(stcb,asoc);
 	if((asoc->state&SCTP_STATE_MASK) == SCTP_STATE_SHUTDOWN_SENT){
 		/* Assure that we ack right away by making
 		 * sure that a d-ack timer is running. So the
 		 * sack_check will send a sack.
 		 */
 		sctp_timer_start(SCTP_TIMER_TYPE_RECV,
-				 stcb->sctp_ep, 
+				 stcb->sctp_ep,
 				 stcb,
 				 netp);
 	}
@@ -1959,14 +1959,14 @@ sctp_handle_segments(struct sctp_tcb *stcb,
 			last_frag_high = frag_end + last_tsn;
 		}else{
 			/* now lets see if we need to reset the queue
-			 * due to a out-of-order SACK fragment 
+			 * due to a out-of-order SACK fragment
 			 */
-			if(compare_with_wrap(frag_strt+last_tsn,last_frag_high,MAX_TSN)){ 
+			if(compare_with_wrap(frag_strt+last_tsn,last_frag_high,MAX_TSN)){
 				/* if the new frag starts after the last TSN frag covered, we are ok */
 				/* and this one is beyond the last one */
 				;
 			}else{
-				/* ok, they have reset us, so we need to reset the queue 
+				/* ok, they have reset us, so we need to reset the queue
 				 * this will cause extra hunting but hey, they chose the performance
 				 * hit when they failed to order there gaps..
 				 */
@@ -2006,8 +2006,8 @@ sctp_handle_segments(struct sctp_tcb *stcb,
 								}
 							}
 						}
-						if((tp1->sent <= SCTP_DATAGRAM_RESEND) && 
-						   (tp1->sent != SCTP_DATAGRAM_UNSENT) && 
+						if((tp1->sent <= SCTP_DATAGRAM_RESEND) &&
+						   (tp1->sent != SCTP_DATAGRAM_UNSENT) &&
 						   (compare_with_wrap(tp1->rec.data.TSN_seq,asoc->this_sack_highest_gap,MAX_TSN))){
 							asoc->this_sack_highest_gap = tp1->rec.data.TSN_seq;
 							if(primary_flag_set){
@@ -2053,9 +2053,9 @@ sctp_check_for_revoked(struct sctp_association *asoc,
 			 */
 			if(tp1->sent == SCTP_DATAGRAM_ACKED){
 				/* it has been revoked */
-				/* We do NOT add back to flight size here since 
+				/* We do NOT add back to flight size here since
 				 * it is really NOT in flight. Resend (when/if it occurs
-				 * will add to flight size 
+				 * will add to flight size
 				 */
 				tp1->sent = SCTP_DATAGRAM_SENT;
 			}else if(tp1->sent == SCTP_DATAGRAM_MARKED){
@@ -2065,7 +2065,7 @@ sctp_check_for_revoked(struct sctp_association *asoc,
 		}
 		if(tp1->sent == SCTP_DATAGRAM_UNSENT)
 			break;
-		tp1 = TAILQ_NEXT(tp1,sctp_next);    
+		tp1 = TAILQ_NEXT(tp1,sctp_next);
 	}
 }
 
@@ -2096,11 +2096,11 @@ sctp_strike_gap_ack_chunks(struct sctp_tcb *tcb,
 		if(tp1->sent >= SCTP_DATAGRAM_RESEND){
 			/* either a RESEND, ACKED, or MARKED */
 			/* skip */
-			tp1 = TAILQ_NEXT(tp1,sctp_next);    
+			tp1 = TAILQ_NEXT(tp1,sctp_next);
 			continue;
 		}
 		if(compare_with_wrap(tp1->rec.data.TSN_seq,asoc->this_sack_highest_gap,MAX_TSN)){
-			tp1 = TAILQ_NEXT(tp1,sctp_next);    
+			tp1 = TAILQ_NEXT(tp1,sctp_next);
 			continue;
 		}
 		if(primary_switch_active && (strike_enabled == 0)){
@@ -2118,7 +2118,7 @@ sctp_strike_gap_ack_chunks(struct sctp_tcb *tcb,
 				continue;
 			}
 		}
-		if(double_switch_active && 
+		if(double_switch_active &&
 		   (compare_with_wrap(asoc->primary_destination->next_tsn_at_change,
 				      tp1->rec.data.TSN_seq,
 				      MAX_TSN))){
@@ -2157,7 +2157,7 @@ sctp_strike_gap_ack_chunks(struct sctp_tcb *tcb,
 				alt->ref_count++;
 			}
 		}
-		tp1 = TAILQ_NEXT(tp1,sctp_next);    
+		tp1 = TAILQ_NEXT(tp1,sctp_next);
 	} /* while(tp1) */
 }
 
@@ -2182,15 +2182,15 @@ sctp_try_advance_peer_ack_point(struct sctp_tcb *stcb,
 			break;
 		}
 		if((tp1->flags & SCTP_PR_SCTP_ENABLED) == 0){
-			/* We can't fwd-tsn past any that are reliable 
+			/* We can't fwd-tsn past any that are reliable
 			 * aka retransmitted until the asoc fails.
 			 */
 			break;
 		}
-		tp2 = TAILQ_NEXT(tp1,sctp_next);    
-		/* 
-		 * now we got a chunk which is marked for another 
-		 * retransmission to a PR-stream but has run 
+		tp2 = TAILQ_NEXT(tp1,sctp_next);
+		/*
+		 * now we got a chunk which is marked for another
+		 * retransmission to a PR-stream but has run
 		 * out its chances already maybe OR has been
 		 * marked to skip now. Can we skip it if its a
 		 * resend?
@@ -2252,7 +2252,7 @@ sctp_try_advance_peer_ack_point(struct sctp_tcb *stcb,
 					       (int)asoc->total_output_queue_size,
 					       (int)asoc->total_output_mbuf_queue_size);
 				}
-#endif								
+#endif
 
 				m_freem(tp1->data);
 				sctp_sowwakeup(stcb->sctp_ep,stcb->sctp_socket);
@@ -2313,7 +2313,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 	 * been sending.
 	 */
 
-	/* we take any chance we can to service our queues 
+	/* we take any chance we can to service our queues
 	 * since we cannot get awoken when the socket
 	 * is read from :<
 	 */
@@ -2414,7 +2414,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 		/* stop any timers */
 		TAILQ_FOREACH(net,&asoc->nets,sctp_next){
 			sctp_timer_stop(SCTP_TIMER_TYPE_SEND,
-					stcb->sctp_ep, 
+					stcb->sctp_ep,
 					stcb,
 					net);
 			net->partial_bytes_acked = 0;
@@ -2489,7 +2489,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 	if(accum_moved){
 		TAILQ_FOREACH(net,&asoc->nets,sctp_next){
 			sctp_timer_stop(SCTP_TIMER_TYPE_SEND,
-					stcb->sctp_ep, 
+					stcb->sctp_ep,
 					stcb,
 					net);
 		}
@@ -2584,7 +2584,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 			       (int)asoc->total_output_queue_size,
 			       (int)asoc->total_output_mbuf_queue_size);
 		}
-#endif								
+#endif
 
 		if(tp1->data)
 			m_freem(tp1->data);
@@ -2616,7 +2616,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 	/* update cwnd                */
 	/******************************/
 	TAILQ_FOREACH(net,&asoc->nets,sctp_next){
-		/* if nothing was acked on this destination 
+		/* if nothing was acked on this destination
 		 * skip it.
 		 */
 		if(net->net_ack == 0)
@@ -2714,7 +2714,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 		/* stop any timers */
 		TAILQ_FOREACH(net,&asoc->nets,sctp_next){
 			sctp_timer_stop(SCTP_TIMER_TYPE_SEND,
-					stcb->sctp_ep, 
+					stcb->sctp_ep,
 					stcb,
 					net);
 			net->flight_size = 0;
@@ -2743,7 +2743,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 		return;
 	}
 	/* Now here we are going to recycle net_ack for a different
-	 * use... HEADS UP. 
+	 * use... HEADS UP.
 	 */
 	TAILQ_FOREACH(net,&asoc->nets,sctp_next){
 		net->net_ack = 0;
@@ -2801,7 +2801,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 		}
 		if(net->flight_size > 0){
 			sctp_timer_start(SCTP_TIMER_TYPE_SEND,
-					 stcb->sctp_ep, 
+					 stcb->sctp_ep,
 					 stcb,
 					 net);
 		}
@@ -2813,7 +2813,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 		/* SWS sender side engages */
 		asoc->peers_rwnd = 0;
 	}
-	/* Now we must setup so we have a timer up 
+	/* Now we must setup so we have a timer up
 	 * for anyone with outstanding data.
 	 */
 	TAILQ_FOREACH(net,&asoc->nets,sctp_next){
@@ -2821,13 +2821,13 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 		int flg;
 		flg = 0;
 		TAILQ_FOREACH(chk,&asoc->sent_queue,sctp_next){
-			if((chk->whoTo == net) && 
+			if((chk->whoTo == net) &&
 			   (chk->sent < SCTP_DATAGRAM_ACKED)){
 				/* Not ack'ed and still outstanding to this
 				 * destination.
 				 */
 				sctp_timer_start(SCTP_TIMER_TYPE_SEND,
-						 stcb->sctp_ep, 
+						 stcb->sctp_ep,
 						 stcb,
 						 net);
 				flg = 1;
@@ -2871,7 +2871,7 @@ static int
 sctp_kick_unrel_reorder_queue(struct sctp_tcb *stcb,
 			      struct sctp_stream_in *strmin)
 {
-	/* this subroutine tries to deliver any ready msgs 
+	/* this subroutine tries to deliver any ready msgs
 	 * from the inqueue of an PR-streams
 	 */
 	struct sctp_tmit_chunk *chk,*nchk;
@@ -2883,7 +2883,7 @@ sctp_kick_unrel_reorder_queue(struct sctp_tcb *stcb,
 	chk = TAILQ_FIRST(&strmin->inqueue);
 	while(chk){
 		nchk = TAILQ_NEXT(chk,sctp_next);
-		if(compare_with_wrap(asoc->cumulative_tsn, 
+		if(compare_with_wrap(asoc->cumulative_tsn,
 				     chk->rec.data.TSN_seq, MAX_TSN) ||
 		   (asoc->cumulative_tsn == chk->rec.data.TSN_seq) ||
 		   (tt == chk->rec.data.stream_seq)) {
@@ -2907,14 +2907,14 @@ sctp_kick_unrel_reorder_queue(struct sctp_tcb *stcb,
 				/* yep */
 				break;
 		}
-	} 
+	}
 	if(ret){
 		/* Update the last sequence delivered */
 		strmin->last_sequence_delivered = tt - 1;
 		if(TAILQ_EMPTY(&strmin->inqueue) &&
 		   ((strmin->next_spoke.tqe_next != NULL) |
 		    (strmin->next_spoke.tqe_prev != NULL))){
-			/* Ok it was on the wheel and 
+			/* Ok it was on the wheel and
 			 * has nothing left, remove it.
 			 */
 			TAILQ_REMOVE(&asoc->unrel_wheel,strmin,next_spoke);
@@ -2931,7 +2931,7 @@ sctp_handle_forward_tsn(struct sctp_tcb *stcb,
 {
 	/* ISSUES that MUST be fixed for ECN! When we are the
 	 * sender of the forward TSN, when the SACK comes back
-	 * that acknowledges the FWD-TSN we must reset the 
+	 * that acknowledges the FWD-TSN we must reset the
 	 * NONCE sum to match correctly. This will get quite
 	 * tricky since we may have sent more data interveneing and
 	 * must carefully account for what the SACK says on the
@@ -2941,9 +2941,9 @@ sctp_handle_forward_tsn(struct sctp_tcb *stcb,
 	 */
 
 	/* The u-sctp fwd tsn */
-	/* here we will perform all the data receiver side steps for 
+	/* here we will perform all the data receiver side steps for
 	 * processing FwdTSN, as required in by u-sctp draft:
-	 * 
+	 *
 	 * Assume we get FwdTAN(x):
 	 *
 	 * 1) update local cumTSN to x
@@ -2956,7 +2956,7 @@ sctp_handle_forward_tsn(struct sctp_tcb *stcb,
 	int i, ret, cnt_gone;
 	struct sctp_stream_in *strm,*nstrm;
 	struct sctp_tmit_chunk *chk,*at;
-  
+
 	asoc = &stcb->asoc;
 	cnt_gone = 0;
 	if(ntohs(fwd->ch.chunk_length) != sizeof(struct sctp_forward_tsn_chunk)){
@@ -3007,7 +3007,7 @@ sctp_handle_forward_tsn(struct sctp_tcb *stcb,
 	if(asoc->fragmented_delivery_inprogress){
 		sctp_service_reassembly(stcb,asoc);
 	}
-	if(!TAILQ_EMPTY(&asoc->reasmqueue)){ 
+	if(!TAILQ_EMPTY(&asoc->reasmqueue)){
 		/* For each one on here see if we need to toss it */
 		chk = TAILQ_FIRST(&asoc->reasmqueue);
 		while(chk){
@@ -3022,7 +3022,7 @@ sctp_handle_forward_tsn(struct sctp_tcb *stcb,
 						     MAX_TSN)){
 					/* advance stuff here, hmm we may have been
 					 * in a partial delivery thats a problem.
-					 */ 
+					 */
 					asoc->tsn_last_delivered = chk->rec.data.TSN_seq;
 					asoc->str_of_pdapi = chk->rec.data.stream_number;
 					asoc->ssn_of_pdapi = chk->rec.data.stream_seq;
@@ -3034,7 +3034,7 @@ sctp_handle_forward_tsn(struct sctp_tcb *stcb,
 				/* If we are delivering to the PD-API and the last chunk is
 				 * being dumped, we can turn of the PD-API
 				 */
-				if((asoc->fragmented_delivery_inprogress) && 
+				if((asoc->fragmented_delivery_inprogress) &&
 				   (chk->rec.data.rcv_flags & SCTP_DATA_LAST_FRAG)
 					){
 					asoc->fragmented_delivery_inprogress = 0;
@@ -3098,10 +3098,10 @@ sctp_handle_forward_tsn(struct sctp_tcb *stcb,
 			chk = at;
 		}
 	}
-	if((asoc->fragmented_delivery_inprogress) && 
+	if((asoc->fragmented_delivery_inprogress) &&
 	   (cnt_gone)){
 		/* Ok we removed cnt_gone chunks in the PD-API queue that
-		 * were being delivered. So now we must turn off the 
+		 * were being delivered. So now we must turn off the
 		 * flag.
 		 */
 		asoc->fragmented_delivery_inprogress = 0;

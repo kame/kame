@@ -1,4 +1,4 @@
-/*	$KAME: sctp_header.h,v 1.2 2002/05/20 05:50:02 itojun Exp $	*/
+/*	$KAME: sctp_header.h,v 1.3 2002/06/09 16:29:54 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_header.h,v 1.34 2002/04/03 21:10:19 lei Exp	*/
 
 #ifndef __sctp_header_h__
@@ -316,7 +316,7 @@ struct sctp_cookie_while_shutting_down {
 
 struct sctp_shutdown_complete_msg {
         struct sctphdr sh;
-        struct sctp_shutdown_complete_chunk shut_cmp;  
+        struct sctp_shutdown_complete_chunk shut_cmp;
 };
 
 /* draft-ietf-tsvwg-addip-sctp */

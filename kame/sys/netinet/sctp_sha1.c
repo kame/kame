@@ -1,4 +1,4 @@
-/*	$KAME: sctp_sha1.c,v 1.2 2002/05/20 05:50:03 itojun Exp $	*/
+/*	$KAME: sctp_sha1.c,v 1.3 2002/06/09 16:29:55 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_sha1.c,v 1.6 2002/04/04 17:43:19 randall Exp	*/
 
 /*
@@ -82,28 +82,28 @@ sha1_process_a_block(struct sha1_context *ctx, unsigned int *block)
 	/* step d) */
 	for (i=0; i<80; i++) {
 		if (i < 20) {
-			ctx->TEMP = ((CSHIFT(5, ctx->A)) + 
-				     (F1(ctx->B, ctx->C, ctx->D)) + 
+			ctx->TEMP = ((CSHIFT(5, ctx->A)) +
+				     (F1(ctx->B, ctx->C, ctx->D)) +
 				     (ctx->E) +
 				     ctx->words[i] +
 				     K1);
 		}else if (i < 40) {
-			ctx->TEMP = ((CSHIFT(5, ctx->A)) + 
-				     (F2(ctx->B, ctx->C, ctx->D)) + 
-				     (ctx->E) + 
-				     (ctx->words[i]) + 
+			ctx->TEMP = ((CSHIFT(5, ctx->A)) +
+				     (F2(ctx->B, ctx->C, ctx->D)) +
+				     (ctx->E) +
+				     (ctx->words[i]) +
 				     K2);
 		}else if (i < 60) {
-			ctx->TEMP = ((CSHIFT(5, ctx->A)) + 
-				     (F3(ctx->B, ctx->C, ctx->D)) + 
-				     (ctx->E) + 
+			ctx->TEMP = ((CSHIFT(5, ctx->A)) +
+				     (F3(ctx->B, ctx->C, ctx->D)) +
+				     (ctx->E) +
 				     (ctx->words[i]) +
 				     K3);
 		} else {
-			ctx->TEMP = ((CSHIFT(5, ctx->A)) + 
+			ctx->TEMP = ((CSHIFT(5, ctx->A)) +
 				     (F4(ctx->B, ctx->C, ctx->D)) +
 				     (ctx->E) +
-				     (ctx->words[i]) + 
+				     (ctx->words[i]) +
 				     K4);
 		}
 		ctx->E = ctx->D;
@@ -189,7 +189,7 @@ SHA1_Final(struct sha1_context *ctx, unsigned char *digest)
 			sha1_process_a_block(ctx,
 					     (unsigned int *)ctx->sha_block);
 			/* init last block */
-			memset(ctx->sha_block, 0, sizeof(ctx->sha_block));  
+			memset(ctx->sha_block, 0, sizeof(ctx->sha_block));
 		}else{
 			ctx->sha_block[ctx->how_many_in_block] = 0x80;
 			for (i=(ctx->how_many_in_block+1);
@@ -200,7 +200,7 @@ SHA1_Final(struct sha1_context *ctx, unsigned char *digest)
 			sha1_process_a_block(ctx,
 					     (unsigned int *)ctx->sha_block);
 			/* init last block */
-			memset(ctx->sha_block, 0, sizeof(ctx->sha_block));  
+			memset(ctx->sha_block, 0, sizeof(ctx->sha_block));
 		}
 		/* This is in bits so multiply by 8 */
 		ctx->running_total *= 8;

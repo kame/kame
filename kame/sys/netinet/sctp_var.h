@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.5 2002/05/20 05:50:03 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.6 2002/06/09 16:29:55 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_var.h,v 1.46 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef _NETINET_SCTP_VAR_H_
@@ -60,10 +60,10 @@
 #ifdef __FreeBSD__
 struct  xsctp_inpcb {
 	size_t xs_len;
- 	struct inpcb		xs_inp;
- 	struct sctp_inpcb	xs_sctp_inpcb;
- 	struct sctp_tcb		xs_sctp_tcb;
- 	struct xsocket		xs_socket;
+	struct inpcb		xs_inp;
+	struct sctp_inpcb	xs_sctp_inpcb;
+	struct sctp_tcb		xs_sctp_tcb;
+	struct xsocket		xs_socket;
 	u_quad_t		xs_alignment_hack;
 };
 #endif /* __FreeBSD__ */
@@ -140,7 +140,7 @@ int sctp_usr_recvd __P((struct socket *so, int flags));
 void ip_2_ip6_hdr __P((struct ip6_hdr *ip6, struct ip *ip));
 #endif /* INET6 */
 
-int sctp_bindx(struct socket *so, int sd, struct sockaddr_storage *addrs, 
+int sctp_bindx(struct socket *so, int sd, struct sockaddr_storage *addrs,
 	       int addrcnt, int flags, struct proc *p);
 
 int sctp_peeloff(struct socket *so, struct socket *nso, int sd,
@@ -164,7 +164,7 @@ int sctp_peeraddr(struct socket *so,
 
 int sctp_listen(struct socket *so, struct proc *p);
 
-int sctp_accept(struct socket *so, 
+int sctp_accept(struct socket *so,
 #if defined(__FreeBSD__)
 		struct sockaddr **nam
 #else

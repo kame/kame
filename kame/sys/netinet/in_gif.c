@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.85 2002/05/30 04:13:44 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.86 2002/06/09 16:29:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -83,7 +83,7 @@
 #include <netinet/ip6.h>
 #endif
 
-#include <net/if_gif.h>	
+#include <net/if_gif.h>
 
 #include "gif.h"
 #ifdef __OpenBSD__

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.h,v 1.2 2002/05/20 05:50:02 itojun Exp $	*/
+/*	$KAME: sctp_asconf.h,v 1.3 2002/06/09 16:29:54 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_asconf.h,v 1.15 2002/04/02 15:34:44 lei Exp	*/
 
 #ifndef _NETINET_SCTP_ASCONF_H_
@@ -68,7 +68,7 @@ extern void
 sctp_set_primary_ip_address(struct ifaddr *ifa);
 
 extern void
-sctp_check_address_list(struct sctp_tcb *stcb, 
+sctp_check_address_list(struct sctp_tcb *stcb,
 			struct mbuf *m, int offset, int length,
 			uint16_t local_scope, uint16_t site_scope,
 			uint16_t ipv4_scope, uint16_t loopback_scope);

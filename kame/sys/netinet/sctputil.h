@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.h,v 1.2 2002/05/20 05:50:03 itojun Exp $	*/
+/*	$KAME: sctputil.h,v 1.3 2002/06/09 16:29:55 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.h,v 1.36 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctputil_h__
@@ -47,13 +47,13 @@ sctp_fill_random_store(struct sctp_pcb *m);
 
 int
 sctp_timer_start(int t_type,
-		 struct sctp_inpcb *ep, 
+		 struct sctp_inpcb *ep,
 		 struct sctp_tcb *tcb,
 		 struct sctp_nets *net);
 
 int
 sctp_timer_stop(int t_type,
-		struct sctp_inpcb *ep, 
+		struct sctp_inpcb *ep,
 		struct sctp_tcb *tcb,
 		struct sctp_nets *net);
 
@@ -79,9 +79,9 @@ caddr_t
 sctp_m_getptr(struct mbuf *m, int off, int len, u_int8_t *ptr);
 
 struct sctp_paramhdr *
-sctp_get_next_param(struct mbuf *m, 
-		    int offset, 
-		    struct sctp_paramhdr *pull, 
+sctp_get_next_param(struct mbuf *m,
+		    int offset,
+		    struct sctp_paramhdr *pull,
 		    int pull_limit);
 
 int

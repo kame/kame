@@ -1,4 +1,4 @@
-/*	$KAME: sctp_constants.h,v 1.2 2002/05/20 05:50:02 itojun Exp $	*/
+/*	$KAME: sctp_constants.h,v 1.3 2002/06/09 16:29:54 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_constants.h,v 1.61 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_constants_h__
@@ -74,8 +74,8 @@
 #endif
 
 #define SCTP_CWND_POSTS_LIST 256
-/* 
- * the SCTP protocol signature 
+/*
+ * the SCTP protocol signature
  * this includes the version number encoded in the last 4 bits
  * of the signature.
  */
@@ -121,8 +121,8 @@
 #define SCTP_DATA		0x00
 #define SCTP_INITIATION		0x01
 #define SCTP_INITIATION_ACK	0x02
-#define SCTP_SELECTIVE_ACK	0x03 
-#define SCTP_HEARTBEAT_REQUEST	0x04	
+#define SCTP_SELECTIVE_ACK	0x03
+#define SCTP_HEARTBEAT_REQUEST	0x04
 #define SCTP_HEARTBEAT_ACK	0x05
 #define SCTP_ABORT_ASSOCIATION	0x06
 #define SCTP_SHUTDOWN		0x07
@@ -352,7 +352,7 @@
 #define SCTP_DEF_MAX_SHUTDOWN (180*hz)
 
 
-/* This is how long a secret lives, NOT how long a cookie lives 
+/* This is how long a secret lives, NOT how long a cookie lives
  * how many ticks the current secret will live.
  */
 #define SCTP_DEFAULT_SECRET_LIFE (3600 * hz)
@@ -375,9 +375,9 @@
 #define SCTP_MAX_OUTSTANDING_DG	10000
 
 
-/* This constant (SCTP_MAX_READBUFFER) define 
+/* This constant (SCTP_MAX_READBUFFER) define
  * how big the read/write buffer is
- * when we enter the fd event notification 
+ * when we enter the fd event notification
  * the buffer is put on the stack, so the bigger
  * it is the more stack you chew up, however it
  * has got to be big enough to handle the bigest
@@ -424,7 +424,7 @@
 #define SCTP_DEBUG_NOISY   0x00040000
 
 /* What sender needs to see to avoid SWS or we consider peers rwnd 0 */
-#define SCTP_SWS_SENDER_DEF	1420	
+#define SCTP_SWS_SENDER_DEF	1420
 
 /*
  * SWS is scaled to the sb_hiwat of the socket.
@@ -438,7 +438,7 @@
 #define SCTP_MIN_RWND	1500
 
 #define SCTP_WINDOW_MIN	1500	/* smallest rwnd can be */
-#define SCTP_WINDOW_MAX 1048576	/* biggest I can grow rwnd to 
+#define SCTP_WINDOW_MAX 1048576	/* biggest I can grow rwnd to
 				 * My playing around suggests a
 				 * value greater than 64k does not
 				 * do much, I guess via the kernel
@@ -456,7 +456,7 @@
 					 * size to. This governs what is the
 					 * largest size we will use, of course
 					 * PMTU will raise this up to
-					 * the largest interface MTU or the 
+					 * the largest interface MTU or the
 					 * ceiling below if there is no
 					 * SIOCGIFMTU.
 					 */
@@ -540,11 +540,11 @@
 #define SCTP_DUPTSN_RECVD   7 /* XX */
 #define SCTP_HB_RECV	    8 /* XX */
 #define SCTP_HB_ACK_RECV    9 /* XX */
-#define SCTP_HB_SENT	   10 /* XX */ 
+#define SCTP_HB_SENT	   10 /* XX */
 #define SCTP_WINDOW_PROBES 11 /* XX */
 #define SCTP_DATA_DG_RECV  12 /* XX */
 #define SCTP_TMIT_TIMER    13 /* XX */
-#define SCTP_RECV_TIMER    14 /* XX */ 
+#define SCTP_RECV_TIMER    14 /* XX */
 #define SCTP_HB_TIMER      15 /* XX */
 #define SCTP_FAST_RETRAN   16 /* XX */
 #define SCTP_TIMERS_EXP    17 /* XX */
@@ -568,7 +568,7 @@
 #define SCTP_CWND_INCRS    35 /* XX */
 
 
-/* 
+/*
  * This value defines the number of vtag block time wait entry's
  * per list element.  Each entry will take 2 4 byte ints (and of
  * course the overhead of the next pointer as well). Using 15 as
@@ -605,7 +605,7 @@
 #define SCTP_TIME_WAIT 480
 
 /*
- * For U-SCTP 
+ * For U-SCTP
  */
 #define SCTP_STRM_RELIABLE   0
 #define SCTP_STRM_UNRELIABLE 1

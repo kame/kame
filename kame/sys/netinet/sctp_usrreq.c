@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.14 2002/06/08 21:42:38 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.15 2002/06/09 16:29:55 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -206,7 +206,7 @@ sctp_notify_mbuf(struct sctp_inpcb *inp,
 		/* Adjust that too */
 		stcb->asoc.smallest_mtu = nxtsz;
 		/* now off to subtract IP_DF flag if needed */
-    
+
 		TAILQ_FOREACH(chk, &stcb->asoc.send_queue, sctp_next) {
 			if ((chk->send_size+IP_HDR_SIZE) > nxtsz) {
 				chk->flags |= CHUNK_FLAGS_FRAGMENT_OK;
@@ -236,9 +236,9 @@ sctp_notify_mbuf(struct sctp_inpcb *inp,
 
 void
 sctp_notify(struct sctp_inpcb *inp,
-	    int errno, 
+	    int errno,
 	    struct sctphdr *sh,
-	    struct sockaddr *to, 
+	    struct sockaddr *to,
 	    struct sctp_tcb *tcb,
 	    struct sctp_nets *net)
 {
@@ -306,7 +306,7 @@ sctp_ctlinput(cmd, sa, vip)
 	struct sctphdr *sh;
 	int s;
 
-	if (sa->sa_family != AF_INET || 
+	if (sa->sa_family != AF_INET ||
 	    ((struct sockaddr_in *)sa)->sin_addr.s_addr == INADDR_ANY) {
 #if defined(__FreeBSD__)
 		return;
@@ -434,13 +434,13 @@ sctp_pcblist(SYSCTL_HANDLER_ARGS)
 	inp_list = malloc(n * sizeof *inp_list, M_TEMP, M_WAITOK);
 	if (inp_list == 0)
 		return ENOMEM;
-	
+
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
 #endif
-	for (s_inp = sctppcbinfo.listhead.lh_first, i = 0; 
+	for (s_inp = sctppcbinfo.listhead.lh_first, i = 0;
 	     s_inp && i < n;
 	     s_inp = s_inp = s_inp->sctp_list.le_next) {
 		inp = (struct inpcb *)s_inp;
@@ -468,10 +468,10 @@ sctp_pcblist(SYSCTL_HANDLER_ARGS)
 				struct sockaddr_storage from_store;
 				struct sctp_nets *netp = NULL;
 				struct sctp_tcb *scbp, scb;
- 
+
 				bcopy(s_inp, &xs.xs_sctp_inpcb,
 				      sizeof xs.xs_sctp_inpcb);
- 
+
 				if (inp->inp_vflag == INP_IPV4) {
 					sinto = (struct sockaddr_in *)&to_store;
 					sinfrom = (struct sockaddr_in *)&from_store;
@@ -553,7 +553,7 @@ sctp_getcred(SYSCTL_HANDLER_ARGS)
 	error = SYSCTL_IN(req, addrs, sizeof(addrs));
 	if (error)
 		return (error);
-	
+
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
@@ -642,7 +642,7 @@ sctp_attach(struct socket *so, int proto, struct proc *p)
 	if (error)
 		return error;
 
-	inp = (struct sctp_inpcb *)so->so_pcb;	
+	inp = (struct sctp_inpcb *)so->so_pcb;
 	inp->sctp_flags &= ~SCTP_PCB_FLAGS_BOUND_V6;	/* I'm not v6! */
 	ip_inp = &inp->ip_inp.inp;
 #ifndef __FreeBSD__
@@ -727,7 +727,7 @@ sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		return EINVAL;
 	}
 	/* Got to have an to address if we are NOT a connected socket */
-	if((addr == NULL) && 
+	if((addr == NULL) &&
 	   (((inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) == SCTP_PCB_FLAGS_CONNECTED) ||
 	    ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) == SCTP_PCB_FLAGS_TCPTYPE))){
 		return sctp_output(inp, m, addr, control, p);
@@ -798,7 +798,7 @@ sctp_disconnect(struct socket *so)
 				}
 			}
 
-			if (TAILQ_EMPTY(&asoc->send_queue) && 
+			if (TAILQ_EMPTY(&asoc->send_queue) &&
 			    TAILQ_EMPTY(&asoc->sent_queue) &&
 			    (some_on_streamwheel == 0)) {
 				/* there is nothing queued to send, so done */
@@ -890,7 +890,7 @@ sctp_shutdown(struct socket *so)
 				}
 			}
 		}
-		if (TAILQ_EMPTY(&asoc->send_queue) && 
+		if (TAILQ_EMPTY(&asoc->send_queue) &&
 		    TAILQ_EMPTY(&asoc->sent_queue) &&
 		    (some_on_streamwheel == 0)) {
 			/* there is nothing queued to send, so I'm done... */
@@ -1023,7 +1023,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 							sin6 = &lsa6;
 						}
 					}
-					if ((site_scope == 0) && 
+					if ((site_scope == 0) &&
 					    (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr))) {
 						continue;
 					}
@@ -1055,7 +1055,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 				}
 				if (sctp_fill_user_address(sas, laddr->ifa->ifa_addr))
 					continue;
-				sas = (struct sockaddr_storage *)((caddr_t)sas + 
+				sas = (struct sockaddr_storage *)((caddr_t)sas +
 								  laddr->ifa->ifa_addr->sa_len);
 				actual += laddr->ifa->ifa_addr->sa_len;
 				if (actual >= limit) {
@@ -1071,7 +1071,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 					if (sctp_fill_user_address(sas,
 								   laddr->ifa->ifa_addr))
 						continue;
-					sas = (struct sockaddr_storage *)((caddr_t)sas + 
+					sas = (struct sockaddr_storage *)((caddr_t)sas +
 									  laddr->ifa->ifa_addr->sa_len);
 					actual += laddr->ifa->ifa_addr->sa_len;
 					if (actual >= limit) {
@@ -1085,7 +1085,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 					if (sctp_fill_user_address(sas,
 								   laddr->ifa->ifa_addr))
 						continue;
-					sas = (struct sockaddr_storage *)((caddr_t)sas + 
+					sas = (struct sockaddr_storage *)((caddr_t)sas +
 									  laddr->ifa->ifa_addr->sa_len);
 					actual += laddr->ifa->ifa_addr->sa_len;
 					if (actual >= limit) {
@@ -1098,7 +1098,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 	return(actual);
 }
 
-static int 
+static int
 sctp_count_max_addresses(struct sctp_inpcb *inp)
 {
 	int cnt = 0;
@@ -1240,7 +1240,7 @@ sctp_optsget(struct socket *so,
 				asoc = &tcb->asoc;
 				ss->ss_total_sndbuf = (u_int32_t)asoc->total_output_queue_size;
 				ss->ss_total_mbuf_sndbuf = (u_int32_t)asoc->total_output_mbuf_queue_size;
-				ss->ss_total_recv_buf = (u_int32_t)(asoc->size_on_delivery_queue + 
+				ss->ss_total_recv_buf = (u_int32_t)(asoc->size_on_delivery_queue +
 								    asoc->size_on_reasm_queue +
 								    asoc->size_on_all_streams);
 				error = 0;
@@ -1334,7 +1334,7 @@ sctp_optsget(struct socket *so,
 
 		if (inp->sctp_flags & SCTP_PCB_FLAGS_RECVSENDFAILEVNT)
 			events->sctp_send_failure_event = 1;
-	
+
 		if (inp->sctp_flags & SCTP_PCB_FLAGS_RECVPEERERR)
 			events->sctp_peer_error_event = 1;
 
@@ -1348,7 +1348,7 @@ sctp_optsget(struct socket *so,
 			events->sctp_adaption_layer_event = 1;
 
 	}
-	break;	
+	break;
 
 	case SCTP_SET_ADAPTION_LAYER_BITS:
 		if (m->m_len < sizeof(int)) {
@@ -1429,7 +1429,7 @@ sctp_optsget(struct socket *so,
 	break;
 	case SCTP_GET_PEER_ADDRESSES:
 		/*
-		 * Get the address information, an array of sockaddr_storage 
+		 * Get the address information, an array of sockaddr_storage
 		 * is passed in to fill up.
 		 */
 	{
@@ -1717,7 +1717,7 @@ sctp_optsget(struct socket *so,
 		 * We can't include chunks that have been passed
 		 * to the socket layer. Only things in queue.
 		 */
-		sstat->sstat_penddata = (tcb->asoc.cnt_on_delivery_queue + 
+		sstat->sstat_penddata = (tcb->asoc.cnt_on_delivery_queue +
 					 tcb->asoc.cnt_on_reasm_queue +
 					 tcb->asoc.cnt_on_all_streams);
 
@@ -1731,7 +1731,7 @@ sctp_optsget(struct socket *so,
 		       ((struct sockaddr *)(&tcb->asoc.primary_destination->ra._l_addr))->sa_len);
 		net = tcb->asoc.primary_destination;
 		/*
-		 * Again the user can get info from sctp_constants.h 
+		 * Again the user can get info from sctp_constants.h
 		 * for what the state of the network is.
 		 */
 		sstat->sstat_primary.spinfo_state = net->dest_state;
@@ -1902,13 +1902,13 @@ sctp_optsget(struct socket *so,
 		memcpy(&ssp->ssp_addr,
 		       &tcb->asoc.primary_destination->ra._l_addr,
 		       ((struct sockaddr *)&tcb->asoc.primary_destination->ra._l_addr)->sa_len);
-				
+
 	}
 	break;
 	case SCTP_SET_PEER_PRIMARY_ADDR:
 		/*
-		 * FIX: How can we know what his primary is? 
-		 * I don't see anyway to know this!! 
+		 * FIX: How can we know what his primary is?
+		 * I don't see anyway to know this!!
 		 */
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_USRREQ1) {
@@ -2014,7 +2014,7 @@ sctp_optsset(struct socket *so,
 					printf("Assoc:%lx stream:%d has %d chunks in queue\n",
 					       (unsigned long)tcb, i,
 					       cnt);
-	    
+
 				}
 			}
 		}
@@ -2030,7 +2030,7 @@ sctp_optsset(struct socket *so,
 			break;
 		}
 		LIST_FOREACH(tcb, &inp->sctp_asoc_list, sctp_tcblist) {
-			asoc = &tcb->asoc;	
+			asoc = &tcb->asoc;
 			printf("Assoc %lx send_queue\n",
 			       (unsigned long)asoc);
 			TAILQ_FOREACH(chk, &asoc->send_queue,
@@ -2079,7 +2079,7 @@ sctp_optsset(struct socket *so,
 			asoc = &tcb->asoc;
 			printf("tcb:%lx has %d on dq (%d sz) rwnd:%d\n",
 			       (unsigned long)tcb,
-			       (int)asoc->cnt_on_delivery_queue, 
+			       (int)asoc->cnt_on_delivery_queue,
 			       (int)asoc->size_on_delivery_queue,
 			       (int)asoc->my_rwnd);
 		}
@@ -2133,7 +2133,7 @@ sctp_optsset(struct socket *so,
 		}
 		level = mtod(m,u_int32_t *);
 		error = 0;
-		sctp_debug_on = (*level & (SCTP_DEBUG_ALL | 
+		sctp_debug_on = (*level & (SCTP_DEBUG_ALL |
 					   SCTP_DEBUG_NOISY));
 		printf("SETTING DEBUG LEVEL to %x\n",
 		       (u_int)sctp_debug_on);
@@ -2199,7 +2199,7 @@ sctp_optsset(struct socket *so,
 			inp->sctp_flags &= ~SCTP_PCB_FLAGS_ADAPTIONEVNT;
 		}
 	}
-	break;	
+	break;
 
 	case SCTP_SET_ADAPTION_LAYER_BITS:
 	{
@@ -2211,7 +2211,7 @@ sctp_optsset(struct socket *so,
 		adap_bits = mtod(m, struct sctp_setadaption *);
 		inp->sctp_ep.adaption_layer_indicator = adap_bits->ssb_adaption_ind;
 	}
-	break;	
+	break;
 	case SCTP_SET_INITIAL_DBG_SEQ:
 	{
 		u_int32_t *vvv;
@@ -2248,7 +2248,7 @@ sctp_optsset(struct socket *so,
 			break;
 		}
 		/* Mask off the flags that are allowed */
-		s_info->sinfo_flags = (s_info->sinfo_flags & 
+		s_info->sinfo_flags = (s_info->sinfo_flags &
 				       (MSG_UNORDERED | MSG_ADDR_OVER |
 					MSG_PR_SCTP | MSG_PR_BUFFER));
 		/* Copy it in */
@@ -2639,7 +2639,7 @@ sctp_ctloutput(struct socket *so, struct sockopt *sopt)
 		error = EINVAL;
 	}
 	if (m != NULL) {
-		error = sooptcopyout(sopt, mtod(m, caddr_t), m->m_len);    
+		error = sooptcopyout(sopt, mtod(m, caddr_t), m->m_len);
 		m_freem(m);
 	}
  out:
@@ -2747,7 +2747,7 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
                 printf("Port %d\n",ntohs(((struct sockaddr_in *)nam)->sin_port));
 	}
 #endif /* SCTP_DEBUG */
-	
+
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0) {
 		splx(s);
@@ -2762,7 +2762,7 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	}
 #endif /* INET6 */
 	if ((inp->sctp_flags & SCTP_PCB_FLAGS_UNBOUND) ==
-	    SCTP_PCB_FLAGS_UNBOUND) {  
+	    SCTP_PCB_FLAGS_UNBOUND) {
 		/* Bind a ephemeral port */
 		struct sockaddr_in sin;
 		memset(&sin, 0, sizeof(sin));
@@ -2770,14 +2770,14 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		sin.sin_family = AF_INET;
 		error = sctp_inpcb_bind(so, (struct sockaddr *)&sin, p);
 		if (error) {
-			splx(s); 
+			splx(s);
 			return(error);
 		}
 	}
 	/* Now do we connect? */
 
 #ifdef SCTP_TCP_MODEL_SUPPORT
-	if ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) && 
+	if ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) &&
 	    (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED)) {
 		/* We are already connected AND the TCP model */
 		splx(s);
@@ -2814,7 +2814,7 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	tcb->asoc.state = SCTP_STATE_COOKIE_WAIT;
 	SCTP_GETTIME_TIMEVAL(&tcb->asoc.time_entered);
 	sctp_send_initiate(inp, tcb);
-	splx(s); 
+	splx(s);
 	return error;
 }
 
@@ -2841,7 +2841,7 @@ sctp_usr_recvd(struct socket *so, int flags)
 	}
 	/*
 	 * Grab the first one on the list. It will re-insert itself if
-	 * it runs out of room 
+	 * it runs out of room
 	 */
 	tcb = TAILQ_FIRST(&inp->sctp_queue_list);
 	if (tcb) {
@@ -2853,7 +2853,7 @@ sctp_usr_recvd(struct socket *so, int flags)
 		u_int32_t rwnd;
 		rwnd = tcb->asoc.my_rwnd;
 
-		TAILQ_REMOVE(&inp->sctp_queue_list, tcb, sctp_toqueue);  
+		TAILQ_REMOVE(&inp->sctp_queue_list, tcb, sctp_toqueue);
 		tcb->on_toqueue = 0;
 
 		sctp_service_queues(tcb, &tcb->asoc);
@@ -2903,7 +2903,7 @@ sctp_listen(struct socket *so, struct proc *p)
 		return(ECONNRESET);
 	}
 #ifdef SCTP_TCP_MODEL_SUPPORT
-	if ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) && 
+	if ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) &&
 	    (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED)) {
 		/* We are already connected AND the TCP model */
 		splx(s);
@@ -2945,7 +2945,7 @@ sctp_listen(struct socket *so, struct proc *p)
 }
 
 int
-sctp_accept(struct socket *so, 
+sctp_accept(struct socket *so,
 #if defined(__FreeBSD__)
 	    struct sockaddr **nam
 #else
@@ -2967,7 +2967,7 @@ sctp_accept(struct socket *so,
 
 	if (inp == 0) {
 		splx(s);
-		return(ECONNRESET);	
+		return(ECONNRESET);
 	}
 	if (so->so_state & SS_ISDISCONNECTED) {
 		splx(s);
@@ -3193,8 +3193,8 @@ sctp_peeraddr(struct socket *so,
 
 #if defined(__FreeBSD__)
 struct pr_usrreqs sctp_usrreqs = {
-	sctp_abort, sctp_accept, sctp_attach, sctp_bind, sctp_connect, 
-	pru_connect2_notsupp, in_control, sctp_detach, sctp_disconnect, 
+	sctp_abort, sctp_accept, sctp_attach, sctp_bind, sctp_connect,
+	pru_connect2_notsupp, in_control, sctp_detach, sctp_disconnect,
 	sctp_listen, sctp_peeraddr, sctp_usr_recvd, pru_rcvoob_notsupp,
 	sctp_send, pru_sense_null, sctp_shutdown, sctp_ingetaddr, sosend,
 	soreceive, sopoll
@@ -3255,10 +3255,10 @@ sctp_usrreq(so, req, m, nam, control)
 		splx(s);
 		return(error);
 	}
-#ifdef __NetBSD__    
+#ifdef __NetBSD__
 	if (req == PRU_PURGEIF) {
 		struct ifnet *ifn;
-		struct ifaddr *ifa;      
+		struct ifaddr *ifa;
 		ifn = (struct ifnet *)control;
 		TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 			if (ifa->ifa_addr->sa_family == family) {

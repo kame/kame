@@ -1,4 +1,4 @@
-/*	$KAME: sctp_sha1.h,v 1.2 2002/05/20 05:50:03 itojun Exp $	*/
+/*	$KAME: sctp_sha1.h,v 1.3 2002/06/09 16:29:55 itojun Exp $	*/
 
 #ifndef __SCTP_SLA1_h__
 #define __SCTP_SLA1_h__
@@ -46,7 +46,7 @@ struct sha1_context {
 	unsigned int H2;
 	unsigned int H3;
 	unsigned int H4;
-	unsigned int words[80];	
+	unsigned int words[80];
 	unsigned int TEMP;
 	/* block I am collecting to process */
 	char sha_block[64];

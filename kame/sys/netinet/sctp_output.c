@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.9 2002/06/08 21:42:38 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.10 2002/06/09 16:29:54 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c,v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -129,7 +129,7 @@
 #endif
 #endif /* IPSEC */
 
-#include <netinet/sctp_header.h> 
+#include <netinet/sctp_header.h>
 #include <netinet/sctputil.h>
 #include <netinet/sctp_var.h>
 #include <netinet/sctp_pcb.h>
@@ -262,7 +262,7 @@ sctp_add_addr_to_mbuf(struct mbuf *m,
 
 static struct mbuf *
 sctp_add_cookie(struct sctp_inpcb *inp,
-		struct mbuf *init, 
+		struct mbuf *init,
 		int iphlen,
 		struct mbuf *init_ack,
 		struct sctp_state_cookie *stc_in,
@@ -349,7 +349,7 @@ sctp_add_cookie(struct sctp_inpcb *inp,
 	} else {
 		signature = mtod(sig, u_int8_t *);
 		sig->m_len = SCTP_SIGNATURE_SIZE;
-	}	
+	}
 	/* Time to sign the cookie */
 	sctp_hash_digest_m((char *)inp->sctp_ep.secret_key[(int)(inp->sctp_ep.current_secret_number)],
 			   SCTP_SECRET_SIZE,
@@ -461,7 +461,7 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 	struct sctp_laddr *laddr;
 	struct sockaddr_in *out;
 	u_int8_t ipv4_scope,loopscope;
-	/* 
+	/*
 	 * Rules:
 	 * - Find the route if needed, cache if I can.
 	 * - Look at interface address in route, Is it
@@ -479,7 +479,7 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 		 * structure.
 		 */
 		if (net) {
-			/* 
+			/*
 			 * There is a NET structure that may have next/prev
 			 * entries that may have a route already.  If so we
 			 * want to find a DIFFERENT route/interface if
@@ -527,7 +527,7 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 				 * for a more diverse route.
 				 */
 				RTFREE(rtp->ro_rt);
-				rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, t_rt); 
+				rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, t_rt);
 			}
 #else
 #ifdef __FreeBSD__
@@ -618,7 +618,7 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 				}
 			}
 		}
-		/* Ok nothing turned up in the next_ifn_touse to the next 
+		/* Ok nothing turned up in the next_ifn_touse to the next
 		 * lets check the beginning up to next_ifn_touse.
 		 */
 		for (ifn=TAILQ_FIRST(&ifnet);
@@ -652,13 +652,13 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 		 * Ok we can find NO address to source from that is
 		 * not on our negative list. It is either the special
 		 * ASCONF case where we are sourceing from a intf that
-		 * has been ifconfig'd to a different address (i.e. 
-		 * it holds a ADD/DEL/SET-PRIM and the proper lookup 
+		 * has been ifconfig'd to a different address (i.e.
+		 * it holds a ADD/DEL/SET-PRIM and the proper lookup
 		 * address. OR we are hosed, and this baby is going
 		 * to abort the association.
 		 */
 		if (non_asoc_addr_ok) {
-			return(((struct sockaddr_in *)(rt->rt_ifa->ifa_addr))->sin_addr);    
+			return(((struct sockaddr_in *)(rt->rt_ifa->ifa_addr))->sin_addr);
 		} else {
 			memset(&ans, 0, sizeof(ans));
 			return(ans);
@@ -686,7 +686,7 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 				 */
 				return(((struct sockaddr_in *)(rt->rt_ifa->ifa_addr))->sin_addr);
 			}
-			/* 
+			/*
 			 * Src address selection is in order, here we use the
 			 * EP list and don't use any in the negative list on
 			 * the tcb.
@@ -868,7 +868,7 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 		 * you may not even recognize it :> sigh..
 		 */
 		if (non_asoc_addr_ok) {
-			return(((struct sockaddr_in *)(rt->rt_ifa->ifa_addr))->sin_addr);	  	
+			return(((struct sockaddr_in *)(rt->rt_ifa->ifa_addr))->sin_addr);
 		} else {
 			memset(&ans, 0, sizeof(ans));
 			return(ans);
@@ -880,7 +880,7 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 	if (sctp_is_addr_in_ep(inp,rt->rt_ifa->ifa_addr)) {
 		/* We are good, the interface address IS bound to this ep */
 		return(((struct sockaddr_in *)
-			(rt->rt_ifa->ifa_addr))->sin_addr);	  	
+			(rt->rt_ifa->ifa_addr))->sin_addr);
 	}
 	/* Ok, not lucky, instead lets do src addr selection */
 	if (inp->next_addr_touse == NULL)
@@ -956,7 +956,7 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 	 * land where they may :>
 	 */
 	if (non_asoc_addr_ok) {
-		return(((struct sockaddr_in *)(rt->rt_ifa->ifa_addr))->sin_addr);	  	      
+		return(((struct sockaddr_in *)(rt->rt_ifa->ifa_addr))->sin_addr);
 	} else {
 		memset(&ans, 0, sizeof(ans));
 		return(ans);
@@ -1092,7 +1092,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 	/*
 	 * This is quite tricky. We can't use the normal
 	 * in6_selectsrc() function since this really does
-	 * not do what we want. 
+	 * not do what we want.
 	 */
 	struct in6_addr ans;
 	struct rtentry *rt;
@@ -1113,12 +1113,12 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 
 	/* Find the route */
 	if (rtp->ro_rt == NULL) {
-		/* 
+		/*
 		 * Not sure if I should clone a new route or not.
 		 * For now we won't.
 		 */
 		if (net) {
-			/* 
+			/*
 			 * There is a NET structure that may have next/prev
 			 * entry's that may have a route already.
 			 * If so we want to find a DIFFERENT route/interface
@@ -1140,7 +1140,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 					break;
 				}
 				f_net = TAILQ_NEXT(f_net, sctp_next);
-  
+
 			}
 			if (t_rt == NULL) {
 				/* Forward search failed */
@@ -1268,7 +1268,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 						if (!sctp_is_same_scope(ifa_a, to))
 							continue;
 					}
-					if ((site_scope == 0) && 
+					if ((site_scope == 0) &&
 					    (IN6_IS_ADDR_SITELOCAL(&ifa_a->sin6_addr))) {
 						/* can't use it wrong scope */
 						continue;
@@ -1290,7 +1290,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 				}
 			}
 		}
-		/* Ok nothing turned up in the next_ifn_touse to the next 
+		/* Ok nothing turned up in the next_ifn_touse to the next
 		 * lets check the beginning up to next_ifn_touse.
 		 */
 		for (ifn=TAILQ_FIRST(&ifnet);
@@ -1316,7 +1316,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 						if (!sctp_is_same_scope(ifa_a, to))
 							continue;
 					}
-					if ((site_scope == 0) && 
+					if ((site_scope == 0) &&
 					    (IN6_IS_ADDR_SITELOCAL(&ifa_a->sin6_addr))) {
 						/* can't use it wrong scope */
 						continue;
@@ -1326,7 +1326,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 						continue;
 					/* is the interface address valid */
 					ifa6 = (struct in6_ifaddr *)ifa;
-					if (ifa6->ia6_flags & (IN6_IFF_DETACHED | 
+					if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
 							       IN6_IFF_DEPRECATED |
 							       IN6_IFF_ANYCAST |
 							       IN6_IFF_NOTREADY))
@@ -1368,7 +1368,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 						if (!sctp_is_same_scope(ifa_a, to))
 							continue;
 					}
-					if ((site_scope == 0) && 
+					if ((site_scope == 0) &&
 					    (IN6_IS_ADDR_SITELOCAL(&ifa_a->sin6_addr))) {
 						/* can't use it wrong scope */
 						continue;
@@ -1399,7 +1399,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 	}
 	/* Now here we have specific BOUND addresses cases */
 	if (tcb) {
-		/* Ok, we have a local list on the association level 
+		/* Ok, we have a local list on the association level
 		 * If asconf is enabled then my list is a reverse composite
 		 * of the addresses allowed.
 		 */
@@ -1439,7 +1439,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 					if (!sctp_is_same_scope(out6, to))
 						continue;
 				}
-				if ((site_scope == 0) && 
+				if ((site_scope == 0) &&
 				    (IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr))) {
 					/* can't use it wrong scope */
 					continue;
@@ -1481,7 +1481,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 					if (!sctp_is_same_scope(out6, to))
 						continue;
 				}
-				if ((site_scope == 0) && 
+				if ((site_scope == 0) &&
 				    (IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr))) {
 					/* can't use it wrong scope */
 					continue;
@@ -1550,7 +1550,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 						if (!sctp_is_same_scope(out6, to))
 							continue;
 					}
-					if ((site_scope == 0) && 
+					if ((site_scope == 0) &&
 					    (IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr))) {
 						/* can't use it wrong scope */
 						continue;
@@ -1602,7 +1602,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 					if (!sctp_is_same_scope(out6, to))
 						continue;
 				}
-				if ((site_scope == 0) && 
+				if ((site_scope == 0) &&
 				    (IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr))) {
 					/* can't use it wrong scope */
 					continue;
@@ -1661,7 +1661,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 			if (!sctp_is_same_scope(out6, to))
 				continue;
 		}
-		if ((site_scope == 0) && 
+		if ((site_scope == 0) &&
 		    (IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr))) {
 			/* can't use it wrong scope */
 			continue;
@@ -1710,7 +1710,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 			if (!sctp_is_same_scope(out6, to))
 				continue;
 		}
-		if ((site_scope == 0) && 
+		if ((site_scope == 0) &&
 		    (IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr))) {
 			/* can't use it wrong scope */
 			continue;
@@ -1750,7 +1750,7 @@ sctp_get_ect(struct sctp_tcb *tcb,
 		memcpy(tcb->asoc.hb_random_values,&rndval,
 		       sizeof(tcb->asoc.hb_random_values));
 		this_random = tcb->asoc.hb_random_values[0];
-		tcb->asoc.hb_random_values[0] = 1; 
+		tcb->asoc.hb_random_values[0] = 1;
 		tcb->asoc.hb_ect_randombit = 0;
 	} else {
 		int indx;
@@ -1788,7 +1788,7 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 {
 	/*
 	 * Given a mbuf chain (via m_next) that holds a packet header
-	 * WITH a SCTPHDR but no IP header, endpoint inp and sa structure. 
+	 * WITH a SCTPHDR but no IP header, endpoint inp and sa structure.
 	 * - calculate SCTP checksum and fill in
 	 * - prepend a IP address header
 	 * - if boundall use INADDR_ANY
@@ -1851,10 +1851,10 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 			if ((tcb->asoc.ecn_allowed) && ecn_ok) {
 				/* Enable ECN */
 #if defined(__FreeBSD__)
-				ip->ip_tos = (u_char)((inp->ip_inp.inp.inp_ip_tos & 0x000000fc) | 
+				ip->ip_tos = (u_char)((inp->ip_inp.inp.inp_ip_tos & 0x000000fc) |
 						      sctp_get_ect(tcb,chk));
 #else
-				ip->ip_tos = (u_char)((inp->inp_ip_tos & 0x000000fc) | 
+				ip->ip_tos = (u_char)((inp->inp_ip_tos & 0x000000fc) |
 						      sctp_get_ect(tcb,chk));
 #endif
 			} else {
@@ -1912,7 +1912,7 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 					sctp_ulp_notify(SCTP_NOTIFY_INTERFACE_DOWN,
 							tcb,
 							SCTP_FAILED_THRESHOLD,
-							(void *)net);	
+							(void *)net);
 				net->dest_state &= ~SCTP_ADDR_REACHABLE;
 				net->dest_state |= SCTP_ADDR_NOT_REACHABLE;
 				if (tcb) {
@@ -1960,7 +1960,7 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 		} else {
 			/* PMTU check versus smallest asoc MTU goes here */
 			if (rtp->ro_rt != NULL) {
-				if (rtp->ro_rt->rt_rmx.rmx_mtu && 
+				if (rtp->ro_rt->rt_rmx.rmx_mtu &&
 				    (tcb->asoc.smallest_mtu > rtp->ro_rt->rt_rmx.rmx_mtu)) {
 					sctp_mtu_size_reset(&tcb->asoc, rtp->ro_rt->rt_rmx.rmx_mtu);
 				}
@@ -2026,7 +2026,7 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 		ip6h->ip6_plen = m->m_pkthdr.len;
 		ip6h->ip6_dst = ((struct sockaddr_in6 *)to)->sin6_addr;
 
-		/* 
+		/*
 		 * Add SRC address selection here:
 		 * we can only reuse to a limited degree the kame src-addr-sel,
 		 * since we can try their selection but it may not be bound.
@@ -2056,7 +2056,7 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 					sctp_ulp_notify(SCTP_NOTIFY_INTERFACE_DOWN,
 							tcb,
 							SCTP_FAILED_THRESHOLD,
-							(void *)net);	
+							(void *)net);
 				net->dest_state &= ~SCTP_ADDR_REACHABLE;
 				net->dest_state |= SCTP_ADDR_NOT_REACHABLE;
 				if (tcb) {
@@ -2092,10 +2092,10 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 		ip6h->ip6_src = lsa6->sin6_addr;
 
 		/* We set the hop limit now since there is a good chance that
-		 * our rtp pointer is now filled 
+		 * our rtp pointer is now filled
 		 */
 		ip6h->ip6_hlim = in6_selecthlim((struct in6pcb *)&inp->ip_inp.inp,
-						(rtp ? 
+						(rtp ?
 						 (rtp->ro_rt ? (rtp->ro_rt->rt_ifp) : (NULL)) :
 						 (NULL)));
 		o_flgs = 0;
@@ -2144,7 +2144,7 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 		} else {
 			/* PMTU check versus smallest asoc MTU goes here */
 			if (rtp->ro_rt != NULL) {
-				if (rtp->ro_rt->rt_rmx.rmx_mtu && 
+				if (rtp->ro_rt->rt_rmx.rmx_mtu &&
 				    (tcb->asoc.smallest_mtu > rtp->ro_rt->rt_rmx.rmx_mtu)) {
 					sctp_mtu_size_reset(&tcb->asoc,rtp->ro_rt->rt_rmx.rmx_mtu);
 				}
@@ -2180,7 +2180,7 @@ sctp_send_initiate(inp,tcb)
 	struct sctp_supported_addr_param *sup_addr;
 	struct sctp_paramhdr *ecn;
 	int padval;
-  
+
 	/* INIT's always go to the primary (and usually ONLY address) */
 	m_last = NULL;
 	net = tcb->asoc.primary_destination;
@@ -2193,7 +2193,7 @@ sctp_send_initiate(inp,tcb)
 	if (callout_pending(&net->rxt_timer.timer)) {
 		/* This case should not happen */
 		return;
-	} 
+	}
 	/* start the INIT timer */
 	if (sctp_timer_start(SCTP_TIMER_TYPE_INIT, inp, tcb, net)){
 		/* we are hosed since I can't start the INIT timer? */
@@ -2222,7 +2222,7 @@ sctp_send_initiate(inp,tcb)
 	initm->msg.ch.chunk_type = SCTP_INITIATION;
 	initm->msg.ch.chunk_flags = 0;
 	/* fill in later from mbuf we build */
-	initm->msg.ch.chunk_length = 0;	
+	initm->msg.ch.chunk_length = 0;
 	/* place in my tag */
 	initm->msg.init.initiate_tag = htonl(tcb->asoc.my_vtag);
 	/* set up some of the credits. */
@@ -2232,7 +2232,7 @@ sctp_send_initiate(inp,tcb)
 	initm->msg.init.num_inbound_streams = htons(tcb->asoc.max_inbound_streams);
 	initm->msg.init.initial_tsn = htonl(tcb->asoc.init_seq_number);
 	/* now the address restriction */
-	sup_addr = (struct sctp_supported_addr_param *)((caddr_t)initm + 
+	sup_addr = (struct sctp_supported_addr_param *)((caddr_t)initm +
 							sizeof(*initm));
 	sup_addr->ph.param_type = htons(SCTP_SUPPORTED_ADDRTYPE);
 	/* we support 2 types IPv6/IPv4 */
@@ -2269,7 +2269,7 @@ sctp_send_initiate(inp,tcb)
 	ecn->param_length = htons(sizeof(*ecn));
 	m->m_len += sizeof(*ecn);
 	ecn++;
-  
+
 	/* And now tell the peer we do  pr-sctp */
 	{
 		struct sctp_unrel_streams_param *usctp;
@@ -2315,7 +2315,7 @@ sctp_send_initiate(inp,tcb)
 					   (tcb->asoc.ipv6_addr_legal)) {
 					struct sockaddr_in6 *sin6;
 					struct in6_ifaddr *ifa6;
-	  
+
 					ifa6 = (struct in6_ifaddr *)ifa;
 					if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
 							       IN6_IFF_ANYCAST |
@@ -2329,11 +2329,11 @@ sctp_send_initiate(inp,tcb)
 						/* skip unspecifed addresses */
 						continue;
 					}
-					if ((tcb->asoc.local_scope == 0) && 
+					if ((tcb->asoc.local_scope == 0) &&
 					    (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))) {
 						continue;
 					}
-					if ((tcb->asoc.site_scope == 0) && 
+					if ((tcb->asoc.site_scope == 0) &&
 					    (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr))) {
 						continue;
 					}
@@ -2407,7 +2407,7 @@ sctp_send_initiate(inp,tcb)
 	sctp_lowlevel_chunk_output(inp, tcb, net,
 				   (struct sockaddr *)&net->ra._l_addr,
 				   m, 0, 0, NULL, 0);
-	sctp_timer_start(SCTP_TIMER_TYPE_INIT, inp, tcb, net);  
+	sctp_timer_start(SCTP_TIMER_TYPE_INIT, inp, tcb, net);
 	SCTP_GETTIME_TIMEVAL(&net->last_sent_time);
 }
 
@@ -2420,9 +2420,9 @@ sctp_arethere_unrecognized_parameters(struct mbuf *in_initpkt,
 	 * with the param_offset being equal to the
 	 * beginning of the params i.e. (iphlen + sizeof(struct sctp_init_msg)
 	 * parse through the parameters to the end of the mbuf verifying
-	 * that all parameters are known. 
+	 * that all parameters are known.
 	 *
-	 * For unknown parameters build and return a mbuf with 
+	 * For unknown parameters build and return a mbuf with
 	 * UNRECOGNIZED_PARAMETER errors. If the flags indicate
 	 * to stop processing this chunk stop, and set *abort_processing
 	 * to 1.
@@ -2456,7 +2456,7 @@ sctp_arethere_unrecognized_parameters(struct mbuf *in_initpkt,
 			break;
 		}
 		if ((ptype == SCTP_HEARTBEAT_INFO) ||
-		    (ptype == SCTP_IPV4_ADDRESS) || 
+		    (ptype == SCTP_IPV4_ADDRESS) ||
 		    (ptype == SCTP_IPV6_ADDRESS) ||
 		    (ptype == SCTP_STATE_COOKIE) ||
 		    (ptype == SCTP_UNRECOG_PARAM) ||
@@ -2495,7 +2495,7 @@ sctp_arethere_unrecognized_parameters(struct mbuf *in_initpkt,
 				err_at += sizeof(ura);
 			}
 		} else {
-			/* we do not recognize the parameter 
+			/* we do not recognize the parameter
 			 * figure out what we do.
 			 */
 			if ((ptype & 0xc000) == 0x8000) {
@@ -2651,7 +2651,7 @@ sctp_are_there_new_addresses(struct sctp_association *asoc,
 		phdr = sctp_get_next_param(mat, at, &params, sizeof(params));
 		ptype = ntohs(phdr->param_type);
 		plen = ntohs(phdr->param_length);
-		if ((ptype == SCTP_IPV4_ADDRESS) || 
+		if ((ptype == SCTP_IPV4_ADDRESS) ||
 		    (ptype == SCTP_IPV6_ADDRESS)) {
 			at += SCTP_SIZE32(plen);
 			addrp = (u_int8_t *)((caddr_t)phdr +
@@ -2783,14 +2783,14 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 
 	/* populate any tie tags */
 	if(asoc != NULL){
-		stc.tie_tag_my_vtag = asoc->my_vtag;	
-		stc.tie_tag_peer_vtag = asoc->peer_vtag; 
+		stc.tie_tag_my_vtag = asoc->my_vtag;
+		stc.tie_tag_peer_vtag = asoc->peer_vtag;
 		stc.cookie_life = asoc->cookie_life;
 	}else{
 		stc.tie_tag_my_vtag = 0;
 		stc.tie_tag_peer_vtag = 0;
 		/* life I will award this cookie */
-		stc.cookie_life = inp->sctp_ep.def_cookie_life; 
+		stc.cookie_life = inp->sctp_ep.def_cookie_life;
 	}
 	/* If we wanted to honor cookie life extenstions
 	 * we would add to stc.cookie_life. For now
@@ -2926,7 +2926,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 	initack_mout->msg.ch.chunk_type = SCTP_INITIATION_ACK;
 	initack_mout->msg.ch.chunk_flags = 0;
 	/* fill in later from mbuf we build */
-	initack_mout->msg.ch.chunk_length = 0;	
+	initack_mout->msg.ch.chunk_length = 0;
 	/* place in my tag */
 	if ((asoc != NULL) &&
 	    (((asoc->state & SCTP_STATE_MASK) == SCTP_STATE_COOKIE_WAIT) ||
@@ -2967,7 +2967,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 
 	if(inp->sctp_flags & SCTP_PCB_FLAGS_ADAPTIONEVNT){
 		struct sctp_adaption_layer_indication *ali;
-		ali = (struct sctp_adaption_layer_indication *)((caddr_t)initack_mout +  
+		ali = (struct sctp_adaption_layer_indication *)((caddr_t)initack_mout +
 								sizeof(struct sctp_init_msg));
 		ali->ph.param_type = htons(SCTP_ULP_ADAPTION);
 		ali->ph.param_length = htons(sizeof(struct sctp_adaption_layer_indication));
@@ -2975,7 +2975,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 		m->m_len += sizeof(*ali);
 		ecn = (struct sctp_paramhdr *)((caddr_t)ali + sizeof(*ali));
 	}else{
-		ecn = (struct sctp_paramhdr *)((caddr_t)initack_mout +  
+		ecn = (struct sctp_paramhdr *)((caddr_t)initack_mout +
 					       sizeof(struct sctp_init_msg));
 	}
 	ecn->param_type = htons(SCTP_ECN_CAPABLE);
@@ -3049,11 +3049,11 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 						/* skip unspecifed addresses */
 						continue;
 					}
-					if((stc.local_scope == 0) && 
+					if((stc.local_scope == 0) &&
 					   (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))){
 						continue;
 					}
-					if((stc.site_scope == 0) && 
+					if((stc.site_scope == 0) &&
 					   (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr))){
 						continue;
 					}
@@ -3118,7 +3118,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 
 	/* add once for the INIT-ACK */
 	sz_of += (m->m_pkthdr.len - sizeof(struct sctphdr));
-  
+
 	/* add a second time for the INIT-ACK in the cookie */
 	sz_of += (m->m_pkthdr.len - sizeof(struct sctphdr));
 
@@ -3161,7 +3161,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 		/* see my previous comments on m_last */
 		int ret;
 		ret = sctp_add_pad_tombuf(m_last, (4-padval));
-		if (ret) {	
+		if (ret) {
 			/* Houston we have a problem, no space */
 			m_freem(m);
 			return;
@@ -3294,9 +3294,9 @@ sctp_msg_append(struct sctp_tcb *tcb,
 		/* It will NEVER fit */
 		return(EMSGSIZE);
 	}
-	if((sbspace(&tcb->sctp_socket->so_snd) < 
+	if((sbspace(&tcb->sctp_socket->so_snd) <
 	    (dataout + asoc->total_output_queue_size)) ||
-	   (asoc->total_output_mbuf_queue_size > 
+	   (asoc->total_output_mbuf_queue_size >
 	    tcb->sctp_socket->so_snd.sb_mbmax)
 		){
 		/* XXX Buffer space hunt for data to skip */
@@ -3308,12 +3308,12 @@ sctp_msg_append(struct sctp_tcb *tcb,
 				 * being sent is equal or greater priority then
 				 * purge the old one and free some space.
 				 */
-				if ((chk->flags & (SCTP_PR_SCTP_ENABLED | 
+				if ((chk->flags & (SCTP_PR_SCTP_ENABLED |
 						   SCTP_PR_SCTP_BUFFER)) ==
 				    (SCTP_PR_SCTP_ENABLED|SCTP_PR_SCTP_BUFFER)) {
 					/*
 					 * This one is PR-SCTP AND buffer space
-					 * limited type 
+					 * limited type
 					 */
 					if (chk->rec.data.timetodrop.tv_sec >= srcv->sinfo_timetolive) {
 						/* Lower numbers equates to
@@ -3350,7 +3350,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 								       (int)asoc->total_output_queue_size,
 								       (int)asoc->total_output_mbuf_queue_size);
 							}
-#endif								
+#endif
 							m_freem(chk->data);
 							sctp_sowwakeup(tcb->sctp_ep,tcb->sctp_socket);
 						}
@@ -3359,9 +3359,9 @@ sctp_msg_append(struct sctp_tcb *tcb,
 				}
 			}
 		}
-		if((sbspace(&tcb->sctp_socket->so_snd) < 
+		if((sbspace(&tcb->sctp_socket->so_snd) <
 		    (dataout + asoc->total_output_queue_size)) ||
-		   (asoc->total_output_mbuf_queue_size > 
+		   (asoc->total_output_mbuf_queue_size >
 		    tcb->sctp_socket->so_snd.sb_mbmax)) {
 			/* Now did we free up enough room? */
 			if ((tcb->sctp_socket->so_state & SS_NBIO) == 0) {
@@ -3377,9 +3377,9 @@ sctp_msg_append(struct sctp_tcb *tcb,
 				 */
 				so = tcb->sctp_socket;
 				inp = tcb->sctp_ep;
-				while ((sbspace(&tcb->sctp_socket->so_snd) < 
+				while ((sbspace(&tcb->sctp_socket->so_snd) <
 					(dataout + asoc->total_output_queue_size)) ||
-				       (asoc->total_output_mbuf_queue_size > 
+				       (asoc->total_output_mbuf_queue_size >
 					tcb->sctp_socket->so_snd.sb_mbmax)) {
 					int err, ret;
 					/*
@@ -3491,7 +3491,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 				/* Add in the micro seconds */
 				chk->rec.data.timetodrop.tv_usec += ((srcv->sinfo_timetolive%1000) * 1000);
 				if (chk->rec.data.timetodrop.tv_usec > 1000000) {
-  				        /* add in the carry over */
+				        /* add in the carry over */
 					template.rec.data.timetodrop.tv_usec -= 1000000;
 					template.rec.data.timetodrop.tv_usec++;
 				}
@@ -3518,7 +3518,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 		if(srcv->sinfo_flags & MSG_UNORDERED){
 			chk->rec.data.rcv_flags = (SCTP_DATA_FIRST_FRAG|
 						   SCTP_DATA_LAST_FRAG|
-						   SCTP_DATA_UNORDERED);    
+						   SCTP_DATA_UNORDERED);
 		}else{
 			chk->rec.data.rcv_flags = (SCTP_DATA_FIRST_FRAG|
 						   SCTP_DATA_LAST_FRAG);
@@ -3538,7 +3538,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 		/* ok, we are commited */
 		if((srcv->sinfo_flags & MSG_UNORDERED) == 0){
 			/* bump the ssn if we are unordered. */
-			strq->next_sequence_sent++;  
+			strq->next_sequence_sent++;
 		}
 		/* Mark the first/last flags. This will
 		 * result int a 3 for a single item on the list
@@ -3549,7 +3549,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 		chk->data->m_nextpkt = 0;
 		TAILQ_INSERT_TAIL(&strq->outqueue,chk,sctp_next);
 		/* now check if this stream is on the wheel */
-		if((strq->next_spoke.tqe_next == NULL) && 
+		if((strq->next_spoke.tqe_next == NULL) &&
 		   (strq->next_spoke.tqe_prev == NULL)){
 			/* Insert it on the wheel since it is not
 			 * on it currently
@@ -3637,7 +3637,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 		}
 		/* the actual chunk flags */
 		if(srcv->sinfo_flags & MSG_UNORDERED){
-			template.rec.data.rcv_flags = SCTP_DATA_UNORDERED;    
+			template.rec.data.rcv_flags = SCTP_DATA_UNORDERED;
 		}else{
 			template.rec.data.rcv_flags = 0;
 		}
@@ -3682,7 +3682,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 				 * no_membad
 				 */
 				chk = TAILQ_FIRST(&tmp);
-				while(chk){	
+				while(chk){
 					TAILQ_REMOVE(&tmp,chk,sctp_next);
 #if defined(__FreeBSD__)
 					zfreei(sctppcbinfo.ipi_zone_chunk, chk);
@@ -3709,7 +3709,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 				asoc->total_output_mbuf_queue_size += chk->data->m_ext.ext_size;
 			/* fix up the send_size if it is not present */
 			if(chk->data->m_flags & M_PKTHDR){
-				chk->send_size = chk->data->m_pkthdr.len; 
+				chk->send_size = chk->data->m_pkthdr.len;
 			}else{
 				struct mbuf *nn;
 				chk->send_size = 0;
@@ -3731,7 +3731,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 		/* ok, we are commited */
 		if((srcv->sinfo_flags & MSG_UNORDERED) == 0){
 			/* bump the ssn if we are unordered. */
-			strq->next_sequence_sent++;  
+			strq->next_sequence_sent++;
 		}
 		/* Mark the first/last flags. This will
 		 * result int a 3 for a single item on the list
@@ -3751,7 +3751,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 			chk = TAILQ_FIRST(&tmp);
 		}
 		/* now check if this stream is on the wheel */
-		if((strq->next_spoke.tqe_next == NULL) && 
+		if((strq->next_spoke.tqe_next == NULL) &&
 		   (strq->next_spoke.tqe_prev == NULL)){
 			/* Insert it on the wheel since it is not
 			 * on it currently
@@ -3764,7 +3764,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 		m = NULL;
 	}
 	/* has a SHUTDOWN been (also) requested by the user on this assoc? */
-	if ((srcv->sinfo_flags & MSG_EOF) && 
+	if ((srcv->sinfo_flags & MSG_EOF) &&
 	    (tcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_UDPTYPE)) {
 		int some_on_streamwheel = 0;
 		if(!TAILQ_EMPTY(&asoc->out_wheel)){
@@ -3778,7 +3778,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 			}
 		}
 
-		if (TAILQ_EMPTY(&asoc->send_queue) && 
+		if (TAILQ_EMPTY(&asoc->send_queue) &&
 		    TAILQ_EMPTY(&asoc->sent_queue) &&
 		    (some_on_streamwheel == 0)) {
 			/* there is nothing queued to send, so I'm done... */
@@ -3811,7 +3811,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 		       (int)asoc->total_output_queue_size,
 		       (int)asoc->total_output_mbuf_queue_size);
 	}
-#endif								
+#endif
 
 	return(0);
  no_membad:
@@ -3821,7 +3821,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 		n = n->m_nextpkt;
 		f->m_nextpkt = NULL;
 		m_freem(f);
-	} 
+	}
 	return(ENOMEM);
 }
 
@@ -3954,7 +3954,7 @@ sctp_clean_up_datalist(struct sctp_tcb *stcb,
 				  sctp_next);
 		/* This does not lower until the cum-ack passes it */
 		asoc->sent_queue_cnt++;
-		if((asoc->peers_rwnd <= 0) && 
+		if((asoc->peers_rwnd <= 0) &&
 		   (asoc->total_flight == 0) &&
 		   (bundle_at == 1)){
 			/* Mark the chunk as being a window probe */
@@ -3981,7 +3981,7 @@ sctp_clean_up_datalist(struct sctp_tcb *stcb,
 }
 
 static void
-sctp_clean_up_ctl(register struct sctp_association *asoc)	
+sctp_clean_up_ctl(register struct sctp_association *asoc)
 {
 	struct sctp_tmit_chunk *chk,*nchk;
 	for(chk=TAILQ_FIRST(&asoc->control_send_queue);
@@ -4044,7 +4044,7 @@ sctp_move_to_outqueue(struct sctp_tcb *tcb,
 		}
 		chk->send_size += sizeof(struct sctp_data_chunk);
 		/* This should NOT have to do anything, but
-		 * I would rather be cautious 
+		 * I would rather be cautious
 		 */
 		if(!failed && (chk->data->m_len < sizeof(struct sctp_data_chunk))){
 			m_pullup(chk->data,sizeof(struct sctp_data_chunk));
@@ -4058,7 +4058,7 @@ sctp_move_to_outqueue(struct sctp_tcb *tcb,
 		padval = chk->send_size % 4;
 		if(padval){
 			/* For fragmented messages this should not
-			 * run except possibly on the last chunk 
+			 * run except possibly on the last chunk
 			 */
 			if(sctp_pad_lastmbuf(chk->data,(4-padval))){
 				/* we are in big big trouble no mbufs :< */
@@ -4068,7 +4068,7 @@ sctp_move_to_outqueue(struct sctp_tcb *tcb,
 		}
 		/* pull from stream queue */
 		TAILQ_REMOVE(&strq->outqueue,chk,sctp_next);
-		TAILQ_INSERT_TAIL(&tmp,chk,sctp_next);    
+		TAILQ_INSERT_TAIL(&tmp,chk,sctp_next);
 
 		/* add it in to the size of moved chunks */
 		if(chk->rec.data.rcv_flags & SCTP_DATA_LAST_FRAG){
@@ -4267,7 +4267,7 @@ sctp_med_chunk_output(struct sctp_inpcb *inp,
 	 *    message i.e. FIRST/MIDDLE and LAST to the out
 	 *    queue in one pass) and assigning TSN's
 	 *  - Check to see if the cwnd/rwnd allows any output, if
-	 *	so we go ahead and fomulate and send the low level 
+	 *	so we go ahead and fomulate and send the low level
 	 *    chunks. Making sure to combine any control in the
 	 *    control chunk queue also.
 	 */
@@ -4317,7 +4317,7 @@ sctp_med_chunk_output(struct sctp_inpcb *inp,
 #ifdef SCTP_DEBUG
 			if(sctp_debug_on & SCTP_DEBUG_OUTPUT3){
 				printf("Ok skip net:%x out_wheel is empty\n",(u_int)net);
-			}	
+			}
 #endif
 		}
 	}
@@ -4514,7 +4514,7 @@ sctp_med_chunk_output(struct sctp_inpcb *inp,
 						asconf = 0;
 					}
 					if (cookie) {
-						sctp_timer_start(SCTP_TIMER_TYPE_COOKIE,inp,tcb,net);	    
+						sctp_timer_start(SCTP_TIMER_TYPE_COOKIE,inp,tcb,net);
 						cookie = 0;
 					}
 					if (outchain->m_len == 0) {
@@ -4638,7 +4638,7 @@ sctp_med_chunk_output(struct sctp_inpcb *inp,
 					printf("Can we pick up a chunk?\n");
 				}
 #endif
-				if (((chk->send_size < mtu) && (chk->send_size < r_mtu)) || 
+				if (((chk->send_size < mtu) && (chk->send_size < r_mtu)) ||
 				    ((chk->flags & CHUNK_FLAGS_FRAGMENT_OK) && (chk->send_size < asoc->peers_rwnd))) {
 					/* ok we will add this one */
 #ifdef SCTP_DEBUG
@@ -4704,7 +4704,7 @@ sctp_med_chunk_output(struct sctp_inpcb *inp,
 				asconf = 0;
 			}
 			if(cookie){
-				sctp_timer_start(SCTP_TIMER_TYPE_COOKIE,inp,tcb,net);	    
+				sctp_timer_start(SCTP_TIMER_TYPE_COOKIE,inp,tcb,net);
 				cookie = 0;
 			}
 			/* must start a send timer if data is being sent */
@@ -4883,8 +4883,8 @@ sctp_queue_op_err(struct sctp_tcb *stcb, struct mbuf *op_err)
 }
 
 int
-sctp_send_cookie_echo(struct mbuf *m, 
-		      int offset, 
+sctp_send_cookie_echo(struct mbuf *m,
+		      int offset,
 		      struct sctp_tcb *stcb,
 		      struct sctp_nets *netp)
 {
@@ -5087,7 +5087,7 @@ sctp_send_cookie_ack(struct sctp_tcb *stcb) {
 
 
 int
-sctp_send_shutdown_ack(struct sctp_tcb *stcb,struct sctp_nets *net) 
+sctp_send_shutdown_ack(struct sctp_tcb *stcb,struct sctp_nets *net)
 {
 	/* formulate and queue a SHUTDOWN-ACK back to the sender */
 	struct mbuf *m_shutdown_ack;
@@ -5137,7 +5137,7 @@ sctp_send_shutdown_ack(struct sctp_tcb *stcb,struct sctp_nets *net)
 }
 
 int
-sctp_send_shutdown(struct sctp_tcb *stcb,struct sctp_nets *net) 
+sctp_send_shutdown(struct sctp_tcb *stcb,struct sctp_nets *net)
 {
 	/* formulate and queue a SHUTDOWN to the sender */
 	struct mbuf *m_shutdown;
@@ -5188,7 +5188,7 @@ sctp_send_shutdown(struct sctp_tcb *stcb,struct sctp_nets *net)
 }
 
 int
-sctp_send_asconf(struct sctp_tcb *stcb, struct sctp_nets *netp) 
+sctp_send_asconf(struct sctp_tcb *stcb, struct sctp_nets *netp)
 {
 	/*
 	 * formulate and queue an ASCONF to the peer
@@ -5270,7 +5270,7 @@ sctp_send_asconf(struct sctp_tcb *stcb, struct sctp_nets *netp)
 }
 
 int
-sctp_send_asconf_ack(struct sctp_tcb *stcb, uint32_t retrans) 
+sctp_send_asconf_ack(struct sctp_tcb *stcb, uint32_t retrans)
 {
 	/*
 	 * formulate and queue a asconf-ack back to sender
@@ -5288,7 +5288,7 @@ sctp_send_asconf_ack(struct sctp_tcb *stcb, uint32_t retrans)
 	m_ack = m_copym(stcb->asoc.last_asconf_ack_sent, 0, M_COPYALL, M_DONTWAIT);
 	if (m_ack == NULL) {
 		/* couldn't copy it */
-	        
+
 		return(-1);
 	}
 #if defined(__FreeBSD__)
@@ -5354,9 +5354,9 @@ sctp_chunk_retransmission(struct sctp_inpcb *inp,
 			  int *cnt_out)
 {
 	/*
-	 * send out one MTU of retransmission. 
-	 * If fast_retransmit is happening we ignore the cwnd. 
-	 * Otherwise we obey the cwnd and rwnd. 
+	 * send out one MTU of retransmission.
+	 * If fast_retransmit is happening we ignore the cwnd.
+	 * Otherwise we obey the cwnd and rwnd.
 	 * For a Cookie or Asconf in the control chunk queue we retransmit
 	 * them by themselves.
 	 *
@@ -5389,7 +5389,7 @@ sctp_chunk_retransmission(struct sctp_inpcb *inp,
 			       asoc->sent_queue_retran_cnt);
 		}
 #endif
-		asoc->sent_queue_retran_cnt = 0;    
+		asoc->sent_queue_retran_cnt = 0;
 		asoc->sent_queue_cnt = 0;
 		asoc->sent_queue_cnt_removeable = 0;
 	}
@@ -5398,7 +5398,7 @@ sctp_chunk_retransmission(struct sctp_inpcb *inp,
 			/* we only worry about things marked for resend */
 			continue;
 		}
-		if((chk->rec.chunk_id == SCTP_COOKIE_ECHO) || 
+		if((chk->rec.chunk_id == SCTP_COOKIE_ECHO) ||
 		   (chk->rec.chunk_id == SCTP_ASCONF) ||
 		   (chk->rec.chunk_id == SCTP_FORWARD_CUM_TSN)){
 			ctl_cnt++;
@@ -5602,7 +5602,7 @@ sctp_chunk_retransmission(struct sctp_inpcb *inp,
 				}else{
 					data_list[i]->sent = SCTP_DATAGRAM_SENT;
 				}
-	
+
 				data_list[i]->snd_count++;
 				asoc->sent_queue_retran_cnt--;
 				net->flight_size += data_list[i]->send_size;
@@ -5632,8 +5632,8 @@ sctp_chunk_retransmission(struct sctp_inpcb *inp,
 						 * more time to get a SACK
 						 * back without a t3-expiring.
 						 */
-						sctp_timer_stop(SCTP_TIMER_TYPE_SEND,inp,tcb,net);	  
-						sctp_timer_start(SCTP_TIMER_TYPE_SEND,inp,tcb,net);	  
+						sctp_timer_stop(SCTP_TIMER_TYPE_SEND,inp,tcb,net);
+						sctp_timer_start(SCTP_TIMER_TYPE_SEND,inp,tcb,net);
 					}
 				}
 			}
@@ -5644,7 +5644,7 @@ sctp_chunk_retransmission(struct sctp_inpcb *inp,
 			asoc->sent_queue_retran_cnt = 0;
 			break;
 		}
-	}  
+	}
 	return(0);
 }
 
@@ -5695,7 +5695,7 @@ sctp_chunk_output(struct sctp_inpcb *inp,
 	 *    message i.e. FIRST/MIDDLE and LAST to the out
 	 *    queue in one pass) and assigning TSN's
 	 *  - Check to see if the cwnd/rwnd allows any output, if
-	 *	so we go ahead and fomulate and send the low level 
+	 *	so we go ahead and fomulate and send the low level
 	 *    chunks. Making sure to combine any control in the
 	 *    control chunk queue also.
 	 */
@@ -5792,7 +5792,7 @@ sctp_chunk_output(struct sctp_inpcb *inp,
 		if ((net->dest_state & SCTP_ADDR_NOT_REACHABLE) ==
 		    SCTP_ADDR_NOT_REACHABLE) {
 			/*
-			 * if possible move things off of this address 
+			 * if possible move things off of this address
 			 * we still may send below due to the dormant state
 			 * but we try to find an alternate address to send
 			 * to and if we have one we move all queued data on
@@ -5825,7 +5825,7 @@ sctp_chunk_output(struct sctp_inpcb *inp,
 	}
 	/* Now we need to clean up the control chunk chain if
 	 * a ECNE is on it. It must be marked as UNSENT again
-	 * so next call will continue to send it until 
+	 * so next call will continue to send it until
 	 * such time that we get a CWR, to remove it.
 	 */
 	sctp_fix_ecn_echo(asoc);
@@ -5912,7 +5912,7 @@ sctp_output(inp, m, addr, control, p)
 				 * assoc_id is no longer valid?
 				 * i.e. I can't find it?
 				 */
-				if ((tcb) && 
+				if ((tcb) &&
 				    (srcv.sinfo_flags & MSG_ADDR_OVER) &&
 				    (addr != NULL)) {
 					/* Must locate the net structure */
@@ -5946,7 +5946,7 @@ sctp_output(inp, m, addr, control, p)
 			if(addr != NULL)
 				tcb = sctp_findassociation_ep_addr(&t_inp,addr,&net,NULL);
 	}
-	if((tcb == NULL) && 
+	if((tcb == NULL) &&
 	   (inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE)){
 		if(control){
 			sctppcbinfo.mbuf_track--;
@@ -6025,7 +6025,7 @@ sctp_output(inp, m, addr, control, p)
 					 * must be notified to the upper layer
 					 * as failed to send.
 					 */
-					asoc->strmout[i].next_sequence_sent = 0x0; 
+					asoc->strmout[i].next_sequence_sent = 0x0;
 					TAILQ_INIT(&asoc->strmout[i].outqueue);
 					asoc->strmout[i].stream_no = i;
 					asoc->strmout[i].next_spoke.tqe_next = 0;
@@ -6126,7 +6126,7 @@ send_forward_tsn(struct sctp_tcb *stcb,
 			fwdtsn->new_cumulative_tsn = htonl(asoc->advanced_peer_ack_point);
 			/* mark it to unsent */
 			chk->sent = SCTP_DATAGRAM_UNSENT;
-			chk->snd_count = 0;      
+			chk->snd_count = 0;
 			/* Do we correct its output location? */
 			if(chk->whoTo != asoc->primary_destination){
 				sctp_free_remote_addr(chk->whoTo);
@@ -6170,7 +6170,7 @@ send_forward_tsn(struct sctp_tcb *stcb,
 	}
 	chk->data->m_pkthdr.len = chk->data->m_len = sizeof(struct sctp_forward_tsn_chunk);
 	chk->sent = SCTP_DATAGRAM_UNSENT;
-	chk->snd_count = 0;      
+	chk->snd_count = 0;
 	chk->whoTo = asoc->primary_destination;
 	chk->whoTo->ref_count++;
 	fwdtsn = mtod(chk->data,struct sctp_forward_tsn_chunk *);
@@ -6186,7 +6186,7 @@ send_forward_tsn(struct sctp_tcb *stcb,
 			  sctp_next);
 	asoc->ctrl_queue_cnt++;
 	return;
-  
+
 }
 
 void
@@ -6198,7 +6198,7 @@ sctp_send_sack(struct sctp_tcb *stcb)
 	 * take and and remove the old one.
 	 */
 	struct sctp_association *asoc;
-	struct sctp_tmit_chunk *chk,*a_chk;  
+	struct sctp_tmit_chunk *chk,*a_chk;
 	struct sctp_sack_chunk *sack;
 	struct sctp_gap_ack_block *gap_descriptor;
 	u_int32_t *dup;
@@ -6352,7 +6352,7 @@ sctp_send_sack(struct sctp_tcb *stcb)
 				 */
 				if(SCTP_IS_TSN_PRESENT(asoc->mapping_array,i) == 0){
 					seeing_ones = 0;
-				}	
+				}
 			}else{
 				if(SCTP_IS_TSN_PRESENT(asoc->mapping_array,i)){
 					seeing_ones = 1;
@@ -6369,9 +6369,9 @@ sctp_send_sack(struct sctp_tcb *stcb)
 		}
 	}
 	/* Now calculate the space needed */
-	space = (sizeof(struct sctp_sack_chunk) + 
+	space = (sizeof(struct sctp_sack_chunk) +
 		 (num_gap_blocks * sizeof(struct sctp_gap_ack_block)) +
-		 (asoc->numduptsns * sizeof(int32_t)) 
+		 (asoc->numduptsns * sizeof(int32_t))
 		);
 	if(space > (asoc->smallest_mtu-SCTP_MAX_OVERHEAD)){
 		/* Reduce the size of the sack to fit */
@@ -6388,9 +6388,9 @@ sctp_send_sack(struct sctp_tcb *stcb)
 			asoc->numduptsns = 0;
 		}
 		/* recalc space */
-		space = (sizeof(struct sctp_sack_chunk) + 
+		space = (sizeof(struct sctp_sack_chunk) +
 			 (num_gap_blocks * sizeof(struct sctp_gap_ack_block)) +
-			 (asoc->numduptsns * sizeof(int32_t)) 
+			 (asoc->numduptsns * sizeof(int32_t))
 			);
 
 	}
@@ -6398,8 +6398,8 @@ sctp_send_sack(struct sctp_tcb *stcb)
 		/* We need a cluster */
 		MCLGET(a_chk->data,M_DONTWAIT);
 		if((a_chk->data->m_flags & M_EXT) != M_EXT){
-			/* can't get a cluster 
-			 * give up and try later. 
+			/* can't get a cluster
+			 * give up and try later.
 			 */
 			if(a_chk->data)
 				m_freem(a_chk->data);
@@ -6429,7 +6429,7 @@ sctp_send_sack(struct sctp_tcb *stcb)
 	sack->ch.chunk_flags = 0;
 	sack->sack.cum_tsn_ack = htonl(asoc->cumulative_tsn);
 	sack->sack.a_rwnd = htonl(asoc->my_rwnd);
-	sack->sack.num_gap_ack_blks = htons(num_gap_blocks); 
+	sack->sack.num_gap_ack_blks = htons(num_gap_blocks);
 	sack->sack.num_dup_tsns = htons(asoc->numduptsns);
 
 	a_chk->send_size = (sizeof(struct sctp_sack_chunk) +
@@ -6447,14 +6447,14 @@ sctp_send_sack(struct sctp_tcb *stcb)
 		if(seeing_ones){
 			/* while seeing Ones I must
 			 * transition back to 0 before
-			 * finding the next gap 
+			 * finding the next gap
 			 */
 			if(SCTP_IS_TSN_PRESENT(asoc->mapping_array,i) == 0){
 				gap_descriptor->end = htons(((u_short)(i-start)));
 				gap_descriptor++;
 				seeing_ones = 0;
 				num_gap_blocks--;
-			}	
+			}
 		}else{
 			if(SCTP_IS_TSN_PRESENT(asoc->mapping_array,i)){
 				gap_descriptor->start = htons(((u_short)(i+1-start)));
@@ -6536,7 +6536,7 @@ sctp_send_abort_tcb(struct sctp_tcb *stcb,struct mbuf *operr)
 int
 sctp_send_shutdown_complete(struct sctp_tcb *stcb,
 			    struct sctp_nets *net)
-			    
+
 {
 	/* formulate and SEND a SHUTDOWN-COMPLETE */
 	struct mbuf *m_shutdown_comp;
@@ -6646,7 +6646,7 @@ sctp_select_hb_destination(struct sctp_tcb *tcb, struct timeval *now)
 			/* With the Allman change above we no longer
 			 * need this since we are ALWAYS limited to
 			 * 4 * MTU over flightsize (for idle this means
-			 * we are limited to 4 * MTU 
+			 * we are limited to 4 * MTU
 			 */
 			/*
 			  if((ticks_goneby > net->RTO) &&
@@ -6713,7 +6713,7 @@ sctp_send_hb(struct sctp_tcb *tcb,int user_req,struct sctp_nets *u_net)
 	if(user_req == 0){
 		net = sctp_select_hb_destination(tcb,&now);
 		if(net == NULL){
-			/* All our busy none to send to, just 
+			/* All our busy none to send to, just
 			 * start the timer again.
 			 */
 			if(tcb->asoc.state == 0){
@@ -6776,7 +6776,7 @@ sctp_send_hb(struct sctp_tcb *tcb,int user_req,struct sctp_nets *u_net)
 	}
 	chk->data->m_pkthdr.len = chk->data->m_len = chk->send_size;
 	chk->sent = SCTP_DATAGRAM_UNSENT;
-	chk->snd_count = 0;      
+	chk->snd_count = 0;
 	chk->whoTo = net;
 	chk->whoTo->ref_count++;
 	/* Now we have a mbuf that we can fill in with the details */
@@ -6854,7 +6854,7 @@ sctp_send_hb(struct sctp_tcb *tcb,int user_req,struct sctp_nets *u_net)
 	 * always tumble out control chunks aka HB but it may even tumble
 	 * out data too.
 	 */
-  
+
 	if(user_req == 0){
 		/* Ok now lets start the HB timer if it is NOT a user req */
 		sctp_timer_start(SCTP_TIMER_TYPE_HEARTBEAT,
@@ -6914,7 +6914,7 @@ sctp_send_ecn_echo(struct sctp_tcb *tcb,struct sctp_nets *net,u_int32_t high_tsn
 	}
 	chk->data->m_pkthdr.len = chk->data->m_len = chk->send_size;
 	chk->sent = SCTP_DATAGRAM_UNSENT;
-	chk->snd_count = 0;      
+	chk->snd_count = 0;
 	chk->whoTo = net;
 	chk->whoTo->ref_count++;
 	ecne = mtod(chk->data,struct sctp_ecne_chunk *);
@@ -6982,7 +6982,7 @@ sctp_send_cwr(struct sctp_tcb *tcb,struct sctp_nets *net,u_int32_t high_tsn)
 	}
 	chk->data->m_pkthdr.len = chk->data->m_len = chk->send_size;
 	chk->sent = SCTP_DATAGRAM_UNSENT;
-	chk->snd_count = 0;      
+	chk->snd_count = 0;
 	chk->whoTo = net;
 	chk->whoTo->ref_count++;
 	cwr = mtod(chk->data,struct sctp_cwr_chunk *);
@@ -7007,7 +7007,7 @@ sctp_handle_ecn_cwr(struct sctp_cwr_chunk *cwr,
 	 */
 	struct sctp_tmit_chunk *chk;
 	struct sctp_ecne_chunk *ecne;
-  
+
 	TAILQ_FOREACH(chk,&tcb->asoc.control_send_queue,sctp_next){
 		if(chk->rec.chunk_id == SCTP_ECN_ECHO){
 			/* Look for and remove if it is the right TSN. Since
@@ -7172,8 +7172,8 @@ sctp6_send_abort(struct mbuf *m,
 	}
 #if 0
 	/*
-	 * Use ICMP rate limit since this is the equivalent of 
-	 * sending a no listener ICMP message 
+	 * Use ICMP rate limit since this is the equivalent of
+	 * sending a no listener ICMP message
 	 */
 	if (icmp6_ratelimit(&oip->ip6_dst, ICMP6_DST_UNREACH,
 			    ICMP6_DST_UNREACH_NOPORT)) {
@@ -7298,7 +7298,7 @@ sctp6_send_abort(struct mbuf *m,
 #endif
 
 void
-sctp_send_operr_to(struct mbuf *m, int iphlen, 
+sctp_send_operr_to(struct mbuf *m, int iphlen,
 		   struct mbuf *scm,
 		   struct sctphdr *ohdr,
 		   u_int32_t vtag)
@@ -7313,7 +7313,7 @@ sctp_send_operr_to(struct mbuf *m, int iphlen,
 	ohdr->v_tag = vtag;
 	ohdr->checksum = 0;
 	val = sctp_calculate_sum(scm,NULL,0);
-	ohdr->checksum = val;  
+	ohdr->checksum = val;
 	if (iph->ip_v == IPVERSION) {
 		/* V4 */
 		struct ip *out;
