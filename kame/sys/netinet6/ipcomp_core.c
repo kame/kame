@@ -70,10 +70,12 @@ static int deflate_decompress __P((struct mbuf *, struct mbuf *, size_t *));
 /*
  * We need to use default window size (2^15 = 32Kbytes as of writing) for
  * inbound case.  Otherwise we get interop problem.
+ * Use negative value to avoid Adler32 checksum.  This is an undocumented
+ * feature in zlib (see ipsec wg mailing list archive in January 2000).
  */
 static int deflate_policy = Z_DEFAULT_COMPRESSION;
-static int deflate_window_out = 12;
-static const int deflate_window_in = MAX_WBITS;	/* don't change it */
+static int deflate_window_out = -12;
+static const int deflate_window_in = -1 * MAX_WBITS;	/* don't change it */
 static int deflate_memlevel = MAX_MEM_LEVEL; 
 
 struct ipcomp_algorithm ipcomp_algorithms[] = {
