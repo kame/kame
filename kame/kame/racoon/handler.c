@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.38 2000/10/04 17:40:59 itojun Exp $	*/
+/*	$KAME: handler.c,v 1.39 2000/11/09 06:28:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -109,15 +109,16 @@ getph1byindex0(index)
  * with phase 2's destinaion.
  */
 struct ph1handle *
-getph1byaddr(remote)
-	struct sockaddr *remote;
+getph1byaddr(local, remote)
+	struct sockaddr *local, *remote;
 {
 	struct ph1handle *p;
 
 	LIST_FOREACH(p, &ph1tree, chain) {
 		if (p->status == PHASE1ST_EXPIRED)
 			continue;
-		if (cmpsaddrwop(remote, p->remote) == 0)
+		if (cmpsaddrwop(local, p->local) == 0
+		 && cmpsaddrwop(remote, p->remote) == 0)
 			return p;
 	}
 

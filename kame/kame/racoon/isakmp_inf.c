@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.60 2000/10/19 05:11:05 sakane Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.61 2000/11/09 06:28:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -257,7 +257,7 @@ isakmp_info_send_d2(iph2)
 	 * don't send delete information if there is no phase 1 handler.
 	 * It's nonsensical to negotiate phase 1 to send the information.
 	 */
-	iph1 = getph1byaddr(iph2->dst); 
+	iph1 = getph1byaddr(iph2->src, iph2->dst); 
 	if (iph1 == NULL)
 		return 0;
 

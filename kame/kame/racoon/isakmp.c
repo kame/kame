@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.109 2000/11/08 11:47:30 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.110 2000/11/09 06:28:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1611,7 +1611,7 @@ isakmp_post_acquire(iph2)
 	}
 
 	/* search isakmp status table by address with masking port */
-	iph1 = getph1byaddr(iph2->dst);
+	iph1 = getph1byaddr(iph2->src, iph2->dst);
 
 	/* no ISAKMP-SA found. */
 	if (iph1 == NULL) {
@@ -1711,7 +1711,7 @@ isakmp_chkph1there(iph2)
 		return;
 	}
 
-	iph1 = getph1byaddr(iph2->dst);
+	iph1 = getph1byaddr(iph2->src, iph2->dst);
 
 	/* XXX Even if ph1 as responder is there, should we not start
 	 * phase 2 negotiation ? */
