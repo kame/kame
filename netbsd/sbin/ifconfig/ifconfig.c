@@ -2013,18 +2013,20 @@ in6_alias(creq)
 		if (errno != EADDRNOTAVAIL)
 			warn("SIOCGIFAFLAG_IN6");
 	} else {
-		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_ANYCAST)
+		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_ANYCAST) != 0)
 			printf(" anycast");
-		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_TENTATIVE)
+		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_TENTATIVE) != 0)
 			printf(" tentative");
-		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DUPLICATED)
+		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DUPLICATED) != 0)
 			printf(" duplicated");
-		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DETACHED)
+		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DETACHED) != 0)
 			printf(" detached");
-		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DEPRECATED)
+		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DEPRECATED) != 0)
 			printf(" deprecated");
-		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_AUTOCONF)
+		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_AUTOCONF) != 0)
 			printf(" autoconf");
+		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_TEMPORARY) != 0)
+			printf(" temporary");
 	}
 
 	if (scopeid)

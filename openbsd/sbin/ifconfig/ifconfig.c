@@ -1771,6 +1771,8 @@ in6_alias(creq)
 			printf(" deprecated");
 		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_AUTOCONF) != 0)
 			printf(" autoconf");
+		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_TEMPORARY) != 0)
+			printf(" temporary");
 	}
 
 	if (scopeid)
