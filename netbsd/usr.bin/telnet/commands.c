@@ -2142,7 +2142,7 @@ status(argc, argv)
 	}
     }
     if (In3270 && transcom) {
-       printf("Transparent mode command is '%s'.\n", transcom);
+	printf("Transparent mode command is '%s'.\n", transcom);
     }
 #   endif /* defined(unix) */
     (void) fflush(stdout);
@@ -2300,8 +2300,8 @@ tn(argc, argv)
 	hostname = hostp;
 
     if (!portp) {
-      telnetport = 1;
-      portp = "telnet";
+	telnetport = 1;
+	portp = "telnet";
     }
 
     memset(&hints, 0, sizeof(hints));
@@ -2328,13 +2328,13 @@ tn(argc, argv)
 	error = getaddrinfo(hostname, portp, &hints, &res0);
     }
     if (error) {
-      fprintf(stderr, "%s: %s\n", hostname, gai_strerror(error));
-      setuid(getuid());
-      return 0;
+	fprintf(stderr, "%s: %s\n", hostname, gai_strerror(error));
+	setuid(getuid());
+	return 0;
     }
 
     if (res0->ai_canonname)
-      (void) strcpy(_hostname, res0->ai_canonname);
+	(void) strcpy(_hostname, res0->ai_canonname);
     hostname = _hostname;
 
     net = -1;
