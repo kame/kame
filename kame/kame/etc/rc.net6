@@ -79,6 +79,9 @@ $route add -inet6 fec0:: -prefixlen 10 ::1 -reject
 $route add -inet6 ::ffff:0.0.0.0 -prefixlen 96 ::1 -reject
 $route add -inet6 ::0.0.0.0 -prefixlen 96 ::1 -reject
 
+# disallow 6to4 destinations that map to IPv4 multicast destinations
+$route add -inet6 2002:e000:: -prefixlen 20 ::1 -reject
+
 if [ X"${ip6router}" = X"YES" ]; then
 	# act as a router
 	$sysctl -w net.inet6.ip6.forwarding=1
