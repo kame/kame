@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.153 2001/01/30 15:35:21 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.154 2001/02/01 05:17:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -203,7 +203,7 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 {
 	struct sockaddr_in6 lo_sa;
 	struct sockaddr_in6 all1_sa;
-	struct rtentry *nrt = NULL, **nrtp = NULL;
+	struct rtentry *nrt = NULL;
 	int e;
 	
 	bzero(&lo_sa, sizeof(lo_sa));
@@ -214,17 +214,10 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 	lo_sa.sin6_addr = in6addr_loopback;
 	all1_sa.sin6_addr = in6mask128;
 	
-	/*
-	 * So we add or remove static loopback entry, here.
-	 * This request for deletion could fail, e.g. when we remove
-	 * an address right after adding it.
-	 */
-	if (cmd == RTM_ADD)
-		nrtp = &nrt;
 	e = rtrequest(cmd, ifa->ifa_addr,
 		      (struct sockaddr *)&lo_sa,
 		      (struct sockaddr *)&all1_sa,
-		      RTF_UP|RTF_HOST, nrtp);
+		      RTF_UP|RTF_HOST, &nrt);
 	if (e != 0) {
 		log(LOG_ERR, "in6_ifloop_request: "
 		    "%s operation failed for %s (errno=%d)\n",
@@ -245,8 +238,26 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 		IFAREF(ifa);
 		nrt->rt_ifa = ifa;
 	}
-	if (nrt)
-		nrt->rt_refcnt--;
+
+	/*
+	 * Report the addition/removal of the address to the routing socket.
+	 * XXX: since we called rtinit for a p2p interface with a destination,
+	 *      we end up reporting twice in such a case.  Should we rather
+	 *      omit the second report?
+	 */
+	if (nrt) {
+		rt_newaddrmsg(cmd, ifa, e, nrt);
+		if (cmd == RTM_DELETE) {
+			if (nrt->rt_refcnt <= 0) {
+				/* XXX: we should free the entry ourselves. */
+				nrt->rt_refcnt++;
+				rtfree(nrt);
+			}
+		} else {
+			/* the cmd must be RTM_ADD here */
+			nrt->rt_refcnt--;
+		}
+	}
 }
 
 /*
@@ -810,8 +821,52 @@ in6_control(so, cmd, data, ifp)
 	}
 
 	case SIOCDIFADDR_IN6:
+	{
+		int i = 0;
+		struct nd_prefix pr0, *pr;
+
+		/*
+		 * If the address being deleted is the only one that owns
+		 * the corresponding on-link prefix, expire the prefix as well.
+		 * XXX: theoretically, we don't have to warry about such
+		 * relationship, since we separate the address management
+		 * and the prefix management.  We do this, however, to provide
+		 * as much backward compatibility as possible in terms of
+		 * the ioctl operation.
+		 */
+		bzero(&pr0, sizeof(pr0));
+		pr0.ndpr_ifp = ifp;
+		pr0.ndpr_plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr,
+					     NULL);
+		if (pr0.ndpr_plen == 128)
+			goto purgeaddr;
+		pr0.ndpr_prefix = ia->ia_addr;
+		pr0.ndpr_mask = ia->ia_prefixmask.sin6_addr;
+		for (i = 0; i < 4; i++) {
+			pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
+				ia->ia_prefixmask.sin6_addr.s6_addr32[i];
+		}
+		/*
+		 * The logic of the following condition is a bit complicated.
+		 * We expire an on-link prefix when
+		 * 1. the address obeys autoconfiguration and it is the
+		 *    only owner of the associated prefix, or
+		 * 2. the address does not obey autoconf and there is no
+		 *    other owner of the prefix.
+		 */
+		if ((pr = nd6_prefix_lookup(&pr0)) != NULL &&
+		    (pr->ndpr_stateflags & NDPRF_ONLINK) != 0 &&
+		    (((ia->ia6_flags & IN6_IFF_AUTOCONF) != 0 &&
+		      pr->ndpr_refcnt == 1) ||
+		     ((ia->ia6_flags & IN6_IFF_AUTOCONF) == 0 &&
+		      pr->ndpr_refcnt == 0))) {
+			pr->ndpr_expire = 1; /* XXX: just for expiration */
+		}
+
+	  purgeaddr:
 		in6_purgeaddr(&ia->ia_ifa);
 		break;
+	}
 
 	default:
 		if (ifp == NULL || ifp->if_ioctl == 0)
