@@ -117,11 +117,7 @@ struct inpcb {
 #define	inp_ip		inp_hu.hu_ip
 #define	inp_ipv6	inp_hu.hu_ipv6
 	struct	  mbuf *inp_options;	/* IPv4 options */
-#ifndef INET6
-	void *inp_inputopts6;	/* XXX bad fix. */
-#else
-	struct ip6_recvpktopts inp_inputopts6;/* IPv6 opts for incoming pkts */
-#endif 
+	struct ip6_recvpktopts *inp_inputopts6;
 	struct ip6_pktopts *inp_outputopts6; /* IP6 opts for outgoing pkts */
 	int inp_hops;
 	union {
