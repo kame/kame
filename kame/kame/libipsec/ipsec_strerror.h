@@ -1,3 +1,5 @@
+/*	$KAME: ipsec_strerror.h,v 1.7 2000/05/07 05:25:03 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
  * All rights reserved.

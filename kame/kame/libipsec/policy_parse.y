@@ -1,3 +1,5 @@
+/*	$KAME: policy_parse.y,v 1.10 2000/05/07 05:25:03 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: policy_parse.y,v 1.9 2000/03/03 07:56:07 itojun Exp $ */
 
 /*
  * IN/OUT bound policy configuration take place such below:

@@ -1,3 +1,5 @@
+/*	$KAME: ipsec_dump_policy.c,v 1.8 2000/05/07 05:25:03 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
  * All rights reserved.
@@ -129,7 +131,7 @@ ipsec_dump_policy(policy, delimiter)
 	}
 
 	/* count length of buffer for use */
-	off = sizeof(*xpl); 
+	off = sizeof(*xpl);
 	while (off < PFKEY_EXTLEN(xpl)) {
 		xisr = (struct sadb_x_ipsecrequest *)((caddr_t)xpl + off);
 		off += xisr->sadb_x_ipsecrequest_len;
@@ -142,7 +144,7 @@ ipsec_dump_policy(policy, delimiter)
 		return NULL;
 	}
 
-	off = sizeof(*xpl); 
+	off = sizeof(*xpl);
 	while (off < PFKEY_EXTLEN(xpl)) {
 		xisr = (struct sadb_x_ipsecrequest *)((caddr_t)xpl + off);
 
