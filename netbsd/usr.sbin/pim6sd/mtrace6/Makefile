@@ -24,6 +24,20 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIR+=pim6sd mtrace6
+BINDIR=	$(PREFIX)/sbin
+PROG=	mtrace6
 
-.include <bsd.subdir.mk>
+SRCDIR=	${.CURDIR}/../../../kame/pim6sd/mtrace6
+
+CFLAGS+= -I$(.CURDIR)/../../../kame/pim6sd
+LDADD+=	-L/usr/local/v6/lib -L${.OBJDIR}/../../../lib/libinet6 \
+	-L${.OBJDIR}/../../../lib/libinet6/obj -linet6
+DPADD+=	-L${.OBJDIR}/../../../lib/libinet6/libinet6.a \
+	${.OBJDIR}/../../../lib/libinet6/obj/libinet6.a \
+	/usr/local/v6/lib/libinet6.a 
+
+.PATH:	${SRCDIR}
+
+MAN8= mtrace6.8
+
+.include <bsd.prog.mk>

@@ -24,6 +24,29 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIR+=pim6sd mtrace6
+SRCDIR=	${.CURDIR}/../../../kame/pim6sd
 
-.include <bsd.subdir.mk>
+PROG=	pim6sd
+SRCS=	mld6.c mld6_proto.c\
+	inet6.c kern.c main.c config.c debug.c routesock.c vers.c callout.c\
+	route.c vif.c timer.c mrt.c pim6.c pim6_proto.c rp.c crc.c trace.c
+
+CFLAGS+= -g
+CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -I${SRCDIR}
+LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
+	-L${.CURDIR}/../../lib/libinet6/obj \
+	-L/usr/local/v6/lib -linet6
+DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
+	-L${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
+
+#MAN5=	pim6sd.conf.0: notyet
+MAN8=	pim6sd.8
+
+afterinstall:
+	install ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+		${INSTALLFLAGS} ${SRCDIR}/pim6stat ${DESTDIR}${BINDIR}
+
+.PATH:	${SRCDIR}
+
+.include <bsd.prog.mk>
