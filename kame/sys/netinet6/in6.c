@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.354 2003/10/22 02:12:54 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.355 2004/01/13 11:15:57 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3137,6 +3137,7 @@ in6_addmulti(maddr6, ifp, errorp)
 	bzero(in6m, sizeof *in6m);
 	in6m->in6m_sa = *maddr6;
 	in6m->in6m_ifp = ifp;
+	in6m->in6m_refcount = 1;
 	in6m->in6m_ifma = ifma;
 	ifma->ifma_protospec = in6m;
 	LIST_INSERT_HEAD(&in6_multihead, in6m, in6m_entry);
