@@ -1,4 +1,4 @@
-/*	$KAME: ip6opt.c,v 1.16 2005/01/05 04:51:55 itojun Exp $	*/
+/*	$KAME: ip6opt.c,v 1.17 2005/01/13 04:01:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -56,7 +56,7 @@ inet6_option_space(nbytes)
 	int nbytes;
 {
 	nbytes += 2;	/* we need space for nxt-hdr and length fields */
-	return(CMSG_SPACE((nbytes + 7) & ~7));
+	return (CMSG_SPACE((nbytes + 7) & ~7));
 }
 
 /*
@@ -74,14 +74,14 @@ inet6_option_init(bp, cmsgp, type)
 
 	/* argument validation */
 	if (type != IPV6_HOPOPTS && type != IPV6_DSTOPTS)
-		return(-1);
+		return (-1);
 	
 	ch->cmsg_level = IPPROTO_IPV6;
 	ch->cmsg_type = type;
 	ch->cmsg_len = CMSG_LEN(0);
 
 	*cmsgp = ch;
-	return(0);
+	return (0);
 }
 
 /*
@@ -107,12 +107,12 @@ inet6_option_append(cmsg, typep, multx, plusy)
 
 	/* argument validation */
 	if (multx != 1 && multx != 2 && multx != 4 && multx != 8)
-		return(-1);
+		return (-1);
 	if (plusy < 0 || plusy > 7)
-		return(-1);
+		return (-1);
 #if 0 /* always false */
 	if (typep[0] > 255)
-		return(-1);
+		return (-1);
 #endif
 
 	/*
@@ -155,7 +155,7 @@ inet6_option_append(cmsg, typep, multx, plusy)
 	/* update the length field of the ip6 option header */
 	eh->ip6e_len = ((bp - (u_char *)eh) >> 3) - 1;
 
-	return(0);
+	return (0);
 }
 
 /*
@@ -185,9 +185,9 @@ inet6_option_alloc(cmsg, datalen, multx, plusy)
 
 	/* argument validation */
 	if (multx != 1 && multx != 2 && multx != 4 && multx != 8)
-		return(NULL);
+		return (NULL);
 	if (plusy < 0 || plusy > 7)
-		return(NULL);
+		return (NULL);
 
 	/*
 	 * If this is the first option, allocate space for the
@@ -225,7 +225,7 @@ inet6_option_alloc(cmsg, datalen, multx, plusy)
 	/* update the length field of the ip6 option header */
 	eh->ip6e_len = ((bp - (u_char *)eh) >> 3) - 1;
 
-	return(retval);
+	return (retval);
 }
 
 /*
@@ -250,15 +250,15 @@ inet6_option_next(cmsg, tptrp)
 	if (cmsg->cmsg_level != IPPROTO_IPV6 ||
 	    (cmsg->cmsg_type != IPV6_HOPOPTS &&
 	     cmsg->cmsg_type != IPV6_DSTOPTS))
-		return(-1);
+		return (-1);
 
 	/* message length validation */
 	if (cmsg->cmsg_len < CMSG_SPACE(sizeof(struct ip6_ext)))
-		return(-1);
+		return (-1);
 	ip6e = (struct ip6_ext *)CMSG_DATA(cmsg);
 	hdrlen = (ip6e->ip6e_len + 1) << 3;
 	if (cmsg->cmsg_len < CMSG_SPACE(hdrlen))
-		return(-1);
+		return (-1);
 
 	/*
 	 * If the caller does not specify the starting point,
@@ -270,22 +270,22 @@ inet6_option_next(cmsg, tptrp)
 		*tptrp = (u_int8_t *)(ip6e + 1);
 	else {
 		if ((optlen = ip6optlen(*tptrp, lim)) == 0)
-			return(-1);
+			return (-1);
 
 		*tptrp = *tptrp + optlen;
 	}
 	if (*tptrp >= lim) {	/* there is no option */
 		*tptrp = NULL;
-		return(-1);
+		return (-1);
 	}
 	/*
 	 * Finally, checks if the next option is safely stored in the
 	 * cmsg data.
 	 */
 	if (ip6optlen(*tptrp, lim) == 0)
-		return(-1);
+		return (-1);
 	else
-		return(0);
+		return (0);
 }
 
 /*
@@ -309,15 +309,15 @@ inet6_option_find(cmsg, tptrp, type)
 	if (cmsg->cmsg_level != IPPROTO_IPV6 ||
 	    (cmsg->cmsg_type != IPV6_HOPOPTS &&
 	     cmsg->cmsg_type != IPV6_DSTOPTS))
-		return(-1);
+		return (-1);
 
 	/* message length validation */
 	if (cmsg->cmsg_len < CMSG_SPACE(sizeof(struct ip6_ext)))
-		return(-1);
+		return (-1);
 	ip6e = (struct ip6_ext *)CMSG_DATA(cmsg);
 	hdrlen = (ip6e->ip6e_len + 1) << 3;
 	if (cmsg->cmsg_len < CMSG_SPACE(hdrlen))
-		return(-1);	
+		return (-1);	
 
 	/*
 	 * If the caller does not specify the starting point,
@@ -329,22 +329,22 @@ inet6_option_find(cmsg, tptrp, type)
 		*tptrp = (u_int8_t *)(ip6e + 1);
 	else {
 		if ((optlen = ip6optlen(*tptrp, lim)) == 0)
-			return(-1);
+			return (-1);
 
 		*tptrp = *tptrp + optlen;
 	}
 	for (optp = *tptrp; optp < lim; optp += optlen) {
 		if (*optp == type) {
 			*tptrp = optp;
-			return(0);
+			return (0);
 		}
 		if ((optlen = ip6optlen(optp, lim)) == 0)
-			return(-1);
+			return (-1);
 	}
 
 	/* search failed */
 	*tptrp = NULL;
-	return(-1);
+	return (-1);
 }
 
 /*
@@ -363,13 +363,13 @@ ip6optlen(opt, lim)
 	else {
 		/* is there enough space to store type and len? */
 		if (opt + 2 > lim)
-			return(0);
+			return (0);
 		optlen = *(opt + 1) + 2;
 	}
 	if (opt + optlen <= lim)
-		return(optlen);
+		return (optlen);
 
-	return(0);
+	return (0);
 }
 
 static void
@@ -400,15 +400,15 @@ inet6_opt_init(void *extbuf, socklen_t extlen)
 	struct ip6_ext *ext = (struct ip6_ext *)extbuf;
 
 	if (extlen < 0 || (extlen % 8))
-		return(-1);
+		return (-1);
 
 	if (ext) {
 		if (extlen == 0)
-			return(-1);
+			return (-1);
 		ext->ip6e_len = (extlen >> 3) - 1;
 	}
 
-	return(2);		/* sizeof the next and the length fields */
+	return (2);		/* sizeof the next and the length fields */
 }
 
 int
@@ -426,23 +426,23 @@ inet6_opt_append(void *extbuf, socklen_t extlen, int offset, u_int8_t type,
 #else
 	if (type < 2)
 #endif
-		return(-1);
+		return (-1);
 
 	/*
 	 * The option data length must have a value between 0 and 255,
 	 * inclusive, and is the length of the option data that follows.
 	 */
 	if (len < 0 || len > 255)
-		return(-1);
+		return (-1);
 
 	/*
 	 * The align parameter must have a value of 1, 2, 4, or 8.
 	 * The align value can not exceed the value of len.
 	 */
 	if (align != 1 && align != 2 && align != 4 && align != 8)
-		return(-1);
+		return (-1);
 	if (align > len)
-		return(-1);
+		return (-1);
 
 	/* Calculate the padding length. */
 	currentlen += 2 + len;	/* 2 means "type + len" */
@@ -453,7 +453,7 @@ inet6_opt_append(void *extbuf, socklen_t extlen, int offset, u_int8_t type,
 	currentlen += padlen;
 	if (extlen &&		/* XXX: right? */
 	    currentlen > extlen)
-		return(-1);
+		return (-1);
 
 	if (extbuf) {
 		u_int8_t *optp = (u_int8_t *)extbuf + offset;
@@ -476,7 +476,7 @@ inet6_opt_append(void *extbuf, socklen_t extlen, int offset, u_int8_t type,
 		*databufp = optp;
 	}
 
-	return(currentlen);
+	return (currentlen);
 }
 
 int
@@ -489,7 +489,7 @@ inet6_opt_finish(void *extbuf, socklen_t extlen, int offset)
 		int padlen = updatelen - offset;
 
 		if (updatelen > extlen)
-			return(-1);
+			return (-1);
 
 		padp = (u_int8_t *)extbuf + offset;
 		if (padlen == 1)
@@ -501,7 +501,7 @@ inet6_opt_finish(void *extbuf, socklen_t extlen, int offset)
 		}
 	}
 
-	return(updatelen);
+	return (updatelen);
 }
 
 int
@@ -509,7 +509,7 @@ inet6_opt_set_val(void *databuf, int offset, void *val, socklen_t vallen)
 {
 
 	memcpy((u_int8_t *)databuf + offset, val, vallen);
-	return(offset + vallen);
+	return (offset + vallen);
 }
 
 int
@@ -521,7 +521,7 @@ inet6_opt_next(void *extbuf, socklen_t extlen, int offset, u_int8_t *typep,
 
 	/* Validate extlen. XXX: is the variable really necessary?? */
 	if (extlen == 0 || (extlen % 8))
-		return(-1);
+		return (-1);
 	lim = (u_int8_t *)extbuf + extlen;
 
 	/*
@@ -529,14 +529,13 @@ inet6_opt_next(void *extbuf, socklen_t extlen, int offset, u_int8_t *typep,
 	 * header, simply return the 1st option.
 	 * Otherwise, search the option list for the next option.
 	 */
-	if (offset == 0) {
+	if (offset == 0)
 		optp = (u_int8_t *)((struct ip6_hbh *)extbuf + 1);
-	}
 	else
 		optp = (u_int8_t *)extbuf + offset;
 
 	/* Find the next option skipping any padding options. */
-	while(optp < lim) {
+	while (optp < lim) {
 		switch(*optp) {
 		case IP6OPT_PAD1:
 			optp++;
@@ -552,13 +551,13 @@ inet6_opt_next(void *extbuf, socklen_t extlen, int offset, u_int8_t *typep,
 			*typep = *optp;
 			*lenp = optlen - 2;
 			*databufp = optp + 2;
-			return(optp + optlen - (u_int8_t *)extbuf);
+			return (optp + optlen - (u_int8_t *)extbuf);
 		}
 	}
 
   optend:
 	*databufp = NULL; /* for safety */
-	return(-1);
+	return (-1);
 }
 
 int
@@ -570,7 +569,7 @@ inet6_opt_find(void *extbuf, socklen_t extlen, int offset, u_int8_t type,
 
 	/* Validate extlen. XXX: is the variable really necessary?? */
 	if (extlen == 0 || (extlen % 8))
-		return(-1);
+		return (-1);
 	lim = (u_int8_t *)extbuf + extlen;
 
 	/*
@@ -578,21 +577,20 @@ inet6_opt_find(void *extbuf, socklen_t extlen, int offset, u_int8_t type,
 	 * header, simply return the 1st option.
 	 * Otherwise, search the option list for the next option.
 	 */
-	if (offset == 0) {
+	if (offset == 0)
 		optp = (u_int8_t *)((struct ip6_hbh *)extbuf + 1);
-	}
 	else
 		optp = (u_int8_t *)extbuf + offset;
 
 	/* Find the specified option */
-	while(optp < lim) {
+	while (optp < lim) {
 		if ((optlen = ip6optlen(optp, lim)) == 0)
 			goto optend;
 
 		if (*optp == type) { /* found */
 			*lenp = optlen - 2;
 			*databufp = optp + 2;
-			return(optp + optlen - (u_int8_t *)extbuf);
+			return (optp + optlen - (u_int8_t *)extbuf);
 		}
 
 		optp += optlen;
@@ -600,7 +598,7 @@ inet6_opt_find(void *extbuf, socklen_t extlen, int offset, u_int8_t type,
 
   optend:
 	*databufp = NULL; /* for safety */
-	return(-1);
+	return (-1);
 }
 
 int
@@ -610,5 +608,5 @@ inet6_opt_get_val(void *databuf, int offset, void *val, socklen_t vallen)
 	/* we can't assume alignment here */
 	memcpy(val, (u_int8_t *)databuf + offset, vallen);
 
-	return(offset + vallen);
+	return (offset + vallen);
 }
