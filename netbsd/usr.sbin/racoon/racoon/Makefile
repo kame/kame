@@ -10,7 +10,7 @@ SRCS=	main.c session.c isakmp.c handler.c \
 # debugging code with print-isakmp.c
 SRCS+=	print-isakmp.c
 CPPFLAGS+=-I${SRCDIR}/../tcpdump -I${SRCDIR}/../tcpdump/lbl \
-	-DHAVE_PRINT_ISAKMP_C=1 
+	-DHAVE_PRINT_ISAKMP_C=1
 
 # for debugging malloc/free
 #.if exists(/usr/pkg/lib/libefence.a) || exists(/usr/pkg/lib/libefence.so)
