@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.32.2.6 2001/08/01 20:37:03 obrien Exp $
+# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.32.2.8 2002/03/25 21:37:31 gshapiro Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -14,6 +14,8 @@
         ..
     ..
     dev
+        an
+        ..
         ppbus
         ..
         usb
@@ -32,6 +34,8 @@
     isofs
         cd9660
         ..
+    ..
+    libmilter
     ..
     machine
     ..

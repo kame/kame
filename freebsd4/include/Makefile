@@ -1,5 +1,5 @@
 #	@(#)Makefile	8.2 (Berkeley) 1/4/94
-# $FreeBSD: src/include/Makefile,v 1.109.2.17 2001/12/18 13:29:59 sheldonh Exp $
+# $FreeBSD: src/include/Makefile,v 1.109.2.20 2002/03/12 17:12:24 phantom Exp $
 #
 # Doing a make install builds /usr/include
 #
@@ -8,11 +8,11 @@
 
 CLEANFILES= osreldate.h version vers.c
 SUBDIR= rpcsvc
-FILES=	a.out.h ar.h assert.h bitstring.h complex.h ctype.h db.h \
+HDRS=	a.out.h ar.h assert.h bitstring.h complex.h ctype.h db.h \
 	dirent.h disktab.h \
 	dlfcn.h elf.h elf-hints.h err.h fnmatch.h fstab.h \
 	fts.h glob.h grp.h strhash.h histedit.h ieeefp.h ifaddrs.h iso646.h \
-	libgen.h limits.h link.h locale.h malloc.h memory.h mpool.h \
+	langinfo.h libgen.h limits.h link.h locale.h malloc.h memory.h mpool.h \
 	ndbm.h netdb.h nl_types.h nlist.h objformat.h \
 	paths.h pthread.h pthread_np.h pwd.h \
 	ranlib.h regex.h regexp.h resolv.h rune.h runetype.h \
@@ -21,25 +21,25 @@ FILES=	a.out.h ar.h assert.h bitstring.h complex.h ctype.h db.h \
 	string.h stringlist.h strings.h struct.h sysexits.h tar.h time.h \
 	timers.h ttyent.h unistd.h utime.h utmp.h vis.h wchar.h wctype.h
 
-ARPAFILES=	ftp.h inet.h nameser.h nameser_compat.h telnet.h tftp.h
+ARPAHDRS=	ftp.h inet.h nameser.h nameser_compat.h telnet.h tftp.h
 
-PROTOFILES=	dumprestore.h routed.h rwhod.h talkd.h timed.h
+PROTOHDRS=	dumprestore.h routed.h rwhod.h talkd.h timed.h
 
-RPCFILES=	auth.h auth_unix.h clnt.h pmap_clnt.h pmap_prot.h pmap_rmt.h \
+RPCHDRS=	auth.h auth_unix.h clnt.h pmap_clnt.h pmap_prot.h pmap_rmt.h \
 		rpc.h rpc_com.h rpc_msg.h svc.h svc_auth.h types.h xdr.h \
 		auth_des.h des.h des_crypt.h
 
-NETSMBFILES=	nb_lib.h smb_lib.h smb_rap.h
+NETSMBHDRS=	nb_lib.h smb_lib.h smb_rap.h
 
-MFILES=	float.h floatingpoint.h stdarg.h varargs.h
+MHDRS=	float.h floatingpoint.h stdarg.h varargs.h
 
 # posix4/aio.h conflicts with dysons and isn't installed:
-PFILES=	mqueue.h sched.h semaphore.h # aio.h
+PHDRS=	mqueue.h sched.h semaphore.h # aio.h
 
 # Only for default SHARED=copies case
-SFILES=	soundcard.h joystick.h
+SHDRS=	soundcard.h joystick.h
 
-LFILES=	aio.h errno.h fcntl.h inttypes.h linker_set.h poll.h syslog.h \
+LHDRS=	aio.h errno.h fcntl.h inttypes.h linker_set.h poll.h syslog.h \
 	termios.h ucontext.h
 
 LDIRS=	cam msdosfs net netatalk netatm netgraph netinet netinet6 \
@@ -49,7 +49,7 @@ LDIRS+=	altq
 
 LNOHEADERDIRS=	fs isofs ufs dev
 LSUBDIRS=	fs/smbfs isofs/cd9660 ufs/ffs ufs/mfs ufs/ufs \
-	cam/scsi dev/ppbus dev/usb
+	cam/scsi dev/an dev/ppbus dev/usb
 
 # For SHARED=symlinks, cam is a symlink, so cam/scsi is taken care of
 LSYMSUBDIRS=	fs/smbfs isofs/cd9660 ufs/ffs ufs/mfs ufs/ufs dev/ppbus dev/usb
@@ -80,26 +80,26 @@ beforeinstall: ${SHARED}
 	@rm -f ${DESTDIR}/usr/include/timepps.h
 	cd ${.CURDIR}; \
 		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \
-		${FILES} ${DESTDIR}/usr/include
+		${HDRS} ${DESTDIR}/usr/include
 	cd ${.CURDIR}/arpa; \
 		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \
-		${ARPAFILES} ${DESTDIR}/usr/include/arpa
+		${ARPAHDRS} ${DESTDIR}/usr/include/arpa
 	cd ${.CURDIR}/protocols; \
 		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \
-		${PROTOFILES} ${DESTDIR}/usr/include/protocols
+		${PROTOHDRS} ${DESTDIR}/usr/include/protocols
 	cd ${.CURDIR}/rpc; \
 		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \
-		${RPCFILES} ${DESTDIR}/usr/include/rpc
+		${RPCHDRS} ${DESTDIR}/usr/include/rpc
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \
 		${.OBJDIR}/osreldate.h \
 		${DESTDIR}/usr/include
-.for i in ${LFILES}
+.for i in ${LHDRS}
 	ln -sf sys/$i ${DESTDIR}/usr/include/$i
 .endfor
-.for i in ${MFILES}
+.for i in ${MHDRS}
 	ln -sf machine/$i ${DESTDIR}/usr/include/$i
 .endfor
-.for i in ${PFILES}
+.for i in ${PHDRS}
 	ln -sf posix4/$i ${DESTDIR}/usr/include/$i
 .endfor
 
@@ -123,7 +123,7 @@ copies:
 .endif
 .if exists(${.CURDIR}/../sys/contrib/netsmb/include/netsmb)
 	cd ${.CURDIR}/../sys/contrib/netsmb/include/netsmb; \
-		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 ${NETSMBFILES} \
+		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 ${NETSMBHDRS} \
 		${DESTDIR}/usr/include/netsmb
 .endif
 .if exists(${.CURDIR}/../sys/${MACHINE_ARCH}/include)
@@ -131,7 +131,7 @@ copies:
 		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
 		${DESTDIR}/usr/include/machine
 .endif
-.for i in ${SFILES}
+.for i in ${SHDRS}
 	ln -sf ../sys/$i ${DESTDIR}/usr/include/machine/$i
 .endfor
 

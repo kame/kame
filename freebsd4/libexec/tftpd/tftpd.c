@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)tftpd.c	8.1 (Berkeley) 6/4/93";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/libexec/tftpd/tftpd.c,v 1.15.2.2 2001/03/04 09:15:27 kris Exp $";
+  "$FreeBSD: src/libexec/tftpd/tftpd.c,v 1.15.2.4 2002/04/26 17:22:41 ume Exp $";
 #endif /* not lint */
 
 /*
@@ -91,7 +91,7 @@ struct	sockaddr_storage from;
 int	fromlen;
 
 void	tftp __P((struct tftphdr *, int));
-static char *verifyhost __P((struct sockaddr *));
+static void unmappedaddr __P((struct sockaddr_in6 *));
 
 /*
  * Null-terminated directory prefix list for absolute pathname requests and
@@ -246,11 +246,15 @@ main(argc, argv)
 			char *tempchroot;
 			struct stat sb;
 			int statret;
-			char ntop_buf[INET6_ADDRSTRLEN];
+			struct sockaddr_storage ss;
+			char hbuf[NI_MAXHOST];
 
-			tempchroot = inet_ntop(from.ss_family, &from,
-					       ntop_buf, INET6_ADDRSTRLEN);
-			asprintf(&tempchroot, "%s/%s", chroot_dir, tempchroot);
+			memcpy(&ss, &from, from.ss_len);
+			unmappedaddr((struct sockaddr_in6 *)&ss);
+			getnameinfo((struct sockaddr *)&ss, ss.ss_len,
+				    hbuf, sizeof(hbuf), NULL, 0,
+				    NI_NUMERICHOST);
+			asprintf(&tempchroot, "%s/%s", chroot_dir, hbuf);
 			statret = stat(tempchroot, &sb);
 			if ((sb.st_mode & S_IFDIR) &&
 			    (statret == 0 || (statret == -1 && ipchroot == 1)))
@@ -371,8 +375,12 @@ again:
 	}
 	ecode = (*pf->f_validate)(&filename, tp->th_opcode);
 	if (logging) {
-		syslog(LOG_INFO, "%s: %s request for %s: %s",
-			verifyhost((struct sockaddr *)&from),
+		char hbuf[NI_MAXHOST];
+
+		getnameinfo((struct sockaddr *)&from, from.ss_len,
+			    hbuf, sizeof(hbuf), NULL, 0, 
+			    NULL);
+		syslog(LOG_INFO, "%s: %s request for %s: %s", hbuf,
 			tp->th_opcode == WRQ ? "write" : "read",
 			filename, errtomsg(ecode));
 	}
@@ -535,9 +543,19 @@ xmitfile(pf)
 		(void)setjmp(timeoutbuf);
 
 send_data:
-		if (send(peer, dp, size + 4, 0) != size + 4) {
-			syslog(LOG_ERR, "write: %m");
-			goto abort;
+		{
+			int i, t = 1;
+			for (i = 0; ; i++){
+				if (send(peer, dp, size + 4, 0) != size + 4) {
+					sleep(t);
+					t = (t < 32) ? t<< 1 : t;
+					if (i >= 12) {
+						syslog(LOG_ERR, "write: %m");
+						goto abort;
+					}
+				}
+				break;
+			}
 		}
 		read_ahead(file, pf->f_convert);
 		for ( ; ; ) {
@@ -717,12 +735,23 @@ nak(error)
 		syslog(LOG_ERR, "nak: %m");
 }
 
-static char *
-verifyhost(fromp)
-	struct sockaddr *fromp;
+/* translate IPv4 mapped IPv6 address to IPv4 address */
+static void
+unmappedaddr(struct sockaddr_in6 *sin6)
 {
-	static char hbuf[MAXHOSTNAMELEN];
+	struct sockaddr_in *sin4;
+	u_int32_t addr;
+	int port;
 
-	getnameinfo(fromp, fromp->sa_len, hbuf, sizeof(hbuf), NULL, 0, 0);
-	return hbuf;
+	if (sin6->sin6_family != AF_INET6 ||
+	    !IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
+		return;
+	sin4 = (struct sockaddr_in *)sin6;
+	addr = *(u_int32_t *)&sin6->sin6_addr.s6_addr[12];
+	port = sin6->sin6_port;
+	memset(sin4, 0, sizeof(struct sockaddr_in));
+	sin4->sin_addr.s_addr = addr;
+	sin4->sin_port = port;
+	sin4->sin_family = AF_INET;
+	sin4->sin_len = sizeof(struct sockaddr_in);
 }
