@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1740 2001/06/22 18:14:48 itojun Exp $
+$KAME: CHANGELOG,v 1.1741 2001/06/23 02:02:34 itojun Exp $
 
 <200106>
+Sat Jun 23 10:55:46 JST 2001  itojun@iijlab.net
+	* kame/mdnsd: with -N flag, mdnsd will lookup name-to-address mapping
+	  using ICMPv6 node information query.  experimental.
+
 Sat Jun 23 03:10:50 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ip6_output.c: disallow setsockopt(IPV6_V6ONLY)
 	  for sockets that are already bound.  per discussions on ipngwg
