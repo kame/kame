@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.55 2001/08/16 14:13:48 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.56 2001/08/18 05:37:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -129,15 +129,21 @@ int ip6_prefer_tempaddr = 0;
  * an entry to the caller for later use.
  */
 #define REPLACE(r) do {\
-	ip6stat.ip6s_sources_rule[(r)]++; \
+	if ((r) < sizeof(ip6stat.ip6s_sources_rule) / \
+		sizeof(ip6stat.ip6s_sources_rule[0])) /* check for safety */ \
+		ip6stat.ip6s_sources_rule[(r)]++; \
  	goto replace; \
 } while(0)
 #define NEXT(r) do {\
-	ip6stat.ip6s_sources_rule[(r)]++; \
+	if ((r) < sizeof(ip6stat.ip6s_sources_rule) / \
+		sizeof(ip6stat.ip6s_sources_rule[0])) /* check for safety */ \
+		ip6stat.ip6s_sources_rule[(r)]++; \
  	goto next; 		/* XXX: we can't use 'continue' here */ \
 } while(0)
 #define BREAK(r) do { \
-	ip6stat.ip6s_sources_rule[(r)]++; \
+	if ((r) < sizeof(ip6stat.ip6s_sources_rule) / \
+		sizeof(ip6stat.ip6s_sources_rule[0])) /* check for safety */ \
+		ip6stat.ip6s_sources_rule[(r)]++; \
  	goto out; 		/* XXX: we can't use 'break' here */ \
 } while(0)
 
@@ -303,8 +309,8 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 			NEXT(2);
 		} else if (IN6_ARE_SCOPE_CMP(new_scope, best_scope) < 0) {
 			if (IN6_ARE_SCOPE_CMP(new_scope, dst_scope) < 0)
-				REPLACE(2);
-			NEXT(2);
+				NEXT(2);
+			REPLACE(2);
 		}
 
 		/*
