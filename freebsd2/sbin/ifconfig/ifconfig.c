@@ -646,7 +646,7 @@ ifconfig(argc, argv, afp)
 			newaddr = NULL;
 		}
 	}
-	if (newaddr) {
+	if (newaddr && setaddr) {
 		strncpy(afp->af_addreq, name, sizeof ifr.ifr_name);
 		if (ioctl(s, afp->af_aifaddr, afp->af_addreq) < 0)
 			Perror("ioctl (SIOCAIFADDR)");
