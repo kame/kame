@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.191 2001/06/27 10:46:49 sakane Exp $	*/
+/*	$KAME: key.c,v 1.192 2001/06/27 13:07:05 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -422,6 +422,8 @@ static struct mbuf *key_setsadbident __P((u_int16_t, u_int16_t, caddr_t,
 	int, u_int64_t));
 #endif
 static struct mbuf *key_setsadbxsa2 __P((u_int8_t, u_int32_t, u_int32_t));
+static struct mbuf *key_setsadblifetime __P((u_int16_t, u_int32_t,
+	u_int64_t, u_int64_t, u_int64_t));
 static struct mbuf *key_setsadbxpolicy __P((u_int16_t, u_int8_t,
 	u_int32_t));
 static void *key_newbuf __P((const void *, u_int));
@@ -2398,6 +2400,18 @@ key_setdumpsp(sp, type, seq, pid)
 		goto fail;
 	m_cat(result, m);
 
+	m = key_setsadblifetime(SADB_EXT_LIFETIME_CURRENT,
+		0, 0, (u_int64_t)sp->created, (u_int64_t)sp->lastused);
+	if (!m)
+		goto fail;
+	m_cat(result, m);
+
+	m = key_setsadblifetime(SADB_EXT_LIFETIME_HARD,
+		0, 0, (u_int64_t)sp->lifetime, (u_int64_t)sp->validtime);
+	if (!m)
+		goto fail;
+	m_cat(result, m);
+
 	if ((result->m_flags & M_PKTHDR) == 0)
 		goto fail;
 
@@ -3764,6 +3778,40 @@ key_setsadbxsa2(mode, seq, reqid)
 	p->sadb_x_sa2_reserved2 = 0;
 	p->sadb_x_sa2_sequence = seq;
 	p->sadb_x_sa2_reqid = reqid;
+
+	return m;
+}
+
+/*
+ * set data into sadb_lifetime
+ */
+static struct mbuf *
+key_setsadblifetime(type, alloc, bytes, addtime, usetime)
+	u_int16_t type;
+	u_int32_t alloc;
+	u_int64_t bytes, addtime, usetime;
+{
+	struct mbuf *m;
+	struct sadb_lifetime *p;
+	size_t len;
+
+	len = PFKEY_ALIGN8(sizeof(struct sadb_lifetime));
+	m = key_alloc_mbuf(len);
+	if (!m || m->m_next) {	/*XXX*/
+		if (m)
+			m_freem(m);
+		return NULL;
+	}
+
+	p = mtod(m, struct sadb_lifetime *);
+
+	bzero(p, len);
+	p->sadb_lifetime_len = PFKEY_UNIT64(len);
+	p->sadb_lifetime_exttype = type;
+	p->sadb_lifetime_allocations = alloc;
+	p->sadb_lifetime_bytes = bytes;
+	p->sadb_lifetime_addtime = addtime;
+	p->sadb_lifetime_usetime = usetime;
 
 	return m;
 }
