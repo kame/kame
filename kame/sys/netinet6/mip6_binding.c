@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.90 2002/02/20 09:43:49 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.91 2002/02/27 01:45:29 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -3100,8 +3100,15 @@ mip6_ba_authdata_calc(sav, src, dst, ba_opt, authdata, sumbuf)
 	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_status, 1);
 	bytes += 1;
+#if 0
+	/*
+	 * as Vijay said in his mail sent Wed, 09 Jan 2002 10:36:17
+	 * -0800 to mobile-ip, not to include the reserved field is a
+	 * mistake of the spec.  but for now, we follow the spec.
+	 */
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_reserved, 1);
 	bytes += 1;
+#endif
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_seqno, 1);
 	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_lifetime[0], 4);
