@@ -61,7 +61,7 @@ sub dig {
 		} else {
 			if (! -d "$dst") {
 				print "mkdir -p $dst\n" if $debug;
-				system "mkdir -p $dst";
+				system "mkdir -p $dst" if (!$test);
 			}
 
 			if (-f "$dst/$i" && ! -l "$dst/$i") {
@@ -69,7 +69,7 @@ sub dig {
 			} else {
 				if (-l "$dst/$i") {
 					print "unlink $dst/$i (symlink)\n" if $debug;
-					unlink "$dst/$i";
+					unlink "$dst/$i" if (!$test);
 				}
 				print "ln -s $src/$i $dst/$i\n" if $debug;
 				symlink "$src/$i", "$dst/$i" if (!$test);
