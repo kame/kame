@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.88 2000/07/03 17:18:56 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.89 2000/07/04 03:20:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -892,19 +892,6 @@ in6_control(so, cmd, data, ifp)
 		prefixIsNew = 0;
 		hostIsNew = 1;
 
-#if 0
-		if (ifra->ifra_addr.sin6_len == 0) { /* impossible, to be removed */
-			ifra->ifra_addr = ia->ia_addr;
-			hostIsNew = 0;
-		} else if (IN6_ARE_ADDR_EQUAL(&ifra->ifra_addr.sin6_addr,
-					      &ia->ia_addr.sin6_addr))
-			hostIsNew = 0;
-#else
-		if (IN6_ARE_ADDR_EQUAL(&ifra->ifra_addr.sin6_addr,
-				       &ia->ia_addr.sin6_addr))
-			hostIsNew = 0;
-#endif
-
 		/* Validate parameters */
 		/*
 		 * The destination address for a p2p link must have a family
@@ -948,6 +935,18 @@ in6_control(so, cmd, data, ifp)
 					return(EINVAL);	/* XXX: undo? */
 				}
 			}
+		}
+
+		/* check if a new address is being added */
+		if (ia->ia_addr.sin6_len &&
+		    IN6_ARE_ADDR_EQUAL(&ifra->ifra_addr.sin6_addr,
+				       &ia->ia_addr.sin6_addr)) {
+			/*
+			 * The requested address is already in the list.
+			 * This means the user just wants to modify some
+			 * parameters of the existing address.
+			 */
+			hostIsNew = 0;
 		}
 
 		/* calculate the prefix length, which will be used later */
