@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.33 2003/01/14 06:14:50 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.34 2003/01/17 12:20:18 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -11,8 +11,6 @@ KAME project
 	- Processing a binding update with S=0 doesn't work as
 	  described in the spec.
 	- Simultaniously use with the privacy extention doesn't work.
-	- Accept HoT/CoT messages with HAO.
-	- Incorrect DHAAD reply message format.
 	- Incorrect auth data calculation of the BU message
 	  when a mobile node is home.
 	- Incorrect lifetime calculation at a correspondent node
