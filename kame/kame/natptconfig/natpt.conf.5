@@ -1,4 +1,4 @@
-.\"	$KAME: natpt.conf.5,v 1.18 2002/10/04 07:50:40 fujisawa Exp $
+.\"	$KAME: natpt.conf.5,v 1.19 2002/10/04 07:56:48 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -266,31 +266,60 @@ Enable or disable translation.  Initial status is disabled.
 .It Xo Sy set Ar var Ar = Ar value
 .Xc
 Set the value to the variable.  Value can use decimal or hexadecimal
-(begin with 0x) notation.  Allowed variable is as follows.
-.Bl -tag -width XXX
-.It Sy translation
+(begin with 0x) notation.  Variables are divided into three
+categories,
+.Sq tslot ,
+.Sq caddr
+and
+.Sq others .
+Description of each category and of variables belonging to it is as
+follows.
+.Pp
+Following variables are belonging to
+.Sq others
+and are displayed with
+.Sq show variables
+subcommand.
+.Pp
+.Bl -tag -width XXX -offset XXX -compact
+.It translation
 The flag which does Protocol translation.  If this value is not zero,
 protocol translation is done.  Otherwise, protocol translation is not
 done.  This value is also set by
 .Sq map
 subcommand.
-.It Sy debug
+.It debug
 This is for debug.
-.It Sy dump
+.It dump
 When set, dump mbuf or ip packet.  You must run natptlog command to
 show its dump.
-.It Sy prefix
+.It prefix
 NAT-PT prefix. This value is set by
 .Sq prefix
 subcommand.
+.It forcefragment4
+If set to non-zero value, translator translates ipv4 packet into ipv6
+packet even if its DF bit is set and its size exceeds 1260 octets.  if
+ipv4 packet size exceeds 1260 octets, packet is divided into two ipv6
+packet with fragment header.
+.Pp
+Because this behavior ignores meaning of DF bit, you had better not
+use it if possible.
+.It uselog
+If set to non-zero value, log output goes to natptlog system.  You
+need to invoke natptlog to read this log message
+.It usesyslog
+If set to non-zero value, log output goes to syslog system.  Log
+facility of this time is LOG_KERNEL.  See
+.Xr syslog.conf 5
+for more detail.  There is no way to distinguish between this message
+and other message from kernel now.
 .El
 .Pp
-You can examine these variables and it's value with invoking following
-command.
-.Dl # natptconfig show variables
-.Pp
-However, you cannot set all of the variables which can appear with
-.Sq show
+See
+.Xr natptconfig 8
+for more detail of the
+.Sq natptconfig show
 subcommand.
 .El
 .\"
