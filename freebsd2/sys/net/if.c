@@ -264,10 +264,7 @@ if_attachdomain1(ifp)
 {
 	struct domain *dp;
 
-	/*
-	 * address family dependent data region - effective only
-	 * after domaininit()
-	 */
+	/* address family dependent data region */
 	bzero(ifp->if_afdata, sizeof(ifp->if_afdata));
 	for (dp = domains; dp; dp = dp->dom_next) {
 		if (dp->dom_ifattach)
