@@ -136,6 +136,10 @@ bgp_send_open(struct rpcb *bnp)
 
   /***   OpenSent   ***/
   bnp->rp_state = BGPSTATE_OPENSENT;
+#ifdef DEBUG_BGPSTATE
+  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
+#endif 
 
   FD_SET(bnp->rp_socket, &fdmask);  /* open-sent Socket (to the global) */
 
@@ -162,8 +166,6 @@ bgp_send_open(struct rpcb *bnp)
 
   return NULL;
 }
-
-
 
 /*
  *   bgp_send_notification()
@@ -257,6 +259,10 @@ bgp_send_notification(bnp, errcode, subcode, len, data)
   BGP_LOG_SEND(BGP_NOTIFY, i);
 
   bnp->rp_state = BGPSTATE_IDLE;
+#ifdef DEBUG_BGPSTATE
+  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
+#endif 
 
   return NULL;    /* End of bgp_send_notification() */
 }

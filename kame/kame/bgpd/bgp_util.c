@@ -145,6 +145,10 @@ bgp_new_peer()
   bnp->rp_next   = bnp;
   bnp->rp_prev   = bnp;
   bnp->rp_state  = BGPSTATE_IDLE;
+#ifdef DEBUG_BGPSTATE
+  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
+#endif 
   bnp->rp_socket = -1;    /* none */
   bnp->rp_prefer = htonl(BGP_DEF_LOCALPREF);
   bnp->rp_sfd[0] = -1;    /* none */
@@ -1158,7 +1162,10 @@ char *
 bgp_peerstr(bnp)
 	struct rpcb *bnp;
 {
-	if (!IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_gaddr))
+	if (IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_addr.sin6_addr))
+		return(ip6str(&bnp->rp_addr.sin6_addr,
+			      bnp->rp_addr.sin6_scope_id));
+	else if (!IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_gaddr))
 		return(ip6str(&bnp->rp_gaddr, 0));
 	else {
 		unsigned int ifindex = 0;

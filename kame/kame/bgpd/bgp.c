@@ -100,6 +100,11 @@ bgp_connect_start(struct rpcb *bnp)
   bnp->rp_connect_timer     = tsk;
   bnp->rp_state             = BGPSTATE_CONNECT;
 
+#ifdef DEBUG_BGPSTATE
+  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
+#endif 
+
   if (!(bnp->rp_mode & BGPO_IFSTATIC))  /* <--- need.   */
     bnp->rp_ife = NULL;
 
@@ -132,6 +137,10 @@ connect_try(struct rpcb *bnp)
 
   /* CONNECT state - trying to connect */
   bnp->rp_state = BGPSTATE_CONNECT;
+#ifdef DEBUG_BGPSTATE
+  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
+#endif 
 
   /* If specfied, set source address */
   if (!IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_lcladdr.sin6_addr) &&
@@ -275,6 +284,10 @@ connect_process(struct rpcb *bnp)
       close(bnp->rp_socket);
       bnp->rp_socket = -1;
       bnp->rp_state = BGPSTATE_IDLE;
+#ifdef DEBUG_BGPSTATE
+  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
+#endif 
 
       if (!(bnp->rp_mode & BGPO_IGP)) /* EBGP */
 	bnp->rp_id = 0;
@@ -347,7 +360,6 @@ connect_process(struct rpcb *bnp)
       }
     }
 #endif /* ADVANCEDAPI */
-
 
     bgp_send_open(bnp);
     return;
@@ -641,6 +653,10 @@ bgp_process_open(struct rpcb *bnp) {
 
   /***  Finally, the state is changed to  OpenConfirm.   ***/
   p->rp_state = BGPSTATE_OPENCONFIRM;
+#ifdef DEBUG_BGPSTATE
+  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	 bgp_statestr[p->rp_state], bgp_peerstr(p));
+#endif 
 
 }
 
@@ -1991,6 +2007,10 @@ bgp_process_keepalive (struct rpcb *bnp) {
 
   case BGPSTATE_OPENCONFIRM:
     bnp->rp_state = BGPSTATE_ESTABLISHED;
+#ifdef DEBUG_BGPSTATE
+  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
+#endif 
     if (bgpsbsize &&
 	setsockopt(bnp->rp_socket, SOL_SOCKET, SO_SNDBUF, &bgpsbsize,
 		   sizeof(bgpsbsize)) < 0) {
@@ -2165,6 +2185,10 @@ bgp_flush(struct rpcb *bnp)
   extern fd_set  fdmask;
 
   bnp->rp_state = BGPSTATE_IDLE;       /* (1998/7/15) */
+#ifdef DEBUG_BGPSTATE
+  syslog(LOG_NOTICE, "<%s>: BGP state shift[%s] peer: %s", __FUNCTION__,
+	 bgp_statestr[bnp->rp_state], bgp_peerstr(bnp));
+#endif 
 
   close(bnp->rp_socket);
 

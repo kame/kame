@@ -29,6 +29,7 @@
 
 #define BGP_DEFAULT_SBSIZE	32768
 extern int bgpsbsize;
+extern char *bgp_statestr[];
 
 void             bgp_connect_start      __P((struct rpcb *));
 void             connect_try            __P((struct rpcb *));
