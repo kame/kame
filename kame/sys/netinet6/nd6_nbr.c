@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.61 2001/02/10 16:06:14 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.62 2001/02/23 09:01:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -569,6 +569,9 @@ nd6_na_input(m, off, icmp6len)
 	struct rtentry *rt;
 	struct sockaddr_dl *sdl;
 	union nd_opts ndopts;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	if (ip6->ip6_hlim != 255) {
 		nd6log((LOG_ERR,
@@ -683,19 +686,11 @@ nd6_na_input(m, off, icmp6len)
 			ln->ln_state = ND6_LLINFO_REACHABLE;
 			ln->ln_byhint = 0;
 			if (ln->ln_expire)
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-				ln->ln_expire = time.tv_sec +
-#else
 				ln->ln_expire = time_second +
-#endif
-					nd_ifinfo[rt->rt_ifp->if_index].reachable;
+				    nd_ifinfo[rt->rt_ifp->if_index].reachable;
 		} else {
 			ln->ln_state = ND6_LLINFO_STALE;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-			ln->ln_expire = time.tv_sec + nd6_gctimer;
-#else
 			ln->ln_expire = time_second + nd6_gctimer;
-#endif
 		}
 		if ((ln->ln_router = is_router) != 0) {
 			/*
@@ -749,11 +744,7 @@ nd6_na_input(m, off, icmp6len)
 			 */
 			if (ln->ln_state == ND6_LLINFO_REACHABLE) {
 				ln->ln_state = ND6_LLINFO_STALE;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-				ln->ln_expire = time.tv_sec + nd6_gctimer;
-#else
 				ln->ln_expire = time_second + nd6_gctimer;
-#endif
 			}
 			goto freeit;
 		} else if (is_override				   /* (2a) */
@@ -776,21 +767,13 @@ nd6_na_input(m, off, icmp6len)
 				ln->ln_state = ND6_LLINFO_REACHABLE;
 				ln->ln_byhint = 0;
 				if (ln->ln_expire) {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-					ln->ln_expire = time.tv_sec +
-#else
 					ln->ln_expire = time_second +
-#endif
-						nd_ifinfo[ifp->if_index].reachable;
+					    nd_ifinfo[ifp->if_index].reachable;
 				}
 			} else {
 				if (lladdr && llchange) {
 					ln->ln_state = ND6_LLINFO_STALE;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-					ln->ln_expire = time.tv_sec + nd6_gctimer;
-#else
 					ln->ln_expire = time_second + nd6_gctimer;
-#endif
 				}
 			}
 		}
