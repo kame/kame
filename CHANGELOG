@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2437 2003/07/15 11:02:45 itojun Exp $
+$KAME: CHANGELOG,v 1.2438 2003/07/19 10:44:54 itojun Exp $
 
 <200307>
+Sat Jul 19 18:12:01 JST 2003  itojun@iijlab.net
+	* sys/netinet6/esp_aesctr.c: support draft-ietf-ipsec-ciph-aes-ctr-03
+	  as there's no official DOI assignment yet, we use private DOI number.
+	* sys/netinet6/ah_aesxcbcmac.c: support
+	  draft-ietf-ipsec-ciph-aes-xcbc-mac-03.
+	  as there's no official DOI assignment yet, we use private DOI number.
+
 Tue Jul 15 20:02:05 JST 2003  itojun@iijlab.net
 	* sys/netinet6/esp_rijndael.c: simplify and update rijndael code.
 	  markus@openbsd

@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.336 2003/07/16 17:11:10 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.337 2003/07/19 10:44:54 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1860,6 +1860,10 @@ Currently supported algorithms are:
 	keyed SHA1 with 128bit crypto checksum (no document)
 	HMAC MD5 with 128bit crypto checksum (rfc2085.txt)
 	HMAC SHA1 with 128bit crypto checksum (no document)
+	HMAC SHA2-256 with 128bit crypto checksum (no document)
+	HMAC SHA2-384 with 128bit crypto checksum (no document)
+	HMAC SHA2-512 with 128bit crypto checksum (no document)
+	AES XCBC MAC with 128bit crypto checksum (no document)
     old IPsec ESP
 	null encryption (no document, similar to rfc2410.txt)
 	DES-CBC mode (rfc1829.txt)
@@ -1869,9 +1873,10 @@ Currently supported algorithms are:
 	keyed SHA1 with 96bit crypto checksum (no document)
 	HMAC MD5 with 96bit crypto checksum (rfc2403.txt
 	HMAC SHA1 with 96bit crypto checksum (rfc2404.txt)
-	HMAC SHA2-256 with 96bit crypto checksum (no document)
+	HMAC SHA2-256 with 96bit crypto checksum (draft-ietf-ipsec-ciph-sha-256-00.txt)
 	HMAC SHA2-384 with 96bit crypto checksum (no document)
 	HMAC SHA2-512 with 96bit crypto checksum (no document)
+	AES XCBC MAC with 96bit crypto checksum (draft-ietf-ipsec-ciph-aes-xcbc-mac-03.txt)
     new IPsec ESP
 	null encryption (rfc2410.txt)
 	DES-CBC with derived IV
@@ -1883,9 +1888,10 @@ Currently supported algorithms are:
 	RIJNDAEL/AES CBC (draft-ietf-ipsec-ciph-aes-cbc-01.txt,
 		uses IANA-assigned protocol number)
 	TWOFISH CBC (draft-ietf-ipsec-ciph-aes-cbc-01.txt)
-	each of the above can be combined with:
-	    ESP authentication with HMAC-MD5(96bit)
-	    ESP authentication with HMAC-SHA1(96bit)
+	AES counter mode (draft-ietf-ipsec-ciph-aes-ctr-03.txt)
+
+	each of the above can be combined with new IPsec AH schemes for
+	ESP authentication.
     IPComp
 	RFC2394: IP Payload Compression Using DEFLATE
 
