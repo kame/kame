@@ -487,7 +487,9 @@ resin(s, event, arg)
 		p = strrchr(relay->ser.buf, ' ');
 		if (!p)
 			goto epsvfail;
-		if (*p == '(')	/*)*/
+		if (*p == ' ' && p + 1 < ep)
+			p++;
+		if (*p == '(' && p + 1 < ep)	/*)*/
 			p++;
 		n = sscanf(p, "%u,%u,%u,%u,%u,%u",
 		    &ho[0], &ho[1], &ho[2], &ho[3], &po[0], &po[1]);
