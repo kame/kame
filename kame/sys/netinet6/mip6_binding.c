@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.124 2002/08/30 08:57:40 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.125 2002/09/01 05:58:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2684,6 +2684,8 @@ mip6_tunnel_input(mp, offp, proto)
 		}
 
 		ip6 = mtod(m, struct ip6_hdr *);
+
+		mip6stat.mip6s_revtunnel++;
 
 		s = splimp();
 		if (IF_QFULL(&ip6intrq)) {

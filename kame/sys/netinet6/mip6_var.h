@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.52 2002/08/27 09:52:39 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.53 2002/09/01 05:58:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -315,6 +315,8 @@ struct mip6stat {
 	u_quad_t mip6s_ohao;		/* HAO sent */
 	u_quad_t mip6s_rthdr2;		/* RTHDR2 received */
 	u_quad_t mip6s_orthdr2;		/* RTHDR2 sent */
+	u_quad_t mip6s_revtunnel;	/* reverse tunnel input */
+	u_quad_t mip6s_orevtunnel;	/* reverse tunnel output */
 	u_quad_t mip6s_checksum;	/* bad checksum */
 	u_quad_t mip6s_payloadproto;	/* payload proto != no nxt header */
 	u_quad_t mip6s_unknowntype;	/* unknown MH type value */

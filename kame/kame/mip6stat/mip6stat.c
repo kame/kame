@@ -1,4 +1,4 @@
-/*	$KAME: mip6stat.c,v 1.15 2002/08/28 13:34:38 keiichi Exp $	*/
+/*	$KAME: mip6stat.c,v 1.16 2002/09/01 05:58:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -669,6 +669,7 @@ showdetail()
 	PS("Home Address Option", mip6s_hao);
 	PS("unverified Home Address Option", mip6s_unverifiedhao);
 	PS("Routing Header type 2", mip6s_rthdr2);
+	PS("reverse tunneled input", mip6s_revtunnel);
 	PS("bad MH checksum", mip6s_checksum);
 	PS("bad payload protocol", mip6s_payloadproto);
 	PS("unknown MH type", mip6s_unknowntype);
@@ -707,6 +708,7 @@ showdetail()
 	}
 	PS("Home Address Option", mip6s_ohao);
 	PS("Routing Header type 2", mip6s_orthdr2);
+	PS("reverse tunneled output", mip6s_orevtunnel);
 
 	return (0);
 }
@@ -742,6 +744,7 @@ tmpshow()
 	M(mip6s_hao);
 	M(mip6s_unverifiedhao);
 	M(mip6s_rthdr2);
+	M(mip6s_revtunnel);
 	M(mip6s_paramprobhao);
 	M(mip6s_paramprobmh);
 
@@ -767,6 +770,7 @@ tmpshow()
 	}
 	M(mip6s_ohao);
 	M(mip6s_orthdr2);
+	M(mip6s_orevtunnel);
 
 	printf("ENDOFDATA\n");
 	return (0);
