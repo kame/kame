@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2640 2004/07/09 14:53:07 suz Exp $
+$KAME: CHANGELOG,v 1.2641 2004/07/10 08:04:41 jinmei Exp $
 
 <200407>
+2004-07-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *bsd/usr.sbin/Makefile: stopped building KAME bgpd.  It has
+	reached the end of life.
+
 2004-07-09  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/kame/pim6sd/timer.c: fixed a bug that that MLDv1/v2 query 
 	is not advertised when a router becomes a new querier
