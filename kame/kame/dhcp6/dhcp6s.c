@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.96 2003/01/21 12:05:37 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.97 2003/01/22 10:10:19 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1079,6 +1079,12 @@ server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
 		if (make_binding_ia(iapd, &roptinfo.iapd_list, optinfo))
 			goto fail;
 	}
+	if (TAILQ_EMPTY(&roptinfo.iapd_list)) {
+		/* XXX: need a clean-up and additional comments */
+		dprintf(LOG_INFO, "%s" "no useful information for a rebind",
+		    FNAME);
+		goto fail;	/* discard the rebind */
+	}
 
 	/* add other configuration information */
 	/* DNS server */
@@ -1235,12 +1241,14 @@ make_binding_ia(iapd, retlist, optinfo)
 		 */
 		struct dhcp6_list *stcode_list;
 
+#if 0
 		if (make_ia_stcode(iapd->type, iapd->val_ia.iaid,
 		    DH6OPT_STCODE_NOBINDING, retlist)) {
 			dprintf(LOG_NOTICE, "%s"
 			    "failed to make an option list" FNAME);
 			return (-1);
 		}
+#endif
 	} else {	/* we found a binding */
 		struct dhcp6_list ialist;
 		struct dhcp6_listval *lv;
@@ -1374,6 +1382,17 @@ server6_react_informreq(ifp, dh6, optinfo, from, fromlen)
 {
 	struct dhcp6_optinfo roptinfo;
 	int error;
+
+	/*
+	 * An IA option is not allowed to appear in an Information-request
+	 * message.  Such a message SHOULD be discarded.
+	 * [dhcpv6-28 Section 15]
+	 */
+	if (!TAILQ_EMPTY(&optinfo->iapd_list)) {
+		dprintf(LOG_INFO, "%s" "information request contains an IA_PD"
+		    " option", FNAME);
+		return (-1);
+	}
 
 	/* if a server information is included, it must match ours. */
 	if (optinfo->serverID.duid_len &&
