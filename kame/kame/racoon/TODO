@@ -1,4 +1,4 @@
-$Id: TODO,v 1.9 2000/07/04 17:01:21 sakane Exp $
+$Id: TODO,v 1.10 2000/07/15 12:38:05 sakane Exp $
 
 Sorry that `racoon' is not stable yet.  But she can exchange the key
 in limited environment.  Try to run with racoon.conf in the case
@@ -23,6 +23,7 @@ o Support scoped (link-local and site-local) IPv6 addresses.
 o kmstat should be improved.
 o aggressive mode DH group checks/handling on responder side.
 o Informational Exchange processing properly.
+o support RESPONDER-LIFETIME and rekeying
 
 SHOULD
 o To be supported bytes lifetimes for ISAKMP-SA.
