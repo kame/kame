@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.134 2000/06/22 09:06:22 sakane Exp $	*/
+/*	$KAME: key.c,v 1.135 2000/06/22 09:11:10 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -402,8 +402,10 @@ static struct mbuf *key_setsadbmsg __P((u_int8_t, u_int16_t, u_int8_t,
 static struct mbuf *key_setsadbsa __P((struct secasvar *));
 static struct mbuf *key_setsadbaddr __P((u_int16_t,
 	struct sockaddr *, u_int8_t, u_int16_t));
+#if 0
 static struct mbuf *key_setsadbident __P((u_int16_t, u_int16_t, caddr_t,
 	int, u_int64_t));
+#endif
 static struct mbuf *key_setsadbxsa2(u_int8_t, u_int32_t);
 static struct mbuf *key_setsadbxpolicy __P((u_int16_t, u_int8_t,
 	u_int32_t));
@@ -414,6 +416,8 @@ static int key_ismyaddr6 __P((struct sockaddr_in6 *));
 static int key_cmpsaidx_exactly
 	__P((struct secasindex *, struct secasindex *));
 static int key_cmpsaidx_withmode
+	__P((struct secasindex *, struct secasindex *));
+static int key_cmpsaidx_withoutmode
 	__P((struct secasindex *, struct secasindex *));
 static int key_cmpspidx_exactly
 	__P((struct secpolicyindex *, struct secpolicyindex *));
@@ -3481,6 +3485,7 @@ key_setsadbaddr(exttype, saddr, prefixlen, ul_proto)
 	return m;
 }
 
+#if 0
 /*
  * set data into sadb_ident.
  */
@@ -3518,6 +3523,7 @@ key_setsadbident(exttype, idtype, string, stringlen, id)
 
 	return m;
 }
+#endif
 
 /*
  * set data into sadb_x_sa2.
@@ -5086,7 +5092,6 @@ key_setident(sah, m, mhp)
 	}
 
 	switch (idsrc->sadb_ident_type) {
-		break;
 	case SADB_IDENTTYPE_PREFIX:
 	case SADB_IDENTTYPE_FQDN:
 	case SADB_IDENTTYPE_USERFQDN:
