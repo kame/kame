@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.72 2001/06/11 13:29:26 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.73 2001/06/11 13:51:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -640,10 +640,10 @@ ip6_forward(m, srcrt)
 				goto freecopy;
 		}
 	}
-	if (mcopy == NULL)
-		return;
 
  senderr:
+	if (mcopy == NULL)
+		return;
 	switch (error) {
 	case 0:
 #if 1
