@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.261 2004/08/11 07:47:50 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.262 2004/08/17 10:18:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,7 +88,6 @@
 
 static int rtpref __P((struct nd_defrouter *));
 static struct nd_defrouter *defrtrlist_update __P((struct nd_defrouter *));
-static int if2idlen __P((struct ifnet *));
 static int prelist_update __P((struct nd_prefixctl *, struct nd_defrouter *,
     struct mbuf *, int));
 static struct in6_ifaddr *in6_ifadd __P((struct nd_prefixctl *, int));
@@ -1273,45 +1272,6 @@ prelist_remove(pr)
 	pfxlist_onlink_check();
 }
 
-/*
- * Provide the length of interface identifiers to be used for the link attached
- * to the given interface.  The length should be defined in "IPv6 over
- * xxx-link" document.  Note that address architecture might also define
- * the length for a particular set of address prefixes, regardless of the
- * link type.  As clarified in rfc2462bis, those two definitions should be
- * consistent, and those really are as of August 2004.
- */
-static int
-if2idlen(ifp)
-	struct ifnet *ifp;
-{
-	switch (ifp->if_type) {
-	case IFT_ETHER:		/* RFC2464 */
-#ifdef IFT_PROPVIRTUAL
-	case IFT_PROPVIRTUAL:	/* XXX: no RFC. treat it as ether */
-#endif
-#ifdef IFT_L2VLAN
-	case IFT_L2VLAN:	/* ditto */
-#endif
-#ifdef IFT_IEEE80211
-	case IFT_IEEE80211:	/* ditto */
-#endif
-		return (64);
-	case IFT_FDDI:		/* RFC2467 */
-		return (64);
-	case IFT_ISO88025:	/* RFC2470 (IPv6 over Token Ring) */
-		return (64);
-	case IFT_ARCNET:	/* RFC2497 */
-		return (64);
-	case IFT_FRELAY:	/* RFC2590 */
-		return (64);
-	case IFT_IEEE1394:	/* RFC3146 */
-		return (64);
-	default:
-		return (-1);	/* unknown link type */
-	}
-}
-
 static int
 prelist_update(new, dr, m, mcast)
 	struct nd_prefixctl *new;
@@ -1605,7 +1565,7 @@ prelist_update(new, dr, m, mcast)
 		 * identifier is defined in a separate link-type specific
 		 * document.
 		 */
-		ifidlen = if2idlen(ifp);
+		ifidlen = ((struct in6_ifextra *)(ifp)->if_afdata[AF_INET6])->ifidlen;
 		if (ifidlen < 0) {
 			/* this should not happen, so we always log it. */
 			log(LOG_ERR, "prelist_update: IFID undefined (%s)\n",

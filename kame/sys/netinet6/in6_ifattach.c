@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.200 2004/08/12 02:03:20 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.201 2004/08/17 10:18:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -586,6 +586,25 @@ in6_ifattach_linklocal(ifp, altifp)
 	struct in6_aliasreq ifra;
 	struct nd_prefixctl pr0;
 	int i, error;
+	int ifidlen;
+
+	/*
+	 * If the interface identifier is too long for the link-local prefix,
+	 * autoconfiguration fails and manual configuration is required.
+	 * We simply assume the link-local prefix is fe80::/10.
+	 */
+	ifidlen = ((struct in6_ifextra *)(ifp)->if_afdata[AF_INET6])->ifidlen;
+	if (ifidlen < 0) {
+		/* this should not happen, so we always log it. */
+		log(LOG_ERR, "%s: IFID undefined\n", if_name(ifp));
+		return (-1);
+	}
+	if (ifidlen + 10 > 128) {
+		log(LOG_ERR, "%s: IFID is too long (%d) for link-local "
+		    "address. Manual configuration is required.\n",
+		    if_name(ifp), ifidlen);
+		return (-1);
+	}
 
 	/*
 	 * configure link-local address.

@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.102 2004/07/05 07:27:29 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.103 2004/08/17 10:18:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,6 +96,7 @@ struct in6_ifextra {
 	struct icmp6_ifstat *icmp6_ifstat;
 	struct nd_ifinfo *nd_ifinfo;
 	struct scope6_id *scope6_id;
+	int ifidlen;
 };
 
 struct	in6_ifaddr {

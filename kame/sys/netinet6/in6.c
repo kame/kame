@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.380 2004/07/23 04:39:20 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.381 2004/08/17 10:18:57 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -220,6 +220,7 @@ static int in6_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
 static int in6_ifinit __P((struct ifnet *, struct in6_ifaddr *,
 	struct sockaddr_in6 *, int));
 static void in6_unlink_ifa __P((struct in6_ifaddr *, struct ifnet *));
+static int if2idlen __P((struct ifnet *));
 
 #ifdef __FreeBSD__
 int	(*faithprefix_p)(struct in6_addr *);
@@ -2507,6 +2508,45 @@ in6_setmaxmtu()
 		in6_maxmtu = maxmtu;
 }
 
+/*
+ * Provide the length of interface identifiers to be used for the link attached
+ * to the given interface.  The length should be defined in "IPv6 over
+ * xxx-link" document.  Note that address architecture might also define
+ * the length for a particular set of address prefixes, regardless of the
+ * link type.  As clarified in rfc2462bis, those two definitions should be
+ * consistent, and those really are as of August 2004.
+ */
+static int
+if2idlen(ifp)
+	struct ifnet *ifp;
+{
+	switch (ifp->if_type) {
+	case IFT_ETHER:		/* RFC2464 */
+#ifdef IFT_PROPVIRTUAL
+	case IFT_PROPVIRTUAL:	/* XXX: no RFC. treat it as ether */
+#endif
+#ifdef IFT_L2VLAN
+	case IFT_L2VLAN:	/* ditto */
+#endif
+#ifdef IFT_IEEE80211
+	case IFT_IEEE80211:	/* ditto */
+#endif
+		return (64);
+	case IFT_FDDI:		/* RFC2467 */
+		return (64);
+	case IFT_ISO88025:	/* RFC2470 (IPv6 over Token Ring) */
+		return (64);
+	case IFT_ARCNET:	/* RFC2497 */
+		return (64);
+	case IFT_FRELAY:	/* RFC2590 */
+		return (64);
+	case IFT_IEEE1394:	/* RFC3146 */
+		return (64);
+	default:
+		return (-1);	/* unknown link type */
+	}
+}
+
 void *
 in6_domifattach(ifp)
 	struct ifnet *ifp;
@@ -2525,6 +2565,7 @@ in6_domifattach(ifp)
 	    M_IFADDR, M_WAITOK);
 	bzero(ext->icmp6_ifstat, sizeof(*ext->icmp6_ifstat));
 
+	ext->ifidlen = if2idlen(ifp);
 	ext->nd_ifinfo = nd6_ifattach(ifp);
 	ext->scope6_id = scope6_ifattach(ifp);
 	return ext;
