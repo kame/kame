@@ -448,6 +448,7 @@ pci/dpt_pci.c		optional  dpt     device-driver
 net/if_dummy.c		optional dummy
 net/if_faith.c		optional faith
 net/if_gif.c		optional gif
+net/if_sec.c		optional sec
 net/if_stf.c		optional stf inet inet6
 net/if_vlan.c		optional vlan
 netinet/ip_ecn.c	optional inet
