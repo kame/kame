@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: misc.c,v 1.3 2000/01/07 14:33:32 fujisawa Exp $
+ *	$Id: misc.c,v 1.4 2000/02/03 10:10:16 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -315,10 +315,9 @@ getAddrInfo(int family, char *text)
 
 
 struct addrCouple *
-getAddrBlock(int family, int type, struct addrinfo *one, struct addrinfo *two)
+getAddrBlock(int family, int type, struct addrinfo *one, void *two)
 {
-    struct sockaddr_in	*sin4;
-    struct sockaddr_in6	*sin6;
+    struct sockaddr	*sin;
     struct addrCouple	*block;
 
     block = malloc(sizeof(struct addrCouple));
@@ -330,13 +329,11 @@ getAddrBlock(int family, int type, struct addrinfo *one, struct addrinfo *two)
     switch (family)
     {
       case AF_INET:
-	sin4 = (struct sockaddr_in *)one->ai_addr;
-	block->addr[0].in4 = sin4->sin_addr;
+	block->addr[0].in4 = ((struct sockaddr_in *)one)->sin_addr;
 	break;
 
       case AF_INET6:
-	sin6 = (struct sockaddr_in6 *)one->ai_addr;
-	block->addr[0].in6 = sin6->sin6_addr;
+	block->addr[0].in6 = ((struct sockaddr_in6 *)one)->sin6_addr;
 	break;
     }
 
@@ -349,11 +346,11 @@ getAddrBlock(int family, int type, struct addrinfo *one, struct addrinfo *two)
 	switch (family)
 	{
 	  case AF_INET:
-	    block->addr[1].in4 = *in4_len2mask((int)two);
+	    block->addr[1].in4 = *in4_len2mask(*(int *)two);
 	    break;
 
 	  case AF_INET6:
-	    block->addr[1].in6 = *in6_len2mask((int)two);
+	    block->addr[1].in6 = *in6_len2mask(*(int *)two);
 	    break;
 	}
 	break;
@@ -362,13 +359,13 @@ getAddrBlock(int family, int type, struct addrinfo *one, struct addrinfo *two)
 	switch (family)
 	{
 	  case AF_INET:
-	    sin4 = (struct sockaddr_in *)two->ai_addr;
-	    block->addr[1].in4 = sin4->sin_addr;
+	    sin = ((struct addrinfo *)two)->ai_addr;
+	    block->addr[1].in4 = ((struct sockaddr_in *)sin)->sin_addr;
 	    break;
 
 	  case AF_INET6:
-	    sin6 = (struct sockaddr_in6 *)two->ai_addr;
-	    block->addr[1].in6 = sin6->sin6_addr;
+	    sin = ((struct addrinfo *)two)->ai_addr;
+	    block->addr[1].in6 = ((struct sockaddr_in6 *)sin)->sin6_addr;
 	    break;
 	}
 	break;

@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptconfig.y,v 1.2 2000/01/07 14:33:33 fujisawa Exp $
+ *	$Id: natptconfig.y,v 1.3 2000/02/03 10:10:16 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -329,7 +329,11 @@ ipv4addrs
 		: ipv4addr
 		    { $$ = getAddrBlock(AF_INET, ADDR_SINGLE, $1, NULL); }
 		| ipv4addr SSLASH SDECIMAL
-		    { $$ = getAddrBlock(AF_INET, ADDR_MASK, $1, (struct addrinfo *)$3); }
+		    {
+			int	dec = $3;
+
+			$$ = getAddrBlock(AF_INET, ADDR_MASK, $1, (void *)&dec);
+		    }
 		| ipv4addr SMINUS ipv4addr
 		    { $$ = getAddrBlock(AF_INET, ADDR_RANGE, $1, $3); }
 		;
@@ -338,7 +342,11 @@ ipv6addrs
 		: ipv6addr
 		    { $$ = getAddrBlock(AF_INET6, ADDR_SINGLE, $1, NULL); }
 		| ipv6addr SSLASH SDECIMAL
-		    { $$ = getAddrBlock(AF_INET6, ADDR_MASK, $1, (struct addrinfo *)$3); }
+		    {
+			int	dec = $3;
+
+			$$ = getAddrBlock(AF_INET6, ADDR_MASK, $1, (void *)&dec);
+		    }
 		| ipv6addr SMINUS ipv6addr
 		    { $$ = getAddrBlock(AF_INET6, ADDR_RANGE, $1, $3); }
 		;

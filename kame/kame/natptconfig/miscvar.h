@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: miscvar.h,v 1.2 2000/01/07 14:33:32 fujisawa Exp $
+ *	$Id: miscvar.h,v 1.3 2000/02/03 10:10:16 fujisawa Exp $
  */
 
 void		 setInterface		__P((char *, int));
@@ -41,7 +41,7 @@ void		 debugBreak		__P((void));
 int		 soctl			__P((int, u_long, ...));
 
 struct addrinfo		*getAddrInfo	__P((int, char *));
-struct addrCouple	*getAddrBlock	__P((int, int, struct addrinfo *, struct addrinfo *));
+struct addrCouple	*getAddrBlock	__P((int, int, struct addrinfo *, void *));
 
 int		 in6_prefix2len		__P((struct in6_addr *));
 
