@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1878 2001/09/18 12:33:40 jinmei Exp $
+$KAME: CHANGELOG,v 1.1879 2001/09/19 07:02:19 sakane Exp $
 
 <200109>
+Thu Sep 20 01:00:08 JST 2001 sakane@kame.net
+	* kame/kame/rtsold:
+	improved the -a option.  it can probe a interface automatically when
+	the interface wake up.  it can be started anytime even when there is no
+	network interface on the list of intarfaces in the kernel.
+
 2001-09-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/resolv/res_send.c (res_send):
 	* bsdi4/contrib/bind/src/lib/resolv/res_send.c (res_nsend):
