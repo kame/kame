@@ -85,7 +85,9 @@ static char *dumpfilename = "/var/run/rtsold.dump"; /* XXX: should be configurab
 static char *pidfilename = "/var/run/rtsold.pid"; /* should be configurable */
 
 static int ifconfig __P((char *ifname));
+#if 0
 static int ifreconfig __P((char *ifname));
+#endif
 static int make_packet __P((struct ifinfo *ifinfo));
 static struct timeval *rtsol_check_timer __P((void));
 static void TIMEVAL_ADD __P((struct timeval *a, struct timeval *b,
@@ -331,6 +333,7 @@ ifconfig(char *ifname)
 	return(-1);
 }
 
+#if 0
 static int
 ifreconfig(char *ifname)
 {
@@ -355,6 +358,7 @@ ifreconfig(char *ifname)
 
 	return rv;
 }
+#endif
 
 struct ifinfo *
 find_ifinfo(int ifindex)
