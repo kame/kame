@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.87 2003/12/05 01:35:16 keiichi Exp $	*/
+/*	$KAME: icmp6.h,v 1.88 2003/12/16 12:14:49 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -170,10 +170,10 @@ struct icmp6_hdr {
 #define IND_ADVERT			142	/* inverse neighbor advertisement */
 
 /* Folloing numbers are defined in the mobile-ip draft. */
-#define MIP6_HA_DISCOVERY_REQUEST	143	/* home agent address discovery request */
-#define MIP6_HA_DISCOVERY_REPLY		144	/* home agent address discovery reply */
-#define MIP6_PREFIX_SOLICIT		145	/* mobile prefix solicitation */
-#define MIP6_PREFIX_ADVERT		146	/* mobile prefix advertisement */
+#define MIP6_HA_DISCOVERY_REQUEST	144	/* home agent address discovery request */
+#define MIP6_HA_DISCOVERY_REPLY		145	/* home agent address discovery reply */
+#define MIP6_PREFIX_SOLICIT		146	/* mobile prefix solicitation */
+#define MIP6_PREFIX_ADVERT		147	/* mobile prefix advertisement */
 
 /* The definitions below are experimental. TBA */
 #define MLD_MTRACE_RESP			200	/* mtrace resp (to sender) */
