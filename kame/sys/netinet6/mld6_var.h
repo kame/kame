@@ -1,4 +1,4 @@
-/*	$KAME: mld6_var.h,v 1.13 2004/07/05 03:10:14 jinmei Exp $	*/
+/*	$KAME: mld6_var.h,v 1.14 2004/07/05 04:43:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -90,7 +90,9 @@ void	mld_start_listening(struct in6_multi *, u_int8_t type);
 #endif
 void	mld_stop_listening(struct in6_multi *);
 void	mld_slowtimeo(void);
+#ifdef MLDV2
 void	mld_fasttimeo(void);
+#endif
 void	mld_send_state_change_report(struct mbuf **, int *,
 				     struct in6_multi *, u_int8_t, int);
 #if defined(MLDV2) && !defined(__FreeBSD__)

@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.103 2004/07/05 03:10:14 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.104 2004/07/05 04:43:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -595,13 +595,6 @@ mld_input(m, off)
 	}
 
 	m_freem(m);
-}
-
-void
-mld_fasttimeo()
-{
-	/* we don't have to do anything */
-	return;
 }
 
 static void

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.386 2004/05/24 11:31:51 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.387 2004/07/05 04:43:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2699,7 +2699,9 @@ void
 icmp6_fasttimo()
 {
 
+#ifdef MLDV2
 	mld_fasttimeo();
+#endif
 }
 
 void
