@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1891 2001/09/24 16:11:43 jinmei Exp $
+$KAME: CHANGELOG,v 1.1892 2001/09/25 15:10:20 sakane Exp $
 
 <200109>
+Wed Sep 26 00:01:08 JST 2001 sakane@kame.net
+	* kame/sys/netkey/key.c:
+	* kame/kame/setkey:
+	the syntax how to define a policy of a ICMPv6 type and/or a code
+	has been changed.  the previous modification at Fri Sep 21 broke
+	a backward compatibility, and had no sense.  when the policy doesn't
+	require IPsec for an inbound Neighbor Solicitation with any source
+	/destination address, the specification is the following;
+		spdadd ::/0 ::/0 icmp6 135,0 -P out none;
+
 2001-09-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/addrselect/: a tool to configure the policy table (see
 	below).  This program is also an experimental stuff.
