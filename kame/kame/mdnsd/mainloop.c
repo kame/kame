@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.12 2000/05/31 05:53:38 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.13 2000/05/31 08:14:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -510,6 +510,8 @@ getans(s, buf, len, from)
 {
 	HEADER *ohp, *hp;
 	struct qcache *qc;
+	const char *on = NULL, *n = NULL;
+	const char *d, *od;
 
 	if (sizeof(*hp) > len)
 		return -1;
@@ -529,7 +531,18 @@ getans(s, buf, len, from)
 		return -1;
 	ohp = (HEADER *)qc->qbuf;
 
-	/* XXX validate reply against original query */
+	/* validate reply against original query */
+	d = (const char *)(hp + 1);
+	n = decode_name(&d, len - (d - buf));
+	if (!n || len - (d - buf) < 4)
+		goto fail;
+	od = (const char *)(ohp + 1);
+	on = decode_name(&od, qc->qlen - (od - qc->qbuf));
+	dprintf("query: %s reply: %s\n", on, n);
+	if (!on || qc->qlen - (od - qc->qbuf) < 4)
+		goto fail;
+	if (strcmp(n, on) != 0 || memcmp(d, od, 4) != 0)
+		goto fail;
 
 	hp->id = ohp->id;
 	hp->ra = 0;	/* recursion not supported */
@@ -537,10 +550,22 @@ getans(s, buf, len, from)
 	if (sendto(s, buf, len, 0, (struct sockaddr *)&qc->from,
 	    qc->from.ss_len) != len) {
 		delqcache(qc);
-		return -1;
+		goto fail;
 	}
 	delqcache(qc);
+
+	if (n)
+		free((char *)n);
+	if (on)
+		free((char *)on);
 	return 0;
+
+fail:
+	if (n)
+		free((char *)n);
+	if (on)
+		free((char *)on);
+	return -1;
 }
 
 static int
@@ -587,6 +612,7 @@ relay(buf, len, from)
 				if (sendto(sock[i], buf, len, 0, sa,
 				    sa->sa_len) == len) {
 					sent++;
+					break;	/* try the next nameserver */
 				}
 			}
 		}
