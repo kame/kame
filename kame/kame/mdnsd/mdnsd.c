@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.37 2001/05/08 04:36:31 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.38 2001/06/23 01:54:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -69,7 +69,8 @@ int dflag = 0;
 int fflag = 0;
 int lflag = 0;
 struct timeval hz = { 1, 0 };	/* timeout every 1 second */
-static int mflag;
+static int mflag = 0;
+int Nflag = 0;
 #ifdef NI_WITHSCOPEID
 const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
 #else
@@ -97,7 +98,7 @@ main(argc, argv)
 	struct sockdb *sd;
 	int nsock;
 
-	while ((ch = getopt(argc, argv, "46Dfh:i:lmp:P:")) != -1) {
+	while ((ch = getopt(argc, argv, "46Dfh:i:lmNp:P:")) != -1) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -130,6 +131,9 @@ main(argc, argv)
 			break;
 		case 'm':
 			mflag++;
+			break;
+		case 'N':
+			Nflag++;
 			break;
 		case 'p':
 			srcport = optarg;
@@ -186,6 +190,12 @@ main(argc, argv)
 		/*NOTREACHED*/
 	}
 
+	if (getsock(AF_INET6, "::", NULL, SOCK_RAW, AI_PASSIVE, S_ICMP6)
+	    != 0) {
+		err(1, "getsock");
+		/*NOTREACHED*/
+	}
+
 	if (mflag) {
 		if (getsock(AF_INET, NULL, MEDIATOR_CTRL_PORT, SOCK_DGRAM, 0,
 		    S_MEDIATOR) != 0) {
@@ -205,6 +215,7 @@ main(argc, argv)
 		case S_TCP:
 			continue;
 		case S_MULTICAST:
+		case S_ICMP6:
 			break;
 		}
 
@@ -289,7 +300,7 @@ usage()
 {
 
 	fprintf(stderr,
-"usage: mdnsd [-46Dflm] [-h hostname] [-p srcport] [-P dstport]\n"
+"usage: mdnsd [-46DflmN] [-h hostname] [-p srcport] [-P dstport]\n"
 "             -i iface [userv...]\n");
 }
 
@@ -309,6 +320,8 @@ getsock(af, host, serv, socktype, flags, stype)
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = af;
 	hints.ai_socktype = socktype;
+	if (stype == S_ICMP6)
+		hints.ai_protocol = IPPROTO_ICMPV6;
 	hints.ai_flags = flags | AI_NUMERICHOST;
 	error = getaddrinfo(host, serv, &hints, &res);
 	if (error) {
@@ -352,11 +365,12 @@ getsock0(ai)
 		dprintf("socket: %s\n", strerror(errno));
 		return -1;
 	}
-	if (bind(s, ai->ai_addr, ai->ai_addrlen) < 0) {
-		dprintf("bind: %s\n", strerror(errno));
-		close(s);
-		return -1;
-	}
+	if (ai->ai_socktype == SOCK_STREAM || ai->ai_socktype == SOCK_DGRAM)
+		if (bind(s, ai->ai_addr, ai->ai_addrlen) < 0) {
+			dprintf("bind: %s\n", strerror(errno));
+			close(s);
+			return -1;
+		}
 	if (ai->ai_socktype == SOCK_STREAM && listen(s, 5) < 0) {
 		dprintf("listen: %s\n", strerror(errno));
 		return -1;

@@ -1,4 +1,4 @@
-.\"	$KAME: mdnsd.8,v 1.34 2001/06/23 00:13:24 itojun Exp $
+.\"	$KAME: mdnsd.8,v 1.35 2001/06/23 01:54:22 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -37,7 +37,7 @@
 .Sh SYNOPSIS
 .Nm mdnsd
 .Bk -words
-.Op Fl 46Dflm
+.Op Fl 46DflmN
 .Ek
 .Bk -words
 .Op Fl h Ar hostname
@@ -122,6 +122,9 @@ restricted, hence
 flag is not very useful for most of users.
 Do not send questions about this
 .Li :-)
+.It Fl N
+Transmit ICMPv6 node information queries, instead of multicast DNS queries,
+for resolving names on the adjacent link.
 .It Fl p Ar inport
 .Nm
 listens to UDP port

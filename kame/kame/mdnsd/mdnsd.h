@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.h,v 1.19 2001/05/02 11:07:57 itojun Exp $	*/
+/*	$KAME: mdnsd.h,v 1.20 2001/06/23 01:54:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -44,6 +44,7 @@ extern const char *hostname;
 extern int dflag;
 extern int fflag;
 extern int lflag;
+extern int Nflag;
 extern struct timeval hz;
 extern const int niflags;
 extern int signo;

@@ -1,4 +1,4 @@
-/*	$KAME: db.h,v 1.13 2001/06/22 21:41:37 itojun Exp $	*/
+/*	$KAME: db.h,v 1.14 2001/06/23 01:54:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -67,7 +67,7 @@ struct nsdb {
 	struct timeval lastrx;	/* last packet delivery */
 };
 
-enum sdtype { S_UNICAST, S_MULTICAST, S_MEDIATOR, S_TCP };
+enum sdtype { S_UNICAST, S_MULTICAST, S_MEDIATOR, S_TCP, S_ICMP6 };
 struct sockdb {
 	LIST_ENTRY(sockdb) link;
 	int af;
