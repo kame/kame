@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.24 2003/01/08 08:47:22 suz Exp $	*/
+/*	$KAME: if.c,v 1.25 2003/01/08 10:30:54 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -659,7 +659,7 @@ is_isatap_router(struct rainfo *rai, struct in6_addr *src)
 #ifndef ISATAP
 	return 0;
 #else
-	struct in_addr *addr, *src4;
+	struct in_addr *src4;
 	char *buf, *ptr, *lim;
 	size_t needed;
 	int mib[3] = {CTL_NET, IPPROTO_IPV6, IPV6CTL_ISATAPRTR};
@@ -673,9 +673,9 @@ is_isatap_router(struct rainfo *rai, struct in6_addr *src)
 	if (!is_isatap(rai))
 		return 0;
 	if (sysctl(mib, 3, NULL, &needed, NULL, 0) < 0)
-		return;
+		return 0;
 	if (needed == 0)
-		return;
+		return 0;
 	if ((buf = malloc(needed)) == NULL) {
 		syslog(LOG_ERR, "<%s> malloc failed", __func__);
 		exit(1);
