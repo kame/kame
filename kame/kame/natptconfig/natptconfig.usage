@@ -1,0 +1,54 @@
+	$KAME: natptconfig.usage,v 1.1 2001/09/02 21:04:05 fujisawa Exp $
+
+This is simple NAT-PT configuration example.  This shows NAT-PT setup
+between inside IPv6 host and outside IPv4 host
+Sorry, this example is FreeBSD 4.3 specific.
+
+Sample network is as follows.  As shown in the following figure,
+outside interface is "fxp0", inside interface is "ed0".
+
+	(outside)
+	------------+---------------- 10.0.69/24
+		    |
+		    | fxp0 (10.0.69.68)
+		 NATPT
+		    | ed0 (3ffe:501:041c:6000:0200:2ff:fe00:270c)
+		    |
+	------------+---------------- 3ffe:0501:041c/48
+	(inside)
+
+
+How to install and use NAT-PT
+  - kernel configuration option
+      uncomment "options NATPT" of your kernel configuration file.
+      % make 
+      # make install
+
+  - edit /etc/rc.conf
+      add the following varibles in /etc/rc.conf.
+
+	ipv6_enable="YES"
+	ipv6_network_interfaces="ed0"
+	ipv6_gateway_enable="YES"
+	ipv6_prefix_ed0="3ffe:0501:041c:6000"
+	prefixcmd_enable="NO"
+	rtadvd_enable="YES"
+	rtadvd_interfaces="ed0"
+
+     then reboot machine.
+
+  - edit natpt.conf (any name is ok)
+      create natpt.conf with the following content.
+
+	prefix natpt 3ffe:0501:041c:c1ad::
+	map from any6 to 10.0.69.68 port 28672 - 32767
+	map enable
+
+  - apply natpt.conf
+      usually natptconfig(8) is installed into /usr/local/v6/sbin.
+
+	natptconfig -f natpt.conf
+
+  - show translation info
+	natptconfig show xlate	-- show current active translation entry.
+	natptconfig show rules  -- show current rule entry.
