@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.2 1999/09/01 05:34:06 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.3 1999/09/09 23:54:16 itojun Exp $ */
 
 %{
 #include <sys/types.h>
@@ -247,7 +247,8 @@ ah_spec
 
 ipcomp_spec
 	:	F_COMP ALG_COMP { p_alg_enc = $2.num; }
-	|	F_RAWCPI { p_ext |= SADB_X_EXT_RAWCPI; }
+	|	F_COMP ALG_COMP { p_alg_enc = $2.num; }
+		F_RAWCPI { p_ext |= SADB_X_EXT_RAWCPI; }
 	;
 
 enc_alg
