@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.150 2002/11/29 04:54:21 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.151 2002/11/29 05:26:21 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1619,7 +1619,7 @@ natpt_translatePYLD4To6(struct pcv *cv6)
 			printf("%s():\n", __FUNCTION__);
 			printf("  delta, fromto: %5d %5d\n", delta, fromto);
 			printf("  delta, seq, ack: %5ld, %11lu, %11lu\n",
-			       ts->delta[fromto], htol(ts->seq[fromto]), htol(ts->ack[fromto]));
+			       ts->delta[fromto], htonl(ts->seq[fromto]), htonl(ts->ack[fromto]));
 #endif
 			ts->delta[fromto] += delta;
 			ts->seq[fromto] = th6->th_seq;
