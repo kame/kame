@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.315 1999/12/03 08:43:25 jinmei Exp $
+$Id: CHANGELOG,v 1.316 1999/12/03 09:03:53 jinmei Exp $
 
 <199912>
+1999-12-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd: massive improvements including
+	- sanity checks for incoming PIM messages
+	- fixed a bug of (sometimes) sending invalid RP-adv messages
+	- fixed a bug in RP group list management
+	- count various statistics inside the daemon and dump them to a
+	  file on receiving a signal. A new option '-s' was added to
+	  the pim6stat command to support this.
+	
 1999-12-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/rtadvd.c: more sanity checks were added for
 	recevied RSes and RAs in order to avoid trying to process an
