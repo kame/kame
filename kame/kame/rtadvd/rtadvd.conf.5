@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.23 2001/01/18 05:42:19 itojun Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.24 2001/01/18 05:44:19 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -307,7 +307,9 @@ for details on the capability.
 #      if you only want to advertise network parameters, and do not
 #      want to let your box forward packets, you can manually set zero
 #      to the router lifetime (rltime) like:
+
 #ne0:rltime#0:
+
 #      where ne0 is the advertising interface of your box.  Again,
 #      PLEASE DO NOT FORGET THAT THIS IS NOT A TYPICAL EXAMPLE.  Do not
 #      just cut and (edit and) paste the above example into your
