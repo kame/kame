@@ -2777,7 +2777,7 @@ ipsec6_output_tunnel(state, sp, flags)
 
 	for (/*already initialized*/; isr; isr = isr->next) {
 		/* When tunnel mode, SA peers must be specified. */
-		bzero(&saidx, sizeof(saidx));
+		bcopy(&isr->saidx, &saidx, sizeof(saidx));
 		if (key_checkrequest(isr, &saidx) == ENOENT) {
 			/*
 			 * IPsec processing is required, but no SA found.
