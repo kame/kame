@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.902 2000/05/18 15:30:45 itojun Exp $
+$Id: CHANGELOG,v 1.903 2000/05/19 00:27:15 sumikawa Exp $
 
 <200005>
+Fri May 19 09:26:28 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd4/{usr.bin/fetch, lib/libftpio}: support IPv6.
+	  From: ume@mahoroba.org
+
 Fri May 19 00:30:04 JST 2000 itojun@iijlab.net
 	* kame/pim6dd/vif.c: allocate uv_querier struct as necessary on
 	  initialization.  it will avoid SEGV right after invocation.
