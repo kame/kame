@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.c,v 1.2 1999/08/20 07:17:01 itojun Exp $ */
+/* YIPS @(#)$Id: misc.c,v 1.3 1999/08/21 22:16:45 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -182,7 +182,8 @@ mem2str(buf, mlen)
 char *
 strtob(str, base, len)
 	char *str;
-	int base, *len;
+	int base;
+	size_t *len;
 {
 	int f, i;
 	char *dst;
