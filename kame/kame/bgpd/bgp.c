@@ -414,7 +414,8 @@ connect_process(struct rpcb *bnp)
  *        DESCRIPTION: process received OPEN msg.
  */
 void
-bgp_process_open(struct rpcb *bnp) {
+bgp_process_open(struct rpcb *bnp)
+{
   int             i, k;       /*  tracer     */
   u_int16_t       rcvas, rcvht, negoht;
   u_int32_t       rcvid;      /*  net-order  */
