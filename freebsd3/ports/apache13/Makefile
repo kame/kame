@@ -1,21 +1,37 @@
 # New ports collection makefile for:    apache HTTPD
 # Version required:     1.3*
 # Date created:         Fri Aug 25 16:42:36 CDT 1995
-# Whom:                 ache@nagual.pp.ru
+# Whom:                 ache@freebsd.org
 #
-# $Id: Makefile,v 1.3 1999/08/23 14:20:52 shin Exp $
+# $FreeBSD: ports/www/apache13/Makefile,v 1.75 1999/09/03 16:07:23 ache Exp $
+# $Id: Makefile,v 1.4 1999/11/17 04:23:36 sumikawa Exp $
 #
 
-DISTNAME=	apache_1.3.6
-PKGNAME=	apache-1.3.6
+DISTNAME=       apache_1.3.9
+PKGNAME=        apache-1.3.9
 CATEGORIES=	www
-MASTER_SITES=	ftp://www.apache.org/dist/
+MASTER_SITES=   http://www.apache.org/dist/ \
+		ftp://ftp.ccs.neu.edu/net/mirrors/ftp.apache.org/apache/dist/ \
+		ftp://ftp.rge.com/pub/infosystems/apache/dist/ \
+		ftp://apache.compuex.com/pub/apache/dist/ \
+		ftp://apache.arctic.org/pub/apache/dist/ \
+		ftp://ftp.epix.net/pub/apache/dist/ \
+		ftp://ftp.ameth.org/pub/mirrors/ftp.apache.org/apache/dist/ \
+		ftp://ftp.connectnet.com/pub/www/apache/ \
+		ftp://apache.technomancer.com/mirrors/apache/dist/ \
+		ftp://ftp.raver.net/pub/ftp.apache.org/ \
+		ftp://www3.service.digital.com/apache/dist/ \
+		ftp://galileo.galilei.com/pub/apache/ \
+		ftp://ftp.mtnranch.net/pub/apache/dist/ \
+		ftp://ftp.iodynamics.com/pub/mirror/apache/dist/ \
+		ftp://apache.nextpath.com/pub/apache/dist/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	apache-136-v6-19990820.diff.gz
+PATCHFILES=	apache-139-v6-19991013a.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@kame.net
+Y2K=		http://www.apache.org/docs/misc/FAQ.html#year2000
 
 #
 # Set APACHE_PERF_TUNING env. variable to YES to get maximum performance
@@ -24,21 +40,15 @@ MAINTAINER=	itojun@kame.net
 HAS_CONFIGURE=  yes
 CONFIGURE_SCRIPT=	configure.v6
 CONFIGURE_ARGS= \
-		 --sysconfdir=${PREFIX}/etc/apache \
-		 --includedir=${PREFIX}/include/apache \
-		 --logfiledir=/var/log \
-		 --runtimedir=/var/run \
-		 --datadir=${PREFIX}/www \
-		 --proxycachedir=${PREFIX}/www/proxy \
-		 --libexecdir=${PREFIX}/libexec/apache \
+		 --prefix=${PREFIX} \
+		 --with-perl=${PERL} \
+		 --with-layout=${FILESDIR}/FreeBSD.layout:FreeBSD \
+		 --suexec-docroot=${PREFIX}/www/data \
 		 --without-confadjust \
 		 --enable-shared=remain \
 		 --enable-module=most \
 		 --enable-module=auth_db \
 		 --disable-module=auth_dbm
-
-# Currently perl version don't matter
-#                 --with-perl=${PERL5}
 
 OPTIM=-DHARD_SERVER_LIMIT=512 \
 -DDOCUMENT_LOCATION=\\"${PREFIX}/www/data/\\" \
@@ -51,18 +61,18 @@ CFLAGS+= -O6 -fomit-frame-pointer
 
 CONFIGURE_ENV= OPTIM='${OPTIM}'
 
-MAN1=   htdigest.1 htpasswd.1
-MAN8=   apachectl.8 ab.8 apxs.8 httpd.8 logresolve.8 rotatelogs.8
+MAN1= dbmmanage.1 htdigest.1 htpasswd.1
+MAN8= ab.8 apachectl.8 apxs.8 httpd.8 logresolve.8 rotatelogs.8
 
-post-patch:
-	chmod +x ${WRKSRC}/${CONFIGURE_SCRIPT}
+pre-configure:
+	${CHMOD} 755 ${WRKSRC}/${CONFIGURE_SCRIPT}
 
 post-install:
 	@if [ ! -f ${PREFIX}/etc/rc.d/apache.sh ]; then \
 		${ECHO} "Installing ${PREFIX}/etc/rc.d/apache.sh startup file."; \
 		${ECHO} "#!/bin/sh" > ${PREFIX}/etc/rc.d/apache.sh; \
-		${ECHO} "[ -x ${PREFIX}/bin/apachectl ] && ${PREFIX}/bin/apachectl start > /dev/null && echo -n ' apache'" >> ${PREFIX}/etc/rc.d/apache.sh; \
-		chmod 751 ${PREFIX}/etc/rc.d/apache.sh; \
+		${ECHO} "[ -x ${PREFIX}/sbin/apachectl ] && ${PREFIX}/sbin/apachectl start > /dev/null && ${ECHO} -n ' apache'" >> ${PREFIX}/etc/rc.d/apache.sh; \
+		${CHMOD} 751 ${PREFIX}/etc/rc.d/apache.sh; \
 	fi
 
 .include <bsd.port.mk>
