@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.5 2003/01/06 06:02:41 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.6 2003/01/06 06:09:22 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -67,7 +67,7 @@ The followings are the format and description of available DHCPv6
 options.
 .Bl -tag -width Ds -compact
 .It Xo
-.Ic dns
+.Ic domain-name-servers
 .Xc
 means a Domain Name Server option.
 .It Ic ia-pd Ar ID
@@ -130,7 +130,7 @@ must exist with the same
 This statement specifies DHCPv6 options to be included in an
 option-request option.
 Currently only
-.Ic dns
+.Ic domain-name-servers
 can be specified in a request statement,
 which requests a list of Domain Name Server addresses.
 .It Ic information-only ;
