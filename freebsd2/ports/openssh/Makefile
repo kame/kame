@@ -1,4 +1,4 @@
-# $KAME: Makefile,v 1.8 2001/03/26 05:22:22 itojun Exp $
+# $KAME: Makefile,v 1.9 2001/03/26 19:16:08 itojun Exp $
 
 DISTNAME=	openssh-2.5.2p2
 #CATEGORIES=	security net ipv6
@@ -8,7 +8,7 @@ MASTER_SITES=	ftp://ftp.openssh.com/pub/OpenBSD/OpenSSH/portable/
 
 MAINTAINER=	itojun@kame.net
 
-BUILD_DEPENDS=	${LOCALBASE}/ssl/bin/openssl:${.CURDIR}/../openssl
+BUILD_DEPENDS=	openssl:${.CURDIR}/../openssl
 
 GNU_CONFIGURE=	yes
 CONFIGURE_ARGS=	--without-pam --enable-ipv6
