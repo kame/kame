@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.51 2000/08/29 03:28:08 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.52 2000/08/29 07:31:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1060,21 +1060,20 @@ prelist_update(new, dr, m)
 
 			lt6 = &ia6->ia6_lifetime;
 
-#if 0	/* RFC 2462 5.5.3 (e) */
-#if 0
-			storedlifetime = lt6->ia6t_vltime;
-#else
+			/* RFC 2462 5.5.3 (e) */
 			storedlifetime = lt6->ia6t_expire > time_second ?
 				lt6->ia6t_expire - time_second : 0;
-#endif
-			lt6->ia6t_pltime = new->ndpr_pltime;
+
 			if (TWOHOUR < new->ndpr_vltime ||
 			    storedlifetime < new->ndpr_vltime) {
 				lt6->ia6t_vltime = new->ndpr_vltime;
 				update++;
 			} else if (storedlifetime <= TWOHOUR
 #if 0
-				   /* this condition is redundant */
+				   /*
+				    * This condition is redundant, so we just
+				    * omit it. See IPng 6712, 6717, and 6721.
+				    */
 				   && new->ndpr_vltime <= storedlifetime
 #endif
 				) {
@@ -1093,33 +1092,7 @@ prelist_update(new, dr, m)
 
 			/* 2 hour rule is not imposed for pref lifetime */
 			lt6->ia6t_pltime = new->ndpr_pltime;
-#else	/* update from Jim Bound, (ipng 6712) */
-			/*
-			 * If the received Valid Lifetime is greater than 2
-			 * hours or greater than Stored Lifetime, update the
-			 * Valid Lifetime of the corresponding address, else
-			 * ignore the prefix, unless the Router Advertisement 
-			 * has been authenticated.
-			 * Note that in this scenario the definition of
-			 * StoredLifetime is the time remaining for the valid
-			 * Lifetime since it was received by a Router
-			 * Advertisement, which is different from the
-			 * definition in RFC2462.
-			 */
-			storedlifetime = lt6->ia6t_expire > time_second ?
-				lt6->ia6t_expire - time_second : 0;
-			if (TWOHOUR < new->ndpr_vltime ||
-			    storedlifetime < new->ndpr_vltime) {
-				lt6->ia6t_vltime = new->ndpr_vltime;
-				update++;
-			} else if (auth) {
-				lt6->ia6t_vltime = new->ndpr_vltime;
-				update++;
-			}
 
-			/* jim bound rule is not imposed for pref lifetime */
-			lt6->ia6t_pltime = new->ndpr_pltime;
-#endif
 			in6_init_address_ltimes(new, lt6, update);
 		}
 
