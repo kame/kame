@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.10 2000/01/31 13:39:13 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.11 2000/02/06 07:26:41 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1364,7 +1364,7 @@ oakley_skeyid(iph1)
 		memcpy(p, bp->v, bp->l);
 		p += bp->l;
 
-		iph1->skeyid = oakley_prf(buf, iph1->dhgxy, iph1);
+		iph1->skeyid = oakley_prf(iph1->dhgxy, buf, iph1);
 		if (iph1->skeyid == NULL)
 			goto end;
 		break;
