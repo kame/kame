@@ -314,6 +314,12 @@ cmd
 			if (getaddrinfo(result[1], result[2], &hints, &res))
 				goto parsefail;
 			memcpy(&data_dest, res->ai_addr, res->ai_addrlen);
+			if (ctrl_addr.su_family == AF_INET6
+			 && data_dest.su_family == AF_INET6) {
+				/* XXX more sanity checks! */
+				data_dest.su_sin6.sin6_scope_id =
+					ctrl_addr.su_sin6.sin6_scope_id;
+			}
 			/* be paranoid, if told so */
 			if (curclass.checkportcmd) {
 				int fail;
@@ -888,6 +894,11 @@ host_long_port
 			 a[4] = $13;  a[5] = $15;  a[6] = $17;  a[7] = $19;
 			 a[8] = $21;  a[9] = $23; a[10] = $25; a[11] = $27;
 			a[12] = $29; a[13] = $31; a[14] = $33; a[15] = $35;
+			if (ctrl_addr.su_family == AF_INET6) {
+				/* XXX more sanity checks! */
+				data_dest.su_sin6.sin6_scope_id =
+					ctrl_addr.su_sin6.sin6_scope_id;
+			}
 		}
 	;
 

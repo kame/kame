@@ -143,6 +143,7 @@ extern  int yyparse __P((void));
 
 extern	char		cbuf[];
 extern	struct ftpclass	curclass;
+extern	union sockunion ctrl_addr;
 extern	union sockunion data_dest;
 extern	int		debug;
 extern	int		form;
