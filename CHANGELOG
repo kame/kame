@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2180 2002/06/06 05:09:30 fujisawa Exp $
+$KAME: CHANGELOG,v 1.2181 2002/06/06 12:57:50 jinmei Exp $
 
 <200206>
+2002-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd: when an advertised prefix configured from the
+	kernel has been added or invalidated, notice the change in a short
+	delay.
+
 2002-06-06 Shin'ichi Fujisawa <fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_*.[ch]:
 	* kame/kame/natptconfig/*.[chly]:
