@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)mbuf.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: mbuf.c,v 1.15 1999/01/18 12:40:44 roberto Exp $";
+  "$FreeBSD: src/usr.bin/netstat/mbuf.c,v 1.15.2.1 1999/08/29 15:31:32 peter Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -158,4 +158,45 @@ mbpr()
 	printf("%lu requests for memory denied\n", mbstat.m_drops);
 	printf("%lu requests for memory delayed\n", mbstat.m_wait);
 	printf("%lu calls to protocol drain routines\n", mbstat.m_drain);
+
+	if (mbstat.m_exthdrget || mbstat.m_exthdrget0) {
+#define	p(f, m) if (mbstat.f || sflag <= 1) \
+    printf(m, (unsigned long long)mbstat.f, plural(mbstat.f))
+#define	p1(f, m) if (mbstat.f || sflag <= 1) \
+    printf(m, (unsigned long long)mbstat.f)
+		p(m_exthdrget, "%llu use%s of IP6_EXTHDR_GET\n");
+		p(m_exthdrget0, "%llu use%s of IP6_EXTHDR_GET0\n");
+		p(m_pulldowns, "%llu call%s to m_pulldown\n");
+		p(m_pulldown_alloc,
+		    "%llu mbuf allocation%s in m_pulldown\n");
+		if (mbstat.m_pulldown_copy != 1) {
+			p1(m_pulldown_copy,
+			    "%llu mbuf copies in m_pulldown\n");
+		} else {
+			p1(m_pulldown_copy,
+			    "%llu mbuf copy in m_pulldown\n");
+		}
+		p(m_pullups, "%llu call%s to m_pullup\n");
+		p(m_pullup_alloc, "%llu mbuf allocation%s in m_pullup\n");
+		if (mbstat.m_pullup_copy != 1) {
+			p1(m_pullup_copy,
+			    "%llu mbuf copies in m_pullup\n");
+		} else {
+			p1(m_pullup_copy, "%llu mbuf copy in m_pullup\n");
+		}
+		p(m_pullup_fail, "%llu failure%s in m_pullup\n");
+		p(m_pullup2, "%llu call%s to m_pullup2\n");
+		p(m_pullup2_alloc,
+		    "%llu mbuf allocation%s in m_pullup2\n");
+		if (mbstat.m_pullup2_copy != 1) {
+			p1(m_pullup2_copy,
+			    "%llu mbuf copies in m_pullup2\n");
+		} else {
+			p1(m_pullup2_copy,
+			    "%llu mbuf copy in m_pullup2\n");
+		}
+		p(m_pullup2_fail, "%llu failure%s in m_pullup2\n");
+#undef p
+#undef p1
+	}
 }

@@ -123,4 +123,45 @@ mbpr(mbaddr)
 	printf("%lu requests for memory denied\n", mbstat.m_drops);
 	printf("%lu requests for memory delayed\n", mbstat.m_wait);
 	printf("%lu calls to protocol drain routines\n", mbstat.m_drain);
+
+	if (mbstat.m_exthdrget || mbstat.m_exthdrget0) {
+#define	p(f, m) if (mbstat.f || sflag <= 1) \
+    printf(m, (u_quad_t)mbstat.f, plural(mbstat.f))
+#define	p1(f, m) if (mbstat.f || sflag <= 1) \
+    printf(m, (u_quad_t)mbstat.f)
+		p(m_exthdrget, "%qu use%s of IP6_EXTHDR_GET\n");
+		p(m_exthdrget0, "%qu use%s of IP6_EXTHDR_GET0\n");
+		p(m_pulldowns, "%qu call%s to m_pulldown\n");
+		p(m_pulldown_alloc,
+		    "%qu mbuf allocation%s in m_pulldown\n");
+		if (mbstat.m_pulldown_copy != 1) {
+			p1(m_pulldown_copy,
+			    "%qu mbuf copies in m_pulldown\n");
+		} else {
+			p1(m_pulldown_copy,
+			    "%qu mbuf copy in m_pulldown\n");
+		}
+		p(m_pullups, "%qu call%s to m_pullup\n");
+		p(m_pullup_alloc, "%qu mbuf allocation%s in m_pullup\n");
+		if (mbstat.m_pullup_copy != 1) {
+			p1(m_pullup_copy,
+			    "%qu mbuf copies in m_pullup\n");
+		} else {
+			p1(m_pullup_copy, "%qu mbuf copy in m_pullup\n");
+		}
+		p(m_pullup_fail, "%qu failure%s in m_pullup\n");
+		p(m_pullup2, "%qu call%s to m_pullup2\n");
+		p(m_pullup2_alloc,
+		    "%qu mbuf allocation%s in m_pullup2\n");
+		if (mbstat.m_pullup2_copy != 1) {
+			p1(m_pullup2_copy,
+			    "%qu mbuf copies in m_pullup2\n");
+		} else {
+			p1(m_pullup2_copy,
+			    "%qu mbuf copy in m_pullup2\n");
+		}
+		p(m_pullup2_fail, "%qu failure%s in m_pullup2\n");
+#undef p
+#undef p1
+	}
 }
