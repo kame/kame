@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.44 2003/11/06 10:33:20 suz Exp $	*/
+/*	$KAME: dhcp6.h,v 1.45 2003/11/06 10:35:49 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -207,8 +207,7 @@ struct dhcp6_relay {
 #  define DH6OPT_STCODE_NOBINDING 3
 #  define DH6OPT_STCODE_NOTONLINK 4
 #  define DH6OPT_STCODE_USEMULTICAST 5
-/* The following code is not yet defined and is currently KAME specific. */
-#  define DH6OPT_STCODE_NOPREFIXAVAIL CONF_DH6OPT_STCODE_NOPREFIXAVAIL
+#  define DH6OPT_STCODE_NOPREFIXAVAIL 6
 
 #define DH6OPT_RAPID_COMMIT 14
 #define DH6OPT_USER_CLASS 15
