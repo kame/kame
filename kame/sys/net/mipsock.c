@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.4 2005/01/31 09:42:56 t-momose Exp $ */
+/* $Id: mipsock.c,v 1.5 2005/02/25 16:44:53 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -352,6 +352,7 @@ mipus_output(m, va_alist)
 	struct mip6_bul_internal *mbul = NULL;
         struct mipm_md_info *mipmd = NULL;
 #endif
+	struct sockaddr_storage hoa, coa, cnaddr;
 	u_int16_t bid = 0;
 
 	miph = mtod(m, struct mip_msghdr *);
@@ -363,10 +364,20 @@ mipus_output(m, va_alist)
 #ifdef MIP6_MCOA
 		bid = mipc->mipc_bid;
 #endif /* MIP6_MCOA */
-		error = mip6_bce_update((struct sockaddr_in6 *)MIPC_CNADDR(mipc),
-		    (struct sockaddr_in6 *)MIPC_HOA(mipc),
-		    (struct sockaddr_in6 *)MIPC_COA(mipc), mipc->mipc_flags,
-		    bid);
+		bcopy(MIPC_CNADDR(mipc), &cnaddr, MIPC_CNADDR(mipc)->sa_len);
+		bcopy(MIPC_HOA(mipc), &hoa, MIPC_HOA(mipc)->sa_len);
+		bcopy(MIPC_COA(mipc), &coa, MIPC_COA(mipc)->sa_len);
+		switch (hoa.ss_family) {
+		case AF_INET6:
+			error = mip6_bce_update((struct sockaddr_in6 *)&cnaddr,
+						(struct sockaddr_in6 *)&hoa,
+						(struct sockaddr_in6 *)&coa,
+						mipc->mipc_flags, bid);
+			break;
+		default:
+			error = EPFNOSUPPORT;
+			break;
+		}
 		break;
 
 	case MIPM_BC_REMOVE:
@@ -374,10 +385,20 @@ mipus_output(m, va_alist)
 #ifdef MIP6_MCOA
 		bid = mipc->mipc_bid;
 #endif /* MIP6_MCOA */
-		error = mip6_bce_remove_addr((struct sockaddr_in6 *)MIPC_CNADDR(mipc),
-		    (struct sockaddr_in6 *)MIPC_HOA(mipc),
-		    (struct sockaddr_in6 *)MIPC_COA(mipc), mipc->mipc_flags,
-		    bid);
+		bcopy(MIPC_CNADDR(mipc), &cnaddr, MIPC_CNADDR(mipc)->sa_len);
+		bcopy(MIPC_HOA(mipc), &hoa, MIPC_HOA(mipc)->sa_len);
+		bcopy(MIPC_COA(mipc), &coa, MIPC_COA(mipc)->sa_len);
+		switch (hoa.ss_family) {
+		case AF_INET6:
+			error = mip6_bce_remove_addr((struct sockaddr_in6 *)&cnaddr,
+						     (struct sockaddr_in6 *)&hoa,
+						     (struct sockaddr_in6 *)&coa,
+						     mipc->mipc_flags, bid);
+			break;
+		default:
+			error = EPFNOSUPPORT;
+			break;
+		}
 		break;
 
 	case MIPM_BC_FLUSH:
@@ -413,19 +434,28 @@ mipus_output(m, va_alist)
 #ifdef MIP6_MCOA
 		bid = mipu->mipu_bid;
 #endif /* MIP6_MCOA */
-
 		/* Non IPv6 address is not supported (only for MIP6) */
-		if ((MIPU_PEERADDR(mipu))->sa_family == AF_INET6 &&
-		    (MIPU_HOA(mipu))->sa_family == AF_INET6 &&
-		    (MIPU_COA(mipu))->sa_family == AF_INET6)
+		bcopy(MIPU_PEERADDR(mipu), &cnaddr, MIPU_PEERADDR(mipu)->sa_len);
+		bcopy(MIPU_HOA(mipu), &hoa, MIPU_HOA(mipu)->sa_len);
+		bcopy(MIPU_COA(mipu), &coa, MIPU_COA(mipu)->sa_len);
+		switch (hoa.ss_family) {
+		case AF_INET6:
+			if ((MIPU_PEERADDR(mipu))->sa_family == AF_INET6 &&
+			    (MIPU_COA(mipu))->sa_family == AF_INET6) {
 		    
-			error = mip6_bul_add(&((struct sockaddr_in6 *)MIPU_PEERADDR(mipu))->sin6_addr,
-			    &((struct sockaddr_in6 *)MIPU_HOA(mipu))->sin6_addr,
-			    &((struct sockaddr_in6 *)MIPU_COA(mipu))->sin6_addr,
-			    mipu->mipu_hoa_ifindex, mipu->mipu_flags,
-			    mipu->mipu_state, bid);
-		else
-			error = EPFNOSUPPORT; /* XXX ? */
+				error = mip6_bul_add(&((struct sockaddr_in6 *)&cnaddr)->sin6_addr,
+						     &((struct sockaddr_in6 *)&hoa)->sin6_addr,
+						     &((struct sockaddr_in6 *)&coa)->sin6_addr,
+						     mipu->mipu_hoa_ifindex,
+						     mipu->mipu_flags,
+						     mipu->mipu_state, bid);
+			} else {
+				error = EPFNOSUPPORT; /* XXX ? */
+			}
+		default:
+			error = EPFNOSUPPORT;
+			break;
+		}
 		break;
 
 	case MIPM_BUL_REMOVE:
@@ -433,9 +463,9 @@ mipus_output(m, va_alist)
 #ifdef MIP6_MCOA
 		bid = mipu->mipu_bid;
 #endif /* MIP6_MCOA */
-		mbul = mip6_bul_get(&((struct sockaddr_in6 *)MIPU_HOA(mipu))->sin6_addr,
-		    &((struct sockaddr_in6 *)MIPU_PEERADDR(mipu))->sin6_addr,
-		    bid);
+		bcopy(MIPU_PEERADDR(mipu), &cnaddr, MIPU_PEERADDR(mipu)->sa_len);
+		bcopy(MIPU_HOA(mipu), &hoa, MIPU_HOA(mipu)->sa_len);
+		mbul = mip6_bul_get(&((struct sockaddr_in6 *)&hoa)->sin6_addr, &((struct sockaddr_in6 *)&cnaddr)->sin6_addr, bid);
 		if (mbul == NULL) 
 			return (ENOENT);
 
