@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.83 2001/02/07 04:58:47 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.84 2001/02/07 07:38:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -569,7 +569,7 @@ udp6_ctlinput(cmd, sa, d)
 			if (in6_pcblookup_connect(&udb6, &sa6->sin6_addr,
 			    uh.uh_dport, (struct in6_addr *)&sa6_src->sin6_addr,
 			    uh.uh_sport, 0))
-				valid = 1;
+				valid++;
 #if 0
 			/*
 			 * As the use of sendto(2) is fairly popular,
@@ -580,7 +580,7 @@ udp6_ctlinput(cmd, sa, d)
 			 */
 			else if (in6_pcblookup_bind(&udb6, &sa6->sin6_addr,
 						    uh.uh_dport, 0))
-				valid = 1;
+				valid++;
 #endif
 
 			/*

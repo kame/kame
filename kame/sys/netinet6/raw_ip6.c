@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.62 2001/02/07 07:14:54 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.63 2001/02/07 07:38:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -380,7 +380,7 @@ rip6_ctlinput(cmd, sa, d)
 
 		if (in6p && in6p->in6p_ip6.ip6_nxt &&
 		    in6p->in6p_ip6.ip6_nxt == nxt)
-			valid = 1;
+			valid++;
 
 		/*
 		 * Depending on the value of "valid" and routing table
