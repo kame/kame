@@ -1,4 +1,4 @@
-# $KAME: Makefile,v 1.1 2001/07/04 08:02:59 jinmei Exp $
+# $KAME: Makefile,v 1.2 2001/07/04 12:58:32 jinmei Exp $
 # Copyright (c) 2001 WIDE Project. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,8 @@
 
 PROG=	gaistatd
 CFLAGS+=-Wall -Werror
+LDADD=	-lkvm
+DPADD=	${LIBKVM}
 
 #XXX man page is not provided.
 NOMAN=	yes

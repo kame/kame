@@ -1,4 +1,4 @@
-/*	$KAME: gaistatd.c,v 1.1 2001/07/04 08:02:59 jinmei Exp $ */
+/*	$KAME: gaistatd.c,v 1.2 2001/07/04 12:58:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -28,14 +28,22 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/user.h>
+#include <sys/sysctl.h>
+#include <sys/proc.h>
 
+#include <fcntl.h>
 #include <time.h>
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <kvm.h>
+#include <limits.h>
+#include <err.h>
 
 struct gai_orderstat
 {
@@ -57,24 +65,31 @@ main()
 	int s;
 	struct sockaddr_un sun;
 	struct gai_orderstat stat;
+	char buf[_POSIX2_LINE_MAX];
+	kvm_t *kvmd;
 
 	unlink(PATH_STATFILE);
 
 	if ((s = socket(AF_LOCAL, SOCK_DGRAM, 0)) < 0)
-		exit(1);
+		err(1, "socket");
 	memset(&sun, 0, sizeof(sun));
 	sun.sun_family = AF_LOCAL;
 	sun.sun_len = sizeof(sun);
 	strncpy(sun.sun_path, PATH_STATFILE, sizeof(sun.sun_path));
 	if (bind(s, (struct sockaddr *)&sun, sizeof(sun)) < 0)
-		exit(2);
+		err(1, "bind");
+
+	if ((kvmd  = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, buf)) == NULL)
+		errx(1, "kvm_openfiles failed");
 
 	while(1) {
-		int cc;
+		int cc, cnt;
 		struct sockaddr_un from;
 		struct timeval delay;
 		socklen_t fromlen;
 		static char timebuf[64], *timestr, *crp;
+		struct kinfo_proc *proc;
+		char *procname = NULL;
 		FILE *fp;
 
 		fromlen = sizeof(from);
@@ -83,6 +98,13 @@ main()
 
 		if (cc != sizeof(stat))
 			continue; /* bogus input, ignore it. */
+
+		if ((proc = kvm_getprocs(kvmd, KERN_PROC_PID, stat.pid, &cnt))
+		    != NULL) {
+			procname = proc->kp_proc.p_comm;
+		}
+		if (procname == NULL)
+			procname = "???";
 
 		memset(&delay, 0, sizeof(delay));
 		timeval_sub(&stat.end, &stat.start, &delay);
@@ -96,11 +118,11 @@ main()
 
 		if ((fp = fopen(PATH_LOGIFLE, "a+")) == NULL)
 			continue;
-		fprintf(fp, "%s (%lu.%06lu): pid=%d, delay=%lu.%06lu, "
-			"entries=%d\n", timebuf,
+		fprintf(fp, "%s (%lu.%06lu): pid=%d, proc=%s, "
+			"delay=%lu.%06lu, entries=%d\n", timebuf,
 			(u_long)stat.start.tv_sec, (u_long)stat.start.tv_usec,
-			stat.pid, (u_long)delay.tv_sec, (u_long)delay.tv_usec,
-			stat.entries);
+			stat.pid, procname, (u_long)delay.tv_sec,
+			(u_long)delay.tv_usec, stat.entries);
 		fclose(fp);
 	}
 }
