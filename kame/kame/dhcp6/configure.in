@@ -70,8 +70,6 @@ AC_CHECK_FUNC(getifaddrs, AC_DEFINE(HAVE_GETIFADDRS), [dnl
 	echo FATAL: getifaddrs is required
 	exit 1])
 AC_CHECK_FUNCS(if_nametoindex)
-AC_DEFINE(USE_STRLCPY)
-AC_DEFINE(USE_STRLCAT)
 AC_REPLACE_FUNCS(strlcpy strlcat)
 
 dnl Checks for header files.

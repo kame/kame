@@ -175,17 +175,11 @@ make_prefix(pstr0)
 	struct in6_addr paddr;
 
 	/* make a local copy for safety */
-	if (strlen(pstr0) + 1 > sizeof(pstr)) {
+	if (strlcpy(pstr, pstr0, sizeof(pstr)) >= sizeof(pstr)) {
 		dprintf(LOG_WARNING,
 			"prefix string too long (maybe bogus): %s", pstr0);
 		return(NULL);
 	}
-#ifndef USE_STRLCPY
-	strncpy(pstr, pstr0, sizeof(pstr));
-	pstr[sizeof(pstr) - 1] = '\0';
-#else
-	strlcpy(pstr, pstr0, sizeof(pstr));
-#endif
 
 	/* parse the string */
 	if ((p = strchr(pstr, '/')) == NULL)
