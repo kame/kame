@@ -369,7 +369,8 @@ igmp_input(struct mbuf *m, ...)
 	int timer;
 	va_list ap;
 
-#ifdef MROUTING
+#if defined(IGMPV3) && defined(MROUTING)
+
 	extern struct socket *ip_mrouter;
 #endif /* MROUTING */
 

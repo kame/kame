@@ -97,7 +97,7 @@
 #include <netinet/ip_var.h>
 #include <netinet/ip_icmp.h>
 
-#ifdef IGMPV3
+#if defined(IGMPV3) || defined(MROUTING)
 #include <netinet/igmp_var.h>
 #endif
 
