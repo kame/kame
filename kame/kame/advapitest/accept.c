@@ -44,9 +44,8 @@
 
 #define COMPAT_RFC2292
 
-static u_char rcvmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-		       CMSG_SPACE(sizeof(int))
-		       + 4096];	/* XXX hardcoding */
+static u_char *rcvmsgbuf;
+static int rcvmsglen; 
 
 void print_options __P((struct msghdr *));
 void print_opthdr __P((void *));
@@ -144,16 +143,20 @@ main(argc, argv)
 
 	s = s0;
 
-	optlen = sizeof(rcvmsgbuf);
+	rcvmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
+		CMSG_SPACE(sizeof(int)) + 4096;	/* XXX hardcoding */
+	if (rcvmsgbuf == NULL &&
+	    (rcvmsgbuf = (u_char *)malloc(rcvmsglen)) == NULL)
+		errx(1, "malloc failed");
 #ifdef COMPAT_RFC2292
 	if (getsockopt(s, IPPROTO_IPV6, IPV6_PKTOPTIONS, (void *)rcvmsgbuf,
-		       &optlen) <0 )
+		       &rcvmsglen) <0 )
 		err(1, "getsockopt(IPV6_PKTOPTIONS)");
 	rcvmh.msg_controllen = optlen;
 	rcvmh.msg_control = (caddr_t)rcvmsgbuf;
 #else  /* new advanced API */
 	memset(&rcvmh, 0, sizeof(rcvmh));
-	rcvmh.msg_controllen = optlen;
+	rcvmh.msg_controllen = rcvmsglen;
 	rcvmh.msg_control = (caddr_t)rcvmsgbuf;
 
 	if (recvmsg(s, &rcvmh, 0) < 0)
@@ -166,9 +169,8 @@ main(argc, argv)
 		int cc;
 
 		memset(&rcvmh, 0, sizeof(rcvmh));
-		rcvmh.msg_controllen = sizeof(rcvmsgbuf);
-		rcvmh.msg_control = (caddr_t)rcvmsgbuf;
-		memset(rcvmsgbuf, 0, optlen);
+		rcvmh.msg_controllen = rcvmsglen;
+		rcvmh.msg_control = rcvmsgbuf;
 		iov[0].iov_base = (caddr_t)recvbuf;
 		iov[0].iov_len = sizeof(recvbuf);
 		rcvmh.msg_iov = iov;
