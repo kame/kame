@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/20 01:55:02 $
+		     $Date: 2000/04/20 07:25:51 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -481,5 +481,41 @@ For more information, please refer to the "pma" man page.
 <<<mobile-ip6>>>
 KAME kit includes mobile-ip6 code.  For more details, please look at
 kame/kame/mip6config/README_MIP6.txt and manpages.
+
+<<<altq>>>
+ALTQ implements several queueing disciplines that can be used to
+manage traffic.  ALTQ supports diffserv EF and AF PHBs, and traffic
+conditioners.  For more details, please look at altqd(8), altq.conf(5)
+and altqstat(1).
+
+How to install and use ALTQ:
+ - kernel configuration options
+	freebsd3, freebsd4:
+		add "options ALTQ" to your kernel config file.
+
+		queueing disciplines are implemented as KLD modules,
+		and dynamically loaded at run time by altqd(8).
+		To install the altq KLD modules:
+		% cd freebsd3/sys/modules/altq
+		% make
+		# make install
+		
+	other platforms:
+		add "options ALTQ" to your kernel config file.
+		add optional queueing disciplines to use.
+
+ - make altq devices
+	you need to create altq devices before using altq:
+	# sh /usr/local/v6/etc/MAKEDEV.altq all
+
+ - set up /etc/altq.conf
+	create /etc/altq.conf.  you can find sample configuration
+	files under kame/kame/altqd/altq.conf.samples.
+
+ - run altqd(8)
+	to disable traffic control, terminate altqd(8) by sending
+	SIGINT or SIGTERM.
+	send SIGHUP to reload the config file.
+	use altqstat(1) to monitor traffic.
 
 							<end of USAGE>
