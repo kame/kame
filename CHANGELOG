@@ -1,12 +1,17 @@
-1999-09-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-
-
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.114 1999/09/15 03:32:15 jinmei Exp $
+$Id: CHANGELOG,v 1.115 1999/09/15 09:39:39 jinmei Exp $
 
 
 <199909>
+1999-09-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_mroute.c (add_m6if, del_m6if):
+	for fbsd3, use if_allmulti() instead of calling if_ioctl directly
+	to set/unset the multicast-promiscuous mode.
+	This fix would be essential if you want to use your kame-freebsd3
+	box as an IPv6 multicast router. Please do not forget apply the
+	fix.
+
 1999-09-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd*/usr.sbin/pim6sd/pim6sd/Makefile: 
 	* *bsd*/usr.sbin/pim6sd/Makefile.inc:
