@@ -1,0 +1,8 @@
+share/doc/sendmail8.9.3/FAQ
+share/doc/sendmail8.9.3/LICENSE
+share/doc/sendmail8.9.3/README
+share/doc/sendmail8.9.3/00READ_ME.WIDE
+share/doc/sendmail8.9.3/00READ_ME.WIDE.j
+share/doc/sendmail8.9.3/00READ_ME.v6
+@dirrm share/doc/sendmail8.9.3
+sbin/sendmail6
