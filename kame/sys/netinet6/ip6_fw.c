@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.16 2000/08/12 00:37:41 itojun Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.17 2000/10/19 00:37:50 itojun Exp $	*/
 
 /*
  * Copyright (c) 1993 Daniel Boulet
@@ -1123,7 +1123,7 @@ ip6_fw_ctl(int stage, struct mbuf **mm)
 			}
 		}
 		for (; fcp; fcp = fcp->chain.le_next) {
-			memcpy(m->m_data, fcp->rule, sizeof *(fcp->rule));
+			bcopy(fcp->rule, m->m_data, sizeof *(fcp->rule));
 			m->m_len = sizeof *(fcp->rule);
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 			m->m_next = m_get(M_WAIT, MT_DATA); /* XXX */

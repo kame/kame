@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.38 2000/07/27 06:22:41 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.39 2000/10/19 00:37:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -282,7 +282,7 @@ rip6_ctlinput(cmd, sa, d)
 		struct in6_addr s;
 
 		/* translate addresses into internal form */
-		memcpy(&s, &ip6->ip6_src, sizeof(s));
+		bcopy(&ip6->ip6_src, &s, sizeof(s));
 		if (IN6_IS_ADDR_LINKLOCAL(&s))
 			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 
