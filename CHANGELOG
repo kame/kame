@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1929 2001/10/23 11:03:12 jinmei Exp $
+$KAME: CHANGELOG,v 1.1930 2001/10/23 12:26:37 jinmei Exp $
 
 <200110>
+2001-10-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_gif.c (in6_gif_output):
+	* kame/sys/netinet/in_gif.c (in_gif_output):
+	Corrected the loop prevation algorithm.  The current one is not
+	effective, because it tries to detecte the loop condition only
+	when generating a new route without removing the cached route.
+	Luckily, the bug does not necessarily mean we'll see infinite
+	loop, since we have another mechanism for loop prevention in
+	gif_output().
+
 2001-10-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c: NULL-clear m->m_pkthdr.rcvif
 	before calling ip6_mforward(). [KAME PR sys/387]
