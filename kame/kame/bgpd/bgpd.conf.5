@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: bgpd.conf.5,v 1.4 1999/10/22 08:46:05 jinmei Exp $
+.\"     $Id: bgpd.conf.5,v 1.5 2000/02/19 17:18:09 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt BGPD.CONF 5
@@ -73,6 +73,34 @@ Interfaces are specified in the form of "name unit", such as
 and
 .Ar ep1.
 .\"
+.Sh Specifying Log Level
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic log
+.Ar option...
+.Ic ;
+.Xc
+Specify debug messages to be printed out. Each
+.Ar option
+usually specifies a subset of the messages to be printed.
+If an
+.Ar option
+begins with
+.Ic no ,
+it means that the set of the messages that are specified by the option
+will not be printed. For example,
+.Ic `all norip'
+means that all the messages except RIPng related ones will be printed.
+Valid options are
+.Ic aspath, bgpstate, bgpconnect, bgpinput, bgpoutput, bgproute, bgp,
+.Ic interface, inet6, rip, route, filter, timer,
+and
+.Ic all .
+The
+.Ic bgp
+option means all the BGP related options to be printed.
+.El
+.\"
 .Sh Specifying Dump File
 .Bl -tag -width Ds -compact
 .It Xo
@@ -81,6 +109,81 @@ and
 Specifies the name of the dump file
 (see
 .Xr bgpd 8 ) .
+.El
+.\"
+.Sh Specifying Filters
+The following four route filters can be specified, each of which
+is for a RIPng interface or a BGP peer (see below).
+.Bl -tag -width Ds -compact
+.It Ic filterin Ar prefix
+Specifies incoming route filtering. If an incoming route on the
+interface or from the peer matches the specified prefix,
+it will be ignored and will not be installed in the kernel.
+.Pp
+The prefixes are specified in the form of
+.Ql address/prefix_length,
+such as
+.Ar 3ffe:509::/32
+and
+.Ar 3ffe:501:100f::/48.
+The special string 
+.Ar default
+can also be specified as a prefix, which means the default route.
+Note that the semantics of
+.Ar default
+is different from the semantics of
+.Ar ::/0 .
+The former is to specify filtering the default route (exact match),
+but the latter is to specify filtering all routes that match
+.Ar ::/0 ,
+that is, filtering all incoming routes.
+.\"
+.It Ic restrictin Ar prefix
+Specifies incoming route restriction.
+An incoming route on the interface or from the peer
+will be ignored unless it matches
+.Ar prefix .
+If this attribute is specified for more than one prefix,
+an incoming route will be required to match at least one prefix of them.
+Like the
+.Ic filterin
+attribute, the special string
+.Ar default
+can be specified as a prefix, which means that all non default routes
+will be ignored on the interface or from the peer.
+.\"
+.It Ic filterout Ar prefix
+Specifies outgoing route filtering. If an outgoing route on the
+interface or to the peer matches the specified prefix,
+it will not be advertised.
+The special string
+.Ar default
+can also be specified for this attribute, which means that the default route
+will not be advertised on the interface nor to the peer.
+Note that the semantics of
+.Ic filterout Ar ::/0
+is different from the semantics of
+.Ic filterout Ar default .
+The former means that all routes that match the prefix
+.Ar ::/0
+will not be advertised on the interface.
+For a RIPng interface, it thus has the same meaning
+of the
+.Ic noripout .
+attribute.
+.\"
+.It Ic restrictout Ar prefix
+Specifies outgoing route restriction.
+An outgoing route on the interface or to the peer will not be
+advertised unless it matches
+.Ar prefix .
+If this attribute is specified for more than one prefix,
+an outgoing route will be required to match at least one prefix of
+them.
+If the special string
+.Ar default
+is specified as a prefix, it means that only the default route will be
+advertised on the interface nor to the peer.
 .El
 .\"
 .Sh The BGP Related Statements
@@ -99,7 +202,14 @@ Sets the size of socket write buffer for each BGP socket.
 .It Ic routerid Ar router_id;
 Sets the router identifier for use by the BGP and OSPF protocols.
 The default is the address of the first interface encountered by
-bgpd except the loopback address(127.0.0.1).
+.Nm bgpd
+except the loopback address(127.0.0.1).
+.\"
+.It Ic clusterid Ar cluster_id;
+Sets the cluster identifier for use as a BGP route reflector.
+The default is the address of the first interface encountered by
+.Nm bgpd
+except the loopback address(127.0.0.1).
 .\"
 .It Ic IamRouteReflector;
 Specifies to act as a route reflector.
@@ -133,6 +243,7 @@ statement.
 .Op Ic prepend Op Ar iteration
 .Op Ic no synchronization
 .Op Ic lcladdr Ar localaddress
+.Op Ar filters...
 .Ic ;
 .Ic };
 .Xc
@@ -169,6 +280,12 @@ The optional keyword
 specifies the local(source) IPv6 address to connect the peer.
 If the node has multiple IPv6 addresses that can be used as the source address,
 the keyword should be specified.
+If a list of
+.Ar filters
+is specified, each of the
+.Ar filters
+is applied to the peer according to the semantics of each filter
+described above.
 .\"
 .It Xo
 .Ic group type internal
@@ -210,11 +327,15 @@ it will reflect each IBGP route without waiting for synchronization with
 RIPng for the route.
 If the optional keyword
 .Ic nexthopself
-is specified, bgpd puts its own address to the next hop field of
+is specified,
+.Nm bgpd
+puts its own address to the next hop field of
 an MP_REACH_NLRI attributes when advertising a new route to the peer.
 .Ic lcladdr
-can also be specified for an IBGP peer.
-The semantics of the keyrword is same as an EBGP peer.
+and
+.Ar filters
+can be specified for an IBGP peer as well as for an EBGP peer.
+The semantics of the keyrwords are same as ones for an EBGP peer.
 .El
 .\"
 .\"
@@ -302,71 +423,6 @@ The default is to send RIP on all interfaces.
 Specifies to advertise the RIPng default route with metric 1 on the interface.
 If this attribute is specified, the incoming default route on the interface
 will be ignored.
-.\"
-.It Ic filterin Ar prefix
-Specifies incoming route filtering. If an incoming route on the interface
-matches the specified prefix, it will be ignored and will not be
-installed in the kernel.
-.Pp
-The prefixes are specified in the form of
-.Ql address/prefix_length,
-such as
-.Ar 3ffe:509::/32
-and
-.Ar 3ffe:501:100f::/48.
-The special string 
-.Ar default
-can also be specified as a prefix, which means the default route.
-Note that the semantics of
-.Ar default
-is different from the semantics of
-.Ar ::/0 .
-The former is to specify to filter the default route(exact match),
-but the latter is to specify to filter all routes that match
-.Ar ::/0 ,
-that is, filter all incoming routes.
-.\"
-.It Ic restrictin Ar prefix
-Specifies incoming route restriction.
-An incoming route on the interface will be ignored unless it matches
-.Ar prefix .
-If this attribute is specified for more than one prefix,
-an incoming route will be required to match at least one prefix of them.
-As for the
-.Ic filterin
-attribute, the special string
-.Ar default
-can be specified as a prefix, which means that all non default routes
-will be ignored on the interface.
-.\"
-.It Ic filterout Ar prefix
-Specifies outgoing route filtering. If an outgoing route on the interface
-matches the specified prefix, it will not be advertised.
-The special string
-.Ar default
-can also be specified for this attribute, which means that the default route
-will not be advertised on the interface. Note that the semantics of
-.Ic filterout Ar ::/0
-is different from the semantics of
-.Ic filterout Ar default .
-The former means that all routes that match the prefix
-.Ar ::/0
-will not be advertised on the interface. Consequently, it has the same meaning
-of
-.Ic noripout .
-.\"
-.It Ic restrictout Ar prefix
-Specifies outgoing route restriction.
-An outgoing route on the interface will not be advertised unless it
-matches
-.Ar prefix .
-If this attribute is specified for more than one prefix,
-an outgoing route will be required to match at least one prefix of
-them.
-If the special string
-.Ar default
-is specified as a prefix, it means that only the default route will be
-advertised on the interface.
 .\"
 .It Ic metricin Ar metric
 Specifies metric which is added to any incoming RIPng routes

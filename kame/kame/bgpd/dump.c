@@ -833,10 +833,10 @@ show_bgp_peer(FILE *fp, struct rpcb *bnp, char *indent)
 					indent,
 					sec2str(tloc_now -
 						abnp->rp_stat.last_established));
-			fprintf(fp, "%s Max esbalished period: %s\n", indent,
-				sec2str(abnp->rp_stat.max_establihed_period));
-			fprintf(fp, "%s Min esbalished period: %s\n", indent,
-				sec2str(abnp->rp_stat.min_establihed_period));
+			fprintf(fp, "%s Max established period: %s\n", indent,
+				sec2str(abnp->rp_stat.max_established_period));
+			fprintf(fp, "%s Min established period: %s\n", indent,
+				sec2str(abnp->rp_stat.min_established_period));
 		}
 		if (abnp->rp_stat.last_closed) {
 			/* ctime appends \n */

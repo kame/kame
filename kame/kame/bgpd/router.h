@@ -42,8 +42,8 @@ struct rpstat {
   u_quad_t withdrawrcvd;	/* number of withdraws received */
   time_t last_established;	/* stamp of the last establish time */
   time_t last_closed;		/* stamp of the last closed time */
-  time_t max_establihed_period;	/* the longest period of peering */
-  time_t min_establihed_period;	/* the shortest period of peering */
+  time_t max_established_period;	/* the longest period of peering */
+  time_t min_established_period;	/* the shortest period of peering */
 };
 
 #define BGPS_ESTABLISHED 1

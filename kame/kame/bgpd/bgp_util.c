@@ -1425,13 +1425,13 @@ bgp_update_stat(bnp, type)
 		if (bnp->rp_state != BGPSTATE_ESTABLISHED)
 			break;
 		period = tloc - abnp->rp_stat.last_established;
-		if (period > abnp->rp_stat.max_establihed_period) {
+		if (period > abnp->rp_stat.max_established_period) {
 			/* this covers the first time */
-			abnp->rp_stat.max_establihed_period = period;
+			abnp->rp_stat.max_established_period = period;
 		}
-		if (abnp->rp_stat.min_establihed_period == 0 ||
-		    period < abnp->rp_stat.min_establihed_period)
-			abnp->rp_stat.min_establihed_period = period;
+		if (abnp->rp_stat.min_established_period == 0 ||
+		    period < abnp->rp_stat.min_established_period)
+			abnp->rp_stat.min_established_period = period;
 		break;
 	}
 }
