@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.285 2003/06/29 11:45:47 itojun Exp $	*/
+/*	$KAME: key.c,v 1.286 2003/06/30 02:47:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1793,6 +1793,9 @@ key_spdadd(so, m, mhp)
 	struct secpolicy *newsp;
 	struct ipsecrequest *isr;
 	int error;
+#if NPF > 0
+	u_int16_t tagvalue;
+#endif
 
 	/* sanity check */
 	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
@@ -1886,8 +1889,9 @@ key_spdadd(so, m, mhp)
 		newsp = key_getsp(&spidx, xpl0->sadb_x_policy_dir);
 	else {
 #if NPF > 0
-		newsp = key_getspbytag(pf_tagname2tag(tag->sadb_x_tag_name),
-		    xpl0->sadb_x_policy_dir);
+		tagvalue = pf_tagname2tag(tag->sadb_x_tag_name);
+		/* tag refcnt++ */
+		newsp = key_getspbytag(tagvalue, xpl0->sadb_x_policy_dir);
 #else
 		panic("PF");
 #endif
@@ -1903,12 +1907,20 @@ key_spdadd(so, m, mhp)
 		if (newsp != NULL) {
 			key_freesp(newsp);
 			ipseclog((LOG_DEBUG, "key_spdadd: a SP entry exists already.\n"));
+#if NPF > 0
+			if (!mhp->ext[SADB_EXT_ADDRESS_SRC])
+				pf_tag_unref(tagvalue);
+#endif
 			return key_senderror(so, m, EEXIST);
 		}
 	}
 
 	/* allocation new SP entry */
 	if ((newsp = key_msg2sp(xpl0, PFKEY_EXTLEN(xpl0), &error)) == NULL) {
+#if NPF > 0
+		if (!mhp->ext[SADB_EXT_ADDRESS_SRC])
+			pf_tag_unref(tagvalue);
+#endif
 		return key_senderror(so, m, error);
 	}
 
@@ -1932,7 +1944,7 @@ key_spdadd(so, m, mhp)
 		}
 	} else {
 #if NPF > 0
-		newsp->tag = pf_tagname2tag(tag->sadb_x_tag_name);
+		newsp->tag = tagvalue;
 #else
 		panic("PF");
 #endif

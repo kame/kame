@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.70 2003/06/29 11:47:46 itojun Exp $	*/
+/*	$KAME: keydb.c,v 1.71 2003/06/30 02:47:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,6 +57,15 @@
 #include <netinet6/ipsec.h>
 
 #include <net/net_osdep.h>
+
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+#include "pf.h"
+#endif
+#if NPF > 0
+#include <net/pfvar.h>
+#else
+#define NPF 0
+#endif
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 MALLOC_DEFINE(M_SECA, "key mgmt", "security associations, key management");
@@ -117,6 +126,10 @@ keydb_delsecpolicy(p)
 	TAILQ_REMOVE(&sptailq, p, tailq);
 	if (p->spidx)
 		free(p->spidx, M_SECA);
+#if NPF > 0
+	else
+		pf_tag_unref(p->tag);
+#endif
 	free(p, M_SECA);
 }
 
