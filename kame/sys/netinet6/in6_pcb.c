@@ -960,25 +960,21 @@ in6_pcbrtentry(in6p)
 	ro = &in6p->in6p_route;
 	dst6 = (struct sockaddr_in6 *)&ro->ro_dst;
 
-	if (ro->ro_rt == NULL || (ro->ro_rt->rt_flags & RTF_UP) == 0 ||
-	    dst6->sin6_family != AF_INET6) {
-		/*
-		 * No route yet, so try to acquire one.
-		 */
-		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
-			if (ro->ro_rt) {
-				RTFREE(ro->ro_rt);
-				ro->ro_rt = (struct rtentry *)NULL;
-			}
-			bzero(dst6, sizeof(*dst6));
-			dst6->sin6_family = AF_INET6;
-			dst6->sin6_len = sizeof(struct sockaddr_in6);
-			sa6_copy_addr(&in6p->in6p_fsa, dst6);
+	if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
+	    !SA6_ARE_ADDR_EQUAL(&dst6, &in6p->in6p_fsa))) {
+		RTFREE(ro->ro_rt);
+		ro->ro_rt = (struct rtentry *)NULL;
+	}
+	if (ro->ro_rt == (struct rtentry *)NULL &&
+	    !SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
+		bzero(dst6, sizeof(*dst6));
+		dst6->sin6_family = AF_INET6;
+		dst6->sin6_len = sizeof(struct sockaddr_in6);
+		dst6->sin6_addr = in6p->in6p_faddr;
 #ifndef SCOPEDROUTING		/* XXX */
-			dst6->sin6_scope_id = 0;
+		dst6->sin6_scope_id = 0;
 #endif
-			rtalloc((struct route *)ro);
-		}
+		rtalloc((struct route *)ro);
 	}
 	return (ro->ro_rt);
 }
