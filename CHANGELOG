@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.226 1999/10/27 12:09:28 itojun Exp $
+$Id: CHANGELOG,v 1.227 1999/10/27 12:15:05 jinmei Exp $
 
 <199910>
+1999-10-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6dd: applied several fixes from sumikawa@hitachi
+
 Wed Oct 27 20:58:42 JST 1999  itojun@iijlab.net
 	* netbsd/usr.bin/netstat: use getnameinfo() with KAME hack.
 	  add support for -v into interface info and pcb info printing,
