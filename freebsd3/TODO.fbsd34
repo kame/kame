@@ -23,18 +23,18 @@ ports
 		ruby:
 
 sbin
-	ifconfig:
-	ping:
-	route:
+	ifconfig: done
+	ping: done
+	route: done
 
 usr.bin
-	fetch:
-	rlogin:
-	tftp:
-	ftp:
-	rsh:
-	netstat:
-        telnet:
+	fetch: done
+	ftp: done
+	netstat: done
+	rlogin: donw
+	rsh: done
+        telnet: done
+	tftp: done
 
 usr.sbin
 	inetd:
