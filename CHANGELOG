@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2513 2003/12/10 05:33:14 jinmei Exp $
+$KAME: CHANGELOG,v 1.2514 2003/12/10 05:35:41 itojun Exp $
 
 <200312>
+Wed Dec 10 14:34:22 JST 2003  itojun@iijlab.net
+	* sys/netinet*/ip*_id.c: correct fix to repetition period issue, based
+	  on comments from niels provos.
+	  - seed2 is necessary, but use it as "seed2 + x" not "seed2 ^ x".
+	  - skipping number is not needed, so disable it for 16bit generator
+	    (makes the repetition period to 30000)
+
 2003-12-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.c (ip6_mrouter_set): validated the
 	argument for multicast routing socket options correctly.
