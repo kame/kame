@@ -124,7 +124,7 @@ ld_icp_attach(struct device *parent, struct device *self, void *aux)
 
 	if (!icp_cmd(icp, ICP_CACHESERVICE, ICP_IOCTL, ICP_CACHE_DRV_INFO,
 	    sc->sc_hwunit, sizeof(struct icp_cdevinfo))) {
-		printf(": unable to retrieve device info\n",
+		printf("%s: unable to retrieve device info\n",
 		    ld->sc_dv.dv_xname);
 		ld->sc_flags = LDF_ENABLED;
 		goto out;

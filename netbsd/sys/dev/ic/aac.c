@@ -358,7 +358,6 @@ aac_describe_controller(struct aac_softc *sc)
 	    le32toh(info->BufferMem) / (1024 * 1024),
 	    aac_describe_code(aac_battery_platform,
 	    le32toh(info->batteryPlatform)),
-	    le32toh(info->batteryPlatform),
 	    info->KernelRevision.external.comp.major,
 	    info->KernelRevision.external.comp.minor,
 	    info->KernelRevision.external.comp.dash);
