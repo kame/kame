@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.140 2004/07/28 22:47:33 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.141 2004/07/30 16:45:04 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -182,13 +182,6 @@ main(argc, argv)
 
 	setloglevel(debug);
 
-	/* dump current PID */
-	pid = getpid();
-	if ((pidfp = fopen(pid_file, "w")) != NULL) {
-		fprintf(pidfp, "%d\n", pid);
-		fclose(pidfp);
-	}
-
 	ifinit(device);
 
 	if ((cfparse(conffile)) != 0) {
@@ -200,6 +193,14 @@ main(argc, argv)
 		if (daemon(0, 0) < 0)
 			err(1, "daemon");
 	}
+
+	/* dump current PID */
+	pid = getpid();
+	if ((pidfp = fopen(pid_file, "w")) != NULL) {
+		fprintf(pidfp, "%d\n", pid);
+		fclose(pidfp);
+	}
+
 	client6_init();
 	ifinit_all();
 
