@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.3 2003/05/11 20:56:46 t-momose Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.4 2003/06/03 08:55:23 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -3047,7 +3047,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
  check_mobility_options:
 
 	if (!ba_safe) {
-		/* XXX autorization */
+		/* XXX authorization */
                 mip6log((LOG_NOTICE,
                          "%s:%d: BA authentication not supported\n",
                          __FILE__, __LINE__));
@@ -3107,8 +3107,14 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	else
 		refresh = lifetime;
 	mbu->mbu_refresh = refresh;
+
         if (mbu->mbu_refresh > mbu->mbu_expire)
                 mbu->mbu_refresh = mbu->mbu_expire;
+
+	if (ip6ma->ip6ma_status == IP6MA_STATUS_PREFIX_DISC) {
+		/* XXX; Need prefix discovery */
+	}
+
 	if (mbu->mbu_flags & IP6MU_HOME) {
 		/* this is from our home agent. */
 		if (mbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITD) {

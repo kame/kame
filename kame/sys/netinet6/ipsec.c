@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.188 2003/04/23 09:15:50 keiichi Exp $	*/
+/*	$KAME: ipsec.c,v 1.189 2003/06/03 08:55:23 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -105,6 +105,8 @@
 #include <netinet6/nd6.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_cncore.h>
+#include <netinet6/mip6_mncore.h>
 #endif /* MIP6 */
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
@@ -2290,7 +2292,7 @@ ipsec6_encapsulate(m, sav)
 	encap_hdr_len = sizeof(struct ip6_hdr);
 	ip6->ip6_nxt = IPPROTO_IPV6;
 
-#if defined(MIP6) && !defined(MIP6_HAIPSEC)
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE) && !defined(MIP6_HAIPSEC)
 	/*
 	 * check if this tunnel is from the mobile node to the home
 	 * agent or not.  if the packet is from the mobile node to the
@@ -3406,7 +3408,7 @@ ipsec6_output_tunnel(state, sp, flags)
 		}
 		ip6 = mtod(state->m, struct ip6_hdr *);
 		ip6->ip6_plen = htons(plen);
-#if defined(MIP6) && !defined(MIP6_HAIPSEC)
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE) && !defined(MIP6_HAIPSEC)
 		/* exchage the address in the HAO and ip6_src. */
 		if (MIP6_IS_MN && (m_hao != NULL))
 			mip6_addr_exchange(state->m, m_hao);
@@ -3497,7 +3499,7 @@ ipsec6_output_tunnel(state, sp, flags)
 			}
 		}
 		}
-#endif /* MIP6 && !MIP6_HAIPSEC */
+#endif /* MIP6 && MIP6_MOBILE_NODE && !MIP6_HAIPSEC */
 	}
 
 	return 0;
