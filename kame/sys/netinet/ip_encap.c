@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.69 2001/09/12 07:05:08 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.70 2001/09/12 07:09:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -219,7 +219,7 @@ encap_init()
 	if (sizeof(struct pack4) > max_keylen)
 		max_keylen = sizeof(struct pack4);
 #ifdef INET6
-	rn_inithead((void **)&encap_head[1], sizeof(struct sockaddr_pack));
+	rn_inithead((void **)&encap_head[1], sizeof(struct sockaddr_pack) << 3);
 	if (sizeof(struct pack6) > max_keylen)
 		max_keylen = sizeof(struct pack6);
 #endif
