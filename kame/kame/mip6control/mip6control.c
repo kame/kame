@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.8 2001/12/13 09:24:34 k-sugyou Exp $	*/
+/*	$KAME: mip6control.c,v 1.9 2001/12/14 03:52:41 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,6 +96,7 @@ main(argc, argv)
 {
 	int ch, s;
 	int enablemn = 0;
+	int disablemn = 0;
 	int enableha = 0;
 	int longdisp = 0;
 	char *ifnarg = "hif0";
@@ -108,10 +109,13 @@ main(argc, argv)
 	int gbu = 0;
 	int gbc = 0;
 
-	while ((ch = getopt(argc, argv, "mngli:H:hP:A:L:abc")) != -1) {
+	while ((ch = getopt(argc, argv, "mMngli:H:hP:A:L:abc")) != -1) {
 		switch(ch) {
 		case 'm':
 			enablemn = 1;
+			break;
+		case 'M':
+			disablemn = 1;
 			break;
 		case 'n':
 			numerichost = 1;
@@ -163,6 +167,14 @@ main(argc, argv)
 
 	if (enablemn) {
 		int enable = 1;
+		if(ioctl(s, SIOCENABLEMN, (caddr_t)&enable) == -1) {
+			perror("ioctl");
+			exit(-1);
+		}
+	}
+
+	if (disablemn) {
+		int enable = 0;
 		if(ioctl(s, SIOCENABLEMN, (caddr_t)&enable) == -1) {
 			perror("ioctl");
 			exit(-1);
