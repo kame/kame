@@ -1,5 +1,9 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2268 2002/10/31 11:27:36 jinmei Exp $
+$KAME: CHANGELOG,v 1.2269 2002/11/04 04:30:10 suz Exp $
+
+Mon Nov  4 13:28:42 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/mld6.c, icmp6.c: MLDv1-compat-mode 
+	  implementation for host side
 
 <200210>
 2002-10-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
