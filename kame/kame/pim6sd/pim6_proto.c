@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.42 2001/08/09 08:46:57 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.43 2001/08/09 10:27:19 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -2872,7 +2872,7 @@ add_jp_entry(pim_nbr, holdtime, group, grp_msklen, source, src_msklen,
 	break;
     case PIM_ACTION_PRUNE:
 	if (rp_flag == TRUE)
-	    data_ptr = bjpm->rp_list_join + bjpm->rp_list_join_size;
+	    data_ptr = bjpm->rp_list_prune + bjpm->rp_list_prune_size;
 	else
 	    data_ptr = bjpm->prune_list + bjpm->prune_list_size;
 	break;
