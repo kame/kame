@@ -165,15 +165,22 @@ struct addrinfo {
 #define	AI_PASSIVE	0x00000001 /* get address to use bind() */
 #define	AI_CANONNAME	0x00000002 /* fill ai_canonname */
 #define	AI_NUMERICHOST	0x00000004 /* prevent name resolution */
-/* valid flags for getaddrinfo (not standard mask, apps should not use it) */
+/* valid flags for getaddrinfo (not a standard def, apps should not use it) */
 #define AI_MASK \
     (AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST | AI_NUMERICSERV | \
      AI_ADDRCONFIG)
 
+#if unsupported
+/*
+ * The following flags are not supported in our getaddrinfo implementation,
+ * and we don't have a plan to implement them.  Rather than providing
+ * the incomplete support, we intentionally cause errors at compilation time.
+ */
 #define	AI_ALL		0x00000100 /* IPv6 and IPv4-mapped (with AI_V4MAPPED) */
 #define	AI_V4MAPPED_CFG	0x00000200 /* accept IPv4-mapped if kernel supports */
-#define	AI_ADDRCONFIG	0x00000400 /* only if any address is assigned */
 #define	AI_V4MAPPED	0x00000800 /* accept IPv4-mapped IPv6 address */
+#endif
+#define	AI_ADDRCONFIG	0x00000400 /* only if any address is assigned */
 #define AI_NUMERICSERV	0x00001000 /* prevent service resolution */
 
 /* special recommended flags for getipnodebyname */
