@@ -38,7 +38,7 @@ SRCS+=	adddi3.c anddi3.c ashldi3.c ashrdi3.c cmpdi2.c divdi3.c iordi3.c \
 # Other stuff
 SRCS+=	__cmsg_alignbytes.c inet_addr.c intoa.c md4c.c md5c.c sha1.c pmatch.c
 SRCS+=	_que.c
-SRCS+=	arc4random.c
+SRCS+=	arc4random.c strlcpy.c strlcat.c
 
 # Files to clean up
 CLEANFILES+= lib${LIB}.o lib${LIB}.po
