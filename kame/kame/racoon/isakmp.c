@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.72 2000/06/14 18:07:31 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.73 2000/06/14 18:25:21 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -133,6 +133,7 @@ static u_char r_ck0[] = { 0,0,0,0,0,0,0,0 }; /* used to verify the r_ck. */
  
 static int isakmp_main __P((vchar_t *, struct sockaddr *, struct sockaddr *));
 static int ph1_main __P((struct ph1handle *, vchar_t *));
+static int quick_main __P((struct ph2handle *, vchar_t *));
 static int isakmp_ph1begin_r __P((vchar_t *, struct sockaddr *, u_int8_t));
 static int isakmp_ph2begin_r __P((struct ph1handle *, vchar_t *));
 static int etypesw1 __P((int));
@@ -266,7 +267,6 @@ isakmp_main(msg, remote, local)
 	isakmp_index *index = (isakmp_index *)isakmp;
 	u_int32_t msgid = isakmp->msgid;
 	struct ph1handle *iph1;
-	int error;
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(msg, remote, local, 0);
@@ -427,7 +427,7 @@ isakmp_main(msg, remote, local)
 		break;
 
 	case ISAKMP_ETYPE_QUICK:
-	    {
+	{
 		struct ph2handle *iph2;
 
 		if (iph1 == NULL) {
@@ -469,67 +469,16 @@ isakmp_main(msg, remote, local)
 		if (ISSET(isakmp->flags, ISAKMP_FLAG_C))
 			iph2->flags |= ISAKMP_FLAG_C;
 
-		/* receive */
-		if (ph2exchange[etypesw2(isakmp->etype)]
-		               [iph2->side]
-		               [iph2->status] == NULL) {
+		/* call main process of quick mode */
+		if (quick_main(iph2, msg) < 0) {
+			plog(logp, LOCATION, iph1->remote,
+				"ERROR: delete phase2 handler due to error.\n");
 			unbindph12(iph2);
 			remph2(iph2);
 			delph2(iph2);
 			return -1;
 		}
-		error = (ph2exchange[etypesw2(isakmp->etype)]
-		                    [iph2->side]
-		                    [iph2->status])(iph2, msg);
-		if (error != 0) {
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, remote,
-					"failed to pre-process packet.\n"));
-			if (error != ISAKMP_INTERNAL_ERROR)
-				isakmp_info_send_n2(iph2, error, NULL);
-			unbindph12(iph2);
-			remph2(iph2);
-			delph2(iph2);
-			return -1;
-		}
-
-		/* free resend buffer */
-		if (iph2->sendbuf == NULL) {
-			plog(logp, LOCATION, NULL,
-				"no buffer found as sendbuf\n"); 
-			unbindph12(iph2);
-			remph2(iph2);
-			delph2(iph2);
-			return -1;
-		}
-		vfree(iph2->sendbuf);
-		iph2->sendbuf = NULL;
-
-		/* turn off schedule */
-		if (iph2->scr == NULL) {
-			plog(logp, LOCATION, NULL,
-				"no buffer found as sendbuf\n"); 
-			unbindph12(iph2);
-			remph2(iph2);
-			delph2(iph2);
-			return -1;
-		}
-		SCHED_KILL(iph2->scr);
-	
-		/* send */
-		YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
-		if ((ph2exchange[etypesw2(isakmp->etype)]
-		                [iph2->side]
-		                [iph2->status])(iph2, msg) < 0) {
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, remote,
-					"failed to process packet.\n"));
-			unbindph12(iph2);
-			remph2(iph2);
-			delph2(iph2);
-			return -1;
-		}
-	    }
+	}
 		break;
 
 	case ISAKMP_ETYPE_NEWGRP:
@@ -613,6 +562,66 @@ ph1_main(iph1, msg)
 			[iph1->side]
 			[iph1->status])(iph1, msg) < 0) {
 		plog(logp, LOCATION, iph1->remote,
+			"ERROR: failed to process packet.\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+/*
+ * main function of quick mode.
+ */
+static int
+quick_main(iph2, msg)
+	struct ph2handle *iph2;
+	vchar_t *msg;
+{
+	struct isakmp *isakmp = (struct isakmp *)msg->v;
+	int error;
+
+	/* receive */
+	if (ph2exchange[etypesw2(isakmp->etype)]
+		       [iph2->side]
+		       [iph2->status] == NULL) {
+		plog(logp, LOCATION, iph2->ph1->remote,
+			"ERROR: why isn't the function defined.\n");
+		return -1;
+	}
+	error = (ph2exchange[etypesw2(isakmp->etype)]
+			    [iph2->side]
+			    [iph2->status])(iph2, msg);
+	if (error != 0) {
+		plog(logp, LOCATION, iph2->ph1->remote,
+			"ERROR: failed to pre-process packet.\n");
+		if (error != ISAKMP_INTERNAL_ERROR)
+			isakmp_info_send_n2(iph2, error, NULL);
+		return -1;
+	}
+
+	/* free resend buffer */
+	if (iph2->sendbuf == NULL) {
+		plog(logp, LOCATION, NULL,
+			"ERROR: no buffer found as sendbuf\n"); 
+		return -1;
+	}
+	vfree(iph2->sendbuf);
+	iph2->sendbuf = NULL;
+
+	/* turn off schedule */
+	if (iph2->scr == NULL) {
+		plog(logp, LOCATION, NULL,
+			"ERROR: no buffer found as sendbuf\n"); 
+		return -1;
+	}
+	SCHED_KILL(iph2->scr);
+
+	/* send */
+	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
+	if ((ph2exchange[etypesw2(isakmp->etype)]
+			[iph2->side]
+			[iph2->status])(iph2, msg) < 0) {
+		plog(logp, LOCATION, iph2->ph1->remote,
 			"ERROR: failed to process packet.\n");
 		return -1;
 	}
@@ -1493,7 +1502,7 @@ isakmp_post_acquire(iph2)
 	bindph12(iph1, iph2);
 	iph2->status = PHASE2ST_STATUS2;
 
-	if ((ph2exchange[etypesw1(ISAKMP_ETYPE_QUICK)]
+	if ((ph2exchange[etypesw2(ISAKMP_ETYPE_QUICK)]
 	                [iph2->side]
 	                [iph2->status])(iph2, NULL) != 0)
 		return -1;
@@ -1508,7 +1517,7 @@ int
 isakmp_post_getspi(iph2)
 	struct ph2handle *iph2;
 {
-	if ((ph2exchange[etypesw1(ISAKMP_ETYPE_QUICK)]
+	if ((ph2exchange[etypesw2(ISAKMP_ETYPE_QUICK)]
 	                [iph2->side]
 	                [iph2->status])(iph2, NULL) != 0)
 		return -1;
@@ -1551,7 +1560,7 @@ isakmp_chkph1there(iph2)
 		/* found isakmp-sa */
 		bindph12(iph1, iph2);
 		iph2->status = PHASE2ST_STATUS2;
-		if ((ph2exchange[etypesw1(ISAKMP_ETYPE_QUICK)]
+		if ((ph2exchange[etypesw2(ISAKMP_ETYPE_QUICK)]
 		                 [iph2->side]
 		                 [iph2->status])(iph2, NULL) < 0) {
 			unbindph12(iph2);
