@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2325 2003/01/30 06:53:20 suz Exp $
+$KAME: CHANGELOG,v 1.2326 2003/01/31 12:32:35 keiichi Exp $
 
 <200301>
+Fri Jan 31 21:28:08 JST 2003	keiichi@iij.ad.jp
+	* kame/kame/mip6control:
+	- the file format for mip6makeconfig.sh has been changed.
+
 Thu Jan 30 15:52:05 JST 2003	suz@crl.hitachi.co.jp
 	* kame/kame/pim6sd/mld6_proto.c:
 	fixed a bug that MLD-compat-mode never switches back to MLDv2
