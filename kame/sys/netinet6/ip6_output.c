@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.269 2001/12/25 02:23:16 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.270 2001/12/25 02:24:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2095,12 +2095,6 @@ do { \
 						ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDR);
 					break;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-				case IPV6_CHECKSUM:
-					in6p->in6p_cksum = optval;
-					break;
-#endif
-
 				case IPV6_FAITH:
 					OPTSET(IN6P_FAITH);
 					break;
@@ -2565,9 +2559,6 @@ do { \
 			case IPV6_RECVDSTOPTS:
 			case IPV6_RECVRTHDRDSTOPTS:
 			case IPV6_UNICAST_HOPS:
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-			case IPV6_CHECKSUM:
-#endif
 			case IPV6_RECVPKTINFO:
 			case IPV6_RECVHOPLIMIT:
 			case IPV6_RECVRTHDR:
@@ -2608,12 +2599,6 @@ do { \
 				case IPV6_RECVRTHDRDSTOPTS:
 					optval = OPTBIT(IN6P_RTHDRDSTOPTS);
 					break;
-
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-				case IPV6_CHECKSUM:
-					optval = in6p->in6p_cksum;
-					break;
-#endif
 
 				case IPV6_RECVPATHMTU:
 					optval = OPTBIT(IN6P_MTU);
