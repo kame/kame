@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.44 2003/10/21 07:20:58 itojun Exp $	*/
+/*	$KAME: token.l,v 1.45 2004/01/08 06:01:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -177,13 +177,13 @@ ipcomp		{ yylval.num = 0; return(PR_IPCOMP); }
 <S_AUTHALG>hmac-sha2-512 { yylval.num = SADB_X_AALG_SHA2_512; BEGIN INITIAL; return(ALG_AUTH); }
 <S_AUTHALG>hmac-ripemd160 { yylval.num = SADB_X_AALG_RIPEMD160HMAC; BEGIN INITIAL; return(ALG_AUTH); }
 <S_AUTHALG>aes-xcbc-mac { yylval.num = SADB_X_AALG_AES_XCBC_MAC; BEGIN INITIAL; return(ALG_AUTH); }
-<S_AUTHALG>null { yylval.num = SADB_X_AALG_NULL; BEGIN INITIAL; return(ALG_AUTH_NOKEY); }
+<S_AUTHALG>null { yylval.num = SADB_X_AALG_NULL; BEGIN INITIAL; return(ALG_AUTH); }
 
 	/* encryption alogorithm */
 {hyphen}E	{ BEGIN S_ENCALG; return(F_ENC); }
 <S_ENCALG>des-cbc	{ yylval.num = SADB_EALG_DESCBC; BEGIN INITIAL; return(ALG_ENC); }
 <S_ENCALG>3des-cbc	{ yylval.num = SADB_EALG_3DESCBC; BEGIN INITIAL; return(ALG_ENC); }
-<S_ENCALG>null		{ yylval.num = SADB_EALG_NULL; BEGIN INITIAL; return(ALG_ENC_NOKEY); }
+<S_ENCALG>null		{ yylval.num = SADB_EALG_NULL; BEGIN INITIAL; return(ALG_ENC); }
 <S_ENCALG>simple	{ yylval.num = SADB_EALG_NULL; BEGIN INITIAL; return(ALG_ENC_OLD); }
 <S_ENCALG>blowfish-cbc	{ yylval.num = SADB_X_EALG_BLOWFISHCBC; BEGIN INITIAL; return(ALG_ENC); }
 <S_ENCALG>cast128-cbc	{ yylval.num = SADB_X_EALG_CAST128CBC; BEGIN INITIAL; return(ALG_ENC); }
