@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1567 2001/02/23 00:06:53 itojun Exp $
+$KAME: CHANGELOG,v 1.1568 2001/02/23 00:07:25 itojun Exp $
 
 <200102>
 Thu Feb 22 10:08:27 JST 2001 sakane@ydc.co.jp
@@ -10,8 +10,10 @@ Thu Feb 22 10:08:27 JST 2001 sakane@ydc.co.jp
 	the pair of IP addresses of the end of the SA had failed.
 
 Thu Feb 22 01:59:01 JST 2001  itojun@iijlab.net
-	* sys/netinet6/{frag6,dest6,nd6}.c: make variable length header parsing
+	* sys/netinet6/{dest6,nd6}.c: make variable length header parsing
 	  pickier (= safer).
+	* sys/netinet6/frag6.c: fix behavior on memory shortage/too many
+	  reass queues.
 	* openbsd/include/netdb.h: change ai_addrlen from int to socklen_t,
 	  to conform to 2553bis-03.
 
