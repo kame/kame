@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.45 2001/06/25 04:54:28 itojun Exp $	*/
+/*	$KAME: debug.c,v 1.46 2001/08/14 02:03:10 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -62,7 +62,6 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/ip_mroute.h>
 #include <netinet/icmp6.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/pim6.h>
@@ -327,7 +326,7 @@ void
 dump_stat()
 {
 	FILE *fp;
-	vifi_t vifi;
+	mifi_t vifi;
 	register struct uvif *v;
 
 	fp = fopen(statfilename, "w");
@@ -441,7 +440,7 @@ void
 dump_vifs(fp)
     FILE           *fp;
 {
-    vifi_t          vifi;
+    mifi_t          vifi;
     register struct uvif *v;
     struct phaddr  *pa;
 
@@ -508,7 +507,7 @@ dump_nbrs(fp)
 	FILE *fp;
 {
 	struct uvif *v;
-	vifi_t vifi;
+	mifi_t vifi;
 	pim_nbr_entry_t *n;
 	struct phaddr *pa;
 
@@ -547,7 +546,7 @@ dump_mldqueriers(fp)
 	FILE *fp;
 {
 	struct uvif *v;
-	vifi_t vifi;
+	mifi_t vifi;
 	time_t now;
 
 	fprintf(fp, "MLD Querier List\n");
@@ -666,7 +665,7 @@ dump_pim_mrt(fp)
 {
     grpentry_t     *g;
     register mrtentry_t *r;
-    register vifi_t vifi;
+    register mifi_t vifi;
     int i;
     u_int           number_of_cache_mirrors = 0;
     u_int           number_of_groups = 0;
