@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.117 2001/07/18 12:47:59 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.118 2001/07/18 15:09:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -411,9 +411,7 @@ getaddrinfo(hostname, servname, hints, res)
 	struct addrinfo *afailist[sizeof(afdl)/sizeof(afdl[0])];
 	struct addrinfo *afai_unspec;
 	int found;
-#ifdef USE_LOG_REORDER
 	int numeric = 0;
-#endif
 
 	/* ensure we return NULL on errors */
 	*res = NULL;
@@ -557,9 +555,7 @@ getaddrinfo(hostname, servname, hints, res)
 			found++;
 	}
 	if (found) {
-#ifdef USE_LOG_REORDER
 		numeric = 1;
-#endif
 		goto globcopy;
 	}
 
