@@ -1,13 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2374 2003/04/10 12:02:09 jinmei Exp $
+$KAME: CHANGELOG,v 1.2375 2003/04/10 12:02:34 jinmei Exp $
 
 <200304>
 2003-04-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/config.c (getconfig): supported a string
 	notation for flag parameters.  For example, rtflags="o" specifies
-	the daemon to set the "O bit" of the router flag of the router
-	advertisement header.  This change is backward compatible; the
-	traditional numeric notation is also accepted.
+	the daemon to set the "O bit" of the router advertisement header.
+	This change is backward compatible; the traditional numeric
+	notation is also accepted.
 
 Wed Apr  9 17:19:41 JST 2003	suz@crl.hitachi.co.jp
 	* kame/freebsd4: sync with FreeBSD 4.8-RELEASE
