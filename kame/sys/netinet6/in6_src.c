@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.76 2001/09/24 16:21:01 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.77 2001/09/24 17:21:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1166,7 +1166,7 @@ set_addrsel_policy(buf, buflen)
 
 	/* before changing the table, validate the specified policy. */
 	ent = (struct in6_addrpolicy *)buf;
-	ep = (struct in6_addrpolicy *)(buf + buflen);
+	ep = (struct in6_addrpolicy *)((caddr_t)buf + buflen);
 	for (; ent && ent + 1 <= ep; ent++) {
 		if (ent->label == ADDR_LABEL_NOTAPP)
 			return(EINVAL);
@@ -1189,7 +1189,7 @@ set_addrsel_policy(buf, buflen)
 
 	/* finally, set the new policy. */
 	ent = (struct in6_addrpolicy *)buf;
-	ep = (struct in6_addrpolicy *)(buf + buflen);
+	ep = (struct in6_addrpolicy *)((caddr_t)buf + buflen);
 	for (; ent && ent + 1 <= ep; ent++) {
 		struct in6_addrpolicy ent0 = *ent;
 		int i;
@@ -1222,7 +1222,7 @@ get_addrsel_policy(oldp, oldlenp)
 	w.w_given = oldlen;
 	w.w_where = oldp;
 	if (oldp)
-		w.w_limit = oldp + oldlen;
+		w.w_limit = (caddr_t)oldp + oldlen;
 
 	error = walk_addrsel_policy(dump_addrsel_policyent, &w);
 
