@@ -32,14 +32,14 @@ SRCS=	mld6.c mld6_proto.c\
 	route.c vif.c timer.c mrt.c pim6.c pim6_proto.c rp.c crc.c trace.c\
 	cfparse.y cftoken.l
 CFLAGS+= -g
-CFLAGS+=-I.
-CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -DUSE_RFC2292BIS -I${SRCDIR}
-CFLAGS+=-DHAVE_STDARG_H
+CPPFLAGS+=-I.
+CPPFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -DUSE_RFC2292BIS -I${SRCDIR}
+CPPFLAGS+=-DHAVE_STDARG_H -DYY_NO_UNPUT
 LDADD+=	-L${.CURDIR}/../../../lib/libinet6 \
 	-L${.CURDIR}/../../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+=	${.CURDIR}/../../../lib/libinet6/libinet6.a \
-	-L${.CURDIR}/../../../lib/libinet6/obj/libinet6.a \
+	${.CURDIR}/../../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 LDADD+=-ly -ll
 YFLAGS+=-d
