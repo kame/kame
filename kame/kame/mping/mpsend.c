@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/*	$Id: mpsend.c,v 1.2 1999/12/07 14:03:58 itojun Exp $	*/
+/*	$Id: mpsend.c,v 1.3 2000/12/05 09:00:05 itojun Exp $	*/
 
 #include "mping.h"
 
@@ -204,5 +204,7 @@ main(argc, argv)
 void
 usage()
 {
-	fprintf(stderr, "%s [-c count][-l hoplimit][-p port][-s size][-t interval][-v] -i interface -m mcastaddr\n", argv0);
+	fprintf(stderr,
+"Usage: %s [-v] [-c count] [-i interface] [-l hoplimit] [-p port] \n"
+"        [-s size] [-t interval] -m mcastaddr\n", argv0);
 }

@@ -1,4 +1,4 @@
-.\"	$KAME: mpsend.8,v 1.3 2000/11/10 12:12:11 itojun Exp $
+.\"	$KAME: mpsend.8,v 1.4 2000/12/05 09:00:05 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -37,14 +37,28 @@
 .\"
 .Sh SYNOPSIS
 .Nm mpsend
-.Op Fl c Ar count
-.Op Fl l Ar hop_limit
-.Op Fl p Ar port
-.Op Fl s Ar size
-.Op Fl t Ar interval
 .Op Fl v
-.Fl i Ar interface
+.Bk -words
+.Op Fl c Ar count
+.Ek
+.Bk -words
+.Op Fl i Ar interface
+.Ek
+.Bk -words
+.Op Fl l Ar hop_limit
+.Ek
+.Bk -words
+.Op Fl p Ar port
+.Ek
+.Bk -words
+.Op Fl s Ar size
+.Ek
+.Bk -words
+.Op Fl t Ar interval
+.Ek
+.Bk -words
 .Fl m Ar mcastaddr
+.Ek
 .\"
 .Sh DESCRIPTION
 The
@@ -70,9 +84,20 @@ terminates.
 By default, the
 .Nm
 sends packets infinitely.
+.It Fl i Ar interface
+Specify the name of
+.Ar interface
+for listening to multicast stream.
+If unicast address is specified with
+.Fl m ,
+the option has no effect.
 .It Fl l Ar hop_limit
 Specify the hop_limit value of the packets.
 Default value is 1.
+.It Fl m Ar mcastaddr
+Specify multicast adddress to be used.
+.Fl m
+is mandatory.
 .It Fl p Ar port
 Specify the UDP port number.
 Default value is 9998.

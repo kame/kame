@@ -24,7 +24,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-#	$Id: Makefile,v 1.1 1999/12/06 06:26:33 jinmei Exp $
+#	$Id: Makefile,v 1.2 2000/12/05 09:00:05 itojun Exp $
 
 .ifndef PREFIX
 PREFIX=/usr/local/v6
@@ -49,7 +49,9 @@ CC=	gcc
 CPPFLAGS+=-DINET6
 CFLAGS+=-g
 
+.if exists(/usr/local/v6/lib/libinet6.a)
 LDADD+=	-L/usr/local/v6/lib -linet6
+.endif
 
 MAN=	mpsend.8 mprecv.8
 BINMODE=0755
