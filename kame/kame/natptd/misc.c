@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: misc.c,v 1.2 2000/01/10 10:45:07 fujisawa Exp $
+ *	$Id: misc.c,v 1.3 2000/02/14 09:58:04 itojun Exp $
  */
 
 #include <stdio.h>
@@ -1431,10 +1431,10 @@ xmallocShow(FILE *fp)
     {
 	if (xalo[iter].alloced != NULL)
 	{
-	    fprintf(stream, "addr: 0x%08x, caller: 0x%08x, size: %6d",
-		    (uint)xalo[iter].alloced,
-		    (uint)xalo[iter].caller,
-		    (uint)xalo[iter].size);
+	    fprintf(stream, "addr: %p, caller: %p, size: %6lu",
+		    xalo[iter].alloced,
+		    xalo[iter].caller,
+		    (u_long)xalo[iter].size);
 
 	    if (xalo[iter].size == sizeof(struct msgHndl))
 	    {

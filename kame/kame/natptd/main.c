@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: main.c,v 1.1 2000/01/07 15:08:34 fujisawa Exp $
+ *	$Id: main.c,v 1.2 2000/02/14 09:58:03 itojun Exp $
  */
 
 #include <stdio.h>
@@ -450,6 +450,7 @@ log(int priority, char *fmt, ...)
 {
     va_list	ap;
     char	Wow[BUFSIZ];
+    time_t	t;
 
     va_start(ap, fmt);
     vsprintf(Wow, fmt, ap);
@@ -468,7 +469,8 @@ log(int priority, char *fmt, ...)
 	};
 
 	gettimeofday(&atv, NULL);
-	tm = localtime(&atv.tv_sec);
+	t = (time_t)atv.tv_sec;
+	tm = localtime(&t);
 
 	fprintf(stderr, "%s ", months[tm->tm_mon]);
 	fprintf(stderr, "%02d ", tm->tm_mday);

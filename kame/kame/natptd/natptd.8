@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	$Id: natptd.8,v 1.1 2000/01/07 15:08:35 fujisawa Exp $
+.\"	$Id: natptd.8,v 1.2 2000/02/14 09:58:04 itojun Exp $
 .\"
 .\" Note: The date here should be updated whenever a non-trivial
 .\" change is made to the manual page.
@@ -91,6 +91,7 @@ Specify the filename to record nameserver database.
 .Li pidFile:		<filename>
 .Xc
 Specify the filename to record daemon's process id.
+.El
 .\"
 .Sh EXAMPLES
 The following is an example of a typical usage
@@ -143,8 +144,8 @@ using the
 command.
 .Pp
 .Bl -tag -width Ds
-SHGHUP
-.Ed
+SIGHUP
+.El
 .\"
 .Sh BUGS
 The
