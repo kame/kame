@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.24 2000/12/22 08:42:26 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.25 2000/12/22 08:48:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -189,6 +189,14 @@ getconfig(intface)
 		       tmp->maxinterval, MAXROUTERLIFETIME);
 		exit(1);
 	}
+	/*
+	 * Basically, hosts MUST NOT send Router Advertisement messages at any
+	 * time (RFC 2461, Section 6.2.3). However, it would sometimes be
+	 * useful to allow hosts to advertise some parameters such as prefix
+	 * information and link MTU. Thus, we allow hosts to invoke rtadvd
+	 * only when router lifetime (on every advertising interface) is
+	 * explicitly set zero. (see also the above section)
+	 */
 	if (val && forwarding == 0) {
 		syslog(LOG_WARNING,
 		       "<%s> non zero router lifetime is specified for %s, "
