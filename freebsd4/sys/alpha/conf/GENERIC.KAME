@@ -173,9 +173,11 @@ pseudo-device	bpf		#Berkeley packet filter
 
 options 	IPSEC			#IP security
 options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
-#options 	"IPSEC_IPV6FWD"         #IP security tunnel for IPv6
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
+# these options will become the default behavior soon.
+options 	NEW_STRUCT_ROUTE
+options 	FAKE_LOOPBACK_IF
 
 # IPv6 firewall
 #options 	"IPV6FIREWALL"
