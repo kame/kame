@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.48 2000/06/04 17:34:21 jinmei Exp $
+	$Id: PORTABILITY,v 1.49 2000/06/04 22:54:32 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -315,12 +315,3 @@ across those possibilities.
 	.Nm foo
   to avoid portability issue (it is unfortunate that we need to place
   duplicated text...).
-
-- How to detect whether a given socket is privileged in kernel:
-  Bsdi, freebsd2, and openbsd have the SS_PRIV flag for the so_state
-  member of the struct socket.
-  Freebsd3 or later and netbsd don't have the SS_PRIV flag, so we
-  should use suser() for the process associated with the
-  socket. However, suser() itself is not so portable. FreeBSD3 and
-  netbsd needs two arguments for the function, bud freebsd4 needs only
-  one.

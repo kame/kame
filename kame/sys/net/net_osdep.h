@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.17 2000/05/27 10:10:50 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.18 2000/06/04 22:54:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -39,6 +39,10 @@
  *	NetBSD, FreeBSD 3
  *		struct proc *p;
  *		if (p && !suser(p->p_ucred, &p->p_acflag))
+ *			privileged;
+ *	FreeBSD 4
+ *		struct proc *p;
+ *		if (p && !suser(p))
  *			privileged;
  *	OpenBSD, BSDI [34], FreeBSD 2
  *		struct socket *so;
