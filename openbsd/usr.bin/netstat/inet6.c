@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-/*__RCSID("$Id: inet6.c,v 1.4 1999/12/02 04:47:27 itojun Exp $");*/
+/*__RCSID("$Id: inet6.c,v 1.5 2000/01/05 00:08:23 itojun Exp $");*/
 #endif
 #endif /* not lint */
 
@@ -479,7 +479,7 @@ ip6_stats(off, name)
 	for (first = 1, i = 0; i < 256; i++)
 		if (ip6stat.ip6s_nxthist[i] != 0) {
 			if (first) {
-				printf("\tInput histogram:\n");
+				printf("\tInput packet histogram:\n");
 				first = 0;
 			}
 			printf("\t\t%s: %qu\n", ip6nh[i],
@@ -847,7 +847,7 @@ icmp6_stats(off, name)
 	for (first = 1, i = 0; i < 256; i++)
 		if (icmp6stat.icp6s_outhist[i] != 0) {
 			if (first) {
-				printf("\tOutput histogram:\n");
+				printf("\tOutput packet histogram:\n");
 				first = 0;
 			}
 			printf("\t\t%s: %qu\n", icmp6names[i],
@@ -860,7 +860,7 @@ icmp6_stats(off, name)
 	for (first = 1, i = 0; i < ICMP6_MAXTYPE; i++)
 		if (icmp6stat.icp6s_inhist[i] != 0) {
 			if (first) {
-				printf("\tInput histogram:\n");
+				printf("\tInput packet histogram:\n");
 				first = 0;
 			}
 			printf("\t\t%s: %qu\n", icmp6names[i],

@@ -426,7 +426,7 @@ icmp_stats(off, name)
 	for (first = 1, i = 0; i < ICMP_MAXTYPE + 1; i++)
 		if (icmpstat.icps_outhist[i] != 0) {
 			if (first) {
-				printf("\tOutput histogram:\n");
+				printf("\tOutput packet histogram:\n");
 				first = 0;
 			}
 			printf("\t\t%s: %lu\n", icmpnames[i],
@@ -439,7 +439,7 @@ icmp_stats(off, name)
 	for (first = 1, i = 0; i < ICMP_MAXTYPE + 1; i++)
 		if (icmpstat.icps_inhist[i] != 0) {
 			if (first) {
-				printf("\tInput histogram:\n");
+				printf("\tInput packet histogram:\n");
 				first = 0;
 			}
 			printf("\t\t%s: %lu\n", icmpnames[i],
