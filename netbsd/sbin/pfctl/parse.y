@@ -1103,7 +1103,7 @@ cbqflags_list	: cbqflags_item				{ $$ |= $1; }
 cbqflags_item	: STRING	{
 			if (!strcmp($1, "default"))
 				$$ = CBQCLF_DEFCLASS;
-#ifdef __OpenBSD__
+#ifdef CBQCLF_BORROW
 			else if (!strcmp($1, "borrow"))
 				$$ = CBQCLF_BORROW;
 #endif

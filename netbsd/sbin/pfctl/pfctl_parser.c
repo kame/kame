@@ -77,7 +77,7 @@ static const struct icmptypeent icmp_type[] = {
 	{ "unreach",	ICMP_UNREACH },
 	{ "squench",	ICMP_SOURCEQUENCH },
 	{ "redir",	ICMP_REDIRECT },
-#ifdef __OpenBSD__
+#ifdef ICMP_ALTHOSTADDR
 	{ "althost",	ICMP_ALTHOSTADDR },
 #endif
 	{ "routeradv",	ICMP_ROUTERADVERT },
@@ -90,7 +90,7 @@ static const struct icmptypeent icmp_type[] = {
 	{ "inforep",	ICMP_IREQREPLY },
 	{ "maskreq",	ICMP_MASKREQ },
 	{ "maskrep",	ICMP_MASKREPLY },
-#ifdef __OpenBSD__
+#ifdef ICMP_TRACEROUTE
 	{ "trace",	ICMP_TRACEROUTE },
 	{ "dataconv",	ICMP_DATACONVERR },
 	{ "mobredir",	ICMP_MOBILE_REDIRECT },
@@ -146,7 +146,7 @@ static const struct icmpcodeent icmp_code[] = {
 	{ "host-prohib",	ICMP_UNREACH,	ICMP_UNREACH_HOST_PROHIB },
 	{ "net-tos",		ICMP_UNREACH,	ICMP_UNREACH_TOSNET },
 	{ "host-tos",		ICMP_UNREACH,	ICMP_UNREACH_TOSHOST },
-#ifdef __OpenBSD__
+#ifdef ICMP_UNREACH_FILTER_PROHIB
 	{ "filter-prohib",	ICMP_UNREACH,	ICMP_UNREACH_FILTER_PROHIB },
 	{ "host-preced",	ICMP_UNREACH,	ICMP_UNREACH_HOST_PRECEDENCE },
 	{ "cutoff-preced",	ICMP_UNREACH,	ICMP_UNREACH_PRECEDENCE_CUTOFF },
@@ -155,13 +155,13 @@ static const struct icmpcodeent icmp_code[] = {
 	{ "redir-host",		ICMP_REDIRECT,	ICMP_REDIRECT_HOST },
 	{ "redir-tos-net",	ICMP_REDIRECT,	ICMP_REDIRECT_TOSNET },
 	{ "redir-tos-host",	ICMP_REDIRECT,	ICMP_REDIRECT_TOSHOST },
-#ifdef __OpenBSD__
+#ifdef ICMP_ROUTERADVERT_NORMAL 
 	{ "normal-adv",		ICMP_ROUTERADVERT, ICMP_ROUTERADVERT_NORMAL },
 	{ "common-adv",		ICMP_ROUTERADVERT, ICMP_ROUTERADVERT_NOROUTE_COMMON },
 #endif
 	{ "transit",		ICMP_TIMXCEED,	ICMP_TIMXCEED_INTRANS },
 	{ "reassemb",		ICMP_TIMXCEED,	ICMP_TIMXCEED_REASS },
-#ifdef __OpenBSD__
+#ifdef ICMP_PARAMPROB_ERRATPTR 
 	{ "badhead",		ICMP_PARAMPROB,	ICMP_PARAMPROB_ERRATPTR },
 	{ "optmiss",		ICMP_PARAMPROB,	ICMP_PARAMPROB_OPTABSENT },
 	{ "badlen",		ICMP_PARAMPROB,	ICMP_PARAMPROB_LENGTH },

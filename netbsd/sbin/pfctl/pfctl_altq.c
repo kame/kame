@@ -553,7 +553,7 @@ print_cbq_opts(const struct pf_altq *a)
 			printf(" cleardscp");
 		if (opts->flags & CBQCLF_FLOWVALVE)
 			printf(" flowvalve");
-#ifdef __OpenBSD__
+#ifdef CBQCLF_BORROW
 		if (opts->flags & CBQCLF_BORROW)
 			printf(" borrow");
 #endif
