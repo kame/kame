@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.47 2005/02/10 04:25:38 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.48 2005/02/10 09:27:55 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -201,8 +201,6 @@ SYSCTL_STRUCT(_net_inet_dccp, DCCPCTL_STATS, stats, CTLFLAG_RW,
 #define in6p_outputopts inp_outputopts6
 #endif
 
-static struct	sockaddr_in dccp_in = { sizeof(dccp_in), AF_INET };
-
 static struct dccpcb * dccp_close(struct dccpcb *);
 static int dccp_disconnect2(struct dccpcb *);
 int dccp_get_option(char *, int, int, char *,int);
@@ -223,7 +221,6 @@ u_char dccp_ackvector_state(struct dccpcb *, u_int32_t);
 
 /*
  * DCCP initialization
- *
  */
 void
 dccp_init()
@@ -355,13 +352,6 @@ dccp_input(struct mbuf *m, ...)
 			return;
 		}
 #endif
-
-		/*
-		 * Construct sockaddr format source address.
-		 * Stuff source address and datagram in user buffer.
-		 */
-		dccp_in.sin_port = dh->dh_sport;
-		dccp_in.sin_addr = ip->ip_src;
 	}
 
 	DCCP_DEBUG((LOG_INFO, "Header info: cslen = %u, off = %u, type = %u, reserved = %u, seq = %lu\n", dh->dh_cscov, dh->dh_off, dh->dh_type, dh->dh_res, (unsigned long)ntohl(dh->dh_seq << 8)));
@@ -377,10 +367,10 @@ dccp_input(struct mbuf *m, ...)
 	else
 #endif
 	{
-#ifdef __OpenBSD__
-		len = ntohs(ip->ip_len);
-#else
+#ifdef __FreeBSD__
 		len = ip->ip_len;
+#else
+		len = ntohs(ip->ip_len);
 #endif
 #ifndef __FreeBSD__
 		len -= ip->ip_hl << 2;
@@ -467,16 +457,12 @@ dccp_input(struct mbuf *m, ...)
 		inp = in_pcblookup_hash(&dccpbinfo, ip->ip_src, dh->dh_sport,
 		    ip->ip_dst, dh->dh_dport, 1, m->m_pkthdr.rcvif);
 #elif defined(__NetBSD__)
-		inp = in_pcblookup_connect(&dccpbtable, ip->ip_src, dh->dh_sport,
-		    ip->ip_dst, dh->dh_dport);
-		log(LOG_INFO,
-		    "INP=%x, Connection attempt to DCCP %s:%d from %s:%d\n",
-		    (unsigned int )inp,
-		    inet_ntoa(ip->ip_dst), ntohs(dh->dh_dport), inet_ntoa(ip->ip_src),
-		    ntohs(dh->dh_sport));
+		inp = in_pcblookup_connect(&dccpbtable, ip->ip_src,
+		    dh->dh_sport, ip->ip_dst, dh->dh_dport);
 		if (inp == NULL) {
 			/* XXX stats increment? */
-			inp = in_pcblookup_bind(&dccpbtable, ip->ip_dst, dh->dh_dport);
+			inp = in_pcblookup_bind(&dccpbtable, ip->ip_dst,
+			    dh->dh_dport);
 		}
 #else /* OpenBSD */
 		inp = in_pcblookup(&dccpbtable, &ip->ip_src,
@@ -501,10 +487,10 @@ dccp_input(struct mbuf *m, ...)
 #ifdef INET6
 			if (isipv6) {
 				strlcpy(dbuf, "[", sizeof dbuf);
-				strlcpy(sbuf, "[", sizeof sbuf);
 				strlcat(dbuf, ip6_sprintf(&ip6->ip6_dst), sizeof dbuf);
-				strlcat(sbuf, ip6_sprintf(&ip6->ip6_src), sizeof sbuf);
 				strlcat(dbuf, "]", sizeof dbuf);
+				strlcpy(sbuf, "[", sizeof sbuf);
+				strlcat(sbuf, ip6_sprintf(&ip6->ip6_src), sizeof sbuf);
 				strlcat(sbuf, "]", sizeof sbuf);
 			} else
 #endif
@@ -519,16 +505,17 @@ dccp_input(struct mbuf *m, ...)
 		}
 		dccpstat.dccps_noport++;
 
-	/*
-	 * We should send DCCP reset here but we can't call dccp_output since we
-	 * have no dccpcb. A icmp unreachable works great but the specs says DCCP reset :(
-	 *
-	 * if (!isipv6) {
-	 *	*ip = save_ip;
-	 *	ip->ip_len += iphlen;
-	 *	icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT, 0, 0); 
-	 * } 
-	 */
+		/*
+		 * We should send DCCP reset here but we can't call dccp_output
+		 * since we have no dccpcb. A icmp unreachable works great but
+		 * the specs says DCCP reset :(
+		 *
+		 * if (!isipv6) {
+		 *	*ip = save_ip;
+		 *	ip->ip_len += iphlen;
+		 *	icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT, 0, 0); 
+		 * } 
+		 */
 
 		INP_INFO_WUNLOCK(&dccpbinfo);
 		goto badunlocked;

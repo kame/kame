@@ -1,4 +1,4 @@
-/*	$KAME: dccp_cc_sw.c,v 1.7 2005/02/10 04:25:38 itojun Exp $	*/
+/*	$KAME: dccp_cc_sw.c,v 1.8 2005/02/10 09:27:55 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -72,11 +72,20 @@
 #include <netinet/dccp_cc_sw.h>
 
 struct dccp_cc_sw cc_sw[] = {
-  {0,0,0,0,0,0,0,0},
-  {dccp_nocc_init,dccp_nocc_free,dccp_nocc_send_packet,dccp_nocc_send_packet_sent,dccp_nocc_packet_recv,
-   dccp_nocc_init,dccp_nocc_free,dccp_nocc_packet_recv},
-  {0,0,0,0,0,0,0,0},
-  {tcplike_send_init,tcplike_send_free,tcplike_send_packet,tcplike_send_packet_sent,
-   tcplike_send_packet_recv,
-   tcplike_recv_init,tcplike_recv_free,tcplike_recv_packet_recv},
+{ 0,			0,			0,
+  0,						0,
+  0,			0,			0
+},
+{ dccp_nocc_init,	dccp_nocc_free,		dccp_nocc_send_packet,
+  dccp_nocc_send_packet_sent,			dccp_nocc_packet_recv,
+  dccp_nocc_init,	dccp_nocc_free,		dccp_nocc_packet_recv
+},
+{ 0,			0,			0,
+  0,						0,
+  0,			0,			0
+},
+{ tcplike_send_init,	tcplike_send_free,	tcplike_send_packet,
+  tcplike_send_packet_sent,			 tcplike_send_packet_recv,
+   tcplike_recv_init,	tcplike_recv_free,	tcplike_recv_packet_recv
+},
 };

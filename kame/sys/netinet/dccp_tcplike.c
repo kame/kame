@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.15 2004/10/28 04:33:26 itojun Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.16 2005/02/10 09:27:55 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -117,10 +117,11 @@ extern u_char dccp_ackvector_state(struct dccpcb *, u_int32_t);
 extern int dccp_get_option(char *, int, int, char *, int);
 extern int dccp_remove_feature(struct dccpcb *, u_int8_t, u_int8_t);
 
-/**
+/*
  * RTO timer activated
- **/
-void tcplike_rto_timeout(void *ccb)
+ */
+void
+tcplike_rto_timeout(void *ccb)
 {
 	struct tcplike_send_ccb *cb = (struct tcplike_send_ccb *) ccb;
 	struct inpcb *inp;
@@ -151,7 +152,7 @@ void tcplike_rto_timeout(void *ccb)
 	cb->oldcwnd_ts = cb->pcb->seq_snd;
 	
 	LOSS_DEBUG((LOG_INFO, "Timeout. CWND value: %u , OUTSTANDING value: %u\n",
-		    cb->cwnd, cb->outstanding));
+	    cb->cwnd, cb->outstanding));
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
 #endif
@@ -195,22 +196,24 @@ void tcplike_rtt_sample(struct tcplike_send_ccb *cb, u_int16_t sample)
 
 
 	/* 5 million ways to calculate RTT ...*/
-	/*
+#if 0
 	cb->srtt = ( 0.8 * cb->srtt ) + (0.2 * sample);
 	if (cb->srtt < TCPLIKE_MIN_RTT)
 		cb->srtt = TCPLIKE_MIN_RTT;
 	cb->rto = cb->srtt << 1;
-	*/
+#endif
 	
 	LOSS_DEBUG((LOG_INFO, "RTT Sample: %u , New RTO: %u\n", sample, cb->rto));
 }
 
 /* Functions declared in struct dccp_cc_sw */
 
-/* Initialises the sender side
+/*
+ * Initialises the sender side
  * returns: pointer to a tfrc_send_ccb struct on success, otherwise 0
  */ 
-void *tcplike_send_init(struct dccpcb* pcb)
+void *
+tcplike_send_init(struct dccpcb* pcb)
 {
 	struct tcplike_send_ccb *cb;
 	
@@ -222,7 +225,6 @@ void *tcplike_send_init(struct dccpcb* pcb)
 		dccpstat.tcplikes_send_memerr++;
 		return 0;
 	}
-
 	memset(cb, 0, sizeof (struct tcplike_send_ccb));
 	
 	/* init sender */
@@ -256,7 +258,7 @@ void *tcplike_send_init(struct dccpcb* pcb)
 
 	cb->cv_size = TCPLIKE_INITIAL_CWNDVECTOR;
 	/* 1 bit per entry */
-	cb->cwndvector = malloc(cb->cv_size/8, M_PCB, M_NOWAIT | M_ZERO);
+	cb->cwndvector = malloc(cb->cv_size / 8, M_PCB, M_NOWAIT | M_ZERO);
 	if (cb->cwndvector == NULL) {
 		MALLOC_DEBUG((LOG_INFO, "Unable to allocate memory for cwndvector\n"));
 		/* What to do now? */
@@ -264,7 +266,7 @@ void *tcplike_send_init(struct dccpcb* pcb)
 		dccpstat.tcplikes_send_memerr++;
 		return 0;
 	}
-	memset(cb->cwndvector, 0, cb->cv_size/8);
+	memset(cb->cwndvector, 0, cb->cv_size / 8);
 	cb->cv_hs = cb->cv_ts = 0;
 	cb->cv_hp = cb->cwndvector;
 
@@ -293,10 +295,12 @@ void tcplike_send_term(void *ccb)
 	TCPLIKE_DEBUG((LOG_INFO, "TCP-like sender is destroyed\n"));
 }
 
-/* Free the sender side
+/*
+ * Free the sender side
  * args: ccb - ccb of sender
  */
-void tcplike_send_free(void *ccb)
+void
+tcplike_send_free(void *ccb)
 {
 	struct tcplike_send_ccb *cb = (struct tcplike_send_ccb *) ccb;
 	
@@ -334,11 +338,13 @@ void tcplike_send_free(void *ccb)
 #endif
 }
 
-/* Ask TCPlike wheter one can send a packet or not 
+/*
+ * Ask TCPlike wheter one can send a packet or not 
  * args: ccb  -  ccb block for current connection 
  * returns: 0 if ok, else <> 0.
  */ 
-int tcplike_send_packet(void *ccb, long datasize)
+int
+tcplike_send_packet(void *ccb, long datasize)
 {
 	/* check if one can send here */
 	struct tcplike_send_ccb *cb = (struct tcplike_send_ccb *) ccb;
@@ -414,11 +420,13 @@ int tcplike_send_packet(void *ccb, long datasize)
 	
 }
 
-/* Notify sender that a packet has been sent 
+/*
+ * Notify sender that a packet has been sent 
  * args: ccb - ccb block for current connection
  *	 moreToSend - if there exists more packets to send
  */
-void tcplike_send_packet_sent(void *ccb, int moreToSend, long datasize)
+void
+tcplike_send_packet_sent(void *ccb, int moreToSend, long datasize)
 {
 	struct tcplike_send_ccb *cb = (struct tcplike_send_ccb *) ccb;
 	
@@ -447,11 +455,12 @@ void tcplike_send_packet_sent(void *ccb, int moreToSend, long datasize)
 #endif
 }
 
-/**
+/*
  * Notify that an ack package was received
  * args: ccb  -  ccb block for current connection
- **/
-void tcplike_send_packet_recv(void *ccb, char *options, int optlen)
+ */
+void
+tcplike_send_packet_recv(void *ccb, char *options, int optlen)
 {
 	u_int32_t acknum, lastok;
 	u_int16_t numlostpackets, avsize, i, prev_size;
@@ -711,7 +720,8 @@ void tcplike_send_packet_recv(void *ccb, char *options, int optlen)
 #endif
 }
 
-int _cwndvector_size(struct tcplike_send_ccb *cb)
+int
+_cwndvector_size(struct tcplike_send_ccb *cb)
 {
 	u_int32_t gap, offset, seqnr, cnt;
 	u_char *t;
@@ -732,7 +742,8 @@ int _cwndvector_size(struct tcplike_send_ccb *cb)
 	return cnt;
 }
 
-u_char _cwndvector_state(struct tcplike_send_ccb *cb, u_int32_t seqnr)
+u_char
+_cwndvector_state(struct tcplike_send_ccb *cb, u_int32_t seqnr)
 {
 	u_int32_t gap, offset;
 	u_char *t;
@@ -759,7 +770,8 @@ u_char _cwndvector_state(struct tcplike_send_ccb *cb, u_int32_t seqnr)
 	return ((*t & (0x01 << offset)) >> offset);
 }
 
-void _add_to_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
+void
+_add_to_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
 {
 	u_int32_t offset, dc;
 	int32_t gap;
@@ -819,7 +831,8 @@ void _add_to_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
 	}
 }
 
-void _remove_from_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
+void
+_remove_from_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
 {
 	u_int32_t offset;
 	int32_t gap;
@@ -854,7 +867,8 @@ void _remove_from_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
 	*t = *t & (~(0x01 << offset)); /* turn off bits */
 }
 
-int _chop_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
+int
+_chop_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
 {
 	int32_t gap, bytegap;
 	u_char *t;
@@ -892,7 +906,8 @@ int _chop_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
 /* Initialises the receiver side
  * returns: pointer to a tcplike_recv_ccb struct on success, otherwise 0
  */ 
-void *tcplike_recv_init(struct dccpcb *pcb)
+void *
+tcplike_recv_init(struct dccpcb *pcb)
 {
 	struct tcplike_recv_ccb *ccb;
   
@@ -946,7 +961,8 @@ void tcplike_recv_term(void *ccb)
 /* Free the receiver side
  * args: ccb - ccb of recevier
  */
-void tcplike_recv_free(void *ccb)
+void
+tcplike_recv_free(void *ccb)
 {
 	struct ack_list *a;
 	struct tcplike_recv_ccb *cb = (struct tcplike_recv_ccb *) ccb;
@@ -985,7 +1001,8 @@ void tcplike_recv_free(void *ccb)
  * Tell TCPlike that a packet has been received
  * args: ccb  -  ccb block for current connection 
  */
-void tcplike_recv_packet_recv(void *ccb, char *options, int optlen)
+void
+tcplike_recv_packet_recv(void *ccb, char *options, int optlen)
 {
 	struct tcplike_recv_ccb *cb = (struct tcplike_recv_ccb *) ccb;
 	u_char ackvector[16];
@@ -1073,7 +1090,8 @@ void tcplike_recv_packet_recv(void *ccb, char *options, int optlen)
 #endif
 }
 
-void _avlist_add(struct tcplike_recv_ccb *cb, u_int32_t localseq, u_int32_t ackthru)
+void
+_avlist_add(struct tcplike_recv_ccb *cb, u_int32_t localseq, u_int32_t ackthru)
 {
 	struct ack_list *a;
 	ACK_DEBUG((LOG_INFO,"Adding localseq %u - ackthru %u to avlist\n", localseq, ackthru));
@@ -1091,10 +1109,12 @@ void _avlist_add(struct tcplike_recv_ccb *cb, u_int32_t localseq, u_int32_t ackt
 	cb->av_list = a;
 }
 
-/**
- * Searches the av_list. if 'localseq' found, drop it from list and return ackthru
- **/
-u_int32_t _avlist_get(struct tcplike_recv_ccb *cb, u_int32_t localseq)
+/*
+ * Searches the av_list. if 'localseq' found, drop it from list and return
+ * ackthru
+ */
+u_int32_t
+_avlist_get(struct tcplike_recv_ccb *cb, u_int32_t localseq)
 {
 	struct ack_list *a, *n, *p;
 	u_int32_t ackthru;
