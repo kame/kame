@@ -1,8 +1,20 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.314 1999/12/03 04:39:23 itojun Exp $
+$Id: CHANGELOG,v 1.315 1999/12/03 08:43:25 jinmei Exp $
 
 <199912>
+1999-12-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd/rtadvd.c: more sanity checks were added for
+	recevied RSes and RAs in order to avoid trying to process an
+	invalid message.
+	Thanks to the TAHI project for pointing out the problem.
+
+1999-12-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (nd6_ra_input): fixed a problem that
+	valid lifetime always updated regardless of the result of "two
+	hours problem" detection.
+	Reported by the TAHI project (http://www.tahi.org/).
+	
 Fri Dec  3 13:35:37 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/nd6_nbr.c: if an interface is not
 	  IFF_RUNNING|IFF_UP, wait for it becomes IFF_RUNNING|IFF_UP before
