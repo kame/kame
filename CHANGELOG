@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1006 2000/06/13 05:09:29 itojun Exp $
+$Id: CHANGELOG,v 1.1007 2000/06/13 05:30:52 itojun Exp $
 
 <200006>
+Tue Jun 13 14:29:12 JST 2000  itojun@iijlab.net
+	* netbsd/sbin/setkey: move setkey from usr.sbin/setkey to sbin/setkey.
+	  we need it for encrypted NFS (sync better with netbsd-current).
+
 Tue Jun 13 14:07:24 JST 2000  itojun@iijlab.net
 	* kame/racoon/safefile.c: be more picky about secret file permission.
 	  now pre-shared key file (psk.txt) is required to be owned by the
