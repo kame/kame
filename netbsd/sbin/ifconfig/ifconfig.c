@@ -259,7 +259,7 @@ const struct cmd {
 	{ "tentative",	IN6_IFF_TENTATIVE,	0,	setia6flags },
 	{ "-tentative",	-IN6_IFF_TENTATIVE,	0,	setia6flags },
 	{ "deprecated",	1,		0,	setia6deprecated },
-	{ "-deprecated", 0,		0,	setia6deprecated },
+	{ "-deprecated",0,		0,	setia6deprecated },
 	{ "autoconf",	IN6_IFF_AUTOCONF,	0,	setia6flags },
 	{ "-autoconf",	-IN6_IFF_AUTOCONF,	0,	setia6flags },
 	{ "pltime",	NEXTARG,	0,		setia6pltime },
