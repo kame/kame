@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1105 2000/07/06 08:24:30 jinmei Exp $
+$Id: CHANGELOG,v 1.1106 2000/07/06 11:30:21 itojun Exp $
 
 <200006>
+Thu Jul  6 20:43:57 JST 2000  itojun@iijlab.net
+	* openbsd/sys/netinet/tcp_*.c: remove IPv4 mapped support completely
+	  from inbound packet processing.  there were some corner cases not
+	  covered by the code, and it caused SEGV due to inconsistency in
+	  address family.  sync with openbsd-current.
+
 2000-07-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/if.c (if_getflags): made sure to close a
 	temporary socket to avoid making garbage sockets.
