@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1640 2001/04/06 14:27:45 sakane Exp $
+$KAME: CHANGELOG,v 1.1641 2001/04/07 11:05:38 jinmei Exp $
 
 <200104>
+2001-04-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet/tcp_input.c (tcp_peer_mss): avoided
+	IPv6 fragmentation when IPV6_USE_MIN_MTU is required.
+
 Fri Apr  6 23:25:19 JST 2001 sakane@ydc.co.jp
 	* racoon:
 	implemented to generate the policy in the responder side automatically.
