@@ -8,11 +8,11 @@
 
 DISTNAME=	libpcap-2000_01_25
 PKGNAME=	libpcap-20000125
-
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
 
 MAINTAINER=	sumikawa@kame.net
+
 HOMEPAGE=	http://www.tcpdump.org/
 
 GNU_CONFIGURE=	yes
