@@ -1,12 +1,11 @@
-			CHANGELOG for KAME kit
-
-$Id: CHANGELOG,v 1.456 2000/01/18 05:11:53 jinmei Exp $
+$Id: CHANGELOG,v 1.457 2000/01/18 05:42:58 jinmei Exp $
 
 <200001>
 2000-01-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* kame/sys/netinet6/icmp6.h: changed the type of the icmp6_nl_none
-	member of icmp6_namelookup{} from u_int64_t to u_int8_t[8] in
-	order to avoid possible alignment problems.
+	* kame/sys/netinet6/icmp6.h: changed the type of the
+	icmp6_n[il]_nonece member of the icmp6_{namelookup, nodeinfo}
+	structures from u_int64_t to u_int8_t[8] in order to avoid
+	possible alignment problems.
 	From: Ryota HIROSE <hirose@comm.yamaha.co.jp>
 
 Tue Jan 18 13:57:28 JST 2000  itojun@iijlab.net
