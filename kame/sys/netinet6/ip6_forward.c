@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.107 2002/08/01 01:59:06 k-sugyou Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.108 2002/08/30 07:50:13 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -360,7 +360,7 @@ ip6_forward(m, srcrt)
 		m_freem(m);
 		return;
 	}
-	dst = (struct sockaddr_in6 *)&state.dst;
+	dst = (struct sockaddr_in6 *)state.dst;
 	rt = state.ro->ro_rt;
 	if (dst != NULL && rt != NULL)
 		ipsecrt = 1;
