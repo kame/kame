@@ -106,8 +106,14 @@ static int in_setmopt_source_list __P((struct sock_msf *, u_int16_t,
 #endif
 
 #ifndef IN_LOCAL_GROUP
-#define IN_LOCAL_GROUP(i) (((u_int32_t)(i) & 0xffffff00) == \
+#define IN_LOCAL_GROUP(i) ((ntohl(i) & 0xffffff00) == \
 			   0xe0000000)
+#endif
+
+#ifdef __FreeBSD__
+/* redefine IN_MULTICAST considering byteorder */
+#undef  IN_MULTICAST
+#define IN_MULTICAST(i)	IN_CLASSD(htonl(i))
 #endif
 
 #ifndef in_nullhost
@@ -3610,8 +3616,10 @@ print_in_addr_slist(struct in_addr_slist *ias, char *heading)
 	printf("\t\t%s(%d)\n", heading, ias->numsrc);
 
 	LIST_FOREACH(tmp, ias->head, ias_list) {
+		struct in_addr dummy = tmp->ias_addr;
+		dummy.s_addr = htonl(dummy.s_addr);
 		printf("\t\tsrc %s (ref=%d)\n",
-		    inet_ntoa(tmp->ias_addr), tmp->ias_refcount);
+		    inet_ntoa(dummy), tmp->ias_refcount);
 	}
 }
 	
