@@ -3,7 +3,7 @@
 # Date created:		18 Oct 1994
 # Whom:			torstenb
 #
-# $Id: Makefile,v 1.2 1999/10/18 15:21:03 sumikawa Exp $
+# $Id: Makefile,v 1.3 1999/10/20 08:54:09 sumikawa Exp $
 # $FreeBSD: ports/ftp/wu-ftpd/Makefile,v 1.30 1999/09/03 17:27:24 ache Exp $
 #
 # REMINDER: to use ftpaccess(5) you need to specify -a in command line,
@@ -13,14 +13,15 @@ DISTNAME=       wu-ftpd-2.5.0
 CATEGORIES=	ftp
 MASTER_SITES=   ftp://ftp.vr.net/pub/wu-ftpd/wu-ftpd/
 
-PATCH_SITES=	ftp://ftp.wu-ftpd.org/pub/wu-ftpd/quickfixes/apply_to_2.5.0/ \
-		ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=     \
-		wu-ftpd-250-v6-19991019.diff.gz \
-		data-limit.patch \
-		deny.not.nameserved.patch \
-		mapped.path.overrun.patch \
-		not.in.class.patch \
+PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
+PATCHFILES=     wu-ftpd-250-v6-19991020.diff.gz
+PATCH_DIST_STRIP=	-p1
+
+# KAME IPv6 patch contains the following patches for security holes
+#		data-limit.patch
+#		deny.not.nameserved.patch
+#		mapped.path.overrun.patch
+#		not.in.class.patch
 #		rfc931.timeout.patch
 
 MAINTAINER=     sumikawa@kame.net
