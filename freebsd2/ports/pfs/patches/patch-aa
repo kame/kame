@@ -1,0 +1,11 @@
+--- ms/Makefile.in-	Mon Jun 14 04:15:23 1999
++++ ms/Makefile.in	Mon Jun 14 04:15:29 1999
+@@ -31,6 +31,8 @@
+ 
+ HDRS = cupc.h
+ 
++all: pfsms
++
+ pfsms: $(HDRS) $(OBJS)
+ 	$(CC) -o pfsms $(LDFLAGS) $(CFLAGS) $(OBJS) $(CSLIB)
+ 

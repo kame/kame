@@ -1,0 +1,12 @@
+--- libncftp/syshdrs.h.orig	Mon Nov 17 07:00:12 1997
++++ libncftp/syshdrs.h	Sat Dec 13 17:19:30 1997
+@@ -34,6 +34,9 @@
+ #include <stddef.h>
+ #include <stdlib.h>
+ #include <ctype.h>
++#if defined(__FreeBSD__) || defined(__NetBSD__)
++#include <locale.h>
++#endif
+ #include <signal.h>
+ #include <setjmp.h>
+ #include <stdarg.h>

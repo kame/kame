@@ -1,0 +1,7 @@
+This is a port style current source of user-level ppp command with the
+extension of IPv6 communication facility and ALTQ mechanism. It's
+quality is still experimentational level.
+The current ppp source is obtained from www.awfulhak.org.
+
+- Yoshinobu
+shin@kame.net

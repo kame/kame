@@ -1,0 +1,36 @@
+--- configure.in.orig	Sun May 30 04:26:03 1999
++++ configure.in	Sat Jul 24 01:33:18 1999
+@@ -42,6 +42,9 @@
+ AC_ARG_WITH(hesiod,
+ [  --with-hesiod           support Hesiod to get the POP server host],
+ [AC_DEFINE(HESIOD)])
++AC_ARG_WITH(xpg4,
++[  --with-xpg4             support XPG4 library on FreeBSD system],
++[AC_DEFINE(USE_XPG)])
+ dnl This should be the last --with option, because --with-x is
+ dnl added later on when we find the path of X, and it's best to
+ dnl keep them together visually.
+@@ -147,6 +150,15 @@
+ machine='' opsys='' unported=no
+ case "${canonical}" in
+ 
++  ## FreeBSD ports
++  *-*-freebsd* )
++    opsys=freebsd
++    case "${canonical}" in
++      alpha*-*-freebsd*)	machine=alpha ;;
++      i[3456]86-*-freebsd*)	machine=intel386 ;;
++    esac
++  ;;
++
+   ## NetBSD ports
+   *-*-netbsd* )
+     opsys=netbsd
+@@ -943,7 +955,6 @@
+ 				;;
+       *-sysv4.2uw* )	  	opsys=unixware; NON_GNU_CPP=/lib/cpp ;;
+       *-386bsd* )	        opsys=386bsd ;;
+-      *-freebsd* )	        opsys=freebsd ;;
+       *-nextstep* )             opsys=nextstep ;;
+       ## Otherwise, we'll fall through to the generic opsys code at the bottom.
+     esac

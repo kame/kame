@@ -1,0 +1,108 @@
+*** conf/httpd.conf-dist.orig	Tue Jul  1 10:30:59 1997
+--- conf/httpd.conf-dist	Tue Jul  8 16:48:52 1997
+***************
+*** 33,39 ****
+  #  On HPUX you may not be able to use shared memory as nobody, and the
+  #  suggested workaround is to create a user www and use that user.
+  User nobody
+! Group #-1
+  
+  # The following directive disables keepalives and HTTP header flushes for
+  # Netscape 2.x and browsers which spoof it. There are known problems with
+--- 33,39 ----
+  #  On HPUX you may not be able to use shared memory as nobody, and the
+  #  suggested workaround is to create a user www and use that user.
+  User nobody
+! Group nogroup
+  
+  # The following directive disables keepalives and HTTP header flushes for
+  # Netscape 2.x and browsers which spoof it. There are known problems with
+***************
+*** 49,55 ****
+  # ServerRoot: The directory the server's config, error, and log files
+  # are kept in
+  
+! ServerRoot /usr/local/etc/httpd
+  
+  # BindAddress: You can support virtual hosts with this option. This option
+  # is used to tell the server which IP address to listen to. It can either
+--- 49,55 ----
+  # ServerRoot: The directory the server's config, error, and log files
+  # are kept in
+  
+! ServerRoot /usr/local/etc/apache
+  
+  # BindAddress: You can support virtual hosts with this option. This option
+  # is used to tell the server which IP address to listen to. It can either
+***************
+*** 61,81 ****
+  # ErrorLog: The location of the error log file. If this does not start
+  # with /, ServerRoot is prepended to it.
+  
+! ErrorLog logs/error_log
+  
+  # TransferLog: The location of the transfer log file. If this does not
+  # start with /, ServerRoot is prepended to it.
+  
+! TransferLog logs/access_log
+  
+  # PidFile: The file the server should log its pid to
+! PidFile logs/httpd.pid
+  
+  # ScoreBoardFile: File used to store internal server process information.
+  # Not all architectures require this.  But if yours does (you'll know because
+  # this file is created when you run Apache) then you *must* ensure that
+  # no two invocations of Apache share the same scoreboard file.
+! ScoreBoardFile logs/apache_status
+  
+  # ServerName allows you to set a host name which is sent back to clients for
+  # your server if it's different than the one the program would get (i.e. use
+--- 61,85 ----
+  # ErrorLog: The location of the error log file. If this does not start
+  # with /, ServerRoot is prepended to it.
+  
+! ErrorLog /var/log/httpd-error.log
+  
+  # TransferLog: The location of the transfer log file. If this does not
+  # start with /, ServerRoot is prepended to it.
+  
+! TransferLog /var/log/httpd-access.log
+! 
+! #LogFormat "%h %l %u %t \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\""
+  
+  # PidFile: The file the server should log its pid to
+! PidFile /var/run/httpd.pid
+  
+  # ScoreBoardFile: File used to store internal server process information.
+  # Not all architectures require this.  But if yours does (you'll know because
+  # this file is created when you run Apache) then you *must* ensure that
+  # no two invocations of Apache share the same scoreboard file.
+! ScoreBoardFile /var/run/apache_runtime_status
+! 
+! LockFile       /var/spool/lock/accept.lock
+  
+  # ServerName allows you to set a host name which is sent back to clients for
+  # your server if it's different than the one the program would get (i.e. use
+***************
+*** 180,189 ****
+   
+  #<VirtualHost host.some_domain.com>
+  #ServerAdmin webmaster@host.some_domain.com
+! #DocumentRoot /www/docs/host.some_domain.com
+  #ServerName host.some_domain.com
+! #ErrorLog logs/host.some_domain.com-error_log
+! #TransferLog logs/host.some_domain.com-access_log
+  #</VirtualHost>
+  
+  
+--- 184,193 ----
+   
+  #<VirtualHost host.some_domain.com>
+  #ServerAdmin webmaster@host.some_domain.com
+! #DocumentRoot /usr/local/www/host.some_domain.com/data
+  #ServerName host.some_domain.com
+! #ErrorLog /var/log/host.some_domain.com-error_log
+! #TransferLog /var/log/host.some_domain.com-access_log
+  #</VirtualHost>
+  
+  

@@ -1,0 +1,46 @@
+fix obsoleted setsockopt target.
+
+--- usr/src/local/kaffe-1.0.b1/libraries/clib/net/PlainDatagramSocketImpl.c-new-	Thu Apr 15 13:12:18 1999
++++ usr/src/local/kaffe-1.0.b1/libraries/clib/net/PlainDatagramSocketImpl.c-new	Thu Apr 15 13:14:50 1999
+@@ -284,7 +284,7 @@
+ void
+ java_net_PlainDatagramSocketImpl_join(struct Hjava_net_PlainDatagramSocketImpl* this, struct Hjava_net_InetAddress* laddr)
+ {
+-#if defined(IPV6_ADD_MEMBERSHIP)
++#if defined(IPV6_ADD_MEMBERSHIP) || defined(IPV6_JOIN_GROUP)
+ 	HArrayOfByte* address = unhand(laddr)->address;
+ 	int r;
+ 	struct ipv6_mreq ipm;
+@@ -297,7 +297,11 @@
+ 	       sizeof(struct in6_addr));
+ 	ipm.ipv6mr_interface = 0;
+ 
++#ifdef IPV6_ADD_MEMBERSHIP
+ 	r = setsockopt(unhand(unhand(this)->fd)->fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &ipm, sizeof(ipm));
++#else
++	r = setsockopt(unhand(unhand(this)->fd)->fd, IPPROTO_IPV6, IPV6_JOIN_GROUP, &ipm, sizeof(ipm));
++#endif
+ 	if (r < 0) {
+ 		SignalError("java.io.IOException", SYS_ERROR);
+ 	}
+@@ -312,7 +316,7 @@
+ void
+ java_net_PlainDatagramSocketImpl_leave(struct Hjava_net_PlainDatagramSocketImpl* this, struct Hjava_net_InetAddress* laddr)
+ {
+-#if defined(IP_DROP_MEMBERSHIP)
++#if defined(IPV6_DROP_MEMBERSHIP) || defined(IPV6_LEAVE_GROUP)
+ 	HArrayOfByte* address = unhand(laddr)->address;
+ 	int r;
+ 	struct ipv6_mreq ipm;
+@@ -325,7 +329,11 @@
+ 	       sizeof(struct in6_addr));
+ 	ipm.ipv6mr_interface = 0;
+ 
++#ifdef IPV6_DROP_MEMBERSHIP
+ 	r = setsockopt(unhand(unhand(this)->fd)->fd, IPPROTO_IPV6, IPV6_DROP_MEMBERSHIP, &ipm, sizeof(ipm));
++#else
++	r = setsockopt(unhand(unhand(this)->fd)->fd, IPPROTO_IPV6, IPV6_LEAVE_GROUP, &ipm, sizeof(ipm));
++#endif
+ 	if (r < 0) {
+ 		SignalError("java.io.IOException", SYS_ERROR);
+ 	}

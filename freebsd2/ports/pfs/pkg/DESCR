@@ -1,0 +1,15 @@
+PFS (Personal File System) is a portable network file sharing system
+designed for mobile computers. It is constructed from file servers
+on stationary hosts and mobile clients. It has a cache storage on
+the client, and dynamically adapts for variety of network speeds
+and bandwidths includes disconnection. All of PFS system is
+implemented on user land on UNIX, and communicates with client
+kernel with traditional NFS. Then, PFS can run on variety of UNIX
+variants.
+
+In short, you can mount file server's disks onto your laptop computer
+over the network, and you can continue accessing to these files
+even when your computer disconnected from the network. You have no
+need to modify Operating Systems on both server and client!
+
+http://www.spa.is.uec.ac.jp/%7Etate/pfs/

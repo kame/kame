@@ -1,0 +1,11 @@
+--- Makefile.orig	Sun Apr 18 09:20:03 1999
++++ Makefile	Sun Apr 18 09:21:23 1999
+@@ -8,7 +8,7 @@
+ RANLIB=ranlib
+ AR=ar cq
+ 
+-INSTROOT=/usr/local
++INSTROOT=${PREFIX}
+ LIBDIR=$(INSTROOT)/lib
+ INCDIR=$(INSTROOT)/include
+ MANDIR=$(INSTROOT)/man/man3

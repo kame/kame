@@ -1,0 +1,23 @@
+--- man/cl.texi.orig	Wed Apr  7 03:12:55 1999
++++ man/cl.texi	Thu Aug  5 17:42:21 1999
+@@ -2,9 +2,9 @@
+ @setfilename ../info/cl
+ @settitle Common Lisp Extensions
+ 
+-@dircategory Editors
++@dircategory The Emacs editor and associated tools
+ @direntry
+-* CL: (cl).		Partial Common Lisp support for Emacs Lisp.
++* CL: (cl).			Partial Common Lisp support for Emacs Lisp.
+ @end direntry
+ 
+ @iftex
+@@ -5672,7 +5672,7 @@
+ @item
+ The Common Lisp Object System (CLOS) is not implemented,
+ nor is the Common Lisp Condition System.  However, the EIEIO package
+-from @uref{ftp://ftp.ultranet.com/pub/zappo} does implement some
++from @file{ftp://ftp.ultranet.com/pub/zappo} does implement some
+ CLOS functionality.
+ 
+ @item

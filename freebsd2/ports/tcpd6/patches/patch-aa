@@ -1,0 +1,20 @@
+--- libwrap.c.orig	Wed Dec 17 08:22:42 1997
++++ libwrap.c	Fri Jan  8 08:49:29 1999
+@@ -18,7 +18,7 @@
+ #include <tcpd.h>
+ #include "tcpd_local.h"
+ 
+-static char access_table[TCPD_STRINGLENL] = "/etc/hosts.access";
++static char access_table[TCPD_STRINGLENL] = "/usr/local/v6/etc/hosts.access";
+ static int userresolvreq;
+ static int defaultallow;
+ static int ignore_dns_fake;
+@@ -330,7 +330,7 @@
+ 		}
+ 		if (*strp == '/') {
+ 			strp++;
+-			if (!isnumber(*strp))
++			if (!isdigit(*strp))
+ 				return TCPD_ERROR;
+ 			mask = strtoul(strp, &strp, 10);
+ 		}

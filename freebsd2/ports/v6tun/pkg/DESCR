@@ -1,0 +1,16 @@
+      v6tun --- ipv6 tunneling tool
+
+* What is v6tun?
+
+   v6tun is an ipv6 tunneling tool using tun device. You can get ipv6
+   reachability using an application level tunneling when you are in
+   ipv6 lonely island on ipv4 world.
+
+   Usage is "v6tun <v6addr> [<cmd> <arg> ...]". To connect to a remote
+   router and authenticate the connection, you can use <cmd> and <arg>s.
+
+                 local host side ||     || remote router side (on 6Bone)
+    /dev/tun0 <-> v6tun <-> <cmd> <-----> <daemon?> <-> v6tun <-> /dev/tun0
+
+   v6tun in the local side executes "<command> <arg> ... v6tun <v6addr>"
+   and executing "v6tun <v6addr>" in the remote side is expected.

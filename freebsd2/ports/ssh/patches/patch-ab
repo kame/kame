@@ -1,0 +1,45 @@
+*** configure.orig	Sat Jul 18 17:14:49 1998
+--- configure	Sat Jul 18 17:17:00 1998
+***************
+*** 1996,2007 ****
+  
+  export CFLAGS CC
+  
+- # Socket pairs appear to be broken on several systems.  I don't know exactly
+- # where, so I'll use pipes everywhere for now.
+- cat >> confdefs.h <<\EOF
+- #define USE_PIPES 1
+- EOF
+- 
+  
+  echo $ac_n "checking that the compiler works""... $ac_c" 1>&6
+  echo "configure:2008: checking that the compiler works" >&5
+--- 1996,2001 ----
+***************
+*** 7750,7756 ****
+  
+  cat >> $CONFIG_STATUS <<EOF
+  
+! CONFIG_FILES=\${CONFIG_FILES-"Makefile sshd.8 ssh.1 make-ssh-known-hosts.1 zlib-1.0.4/Makefile"}
+  EOF
+  cat >> $CONFIG_STATUS <<\EOF
+  for ac_file in .. $CONFIG_FILES; do if test "x$ac_file" != x..; then
+--- 7744,7750 ----
+  
+  cat >> $CONFIG_STATUS <<EOF
+  
+! CONFIG_FILES=\${CONFIG_FILES-"Makefile sshd.8 ssh.1 make-ssh-known-hosts.1 make-ssh-known-hosts.pl"}
+  EOF
+  cat >> $CONFIG_STATUS <<\EOF
+  for ac_file in .. $CONFIG_FILES; do if test "x$ac_file" != x..; then
+***************
+*** 7954,7959 ****
+--- 7948,7955 ----
+    done
+  
+    for ac_config_dir in gmp-2.0.2-ssh-2; do
++   
++ continue # XXX don't configure gmp
+  
+      # Do not complain, so a configure script can configure whichever
+      # parts of a large source tree are present.

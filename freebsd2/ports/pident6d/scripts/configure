@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# $Id: configure,v 1.1 1999/08/09 01:37:18 itojun Exp $
+#
+
+for i in src/paths.h identd.man idecrypt.man ; do
+	mv ${WRKSRC}/$i ${WRKSRC}/$i.bak
+	sed <${WRKSRC}/$i.bak >${WRKSRC}/$i s+!!PREFIX!!+$PREFIX+g
+done

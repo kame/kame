@@ -1,0 +1,81 @@
+*** Makefile.in.orig	Mon Dec 14 17:07:01 1998
+--- Makefile.in	Wed Dec 16 17:47:14 1998
+***************
+*** 40,46 ****
+  
+  # If your system needs extra libraries loaded in, define them here.
+  # In particular, add -lresolv if you are running bind 4.9.5
+! LOADLIBS = @LIBS@ @LEXLIB@ @INTLLIBS@
+  # LOADLIBS = -lsocket3r -lunix3r	# QNX
+  
+  # Any extra object files your system needs.
+--- 40,46 ----
+  
+  # If your system needs extra libraries loaded in, define them here.
+  # In particular, add -lresolv if you are running bind 4.9.5
+! LOADLIBS = @LIBS@ @LEXLIB@ @INTLLIBS@ -lmd
+  # LOADLIBS = -lsocket3r -lunix3r	# QNX
+  
+  # Any extra object files your system needs.
+***************
+*** 70,75 ****
+--- 70,77 ----
+  INSTALL_PROGRAM = @INSTALL_PROGRAM@
+  # Program to install the man page.
+  INSTALL_DATA = @INSTALL_DATA@
++ # Program to install scripts
++ INSTALL_SCRIPT = @INSTALL_SCRIPT@
+  # Generic install program.
+  INSTALL = @INSTALL@
+  
+***************
+*** 84,90 ****
+  
+  protobjs = rcfile_y.o rcfile_l.o socket.o getpass.o pop2.o pop3.o imap.o \
+         etrn.o fetchmail.o env.o options.o daemon.o driver.o sink.o \
+!        rfc822.o smtp.o xmalloc.o uid.o mxget.o md5c.o md5ify.o rpa.o \
+         interface.o netrc.o base64.o error.o unmime.o conf.o checkalias.o
+  
+  objs = $(protobjs) $(extras) $(EXTRAOBJ)
+--- 86,92 ----
+  
+  protobjs = rcfile_y.o rcfile_l.o socket.o getpass.o pop2.o pop3.o imap.o \
+         etrn.o fetchmail.o env.o options.o daemon.o driver.o sink.o \
+!        rfc822.o smtp.o xmalloc.o uid.o mxget.o md5ify.o rpa.o \
+         interface.o netrc.o base64.o error.o unmime.o conf.o checkalias.o
+  
+  objs = $(protobjs) $(extras) $(EXTRAOBJ)
+***************
+*** 95,101 ****
+         $(srcdir)/options.c $(srcdir)/daemon.c $(srcdir)/driver.c	\
+         $(srcdir)/sink.c $(srcdir)/rfc822.c $(srcdir)/smtp.c		\
+         $(srcdir)/xmalloc.c $(srcdir)/uid.c $(srcdir)/mxget.c 		\
+!        $(srcdir)/md5c.c $(srcdir)/md5ify.c $(srcdir)/rpa.c	  	\
+         $(srcdir)/interface.c $(srcdir)/netrc.c $(srcdir)/base64.c	\
+         $(srcdir)/error.c $(srcdir)/unmime.c $(srcdir)/conf.c		\
+         $(srcdir)/checkalias.c
+--- 97,103 ----
+         $(srcdir)/options.c $(srcdir)/daemon.c $(srcdir)/driver.c	\
+         $(srcdir)/sink.c $(srcdir)/rfc822.c $(srcdir)/smtp.c		\
+         $(srcdir)/xmalloc.c $(srcdir)/uid.c $(srcdir)/mxget.c 		\
+!        $(srcdir)/md5ify.c $(srcdir)/rpa.c	  	\
+         $(srcdir)/interface.c $(srcdir)/netrc.c $(srcdir)/base64.c	\
+         $(srcdir)/error.c $(srcdir)/unmime.c $(srcdir)/conf.c		\
+         $(srcdir)/checkalias.c
+***************
+*** 144,150 ****
+  	@echo "Installing fetchmail binary..."
+  	$(INSTALL_PROGRAM) ./fetchmail $(bindir)/fetchmail
+  	@echo "Installing fetchmail configurator..."
+! 	$(INSTALL_PROGRAM) ${srcdir}/fetchmailconf $(bindir)/fetchmailconf
+  	@echo "Installing manual page..."
+  	$(INSTALL_DATA) $(srcdir)/fetchmail.man $(mandir)/fetchmail.$(manext)
+  	ln -f -s $(mandir)/fetchmail.$(manext) $(mandir)/fetchmailconf.$(manext)
+--- 146,152 ----
+  	@echo "Installing fetchmail binary..."
+  	$(INSTALL_PROGRAM) ./fetchmail $(bindir)/fetchmail
+  	@echo "Installing fetchmail configurator..."
+! 	$(INSTALL_SCRIPT) ${srcdir}/fetchmailconf $(bindir)/fetchmailconf
+  	@echo "Installing manual page..."
+  	$(INSTALL_DATA) $(srcdir)/fetchmail.man $(mandir)/fetchmail.$(manext)
+  	ln -f -s $(mandir)/fetchmail.$(manext) $(mandir)/fetchmailconf.$(manext)
