@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.27 2002/03/14 09:02:14 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.28 2002/03/25 09:11:29 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -21,6 +21,7 @@ you can be a volunteer, I will appreciate you much.
 <<Status>>
 
 todo/missing features
+- draft-16(17) support.
 - merge nd_prefix/nd_defrouter structure and mip6_prefix/mip6_ha structure.
 - merge home address configuration and stateless auto-configuration.
 - non auto-configured home address support.
