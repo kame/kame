@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.5 1999/09/26 07:21:15 itojun Exp $ */
+/* $Id: name6.c,v 1.6 1999/09/26 12:40:45 jinmei Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -14,6 +14,10 @@
 #define	MAPPED_ADDR_ENABLED
 #endif
 #endif
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif 
 
 #include <sys/param.h>
 #include <sys/socket.h>
