@@ -611,11 +611,8 @@ in_addr_slistentry(struct in_addr_slist *ias, char *heading)
 
 	KREAD(head.lh_first, &src, struct in_addr_source);
 	while (1) {
-		struct in_addr dummy;
-
-		dummy = src.ias_addr.sin_addr;
 		printf("\t\t\t\tsource %s (ref=%d)\n",
-			inet_ntoa(dummy), src.ias_refcount);
+			inet_ntoa(src.ias_addr.sin_addr), src.ias_refcount);
 		if (src.ias_list.le_next == NULL)
 			break;
 		KREAD(src.ias_list.le_next, &src, struct in_addr_source);
