@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.899 2000/05/18 13:26:50 jinmei Exp $
+$Id: CHANGELOG,v 1.900 2000/05/18 14:22:09 jinmei Exp $
 
 <200005>
+2000-05-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_forward.c (ip6_forward): zero-cleared
+	embedded link zone IDs in forwarded packets. We forgot this, since
+	old kernel did not allow link-scope packets to be forwarded.
+
 2000-05-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c (set): supported <link-local_addr>%<link ID>
 	for "ndp -s".
