@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.982 2000/06/06 12:36:39 jinmei Exp $
+$Id: CHANGELOG,v 1.983 2000/06/06 13:15:48 itojun Exp $
 
 <200006>
+Tue Jun  6 21:53:54 JST 2000  itojun@iijlab.net
+	* bsdi4/sbin/sysctl: correctly handle IPv6 ipsec/pim entries.
+
 2000-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd3/libexec/tftpd/tftpd.c: do not connect tftp session
 	  sockets. Instead, check consistency of the client's local port.
