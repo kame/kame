@@ -1,6 +1,6 @@
-# $KAME: Makefile,v 1.6 2001/02/09 13:23:50 itojun Exp $
+# $KAME: Makefile,v 1.7 2001/02/21 06:18:36 itojun Exp $
 
-DISTNAME=	openssh-2.3.0p1
+DISTNAME=	openssh-2.5.1p1
 #CATEGORIES=	security net ipv6
 CATEGORIES=	security net
 # ${MASTER_SITES} is only for if CVS won't work, period.
@@ -8,7 +8,7 @@ MASTER_SITES=	ftp://ftp.openssh.com/pub/OpenBSD/OpenSSH/portable/
 
 MAINTAINER=	itojun@kame.net
 
-BUILD_DEPENDS=	openssl:${.CURDIR}/../openssl
+BUILD_DEPENDS=	${LOCALBASE}/ssl/bin/openssl:${.CURDIR}/../openssl
 
 GNU_CONFIGURE=	yes
 CONFIGURE_ARGS=	--without-pam --enable-ipv6
