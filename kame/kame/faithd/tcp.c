@@ -1,4 +1,4 @@
-/*	$KAME: tcp.c,v 1.11 2003/08/20 02:05:29 itojun Exp $	*/
+/*	$KAME: tcp.c,v 1.12 2003/08/20 02:10:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -320,6 +320,9 @@ relay(int s_rcv, int s_snd, const char *service, int direction)
 			case 0:
 				/* to close opposite-direction relay process */
 				shutdown(s_snd, 0);
+#ifdef HAVE_POLL_H
+				pfd[0].fd = -1;
+#endif
 
 				close(s_rcv);
 				close(s_snd);
