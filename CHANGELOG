@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.198 1999/10/20 05:33:29 jinmei Exp $
+$Id: CHANGELOG,v 1.199 1999/10/20 11:16:05 sumikawa Exp $
 
 <199910>
+Wed Oct 20 20:13:50 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd[23]/ports/ncftp3, netbsd/pkgsrc/net/ncftp4: upgrade to
+	3.0 beta 21.
+
 1999-10-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c (dump): enabled the NI_WITHSCOPEID flag for
 	getnameinfo when printing a neighbor cache entry for a link-local
