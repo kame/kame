@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_mbuf.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.51.2.1 2000/07/15 07:14:24 kris Exp $
+ * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.51.2.3 2000/08/25 23:23:32 peter Exp $
  */
 
 #include "opt_param.h"
@@ -58,6 +58,7 @@ SYSINIT(mbuf, SI_SUB_MBUF, SI_ORDER_FIRST, mbinit, NULL)
 struct mbuf *mbutl;
 char	*mclrefcnt;
 struct mbstat mbstat;
+u_long	mbtypes[MT_NTYPES];
 struct mbuf *mmbfree;
 union mcluster *mclfree;
 int	max_linkhdr;
@@ -80,6 +81,8 @@ SYSCTL_INT(_kern_ipc, KIPC_MAX_DATALEN, max_datalen, CTLFLAG_RW,
 SYSCTL_INT(_kern_ipc, OID_AUTO, mbuf_wait, CTLFLAG_RW,
 	   &mbuf_wait, 0, "");
 SYSCTL_STRUCT(_kern_ipc, KIPC_MBSTAT, mbstat, CTLFLAG_RW, &mbstat, mbstat, "");
+SYSCTL_OPAQUE(_kern_ipc, OID_AUTO, mbtypes, CTLFLAG_RD, mbtypes,
+	   sizeof(mbtypes), "LU", "");
 SYSCTL_INT(_kern_ipc, KIPC_NMBCLUSTERS, nmbclusters, CTLFLAG_RD, 
 	   &nmbclusters, 0, "Maximum number of mbuf clusters available");
 SYSCTL_INT(_kern_ipc, OID_AUTO, nmbufs, CTLFLAG_RD, &nmbufs, 0,
@@ -184,6 +187,7 @@ m_mballoc(nmb, how)
 		p += MSIZE;
 	}
 	mbstat.m_mbufs += nmb;
+	mbtypes[MT_FREE] += nmb;
 	return (1);
 }
 
@@ -199,9 +203,11 @@ m_mballoc_wait(int caller, int type)
 	struct mbuf *p;
 	int s;
 
+	s = splimp();
 	m_mballoc_wid++;
 	if ((tsleep(&m_mballoc_wid, PVM, "mballc", mbuf_wait)) == EWOULDBLOCK)
 		m_mballoc_wid--;
+	splx(s);
 
 	/*
 	 * Now that we (think) that we've got something, we will redo an

@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sysctl.c	8.4 (Berkeley) 4/14/94
- * $FreeBSD: src/sys/kern/kern_mib.c,v 1.29.2.1 2000/05/16 06:58:11 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_mib.c,v 1.29.2.2 2000/08/03 00:09:32 ps Exp $
  */
 
 #include <sys/param.h>
@@ -142,7 +142,7 @@ SYSCTL_STRING(_hw, HW_MACHINE_ARCH, machine_arch, CTLFLAG_RD,
 char hostname[MAXHOSTNAMELEN];
 
 static int
-sysctl_hostname SYSCTL_HANDLER_ARGS
+sysctl_hostname(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 
@@ -165,7 +165,7 @@ SYSCTL_PROC(_kern, KERN_HOSTNAME, hostname,
 int securelevel = -1;
 
 static int
-sysctl_kern_securelvl SYSCTL_HANDLER_ARGS
+sysctl_kern_securelvl(SYSCTL_HANDLER_ARGS)
 {
 		int error, level;
 

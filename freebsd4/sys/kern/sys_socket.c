@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sys_socket.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/sys_socket.c,v 1.28 1999/11/08 03:30:59 peter Exp $
+ * $FreeBSD: src/sys/kern/sys_socket.c,v 1.28.2.1 2000/08/04 00:49:17 peter Exp $
  */
 
 #include <sys/param.h>
@@ -45,6 +45,7 @@
 #include <sys/stat.h>
 #include <sys/uio.h>
 #include <sys/filedesc.h>
+#include <sys/ucred.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -164,6 +165,18 @@ soo_stat(fp, ub, p)
 
 	bzero((caddr_t)ub, sizeof (*ub));
 	ub->st_mode = S_IFSOCK;
+	/*
+	 * If SS_CANTRCVMORE is set, but there's still data left in the
+	 * receive buffer, the socket is still readable.
+	 */
+	if ((so->so_state & SS_CANTRCVMORE) == 0 ||
+	    so->so_rcv.sb_cc != 0)
+		ub->st_mode |= S_IRUSR | S_IRGRP | S_IROTH;
+	if ((so->so_state & SS_CANTSENDMORE) == 0)
+		ub->st_mode |= S_IWUSR | S_IWGRP | S_IWOTH;
+	ub->st_size = so->so_rcv.sb_cc;
+	ub->st_uid = so->so_cred->cr_uid;
+	ub->st_gid = so->so_cred->cr_gid;
 	return ((*so->so_proto->pr_usrreqs->pru_sense)(so, ub));
 }
 

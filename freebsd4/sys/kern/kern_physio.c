@@ -16,7 +16,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/kern/kern_physio.c,v 1.46 1999/10/30 06:31:49 phk Exp $
+ * $FreeBSD: src/sys/kern/kern_physio.c,v 1.46.2.1 2000/10/03 22:07:24 alc Exp $
  */
 
 #include <sys/param.h>
@@ -33,7 +33,6 @@ static void
 physwakeup(struct buf *bp)
 {
 	wakeup((caddr_t) bp);
-	bp->b_flags &= ~B_CALL;
 }
 
 int

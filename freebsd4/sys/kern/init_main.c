@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)init_main.c	8.9 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/init_main.c,v 1.134 2000/02/25 11:43:08 jkh Exp $
+ * $FreeBSD: src/sys/kern/init_main.c,v 1.134.2.3 2000/09/07 19:13:36 truckman Exp $
  */
 
 #include "opt_init_path.h"
@@ -191,7 +191,7 @@ restart:
 		for (xipp = sipp + 1; *xipp; xipp++) {
 			if ((*sipp)->subsystem < (*xipp)->subsystem ||
 			     ((*sipp)->subsystem == (*xipp)->subsystem &&
-			      (*sipp)->order < (*xipp)->order))
+			      (*sipp)->order <= (*xipp)->order))
 				continue;	/* skip*/
 			save = *sipp;
 			*sipp = *xipp;
@@ -324,9 +324,11 @@ proc0_init(dummy)
 
 	/* Create credentials. */
 	cred0.p_refcnt = 1;
+	cred0.p_uidinfo = uifind(0);
 	p->p_cred = &cred0;
 	p->p_ucred = crget();
 	p->p_ucred->cr_ngroups = 1;	/* group 0 */
+	p->p_ucred->cr_uidinfo = uifind(0);
 
 	/* Don't jail it */
 	p->p_prison = 0;
@@ -387,7 +389,7 @@ proc0_init(dummy)
 	/*
 	 * Charge root for one process.
 	 */
-	(void)chgproccnt(0, 1);
+	(void)chgproccnt(cred0.p_uidinfo, 1, 0);
 
 	/*
 	 * Initialize the current process pointer (curproc) before

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_vnops.c	8.2 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/vfs_vnops.c,v 1.87.2.2 2000/05/05 03:49:58 jlemon Exp $
+ * $FreeBSD: src/sys/kern/vfs_vnops.c,v 1.87.2.3 2000/07/27 11:43:16 asmodai Exp $
  */
 
 #include <sys/param.h>
@@ -93,7 +93,7 @@ struct filterops vn_rwfiltops[] = {
  * Common code for vnode open operations.
  * Check permissions, and call the VOP_OPEN or VOP_CREATE routine.
  * 
- * Note that this do NOT free nameidata for the successful case,
+ * Note that this does NOT free nameidata for the successful case,
  * due to the NDINIT being done elsewhere.
  */
 int

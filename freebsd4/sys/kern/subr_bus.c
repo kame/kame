@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1997,1998 Doug Rabson
  * All rights reserved.
  *
@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/subr_bus.c,v 1.54.2.4 2000/07/19 09:18:48 alc Exp $
+ * $FreeBSD: src/sys/kern/subr_bus.c,v 1.54.2.7 2000/08/03 06:36:38 imp Exp $
  */
 
 #include "opt_bus.h"
@@ -981,6 +981,18 @@ device_get_softc(device_t dev)
     return dev->softc;
 }
 
+void
+device_set_softc(device_t dev, void *softc)
+{
+    if (dev->softc && !(dev->flags & DF_EXTERNALSOFTC))
+	free(dev->softc, M_BUS);
+    dev->softc = softc;
+    if (dev->softc)
+        dev->flags |= DF_EXTERNALSOFTC;
+    else
+        dev->flags &= ~DF_EXTERNALSOFTC;
+}
+
 void *
 device_get_ivars(device_t dev)
 {
@@ -1102,7 +1114,7 @@ device_set_driver(device_t dev, driver_t *driver)
     if (dev->driver == driver)
 	return 0;
 
-    if (dev->softc) {
+    if (dev->softc && !(dev->flags & DF_EXTERNALSOFTC)) {
 	free(dev->softc, M_BUS);
 	dev->softc = NULL;
     }
@@ -1110,13 +1122,15 @@ device_set_driver(device_t dev, driver_t *driver)
     dev->driver = driver;
     if (driver) {
 	dev->ops = driver->ops;
-	dev->softc = malloc(driver->softc, M_BUS, M_NOWAIT);
-	if (!dev->softc) {
-	    dev->ops = &null_ops;
-	    dev->driver = NULL;
-	    return ENOMEM;
+	if (!(dev->flags & DF_EXTERNALSOFTC)) {
+	    dev->softc = malloc(driver->softc, M_BUS, M_NOWAIT);
+	    if (!dev->softc) {
+		dev->ops = &null_ops;
+		dev->driver = NULL;
+		return ENOMEM;
+	    }
+	    bzero(dev->softc, driver->softc);
 	}
-	bzero(dev->softc, driver->softc);
     }
     return 0;
 }
@@ -1194,6 +1208,25 @@ device_shutdown(device_t dev)
     return DEVICE_SHUTDOWN(dev);
 }
 
+int
+device_set_unit(device_t dev, int unit)
+{
+    devclass_t dc;
+    int err;
+
+    dc = device_get_devclass(dev);
+    if (unit < dc->maxunit && dc->devices[unit])
+	return EBUSY;
+    err = devclass_delete_device(dc, dev);
+    if (err)
+	return err;
+    dev->unit = unit;
+    err = devclass_add_device(dc, dev);
+    if (err)
+	return err;
+    return 0;
+}
+
 #ifdef DEVICE_SYSCTLS
 
 /*
@@ -1203,7 +1236,7 @@ device_shutdown(device_t dev)
 SYSCTL_NODE(_hw, OID_AUTO, devices, CTLFLAG_RW, 0, "A list of all devices");
 
 static int
-sysctl_handle_children SYSCTL_HANDLER_ARGS
+sysctl_handle_children(SYSCTL_HANDLER_ARGS)
 {
     device_t dev = arg1;
     device_t child;
@@ -1229,7 +1262,7 @@ sysctl_handle_children SYSCTL_HANDLER_ARGS
 }
 
 static int
-sysctl_handle_state SYSCTL_HANDLER_ARGS
+sysctl_handle_state(SYSCTL_HANDLER_ARGS)
 {
     device_t dev = arg1;
 

@@ -28,7 +28,7 @@
  * sys/kern/kern_clock.c.   Some of the comments below may be (even more)
  * confusing and/or plain wrong in that context.
  *
- * $FreeBSD: src/sys/kern/kern_ntptime.c,v 1.32 2000/01/23 14:52:37 phk Exp $
+ * $FreeBSD: src/sys/kern/kern_ntptime.c,v 1.32.2.1 2000/08/03 00:09:32 ps Exp $
  */
 
 #include "opt_ntp.h"
@@ -197,7 +197,7 @@ static void hardupdate(long offset);
  * See the timex.h header file for synopsis and API description.
  */
 static int
-ntp_sysctl SYSCTL_HANDLER_ARGS
+ntp_sysctl(SYSCTL_HANDLER_ARGS)
 {
 	struct ntptimeval ntv;	/* temporary structure */
 	struct timespec atv;	/* nanosecond time */

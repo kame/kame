@@ -16,7 +16,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/kern/sys_pipe.c,v 1.60.2.2 2000/05/05 03:49:56 jlemon Exp $
+ * $FreeBSD: src/sys/kern/sys_pipe.c,v 1.60.2.3 2000/09/14 20:27:13 jlemon Exp $
  */
 
 /*
@@ -1221,7 +1221,7 @@ filt_pipewrite(struct knote *kn, long hint)
 		return (1);
 	}
 	kn->kn_data = wpipe->pipe_buffer.size - wpipe->pipe_buffer.cnt;
-	if ((wpipe->pipe_state & PIPE_DIRECTW) == 0)
+	if (wpipe->pipe_state & PIPE_DIRECTW)
 		kn->kn_data = 0;
 
 	return (kn->kn_data >= PIPE_BUF);

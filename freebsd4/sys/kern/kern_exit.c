@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_exit.c	8.7 (Berkeley) 2/12/94
- * $FreeBSD: src/sys/kern/kern_exit.c,v 1.92.2.1 2000/05/05 03:49:54 jlemon Exp $
+ * $FreeBSD: src/sys/kern/kern_exit.c,v 1.92.2.3 2000/09/07 19:13:36 truckman Exp $
  */
 
 #include "opt_compat.h"
@@ -472,7 +472,7 @@ loop:
 			/*
 			 * Decrement the count of procs running with this uid.
 			 */
-			(void)chgproccnt(p->p_cred->p_ruid, -1);
+			(void)chgproccnt(p->p_cred->p_uidinfo, -1, 0);
 
 			/*
 			 * Release reference to text vnode
@@ -485,6 +485,7 @@ loop:
 			 */
 			if (--p->p_cred->p_refcnt == 0) {
 				crfree(p->p_ucred);
+				uifree(p->p_cred->p_uidinfo);
 				FREE(p->p_cred, M_SUBPROC);
 				p->p_cred = NULL;
 			}

@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/sys_process.c,v 1.51 1999/11/21 19:03:10 phk Exp $
+ * $FreeBSD: src/sys/kern/sys_process.c,v 1.51.2.1 2000/10/26 04:34:41 jwd Exp $
  */
 
 #include <sys/param.h>
@@ -330,7 +330,7 @@ ptrace(curp, uap)
 	case PT_STEP:
 	case PT_CONTINUE:
 	case PT_DETACH:
-		if ((unsigned)uap->data >= NSIG)
+		if ((uap->req != PT_STEP) && ((unsigned)uap->data >= NSIG))
 			return EINVAL;
 
 		PHOLD(p);

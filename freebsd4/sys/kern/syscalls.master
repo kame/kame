@@ -1,4 +1,4 @@
- $FreeBSD: src/sys/kern/syscalls.master,v 1.72.2.4 2000/07/18 21:49:12 jlemon Exp $
+ $FreeBSD: src/sys/kern/syscalls.master,v 1.72.2.6 2000/11/02 04:25:15 marcel Exp $
 ;	from: @(#)syscalls.master	8.2 (Berkeley) 1/13/94
 ;
 ; System call name/number master file.
@@ -223,8 +223,8 @@
 141	COMPAT	BSD	{ int getpeername(int fdes, caddr_t asa, int *alen); }
 142	COMPAT	BSD	{ long gethostid(void); }
 143	COMPAT	BSD	{ int sethostid(long hostid); }
-144	COMPAT	BSD	{ int getrlimit(u_int which, struct ogetrlimit *rlp); }
-145	COMPAT	BSD	{ int setrlimit(u_int which, struct ogetrlimit *rlp); }
+144	COMPAT	BSD	{ int getrlimit(u_int which, struct orlimit *rlp); }
+145	COMPAT	BSD	{ int setrlimit(u_int which, struct orlimit *rlp); }
 146	COMPAT	BSD	{ int killpg(int pgid, int signum); }
 147	STD	POSIX	{ int setsid(void); }
 148	STD	BSD	{ int quotactl(char *path, int cmd, int uid, \
@@ -294,15 +294,15 @@
 192	STD	POSIX	{ int fpathconf(int fd, int name); }
 193	UNIMPL	NOHIDE	nosys
 194	STD	BSD	{ int getrlimit(u_int which, \
-			    struct orlimit *rlp); } \
+			    struct rlimit *rlp); } \
 			    getrlimit __getrlimit_args int
 195	STD	BSD	{ int setrlimit(u_int which, \
-			    struct orlimit *rlp); } \
+			    struct rlimit *rlp); } \
 			    setrlimit __setrlimit_args int
 196	STD	BSD	{ int getdirentries(int fd, char *buf, u_int count, \
 			    long *basep); }
 197	STD	BSD	{ caddr_t mmap(caddr_t addr, size_t len, int prot, \
-			    int flags, int fd, long pad, off_t pos); }
+			    int flags, int fd, int pad, off_t pos); }
 198	STD	NOHIDE	{ int nosys(void); } __syscall __syscall_args int
 199	STD	POSIX	{ off_t lseek(int fd, int pad, off_t offset, \
 			    int whence); }
@@ -407,9 +407,9 @@
 272	STD	BSD	{ int getdents(int fd, char *buf, size_t count); }
 273	UNIMPL	NOHIDE	nosys
 274	STD	BSD	{ int lchmod(char *path, mode_t mode); }
-275	NOPROTO BSD	{ int lchown(char *path, uid_t uid, gid_t gid); } netbsd_lchown netbsd_lchown int
+275	NOPROTO BSD	{ int lchown(char *path, uid_t uid, gid_t gid); } netbsd_lchown lchown_args int
 276	STD	BSD	{ int lutimes(char *path, struct timeval *tptr); }
-277	NOPROTO	BSD	{ int msync(void *addr, size_t len, int flags); } netbsd_msync netbsd_msync int
+277	NOPROTO	BSD	{ int msync(void *addr, size_t len, int flags); } netbsd_msync msync_args int
 278	STD	BSD	{ int nstat(char *path, struct nstat *ub); }
 279	STD	BSD	{ int nfstat(int fd, struct nstat *sb); }
 280	STD	BSD	{ int nlstat(char *path, struct nstat *ub); }

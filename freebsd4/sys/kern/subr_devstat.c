@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/subr_devstat.c,v 1.17.2.1 2000/07/19 06:23:57 kbyanc Exp $
+ * $FreeBSD: src/sys/kern/subr_devstat.c,v 1.17.2.2 2000/08/03 00:09:32 ps Exp $
  */
 
 #include <sys/param.h>
@@ -261,7 +261,7 @@ devstat_end_transaction_buf(struct devstat *ds, struct buf *bp)
  * guarantee that the generation number and the statistics match up.
  */
 static int
-sysctl_devstat SYSCTL_HANDLER_ARGS
+sysctl_devstat(SYSCTL_HANDLER_ARGS)
 {
 	int error, i;
 	struct devstat *nds;

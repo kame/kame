@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)uipc_usrreq.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/kern/uipc_usrreq.c,v 1.54 2000/03/09 15:15:27 shin Exp $
+ * $FreeBSD: src/sys/kern/uipc_usrreq.c,v 1.54.2.4 2000/09/07 19:13:38 truckman Exp $
  */
 
 #include <sys/param.h>
@@ -48,6 +48,7 @@
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/resourcevar.h>
 #include <sys/stat.h>
 #include <sys/sysctl.h>
 #include <sys/un.h>
@@ -216,6 +217,7 @@ uipc_rcvd(struct socket *so, int flags)
 {
 	struct unpcb *unp = sotounpcb(so);
 	struct socket *so2;
+	u_long newhiwat;
 
 	if (unp == 0)
 		return EINVAL;
@@ -234,9 +236,10 @@ uipc_rcvd(struct socket *so, int flags)
 		 */
 		so2->so_snd.sb_mbmax += unp->unp_mbcnt - so->so_rcv.sb_mbcnt;
 		unp->unp_mbcnt = so->so_rcv.sb_mbcnt;
-		so2->so_snd.sb_hiwat += unp->unp_cc - so->so_rcv.sb_cc;
-		(void)chgsbsize(so2->so_cred->cr_uid,
-		    (rlim_t)unp->unp_cc - so->so_rcv.sb_cc);
+		newhiwat = so2->so_snd.sb_hiwat + unp->unp_cc -
+		    so->so_rcv.sb_cc;
+		(void)chgsbsize(so2->so_cred->cr_uidinfo, &so2->so_snd.sb_hiwat,
+		    newhiwat, RLIM_INFINITY);
 		unp->unp_cc = so->so_rcv.sb_cc;
 		sowwakeup(so2);
 		break;
@@ -256,6 +259,7 @@ uipc_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 	int error = 0;
 	struct unpcb *unp = sotounpcb(so);
 	struct socket *so2;
+	u_long newhiwat;
 
 	if (unp == 0) {
 		error = EINVAL;
@@ -341,10 +345,10 @@ uipc_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 		so->so_snd.sb_mbmax -=
 			so2->so_rcv.sb_mbcnt - unp->unp_conn->unp_mbcnt;
 		unp->unp_conn->unp_mbcnt = so2->so_rcv.sb_mbcnt;
-		so->so_snd.sb_hiwat -=
-		    so2->so_rcv.sb_cc - unp->unp_conn->unp_cc;
-		(void)chgsbsize(so->so_cred->cr_uid,
-		    (rlim_t)unp->unp_conn->unp_cc - so2->so_rcv.sb_cc);
+		newhiwat = so->so_snd.sb_hiwat -
+		    (so2->so_rcv.sb_cc - unp->unp_conn->unp_cc);
+		(void)chgsbsize(so->so_cred->cr_uidinfo, &so->so_snd.sb_hiwat,
+		    newhiwat, RLIM_INFINITY);
 		unp->unp_conn->unp_cc = so2->so_rcv.sb_cc;
 		sorwakeup(so2);
 		m = 0;
@@ -722,7 +726,7 @@ prison_unpcb(struct proc *p, struct unpcb *unp)
 }
 
 static int
-unp_pcblist SYSCTL_HANDLER_ARGS
+unp_pcblist(SYSCTL_HANDLER_ARGS)
 {
 	int error, i, n;
 	struct unpcb *unp, **unp_list;

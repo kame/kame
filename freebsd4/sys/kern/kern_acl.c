@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_acl.c,v 1.2 2000/01/19 06:07:27 rwatson Exp $
+ * $FreeBSD: src/sys/kern/kern_acl.c,v 1.2.2.1 2000/07/28 18:48:16 rwatson Exp $
  */
 
 /*
@@ -45,7 +45,6 @@
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/acl.h>
-#include <vm/vm_zone.h>
 
 static MALLOC_DEFINE(M_ACL, "acl", "access control list");
 

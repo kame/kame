@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty.c	8.8 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/tty.c,v 1.129.2.1 2000/04/11 01:33:35 archie Exp $
+ * $FreeBSD: src/sys/kern/tty.c,v 1.129.2.2 2000/08/03 00:09:33 ps Exp $
  */
 
 /*-
@@ -2421,7 +2421,7 @@ ttyregister(tp)
 }
 
 static int
-sysctl_kern_ttys SYSCTL_HANDLER_ARGS
+sysctl_kern_ttys(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	struct tty *tp, t;

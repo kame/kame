@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_descrip.c	8.6 (Berkeley) 4/19/94
- * $FreeBSD: src/sys/kern/kern_descrip.c,v 1.81.2.2 2000/06/27 23:14:07 alfred Exp $
+ * $FreeBSD: src/sys/kern/kern_descrip.c,v 1.81.2.5 2000/10/31 23:11:23 alc Exp $
  */
 
 #include "opt_compat.h"
@@ -1001,6 +1001,8 @@ setugidsafety(p)
 		if (*fpp != NULL && is_unsafe(*fpp)) {
 			if ((*fdfp & UF_MAPPED) != 0)
 				(void) munmapfd(p, i);
+			if (i < fdp->fd_knlistsize)
+				knote_fdclose(p, i);
 			(void) closef(*fpp, p);
 			*fpp = NULL;
 			*fdfp = 0;
@@ -1034,6 +1036,8 @@ fdcloseexec(p)
 		if (*fpp != NULL && (*fdfp & UF_EXCLOSE)) {
 			if (*fdfp & UF_MAPPED)
 				(void) munmapfd(p, i);
+			if (i < fdp->fd_knlistsize)
+				knote_fdclose(p, i);
 			(void) closef(*fpp, p);
 			*fpp = NULL;
 			*fdfp = 0;
@@ -1269,7 +1273,7 @@ dupfdopen(fdp, indx, dfd, mode, error)
  * Get file structures.
  */
 static int
-sysctl_kern_file SYSCTL_HANDLER_ARGS
+sysctl_kern_file(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	struct file *fp;
@@ -1305,6 +1309,9 @@ SYSCTL_INT(_kern, KERN_MAXFILESPERPROC, maxfilesperproc, CTLFLAG_RW,
 
 SYSCTL_INT(_kern, KERN_MAXFILES, maxfiles, CTLFLAG_RW, 
     &maxfiles, 0, "Maximum number of files");
+
+SYSCTL_INT(_kern, OID_AUTO, openfiles, CTLFLAG_RD, 
+	&nfiles, 0, "System-wide number of open files");
 
 static void
 fildesc_drvinit(void *unused)

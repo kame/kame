@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_synch.c	8.9 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/kern/kern_synch.c,v 1.87.2.1 2000/05/16 06:58:12 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_synch.c,v 1.87.2.2 2000/08/03 00:09:32 ps Exp $
  */
 
 #include "opt_ktrace.h"
@@ -76,7 +76,7 @@ static void	schedcpu __P((void *arg));
 static void	updatepri __P((struct proc *p));
 
 static int
-sysctl_kern_quantum SYSCTL_HANDLER_ARGS
+sysctl_kern_quantum(SYSCTL_HANDLER_ARGS)
 {
 	int error, new_val;
 

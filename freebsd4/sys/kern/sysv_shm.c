@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/kern/sysv_shm.c,v 1.45.2.1 2000/04/02 08:47:09 peter Exp $ */
+/* $FreeBSD: src/sys/kern/sysv_shm.c,v 1.45.2.3 2000/11/01 17:58:06 rwatson Exp $ */
 /*	$NetBSD: sysv_shm.c,v 1.23 1994/07/04 23:25:12 glass Exp $	*/
 
 /*
@@ -46,6 +46,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/sysent.h>
+#include <sys/jail.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -126,12 +127,15 @@ struct	shminfo shminfo = {
 	SHMALL
 };
 
+static int shm_use_phys;
+
 SYSCTL_DECL(_kern_ipc);
 SYSCTL_INT(_kern_ipc, OID_AUTO, shmmax, CTLFLAG_RW, &shminfo.shmmax, 0, "");
 SYSCTL_INT(_kern_ipc, OID_AUTO, shmmin, CTLFLAG_RW, &shminfo.shmmin, 0, "");
 SYSCTL_INT(_kern_ipc, OID_AUTO, shmmni, CTLFLAG_RD, &shminfo.shmmni, 0, "");
 SYSCTL_INT(_kern_ipc, OID_AUTO, shmseg, CTLFLAG_RW, &shminfo.shmseg, 0, "");
 SYSCTL_INT(_kern_ipc, OID_AUTO, shmall, CTLFLAG_RW, &shminfo.shmall, 0, "");
+SYSCTL_INT(_kern_ipc, OID_AUTO, shm_use_phys, CTLFLAG_RW, &shm_use_phys, 0, "");
 
 static int
 shm_find_segment_by_key(key)
@@ -220,6 +224,9 @@ shmdt(p, uap)
 	struct shmmap_state *shmmap_s;
 	int i;
 
+	if (!jail_sysvipc_allowed && p->p_prison != NULL)
+		return (ENOSYS);
+
 	shmmap_s = (struct shmmap_state *)p->p_vmspace->vm_shm;
  	if (shmmap_s == NULL)
  	    return EINVAL;
@@ -253,6 +260,9 @@ shmat(p, uap)
 	vm_prot_t prot;
 	vm_size_t size;
 	int rv;
+
+	if (!jail_sysvipc_allowed && p->p_prison != NULL)
+		return (ENOSYS);
 
 	shmmap_s = (struct shmmap_state *)p->p_vmspace->vm_shm;
 	if (shmmap_s == NULL) {
@@ -345,6 +355,9 @@ oshmctl(p, uap)
 	struct shmid_ds *shmseg;
 	struct oshmid_ds outbuf;
 
+	if (!jail_sysvipc_allowed && p->p_prison != NULL)
+		return (ENOSYS);
+
 	shmseg = shm_find_segment_by_shmid(uap->shmid);
 	if (shmseg == NULL)
 		return EINVAL;
@@ -392,6 +405,9 @@ shmctl(p, uap)
 	int error;
 	struct shmid_ds inbuf;
 	struct shmid_ds *shmseg;
+
+	if (!jail_sysvipc_allowed && p->p_prison != NULL)
+		return (ENOSYS);
 
 	shmseg = shm_find_segment_by_shmid(uap->shmid);
 	if (shmseg == NULL)
@@ -528,8 +544,13 @@ shmget_allocate_segment(p, uap, mode)
 	 * We make sure that we have allocated a pager before we need
 	 * to.
 	 */
-	shm_handle->shm_object =
-		vm_pager_allocate(OBJT_SWAP, 0, size, VM_PROT_DEFAULT, 0);
+	if (shm_use_phys) {
+		shm_handle->shm_object =
+		    vm_pager_allocate(OBJT_PHYS, 0, size, VM_PROT_DEFAULT, 0);
+	} else {
+		shm_handle->shm_object =
+		    vm_pager_allocate(OBJT_SWAP, 0, size, VM_PROT_DEFAULT, 0);
+	}
 	vm_object_clear_flag(shm_handle->shm_object, OBJ_ONEMAPPING);
 	vm_object_set_flag(shm_handle->shm_object, OBJ_NOSPLIT);
 
@@ -564,6 +585,9 @@ shmget(p, uap)
 {
 	int segnum, mode, error;
 
+	if (!jail_sysvipc_allowed && p->p_prison != NULL)
+		return (ENOSYS);
+
 	mode = uap->shmflg & ACCESSPERMS;
 	if (uap->key != IPC_PRIVATE) {
 	again:
@@ -591,6 +615,9 @@ shmsys(p, uap)
 		int	a4;
 	} */ *uap;
 {
+
+	if (!jail_sysvipc_allowed && p->p_prison != NULL)
+		return (ENOSYS);
 
 	if (uap->which >= sizeof(shmcalls)/sizeof(shmcalls[0]))
 		return EINVAL;

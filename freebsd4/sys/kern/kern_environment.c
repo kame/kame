@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_environment.c,v 1.10 1999/11/24 01:03:00 archie Exp $
+ * $FreeBSD: src/sys/kern/kern_environment.c,v 1.10.2.1 2000/08/03 00:09:32 ps Exp $
  */
 
 /*
@@ -102,7 +102,7 @@ getenv_quad(char *name, quad_t *data)
 }
 
 static int
-sysctl_kernenv SYSCTL_HANDLER_ARGS
+sysctl_kernenv(SYSCTL_HANDLER_ARGS)
 {
     int		*name = (int *)arg1;
     u_int	namelen = arg2;

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)cons.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/kern/tty_cons.c,v 1.81 2000/01/25 09:20:08 bde Exp $
+ * $FreeBSD: src/sys/kern/tty_cons.c,v 1.81.2.1 2000/08/03 00:09:33 ps Exp $
  */
 
 #include <sys/param.h>
@@ -202,7 +202,7 @@ cnuninit(void)
  * This may require us to open or close the device in question.
  */
 static int
-sysctl_kern_consmute SYSCTL_HANDLER_ARGS
+sysctl_kern_consmute(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	int ocn_mute;

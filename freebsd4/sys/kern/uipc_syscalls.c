@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_syscalls.c	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.65.2.2 2000/07/15 06:32:21 green Exp $
+ * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.65.2.4 2000/11/13 07:15:44 dg Exp $
  */
 
 #include "opt_compat.h"
@@ -1440,9 +1440,8 @@ sendfile(struct proc *p, struct sendfile_args *uap)
 	 * Do argument checking. Must be a regular file in, stream
 	 * type and connected socket out, positive offset.
 	 */
-	if (((u_int)uap->fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[uap->fd]) == NULL ||
-	    (fp->f_flag & FREAD) == 0) {
+	fp = getfp(fdp, uap->fd, FREAD);
+	if (fp == NULL) {
 		error = EBADF;
 		goto done;
 	}
@@ -1608,8 +1607,10 @@ retry_lookup:
 				 */
 				if (pg->wire_count == 0 && pg->valid == 0 &&
 				    pg->busy == 0 && !(pg->flags & PG_BUSY) &&
-				    pg->hold_count == 0)
+				    pg->hold_count == 0) {
+					vm_page_busy(pg);
 					vm_page_free(pg);
+				}
 				sbunlock(&so->so_snd);
 				goto done;
 			}

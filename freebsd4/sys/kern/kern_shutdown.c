@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_shutdown.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.1 2000/05/16 06:58:11 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.5 2000/10/29 16:59:29 dwmalone Exp $
  */
 
 #include "opt_ddb.h"
@@ -106,6 +106,8 @@ watchdog_tickle_fn wdog_tickler = NULL;
  */
 const char *panicstr;
 
+int dumping;				/* system is dumping */
+
 static void boot __P((int)) __dead2;
 static void dumpsys __P((void));
 static int setdumpdev __P((dev_t dev));
@@ -149,9 +151,13 @@ reboot(p, uap)
 /*
  * Called by events that want to shut down.. e.g  <CTL><ALT><DEL> on a PC
  */
+static int shutdown_howto = 0;
+
 void
-shutdown_nice()
+shutdown_nice(int howto)
 {
+	shutdown_howto = howto;
+	
 	/* Send a signal to init(8) and have it shutdown the world */
 	if (initproc != NULL) {
 		psignal(initproc, SIGINT);
@@ -200,6 +206,9 @@ static void
 boot(howto)
 	int howto;
 {
+
+	/* collect extra flags that shutdown_nice might have set */
+	howto |= shutdown_howto;
 
 #ifdef SMP
 	if (smp_active) {
@@ -296,13 +305,8 @@ boot(howto)
 	 */
 	EVENTHANDLER_INVOKE(shutdown_post_sync, howto);
 	splhigh();
-	if ((howto & (RB_HALT|RB_DUMP)) == RB_DUMP && !cold) {
-		savectx(&dumppcb);
-#ifdef __i386__
-		dumppcb.pcb_cr3 = rcr3();
-#endif
+	if ((howto & (RB_HALT|RB_DUMP)) == RB_DUMP && !cold)
 		dumpsys();
-	}
 
 	/* Now that we're going to really halt the system... */
 	EVENTHANDLER_INVOKE(shutdown_final, howto);
@@ -436,7 +440,7 @@ dump_conf(dummy)
 SYSINIT(dump_conf, SI_SUB_DUMP_CONF, SI_ORDER_FIRST, dump_conf, NULL)
 
 static int
-sysctl_kern_dumpdev SYSCTL_HANDLER_ARGS
+sysctl_kern_dumpdev(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	udev_t ndumpdev;
@@ -460,8 +464,8 @@ static void
 dumpsys(void)
 {
 	int	error;
-	static int dumping;
 
+	savectx(&dumppcb);
 	if (dumping++) {
 		printf("Dump already in progress, bailing...\n");
 		return;

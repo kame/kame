@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)subr_prof.c	8.3 (Berkeley) 9/23/93
- * $FreeBSD: src/sys/kern/subr_prof.c,v 1.32.2.1 2000/05/16 06:58:12 dillon Exp $
+ * $FreeBSD: src/sys/kern/subr_prof.c,v 1.32.2.2 2000/08/03 00:09:32 ps Exp $
  */
 
 #include <sys/param.h>
@@ -276,7 +276,7 @@ kmstartup(dummy)
  * Return kernel profiling information.
  */
 static int
-sysctl_kern_prof SYSCTL_HANDLER_ARGS
+sysctl_kern_prof(SYSCTL_HANDLER_ARGS)
 {
 	int *name = (int *) arg1;
 	u_int namelen = arg2;

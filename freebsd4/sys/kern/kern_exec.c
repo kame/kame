@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_exec.c,v 1.107.2.3 2000/07/19 06:23:56 kbyanc Exp $
+ * $FreeBSD: src/sys/kern/kern_exec.c,v 1.107.2.5 2000/09/21 09:06:43 truckman Exp $
  */
 
 #include <sys/param.h>
@@ -294,7 +294,7 @@ interpret:
 		 */
 		p->p_ucred = crcopy(p->p_ucred);
 		if (attr.va_mode & VSUID)
-			p->p_ucred->cr_uid = attr.va_uid;
+			change_euid(p, attr.va_uid);
 		if (attr.va_mode & VSGID)
 			p->p_ucred->cr_gid = attr.va_gid;
 		setsugid(p);

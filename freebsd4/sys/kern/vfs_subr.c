@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_subr.c	8.31 (Berkeley) 5/26/95
- * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.249.2.4 2000/07/16 13:18:55 bp Exp $
+ * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.249.2.5 2000/08/03 00:09:33 ps Exp $
  */
 
 /*
@@ -2028,10 +2028,10 @@ DB_SHOW_COMMAND(lockedvnodes, lockedvnodes)
 /*
  * Top level filesystem related information gathering.
  */
-static int	sysctl_ovfs_conf __P(SYSCTL_HANDLER_ARGS);
+static int	sysctl_ovfs_conf __P((SYSCTL_HANDLER_ARGS));
 
 static int
-vfs_sysctl SYSCTL_HANDLER_ARGS
+vfs_sysctl(SYSCTL_HANDLER_ARGS)
 {
 	int *name = (int *)arg1 - 1;	/* XXX */
 	u_int namelen = arg2 + 1;	/* XXX */
@@ -2081,7 +2081,7 @@ SYSCTL_NODE(_vfs, VFS_GENERIC, generic, CTLFLAG_RD, vfs_sysctl,
 #if 1 || defined(COMPAT_PRELITE2)
 
 static int
-sysctl_ovfs_conf SYSCTL_HANDLER_ARGS
+sysctl_ovfs_conf(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	struct vfsconf *vfsp;
@@ -2110,7 +2110,7 @@ sysctl_ovfs_conf SYSCTL_HANDLER_ARGS
  */
 /* ARGSUSED */
 static int
-sysctl_vnode SYSCTL_HANDLER_ARGS
+sysctl_vnode(SYSCTL_HANDLER_ARGS)
 {
 	struct proc *p = curproc;	/* XXX */
 	struct mount *mp, *nmp;

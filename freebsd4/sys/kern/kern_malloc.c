@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_malloc.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/kern/kern_malloc.c,v 1.64.2.2 2000/07/07 14:15:20 bp Exp $
+ * $FreeBSD: src/sys/kern/kern_malloc.c,v 1.64.2.3 2000/10/25 09:14:06 phk Exp $
  */
 
 #include "opt_vm.h"
@@ -272,6 +272,9 @@ out:
 	if (ksp->ks_memuse > ksp->ks_maxused)
 		ksp->ks_maxused = ksp->ks_memuse;
 	splx(s);
+	/* XXX: Do idle pre-zeroing.  */
+	if (va != NULL && (flags & M_ZERO))
+		bzero(va, size);
 	return ((void *) va);
 }
 

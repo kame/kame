@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_clock.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_clock.c,v 1.105.2.1 2000/05/16 06:58:11 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_clock.c,v 1.105.2.3 2000/09/22 08:01:00 des Exp $
  */
 
 #include "opt_ntp.h"
@@ -86,11 +86,7 @@ static void tco_setscales __P((struct timecounter *tc));
 static __inline unsigned tco_delta __P((struct timecounter *tc));
 
 /* Some of these don't belong here, but it's easiest to concentrate them. */
-#if defined(SMP) && defined(BETTER_CLOCK)
 long cp_time[CPUSTATES];
-#else
-static long cp_time[CPUSTATES];
-#endif
 
 long tk_cancc;
 long tk_nin;
@@ -465,7 +461,7 @@ statclock(frame)
  * Return information about system clocks.
  */
 static int
-sysctl_kern_clockrate SYSCTL_HANDLER_ARGS
+sysctl_kern_clockrate(SYSCTL_HANDLER_ARGS)
 {
 	struct clockinfo clkinfo;
 	/*
@@ -823,7 +819,7 @@ SYSCTL_INT(_kern_timecounter, OID_AUTO, method, CTLFLAG_RW, &tco_method, 0,
 );
 
 static int
-sysctl_kern_timecounter_hardware SYSCTL_HANDLER_ARGS
+sysctl_kern_timecounter_hardware(SYSCTL_HANDLER_ARGS)
 {
 	char newname[32];
 	struct timecounter *newtc, *tc;

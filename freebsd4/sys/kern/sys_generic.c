@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sys_generic.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/sys_generic.c,v 1.55.2.4 2000/07/15 06:32:21 green Exp $
+ * $FreeBSD: src/sys/kern/sys_generic.c,v 1.55.2.7 2000/08/16 19:20:31 alfred Exp $
  */
 
 #include "opt_ktrace.h"
@@ -69,13 +69,12 @@ MALLOC_DEFINE(M_IOV, "iov", "large iov's");
 
 static int	pollscan __P((struct proc *, struct pollfd *, int));
 static int	selscan __P((struct proc *, fd_mask **, fd_mask **, int));
-static struct file* getfp __P((struct filedesc *, int, int));
 static int	dofileread __P((struct proc *, struct file *, int, void *,
 		    size_t, off_t, int));
 static int	dofilewrite __P((struct proc *, struct file *, int,
 		    const void *, size_t, off_t, int));
 
-static struct file*
+struct file*
 getfp(fdp, fd, flag)
 	struct filedesc* fdp;
 	int fd, flag;
@@ -156,6 +155,7 @@ dofileread(p, fp, fd, buf, nbyte, offset, flags)
 #ifdef KTRACE
 	struct iovec ktriov;
 	struct uio ktruio;
+	int didktr = 0;
 #endif
 
 	aiov.iov_base = (caddr_t)buf;
@@ -176,6 +176,7 @@ dofileread(p, fp, fd, buf, nbyte, offset, flags)
 	if (KTRPOINT(p, KTR_GENIO)) {
 		ktriov = aiov;
 		ktruio = auio;
+		didktr = 1;
 	}
 #endif
 	cnt = nbyte;
@@ -185,7 +186,7 @@ dofileread(p, fp, fd, buf, nbyte, offset, flags)
 			error = 0;
 	cnt -= auio.uio_resid;
 #ifdef KTRACE
-	if (KTRPOINT(p, KTR_GENIO) && error == 0) {
+	if (didktr && error == 0) {
 		ktruio.uio_iov = &ktriov;
 		ktruio.uio_resid = cnt;
 		ktrgenio(p->p_tracep, fd, UIO_READ, &ktruio, error);
@@ -351,9 +352,10 @@ dofilewrite(p, fp, fd, buf, nbyte, offset, flags)
 #ifdef KTRACE
 	struct iovec ktriov;
 	struct uio ktruio;
+	int didktr = 0;
 #endif
 
-	aiov.iov_base = (void *)buf;
+	aiov.iov_base = (void *)(uintptr_t)buf;
 	aiov.iov_len = nbyte;
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
@@ -371,6 +373,7 @@ dofilewrite(p, fp, fd, buf, nbyte, offset, flags)
 	if (KTRPOINT(p, KTR_GENIO)) {
 		ktriov = aiov;
 		ktruio = auio;
+		didktr = 1;
 	}
 #endif
 	cnt = nbyte;
@@ -383,7 +386,7 @@ dofilewrite(p, fp, fd, buf, nbyte, offset, flags)
 	}
 	cnt -= auio.uio_resid;
 #ifdef KTRACE
-	if (KTRPOINT(p, KTR_GENIO) && error == 0) {
+	if (didktr && error == 0) {
 		ktruio.uio_iov = &ktriov;
 		ktruio.uio_resid = cnt;
 		ktrgenio(p->p_tracep, fd, UIO_WRITE, &ktruio, error);

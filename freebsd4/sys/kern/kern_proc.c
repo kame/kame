@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_proc.c	8.7 (Berkeley) 2/14/95
- * $FreeBSD: src/sys/kern/kern_proc.c,v 1.63 2000/02/08 19:54:15 phk Exp $
+ * $FreeBSD: src/sys/kern/kern_proc.c,v 1.63.2.7 2000/09/07 19:13:36 truckman Exp $
  */
 
 #include <sys/param.h>
@@ -55,20 +55,11 @@ MALLOC_DEFINE(M_SESSION, "session", "session header");
 static MALLOC_DEFINE(M_PROC, "proc", "Proc structures");
 MALLOC_DEFINE(M_SUBPROC, "subproc", "Proc sub-structures");
 
-static void pgdelete	__P((struct pgrp *));
+static int ps_showallprocs = 1;
+SYSCTL_INT(_kern, OID_AUTO, ps_showallprocs, CTLFLAG_RW,
+    &ps_showallprocs, 0, "");
 
-/*
- * Structure associated with user cacheing.
- */
-struct uidinfo {
-	LIST_ENTRY(uidinfo) ui_hash;
-	uid_t	ui_uid;
-	long	ui_proccnt;
-	rlim_t	ui_sbsize;
-};
-#define	UIHASH(uid)	(&uihashtbl[(uid) & uihash])
-static LIST_HEAD(uihashhead, uidinfo) *uihashtbl;
-static u_long uihash;		/* size of hash table - 1 */
+static void pgdelete	__P((struct pgrp *));
 
 static void	orphanpg __P((struct pgrp *pg));
 
@@ -94,84 +85,8 @@ procinit()
 	LIST_INIT(&zombproc);
 	pidhashtbl = hashinit(maxproc / 4, M_PROC, &pidhash);
 	pgrphashtbl = hashinit(maxproc / 4, M_PROC, &pgrphash);
-	uihashtbl = hashinit(maxproc / 16, M_PROC, &uihash);
 	proc_zone = zinit("PROC", sizeof (struct proc), 0, 0, 5);
-}
-
-/*
- * Change the count associated with number of processes
- * a given user is using.
- */
-int
-chgproccnt(uid, diff)
-	uid_t	uid;
-	int	diff;
-{
-	register struct uidinfo *uip;
-	register struct uihashhead *uipp;
-
-	uipp = UIHASH(uid);
-	LIST_FOREACH(uip, uipp, ui_hash)
-		if (uip->ui_uid == uid)
-			break;
-	if (uip) {
-		uip->ui_proccnt += diff;
-		if (uip->ui_proccnt < 0)
-			panic("chgproccnt: procs < 0");
-		if (uip->ui_proccnt > 0 || uip->ui_sbsize > 0)
-			return (uip->ui_proccnt);
-		LIST_REMOVE(uip, ui_hash);
-		FREE(uip, M_PROC);
-		return (0);
-	}
-	if (diff <= 0) {
-		if (diff == 0)
-			return(0);
-		panic("chgproccnt: lost user");
-	}
-	MALLOC(uip, struct uidinfo *, sizeof(*uip), M_PROC, M_WAITOK);
-	LIST_INSERT_HEAD(uipp, uip, ui_hash);
-	uip->ui_uid = uid;
-	uip->ui_proccnt = diff;
-	uip->ui_sbsize = 0;
-	return (diff);
-}
-
-/*
- * Change the total socket buffer size a user has used.
- */
-rlim_t
-chgsbsize(uid, diff)
-	uid_t	uid;
-	rlim_t	diff;
-{
-	register struct uidinfo *uip;
-	register struct uihashhead *uipp;
-
-	uipp = UIHASH(uid);
-	LIST_FOREACH(uip, uipp, ui_hash)
-		if (uip->ui_uid == uid)
-			break;
-	if (diff <= 0) {
-		if (diff == 0)
-			return (uip ? uip->ui_sbsize : 0);
-		KASSERT(uip != NULL, ("uidinfo (%d) gone", uid));
-	}
-	if (uip) {
-		uip->ui_sbsize += diff;
-		if (uip->ui_sbsize == 0 && uip->ui_proccnt == 0) {
-			LIST_REMOVE(uip, ui_hash);
-			FREE(uip, M_PROC);
-			return (0);
-		}
-		return (uip->ui_sbsize);
-	}
-	MALLOC(uip, struct uidinfo *, sizeof(*uip), M_PROC, M_WAITOK);
-	LIST_INSERT_HEAD(uipp, uip, ui_hash);
-	uip->ui_uid = uid;
-	uip->ui_proccnt = 0;
-	uip->ui_sbsize = diff;
-	return (diff);
+	uihashinit();
 }
 
 /*
@@ -522,7 +437,7 @@ sysctl_out_proc(struct proc *p, struct sysctl_req *req, int doingzomb)
 }
 
 static int
-sysctl_kern_proc SYSCTL_HANDLER_ARGS
+sysctl_kern_proc(SYSCTL_HANDLER_ARGS)
 {
 	int *name = (int*) arg1;
 	u_int namelen = arg2;
@@ -560,6 +475,11 @@ sysctl_kern_proc SYSCTL_HANDLER_ARGS
 		else
 			p = LIST_FIRST(&zombproc);
 		for (; p != 0; p = LIST_NEXT(p, p_list)) {
+			/*
+			 * Show a user only their processes.
+			 */
+			if ((!ps_showallprocs) && p_trespass(curproc, p))
+				continue;
 			/*
 			 * Skip embryonic processes.
 			 */
@@ -618,7 +538,7 @@ sysctl_kern_proc SYSCTL_HANDLER_ARGS
  * title to a string of its own choice.
  */
 static int
-sysctl_kern_proc_args SYSCTL_HANDLER_ARGS
+sysctl_kern_proc_args(SYSCTL_HANDLER_ARGS)
 {
 	int *name = (int*) arg1;
 	u_int namelen = arg2;

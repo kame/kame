@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_syscalls.c	8.13 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.2 2000/07/10 21:31:58 archie Exp $
+ * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.5 2000/09/20 12:21:20 truckman Exp $
  */
 
 /* For 4.3 integer FS ID compatibility */
@@ -1524,15 +1524,21 @@ access(p, uap)
 		syscallarg(int) flags;
 	} */ *uap;
 {
-	register struct ucred *cred = p->p_ucred;
+	struct ucred *cred, *tmpcred;
 	register struct vnode *vp;
-	int error, flags, t_gid, t_uid;
+	int error, flags;
 	struct nameidata nd;
 
-	t_uid = cred->cr_uid;
-	t_gid = cred->cr_groups[0];
-	cred->cr_uid = p->p_cred->p_ruid;
-	cred->cr_groups[0] = p->p_cred->p_rgid;
+	cred = p->p_ucred;
+	/*
+	 * Create and modify a temporary credential instead of one that
+	 * is potentially shared.  This could also mess up socket
+	 * buffer accounting which can run in an interrupt context.
+	 */
+	tmpcred = crdup(cred);
+	tmpcred->cr_uid = p->p_cred->p_ruid;
+	tmpcred->cr_groups[0] = p->p_cred->p_rgid;
+	p->p_ucred = tmpcred;
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | NOOBJ, UIO_USERSPACE,
 	    SCARG(uap, path), p);
 	if ((error = namei(&nd)) != 0)
@@ -1554,8 +1560,8 @@ access(p, uap)
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	vput(vp);
 out1:
-	cred->cr_uid = t_uid;
-	cred->cr_groups[0] = t_gid;
+	p->p_ucred = cred;
+	crfree(tmpcred);
 	return (error);
 }
 
@@ -3420,8 +3426,8 @@ extattr_set_file(p, uap)
 	error = copyin(SCARG(uap, attrname), attrname, EXTATTR_MAXNAMELEN);
 	if (error)
 		return (error);
-	NDINIT(&nd, LOOKUP, LOCKLEAF | FOLLOW, UIO_USERSPACE, SCARG(uap, path),
-	    p);
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE,
+	    SCARG(uap, path), p);
 	if ((error = namei(&nd)) != 0)
 		return(error);
 	iovlen = uap->iovcnt * sizeof(struct iovec);
@@ -3454,9 +3460,6 @@ extattr_set_file(p, uap)
 	cnt = auio.uio_resid;
 	error = VOP_SETEXTATTR(nd.ni_vp, attrname, &auio, p->p_cred->pc_ucred,
 	    p);
-	if (auio.uio_resid != cnt && (error == ERESTART ||
-	    error == EINTR || error == EWOULDBLOCK))
-		error = 0;
 	cnt -= auio.uio_resid;
 	p->p_retval[0] = cnt;
 done:
@@ -3487,7 +3490,8 @@ extattr_get_file(p, uap)
 	error = copyin(SCARG(uap, attrname), attrname, EXTATTR_MAXNAMELEN);
 	if (error)
 		return (error);
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, SCARG(uap, path), p);
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE,
+	    SCARG(uap, path), p);
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	iovlen = uap->iovcnt * sizeof (struct iovec);
@@ -3522,9 +3526,6 @@ extattr_get_file(p, uap)
 	cnt = auio.uio_resid;
 	error = VOP_GETEXTATTR(nd.ni_vp, attrname, &auio, p->p_cred->pc_ucred,
 	    p);
-	if (auio.uio_resid != cnt && (error == ERESTART ||
-	    error == EINTR || error == EWOULDBLOCK))
-		error = 0;
 	cnt -= auio.uio_resid;
 	p->p_retval[0] = cnt;
 done:
@@ -3550,8 +3551,8 @@ extattr_delete_file(p, uap)
 	error = copyin(SCARG(uap, attrname), attrname, EXTATTR_MAXNAMELEN);
 	if (error)
 		return(error);
-	NDINIT(&nd, LOOKUP, LOCKLEAF | FOLLOW, UIO_USERSPACE, SCARG(uap, path),
-	    p);
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE,
+	    SCARG(uap, path), p);
 	if ((error = namei(&nd)) != 0)
 		return(error);
 	error = VOP_SETEXTATTR(nd.ni_vp, attrname, NULL, p->p_cred->pc_ucred,

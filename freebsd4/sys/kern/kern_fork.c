@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_fork.c	8.6 (Berkeley) 4/8/94
- * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.1 2000/05/05 03:49:54 jlemon Exp $
+ * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.5 2000/09/14 23:21:18 truckman Exp $
  */
 
 #include "opt_ktrace.h"
@@ -153,7 +153,7 @@ static int nextpid = 0;
 static int randompid = 0;
 
 static int
-sysctl_kern_randompid SYSCTL_HANDLER_ARGS
+sysctl_kern_randompid(SYSCTL_HANDLER_ARGS)
 {
 		int error, pid;
 
@@ -183,7 +183,7 @@ fork1(p1, flags, procp)
 	struct proc *p2, *pptr;
 	uid_t uid;
 	struct proc *newproc;
-	int count;
+	int ok;
 	static int pidchecked = 0;
 	struct forklist *ep;
 
@@ -245,9 +245,9 @@ fork1(p1, flags, procp)
 	 * Increment the count of procs running with this uid. Don't allow
 	 * a nonprivileged user to exceed their current limit.
 	 */
-	count = chgproccnt(uid, 1);
-	if (uid != 0 && count > p1->p_rlimit[RLIMIT_NPROC].rlim_cur) {
-		(void)chgproccnt(uid, -1);
+	ok = chgproccnt(p1->p_cred->p_uidinfo, 1,
+		(uid != 0) ? p1->p_rlimit[RLIMIT_NPROC].rlim_cur : 0);
+	if (!ok) {
 		/*
 		 * Back out the process count
 		 */
@@ -359,6 +359,7 @@ again:
 	bcopy(p1->p_cred, p2->p_cred, sizeof(*p2->p_cred));
 	p2->p_cred->p_refcnt = 1;
 	crhold(p1->p_ucred);
+	uihold(p1->p_cred->p_uidinfo);
 
 	if (p2->p_prison) {
 		p2->p_prison->pr_ref++;

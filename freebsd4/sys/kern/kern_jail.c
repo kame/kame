@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/kern/kern_jail.c,v 1.6 2000/02/12 13:41:55 rwatson Exp $
+ * $FreeBSD: src/sys/kern/kern_jail.c,v 1.6.2.2 2000/11/01 17:58:06 rwatson Exp $
  *
  */
 
@@ -33,6 +33,16 @@ int	jail_set_hostname_allowed = 1;
 SYSCTL_INT(_jail, OID_AUTO, set_hostname_allowed, CTLFLAG_RW,
     &jail_set_hostname_allowed, 0,
     "Processes in jail can set their hostnames");
+
+int	jail_socket_unixiproute_only = 1;
+SYSCTL_INT(_jail, OID_AUTO, socket_unixiproute_only, CTLFLAG_RW,
+    &jail_socket_unixiproute_only, 0,
+    "Processes in jail are limited to creating UNIX/IPv4/route sockets only");
+
+int	jail_sysvipc_allowed = 0;
+SYSCTL_INT(_jail, OID_AUTO, sysvipc_allowed, CTLFLAG_RW,
+    &jail_sysvipc_allowed, 0,
+    "Processes in jail can use System V IPC primitives");
 
 int
 jail(p, uap)
@@ -126,7 +136,9 @@ prison_if(struct proc *p, struct sockaddr *sa)
 	struct sockaddr_in *sai = (struct sockaddr_in*) sa;
 	int ok;
 
-	if (sai->sin_family != AF_INET)
+	if ((sai->sin_family != AF_INET) && jail_socket_unixiproute_only)
+		ok = 1;
+	else if (sai->sin_family != AF_INET)
 		ok = 0;
 	else if (p->p_prison->pr_ip != ntohl(sai->sin_addr.s_addr))
 		ok = 1;
