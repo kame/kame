@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/asm.h,v 1.6 1999/12/29 04:27:55 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/include/asm.h,v 1.8 2000/10/16 20:15:43 gallatin Exp $ */
 /* From: NetBSD: asm.h,v 1.18 1997/11/03 04:22:06 ross Exp */
 
 /* 
@@ -245,7 +245,10 @@
 
 #define PALVECT(_name_)						\
 	ESETUP(_name_);						\
-	ERSAVE()
+	ERSAVE();						\
+	br	pv, _name_##lgp;				\
+_name_##lgp:;							\
+	LDGP(pv)
 
 #define	ESETUP(_name_)						\
 	.loc	1 __LINE__;					\
