@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.11 2000/06/18 06:23:06 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.12 2000/07/26 15:53:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -107,6 +107,9 @@
 #endif /*IPSEC*/
 
 #include "faith.h"
+#if defined(NFAITH) && NFAITH > 0
+#include <net/if_faith.h>
+#endif
 
 /*
  * UDP protocol inplementation.
@@ -154,21 +157,22 @@ udp6_input(mp, offp, proto)
 	int plen, ulen;
 	struct sockaddr_in6 udp_in6;
 
-#if defined(NFAITH) && 0 < NFAITH
-	if (m->m_pkthdr.rcvif) {
-		if (m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
-			/* XXX send icmp6 host/port unreach? */
-			m_freem(m);
-			return IPPROTO_DONE;
-		}
-	}
-#endif
-	udpstat.udps_ipackets++;
 	bzero(&opts, sizeof(opts));
 
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
 
 	ip6 = mtod(m, struct ip6_hdr *);
+
+#if defined(NFAITH) && 0 < NFAITH
+	if (faithprefix(&ip6->ip6_dst) {
+		/* XXX send icmp6 host/port unreach? */
+		m_freem(m);
+		return IPPROTO_DONE;
+	}
+#endif
+
+	udpstat.udps_ipackets++;
+
 	plen = ntohs(ip6->ip6_plen) - off + sizeof(*ip6);
 	uh = (struct udphdr *)((caddr_t)ip6 + off);
 	ulen = ntohs((u_short)uh->uh_ulen);

@@ -95,6 +95,9 @@
 #include <netinet6/in6_pcb.h>
 
 #include "faith.h"
+#if defined(NFAITH) && NFAITH > 0
+#include <net/if_faith.h>
+#endif
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -982,6 +985,13 @@ in6_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard, ifp)
 	struct inpcbhead *head;
 	register struct inpcb *inp;
 	u_short fport = fport_arg, lport = lport_arg;
+	int faith;
+
+#if defined(NFAITH) && NFAITH > 0
+	faith = faithprefix(laddr);
+#else
+	faith = 0;
+#endif
 
 	/*
 	 * First look for an exact match.
@@ -1014,8 +1024,7 @@ in6_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard, ifp)
 			if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr) &&
 			    inp->inp_lport == lport) {
 #if defined(NFAITH) && NFAITH > 0
-				if (ifp && ifp->if_type == IFT_FAITH &&
-				    (inp->inp_flags & INP_FAITH) == 0)
+				if (faith && (inp->inp_flags & INP_FAITH) == 0)
 					continue;
 #endif
 				if (IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr,
