@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.102 2002/06/07 04:09:10 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.103 2002/06/08 19:10:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -716,12 +716,10 @@ ip6_forward(m, srcrt)
 		return;
 	switch (error) {
 	case 0:
-#if 1
 		if (type == ND_REDIRECT) {
 			icmp6_redirect_output(mcopy, rt);
 			return;
 		}
-#endif
 		goto freecopy;
 
 	case EMSGSIZE:
