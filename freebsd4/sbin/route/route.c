@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)route.c	8.6 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/route/route.c,v 1.40.2.11 2003/02/27 23:10:10 ru Exp $";
+  "$FreeBSD: src/sbin/route/route.c,v 1.40.2.13 2003/12/10 19:02:03 ume Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -219,7 +219,7 @@ flushroutes(argc, argv)
 	char *buf, *next, *lim;
 	register struct rt_msghdr *rtm;
 
-	if (uid) {
+	if (uid && !debugonly) {
 		errx(EX_NOPERM, "must be root to alter routing table");
 	}
 	shutdown(s, 0); /* Don't want to read back our messages */
@@ -1006,7 +1006,7 @@ getaddr(which, s, hpp)
 		memcpy(&su->sin6, res->ai_addr, sizeof(su->sin6));
 #ifdef __KAME__
 		if ((IN6_IS_ADDR_LINKLOCAL(&su->sin6.sin6_addr) ||
-		     IN6_IS_ADDR_LINKLOCAL(&su->sin6.sin6_addr)) &&
+		     IN6_IS_ADDR_MC_LINKLOCAL(&su->sin6.sin6_addr)) &&
 		    su->sin6.sin6_scope_id) {
 			*(u_int16_t *)&su->sin6.sin6_addr.s6_addr[2] =
 				htons(su->sin6.sin6_scope_id);
