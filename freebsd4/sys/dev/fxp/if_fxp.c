@@ -614,6 +614,8 @@ fxp_attach(device_t dev)
 	ifp->if_ioctl = fxp_ioctl;
 	ifp->if_start = fxp_start;
 	ifp->if_watchdog = fxp_watchdog;
+	IFQ_SET_READY(&ifp->if_snd);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Attach the interface.
@@ -631,7 +633,7 @@ fxp_attach(device_t dev)
 	 * Let the system queue as many packets as we have available
 	 * TX descriptors.
 	 */
-	ifp->if_snd.ifq_maxlen = FXP_NTXCB - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, FXP_NTXCB - 1);
 
 	splx(s);
 	return (0);
@@ -1000,14 +1002,16 @@ fxp_start(struct ifnet *ifp)
 	 * NOTE: One TxCB is reserved to guarantee that fxp_mc_setup() can add
 	 *       a NOP command when needed.
 	 */
-	while (ifp->if_snd.ifq_head != NULL && sc->tx_queued < FXP_NTXCB - 1) {
+	while (!IFQ_IS_EMPTY(&ifp->if_snd) && sc->tx_queued < FXP_NTXCB - 1) {
 		struct mbuf *m, *mb_head;
 		int segment;
 
 		/*
 		 * Grab a packet to transmit.
 		 */
-		IF_DEQUEUE(&ifp->if_snd, mb_head);
+		IFQ_DEQUEUE(&ifp->if_snd, mb_head);
+		if (mb_head == NULL)
+			break;
 
 		/*
 		 * Get pointer to next available tx desc.
@@ -1118,6 +1122,11 @@ tbdinit:
 	 * going again if suspended.
 	 */
 	if (txp != NULL) {
+#ifdef ALTQ
+		/* if tb regulator is used, we need tx complete interrupt */
+		if (TBR_IS_ENABLED(&ifp->if_snd))
+			txp->cb_command |= FXP_CB_COMMAND_I;
+#endif
 		fxp_scb_wait(sc);
 		fxp_scb_cmd(sc, FXP_SCB_COMMAND_CU_RESUME);
 	}
@@ -1186,7 +1195,7 @@ fxp_intr(void *xsc)
 			/*
 			 * Try to start more packets transmitting.
 			 */
-			if (ifp->if_snd.ifq_head != NULL)
+			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				fxp_start(ifp);
 		}
 		/*
