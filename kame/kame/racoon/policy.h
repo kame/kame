@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.h,v 1.11 2000/04/24 19:57:24 sakane Exp $ */
+/* YIPS @(#)$Id: policy.h,v 1.12 2000/06/08 15:46:53 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -109,4 +109,4 @@ extern void flushsp __P((void));
 extern void initsp __P((void));
 extern struct ipsecrequest *newipsecreq __P((void));
 
-extern char *spidx2str __P((struct policyindex *));
+extern const char *spidx2str __P((const struct policyindex *));

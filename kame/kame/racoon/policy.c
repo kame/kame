@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.24 2000/05/31 16:27:08 sakane Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.25 2000/06/08 15:46:53 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -330,9 +330,9 @@ newipsecreq()
 	return new;
 }
 
-char *
+const char *
 spidx2str(spidx)
-	struct policyindex *spidx;
+	const struct policyindex *spidx;
 {
 	/* addr/pref[port] addr/pref[port] ul dir act */
 	static char buf[256];
