@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.145 2001/07/22 01:30:27 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.146 2001/07/22 01:30:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -774,8 +774,6 @@ defrouter_select()
 	 * Let's handle easy case (3) first:
 	 * If default router list is empty, we should probably install
 	 * an interface route and assume that all destinations are on-link.
-	 *
-	 * Otherwise, make sure we don't have the last-resort interface route.
 	 */
 	if (!TAILQ_FIRST(&nd_defrouter)) {
 		/*
