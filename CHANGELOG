@@ -1,10 +1,7 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2212 2002/08/05 23:46:09 itojun Exp $
+$KAME: CHANGELOG,v 1.2213 2002/08/06 11:15:45 itojun Exp $
 
 <200208>
-Tue Aug  6 08:41:31 JST 2002  itojun@iijlab.net
-	* sys/net/if_stf.c: according to RFC2529, 6to4 MTU is 1480, not 1280.
-
 Mon Aug  5 15:12:34 JST 2002	suz@crl.hitachi.co.jp
 	* kame/kame/ifmcstat: displays IGMPv2 and v3 multicast info
 
