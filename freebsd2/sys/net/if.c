@@ -84,9 +84,9 @@
 #include <net/radix.h>
 
 #ifdef INET6
-/*XXX*/
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
+#include <netinet6/nd6.h>
 #endif
 
 /*
@@ -108,14 +108,6 @@ SYSINIT(interfaces, SI_SUB_PROTO_IF, SI_ORDER_FIRST, ifinit, NULL)
 
 int ifqmaxlen = IFQ_MAXLEN;
 struct ifnet *ifnet;
-
-#ifdef INET6
-/*
- * XXX: declare here to avoid to include many inet6 related files..
- * should be more generalized?
- */
-extern void nd6_setmtu __P((struct ifnet *));
-#endif 
 
 /*
  * Network interface utility routines.

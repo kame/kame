@@ -132,21 +132,13 @@
 #endif
 
 #ifdef INET6
-/*XXX*/
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
+#include <netinet6/nd6.h>
 #endif
 
 int	ifqmaxlen = IFQ_MAXLEN;
 struct	callout if_slowtimo_ch;
-
-#ifdef INET6
-/*
- * XXX: declare here to avoid to include many inet6 related files..
- * should be more generalized?
- */
-extern void nd6_setmtu __P((struct ifnet *));
-#endif 
 
 int	if_rt_walktree __P((struct radix_node *, void *));
 

@@ -61,13 +61,13 @@
 #include <net/route.h>
 
 #if defined(INET) || defined(INET6)
-/*XXX*/
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #ifdef INET6
 #include <machine/clock.h> /* XXX: temporal workaround for fxp issue */
 #include <netinet6/in6_var.h>
 #include <netinet6/in6_ifattach.h>
+#include <netinet6/nd6.h>
 #endif
 #endif
 
@@ -95,14 +95,6 @@ MALLOC_DEFINE(M_IFMADDR, "ether_multi", "link-level multicast address");
 
 int	ifqmaxlen = IFQ_MAXLEN;
 struct	ifnethead ifnet;	/* depend on static init XXX */
-
-#ifdef INET6
-/*
- * XXX: declare here to avoid to include many inet6 related files..
- * should be more generalized?
- */
-extern void	nd6_setmtu __P((struct ifnet *));
-#endif
 
 struct if_clone *if_clone_lookup __P((const char *, int *));
 int if_clone_list __P((struct if_clonereq *));
