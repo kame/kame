@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.143 2001/06/28 10:45:46 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.144 2001/07/10 06:06:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1629,7 +1629,7 @@ isakmp_post_acquire(iph2)
 			"due to no phase1 found.\n",
 			saddrwop2str(iph2->dst));
 
-		/* begin ident mode */
+		/* start phase 1 negotiation as a initiator. */
 		if (isakmp_ph1begin_i(rmconf, iph2->dst) < 0) {
 			SCHED_KILL(sc);
 			return -1;
