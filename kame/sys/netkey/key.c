@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.144 2000/07/25 20:16:54 sakane Exp $	*/
+/*	$KAME: key.c,v 1.145 2000/08/02 17:58:25 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1736,7 +1736,9 @@ key_spdadd(so, m, mhp)
 		struct secspacq *spacq;
 		if ((spacq = key_getspacq(&spidx)) != NULL) {
 			/* reset counter in order to deletion by timehander. */
-			spacq->tick = key_blockacq_lifetime;
+			struct timeval tv;
+			microtime(&tv);
+			spacq->created = tv.tv_sec;
 			spacq->count = 0;
 		}
     	}
@@ -2513,8 +2515,12 @@ key_newsav(m, mhp, sah, errp)
 		}
 	}
 
-	/* reset tick */
-	newsav->tick = 0;
+	/* reset created */
+    {
+	struct timeval tv;
+	microtime(&tv);
+	newsav->created = tv.tv_sec;
+    }
 
 	newsav->pid = mhp->msg->sadb_msg_pid;
 
@@ -2853,8 +2859,12 @@ key_setsaval(sav, m, mhp)
 		goto fail;
 	}
 
-	/* reset tick */
-	sav->tick = 0;
+	/* reset created */
+    {
+	struct timeval tv;
+	microtime(&tv);
+	sav->created = tv.tv_sec;
+    }
 
 	/* make lifetime for CURRENT */
     {
@@ -3993,6 +4003,9 @@ key_timehandler(void)
 {
 	u_int dir;
 	int s;
+	struct timeval tv;
+
+	microtime(&tv);
 
 #ifdef __NetBSD__
 	s = splsoftnet();	/*called from softclock()*/
@@ -4041,9 +4054,7 @@ key_timehandler(void)
 
 			nextsav = LIST_NEXT(sav, chain);
 
-			sav->tick++;
-
-			if (key_larval_lifetime < sav->tick) {
+			if (tv.tv_sec - sav->created > key_larval_lifetime) {
 				key_freesav(sav);
 			}
 		}
@@ -4058,8 +4069,6 @@ key_timehandler(void)
 
 			nextsav = LIST_NEXT(sav, chain);
 
-			sav->tick++;
-
 			/* we don't need to check. */
 			if (sav->lft_s == NULL)
 				continue;
@@ -4073,9 +4082,9 @@ key_timehandler(void)
 				continue;
 			}
 
-			/* compare SOFT lifetime and tick */
+			/* check SOFT lifetime */
 			if (sav->lft_s->sadb_lifetime_addtime != 0
-			 && sav->lft_s->sadb_lifetime_addtime < sav->tick) {
+			 && tv.tv_sec - sav->created > sav->lft_s->sadb_lifetime_addtime) {
 				/*
 				 * check SA to be used whether or not.
 				 * when SA hasn't been used, delete it.
@@ -4120,8 +4129,6 @@ key_timehandler(void)
 
 			nextsav = LIST_NEXT(sav, chain);
 
-			sav->tick++;
-
 			/* we don't need to check. */
 			if (sav->lft_h == NULL)
 				continue;
@@ -4135,9 +4142,8 @@ key_timehandler(void)
 				continue;
 			}
 
-			/* compare HARD lifetime and tick */
 			if (sav->lft_h->sadb_lifetime_addtime != 0
-			 && sav->lft_h->sadb_lifetime_addtime < sav->tick) {
+			 && tv.tv_sec - sav->created > sav->lft_h->sadb_lifetime_addtime) {
 				key_sa_chgstate(sav, SADB_SASTATE_DEAD);
 				key_freesav(sav);
 				sav = NULL;
@@ -4145,7 +4151,7 @@ key_timehandler(void)
 #if 0	/* XXX Should we keep to send expire message until HARD lifetime ? */
 			else if (sav->lft_s != NULL
 			      && sav->lft_s->sadb_lifetime_addtime != 0
-			      && sav->lft_s->sadb_lifetime_addtime < sav->tick) {
+			      && tv.tv_sec - sav->created > sav->lft_s->sadb_lifetime_addtime) {
 				/*
 				 * XXX: should be checked to be
 				 * installed the valid SA.
@@ -4206,9 +4212,8 @@ key_timehandler(void)
 
 		nextacq = LIST_NEXT(acq, chain);
 
-		acq->tick++;
-
-		if (key_blockacq_lifetime < acq->tick && __LIST_CHAINED(acq)) {
+		if (tv.tv_sec - acq->created > key_blockacq_lifetime
+		 && __LIST_CHAINED(acq)) {
 			LIST_REMOVE(acq, chain);
 			KFREE(acq);
 		}
@@ -4226,9 +4231,8 @@ key_timehandler(void)
 
 		nextacq = LIST_NEXT(acq, chain);
 
-		acq->tick++;
-
-		if (key_blockacq_lifetime < acq->tick && __LIST_CHAINED(acq)) {
+		if (tv.tv_sec - acq->created > key_blockacq_lifetime
+		 && __LIST_CHAINED(acq)) {
 			LIST_REMOVE(acq, chain);
 			KFREE(acq);
 		}
@@ -4491,7 +4495,7 @@ key_getspi(so, m, mhp)
 		struct secacq *acq;
 		if ((acq = key_getacqbyseq(mhp->msg->sadb_msg_seq)) != NULL) {
 			/* reset counter in order to deletion by timehander. */
-			acq->tick = key_blockacq_lifetime;
+			acq->created = key_blockacq_lifetime;
 			acq->count = 0;
 		}
     	}
@@ -5707,7 +5711,7 @@ key_newacq(saidx)
 	/* copy secindex */
 	bcopy(saidx, &newacq->saidx, sizeof(newacq->saidx));
 	newacq->seq = (acq_seq == ~0 ? 1 : ++acq_seq);
-	newacq->tick = 0;
+	newacq->created = 0;
 	newacq->count = 0;
 
 	return newacq;
@@ -5760,7 +5764,7 @@ key_newspacq(spidx)
 
 	/* copy secindex */
 	bcopy(spidx, &acq->spidx, sizeof(acq->spidx));
-	acq->tick = 0;
+	acq->created = 0;
 	acq->count = 0;
 
 	return acq;
@@ -5839,7 +5843,7 @@ key_acquire2(so, m, mhp)
 		}
 
 		/* reset acq counter in order to deletion by timehander. */
-		acq->tick = key_blockacq_lifetime;
+		acq->created = key_blockacq_lifetime;
 		acq->count = 0;
 #endif
 		m_freem(m);

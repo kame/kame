@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.35 2000/07/30 00:45:11 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.36 2000/08/02 17:58:25 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -118,7 +118,7 @@ struct secspacq {
 
 	struct secpolicyindex spidx;
 
-	u_int32_t tick;		/* for lifetime */
+	long created;		/* for lifetime */
 	int count;		/* for lifetime */
 	/* XXX: here is mbuf place holder to be sent ? */
 };
