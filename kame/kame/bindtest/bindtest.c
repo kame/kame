@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.26 2001/05/08 04:36:27 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.27 2001/05/08 22:12:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -113,6 +113,7 @@ static int reuseaddr = 0;
 static int reuseport = 0;
 static int connect1st = 0;
 static int connect2nd = 0;
+static int delayedlisten = 0;
 
 int
 main(argc, argv)
@@ -123,7 +124,7 @@ main(argc, argv)
 	extern char *optarg;
 	struct testitem *testi, *testj;
 
-	while ((ch = getopt(argc, argv, "126APp:st")) != -1) {
+	while ((ch = getopt(argc, argv, "126AlPp:st")) != -1) {
 		switch (ch) {
 		case '1':
 			connect1st = 1;
@@ -142,6 +143,9 @@ main(argc, argv)
 #ifndef SO_REUSEADDR
 			errx(1, "SO_REUSEADDR is not supported");
 #endif
+			break;
+		case 'l':
+			delayedlisten = 1;
 			break;
 		case 'P':
 			reuseport = 1;
@@ -194,6 +198,8 @@ main(argc, argv)
 #endif
 	if (socktype == SOCK_STREAM && (connect1st != 0 || connect2nd != 0))
 		printf(", connect to %s", (connect1st != 0) ? "1st" : "2nd");
+	if (socktype == SOCK_STREAM && delayedlisten == 1)
+		printf(", delayed listen");
 	putchar('\n');
 	if (summary) {
 		for (testi = testitems; testi->name; testi++)
@@ -385,6 +391,15 @@ test(t1, t2)
 			printf("\t?1(%d)", errno);
 		goto fail;
 	}
+	if (socktype == SOCK_STREAM && delayedlisten == 0 &&
+	    listen(sa, 5) < 0) {
+		if (!summary)
+			printf("\tfailed listen on for %s: %s\n",
+			       printres(a), strerror(errno));
+		else
+			printf("\tL1?(%d)", errno);
+		goto fail;
+	}
 
 	if (!summary)
 		printf("\tbind socket for %s\n", printres(b));
@@ -398,6 +413,15 @@ test(t1, t2)
 			else
 				printf("\t?2(%d)", errno);
 		}
+		goto fail;
+	}
+	if (socktype == SOCK_STREAM && delayedlisten == 0 &&
+	    listen(sb, 5) < 0) {
+		if (!summary)
+			printf("\tfailed listen on for %s: %s\n",
+			       printres(b), strerror(errno));
+		else
+			printf("\tL2?(%d)", errno);
 		goto fail;
 	}
 
@@ -566,6 +590,7 @@ conntest(sa, sb, t)
 	struct testitem *t;
 {
 	int s = -1, maxfd;
+	int newsa = -1, newsb = -1;
 	int e;
 	int recva = 0, recvb = 0;
 	fd_set fdset, fdset0;
@@ -575,8 +600,22 @@ conntest(sa, sb, t)
 	socklen_t fromlen;
 	int flags;
 
-	listen(sa, 5);
-	listen(sb, 5);
+	if (delayedlisten && listen(sa, 5) < 0) {
+		if (!summary) {
+			printf("\tfailed to listen for the 1st socket: %s\n",
+			       strerror(errno));
+		} else
+			putchar('l');
+		goto done;
+	}
+	if (delayedlisten && listen(sb, 5) < 0) {
+		if (!summary) {
+			printf("\tfailed to listen for the 2nd socket: %s\n",
+			       strerror(errno));
+		} else
+			putchar('L');
+		goto done;
+	}
 	
 	if ((s = socket(t->res->ai_family, t->res->ai_socktype,
 			t->res->ai_protocol)) < 0) {
@@ -584,7 +623,7 @@ conntest(sa, sb, t)
 			printf("\tfailed to open a socket for connecting: %s\n",
 			       strerror(errno));
 		} else
-			putchar('x');
+			putchar('s');
 		goto done;
 	}
 	flags = fcntl(s, F_GETFL, 0);
@@ -594,7 +633,7 @@ conntest(sa, sb, t)
 			printf("\tfailed to make connecting socket "
 			       "non-blocking: %s\n", strerror(errno));
 		} else
-			putchar('x');
+			putchar('f');
 		goto done;
 	}
 
@@ -604,7 +643,7 @@ conntest(sa, sb, t)
 			printf("\tfailed to connect a packet to %s: %s\n",
 			       printres(t->res), strerror(errno));
 		} else
-			putchar('x');
+			putchar('c');
 		goto done;
 	} else if (!summary)
 		printf("\ttried to connect to %s\n", printres(t->res));
@@ -626,7 +665,7 @@ conntest(sa, sb, t)
 	}
 	if (FD_ISSET(sa, &fdset)) {
 		fromlen = sizeof(ss);
-		if (accept(sa, from, &fromlen) < 0) {
+		if ((newsa = accept(sa, from, &fromlen)) < 0) {
 			if (!summary) {
 				printf("\tfailed to accept on the "
 				       "1st socket: %s\n", strerror(errno));
@@ -640,11 +679,12 @@ conntest(sa, sb, t)
 				       printsa(from, fromlen));
 			} else
 				recva++;
+			close(newsa);
 		}
 	}
 	if (FD_ISSET(sb, &fdset)) {
 		fromlen = sizeof(ss);
-		if (accept(sb, from, &fromlen) < 0) {
+		if ((newsb = accept(sb, from, &fromlen)) < 0) {
 			if (!summary) {
 				printf("\tfailed to accept on the "
 				       "2nd socket: %s\n", strerror(errno));
@@ -658,6 +698,7 @@ conntest(sa, sb, t)
 				       printsa(from, fromlen));
 			} else
 				recvb++;
+			close(newsb);
 		}
 	}
 
