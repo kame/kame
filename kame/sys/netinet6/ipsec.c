@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.159 2002/06/22 12:26:23 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.160 2002/06/27 11:43:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -257,6 +257,14 @@ static int ipsec6_encapsulate __P((struct mbuf *, struct secasvar *));
 static struct mbuf *ipsec_addaux __P((struct mbuf *));
 static struct mbuf *ipsec_findaux __P((struct mbuf *));
 static void ipsec_optaux __P((struct mbuf *, struct mbuf *));
+#ifdef INET
+static int ipsec4_checksa __P((struct ipsecrequest *,
+	struct ipsec_output_state *));
+#endif
+#ifdef INET6
+static int ipsec6_checksa __P((struct ipsecrequest *,
+	struct ipsec_output_state *, int));
+#endif
 
 /*
  * try to validate and use cached policy on a pcb.
@@ -2604,6 +2612,39 @@ ipsec_dumpmbuf(m)
 }
 
 #ifdef INET
+static int
+ipsec4_checksa(isr, state)
+	struct ipsecrequest *isr;
+	struct ipsec_output_state *state;
+{
+	struct ip *ip;
+	struct secasindex saidx;
+	struct sockaddr_in *sin;
+
+	/* make SA index for search proper SA */
+	ip = mtod(state->m, struct ip *);
+	bcopy(&isr->saidx, &saidx, sizeof(saidx));
+	saidx.mode = isr->saidx.mode;
+	saidx.reqid = isr->saidx.reqid;
+	sin = (struct sockaddr_in *)&saidx.src;
+	if (sin->sin_len == 0) {
+		sin->sin_len = sizeof(*sin);
+		sin->sin_family = AF_INET;
+		sin->sin_port = IPSEC_PORT_ANY;
+		bcopy(&ip->ip_src, &sin->sin_addr,
+			sizeof(sin->sin_addr));
+	}
+	sin = (struct sockaddr_in *)&saidx.dst;
+	if (sin->sin_len == 0) {
+		sin->sin_len = sizeof(*sin);
+		sin->sin_family = AF_INET;
+		sin->sin_port = IPSEC_PORT_ANY;
+		bcopy(&ip->ip_dst, &sin->sin_addr,
+			sizeof(sin->sin_addr));
+	}
+
+	return key_checkrequest(isr, &saidx);
+}
 /*
  * IPsec output logic for IPv4.
  */
@@ -2615,11 +2656,9 @@ ipsec4_output(state, sp, flags)
 {
 	struct ip *ip = NULL;
 	struct ipsecrequest *isr = NULL;
-	struct secasindex saidx;
 	int s;
 	int error;
 	struct sockaddr_in *dst4;
-	struct sockaddr_in *sin;
 
 	if (!state)
 		panic("state == NULL in ipsec4_output");
@@ -2647,30 +2686,8 @@ ipsec4_output(state, sp, flags)
 		 && (flags & IP_FORWARDING))
 			continue;
 #endif
-
-		/* make SA index for search proper SA */
-		ip = mtod(state->m, struct ip *);
-		bcopy(&isr->saidx, &saidx, sizeof(saidx));
-		saidx.mode = isr->saidx.mode;
-		saidx.reqid = isr->saidx.reqid;
-		sin = (struct sockaddr_in *)&saidx.src;
-		if (sin->sin_len == 0) {
-			sin->sin_len = sizeof(*sin);
-			sin->sin_family = AF_INET;
-			sin->sin_port = IPSEC_PORT_ANY;
-			bcopy(&ip->ip_src, &sin->sin_addr,
-			    sizeof(sin->sin_addr));
-		}
-		sin = (struct sockaddr_in *)&saidx.dst;
-		if (sin->sin_len == 0) {
-			sin->sin_len = sizeof(*sin);
-			sin->sin_family = AF_INET;
-			sin->sin_port = IPSEC_PORT_ANY;
-			bcopy(&ip->ip_dst, &sin->sin_addr,
-			    sizeof(sin->sin_addr));
-		}
-
-		if ((error = key_checkrequest(isr, &saidx)) != 0) {
+		error = ipsec4_checksa(isr, state);
+		if (error != 0) {
 			/*
 			 * IPsec processing is required, but no SA found.
 			 * I assume that key_acquire() had been called
@@ -2834,6 +2851,53 @@ bad:
 #endif
 
 #ifdef INET6
+static int
+ipsec6_checksa(isr, state, tunnel)
+	struct ipsecrequest *isr;
+	struct ipsec_output_state *state;
+	int tunnel;
+{
+	struct ip6_hdr *ip6;
+	struct secasindex saidx;
+	struct sockaddr_in6 *sin6, *src_sa, *dst_sa;
+
+	if (isr->saidx.mode == IPSEC_MODE_TUNNEL) {
+#ifdef DIAGNOSTIC
+		if (!tunnel)
+			panic("ipsec6_checksa/inconsistent tunnel attribute");
+#endif
+		/* When tunnel mode, SA peers must be specified. */
+		return key_checkrequest(isr, &isr->saidx);
+	}
+
+	if (ip6_getpktaddrs(state->m, &src_sa, &dst_sa))
+		return EIO;
+
+	/* make SA index for search proper SA */
+	ip6 = mtod(state->m, struct ip6_hdr *);
+	if (tunnel) {
+		bzero(&saidx, sizeof(saidx));
+		saidx.proto = isr->saidx.proto;
+	} else
+		bcopy(&isr->saidx, &saidx, sizeof(saidx));
+	saidx.mode = isr->saidx.mode;
+	saidx.reqid = isr->saidx.reqid;
+	sin6 = (struct sockaddr_in6 *)&saidx.src;
+	if (sin6->sin6_len == 0) {
+		*sin6 = *src_sa;
+		if (tunnel)
+			sin6->sin6_port = IPSEC_PORT_ANY;
+	}
+	sin6 = (struct sockaddr_in6 *)&saidx.dst;
+	if (sin6->sin6_len == 0) {
+		*sin6 = *dst_sa;
+		if (tunnel)
+			sin6->sin6_port = IPSEC_PORT_ANY;
+	}
+
+	return key_checkrequest(isr, &saidx);
+}
+
 /*
  * IPsec output logic for IPv6, transport mode.
  */
@@ -2848,10 +2912,8 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 {
 	struct ip6_hdr *ip6;
 	struct ipsecrequest *isr = NULL;
-	struct secasindex saidx;
 	int error = 0;
 	int plen;
-	struct sockaddr_in6 *sin6, *src_sa, *dst_sa;
 
 	if (!state)
 		panic("state == NULL in ipsec6_output_trans");
@@ -2870,10 +2932,6 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 		printf("ipsec6_output_trans: applyed SP\n");
 		kdebug_secpolicy(sp));
 
-	/* extract full sockaddr structures for the src/dst addresses */
-	if (ip6_getpktaddrs(state->m, &src_sa, &dst_sa))
-		goto bad;
-
 	*tun = 0;
 	for (isr = sp->req; isr; isr = isr->next) {
 		if (isr->saidx.mode == IPSEC_MODE_TUNNEL) {
@@ -2881,19 +2939,10 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 			break;
 		}
 
-		/* make an SA index to search for a proper SA */
-		ip6 = mtod(state->m, struct ip6_hdr *);
-		bcopy(&isr->saidx, &saidx, sizeof(saidx));
-		saidx.mode = isr->saidx.mode;
-		saidx.reqid = isr->saidx.reqid;
-		sin6 = (struct sockaddr_in6 *)&saidx.src;
-		if (sin6->sin6_len == 0)
-			*sin6 = *src_sa;
-		sin6 = (struct sockaddr_in6 *)&saidx.dst;
-		if (sin6->sin6_len == 0)
-			*sin6 = *dst_sa;
-
-		if (key_checkrequest(isr, &saidx) == ENOENT) {
+		error = ipsec6_checksa(isr, state, 0);
+		if (error == EIO)
+			goto bad;
+		if (error == ENOENT) {
 			/*
 			 * IPsec processing is required, but no SA found.
 			 * I assume that key_acquire() had been called
@@ -2902,7 +2951,6 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 			 * upper layer to retransmit the packet.
 			 */
 			ipsec6stat.out_nosa++;
-			error = ENOENT;
 
 			/*
 			 * Notify the fact that the packet is discarded
@@ -3007,10 +3055,9 @@ ipsec6_output_tunnel(state, sp, flags)
 {
 	struct ip6_hdr *ip6;
 	struct ipsecrequest *isr = NULL;
-	struct secasindex saidx;
 	int error = 0;
 	int plen;
-	struct sockaddr_in6* dst6, *sa_src, *sa_dst;
+	struct sockaddr_in6 *dst6, *sa_src, *sa_dst;
 	int s;
 
 	if (!state)
@@ -3024,11 +3071,6 @@ ipsec6_output_tunnel(state, sp, flags)
 		printf("ipsec6_output_tunnel: applyed SP\n");
 		kdebug_secpolicy(sp));
 
-	if (ip6_getpktaddrs(state->m, &sa_src, &sa_dst)) {
-		error = EIO;	/* XXX: should be impossible */
-		goto bad;
-	}
-
 	/*
 	 * transport mode ipsec (before the 1st tunnel mode) is already
 	 * processed by ipsec6_output_trans().
@@ -3039,31 +3081,10 @@ ipsec6_output_tunnel(state, sp, flags)
 	}
 
 	for (/* already initialized */; isr; isr = isr->next) {
-		if (isr->saidx.mode == IPSEC_MODE_TUNNEL) {
-			/* When tunnel mode, SA peers must be specified. */
-			bcopy(&isr->saidx, &saidx, sizeof(saidx));
-		} else {
-			/* make SA index to look for a proper SA */
-			struct sockaddr_in6 *sin6;
-
-			bzero(&saidx, sizeof(saidx));
-			saidx.proto = isr->saidx.proto;
-			saidx.mode = isr->saidx.mode;
-			saidx.reqid = isr->saidx.reqid;
-
-			sin6 = (struct sockaddr_in6 *)&saidx.src;
-			if (sin6->sin6_len == 0) {
-				*sin6 = *sa_src;
-				sin6->sin6_port = IPSEC_PORT_ANY;
-			}
-			sin6 = (struct sockaddr_in6 *)&saidx.dst;
-			if (sin6->sin6_len == 0) {
-				*sin6 = *sa_dst;
-				sin6->sin6_port = IPSEC_PORT_ANY;
-			}
-		}
-
-		if (key_checkrequest(isr, &saidx) == ENOENT) {
+		error = ipsec6_checksa(isr, state, 1);
+		if (error == EIO)
+			goto bad;
+		if (error == ENOENT) {
 			/*
 			 * IPsec processing is required, but no SA found.
 			 * I assume that key_acquire() had been called
