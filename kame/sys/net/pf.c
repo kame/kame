@@ -258,7 +258,7 @@ u_int16_t		 pf_calc_mss(struct pf_addr *, sa_family_t,
 int			 pf_check_proto_cksum(struct mbuf *, int, int,
 			    u_int8_t, sa_family_t);
 
-#if defined(__NetBSD__) || defined(__OpenBSD_)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 struct pf_pool_limit pf_pool_limits[PF_LIMIT_MAX] =
     { { &pf_state_pl, PFSTATE_HIWAT }, { &pf_frent_pl, PFFRAG_FRENT_HIWAT } };
 #endif
