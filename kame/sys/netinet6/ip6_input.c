@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.328 2003/09/10 08:10:54 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.329 2003/09/10 08:20:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1674,6 +1674,10 @@ ip6_savecontrol(in6p, m, ctl)
 		}
 	}
 #endif
+
+	/* some OSes call this logic with IPv4 packet, for SO_TIMESTAMP */
+	if ((ip6->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION)
+		return;
 
 	/* RFC 2292 sec. 5 */
 	if ((in6p->in6p_flags & IN6P_PKTINFO) != 0) {
