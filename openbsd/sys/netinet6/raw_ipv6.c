@@ -522,6 +522,8 @@ rip6_output(m, so, dst, control)
   struct sockaddr_in6 *dst;
   struct mbuf *control;
   struct in6_addr *in6a;
+  u_int8_t type, code;
+  int plen = m->m_pkthdr.len;
 
   va_start(ap, m);
   so = va_arg(ap, struct socket *);
@@ -602,7 +604,7 @@ rip6_output(m, so, dst, control)
   }
 
   /* source address selection */
-  if ((in6a = in6_selectsrc(dstsock, optp, inp->inp_moptions6,
+  if ((in6a = in6_selectsrc(dst, optp, inp->inp_moptions6,
 			     &inp->inp_route6, &inp->inp_laddr6,
 			    &error)) == 0) {
     if (error == 0)
