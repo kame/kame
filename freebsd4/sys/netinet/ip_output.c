@@ -1112,15 +1112,11 @@ pass:
 	}
 
 	/*
-	 * if the interface will not calculate checksums on
-	 * fragmented packets, then do it here.
+	 * Recover all the flag bits in pkthdr.csum_flags for ip_fragment to
+	 * calculate checksum correctly.  pkthdr.csum will be fixed again
+	 * in ip_fragment.
 	 */
-	if (m->m_pkthdr.csum_flags & CSUM_DELAY_DATA &&
-	    (ifp->if_hwassist & CSUM_IP_FRAGS) == 0) {
-		in_delayed_cksum(m);
-		m->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA;
-	}
-
+	m->m_pkthdr.csum_flags |= sw_csum;
 	error = ip_fragment(m, ifp, ifp->if_mtu);
 	if (error == EMSGSIZE)
 		goto bad;
@@ -1182,17 +1178,27 @@ ip_fragment(struct mbuf *m, struct ifnet *ifp, u_long mtu)
 	int mhlen, firstlen;
 	struct mbuf **mnext;
 	int error = 0;
-	int nfrags = 1;
 	int sw_csum;
+	int nfrags = 1;
 
 	ip = mtod(m, struct ip *);
 	hlen = IP_VHL_HL(ip->ip_vhl) << 2;
 	sw_csum = m->m_pkthdr.csum_flags & ~ifp->if_hwassist;
-	sw_csum &= ~CSUM_DELAY_DATA;
+	m->m_pkthdr.csum_flags &= ifp->if_hwassist;
 
 	len = (ifp->if_mtu - hlen) &~ 7;
 	if (len < 8)
 		return (EMSGSIZE);
+
+	/*
+	 * if the interface will not calculate checksums on
+	 * fragmented packets, then do it here.
+	 */
+	if (m->m_pkthdr.csum_flags & CSUM_DELAY_DATA &&
+	    (ifp->if_hwassist & CSUM_IP_FRAGS) == 0) {
+		in_delayed_cksum(m);
+		m->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA;
+	}
 
 	/*
 	 * Loop through length of segment after first fragment,
