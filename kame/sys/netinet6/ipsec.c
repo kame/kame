@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.215 2004/02/19 17:56:28 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.216 2004/02/19 18:01:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3314,9 +3314,10 @@ ipsec6_output_tunnel(state, sp, flags)
 	int plen;
 	struct sockaddr_in6 *dst6;
 	int s;
-#if defined(MIP6) && defined(MIP6_NOHAIPSEC)
 	u_char *nxt;
-	struct mbuf *m_hao, *m_rthdr2, *m_nxt;
+	struct mbuf *m_nxt;
+#if defined(MIP6) && defined(MIP6_NOHAIPSEC)
+	struct mbuf *m_hao, *m_rthdr2;
 #endif /* MIP6 && MIP6_NOHAIPSEC */
 
 	if (!state)
@@ -3473,32 +3474,25 @@ ipsec6_output_tunnel(state, sp, flags)
 			nxt = &ip6->ip6_nxt;
 			m_nxt = state->m->m_next;
 		}
+#else
+		nxt = &ip6->ip6_nxt;
+		m_nxt = state->m->m_next;
 #endif
 		switch (isr->saidx.proto) {
 		case IPPROTO_ESP:
 #ifdef IPSEC_ESP
-#if defined(MIP6) && defined(MIP6_NOHAIPSEC)
 			error = esp6_output(state->m, nxt, m_nxt, isr);
-#else
-			error = esp6_output(state->m, &ip6->ip6_nxt,
-					    state->m->m_next, isr);
-#endif /* MIP6 && MIP6_NOHAIPSEC */
 #else
 			m_freem(state->m);
 			error = EINVAL;
 #endif
 			break;
 		case IPPROTO_AH:
-#if defined(MIP6) && defined(MIP6_NOHAIPSEC)
 			error = ah6_output(state->m, nxt, m_nxt, isr);
-#else
-			error = ah6_output(state->m, &ip6->ip6_nxt,
-					   state->m->m_next, isr);
-#endif /* MIP6 && MIP6_NOHAIPSEC */
 			break;
 		case IPPROTO_IPCOMP:
-			/* XXX code should be here */
-			/* FALLTHROUGH */
+			error = ipcomp6_output(state->m, nxt, m_nxt, isr);
+			break;
 		default:
 			ipseclog((LOG_ERR, "ipsec6_output_tunnel: "
 			    "unknown ipsec protocol %d\n", isr->saidx.proto));
