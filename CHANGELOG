@@ -1,8 +1,22 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.701 2000/03/18 02:48:41 itojun Exp $
+$Id: CHANGELOG,v 1.702 2000/03/18 03:10:36 itojun Exp $
 
 <200003>
+Sat Mar 18 12:09:15 JST 2000  itojun@iijlab.net
+	* sync with latest ericsson mobile-ip6.
+	  major changes include:
+	  - options MIP6_{MN,HA} gone. SIOCSATTACH_MIP6 now selects MN or HA
+	    functionality.  Same usage as before.
+	  - Memory leaks, bug and other irritating things found and eliminated.
+	  - Code clean-up.
+	  - Pretty stable thing now (in FreeBSD3), we tortured it a bit at
+	    Connectathon.
+	  - Better source address selection.
+	  - Delete neighbor cache working better?
+	  - README and TODO updated.
+	  - Proxy delete implemented.
+
 Sat Mar 18 10:27:03 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/mtr: install binary as non-suid root.
 	  unbroken pkgsrc.
