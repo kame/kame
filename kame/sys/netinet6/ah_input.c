@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.55 2001/04/19 07:43:28 sakane Exp $	*/
+/*	$KAME: ah_input.c,v 1.56 2001/05/16 03:00:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -327,7 +327,9 @@ ah4_input(m, va_alist)
 #ifndef __NetBSD__
 	ip->ip_len = ntohs(ip->ip_len) - hlen;
 #if !(defined(__bsdi__) && _BSDI_VERSION >= 199802) /* i.e. !bsdi4 */
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	ip->ip_id = ntohs(ip->ip_id);
+#endif
 #endif
 #else
 	ip->ip_len = ntohs(ip->ip_len);
