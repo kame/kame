@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.41 2001/09/10 08:39:11 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.42 2001/09/10 08:55:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -453,11 +453,13 @@ udp6_output(in6p, m, addr6, control)
 		ui->ui_ulen = ui->ui_len;
 
 #ifdef  __NetBSD__
+		flags = (in6p->in6p_socket->so_options &
+			 (SO_DONTROUTE | SO_BROADCAST));
 		bcopy(&laddr->s6_addr[12], &ui->ui_src, sizeof(ui->ui_src));
 		udp6->uh_sum = in_cksum(m, hlen + plen) == 0;
 #elif (defined(__bsdi__) && _BSDI_VERSION >= 199802)
-		flags =
-		    in6p->inp_socket->so_options & (SO_DONTROUTE | SO_BROADCAST);
+		flags = (in6p->inp_socket->so_options &
+			 (SO_DONTROUTE | SO_BROADCAST));
 
 		if (in6p->inp_flags & INP_ONESBCAST) {
 			struct inhash *ih;
@@ -501,7 +503,7 @@ udp6_output(in6p, m, addr6, control)
 		(void)ipsec_setsocket(m, NULL);	/* XXX */
 #endif /* IPSEC */
 #ifdef __NetBSD__
-		error = ip_output(m, NULL, &in6p->in6p_route, 0 /* XXX */);
+		error = ip_output(m, NULL, &in6p->in6p_route, flags /* XXX */);
 #elif defined(__bsdi__) && _BSDI_VERSION >= 199802
 		error = ip_output(m, NULL, (struct route *)&in6p->in6p_route,
 				  flags, NULL);
