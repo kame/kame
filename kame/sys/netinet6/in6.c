@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.90 2000/07/04 04:38:56 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.91 2000/07/04 05:50:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -154,6 +154,7 @@ static int in6_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
 	struct ifnet *));
 #endif
 static int in6_ifaddroute __P((struct ifnet *, struct in6_ifaddr *)); 
+static void in6_unlink_ifa __P((struct in6_ifaddr *, struct ifnet *));
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 struct in6_multihead in6_multihead;	/* XXX BSS initialization */
@@ -899,20 +900,26 @@ in6_control(so, cmd, data, ifp)
 		 */
 		if ((ifp->if_flags & IFF_POINTOPOINT) != 0 &&
 		    ifra->ifra_dstaddr.sin6_family != AF_INET6 &&
-		    ifra->ifra_dstaddr.sin6_family != AF_UNSPEC)
-			return(EAFNOSUPPORT); /* XXX: undo? */
+		    ifra->ifra_dstaddr.sin6_family != AF_UNSPEC) {
+			error = EAFNOSUPPORT;
+			goto unlink;
+		}
 		/*
 		 * The prefixmask must have a family of AF_UNSPEC or AF_INET6.
 		 */
 		if (ifra->ifra_prefixmask.sin6_family != AF_INET6 &&
-		    ifra->ifra_prefixmask.sin6_family != AF_UNSPEC)
-			return(EAFNOSUPPORT); /* XXX: undo? */
+		    ifra->ifra_prefixmask.sin6_family != AF_UNSPEC) {
+			error = EAFNOSUPPORT;
+			goto unlink;
+		}
 		/*
 		 * Because the IPv6 address architecture is classless,
 		 * prefix length must be specified for a new address. 
 		 */
-		if (hostIsNew && ifra->ifra_prefixmask.sin6_len == 0)
-			return(EINVAL);	/* XXX: undo? */
+		if (hostIsNew && ifra->ifra_prefixmask.sin6_len == 0) {
+			error = EINVAL;
+			goto unlink;
+		}
 		/*
 		 * If the destination address on a p2p interface is specified,
 		 * and the address is a scoped one, validate/set the scope
@@ -932,7 +939,8 @@ in6_control(so, cmd, data, ifp)
 				} else if (dst6.sin6_addr.s6_addr16[1] !=
 					   htons(ifp->if_index)) {
 					/* link id is contradict */
-					return(EINVAL);	/* XXX: undo? */
+					error = EINVAL;
+					goto unlink;
 				}
 			}
 		}
@@ -1012,15 +1020,21 @@ in6_control(so, cmd, data, ifp)
 		}
 
 		/* reset the interface and routing table appropriately. */
-		error = in6_ifinit(ifp, ia, &ifra->ifra_addr, 0,
-				   hostIsNew, prefixIsNew);
-#if 0
-		if (error)
-			goto undo;
-#endif
-		if (hostIsNew && (ifp->if_flags & IFF_MULTICAST)) {
-			int error_local = 0;
+		if ((error = in6_ifinit(ifp, ia, &ifra->ifra_addr, 0,
+					hostIsNew, prefixIsNew)) != 0)
+			goto unlink;
 
+		/* update prefix list */
+		if (hostIsNew) {
+			int iilen;
+
+			iilen = (sizeof(ia->ia_prefixmask.sin6_addr) << 3) -
+				in6_mask2len(&ia->ia_prefixmask.sin6_addr);
+			if ((error = in6_prefix_add_ifid(iilen, ia)) != 0)
+				goto unlink;
+		}
+
+		if (hostIsNew && (ifp->if_flags & IFF_MULTICAST)) {
 			/*
 			 * join solicited multicast addr for new host id
 			 */
@@ -1033,9 +1047,9 @@ in6_control(so, cmd, data, ifp)
 			llsol.s6_addr32[3] =
 				ifra->ifra_addr.sin6_addr.s6_addr32[3];
 			llsol.s6_addr8[12] = 0xff;
-			(void)in6_addmulti(&llsol, ifp, &error_local);
-			if (error == 0)
-				error = error_local;
+			(void)in6_addmulti(&llsol, ifp, &error);
+			if (error != 0)
+				goto unlink;
 		}
 
 		ia->ia6_flags = ifra->ifra_flags;
@@ -1083,17 +1097,10 @@ in6_control(so, cmd, data, ifp)
 			break;
 		}
 
-		if (hostIsNew) {
-			int iilen;
-			int error_local = 0;
+		return(error);
 
-			iilen = (sizeof(ia->ia_prefixmask.sin6_addr) << 3) -
-				in6_mask2len(&ia->ia_prefixmask.sin6_addr);
-			error_local = in6_prefix_add_ifid(iilen, ia);
-			if (error == 0)
-				error = error_local;
-		}
-
+	  unlink:
+		in6_unlink_ifa(ia, ifp);
 		return(error);
 
 	case SIOCDIFADDR_IN6:
@@ -1113,8 +1120,7 @@ in6_purgeaddr(ifa, ifp)
 	struct ifaddr *ifa;
 	struct ifnet *ifp;
 {
-	struct in6_ifaddr *oia, *ia = (void *) ifa;
-	int plen;
+	struct in6_ifaddr *ia = (void *) ifa;
 
 	in6_ifscrub(ifp, ia, 1);
 
@@ -1138,6 +1144,26 @@ in6_purgeaddr(ifa, ifp)
 			in6_delmulti(in6m);
 	}
 
+	in6_unlink_ifa(ia, ifp);
+}
+
+static void
+in6_unlink_ifa(ia, ifp)
+	struct in6_ifaddr *ia;
+	struct ifnet *ifp;
+{
+	int plen, iilen;
+	struct in6_ifaddr *oia;
+#ifdef __NetBSD__
+	int	s = splsoftnet();
+#else
+	int	s = splnet();
+#endif
+
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	struct ifaddr *ifa;
+#endif
+
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	if ((ifa = ifp->if_addrlist) == ia62ifa(ia))
 		ifp->if_addrlist = ifa->ifa_next;
@@ -1147,8 +1173,10 @@ in6_purgeaddr(ifa, ifp)
 			ifa = ifa->ifa_next;
 		if (ifa->ifa_next)
 			ifa->ifa_next = ia62ifa(ia)->ifa_next;
-		else
+		else {
+			/* search failed */
 			printf("Couldn't unlink in6_ifaddr from ifp\n");
+		}
 	}
 #else
 	TAILQ_REMOVE(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
@@ -1164,16 +1192,18 @@ in6_purgeaddr(ifa, ifp)
 			ia = ia->ia_next;
 		if (ia->ia_next)
 			ia->ia_next = oia->ia_next;
-		else
-			printf("Didn't unlink in6_ifaddr from list\n");
+		else {
+			/* search failed */
+			printf("Couldn't unlink in6_ifaddr from in6_ifaddr\n");
+		}
 	}
-	{
-		int iilen;
 
+	if (oia->ia6_ifpr) {	/* check for safety */
 		plen = in6_mask2len(&oia->ia_prefixmask.sin6_addr);
 		iilen = (sizeof(oia->ia_prefixmask.sin6_addr) << 3) - plen;
 		in6_prefix_remove_ifid(iilen, oia);
 	}
+
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	if (oia->ia6_multiaddrs.lh_first != NULL)
 		in6_savemkludge(oia);
@@ -1181,6 +1211,8 @@ in6_purgeaddr(ifa, ifp)
 
 	/* release another refcnt for the link from in6_ifaddr */
 	IFAFREE(&oia->ia_ifa);
+
+	splx(s);
 }
 
 /*
@@ -1785,6 +1817,7 @@ in6_addmulti(maddr6, ifp, errorp)
 		if (*errorp) {
 			LIST_REMOVE(in6m, in6m_entry);
 			free(in6m, M_IPMADDR);
+			ia->ia_ifa.ifa_refcnt--;
 			splx(s);
 			return(NULL);
 		}
