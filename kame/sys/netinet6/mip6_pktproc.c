@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.67 2002/10/08 09:43:32 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.68 2002/10/10 07:36:41 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1457,13 +1457,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	int bu_size = 0, nonce_size = 0, auth_size = 0;
 	struct mip6_bu *mbu, *hrmbu;
 	int need_rr = 0;
-#if 0
-	HMAC_CTX hmac_ctx;
-#endif
 	u_int8_t key_bu[MIP6_KBU_LEN]; /* Stated as 'Kbu' in the spec */
-#if 0
-	u_int8_t result[SHA1_RESULTLEN];
-#endif
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -1672,43 +1666,6 @@ mip6_hexdump("MN: K_bu: ", sizeof(key_bu), key_bu);
 			(caddr_t)ip6mu, bu_size + nonce_size + auth_size, 
 			bu_size + nonce_size + sizeof(struct ip6m_opt_authdata) ,
 			MIP6_AUTHENTICATOR_LEN);
-
-#if 0
-		hmac_init(&hmac_ctx, key_bu, sizeof(key_bu), HMAC_SHA1);
-		hmac_loop(&hmac_ctx, (u_int8_t *)&mbu->mbu_coa.sin6_addr,
-			  sizeof(mbu->mbu_coa.sin6_addr));
-#ifdef RR_DBG
-mip6_hexdump("MN: Auth: ", sizeof(mbu->mbu_coa.sin6_addr), &mbu->mbu_coa.sin6_addr);
-#endif
-		hmac_loop(&hmac_ctx, (u_int8_t *)&dst->sin6_addr,
-			  sizeof(dst->sin6_addr));
-#ifdef RR_DBG
-mip6_hexdump("MN: Auth: ", sizeof(dst->sin6_addr), &dst->sin6_addr);
-#endif
-		hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu, bu_size + nonce_size + sizeof(struct ip6m_opt_authdata) );
-#ifdef RR_DBG
-mip6_hexdump("MN: Auth: ", bu_size + nonce_size, ip6mu);
-#endif
-		/* Eliminate authdata mobility option to calculate authdata 
-		   But it should be included padding area */
-		if (auth_size > AUTH_SIZE) {
-			*((u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE)
-			    = IP6MOPT_PADN;
-			*((u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE + 1)
-			    = auth_size - AUTH_SIZE - 2;
-			hmac_loop(&hmac_ctx,
-				  (u_int8_t *)ip6mu + bu_size + nonce_size
-				  + AUTH_SIZE, auth_size - AUTH_SIZE);
-#ifdef RR_DBG
-mip6_hexdump("MN: Auth: ", auth_size - AUTH_SIZE, (u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE);
-#endif
-		}
-		hmac_result(&hmac_ctx, result);
-		bcopy(result, (u_int8_t *)(mopt_auth + 1), MIP6_AUTHENTICATOR_LEN);
-#ifdef RR_DBG
-mip6_hexdump("MN: Authdata: ", SHA1_RESULTLEN, (u_int8_t *)(mopt_auth + 1));
-#endif
-#endif
 	}
 
 	/* calculate checksum. */
