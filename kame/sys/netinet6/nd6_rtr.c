@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.172 2001/10/31 06:29:34 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.173 2001/10/31 06:31:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -109,11 +109,6 @@ int ip6_use_tempaddr = 0;
 int ip6_desync_factor;
 u_int32_t ip6_temp_preferred_lifetime = DEF_TEMP_PREFERRED_LIFETIME;
 u_int32_t ip6_temp_valid_lifetime = DEF_TEMP_VALID_LIFETIME;
-/*
- * shorter lifetimes for debugging purposes.
-int ip6_temp_preferred_lifetime = 800;
-static int ip6_temp_valid_lifetime = 1800;
-*/
 int ip6_temp_regen_advance = TEMPADDR_REGEN_ADVANCE;
 
 /* RTPREF_MEDIUM has to be 0! */
