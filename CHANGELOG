@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2477 2003/09/24 02:03:29 jinmei Exp $
+$KAME: CHANGELOG,v 1.2478 2003/09/24 02:04:07 jinmei Exp $
 
 <200309>
 2003-09-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* freebsd4/kame/racoon/session.c (check_flushsa): handled the case
-	where pfkey_dump_sadb() returns NULL correctly.  Otherwise, racoon
-	could crash in such a case.
+	* freebsd4/kame/racoon/session.c (check_flushsa): correctly
+	handled the case where pfkey_dump_sadb() returns NULL.  Otherwise,
+	racoon could crash in such a case.
 
 2003-09-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput): simplified the
