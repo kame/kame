@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.1 2003/04/23 09:15:51 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.2 2003/05/06 06:59:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -44,6 +44,11 @@
 #endif
 #ifdef __NetBSD__
 #include "opt_ipsec.h"
+#endif
+
+/* Some of operating systems have standard crypto checksum library */
+#ifdef __NetBSD__
+#define HAVE_SHA1
 #endif
 
 #include <sys/param.h>
