@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.57 2001/02/07 13:39:38 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.58 2001/02/07 13:42:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.57 2001/02/07 13:39:38 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.58 2001/02/07 13:42:02 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -71,9 +71,7 @@ static char _rcsid[] = "$KAME: route6d.c,v 1.57 2001/02/07 13:39:38 itojun Exp $
 #include <netinet/ip6.h>
 #include <netinet/udp.h>
 #include <netdb.h>
-#ifdef HAVE_GETIFADDRS
 #include <ifaddrs.h>
-#endif
 
 #include <arpa/inet.h>
 
@@ -1368,7 +1366,6 @@ riprequest(ifcp, np, nn, sin)
 void
 ifconfig()
 {
-#ifdef HAVE_GETIFADDRS
 	struct ifaddrs *ifap, *ifa;
 	struct ifc *ifcp;
 	struct ipv6_mreq mreq;
@@ -1436,124 +1433,6 @@ ifconfig()
 	}
 	close(s);
 	freeifaddrs(ifap);
-#else
-	int	s, i;
-	char	*buf;
-	struct	ifconf ifconf;
-	struct	ifreq *ifrp, ifr;
-	struct	ifc *ifcp;
-	struct	ipv6_mreq mreq;
-	int	bufsiz;
-
-	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-		fatal("socket");
-		/*NOTREACHED*/
-	}
-
-	/* wild guess - v4, media, link, v6 * 3 */
-	bufsiz = if_maxindex() * sizeof(struct ifreq) * 6;
-	if ((buf = (char *)malloc(bufsiz)) == NULL) {
-		fatal("malloc");
-		/*NOTREACHED*/
-	}
-
-	/*
-	 * ioctl(SIOCGIFCONF) does not return error on buffer size.
-	 * we'll try to guess the buffer size by trying it twice, with
-	 * different buffer size.
-	 */
-	ifconf.ifc_buf = buf;
-	ifconf.ifc_len = bufsiz / 2;
-	if (ioctl(s, SIOCGIFCONF, (char *)&ifconf) < 0) {
-		fatal("ioctl: SIOCGIFCONF");
-		/*NOTREACHED*/
-	}
-	i = ifconf.ifc_len;
-	while (1) {
-		char *newbuf;
-
-		ifconf.ifc_buf = buf;
-		ifconf.ifc_len = bufsiz;
-		if (ioctl(s, SIOCGIFCONF, (char *)&ifconf) < 0) {
-			fatal("ioctl: SIOCGIFCONF");
-			/*NOTREACHED*/
-		}
-		if (i == ifconf.ifc_len)
-			break;
-		i = ifconf.ifc_len;
-		bufsiz *= 2;
-		if ((newbuf = (char *)realloc(buf, bufsiz)) == NULL) {
-			free(buf);
-			fatal("realloc");
-			/*NOTREACHED*/
-		}
-		buf = newbuf;
-	}
-	for (i = 0; i < ifconf.ifc_len; /*nothing*/) {
-		ifrp = (struct ifreq *)(buf + i);
-		if (ifrp->ifr_addr.sa_family != AF_INET6)
-			goto skip;
-		ifcp = ifc_find(ifrp->ifr_name);
-		strcpy(ifr.ifr_name, ifrp->ifr_name);
-		if (ioctl(s, SIOCGIFFLAGS, (char *)&ifr) < 0) {
-			fatal("ioctl: SIOCGIFFLAGS");
-			/*NOTREACHED*/
-		}
-		/* we are interested in multicast-capable interfaces */
-		if ((ifr.ifr_flags & IFF_MULTICAST) == 0)
-			goto skip;
-		if (!ifcp) {
-			/* new interface */
-			if ((ifcp = MALLOC(struct ifc)) == NULL) {
-				fatal("malloc: struct ifc");
-				/*NOTREACHED*/
-			}
-			memset(ifcp, 0, sizeof(*ifcp));
-			ifcp->ifc_index = -1;
-			ifcp->ifc_next = ifc;
-			ifc = ifcp;
-			nifc++;
-			ifcp->ifc_name = allocopy(ifrp->ifr_name);
-			ifcp->ifc_addr = 0;
-			ifcp->ifc_filter = 0;
-			ifcp->ifc_flags = ifr.ifr_flags;
-			trace(1, "newif %s <%s>\n", ifcp->ifc_name,
-				ifflags(ifcp->ifc_flags));
-			if (!strcmp(ifcp->ifc_name, LOOPBACK_IF))
-				loopifcp = ifcp;
-		} else {
-			/* update flag, this may be up again */
-			if (ifcp->ifc_flags != ifr.ifr_flags) {
-				trace(1, "%s: <%s> -> ", ifcp->ifc_name,
-					ifflags(ifcp->ifc_flags));
-				trace(1, "<%s>\n", ifflags(ifr.ifr_flags));
-				ifcp->ifc_cflags |= IFC_CHANGED;
-			}
-			ifcp->ifc_flags = ifr.ifr_flags;
-		}
-		ifconfig1(ifrp->ifr_name, &ifrp->ifr_addr, ifcp, s);
-		if ((ifcp->ifc_flags & (IFF_LOOPBACK | IFF_UP)) == IFF_UP
-		 && 0 < ifcp->ifc_index && !ifcp->ifc_joined) {
-			mreq.ipv6mr_multiaddr = ifcp->ifc_ripsin.sin6_addr;
-			mreq.ipv6mr_interface = ifcp->ifc_index;
-			if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
-			    &mreq, sizeof(mreq)) < 0) {
-				fatal("IPV6_JOIN_GROUP");
-				/*NOTREACHED*/
-			}
-			trace(1, "join %s %s\n", ifcp->ifc_name, RIP6_DEST);
-			ifcp->ifc_joined++;
-		}
-skip:
-		i += IFNAMSIZ;
-		if (ifrp->ifr_addr.sa_len > sizeof(struct sockaddr))
-			i += ifrp->ifr_addr.sa_len;
-		else
-			i += sizeof(struct sockaddr);
-	}
-	close(s);
-	free(buf);
-#endif
 }
 
 void
