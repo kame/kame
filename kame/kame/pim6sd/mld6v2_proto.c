@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.17 2002/10/30 06:27:34 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.18 2003/01/30 06:04:55 suz Exp $
  */
 
 /*
@@ -908,7 +908,6 @@ mld_shift_to_v1mode(mifi, src, grp)
 		g->al_addr = *grp;
 
 		/** set a timer for expiration **/
-		g->al_timer = MLD6_LISTENER_INTERVAL;
 		g->al_reporter = *src;
 		g->al_next = v->uv_groups;
 		g->comp_mode = MLDv1;
