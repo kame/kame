@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.21 2002/02/19 03:40:38 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.22 2002/02/25 08:00:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,30 +77,30 @@ static int parse_address_port(char *, struct in6_addr *, uint16_t *);
 
 static const char *pfx_desc[] = {
 	"prefix\t\tplen\tvltime\tvlexp\tpltime\tplexp\thaddr\n",
-	"prefix\t\t\t\tplen\tvltime\tvlexp\tpltime\tplexp\thaddr\n"
+	"prefix\t\t\t\t\tplen\tvltime\tvlexp\tpltime\tplexp\thaddr\n"
 };
 static const char *bu_desc[] = {
 	"paddr\t\thaddr\t\tcoa\t\tlifetim\tltexp\trefresh\trefexp\tacktimo\tackexp\tseqno\tflags\trstate\tstate\n",
-	"paddr\t\t\t\thaddr\t\t\t\tcoa\t\t\t\tlifetim\tltexp\trefresh\trefexp\tacktimo\tackexp\tseqno\tflags\trstate\tstate\n"
+	"paddr\t\t\t\t\thaddr\t\t\t\t\tcoa\t\t\t\t\tlifetim\tltexp\trefresh\trefexp\tacktimo\tackexp\tseqno\tflags\trstate\tstate\n"
 };
 static const char *ha_desc[] = {
 	"lladdr\t\tgaddr\t\tflags\tpref\tlifetim\tltexp\n",
-	"lladdr\t\t\t\tgaddr\t\t\t\tflags\tpref\tlifetim\tltexp\n"
+	"lladdr\t\t\t\t\tgaddr\t\t\t\t\tflags\tpref\tlifetim\tltexp\n"
 };
 #ifdef MIP6_DRAFT13
 static const char *bc_desc[] = {
 	"phaddr\t\tpcoa\t\taddr\t\tflags\tplen\tseqno\tlifetim\tltexp\tstate\n",
-	"phaddr\t\t\t\tpcoa\t\t\t\taddr\t\t\t\tflags\tplen\tseqno\tlifetim\tltexp\tstate\n"
+	"phaddr\t\t\t\t\tpcoa\t\t\t\t\taddr\t\t\t\t\tflags\tplen\tseqno\tlifetim\tltexp\tstate\n"
 };
 #else
 static const char *bc_desc[] = {
 	"phaddr\t\tpcoa\t\taddr\t\tflags\tseqno\tlifetim\tltexp\tstate\n",
-	"phaddr\t\t\t\tpcoa\t\t\t\taddr\t\t\t\tflags\tseqno\tlifetim\tltexp\tstate\n"
+	"phaddr\t\t\t\t\tpcoa\t\t\t\t\taddr\t\t\t\t\tflags\tseqno\tlifetim\tltexp\tstate\n"
 };
 #endif /* MIP6_DRAFT13 */
 static const char *ipaddr_fmt[] = {
 	"%-15.15s ",
-	"%-31s "
+	"%-39s "
 };
 
 struct nlist nl[] = {
