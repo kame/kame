@@ -1438,7 +1438,7 @@ fi
 echo "$ac_t""$ac_cv_type_socklen_t" 1>&6
 if test $ac_cv_type_socklen_t = no; then
   cat >> confdefs.h <<\EOF
-#define socklen_t unsigned int
+#define socklen_t int
 EOF
 
 fi

@@ -78,7 +78,7 @@ AC_TRY_COMPILE([#include <sys/types.h>
 	[socklen_t x;  x = 1; return x;],
 	[AC_MSG_RESULT(yes)],
 	[AC_MSG_RESULT(no)
-	AC_CHECK_TYPE(socklen_t, unsigned int)])
+	AC_CHECK_TYPE(socklen_t, int)])
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
