@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.50 2001/08/02 16:42:51 jinmei Exp $
+$KAME: FAQ,v 1.51 2001/08/05 19:01:59 itojun Exp $
 
 
 GENERAL
@@ -22,6 +22,13 @@ Q: What is the KAME project?
 
 	To understand more about the KAME project itself, please proceed to
 	http://www.kame.net/project-overview.html.
+
+Q: I'm in trouble and would like to get help.
+	Please route your questions to public mailing lists, like
+	snap-users@kame.net or users@ipv6.org.  Make sure to include
+	all of your configuration details, version numbers and ways to
+	repeat your issue, by going through the topmost portion of
+	http://www.kame.net/dev/send-pr.html.
 
 Q: How can I contribute?
 	- Implement "ports" or "pkgsrc" for IPv6 apps
