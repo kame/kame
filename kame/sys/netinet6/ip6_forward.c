@@ -341,17 +341,35 @@ ip6_forward(m, srcrt)
 		}
 	}
 	rt = ip6_forward_rt.ro_rt;
-	if (m->m_pkthdr.len > rt->rt_ifp->if_mtu){
+	if (m->m_pkthdr.len > rt->rt_ifp->if_mtu) {
 		in6_ifstat_inc(rt->rt_ifp, ifs6_in_toobig);
 		if (mcopy) {
+			u_long mtu;
+#ifdef IPSEC
+			struct secpolicy *sp;
+			int ipsecerror;
+			size_t ipsechdrsiz;
+#endif
+
+			mtu = rt->rt_ifp->if_mtu;
+#ifdef IPSEC
 			/*
-			 * XXX
 			 * When we do IPsec tunnel ingress, we need to play
 			 * with if_mtu value (decrement IPsec header size
-			 * from mtu value).  see ip_input().
+			 * from mtu value).  The code is much simpler than v4
+			 * case, as we have the outgoing interface for
+			 * encapsulated packet as "rt->rt_ifp".
 			 */
-			icmp6_error(mcopy, ICMP6_PACKET_TOO_BIG, 0,
-				rt->rt_ifp->if_mtu);
+			sp = ipsec6_getpolicybyaddr(mcopy, IPSEC_DIR_OUTBOUND,
+				IP_FORWARING, &ipsecerr);
+			if (sp) {
+				ipsechdrsiz = ipsec6_hdrsiz(mcopy,
+					IPSEC_DIR_OUTBONUD, NULL);
+				if (ipsechdrsiz < mtu)
+					mtu -= ipsechdrsiz;
+			}
+#endif
+			icmp6_error(mcopy, ICMP6_PACKET_TOO_BIG, 0, mtu);
 		}
 		m_freem(m);
 		return;
