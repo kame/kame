@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.4 1999/09/03 02:16:36 itojun Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.5 1999/09/03 03:04:19 itojun Exp $ (LBL)";
 #endif
 
 /*
@@ -708,12 +708,12 @@ main(int argc, char **argv)
 		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
 		exit(1);
 	}
-	(void)setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len);
+	(void)setsockopt(sndsock, IPPROTO_IP, IP_IPSEC_POLICY, buf, len);
 	if ((len = ipsec_set_policy(buf, sizeof(buf), "out bypass")) < 0) {
 		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
 		exit(1);
 	}
-	(void)setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len);
+	(void)setsockopt(sndsock, IPPROTO_IP, IP_IPSEC_POLICY, buf, len);
     }
 #else
     {
