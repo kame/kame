@@ -20,3 +20,10 @@ info/zebra.info-2
 info/zebra.info-3
 @exec   install-info          %D/info/zebra.info %D/info/dir
 @dirrm etc/zebra
+man/man1/vtysh.1
+man/man8/bgpd.8
+man/man8/ospf6d.8
+man/man8/ospfd.8
+man/man8/ripd.8
+man/man8/ripngd.8
+man/man8/zebra.8
