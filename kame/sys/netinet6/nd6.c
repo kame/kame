@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.255 2002/05/26 23:24:29 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.256 2002/05/26 23:31:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2029,7 +2029,12 @@ nd6_slowtimo(ignored_arg)
 #else
 	timeout(nd6_slowtimo, (caddr_t)0, ND6_SLOWTIMER_INTERVAL * hz);
 #endif
-	for (ifp = ifnet; ifp; ifp = ifp->if_next) {
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ifp = ifnet; ifp; ifp = ifp->if_next)
+#else
+	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
+#endif
+	{
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
 		nd6if = NDI(ifp);
 #else

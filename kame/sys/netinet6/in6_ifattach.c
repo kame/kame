@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.159 2002/05/26 23:24:29 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.160 2002/05/26 23:31:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1180,7 +1180,12 @@ in6_tmpaddrtimer(ignored_arg)
 #endif
 
 	bzero(nullbuf, sizeof(nullbuf));
-	for (ifp = ifnet; ifp; ifp = ifp->if_next) {
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ifp = ifnet; ifp; ifp = ifp->if_next)
+#else
+	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
+#endif
+	{
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
 		ndi = NDI(ifp);
 #else
