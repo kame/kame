@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2652 2004/07/29 17:17:55 jinmei Exp $
+$KAME: CHANGELOG,v 1.2653 2004/07/30 00:02:32 jinmei Exp $
 
 <200407>
+2004-07-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: relocated some configuration files.
+	Automatically-generated DUID files are now in /var/db.  All the
+	other configuration files should be put under /usr/local/v6/etc
+	by default for consistency.
+	Note: This change may affect the compatibility with old
+	configurations.
+
 2004-07-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6s.c: allowed a Request/Renew/Release
 	message to be unicasted when it is forwarded from a relay agent.
