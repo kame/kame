@@ -1,13 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2690 2004/11/30 18:05:40 suz Exp $
+$KAME: CHANGELOG,v 1.2691 2004/11/30 19:38:11 suz Exp $
 
 <200411>
 2004-12-01 SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/kame/man/man4/ist.4, kame/sys/net/if_ist.[ch],
 	  kame/sys/netinet6/{in6.h, in6_ifattach.c},
 	  kame/kame/rtadvd, kame/kame/rtsold,
-	  freebsd5/sbin/ifconfig:
+	  *bsd/sys/if_types.h, *bsd/sys/*/conf/files, *bsd/*/GENERIC.KAME
+	  *bsd/sbin/ifconfig:
 	revived ISATAP, since the IPR issue has been solved!
+	(ToDo: OpenBSD)
 
 2004-11-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/netinet/tcp_subr.c (tcp_notify): implemented quick

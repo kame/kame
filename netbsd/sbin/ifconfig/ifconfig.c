@@ -124,6 +124,10 @@ __RCSID("$NetBSD: ifconfig.c,v 1.123 2002/05/06 20:14:36 thorpej Exp $");
 #include <unistd.h>
 #include <ifaddrs.h>
 
+#ifdef IFT_IST
+#include <net/if_ist.h>
+#endif
+
 struct	ifreq		ifr, ridreq;
 struct	ifaliasreq	addreq __attribute__((aligned(4)));
 struct	in_aliasreq	in_addreq;
@@ -177,6 +181,10 @@ void	setatrange __P((const char *, int));
 void	setatphase __P((const char *, int));
 void	settunnel __P((const char *, const char *));
 void	deletetunnel __P((const char *, int));
+#ifdef IFT_IST
+void	setisataprouter __P((const char *, int));
+void	deleteisataprouter __P((const char *, int));
+#endif
 #ifdef INET6
 void 	setia6flags __P((const char *, int));
 void	setia6deprecated __P((const char *, int));
@@ -278,6 +286,10 @@ const struct cmd {
 	{ "vlan",	NEXTARG,	0,		setvlan } ,
 	{ "vlanif",	NEXTARG,	0,		setvlanif } ,
 	{ "-vlanif",	0,		0,		unsetvlanif } ,
+#ifdef IFT_IST
+	{ "isatatprtr"	NEXTARG,	0,		setisataprouter },
+	{ "deleteisataprtr", NEXTARG,	0,		deleteisataprouter },
+#endif
 #if 0
 	/* XXX `create' special-cased below */
 	{ "create",	0,		0,		clone_create } ,
@@ -361,6 +373,9 @@ void 	iso_getaddr __P((const char *, int));
 void	ieee80211_status __P((void));
 void	tunnel_status __P((void));
 void	vlan_status __P((void));
+#ifdef IFT_IST
+void	isatap_status __P((int, struct rt_addrinfo *));
+#endif
 
 /* Known address families */
 struct afswtch {
@@ -1061,6 +1076,62 @@ void unsetvlanif(val, d)
 	if (ioctl(s, SIOCSETVLAN, (caddr_t)&ifr) == -1)
 		err(EXIT_FAILURE, "SIOCSETVLAN");
 }
+
+#ifdef IFT_IST
+void
+setisataprouter(addr, param)
+	const char *addr;
+	int param;
+{
+	struct addrinfo hints, *rtrres;
+	struct ifreq ifreq;
+	int ecode;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = afp->af_af;
+	if ((ecode = getaddrinfo(addr, NULL, NULL, &rtrres)) != 0)
+		errx(1, "error in parsing address string: %s",
+		    gai_strerror(ecode));
+
+	if (rtrres->ai_addr->sa_family != AF_INET)
+		errx(1, "ISATAP router must be an IPv4 address");
+
+	memset(&ifreq, 0, sizeof(ifreq));
+	strncpy(ifreq.ifr_name, name, IFNAMSIZ);
+	memcpy(&ifreq.ifr_addr, rtrres->ai_addr, rtrres->ai_addr->sa_len);
+
+	if (ioctl(s, SIOCSISATAPRTR, &ifreq) < 0)
+		warn("SIOCSISATAPRTR");
+	freeaddrinfo(rtrres);
+}
+
+void
+deleteisataprouter(addr, param)
+	const char *addr;
+	int param;
+{
+	struct addrinfo hints, *rtrres;
+	struct ifreq ifreq;
+	int ecode;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = afp->af_af;
+	if ((ecode = getaddrinfo(addr, NULL, NULL, &rtrres)) != 0)
+		errx(1, "error in parsing address string: %s",
+		    gai_strerror(ecode));
+
+	if (rtrres->ai_addr->sa_family != AF_INET)
+		errx(1, "ISATAP router must be an IPv4 address");
+
+	memset(&ifreq, 0, sizeof(ifreq));
+	strncpy(ifreq.ifr_name, name, IFNAMSIZ);
+	memcpy(&ifreq.ifr_addr, rtrres->ai_addr, rtrres->ai_addr->sa_len);
+
+	if (ioctl(s, SIOCDISATAPRTR, &ifreq) < 0)
+		warn("SIOCDISATAPRTR");
+	freeaddrinfo(rtrres);
+}
+#endif /* IFT_IST */
 
 void
 setifnetmask(addr, d)
@@ -1911,6 +1982,9 @@ status(sdl)
 	ieee80211_status();
 	vlan_status();
 	tunnel_status();
+#ifdef IFT_IST
+	isatap_status();
+#endif
 
 	if (sdl != NULL &&
 	    getnameinfo((struct sockaddr *)sdl, sdl->sdl_len,
@@ -2072,6 +2146,44 @@ vlan_status()
 		    vlr.vlr_tag, vlr.vlr_parent[0] == '\0' ?
 		    "<none>" : vlr.vlr_parent);
 }
+
+
+#ifdef IFT_ISt
+void
+isatap_status()
+{
+	char *buf, *ptr, *lim;
+	size_t needed;
+	int mib[4] = {CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ISATAPRTR};
+
+	if (sysctl(mib, 4, NULL, &needed, NULL, 0) < 0)
+		return;
+	if (needed == 0)
+		return;
+	if ((buf = malloc(needed)) == NULL)
+		errx(1, "malloc");
+	if (sysctl(mib, 4, buf, &needed, NULL, 0) < 0)
+		errx(1, "actual retrieval of ISATAP router list");
+	
+	lim = buf + needed;
+	ptr = buf;
+	while (ptr < lim) {
+		char rtraddr[NI_MAXHOST];
+		struct sockaddr *addr = (struct sockaddr *) ptr;
+
+		if (addr->sa_family != AF_INET) {
+			warnx("invalid addr family (%d)", addr->sa_family);
+			continue;
+		}
+		rtraddr[0] = '\0';
+		getnameinfo(addr, addr->sa_len,
+			    rtraddr, sizeof(rtraddr), 0, 0, NI_NUMERICHOST);
+		if (rtraddr[0])
+			printf("\tisataprtr %s\n", rtraddr);
+		ptr += addr->sa_len;
+	}
+}
+#endif
 
 void
 in_alias(creq)

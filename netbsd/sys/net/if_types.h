@@ -264,4 +264,5 @@
 #define IFT_HIF		0xf4
 #define IFT_PFLOG	0xf6
 #define IFT_PFSYNC	0xf7
+#define IFT_IST		0xf9
 #endif /* _NET_IF_TYPES_H_ */

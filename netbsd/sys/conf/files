@@ -904,6 +904,7 @@ defpseudo gre:		ifnet
 defpseudo gif:		ifnet
 defpseudo faith:	ifnet
 defpseudo stf:		ifnet
+defpseudo ist:		ifnet
 defpseudo irframetty:	irframedrv, irdasir
 defpseudo hif:		ifnet
 defpseudo pf:		ifnet
@@ -1118,6 +1119,7 @@ file	net/if_hif.c			hif			needs-count
 file	net/if_hippisubr.c		hippi			needs-flag
 file	net/if_ieee1394subr.c		ieee1394
 file	net/if_ieee80211subr.c		wlan
+file	net/if_ist.c			ist			needs-count
 file	net/if_loop.c			loop			needs-count
 file	net/if_media.c
 file	net/if_ppp.c			ppp			needs-count
