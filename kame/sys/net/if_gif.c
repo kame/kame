@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.104 2003/05/01 08:03:46 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.105 2003/11/09 14:39:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -155,7 +155,8 @@ gifattach(dummy)
 	bzero(sc, ngif * sizeof(struct gif_softc));
 	for (i = 0; i < ngif; sc++, i++) {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-		sprintf(sc->gif_if.if_xname, "gif%d", i);
+		snprintf(sc->gif_if.if_xname, sizeof(sc->gif_if.if_xname),
+		    "gif%d", i);
 #else
 		sc->gif_if.if_name = "gif";
 		sc->gif_if.if_unit = i;
