@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.1 2002/05/14 13:31:34 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.2 2002/05/15 06:37:09 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -43,6 +43,7 @@
 #include <sys/mbuf.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
 #include <sys/syslog.h>
 
 #include <net/if.h>
@@ -679,6 +680,9 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	struct ip6m_binding_update *ip6mu;
 	int ip6mu_size;
 	struct mip6_bu *mbu, *hrmbu;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	*pktopt_mobility = NULL;
 
