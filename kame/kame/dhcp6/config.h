@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.35 2004/09/03 11:02:15 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.36 2004/09/04 09:26:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -36,8 +36,6 @@ TAILQ_HEAD(pifc_list, prefix_ifconf);
 /* per-interface information */
 struct dhcp6_if {
 	struct dhcp6_if *next;
-
-	int outsock;
 
 	/* timer for the interface */
 	struct dhcp6_timer *timer;
@@ -261,7 +259,8 @@ extern struct dhcp6_list dnsnamelist;
 extern struct dhcp6_list ntplist;
 extern long long optlifetime;
 
-extern void ifinit __P((char *));
+extern struct dhcp6_if *ifinit __P((char *));
+extern int ifreset __P((struct dhcp6_if *));
 extern int configure_interface __P((struct cf_namelist *));
 extern int configure_host __P((struct cf_namelist *));
 extern int configure_keys __P((struct cf_namelist *));

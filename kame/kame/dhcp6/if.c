@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.4 2004/09/03 11:02:15 jinmei Exp $	*/
+/*	$KAME: if.c,v 1.5 2004/09/04 09:26:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -51,7 +51,7 @@ extern int errno;
 
 struct dhcp6_if *dhcp6_if;
 
-void
+struct dhcp6_if *
 ifinit(ifname)
 	char *ifname;
 {
@@ -59,12 +59,12 @@ ifinit(ifname)
 
 	if ((ifp = find_ifconfbyname(ifname)) != NULL) {
 		dprintf(LOG_NOTICE, FNAME, "duplicated interface: %s", ifname);
-		return;
+		return (NULL);
 	}
 
 	if ((ifp = malloc(sizeof(*ifp))) == NULL) {
 		dprintf(LOG_ERR, FNAME, "malloc failed");
-		goto die;
+		goto fail;
 	}
 	memset(ifp, 0, sizeof(*ifp));
 
@@ -72,23 +72,11 @@ ifinit(ifname)
 
 	if ((ifp->ifname = strdup(ifname)) == NULL) {
 		dprintf(LOG_ERR, FNAME, "failed to copy ifname");
-		goto die;
+		goto fail;
 	}
 
-	if ((ifp->ifid = if_nametoindex(ifname)) == 0) {
-		dprintf(LOG_ERR, FNAME, "invalid interface(%s): %s",
-			ifname, strerror(errno));
-		goto die;
-	}
-#ifdef HAVE_SCOPELIB
-	if (inet_zoneid(AF_INET6, 2, ifname, &ifp->linkid)) {
-		dprintf(LOG_ERR, FNAME, "failed to get link ID for %s",
-		    ifname);
-		goto die;
-	}
-#else
-	ifp->linkid = ifp->ifid; /* XXX */
-#endif
+	if (ifreset(ifp))
+		goto fail;
 
 	TAILQ_INIT(&ifp->reqopt_list);
 	TAILQ_INIT(&ifp->iaconf_list);
@@ -99,10 +87,42 @@ ifinit(ifname)
 
 	ifp->next = dhcp6_if;
 	dhcp6_if = ifp;
-	return;
+	return (ifp);
 
-  die:
-	exit(1);
+  fail:
+	if (ifp->ifname != NULL)
+		free(ifp->ifname);
+	free(ifp);
+	return (NULL);
+}
+
+int
+ifreset(ifp)
+	struct dhcp6_if *ifp;
+{
+	unsigned int ifid;
+	u_int32_t linkid;
+
+	if ((ifid = if_nametoindex(ifp->ifname)) == 0) {
+		dprintf(LOG_ERR, FNAME, "invalid interface(%s): %s",
+			ifp->ifname, strerror(errno));
+		return (-1);
+	}
+
+#ifdef HAVE_SCOPELIB
+	if (inet_zoneid(AF_INET6, 2, ifname, &linkid)) {
+		dprintf(LOG_ERR, FNAME, "failed to get link ID for %s",
+		    ifname);
+		return (-1);
+	}
+#else
+	linkid = ifid;		/* XXX: assume 1to1 mapping IFs and links */
+#endif
+
+	ifp->ifid = ifid;
+	ifp->linkid = linkid;
+
+	return (0);
 }
 
 struct dhcp6_if *
