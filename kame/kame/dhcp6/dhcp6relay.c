@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.36 2003/07/14 09:28:06 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.37 2003/07/14 09:51:43 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -674,9 +674,28 @@ relay_to_server(dh6, len, from, ifname, ifid)
 	}
 
 	if (dh6->dh6_msgtype == DH6_RELAY_FORW) {
-		/* TBD: Relaying a Message from a Relay Agent */
-		dprintf(LOG_WARNING, FNAME, "not implemented yet");
-		goto out;
+		struct dhcp6_relay *dh6relay0 = (struct dhcp6_relay *)dh6;
+
+		/* Relaying a Message from a Relay Agent */
+
+		/*
+		 * If the hop-count in the message is greater than or equal to
+		 * HOP_COUNT_LIMIT, the relay agent discards the received
+		 * message.
+		 * [dhcpv6-28 Section 20.1.2]
+		 */
+		if (dh6relay0->dh6relay_hcnt >= DHCP6_RELAY_HOP_COUNT_LIMIT) {
+			dprintf(LOG_INFO, FNAME, "too many relay forwardings");
+			goto out;
+		}
+
+		dh6relay->dh6relay_hcnt = dh6relay0->dh6relay_hcnt + 1;
+
+		/*
+		 * We can keep the link-address field 0, regardless of the
+		 * scope of the source address, since we always include
+		 * interface-ID option.
+		 */
 	} else {
 		/* Relaying a Message from a Client */
 
