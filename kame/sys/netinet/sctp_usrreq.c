@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.45 2005/01/26 19:41:41 jinmei Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.46 2005/01/27 02:59:46 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -3597,9 +3597,13 @@ sctp_accept(struct socket *so, struct mbuf *nam)
 		inp->sctp_flags &= ~SCTP_PCB_FLAGS_DONT_WAKE;
 		if (inp->sctp_flags & SCTP_PCB_FLAGS_WAKEOUTPUT) {
 			inp->sctp_flags &= ~SCTP_PCB_FLAGS_WAKEOUTPUT;
-			if (sowriteable(inp->sctp_socket)) {
+#if defined(__NetBSD__)
+			if (sowritable(inp->sctp_socket))
 				sowwakeup(inp->sctp_socket);
-			}
+#else
+			if (sowriteable(inp->sctp_socket))
+				sowwakeup(inp->sctp_socket);
+#endif
 		}
 		if (inp->sctp_flags & SCTP_PCB_FLAGS_WAKEINPUT) {
 			inp->sctp_flags &= ~SCTP_PCB_FLAGS_WAKEINPUT;
