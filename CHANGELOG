@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1071 2000/06/28 08:31:32 suz Exp $
+$Id: CHANGELOG,v 1.1072 2000/06/28 12:40:04 jinmei Exp $
 
 <200006>
+2000-06-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: several minor improvements:
+	- daemonized dhcp6c.
+	- reactivated dhcp6c agains a SIGHUP signal or change of the
+	  default route.
+	- changed logging based on syslog(8).
+
 2000-06-28  SUZUKI Shinsuke  <suz@kame.net>
 	* kame/sys/netinet6/ip6_fw.c
 	ip6fw works on FreeBSD-4.0 + KAME, too.
