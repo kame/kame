@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/19 15:49:02 $
+		     $Date: 2000/04/20 01:51:35 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -50,6 +50,7 @@ been solved.
   specific operating system platform (openbsd, and maybe freebsd[23]).
   It is not KAME problem, it is problem in fxp driver.
   KAME/OpenBSD contains workaround for this.
+  KAME/NetBSD has no problem due to the way driver initializes the card.
 - Alignment constraints were changed in couple of places.  Namely:
   (1) SIOCGIFCONF: due to introduction of sockaddr_in6.
   (2) ancillary data: due to RFC2292 and X/Open change in CMSG_xx
