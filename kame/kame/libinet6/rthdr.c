@@ -45,8 +45,13 @@ inet6_rthdr_space(type, seg)
      case IPV6_RTHDR_TYPE_0:
 	 if (seg < 1 || seg > 23)
 	     return(0);
+#ifdef COMPAT_RFC2292
 	 return(CMSG_SPACE(sizeof(struct in6_addr) * (seg - 1)
 			   + sizeof(struct ip6_rthdr0)));
+#else
+	 return(CMSG_SPACE(sizeof(struct in6_addr) * seg
+			   + sizeof(struct ip6_rthdr0)));
+#endif 
      default:
 #ifdef DEBUG
 	 fprintf(stderr, "inet6_rthdr_space: unknown type(%d)\n", type);
@@ -68,7 +73,12 @@ inet6_rthdr_init(bp, type)
 
     switch(type) {
      case IPV6_RTHDR_TYPE_0:
+#ifdef COMPAT_RFC2292
 	 ch->cmsg_len = CMSG_LEN(sizeof(struct ip6_rthdr0) - sizeof(struct in6_addr));
+#else
+	 ch->cmsg_len = CMSG_LEN(sizeof(struct ip6_rthdr0));
+#endif 
+
 	 bzero(rthdr, sizeof(struct ip6_rthdr0));
 	 rthdr->ip6r_type = IPV6_RTHDR_TYPE_0;
 	 return(ch);
