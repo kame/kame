@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.156 2001/02/06 04:48:52 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.157 2001/02/06 04:51:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3821,7 +3821,9 @@ ip6_mloopback(ifp, m, dst)
 	struct sockaddr_in6 *dst;
 {
 	struct mbuf *copym;
+#ifndef SCOPEDROUTING
 	struct ip6_hdr *ip6;
+#endif
 
 	copym = m_copy(m, 0, M_COPYALL);
 	if (copym == NULL)
@@ -3846,14 +3848,15 @@ ip6_mloopback(ifp, m, dst)
 	}
 #endif
 
-	if (1)
-	{
-		ip6 = mtod(copym, struct ip6_hdr *);
-		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
-			ip6->ip6_src.s6_addr16[1] = 0;
-		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
-			ip6->ip6_dst.s6_addr16[1] = 0;
-	}
+	ip6 = mtod(copym, struct ip6_hdr *);
+#ifndef SCOPEDROUTING
+	/*
+	 * clear embedded scope identifiers if necessary.
+	 * in6_clearscope will touch the addresses only when necessary.
+	 */
+	in6_clearscope(&ip6->ip6_src);
+	in6_clearscope(&ip6->ip6_dst);
+#endif
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #if (__FreeBSD_version >= 410000)
