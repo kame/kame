@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.18 2001/05/07 23:05:14 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.19 2001/05/08 00:42:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -61,6 +61,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/param.h>
+#include <sys/time.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -92,15 +93,16 @@ static struct testitem{
 int main __P((int, char **));
 static void usage __P((void));
 static struct addrinfo *getres __P((int, const char *, const char *));
+static const char *printsa __P((struct sockaddr *, socklen_t));
 static const char *printres __P((struct addrinfo *));
 static int test __P((struct testitem *, struct testitem *));
+static void sendtest __P((int, int, struct testitem *));
 
 static char *port = NULL;
 static int socktype = SOCK_DGRAM;
 static int summary = 0;
 static int reuseaddr = 0;
 static int reuseport = 0;
-
 int
 main(argc, argv)
 	int argc;
@@ -201,16 +203,25 @@ getres(af, host, port)
 }
 
 static const char *
-printres(res)
-	struct addrinfo *res;
+printsa(sa, salen)
+	struct sockaddr *sa;
+	socklen_t salen;
 {
 	char hbuf[MAXHOSTNAMELEN], pbuf[10];
 	static char buf[sizeof(hbuf) + sizeof(pbuf)];
 
-	getnameinfo(res->ai_addr, res->ai_addrlen, hbuf, sizeof(hbuf),
+	getnameinfo(sa, salen, hbuf, sizeof(hbuf),
 		pbuf, sizeof(pbuf), NI_NUMERICHOST | NI_NUMERICSERV);
 	snprintf(buf, sizeof(buf), "%s/%s", hbuf, pbuf);
-	return buf;
+
+	return(buf);
+}
+
+static const char *
+printres(res)
+	struct addrinfo *res;
+{
+	return(printsa(res->ai_addr, res->ai_addrlen));
 }
 
 static int
@@ -332,6 +343,21 @@ test(t1, t2)
 	if (summary)
 		printf("\to");
 
+	if (summary)
+		putchar('[');
+	if (socktype == SOCK_DGRAM) {
+		if (t1->host != NULL)
+			sendtest(sa, sb, t1);
+		else if (summary)
+			putchar('-');
+		if (t2->host != NULL)
+			sendtest(sa, sb, t2);
+		else if (summary)
+			putchar('-');
+	}
+	if (summary)
+		putchar(']');
+
 	if (sa >= 0)
 		close(sa);
 	if (sb >= 0)
@@ -344,4 +370,117 @@ fail:
 	if (sb >= 0)
 		close(sb);
 	return -1;
+}
+
+static void
+sendtest(sa, sb, t)
+	int sa, sb;
+	struct testitem *t;
+{
+	int s = -1, maxfd;
+	int i, cc, e;
+	int recva = 0, recvb = 0;
+	unsigned char buf[10], recvbuf[128];
+	fd_set fdset, fdset0;
+	struct timeval timo;
+	struct sockaddr_storage ss;
+	struct sockaddr *from = (struct sockaddr *)&ss;
+	socklen_t fromlen;
+
+	if ((s = socket(t->res->ai_family, t->res->ai_socktype,
+			t->res->ai_protocol)) < 0) {
+		if (!summary) {
+			printf("\tfailed to open a socket for sending: %s\n",
+			       strerror(errno));
+		} else
+			putchar('x');
+		goto done;
+	}
+	if ((sendto(s, buf, sizeof(buf), 0, t->res->ai_addr,
+		    t->res->ai_addrlen)) < 0) {
+		if (!summary) {
+			printf("\tfailed to send a packet to %s: %s\n",
+			       printres(t->res), strerror(errno));
+		} else
+			putchar('x');
+		goto done;
+	} else if (!summary)
+		printf("\tsend %d bytes to %s\n", sizeof(buf),
+		       printres(t->res));
+
+	FD_ZERO(&fdset0);
+	FD_SET(sa, &fdset0);
+	FD_SET(sb, &fdset0);
+	maxfd = (sa > sb) ? sa : sb;
+	timo.tv_sec = 1;
+	timo.tv_usec = 0;
+
+	for (i = 0; i < 2; i++) { /* try 2 times, just in case. */
+		fdset = fdset0;
+		if ((e = select(maxfd + 1, &fdset, NULL, NULL, &timo)) < 0) {
+			if (!summary) {
+				printf("\tfailed to select: %s\n",
+				       strerror(errno));
+			} else
+				putchar('x');
+			goto done;
+		}
+		if (e == 0)	/* timeout */
+			break;
+		if (FD_ISSET(sa, &fdset)) {
+			fromlen = sizeof(ss);
+			if ((cc = recvfrom(sa, recvbuf, sizeof(recvbuf), 0,
+					   from, &fromlen)) < 0) {
+				if (!summary) {
+					printf("\tfailed to recvfrom on the "
+					       "1st socket: %s\n",
+					       strerror(errno));
+				}
+				else
+					; /* ignore it */
+			} else {
+				if (!summary) {
+					printf("\trecv %d bytes from %s on "
+					       "the 1st socket\n",
+					       cc, printsa(from, fromlen));
+				} else
+					recva++;
+			}
+		}
+		if (FD_ISSET(sb, &fdset)) {
+			fromlen = sizeof(ss);
+			if ((cc = recvfrom(sb, recvbuf, sizeof(recvbuf), 0,
+					   from, &fromlen)) < 0) {
+				if (!summary) {
+					printf("\tfailed to recvfrom on the "
+					       "2nd socket: %s\n",
+					       strerror(errno));
+				}
+				else
+					; /* ignore it */
+			} else {
+				if (!summary) {
+					printf("\trecv %d bytes from %s on "
+					       "the 2nd socket\n",
+					       cc, printsa(from, fromlen));
+				} else
+					recvb++;
+			}
+		}
+	}
+
+	if (summary) {
+		if (recva && recvb)
+			putchar('b');
+		else if (recva)
+			putchar('1');
+		else if (recvb)
+			putchar('2');
+		else
+			putchar('0');
+	}
+
+  done:
+	if (s >= 0)
+		close(s);
 }
