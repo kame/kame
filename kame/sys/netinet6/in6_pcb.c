@@ -315,7 +315,7 @@ in6_pcbsetport(laddr, in6p)
 		if (p == 0 || (suser(p->p_ucred, &p->p_acflag) != 0))
 			return (EACCES);
 #else
-		if ((inp->inp_socket->so_state & SS_PRIV) == 0)
+		if ((so->so_state & SS_PRIV) == 0)
 			return (EACCES);
 #endif
 		min = IPV6PORT_RESERVEDMIN;
