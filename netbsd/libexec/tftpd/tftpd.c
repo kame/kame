@@ -795,20 +795,10 @@ nak(error)
 			break;
 	if (pe->e_code < 0) {
 		tp->th_code = EUNDEF;   /* set 'undef' errorcode */
-#if 0
 		strlcpy(tp->th_msg, strerror(error - 100), msglen);
-#else
-		strncpy(tp->th_msg, strerror(error - 100), msglen - 1);
-		tp->th_msg[msglen - 1] = '\0';
-#endif
 	} else {
 		tp->th_code = htons((u_short)error);
-#if 0
 		strlcpy(tp->th_msg, pe->e_msg, msglen);
-#else
-		strncpy(tp->th_msg, pe->e_msg, msglen - 1);
-		tp->th_msg[msglen - 1] = '\0';
-#endif
 	}
 	length = strlen(tp->th_msg);
 	msglen = &tp->th_msg[length + 1] - buf;
@@ -823,14 +813,8 @@ verifyhost(fromp)
 {
 	static char hbuf[MAXHOSTNAMELEN];
 
-	if (getnameinfo(fromp, fromp->sa_len, hbuf, sizeof(hbuf), NULL, 0, 0)) {
-#if 0
+	if (getnameinfo(fromp, fromp->sa_len, hbuf, sizeof(hbuf), NULL, 0, 0))
 		strlcpy(hbuf, "?", sizeof(hbuf));
-#else
-		strncpy(hbuf, "?", sizeof(hbuf) - 1);
-		hbuf[sizeof(hbuf) - 1] = '\0';
-#endif
-	}
 	return hbuf;
 }
 

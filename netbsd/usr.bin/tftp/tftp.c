@@ -393,20 +393,10 @@ nak(error, peer)
 			break;
 	if (pe->e_code < 0) {
 		tp->th_code = EUNDEF;
-#if 0
 		strlcpy(tp->th_msg, strerror(error - 100), msglen);
-#else
-		strncpy(tp->th_msg, strerror(error - 100), msglen - 1);
-		tp->th_msg[msglen - 1] = '\0';
-#endif
 	} else {
 		tp->th_code = htons((u_short)error);
-#if 0
 		strlcpy(tp->th_msg, pe->e_msg, msglen);
-#else
-		strncpy(tp->th_msg, pe->e_msg, msglen - 1);
-		tp->th_msg[msglen - 1] = '\0';
-#endif
 	}
 	length = strlen(tp->th_msg);
 	msglen = &tp->th_msg[length + 1] - ackbuf;
