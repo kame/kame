@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.57 2000/05/09 14:26:28 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.58 2000/05/25 06:43:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -458,12 +458,33 @@ in6_ifattach_addaddr(ifp, ia)
 	}
 
 	/* add route to the interface. */
-	rtrequest(RTM_ADD,
-		  (struct sockaddr *)&ia->ia_addr,
-		  (struct sockaddr *)&ia->ia_addr,
-		  (struct sockaddr *)&ia->ia_prefixmask,
-		  RTF_UP | rtflag,
-		  (struct rtentry **)0);
+	{
+		int e;
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+		struct rt_addrinfo info;
+#endif
+
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+		bzero(&info, sizeof(info));
+		info.rti_info[RTAX_DST] = (struct sockaddr *)&ia->ia_addr;
+		info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)&ia->ia_addr;
+		info.rti_info[RTAX_NETMASK] =
+			(struct sockaddr *)&ia->ia_prefixmask;
+		info.rti_info[RTAX_IFA] = (struct sockaddr *)&ia->ia_addr;
+		info.rti_flags = RTF_UP | rtflag;
+		e = rtrequest1(RTM_ADD, &info, NULL);
+#else
+		e = rtrequest(RTM_ADD,
+			      (struct sockaddr *)&ia->ia_addr,
+			      (struct sockaddr *)&ia->ia_addr,
+			      (struct sockaddr *)&ia->ia_prefixmask,
+			      RTF_UP | rtflag,
+			      (struct rtentry **)0);
+#endif
+		if (e) {
+			printf("in6_ifattach_addaddr: rtrequest failed. errno = %d\n", e);
+		}
+	}
 	ia->ia_flags |= IFA_ROUTE;
 
 	if ((rtflag & RTF_CLONING) != 0 &&
@@ -526,6 +547,10 @@ in6_ifattach_linklocal(ifp, altifp)
 	bzero(&ia->ia_prefixmask, sizeof(ia->ia_prefixmask));
 	ia->ia_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
 	ia->ia_prefixmask.sin6_family = AF_INET6;
+#ifdef SCOPEDROUTING
+	/* take into accound the sin6_scope_id field for routing */
+	ia->ia_prefixmask.sin6_scope_id = 0xffffffff;
+#endif
 	ia->ia_prefixmask.sin6_addr = in6mask64;
 
 	/* just in case */
@@ -551,6 +576,10 @@ in6_ifattach_linklocal(ifp, altifp)
 			return -1;
 		}
 	}
+#ifdef SCOPEDROUTING
+	ia->ia_addr.sin6_scope_id = in6_addr2scopeid(ifp,
+						     &ia->ia_addr.sin6_addr);
+#endif
 
 	ia->ia_ifa.ifa_metric = ifp->if_metric;
 
@@ -671,6 +700,9 @@ in6_ifattach(ifp, altifp)
 		icmp6_ifstatmax = if_indexlim;
 	}
 
+	/* initialize scope identifiers */
+	scope6_ifattach(ifp);
+
 	/*
 	 * quirks based on interface type
 	 */
@@ -781,12 +813,27 @@ in6_ifattach(ifp, altifp)
 
 		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
 		if (in6m == NULL) {
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+			struct rt_addrinfo info;
+
+			bzero(&info, sizeof(info));
+			info.rti_info[RTAX_DST] = (struct sockaddr *)&mltaddr;
+			info.rti_info[RTAX_GATEWAY] =
+				(struct sockaddr *)&ia->ia_addr;
+			info.rti_info[RTAX_NETMASK] =
+				(struct sockaddr *)&mltmask;
+			info.rti_info[RTAX_IFA] =
+				(struct sockaddr *)&ia->ia_addr;
+			info.rti_flags = RTF_UP | RTF_CLONING; /* XXX(why?) */
+			rtrequest1(RTM_ADD, &info, NULL);
+#else
 			rtrequest(RTM_ADD,
 				  (struct sockaddr *)&mltaddr,
 				  (struct sockaddr *)&ia->ia_addr,
 				  (struct sockaddr *)&mltmask,
 				  RTF_UP|RTF_CLONING,  /* xxx */
 				  (struct rtentry **)0);
+#endif
 			(void)in6_addmulti(&mltaddr.sin6_addr, ifp, &error);
 		}
 
@@ -830,9 +877,6 @@ statinit:;
 
 	/* initialize NDP variables */
 	nd6_ifattach(ifp);
-
-	/* initialize scope identifiers */
-	scope6_ifattach(ifp);
 }
 
 /*
