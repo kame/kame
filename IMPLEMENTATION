@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.352 2003/08/06 23:40:33 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.353 2003/09/09 11:22:42 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1294,8 +1294,8 @@ On the contrary, XNET draft defines as follows:
 		/* and bunch of padding */
 	};
 
-In December 1999, it was agreed that RFC2553bis should pick the latter (XNET)
-definition.
+In December 1999, it was agreed that RFC2553bis (RFC3493) should pick the
+latter (XNET) definition.
 
 KAME kit prior to December 1999 used RFC2553 definition.  KAME kit after
 December 1999 (including December) will conform to XNET definition,

@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$KAME: PORTABILITY,v 1.67 2002/06/11 03:03:21 jinmei Exp $
+	$KAME: PORTABILITY,v 1.68 2003/09/09 11:22:42 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -224,8 +224,8 @@ across those possibilities.
   into __ss_len, or (2) never touch __ss_len.  cast to sockaddr * and use
   sa_len.
 
-  Next version of RFC2553 (RFC2553bis) will define ss_len (not __ss_len),
-  and be synchronized better with X/Open document.
+  Next version of RFC2553 (RFC2553bis = RFC3493) will define ss_len (not
+  __ss_len), and be synchronized better with X/Open document.
 
 - Never, never touch the __u6_addr{,8,16,32} member in struct in6_addr
   directly.  Symbols starting with "__" are NOT supposed to be used.

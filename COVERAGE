@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.132 2003/04/09 08:21:41 suz Exp $
+$KAME: COVERAGE,v 1.133 2003/09/09 11:22:42 itojun Exp $
 
 
 x: supported/integrated
@@ -194,7 +194,7 @@ IPV6_V6ONLY	x	x	-	x	-	-	x	-
 getaddrinfo obeys configured resolv order
 		(+)	x	x	x	x	x	x	-
 
-getaddrinfo supports AI_ADDRCONFIG (2553bis)
+getaddrinfo supports AI_ADDRCONFIG (RFC3493)
 		-	-	-	x	-	-	x	-
     (*1) enabled by default, cannot turn it off
 
@@ -208,7 +208,7 @@ getnameinfo uses addr%numeric for scopeid > maxifindex
 getnameinfo, 2nd arg type is socklen_t
 		x	x	x	x	x	x	x	-
 
-getnameinfo uses EAI_xx as return value (2553bis)
+getnameinfo uses EAI_xx as return value (RFC3493)
 		x	x	x	x	x	x	x	-
 
 getnameinfo always return a string with scope
