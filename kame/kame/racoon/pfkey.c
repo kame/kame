@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.59 2000/07/04 00:53:26 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.60 2000/07/05 04:23:33 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -234,7 +234,8 @@ pfkey_dump_sadb(satype)
 
 	if ((s = pfkey_open()) < 0) {
 		plog(logp, LOCATION, NULL,
-			"libipsec failed pfkey open (%s)", ipsec_strerror());
+			"ERROR: libipsec failed pfkey open: %s\n",
+			ipsec_strerror());
 		return NULL;
 	}
 
@@ -242,7 +243,7 @@ pfkey_dump_sadb(satype)
 		plog(logp, LOCATION, NULL, "call pfkey_send_dump\n"););
 	if (pfkey_send_dump(s, satype) < 0) {
 		plog(logp, LOCATION, NULL,
-			"libipsec failed dump (%s)\n", ipsec_strerror());
+			"ERROR: libipsec failed dump: %s\n", ipsec_strerror());
 		goto fail;
 	}
 
