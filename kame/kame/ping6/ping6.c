@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.101 2000/11/24 11:00:59 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.102 2000/11/28 08:33:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -216,6 +216,8 @@ int ident;			/* process id to identify our packets */
 u_int8_t nonce[8];		/* nonce field for node information */
 struct in6_addr srcaddr;
 int hoplimit = -1;		/* hoplimit */
+int pathmtu = 0;		/* path MTU for the destination.
+				   0 means unspecified. */
 
 /* counters */
 long npackets;			/* max packets to transmit */
@@ -244,6 +246,8 @@ char *scmsg = 0;
 int	 main __P((int, char *[]));
 void	 fill __P((char *, char *));
 int	 get_hoplim __P((struct msghdr *));
+int	 get_pathmtu __P((struct msghdr *));
+void	 set_pathmtu __P((int));
 struct in6_pktinfo *get_rcvpktinfo __P((struct msghdr *));
 void	 onalrm __P((int));
 void	 oninfo __P((int));
@@ -621,7 +625,15 @@ main(argc, argv)
 				&optval, sizeof(optval)) == -1)
 			err(1, "setsockopt(IPV6_USE_MIN_MTU)");
 	}
-#endif
+#ifdef IPV6_RECVPATHMTU
+	else {
+		optval = 1;
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVPATHMTU,
+			       &optval, sizeof(optval)) == -1)
+			err(1, "setsockopt(IPV6_RECVPATHMTU)");
+	}
+#endif /* IPV6_RECVPATHMTU */
+#endif /* IPV6_USE_MIN_MTU */
 
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
@@ -990,8 +1002,29 @@ main(argc, argv)
 			warn("recvmsg");
 			continue;
 		}
+		else if (cc == 0) {
+			int mtu;
 
-		pr_pack(packet, cc, &m);
+			/*
+			 * receive control messages only. Process the
+			 * exceptions (currently the only possiblity is
+			 * a path MTU notification.)
+			 */
+			if ((mtu = get_pathmtu(&m)) > 0) {
+				if ((options & F_VERBOSE) != 0) {
+					printf("new path MTU (%d) is "
+					       "notified\n", mtu);
+				}
+				set_pathmtu(mtu);
+			}
+			continue;
+		}
+		else {
+			/*
+			 * an ICMPv6 message (probably an echoreply) arrived.
+			 */
+			pr_pack(packet, cc, &m);
+		}
 		if (npackets && nreceived >= npackets)
 			break;
 	}
@@ -1808,6 +1841,9 @@ get_hoplim(mhdr)
 
 	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(mhdr); cm;
 	     cm = (struct cmsghdr *)CMSG_NXTHDR(mhdr, cm)) {
+		if (cm->cmsg_len == 0)
+			return(-1);
+
 		if (cm->cmsg_level == IPPROTO_IPV6 &&
 		    cm->cmsg_type == IPV6_HOPLIMIT &&
 		    cm->cmsg_len == CMSG_LEN(sizeof(int)))
@@ -1825,6 +1861,9 @@ get_rcvpktinfo(mhdr)
 
 	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(mhdr); cm;
 	     cm = (struct cmsghdr *)CMSG_NXTHDR(mhdr, cm)) {
+		if (cm->cmsg_len == 0)
+			return(NULL);
+
 		if (cm->cmsg_level == IPPROTO_IPV6 &&
 		    cm->cmsg_type == IPV6_PKTINFO &&
 		    cm->cmsg_len == CMSG_LEN(sizeof(struct in6_pktinfo)))
@@ -1832,6 +1871,109 @@ get_rcvpktinfo(mhdr)
 	}
 
 	return(NULL);
+}
+
+int
+get_pathmtu(mhdr)
+	struct msghdr *mhdr;
+{
+#ifdef IPV6_RECVPATHMTU
+	struct cmsghdr *cm;
+	struct ip6_mtuinfo *mtuctl = NULL;
+
+	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(mhdr); cm;
+	     cm = (struct cmsghdr *)CMSG_NXTHDR(mhdr, cm)) {
+		if (cm->cmsg_len == 0)
+			return(0);
+
+		if (cm->cmsg_level == IPPROTO_IPV6 &&
+		    cm->cmsg_type == IPV6_PATHMTU &&
+		    cm->cmsg_len == CMSG_LEN(sizeof(struct ip6_mtuinfo))) {
+			mtuctl = (struct ip6_mtuinfo *)CMSG_DATA(cm);
+
+			/*
+			 * If the notified destination is different from
+			 * the one we are pinging, just ignore the info.
+			 * We check the scope ID only when both notified value
+			 * and our own value has non-0 value, because we may
+			 * have used the default scope zone ID for sending,
+			 * in which case the scope ID value is 0.
+			 */
+			if (!IN6_ARE_ADDR_EQUAL(&mtuctl->ip6m_addr.sin6_addr,
+						&dst.sin6_addr) ||
+			    (mtuctl->ip6m_addr.sin6_scope_id &&
+			     dst.sin6_scope_id &&
+			     mtuctl->ip6m_addr.sin6_scope_id !=
+			     dst.sin6_scope_id))
+				return(0);
+
+			/*
+			 * Ignore an invalid MTU. XXX: can we just believe
+			 * the kernel check?
+			 */
+			if (mtuctl->ip6m_mtu < IPV6_MMTU)
+				return(0);
+
+			/* notification for our destination. return the MTU. */
+			return((int)mtuctl->ip6m_mtu);
+		}
+	}
+#endif
+	return(0);
+}
+
+void
+set_pathmtu(mtu)
+	int mtu;
+{
+#ifdef IPV6_USE_MTU
+	static int firsttime = 1;
+	struct cmsghdr *cm;
+
+	if (firsttime) {
+		int oldlen = smsghdr.msg_controllen;
+		char *oldbuf = smsghdr.msg_control;
+
+		/* XXX: We need to enlarge control message buffer */
+		firsttime = 0;	/* prevent further enlargement */
+
+		smsghdr.msg_controllen = oldlen + CMSG_SPACE(sizeof(int));
+		if ((smsghdr.msg_control =
+		     (char *)malloc(smsghdr.msg_controllen)) == NULL)
+			err(1, "set_pathmtu: malloc");
+		cm = (struct cmsghdr *)CMSG_FIRSTHDR(&smsghdr);
+		cm->cmsg_len = CMSG_LEN(sizeof(int));
+		cm->cmsg_level = IPPROTO_IPV6;
+		cm->cmsg_type = IPV6_USE_MTU;
+
+		cm = (struct cmsghdr *)CMSG_NXTHDR(&smsghdr, cm);
+		if (oldlen)
+			memcpy((void *)cm, (void *)oldbuf, oldlen);
+
+		free(oldbuf);
+	}
+
+	/*
+	 * look for a cmsgptr that points MTU structure.
+	 * XXX: this procedure seems redundant at this moment, but we'd better
+	 * keep the code generic enough for future extensions.
+	 */
+	for (cm = CMSG_FIRSTHDR(&smsghdr); cm;
+	     cm = (struct cmsghdr *)CMSG_NXTHDR(&smsghdr, cm)) {
+		if (cm->cmsg_len == 0) /* XXX: paranoid check */
+			errx(1, "set_pathmtu: internal error");
+
+		if (cm->cmsg_level == IPPROTO_IPV6 &&
+		    cm->cmsg_type == IPV6_USE_MTU &&
+		    cm->cmsg_len == CMSG_LEN(sizeof(int)))
+			break;
+	}
+
+	if (cm == NULL)
+		errx(1, "set_pathmtu: internal error: no space for path MTU");
+
+	*(int *)CMSG_DATA(cm) = mtu;
+#endif
 }
 
 /*
