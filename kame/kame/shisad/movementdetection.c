@@ -1,4 +1,4 @@
-/*      $Id: movementdetection.c,v 1.2 2005/01/25 11:41:11 ryuji Exp $  */
+/*      $Id: movementdetection.c,v 1.3 2005/01/26 04:47:53 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -72,20 +72,22 @@ void mdd_reset();
 void mdd_getifinfo(struct if_info *);
 void mdd_selection();
 int mdd_checklink();
+
 int mdd_rtmsg(struct rt_msghdr *, int);
+int mdd_mipmsg(struct mip_msghdr *, int);
 
 static void mdd_initif();
 static int mdd_md_scan(struct if_info *);
 static int mdd_md_reg(struct sockaddr_in6 *, u_int16_t);
 static void mdd_md_dereg(struct if_info *);
 static void mdd_md_home(struct sockaddr_in6 *, struct sockaddr_in6 *, int);
-int mdd_mipmsg(struct mip_msghdr *, int);
 
-void get_rtaddrs(int, struct sockaddr *, struct sockaddr **);
-int mdd_coa_equal(struct if_info *);
-int send_rs(struct if_info  *);
 
-int in6_addrscope(struct in6_addr *);
+static void get_rtaddrs(int, struct sockaddr *, struct sockaddr **);
+static int mdd_coa_equal(struct if_info *);
+static int send_rs(struct if_info  *);
+
+static int in6_addrscope(struct in6_addr *);
 static struct if_info *mdd_ifindex2ifinfo(u_int16_t);
 
 
@@ -166,7 +168,7 @@ main (argc, argv)
 	}
 
         /* open syslog */
-        openlog("shisad(mdd)", 0, LOG_DAEMON);
+        openlog("shisad(move)", 0, LOG_DAEMON);
         syslog(LOG_INFO, "Let's start moving\n");
 
 	/* mdd initialization */
@@ -543,7 +545,12 @@ mdd_rtmsg(rtm, msglen)
 				syslog(LOG_INFO, "%s becomes invalid\n", 
 				       ip6_sprintf(&sin6->sin6_addr));
 
-			/* when home address is deleted, it assumes moving out from home */
+			/* 
+			 * when a home address is deleted, it assumes
+			 * moving out from home. If a home address is
+			 * detached, we use the same code. see
+			 * ADDRINFO case.
+			 */
 			if (mddinfo.whereami == IAMHOME) {
 				if ((ifinfo == mddinfo.coaif) && 
 				    (mip6_are_prefix_equal(&mddinfo.hoa, 
@@ -558,25 +565,37 @@ mdd_rtmsg(rtm, msglen)
 			}
 			
 			if (mddinfo.multiplecoa) { 
+				/* 
+				 * multiplecoa is supported, invalid
+				 * CoA should be explicitly
+				 * deregistered.
+				 */
 				if (IN6_ARE_ADDR_EQUAL(
 					    &storage2sin6(&ifinfo->coa)->sin6_addr, 
 					    &sin6->sin6_addr)) {
-					if (mddinfo.multiplecoa) 
-						mdd_md_dereg(ifinfo);
-				
+
+					mdd_md_dereg(ifinfo);
 				} 
 				memset(&ifinfo->coa, 0, sizeof(ifinfo->coa));
 			} else {
 				if (mddinfo.coaif == ifinfo) {
+					/* remove the primary CoA */
 					mddinfo.coaif = NULL;
 
+					/* 
+					 * if a different CoA becomes
+					 * invalid, getting a new
+					 * coa 
+					 */
                                 	if (mddinfo.whereami != IAMHOME && 
 					    IN6_ARE_ADDR_EQUAL(&storage2sin6(&ifinfo->coa)->sin6_addr,
 						    &sin6->sin6_addr)) {
+
 						mdd_getifinfo(ifinfo); 	
 					} 
 				} else {
 					memset(&ifinfo->coa, 0, sizeof(ifinfo->coa));
+					mdd_getifinfo(ifinfo); 	
 				}
 			}
 			break;
@@ -602,35 +621,45 @@ mdd_rtmsg(rtm, msglen)
 
 		sin6 = (struct sockaddr_in6 *) rti_info[RTAX_IFA];
 		
-		/* Detached address must be global */
+		/* The detached address must be global */
 		if (in6_addrscope(&sin6->sin6_addr) !=  
 		    __IPV6_ADDR_SCOPE_GLOBAL) 
 			break;
 
+		/* retrieving flags */
 		memset(&ifr6, 0, sizeof(ifr6));
 		ifr6.ifr_addr = *sin6;
 		strncpy(ifr6.ifr_name, ifinfo->ifname, strlen(ifinfo->ifname));
 		if (ioctl(mddinfo.linksock, SIOCGIFAFLAG_IN6, &ifr6) < 0) 
 			break;
 
-		/* address is now detached from the link, send
-		 *  deregfromforeign to mnd 
+		/* 
+		 * When the address is detached, send dereg from
+		 * foreign. 
 		 */
 		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DETACHED) {
 			if (DEBUGHIGH)
 				syslog(LOG_INFO, "%s is detached\n", 
 				       ip6_sprintf(&sin6->sin6_addr)); 
 
+			/* 
+			 * The HoA is removed by mnd. Otherwise, it
+			 * removes the detached address from the
+			 * interface.
+			 */
 			if (!IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &mddinfo.hoa)) 
 				delete_ip6addr(ifinfo->ifname, &sin6->sin6_addr, 128);
 			else {
-
+				/* 
+				 * when the HoA is detached, it
+				 * assumes moving out from the home 
+				 */
 				memset(&ifinfo->coa, 0, 
 				       sizeof(ifinfo->coa));
 				memset(&ifinfo->pcoa, 0, 
 				       sizeof(ifinfo->coa));
 				mddinfo.whereami = 0; /* reset */
-
+				
 				mdd_getifinfo(ifinfo);
 
 				return (1);
@@ -853,7 +882,7 @@ mdd_initif() {
 	return;
 }
 
-int
+static int
 in6_addrscope(addr)
 	struct in6_addr *addr;
 {
@@ -917,8 +946,7 @@ in6_addrscope(addr)
 #define ROUNDUP(a, size)                                        \
 	(((a) & ((size)-1)) ? (1+((a) | ((size)-1))) : (a))
 
-
-int
+static int
 next_sa(sa)
         struct sockaddr *sa;
 {
@@ -930,7 +958,7 @@ next_sa(sa)
 }
 
 
-void
+static void
 get_rtaddrs(addrs, sa, rti_info)
         int addrs;
         struct sockaddr *sa;
@@ -988,7 +1016,6 @@ mdd_getifinfo(ifinfo)
 		return;
 	}
  
-/*	memcpy(&ifinfo->pcoa, &ifinfo->coa, sizeof(ifinfo->coa));*/
 	memset(&ifinfo->coa, 0, sizeof(ifinfo->coa));
         
 	limit = ifmsg +  len;
@@ -1037,7 +1064,7 @@ mdd_getifinfo(ifinfo)
 
 	if (!ifinfo->ipv4) {
 		if (DEBUGNORM)
-			fprintf(stderr, "%s is ipv4 inactive\n", ifinfo->ifname);
+			syslog(LOG_INFO, "%s is ipv4 inactive\n", ifinfo->ifname);
 		return;
 	}
 
@@ -1105,19 +1132,24 @@ mdd_selection() {
 			break;
 		}
 	}
+
+/*
 	if (DEBUGHIGH)
 		fprintf(stderr, "%s: v4 %d v6 %d\n", __FUNCTION__, inet_n, inet6_n);
-
+*/
 	if (mddinfo.whereami == IAMHOME) {
 		/* 
-		 * if movement detection to home link message is not
-		 * sent to mobile network daemon, it must send it
-		 * here. Otherwise, it verifies whether home address
-		 * attached to the physical link is active or not. If
-		 * it's active, do nothing. If it becomes inactive, it
-		 * re-selects a CoA and moves to foreign link!. 
+		 * when it moves to home but the primary CoA is not
+		 * set, it sends MD_INFO message indicating home. If
+		 * the primary CoA is already set, do nothing. MR
+		 * being home, the coa can be changed to other than
+		 * home address (ex. an address auto-configured at the
+		 * home link), but it does not matter whether coa is
+		 * the home address or not. Only when the home address
+		 * is detached/deleted, mdd_selection() starts to
+		 * select other address as a primary CoA and marks
+		 * foreign. 
 		 */
-
 		
 		for (ifinfo = LIST_FIRST(&mddinfo.ifinfo_head); 
 		     ifinfo; ifinfo = ifinfo_next) {
@@ -1128,11 +1160,9 @@ mdd_selection() {
 				break;
 		}
 		if (ifinfo && mddinfo.coaif != ifinfo) {
-
-			/* send return home message to mobile network */
-			return mdd_md_home(storage2sin6(&ifinfo->coa), 
-					   storage2sin6(&ifinfo->coa), 
-					   ifinfo->ifindex);
+			mdd_md_home(storage2sin6(&ifinfo->coa), 
+				    storage2sin6(&ifinfo->coa), 
+				    ifinfo->ifindex);
 		}
 
 		return;
@@ -1180,20 +1210,36 @@ mdd_selection() {
 	} else { /* regular Mobile IPv6 */
 		if (inet6_n > 0) {
 			if (mddinfo.whereami == IAMV4) {
-				/* XXX dereg v4 */
+				/* XXX deregistration for v4 address */
 			}
 
-			/* send the first IF v6 CoA*/
+			/* pick a primary CoA from the first matched interface */
 			for (ifinfo = LIST_FIRST(&mddinfo.ifinfo_head); 
 			     ifinfo; ifinfo = ifinfo_next) {
 				ifinfo_next = LIST_NEXT(ifinfo, ifinfo_entry);
 
 				if (ifinfo->coa.ss_family != AF_INET6) 
 					continue;
+
+				/* 
+				 * when the primray coa is not set or
+				 * the priority of the primary coa is
+				 * lower than the one of the active
+				 * interface (ifinfo), trigger
+				 * movement detection to other daemons
+				 */
+				if (((mddinfo.coaif == NULL) || 
+				     (mddinfo.coaif && 
+				      mddinfo.coaif->priority <= ifinfo->priority)) 
+				    && !mdd_coa_equal(ifinfo)) {
+
+/*
 				if ((((mddinfo.coaif == NULL) && !mdd_coa_equal(ifinfo)) 
 				     || 
-				     (mddinfo.coaif && mddinfo.coaif->priority <= 
-				      ifinfo->priority && !mdd_coa_equal(ifinfo)))) {
+				     (mddinfo.coaif && 
+				      mddinfo.coaif->priority <= ifinfo->priority && 
+				      !mdd_coa_equal(ifinfo)))) {
+*/
 
 					mdd_md_reg((struct sockaddr_in6 *)&ifinfo->coa, 0); 
 					memcpy(&ifinfo->pcoa, &ifinfo->coa, 
@@ -1238,7 +1284,7 @@ mdd_selection() {
 }
 
 
-int
+static int
 mdd_coa_equal(struct if_info *ifinfo) {
 
 	if ((ifinfo->coa.ss_family != 0) && 
@@ -1265,7 +1311,7 @@ mdd_coa_equal(struct if_info *ifinfo) {
 	return (0);
 };
 
-int
+static int
 send_rs(struct if_info  *ifinfo) {
         struct msghdr msg;
         struct iovec iov;
@@ -1419,7 +1465,7 @@ mdd_md_dereg(struct if_info *dereg_ifinfo) {
 		    __IPV6_ADDR_SCOPE_GLOBAL) 
 			continue;
 
-		fprintf(stderr, "send dereg from address is %s\n", 
+		syslog(LOG_INFO, "send dereg from address is %s\n", 
 			ip6_sprintf(&storage2sin6(&ifinfo->coa)->sin6_addr));
 
                 /* mdinfo + hoa + newcoa + deregcoa */
@@ -1485,5 +1531,3 @@ mdd_ifindex2ifinfo(u_int16_t ifindex) {
 
 	return ifinfo;
 }
-
-
