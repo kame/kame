@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2257 2002/10/20 08:27:17 jinmei Exp $
+$KAME: CHANGELOG,v 1.2258 2002/10/22 02:00:00 suz Exp $
 
 <200210>
+Tue Oct 22 10:54:38 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/in6_msf.[ch], ip6_output.c: fixed a kernel crash
+	occuring when specifying multiple source addresses in MLDv2-API
+
 Fri Oct 18 18:57:42 JST 2002	suz@crl.hitachi.co.jp
 	* kame/freebsd4/ports/{ct,v6eval}: updated to ver 2.0.
 
