@@ -1,3 +1,0 @@
-@comment $NetBSD$
-sbin/totd
-etc/totd.conf.sample
