@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.38 2002/12/09 06:28:12 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.39 2002/12/16 04:37:36 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -107,6 +107,8 @@ struct fragment	*natpt_internFragment4	__P((struct pcv *, struct tSlot *));
 struct tSlot	*natpt_lookForFragment6	__P((struct pcv *));
 struct tSlot	*natpt_lookForFragment4	__P((struct pcv *));
 void		 natpt_removeFragmentEntry __P((struct fragment *));
+
+int		 natpt_sessions		__P((caddr_t));
 
 void		 natpt_init_tslot	__P((void));
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_usrreq.c,v 1.25 2002/12/09 06:28:12 fujisawa Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.26 2002/12/16 04:37:36 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -35,6 +35,7 @@
 
 #include <sys/param.h>
 #include <sys/domain.h>
+#include <sys/errno.h>
 #include <sys/ioccom.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -347,6 +348,9 @@ natpt_control(struct socket *so, int cmd, caddr_t data, struct ifnet *ifp)
 
 	case NATPT_TESTLOG:
 		return (natpt_testLog(data));
+
+	case NATPT_SESSIONS:
+		return (natpt_sessions(data));
 
 	case NATPT_BREAK:
 		return (natpt_break(__FUNCTION__));

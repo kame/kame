@@ -1,4 +1,4 @@
-/*	$KAME: showvar.h,v 1.12 2002/05/17 05:56:39 fujisawa Exp $	*/
+/*	$KAME: showvar.h,v 1.13 2002/12/16 04:41:19 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -30,6 +30,7 @@
  */
 
 void		showRules		__P((int));
+void		showSessions		__P((void));
 void		showXlate		__P((int, int));
 void		writeXlateHeader	__P((int));
 void		showTimer		__P((void));

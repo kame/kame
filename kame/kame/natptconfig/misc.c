@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.28 2002/05/30 06:42:44 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.29 2002/12/16 04:41:19 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -337,6 +337,23 @@ testLog(char *str)
 
 	if (soctl(sfd, NATPT_TESTLOG, &mBox) < 0)
 		soctlFailure(fn);
+}
+
+
+int
+readSessions(struct sessions *sess)
+{
+	struct natpt_msgBox mBox;
+
+	bzero(&mBox, sizeof(struct natpt_msgBox));
+
+	mBox.size = sizeof(struct sessions);
+	mBox.freight = (caddr_t)sess;
+
+	if (soctl(sfd, NATPT_SESSIONS, &mBox) < 0)
+		soctlFailure(__FUNCTION__);
+
+	return (1);
 }
 
 

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.35 2002/06/28 02:27:44 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.36 2002/12/16 04:41:19 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -136,6 +136,7 @@ yyerror(char *msg, ...)
 %token		SPROTO
 %token		SRENUM
 %token		SRULES
+%token		SSESSIONS
 %token		SSET
 %token		SSHORT
 %token		SSHOW
@@ -416,6 +417,8 @@ show
 		    { showVariable(NATPTCTL_PREFIX); }
 		| SSHOW SRULES opt_cui
 		    { showRules($3); }
+		| SSHOW SSESSIONS
+		    { showSessions(); }
 		| SSHOW STIMER
 		    { showTimer(); }
 		| SSHOW STTL

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.68 2002/12/09 08:21:27 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.69 2002/12/16 04:37:36 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -52,6 +52,7 @@
 #include <netinet/udp.h>
 
 #include <netinet6/natpt_defs.h>
+#include <netinet6/natpt_soctl.h>
 #include <netinet6/natpt_var.h>
 
 
@@ -939,6 +940,53 @@ natpt_hashPJW(u_char *s, int len)
 	}
 
 	return (h % NATPTHASHSZ);
+}
+
+
+/*
+ *
+ */
+
+int
+natpt_sessions(caddr_t addr)
+{
+	struct natpt_msgBox	*mbox = (struct natpt_msgBox *)addr;
+
+	int		 s;
+	struct tSlot	*tsl;
+	struct tcpstate	*ts;
+	struct sessions	 sess;
+
+	if (mbox->size < sizeof(struct sessions))
+		return (ERANGE);
+
+	bzero(&sess, sizeof(struct sessions));
+
+	s = splnet();
+	for (tsl = TAILQ_FIRST(&tsl_head); tsl; tsl = TAILQ_NEXT(tsl, tsl_list)) {
+		switch (tsl->ip_p) {
+		case IPPROTO_ICMP:
+		case IPPROTO_ICMPV6:
+			sess.icmp++;
+			break;
+
+		case IPPROTO_UDP:
+			sess.udp++;
+			break;
+
+		case IPPROTO_TCP:
+			sess.tcp++;
+			if ((ts = tsl->suit.tcps) != NULL) {
+				sess.tcps[ts->state]++;
+			}
+			break;
+		}
+	}
+	splx(s);
+
+	copyout(&sess, mbox->freight, sizeof(struct sessions));
+
+	return (0);
 }
 
 

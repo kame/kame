@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.62 2002/12/11 12:06:10 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.63 2002/12/16 04:37:36 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -369,4 +369,13 @@ struct tcpstate {
 	 */
 	caddr_t		pkthdr[2];	/* [0]: "local"  -> "remote" */
 					/* [1]: "remote" -> "local"  */
+};
+
+
+struct sessions {
+	u_int		tcp;
+	u_int		tcps[11];	/* TCP_NSTATES */
+	u_int		udp;
+	u_int		icmp;
+	u_int		others;
 };

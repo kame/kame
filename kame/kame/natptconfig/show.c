@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.33 2002/12/09 09:57:22 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.34 2002/12/16 04:41:19 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -47,6 +47,8 @@
 #include <netinet/in_systm.h>
 #include <netinet/ip6.h>
 
+#include <netinet/tcp_fsm.h>
+
 #include <arpa/inet.h>
 
 #include <netinet6/natpt_defs.h>
@@ -77,6 +79,9 @@ void		 makeCUILine	__P((char *, int, struct cSlot *));
 void		 makeTSlotLine	__P((char *, int, struct tSlot *,
 				     struct tcpstate *, int));
 void		 showVariableSubsid __P((int, int));
+
+/* in misc.c */
+int		 readSessions		__P((struct sessions *));
 
 
 /*
@@ -127,6 +132,30 @@ showRules(int cui)
 			break;
 		readKvm(&csl, sizeof(struct cSlot), TAILQ_NEXT(&csl, csl_list));
 	}
+}
+
+
+void
+showSessions()
+{
+	struct sessions	sess;
+
+	if (readSessions(&sess) == 0)
+		return ;
+
+	printf("proto:    count    close    estab      fin      syn\n");
+
+	printf("%5s:", "tcp");
+	printf("%9d", sess.tcp);
+	printf("%9d", sess.tcps[TCPS_CLOSED]);
+	printf("%9d", sess.tcps[TCPS_ESTABLISHED]);
+	printf("%9d", sess.tcps[TCPS_FIN_WAIT_1]);
+	printf("%9d", sess.tcps[TCPS_SYN_SENT]);
+	printf("\n");
+
+	printf("%5s:%9d\n", "udp", sess.udp);
+	printf("%5s:%9d\n", "icmp", sess.icmp);
+	printf("%5s:%9d\n", "misc", sess.others);
 }
 
 
