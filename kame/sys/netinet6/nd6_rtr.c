@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.259 2004/07/23 05:53:39 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.260 2004/08/11 07:17:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1005,7 +1005,7 @@ rtpref(struct nd_defrouter *dr)
 		 * serious bug of kernel internal.  We thus always bark here.
 		 * Or, can we even panic?
 		 */
-		log(LOG_ERR, "rtpref: impossible RA flag %x", dr->flags);
+		log(LOG_ERR, "rtpref: impossible RA flag %x\n", dr->flags);
 		return (RTPREF_INVALID);
 	}
 	/* NOTREACHED */
