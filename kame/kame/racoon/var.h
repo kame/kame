@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: var.h,v 1.2 2000/01/09 01:31:34 itojun Exp $ */
+/* YIPS @(#)$Id: var.h,v 1.3 2000/01/10 22:38:40 itojun Exp $ */
 
 #if !defined(_VAR_H_)
 #define _VAR_H_
@@ -63,11 +63,22 @@
 #define INET_NTOP(addr, buf) \
 	inet_ntop(((struct sockaddr *)(addr))->sa_family, _INADDRBYSA(addr), buf, sizeof(buf))
 
+/*
+ * XXX use of GETNAMEINFO(x, y, NULL) is not politically correct,
+ * as sizeof(NULL) would be 4, not 0.
+ */
 #include <sys/socket.h>
 #include <netdb.h>
 #define GETNAMEINFO(x, y, z) \
-	getnameinfo((x), (x)->sa_len, (y), sizeof(y), (z), sizeof(z), \
-		NI_NUMERICHOST | NI_NUMERICSERV)
+do { \
+	if (getnameinfo((x), (x)->sa_len, (y), sizeof(y), (z), sizeof(z), \
+			NI_NUMERICHOST | NI_NUMERICSERV) != 0) { \
+		if (y) \
+			strncpy((y), "(invalid)", sizeof(y)); \
+		if (z) \
+			strncpy((z), "(invalid)", sizeof(z)); \
+	} \
+} while (0);
 
 #include <sys/queue.h>
 #ifndef LIST_FOREACH

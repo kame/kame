@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.c,v 1.1 2000/01/09 01:31:31 itojun Exp $ */
+/* YIPS @(#)$Id: remoteconf.c,v 1.2 2000/01/10 22:38:39 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -80,7 +80,8 @@ getrmconf(remote)
 	struct remoteconf *p;
 	struct remoteconf *anon = NULL;
 	int withport = 0;
-	char buf[BUFADDRSIZE], addr[BUFADDRSIZE], port[10];	/* for log */
+	char buf[NI_MAXHOST + NI_MAXSERV + 10];
+	char addr[NI_MAXHOST], port[NI_MAXSERV];
 
 	if (_INPORTBYSA(remote) != IPSEC_PORT_ANY)
 		withport = 1;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.c,v 1.2 2000/01/10 16:02:15 itojun Exp $ */
+/* YIPS @(#)$Id: sockmisc.c,v 1.3 2000/01/10 22:38:40 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -548,7 +548,7 @@ saddr2str(saddr)
 	struct sockaddr *saddr;
 {
 	static char buf[BUFADDRSIZE];
-	char addr[BUFADDRSIZE], port[BUFADDRSIZE];
+	char addr[NI_MAXHOST], port[NI_MAXSERV];
 
 	if (saddr == NULL)
 		return NULL;
@@ -564,7 +564,7 @@ saddrwop2str(saddr)
 	struct sockaddr *saddr;
 {
 	static char buf[BUFADDRSIZE];
-	char addr[BUFADDRSIZE];
+	char addr[NI_MAXHOST];
 
 	if (saddr == NULL)
 		return NULL;

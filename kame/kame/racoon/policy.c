@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.2 2000/01/10 21:25:05 itojun Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.3 2000/01/10 22:38:39 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -72,6 +72,11 @@ int
 cmpspidx(a, b)
 	struct policyindex *a, *b;
 {
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, NULL, "comparing %p and %p\n");
+		plog(logp, LOCATION, NULL, "%p: %s\n", a, spidx2str(a));
+		plog(logp, LOCATION, NULL, "%p: %s\n", b, spidx2str(b)););
+
 	if (a->dir != b->dir
 	 || a->prefs != b->prefs
 	 || a->prefd != b->prefd

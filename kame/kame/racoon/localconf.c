@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.1 2000/01/09 01:31:27 itojun Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.2 2000/01/10 22:38:39 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -113,7 +113,7 @@ getpsk(remote)
 	struct sockaddr *remote;
 {
 	FILE *fp;
-	char addr[BUFADDRSIZE], port[10];
+	char addr[NI_MAXHOST], port[NI_MAXSERV];
 	char buf[1024];	/* XXX how is variable length ? */
 	char *p, *q;
 	vchar_t *key;

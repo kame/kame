@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.21 2000/01/10 21:08:07 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.22 2000/01/10 22:38:38 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1676,7 +1676,7 @@ getname(ap)
 	const u_char *ap;
 {
 	struct sockaddr_in addr;
-	static char ntop_buf[MAXHOSTNAMELEN];
+	static char ntop_buf[NI_MAXHOST];
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_len = sizeof(struct sockaddr_in);
@@ -1698,7 +1698,7 @@ getname6(ap)
 	const u_char *ap;
 {
 	struct sockaddr_in6 addr;
-	static char ntop_buf[MAXHOSTNAMELEN];
+	static char ntop_buf[NI_MAXHOST];
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sin6_len = sizeof(struct sockaddr_in6);
@@ -1720,8 +1720,8 @@ isakmp_printpacket(msg, from, my, decoded)
 {
 	struct timeval tv;
 	int s;
-	char hostbuf[MAXHOSTNAMELEN];
-	char portbuf[MAXHOSTNAMELEN];
+	char hostbuf[NI_MAXHOST];
+	char portbuf[NI_MAXSERV];
 	struct isakmp *isakmp;
 	vchar_t *buf;
 

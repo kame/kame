@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.5 2000/01/09 01:31:27 itojun Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.6 2000/01/10 22:38:38 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -123,7 +123,7 @@ int so;
 char combuf[512];
 
 char *comarg;
-char _addr1_[BUFADDRSIZE], _addr2_[BUFADDRSIZE];
+static char _addr1_[NI_MAXHOST], _addr2_[NI_MAXHOST];
 
 char *pname;
 int long_format = 0;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.c,v 1.2 2000/01/09 21:13:36 itojun Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.c,v 1.3 2000/01/10 22:38:38 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -92,7 +92,7 @@ grab_myaddrs()
 #endif
 
 #if defined(YIPS_DEBUG)
-	char _addr1_[BUFADDRSIZE];
+	char _addr1_[NI_MAXHOST];
 #endif
 
 	maxif = if_maxindex() + 1;

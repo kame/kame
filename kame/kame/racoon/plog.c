@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: plog.c,v 1.1 2000/01/09 01:31:29 itojun Exp $ */
+/* YIPS @(#)$Id: plog.c,v 1.2 2000/01/10 22:38:39 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -73,7 +73,7 @@ plog_common(struct log *lp, const char *func, struct sockaddr *sa)
 	time_t t;
 	char tbuf[56];
 	struct tm *tm;
-	char addr[BUFADDRSIZE], port[BUFADDRSIZE];
+	char addr[NI_MAXHOST], port[NI_MAXSERV];
 
 	t = time(0);
 	tm = localtime(&t);
