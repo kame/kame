@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.71 2001/01/04 06:41:54 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.72 2001/01/24 05:37:39 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1971,7 +1971,8 @@ get_proposal_r(iph2)
 		if (pr || req) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"There is a difference "
-				"between the policies.\n");
+				"between your out-bound policies "
+				"and the policy proposed from the peer.\n");
 			goto err;
 		}
 	}
