@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1987 2001/11/26 11:53:53 jinmei Exp $
+$KAME: CHANGELOG,v 1.1988 2001/11/26 16:56:35 sakane Exp $
 
 <200111>
+Tue Nov 27 01:35:26 JST 2001 sakane@kame.net
+	* kame/kame/racoon:
+	- when racoon receives a IKE packet, it checks the value of the
+	responder's cookie strictly.
+	- fixed to recover the state when a error happens during the phase1
+	negotiation.  the return value was overwritten a illegal value.
+	- added a debugging code to find memory leaks.  two memory leaks
+	have been fixed.
+
 2001-11-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c(ip6_output): initialized the last
 	argument to ip6_process_hopopts(), because the callee requires it
