@@ -102,6 +102,9 @@ int	nd6_mmaxtries	= 3;	/* maximum multicast query */
 int	nd6_useloopback = 1;	/* use loopback interface for local traffic */
 int	nd6_proxyall	= 0;	/* enable Proxy Neighbor Advertisement */
 
+/* preventing too many loops in ND option parsing */
+int nd6_maxndopt = 10;	/* max # of ND options allowed */
+
 /* for debugging? */
 static int nd6_inuse, nd6_allocated;
 
@@ -368,7 +371,8 @@ nd6_options(ndopts)
 
 skip1:
 		i++;
-		if (i > 10) {
+		if (i > nd6_maxndopt) {
+			icmp6stat.icp6s_nd_toomanyopt++;
 			printf("too many loop in nd opt\n");
 			break;
 		}
