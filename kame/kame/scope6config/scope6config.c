@@ -150,6 +150,7 @@ scopeconfig(name, linkid, siteid, orgid)
 
 	putchar('\n');
 
+	close(s);
 	return 0;
 }
 
@@ -174,5 +175,6 @@ print_default()
 
 	putchar('\n');
 
+	close(s);
 	return 0;
 }
