@@ -1,7 +1,17 @@
-$Id: CHANGELOG,v 1.467 2000/01/19 11:54:38 fujisawa Exp $
+$Id: CHANGELOG,v 1.468 2000/01/19 13:13:16 kjc Exp $
 
 
 <200001>
+Wed Jan 19 22:04:22 2000 kjc@csl.sony.co.jp
+	remove ECN support from TCP in freebsd3.
+	it was removed in altq-2.0 and provided as a separate patch.
+
+Wed Jan 19 21:47:19 2000 kjc@csl.sony.co.jp
+	add atm pvc support tools included in the altq release.
+	- pvcsif:    create pvc sub-interface
+	- pvctxctl:  set vpi:vci and shaper
+	- pvcbridge: set pvc bridge mode
+
 Wed Jan 19 20:35:42 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* NAT-PT translator and its command become compilable on
 	  freebsd2, freebsd3, netbsd, and bsdos3.
