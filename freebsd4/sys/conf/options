@@ -247,6 +247,7 @@ MROUTING		opt_mrouting.h
 INET			opt_inet.h
 INET6			opt_inet6.h
 ENABLE_DEFAULT_SCOPE	opt_inet6.h
+IPV6TMPADDR		opt_inet6.h
 MIP6			opt_inet.h
 MIP6_DEBUG		opt_inet.h
 NATPT			opt_natpt.h
