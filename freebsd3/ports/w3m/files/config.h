@@ -55,7 +55,7 @@ GCTARGET=gc/gc.a
 #define DEF_EDITOR "/usr/bin/vi"
 #define DEF_MAILER "/usr/bin/mail"
 #define DEF_EXT_BROWSER "@PREFIX@/bin/netscape"
-#define HELP_FILE "@PREFIX@/lib/w3mhelp.html"
+#define HELP_FILE "@PREFIX@/lib/w3m/w3mhelp.html"
 #define BOOKMARK "~/.w3m/bookmark.html"
 #define KEYMAP_FILE  "~/.w3m/keymap"
 #define MENU_FILE    "~/.w3m/menu"
