@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.32.2.8 2002/03/25 21:37:31 gshapiro Exp $
+# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.32.2.11 2002/07/22 14:21:43 ru Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -20,6 +20,8 @@
         ..
         usb
         ..
+        wi
+        ..
     ..
     fs
         smbfs
@@ -38,6 +40,8 @@
     libmilter
     ..
     machine
+        pc
+        ..
     ..
     msdosfs
     ..
@@ -46,6 +50,14 @@
     netatalk
     ..
     netatm
+        ipatm
+        ..
+        sigpvc
+        ..
+        spans
+        ..
+        uni
+        ..
     ..
     netgraph
     ..
@@ -88,8 +100,6 @@
     rpcsvc
     ..
     security
-    ..
-    ss
     ..
     sys
     ..

@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)route.c	8.6 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/route/route.c,v 1.40.2.7 2002/02/01 11:48:00 ru Exp $";
+  "$FreeBSD: src/sbin/route/route.c,v 1.40.2.9 2002/07/24 12:55:09 ru Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -112,6 +112,9 @@ char	*atalk_ntoa __P((struct at_addr));
 const char	*routename(), *netname();
 void	flushroutes(), newroute(), monitor(), sockaddr(), sodump(), bprintf();
 void	print_getmsg(), print_rtmsg(), pmsg_common(), pmsg_addrs(), mask_addr();
+#ifdef INET6
+static int inet6_makenetandmask __P((struct sockaddr_in6 *, char *));
+#endif
 int	getaddr(), rtmsg(), x25_makemask();
 int	prefixlen();
 extern	char *iso_ntoa();
@@ -775,38 +778,39 @@ newroute(argc, argv)
 	}
 	if (*cmd == 'g')
 		exit(0);
-	oerrno = errno;
-	(void) printf("%s %s %s", cmd, ishost? "host" : "net", dest);
-	if (*gateway) {
-		(void) printf(": gateway %s", gateway);
-		if (attempts > 1 && ret == 0 && af == AF_INET)
-		    (void) printf(" (%s)",
-			inet_ntoa(((struct sockaddr_in *)&route.rt_gateway)->sin_addr));
-	}
-	if (ret == 0) {
-		(void) printf("\n");
-		exit(0);
-	} else {
-		switch (oerrno) {
-		case ESRCH:
-			err = "not in table";
-			break;
-		case EBUSY:
-			err = "entry in use";
-			break;
-		case ENOBUFS:
-			err = "routing table overflow";
-			break;
-		case EDQUOT: /* handle recursion avoidance in rt_setgate() */
-			err = "gateway uses the same route";
-			break;
-		default:
-			err = strerror(oerrno);
-			break;
+	if (!qflag) {
+		oerrno = errno;
+		(void) printf("%s %s %s", cmd, ishost? "host" : "net", dest);
+		if (*gateway) {
+			(void) printf(": gateway %s", gateway);
+			if (attempts > 1 && ret == 0 && af == AF_INET)
+			    (void) printf(" (%s)",
+				inet_ntoa(((struct sockaddr_in *)&route.rt_gateway)->sin_addr));
 		}
-		(void) printf(": %s\n", err);
-		exit(1);
+		if (ret == 0) {
+			(void) printf("\n");
+		} else {
+			switch (oerrno) {
+			case ESRCH:
+				err = "not in table";
+				break;
+			case EBUSY:
+				err = "entry in use";
+				break;
+			case ENOBUFS:
+				err = "routing table overflow";
+				break;
+			case EDQUOT: /* handle recursion avoidance in rt_setgate() */
+				err = "gateway uses the same route";
+				break;
+			default:
+				err = strerror(oerrno);
+				break;
+			}
+			(void) printf(": %s\n", err);
+		}
 	}
+	exit(ret != 0);
 }
 
 void
@@ -852,6 +856,38 @@ inet_makenetandmask(net, sin, bits)
 		;
 	sin->sin_len = 1 + cp - (char *)sin;
 }
+
+#ifdef INET6
+/*
+ * XXX the function may need more improvement...
+ */
+static int
+inet6_makenetandmask(sin6, plen)
+	struct sockaddr_in6 *sin6;
+	char *plen;
+{
+	struct in6_addr in6;
+
+	if (!plen) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr) &&
+		    sin6->sin6_scope_id == 0) {
+			plen = "0";
+		} else if ((sin6->sin6_addr.s6_addr[0] & 0xe0) == 0x20) {
+			/* aggregatable global unicast - RFC2374 */
+			memset(&in6, 0, sizeof(in6));
+			if (!memcmp(&sin6->sin6_addr.s6_addr[8],
+				    &in6.s6_addr[8], 8))
+				plen = "64";
+		}
+	}
+
+	if (!plen || strcmp(plen, "128") == 0)
+		return 1;
+	rtm_addrs |= RTA_NETMASK;
+	(void)prefixlen(plen);
+	return 0;
+}
+#endif
 
 /*
  * Interpret an argument as a network address of some kind,
@@ -954,6 +990,9 @@ getaddr(which, s, hpp)
 	{
 		struct addrinfo hints, *res;
 
+		q = NULL;
+		if (which == RTA_DST && (q = strchr(s, '/')) != NULL)
+			*q = '\0';
 		memset(&hints, 0, sizeof(hints));
 		hints.ai_family = afamily;	/*AF_INET6*/
 		hints.ai_flags = AI_NUMERICHOST;
@@ -975,6 +1014,10 @@ getaddr(which, s, hpp)
 		}
 #endif
 		freeaddrinfo(res);
+		if (q != NULL)
+			*q++ = '/';
+		if (which == RTA_DST)
+			return (inet6_makenetandmask(&su->sin6, q));
 		return (0);
 	}
 #endif /* INET6 */
