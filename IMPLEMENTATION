@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.231 2001/07/18 05:30:47 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.232 2001/07/18 05:31:54 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -149,7 +149,7 @@ draft-ietf-dnsext-mdns-00.txt: Multicast DNS
       near future, so don't rely upon it.
 draft-ietf-ipngwg-p2p-pingpong-00.txt:
 	Avoiding ping-pong packets on point-to-point links
-draft-itojun-ipv6-tcp-to-anycast-00.txt:
+draft-itojun-ipv6-tcp-to-anycast-01.txt:
 	Disconnecting TCP connection toward IPv6 anycast address
 draft-itojun-ipv6-transition-abuse-02.txt:
 	Possible abuse against IPv6 transition technologies (expired)
@@ -160,7 +160,7 @@ draft-itojun-ipv6-transition-abuse-02.txt:
     * kame/openbsd completely disables IPv4 mapped address support.
     * kame/netbsd makes IPv4 mapped address support off by default.
     * See section 1.12.6 and 1.14 for more details.
-draft-itojun-ipv6-tclass-api-02.txt: Socket API for IPv6 traffic class field
+draft-itojun-ipv6-tclass-api-03.txt: Socket API for IPv6 traffic class field
 draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
     * no consideration is made against the use of routing headers and such.
 
