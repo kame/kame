@@ -54,7 +54,7 @@ struct mldv2_hdr {	/* MLDv2 Header */
     struct in6_addr mld_src[1];	/* Sources Addresses List */
 };
 
-#define MLD_QRV(x) ((x)->mld_misc & (0x07))
+#define MLD_QRV(x) ((x) & (0x07))
 
 struct mld_group_record_hdr {	/* Multicast Address Record  */
     u_int8          record_type;/* Multicast Address Record Type */
