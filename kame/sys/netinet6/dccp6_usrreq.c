@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_usrreq.c,v 1.10 2005/01/20 05:06:04 itojun Exp $	*/
+/*	$KAME: dccp6_usrreq.c,v 1.11 2005/02/10 09:42:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -90,10 +90,6 @@
 
 #ifdef __FreeBSD__
 #include <machine/in_cksum.h>
-#endif
-
-#ifndef __FreeBSD__
-#include <machine/stdarg.h>
 #endif
 
 #ifdef __OpenBSD__

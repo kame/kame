@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.48 2005/02/10 09:27:55 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.49 2005/02/10 09:42:55 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -140,10 +140,6 @@
 
 #ifdef __OpenBSD__
 #include <dev/rndvar.h>
-#endif
-
-#ifndef __FreeBSD__
-#include <machine/stdarg.h>
 #endif
 
 #define DEFAULT_CCID 2
