@@ -8,6 +8,8 @@ MASTER_SITES=	ftp://ftp.isc.org/isc/bind9/9.0.0/
 MAINTAINER=	itojun@kame.net
 HOMEPAGE=	http://www.isc.org/
 
+BROKEN=		"old veresion, use NetBSD pkgsrc"
+
 #CONFLICTS=	bind-*
 DEPENDS=	unproven-pthreads-*:../../devel/unproven-pthreads
 
