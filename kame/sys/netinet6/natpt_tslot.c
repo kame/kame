@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.38 2002/01/18 08:14:24 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.39 2002/02/22 14:43:33 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -97,19 +97,18 @@ MALLOC_DECLARE(M_NATPT);
 /*
  *
  */
+struct tSlot	*natpt_lookForHash	__P((struct pcv *, struct tslhash *, int));
+static int	 natpt_hash4		__P((struct pcv *));
+static int	 natpt_hash6		__P((struct pcv *));
+static int	 natpt_hashPad4		__P((struct pAddr *));
+static int	 natpt_hashPad6		__P((struct pAddr *));
+static int	 natpt_hashSin4		__P((struct sockaddr_in *));
+static int	 natpt_hashSin6		__P((struct sockaddr_in6 *));
+static int	 natpt_hashPJW		__P((u_char *, int));
 
-struct tSlot	*natpt_lookForHash		__P((struct pcv *, struct tslhash *, int));
-static int	 natpt_hash4			__P((struct pcv *));
-static int	 natpt_hash6			__P((struct pcv *));
-static int	 natpt_hashPad4			__P((struct pAddr *));
-static int	 natpt_hashPad6			__P((struct pAddr *));
-static int	 natpt_hashSin4			__P((struct sockaddr_in *));
-static int	 natpt_hashSin6			__P((struct sockaddr_in6 *));
-static int	 natpt_hashPJW			__P((u_char *, int));
-
-static void	 natpt_expireFragment		__P((void *));
-static void	 natpt_expireTSlot		__P((void *));
-static void	 natpt_removeTSlotEntry		__P((struct tSlot *));
+static void	 natpt_expireFragment	__P((void *));
+static void	 natpt_expireTSlot	__P((void *));
+static void	 natpt_removeTSlotEntry	__P((struct tSlot *));
 
 
 /*
@@ -393,9 +392,7 @@ natpt_checkICMP6return(struct pcv *cv6)
 	hvr = ((natpt_hashSin6(&src) + natpt_hashSin6(&dst)) % NATPTHASHSZ);
 	thr = &tslhashr[hvr];
 
-	for (ats = TAILQ_FIRST(&thr->tslhead);
-	     ats;
-	     ats = TAILQ_NEXT(ats, tsl_hashr)) {
+	for (ats = TAILQ_FIRST(&thr->tslhead); ats; ats = TAILQ_NEXT(ats, tsl_hashr)) {
 		struct pAddr	*pad = &ats->remote;
 
 		if (pad->sa_family != AF_INET6)
@@ -450,11 +447,8 @@ natpt_checkICMP(struct pcv *cv4)
 	hvr = ((natpt_hashSin4(&src) + natpt_hashSin4(&dst)) % NATPTHASHSZ);
 	thr = &tslhashr[hvr];
 
-	for (ats = TAILQ_FIRST(&thr->tslhead);
-	     ats;
-	     ats = TAILQ_NEXT(ats, tsl_hashr)) {
-
-		struct pAddr	*pad;
+	for (ats = TAILQ_FIRST(&thr->tslhead); ats; ats = TAILQ_NEXT(ats, tsl_hashr)) {
+		struct pAddr *pad;
 
 		pad = &ats->remote;
 
@@ -596,9 +590,7 @@ natpt_lookForFragment6(struct pcv *cv6)
 {
 	struct fragment		 *frg;
 
-	for (frg = TAILQ_FIRST(&frg_head);
-	     frg;
-	     frg = TAILQ_NEXT(frg, frg_list)) {
+	for (frg = TAILQ_FIRST(&frg_head); frg; frg = TAILQ_NEXT(frg, frg_list)) {
 		if (frg->fg_family != AF_INET6)
 			continue;
 		if (cv6->ip_p != frg->fg_proto)
@@ -619,9 +611,7 @@ natpt_lookForFragment4(struct pcv *cv4)
 {
 	struct fragment		 *frg;
 
-	for (frg = TAILQ_FIRST(&frg_head);
-	     frg;
-	     frg = TAILQ_NEXT(frg, frg_list)) {
+	for (frg = TAILQ_FIRST(&frg_head); frg; frg = TAILQ_NEXT(frg, frg_list)) {
 		if (frg->fg_family != AF_INET)
 			continue;
 		if (cv4->ip_p != frg->fg_proto)
