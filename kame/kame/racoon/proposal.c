@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.34 2001/07/10 04:07:03 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.35 2001/08/16 06:13:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -676,6 +676,14 @@ aproppair2saprop(p0)
 		memcpy(spi, p->prop + 1, p->prop->spi_size);
 		newpr->reqid_in = 0;
 		newpr->reqid_out = 0;
+		/*
+		 * If the peer does not specify encryption mode, use 
+		 * transport mode by default.  This is to conform to
+		 * draft-shacham-ippcp-rfc2393bis-08.txt (explicitly specifies
+		 * that unspecified == transport), as well as RFC2407
+		 * (unspecified == implementation dependent default).
+		 */
+		newpr->encmode = IPSECDOI_ATTR_ENC_MODE_DEFAULT;
 
 		for (t = p; t; t = t->tnext) {
 
