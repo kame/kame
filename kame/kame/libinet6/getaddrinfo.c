@@ -131,25 +131,28 @@ static const struct afd {
 
 struct explore {
 	int e_af;
-	int e_wildaf;
 	int e_socktype;
 	int e_protocol;
 	const char *e_protostr;
+	int e_wild;
+#define WILD_AF(ex)		((ex)->e_wild & 0x01)
+#define WILD_SOCKTYPE(ex)	((ex)->e_wild & 0x02)
+#define WILD_PROTOCOL(ex)	((ex)->e_wild & 0x04)
 };
 
 static const struct explore explore[] = {
 #if 0
-	{ PF_LOCAL, 0, ANY, ANY, NULL },
+	{ PF_LOCAL, 0, ANY, ANY, NULL, 0x01 },
 #endif
 #ifdef INET6
-	{ PF_INET6, 1, SOCK_DGRAM, IPPROTO_UDP, "udp" },
-	{ PF_INET6, 1, SOCK_STREAM, IPPROTO_TCP, "tcp" },
-	{ PF_INET6, 0, SOCK_RAW, ANY },
+	{ PF_INET6, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x07 },
+	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x07 },
+	{ PF_INET6, SOCK_RAW, ANY, NULL, 0x05 },
 #endif
-	{ PF_INET, 1, SOCK_DGRAM, IPPROTO_UDP, "udp" },
-	{ PF_INET, 1, SOCK_STREAM, IPPROTO_TCP, "tcp" },
-	{ PF_INET, 0, SOCK_RAW, ANY, NULL },
-	{ -1, 0, 0, 0, NULL },
+	{ PF_INET, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x07 },
+	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x07 },
+	{ PF_INET, SOCK_RAW, ANY, NULL, 0x05 },
+	{ -1, 0, 0, NULL, 0 },
 };
 
 #ifdef INET6
@@ -231,9 +234,10 @@ do { \
 	goto bad; \
 } while (0)
 
-#define MATCH_FAMILY(x, y) \
-	((x) == PF_UNSPEC || (y) == PF_UNSPEC || (x) == (y))
-#define MATCH(x, y)	((x) == ANY || (y) == ANY || (x) == (y))
+#define MATCH_FAMILY(x, y, w) \
+	((x) == (y) || ((w) && ((x) == PF_UNSPEC || (y) == PF_UNSPEC)))
+#define MATCH(x, y, w) \
+	((x) == (y) || ((w) && ((x) == ANY || (y) == ANY)))
 
 char *
 gai_strerror(ecode)
@@ -357,8 +361,8 @@ getaddrinfo(hostname, servname, hints, res)
 	 * socktype/protocol are left unspecified. (2) servname is disallowed
 	 * for raw and other inet{,6} sockets.
 	 */
-	if (MATCH_FAMILY(pai->ai_family, PF_INET)
-	 || MATCH_FAMILY(pai->ai_family, PF_INET6)) {
+	if (MATCH_FAMILY(pai->ai_family, PF_INET, 1)
+	 || MATCH_FAMILY(pai->ai_family, PF_INET6, 1)) {
 		ai0 = *pai;
 
 		if (pai->ai_family == PF_UNSPEC)
@@ -376,16 +380,11 @@ getaddrinfo(hostname, servname, hints, res)
 	for (ex = explore; ex->e_af >= 0; ex++) {
 		*pai = ai0;
 
-		if (ex->e_wildaf) {
-			if (!MATCH_FAMILY(pai->ai_family, ex->e_af))
-				continue;
-		} else {
-			if (pai->ai_family != ex->e_af)
-				continue;
-		}
-		if (!MATCH(pai->ai_socktype, ex->e_socktype))
+		if (!MATCH_FAMILY(pai->ai_family, ex->e_af, WILD_AF(ex)))
 			continue;
-		if (!MATCH(pai->ai_protocol, ex->e_protocol))
+		if (!MATCH(pai->ai_socktype, ex->e_socktype, WILD_SOCKTYPE(ex)))
+			continue;
+		if (!MATCH(pai->ai_protocol, ex->e_protocol, WILD_PROTOCOL(ex)))
 			continue;
 
 		if (pai->ai_family == PF_UNSPEC)
@@ -428,7 +427,7 @@ getaddrinfo(hostname, servname, hints, res)
 	for (afd = afdl; afd->a_af; afd++) {
 		*pai = ai0;
 
-		if (!MATCH_FAMILY(pai->ai_family, afd->a_af))
+		if (!MATCH_FAMILY(pai->ai_family, afd->a_af, 1))
 			continue;
 
 		for (ex = explore; ex->e_af >= 0; ex++) {
@@ -437,17 +436,16 @@ getaddrinfo(hostname, servname, hints, res)
 			if (pai->ai_family == PF_UNSPEC)
 				pai->ai_family = afd->a_af;
 
-			if (ex->e_wildaf) {
-				if (!MATCH_FAMILY(pai->ai_family, ex->e_af))
-					continue;
-			} else {
-				if (pai->ai_family != ex->e_af)
-					continue;
+			if (!MATCH_FAMILY(pai->ai_family, ex->e_af, WILD_AF(ex)))
+				continue;
+			if (!MATCH(pai->ai_socktype, ex->e_socktype,
+					WILD_SOCKTYPE(ex))) {
+				continue;
 			}
-			if (!MATCH(pai->ai_socktype, ex->e_socktype))
+			if (!MATCH(pai->ai_protocol, ex->e_protocol,
+					WILD_PROTOCOL(ex))) {
 				continue;
-			if (!MATCH(pai->ai_protocol, ex->e_protocol))
-				continue;
+			}
 
 			if (pai->ai_family == PF_UNSPEC)
 				pai->ai_family = ex->e_af;
