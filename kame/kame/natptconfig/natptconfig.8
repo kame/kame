@@ -1,4 +1,4 @@
-.\"	$KAME: natptconfig.8,v 1.19 2002/02/17 08:52:49 fujisawa Exp $
+.\"	$KAME: natptconfig.8,v 1.20 2002/02/17 09:42:09 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -73,8 +73,42 @@ as a file name, standard input is used.
 .Pp
 The first form
 .Pq with Fl f
-takes directives from the specified configuration file.  The second
-form is to give single directive directly from the command line.
+takes directives from the specified configuration file.  This file
+will be read line by line and applied as argument to the
+.Nm
+utility.  The second form is to give single directive directly from
+the command line.
+.Pp
+.Nm
+configuration is made of a list of numbered rules, which is scanned
+for each incoming IPv6 and IPV4 packet until match is found and the
+relevant translation action is performed.  When no match is found,
+packet is not translated into.  In most case, this means the packet is
+dropped.  Translation rule is examined from a small number
+sequentially.  If matched rule is found, search is finished, and
+action is performed.
+.Pp
+Rules can be added with the
+.Sy map
+command; delete individually with the
+.Sy map delete
+command, and globally with the
+.Sy map flush
+command;  Rule number can be renumbered with the
+.Sy map renum
+command.  Finally, rules can be displayed with
+.Sy show
+command.
+.Pp
+To ease configuration, rules can be put into a file which is processed
+using
+.Fl f
+option in the first synopsis line. 
+See
+.Xr natpt.conf 5
+for more detail about
+.Sy map
+command.
 .\"
 .Sh RETURN VALUES
 .Nm
