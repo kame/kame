@@ -23,7 +23,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-atalk.c,v 1.1.1.1 1999/08/08 23:32:02 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-atalk.c,v 1.2 2000/04/02 23:46:47 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -181,8 +181,9 @@ aarp_print(register const u_char *bp, u_int length)
 			    AT(pdaddr), AT(psaddr));
 			return;
 		}
-	(void)printf("len %d op %d htype %d ptype %#x halen %d palen %d",
-	    length, ap->op, ap->htype, ap->ptype, ap->halen, ap->palen );
+	(void)printf("len %u op %u htype %u ptype %#x halen %u palen %u",
+	    length, ntohs(ap->op), ntohs(ap->htype), ntohs(ap->ptype),
+	    ap->halen, ap->palen);
 }
 
 static void
