@@ -1,4 +1,4 @@
-/*	$KAME: scope6_var.h,v 1.1 2000/04/18 08:02:25 jinmei Exp $	*/
+/*	$KAME: scope6_var.h,v 1.2 2000/04/18 08:53:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -34,8 +34,8 @@
 
 #ifdef _KERNEL
 void	scope6_ifattach __P((struct ifnet *));
-int	scope6_set __P((struct ifnet *, u_int32_t));
-int	scope6_get __P((struct ifnet *, u_int32_t));
+int	scope6_set __P((struct ifnet *, u_int32_t *));
+int	scope6_get __P((struct ifnet *, u_int32_t *));
 #endif /* _KERNEL */
 
 #endif /* _NETINET6_SCOPE6_VAR_H_ */
