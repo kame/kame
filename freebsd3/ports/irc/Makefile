@@ -3,7 +3,7 @@
 # Date created:         26 Jul 1999
 # Whom:                 sumikawa
 #
-# $Id: Makefile,v 1.1.1.1 1999/08/17 09:09:53 itojun Exp $
+# $Id: Makefile,v 1.1.1.1.2.1 1999/10/12 07:39:12 sumikawa Exp $
 #
 
 DISTNAME=	irc2.10.2p1
@@ -13,6 +13,8 @@ MASTER_SITES=	ftp://ftp.funet.fi/pub/unix/irc/server/
 EXTRACT_SUFX=	.tgz
 
 MAINTAINER=	sumikawa@kame.net
+
+BROKEN=		"uses nonstandard struct field"
 
 GNU_CONFIGURE=  yes
 CONFIGURE_ARGS= --enable-ip6 --without-ncurses
