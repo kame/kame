@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.409 2003/12/24 09:10:07 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.410 2004/01/09 11:05:26 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -459,22 +459,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		if (mip6opt.mip6po_haddr != NULL)
 			have_hao = 1;
 		MAKE_EXTHDR(mip6opt.mip6po_haddr, &exthdrs.ip6e_haddr);
-		/*
-		 * add a mobility header only when there is no
-		 * mobility header specified by the caller of
-		 * ip6_output().
-		 */
-		if ((mip6opt.mip6po_mobility != NULL) &&
-		    (exthdrs.ip6e_mh == NULL)) {
-			/*
-			 * insert a mobility header created by
-			 * mip6_exthdr_create() only if no mobility
-			 * header is specified by the ip6_output()
-			 * caller.
-			 */
-			MAKE_EXTHDR(mip6opt.mip6po_mobility,
-			    &exthdrs.ip6e_mh);
-		}
 	} else {
 		/*
 		 * this is a forwarded packet.  do not modify any

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.56 2003/12/17 07:52:36 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.57 2004/01/09 11:05:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -535,8 +535,6 @@ mip6_exthdr_create(m, opt, mip6opt)
 
 	mip6opt->mip6po_rthdr2 = NULL;
 	mip6opt->mip6po_haddr = NULL;
-	mip6opt->mip6po_dest2 = NULL;
-	mip6opt->mip6po_mobility = NULL;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	if (ip6_getpktaddrs(m, &src, &dst))
@@ -744,12 +742,6 @@ mip6_destopt_discard(mip6opt)
 
 	if (mip6opt->mip6po_haddr)
 		FREE(mip6opt->mip6po_haddr, M_IP6OPT);
-
-	if (mip6opt->mip6po_dest2)
-		FREE(mip6opt->mip6po_dest2, M_IP6OPT);
-
-	if (mip6opt->mip6po_mobility)
-		FREE(mip6opt->mip6po_mobility, M_IP6OPT);
 
 	return;
 }

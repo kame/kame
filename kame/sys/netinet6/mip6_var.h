@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.111 2003/12/10 21:25:22 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.112 2004/01/09 11:05:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -298,8 +298,6 @@ LIST_HEAD(mip6_prefix_list, mip6_prefix);
 struct mip6_pktopts {
 	struct ip6_rthdr *mip6po_rthdr2;
 	struct ip6_dest *mip6po_haddr;
-	struct ip6_dest *mip6po_dest2;
-	struct ip6_mobility *mip6po_mobility;
 };
 
 struct mip6_mobility_options {
