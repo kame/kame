@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.597 2000/02/23 15:16:02 jinmei Exp $
+$Id: CHANGELOG,v 1.598 2000/02/23 16:52:16 jinmei Exp $
 
 <200002>
+2000-02-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/usr.sbin/netstat/{main.c, inet6.c(added)}: printed KAME's
+	statistics for IPv6 and ICMPv6 instead of original ones.
+
 2000-02-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ah_input.c (ah4_input): prevented
 	re-translating the byte order of the ip_id field on bsdi4.
