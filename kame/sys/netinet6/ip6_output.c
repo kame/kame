@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.394 2003/08/26 20:00:06 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.395 2003/09/04 03:05:51 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1588,6 +1588,8 @@ skip_ipsec2:;
 		 */
 		m0 = m;
 		for (off = hlen; off < tlen; off += len) {
+			struct mbuf *mlast;
+
 			MGETHDR(m, M_DONTWAIT, MT_HEADER);
 			if (!m) {
 				error = ENOBUFS;
@@ -1624,7 +1626,9 @@ skip_ipsec2:;
 				ip6stat.ip6s_odropped++;
 				goto sendorfree;
 			}
-			m_cat(m, m_frgpart);
+			for (mlast = m; mlast->m_next; mlast = mlast->m_next)
+				;
+			mlast->m_next = m_frgpart;
 			m->m_pkthdr.len = len + hlen + sizeof(*ip6f);
 			m->m_pkthdr.rcvif = (struct ifnet *)0;
 			ip6f->ip6f_reserved = 0;
