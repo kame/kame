@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ping6.8,v 1.16 2000/05/05 15:16:55 sumikawa Exp $
+.\"     $Id: ping6.8,v 1.17 2000/05/09 17:34:27 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt PING6 8
@@ -228,8 +228,9 @@ has no effect if
 is specified.
 .It Fl W
 Same as
-.Fl w .
-This option was remained for backward compatibility.
+.Fl w ,
+but with old packet format based on 03 draft.
+This option is present for backward compatibility.
 .Fl s
 has no effect if
 .Fl w
@@ -359,6 +360,13 @@ if an error occurred.
 .%T "Internet Control Message Protocol (ICMPv6) for the Internet Protocol Version 6 (IPv6) Specification"
 .%N RFC2463
 .%D December 1998
+.Re
+.Rs
+.%A Matt Crawford
+.%T "IPv6 Node Information Queries"
+.%N draft-ietf-ipngwg-icmp-name-lookups-05.txt
+.%D October 22, 1999
+.%O work in progress material
 .Re
 .Sh HISTORY
 The

@@ -945,7 +945,7 @@ pinger()
 
 	if (options & F_FQDN) {
 		icp->icmp6_type = ICMP6_NI_QUERY;
-		icp->icmp6_code = 0;	/* Subject is IPv6 address */
+		icp->icmp6_code = ICMP6_NI_SUBJ_IPV6;
 		/* XXX: overwrite icmp6_id */
 		icp->icmp6_data16[0] = htons(NI_QTYPE_FQDN);
 		if (timing)
@@ -956,6 +956,7 @@ pinger()
 		cc = ICMP6_NIQLEN + sizeof(dst.sin6_addr);
 		datalen = 0;
 	} else if (options & F_FQDNOLD) {
+		/* packet format in 03 draft - no Subject data on queries */
 		icp->icmp6_type = ICMP6_NI_QUERY;
 		/* code field is always 0 */
 		/* XXX: overwrite icmp6_id */
@@ -967,7 +968,7 @@ pinger()
 		datalen = 0;
 	} else if (options & F_NODEADDR) {
 		icp->icmp6_type = ICMP6_NI_QUERY;
-		icp->icmp6_code = 0;	/* Subject is IPv6 address */
+		icp->icmp6_code = ICMP6_NI_SUBJ_IPV6;
 		/* XXX: overwrite icmp6_id */
 		icp->icmp6_data16[0] = htons(NI_QTYPE_NODEADDR);
 		if (timing)
