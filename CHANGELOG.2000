@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit, 2000
 
-$KAME: CHANGELOG.2000,v 1.1 2000/12/31 20:46:35 sumikawa Exp $
+$KAME: CHANGELOG.2000,v 1.2 2001/07/21 06:06:13 itojun Exp $
 
 <200012>
 Thu Dec 28 08:48:12 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
@@ -963,7 +963,7 @@ Wed Sep 13 15:01:17 JST 2000 sakane@ydc.co.jp
 	- verifying the subjectAltName and the sucjectName.
 	- sending a certificate or not.
 
-Wed Sep 13 14:56:23 JST 2000  itojun@iijab.net
+Wed Sep 13 14:56:23 JST 2000  itojun@iijlab.net
 	* kame/racoon/doc/FAQ: add racoon FAQ.  will be improved in the near
 	  future.
 
@@ -1653,7 +1653,7 @@ Wed Jul 19 JST 2000 sakane@ydc.co.jp
 	  received, don't delete phase 2 SA.
 	- more improve to delete phase 1 SA on receiving initial contact.
 
-Wed Jul 19 22:22:47 JST 2000  itojun@iiljab.net
+Wed Jul 19 22:22:47 JST 2000  itojun@iijlab.net
 	* kame/rtsold/rtsol.c, kame/rtadvd/rtadvd.c: ip6_var.h requires
 	  sys/queue.h.
 	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 7/17 weekly snap.
@@ -1746,7 +1746,7 @@ Thu Jul 13 22:27:18 JST 2000  itojun@iijlab.net
 	  netstat -g, make mif6table a non-static variable.  on openbsd
 	  file static variables will not appear in kernel symbol table.
 
-Thu Jul 13 16:09:57 JST 2000  itojun@iiljab.net
+Thu Jul 13 16:09:57 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/bind9: upgrade to 9.0.0rc1.
 
 Thu Jul 13 01:39:26 JST 2000  itojun@iijlab.net
@@ -1875,7 +1875,7 @@ Wed Jul  5 12:08:16 JST 2000  suz@kame.net
 	  ported WaveLAN driver and its configuration program from bsdi4
 	  (geertj permitted it. Thanks!) 
 
-Wed Jul  5 11:30:39 JST 2000  itojun@iiljab.net
+Wed Jul  5 11:30:39 JST 2000  itojun@iijlab.net
 	* {netbsd,openbsd,freebsd4}/lib/libinet6/getaddrinfo.c,
 	  kame/libinet6/getaddrinfo.c:
 	  return EAI_NODATA, instead of EAI_NONAME, on name resolution errors.
@@ -2218,7 +2218,7 @@ Thu Jun 15 13:29:29 JST 2000 sakane@ydc.co.jp
 	In racoon.conf, the path of configuration file is complemented by
 	include directive only if there is no '/' in the path.
 
-Thu Jun 15 13:08:25 JST 2000  iotjun@iijlab.net
+Thu Jun 15 13:08:25 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ipsec.[ch]: net.inet.ipsec.inbound_call_ike sysctl
 	  MIB is now gone for good.
 
@@ -2561,7 +2561,7 @@ Thu Jun  1 02:43:31 JST 2000  itojun@iijlab.net
 	of the IPv6 header only in an M_EXT case. Practically, we'll
 	rarely need such an extra copy.
 
-Tue May 30 23:56:04 JST 2000  itojun@iiljab.net
+Tue May 30 23:56:04 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_output.c: make scopeid handling in multicast
 	loopback case (ip6_mloopback) consistent with other cases.
 
@@ -2703,7 +2703,7 @@ Thu May 25 01:25:39 JST 2000 sakane@ydc.co.jp
 	supported IPsec with link local address.
 	XXX to be supported by racoon.
 
-Wed May 24 22:42:40 JST 2000  itojun@iijab.net
+Wed May 24 22:42:40 JST 2000  itojun@iijlab.net
 	* bsdi4/sys/net/if_ppp.c: IPv6 support.  highly experimental.
 	* bsdi4/usr.bin/ppp: IPv6CP support.  highly experimental.  solicit
 	  test/experience reports.

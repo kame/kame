@@ -1,16 +1,16 @@
 			CHANGELOG for KAME kit, 1999
 
-$KAME: CHANGELOG.1999,v 1.3 2000/07/26 08:09:56 itojun Exp $
+$KAME: CHANGELOG.1999,v 1.4 2001/07/21 06:06:13 itojun Exp $
 
 <199912>
-Fri Dec ?? JST 1999  itojun@iijab.net
+Fri Dec ?? JST 1999  itojun@iijlab.net
 	* renamed "ptr" related files from "ptr_xx.c" to "natpt_xx.c".
 	  you may need to run "make TARGET=netbsd clean prepare" before
 	  rebuilding on your existing tree.
 	  at least, "make install-includes" on freebsd2 may fail if you have
 	  dangling symbolic links.
 
-Fri Dec 31 13:21:58 JST 1999  itojun@iijab.net
+Fri Dec 31 13:21:58 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/ethereal: upgrade to 0.8.0.
 
 Wed Dec 29 16:09:41 JST 1999  itojun@iijlab.net
@@ -335,7 +335,7 @@ Fri Dec 10 13:57:35 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	becomes detached if it has no (probably) reachable advertising
 	router.
 
-Thu Dec  9 09:46:58 JST 1999  itojun@iiljab.net
+Thu Dec  9 09:46:58 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/ip6_input.c (non-bsdi):
 	  don't initialize non-lo0 loopback interface.  they will be
 	  initialized when they are made IFF_UP.
