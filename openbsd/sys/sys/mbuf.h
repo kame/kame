@@ -84,7 +84,6 @@ struct	pkthdr {
 	struct	ifnet *rcvif;		/* rcv interface */
 	SLIST_HEAD(packet_tags, m_tag) tags; /* list of packet tags */
 	int	len;			/* total packet length */
-	struct mbuf *aux;		/* extra data buffer; ip6/others */
 	int	csum;			/* Hardware checksum info */
 };
 
@@ -160,8 +159,6 @@ struct mbuf {
 
 /* KAME IPv6 */
 #define M_LOOP		0x0040	/* for Mbuf statistics */
-
-#define M_AUX		0x0010	/* mbufs pointed to by m->m_pkthdr.aux */
 
 /* flags copied when copying m_pkthdr */
 #define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_BCAST|M_MCAST|M_CONF|M_AUTH|M_COMP|M_AUX|M_LOOP|M_NOTIFICATION)
@@ -389,17 +386,9 @@ void _sk_mclget(struct mbuf *, int);
  * MFREE(struct mbuf *m, struct mbuf *n)
  * Free a single mbuf and associated external storage.
  * Place the successor, if any, in n.
- *
- * we do need to check non-first mbuf for m_aux, since some of existing
- * code does not call M_PREPEND properly.
- * (example: call to bpf_mtap from drivers)
  */
 #define	MFREE(m, n) \
 	MBUFLOCK( \
-		if (((m)->m_flags & M_PKTHDR) != 0 && (m)->m_pkthdr.aux) { \
-			m_freem((m)->m_pkthdr.aux); \
-			(m)->m_pkthdr.aux = NULL; \
-		} \
 		mbstat.m_mtypes[(m)->m_type]--; \
 		if ((m)->m_flags & M_PKTHDR) \
 			m_tag_delete_chain((m), NULL); \
@@ -416,7 +405,6 @@ void _sk_mclget(struct mbuf *, int);
  */
 #define M_MOVE_HDR(to, from) { \
 	(to)->m_pkthdr = (from)->m_pkthdr; \
-	(from)->m_pkthdr.aux = (struct mbuf *)NULL; \
 	(from)->m_flags &= ~M_PKTHDR; \
 	SLIST_INIT(&(from)->m_pkthdr.tags); \
 }
@@ -426,7 +414,6 @@ void _sk_mclget(struct mbuf *, int);
  */
 #define M_DUP_HDR(to, from) { \
 	(to)->m_pkthdr = (from)->m_pkthdr; \
-	(from)->m_pkthdr.aux = (struct mbuf *)NULL; \
 	SLIST_INIT(&(to)->m_pkthdr.tags); \
 	m_tag_copy_chain((to), (from)); \
 }
@@ -444,7 +431,6 @@ void _sk_mclget(struct mbuf *, int);
 /*
  * MOVE mbuf pkthdr from from to to.
  * from must have M_PKTHDR set, and to must be empty.
- * aux pointer will be moved to `to'.
  */
 #define	M_MOVE_PKTHDR(to, from) { \
 	(to)->m_flags = (from)->m_flags & M_COPYFLAGS; \
@@ -554,15 +540,6 @@ struct mbstat {
 	u_quad_t m_pullup2_copy; /* # of possible m_pullup2 copies */
 	u_quad_t m_pullup2_alloc; /* # of possible m_pullup2 mallocs */
 	u_quad_t m_pullup2_fail; /* # of possible m_pullup2 failures */
-};
-
-/*
- * pkthdr.aux type tags.
- */
-struct mauxtag {
-	int af;
-	int type;
-	void* p;
 };
 
 #ifdef	_KERNEL
