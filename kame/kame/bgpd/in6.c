@@ -280,7 +280,7 @@ get_in6_addr(addr, sap)
 	struct sockaddr_in6 *sap;
 {
 	int ret_ga, error = 0;
-	struct addrinfo *res, hints;
+	struct addrinfo *res0, *res, hints;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
@@ -292,6 +292,7 @@ get_in6_addr(addr, sap)
 		return(-1);
 	}
 
+	res0 = res;
 	for(; res; res = res->ai_next) {
 		if (res->ai_addr->sa_family == AF_INET6) {
 			memcpy(sap, res->ai_addr, sizeof(*sap));
@@ -306,6 +307,6 @@ get_in6_addr(addr, sap)
 	}
 	
   end:
-	freeaddrinfo(res);
+	freeaddrinfo(res0);
 	return(error);
 }
