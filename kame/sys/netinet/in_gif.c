@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.91 2003/04/09 09:28:19 suz Exp $	*/
+/*	$KAME: in_gif.c,v 1.92 2003/11/09 14:44:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -224,12 +224,6 @@ in_gif_output(ifp, family, m)
 #if NBRIDGE > 0
  sendit:
 #endif /* NBRIDGE */
-	/* ip_output needs host-order length.  it should be nuked */
-	m_copydata(m, offsetof(struct ip, ip_len), sizeof(u_int16_t),
-	    (caddr_t) &plen);
-	NTOHS(plen);
-	m_copyback(m, offsetof(struct ip, ip_len), sizeof(u_int16_t),
-	    (caddr_t) &plen);
 
 	return ip_output(m, NULL, NULL, 0, NULL, NULL);
 #else  /* !OpenBSD */
