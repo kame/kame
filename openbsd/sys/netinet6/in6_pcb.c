@@ -629,7 +629,6 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 	  (!IN6_IS_ADDR_UNSPECIFIED(&laddr) && !IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6, &laddr)) ||
 	  (fport && inp->inp_fport != fport))
 	{
-	  inp = inp->inp_queue.cqe_next;
 	  continue;
 	}
       nmatch++;
