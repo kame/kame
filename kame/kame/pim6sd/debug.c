@@ -660,7 +660,7 @@ dump_pim_mrt(fp)
 		    r->timer, r->jp_timer, r->rs_timer, r->assert_timer);
 
 	    fprintf(fp, "  MIF   0   1   2   3   4   5   6   7   8   9\n");
-	    for (vifi = 0, i = 0; i < numvifs / 10; i++) {
+	    for (vifi = 0, i = 0; vifi < numvifs && i <= numvifs / 10; i++) {
 		    int j;
 
 		    fprintf(fp, " %4d", i);
@@ -745,7 +745,7 @@ dump_pim_mrt(fp)
 		    r->timer, r->jp_timer, r->rs_timer, r->assert_timer);
 
 	    fprintf(fp, "  MIF   0   1   2   3   4   5   6   7   8   9\n");
-	    for (vifi = 0, i = 0; i < numvifs / 10; i++) {
+	    for (vifi = 0, i = 0; vifi < numvifs && i <= numvifs / 10; i++) {
 		    int j;
 
 		    fprintf(fp, " %4d", i);
@@ -832,7 +832,7 @@ dump_pim_mrt(fp)
 		    r->timer, r->jp_timer, r->rs_timer, r->assert_timer);
 
 	    fprintf(fp, "  MIF   0   1   2   3   4   5   6   7   8   9\n");
-	    for (vifi = 0, i = 0; i < numvifs / 10; i++) {
+	    for (vifi = 0, i = 0; vifi < numvifs && i <= numvifs / 10; i++) {
 		    int j;
 
 		    fprintf(fp, " %4d", i);

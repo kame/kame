@@ -1286,7 +1286,6 @@ join_or_prune(mrtentry_ptr, upstream_router)
 }
 
 
-/* TODO: when parsing, check if we go beyong message size */
 /* TODO: too long, simplify it! */
 #define PIM6_JOIN_PRUNE_MINLEN (4 + PIM6_ENCODE_UNI_ADDR_LEN + 4)
 
