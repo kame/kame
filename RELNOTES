@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.64 2000/10/11 00:42:20 itojun Exp $
+	$KAME: RELNOTES,v 1.65 2000/10/22 12:14:26 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -98,5 +98,7 @@ Many of old ones have been solved.
 - freebsd4/alpha: kernel fails to boot if you reach certain kernel size.
   this is because of some kernel memory management issue, and is under
   discussion in freebsd mailing list(s).
+
+- bsdi4: may see panics on multicast socket close.
 
 							<end of RELNOTES>
