@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/04/26 14:28:10 $
+			$Date: 2000/04/29 04:07:09 $
 
 1. IPv6
 
@@ -1463,6 +1463,6 @@ compile ALTQ-ready kernel for other archititectures, take the following steps:
 KAME kit includes Ericsson mobile-ip6 code.  The integration is just started
 (in Feb 2000), and we will need some more time to integrate it better.
 
-See kame/mip6config/README_MIP6.txt for more details.
+See kame/mip6config/{QUICKSTART,README_MIP6.txt} for more details.
 
 						 <end of IMPLEMENTATION>

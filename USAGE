@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/26 14:24:32 $
+		     $Date: 2000/04/29 04:07:09 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -501,7 +501,7 @@ For more information, please refer to the "pma" man page.
 
 <<<mobile-ip6>>>
 KAME kit includes mobile-ip6 code.  For more details, please look at
-kame/kame/mip6config/README_MIP6.txt and manpages.
+kame/kame/mip6config/QUICKSTART,README_MIP6.txt} and manpages.
 
 
 <<<altq>>>
