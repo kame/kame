@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.200 2001/09/21 10:07:23 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.201 2001/09/21 13:46:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -163,6 +163,12 @@ struct timeout nd6_slowtimo_ch;
 struct timeout nd6_timer_ch;
 extern struct timeout in6_tmpaddrtimer_ch;
 #endif
+
+#ifdef __FreeBSD__
+static int fill_drlist __P((struct sysctl_req *));
+static int fill_prlist __P((struct sysctl_req *));
+#endif
+
 
 void
 nd6_init()
@@ -2355,6 +2361,7 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 	if (oldp && !oldlenp)
 		return EINVAL;
 	ol = oldlenp ? *oldlenp : 0;
+
 #ifdef ICMPV6CTL_ND6_DRLIST
 	if (name == ICMPV6CTL_ND6_DRLIST) {
 		struct in6_defrouter *d, *de;
@@ -2515,43 +2522,10 @@ nd6_sysctl_drlist(SYSCTL_HANDLER_ARGS)
 nd6_sysctl_drlist SYSCTL_HANDLER_ARGS
 #endif
 {
-	int error;
-	char buf[1024];
-	struct in6_defrouter *d, *de;
-	struct nd_defrouter *dr;
-
 	if (req->newptr)
 		return EPERM;
-	error = 0;
 
-	for (dr = TAILQ_FIRST(&nd_defrouter);
-	     dr;
-	     dr = TAILQ_NEXT(dr, dr_entry)) {
-		d = (struct in6_defrouter *)buf;
-		de = (struct in6_defrouter *)(buf + sizeof(buf));
-
-		if (d + 1 <= de) {
-			bzero(d, sizeof(*d));
-			d->rtaddr.sin6_family = AF_INET6;
-			d->rtaddr.sin6_len = sizeof(d->rtaddr);
-			if (in6_recoverscope(&d->rtaddr, &dr->rtaddr,
-			    dr->ifp) != 0)
-				log(LOG_ERR,
-				    "scope error in "
-				    "default router list (%s)\n",
-				    ip6_sprintf(&dr->rtaddr));
-			d->flags = dr->flags;
-			d->rtlifetime = dr->rtlifetime;
-			d->expire = dr->expire;
-			d->if_index = dr->ifp->if_index;
-		} else
-			panic("buffer too short");
-
-		error = SYSCTL_OUT(req, buf, sizeof(*d));
-		if (error)
-			break;
-	}
-	return error;
+	return(fill_drlist(req));
 }
 
 static int
@@ -2561,14 +2535,118 @@ nd6_sysctl_prlist(SYSCTL_HANDLER_ARGS)
 nd6_sysctl_prlist SYSCTL_HANDLER_ARGS
 #endif
 {
-	int error;
-	char buf[1024];
-	struct in6_prefix *p, *pe;
-	struct nd_prefix *pr;
-
 	if (req->newptr)
 		return EPERM;
-	error = 0;
+
+	return(fill_prlist(req));
+}
+#endif
+
+#ifndef __FreeBSD__
+static int
+fill_drlist(oldp, oldlenp, ol)
+	void *oldp;
+	size_t *oldlenp, ol;
+#else
+static int
+fill_drlist(req)
+	struct sysctl_req *req;
+#endif
+{
+	int error = 0;
+	struct in6_defrouter *d, *de;
+	struct nd_defrouter *dr;
+#ifdef __FreeBSD__
+	struct in6_defrouter dbuf;
+#else
+	size_t l;
+#endif
+	
+#ifndef __FreeBSD__
+	if (oldp) {
+		d = (struct in6_defrouter *)oldp;
+		de = (struct in6_defrouter *)((caddr_t)oldp + *oldlenp);
+	}
+	l = 0;
+#endif
+
+	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
+	     dr = TAILQ_NEXT(dr, dr_entry)) {
+#ifdef __FreeBSD__
+		d = &dbuf;
+		de = d + 1;
+#endif
+
+		if (
+#ifndef __FreeBSD__
+		    oldp &&
+#endif
+		    d + 1 <= de) {
+			bzero(d, sizeof(*d));
+			d->rtaddr.sin6_family = AF_INET6;
+			d->rtaddr.sin6_len = sizeof(d->rtaddr);
+			if (in6_recoverscope(&d->rtaddr, &dr->rtaddr,
+					     dr->ifp) != 0)
+				log(LOG_ERR,
+				    "scope error in "
+				    "default router list (%s)\n",
+				    ip6_sprintf(&dr->rtaddr));
+			d->flags = dr->flags;
+			d->rtlifetime = dr->rtlifetime;
+			d->expire = dr->expire;
+			d->if_index = dr->ifp->if_index;
+		}
+
+#ifndef __FreeBSD__
+		l += sizeof(*d);
+		if (d)
+			d++;
+#else
+		error = SYSCTL_OUT(req, d, sizeof(*d));
+		if (error)
+			break;
+#endif
+	}
+
+#ifndef __FreeBSD__
+	if (oldp) {
+		*oldlenp = l;	/* (caddr_t)d - (caddr_t)oldp */
+		if (l > ol)
+			error = ENOMEM;
+	} else
+		*oldlenp = l;
+#endif
+
+	return(error);
+}
+
+#ifndef __FreeBSD__
+static int
+fill_prlist(oldp, oldlenp, ol)
+	void *oldp;
+	size_t *oldlenp, ol;
+#else
+static int
+fill_prlist(req)
+	struct sysctl_req *req;
+#endif
+{
+	int error = 0;
+	struct in6_prefix *p, *pe;
+	struct nd_prefix *pr;
+#ifdef __FreeBSD__
+	struct in6_defrouter pbuf[1024]; /* XXX */
+#else
+	size_t l;
+#endif
+
+#ifndef __FreeBSD__
+	if (oldp) {
+		p = (struct in6_prefix *)oldp;
+		pe = (struct in6_prefix *)((caddr_t)oldp + *oldlenp);
+	}
+	l = 0;
+#endif
 
 	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 		u_short advrtrs;
@@ -2576,10 +2654,16 @@ nd6_sysctl_prlist SYSCTL_HANDLER_ARGS
 		struct sockaddr_in6 *sin6, *s6;
 		struct nd_pfxrouter *pfr;
 
-		p = (struct in6_prefix *)buf;
-		pe = (struct in6_prefix *)(buf + sizeof(buf));
+#ifdef __FreeBSD__
+		p = (struct in6_prefix *)pbuf;
+		pe = (struct in6_prefix *)(pbuf + sizeof(pbuf));
+#endif
 
-		if (p + 1 <= pe) {
+		if (
+#ifndef __FreeBSD__
+		    oldp &&
+#endif
+		    p + 1 <= pe) {
 			bzero(p, sizeof(*p));
 			sin6 = (struct sockaddr_in6 *)(p + 1);
 
@@ -2613,11 +2697,9 @@ nd6_sysctl_prlist SYSCTL_HANDLER_ARGS
 			p->flags = pr->ndpr_stateflags;
 			p->origin = PR_ORIG_RA;
 			advrtrs = 0;
-			for (pfr = pr->ndpr_advrtrs.lh_first;
-			     pfr;
+			for (pfr = pr->ndpr_advrtrs.lh_first; pfr;
 			     pfr = pfr->pfr_next) {
-				if ((void *)&sin6[advrtrs + 1] >
-				    (void *)pe) {
+				if ((void *)&sin6[advrtrs + 1] > (void *)pe) {
 					advrtrs++;
 					continue;
 				}
@@ -2625,24 +2707,49 @@ nd6_sysctl_prlist SYSCTL_HANDLER_ARGS
 				bzero(s6, sizeof(*s6));
 				s6->sin6_family = AF_INET6;
 				s6->sin6_len = sizeof(*sin6);
-				if (in6_recoverscope(s6,
-				    &pfr->router->rtaddr,
-				    pfr->router->ifp) != 0)
-					log(LOG_ERR,
-					    "scope error in "
+				if (in6_recoverscope(s6, &pfr->router->rtaddr,
+						     pfr->router->ifp) != 0) {
+					log(LOG_ERR, "scope error in "
 					    "prefix list (%s)\n",
 					    ip6_sprintf(&pfr->router->rtaddr));
+				}
 				advrtrs++;
 			}
 			p->advrtrs = advrtrs;
-		} else 
-			panic("buffer too short");
+		} else { 
+#ifndef __FreeBSD__
+			advrtrs = 0;
+			for (pfr = pr->ndpr_advrtrs.lh_first; pfr;
+			     pfr = pfr->pfr_next)
+					advrtrs++;
+#else
+			log(LOG_INFO,
+			    "fill_prlist: internal buffer too short\n");
+			error = ENOBUFS;
+			break;
+#endif
+		}
 
 		advance = sizeof(*p) + sizeof(*sin6) * advrtrs;
-		error = SYSCTL_OUT(req, buf, advance);
+#ifndef __FreeBSD__
+		l += advance;
+		if (p)
+			p = (struct in6_prefix *)((caddr_t)p + advance);
+#else
+		error = SYSCTL_OUT(req, pbuf, advance);
 		if (error)
 			break;
-	}
-	return error;
-}
 #endif
+	}
+
+#ifndef __FreeBSD__
+	if (oldp) {
+		*oldlenp = l;	/* (caddr_t)d - (caddr_t)oldp */
+		if (l > ol)
+			error = ENOMEM;
+	} else
+		*oldlenp = l;
+#endif
+
+	return(error);
+}
