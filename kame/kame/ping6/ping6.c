@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.150 2002/03/11 02:02:49 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.151 2002/04/24 07:46:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -318,6 +318,9 @@ main(argc, argv)
 #endif
 	double intval;
 	size_t rthlen;
+#ifdef IPV6_USE_MIN_MTU
+	int mflag = 0;
+#endif
 
 	/* just to be sure */
 	memset(&smsghdr, 0, sizeof(&smsghdr));
@@ -458,7 +461,7 @@ main(argc, argv)
 			break;
 		case 'm':
 #ifdef IPV6_USE_MIN_MTU
-			options |= F_NOMINMTU;
+			mflag++;
 			break;
 #else
 			errx(1, "-%c is not supported on this platform", ch);
@@ -557,6 +560,7 @@ main(argc, argv)
 			/*NOTREACHED*/
 		}
 	}
+
 	argc -= optind;
 	argv += optind;
 
@@ -731,8 +735,9 @@ main(argc, argv)
 		    &optval, sizeof(optval)) == -1)
 			err(1, "IPV6_MULTICAST_HOPS");
 #ifdef IPV6_USE_MIN_MTU
-	if ((options & F_NOMINMTU) == 0) {
-		optval = 1;
+	if (mflag != 1) {
+		optval = mflag > 1 ? 0 : 1;
+
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
 		    &optval, sizeof(optval)) == -1)
 			err(1, "setsockopt(IPV6_USE_MIN_MTU)");
