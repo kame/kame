@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.h,v 1.26 2003/12/08 15:12:31 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.h,v 1.27 2003/12/08 22:09:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -102,9 +102,7 @@ struct mif6ctl {
 	mifi_t	    mif6c_mifi;	    	/* the index of the mif to be added  */
 	u_char	    mif6c_flags;     	/* MIFF_ flags defined below         */
 	u_short	    mif6c_pifi;		/* the index of the physical IF */
-#ifdef notyet
 	u_int	    mif6c_rate_limit;    /* max rate           		     */
-#endif
 };
 
 #define	MIFF_REGISTER	0x1	/* mif represents a register end-point */
