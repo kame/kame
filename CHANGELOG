@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1198 2000/08/15 07:25:28 itojun Exp $
+$KAME: CHANGELOG,v 1.1199 2000/08/15 07:40:49 sumikawa Exp $
 
 <200008> 
+Tue Aug 15 16:39:43 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/postfix: postfix 20000531 + IPv6 patch.
+
 Tue Aug 15 16:24:51 JST 2000  itojun@iijlab.net
 	* kame/sys/net/if_stf.c, kame/sys/netinet/in_gif.c:
 	  repair IN_MULTICAST() check for bsdi/freebsd.
