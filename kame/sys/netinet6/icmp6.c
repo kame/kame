@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.66 2000/02/22 14:04:16 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.67 2000/02/24 09:27:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -192,8 +192,10 @@ icmp6_error(m, type, code, param)
 	icmp6stat.icp6s_error++;
 
 #ifdef M_DECRYPTED	/*not openbsd*/
-	if (m->m_flags & M_DECRYPTED)
+	if (m->m_flags & M_DECRYPTED) {
+		icmp6stat.icp6s_canterror++;
 		goto freeit;
+	}
 #endif
 
 #ifndef PULLDOWN_TEST
