@@ -32,7 +32,7 @@
  * Sun Jan  9 06:23:42 JST 2000
  *    Merged into new racoon with trivial modification.
  */
-/* $Id: signing.c,v 1.1 2000/01/09 01:31:33 itojun Exp $ */
+/* $Id: signing.c,v 1.2 2000/01/18 22:03:48 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -85,7 +85,14 @@ BIO *bio_err=NULL;
  *	does not exist, or the key is not correctly retrieved, then "sign"
  *	returns -1. If everything goes well, it returns 0.
  */
-int sign(void *donnees_source, int taille_donnees_source, char *user, char **signature, int *taille_signature){
+int
+sign(donnees_source, taille_donnees_source, user, signature, taille_signature)
+	void *donnees_source;
+	int taille_donnees_source;
+	char *user;
+	char **signature;
+	int *taille_signature;
+{
 
 
 /* Declaration */
@@ -166,7 +173,14 @@ int sign(void *donnees_source, int taille_donnees_source, char *user, char **sig
  *	from the certificate, then "sign" returns -1. If everything goes
  *	well, it returns 0.
  */
-int check_signature(void *donnees_source, int taille_donnees_source, char *user, char *signature, int taille_signature){
+int
+check_signature(donnees_source, taille_donnees_source, user, signature, taille_signature)
+	void *donnees_source;
+	int taille_donnees_source;
+	char *user;
+	char *signature;
+	int taille_signature;
+{
 
 	/* Declaration */
 	static const char	certfile[]		= "/root/PKI/USERS/";
@@ -238,7 +252,12 @@ int check_signature(void *donnees_source, int taille_donnees_source, char *user,
 //	int *: set certificate_size
 //	char **: points to a certificate pointer
 //////////////////////////////////////////////////////////////////////////////////////////
-int get_certificate(char *user, int *certificate_size, char **certificate) {
+int
+get_certificate(user, certificate_size, certificate)
+	char *user;
+	int *certificate_size;
+	char **certificate;
+{
 
 /* Declaration */
 	static const char	certfile[]		= "/root/PKI/USERS/";
@@ -309,7 +328,11 @@ static int check(X509_STORE *ctx,char *file);
 static int v_verbose=0;
 
 
-int verify_certificate(char *CApath, char *CAfile, char *cert_to_check)
+int
+verify_certificate(CApath, CAfile, cert_to_check)
+	char *CApath;
+	char *CAfile;
+	char *cert_to_check;
 {
 
 	int i = 0;
@@ -348,7 +371,11 @@ end:
 
 
 
-static int check(X509_STORE *ctx, char *file){
+static int
+check(ctx, file)
+	X509_STORE *ctx;
+	char *file;
+{
 
 	X509 *x=NULL;
 	BIO *in=NULL;
@@ -404,9 +431,13 @@ end:
 	if (in != NULL) BIO_free(in);
 
 	return(i);
-	}
+}
 
-static int MS_CALLBACK cb(int ok, X509_STORE_CTX *ctx){
+static int MS_CALLBACK
+cb(ok, ctx)
+	int ok;
+	X509_STORE_CTX *ctx;
+{
 
 	char buf[256];
 
@@ -447,7 +478,12 @@ static int MS_CALLBACK cb(int ok, X509_STORE_CTX *ctx){
 //	return int: 0 if cert is OK or -1 otherwise.
 //
 //////////////////////////////////////////////////////////////////////////////////////////
-int check_certificate(char *user, char *cryptCert, int certificate_size){
+int
+check_certificate(user, cryptCert, certificate_size)
+	char *user;
+	char *cryptCert;
+	int certificate_size;
+{
 
 	static  char	certfile[]		= "/root/PKI/USERS/";
 	char	buf[BUFFER_SIZE],
