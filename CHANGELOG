@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.989 2000/06/10 12:48:22 sakane Exp $
+$Id: CHANGELOG,v 1.990 2000/06/10 14:24:45 sakane Exp $
 
 <200006>
+Sat Jun 10 23:11:41 JST 2000 sakane@ydc.co.jp
+	* kame/sys/netkey/key.c:
+	* kame/kame/libipsec/pfkey.c:
+	* kame/kame/setkey/parse.y:
+	Obsoleted mode specification.  You don't need to specify a mode of
+	SA when you get/delete SA by setkey.  Also, it's not need to do
+	pfkey_send_delete/pfkey_send_get().
+
 Sat Jun 10 15:42:25 JST 2000 sakane@ydc.co.jp
 	* kame/sys/{netkey/key.c,net/pfkeyv2.h}:
 	* kame/kame/{stekey,racoon,libipsec}:
