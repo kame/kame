@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.70 2002/01/23 05:13:28 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.71 2002/01/23 11:47:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2393,6 +2393,19 @@ mip6_validate_ba(m, opt)
 	 * the sequence number of the binding ack received.
 	 */
 	sc = hif_list_find_withhaddr(&ip6->ip6_dst);
+	if (sc == NULL) {
+		/*
+		 * if we receive a binding ack before sending binding
+		 * updates(!), sc will be NULL.  because we search the
+		 * hif interface that have a binding update entry having
+		 * ip6_dst as a home address.
+		 */
+		mip6log((LOG_NOTICE,
+			 "%s:%d: no matching binding update entry found.\n",
+			 __FILE__, __LINE__));
+		/* silently ignore. */
+		return (1);
+	}
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &ip6->ip6_src);
 	if (mbu == NULL) {
 		mip6log((LOG_NOTICE,
