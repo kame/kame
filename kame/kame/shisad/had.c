@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.11 2005/02/18 05:28:01 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.12 2005/02/18 06:04:19 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -42,6 +42,7 @@
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/sysctl.h>
+#include <sys/uio.h>
 #include <sys/ioctl.h>
 #include <ifaddrs.h>
 
