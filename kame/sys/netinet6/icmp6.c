@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.241 2001/08/09 10:19:32 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.242 2001/09/11 11:25:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -748,6 +748,7 @@ icmp6_input(mp, offp, proto)
 		break;
 
 #ifdef MIP6
+	case ICMP6_HADISCOV_REQUEST:
 	case ICMP6_HADISCOV_REPLY:
 		if (code != 0)
 			goto badcode;

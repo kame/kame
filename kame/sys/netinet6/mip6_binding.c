@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.9 2001/09/05 02:33:08 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.10 2001/09/11 11:25:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -231,6 +231,7 @@ mip6_home_registration(sc)
 	struct mip6_subnet *ms;
 	struct mip6_subnet_ha *msha;
 	struct mip6_ha *mha;
+	struct in6_addr *haaddr;
 	struct mip6_subnet_prefix *mspfx;
 	struct mip6_prefix *mpfx;
 	struct mip6_bu *mbu;
@@ -240,17 +241,24 @@ mip6_home_registration(sc)
 	 * first, register to home agent on our home link.
 	 */
 
+	/* find a home subnet */
 	/* XXX home subnet is only one? */
 	hs = TAILQ_FIRST(&sc->hif_hs_list_home);
 	if (hs == NULL) {
 		mip6log((LOG_NOTICE,
-			 "%s: no home subnet info.  you must specify at least one home prefix.\n",
+			 "%s: no home subnet info.  "
+			 "you must specify at least one home prefix.\n",
 			 __FUNCTION__));
 		return (0);
 	}
 	if ((ms = hs->hs_ms) == NULL) {
 		return (EINVAL);
 	}
+
+	/*
+	 * pick one home agent that seems preferable from our home
+	 * subnet.
+	 */
 	msha = mip6_subnet_ha_list_find_preferable(&ms->ms_msha_list);
 	if (msha == NULL) {
 		/*
@@ -262,15 +270,23 @@ mip6_home_registration(sc)
 			 "%s: no home agent.  start ha discovery.\n",
 			 __FUNCTION__));
 		mip6_icmp6_ha_discov_req_output(sc);
-		return (0);
+		haaddr = &in6addr_any;
+	} else {
+		if ((mha = msha->msha_mha) == NULL) {
+			return (EINVAL);
+		}
+		haaddr = &mha->mha_gaddr;
 	}
-	if ((mha = msha->msha_mha) == NULL) {
-		return (EINVAL);
-	}
-	mip6log((LOG_INFO, "%s: our home agent is %s\n",
-		 __FUNCTION__, ip6_sprintf(&mha->mha_gaddr)));
+	mip6log((LOG_INFO,
+		 "%s: our home agent is %s\n",
+		 __FUNCTION__,
+		 ip6_sprintf(haaddr)));
 
-	/* find one prefix to get ifid information. */
+	/* pick one prefix up to get the home address. */
+	/* 
+	 * XXX: which prefix to use to get a home address when we have
+	 * multiple home prefixes.
+	 */
 	if ((mspfx = TAILQ_FIRST(&ms->ms_mspfx_list)) == NULL) {
 		mip6log((LOG_ERR,
 			 "%s: we don't have any home prefix.\n",
@@ -279,16 +295,20 @@ mip6_home_registration(sc)
 	}
 	if ((mpfx = mspfx->mspfx_mpfx) == NULL)
 		return (EINVAL);
-	mip6log((LOG_INFO, "%s: home address is %s\n",
-	    __FUNCTION__, ip6_sprintf(&mpfx->mpfx_haddr)));
+	mip6log((LOG_INFO,
+		 "%s: home address is %s\n",
+		 __FUNCTION__,
+		 ip6_sprintf(&mpfx->mpfx_haddr)));
 
 	/* search a BU entry for our home agent */
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-					  &mha->mha_gaddr);
+					  haaddr);
 	if (mbu == NULL) {
-		/* we don't have any BU for home regsitration yet.
-		   create it. */
-		mbu = mip6_bu_create(&mha->mha_gaddr, mpfx, &hif_coa,
+		/*
+		 * we don't have any BU for home regsitration yet.
+		 * create it.
+		 */
+		mbu = mip6_bu_create(haaddr, mpfx, &hif_coa,
 				     IP6_BUF_ACK|IP6_BUF_HOME, sc);
 		if (mbu == NULL)
 			return (ENOMEM);
@@ -296,7 +316,9 @@ mip6_home_registration(sc)
 		LIST_INSERT_HEAD(&sc->hif_bu_list, mbu, mbu_entry);
 		/* XXX mip6_bu_list_insert(&sc->hif_bu_list, mbu); */
 	} else {
-		/* an BU entry for home registration already exists. */
+		/*
+		 * an BU entry for home registration already exists.
+		 */
 		if (sc->hif_location == HIF_LOCATION_HOME) {
 			/* un-registration. */
 			mbu->mbu_coa = hif_coa;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.8 2001/09/05 02:33:08 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.9 2001/09/11 11:25:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -85,6 +85,8 @@
 
 extern struct mip6_bc_list mip6_bc_list;
 
+u_int16_t mip6_hadiscovid = 0;
+
 static struct in6_addr haanyaddr_ifid64 =
 	{{{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	    0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe }}};
@@ -96,6 +98,8 @@ static void mip6_icmp6_find_addr __P((caddr_t, int,
 				      struct in6_addr **, struct in6_addr **));
 static int mip6_icmp6_ha_discov_req_input __P((struct mbuf *, int, int));
 static int mip6_icmp6_ha_discov_rep_input __P((struct mbuf *, int, int));
+static int mip6_ha_discov_ha_list_insert __P((struct hif_softc *,
+					      struct mip6_ha *));
 static int mip6_icmp6_create_haanyaddr __P((struct in6_addr *,
 					    struct mip6_prefix *));
 static int mip6_icmp6_create_linklocal __P((struct in6_addr *,
@@ -433,7 +437,7 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 	int icmp6len;
 {
 	struct ifnet *rifp = m->m_pkthdr.rcvif;
-	struct ip6_hdr *ip6;
+	struct ip6_hdr *ip6, *ip6_rep;
 	struct icmp6_hdr *icmp6;
 	struct ha_discov_req *hdreq;
 	struct ha_discov_rep *hdrep;
@@ -443,6 +447,7 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 	struct in6_addr *halist;
 	int halistlen;
 	struct mbuf *n;
+	int error = 0;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	/* ha_discov_req may not continuous */
@@ -457,7 +462,7 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 	haifa = in6_ifawithifp(rifp, haddr);
 
 	/* XXX TODO */
-	/* correct ha list on the home link and create a list */
+	/* collect ha list on the home link and create a list */
 
 	/* create a home agent address list */
 	/* XXX */
@@ -483,18 +488,19 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 		haddr = &ip6->ip6_src;
 	}
 	hdreplen = sizeof(*hdrep);
-	n = mip6_create_ip6hdr(&haifa->ia_addr.sin6_addr, haddr,
+	n = mip6_create_ip6hdr(&haifa->ia_addr.sin6_addr, &ip6->ip6_src,
 			       IPPROTO_ICMPV6, hdreplen + halistlen);
 	if (n == NULL) {
-		mip6log((LOG_ERR, "%s: mbuf allocation failed\n",
+		mip6log((LOG_ERR,
+			 "%s: mbuf allocation failed\n",
 			 __FUNCTION__));
 		/* free the input packet */
 		m_freem(m);
 		FREE(halist, M_TEMP);
 		return (ENOBUFS);
 	}
-	hdrep = (struct ha_discov_rep *)
-		((caddr_t)mtod(n, struct ip6_hdr *) + 1);
+	ip6_rep = mtod(n, struct ip6_hdr *);
+	hdrep = (struct ha_discov_rep *)(ip6_rep + 1);
 	hdrep->discov_rep_type = ICMP6_HADISCOV_REPLY;
 	hdrep->discov_rep_code = 0;
 	hdrep->discov_rep_cksum = 0;
@@ -509,6 +515,13 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 					    n->m_pkthdr.len
 					    - sizeof(struct ip6_hdr));
 
+	error = ip6_output(n, NULL, NULL, 0, NULL, NULL);
+	if (error) {
+		mip6log((LOG_ERR,
+			 "%s: send failed (errno = %d)\n",
+			 __FUNCTION__, error));
+	}
+
 	return (0);
 }
 
@@ -520,20 +533,36 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 {
 	struct ip6_hdr *ip6;
 	struct ha_discov_rep *hdrep;
-	struct mip6_ha *mha, *mha_next;
+	u_int16_t hdrep_id;
+	struct mip6_ha *mha, *mha_next, *mha_prefered = NULL;
 	struct in6_addr *haaddrs, *haaddrptr, lladdr;
 	int i, hacount = 0, found = 0;
 	struct hif_softc *sc;
+	struct mip6_bu *mbu;
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	hdrep = mtod(m, struct ha_discov_rep *);
+	hdrep = (struct ha_discov_rep *)(ip6 + 1);
 	haaddrs = (struct in6_addr *)(hdrep + 1);
 
 	/* sainty check ... */
 	if (hdrep->discov_rep_code != 0)
-		return (-1);
+		return (EINVAL);
 
-	/* XXX check icmp6->discov_rep_id */
+	/* find hif that matches this receiving hadiscovid. */
+	hdrep_id = hdrep->discov_rep_id;
+	hdrep_id = ntohs(hdrep_id);
+	for (sc = TAILQ_FIRST(&hif_softc_list);
+	     sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
+		if (sc->hif_hadiscovid == hdrep_id)
+			break;
+	}
+	if (sc == NULL) {
+		/*
+		 * no matching hif.  maybe this reply is too late.
+		 */
+		return (0);
+	}
 
 	/*
 	 * check if the home agent list contains sending home agent's
@@ -543,7 +572,7 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 		/ sizeof(struct in6_addr);
 	haaddrptr = haaddrs;
 	for (i = 0; i < hacount; i++) {
-		/* XXX check if these addresses are global. */
+		/* XXX: check if these addresses are global. */
 		if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_src, haaddrptr)) {
 			found = 1;
 			break;
@@ -551,52 +580,70 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 		haaddrptr++;
 	}
 
-	/* remove existing HA list. */
-	for(mha = LIST_FIRST(&mip6_ha_list); mha != NULL; mha = mha_next) {
-		mha_next = LIST_NEXT(mha, mha_entry);
-
-		mip6_ha_list_remove(&mip6_ha_list, mha);
-	}
-
 	/*
 	 * install homeagent to the list.
 	 */
 	if (found == 0) {
 		/* 
-		 * if the HA list doesn't include the addr of 
+		 * if the HA list doesn't include an addr of 
 		 * ip_src field, the addr is considered as a most 
 		 * preferable.
 		 * draft-13 9.2
 		 */
 		/* XXX how do we make the HA specified in the ip src field
 		   as a most preferable one ? */
-		mip6_icmp6_create_linklocal(&lladdr, &ip6->ip6_src);
-		mha = mip6_ha_create(&lladdr, &ip6->ip6_src,
-				     ND_RA_FLAG_HOME_AGENT,
-				     0, MIP6_HA_DEFAULT_LIFETIME);
-		if (mha == NULL) {
-			mip6log((LOG_ERR, "%s: mip6_ha create failed\n",
-				 __FUNCTION__));
-			return (-1);
+		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &ip6->ip6_src);
+		if (mha) {
+			/*
+			 * if this ha already exists in the list,
+			 * update its lifetime.
+			 */
+			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME;
+		} else {
+			/*
+			 * create a new ha entry and insert to mip6_ha_list.
+			 */
+			mip6_icmp6_create_linklocal(&lladdr, &ip6->ip6_src);
+			mha = mip6_ha_create(&lladdr, &ip6->ip6_src,
+					     ND_RA_FLAG_HOME_AGENT,
+					     0, MIP6_HA_DEFAULT_LIFETIME);
+			if (mha == NULL) {
+				mip6log((LOG_ERR,
+					 "%s: mip6_ha create failed\n",
+					 __FUNCTION__));
+				return (ENOMEM);
+			}
+			mip6_ha_list_insert(&mip6_ha_list, mha);
+			mip6_ha_discov_ha_list_insert(sc, mha);
 		}
-		mip6_ha_list_insert(&mip6_ha_list, mha);
+		mha_prefered = mha;
 	}
 
 	/* install HAs specified in the HA list */
 	haaddrptr = haaddrs;
 	for (i = 0; i < hacount; i++) {
-		mip6_icmp6_create_linklocal(&lladdr, haaddrptr);
-		mha = mip6_ha_create(&lladdr, haaddrptr,
-				     ND_RA_FLAG_HOME_AGENT,
-				     0, MIP6_HA_DEFAULT_LIFETIME);
-		if (mha == NULL) {
-			mip6log((LOG_ERR, "%s: mip6_ha create failed\n",
-				 __FUNCTION__));
-			return (-1);
+		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, haaddrptr);
+		if (mha) {
+			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME;
+		} else {
+			mip6_icmp6_create_linklocal(&lladdr, haaddrptr);
+			mha = mip6_ha_create(&lladdr, haaddrptr,
+					     ND_RA_FLAG_HOME_AGENT,
+					     0, MIP6_HA_DEFAULT_LIFETIME);
+			if (mha == NULL) {
+				mip6log((LOG_ERR,
+					 "%s: mip6_ha create failed\n",
+					 __FUNCTION__));
+				return (ENOMEM);
+			}
+			mip6_ha_list_insert(&mip6_ha_list, mha);
+			mip6_ha_discov_ha_list_insert(sc, mha);
 		}
-		mip6_ha_list_insert(&mip6_ha_list, mha);
+		if (mha_prefered == NULL)
+			mha_prefered = mha;
 	}
 
+#if 0
 	/* register to the new home agent. */
 	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
 	     sc = TAILQ_NEXT(sc, hif_entry)) {
@@ -604,6 +651,58 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 			continue;
 
 		mip6_home_registration(sc);
+	}
+#endif
+	/* XXX */
+	/* search bu_list and do home registration pending. */
+	for (mbu = LIST_FIRST(&sc->hif_bu_list); mbu;
+	     mbu = LIST_NEXT(mbu, mbu_entry)) {
+		if ((mbu->mbu_flags & IP6_BUF_HOME)
+		    && IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr)) {
+			/* home registration */
+			mbu->mbu_paddr = mha_prefered->mha_gaddr;
+		}
+	}
+
+	return (0);
+}
+
+static int
+mip6_ha_discov_ha_list_insert(sc, mha)
+	struct hif_softc *sc;
+	struct mip6_ha *mha;
+{
+	struct hif_subnet *hs;
+	struct mip6_subnet *ms;
+	struct mip6_subnet_ha *msha;
+	int error = 0;
+
+	hs = TAILQ_FIRST(&sc->hif_hs_list_home);
+	if (hs == NULL) {
+		/* must not happen */
+		mip6log((LOG_ERR,
+			 "%s: receive dhaad reply.  "
+			 "but we have no home subnet???\n",
+			 __FUNCTION__));
+		return (EINVAL);
+	}
+	if ((ms = hs->hs_ms) == NULL)
+		return (EINVAL);
+
+	msha = mip6_subnet_ha_create(mha);
+	if (msha == NULL) {
+		mip6log((LOG_ERR,
+			 "%s: can't create msha\n",
+			 __FUNCTION__));
+		return (ENOMEM);
+	}
+
+	error = mip6_subnet_ha_list_insert(&ms->ms_msha_list, msha);
+	if (error) {
+		mip6log((LOG_ERR,
+			 "%s: insert msha entry to msha_list failed.\n",
+			 __FUNCTION__));
+		return (EINVAL);
 	}
 
 	return (0);
@@ -645,7 +744,7 @@ mip6_icmp6_ha_discov_req_output(sc)
 		return (ENOBUFS);
 	}
 
-	sc->hif_hadiscovid++; /* XXX ??? */
+	sc->hif_hadiscovid = mip6_hadiscovid++;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	hdreq = (struct ha_discov_req *)(ip6 + 1);

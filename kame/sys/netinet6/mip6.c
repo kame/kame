@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.48 2001/09/05 02:33:08 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.49 2001/09/11 11:25:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1301,6 +1301,17 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		 * this means the peer doesn't support MIP6 (at least
 		 * BU destopt).  we should not send BU to such a peer.
 		 */
+		return (0);
+	}
+	if (IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr)) {
+		/*
+		 * the peer addr is unspecified.  this happens when
+		 * home registration occurs but no home agent address
+		 * is known.
+		 */
+		mip6log((LOG_INFO,
+			 "%s: the peer addr is unspecified.\n",
+			 __FUNCTION__));
 		return (0);
 	}
 	if (!(mbu->mbu_state & MIP6_BU_STATE_WAITSENT)) {
