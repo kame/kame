@@ -487,8 +487,6 @@ struct icmp6_filter {
 #define	ICMP6_FILTER_WILLBLOCK(type, filterp) \
 	((((filterp)->icmp6_filter[(type) >> 5]) & (1 << ((type) & 31))) == 0)
 
-
-#if defined(__FreeBSD__) || defined(__NetBSD__)
 /*
  * Variables related to this implementation
  * of the internet control message protocol version 6.
@@ -539,65 +537,6 @@ struct icmp6stat {
 	{ "nd6_useloopback", CTLTYPE_INT }, \
 	{ "nd6_proxyall", CTLTYPE_INT }, \
 }
-#endif /*__FreeBSD__*/
-#ifdef __bsdi__
-/*
- * Variables related to this implementation
- * of the internet control message protocol version 6.
- */
-struct icmp6stat {
-/* statistics related to icmp6 packets generated */
-	u_quad_t icp6s_error;		/* # of calls to icmp6_error */
-	u_quad_t icp6s_canterror;	/* no error 'cuz old was icmp */
-	u_quad_t icp6s_toofreq;		/* no error 'cuz rate limitation */
-	u_quad_t icp6s_outhist[256];
-/* statistics related to input messages proccesed */
-	u_quad_t icp6s_badcode;		/* icmp6_code out of range */
-	u_quad_t icp6s_tooshort;	/* packet < sizeof(struct icmp6_hdr) */
-	u_quad_t icp6s_checksum;	/* bad checksum */
-	u_quad_t icp6s_badlen;		/* calculated bound mismatch */
-	u_quad_t icp6s_reflect;		/* number of responses */
-	u_quad_t icp6s_inhist[256];	
-};
-
-/*
- * Names for ICMP sysctl objects
- */
-#define ICMPV6CTL_REDIRACCEPT		2	/* accept/process redirects */
-#define ICMPV6CTL_REDIRTIMEOUT		3	/* redirect cache time */
-#define ICMPV6CTL_PRINTFS		4	/* redirect cache time */
-#define ICMPV6CTL_STATS			5	/* statistics */
-#define ICMPV6CTL_ERRRATELIMIT		6	/* ICMPv6 error rate limitation */
-#define ICMPV6CTL_ND6_PRUNE		7
-#define ICMPV6CTL_ND6_DELAY		9
-#define ICMPV6CTL_ND6_UMAXTRIES		10
-#define ICMPV6CTL_ND6_MMAXTRIES		11
-#define ICMPV6CTL_ND6_USELOOPBACK	12
-#define ICMPV6CTL_ND6_PROXYALL		13
-#define ICMPV6CTL_MAXID			14
-
-#ifdef ICMP6PRINTFS
-#define __ICMP6PRINTFS	&icmp6printfs
-#else
-#define __ICMP6PRINTFS	0
-#endif
-
-#define ICMPV6CTL_NAMES { \
-	{ 0, 0 }, \
-	{ 0, 0 }, \
-	{ "rediraccept",   CTLTYPE_INT }, 	\
-	{ "redirtimeout",  CTLTYPE_INT }, 	\
-	{ "printfs", CTLTYPE_INT },		\
-	{ 0, 0 },		\
-	{ "errratelimit", CTLTYPE_INT }, \
-	{ "nd6_prune", CTLTYPE_INT },		\
-	{ 0, 0 }, \
-	{ "nd6_delay", CTLTYPE_INT },		\
-	{ "nd6_umaxtries", CTLTYPE_INT },	\
-	{ "nd6_mmaxtries", CTLTYPE_INT },	\
-	{ "nd6_useloopback", CTLTYPE_INT },	\
-	{ "nd6_proxyall", CTLTYPE_INT },	\
-}
 
 #define ICMPV6CTL_VARS { \
 	0, \
@@ -615,7 +554,6 @@ struct icmp6stat {
 	&nd6_useloopback, \
 	&nd6_proxyall, \
 }
-#endif /*__bsdi__*/
 
 #define RTF_PROBEMTU	RTF_PROTO1
 
@@ -638,9 +576,9 @@ void	icmp6_redirect_output __P((struct mbuf *, struct rtentry *));
 int	icmp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 void	icmp6_mtuexpire __P((struct rtentry *, struct rttimer *));
 #endif /*__bsdi__*/
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 int	icmp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
-#endif /* __NetBSD__ */
+#endif
 
 extern struct	icmp6stat icmp6stat;
 extern int	icmp6_rediraccept;	/* accept/process redirects */

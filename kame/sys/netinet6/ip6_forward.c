@@ -46,11 +46,10 @@
 #include <netinet/in_var.h>
 #include <netinet6/in6_systm.h>
 #include <netinet6/ip6.h>
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
-#include <netinet6/in6_pcb.h>
-#endif
 #include <netinet6/ip6_var.h>
 #include <netinet6/icmp6.h>
+
+#include <net/net_osdep.h>
 
 struct	route_in6 ip6_forward_rt;
 
@@ -95,7 +94,7 @@ ip6_forward(m, srcrt)
 			    ip6_sprintf(&ip6->ip6_src), /* XXX meaningless */
 			    ip6_sprintf(&ip6->ip6_dst),
 			    ip6->ip6_nxt,
-			    m->m_pkthdr.rcvif->if_xname);
+			    if_name(m->m_pkthdr.rcvif));
 		}
 		m_freem(m);
 		return;
@@ -120,11 +119,11 @@ ip6_forward(m, srcrt)
 				ip6_forward_rt.ro_rt = 0;
 			}
 			/* this probably fails but give it a try again */
-#ifdef __NetBSD__
-			rtalloc((struct route *)&ip6_forward_rt);
-#else
+#ifdef __FreeBSD__
 			rtalloc_ign((struct route *)&ip6_forward_rt,
 				    RTF_PRCLONING);
+#else
+			rtalloc((struct route *)&ip6_forward_rt);
 #endif
 		}
 		
@@ -145,10 +144,10 @@ ip6_forward(m, srcrt)
 		dst->sin6_family = AF_INET6;
 		dst->sin6_addr = ip6->ip6_dst;
 
-#ifdef __NetBSD__
-		rtalloc((struct route *)&ip6_forward_rt);
-#else
+#ifdef __FreeBSD__
   		rtalloc_ign((struct route *)&ip6_forward_rt, RTF_PRCLONING);
+#else
+		rtalloc((struct route *)&ip6_forward_rt);
 #endif
 		if (ip6_forward_rt.ro_rt == 0) {
 			ip6stat.ip6s_noroute++;

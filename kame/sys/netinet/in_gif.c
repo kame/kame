@@ -72,9 +72,9 @@
 
 #include "gif.h"
 
-#ifdef __NetBSD__
 #include <machine/stdarg.h>
-#endif
+
+#include <net/net_osdep.h>
 
 #if NGIF > 0
 int ip_gif_ttl = GIF_TTL;
@@ -220,13 +220,6 @@ in_gif_output(ifp, family, m, rt)
 }
 
 void
-#ifndef __NetBSD__
-in_gif_input(m, off, proto)
-	struct mbuf *m;
-	int off;
-	int proto;
-{
-#else /* __NetBSD__ */
 #if __STDC__
 in_gif_input(struct mbuf *m, ...)
 #else
@@ -236,7 +229,6 @@ in_gif_input(m, va_alist)
 #endif
 {
 	int off, proto;
-#endif /* __NetBSD__ */
 	struct gif_softc *sc;
 	struct ifnet *gifp = NULL;
 	struct ip *ip;
@@ -246,12 +238,10 @@ in_gif_input(m, va_alist)
 #endif /* __NetBSD__ */
 	u_int8_t otos;
 
-#ifdef __NetBSD__
 	va_start(ap, m);
 	off = va_arg(ap, int);
 	proto = va_arg(ap, int);
 	va_end(ap);
-#endif /* __NetBSD__ */
 
 	ip = mtod(m, struct ip *);
 

@@ -97,8 +97,10 @@ struct	in6_ifaddr {
 	struct	sockaddr_in6 ia_prefixmask; /* prefix mask */
 	u_int32_t ia_plen;		/* prefix length */
 	struct	in6_ifaddr *ia_next;	/* next in6 list of IP6 addresses */
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	LIST_HEAD(in6_multihead, in6_multi) ia6_multiaddrs;
 					/* list of multicast addresses */
+#endif
 	int	ia6_flags;
 
 	struct in6_addrlifetime ia6_lifetime;	/* NULL = infty */
@@ -288,10 +290,28 @@ MALLOC_DECLARE(M_IPMADDR);
  * Macro for finding the internet address structure (in6_ifaddr) corresponding
  * to a given interface (ifnet structure).
  */
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+
 #define IFP_TO_IA6(ifp, ia)				\
 /* struct ifnet *ifp; */				\
 /* struct in6_ifaddr *ia; */				\
 {									\
+	struct ifaddr *ifa;						\
+	for (ifa = (ifp)->if_addrlist; ifa; ifa = ifa->ifa_next) {	\
+		if (!ifa->ifa_addr)					\
+			continue;					\
+		if (ifa->ifa_addr->sa_family == AF_INET6)		\
+			break;						\
+	}								\
+	(ia) = (struct in6_ifaddr *)ifa;				\
+}
+
+#else
+
+#define IFP_TO_IA6(ifp, ia)				\
+/* struct ifnet *ifp; */				\
+/* struct in6_ifaddr *ia; */				\
+do {									\
 	struct ifaddr *ifa;						\
 	for (ifa = (ifp)->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next) {	\
 		if (!ifa->ifa_addr)					\
@@ -300,8 +320,10 @@ MALLOC_DECLARE(M_IPMADDR);
 			break;						\
 	}								\
 	(ia) = (struct in6_ifaddr *)ifa;				\
-}
+} while (0)
 #endif /* _KERNEL */
+
+#endif
 
 /*
  * Multi-cast membership entry.  One for each group/ifp that a PCB
@@ -316,13 +338,21 @@ struct	in6_multi {
 	LIST_ENTRY(in6_multi) in6m_entry; /* list glue */
 	struct	in6_addr in6m_addr;	/* IP6 multicast address */
 	struct	ifnet *in6m_ifp;	/* back pointer to ifnet */
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct	in6_ifaddr *in6m_ia;    /* back pointer to in6_ifaddr */ 
+#else
+	struct	ifmultiaddr *in6m_ifma;	/* back pointer to ifmultiaddr */
+#endif
 	u_int	in6m_refcount;		/* # membership claims by sockets */
 	u_int	in6m_state;		/* state of the membership */
 	u_int	in6m_timer;		/* MLD6 listener report timer */
 };
 
 #ifdef _KERNEL
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+extern LIST_HEAD(in6_multihead, in6_multi) in6_multihead;
+#endif
+
 /*
  * Structure used by macros below to remember position when stepping through
  * all of eht in6_multi records.
@@ -338,23 +368,23 @@ struct	in6_multistep {
  * returns NLL.
  */
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+
 #define IN6_LOOKUP_MULTI(addr, ifp, in6m)			\
 /* struct in6_addr addr; */					\
 /* struct ifnet *ifp; */					\
 /* struct in6_multi *in6m; */					\
-{								\
-	register struct in6_ifaddr *ia;				\
-								\
-	IFP_TO_IA6((ifp), ia);					\
-	if (ia == NULL)						\
-	  	(in6m) = NULL;					\
-	else							\
-		for ((in6m) = ia->ia6_multiaddrs.lh_first;	\
-		     (in6m) != NULL &&				\
-		     !IN6_ARE_ADDR_EQUAL(&(in6m)->in6m_addr, &(addr));	\
-		     (in6m) = in6m->in6m_entry.le_next)		\
-			continue;				\
-}
+do { \
+	register struct ifmultiaddr *ifma; \
+	for (ifma = (ifp)->if_multiaddrs.lh_first; ifma; \
+	     ifma = ifma->ifma_link.le_next) { \
+		if (ifma->ifma_addr->sa_family == AF_INET6 \
+		    && IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6 *)ifma->ifma_addr)->sin6_addr, \
+					  &(addr))) \
+			break; \
+	} \
+	(in6m) = (struct in6_multi *)(ifma ? ifma->ifma_protospec : 0); \
+} while(0)
 
 /*
  * Macro to step through all of the in6_multi records, one at a time.
@@ -366,7 +396,50 @@ struct	in6_multistep {
 #define IN6_NEXT_MULTI(step, in6m)					\
 /* struct in6_multistep step; */					\
 /* struct in6_multi *in6m; */						\
-{									\
+do { \
+	if (((in6m) = (step).i_in6m) != NULL) \
+		(step).i_in6m = (step).i_in6m->in6m_entry.le_next; \
+} while(0)
+
+#define IN6_FIRST_MULTI(step, in6m)		\
+/* struct in6_multistep step; */		\
+/* struct in6_multi *in6m */			\
+do { \
+	(step).i_in6m = in6_multihead.lh_first; \
+		IN6_NEXT_MULTI((step), (in6m)); \
+} while(0)
+
+#else /* not FreeBSD3 */
+
+#define IN6_LOOKUP_MULTI(addr, ifp, in6m)			\
+/* struct in6_addr addr; */					\
+/* struct ifnet *ifp; */					\
+/* struct in6_multi *in6m; */					\
+do {								\
+	register struct in6_ifaddr *ia;				\
+								\
+	IFP_TO_IA6((ifp), ia);					\
+	if (ia == NULL)						\
+	  	(in6m) = NULL;					\
+	else							\
+		for ((in6m) = ia->ia6_multiaddrs.lh_first;	\
+		     (in6m) != NULL &&				\
+		     !IN6_ARE_ADDR_EQUAL(&(in6m)->in6m_addr, &(addr));	\
+		     (in6m) = in6m->in6m_entry.le_next)		\
+			continue;				\
+} while (0)
+
+/*
+ * Macro to step through all of the in6_multi records, one at a time.
+ * The current position is remembered in "step", which the caller must
+ * provide.  IN6_FIRST_MULTI(), below, must be called to initialize "step"
+ * and get the first record.  Both macros return a NULL "in6m" when there
+ * are no remaining records.
+ */
+#define IN6_NEXT_MULTI(step, in6m)					\
+/* struct in6_multistep step; */					\
+/* struct in6_multi *in6m; */						\
+do {									\
 	if (((in6m) = (step).i_in6m) != NULL)				\
 		(step).i_in6m = (in6m)->in6m_entry.le_next;		\
 	else								\
@@ -378,16 +451,18 @@ struct	in6_multistep {
 				break;					\
 			}						\
 		}							\
-}
+} while (0)
 
 #define IN6_FIRST_MULTI(step, in6m)		\
 /* struct in6_multistep step; */		\
 /* struct in6_multi *in6m */			\
-{						\
+do {						\
 	(step).i_ia = in6_ifaddr;		\
 	(step).i_in6m = NULL;			\
 	IN6_NEXT_MULTI((step), (in6m));		\
-}
+} while (0)
+
+#endif /* not FreeBSD3 */
 
 int	in6_ifinit __P((struct ifnet *,
 			struct in6_ifaddr *, struct sockaddr_in6 *, int));
@@ -395,6 +470,7 @@ struct	in6_multi *in6_addmulti __P((struct in6_addr *, struct ifnet *,
 				     int *));
 void	in6_delmulti __P((struct in6_multi *));
 void	in6_ifscrub __P((struct ifnet *, struct in6_ifaddr *));
+extern int in6_ifindex2scopeid __P((int));
 extern int in6_mask2len __P((struct in6_addr *));
 extern void in6_len2mask __P((struct in6_addr *, int));
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)

@@ -119,6 +119,8 @@
 #include "gif.h"
 #include "bpfilter.h"
 
+#include <net/net_osdep.h>
+
 extern struct domain inet6domain;
 extern struct ip6protosw inet6sw[];
 #ifdef __bsdi__
@@ -176,7 +178,9 @@ ip6_init()
 	in6_iflladdr = malloc(i, M_IFADDR, M_WAITOK);
 	bzero(in6_iflladdr, i);
 
+#ifndef __FreeBSD__
 	ip6_init2((void *)0);
+#endif
 }
 
 static void
@@ -189,8 +193,12 @@ ip6_init2(dummy)
 	 * to route local address of p2p link to loopback,
 	 * assign loopback address first. 
 	 */
+#ifdef __bsdi__
+	in6_ifattach(&loif, IN6_IFT_LOOP, NULL, 0);
+#else
 	for (i = 0; i < NLOOP; i++)
 		in6_ifattach(&loif[i], IN6_IFT_LOOP, NULL, 0);
+#endif
 
 	/* get EUI64 from somewhere, attach pseudo interfaces */
 	if (in6_ifattach_getifid(NULL) == 0)
@@ -260,8 +268,13 @@ ip6_input(m)
 			ip6stat.ip6s_mext1++;
 	} else {
 		if (m->m_next) {
-			if (m->m_flags & M_LOOP)
+			if (m->m_flags & M_LOOP) {
+#ifdef __bsdi__
+				ip6stat.ip6s_m2m[loif.if_index]++;	/*XXX*/
+#else
 				ip6stat.ip6s_m2m[loif[0].if_index]++;	/*XXX*/
+#endif
+			}
 			else if (m->m_pkthdr.rcvif->if_index <= 31)
 				ip6stat.ip6s_m2m[m->m_pkthdr.rcvif->if_index]++;
 			else
@@ -422,6 +435,28 @@ ip6_input(m)
 	}
 #endif
 
+#ifdef __OpenBSD__
+    {
+	/*
+	 * Last resort: check in6_ifaddr for incoming interface.
+	 * The code is here until I update the "goto ours hack" code above
+	 * working right.
+	 */
+	struct ifaddr *ifa;
+	for (ifa = m->m_pkthdr.rcvif->if_addrlist.tqh_first;
+	     ifa;
+	     ifa = ifa->ifa_list.tqe_next) {
+		if (ifa->ifa_addr == NULL)
+			continue;	/* just for safety */
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+		if (IN6_ARE_ADDR_EQUAL(&IFA_IN6(ifa), &ip6->ip6_dst)) {
+			ours = 1;
+			goto hbhcheck;
+		}
+	}
+    }
+#endif
 	/*
 	 * Now there is no reason to process the packet if it's not our own
 	 * and we're not a router.
@@ -955,7 +990,7 @@ u_char	inet6ctlerrmap[PRC_NCMDS] = {
 	ENOPROTOOPT
 };
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <vm/vm.h>
 #include <sys/sysctl.h>
 
@@ -1014,4 +1049,4 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	}
 	/* NOTREACHED */
 }
-#endif /* __NetBSD__ */
+#endif /* __NetBSD__ || __OpenBSD__ */

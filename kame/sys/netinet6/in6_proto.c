@@ -72,6 +72,9 @@
 #include <sys/kernel.h>
 #include <sys/domain.h>
 #include <sys/mbuf.h>
+#ifdef __FreeBSD__
+#include <sys/sysctl.h>
+#endif
 
 #include <net/if.h>
 #include <net/radix.h>
@@ -141,6 +144,8 @@
 #include <netinet6/in6_gif.h>
 #endif
 
+#include <net/net_osdep.h>
+
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member))
 
 /*
@@ -148,17 +153,27 @@
  */
 
 extern	struct domain inet6domain;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+static struct pr_usrreqs nousrreqs;
+#endif
 
 struct ip6protosw inet6sw[] = {
 { 0,		&inet6domain,	IPPROTO_IPV6,	0,
   0,		0,		0,		0,
   0,
-  ip6_init,	0,		frag6_slowtimo,	frag6_drain,	ip6_sysctl
+  ip6_init,	0,		frag6_slowtimo,	frag6_drain,
+#ifndef __FreeBSD__
+  ip6_sysctl,
+#else
+# if __FreeBSD__ >= 3
+  &nousrreqs,
+# endif
+#endif
 },
 { SOCK_DGRAM,	&inet6domain,	IPPROTO_UDP,	PR_ATOMIC | PR_ADDR,
   udp6_input,	0,		udp6_ctlinput,	ip6_ctloutput,
   udp6_usrreq,
-  udp6_init,	0,		0,		0,		udp6_sysctl
+  udp6_init,	0,		0,		0,		udp6_sysctl,
 },
 #ifdef TCP6
 { SOCK_STREAM,	&inet6domain,	IPPROTO_TCP,	PR_CONNREQUIRED | PR_WANTRCVD,
@@ -296,8 +311,15 @@ int	ip6_keepfaith = 0;
 time_t	ip6_log_time = (time_t)0L;
 
 /* icmp6 */
+#ifndef __bsdi__
+/*
+ * BSDI4 defines these variables in in_proto.c...
+ * XXX: what if we don't define INET? Should we define pmtu6_expire
+ * or so? (jinmei@kame.net 19990310)
+ */
 int pmtu_expire = 60*10;
 int pmtu_probe = 60*2;
+#endif
 
 /* raw IP6 parameters */
 /*

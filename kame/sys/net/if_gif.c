@@ -42,7 +42,9 @@
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/errno.h>
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if defined(__FreeBSD__) || __FreeBSD__ >= 3
+/*nothing*/
+#else
 #include <sys/ioctl.h>
 #endif
 #include <sys/time.h>
@@ -79,6 +81,8 @@
 #include "gif.h"
 #include "bpfilter.h"
 
+#include <net/net_osdep.h>
+
 #if NGIF > 0
 
 void gifattach __P((void *));
@@ -99,7 +103,12 @@ gifattach(dummy)
 	gif = sc = malloc (ngif * sizeof(struct gif_softc), M_DEVBUF, M_WAIT);
 	bzero(sc, ngif * sizeof(struct gif_softc));
 	for (i = 0; i < ngif; sc++, i++) {
+#ifdef __NetBSD__
 		sprintf(sc->gif_if.if_xname, "gif%d", i);
+#else
+		sc->gif_if.if_name = "gif";
+		sc->gif_if.if_unit = i;
+#endif
 		sc->gif_if.if_mtu    = GIF_MTU;
 		sc->gif_if.if_flags  = IFF_POINTOPOINT | IFF_MULTICAST;
 		sc->gif_if.if_ioctl  = gif_ioctl;
@@ -107,7 +116,11 @@ gifattach(dummy)
 		sc->gif_if.if_type   = IFT_GIF;
 		if_attach(&sc->gif_if);
 #if NBPFILTER > 0
+#ifdef HAVE_OLD_BPF
+		bpfattach(&sc->gif_if, DLT_NULL, sizeof(u_int));
+#else
 		bpfattach(&sc->gif_if.if_bpf, &sc->gif_if, DLT_NULL, sizeof(u_int));
+#endif
 #endif
 	}
 }
@@ -144,7 +157,11 @@ gif_output(ifp, m, dst, rt)
 		goto end;
 	}
 
+#if defined(__FreeBSD__) || __FreeBSD__ >= 3
+	getmicrotime(&ifp->if_lastchange);	
+#else
 	ifp->if_lastchange = time;	
+#endif
 	m->m_flags &= ~(M_BCAST|M_MCAST);
 	if (!(ifp->if_flags & IFF_UP) ||
 #if 0	    
@@ -172,7 +189,11 @@ gif_output(ifp, m, dst, rt)
 		m0.m_len = 4;
 		m0.m_data = (char *)&af;
 		
+#ifdef HAVE_OLD_BPF
+		bpf_mtap(ifp, &m0);
+#else
 		bpf_mtap(ifp->if_bpf, &m0);
+#endif
 	}
 #endif
 	ifp->if_opackets++;	
@@ -242,7 +263,11 @@ gif_input(m, af, gifp)
 		m0.m_len = 4;
 		m0.m_data = (char *)&af;
 		
+#ifdef HAVE_OLD_BPF
+		bpf_mtap(gifp, &m0);
+#else
 		bpf_mtap(gifp->if_bpf, &m0);
+#endif
 	}
 #endif /*NBPFILTER > 0*/
 
@@ -314,6 +339,7 @@ gif_ioctl(ifp, cmd, data)
 
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		switch (ifr->ifr_addr.sa_family) {
 #ifdef INET
 		case AF_INET:	/* IP supports Multicast */
@@ -327,6 +353,7 @@ gif_ioctl(ifp, cmd, data)
 			error = EAFNOSUPPORT;
 			break;
 		}
+#endif /*not FreeBSD3*/
 		break;
 
 #ifdef	SIOCSIFMTU /* xxx */

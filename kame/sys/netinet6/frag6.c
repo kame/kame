@@ -46,11 +46,13 @@
 #include <netinet/in_var.h>
 #include <netinet6/in6_systm.h>
 #include <netinet6/ip6.h>
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet6/ip6_var.h>
 #include <netinet6/icmp6.h>
+
+#include <net/net_osdep.h>
 
 static void frag6_enq __P((struct ip6asfrag *, struct ip6asfrag *));
 static void frag6_deq __P((struct ip6asfrag *));
@@ -61,6 +63,11 @@ static void frag6_freef __P((struct ip6q *));
 int frag6_doing_reass;
 u_int frag6_nfragpackets;
 struct	ip6q ip6q;	/* ip6 reassemble queue */
+
+/* FreeBSD tweak */
+#ifndef M_FTABLE
+#define M_FTABLE	M_TEMP
+#endif
 
 /*
  * Initialise reassembly queue and fragment identifier.
@@ -393,10 +400,10 @@ insert:
 	 */
 
 	if (offset < m->m_len)
-		bcopy((caddr_t)ip6, (caddr_t)ip6 + sizeof(struct ip6_frag),
+		ovbcopy((caddr_t)ip6, (caddr_t)ip6 + sizeof(struct ip6_frag),
 			offset);
 	else {
-		bcopy(mtod(m, caddr_t), (caddr_t)ip6 + offset, m->m_len);
+		ovbcopy(mtod(m, caddr_t), (caddr_t)ip6 + offset, m->m_len);
 		m->m_data -= sizeof(struct ip6_frag);
 	}
 	m->m_data -= offset;	
@@ -535,7 +542,11 @@ void
 frag6_slowtimo()
 {
 	struct ip6q *q6;
+#ifdef __NetBSD__
 	int s = splsoftnet();
+#else
+	int s = splnet();
+#endif
 #if 0
 	extern struct	route_in6 ip6_forward_rt;
 #endif

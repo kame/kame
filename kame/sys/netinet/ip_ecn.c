@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ip_ecn.c,v 1.1 1999/07/30 09:20:33 itojun Exp $
+ * $Id: ip_ecn.c,v 1.2 1999/07/30 12:17:15 itojun Exp $
  */
 /*
  * ECN consideration on tunnel ingress/egress operation.
@@ -53,7 +53,6 @@
 #ifndef INET
 #include <netinet/in.h>
 #endif
-#include <netinet6/in6_systm.h>
 #include <netinet/ip6.h>
 #endif
 

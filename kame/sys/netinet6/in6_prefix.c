@@ -78,6 +78,8 @@
 #include <netinet/in_var.h>
 #include <netinet6/nd6.h>
 
+#include <net/net_osdep.h>
+
 extern int	in6_interfaces;
 
 /*
@@ -154,7 +156,7 @@ search_matched_prefix(struct ifnet *ifp, struct in6_prefixreq *ipr)
 	if (ifpr == 0) {
 		struct ifaddr *ifa;
 
-#ifndef __NetBSD__
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
 #else
 		for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
@@ -214,7 +216,7 @@ mark_matched_prefixes(u_long cmd, struct ifnet *ifp, struct in6_rrenumreq *irr)
 	 * search matched addr, and then search prefixes
 	 * which matche the addr
 	 */
-#ifndef __NetBSD__
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
 #else
 	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)

@@ -147,7 +147,7 @@ faithattach(faith)
 		ifp->if_addrlen = 0;
 		if_attach(ifp);
 #if NBPFILTER > 0
-#ifdef __FreeBSD__
+#ifdef HAVE_OLD_BPF
 		bpfattach(ifp, DLT_NULL, sizeof(u_int));
 #else
 		bpfattach(&ifp->if_bpf, ifp, DLT_NULL, sizeof(u_int));
@@ -192,7 +192,7 @@ faithoutput(ifp, m, dst, rt)
 		m0.m_len = 4;
 		m0.m_data = (char *)&af;
 
-#ifdef __FreeBSD__
+#ifdef HAVE_OLD_BPF
 		bpf_mtap(ifp, &m0);
 #else
 		bpf_mtap(ifp->if_bpf, &m0);

@@ -65,6 +65,8 @@
 
 #include <net/if_gif.h>
 
+#include <net/net_osdep.h>
+
 int
 in6_gif_output(ifp, family, m, rt)
 	struct ifnet *ifp;

@@ -89,7 +89,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/icmp6.h>
 #include <netinet6/mld6_var.h>
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <netinet6/in6_pcb.h>
 #else
 #include <netinet/in_pcb.h>
@@ -104,6 +104,8 @@
 #endif
 
 #include "faith.h"
+
+#include <net/net_osdep.h>
 
 extern struct ip6protosw inet6sw[];
 extern u_char ip6_protox[];
@@ -902,22 +904,18 @@ ni6_addrs(ni6, m, ifpp)
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	int addrs = 0, addrsofif, iffound = 0;
 
-#ifdef __NetBSD__
-	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-	TAILQ_FOREACH(ifp, &ifnet, if_link)
-#else
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifp = ifnet; ifp; ifp = ifp->if_next)
+#else
+	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
 #endif
 	{
 		addrsofif = 0;
-#ifdef __NetBSD__
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+#else
 		for (ifa = ifp->if_addrlist.tqh_first; ifa;
 		     ifa = ifa->ifa_list.tqe_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
-#else
-		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
 #endif
 		{
 			if (ifa->ifa_addr->sa_family != AF_INET6)
@@ -972,10 +970,10 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 	struct ifnet *ifp0;
 	int resid;
 {
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	register struct ifnet *ifp = ifp0 ? ifp0 : TAILQ_FIRST(&ifnet);
-#else
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	register struct ifnet *ifp = ifp0 ? ifp0 : ifnet;
+#else
+	register struct ifnet *ifp = ifp0 ? ifp0 : TAILQ_FIRST(&ifnet);
 #endif
 	register struct in6_ifaddr *ifa6;
 	register struct ifaddr *ifa;
@@ -985,21 +983,17 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 	if (ifp0 == NULL && !(ni6->ni_flags & NI_NODEADDR_FLAG_ALL))
 		return(0);	/* needless to copy */
 
-#ifdef __NetBSD__
-	for (; ifp; ifp = TAILQ_NEXT(ifp, if_list))
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-	for (; ifp; ifp = TAILQ_NEXT(ifp, if_link))
-#else
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (; ifp; ifp = ifp->if_next)
+#else
+	for (; ifp; ifp = TAILQ_NEXT(ifp, if_list))
 #endif
 	{
-#ifdef __NetBSD__
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+#else
 		for (ifa = ifp->if_addrlist.tqh_first; ifa;
 		     ifa = ifa->ifa_list.tqe_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
-#else
-		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
 #endif
 		{
 			docopy = 0;
@@ -1089,11 +1083,11 @@ icmp6_rip6_input(mp, off)
 	} else
 		rip6src.sin6_scope_id = 0;
 
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	LIST_FOREACH(in6p, &ripcb, inp_list)
+#else
 	for (in6p = rawin6pcb.in6p_next;
 	     in6p != &rawin6pcb; in6p = in6p->in6p_next)
-#else
-	LIST_FOREACH(in6p, &ripcb, inp_list)
 #endif
 	{
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -1199,7 +1193,7 @@ icmp6_reflect(m, off)
 		IP6_EXTHDR_CHECK(m, 0, off, /*nothing*/);
 		IP6_EXTHDR_CHECK(m, off, sizeof(struct icmp6_hdr), /*nothing*/);
 
-		bcopy((caddr_t)ip6,
+		ovbcopy((caddr_t)ip6,
 			(caddr_t)(mtod(m, u_char *) + siz),
 			sizeof(struct ip6_hdr));
 		m->m_data += siz;
@@ -1498,10 +1492,10 @@ icmp6_redirect_input(m, off)
 		rtredirect((struct sockaddr *)&sdst, (struct sockaddr *)&sgw,
 			   (struct sockaddr *)NULL, RTF_GATEWAY | RTF_HOST,
 			   (struct sockaddr *)&ssrc,
-#if defined(__FreeBSD__) || defined(__NetBSD__)
+#ifdef __bsdi__
+			   icmp_redirtimeout
+#else
 			   (struct rtentry **)NULL
-#elif defined(__bsdi__)
-			   icmp_redirtimeout /*XXX*/
 #endif /*__FreeBSD__, __NetBSD__, __bsdi__*/
 			   );
 	}
@@ -1778,68 +1772,110 @@ fail:
  * ICMPv6 socket option processing.
  */
 int
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+icmp6_ctloutput(so, sopt)
+	struct socket *so;
+	struct sockopt *sopt;
+#else
 icmp6_ctloutput(op, so, level, optname, mp)
 	int op;
 	struct socket *so;
 	int level, optname;
 	struct mbuf **mp;
+#endif
 {
+	int error = 0;
+	int optlen;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	register struct inpcb *inp = sotoinpcb(so);
+	int level, op, optname;
+
+	if (sopt) {
+		level = sopt->sopt_level;
+		op = sopt->sopt_dir;
+		optname = sopt->sopt_name;
+		optlen = sopt->sopt_valsize;
+	} else
+		level = op = optname = optlen = 0;
+#else
 	register struct in6pcb *in6p = sotoin6pcb(so);
 	register struct mbuf *m = *mp;
-	int error = 0;
+
+	optlen = m ? m->m_len : 0;
+#endif
 
 	if (level != IPPROTO_ICMPV6) {
-		error = EINVAL;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		if (op == PRCO_SETOPT && m)
 			(void)m_free(m);
-	} else switch(op) {
-	 case PRCO_SETOPT:
-		 switch (optname) {
-		  case ICMP6_FILTER:
-		  {
-			  struct icmp6_filter *p;
+#endif
+		return EINVAL;
+	}
 
-			  p = mtod(m, struct icmp6_filter *);
-			  if (!p || !in6p->in6p_icmp6filt) {
-				  error = EINVAL;
-				  break;
-			  }
-			  bcopy(p, in6p->in6p_icmp6filt,
+	switch(op) {
+	case PRCO_SETOPT:
+		switch (optname) {
+		case ICMP6_FILTER:
+		    {
+			struct icmp6_filter *p;
+
+			if (optlen != sizeof(*p)) {
+				error = EMSGSIZE;
+				break;
+			}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			error = sooptcopyin(sopt, &inp->inp_filter, optlen,
+				optlen);
+#else
+			p = mtod(m, struct icmp6_filter *);
+			if (!p || !in6p->in6p_icmp6filt) {
+				error = EINVAL;
+				break;
+			}
+			bcopy(p, in6p->in6p_icmp6filt,
 				sizeof(struct icmp6_filter));
-			  error = 0;
-			  break;
-		  }
+#endif
+			error = 0;
+			break;
+		    }
 
-		  default:
-			  error = ENOPROTOOPT;
-			  break;
-		 }
-		 if (m)
-			 (void)m_free(m);
-		 break;
+		default:
+			error = ENOPROTOOPT;
+			break;
+		}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+		if (m)
+			(void)m_free(m);
+#endif
+		break;
 
-	 case PRCO_GETOPT:
-		 switch (optname) {
-		  case ICMP6_FILTER:
-		  {
-			  struct icmp6_filter *p;
-
-			  p = mtod(m, struct icmp6_filter *);
-			  if (!p || !in6p->in6p_icmp6filt) {
-				  error = EINVAL;
-				  break;
-			  }
-			  bcopy(in6p->in6p_icmp6filt, p,
+	case PRCO_GETOPT:
+		switch (optname) {
+		case ICMP6_FILTER:
+		    {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			error = sooptcopyout(sopt, &inp->inp_filter,
 				sizeof(struct icmp6_filter));
-			  error = 0;
-			  break;
-		  }
+#else
+			struct icmp6_filter *p;
 
-		  default:
-			  error = ENOPROTOOPT;
-			  break;
-		 }
-		 break;
+			p = mtod(m, struct icmp6_filter *);
+			if (!p || !in6p->in6p_icmp6filt) {
+				error = EINVAL;
+				break;
+			}
+			bcopy(in6p->in6p_icmp6filt, p,
+				sizeof(struct icmp6_filter));
+#endif
+			error = 0;
+			break;
+		    }
+
+		default:
+			error = ENOPROTOOPT;
+			break;
+		}
+		break;
 	}
 
 	return(error);
@@ -1992,7 +2028,7 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 }
 #endif /*__bsdi__*/
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <vm/vm.h>
 #include <sys/sysctl.h>
 int

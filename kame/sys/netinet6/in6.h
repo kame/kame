@@ -226,7 +226,7 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 	(((a)->s6_addr32[0] == 0) &&	\
 	 ((a)->s6_addr32[1] == 0) &&	\
 	 ((a)->s6_addr32[2] == 0) &&	\
-	 ((a)->s6_addr32[3] == IPV6_ADDR_INT32_ONE))
+	 ((a)->s6_addr32[3] == ntohl(1)))
 
 /*
  * IPv4 compatible
@@ -236,7 +236,7 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 	 ((a)->s6_addr32[1] == 0) &&	\
 	 ((a)->s6_addr32[2] == 0) &&	\
 	 ((a)->s6_addr32[3] != 0) &&	\
-	 ((a)->s6_addr32[3] != IPV6_ADDR_INT32_ONE))
+	 ((a)->s6_addr32[3] != ntohl(1)))
 
 /*
  * Mapped
@@ -244,7 +244,7 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 #define IN6_IS_ADDR_V4MAPPED(a)		      \
 	(((a)->s6_addr32[0] == 0) &&	      \
 	 ((a)->s6_addr32[1] == 0) &&	      \
-	 ((a)->s6_addr32[2] == IPV6_ADDR_INT32_SMP))
+	 ((a)->s6_addr32[2] == ntohl(0xffff)))
 
 /*
  * KAME Scope Values
