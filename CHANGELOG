@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1617 2001/03/21 22:02:51 jinmei Exp $
+$KAME: CHANGELOG,v 1.1618 2001/03/21 22:05:37 jinmei Exp $
 
 <200103>
 2001-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -12,7 +12,7 @@ $KAME: CHANGELOG,v 1.1617 2001/03/21 22:02:51 jinmei Exp $
 	necessarily have to update the kernel in a hurry.
 
 	The bug was introduced around Jan 20th, 2001, and was found by a
-	recent TAHI coformance check.
+	recent TAHI conformance check.
 
 Thu Mar 22 04:56:57 JST 2001 sakane@ydc.co.jp
 	* racoon/policy.c:
