@@ -96,7 +96,6 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#include <netinet6/ipsec6.h>
 #endif /*IPSEC*/
 
 #include <machine/stdarg.h>

@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.6 2000/04/10 06:13:15 kjc Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.7 2000/04/21 10:45:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -104,7 +104,6 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#include <netinet6/ipsec6.h>
 #endif /*IPSEC*/
 
 #include "faith.h"
