@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.31 2000/08/23 03:20:05 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.32 2000/09/10 06:47:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1925,6 +1925,18 @@ pim6_input(mp, offp, proto)
 			    ip6_sprintf(&eip6->ip6_dst),
 			    ntohs(eip6->ip6_plen));
 #endif
+
+		/* verify the version number of the inner packet */
+		if ((eip6->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
+			++pim6stat.pim6s_rcv_badregisters;
+#ifdef MRT6DEBUG
+			log(LOG_DEBUG, "pim6_input: invalid IP version (%d) "
+			    "of the inner packet\n",
+			    (eip6->ip6_vfc & IPV6_VERSION));
+#endif
+			m_freem(m);
+			return(IPPROTO_NONE);
+		}
 	
 		/* verify the inner packet is destined to a mcast group */
 		if (!IN6_IS_ADDR_MULTICAST(&eip6->ip6_dst)) {
