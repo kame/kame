@@ -66,6 +66,8 @@
 # include <net/if_ether.h>
 #endif
 #include <netinet/in_var.h>
+#include <netinet/icmp6.h>
+#include <netinet6/mld6_var.h>
 #include <arpa/inet.h>
 
 #include <netdb.h>
@@ -400,10 +402,27 @@ in6_multientry(mc)
 #ifdef MCAST_JOIN_SOURCE_GROUP
 	struct in6_multi_source src;
 #endif
+	struct router6_info rt6i;
 
 	KREAD(mc, &multi, struct in6_multi);
 	printf("\t\tgroup %s", inet6_n2a(&multi.in6m_sa));
 	printf(" refcnt %u", multi.in6m_refcount);
+
+	KREAD(multi.in6m_rti, &rt6i, struct router_info);
+	switch (rt6i.rt6i_type) {
+	case MLD_LISTENER_REPORT:
+		printf("\tmld_ver 1");
+		break;
+#ifdef MCAST_JOIN_SOURCE_GROUP
+	case MLDV2_LISTENER_REPORT:
+		printf("\tmld_ver 2");
+		break;
+#endif
+	default:
+		printf("\tmld_ver ?(%d)", rt6i.rt6i_type);
+		break;
+	}
+
 
 #ifdef MCAST_JOIN_SOURCE_GROUP
 	if (multi.in6m_source == NULL) {
@@ -557,12 +576,31 @@ in_multientry(mc)
 	struct in_multi *mc;
 {
 	struct in_multi multi;
+	struct router_info rti;
 #ifdef IGMP_V3_MEMBERSHIP_REPORT
 	struct in_multi_source src;
 #endif
 
 	KREAD(mc, &multi, struct in_multi);
 	printf("\t\tgroup %s", inet_ntoa(multi.inm_addr));
+
+	KREAD(multi.inm_rti, &rti, struct router_info);
+	switch (rti.rti_type) {
+	case IGMP_V1_MEMBERSHIP_REPORT:
+		printf("\tigmp_ver 1");
+		break;
+	case IGMP_V2_MEMBERSHIP_REPORT:
+		printf("\tigmp_ver 2");
+		break;
+#ifdef IGMP_V3_MEMBERSHIP_REPORT
+	case IGMP_V3_MEMBERSHIP_REPORT:
+		printf("\tigmp_ver 3");
+		break;
+#endif
+	default:
+		printf("\tigmp_ver ?(%d)", rti.rti_type);
+		break;
+	}
 
 #ifdef IGMP_V3_MEMBERSHIP_REPORT
 	if (multi.inm_source == NULL) {
