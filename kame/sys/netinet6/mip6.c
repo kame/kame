@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.45 2001/08/07 07:55:15 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.46 2001/08/09 07:55:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -233,16 +233,34 @@ mip6_process_nd_prefix(saddr, ndpr, dr, m)
 	int coa_changed;
 	int error = 0;
 
+	if (dr == NULL) {
+		struct mip6_ha *mha;
+		/*
+		 * advertizing router is shutting down.
+		 */
+		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, saddr);
+		if (mha) {
+			error = mip6_ha_list_remove(&mip6_ha_list, mha);
+		}
+		return (error);
+	}
+
 	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
 	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		sc->hif_location_prev = sc->hif_location;
 		sc->hif_hs_prev = sc->hif_hs_current;
 		error = mip6_determine_location_withndpr(sc, saddr, ndpr, dr);
-		if (error)
+		if (error) {
+			mip6log((LOG_ERR,
+				 "%s: error while determining location\n",
+				 __FUNCTION__));
 			goto process_ndpr_done;
+		}
 		error = mip6_haddr_config(sc, ndpr->ndpr_ifp);
-		if (error)
+		if (error) {
 			goto process_ndpr_done;
+		}
+
 	}
 
 	/* update nd prefix list and perform addrconf. */
@@ -262,7 +280,6 @@ mip6_process_nd_prefix(saddr, ndpr, dr, m)
 			goto process_ndpr_done;
 		}
 	}
-
  process_ndpr_done:
 	return (error);
 }
@@ -1112,6 +1129,7 @@ mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
 	struct in6_addr *dst;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
+	int error = 0;
 
 	*pktopt_rthdr = NULL;
 	*pktopt_haddr = NULL;
@@ -1126,12 +1144,18 @@ mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
 	 */
 	if ((opt == NULL) || (opt->ip6po_rthdr == NULL)) {
 		/* 
-		 * if no rthdr is specified from the upper layer,
-		 * we add a rthdr for route optimization when needed.
-		 * if a rthdr from the upper layer already exists,
-		 * we use it (not route optimized).
+		 * only when no rthdr is specified from the upper
+		 * layer, we add a rthdr for route optimization when
+		 * needed.  if a rthdr from the upper layer already
+		 * exists, we use it (not route optimized).
 		 */
-		mip6_rthdr_create_withdst(pktopt_rthdr, dst);
+		error = mip6_rthdr_create_withdst(pktopt_rthdr, dst);
+		if (error) {
+			mip6log((LOG_ERR,
+				 "%s: rthdr creation failed.\n",
+				 __FUNCTION__));
+			goto bad;
+		}
 	}
 
 	/*
@@ -1157,8 +1181,7 @@ mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
 	}
 
 	/* check registration status */
-	mbu = mip6_bu_list_find_withhaddr(&sc->hif_bu_list,
-					  src);
+	mbu = mip6_bu_list_find_withhaddr(&sc->hif_bu_list, src);
 	if (mbu == NULL) {
 		/* no registration action started yet. */
 		return (0);
@@ -1172,16 +1195,28 @@ mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
 	}
 
 	/* create haddr destopt. */
-	if (mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)) {
-		return (-1);
+	error = mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc);
+	if (error) {
+		mip6log((LOG_ERR,
+			 "%s: homeaddress insertion failed.\n",
+			 __FUNCTION__));
+		
+		goto bad;
 	}
 
 	/* create bu destopt. */
-	if (mip6_bu_destopt_create(pktopt_binding, src, dst, opt, sc)) {
-		return (-1);
+	error = mip6_bu_destopt_create(pktopt_binding, src, dst, opt, sc);
+	if (error) {
+		mip6log((LOG_ERR,
+			 "%s: BU destopt insertion failed.\n",
+			 __FUNCTION__));
+		goto bad;
 	}
 
 	return (0);
+ bad:
+	m_freem(m);
+	return (error);
 }
 
 int
@@ -1693,30 +1728,37 @@ mip6_add_opt2dh(opt, dh)
  * Ret value:   Void
  ******************************************************************************
  */
-void
+int
 mip6_addr_exchange(m, dstm)
-     struct mbuf *m;       /* Includes IPv6 header */
-     struct mbuf *dstm;    /* Includes Destination Header 1 */
+	struct mbuf *m; /* includes IPv6 header */
+	struct mbuf *dstm; /* includes homeaddress destopt */
 {
 	struct ip6_opt_home_address *ha_opt;
-	struct ip6_dest             *dh;
-	struct ip6_hdr              *ip6;
-	struct in6_addr             ip6_src;
-	u_int8_t                    *opt;
-	int                         ii, len;
+	struct ip6_dest *dh;
+	struct ip6_hdr *ip6;
+	struct in6_addr ip6_src;
+	u_int8_t *opt;
+	int ii, len;
 
-	/* Sanity check */
-	if (!MIP6_IS_MN)
-		return;
+	/* sanity check */
+	if (!MIP6_IS_MN) {
+		return (0);
+	}
 
-	if (dstm == NULL)
-		return;
+	if (dstm == NULL) {
+		/* home address destopt not exists. */
+		return (0);
+	}
 	
 	/* Find Home Address option */
 	dh = mtod(dstm, struct ip6_dest *);
 	len = (dh->ip6d_len + 1) << 3;
-	if (len > dstm->m_len)
-		return;	
+	if (len > dstm->m_len) {
+		mip6log((LOG_ERR,
+			 "%s: haddr destopt illegal mbuf length.\n",
+			 __FUNCTION__));
+		return (EINVAL);
+	}
 
 	ha_opt = NULL;
 	ii = 2;
@@ -1739,7 +1781,12 @@ mip6_addr_exchange(m, dstm)
 		if (ha_opt) break;
 	}
 
-	if (ha_opt == NULL) return;
+	if (ha_opt == NULL) {
+		mip6log((LOG_INFO,
+			 "%s: haddr dest opt not found.\n",
+			 __FUNCTION__));
+		return (0);
+	}
 
 	/* Change the IP6 source address to the care-of address */
 	ip6 = mtod(m, struct ip6_hdr *);
@@ -1747,7 +1794,7 @@ mip6_addr_exchange(m, dstm)
 
 	ip6->ip6_src = *(struct in6_addr *)ha_opt->ip6oh_addr;
 	bcopy((caddr_t)&ip6_src, ha_opt->ip6oh_addr, sizeof(struct in6_addr));
-	return;
+	return (0);
 }
 
 int
@@ -1763,23 +1810,29 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 	case IP6OPT_BINDING_UPDATE:
 		if ((opt - (u_int8_t *)dstopts) % 4 != 2) {
 			ip6stat.ip6s_badoptions++;
-			return (-1);
+			goto bad;
 		}
 
 		error = mip6_validate_bu(m, opt);
 		if (error == -1) {
-			mip6log((LOG_ERR, "invalid BU received.\n"));
-			return (-1);
+			mip6log((LOG_ERR,
+				 "%s: invalid BU received.\n",
+				 __FUNCTION__));
+			goto bad;
 		}
 		if (error == 1) {
 			/* invalid BU.  we ignore this silently */
-			mip6log((LOG_NOTICE, "invalid BU received.  ignore this.\n"));
+			mip6log((LOG_NOTICE,
+				 "%s: invalid BU received.  ignore this.\n",
+				 __FUNCTION__));
 			return (0);
 		}
 
 		if (mip6_process_bu(m, opt) != 0) {
-			mip6log((LOG_ERR, "processing BU failed\n"));
-			return (-1);
+			mip6log((LOG_ERR,
+				 "%s: processing BU failed\n",
+				 __FUNCTION__));
+			goto bad;
 		}
 		break;
 
@@ -1789,23 +1842,29 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 
 		if ((opt - (u_int8_t *)dstopts) % 4 != 3) {
 			ip6stat.ip6s_badoptions++;
-			return (-1);
+			goto bad;
 		}
 
 		error = mip6_validate_ba(m, opt);
 		if (error == -1) {
-			mip6log((LOG_ERR, "invalid BA received.\n"));
-			return (-1);
+			mip6log((LOG_ERR,
+				 "%s: invalid BA received.\n",
+				 __FUNCTION__));
+			goto bad;
 		}
 		if (error == 1) {
 			/* invalid BA.  we ignore this silently */
-			mip6log((LOG_NOTICE, "invalid BA received.  ignore this.\n"));
+			mip6log((LOG_NOTICE,
+				 "%s: invalid BA received.  ignore this.\n",
+				 __FUNCTION__));
 			return (0);
 		}
 
 		if (mip6_process_ba(m, opt) != 0) {
-			mip6log((LOG_ERR, "processing BA failed\n"));
-			return (-1);
+			mip6log((LOG_ERR,
+				 "%s: processing BA failed\n",
+				 __FUNCTION__));
+			goto bad;
 		}
 		break;
 
@@ -1814,18 +1873,25 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 			return (0);
 		
 		if (mip6_validate_br(m, opt)) {
-			mip6log((LOG_ERR, "invalid BR received\n"));
-			return (-1);
+			mip6log((LOG_ERR,
+				 "%s: invalid BR received\n",
+				 __FUNCTION__));
+			goto bad;
 		}
 
 		if (mip6_process_br(m, opt) != 0) {
-			mip6log((LOG_ERR, "processing BR failed\n"));
-			return (-1);
+			mip6log((LOG_ERR,
+				 "%s: processing BR failed\n",
+				 __FUNCTION__));
+			goto bad;
 		}
 		break;
 	}
 
 	return (0);
+ bad:
+	m_freem(m);
+	return (IPPROTO_DONE);
 }
 
 u_int8_t *

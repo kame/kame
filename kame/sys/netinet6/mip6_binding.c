@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.6 2001/08/07 07:55:16 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.7 2001/08/09 07:55:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2207,37 +2207,59 @@ mip6_route_optimize(m)
 	struct mip6_bu *mbu;
 	struct hif_softc *sc;
 	int32_t coa_lifetime;
+	int error = 0;
 
-	if (!MIP6_IS_MN)
+	if (!MIP6_IS_MN) {
+		/* only MN does the route optimization. */
 		return (0);
-	if (!(m->m_flags & M_MIP6TUNNEL))
+	}
+
+	if (!(m->m_flags & M_MIP6TUNNEL)) {
+		/*
+		 * XXX
+		 * not tunneled packet.  no need to optimize route.
+		 */
 		return (0);
+	}
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	
 	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
 	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		/*
+		 * find a mip6_prefix which has a home address of received
+		 * packet.
+		 */
+		mpfx = mip6_prefix_list_find_withhaddr(&mip6_prefix_list,
+						       &ip6->ip6_dst);
+		if (mpfx == NULL) {
+			/*
+			 * no related prefix found.  this packet is
+			 * destined to another address of this node
+			 * that is not a home address.
+			 */
+			return (0);
+		}
+
+		/*
 		 * search all BUs including peer address.
 		 */
 		mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
 						  &ip6->ip6_src);
-
 		/*
 		 * if no BU entry is found, this is a first packet
 		 * from the peer.  create an BU entry.
 		 */
-		mpfx = mip6_prefix_list_find_withhaddr(&mip6_prefix_list,
-						       &ip6->ip6_dst);
-		if (mpfx == NULL)
-			return (-1);
 		if (mbu == NULL) {
 			mbu = mip6_bu_create(&ip6->ip6_src,
 					     mpfx,
 					     &hif_coa,
 					     0, sc);
-			if (mbu == NULL)
-				return (ENOMEM);
+			if (mbu == NULL) {
+				error = ENOMEM;
+				goto bad;
+			}
+			mbu->mbu_state = MIP6_BU_STATE_WAITSENT;
 
 			LIST_INSERT_HEAD(&sc->hif_bu_list, mbu, mbu_entry);
 			/* XXX mip6_bu_list_insert(&sc->hif_bu_list, mbu); */
@@ -2257,4 +2279,7 @@ mip6_route_optimize(m)
 	}
 
 	return (0);
+ bad:
+	m_freem(m);
+	return (error);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.5 2001/08/07 07:55:16 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.6 2001/08/09 07:55:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -114,6 +114,7 @@ mip6_icmp6_input(m, off, icmp6len)
 	struct mip6_bu *mbu;
 	struct mip6_bc *mbc;
 	struct in6_addr *laddr, *paddr;
+	int error = 0;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
@@ -121,13 +122,17 @@ mip6_icmp6_input(m, off, icmp6len)
 	switch (icmp6->icmp6_type) {
 	case ICMP6_DST_UNREACH:
 		/*
-		 * peer might move to somewhere.  in current code, we
-		 * remove a related BC entry immediately.  should we be
-		 * more patient ?
+		 * the contacting MN might move to somewhere.  in
+		 * current code, we remove a related BC entry
+		 * immediately.  should we be more patient ?
 		 */
 		mip6_icmp6_find_addr((caddr_t)icmp6, icmp6len, &laddr, &paddr);
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, paddr);
 		if (mbc) {
+			mip6log((LOG_INFO,
+				 "%s: a MN (%s) moved.\n",
+				 __FUNCTION__,
+				 ip6_sprintf(paddr)));
 			mip6_bc_list_remove(&mip6_bc_list, mbc);
 		}
 		break;
@@ -166,15 +171,22 @@ mip6_icmp6_input(m, off, icmp6len)
 			     sc = TAILQ_NEXT(sc, hif_entry)) {
 				mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
 								  paddr);
-				if (mbu)
+				if (mbu) {
+					mip6log((LOG_INFO,
+						 "%s: a node (%s) doesn't support a binding update destopt.\n",
+						 __FUNCTION__,
+						 ip6_sprintf(paddr)));
 					mbu->mbu_dontsend = 1;
+				}
 			}
 			break;
 		case IP6OPT_HOME_ADDRESS:
 			/*
 			 * all IPv6 node must support a home address option.
 			 */
-			mip6log((LOG_INFO, "%s: %s doesn't support home address opt\n",
+			mip6log((LOG_NOTICE,
+				 "%s: a node (%s) doesn't support "
+				 "a home address destopt.\n",
 				 __FUNCTION__,
 				 ip6_sprintf(paddr)));
 			break;
@@ -183,6 +195,9 @@ mip6_icmp6_input(m, off, icmp6len)
 	}
 
 	return (0);
+ bad:
+	m_freem(m);
+	return (error);
 }
 
 int

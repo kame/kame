@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.212 2001/08/07 14:13:28 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.213 2001/08/09 07:55:20 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -147,6 +147,7 @@ extern int ipsec_esp_network_default_level;
 #endif
 
 #ifdef MIP6
+#include <sys/syslog.h>
 #include <netinet6/mip6.h>
 #endif /* MIP6 */
 
@@ -661,7 +662,12 @@ skip_ipsec2:;
 	 * and the address currently stored in the Home Address option
 	 * field must be exchanged
 	 */
-	mip6_addr_exchange(m, exthdrs.ip6e_haddr);
+	if (error = mip6_addr_exchange(m, exthdrs.ip6e_haddr)) {
+		mip6log((LOG_ERR,
+			 "%s: addr exchange between haddr and coa failed.\n",
+			 __FUNCTION__));
+		goto bad;
+	}
 #endif /* MIP6 */
 
 	/*
