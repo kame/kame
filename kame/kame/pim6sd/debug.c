@@ -959,16 +959,20 @@ dump_rp_set(fp)
     cand_rp_t      *rp;
     rp_grp_entry_t *rp_grp_entry;
     grp_mask_t     *grp_mask;
+    int print_upstream;
 
     fprintf(fp, "---------------------------RP-Set----------------------------\n");
     fprintf(fp, "Current BSR address: %s Prio: %d Timeout: %d\n",
 	    inet6_fmt(&curr_bsr_address.sin6_addr), curr_bsr_priority,
 	    pim_bootstrap_timer);
     fprintf(fp, "%-40s %-3s Group prefix     Prio Hold Age\n",
-	    "RP-address", "IN");
+	    "RP-address/Upstream", "IN");
 
     for (rp = cand_rp_list; rp != (cand_rp_t *) NULL; rp = rp->next)
     {
+	char *upstream_str;
+
+	print_upstream = 0;
 
 	fprintf(fp, "%-40s %-3d ",
 		inet6_fmt(&rp->rpentry->address.sin6_addr),
@@ -982,18 +986,31 @@ dump_rp_set(fp)
 		    rp_grp_entry->priority, rp_grp_entry->advholdtime,
 		    rp_grp_entry->holdtime);
 
+	    if (rp->rpentry->upstream != NULL)
+		upstream_str = sa6_fmt(&rp->rpentry->upstream->address);
+	    else
+		upstream_str = "(none)";
+
 	    for (rp_grp_entry = rp_grp_entry->rp_grp_next;
 		 rp_grp_entry != (rp_grp_entry_t *) NULL;
 		 rp_grp_entry = rp_grp_entry->rp_grp_next)
 	    {
 		grp_mask = rp_grp_entry->group;
 		/* XXX: hardcoding */
-		fprintf(fp, "%44s %-16.16s %-4u %-4u %-3u\n", "",
+		if (print_upstream == 0) {
+		    fprintf(fp, "  %-38s", upstream_str);
+		    print_upstream = 1;
+		}
+		else
+		    fprintf(fp, "  %38s", "");
+		fprintf(fp, "%4s %-16.16s %-4u %-4u %-3u\n", "",
 			net6name(&grp_mask->group_addr.sin6_addr,
 				 &grp_mask->group_mask),
 			rp_grp_entry->priority,
 			rp_grp_entry->advholdtime, rp_grp_entry->holdtime);
 	    }
+	    if (print_upstream == 0)
+		fprintf(fp, "  %-38s\n", upstream_str);
 	}
     }
     return (TRUE);
