@@ -326,7 +326,7 @@ route_output(m, so)
 	struct rt_addrinfo info;
 	int len, error = 0;
 	struct ifnet *ifp = 0;
-#ifdef MIP6
+#ifndef BBNHACK
 	struct ifaddr *ifa = 0;
 #endif
 
@@ -385,7 +385,7 @@ route_output(m, so)
 		error = rtrequest(RTM_ADD, dst, gate, netmask,
 					rtm->rtm_flags, &saved_nrt);
 		if (error == 0 && saved_nrt) {
-#ifndef MIP6
+#ifdef BBNHACK
 		    /* 
 		     * If the route request specified an interface with
 		     * IFA and/or IFP, we set the requested interface on
@@ -518,8 +518,7 @@ route_output(m, so)
 			if ((rt->rt_flags & RTF_GATEWAY) && !gate)
 				gate = rt->rt_gateway;
 
-#ifndef MIP6
-			/* bbn patched */
+#ifdef BBNHACK
 			rt_setif(rt, ifpaddr, ifaaddr, gate);
 			rt_setmetrics(rtm->rtm_inits, &rtm->rtm_rmx,
 					&rt->rt_rmx);
@@ -626,7 +625,7 @@ rt_setmetrics(which, in, out)
 #undef metric
 }
 
-#ifndef MIP6
+#ifdef BBNHACK
 /*
  * Set route's interface given ifpaddr, ifaaddr, and gateway.
  */
