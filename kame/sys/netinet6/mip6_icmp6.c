@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.33 2002/01/17 04:56:11 k-sugyou Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.34 2002/01/29 01:40:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -408,7 +408,6 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		mip6log((LOG_ERR,
 			 "%s:%d: send failed. (errno = %d)\n",
 			 __FILE__, __LINE__, error));
-		m_freem(n);
 		/* continue processing 'm' (the original icmp). */
 		return (0);
 	}
