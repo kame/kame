@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.29 2001/08/16 20:59:11 itojun Exp $	*/
+/*	$KAME: token.l,v 1.30 2001/08/17 05:53:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -86,7 +86,6 @@ decstring	{digit}+
 hexstring	0[xX]{hexdigit}+
 ipaddress	[a-fA-F0-9:]([a-fA-F0-9:\.]*|[a-fA-F0-9:\.]*%[a-zA-Z0-9]*)
 ipaddrmask	{slash}{digit}{1,3}
-ipaddrport	{blcl}([a-z0-9]+){elcl}
 name		{letter}(({letter}|{digit}|{hyphen})*({letter}|{digit}))*
 hostname	{name}(({dot}{name})+{dot}?)?
 
@@ -190,30 +189,17 @@ any		{ return(ANY); }
 {comment}
 {semi}		{ return(EOT); }
 
+	/* for address parameters: /prefix, [port] */
+{slash}		{ return SLASH; }
+{blcl}		{ return BLCL; }
+{elcl}		{ return ELCL; }
+
 	/* parameter */
 {decstring}	{
 			char *bp;
 
 			yylval.num = strtoul(yytext, &bp, 10);
 			return(DECSTRING);
-		}
-
-{ipaddrmask}	{
-			yytext++;
-			yylval.num = atoi(yytext);
-			return(PREFIX);
-		}
-
-{ipaddrport}	{
-			char *p = yytext;
-			while (*++p != ']')
-				;
-			*p = NULL;
-			yytext++;
-			yylval.val.len = strlen(yytext);
-			yylval.val.buf = strdup(yytext);
-
-			return(PORT);
 		}
 
 {hexstring}	{

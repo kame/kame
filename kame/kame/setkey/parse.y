@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.55 2001/08/17 05:29:00 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.56 2001/08/17 05:53:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -93,8 +93,7 @@ extern void yyerror __P((const char *));
 
 %token EOT
 %token ADD GET DELETE DELETEALL FLUSH DUMP
-%token PREFIX PORT PORTANY
-%token UP_PROTO PR_ESP PR_AH PR_IPCOMP
+%token PR_ESP PR_AH PR_IPCOMP
 %token F_PROTOCOL F_AUTH F_ENC F_REPLAY F_COMP F_RAWCPI
 %token F_MODE MODE F_REQID
 %token F_EXT EXTENSION NOCYCLICSEQ
@@ -106,12 +105,12 @@ extern void yyerror __P((const char *));
 %token F_POLICY PL_REQUESTS
 %token F_AIFLAGS
 
-%type <num> PREFIX EXTENSION MODE
-%type <num> UP_PROTO PR_ESP PR_AH PR_IPCOMP
+%type <num> EXTENSION MODE
+%type <num> PR_ESP PR_AH PR_IPCOMP
 %type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
 %type <num> DECSTRING
 %type <intnum> prefix protocol_spec upper_spec
-%type <val> PORT PL_REQUESTS portstr key_string
+%type <val> PL_REQUESTS portstr key_string
 %type <val> policy_requests
 %type <val> QUOTEDSTRING HEXSTRING STRING
 %type <val> F_AIFLAGS
@@ -528,7 +527,7 @@ ipaddr
 
 prefix
 	:	/*NOTHING*/ { $$ = ~0; }
-	|	PREFIX { $$ = $1; }
+	|	SLASH DECSTRING { $$ = $2; }
 	;
 
 portstr
@@ -537,19 +536,19 @@ portstr
 			$$.buf = strdup("0");
 			$$.len = strlen($$.buf);
 		}
-	|	PORT
+	|	BLCL ANY ELCL
 		{
-			if (strcmp($$.buf, "any") == 0) {
-				$$.buf = strdup("0");
-				$$.len = strlen($$.buf);
-			} else
-				$$ = $1;
+			$$.buf = strdup("0");
+			$$.len = strlen($$.buf);
+		}
+	|	BLCL STRING ELCL
+		{
+			$$ = $2;
 		}
 	;
 
 upper_spec
 	:	DECSTRING { $$ = $1; }
-	|	UP_PROTO { $$ = $1; }
 	|	ANY { $$ = IPSEC_ULPROTO_ANY; }
 	|	STRING
 		{
