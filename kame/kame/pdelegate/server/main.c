@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.2 2001/03/04 23:23:47 itojun Exp $	*/
+/*	$KAME: main.c,v 1.3 2001/03/05 12:37:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -288,12 +288,8 @@ receive_ireq(s, rbuf, l, from, fromlen)
 	}
 	p = (const struct icmp6_prefix_request *)rbuf;
 
-	if ((p->icmp6_pr_hdr.icmp6_pr_flaglen & ICMP6_PR_FLAGS_SCOPE) != 0) {
-		warnx("we do not serve site-local prefixes");
-		return -1;
-	}
-	if ((p->icmp6_pr_hdr.icmp6_pr_flaglen & ICMP6_PR_LEN_MASK) != 0 ||
-	    !IN6_IS_ADDR_UNSPECIFIED(&p->icmp6_pr_prefix)) {
+	/* drop invalid packets */
+	if (!IN6_IS_ADDR_UNSPECIFIED(&p->icmp6_pr_prefix)) {
 		warnx("invalid prefix %s/%d", inet_ntop(AF_INET6,
 		    &p->icmp6_pr_prefix, hbuf, sizeof(hbuf)),
 		    p->icmp6_pr_hdr.icmp6_pr_flaglen & ICMP6_PR_LEN_MASK);
@@ -302,14 +298,26 @@ receive_ireq(s, rbuf, l, from, fromlen)
 
 	memset(&reply, 0, sizeof(reply));
 	reply.icmp6_pd_hdr.icmp6_type = ICMP6_PREFIX_DELEGATION;
-	reply.icmp6_pd_hdr.icmp6_code = ICMP6_PD_PREFIX_DELEGATOR;
-	reply.icmp6_pd_hdr.icmp6_pd_flaglen = prefixlen & ICMP6_PD_LEN_MASK;
+
+	if ((p->icmp6_pr_hdr.icmp6_pr_flaglen & ICMP6_PR_FLAGS_SCOPE) != 0) {
+		warnx("we do not serve site-local prefixes");
+		reply.icmp6_pd_hdr.icmp6_code = ICMP6_PD_PREFIX_UNAVAIL;
+		reply.icmp6_pd_hdr.icmp6_pd_flaglen = 0;
+	} else if ((p->icmp6_pr_hdr.icmp6_pr_flaglen & ICMP6_PR_LEN_MASK) !=
+	    prefixlen) {
+		warnx("prefixlen mismatch");
+		reply.icmp6_pd_hdr.icmp6_code = ICMP6_PD_PREFIX_UNAVAIL;
+		reply.icmp6_pd_hdr.icmp6_pd_flaglen = 0;
+	} else {
+		reply.icmp6_pd_hdr.icmp6_code = ICMP6_PD_PREFIX_DELEGATED;
+		reply.icmp6_pd_hdr.icmp6_pd_flaglen = prefixlen & ICMP6_PD_LEN_MASK;
+		if (inet_pton(AF_INET6, prefix, &reply.icmp6_pd_prefix) != 1) {
+			warnx("cannot assign prefix %s/%d", prefix, prefixlen);
+			return -1;
+		}
+	}
 	/* S bit = 0, global */
 	reply.icmp6_pd_hdr.icmp6_pd_flaglen &= ~ICMP6_PD_FLAGS_SCOPE;
-	if (inet_pton(AF_INET6, prefix, &reply.icmp6_pd_prefix) != 1) {
-		warnx("cannot assign prefix %s/%d", prefix, prefixlen);
-		return -1;
-	}
 	reply.icmp6_pd_rtlen = 0;
 	if (sethops(s, 1) < 0) {
 		errx(1, "sethops");

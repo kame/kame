@@ -1,4 +1,4 @@
-/*	$KAME: pdelegate.h,v 1.2 2001/03/04 22:38:20 itojun Exp $	*/
+/*	$KAME: pdelegate.h,v 1.3 2001/03/05 12:37:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * draft-haberman-ipngwg-auto-prefix-00.txt
+ * draft-haberman-ipngwg-auto-prefix-00.txt (with a change on ipngwg)
  */
 
 #define ICMP6_PREFIX_REQUEST		150	/*XXX local agreement*/
@@ -49,7 +49,7 @@
 
 #define ICMP6_PD_QUERY_INTERVAL		5 /* seconds */
 #define ICMP6_PD_QUERY_RETRY_MAX	3 /* times */
-#define ICMP6_PD_QUERY_INTERVAL		5 /* seconds */
+#define ICMP6_PD_INITIAL_INTERVAL	5 /* seconds */
 #define ICMP6_PD_INITIAL_RETRY_MAX	3 /* times */
 
 /* 5.1 Prefix Request */
@@ -60,8 +60,7 @@ struct icmp6_prefix_request {
 #define icmp6_pr_flaglen	icmp6_data8[0]
 #define ICMP6_PR_FLAGS_SCOPE	0x80
 #define ICMP6_PR_LEN_MASK	0x7f
-#define icmp6_pr_rtcap0	icmp6_data8[1]
-#define icmp6_pr_rtcap1	icmp6_data8[2]
+#define icmp6_pr_rtcap	icmp6_data16[1]
 
 /* 5.2 Prefix Delegation */
 struct icmp6_prefix_delegation {
@@ -73,6 +72,5 @@ struct icmp6_prefix_delegation {
 #define icmp6_pd_flaglen	icmp6_data8[0]
 #define ICMP6_PD_FLAGS_SCOPE	0x80
 #define ICMP6_PD_LEN_MASK	0x7f
-#define icmp6_pd_lifetime0	icmp6_data8[1]
-#define icmp6_pd_lifetime1	icmp6_data8[2]
-#define icmp6_pd_rtproto	icmp6_data3[3]
+#define icmp6_pd_lifetime	icmp6_data16[1]
+#define icmp6_pd_rtproto	icmp6_data3[1]

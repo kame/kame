@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.2 2001/03/04 22:38:20 itojun Exp $	*/
+/*	$KAME: main.c,v 1.3 2001/03/05 12:37:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -46,10 +46,14 @@
 int main __P((int, char **));
 static void usage __P((void));
 static void mainloop __P((void));
-static struct timeval *settimeo __P((struct timeval *, struct timeval *));
 static void send_discover __P((int));
 static int receive_discover __P((int, struct sockaddr *, int *));
+static void send_initreq __P((int, const struct sockaddr *, int));
+static int receive_initreq __P((int, struct sockaddr *, int *, int *));
+static int receive __P((int, char *, size_t, struct sockaddr *, int *));
 static int sethops __P((int, int));
+static int cmpsockaddr __P((const struct sockaddr *, int, const struct sockaddr *,
+	int));
 
 int s;
 int dflag = 0;
@@ -108,35 +112,6 @@ usage()
 	fprintf(stderr, "usage: pdelegate [-d] iface\n");
 }
 
-static struct timeval *
-settimeo(tvp, prev)
-	struct timeval *tvp;
-	struct timeval *prev;
-{
-	struct timeval now;
-
-	gettimeofday(&now, NULL);
-
-	now.tv_sec -= prev->tv_sec;
-	now.tv_usec -= prev->tv_usec;
-	while (now.tv_usec < 0) {
-		now.tv_sec--;
-		now.tv_usec += 1000000;
-	}
-
-	tvp->tv_sec -= now.tv_sec;
-	tvp->tv_usec -= now.tv_usec;
-	while (tvp->tv_usec < 0) {
-		tvp->tv_sec--;
-		tvp->tv_usec += 1000000;
-	}
-
-	if (tvp->tv_sec < 0)
-		return NULL;
-	else
-		return tvp;
-}
-
 static void
 mainloop()
 {
@@ -145,11 +120,18 @@ mainloop()
 	size_t fdssize;
 	int n;
 	struct timeval tv, *tvp;
-	struct timeval prev;
+	struct timeval prev, cur, timeo;
 	int retry;
+	struct sockaddr_storage serv;
+	int servlen;
 	struct sockaddr_storage from;
 	int fromlen;
+	char buf[4096];
+	struct icmp6_prefix_delegation *p;
+	int ecode;
 
+#define settimeo(x)	do { timeo = cur; timeo.tv_sec += (x); } while (0)
+#define clrtimeo(x)	do {timeo.tv_sec = timeo.tv_usec = 0; } while (0)
 	fdssize = howmany(s + 1, NFDBITS) * sizeof(fd_mask);
 	if (sizeof(*fds) > fdssize)
 		fdssize = sizeof(*fds);
@@ -160,16 +142,14 @@ mainloop()
 	}
 
 	while (1) {
-		tvp = NULL;
+		gettimeofday(&cur, NULL);
 
 		switch (state) {
 		case 0:
 			/* send discover */
 			send_discover(s);
 			state = 1;
-			tv.tv_sec = ICMP6_PD_QUERY_INTERVAL;
-			tv.tv_usec = 0;
-			tvp = &tv;
+			settimeo(ICMP6_PD_QUERY_INTERVAL);
 			retry = ICMP6_PD_QUERY_RETRY_MAX;
 			break;
 		case 1:
@@ -179,14 +159,7 @@ mainloop()
 					warnx("foo");
 					send_discover(s);
 					state = 1;
-					tvp = settimeo(&tv, &prev);
-					if (!tvp) {
-						/* timeout exceeded, reset */
-						tv.tv_sec =
-						    ICMP6_PD_QUERY_INTERVAL;
-						tv.tv_usec = 0;
-						tvp = &tv;
-					}
+					settimeo(ICMP6_PD_QUERY_INTERVAL);
 				} else {
 					/* retry exceeded */
 					errx(1, "no delegator, retry exceeded");
@@ -194,37 +167,84 @@ mainloop()
 				}
 			} else {
 				/* got discovery reply? */
-				fromlen = sizeof(from);
-				if (receive_discover(s,
-				    (struct sockaddr *)&from, &fromlen) < 0) {
-					/* no, it is not */
-					send_discover(s);
+				servlen = sizeof(serv);
+				if (receive_discover(s, (struct sockaddr *)&serv,
+				    &servlen) < 0) {
+					/* no, it is not - once again */
 					state = 1;
-					tvp = settimeo(&tv, &prev);
-					if (!tvp) {
-						/* timeout exceeded, reset */
-						tv.tv_sec =
-						    ICMP6_PD_QUERY_INTERVAL;
-						tv.tv_usec = 0;
-						tvp = &tv;
-					}
-				} else {
-					/* got discovery reply */
-#if 0
-					send_initquery(s);
-#endif
-					state = 2;
-					tv.tv_sec = ICMP6_PD_QUERY_INTERVAL;
-					tv.tv_usec = 0;
-					tvp = &tv;
+					break;
 				}
+				p = (struct icmp6_prefix_delegation *)buf;
+
+				/* got discovery reply, send initreq */
+				warnx("bar");
+				send_initreq(s, (struct sockaddr *)&serv, servlen);
+				state = 2;
+				settimeo(ICMP6_PD_INITIAL_INTERVAL);
+				retry = ICMP6_PD_INITIAL_RETRY_MAX;
 			}
 			break;
+		case 2:
+			if (n == 0) {
+				warnx("initreq retry");
+				if (retry-- > 0) {
+					warnx("foo");
+					send_initreq(s, (struct sockaddr *)&serv,
+					    servlen);
+					state = 2;
+					settimeo(ICMP6_PD_INITIAL_INTERVAL);
+				} else {
+					/* retry exceeded */
+					errx(1, "no response from delegator "
+					    "for initreq");
+					/*NOTREACHED*/
+				}
+			} else {
+				/* got discovery reply? */
+				fromlen = sizeof(from);
+				if (receive_initreq(s, (struct sockaddr *)&from,
+				    &fromlen, &ecode) < 0) {
+					if (ecode) {
+						errx(1, "fatal error");
+						/*NOTREACHED*/
+					}
+
+					/* type/code mismatch - once again */
+					state = 2;
+					break;
+				}
+				if (!cmpsockaddr((struct sockaddr *)&serv, servlen,
+				    (struct sockaddr *)&from, fromlen)) {
+					warnx("a reply from different server");
+					state = 2;
+					break;
+				}
+
+				warnx("successful");
+				exit(0);
+			}
+			break;
+		default:
+			errx(1, "unknown state %d", state);
+			/*NOTREACHED*/
 		}
 
 	again:
 		memset(fds, 0, fdssize);
 		FD_SET(s, fds);
+		if (timeo.tv_sec) {
+			tv.tv_sec = timeo.tv_sec - cur.tv_sec;
+			tv.tv_usec = timeo.tv_usec - cur.tv_usec;
+			while (tv.tv_usec < 0) {
+				tv.tv_usec += 1000000;
+				tv.tv_sec -= 0;
+			}
+			if (tv.tv_sec >= 0)
+				tvp = &tv;
+			else
+				tvp = NULL;
+		} else
+			tvp = NULL;
 		warnx("select, timeout=%d.%06d", tvp ? tvp->tv_sec : -1,
 		    tvp ? tvp->tv_usec : 0);
 		warnx("state: %d retry: %d", state, retry);
@@ -238,6 +258,7 @@ mainloop()
 			/*NOTREACHED*/
 		}
 	}
+#undef settimeo
 }
 
 static void
@@ -259,7 +280,8 @@ send_discover(s)
 	memset(&req, 0, sizeof(req));
 	req.icmp6_pr_hdr.icmp6_type = ICMP6_PREFIX_REQUEST;
 	req.icmp6_pr_hdr.icmp6_code = ICMP6_PR_DELEGATOR_QUERY;
-	req.icmp6_pr_hdr.icmp6_pr_flaglen = 0;	/* global scope */
+	/* global scope */
+	req.icmp6_pr_hdr.icmp6_pr_flaglen &= ~ICMP6_PR_FLAGS_SCOPE;
 
 #ifndef __KAME__
 #error kame systems only
@@ -304,21 +326,112 @@ receive_discover(s, from, fromlenp)
 	char buf[4096];
 	ssize_t l;
 	struct icmp6_prefix_delegation *p;
-	struct addrinfo hints, *res, *res0;
-	char dest[NI_MAXHOST];
-	int error;
 
-	l = recvfrom(s, buf, sizeof(buf), 0, from, fromlenp);
-	if (l < 0 || l < sizeof(*p))
+	l = receive(s, buf, sizeof(buf), from, fromlenp);
+	if (l < 0)
 		return -1;
 	p = (struct icmp6_prefix_delegation *)buf;
-	if (p->icmp6_pd_hdr.icmp6_type != ICMP6_PREFIX_DELEGATION ||
-	    p->icmp6_pd_hdr.icmp6_code != ICMP6_PD_PREFIX_DELEGATOR)
+	if (p->icmp6_pd_hdr.icmp6_code != ICMP6_PD_PREFIX_DELEGATOR)
 		return -1;
 
 	/* XXX more validation */
 
 	return 0;
+}
+
+static void
+send_initreq(s, serv, servlen)
+	int s;
+	const struct sockaddr *serv;
+	int servlen;
+{
+	struct icmp6_prefix_request req;
+	int error;
+
+	warnx("send_initreq");
+
+	if (sethops(s, 1) < 0) {
+		errx(1, "sethops");
+		/*NOTREACHED*/
+	}
+
+	memset(&req, 0, sizeof(req));
+	req.icmp6_pr_hdr.icmp6_type = ICMP6_PREFIX_REQUEST;
+	req.icmp6_pr_hdr.icmp6_code = ICMP6_PR_INITIAL_REQUEST;
+	req.icmp6_pr_hdr.icmp6_pr_flaglen = 64;	/*XXX*/
+	/* global scope */
+	req.icmp6_pr_hdr.icmp6_pr_flaglen &= ~ICMP6_PR_FLAGS_SCOPE;
+
+	if (sendto(s, &req, sizeof(req), 0, serv, servlen) < 0) {
+		err(1, "sendto");
+		/*NOTREACHED*/
+	}
+}
+
+static int
+receive_initreq(s, from, fromlenp, ecode)
+	int s;
+	struct sockaddr *from;
+	int *fromlenp;
+	int *ecode;
+{
+	char buf[4096];
+	ssize_t l;
+	struct icmp6_prefix_delegation *p;
+
+	*ecode = 0;
+
+	l = receive(s, buf, sizeof(buf), from, fromlenp);
+	if (l < 0)
+		return -1;
+	p = (struct icmp6_prefix_delegation *)buf;
+
+	/* XXX more validation */
+
+	switch (p->icmp6_pd_hdr.icmp6_code) {
+	case ICMP6_PD_AUTH_REQUIRED:
+	case ICMP6_PD_AUTH_FAILED:
+		warnx("authentication failed");
+		*ecode = p->icmp6_pd_hdr.icmp6_code;
+		return -1;
+	case ICMP6_PD_PREFIX_UNAVAIL:
+		warnx("prefix unavailable");
+		*ecode = p->icmp6_pd_hdr.icmp6_code;
+		return -1;
+	case ICMP6_PD_PREFIX_DELEGATED:
+		return 0;
+	default:
+		*ecode = p->icmp6_pd_hdr.icmp6_code;
+		warnx("unexpected reply %u\n", p->icmp6_pd_hdr.icmp6_code);
+		return -1;
+	}
+}
+
+static ssize_t
+receive(s, buf, blen, from, fromlenp)
+	int s;
+	char *buf;
+	size_t blen;
+	struct sockaddr *from;
+	int *fromlenp;
+{
+	ssize_t l;
+	struct icmp6_prefix_delegation *p;
+	int error;
+
+	l = recvfrom(s, buf, blen, 0, from, fromlenp);
+	if (l < 0 || l < sizeof(*p))
+		return -1;
+	p = (struct icmp6_prefix_delegation *)buf;
+	if (p->icmp6_pd_hdr.icmp6_type != ICMP6_PREFIX_DELEGATION)
+		return -1;
+	/* XXX we need a global prefix */
+	if ((p->icmp6_pd_hdr.icmp6_pd_flaglen & ICMP6_PD_FLAGS_SCOPE) != 0)
+		return -1;
+
+	/* XXX more validation */
+
+	return l;
 }
 
 static int
@@ -335,4 +448,28 @@ sethops(s, hops)
 		return -1;
 
 	return 0;
+}
+
+static int
+cmpsockaddr(a, alen, b, blen)
+	const struct sockaddr *a;
+	int alen;
+	const struct sockaddr *b;
+	int blen;
+{
+	char abuf[NI_MAXHOST], bbuf[NI_MAXHOST];
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST;
+#endif
+
+	if (getnameinfo(a, alen, abuf, sizeof(abuf), NULL, 0, niflags))
+		return 0;
+	if (getnameinfo(b, blen, bbuf, sizeof(bbuf), NULL, 0, niflags))
+		return 0;
+	if (strcmp(abuf, bbuf) == 0)
+		return 1;
+	else
+		return 0;
 }
