@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.55 2000/12/21 01:54:22 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.56 2001/01/11 11:01:23 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -277,6 +277,7 @@ rip6_input(mp, offp, proto)
 			m_freem(m);
 		else {
 			char *prvnxtp = ip6_get_prevhdr(m, *offp); /* XXX */
+			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_protounknown);
 			icmp6_error(m, ICMP6_PARAM_PROB,
 				    ICMP6_PARAMPROB_NEXTHEADER,
 				    prvnxtp - mtod(m, char *));
