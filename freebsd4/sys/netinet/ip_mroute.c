@@ -2125,13 +2125,13 @@ ip_rsvp_force_done(so)
 }
 
 void
-rsvp_input(m, off, proto)
+rsvp_input(m, off)
 	struct mbuf *m;
 	int off;
-	int proto;
 {
     int vifi;
     register struct ip *ip = mtod(m, struct ip *);
+    int proto = ip->ip_p;
     static struct sockaddr_in rsvp_src = { sizeof rsvp_src, AF_INET };
     register int s;
     struct ifnet *ifp;
