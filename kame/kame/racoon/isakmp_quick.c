@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.23 2000/04/24 12:09:11 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.24 2000/04/24 18:34:42 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1636,53 +1636,31 @@ end:
 
 /*
  * get remote's sainfo.
+ * NOTE: this function is for responder.
  */
 static int
 get_sainfo_r(iph2)
 	struct ph2handle *iph2;
 {
-	char *name;
-	int namelen;
+	vchar_t idsrc, iddst;
 
 	if (iph2->id_p == NULL) {
-		name = (char *)iph2->src;
-		namelen = iph2->src->sa_len;
+		idsrc.l = iph2->src->sa_len;
+		idsrc.v = (caddr_t)iph2->src;
 	} else {
-		struct ipsecdoi_id_b *id;
-		struct sockaddr_storage sa;
-
-		id = (struct ipsecdoi_id_b *)iph2->id_p->v;
-
-		switch (id->type) {
-		case IPSECDOI_ID_IPV4_ADDR:
-		case IPSECDOI_ID_IPV6_ADDR:
-
-			memset(&sa, 0, sizeof(sa));
-
-			sa.ss_family = id->type == IPSECDOI_ID_IPV4_ADDR
-					? AF_INET : AF_INET6;
-			sa.ss_len = id->type == IPSECDOI_ID_IPV4_ADDR
-					? 16 : 28;
-
-			memcpy(_INADDRBYSA(&sa), id + 1,
-				_INALENBYAF(sa.ss_family));
-
-			name = (char *)&sa;
-			namelen = sa.ss_len;
-			break;
-		case IPSECDOI_ID_FQDN:
-		case IPSECDOI_ID_USER_FQDN:
-			name = (char *)(id + 1);
-			namelen = iph2->id_p->l - sizeof(*id);
-			break;
-		default:
-			plog(logp, LOCATION, NULL,
-				"not supported id type %d\n", id->type);
-			return -1;
-		}
+		idsrc.l = iph2->id_p->l;
+		idsrc.v = iph2->id_p->v;
 	}
 
-	iph2->sainfo = getsainfo(name, namelen);
+	if (iph2->id == NULL) {
+		iddst.l = iph2->dst->sa_len;
+		iddst.v = (caddr_t)iph2->dst;
+	} else {
+		iddst.l = iph2->id->l;
+		iddst.v = iph2->id->v;
+	}
+
+	iph2->sainfo = getsainfo(&idsrc, &iddst);
 	if (iph2->sainfo == NULL) {
 		plog(logp, LOCATION, NULL,
 			"failed to get sainfo.\n");
@@ -1691,7 +1669,7 @@ get_sainfo_r(iph2)
 
 	YIPSDEBUG(DEBUG_MISC,
 		plog(logp, LOCATION, NULL,
-			"get sa info: %p\n", iph2->sainfo));
+			"get sa info: %s\n", sainfo2str(iph2->sainfo)));
 
 	return 0;
 }
@@ -1727,7 +1705,7 @@ get_proposal_r(iph2)
 	  || _XIDT(iph2->id_p) == IPSECDOI_ID_IPV4_ADDR_SUBNET
 	  || _XIDT(iph2->id_p) == IPSECDOI_ID_IPV6_ADDR_SUBNET)) {
 		/* from ID payload */
-		if (ipsecdoi_id2sockaddr(iph2->id,
+		if (ipsecdoi_id2sockaddr(iph2->id_p,
 				(struct sockaddr *)&spidx.src,
 				&spidx.prefs, &spidx.ul_proto) != 0)
 			return -1;
@@ -1738,7 +1716,7 @@ get_proposal_r(iph2)
 				saddr2str((struct sockaddr *)&spidx.src),
 				spidx.prefs, spidx.ul_proto));
 
-		if (ipsecdoi_id2sockaddr(iph2->id_p,
+		if (ipsecdoi_id2sockaddr(iph2->id,
 				(struct sockaddr *)&spidx.dst,
 				&spidx.prefd, &spidx.ul_proto) != 0)
 			return -1;
@@ -1827,8 +1805,12 @@ get_proposal_r(iph2)
 			pdaddr = (struct sockaddr *)&req->saidx.dst;
 
 			/* check end addresses of SA */
-			if (memcmp(iph2->src, psaddr, iph2->src->sa_len)
-			 || memcmp(iph2->dst, pdaddr, iph2->dst->sa_len)) {
+			/*
+			 * NOTE: In inbound, SA's addresses in SP entry are
+			 * reverse against real SA's addresses 
+			 */
+			if (memcmp(iph2->dst, psaddr, iph2->dst->sa_len)
+			 || memcmp(iph2->src, pdaddr, iph2->src->sa_len)) {
 				/* end of SA bundle */
 				break;
 			}

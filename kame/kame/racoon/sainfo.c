@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sainfo.c,v 1.1 2000/04/24 07:37:44 sakane Exp $ */
+/* YIPS @(#)$Id: sainfo.c,v 1.2 2000/04/24 18:34:42 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -69,36 +69,34 @@ static LIST_HEAD(_sitree, sainfo) sitree;
  * XXX by each data type, should be changed to compare the buffer.
  */
 struct sainfo *
-getsainfo(name, len)
-	caddr_t name;
-	int len;
+getsainfo(src, dst)
+	const vchar_t *src, *dst;
 {
 	struct sainfo *s = NULL;
 	struct sainfo *anonymous = NULL;
 
 	LIST_FOREACH(s, &sitree, chain) {
-		if (s->name == NULL) {
+		if (s->idsrc == NULL) {
 			anonymous = s;
 			continue;
 		}
 
 		/* anonymous ? */
-		if (name == NULL || len == 0) {
+		if (src == NULL) {
 			if (anonymous != NULL)
 				break;
 			continue;
 		}
 
-		if (len != s->name->l)
-			continue;
-		if (!memcmp(name, s->name->v, len))
+		if (memcmp(src->v, s->idsrc->v, s->idsrc->l) == 0
+		 && memcmp(dst->v, s->iddst->v, s->iddst->l) == 0)
 			return s;
 	}
 
 	YIPSDEBUG(DEBUG_MISC,
 		if (anonymous) {
 			plog(logp, LOCATION, NULL,
-				"anonymous info configuration selected.\n");
+				"anonymous sainfo selected.\n");
 		});
 	return anonymous;
 }
@@ -122,6 +120,16 @@ void
 delsainfo(si)
 	struct sainfo *si;
 {
+	int i;
+
+	for (i = 0; i < MAXALGCLASS; i++)
+		delsainfoalg(si->algs[i]);
+
+	if (si->idsrc)
+		vfree(si->idsrc);
+	if (si->iddst)
+		vfree(si->iddst);
+
 	free(si);
 }
 
@@ -173,6 +181,18 @@ newsainfoalg()
 }
 
 void
+delsainfoalg(alg)
+	struct sainfoalg *alg;
+{
+	struct sainfoalg *a, *next;
+
+	for (a = alg; a; a = next) {
+		next = a->next;
+		free(a);
+	}
+}
+
+void
 inssainfoalg(head, new)
 	struct sainfoalg **head;
 	struct sainfoalg *new;
@@ -193,24 +213,9 @@ sainfo2str(si)
 {
 	static char buf[256];
 
-	memset(buf, '\0', sizeof(buf));
-
-	if (si->name == NULL) {
-		strcpy(buf, "anonymous");
-		return buf;
-	}
-
-	switch (si->identtype) {
-	case 0:	/* XXX */
-	case IPSECDOI_ID_IPV4_ADDR:
-	case IPSECDOI_ID_IPV6_ADDR:
-	case IPSECDOI_ID_IPV4_ADDR_SUBNET:
-	case IPSECDOI_ID_IPV6_ADDR_SUBNET:
-		/* XXX */
-		return buf;
-	}
-
-	memcpy(buf, si->name->v, si->name->l);
+	snprintf(buf, sizeof(buf), "%s", ipsecdoi_id2str(si->idsrc));
+	snprintf(buf + strlen(buf), sizeof(buf) - strlen(buf),
+		" %s", ipsecdoi_id2str(si->iddst));
 
 	return buf;
 }

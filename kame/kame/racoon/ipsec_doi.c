@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.59 2000/04/24 14:25:47 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.60 2000/04/24 18:34:42 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -134,8 +134,6 @@ static int setph1attr __P((struct isakmpsa *props, caddr_t buf));
 #if 0
 static int getph2proplen __P((struct ipsecsa *proposal));
 #endif
-static vchar_t *sockaddr2id __P((struct sockaddr *saddr,
-	u_int prefixlen, u_int ul_proto));
 
 /*%%%*/
 /*
@@ -2652,7 +2650,7 @@ ipsecdoi_setid2(iph2)
 	}
 
 	if (ident == NULL) {
-		iph2->id = sockaddr2id((struct sockaddr *)&sp->spidx.src,
+		iph2->id = ipsecdoi_sockaddr2id((struct sockaddr *)&sp->spidx.src,
 					sp->spidx.prefs, sp->spidx.ul_proto);
 		if (iph2->id == NULL) {
 			plog(logp, LOCATION, NULL,
@@ -2682,7 +2680,7 @@ ipsecdoi_setid2(iph2)
 	}
 
 	/* remote side */
-	iph2->id_p = sockaddr2id((struct sockaddr *)&sp->spidx.dst,
+	iph2->id_p = ipsecdoi_sockaddr2id((struct sockaddr *)&sp->spidx.dst,
 				sp->spidx.prefd, sp->spidx.ul_proto);
 	if (iph2->id_p == NULL) {
 		plog(logp, LOCATION, NULL,
@@ -2702,9 +2700,10 @@ ipsecdoi_setid2(iph2)
 
 /*
  * set address type of ID.
+ * NOT INCLUDING general header.
  */
-static vchar_t *
-sockaddr2id(saddr, prefixlen, ul_proto)
+vchar_t *
+ipsecdoi_sockaddr2id(saddr, prefixlen, ul_proto)
 	struct sockaddr *saddr;
 	u_int prefixlen;
 	u_int ul_proto;
@@ -2884,6 +2883,21 @@ ipsecdoi_id2sockaddr(
 				: id_b->proto_id;	/* see sockaddr2id() */
 
 	return 0;
+}
+
+/*
+ * make printable string from ID payload except of general header.
+ */
+const char *
+ipsecdoi_id2str(id)
+	const vchar_t *id;
+{
+	static char buf[256];
+
+	/* XXX */
+	buf[0] = '\0';
+
+	return buf;
 }
 
 #if 0

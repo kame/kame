@@ -26,14 +26,19 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sainfo.h,v 1.1 2000/04/24 07:37:44 sakane Exp $ */
+/* YIPS @(#)$Id: sainfo.h,v 1.2 2000/04/24 18:34:42 sakane Exp $ */
 
 #include <sys/queue.h>
 
 /* SA info */
 struct sainfo {
-	int identtype;
-	vchar_t *name;			/* info name. e.g. IP address, FQDN.*/
+	vchar_t *idsrc;
+	vchar_t *iddst;
+		/*
+		 * idsrc and iddst are constructed body of ID payload.
+		 * that is (struct ipsecdoi_id_b) + ID value.
+		 * If idsrc == NULL, that is anonymous entry.
+		 */
 
 	time_t lifetime;
 	int lifebyte;
@@ -51,7 +56,7 @@ struct sainfoalg {
 	struct sainfoalg *next;
 };
 
-extern struct sainfo *getsainfo __P((caddr_t, int));
+extern struct sainfo *getsainfo __P((const vchar_t *, const vchar_t *dst));
 extern struct sainfo *newsainfo __P((void));
 extern void delsainfo __P((struct sainfo *));
 extern void inssainfo __P((struct sainfo *));
@@ -59,5 +64,6 @@ extern void remsainfo __P((struct sainfo *));
 extern void flushsainfo __P((void));
 extern void initsainfo __P((void));
 extern struct sainfoalg *newsainfoalg __P((void));
+extern void delsainfoalg __P((struct sainfoalg *));
 extern void inssainfoalg __P((struct sainfoalg **, struct sainfoalg *));
 extern const char * sainfo2str __P((const struct sainfo *si));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.31 2000/04/24 14:03:06 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.32 2000/04/24 18:34:42 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1379,14 +1379,37 @@ pk_recvacquire(mhp)
 			"new acquire iph2 %p: src %s %s dst %s %s\n",
 			iph2, h1, s1, h2, s2));
 
-	/* get sa entitiy */
-	iph2[n]->sainfo = getsainfo((caddr_t)iph2[n]->dst, iph2[n]->dst->sa_len);
+	/* get sainfo */
+    {
+	vchar_t *idsrc, *iddst;
+
+	idsrc = ipsecdoi_sockaddr2id((struct sockaddr *)&sp->spidx.src,
+				sp->spidx.prefs, sp->spidx.ul_proto);
+	if (idsrc == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to get ID for %s\n",
+			spidx2str(&sp->spidx));
+		goto err;
+	}
+	iddst = ipsecdoi_sockaddr2id((struct sockaddr *)&sp->spidx.dst,
+				sp->spidx.prefd, sp->spidx.ul_proto);
+	if (iddst == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to get ID for %s\n",
+			spidx2str(&sp->spidx));
+		vfree(idsrc);
+		goto err;
+	}
+	iph2[n]->sainfo = getsainfo(idsrc, iddst);
+	vfree(idsrc);
+	vfree(iddst);
 	if (iph2[n]->sainfo == NULL) {
 		plog(logp, LOCATION, NULL,
 			"failed to get sainfo.\n");
 		goto err;
 		/* XXX should use the algorithm list from register message */
 	}
+    }
 
 	/* allocate first proposal */
 	newpp = newsaprop();

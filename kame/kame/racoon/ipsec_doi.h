@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.12 2000/04/24 07:37:43 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.13 2000/04/24 18:34:42 sakane Exp $ */
 
 /* refered to RFC2407 */
 
@@ -161,8 +161,10 @@ extern vchar_t *get_sabysaprop __P((struct saprop *, vchar_t *));
 extern int ipsecdoi_checkid1 __P((struct ph1handle *iph1));
 extern int ipsecdoi_setid1 __P((struct ph1handle *iph1));
 extern int ipsecdoi_setid2 __P((struct ph2handle *iph2));
+extern vchar_t *ipsecdoi_sockaddr2id __P((struct sockaddr *, u_int, u_int));
 extern int ipsecdoi_id2sockaddr __P((vchar_t *buf, struct sockaddr *saddr,
 	u_int8_t *prefixlen, u_int16_t *ul_proto));
+extern const char *ipsecdoi_id2str __P((const vchar_t *id));
 
 extern vchar_t *ipsecdoi_setph1proposal __P((struct isakmpsa *proposal));
 extern vchar_t *ipsecdoi_setph2proposal __P((struct ph2handle *iph2));

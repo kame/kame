@@ -174,7 +174,7 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 %type <num> LIFETYPE UNITTYPE
 %type <num> SECLEVELTYPE SECMODETYPE 
 %type <num> EXCHANGETYPE DOITYPE SITUATIONTYPE CERTTYPE
-%type <val> QUOTEDSTRING HEXSTRING ADDRSTRING STATICSA_STATEMENT
+%type <val> QUOTEDSTRING HEXSTRING ADDRSTRING STATICSA_STATEMENT sainfo_id
 %type <res> ike_addrinfo_port
 %type <spidx> policy_index
 %type <saddr> remote_index
@@ -707,34 +707,56 @@ sainfo_statement
 sainfo_name
 	:	ANONYMOUS
 		{
-			cur_sainfo->identtype = 0;
-			cur_sainfo->name = NULL;
+			cur_sainfo->idsrc = NULL;
+			cur_sainfo->iddst = NULL;
 		}
-	|	IDENTIFIERTYPE ADDRSTRING
+	|	sainfo_id sainfo_id
 		{
+			cur_sainfo->idsrc = $1;
+			cur_sainfo->iddst = $2;
+		}
+	;
+sainfo_id
+	:	IDENTIFIERTYPE ADDRSTRING prefix port ul_proto
+		{
+			char portbuf[10];
 			struct addrinfo *res;
 
-			res = parse_addr($2->v, NULL, AI_NUMERICHOST);
+			if (($5 == IPPROTO_ICMP || $5 == IPPROTO_ICMPV6)
+			 && ($4 != IPSEC_PORT_ANY || $4 != IPSEC_PORT_ANY)) {
+				yyerror("port number must be \"any\".");
+				return -1;
+			}
+
+			snprintf(portbuf, sizeof(portbuf), "%lu", $4);
+			res = parse_addr($2->v, portbuf, AI_NUMERICHOST);
 			vfree($2);
 			if (!res)
 				return -1;
-			cur_sainfo->name = vmalloc(res->ai_addrlen);
-			if (cur_sainfo->name == NULL) {
-				yyerror("vmalloc (%s)", strerror(errno));
-				freeaddrinfo(res);
-				return -1;
-			}
-			memcpy(cur_sainfo->name->v, res->ai_addr,
-				cur_sainfo->name->l);
+			$$ = ipsecdoi_sockaddr2id(res->ai_addr,
+					_INALENBYAF(res->ai_family) << 3, $5);
 			freeaddrinfo(res);
-
-			cur_sainfo->identtype = idtype2doi($1);
+			if ($$ == NULL)
+				return -1;
 		}
 	|	IDENTIFIERTYPE QUOTEDSTRING
 		{
+			struct ipsecdoi_id_b *id_b;
+
 			$2->l--;
-			cur_sainfo->name = $2;
-			cur_sainfo->identtype = idtype2doi($1);
+
+			$$ = vmalloc(sizeof(*id_b) + $2->l);
+			if ($$ == NULL) {
+				yyerror("vmalloc (%s)\n", strerror(errno));
+				return -1;
+			}
+
+			id_b = (struct ipsecdoi_id_b *)$$->v;
+			id_b->type = idtype2doi($1);
+			id_b->proto_id = 0;
+			id_b->port = 0;
+
+			memcpy($$->v + sizeof(*id_b), $2->v, $2->l);
 		}
 	;
 sainfo_specs
