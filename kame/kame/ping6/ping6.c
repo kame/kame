@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.151 2002/04/24 07:46:57 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.152 2002/05/26 05:37:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -625,17 +625,17 @@ main(argc, argv)
 	/* set the gateway (next hop) if specified */
 	if (gateway) {
 		struct addrinfo ghints, *gres;
-		int e;
+		int error;
 
 		memset(&ghints, 0, sizeof(ghints));
 		ghints.ai_family = AF_INET6;
 		ghints.ai_socktype = SOCK_RAW;
 		ghints.ai_protocol = IPPROTO_ICMPV6;
 
-		e = getaddrinfo(gateway, NULL, &hints, &gres);
-		if (e) {
+		error = getaddrinfo(gateway, NULL, &hints, &gres);
+		if (error) {
 			errx(1, "getaddrinfo for the gateway %s",
-			     gateway, gai_strerror(e));
+			     gateway, gai_strerror(error));
 		}
 		if (gres->ai_next && (options & F_VERBOSE))
 			warnx("gateway resolves to multiple addresses");
@@ -1863,9 +1863,9 @@ pr_rthdr(void *extbuf)
 #endif /* USE_RFC2292BIS */
 
 int
-pr_bitrange(v, s, ii)
+pr_bitrange(v, soff, ii)
 	u_int32_t v;
-	int s;
+	int soff;
 	int ii;
 {
 	int off;
@@ -1876,7 +1876,7 @@ pr_bitrange(v, s, ii)
 		/* shift till we have 0x01 */
 		if ((v & 0x01) == 0) {
 			if (ii > 1)
-				printf("-%u", s + off - 1);
+				printf("-%u", soff + off - 1);
 			ii = 0;
 			switch (v & 0x0f) {
 			case 0x00:
