@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.71 2000/11/30 12:30:57 jinmei Exp $	*/
+/*	$KAME: in6_proto.c,v 1.72 2000/12/02 17:20:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -224,7 +224,12 @@ struct ip6protosw inet6sw[] = {
 #endif
 },
 #ifdef TCP6
-{ SOCK_STREAM,	&inet6domain,	IPPROTO_TCP,	PR_CONNREQUIRED | PR_WANTRCVD,
+{ SOCK_STREAM,	&inet6domain,	IPPROTO_TCP,
+#ifdef __NetBSD__
+  PR_CONNREQUIRED | PR_WANTRCVD | PR_LISTEN,
+#else
+  PR_CONNREQUIRED | PR_WANTRCVD,
+#endif
   tcp6_input,	0,		tcp6_ctlinput,	tcp6_ctloutput,
   tcp6_usrreq,
   tcp6_init,	tcp6_fasttimo,	tcp6_slowtimo,	tcp6_drain,
@@ -237,7 +242,12 @@ struct ip6protosw inet6sw[] = {
 #endif
 },
 #else
-{ SOCK_STREAM,	&inet6domain,	IPPROTO_TCP,	PR_CONNREQUIRED | PR_WANTRCVD,
+{ SOCK_STREAM,	&inet6domain,	IPPROTO_TCP,
+#ifdef __NetBSD__
+  PR_CONNREQUIRED | PR_WANTRCVD | PR_LISTEN,
+#else
+  PR_CONNREQUIRED | PR_WANTRCVD,
+#endif
   tcp6_input,	0,		tcp6_ctlinput,	tcp_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
