@@ -1,4 +1,4 @@
-/*	$KAME: rtsol.c,v 1.21 2003/04/11 12:46:12 jinmei Exp $	*/
+/*	$KAME: rtsol.c,v 1.22 2003/04/16 09:48:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -190,9 +190,10 @@ sendpacket(struct ifinfo *ifinfo)
 	dst = sin6_allrouters;
 	dst.sin6_scope_id = ifinfo->linkid;
 	/* get ISATAP router list for later use */
-	if (is_isatap(ifinfo)) {
+#ifdef ISTAP
+	if (is_isatap(ifinfo))
 		isatapsiz = get_isatap_router(ifinfo, (void **) &isatap);
-	}
+#endif
 
 	sndmhdr.msg_name = (caddr_t)&dst;
 	sndmhdr.msg_iov[0].iov_base = (caddr_t)ifinfo->rs_data;
@@ -216,6 +217,7 @@ sendpacket(struct ifinfo *ifinfo)
 
 	ptr = isatap;
 	do {
+#ifdef ISTAP
 		if (is_isatap(ifinfo)) {
 			if (isatapsiz == 0)
 				break;
@@ -229,6 +231,7 @@ sendpacket(struct ifinfo *ifinfo)
 			isatapsiz -= ptr->sin_len;
 			ptr++;
 		}
+#endif
 		warnmsg(LOG_DEBUG, __func__,
 		    "send RS on %s, whose state is %d",
 		    ifinfo->ifname, ifinfo->state);

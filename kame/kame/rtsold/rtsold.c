@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.64 2003/04/14 04:48:59 jinmei Exp $	*/
+/*	$KAME: rtsold.c,v 1.65 2003/04/16 09:48:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -412,11 +412,13 @@ ifconfig(char *ifname)
 
 	strncpy(ifinfo->ifname, ifname, sizeof(ifinfo->ifname));
 
+#ifdef ISATAP
 	if (is_6to4(ifinfo)) {
 		warnmsg(LOG_ERR, __func__,
 			"you cannot solicit RA on 6to4 interface");
 		goto bad;
 	}
+#endif
 
 	/* construct a router solicitation message */
 	if (make_packet(ifinfo))
@@ -443,10 +445,14 @@ ifconfig(char *ifname)
 		 * does not change.
 		 * (ISATAP router cannot send unsolicited RA)
 		 */
+#ifdef ISATAP
 		if (is_isatap(ifinfo))
 			ifinfo->probeinterval = ISATAP_PROBE_INTERVAL;
 		else
 			ifinfo->probeinterval = PROBE_INTERVAL;
+#else
+		ifinfo->probeinterval = PROBE_INTERVAL;
+#endif
 	}
 
 	/* activate interface: interface_up returns 0 on success */
@@ -694,10 +700,14 @@ rtsol_timer_update(struct ifinfo *ifinfo)
 		if (mobile_node) {
 			/* XXX should be configurable */
 			ifinfo->timer.tv_sec = 3;
-		} else if (is_isatap(ifinfo)) {
+		}
+#ifdef ISATAP
+		else if (is_isatap(ifinfo)) {
 			/* don't have to consider I/F updown in ISATAP */
 			ifinfo->timer.tv_sec = 60;
-		} else
+		}
+#endif
+		else
 			ifinfo->timer = tm_max;	/* stop timer(valid?) */
 		break;
 	case IFS_DELAY:
@@ -893,11 +903,11 @@ autoifprobe()
 		if (a == NULL)
 			err(1, "realloc");
 		argv = a;
-		argv[n] = (char *)malloc(1 + strlen(ifa->ifa_name));
+		argv[n] = strdup(ifa->ifa_name);
 		if (!argv[n])
 			err(1, "malloc");
-		strcpy(argv[n], ifa->ifa_name);
 		n++;
+		argv[n] = NULL;
 	}
 
 	if (n) {

@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.24 2003/04/11 12:34:44 jinmei Exp $	*/
+/*	$KAME: if.c,v 1.25 2003/04/16 09:48:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,7 +82,9 @@ static int get_llflag __P((const char *));
 static unsigned int if_maxindex __P((void));
 #endif
 static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
+#ifdef ISATAP
 static int get_isatap_mode __P((struct ifinfo *ifinfo));
+#endif
 
 int
 ifinit()
@@ -463,12 +465,10 @@ get_rtaddrs(int addrs, struct sockaddr *sa, struct sockaddr **rti_info)
 	}
 }
 
+#ifdef ISATAP
 static int
 get_isatap_mode(struct ifinfo *ifinfo)
 {
-#ifndef ISATAP
-	return -1;
-#else
 	struct ifreq ifr;
 	int s;
 	static struct in_addr addr;
@@ -489,9 +489,10 @@ get_isatap_mode(struct ifinfo *ifinfo)
 	}
 	close(s);
 	return ((int) ifr.ifr_data);
-#endif /* ISATAP */
 }
+#endif /* ISATAP */
 
+#ifdef ISATAP
 int
 is_isatap(struct ifinfo *ifinfo)
 {
@@ -503,6 +504,7 @@ is_6to4(struct ifinfo *ifinfo)
 {
 	return (get_isatap_mode(ifinfo) == STFM_6TO4);
 }
+#endif
 
 size_t
 get_isatap_router(struct ifinfo *ifinfo, void **buf)

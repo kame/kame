@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.h,v 1.18 2003/04/11 10:14:56 jinmei Exp $	*/
+/*	$KAME: rtsold.h,v 1.19 2003/04/16 09:48:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,9 +88,11 @@ extern int lladdropt_length __P((struct sockaddr_dl *));
 extern void lladdropt_fill __P((struct sockaddr_dl *, struct nd_opt_hdr *));
 extern struct sockaddr_dl *if_nametosdl __P((char *));
 extern int getinet6sysctl __P((int));
+#ifdef ISATAP
 extern int is_isatap __P((struct ifinfo *));
 extern int is_6to4 __P((struct ifinfo *));
 extern size_t get_isatap_router __P((struct ifinfo *, void **));
+#endif
 
 /* rtsol.c */
 extern int sockopen __P((void));
