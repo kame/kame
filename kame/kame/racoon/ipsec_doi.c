@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.148 2001/10/05 02:47:06 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.149 2001/10/23 02:30:12 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2944,7 +2944,7 @@ ipsecdoi_checkid1(iph1)
 			"invalid iph1 passed id_p == NULL\n");
 		return ISAKMP_INTERNAL_ERROR;
 	}
-	if (iph1->id_p->l < sizeof(id_b)) {
+	if (iph1->id_p->l < sizeof(*id_b)) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid value passed as \"ident\" (len=%lu)\n",
 			(u_long)iph1->id_p->l);
