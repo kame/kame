@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1557 2001/02/16 23:49:35 thorpej Exp $
+$KAME: CHANGELOG,v 1.1558 2001/02/18 20:52:34 fujisawa Exp $
 
 <200102>
+2001-02-19  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* sys/netinet/ip_input.c: AddAdd a NATPT hook into ip_input().
+	* sys/netinet/ip_proto.c: Add a NATPT entry into struct ipprotosw
+	  inetsw[].
+	* sys/netinet6/ip6_input.c: include "opt_natpt.h" when FreeBSD
+	  version is more than 3.
+
+	  Sorry, there is a problem a little, and NATPT does not work yet.
+
 2001-02-16  Jason R. Thorpe  <thorpej@zembu.com>
 	* sys/netkey/key.c: When processing an SADB_DELETE message,
 	  allow SADB_EXT_SA to be blank.  In this case, we delete
