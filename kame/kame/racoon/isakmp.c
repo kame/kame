@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.7 1999/12/01 11:16:56 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.8 2000/01/01 06:23:37 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -3397,8 +3397,6 @@ end:
 
 	if (vidhash != NULL)
 		vfree(vidhash);
-	if (mysa != NULL)
-		vfree(mysa);
 
 	return error;
 }
