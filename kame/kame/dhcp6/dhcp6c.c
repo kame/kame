@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.106 2003/01/23 05:08:59 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.107 2003/01/23 05:16:57 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -588,9 +588,15 @@ client6_timo(arg)
 			ifp->current_server = select_server(ifp);
 			if (ifp->current_server == NULL) {
 				/* this should not happen! */
-				dprintf(LOG_ERR, "%s" "can't find a server"
+				dprintf(LOG_NOTICE, "%s" "can't find a server"
 					FNAME);
 				exit(1); /* XXX */
+			}
+			if (duidcpy(&ev->serverid,
+			    &ifp->current_server->optinfo.serverID)) {
+				dprintf(LOG_NOTICE, "%s"
+				    "can't copy server ID", FNAME);
+				return (NULL); /* XXX: better recovery? */
 			}
 			ev->timeouts = 0;
 			ev->state = DHCP6S_REQUEST;
@@ -699,7 +705,6 @@ client6_send(ev)
 	char buf[BUFSIZ];
 	struct sockaddr_in6 dst;
 	struct dhcp6 *dh6;
-	struct duid *serverid = NULL;
 	struct dhcp6_optinfo optinfo;
 	ssize_t optlen, len;
 	struct dhcp6_listval *iapd;
@@ -763,16 +768,14 @@ client6_send(ev)
 	/* server ID */
 	switch (ev->state) {
 	case DHCP6S_REQUEST:
-		serverid = &ifp->current_server->optinfo.serverID;
-		break;
 	case DHCP6S_RENEW:
 	case DHCP6S_RELEASE:
-		serverid = &ev->serverid;
+		if (duidcpy(&optinfo.serverID, &ev->serverid)) {
+			dprintf(LOG_ERR, "%s" "failed to copy server ID",
+			    FNAME);
+			goto end;
+		}
 		break;
-	}
-	if (serverid && duidcpy(&optinfo.serverID, serverid)) {
-		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
-		goto end;
 	}
 
 	/* client ID */
