@@ -6,11 +6,14 @@ $hostname =~ s/\n$//;
 $userfqdn = `whoami`;
 $userfqdn =~ s/\n$//;
 $userfqdn .= '@' . $hostname;
-$rcsid = '$Id: sandiego.pl,v 1.6 2000/01/11 21:27:48 itojun Exp $';
+$rcsid = '$Id: sandiego.pl,v 1.7 2000/01/12 00:35:55 itojun Exp $';
 
 print <<EOF;
 # automatically generated from $rcsid
-# do not edit
+# do not edit.
+
+# sample policy setting for setkey(8):
+# spdadd $me $you any -P out ipsec esp/transport//use ah/transport//use;
 
 # search this file for pre_shared_key with various ID key.
 path pre_shared_key "./psk.txt" ;
