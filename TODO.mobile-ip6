@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.17 2001/10/26 13:31:21 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.18 2001/11/16 10:23:22 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -31,8 +31,7 @@ todo
 - mobile prefix advertisement.
 - NA when returning to home.
 - complete dynamic home agent discovery. (implement user-land daemon?)
-- rate limit.
-- BR.
+- rate limit (many places).
 - homeagent info handling.
 - ICMP against tunneled packet handling.
 - registration to the old AR.
@@ -50,6 +49,7 @@ MN side
 CN side
 - recieving binding update.
 - insertion of a routing header.
+- sending binding requests.
 
 HA side
 - home registration.
