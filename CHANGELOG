@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1797 2001/07/21 04:48:18 itojun Exp $
+$KAME: CHANGELOG,v 1.1798 2001/07/21 05:44:54 itojun Exp $
 
 <200107>
 Sat Jul 21 13:30:21 JST 2001  itojun@iijlab.net
@@ -11,52 +11,7 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	* *bsd*/sys/net/route.c: make equal() more pickier about sa_len,
 	  to avoid possible data buffer overrun.
 	* netbsd/sys/net/radix.c: multipath support in radix routing table.
-	  experimental, netbsd only.
-	  - multipath support will be enabled for inet and inet6 radix table,
-	    if "options RADIX_MPATH" is specified.
-	  - even with multipath support enabled, there's no behavior change if
-	    you operate it normally with single routing entries per rt_key.
-	  - if you issue multiple RTM_ADD requests with the same rt_key, they
-	    will coexist in the routing table (4.4BSD behavior: the latter one
-	    gets rejected with EEXIST).  first one to get added will appear
-	    at the top of rn_dupedkey, so on normal lookups the first one 
-	    will be picked up (fewer behavior change).
-	  - on RTM_DELETE/CHANGE/LOCK, it is now required to specify
-	    rt_gateway, if there are multiple route entries with the same
-	    rt_key.  if there's only one entry, no need for rt_gateway
-	    (preserves original behavior for non-multipath case).
-	  - on RTM_GET, you can identify single route out of multipaths
-	    if you specify rt_gateway.  rt_gateway is still optional,
-	    and the first route is returned if it is not specified.
-	  - IPv4 and IPv6 output logic will pick a route out of multiple
-	    gateways, based on Modulo-N Hash (RFC2991) using lowermost 32bits
-	    from ip{,6}_dst.  it is likely that packets to 3ffe::1 and 3ffe::2
-	    will go through a different gateway:-)
-	  
-	  DEMO:
-	  (adding multipath routes)
-	  # route add -inet 10.1.0.0 -netmask 0xffffff00 10.0.0.1
-	  # route add -inet 10.1.0.0 -netmask 0xffffff00 10.0.0.2
-	  # route add -inet 10.1.0.0 -netmask 0xffffff00 10.0.0.3
-	  (use different gateways based on ip_dst)
-	  # ping -n -c1 10.1.0.1
-	  # ping -n -c1 10.1.0.2
-	  # ping -n -c1 10.1.0.3
-	  # ping -n -c1 10.1.0.4
-	  (removing only one of them)
-	  # route delete -inet 10.1.0.0 10.0.0.2
-	  (it will raise error as there are two routes with the same rt_key)
-	  # route delete -inet 10.1.0.0
-	  (it is not ambiguous, it works)
-	  # route delete -inet 10.1.0.0 10.0.0.3
-	  (now you can erase the route without rt_gateway, as there's only one)
-	  # route delete -inet 10.1.0.0
-
-	  routing todo: reject same key/gw pair on RTM_ADD
-
-	  L3 TODO: more clever hash/gw selection policy (-> RFC2991/2992),
-	  avoid faulty gateways/nonworking paths, revisit issues with cached
-	  route on struct route/sendto(3)
+	  experimental, netbsd only.  see 1.17 of IMPLEMENTATION.
 
 Fri Jul 20 14:20:51 JST 2001  itojun@iijlab.net
 	* nodeinfod: a daemon that responds to node information queries.
