@@ -1,19 +1,19 @@
 # New ports collection makefile for:    sendmail
-# Version required:	8.10.0
+# Version required:	8.10.1
 # Date created:		1 Oct 1997
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.3 2000/03/20 14:59:07 itojun Exp $
+# $Id: Makefile,v 1.4 2000/04/10 05:43:52 itojun Exp $
 #
 
 DISTNAME=	sendmail.${SENDMAILVER}
-PKGNAME=	sendmail-8.10.0
+PKGNAME=	sendmail-8.10.1
 CATEGORIES=	mail
 MASTER_SITES=	ftp://ftp.sendmail.org/pub/sendmail/
 
 MAINTAINER=	itojun@itojun.org
 
-SENDMAILVER=	8.10.0
+SENDMAILVER=	8.10.1
 
 WRKSRC=		${WRKDIR}/sendmail-${SENDMAILVER}/sendmail
 
@@ -26,6 +26,6 @@ do-build:
 do-install:
 	${INSTALL} -c -o root -g kmem -m 6555 \
 		${WRKSRC}/../obj.FreeBSD.*/sendmail/sendmail \
-		${PREFIX}/sbin/sendmail.8.10.0
+		${PREFIX}/sbin/sendmail.8.10.1
 
 .include <bsd.port.mk>
