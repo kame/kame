@@ -3,7 +3,7 @@
 # Date created:		Tue Nov 16 19:45:46 JST 1999
 # Whom:			sumikawa
 #
-# $Id: Makefile,v 1.1 1999/11/16 11:10:13 sumikawa Exp $
+# $Id: Makefile,v 1.1.1.1 1999/11/16 11:10:13 sumikawa Exp $
 #
 
 DISTNAME=	OpenSSH-1.2
