@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/01/25 11:32:33 $
+			$Date: 2000/01/30 08:49:24 $
 
 1. IPv6
 
@@ -139,10 +139,11 @@ list.  For more details, see the comments in the source code and email
 thread started from (IPng 7155), dated Feb 6 1999.
 
 IPv6 on-link determination rule (RFC2461) is quite different from assumptions
-in BSD network code.  At this moment, KAME does not implement on-link
-determination rule when default router list is empty (RFC2461, section 5.2,
-last sentence in 2nd paragraph - note that the spec misuse the word "host"
-and "node" in several places in the section).
+in BSD IPv4 network code.  To implement behavior in RFC2461 section 5.2
+(when default router list is empty), the kernel needs to know the default
+outgoing interface.  To configure the default outgoing interface, use
+commands like "ndp -I de0" as root.  Note that the spec misuse the word
+"host" and "node" in several places in the section.
 
 To avoid possible DoS attacks and infinite loops, KAME stack will accept
 only 10 options on ND packet.  Therefore, if you have 20 prefix options
