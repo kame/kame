@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.82 2004/01/19 03:24:21 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.83 2004/01/26 03:37:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -307,9 +307,9 @@
  * - TAILQ_EMPTY
  *	BSD/OS 4.x does not have this macro.
  *
- * - timercmp(), timersub()
- *	bsdi[34]: no timercmp, timersub
- *	freebsd[45]: only in userland (why?)
+ * - timercmp(), timersub(), timeradd()
+ *	bsdi[34]: no timer*
+ *	freebsd[45]: only in userland.  in kernel, timeval*() is available.
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
