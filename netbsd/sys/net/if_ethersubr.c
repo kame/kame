@@ -814,7 +814,7 @@ ether_addmulti(ifr, ec)
 	case AF_INET6:
 		sin6 = (struct sockaddr_in6 *)
 			&(((struct in6_ifreq *)ifr)->ifr_addr);
-		if (IN6_IS_ADDR_ANY(&sin6->sin6_addr)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
 			/*
 			 * An IP6 address of 0 means listen to all
 			 * of the Ethernet multicast address used for IP6.
@@ -926,7 +926,7 @@ ether_delmulti(ifr, ec)
 #ifdef INET6
 	case AF_INET6:
 		sin6 = (struct sockaddr_in6 *)&(ifr->ifr_addr);
-		if (IN6_IS_ADDR_ANY(&sin6->sin6_addr)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
 			/*
 			 * An IP6 address of all 0 means stop listening
 			 * to the range of Ethernet multicast addresses used
