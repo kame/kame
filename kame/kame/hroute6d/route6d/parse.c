@@ -1,5 +1,5 @@
 /* 
- * $Id: parse.c,v 1.3 2003/01/21 08:50:09 suz Exp $
+ * $Id: parse.c,v 1.4 2003/01/21 09:28:40 suz Exp $
  */
 
 /*
@@ -84,11 +84,12 @@ extern int dflag;
 		now++;
 
 #define ERR(mes) \
-	{ \
-		syslog(LOG_ERR, "line %d: %s", lnum, mes); \
-		fprintf(stderr, "line %d: %s\n", lnum, mes); \
-		goto err; \
-	}
+	do { \
+		char err_str[LINE_LEN]; \
+		snprintf(err_str, sizeof(err_str), "line %d: %s", lnum, mes); \
+		fprintf(stderr, "%s\n", err_str); \
+		quit_route6d(err_str, 1); \
+	} while (0)
 
 void
 parse_config(void)
@@ -100,7 +101,7 @@ parse_config(void)
 	char *line_end;
 
 	if ((config = fopen(RT6_CONFIGFILE, "r")) == NULL)
-		ERR("cannot find configuration file\n");
+		quit_route6d("cannot find configuration file", 1);
 
 	bzero(line, LINE_LEN);
 	while (fgets(line, LINE_LEN, config) != NULL) {
@@ -134,12 +135,6 @@ parse_config(void)
 	if (dflag)
 		print_config();
 	return;
-
- err:
-	if (Cflag)
-		exit(1);
-	else
-		WAIT_FOR_SIGHUP();
 }
 
 void
@@ -271,8 +266,7 @@ global_part(void)
 	case K_IGNORE:
 		if ((ign = (struct ign_prefix *)
 		     malloc(sizeof(struct ign_prefix))) == NULL) {
-			syslog(LOG_ERR, "parse: %m");
-			exit_route6d();
+			ERR("parse: %m");
 		}
 		if (prefix(&ign->igp_prefix) < 1)
 			ERR("Invalid prefix");
@@ -295,8 +289,6 @@ global_part(void)
 		ERR("unknown keyword");
 	}
 	return;
- err:
-	exit_route6d();
 }
 
 void
@@ -325,8 +317,7 @@ interface_part(void)
 		if_ll_addr = get_if_addr(&iface);
 		ifc = (struct int_config *)malloc(sizeof(*ifc));
 		if (ifc == NULL) {
-			syslog(LOG_ERR, "parse: %m");
-			exit_route6d();
+			ERR("parse: %m");
 		}
 		ifc->int_next = NULL;
 		ifc->int_scheme = rt6_scheme;
@@ -505,7 +496,7 @@ interface_part(void)
 
 		/* prefix */
 		if (prefix(&ag->agr_pref) < 1)
-			goto err;
+			ERR("illegal prefix");
 
 		if (ag->agr_pref.prf_len == 0) {
 			/* filter all */
@@ -561,9 +552,9 @@ interface_part(void)
 		if ((nh = (struct nexthop_rte *)malloc(sizeof(*nh))) == NULL)
 			ERR("cannot allocate memory");
 		if (prefix(&nh->nh_prf) < 1)
-			goto err;
+			ERR("invalid prefix");
 		if (address(&nh->nh_addr, 0) < 1)
-			goto err;
+			ERR("invalid nexthop");
 		get_mask(nh->nh_prf.prf_len, (char *)&nh->nh_mask);
 		for (np = ifc->int_nhop; np; np = np->nh_next) {
 			if (pcmp(&np->nh_prf, &nh->nh_prf)) {
@@ -588,9 +579,6 @@ interface_part(void)
 	}
 
 	return;
- err:
-	fprintf(stderr, "some error\n");
-	exit_route6d();
 }
 
 /* 
@@ -613,8 +601,7 @@ check_ctl_list(struct control **list_start, struct in6_addr *address,
 	/* Add new entry in linklist. */
 	p = (struct control *)(malloc(sizeof(struct control)));
 	if (p == NULL) {
-		syslog(LOG_ERR, "parse: %m");
-		exit_route6d();
+		quit_route6d("parse: %m", 1);
 	}
 	bzero(p, sizeof(struct control));
 	p->ctl_addr.sin6_port = htons(RIP6_PORT);

@@ -1,5 +1,5 @@
 /* 
- * $Id: tree.c,v 1.2 1999/08/17 14:23:31 itojun Exp $
+ * $Id: tree.c,v 1.3 2003/01/21 09:28:40 suz Exp $
  */
 
 /*
@@ -54,8 +54,7 @@ initialize_cache(void)
 
 	rnhead = (struct tree_head *)malloc(sizeof(struct tree_head));
 	if (rnhead == NULL) {
-		syslog(LOG_ERR, "local cache memory allocation failed: %m");
-		exit_route6d();
+		quit_route6d("local cache memory allocation failed: %m", 1);
 	}
 	bzero(rnhead, sizeof(struct tree_head));
 
@@ -469,8 +468,7 @@ get_gateway(struct in6_addr *gw_addr, struct interface *if_ptr)
 
 	gw = (struct gateway *)malloc(sizeof(struct gateway));
 	if (gw == NULL) {
-		syslog(LOG_ERR, "local cache memory allocation failed: %m");
-		exit_route6d();
+		quit_route6d("local cache memory allocation failed: %m", 1);
 	}
 	bzero(gw, sizeof(*gw));
 	gw->gw_next = gway;

@@ -1,5 +1,5 @@
 /* 
- * $Id: proto.h,v 1.1 1999/08/08 23:29:41 itojun Exp $
+ * $Id: proto.h,v 1.2 2003/01/21 09:28:40 suz Exp $
  */
 
 /*
@@ -37,7 +37,6 @@
 
 /* main.c */
 int scan_interface(void);
-void quit_route6d(char *);
 
 /* startup.c */
 void initialize_signals(void);
@@ -103,8 +102,8 @@ void send_all_entries(struct tree_node *, char *, int *);
 struct tree_node* get_start_ptr( void );
 
 /* exit.c */
-void exit_route6d(void);
 void release_resources(void);
+void quit_route6d(char *, int);
 
 /* parse.c */
 void parse_config(void);

@@ -1,5 +1,5 @@
 /* 
- * $Id: exit.c,v 1.1 1999/08/08 23:29:46 itojun Exp $
+ * $Id: exit.c,v 1.2 2003/01/21 09:28:39 suz Exp $
  */
 
 /*
@@ -63,15 +63,26 @@ release_resources(void)
 	if (rcv_data)
 		free(rcv_data);
 	closelog();
-	unlink(RT6_PID);
+
+	/* 
+	 * if there is already a route6d process, it is detected by 
+	 * initialize_pidfile() and route6d stops there (except in
+	 * case of configuration check mode).  So when you reach here, 
+	 * you can remove RT6_PID without considering the other route6d.
+	 */
+	if (!Cflag)
+		unlink(RT6_PID);
 	return;
 }
 
 /* 
- * Relaese resources and exit route6d.
+ * Log & Quit
  */
 void
-exit_route6d(void)
+quit_route6d(char *s, int ret_code)
 {
-	exit(0);
+	if (s)
+		syslog(LOG_ERR, "%s: %m", s);
+	release_resources();
+	exit(ret_code);
 }

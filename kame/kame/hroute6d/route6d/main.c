@@ -1,5 +1,5 @@
 /* 
- * $Id: main.c,v 1.3 2001/02/01 06:03:34 suz Exp $
+ * $Id: main.c,v 1.4 2003/01/21 09:28:39 suz Exp $
  */
 
 /*
@@ -106,7 +106,7 @@ main(int argc, char **argv)
 		daemon(0, 0);
 	
 	if ((rip6_sock = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
-		quit_route6d("rip6_sock socket retry");
+		quit_route6d("rip6_sock socket retry", 1);
 
 	bzero((char *)&sa, sizeof(sa));
 	sa.sin6_len = sizeof(sa);
@@ -115,7 +115,7 @@ main(int argc, char **argv)
 	sa.sin6_flowinfo = 0;
 	sa.sin6_addr = anyaddr;	/* ANY */
 	if (bind(rip6_sock, (struct sockaddr *)&sa, sizeof(sa)) < 0)
-		quit_route6d("ripng bind another port");
+		quit_route6d("ripng bind another port", 1);
 
 	initialize_sockets();
 	install_interface();
@@ -306,18 +306,6 @@ allocate_memory(void)
 		return -1;
 	}
 	return 0;
-}
-
-/* 
- * Log & Quit
- */
-void
-quit_route6d(char *s)
-{
-	syslog(LOG_ERR, "%s: %m", s);
-	syslog(LOG_ERR, "unrecoverable, QUIT");
-	release_resources();
-	exit(1);
 }
 
 /* 

@@ -1,5 +1,5 @@
 /* 
- * $Id: handler.c,v 1.1 1999/08/08 23:29:46 itojun Exp $
+ * $Id: handler.c,v 1.2 2003/01/21 09:28:39 suz Exp $
  */
 
 /*
@@ -47,7 +47,7 @@ sighup_handler(void)
 	alarm(0);
 	release_resources();	/* and also kernel_routes */
 	execl(progname, progname, NULL);
-	quit_route6d("restart failed");
+	quit_route6d("restart failed", 1);
 }
 
 /* 
@@ -60,10 +60,8 @@ sigint_handler(void)
 	sigset_t sss;
 	sigset_t oss;
 
-	if (Nflag) {
-		release_resources();
-		exit(0);
-	}
+	if (Nflag)
+		quit_route6d("", 0);
 
 	sigemptyset(&sss);
 	sigaddset(&sss, SIGALRM);
@@ -101,6 +99,5 @@ sigterm_handler(void)
 	signal(SIGINT, SIG_IGN);
 	signal(SIGUSR2, SIG_IGN);
 
-	release_resources();
-	exit(1);
+	quit_route6d("SIGTERM received", 0);
 }

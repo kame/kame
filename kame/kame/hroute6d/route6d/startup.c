@@ -1,5 +1,5 @@
 /* 
- * $Id: startup.c,v 1.6 2001/02/01 07:42:34 itojun Exp $
+ * $Id: startup.c,v 1.7 2003/01/21 09:28:40 suz Exp $
  */
 
 /*
@@ -116,7 +116,7 @@ initialize_pidfile(void)
 	}
 
 	if ((fp = fopen(RT6_PID, "w")) == NULL)
-		quit_route6d("could not write to pid file");
+		quit_route6d("could not write to pid file", 1);
 	rt6_pid = getpid();
 	fprintf(fp, "%d", rt6_pid);
 	fclose(fp);
@@ -144,19 +144,16 @@ initialize_sockets(void)
 #ifdef IPV6_RECVPKTINFO
 	if (setsockopt(rip6_sock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
 		       (void *)&hops, sizeof(int)) < 0) {
-		syslog(LOG_ERR, "sockopt RECVPKTINFO: %m");
-		exit_route6d();
+		quit_route6d("sockopt RECVPKTINFO: %m", 1);
 	}
 #else  /* old adv. API */
 	if (setsockopt(rip6_sock, IPPROTO_IPV6, IPV6_PKTINFO,
 		       (void *)&hops, sizeof(int)) < 0) {
-		syslog(LOG_ERR, "sockopt PKTINFO: %m");
-		exit_route6d();
+		quit_route6d("sockopt PKTINFO: %m", 1);
 	}
 #endif 
 	if ((admin_sock = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) {
-		syslog(LOG_ERR, "admin socket: %m");
-		exit_route6d();
+		quit_route6d("admin socket: %m", 1);
 	}
 	unlink(ADM_RIP6_UDS);	/* fail safe */
 	bzero((char *)&su, sizeof(su));
@@ -164,8 +161,7 @@ initialize_sockets(void)
 	su.sun_family = AF_UNIX;
 	strcpy(su.sun_path, ADM_RIP6_UDS);
 	if (bind(admin_sock, (struct sockaddr *)&su, sizeof(su)) < 0) {
-		syslog(LOG_ERR, "admin bind: %m");
-		exit_route6d();
+		quit_route6d("admin bind: %m", 1);
 	}
 	hops = ADM_BUFSIZE;
 	if (setsockopt(admin_sock, SOL_SOCKET, SO_SNDBUF, (void *)&hops,
@@ -178,8 +174,7 @@ initialize_sockets(void)
 		syslog(LOG_ERR, "rt6_sock setsockopt: %m");
 
 	if ((rt6_sock = socket(PF_ROUTE, SOCK_RAW, 0)) < 0) {
-		syslog(LOG_ERR, "routing sock: %m");
-		exit_route6d();
+		quit_route6d("routing sock: %m", 1);
 	}
 	hops = 0;		/* Do not want to hear my own rt_msg */
 	if (setsockopt(rt6_sock, SOL_SOCKET, SO_USELOOPBACK, (void *)&hops,
@@ -702,16 +697,13 @@ install_routes(void)
 	mib[4] = NET_RT_DUMP;
 	mib[5] = 0;
 	if (sysctl(mib, 6, NULL, &bufsize, NULL, 0) < 0) {
-		syslog(LOG_ERR, "sysctl1 RT_DUMP:%m");
-		exit_route6d();
+		quit_route6d("sysctl1 RT_DUMP:%m", 1);
 	}
 	if ((buf = malloc(bufsize)) == NULL) {
-		syslog(LOG_ERR, "RT_DUMP: %m");
-		exit_route6d();
+		quit_route6d("RT_DUMP: %m", 1);
 	}
 	if (sysctl(mib, 6, buf, &bufsize, NULL, 0) < 0) {
-		syslog(LOG_ERR, "sysctl2 RT_DUMP:%m");
-		exit_route6d();
+		quit_route6d("sysctl2 RT_DUMP:%m", 1);
 		/* But, maybe some entries are added between 2 sysctls */
 	}
 	lim = buf + bufsize;
