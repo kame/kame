@@ -731,6 +731,8 @@ netinet6/udp6_output.c	optional inet6
 #crypto/md5.c		optional ipsec
 netinet6/ah_core.c	optional ipsec
 netinet6/esp_core.c	optional ipsec_esp
+netinet6/esp_rijndael.c	optional ipsec_esp
+netinet6/esp_twofish.c	optional ipsec_esp
 netinet6/ipsec.c	optional ipsec
 netinet6/ah_output.c	optional ipsec
 netinet6/ah_input.c	optional ipsec
