@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sbin/ifconfig/ifieee80211.c,v 1.5 2002/04/18 17:14:09 imp Exp $
+ * $FreeBSD: src/sbin/ifconfig/ifieee80211.c,v 1.8 2003/11/01 00:03:20 brooks Exp $
  */
 
 /*-
@@ -75,7 +75,9 @@
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/route.h>
-#include <net/if_ieee80211.h>
+#include <net80211/ieee80211.h>
+#include <net80211/ieee80211_crypto.h>
+#include <net80211/ieee80211_ioctl.h>
 
 #include <ctype.h>
 #include <err.h>
@@ -101,7 +103,7 @@ set80211ssid(const char *val, int d, int s, const struct afswtch *rafp)
 	u_int8_t	data[33];
 
 	ssid = 0;
-	len = sizeof(val);
+	len = strlen(val);
 	if (len > 2 && isdigit(val[0]) && val[1] == ':') {
 		ssid = atoi(val)-1;
 		val += 2;
@@ -130,7 +132,10 @@ set80211stationname(const char *val, int d, int s, const struct afswtch *rafp)
 void
 set80211channel(const char *val, int d, int s, const struct afswtch *rafp)
 {
-	set80211(s, IEEE80211_IOC_CHANNEL, atoi(val), 0, NULL);
+	if (strcmp(val, "-") == 0)
+		set80211(s, IEEE80211_IOC_CHANNEL, IEEE80211_CHAN_ANY, 0, NULL);
+	else
+		set80211(s, IEEE80211_IOC_CHANNEL, atoi(val), 0, NULL);
 }
 
 void
@@ -225,7 +230,7 @@ set80211wepkey(const char *val, int d, int s, const struct afswtch *rafp)
 {
 	int		key = 0;
 	int		len;
-	u_int8_t	data[14];
+	u_int8_t	data[IEEE80211_KEYBUF_SIZE];
 
 	if (isdigit(val[0]) && val[1] == ':') {
 		key = atoi(val)-1;
@@ -249,7 +254,7 @@ set80211nwkey(const char *val, int d, int s, const struct afswtch *rafp)
 {
 	int		txkey;
 	int		i, len;
-	u_int8_t	data[14];
+	u_int8_t	data[IEEE80211_KEYBUF_SIZE];
 
 	set80211(s, IEEE80211_IOC_WEP, IEEE80211_WEP_ON, 0, NULL);
 
@@ -423,10 +428,12 @@ ieee80211_status (int s, struct rt_addrinfo *info __unused)
 				warn("WEP support, but can get keys!");
 				goto end;
 			}
-			if (ireq.i_len == 0 || ireq.i_len > 13)
+			if (ireq.i_len == 0 ||
+			    ireq.i_len > IEEE80211_KEYBUF_SIZE)
 				continue;
 			printf("%cwepkey %d:%s", spacer, i+1,
-			    ireq.i_len <= 5 ? "64-bit" : "128-bit");
+			    ireq.i_len <= 5 ? "40-bit" :
+			    ireq.i_len <= 13 ? "104-bit" : "128-bit");
 			if (spacer == '\t')
 				spacer = ' ';
 		}

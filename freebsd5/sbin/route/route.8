@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     @(#)route.8	8.3 (Berkeley) 3/19/94
-.\" $FreeBSD: src/sbin/route/route.8,v 1.32 2002/07/06 19:34:51 charnier Exp $
+.\" $FreeBSD: src/sbin/route/route.8,v 1.35 2003/11/10 14:28:33 brueffer Exp $
 .\"
 .Dd June 8, 2001
 .Dt ROUTE 8
@@ -51,7 +51,7 @@ The
 .Nm
 utility is used to manually manipulate the network
 routing tables.  It normally is not needed, as a
-system routing table management daemon such as
+system routing table management daemon, such as
 .Xr routed 8 ,
 should tend to this task.
 .Pp
@@ -65,6 +65,8 @@ programmatic interface discussed in
 .Pp
 The following options are available:
 .Bl -tag -width indent
+.It Fl d
+Run in debug-only mode, i.e., do not actually modify the routing table.
 .It Fl n
 Bypass attempts to print host and network names symbolically
 when reporting actions.  (The process of translating between symbolic
@@ -327,6 +329,15 @@ routing table entry is the
 .Tn ARP
 entry, as reported by
 .Xr arp 8 .
+.Pp
+The optional
+.Fl genmask
+modifier specifies that a cloning mask is present.
+This specifies the mask applied when determining if a child route
+should be created.
+It is only applicable to network routes with the
+.Dv RTF_CLONING
+flag set.
 .Pp
 All symbolic names specified for a
 .Ar destination
