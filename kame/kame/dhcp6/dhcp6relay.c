@@ -104,6 +104,7 @@ main(argc, argv)
 {
 	int ch;
 	char *progname;
+	char *p;
 
 	if ((progname = strrchr(*argv, '/')) == NULL)
 		progname = *argv;
@@ -122,7 +123,12 @@ main(argc, argv)
 			foreground++;
 			break;
 		case 'H':
-			mhops = atoi(optarg);
+			p = NULL;
+			mhops = (int)strtoul(optarg, &p, 10);
+			if (!*optarg || *p) {
+				errx(1, "illegal hop limit: %s", optarg);
+				/* NOTREACHED */
+			}
 			if (mhops <= 0 || mhops > 255) {
 				errx(1, "illegal hop limit: %d", mhops);
 				/* NOTREACHED */
