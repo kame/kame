@@ -33,7 +33,7 @@
  *
  * Author:  Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  *
- * $Id: mip6_md.c,v 1.4 2000/02/09 13:48:41 itojun Exp $
+ * $Id: mip6_md.c,v 1.5 2000/02/12 07:33:19 itojun Exp $
  *
  */
 
@@ -598,54 +598,17 @@ mip6_select_defrtr()
 #ifdef MIP6_DEBUG
                 mip6_debug("Ref count = %d, now rt_mip6msg\n", rt->rt_refcnt);
 #endif
-                
+
                 rt_mip6msg(RTM_DELETE, ifp, rt); /* Useless? */
-
-
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-                {
-                extern struct inpcbhead ripcb;
-                register struct inpcb *in6p;
-                int s;
-                
-                LIST_FOREACH(in6p, &ripcb, inp_list) {
-                    struct sockaddr_in6 *sa6;
-                    struct route_in6 rin6;
-
-                    if ((in6p->in6p_vflag & INP_IPV6) == NULL)
-                        continue;
-                    mip6_debug("raw in6pcb faddr = %s\n", 
-                          ip6_sprintf(&in6p->in6p_faddr));
-                    rin6 = in6p->in6p_route; 
-                    sa6 = (struct sockaddr_in6*)rt_key(rin6.ro_rt);
-                    mip6_debug("raw in6pcb rt_key = %s\n", 
-                          ip6_sprintf(&sa6->sin6_addr));
-/*((struct sockaddr_in6*)rt_key(in6p->in6p_route->
-  ro_rt))->sin6_addr));*/
-                    mip6_debug("raw in6pcb ro_dst = %s\n",
-                          ip6_sprintf(&in6p->in6p_route.ro_dst.sin6_addr));
-                    
-                    s = splnet();
-                    /* Do same thing as in6_rtchange(). */
-                    if (in6p->in6p_route.ro_rt && 
-                        rt == in6p->in6p_route.ro_rt) {
-                        rtfree(in6p->in6p_route.ro_rt);
-                        in6p->in6p_route.ro_rt = 0;
-                    }
-                    splx(s);
-                }
-                }
-#endif
 
 #ifdef MIP6_DEBUG
                 mip6_debug("Ref count = %d, now RTM_DELETE\n", rt->rt_refcnt);
 #endif
                 nd6_free(rt);
-                
             }
             ln = next;
             /* XXX Also remove the link-local addresses which are not ours? */
-        } 
+        }
     }
 
 #ifdef MIP6_DEBUG
