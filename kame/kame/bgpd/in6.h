@@ -82,7 +82,7 @@ void             mask_nset   __P((struct in6_addr  *, int));
 void             mask_nclear __P((struct in6_addr  *, int));
 int              inet_ptox   __P((int, const char *, void *, u_char *));
 u_int16_t        ip6_cksum   __P((struct ip6_pseudohdr *, u_char *));
-char            *ip6str      __P((struct in6_addr *));
+char            *ip6str      __P((struct in6_addr *, unsigned int));
 
 #ifndef IPV6_JOIN_MEMBERSHIP
 /* XXX */

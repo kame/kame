@@ -43,6 +43,7 @@ void             bgp_process_notification __P((struct rpcb *));
 void             bgp_process_keepalive    __P((struct rpcb *));
 
 char		*bgp_errdatastr __P((char *, int));
+char		*bgp_peerstr __P((struct rpcb *));
 
 struct rpcb     *collision_resolv __P((struct rpcb *, struct rpcb *));
 

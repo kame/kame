@@ -93,7 +93,7 @@ bgp_read_header(bnp)
 	if (length < BGP_HEADER_LEN || length > BGPMAXPACKETSIZE) {
 		syslog(LOG_ERR,
 		       "<%s>: invalid BGP data length(%d) from %s",
-		       __FUNCTION__, length, ip6str(&bnp->rp_gaddr));
+		       __FUNCTION__, length, bgp_peerstr(bnp));
 		bgp_notify(bnp, BGP_ERR_HEADER, BGP_ERRHDR_LENGTH,
 			   2, (byte *)&bh->bh_length);
 	}
@@ -133,9 +133,9 @@ bgp_read_data(bnp)
 #ifdef DEBUG
 	syslog(LOG_DEBUG,
 	       "BGP+ RECV %s+%d -> %s+%d",
-	       ip6str(&bnp->rp_addr.sin6_addr),
+	       ip6str(&bnp->rp_addr.sin6_addr, 0),
 	       ntohs(bnp->rp_addr.sin6_port),
-	       ip6str(&bnp->rp_myaddr.sin6_addr),
+	       ip6str(&bnp->rp_myaddr.sin6_addr, 0),
 	       ntohs(bnp->rp_myaddr.sin6_port));
 
 	if (BGP_TYPE_VALID(bh->bh_type))
@@ -154,7 +154,7 @@ bgp_read_data(bnp)
 			 /* Bad Message Length */
 			 syslog(LOG_ERR,
 				"<%s>: invalid BGP_OPEN data length(%d) from %s",
-				__FUNCTION__, length, ip6str(&bnp->rp_gaddr));
+				__FUNCTION__, length, bgp_peerstr(bnp));
 			 bgp_notify(bnp, BGP_ERR_HEADER, BGP_ERRHDR_LENGTH,
 				    2, (byte *)&bh->bh_length);
 			 return;
@@ -168,7 +168,7 @@ bgp_read_data(bnp)
 			 syslog(LOG_ERR,
 				"<%s>: invalid BGP_UPDATE data length(%d) "
 				"from %s",
-				__FUNCTION__, length, ip6str(&bnp->rp_gaddr));
+				__FUNCTION__, length, bgp_peerstr(bnp));
 			 bgp_notify(bnp, BGP_ERR_HEADER, BGP_ERRHDR_LENGTH,
 				    2, (byte *)&bh->bh_length);
 			 return;
@@ -186,7 +186,7 @@ bgp_read_data(bnp)
 			 syslog(LOG_ERR,
 				"<%s>: invalid BGP_KEEPALIVE data length(%d) "
 				"from %s",
-				__FUNCTION__, length, ip6str(&bnp->rp_gaddr));
+				__FUNCTION__, length, bgp_peerstr(bnp));
 			 bgp_notify(bnp, BGP_ERR_HEADER, BGP_ERRHDR_LENGTH,
 				    2, (byte *)&bh->bh_length);
 			 return;
@@ -202,7 +202,7 @@ bgp_read_data(bnp)
 		  */
 		 syslog(LOG_ERR,
 			"<%s>: unrecognized BGP data type(%d) from %s",
-			__FUNCTION__, bh->bh_type, ip6str(&bnp->rp_gaddr));
+			__FUNCTION__, bh->bh_type, bgp_peerstr(bnp));
 		 bgp_notify(bnp, BGP_ERR_HEADER, BGP_ERRHDR_TYPE,
 			    1, &bh->bh_type);
 		 break;
@@ -231,7 +231,7 @@ bgp_read(struct rpcb *bnp, int total)
 		syslog(LOG_ERR,
 		       "<%s>: read from peer %s (%s AS %d) failed: %s",
 		       __FUNCTION__,
-		       ip6str(&bnp->rp_addr.sin6_addr),
+		       ip6str(&bnp->rp_addr.sin6_addr, 0),
 		       ((bnp->rp_mode & BGPO_IGP) ?
 			"Internal" : "External"),
 		       (int)bnp->rp_as, strerror(errno));

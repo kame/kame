@@ -33,6 +33,7 @@
 #include "task.h"
 #include "rt_table.h"
 #include "in6.h"
+#include <netdb.h>
 
 int
 mask2len(addr)
@@ -249,16 +250,24 @@ ip6_cksum(phdr, payload)
 }
 
 char *
-ip6str(addr)
+ip6str(addr, ifindex)
 	struct in6_addr *addr;
+	unsigned int ifindex;
 {
-	static char ip6buf[8][INET6_ADDRSTRLEN];
+	static char ip6buf[8][MAXHOSTNAMELEN];
 	static int ip6round = 0;
 	char *cp;
+	struct sockaddr_in6 sa6;
 
 	ip6round = (ip6round + 1) & 7;
 	cp = ip6buf[ip6round];
 
-	inet_ntop(AF_INET6, addr, cp, INET6_ADDRSTRLEN);
+	memset(&sa6, 0, sizeof(sa6));
+	sa6.sin6_len = sizeof(sa6);
+	sa6.sin6_family = AF_INET6;
+	sa6.sin6_addr = *addr;
+	sa6.sin6_scope_id = ifindex; /* XXX: link(not i/f) index should be used */
+	getnameinfo((struct sockaddr *)&sa6, sa6.sin6_len, cp, MAXHOSTNAMELEN,
+		    NULL, 0, NI_NUMERICHOST|NI_WITHSCOPEID);
 	return(cp);
 }

@@ -56,7 +56,7 @@ dump_if_rtable(FILE *fp, struct rt_entry *base)
 	while(rte) {
 		fprintf(fp, "    "); /* indentation */
 		fprintf(fp, "%s/%d(%d)\n",
-			ip6str(&rte->rt_ripinfo.rip6_dest),
+			ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 			rte->rt_ripinfo.rip6_plen,
 			rte->rt_ripinfo.rip6_metric);
 
@@ -75,11 +75,11 @@ dump_rip_rtable(FILE *fp, struct rt_entry *base)
 		fprintf(fp, "    "); /* indentation */
 		fprintf(fp,
 			"%s/%d(%d) [%d] gw = %s\n",
-			ip6str(&rte->rt_ripinfo.rip6_dest),
+			ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 			rte->rt_ripinfo.rip6_plen,
 			rte->rt_ripinfo.rip6_metric,
 			rte->rt_ripinfo.rip6_tag,
-			ip6str(&rte->rt_gw));
+			ip6str(&rte->rt_gw, 0));
 
 			if ((rte = rte->rt_next) == base)
 				break;
@@ -99,11 +99,11 @@ print_filterinfo(FILE *fp, struct filtinfo *top, int type)
 
 		if (type == FILTERTYPE_FILTER)
 			fprintf(fp, "%s/%d: filtered %d routes\n",
-				ip6str(&filter->filtinfo_addr),
+				ip6str(&filter->filtinfo_addr, 0),
 				filter->filtinfo_plen, filter->filtinfo_stat);
 		if (type == FILTERTYPE_RESTRICTION)
 			fprintf(fp, "%s/%d: passed %d routes\n",
-				ip6str(&filter->filtinfo_addr),
+				ip6str(&filter->filtinfo_addr, 0),
 				filter->filtinfo_plen, filter->filtinfo_stat);
 
 		if ((filter = filter->filtinfo_next) == top)
@@ -163,15 +163,17 @@ dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 	struct optatr *optatr;
 
 	while(rte) {
+		unsigned int ifindex;
+
 		ap = rte->rt_aspath;
 
 		fprintf(fp, "    "); /* indentation */
 		fprintf(fp, "%s/%d nexthop: %s\n",
-			ip6str(&rte->rt_ripinfo.rip6_dest),
-			rte->rt_ripinfo.rip6_plen, ip6str(&ap->asp_nexthop));
+			ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+			rte->rt_ripinfo.rip6_plen, ip6str(&ap->asp_nexthop, 0));
 
 		fprintf(fp, "      "); /* more indent */
-		fprintf(fp, "Gateway: %s ", ip6str(&rte->rt_gw));
+		fprintf(fp, "Gateway: %s ", ip6str(&rte->rt_gw, 0));
 		fprintf(fp, "Flags:");
 		if (rte->rt_flags & RTF_UP) fprintf(fp, " UP");
 		if (rte->rt_flags & RTF_GATEWAY) fprintf(fp, " GW");
@@ -372,10 +374,10 @@ print_bgp_dump(FILE *fp)
 		if (bnp->rp_mode & BGPO_NEXTHOPSELF) fprintf(fp, " NEXTHOPSELF");
 		fputc('\n', fp);
 
-		fprintf(fp, "  His global addr: %s\n", ip6str(&bnp->rp_gaddr));
-		fprintf(fp, "  His local addr: %s\n", ip6str(&bnp->rp_laddr));
+		fprintf(fp, "  His global addr: %s\n", bgp_peerstr(bnp));
+		fprintf(fp, "  His local addr: %s\n", bgp_peerstr(bnp));
 		fprintf(fp, "  Our addr: %s\n",
-			ip6str(&bnp->rp_myaddr.sin6_addr));
+			ip6str(&bnp->rp_myaddr.sin6_addr, 0));
 		if (bnp->rp_ebgp_as_prepends)
 			fprintf(fp, "  our own AS number will be prepended "
 				"to each advertised AS path %d time%s\n",

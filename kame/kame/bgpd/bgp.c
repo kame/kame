@@ -784,7 +784,7 @@ bgp_process_update(struct rpcb *bnp)
       atrlen = i + atrdatalen - k;\
       if (i + atrdatalen > pa_p + tpalen) {\
 	syslog(LOG_ERR, "<%s>: invalid attribute length(%d) from %s\n",\
-		         __FUNCTION__, atrdatalen, ip6str(&bnp->rp_gaddr));\
+		         __FUNCTION__, atrdatalen, bgp_peerstr(bnp));\
 	bgp_notify(bnp, BGP_ERR_UPDATE, BGP_ERRUPD_LENGTH,\
 		   i - k, &bnp->rp_inpkt[k]);\
 	goto done;\
@@ -1522,9 +1522,9 @@ bgp_process_update(struct rpcb *bnp)
 		  syslog(LOG_NOTICE,
 			 "<%s>: MP_REACH_NLRI %s/%d: from %s, not enabled",
 			 __FUNCTION__,
-			 ip6str(&uprte->rt_ripinfo.rip6_dest),
+			 ip6str(&uprte->rt_ripinfo.rip6_dest, 0),
 			 uprte->rt_ripinfo.rip6_plen,
-			 ip6str(&bnp->rp_gaddr));
+			 bgp_peerstr(&bnp->rp_gaddr));
 #endif
 		  nrte = uprte->rt_prev; /* XXX */
 		  remque(uprte);
@@ -1539,9 +1539,9 @@ bgp_process_update(struct rpcb *bnp)
 		  syslog(LOG_NOTICE,
 			 "<%s>: MP_REACH_NLRI %s/%d: from %s, enabled(%s)",
 			 __FUNCTION__,
-			 ip6str(&uprte->rt_ripinfo.rip6_dest),
+			 ip6str(&uprte->rt_ripinfo.rip6_dest, 0),
 			 uprte->rt_ripinfo.rip6_plen,
-			 ip6str(&bnp->rp_gaddr),
+			 bgp_peerstr(&bnp->rp_gaddr),
 			 (uprte->rt_flags & RTF_UP) ? "installed" : "backup");
 #endif 
 
@@ -1587,9 +1587,9 @@ bgp_process_update(struct rpcb *bnp)
 			  syslog(LOG_NOTICE,
 				 "<%s>: MP_UNREACH_NLRI %s/%d: from %s (deleted)",
 				 __FUNCTION__,
-				 ip6str(&wdrte->rt_ripinfo.rip6_dest),
+				 ip6str(&wdrte->rt_ripinfo.rip6_dest, 0),
 				 wdrte->rt_ripinfo.rip6_plen,
-				 ip6str(&bnp->rp_gaddr));
+				 bgp_peerstr(&bnp->rp_gaddr));
 #endif 
 			  bgp_disable_rte(drte);
 
@@ -1630,9 +1630,9 @@ bgp_process_update(struct rpcb *bnp)
 			  syslog(LOG_NOTICE,
 				 "<%s>: MP_UNREACH_NLRI %s/%d: from %s (~UP)",
 				 __FUNCTION__,
-				 ip6str(&wdrte->rt_ripinfo.rip6_dest),
+				 ip6str(&wdrte->rt_ripinfo.rip6_dest, 0),
 				 wdrte->rt_ripinfo.rip6_plen,
-				 ip6str(&bnp->rp_gaddr));
+				 bgp_peerstr(&bnp->rp_gaddr));
 
 #endif 
 			  bnp->rp_adj_ribs_in 
@@ -1642,9 +1642,9 @@ bgp_process_update(struct rpcb *bnp)
 		  syslog(LOG_NOTICE,
 			 "<%s>: MP_UNREACH_NLRI %s/%d: %s not origin (ignored): ",
 			 __FUNCTION__,
-			 ip6str(&wdrte->rt_ripinfo.rip6_dest),
+			 ip6str(&wdrte->rt_ripinfo.rip6_dest, 0),
 			 wdrte->rt_ripinfo.rip6_plen,
-			 ip6str(&bnp->rp_gaddr));
+			 bgp_peerstr(bnp));
 	  }
   }
 
@@ -1717,9 +1717,9 @@ bgp_selectroute(rte, bnp)
 			syslog(LOG_NOTICE,
 			       "<%s>: %s/%d from %s was overwritten",
 			       __FUNCTION__,
-			       ip6str(&orte->rt_ripinfo.rip6_dest),
+			       ip6str(&orte->rt_ripinfo.rip6_dest, 0),
 			       orte->rt_ripinfo.rip6_plen,
-			       ip6str(&bnp->rp_gaddr));
+			       bgp_peerstr(&bnp->rp_gaddr));
 #endif 
 			crte = *orte;
 			crte.rt_next = crte.rt_prev = &crte;

@@ -179,7 +179,7 @@ bgp_enable_rte(rte)
 		      /* currently we do not support multi-hop EBGP */
 		      syslog(LOG_INFO, "<%s>: EBGP next hop %s is not on-link"
 			     "(not activated)",
-			     __FUNCTION__, ip6str(&rte->rt_gw));
+			     __FUNCTION__, ip6str(&rte->rt_gw, 0));
 		      rte->rt_flags &= ~RTF_UP;
 		      return 0;	/* continue to next rte */
 	      }
@@ -213,9 +213,10 @@ bgp_enable_rte(rte)
 			      syslog(LOG_ERR,
 				     "<%s>: failed to add a route dst: %s/%d, gw: %s",
 				     __FUNCTION__,
-				     ip6str(&rte->rt_ripinfo.rip6_dest),
+				     ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 				     rte->rt_ripinfo.rip6_plen,
-				     ip6str(&rte->rt_gw));
+				     ip6str(&rte->rt_gw,
+					    ifep->ifi_ifn ? ifep->ifi_ifn->if_index : 0));
 			      rte->rt_flags &= ~RTF_UP;
 			      return 0; /* continue to next rte */
 		      }
@@ -243,8 +244,9 @@ bgp_enable_rte(rte)
 #ifdef DEBUG
 					      syslog(LOG_DEBUG,
 						     "<%s>:succeed (forward to the iBGP peer %s)",
-					     __FUNCTION__,
-					     ip6str(&rte->rt_gw));
+						     __FUNCTION__,
+						     ip6str(&rte->rt_gw,
+							    ifep->ifi_ifn ? ifep->ifi_ifn->if_index : 0));
 #endif
 				      }
 				      else {
@@ -367,9 +369,9 @@ bgp_recover_rte(drte)
 	    syslog(LOG_NOTICE,
 		   "<%s>: failed route recovery for %s/%d, origin: %s(deleted)",
 		   __FUNCTION__,
-		   ip6str(&drte->rt_ripinfo.rip6_dest),
+		   ip6str(&drte->rt_ripinfo.rip6_dest, 0),
 		   drte->rt_ripinfo.rip6_plen,
-		   ip6str(&rrte->rt_proto.rtp_bgp->rp_gaddr));
+		   bgp_peerstr(&rrte->rt_proto.rtp_bgp));
 #endif
 	    obnp->rp_adj_ribs_in = rte_remove(rrte, obnp->rp_adj_ribs_in);
     }
@@ -377,9 +379,9 @@ bgp_recover_rte(drte)
 #ifdef DEBUG_BGP
 	    syslog(LOG_NOTICE, "<%s>: route recover for %s/%d, origin: %s",
 		   __FUNCTION__,
-		   ip6str(&drte->rt_ripinfo.rip6_dest),
+		   ip6str(&drte->rt_ripinfo.rip6_dest, 0),
 		   drte->rt_ripinfo.rip6_plen,
-		   ip6str(&rrte->rt_proto.rtp_bgp->rp_gaddr));
+		   bgp_peerstr(&rrte->rt_proto.rtp_bgp));
 #endif
 	    crte = *rrte;
 	    crte.rt_next = crte.rt_prev = &crte;
@@ -388,7 +390,7 @@ bgp_recover_rte(drte)
   } else {
 #ifdef DEBUG_BGP
     syslog(LOG_NOTICE, "<%s>: no recover for %s/%d", __FUNCTION__,
-	   ip6str(&drte->rt_ripinfo.rip6_dest), drte->rt_ripinfo.rip6_plen);
+	   ip6str(&drte->rt_ripinfo.rip6_dest, 0), drte->rt_ripinfo.rip6_plen);
 #endif
   }
   return;
@@ -1004,8 +1006,6 @@ bgpd_sendfile(sockfd, fd)
   return 0;
 }
 
-
-
 int
 recvfile(sockfd)
      int sockfd;
@@ -1028,3 +1028,18 @@ recvfile(sockfd)
   return ntohl(*(int *)buf);/* <-- the FD !! */
 }
 
+char *
+bgp_peerstr(bnp)
+	struct rpcb *bnp;
+{
+	if (!IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_gaddr))
+		return(ip6str(&bnp->rp_gaddr, 0));
+	else {
+		unsigned int ifindex = 0;
+
+		if (bnp->rp_ife && bnp->rp_ife->ifi_ifn)
+			ifindex = bnp->rp_ife->ifi_ifn->if_index;
+
+		return(ip6str(&bnp->rp_laddr, ifindex));
+	}
+}

@@ -277,7 +277,7 @@ msg2aspath(bnp, i, len, errorp)
 
       if (my_as_number == asn->asn_num) {    /* loop detection */ 
 	syslog(LOG_ERR, "<%s>: ASpath loop detected: %s from %s",
-	       __FUNCTION__, buf, ip6str(&bnp->rp_gaddr));
+	       __FUNCTION__, buf, ip6str(&bnp->rp_gaddr, 0));
 	free_aspath(asp);
 	return NULL;
       }

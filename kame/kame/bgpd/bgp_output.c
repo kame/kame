@@ -791,8 +791,8 @@ bgp_send_update(bnp, rte, headrte)
       i +=  poctets;
 #ifdef DEBUG_BGP
       syslog(LOG_NOTICE, "BGP+ SEND MP_REACH\t\t%s/%d to %s",
-	     ip6str(&agg->rt_ripinfo.rip6_dest), agg->rt_ripinfo.rip6_plen,
-	     ip6str(&bnp->rp_gaddr));
+	     ip6str(&agg->rt_ripinfo.rip6_dest, 0), agg->rt_ripinfo.rip6_plen,
+	     bgp_peerstr(bnp));
 #endif
       agg->rt_aggr.ag_flags |= AGGR_ADVDONE;
     }
@@ -891,7 +891,7 @@ bgp_send_update(bnp, rte, headrte)
   if ((netnlrilen = htons(i - nlri_p)) == 0) {
 #ifdef DEBUG_BGP
     syslog(LOG_NOTICE, "<%s>: Nothing to be sent for %s",
-	   __FUNCTION__, ip6str(&bnp->rp_gaddr));
+	   __FUNCTION__, bgp_peerstr(bnp));
 #endif 
     return rt;           /* (1998/06/16) */
   }
@@ -1065,9 +1065,9 @@ bgp_send_withdrawn(bnp, rte, headrte)
       outpkt[i++] = rt->rt_ripinfo.rip6_plen;
 #ifdef DEBUG_BGP
       syslog(LOG_NOTICE, "BGP+ SEND MP_UNREACH\t\t%s/%d to %s",
-	     ip6str(&rt->rt_ripinfo.rip6_dest),
+	     ip6str(&rt->rt_ripinfo.rip6_dest, 0),
 	     rt->rt_ripinfo.rip6_plen,
-	     ip6str(&bnp->rp_gaddr));
+	     bgp_peerstr(bnp));
 #endif
       pbytes = POCTETS(rt->rt_ripinfo.rip6_plen);
 
@@ -1126,7 +1126,7 @@ bgp_send_withdrawn(bnp, rte, headrte)
   /****  send UPDATE message  ****/ 
   if ((write(bnp->rp_socket, outpkt, i)) != i) {
     syslog(LOG_ERR, "<%s>: write %s failed: %s",
-	   __FUNCTION__, ip6str(&bnp->rp_gaddr), strerror(errno));
+	   __FUNCTION__, bgp_peerstr(bnp), strerror(errno));
 
     return NULL;
   }
