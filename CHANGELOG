@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.715 2000/03/22 07:24:20 jinmei Exp $
+$Id: CHANGELOG,v 1.716 2000/03/22 07:30:12 itojun Exp $
 
 <200003>
+Wed Mar 22 16:29:19 JST 2000  itojun@iijlab.net
+	* {ports,pkgsrc}/net/bind8: upgrade to latest patch.  this avoids
+	  invalid use of netinet6/in6.h.
+
 2000-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/dump.c: supported the SIGUSR1 signal to let
 	rtadvd dump its internal status into a file upon receipt of the
