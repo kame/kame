@@ -97,10 +97,6 @@ static struct mbuf *
 static int	rt_msg2 __P((int,
 		    struct rt_addrinfo *, caddr_t, struct walkarg *));
 static void	rt_xaddrs __P((caddr_t, caddr_t, struct rt_addrinfo *));
-#ifdef BBNHACK
-static void rt_setif __P((struct rtentry *, struct sockaddr *,
-	struct sockaddr *, struct sockaddr *));
-#endif
 
 /* Sleazy use of local variables throughout file, warning!!!! */
 #define dst	info.rti_info[RTAX_DST]
@@ -197,9 +193,7 @@ route_output(m, va_alist)
 	struct rt_addrinfo info;
 	int len, error = 0;
 	struct ifnet *ifp = 0;
-#ifndef BBNHACK
 	struct ifaddr *ifa = 0;
-#endif
 	struct socket *so;
 	va_list ap;
 
@@ -259,37 +253,6 @@ route_output(m, va_alist)
 		error = rtrequest(RTM_ADD, dst, gate, netmask,
 					rtm->rtm_flags, &saved_nrt);
 		if (error == 0 && saved_nrt) {
-#ifdef BBNHACK
-			/* 
-			 * If the route request specified an interface with
-			 * IFA and/or IFP, we set the requested interface on
-			 * the route with rt_setif.  It would be much better
-			 * to do this inside rtrequest, but that would
-			 * require passing the desired interface, in some
-			 * form, to rtrequest.  Since rtrequest is called in
-			 * so many places (roughly 40 in our source), adding
-			 * a parameter is to much for us to swallow; this is
-			 * something for the FreeBSD developers to tackle.
-			 * Instead, we let rtrequest compute whatever
-			 * interface it wants, then come in behind it and
-			 * stick in the interface that we really want.  This
-			 * works reasonably well except when rtrequest can't
-			 * figure out what interface to use (with
-			 * ifa_withroute) and returns ENETUNREACH.  Ideally
-			 * it shouldn't matter if rtrequest can't figure out
-			 * the interface if we're going to explicitly set it
-			 * ourselves anyway.  But practically we can't
-			 * recover here because rtrequest will not do any of
-			 * the work necessary to add the route if it can't
-			 * find an interface.  As long as there is a default
-			 * route that leads to some interface, rtrequest will
-			 * find an interface, so this problem should be
-			 * rarely encountered.
-			 * dwiggins@bbn.com
-			 */
-
-			rt_setif(saved_nrt, ifpaddr, ifaaddr, gate);
-#endif
 			rt_setmetrics(rtm->rtm_inits,
 				&rtm->rtm_rmx, &saved_nrt->rt_rmx);
 			saved_nrt->rt_refcnt--;
@@ -361,10 +324,6 @@ route_output(m, va_alist)
 		case RTM_CHANGE:
 			if (gate && rt_setgate(rt, rt_key(rt), gate))
 				senderr(EDQUOT);
-
-#ifdef BBNHACK
-			rt_setif(rt, ifpaddr, ifaaddr, gate);
-#else
 			/* new gateway could require new ifaddr, ifp;
 			   flags may also be different; ifp may be specified
 			   by ll sockaddr when protocol address is ambiguous */
@@ -388,13 +347,10 @@ route_output(m, va_alist)
 				    rt->rt_ifp = ifp;
 				}
 			}
-#endif
 			rt_setmetrics(rtm->rtm_inits, &rtm->rtm_rmx,
 					&rt->rt_rmx);
-#ifndef BBNHACK
 			if (rt->rt_ifa && rt->rt_ifa->ifa_rtrequest)
 			       rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, gate);
-#endif
 			if (genmask)
 				rt->rt_genmask = genmask;
 			/*
@@ -467,58 +423,6 @@ rt_setmetrics(which, in, out)
 	metric(RTV_EXPIRE, rmx_expire);
 #undef metric
 }
-
-#ifdef BBNHACK
-/*
- * Set route's interface given ifpaddr, ifaaddr, and gateway.
- */
-static void
-rt_setif(rt, Ifpaddr, Ifaaddr, Gate)
-	struct rtentry *rt;
-	struct sockaddr *Ifpaddr, *Ifaaddr, *Gate;
-{
-	struct ifaddr *ifa = 0;
-	struct ifnet  *ifp = 0;
-
-	/* new gateway could require new ifaddr, ifp;
-	   flags may also be different; ifp may be specified
-	   by ll sockaddr when protocol address is ambiguous */
-	if (Ifpaddr && (ifa = ifa_ifwithnet(Ifpaddr)) &&
-	    (ifp = ifa->ifa_ifp) && (Ifaaddr || Gate))
-		ifa = ifaof_ifpforaddr(Ifaaddr ? Ifaaddr : Gate,
-					ifp);
-	else if (Ifpaddr && (ifp = if_withname(Ifpaddr)) ) {
-		ifa = Gate ? ifaof_ifpforaddr(Gate, ifp) :
-				TAILQ_FIRST(&ifp->if_addrlist);
-	}
-	else if ((Ifaaddr && (ifa = ifa_ifwithaddr(Ifaaddr))) ||
-		 (Gate && (ifa = ifa_ifwithroute(rt->rt_flags,
-					rt_key(rt), Gate))))
-		ifp = ifa->ifa_ifp;
-	if (ifa) {
-		register struct ifaddr *oifa = rt->rt_ifa;
-		if (oifa != ifa) {
-		    if (oifa && oifa->ifa_rtrequest)
-			oifa->ifa_rtrequest(RTM_DELETE,
-						rt, Gate);
-		    IFAFREE(rt->rt_ifa);
-		    rt->rt_ifa = ifa;
-		    ifa->ifa_refcnt++;
-		    rt->rt_ifp = ifp;
-		    rt->rt_rmx.rmx_mtu = ifp->if_mtu;
-		    if (rt->rt_ifa && rt->rt_ifa->ifa_rtrequest)
-			rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, Gate);
-		} else
-			goto call_ifareq;
-		return;
-	}
-      call_ifareq:
-	/* XXX: to reset gateway to correct value, at RTM_CHANGE */
-	if (rt->rt_ifa && rt->rt_ifa->ifa_rtrequest)
-		rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, Gate);
-}
-#endif
-
 
 #define ROUNDUP(a) \
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))

@@ -527,12 +527,6 @@ rtrequest(req, dst, gateway, netmask, flags, ret_nrt)
 	case RTM_ADD:
 		if ((ifa = ifa_ifwithroute(flags, dst, gateway)) == NULL)
 			senderr(ENETUNREACH);
-#ifdef BBNHACK
-		/* The interface found in the previous statement may
-		 * be overridden later by rt_setif.  See the code
-		 * for case RTM_ADD in rtsock.c:route_output.
-		 */
-#endif
 	makeroute:
 		R_Malloc(rt, struct rtentry *, sizeof(*rt));
 		if (rt == NULL)
