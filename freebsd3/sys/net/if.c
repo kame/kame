@@ -87,6 +87,7 @@
 #ifdef INET6
 /*XXX*/
 #include <netinet/in.h>
+#include <netinet6/in6_var.h>
 #endif
 
 /*
@@ -808,6 +809,11 @@ ifioctl(so, cmd, data, p)
 			getmicrotime(&ifp->if_lastchange);
 		return error;
 
+	case SIOCSIFPHYADDR:
+	case SIOCDIFPHYADDR:
+#ifdef INET6
+	case SIOCSIFPHYADDR_IN6:
+#endif
         case SIOCSIFMEDIA:
 	case SIOCSIFGENERIC:
 		error = suser(p->p_ucred, &p->p_acflag);

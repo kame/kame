@@ -89,6 +89,7 @@
 #ifdef INET6
 /*XXX*/
 #include <netinet/in.h>
+#include <netinet6/in6_var.h>
 #endif
 
 #ifdef NETATALK
@@ -615,6 +616,11 @@ ifioctl(so, cmd, data, p)
 		}
 		break;
 	    }
+	case SIOCSIFPHYADDR:
+	case SIOCDIFPHYADDR:
+#ifdef INET6
+	case SIOCSIFPHYADDR_IN6:
+#endif
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 	case SIOCSIFMEDIA:
