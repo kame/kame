@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.350 2003/06/16 09:30:14 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.351 2003/06/16 09:49:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -485,6 +485,10 @@ icmp6_error(m, type, code, param)
 				return;
 			}
 			oip6 = mtod(m, struct ip6_hdr *); /* adjust pointer */
+			/* ip6_src is changed in icmp6_recover_src(). */
+			if (ip6_getpktaddrs(m, &src_sa, NULL)) {
+				goto freeit;
+			}
 		}
 	}
 
