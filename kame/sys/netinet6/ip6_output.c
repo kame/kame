@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.159 2001/02/09 01:58:12 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.160 2001/02/10 01:40:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -618,7 +618,7 @@ skip_ipsec2:;
 		struct in6_addr *addr;
 
 		finaldst = ip6->ip6_dst;
-		switch(rh->ip6r_type) {
+		switch (rh->ip6r_type) {
 		case IPV6_RTHDR_TYPE_0:
 			 rh0 = (struct ip6_rthdr0 *)rh;
 			 addr = (struct in6_addr *)(rh0 + 1);
@@ -1948,7 +1948,7 @@ do { \
 #else
 				optval = *mtod(m, int *);
 #endif
-				switch(optname) {
+				switch (optname) {
 				case IPV6_2292PKTINFO:
 					OPTSET2292(IN6P_PKTINFO);
 					if (OPTBIT(IN6P_PKTINFO) == 0)
@@ -2430,7 +2430,7 @@ do { \
 				    optname == IPV6_2292DSTOPTS ||
 				    !privileged)
 					return(EPERM);
-				switch(optname) {
+				switch (optname) {
 				case IPV6_2292PKTINFO:
 					optval = OPTBIT(IN6P_PKTINFO);
 					break;
@@ -2741,7 +2741,7 @@ ip6_pcbopt(optname, buf, len, pktopt, priv)
 	}
 	opt = *pktopt;
 
-	switch(optname) {
+	switch (optname) {
 	case IPV6_PKTINFO:
 		if (len == 0) {	/* just remove the option */
 			ip6_clearpktopts(opt, 1, IPV6_PKTINFO);
@@ -2922,7 +2922,7 @@ ip6_pcbopt(optname, buf, len, pktopt, priv)
 		if (len != rthlen)
 			return(EINVAL);
 
-		switch(rth->ip6r_type) {
+		switch (rth->ip6r_type) {
 		case IPV6_RTHDR_TYPE_0:
 			if (rth->ip6r_len == 0)	/* must contain one addr */
 				return(EINVAL);
@@ -2963,7 +2963,7 @@ ip6_getpcbopt(pktopt, optname, datap, datalenp)
 	if (pktopt == NULL)
 		goto end;
 
-	switch(optname) {
+	switch (optname) {
 	case IPV6_PKTINFO:
 		if (pktopt->ip6po_pktinfo) {
 			optdata = (void *)pktopt->ip6po_pktinfo;
@@ -3695,7 +3695,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 			 * header should be inserted; before or after the
 			 * routing header.
 			 */
-			switch(cm->cmsg_type) {
+			switch (cm->cmsg_type) {
 			case IPV6_2292DSTOPTS:
 				/* 
 				 * The old advacned API is ambiguous on this
@@ -3745,7 +3745,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 			if (cm->cmsg_len != CMSG_LEN(rthlen))
 				return(EINVAL);
 
-			switch(rth->ip6r_type) {
+			switch (rth->ip6r_type) {
 			case IPV6_RTHDR_TYPE_0:
 				/* must contain one addr */
 				if (rth->ip6r_len == 0)
