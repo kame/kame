@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1880 2001/09/19 10:06:57 itojun Exp $
+$KAME: CHANGELOG,v 1.1881 2001/09/19 10:14:14 fujisawa Exp $
 
 <200109>
+2001-09-03 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* freebsd4/sys/netinet/udp_usrreq.c:
+	- Remove 'static' attribute from variable "udpcksum".
+	* kame/kame/sys/netinet6/natpt_trans.c:
+	- Examine net.inet.udp.checksum when making UDP packet.
+	* kame/sys/netinet6/natpt_{defs.h,{dispatch,trans,tslot}.c}:
+	- traceroute6 works.  I forgot to review it.
+
 Wed Sep 19 19:06:06 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ip6_{in,out}put.c: make IPV6_TCLASS socket option to
 	  take int, not u_int8_t.  follows the latest 2292bis draft.
