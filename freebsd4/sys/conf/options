@@ -265,6 +265,7 @@ IP6_AUTO_LINKLOCAL	opt_inet6.h
 MIP6			opt_mip6.h
 MIP6_ALLOW_COA_FALLBACK	opt_mip6.h
 MIP6_DEBUG		opt_mip6.h
+MIP6_DRAFT13		opt_mip6.h
 NATPT			opt_natpt.h
 NATPT_NAT		opt_natpt.h
 NEW_STRUCT_ROUTE	opt_global.h
