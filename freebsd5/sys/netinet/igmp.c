@@ -508,7 +508,7 @@ igmp_input(m, off)
 		} else {
 			if (query_ver == IGMP_v2_QUERY) {
 				++igmpstat.igps_rcv_v2_queries;
-				if (!IN_MULTICAST(ip->ip_dst.s_addr)) {
+				if (!IN_MULTICAST(ntohl(ip->ip_dst.s_addr))) {
 					++igmpstat.igps_rcv_badqueries;
 					m_freem(m);
 					return;
@@ -584,16 +584,16 @@ igmpv3_query:
 			if (igmp->igmp_group.s_addr == zeroin_addr.s_addr &&
 					(igmp->igmp_numsrc == 0)) {
 				if (ip->ip_dst.s_addr
-					!= INADDR_ALLHOSTS_GROUP) {
+					!= htonl(INADDR_ALLHOSTS_GROUP)) {
 					++igmpstat.igps_rcv_badqueries;
 					m_freem(m);
 					return;
 				}
 				query_type = IGMP_V3_GENERAL_QUERY;
-			} else if (IN_MULTICAST(igmp->igmp_group.s_addr) &&
+			} else if (IN_MULTICAST(ntohl(igmp->igmp_group.s_addr)) &&
 					(igmp->igmp_numsrc == 0))
 				query_type = IGMP_V3_GROUP_QUERY;
-			else if (IN_MULTICAST(igmp->igmp_group.s_addr) &&
+			else if (IN_MULTICAST(ntohl(igmp->igmp_group.s_addr)) &&
 					(ntohs(igmp->igmp_numsrc) > 0))
 				query_type = IGMP_V3_GROUP_SOURCE_QUERY;
 			else {
@@ -814,7 +814,7 @@ igmp_fasttimo()
 		}
 
 #ifdef IGMPV3
-		if (IN_LOCAL_GROUP(inm->inm_addr.s_addr))
+		if (IN_LOCAL_GROUP(ntohl(inm->inm_addr.s_addr)))
 			; /* skip */
 		else if (inm->inm_source->ims_timer == 0)
 			; /* do nothing */
@@ -1082,7 +1082,8 @@ igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
 
 	IN_FIRST_MULTI(step, inm);
 	while (inm != NULL) {
-	    if (IN_LOCAL_GROUP(inm->inm_addr.s_addr) || inm->inm_ifp != ifp)
+	    if (IN_LOCAL_GROUP(ntohl(inm->inm_addr.s_addr))
+	        || inm->inm_ifp != ifp)
 		goto next_multi;
 
 	    if ((inm->inm_source->ims_grpjoin == 0) &&
@@ -1344,7 +1345,8 @@ igmp_send_all_current_state_report(ifp)
 
 	IN_FIRST_MULTI(step, inm);
 	while (inm != NULL) {
-		if (inm->inm_ifp != ifp || IN_LOCAL_GROUP(inm->inm_addr.s_addr))
+		if (inm->inm_ifp != ifp ||
+		    IN_LOCAL_GROUP(ntohl(inm->inm_addr.s_addr)))
 			goto next_multi;
 
 		if (igmp_send_current_state_report(&m, &buflen, inm) != 0)
@@ -1376,7 +1378,7 @@ igmp_send_current_state_report(m0, buflenp, inm)
 	u_int8_t type = 0;
 	int error = 0;
 
-	if (IN_LOCAL_GROUP(inm->inm_addr.s_addr) ||
+	if (IN_LOCAL_GROUP(ntohl(inm->inm_addr.s_addr)) ||
 		(inm->inm_ifp->if_flags & IFF_LOOPBACK) != 0)
 	    return 0;
 
@@ -1524,7 +1526,7 @@ igmp_send_state_change_report(m0, buflenp, inm, type, timer_init)
 	int buflen = 0;
 	int error = 0;
 
-	if (IN_LOCAL_GROUP(inm->inm_addr.s_addr) ||
+	if (IN_LOCAL_GROUP(ntohl(inm->inm_addr.s_addr)) ||
 		(inm->inm_ifp->if_flags & IFF_LOOPBACK) != 0)
 	    return;
 
@@ -1870,7 +1872,7 @@ igmp_cancel_pending_response(ifp, rti)
 	while (inm != NULL) {
 	    if (inm->inm_ifp != ifp)
 		goto next_multi;
-	    if (IN_LOCAL_GROUP(inm->inm_addr.s_addr))
+	    if (IN_LOCAL_GROUP(ntohl(inm->inm_addr.s_addr)))
 		goto next_multi;
 	    if (inm->inm_source == NULL)
 		goto next_multi;
