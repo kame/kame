@@ -298,7 +298,7 @@ dump_vifs(fp)
     int             width;
     int             i;
 
-    fprintf(fp, "\nMulticast Interface Table\n %-4s %-6s %-50s %-10s %-14s %s",
+    fprintf(fp, "\nMulticast Interface Table\n %-4s %-6s %-43s %5s %-14s %s",
 	    "Mif", " PhyIF", "Local-Address/Prefixlen","Scope", "Flags",
 	    "Neighbors\n");
 
@@ -309,20 +309,20 @@ dump_vifs(fp)
 	{
 	    if (!firstaddr)
 	    {
-		fprintf(fp, "  %3s %6s %-50s", "", "",
+		fprintf(fp, "  %3s %6s %-43s", "", "",
 			net6name(&pa->pa_addr.sin6_addr,
 				 &pa->pa_subnetmask));
-	    	fprintf(fp,"   %-5d\n",pa->pa_addr.sin6_scope_id);
+	    	fprintf(fp," %-5d\n", pa->pa_addr.sin6_scope_id);
 		continue;
 	    }
 
 	    firstaddr = 0;
-	    fprintf(fp, "  %-3u %6s %-50s", vifi,
+	    fprintf(fp, "  %-3u %6s %-43s", vifi,
 		    (v->uv_flags & MIFF_REGISTER)?"regist":v->uv_name,
 		    net6name(&pa->pa_addr.sin6_addr,
 			     &pa->pa_subnetmask));
 
-	    fprintf(fp,"   %-5d",pa->pa_addr.sin6_scope_id);
+	    fprintf(fp," %-5d", pa->pa_addr.sin6_scope_id);
 	    firstaddr = 0;
 
 	    width = 0;
