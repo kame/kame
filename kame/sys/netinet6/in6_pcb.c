@@ -861,7 +861,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 		notify = in6_rtchange;
 	}
 
-	if (notify == NULL && notify2 == NULL)
+	if (notify == NULL)
 		return 0;
 
 	errno = inet6ctlerrmap[cmd];
@@ -880,21 +880,23 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 					       &faddr6))
 				in6_rtchange(in6p, errno);
 
-			if (notify2 != NULL)
+			if (notify2 == NULL)
 				continue;
+
+			notify = notify2;
 		}
+
+		/* at this point, we can assume that NOTIFY is not NULL. */
 
 		if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &faddr6) ||
 		    in6p->in6p_socket == 0 ||
 		    (lport && in6p->in6p_lport != lport) ||
 		    (!IN6_IS_ADDR_UNSPECIFIED(laddr6) &&
 		     !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, laddr6)) ||
-		    (fport && in6p->in6p_fport != fport)) {
-			in6p = in6p->in6p_next;
+		    (fport && in6p->in6p_fport != fport))
 			continue;
-		}
-		if (notify2)
-			(*notify2)(in6p, errno);
+
+		(*notify)(in6p, errno);
 		nmatch++;
 	}
 	return nmatch;
