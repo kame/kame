@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.26 2003/10/31 06:43:00 jinmei Exp $
+# $Id: Makefile.in,v 1.27 2003/11/25 03:51:25 jinmei Exp $
 #
 
 srcdir=	@srcdir@
@@ -20,11 +20,10 @@ sbindir=@sbindir@
 mandir=	@mandir@
 
 CFLAGS+= @DHCPOPT_DNS@ @DH6OPT_DNSNAME@ \
+	@DH6OPT_IA_PD@ @DH6OPT_IA_PD_PREFIX@ \
 	-DCONF_DH6OPT_PREFIX_DELEGATION=@dhcpopt_pdel@ \
 	-DCONF_DH6OPT_PREFIX_INFORMATION=@dhcpopt_pinfo@ \
 	-DCONF_DH6OPT_PREFIX_REQUEST=@dhcpopt_preq@ \
-	-DCONF_DH6OPT_IA_PD=@dhcpopt_ia_pd@ \
-	-DCONF_DH6OPT_IA_PD_PREFIX=@dhcpopt_ia_pd_prefix@ \
 	-DCONF_DH6OPT_STCODE_NOPREFIXAVAIL=@dhcpstcode_no_prefix@ \
 	-DCONF_DH6OPT_NTP=@dhcpopt_ntp@ \
 
