@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.99 2002/04/01 13:46:26 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.100 2002/04/22 09:39:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1359,8 +1359,8 @@ nd6_dad_start(ifa, tick)
 	dp->dad_ns_ocount = dp->dad_ns_tcount = 0;
 	if (tick == NULL) {
 		nd6_dad_ns_output(dp, ifa);
-		nd6_dad_starttimer(dp, 
-		    nd_ifinfo[ifa->ifa_ifp->if_index].retrans * hz / 1000);
+		nd6_dad_starttimer(dp,
+				   ND6_RETRANS_SEC(nd_ifinfo[ifa->ifa_ifp->if_index].retrans) * hz);
 	} else {
 		int ntick;
 
@@ -1461,8 +1461,8 @@ nd6_dad_timer(ifa)
 		 * We have more NS to go.  Send NS packet for DAD.
 		 */
 		nd6_dad_ns_output(dp, ifa);
-		nd6_dad_starttimer(dp, 
-		    nd_ifinfo[ifa->ifa_ifp->if_index].retrans * hz / 1000);
+		nd6_dad_starttimer(dp,
+				   ND6_RETRANS_SEC(nd_ifinfo[ifa->ifa_ifp->if_index].retrans) * hz);
 	} else {
 		/*
 		 * We have transmitted sufficient number of DAD packets.

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.81 2002/02/14 08:47:04 sakane Exp $	*/
+/*	$KAME: nd6.h,v 1.82 2002/04/22 09:39:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,6 +72,12 @@ struct	llinfo_nd6 {
 #define ND6_LLINFO_PROBE	4
 
 #define ND6_IS_LLINFO_PROBREACH(n) ((n)->ln_state > ND6_LLINFO_INCOMPLETE)
+
+/*
+ * Since the granularity of our retransmission timer is seconds, we should
+ * ensure that a positive timer value will be mapped to at least one second.
+ */
+#define ND6_RETRANS_SEC(r) (((r) + 999) / 1000)
 
 struct nd_ifinfo {
 	u_int32_t linkmtu;		/* LinkMTU */
