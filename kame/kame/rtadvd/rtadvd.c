@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.57 2002/04/28 10:37:18 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.58 2002/05/21 13:59:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -219,7 +219,6 @@ main(argc, argv)
 	if (fflag)
 		logopt |= LOG_PERROR;
 	openlog("rtadvd", logopt, LOG_DAEMON);
-
 
 	/* set log level */
 	if (dflag == 0)
