@@ -1391,7 +1391,7 @@ if_allmulti(ifp, onswitch)
 		if (ifp->if_amcount++ == 0) {
 			ifp->if_flags |= IFF_ALLMULTI;
 			ifr.ifr_flags = ifp->if_flags;
-			error = ifp->if_ioctl(ifp, SIOCSIFFLAGS, &ifr);
+			error = ifp->if_ioctl(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 		}
 	} else {
 		if (ifp->if_amcount > 1) {
@@ -1400,7 +1400,7 @@ if_allmulti(ifp, onswitch)
 			ifp->if_amcount = 0;
 			ifp->if_flags &= ~IFF_ALLMULTI;
 			ifr.ifr_flags = ifp->if_flags;
-			error = ifp->if_ioctl(ifp, SIOCSIFFLAGS, &ifr);
+			error = ifp->if_ioctl(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 		}
 	}
 	splx(s);
@@ -1618,10 +1618,10 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 	if ((ifp->if_flags & IFF_UP) != 0) {
 		ifp->if_flags &= ~IFF_UP;
 		ifr.ifr_flags = ifp->if_flags;
-		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, &ifr);
+		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 		ifp->if_flags |= IFF_UP;
 		ifr.ifr_flags = ifp->if_flags;
-		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, &ifr);
+		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 	}
 	return (0);
 }
