@@ -887,11 +887,25 @@ findpcb:
 				struct ip6_recvpktopts newopts;
 
 				/*
-				 * inherit socket options from the listening
+				 * Inherit socket options from the listening
 				 * socket.
+				 * Note that in6p_inputopts are not (even
+				 * should not be) copied, since it stores
+				 * previously received options and is used to
+				 * detect if each new option is different than
+				 * the previous one and hence should be passed
+				 * to a user.
+				 * If we copied in6p_inputopts, a user would
+				 * not be able to receive options just after
+				 * calling the accept system call.
 				 */
 				inp->inp_flags |=
 					oinp->inp_flags & INP_CONTROLOPTS;
+				if (oinp->in6p_outputopts)
+					inp->in6p_outputopts =
+						ip6_copypktopts(oinp->in6p_outputopts,
+								M_NOWAIT);
+
 				if (inp->inp_flags & INP_CONTROLOPTS) {
 					bzero(&newopts, sizeof(newopts));
 					/*
