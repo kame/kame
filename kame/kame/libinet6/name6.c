@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.34 2001/12/04 01:10:42 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.35 2001/12/04 04:16:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1465,17 +1465,14 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 #endif
 
 	switch (af) {
-	case AF_INET:
-		tld = tld4;
-		break;
 #ifdef INET6
 	case AF_INET6:
 		tld = tld6;
 		break;
 #endif
 	default:
-		*errp = NO_RECOVERY;	/* XXX */
-		return NULL;
+		tld = tld4;
+		break;
 	}
 
 	if ((_res.options & RES_INIT) == 0) {
