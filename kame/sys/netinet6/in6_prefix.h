@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.h,v 1.7 2000/12/02 07:30:37 itojun Exp $	*/
+/*	$KAME: in6_prefix.h,v 1.8 2001/02/08 10:23:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998 and 1999 WIDE Project.
@@ -31,6 +31,9 @@
 
 #ifdef __NetBSD__
 #include <sys/callout.h>
+#endif
+#ifdef __OpenBSD__
+#include <sys/timeout.h>
 #endif
 
 struct rr_prefix {
@@ -88,5 +91,10 @@ LIST_HEAD(rr_prhead, rr_prefix);
 extern struct rr_prhead rr_prefix;
 
 void in6_rr_timer __P((void *));
+#ifdef __NetBSD__
 extern struct callout in6_rr_timer_ch;
+#endif
+#ifdef __OpenBSD__
+extern struct timeout in6_rr_timer_ch;
+#endif
 int delete_each_prefix  __P((struct rr_prefix *rpp, u_char origin));

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.43 2001/02/07 10:48:32 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.44 2001/02/08 10:23:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -40,6 +40,9 @@
 #include <sys/queue.h>
 #ifdef __NetBSD__
 #include <sys/callout.h>
+#endif
+#ifdef __OpenBSD__
+#include <sys/timeout.h>
 #endif
 
 struct	llinfo_nd6 {
@@ -269,6 +272,9 @@ extern int nd6_debug;
 
 #ifdef __NetBSD__
 extern struct callout nd6_timer_ch;
+#endif
+#ifdef __OpenBSD__
+extern struct timeout nd6_timer_ch;
 #endif
 
 /* nd6_rtr.c */
