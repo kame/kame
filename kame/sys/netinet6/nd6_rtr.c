@@ -78,16 +78,7 @@ static void in6_init_address_ltimes __P((struct nd_prefix *ndpr,
 
 static int rt6_deleteroute __P((struct radix_node *, void *));
 
-#if 0
-extern struct timeval time;
-#endif
 extern int nd6_recalc_reachtm_interval;
-
-#if 0
-static u_char bmask [] = {
-	0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe,
-};
-#endif
 
 struct ifnet *nd6_defifp;
 int nd6_defifindex;
