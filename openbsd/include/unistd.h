@@ -196,8 +196,9 @@ int	 issetugid __P((void));
 
 #if 1 /*INET6*/
 int	 rresvport_af __P((int *, int));
-int	 ruserok_af __P((const char *, int, const char *, const char *, int));
 int	 iruserok_af __P((const void *, int, const char *, const char *, int));
+struct sockaddr;
+int	 iruserok_af __P((struct sockaddr *, int, const char *, const char *));
 #endif
 
 int	 getopt __P((int, char * const *, const char *));
