@@ -82,11 +82,16 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #endif /* IPSEC */
 
 #ifdef INET6
+#ifndef INET
+#include <netinet/in.h>
+#endif
 #include <sys/domain.h>
 #include <netinet6/in6_var.h>
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/tcpipv6.h>
+#include <netinet/icmp6.h>
+#include <netinet6/nd6.h>
 
 #ifndef CREATE_IPV6_MAPPED
 #define CREATE_IPV6_MAPPED(a6, a4) \
@@ -118,6 +123,22 @@ extern u_long sb_max;
 /* for modulo comparisons of timestamps */
 #define TSTMP_LT(a,b)	((int)((a)-(b)) < 0)
 #define TSTMP_GEQ(a,b)	((int)((a)-(b)) >= 0)
+
+/*
+ * Neighbor Discovery, Neighbor Unreachability Detection Upper layer hint.
+ */
+#ifdef INET6
+#define ND6_HINT(tp) \
+do { \
+	if (tp && tp->t_inpcb && (tp->t_inpcb->inp_flags & INP_IPV6) \
+	 && !(tp->t_inpcb->inp_flags & INP_IPV6_MAPPED) \
+	 && tp->t_inpcb->inp_route6.ro_rt) { \
+		nd6_nud_hint(tp->t_inpcb->inp_route6.ro_rt, NULL); \
+	} \
+} while (0)
+#else
+#define ND6_HINT(tp)
+#endif
 
 /*
  * Insert segment ti into reassembly queue of tcp with
@@ -246,6 +267,7 @@ present:
 
 		nq = q->ipqe_q.le_next;
 		LIST_REMOVE(q, ipqe_q);
+		ND6_HINT(tp);
 		if (so->so_state & SS_CANTRCVMORE)
 			m_freem(q->ipqe_m);
 		else
@@ -803,6 +825,7 @@ findpcb:
 				acked = th->th_ack - tp->snd_una;
 				tcpstat.tcps_rcvackpack++;
 				tcpstat.tcps_rcvackbyte += acked;
+				ND6_HINT(tp);
 				sbdrop(&so->so_snd, acked);
 				tp->snd_una = th->th_ack;
 #if defined(TCP_SACK) || defined(TCP_NEWRENO)
@@ -856,6 +879,7 @@ findpcb:
 			tp->rcv_nxt += tlen;
 			tcpstat.tcps_rcvpack++;
 			tcpstat.tcps_rcvbyte += tlen;
+			ND6_HINT(tp);
 			/*
 			 * Drop TCP, IP headers and TCP options then add data
 			 * to socket buffer.
@@ -1723,6 +1747,7 @@ trimthenstep6:
 #endif
 		tp->snd_cwnd = min(cw + incr, TCP_MAXWIN<<tp->snd_scale);
 		}
+		ND6_HINT(tp);
 		if (acked > so->so_snd.sb_cc) {
 			tp->snd_wnd -= so->so_snd.sb_cc;
 			sbdrop(&so->so_snd, (int)so->so_snd.sb_cc);
@@ -1906,6 +1931,7 @@ dodata:							/* XXX */
 			tiflags = th->th_flags & TH_FIN;
 			tcpstat.tcps_rcvpack++;
 			tcpstat.tcps_rcvbyte += tlen;
+			ND6_HINT(tp);
 			m_adj(m, hdroptlen);
 			sbappend(&so->so_rcv, m);
 			sorwakeup(so);
