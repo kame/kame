@@ -1157,7 +1157,7 @@ ipsec4_set_policy(inp, optname, request, priv)
 	struct secpolicy **pcb_sp;
 
 	/* sanity check. */
-	if (inp == NULL || xpl == NULL)
+	if (inp == NULL || request == NULL)
 		return EINVAL;
 
 	/* select direction */
@@ -1187,7 +1187,7 @@ ipsec4_get_policy(inp, request, mp)
 	struct secpolicy *pcb_sp;
 
 	/* sanity check. */
-	if (inp == NULL || mp == NULL)
+	if (inp == NULL || request == NULL || mp == NULL)
 		return EINVAL;
 
 	/* select direction */
@@ -1241,7 +1241,7 @@ ipsec6_set_policy(in6p, optname, request, priv)
 	struct secpolicy **pcb_sp;
 
 	/* sanity check. */
-	if (in6p == NULL || xpl == NULL)
+	if (in6p == NULL || request == NULL)
 		return EINVAL;
 
 	/* select direction */
@@ -1271,7 +1271,7 @@ ipsec6_get_policy(in6p, request, mp)
 	struct secpolicy *pcb_sp;
 
 	/* sanity check. */
-	if (in6p == NULL || mp == NULL)
+	if (in6p == NULL || request == NULL || mp == NULL)
 		return EINVAL;
 
 	/* select direction */
