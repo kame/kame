@@ -1,4 +1,4 @@
-/*	$NetBSD: route.c,v 1.30 1998/10/23 05:36:42 lukem Exp $	*/
+/*	$NetBSD: route.c,v 1.38.4.1 2000/10/17 20:44:14 tv Exp $	*/
 
 /*
  * Copyright (c) 1983, 1989, 1991, 1993
@@ -43,7 +43,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1989, 1991, 1993\n\
 #if 0
 static char sccsid[] = "@(#)route.c	8.6 (Berkeley) 4/28/95";
 #else
-__RCSID("$NetBSD: route.c,v 1.30 1998/10/23 05:36:42 lukem Exp $");
+__RCSID("$NetBSD: route.c,v 1.38.4.1 2000/10/17 20:44:14 tv Exp $");
 #endif
 #endif /* not lint */
 
@@ -110,7 +110,6 @@ static int keyword __P((char *));
 static void sodump __P((sup, char *));
 static void sockaddr __P((char *, struct sockaddr *));
 
-struct	ortentry route;
 union	sockunion {
 	struct	sockaddr sa;
 	struct	sockaddr_in sin;
@@ -877,8 +876,7 @@ newroute(argc, argv)
 			(void) printf(": gateway %s", gateway);
 			if (attempts > 1 && ret == 0 && af == AF_INET)
 			    (void) printf(" (%s)",
-				inet_ntoa(((struct sockaddr_in *)
-					   &route.rt_gateway)->sin_addr));
+			        inet_ntoa(so_gate.sin.sin_addr));
 		}
 		if (ret == 0)
 			(void) printf("\n");
@@ -952,9 +950,10 @@ static void
 inet6_makenetandmask(sin6)
 	struct sockaddr_in6 *sin6;
 {
-	char *plen = NULL;
+	char *plen;
 	struct in6_addr in6;
 
+	plen = NULL;
 	if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr) &&
 	    sin6->sin6_scope_id == 0) {
 		plen = "0";
@@ -1160,7 +1159,6 @@ netdone:
 	errx(1, "bad value: %s", s);
 }
 
-#ifndef SMALL
 #ifdef INET6
 int
 prefixlen(s)
@@ -1188,6 +1186,7 @@ prefixlen(s)
 }
 #endif
 
+#ifndef SMALL
 int
 x25_makemask()
 {
@@ -1444,14 +1443,16 @@ char *msgtypes[] = {
 	"RTM_RESOLVE: Route created by cloning",
 	"RTM_NEWADDR: address being added to iface",
 	"RTM_DELADDR: address being removed from iface",
+	"RTM_OIFINFO: iface status change (pre-1.5)",
 	"RTM_IFINFO: iface status change",
+	"RTM_IFANNOUNCE: iface arrival/departure",
 	0,
 };
 
 char metricnames[] =
 "\011pksent\010rttvar\7rtt\6ssthresh\5sendpipe\4recvpipe\3expire\2hopcount\1mtu";
 char routeflags[] =
-"\1UP\2GATEWAY\3HOST\4REJECT\5DYNAMIC\6MODIFIED\7DONE\010MASK_PRESENT\011CLONING\012XRESOLVE\013LLINFO\014STATIC\017PROTO2\020PROTO1";
+"\1UP\2GATEWAY\3HOST\4REJECT\5DYNAMIC\6MODIFIED\7DONE\010MASK_PRESENT\011CLONING\012XRESOLVE\013LLINFO\014STATIC\015BLACKHOLE\016CLONED\017PROTO2\020PROTO1";
 char ifnetflags[] =
 "\1UP\2BROADCAST\3DEBUG\4LOOPBACK\5PTP\6NOTRAILERS\7RUNNING\010NOARP\011PPROMISC\012ALLMULTI\013OACTIVE\014SIMPLEX\015LINK0\016LINK1\017LINK2\020MULTICAST";
 char addrnames[] =
@@ -1464,6 +1465,7 @@ print_rtmsg(rtm, msglen)
 {
 	struct if_msghdr *ifm;
 	struct ifa_msghdr *ifam;
+	struct if_announcemsghdr *ifan;
 
 	if (verbose == 0)
 		return;
@@ -1472,7 +1474,11 @@ print_rtmsg(rtm, msglen)
 		    rtm->rtm_version);
 		return;
 	}
-	(void)printf("%s: len %d, ", msgtypes[rtm->rtm_type], rtm->rtm_msglen);
+	if (msgtypes[rtm->rtm_type])
+		(void)printf("%s: ", msgtypes[rtm->rtm_type]);
+	else
+		(void)printf("#%d: ", rtm->rtm_type);
+	(void)printf("len %d, ", rtm->rtm_msglen);
 	switch (rtm->rtm_type) {
 	case RTM_IFINFO:
 		ifm = (struct if_msghdr *)rtm;
@@ -1486,6 +1492,22 @@ print_rtmsg(rtm, msglen)
 		(void) printf("metric %d, flags:", ifam->ifam_metric);
 		bprintf(stdout, ifam->ifam_flags, routeflags);
 		pmsg_addrs((char *)(ifam + 1), ifam->ifam_addrs);
+		break;
+	case RTM_IFANNOUNCE:
+		ifan = (struct if_announcemsghdr *)rtm;
+		(void) printf("if# %d, what: ", ifan->ifan_index);
+		switch (ifan->ifan_what) {
+		case IFAN_ARRIVAL:
+			printf("arrival");
+			break;
+		case IFAN_DEPARTURE:
+			printf("departure");
+			break;
+		default:
+			printf("#%d", ifan->ifan_what);
+			break;
+		}
+		printf("\n");
 		break;
 	default:
 		(void) printf("pid: %d, seq %d, errno %d, flags:",
@@ -1501,7 +1523,7 @@ print_getmsg(rtm, msglen)
 	struct rt_msghdr *rtm;
 	int msglen;
 {
-	struct sockaddr *dst = NULL, *gate = NULL, *mask = NULL;
+	struct sockaddr *dst = NULL, *gate = NULL, *mask = NULL, *ifa = NULL;
 	struct sockaddr_dl *ifp = NULL;
 	struct sockaddr *sa;
 	char *cp;
@@ -1542,6 +1564,9 @@ print_getmsg(rtm, msglen)
 					   ((struct sockaddr_dl *)sa)->sdl_nlen)
 						ifp = (struct sockaddr_dl *)sa;
 					break;
+				case RTA_IFA:
+					ifa = sa;
+					break;
 				}
 				ADVANCE(cp, sa);
 			}
@@ -1558,6 +1583,8 @@ print_getmsg(rtm, msglen)
 	}
 	if (gate && rtm->rtm_flags & RTF_GATEWAY)
 		(void)printf("    gateway: %s\n", routename(gate));
+	if (ifa)
+		(void)printf(" local addr: %s\n", routename(ifa));
 	if (ifp)
 		(void)printf("  interface: %.*s\n",
 		    ifp->sdl_nlen, ifp->sdl_data);
