@@ -10,8 +10,10 @@ SRCS=	main.c session.c isakmp.c handler.c random.c \
 
 # debugging code with print-isakmp.c
 SRCS+=	print-isakmp.c
+SRCS+=	rijndael-alg-fst.c rijndael-api-fst.c
 CFLAGS+=-I${SRCDIR}/../tcpdump -I${SRCDIR}/../tcpdump/lbl \
 	-DHAVE_PRINT_ISAKMP_C=1 -DHAVE_GETIFADDRS=1
+CFLAGS+=-I${SRCDIR}/missing
 
 #for debugging malloc/free
 #.if exists(/usr/local/lib/libefence.a) || exists(/usr/local/lib/libefence.so)
@@ -24,3 +26,4 @@ MAN8=	racoon.8
 .include <bsd.prog.mk>
 
 CLEANFILES+=	y.tab.h cfparse.c cftoken.c
+.PATH: ${SRCDIR}/missing/crypto/rijndael
