@@ -1,20 +1,84 @@
-# New ports collection makefile for:	w3m
-# Version required:     990902
-# Date created:		Thu Sep 30 10:05:36 JST 1999
-# Whom:			sumikawa@kame.net
+# New ports collection makefile for:   w3m
+# Version required:		991203
+# Date Created:			7 Oct 1999
+# Whom:				MANTANI Nobutaka <nobutaka@nobutaka.com>
 #
-# $Id: Makefile,v 1.1 1999/09/30 01:18:52 sumikawa Exp $
+# $FreeBSD: ports/www/w3m/Makefile,v 1.3 1999/11/18 21:56:34 sada Exp $
+# $Id: Makefile,v 1.2 1999/12/07 16:17:31 sumikawa Exp $
 #
 
-DISTNAME=	w3m-990902
-CATEGORIES=	www
+DISTNAME=	w3m-${W3M_DIST_VER}
+PKGNAME?=	w3m-${W3M_VER}
+W3M_DIST_VER=	991203
+W3M_VER=	${W3M_DIST_VER}
+CATEGORIES?=	www
 MASTER_SITES=	ftp://ei5nazha.yz.yamagata-u.ac.jp/w3m/ \
-		ftp://ftp.firedrake.org/w3m/
-WRKSRC=		${WRKDIR}/w3m
+		ftp://ftp.firedrake.org/w3m/ \
+		http://www.instinct.org/~pgl/w3m/ \
+		http://grilli.net/mirrors/w3m/download/
 
 MAINTAINER=	sumikawa@kame.net
 
-pre-build:
-	${SED} -e "s|@PREFIX@|${PREFIX}|g" < ${FILESDIR}/config.h > ${WRKSRC}/config.h
+RESTRICTED=     "Contains cryptography"
+
+BUILD_DEPENDS=	${LOCALBASE}/lib/libgc.a:${PORTSDIR}/devel/boehm-gc
+
+WRKSRC=		${WRKDIR}/w3m
+MAN1=		w3m.1
+MANLANG=	""
+
+TARGET=		${WRKSRC}/config.h
+DOCS=		FAQ.html MANUAL.html MANUAL_lynx.html README \
+		README.dict README.func STORY.html keymap.default \
+		keymap.lynx menu.default menu.submenu
+SED_CMD=	-e "s,%%PREFIX%%,${PREFIX},g" \
+		-e "s,%%LOCALBASE%%,${LOCALBASE},g"
+
+.if defined(JAPANESE)
+SED_CMD+=	-e "s,undef JAPANESE,define JAPANESE,g" \
+		-e "s,w3mhelp_en.html,w3mhelp_ja.html,g"
+MANLANG+=	ja
+DOCS_JP=	${DOCS} HISTORY HISTORY.kokb README.keymap README.kokb \
+		README.menu
+.endif
+
+.if defined(USE_SSL)
+LIB_DEPENDS+=	crypto.1:${PORTSDIR}/security/openssl \
+		ssl.1:${PORTSDIR}/security/openssl
+
+SSL_CFLAGS=	-I${LOCALBASE}/include/openssl
+SSL_LIBS=	-lssl -lcrypto
+.if defined(USA_RESIDENT) && ${USA_RESIDENT} == YES
+EXTRA_SSL_LIBS=	-lRSAglue -lrsaref
+.endif
+
+SED_CMD+=	-e "s,undef USE_SSL,define USE_SSL,g"
+.endif
+
+MAKE_FLAGS+=	DEFS="-I${LOCALBASE}/include ${SSL_CFLAGS}" \
+		LIBS="-L${LOCALBASE}/lib ${SSL_LIBS} ${EXTRA_SSL_LIBS}"
+
+post-configure:
+	@${CP} ${TARGET} ${TARGET}.in
+	@${SED} ${SED_CMD} < ${TARGET}.in > ${TARGET}
+
+post-install:
+.if !defined(NOPORTDOCS)
+.if defined(JAPANESE)
+	@${MKDIR} ${PREFIX}/share/doc/ja/w3m
+	@(cd ${WRKSRC}/doc-jp; \
+	for i in ${DOCS_JP} ; do \
+		${INSTALL_DATA} $$i ${PREFIX}/share/doc/ja/w3m/ ; \
+	done)
+.endif
+	@(cd ${WRKSRC}/doc; \
+	for i in ${DOCS} ; do \
+		${INSTALL_DATA} $$i ${PREFIX}/share/doc/w3m/ ; \
+	done)
+.endif
+	@${INSTALL_MAN} ${WRKSRC}/doc/w3m.1 ${PREFIX}/man/man1
+.if defined(JAPANESE)
+	@${INSTALL_MAN} ${WRKSRC}/doc-jp/w3m.1 ${PREFIX}/man/ja/man1
+.endif
 
 .include <bsd.port.mk>
