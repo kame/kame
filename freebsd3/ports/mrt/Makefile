@@ -1,31 +1,31 @@
 # New ports collection makefile for:	mrt
-# Version required:	1.5.2a
+# Version required:	2.1.2a
 # Date created:		Sat Jun  6 00:09:52 JST 1998
-# Whom:			Jun-ichiro itojun Itoh <itojun@itojun.org>
+# Whom:			Jun-ichiro itojun Hagino <itojun@itojun.org>
 #
-# $Id: Makefile,v 1.3 1999/11/01 13:09:02 itojun Exp $
+# $FreeBSD: ports/net/mrt/Makefile,v 1.4 2000/01/11 19:53:22 sumikawa Exp $
 #
 
-DISTNAME=	mrt-${VERBASE}${VERADD}-src
+DISTNAME=	mrt-${VERBASE}-src
 PKGNAME=	mrt-${VERBASE}
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.merit.edu/net-research/mrt/
 
 MAINTAINER=	itojun@itojun.org
 
-WRKSRC=		${WRKDIR}/mrt-${VERBASE}/src.kame
+WRKSRC=		${WRKDIR}/mrt-${VERBASE}/src
 GNU_CONFIGURE=	yes
+USE_AUTOCONF=	yes
 
-VERBASE=	2.0.1a
-VERADD=
+VERBASE=	2.1.2a
 
 MAN8=	mrtd.8
 EXAMPLES=	programs/bgpsim/bgpsim.conf programs/bgpsim/bgpsim6.conf \
 		programs/mrtd/mrtd.conf programs/mrtd/mrtd.ripng.conf \
 		programs/mrtd/solaris.ripng.conf
 
-post-extract:
-	(cd ${WRKDIR}/mrt-${VERBASE}; ./make-sym-links kame)
+#post-extract:
+#	(${CHDIR} ${WRKSRC}/..; ./make-sym-links kame)
 
 post-install:
 	${MKDIR} ${PREFIX}/share/examples/mrt
