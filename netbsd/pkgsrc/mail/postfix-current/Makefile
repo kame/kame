@@ -1,13 +1,13 @@
-# $NetBSD: Makefile,v 1.3 2000/08/14 11:26:14 itojun Exp $
+# $NetBSD: Makefile,v 1.9 2000/10/29 12:01:05 itojun Exp $
 
-DISTNAME=	snapshot-20000531
-PKGNAME=	postfix-20000531
+DISTNAME=	snapshot-20001005
+PKGNAME=	postfix-20001005
 CATEGORIES=	mail
 MASTER_SITES=	ftp://postfix.cloud9.net/experimental/
 
-PATCHFILES=	postfix-20000531snap-v6-20000814b.diff.gz
+PATCHFILES=	postfix-20001005snap-v6-20001011a.diff.gz
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCH_DIST_STRIP=	-p1
+PATCH_DIST_STRIP+=	-p1
 
 MAINTAINER=	packages@netbsd.org
 HOMEPAGE=	http://www.postfix.org/
@@ -29,11 +29,11 @@ BUILD_DEFS+=	USE_INET6
 .if defined(POSTFIX_PCRE) && ${POSTFIX_PCRE} == YES
 DEPENDS+=	pcre-2.08:../../devel/pcre
 CFLAGS+=	-DHAS_PCRE -I${LOCALBASE}/include
-AUXLIBS=	-lpcre
+AUXLIBS=	-L${LOCALBASE}/lib -Wl,-R${LOCALBASE}/lib -lpcre
 MAKE_ENV+=	AUXLIBS="${AUXLIBS}"
 .endif
 
-BUILD_DEFS+=	POSTFIX_PCRE POSTFIX_VERP MANINSTALL
+BUILD_DEFS+=	POSTFIX_PCRE
 
 PLIST_SRC=	${PKGDIR}/PLIST
 
@@ -41,14 +41,14 @@ ALL_TARGET=	#empty
 
 pre-configure:
 	${CP} ${WRKSRC}/conf/main.cf ${WRKSRC}/conf/main.cf.dist
-	${CP} ${WRKSRC}/util/sys_defs.h ${WRKSRC}/util/sys_defs.h.dist
+	${CP} ${WRKSRC}/src/util/sys_defs.h ${WRKSRC}/src/util/sys_defs.h.dist
 	${CP} ${WRKSRC}/INSTALL.sh ${WRKSRC}/INSTALL.sh.dist
 	${SED} -e 's:__PREFIX:'${PREFIX}':g' \
 	    < ${WRKSRC}/conf/main.cf.dist \
 	    > ${WRKSRC}/conf/main.cf
 	${SED} -e 's:__PREFIX:'${PREFIX}':g' \
-	    < ${WRKSRC}/util/sys_defs.h.dist \
-	    > ${WRKSRC}/util/sys_defs.h
+	    < ${WRKSRC}/src/util/sys_defs.h.dist \
+	    > ${WRKSRC}/src/util/sys_defs.h
 	${SED} -e 's:__PREFIX:'${PREFIX}':g' \
 	    < ${WRKSRC}/INSTALL.sh.dist \
 	    > ${WRKSRC}/INSTALL.sh
@@ -71,7 +71,7 @@ post-install:
 	${INSTALL_DATA} ${WRKDIR}/mailer.conf.postfix ${PREFIX}/etc
 	${LN} -sf ${PREFIX}/share/postfix/postfix-script /etc/postfix
 	-${MKDIR} ${POSTFIX_SPOOL}
-	$(CHMOD) 755 ${POSTFIX_SPOOL}
+	${CHMOD} 755 ${POSTFIX_SPOOL}
 	${TEST} -f /etc/postfix/main.cf || \
 		${INSTALL_DATA} ${PREFIX}/share/postfix/main.cf /etc/postfix
 	${TEST} -f /etc/postfix/master.cf || \
