@@ -28,6 +28,22 @@ dnl default defs
 AC_DEFINE(DNS)
 AC_DEFINE(USE_GETIPNODEBY)
 
+AC_ARG_ENABLE(inet6,
+	[  --enable-inet6          enable IPv6 support (-DINET6)],
+	[case "${enableval}" in
+	yes)	AC_DEFINE(INET6) ;;
+	no)	;;
+	*) AC_MSG_ERROR(bad value ${enableval} for --enable-inet6 option) ;;
+	esac], [])
+
+AC_ARG_ENABLE(pedant,
+	[  --enable-pedant         pedantic compilation options],
+	[case "${enableval}" in
+	yes)	CFLAGS="$CFLAGS -Wall -Werror" ;;
+	no)	;;
+	*) AC_MSG_ERROR(bad value ${enableval} for --enable-pedant option) ;;
+	esac], [])
+
 dnl Checks for library functions.
 AC_FUNC_MEMCMP
 AC_CHECK_FUNCS(gethostname gettimeofday select socket strdup strerror)
