@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.130 2001/12/19 14:32:52 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.131 2001/12/24 10:40:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -825,7 +825,7 @@ get_addrselectpolicy(head)
 	struct policyhead *head;
 {
 #if defined(INET6)
-	int mib[] = { CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ADDRSELPOLICY };
+	int mib[] = { CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ADDRCTLPOLICY };
 	size_t l;
 	char *buf;
 	struct in6_addrpolicy *pol, *ep;
