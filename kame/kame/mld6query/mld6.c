@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.16 2003/09/09 00:42:46 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.17 2004/03/19 10:20:35 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -31,6 +31,7 @@
 #include <sys/param.h>
 #include <sys/uio.h>
 #include <sys/socket.h>
+#include <sys/sysctl.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <ifaddrs.h>
@@ -45,6 +46,7 @@
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
+#include <netinet6/ip6_mroute.h>
 
 #include  <arpa/inet.h>
 
@@ -76,7 +78,6 @@ struct msghdr m;
 struct sockaddr_in6 dst;
 struct mld_hdr mldh;
 struct in6_addr maddr = IN6ADDR_ANY_INIT, any = IN6ADDR_ANY_INIT;
-struct ipv6_mreq mreq;
 u_short ifindex;
 int s;
 
@@ -97,6 +98,10 @@ main(int argc, char *argv[])
 	struct itimerval itimer;
 	u_int type;
 	int ch;
+	int value, size, mrt6_init = 0;
+	int mib[] = { CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_FORWARDING };
+	char *errmsg;
+	struct mif6ctl mc;
 
 	type = MLD_LISTENER_QUERY;
 	while ((ch = getopt(argc, argv, "dr")) != -1) {
@@ -132,12 +137,6 @@ main(int argc, char *argv[])
 		       sizeof(hlim)) == -1)
 		err(1, "setsockopt(IPV6_MULTICAST_HOPS)");
 
-	mreq.ipv6mr_multiaddr = any;
-	mreq.ipv6mr_interface = ifindex;
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq,
-		       sizeof(mreq)) == -1)
-		err(1, "setsockopt(IPV6_JOIN_GROUP)");
-
 	ICMP6_FILTER_SETBLOCKALL(&filt);
 	ICMP6_FILTER_SETPASS(ICMP6_MEMBERSHIP_QUERY, &filt);
 	ICMP6_FILTER_SETPASS(ICMP6_MEMBERSHIP_REPORT, &filt);
@@ -146,10 +145,37 @@ main(int argc, char *argv[])
 			sizeof(filt)) < 0)
 		err(1, "setsockopt(ICMP6_FILTER)");
 
+	/* 
+	 * Only IPv6 multicast router can receive an arbitrary MLD Report.
+	 * Allocates MIF#0 to listen to arbitrary MLD Report.
+	 */
+	value = 1;
+	bzero(&mc, sizeof(mc));
+	mc.mif6c_pifi = ifindex;
+	if (setsockopt(s, IPPROTO_IPV6, MRT6_INIT, (char *) &value,
+		sizeof(value)) < 0 ||
+	    setsockopt(s, IPPROTO_IPV6, MRT6_ADD_MIF, (char *) &mc,
+		sizeof(mc)) < 0) {
+		mrt6_init = 1;
+		printf("not receive report/done, "
+			"since a multicast router daemon fetches it\n");
+	}
+	size = sizeof(value);
+	if (sysctl(mib, sizeof(mib)/sizeof(mib[0]), &value, &size,
+	    NULL, 0) < 0) {
+		errmsg = "sysctl";
+		goto finish;
+	}
+	if (value != 1)
+		printf("not receive report/done from outwide, "
+			"since kernel is configured as a host\n");
+
 	make_msg(ifindex, &maddr, type);
 
-	if (sendmsg(s, &m, 0) < 0)
-		err(1, "sendmsg");
+	if (sendmsg(s, &m, 0) < 0) {
+		errmsg = "sendmsg";
+		goto finish;
+	}
 
 	itimer.it_value.tv_sec =  QUERY_RESPONSE_INTERVAL / 1000;
 	itimer.it_interval.tv_sec = 0;
@@ -160,8 +186,10 @@ main(int argc, char *argv[])
 	(void)setitimer(ITIMER_REAL, &itimer, NULL);
 
 	FD_ZERO(&fdset);
-	if (s >= FD_SETSIZE)
-		errx(1, "descriptor too big");
+	if (s >= FD_SETSIZE) {
+		errmsg = "descriptor too big";
+		goto finish;
+	}
 	for (;;) {
 		FD_SET(s, &fdset);
 		if ((i = select(s + 1, &fdset, NULL, NULL, NULL)) < 0)
@@ -171,6 +199,13 @@ main(int argc, char *argv[])
 		else
 			dump(s);
 	}
+
+finish:
+	value = 1;
+	if (mrt6_init)
+		setsockopt(s, IPPROTO_IPV6, MRT6_DONE, (char *) &value,
+			sizeof(value));
+	err(1, errmsg);
 }
 
 void
@@ -335,12 +370,6 @@ dump(int s)
 void
 quit(int signum)
 {
-	mreq.ipv6mr_multiaddr = any;
-	mreq.ipv6mr_interface = ifindex;
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_LEAVE_GROUP, &mreq,
-		       sizeof(mreq)) == -1)
-		err(1, "setsockopt(IPV6_LEAVE_GROUP)");
-
 	exit(0);
 }
 
