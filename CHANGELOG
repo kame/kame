@@ -1,25 +1,44 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.399 2000/01/04 12:01:26 jinmei Exp $
+$Id: CHANGELOG,v 1.400 2000/01/04 14:59:03 jinmei Exp $
 
 <200001>
 2000-01-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/{ip6opt.c, rthdr.c}: implemented some new
 	functions introduced in rfc2292bis (see TODO.2292bis for more
-	detail).
+	details).
 	All the new functions except rresvport_af, rcmd_af, and rexec_af
 	are now	available.
 
 2000-01-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/{various files}: implemented the new advanced
-	API (rfc2292bis). The kernel part is now alrmost finished (see
+	API (rfc2292bis). The kernel part is now almost finished (see
 	TODO.2292bis for more details).
+	
 	Note about lower compatibility: I believe the new kernel is
-	compatible with the old API (i.e RFC2292) except the IPV6_HOPLIMIT
-	socket option. You won't have to adjust your application unless
-	you use the socket option. If you use the option but don't want to
-	migrate to the new API, use IPV6_RECVHOPLIMIT instead of
-	IPV6_HOPLIMIT and just keep the other code.
+	fairly compatible with the old API (i.e. RFC2292).
+
+	There are few compatibility issues in interfaces using ancillary
+	data. I believe the compatibility issues won't practically bother
+	you.
+
+	You don't have to care compatibility when setting a socket option
+	except IPV6_HOPLIMIT. If you use the option but don't want to
+	migrate to the new API, you have two choices. One is to use
+	IPV6_RECVHOPLIMIT instead of IPV6_HOPLIMIT and just keep the other
+	code. The other is to define COMPAT_RFC2292 in your kernel
+	configuration file and recompile the kernel. Then the kernel will
+	handle IPV6_HOPLIMIT in the RFC2292 manner.
+
+	Unfortunately, it is impossible to ensure compatibility for
+	getting socket options whose semantics in the new API is different
+	than in RFC2292. If you don't want to use the new API but want to
+	do getsockopt for such options (I believe the possibility is very
+	rare, though) define COMPAT_RFC2292 in your kernel configuration
+	file and recompile the kernel. Then the kernel will handle the
+	options in the RFC2292 manner.
+
+	Please note that the new API is enabled by default in any case.
 
 Tue Jan  4 18:59:08 JST 2000 sakane@ydc.co.jp
 	* kame/sys/netkey:
