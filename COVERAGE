@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.91 2001/01/12 10:43:20 itojun Exp $
+$KAME: COVERAGE,v 1.92 2001/01/21 15:40:23 itojun Exp $
 
 
 x: supported/integrated
@@ -218,6 +218,9 @@ ipsec esp, twofish support
 
 router renumbering declaration does not use bitfield (sys/netinet/icmp6.h)
 		x	x	x	x	x	x	x	-
+
+router renumbering bit declaration conforms 2292bis-02 (sys/netinet/icmp6.h)
+		x	x	-	-	-	-	-	-
 
 source address selection
 		latest	may00	may00	may00	may00	may00	may00	apr00?
