@@ -114,6 +114,7 @@ struct servtab *enter __P((struct servtab *));
 void		freeconfig __P((struct servtab *));
 struct servtab *getconfigent __P((void));
 void		iderror __P((int, int, int, int));
+void		ident_stream __P((int, struct servtab *));
 void		machtime_dg __P((int, struct servtab *));
 void		machtime_stream __P((int, struct servtab *));
 int		matchservent __P((char *, char *, char *));

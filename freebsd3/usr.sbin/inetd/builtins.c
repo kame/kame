@@ -83,6 +83,8 @@ struct biltin biltins[] = {
 
 	{ "tcpmux",	SOCK_STREAM,	1, -1,	(void (*)())tcpmux },
 
+	{ "auth",	SOCK_STREAM,	1, -1,	ident_stream },
+
 	{ NULL }
 };
 
@@ -315,6 +317,250 @@ iderror(lport, fport, s, er)	/* Generic ident_stream error-sending func */
 	write(s, p, strlen(p));
 	free(p);
 
+	exit(0);
+}
+
+/* ARGSUSED */
+void
+ident_stream(s, sep)		/* Ident service (AKA "auth") */
+	int s;
+	struct servtab *sep;
+{
+	struct utsname un;
+	struct stat sb;
+	struct sockaddr_in6 sin[2];
+	struct sockaddr_in sin4[2];
+	struct ucred uc;
+	struct timeval tv = {
+		10,
+		0
+	};
+	struct passwd *pw;
+	fd_set fdset;
+	char buf[BUFSIZE], *cp = NULL, *p, **av, *osname = NULL, *ctlname;
+	int len, c, fflag = 0, nflag = 0, rflag = 0, argc = 0;
+	u_short lport, fport;
+	struct sockaddr *sa;
+	int salen;
+
+	inetd_setproctitle(sep->se_service, s);
+	/*
+	 * Reset getopt() since we are a fork() but not an exec() from
+	 * a parent which used getopt() already.
+	 */
+	optind = 1;
+	optreset = 1;
+	/*
+	 * Take the internal argument vector and count it out to make an
+	 * argument count for getopt. This can be used for any internal
+	 * service to read arguments and use getopt() easily.
+	 */
+	for (av = sep->se_argv; *av; av++)
+		argc++;
+	if (argc) {
+		int sec, usec;
+
+		while ((c = getopt(argc, sep->se_argv, "fno:rt:")) != -1)
+			switch (c) {
+			case 'f':
+				fflag = 1;
+				break;
+			case 'n':
+				nflag = 1;
+				break;
+			case 'o':
+				osname = optarg;
+				break;
+			case 'r':
+				rflag = 1;
+				break;
+			case 't':
+				switch (sscanf(optarg, "%d.%d", &sec, &usec)) {
+				case 2:
+					tv.tv_usec = usec;
+				case 1:
+					tv.tv_sec = sec;
+					break;
+				default:
+					if (debug)
+						warnx("bad -t argument");
+					break;
+				}
+				break;
+			default:
+				break;
+			}
+	}
+	if (osname == NULL) {
+		if (uname(&un) == -1)
+			iderror(0, 0, s, errno);
+		osname = un.sysname;
+	}
+	len = sizeof(sin[0]);
+	if (getsockname(s, (struct sockaddr *)&sin[0], &len) == -1)
+		iderror(0, 0, s, errno);
+	len = sizeof(sin[1]);
+	if (getpeername(s, (struct sockaddr *)&sin[1], &len) == -1)
+		iderror(0, 0, s, errno);
+	/*
+	 * We're going to prepare for and execute reception of a
+	 * packet of data from the user. The data is in the format
+	 * "local_port , foreign_port\r\n" (with local being the
+	 * server's port and foreign being the client's.)
+	 */
+	FD_ZERO(&fdset);
+	FD_SET(s, &fdset);
+	if (select(s + 1, &fdset, NULL, NULL, &tv) == -1)
+		iderror(0, 0, s, errno);
+	if (ioctl(s, FIONREAD, &len) == -1)
+		iderror(0, 0, s, errno);
+	if (len >= sizeof(buf))
+		len = sizeof(buf) - 1;
+	len = read(s, buf, len);
+	if (len == -1)
+		iderror(0, 0, s, errno);
+	buf[len] = '\0';
+	if (sscanf(buf, "%hu , %hu", &lport, &fport) != 2)
+		iderror(0, 0, s, 0);
+	if (!rflag) /* Send HIDDEN-USER immediately if not "real" */
+		iderror(lport, fport, s, -1);
+	/*
+	 * We take the input and construct an array of two sockaddr_ins
+	 * which contain the local address information and foreign
+	 * address information, respectively, used to look up the
+	 * credentials for the socket (which are returned by the
+	 * sysctl "net.inet.tcp.getcred" when we call it.) The
+	 * arrays have been filled in above via get{peer,sock}name(),
+	 * so right here we are only setting the ports.
+	 */
+	if (sin[0].sin6_family == AF_INET) {
+		sin4[0].sin_family = AF_INET;
+		sin4[0].sin_len = sizeof(struct sockaddr_in);
+		memcpy(&sin4[0].sin_addr,
+		       &((struct sockaddr_in *)&sin[0])->sin_addr.s_addr,
+		       sizeof(struct in_addr));
+		sin4[0].sin_port = htons(lport);
+		sin4[1].sin_family = AF_INET;
+		sin4[1].sin_len = sizeof(struct sockaddr_in);
+		memcpy(&(sin4[1].sin_addr),
+		       &((struct sockaddr_in *)&sin[1])->sin_addr.s_addr,
+		       sizeof(struct in_addr));
+		sin4[1].sin_port = htons(fport);
+		sa = (struct sockaddr *)sin4;
+		salen = sizeof(sin4);
+		ctlname = "net.inet.tcp.getcred";
+	} else if (IN6_IS_ADDR_V4MAPPED(&sin[0].sin6_addr)) {
+		sin4[0].sin_family = AF_INET;
+		sin4[0].sin_len = sizeof(struct sockaddr_in);
+		memcpy(&sin4[0].sin_addr, &sin[0].sin6_addr.s6_addr[12],
+		       sizeof(struct in_addr));
+		sin4[0].sin_port = htons(lport);
+		sin4[1].sin_family = AF_INET;
+		sin4[1].sin_len = sizeof(struct sockaddr_in);
+		memcpy(&(sin4[1].sin_addr), &sin[1].sin6_addr.s6_addr[12],
+		       sizeof(struct in_addr));
+		sin4[1].sin_port = htons(fport);
+		sa = (struct sockaddr *)sin4;
+		salen = sizeof(sin4);
+		ctlname = "net.inet.tcp.getcred";
+	} else {
+		sin[0].sin6_port = htons(lport);
+		sin[1].sin6_port = htons(fport);
+		sa = (struct sockaddr *)sin;
+		salen = sizeof(sin);
+		ctlname = "net.inet6.tcp6.getcred";
+	}
+	len = sizeof(uc);
+	if (sysctlbyname(ctlname, &uc, &len, sa, salen) == -1)
+		iderror(lport, fport, s, errno);
+	pw = getpwuid(uc.cr_uid);	/* Look up the pw to get the username */
+	if (pw == NULL)
+		iderror(lport, fport, s, errno);
+	/*
+	 * If enabled, we check for a file named ".noident" in the user's
+	 * home directory. If found, we return HIDDEN-USER.
+	 */
+	if (nflag) {
+		if (asprintf(&p, "%s/.noident", pw->pw_dir) == -1)
+			iderror(lport, fport, s, errno);
+		if (lstat(p, &sb) == 0) {
+			free(p);
+			iderror(lport, fport, s, -1);
+		}
+		free(p);
+	}
+	/*
+	 * Here, if enabled, we read a user's ".fakeid" file in their
+	 * home directory. It consists of a line containing the name
+	 * they want.
+	 */
+	if (fflag) {
+		FILE *fakeid = NULL;
+
+		if (asprintf(&p, "%s/.fakeid", pw->pw_dir) == -1)
+			iderror(lport, fport, s, errno);
+		/*
+		 * Here we set ourself to effectively be the user, so we don't
+		 * open any files we have no permission to open, especially
+		 * symbolic links to sensitive root-owned files or devices.
+		 */
+		seteuid(pw->pw_uid);
+		setegid(pw->pw_gid);
+		/*
+		 * If we were to lstat() here, it would do no good, since it
+		 * would introduce a race condition and could be defeated.
+		 * Therefore, we open the file we have permissions to open
+		 * and if it's not a regular file, we close it and end up
+		 * returning the user's real username.
+		 */
+		fakeid = fopen(p, "r");
+		free(p);
+		if (fakeid != NULL &&
+		    fstat(fileno(fakeid), &sb) != -1 && S_ISREG(sb.st_mode)) {
+			buf[sizeof(buf) - 1] = '\0';
+			if (fgets(buf, sizeof(buf), fakeid) == NULL) {
+				cp = pw->pw_name;
+				fclose(fakeid);
+				goto printit;
+			}
+			fclose(fakeid);
+			/*
+			 * Usually, the file will have the desired identity
+			 * in the form "identity\n", so we use strtok() to
+			 * end the string (which fgets() doesn't do.)
+			 */
+			strtok(buf, "\r\n");
+			/* User names of >16 characters are invalid */
+			if (strlen(buf) > 16)
+				buf[16] = '\0';
+			cp = buf;
+			/* Allow for beginning white space... */
+			while (isspace(*cp))
+				cp++;
+			/* ...and ending white space. */
+			strtok(cp, " \t");
+			/*
+			 * If the name is a zero-length string or matches
+			 * the name of another user, it's invalid, so
+			 * we will return their real identity instead.
+			 */
+			
+			if (!*cp || getpwnam(cp))
+				cp = getpwuid(uc.cr_uid)->pw_name;
+		} else
+			cp = pw->pw_name;
+	} else
+		cp = pw->pw_name;
+printit:
+	/* Finally, we make and send the reply. */
+	if (asprintf(&p, "%d , %d : USERID : %s : %s\r\n", lport, fport, osname,
+	    cp) == -1) {
+		syslog(LOG_ERR, "asprintf: %m");
+		exit(EX_OSERR);
+	}
+	write(s, p, strlen(p));
+	free(p);
+	
 	exit(0);
 }
 
