@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.155 2001/07/23 15:35:51 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.156 2001/07/27 07:50:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,7 +74,7 @@
 
 #define SDL(s)	((struct sockaddr_dl *)s)
 
-static __inline__ int rtpref __P((struct nd_defrouter *));
+static int rtpref __P((struct nd_defrouter *));
 static struct nd_defrouter *defrtrlist_update __P((struct nd_defrouter *));
 static struct in6_ifaddr *in6_ifadd __P((struct nd_prefix *));
 static struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
@@ -886,7 +886,7 @@ defrouter_select()
  * for default router selection
  * regards router-preference field as a 2-bit signed integer 
  */
-static __inline__ int
+static int
 rtpref(struct nd_defrouter *dr)
 {
 #ifdef RTPREF
