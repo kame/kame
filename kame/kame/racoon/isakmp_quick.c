@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.43 2000/07/18 05:24:58 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.44 2000/07/18 05:43:14 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1027,13 +1027,11 @@ quick_r1recv(iph2, msg0)
 	}
 
 	/* create responder's proposal */
-	if (iph2->proposal == NULL) {
-		if (get_proposal_r(iph2) < 0) {
-			plog(logp, LOCATION, NULL,
-				"failed to get proposal for responder.\n");
-			error = ISAKMP_INTERNAL_ERROR;
-			goto end;
-		}
+	if (get_proposal_r(iph2) < 0) {
+		plog(logp, LOCATION, NULL,
+			"failed to get proposal for responder.\n");
+		error = ISAKMP_INTERNAL_ERROR;
+		goto end;
 	}
 
 	/* select single proposal or reject it. */
