@@ -2185,6 +2185,9 @@ tn(argc, argv)
     char *cmd, *hostp = 0, *portp = 0, *user = 0;
     struct addrinfo hints, *res;
     int error = 0;
+    struct addrinfo srchints, *srcres;
+    char *src_addr = NULL;
+    char *src_portp = "0\0";
 
     /* clear the socket address prior to use */
 
@@ -2219,6 +2222,14 @@ tn(argc, argv)
 	    autologin = 1;
 	    continue;
 	}
+	if (strcmp(*argv, "-s") == 0) {
+	    --argc; ++argv;
+	    if (argc == 0)
+		goto usage;
+	    src_addr = *argv++;
+	    --argc;
+	    continue;
+	}
 	if (hostp == 0) {
 	    hostp = *argv++;
 	    --argc;
@@ -2230,12 +2241,25 @@ tn(argc, argv)
 	    continue;
 	}
     usage:
-	printf("usage: telnet [-l user] [-a] host-name [port]\n");
+	printf("usage: telnet [-l user] [-a] [-s src_addr] host-name [port]\n");
 	setuid(getuid());
 	return 0;
     }
     if (hostp == 0)
 	goto usage;
+
+    if (src_addr != NULL) {
+	memset(&srchints, 0, sizeof(srchints));
+	srchints.ai_flags = 0;
+	srchints.ai_family = AF_UNSPEC;
+	srchints.ai_socktype = SOCK_STREAM;
+	srchints.ai_protocol = 0;
+	error = getaddrinfo(src_addr, src_portp, &srchints, &srcres);
+	if (error) {
+	    fprintf(stderr, "%s: %s\n", src_addr, gai_strerror(error));
+	    return 0;
+	}
+    }
 
     (void) strcpy(_hostname, hostp);
     if (hostp[0] == '@' || hostp[0] == '!') {
@@ -2315,6 +2339,15 @@ tn(argc, argv)
 	    if (srp && setsockopt(net, proto, opt, srp, srlen) < 0)
 		perror("setsockopt (source route)");
 	}
+
+	if (src_addr != NULL) {
+	    /* xxx TODO: should match address families between dst and src */
+	    if (bind(net, srcres->ai_addr, srcres->ai_addrlen) == -1) {
+		perror("bind");
+		return 0;
+	    }
+	}
+
 #if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
 	if (setpolicy(net, res, ipsec_policy_in) < 0)
 		return 0;

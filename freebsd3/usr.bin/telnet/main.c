@@ -86,20 +86,22 @@ usage()
 	fprintf(stderr, "Usage: %s %s%s%s%s\n",
 	    prompt,
 #ifdef	AUTHENTICATION
-	    "[-8] [-E] [-K] [-L] [-S tos] [-X atype] [-a] [-c] [-d] [-e char]",
-	    "\n\t[-k realm] [-l user] [-f/-F] [-n tracefile] ",
+	    "[-8] [-E] [-K] [-L] [-N] [-S tos] [-X atype] [-a] [-c] [-d]",
+	    "\n\t[-e char] [-k realm] [-l user] [-f/-F] [-n tracefile] ",
 #else
-	    "[-8] [-E] [-L] [-S tos] [-a] [-c] [-d] [-e char] [-l user]",
-	    "\n\t[-n tracefile]",
+	    "[-8] [-E] [-L] [-N] [-S tos] [-a] [-c] [-d] [-e char] [-l user]",
+	    "\n\t[-n tracefile] ",
 #endif
 #if defined(TN3270) && defined(unix)
 # ifdef AUTHENTICATION
-	    "[-noasynch] [-noasynctty]\n\t[-noasyncnet] [-r] [-t transcom] ",
+	    "[-noasynch] [-noasynctty]\n\t"
+	    "[-noasyncnet] [-r] [-s src_addr] [-t transcom] ",
 # else
-	    "[-noasynch] [-noasynctty] [-noasyncnet] [-r]\n\t[-t transcom]",
+	    "[-noasynch] [-noasynctty] [-noasyncnet] [-r]\n\t"
+	    "[-s src_addr] [-t transcom]",
 # endif
 #else
-	    "[-r] ",
+	    "[-r] [-s src_addr] ",
 #endif
 #if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
 	    "[-P policy] [host-name [port]]"
@@ -123,6 +125,7 @@ main(argc, argv)
 	extern int optind;
 	int ch;
 	char *user, *strrchr();
+	char *src_addr = NULL;
 #ifdef	FORWARD
 	extern int forward_flags;
 #endif	/* FORWARD */
@@ -150,7 +153,7 @@ main(argc, argv)
 #define IPSECOPT
 #endif
 	while ((ch = getopt(argc, argv,
-	                    "8EKLNS:X:acde:fFk:l:n:rt:x" IPSECOPT)) != -1)
+	                    "8EKLNS:X:acde:fFk:l:n:rs:t:x" IPSECOPT)) != -1)
 #undef IPSECOPT
 	{
 		switch(ch) {
@@ -272,6 +275,9 @@ main(argc, argv)
 		case 'r':
 			rlogin = '~';
 			break;
+		case 's':
+			src_addr = optarg;
+			break;
 		case 't':
 #if defined(TN3270) && defined(unix)
 			transcom = tline;
@@ -310,7 +316,7 @@ main(argc, argv)
 	argv += optind;
 
 	if (argc) {
-		char *args[7], **argp = args;
+		char *args[9], **argp = args;
 
 		if (argc > 2)
 			usage();
@@ -318,6 +324,10 @@ main(argc, argv)
 		if (user) {
 			*argp++ = "-l";
 			*argp++ = user;
+		}
+		if (src_addr) {
+			*argp++ = "-s";
+			*argp++ = src_addr;
 		}
 		*argp++ = argv[0];		/* host */
 		if (argc > 1)
