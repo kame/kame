@@ -794,9 +794,6 @@ ether_ifattach(ifp, lla)
 	}
 	LIST_INIT(&((struct ethercom *)ifp)->ec_multiaddrs);
 	ifp->if_broadcastaddr = etherbroadcastaddr;
-#ifdef INET6
-	in6_ifattach_getifid(ifp);
-#endif
 }
 
 u_char	ether_ipmulticast_min[6] = { 0x01, 0x00, 0x5e, 0x00, 0x00, 0x00 };
