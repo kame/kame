@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.22 2003/11/06 08:25:58 ono Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.23 2003/11/07 07:57:30 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -533,14 +533,12 @@ dccp_input(struct mbuf *m, ...)
 		goto badunlocked;
 	}
 
-#ifdef __FreeBSD__
-	so = inp->inp_socket;
-#else
+#if !defined(__FreeBSD__) && defined(INET6)
 	if (isipv6)
 		so = in6p->in6p_socket;
 	else
-		so = inp->inp_socket;
 #endif
+		so = inp->inp_socket;
 
 	if (so->so_options & SO_ACCEPTCONN) {
 		DCCP_DEBUG((LOG_INFO, "so->options & SO_ACCEPTCONN! dp->state = %i\n", dp->state));
@@ -552,7 +550,7 @@ dccp_input(struct mbuf *m, ...)
 			goto badunlocked;
 		}
 
-#if defined(__NetBSD__) && defined(INET6)
+#if !defined(__FreeBSD__) && defined(INET6)
 		if (isipv6)
 			oin6p = in6p;
 		else
@@ -601,27 +599,25 @@ dccp_input(struct mbuf *m, ...)
 			in_pcbstate(inp, INP_BOUND);
 #endif
 
-#ifdef __FreeBSD__
-		dp = (struct dccpcb *)inp->inp_ppcb;
-#else
+#if !defined(__FreeBSD__) && defined(INET6)
 		if (isipv6)
 			dp = (struct dccpcb *)in6p->in6p_ppcb;
 		else
-			dp = (struct dccpcb *)inp->inp_ppcb;
 #endif
+			dp = (struct dccpcb *)inp->inp_ppcb;
+
 		dp->state = DCCPS_LISTEN;
 		dp->who = DCCP_SERVER;
-#if defined(__NetBSD__) && defined(INET6)
+#if !defined(__FreeBSD__) && defined(INET6)
 		if (isipv6) {
 			dp->cslen = ((struct dccpcb *)oin6p->in6p_ppcb)->cslen;
 			dp->avgpsize = ((struct dccpcb *)oin6p->in6p_ppcb)->avgpsize;
 		} else 
-#else
+#endif
 		{
 			dp->cslen = ((struct dccpcb *)oinp->inp_ppcb)->cslen;
 			dp->avgpsize = ((struct dccpcb *)oinp->inp_ppcb)->avgpsize;
 		}
-#endif
 		dp->seq_snd = arc4random() % 16777216;
 		INP_UNLOCK(oinp);
 		DCCP_DEBUG((LOG_INFO, "New dp = %u, dp->state = %u!\n", (int)dp, dp->state));
@@ -763,14 +759,12 @@ dccp_input(struct mbuf *m, ...)
 				DCCP_DEBUG((LOG_INFO, "Setting DCCPS_ESTAB & soisconnected\n"));
 				dp->state = DCCPS_ESTAB;
 				dccpstat.dccps_connects++;
-#ifdef __FreeBSD__
-				soisconnected(inp->inp_socket);
-#else
+#if !defined(__FreeBSD__) && defined(INET6)
 				if (isipv6)
 					soisconnected(in6p->in6p_socket);
 				else
-					soisconnected(inp->inp_socket);
 #endif
+					soisconnected(inp->inp_socket);
 			} else {
 				dp->state = DCCPS_RESPOND;
 				DCCP_DEBUG((LOG_INFO, "CC negotiation is not finished, cc_in_use[0] = %u, cc_in_use[1] = %u\n",dp->cc_in_use[0], dp->cc_in_use[1]));
@@ -814,14 +808,12 @@ dccp_input(struct mbuf *m, ...)
 				DCCP_DEBUG((LOG_INFO, "Setting DCCPS_ESTAB & soisconnected\n"));
 				dp->state = DCCPS_ESTAB;
 				dccpstat.dccps_connects++;
-#ifdef __FreeBSD__
-				soisconnected(inp->inp_socket);
-#else
+#if !defined(__FreeBSD__) && defined(INET6)
 				if (isipv6)
 					soisconnected(in6p->in6p_socket);
 				else
-					soisconnected(inp->inp_socket);
 #endif
+					soisconnected(inp->inp_socket);
 			} else {
 				DCCP_DEBUG((LOG_INFO, "CC negotiation is not finished, cc_in_use[0] = %u, cc_in_use[1] = %u\n",dp->cc_in_use[0], dp->cc_in_use[1]));
 				/* Force an output!!! */
@@ -1420,7 +1412,7 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 	mtx_assert(&dp->d_inpcb->inp_mtx, MA_OWNED);
 #endif
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && defined(INET6)
 	if (isipv6) {
 		inp = 0;
 		in6p = dp->d_in6pcb;
@@ -1630,7 +1622,7 @@ again:
 		dh->dh_sport = inp->inp_lport;
 		dh->dh_dport = inp->inp_fport;
 	}
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && defined(INET6)
 	else if (in6p) {
 		dh->dh_sport = in6p->in6p_lport;
 		dh->dh_dport = in6p->in6p_fport;
@@ -1770,21 +1762,16 @@ again:
 		return(error);
 	}
 
-	DCCP_DEBUG((LOG_INFO, "ip_output6 success\n"));
-
-#if defined(__NetBSD__) && defined(INET6)
+#if !defined(__FreeBSD__) && defined(INET6)
 	if (isipv6) {
 		sbdrop(&in6p->in6p_socket->so_snd, len);
 		sowwakeup(in6p->in6p_socket);
 	} else
-#else
+#endif
 	{
 		sbdrop(&inp->inp_socket->so_snd, len);
 		sowwakeup(inp->inp_socket);
 	}
-#endif
-
-	DCCP_DEBUG((LOG_INFO, "sowwakeup success %d\n", sendalot));
 
 	if (dp->cc_in_use[0] > 0  && dp->state == DCCPS_ESTAB) {
 		DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_send_packet_sent!\n", dp->cc_in_use[0]));
@@ -2220,7 +2207,7 @@ dccp_doconnect(struct socket *so, struct mbuf *m,
 
 	DCCP_DEBUG((LOG_INFO, "Entering dccp_doconnect!\n"));
 
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && defined(INET6)
 	if (isipv6) {
 		in6p = sotoin6pcb(so);
 		inp = 0;
