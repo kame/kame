@@ -1495,7 +1495,11 @@ trimthenstep6:
 	 *	Close the tcb.
 	 */
 	if (tiflags & TH_RST) {
+#ifndef INET6
 		if (ti->ti_seq != tp->last_ack_sent)
+#else
+		if (th->th_seq != tp->last_ack_sent)
+#endif
 			goto drop;
 
 		switch (tp->t_state) {

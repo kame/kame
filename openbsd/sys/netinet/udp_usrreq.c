@@ -534,18 +534,21 @@ udp_input(m, va_alist)
 				udpstat.udps_noportbcast++;
 				goto bad;
 			}
-			*ip = save_ip;
-			HTONS(ip->ip_len);
-			HTONS(ip->ip_id);
-			HTONS(ip->ip_off);
-			uh->uh_sum = savesum;
 #ifdef INET6
-			if (ipv6)
+			if (ipv6) {
 				icmp6_error(m, ICMP6_DST_UNREACH,
 				    ICMP6_DST_UNREACH_NOPORT,0);
-			else
+			} else
 #endif /* INET6 */
-			icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT, 0, 0);
+			{
+				*ip = save_ip;
+				HTONS(ip->ip_len);
+				HTONS(ip->ip_id);
+				HTONS(ip->ip_off);
+				uh->uh_sum = savesum;
+				icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT,
+					0, 0);
+			}
 			return;
 		}
 	}
