@@ -496,6 +496,10 @@ in_pcbconnect(v, nam)
 	inp->inp_fport = sin->sin_port;
 	in_pcbrehash(inp);
 #ifdef IPSEC
+	if (inp->inp_socket->so_type == SOCK_STREAM)
+		ipsec_pcbconn(inp->inp_sp);
+#endif
+#ifdef IPSEC
         /* XXX Find IPsec TDB */
         return (0);
 #else
@@ -526,6 +530,9 @@ in_pcbdisconnect(v)
 	in_pcbrehash(inp);
 	if (inp->inp_socket->so_state & SS_NOFDREF)
 		in_pcbdetach(inp);
+#ifdef IPSEC
+	ipsec_pcbdisconn(inp->inp_sp);
+#endif
 }
 
 void
