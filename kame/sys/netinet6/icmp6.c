@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.90 2000/05/15 06:48:15 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.91 2000/05/15 09:24:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -152,6 +152,7 @@ static const char *icmp6_redirect_diag __P((struct in6_addr *,
 	struct in6_addr *, struct in6_addr *));
 static struct mbuf *ni6_input __P((struct mbuf *, int));
 static struct mbuf *ni6_nametodns __P((const char *, int, int));
+static int ni6_dnsmatch __P((const char *, int, const char *, int));
 static int ni6_addrs __P((struct icmp6_nodeinfo *, struct mbuf *,
 			  struct ifnet **));
 static int ni6_store_addrs __P((struct icmp6_nodeinfo *, struct icmp6_nodeinfo *,
@@ -604,8 +605,6 @@ icmp6_input(mp, offp, proto)
 	    {
 		enum { WRU, FQDN } mode;
 
-		if (code != 0)
-			goto badcode;
 		if (!icmp6_nodeinfo)
 			break;
 
@@ -633,6 +632,8 @@ icmp6_input(mp, offp, proto)
 			u_char *p;
 			int maxlen, maxhlen;
 
+			if (code != 0)
+				goto badcode;
 			maxlen = sizeof(*nip6) + sizeof(*nicmp6) + 4;
 			if (maxlen >= MCLBYTES) {
 #ifdef DIAGNOSTIC
@@ -1089,6 +1090,7 @@ ni6_input(m, off)
 	struct sockaddr_in6 sin6;
 	struct ip6_hdr *ip6;
 	int oldfqdn = 0;	/* if 1, return pascal string (03 draft) */
+	char *subj;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 #ifndef PULLDOWN_TEST
@@ -1222,7 +1224,19 @@ ni6_input(m, off)
 			goto bad;
 
 		case ICMP6_NI_SUBJ_FQDN:
-			/* XXX need validation */
+			n = ni6_nametodns(hostname, hostnamelen, 0);
+			if (!n || n->m_next)
+				goto bad;
+			IP6_EXTHDR_GET(subj, char *, m,
+			    off + sizeof(struct icmp6_nodeinfo), subjlen);
+			if (subj == NULL)
+				goto bad;
+			if (!ni6_dnsmatch(subj, subjlen, mtod(n, const char *),
+					n->m_len)) {
+				goto bad;
+			}
+			m_freem(n);
+			n = NULL;
 			break;
 
 		case ICMP6_NI_SUBJ_IPV4:	/* xxx: to be implemented? */
@@ -1407,6 +1421,71 @@ ni6_nametodns(name, namelen, old)
 	if (m)
 		m_freem(m);
 	return NULL;
+}
+
+/*
+ * check if two DNS-encoded string matches.  takes care of truncated
+ * form (with \0\0 at the end).  no compression support.
+ */
+static int
+ni6_dnsmatch(a, alen, b, blen)
+	const char *a;
+	int alen;
+	const char *b;
+	int blen;
+{
+	const char *a0, *b0;
+	int l;
+
+	/* simplest case - need validation? */
+	if (alen == blen && bcmp(a, b, alen) == 0)
+		return 1;
+
+	a0 = a;
+	b0 = b;
+
+	/* termination is mandatory */
+	if (alen < 2 || blen < 2)
+		return 0;
+	if (a0[alen - 1] != '\0' || b0[blen - 1] != '\0')
+		return 0;
+	alen--;
+	blen--;
+
+	while (a - a0 < alen && b - b0 < blen) {
+		if (a - a0 + 1 > alen || b - b0 + 1 > blen)
+			return 0;
+
+		if (a[0] < 0 || b[0] < 0)
+			return 0;
+		/* we don't support compression yet */
+		if (a[0] >= 64 || b[0] >= 64)
+			return 0;
+
+		/* truncated case */
+		if (a[0] == 0 && a - a0 == alen - 1)
+			return 1;
+		if (b[0] == 0 && b - b0 == blen - 1)
+			return 1;
+		if (a[0] == 0 || b[0] == 0)
+			return 0;
+
+		if (a[0] != b[0])
+			return 0;
+		l = a[0];
+		if (a - a0 + 1 + l > alen || b - b0 + 1 + l > blen)
+			return 0;
+		if (bcmp(a + 1, b + 1, l) != 0)
+			return 0;
+
+		a += 1 + l;
+		b += 1 + l;
+	}
+
+	if (a - a0 == alen && b - b0 == blen)
+		return 1;
+	else
+		return 0;
 }
 
 /*
