@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.116 2004/08/22 01:58:06 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.117 2004/08/22 02:11:18 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2558,7 +2558,7 @@ dhcp6_reset_timer(ev)
 		 * [RFC3315 17.1.2]
 		 * XXX: a random delay is also necessary before the first
 		 * information-request message.  Fortunately, the parameters
-		 * and the algorithm for these two cases are same.
+		 * and the algorithm for these two cases are the same.
 		 * [RFC3315 18.1.5]
 		 */
 		ev->retrans = (random() % (SOL_MAX_DELAY));
