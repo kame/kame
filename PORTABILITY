@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.36 2000/03/03 04:27:46 itojun Exp $
+	$Id: PORTABILITY,v 1.37 2000/03/15 14:23:00 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -74,7 +74,7 @@ across those possibilities.
 	if ((1 & (int)p) == 0) {
 		...
 	}
-  This is correct (but actually is not future-proven - fail on 128bit arch):
+  This is correct (but actually may not be future-proven):
 	void *p;
 	/* alignment check */
 	if ((1 & (u_long)p) == 0) {
@@ -85,7 +85,7 @@ across those possibilities.
   When doing printf(), cast size_t to u_long and print it as %lu.
 	size_t siz;
 	printf("%lu", (u_long)siz);
-  Use of "%p" is more appropriate here.
+  Use of "%p" is more appropriate than casting, for pointers.
 
 - If you would like to use printf() against variable typed u_quad_t,
   cast them to unsigned long long and use %llu.
@@ -255,7 +255,7 @@ across those possibilities.
   useful. Note, however, that the default compiler of bsdi3 (/usr/ucb/cc)
   does not suppport the -Werror option.
 
-  Note that the meaning of -Wall is different across *BSD because *BSD uses
+  Note that the meaning of -Wall is different across *BSD because *BSD use
   different version of gnu cc.  Sometimes -Wall raises bogus warning due to
   bugs in code generator.  Also, since function prototypes are defined
   differently in some cases (like ntohl), certain tweaks are needed to
