@@ -391,7 +391,7 @@ in6_pcbconnect(inp, nam, td)
 	inp->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
 	if (inp->in6p_flags & IN6P_AUTOFLOWLABEL)
 		inp->in6p_flowinfo |=
-		    (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
+		    (htonl(ip6_randomflowlabel()) & IPV6_FLOWLABEL_MASK);
 
 	in_pcbrehash(inp);
 	return (0);

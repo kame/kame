@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.9 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.1.1.6 2003/04/09 04:17:19 suz Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.56 2003/04/09 07:11:11 suz Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -389,7 +389,7 @@ in6_pcbconnect(inp, nam, p)
 	inp->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
 	if (inp->in6p_flags & IN6P_AUTOFLOWLABEL)
 		inp->in6p_flowinfo |=
-		    (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
+		    (htonl(ip6_randomflowlabel()) & IPV6_FLOWLABEL_MASK);
 
 	in_pcbrehash(inp);
 	return (0);
