@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.12 2002/09/27 11:28:47 k-sugyou Exp $	*/
+/*	$KAME: mobility6.c,v 1.13 2002/10/09 13:07:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,9 +67,6 @@
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 #endif
-
-static int mobility6_send_be __P((struct sockaddr_in6 *, struct sockaddr_in6 *,
-				  struct sockaddr_in6 *));
 
 /*
  * Mobility header processing.
@@ -197,18 +194,36 @@ mobility6_input(mp, offp, proto)
 		break;
 
 	default:
-		/* send an binding error message. */
+		/*
+		 * if we receive a MH packet which type is unknown,
+		 * send a binding error message.
+		 */
 		n = ip6_findaux(m);
 		if (n) {
 			struct ip6aux *ip6a;
 			struct sockaddr_in6 src_sa;
+			struct sockaddr_in6 *home_sa;
+
 			ip6a = mtod(n, struct ip6aux *);
+			src_sa = ip6a->ip6a_src;
+			home_sa = &ip6a->ip6a_src;
 			if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
-				src_sa = ip6a->ip6a_src;
+				/*
+				 * HAO exists and swapped already at
+				 * this point.  send a binding error
+				 * to CoA of the sending node.
+				 */
 				src_sa.sin6_addr = ip6a->ip6a_coa;
-				(void)mobility6_send_be(&ip6a->ip6a_dst,
-				    &src_sa, &ip6a->ip6a_src);
+			} else {
+				/*
+				 * if no HAO exists, the home address
+				 * field of the binding error message
+				 * must be an unspecified address.
+				 */
+				home_sa = &in6addr_any;
 			}
+			(void)mobility6_send_be(&ip6a->ip6a_dst, &src_sa,
+			    IP6ME_STATUS_UNKNOWN_MH_TYPE, home_sa);
 		}
 		m_freem(m);
 		mip6stat.mip6s_unknowntype++;
@@ -225,10 +240,11 @@ mobility6_input(mp, offp, proto)
  * send binding error message.
  * XXX duplicated code.  see dest6_send_be().
  */
-static int
-mobility6_send_be(src, dst, home)
+int
+mobility6_send_be(src, dst, status, home)
 	struct sockaddr_in6 *src;
 	struct sockaddr_in6 *dst;
+	u_int8_t status;
 	struct sockaddr_in6 *home;
 {
 	struct mbuf *m;
@@ -245,8 +261,7 @@ mobility6_send_be(src, dst, home)
 	if (m == NULL)
 		return (ENOMEM);
 
-	error = mip6_ip6me_create(&opt.ip6po_mobility, src, dst,
-				  IP6ME_STATUS_UNKNOWN_MH_TYPE, home);
+	error = mip6_ip6me_create(&opt.ip6po_mobility, src, dst, status, home);
 	if (error) {
 		m_freem(m);
 		goto free_ip6pktopts;

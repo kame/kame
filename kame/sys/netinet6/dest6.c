@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.52 2002/10/04 08:58:23 t-momose Exp $	*/
+/*	$KAME: dest6.c,v 1.53 2002/10/09 13:07:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -73,9 +73,6 @@
 static int	dest6_swap_hao __P((struct ip6_hdr *, struct ip6aux *,
 				    struct ip6_opt_home_address *));
 static int	dest6_nextopt __P((struct mbuf *, int, struct ip6_opt *));
-static int	dest6_send_be __P((struct sockaddr_in6 *,
-				   struct sockaddr_in6 *,
-				   struct sockaddr_in6 *));
 #endif /* MIP6 */
 
 #ifdef MIP6
@@ -384,51 +381,9 @@ dest6_mip6_hao(m, mhoff, nxt)
 	mip6stat.mip6s_unverifiedhao++;
 	home_sa = ip6a->ip6a_src;
 	home_sa.sin6_addr = *(struct in6_addr *)haopt.ip6oh_addr;
-	dest6_send_be(&ip6a->ip6a_dst, &ip6a->ip6a_src, &home_sa);
+	mobility6_send_be(&ip6a->ip6a_dst, &ip6a->ip6a_src,
+	    IP6ME_STATUS_NO_BINDING, &home_sa);
 
 	return (-1);
-}
-
-/*
- * send a binding error message.
- */
-static int
-dest6_send_be(src, dst, home)
-	struct sockaddr_in6 *src;
-	struct sockaddr_in6 *dst;
-	struct sockaddr_in6 *home;
-{
-	struct mbuf *m;
-	struct ip6_pktopts opt;
-	int error = 0;
-
-	/*
-	 * XXX a binding message must be rate limited (per host?).
-	 */
-
-	init_ip6pktopts(&opt);
-
-	m = mip6_create_ip6hdr(src, dst, IPPROTO_NONE, 0);
-	if (m == NULL)
-		return (ENOMEM);
-
-	error = mip6_ip6me_create(&opt.ip6po_mobility, src, dst,
-				  IP6ME_STATUS_NO_BINDING, home);
-	if (error) {
-		m_freem(m);
-		goto free_ip6pktopts;
-	}
-
-	/* output a binding missing message. */
-	mip6stat.mip6s_obe++;
-	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
-	if (error)
-		goto free_ip6pktopts;
-
- free_ip6pktopts:
-	if (opt.ip6po_mobility)
-		free(opt.ip6po_mobility, M_IP6OPT);
-
-	return (error);
 }
 #endif /* MIP6 */

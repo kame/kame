@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.103 2002/09/11 02:40:49 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.104 2002/10/09 13:07:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -480,6 +480,8 @@ int	dest6_input __P((struct mbuf **, int *, int));
 int	dest6_mip6_hao __P((struct mbuf *, int, int));
 #endif
 int	mobility6_input __P((struct mbuf **, int *, int));
+int	mobility6_send_be __P((struct sockaddr_in6 *, struct sockaddr_in6 *,
+				u_int8_t, struct sockaddr_in6 *));
 int	none_input __P((struct mbuf **, int *, int));
 
 #ifdef NEW_STRUCT_ROUTE
