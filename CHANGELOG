@@ -1,9 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.137 1999/09/26 03:12:12 itojun Exp $
-
+$Id: CHANGELOG,v 1.138 1999/09/26 07:49:10 jinmei Exp $
 
 <199909>
+1999-09-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6: made the code as much portable as possible.
+	Some macros were added and were used in configure.in to aclocal.m4
+	for compilation on other platforms than KAME.
+
 Sun Sep 26 12:08:28 JST 1999  itojun@iijlab.net
 	* freebsd[23]/ports/vic6: upgrade to new IPv6 patch.
 	  From: isaki@net.ipc.hiroshima-u.ac.jp
