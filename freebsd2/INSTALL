@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 2.2.8
 KAME project
-$Id: INSTALL,v 1.7 1999/09/16 05:55:17 itojun Exp $
+$Id: INSTALL,v 1.8 1999/10/03 01:28:58 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -104,7 +104,9 @@ E-2. If you would like to use IPv6-ready inetd, you will need to stop using
 
      Configuration file is placed in /etc/inetd.conf, but with enhanced syntax
      (it is backward compatible so do not be afraid).  Consult manpages
-     for details.
+     for details.  You only need add lines for IPv6-ready daemons with "tcp6"
+     or "udp6", like below:
+>ftp	stream	tcp6	nowait	root	/usr/local/v6/libexec/ftpd	ftpd -l
 
 E-3. Commands modified by KAME project are placed in /usr/local/v6/{bin,sbin}.
      For daily use, you will need to add both of (or either of) them
