@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.39 2002/08/27 08:50:42 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.40 2003/03/28 11:25:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -211,7 +211,10 @@ static void _dns_shent(int stayopen);
 static void _dns_ehent(void);
 #endif /* DNS */
 #ifdef ICMPNL
-static struct hostent *_icmp_ghbyaddr(const void *addr, int addrlen, int af, int *errp);
+static struct hostent *_icmp_ghbyaddr(const void *addr, int addrlen,
+    int af, int *errp);
+static char *dnsdecode __P((const u_char **, const u_char *,
+    const u_char *, u_char *, size_t));
 #endif /* ICMPNL */
 
 /*
@@ -1569,46 +1572,101 @@ _dns_ehent(void)
 
 /*
  * experimental:
- *	draft-ietf-ipngwg-icmp-namelookups-02.txt
+ *	draft-ietf-ipngwg-icmp-name-lookups-09.txt
  *	ifindex is assumed to be encoded in addr.
  */
 #include <sys/uio.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 
-struct _icmp_host_cache {
-	struct _icmp_host_cache *hc_next;
-	int hc_ifindex;
-	struct in6_addr hc_addr;
-	char *hc_name;
-};
+static char *
+dnsdecode(sp, ep, base, buf, bufsiz)
+	const u_char **sp;
+	const u_char *ep;
+	const u_char *base;	/*base for compressed name*/
+	u_char *buf;
+	size_t bufsiz;
+{
+	int i;
+	const u_char *cp;
+	char cresult[MAXDNAME + 1];
+	const u_char *comp;
+	int l;
+
+	cp = *sp;
+	*buf = '\0';
+
+	if (cp >= ep)
+		return NULL;
+	while (cp < ep) {
+		i = *cp;
+		if (i == 0 || cp != *sp) {
+			if (strlcat(buf, ".", bufsiz) >= bufsiz)
+				return NULL;	/* result overrun */
+		}
+		if (i == 0)
+			break;
+		cp++;
+
+		if ((i & 0xc0) == 0xc0 && cp - base > (i & 0x3f)) {
+			/* DNS compression */
+			if (!base)
+				return NULL;
+
+			comp = base + (i & 0x3f);
+			if (dnsdecode(&comp, cp, base, cresult,
+			    sizeof(cresult)) == NULL)
+				return NULL;
+			if (strlcat(buf, cresult, bufsiz) >= bufsiz)
+				return NULL;	/* result overrun */
+			break;
+		} else if ((i & 0x3f) == i) {
+			if (i > ep - cp)
+				return NULL;	/* source overrun */
+			while (i-- > 0 && cp < ep) {
+				l = snprintf(cresult, sizeof(cresult),
+				    isprint(*cp) ? "%c" : "\\%03o", *cp & 0xff);
+				if (l >= sizeof(cresult) || l < 0)
+					return NULL;
+				if (strlcat(buf, cresult, bufsiz) >= bufsiz)
+					return NULL;	/* result overrun */
+				cp++;
+			}
+		} else
+			return NULL;	/* invalid label */
+	}
+	if (i != 0)
+		return NULL;	/* not terminated */
+	cp++;
+	*sp = cp;
+	return buf;
+}
 
 static char *
-_icmp_fqdn_query(const struct in6_addr *addr, int ifindex)
+_icmp_nodeinfo_query(const struct in6_addr *addr, int ifindex)
 {
 	int s;
 	struct icmp6_filter filter;
 	struct msghdr msg;
 	struct cmsghdr *cmsg;
 	struct in6_pktinfo *pkt;
-	char cbuf[256];
-	char buf[1024];
+	char cbuf[256], buf[1024], *cp, *end;
 	int cc;
-	struct icmp6_fqdn_query *fq;
-	struct icmp6_fqdn_reply *fr;
-	struct _icmp_host_cache *hc;
+	struct icmp6_nodeinfo niq, *nir;
 	struct sockaddr_in6 sin6;
 	struct iovec iov;
 	fd_set s_fds, fds;
-	struct timeval tout;
+	struct timeval tout, now;
 	int len;
 	char *name;
 	static int pid;
 	static struct _icmp_host_cache *hc_head;
+	static char dnsname[MAXDNAME + 1]; /* XXX: thread unsafe */
+	u_int32_t r1, r2;
 
 	for (hc = hc_head; hc; hc = hc->hc_next) {
-		if (hc->hc_ifindex == ifindex
-		&&  IN6_ARE_ADDR_EQUAL(&hc->hc_addr, addr))
+		if (hc->hc_ifindex == ifindex &&
+		    IN6_ARE_ADDR_EQUAL(&hc->hc_addr, addr))
 			return hc->hc_name;
 	}
 
@@ -1616,20 +1674,33 @@ _icmp_fqdn_query(const struct in6_addr *addr, int ifindex)
 		pid = getpid();
 
 	ICMP6_FILTER_SETBLOCKALL(&filter);
-	ICMP6_FILTER_SETPASS(ICMP6_FQDN_REPLY, &filter);
+	ICMP6_FILTER_SETPASS(ICMP6_NI_REPLY, &filter);
 
 	FD_ZERO(&s_fds);
 	tout.tv_sec = 0;
-	tout.tv_usec = 200000;	/*XXX: 200ms*/
+	tout.tv_usec = 500000;	/* 500ms */
 
-	fq = (struct icmp6_fqdn_query *)buf;
-	fq->icmp6_fqdn_type = ICMP6_FQDN_QUERY;
-	fq->icmp6_fqdn_code = 0;
-	fq->icmp6_fqdn_cksum = 0;
-	fq->icmp6_fqdn_id = (u_short)pid;
-	fq->icmp6_fqdn_unused = 0;
-	fq->icmp6_fqdn_cookie[0] = 0;
-	fq->icmp6_fqdn_cookie[1] = 0;
+	memset(&niq, 0, sizeof(niq));
+	niq.ni_type = ICMP6_NI_QUERY;
+	niq.ni_code = ICMP6_NI_SUBJ_IPV6;
+	niq.ni_qtype = htons(NI_QTYPE_NODENAME);
+	niq.ni_flags = 0;
+#ifdef HAVE_ARC4RANDOM
+	r1 = arc4random();
+	r2 = arc4random();
+#else
+	if (pid == 0) {
+		int ident;
+
+		ident = getpid() & 0xFFFF;
+		gettimeofday(&now, NULL);
+		srand((unsigned int)(now.tv_sec ^ now.tv_usec ^ (long)ident));
+	}
+	r1 = (u_int32_t)rand();
+	r2 = (u_int32_t)rand();
+#endif
+	memcpy(&niq.icmp6_ni_nonce[0], &r1, sizeof(r1));
+	memcpy(&niq.icmp6_ni_nonce[4], &r2, sizeof(r2));
 
 	memset(&sin6, 0, sizeof(sin6));
 	sin6.sin6_family = AF_INET6;
@@ -1642,8 +1713,8 @@ _icmp_fqdn_query(const struct in6_addr *addr, int ifindex)
 	msg.msg_iovlen = 1;
 	msg.msg_control = NULL;
 	msg.msg_controllen = 0;
-	iov.iov_base = (caddr_t)buf;
-	iov.iov_len = sizeof(struct icmp6_fqdn_query);
+	iov.iov_base = (caddr_t)&niq;
+	iov.iov_len = sizeof(struct icmp6_nodeinfo);
 
 	if (ifindex) {
 		msg.msg_control = cbuf;
@@ -1659,89 +1730,102 @@ _icmp_fqdn_query(const struct in6_addr *addr, int ifindex)
 		msg.msg_controllen = (char *)cmsg - cbuf;
 	}
 
-	if ((s = socket(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0)
+	/* XXX: we need root privilege here */
+	if ((s = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0)
 		return NULL;
 	(void)setsockopt(s, IPPROTO_ICMPV6, ICMP6_FILTER,
 			 (char *)&filter, sizeof(filter));
 	cc = sendmsg(s, &msg, 0);
 	if (cc < 0) {
 		close(s);
-		return NULL;
+		return (NULL);
 	}
 	FD_SET(s, &s_fds);
 	for (;;) {
 		fds = s_fds;
 		if (select(s + 1, &fds, NULL, NULL, &tout) <= 0) {
 			close(s);
-			return NULL;
+			return (NULL);
 		}
 		len = sizeof(sin6);
 		cc = recvfrom(s, buf, sizeof(buf), 0,
 			      (struct sockaddr *)&sin6, &len);
 		if (cc <= 0) {
 			close(s);
-			return NULL;
+			return (NULL);
 		}
-		if (cc < sizeof(struct ip6_hdr) + sizeof(struct icmp6_hdr))
+		if (cc < sizeof(struct icmp6_hdr))
 			continue;
-		if (!IN6_ARE_ADDR_EQUAL(addr, &sin6.sin6_addr))
+		nir = (struct icmp6_nodeinfo *)buf;
+		if (nir->ni_type != ICMP6_NI_REPLY)
 			continue;
-		fr = (struct icmp6_fqdn_reply *)(buf + sizeof(struct ip6_hdr));
-		if (fr->icmp6_fqdn_type == ICMP6_FQDN_REPLY)
-			break;
+		if (nir->ni_qtype != htons(NI_QTYPE_NODENAME))
+			continue;
+		if (memcmp(nir->icmp6_ni_nonce, niq.icmp6_ni_nonce,
+		    sizeof(nir->icmp6_ni_nonce)) != 0) {
+			continue;
+		}
+		if (nir->ni_code != htons(ICMP6_NI_SUCCESS))
+			continue; /* or should we fail? */
+
+		/* this is an expected reply. */
+		break;
 	}
 	close(s);
-	if (fr->icmp6_fqdn_cookie[1] != 0) {
-		/* rfc1788 type */
-		name = buf + sizeof(struct ip6_hdr) + sizeof(struct icmp6_hdr) + 4;
-		len = (buf + cc) - name;
-	} else {
-		len = fr->icmp6_fqdn_namelen;
-		name = fr->icmp6_fqdn_name;
-	}
-	if (len <= 0)
-		return NULL;
-	name[len] = 0;
 
-	if ((hc = (struct _icmp_host_cache *)malloc(sizeof(*hc))) == NULL)
-		return NULL;
-	/* XXX: limit number of cached entries */
-	hc->hc_ifindex = ifindex;
-	hc->hc_addr = *addr;
-	hc->hc_name = strdup(name);
-	if (!hc->hc_name) {
-		free(hc);
-		return NULL;
+	cp = (char *)(nir + 1);
+	end = ((char *)nir) + cc;
+	if (end - cp < sizeof(int32_t))	/* for TTL.  we don't use it. */
+		return (NULL);
+	cp += sizeof(int32_t);
+	if (*cp == end - cp - 1) { /* an old version */
+		int nlen;
+
+		cp++;	/* skip length */
+		nlen = end - cp;
+		if (nlen > MAXDNAME)
+			return (NULL); /* XXX: use it anyway? */
+		memcpy(dnsname, cp, nlen);
+	} else {
+		/* XXX: should we use a generic function? */
+		if (dnsdecode((const u_char **)&cp, end,
+		    (const u_char *)(nir + 1), dnsname, sizeof(dnsname))
+		    == NULL) {
+			return (NULL); /* bogus name */
+		}
+		/* Name-lookup special handling for truncated name. */
+		if (cp + 1 <= end && !*cp && strlen(dnsname) > 0)
+			dnsname[strlen(dnsname) - 1] = '\0';
+
+		/* There may be other names, but we ignore them. */
 	}
-	hc->hc_next = hc_head;
-	hc_head = hc;
-	return hc->hc_name;
+
+	return (dnsname);
 }
 
 static struct hostent *
 _icmp_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 {
 	char *hname;
-	int ifindex;
+	int ifindex = 0;
 	struct in6_addr addr6;
 
-	if (af != AF_INET6) {
+	if (af != AF_INET6 || addrlen != sizeof(addr6)) {
 		/*
 		 * Note: rfc1788 defines Who Are You for IPv4,
 		 * but no one implements it.
 		 */
-		return NULL;
+		return (NULL);
 	}
 
 	memcpy(&addr6, addr, addrlen);
-	ifindex = (addr6.s6_addr[2] << 8) | addr6.s6_addr[3];
-	addr6.s6_addr[2] = addr6.s6_addr[3] = 0;
+	if (IN6_IS_ADDR_LINKLOCAL(&addr6)) {
+		ifindex = (addr6.s6_addr[2] << 8) | addr6.s6_addr[3];
+		addr6.s6_addr[2] = addr6.s6_addr[3] = 0;
+	}
 
-	if (!IN6_IS_ADDR_LINKLOCAL(&addr6))
-		return NULL;	/*XXX*/
-
-	if ((hname = _icmp_fqdn_query(&addr6, ifindex)) == NULL)
-		return NULL;
-	return _hpaddr(af, hname, &addr6, errp);
+	if ((hname = _icmp_nodeinfo_query(&addr6, ifindex)) == NULL)
+		return (NULL);
+	return (_hpaddr(af, hname, &addr6, errp));
 }
 #endif /* ICMPNL */
