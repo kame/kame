@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.36 2003/09/24 23:52:51 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.37 2004/07/03 11:02:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -347,16 +347,14 @@ sendkeymsg(buf, len)
 	u_char rbuf[1024 * 32];	/* XXX: Enough ? Should I do MSG_PEEK ? */
 	ssize_t l;
 	struct sadb_msg *msg;
-
-    {
 	struct timeval tv;
+	
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
 	if (setsockopt(so, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
 		perror("setsockopt");
 		goto end;
 	}
-    }
 
 	if (f_forever)
 		shortdump_hdr();
