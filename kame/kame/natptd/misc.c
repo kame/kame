@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: misc.c,v 1.5 2000/05/16 16:25:35 fujisawa Exp $
+ *	$Id: misc.c,v 1.6 2000/06/04 13:55:16 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -986,17 +986,16 @@ openSocket6(struct ifaddrs *ifap)
 	return (-1);
     }
 
-#if 0
-    ifap->ifa_flags6 = ifr6.ifr_ifru.ifru_flags6;
     if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_ANYCAST)
     {
+#if 0
 	log(LOG_INFO, "cannot bind anycast address (%s) of %s",
 	    displaySockaddrIn6(&sin6),
 	    ifap->ifa_name);
+#endif
 	close (sd6);
 	return (-1);
     }
-#endif
 
     sin6.sin6_port   = htons(NAMESERVER_PORT);
     if (bind(sd6, (struct sockaddr *)&sin6, sizeof(struct sockaddr_in6)) < 0)
