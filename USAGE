@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/07 02:31:12 $
+		     $Date: 1999/10/07 02:37:16 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -27,7 +27,7 @@ ifconfig IF up').
 If you have a router announcing Router Advertisement,
 global addresses will be assigned automatically.  So, neither
 "ifconfig" nor "prefix" is necessary for your *host*. (Please refer to
-"sysctl" section to allow accepting Router Advertisement.)
+"sysctl" section to accept Router Advertisement.)
 
 If you want to set up a router, you need to assign global addresses
 for two or more interfaces by "ifconfig" or "prefix". (prefix command
@@ -54,14 +54,14 @@ interface. So assigning a full IPv6 address by ifconfig is not
 necessary anymore, because user can only take care of prefix, by
 letting system take care of interface identifier.
 
-The newly added "prefix" command enables user just assign prefixes for
-interfaces, and let your system automatically generate IPv6 addresses.
-Prefixes added by the "prefix" command is maintained in the kernel
-consistently with prefixes assigned by Router Advertisement(in case of
-hosts) and with prefixes assigned by Router Renumbering(in case of
-routers).  Manual assignment of prefixes or change of prefix
-properties take precedence over ones assigned by Router Advertisement
-or Router Renumbering.
+The newly added "prefix" command enables user to just assign prefixes
+for interfaces, and let your system automatically generate IPv6
+addresses.  Prefixes added by the "prefix" command is maintained in
+the kernel consistently with prefixes assigned by Router
+Advertisement(in case of hosts) and with prefixes assigned by Router
+Renumbering(in case of routers).  Manual assignment of prefixes or
+change of prefix properties take precedence over ones assigned by
+Router Advertisement or Router Renumbering.
 
 If you want to assign a prefix(and consequently address) manually, do
 as follows:
@@ -149,7 +149,7 @@ See also "/usr/local/v6/etc/rc.net6".
 
 If there is a router announcing Router Advertisement on the subnet,
 you need not to add a default route for your host by yourself.
-(Please refer to "sysctl" section to allow accepting Router Advertisement.)
+(Please refer to "sysctl" section to accept Router Advertisement.)
 
 If you want to add a default route manually, do as follows:
 
