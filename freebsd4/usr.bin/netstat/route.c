@@ -36,7 +36,7 @@
 static char sccsid[] = "From: @(#)route.c	8.6 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.41.2.11 2001/10/18 10:33:25 ru Exp $";
+  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.41.2.12 2002/04/08 08:01:51 ru Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -44,6 +44,7 @@ static const char rcsid[] =
 #include <sys/socket.h>
 #include <sys/time.h>
 
+#include <net/ethernet.h>
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/if_dl.h>
@@ -514,20 +515,12 @@ p_sockaddr(struct sockaddr *sa, struct sockaddr *mask, int flags, int width)
 			switch (sdl->sdl_type) {
 
 			case IFT_ETHER:
-			    {
-				register int i;
-				register u_char *lla = (u_char *)sdl->sdl_data +
-				    sdl->sdl_nlen;
-
-				cplim = "";
-				for (i = 0; i < sdl->sdl_alen; i++, lla++) {
-					cp += sprintf(cp, "%s%x", cplim, *lla);
-					cplim = ":";
+				if (sdl->sdl_alen == ETHER_ADDR_LEN) {
+					cp = ether_ntoa((struct ether_addr *)
+					    sdl->sdl_data + sdl->sdl_nlen);
+					break;
 				}
-				cp = workbuf;
-				break;
-			    }
-
+				/* FALLTHROUGH */
 			default:
 				cp = link_ntoa(sdl);
 				break;

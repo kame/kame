@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)main.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/tftp/main.c,v 1.8.2.1 2002/01/07 09:01:53 guido Exp $";
+  "$FreeBSD: src/usr.bin/tftp/main.c,v 1.8.2.3 2002/05/14 22:08:07 bsd Exp $";
 #endif /* not lint */
 
 /* Many bug fixes are from Jim Guyton <guyton@rand-unix> */
@@ -85,6 +85,7 @@ int	margc;
 char	*margv[20];
 char	*prompt = "tftp";
 jmp_buf	toplevel;
+volatile int txrx_error;
 void	intr();
 
 void	get __P((int, char **));
@@ -156,12 +157,12 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
- 	f = -1;
+	f = -1;
 	strcpy(mode, "netascii");
 	signal(SIGINT, intr);
 	if (argc > 1) {
 		if (setjmp(toplevel) != 0)
-			exit(0);
+			exit(txrx_error);
 		setpeer(argc, argv);
 	}
 	if (setjmp(toplevel) != 0)
@@ -257,10 +258,10 @@ setpeer(argc, argv)
 		printf("usage: %s host-name [port]\n", argv[0]);
 		return;
 	}
- 	if (argc == 3)
- 		setpeer0(argv[1], NULL);
- 	else
- 		setpeer0(argv[1], argv[2]);
+	if (argc == 3)
+		setpeer0(argv[1], NULL);
+	else
+		setpeer0(argv[1], argv[2]);
 }
 
 struct	modes {
@@ -375,11 +376,11 @@ put(argc, argv)
 		cp = argv[argc - 1];
 		targ = rindex(cp, ':');
 		*targ++ = 0;
- 		if (cp[0] == '[' && cp[strlen(cp) - 1] == ']') {
- 			cp[strlen(cp) - 1] = '\0';
- 			cp++;
+		if (cp[0] == '[' && cp[strlen(cp) - 1] == ']') {
+			cp[strlen(cp) - 1] = '\0';
+			cp++;
 		}
- 		setpeer0(cp, NULL);		
+		setpeer0(cp, NULL);		
 	}
 	if (!connected) {
 		printf("No target machine specified.\n");
@@ -461,16 +462,16 @@ get(argc, argv)
 		if (src == NULL)
 			src = argv[n];
 		else {
- 			char *cp;
+			char *cp;
 			*src++ = 0;
- 			cp = argv[n];
- 			if (cp[0] == '[' && cp[strlen(cp) - 1] == ']') {
- 				cp[strlen(cp) - 1] = '\0';
- 				cp++;
+			cp = argv[n];
+			if (cp[0] == '[' && cp[strlen(cp) - 1] == ']') {
+				cp[strlen(cp) - 1] = '\0';
+				cp++;
 			}
- 			setpeer0(cp, NULL);
- 			if (!connected)
- 				continue;
+			setpeer0(cp, NULL);
+			if (!connected)
+				continue;
 		}
 		if (argc < 4) {
 			cp = argc == 3 ? argv[2] : tail(src);
@@ -616,7 +617,7 @@ command()
 		printf("%s> ", prompt);
 		if (fgets(line, sizeof line , stdin) == 0) {
 			if (feof(stdin)) {
-				exit(0);
+				exit(txrx_error);
 			} else {
 				continue;
 			}
@@ -704,7 +705,7 @@ quit(argc, argv)
 	char *argv[];
 {
 
-	exit(0);
+	exit(txrx_error);
 }
 
 /*
