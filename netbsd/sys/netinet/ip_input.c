@@ -537,23 +537,28 @@ nofilt:;
 #ifdef NATPT
 	if (ip6_protocol_tr)
 	{
-	    struct mbuf *m1 = NULL;
+		struct mbuf *m1 = NULL;
 
-	    switch (natpt_in4(m, &m1))
-	    {
-	      case IPPROTO_IP:					goto dooptions;
-	      case IPPROTO_IPV4:	ip_forward(m1, 0);	break;
-	      case IPPROTO_IPV6:	ip6_forward(m1, 1);	break;
-	      case IPPROTO_MAX:			/* discard this packet	*/
-	      default:						break;
-
-	      case IPPROTO_DONE:		/* discard without free	*/
-		return;
-	    }
+		switch (natpt_in4(m, &m1))
+		{
+		case IPPROTO_IP:
+			goto dooptions;
+		case IPPROTO_IPV4:
+			ip_forward(m1, 0);
+			break;
+		case IPPROTO_IPV6:
+			ip6_forward(m1, 1);
+			break;
+		case IPPROTO_MAX: /* discard this packet */
+		default:
+			break;
+		case IPPROTO_DONE: /* discard without free */
+			return;
+		}
 	    
-	    if (m != m1)
-		m_freem(m);
-	    return;
+		if (m != m1)
+			m_freem(m);
+		return;
 	}
   dooptions:
 #endif /* NATPT */
