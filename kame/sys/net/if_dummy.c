@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.19 2003/01/10 08:41:23 suz Exp $	*/
+/*	$KAME: if_dummy.c,v 1.20 2003/02/03 02:55:24 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -125,7 +125,7 @@ static int dummyioctl __P((struct ifnet *, u_long, caddr_t));
 #endif
 int dummyoutput __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 	struct rtentry *));
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__)
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 static void dummyrtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 #else
 static void dummyrtrequest __P((int, struct rtentry *, struct sockaddr *));
@@ -314,7 +314,7 @@ dummyoutput(ifp, m, dst, rt)
 
 /* ARGSUSED */
 static void
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__)
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 dummyrtrequest(cmd, rt, info)
 	int cmd;
 	struct rtentry *rt;
