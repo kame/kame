@@ -1746,9 +1746,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 
 			case IPV6_PKTOPTIONS:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-				if (in6p->in6p_recvoptions) {
+				if (in6p->in6p_inputopts.head) {
 					error = soopt_mcopyout(sopt, 
-							       in6p->in6p_recvoptions);
+							       in6p->in6p_inputopts.head);
 				} else
 					sopt->sopt_valsize = 0;
 #elif defined(HAVE_NRL_INPCB)
