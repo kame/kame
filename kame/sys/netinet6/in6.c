@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.287 2002/06/08 08:25:22 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.288 2002/06/08 10:10:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -169,7 +169,7 @@ static int in6_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
 	struct ifnet *));
 #endif
 static int in6_ifinit __P((struct ifnet *, struct in6_ifaddr *,
-			   struct sockaddr_in6 *, int));
+	struct sockaddr_in6 *, int));
 static void in6_unlink_ifa __P((struct in6_ifaddr *, struct ifnet *));
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
