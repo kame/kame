@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.89 2001/03/21 06:49:12 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.90 2001/04/24 16:42:15 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -184,7 +184,9 @@
 
 #include <net/net_osdep.h>
 
+#ifndef offsetof
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member))
+#endif
 
 /*
  * TCP/IP protocol family: IP6, ICMP6, UDP, TCP.
