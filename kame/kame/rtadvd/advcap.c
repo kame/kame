@@ -1,4 +1,4 @@
-/*	$KAME: advcap.c,v 1.3 2000/05/16 13:34:13 itojun Exp $	*/
+/*	$KAME: advcap.c,v 1.4 2000/05/23 11:17:40 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983 The Regents of the University of California.
@@ -137,7 +137,7 @@ getent(bp, name, cp)
 		tf = open(RM = cp, O_RDONLY);
 	}
 	if (tf < 0) {
-		syslog(LOG_WARNING,
+		syslog(LOG_INFO,
 		       "<%s> open: %s", __FUNCTION__, strerror(errno));
 		return (-2);
 	}
