@@ -1,4 +1,4 @@
-/*	$KAME: ip_ecn.c,v 1.5 2000/03/27 04:58:37 sumikawa Exp $	*/
+/*	$KAME: ip_ecn.c,v 1.6 2000/04/26 06:02:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -36,6 +36,9 @@
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #include "opt_inet.h"
+#endif
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#include "opt_inet6.h"
 #endif
 
 #include <sys/param.h>
