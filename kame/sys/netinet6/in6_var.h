@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.93 2004/02/05 10:09:23 suz Exp $	*/
+/*	$KAME: in6_var.h,v 1.94 2004/03/18 04:59:18 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -596,7 +596,7 @@ struct	in6_multistep {
 /*
  * Macros for looking up the in6_multi record for a given IP6 multicast
  * address on a given interface. If no matching record is found, "in6m"
- * returns NLL.
+ * returns NULL.
  */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
