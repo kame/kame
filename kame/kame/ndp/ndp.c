@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.56 2001/02/08 07:36:45 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.57 2001/02/08 09:11:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1075,7 +1075,10 @@ plist()
 		 * meaning of fields, especially flags, is very different
 		 * by origin.  notify the difference to the users.
 		 */
-		printf("  %s", PR.origin == PR_ORIG_RA ? "" : "advertise: ");
+		if (0) {       /* prefix origin is almost obsoleted */
+			printf("  %s",
+			       PR.origin == PR_ORIG_RA ? "" : "advertise: ");
+		}
 #ifdef NDPRF_ONLINK
 		printf("flags=%s%s%s%s",
 		       PR.raflags.onlink ? "L" : "",
@@ -1105,29 +1108,32 @@ plist()
 #ifdef NDPRF_ONLINK
 		printf(", ref=%d", PR.refcnt);
 #endif
-		switch (PR.origin) {
-		case PR_ORIG_RA:
-			printf(", origin=RA");
-			break;
-		case PR_ORIG_RR:
-			printf(", origin=RR");
-			break;
-		case PR_ORIG_STATIC:
-			printf(", origin=static");
-			break;
-		case PR_ORIG_KERNEL:
-			printf(", origin=kernel");
-			break;
-		default:
-			printf(", origin=?");
-			break;
+		if (0) {	/* prefix origin is almost obsoleted */
+			switch (PR.origin) {
+			case PR_ORIG_RA:
+				printf(", origin=RA");
+				break;
+			case PR_ORIG_RR:
+				printf(", origin=RR");
+				break;
+			case PR_ORIG_STATIC:
+				printf(", origin=static");
+				break;
+			case PR_ORIG_KERNEL:
+				printf(", origin=kernel");
+				break;
+			default:
+				printf(", origin=?");
+				break;
+			}
 		}
 		printf("\n");
 		/*
 		 * "advertising router" list is meaningful only if the prefix
 		 * information is from RA.
 		 */
-		if (PR.origin != PR_ORIG_RA)
+		if (0 &&	/* prefix origin is almost obsolted */
+		    PR.origin != PR_ORIG_RA)
 			;
 		else if (PR.advrtrs) {
 			int j;
