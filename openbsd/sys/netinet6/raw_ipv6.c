@@ -271,7 +271,7 @@ rip6_input(mp, offp, proto)
   int nexthdr, icmp6type;
   int foundone = 0;
   struct mbuf *m2 = NULL;
-  struct ip6_recvpktopts opts = NULL;
+  struct ip6_recvpktopts opts;
   struct sockaddr_in6 srcsa;
 #ifdef IPSEC
   struct sockaddr_in6 dstsa;
