@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.83 2004/05/18 08:48:23 sakane Exp $	*/
+/*	$KAME: parse.y,v 1.84 2004/06/18 17:38:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -72,7 +72,9 @@ void free_buffer __P((void));
 int setkeymsg0 __P((struct sadb_msg *, unsigned int, unsigned int, size_t));
 static int setkeymsg_spdaddr __P((unsigned int, unsigned int, vchar_t *,
 	struct addrinfo *, int, struct addrinfo *, int));
+#ifdef SADB_X_EXT_TAG
 static int setkeymsg_spdaddr_tag __P((unsigned int, char *, vchar_t *));
+#endif
 static int setkeymsg_addr __P((unsigned int, unsigned int,
 	struct addrinfo *, struct addrinfo *, int));
 static int setkeymsg_add __P((unsigned int, unsigned int,
@@ -528,10 +530,14 @@ spdadd_command
 		{
 			int status;
 
+#ifdef SADB_X_EXT_TAG
 			status = setkeymsg_spdaddr_tag(SADB_X_SPDADD,
 			    $3.buf, &$4);
 			if (status < 0)
 				return -1;
+#else
+			return (-1);
+#endif
 		}
 	;
 
@@ -856,6 +862,7 @@ setkeymsg_spdaddr(type, upper, policy, srcs, splen, dsts, dplen)
 		return 0;
 }
 
+#ifdef SADB_X_EXT_TAG
 static int
 setkeymsg_spdaddr_tag(type, tag, policy)
 	unsigned int type;
@@ -895,6 +902,7 @@ setkeymsg_spdaddr_tag(type, tag, policy)
 
 	return 0;
 }
+#endif
 
 /* XXX NO BUFFER OVERRUN CHECK! BAD BAD! */
 static int
