@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.52 2001/04/26 23:52:31 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.53 2001/04/30 17:16:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -126,7 +126,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	if (sa->sa_len != salen)
 		return EAI_FAIL;
 #endif
-	
+
 	family = sa->sa_family;
 	for (i = 0; afdl[i].a_af; i++)
 		if (afdl[i].a_af == family) {
@@ -134,7 +134,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 			goto found;
 		}
 	return EAI_FAMILY;
-	
+
  found:
 	if (salen != afd->a_socklen)
 		return EAI_FAIL;
