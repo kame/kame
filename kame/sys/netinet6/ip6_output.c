@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.137 2000/12/03 00:53:59 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.138 2000/12/04 04:27:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3317,7 +3317,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 		case IPV6_NEXTHOP:
 			if (!priv)
 				return(EPERM);
-			
+
 			if (cm->cmsg_len < sizeof(u_char) ||
 			    /* check if cmsg_len is large enough for sa_len */
 			    cm->cmsg_len < CMSG_LEN(*CMSG_DATA(cm)))
