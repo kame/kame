@@ -1,4 +1,4 @@
-$Id: TODO,v 1.23 2000/09/21 20:09:16 itojun Exp $
+$Id: TODO,v 1.24 2000/09/21 20:15:36 sakane Exp $
 
 Please send any questions or bug reports to snap-users@kame.net.
 
@@ -15,6 +15,7 @@ o fix delete payload for IPComp SA.  use 2 byte SPI.
 
 MUST
 o Certificate type handling.  e.g. CRL, CR, PGP...
+o multiple certificate payload handling.
 o To consider the use with certificate infrastructure.  PXIX ???
 o Support scoped (link-local and site-local) IPv6 addresses.
   It needs pfkey modification for scope IDs, and advanced API (RFC2292)
