@@ -493,4 +493,24 @@ do { \
                              			* ff00 ::
                              			* to encode (*,*,RP)
                              			*/ 
+
+/* interface independent statistics */
+struct pim6dstat {
+	/* incoming PIM6 packets on this interface */
+	u_quad_t in_pim6_register;
+	u_quad_t in_pim6_register_stop;
+	u_quad_t in_pim6_cand_rp;
+	u_quad_t in_pim6_graft; /* for dense mode only */
+	u_quad_t in_pim6_graft_ack; /* for dense mode only  */
+	/* outgoing PIM6 packets on this interface */
+	u_quad_t out_pim6_register;
+	u_quad_t out_pim6_register_stop;
+	u_quad_t out_pim6_cand_rp;
+	/* occurrences of timeouts */
+	u_quad_t pim6_bootstrap_timo;/* pim_bootstrap_timer */
+	u_quad_t pim6_rpgrp_timo; /* rp_grp_entry_ptr->holdtime */
+	u_quad_t pim6_rtentry_timo; /* routing entry */
+};
+
+extern struct pim6dstat pim6dstat;
 #endif

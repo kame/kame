@@ -99,6 +99,7 @@ static int      	sighandled = 0;
 #define GOT_SIGUSR1     0x04
 #define GOT_SIGUSR2     0x08
 #define GOT_SIGALRM     0x10
+#define GOT_SIGINFO	0x20
 
 
 #define NHANDLERS       3
@@ -421,6 +422,7 @@ usage:
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGUSR1, &sa, NULL);
     sigaction(SIGUSR2, &sa, NULL);
+    sigaction(SIGINFO, &sa, NULL);
 
     FD_ZERO(&readers);
     FD_SET(mld6_socket, &readers);
@@ -515,6 +517,11 @@ usage:
 	    {
 		sighandled &= ~GOT_SIGHUP;
 		restart(SIGHUP);
+	    }
+	    if (sighandled & GOT_SIGINFO)
+	    {
+		sighandled &= ~GOT_SIGINFO;
+		dump_stat();
 	    }
 	    if (sighandled & GOT_SIGUSR1)
 	    {
@@ -702,6 +709,10 @@ handler(sig)
 
     case SIGUSR2:
 	sighandled |= GOT_SIGUSR2;
+	break;
+
+    case SIGINFO:
+	sighandled |= GOT_SIGINT;
 	break;
     }
 }

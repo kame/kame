@@ -232,7 +232,10 @@ age_vifs()
 		continue;
 
 	    IF_DEBUG(DEBUG_PIM_HELLO)
-		log(LOG_DEBUG,0,"%s on %s is dead , delete it",inet6_fmt(&curr_nbr->address.sin6_addr),uvifs[curr_nbr->vifi].uv_name);
+		log(LOG_DEBUG, 0,
+		    "%s on %s is dead , delete it",
+		    inet6_fmt(&curr_nbr->address.sin6_addr),
+		    uvifs[curr_nbr->vifi].uv_name);
 	    delete_pim6_nbr(curr_nbr);
 	}
 
@@ -429,8 +432,9 @@ age_routes()
 		if (IF_ISSET(vifi, &mrtentry_rp->joined_oifs))
 		    IF_TIMEOUT(mrtentry_rp->vif_timers[vifi])
 		    {
-		    IF_CLR(vifi, &mrtentry_rp->joined_oifs);
-		    change_flag = TRUE;
+			    uvifs[vifi].uv_outif_timo++;
+			    IF_CLR(vifi, &mrtentry_rp->joined_oifs);
+			    change_flag = TRUE;
 		    }
 	    }
 	    if ((change_flag == TRUE) || (update_rp_iif == TRUE))
@@ -606,6 +610,7 @@ age_routes()
 	    if ((TIMEOUT(mrtentry_rp->timer))
 		&& (IF_ISEMPTY(&mrtentry_rp->leaves)))
 	    {
+		pim6dstat.pim6_rtentry_timo++;
 		delete_mrtentry(mrtentry_rp);
 	    }
 	}			/* mrtentry_rp != NULL */
@@ -642,6 +647,7 @@ age_routes()
 			    IF_TIMEOUT(mrtentry_grp->vif_timers[vifi])
 			{
 			    IF_CLR(vifi, &mrtentry_grp->joined_oifs);
+			    uvifs[vifi].uv_outif_timo++;
 			    change_flag = TRUE;
 			}
 		    }
@@ -809,6 +815,7 @@ age_routes()
 		    if ((TIMEOUT(mrtentry_grp->timer))
 			&& (IF_ISEMPTY(&mrtentry_grp->leaves)))
 		    {
+			pim6dstat.pim6_rtentry_timo++;
 			delete_mrtentry(mrtentry_grp);
 		    }
 		}		/* if (mrtentry_grp != NULL) */
@@ -838,6 +845,7 @@ age_routes()
 				    IF_CLR(vifi,
 					     &mrtentry_srcs->joined_oifs);
 				    change_flag = TRUE;
+				    uvifs[vifi].uv_outif_timo++;
 				}
 			    }
 			}
@@ -1126,6 +1134,8 @@ age_routes()
 		    /* routing entry */
 		    if (TIMEOUT(mrtentry_srcs->timer))
 		    {
+			pim6dstat.pim6_rtentry_timo++;
+
 			if (IF_ISEMPTY(&mrtentry_srcs->leaves))
 			{
 			    delete_mrtentry(mrtentry_srcs);
@@ -1205,9 +1215,11 @@ age_misc()
 	     rp_grp_entry_ptr = rp_grp_entry_next)
 	{
 	    rp_grp_entry_next = rp_grp_entry_ptr->grp_rp_next;
-	    IF_TIMEOUT(rp_grp_entry_ptr->holdtime)
+	    IF_TIMEOUT(rp_grp_entry_ptr->holdtime) {
 		delete_rp_grp_entry(&cand_rp_list, &grp_mask_list,
 				    rp_grp_entry_ptr);
+		pim6dstat.pim6_rpgrp_timo++;
+	    }
 	}
     }
 
@@ -1225,6 +1237,8 @@ age_misc()
 
     IF_TIMEOUT(pim_bootstrap_timer)
     {
+	pim6dstat.pim6_bootstrap_timo++;
+
 	if (cand_bsr_flag == FALSE)
 	{
 	    /*

@@ -201,13 +201,28 @@ struct uvif {
 	void *config_attr;	/* temporary buffer while parsing config */
 
 	/* the followings are to collect statistics */
+	/* incoming PIM6 packets on this interface */
 	u_quad_t uv_in_pim6_hello;
 	u_quad_t uv_in_pim6_join_prune;
-	u_quad_t uv_bootsrap;
-	u_quad_t uv_assert;
-	u_quad_t uv_graft;	/* for dense mode only */
-	u_quad_t uv_graft_ack;	/* for dense mode only  */
-	u_quad_t uv_rp_adv;
+	u_quad_t uv_in_pim6_bootsrap;
+	u_quad_t uv_in_pim6_assert;
+	/* outgoing PIM6 packets on this interface */
+	u_quad_t uv_out_pim6_hello;
+	u_quad_t uv_out_pim6_join_prune;
+	u_quad_t uv_out_pim6_bootsrap;
+	u_quad_t uv_out_pim6_assert;
+	/* incoming MLD packets on this interface */
+	u_quad_t uv_in_mld_query;
+	u_quad_t uv_in_mld_report;
+	u_quad_t uv_in_mld_done;
+	/* outgoing MLD packets on this interface */
+	u_quad_t uv_out_mld_query;
+	u_quad_t uv_out_mld_report;
+	u_quad_t uv_out_mld_done;
+	/* occurrences of timeouts */
+	u_quad_t uv_pim6_nbr_timo;
+	u_quad_t uv_listener_timo;
+	u_quad_t uv_outif_timo;	/* outgoing interfaces timers */
 };
 
 struct phaddr {

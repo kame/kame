@@ -142,10 +142,12 @@ query_groups(v)
     register struct listaddr *g;
 
     v->uv_gq_timer = MLD6_QUERY_INTERVAL;
-    if (v->uv_flags & VIFF_QUERIER && (v->uv_flags & VIFF_NOLISTENER) == 0)
+    if (v->uv_flags & VIFF_QUERIER && (v->uv_flags & VIFF_NOLISTENER) == 0) {
 	send_mld6(MLD6_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 		  NULL, (struct in6_addr *)&in6addr_any, v->uv_ifindex,
 		  MLD6_QUERY_RESPONSE_INTERVAL, 0, 1);
+	v->uv_out_mld_query++;
+    }
 
     /*
      * Decrement the old-hosts-present timer for each active group on that
@@ -193,6 +195,7 @@ accept_listener_query(src, dst, group, tmo)
 	    inet6_fmt(group));
 
     v = &uvifs[mifi];
+    v->uv_in_mld_query++;
 
     if (v->uv_querier == NULL || inet6_equal(&v->uv_querier->al_addr, src))
     {
@@ -325,6 +328,7 @@ accept_listener_report(src, dst, group)
 	    inet6_fmt(group));
 
     v = &uvifs[mifi];
+    v->uv_in_mld_report++;
 
     /*
      * Look for the group in our group list; if found, reset its timer.
@@ -418,8 +422,6 @@ accept_listener_done(src, dst, group)
     return;
     }
 
-
-
     if ((mifi = find_vif_direct_local(src)) == NO_VIF)
     {
 	IF_DEBUG(DEBUG_MLD)
@@ -435,6 +437,7 @@ accept_listener_done(src, dst, group)
 	    inet6_fmt(dst), inet6_fmt(group));
 
     v = &uvifs[mifi];
+    v->uv_in_mld_done++;
 
     if (!(v->uv_flags & (VIFF_QUERIER | VIFF_DR)))
 	return;
@@ -474,12 +477,14 @@ accept_listener_done(src, dst, group)
 	    g->al_timer = (MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE) *
 		(MLD6_LAST_LISTENER_QUERY_COUNT + 1);
 	    if (v->uv_flags & VIFF_QUERIER &&
-		(v->uv_flags & VIFF_NOLISTENER) == 0)
+		(v->uv_flags & VIFF_NOLISTENER) == 0) {
 		    send_mld6(MLD6_LISTENER_QUERY, 0,
 			      &v->uv_linklocal->pa_addr, NULL,
 			      &g->al_addr.sin6_addr,
 			      v->uv_ifindex,
 			      MLD6_LAST_LISTENER_QUERY_INTERVAL, 0, 1);
+		    v->uv_out_mld_query++;
+	    }
 	    g->al_query = SetQueryTimer(g, mifi,
 		       MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE,
 					MLD6_LAST_LISTENER_QUERY_INTERVAL);
@@ -512,6 +517,9 @@ DelVif(arg)
 
     delete_leaf(mifi, NULL, &g->al_addr);
 
+    /* increment statistics */
+    v->uv_listener_timo++;
+    
     anp = &(v->uv_groups);
     while ((a = *anp) != NULL)
     {
@@ -569,10 +577,12 @@ SendQuery(arg)
     cbk_t          *cbk = (cbk_t *) arg;
     register struct uvif *v = &uvifs[cbk->mifi];
 
-    if (v->uv_flags & VIFF_QUERIER && (v->uv_flags & VIFF_NOLISTENER) == 0)
+    if (v->uv_flags & VIFF_QUERIER && (v->uv_flags & VIFF_NOLISTENER) == 0) {
 	send_mld6(MLD6_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 		  NULL, &cbk->g->al_addr.sin6_addr, v->uv_ifindex,
 		  cbk->q_time, 0, 1);
+	v->uv_out_mld_query++;
+    }
     cbk->g->al_query = 0;
     free(cbk);
 }

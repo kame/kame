@@ -67,11 +67,13 @@
 	#define _PATH_PIM6D_GENID	"/var/run/pim6sd.genid"
 	#define _PATH_PIM6D_DUMP	"/var/tmp/pim6sd.dump"
 	#define _PATH_PIM6D_CACHE	"/var/tmp/pim6sd.cache"
+	#define _PATH_PIM6D_STAT	"/var/tmp/pim6sd.stat"
 #else
 	#define _PATH_PIM6D_PID		"/etc/pim6sd.pid"
 	#define _PATH_PIM6D_GENID	"/etc/pim6sd.genid"
 	#define _PATH_PIM6D_DUMP	"/usr/tmp/pim6sd.dump"
 	#define _PATH_PIM6D_CACHE	"/usr/tmp/pim6sd.cache"
+	#define _PATH_PIM6D_STAT	"/usr/tmp/pim6sd.stat"
 #endif
 
 #endif

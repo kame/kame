@@ -90,7 +90,7 @@ unsigned long   debug = 0x00000000;	/* If (long) is smaller than 4 bytes,
 					 * then we are in trouble. */
 static char     dumpfilename[] = _PATH_PIM6D_DUMP;
 static char     cachefilename[] = _PATH_PIM6D_CACHE;	/* TODO: notused */
-
+static char	statfilename[] = _PATH_PIM6D_STAT;
 
 char           *
 packet_kind(proto, type, code)
@@ -286,6 +286,79 @@ cdump(i)
 	 */
 	(void) fclose(fp);
     }
+}
+
+void
+dump_stat()
+{
+	FILE *fp;
+	vifi_t vifi;
+	register struct uvif *v;
+
+	fp = fopen(statfilename, "w");
+	if (fp == NULL) {
+		log(LOG_WARNING, errno, "dump_stat: can't open file(%s)",
+		    statfilename);
+		return;
+	}
+
+	fprintf(fp, "pim6sd per-interface statistics\n");
+	for (vifi = 0, v = uvifs; vifi < numvifs; vifi++, v++) {
+#if 0				/* is it better to skip them? */
+		if ((v->uv_flags & (VIFF_DISABLED|VIFF_DOWN)) != 0)
+			continue;
+#endif
+		fprintf(fp, " Mif=%d, PhyIF=%s\n", vifi, v->uv_name);
+		fprintf(fp, "\t%qu pim6 hello received\n", v->uv_in_pim6_hello);
+		fprintf(fp, "\t%qu pim6 join-prune received\n",
+			v->uv_in_pim6_join_prune);
+		fprintf(fp, "\t%qu pim6 bootstrap received\n",
+			v->uv_in_pim6_bootsrap);
+		fprintf(fp, "\t%qu pim6 assert received\n", v->uv_in_pim6_assert);
+
+		fprintf(fp, "\t%qu pim6 hello sent\n", v->uv_out_pim6_hello);
+		fprintf(fp, "\t%qu pim6 join-prune sent\n",
+			v->uv_out_pim6_join_prune);
+		fprintf(fp, "\t%qu pim6 bootstrap sent\n",
+			v->uv_out_pim6_bootsrap);
+		fprintf(fp, "\t%qu pim6 assert sent\n", v->uv_out_pim6_assert);
+
+		fprintf(fp, "\t%qu MLD query received\n", v->uv_in_mld_query);
+		fprintf(fp, "\t%qu MLD report received\n", v->uv_in_mld_report);
+		fprintf(fp, "\t%qu MLD done received\n", v->uv_in_mld_done);
+
+		fprintf(fp, "\t%qu MLD query sent\n", v->uv_out_mld_query);
+		fprintf(fp, "\t%qu MLD report sent\n", v->uv_out_mld_report);
+		fprintf(fp, "\t%qu MLD done sent\n", v->uv_out_mld_done);
+
+		fprintf(fp, "\t%qu PIM neighbor timeouts\n", v->uv_pim6_nbr_timo);
+		fprintf(fp, "\t%qu MLD listener timeouts\n", v->uv_listener_timo);
+		fprintf(fp, "\t%qu out-I/F timeouts\n", v->uv_outif_timo);
+	}
+
+	fprintf(fp, "\npim6sd interface independent statistics\n");
+
+	fprintf(fp, "\t%qu pim6 register received\n", pim6dstat.in_pim6_register);
+	fprintf(fp, "\t%qu pim6 register-stop received\n",
+		pim6dstat.in_pim6_register_stop);
+	fprintf(fp, "\t%qu pim6 cand-RP received\n", pim6dstat.in_pim6_cand_rp);
+	fprintf(fp, "\t%qu pim6 graft received\n", pim6dstat.in_pim6_graft);
+	fprintf(fp, "\t%qu pim6 graft ack received\n",
+		pim6dstat.in_pim6_graft_ack);
+
+	fprintf(fp, "\t%qu pim6 register sent\n", pim6dstat.out_pim6_register);
+	fprintf(fp, "\t%qu pim6 register-stop sent\n",
+		pim6dstat.out_pim6_register_stop);
+	fprintf(fp, "\t%qu pim6 cand-RP sent\n", pim6dstat.out_pim6_cand_rp);
+
+	fprintf(fp, "\t%qu pim6 bootstrap timeouts\n",
+		pim6dstat.pim6_bootstrap_timo);
+	fprintf(fp, "\t%qu pim6 RP group entry timeouts\n",
+		pim6dstat.pim6_rpgrp_timo);
+	fprintf(fp, "\t%qu pim6 routing entry timeouts\n",
+		pim6dstat.pim6_rtentry_timo);
+
+	fclose(fp);
 }
 
 void

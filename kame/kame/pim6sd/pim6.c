@@ -313,7 +313,13 @@ accept_pim6(pimlen)
          receive_pim6_assert(src, &dst, (char *)(pim), pimlen);
          break;
      case PIM_GRAFT:
+	 pim6dstat.in_pim6_graft++;
+         log(LOG_INFO, 0, "ignore %s from %s",
+             packet_kind(IPPROTO_PIM, pim->pim_type, 0),
+             inet6_fmt(&src->sin6_addr));
+         break;
      case PIM_GRAFT_ACK:
+	 pim6dstat.in_pim6_graft_ack++;
          log(LOG_INFO, 0, "ignore %s from %s",
              packet_kind(IPPROTO_PIM, pim->pim_type, 0),
              inet6_fmt(&src->sin6_addr));
@@ -329,8 +335,6 @@ accept_pim6(pimlen)
          break;
     }
 }   
-
-
 
 void
 send_pim6(char *buf, struct sockaddr_in6 *src,

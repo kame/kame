@@ -152,6 +152,8 @@ int			build_jp_message_pool_counter;
 struct sockaddr_in6 sockaddr6_any = {sizeof(struct sockaddr_in6) , AF_INET6 ,0,0, IN6ADDR_ANY_INIT};
 struct sockaddr_in6 sockaddr6_d;
 
+struct pim6dstat pim6dstat;
+
 /************************************************************************
  *                        PIM_HELLO
  ************************************************************************/
@@ -187,6 +189,7 @@ receive_pim6_hello(src, pim_message, datalen)
     }
 
     v = &uvifs[mifi];
+    v->uv_in_pim6_hello++;	/* increment statistacs */
     if (v->uv_flags & (VIFF_DOWN | VIFF_DISABLED | MIFF_REGISTER))
 	return (FALSE);		/* Shoudn't come on this interface */
 
@@ -590,12 +593,13 @@ send_pim6_hello(v, holdtime)
 
     datalen = data_ptr - (u_int8 *) buf;
 
-    send_pim6(pim6_send_buf, &v->uv_linklocal->pa_addr , &allpim6routers_group, PIM_HELLO,
-	     datalen);
+    send_pim6(pim6_send_buf, &v->uv_linklocal->pa_addr,
+	      &allpim6routers_group, PIM_HELLO, datalen);
     SET_TIMER(v->uv_pim_hello_timer, pim_hello_period);
+
+    v->uv_out_pim6_hello++;
     return (TRUE);
 }
-
 
 /************************************************************************
  *                        PIM_REGISTER
@@ -615,14 +619,15 @@ receive_pim6_register(reg_src, reg_dst, pim_message, datalen)
 {
     struct sockaddr_in6		inner_src,
                     		inner_grp;
-    pim_register_t 			*register_p;
+    pim_register_t		*register_p;
     struct ip6_hdr    		*ip;
     u_int32         		borderBit,
                     		nullRegisterBit;
-    mrtentry_t     			*mrtentry_ptr;
-    mrtentry_t     			*mrtentry_ptr2;
-    if_set	     			oifs;
+    mrtentry_t 			*mrtentry_ptr;
+    mrtentry_t 			*mrtentry_ptr2;
+    if_set			oifs;
 
+    pim6dstat.in_pim6_register++;
 
     register_p = (pim_register_t *) (pim_message + sizeof(struct pim));
 
@@ -968,11 +973,12 @@ send_pim6_register(pkt)
     	send_pim6(pim6_send_buf, reg_src , reg_dst , PIM_REGISTER,
 	     	  pktlen);
 
+	pim6dstat.out_pim6_register++;
+
 	return (TRUE);
     }
     return (TRUE);
 }
-
 
 int
 send_pim6_null_register(mrtentry_ptr)
@@ -1012,6 +1018,7 @@ send_pim6_null_register(mrtentry_ptr)
     
     send_pim6(pim6_send_buf, reg_source , dest, PIM_REGISTER,
 	      pktlen);
+    pim6dstat.out_pim6_register++; /* should be counted separately? */
 
     return (TRUE);
 }
@@ -1037,6 +1044,8 @@ receive_pim6_register_stop(reg_src, reg_dst, pim_message, datalen)
     if_set     			pruned_oifs;
     mifi_t			mifi;
     struct uvif 		*v;
+
+    pim6dstat.in_pim6_register_stop++;
 
     pim_regstop_p = (pim_register_stop_t *) (pim_message +
 					     sizeof(struct pim));
@@ -1159,10 +1168,10 @@ send_pim6_register_stop(reg_src, reg_dst, inner_grp, inner_src)
 
     send_pim6(pim6_send_buf, reg_src , reg_dst , PIM_REGISTER_STOP,
 	      data_ptr-(u_int8 *) buf);
+    pim6dstat.out_pim6_register_stop++;
  
     return (TRUE);
 }
-
 
 /************************************************************************
  *                        PIM_JOIN_PRUNE
@@ -1336,6 +1345,7 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
     }
 
     v = &uvifs[mifi];
+    v->uv_in_pim6_join_prune++;
     if (uvifs[mifi].uv_flags &
 	(VIFF_DOWN | VIFF_DISABLED | VIFF_NONBRS | MIFF_REGISTER))
     {
@@ -2908,6 +2918,7 @@ send_jp6_message(pim_nbr)
 
     send_pim6(pim6_send_buf, &uvifs[mifi].uv_linklocal->pa_addr,
 	      &allpim6routers_group , PIM_JOIN_PRUNE, datalen);
+    uvifs[mifi].uv_out_pim6_join_prune++;
     return_jp6_working_buff(pim_nbr);
 }
 
@@ -2955,6 +2966,7 @@ receive_pim6_assert(src, dst, pim_message, datalen)
     }
 
     v = &uvifs[mifi];
+    v->uv_in_pim6_assert++;
     if (uvifs[mifi].uv_flags &
 	(VIFF_DOWN | VIFF_DISABLED | VIFF_NONBRS | MIFF_REGISTER))
 	return (FALSE);		/* Shoudn't come on this interface */
@@ -3292,6 +3304,7 @@ send_pim6_assert(source, group, mifi, mrtentry_ptr)
     send_pim6(pim6_send_buf, &uvifs[mifi].uv_linklocal->pa_addr,
           &allpim6routers_group, PIM_ASSERT,
           data_ptr - data_start_ptr);
+    uvifs[mifi].uv_out_pim6_assert++;
 
     return (TRUE);
 }
@@ -3402,7 +3415,8 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	    return(FALSE);
     }
 
-    v=&uvifs[mifi];	
+    v = &uvifs[mifi];
+    v->uv_in_pim6_bootsrap++;
     data_ptr = (u_int8 *) (pim_message + sizeof(struct pim));
 
     /* Parse the PIM_BOOTSTRAP message */
@@ -3853,7 +3867,6 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
     return (TRUE);
 }
 
-
 void
 send_pim6_bootstrap()
 {
@@ -3870,11 +3883,10 @@ send_pim6_bootstrap()
 
    	     send_pim6(pim6_send_buf, &uvifs[mifi].uv_linklocal->pa_addr,
           	       &allpim6routers_group, PIM_BOOTSTRAP, datalen);
-
+	     uvifs[mifi].uv_out_pim6_bootsrap++;
 	}
     }
 }
-
 
 /************************************************************************
  *                        PIM_CAND_RP_ADV
@@ -3905,6 +3917,8 @@ receive_pim6_cand_rp_adv(src, dst, pim_message, datalen)
     u_int8         		*data_ptr;
     struct in6_addr         	grp_mask;
     struct sockaddr_in6		group_, rpp_;
+
+    pim6dstat.in_pim6_cand_rp++;
 
     /* if I am not the bootstrap RP, then do not accept the message */
     if ((cand_bsr_flag != FALSE) && 
@@ -3997,7 +4011,6 @@ receive_pim6_cand_rp_adv(src, dst, pim_message, datalen)
     return (TRUE);
 }
 
-
 int
 send_pim6_cand_rp_adv()
 {
@@ -4055,6 +4068,7 @@ send_pim6_cand_rp_adv()
 
     send_pim6(pim6_send_buf, &my_cand_rp_address, &curr_bsr_address ,
             PIM_CAND_RP_ADV, cand_rp_adv_message.message_size);
+    pim6dstat.out_pim6_cand_rp++;
 
     return TRUE;
 }
