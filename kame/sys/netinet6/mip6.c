@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.55 2001/09/20 07:10:40 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.56 2001/09/20 07:46:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -755,10 +755,27 @@ mip6_remove_addrs(ifp)
 	struct in6_ifaddr *ia6;
 
 	/* delete all addrs currently assigned to ifp */
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ia = ifp->if_addrlist;
+	     ia;
+	     ia = ia_next)
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
 	for (ia = TAILQ_FIRST(&ifp->if_addrhead);
-	     ia != NULL; ia = ia_next) {
-
+	     ia;
+	     ia = ia_next)
+#else
+	for (ia = ifp->if_addrlist.tqh_first;
+	     ia;
+	     ia = ia_next)
+#endif
+	{
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		ia_next = ia->ifa_next;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
 		ia_next = TAILQ_NEXT(ia, ifa_link);
+#else
+		ia_next = ia->ifa_list.tqe_next;
+#endif
 
 		if (ia->ifa_addr->sa_family != AF_INET6)
 			continue;
@@ -827,9 +844,27 @@ mip6_remove_haddrs(sc, ifp)
 	struct mip6_prefix *mpfx;
 	int error = 0;
 
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ia = ifp->if_addrlist;
+	     ia;
+	     ia = ia_next)
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
 	for (ia = TAILQ_FIRST(&ifp->if_addrhead);
-	     ia != NULL; ia = ia_next) {
+	     ia;
+	     ia = ia_next)
+#else
+	for (ia = ifp->if_addrlist.tqh_first;
+	     ia;
+	     ia = ia_next)
+#endif
+	{
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		ia_next = ia->ifa_next;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
 		ia_next = TAILQ_NEXT(ia, ifa_link);
+#else
+		ia_next = ia->ifa_list.tqe_next;
+#endif
 
 		if (ia->ifa_addr->sa_family != AF_INET6)
 			continue;
@@ -878,9 +913,27 @@ mip6_detach_haddrs(sc, ifp)
 	struct in6_ifaddr *ia6;
 	int error = 0;
 
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ia = hif_ifp->if_addrlist;
+	     ia;
+	     ia = ia_next)
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
 	for (ia = TAILQ_FIRST(&hif_ifp->if_addrhead);
-	     ia != NULL; ia = ia_next) {
+	     ia;
+	     ia = ia_next)
+#else
+	for (ia = hif_ifp->if_addrlist.tqh_first;
+	     ia;
+	     ia = ia_next)
+#endif
+	{
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		ia_next = ia->ifa_next;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
 		ia_next = TAILQ_NEXT(ia, ifa_link);
+#else
+		ia_next = ia->ifa_list.tqe_next;
+#endif
 
 		if (ia->ifa_addr->sa_family != AF_INET6)
 			continue;
