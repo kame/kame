@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.870 2000/05/14 10:28:36 jinmei Exp $
+$Id: CHANGELOG,v 1.871 2000/05/14 12:39:18 jinmei Exp $
 
 <200005>
+2000-05-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/usr.sbin/netstat: printed per-interface IPv6 statistics.
+	Please try
+	% netstat [-p [ip6|icmp6] | -f inet6] -s -I if_name
+	for printing statistics on a specified interface.
+
 2000-05-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* {bsdi4, openbsd}/sys/netinet6/raw_ipv6.c (rip6_output):
 	- fixed memory leak for outgoing ancillary data
