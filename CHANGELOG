@@ -1,7 +1,20 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2660 2004/08/11 10:43:12 jinmei Exp $
+$KAME: CHANGELOG,v 1.2661 2004/08/11 10:47:06 jinmei Exp $
 
 <200408>
+2004-08-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ndp/ndp.c (ifinfo): supported the "disabled" ndp flag
+	to view or modify the status of whether IPv6 operation is disabled
+	on the interface. (see also the next log entry)
+
+2004-08-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_nbr.c (nd6_dad_duplicated):
+	* kame/sys/netinet6/ip6_input.c (ip6intr):
+	* kame/sys/netinet6/nd6.c (nd6_output):
+	disabled IPv6 operation if DAD fails if the interface identifier
+	is based on EUI-64 ID which is supposed to be unique
+	(clarification in rfc2462bis).
+
 2004-08-11  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/freebsd5/sbin/ifconfig/ifconfig.c: stopped unnecessary kernel
 	module loading
