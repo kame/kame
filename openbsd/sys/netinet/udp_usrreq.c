@@ -703,6 +703,8 @@ udp6_ctlinput(cmd, sa, d)
 	} *uhp;
 	void (*notify) __P((struct inpcb *, int)) = udp_notify;
 
+	if (sa == NULL)
+		return;
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
 		return;
