@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.8 2000/01/09 01:31:22 itojun Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.9 2000/02/07 11:23:56 sakane Exp $ */
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -34,11 +34,16 @@
 #include <limits.h>
 #include <string.h>
 
-#include "var.h"
-#include "vmbuf.h"
-#include "oakley.h"
-#include "crypto_openssl.h"
-#include "debug.h"
+/* get openssl/ssleay version number */
+#ifdef HAVE_OPENSSLV_H
+#include <opensslv.h>
+#define SSLVER        OPENSSL_VERSION_NUMBER
+#else
+#ifdef HAVE_CVERSION_H
+#include <cversion.h>
+#define SSLVER        SSLEAY_VERSION_NUMBER
+#endif
+#endif
 
 #include <bn.h>
 #include <dh.h>
@@ -53,6 +58,12 @@
 #include <rc5.h>
 #endif
 #include <cast.h>
+
+#include "var.h"
+#include "vmbuf.h"
+#include "oakley.h"
+#include "crypto_openssl.h"
+#include "debug.h"
 
 /*
  * I hate to cast every parameter to des_xx into void *, but it is
