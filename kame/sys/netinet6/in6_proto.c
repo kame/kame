@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.54 2000/05/22 11:25:21 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.55 2000/05/22 15:18:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -760,7 +760,7 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_NODEINFO,
 #if __FreeBSD__ < 3
 /* net.inet6.udp6 */
 SYSCTL_INT(_net_inet6_udp6, UDP6CTL_SENDMAX,
-	sendmax, CTLFLAG_RW,	&udp6_sendspace,	0, "");
+	maxdgram, CTLFLAG_RW,	&udp6_sendspace,	0, "");
 SYSCTL_INT(_net_inet6_udp6, UDP6CTL_RECVSPACE,
 	recvspace, CTLFLAG_RW,	&udp6_recvspace,	0, "");
 

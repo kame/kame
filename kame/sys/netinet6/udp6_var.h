@@ -1,4 +1,4 @@
-/*	$KAME: udp6_var.h,v 1.8 2000/03/25 07:24:03 sumikawa Exp $	*/
+/*	$KAME: udp6_var.h,v 1.9 2000/05/22 15:18:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -93,9 +93,15 @@ struct	udp6stat {
 #define UDP6CTL_RECVSPACE	2	/* default recv buffer */
 #define UDP6CTL_MAXID		3
 
+#ifdef __FreeBSD__
+#define __SENDSPACENAME	"maxdgram"
+#else
+#define __SENDSPACENAME	"sendspace"
+#endif
+
 #define UDP6CTL_NAMES { \
 	{ 0, 0 }, \
-	{ "sendmax", CTLTYPE_INT }, \
+	{ __SENDSPACENAME, CTLTYPE_INT }, \
 	{ "recvspace", CTLTYPE_INT }, \
 }
 #endif /*__FreeBSD__||__NetBSD__*/
