@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.63 2003/07/22 08:53:18 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.64 2003/07/25 09:57:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -455,7 +455,6 @@ esp_cbc_mature(sav)
 	case SADB_X_EALG_TWOFISHCBC:
 		break;
 	case SADB_X_EALG_RIJNDAELCBC:
-	case SADB_X_EALG_AESCTR:
 		/* allows specific key sizes only */
 		if (!(keylen == 128 || keylen == 192 || keylen == 256)) {
 			ipseclog((LOG_ERR,
