@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.12 2001/09/07 09:25:50 itojun Exp $	*/
+/*	$KAME: main.c,v 1.13 2001/09/18 07:32:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -156,7 +156,7 @@ mainloop(s)
 	int ecode;
 
 #define settimeo(x)	do { timeo = cur; timeo.tv_sec += (x); } while (0)
-#define clrtimeo(x)	do {timeo.tv_sec = timeo.tv_usec = 0; } while (0)
+#define clrtimeo(x)	do { timeo.tv_sec = timeo.tv_usec = 0; } while (0)
 	fdssize = howmany(s + 1, NFDBITS) * sizeof(fd_mask);
 	if (sizeof(*fds) > fdssize)
 		fdssize = sizeof(*fds);
