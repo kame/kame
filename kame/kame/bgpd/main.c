@@ -40,6 +40,9 @@
 #include "ripng_var.h"
 #include "parse.h"
 #include "ospf.h"
+#ifdef USE_LEX_YACC
+#include "cfparse.h"
+#endif 
 
 int              rtsock;       /* the routing socket               */
 pid_t            pid;
@@ -51,6 +54,8 @@ struct rt_entry *aggregations; /* aggregate-generated routes       */
 task            *taskhead;
 
 byte             bgpyes, ripyes, ospfyes;
+
+unsigned long debug;
 
 #define  PIDFILENAME  "/var/run/bgpd.pid"
 #define CONFFILENAME  "/usr/local/v6/etc/bgpd.conf"
@@ -148,7 +153,11 @@ main(argc, argv)
   ifconfig();
   krt_init();
 
+#ifdef USE_LEX_YACC
+  cfparse(0, conf ? conf : CONFFILENAME);
+#else
   conf_check(conf ? conf : CONFFILENAME);
+#endif
 
   aggr_ifinit();
 
@@ -260,8 +269,12 @@ main_listen_accept()
       /* purge ancillary data (if any) on the listening socket */
       if (ioctl(bgpsock, FIONREAD, &alen) <0)/* XXX is there a smarter way? */
 	fatal("<main_listen_accept>: ioctl(FIONREAD)");
-      if (alen > 0 && read(bgpsock, NULL, 0) < 0)
-	fatal("<main_listen_accept>: read on the listening socket");
+      if (alen > 0) {
+	      if (read(bgpsock, NULL, 0) < 0)
+		      fatal("<main_listen_accept>: read on the listening socket");
+	      /* XXX: make sure to purge all ancillary data before accepting */
+	      continue;
+      }
 
       /*
        * Accept the BGP connection.
@@ -315,10 +328,7 @@ main_listen_accept()
 #endif
 
       bgp_send_open(bnp);
-
     }   /* End of "bgpsock" */
-
-
 
     /* Check BGP external-links of their discriptors */
     if (bgpyes) {
