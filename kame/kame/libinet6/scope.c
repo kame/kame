@@ -1,4 +1,4 @@
-/*	$KAME: scope.c,v 1.6 2001/11/13 10:26:19 jinmei Exp $ */
+/*	$KAME: scope.c,v 1.7 2001/11/13 10:26:41 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -38,7 +38,6 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif
-#include <netinet/in.h>
 #include <netinet6/in6_var.h>
 #endif
 
