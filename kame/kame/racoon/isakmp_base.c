@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.8 2000/01/12 20:57:27 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.9 2000/01/12 22:33:47 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -774,7 +774,22 @@ base_r2send(iph1, msg)
 
 	/* generate HASH to send */
 	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "generate HASH_I\n"));
-	iph1->hash = oakley_ph1hash_base_r(iph1, GENERATE);
+	switch (iph1->approval->authmethod) {
+	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
+	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
+	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
+		iph1->hash = oakley_ph1hash_common(iph1, GENERATE);
+		break;
+	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
+	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
+		iph1->hash = oakley_ph1hash_base_r(iph1, GENERATE);
+		break;
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid authentication method %d\n",
+			iph1->approval->authmethod);
+		goto end; 
+	}
 	if (iph1->hash == NULL)
 		goto end;
 
@@ -850,11 +865,11 @@ base_ir2sendmx(iph1)
 
 	/* create isakmp HASH payload */
 	p = set_isakmp_payload(p, iph1->hash,
-		vidhash ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_HASH);
+		vidhash ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
 
 	/* append vendor id, if needed */
 	if (vidhash)
-		p = set_isakmp_payload(p, vidhash, ISAKMP_NPTYPE_NONCE);
+		p = set_isakmp_payload(p, vidhash, ISAKMP_NPTYPE_NONE);
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(buf, iph1->local, iph1->remote, 0);

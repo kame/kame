@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.7 2000/01/12 21:03:49 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.8 2000/01/12 22:33:48 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -731,14 +731,6 @@ oakley_ph1hash_common(iph1, sw)
 	int len, bl;
 	int error = -1;
 
-	if (iph1->etype != ISAKMP_ETYPE_AGG
-	 && iph1->etype != ISAKMP_ETYPE_IDENT) {
-		YIPSDEBUG(DEBUG_KEY,
-			plog(logp, LOCATION, NULL,
-				"invalid etype for this hash function\n"));
-			return NULL;
-	}
-
 	/* create buffer */
 	len = iph1->dhpub->l
 		+ iph1->dhpub_p->l
@@ -897,7 +889,7 @@ end:
 }
 
 /*
- * compute HASH_R on base mode.
+ * compute HASH_R on base mode for signature method.
  * base:
  * HASH_R = prf(hash(Ni_b | Nr_b), g^xi | g^xr | CKY-I | CKY-R | SAi_b | IDii_b)
  */
@@ -1048,7 +1040,7 @@ oakley_validate_auth(iph1)
 			break;
 		case ISAKMP_ETYPE_BASE:
 			if (iph1->side == INITIATOR)
-				my_hash = oakley_ph1hash_base_r(iph1, VALIDATE);
+				my_hash = oakley_ph1hash_common(iph1, VALIDATE);
 			else
 				my_hash = oakley_ph1hash_base_i(iph1, VALIDATE);
 			break;
