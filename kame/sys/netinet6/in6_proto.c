@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.132 2002/11/04 23:00:00 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.133 2002/11/11 18:24:04 itojun Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -631,7 +631,9 @@ time_t	ip6_log_time = (time_t)0L;
  * or so? (jinmei@kame.net 19990310)
  */
 int pmtu_expire = 60*10;
+#ifdef TCP6
 int pmtu_probe = 60*2;
+#endif
 #endif
 
 /* raw IP6 parameters */
