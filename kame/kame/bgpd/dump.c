@@ -632,7 +632,7 @@ show_bgp_route_entry(fp, bre)
 	fprintf(fp, "%s            ID: %s, Type: %s\n", indent,
 		inet_ntop(AF_INET, &bnp->rp_id, inetaddrstr, INET_ADDRSTRLEN),
 		(bnp->rp_mode & BGPO_IGP) ? "IBGP" : "EBGP");
-	fprintf(fp, "%s  Last Update: %s\n", indent,
+	fprintf(fp, "%s  Last Update: %s", indent,
 		ctime(&bre->rte->rt_time));
 	if (bre->rte->rt_flags & RTF_INSTALLED)
 		dump_bgp_exportlist(fp, bre->rte, indent);
