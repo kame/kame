@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2118 2002/04/08 11:20:12 jinmei Exp $
+$KAME: CHANGELOG,v 1.2119 2002/04/09 12:20:26 jinmei Exp $
 
 <200204>
+2002-04-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_input, icmp6_mtudisc_update):
+	dropped icmp6 too big messages that reported an MTU less than the
+	minimum MTU (i.e., 1280 bytes).  We believe such an error is only
+	meaningful when we're acting as an SIIT(-like) client, which we do
+	not support.
+
 2002-04-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_proto.c: added a new sysctl knob
 	"net.inet6.ip6.pmtu_expire" to configure the timer value (in
