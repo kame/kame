@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.19 2000/03/25 07:23:37 sumikawa Exp $	*/
+/*	$KAME: ip_encap.c,v 1.20 2000/03/30 14:25:53 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -58,6 +58,7 @@
 #endif
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #include "opt_inet.h"
+#include "opt_inet6.h"
 #endif
 
 #include <sys/param.h>
@@ -121,6 +122,7 @@ encap_init()
 #endif
 }
 
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 void
 #if __STDC__
 encap4_input(struct mbuf *m, ...)
@@ -201,6 +203,7 @@ encap4_input(m, va_alist)
 	/* last resort: inject to raw socket */
 	rip_input(m, off, proto);
 }
+#endif
 
 #ifdef INET6
 int
