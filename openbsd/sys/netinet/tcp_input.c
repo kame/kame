@@ -1212,6 +1212,7 @@ findpcb:
 			 */
 			am->m_len = sizeof(struct sockaddr_in6);
 			sin6 = mtod(am, struct sockaddr_in6 *);
+			bzero(sin6, sizeof(*sin6));
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_len = sizeof(struct sockaddr_in6);
 			sa6_copy_addr(src_sa6, sin6);
@@ -1237,6 +1238,7 @@ findpcb:
 			}
 			am->m_len = sizeof(struct sockaddr_in);
 			sin = mtod(am, struct sockaddr_in *);
+			bzero(sin, sizeof(*sin));
 			sin->sin_family = AF_INET;
 			sin->sin_len = sizeof(*sin);
 			sin->sin_addr = ip->ip_src;
