@@ -1,4 +1,4 @@
-/* $OpenBSD: machdep.c,v 1.79 2002/12/17 23:11:31 millert Exp $ */
+/* $OpenBSD: machdep.c,v 1.83 2003/08/10 00:03:21 miod Exp $ */
 /* $NetBSD: machdep.c,v 1.210 2000/06/01 17:12:38 thorpej Exp $ */
 
 /*-
@@ -385,7 +385,7 @@ nobootinfo:
 		/* NOTREACHED */
 	}
 	(*c->init)();
-	strcpy(cpu_model, platform.model);
+	strlcpy(cpu_model, platform.model, sizeof cpu_model);
 
 	/*
 	 * Initialize the real console, so that the bootstrap console is
@@ -945,14 +945,15 @@ cpu_startup()
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
 	 */
+	minaddr = vm_map_min(kernel_map);
 	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   16 * NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
+	    16 * NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
 
 	/*
 	 * Allocate a submap for physio
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   VM_PHYS_SIZE, 0, FALSE, NULL);
+	    VM_PHYS_SIZE, 0, FALSE, NULL);
 
 #if defined(DEBUG)
 	pmapdebug = opmapdebug;
@@ -1038,7 +1039,7 @@ alpha_unknown_sysname()
 {
 	static char s[128];		/* safe size */
 
-	sprintf(s, "%s family, unknown model variation 0x%lx",
+	snprintf(s, sizeof s, "%s family, unknown model variation 0x%lx",
 	    platform.family, hwrpb->rpb_variation & SV_ST_MASK);
 	return ((const char *)s);
 }
@@ -1556,24 +1557,6 @@ sendsig(catcher, sig, mask, code, type, val)
 		printf("sendsig(%d): sig %d ssp %p usp %p\n", p->p_pid,
 		    sig, &oonstack, scp);
 #endif
-	if (uvm_useracc((caddr_t)scp, fsize, B_WRITE) == 0) {
-#ifdef DEBUG
-		if ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid)
-			printf("sendsig(%d): uvm_useracc failed on sig %d\n",
-			    p->p_pid, sig);
-#endif
-		/*
-		 * Process has trashed its stack; give it an illegal
-		 * instruction to halt it in its tracks.
-		 */
-		SIGACTION(p, SIGILL) = SIG_DFL;
-		sig = sigmask(SIGILL);
-		p->p_sigignore &= ~sig;
-		p->p_sigcatch &= ~sig;
-		p->p_sigmask &= ~sig;
-		psignal(p, SIGILL);
-		return;
-	}
 
 	/*
 	 * Build the signal context to be used by sigreturn.
@@ -1611,14 +1594,33 @@ sendsig(catcher, sig, mask, code, type, val)
 	if (psp->ps_siginfo & sigmask(sig)) {
 		initsiginfo(&ksi, sig, code, type, val);
 		sip = (void *)scp + kscsize;
-		(void) copyout((caddr_t)&ksi, (caddr_t)sip, fsize - kscsize);
+		if (copyout((caddr_t)&ksi, (caddr_t)sip, fsize - kscsize) != 0)
+			goto trash;
 	} else
 		sip = NULL;
 
 	/*
 	 * copy the frame out to userland.
 	 */
-	(void) copyout((caddr_t)&ksc, (caddr_t)scp, kscsize);
+	if (copyout((caddr_t)&ksc, (caddr_t)scp, kscsize) != 0) {
+trash:
+#ifdef DEBUG
+		if ((sigdebug & SDB_KSTACK) && p->p_pid == sigpid)
+			printf("sendsig(%d): copyout failed on sig %d\n",
+			    p->p_pid, sig);
+#endif
+		/*
+		 * Process has trashed its stack; give it an illegal
+		 * instruction to halt it in its tracks.
+		 */
+		SIGACTION(p, SIGILL) = SIG_DFL;
+		sig = sigmask(SIGILL);
+		p->p_sigignore &= ~sig;
+		p->p_sigcatch &= ~sig;
+		p->p_sigmask &= ~sig;
+		psignal(p, SIGILL);
+		return;
+	}
 #ifdef DEBUG
 	if (sigdebug & SDB_FOLLOW)
 		printf("sendsig(%d): sig %d scp %p code %lx\n", p->p_pid, sig,

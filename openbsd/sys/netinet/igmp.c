@@ -1,4 +1,4 @@
-/*	$OpenBSD: igmp.c,v 1.17 2003/02/12 14:41:07 jason Exp $	*/
+/*	$OpenBSD: igmp.c,v 1.18 2003/07/09 22:03:16 itojun Exp $	*/
 /*	$NetBSD: igmp.c,v 1.15 1996/02/13 23:41:25 christos Exp $	*/
 
 /*
@@ -126,7 +126,7 @@ static int addrlen = sizeof(struct in_addr);
 	(m)->m_data += max_linkhdr;					\
 	ip = mtod((m), struct ip *);					\
 	buflen = sizeof(struct ip);					\
-	ip->ip_len = sizeof(struct ip) + rhdrlen;			\
+	ip->ip_len = htons(sizeof(struct ip) + rhdrlen);		\
 	ip->ip_tos = 0xc0;						\
 	ip->ip_off = 0;							\
 	ip->ip_p = IPPROTO_IGMP;					\
@@ -286,7 +286,7 @@ igmp_get_router_alert(m)
 	iphlen = ip->ip_hl << 2;
 #endif
 	minlen = iphlen + IGMP_MINLEN;
-	if (ip->ip_len < minlen) {
+	if (ntohs(ip->ip_len) < minlen) {
 		++igmpstat.igps_rcv_tooshort;
 		return -1;
 	}
@@ -373,18 +373,20 @@ igmp_input(struct mbuf *m, ...)
 	iphlen = va_arg(ap, int);
 	va_end(ap);
 
-	igmplen = ip->ip_len;
+	++igmpstat.igps_rcv_total;
+
+	igmplen = ntohs(ip->ip_len) - iphlen;
 
 	/*
 	 * Check length and validate checksum
 	 */
-	if (ip->ip_len > ifp->if_mtu) {
+	if (ntohs(ip->ip_len) > ifp->if_mtu) {
 		++igmpstat.igps_rcv_toolong;
 		m_freem(m);
 		return;
 	}
-	igmplen = ip->ip_len - iphlen;
-#ifdef m_pulldown
+	igmplen = ntohs(ip->ip_len) - iphlen;
+#ifdef PULLDOWN_TEST
 	if ((n = m_pulldown(m, iphlen, igmplen, offp)) == NULL) {
 		++igmpstat.igps_rcv_query_fails;
 		m_freem(m);
@@ -998,7 +1000,7 @@ igmp_sendpkt(inm, type, addr)
 
 	ip = mtod(m, struct ip *);
 	ip->ip_tos = 0;
-	ip->ip_len = sizeof(struct ip) + IGMP_MINLEN;
+	ip->ip_len = htons(sizeof(struct ip) + IGMP_MINLEN);
 	ip->ip_off = 0;
 	ip->ip_p = IPPROTO_IGMP;
 	ip->ip_src.s_addr = INADDR_ANY;
@@ -1908,7 +1910,7 @@ igmp_create_group_record(m, buflenp, inm, numsrc, done, type)
 	igmp_ghdr->auxlen = 0;
 	igmp_ghdr->numsrc = 0;
 	igmp_ghdr->group.s_addr = inm->inm_addr.s_addr;
-	ip->ip_len += ghdrlen;
+	ip->ip_len = ntohs(htons(ip->ip_len) + ghdrlen);
 	m->m_len += ghdrlen;
 	m->m_pkthdr.len += ghdrlen;
 	mfreelen = M_TRAILINGSPACE(m) - *buflenp;
@@ -1929,7 +1931,7 @@ igmp_create_group_record(m, buflenp, inm, numsrc, done, type)
 	}
 
 	*done = total;
-	ip->ip_len += SOURCE_RECORD_LEN(i);
+	ip->ip_len = ntohs(htons(ip->ip_len) + SOURCE_RECORD_LEN(i));
 	igmp_ghdr->numsrc = i;
 	*buflenp += ghdrlen + SOURCE_RECORD_LEN(i);
 	m->m_len += SOURCE_RECORD_LEN(i);

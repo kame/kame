@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_usrreq.c,v 1.86 2002/08/28 15:43:03 pefo Exp $	*/
+/*	$OpenBSD: udp_usrreq.c,v 1.91 2003/07/09 22:03:16 itojun Exp $	*/
 /*	$NetBSD: udp_usrreq.c,v 1.28 1996/03/16 23:54:03 christos Exp $	*/
 
 /*
@@ -45,11 +45,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -148,6 +144,8 @@ extern int ip6_defhlim;
  */
 int	udpcksum = 1;
 
+struct	inpcbtable udbtable;
+struct	udpstat udpstat;
 
 static	void udp_detach(struct inpcb *);
 static	void udp_notify(struct inpcb *, int);
@@ -297,7 +295,9 @@ udp_input(struct mbuf *m, ...)
 			}
 			m_adj(m, len - (m->m_pkthdr.len - iphlen));
 		}
-	} else if (ip6) {
+	}
+#ifdef INET6
+	else if (ip6) {
 		/* jumbograms */
 		if (len == 0 && m->m_pkthdr.len - iphlen > 0xffff)
 			len = m->m_pkthdr.len - iphlen;
@@ -305,7 +305,9 @@ udp_input(struct mbuf *m, ...)
 			udpstat.udps_badlen++;
 			goto bad;
 		}
-	} else /* shouldn't happen */
+	}
+#endif
+	else /* shouldn't happen */
 		goto bad;
 
 	/*
@@ -1245,7 +1247,7 @@ udp_output(struct mbuf *m, ...)
 		    sizeof (struct udphdr) + IPPROTO_UDP));
 	} else
 		ui->ui_sum = 0;
-	((struct ip *)ui)->ip_len = sizeof (struct udpiphdr) + len;
+	((struct ip *)ui)->ip_len = htons(sizeof (struct udpiphdr) + len);
 	((struct ip *)ui)->ip_ttl = inp->inp_ip.ip_ttl;
 	((struct ip *)ui)->ip_tos = inp->inp_ip.ip_tos;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.104 2003/02/26 22:59:32 miod Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.107 2003/06/02 23:27:49 millert Exp $	*/
 /*	$NetBSD: machdep.c,v 1.207 1998/07/08 04:39:34 thorpej Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -352,7 +348,8 @@ cpu_startup(void)
 	for (i = 0; i < btoc(MSGBUFSIZE); i++)
 		pmap_enter(pmap_kernel(), (vaddr_t)msgbufp + i * NBPG,
 		    high[numranges - 1] + i * NBPG,
-		    VM_PROT_ALL, VM_PROT_ALL|PMAP_WIRED);
+		    VM_PROT_READ|VM_PROT_WRITE,
+		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 	pmap_update(pmap_kernel());
 	initmsgbuf((caddr_t)msgbufp, round_page(MSGBUFSIZE));
 
@@ -2181,7 +2178,7 @@ identifycpu()
 	/*
 	 * Print the machine type...
 	 */
-	sprintf(cpu_model, "Apple Macintosh %s%s",
+	snprintf(cpu_model, sizeof cpu_model, "Apple Macintosh %s%s",
 	    cpu_models[mac68k_machine.cpu_model_index].model_major,
 	    cpu_models[mac68k_machine.cpu_model_index].model_minor);
 
@@ -2190,16 +2187,16 @@ identifycpu()
 	 */
 	switch (cputype) {
 	case CPU_68040:
-		strcat(cpu_model, ", 68040 CPU");
+		strlcat(cpu_model, ", 68040 CPU", sizeof cpu_model);
 		break;
 	case CPU_68030:
-		strcat(cpu_model, ", 68030 CPU");
+		strlcat(cpu_model, ", 68030 CPU", sizeof cpu_model);
 		break;
 	case CPU_68020:
-		strcat(cpu_model, ", 68020 CPU");
+		strlcat(cpu_model, ", 68020 CPU", sizeof cpu_model);
 		break;
 	default:
-		strcat(cpu_model, ", unknown CPU");
+		strlcat(cpu_model, ", unknown CPU", sizeof cpu_model);
 		break;
 	}
 
@@ -2209,10 +2206,10 @@ identifycpu()
 	switch (mmutype) {
 	case MMU_68040:
 	case MMU_68030:
-		strcat(cpu_model, "+MMU");
+		strlcat(cpu_model, "+MMU", sizeof cpu_model);
 		break;
 	case MMU_68851:
-		strcat(cpu_model, ", MC68851 MMU");
+		strlcat(cpu_model, ", MC68851 MMU", sizeof cpu_model);
 		break;
 	default:
 		printf("%s\n", cpu_model);
@@ -2227,19 +2224,19 @@ identifycpu()
 
 	switch (fputype) {
 	case FPU_68040:
-		strcat(cpu_model, "+FPU");
+		strlcat(cpu_model, "+FPU", sizeof cpu_model);
 		break;
 	case FPU_68882:
-		strcat(cpu_model, ", MC6882 FPU");
+		strlcat(cpu_model, ", MC6882 FPU", sizeof cpu_model);
 		break;
 	case FPU_68881:
-		strcat(cpu_model, ", MC6881 FPU");
+		strlcat(cpu_model, ", MC6881 FPU", sizeof cpu_model);
 		break;
 	case FPU_UNKNOWN:
-		strcat(cpu_model, ", unknown FPU");
+		strlcat(cpu_model, ", unknown FPU", sizeof cpu_model);
 		break;
 	default:
-		/*strcat(cpu_model, ", no FPU");*/
+		/*strlcat(cpu_model, ", no FPU", sizeof cpu_model);*/
 		break;
 	}
 
@@ -2247,7 +2244,7 @@ identifycpu()
 	 * ... and finally, the cache type.
 	 */
 	if (cputype == CPU_68040)
-		strcat(cpu_model, ", 4k on-chip physical I/D caches");
+		strlcat(cpu_model, ", 4k on-chip physical I/D caches", sizeof cpu_model);
 
 	printf("%s\n", cpu_model);
 #ifdef DEBUG

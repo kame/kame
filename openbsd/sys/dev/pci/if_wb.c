@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wb.c,v 1.20 2003/01/15 06:31:24 art Exp $	*/
+/*	$OpenBSD: if_wb.c,v 1.22 2003/08/19 14:01:35 mpech Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -71,7 +71,7 @@
  * For transmission, the driver creates a linked list of 'super descriptors'
  * which each contain several individual descriptors linked toghether.
  * Each 'super descriptor' contains WB_MAXFRAGS descriptors, which we
- * abuse as fragment pointers. This allows us to use a buffer managment
+ * abuse as fragment pointers. This allows us to use a buffer management
  * scheme very similar to that used in the ThunderLAN and Etherlink XL
  * drivers.
  *
@@ -1683,6 +1683,7 @@ int wb_ioctl(ifp, command, data)
 		default:
 			wb_init(sc);
 		}
+		break;
 	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP) {
 			wb_init(sc);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.64 2002/09/11 05:38:47 itojun Exp $	*/
+/*	$OpenBSD: if.c,v 1.70 2003/08/27 00:33:34 henric Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -42,11 +42,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -112,14 +108,14 @@
 void	if_attachsetup(struct ifnet *);
 void	if_attachdomain1(struct ifnet *);
 int	if_detach_rtdelete(struct radix_node *, void *);
-int	if_mark_ignore(struct radix_node *, void *);
-int	if_mark_unignore(struct radix_node *, void *);
 
 int	ifqmaxlen = IFQ_MAXLEN;
+int	netisr;
 
 void	if_detach_queues(struct ifnet *, struct ifqueue *);
 void	if_detached_start(struct ifnet *);
 int	if_detached_ioctl(struct ifnet *, u_long, caddr_t);
+int	if_detached_init(struct ifnet *);
 void	if_detached_watchdog(struct ifnet *);
 
 /*
@@ -377,34 +373,6 @@ if_detach_rtdelete(rn, vifp)
 	return (0);
 }
 
-int
-if_mark_ignore(rn, vifp)
-	struct radix_node *rn;
-	void *vifp;
-{
-	struct ifnet *ifp = vifp;
-	struct rtentry *rt = (struct rtentry *)rn;
-
-	if (rt->rt_ifp == ifp)
-		rn->rn_flags |= RNF_IGNORE;
-
-	return (0);
-}
-
-int
-if_mark_unignore(rn, vifp)
-	struct radix_node *rn;
-	void *vifp;
-{
-	struct ifnet *ifp = vifp;
-	struct rtentry *rt = (struct rtentry *)rn;
-
-	if (rt->rt_ifp == ifp)
-		rn->rn_flags &= ~RNF_IGNORE;
-
-	return (0);
-}
-
 /*
  * Detach an interface from everything in the kernel.  Also deallocate
  * private resources.
@@ -423,6 +391,7 @@ if_detach(ifp)
 	ifp->if_flags &= ~IFF_OACTIVE;
 	ifp->if_start = if_detached_start;
 	ifp->if_ioctl = if_detached_ioctl;
+	ifp->if_init = if_detached_init;
 	ifp->if_watchdog = if_detached_watchdog;
 
 #if NBRIDGE > 0
@@ -770,8 +739,6 @@ void
 if_down(struct ifnet *ifp)
 {
 	struct ifaddr *ifa;
-	struct radix_node_head *rnh;
-	int i;
 
 	splassert(IPL_SOFTNET);
 
@@ -782,16 +749,6 @@ if_down(struct ifnet *ifp)
 	}
 	IFQ_PURGE(&ifp->if_snd);
 	rt_ifmsg(ifp);
-
-	/*
-	 * Find and mark as ignore all routes which are using this interface.
-	 * XXX Factor out into a route.c function?
-	 */
-	for (i = 1; i <= AF_MAX; i++) {
-		rnh = rt_tables[i];
-		if (rnh)
-			(*rnh->rnh_walktree)(rnh, if_mark_ignore, ifp);
-	}
 }
 
 /*
@@ -805,8 +762,6 @@ if_up(struct ifnet *ifp)
 #ifdef notyet
 	struct ifaddr *ifa;
 #endif
-	struct radix_node_head *rnh;
-	int i;
 
 	splassert(IPL_SOFTNET);
 
@@ -822,16 +777,6 @@ if_up(struct ifnet *ifp)
 #ifdef INET6
 	in6_if_up(ifp);
 #endif
-
-	/*
-	 * Find and unignore all routes which are using this interface.
-	 * XXX Factor out into a route.c function?
-	 */
-	for (i = 1; i <= AF_MAX; i++) {
-		rnh = rt_tables[i];
-		if (rnh)
-			(*rnh->rnh_walktree)(rnh, if_mark_unignore, ifp);
-	}
 }
 
 /*
@@ -939,7 +884,7 @@ ifioctl(so, cmd, data, p)
 		break;
 
 	case SIOCSIFFLAGS:
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+		if ((error = suser(p, 0)) != 0)
 			return (error);
 		if (ifp->if_flags & IFF_UP && (ifr->ifr_flags & IFF_UP) == 0) {
 			int s = splimp();
@@ -958,7 +903,7 @@ ifioctl(so, cmd, data, p)
 		break;
 
 	case SIOCSIFMETRIC:
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+		if ((error = suser(p, 0)) != 0)
 			return (error);
 		ifp->if_metric = ifr->ifr_metric;
 		break;
@@ -969,7 +914,7 @@ ifioctl(so, cmd, data, p)
 		int oldmtu = ifp->if_mtu;
 #endif
 
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+		if ((error = suser(p, 0)) != 0)
 			return (error);
 		if (ifp->if_ioctl == NULL)
 			return (EOPNOTSUPP);
@@ -994,7 +939,7 @@ ifioctl(so, cmd, data, p)
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 	case SIOCSIFMEDIA:
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+		if ((error = suser(p, 0)) != 0)
 			return (error);
 		/* FALLTHROUGH */
 	case SIOCGIFPSRCADDR:
@@ -1197,6 +1142,12 @@ int
 if_detached_ioctl(struct ifnet *ifp, u_long a, caddr_t b)
 {
 	return ENODEV;
+}
+
+int
+if_detached_init(struct ifnet *ifp)
+{
+	return (ENXIO);
 }
 
 void

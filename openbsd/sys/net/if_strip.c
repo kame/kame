@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_strip.c,v 1.23 2003/01/07 09:00:33 kjc Exp $	*/
+/*	$OpenBSD: if_strip.c,v 1.26 2003/08/15 20:32:19 tedu Exp $	*/
 /*	$NetBSD: if_strip.c,v 1.2.4.3 1996/08/03 00:58:32 jtc Exp $	*/
 /*	from: NetBSD: if_sl.c,v 1.38 1996/02/13 22:00:23 christos Exp $	*/
 
@@ -40,11 +40,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -351,7 +347,8 @@ stripattach(n)
 	for (sc = st_softc; i < NSTRIP; sc++) {
 		timeout_set(&sc->sc_timo, strip_timeout, sc);
 		sc->sc_unit = i;		/* XXX */
-		sprintf(sc->sc_if.if_xname, "strip%d", i++);
+		snprintf(sc->sc_if.if_xname, sizeof sc->sc_if.if_xname,
+		    "strip%d", i++);
 		sc->sc_if.if_softc = sc;
 		sc->sc_if.if_mtu = SLMTU;
 		sc->sc_if.if_flags = 0;
@@ -450,7 +447,7 @@ stripopen(dev, tp)
 	int s;
 #endif
 
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+	if ((error = suser(p, 0)) != 0)
 		return (error);
 
 	if (tp->t_line == STRIPDISC)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_socket2.c,v 1.33 2002/10/12 01:09:45 krw Exp $	*/
+/*	$OpenBSD: uipc_socket2.c,v 1.35 2003/07/21 22:44:50 tedu Exp $	*/
 /*	$NetBSD: uipc_socket2.c,v 1.11 1996/02/04 02:17:55 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -111,9 +107,9 @@ soisconnected(so)
 	if (head && soqremque(so, 0)) {
 		soqinsque(head, so, 1);
 		sorwakeup(head);
-		wakeup_one((caddr_t)&head->so_timeo);
+		wakeup_one(&head->so_timeo);
 	} else {
-		wakeup((caddr_t)&so->so_timeo);
+		wakeup(&so->so_timeo);
 		sorwakeup(so);
 		sowwakeup(so);
 	}
@@ -126,7 +122,7 @@ soisdisconnecting(so)
 
 	so->so_state &= ~SS_ISCONNECTING;
 	so->so_state |= (SS_ISDISCONNECTING|SS_CANTRCVMORE|SS_CANTSENDMORE);
-	wakeup((caddr_t)&so->so_timeo);
+	wakeup(&so->so_timeo);
 	sowwakeup(so);
 	sorwakeup(so);
 }
@@ -138,7 +134,7 @@ soisdisconnected(so)
 
 	so->so_state &= ~(SS_ISCONNECTING|SS_ISCONNECTED|SS_ISDISCONNECTING);
 	so->so_state |= (SS_CANTRCVMORE|SS_CANTSENDMORE|SS_ISDISCONNECTED);
-	wakeup((caddr_t)&so->so_timeo);
+	wakeup(&so->so_timeo);
 	sowwakeup(so);
 	sorwakeup(so);
 }
@@ -166,7 +162,7 @@ sonewconn(struct socket *head, int connstatus)
 	so = pool_get(&socket_pool, PR_NOWAIT);
 	if (so == NULL)
 		return ((struct socket *)0);
-	bzero((caddr_t)so, sizeof(*so));
+	bzero(so, sizeof(*so));
 	so->so_type = head->so_type;
 	so->so_options = head->so_options &~ SO_ACCEPTCONN;
 	so->so_linger = head->so_linger;
@@ -190,7 +186,7 @@ sonewconn(struct socket *head, int connstatus)
 	}
 	if (connstatus) {
 		sorwakeup(head);
-		wakeup((caddr_t)&head->so_timeo);
+		wakeup(&head->so_timeo);
 		so->so_state |= connstatus;
 	}
 	return (so);
@@ -274,7 +270,7 @@ sbwait(sb)
 {
 
 	sb->sb_flags |= SB_WAIT;
-	return (tsleep((caddr_t)&sb->sb_cc,
+	return (tsleep(&sb->sb_cc,
 	    (sb->sb_flags & SB_NOINTR) ? PSOCK : PSOCK | PCATCH, netio,
 	    sb->sb_timeo));
 }
@@ -291,7 +287,7 @@ sb_lock(sb)
 
 	while (sb->sb_flags & SB_LOCK) {
 		sb->sb_flags |= SB_WANT;
-		error = tsleep((caddr_t)&sb->sb_flags,
+		error = tsleep(&sb->sb_flags,
 		    (sb->sb_flags & SB_NOINTR) ?
 		    PSOCK : PSOCK|PCATCH, netlck, 0);
 		if (error)
@@ -315,7 +311,7 @@ sowakeup(so, sb)
 	sb->sb_flags &= ~SB_SEL;
 	if (sb->sb_flags & SB_WAIT) {
 		sb->sb_flags &= ~SB_WAIT;
-		wakeup((caddr_t)&sb->sb_cc);
+		wakeup(&sb->sb_cc);
 	}
 	if (so->so_state & SS_ASYNC)
 		csignal(so->so_pgid, SIGIO, so->so_siguid, so->so_sigeuid);
@@ -682,7 +678,7 @@ sbappendaddr(struct sockbuf *sb, struct sockaddr *asa, struct mbuf *m0,
 	if (m == 0)
 		return (0);
 	m->m_len = asa->sa_len;
-	bcopy((caddr_t)asa, mtod(m, caddr_t), asa->sa_len);
+	bcopy(asa, mtod(m, caddr_t), asa->sa_len);
 	if (n)
 		n->m_next = m0;		/* concatenate data to control */
 	else

@@ -1,4 +1,4 @@
-/*	$OpenBSD: netisr.h,v 1.17 2002/03/14 01:27:09 millert Exp $	*/
+/*	$OpenBSD: netisr.h,v 1.19 2003/06/02 23:28:12 millert Exp $	*/
 /*	$NetBSD: netisr.h,v 1.12 1995/08/12 23:59:24 mycroft Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -72,7 +68,7 @@
 
 #ifndef _LOCORE
 #ifdef _KERNEL
-int	netisr;				/* scheduling bits for network */
+extern int	netisr;			/* scheduling bits for network */
 
 void	arpintr(void);
 void	ipintr(void);

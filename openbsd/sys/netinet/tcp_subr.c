@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_subr.c,v 1.65 2002/08/28 15:43:03 pefo Exp $	*/
+/*	$OpenBSD: tcp_subr.c,v 1.68 2003/07/09 22:03:16 itojun Exp $	*/
 /*	$NetBSD: tcp_subr.c,v 1.22 1996/02/13 23:44:00 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -136,6 +132,8 @@ int	tcp_do_sack = TCP_DO_SACK;		/* RFC 2018 selective ACKs */
 int	tcp_ack_on_push = 0;	/* set to enable immediate ACK-on-PUSH */
 int	tcp_do_ecn = 0;		/* RFC3168 ECN enabled/disabled? */
 
+u_int32_t	tcp_now;
+
 #ifndef TCBHASHSIZE
 #define	TCBHASHSIZE	128
 #endif
@@ -158,6 +156,7 @@ struct pool sackhl_pool;
 int	tcp_freeq(struct tcpcb *);
 
 struct tcpstat tcpstat;		/* tcp statistics */
+tcp_seq  tcp_iss;
 
 /*
  * Tcp initialization
@@ -487,7 +486,7 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		 */
 		th->th_sum = 0;
 		th->th_sum = in_cksum(m, tlen);
-		((struct ip *)ti)->ip_len = tlen;
+		((struct ip *)ti)->ip_len = htons(tlen);
 		((struct ip *)ti)->ip_ttl = ip_defttl;
 		ip_output(m, (void *)NULL, ro, ip_mtudisc ? IP_MTUDISC : 0,
 			(void *)NULL, tp ? tp->t_inpcb : (void *)NULL);

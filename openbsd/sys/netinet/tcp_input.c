@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_input.c,v 1.125 2003/02/14 17:54:46 dhartmei Exp $	*/
+/*	$OpenBSD: tcp_input.c,v 1.132 2003/07/09 22:03:16 itojun Exp $	*/
 /*	$NetBSD: tcp_input.c,v 1.23 1996/02/13 23:43:44 christos Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -537,7 +533,6 @@ tcp_input(struct mbuf *m, ...)
 		/*
 		 * Checksum extended TCP header and data.
 		 */
-		HTONS(ip->ip_len);
 		if ((m->m_pkthdr.csum & M_TCP_CSUM_IN_OK) == 0) {
 			if (m->m_pkthdr.csum & M_TCP_CSUM_IN_BAD) {
 				tcpstat.tcps_inhwcsum++;
@@ -1448,7 +1443,7 @@ trimthenstep6:
 				tiflags &= ~TH_URG;
 			todrop--;
 		}
-		if (todrop >= tlen ||
+		if (todrop > tlen ||
 		    (todrop == tlen && (tiflags & TH_FIN) == 0)) {
 			/*
 			 * Any valid FIN must be to the left of the
@@ -2216,8 +2211,25 @@ dodata:							/* XXX */
 			break;
 		}
 	}
+<<<<<<< tcp_input.c
 	if (so->so_options & SO_DEBUG)
 		tcp_trace(TA_INPUT, ostate, tp, tcp_saveti, 0, tlen);
+=======
+	if (so->so_options & SO_DEBUG) {
+		switch (tp->pf) {
+#ifdef INET6
+		case PF_INET6:
+			tcp_trace(TA_INPUT, ostate, tp, (caddr_t) &tcp_saveti6,
+			    0, tlen);
+			break;
+#endif /* INET6 */
+		case PF_INET:
+			tcp_trace(TA_INPUT, ostate, tp, (caddr_t) &tcp_saveti,
+			    0, tlen);
+			break;
+		}
+	}
+>>>>>>> 1.1.1.10
 
 	/*
 	 * Return any desired output.
