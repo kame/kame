@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.34 2000/05/29 08:05:02 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.35 2000/06/14 11:14:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -141,15 +141,15 @@ static void ah_update_mbuf __P((struct mbuf *, int, int, struct ah_algorithm *,
 /* NOTE: The order depends on SADB_AALG_x in net/pfkeyv2.h */
 struct ah_algorithm ah_algorithms[] = {
 	{ 0, 0, 0, 0, 0, 0, },
-	{ ah_sumsiz_1216, ah_hmac_md5_mature, 128, 128,
+	{ ah_sumsiz_1216, ah_hmac_md5_mature, 128, 128, "hmac-md5",
 		ah_hmac_md5_init, ah_hmac_md5_loop, ah_hmac_md5_result, },
-	{ ah_sumsiz_1216, ah_hmac_sha1_mature, 160, 160,
+	{ ah_sumsiz_1216, ah_hmac_sha1_mature, 160, 160, "hmac-sha1",
 		ah_hmac_sha1_init, ah_hmac_sha1_loop, ah_hmac_sha1_result, },
-	{ ah_sumsiz_1216, ah_keyed_md5_mature, 128, 128,
+	{ ah_sumsiz_1216, ah_keyed_md5_mature, 128, 128, "keyed-md5",
 		ah_keyed_md5_init, ah_keyed_md5_loop, ah_keyed_md5_result, },
-	{ ah_sumsiz_1216, ah_keyed_sha1_mature, 160, 160,
+	{ ah_sumsiz_1216, ah_keyed_sha1_mature, 160, 160, "keyed-sha1",
 		ah_keyed_sha1_init, ah_keyed_sha1_loop, ah_keyed_sha1_result, },
-	{ ah_sumsiz_zero, ah_none_mature, 0, 2048,
+	{ ah_sumsiz_zero, ah_none_mature, 0, 2048, "none",
 		ah_none_init, ah_none_loop, ah_none_result, },
 };
 
