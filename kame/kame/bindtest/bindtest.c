@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.11 2000/10/20 16:49:36 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.12 2000/10/22 13:58:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI Project.
@@ -74,7 +74,7 @@
 
 static struct testitem{
 	const char *name;
-	const sa_family_t family;
+	const int family;	/*sa_family_t is not widely defined*/
 	const char *host;
 	struct addrinfo *res;
 } testitems[] = {
@@ -105,7 +105,6 @@ main(argc, argv)
 	char **argv;
 {
 	int ch;
-	extern int optind;
 	extern char *optarg;
 	struct testitem *testi, *testj;
 
