@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.5 2003/01/21 12:05:37 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.6 2003/01/22 08:05:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -326,18 +326,6 @@ release_ia(ia)
 		dhcp6_remove_event(ev);
 
 	return (-1);
-}
-
-void
-remove_all_ia()
-{
-	struct ia *ia, *ia_next;
-
-	for (ia = TAILQ_FIRST(&ia_listhead); ia; ia = ia_next) {
-		ia_next = TAILQ_NEXT(ia, link);
-
-		remove_ia(ia);
-	}
 }
 
 static void
