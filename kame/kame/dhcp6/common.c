@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.74 2003/01/22 07:24:15 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.75 2003/01/22 07:42:30 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -767,7 +767,7 @@ dhcp6_init_options(optinfo)
 	memset(optinfo, 0, sizeof(*optinfo));
 
 	optinfo->pref = DH6OPT_PREF_UNDEF;
-	optinfo->pref = DH6OPT_ELAPSED_TIME_UNDEF;
+	optinfo->elapsed_time = DH6OPT_ELAPSED_TIME_UNDEF;
 
 	TAILQ_INIT(&optinfo->iapd_list);
 	TAILQ_INIT(&optinfo->reqopt_list);
