@@ -1,12 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1369 2000/11/07 16:35:45 jinmei Exp $
+$KAME: CHANGELOG,v 1.1370 2000/11/07 16:40:59 itojun Exp $
 
 <200011>
 2000-11-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi3/sbin/ifconfig/ifconfig.c (in6_status):
 	* bsdi4/sbin/ifconfig/ifconfig.c (inet6_status):
-	bark if an IPv6 address is deprecated.
+	* {net,open}bsd/sbin/ifconfig/ifconfig.c:
+	  explicitly state that an address is "deprecated" if preferred
+	  lifetime goes into 0.
 
 2000-11-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/rtadvd.c (sock_open): join ff05::2 if router
