@@ -65,7 +65,8 @@ probe_init()
 		CMSG_SPACE(sizeof(int));
 	static u_char *sndcmsgbuf = NULL;
 	
-	if (sndcmsgbuf == NULL && (sndcmsgbuf = malloc(scmsglen)) == NULL) {
+	if (sndcmsgbuf == NULL &&
+	    (sndcmsgbuf = (u_char *)malloc(scmsglen)) == NULL) {
 		warnmsg(LOG_ERR, __FUNCTION__, "malloc failed");
 		return(-1);
 	}
