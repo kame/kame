@@ -1,0 +1,27 @@
+--- auth.c.orif	Thu Apr 20 17:21:58 2000
++++ auth.c	Thu Apr 20 17:50:06 2000
+@@ -26,7 +26,6 @@
+ #include "session.h"
+ #include "dispatch.h"
+ 
+-
+ /* import */
+ extern ServerOptions options;
+ extern char *forced_command;
+@@ -106,6 +105,16 @@
+ 				return 0;
+ 		}
+ 	}
++#ifdef __FreeBSD__
++	/* Fail if the account's expiration time has passed. */
++	if (pw->pw_expire != 0) {
++		struct timeval tv;
++
++		(void)gettimeofday(&tv, NULL);
++		if (tv.tv_sec >= pw->pw_expire)
++			return 0;
++	}
++#endif /* __FreeBSD__ */
+ 	/* We found no reason not to let this user try to log on... */
+ 	return 1;
+ }

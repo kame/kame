@@ -1,0 +1,11 @@
+--- ssh-keygen.c.orig	Sat May 20 01:02:23 2000
++++ ssh-keygen.c	Sat May 20 01:01:39 2000
+@@ -516,7 +516,7 @@
+ 	extern int optind;
+ 	extern char *optarg;
+ 
+-	OpenSSL_add_all_algorithms();
++	SSLeay_add_all_algorithms();
+ 
+ 	/* we need this for the home * directory.  */
+ 	pw = getpwuid(getuid());

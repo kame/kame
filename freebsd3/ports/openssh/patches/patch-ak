@@ -1,6 +1,6 @@
---- /usr/ports/distfiles/OpenSSH-1.2/src/usr.bin/ssh/ssh.c	Tue Nov 23 18:57:50 1999
-+++ ./ssh.c	Tue Nov 23 19:28:33 1999
-@@ -123,6 +123,9 @@
+--- ssh.c.orig	Mon May  8 13:12:15 2000
++++ ssh.c	Sat May 20 01:02:44 2000
+@@ -154,6 +154,9 @@
  	log("Using rsh.  WARNING: Connection will not be encrypted.");
  	/* Build argument list for rsh. */
  	i = 0;
@@ -10,3 +10,24 @@
  	args[i++] = _PATH_RSH;
  	/* host may have to come after user on some systems */
  	args[i++] = host;
+@@ -422,7 +425,7 @@
+ 	if (!host)
+ 		usage();
+ 
+-        OpenSSL_add_all_algorithms();
++        SSLeay_add_all_algorithms();
+ 
+ 	/* Initialize the command to execute on remote host. */
+ 	buffer_init(&command);
+@@ -477,6 +480,11 @@
+ 	pwcopy.pw_gid = pw->pw_gid;
+ 	pwcopy.pw_dir = xstrdup(pw->pw_dir);
+ 	pwcopy.pw_shell = xstrdup(pw->pw_shell);
++#ifdef __FreeBSD__
++	pwcopy.pw_class = xstrdup(pw->pw_class);
++ 	pwcopy.pw_expire = pw->pw_expire;
++ 	pwcopy.pw_change = pw->pw_change;
++#endif /* __FreeBSD__ */
+ 	pw = &pwcopy;
+ 
+ 	/* Initialize "log" output.  Since we are the client all output
