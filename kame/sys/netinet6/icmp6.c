@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.276 2002/02/02 07:06:11 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.277 2002/02/02 13:15:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2502,7 +2502,7 @@ icmp6_reflect(m, off)
 		 * source address of the erroneous packet.
 		 */
 		bzero(&ro, sizeof(ro));
-		src = in6_selectsrc(osrc, NULL, NULL, &ro, NULL, NULL, &e);
+		src = in6_selectsrc(osrc, NULL, NULL, &ro, NULL, &outif, &e);
 		if (ro.ro_rt) { /* XXX: see comments in icmp6_mtudisc_update */
 			RTFREE(ro.ro_rt); /* XXX: we could use this */
 		}
@@ -2549,7 +2549,9 @@ icmp6_reflect(m, off)
 	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
 	ip6->ip6_vfc |= IPV6_VERSION;
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
-	if (m->m_pkthdr.rcvif) {
+	if (outif)
+		ip6->ip6_hlim = nd_ifinfo[outif->if_index].chlim;
+	else if (m->m_pkthdr.rcvif) {
 		/* XXX: This may not be the outgoing interface */
 		ip6->ip6_hlim = nd_ifinfo[m->m_pkthdr.rcvif->if_index].chlim;
 	} else
