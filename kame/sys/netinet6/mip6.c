@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.168 2002/09/18 08:55:45 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.169 2002/09/18 11:17:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1838,6 +1838,8 @@ mip6_rthdr_create(pktopt_rthdr, coa, opt)
 	      sizeof(struct in6_addr));
 	*pktopt_rthdr = (struct ip6_rthdr *)rthdr2;
 
+	mip6stat.mip6s_orthdr2++;
+
 	return (0);
 }
 
@@ -1860,8 +1862,6 @@ mip6_rthdr_create_withdst(pktopt_rthdr, dst, opt)
 	if (error) {
 		return (error);
 	}
-
-	mip6stat.mip6s_orthdr2++;
 
 	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.132 2002/09/11 02:34:18 itojun Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.133 2002/09/18 11:17:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2780,6 +2780,9 @@ mip6_tunnel_output(mp, mbc)
 		m_freem(m);
 		return (error);
 	}
+
+	mip6stat.mip6s_orevtunnel++;
+
 #if defined(IPV6_MINMTU) && 0
 	/*
 	 * force fragmentation to minimum MTU, to avoid path MTU discovery.
