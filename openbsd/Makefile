@@ -32,7 +32,6 @@ afterinstall:
 	if test -x $(PREFIX)/sbin/inet6d; then \
 		cp kame/inet6d/inet6d.conf $(PREFIX)/etc/inet6d.conf.sample; \
 	fi
-	cp kame/etc/rc.net6 $(PREFIX)/etc/rc.net6.sample
 	for i in $(DOCS); do \
 		if test -f ../$$i; then \
 			cp ../$$i $(PREFIX)/share/doc/kame; \
