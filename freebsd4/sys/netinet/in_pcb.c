@@ -152,6 +152,10 @@ in_pcballoc(so, pcbinfo, p)
 	inp->inp_gencnt = ++pcbinfo->ipi_gencnt;
 	inp->inp_pcbinfo = pcbinfo;
 	inp->inp_socket = so;
+#if defined(INET6)
+	if (INP_SOCKAF(so) == AF_INET6 && !ip6_mapped_addr_on)
+ 		inp->inp_flags |= IN6P_BINDV6ONLY;
+#endif
 	LIST_INSERT_HEAD(pcbinfo->listhead, inp, inp_list);
 	pcbinfo->ipi_count++;
 	so->so_pcb = (caddr_t)inp;
@@ -230,8 +234,7 @@ in_pcbbind(inp, nam, p)
 				    (so->so_cred->cr_uid !=
 				     t->inp_socket->so_cred->cr_uid)) {
 #if defined(INET6)
-					if (ip6_mapped_addr_on == 0 ||
-					    ntohl(sin->sin_addr.s_addr) !=
+					if (ntohl(sin->sin_addr.s_addr) !=
 					    INADDR_ANY ||
 					    ntohl(t->inp_laddr.s_addr) !=
 					    INADDR_ANY ||
@@ -246,8 +249,7 @@ in_pcbbind(inp, nam, p)
 			if (t &&
 			    (reuseport & t->inp_socket->so_options) == 0) {
 #if defined(INET6)
-				if (ip6_mapped_addr_on == 0 ||
-				    ntohl(sin->sin_addr.s_addr) !=
+				if (ntohl(sin->sin_addr.s_addr) !=
 				    INADDR_ANY ||
 				    ntohl(t->inp_laddr.s_addr) !=
 				    INADDR_ANY ||

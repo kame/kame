@@ -737,10 +737,8 @@ findpcb:
 			if (isipv6)
 				inp->in6p_laddr = ip6->ip6_dst;
 			else {
-				if (ip6_mapped_addr_on) {
-					inp->inp_vflag &= ~INP_IPV6;
-					inp->inp_vflag |= INP_IPV4;
-				}
+				inp->inp_vflag &= ~INP_IPV6;
+				inp->inp_vflag |= INP_IPV4;
 #endif /* INET6 */
 			inp->inp_laddr = ip->ip_dst;
 #ifdef INET6
