@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.128 2001/12/11 21:53:24 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.129 2001/12/12 00:16:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -965,14 +965,14 @@ set_source(aio, ph)
 
 	/* XXX: make a dummy addrinfo to call connect() */
 	ai.ai_socktype = SOCK_DGRAM;
-	ai.ai_protocol = IPPROTO_UDP;
+	ai.ai_protocol = IPPROTO_UDP; /* is UDP too specific? */
 	ai.ai_next = NULL;
 	memset(&ss, 0, sizeof(ss));
 	memcpy(&ss, ai.ai_addr, ai.ai_addrlen);
 	ai.ai_addr = (struct sockaddr *)&ss;
 	get_port(&ai, "1", 0);
 
-	/* open a socket to get the source address (is UDP too specific?) */
+	/* open a socket to get the source address for the given dst */
 	if ((s = socket(ai.ai_family, ai.ai_socktype, ai.ai_protocol)) < 0)
 		return;		/* give up */
 	if (connect(s, ai.ai_addr, ai.ai_addrlen) < 0)
@@ -1125,6 +1125,7 @@ comp_dst(arg1, arg2)
 #endif
 
 	/* Rule 6: Prefer higher precedence. */
+#ifdef INET6
 	if (dst1->aio_dstpolicy &&
 	    (dst2->aio_dstpolicy == NULL ||
 	     dst1->aio_dstpolicy->pc_policy.preced >
@@ -1139,6 +1140,7 @@ comp_dst(arg1, arg2)
 		dst1->aio_rulestat[6]++;
 		return(1);
 	}
+#endif
 
 	/* Rule 7: Prefer native transport. */
 	/* XXX: not implemented yet */
