@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.29 2000/09/12 05:20:35 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.30 2000/09/29 03:47:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -175,10 +175,10 @@ inetd_main(int argc, char **argv)
 
 	melen = sizeof(me);
 	if (getsockname(STDIN_FILENO, (struct sockaddr *)&me, &melen) < 0)
-		exit_failure("getsockname");
+		exit_failure("getsockname: %s", ERRSTR);
 	fromlen = sizeof(from);
 	if (getpeername(STDIN_FILENO, (struct sockaddr *)&from, &fromlen) < 0)
-		exit_failure("getpeername");
+		exit_failure("getpeername: %s", ERRSTR);
 	if (getnameinfo((struct sockaddr *)&me, melen, NULL, 0,
 	    sbuf, sizeof(sbuf), NI_NUMERICHOST) == 0)
 		service = sbuf;
