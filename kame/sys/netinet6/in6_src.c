@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.16 2000/06/04 17:00:34 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.17 2000/06/04 17:01:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -505,7 +505,8 @@ in6_pcbsetport(laddr, in6p)
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 /*
- * XXX: this is 
+ * XXX: this is borrowed from in6_pcbbind(). If possible, we should
+ * share this function by all *bsd*...
  */
 int
 in6_pcbsetport(laddr, inp, p)
