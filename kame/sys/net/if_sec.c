@@ -1,4 +1,4 @@
-/*	$KAME: if_sec.c,v 1.8 2001/07/26 02:23:18 itojun Exp $	*/
+/*	$KAME: if_sec.c,v 1.9 2001/07/26 20:11:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -146,6 +146,8 @@ sec_create(unit)
 #endif
 
 	gifattach0(&sc->sc_gif);
+
+	sc->sc_gif.gif_if.if_ioctl = sec_ioctl;
 
 	ifcp->ifp = (struct ifnet *)&sc->sc_gif.gif_if;
 	LIST_INSERT_HEAD(&ifchainhead, ifcp, chain);
