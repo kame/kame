@@ -2,11 +2,11 @@
 # Date created:				11 September 1997
 # Whom:					Andrey Zakhvatov
 #
-# $FreeBSD: ports/ftp/lftp/Makefile,v 1.30 2000/06/11 16:08:28 alex Exp $
+# $FreeBSD: ports/ftp/lftp/Makefile,v 1.36 2000/10/03 15:08:27 kevlo Exp $
 #
 
 PORTNAME=	lftp
-PORTVERSION=	2.2.6
+PORTVERSION=	2.3.3
 CATEGORIES=	ftp ipv6
 MASTER_SITES=	ftp://ftp.yars.free.net/pub/software/unix/net/ftp/client/lftp/ \
 		${MASTER_SITE_SUNSITE}
@@ -14,22 +14,27 @@ MASTER_SITE_SUBDIR=	system/network/file-transfer
 
 MAINTAINER=	sumikawa@kame.net
 
-USE_LIBTOOL=	yes
+LIB_DEPENDS=	intl.1:${PORTSDIR}/devel/gettext
+
 USE_BZIP2=	yes
-CONFIGURE_ENV=	CXXFLAGS="${CFLAGS}"
-CONFIGURE_ENV+=	LDFLAGS="-L/usr/local/v6/lib" LIBS="-linet6"
+USE_OPENSSL=	yes
+GNU_CONFIGURE=	yes
+CONFIGURE_ENV=	CPPFLAGS="-I${LOCALBASE}/include" \
+		LDFLAGS="-L/usr/local/v6/lib" \
+		LIBS="-L${LOCALBASE}/lib -linet6"
 
 MAN1=		lftp.1
 
-post-extract:
-	@ ${CP} ${FILESDIR}/nameser.h ${WRKSRC}/src
+pre-patch:
+	@${PERL} -pi -e 's|-lpthread|-pthread|g ; \
+		s|DATADIRNAME=lib|DATADIRNAME=share|g' ${WRKSRC}/configure
 
 post-install:
-	@ ${INSTALL_DATA} ${WRKSRC}/lftp.conf ${PREFIX}/etc/lftp.conf.sample
+	${INSTALL_DATA} ${WRKSRC}/lftp.conf ${PREFIX}/etc/lftp.conf.sample
 .if !defined(NOPORTDOCS)
-	@ ${MKDIR} ${PREFIX}/share/doc/lftp
+	@${MKDIR} ${PREFIX}/share/doc/lftp
 .for file in COPYING FAQ NEWS README THANKS TODO
-	@ ${INSTALL_DATA} ${WRKSRC}/${file} ${PREFIX}/share/doc/lftp
+	${INSTALL_DATA} ${WRKSRC}/${file} ${PREFIX}/share/doc/lftp
 .endfor
 .endif
 
