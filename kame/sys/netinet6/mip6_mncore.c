@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.43 2003/12/05 01:35:18 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.44 2004/01/21 00:00:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -3046,7 +3046,6 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 			 __FILE__, __LINE__, mopt.valid_options,
 		 "\20\5REFRESH\4AUTH\3NONCE\2ALTCOA\1UID\n"));
 #endif
-
 	mip6stat.mip6s_ba_hist[ip6ma->ip6mhba_status]++;
 
 	/*
@@ -3208,13 +3207,32 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 			mbu->mbu_expire = time_second;
 	}
 	/* binding refresh advice option */
-	if ((mbu->mbu_flags & IP6MU_HOME) &&
-	    (mopt.valid_options & MOPT_REFRESH)) {
-		refresh = mopt.mopt_refresh << 2;
-		if (refresh > lifetime || refresh == 0)
-			refresh = lifetime;
-	}
-	else
+	if (mbu->mbu_flags & IP6MU_HOME) {
+		if (mopt.valid_options & MOPT_REFRESH) {
+			refresh = mopt.mopt_refresh << 2;
+			if (refresh > lifetime || refresh == 0) {
+				/*
+				 * use default refresh interval for an
+				 * invalid binding refresh interval
+				 * option.
+				 */
+				refresh =
+				    MIP6_BU_DEFAULT_REFRESH_INTERVAL(lifetime);
+			}
+		} else {
+			/*
+			 * set refresh interval even when a home agent
+			 * doesn't specify refresh interval, so that a
+			 * mobile node can re-register its binding
+			 * before the binding update entry expires.
+			 */
+			/*
+			 * XXX: the calculation algorithm of a default
+			 * value must be discussed.
+			 */
+			refresh = MIP6_BU_DEFAULT_REFRESH_INTERVAL(lifetime);
+		}
+	} else
 		refresh = lifetime;
 	mbu->mbu_refresh = refresh;
 

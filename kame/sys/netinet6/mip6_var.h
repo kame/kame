@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.113 2004/01/20 07:51:19 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.114 2004/01/21 00:00:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -230,6 +230,12 @@ LIST_HEAD(mip6_bu_list, mip6_bu);
 #define MIP6_BU_SEC_FSM_EVENT_COT		18
 #define MIP6_BU_SEC_FSM_EVENT_RETRANS_TIMER	19
 #define MIP6_BU_IS_SEC_FSM_EVENT(ev) (!MIP6_BU_IS_PRI_FSM_EVENT((ev)))
+
+/*
+ * Default binding refresh interval value, when a home agent doesn't
+ * specify refresh interval by binding refresh option.
+ */
+#define MIP6_BU_DEFAULT_REFRESH_INTERVAL(lifetime) ((lifetime) >> 2)
 
 #define MIP6_BU_TIMEOUT_INTERVAL 1
 
