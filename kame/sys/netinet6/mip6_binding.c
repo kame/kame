@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.123 2002/08/30 08:18:14 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.124 2002/08/30 08:57:40 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1455,17 +1455,14 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 		}
 	}
 
-	if (prim_mbc) {
+	if (prim_mbc) {	/* D=1 and new entry */
 		/* start DAD */
 #ifdef MIP6_DAD_ON_ALL_PREFIX
 		mip6_dad_start(mbc, NULL);
 #else
 		mip6_dad_start(mbc, &lladdr);
 #endif
-	}
-
-	if ((flags & IP6MU_DAD) == 0)
-	{
+	} else {	/* D=0 or update */
 		/* return BA */
 		refresh = lifetime * MIP6_REFRESH_LIFETIME_RATE / 100;
 		if (refresh < MIP6_REFRESH_MINLIFETIME)
