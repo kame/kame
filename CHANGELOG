@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1753 2001/07/02 14:35:42 itojun Exp $
+$KAME: CHANGELOG,v 1.1754 2001/07/02 16:38:22 jinmei Exp $
 
-<200106>
+<200107>
+2001-07-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet/in_proto.c (inetsw[]): corrected the sysctl
+	callback function for net.inet.ip6.XXX names (from icmp6_sysctl to
+	ip6_sysctl).
+
 Mon Jul  2 20:06:28 JST 2001  itojun@iijlab.net
 	* sys/netinet6/in6.c: record multicast groups joined from within the
 	  kernel, into struct in6_ifaddr.  leave from these groups accordingly
@@ -11,6 +16,7 @@ Mon Jul  2 20:06:28 JST 2001  itojun@iijlab.net
 	  in6_pcbpurgeif0().  without this change kernel may panic on pcmcia
 	  card removal.  notified by jinmei.
 
+<200106>
 2001-06-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_forward.c (ip6_forward): do not drop the
 	packet (nor send an icmp6 error) on a "p2p redirect" case, unless
