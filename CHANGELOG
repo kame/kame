@@ -1,8 +1,51 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1498 2001/01/23 04:52:55 itojun Exp $
+$KAME: CHANGELOG,v 1.1499 2001/01/23 08:51:11 jinmei Exp $
 
 <200101>
+2001-01-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_ifinit): clarified on installation
+	of interface direct routes;
+	- made an interface route only when
+	  + prefixlen is smaller than 128, or
+	  + the destination address is specified.
+	- set the cloning bit of an interface route only when the prefix
+	  length is smaller than 128.  And, in this case, the bit is
+	  always set regardless of the interface type.  In particular, an
+	  interface route with the cloning bit would be configured on a
+	  p2p interface.
+	This mean you can now invoke the following command:
+
+	# ifconfig gif0 inet6 3ffe::ffff::1
+
+	Note that there is no destination address specified, and the
+	prefix length is implicitly set 64.  Also note that the
+	corresponding interface route of the address would have the
+	cloning bit, and neighbor caches would be created when you try to
+	communicate with a destination that matches the prefix
+	3ffe::ffff::/64.
+	
+	In summary, by the two consecutive changes, the only possible
+	commands you can type are:
+	# ifconfig gif0 inet6 IPv6address prefixlen plen
+	(where IPv6address is an IPv6 address, plen < 128,) and
+	# ifconfig gif0 inet6 IPv6address IPv6dstaddress prefixlen 128	
+	(where IPv6address and IPv6dstaddress are IPv6 addresses)
+
+2001-01-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_update_ifa): made the argument
+	validation stricter; if a destination address is specified for the
+	SIOCAIFADDR_IN6 ioctl, its prefix MUST be 128. As an effect, the
+	kernel now refuses the following command:
+	# ifconfig gif0 inet6 3ffe:ffff::1 3ffe:ffff::2 alias
+	(note that the default prefix length is 64).
+	You should explicitly specify 128 as the prefix length:
+	# ifconfig gif0 inet6 3ffe:ffff::1 3ffe:ffff::2 prefixlen 128 alias
+
+	You may think this is too restrictive, but I believe it's better
+	than before. We've seen many users confused about configration of
+	p2p interfaces.
+
 Tue Jan 23 13:51:34 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ipsec.c: record IPsec decapsulation history information,
 	  so that we can use it for validating inbound packets at L4.
