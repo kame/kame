@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.138.4.1 2002/05/22 03:32:03 tv Exp $	*/
+/*	$NetBSD: param.h,v 1.138.4.4 2003/01/31 09:32:22 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -67,7 +67,7 @@
  * Don't forget to change conf/osrelease.sh too.
  */
 
-#define	__NetBSD_Version__	106000000	/* NetBSD 1.6 */
+#define	__NetBSD_Version__	106000100	/* NetBSD 1.6.1 */
 
 /*
  * Historical NetBSD #define
@@ -105,10 +105,12 @@
 #define	MAXLOGNAME	(LOGIN_NAME_MAX - 1) /* max login name length */
 #define	NCARGS		ARG_MAX		/* max bytes for an exec function */
 #define	NGROUPS		NGROUPS_MAX	/* max number groups */
-#define	NOFILE		OPEN_MAX	/* max open files per process */
 #define	NOGROUP		65535		/* marker for empty group set member */
 #define	MAXHOSTNAMELEN	256		/* max hostname size */
 
+#ifndef NOFILE
+#define	NOFILE		OPEN_MAX	/* max open files per process */
+#endif
 #ifndef MAXUPRC				/* max simultaneous processes */
 #define	MAXUPRC		CHILD_MAX	/* POSIX 1003.1-compliant default */
 #else

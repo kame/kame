@@ -1,4 +1,4 @@
-/*	$NetBSD: integrator_machdep.c,v 1.22 2002/04/12 06:13:42 thorpej Exp $	*/
+/*	$NetBSD: integrator_machdep.c,v 1.22.4.2 2003/02/14 22:22:40 he Exp $	*/
 
 /*
  * Copyright (c) 2001 ARM Ltd

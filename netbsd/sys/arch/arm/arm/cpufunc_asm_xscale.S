@@ -1,4 +1,4 @@
-/*	$NetBSD: cpufunc_asm_xscale.S,v 1.13 2002/04/09 23:44:00 thorpej Exp $	*/
+/*	$NetBSD: cpufunc_asm_xscale.S,v 1.13.4.2 2002/11/18 02:12:37 he Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Wasabi Systems, Inc.
@@ -332,7 +332,10 @@ ENTRY(xscale_cache_clean_minidata)
 1:	ldr	r3, [r0], #32
 	subs	r1, r1, #32
 	bne	1b
-	mov	pc, lr
+
+	mcr	p15, 0, r0, c7, c10, 4	/* drain write buffer */
+
+	CPWAIT_AND_RETURN(r1)
 
 ENTRY(xscale_cache_purgeID_E)
 	mcr	p15, 0, r0, c7, c10, 1	/* clean D cache entry */
@@ -366,7 +369,7 @@ ENTRY(xscale_cache_cleanD_rng)
 1:	mcr	p15, 0, r0, c7, c10, 1	/* clean D cache entry */
 	add	r0, r0, #32
 	subs	r1, r1, #32
-	bpl	1b
+	bhi	1b
 
 	CPWAIT(r0)
 
@@ -387,7 +390,7 @@ ENTRY(xscale_cache_purgeID_rng)
 	mcr	p15, 0, r0, c7, c5, 1	/* flush I cache single entry */
 	add	r0, r0, #32
 	subs	r1, r1, #32
-	bpl	1b
+	bhi	1b
 
 	CPWAIT(r0)
 
@@ -407,7 +410,7 @@ ENTRY(xscale_cache_purgeD_rng)
 	mcr	p15, 0, r0, c7, c6, 1	/* flush D cache single entry */
 	add	r0, r0, #32
 	subs	r1, r1, #32
-	bpl	1b
+	bhi	1b
 
 	CPWAIT(r0)
 
@@ -427,7 +430,7 @@ ENTRY(xscale_cache_syncI_rng)
 	mcr	p15, 0, r0, c7, c5, 1	/* flush I cache single entry */
 	add	r0, r0, #32
 	subs	r1, r1, #32
-	bpl	1b
+	bhi	1b
 
 	CPWAIT(r0)
 
@@ -435,30 +438,7 @@ ENTRY(xscale_cache_syncI_rng)
 
 	CPWAIT_AND_RETURN(r0)
 
-/* Used in write-through mode. */
-ENTRY(xscale_cache_flushID_rng)
-	cmp	r1, #0x4000
-	bcs	_C_LABEL(xscale_cache_flushID)
-
-	and	r2, r0, #0x1f
-	add	r1, r1, r2
-	bic	r0, r0, #0x1f
-
-1:	mcr	p15, 0, r0, c7, c6, 1	/* flush D cache single entry */
-	mcr	p15, 0, r0, c7, c5, 1	/* flush I cache single entry */
-	add	r0, r0, #32
-	subs	r1, r1, #32
-	bpl	1b
-
-	mcr	p15, 0, r0, c7, c10, 4	/* drain write buffer */
-
-	CPWAIT_AND_RETURN(r0)
-
-/* Used in write-though mode. */
 ENTRY(xscale_cache_flushD_rng)
-	cmp	r1, #0x4000
-	bcs	_C_LABEL(xscale_cache_flushD)
-
 	and	r2, r0, #0x1f
 	add	r1, r1, r2
 	bic	r0, r0, #0x1f
@@ -466,25 +446,7 @@ ENTRY(xscale_cache_flushD_rng)
 1:	mcr	p15, 0, r0, c7, c6, 1	/* flush D cache single entry */
 	add	r0, r0, #32
 	subs	r1, r1, #32
-	bpl	1b
-
-	mcr	p15, 0, r0, c7, c10, 4	/* drain write buffer */
-
-	CPWAIT_AND_RETURN(r0)
-
-/* Used in write-through mode. */
-ENTRY(xscale_cache_flushI_rng)
-	cmp	r1, #0x4000
-	bcs	_C_LABEL(xscale_cache_flushI)
-
-	and	r2, r0, #0x1f
-	add	r1, r1, r2
-	bic	r0, r0, #0x1f
-
-1:	mcr	p15, 0, r0, c7, c5, 1	/* flush I cache single entry */
-	add	r0, r0, #32
-	subs	r1, r1, #32
-	bpl	1b
+	bhi	1b
 
 	mcr	p15, 0, r0, c7, c10, 4	/* drain write buffer */
 
@@ -516,7 +478,7 @@ ENTRY(xscale_context_switch)
 	CPWAIT_AND_RETURN(r0)
 
 /*
- * xscale_cpusleep
+ * xscale_cpu_sleep
  *
  * This is called when there is nothing on any of the run queues.
  * We go into IDLE mode so that any IRQ or FIQ will awaken us.

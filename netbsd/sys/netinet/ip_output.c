@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_output.c,v 1.95 2002/02/07 21:47:45 thorpej Exp $	*/
+/*	$NetBSD: ip_output.c,v 1.95.10.2 2002/11/01 12:14:28 tron Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,7 +102,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ip_output.c,v 1.95 2002/02/07 21:47:45 thorpej Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ip_output.c,v 1.95.10.2 2002/11/01 12:14:28 tron Exp $");
 
 #include "opt_pfil_hooks.h"
 #include "opt_ipsec.h"
@@ -186,6 +186,7 @@ ip_output(m0, va_alist)
 #endif /*IPSEC*/
 	u_int16_t ip_len;
 
+	len = 0;
 	va_start(ap, m0);
 	opt = va_arg(ap, struct mbuf *);
 	ro = va_arg(ap, struct route *);
@@ -208,7 +209,8 @@ ip_output(m0, va_alist)
 #endif
 	if (opt) {
 		m = ip_insertoptions(m, opt, &len);
-		hlen = len;
+		if (len >= sizeof(struct ip))
+			hlen = len;
 	}
 	ip = mtod(m, struct ip *);
 	/*
@@ -263,6 +265,12 @@ ip_output(m0, va_alist)
 		ifp = ia->ia_ifp;
 		mtu = ifp->if_mtu;
 		ip->ip_ttl = 1;
+	} else if ((IN_MULTICAST(ip->ip_dst.s_addr) ||
+	    ip->ip_dst.s_addr == INADDR_BROADCAST) &&
+	    imo != NULL && imo->imo_multicast_ifp != NULL) {
+		ifp = imo->imo_multicast_ifp;
+		mtu = ifp->if_mtu;
+		IFP_TO_IA(ifp, ia);
 	} else {
 		if (ro->ro_rt == 0)
 			rtalloc(ro);
@@ -294,14 +302,21 @@ ip_output(m0, va_alist)
 		/*
 		 * See if the caller provided any multicast options
 		 */
-		if (imo != NULL) {
+		if (imo != NULL)
 			ip->ip_ttl = imo->imo_multicast_ttl;
-			if (imo->imo_multicast_ifp != NULL) {
-				ifp = imo->imo_multicast_ifp;
-				mtu = ifp->if_mtu;
-			}
-		} else
+		else
 			ip->ip_ttl = IP_DEFAULT_MULTICAST_TTL;
+
+		/*
+		 * if we don't know the outgoing ifp yet, we can't generate
+		 * output
+		 */
+		if (!ifp) {
+			ipstat.ips_noroute++;
+			error = ENETUNREACH;
+			goto bad;
+		}
+
 		/*
 		 * If the packet is multicast or broadcast, confirm that
 		 * the outgoing interface can transmit it.

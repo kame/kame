@@ -1,10 +1,10 @@
-/*	$NetBSD: miidevs.h,v 1.37.4.1 2002/07/12 04:10:46 thorpej Exp $	*/
+/*	$NetBSD: miidevs.h,v 1.37.4.3 2003/01/28 06:24:51 jmc Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: miidevs,v 1.37.4.1 2002/07/12 04:10:16 thorpej Exp 
+ *	NetBSD
  */
 
 /*-
@@ -146,6 +146,10 @@
 #define	MII_STR_BROADCOM_BCM5421	"BCM5421 1000BASE-T media interface"
 #define	MII_MODEL_BROADCOM_BCM5701	0x0011
 #define	MII_STR_BROADCOM_BCM5701	"BCM5701 1000BASE-T media interface"
+#define	MII_MODEL_BROADCOM_BCM5703	0x0016
+#define	MII_STR_BROADCOM_BCM5703	"BCM5703 1000BASE-T media interface"
+#define	MII_MODEL_BROADCOM_BCM5704	0x0019
+#define	MII_STR_BROADCOM_BCM5704	"BCM5704 1000BASE-T media interface"
 
 /* Davicom Semiconductor PHYs */
 #define	MII_MODEL_xxDAVICOM_DM9101	0x0000
@@ -182,6 +186,8 @@
 #define	MII_STR_LEVEL1_LXT1000	"LXT1000 1000BASE-T media interface"
 
 /* Marvell Semiconductor PHYs */
+#define	MII_MODEL_xxMARVELL_E1011	0x0002
+#define	MII_STR_xxMARVELL_E1011	"Marvell 88E1011 Gigabit PHY"
 #define	MII_MODEL_xxMARVELL_E1000_3	0x0003
 #define	MII_STR_xxMARVELL_E1000_3	"Marvell 88E1000 Gigabit PHY"
 #define	MII_MODEL_xxMARVELL_E1000_5	0x0005

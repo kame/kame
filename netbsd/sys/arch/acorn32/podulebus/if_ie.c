@@ -1,4 +1,4 @@
-/* $NetBSD: if_ie.c,v 1.5 2002/02/18 19:22:14 bjh21 Exp $ */
+/* $NetBSD: if_ie.c,v 1.5.10.2 2003/01/28 05:38:39 jmc Exp $ */
 
 /*
  * Copyright (c) 1995 Melvin Tang-Richardson.
@@ -61,7 +61,7 @@
 
 #include <sys/param.h>
 
-__RCSID("$NetBSD: if_ie.c,v 1.5 2002/02/18 19:22:14 bjh21 Exp $");
+__RCSID("$NetBSD: if_ie.c,v 1.5.10.2 2003/01/28 05:38:39 jmc Exp $");
 
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -309,10 +309,7 @@ ieprobe(struct device *parent, struct cfdata *cf, void *aux)
 
 /* Look for a network slot interface */
 
-	if (matchpodule(pa, MANUFACTURER_ACORN, PODULE_ACORN_ETHER1, -1) == 0)
-		return(0);
-
-	return(1);
+	return (pa->pa_product == PODULE_ETHER1);
 }
 
 /*
@@ -1556,8 +1553,12 @@ iestart(ifp)
 #endif
 
 		m_freem(m0);
-		len = max(len, ETHER_MIN_LEN);
-
+		if (len < ETHER_MIN_LEN - ETHER_CRC_LEN) {
+			memset(buffer, 0, ETHER_MIN_LEN - ETHER_CRC_LEN - len);
+			len = ETHER_MIN_LEN - ETHER_CRC_LEN;
+			buffer += ETHER_MIN_LEN - ETHER_CRC_LEN;
+		}
+			
 		/* When we write directly to the card we dont need this */
     		if (len&1)
    		    host2ie(sc, txbuf, sc->xmit_cbuffs[sc->xchead], len+1 );

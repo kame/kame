@@ -1,4 +1,4 @@
-/*	$NetBSD: iq80310_machdep.c,v 1.40 2002/04/12 20:50:26 thorpej Exp $	*/
+/*	$NetBSD: iq80310_machdep.c,v 1.40.4.2 2003/02/14 22:24:05 he Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Wasabi Systems, Inc.

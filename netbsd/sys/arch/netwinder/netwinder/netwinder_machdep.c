@@ -1,4 +1,4 @@
-/*	$NetBSD: netwinder_machdep.c,v 1.31 2002/04/12 19:12:32 thorpej Exp $	*/
+/*	$NetBSD: netwinder_machdep.c,v 1.31.4.2 2003/02/14 22:27:07 he Exp $	*/
 
 /*
  * Copyright (c) 1997,1998 Mark Brinicombe.

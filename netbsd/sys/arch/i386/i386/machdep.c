@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.471 2002/05/12 23:16:53 matt Exp $	*/
+/*	$NetBSD: machdep.c,v 1.471.4.3 2003/02/08 06:40:59 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998, 2000 The NetBSD Foundation, Inc.
@@ -76,7 +76,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.471 2002/05/12 23:16:53 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: machdep.c,v 1.471.4.3 2003/02/08 06:40:59 jmc Exp $");
 
 #include "opt_cputype.h"
 #include "opt_ddb.h"
@@ -860,6 +860,60 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 				0, 0, 0, 0, 0, 0, 0, 0,
 				0, 0, 0, 0, 0, 0, 0, 0,
 				"Unknown 6x86MX"		/* Default */
+			},
+			NULL,
+			NULL,
+			NULL,
+		} }
+	},
+	{	/* MediaGX is now owned by National Semiconductor */
+		"Geode by NSC",
+		CPUVENDOR_CYRIX, /* XXX */
+		"National Semiconductor",
+		/* Family 4, NSC never had any of these */
+		{ {
+			CPUCLASS_486,
+			{
+				0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+				"486 compatible"	/* Default */
+			},
+			NULL,
+			NULL,
+			NULL,
+		},
+		/* Family 5: Geode family, formerly MediaGX */
+		{
+			CPUCLASS_586,
+			{
+				0, 0, 0, 0,
+				"Geode GX1",
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				"Geode"		/* Default */
+			},
+			cyrix6x86_cpu_setup,
+			NULL,
+			NULL,
+		},
+		/* Family 6, not yet available from NSC */
+		{
+			CPUCLASS_686,
+			{
+				0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+				"Pentium Pro compatible" /* Default */
+			},
+			NULL,
+			NULL,
+			NULL,
+		},
+		/* Family > 6, not yet available from NSC */
+		{
+			CPUCLASS_686,
+			{
+				0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+				"Pentium Pro compatible"	/* Default */
 			},
 			NULL,
 			NULL,
@@ -2606,6 +2660,7 @@ add_mem_cluster(seg_start, seg_end, type)
 	u_int32_t type;
 {
 	extern struct extent *iomem_ex;
+	int i;
 
 	if (seg_end > 0x100000000ULL) {
 		printf("WARNING: skipping large "
@@ -2627,6 +2682,17 @@ add_mem_cluster(seg_start, seg_end, type)
 	if (seg_end <= seg_start)
 		return;
 
+	for (i = 0; i < mem_cluster_cnt; i++) {
+		if ((mem_clusters[i].start == round_page(seg_start))
+		    && (mem_clusters[i].size
+			    == trunc_page(seg_end) - mem_clusters[i].start)) {
+#ifdef DEBUG_MEMLOAD
+			printf("WARNING: skipping duplicate segment entry\n");
+#endif
+			return;
+		}
+	}
+
 	/*
 	 * Allocate the physical addresses used by RAM
 	 * from the iomem extent map.  This is done before
@@ -2641,6 +2707,7 @@ add_mem_cluster(seg_start, seg_end, type)
 		    "(0x%qx/0x%qx/0x%x) FROM "
 		    "IOMEM EXTENT MAP!\n",
 		    seg_start, seg_end - seg_start, type);
+		return;
 	}
 
 	/*
@@ -2800,6 +2867,10 @@ init386(first_avail)
 	}
 #endif /* ! REALBASEMEM && ! REALEXTMEM */
 
+#ifdef DEBUG_MEMLOAD
+	printf("mem_cluster_count: %d\n", mem_cluster_cnt);
+#endif
+
 	/*
 	 * If the loop above didn't find any valid segment, fall back to
 	 * former code.
@@ -2910,7 +2981,7 @@ init386(first_avail)
 
 		/* First hunk */
 		if (seg_start != seg_end) {
-			if (seg_start <= (16 * 1024 * 1024) &&
+			if (seg_start < (16 * 1024 * 1024) &&
 			    first16q != VM_FREELIST_DEFAULT) {
 				u_int64_t tmp;
 
@@ -2918,14 +2989,18 @@ init386(first_avail)
 					tmp = (16 * 1024 * 1024);
 				else
 					tmp = seg_end;
+
+				if (tmp != seg_start) {
 #ifdef DEBUG_MEMLOAD
-				printf("loading 0x%qx-0x%qx (0x%lx-0x%lx)\n",
-				    seg_start, tmp,
-				    atop(seg_start), atop(tmp));
+					printf("loading 0x%qx-0x%qx "
+					    "(0x%lx-0x%lx)\n",
+				    	    seg_start, tmp,
+				  	    atop(seg_start), atop(tmp));
 #endif
-				uvm_page_physload(atop(seg_start),
-				    atop(tmp), atop(seg_start),
-				    atop(tmp), first16q);
+					uvm_page_physload(atop(seg_start),
+				    	    atop(tmp), atop(seg_start),
+				    	    atop(tmp), first16q);
+				}
 				seg_start = tmp;
 			}
 
@@ -2943,7 +3018,7 @@ init386(first_avail)
 
 		/* Second hunk */
 		if (seg_start1 != seg_end1) {
-			if (seg_start1 <= (16 * 1024 * 1024) &&
+			if (seg_start1 < (16 * 1024 * 1024) &&
 			    first16q != VM_FREELIST_DEFAULT) {
 				u_int64_t tmp;
 
@@ -2951,14 +3026,18 @@ init386(first_avail)
 					tmp = (16 * 1024 * 1024);
 				else
 					tmp = seg_end1;
+
+				if (tmp != seg_start1) {
 #ifdef DEBUG_MEMLOAD
-				printf("loading 0x%qx-0x%qx (0x%lx-0x%lx)\n",
-				    seg_start1, tmp,
-				    atop(seg_start1), atop(tmp));
+					printf("loading 0x%qx-0x%qx "
+					    "(0x%lx-0x%lx)\n",
+				    	    seg_start1, tmp,
+				    	    atop(seg_start1), atop(tmp));
 #endif
-				uvm_page_physload(atop(seg_start1),
-				    atop(tmp), atop(seg_start1),
-				    atop(tmp), first16q);
+					uvm_page_physload(atop(seg_start1),
+				    	    atop(tmp), atop(seg_start1),
+				    	    atop(tmp), first16q);
+				}
 				seg_start1 = tmp;
 			}
 

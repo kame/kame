@@ -1,4 +1,4 @@
-/*	$NetBSD: hpc_machdep.c,v 1.47 2002/05/03 16:45:23 rjs Exp $	*/
+/*	$NetBSD: hpc_machdep.c,v 1.47.4.2 2003/02/14 22:26:11 he Exp $	*/
 
 /*
  * Copyright (c) 1994-1998 Mark Brinicombe.

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_pcn.c,v 1.9.4.1 2002/08/02 01:28:29 lukem Exp $	*/
+/*	$NetBSD: if_pcn.c,v 1.9.4.3 2002/11/30 13:57:46 he Exp $	*/
 
 /*
  * Copyright (c) 2001 Wasabi Systems, Inc.
@@ -65,7 +65,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_pcn.c,v 1.9.4.1 2002/08/02 01:28:29 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_pcn.c,v 1.9.4.3 2002/11/30 13:57:46 he Exp $");
 
 #include "bpfilter.h"
 
@@ -542,10 +542,10 @@ pcn_attach(struct device *parent, struct device *self, void *aux)
 	pci_chipset_tag_t pc = pa->pa_pc;
 	pci_intr_handle_t ih;
 	const char *intrstr = NULL;
-	bus_space_tag_t iot;
-	bus_space_handle_t ioh;
+	bus_space_tag_t iot, memt;
+	bus_space_handle_t ioh, memh;
 	bus_dma_segment_t seg;
-	int ioh_valid;
+	int ioh_valid, memh_valid;
 	int i, rseg, error;
 	pcireg_t pmode;
 	uint32_t chipid, reg;
@@ -561,8 +561,14 @@ pcn_attach(struct device *parent, struct device *self, void *aux)
 	 */
 	ioh_valid = (pci_mapreg_map(pa, PCN_PCI_CBIO, PCI_MAPREG_TYPE_IO, 0,
 	    &iot, &ioh, NULL, NULL) == 0);
+	memh_valid = (pci_mapreg_map(pa, PCN_PCI_CBMEM,
+	    PCI_MAPREG_TYPE_MEM|PCI_MAPREG_MEM_TYPE_32BIT, 0,
+	    &memt, &memh, NULL, NULL) == 0);
 
-	if (ioh_valid) {
+	if (memh_valid) {
+		sc->sc_st = memt;
+		sc->sc_sh = memh;
+	} else if (ioh_valid) {
 		sc->sc_st = iot;
 		sc->sc_sh = ioh;
 	} else {
@@ -1636,7 +1642,7 @@ pcn_init(struct ifnet *ifp)
 		 * our own MII layer.
 		 */
 		pcn_bcr_write(sc, LE_BCR32,
-		    pcn_csr_read(sc, LE_BCR32) | LE_B32_DANAS);
+		    pcn_bcr_read(sc, LE_BCR32) | LE_B32_DANAS);
 	}
 
 	/*
@@ -2025,7 +2031,7 @@ pcn_79c970_mediachange(struct ifnet *ifp)
 			reg |= LE_B9_AUIFD;
 		pcn_bcr_write(sc, LE_BCR9, reg);
 	} else
-		pcn_bcr_write(sc, LE_BCR0, 0);
+		pcn_bcr_write(sc, LE_BCR9, 0);
 
 	return (0);
 }

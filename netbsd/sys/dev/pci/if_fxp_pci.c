@@ -1,4 +1,4 @@
-/*	$NetBSD: if_fxp_pci.c,v 1.22.4.1 2002/06/25 22:07:42 lukem Exp $	*/
+/*	$NetBSD: if_fxp_pci.c,v 1.22.4.4 2003/01/27 06:26:57 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_fxp_pci.c,v 1.22.4.1 2002/06/25 22:07:42 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_fxp_pci.c,v 1.22.4.4 2003/01/27 06:26:57 jmc Exp $");
 
 #include "rnd.h"
 
@@ -117,6 +117,10 @@ const struct fxp_pci_product {
 	  "Intel InBusiness Ethernet" },
 	{ PCI_PRODUCT_INTEL_82801BA_LAN,
 	  "Intel i82562 Ethernet" },
+	{ PCI_PRODUCT_INTEL_82801E_LAN_1,
+	  "Intel i82559 Ethernet" },
+	{ PCI_PRODUCT_INTEL_82801E_LAN_2,
+	  "Intel i82559 Ethernet" },
 	{ PCI_PRODUCT_INTEL_PRO_100_VE_0,
 	  "Intel PRO/100 VE Network Controller" },
 	{ PCI_PRODUCT_INTEL_PRO_100_VE_1,
@@ -127,6 +131,12 @@ const struct fxp_pci_product {
 	  "Intel PRO/100 VE Network Controller with 82562ET/EZ (CNR) PHY" },
 	{ PCI_PRODUCT_INTEL_PRO_100_VE_4,
 	  "Intel PRO/100 VE (MOB) Network Controller" },
+	{ PCI_PRODUCT_INTEL_PRO_100_VM_0,
+	  "Intel PRO/100 VM Network Controller" },
+	{ PCI_PRODUCT_INTEL_PRO_100_VM_1,
+	  "Intel PRO/100 VM Network Controller" },
+	{ PCI_PRODUCT_INTEL_PRO_100_VM_2,
+	  "Intel PRO/100 VM Network Controller" },
 	{ 0,
 	  NULL },
 };
@@ -370,6 +380,15 @@ fxp_pci_attach(parent, self, aux)
 		sc->sc_rev = 1;
 		sc->sc_flags |= FXPF_HAS_RESUME_BUG;
 		break;
+	case PCI_PRODUCT_INTEL_82801E_LAN_1:
+	case PCI_PRODUCT_INTEL_82801E_LAN_2:
+		printf(": %s, rev %d\n", fpp->fpp_name, sc->sc_rev);
+
+		/*
+		 *  XXX We have to read the C-ICH's developer's manual
+		 *  in detail
+		 */
+		break;
 	}
 
 	/* Make sure bus-mastering is enabled. */
@@ -479,6 +498,13 @@ void
 fxp_pci_disable(struct fxp_softc *sc)
 {
 	struct fxp_pci_softc *psc = (void *) sc;
+
+	/*
+	 * for some 82558_A4 and 82558_B0, entering D3 state makes
+	 * media detection disordered.
+	 */
+	if (sc->sc_rev <= FXP_REV_82558_B0)
+		return;
 
 #if 0
 	printf("%s: going to power state D3\n", sc->sc_dev.dv_xname);

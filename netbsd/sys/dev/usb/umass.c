@@ -1,4 +1,4 @@
-/*	$NetBSD: umass.c,v 1.87 2002/03/17 18:02:53 augustss Exp $	*/
+/*	$NetBSD: umass.c,v 1.87.6.2 2003/01/05 08:25:42 jmc Exp $	*/
 /*-
  * Copyright (c) 1999 MAEKAWA Masahide <bishop@rr.iij4u.or.jp>,
  *		      Nick Hibma <n_hibma@freebsd.org>
@@ -94,7 +94,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: umass.c,v 1.87 2002/03/17 18:02:53 augustss Exp $");
+__KERNEL_RCSID(0, "$NetBSD: umass.c,v 1.87.6.2 2003/01/05 08:25:42 jmc Exp $");
 
 #include "atapibus.h"
 #include "scsibus.h"
@@ -500,7 +500,7 @@ USB_ATTACH(umass)
 	/* request a sufficient number of xfer handles */
 	for (i = 0; i < XFER_NR; i++) {
 		sc->transfer_xfer[i] = usbd_alloc_xfer(uaa->device);
-		if (sc->transfer_xfer[i] == 0) {
+		if (sc->transfer_xfer[i] == NULL) {
 			DPRINTF(UDMASS_USB, ("%s: Out of memory\n",
 				USBDEVNAME(sc->sc_dev)));
 			umass_disco(sc);
@@ -684,8 +684,10 @@ umass_disco(struct umass_softc *sc)
 
 	/* Remove all the pipes. */
 	for (i = 0 ; i < UMASS_NEP ; i++) {
-		if (sc->sc_pipe[i] != NULL)
+		if (sc->sc_pipe[i] != NULL) {
 			usbd_close_pipe(sc->sc_pipe[i]);
+			sc->sc_pipe[i] = NULL;
+		}
 	}
 }
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: ulpt.c,v 1.49 2002/02/25 22:39:01 augustss Exp $	*/
+/*	$NetBSD: ulpt.c,v 1.49.10.3 2003/01/27 06:05:48 jmc Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/ulpt.c,v 1.24 1999/11/17 22:33:44 n_hibma Exp $	*/
 
 /*
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ulpt.c,v 1.49 2002/02/25 22:39:01 augustss Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ulpt.c,v 1.49.10.3 2003/01/27 06:05:48 jmc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -235,8 +235,8 @@ USB_ATTACH(ulpt)
 		    id->bInterfaceNumber == ifcd->bInterfaceNumber) {
 			if (id->bInterfaceClass == UICLASS_PRINTER &&
 			    id->bInterfaceSubClass == UISUBCLASS_PRINTER &&
-			    (id->bInterfaceProtocol == UIPROTO_PRINTER_BI ||
-			     id->bInterfaceProtocol == UIPROTO_PRINTER_1284))
+			    (id->bInterfaceProtocol == UIPROTO_PRINTER_BI /*||
+			     id->bInterfaceProtocol == UIPROTO_PRINTER_1284*/))
 				goto found;
 			altno++;
 		}
@@ -276,18 +276,19 @@ USB_ATTACH(ulpt)
 		}
 	}
 	if (sc->sc_out == -1) {
-		printf("%s: could not find bulk endpoint\n",
+		printf("%s: could not find bulk out endpoint\n",
 		    USBDEVNAME(sc->sc_dev));
 		sc->sc_dying = 1;
 		USB_ATTACH_ERROR_RETURN;
 	}
-	printf("%s: using %s-directional mode\n", USBDEVNAME(sc->sc_dev),
-	       sc->sc_in >= 0 ? "bi" : "uni");
 
 	if (usbd_get_quirks(dev)->uq_flags & UQ_BROKEN_BIDIR) {
 		/* This device doesn't handle reading properly. */
 		sc->sc_in = -1;
 	}
+
+	printf("%s: using %s-directional mode\n", USBDEVNAME(sc->sc_dev),
+	       sc->sc_in >= 0 ? "bi" : "uni");
 
 	DPRINTFN(10, ("ulpt_attach: bulk=%d\n", sc->sc_out));
 
@@ -399,6 +400,7 @@ USB_DETACH(ulpt)
 	/* Nuke the vnodes for any open instances (calls close). */
 	mn = self->dv_unit;
 	vdevgone(maj, mn, mn, VCHR);
+	vdevgone(maj, mn | ULPT_NOPRIME , mn | ULPT_NOPRIME, VCHR);
 #elif defined(__FreeBSD__)
 	vp = SLIST_FIRST(&sc->dev->si_hlist);
 	if (vp)

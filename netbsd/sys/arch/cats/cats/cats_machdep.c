@@ -1,4 +1,4 @@
-/*	$NetBSD: cats_machdep.c,v 1.29 2002/04/05 16:58:07 thorpej Exp $	*/
+/*	$NetBSD: cats_machdep.c,v 1.29.4.2 2003/02/14 22:21:52 he Exp $	*/
 
 /*
  * Copyright (c) 1997,1998 Mark Brinicombe.

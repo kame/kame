@@ -1,4 +1,4 @@
-/*	$NetBSD: esp_sbus.c,v 1.20 2002/03/21 00:16:15 eeh Exp $	*/
+/*	$NetBSD: esp_sbus.c,v 1.20.6.2 2002/11/22 17:50:36 tron Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: esp_sbus.c,v 1.20 2002/03/21 00:16:15 eeh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: esp_sbus.c,v 1.20.6.2 2002/11/22 17:50:36 tron Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -212,9 +212,9 @@ espattach_sbus(parent, self, aux)
 				sa->sa_promvaddrs[0], &lsc->sc_regs);
 		} else {
 			if (sbus_bus_map(sa->sa_bustag,
-				sa->sa_reg[0].sbr_slot,
-				sa->sa_reg[0].sbr_offset,
-				sa->sa_reg[0].sbr_size,
+				sa->sa_reg[0].oa_space,
+				sa->sa_reg[0].oa_base,
+				sa->sa_reg[0].oa_size,
 				0, &lsc->sc_regs) != 0) {
 				printf("%s: cannot map dma registers\n",
 					self->dv_xname);
@@ -262,9 +262,9 @@ espattach_sbus(parent, self, aux)
 				sa->sa_promvaddrs[1], &esc->sc_reg);
 		} else {
 			if (sbus_bus_map(sa->sa_bustag,
-				sa->sa_reg[1].sbr_slot,
-				sa->sa_reg[1].sbr_offset,
-				sa->sa_reg[1].sbr_size,
+				sa->sa_reg[1].oa_space,
+				sa->sa_reg[1].oa_base,
+				sa->sa_reg[1].oa_size,
 				0, &esc->sc_reg) != 0) {
 				printf("%s @ sbus: "
 					"cannot map scsi core registers\n",
@@ -759,7 +759,7 @@ db_esp(addr, have_addr, count, modif)
 		}
 		db_printf("\n");
 		
-		for (t=0; t<NCR_NTARG; t++) {
+		for (t=0; t<sc->sc_ntarg; t++) {
 			LIST_FOREACH(li, &sc->sc_tinfo[t].luns, link) {
 				db_printf("t%d lun %d untagged %p busy %d used %x\n",
 					  t, (int)li->lun, li->untagged, li->busy,

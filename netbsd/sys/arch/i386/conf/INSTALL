@@ -1,4 +1,4 @@
-#	$NetBSD: INSTALL,v 1.196.4.1 2002/06/24 17:38:43 lukem Exp $
+#	$NetBSD: INSTALL,v 1.196.4.3 2003/01/28 06:28:37 jmc Exp $
 #
 #	INSTALL - Installation kernel.
 #
@@ -479,6 +479,7 @@ fd*	at fdc? drive ?			# the drives themselves
 
 # PCI network interfaces
 an*	at pci? dev ? function ?	# Aironet PC4500/PC4800 (802.11)
+bge* 	at pci? dev ? function ?	# Broadcom 570x Gigabit Ethernet
 #en*	at pci? dev ? function ?	# ENI/Adaptec ATM
 ep*	at pci? dev ? function ?	# 3Com 3c59x
 ex*	at pci? dev ? function ?	# 3Com 90x[BC]
@@ -538,7 +539,7 @@ cs0	at isa? port 0x300 iomem ? irq ? drq ?	# CS8900 Ethernet
 ec0	at isa? port 0x250 iomem 0xd8000 irq 9	# 3Com 3c503 Ethernet
 eg0	at isa? port 0x280 irq 9		# 3C505 ethernet cards
 el0	at isa? port 0x300 irq 9		# 3C501 ethernet cards
-ep0	at isa? port ? irq ?			# 3C509 ethernet cards
+ep*	at isa? port ? irq ?			# 3C509 ethernet cards
 ef0	at isa? port 0x360 iomem 0xd0000 irq 7	# 3C507
 ai0	at isa? port 0x360 iomem 0xd0000 irq 7	# StarLAN
 fmv0	at isa? port 0x2a0 irq ?		# FMV-180 series

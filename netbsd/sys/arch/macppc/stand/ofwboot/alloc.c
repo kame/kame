@@ -1,4 +1,4 @@
-/*	$NetBSD: alloc.c,v 1.1 1998/05/15 10:15:59 tsubai Exp $	*/
+/*	$NetBSD: alloc.c,v 1.3.2.1 2002/09/30 13:38:33 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.

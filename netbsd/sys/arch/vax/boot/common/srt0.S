@@ -1,4 +1,4 @@
-/*	$NetBSD: srt0.S,v 1.2 2002/03/31 00:11:14 matt Exp $ */
+/*	$NetBSD: srt0.S,v 1.2.4.2 2002/12/12 15:45:18 he Exp $ */
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden.
  * All rights reserved.

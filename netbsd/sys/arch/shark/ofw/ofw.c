@@ -1,4 +1,4 @@
-/*	$NetBSD: ofw.c,v 1.13 2002/04/05 16:58:11 thorpej Exp $	*/
+/*	$NetBSD: ofw.c,v 1.13.4.2 2003/02/14 22:29:35 he Exp $	*/
 
 /*
  * Copyright 1997
