@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.293 2001/12/20 09:33:06 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.294 2001/12/21 08:27:43 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -680,11 +680,10 @@ sent from a user application as follows:
    draft-ietf-ipngwg-default-addr-select-xx.txt .
 
    The policy table used in this algorithm is stored in the kernel.
-   To install or view the installed policy, use the addrselect(8)
-   command.  (Note that the command name is experimental and may be
-   changed in the future.)  The kernel does not have pre-installed
-   policy.  It is expected that the default policy described in the
-   draft should be installed at the bootstrap time using this command.
+   To install or view the installed policy, use the ip6addrctl(8)
+   command.  The kernel does not have pre-installed policy.  It is
+   expected that the default policy described in the draft should be
+   installed at the bootstrap time using this command.
 
    This draft allows an implementation to add implementation-specific
    rules with higher precedence than the rule "Use longest matching
