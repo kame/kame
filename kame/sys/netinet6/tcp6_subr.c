@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.29 2000/11/30 16:00:06 jinmei Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.30 2000/11/30 16:06:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -600,7 +600,7 @@ tcp6_ctlinput(cmd, sa, d)
 
 		/* translate addresses into internal form */
 		ip6_tmp = *ip6;
-		ip6_tmp = ((struct sockaddr_in6 *)sa)->sin6_addr;
+		ip6_tmp.ip6_dst = ((struct sockaddr_in6 *)sa)->sin6_addr;
 		/* XXX: to be more generic... */
 		if (IN6_IS_ADDR_LINKLOCAL(&ip6_tmp.ip6_src))
 			ip6_tmp.ip6_src.s6_addr16[1] =
