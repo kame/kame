@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.15 2000/07/09 04:37:24 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.16 2000/08/31 17:45:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -40,7 +40,7 @@
  *   in the source code.  This is because RFC2553 is silent about which error
  *   code must be returned for which situation.
  * - IPv4 classful (shortened) form.  RFC2553 is silent about it.  XNET 5.2
- *   says to use inet_aton() to convert IPv4 numeric to binary (alows
+ *   says to use inet_aton() to convert IPv4 numeric to binary (allows
  *   classful form as a result).
  *   current code - disallow classful form for IPv4 (due to use of inet_pton).
  * - freeaddrinfo(NULL).  RFC2553 is silent about it.  XNET 5.2 says it is
