@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.719 2000/03/22 12:09:46 jinmei Exp $
+$Id: CHANGELOG,v 1.720 2000/03/22 12:10:23 jinmei Exp $
 
 <200003>
 2000-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -14,7 +14,7 @@ $Id: CHANGELOG,v 1.719 2000/03/22 12:09:46 jinmei Exp $
 	# route add add -inet6 3ffe:: fe80::1234%ed0 -prefixlen 16
 	instead of
 	# route add add -inet6 3ffe:: fe80:1::1234 -prefixlen 16
-	(where 1 embedded in the link-local address is the inteface index
+	(where embedded "1" in the link-local address is the inteface index
 	 of ed0).
 	
 Wed Mar 22 17:57:21 JST 2000  itojun@iijlab.net
