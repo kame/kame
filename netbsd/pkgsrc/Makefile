@@ -4,6 +4,7 @@
 
 SUBDIR += audio
 SUBDIR += devel
+SUBDIR += games
 SUBDIR += mail
 SUBDIR += lang
 SUBDIR += net
