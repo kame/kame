@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.443 2004/03/24 09:03:29 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.444 2004/03/24 09:11:21 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3852,11 +3852,11 @@ ip6_setmoptions(optname, im6op, m)
 		error = ip6_getmopt_sgaddr(m, optname, &ifp, &ss_grp, NULL);
 		if (error != 0)
 			break;
-			if (in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc)) {
-				/* XXX: should not happen */
-				error = EADDRNOTAVAIL;
-				break;
-			}
+		if (in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc)) {
+			/* XXX: should not happen */
+			error = EADDRNOTAVAIL;
+			break;
+		}
 		/* check for duplication */
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
