@@ -254,13 +254,8 @@ esp4_input(m, va_alist)
 		goto bad;
 	}
 
-	/* strip off */
-#if 1
+	/* strip off the authentication data */
 	m_adj(m, -siz);
-#else
-	m->m_pkthdr.len -= siz;
-	n->m_len -= siz;
-#endif
 	ip = mtod(m, struct ip *);
 #ifdef IPLEN_FLIPPED
 	ip->ip_len = ip->ip_len - siz;
@@ -416,58 +411,8 @@ noreplaycheck:
 		goto bad;
 	}
 
-	/*
-	 * strip off the trailing pad area.
-	 */
-#if 1
+	/* strip off the trailing pad area. */
 	m_adj(m, -taillen);
-#else
-	if (taillen < n->m_len) {
-		/* trailing pad data is included in the last mbuf item. */
-		n->m_len -= taillen;
-		m->m_pkthdr.len -= taillen;
-	} else {
-		/* trailing pad data spans on multiple mbuf item. */
-		size_t siz;
-
-		siz = m->m_pkthdr.len;
-		if (siz < taillen) {
-			log(LOG_NOTICE, "bad packet length in IPv4 ESP input: %s %s\n",
-				ipsec4_logpacketstr(ip, spi),
-				ipsec_logsastr(sav));
-			ipsecstat.in_inval++;
-			goto bad;
-		}
-		siz -= taillen;
-
-		/* find the final mbuf */
-		for (n = m; n; n = n->m_next) {
-			if (n->m_len < siz)
-				siz -= n->m_len;
-			else
-				break;
-		}
-		if (!n) {
-			printf("invalid packet\n");
-			ipsecstat.in_inval++;
-			goto bad;
-		}
-
-		/* trim the final mbuf */
-		if (n->m_len < siz) {
-			printf("invalid size: %d %lu\n", n->m_len, (u_long)siz);
-			ipsecstat.in_inval++;
-			goto bad;
-		}
-		n->m_len = siz;
-
-		/* dispose the rest of the packet */
-		m_freem(n->m_next);
-		n->m_next = NULL;
-
-		m->m_pkthdr.len -= taillen;
-	}
-#endif
 
 #ifdef IPLEN_FLIPPED
 	ip->ip_len = ip->ip_len - taillen;
@@ -733,13 +678,8 @@ esp6_input(mp, offp, proto)
 		goto bad;
 	}
 
-	/* strip off */
-#if 1
+	/* strip off the authentication data */
 	m_adj(m, -siz);
-#else
-	m->m_pkthdr.len -= siz;
-	n->m_len -= siz;
-#endif
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - siz);
 
@@ -883,58 +823,8 @@ noreplaycheck:
 		goto bad;
 	}
 
-	/*
-	 * XXX strip off the padding.
-	 */
-#if 1
+	/* strip off the padding. */
 	m_adj(m, -taillen);
-#else
-	if (taillen < n->m_len) {
-		/* trailing pad data is included in the last mbuf item. */
-		n->m_len -= taillen;
-		m->m_pkthdr.len -= taillen;
-	} else {
-		/* trailing pad data spans on multiple mbuf item. */
-		size_t siz;
-
-		siz = m->m_pkthdr.len;
-		if (siz < taillen) {
-			log(LOG_NOTICE, "bad packet length in IPv6 ESP input: %s %s\n",
-				ipsec6_logpacketstr(ip6, spi),
-				ipsec_logsastr(sav));
-			ipsec6stat.in_inval++;
-			goto bad;
-		}
-		siz -= taillen;
-
-		/* find the final mbuf */
-		for (n = m; n; n = n->m_next) {
-			if (n->m_len < siz)
-				siz -= n->m_len;
-			else
-				break;
-		}
-		if (!n) {
-			printf("invalid packet\n");
-			ipsec6stat.in_inval++;
-			goto bad;
-		}
-
-		/* trim the final mbuf */
-		if (n->m_len < siz) {
-			printf("invalid size: %d %lu\n", n->m_len, (u_long)siz);
-			ipsec6stat.in_inval++;
-			goto bad;
-		}
-		n->m_len = siz;
-
-		/* dispose the rest of the packet */
-		m_freem(n->m_next);
-		n->m_next = NULL;
-
-		m->m_pkthdr.len -= taillen;
-	}
-#endif
 
 	ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - taillen);
     }
