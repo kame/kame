@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.94 2002/06/03 03:22:40 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.95 2002/06/03 03:26:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -180,7 +180,6 @@ main(argc, argv)
 	char **argv;
 {
 	int ch;
-	int aflag = 0;
 
 	pid = getpid();
 	thiszone = gmt2local(0);
@@ -237,10 +236,6 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
-	if (aflag && mode != 'a') {
-		usage();
-		/*NOTREACHED*/
-	}
 	switch (mode) {
 	case 'a':
 	case 'c':
