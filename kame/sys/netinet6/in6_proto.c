@@ -570,7 +570,7 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_USELOOPBACK,
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_PROXYALL,
 	nd6_proxyall, CTLFLAG_RW,	&nd6_proxyall, 0, "");
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if __FreeBSD__ < 3
 /* net.inet6.udp6 */
 SYSCTL_INT(_net_inet6_udp6, UDP6CTL_SENDMAX,
 	sendmax, CTLFLAG_RW,	&udp6_sendspace,	0, "");
