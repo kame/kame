@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1638 2001/04/04 18:47:19 suz Exp $
+$KAME: CHANGELOG,v 1.1639 2001/04/04 22:23:03 thorpej Exp $
 
 <200104>
+2001-04-04  Jason R. Thorpe  <thorpej@zembu.com>
+
+	* racoon: Add support for the Dmalloc debugging malloc
+	library.  This library gives very nice memory usage
+	statistics and leak information.
+
 Thu Apr  5 03:42:24 JST 2001	suz@sdl.hitachi.co.jp
 	* kame/v6test/getconfig.c: v6test supports arbitrary raw packet 
 	advertisement, such as OSPFv3, Tunnelled packet etc.

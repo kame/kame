@@ -53,7 +53,7 @@ AC_MSG_RESULT($enable_idea)
 
 AC_MSG_CHECKING(if --enable-gssapi option is specified)
 AC_ARG_ENABLE(rc5,
-        [  --enable-gssapi            enable GSS-API authentication],
+        [  --enable-gssapi         enable GSS-API authentication],
         [], [enable_gssapi=no])
 if test $enable_gssapi = "yes"; then
 	AC_DEFINE(HAVE_GSSAPI)
@@ -85,6 +85,20 @@ if test "$gc_dir" != "no"; then
 		RACOON_PATH_LIBS(GC_malloc, leak)
 	else
 		RACOON_PATH_LIBS(GC_malloc, leak, $gc_dir)
+	fi
+fi
+
+dmalloc_dir=
+AC_MSG_CHECKING(if --with-dmalloc option is specified)
+AC_ARG_WITH(dmalloc, [  --with-dmalloc=DIR      specify Dmalloc directory],
+	[dmalloc_dir=$withval], [dmalloc_dir=no])
+AC_MSG_RESULT(${dmalloc_dir})
+if test "$dmalloc_dir" != "no"; then
+	AC_DEFINE(DMALLOC)
+	if test "x$dmalloc_dir" = "x"; then
+		RACOON_PATH_LIBS(dmalloc_log_unfreed, dmalloc)
+	else
+		RACOON_PATH_LIBS(dmalloc_log_unfreed, dmalloc, $dmalloc_dir)
 	fi
 fi
 
