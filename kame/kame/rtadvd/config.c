@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.39 2001/06/01 18:00:00 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.40 2001/06/01 22:54:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -179,7 +179,7 @@ getconfig(intface)
 	tmp->otherflg = val & ND_RA_FLAG_OTHER;
 #ifdef MIP6
 	if (mobileip6)
-		tmp->haflg = val & ND_RA_FLAG_HA;
+		tmp->haflg = val & ND_RA_FLAG_HOME_AGENT;
 #endif
 #ifndef ND_RA_FLAG_RTPREF_MASK
 #define ND_RA_FLAG_RTPREF_MASK	0x18 /* 00011000 */
@@ -852,7 +852,7 @@ make_packet(struct rainfo *rainfo)
 		rainfo->otherflg ? ND_RA_FLAG_OTHER : 0;
 #ifdef MIP6
 	ra->nd_ra_flags_reserved |=
-		rainfo->haflg ? ND_RA_FLAG_HA : 0;
+		rainfo->haflg ? ND_RA_FLAG_HOME_AGENT : 0;
 #endif
 	ra->nd_ra_router_lifetime = htons(rainfo->lifetime);
 	ra->nd_ra_reachable = htonl(rainfo->reachabletime);

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.49 2001/06/01 03:20:12 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.50 2001/06/01 22:54:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -202,7 +202,7 @@ struct nd_router_advert {	/* router advertisement */
 #define nd_ra_flags_reserved	nd_ra_hdr.icmp6_data8[1]
 #define ND_RA_FLAG_MANAGED	0x80
 #define ND_RA_FLAG_OTHER	0x40
-#define ND_RA_FLAG_HA		0x20
+#define ND_RA_FLAG_HOME_AGENT	0x20
 
 /*
  * Router preference values based on draft-draves-ipngwg-router-selection-01.

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.38 2001/03/29 05:34:31 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.39 2001/06/01 22:54:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -1501,7 +1501,7 @@ int          icmp6len;  /* Total ICMP6 payload length */
 			}
 
 			ra = (struct nd_router_advert *)icmp6;
-			if (!(ra->nd_ra_flags_reserved & ND_RA_FLAG_HA))
+			if (!(ra->nd_ra_flags_reserved & ND_RA_FLAG_HOME_AGENT))
 				return 0;
 
 			if (mip6_icmp6_ra(m, off, icmp6len))

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hooks.c,v 1.14 2001/03/29 05:34:32 itojun Exp $	*/
+/*	$KAME: mip6_hooks.c,v 1.15 2001/06/01 22:54:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -154,8 +154,8 @@ mip6_find_auto_home_addr(struct in6_ifaddr **ia6p)
 #if 0		/* XXXYYY Add in v2.0 */
 		for (pfxrtr = pr->ndpr_advrtrs.lh_first; pfxrtr;
 		     pfxrtr = pfxrtr->pfr_next) {
-			if ((pfxrtr->router->flags & ND_RA_FLAG_HA)
-			    == ND_RA_FLAG_HA)
+			if ((pfxrtr->router->flags & ND_RA_FLAG_HOME_AGENT)
+			    == ND_RA_FLAG_HOME_AGENT)
 				break;
 		}
 #endif /* 0 */
