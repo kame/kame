@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.sample,v 1.3 2000/04/26 08:35:20 sakane Exp $
+# $KAME: racoon.conf.sample,v 1.4 2000/04/26 20:07:12 sakane Exp $
 
 # "path" must be placed before it should be used.
 # You can overwrite which you defined, but it should not use due to confusing.
@@ -13,7 +13,6 @@ path pre_shared_key "/usr/local/v6/etc/psk.txt" ;
 path certificate "/usr/local/openssl/certs" ;
 
 # personal information.
-identifier vendor_id "KAME/racoon";
 identifier user_fqdn "foo@kame.net";
 identifier fqdn "foo.kame.net";
 
