@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.22 2001/07/09 01:24:13 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.23 2001/07/23 05:34:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -345,12 +345,7 @@ struct ip6_frag {
 #define IP6_EXTHDR_CHECK(m, off, hlen, ret)				\
 do {									\
     if ((m)->m_next != NULL) {						\
-	if (((m)->m_flags & M_LOOP) &&					\
-	    ((m)->m_len < (off) + (hlen)) &&				\
-	    (((m) = m_pullup((m), (off) + (hlen))) == NULL)) {		\
-		ip6stat.ip6s_exthdrtoolong++;				\
-		return ret;						\
-	} else if ((m)->m_flags & M_EXT) {				\
+	if ((m)->m_flags & M_EXT) {					\
 		if ((m)->m_len < (off) + (hlen)) {			\
 			ip6stat.ip6s_exthdrtoolong++;			\
 			m_freem(m);					\
