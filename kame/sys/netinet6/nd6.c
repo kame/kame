@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.326 2003/06/25 07:10:40 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.327 2003/06/25 07:43:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -604,7 +604,7 @@ nd6_llinfo_timer(arg)
 		}
 		break;
 	case ND6_LLINFO_REACHABLE:
-		if (ln->ln_expire) {
+		if (!ND6_LLINFO_PERMANENT(ln)) {
 			ln->ln_state = ND6_LLINFO_STALE;
 			nd6_llinfo_settimer(ln, (long)nd6_gctimer * hz);
 		}
@@ -612,7 +612,7 @@ nd6_llinfo_timer(arg)
 
 	case ND6_LLINFO_STALE:
 		/* Garbage Collection(RFC 2461 5.3) */
-		if (ln->ln_expire) {
+		if (!ND6_LLINFO_PERMANENT(ln)) {
 			(void)nd6_free(rt, 1);
 			ln = NULL;
 		}
@@ -1286,7 +1286,7 @@ nd6_nud_hint(rt, dst6, force)
 	}
 
 	ln->ln_state = ND6_LLINFO_REACHABLE;
-	if (ln->ln_expire) {
+	if (!ND6_LLINFO_PERMANENT(ln)) {
 		nd6_llinfo_settimer(ln,
 		    (long)ND_IFINFO(rt->rt_ifp)->reachable * hz);
 	}
@@ -2336,7 +2336,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	 * If there has been no NS for the neighbor after entering the
 	 * INCOMPLETE state, send the first solicitation.
 	 */
-	if (ln->ln_expire && ln->ln_asked == 0) {
+	if (!ND6_LLINFO_PERMANENT(ln) && ln->ln_asked == 0) {
 		ln->ln_asked++;
 		nd6_llinfo_settimer(ln,
 		    (long)ND_IFINFO(ifp)->retrans * hz / 1000);
