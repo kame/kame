@@ -50,8 +50,8 @@ static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <netinet/in_systm.h>
-#include <netinet6/in6_pcb.h>
 #include <netinet6/in6_var.h>
+#include <netinet6/in6_pcb.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/pim6_var.h>
 
