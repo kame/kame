@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.215 2002/10/28 10:04:14 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.216 2002/10/28 11:25:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -117,7 +117,8 @@ int ip6_temp_regen_advance = TEMPADDR_REGEN_ADVANCE;
 #define RTPREF_HIGH	1
 #define RTPREF_MEDIUM	0
 #define RTPREF_LOW	(-1)
-#define RTPREF_INVALID	(-2)
+#define RTPREF_RESERVED	(-2)
+#define RTPREF_INVALID	(-3)	/* internal */
 
 /*
  * Receive Router Solicitation Message - just for routers.
@@ -241,6 +242,8 @@ nd6_ra_input(m, off, icmp6len)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second;
 #endif
+	char *lladdr = NULL;
+	int lladdrlen = 0;
 
 	/*
 	 * We only accept RAs only when
@@ -299,7 +302,16 @@ nd6_ra_input(m, off, icmp6len)
 	Bzero(&dr0, sizeof(dr0));
 	dr0.rtaddr = *src_sa6;
 	dr0.flags  = nd_ra->nd_ra_flags_reserved;
-	dr0.rtlifetime = ntohs(nd_ra->nd_ra_router_lifetime);
+	if (rtpref(&dr0) == RTPREF_RESERVED) {
+		/*
+		 * "reserved" router preference should be treated as
+		 * 0-lifetime.  Note that rtpref() covers the case that the
+		 * kernel is not configured to support the preference
+		 * extension.
+		 */
+		dr0.rtlifetime = 0;
+	} else
+		dr0.rtlifetime = ntohs(nd_ra->nd_ra_router_lifetime);
 	dr0.expire = time_second + dr0.rtlifetime;
 	dr0.ifp = ifp;
 	dr0.advint = 0;		/* Mobile IPv6 */
@@ -483,10 +495,6 @@ nd6_ra_input(m, off, icmp6len)
 	/*
 	 * Source link layer address
 	 */
-    {
-	char *lladdr = NULL;
-	int lladdrlen = 0;
-
 	if (ndopts.nd_opts_src_lladdr) {
 		lladdr = (char *)(ndopts.nd_opts_src_lladdr + 1);
 		lladdrlen = ndopts.nd_opts_src_lladdr->nd_opt_len << 3;
@@ -508,7 +516,6 @@ nd6_ra_input(m, off, icmp6len)
 	 * detection of adveritsed prefixes.
 	 */
 	pfxlist_onlink_check();
-    }
 
  freeit:
 	m_freem(m);
@@ -982,12 +989,13 @@ rtpref(struct nd_defrouter *dr)
 #ifdef RTPREF
 	switch (dr->flags & ND_RA_FLAG_RTPREF_MASK) {
 	case ND_RA_FLAG_RTPREF_HIGH:
-		return RTPREF_HIGH;
+		return (RTPREF_HIGH);
 	case ND_RA_FLAG_RTPREF_MEDIUM:
+		return (RTPREF_MEDIUM);
 	case ND_RA_FLAG_RTPREF_RSV:
-		return RTPREF_MEDIUM;
+		return (RTPREF_RESERVED);
 	case ND_RA_FLAG_RTPREF_LOW:
-		return RTPREF_LOW;
+		return (RTPREF_LOW);
 	default:
 		/*
 		 * This case should never happen.  If it did, it would mean a
@@ -995,7 +1003,7 @@ rtpref(struct nd_defrouter *dr)
 		 * Or, can we even panic?
 		 */
 		log(LOG_ERR, "rtpref: impossible RA flag %x", dr->flags);
-		return RTPREF_INVALID;
+		return (RTPREF_INVALID);
 	}
 	/* NOTREACHED */
 #else
