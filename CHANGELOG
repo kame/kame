@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.75 1999/08/27 03:26:29 itojun Exp $
+$Id: CHANGELOG,v 1.76 1999/08/28 06:29:13 itojun Exp $
 
 <199908>
+Sat Aug 28 15:28:16 JST 1999  itojun@iijlab.net
+	* kame/rtsold: fix rtsol's behavior when link-local address is
+	  considered a duplicated address (by DAD).
+
 Fri Aug 27 12:23:19 JST 1999  itojun@iijlab.net
 	* netbsd/sys/netinet/tcp_subr.c: fix IPsec header size consideration
 	  during TCP mss computation.  you will see no fragmentation on
