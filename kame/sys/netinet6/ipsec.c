@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.115 2001/07/27 18:43:02 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.116 2001/07/27 18:49:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -325,7 +325,7 @@ ipsec_fillpcbcache(pcbsp, sp, dir)
 			printf("DP ipsec_fillpcbcache cause refcnt++:%d SP:%p\n",
 			pcbsp->cache[dir]->refcnt, pcbsp->cache[dir]));
 	}
-	pcbsp->cachegen[dir] = ps_cachegen;
+	pcbsp->cachegen[dir] = sp_cachegen;
 
 	return 0;
 }
