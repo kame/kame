@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.165 2001/02/26 09:20:38 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.166 2001/03/06 00:22:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1725,7 +1725,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 				/* fall through */
 			case IPV6_UNICAST_HOPS:
 			case IPV6_HOPLIMIT:
-			case IPV6_CHECKSUM:
 			case IPV6_FAITH:
 
 			case IPV6_RECVPKTINFO:
@@ -1894,14 +1893,6 @@ do { \
 					OPTSET(IN6P_RTHDR);
 					if (OPTBIT(IN6P_RTHDR) == 0)
 						ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDR);
-					break;
-
-				case IPV6_CHECKSUM:
-#ifdef HAVE_NRL_INPCB
-					inp->in6p_cksum = optval;
-#else
-					in6p->in6p_cksum = optval;
-#endif
 					break;
 
 				case IPV6_FAITH:
@@ -2323,7 +2314,6 @@ do { \
 				}
 				/* fall through */
 			case IPV6_UNICAST_HOPS:
-			case IPV6_CHECKSUM:
 
 			case IPV6_RECVPKTINFO:
 			case IPV6_RECVHOPLIMIT:
@@ -2366,14 +2356,6 @@ do { \
 
 				case IPV6_RECVRTHDRDSTOPTS:
 					optval = OPTBIT(IN6P_RTHDRDSTOPTS);
-					break;
-
-				case IPV6_CHECKSUM:
-#ifdef HAVE_NRL_INPCB
-					optval = inp->in6p_cksum;
-#else
-					optval = in6p->in6p_cksum;
-#endif
 					break;
 
 				case IPV6_USE_MIN_MTU:

@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.69 2001/03/04 15:55:44 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.70 2001/03/06 00:22:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -613,13 +613,16 @@ rip6_output(m, va_alist)
  * Raw IPv6 socket option processing.
  */
 int
-rip6_ctloutput(op, so, level, optname, m)
+rip6_ctloutput(op, so, level, optname, mp)
 	int op;
 	struct socket *so;
 	int level, optname;
-	struct mbuf **m;
+	struct mbuf **mp;
 {
 	int error = 0;
+	int optval;
+	struct in6pcb *in6p;
+	struct mbuf *m;
 
 	switch (level) {
 	case IPPROTO_IPV6:
@@ -632,16 +635,31 @@ rip6_ctloutput(op, so, level, optname, m)
 		case MRT6_DEL_MFC:
 		case MRT6_PIM:
 			if (op == PRCO_SETOPT) {
-				error = ip6_mrouter_set(optname, so, *m);
-				if (*m)
-					(void)m_free(*m);
+				error = ip6_mrouter_set(optname, so, *mp);
+				if (*mp)
+					(void)m_free(*mp);
+			} else if (op == PRCO_GETOPT)
+				error = ip6_mrouter_get(optname, so, mp);
+			else
+				error = EINVAL;
+			return (error);
+		case IPV6_CHECKSUM:
+			if (so->so_proto->pr_protocol == IPPROTO_ICMPV6)
+				return EINVAL;
+			in6p = sotoin6pcb(so);
+			if (op == PRCO_SETOPT) {
+				optval = *mtod(m, int *);
+				in6p->in6p_cksum = optval;
 			} else if (op == PRCO_GETOPT) {
-				error = ip6_mrouter_get(optname, so, m);
+				optval = in6p->in6p_cksum;
+				*mp = m = m_get(M_WAIT, MT_SOOPTS);
+				m->m_len = sizeof(int);
+				*mtod(m, int *) = optval;
 			} else
 				error = EINVAL;
 			return (error);
 		}
-		return (ip6_ctloutput(op, so, level, optname, m));
+		return (ip6_ctloutput(op, so, level, optname, mp));
 		/* NOTREACHED */
 
 	case IPPROTO_ICMPV6:
@@ -649,11 +667,11 @@ rip6_ctloutput(op, so, level, optname, m)
 		 * XXX: is it better to call icmp6_ctloutput() directly
 		 * from protosw?
 		 */
-		return(icmp6_ctloutput(op, so, level, optname, m));
+		return(icmp6_ctloutput(op, so, level, optname, mp));
 
 	default:
-		if (op == PRCO_SETOPT && *m)
-			(void)m_free(*m);
+		if (op == PRCO_SETOPT && *mp)
+			(void)m_free(*mp);
 		return(EINVAL);
 	}
 }
