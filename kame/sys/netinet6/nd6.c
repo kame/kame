@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.132 2001/02/24 17:47:22 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.133 2001/02/26 13:51:43 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1886,8 +1886,12 @@ nd6_cache_lladdr(ifp, from, lladdr, lladdrlen, type, code)
 
 		rt = nd6_lookup(from, 1, ifp);
 		is_newentry = 1;
-	} else
+	} else {
+		/* do nothing if static ndp is set */
+		if (rt->rt_flags & RTF_STATIC)
+			return NULL;
 		is_newentry = 0;
+	}
 
 	if (!rt)
 		return NULL;
