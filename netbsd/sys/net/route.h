@@ -127,6 +127,13 @@ struct rtentry {
 	struct	rtentry *rt_gwroute;	/* implied entry for gatewayed routes */
 	LIST_HEAD(, rttimer) rt_timer;  /* queue of timeouts for misc funcs */
 	struct	rtentry *rt_parent;	/* parent of cloned route */
+
+	/* the following entries are for statistics*/
+	time_t rt_createtime;	/* timestamp at creation of this route */
+	time_t rt_lastreftime;	/* timestamp when the latest reference time */
+	u_long rt_usehist[16];	/* histogram of references for every 5 min */
+	u_long rt_reusehist[16]; /* histogram of re-use of this route */
+	u_long rt_releasehist[16]; /* histogram of release of this route*/
 };
 
 /*
@@ -300,6 +307,36 @@ do { \
 		(rt)->rt_refcnt--; \
 } while (0)
 
+#define	RTUSE(rt) \
+	do { \
+		extern struct timeval time; \
+		int i; \
+		(rt)->rt_use++; \
+		(rt)->rt_lastreftime = time.tv_sec; \
+		i = ((rt)->rt_lastreftime - (rt)->rt_createtime) / 300; \
+		if (i > 12) \
+			i = 12; \
+		(rt)->rt_usehist[i]++; \
+	} while (0)
+
+#define	RTREUSE(rt) \
+	do { \
+		int i; \
+		i = (time.tv_sec - (rt)->rt_createtime) / 300; \
+		if (i > 12) \
+			i = 12; \
+		(rt)->rt_reusehist[i]++; \
+	} while (0)
+
+#define	RTRELEASE(rt) \
+	do { \
+		int i; \
+		i = (time.tv_sec - (rt)->rt_createtime) / 300; \
+		if (i > 12) \
+			i = 12; \
+		(rt)->rt_releasehist[i]++; \
+	} while (0)
+
 struct	route_cb route_cb;
 struct	rtstat	rtstat;
 struct	radix_node_head *rt_tables[AF_MAX+1];
@@ -330,6 +367,8 @@ void	 rt_timer_queue_destroy __P((struct rttimer_queue *, int));
 void	 rt_timer_remove_all __P((struct rtentry *));
 unsigned long	rt_timer_count __P((struct rttimer_queue *));
 void	 rt_timer_timer __P((void *));
+void	 rt_add_cache __P((struct rtentry *,
+			   void(*) __P((struct rtentry *, struct rttimer *))));
 void	 rtable_init __P((void **));
 void	 rtalloc __P((struct route *));
 struct rtentry *
