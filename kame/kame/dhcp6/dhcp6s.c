@@ -117,6 +117,7 @@ main(argc, argv)
 	struct in6_addr a;
 	struct dnslist *dle;
 
+	TAILQ_INIT(&dnslist);
 	srandom(time(NULL) & getpid());
 	while ((ch = getopt(argc, argv, "dn:N:")) != EOF) {
 		switch (ch) {
@@ -216,7 +217,6 @@ server6_init()
 	ifidx = if_nametoindex(device);
 	if (ifidx == 0)
 		errx(1, "invalid interface %s", device);
-	TAILQ_INIT(&dnslist);
 
 	/* initialize constant variables */
 	if (inet_pton(AF_INET6, "fe80::", &link_local_prefix) != 1) {
