@@ -354,7 +354,7 @@ rip6_output(m, so, dstsock, control)
 	dst = &dstsock->sin6_addr;
 	if (control) {
 		if ((error = ip6_setpktopts(control, &opt,
-		    in6p->in6p_outputopts, priv, 0,
+		    in6p->in6p_outputopts, priv,
 		    so->so_proto->pr_protocol)) != 0) {
 			goto bad;
 		}
