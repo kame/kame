@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.20 2004/02/02 13:11:39 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.21 2004/02/05 10:09:23 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2173,8 +2173,8 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	}
 
 	/*
-	 * Prepare sock_storage for in6_addmulti(), in6_delmulti(), and
-	 * in6_modmulti(). Input source lists are sorted below.
+	 * Prepare sock_storage for in6_addmulti2(), in6_delmulti2(), and
+	 * in6_modmulti2(). Input source lists are sorted below.
 	 */
 	if (grpf->gf_numsrc != 0) {
 		I6AS_LIST_ALLOC(iasl);
@@ -2349,15 +2349,15 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	if ((grpf->gf_fmode == MCAST_INCLUDE) && (grpf->gf_numsrc == 0)) {
 		final = 1;
 		if (msf->msf_grpjoin != 0 && msf->msf_blknumsrc == 0) {
-			in6_delmulti(imm->i6mm_maddr, &error, 0, NULL,
-				     MCAST_EXCLUDE, final);
+			in6_delmulti2(imm->i6mm_maddr, &error, 0, NULL,
+				      MCAST_EXCLUDE, final);
 			if (error != 0) {
 				mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: error must be 0! panic!\n"));
 				splx(s);
 				return error;
 			}
 		} else {
-			in6_delmulti(imm->i6mm_maddr, &error, old_num,
+			in6_delmulti2(imm->i6mm_maddr, &error, old_num,
 				     old_ss, old_mode, final);
 			if (error != 0) {
 				mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: error %d. undo for IN{non NULL}/EX{non NULL} -> IN{NULL}\n", error));
@@ -2372,13 +2372,13 @@ sock6_setmopt_srcfilter(sop, grpfp)
 				(grpf->gf_numsrc == 0)) {
 		if (old_num > 0) {
 			imm->i6mm_maddr = 
-				in6_modmulti(SIN6(sa_grp), ifp, &error,
-					     0, NULL, MCAST_EXCLUDE, old_num,
-					     old_ss, old_mode, init, 0);
+				in6_modmulti2(SIN6(sa_grp), ifp, &error,
+					      0, NULL, MCAST_EXCLUDE, old_num,
+					      old_ss, old_mode, init, 0);
 		} else {
 			imm->i6mm_maddr =
-				in6_addmulti(SIN6(sa_grp), ifp, &error,
-					     0, NULL, MCAST_EXCLUDE, init);
+				in6_addmulti2(SIN6(sa_grp), ifp, &error,
+					      0, NULL, MCAST_EXCLUDE, init);
 		}
 		if (error != 0) {
 			mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: error %d. undo for IN{non NULL}/EX{non NULL} -> EX{NULL} or IN{NULL} -> EX{NULL}\n", error));
@@ -2400,10 +2400,10 @@ sock6_setmopt_srcfilter(sop, grpfp)
 				splx(s);
 				return EOPNOTSUPP;
 			}
-			in6_delmulti(imm->i6mm_maddr, &error, old_num,
-				     old_ss, old_mode, final);
+			in6_delmulti2(imm->i6mm_maddr, &error, old_num,
+				      old_ss, old_mode, final);
 			if (error != 0) {
-				mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: in6_delmulti retuned error=%d. undo.\n", error));
+				mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: in6_delmulti2 retuned error=%d. undo.\n", error));
 				in6_undomopt_source_list(msf, grpf->gf_fmode);
 				FREE(old_ss, M_IPMOPTS);
 				if (ss_src != NULL)
@@ -2413,13 +2413,13 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			}
 		} else {
 			imm->i6mm_maddr =
-				in6_modmulti(SIN6(sa_grp), ifp, &error,
-					     grpf->gf_numsrc, ss_src,
-					     grpf->gf_fmode, old_num,
-					     old_ss, old_mode, init,
-					     msf->msf_grpjoin);
+				in6_modmulti2(SIN6(sa_grp), ifp, &error,
+					      grpf->gf_numsrc, ss_src,
+					      grpf->gf_fmode, old_num,
+					      old_ss, old_mode, init,
+					      msf->msf_grpjoin);
 			if (error != 0) {
-				mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: in6_modmulti returned error=%d. undo.\n", error));
+				mldlog((LOG_DEBUG, "sock6_setmopt_srcfilter: in6_modmulti2 returned error=%d. undo.\n", error));
 				in6_undomopt_source_list(msf, grpf->gf_fmode);
 				if (old_num != 0)
 					FREE(old_ss, M_IPMOPTS);

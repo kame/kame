@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.187 2004/02/04 05:07:43 suz Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.188 2004/02/05 10:09:23 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1095,18 +1095,10 @@ in6_ifdetach(ifp)
 #endif
 
 	for (in6m = LIST_FIRST(&in6_multihead); in6m; in6m = in6m_next) {
-#ifdef MLDV2
-		int error;
-#endif
 		in6m_next = LIST_NEXT(in6m, in6m_entry);
 		if (in6m->in6m_ifp != ifp)
 			continue;
-#ifdef MLDV2
-		/* ToDo: should remove all the multicast group */
-		in6_delmulti(in6m, &error, 0, NULL, MCAST_EXCLUDE, 1);
-#else
 		in6_delmulti(in6m);
-#endif
 		in6m = NULL;
 	}
 #endif

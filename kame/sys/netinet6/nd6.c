@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.338 2004/02/04 05:53:39 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.339 2004/02/05 10:09:24 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1558,11 +1558,7 @@ nd6_rtrequest(req, rt, sa)
 				    &llsol.sin6_scope_id);
 				if (error)
 					break;
-#ifdef MLDV2
-				if (in6_addmulti(&llsol.sin6_addr, ifp, &error, 0, NULL, MCAST_EXCLUDE, 0) == NULL)
-#else
 				if (in6_addmulti(&llsol.sin6_addr, ifp, &error) == NULL)
-#endif
 				{
 					nd6log((LOG_ERR, "%s: failed to join "
 					    "%s (errno=%d)\n", if_name(ifp),
@@ -1600,12 +1596,7 @@ nd6_rtrequest(req, rt, sa)
 			    &llsol.sin6_scope_id) == 0) {
 				IN6_LOOKUP_MULTI(llsol.sin6_addr, ifp, in6m);
 				if (in6m) {
-#ifdef MLDV2
-					int error;
-					in6_delmulti(in6m, &error, 0, NULL, MCAST_EXCLUDE, 1);
-#else
 					in6_delmulti(in6m);
-#endif
 				}
 			} else {
 				/* XXX: this should not fail.  bark here? */

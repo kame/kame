@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2540 2004/02/03 07:27:50 itojun Exp $
+$KAME: CHANGELOG,v 1.2541 2004/02/05 10:09:23 suz Exp $
 
 <200402>
+2004-02-05  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/sys/netinet6/{in6.c, mld6.c, mldv2.c}: creates mldv2.c to
+	  concentrate almost all the MLDv2-related functions on this file
+	  (just for maintenance convenience); mld6.c or mldv2.c are used 
+	  exclusively depending on your kernel configuration.
+
+	* kame/sys/netinet6/{in6_ifattach.c, in6_msf.c, in6_var.h,
+	  ip6_output.c, nd6.c}: renamed MLDv2-ready in6_multi manupulation
+	  functions to reduce the number of 'ifdef MLDV2'
+
 Tue Feb  3 16:26:08 JST 2004  itojun@iijlab.net
 	* sys: move away from in6_{get,set}pktaddrs framework, go back to
 	  embedded scopeid in s6_addr16[1].  this is to make *BSD merge easier.

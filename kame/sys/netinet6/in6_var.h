@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.92 2004/02/03 07:25:22 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.93 2004/02/05 10:09:23 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -712,22 +712,22 @@ do {						\
 
 #endif /* not FreeBSD3 */
 
-#ifdef MLDV2
-struct	in6_multi *in6_addmulti(struct in6_addr *, struct ifnet *,
-	int *, u_int16_t, struct sockaddr_storage *, u_int, int);
-void	in6_delmulti(struct in6_multi *, int *, u_int16_t,
-	struct sockaddr_storage *, u_int, int);
-struct	in6_multi *in6_modmulti(struct in6_addr *, struct ifnet *,
-	int *, u_int16_t, struct sockaddr_storage *, u_int, u_int16_t,
-	struct sockaddr_storage *, u_int, int, u_int);
-#else
 struct	in6_multi *in6_addmulti __P((struct in6_addr *, struct ifnet *, int *));
 void	in6_delmulti __P((struct in6_multi *));
-#endif
-
 struct in6_multi_mship *in6_joingroup __P((struct ifnet *,
 	struct in6_addr *, int *));
 int	in6_leavegroup __P((struct in6_multi_mship *));
+#ifdef MLDV2
+struct	in6_multi *in6_addmulti2(struct in6_addr *, struct ifnet *,
+	int *, u_int16_t, struct sockaddr_storage *, u_int, int);
+void	in6_delmulti2(struct in6_multi *, int *, u_int16_t,
+	struct sockaddr_storage *, u_int, int);
+struct	in6_multi *in6_modmulti2(struct in6_addr *, struct ifnet *,
+	int *, u_int16_t, struct sockaddr_storage *, u_int, u_int16_t,
+	struct sockaddr_storage *, u_int, int, u_int);
+#endif
+
+
 int	in6_mask2len __P((struct in6_addr *, u_char *));
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 int	in6_control(struct socket *, u_long, caddr_t, struct ifnet *,

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.420 2004/02/04 09:13:55 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.421 2004/02/05 10:09:23 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3980,8 +3980,8 @@ ip6_setmoptions(optname, im6op, m)
 		 * But if some error occurs when source list is added to
 		 * the list, undo added msf list from the socket.
 		 */
-		imm->i6mm_maddr = in6_addmulti(SIN6(&ss_grp), ifp, &error, 1,
-				    &ss_src, MCAST_INCLUDE, init);
+		imm->i6mm_maddr = in6_addmulti2(SIN6(&ss_grp), ifp, &error, 1,
+						&ss_src, MCAST_INCLUDE, init);
 		if (error != 0) {
 			if (init) {
 				IMO_MSF_FREE(msf);
@@ -4041,8 +4041,8 @@ ip6_setmoptions(optname, im6op, m)
 		 * Give up the multicast address record to which the
 		 * membership points.
 		 */
-		in6_delmulti(imm->i6mm_maddr, &error, 1, &ss_src,
-			     MCAST_INCLUDE, final);
+		in6_delmulti2(imm->i6mm_maddr, &error, 1, &ss_src,
+			      MCAST_INCLUDE, final);
 		if (error != 0) {
 			printf("ip6_setmoptions: error must be 0! panic!\n");
 			in6_undomopt_source_addr(msf, optname);
@@ -4119,8 +4119,8 @@ ip6_setmoptions(optname, im6op, m)
 			 * IN{NULL}->EX{non NULL} is prohibited
 			 */
 			imm->i6mm_maddr = 
-				in6_addmulti(SIN6(&ss_grp), ifp, &error, 1,
-					     &ss_src, MCAST_EXCLUDE, 0);
+				in6_addmulti2(SIN6(&ss_grp), ifp, &error, 1,
+					      &ss_src, MCAST_EXCLUDE, 0);
 			if (error != 0) {
 				in6_undomopt_source_addr(msf, optname);
 				break;
@@ -4134,7 +4134,7 @@ ip6_setmoptions(optname, im6op, m)
 			 *  msf->msf_grpjoin is greater than 0)
 			 */
 			imm->i6mm_maddr =
-				in6_modmulti(SIN6(&ss_grp), ifp, &error, 1,
+				in6_modmulti2(SIN6(&ss_grp), ifp, &error, 1,
 					     &ss_src, MCAST_EXCLUDE,
 					     0, NULL, MCAST_EXCLUDE, 0,
 					     msf->msf_grpjoin);
@@ -4186,8 +4186,8 @@ ip6_setmoptions(optname, im6op, m)
 		 * Give up the multicast address record to which the
 		 * membership points.
 		 */
-		in6_delmulti(imm->i6mm_maddr, &error, 1, &ss_src,
-			     MCAST_EXCLUDE, 0);
+		in6_delmulti2(imm->i6mm_maddr, &error, 1, &ss_src,
+			      MCAST_EXCLUDE, 0);
 		if (error != 0) {
 			printf("ip6_setmoptions: error must be 0! panic!\n");
 			in6_undomopt_source_addr(msf, optname);
