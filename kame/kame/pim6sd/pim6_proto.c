@@ -3781,7 +3781,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 			& grp_mask_ptr->group_mask.s6_addr[i];
 	    }
 
-	    if (inet6_greaterthan(&prefix_h2,&prefix_h))
+	    if (inet6_lessthan(&prefix_h2, &prefix_h))
 		continue;
 	    else
 		break;
@@ -4086,8 +4086,8 @@ send_pim6_cand_rp_adv()
 			     my_cand_rp_holdtime,
 			     &sockaddr6_d,
 			     grp_mask,
-				 my_bsr_hash_mask,
-			      curr_bsr_fragment_tag);
+			     my_bsr_hash_mask,
+			     curr_bsr_fragment_tag);
 	    return (TRUE);
 	}
 	/* TODO: hardcoding!! */

@@ -358,7 +358,7 @@ add_grp_mask(used_grp_mask_list, group_addr, group_mask, hash_mask)
 	prefix_h.sin6_addr.s6_addr[i] =
 		group_addr->sin6_addr.s6_addr[i] & group_mask.s6_addr[i];
 
-    /* The ordering is: bigger first */
+    /* The ordering is: smaller first */
     for (grp_mask = *used_grp_mask_list; grp_mask != (grp_mask_t *) NULL;
 	 grp_mask_prev = grp_mask, grp_mask = grp_mask->next)
     {
@@ -366,7 +366,7 @@ add_grp_mask(used_grp_mask_list, group_addr, group_mask, hash_mask)
 	    prefix_h2.sin6_addr.s6_addr[i] =
 		    (grp_mask->group_addr.sin6_addr.s6_addr[i] &
 		     grp_mask->group_mask.s6_addr[i]);
-	if (inet6_greaterthan(&prefix_h2, &prefix_h) )
+	if (inet6_lessthan(&prefix_h2, &prefix_h) )
 	    continue;
 	if (inet6_equal(&prefix_h2, &prefix_h))
 	    return (grp_mask);
@@ -722,7 +722,7 @@ delete_grp_mask(used_cand_rp_list, used_grp_mask_list, group_addr, group_mask)
 	    prefix_h2.sin6_addr.s6_addr[i] = 
 		grp_mask_ptr->group_addr.sin6_addr.s6_addr[i]&grp_mask_ptr->group_mask.s6_addr[i];
 
-	if (inet6_greaterthan(&prefix_h2 , &prefix_h ))
+	if (inet6_lessthan(&prefix_h2, &prefix_h))
 	    continue;
 	if (IN6_ARE_ADDR_EQUAL(&grp_mask_ptr->group_addr.sin6_addr,
 			       &group_addr->sin6_addr) &&
@@ -1017,35 +1017,29 @@ rp_grp_match(group)
     struct sockaddr_in6	    prefix_h2;
     int i;	
 
-
     if (grp_mask_list == (grp_mask_t *) NULL)
 	return (rp_grp_entry_t *) NULL;
  
-
-/* XXX :I compare on the adresses , inet6_equal use the scope too */
-
-	prefix_h.sin6_scope_id = prefix_h2.sin6_scope_id = 0;
+    /* XXX :I compare on the adresses , inet6_equal use the scope too */
+    prefix_h.sin6_scope_id = prefix_h2.sin6_scope_id = 0;
 
     for (grp_mask_ptr = grp_mask_list; grp_mask_ptr != (grp_mask_t *) NULL;
 	 grp_mask_ptr = grp_mask_ptr->next)
     {
 	for (i = 0; i < sizeof(struct in6_addr); i++)
 	    prefix_h2.sin6_addr.s6_addr[i] = 
-		grp_mask_ptr->group_addr.sin6_addr.s6_addr[i]&grp_mask_ptr->group_mask.s6_addr[i];
+		(grp_mask_ptr->group_addr.sin6_addr.s6_addr[i] &
+		 grp_mask_ptr->group_mask.s6_addr[i]);
 	for (i = 0; i < sizeof(struct in6_addr); i++)
 	    prefix_h.sin6_addr.s6_addr[i] = 
-		group->sin6_addr.s6_addr[i]&grp_mask_ptr->group_mask.s6_addr[i];
-
+		(group->sin6_addr.s6_addr[i] &
+		 grp_mask_ptr->group_mask.s6_addr[i]);
 
 	/* Search the grp_mask (group_prefix) list */
-
-	if ((inet6_lessthan(&prefix_h ,&prefix_h2)))
+	if ((inet6_greaterthan(&prefix_h, &prefix_h2)))
 	    continue;
-	if ((inet6_greaterthan(&prefix_h ,&prefix_h2)))
+	if ((inet6_lessthan(&prefix_h, &prefix_h2)))
 	    break;
-
-
-/* THE HASH FONCTION => TODO */
 
 	for (grp_rp_entry_ptr = grp_mask_ptr->grp_rp_next;
 	     grp_rp_entry_ptr != (rp_grp_entry_t *) NULL;
@@ -1104,10 +1098,11 @@ rp_grp_match(group)
 	return (rp_grp_entry_t *) NULL;
 
     IF_DEBUG(DEBUG_PIM_CAND_RP)
-	log(LOG_DEBUG,0,"Rp_grp_match found %s for group %s",inet6_fmt(&best_entry->rp->rpentry->address.sin6_addr),
-							     inet6_fmt(&group->sin6_addr));
+	log(LOG_DEBUG,0,"Rp_grp_match found %s for group %s",
+	    inet6_fmt(&best_entry->rp->rpentry->address.sin6_addr),
+	    inet6_fmt(&group->sin6_addr));
 
-     return (best_entry);
+    return (best_entry);
 }
 
 
