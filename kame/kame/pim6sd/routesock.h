@@ -1,4 +1,4 @@
-/*	$KAME: routesock.h,v 1.4 2000/12/04 06:45:31 itojun Exp $	*/
+/*	$KAME: routesock.h,v 1.5 2003/02/07 10:40:48 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -50,6 +50,7 @@
 #define ROUTESOCK_H
 
 int init_routesock __P((void));
+extern int routing_socket;
 extern int pid;
 extern int    k_req_incoming         __P((struct sockaddr_in6 *source,
                       struct rpfctl *rpfp)); 
