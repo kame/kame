@@ -160,8 +160,11 @@ __KERNEL_RCSID(0, "$NetBSD: in.c,v 1.93.2.1 2004/07/10 12:42:37 tron Exp $");
 #include <netinet/ip_mroute.h>
 #include <netinet/igmp_var.h>
 
-#ifdef INET
+#ifdef PFIL_HOOKS
+#include <net/pfil.h>
+#endif
 
+#ifdef INET
 static u_int in_mask2len __P((struct in_addr *));
 static void in_len2mask __P((struct in_addr *, u_int));
 static int in_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
@@ -495,6 +498,11 @@ in_control(so, cmd, data, ifp, p)
 
 	case SIOCSIFADDR:
 		error = in_ifinit(ifp, ia, satosin(&ifr->ifr_addr), 1);
+#ifdef PFIL_HOOKS
+		if (!error)
+			(void)pfil_run_hooks(&if_pfil,
+			    (struct mbuf **)SIOCSIFADDR, ifp, PFIL_IFADDR);
+#endif
 		return error;
 
 	case SIOCSIFNETMASK:
@@ -534,6 +542,11 @@ in_control(so, cmd, data, ifp, p)
 		if ((ifp->if_flags & IFF_BROADCAST) &&
 		    (ifra->ifra_broadaddr.sin_family == AF_INET))
 			ia->ia_broadaddr = ifra->ifra_broadaddr;
+#ifdef PFIL_HOOKS
+		if (!error)
+			(void)pfil_run_hooks(&if_pfil,
+			    (struct mbuf **)SIOCAIFADDR, ifp, PFIL_IFADDR);
+#endif
 		return (error);
 
 	case SIOCGIFALIAS:
@@ -551,6 +564,10 @@ in_control(so, cmd, data, ifp, p)
 
 	case SIOCDIFADDR:
 		in_purgeaddr(&ia->ia_ifa, ifp);
+#ifdef PFIL_HOOKS
+		(void)pfil_run_hooks(&if_pfil, (struct mbuf **)SIOCDIFADDR,
+		    ifp, PFIL_IFADDR);
+#endif
 		break;
 
 #ifdef MROUTING
