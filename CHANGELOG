@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1613 2001/03/21 16:51:20 sakane Exp $
+$KAME: CHANGELOG,v 1.1614 2001/03/21 17:49:56 jinmei Exp $
 
 <200103>
+2001-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd/config.c (getconfig): allow router preference
+	values to be specified in the "raflags" directive.
+	* kame/sys/netinet/icmp6.h (ND_RA_RTPREF_xxx): added definitions
+	for router preferences.  Note that these are non-standard.
+
+	Note: before compiling the latest rtadvd, you have to install the
+	header file, and (probably) perform "make clean".
+
 Thu Mar 22 01:45:32 JST 2001 sakane@ydc.co.jp
 	* racoon:
 	fixed potencial of a buffer overrun when adding a ID payload to
