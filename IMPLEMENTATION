@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.325 2003/01/17 09:08:24 suz Exp $
+	$KAME: IMPLEMENTATION,v 1.326 2003/03/06 02:04:11 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -199,6 +199,9 @@ RFC3152: Delegation of IP6.ARPA
 RFC3376: Internet Group Management Protocol, Version 3
     * host-side implementation on kame/freebsd4, kame/netbsd, and kame/openbsd.
     * Multicast Source Filter works only for UDP packets.
+RFC3484: Default Address Selection for IPv6
+    * the selection algorithm for both source and destination addresses
+      is implemented based on the RFC, though some rules are still omitted.
 draft-ietf-ipngwg-icmp-name-lookups-09: IPv6 Name Lookups Through ICMP
 draft-ietf-dhc-dhcpv6-28.txt: DHCPv6
 draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
@@ -237,9 +240,6 @@ draft-ietf-dnsext-mdns-03.txt: Multicast DNS
     * kame/mdnsd has test implementation, which will not be built in
       default compilation.  The draft will experience a major change in the
       near future, so don't rely upon it.
-draft-ietf-ipv6-default-addr-select-08.txt: Default Address Selection for IPv6
-    * the selection algorithm for both source and destination addresses
-      is implemented based on the draft, though some rules are still omitted.
 draft-ietf-ipngwg-icmp-v3-02.txt: ICMPv6 for IPv6 specification (revised)
     * See 1.9 in this document for details.
 draft-ietf-vrrp-ipv6-spec-02.txt: Virtual Router Redundancy Protocol for IPv6
@@ -729,8 +729,7 @@ sent from a user application as follows:
 3. otherwise, the kernel first tries to find the outgoing interface of
    the packet.  If it fails, the source address selection also fails.
    If the kernel can find an interface, choose the most appropriate
-   address based on the algorithm described in
-   draft-ietf-ipv6-default-addr-select-xx.txt .
+   address based on the algorithm described in RFC3484.
 
    The policy table used in this algorithm is stored in the kernel.
    To install or view the policy, use the ip6addrctl(8) command.  The
@@ -787,12 +786,12 @@ default value of this variable is 0.
 1.6.2 Destination Address Ordering
 
 KAME's getaddrinfo(3) supports the destination address ordering
-algorithm described in draft-ietf-ipngwg-default-addr-select-xx.txt .
-Getaddrinfo(3) needs to know the source address for each destination
-address and policy entries (described in the previous section) for the
-source and destination addresses.  To get the source address, the
-library function opens a UDP socket and tries to connect(2) for the
-destination.  To get the policy entry, the function issues sysctl(3).
+algorithm described in RFC3484.  Getaddrinfo(3) needs to know the
+source address for each destination address and policy entries
+(described in the previous section) for the source and destination
+addresses.  To get the source address, the library function opens a
+UDP socket and tries to connect(2) for the destination.  To get the
+policy entry, the function issues sysctl(3).
 
 1.7 Jumbo Payload
 
