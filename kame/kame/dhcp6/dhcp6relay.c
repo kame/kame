@@ -77,7 +77,7 @@ struct prefix_list {
 };
 TAILQ_HEAD(, prefix_list) global_prefixes; /* list of non-link-local prefixes */
 static char *global_strings[] = {
-	"2001::/3", "3ffe::/16", "2002::/16", "fec0::/10",
+	"2000::/3", "fec0::/10",
 };
 
 static void usage __P((void));
