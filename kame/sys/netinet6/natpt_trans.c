@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.112 2002/05/10 04:53:12 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.113 2002/05/10 06:46:32 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -177,10 +177,8 @@ void		 natpt_watchUDP6		__P((struct pcv *));
 
 /* IPv4 -> IPv6 */
 struct mbuf	*natpt_translateICMPv4To6	__P((struct pcv *, struct pAddr *));
-int		 natpt_icmp4EchoReply	__P((struct pcv *, struct pcv *));
-void		 natpt_icmp4Unreach	__P((struct pcv *, struct pcv *,
-					     struct pAddr *));
-int		 natpt_icmp4Echo		__P((struct pcv *, struct pcv *));
+int		 natpt_icmp4Informational	__P((struct pcv *, struct pcv *));
+void		 natpt_icmp4Unreach		__P((struct icmp *, struct icmp6_hdr*));
 int		 natpt_icmp4MimicPayload	__P((struct pcv *, struct pcv *,
 					     struct pAddr *));
 struct mbuf	*natpt_translateTCPv4To6	__P((struct pcv *, struct pAddr *));
@@ -825,13 +823,12 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	struct ip	*ip4 = mtod(cv4->m, struct ip *);
 	struct ip6_hdr	*ip6;
 	struct ip6_frag	*frag6;
+	struct icmp	*icmp4;
 	struct icmp6_hdr *icmp6;
-	caddr_t		icmp4end;
-	int		icmp4len;
-	int		icmp6len = 0;
 
-	icmp4end = (caddr_t)ip4 + cv4->m->m_pkthdr.len;
-	icmp4len = icmp4end - (caddr_t)cv4->pyld.icmp4;
+	caddr_t		icmp4end = (caddr_t)ip4 + cv4->m->m_pkthdr.len;
+	int		icmp4len = icmp4end - (caddr_t)cv4->pyld.icmp4;
+	int		icmp6len = 0;
 
 	if ((m6 = natpt_mgethdr(sizeof(struct ip6_hdr), icmp4len)) == NULL)
 		return (NULL);
@@ -852,9 +849,14 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 
 	cv6.pyld.icmp6->icmp6_data32[0] = 0;	/* clear unused (maybe) field */
 
+	icmp4 = cv4->pyld.icmp4;
+	icmp6 = cv6.pyld.icmp6;
+	bzero(icmp6, sizeof(struct icmp6_hdr));
+
 	switch (cv4->pyld.icmp4->icmp_type) {
 	case ICMP_ECHOREPLY:
-		icmp6len = natpt_icmp4EchoReply(cv4, &cv6);
+		icmp6->icmp6_type = ICMP6_ECHO_REPLY;
+		icmp6len = natpt_icmp4Informational(cv4, &cv6);
 		if (frag6 && needFragment(cv4)) {
 			cv6.fh = frag6;
 			natpt_translatePing4to66(cv4, &cv6, icmp6len);
@@ -863,12 +865,13 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 		break;
 
 	case ICMP_UNREACH:
-		natpt_icmp4Unreach(cv4, &cv6, pad);
+		natpt_icmp4Unreach(icmp4, icmp6);
 		icmp6len = natpt_icmp4MimicPayload(cv4, &cv6, pad);
 		break;
 
 	case ICMP_ECHO:
-		icmp6len = natpt_icmp4Echo(cv4, &cv6);
+		icmp6->icmp6_type = ICMP6_ECHO_REQUEST;
+		icmp6len = natpt_icmp4Informational(cv4, &cv6);
 		if (frag6 && needFragment(cv4)) {
 			cv6.fh = frag6;
 			natpt_translatePing4to66(cv4, &cv6, icmp6len);
@@ -937,21 +940,19 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 
 
 int
-natpt_icmp4EchoReply(struct pcv *cv4, struct pcv *cv6)
+natpt_icmp4Informational(struct pcv *cv4, struct pcv *cv6)
 {
-	struct icmp6_hdr	*icmp6 = cv6->pyld.icmp6;
-
-	icmp6->icmp6_type = ICMP6_ECHO_REPLY;
-	icmp6->icmp6_code = 0;
-	icmp6->icmp6_id  = cv4->pyld.icmp4->icmp_id;
-	icmp6->icmp6_seq = cv4->pyld.icmp4->icmp_seq;
-
-    {
 	int		dlen;
 	struct ip	*ip4 = cv4->ip.ip4;
 	caddr_t		icmp4off, icmp6off;
 	caddr_t		icmp4end = (caddr_t)ip4 + cv4->m->m_pkthdr.len;
 	int		icmp4len = icmp4end - (caddr_t)cv4->pyld.icmp4;
+	struct icmp	*icmp4 = cv4->pyld.icmp4;
+	struct icmp6_hdr *icmp6 = cv6->pyld.icmp6;
+
+	icmp6->icmp6_code = 0;
+	icmp6->icmp6_id  = icmp4->icmp_id;
+	icmp6->icmp6_seq = icmp4->icmp_seq;
 
 	dlen = icmp4len - ICMP_MINLEN;
 	icmp4off = (caddr_t)(cv4->pyld.icmp4) + ICMP_MINLEN;
@@ -959,16 +960,12 @@ natpt_icmp4EchoReply(struct pcv *cv4, struct pcv *cv6)
 	bcopy(icmp4off, icmp6off, dlen);
 
 	return (dlen);
-    }
 }
 
 
 void
-natpt_icmp4Unreach(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
+natpt_icmp4Unreach(struct icmp *icmp4, struct icmp6_hdr *icmp6)
 {
-	struct icmp	*icmp4 = cv4->pyld.icmp4;
-	struct icmp6_hdr	*icmp6 = cv6->pyld.icmp6;
-
 	icmp6->icmp6_type = ICMP6_DST_UNREACH;
 	icmp6->icmp6_code = 0;
 
@@ -1023,33 +1020,6 @@ natpt_icmp4Unreach(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 
 	default:
 		break;
-	}
-}
-
-
-int
-natpt_icmp4Echo(struct pcv *cv4, struct pcv *cv6)
-{
-	struct icmp6_hdr	*icmp6 = cv6->pyld.icmp6;
-
-	icmp6->icmp6_type = ICMP6_ECHO_REQUEST;
-	icmp6->icmp6_code = 0;
-	icmp6->icmp6_id  = cv4->pyld.icmp4->icmp_id;
-	icmp6->icmp6_seq = cv4->pyld.icmp4->icmp_seq;
-
-	{
-		int		dlen;
-		struct ip	*ip4 = cv4->ip.ip4;
-		caddr_t		icmp4off, icmp6off;
-		caddr_t		icmp4end = (caddr_t)ip4 + cv4->m->m_pkthdr.len;
-		int		icmp4len = icmp4end - (caddr_t)cv4->pyld.icmp4;
-
-		dlen = icmp4len - ICMP_MINLEN;
-		icmp4off = (caddr_t)(cv4->pyld.icmp4) + ICMP_MINLEN;
-		icmp6off = (caddr_t)(cv6->pyld.icmp6) + sizeof(struct icmp6_hdr);
-		bcopy(icmp4off, icmp6off, dlen);
-
-		return (dlen);
 	}
 }
 
