@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1831 2001/08/07 00:46:07 itojun Exp $
+$KAME: CHANGELOG,v 1.1832 2001/08/07 14:32:44 sakane Exp $
 
 <200108>
+Tue Aug  7 23:30:59 JST 2001 sakane@kame.net
+	* kame/racoon:
+	RFC2407 4.6.3.3 says that INITIAL-CONTACT is the notify message that
+	announces the peer the sender of the message was rebooted.
+	it is interpreted to delete all SAs which source address
+	is the sender of the message.
+	but racoon only deletes SA which is matched BOTH the
+	source address and the destination accress in the notify message.
+
 Tue Aug  7 09:42:23 JST 2001  itojun@iijlab.net
 	* libinet6/getrrsetbyname.c: libc implementation of getrrsetbyname(3).
 	  useful for racoon(8) cert-on-DNS handling.  from openbsd.
