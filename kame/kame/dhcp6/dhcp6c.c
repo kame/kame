@@ -431,11 +431,13 @@ client6_findserv()
 				break;
 			}
 			client6_addserv(p);
-#if 0
-			if (p->st_pref == 255)
-				return;
-#endif
-			return;	/* XXX */
+
+			/*
+			 * XXX: we should hear more advertisements and
+			 * choose the primary server. But currently, we just
+			 * take the first server.
+			 */
+			return;
 			break;
 		}
 	}
