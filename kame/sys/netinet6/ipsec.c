@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.183 2003/04/09 09:28:19 suz Exp $	*/
+/*	$KAME: ipsec.c,v 1.184 2003/04/09 10:45:18 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4014,7 +4014,9 @@ ipsec_gethist(m, lenp)
 	int *lenp;
 {
 
+#if 0
 	panic("ipsec_gethist: obsolete API");
+#endif
 }
 
 void
