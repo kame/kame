@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.461 2005/01/11 06:37:04 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.462 2005/01/16 02:48:31 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -158,6 +158,9 @@
 #include <netinet6/nd6.h>
 #include <netinet6/ip6protosw.h>
 #include <netinet6/scope6_var.h>
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+#include <netinet/tcp_var.h>
+#endif
 
 #if NPF > 0
 #include <net/pfvar.h>
@@ -1926,7 +1929,14 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 	u_int32_t mtu = 0;
 	int alwaysfrag = 0;
 	int error = 0;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+	struct in_conninfo inc;
 
+	bzero(&inc, sizeof(inc));
+	inc.inc_flags = 1; /* IPv6 */
+	inc.inc6_faddr = ((struct sockaddr_in6 *)&ro_pmtu->ro_dst)->sin6_addr;
+	mtu = tcp_hc_getmtu(&inc);
+#else
 	if (ro_pmtu != ro) {
 		/* The first hop and the final destination may differ. */
 		struct sockaddr_in6 *sa6_dst =
@@ -1947,15 +1957,18 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 		}
 	}
 	if (ro_pmtu->ro_rt) {
+		mtu = ro_pmtu->ro_rt->rt_rmx.rmx_mtu;
+	}
+#endif
+	if (mtu != 0) {
 		u_int32_t ifmtu;
 
 		if (ifp == NULL)
 			ifp = ro_pmtu->ro_rt->rt_ifp;
 		ifmtu = IN6_LINKMTU(ifp);
-		mtu = ro_pmtu->ro_rt->rt_rmx.rmx_mtu;
-		if (mtu == 0)
+		if (mtu == 0) {
 			mtu = ifmtu;
-		else if (mtu < IPV6_MMTU) {
+		} else if (mtu < IPV6_MMTU) {
 			/*
 			 * RFC2460 section 5, last paragraph:
 			 * if we record ICMPv6 too big message with
@@ -1976,10 +1989,14 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 			 * field isn't locked).
 			 */
 			mtu = ifmtu;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+			tcp_hc_updatemtu(&inc, mtu);
+#else
 #if defined(__FreeBSD__) && __FreeBSD_version < 502000
 			if (!(ro_pmtu->ro_rt->rt_rmx.rmx_locks & RTV_MTU))
 #endif
 				ro_pmtu->ro_rt->rt_rmx.rmx_mtu = mtu;
+#endif
 		}
 	} else if (ifp) {
 		mtu = IN6_LINKMTU(ifp);
