@@ -1,8 +1,6 @@
-SUBDIR+=lpr inetd
-
-SUBDIR+=bgpd dtcp faithd gifconfig hroute6d icmp6dump ifmcstat mld6query \
-	ndp pim6dd pim6sd prefix route6d rrenumd setkey tcpdump traceroute \
-	traceroute6 rtsold rtadvd rip6query racoon
-SUBDIR+=inet6d
+SUBDIR+=bgpd dtcp faithd gifconfig hroute6d icmp6dump ifmcstat inetd lpr \
+	mld6query ndp pim6dd pim6sd pma prefix racoon rip6query route6d \
+	rrenumd rtadvd rtsold setkey tcpdump traceroute traceroute6 trpt
+#SUBDIR+=inet6d
 
 .include <bsd.subdir.mk>
