@@ -1,4 +1,4 @@
-/*	$KAME: rrenumd.c,v 1.16 2000/11/07 17:09:15 jinmei Exp $	*/
+/*	$KAME: rrenumd.c,v 1.17 2000/11/07 17:26:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -278,12 +278,21 @@ sock6_open(struct flags *flags
 
 	/* specify to tell receiving interface */
 	on = 1;
+#ifdef IPV6_RECVPKTINFO
+	if (setsockopt(s6, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
+		       sizeof(on)) < 0) {
+		syslog(LOG_ERR, "<%s> IPV6_RECVPKTINFO: %s",
+		       __FUNCTION__, strerror(errno));
+		exit(1);
+	}
+#else
 	if (setsockopt(s6, IPPROTO_IPV6, IPV6_PKTINFO, &on,
 		       sizeof(on)) < 0) {
 		syslog(LOG_ERR, "<%s> IPV6_PKTINFO: %s",
 		       __FUNCTION__, strerror(errno));
 		exit(1);
 	}
+#endif
 
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
