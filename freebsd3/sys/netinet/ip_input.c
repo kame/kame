@@ -392,6 +392,14 @@ ip_input(struct mbuf *m)
 		}
 		ip = mtod(m, struct ip *);
 	}
+
+	/* 127/8 must not appear on wire - RFC1122 */
+	if ((ntohl(ip->ip_dst.s_addr) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET ||
+	    (ntohl(ip->ip_src.s_addr) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET) {
+		if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0)
+			goto bad;
+	}
+
 	if (hlen == sizeof(struct ip)) {
 		sum = in_cksum_hdr(ip);
 	} else {
