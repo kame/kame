@@ -1,0 +1,6 @@
+lib/libpcap.a
+include/pcap.h
+include/pcap-namedb.h
+include/net/bpf.h
+man/man3/pcap.3
+@dirrm include/net
