@@ -906,6 +906,9 @@ udp6_realinput(af, src, dst, m, off)
 			    &dst->sin6_addr) == 0)
 				continue;
 #endif
+			last = in6p;
+			udp6_sendup(m, off, (struct sockaddr *)src,
+				in6p->in6p_socket);
 			rcvcnt++;
 
 			/*
