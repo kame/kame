@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.259 2001/12/24 12:59:21 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.260 2001/12/24 17:33:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3865,7 +3865,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
  */
 static int
 ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
-	int optname, len, priv;
+	int optname, len, priv, cmsg;
 	u_char *buf;
 	struct ip6_pktopts *opt;
 	int sticky;
