@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.111 2003/08/01 01:20:05 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.112 2003/08/01 07:00:05 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -716,7 +716,7 @@ process_relayforw(dh6p, optendp, relayinfohead, from)
 
 	/* A relay forward message must include a relay message option */
 	if (optinfo.relaymsg_msg == NULL) {
-		dprintf(LOG_INFO, FNAME, "relay forward from %s message "
+		dprintf(LOG_INFO, FNAME, "relay forward from %s "
 		    "without a relay message", addr2str(from));
 		return (-1);
 	}
@@ -798,7 +798,6 @@ set_statelessinfo(optinfo)
 
 	return (0);
 }
-
 
 static int
 react_solicit(ifp, dh6, optinfo, from, fromlen, relayinfohead)
