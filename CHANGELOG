@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2351 2003/02/19 08:31:30 keiichi Exp $
+$KAME: CHANGELOG,v 1.2352 2003/02/19 10:34:28 ono Exp $
 
 <200302>
+2003-02-19  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
+	* kame/kame/vrrp6d,
+	  kame/sys/net/{if_vrrp.c,if_vrrp_var.h},kame/sys/netinet6/mld6.c,
+	  netbsd/sbin/ifconfig, netbsd/sys/net/{if_ethersubr.c,if_types.h},
+	  netbsd/sys/sys/mbuf.h
+	VRRP6 implementation for NetBSD
+	* freebsd4/sbin/ifconfig, freebsd4/sys/net/{if_ethersubr.c,if_types.h},
+	  freebsd4/sys/sys/mbuf.h
+	changed VRRP6 implementation for FreeBSD4	
+
 Wed Feb 19 17:26:11 JST 2003	keiichi@iij.ad.jp
 	more mtag leaks are fidex.  M_MOVE_PKTHDR is introduced to
 	NetBSD (ported from OpenBSD).
