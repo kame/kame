@@ -1,0 +1,220 @@
+.\" Copyright (C) 1999 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"	$Id: pim6sd.conf.5,v 1.1 1999/10/06 03:40:07 jinmei Exp $
+.\"
+.Dd Oct 6, 1999
+.Dt PIM6SD.CONF 5
+.Os KAME
+.Sh NAME
+.Nm pim6sd.conf
+.Nd config file for pim6sd, PIM-SM daemon for IPv6
+.\"
+.Sh DESCRIPTION
+The
+.Nm pim6sd
+configuration file consists of a sequence of statements, each of which
+specifies how the daemon treats each interface on the system,
+specifies some parameters of the PIM protocol, and
+requires some special behavior defined by the protocol.
+.Pp
+Lines beginning with
+.Ql #
+are comments.
+.Pp
+Note that
+.Nm pim6sd
+works even without the configuration file, although the daemon
+will warn that there is no configuration file.
+In such a case, the daemon will automatically set the default value
+to each configurable parameter.
+.\"
+.Pp
+The following statements can be specified in the configuration file.
+.Pp
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic default_source_preference Ar preference
+.Xc
+Specifies a default preference value when sending a PIM assert message.
+Preferences are used by assert elections to determine upstream routers.
+Currently
+.Nm
+cannot reliably obtain preferences and metrics from the
+unicast routing protocols, so a default value may be configured.
+.\"
+.It Ic default_source_metric Ar metric
+Specifies a default metric value when sending a PIM assert message.
+It is recommended that preferences be set such that metrics are never
+consulted. However, default metrics may also be set and will default to
+1024.
+.\"
+.It Xo
+.Ic phyint Ar interface
+.Op disable
+.Xc
+Specifies
+.Nm
+to ignore the interface even if the interface is multicast-capable.
+Note that PIM will be activated on all interfaces by default(including
+the case where there is no configuration file).
+Interfaces are specified in the form of "name unit", such as
+.Ar gif0
+and
+.Ar ep1.
+.\"
+.It Xo
+.Ic phyint Ar interface
+.Op preference Ar preference
+.Op metric Ar metric
+.Xc
+Specifies the preference and/or metric values when sending a PIM
+assert message on the interface.
+.\"
+.It Xo
+.Ic granularity Ar second
+.Xc
+Specifies timer granularity in seconds.
+.\"
+.It Xo
+.Ic hello_period Ar period Ar coef
+.Xc
+.Ar Period
+specifies the period in second between 2 hello messages.
+.Ar Coef
+is the coefficient to deterimine the hello holdtime;
+the holdtime will be
+.Ar period
+*
+.Ar coef .
+.\"
+.It Xo
+.Ic join_prune_period Ar period Ar coef
+.Xc
+.Ar Period
+specifies the period in second between 2 join/prune messages.
+.Ar Coef
+is the coefficient to deterimine the join/prune holdtime;
+the holdtime will be
+.Ar period
+*
+.Ar coef .
+.\"
+.It Xo
+.Ic data_timeout Ar timer
+.Xc
+Specifies the time after which (S,G) state for a silent source will be deleted.
+.\"
+.It Xo
+.Ic register_suppression_timeout Ar interval
+.Xc
+.Ar Interval
+specifies the interval between receiving a Register-Stop and allowing
+PIM Register to be send again.
+.\"
+.It Xo
+.Ic probe_time Ar timer
+.Xc
+.Ar Timer
+specifies the time between sending a null Register and the
+Register-Suppression-Timer expiring unless it is restarted by
+receiving a Register-Stop.
+.\"
+.It Xo
+.Ic assert_timeout Ar interval
+.Xc
+.Ar Interval
+specifies the interval between the last time an Assert is received and
+the time at wich the assert is timeout.
+.\"
+.It Xo
+.Ic cand_rp
+.Op Ic interface Ar interface
+.Op Ic time Ar time
+.Op Ic priority Ar priority
+.Xc
+Specifies to act as a candidate Rendezvous Point(RP).
+.\"
+.It Xo
+.Ic group_prefix Ar prefix
+.Xc
+When acting as a Rendezvous Point(RP),
+.Ar prefix
+specifies a group prefix that the RP will handle.
+.\"
+.It Xo
+.Ic cand_bootstrap_router
+.Op Ic interface Ar interface
+.Op Ic time Ar time
+.Op Ic priority Ar priority
+.Xc
+Specifies to act as a candidate bootstrap router(BSR).
+It is recommended to specify
+.Ic cand_bootstrap_router
+only in typical usage.
+All other parameters are optional and will be set automatically.
+.\"
+.It Xo
+.Ic switch_register_threshold Ic rate Ar rate Ic interval Ar interval
+.Xc
+Specifies the threshold that a Rendezvous Point(RP) switches to a shortest
+path tree, which is valid only when acting as an RP.
+\"
+.It Xo
+.Ic switch_data_threshold Ic rate Ar rate Ic interval Ar interval
+.Xc
+Specifies the threshold that a last hop router switches to a shortest
+path tree.
+.El
+.\"
+.Sh EXAMPLE
+.Bd -literal -offset
+#phyint gif0 disable
+#phyint ep0 preference 101
+phyint de0 disable
+#
+#followings are for a candidate Rendezvous Point, which should usually
+#be disabled.
+cand_bootstrap_router
+cand_rp
+.Ed
+.Sh SEE ALSO
+.Xr pim6sd 8
+.Sh HISTORY
+The
+.Nm pim6sd
+command is developed by Mickael Hoerdt at LSIIT Laboratory.
+It is based on IPv4 PIM sparse-mode
+.Nm pimd
+developed at University of Southern California,
+which has also been derived from
+.Nm mrouted.
+.Nm Mrouted
+is COPYRIGHT 1989 by The Board of Trustees of
+Leland Stanford Junior University.
+.\" .Sh BUGS
+.\" (to be written)
