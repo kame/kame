@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.121 2001/01/02 08:15:23 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.122 2001/01/03 08:02:04 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1706,7 +1706,7 @@ in6_restoremkludge(ia, ifp)
 		if (mk->mk_ifp == ifp) {
 			struct in6_multi *in6m, *next;
 
-			for (in6m = mk->mk_head.lh_first; in6m; in6m = next){
+			for (in6m = mk->mk_head.lh_first; in6m; in6m = next) {
 				next = in6m->in6m_entry.le_next;
 				in6m->in6m_ia = ia;
 				IFAREF(&ia->ia_ifa);
