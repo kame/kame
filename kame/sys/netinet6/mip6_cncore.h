@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.h,v 1.2 2003/06/11 11:32:28 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.h,v 1.3 2003/07/25 08:13:20 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -129,6 +129,16 @@ int mip6_tunnel_control(int, void *,
 	if (mip6_config.mcfg_debug)	\
 	    log arg;			\
 } while (/*CONSTCOND*/ 0)
+
+#ifdef RR_DBG
+	extern void ipsec_hexdump(caddr_t, int);
+#define mip6_hexdump(m,l,a)			\
+		do {				\
+			printf("%s", (m));	\
+			ipsec_hexdump((caddr_t)(a),(l)); \
+			printf("\n");		\
+		} while (/*CONSTCOND*/ 0)
+#endif
 
 #endif /* _KERNEL */
 

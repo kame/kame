@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.14 2003/07/24 07:11:18 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.15 2003/07/25 08:13:20 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -3317,16 +3317,6 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
-#ifdef RR_DBG
-	extern void ipsec_hexdump(caddr_t, int);
-#define mip6_hexdump(m,l,a)			\
-		do {				\
-			printf("%s", (m));	\
-			ipsec_hexdump((caddr_t)(a),(l)); \
-			printf("\n");		\
-		} while (/*CONSTCOND*/ 0)
-#endif
-
 	*pktopt_mobility = NULL;
 
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst, src);
