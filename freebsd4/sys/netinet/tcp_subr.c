@@ -1049,6 +1049,7 @@ tcp_ctlinput(cmd, sa, vip)
 		} else {
 			struct in_conninfo inc;
 
+			bzero(&inc, sizeof(inc));
 			inc.inc_fport = th->th_dport;
 			inc.inc_lport = th->th_sport;
 			inc.inc_faddr = faddr;
@@ -1126,8 +1127,12 @@ tcp6_ctlinput(cmd, sa, d)
 		    (struct sockaddr *)ip6cp->ip6c_src,
 		    th.th_sport, cmd, NULL, notify);
 
+		bzero(&inc, sizeof(inc));
 		inc.inc_fport = th.th_dport;
 		inc.inc_lport = th.th_sport;
+		inc.inc6_fsa.sin6_family = inc.inc6_lsa.sin6_family = AF_INET6;
+		inc.inc6_fsa.sin6_len = inc.inc6_lsa.sin6_len =
+			sizeof(struct sockaddr_in6);
 		sa6_copy_addr((struct sockaddr_in6 *)sa, &inc.inc6_fsa);
 		sa6_copy_addr(ip6cp->ip6c_src, &inc.inc6_lsa);
 		inc.inc_isipv6 = 1;
