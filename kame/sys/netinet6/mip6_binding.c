@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.175 2003/02/20 12:06:52 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.176 2003/02/28 12:03:04 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2059,6 +2059,7 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 	/* sanity check for overflow */
 	if (mbc->mbc_expire < time_second)
 		mbc->mbc_expire = 0x7fffffff;
+	mbc->mbc_mpa_exp = time_second;	/* set to current time to send mpa as soon as created it */
 #ifdef MIP6_CALLOUTTEST
 	/* It isn't necessary to create timeout entry here because it will be done when inserting mbc to the list */
 #endif /* MIP6_CALLOUTTEST */

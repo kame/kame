@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.84 2003/02/24 02:57:58 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.85 2003/02/28 12:03:04 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -91,6 +91,8 @@ struct mip6_prefix {
 	u_int32_t               mpfx_pltime;
 	time_t                  mpfx_plexpire;
 	struct sockaddr_in6     mpfx_haddr;
+	u_int16_t		mpfx_mpsid;	/* Used for MPS */
+	u_int8_t		mpfx_sentmps;	/* 1: sent MPS to HA with above ID */
 };
 LIST_HEAD(mip6_prefix_list, mip6_prefix);
 
@@ -133,6 +135,10 @@ struct mip6_subnet {
 LIST_HEAD(mip6_subnet_list, mip6_subnet);
 
 #define MIP6_SUBNET_TIMEOUT_INTERVAL 10
+
+/* MPS/MPA related constants */
+#define MIP6_MAX_MOB_PFX_ADV_INTERVAL	86400
+#define MIP6_MIN_MOB_PFX_ADV_INTERVAL	  600
 
 /* the binding update list entry. */
 struct mip6_bu {
@@ -239,6 +245,8 @@ struct mip6_bc {
 	                                     /* valid only when BUF_HOME. */
 	const struct encaptab *mbc_encap;    /* encapsulation from MN */
 	void		      *mbc_dad;	     /* dad handler */
+	time_t		      mbc_mpa_exp;  /* expiration time for sending MPA */
+	                                     /* valid only when BUF_HOME. */
 #ifdef MIP6_CALLOUTTEST
 	struct mip6_timeout_entry *mbc_timeout;
 	struct mip6_timeout_entry *mbc_brr_timeout;
