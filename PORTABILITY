@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.1 1999/08/11 16:47:27 itojun Exp $
+$Id: PORTABILITY,v 1.2 1999/08/11 16:48:49 itojun Exp $
 
 
 Source code in "kame" directory will be shared among operating systems
@@ -61,5 +61,12 @@ across those possibilities.
   Structure returned by SIOCGIFCONF falls into this category.
 
 - 2nd arg to ioctl() must be u_long, not int, on non-FreeBSD2 platforms.
+
+- If you define multi-statement #define, define that like:
+	#define foobaa (x, y) \
+	do { \
+		/*something*/ \
+	} while (0)
+  Without this wrapper nasty mistakes can happen.
 
 - For portability in networking code, look at kame/sys/net/net_osdep.h.
