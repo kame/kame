@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.18 2002/01/17 05:24:03 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.19 2002/01/18 08:11:30 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -634,7 +634,9 @@ mip6_subnet_ha_timeout(msha)
 	struct mip6_bu *mbu;
 	int error;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if 0 /* stop temporally */
 	long time_second = time.tv_sec;
+#endif
 #endif
 
 	if (mha == NULL) {
@@ -696,7 +698,9 @@ mip6_subnet_prefix_timeout(mspfx, msha)
 	struct mip6_prefix *mpfx = mspfx->mspfx_mpfx;
 	struct mip6_ha *mha = msha->msha_mha;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if 0 /* stop temporally */
 	long time_second = time.tv_sec;
+#endif
 #endif
 
 	if ((mpfx == NULL) || (mha == NULL)) {
