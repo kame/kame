@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.106 2004/02/03 10:15:22 keiichi Exp $	*/
+/*	$KAME: ndp.c,v 1.107 2004/02/04 04:18:47 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1088,6 +1088,7 @@ rtrlist()
 		struct sockaddr_in6 rtaddr;
 
 		bzero(&rtaddr, sizeof(rtaddr));
+		rtaddr.sin6_family = AF_INET6;
 		rtaddr.sin6_len = sizeof(rtaddr);
 		rtaddr.sin6_addr = p->rtaddr;
 #ifdef __KAME__
@@ -1097,7 +1098,7 @@ rtrlist()
 			*(u_int16_t *)&p->rtaddr.s6_addr[2] = 0;
 		}
 #endif
-		if (getnameinfo((struct sockaddr *)&rtaddr.sin6_addr,
+		if (getnameinfo((struct sockaddr *)&rtaddr,
 		    rtaddr.sin6_len, host_buf, sizeof(host_buf), NULL, 0,
 		    (nflag ? NI_NUMERICHOST : 0)) != 0)
 			strlcpy(host_buf, "?", sizeof(host_buf));
