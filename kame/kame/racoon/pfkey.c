@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.82 2000/09/16 09:18:47 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.83 2000/09/19 06:21:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.82 2000/09/16 09:18:47 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.83 2000/09/19 06:21:54 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -840,7 +840,7 @@ pk_sendgetspi(iph2)
 		YIPSDEBUG(DEBUG_PFKEY,
 			plog(logp, LOCATION, NULL,
 				"pfkey GETSPI sent: %s\n",
-				sadbsecas2str(iph2->src, iph2->dst,
+				sadbsecas2str(iph2->dst, iph2->src,
 					satype, 0, mode)));
 	}
 
@@ -903,7 +903,7 @@ pk_recvgetspi(mhp)
 			YIPSDEBUG(DEBUG_PFKEY,
 				plog(logp, LOCATION, NULL,
 					"pfkey GETSPI succeeded: %s\n",
-					sadbsecas2str(iph2->src, iph2->dst,
+					sadbsecas2str(iph2->dst, iph2->src,
 					    msg->sadb_msg_satype,
 					    sa->sadb_sa_spi,
 					    ipsecdoi2pfkey_mode(pr->encmode))));
