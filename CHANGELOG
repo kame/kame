@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1278 2000/09/16 14:29:37 itojun Exp $
+$KAME: CHANGELOG,v 1.1279 2000/09/18 17:51:23 itojun Exp $
 
 <200009>
+Tue Sep 19 02:50:41 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/bind9: use 9.0.0 (first official release)
+
+Tue Sep 19 00:59:30 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ipsec.c: on ipsec policy lookup, properly handle traffic
+	  on AF_INET6 socket with IPv4 mapped address (eg IPv4 on wire).
+	  NOTE: we still have issue with port number lookup (KAME PR 287).
+
 Sat Sep 16 23:28:32 JST 2000  itojun@iijlab.net
 	* freebsd2/ports/wget, netbsd/pkgsrc/net/wget: use latest IPv6 patch
 	  (9/15).  it repairs -I option.
