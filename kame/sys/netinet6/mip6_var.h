@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.18 2002/01/17 03:43:05 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.19 2002/01/17 05:24:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -62,9 +62,9 @@ struct mip6_prefix {
 	struct in6_addr         mpfx_prefix;
 	u_int8_t                mpfx_prefixlen;
 	u_int32_t               mpfx_vltime;
-	u_int64_t               mpfx_vlremain;
+	time_t                  mpfx_vlexpire;
 	u_int32_t               mpfx_pltime;
-	u_int64_t               mpfx_plremain;
+	time_t                  mpfx_plexpire;
 	struct in6_addr         mpfx_haddr;
 };
 LIST_HEAD(mip6_prefix_list, mip6_prefix);
@@ -78,7 +78,7 @@ struct mip6_ha {
 	u_int8_t            mha_flags;     /* RA flags */
 	int16_t             mha_pref;      /* preference */
 	u_int16_t           mha_lifetime;  /* HA lifetime */
-	int32_t             mha_remain;    /* remaining lifetime */
+	time_t              mha_expire;    /* expiration time of this HA. */
 };
 LIST_HEAD(mip6_ha_list, mip6_ha);
 

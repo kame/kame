@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.17 2002/01/08 02:40:58 k-sugyou Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.18 2002/01/17 05:24:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -633,6 +633,9 @@ mip6_subnet_ha_timeout(msha)
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 	int error;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	if (mha == NULL) {
 		/* must not happen. */
@@ -645,10 +648,11 @@ mip6_subnet_ha_timeout(msha)
 	}
 
 #if 0 /* stop temporally */
-	/* count down the remaining lifetime of each home agent. */
-	mha->mha_remain -= MIP6_SUBNET_TIMEOUT_INTERVAL;
+	if (mha->mha_expire < time_second)
+#else
+	if (0)
 #endif
-	if (mha->mha_remain < 0) {
+	{
 		/* lifetime expired. */
 		for (sc = TAILQ_FIRST(&hif_softc_list);
 		     sc;
@@ -691,17 +695,14 @@ mip6_subnet_prefix_timeout(mspfx, msha)
 {
 	struct mip6_prefix *mpfx = mspfx->mspfx_mpfx;
 	struct mip6_ha *mha = msha->msha_mha;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	if ((mpfx == NULL) || (mha == NULL)) {
 		/* must not happen. */
 		return;
 	}
-
-#if 0 /* stop temporally.  until mobile prefix adv is implemented. */
-	/* decrease remaining lifetime of this prefix. */
-	mpfx->mpfx_vlremain -= MIP6_SUBNET_TIMEOUT_INTERVAL;
-	mpfx->mpfx_plremain -= MIP6_SUBNET_TIMEOUT_INTERVAL;
-#endif
 
 	/*
 	 * XXX: TODO
@@ -709,8 +710,12 @@ mip6_subnet_prefix_timeout(mspfx, msha)
 	 * expiration check and home address autoconfiguration on hif0.
 	 */
 
-	/* XXX: TODO */
-	if (mpfx->mpfx_plremain < (mpfx->mpfx_plremain / 2)) {
+#if 0  /* stop temporally.  until mobile prefix adv is implemented. */
+	if ((mpfx->mpfx_plexpire - time_second) < (mpfx->mpfx_pltime / 2))
+#else
+	if (0)
+#endif
+	{
 		mip6_icmp6_mp_sol_output(mpfx, mha);
 	}
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.15 2002/01/08 02:40:58 k-sugyou Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.16 2002/01/17 05:24:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -90,6 +90,9 @@ mip6_prefix_create(prefix, prefixlen, vltime, pltime)
 	u_int32_t pltime;
 {
 	struct mip6_prefix *mpfx;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	MALLOC(mpfx, struct mip6_prefix *, sizeof(struct mip6_prefix),
 	       M_TEMP, M_NOWAIT);
@@ -103,9 +106,9 @@ mip6_prefix_create(prefix, prefixlen, vltime, pltime)
 	mpfx->mpfx_prefix = *prefix;
 	mpfx->mpfx_prefixlen = prefixlen;
 	mpfx->mpfx_vltime = vltime;
-	mpfx->mpfx_vlremain = mpfx->mpfx_vltime;
+	mpfx->mpfx_vlexpire = time_second + mpfx->mpfx_vltime;
 	mpfx->mpfx_pltime = pltime;
-	mpfx->mpfx_plremain = mpfx->mpfx_pltime;
+	mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
 	/* XXX mpfx->mpfx_haddr; */
 
 	return (mpfx);

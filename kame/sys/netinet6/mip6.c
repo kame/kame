@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.103 2002/01/17 04:56:10 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.104 2002/01/17 05:24:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -270,6 +270,9 @@ mip6_prefix_list_update_sub(sc, rtaddr, ndpr, dr)
 	int mpfx_is_new, mha_is_new;
 	int location;
 	int error = 0;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	location = HIF_LOCATION_UNKNOWN;
 	if (!IN6_IS_ADDR_LINKLOCAL(rtaddr)) {
@@ -314,9 +317,9 @@ mip6_prefix_list_update_sub(sc, rtaddr, ndpr, dr)
 	if (mpfx) {
 		/* found an existing entry.  just update it. */
 		mpfx->mpfx_vltime = ndpr->ndpr_vltime;
-		mpfx->mpfx_vlremain = mpfx->mpfx_vltime;
+		mpfx->mpfx_vlexpire = time_second + mpfx->mpfx_vltime;
 		mpfx->mpfx_pltime = ndpr->ndpr_pltime;
-		mpfx->mpfx_plremain = mpfx->mpfx_pltime;
+		mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
 		/* XXX mpfx->mpfx_haddr; */
 	} else {
 		/* this is a new prefix. */

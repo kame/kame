@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.188 2002/01/08 02:40:59 k-sugyou Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.189 2002/01/17 05:24:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -416,9 +416,7 @@ nd6_ra_input(m, off, icmp6len)
 	}
 
 	/* update home agent list. */
-	if ((MIP6_IS_MN || MIP6_IS_HA)
-	    && dr
-	    && (dr->flags & ND_RA_FLAG_HOME_AGENT)) {
+	if ((MIP6_IS_MN || MIP6_IS_HA) && dr) {
 		if (mip6_ha_list_update_hainfo(&mip6_ha_list,
 					       dr, ndopts.nd_opts_hai)) {
 			mip6log((LOG_ERR,

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.61 2002/01/17 04:56:10 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.62 2002/01/17 05:24:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2831,7 +2831,7 @@ mip6_process_br(m, opt)
 		/* XXX */
 		return (0);
 	}
-	haddr_remain = mpfx->mpfx_plremain;
+	haddr_remain = mpfx->mpfx_plexpire - time_second;
 	coa_remain = mip6_coa_get_lifetime(&mbu->mbu_coa);
 	remain =  (haddr_remain < coa_remain)
 		? haddr_remain : coa_remain;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.31 2002/01/08 02:40:58 k-sugyou Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.32 2002/01/17 05:24:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -90,6 +90,9 @@ mip6_ha_create(lladdr, gaddr, flags, pref, lifetime)
 	int32_t lifetime;
 {
 	struct mip6_ha *mha = NULL;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	MALLOC(mha, struct mip6_ha *, sizeof(struct mip6_ha),
 	       M_TEMP, M_NOWAIT);
@@ -105,7 +108,7 @@ mip6_ha_create(lladdr, gaddr, flags, pref, lifetime)
 	mha->mha_flags = flags;
 	mha->mha_pref = pref;
 	mha->mha_lifetime = lifetime;
-	mha->mha_remain = lifetime;
+	mha->mha_expire = time_second + mha->mha_lifetime;
 
 	return (mha);
 }
@@ -114,6 +117,10 @@ void
 mip6_ha_print(mha)
 	struct mip6_ha *mha;
 {
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
+
 	mip6log((LOG_INFO,
 		 "lladdr   %s\n"
 		 "gaddr    %s\n"
@@ -124,7 +131,7 @@ mip6_ha_print(mha)
 		 ip6_sprintf(&mha->mha_gaddr),
 		 mha->mha_pref,
 		 mha->mha_lifetime,
-		 (long)mha->mha_remain));
+		 mha->mha_expire - time_second));
 }
 
 int
@@ -181,21 +188,31 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 	struct nd_defrouter *dr;
 	struct nd_opt_homeagent_info *hai;
 {
+	struct in6_addr lladdr;
 	int16_t pref = 0;
-	u_int16_t lifetime = dr->rtlifetime;
+	u_int16_t lifetime;
 	struct mip6_ha *mha;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
-	if ((mha_list == NULL) || (dr == NULL)) {
+	if ((mha_list == NULL) ||
+	    (dr == NULL) ||
+	    !IN6_IS_ADDR_LINKLOCAL(&dr->rtaddr)) {
 		return (EINVAL);
 	}
 
+	lifetime = dr->rtlifetime;
 	if (hai) {
 		pref = ntohs(hai->nd_opt_hai_preference);
 		lifetime = ntohs(hai->nd_opt_hai_lifetime);
 	}
 
-	/* find an exising entry */
-	mha = mip6_ha_list_find_withaddr(mha_list, &dr->rtaddr);
+	/* find an exising entry. */
+	lladdr = dr->rtaddr;
+	/* XXX: KAME link-local hack; remove ifindex */
+	lladdr.s6_addr16[1] = 0;
+	mha = mip6_ha_list_find_withaddr(mha_list, &lladdr);
 	if (mha == NULL) {
 		/* an entry must exist at this point. */
 		return (EINVAL);
@@ -211,9 +228,8 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 		/* reset pref and lifetime */
 		mha->mha_pref = pref;
 		mha->mha_lifetime = lifetime;
-		mha->mha_remain = lifetime;
+		mha->mha_expire = time_second + mha->mha_lifetime;
 		/* XXX re-order by pref */
-		mip6_ha_print(mha);
 	}
 
 	return (0);

@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.14 2002/01/17 01:16:43 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.15 2002/01/17 05:24:04 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,30 +69,32 @@ static int getaddress(char *, struct in6_addr *);
 static const char *ip6_sprintf(const struct in6_addr *);
 static const char *raflg_sprintf(u_int8_t);
 static const char *buflg_sprintf(u_int8_t);
+static const char *bustate_sprintf(u_int8_t);
+static const char *bcflg_sprintf(u_int8_t);
 static struct hif_softc *get_hif_softc(char *);
 static void kread __P((u_long, void *, int));
 
 static const char *pfx_desc[] = {
-	"prefix\t\tplen\tvltime\tvlrem\tpltime\tplrem\thaddr\n",
-	"prefix\t\t\t\tplen\tvltime\tvlrem\tpltime\tplrem\thaddr\n"
+	"prefix\t\tplen\tvltime\tvlexp\tpltime\tplexp\thaddr\n",
+	"prefix\t\t\t\tplen\tvltime\tvlexp\tpltime\tplexp\thaddr\n"
 };
 static const char *bu_desc[] = {
-	"paddr\t\thaddr\t\tcoa\t\tlifetim\tltrem\trefresh\trefrem\tacktimo\tackrem\tseqno\tflags\trstate\tstate\n",
-	"paddr\t\t\t\thaddr\t\t\t\tcoa\t\t\t\tlifetim\tltrem\trefresh\trefrem\tacktimo\tackrem\tseqno\tflags\trstate\tstate\n"
+	"paddr\t\thaddr\t\tcoa\t\tlifetim\tltexp\trefresh\trefexp\tacktimo\tackexp\tseqno\tflags\trstate\tstate\n",
+	"paddr\t\t\t\thaddr\t\t\t\tcoa\t\t\t\tlifetim\tltexp\trefresh\trefexp\tacktimo\tackexp\tseqno\tflags\trstate\tstate\n"
 };
 static const char *ha_desc[] = {
-	"lladdr\t\tgaddr\t\tflags\tpref\tlifetim\tltrem\n",
-	"lladdr\t\t\t\tgaddr\t\t\t\tflags\tpref\tlifetim\tltrem\n"
+	"lladdr\t\tgaddr\t\tflags\tpref\tlifetim\tltexp\n",
+	"lladdr\t\t\t\tgaddr\t\t\t\tflags\tpref\tlifetim\tltexp\n"
 };
 #ifdef MIP6_DRAFT13
 static const char *bc_desc[] = {
-	"phaddr\t\tpcoa\t\taddr\t\tflags\tplen\tseqno\tlifetim\tltrem\tstate\n",
-	"phaddr\t\t\t\tpcoa\t\t\t\taddr\t\t\t\tflags\tplen\tseqno\tlifetim\tltrem\tstate\n"
+	"phaddr\t\tpcoa\t\taddr\t\tflags\tplen\tseqno\tlifetim\tltexp\tstate\n",
+	"phaddr\t\t\t\tpcoa\t\t\t\taddr\t\t\t\tflags\tplen\tseqno\tlifetim\tltexp\tstate\n"
 };
 #else
 static const char *bc_desc[] = {
-	"phaddr\t\tpcoa\t\taddr\t\tflags\tseqno\tlifetim\tltrem\tstate\n",
-	"phaddr\t\t\t\tpcoa\t\t\t\taddr\t\t\t\tflags\tseqno\tlifetim\tltrem\tstate\n"
+	"phaddr\t\tpcoa\t\taddr\t\tflags\tseqno\tlifetim\tltexp\tstate\n",
+	"phaddr\t\t\t\tpcoa\t\t\t\taddr\t\t\t\tflags\tseqno\tlifetim\tltexp\tstate\n"
 };
 #endif /* MIP6_DRAFT13 */
 static const char *ipaddr_fmt[] = {
@@ -254,6 +256,9 @@ main(argc, argv)
 		struct mip6_subnet *ms, mip6_subnet;
 		struct mip6_subnet_prefix *mspfx, mip6_subnet_prefix;
 		struct mip6_prefix *mpfx, mip6_prefix;
+		struct timeval time;
+
+		gettimeofday(&time, 0);
 
 		sc = get_hif_softc(ifnarg);
 		printf(pfx_desc[longdisp]);
@@ -273,12 +278,12 @@ main(argc, argv)
 				mpfx = &mip6_prefix;
 				printf(ipaddr_fmt[longdisp],
 				       ip6_sprintf(&mpfx->mpfx_prefix));
-				printf("%7u %7u %7qd %7u %7qd ",
+				printf("%7u %7u %7ld %7u %7ld ",
 				       mpfx->mpfx_prefixlen,
 				       mpfx->mpfx_vltime,
-				       mpfx->mpfx_vlremain,
+				       mpfx->mpfx_vlexpire - time.tv_sec,
 				       mpfx->mpfx_pltime,
-				       mpfx->mpfx_plremain);
+				       mpfx->mpfx_plexpire - time.tv_sec);
 				printf(ipaddr_fmt[longdisp],
 				       ip6_sprintf(&mpfx->mpfx_haddr));
 				printf("\n");
@@ -321,6 +326,9 @@ main(argc, argv)
 		struct mip6_ha *mha, mip6_ha;
 		struct hif_subnet *hsl[2];
 		int i;
+		struct timeval time;
+
+		gettimeofday(&time, 0);
 
 		sc = get_hif_softc(ifnarg);
 		hsl[0] = TAILQ_FIRST(&sc->hif_hs_list_home);
@@ -345,11 +353,11 @@ main(argc, argv)
 					       ip6_sprintf(&mha->mha_lladdr));
 					printf(ipaddr_fmt[longdisp],
 					       ip6_sprintf(&mha->mha_gaddr));
-					printf("%-7s %7d %7d %7d\n",
+					printf("%-7s %7d %7d %7ld\n",
 					       raflg_sprintf(mha->mha_flags),
 					       mha->mha_pref,
 					       mha->mha_lifetime,
-					       mha->mha_remain);
+					       mha->mha_expire - time.tv_sec);
 				}
 			}
 		}
@@ -375,7 +383,7 @@ main(argc, argv)
 			       ip6_sprintf(&mbu->mbu_haddr));
 			printf(ipaddr_fmt[longdisp],
 			       ip6_sprintf(&mbu->mbu_coa));
-			printf("%7u %7ld %7u %7ld %7u %7ld %7u %-7s %7x %7x\n",
+			printf("%7u %7ld %7u %7ld %7u %7ld %7u %-7s %7x %-7s\n",
 			       mbu->mbu_lifetime,
 			       mbu->mbu_expire - time.tv_sec,
 			       mbu->mbu_refresh,
@@ -386,7 +394,7 @@ main(argc, argv)
 			       mbu->mbu_seqno,
 			       buflg_sprintf(mbu->mbu_flags),
 			       mbu->mbu_reg_state,
-			       mbu->mbu_state);
+			       bustate_sprintf(mbu->mbu_state));
 		}
 	}
 
@@ -416,9 +424,9 @@ main(argc, argv)
 			       ip6_sprintf(&mbc->mbc_addr));
 			printf(
 #ifdef MIP6_DRAFT13
-			       "%-7s %7u %7u %7u %7ld %5x\n",
+			       "%-7s %7u %7u %7u %7ld %-7s\n",
 #else
-			       "%-7s %7u %7u %7ld %5x\n",
+			       "%-7s %7u %7u %7ld %-7s\n",
 #endif /* MIP6_DRAFT13 */
 			       buflg_sprintf(mbc->mbc_flags),
 #ifdef MIP6_DRAFT13
@@ -427,7 +435,7 @@ main(argc, argv)
 			       mbc->mbc_seqno,
 			       mbc->mbc_lifetime,
 			       mbc->mbc_expire - time.tv_sec,
-			       mbc->mbc_state);
+			       bcflg_sprintf(mbc->mbc_state));
 		}
 	}
 	
@@ -506,6 +514,35 @@ buflg_sprintf(flags)
 		 (flags & IP6_BUF_SINGLE ? "S" : ""),
 #endif
 		 (flags & IP6_BUF_DAD ? "D" : ""));
+
+	return buf;
+}
+
+static const char *
+bustate_sprintf(flags)
+	u_int8_t flags;
+{
+	static char buf[] = "MUAS";
+
+	snprintf(buf, sizeof(buf), "%s%s%s%s",
+		 (flags & MIP6_BU_STATE_MIP6NOTSUPP ? "M" : ""),
+		 (flags & MIP6_BU_STATE_BUNOTSUPP ? "U" : ""),
+		 (flags & MIP6_BU_STATE_WAITACK ? "A" : ""),
+		 (flags & MIP6_BU_STATE_WAITSENT ? "S" : ""));
+
+	return buf;
+}
+
+static const char *
+bcflg_sprintf(flags)
+	u_int8_t flags;
+{
+	static char buf[] = "DRA";
+
+	snprintf(buf, sizeof(buf), "%s%s%s",
+		 (flags & MIP6_BC_STATE_DAD_WAIT ? "D" : ""),
+		 (flags & MIP6_BC_STATE_BR_WAITSENT ? "R" : ""),
+		 (flags & MIP6_BC_STATE_BA_WAITSENT ? "A" : ""));
 
 	return buf;
 }
