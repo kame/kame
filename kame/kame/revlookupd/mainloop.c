@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.3 2002/05/22 15:09:50 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.4 2002/05/23 03:34:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -46,7 +46,6 @@
  *	- how long should we wait for subsequent replies?
  *	- conflict resolution
  * - spec conformance check
- * - set hoplimit on reply to 255, verify
  */
 
 #include <sys/types.h>
@@ -240,18 +239,6 @@ recv_dns0(sd, vclen)
 	from = (struct sockaddr *)&from_ss;
 	fromlen = sizeof(from_ss);
 
-	/*
-	 * XXX we need to get destination address of incoming packet.
-	 * reason 1: we need to forbid recursion for multicast query.
-	 *	to check it, we need to know the destination address.
-	 * reason 2: for unicast query, we need to flip the src/dst
-	 *	pair.
-	 * reason 3: we do not want to be hosed by fake multicast reply.
-	 * reason 4: for newer specs, local.arpa (or lcl.arpa) queries must be
-	 *	handled iff the query is sent to multicast address.
-	 * reason 5: for newer specs, PTR query must return local.arpa (or
-	 *	lcl.arpa) zone iff the query is sent to multicast address.
-	 */
 	l = recvfrom(sd->s, buf, sizeof(buf), 0, from, &fromlen);
 	if (l < 0) {
 		if (dflag)
@@ -319,7 +306,7 @@ recv_icmp6(sd)
 	char hbuf[NI_MAXHOST];
 
 	if (dflag)
-		fprintf(stderr, "recv_icmp6 I\n");
+		printf("recv_icmp6 I\n");
 
 	from = (struct sockaddr *)&from_ss;
 	fromlen = sizeof(from_ss);
@@ -965,7 +952,7 @@ getans_icmp6_fqdn(buf, len, from, fromlen)
 	char *p, *q;
 
 	if (dflag)
-		fprintf(stderr, "getans_icmp6_fqdn\n");
+		printf("getans_icmp6_fqdn\n");
 
 	if (sizeof(*ni6) + sizeof(*ttl) > len)
 		return -1;
@@ -1422,9 +1409,6 @@ fail:
 /*
  * parse inbound DNS query packet, and try to respond with answer from
  * local configuration (like hostname, ifconfig).
- *
- * XXX should defer response with random delay, and supress duplicated
- * replies (mdns-00 page 3)
  */
 static int
 serve(sd, buf, len, from, fromlen)
