@@ -87,10 +87,10 @@ extern int     	check_ipsec_policy  __P((struct inpcb *, u_int32_t));
 #ifndef INET
 #include <netinet/in.h>
 #endif
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>
-#include <netinet6/icmp6.h>
+#include <netinet/icmp6.h>
 #include <netinet6/ip6protosw.h>
 
 extern int ip6_defhlim;
