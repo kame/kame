@@ -33,7 +33,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/ifaddrlist.c,v 1.4 2000/02/23 16:09:11 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/ifaddrlist.c,v 1.5 2000/02/25 09:03:36 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -131,6 +131,9 @@ ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf)
 	for (ifa = ifap; ifa && nipaddr < maxif; ifa = ifa->ifa_next) {
 		if (ifa->ifa_addr->sa_family != AF_INET)
 			continue;
+		if (((struct sockaddr_in *)ifa->ifa_addr)->sin_addr.s_addr ==
+		    htonl(INADDR_ANY))
+			continue;
 		if ((ifa->ifa_flags & IFF_UP) == 0)
 			continue;
 #ifdef IFF_LOOPBACK
@@ -220,6 +223,10 @@ ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf)
 #else
 		ifnext = ifrp + 1;
 #endif
+
+		if (((struct sockaddr_in *)&ifrp->ifr_addr)->sin_addr.s_addr ==
+		    htonl(INADDR_ANY))
+			continue;
 		/*
 		 * Need a template to preserve address info that is
 		 * used below to locate the next entry.  (Otherwise,
