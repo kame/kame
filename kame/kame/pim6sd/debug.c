@@ -563,6 +563,7 @@ dump_pim_mrt(fp)
     grpentry_t     *g;
     register mrtentry_t *r;
     register vifi_t vifi;
+    int i;
     u_int           number_of_cache_mirrors = 0;
     u_int           number_of_groups = 0;
     char            joined_oifs[(sizeof(if_set) << 3) + 1];
@@ -655,14 +656,18 @@ dump_pim_mrt(fp)
 	    fprintf(fp, "Upstream nbr: %s\n",
 		    r->upstream ? inet6_fmt(&r->upstream->address.sin6_addr) : "NONE");
 
-	    fprintf(fp, "\nTIMERS:  Entry   JP   RS Assert MIFS:");
-	    for (vifi = 0; vifi < numvifs; vifi++)
-		fprintf(fp, "  %d", vifi);
-	    fprintf(fp, "\n           %d     %d    %d    %d        ",
+	    fprintf(fp, "\nTIMERS: Entry=%d JP=%d RS=%d Assert=%d\n",
 		    r->timer, r->jp_timer, r->rs_timer, r->assert_timer);
-	    for (vifi = 0; vifi < numvifs; vifi++)
-		fprintf(fp, "  %d", r->vif_timers[vifi]);
-	    fprintf(fp, "\n");
+
+	    fprintf(fp, "  MIF   0   1   2   3   4   5   6   7   8   9\n");
+	    for (i = 0; i <= numvifs / 10; i++) {
+		    int j;
+
+		    fprintf(fp, " %4d", i);
+		    for (j = 0; j < 10 && vifi < numvifs; j++, vifi++)
+			    fprintf(fp, " %3d", r->vif_timers[vifi]);
+		    fprintf(fp, "\n");
+	    }
 	}
 
 	/* Print all (S,G) routing info */
