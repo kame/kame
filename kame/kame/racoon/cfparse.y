@@ -1107,6 +1107,7 @@ isakmpproposal_spec
 	|	ALGORITHM_CLASS ALGORITHMTYPE keylength EOS
 		{
 			int doi;
+			int defklen;
 
 			doi = algtype2doi($1, $2);
 			if (doi == -1) {
@@ -1116,9 +1117,22 @@ isakmpproposal_spec
 			switch ($1) {
 			case algclass_isakmp_enc:
 				prhead->spspec->algclass[algclass_isakmp_enc] = doi;
-				if (check_keylen($1, $2, $3) == -1)
-					return -1;
-				prhead->spspec->encklen = $3;
+				defklen = default_keylen($1, $2);
+				if (defklen == 0) {
+					if ($3) {
+						yyerror("keylen not allowed");
+						return -1;
+					}
+				} else {
+					if ($3 && check_keylen($1, $2, $3) < 0) {
+						yyerror("invalid keylen %d", $3);
+						return -1;
+					}
+				}
+				if ($3)
+					prhead->spspec->encklen = $3;
+				else
+					prhead->spspec->encklen = defklen;
 				break;
 			case algclass_isakmp_hash:
 				prhead->spspec->algclass[algclass_isakmp_hash] = doi;
