@@ -248,7 +248,7 @@ int twofish_TableOp(int op)
 static int ParseHexDword(int bits,CONST char *srcTxt,DWORD *d,char *dstTxt)
 	{
 	int i;
-	char c;
+	BYTE c;
 	DWORD b;
 
 	union	/* make sure LittleEndian is defined correctly */
@@ -274,20 +274,13 @@ static int ParseHexDword(int bits,CONST char *srcTxt,DWORD *d,char *dstTxt)
 	for (i=0;i*32<bits;i++)
 		d[i]=0;					/* first, zero the field */
 
-	for (i=0;i*4<bits;i++)		/* parse one nibble at a time */
+	for (i=0;i*8<bits;i++)		/* parse one nibble at a time */
 		{						/* case out the hexadecimal characters */
 		c=srcTxt[i];
-		if (dstTxt) dstTxt[i]=c;
-		if ((c >= '0') && (c <= '9'))
-			b=c-'0';
-		else if ((c >= 'a') && (c <= 'f'))
-			b=c-'a'+10;
-		else if ((c >= 'A') && (c <= 'F'))
-			b=c-'A'+10;
-		else
-			return BAD_KEY_MAT;	/* invalid hex character */
+		if (dstTxt) dstTxt[i]=srcTxt[i];
+		b=c;
 		/* works for big and little endian! */
-		d[i/8] |= b << (4*((i^1)&7));		
+		d[i/4] |= b << ((i % 4) * 8);
 		}
 
 	return 0;					/* no error */
