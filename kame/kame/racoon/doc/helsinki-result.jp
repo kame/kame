@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.18 2001/08/15 08:33:13 sakane Exp $
+$KAME: helsinki-result.jp,v 1.19 2001/08/15 09:28:49 sakane Exp $
 
 
 generic
@@ -64,7 +64,7 @@ Compaq Tru54 UNIX X5.1B-BL4
 	終わったらやれるかな。
 
 	明日12:00 RSA signature modeで再戦
-
+	むむ、authentication-failedで失敗。こっちの問題か？
 
 IBM AIX 5.1
 	Tue Aug 14 17:33:43 JST 2001
@@ -194,11 +194,20 @@ WindowsXP
 
 	明日夕方 RSA signature modeで再戦
 
-
 Ashley
 	Tue Aug 14 18:00
-	明日 9:00 RSA signature mode 予約
+	invalid-signatureと文句を言われる。
+	互いに ssh-ca1から署名してもらったと言ってるが、
+	実はtest-ca1.ssh.comとbakeoff-ca1.ssh.comの2つある事が判明…
 
+	test-ca1.ssh.comに統一して再戦予約
+
+Netoctave
+	Wed Aug 15 11:00
+	こっちが initiateすると no-proposal-chosenが帰ってくる。
+	敵からpingしてもらうとIKEのパケットが出ない。
+
+	状況確認してもらって後から再戦する予定。
 
 isakmpd (jakob@openbsd)
 	IPv4, ESP, transport mode
