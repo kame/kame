@@ -1,4 +1,4 @@
-/*	$KAME: rafixd.c,v 1.5 2003/05/17 18:18:02 itojun Exp $	*/
+/*	$KAME: rafixd.c,v 1.6 2003/07/14 12:09:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -993,7 +993,7 @@ check_timer()
 	} else
 		timeval_sub(&timer, &now, &returnval);
 
-	dprintf(LOG_DEBUG, FNAME, "New timer is %ld:%08ld",
+	dprintf(LOG_DEBUG, FNAME, "New timer is %ld:%06ld",
 	    (long)returnval.tv_sec, (long)returnval.tv_usec);
 
 	return (&returnval);
