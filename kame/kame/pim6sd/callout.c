@@ -11,7 +11,7 @@
  */
 /*
  *  Questions concerning this software should be directed to
- *  Mickael Hoerdt (mhoerdt@iutsud.u-strasbg.fr)
+ *  Mickael Hoerdt (hoerdt@clarinet.u-strasbg.fr) LSIIT Strasbourg.
  *
  */
 /*
