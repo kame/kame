@@ -836,7 +836,7 @@ Optional Packages:
   --with-opt-pinfo=VALUE  specify DHCP option value for prefix information
   --with-opt-preq=VALUE   specify DHCP option value for prefix request
   --with-opt-ntp=VALUE    specify DHCP option value for NTP
-  --with-opt-lifetime=VALUE    specify DHCP option value for lifetime
+  --with-opt-refreshtime=VALUE    specify DHCP option value for refresh time
 
 Some influential environment variables:
   CC          C compiler command
@@ -4437,23 +4437,23 @@ echo "${ECHO_T}using $dhcpopt_ntp" >&6
 fi
 
 
-echo "$as_me:$LINENO: checking for DHCP Lifetime option" >&5
-echo $ECHO_N "checking for DHCP Lifetime option... $ECHO_C" >&6
+echo "$as_me:$LINENO: checking for DHCP information refresh time option" >&5
+echo $ECHO_N "checking for DHCP information refresh time option... $ECHO_C" >&6
 
-# Check whether --with-opt-lifetime or --without-opt-lifetime was given.
-if test "${with_opt_lifetime+set}" = set; then
-  withval="$with_opt_lifetime"
-  dhcpopt_lifetime="$withval"
+# Check whether --with-opt-refreshtime or --without-opt-refreshtime was given.
+if test "${with_opt_refreshtime+set}" = set; then
+  withval="$with_opt_refreshtime"
+  dhcpopt_refreshtime="$withval"
 else
-  dhcpopt_lifetime=0
+  dhcpopt_refreshtime=0
 fi;
-if test $dhcpopt_lifetime = 0 ; then
-	dhcpopt_lifetime=-1
+if test $dhcpopt_refreshtime = 0 ; then
+	dhcpopt_refreshtime=-1
 	echo "$as_me:$LINENO: result: unspecified" >&5
 echo "${ECHO_T}unspecified" >&6
 else
-	echo "$as_me:$LINENO: result: using $dhcpopt_lifetime" >&5
-echo "${ECHO_T}using $dhcpopt_lifetime" >&6
+	echo "$as_me:$LINENO: result: using $dhcpopt_refreshtime" >&5
+echo "${ECHO_T}using $dhcpopt_refreshtime" >&6
 fi
 
 
@@ -5173,7 +5173,7 @@ s,@dhcpopt_pdel@,$dhcpopt_pdel,;t t
 s,@dhcpopt_pinfo@,$dhcpopt_pinfo,;t t
 s,@dhcpopt_preq@,$dhcpopt_preq,;t t
 s,@dhcpopt_ntp@,$dhcpopt_ntp,;t t
-s,@dhcpopt_lifetime@,$dhcpopt_lifetime,;t t
+s,@dhcpopt_refreshtime@,$dhcpopt_refreshtime,;t t
 CEOF
 
 _ACEOF
