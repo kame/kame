@@ -38,27 +38,29 @@ LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
 DPADD+=	${.OBJDIR}/../../lib/libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
-# crypto support - need SSLeay
-# make sure to have non-buggy cast128 routine with you, if you enable cast128.
+# crypto support - need OpenSSL 0.9.4
 .if exists(/usr/local/lib/libcrypto.a)
 CFLAGS+=-DCRYPTO=1
-.if exists(/usr/local/include/rc5.h)
+.if exists(/usr/local/include/openssl/rc5.h)
 CFLAGS+=-DHAVE_RC5_H=1
 .endif
-#CFLAGS+=-DHAVE_CAST_H=1 
-CFLAGS+=-I/usr/local/include
-.if exists(/usr/local/include/openssl)
-CFLAGS+=-I/usr/local/include/openssl
-.elif exists(/usr/local/include/ssleay)
-CFLAGS+=-I/usr/local/include/ssleay
-.elif exists(/usr/local/ssl/include)
-CFLAGS+=-I/usr/local/ssl/include
-.if exists(/usr/local/ssl/include/openssl)
-CFLAGS+=-I/usr/local/ssl/include/openssl
+.if exists(/usr/local/include/openssl/cast.h)
+CFLAGS+=-DHAVE_CAST_H=1
 .endif
-.endif  
+CFLAGS+=-I/usr/local/include
 LDADD+=	-L/usr/local/lib -lcrypto
 DPADD+=	/usr/local/lib/libcrypto.a
+.elif exists(/usr/local/ssl/lib/libcrypto.a)
+CFLAGS+=-DCRYPTO=1
+.if exists(/usr/local/ssl/include/openssl/rc5.h)
+CFLAGS+=-DHAVE_RC5_H=1
+.endif
+.if exists(/usr/local/ssl/include/openssl/cast.h)
+CFLAGS+=-DHAVE_CAST_H=1
+.endif
+CFLAGS+=-I/usr/local/ssl/include
+LDADD+=	-L/usr/local/ssl/lib -lcrypto
+DPADD+=	/usr/local/ssl/lib/libcrypto.a
 .endif
 
 version.c: VERSION
