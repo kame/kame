@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.220 2002/12/10 12:53:29 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.221 2002/12/18 01:42:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1644,6 +1644,8 @@ pfxlist_onlink_check()
 {
 	struct nd_prefix *pr;
 	struct in6_ifaddr *ifa;
+	struct nd_defrouter *dr;
+	struct nd_pfxrouter *pfxrtr = NULL;
 
 	/*
 	 * Check if there is a prefix that has a reachable advertising
@@ -1653,7 +1655,25 @@ pfxlist_onlink_check()
 		if (pr->ndpr_raf_onlink && find_pfxlist_reachable_router(pr))
 			break;
 	}
-	if (pr != NULL || TAILQ_FIRST(&nd_defrouter) != NULL) {
+	/*
+	 * If we have no such prefix, check whether we still have a router
+	 * that does not advertise any prefixes.
+	 */
+	if (!pr) {
+		for (dr = TAILQ_FIRST(&nd_defrouter); dr;
+		    dr = TAILQ_NEXT(dr, dr_entry)) {
+			struct nd_prefix *pr0;
+
+			for (pr0 = nd_prefix.lh_first; pr0;
+			    pr0 = pr0->ndpr_next) {
+				if ((pfxrtr = pfxrtr_lookup(pr0, dr)) != NULL)
+					break;
+			}
+			if (pfxrtr)
+				break;
+		}
+	}
+	if (pr != NULL || (TAILQ_FIRST(&nd_defrouter) && !pfxrtr)) {
 		/*
 		 * There is at least one prefix that has a reachable router,
 		 * or at least a router which probably does not advertise
