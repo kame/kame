@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 3.2
 KAME project
-$Id: INSTALL,v 1.3 1999/08/22 17:57:38 shin Exp $
+$Id: INSTALL,v 1.4 1999/08/26 11:15:29 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -8,6 +8,11 @@ sections - kernel build and userland build.
 
 Be sure to perform "tree preparation" procedure, described in
 ../INSTALL, prior to taking the steps below.
+
+NOTE: it is possible to perform "make obj" before the build, however,
+it is not recommended as it will cause trouble with anoncvs operation,
+like "make update" target in the top-level Makefile.  Do not perform
+"make obj" unless you are ready to tackle those troubles.
 
 
 A. Backup
