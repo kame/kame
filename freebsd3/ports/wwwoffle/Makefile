@@ -3,11 +3,11 @@
 # Whom:			Peter Mutsaers
 #
 # $FreeBSD: ports/www/wwwoffle/Makefile,v 1.10 2000/07/10 22:35:32 ben Exp $
-# $KAME: Makefile,v 1.5 2000/09/23 19:12:48 sumikawa Exp $
+# $KAME: Makefile,v 1.6 2000/11/20 17:22:27 sumikawa Exp $
 #
 
 PORTNAME=	wwwoffle
-PORTVERSION= 	2.5e
+PORTVERSION= 	2.6
 CATEGORIES=	www
 MASTER_SITES=	ftp://ftp.demon.co.uk/pub/unix/httpd/ \
 		${MASTER_SITE_SUNSITE}
@@ -16,7 +16,7 @@ EXTRACT_SUFX=	.tgz
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
 		ftp://ftp.pasta.cs.uit.no/pub/IPv6/misc/
-PATCHFILES=	wwwoffle-25e-v6-20000924.diff.gz
+PATCHFILES=	wwwoffle-26-v6-20001120.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	jinmei@kame.net
