@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.136 2002/07/01 07:38:52 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.137 2002/07/01 21:02:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -273,7 +273,7 @@ static int addrconfig __P((int));
 static void set_source __P((struct ai_order *, struct policyhead *));
 static int comp_dst __P((const void *, const void *));
 #ifdef INET6
-static u_int32_t ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
+static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *, u_int32_t *));
 #endif
 static int gai_addr2scopetype __P((struct sockaddr *));
 
@@ -1492,7 +1492,7 @@ explore_numeric_scope(pai, hostname, servname, res)
 			if (cur->ai_family != AF_INET6)
 				continue;
 			sin6 = (struct sockaddr_in6 *)(void *)cur->ai_addr;
-			if ((scopeid = ip6_str2scopeid(scope, sin6)) == -1) {
+			if (ip6_str2scopeid(scope, sin6, &scopeid) == -1) {
 				free(hostname2);
 				freeaddrinfo(*res);
 				*res = NULL;
@@ -1719,12 +1719,12 @@ addrconfig(af)
 
 #ifdef INET6
 /* convert a string to a scope identifier. XXX: IPv6 specific */
-static u_int32_t
-ip6_str2scopeid(scope, sin6)
+static int
+ip6_str2scopeid(scope, sin6, scopeid)
 	char *scope;
 	struct sockaddr_in6 *sin6;
+	u_int32_t *scopeid;
 {
-	u_int32_t scopeid;
 	u_long lscopeid;
 	struct in6_addr *a6 = &sin6->sin6_addr;
 	char *ep;
@@ -1740,10 +1740,10 @@ ip6_str2scopeid(scope, sin6)
 		 * and interfaces, so we simply use interface indices for
 		 * like-local scopes.
 		 */
-		scopeid = if_nametoindex(scope);
-		if (scopeid == 0)
+		*scopeid = if_nametoindex(scope);
+		if (*scopeid == 0)
 			goto trynumeric;
-		return(scopeid);
+		return 0;
 	}
 
 	/* still unclear about literal, allow numeric only - placeholder */
@@ -1758,9 +1758,9 @@ ip6_str2scopeid(scope, sin6)
 trynumeric:
 	errno = 0;
 	lscopeid = strtoul(scope, &ep, 10);
-	scopeid = lscopeid & 0xffffffff;
-	if (errno == 0 && ep && *ep == '\0' && scopeid == lscopeid)
-		return scopeid;
+	*scopeid = lscopeid & 0xffffffff;
+	if (errno == 0 && ep && *ep == '\0' && *scopeid == lscopeid)
+		return 0;
 	else
 		return -1;
 }
