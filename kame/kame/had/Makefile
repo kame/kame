@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.3 2003/02/18 09:57:06 t-momose Exp $
+#	$KAME: Makefile,v 1.4 2003/04/11 11:21:38 t-momose Exp $
 #
 # Copyright (c) 2001 WIDE Project. All rights reserved.
 #
@@ -27,7 +27,7 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile,v 1.3 2003/02/18 09:57:06 t-momose Exp $
+# $Id: Makefile,v 1.4 2003/04/11 11:21:38 t-momose Exp $
 #
 
 .if exists(${.CURDIR}/../Makefile.opsys)
@@ -36,7 +36,7 @@
 
 BINDIR=	$(PREFIX)/sbin
 PROG=	had
-SRCS=	haadisc.c halist.c timestamp.c
+SRCS=	haadisc.c halist.c timestamp.c mpa.c
 
 .if (${OPSYS} != "NetBSD")
 CFLAGS+=-Wall -g

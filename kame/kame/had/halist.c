@@ -1,4 +1,4 @@
-/*	$KAME: halist.c,v 1.6 2003/02/28 07:08:06 t-momose Exp $	*/
+/*	$KAME: halist.c,v 1.7 2003/04/11 11:21:39 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: halist.c,v 1.6 2003/02/28 07:08:06 t-momose Exp $
+ * $Id: halist.c,v 1.7 2003/04/11 11:21:39 t-momose Exp $
  */
 
 /*
@@ -555,7 +555,7 @@ hal_check_expire()
     gettimeofday(&tv, NULL);
     now = tv.tv_sec;
 
-    /* at first check first entry only because it will expires first */
+    /* at first check the first entry only because it will expires first */
     /* IMPLID:MIP6HA#15 */
     if (halist_expire_head.hagent_next_expire
 	&& (halist_expire_head.hagent_next_expire->hagent_expire < now)) {
