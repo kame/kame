@@ -28,7 +28,7 @@
  */
 
 #ifndef lint
-static char *rcsid = "@(#) pfkey.c $Revision: 1.4 $";
+static char *rcsid = "@(#) pfkey.c $Revision: 1.5 $";
 #endif
 
 #include <sys/types.h>
@@ -1186,6 +1186,7 @@ pfkey_check(mhp)
 		break;
 	case SADB_SATYPE_ESP:
 	case SADB_SATYPE_AH:
+	case SADB_X_SATYPE_IPCOMP:
 		switch (msg->sadb_msg_type) {
 		case SADB_X_SPDADD:
 		case SADB_X_SPDDELETE:
