@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.61 2000/05/05 11:01:03 sumikawa Exp $	*/
+/*	$KAME: nd6.c,v 1.62 2000/05/09 11:35:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1252,7 +1252,7 @@ nd6_rtrequest(req, rt, sa)
 				 * of the loopback address.
 				 */
 				if (ifa != rt->rt_ifa) {
-					rt->rt_ifa->ifa_refcnt--;
+					IFAFREE(rt->rt_ifa);
 					ifa->ifa_refcnt++;
 					rt->rt_ifa = ifa;
 				}
