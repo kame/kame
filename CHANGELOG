@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1877 2001/09/16 04:04:01 suz Exp $
+$KAME: CHANGELOG,v 1.1878 2001/09/18 12:33:40 jinmei Exp $
 
 <200109>
+2001-09-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/resolv/res_send.c (res_send):
+	* bsdi4/contrib/bind/src/lib/resolv/res_send.c (res_nsend):
+	if a UDP response from a "wrong" server is truncated (and if we
+	allow to accept such responses), fall back to TCP with the "wrong"
+	address, in order to avoid connecting to an anycast address.
+
 2001-09-16  suz@sdl.hitachi.co.jp
 	* kame/kame/v6test/testcap.[ch](tgetnum), getconfig.c: fixed a
 	bug that you sometimes cannot specify a value if its MSB is on.
