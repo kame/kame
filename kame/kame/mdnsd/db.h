@@ -1,4 +1,4 @@
-/*	$KAME: db.h,v 1.9 2000/05/31 14:17:55 itojun Exp $	*/
+/*	$KAME: db.h,v 1.10 2000/05/31 14:56:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -92,5 +92,5 @@ extern void delnsdb __P((struct nsdb *));
 extern void printnsdb __P((struct nsdb *));
 extern struct sockdb *newsockdb __P((int, int));
 extern struct sockdb *sock2sockdb __P((int));
-extern struct sockdb *af2sockdb __P((int, int));
+extern struct sockdb *af2sockdb __P((int, enum sdtype));
 extern void delsockdb __P((struct sockdb *));

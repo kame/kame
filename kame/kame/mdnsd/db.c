@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.8 2000/05/31 14:17:55 itojun Exp $	*/
+/*	$KAME: db.c,v 1.9 2000/05/31 14:56:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -287,25 +287,18 @@ sock2sockdb(s)
 }
 
 struct sockdb *
-af2sockdb(af, mcast)
+af2sockdb(af, type)
 	int af;
-	int mcast;
+	enum sdtype type;
 {
 	struct sockdb *sd;
 
 	for (sd = LIST_FIRST(&sockdb); sd; sd = LIST_NEXT(sd, link)) {
-		switch (sd->type) {
-		case S_MEDIATOR:
+		if (sd->af != af)
 			continue;
-		case S_UNICAST:
-			if (!mcast)
-				return sd;
-			break;
-		case S_MULTICAST:
-			if (mcast)
-				return sd;
-			break;
-		}
+		if (sd->type != type)
+			continue;
+		return sd;
 	}
 	return NULL;
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.29 2000/05/31 14:17:55 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.30 2000/05/31 14:56:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -677,7 +677,7 @@ relay(sd, buf, len, from)
 		for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
 			printnsdb(ns);
 			sd = af2sockdb(ns->addr.ss_family,
-			    ns->type == N_MULTICAST ? 1 : 0);
+			    ns->type == N_MULTICAST ? S_MULTICAST : S_UNICAST);
 			if (sd == NULL)
 				continue;
 
