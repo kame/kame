@@ -1,4 +1,4 @@
-/*	$KAME: rip6query.c,v 1.18 2003/04/15 07:12:46 itojun Exp $	*/
+/*	$KAME: rip6query.c,v 1.19 2004/06/14 05:35:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -44,9 +44,9 @@
 #include <sys/queue.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <arpa/inet.h>

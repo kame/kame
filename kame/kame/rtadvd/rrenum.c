@@ -1,4 +1,4 @@
-/*	$KAME: rrenum.c,v 1.13 2003/10/21 07:19:03 itojun Exp $	*/
+/*	$KAME: rrenum.c,v 1.14 2004/06/14 05:36:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,9 +35,9 @@
 #include <sys/sysctl.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>

@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.33 2003/10/22 09:18:44 suz Exp $	*/
+/*	$KAME: if.c,v 1.34 2004/06/14 05:36:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -47,14 +47,11 @@
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
 #ifdef MIP6
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 #include <netinet6/in6_var.h>
 #endif /* MIP6 */
-#ifdef __bsdi__
-# include <netinet/if_ether.h>
-#endif
 #ifdef __OpenBSD__
 #include <netinet/if_ether.h>
 #endif

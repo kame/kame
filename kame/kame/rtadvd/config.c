@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.88 2004/02/05 05:54:05 t-momose Exp $	*/
+/*	$KAME: config.c,v 1.89 2004/06/14 05:35:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -36,9 +36,9 @@
 #include <sys/sysctl.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 #include <net/route.h>
 #include <net/if_dl.h>
 

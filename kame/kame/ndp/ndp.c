@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.109 2004/05/24 03:51:58 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.110 2004/06/14 05:35:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -88,9 +88,9 @@
 #endif
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/route.h>

@@ -1,4 +1,4 @@
-/*	$KAME: rtsock.c,v 1.7 2003/10/21 07:21:47 itojun Exp $	*/
+/*	$KAME: rtsock.c,v 1.8 2004/06/14 05:36:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -65,7 +65,7 @@
 #ifdef RTM_IFANNOUNCE	/*NetBSD 1.5 or later*/
 static int rtsock_input_ifannounce __P((int, struct rt_msghdr *, char *));
 #endif
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 static int rtsock_ifprobe __P((int, struct rt_msghdr *, char *));
 #endif
 
@@ -78,7 +78,7 @@ static struct {
 	{ RTM_IFANNOUNCE, sizeof(struct if_announcemsghdr),
 	  rtsock_input_ifannounce },
 #endif
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 	{ RTM_IFINFO, 0, rtsock_ifprobe },
 #endif
 	{ 0, 0, NULL },
@@ -179,7 +179,7 @@ rtsock_input_ifannounce(int s, struct rt_msghdr *rtm, char *lim)
 }
 #endif
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 static int
 rtsock_ifprobe(int s, struct rt_msghdr *rtm, char *lim)
 {

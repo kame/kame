@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.43 2004/04/14 00:51:28 suz Exp $	*/
+/*	$KAME: name6.c,v 1.44 2004/06/14 05:34:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -91,12 +91,6 @@
  *	use mutex for _hostconf, _hostconf_init if HOSTCONF is defined.
  *	rewrite resolvers to be thread safe
  */
-
-#ifdef __KAME__
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-#define	MAPPED_ADDR_ENABLED
-#endif
-#endif
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -229,10 +223,6 @@ static char *dnsdecode __P((const u_char **, const u_char *,
 #ifndef HOSTCONF
 # ifdef __FreeBSD__
 #  define	HOSTCONF	"/etc/host.conf"
-# endif
-# ifdef __bsdi__
-#  define	HOSTCONF	"/etc/irs.conf"
-#  define	HOSTCONF_KWD	"hosts"
 # endif
 # ifdef __NetBSD__
 #  define	HOSTCONF	"/etc/nsswitch.conf"

@@ -1,5 +1,5 @@
 /*	$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $	*/
-/*	$KAME: ipsec.c,v 1.33 2003/07/25 09:54:32 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.34 2004/06/14 05:35:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -90,16 +90,6 @@ __RCSID("$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $");
 #include <unistd.h>
 #include "netstat.h"
 
-/*
- * portability issues:
- * - bsdi[34] uses PLURAL(), not plural().
- * - freebsd2 can't print "unsigned long long" properly.
- */
-#ifdef __bsdi__
-#define plural(x)	PLURAL(x)
-#define plurales(x)	PLURALES(x)
-#endif
-
 #ifdef IPSEC 
 struct val2str {
 	int val;
@@ -167,20 +157,6 @@ static const char *pfkey_msgtypenames[] = {
 };
 
 static struct ipsecstat ipsecstat;
-
-#if defined(__bsdi__) && _BSDI_VERSION >= 199802
-struct data_info ipsecstat_info = {	/* for bsdi4 only */
-	"_ipsecstat",
-	NULL, 0,
-	&ipsecstat, sizeof(struct ipsecstat)
-};
-
-struct data_info ipsec6stat_info = {	/* for bsdi4 only */
-	"_ipsec6stat",
-	NULL, 0,
-	&ipsecstat, sizeof(struct ipsecstat)
-};
-#endif
 
 static void print_ipsecstats __P((void));
 static const char *pfkey_msgtype_names __P((int));
@@ -277,30 +253,6 @@ ipsec_stats(off, name)
 
 	print_ipsecstats();
 }
-
-#if defined(__bsdi__) && _BSDI_VERSION >= 199802 /* bsdi4 only */
-void
-ipsec_stats0(name)
-	char *name;
-{
-	printf("%s:\n", name);
-
-	skread(name, &ipsecstat_info);
-
-	print_ipsecstats();
-}
-
-void
-ipsec6_stats0(name)
-	char *name;
-{
-	printf("%s:\n", name);
-
-	skread(name, &ipsec6stat_info);
-
-	print_ipsecstats();
-}
-#endif
 
 static const char *
 pfkey_msgtype_names(x)

@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.17 2004/03/19 10:20:35 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.18 2004/06/14 05:35:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -39,9 +39,9 @@
 #include <signal.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 
 #include <netinet/in.h>
 #include <netinet/ip6.h>

@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.61 2004/02/13 02:52:08 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.62 2004/06/14 05:35:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -42,7 +42,7 @@
 #include <netdb.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 

@@ -36,9 +36,9 @@
 #include <sys/queue.h>
 
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
-#endif /* __FreeBSD__ >= 3 */
+#endif
 #include <net/if_types.h>
 #include <net/route.h>
 #include <net/if_dl.h>
@@ -49,7 +49,7 @@
 #ifdef __NetBSD__
 #include <net/if_ether.h>
 #endif
-#if defined(__bsdi__) || defined(__OpenBSD__)
+#ifdef __OpenBSD__
 # include <netinet/in.h>
 # include <netinet/if_ether.h>
 #endif
