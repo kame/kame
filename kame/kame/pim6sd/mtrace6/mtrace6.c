@@ -1,4 +1,4 @@
-/*	$KAME: mtrace6.c,v 1.22 2003/09/23 11:06:56 itojun Exp $	*/
+/*	$KAME: mtrace6.c,v 1.23 2004/08/24 01:35:20 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -349,7 +349,7 @@ show_ip6_result(from6, datalen)
 			printf("%3d  ", -i);/* index */
 			/* router address and incoming/outgoing interface */
 			printf("%s", pr_addr((struct sockaddr *)&sa_resp, opt_n));
-			printf("(%s/%d->%d) ",
+			printf("(%s/%ld->%ld) ",
 			       pr_addr((struct sockaddr *)&sa_upstream, 1),
 			       ntohl(rp->tr_inifid), ntohl(rp->tr_outifid));
 			/* multicast routing protocol type */

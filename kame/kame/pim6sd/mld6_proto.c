@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.44 2004/06/15 16:41:05 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.45 2004/08/24 01:35:20 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -684,7 +684,9 @@ SetQueryTimer(g, mifi, to_expire, q_time)
 	int q_time;
 {
 	cbk_t *cbk;
+#ifdef MLDV2_LISTENER_REPORT
 	struct uvif *v = &uvifs[mifi];
+#endif
 
 	cbk = (cbk_t *) malloc(sizeof(cbk_t));
 	cbk->g = g;
