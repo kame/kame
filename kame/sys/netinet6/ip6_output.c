@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.195 2001/07/09 13:47:09 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.196 2001/07/15 05:16:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3268,9 +3268,6 @@ ip6_setmoptions(optname, im6op, m)
 		 */
 		im6o = (struct ip6_moptions *)
 			malloc(sizeof(*im6o), M_IPMOPTS, M_WAITOK);
-
-		if (im6o == NULL)
-			return(ENOBUFS);
 		*im6op = im6o;
 		im6o->im6o_multicast_ifp = NULL;
 		im6o->im6o_multicast_hlim = ip6_defmcasthlim;
