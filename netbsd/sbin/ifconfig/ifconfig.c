@@ -590,8 +590,12 @@ main(argc, argv)
 		 * Aggregatable address architecture defines all prefixes
 		 * are 64. So, it is convenient to set prefixlen to 64 if
 		 * it is not specified.
+		 * For p2p interface, set it to 128 by default.
 		 */
-		setifprefixlen("64", 0);
+		if (in6_addreq.ifra_dstaddr.sin6_family)
+			setifprefixlen("128", 0);
+		else
+			setifprefixlen("64", 0);
 		/* in6_getprefix("64", MASK) if MASK is available here... */
 	}
 
