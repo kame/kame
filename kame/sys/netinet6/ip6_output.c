@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.457 2004/11/11 22:34:46 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.458 2004/11/22 06:40:08 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -344,7 +344,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		panic("ip6_output: IPv4 pcb is passed");
 #else
 	int needipsectun = 0;
-	struct socket *so;
+	struct socket *so = NULL;
 	struct secpolicy *sp = NULL;
 
 #if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.74 2004/08/01 03:38:58 sumikawa Exp $	*/
+/*	$KAME: ipsec.h,v 1.75 2004/11/22 06:40:08 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -357,6 +357,9 @@ extern int ipsec_invalpcbcacheall __P((void));
 
 extern struct secpolicy *ipsec4_getpolicybysock
 	__P((struct mbuf *, u_int, struct socket *, int *));
+struct inpcb;
+extern struct secpolicy *ipsec4_getpolicybypcb
+	(struct mbuf *m, u_int dir, struct inpcb *, int *);
 extern struct secpolicy *ipsec4_getpolicybyaddr
 	__P((struct mbuf *, u_int, int, int *));
 extern struct secpolicy *ipsec4_getpolicybytag

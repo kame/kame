@@ -7,5 +7,4 @@ exclude pf_ioctl.c
 exclude pf_norm.c
 exclude pf_osfp.c
 exclude pf_table.c
-exclude pfkeyv2.h
 exclude pfvar.h

@@ -1488,13 +1488,11 @@ ip_ctloutput(so, sopt)
 			size_t ovalsize = sopt->sopt_valsize;
 			caddr_t oval = (caddr_t)sopt->sopt_val;
 
-			error = soopt_getm(sopt, &m); /* XXX */
-			if (error != NULL)
+			if ((error = soopt_getm(sopt, &m)) != 0) /* XXX */
+				break;
+			if ((error = soopt_mcopyin(sopt, m)) != 0) /* XXX */
 				break;
 
-			error = soopt_mcopyin(sopt, m); /* XXX */
-			if (error != NULL)
-				break;
 			sopt->sopt_valsize = ovalsize;
 			sopt->sopt_val = oval;
 			if (m != 0) {

@@ -415,7 +415,9 @@ static int key_spdflush __P((struct socket *, struct mbuf *,
 	const struct sadb_msghdr *));
 static int key_spddump __P((struct socket *, struct mbuf *,
 	const struct sadb_msghdr *));
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct mbuf *key_setspddump __P((int *));
+#endif
 static u_int key_getspreqmsglen __P((struct secpolicy *));
 static int key_spdexpire __P((struct secpolicy *));
 static struct secashead *key_newsah __P((struct secasindex *));
@@ -511,11 +513,13 @@ static int key_flush __P((struct socket *, struct mbuf *,
 	const struct sadb_msghdr *));
 static int key_dump __P((struct socket *, struct mbuf *,
 	const struct sadb_msghdr *));
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct mbuf *key_setdump __P((u_int8_t, int *));
+#endif
 static int key_promisc __P((struct socket *, struct mbuf *,
 	const struct sadb_msghdr *));
 static int key_senderror __P((struct socket *, struct mbuf *, int));
-static int key_validate_ext __P((const struct sadb_ext *, int));
+static int key_validate_ext __P((/*const */struct sadb_ext *, int));
 static int key_align __P((struct mbuf *, struct sadb_msghdr *));
 #if 0
 static const char *key_getfqdn __P((void));
@@ -525,7 +529,7 @@ static void key_sa_chgstate __P((struct secasvar *, u_int8_t));
 static void key_sp_dead __P((struct secpolicy *));
 static void key_sp_unlink __P((struct secpolicy *));
 static struct mbuf *key_alloc_mbuf __P((int));
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 struct callout key_timehandler_ch;
 #endif
 
@@ -2630,6 +2634,7 @@ key_spddump(so, m, mhp)
 	return 0;
 }
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct mbuf *
 key_setspddump(errorp)
 	int *errorp;
@@ -2675,6 +2680,7 @@ key_setspddump(errorp)
 	*errorp = 0;
 	return (m);
 }
+#endif
 
 struct mbuf *
 key_setdumpsp(sp, type, seq, pid)
@@ -6501,7 +6507,7 @@ key_acquire2(so, m, mhp)
 	struct mbuf *m;
 	const struct sadb_msghdr *mhp;
 {
-	const struct sadb_address *src0, *dst0;
+  	/*const */struct sadb_address *src0, *dst0;
 	struct secasindex saidx;
 	struct secashead *sah;
 	u_int16_t proto;
@@ -7117,6 +7123,7 @@ key_dump(so, m, mhp)
 	return 0;
 }
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct mbuf *
 key_setdump(req_satype, errorp)
 	u_int8_t req_satype;
@@ -7208,6 +7215,7 @@ key_setdump(req_satype, errorp)
 	*errorp = 0;
 	return (m);
 }
+#endif
 
 struct mbuf *
 key_setdumpsa_spi(spi)
@@ -7739,7 +7747,7 @@ key_align(m, mhp)
 
 static int
 key_validate_ext(ext, len)
-	const struct sadb_ext *ext;
+     /* const */struct sadb_ext *ext;
 	int len;
 {
 	struct sockaddr *sa;

@@ -157,7 +157,6 @@ struct tcphdr tcp_savetcp;
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#include <netinet6/ipsec6.h>
 #include <netkey/key.h>
 #endif /*IPSEC*/
 #include <machine/in_cksum.h>

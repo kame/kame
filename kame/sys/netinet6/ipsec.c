@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.225 2004/11/11 22:34:46 suz Exp $	*/
+/*	$KAME: ipsec.c,v 1.226 2004/11/22 06:40:08 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -138,7 +138,7 @@ int ipsec_debug = 0;
 #endif
 
 #ifdef NET_NEEDS_GIANT
-NET_NEEEDS_GIANT("ipsec");
+NET_NEEDS_GIANT("ipsec");
 #endif
 
 #ifndef offsetof		/* XXX */
@@ -620,6 +620,154 @@ ipsec4_getpolicybysock(m, dir, so, error)
 
 	default:
 		ipseclog((LOG_ERR, "ipsec4_getpolicybysock: "
+		   "Invalid policy for PCB %d\n", currsp->policy));
+		*error = EINVAL;
+		return NULL;
+	}
+	/* NOTREACHED */
+}
+
+/*
+ * For OUTBOUND packet having a socket. Searching SPD for packet,
+ * and return a pointer to SP.
+ * OUT:	NULL:	no apropreate SP found, the following value is set to error.
+ *		0	: bypass
+ *		EACCES	: discard packet.
+ *		ENOENT	: ipsec_acquire() in progress, maybe.
+ *		others	: error occured.
+ *	others:	a pointer to SP
+ *
+ * NOTE: IPv6 mapped adddress concern is implemented here.
+ */
+struct secpolicy *
+ipsec4_getpolicybypcb(m, dir, inp, error)
+	struct mbuf *m;
+	u_int dir;
+	struct inpcb *inp;
+	int *error;
+{
+	struct inpcbpolicy *pcbsp = NULL;
+	struct secpolicy *currsp = NULL;	/* policy on socket */
+	struct secpolicy *kernsp = NULL;	/* policy on kernel */
+	struct secpolicyindex spidx;
+	u_int16_t tag;
+
+	/* sanity check */
+	if (m == NULL || inp == NULL || error == NULL)
+		panic("ipsec4_getpolicybypcb: NULL pointer was passed.");
+
+	pcbsp = inp->inp_sp;
+
+#ifdef DIAGNOSTIC
+	if (pcbsp == NULL)
+		panic("ipsec4_getpolicybypcb: pcbsp is NULL.");
+#endif
+
+	tag = 0;
+
+	/* if we have a cached entry, and if it is still valid, use it. */
+	ipsecstat.spdcachelookup++;
+	currsp = ipsec_checkpcbcache(m, pcbsp, dir);
+	if (currsp) {
+		*error = 0;
+		return currsp;
+	}
+	ipsecstat.spdcachemiss++;
+
+	switch (dir) {
+	case IPSEC_DIR_INBOUND:
+		currsp = pcbsp->sp_in;
+		break;
+	case IPSEC_DIR_OUTBOUND:
+		currsp = pcbsp->sp_out;
+		break;
+	default:
+		panic("ipsec4_getpolicybypcb: illegal direction.");
+	}
+
+	/* sanity check */
+	if (currsp == NULL)
+		panic("ipsec4_getpolicybypcb: currsp is NULL.");
+
+	/* when privileged socket */
+	if (pcbsp->priv) {
+		switch (currsp->policy) {
+		case IPSEC_POLICY_BYPASS:
+			currsp->refcnt++;
+			*error = 0;
+			ipsec_fillpcbcache(pcbsp, m, currsp, dir);
+			return currsp;
+
+		case IPSEC_POLICY_ENTRUST:
+			/* look for a policy in SPD */
+			if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 1) == 0 &&
+			    (kernsp = key_allocsp(tag, &spidx, dir)) != NULL) {
+				/* SP found */
+				KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
+					printf("DP ipsec4_getpolicybypcb called "
+					       "to allocate SP:%p\n", kernsp));
+				*error = 0;
+				ipsec_fillpcbcache(pcbsp, m, kernsp, dir);
+				return kernsp;
+			}
+
+			/* no SP found */
+			ip4_def_policy->refcnt++;
+			*error = 0;
+			ipsec_fillpcbcache(pcbsp, m, ip4_def_policy, dir);
+			return ip4_def_policy;
+
+		case IPSEC_POLICY_IPSEC:
+			currsp->refcnt++;
+			*error = 0;
+			ipsec_fillpcbcache(pcbsp, m, currsp, dir);
+			return currsp;
+
+		default:
+			ipseclog((LOG_ERR, "ipsec4_getpolicybypcb: "
+			      "Invalid policy for PCB %d\n", currsp->policy));
+			*error = EINVAL;
+			return NULL;
+		}
+		/* NOTREACHED */
+	}
+
+	/* when non-privileged socket */
+	/* look for a policy in SPD */
+	if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 1) == 0 &&
+	    (kernsp = key_allocsp(tag, &spidx, dir)) != NULL) {
+		/* SP found */
+		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
+			printf("DP ipsec4_getpolicybypcb called "
+			       "to allocate SP:%p\n", kernsp));
+		*error = 0;
+		ipsec_fillpcbcache(pcbsp, m, kernsp, dir);
+		return kernsp;
+	}
+
+	/* no SP found */
+	switch (currsp->policy) {
+	case IPSEC_POLICY_BYPASS:
+		ipseclog((LOG_ERR, "ipsec4_getpolicybypcb: "
+		       "Illegal policy for non-privileged defined %d\n",
+			currsp->policy));
+		*error = EINVAL;
+		return NULL;
+
+	case IPSEC_POLICY_ENTRUST:
+		ip4_def_policy->refcnt++;
+		*error = 0;
+		ipsec_fillpcbcache(pcbsp, m, ip4_def_policy, dir);
+		return ip4_def_policy;
+
+	case IPSEC_POLICY_IPSEC:
+		currsp->refcnt++;
+		*error = 0;
+		ipsec_fillpcbcache(pcbsp, m, currsp, dir);
+		return currsp;
+
+	default:
+		ipseclog((LOG_ERR, "ipsec4_getpolicybypcb: "
 		   "Invalid policy for PCB %d\n", currsp->policy));
 		*error = EINVAL;
 		return NULL;

@@ -387,7 +387,7 @@ udp_input(m, off)
 #endif
 
 			if (last != NULL) {
-				struct mbuf *n;
+				struct mbuf *n = NULL;
 #ifdef IPSEC
 				/* check AH/ESP integrity. */
 				if (ipsec4_in_reject_so(m, last->inp_socket))
