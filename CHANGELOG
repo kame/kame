@@ -1,7 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2701 2004/12/03 12:57:23 jinmei Exp $
+$KAME: CHANGELOG,v 1.2702 2004/12/07 14:14:52 jinmei Exp $
 
 <200412>
+2004-12-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c (getaddrinfo): fixed missing
+	initialization of the addrconfig structure.  KAME snaps since
+	20041129 must be upgraded to apply this fix.
+
+2004-12-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c: synchronized with FreeBSD5.3's
+	getaddrinfo implementation:
+	- ensure thread-safeness
+	- use nsswitch.conf instead of host.conf
+
 2004-12-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd5/lib/libinet6/res_send.c (res_send): made sure this
 	function return a valid value.
