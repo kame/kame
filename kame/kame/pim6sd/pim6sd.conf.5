@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	$Id: pim6sd.conf.5,v 1.10 2000/07/09 17:28:42 itojun Exp $
+.\"	$Id: pim6sd.conf.5,v 1.11 2000/07/10 07:05:53 jinmei Exp $
 .\"
 .Dd Oct 6, 1999
 .Dt PIM6SD.CONF 5
@@ -135,17 +135,22 @@ listner on the interface.
 .Xc
 Specifies a default preference value when sending a PIM assert message.
 Preferences are used by assert elections to determine upstream routers.
+Specifies a default preference value when sending a PIM assert message.
+Preferences are used by assert elections to determine upstream routers.
 Currently
 .Xr pim6sd 8
-cannot reliably obtain preferences and metrics from the
-unicast routing protocols, so a default value may be configured.
+does not have an effective method to obtain preferences and metrics from the
+unicast routing protocols, so you may want to set a default value by hand.
 The default preference is 1024.
 .\"
 .It Ic default_source_metric Ar metric;
 Specifies a default metric value when sending a PIM assert message.
-It is recommended that preferences be set such that metrics are never
-consulted. However, default metrics may also be set and will default to
-1024.
+Since
+.Xr pim6sd 8
+cannot get an effective metric of unicast routing,
+it is recommended that preferences is set such that metrics are never
+consulted. However, default metrics may also be set, and
+its default value is 1024.
 .\"
 .It Xo
 .Ic granularity Ar second;
@@ -220,7 +225,7 @@ The default value is 180.
 .Op Ic priority Ar priority
 .Ic ;
 .Xc
-Specifies to act as a candidate Rendezvous Point(RP).
+Specifies to act as a Candidate Rendezvous Point(RP).
 It is recommended to specify
 .Ic cand_rp
 only in typical usage.
@@ -258,7 +263,7 @@ specifies a group prefix that the RP will handle.
 .Op Ic masklen Ar masklen
 .Ic ;
 .Xc
-Specifies to act as a candidate bootstrap router(BSR).
+Specifies to act as a Candidate Bootstrap Router(BSR).
 It is recommended to specify
 .Ic cand_bootstrap_router
 only in typical usage.
@@ -275,7 +280,7 @@ specifies the interval of two succeeding bootstraps in seconds.
 Its default value is 60.
 Another optional parameter
 .Ic priority
-specifies the priority of the RP.
+specifies the priority of the BSR.
 The default value is 0, which means the lowest priority.
 Hash mask length can also be specified by the
 .Ic masklen
