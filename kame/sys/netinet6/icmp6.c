@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.355 2003/08/09 17:06:40 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.356 2003/08/25 00:13:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2351,7 +2351,7 @@ icmp6_rip6_input(mp, off, src, dst)
 		if (!(in6p->in6p_flags & INP_IPV6))
 			continue;
 #endif
-		if (in6p->in6p_ip6_nxt != IPPROTO_ICMPV6)
+		if (in6p->inp_ipv6.ip6_nxt != IPPROTO_ICMPV6)
 			continue;
 		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa) &&
 		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))

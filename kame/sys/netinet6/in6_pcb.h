@@ -125,10 +125,6 @@ struct	in6pcb {
 	int	in6p_cksum;		/* IPV6_CHECKSUM setsockopt */
 };
 
-#ifdef _KERNEL
-#define in6p_ip6_nxt in6p_ip6.ip6_nxt  /* for KAME src sync over BSD*'s */
-#endif
-
 /*
  * Flags in in6p_flags
  * We define KAME's original flags in higher 16 bits as much as possible
