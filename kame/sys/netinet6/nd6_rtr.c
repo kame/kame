@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.256 2004/07/05 07:55:55 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.257 2004/07/05 07:58:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1434,7 +1434,11 @@ prelist_update(new, dr, m, mcast)
 
 		ifa6 = (struct in6_ifaddr *)ifa;
 
-		if ((ifa6->ia6_flags & IN6_IFF_AUTOCONF) != 0)
+		/*
+		 * We only consider autoconfigured addresses as per
+		 * rfc2462bis
+		 */
+		if (!(ifa6->ia6_flags & IN6_IFF_AUTOCONF))
 			continue;
 
 		/*
