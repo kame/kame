@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.7 2000/03/10 15:56:51 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.8 2000/03/11 09:34:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -30,11 +30,30 @@
  */
 
 /*
- * 6to4 interface, based on draft-ietf-ngtrans-6to4-03.txt
+ * 6to4 interface, based on draft-ietf-ngtrans-6to4-03.txt.
  *
- * Section 6 in 03 draft looks impractical, as we cannot transmit IPv6 packet
- * to "all PIM routers multicast" address (ff02::d) on 6to4 pseudo link.
- * Therefore, we have removed IFF_MULTICAST from the interface.
+ * Due to the lack of address mapping for link-local addresses, we cannot
+ * throw packets toward link-local addresses (fe80::x).  Also, we cannot throw
+ * packets to link-local multicast addresses (ff02::x).
+ *
+ * Here are interesting symptoms due to the lack of link-local address:
+ *
+ * Unicast routing exchange:
+ * - RIPng: Impossible.  Uses link-local multicast packet toward ff02::2,
+ *   and link-local addresses as nexthop.
+ * - OSPFv6: Impossible.  OSPFv6 assumes that there's link-local address
+ *   assigned to the link, and makes use of them.  Also, HELLO packets use
+ *   link-local multicast addresses (ff02::5 and ff02::6).
+ * - BGP4+: Maybe.  You can only use global address as nexthop, and global
+ *   address as TCP endpoint address.
+ *
+ * Multicast routing protocols:
+ * - PIM: Hello packet cannot be used to discover adjacent PIM routers.
+ *   Adjacent PIM routers must be configured manually (is it really spec-wise
+ *   correct thing to do?).
+ *
+ * ICMPv6:
+ * - Redirects cannot be used due to the lack of link-local address.
  */
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
