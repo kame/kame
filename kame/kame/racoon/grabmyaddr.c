@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.c,v 1.14 2000/05/31 15:05:55 sakane Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.c,v 1.15 2000/07/18 03:51:41 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -357,7 +357,7 @@ update_myaddrs()
 	case RTM_IFINFO:
 		break;
 	default:
-		YIPSDEBUG(DEBUG_NET,
+		YIPSDEBUG(DEBUG_SVERB,
 			plog(logp, LOCATION, NULL,
 				"msg %d not interesting\n", rtm->rtm_type));
 		return 0;
