@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.26 2000/07/12 12:58:04 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.27 2000/07/12 13:34:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2066,11 +2066,13 @@ tcp6_rtlookup(in6p)
 
 	/* No route yet, so try to acquire one */
 	if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+		struct sockaddr_in6 *dst6;
+
 		bzero(&ro->ro_dst, sizeof(struct sockaddr_in6));
-		ro->ro_dst.sin6_family = AF_INET6;
-		ro->ro_dst.sin6_len = sizeof(struct sockaddr_in6);
-		((struct sockaddr_in6 *) &ro->ro_dst)->sin6_addr =
-			in6p->in6p_faddr;
+		dst6 = (struct sockaddr_in6 *)&ro->ro_dst;
+		dst6->sin6_family = AF_INET6;
+		dst6->sin6_len = sizeof(struct sockaddr_in6);
+		dst6->sin6_addr = in6p->in6p_faddr;
 #ifdef __bsdi__			/* bsdi needs rtcalloc to clone a route */
 		rtcalloc((struct route *)ro);
 #else
