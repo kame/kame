@@ -172,6 +172,36 @@ if test "$ac_cv_pfkey" = yes; then
         OPTFLAG="-DHAVE_PFKEYV2 $OPTFLAG"
 fi
 
+dnl old KAME header check
+if test "$ac_cv_pfkey" = "yes"; then
+	AC_MSG_CHECKING(for old KAME PF_KEYv2 header file)
+	AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <net/pfkeyv2.h>],
+		[struct sadb_msg m; m.sadb_msg_reserved2 = 0;],
+		[AC_MSG_RESULT(old)
+		echo "FATAL: obsolete KAME PF_KEYv2 declaration (non-PF_KEY sadb_msg)"
+		exit 1])
+	AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <net/pfkeyv2.h>],
+		[struct sadb_x_policy m; m.sadb_x_policy_id = 0;], [],
+		[AC_MSG_RESULT(old)
+		echo "FATAL: obsolete KAME PF_KEYv2 declaration (no sadb_x_policy_id)"
+		exit 1])
+	AC_TRY_COMPILE([
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <net/pfkeyv2.h>],
+		[struct sadb_x_sa2 m;], [],
+		[AC_MSG_RESULT(old)
+		echo "FATAL: obsolete KAME PF_KEYv2 declaration (no sadb_x_sa2)"
+		exit 1])
+	AC_MSG_RESULT(fine)
+fi
+
 ipsectype=unknown
 ipseclib=none
 ipseclibdir=none
