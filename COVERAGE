@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.74 2000/08/29 17:04:10 itojun Exp $
+$KAME: COVERAGE,v 1.75 2000/08/31 17:40:40 itojun Exp $
 
 
 x: supported/integrated
@@ -129,7 +129,12 @@ getaddrinfo obeys configured resolv order
 		(+)	x	x	x	x	x	x
 
 getaddrinfo supports AI_ADDRCONFIG (2553bis)
-		-	-	-	x	-	-	?
+		-	-	-	(*1)	-	-	(*1)
+    (*1) enabled by default, cannot turn it off
+
+getaddrinfo returns official hostname (leftmost) in ai_canonname
+		(*1)	x	x	x	-	-	x
+    (*1) netbsd, openbsd, freebsd4 are "x", others are "-"
 
 getnameinfo uses addr%numeric for scopeid > maxifindex
 		x	x	x	x	x	x	x
