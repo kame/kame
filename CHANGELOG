@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2388 2003/04/22 07:28:23 itojun Exp $
+$KAME: CHANGELOG,v 1.2389 2003/04/23 09:30:55 keiichi Exp $
 
 <200304>
+Wed Apr 23 18:22:53 JST 2003	keiichi@iij.ad.jp
+	* mip6 related part restructuring.
+	codes are divided into three parts based on node types.
+	a user can build CN only, MN only and HA only kernel now.
+
 Wed Apr 23 01:24:32 JST 2003  itojun@iijlab.net
 	* netbsd: use 1.6.1
 
