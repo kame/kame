@@ -2835,8 +2835,23 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 #ifdef INET6
 	if (in6p && in6totcpcb(in6p)->t_family == AF_INET6 && sotoinpcb(oso)) {
 		struct in6pcb *oin6p = sotoin6pcb(oso);
-		/* inherit socket options from the listening socket */
+		/*
+		 * Inherit socket options from the listening socket.
+		 * Note that in6p_inputopts are not (even should not
+		 * be) copied, since it stores previously received
+		 * options and is used to detect if each new option is
+		 * different than the previous one and hence should be
+		 * passed to a user.
+		 * If we copied in6p_inputopts, a user would not be
+		 * able to receive options just after calling the
+		 * accept system call.
+		 */
 		in6p->in6p_flags |= (oin6p->in6p_flags & IN6P_CONTROLOPTS);
+		if (oin6p->in6p_outputopts)
+			in6p->in6p_outputopts =
+				ip6_copypktopts(oin6p->in6p_outputopts,
+						M_NOWAIT);
+
 		if ((in6p->in6p_flags & IN6P_CONTROLOPTS)
 		 && m->m_len >= sizeof(struct ip6_hdr)) {
 			struct ip6_recvpktopts newopts;
