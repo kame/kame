@@ -827,7 +827,7 @@ file net/if_hippisubr.c                 hippi                   needs-flag
 file net/if_loop.c			loop			needs-count
 file net/if_media.c
 file net/if_ppp.c			ppp			needs-count
-file net/if_sec.c			sec & gif		needs-flag
+file net/if_sec.c			sec			needs-flag
 file net/if_stf.c			stf & inet & inet6	needs-flag
 file net/if_sl.c			sl			needs-count
 file net/if_spppsubr.c			sppp
