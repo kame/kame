@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.94 2000/07/04 09:58:51 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.95 2000/07/04 10:03:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -571,6 +571,13 @@ in6_control(so, cmd, data, ifp)
 
 	switch (cmd) {
 	case SIOCSIFADDR_IN6:
+	case SIOCSIFDSTADDR_IN6:
+	case SIOCSIFNETMASK_IN6:
+		/*
+		 * Since IPv6 allows a node to assign multiple addresses
+		 * on a single interface, SIOCSIFxxx ioctls are not suitable
+		 * and should be unused.
+		 */
 		/* we decided to obsolete this command (20000704) */
 		return(EINVAL);
 
@@ -586,15 +593,6 @@ in6_control(so, cmd, data, ifp)
 			return(EADDRNOTAVAIL);
 		/* FALLTHROUGH */
 	case SIOCAIFADDR_IN6:
-#ifdef COMPAT_IN6IFIOCTL
-	case SIOCSIFDSTADDR_IN6:
-	case SIOCSIFNETMASK_IN6:
-		/*
-		 * Since IPv6 allows a node to assign multiple addresses
-		 * on a single interface, SIOCSIFxxx ioctls are not suitable
-		 * and should be unused.
-		 */
-#endif
 		/*
 		 * We always require users to specify a valid IPv6 address for
 		 * the corresponding operation.
@@ -756,42 +754,6 @@ in6_control(so, cmd, data, ifp)
 				*icmp6_ifstat[ifp->if_index];
 		break;
 
-#ifdef COMPAT_IN6IFIOCTL		/* should be unused */
-	case SIOCSIFDSTADDR_IN6:
-		if ((ifp->if_flags & IFF_POINTOPOINT) == 0)
-			return(EINVAL);
-		oldaddr = ia->ia_dstaddr;
-		ia->ia_dstaddr = ifr->ifr_dstaddr;
-
-		/* link-local index check */
-		if (IN6_IS_ADDR_LINKLOCAL(&ia->ia_dstaddr.sin6_addr)) {
-			if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] == 0) {
-				/* interface ID is not embedded by the user */
-				ia->ia_dstaddr.sin6_addr.s6_addr16[1]
-					= htons(ifp->if_index);
-			} else if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] !=
-				    htons(ifp->if_index)) {
-				ia->ia_dstaddr = oldaddr;
-				return(EINVAL);	/* ifid is contradict */
-			}
-		}
-
-		if (ifp->if_ioctl && (error = (ifp->if_ioctl)
-				      (ifp, SIOCSIFDSTADDR, (caddr_t)ia))) {
-			ia->ia_dstaddr = oldaddr;
-			return(error);
-		}
-		ia->ia_ifa.ifa_dstaddr = (struct sockaddr *)&ia->ia_dstaddr;
-		if (ia->ia_flags & IFA_ROUTE) {
-			ia->ia_ifa.ifa_dstaddr = (struct sockaddr *)&oldaddr;
-			rtinit(&(ia->ia_ifa), (int)RTM_DELETE, RTF_HOST);
-			ia->ia_ifa.ifa_dstaddr =
-				(struct sockaddr *)&ia->ia_dstaddr;
-			rtinit(&(ia->ia_ifa), (int)RTM_ADD, RTF_HOST|RTF_UP);
-		}
-		break;
-
-#endif
 	case SIOCGIFALIFETIME_IN6:
 		ifr->ifr_ifru.ifru_lifetime = ia->ia6_lifetime;
 		break;
@@ -810,30 +772,6 @@ in6_control(so, cmd, data, ifp)
 		} else
 			ia->ia6_lifetime.ia6t_preferred = 0;
 		break;
-
-#ifdef COMPAT_IN6IFIOCTL		/* XXX should be unused */
-	case SIOCSIFNETMASK_IN6:
-		ia->ia_prefixmask = ifr->ifr_addr;
-		bzero(&net, sizeof(net));
-		net.sin6_len = sizeof(struct sockaddr_in6);
-		net.sin6_family = AF_INET6;
-		net.sin6_port = htons(0);
-		net.sin6_flowinfo = htonl(0);
-		net.sin6_addr.s6_addr32[0]
-			= ia->ia_addr.sin6_addr.s6_addr32[0] &
-				ia->ia_prefixmask.sin6_addr.s6_addr32[0];
-		net.sin6_addr.s6_addr32[1]
-			= ia->ia_addr.sin6_addr.s6_addr32[1] &
-				ia->ia_prefixmask.sin6_addr.s6_addr32[1];
-		net.sin6_addr.s6_addr32[2]
-			= ia->ia_addr.sin6_addr.s6_addr32[2] &
-				ia->ia_prefixmask.sin6_addr.s6_addr32[2];
-		net.sin6_addr.s6_addr32[3]
-			= ia->ia_addr.sin6_addr.s6_addr32[3] &
-				ia->ia_prefixmask.sin6_addr.s6_addr32[3];
-		ia->ia_net = net;
-		break;
-#endif
 
 	case SIOCAIFADDR_IN6:
 		prefixIsNew = 0;
