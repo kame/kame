@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1454 2000/12/26 12:02:45 jinmei Exp $
+$KAME: CHANGELOG,v 1.1455 2000/12/27 11:51:57 sakane Exp $
 
 <200012>
+Wed Dec 27 20:52:26 JST 2000 sakane@ydc.co.jp
+	* netkey/key.c:
+	Added lifetime handler of the policy.  There are two timer
+	"lifetime" and "validtime".  "lifetime" means the lifetime of
+	the policy.  "validtime" means the duration after the policy
+	has not been used.  when these timer will be expired, key_spdexpire()
+	is called and the expiration message is sent to the userland.
+	the policy can be used without limitiation if both lifetime and
+	validtime are zero.
+
 2000-12-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/lib/libinet6/resolv: supported EDNS0. See log on
 	Wed Apr 26 12:00:59 JST 2000 by itojun for more details.
