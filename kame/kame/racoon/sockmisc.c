@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.c,v 1.9 2000/05/23 16:25:09 sakane Exp $ */
+/* YIPS @(#)$Id: sockmisc.c,v 1.10 2000/05/24 09:58:54 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -424,7 +424,7 @@ sendfromto(s, buf, buflen, src, dst)
 			plog(logp, LOCATION, NULL,
 				"dst6 %s %d\n",
 				saddr2str((struct sockaddr *)&dst6),
-				dst6.sin6_scope_id);)
+				dst6.sin6_scope_id););
 
 		len = sendmsg(s, &m, 0 /*MSG_DONTROUTE*/);
 		if (len < 0) {

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: debug.h,v 1.9 2000/05/22 21:40:57 sakane Exp $ */
+/* YIPS @(#)$Id: debug.h,v 1.10 2000/05/24 09:58:54 itojun Exp $ */
 
 #define DEBUG_INFO	0x00000002	/* force informational */
 #define DEBUG_NOTIFY	0x00000004	/* force notify */
@@ -59,13 +59,15 @@
 #define DEBUG_DCERT	(DEBUG_SVERB | DEBUG_CERT)	/* private key */
 #define DEBUG_DMISC	(DEBUG_SVERB | DEBUG_MISC)
 
-#if defined(YIPS_DEBUG)
-#define YIPSDEBUG(lev,arg) if ((debug & (lev)) == (lev)) { arg; }
+#ifdef YIPS_DEBUG
+#define YIPSDEBUG(lev,arg) \
+	do { if ((debug & (lev)) == (lev)) { arg; } } while (0)
 #else
 #define YIPSDEBUG(lev,arg)
 #endif /* defined(YIPS_DEBUG) */
 
-#define YIPSLOG(lev,arg) if ((debug & (lev)) == (lev)) { arg; }
+#define YIPSLOG(lev,arg) \
+	do { if ((debug & (lev)) == (lev)) { arg; } } while (0)
 
 #ifdef HAVE_FUNCTION_MACRO
 #define LOCATION	debug_location(__FILE__, __LINE__, __FUNCTION__)
