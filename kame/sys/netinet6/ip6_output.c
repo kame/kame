@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.207 2001/08/01 04:29:57 sumikawa Exp $	*/
+/*	$KAME: ip6_output.c,v 1.208 2001/08/01 16:50:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -116,6 +116,7 @@
 #endif
 #include <netinet6/nd6.h>
 #include <netinet6/ip6protosw.h>
+#include <netinet6/scope6_var.h>
 
 #ifdef IPSEC
 #ifdef __OpenBSD__
@@ -905,8 +906,18 @@ skip_ipsec2:;
 	}
 
   routefound:
-	if (rt != NULL && (rt->rt_flags & RTF_GATEWAY)) /* XXX NEXTHOP case */
-		dst = (struct sockaddr_in6 *)rt->rt_gateway;
+	if (rt) {
+		if (opt && opt->ip6po_nextroute.ro_rt) {
+			/*
+			 * The nexthop is explicitly specified by the
+			 * application.  We assume the next hop is an IPv6
+			 * address.
+			 */
+			dst = (struct sockaddr_in6 *)opt->ip6po_nexthop;
+		}
+		else if ((rt->rt_flags & RTF_GATEWAY))
+			dst = (struct sockaddr_in6 *)rt->rt_gateway;
+	}
 
 	if (!IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 		m->m_flags &= ~(M_BCAST | M_MCAST); /* just in case */
@@ -2897,9 +2908,33 @@ ip6_pcbopt(optname, buf, len, pktopt, priv)
 		}
 
 		/* check if cmsg_len is large enough for sa_len */
-		if (len < sizeof(u_char) ||
-		    len < *buf)
+		if (len < sizeof(struct sockaddr) || len < *buf)
 			return(EINVAL);
+
+		switch(((struct sockaddr *)buf)->sa_family) {
+		case AF_INET6:
+		{
+			struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)buf;
+
+			if (IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr) ||
+			    IN6_IS_ADDR_MULTICAST(&sa6->sin6_addr)) {
+				return(EINVAL);
+			}
+			if (sa6->sin6_scope_id == 0)
+				sa6->sin6_scope_id =
+					scope6_addr2default(&sa6->sin6_addr);
+#ifndef SCOPEDROUTING
+			if (in6_embedscope(&sa6->sin6_addr, sa6, NULL, NULL)
+			    != 0) {
+				return(EINVAL);
+			}
+#endif
+			break;
+		}
+		case AF_LINK:	/* should eventually be supported */
+		default:
+			return(EAFNOSUPPORT);
+		}
 
 		/* turn off the previous option */
 		ip6_clearpktopts(opt, 1, IPV6_NEXTHOP);
@@ -3113,6 +3148,10 @@ ip6_clearpktopts(pktopt, needfree, optname)
 	if (optname == -1 || optname == IPV6_TCLASS)
 		pktopt->ip6po_tclass = 0x00;
 	if (optname == -1 || optname == IPV6_NEXTHOP) {
+		if (pktopt->ip6po_nextroute.ro_rt) {
+			RTFREE(pktopt->ip6po_nextroute.ro_rt);
+			pktopt->ip6po_nextroute.ro_rt = NULL;
+		}
 		if (needfree && pktopt->ip6po_nexthop)
 			free(pktopt->ip6po_nexthop, M_IP6OPT);
 		pktopt->ip6po_nexthop = NULL;
@@ -3687,26 +3726,51 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 
 		case IPV6_2292NEXTHOP:
 		case IPV6_NEXTHOP:
+		{
+			struct sockaddr *sa = (struct sockaddr *)CMSG_DATA(cm);
+			struct sockaddr_in6 *sa6;
+
 			if (!priv)
 				return(EPERM);
 
-			if (cm->cmsg_len < sizeof(u_char) ||
-			    /* check if cmsg_len is large enough for sa_len */
-			    cm->cmsg_len < CMSG_LEN(*CMSG_DATA(cm)))
+			if (cm->cmsg_len < sizeof(struct sockaddr) ||
+			    cm->cmsg_len < sa->sa_len) {
 				return(EINVAL);
+			}
+
+			switch(sa->sa_family) {
+			case AF_INET6:
+				sa6 = (struct sockaddr_in6 *)sa;
+				if (IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr) ||
+				    IN6_IS_ADDR_MULTICAST(&sa6->sin6_addr)) {
+					return(EINVAL);
+				}
+				if (sa6->sin6_scope_id == 0) {
+					sa6->sin6_scope_id =
+						scope6_addr2default(&sa6->sin6_addr);
+				}
+#ifndef SCOPEDROUTING
+				if (in6_embedscope(&sa6->sin6_addr, sa6, NULL,
+						   NULL)
+				    != 0) {
+					return(EINVAL);
+				}
+#endif
+				break;
+			case AF_LINK:	/* should eventually be supported */
+			default:
+				return(EAFNOSUPPORT);
+			}
 
 			if (needcopy) {
-				opt->ip6po_nexthop =
-					malloc(*CMSG_DATA(cm),
-					       M_IP6OPT, M_WAITOK);
-				bcopy(CMSG_DATA(cm),
-				      opt->ip6po_nexthop,
-				      *CMSG_DATA(cm));
+				opt->ip6po_nexthop = malloc(sa->sa_len,
+							     M_IP6OPT,
+							    M_WAITOK);
+				bcopy(sa, opt->ip6po_nexthop, sa->sa_len);
 			} else
-				opt->ip6po_nexthop =
-					(struct sockaddr *)CMSG_DATA(cm);
+				opt->ip6po_nexthop = sa;
 			break;
-
+		}
 		case IPV6_2292HOPOPTS:
 		case IPV6_HOPOPTS:
 		{

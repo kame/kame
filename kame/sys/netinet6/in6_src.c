@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.48 2001/07/29 12:05:05 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.49 2001/08/01 16:50:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -203,6 +203,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 	int error = 0;
 	struct ifnet *ifp = NULL;
 	struct rtentry *rt = NULL;
+	struct sockaddr_in6 *sin6_next;
 	struct in6_pktinfo *pi = NULL;
 	struct in6_addr *dst = &dstsock->sin6_addr;
 
@@ -230,24 +231,63 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 		goto done; /* we do not need a route for multicast. */
 	}
 
-  getroute:	
+  getroute:
 	/*
 	 * If the next hop address for the packet is specified by the caller,
 	 * use it as the gateway.
 	 */
-#ifdef notyet			/* XXX */
-	{
-		struct sockaddr_in6 *sin6_next;
-		struct rtentry *rt;
-
-		if (opts && opts->ip6po_nexthop) {
-			sin6_next = satosin6(opts->ip6po_nexthop);
-
-			/* XXX: must check if it is really a neighbor */
-			rt = nd6_lookup(&sin6_next->sin6_addr, 0, NULL);
-		}
-	}
+	if (opts && opts->ip6po_nexthop) {
+#ifdef NEW_STRUCT_ROUTE
+		struct route *ron;
+#else
+		struct route_in6 *ron;
 #endif
+
+		sin6_next = satosin6(opts->ip6po_nexthop);
+
+		/* at this moment, we only support AF_INET6 next hops */
+		if (sin6_next->sin6_family != AF_INET6) {
+			error = EAFNOSUPPORT; /* or should we proceed? */
+			goto done;
+		}
+
+		/*
+		 * If the next hop is an IPv6 address, then the node identified
+		 * by that address must be a neighbor of the sending host.
+		 */
+		ron = &opts->ip6po_nextroute;
+		if ((ron->ro_rt &&
+		     (ron->ro_rt->rt_flags & (RTF_UP | RTF_LLINFO)) !=
+		     (RTF_UP | RTF_LLINFO)) ||
+		    !SA6_ARE_ADDR_EQUAL(satosin6(&ron->ro_dst), sin6_next)) {
+			if (ron->ro_rt) {
+				RTFREE(ron->ro_rt);
+				ron->ro_rt = NULL;
+			}
+			*satosin6(&ron->ro_dst) = *sin6_next;
+		}
+		if (ron->ro_rt == NULL) {
+			rtalloc((struct route *)ron); /* multi path case? */
+			if (ron->ro_rt == NULL ||
+			    !(ron->ro_rt->rt_flags & RTF_LLINFO)) {
+				if (ron->ro_rt) {
+					RTFREE(ron->ro_rt);
+					ron->ro_rt = NULL;
+				}
+				return(EHOSTUNREACH);
+			}
+		}
+		rt = ron->ro_rt;
+		ifp = rt->rt_ifp;
+
+		/*
+		 * When cloning is required, try to allocate a route to the
+		 * destination so that the caller can store path MTU
+		 * information.
+		 */
+		if (!clone)
+			goto done;
+	}
 
 	/*
 	 * Use a cached route if it exists and is valid, else try to allocate
@@ -301,6 +341,13 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 #endif /* __FreeBSD__ */
 			}
 		}
+
+		/*
+		 * do not care about the result if we have the nexthop
+		 * explicitly specified.
+		 */
+		if (opts && opts->ip6po_nexthop)
+			goto done;
 
 		if (ro->ro_rt) {
 			ifp = ro->ro_rt->rt_ifp;

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.65 2001/07/29 11:58:16 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.66 2001/08/01 16:50:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -130,13 +130,26 @@ struct	ip6po_rhinfo {
 #define ip6po_rthdr	ip6po_rhinfo.ip6po_rhi_rthdr
 #define ip6po_route	ip6po_rhinfo.ip6po_rhi_route
 
+/* Nexthop related info */
+struct	ip6po_nhinfo {
+	struct	sockaddr *ip6po_nhi_nexthop;
+#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+	struct	route ip6po_nhi_route; /* Route to the nexthop */
+#else
+	struct	route_in6 ip6po_nhi_route; /* Route to the nexthop */
+#endif
+};
+#define ip6po_nexthop	ip6po_nhinfo.ip6po_nhi_nexthop
+#define ip6po_nextroute	ip6po_nhinfo.ip6po_nhi_route
+
 struct	ip6_pktopts {
 	int	ip6po_hlim;	/* Hoplimit for outgoing packets */
 
 	/* Outgoing IF/address information */
 	struct	in6_pktinfo *ip6po_pktinfo;
 
-	struct	sockaddr *ip6po_nexthop; /* Next-hop address */
+	/* Next-hop address information */
+	struct	ip6po_nhinfo ip6po_nhinfo;
 	
 	struct	ip6_hbh *ip6po_hbh; /* Hop-by-Hop options header */
 
