@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.47 2002/10/10 06:19:58 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.48 2003/06/13 11:36:30 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -590,7 +590,7 @@ esp_output(m, nexthdrp, md, isr, af)
 		goto noantireplay;
 	if (!sav->key_auth)
 		goto noantireplay;
-	if (sav->key_auth == SADB_AALG_NONE)
+	if (sav->alg_auth == SADB_AALG_NONE)
 		goto noantireplay;
 
     {
