@@ -8,6 +8,8 @@ LDADD=	-lkvm
 BINGRP=	kmem
 BINMODE=2555
 
+CPPFLAGS+=	-DINET6
+
 .include <bsd.prog.mk>
 
 # XXX

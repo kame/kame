@@ -79,6 +79,12 @@ __RCSID("$NetBSD: fstat.c,v 1.34 1999/02/18 06:09:25 lukem Exp $");
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
 
+#ifdef INET6
+#include <netinet/ip6.h>
+#include <netinet6/ip6_var.h>
+#include <netinet6/in6_pcb.h>
+#endif
+
 #include <arpa/inet.h>
 
 #include <ctype.h>
@@ -607,9 +613,16 @@ socktrans(sock, i)
 	struct protosw	proto;
 	struct domain	dom;
 	struct inpcb	inpcb;
+#ifdef INET6
+	struct in6pcb	in6pcb;
+#endif
 	struct unpcb	unpcb;
 	int len;
 	char dname[32];
+#ifdef INET6
+	char addrbuf[INET6_ADDRSTRLEN];
+	char xaddrbuf[INET6_ADDRSTRLEN + 2];
+#endif
 
 	PREFIX(i);
 
@@ -671,8 +684,7 @@ socktrans(sock, i)
 			    inpcb.inp_laddr.s_addr == INADDR_ANY ? "*" :
 			    inet_ntoa(inpcb.inp_laddr), ntohs(inpcb.inp_lport));
 			if (inpcb.inp_fport) {
-				printf(" <-> ");
-				printf("%s:%d",
+				printf(" <-> %s:%d",
 				    inpcb.inp_faddr.s_addr == INADDR_ANY ? "*" :
 				    inet_ntoa(inpcb.inp_faddr),
 				    ntohs(inpcb.inp_fport));
@@ -697,6 +709,63 @@ socktrans(sock, i)
 		} else if (so.so_pcb)
 			printf(" %lx", (long)so.so_pcb);
 		break;
+#ifdef INET6
+	case AF_INET6:
+		getinetproto(proto.pr_protocol);
+		if (proto.pr_protocol == IPPROTO_TCP) {
+			if (so.so_pcb == NULL)
+				break;
+			if (kvm_read(kd, (u_long)so.so_pcb, (char *)&in6pcb,
+			    sizeof(struct in6pcb)) != sizeof(struct in6pcb)) {
+				dprintf("can't read in6pcb at %p", so.so_pcb);
+				goto bad;
+			}
+			printf(" %lx", (long)in6pcb.in6p_ppcb);
+			sprintf(xaddrbuf, "[%s]", 
+ 			    inet_ntop(AF_INET6, &in6pcb.in6p_laddr,
+				addrbuf, sizeof(addrbuf)));
+			printf(" %s:%d",
+			    IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_laddr) ? "*" :
+			    xaddrbuf,
+			    ntohs(in6pcb.in6p_lport));
+			if (in6pcb.in6p_fport) {
+				sprintf(xaddrbuf, "[%s]", 
+				    inet_ntop(AF_INET6, &in6pcb.in6p_faddr,
+					addrbuf, sizeof(addrbuf)));
+				printf(" <-> %s:%d",
+			            IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_faddr) ? "*" :
+				    xaddrbuf,
+				    ntohs(in6pcb.in6p_fport));
+			}
+		} else if (proto.pr_protocol == IPPROTO_UDP) {
+			if (so.so_pcb == NULL)
+				break;
+			if (kvm_read(kd, (u_long)so.so_pcb, (char *)&in6pcb,
+			    sizeof(struct in6pcb)) != sizeof(struct in6pcb)) {
+				dprintf("can't read inpcb at %p", so.so_pcb);
+				goto bad;
+			}
+			printf(" %lx", (long)so.so_pcb);
+			sprintf(xaddrbuf, "[%s]", 
+			    inet_ntop(AF_INET6, &in6pcb.in6p_laddr,
+				addrbuf, sizeof(addrbuf)));
+			printf(" %s:%d",
+		            IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_laddr) ? "*" :
+			    xaddrbuf,
+			    ntohs(in6pcb.in6p_lport));
+			if (in6pcb.in6p_fport) {
+				sprintf(xaddrbuf, "[%s]", 
+				    inet_ntop(AF_INET6, &in6pcb.in6p_faddr,
+					addrbuf, sizeof(addrbuf)));
+				printf(" <-> %s:%d",
+			            IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_faddr) ? "*" :
+				    xaddrbuf,
+				    ntohs(in6pcb.in6p_fport));
+			}
+		} else if (so.so_pcb)
+			printf(" %lx", (long)so.so_pcb);
+		break;
+#endif
 	case AF_LOCAL:
 		/* print address of pcb and connected pcb */
 		if (so.so_pcb) {
