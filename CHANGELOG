@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1795 2001/07/21 04:36:01 itojun Exp $
+$KAME: CHANGELOG,v 1.1796 2001/07/21 04:40:19 itojun Exp $
 
 <200107>
 Sat Jul 21 13:30:21 JST 2001  itojun@iijlab.net
@@ -29,7 +29,9 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	    if you specify rt_gateway.  rt_gateway is still optional,
 	    and the first route is returned if it is not specified.
 	  - IPv4 and IPv6 output logic will pick a route out of multiple
-	    gateways, based on Modulo-N Hash (RFC2991) using ip{,6}_dst bits.
+	    gateways, based on Modulo-N Hash (RFC2991) using lowermost 32bits
+	    from ip{,6}_dst.  it is likely that packets to 3ffe::1 and 3ffe::2
+	    will go through a different gateway:-)
 	  
 	  DEMO:
 	  (adding multipath routes)
