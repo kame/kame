@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.66 2003/09/05 07:52:45 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.67 2003/10/14 08:46:59 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -609,6 +609,7 @@ parse_pim6_hello(pim_message, datalen, src, opts)
 	    holdtime_received_ok = TRUE;
 	    break;
 	case PIM_MESSAGE_HELLO_ADDRESSES:
+	case PIM_MESSAGE_HELLO_ADDR_LIST:
 	    for (lim = data_ptr + option_length; data_ptr < lim; ) {
 		struct phaddr *addr;
 
@@ -693,8 +694,17 @@ send_pim6_hello(v, holdtime)
 	PUT_EUADDR6(pa->pa_addr.sin6_addr, data_ptr);
     }
     if ((datalen = data_ptr - data_ptr0 - 4) > 0) {
-	/* at least one address is encoded. */
-	PUT_HOSTSHORT(PIM_MESSAGE_HELLO_ADDRESSES, data_ptr0);
+	/* 
+	 * at least one address is encoded.
+	 * send the address list option in option-65001 too,
+	 * for the compatibility to old pim6sd.
+	 */
+	memcpy(data_ptr, data_ptr0, data_ptr - data_ptr0);
+	PUT_HOSTSHORT(PIM_MESSAGE_HELLO_ADDRESSES, data_ptr);
+	PUT_HOSTSHORT(datalen, data_ptr);
+	data_ptr += datalen;
+
+	PUT_HOSTSHORT(PIM_MESSAGE_HELLO_ADDR_LIST, data_ptr0);
 	PUT_HOSTSHORT(datalen, data_ptr0);
     }
     else

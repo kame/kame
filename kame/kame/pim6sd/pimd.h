@@ -1,4 +1,4 @@
-/*	$KAME: pimd.h,v 1.11 2001/06/25 04:54:30 itojun Exp $	*/
+/*	$KAME: pimd.h,v 1.12 2003/10/14 08:46:59 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -268,7 +268,10 @@ typedef struct pim_jp_encod_grp_ {
 #define PIM_MESSAGE_HELLO_HOLDTIME_FOREVER      0xffff
 
 /* PIM HELLO additional addresses option (experimental) */
-#define PIM_MESSAGE_HELLO_ADDRESSES		65001
+#define PIM_MESSAGE_HELLO_ADDR_LIST		24    
+	/* newly defined value in draft-ietf-pim-sm-v2-new-08.txt */
+#define PIM_MESSAGE_HELLO_ADDRESSES		65001 
+	/* old value (provided for compatibility) */
 
 /* PIM_REGISTER definitions */
 #define PIM_MESSAGE_REGISTER_BORDER_BIT         0x80000000
