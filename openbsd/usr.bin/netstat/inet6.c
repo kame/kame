@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-/*__RCSID("$Id: inet6.c,v 1.10 2000/02/09 10:49:31 itojun Exp $");*/
+/*__RCSID("$Id: inet6.c,v 1.11 2000/02/28 13:01:12 itojun Exp $");*/
 #endif
 #endif /* not lint */
 
@@ -59,7 +59,6 @@ static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #include <netinet/ip_var.h>
 #endif
 #include <netinet6/ip6_var.h>
-#include <netinet6/in6_pcb.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/pim6_var.h>
 
@@ -76,101 +75,10 @@ static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 
 #ifdef INET6
 
-struct	in6pcb in6pcb;
 struct	socket sockb;
 
 char	*inet6name __P((struct in6_addr *));
 void	inet6print __P((struct in6_addr *, int, char *));
-
-#if 0
-/*
- * Print a summary of connections related to an Internet
- * protocol.  For TCP, also give state of connection.
- * Listening processes (aflag) are suppressed unless the
- * -a (all) flag is specified.
- */
-void
-ip6protopr(off, name)
-	u_long off;
-	char *name;
-{
-	struct in6pcb cb;
-	register struct in6pcb *prev, *next;
-	int istcp;
-	static int first = 1;
-
-	if (off == 0)
-		return;
-	istcp = strcmp(name, "tcp6") == 0;
-	kread(off, (char *)&cb, sizeof (struct in6pcb));
-	in6pcb = cb;
-	prev = (struct in6pcb *)off;
-	if (in6pcb.in6p_next == (struct in6pcb *)off)
-		return;
-	while (in6pcb.in6p_next != (struct in6pcb *)off) {
-		next = in6pcb.in6p_next;
-		kread((u_long)next, (char *)&in6pcb, sizeof (in6pcb));
-		if (in6pcb.in6p_prev != prev) {
-			printf("???\n");
-			break;
-		}
-		if (!aflag && IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_laddr)) {
-			prev = next;
-			continue;
-		}
-		kread((u_long)in6pcb.in6p_socket, (char *)&sockb, sizeof (sockb));
-		if (istcp) {
-#ifdef TCP6
-			kread((u_long)in6pcb.in6p_ppcb,
-			    (char *)&tcp6cb, sizeof (tcp6cb));
-#else
-			kread((u_long)in6pcb.in6p_ppcb,
-			    (char *)&tcpcb, sizeof (tcpcb));
-#endif
-		}
-		if (first) {
-			printf("Active Internet6 connections");
-			if (aflag)
-				printf(" (including servers)");
-			putchar('\n');
-			if (Aflag)
-				printf("%-8.8s ", "PCB");
-			printf(Aflag ?
-				"%-5.5s %-6.6s %-6.6s  %-18.18s %-18.18s %s\n" :
-				"%-5.5s %-6.6s %-6.6s  %-22.22s %-22.22s %s\n",
-				"Proto", "Recv-Q", "Send-Q",
-				"Local Address", "Foreign Address", "(state)");
-			first = 0;
-		}
-		if (Aflag) {
-			if (istcp)
-				printf("%8p ", in6pcb.in6p_ppcb);
-			else
-				printf("%8p ", next);
-		}
-		printf("%-5.5s %6ld %6ld ", name, sockb.so_rcv.sb_cc,
-			sockb.so_snd.sb_cc);
-		/* xxx */
-		inet6print(&in6pcb.in6p_laddr, (int)in6pcb.in6p_lport, name);
-		inet6print(&in6pcb.in6p_faddr, (int)in6pcb.in6p_fport, name);
-		if (istcp) {
-#ifdef TCP6
-			if (tcp6cb.t_state < 0 || tcp6cb.t_state >= TCP6_NSTATES)
-				printf(" %d", tcp6cb.t_state);
-			else
-				printf(" %s", tcp6states[tcp6cb.t_state]);
-#else
-			if (tcpcb.t_state < 0 || tcpcb.t_state >= TCP_NSTATES)
-				printf(" %d", tcpcb.t_state);
-			else
-				printf(" %s", tcpstates[tcpcb.t_state]);
-#endif
-		}
-		putchar('\n');
-		prev = next;
-	}
-}
-#endif
 
 static	char *ip6nh[] = {
 	"hop by hop",
