@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.c,v 1.6 2001/03/16 06:22:34 itojun Exp $	*/
+/*	$KAME: radix_art.c,v 1.7 2001/03/16 06:25:54 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -69,7 +69,7 @@
 
 /*
  * ART: Allotment Routing Table, by Donald Knuth and Yoichi Hariguchi
- *	<yoichi@mayannetworks.com>
+ *	<yoichi@yottanet.com>
  * The implementation is by Jun-ichiro itojun Hagino <itojun@iijlab.net>
  *
  * We have multiple ART tables which hold 2^(ART_BITLEN + 1) elements.
