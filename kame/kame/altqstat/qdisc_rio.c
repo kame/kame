@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_rio.c,v 1.2 2000/10/18 09:15:17 kjc Exp $	*/
+/*	$KAME: qdisc_rio.c,v 1.3 2001/05/17 08:01:47 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -123,7 +123,7 @@ rio_stat_loop(int fd, const char *ifname, int count, int interval)
 
 		last_bytes[0] = rio_stats.q_stats[0].xmit_cnt.bytes;
 		last_bytes[1] = rio_stats.q_stats[1].xmit_cnt.bytes;
-		last_bytes[2] = rio_stats.q_stats[3].xmit_cnt.bytes;
+		last_bytes[2] = rio_stats.q_stats[2].xmit_cnt.bytes;
 		last_time = cur_time;
 		sleep(interval);
 	}
