@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.2 2002/04/30 14:56:07 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.3 2002/05/01 04:47:53 jinmei Exp $	*/
 
 %{
 /*
@@ -30,7 +30,12 @@
  * SUCH DAMAGE.
  */
 #include <sys/types.h>
+#include <sys/socket.h>
 
+#include <netinet/in.h>
+
+#include <errno.h>
+#include <syslog.h>
 #include <string.h>
 #ifdef HAVE_STDARG_H
 #include <stdarg.h>
@@ -38,7 +43,8 @@
 #include <varargs.h>
 #endif
 
-#include "cfparse.h"
+#include "dhcp6.h"
+#include "common.h"
 #include "y.tab.h"
 
 char *configfilename;
@@ -54,6 +60,9 @@ int cfdebug = 0;
 #endif
 
 static void cfdebug_print __P((char *, char *, int));
+
+#define DP(str) if (cfdebug) cfdebug_print(str, yytext, yyleng)
+#define DECHO if (cfdebug) cfdebug_print(NULL, yytext, yyleng);
 %}
 
 /* abbreviations */
@@ -124,15 +133,24 @@ cfdebug_print(w, t, l)
 	char *w, *t;
 	int l;
 {
-	printf("<%d>%s [%s] (%d)\n", yy_start, w, t, l);
+	if (w)
+		dprintf(LOG_DEBUG, "<%d>%s [%s] (%d)", yy_start, w, t, l);
+	else
+		dprintf(LOG_DEBUG, "<%d>[%s] (%d)", yy_start, t, l);
 }
 
 static void
-yyerror0(char *s, va_list ap)
+yyerror0(int level, char *s, va_list ap)
 {
-	fprintf(stderr, "%s %d: ", configfilename, lineno);
-	vfprintf(stderr, s, ap);
-	fprintf(stderr, "\n");
+	char ebuf[BUFSIZ], *bp, *ep;
+
+	bp = ebuf;
+	ep = ebuf + sizeof(ebuf);
+	bp += snprintf(bp, ep - bp, "%s %d: ", configfilename, lineno);
+	if (bp < ep)
+		bp += vsnprintf(bp, ep - bp, s, ap);
+
+	dprintf(level, ebuf);
 }
 
 void
@@ -144,7 +162,7 @@ yyerror(char *s, ...)
 #else
 	va_start(ap);
 #endif
-	yyerror0(s, ap);
+	yyerror0(LOG_ERR, s, ap);
 	va_end(ap);
 	yyerrorcount++;
 }
@@ -158,7 +176,7 @@ yywarn(char *s, ...)
 #else
 	va_start(ap);
 #endif
-	yyerror0(s, ap);
+	yyerror0(LOG_WARNING, s, ap);
 	va_end(ap);
 }
 
@@ -168,7 +186,10 @@ cfparse(conf)
 {
 	configfilename = conf;
 	if ((yyin = fopen(configfilename, "r")) == NULL) {
-		warn("cfparse: fopen(%s)", configfilename);
+		if (errno == ENOENT)
+			return(0);
+		dprintf(LOG_ERR, "cfparse: fopen(%s): %s",
+			configfilename, strerror(errno));
 		return(-1);
 	}
 
