@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.264 2001/11/28 11:08:54 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.265 2001/11/29 04:38:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -802,7 +802,17 @@ icmp6_input(mp, offp, proto)
 		break;
 #ifndef MIP6_DRAFT13
 	case ICMP6_MOBILEPREFIX_SOLICIT:
+		if (icmp6len < sizeof(struct mobile_prefix_solicit))
+			goto badlen;
+		if (code != 0)
+			goto badcode;
+		if (mip6_icmp6_input(m, off, icmp6len))
+			goto freeit;
+		break;
+
 	case ICMP6_MOBILEPREFIX_ADVERT:
+		if (icmp6len < sizeof (struct mobile_prefix_advert))
+			goto badlen;
 		if (code != 0)
 			goto badcode;
 		if (mip6_icmp6_input(m, off, icmp6len))

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.63 2001/11/16 07:51:12 keiichi Exp $	*/
+/*	$KAME: icmp6.h,v 1.64 2001/11/29 04:38:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -123,14 +123,15 @@ struct icmp6_hdr {
 #define IND_SOLICIT			141	/* inverse neighbor solicitation */
 #define IND_ADVERT			142	/* inverse neighbor advertisment */
 
+/* Folloing numbers are defined in the mobile-ip draft. */
+#define ICMP6_HADISCOV_REQUEST		150	/* XXX To be authorized */
+#define ICMP6_HADISCOV_REPLY		151	/* XXX To be authorized */
+#define ICMP6_MOBILEPREFIX_SOLICIT	152	/* XXX To be authorized */
+#define ICMP6_MOBILEPREFIX_ADVERT	153	/* XXX To be authorized */
+
 /* The definitions below are experimental. TBA */
 #define MLD6_MTRACE_RESP		200	/* mtrace response(to sender) */
 #define MLD6_MTRACE			201	/* mtrace messages */
-
-#define ICMP6_HADISCOV_REQUEST		202	/* XXX To be defined */
-#define ICMP6_HADISCOV_REPLY		203	/* XXX To be defined */
-#define ICMP6_MOBILEPREFIX_SOLICIT	204	/* XXX To be defined */
-#define ICMP6_MOBILEPREFIX_ADVERT	205	/* XXX To be defined */
 
 #define MLD6V2_LISTENER_REPORT		206	/* MLDv2 report. to be assigned */
  

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.80 2001/11/26 07:17:43 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.81 2001/11/29 04:38:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -366,15 +366,18 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 	mpfx = mip6_prefix_list_find(&tmpmpfx);
 	if (mpfx) {
 		/* found an existing entry.  just update it. */
-		mpfx->mpfx_lifetime = ndpr->ndpr_vltime;
-		mpfx->mpfx_remain = mpfx->mpfx_lifetime;
+		mpfx->mpfx_vltime = ndpr->ndpr_vltime;
+		mpfx->mpfx_vlremain = mpfx->mpfx_vltime;
+		mpfx->mpfx_pltime = ndpr->ndpr_pltime;
+		mpfx->mpfx_plremain = mpfx->mpfx_pltime;
 		/* XXX mpfx->mpfx_haddr; */
 	} else {
 		/* this is a new prefix. */
 		mpfx_is_new = 1;
 		mpfx = mip6_prefix_create(&ndpr->ndpr_prefix.sin6_addr,
 					  ndpr->ndpr_plen,
-					  ndpr->ndpr_vltime);
+					  ndpr->ndpr_vltime,
+					  ndpr->ndpr_pltime);
 		if (mpfx == NULL) {
 			mip6log((LOG_ERR,
 				 "%s:%d: "
@@ -1027,7 +1030,7 @@ mip6_add_haddrs(sc, ifp)
 			}
 
 			/* skip a prefix that has 0 lifetime. */
-			if (mpfx->mpfx_lifetime == 0)
+			if (mpfx->mpfx_vltime == 0)
 				continue;
 
 			/* construct in6_aliasreq. */
@@ -1553,7 +1556,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 
 		mpfx = mip6_prefix_list_find_withhaddr(&mip6_prefix_list,
 						       src);
-		haddr_lifetime = mpfx->mpfx_lifetime;
+		haddr_lifetime = mpfx->mpfx_pltime;
 		coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa);
 		lifetime = haddr_lifetime < coa_lifetime ?
 			haddr_lifetime : coa_lifetime;

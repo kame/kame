@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.12 2001/11/07 03:31:41 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.13 2001/11/29 04:38:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -44,15 +44,21 @@
 #define MIP6_SEQNO_T u_int16_t
 #else
 #define MIP6_SEQNO_T u_int8_t
-#endif
+#endif /* MIP6_DRAFT13 */
 
 struct mip6_prefix {
 	LIST_ENTRY(mip6_prefix) mpfx_entry;
-	struct in6_addr          mpfx_prefix;
-	u_int8_t                 mpfx_prefixlen;
-	u_int32_t                mpfx_lifetime;
-	int64_t                  mpfx_remain;
-	struct in6_addr          mpfx_haddr;
+	struct in6_addr         mpfx_prefix;
+	u_int8_t                mpfx_prefixlen;
+#if 0
+	u_int32_t               mpfx_lifetime;
+	int64_t                 mpfx_remain;
+#endif
+	u_int32_t               mpfx_vltime;
+	u_int64_t               mpfx_vlremain;
+	u_int32_t               mpfx_pltime;
+	u_int64_t               mpfx_plremain;
+	struct in6_addr         mpfx_haddr;
 };
 LIST_HEAD(mip6_prefix_list, mip6_prefix);
 
@@ -60,12 +66,12 @@ LIST_HEAD(mip6_prefix_list, mip6_prefix);
 
 struct mip6_ha {
 	LIST_ENTRY(mip6_ha) mha_entry;
-	struct in6_addr      mha_lladdr;    /* XXX link-local addr */
-	struct in6_addr      mha_gaddr;     /* XXX global addr */
-	u_int8_t             mha_flags;     /* RA flags */
-	int16_t              mha_pref;      /* preference */
-	u_int16_t            mha_lifetime;  /* HA lifetime */
-	int32_t              mha_remain;    /* remaining lifetime */
+	struct in6_addr     mha_lladdr;    /* XXX link-local addr */
+	struct in6_addr     mha_gaddr;     /* XXX global addr */
+	u_int8_t            mha_flags;     /* RA flags */
+	int16_t             mha_pref;      /* preference */
+	u_int16_t           mha_lifetime;  /* HA lifetime */
+	int32_t             mha_remain;    /* remaining lifetime */
 };
 LIST_HEAD(mip6_ha_list, mip6_ha);
 
@@ -150,7 +156,7 @@ struct mip6_bc {
 #define MIP6_BA_STATUS_RESOURCES             131
 #define MIP6_BA_STATUS_NOT_SUPPORTED         132
 #define MIP6_BA_STATUS_NOT_HOME_SUBNET       133
-#define MIP6_BA_STATUS_INCORRECT_IFID_LENGTH 136
+/* #define MIP6_BA_STATUS_INCORRECT_IFID_LENGTH 136 */
 #define MIP6_BA_STATUS_NOT_HOME_AGENT        137
 #define MIP6_BA_STATUS_DAD_FAILED            138
 #define MIP6_BA_STATUS_NO_SA                 139
@@ -167,6 +173,23 @@ LIST_HEAD(mip6_bc_list, mip6_bc);
 /* Macro for modulo 2^^8 comparison */
 #define MIP6_LEQ(a,b)   ((int8_t)((a)-(b)) <= 0)
 #endif /* MIP6_DRAFT13 */
+
+/* authdata calculation template structure */
+struct mip6_authdata_template {
+	u_int8_t mauth_src[16];
+	u_int8_t mauth_coa[16];
+	u_int8_t mauth_haddr[16];
+	u_int8_t mauth_type;
+	u_int8_t mauth_len;
+	u_int8_t mauth_flags;
+	u_int8_t mauth_reserved[2];
+	u_int8_t mauth_seqno;
+	u_int8_t mauth_lifetime[4];
+	/* followed by all the sub-options */
+	/* type of the authentication data sub-option (== 0x04) */
+	/* len  of the authentication data sub-option */
+	/* the value of SPI */
+} __attribute__((__packed__));
 
 struct mip6_config {
 	u_int32_t mcfg_debug;

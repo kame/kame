@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.12 2001/11/22 01:27:27 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.13 2001/11/29 04:38:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -77,10 +77,11 @@ mip6_prefix_init(void)
 }
 
 struct mip6_prefix *
-mip6_prefix_create(prefix, prefixlen, lifetime)
+mip6_prefix_create(prefix, prefixlen, vltime, pltime)
 	struct in6_addr *prefix;
 	u_int8_t prefixlen;
-	u_int32_t lifetime;
+	u_int32_t vltime;
+	u_int32_t pltime;
 {
 	struct mip6_prefix *mpfx;
 
@@ -95,8 +96,10 @@ mip6_prefix_create(prefix, prefixlen, lifetime)
 	bzero(mpfx, sizeof(*mpfx));
 	mpfx->mpfx_prefix = *prefix;
 	mpfx->mpfx_prefixlen = prefixlen;
-	mpfx->mpfx_lifetime = lifetime;
-	mpfx->mpfx_remain = mpfx->mpfx_lifetime;
+	mpfx->mpfx_vltime = vltime;
+	mpfx->mpfx_vlremain = mpfx->mpfx_vltime;
+	mpfx->mpfx_pltime = pltime;
+	mpfx->mpfx_plremain = mpfx->mpfx_pltime;
 	/* XXX mpfx->mpfx_haddr; */
 
 	return (mpfx);

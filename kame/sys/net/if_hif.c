@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.11 2001/11/19 08:09:37 k-sugyou Exp $	*/
+/*	$KAME: if_hif.c,v 1.12 2001/11/29 04:38:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -827,7 +827,8 @@ hif_subnet_list_update_withmpfx(sc, data)
 
 			mpfx = mip6_prefix_create(&nmpfx->mpfx_prefix,
 						  nmpfx->mpfx_prefixlen,
-						  nmpfx->mpfx_lifetime);
+						  nmpfx->mpfx_vltime,
+						  nmpfx->mpfx_pltime);
 			if (mpfx == NULL) {
 				mip6log((LOG_ERR,
 					 "%s:%d: mip6_prefix memory allocation "
@@ -889,8 +890,10 @@ hif_subnet_list_update_withmpfx(sc, data)
 			if (mpfx == NULL) {
 				return (EINVAL);
 			}
-			mpfx->mpfx_lifetime = nmpfx->mpfx_lifetime;
-			mpfx->mpfx_remain = mpfx->mpfx_lifetime;
+			mpfx->mpfx_vltime = nmpfx->mpfx_vltime;
+			mpfx->mpfx_vlremain = mpfx->mpfx_vltime;
+			mpfx->mpfx_pltime = nmpfx->mpfx_pltime;
+			mpfx->mpfx_plremain = mpfx->mpfx_pltime;
 		}
 		hs = hif_subnet_create(ms);
 		if (hs == NULL) {
@@ -922,8 +925,10 @@ hif_subnet_list_update_withmpfx(sc, data)
 		if (mpfx == NULL) {
 			return (EINVAL);
 		}
-		mpfx->mpfx_lifetime = nmpfx->mpfx_lifetime;
-		mpfx->mpfx_remain = mpfx->mpfx_lifetime;
+		mpfx->mpfx_vltime = nmpfx->mpfx_vltime;
+		mpfx->mpfx_vlremain = mpfx->mpfx_vltime;
+		mpfx->mpfx_pltime = nmpfx->mpfx_pltime;
+		mpfx->mpfx_plremain = mpfx->mpfx_pltime;
 	}
 	return (0);
 }

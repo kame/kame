@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.12 2001/11/26 10:52:22 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.13 2001/11/29 04:38:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -70,6 +70,9 @@ static int mip6_subnet_count = 0;
 
 extern struct mip6_prefix_list mip6_prefix_list;
 
+static void mip6_subnet_ha_timeout __P((struct mip6_subnet_ha *));
+static void mip6_subnet_prefix_timeout __P((struct mip6_subnet_prefix *,
+					    struct mip6_subnet_ha *));
 static void mip6_subnet_timeout __P((void *));
 static void mip6_subnet_starttimer __P((void));
 static void mip6_subnet_stoptimer __P((void));
@@ -429,8 +432,8 @@ mip6_subnet_prefix_list_get_minimum_lifetime(mspfx_list)
 			continue;
 		}
 
-		if (lifetime > mpfx->mpfx_lifetime) {
-			lifetime = mpfx->mpfx_lifetime;
+		if (lifetime > mpfx->mpfx_pltime) {
+			lifetime = mpfx->mpfx_pltime;
 		}
 	}
 	
@@ -563,9 +566,7 @@ mip6_subnet_timeout(arg)
 {
 	struct mip6_subnet *ms, *ms_next;
 	struct mip6_subnet_prefix *mspfx, *mspfx_next;
-	struct mip6_prefix *mpfx;
 	struct mip6_subnet_ha *msha, *msha_next, *msha_head;
-	struct mip6_ha *mha_head;
 	int s;
 
 	mip6_subnet_starttimer();
@@ -592,14 +593,11 @@ mip6_subnet_timeout(arg)
 			 *
 			 * mip6_ha timeout routine will be here.
 			 */
+			mip6_subnet_ha_timeout(msha);
 		}
 		msha_head = TAILQ_FIRST(&ms->ms_msha_list);
 		if (msha_head == NULL) {
 			/* no home agent is found yet. */
-			continue;
-		}
-		if ((mha_head = msha_head->msha_mha) == NULL) {
-			/* must not happen. */
 			continue;
 		}
 
@@ -608,20 +606,99 @@ mip6_subnet_timeout(arg)
 		     mspfx;
 		     mspfx = mspfx_next) {
 			mspfx_next = TAILQ_NEXT(mspfx, mspfx_entry);
-			
-			mpfx = mspfx->mspfx_mpfx;
-			if (mpfx == NULL) {
-				/* must not happen. */
-				continue;
-			}
 			/*
 			 * XXX: TODO
-			 * check timeout and send mps req if needed.
+			 * check timeout and send mp_sol if needed.
 			 */
+			mip6_subnet_prefix_timeout(mspfx, msha_head);
 		}
 	}
 
 	splx(s);
+}
+
+static void
+mip6_subnet_ha_timeout(msha)
+	struct mip6_subnet_ha *msha;
+{
+	struct mip6_ha *mha = msha->msha_mha;
+	struct hif_softc *sc;
+	struct mip6_bu *mbu;
+	int error;
+
+	if (mha == NULL) {
+		/* must not happen. */
+		return;
+	}
+
+	if (!(mha->mha_flags & ND_RA_FLAG_HOME_AGENT)) {
+		/* this is not a home agent. */
+		return;
+	}
+
+#if 0 /* stop temporally */
+	/* count down the remaining lifetime of each home agent. */
+	mha->mha_remain -= MIP6_SUBNET_TIMEOUT_INTERVAL;
+#endif
+	if (mha->mha_remain < 0) {
+		/* lifetime expired. */
+		for (sc = TAILQ_FIRST(&hif_softc_list);
+		     sc;
+		     sc = TAILQ_NEXT(sc, hif_entry)) {
+			/*
+			 * set in6addr_any as a home agent address for
+			 * each binding update entry that are using
+			 * the expired home agent address.
+			 */
+			for (mbu = LIST_FIRST(&sc->hif_bu_list);
+			     mbu;
+			     mbu = LIST_NEXT(mbu, mbu_entry)) {
+				if ((mbu->mbu_flags & IP6_BUF_HOME) == 0) {
+					/*
+					 * this is not a home
+					 * registration entry.
+					 */
+					continue;
+				}
+				if (IN6_ARE_ADDR_EQUAL(&mbu->mbu_paddr,
+						       &mha->mha_gaddr)) {
+					/* this home agent has expired. */
+					mbu->mbu_paddr = in6addr_any;
+				}
+			}
+		}
+		error = mip6_ha_list_remove(&mip6_ha_list, mha);
+		if (error) {
+			mip6log((LOG_ERR,
+				 "%s:%d: mha deletion failed (code %d).\n",
+				 __FILE__, __LINE__, error));
+		}
+	}
+}
+
+static void
+mip6_subnet_prefix_timeout(mspfx, msha)
+	struct mip6_subnet_prefix *mspfx;
+	struct mip6_subnet_ha *msha;
+{
+	struct mip6_prefix *mpfx = mspfx->mspfx_mpfx;
+	struct mip6_ha *mha = msha->msha_mha;
+
+	if ((mpfx == NULL) || (mha == NULL)) {
+		/* must not happen. */
+		return;
+	}
+
+#if 0 /* stop temporally.  until mobile prefix adv is implemented. */
+	/* decrease remaining lifetime of this prefix. */
+	mpfx->mpfx_vlremain -= MIP6_SUBNET_TIMEOUT_INTERVAL;
+	mpfx->mpfx_plremain -= MIP6_SUBNET_TIMEOUT_INTERVAL;
+#endif
+
+	 /* XXX: TODO */
+	if (mpfx->mpfx_plremain < (mpfx->mpfx_plremain / 2)) {
+		mip6_icmp6_mp_sol_output(mpfx, mha);
+	}
 }
 
 static void

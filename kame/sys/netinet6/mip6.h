@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.30 2001/11/22 01:27:27 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.31 2001/11/29 04:38:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -160,6 +160,8 @@ int mip6_route_optimize			__P((struct mbuf *));
 int mip6_icmp6_input			__P((struct mbuf *, int, int));
 int mip6_icmp6_tunnel_input		__P((struct mbuf *, int, int));
 int mip6_icmp6_ha_discov_req_output	__P((struct hif_softc *));
+int mip6_icmp6_mp_sol_output		__P((struct mip6_prefix *,
+					     struct mip6_ha *));
 #if 0
 int mip6_tunneled_rs_output		__P((struct hif_softc *,
 					     struct mip6_pfx *));
@@ -167,8 +169,8 @@ int mip6_tunneled_rs_output		__P((struct hif_softc *,
 
 /* mip6_prefix management */
 void mip6_prefix_init			__P((void));
-struct mip6_prefix *mip6_prefix_create	__P((struct in6_addr *,
-					     u_int8_t, u_int32_t));
+struct mip6_prefix *mip6_prefix_create	__P((struct in6_addr *, u_int8_t,
+					     u_int32_t, u_int32_t));
 int mip6_prefix_haddr_assign		__P((struct mip6_prefix *,
 					     struct hif_softc *));
 int mip6_prefix_list_insert		__P((struct mip6_prefix_list *,

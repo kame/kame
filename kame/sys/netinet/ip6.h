@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.24 2001/10/24 04:44:17 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.25 2001/11/29 04:38:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -237,10 +237,10 @@ struct ip6_opt_binding_update {
 #define IP6_BUF_HOME	0x40	/* Home Registration */
 #ifdef MIP6_DRAFT13
 #define IP6_BUF_ROUTER	0x20	/* Sending mobile node is a router */
-#define IP6_BUF_DAD	0x10	/* Perform Duplicate Address Detection */
 #else
-#define IP6_BUF_DAD	0x20	/* Perform Duplicate Address Detection */
+#define IP6_BUF_SINGLE	0x20	/* Update the specified address only */
 #endif /* MIP6_DRAFT13 */
+#define IP6_BUF_DAD	0x10	/* Perform Duplicate Address Detection */
 
 /* Binding Ack Option */
 struct ip6_opt_binding_ack {

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.23 2001/11/27 12:05:19 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.24 2001/11/29 04:38:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -177,8 +177,15 @@ mip6_icmp6_input(m, off, icmp6len)
 		break;
 
 	case ICMP6_MOBILEPREFIX_SOLICIT:
+		if (!MIP6_IS_HA)
+			break;
+		/* XXX: TODO */
+		break;
+
 	case ICMP6_MOBILEPREFIX_ADVERT:
-		/* XXX TODO */
+		if (!MIP6_IS_MN)
+			break;
+		/* XXX: TODO */
 		break;
 
 	case ICMP6_PARAM_PROB:
@@ -656,14 +663,6 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 
-	/* check packet length. */
-	if (icmp6len < sizeof(struct ha_discov_rep)) {
-		mip6log((LOG_ERR,
-			 "%s:%d: too short DHAAD reply.\n",
-			 __FILE__, __LINE__));
-		return (EINVAL);
-	}
-
 	ip6 = mtod(m, struct ip6_hdr *);
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
@@ -981,6 +980,78 @@ mip6_icmp6_create_linklocal(lladdr, ifid)
 	lladdr->s6_addr32[3] = ifid->s6_addr32[3];
 
 	return (0);
+}
+
+int
+mip6_icmp6_mp_sol_output(mpfx, mha)
+	struct mip6_prefix *mpfx;
+	struct mip6_ha *mha;
+{
+	struct mbuf *m;
+	struct ip6_hdr *ip6;
+	struct mobile_prefix_solicit *mp_sol;
+	int icmp6len;
+	int maxlen;
+	int error;
+	
+	/* estimate the size of message. */
+	maxlen = sizeof(*ip6) + sizeof(*mp_sol);
+	/* XXX we must determine the link type of our home address
+	   instead using hardcoded '6' */
+	maxlen += (sizeof(struct nd_opt_hdr) + 6 + 7) & ~7;
+	if (max_linkhdr + maxlen >= MCLBYTES) {
+		mip6log((LOG_ERR,
+			 "%s:%d: too large cluster reqeust.\n",
+			 __FILE__, __LINE__));
+		return (EINVAL);
+	}
+
+	/* get packet header. */
+	MGETHDR(m, M_DONTWAIT, MT_HEADER);
+	if (m && max_linkhdr + maxlen >= MHLEN) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			m_free(m);
+			m = NULL;
+		}
+	}
+	if (m == NULL)
+		return (ENOBUFS);
+	m->m_pkthdr.rcvif = NULL;
+
+	icmp6len = sizeof(*mp_sol);
+	m->m_pkthdr.len = m->m_len = sizeof(*ip6) + icmp6len;
+	m->m_data += max_linkhdr;
+
+	/* fill the mobile prefix solicitation. */
+	ip6 = mtod(m, struct ip6_hdr *);
+	ip6->ip6_flow = 0;
+	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
+	ip6->ip6_vfc |= IPV6_VERSION;
+	/* ip6->ip6_plen will be set later */
+	ip6->ip6_nxt = IPPROTO_ICMPV6;
+	ip6->ip6_hlim = ip6_defhlim;
+	ip6->ip6_src = mpfx->mpfx_haddr;
+	ip6->ip6_dst = mha->mha_gaddr;
+	mp_sol = (struct mobile_prefix_solicitation *)(ip6 + 1);
+	mp_sol->mp_sol_type = ICMP6_MOBILEPREFIX_SOLICIT;
+	mp_sol->mp_sol_code = 0;
+	mp_sol->mp_sol_reserved = 0;
+
+	/* calculate checksum. */
+	ip6->ip6_plen = htons((u_short)icmp6len);
+	mp_sol->mp_sol_cksum = 0;
+	mp_sol->mp_sol_cksum
+		= in6_cksum(m, IPPROTO_ICMPV6, sizeof(*ip6), icmp6len);
+
+	error = ip6_output(m, 0, 0, 0, 0,NULL);
+	if (error) {
+		mip6log((LOG_ERR,
+			 "%s:%d: mobile prefix sol send failed (code = %d)\n",
+			 __FILE__, __LINE__, error));
+	}
+
+	return(error);
 }
 
 #if 0

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.39 2001/11/28 06:27:50 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.40 2001/11/29 04:38:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -231,10 +231,10 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 		mbu->mbu_coa = *coa;
 		mbu->mbu_reg_state = MIP6_BU_REG_STATE_REGWAITACK;
 	}
-	if (coa_lifetime < mpfx->mpfx_lifetime) {
+	if (coa_lifetime < mpfx->mpfx_pltime) {
 		mbu->mbu_lifetime = coa_lifetime;
 	} else {
-		mbu->mbu_lifetime = mpfx->mpfx_lifetime;
+		mbu->mbu_lifetime = mpfx->mpfx_pltime;
 	}
 	mbu->mbu_remain = mbu->mbu_lifetime;
 	mbu->mbu_refresh = mbu->mbu_lifetime;
@@ -427,10 +427,10 @@ mip6_bu_list_notify_binding_change(sc)
 			mip6_bu_list_remove(&sc->hif_bu_list, mbu);
 			continue;
 		}
-		if (coa_lifetime < mpfx->mpfx_lifetime) {
+		if (coa_lifetime < mpfx->mpfx_pltime) {
 			mbu->mbu_lifetime = coa_lifetime;
 		} else {
-			mbu->mbu_lifetime = mpfx->mpfx_lifetime;
+			mbu->mbu_lifetime = mpfx->mpfx_pltime;
 		}
 		mbu->mbu_remain = mbu->mbu_lifetime;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
@@ -2137,7 +2137,7 @@ mip6_process_br(m, opt)
 		/* XXX */
 		return (0);
 	}
-	haddr_remain = mpfx->mpfx_remain;
+	haddr_remain = mpfx->mpfx_plremain;
 	coa_remain = mip6_coa_get_lifetime(&mbu->mbu_coa);
 	remain =  (haddr_remain < coa_remain)
 		? haddr_remain : coa_remain;
@@ -2799,10 +2799,10 @@ mip6_route_optimize(m)
 		 */
 		mbu->mbu_coa = hif_coa;
 		coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa);
-		if (coa_lifetime < mpfx->mpfx_lifetime) {
+		if (coa_lifetime < mpfx->mpfx_pltime) {
 			mbu->mbu_lifetime = coa_lifetime;
 		} else {
-			mbu->mbu_lifetime = mpfx->mpfx_lifetime;
+			mbu->mbu_lifetime = mpfx->mpfx_pltime;
 		}
 		mbu->mbu_remain = mbu->mbu_lifetime;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
