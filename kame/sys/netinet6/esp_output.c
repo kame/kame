@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.39 2001/02/28 13:31:59 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.40 2001/03/01 04:38:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -454,6 +454,15 @@ esp_output(m, nexthdrp, md, isr, af)
 		int m, n;
 
 		m = randpadmax;
+		/*
+		 * make sure we do not pad too much.
+		 * MLEN limitation comes from the trailer attachment
+		 * code below.
+		 * 256 limitation comes from sequential padding.
+		 * also, the 1-octet length field in ESP trailer imposes
+		 * limitation (but is less strict than sequential padding
+		 * as length field do not count the last 2 octets).
+		 */
 		if (randpadmax > MLEN)
 			randpadmax = MLEN;
 		if (randpadmax >= 256)
@@ -466,10 +475,6 @@ esp_output(m, nexthdrp, md, isr, af)
 	}
 
 #ifdef DIAGNOSTIC
-	/*
-	 * MLEN limitation comes from the code fragment below.
-	 * 256 limitation comes from sequential padding.
-	 */
 	if (extendsiz > MLEN || extendsiz >= 256)
 		panic("extendsiz too big in esp_output");
 #endif
