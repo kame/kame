@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.24 2003/02/12 04:30:11 suz Exp $	*/
+/*	$KAME: rp.c,v 1.25 2003/04/30 04:49:34 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -287,20 +287,16 @@ init_bsr6()
 
 
 /*
- * XXX: This implementation is based on section 6.2 of RFC 2362, which
- * is highly dependent on IPv4.
- * We'll have to rewrite the function...
+ * based on draft-ietf-pim-sm-bsr-03.txt
  */
 u_int16
 bootstrap_initial_delay()
 {
-#if 0
     long            AddrDelay;
     long            Delay;
-    long            log_mask;
     int             log_of_2;
+    int             log_mask;
     u_int8          bestPriority;
-#endif
 
     /*
      * The bootstrap timer initial value (if Cand-BSR). It depends of the
@@ -309,34 +305,46 @@ bootstrap_initial_delay()
      * Delay = 5 + 2*log_2(1 + bestPriority - myPriority) + AddrDelay;
      * 
      * bestPriority = Max(storedPriority, myPriority); if (bestPriority ==
-     * myPriority) AddrDelay = log_2(bestAddr - myAddr)/16; else AddrDelay =
-     * 2 - (myAddr/2^31);
+     * myPriority) AddrDelay = log_2(bestAddr - myAddr)/64; else AddrDelay =
+     * 2 - (myAddr/2^127);
      */
 
-#if 0
     bestPriority = max(curr_bsr_priority, my_bsr_priority);
-    if (bestPriority == my_bsr_priority)
-    {
-	AddrDelay = ntohl(curr_bsr_address) - ntohl(my_bsr_address);
-	/* Calculate the integer part of log_2 of (bestAddr - myAddr) */
+    if (bestPriority == my_bsr_priority) {
+	char *curr = (char *) &curr_bsr_address.sin6_addr;
+	char *my = (char *) &my_bsr_address.sin6_addr;
+	int i, j;
+
 	/*
+	 * Calculate the integer part of log_2 of (bestAddr - myAddr).
 	 * To do so, have to find the position number of the first bit from
 	 * left which is `1`
 	 */
-	log_mask = sizeof(AddrDelay) << 3;
-	log_mask = (1 << (log_mask - 1));	/* Set the leftmost bit to
-						 * `1` */
-	for (log_of_2 = (sizeof(AddrDelay) << 3) - 1; log_of_2; log_of_2--)
-	{
-	    if (AddrDelay & log_mask)
-		break;
-	    else
-		log_mask >>= 1;	/* Start shifting `1` on right */
+	log_of_2 = 128;
+	for (i = 0; i < 16; i++) {
+	    char mask;
+	    int diff;
+
+	    diff = *curr++ - *my++;
+	    if (diff < 0)
+		log(LOG_ERR, 0, "curr_bsr < my_bsr, impossible!");
+	    if (diff == 0) {
+		log_of_2 -= 8;
+		continue;
+	    }
+
+	    for (j = 0; j < 8; j++) {
+		mask = 0x80 >> j;
+		if ((mask & diff) == 0)
+			log_of_2--;
+			continue;
+	    }
+	    break;
 	}
-	AddrDelay = log_of_2 / 16;
+	AddrDelay = log_of_2 / 64;
+    } else {
+	AddrDelay = 2 - (my_bsr_address.sin6_addr.s6_addr[0] >> 7);
     }
-    else
-	AddrDelay = 2 - (ntohl(my_bsr_address) / (1 << 31));
 
     Delay = 1 + bestPriority - my_bsr_priority;
     /* Calculate log_2(Delay) */
@@ -344,20 +352,14 @@ bootstrap_initial_delay()
     log_mask = sizeof(Delay) << 3;
     log_mask = (1 << (log_mask - 1)); 	
 
-    for (log_of_2 = (sizeof(Delay) << 3) - 1; log_of_2; log_of_2--)
-    {
+    for (log_of_2 = (sizeof(Delay) << 3) - 1; log_of_2; log_of_2--) {
 	if (Delay & log_mask)
 	    break;
-	else
-	    log_mask >>= 1;	/* Start shifting `1` on right */
+	log_mask >>= 1;	/* Start shifting `1` on right */
     }
 
     Delay = 5 + 2 * Delay + AddrDelay;
     return (u_int16) Delay;
-#endif
-
-	/* Temporary implementation */
-	return (RANDOM()%my_bsr_period);
 }
 
 
