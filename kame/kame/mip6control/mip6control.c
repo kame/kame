@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.25 2002/05/14 13:37:05 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.26 2002/06/10 02:26:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -505,7 +505,7 @@ main(argc, argv)
 			       : (mbu->mbu_ackexpire - time.tv_sec), /* XXX */
 			       mbu->mbu_seqno,
 			       buflg_sprintf(mbu->mbu_flags),
-			       mbu->mbu_reg_state,
+			       mbu->mbu_fsm_state,
 			       bustate_sprintf(mbu->mbu_state));
 		}
 	}
