@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.14 2000/02/08 18:36:22 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.15 2000/02/09 05:18:08 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -370,23 +370,61 @@ agg_i2send(iph1, msg)
 	if (iph1->hash == NULL)
 		goto end;
 
-	/* create buffer to send isakmp payload */
-	tlen = sizeof(struct isakmp)
-		+ sizeof(*gen) + iph1->hash->l;
-	iph1->sendbuf = vmalloc(tlen);
-	if (iph1->sendbuf == NULL) {
-		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
-		goto end;
+	tlen = sizeof(struct isakmp);
+
+	switch (iph1->approval->authmethod) {
+	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
+		tlen += sizeof(*gen) + iph1->hash->l;
+
+		iph1->sendbuf = vmalloc(tlen);
+		if (iph1->sendbuf == NULL) {
+			plog(logp, LOCATION, NULL,
+				"vmalloc (%s)\n", strerror(errno));
+			goto end;
+		}
+
+		/* set isakmp header */
+		p = set_isakmp_header(iph1->sendbuf, iph1, ISAKMP_NPTYPE_HASH);
+		if (p == NULL)
+			goto end;
+
+		/* set HASH payload */
+		p = set_isakmp_payload(p, iph1->hash, ISAKMP_NPTYPE_NONE);
+		break;
+#ifdef HAVE_SIGNING_C
+	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
+	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
+		/* XXX if there is CR or not ? */
+
+		if (oakley_getmycert(iph1) < 0)
+			goto end;
+
+		if (oakley_getsign(iph1) < 0)
+			goto end;
+
+		tlen += sizeof(*gen) + iph1->sig->l;
+		if (iph1->cert != NULL)
+			tlen += sizeof(*gen) + iph1->cert->l;
+
+		/* set isakmp header */
+		p = set_isakmp_header(iph1->sendbuf, iph1, iph1->cert != NULL
+							? ISAKMP_NPTYPE_CERT
+							: ISAKMP_NPTYPE_SIG);
+		if (p == NULL)
+			goto end;
+
+		/* add CERT payload if there */
+		if (iph1->cert != NULL)
+			p = set_isakmp_payload(p, iph1->cert, ISAKMP_NPTYPE_SIG);
+		/* add SIG payload */
+		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);
+		break;
+	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
+	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
+		tlen += sizeof(*gen) + iph1->hash->l;
+		break;
 	}
-
-	/* set isakmp header */
-	p = set_isakmp_header(iph1->sendbuf, iph1, ISAKMP_NPTYPE_HASH);
-	if (p == NULL)
-		goto end;
-
-	/* set HASH payload */
-	p = set_isakmp_payload(p, iph1->hash, ISAKMP_NPTYPE_NONE);
+#endif
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
@@ -613,49 +651,120 @@ agg_r1send(iph1, msg)
 	if (iph1->hash == NULL)
 		goto end;
 
-	/* create buffer to send isakmp payload */
-	tlen = sizeof(struct isakmp)
-		+ sizeof(*gen) + iph1->sa_ret->l
-		+ sizeof(*gen) + iph1->dhpub->l
-		+ sizeof(*gen) + iph1->nonce->l
-		+ sizeof(*gen) + iph1->id->l
-		+ sizeof(*gen) + iph1->hash->l;
-	if (lcconf->vendorid) {
-		vidhash = oakley_hash(lcconf->vendorid, iph1);
-		tlen += sizeof(*gen) + vidhash->l;
+	tlen = sizeof(struct isakmp);
+
+	switch (iph1->approval->authmethod) {
+	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
+		/* create buffer to send isakmp payload */
+		tlen += sizeof(*gen) + iph1->sa_ret->l
+			+ sizeof(*gen) + iph1->dhpub->l
+			+ sizeof(*gen) + iph1->nonce->l
+			+ sizeof(*gen) + iph1->id->l
+			+ sizeof(*gen) + iph1->hash->l;
+		if (lcconf->vendorid) {
+			vidhash = oakley_hash(lcconf->vendorid, iph1);
+			tlen += sizeof(*gen) + vidhash->l;
+		}
+
+		iph1->sendbuf = vmalloc(tlen);
+		if (iph1->sendbuf == NULL) { 
+			plog(logp, LOCATION, NULL,
+				"vmalloc (%s)\n", strerror(errno));
+			goto end;
+		}
+
+		/* set isakmp header */
+		p = set_isakmp_header(iph1->sendbuf, iph1, ISAKMP_NPTYPE_SA);
+		if (p == NULL)
+			goto end;
+
+		/* set SA payload to reply */
+		p = set_isakmp_payload(p, iph1->sa_ret, ISAKMP_NPTYPE_KE);
+
+		/* create isakmp KE payload */
+		p = set_isakmp_payload(p, iph1->dhpub, ISAKMP_NPTYPE_NONCE);
+
+		/* create isakmp NONCE payload */
+		p = set_isakmp_payload(p, iph1->nonce, ISAKMP_NPTYPE_ID);
+
+		/* create isakmp ID payload */
+		p = set_isakmp_payload(p, iph1->id, ISAKMP_NPTYPE_HASH);
+
+		/* create isakmp HASH payload */
+		p = set_isakmp_payload(p, iph1->hash,
+			vidhash ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
+
+		/* append vendor id, if needed */
+		if (vidhash)
+			p = set_isakmp_payload(p, vidhash, ISAKMP_NPTYPE_NONE);
+		break;
+#ifdef HAVE_SIGNING_C
+	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
+	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
+		/* XXX if there is CR or not ? */
+
+		if (oakley_getmycert(iph1) < 0)
+			goto end;
+
+		if (oakley_getsign(iph1) < 0)
+			goto end;
+
+		tlen = + sizeof(*gen) + iph1->sa_ret->l
+			+ sizeof(*gen) + iph1->dhpub->l
+			+ sizeof(*gen) + iph1->nonce->l
+			+ sizeof(*gen) + iph1->id->l
+			+ sizeof(*gen) + iph1->sig->l;
+		if (iph1->cert != NULL)
+			tlen += sizeof(*gen) + iph1->cert->l;
+		if (lcconf->vendorid) {
+			vidhash = oakley_hash(lcconf->vendorid, iph1);
+			tlen += sizeof(*gen) + vidhash->l;
+		}
+
+		iph1->sendbuf = vmalloc(tlen);
+		if (iph1->sendbuf == NULL) { 
+			plog(logp, LOCATION, NULL,
+				"vmalloc (%s)\n", strerror(errno));
+			goto end;
+		}
+
+		/* set isakmp header */
+		p = set_isakmp_header(iph1->sendbuf, iph1, ISAKMP_NPTYPE_SA);
+		if (p == NULL)
+			goto end;
+
+		/* set SA payload to reply */
+		p = set_isakmp_payload(p, iph1->sa_ret, ISAKMP_NPTYPE_KE);
+
+		/* create isakmp KE payload */
+		p = set_isakmp_payload(p, iph1->dhpub, ISAKMP_NPTYPE_NONCE);
+
+		/* create isakmp NONCE payload */
+		p = set_isakmp_payload(p, iph1->nonce, ISAKMP_NPTYPE_ID);
+
+		/* add ID payload */
+		p = set_isakmp_payload(p, iph1->id, iph1->cert != NULL
+							? ISAKMP_NPTYPE_CERT
+							: ISAKMP_NPTYPE_SIG);
+
+		/* add CERT payload if there */
+		if (iph1->cert != NULL)
+			p = set_isakmp_payload(p, iph1->cert, ISAKMP_NPTYPE_SIG);
+		/* add SIG payload */
+		p = set_isakmp_payload(p, iph1->sig,
+			vidhash ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
+
+		/* append vendor id, if needed */
+		if (vidhash)
+			p = set_isakmp_payload(p, vidhash, ISAKMP_NPTYPE_NONE);
+		break;
+#endif
+	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
+	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
+		tlen += sizeof(*gen) + iph1->hash->l;
+		break;
 	}
 
-	iph1->sendbuf = vmalloc(tlen);
-	if (iph1->sendbuf == NULL) { 
-		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
-		goto end;
-	}
-
-	/* set isakmp header */
-	p = set_isakmp_header(iph1->sendbuf, iph1, ISAKMP_NPTYPE_SA);
-	if (p == NULL)
-		goto end;
-
-	/* set SA payload to reply */
-	p = set_isakmp_payload(p, iph1->sa_ret, ISAKMP_NPTYPE_KE);
-
-	/* create isakmp KE payload */
-	p = set_isakmp_payload(p, iph1->dhpub, ISAKMP_NPTYPE_NONCE);
-
-	/* create isakmp NONCE payload */
-	p = set_isakmp_payload(p, iph1->nonce, ISAKMP_NPTYPE_ID);
-
-	/* create isakmp ID payload */
-	p = set_isakmp_payload(p, iph1->id, ISAKMP_NPTYPE_HASH);
-
-	/* create isakmp HASH payload */
-	p = set_isakmp_payload(p, iph1->hash,
-		vidhash ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
-
-	/* append vendor id, if needed */
-	if (vidhash)
-		p = set_isakmp_payload(p, vidhash, ISAKMP_NPTYPE_NONE);
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 1);

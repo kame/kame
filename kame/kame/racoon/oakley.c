@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.12 2000/02/08 18:36:23 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.13 2000/02/09 05:18:09 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -105,6 +105,7 @@ static struct cipher_algorithm cipher[] = {
 };
 
 static int oakley_compute_keymat_x __P((struct ph2handle *iph2, int side, int sa_dir));
+static char *oakley_getidstr __P((char *id, int len));
 
 int
 oakley_get_defaultlifetime()
@@ -1011,12 +1012,13 @@ int
 oakley_validate_auth(iph1)
 	struct ph1handle *iph1;
 {
+	vchar_t *my_hash = NULL;
+
 	switch (iph1->approval->authmethod) {
 	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
 		/* validate HASH */
 	    {
 		char *r_hash;
-		vchar_t *my_hash = NULL;
 		int result;
 
 		if (iph1->id_p == NULL || iph1->pl_hash == NULL) {
@@ -1067,93 +1069,86 @@ oakley_validate_auth(iph1)
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
 	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
 	    {
-		vchar_t *my_hash = NULL;
-		char *signer_name = NULL;
-		void *certificate = NULL;
-		void *signature = NULL;
-		int signature_size = 0;
+		char *idstr = NULL;
 		int error;
 
 		/* validate SIG & CERT */
-		if (iph1->id_p == NULL || iph1->pl_sig == NULL) {
+		if (iph1->id_p == NULL || iph1->sig_p == NULL) {
 			plog(logp, LOCATION, iph1->remote,
 				"few isakmp message received.\n");
 			return -1;
 		}
-
-		/* MS&I: We validate CERT and SIG, calling cryptlib via
-		 * check_certificate and check_signature calls Depending on
-		 * the success of this section, the issue must reject the all
-		 * packet (goto end;) or proceed.
-		 * Possible error to notify:
-		 * AKMP_NTYPE_INVALID_SIGNATURE
-		 * AKMP_NTYPE_AUTHENTICATION_FAILED
-		 * AKMP_NTYPE_INVALID_CERT_AUTHORITY
-		 * AKMP_NTYPE_INVALID_CERTIFICATE
-		 * AKMP_NTYPE_INVALID_CERT_ENCODING
-		 */
-		/* Getting back the signer identifier from id payload: */
-		signer_name = malloc(iph1->id_p->l-sizeof(u_int32_t)+1);
-		if (signer_name == NULL) {
+		if (iph1->cert_p == NULL && iph1->pl_cr != NULL) {
 			plog(logp, LOCATION, NULL,
-				"malloc (%s)\n", strerror(errno));
+				"no CERT payload found even though CR sent.\n");
 			return -1;
 		}
-		memcpy(signer_name, iph1->id_p->v+(sizeof(u_int32_t)),
-			iph1->id_p->l-sizeof(u_int32_t));
-		*(signer_name + iph1->id_p->l - sizeof(u_int32_t)) = '\0';
 
-		if (iph1->pl_cert) {
-			int certificate_size;
-			int error;
-
-			certificate_size = ntohs(iph1->pl_cert->h.len)
-				- sizeof(struct isakmp_gen)
-				- sizeof(u_int8_t);
-
-			certificate = (void *)
-				((caddr_t)&(iph1->pl_cert->encode)
-				+ sizeof(u_int8_t));
-
-				error = check_certificate(signer_name,
-						certificate,
-						certificate_size);
-			if (error) {
-				plog(logp, LOCATION, NULL, "CERT mismatch.\n");
-				return ISAKMP_NTYPE_INVALID_CERTIFICATE;
-			}
+		idstr = oakley_getidstr(iph1->id_p->v, iph1->id_p->l);
+		if (idstr == NULL) {
 			plog(logp, LOCATION, NULL,
-				"Certificate Authenticated\n");
-		}
-		/*
-		 * When no certificate is sent as a payload, there must be a
-		 * local public key certificate to verify the signature, and
-		 * this cerificate should be verified by the CA too. So we do.
-		 */
-		else {
-			int size, res;
-
-			if (get_certificate(signer_name, &size, (char **) &certificate)) {
-				printf("No local user certificate grabbed "
-					"to verify signature: Stop.\n");
-				return -1;
-			}
-			res = check_certificate(signer_name, certificate, size);
-			if (certificate) {
-				printf("b\n");
-				free(certificate);
-			}
-			if (res != 0) {
-				printf("Local user certificate grabbed to "
-					"verify signature is not valid! Stop.\n");
-				return -1;
-			}
+				"failed to get idstr name\n");
+			return -1;
 		}
 
-		signature = (char *)((void *)iph1->pl_sig + sizeof(struct isakmp_gen));
-		signature_size = ntohs(iph1->pl_sig->h.len)
-				- sizeof(struct isakmp_gen);
-		
+		/* get peer's certificate if no there */
+		if (iph1->cert_p == NULL) {
+			char path[MAXPATHLEN];
+			vchar_t *cert;
+
+			switch (iph1->rmconf->certtype) {
+			case ISAKMP_CERT_X509SIGN:
+				/* make public file name */
+				snprintf(path, sizeof(path), "%s/%s/%s/%s",
+					lcconf->pathinfo[LC_PATHTYPE_CERT],
+					s_ipsecdoi_ident(iph1->rmconf->identtype),
+					idstr, CERTFILE);
+				cert = eay_get_x509cert(path);
+				break;
+			default:
+				plog(logp, LOCATION, NULL,
+					"not supported certtype %d\n",
+					iph1->rmconf->certtype);
+				free(idstr);
+				return -1;
+			}
+
+			if (cert == NULL) {
+				plog(logp, LOCATION, NULL,
+					"failed to get peer's CERT.\n");
+				free(idstr);
+				return -1;
+			}
+
+			iph1->cert_p = vmalloc(cert->l + 1);
+			if (iph1->cert_p == NULL) {
+				plog(logp, LOCATION, NULL,
+					"vmalloc (%s)\n", strerror(errno));
+				free(idstr);
+				vfree(cert);
+				return -1;
+			}
+			memcpy(iph1->cert_p->v + 1, cert->v, cert->l);
+			iph1->cert_p->v[0] = iph1->rmconf->certtype;
+
+			YIPSDEBUG(DEBUG_CERT,
+				plog(logp, LOCATION, NULL, "get peer's CERT:"));
+			YIPSDEBUG(DEBUG_DCERT, PVDUMP(iph1->cert_p));
+		}
+
+		/* check certificate */
+		error = eay_check_x509cert(idstr,
+				iph1->cert_p->v[0],
+				iph1->cert_p->v + 1,
+				iph1->cert_p->l - 1);
+		if (error != 0) {
+			plog(logp, LOCATION, NULL, "CERT mismatch.\n");
+			return ISAKMP_NTYPE_INVALID_CERTIFICATE;
+		}
+		YIPSDEBUG(DEBUG_CERT,
+			plog(logp, LOCATION, NULL,
+				"Certificate Authenticated\n"));
+
 		switch (iph1->etype) {
 		case ISAKMP_ETYPE_IDENT:
 		case ISAKMP_ETYPE_AGG:
@@ -1173,15 +1168,22 @@ oakley_validate_auth(iph1)
 		if (my_hash == NULL)
 			return -1;
 
-		error = check_signature((void *)(my_hash->v),
-						(int)(my_hash->l),
-						signer_name,
-						signature,
-						signature_size);
+		switch (iph1->rmconf->certtype) {
+		case ISAKMP_CERT_X509SIGN:
+			error = eay_check_x509sign(my_hash,
+					iph1->sig_p,
+					iph1->cert_p);
+			break;
+		default:
+			plog(logp, LOCATION, NULL,
+				"no supported certtype %d\n",
+				iph1->rmconf->certtype);
+			return -1;
+		}
+
 		vfree(my_hash);
-		if (signer_name)
-			free(signer_name);
-		if (error) {
+		free(idstr);
+		if (error != 0) {
 			plog(logp, LOCATION, NULL, "SIG mismatch.\n");
 			return ISAKMP_NTYPE_INVALID_SIGNATURE;
 		}
@@ -1211,70 +1213,148 @@ oakley_validate_auth(iph1)
 }
 
 #ifdef HAVE_SIGNING_C
-/* get certificate */
+/* get my certificate
+ * NOTE: include certificate type.
+ */
 int
-oakley_getcert(iph1)
+oakley_getmycert(iph1)
 	struct ph1handle *iph1;
 {
-	char *signer;
-	char *sig = NULL;
-	int signature_size = 0;
-	char *certificate = NULL;
-	int certificate_size = 0;
+	char path[MAXPATHLEN];
+	char *idstr = NULL;
+	vchar_t *cert = NULL;
+	int error = -1;
 
-	/* signature */
-	signer = malloc(iph1->id->l - sizeof(struct ipsecdoi_id_b) + 1);
-	if (signer == NULL) {
-		plog(logp, LOCATION, NULL, "malloc (%s)\n", strerror(errno));
+	idstr = oakley_getidstr(iph1->id->v, iph1->id->l);
+	if (idstr == NULL) {
+		plog(logp, LOCATION, NULL, "failed to get idstr name\n");
 		return -1;
 	}
-	memcpy(signer, iph1->id->v + sizeof(struct ipsecdoi_id_b),
-		iph1->id->l - sizeof(struct ipsecdoi_id_b));
-	signer[iph1->id->l - sizeof(struct ipsecdoi_id_b)] = '\0';
+	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL, "get idstr:"));
+	YIPSDEBUG(DEBUG_DCERT, hexdump(idstr, strlen(idstr)));
 
-	if (sign((void *)iph1->hash->v,
-			iph1->hash->l,
-			signer,
-			&sig,
-			(int *)&signature_size) < 0) {
-		printf("Signing error!!! Stop.\n");
-		free(signer);
-		return -1;
+	switch (iph1->rmconf->certtype) {
+	case ISAKMP_CERT_X509SIGN:
+		/* make public file name */
+		snprintf(path, sizeof(path), "%s/%s/%s/%s",
+			lcconf->pathinfo[LC_PATHTYPE_CERT],
+			s_ipsecdoi_ident(iph1->rmconf->identtype),
+			idstr, CERTFILE);
+		cert = eay_get_x509cert(path);
+		break;
+	default:
+		goto end;
 	}
 
-	iph1->sig = vmalloc(signature_size);
-	if (iph1->sig == NULL) {
-		plog(logp, LOCATION, NULL, "vmalloc (%s)\n", strerror(errno));
-		free(signer);
-		return -1;
-	}
-	memcpy(iph1->sig->v, sig, iph1->sig->l);
-
-	/* certificate */
-	if (get_certificate(signer,
-			(int *)&certificate_size, &certificate)) {
-		printf("No local user certificate grabbed: going on "
-			"still, no cert payload will be sent.\n");
-		return 0;
+	if (cert == NULL) {
+		plog(logp, LOCATION, NULL, "failed to get my certificate.\n");
+		goto end;
 	}
 
-	/* XXX ???
-	 * else there IS a local certificate: we could CA-validate it,
-	 * but leave this to the receiver
-	 */
-
-	iph1->cert = vmalloc(certificate_size + 1);
+	iph1->cert = vmalloc(cert->l + 1);
 	if (iph1->cert == NULL) {
 		plog(logp, LOCATION, NULL, "vmalloc (%s)\n", strerror(errno));
-		free(signer);
+		goto end;
+	}
+	memcpy(iph1->cert->v + 1, cert->v, cert->l);
+	iph1->cert->v[0] = iph1->rmconf->certtype;
+
+	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL, "get CERT:"));
+	YIPSDEBUG(DEBUG_DCERT, PVDUMP(iph1->cert));
+
+	error = 0;
+
+end:
+	if (cert != NULL)
+		vfree(cert);
+	if (idstr != NULL)
+		free(idstr);
+
+	return error;
+}
+
+/* get signature */
+int
+oakley_getsign(iph1)
+	struct ph1handle *iph1;
+{
+	char path[MAXPATHLEN];
+	char *idstr = NULL;
+	vchar_t *privkey = NULL;
+	int error = -1;
+
+	idstr = oakley_getidstr(iph1->id->v, iph1->id->l);
+	if (idstr == NULL) {
+		plog(logp, LOCATION, NULL, "failed to get idstr name\n");
 		return -1;
 	}
+	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL, "get idstr:"));
+	YIPSDEBUG(DEBUG_DCERT, hexdump(idstr, strlen(idstr)));
 
-	/* XXX to be configurable ! */
-	iph1->cert->v[0] = ISAKMP_CERT_X509SIGN;
-	memcpy(iph1->cert->v + 1, certificate, certificate_size);
+	switch (iph1->rmconf->certtype) {
+	case ISAKMP_CERT_X509SIGN:
+		/* make private file name */
+		snprintf(path, sizeof(path), "%s/%s/%s/%s",
+			lcconf->pathinfo[LC_PATHTYPE_CERT],
+			s_ipsecdoi_ident(iph1->rmconf->identtype),
+			idstr, PRIVKEYFILE);
+		privkey = eay_get_asn1privkey(path);
+		if (privkey == NULL) {
+			plog(logp, LOCATION, NULL,
+				"failed to get private key.\n");
+			goto end;
+		}
 
-	return 0;
+		iph1->sig = eay_get_x509sign(iph1->hash, privkey, iph1->cert);
+		break;
+	default:
+		goto end;
+	}
+
+	if (iph1->sig == NULL) {
+		plog(logp, LOCATION, NULL, "failed to sign.\n");
+		goto end;
+	}
+
+	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL, "SIGN computed:"));
+	YIPSDEBUG(DEBUG_DCERT, PVDUMP(iph1->sig));
+
+	error = 0;
+
+end:
+	if (privkey != NULL)
+		vfree(privkey);
+	if (idstr != NULL)
+		free(idstr);
+
+	return error;
+}
+
+/* get idstr name from ID payload */
+static char *
+oakley_getidstr(id, len)
+	char *id;
+	int len;
+{
+	char *idstr;
+	int idstrlen;
+
+	if (len < sizeof(struct ipsecdoi_id_b)) {
+		plog(logp, LOCATION, NULL, "Invalid ID payload length\n");
+		return NULL;
+	}
+
+	idstrlen = len - sizeof(struct ipsecdoi_id_b);
+
+	idstr = malloc(idstrlen + 1);
+	if (idstr == NULL) {
+		plog(logp, LOCATION, NULL, "malloc (%s)\n", strerror(errno));
+		return NULL;
+	}
+	memcpy(idstr, id + sizeof(struct ipsecdoi_id_b), idstrlen);
+	idstr[idstrlen] = '\0';
+
+	return idstr;
 }
 #endif
 

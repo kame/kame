@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.10 2000/02/08 12:52:06 itojun Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.11 2000/02/09 05:18:06 sakane Exp $ */
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -36,6 +36,26 @@
 
 /* get openssl/ssleay version number */
 #ifdef INCLUDE_PATH_OPENSSL
+# ifdef HAVE_OPENSSL_OPENSSLV_H
+#  include <openssl/opensslv.h>
+#  define SSLVER	OPENSSL_VERSION_NUMBER
+# endif
+#else
+# ifdef HAVE_OPENSSLV_H
+#  include <opensslv.h>
+#  define SSLVER	OPENSSL_VERSION_NUMBER
+# else
+#  ifdef HAVE_CVERSION_H
+#   include <cversion.h>
+#   define SSLVER	SSLEAY_VERSION_NUMBER
+#  endif
+# endif
+#endif
+
+#ifdef INCLUDE_PATH_OPENSSL
+#include <openssl/pem.h>
+#include <openssl/evp.h>
+#include <openssl/x509.h>
 #include <openssl/bn.h>
 #include <openssl/dh.h>
 #include <openssl/md5.h>
@@ -49,7 +69,11 @@
 #include <openssl/rc5.h>
 #endif
 #include <openssl/cast.h>
+#include <openssl/err.h>
 #else
+#include <pem.h>
+#include <evp.h>
+#include <x509.h>
 #include <bn.h>
 #include <dh.h>
 #include <md5.h>
@@ -63,6 +87,7 @@
 #include <rc5.h>
 #endif
 #include <cast.h>
+#include <err.h>
 #endif
 
 #include "var.h"
@@ -75,6 +100,297 @@
  * I hate to cast every parameter to des_xx into void *, but it is
  * necessary for SSLeay/OpenSSL portability.  It sucks.
  */
+
+/* X509 Certificate */
+/*
+ * get a certificate
+ * first, trying to get PEM format.  Next DER format.
+ * Input:
+ *	path to a certificate.
+ * Output:
+ *	NULL if error occured
+ *	other is the cert.
+ */
+vchar_t *
+eay_get_x509cert(path)
+	char *path;
+{
+	FILE *fp;
+	X509 *x509;
+	vchar_t *cert;
+	u_char *bp;
+	int len;
+	int error;
+
+	/* Read private key */
+	fp = fopen (path, "r");
+	if (fp == NULL)
+		return NULL;
+#if (defined(SSLVER) && SSLVER >= 94)
+	x509 = PEM_read_X509(fp, NULL, NULL, NULL);
+#else
+	x509 = PEM_read_X509(fp, NULL, NULL);
+#endif
+	fclose (fp);
+
+	if (x509 == NULL) {
+		fp = fopen (path, "r");
+		if (fp == NULL)
+			return NULL;
+		x509 = d2i_X509_fp(fp, NULL);
+		fclose (fp);
+		if (x509 == NULL)
+			return NULL;
+	}
+
+	len = i2d_X509(x509, NULL);
+	cert = vmalloc(len);
+	if (cert == NULL) {
+		X509_free(x509);
+		return NULL;
+	}
+	bp = cert->v;
+	error = i2d_X509(x509, &bp);
+	X509_free(x509);
+
+	if (error == 0)
+		return NULL;
+
+	return cert;
+}
+
+/*
+ * sign a souce by X509 signature.
+ * XXX: to be get hash type from my cert ?
+ *	to be handled EVP_dss().
+ */
+vchar_t *
+eay_get_x509sign(source, privkey, cert)
+	vchar_t *source;
+	vchar_t *privkey;
+	vchar_t *cert;
+{
+	EVP_MD_CTX md_ctx;
+	EVP_PKEY *evp;
+	u_char *bp;
+	char sigbuf[BUFSIZE];
+	int siglen;
+	vchar_t *sig = NULL;
+	int error;
+
+	bp = privkey->v;
+
+	/* XXX to be handled EVP_PKEY_DSA */
+	evp = d2i_PrivateKey(EVP_PKEY_RSA, NULL, &bp, privkey->l);
+	if (evp == NULL)
+		return NULL;
+
+	/* XXX: to be handled EVP_dss() */
+	/* XXX: Where can I get such parameters ?  From my cert ? */
+	/* XXX: How can I get a length of signed buffer */
+	EVP_SignInit(&md_ctx, EVP_md5());
+	EVP_SignUpdate(&md_ctx, source->v, source->l);
+	siglen = sizeof(sigbuf);
+	error = EVP_SignFinal(&md_ctx, sigbuf, &siglen, evp);
+
+	EVP_PKEY_free(evp);
+
+	if (error != 1)
+		return NULL;
+
+	sig = vmalloc(siglen);
+	if (sig == NULL)
+		return NULL;
+	memcpy(sig->v, sigbuf, siglen);
+
+	return sig;
+}
+
+/*
+ * check a X509 signature
+ *	XXX: to be get hash type from my cert ?
+ *		to be handled EVP_dss().
+ * OUT: return -1 when error.
+ *	0
+ */
+int
+eay_check_x509sign(source, sig, cert)
+	vchar_t *source;
+	vchar_t *sig;
+	vchar_t *cert;
+{
+	X509 *x509;
+	EVP_MD_CTX md_ctx;
+	EVP_PKEY *evp;
+	u_char *bp;
+	int error;
+
+	bp = cert->v;
+	x509 = d2i_X509(&x509, &bp, cert->l);
+	if (x509 == NULL)
+		return -1;
+
+	evp = X509_get_pubkey(x509);
+	X509_free(x509);
+	if (evp == NULL)
+		return -1;
+
+	/* Verify the signature */
+	/* XXX: to be handled EVP_dss() */
+	EVP_VerifyInit(&md_ctx, EVP_md5());
+	EVP_VerifyUpdate(&md_ctx, source->v, source->l);
+	error = EVP_VerifyFinal(&md_ctx, sig->v, sig->l, evp);
+
+	EVP_PKEY_free(evp);
+
+	if (error != 1)
+		return -1;
+
+	return 0;
+}
+
+/*
+ * get ASN.1 Private Key of PEM format.
+ */
+vchar_t *
+eay_get_asn1privkey(path)
+	char *path;
+{
+	FILE *fp;
+	EVP_PKEY *evp = NULL;
+	vchar_t *pkey = NULL;
+	u_char *bp;
+	int pkeylen;
+	int error = -1;
+
+	/* Read private key */
+	fp = fopen (path, "r");
+	if (fp == NULL)
+		return NULL;
+
+#if (defined(SSLVER) && SSLVER >= 94)
+	evp = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
+#else
+	evp = PEM_read_PrivateKey(fp, NULL, NULL);
+#endif
+	fclose (fp);
+
+	if (evp == NULL)
+		return NULL;
+
+	pkeylen = i2d_PrivateKey(evp, NULL);
+	if (pkeylen == 0)
+		goto end;
+	pkey = vmalloc(pkeylen);
+	if (pkey == NULL)
+		goto end;
+	bp = pkey->v;
+	pkeylen = i2d_PrivateKey(evp, &bp);
+	if (pkeylen == 0)
+		goto end;
+
+	error = 0;
+
+end:
+	if (evp != NULL)
+		EVP_PKEY_free(evp);
+	if (error != 0 && pkey != NULL) {
+		vfree(pkey);
+		pkey = NULL;
+	}
+
+	return pkey;
+}
+
+vchar_t *
+eay_get_asn1pubkey(path)
+	char *path;
+{
+	FILE *fp;
+	EVP_PKEY *evp = NULL;
+	vchar_t *pkey = NULL;
+	X509 *x509 = NULL;
+	u_char *bp;
+	int pkeylen;
+	int error = -1;
+
+	/* Read private key */
+	fp = fopen (path, "r");
+	if (fp == NULL)
+		return NULL;
+
+#if (defined(SSLVER) && SSLVER >= 94)
+	x509 = PEM_read_X509(fp, NULL, NULL, NULL);
+#else
+	x509 = PEM_read_X509(fp, NULL, NULL);
+#endif
+	fclose (fp);
+
+	if (x509 == NULL)
+		return NULL;
+  
+	/* Get public key - eay */
+	evp = X509_get_pubkey(x509);
+	if (evp == NULL)
+		return NULL;
+
+	pkeylen = i2d_PublicKey(evp, NULL);
+	if (pkeylen == 0)
+		goto end;
+	pkey = vmalloc(pkeylen);
+	if (pkey == NULL)
+		goto end;
+	bp = pkey->v;
+	pkeylen = i2d_PublicKey(evp, &bp);
+	if (pkeylen == 0)
+		goto end;
+
+	error = 0;
+end:
+	if (evp != NULL)
+		EVP_PKEY_free(evp);
+	if (error != 0 && pkey != NULL) {
+		vfree(pkey);
+		pkey = NULL;
+	}
+
+	return pkey;
+}
+  
+/*
+ * get error string
+ * MUST load ERR_load_crypto_strings() first.
+ */
+char *
+eay_strerror()
+{
+	static char ebuf[512];
+	int len = 0;
+	unsigned long l;
+	char buf[200];
+	const char *file, *data;
+	int line, flags;
+	unsigned long es;
+
+	es = CRYPTO_thread_id();
+
+	while ((l = ERR_get_error_line_data(&file, &line, &data, &flags)) != 0){
+		len += snprintf(ebuf + len, sizeof(ebuf) - len,
+				"%lu:%s:%s:%d:%s ",
+				es, ERR_error_string(l, buf), file, line,
+				(flags & ERR_TXT_STRING) ? data : "");
+		if (sizeof(ebuf) < len)
+			break;
+	}
+
+	return ebuf;
+}
+
+void
+eay_init_error()
+{
+	ERR_load_crypto_strings();
+}
 
 /*
  * DES-CBC

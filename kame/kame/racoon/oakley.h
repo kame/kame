@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.h,v 1.6 2000/01/31 13:39:13 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.h,v 1.7 2000/02/09 05:18:09 sakane Exp $ */
 
 /* refer to RFC 2409 */
 
@@ -158,7 +158,8 @@ extern vchar_t *oakley_ph1hash_base_r __P((struct ph1handle *iph1, int sw));
 
 extern int oakley_validate_auth __P((struct ph1handle *iph1));
 #ifdef HAVE_SIGNING_C
-extern int oakley_getcert __P((struct ph1handle *iph1));
+extern int oakley_getmycert __P((struct ph1handle *iph1));
+extern int oakley_getsign __P((struct ph1handle *iph1));
 #endif
 extern int oakley_skeyid __P((struct ph1handle *iph1));
 extern int oakley_skeyid_dae __P((struct ph1handle *iph1));

@@ -26,9 +26,21 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: crypto_openssl.h,v 1.2 2000/02/08 12:52:06 itojun Exp $ */
+/* YIPS @(#)$Id: crypto_openssl.h,v 1.3 2000/02/09 05:18:07 sakane Exp $ */
 
-/* cipher */
+/* X509 Certificate */
+extern vchar_t *eay_get_x509cert __P((char *));
+extern vchar_t *eay_get_x509sign __P((vchar_t *, vchar_t *, vchar_t *));
+extern int eay_check_x509sign __P((vchar_t *, vchar_t *, vchar_t *));
+
+/* ASN.1 */
+extern vchar_t *eay_get_asn1privkey __P((char *));
+extern vchar_t *eay_get_asn1pubkey __P((char *));
+
+/* string error */
+extern char *eay_strerror __P((void));
+extern void eay_init_error __P((void));
+
 /* DES */
 extern vchar_t *eay_des_encrypt __P((vchar_t *, vchar_t *key, caddr_t));
 extern vchar_t *eay_des_decrypt __P((vchar_t *, vchar_t *key, caddr_t));
@@ -40,23 +52,23 @@ extern vchar_t *eay_idea_decrypt __P((vchar_t *, vchar_t *key, caddr_t));
 extern int eay_idea_weakkey __P((vchar_t *));
 
 /* blowfish */
-extern vchar_t *eay_bf_encrypt __P((vchar_t *, vchar_t *key, caddr_t));
-extern vchar_t *eay_bf_decrypt __P((vchar_t *, vchar_t *key, caddr_t));
+extern vchar_t *eay_bf_encrypt __P((vchar_t *, vchar_t *, caddr_t));
+extern vchar_t *eay_bf_decrypt __P((vchar_t *, vchar_t *, caddr_t));
 extern int eay_bf_weakkey __P((vchar_t *));
 
 /* RC5 */
-extern vchar_t *eay_rc5_encrypt __P((vchar_t *, vchar_t *key, caddr_t));
-extern vchar_t *eay_rc5_decrypt __P((vchar_t *, vchar_t *key, caddr_t));
+extern vchar_t *eay_rc5_encrypt __P((vchar_t *, vchar_t *, caddr_t));
+extern vchar_t *eay_rc5_decrypt __P((vchar_t *, vchar_t *, caddr_t));
 extern int eay_rc5_weakkey __P((vchar_t *));
 
 /* 3DES */
-extern vchar_t *eay_3des_encrypt __P((vchar_t *, vchar_t *key, caddr_t));
-extern vchar_t *eay_3des_decrypt __P((vchar_t *, vchar_t *key, caddr_t));
+extern vchar_t *eay_3des_encrypt __P((vchar_t *, vchar_t *, caddr_t));
+extern vchar_t *eay_3des_decrypt __P((vchar_t *, vchar_t *, caddr_t));
 extern int eay_3des_weakkey __P((vchar_t *));
 
 /* CAST */
-extern vchar_t *eay_cast_encrypt __P((vchar_t *, vchar_t *key, caddr_t));
-extern vchar_t *eay_cast_decrypt __P((vchar_t *, vchar_t *key, caddr_t));
+extern vchar_t *eay_cast_encrypt __P((vchar_t *, vchar_t *, caddr_t));
+extern vchar_t *eay_cast_decrypt __P((vchar_t *, vchar_t *, caddr_t));
 extern int eay_cast_weakkey __P((vchar_t *));
 
 /* hash */

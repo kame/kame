@@ -32,7 +32,7 @@
  * Sun Jan  9 06:23:42 JST 2000
  *    Merged into new racoon with trivial modification.
  */
-/* $Id: signing.c,v 1.10 2000/02/08 17:55:07 sakane Exp $ */
+/* $Id: signing.c,v 1.11 2000/02/09 05:18:09 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -89,6 +89,9 @@
 #include "plog.h"
 #include "debug.h"
 #include "localconf.h"
+#include "isakmp_var.h"
+#include "isakmp.h"
+#include "strnames.h"
 #include "signing.h"
 
 #ifdef WIN16
@@ -99,339 +102,37 @@
 
 BIO *bio_err=NULL;
 
-/*
- *	sign is a signature function
- *	Input: 	void *donnees_source
- *		int taille_donnees_source
- *		char *user
- *	Output:	char **signature
- *		int *taille_signature
- *
- *	user will be used to fetch the user signing key. If such user
- *	does not exist, or the key is not correctly retrieved, then "sign"
- *	returns -1. If everything goes well, it returns 0.
- */
-int
-sign(donnees_source, taille_donnees_source, user, signature, taille_signature)
-	void *donnees_source;
-	int taille_donnees_source;
-	char *user;
-	char **signature;
-	int *taille_signature;
-{
-	/* Declaration */
-	static char	keyfile[]		= USERS_PATH;
-	char		buf[BUFSIZ],
-			*sig_buf,
-			*data,
-			*sig;
-	int		err,
-			sig_len			= BUFSIZ;
-	EVP_MD_CTX	md_ctx;
-	EVP_PKEY	*pkey;
-	FILE		*fp;
-
-
-	/* Initialization */
-	ERR_load_crypto_strings();
-	data	=	&(buf[0]);
-	*data	=	'\0';
-	sig_buf	=	data + 3072;
-
-
-/* Read private key (what if it is password-ciphered?)*/
-	strcat(data, keyfile);
-	strcat(data, user);
-	strcat(data, PRIVKEYFILE);
-	fp = fopen (data, "r");
-	if (fp == NULL) return (-1);
-#if (defined(SSLVER) && SSLVER >= 0x0940)
-	pkey = (EVP_PKEY*)PEM_ASN1_read (  (char *(*)())d2i_PrivateKey,
-        	                           PEM_STRING_EVP_PKEY,
-                	                   fp,
-                        	           NULL, NULL, NULL);
-#else
-	pkey = (EVP_PKEY*)PEM_ASN1_read (  (char *(*)())d2i_PrivateKey,
-        	                           PEM_STRING_EVP_PKEY,
-                	                   fp,
-                        	           NULL, NULL);
+#if 0
+static int verify_certificate
+	__P((char *CApath, char *CAfile, char *cert_to_check));
 #endif
-	if (pkey == NULL) {  ERR_print_errors_fp (stderr);    return (-1);  }
-	fclose (fp);
-
-/* Do the signature (it only takes a private key, with no consistency to
- * whether it is consistent with the associated public key certificate or not!
- */
-	memcpy((void *) data, donnees_source, taille_donnees_source);
-	EVP_SignInit   (&md_ctx, EVP_md5());
-	EVP_SignUpdate (&md_ctx, data, taille_donnees_source);
-	err = EVP_SignFinal (	&md_ctx,
-				sig_buf, 
-				&sig_len,
-				pkey);
-	if (err != 1) {  ERR_print_errors_fp (stderr);    return (-1);  }
-	EVP_PKEY_free (pkey);
-/* End of user-signature, length sig_len, contained in sig_buf*/
-
-/* Set the output and return */
-	*taille_signature 	= 	sig_len;
-	sig		 	= 	(char *) malloc(sig_len);
-	memcpy(sig, sig_buf, sig_len);	
-	*signature	 	= 	(char *) sig;
-
-	return(0);
-}
-
-
-
-/*
- *	check_signature is a signature checking function
- *	Input: 	void *donnees_source
- *		int   taille_donnees_source
- *		char *user
- *		char *signature
- *		int taille_signature
- *
- *	user will be used to fetch the user public key certificate. If
- *	such user does not exist, or the public key is not correctly retrieved
- *	from the certificate, then "sign" returns -1. If everything goes
- *	well, it returns 0.
- */
-int
-check_signature(donnees_source, taille_donnees_source, user, signature, taille_signature)
-	void *donnees_source;
-	int taille_donnees_source;
-	char *user;
-	char *signature;
-	int taille_signature;
-{
-	/* Declaration */
-	static const char	certfile[]		= USERS_PATH;
-	char			buf[BUFSIZ],
-				*data,
-				*sig_buf;
-	int 			err;
-	EVP_MD_CTX      	md_ctx;
-	EVP_PKEY 		*pkey;
-	FILE 			*fp;
-	X509 			*x509;
-
-
-/* Initialization */
-	data = &(buf[0]);
-	*data = '\0';			// Omitting this line is bad, as strcat needs a \0 to begin copying!
-	sig_buf = data + 3072;
-
-
-/* Read the public key certificate and get the public key from the user directory*/
-	strcat(data,certfile);
-	strcat(data,user);
-	strcat(data, CERTFILE);
-	fp 	= fopen (data, "r");   if (fp == NULL) {printf("Bad user. Stop.\n");return (-1);}
-
-#if (defined(SSLVER) && SSLVER >= 0x0940)
-	x509 	= (X509 *)PEM_ASN1_read ((char *(*)())d2i_X509,
-        	                           PEM_STRING_X509,
-                	                   fp, NULL, NULL, NULL);
-#else
-	x509 	= (X509 *)PEM_ASN1_read ((char *(*)())d2i_X509,
-        	                           PEM_STRING_X509,
-                	                   fp, NULL, NULL);
-#endif
-	if (x509 == NULL) {  ERR_print_errors_fp (stderr);    return (-1);  }
-	fclose (fp);
-  	pkey	= X509_extract_key(x509);
-	if (pkey == NULL) {  ERR_print_errors_fp (stderr);    return (-1);  }
-/* Got public key from CA in pkey */
-
-
-/* Verify the signature */
-	EVP_VerifyInit   (&md_ctx, EVP_md5());
-	memcpy(data, donnees_source, taille_donnees_source);
-	memcpy(sig_buf, (void *)signature, taille_signature);
-	EVP_VerifyUpdate (&md_ctx, data, taille_donnees_source);
-	err 	= EVP_VerifyFinal (&md_ctx,
-        	                   sig_buf,
-                	           taille_signature,
-                        	   pkey);
-/* Signature verified */
-
-
-/* Returns */
-	EVP_PKEY_free (pkey);
-	if (err != 1){
-		ERR_print_errors_fp (stderr);
-		return (-1);
-	}
-	return(0);
-}
 
 #if 0
-static EVP_PKEY *
-getsecretkey(certtype, idtype, subject)
-	int certtype;
-	int idtype;
-	char *subject;
-{
-	char path[MAXPATHLEN];
-	FILE *fp;
-	EVP_PKEY *pkey = NULL;
-
-	switch (certtype) {
-	case ISAKMP_CERT_PKCS7:
-	case ISAKMP_CERT_X509SIGN:
-		/* make secret file name */
-		snprintf(path, sizeof(path), "%s/%s/%s/%s",
-			lcconf->pathinfo[LC_PATHTYPE_CERT],
-			s_ipsecdoi_ident(idtype),
-			subject, PRIVKEYFILE);
-
-		/* Read private key */
-		fp = fopen (path, "r");
-		if (fp == NULL)
-			return NULL
-		pkey = PEM_read_PrivateKey(fp, NULL, NULL);
-		fclose (fp);
-		break;
-	default:
-		return NULL;
-	}
-
-	if (pkey == NULL)
-		return NULL;
-
-	return pkey;
-}
-
-static EVP_PKEY *
-getpubkey(certtype, idtype, subject)
-	int certtype;
-	int idtype;
-	char *subject;
-{
-	char path[MAXPATHLEN];
-	FILE *fp;
-	EVP_PKEY *pkey = NULL;
-	X509 *x509 = NULL;
-
-	switch (certtype) {
-	case ISAKMP_CERT_PKCS7:
-	case ISAKMP_CERT_X509SIGN:
-		/* make secret file name */
-		snprintf(path, sizeof(path), "%s/%s/%s/%s",
-			lcconf->pathinfo[LC_PATHTYPE_CERT],
-			s_ipsecdoi_ident(idtype),
-			subject, CERTFILE);
-
-		/* Read private key */
-		fp = fopen (path, "r");
-		if (fp == NULL)
-			return NULL
-		x509 = PEM_read_X509(fp, NULL, NULL);
-		fclose (fp);
-		break;
-	default:
-		return NULL;
-	}
-
-	if (x509 == NULL)
-		return NULL;
-  
-	/* Get public key - eay */
-	pkey = X509_get_pubkey(x509);
-	if (pkey == NULL)
-		return NULL;
-
-	return pkey;
-}
-#endif
-  
-//////////////////////////////////////////////////////////////////////////////////////////
-// 					TO GET A CERTIFICATE
-// Input:
-//	a user name "user" (we check his public key certificate)
-// Output:
-//	return int: 0 if the cert is OK or -1 otherwise.
-//	int *: set certificate_size
-//	char **: points to a certificate pointer
-//////////////////////////////////////////////////////////////////////////////////////////
-int
-get_certificate(user, certificate_size, certificate)
-	char *user;
-	int *certificate_size;
-	char **certificate;
-{
-
-/* Declaration */
-	static const char	certfile[]		= USERS_PATH;
-	struct stat 		*statistics;
-	char			buf[MAXPATHLEN],
-				*data;
-	FILE 			*fp			= 	NULL;
-	X509 			*x509;
-
-
-/* Initialization */
-	*certificate = NULL;
-	data = &(buf[0]);
-	*data = '\0';			// Omitting this line is bad, as strcat needs a \0 to begin copying!
-
-
-/* Read the public key certificate: we also check that ASN.1 format is OK
- * as we only need to copy the file itself into the payload (or the ASN.1 itself:
- * we should indeed filter the decoded data, but not the formated head and tail
- * lines (if so, SSLeay would fail to check).
- */
- 	strcat(data,certfile);
-	strcat(data,user);
-	strcat(data, CERTFILE);
-
-	fp 	= fopen (data, "r");   if (fp == NULL) return (-1);
-	statistics = (struct stat*) malloc(sizeof(stat));
-	fstat(fileno(fp), statistics);
-	*certificate_size = statistics->st_size;
-	free(statistics);
-#if (defined(SSLVER) && SSLVER >= 0x0940)
-	x509 	= (X509 *)PEM_ASN1_read ((char *(*)())d2i_X509,
-        	                           PEM_STRING_X509,
-                	                   fp, NULL, NULL, NULL);
-#else
-	x509 	= (X509 *)PEM_ASN1_read ((char *(*)())d2i_X509,
-        	                           PEM_STRING_X509,
-                	                   fp, NULL, NULL);
-#endif
-	fclose (fp);
-	if (x509 == NULL) {  ERR_print_errors_fp (stderr);    return (-1);  }
-/* Got public key certificate and its size */
-
-	{
-	   unsigned char buf[10000];
-	   size_t nb = *certificate_size;
-	   int    fd = -1;
-	   
-           fd = open(data,O_RDONLY);
-	   if (read(fd, buf, nb)!=nb)
-	      printf ("Error reading certificate file %s\n", data);
-	   close (fd);
-	   *certificate = malloc(nb);
-	   memcpy(*certificate, buf, nb);
-        }
-
-	return 0;
-}
-
 //////////////////////////////////////////////////////////////////////////////////////////
 // 					TO CHECK A CERTIFICATE
 //
 // Three functions for certificate validation steps.
 //
 //////////////////////////////////////////////////////////////////////////////////////////
+
+/*
+ * MAIN CERTIFICATE CHECKING FUNCTION
+ * Input:
+ *	a char * user name
+ * 		precise the location of the to-be-stored certificate
+ *		In case there was already a certificate here, it is erased.
+ *	a char * certificate to check
+ *	its size int
+ *
+ * Output:
+ *	return int: 0 if cert is OK or -1 otherwise.
+ *
+ */
 static int MS_CALLBACK cb(int ok, X509_STORE_CTX *ctx);
 static int check(X509_STORE *ctx,char *file);
 static int v_verbose=0;
 
-
-int
+static int
 verify_certificate(CApath, CAfile, cert_to_check)
 	char *CApath;
 	char *CAfile;
@@ -564,28 +265,21 @@ cb(ok, ctx)
 		ERR_clear_error();
 	return(ok);
 }
+#endif
 
-
-//////////////////////////////////////////////////////////////////////////////////////////
-// 					MAIN CERTIFICATE CHECKING FUNCTION
-// Input:
-//	a char * user name
-// 		precise the location of the to-be-stored certificate
-//		In case there was already a certificate here, it is erased.
-//	a char * certificate to check
-//	its size
-//
-// Output:
-//	return int: 0 if cert is OK or -1 otherwise.
-//
-//////////////////////////////////////////////////////////////////////////////////////////
+/*
+ * check certificate
+ */
 int
-check_certificate(user, cryptCert, certificate_size)
-	char *user;
-	char *cryptCert;
-	int certificate_size;
+eay_check_x509cert(idstr, certtype, cert, certlen)
+	char *idstr;
+	int certtype;
+	char *cert;
+	int certlen;
 {
-
+#if 1
+	return 0;
+#else
 	static  char	certfile[]		= USERS_PATH;
 	char	buf[BUFSIZ],
 		buf_string[BUFSIZ],
@@ -638,6 +332,7 @@ check_certificate(user, cryptCert, certificate_size)
 	}
 
 	return(ret);
+#endif
 }
 
 

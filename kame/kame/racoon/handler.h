@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.10 2000/01/12 21:00:03 itojun Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.11 2000/02/09 05:18:07 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -137,7 +137,9 @@ struct ph1handle {
 	vchar_t *key;			/* cipher key */
 	vchar_t *hash;			/* HASH minus general header */
 	vchar_t *sig;			/* SIG minus general header */
+	vchar_t *sig_p;			/* peer's SIG minus general header */
 	vchar_t *cert;			/* CERT minus general header */
+	vchar_t *cert_p;		/* peer's CERT minus general header */
 	vchar_t *id;			/* ID minus gen header */
 	vchar_t *id_p;			/* partner's ID minus general header */
 					/* i.e. strut ipsecdoi_id_b*. */
@@ -151,8 +153,7 @@ struct ph1handle {
 					/* NOTE: Should be release after use. */
 
 	struct isakmp_pl_hash *pl_hash;	/* pointer to hash payload */
-	struct isakmp_pl_cert *pl_cert;	/* pointer to cert payload */
-	struct isakmp_pl_sig *pl_sig;	/* pointer to sig payload */
+	struct isakmp_pl_cert *pl_cr;	/* pointer to cert reqest payload */
 			/* XXX save these values into my buffer respectively.
 			 * Need more cool method. */
 

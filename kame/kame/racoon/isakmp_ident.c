@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.17 2000/02/08 18:36:23 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.18 2000/02/09 05:18:09 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -357,6 +357,7 @@ ident_i3recv(iph1, msg)
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
 			break;
 		case ISAKMP_NPTYPE_CR:
+			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
 			plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Certificate Request.\n");
 			break;
@@ -521,10 +522,12 @@ ident_i4recv(iph1, msg0)
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
 		case ISAKMP_NPTYPE_CERT:
-			iph1->pl_cert = (struct isakmp_pl_cert *)pa->ptr;
+			if (isakmp_p2ph(&iph1->cert_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_SIG:
-			iph1->pl_sig = (struct isakmp_pl_sig *)pa->ptr;
+			if (isakmp_p2ph(&iph1->sig_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
@@ -858,6 +861,7 @@ ident_r2recv(iph1, msg)
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
 			break;
 		case ISAKMP_NPTYPE_CR:
+			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
 			plog(logp, LOCATION, iph1->remote,
 				"certificate request received.\n");
 			break;
@@ -1020,14 +1024,17 @@ ident_r3recv(iph1, msg0)
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
 		case ISAKMP_NPTYPE_CR:
+			iph1->pl_cr = (struct isakmp_pl_cert *)pa->ptr;
 			plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Certificate Request.\n");
 			break;
 		case ISAKMP_NPTYPE_CERT:
-			iph1->pl_cert = (struct isakmp_pl_cert *)pa->ptr;
+			if (isakmp_p2ph(&iph1->cert_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_SIG:
-			iph1->pl_sig = (struct isakmp_pl_sig *)pa->ptr;
+			if (isakmp_p2ph(&iph1->sig_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
@@ -1061,7 +1068,7 @@ ident_r3recv(iph1, msg0)
 		break;
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
 	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
-		if (iph1->id_p == NULL || iph1->pl_sig == NULL)
+		if (iph1->id_p == NULL || iph1->sig_p == NULL)
 			ng++;
 		break;
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
@@ -1284,7 +1291,6 @@ ident_ir3sendmx(iph1)
 	struct isakmp_gen *gen;
 	int error = -1;
 
-	/* create buffer */
 	tlen = sizeof(struct isakmp);
 
 	switch (iph1->approval->authmethod) {
@@ -1313,8 +1319,12 @@ ident_ir3sendmx(iph1)
 #ifdef HAVE_SIGNING_C
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
 	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
-	{
-		if (oakley_getcert(iph1) < 0)
+		/* XXX if there is CR or not ? */
+
+		if (oakley_getmycert(iph1) < 0)
+			goto end;
+
+		if (oakley_getsign(iph1) < 0)
 			goto end;
 
 		tlen += sizeof(*gen) + iph1->id->l
@@ -1342,8 +1352,8 @@ ident_ir3sendmx(iph1)
 		/* add CERT payload if there */
 		if (iph1->cert != NULL)
 			p = set_isakmp_payload(p, iph1->cert, ISAKMP_NPTYPE_SIG);
+		/* add SIG payload */
 		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);
-	}
 		break;
 #endif
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:

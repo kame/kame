@@ -6,8 +6,5 @@
 #define CERTFILE	"cert.pem"
 #define CERTREQFILE	"cr.pem"
 
-extern int sign __P((void *, int , char *, char **, int *));
-extern int check_signature __P((void *, int , char *, char *, int ));
-extern int get_certificate __P((char *, int *, char **));
-extern int check_certificate __P((char *, char *, int ));
-
+extern int eay_check_x509cert __P((char *idstr,
+	int certtype, char *cert, int certlen));

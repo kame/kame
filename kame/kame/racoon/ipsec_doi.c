@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.48 2000/02/08 18:10:11 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.49 2000/02/09 05:18:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -3213,7 +3213,7 @@ ipsecdoi_checkid1(iph1)
 
 	if (iph1->id_p == NULL) {
 		plog(logp, LOCATION, NULL,
-			"invalid iph1 passed (id_p == NULL\n");
+			"invalid iph1 passed id_p == NULL\n");
 		goto err;
 	}
 	if (iph1->id_p->l < sizeof(id_b)) {
