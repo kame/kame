@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.913 2000/05/22 07:46:39 jinmei Exp $
+$Id: CHANGELOG,v 1.914 2000/05/22 08:55:43 itojun Exp $
 
 <200005>
+Mon May 22 17:54:29 JST 2000  itojun@iijlab.net
+	* sys/netinet6/{ah,esp}_output.c: correct rare error case handling
+	  (do not leak mbuf/do not emit incomplete packet).
+	* sys/netinet6/ah_*.c: cope with memory allocation failure more
+	  gracefully.
+
 2000-05-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/scopedaddrtest/scopedaddrtest.c: a new option "-N" was
 	added to specify the NI_NUMERICSCOPE flag for getnameinfo().
