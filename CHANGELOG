@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2080 2002/02/19 13:12:33 jinmei Exp $
+$KAME: CHANGELOG,v 1.2081 2002/02/19 13:46:30 jinmei Exp $
 
 <200202>
+2002-02-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/tcp6_subr.c (tcp6_respond): called
+	ip6_getpktaddrs() correctly.  NULL pointers would be referred to
+	without this fix.
+	Based on: a report from Tomomi Suzuki <stomomi@ebina.hitachi.co.jp>
+
 2002-02-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_input.c (ip6_init2): called nd6_ifattach()
 	for the loopback interface, in order to make sure to initialize
