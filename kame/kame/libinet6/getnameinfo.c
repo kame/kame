@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.60 2002/05/22 01:51:22 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.61 2002/06/27 09:25:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -164,7 +164,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 				return EAI_MEMORY;
 			strlcpy(serv, sp->s_name, servlen);
 		} else {
-			snprintf(numserv, sizeof(numserv), "%d", ntohs(port));
+			snprintf(numserv, sizeof(numserv), "%u", ntohs(port));
 			if (strlen(numserv) + 1 > servlen)
 				return EAI_MEMORY;
 			strlcpy(serv, numserv, servlen);
