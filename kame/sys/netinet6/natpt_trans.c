@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.96 2002/04/18 06:03:57 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.97 2002/04/18 15:28:38 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -991,9 +991,10 @@ natpt_icmp4Unreach(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 		icmp6->icmp6_code = ICMP6_DST_UNREACH_NOROUTE;
 		break;
 
-	case ICMP_UNREACH_PROTOCOL:			/* do more */
+	case ICMP_UNREACH_PROTOCOL:
 		icmp6->icmp6_type = ICMP6_PARAM_PROB;
-		icmp6->icmp6_code = ICMP6_PARAMPROB_NEXTHEADER; /* xxx */
+		icmp6->icmp6_code = ICMP6_PARAMPROB_NEXTHEADER;
+		icmp6->icmp6_pptr = htonl(6);	/* point to the IPv6 Next Header field. */
 		break;
 
 	case ICMP_UNREACH_PORT:
