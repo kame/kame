@@ -607,8 +607,10 @@ make_packet(struct rainfo *rainfo)
 	struct nd_router_advert *ra;
 	struct nd_opt_prefix_info *ndopt_pi;
 	struct nd_opt_mtu *ndopt_mtu;
+#ifdef MIP6
 	struct nd_opt_advint *ndopt_advint;
 	struct nd_opt_hai *ndopt_hai;
+#endif
 	struct prefix *pfx;
 
 	/* calculate total length */
