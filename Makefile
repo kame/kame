@@ -18,7 +18,7 @@ bsdi3:
 bsdi4:
 	(cd ${.CURDIR}; set CVSROOT=cvs.kame.net:/cvsroot/kame-local; export CVSROOT; cvs -d cvs.kame.net:/cvsroot/kame-local co -d bsdi4 -P kame/bsdi4)
 
-DOC=	CHANGELOG CHANGELOG.1998 CHANGELOG.1997 CHANGELOG.1996 \
+DOC=	CHANGELOG CHANGELOG.1999 CHANGELOG.1998 CHANGELOG.1997 CHANGELOG.1996 \
 	COPYRIGHT COPYRIGHT.jp IMPLEMENTATION INSTALL \
 	INSTALL.anoncvs Makefile PORTABILITY VERSION prepare.pl \
 	TODO.2292bis TODO.new-repository RELNOTES README USAGE
