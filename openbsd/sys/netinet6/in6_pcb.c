@@ -874,13 +874,11 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
   register struct inpcb *inp, *ninp;
   struct in6_addr *faddr,laddr = *la;
   u_short fport = fport_arg, lport = lport_arg;
-  int errno;
-  void (*notify2) __P((struct inpcb *, int));
+  int errno, nmatch = 0;
+  int do_rtchange = (notify == in6_rtchange);
 #ifdef IPSEC
   struct sockaddr_in6 srcsa, dstsa;
 #endif /* IPSEC */
-
-  notify2 = NULL;
 
   DPRINTF(IDL_EVENT,("Entering in6_pcbnotify.  head = 0x%lx, dst is\n", (unsigned long)head));
   DDO(IDL_EVENT,dump_smart_sockaddr(dst));
@@ -912,13 +910,6 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
       lport = 0;
       laddr = in6addr_any;
 
-      /*
-       * Keep the old notify function to store a soft error
-       * in each PCB.
-       */
-      if (cmd == PRC_HOSTDEAD && notify != in6_rtchange)
-	notify2 = notify;
-
       notify = in6_rtchange;
     }
   errno = inet6ctlerrmap[cmd];
@@ -947,7 +938,7 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
       if ((inp->inp_flags & INP_IPV6) == 0)
 	continue;
 
-      if (notify == in6_rtchange) {
+      if (do_rtchange) {
 	/*
 	 * Since a non-connected PCB might have a cached route,
 	 * we always call in6_rtchange without matching
@@ -973,12 +964,10 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 	    {
 	      in6_rtchange(inp, errno);
 	    }
+
+	  if (notify == in6_rtchange)
+		  continue;		/* there's nothing to do any more */
 	}
-
-	if (notify2 == NULL)
-	  continue;
-
-	notify = notify2;
       }
 
       if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr) ||
@@ -989,6 +978,7 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 	{
 	  continue;
 	}
+      nmatch++;
 
       if (notify)
 	{
