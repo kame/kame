@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.39 2000/08/17 00:44:12 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.40 2000/08/17 01:08:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -121,7 +121,7 @@ struct	ip6_moptions {
 /* Routing header related info */
 struct	ip6po_rhinfo {
 	struct	ip6_rthdr *ip6po_rhi_rthdr; /* Routing header */
-#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__)
+#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__) || defined(__OpenBSD__)
 	struct	route ip6po_rhi_route; /* Route to the 1st hop */
 #else
 	struct	route_in6 ip6po_rhi_route; /* Route to the 1st hop */
@@ -320,7 +320,7 @@ int	ip6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 void	ip6_forward __P((struct mbuf *, int));
 
 void	ip6_mloopback __P((struct ifnet *, struct mbuf *, struct sockaddr_in6 *));
-#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__)
+#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__) || defined(__OpenBSD__)
 int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			struct route *,
 			int,

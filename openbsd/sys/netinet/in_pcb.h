@@ -102,7 +102,7 @@ struct inpcb {
 	caddr_t	  inp_ppcb;		/* pointer to per-protocol pcb */
 	union {				/* Route (notice increased size). */
 		struct route ru_route;
-#ifdef NEW_STRUCT_ROUTE
+#if 1 /*def NEW_STRUCT_ROUTE*/
 		struct route ru_route6;
 #else
 		struct route_in6 ru_route6;
@@ -270,7 +270,7 @@ extern struct sockaddr_in *in_selectsrc __P((struct sockaddr_in *,
 int	in6_pcbnotify __P((struct inpcbtable *, struct sockaddr *,
 			   u_int, struct in6_addr *, u_int, int,
 			   void (*)(struct inpcb *, int)));
-#ifdef NEW_STRUCT_ROUTE
+#if 1 /*def NEW_STRUCT_ROUTE*/
 struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 				     struct ip6_pktopts *,
 				     struct ip6_moptions *,

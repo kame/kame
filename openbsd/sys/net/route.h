@@ -50,7 +50,7 @@
  * to a routing entry.  These are often held by protocols
  * in their control blocks, e.g. inpcb.
  */
-#ifdef NEW_STRUCT_ROUTE
+#if 1 /*def NEW_STRUCT_ROUTE*/
 struct route {
 	struct	rtentry *ro_rt;
 	union {
