@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.393 2004/12/27 05:41:17 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.394 2004/12/28 10:01:22 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3666,6 +3666,9 @@ sysctl_net_inet6_icmp6_nd6(SYSCTLFN_ARGS)
 SYSCTL_SETUP(sysctl_net_inet6_icmp6_setup,
 	     "sysctl net.inet6.icmp6 subtree setup")
 {
+#ifdef MLDV2
+	extern int mld_version;	/* defined in mldv2.c */
+#endif
 
 	sysctl_createv(clog, 0, NULL, NULL,
 		       CTLFLAG_PERMANENT,
@@ -3812,5 +3815,28 @@ SYSCTL_SETUP(sysctl_net_inet6_icmp6_setup,
 		       sysctl_net_inet6_icmp6_nd6, 0, NULL, 0,
 		       CTL_NET, PF_INET6, IPPROTO_ICMPV6,
 		       ICMPV6CTL_ND6_PRLIST, CTL_EOL);
+#ifdef MLDV2
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "mld_maxsrcfilter",
+		       SYSCTL_DESCR("Max number of MSF entries"),
+		       NULL, 0, &mldmaxsrcfilter, 0,
+		       CTL_NET, PF_INET6, IPPROTO_ICMPV6,
+		       ICMPV6CTL_MLD_MAXSRCFILTER, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "mld_somaxsrc",
+		       SYSCTL_DESCR("Max number of sources in an MSF"),
+		       NULL, 0, &mldsomaxsrc, 0,
+		       CTL_NET, PF_INET6, IPPROTO_ICMPV6,
+		       ICMPV6CTL_MLD_SOMAXSRC, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "mld_version",
+		       SYSCTL_DESCR("MLD version"),
+		       NULL, 0, &mld_version, 0,
+		       CTL_NET, PF_INET6, IPPROTO_ICMPV6,
+		       ICMPV6CTL_MLD_VERSION, CTL_EOL);
+#endif
 }
 #endif

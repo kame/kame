@@ -96,6 +96,7 @@ __KERNEL_RCSID(0, "$NetBSD: igmp.c,v 1.36 2003/08/22 21:53:02 itojun Exp $");
 
 #define IP_MULTICASTOPTS	0
 
+MALLOC_DEFINE(M_MSFILTER, "msfilter", "multicast source filter");
 struct pool igmp_rti_pool;
 struct igmpstat igmpstat;
 int igmp_timers_are_running;

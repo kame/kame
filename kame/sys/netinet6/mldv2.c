@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.28 2004/12/27 11:45:03 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.29 2004/12/28 10:01:22 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -968,7 +968,7 @@ mld_sendpkt(in6m, type, dst)
 		break;
 	}
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 	ip6_output(mh, &ip6_opts, NULL,
 		   ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL, NULL);
 #else
@@ -1119,7 +1119,7 @@ mld_sendbuf(mh, ifp)
 
 	/* XXX: ToDo: create MLDv2 statistics field */
 	icmp6_ifstat_inc(ifp, ifs6_out_mldreport);
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 	ip6_output(mh, &ip6_opts, NULL,
 		   ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL, NULL);
 #else
@@ -2058,7 +2058,7 @@ next_multi:
 }
 #undef in6mm_src
 
-#ifndef __FreeBSD__
+#ifdef __OpenBSD__
 int
 mld_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	int *name;
@@ -2093,7 +2093,7 @@ mld_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	}
 	return error;
 }
-#endif /* !__FreeBSD__ */
+#endif /* __OpenBSD__ */
 
 
 /* 

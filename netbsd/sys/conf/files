@@ -1311,7 +1311,6 @@ file	netinet/dccp_usrreq.c		dccp & inet
 file	netinet/if_arp.c		arp | netatalk		needs-flag
 file	netinet/if_atm.c		atm
 file	netinet/in_gif.c		gif & inet
-file	netinet/in_msf.c		igmpv3 | mldv2
 file	netinet/ip_ecn.c		ipsec | fast_ipsec | gif | stf
 file	netinet/ip_encap.c		inet | inet6
 file	netinet/ip_gre.c		inet & gre

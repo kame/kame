@@ -14,6 +14,7 @@ defflag opt_inet_csum.h		INET_CSUM_COUNTERS TCP_CSUM_COUNTERS
 				UDP_CSUM_COUNTERS
 
 file	netinet/igmp.c		inet
+file	netinet/in_msf.c	inet & (igmpv3 | mldv2)
 file	netinet/in.c		inet
 file	netinet/in_pcb.c	inet
 file	netinet/in_proto.c	inet
