@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.46 2003/02/07 09:34:40 jinmei Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.47 2003/09/05 23:17:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -292,7 +292,7 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 			nth->th_sport = th->th_sport;
 			nth->th_dport = th->th_dport;
 		}
-		xchg(nth->th_dport, nth->th_sport, u_short);
+		xchg(nth->th_dport, nth->th_sport, u_int16_t);
 #undef xchg
 	}
 
@@ -304,7 +304,7 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 			win >>= t6p->rcv_scale;
 		if (win > TCP6_MAXWIN)
 			win = TCP6_MAXWIN;
-		nth->th_win = htons((u_short)win);
+		nth->th_win = htons((u_int16_t)win);
 		nth->th_off = sizeof (struct tcp6hdr) >> 2;
 		tlen += sizeof (struct tcp6hdr);
 	} else
@@ -312,7 +312,9 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 	m->m_len = tlen + sizeof (struct ip6_hdr);
 	m->m_pkthdr.len = tlen + sizeof (struct ip6_hdr);
 	m->m_pkthdr.rcvif = (struct ifnet *) 0;
-	nip6->ip6_plen = htons((u_short)tlen);
+#if 0	/* ip6_plen will be filled by ip6_output */
+	nip6->ip6_plen = htons((u_int16_t)tlen);
+#endif
 	nip6->ip6_nxt = IPPROTO_TCP;
 	nip6->ip6_hlim = in6_selecthlim(in6p, oifp);
 	nip6->ip6_flow &= ~IPV6_FLOWLABEL_MASK;

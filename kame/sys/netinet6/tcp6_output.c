@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_output.c,v 1.23 2003/06/11 11:32:28 keiichi Exp $	*/
+/*	$KAME: tcp6_output.c,v 1.24 2003/09/05 23:17:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -367,11 +367,11 @@ send:
 	if (flags & TH_SYN) {
 		t6p->snd_nxt = t6p->iss;
 		if ((t6p->t_flags & TF_NOOPT) == 0) {
-			u_short mss;
+			u_int16_t mss;
 
 			opt[0] = TCP6OPT_MAXSEG;
 			opt[1] = 4;
-			mss = htons((u_short) tcp6_send_mss(t6p));
+			mss = htons((u_int16_t) tcp6_send_mss(t6p));
 			bcopy((caddr_t)&mss, (caddr_t)(opt + 2), sizeof(mss));
 			optlen = 4;
 
@@ -565,7 +565,7 @@ send:
 		win = (long)TCP6_MAXWIN << t6p->rcv_scale;
 	if (win < (long)(t6p->rcv_adv - t6p->rcv_nxt))
 		win = (long)(t6p->rcv_adv - t6p->rcv_nxt);
-	th->th_win = htons((u_short) (win>>t6p->rcv_scale));
+	th->th_win = htons((u_int16_t) (win>>t6p->rcv_scale));
 
 	/*
 	 * If no urgent pointer is outstanding, then we pull the
@@ -588,7 +588,7 @@ send:
 				urp--;
 			if (urp > 65535)
 				urp = 65535;
-			th->th_urp = htons((u_short)urp);
+			th->th_urp = htons((u_int16_t)urp);
 			th->th_flags |= TH_URG;
 		}
 	} else
@@ -655,7 +655,7 @@ send:
 	m->m_pkthdr.len = hdrlen + len;
 
 #if 0				/* ip6_plen will be filled in ip6_output. */
-	ip6->ip6_plen = htons((u_short)(m->m_pkthdr.len - sizeof(struct ip6_hdr)));
+	ip6->ip6_plen = htons((u_int16_t)(m->m_pkthdr.len - sizeof(struct ip6_hdr)));
 #endif
 	th->th_sum = in6_cksum(m, IPPROTO_TCP, sizeof(struct ip6_hdr),
 			       m->m_pkthdr.len - sizeof(struct ip6_hdr));

@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.139 2003/06/28 03:56:15 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.140 2003/09/05 23:17:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -551,7 +551,7 @@ rip6_output(m, va_alist)
 	ip6->ip6_vfc  &= ~IPV6_VERSION_MASK;
 	ip6->ip6_vfc  |= IPV6_VERSION;
 #if 0				/* ip6_plen will be filled in ip6_output. */
-	ip6->ip6_plen  = htons((u_short)plen);
+	ip6->ip6_plen  = htons((u_int16_t)plen);
 #endif
 	ip6->ip6_nxt   = in6p->in6p_ip6.ip6_nxt;
 	ip6->ip6_hlim = in6_selecthlim(in6p, oifp);

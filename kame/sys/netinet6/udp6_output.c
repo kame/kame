@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.68 2003/04/09 09:28:20 suz Exp $	*/
+/*	$KAME: udp6_output.c,v 1.69 2003/09/05 23:17:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -171,7 +171,7 @@ udp6_output(in6p, m, addr6, control)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct sockaddr_in6 lsa6_mapped; /* XXX ugly */
 #endif
-	u_short fport;
+	u_int16_t fport;
 	int error = 0;
 	struct ip6_pktopts opt, *stickyopt = in6p->in6p_outputopts;
 	int priv;
@@ -416,7 +416,7 @@ udp6_output(in6p, m, addr6, control)
 	udp6->uh_sport = in6p->in6p_lport; /* lport is always set in the PCB */
 	udp6->uh_dport = fport;
 	if (plen <= 0xffff)
-		udp6->uh_ulen = htons((u_short)plen);
+		udp6->uh_ulen = htons((u_int16_t)plen);
 	else
 		udp6->uh_ulen = 0;
 	udp6->uh_sum = 0;
@@ -428,7 +428,7 @@ udp6_output(in6p, m, addr6, control)
 		ip6->ip6_vfc 	&= ~IPV6_VERSION_MASK;
 		ip6->ip6_vfc 	|= IPV6_VERSION;
 #if 0				/* ip6_plen will be filled in ip6_output. */
-		ip6->ip6_plen	= htons((u_short)plen);
+		ip6->ip6_plen	= htons((u_int16_t)plen);
 #endif
 		ip6->ip6_nxt	= IPPROTO_UDP;
 		ip6->ip6_hlim	= in6_selecthlim(in6p, oifp);

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.130 2003/08/26 04:42:27 keiichi Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.131 2003/09/05 23:17:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -649,7 +649,7 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 		bcopy(mac, (caddr_t)(nd_opt + 1), ifp->if_addrlen);
 	}
 
-	ip6->ip6_plen = htons((u_short)icmp6len);
+	ip6->ip6_plen = htons((u_int16_t)icmp6len);
 	nd_ns->nd_ns_cksum = 0;
 	nd_ns->nd_ns_cksum =
 	    in6_cksum(m, IPPROTO_ICMPV6, sizeof(*ip6), icmp6len);
@@ -1171,7 +1171,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	} else
 		flags &= ~ND_NA_FLAG_OVERRIDE;
 
-	ip6->ip6_plen = htons((u_short)icmp6len);
+	ip6->ip6_plen = htons((u_int16_t)icmp6len);
 	nd_na->nd_na_flags_reserved = flags;
 	nd_na->nd_na_cksum = 0;
 	nd_na->nd_na_cksum =

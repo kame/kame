@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.395 2003/09/04 03:05:51 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.396 2003/09/05 23:17:04 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1614,12 +1614,12 @@ skip_ipsec2:;
 				ip6stat.ip6s_odropped++;
 				goto sendorfree;
 			}
-			ip6f->ip6f_offlg = htons((u_short)((off - hlen) & ~7));
+			ip6f->ip6f_offlg = htons((u_int16_t)((off - hlen) & ~7));
 			if (off + len >= tlen)
 				len = tlen - off;
 			else
 				ip6f->ip6f_offlg |= IP6F_MORE_FRAG;
-			mhip6->ip6_plen = htons((u_short)(len + hlen +
+			mhip6->ip6_plen = htons((u_int16_t)(len + hlen +
 			    sizeof(*ip6f) - sizeof(struct ip6_hdr)));
 			if ((m_frgpart = m_copy(m0, off, len)) == 0) {
 				error = ENOBUFS;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.14 2003/08/28 07:25:55 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.15 2003/09/05 23:17:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -918,7 +918,9 @@ mip6_tunnel_output(mp, mbc)
 	ip6->ip6_flow = 0;
 	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
 	ip6->ip6_vfc |= IPV6_VERSION;
-	ip6->ip6_plen = htons((u_short)len);
+#if 0	/* ip6_plen will be filled by ip6_output */
+	ip6->ip6_plen = htons((u_int16_t)len);
+#endif
 	ip6->ip6_nxt = IPPROTO_IPV6;
 	ip6->ip6_hlim = ip6_defhlim;
 	ip6->ip6_src = encap_src->sin6_addr;

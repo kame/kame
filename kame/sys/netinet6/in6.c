@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.348 2003/08/15 06:30:10 suz Exp $	*/
+/*	$KAME: in6.c,v 1.349 2003/09/05 23:17:04 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3761,8 +3761,8 @@ ip6_sprintf(addr)
 	static char ip6buf[8][48];
 	int i;
 	char *cp;
-	const u_short *a = (const u_short *)addr;
-	const u_char *d;
+	const u_int16_t *a = (const u_int16_t *)addr;
+	const u_int8_t *d;
 	int dcolon = 0;
 
 	ip6round = (ip6round + 1) & 7;

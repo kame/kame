@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.198 2003/08/09 17:06:40 suz Exp $	*/
+/*	$KAME: ipsec.c,v 1.199 2003/09/05 23:17:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1212,9 +1212,9 @@ ipsec6_get_ulp(m, spidx, needport)
 			break;
 		m_copydata(m, off, sizeof(ih), (caddr_t)&ih);
 		((struct sockaddr_in6 *)&spidx->src)->sin6_port =
-			htons((u_short)ih.icmp6_type);
+			htons((u_int16_t)ih.icmp6_type);
 		((struct sockaddr_in6 *)&spidx->dst)->sin6_port =
-			htons((u_short)ih.icmp6_code);
+			htons((u_int16_t)ih.icmp6_code);
 		break;
 	default:
 		/* XXX intermediate headers??? */

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.81 2003/09/03 03:29:46 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.82 2003/09/05 23:17:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -763,7 +763,7 @@ mip6_icmp6_mp_sol_output(haddr, haaddr)
 	mp_sol->mp_sol_reserved = 0;
 
 	/* calculate checksum. */
-	ip6->ip6_plen = htons((u_short)icmp6len);
+	ip6->ip6_plen = htons((u_int16_t)icmp6len);
 	mp_sol->mp_sol_cksum = 0;
 	mp_sol->mp_sol_cksum = in6_cksum(m, IPPROTO_ICMPV6, sizeof(*ip6),
 	    icmp6len);

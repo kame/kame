@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.62 2003/02/07 09:34:40 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.63 2003/09/05 23:17:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -151,9 +151,9 @@ extern int tcp_log_in_vain;
 #define TSTMP_LT(a,b)	((int)((a)-(b)) < 0)
 #define TSTMP_GEQ(a,b)	((int)((a)-(b)) >= 0)
 
-static struct in6pcb *tcp6_listen_lookup __P((struct sockaddr_in6 *, u_short));
-static struct in6pcb *tcp6_conn_lookup __P((struct sockaddr_in6 *, u_short,
-					    struct sockaddr_in6 *, u_short));
+static struct in6pcb *tcp6_listen_lookup __P((struct sockaddr_in6 *, u_int16_t));
+static struct in6pcb *tcp6_conn_lookup __P((struct sockaddr_in6 *, u_int16_t,
+					    struct sockaddr_in6 *, u_int16_t));
 static void tcp6_start2msl __P((struct in6pcb *, struct tcp6cb *));
 static void tcp6_rtt_init __P((struct tcp6cb *, struct rtentry *));
 static int  tcp6_mss_round __P((int));
@@ -212,7 +212,7 @@ do {									\
 static struct in6pcb *
 tcp6_listen_lookup(dst, dport)
 	struct sockaddr_in6 *dst;
-	u_short dport;
+	u_int16_t dport;
 {
 	struct in6pcb *in6p, *maybe = NULL;
 	int faith;
@@ -247,9 +247,9 @@ tcp6_listen_lookup(dst, dport)
 static struct in6pcb *
 tcp6_conn_lookup(src, sport, dst, dport)
 	struct sockaddr_in6 *src;
-	u_short sport;
+	u_int16_t sport;
 	struct sockaddr_in6 *dst;
-	u_short dport;
+	u_int16_t dport;
 {
 	struct in6pcb *in6p;
 	u_long hash;
@@ -1807,7 +1807,7 @@ tcp6_dooptions(t6p, cp, cnt, th, oi)
 	struct tcp6hdr *th;
 	struct tcp6_opt_info *oi;
 {
-	u_short mss;
+	u_int16_t mss;
 	int opt, optlen;
 	int scale_present = 0;
 
@@ -2775,7 +2775,7 @@ syn_cache_respond6(sc, m, ip6, th, win, ts, dst)
 {
 	u_char *optp;
 	int optlen;
-	u_short mss;
+	u_int16_t mss;
 
 	mss = in6_maxmtu - sizeof(struct ip6_hdr) - sizeof(struct tcp6hdr);
 	if (tcp6_43maxseg && !in6_localaddr(dst))

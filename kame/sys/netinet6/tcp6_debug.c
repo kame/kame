@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_debug.c,v 1.7 2001/07/26 06:53:19 jinmei Exp $	*/
+/*	$KAME: tcp6_debug.c,v 1.8 2003/09/05 23:17:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -154,7 +154,7 @@ tcp6_trace(act, ostate, t6p, ip6, th, req)
 		if (act == TA_OUTPUT) {
 			seq = ntohl(seq);
 			ack = ntohl(ack);
-			len = ntohs((u_short)len);
+			len = ntohs((u_int16_t)len);
 		}
 		if (act == TA_OUTPUT)
 			len -= sizeof (struct tcp6hdr);

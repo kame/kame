@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.113 2003/06/19 07:56:23 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.114 2003/09/05 23:17:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -189,7 +189,7 @@ udp6_input(mp, offp, proto)
 	in6_clearscope(&fromsa.sin6_addr);
 #endif
 
-	ulen = ntohs((u_short)uh->uh_ulen);
+	ulen = ntohs((u_int16_t)uh->uh_ulen);
 	/*
 	 * RFC2675 section 4: jumbograms will have 0 in the UDP header field,
 	 * iff payload length > 0xffff.
