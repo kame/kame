@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1521 2001/02/01 09:18:44 jinmei Exp $
+$KAME: CHANGELOG,v 1.1522 2001/02/02 02:12:37 jinmei Exp $
 
 <200102>
 2001-02-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -9,7 +9,7 @@ $KAME: CHANGELOG,v 1.1521 2001/02/01 09:18:44 jinmei Exp $
 	use a long long integer to parse numeric values to unitentional
 	overflow for 32 bits integers.  With this change, you can specify
 	very large value (i.e. values larger than 0x80000000) for valid
-	lifetimes and preferred lifetimes.
+	and preferred lifetimes.
 	XXX: we assume long long is more than 32 bits in length.
 
 2001-02-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
