@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.46 2002/05/10 11:47:49 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.47 2002/05/16 08:05:58 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -84,14 +84,14 @@ natpt_lookForRule6(struct pcv *cv6)
 	int s;
 	struct cSlot *csl;
 
+	if ((cv6->ip_p == IPPROTO_TCP)
+	    && (((cv6->pyld.tcp4->th_flags & TH_SYN) == 0)
+		|| ((cv6->pyld.tcp4->th_flags & TH_ACK) != 0)))
+		return (NULL);
+
 	s = splnet();
 	for (csl = TAILQ_FIRST(&csl_head); csl; csl = TAILQ_NEXT(csl, csl_list)) {
 		if (csl->Local.sa_family != AF_INET6)
-			continue;
-
-		if ((cv6->ip_p == IPPROTO_TCP)
-		    && (((cv6->pyld.tcp4->th_flags & TH_SYN) == 0)
-			|| ((cv6->pyld.tcp4->th_flags & TH_ACK) != 0)))
 			continue;
 
 		if (csl->proto != 0) {
@@ -134,14 +134,14 @@ natpt_lookForRule4(struct pcv *cv4)
 	int s;
 	struct cSlot *csl;
 
+	if ((cv4->ip_p == IPPROTO_TCP)
+	    && (((cv4->pyld.tcp4->th_flags & TH_SYN) == 0)
+		|| ((cv4->pyld.tcp4->th_flags & TH_ACK) != 0)))
+		return (NULL);
+
 	s = splnet();
 	for (csl = TAILQ_FIRST(&csl_head); csl; csl = TAILQ_NEXT(csl, csl_list)) {
 		if (csl->Local.sa_family != AF_INET)
-			continue;
-
-		if ((cv4->ip_p == IPPROTO_TCP)
-		    && (((cv4->pyld.tcp4->th_flags & TH_SYN) == 0)
-			|| ((cv4->pyld.tcp4->th_flags & TH_ACK) != 0)))
 			continue;
 
 		if (csl->proto != 0) {
