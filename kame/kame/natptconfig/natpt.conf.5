@@ -1,4 +1,4 @@
-.\"	$KAME: natpt.conf.5,v 1.20 2002/10/04 08:28:36 fujisawa Exp $
+.\"	$KAME: natpt.conf.5,v 1.21 2002/10/10 08:46:12 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -275,7 +275,7 @@ and
 Description of each category and of variables belonging to it is as
 follows.
 .Pp
-Following variables are belonging to
+The following variables are belonging to
 .Sq others
 and are displayed with
 .Sq show variables
@@ -316,7 +316,7 @@ for more detail.  There is no way to distinguish between this message
 and other message from kernel now.
 .El
 .Pp
-Following variables are belonging to
+The following variables are belonging to
 .Sq caddr
 and are displayed with
 .Sq show variables caddr
@@ -328,6 +328,74 @@ are for debug.
 Start address of the configuration table.
 .It tSlotHead
 Start address of the current translation table.
+.El
+.Pp
+The following variables are belonging to
+.Sq tslot
+and are displayed with
+.Sq show variables tslot
+subcommand.  These variables are all related with timer, and unit of
+time is a second.
+.Pp
+.Dq tSlot
+is a current translation table and holds an translation information.
+If translation is disabled or there is no translation, this table size
+is zero, and this size increases or decreases according to translation
+process.  This table has a time watching process and several valid
+lifetimes.  Time watching process watches every entry of this table
+and eliminates an entry which exceed its lifetime.  Lifetime varies by
+what kind of protocol this slot translates into.  Detail of each
+lifetime is described below.
+.Pp
+.Bl -tag -width XXX -offset XXX -compact
+.It tSlotTimer
+This is a time interval to invoke the time watching process.  If set
+to zero value time-watching-process invokes continuously, it may bear
+an unexpected result; e.g. translation slot is not registered, and
+translation never occurs.
+.Pp
+If set to 10 seconds, and lifetime described below is set to 20
+seconds, slot entry exists for maximum 30 seconds for minimum 20
+seconds.
+.It maxTTLany
+This is one of lifetime and this is valid when protocol is not a TCP,
+UDP nor ICMP.
+.It maxTTLicmp
+This is one of lifetime and is related to ICMP/ICMPv6.
+.It maxTTLudp
+This is one of lifetime and is related to UDP.
+.It maxTTLtcp
+This is one of lifetime and is related to TCP and this is valid when
+status of TCP session is as follows.
+.Bl -inset -compact
+.It -
+TCPS_ESTABLISHED
+.El
+.It tcpt_2msl
+This is one of lifetime and is related to TCP and this is valid when
+status of TCP session is as follows.
+.Bl -inset -compact
+.It -
+TCPS_CLOSED
+.It -
+TCPS_TIME_WAIT
+.El
+.It tcp_maxidle
+This is one of lifetime and is related to TCP and this is valid when
+status of TCP session is as follows.
+.Bl -inset -compact
+.It -
+TCPS_SYN_SENT
+.It -
+TCPS_SYN_RECEIVED
+.It -
+TCPS_FIN_WAIT_1
+.It -
+TCPS_FIN_WAIT_2
+.El
+.It maxFragment
+This is one of lifetime and is related to fragmented packet.  You do
+not need to change this usually.
 .El
 .Pp
 See
