@@ -43,9 +43,9 @@ static void usage __P((void));
 int main __P((int, char *[]));
 int bpf_open __P((char *));
 static int linkhdrlen __P((int, char *));
-static void form __P((int, char *));
-static void form_ether __P((void));
-static void form_null __P((void));
+static void form __P((int, char *, int));
+static void form_ether __P((int));
+static void form_null __P((int));
 
 static void
 usage()
@@ -115,7 +115,7 @@ main(argc, argv)
 	for (; argc > 0; argv++, argc--) {
 		bzero(buf, sizeof(buf));
 		size = getconfig(*argv, buf + linkhdr);
-		form(fd, iface);
+		form(fd, iface, size);
 		if (size && nflag == 0)
 			write(fd, buf, size + linkhdr);
 	}
@@ -195,8 +195,8 @@ linkhdrlen(fd, iface)
 }
 
 static void
-form(fd, iface)
-	int fd;
+form(fd, iface, size)
+	int fd, size;
 	char *iface;
 {
 	u_int v;
@@ -210,16 +210,17 @@ form(fd, iface)
 	}
 	switch (v) {
 	case DLT_EN10MB:
-		form_ether();
+		form_ether(size);
 		break;
 	case DLT_NULL:
-		form_null();
+		form_null(size);
 		break;
 	}
 }
 
 static void
-form_ether()
+form_ether(size)
+	int size;
 {
 	struct ether_header *ether;
 	struct ip6_hdr *ip;
@@ -251,16 +252,17 @@ form_ether()
 		ether->ether_dhost[5] = ip->ip6_dst.s6_addr[15];
 	}		
 
-	cksum6(sizeof(struct ether_header));
+	cksum6(sizeof(struct ether_header), size);
 }
 
 static void
-form_null()
+form_null(size)
+	int size;
 {
 	u_int *af;
 
 	af = (u_int *)buf;
 	*af = AF_INET6;
 
-	cksum6(sizeof(*af));
+	cksum6(sizeof(*af), size);
 }

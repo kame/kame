@@ -533,8 +533,8 @@ make_icmp6echo(char *name, u_char type)
 
 	icmp6->icmp6_type = type;
 	MUSTHAVE(icmp6->icmp6_code, "icmp6_code", icmp6buf);
-	MAYHAVE(val16, "icmp6_cksum", 0, icmp6buf);
-	icmp6->icmp6_cksum = htons(val16);
+	MAYHAVE(icmp6->icmp6_cksum, "icmp6_cksum", 0, icmp6buf);
+	HTONS(icmp6->icmp6_cksum);
 	MUSTHAVE(icmp6->icmp6_id, "icmp6_id", icmp6buf);
 	HTONS(icmp6->icmp6_id);
 	MUSTHAVE(icmp6->icmp6_seq, "icmp6_seq", icmp6buf);
@@ -556,6 +556,8 @@ make_icmperr(char *name)
 	}
 	MUSTHAVE(icmp6->icmp6_type, "icmp6_type", icmp6buf);
 	MUSTHAVE(icmp6->icmp6_code, "icmp6_code", icmp6buf);
+	MAYHAVE(icmp6->icmp6_cksum, "icmp6_cksum", 0, icmp6buf);
+	HTONS(icmp6->icmp6_cksum);
 
 	switch(icmp6->icmp6_type) {
 	case ICMP6_PACKET_TOO_BIG:
@@ -587,6 +589,7 @@ make_mld(char *name)
 	MUSTHAVE(mld->mld6_type, "mld_type", mldbuf);
 	MAYHAVE(mld->mld6_code, "mld_code", 0, mldbuf);
 	MAYHAVE(mld->mld6_cksum, "mld_cksum", 0, mldbuf);
+	HTONS(mld->mld6_cksum);
 	MAYHAVE(mld->mld6_reserved, "mld_rsv", 0, mldbuf);
 	if ((target = tgetstr("mld_addr", &bp, mldbuf)) == NULL) {
 		fprintf(stderr, "v6test: needs addr for MLD\n");
@@ -600,10 +603,12 @@ make_mld(char *name)
 	switch(mld->mld6_type) {
 	case MLD6_LISTENER_QUERY:
 		MUSTHAVE(mld->mld6_maxdelay, "mld_maxdelay", mldbuf);
+		HTONS(mld->mld6_maxdelay);
 		break;
 	case MLD6_LISTENER_REPORT:
 	case MLD6_LISTENER_DONE:
 		MAYHAVE(mld->mld6_maxdelay, "mld_maxdelay", 0, mldbuf);
+		HTONS(mld->mld6_maxdelay);
 		break;
 	default:
 		break;
