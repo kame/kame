@@ -1,4 +1,3 @@
-BINDIR=	$(PREFIX)/sbin
 PROG=	mld6query
 SRCS=	mld6.c
 
