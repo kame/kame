@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.313 2003/09/12 03:31:32 itojun Exp $	*/
+/*	$KAME: key.c,v 1.314 2003/09/14 03:10:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -175,7 +175,7 @@ static LIST_HEAD(_sahtree, secashead) sahtree;			/* SAD */
 static LIST_HEAD(_regtree, secreg) regtree[SADB_SATYPE_MAX + 1];
 							/* registed list */
 
-#define SPIHASHSIZE	128
+#define SPIHASHSIZE	131	/* prime */
 static LIST_HEAD(_spihash, secasvar) spihash[SPIHASHSIZE];
 
 #ifndef IPSEC_NONBLOCK_ACQUIRE
