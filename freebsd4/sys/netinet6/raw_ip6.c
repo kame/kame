@@ -365,40 +365,6 @@ rip6_output(m, so, dstsock, control)
 	M_PREPEND(m, sizeof(*ip6), M_WAIT);
 	ip6 = mtod(m, struct ip6_hdr *);
 
-	ip6->ip6_dst = *dst;
-
-        /*
-         * If the scope of the destination is link-local, embed the interface
-         * index in the address.
-         *
-         * XXX advanced-api value overrides sin6_scope_id
-         */
-        if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
-                struct in6_pktinfo *pi;
-                                                                                
-                /*
-                 * XXX Boundary check is assumed to be already done in
-                 * ip6_setpktoptions().
-                 */
-                if (optp && (pi = optp->ip6po_pktinfo) && pi->ipi6_ifindex) {
-                        ip6->ip6_dst.s6_addr16[1] = htons(pi->ipi6_ifindex);
-                        oifp = ifindex2ifnet[pi->ipi6_ifindex];
-                } else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) &&
-                         in6p->in6p_moptions &&
-                         in6p->in6p_moptions->im6o_multicast_ifp) {
-                        oifp = in6p->in6p_moptions->im6o_multicast_ifp;
-                        ip6->ip6_dst.s6_addr16[1] = htons(oifp->if_index);
-                } else if (dstsock->sin6_scope_id) {
-                        /* boundary check */
-                        if (dstsock->sin6_scope_id < 0
-                         || if_indexlim < dstsock->sin6_scope_id) {
-                                error = ENXIO;  /* XXX EINVAL? */
-                                goto bad;
-                        }
-                        ip6->ip6_dst.s6_addr16[1]
-                                = htons(dstsock->sin6_scope_id & 0xffff);/*XXX*/                }
-        }
-
 	/* Source address selection. */
 	if ((in6 = in6_selectsrc(dstsock, optp, in6p->in6p_moptions,
 	    &in6p->in6p_route, &in6p->in6p_laddr, &oifp, &error)) == NULL) {
@@ -412,6 +378,7 @@ rip6_output(m, so, dstsock, control)
 	    (error = scope6_setzoneid(oifp, dstsock)) != 0) { /* XXX */
 		goto bad;
 	}
+	ip6->ip6_dst = dstsock->sin6_addr;
 
 	/* fill in the rest of the IPv6 header fields */
 	ip6->ip6_flow = (ip6->ip6_flow & ~IPV6_FLOWINFO_MASK) |
