@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.61 2000/11/10 12:12:12 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.62 2000/11/16 08:14:07 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -135,23 +135,8 @@ See
 .Ic File Include .
 .It Ic path pre_shared_key Ar file ;
 specifies a file including pre-shared key for various ID.
-This file includes some lines of a pair of
-.Ar ID
-and
-.Ar key .
-.Ar ID
-and
-.Ar key
-are separated by any number of blanks and/or tab characters.
-Lines start with
-.Ql #
-are ignored.
-The
-.Ar file
-must be owned by the user ID running
-.Xr racoon 8
-.Pq usually privileged user ,
-and must not be accessible by others.
+See
+.Ic Pre-shared key File .
 .It Ic path certificate Ar path ;
 .Xr racoon 8
 will search this directory if the certificate or certificate request
@@ -579,6 +564,25 @@ means to be constrained the peer to set the number of pad bytes.
 Default is off.
 .El
 .El
+.\"
+.Ss Pre-shared key File
+Pre-shared key file defines a pair of the identifier and the shared secret key
+which are used at Pre-shared key authentication method in phase 1.
+The pair in each lines are separated by any number of blanks and/or tab
+characters such like
+.Xr hosts 5 .
+Key can be included any blanks because all of the words after 2nd column
+are interpreted as a secret key.
+Lines start with
+.Ql #
+are ignored.
+Key start with
+.Ql 0x
+means hexa-decimal string.
+Note that the file must be owned by the user ID running
+.Xr racoon 8
+.Pq usually privileged user ,
+and must not be accessible by others.
 .\"
 .Sh EXAMPLE
 The following shows how remote directive should be configured.
