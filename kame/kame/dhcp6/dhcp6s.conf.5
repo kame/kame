@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6s.conf.5,v 1.2 2002/05/29 14:47:13 jinmei Exp $
+.\"	$KAME: dhcp6s.conf.5,v 1.3 2002/06/21 11:07:54 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -111,7 +111,7 @@ interface to the value
 The specified value will be contained in a preference option of
 advertise messages.
 The preference value must be a decimal integer and be between 0 and
-255.
+255 (inclusive.)
 .El
 .El
 .\"
@@ -126,7 +126,7 @@ The generic format of a host statement is as follows:
 .Ar substatements
 };
 .Xc
-.Ar host
+.Ar name
 is an arbitrary string.
 It does not affect server's behavior but is provided for
 readability of log messages.
