@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.1 2005/01/11 08:37:50 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.2 2005/01/11 08:40:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,9 +64,7 @@
  *	@(#)udp_var.h	8.1 (Berkeley) 6/10/93
  */
 
-#ifdef __NetBSD__	/* XXX */
 #include "opt_ipsec.h"
-#endif
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -77,10 +75,8 @@
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/systm.h>
-#ifdef __NetBSD__
 #include <sys/proc.h>
 #include <sys/sysctl.h>
-#endif
 #include <sys/syslog.h>
 
 #include <net/if.h>
@@ -116,335 +112,17 @@
  * Per RFC 768, August, 1980.
  */
 
-#ifdef __NetBSD__
 extern struct inpcbtable udbtable;
-#else
-struct	in6pcb *udp6_last_in6pcb = &udb6;
-#endif
 
 static	void udp6_notify __P((struct in6pcb *, int));
-
-#ifdef __FreeBSD__
-extern int udp_log_in_vain;
-#endif
 
 void
 udp6_init()
 {
 
-#ifdef __NetBSD__
 	/* initialization done in udp_input() due to initialization order */
-#else
-	udb6.in6p_next = udb6.in6p_prev = &udb6;
-#endif
 }
 
-#ifndef __NetBSD__
-int
-udp6_input(mp, offp, proto)
-	struct mbuf **mp;
-	int *offp, proto;
-{
-	struct mbuf *m = *mp, *opts = NULL;
-	struct ip6_hdr *ip6;
-	struct udphdr *uh;
-	struct in6pcb *in6p;
-	int off = *offp;
-	u_int32_t plen, ulen;
-
-	ip6 = mtod(m, struct ip6_hdr *);
-
-#if defined(NFAITH) && 0 < NFAITH
-	if (faithprefix(&ip6->ip6_dst)) {
-		/* send icmp6 host unreach? */
-		m_freem(m);
-		return IPPROTO_DONE;
-	}
-#endif
-
-	udp6stat.udp6s_ipackets++;
-
-	/* check for jumbogram is done in ip6_input.  we can trust pkthdr.len */
-	plen = m->m_pkthdr.len - off;
-#ifndef PULLDOWN_TEST
-	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
-	uh = (struct udphdr *)((caddr_t)ip6 + off);
-#else
-	IP6_EXTHDR_GET(uh, struct udphdr *, m, off, sizeof(struct udphdr));
-	if (uh == NULL) {
-		udp6stat.udp6s_hdrops++;
-		return IPPROTO_DONE;
-	}
-#endif
-
-	/*
-	 * XXX: the address may have embedded scope zone ID, which should be
-	 * hidden from applications.
-	 */
-	fromsa = src;
-#ifndef SCOPEDROUTING
-	in6_clearscope(&fromsa.sin6_addr);
-#endif
-
-	ulen = ntohs((u_int16_t)uh->uh_ulen);
-	/*
-	 * RFC2675 section 4: jumbograms will have 0 in the UDP header field,
-	 * iff payload length > 0xffff.
-	 */
-	if (ulen == 0 && plen > 0xffff)
-		ulen = plen;
-
-	if (plen != ulen) {
-		udp6stat.udp6s_badlen++;
-		goto bad;
-	}
-
-	/* destination port of 0 is illegal, based on RFC768. */
-	if (uh->uh_dport == 0)
-		goto bad;
-
-	/* Be proactive about malicious use of IPv4 mapped address */
-	if (IN6_IS_ADDR_V4MAPPED(&ip6->ip6_src) ||
-	    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst)) {
-		/* XXX stat */
-		goto bad;
-	}
-
-	/*
-	 * Checksum extended UDP header and data.
-	 */
-	if (uh->uh_sum == 0)
-		udp6stat.udp6s_nosum++;
-	else if (in6_cksum(m, IPPROTO_UDP, off, ulen) != 0) {
-		udp6stat.udp6s_badsum++;
-		goto bad;
-	}
-
-	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
-		struct	in6pcb *last;
-
-		/*
-		 * Deliver a multicast datagram to all sockets
-		 * for which the local and remote addresses and ports match
-		 * those of the incoming datagram.  This allows more than
-		 * one process to receive multicasts on the same port.
-		 * (This really ought to be done for unicast datagrams as
-		 * well, but that would cause problems with existing
-		 * applications that open both address-specific sockets and
-		 * a wildcard socket listening to the same port -- they would
-		 * end up receiving duplicates of every unicast datagram.
-		 * Those applications open the multiple sockets to overcome an
-		 * inadequacy of the UDP socket interface, but for backwards
-		 * compatibility we avoid the problem here rather than
-		 * fixing the interface.  Maybe 4.5BSD will remedy this?)
-		 */
-
-		/*
-		 * In a case that laddr should be set to the link-local
-		 * address (this happens in RIPng), the multicast address
-		 * specified in the received packet does not match with
-		 * laddr. To cure this situation, the matching is relaxed
-		 * if the receiving interface is the same as one specified
-		 * in the socket and if the destination multicast address
-		 * matches one of the multicast groups specified in the socket.
-		 */
-
-		/*
-		 * Construct sockaddr format source address.
-		 */
-		fromsa.sin6_port = uh->uh_sport;
-
-		/*
-		 * KAME note: traditionally we dropped udpiphdr from mbuf here.
-		 * We need udphdr for IPsec processing so we do that later.
-		 */
-
-		/*
-		 * Locate pcb(s) for datagram.
-		 * (Algorithm copied from raw_intr().)
-		 */
-		last = NULL;
-		for (in6p = udb6.in6p_next;
-		     in6p != &udb6;
-		     in6p = in6p->in6p_next) {
-			if (in6p->in6p_lport != uh->uh_dport)
-				continue;
-			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
-				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr,
-				    &ip6->ip6_dst))
-					continue;
-			}
-			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
-				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
-				    &ip6->ip6_src) ||
-				    in6p->in6p_fport != uh->uh_sport)
-					continue;
-			}
-
-			if (last != NULL) {
-				struct	mbuf *n;
-
-#ifdef IPSEC
-				/*
-				 * Check AH/ESP integrity.
-				 */
-				if (ipsec6_in_reject(m, last)) {
-					ipsec6stat.in_polvio++;
-					/* do not inject data into pcb */
-				} else
-#endif /* IPSEC */
-				if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
-					/*
-					 * KAME NOTE: do not
-					 * m_copy(m, offset, ...) above.
-					 * sbappendaddr() expects M_PKTHDR,
-					 * and m_copy() will copy M_PKTHDR
-					 * only if offset is 0.
-					 */
-					if (last->in6p_flags & IN6P_CONTROLOPTS
-#ifdef SO_TIMESTAMP
-					 || last->in6p_socket->so_options & SO_TIMESTAMP
-#endif
-					    ) {
-						ip6_savecontrol(last, n, &opts);
-					}
-
-					m_adj(n, off + sizeof(struct udphdr));
-					if (sbappendaddr(&last->in6p_socket->so_rcv,
-					    (struct sockaddr *)&fromsa,
-					    n, opts) == 0) {
-						m_freem(n);
-						if (opts)
-							m_freem(opts);
-						udp6stat.udp6s_fullsock++;
-					} else
-						sorwakeup(last->in6p_socket);
-					opts = NULL;
-				}
-			}
-			last = in6p;
-			/*
-			 * Don't look for additional matches if this one does
-			 * not have either the SO_REUSEPORT or SO_REUSEADDR
-			 * socket options set.  This heuristic avoids searching
-			 * through all pcbs in the common case of a non-shared
-			 * port.  It assumes that an application will never
-			 * clear these options after setting them.
-			 */
-			if ((last->in6p_socket->so_options &
-			     (SO_REUSEPORT|SO_REUSEADDR)) == 0)
-				break;
-		}
-
-		if (last == NULL) {
-			/*
-			 * No matching pcb found; discard datagram.
-			 * (No need to send an ICMP Port Unreachable
-			 * for a broadcast or multicast datgram.)
-			 */
-			udp6stat.udp6s_noport++;
-			udp6stat.udp6s_noportmcast++;
-			goto bad;
-		}
-#ifdef IPSEC
-		/*
-		 * Check AH/ESP integrity.
-		 */
-		if (last != NULL && ipsec6_in_reject(m, last)) {
-			ipsec6stat.in_polvio++;
-			goto bad;
-		}
-#endif /* IPSEC */
-		if (last->in6p_flags & IN6P_CONTROLOPTS
-#ifdef SO_TIMESTAMP
-		 || last->in6p_socket->so_options & SO_TIMESTAMP
-#endif
-		    ) {
-			ip6_savecontrol(last, m, &opts);
-		}
-
-		m_adj(m, off + sizeof(struct udphdr));
-		if (sbappendaddr(&last->in6p_socket->so_rcv,
-		    (struct sockaddr *)&fromsa, m, opts) == 0) {
-			udp6stat.udp6s_fullsock++;
-			goto bad;
-		}
-		sorwakeup(last->in6p_socket);
-		return IPPROTO_DONE;
-	}
-	/*
-	 * Locate pcb for datagram.
-	 */
-	in6p = udp6_last_in6pcb;
-	if (in6p->in6p_lport != uh->uh_dport ||
-	   in6p->in6p_fport != uh->uh_sport ||
-	   !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, &src) ||
-	   !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &dst)) {
-		in6p = in6_pcblookup(&udb6, &src, uh->uh_sport,
-		    &dst, uh->uh_dport, IN6PLOOKUP_WILDCARD);
-		if (in6p)
-			udp6_last_in6pcb = in6p;
-		udp6stat.udp6ps_pcbcachemiss++;
-	}
-	if (in6p == 0) {
-#ifdef __FreeBSD__
-		if (udp_log_in_vain) {
-			char buf[INET6_ADDRSTRLEN];
-
-			strcpy(buf, ip6_sprintf(&ip6->ip6_dst));
-			log(LOG_INFO,
-			    "Connection attempt to UDP [%s]:%d from [%s]:%d\n",
-			    buf, ntohs(uh->uh_dport),
-			    ip6_sprintf(&ip6->ip6_src), ntohs(uh->uh_sport));
-		}
-#endif
-		udp6stat.udp6s_noport++;
-		if (m->m_flags & M_MCAST) {
-			udp6stat.udp6s_noportmcast++;
-			goto bad;
-		}
-		icmp6_error(m, ICMP6_DST_UNREACH, ICMP6_DST_UNREACH_NOPORT, 0);
-		return IPPROTO_DONE;
-	}
-#ifdef IPSEC
-	/*
-	 * Check AH/ESP integrity.
-	 */
-	if (in6p != NULL && ipsec6_in_reject(m, in6p)) {
-		ipsec6stat.in_polvio++;
-		goto bad;
-	}
-#endif /* IPSEC */
-
-	/*
-	 * Construct sockaddr format source address.
-	 * Stuff source address and datagram in user buffer.
-	 */
-	fromsa.sin6_port = uh->uh_sport;
-	if (in6p->in6p_flags & IN6P_CONTROLOPTS
-#ifdef SO_TIMESTAMP
-	 || in6p->in6p_socket->so_options & SO_TIMESTAMP
-#endif
-	   ) {
-		ip6_savecontrol(in6p, m, &opts);
-	}
-
-	m_adj(m, off + sizeof(struct udphdr));
-	if (sbappendaddr(&in6p->in6p_socket->so_rcv,
-	    (struct sockaddr *)&fromsa, m, opts) == 0) {
-		udp6stat.udp6s_fullsock++;
-		goto bad;
-	}
-	sorwakeup(in6p->in6p_socket);
-	return IPPROTO_DONE;
-bad:
-	if (m)
-		m_freem(m);
-	if (opts)
-		m_freem(opts);
-	return IPPROTO_DONE;
-}
-#endif
 
 /*
  * Notify a udp user of an asynchronous error;
@@ -490,12 +168,10 @@ udp6_ctlinput(cmd, sa, d)
 		notify = in6_rtchange, d = NULL;
 	else if (cmd == PRC_HOSTDEAD)
 		d = NULL;
-#ifdef __NetBSD__
 	else if (cmd == PRC_MSGSIZE) {
 		/* special code is present, see below */
 		notify = in6_rtchange;
 	}
-#endif
 	else if (inet6ctlerrmap[cmd] == 0)
 		return;
 
@@ -532,7 +208,6 @@ udp6_ctlinput(cmd, sa, d)
 		bzero(&uh, sizeof(uh));
 		m_copydata(m, off, sizeof(*uhp), (caddr_t)&uh);
 
-#ifdef __NetBSD__
 		if (cmd == PRC_MSGSIZE) {
 			int valid = 0;
 
@@ -577,7 +252,6 @@ udp6_ctlinput(cmd, sa, d)
 			 * destination and want to know the path MTU.
 			 */
 		}
-#endif
 
 		(void) in6_pcbnotify(&udbtable, sa, uh.uh_dport,
 		    (struct sockaddr *)sa6_src, uh.uh_sport, cmd, cmdarg,
@@ -592,18 +266,11 @@ extern	int udp6_sendspace;
 extern	int udp6_recvspace;
 
 int
-#if defined(__NetBSD__) || defined(__FreeBSD__)
 udp6_usrreq(so, req, m, addr6, control, p)
 	struct socket *so;
 	int req;
 	struct mbuf *m, *addr6, *control;
 	struct proc *p;
-#else
-udp6_usrreq(so, req, m, addr6, control)
-	struct socket *so;
-	int req;
-	struct mbuf *m, *addr6, *control;
-#endif
 {
 	struct	in6pcb *in6p = sotoin6pcb(so);
 	int	error = 0;
@@ -622,19 +289,15 @@ udp6_usrreq(so, req, m, addr6, control)
 	if (req == PRU_CONTROL)
 		return (in6_control(so, (u_long)m, (caddr_t)addr6,
 		    (struct ifnet *)control
-#if defined(__NetBSD__) || defined(__FreeBSD__)
 				   , p
-#endif
 				   ));
 
-#ifdef __NetBSD__
 	if (req == PRU_PURGEIF) {
 		in6_pcbpurgeif0(&udbtable, (struct ifnet *)control);
 		in6_purgeif((struct ifnet *)control);
 		in6_pcbpurgeif(&udbtable, (struct ifnet *)control);
 		return (0);
 	}
-#endif
 
 	if (in6p == NULL && req != PRU_ATTACH) {
 		error = EINVAL;
@@ -652,16 +315,8 @@ udp6_usrreq(so, req, m, addr6, control)
 			error = EINVAL;
 			break;
 		}
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
-#else
-		s = splnet();
-#endif
-#ifdef __NetBSD__
 		error = in6_pcballoc(so, &udbtable);
-#else
-		error = in6_pcballoc(so, &udb6);
-#endif
 		splx(s);
 		if (error)
 			break;
@@ -677,13 +332,8 @@ udp6_usrreq(so, req, m, addr6, control)
 		break;
 
 	case PRU_BIND:
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 		error = in6_pcbbind(in6p, addr6, p);
-#else
-		s = splnet();
-		error = in6_pcbbind(in6p, addr6);
-#endif
 		splx(s);
 		break;
 
@@ -696,11 +346,7 @@ udp6_usrreq(so, req, m, addr6, control)
 			error = EISCONN;
 			break;
 		}
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
-#else
-		s = splnet();
-#endif
 		error = in6_pcbconnect(in6p, addr6);
 		splx(s);
 		if (error == 0)
@@ -720,11 +366,7 @@ udp6_usrreq(so, req, m, addr6, control)
 			error = ENOTCONN;
 			break;
 		}
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
-#else
-		s = splnet();
-#endif
 		in6_pcbdisconnect(in6p);
 		bzero((caddr_t)&in6p->in6p_laddr, sizeof(in6p->in6p_laddr));
 		splx(s);
@@ -736,11 +378,7 @@ udp6_usrreq(so, req, m, addr6, control)
 		break;
 
 	case PRU_SEND:
-#ifdef __NetBSD__
 		return (udp6_output(in6p, m, addr6, control, p));
-#else
-		return (udp6_output(in6p, m, addr6, control));
-#endif
 
 	case PRU_ABORT:
 		soisdisconnected(so);
@@ -785,7 +423,6 @@ release:
 	return (error);
 }
 
-#ifdef __NetBSD__
 SYSCTL_SETUP(sysctl_net_inet6_udp6_setup, "sysctl net.inet6.udp6 subtree setup")
 {
 	sysctl_createv(clog, 0, NULL, NULL,
@@ -820,4 +457,3 @@ SYSCTL_SETUP(sysctl_net_inet6_udp6_setup, "sysctl net.inet6.udp6 subtree setup")
 		       CTL_NET, PF_INET6, IPPROTO_UDP, UDP6CTL_RECVSPACE,
 		       CTL_EOL);
 }
-#endif

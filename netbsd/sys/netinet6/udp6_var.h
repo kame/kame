@@ -1,4 +1,4 @@
-/*	$KAME: udp6_var.h,v 1.1 2005/01/11 08:37:50 itojun Exp $	*/
+/*	$KAME: udp6_var.h,v 1.2 2005/01/11 08:40:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,56 +85,31 @@ struct	udp6stat {
 	u_quad_t udp6s_opackets;	/* total output packets */
 };
 
-#if defined(__FreeBSD__) || defined(__NetBSD__)
 /*
  * Names for UDP sysctl objects
  */
-#ifdef __FreeBSD__
-#define UDP6CTL_MAXDGRAM	1	/* default send buffer */
-#else
 #define UDP6CTL_SENDSPACE	1	/* default send buffer */
-#endif
 #define UDP6CTL_RECVSPACE	2	/* default recv buffer */
 #define UDP6CTL_MAXID		3
 
-#ifdef __FreeBSD__
-#define __SENDSPACENAME	"maxdgram"
-#else
-#define __SENDSPACENAME	"sendspace"
-#endif
-
 #define UDP6CTL_NAMES { \
 	{ 0, 0 }, \
-	{ __SENDSPACENAME, CTLTYPE_INT }, \
+	{ "sendspace", CTLTYPE_INT }, \
 	{ "recvspace", CTLTYPE_INT }, \
 }
-#endif /* __FreeBSD__||__NetBSD__ */
 
 #ifdef _KERNEL
-#ifndef __NetBSD__
-struct	in6pcb udb6;
-#endif
 struct	udp6stat udp6stat;
 
 void	udp6_ctlinput __P((int, struct sockaddr *, void *));
 void	udp6_init __P((void));
 int	udp6_input __P((struct mbuf **, int *, int));
-#ifndef __NetBSD__
-int	udp6_output __P((struct in6pcb *,
-			 struct mbuf *, struct mbuf *, struct mbuf *));
-#else
 int	udp6_output __P((struct in6pcb *, struct mbuf *, struct mbuf *,
 	struct mbuf *, struct proc *));
-#endif
 int	udp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
-#if defined(__NetBSD__) || defined(__FreeBSD__)
 int	udp6_usrreq __P((struct socket *,
 			 int, struct mbuf *, struct mbuf *, struct mbuf *,
 			 struct proc *));
-#else
-int	udp6_usrreq __P((struct socket *,
-			 int, struct mbuf *, struct mbuf *, struct mbuf *));
-#endif
 #endif /* _KERNEL */
 
 #endif /* _NETINET6_UDP6_VAR_H_ */
