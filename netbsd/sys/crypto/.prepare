@@ -2,3 +2,5 @@ exclude md5.c
 exclude md5.h
 exclude sha1.c
 exclude sha1.h
+exclude hmac_md5.c
+exclude hmac_md5.h
