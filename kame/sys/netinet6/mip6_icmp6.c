@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.21 2001/11/16 09:48:53 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.22 2001/11/27 06:33:56 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -67,6 +67,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
+#include <netinet6/in6_pcb.h>
 
 #ifdef IPSEC
 #ifdef __OpenBSD__
@@ -537,12 +538,13 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 	 */
 	{
 		struct sockaddr_in6 sin6;
+		struct ifaddr *ifa;
 
 		bzero((caddr_t)&sin6, sizeof(sin6));
 		sin6.sin6_len = sizeof(sin6);
 		sin6.sin6_family = AF_INET6;
 #ifdef MIP6_DRAFT13
-		sin6.sin6_addr = *haddr;
+		sin6.sin6_addr = *haddr;	/* MN's home address */
 #else
 		/*
 		 * the destination ip address of a DHAAD request
@@ -551,10 +553,10 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 		 * all interfaces with the prefix of the anycast
 		 * address as a search key.
 		 */
-		sin6.sin6_addr = ip6->ip6_dst;
+		sin6.sin6_addr = ip6->ip6_dst;	/* HA's anycast address */
 #endif /* MIP6_DRAFT13 */
-		haifa = (struct in6_ifaddr *)
-			ifa_ifwithnet((struct sockaddr *)&sin6);
+		ifa = ifa_ifwithnet((struct sockaddr *)&sin6);
+		haifa = in6_ifawithifp(ifa->ifa_ifp, &sin6.sin6_addr);
 	}
 
         /*
@@ -593,11 +595,7 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 #endif /* MIP6_DRAFT13 */
 	hdreplen = sizeof(*hdrep);
 	n = mip6_create_ip6hdr(&haifa->ia_addr.sin6_addr,
-#ifdef MIP6_DRAFT13
-			       haddr, /* XXX: true? */
-#else
 			       &ip6->ip6_src, /* XXX: true? */
-#endif /* MIP6_DRAFT13 */
 			       IPPROTO_ICMPV6, hdreplen + halistlen);
 	if (n == NULL) {
 		mip6log((LOG_ERR,
@@ -609,6 +607,7 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 		return (ENOBUFS);
 	}
 	ip6_rep = mtod(n, struct ip6_hdr *);
+	ip6_rep->ip6_hlim = in6_selecthlim(NULL, haifa->ia_ifp);
 	hdrep = (struct ha_discov_rep *)(ip6_rep + 1);
 	bzero((caddr_t)hdrep, sizeof(*hdrep));
 	hdrep->discov_rep_type = ICMP6_HADISCOV_REPLY;
