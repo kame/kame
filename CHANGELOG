@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1381 2000/11/09 05:20:31 jinmei Exp $
+$KAME: CHANGELOG,v 1.1382 2000/11/09 05:22:08 itojun Exp $
 
 <200011>
 Thu Nov  9 09:53:54 JST 2000  itojun@iijlab.net
@@ -11,8 +11,8 @@ Thu Nov  9 02:21:00 JST 2000  itojun@iijlab.net
 	* *bsd*/sys/sys/mbuf.h: make sure we nuke mbuf pointed to by m_aux,
 	  on MFREE().  under sys/kern, there are code which calls MFREE()
 	  instead of m_free().
-	* sys/netinet6?/tcp6?_input.c: reject SYN if the destination address is
-	  a deprecated address, and we forbid the use of deprecated address.
+	* sys/netinet6?/tcp6?_input.c: reject SYN, if the destination address is
+	  a deprecated address and we forbid the use of deprecated address.
 	* sys/sys/mbuf.h: get rid of M_ANYCAST6. flag bit is a precious resource
 	  (done for freebsd2/bsdi[34]/openbsd/netbsd)
 
