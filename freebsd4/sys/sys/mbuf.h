@@ -466,10 +466,11 @@ union mcluster {
 	struct mbuf *_mfrom = (from);					\
 	struct mbuf *_mto = (to);					\
 									\
-	_mto->m_data = _mto->m_pktdat;					\
-	_mto->m_flags = _mfrom->m_flags & M_COPYFLAGS;			\
 	_mto->m_pkthdr = _mfrom->m_pkthdr;				\
-	SLIST_INIT(&(_mfrom)->m_pkthdr.tags);				\
+	_mto->m_flags = _mfrom->m_flags & M_COPYFLAGS;			\
+	SLIST_INIT(&(_mto)->m_pkthdr.tags);				\
+	m_tag_copy_chain((_mto), (_mfrom));				\
+	_mto->m_data = _mto->m_pktdat;					\
 } while (0)
 
 /*

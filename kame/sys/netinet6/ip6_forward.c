@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.113 2002/10/29 09:41:59 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.114 2003/02/05 01:29:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -243,15 +243,6 @@ ip6_forward(m, srcrt)
 	 * processing may modify the mbuf.
 	 */
 	mcopy = m_copy(m, 0, imin(m->m_pkthdr.len, ICMPV6_PLD_MAXLEN));
-	/*
-	 * XXX: m_copy moves m_aux to mcopy, but we need the data for both the
-	 * original and the copy.
-	 */
-	if (ip6_setpktaddrs(m, sa6_src, sa6_dst) == NULL) {
-		m_freem(m);
-		m_freem(mcopy);
-		return;
-	}
 
 #ifdef IPSEC
 	/* get a security policy for this packet */

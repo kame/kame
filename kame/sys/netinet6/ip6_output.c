@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.355 2003/01/23 09:15:09 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.356 2003/02/05 01:29:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4827,15 +4827,6 @@ ip6_mloopback(ifp, m, dst)
 	 * Duplicate the packet.
 	 */
 	copym = m_copy(m, 0, M_COPYALL);
-	/*
-	 * m_copy() moves the tags from the original mbuf to the
-	 * copied mbuf.  But, since we may still need the aux
-	 * information stored in the tags in the later process of the
-	 * output routine, recover the aux information from the copied
-	 * mbuf to the original mbuf.
-	 */
-	m->m_pkthdr.tags = copym->m_pkthdr.tags;
-	SLIST_INIT(&copym->m_pkthdr.tags);
 	if (copym == NULL)
 		return;
 
