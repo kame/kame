@@ -1,6 +1,6 @@
 TODO list for the new advanced API (aka rfc2292bis)
 KAME project
-$KAME: TODO.2292bis,v 1.29 2000/11/18 11:29:48 jinmei Exp $
+$KAME: TODO.2292bis,v 1.30 2000/11/25 12:09:14 jinmei Exp $
 
 new socket options or ancillary data types:
 - IPV6_RTHDRDSTOPTS	done/20000102	jinmei
@@ -11,17 +11,15 @@ new socket options or ancillary data types:
 - IPV6_RECVDSTOPTS	done/19991217	jinmei	*
 - IPV6_RECVRTHDRDSTOPTS	done/19991217	jinmei  *
 - IPV6_USE_MIN_MTU	done/20000404	itojun	**
-- IPV6_RECVPATHMTU	done/20001115	jinmei	***
+- IPV6_RECVPATHMTU	done/20001115	jinmei
 - IPV6_REACHCONF	done/19991223	itojun	****
 (*) the current implementation returns each dst opt header in a single
     ancillary object, but the specfication requires that all headers are
     stored in a single object.
 (**) setsockopt works only for IPv6 UDP sockets (may need improvement).
      Ancillary data works for all cases.
-(***) transport layer support has been done for bsdi4 only at this moment.
-      code was provided for other OSes as well, but not compiled yet.
-(****) 2292bis-01 does not talk about security risks with it.  KAME code
-       requires root privilege to use this.
+(***) 2292bis-01 does not talk about security risks with it.  KAME code
+      requires root privilege to use this.
 
 existing options whose semantics is changed in 2292bis:
 - IPV6_PKTINFO		done/20000102	jinmei
