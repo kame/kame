@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.61 2001/07/24 08:55:29 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.62 2001/07/24 17:31:12 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -560,7 +560,7 @@ extern LIST_HEAD(in6_multihead, in6_multi) in6_multihead;
 
 /*
  * Structure used by macros below to remember position when stepping through
- * all of eht in6_multi records.
+ * all of the in6_multi records.
  */
 struct	in6_multistep {
 	struct	in6_ifaddr *i_ia;
