@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.219 2001/11/28 11:08:56 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.220 2001/12/18 02:21:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -530,7 +530,7 @@ nd6_timer(ignored_arg)
 #endif
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&nd6_timer_ch, nd6_prune * hz,
-		      nd6_timer, NULL);
+	    nd6_timer, NULL);
 #elif defined(__OpenBSD__)
 	timeout_set(&nd6_timer_ch, nd6_timer, NULL);
 	timeout_add(&nd6_timer_ch, nd6_prune * hz);
