@@ -173,9 +173,11 @@ ip_output(m0, opt, ro, flags, imo)
 	 */
 #ifdef DUMMYNET
 	if (m->m_type == MT_DUMMYNET) {
-		so = (m->m_next == NULL) ? NULL :
-			(struct socket *)m->m_next->m_pkthdr.rcvif;
-		m->m_next->m_pkthdr.rcvif = NULL;
+		if (m->m_next != NULL) {
+			so = (struct socket *)m->m_next->m_pkthdr.rcvif;
+			m->m_next->m_pkthdr.rcvif = NULL;
+		} else
+			so = NULL;
 	} else
 #endif
 	{

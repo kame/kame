@@ -220,9 +220,6 @@ dn_move(struct dn_pipe *pipe, int immediate)
 	case DN_TO_IP_OUT: {
 	    struct rtentry *tmp_rt = pkt->ro.ro_rt ;
 
-#ifdef IPSEC
-	    pkt->dn_m->m_pkthdr.rcvif = NULL;
-#endif /*IPSEC*/
 	    (void)ip_output((struct mbuf *)pkt, (struct mbuf *)pkt->ifp,
 			&(pkt->ro), pkt->dn_dst, NULL);
 	    rt_unref (tmp_rt) ;
