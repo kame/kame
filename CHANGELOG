@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2350 2003/02/18 14:43:04 jinmei Exp $
+$KAME: CHANGELOG,v 1.2351 2003/02/19 08:31:30 keiichi Exp $
 
 <200302>
+Wed Feb 19 17:26:11 JST 2003	keiichi@iij.ad.jp
+	more mtag leaks are fidex.  M_MOVE_PKTHDR is introduced to
+	NetBSD (ported from OpenBSD).
+	TODO: KAME/freebsd5
+
+Wed Feb 19 12:15:00 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/netkey/key.c
+	MIP6: flush a cached route of a SA when the destaddr of the SA
+	has been changed.
+
 2003-02-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/sys/mbuf.h (M_MOVE_PKTHDR): ported from OpenBSD to
 	"move" mtag from one mbuf to another.
