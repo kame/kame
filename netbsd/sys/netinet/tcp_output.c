@@ -919,15 +919,13 @@ send:
 		 * need to recover version # field, which was overwritten
 		 * on ip_cksum computation.
 		 */
-		struct ip *sip;
-		sip = mtod(m, struct ip *);
 		switch (af) {
 		case AF_INET:
-			sip->ip_v = 4;
+			mtod(m, struct ip *)->ip_v = 4;
 			break;
 #ifdef INET6
 		case AF_INET6:
-			sip->ip_v = 6;
+			mtod(m, struct ip *)->ip_v = 6;
 			break;
 #endif
 		}
