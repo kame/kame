@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.265 2001/08/28 09:21:14 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.266 2001/08/28 12:05:48 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -597,9 +597,10 @@ To summarize the sysctl knob:
 	0		0		host (to be manually configured)
 	0		1		router
 	1		0		autoconfigured host
-					(spec assumes that host has single
-					interface only, autoconfigred host with
-					multiple interface is out-of-scope)
+					(spec assumes that hosts have a single
+					interface only, autoconfigred hosts
+					with multiple interfaces are
+					out-of-scope)
 	1		1		invalid, or experimental
 					(out-of-scope of spec)
 
