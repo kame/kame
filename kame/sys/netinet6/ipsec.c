@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.204 2003/09/19 10:53:38 jinmei Exp $	*/
+/*	$KAME: ipsec.c,v 1.205 2003/09/22 04:50:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1288,13 +1288,15 @@ ipsec_init_pcbpolicy(so, pcb_sp)
 		in->policy = IPSEC_POLICY_ENTRUST;
 		in->dir = IPSEC_DIR_INBOUND;
 		in->readonly = 1;
-		in->so = so;
+		in->persist = 1;
+		in->so = NULL;
 
 		out->state = IPSEC_SPSTATE_ALIVE;
 		out->policy = IPSEC_POLICY_ENTRUST;
 		out->dir = IPSEC_DIR_OUTBOUND;
 		out->readonly = 1;
-		out->so = so;
+		out->persist = 1;
+		out->so = NULL;
 
 		initialized++;
 	}

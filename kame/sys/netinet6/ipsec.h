@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.69 2003/09/10 23:49:11 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.70 2003/09/22 04:50:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,6 +80,7 @@ struct secpolicy {
 
 	u_int8_t dir;			/* direction of packet flow */
 	int readonly;			/* write prohibited */
+	int persist;			/* will never be removed */
 	int refcnt;			/* reference count */
 	struct secpolicyindex *spidx;	/* selector - NULL if not valid */
 	u_int16_t tag;			/* PF tag */
