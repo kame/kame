@@ -155,11 +155,17 @@ udp_input(m, off, proto)
 	register struct udphdr *uh;
 	register struct inpcb *inp;
 	struct mbuf *opts = 0;
+#ifdef INET6
+	struct ip6_recvpktopts opts6;
+#endif 
 	int len;
 	struct ip save_ip;
 	struct sockaddr *append_sa;
 
 	udpstat.udps_ipackets++;
+#ifdef INET6
+	bzero(&opts6, sizeof(opts6));
+#endif
 
 	/*
 	 * Strip IP options, if any; should skip this,
@@ -184,6 +190,10 @@ udp_input(m, off, proto)
 		ip = mtod(m, struct ip *);
 	}
 	uh = (struct udphdr *)((caddr_t)ip + iphlen);
+
+	/* destination port of 0 is illegal, based on RFC768. */
+	if (uh->uh_dport == 0)
+		goto bad;
 
 	/*
 	 * Make mbuf data length reflect UDP length.
@@ -369,18 +379,19 @@ udp_input(m, off, proto)
 			ip_2_ip6_hdr(&udp_ip6.uip6_ip6, ip);
 			savedflags = inp->inp_flags;
 			inp->inp_flags &= ~INP_UNMAPPABLEOPTS;
-			ip6_savecontrol(inp, &opts, &udp_ip6.uip6_ip6, m);
+ 			ip6_savecontrol(inp, &udp_ip6.uip6_ip6, m,
+ 					&opts6, NULL);
 			inp->inp_flags = savedflags;
 		} else
 #endif
 		ip_savecontrol(inp, &opts, ip, m);
 	}
-	iphlen += sizeof(struct udphdr);
-	m_adj(m, iphlen);
+ 	m_adj(m, iphlen + sizeof(struct udphdr));
 #ifdef INET6
 	if (inp->inp_vflag & INP_IPV6) {
 		in6_sin_2_v4mapsin6(&udp_in, &udp_in6.uin6_sin);
 		append_sa = (struct sockaddr *)&udp_in6;
+ 		opts = opts6.head;
 	} else
 #endif
 	append_sa = (struct sockaddr *)&udp_in;
@@ -397,7 +408,7 @@ bad:
 	return;
 }
 
-#if defined(INET6)
+#ifdef INET6
 static void
 ip_2_ip6_hdr(ip6, ip)
 	struct ip6_hdr *ip6;
@@ -429,7 +440,11 @@ udp_append(last, ip, n, off)
 {
 	struct sockaddr *append_sa;
 	struct mbuf *opts = 0;
+#ifdef INET6
+	struct ip6_recvpktopts opts6;
 
+	bzero(&opts6, sizeof(opts6));
+#endif
 	if (last->inp_flags & INP_CONTROLOPTS ||
 	    last->inp_socket->so_options & SO_TIMESTAMP) {
 #ifdef INET6
@@ -442,7 +457,8 @@ udp_append(last, ip, n, off)
 			}
 			savedflags = last->inp_flags;
 			last->inp_flags &= ~INP_UNMAPPABLEOPTS;
-			ip6_savecontrol(last, &opts, &udp_ip6.uip6_ip6, n);
+ 			ip6_savecontrol(last, &udp_ip6.uip6_ip6, n,
+ 					&opts6, NULL);
 			last->inp_flags = savedflags;
 		} else
 #endif
@@ -455,6 +471,7 @@ udp_append(last, ip, n, off)
 			udp_in6.uin6_init_done = 1;
 		}
 		append_sa = (struct sockaddr *)&udp_in6.uin6_sin;
+ 		opts = opts6.head;
 	} else
 #endif
 	append_sa = (struct sockaddr *)&udp_in;
@@ -702,9 +719,8 @@ udp_output(inp, m, addr, control, p)
 	udpstat.udps_opackets++;
 
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = (struct ifnet *)inp->inp_socket;
+	ipsec_setsocket(m, inp->inp_socket);
 #endif /*IPSEC*/
-
 	error = ip_output(m, inp->inp_options, &inp->inp_route,
 	    (inp->inp_socket->so_options & (SO_DONTROUTE | SO_BROADCAST))
 	    | IP_SOCKINMRCVIF,
