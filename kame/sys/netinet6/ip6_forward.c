@@ -369,6 +369,13 @@ ip6_forward(m, srcrt)
 				if (ipsechdrsiz < mtu)
 					mtu -= ipsechdrsiz;
 			}
+
+			/*
+			 * if mtu becomes less than minimum MTU, 
+			 * tell minimum MTU (and I'll need to fragment it).
+			 */
+			if (mtu < IPV6_MMTU)
+				mtu = IPV6_MMTU;
 #endif
 			icmp6_error(mcopy, ICMP6_PACKET_TOO_BIG, 0, mtu);
 		}
