@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.159 2000/09/22 15:39:51 itojun Exp $	*/
+/*	$KAME: key.c,v 1.160 2000/09/22 16:04:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -5378,7 +5378,6 @@ key_getcomb_setlifetime(comb)
 /*
  * XXX reorder combinations by preference
  * XXX no idea if the user wants ESP authentication or not
- * XXX lifetime - should be in policy?
  */
 static struct mbuf *
 key_getcomb_esp()
@@ -5461,7 +5460,6 @@ key_getcomb_esp()
 
 /*
  * XXX reorder combinations by preference
- * XXX lifetime - should be in policy?
  */
 static struct mbuf *
 key_getcomb_ah()
