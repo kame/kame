@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2474 2003/09/19 10:58:44 jinmei Exp $
+$KAME: CHANGELOG,v 1.2475 2003/09/20 09:34:59 jinmei Exp $
 
 <200309>
+2003-09-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd/if.c (if_nametosdl): made sure to free the
+	temporary buffer.
+	In response to KAME PR 502 reported by Takayuki Sakuma.
+
 2003-09-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ipsec.c (ipsec_copypkt): avoided coping m_flag
 	after M_MOVE_PKTHDR().  It would clear M_PKTHDR from the copy
