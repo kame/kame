@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.83 2002/05/29 23:07:33 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.84 2002/05/29 23:45:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.83 2002/05/29 23:07:33 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.84 2002/05/29 23:45:23 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -49,7 +49,9 @@ static char _rcsid[] = "$KAME: route6d.c,v 1.83 2002/05/29 23:07:33 itojun Exp $
 #include <stddef.h>
 #include <errno.h>
 #include <err.h>
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 #include <util.h>
+#endif
 
 #include <sys/types.h>
 #include <sys/param.h>
