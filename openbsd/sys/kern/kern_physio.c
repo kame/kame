@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_physio.c,v 1.13 2001/06/27 04:49:44 art Exp $	*/
+/*	$OpenBSD: kern_physio.c,v 1.19 2002/03/14 01:27:04 millert Exp $	*/
 /*	$NetBSD: kern_physio.c,v 1.28 1997/05/19 10:43:28 pk Exp $	*/
 
 /*-
@@ -47,9 +47,7 @@
 #include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/proc.h>
-#include <sys/malloc.h>
-
-#include <vm/vm.h>
+#include <sys/pool.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -64,8 +62,8 @@
  * I/O, so raw I/O requests don't have to be single-threaded.
  */
 
-struct buf *getphysbuf __P((void));
-void putphysbuf __P((struct buf *bp));
+struct buf *getphysbuf(void);
+void putphysbuf(struct buf *bp);
 
 /*
  * Do "physical I/O" on behalf of a user.  "Physical I/O" is I/O directly
@@ -75,11 +73,11 @@ void putphysbuf __P((struct buf *bp));
  */
 int
 physio(strategy, bp, dev, flags, minphys, uio)
-	void (*strategy) __P((struct buf *));
+	void (*strategy)(struct buf *);
 	struct buf *bp;
 	dev_t dev;
 	int flags;
-	void (*minphys) __P((struct buf *));
+	void (*minphys)(struct buf *);
 	struct uio *uio;
 {
 	struct iovec *iovp;
@@ -88,21 +86,6 @@ physio(strategy, bp, dev, flags, minphys, uio)
 
 	error = 0;
 	flags &= B_READ | B_WRITE;
-
-	/*
-	 * [check user read/write access to the data buffer]
-	 *
-	 * Check each iov one by one.  Note that we know if we're reading or
-	 * writing, so we ignore the uio's rw parameter.  Also note that if
-	 * we're doing a read, that's a *write* to user-space.
-	 */
-	if (uio->uio_segflg == UIO_USERSPACE)
-		for (i = 0; i < uio->uio_iovcnt; i++)
-			/* XXX - obsolete now that vslock can error? */
-			if (!uvm_useracc(uio->uio_iov[i].iov_base,
-			    uio->uio_iov[i].iov_len,
-			    (flags == B_READ) ? B_WRITE : B_READ))
-				return (EFAULT);
 
 	/* Make sure we have a buffer, creating one if necessary. */
 	if ((nobuf = (bp == NULL)) != 0)
@@ -175,11 +158,12 @@ physio(strategy, bp, dev, flags, minphys, uio)
 			 * restores it.
 			 */
 			PHOLD(p);
-			if (uvm_vslock(p, bp->b_data, todo, (flags & B_READ) ?
-			    VM_PROT_READ | VM_PROT_WRITE : VM_PROT_READ) !=
-			    KERN_SUCCESS) {
+			error = uvm_vslock(p, bp->b_data, todo,
+			    (flags & B_READ) ?
+			    VM_PROT_READ | VM_PROT_WRITE : VM_PROT_READ);
+			if (error) {
 				bp->b_flags |= B_ERROR;
-				bp->b_error = EFAULT;
+				bp->b_error = error;
 				goto after_unlock;
 			}
 			vmapbuf(bp, todo);
@@ -281,11 +265,10 @@ getphysbuf()
 {
 	struct buf *bp;
 
-	bp = malloc(sizeof(*bp), M_TEMP, M_WAITOK);
+	bp = pool_get(&bufpool, PR_WAITOK);
 	bzero(bp, sizeof(*bp));
 
 	/* XXXCDC: are the following two lines necessary? */
-	bp->b_rcred = bp->b_wcred = NOCRED;
 	bp->b_vnbufs.le_next = NOLIST;
 
 	return (bp);
@@ -305,9 +288,11 @@ putphysbuf(bp)
 	if (bp->b_vp)
 		brelvp(bp);
 
+#ifdef DIAGNOSTIC
 	if (bp->b_flags & B_WANTED)
 		panic("putphysbuf: private buf B_WANTED");
-	free(bp, M_TEMP);
+#endif
+	pool_put(&bufpool, bp);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: mainbus.c,v 1.4 2001/08/26 02:37:07 miod Exp $ */
+/*	$OpenBSD: mainbus.c,v 1.8 2002/03/14 01:26:39 millert Exp $ */
 /*  Copyright (c) 1998 Steve Murphree, Jr. */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -10,10 +10,10 @@
 #include <machine/cpu.h>
 #include <machine/autoconf.h>
 
-void mainbus_attach __P((struct device *, struct device *, void *));
-int  mainbus_match __P((struct device *, void *, void *));
-int mainbus_print __P((void *, const char *));
-int mainbus_scan __P((struct device *, void *, void *));
+void mainbus_attach(struct device *, struct device *, void *);
+int  mainbus_match(struct device *, void *, void *);
+int mainbus_print(void *, const char *);
+int mainbus_scan(struct device *, void *, void *);
 
 struct cfattach mainbus_ca = {
 	sizeof(struct device), mainbus_match, mainbus_attach
@@ -69,7 +69,7 @@ mainbus_attach(parent, self, args)
 	struct device *parent, *self;
 	void *args;
 {
-	printf (" machine type MVME%x\n", cputyp);
+	printf (" machine type MVME%x\n", brdtyp);
 
 	/* XXX
 	 * should have a please-attach-first list for mainbus,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: hifn7751reg.h,v 1.30 2001/08/27 18:54:56 jason Exp $	*/
+/*	$OpenBSD: hifn7751reg.h,v 1.35 2002/04/08 17:49:42 jason Exp $	*/
 
 /*
  * Invertex AEON / Hifn 7751 driver
@@ -33,9 +33,14 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Effort sponsored in part by the Defense Advanced Research Projects
+ * Agency (DARPA) and Air Force Research Laboratory, Air Force
+ * Materiel Command, USAF, under agreement number F30602-01-2-0537.
+ *
  */
 #ifndef __HIFN_H__
-#define __HIFN_H__
+#define	__HIFN_H__
 
 #include <machine/endian.h>
 
@@ -43,8 +48,10 @@
  * Some PCI configuration space offset defines.  The names were made
  * identical to the names used by the Linux kernel.
  */
-#define HIFN_BAR0		(PCI_MAPREG_START + 0)	/* PUC register map */
-#define HIFN_BAR1		(PCI_MAPREG_START + 4)	/* DMA register map */
+#define	HIFN_BAR0		(PCI_MAPREG_START + 0)	/* PUC register map */
+#define	HIFN_BAR1		(PCI_MAPREG_START + 4)	/* DMA register map */
+#define	HIFN_RETRY_TIMEOUT	0x40
+#define	HIFN_TRDY_TIMEOUT	0x41
 
 /*
  * The values below should multiple of 4 -- and be large enough to handle
@@ -186,6 +193,11 @@ typedef struct hifn_desc {
 #define	HIFN_1_DMA_CSR		0x40	/* DMA Status and Control */
 #define	HIFN_1_DMA_IER		0x44	/* DMA Interrupt Enable */
 #define	HIFN_1_DMA_CNFG		0x48	/* DMA Configuration */
+#define	HIFN_1_7811_RNGENA	0x60	/* 7811: rng enable */
+#define	HIFN_1_7811_RNGCFG	0x64	/* 7811: rng config */
+#define	HIFN_1_7811_RNGDAT	0x68	/* 7811: rng data */
+#define	HIFN_1_7811_RNGSTS	0x6c	/* 7811: rng status */
+#define	HIFN_1_7811_MIPSRST	0x94	/* 7811: MIPS reset */
 #define	HIFN_1_REVID		0x98	/* Revision ID */
 
 #define	HIFN_1_PUB_RESET	0x204	/* Public/RNG Reset */
@@ -226,7 +238,8 @@ typedef struct hifn_desc {
 #define	HIFN_DMACSR_S_DONE	0x00001000	/* Source Ring Done */
 #define	HIFN_DMACSR_S_LAST	0x00000800	/* Source Ring Last */
 #define	HIFN_DMACSR_S_WAIT	0x00000400	/* Source Ring Waiting */
-#define	HIFN_DMACSR_S_OVER	0x00000200	/* Source Ring Overflow */
+#define	HIFN_DMACSR_ILLW	0x00000200	/* Illegal write (7811 only) */
+#define	HIFN_DMACSR_ILLR	0x00000100	/* Illegal read (7811 only) */
 #define	HIFN_DMACSR_C_CTRL	0x000000c0	/* Command Ring Control */
 #define	HIFN_DMACSR_C_CTRL_NOP	0x00000000	/* Command Control: no-op */
 #define	HIFN_DMACSR_C_CTRL_DIS	0x00000040	/* Command Control: disable */
@@ -236,7 +249,7 @@ typedef struct hifn_desc {
 #define	HIFN_DMACSR_C_LAST	0x00000008	/* Command Ring Last */
 #define	HIFN_DMACSR_C_WAIT	0x00000004	/* Command Ring Waiting */
 #define	HIFN_DMACSR_PUBDONE	0x00000002	/* Public op done (7951 only) */
-#define	HIFN_DMACSR_C_EIRQ	0x00000001	/* Command Ring Engine IRQ */
+#define	HIFN_DMACSR_ENGINE	0x00000001	/* Command Ring Engine IRQ */
 
 /* DMA Interrupt Enable Register (HIFN_1_DMA_IER) */
 #define	HIFN_DMAIER_D_ABORT	0x20000000	/* Destination Ring PCIAbort */
@@ -253,12 +266,13 @@ typedef struct hifn_desc {
 #define	HIFN_DMAIER_S_DONE	0x00001000	/* Source Ring Done */
 #define	HIFN_DMAIER_S_LAST	0x00000800	/* Source Ring Last */
 #define	HIFN_DMAIER_S_WAIT	0x00000400	/* Source Ring Waiting */
-#define	HIFN_DMAIER_S_OVER	0x00000200	/* Source Ring Overflow */
+#define	HIFN_DMAIER_ILLW	0x00000200	/* Illegal write (7811 only) */
+#define	HIFN_DMAIER_ILLR	0x00000100	/* Illegal read (7811 only) */
 #define	HIFN_DMAIER_C_ABORT	0x00000020	/* Command Ring PCI Abort */
 #define	HIFN_DMAIER_C_DONE	0x00000010	/* Command Ring Done */
 #define	HIFN_DMAIER_C_LAST	0x00000008	/* Command Ring Last */
 #define	HIFN_DMAIER_C_WAIT	0x00000004	/* Command Ring Waiting */
-#define	HIFN_DMAIER_PUBDONE	0x00000002	/* public op done (7951 only */
+#define	HIFN_DMAIER_PUBDONE	0x00000002	/* public op done (7951 only) */
 #define	HIFN_DMAIER_ENGINE	0x00000001	/* Engine IRQ */
 
 /* DMA Configuration Register (HIFN_1_DMA_CNFG) */
@@ -270,6 +284,29 @@ typedef struct hifn_desc {
 #define	HIFN_DMACNFG_MODE	0x00000004	/* DMA mode */
 #define	HIFN_DMACNFG_DMARESET	0x00000002	/* DMA Reset # */
 #define	HIFN_DMACNFG_MSTRESET	0x00000001	/* Master Reset # */
+
+/* 7811 RNG Enable Register (HIFN_1_7811_RNGENA) */
+#define	HIFN_7811_RNGENA_ENA	0x00000001	/* enable RNG */
+
+/* 7811 RNG Config Register (HIFN_1_7811_RNGCFG) */
+#define	HIFN_7811_RNGCFG_PRE1	0x00000f00	/* first prescalar */
+#define	HIFN_7811_RNGCFG_OPRE	0x00000080	/* output prescalar */
+#define	HIFN_7811_RNGCFG_DEFL	0x00000f80	/* 2 words/ 1/100 sec */
+
+/* 7811 RNG Status Register (HIFN_1_7811_RNGSTS) */
+#define	HIFN_7811_RNGSTS_RDY	0x00004000	/* two numbers in FIFO */
+#define	HIFN_7811_RNGSTS_UFL	0x00001000	/* rng underflow */
+
+/* 7811 MIPS Reset Register (HIFN_1_7811_MIPSRST) */
+#define	HIFN_MIPSRST_BAR2SIZE	0xffff0000	/* sdram size */
+#define	HIFN_MIPSRST_GPRAMINIT	0x00008000	/* gpram can be accessed */
+#define	HIFN_MIPSRST_CRAMINIT	0x00004000	/* ctxram can be accessed */
+#define	HIFN_MIPSRST_LED2	0x00000400	/* external LED2 */
+#define	HIFN_MIPSRST_LED1	0x00000200	/* external LED1 */
+#define	HIFN_MIPSRST_LED0	0x00000100	/* external LED0 */
+#define	HIFN_MIPSRST_MIPSDIS	0x00000004	/* disable MIPS */
+#define	HIFN_MIPSRST_MIPSRST	0x00000002	/* warm reset MIPS */
+#define	HIFN_MIPSRST_MIPSCOLD	0x00000001	/* cold reset MIPS */
 
 /* Public key reset register (HIFN_1_PUB_RESET) */
 #define	HIFN_PUBRST_RESET	0x00000001	/* reset public/rng unit */

@@ -1,4 +1,4 @@
-# 	$OpenBSD: RAMDISK,v 1.10 2001/10/15 18:44:56 jason Exp $
+# 	$OpenBSD: RAMDISK,v 1.13 2002/03/20 18:58:13 jason Exp $
 
 # Machine architecture; required by config(8)
 machine		sparc64
@@ -42,11 +42,13 @@ ebus*	at pci?
 
 hme*	at pci? dev ? function ?
 gem*	at pci? dev ? function ?
+dc*	at pci? dev ? function ?
 
 auxio*	at ebus?
 #com*	at ebus?
 clock*	at sbus? slot ? offset ?		# Mostek clock 
 clock*	at ebus?
+rtc*	at ebus?				# DS1287/M5819 clock
 timer*	at mainbus0				# Timer chip
 
 ## PROM console driver -- if all else fails
@@ -94,6 +96,7 @@ cd*	at scsibus? target ? lun ?	# SCSI CD-ROMs
 # Media Independent Interface (mii) drivers)
 nsphy*	at mii? phy ?				# NS and compatible PHYs
 qsphy*	at mii? phy ?				# Quality Semi QS6612 PHYs
+dcphy*	at mii? phy ?				# Digital clone PHYs
 ukphy*	at mii? phy ?				# Unknown PHYs
 
 pseudo-device	rd	2	# ramdisk

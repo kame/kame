@@ -1,4 +1,4 @@
-/*	$OpenBSD: ofw_machdep.c,v 1.3 2001/08/20 20:23:53 jason Exp $	*/
+/*	$OpenBSD: ofw_machdep.c,v 1.6 2002/03/15 18:19:52 millert Exp $	*/
 /*	$NetBSD: ofw_machdep.c,v 1.16 2001/07/20 00:07:14 eeh Exp $	*/
 
 /*
@@ -57,14 +57,14 @@
 
 #include <machine/sparc64.h>
 
-int vsprintf __P((char *, const char *, va_list));
+int vsprintf(char *, const char *, va_list);
 
-void dk_cleanup __P((void));
+void dk_cleanup(void);
 
 static u_int mmuh = -1, memh = -1;
 
-static u_int get_mmu_handle __P((void));
-static u_int get_memory_handle __P((void));
+static u_int get_mmu_handle(void);
+static u_int get_memory_handle(void);
 
 static u_int 
 get_mmu_handle()
@@ -557,15 +557,15 @@ prom_get_msgbuf(len, align)
  * Low-level prom I/O routines.
  */
 
-static u_int stdin = NULL;
-static u_int stdout = NULL;
+static u_int stdin;
+static u_int stdout;
 
 int 
 OF_stdin() 
 {
 	u_int chosen;
 
-	if (stdin != NULL) 
+	if (stdin != 0) 
 		return stdin;
 		
 	chosen = OF_finddevice("/chosen");
@@ -578,7 +578,7 @@ OF_stdout()
 {
 	u_int chosen;
 
-	if (stdout != NULL) 
+	if (stdout != 0) 
 		return stdout;
 		
 	chosen = OF_finddevice("/chosen");
@@ -592,13 +592,7 @@ OF_stdout()
  * This is not safe, but then what do you expect?
  */
 void
-#ifdef __STDC__
 prom_printf(const char *fmt, ...)
-#else
-prom_printf(fmt, va_alist)
-	char *fmt;
-	va_dcl
-#endif
 {
 	int len;
 	static char buf[256];

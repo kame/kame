@@ -1,4 +1,4 @@
-/*	$OpenBSD: disksubr.c,v 1.14 2001/09/11 20:05:25 miod Exp $	*/
+/*	$OpenBSD: disksubr.c,v 1.17 2002/03/14 01:26:48 millert Exp $	*/
 /*	$NetBSD: disksubr.c,v 1.21 1999/06/30 18:48:06 ragge Exp $	*/
 
 /*
@@ -45,7 +45,7 @@
 #include <sys/proc.h>
 #include <sys/user.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/macros.h>
 #include <machine/pte.h>
@@ -120,7 +120,7 @@ bad:
 char *
 readdisklabel(dev, strat, lp, osdep, spoofonly)
 	dev_t dev;
-	void (*strat) __P((struct buf *));
+	void (*strat)(struct buf *);
 	register struct disklabel *lp;
 	struct cpu_disklabel *osdep;
 	int spoofonly;
@@ -128,13 +128,21 @@ readdisklabel(dev, strat, lp, osdep, spoofonly)
 	register struct buf *bp;
 	struct disklabel *dlp;
 	char *msg = NULL;
+	int i;
 
-	if (lp->d_npartitions == 0) { /* Assume no label */
+	/* minimal requirements for archetypal disk label */
+	if (lp->d_secperunit == 0)
 		lp->d_secperunit = 0x1fffffff;
-		lp->d_npartitions = 3;
-		lp->d_partitions[2].p_size = 0x1fffffff;
-		lp->d_partitions[2].p_offset = 0;
+	lp->d_npartitions = RAW_PART + 1;
+	for (i = 0; i < RAW_PART; i++) {
+		lp->d_partitions[i].p_size = 0;
+		lp->d_partitions[i].p_offset = 0;
 	}
+	if (lp->d_partitions[i].p_size == 0)
+		lp->d_partitions[i].p_size = 0x1fffffff;
+	lp->d_partitions[0].p_offset = 0;
+	lp->d_bbsize = 8192;
+	lp->d_sbsize = 64 * 1024;
 
 	/* don't read the on-disk label if we are in spoofed-only mode */
 	if (spoofonly)
@@ -160,7 +168,7 @@ readdisklabel(dev, strat, lp, osdep, spoofonly)
 			*lp = *dlp;
 		}
 	}
-	bp->b_flags = B_INVAL | B_AGE;
+	bp->b_flags = B_INVAL | B_AGE | B_READ;
 	brelse(bp);
 	return (msg);
 }
@@ -185,9 +193,21 @@ setdisklabel(olp, nlp, openmask, osdep)
 	register int i;
 	register struct partition *opp, *npp;
 
+	/* sanity clause */
+	if (nlp->d_secpercyl == 0 || nlp->d_secsize == 0 ||
+	    (nlp->d_secsize % DEV_BSIZE) != 0)
+		return (EINVAL);
+
+	/* special case to allow disklabel to be invalidated */
+	if (nlp->d_magic == 0xffffffff) {
+		*olp = *nlp;
+		return (0);
+	}
+		
 	if (nlp->d_magic != DISKMAGIC || nlp->d_magic2 != DISKMAGIC ||
 	    dkcksum(nlp) != 0)
 		return (EINVAL);
+
 	while ((i = ffs((long)openmask)) != 0) {
 		i--;
 		openmask &= ~(1 << i);
@@ -221,7 +241,7 @@ setdisklabel(olp, nlp, openmask, osdep)
 int
 writedisklabel(dev, strat, lp, osdep)
 	dev_t dev;
-	void (*strat) __P((struct buf *));
+	void (*strat)(struct buf *);
 	register struct disklabel *lp;
 	struct cpu_disklabel *osdep;
 {
@@ -230,21 +250,19 @@ writedisklabel(dev, strat, lp, osdep)
 	int error = 0;
 
 	bp = geteblk((int)lp->d_secsize);
-	bp->b_dev = MAKEDISKDEV(major(dev), DISKUNIT(dev), RAW_PART);
-	bp->b_blkno = LABELSECTOR;
-	bp->b_bcount = lp->d_secsize;
-	bp->b_flags = B_READ;
-	(*strat)(bp);
-	if ((error = biowait(bp)))
-		goto done;
+
 	dlp = (struct disklabel *)(bp->b_un.b_addr + LABELOFFSET);
 	bcopy(lp, dlp, sizeof(struct disklabel));
+
+	bp->b_dev = MAKEDISKDEV(major(dev), DISKUNIT(dev), RAW_PART);
+	bp->b_blkno = LABELSECTOR;
+	bp->b_cylinder = LABELSECTOR / lp->d_secpercyl;
+	bp->b_bcount = lp->d_secsize;
 	bp->b_flags = B_WRITE;
 	(*strat)(bp);
 	error = biowait(bp);
-
-done:
 	brelse(bp);
+
 	return (error);
 }
 

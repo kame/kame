@@ -1,4 +1,4 @@
-/*	$OpenBSD: process_machdep.c,v 1.3 1997/08/08 08:27:39 downsj Exp $	*/
+/*	$OpenBSD: process_machdep.c,v 1.5 2002/03/14 00:42:24 miod Exp $	*/
 /*	$NetBSD: process_machdep.c,v 1.6 1996/03/14 21:09:26 christos Exp $ */
 
 /*
@@ -85,6 +85,23 @@ process_read_regs(p, regs)
 }
 
 int
+process_read_fpregs(p, regs)
+	struct proc	*p;
+	struct fpreg	*regs;
+{
+	extern struct fpstate	initfpstate;
+	struct fpstate		*statep = &initfpstate;
+
+	/* NOTE: struct fpreg == struct fpstate */
+	if (p->p_md.md_fpstate)
+		statep = p->p_md.md_fpstate;
+	bcopy(statep, regs, sizeof(struct fpreg));
+	return 0;
+}
+
+#ifdef PTRACE
+
+int
 process_write_regs(p, regs)
 	struct proc *p;
 	struct reg *regs;
@@ -116,24 +133,9 @@ process_set_pc(p, addr)
 }
 
 int
-process_read_fpregs(p, regs)
-struct proc	*p;
-struct fpreg	*regs;
-{
-	extern struct fpstate	initfpstate;
-	struct fpstate		*statep = &initfpstate;
-
-	/* NOTE: struct fpreg == struct fpstate */
-	if (p->p_md.md_fpstate)
-		statep = p->p_md.md_fpstate;
-	bcopy(statep, regs, sizeof(struct fpreg));
-	return 0;
-}
-
-int
 process_write_fpregs(p, regs)
-struct proc	*p;
-struct fpreg	*regs;
+	struct proc	*p;
+	struct fpreg	*regs;
 {
 	if (p->p_md.md_fpstate == NULL)
 		return EINVAL;
@@ -141,3 +143,5 @@ struct fpreg	*regs;
 	bcopy(regs, p->p_md.md_fpstate, sizeof(struct fpreg));
 	return 0;
 }
+
+#endif	/* PTRACE */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.20 2001/07/18 10:47:05 art Exp $	*/
+/*	$OpenBSD: param.h,v 1.26 2002/03/15 00:06:08 miod Exp $	*/
 /*	$NetBSD: param.h,v 1.29 1997/03/10 22:50:37 pk Exp $ */
 
 /*
@@ -83,16 +83,6 @@
 #define SUN4_PGSHIFT	13	/* for a sun4 machine */
 #define SUN4CM_PGSHIFT	12	/* for a sun4c or sun4m machine */
 
-/*
- * The following variables are always defined and initialized (in locore)
- * so independently compiled modules (e.g. LKMs) can be used irrespective
- * of the `options SUN4?' combination a particular kernel was configured with.
- * See also the definitions of NBPG, PGOFSET and PGSHIFT below.
- */
-#if defined(_KERNEL) && !defined(_LOCORE)
-extern int nbpg, pgofset, pgshift;
-#endif
-
 #define	KERNBASE	0xf8000000	/* start of kernel virtual space */
 #define	KERNTEXTOFF	0xf8004000	/* start of kernel text */
 
@@ -112,8 +102,8 @@ extern int nbpg, pgofset, pgshift;
  * of the hardware page size.
  */
 #define	MSIZE		256		/* size of an mbuf */
-#define	MCLBYTES	2048		/* enough for whole Ethernet packet */
 #define	MCLSHIFT	11		/* log2(MCLBYTES) */
+#define	MCLBYTES	(1 << MCLSHIFT)	/* enough for whole Ethernet packet */
 #define	MCLOFSET	(MCLBYTES - 1)
 
 #ifndef NMBCLUSTERS
@@ -127,11 +117,11 @@ extern int nbpg, pgofset, pgshift;
 #define MSGBUFSIZE	4096		/* cannot be changed without great pain */
 
 /*
- * Size of kernel malloc arena in logical pages.
+ * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
+ * logical pages.
  */
-#ifndef	NKMEMCLUSTERS
-#define	NKMEMCLUSTERS	(6 * 1024 * 1024 / PAGE_SIZE)
-#endif
+#define	NKMEMPAGES_MIN_DEFAULT	((6 * 1024 * 1024) >> PAGE_SHIFT)
+#define	NKMEMPAGES_MAX_DEFAULT	((6 * 1024 * 1024) >> PAGE_SHIFT)
 
 /* pages ("clicks") to disk blocks */
 #define	ctod(x)		((x) << (PGSHIFT - DEV_BSHIFT))
@@ -175,12 +165,12 @@ extern vaddr_t		dvma_base;
 extern vaddr_t		dvma_end;
 extern struct extent	*dvmamap_extent;
 
-extern caddr_t	kdvma_mapin __P((caddr_t, int, int));
-extern caddr_t	dvma_malloc_space  __P((size_t, void *, int, int));
-extern void	dvma_free __P((caddr_t, size_t, void *));
+extern caddr_t	kdvma_mapin(caddr_t, int, int);
+extern caddr_t	dvma_malloc_space(size_t, void *, int, int);
+extern void	dvma_free(caddr_t, size_t, void *);
 #define		dvma_malloc(len,kaddr,flags)	dvma_malloc_space(len,kaddr,flags,0)
 
-extern void	delay __P((unsigned int));
+extern void	delay(unsigned int);
 #define	DELAY(n)	delay(n)
 
 extern int cputyp;
@@ -218,9 +208,6 @@ extern int mmumod;
 #	define CPU_ISSUN4	(cputyp == CPU_SUN4)
 #	define CPU_ISSUN4OR4C	(cputyp == CPU_SUN4 || cputyp == CPU_SUN4C)
 #	define CPU_ISSUN4COR4M	(cputyp == CPU_SUN4C || cputyp == CPU_SUN4M)
-#	define NBPG		nbpg
-#	define PGOFSET		pgofset
-#	define PGSHIFT		pgshift
 #elif defined(SUN4M) && defined(SUN4C) && !defined(SUN4)
 #	define CPU_ISSUN4M	(cputyp == CPU_SUN4M)
 #	define CPU_ISSUN4C	(cputyp == CPU_SUN4C)
@@ -239,9 +226,6 @@ extern int mmumod;
 #	define CPU_ISSUN4	(cputyp == CPU_SUN4)
 #	define CPU_ISSUN4OR4C	(cputyp == CPU_SUN4)
 #	define CPU_ISSUN4COR4M	(cputyp == CPU_SUN4M)
-#	define NBPG		nbpg
-#	define PGOFSET		pgofset
-#	define PGSHIFT		pgshift
 #elif defined(SUN4M) && !defined(SUN4C) && !defined(SUN4)
 #	define CPU_ISSUN4M	(1)
 #	define CPU_ISSUN4C	(0)
@@ -260,9 +244,6 @@ extern int mmumod;
 #	define CPU_ISSUN4	(cputyp == CPU_SUN4)
 #	define CPU_ISSUN4OR4C	(1)
 #	define CPU_ISSUN4COR4M	(cputyp == CPU_SUN4C)
-#	define NBPG		nbpg
-#	define PGOFSET		pgofset
-#	define PGSHIFT		pgshift
 #elif !defined(SUN4M) && defined(SUN4C) && !defined(SUN4)
 #	define CPU_ISSUN4M	(0)
 #	define CPU_ISSUN4C	(1)
@@ -293,9 +274,24 @@ extern int mmumod;
 #	define CPU_ISSUN4	(cputyp == CPU_SUN4)
 #	define CPU_ISSUN4OR4C	(cputyp == CPU_SUN4 || cputyp == CPU_SUN4C)
 #	define CPU_ISSUN4COR4M	(cputyp == CPU_SUN4C || cputyp == CPU_SUN4M)
+#endif
+
+#ifndef	NBPG
+#ifdef	STANDALONE	/* boot blocks */
 #	define NBPG		nbpg
 #	define PGOFSET		pgofset
 #	define PGSHIFT		pgshift
+#	define PAGE_SIZE	nbpg
+#	define PAGE_MASK	pgofset
+#	define PAGE_SHIFT	pgshift
+#else
+#	define NBPG		uvmexp.pagesize
+#	define PGOFSET		uvmexp.pagemask
+#	define PGSHIFT		uvmexp.pageshift
+#	define PAGE_SIZE	uvmexp.pagesize
+#	define PAGE_MASK	uvmexp.pagemask
+#	define PAGE_SHIFT	uvmexp.pageshift
+#endif
 #endif
 
 #endif /* _SPARC_PARAM_H_ */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.14 2001/09/28 20:49:17 miod Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.20 2002/03/14 01:26:39 millert Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -33,10 +33,8 @@
  */
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/map.h>
 #include <sys/buf.h>
 #include <sys/dkstat.h>
-#include <sys/dmap.h>
 #include <sys/reboot.h>
 #include <sys/conf.h>
 #include <sys/device.h>
@@ -47,7 +45,6 @@
 #include <machine/autoconf.h>
 #include <machine/cpu.h>
 #include <machine/disklabel.h>
-#include <machine/pte.h>
 #include <machine/vmparam.h>
 
 /*
@@ -56,19 +53,20 @@
  * the machine.
  */
 
-struct	device *parsedisk __P((char *, int, int, dev_t *));
-void	setroot __P((void));
-void	swapconf __P((void));
-char	buginchr __P((void));
-int	getsb __P((char *, int));
-void	dumpconf __P((void));
-int	findblkmajor __P((struct device *));
-struct device	*getdisk __P((char *, int, int, dev_t *));
+struct	device *parsedisk(char *, int, int, dev_t *);
+void	setroot(void);
+void	swapconf(void);
+char	buginchr(void);
+int	getsb(char *, int);
+void	dumpconf(void);
+int	findblkmajor(struct device *);
+struct device	*getdisk(char *, int, int, dev_t *);
 
 int cold = 1;   /* 1 if still booting */
 
 void *bootaddr;
 int bootpart;
+struct device *bootdv;	/* set by device drivers (if found) */
 
 /*
  * called at boot time, configure all devices on the system.
@@ -76,8 +74,6 @@ int bootpart;
 void
 cpu_configure()
 {
-	bootdv = NULL; /* set by device drivers (if found) */
-
 	if (config_rootfound("mainbus", "mainbus") == 0)
 		panic("no mainbus found");
 

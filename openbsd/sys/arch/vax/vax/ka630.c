@@ -1,4 +1,4 @@
-/*	$OpenBSD: ka630.c,v 1.6 2001/09/11 20:05:25 miod Exp $	*/
+/*	$OpenBSD: ka630.c,v 1.8 2002/03/14 01:26:48 millert Exp $	*/
 /*	$NetBSD: ka630.c,v 1.17 1999/09/06 19:52:52 ragge Exp $	*/
 /*-
  * Copyright (c) 1982, 1988, 1990, 1993
@@ -42,7 +42,7 @@
 #include <sys/time.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/pmap.h>
@@ -52,12 +52,12 @@
 
 static struct uvaxIIcpu *uvaxIIcpu_ptr;
 
-static void ka630_conf __P((void));
-static void ka630_memerr __P((void));
-static int ka630_mchk __P((caddr_t));
-static void ka630_halt __P((void));
-static void ka630_reboot __P((int));
-static void ka630_clrf __P((void));
+static void ka630_conf(void);
+static void ka630_memerr(void);
+static int ka630_mchk(caddr_t);
+static void ka630_halt(void);
+static void ka630_reboot(int);
+static void ka630_clrf(void);
 
 struct	cpu_dep ka630_calls = {
 	0,

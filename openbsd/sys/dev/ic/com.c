@@ -1,4 +1,4 @@
-/*	$OpenBSD: com.c,v 1.76 2001/10/05 21:01:10 mickey Exp $	*/
+/*	$OpenBSD: com.c,v 1.84 2002/04/09 15:08:43 pefo Exp $	*/
 /*	$NetBSD: com.c,v 1.82.4.1 1996/06/02 09:08:00 mrg Exp $	*/
 
 /*
@@ -104,11 +104,11 @@
 cdev_decl(com);
 bdev_decl(com);
 
-static u_char tiocm_xxx2mcr __P((int));
+static u_char tiocm_xxx2mcr(int);
 
-void	compwroff __P((struct com_softc *));
-void	com_raisedtr __P((void *));
-void	com_enable_debugport	__P((struct com_softc *));
+void	compwroff(struct com_softc *);
+void	com_raisedtr(void *);
+void	com_enable_debugport(struct com_softc *);
 
 struct cfdriver com_cd = {
 	NULL, "com", DV_TTY
@@ -127,21 +127,16 @@ int	commajor;
 #ifdef KGDB
 #include <sys/kgdb.h>
 
-static int com_kgdb_addr;
-static bus_space_tag_t com_kgdb_iot;
-static bus_space_handle_t com_kgdb_ioh;
+int com_kgdb_addr;
+bus_space_tag_t com_kgdb_iot;
+bus_space_handle_t com_kgdb_ioh;
 
-int    com_kgdb_getc __P((void *));
-void   com_kgdb_putc __P((void *, int));
+int    com_kgdb_getc(void *);
+void   com_kgdb_putc(void *, int);
 #endif /* KGDB */
 
 #define	DEVUNIT(x)	(minor(x) & 0x7f)
 #define	DEVCUA(x)	(minor(x) & 0x80)
-
-/* Macros to clear/set/test flags. */
-#define	SET(t, f)	(t) |= (f)
-#define	CLR(t, f)	(t) &= ~(f)
-#define	ISSET(t, f)	((t) & (f))
 
 int
 comspeed(freq, speed)
@@ -334,7 +329,7 @@ com_attach_subr(sc)
 	 * the kgdb device, it has exclusive use.
 	 */
 
-	if (iot == com_kgdb_iot && iobase == com_kgdb_addr &&
+	if (iot == com_kgdb_iot && sc->sc_iobase == com_kgdb_addr &&
 	    !ISSET(sc->sc_hwflags, COM_HW_CONSOLE)) {
 		printf("%s: kgdb\n", sc->sc_dev.dv_xname);
 		SET(sc->sc_hwflags, COM_HW_KGDB);
@@ -384,8 +379,10 @@ com_enable_debugport(sc)
 
 	/* Turn on line break interrupt, set carrier. */
 	s = splhigh();
+#ifdef KGDB
 	SET(sc->sc_ier, IER_ERXRDY);
 	bus_space_write_1(sc->sc_iot, sc->sc_ioh, com_ier, sc->sc_ier);
+#endif
 	SET(sc->sc_mcr, MCR_DTR | MCR_RTS | MCR_IENABLE);
 	bus_space_write_1(sc->sc_iot, sc->sc_ioh, com_mcr, sc->sc_mcr);
 
@@ -1180,7 +1177,7 @@ compoll(arg)
 		TTY_FE, TTY_PE|TTY_FE
 	};
 
-	if (sc == 0 || sc->sc_ibufp == sc->sc_ibuf)
+	if (sc == NULL || sc->sc_ibufp == sc->sc_ibuf)
 		goto out;
 
 	tp = sc->sc_tty;
@@ -1200,7 +1197,7 @@ compoll(arg)
 	sc->sc_ibufhigh = sc->sc_ibuf + COM_IHIGHWATER;
 	sc->sc_ibufend = sc->sc_ibuf + COM_IBUFSIZE;
 
-	if (tp == 0 || !ISSET(tp->t_state, TS_ISOPEN)) {
+	if (tp == NULL || !ISSET(tp->t_state, TS_ISOPEN)) {
 		splx(s);
 		goto out;
 	}
@@ -1404,7 +1401,7 @@ comintr(arg)
  * Following are all routines needed for COM to act as console
  */
 
-#if defined(arc) || defined(hppa)
+#if defined(arc)
 #undef CONADDR
 	extern int CONADDR;
 #endif
@@ -1477,7 +1474,7 @@ cominit(iot, ioh, rate)
 	bus_space_write_1(iot, ioh, com_dlbh, rate >> 8);
 	bus_space_write_1(iot, ioh, com_lcr, LCR_8BITS);
 	bus_space_write_1(iot, ioh, com_mcr, MCR_DTR | MCR_RTS);
-	bus_space_write_1(iot, ioh, com_ier, IER_ERXRDY | IER_ETXRDY);
+	bus_space_write_1(iot, ioh, com_ier, 0);  /* Make sure they are off */
 	bus_space_write_1(iot, ioh, com_fifo,
 	    FIFO_ENABLE | FIFO_RCV_RST | FIFO_XMT_RST | FIFO_TRIGGER_1);
 	stat = bus_space_read_1(iot, ioh, com_iir);
@@ -1509,7 +1506,11 @@ comcnprobe(cp)
 		cp->cn_pri = CN_DEAD;
 		return;
 	}
+#ifdef __hppa__
+	found = 1;
+#else
 	found = comprobe1(iot, ioh);
+#endif
 	bus_space_unmap(iot, ioh, COM_NPORTS);
 	if (!found) {
 		cp->cn_pri = CN_DEAD;
@@ -1523,14 +1524,13 @@ comcnprobe(cp)
 
 	/* initialize required fields */
 	cp->cn_dev = makedev(commajor, CONUNIT);
-	cp->cn_pri = CN_NORMAL;
+	cp->cn_pri = CN_REMOTE;
 }
 
 void
 comcninit(cp)
 	struct consdev *cp;
 {
-
 	comconsaddr = CONADDR;
 
 	if (bus_space_map(comconsiot, comconsaddr, COM_NPORTS, 0, &comconsioh))

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cgthree.c,v 1.10 2001/08/17 13:52:28 mickey Exp $	*/
+/*	$OpenBSD: cgthree.c,v 1.13 2002/03/14 01:26:42 millert Exp $	*/
 /*	$NetBSD: cgthree.c,v 1.33 1997/05/24 20:16:11 pk Exp $ */
 
 /*
@@ -63,7 +63,7 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/fbio.h>
 #include <machine/autoconf.h>
@@ -110,9 +110,9 @@ static struct fbdriver cgthreefbdriver = {
 extern int fbnode;
 extern struct tty *fbconstty;
 
-static void cgthreeloadcmap __P((struct cgthree_softc *, int, int));
-static void cgthree_set_video __P((struct cgthree_softc *, int));
-static int cgthree_get_video __P((struct cgthree_softc *));
+static void cgthreeloadcmap(struct cgthree_softc *, int, int);
+static void cgthree_set_video(struct cgthree_softc *, int);
+static int cgthree_get_video(struct cgthree_softc *);
 
 /* Video control parameters */
 struct cg3_videoctrl {
@@ -419,10 +419,11 @@ cgthreeloadcmap(sc, start, ncolors)
  * As well, mapping at an offset of 0x04000000 causes the cg3 to be
  * mapped in flat mode without the cg4 emulation.
  */
-int
+paddr_t
 cgthreemmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	register struct cgthree_softc *sc = cgthree_cd.cd_devs[minor(dev)];
 #define START		(128*1024 + 128*1024)

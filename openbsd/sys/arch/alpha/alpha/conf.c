@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.32 2001/09/28 03:33:39 mickey Exp $	*/
+/*	$OpenBSD: conf.c,v 1.37 2002/01/23 05:21:03 ericj Exp $	*/
 /*	$NetBSD: conf.c,v 1.16 1996/10/18 21:26:57 cgd Exp $	*/
 
 /*-
@@ -46,6 +46,8 @@
 
 #include "wd.h"
 bdev_decl(wd);
+#include "fd.h"
+bdev_decl(fd);
 #include "st.h"
 #include "cd.h"
 #include "sd.h"
@@ -62,7 +64,7 @@ struct bdevsw	bdevsw[] =
 	bdev_swap_init(1,sw),		/* 1: swap pseudo-device */
 	bdev_tape_init(NST,st),		/* 2: SCSI tape */
 	bdev_disk_init(NCD,cd),		/* 3: SCSI CD-ROM */
-	bdev_notdef(),			/* 4 */
+	bdev_disk_init(NFD,fd),		/* 4: Floppy disk */
 	bdev_notdef(),			/* 5 */
 	bdev_disk_init(NRD,rd),		/* 6: ram disk driver */
 	bdev_disk_init(NCCD,ccd),	/* 7: concatenated disk driver */
@@ -89,7 +91,6 @@ int	nblkdev = sizeof (bdevsw) / sizeof (bdevsw[0]);
 cdev_decl(mm);
 #include "pty.h"
 #include "tun.h"
-dev_type_open(filedescopen);
 #include "bpfilter.h"
 #include "iop.h"
 #include "ch.h"
@@ -101,10 +102,19 @@ cdev_decl(com);
 #include "wsdisplay.h"
 #include "wskbd.h"
 #include "wsmouse.h"
+#include "midi.h"
+cdev_decl(midi);
+#include "sequencer.h"
+cdev_decl(music);
+
+#include "spkr.h"
+cdev_decl(spkr);
+
 #include "lpt.h"
 cdev_decl(lpt);
 cdev_decl(prom);			/* XXX XXX XXX */
 cdev_decl(wd);
+cdev_decl(fd);
 #include "cy.h"
 cdev_decl(cy);
 #ifdef XFS
@@ -174,12 +184,12 @@ struct cdevsw	cdevsw[] =
 	cdev_random_init(1,random),	/* 34: random data source */
 	cdev_pf_init(NPF, pf),		/* 35: packet filter */
 	cdev_disk_init(NWD,wd), 	/* 36: ST506/ESDI/IDE disk */
-	cdev_notdef(),			/* 37 */
+	cdev_disk_init(NFD,fd),		/* 37: Floppy disk */
         cdev_tty_init(NCY,cy),          /* 38: Cyclom serial port */
 	cdev_ksyms_init(NKSYMS,ksyms),	/* 39: Kernel symbols device */
-	cdev_notdef(),			/* 40 */
-	cdev_notdef(),			/* 41 */
-	cdev_notdef(),			/* 42 */
+	cdev_spkr_init(NSPKR,spkr),	/* 40: PC speaker */
+	cdev_midi_init(NMIDI,midi),     /* 41: MIDI I/O */
+        cdev_midi_init(NSEQUENCER,sequencer),   /* 42: sequencer I/O */
 	cdev_disk_init(NRAID,raid),	/* 43: RAIDframe disk driver */
 	cdev_notdef(),			/* 44 */
 	cdev_usb_init(NUSB,usb),	/* 45: USB controller */
@@ -284,13 +294,13 @@ static int chrtoblktbl[] = {
 	/* 34 */	NODEV,
 	/* 35 */	NODEV,
 	/* 36 */	0,
-	/* 37 */	4,
+	/* 37 */	4,		/* fd */
 	/* 38 */	NODEV,
 	/* 39 */	NODEV,
 	/* 40 */	NODEV,
 	/* 41 */	NODEV,
 	/* 42 */	NODEV,
-	/* 43 */	16,
+	/* 43 */	16,		/* raid */
 	/* 44 */	NODEV,
 	/* 45 */	NODEV,
 	/* 46 */	NODEV,
@@ -320,7 +330,7 @@ chrtoblk(dev)
 }
 
 /*
- * Convert a character device number to a block device number.
+ * Convert a block device number to a character device number.
  */
 dev_t
 blktochr(dev)

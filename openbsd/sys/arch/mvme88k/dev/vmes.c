@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmes.c,v 1.5 2001/08/26 02:37:07 miod Exp $ */
+/*	$OpenBSD: vmes.c,v 1.9 2002/03/14 03:15:57 millert Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -48,8 +48,8 @@
  * functions will decide how many address bits are relevant.
  */
 
-void vmesattach __P((struct device *, struct device *, void *));
-int  vmesmatch __P((struct device *, void *, void *));
+void vmesattach(struct device *, struct device *, void *);
+int  vmesmatch(struct device *, void *, void *);
 
 struct cfattach vmes_ca = {
         sizeof(struct vmessoftc), vmesmatch, vmesattach
@@ -59,13 +59,13 @@ struct cfdriver vmes_cd = {
         NULL, "vmes", DV_DULL, 0
 };
 
-int vmesscan __P((struct device *, void *, void*));
-int vmesopen __P((dev_t, int, int));
-int vmesclose __P((dev_t, int, int));
-int vmesioctl __P((dev_t, int, caddr_t, int, struct proc *));
-int vmesread __P((dev_t, struct uio *, int));
-int vmeswrite __P((dev_t, struct uio *, int));
-int vmesmmap __P((dev_t, int, int));
+int vmesscan(struct device *, void *, void *);
+int vmesopen(dev_t, int, int);
+int vmesclose(dev_t, int, int);
+int vmesioctl(dev_t, int, caddr_t, int, struct proc *);
+int vmesread(dev_t, struct uio *, int);
+int vmeswrite(dev_t, struct uio *, int);
+paddr_t vmesmmap(dev_t, off_t, int);
 
 int
 vmesmatch(parent, cf, args)
@@ -161,16 +161,17 @@ vmeswrite(dev, uio, flags)
 	return (vmerw(sc->sc_vme, uio, flags, BUS_VMES));
 }
 
-int
+paddr_t
 vmesmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	int unit = minor(dev);
 	struct vmessoftc *sc = (struct vmessoftc *) vmes_cd.cd_devs[unit];
 	void * pa;
 
-	pa = vmepmap(sc->sc_vme, (void *)off, NBPG, BUS_VMES);
+	pa = vmepmap(sc->sc_vme, off, NBPG, BUS_VMES);
 	printf("vmes %x pa %x\n", off, pa);
 	if (pa == NULL)
 		return (-1);

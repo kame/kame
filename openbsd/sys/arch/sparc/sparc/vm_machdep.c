@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.32 2001/09/19 20:50:57 mickey Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.43 2002/02/20 22:28:23 deraadt Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.30 1997/03/10 23:55:40 pk Exp $ */
 
 /*
@@ -59,10 +59,8 @@
 #include <sys/buf.h>
 #include <sys/exec.h>
 #include <sys/vnode.h>
-#include <sys/map.h>
 #include <sys/extent.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
@@ -96,6 +94,7 @@ pagemove(from, to, size)
 		to += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	}
+	pmap_update(pmap_kernel());
 }
 
 /*
@@ -232,6 +231,7 @@ dvma_mapin_space(map, va, len, canwait, space)
 				pa |= PG_IOC;
 #endif
 #endif
+			/* XXX - this should probably be pmap_kenter */
 			pmap_enter(pmap_kernel(), tva, pa | PMAP_NC,
 				   VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
 		}
@@ -239,6 +239,7 @@ dvma_mapin_space(map, va, len, canwait, space)
 		tva += PAGE_SIZE;
 		va += PAGE_SIZE;
 	}
+	pmap_update(pmap_kernel());
 
 	/*
 	 * XXX Only have to do this on write.
@@ -270,7 +271,10 @@ dvma_mapout(kva, va, len)
 		iommu_remove(kva, klen);
 	else
 #endif
+	{
 		pmap_remove(pmap_kernel(), kva, kva + klen);
+		pmap_update(pmap_kernel());
+	}
 
 	s = splhigh();
 	error = extent_free(dvmamap_extent, kva, klen, EX_NOWAIT);
@@ -313,9 +317,9 @@ vmapbuf(bp, sz)
 	 */
 	while (1) {
 		kva = vm_map_min(kernel_map);
-		if (uvm_map(kernel_map, &kva, size, NULL, uva,
+		if (uvm_map(kernel_map, &kva, size, NULL, uva, 0,
 		    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL,
-		    UVM_INH_NONE, UVM_ADV_RANDOM, 0)) == KERN_SUCCESS)
+		    UVM_INH_NONE, UVM_ADV_RANDOM, 0)) == 0)
 			break;
 		tsleep(kernel_map, PVM, "vallocwait", 0);
 	}
@@ -334,10 +338,6 @@ vmapbuf(bp, sz)
 		if (!(cpuinfo.flags & CPUFLG_CACHE_MANDATORY))
 			pa |= PMAP_NC;
 
-		/*
-		 * pmap_enter distributes this mapping to all
-		 * contexts... maybe we should avoid this extra work
-		 */
 		pmap_enter(pmap_kernel(), kva, pa,
 			   VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
 
@@ -345,6 +345,7 @@ vmapbuf(bp, sz)
 		kva += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	}
+	pmap_update(pmap_kernel());
 }
 
 /*
@@ -387,15 +388,17 @@ vunmapbuf(bp, sz)
  * the first element in struct user.
  */
 void
-cpu_fork(p1, p2, stack, stacksize)
-	register struct proc *p1, *p2;
+cpu_fork(p1, p2, stack, stacksize, func, arg)
+	struct proc *p1, *p2;
 	void *stack;
 	size_t stacksize;
+	void (*func)(void *);
+	void *arg;
 {
-	register struct pcb *opcb = &p1->p_addr->u_pcb;
-	register struct pcb *npcb = &p2->p_addr->u_pcb;
-	register struct trapframe *tf2;
-	register struct rwindow *rp;
+	struct pcb *opcb = &p1->p_addr->u_pcb;
+	struct pcb *npcb = &p2->p_addr->u_pcb;
+	struct trapframe *tf2;
+	struct rwindow *rp;
 
 	/*
 	 * Save all user registers to p1's stack or, in the case of
@@ -464,53 +467,14 @@ cpu_fork(p1, p2, stack, stacksize)
 
 	/* Construct kernel frame to return to in cpu_switch() */
 	rp = (struct rwindow *)((u_int)npcb + TOPFRAMEOFF);
-	rp->rw_local[0] = (int)child_return;	/* Function to call */
-	rp->rw_local[1] = (int)p2;		/* and its argument */
+	rp->rw_local[0] = (int)func;		/* Function to call */
+	rp->rw_local[1] = (int)arg;		/* and its argument */
 
 	npcb->pcb_pc = (int)proc_trampoline - 8;
 	npcb->pcb_sp = (int)rp;
 	npcb->pcb_psr &= ~PSR_CWP;	/* Run in window #0 */
 	npcb->pcb_wim = 1;		/* Fence at window #1 */
 
-}
-
-/*
- * cpu_set_kpc:
- *
- * Arrange for in-kernel execution of a process to continue at the
- * named pc, as if the code at that address were called as a function
- * with the current process's process pointer as an argument.
- *
- * Note that it's assumed that when the named process returns,
- * we immediately return to user mode.
- *
- * (Note that cpu_fork(), above, uses an open-coded version of this.)
- */
-void
-cpu_set_kpc(p, pc, arg)
-	struct proc *p;
-	void (*pc) __P((void *));
-	void *arg;
-{
-	struct pcb *pcb;
-	struct rwindow *rp;
-
-	pcb = &p->p_addr->u_pcb;
-
-	rp = (struct rwindow *)((u_int)pcb + TOPFRAMEOFF);
-	rp->rw_local[0] = (int)pc;		/* Function to call */
-	rp->rw_local[1] = (int)arg;		/* and its argument */
-
-	/*
-	 * Frob PCB:
-	 *	- arrange to return to proc_trampoline() from cpu_switch()
-	 *	- point it at the stack frame constructed above
-	 *	- make it run in a clear set of register windows
-	 */
-	pcb->pcb_pc = (int)proc_trampoline - 8;
-	pcb->pcb_sp = (int)rp;
-	pcb->pcb_psr &= ~PSR_CWP;	/* Run in window #0 */
-	pcb->pcb_wim = 1;		/* Fence at window #1 */
 }
 
 /*
@@ -560,6 +524,7 @@ cpu_coredump(p, vp, cred, chdr)
 	chdr->c_cpusize = sizeof(md_core);
 
 	md_core.md_tf = *p->p_md.md_tf;
+	md_core.md_wcookie = p->p_addr->u_pcb.pcb_wcookie;
 	if (p->p_md.md_fpstate) {
 		if (p == cpuinfo.fpproc)
 			savefpstate(p->p_md.md_fpstate);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: hpux_compat.c,v 1.13 2001/10/10 23:43:44 art Exp $	*/
+/*	$OpenBSD: hpux_compat.c,v 1.19 2002/03/14 20:31:31 mickey Exp $	*/
 /*	$NetBSD: hpux_compat.c,v 1.35 1997/05/08 16:19:48 mycroft Exp $	*/
 
 /*
@@ -112,11 +112,11 @@ extern char sigcode[], esigcode[];
 extern struct sysent hpux_sysent[];
 extern char *hpux_syscallnames[];
 
-int	hpux_shmctl1 __P((struct proc *, struct hpux_sys_shmctl_args *,
-	    register_t *, int));
-int	hpuxtobsdioctl __P((u_long));
+int	hpux_shmctl1(struct proc *, struct hpux_sys_shmctl_args *,
+	    register_t *, int);
+int	hpuxtobsdioctl(u_long);
 
-static int	hpux_scale __P((struct timeval *));
+static int	hpux_scale(struct timeval *);
 
 /*
  * HP-UX fork and vfork need to map the EAGAIN return value appropriately.
@@ -386,8 +386,7 @@ hpux_sys_utssys(p, v, retval)
 	int i;
 	int error;
 	struct hpux_utsname	ut;
-	extern char ostype[], hostname[], osrelease[], version[];
-	extern char machine[];
+	extern char hostname[], machine[];
 
 	switch (SCARG(uap, request)) {
 	/* uname */
@@ -553,6 +552,8 @@ hpux_sys_rtprio(cp, v, retval)
 
 /* hpux_sys_advise() is found in hpux_machdep.c */
 
+#ifdef PTRACE
+
 int
 hpux_sys_ptrace(p, v, retval)
 	struct proc *p;
@@ -630,6 +631,8 @@ hpux_sys_ptrace(p, v, retval)
 	return (error);
 }
 
+#endif	/* PTRACE */
+
 #ifdef SYSVSHM
 #include <sys/shm.h>
 
@@ -669,7 +672,7 @@ hpux_shmctl1(p, uap, retval, isnew)
 	struct ucred *cred = p->p_ucred;
 	struct hpux_shmid_ds sbuf;
 	int error;
-	extern struct shmid_ds *shm_find_segment_by_shmid __P((int));
+	extern struct shmid_ds *shm_find_segment_by_shmid(int);
 
 	if ((shp = shm_find_segment_by_shmid(SCARG(uap, shmid))) == NULL)
 		return EINVAL;
@@ -826,8 +829,7 @@ hpux_sys_ioctl(p, v, retval)
 	if (com == HPUXTIOCGETP || com == HPUXTIOCSETP)
 		return (getsettty(p, SCARG(uap, fd), com, SCARG(uap, data)));
 
-	if (((unsigned)SCARG(uap, fd)) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
 	if ((fp->f_flag & (FREAD|FWRITE)) == 0)
 		return (EBADF);
@@ -840,6 +842,7 @@ hpux_sys_ioctl(p, v, retval)
 	size = IOCPARM_LEN(com);
 	if (size > IOCPARM_MAX)
 		return (ENOTTY);
+	FREF(fp);
 	if (size > sizeof (stkbuf)) {
 		memp = (caddr_t)malloc((u_long)size, M_IOCTLOPS, M_WAITOK);
 		dt = memp;
@@ -848,9 +851,7 @@ hpux_sys_ioctl(p, v, retval)
 		if (size) {
 			error = copyin(SCARG(uap, data), dt, (u_int)size);
 			if (error) {
-				if (memp)
-					free(memp, M_IOCTLOPS);
-				return (error);
+				goto out;
 			}
 		} else
 			*(caddr_t *)dt = SCARG(uap, data);
@@ -938,6 +939,9 @@ hpux_sys_ioctl(p, v, retval)
 	 */
 	if (error == 0 && (com&IOC_OUT) && size)
 		error = copyout(dt, SCARG(uap, data), (u_int)size);
+
+out:
+	FRELE(fp);
 	if (memp)
 		free(memp, M_IOCTLOPS);
 	return (error);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: nvram.c,v 1.11 2001/08/26 02:37:07 miod Exp $ */
+/*	$OpenBSD: nvram.c,v 1.18 2002/03/14 01:26:39 millert Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -51,7 +51,7 @@
 #include <machine/mioctl.h>
 #include <machine/vmparam.h>
 
-#include <vm/vm_param.h>
+#include <uvm/uvm_param.h>
 
 #include <mvme88k/dev/memdevs.h>
 #include <mvme88k/dev/nvramreg.h>
@@ -65,8 +65,8 @@ struct nvramsoftc {
 	void *      sc_regs;
 };
 
-void    nvramattach     __P((struct device *, struct device *, void *));
-int     nvrammatch __P((struct device *, void *, void *));
+void    nvramattach(struct device *, struct device *, void *);
+int     nvrammatch(struct device *, void *, void *);
 
 struct cfattach nvram_ca = { 
 	sizeof(struct nvramsoftc), nvrammatch, nvramattach
@@ -76,15 +76,15 @@ struct cfdriver nvram_cd = {
 	NULL, "nvram", DV_DULL, 0
 };
 
-int nvramopen __P((dev_t dev, int flag, int mode));
-int nvramclose __P((dev_t dev, int flag, int mode));
-int nvramioctl __P((dev_t dev, int cmd, caddr_t data, int flag,
-    struct proc *p));
-int nvramread __P((dev_t dev, struct uio *uio, int flags));
-int nvramwrite __P((dev_t dev, struct uio *uio, int flags));
-int nvrammmap __P((dev_t dev, int off, int prot));
+int nvramopen(dev_t dev, int flag, int mode);
+int nvramclose(dev_t dev, int flag, int mode);
+int nvramioctl(dev_t dev, int cmd, caddr_t data, int flag,
+    struct proc *p);
+int nvramread(dev_t dev, struct uio *uio, int flags);
+int nvramwrite(dev_t dev, struct uio *uio, int flags);
+paddr_t nvrammmap(dev_t dev, off_t off, int prot);
 
-u_long chiptotime __P((int, int, int, int, int, int));
+u_long chiptotime(int, int, int, int, int, int);
 
 int
 nvrammatch(parent, vcf, args)
@@ -95,20 +95,14 @@ nvrammatch(parent, vcf, args)
 	int ret;
 #endif
 	struct confargs *ca = args;
-	struct bugrtc rtc;
+	struct mvmeprom_time rtc;
 	ca->ca_vaddr = ca->ca_paddr;   /* map 1:1 */
 /*X*/	if (ca->ca_vaddr == (void *)-1)
 /*X*/		return (1);
 
 #if 0
 	bugrtcrd(&rtc);
-	ret = badvaddr(IIOV(ca->ca_vaddr), 1);
-	if (ret != 0)
-		ret = badvaddr(IIOV(ca->ca_vaddr), 2);
-	if (ret != 0)
-		ret = badvaddr(IIOV(ca->ca_vaddr), 4);
-
-	if (ret != 0) {
+	if (badvaddr(IIOV(ca->ca_vaddr), 1)) {
 		printf("==> nvram: address 0x%x failed check\n", ca->ca_vaddr);
 		return (0);
 	} else
@@ -130,7 +124,7 @@ nvramattach(parent, self, args)
 	sc->sc_paddr = ca->ca_paddr;
 	sc->sc_vaddr = ca->ca_vaddr;
 
-	if (cputyp == CPU_188) {
+	if (brdtyp == BRD_188) {
 		sc->sc_len = MK48T02_SIZE;
 	} else {
 		sc->sc_len = MK48T08_SIZE;
@@ -142,7 +136,7 @@ nvramattach(parent, self, args)
 /*X*/	if (sc->sc_vaddr == NULL)
 /*X*/		panic("failed to map!");
 
-	if (cputyp != CPU_188) {
+	if (brdtyp != BRD_188) {
 		sc->sc_regs = (void *)(sc->sc_vaddr + sc->sc_len -
 				       sizeof(struct clockreg));
 	} else {
@@ -248,7 +242,7 @@ struct chiptime {
 	int     year;
 };
 
-void timetochip __P((struct chiptime *c));
+void timetochip(struct chiptime *c);
 
 void
 timetochip(c)
@@ -322,7 +316,7 @@ inittodr(base)
 		base = 21*SECYR + 186*SECDAY + SECDAY/2;
 		badbase = 1;
 	}
-	if (cputyp != CPU_188) {
+	if (brdtyp != BRD_188) {
 		register struct clockreg *cl = (struct clockreg *)sc->sc_regs;
 		cl->cl_csr |= CLK_READ;		/* enable read (stop time) */
 		sec = cl->cl_sec;
@@ -378,7 +372,7 @@ void resettodr()
 {
 	struct nvramsoftc *sc = (struct nvramsoftc *) nvram_cd.cd_devs[0];
 	struct chiptime c;
-	if (cputyp != CPU_188) {
+	if (brdtyp != BRD_188) {
 		register struct clockreg *cl = (struct clockreg *)sc->sc_regs;
 
 		if (!time.tv_sec || cl == NULL)
@@ -487,10 +481,11 @@ nvramwrite(dev, uio, flags)
  * will also be mmap'd, due to NBPG being 4K. On the MVME147 the NVRAM
  * repeats, so userland gets two copies back-to-back.
  */
-int
+paddr_t
 nvrammmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	int unit = minor(dev);
 	struct nvramsoftc *sc = (struct nvramsoftc *) nvram_cd.cd_devs[unit];

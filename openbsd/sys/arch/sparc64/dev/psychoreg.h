@@ -1,4 +1,4 @@
-/*	$OpenBSD: psychoreg.h,v 1.5 2001/09/15 07:08:04 jason Exp $	*/
+/*	$OpenBSD: psychoreg.h,v 1.9 2002/03/04 02:32:51 jason Exp $	*/
 /*	$NetBSD: psychoreg.h,v 1.6.4.2 2001/09/13 01:14:40 thorpej Exp $ */
 
 /*
@@ -93,8 +93,8 @@ struct psychoreg {
 	u_int64_t	pcia_slot3_int;		/* PCI bus a slot 3 irq map reg (IIi)*/	/* 1fe.0000.0c18 */
 	u_int64_t	pcib_slot0_int;		/* PCI bus b slot 0 irq map reg */	/* 1fe.0000.0c20 */
 	u_int64_t	pcib_slot1_int;		/* PCI bus b slot 1 irq map reg */	/* 1fe.0000.0c28 */
-	u_int64_t	pcib_slot2_int;		/* PCI bus b slot 1 irq map reg */	/* 1fe.0000.0c30 */
-	u_int64_t	pcib_slot3_int;		/* PCI bus b slot 1 irq map reg */	/* 1fe.0000.0c38 */
+	u_int64_t	pcib_slot2_int;		/* PCI bus b slot 2 irq map reg */	/* 1fe.0000.0c30 */
+	u_int64_t	pcib_slot3_int;		/* PCI bus b slot 3 irq map reg */	/* 1fe.0000.0c38 */
 
 	u_int64_t	pad4[120];
 
@@ -263,6 +263,27 @@ struct psychoreg {
 
 /* what the bits mean! */
 
+/* uncorrectable error fault status */
+#define	PSY_UEAFSR_PDRD	0x4000000000000000	/* primary pci dma read */
+#define	PSY_UEAFSR_PDWR	0x2000000000000000	/* primary pci dma write */
+#define	PSY_UEAFSR_SDRD	0x0800000000000000	/* secondary pci dma read */
+#define	PSY_UEAFSR_SDWR	0x0400000000000000	/* secondary pci dma write */
+#define	PSY_UEAFSR_SDTE	0x0200000000000000	/* secondary dma translation error */
+#define	PSY_UEAFSR_PDTE	0x0100000000000000	/* primary dma translation error */
+#define	PSY_UEAFSR_MASK	0x0000ffff00000000	/* byte mask */
+#define	PSY_UEAFSR_OFF	0x00000000e0000000	/* offset (afar [5:3]) */
+#define	PSY_UEAFSR_BLK	0x0000000000800000	/* block operation */
+
+/* correctable error fault status */
+#define	PSY_CEAFSR_PDRD	0x4000000000000000	/* primary pci dma read */
+#define	PSY_CEAFSR_PDWR	0x2000000000000000	/* primary pci dma write */
+#define	PSY_CEAFSR_SDRD	0x0800000000000000	/* secondary pci dma read */
+#define	PSY_CEAFSR_SDWR	0x0400000000000000	/* secondary pci dma write */
+#define	PSY_CEAFSR_SYND	0x00ff000000000000	/* ecc syndrome */
+#define	PSY_CEAFSR_MASK	0x0000ffff00000000	/* byte mask */
+#define	PSY_CEAFSR_OFF	0x00000000e0000000	/* offset (afar [5:3]) */
+#define	PSY_CEAFSR_BLK	0x0000000000800000	/* block operation */
+
 /* PCI [a|b] control/status register */
 /* note that the sabre only has one set of PCI control/status registers */
 #define	PCICTL_MRLM	0x0000001000000000	/* Memory Read Line/Multiple */
@@ -290,6 +311,39 @@ struct psychoreg {
 #define	PSY_PCIAFSR_RESV2	0x0000000040000000	/* reserved */
 #define	PSY_PCIAFSR_MID		0x000000003e000000	/* mid causing error */
 #define	PSY_PCIAFSR_RESV3	0x0000000001ffffff	/* reserved */
+
+/* performance counter control */
+#define	PSY_PMCR_CLR1		0x0000000000008000	/* clear cnt 1 */
+#define	PSY_PMCR_SEL1		0x0000000000001f00	/* set cnt 1 src */
+#define	PSY_PMCR_CLR0		0x0000000000000080	/* clear cnt 0 */
+#define	PSY_PMCR_SEL0		0x000000000000001f	/* set cnt 0 src */
+
+#define	PSY_PMCRSEL_SDVRA	0x0000000000000000	/* stream dvma read, A */
+#define	PSY_PMCRSEL_SDVWA	0x0000000000000001	/* stream dvma write, A */
+#define	PSY_PMCRSEL_CDVRA	0x0000000000000002	/* consist dvma read, A */
+#define	PSY_PMCRSEL_CDVWA	0x0000000000000003	/* consist dvma write, A */
+#define	PSY_PMCRSEL_SBMA	0x0000000000000004	/* stream buf miss, A */
+#define	PSY_PMCRSEL_DVA		0x0000000000000005	/* dvma cycles, A */
+#define	PSY_PMCRSEL_DVWA	0x0000000000000006	/* dvma words, A */
+#define	PSY_PMCRSEL_PIOA	0x0000000000000007	/* pio cycles, A */
+#define	PSY_PMCRSEL_SDVRB	0x0000000000000008	/* stream dvma read, B */
+#define	PSY_PMCRSEL_SDVWB	0x0000000000000009	/* stream dvma write, B */
+#define	PSY_PMCRSEL_CDVRB	0x000000000000000a	/* consist dvma read, B */
+#define	PSY_PMCRSEL_CDVWB	0x000000000000000b	/* consist dvma write, B */
+#define	PSY_PMCRSEL_SBMB	0x000000000000000c	/* stream buf miss, B */
+#define	PSY_PMCRSEL_DVB		0x000000000000000d	/* dvma cycles, B */
+#define	PSY_PMCRSEL_DVWB	0x000000000000000e	/* dvma words, B */
+#define	PSY_PMCRSEL_PIOB	0x000000000000000f	/* pio cycles, B */
+#define	PSY_PMCRSEL_TLBMISS	0x0000000000000010	/* tlb misses */
+#define	PSY_PMCRSEL_NINTRS	0x0000000000000011	/* interrupts */
+#define	PSY_PMCRSEL_INACK	0x0000000000000012	/* intr nacks */
+#define	PSY_PMCRSEL_PIOR	0x0000000000000013	/* pio read xfers */
+#define	PSY_PMCRSEL_PIOW	0x0000000000000014	/* pio write xfers */
+#define	PSY_PMCRSEL_MERGE	0x0000000000000015	/* merge buffer xacts */
+#define	PSY_PMCRSEL_TBLA	0x0000000000000016	/* tbl walk retries, A */
+#define	PSY_PMCRSEL_STCA	0x0000000000000017	/* stc retries, A */
+#define	PSY_PMCRSEL_TBLB	0x0000000000000018	/* tbl walk retries, B */
+#define	PSY_PMCRSEL_STCB	0x0000000000000019	/* stc retries, B */
 
 /*
  * these are the PROM structures we grovel

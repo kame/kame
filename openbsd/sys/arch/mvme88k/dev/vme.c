@@ -1,4 +1,4 @@
-/*	$OpenBSD: vme.c,v 1.13 2001/09/11 20:05:24 miod Exp $ */
+/*	$OpenBSD: vme.c,v 1.19 2002/03/14 01:26:39 millert Exp $ */
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
  * Copyright (c) 1995 Theo de Raadt
@@ -42,7 +42,7 @@
 #include <sys/syslog.h>
 #include <sys/fcntl.h>
 #include <sys/device.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/cpu.h>
@@ -58,18 +58,17 @@
 #include <mvme88k/dev/sysconreg.h>
 #endif
 
-int  vmematch __P((struct device *, void *, void *));
-void vmeattach __P((struct device *, struct device *, void *));
+int  vmematch(struct device *, void *, void *);
+void vmeattach(struct device *, struct device *, void *);
 
-void vme2chip_init __P((struct vmesoftc *));
-u_long vme2chip_map __P((u_long, int, int));
-int vme2abort __P((void *));
-int sysconabort __P((void *));
-void * vmemap __P((struct vmesoftc *, void *, int, int));
-void vmeunmap __P((void *, int));
-int vmeprint __P((void *, const char *));
+void vme2chip_init(struct vmesoftc *);
+u_long vme2chip_map(u_long, int, int);
+int vme2abort(void *);
+int sysconabort(void *);
+void vmeunmap(void *, int);
+int vmeprint(void *, const char *);
 
-void vmesyscon_init __P((struct vmesoftc *));
+void vmesyscon_init(struct vmesoftc *);
 
 int vmebustype;
 int vmevecbase;
@@ -122,7 +121,7 @@ vmematch(parent, cf, args)
 void *
 vmepmap(sc, vmeaddr, len, bustype)
 	struct vmesoftc *sc;
-	void *vmeaddr;
+	off_t vmeaddr;
 	int len;
 	int bustype;
 {
@@ -164,7 +163,7 @@ vmepmap(sc, vmeaddr, len, bustype)
 void *
 vmemap(sc, vmeaddr, len, bustype)
 	struct vmesoftc *sc;
-	void *vmeaddr;
+	off_t vmeaddr;
 	int len;
 	int bustype;
 {
@@ -214,7 +213,7 @@ vmerw(sc, uio, flags, bus)
 			c = NBPG - (v & PGOFSET);
 		if (c == 0)
 			return (0);
-		vme = vmemap(sc, (void *)(v & ~PGOFSET),
+		vme = vmemap(sc, v & ~PGOFSET,
 		    NBPG, BUS_VMES);
 		if (vme == NULL) {
 			error = EFAULT;	/* XXX? */
@@ -269,7 +268,8 @@ vmescan(parent, child, args, bustype)
 		oca.ca_len = 4096;
 
 	oca.ca_offset = (u_int)oca.ca_paddr;
-	oca.ca_vaddr = vmemap(sc, oca.ca_paddr, oca.ca_len, oca.ca_bustype);
+	oca.ca_vaddr = vmemap(sc, (vm_offset_t)oca.ca_paddr, oca.ca_len,
+	    oca.ca_bustype);
 	if (!oca.ca_vaddr)
 		oca.ca_vaddr = (void *)-1;
 	oca.ca_master = (void *)sc;
@@ -294,7 +294,6 @@ vmeattach(parent, self, args)
 {
 	struct vmesoftc *sc = (struct vmesoftc *)self;
 	struct confargs *ca = args;
-	struct vme2reg *vme2;
 
 	/* XXX any initialization to do? */
 
@@ -306,6 +305,7 @@ vmeattach(parent, self, args)
 	case BUS_PCCTWO:
 	{
 		int scon;
+		struct vme2reg *vme2;
 
 		vme2 = (struct vme2reg *)sc->sc_vaddr;
 		/* Sanity check that the Bug is set up right */

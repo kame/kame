@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_input.c,v 1.93 2001/09/18 15:24:32 aaron Exp $	*/
+/*	$OpenBSD: ip_input.c,v 1.100 2002/03/14 01:27:11 millert Exp $	*/
 /*	$NetBSD: ip_input.c,v 1.30 1996/03/16 23:53:58 christos Exp $	*/
 
 /*
@@ -150,8 +150,8 @@ struct	in_ifaddrhead in_ifaddr;
 struct	ifqueue ipintrq;
 
 int	ipq_locked;
-static __inline int ipq_lock_try __P((void));
-static __inline void ipq_unlock __P((void));
+static __inline int ipq_lock_try(void);
+static __inline void ipq_unlock(void);
 
 struct pool ipqent_pool;
 
@@ -209,7 +209,7 @@ static	struct ip_srcrt {
 	struct	in_addr route[MAX_IPOPTLEN/sizeof(struct in_addr)];
 } ip_srcrt;
 
-static void save_rte __P((u_char *, struct in_addr));
+static void save_rte(u_char *, struct in_addr);
 static int ip_weadvertise(u_int32_t);
 
 /*
@@ -225,7 +225,7 @@ ip_init()
 	const u_int16_t defbaddynamicports_udp[] = DEFBADDYNAMICPORTS_UDP;
 
 	pool_init(&ipqent_pool, sizeof(struct ipqent), 0, 0, 0, "ipqepl",
-	    0, NULL, NULL, M_IPQ);
+	    NULL);
 
 	pr = pffindproto(PF_INET, IPPROTO_RAW, SOCK_RAW);
 	if (pr == 0)
@@ -262,12 +262,9 @@ struct	route ipforward_rt;
 void
 ipintr()
 {
-	register struct mbuf *m;
+	struct mbuf *m;
 	int s;
 
-	if (needqueuedrain)
-		m_reclaim();
-	
 	while (1) {
 		/*
 		 * Get next datagram off input queue and get IP header
@@ -395,6 +392,8 @@ ipv4_input(m)
 	 */
 	if (pf_test(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
 		goto bad;
+	if (m == NULL)
+		return;
 
 	ip = mtod(m, struct ip *);
 	hlen = ip->ip_hl << 2;
@@ -1476,9 +1475,6 @@ ip_forward(m, srcrt)
 		}
 	}
 
-#if 0 /*KAME IPSEC*/
-	m->m_pkthdr.rcvif = NULL;
-#endif /*IPSEC*/
 	error = ip_output(m, (struct mbuf *)0, &ipforward_rt,
 	    (IP_FORWARDING | (ip_directedbcast ? IP_ALLOWBROADCAST : 0)), 
 	    0, NULL, NULL);
@@ -1536,9 +1532,21 @@ ip_forward(m, srcrt)
 		break;
 
 	case ENOBUFS:
+#if 1
+		/*
+		 * a router should not generate ICMP_SOURCEQUENCH as
+		 * required in RFC1812 Requirements for IP Version 4 Routers.
+		 * source quench could be a big problem under DoS attacks,
+		 * or the underlying interface is rate-limited.
+		 */
+		if (mcopy)
+			m_freem(mcopy);
+		return;
+#else
 		type = ICMP_SOURCEQUENCH;
 		code = 0;
 		break;
+#endif
 	}
 
 	icmp_error(mcopy, type, code, dest, destifp);

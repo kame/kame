@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysv_shm.c,v 1.20 2001/08/12 22:50:12 millert Exp $	*/
+/*	$OpenBSD: sysv_shm.c,v 1.25 2002/03/14 01:27:05 millert Exp $	*/
 /*	$NetBSD: sysv_shm.c,v 1.50 1998/10/21 22:24:29 tron Exp $	*/
 
 /*
@@ -46,13 +46,12 @@
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 struct shminfo shminfo;
 struct shmid_ds *shmsegs;
 
-struct shmid_ds *shm_find_segment_by_shmid __P((int));
+struct shmid_ds *shm_find_segment_by_shmid(int);
 
 /*
  * Provides the following externally accessible functions:
@@ -83,13 +82,13 @@ struct shmmap_state {
 	int shmid;
 };
 
-int shm_find_segment_by_key __P((key_t));
-void shm_deallocate_segment __P((struct shmid_ds *));
-int shm_delete_mapping __P((struct vmspace *, struct shmmap_state *));
-int shmget_existing __P((struct proc *, struct sys_shmget_args *,
-			 int, int, register_t *));
-int shmget_allocate_segment __P((struct proc *, struct sys_shmget_args *,
-				 int, register_t *));
+int shm_find_segment_by_key(key_t);
+void shm_deallocate_segment(struct shmid_ds *);
+int shm_delete_mapping(struct vmspace *, struct shmmap_state *);
+int shmget_existing(struct proc *, struct sys_shmget_args *,
+			 int, int, register_t *);
+int shmget_allocate_segment(struct proc *, struct sys_shmget_args *,
+				 int, register_t *);
 
 int
 shm_find_segment_by_key(key)
@@ -254,7 +253,7 @@ sys_shmat(p, v, retval)
 	shm_handle = shmseg->shm_internal;
 	uao_reference(shm_handle->shm_object);
 	rv = uvm_map(&p->p_vmspace->vm_map, &attach_va, size,
-	    shm_handle->shm_object, 0, UVM_MAPFLAG(prot, prot,
+	    shm_handle->shm_object, 0, 0, UVM_MAPFLAG(prot, prot,
 	    UVM_INH_SHARE, UVM_ADV_RANDOM, 0));
 	if (rv != KERN_SUCCESS) {
 	    return ENOMEM;

@@ -1,11 +1,13 @@
-#	$OpenBSD: RAMDISK,v 1.11 2001/08/28 09:19:03 jj Exp $
+#	$OpenBSD: RAMDISK,v 1.14 2002/03/14 00:47:56 miod Exp $
 
 #
 # A ramdisk kernel
 #
 
 include "arch/amiga/conf/std.amiga"
+
 include "conf/GENERIC"
+rmoption	PTRACE
 
 maxusers	4
 
@@ -31,10 +33,10 @@ option		FPU_EMULATE	# FPU emulation
 option		ADOSFS		# AmigaDOS file system
 
 #
-# Compatability options for various existing systems
+# Compatibility options for various existing systems
 #
 #option		COMPAT_SUNOS	# Support to run Sun (m68k) executables
-#option		COMPAT_HPUX	# HP300 compatability
+#option		COMPAT_HPUX	# HP300 compatibility
 
 #
 # Support for various kernel options
@@ -52,7 +54,6 @@ option		ADOSFS		# AmigaDOS file system
 #
 # Amiga specific options
 #
-option		MACHINE_NONCONTIG # Non-contiguous memory support
 # ATTENTION: There is NO WARRANTY AT ALL that the sync will be complete
 # before the 10 secondinterval ends, or that KBDRESET does work at all.
 #option		KBDRESET	# sync on Ctrl-Amiga-Amiga

@@ -1,4 +1,4 @@
-/*	$OpenBSD: fpu_calcea.c,v 1.6 1999/01/11 05:11:33 millert Exp $	*/
+/*	$OpenBSD: fpu_calcea.c,v 1.8 2002/03/14 03:15:54 millert Exp $	*/
 /*	$NetBSD: fpu_calcea.c,v 1.7 1996/10/16 06:27:05 scottr Exp $	*/
 
 /*
@@ -43,13 +43,13 @@
 /*
  * Prototypes of static functions
  */
-static int decode_ea6 __P((struct frame *frame, struct instruction *insn,
-			   struct insn_ea *ea, int modreg));
-static int fetch_immed __P((struct frame *frame, struct instruction *insn,
-			    int *dst));
-static int fetch_disp __P((struct frame *frame, struct instruction *insn,
-			   int size, int *res));
-static int calc_ea __P((struct insn_ea *ea, char *ptr, char **eaddr));
+static int decode_ea6(struct frame *frame, struct instruction *insn,
+			   struct insn_ea *ea, int modreg);
+static int fetch_immed(struct frame *frame, struct instruction *insn,
+			    int *dst);
+static int fetch_disp(struct frame *frame, struct instruction *insn,
+			   int size, int *res);
+static int calc_ea(struct insn_ea *ea, char *ptr, char **eaddr);
 
 /*
  * Helper routines for dealing with "effective address" values.
@@ -478,7 +478,7 @@ fpu_store_ea(frame, insn, ea, src)
 #endif
 	    return SIGILL;
 	}
-	dst = (char*)&frame->f_regs[ea->ea_regnum];
+	dst = (char *)&frame->f_regs[ea->ea_regnum];
 	/* The destination is an int. */
 	if (len < 4) {
 	    dst += (4 - len);

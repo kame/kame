@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ie_gsc.c,v 1.6 2001/01/12 22:57:04 mickey Exp $	*/
+/*	$OpenBSD: if_ie_gsc.c,v 1.12 2002/03/18 19:13:28 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998,1999 Michael Shalayeff
@@ -73,8 +73,8 @@ struct ie_gsc_regs {
 
 #define	IE_SIZE	0x8000
 
-int	ie_gsc_probe __P((struct device *, void *, void *));
-void	ie_gsc_attach __P((struct device *, struct device *, void *));
+int	ie_gsc_probe(struct device *, void *, void *);
+void	ie_gsc_attach(struct device *, struct device *, void *);
 
 struct cfattach ie_gsc_ca = {
 	sizeof(struct ie_softc), ie_gsc_probe, ie_gsc_attach
@@ -85,18 +85,20 @@ static int ie_gsc_media[] = {
 };
 #define	IE_NMEDIA	(sizeof(ie_gsc_media) / sizeof(ie_gsc_media[0]))
 
-void ie_gsc_reset __P((struct ie_softc *sc, int what));
-void ie_gsc_attend __P((struct ie_softc *sc));
-void ie_gsc_run __P((struct ie_softc *sc));
-void ie_gsc_port __P((struct ie_softc *sc, u_int));
+char *ie_mem;
+
+void ie_gsc_reset(struct ie_softc *sc, int what);
+void ie_gsc_attend(struct ie_softc *sc);
+void ie_gsc_run(struct ie_softc *sc);
+void ie_gsc_port(struct ie_softc *sc, u_int);
 #ifdef USELEDS
-int ie_gsc_intrhook __P((struct ie_softc *sc, int what));
+int ie_gsc_intrhook(struct ie_softc *sc, int what);
 #endif
-u_int16_t ie_gsc_read16 __P((struct ie_softc *sc, int offset));
-void ie_gsc_write16 __P((struct ie_softc *sc, int offset, u_int16_t v));
-void ie_gsc_write24 __P((struct ie_softc *sc, int offset, int addr));
-void ie_gsc_memcopyin __P((struct ie_softc *sc, void *p, int offset, size_t));
-void ie_gsc_memcopyout __P((struct ie_softc *sc, const void *p, int, size_t));
+u_int16_t ie_gsc_read16(struct ie_softc *sc, int offset);
+void ie_gsc_write16(struct ie_softc *sc, int offset, u_int16_t v);
+void ie_gsc_write24(struct ie_softc *sc, int offset, int addr);
+void ie_gsc_memcopyin(struct ie_softc *sc, void *p, int offset, size_t);
+void ie_gsc_memcopyout(struct ie_softc *sc, const void *p, int, size_t);
 
 
 void
@@ -106,7 +108,7 @@ ie_gsc_reset(sc, what)
 {
 	register volatile struct ie_gsc_regs *r = (struct ie_gsc_regs *)sc->ioh;
 	register int i;
-	
+
 	switch (what) {
 	case IE_CHIP_PROBE:
 		r->ie_reset = 0;
@@ -152,6 +154,7 @@ ie_gsc_attend(sc)
 {
 	register volatile struct ie_gsc_regs *r = (struct ie_gsc_regs *)sc->ioh;
 
+	fdcache(0, (vaddr_t)ie_mem, IE_SIZE);
 	r->ie_attn = 0;
 }
 
@@ -228,7 +231,7 @@ ie_gsc_read16(sc, offset)
 
 void
 ie_gsc_write16(sc, offset, v)
-	struct ie_softc *sc;	
+	struct ie_softc *sc;
 	int offset;
 	u_int16_t v;
 {
@@ -238,7 +241,7 @@ ie_gsc_write16(sc, offset, v)
 
 void
 ie_gsc_write24(sc, offset, addr)
-	struct ie_softc *sc;	
+	struct ie_softc *sc;
 	int offset;
 	int addr;
 {
@@ -290,7 +293,6 @@ ie_gsc_attach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
 {
-	static char mem[IE_SIZE+16];
 	struct pdc_lan_station_id pdc_mac PDC_ALIGNMENT;
 	register struct ie_softc *sc = (struct ie_softc *)self;
 	register struct gsc_attach_args *ga = aux;
@@ -307,6 +309,7 @@ ie_gsc_attach(parent, self, aux)
 		sc->sc_flags |= IEGSC_GECKO;
 
 	sc->sc_msize = IE_SIZE;
+	/* XXX memory must be under 16M until the mi part is fixed */
 #if 0
 	if (bus_dmamem_alloc(ga->ga_dmatag, sc->sc_msize, NBPG, 0,
 			     &seg, 1, &rseg, BUS_DMA_NOWAIT)) {
@@ -325,14 +328,14 @@ ie_gsc_attach(parent, self, aux)
 	sc->sc_maddr = kvtop((caddr_t)sc->bh);
 
 #else
-	bzero(mem, sizeof(mem));
-	sc->bh = ((u_int)&mem + 15) & ~0xf;
+	sc->bh = (u_int)ie_mem;
+	sc->sc_maddr = sc->bh;
 #endif
-	sc->sc_maddr = kvtop((caddr_t)sc->bh);
 	sc->sysbus = 0x40 | IE_SYSBUS_82586 | IE_SYSBUS_INTLOW | IE_SYSBUS_TRG | IE_SYSBUS_BE;
 
 	sc->iot = sc->bt = ga->ga_iot;
 	sc->ioh = ga->ga_hpa;
+	sc->do_xmitnopchain = 0;
 	sc->hwreset = ie_gsc_reset;
 	sc->chan_attn = ie_gsc_attend;
 	sc->port = ie_gsc_port;
@@ -374,7 +377,7 @@ ie_gsc_attach(parent, self, aux)
 	sc->iscp = 0;
 	sc->scp = sc->iscp + IE_ISCP_SZ;
 	sc->scb = sc->scp + IE_SCP_SZ;
-	sc->buf_area = sc->scb + IE_SCB_SZ;
+	sc->buf_area = sc->scb + 256;
 	sc->buf_area_sz = sc->sc_msize - sc->buf_area;
 	sc->sc_type = sc->sc_flags & IEGSC_GECKO? "LASI/i82596CA" : "i82596DX";
 	sc->sc_vers = ga->ga_type.iodc_model * 10 + ga->ga_type.iodc_sv_rev;

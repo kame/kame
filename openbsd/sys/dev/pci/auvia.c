@@ -1,4 +1,4 @@
-/*	$OpenBSD: auvia.c,v 1.10 2001/08/25 10:13:29 art Exp $ */
+/*	$OpenBSD: auvia.c,v 1.15 2002/03/14 01:26:58 millert Exp $ */
 /*	$NetBSD: auvia.c,v 1.7 2000/11/15 21:06:33 jdolecek Exp $	*/
 
 /*-
@@ -53,7 +53,7 @@
 #include <sys/device.h>
 #include <sys/audioio.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <dev/pci/pcidevs.h>
 #include <dev/pci/pcivar.h>
@@ -103,7 +103,7 @@ int	auvia_query_devinfo(void *, mixer_devinfo_t *);
 void *	auvia_malloc(void *, int, size_t, int, int);
 void	auvia_free(void *, void *, int);
 size_t	auvia_round_buffersize(void *, int, size_t);
-int	auvia_mappage(void *, void *, int, int);
+paddr_t	auvia_mappage(void *, void *, off_t, int);
 int	auvia_get_props(void *);
 int	auvia_build_dma_ops(struct auvia_softc *, struct auvia_softc_chan *,
 	struct auvia_dma *, void *, void *, int);
@@ -112,7 +112,7 @@ int	auvia_trigger_output(void *, void *, void *, int, void (*)(void *),
 int	auvia_trigger_input(void *, void *, void *, int, void (*)(void *),
 	void *, struct audio_params *);
 
-int	auvia_intr __P((void *));
+int	auvia_intr(void *);
 
 struct  cfdriver auvia_cd = {
 	NULL, "auvia", DV_DULL
@@ -177,15 +177,13 @@ struct audio_hw_if auvia_hw_if = {
 	auvia_set_port,
 	auvia_get_port,
 	auvia_query_devinfo,
-	NULL,
+	auvia_malloc,
 	auvia_free,
-	NULL,
+	auvia_round_buffersize,
 	auvia_mappage,
 	auvia_get_props,
 	auvia_trigger_output,
-	auvia_trigger_input,
-	auvia_malloc,
-	auvia_round_buffersize,
+	auvia_trigger_input
 };
 
 int	auvia_attach_codec(void *, struct ac97_codec_if *);
@@ -221,7 +219,6 @@ auvia_attach(struct device *parent, struct device *self, void *aux)
 	pcitag_t pt = pa->pa_tag;
 	pci_intr_handle_t ih;
 	pcireg_t pr;
-	u_int16_t v;
 	int r, i;
 
 	if (pci_intr_map(pa, &ih)) {
@@ -275,22 +272,6 @@ auvia_attach(struct device *parent, struct device *self, void *aux)
 		printf("%s: can't attach codec (error 0x%X)\n",
 			sc->sc_dev.dv_xname, r);
 		return;
-	}
-
-	/*
-	 * Print a warning if the codec doesn't support hardware variable
-	 * rate audio.
-	 */
-	if (auvia_read_codec(sc, AC97_REG_EXT_AUDIO_ID, &v)
-		|| !(v & AC97_EXT_AUDIO_VRA)) {
-		printf("%s: warning: codec doesn't support hardware AC'97 2.0 Variable Rate Audio\n",
-			sc->sc_dev.dv_xname);
-		sc->sc_fixed_rate = AUVIA_FIXED_RATE;
-	} else {
-		/* enable VRA */
-		auvia_write_codec(sc, AC97_REG_EXT_AUDIO_CTRL,
-			AC97_EXT_AUDIO_VRA | AC97_EXT_AUDIO_VRM);
-		sc->sc_fixed_rate = 0;
 	}
 
 	/* disable mutes */
@@ -521,7 +502,7 @@ auvia_set_params(void *addr, int setmode, int usemode,
 	struct auvia_softc *sc = addr;
 	struct audio_params *p;
 	u_int16_t regval;
-	int reg, mode;
+	int mode;
 
 	/* for mode in (RECORD, PLAY) */
 	for (mode = AUMODE_RECORD; mode != -1;
@@ -531,20 +512,12 @@ auvia_set_params(void *addr, int setmode, int usemode,
 
 		p = mode == AUMODE_PLAY ? play : rec;
 
-		if (p->sample_rate < 4000 || p->sample_rate > 48000 ||
-		    (p->precision != 8 && p->precision != 16) ||
-		    (p->channels != 1 && p->channels != 2))
+		if (ac97_set_rate(sc->codec_if, p, mode))
 			return (EINVAL);
 
-		reg = mode == AUMODE_PLAY ?
-			AC97_REG_FRONT_DAC_RATE : AC97_REG_PCM_ADC_RATE;
-
-		if (!sc->sc_fixed_rate) {
-			auvia_write_codec(sc, reg, (u_int16_t) p->sample_rate);
-			auvia_read_codec(sc, reg, &regval);
-			p->sample_rate = regval;
-		} else
-			p->sample_rate = sc->sc_fixed_rate;
+		if ((p->precision != 8 && p->precision != 16) ||
+		    (p->channels != 1 && p->channels != 2))
+			return (EINVAL);
 
 		p->factor = 1;
 		p->sw_code = 0;
@@ -767,8 +740,8 @@ auvia_round_buffersize(void *addr, int direction, size_t size)
 }
 
 
-int
-auvia_mappage(void *addr, void *mem, int off, int prot)
+paddr_t
+auvia_mappage(void *addr, void *mem, off_t off, int prot)
 {
 	struct auvia_softc *sc = addr;
 	struct auvia_dma *p;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.23 2001/09/21 02:11:53 miod Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.30 2001/12/08 02:24:06 art Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.30 1997/05/19 10:14:50 veego Exp $	*/
 
 /*
@@ -48,22 +48,17 @@
 #include <sys/proc.h>
 #include <sys/signalvar.h>
 #include <sys/malloc.h>
-#include <sys/vnode.h>
 #include <sys/buf.h>
+#include <sys/vnode.h>
+#include <sys/user.h>
 #include <sys/core.h>
-#include <sys/exec_aout.h>
-#include <m68k/reg.h>
+#include <sys/exec.h>
 
 #include <machine/cpu.h>
-
-#include <vm/vm.h>
-#include <sys/user.h>
-#include <uvm/uvm_extern.h>
 #include <machine/pte.h>
+#include <machine/reg.h>
 
-/* XXX - Put this in some header file? */
-void child_return __P((struct proc *, struct frame));
-
+#include <uvm/uvm_extern.h>
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -75,14 +70,16 @@ void child_return __P((struct proc *, struct frame));
  * the frame pointers on the stack after copying.
  */
 void
-cpu_fork(p1, p2, stack, stacksize)
-	register struct proc *p1, *p2;
+cpu_fork(p1, p2, stack, stacksize, func, arg)
+	struct proc *p1, *p2;
 	void *stack;
 	size_t stacksize;
+	void (*func)(void *);
+	void *arg;
 {
-	register struct pcb *pcb = &p2->p_addr->u_pcb;
-	register struct trapframe *tf;
-	register struct switchframe *sf;
+	struct pcb *pcb = &p2->p_addr->u_pcb;
+	struct trapframe *tf;
+	struct switchframe *sf;
 	extern struct pcb *curpcb;
 
 	p2->p_md.md_flags = p1->p_md.md_flags;
@@ -99,7 +96,7 @@ cpu_fork(p1, p2, stack, stacksize)
 
 	/*
 	 * Copy the trap frame, and arrange for the child to return directly
-	 * through return_to_user().  Note the inline cpu_set_kpc();
+	 * through return_to_user().
 	 */
 	tf = (struct trapframe *)((u_int)p2->p_addr + USPACE) - 1;
 	p2->p_md.md_regs = (int *)tf;
@@ -113,35 +110,9 @@ cpu_fork(p1, p2, stack, stacksize)
 
 	sf = (struct switchframe *)tf - 1;
 	sf->sf_pc = (u_int)proc_trampoline;
-	pcb->pcb_regs[6] = (int)child_return;	/* A2 */
-	pcb->pcb_regs[7] = (int)p2;		/* A3 */
+	pcb->pcb_regs[6] = (int)func;		/* A2 */
+	pcb->pcb_regs[7] = (int)arg;		/* A3 */
 	pcb->pcb_regs[11] = (int)sf;		/* SSP */
-}
-
-/*
- * cpu_set_kpc:
- *
- * Arrange for in-kernel execution of a process to continue at the
- * named pc, as if the code at that address were called as a function
- * with argument, the current process's process pointer.
- *
- * Note that it's assumed that when the named process returns, rei()
- * should be invoked, to return to user mode.
- */
-void
-cpu_set_kpc(p, pc, arg)
-	struct proc	*p;
-	void		(*pc) __P((void *));
-	void		*arg;
-{
-	struct pcb *pcbp;
-	struct switchframe *sf;
-
-	pcbp = &p->p_addr->u_pcb;
-	sf = (struct switchframe *)pcbp->pcb_regs[11];
-	sf->sf_pc = (u_int)proc_trampoline;
-	pcbp->pcb_regs[6] = (int)pc;		/* A2 */
-	pcbp->pcb_regs[7] = (int)arg;		/* A3 */
 }
 
 /*
@@ -187,15 +158,13 @@ pagemove(from, to, size)
 			panic("pagemove 3");
 #endif
 #endif
-		pmap_remove(pmap_kernel(), (vm_offset_t)from,
-		    (vm_offset_t)from + PAGE_SIZE);
-		pmap_enter(pmap_kernel(),  (vm_offset_t)to, pa,
-		    VM_PROT_READ|VM_PROT_WRITE,
-		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+		pmap_kremove((vaddr_t)from, PAGE_SIZE);
+		pmap_kenter_pa((vaddr_t)to, pa, VM_PROT_READ|VM_PROT_WRITE);
 		from += PAGE_SIZE;
 		to += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	}
+	pmap_update(pmap_kernel());
 }
 
 /*
@@ -212,7 +181,7 @@ physaccess(vaddr, paddr, size, prot)
 	register u_int page;
 
 	/* if cache not inhibited, set cacheable & copyback */
-	if (mmutype == MMU_68040 && (prot & PG_CI) == 0)
+	if (mmutype <= MMU_68040 && (prot & PG_CI) == 0)
 		prot |= PG_CCB;
 	else if (cputype == CPU_68060 && (prot & PG_CI))
                 prot |= PG_CIN;
@@ -314,25 +283,6 @@ cpu_coredump(p, vp, cred, chdr)
 }
 
 /*
- * Set a red zone in the kernel stack after the u. area.
- * We don't support a redzone right now.  It really isn't clear
- * that it is a good idea since, if the kernel stack were to roll
- * into a write protected page, the processor would lock up (since
- * it cannot create an exception frame) and we would get no useful
- * post-mortem info.  Currently, under the DEBUG option, we just
- * check at every clock interrupt to see if the current k-stack has
- * gone too far (i.e. into the "redzone" page) and if so, panic.
- * Look at _lev6intr in locore.s for more details.
- */
-/*ARGSUSED*/
-void
-setredzone(pte, vaddr)
-	u_int *pte;
-	caddr_t vaddr;
-{
-}
-
-/*
  * Convert kernel VA to physical address
  */
 int
@@ -382,6 +332,7 @@ vmapbuf(bp, len)
                 kva += PAGE_SIZE;
                 len -= PAGE_SIZE;
         } while (len);
+	pmap_update(kpmap);
 }
 
 /*
@@ -402,10 +353,8 @@ vunmapbuf(bp, len)
         off = (vaddr_t)bp->b_data - kva;
         len = m68k_round_page(off + len);
 
-        /*
-         * pmap_remove() is unnecessary here, as kmem_free_wakeup()
-         * will do it for us.
-         */
+	pmap_remove(pmap_kernel(), kva, kva + len);
+	pmap_update(pmap_kernel());
         uvm_km_free_wakeup(phys_map, kva, len);
 	bp->b_data = bp->b_saveaddr;
 	bp->b_saveaddr = 0;

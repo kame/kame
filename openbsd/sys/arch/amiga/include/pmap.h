@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.7 2001/08/18 20:50:18 art Exp $	*/
+/*	$OpenBSD: pmap.h,v 1.14 2002/03/25 19:41:03 niklas Exp $	*/
 /*	$NetBSD: pmap.h,v 1.17 1997/06/10 18:34:52 veego Exp $	*/
 
 /* 
@@ -54,7 +54,7 @@ struct pmap {
 	short			pm_sref;	/* segment table ref count */
 	short			pm_count;	/* pmap reference count */
 	long			pm_ptpages;	/* more stats: PT pages */
-	simple_lock_data_t	pm_lock;	/* lock on pmap */
+	struct simplelock	pm_lock;	/* lock on pmap */
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
 };
 
@@ -135,6 +135,7 @@ struct pmap	kernel_pmap_store;
 
 #define	pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
+#define pmap_update(pmap)			/* nothing */
 
 #endif	/* _KERNEL */
 

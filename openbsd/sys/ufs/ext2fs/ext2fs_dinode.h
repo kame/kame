@@ -1,3 +1,4 @@
+/*	$OpenBSD: ext2fs_dinode.h,v 1.7 2002/03/30 10:37:40 niklas Exp $	*/
 /*	$NetBSD: ext2fs_dinode.h,v 1.6 2000/01/26 16:21:33 bouyer Exp $	*/
 
 /*
@@ -139,7 +140,7 @@ struct ext2fs_dinode {
 #	define e2fs_iload(old, new) memcpy((new),(old),sizeof(struct ext2fs_dinode))
 #	define e2fs_isave(old, new) memcpy((new),(old),sizeof(struct ext2fs_dinode))
 #else
-void e2fs_i_bswap __P((struct ext2fs_dinode *, struct ext2fs_dinode *));
+void e2fs_i_bswap(struct ext2fs_dinode *, struct ext2fs_dinode *);
 #	define e2fs_iload(old, new) e2fs_i_bswap((old), (new))
 #	define e2fs_isave(old, new) e2fs_i_bswap((old), (new))
 #endif

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ka670.c,v 1.2 2001/09/11 20:05:25 miod Exp $	*/
+/*	$OpenBSD: ka670.c,v 1.5 2002/03/14 03:16:02 millert Exp $	*/
 /*	$NetBSD: ka670.c,v 1.4 2000/03/13 23:52:35 soren Exp $	*/
 /*
  * Copyright (c) 1999 Ludd, University of Lule}, Sweden.
@@ -39,7 +39,7 @@
 #include <sys/kernel.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/pte.h>
 #include <machine/cpu.h>
@@ -52,13 +52,13 @@
 #include <machine/ka670.h>
 #include <machine/clock.h>
 
-static	void ka670_conf __P((void));
+static	void ka670_conf(void);
 
-static	int ka670_mchk __P((caddr_t));
-static	void ka670_memerr __P((void));
-static	int ka670_cache_init __P((void));	/* "int mapen" as argument? */
-static	void ka670_halt __P((void));
-static	void ka670_reboot __P((int));
+static	int ka670_mchk(caddr_t);
+static	void ka670_memerr(void);
+static	int ka670_cache_init(void);	/* "int mapen" as argument? */
+static	void ka670_halt(void);
+static	void ka670_reboot(int);
 
 struct	cpu_dep ka670_calls = {
 	0,
@@ -125,7 +125,7 @@ int
 ka670_mchk(addr)
 	caddr_t addr;
 {
-	register struct ka670_mcframe *mcf = (void*)addr;
+	register struct ka670_mcframe *mcf = (void *)addr;
 
 	mtpr(0x00, PR_MCESR);	/* Acknowledge the machine check */
 	printf("machine check %d (0x%x)\n", mcf->mc670_code, mcf->mc670_code);

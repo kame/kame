@@ -1,4 +1,4 @@
-/*	$OpenBSD: ksyms.c,v 1.9 2001/09/17 05:16:05 jason Exp $	*/
+/*	$OpenBSD: ksyms.c,v 1.12 2002/03/14 01:26:52 millert Exp $	*/
 /*
  * Copyright (c) 1998 Todd C. Miller <Todd.Miller@courtesan.com>
  * Copyright (c) 2001 Artur Grabowski <art@openbsd.org>
@@ -41,7 +41,7 @@
 
 #include <machine/cpu.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 extern char *esym;				/* end of symbol table */
 #ifdef __sparc64__
@@ -55,10 +55,10 @@ static caddr_t ksym_syms;
 static size_t ksym_head_size;
 static size_t ksym_syms_size;
 
-void	ksymsattach __P((int));
-int	ksymsopen __P((dev_t, int, int));
-int	ksymsclose __P((dev_t, int, int));
-int	ksymsread __P((dev_t, struct uio *, int));
+void	ksymsattach(int);
+int	ksymsopen(dev_t, int, int);
+int	ksymsclose(dev_t, int, int);
+int	ksymsread(dev_t, struct uio *, int);
 
 /*
  * We assume __LDPGSZ is a multiple of PAGE_SIZE (it is)
@@ -224,10 +224,11 @@ ksymsread(dev, uio, flags)
 
 /* XXX - not yet */
 #if 0
-int
+paddr_t
 ksymsmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	vaddr_t va;
 	paddr_t pa;

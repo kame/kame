@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_hdio.c,v 1.1 2001/04/09 06:53:45 tholo Exp $	*/
+/*	$OpenBSD: linux_hdio.c,v 1.5 2002/03/14 01:26:50 millert Exp $	*/
 /*	$NetBSD: linux_hdio.c,v 1.1 2000/12/10 14:12:17 fvdl Exp $	*/
 
 /*
@@ -68,7 +68,7 @@ linux_ioctl_hdio(struct proc *p, struct linux_sys_ioctl_args *uap,
 	caddr_t sg;
 	struct filedesc *fdp;
 	struct file *fp;
-	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *));
+	int (*ioctlf)(struct file *, u_long, caddr_t, struct proc *);
 	struct ataparams *atap, ata;
 	struct atareq req;
 	struct disklabel label, *labp;
@@ -77,19 +77,10 @@ linux_ioctl_hdio(struct proc *p, struct linux_sys_ioctl_args *uap,
 	struct linux_hd_big_geometry hdg_big;
 
 	fdp = p->p_fd;
-#if 1
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
-		return (EBADF);
-#else
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
 
-	FILE_USE(fp);
-#endif
-
+	FREF(fp);
 	com = SCARG(uap, com);
 	ioctlf = fp->f_ops->fo_ioctl;
 	retval[0] = error = 0;
@@ -114,8 +105,10 @@ linux_ioctl_hdio(struct proc *p, struct linux_sys_ioctl_args *uap,
 		error = ioctlf(fp, ATAIOCCOMMAND, (caddr_t)&req, p);
 		if (error != 0)
 			break;
-		if (req.retsts != ATACMD_OK)
-			return EIO;
+		if (req.retsts != ATACMD_OK) {
+			error = EIO;
+			break;
+		}
 		error = copyin(atap, &ata, sizeof ata);
 		if (error != 0)
 			break;
@@ -185,9 +178,6 @@ linux_ioctl_hdio(struct proc *p, struct linux_sys_ioctl_args *uap,
 		error = EINVAL;
 	}
 
-#ifdef notyet
-	FILE_UNUSE(fp, p);
-#endif
-
+	FRELE(fp);
 	return error;
 }

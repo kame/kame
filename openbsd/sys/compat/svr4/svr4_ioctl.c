@@ -1,4 +1,4 @@
-/*	$OpenBSD: svr4_ioctl.c,v 1.8 2000/08/29 02:22:13 brad Exp $	 */
+/*	$OpenBSD: svr4_ioctl.c,v 1.11 2002/03/14 01:26:51 millert Exp $	 */
 /*	$NetBSD: svr4_ioctl.c,v 1.16 1996/04/11 12:54:41 christos Exp $	 */
 
 /*
@@ -56,7 +56,7 @@
 #include <compat/svr4/svr4_sockio.h>
 
 #ifdef DEBUG_SVR4
-static void svr4_decode_cmd __P((u_long, char *, char *, int *, int *));
+static void svr4_decode_cmd(u_long, char *, char *, int *, int *);
 /*
  * Decode an ioctl command symbolically
  */
@@ -93,8 +93,9 @@ svr4_sys_ioctl(p, v, retval)
 	struct file	*fp;
 	struct filedesc	*fdp;
 	u_long		 cmd;
-	int (*fun) __P((struct file *, struct proc *, register_t *,
-			int, u_long, caddr_t));
+	int (*fun)(struct file *, struct proc *, register_t *,
+			int, u_long, caddr_t);
+	int error = 0;
 #ifdef DEBUG_SVR4
 	char		 dir[4];
 	char		 c;
@@ -109,8 +110,7 @@ svr4_sys_ioctl(p, v, retval)
 	fdp = p->p_fd;
 	cmd = SCARG(uap, com);
 
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return EBADF;
 
 	if ((fp->f_flag & (FREAD | FWRITE)) == 0)
@@ -143,11 +143,16 @@ svr4_sys_ioctl(p, v, retval)
 
 	case SVR4_XIOC:
 		/* We do not support those */
-		return (EINVAL);
+		error = EINVAL;
+		goto out;
 
 	default:
 		DPRINTF(("Unimplemented ioctl %lx\n", cmd));
-		return (0);	/* XXX: really ENOSYS */
+		error = 0;	/* XXX: really ENOSYS */
+		goto out;
 	}
-	return (*fun)(fp, p, retval, SCARG(uap, fd), cmd, SCARG(uap, data));
+	error = (*fun)(fp, p, retval, SCARG(uap, fd), cmd, SCARG(uap, data));
+out:
+	FRELE(fp);
+	return (error);
 }

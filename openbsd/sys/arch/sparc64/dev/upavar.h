@@ -1,4 +1,4 @@
-/*	$OpenBSD: upavar.h,v 1.2 2001/08/18 21:30:00 jason Exp $	*/
+/*	$OpenBSD: upavar.h,v 1.4 2002/03/14 03:16:00 millert Exp $	*/
 /*	$NetBSD: upavar.h,v 1.2 2000/01/14 14:33:31 pk Exp $ */
 
 /*-
@@ -96,7 +96,7 @@ struct upa_reg {
 struct upadev {
 	struct	device *ud_dev;		/* backpointer to generic */
 	struct	upadev *ud_bchain;	/* forward link in bus chain */
-	void	(*ud_reset) __P((struct device *));
+	void	(*ud_reset)(struct device *);
 };
 
 /* variables per Upa */
@@ -118,7 +118,7 @@ struct upa_attach_args {
 	int		ua_node;	/* PROM handle */
 	struct upa_reg	*ua_reg;	/* "reg" properties */
 	int		ua_nreg;
-	void*		*ua_address;	/* "address" properties */
+	void *		*ua_address;	/* "address" properties */
 	int		ua_naddress;
 	int		*ua_interrupts;	/* "interrupts" properties */
 	int		ua_ninterrupts;
@@ -126,19 +126,19 @@ struct upa_attach_args {
 };
 
 /* upa_attach() is also used from obio.c */
-void	upa_attach __P((struct upa_softc *, char *, int,
-			 const char * const *));
-int	upa_print __P((void *, const char *));
+void	upa_attach(struct upa_softc *, char *, int,
+			 const char * const *);
+int	upa_print(void *, const char *);
 
-int	upadev_match __P((struct cfdata *, void *));
-void	upa_establish __P((struct upadev *, struct device *));
+int	upadev_match(struct cfdata *, void *);
+void	upa_establish(struct upadev *, struct device *);
 
-int	upa_setup_attach_args __P((
+int	upa_setup_attach_args(
 		struct upa_softc *,
 		bus_space_tag_t,
 		bus_dma_tag_t,
 		int,			/*node*/
-		struct upa_attach_args *));
+		struct upa_attach_args *);
 
 #define upa_bus_map(t, bt, a, s, f, v, hp) \
 	bus_space_map2(t, bt, a, s, f, v, hp)

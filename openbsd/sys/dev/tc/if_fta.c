@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_fta.c,v 1.8 2001/09/11 20:05:25 miod Exp $	*/
+/*	$OpenBSD: if_fta.c,v 1.10 2002/03/14 01:27:03 millert Exp $	*/
 /*	$NetBSD: if_fta.c,v 1.7 1996/10/22 21:37:26 cgd Exp $	*/
 
 /*-
@@ -56,14 +56,14 @@
 #endif
 #include <net/if_fddi.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <dev/tc/tcvar.h>
 #include <dev/ic/pdqvar.h>
 #include <dev/ic/pdqreg.h>
 
-int	pdq_tc_match __P((struct device *, void *, void *));
-void	pdq_tc_attach __P((struct device *, struct device *, void *));
+int	pdq_tc_match(struct device *, void *, void *);
+void	pdq_tc_attach(struct device *, struct device *, void *);
 
 int
 pdq_tc_match(parent, match, aux)

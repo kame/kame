@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.20 2001/07/06 02:07:44 provos Exp $ */
+/*	$OpenBSD: param.h,v 1.22 2002/03/14 01:26:48 millert Exp $ */
 /*      $NetBSD: param.h,v 1.39 1999/10/22 21:14:34 ragge Exp $    */
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -125,12 +125,11 @@
 #endif	/* NMBCLUSTERS */
 
 /*
- * Size of kernel malloc arena in NBPG-sized logical pages
- */ 
-
-#ifndef NKMEMCLUSTERS
-#define	NKMEMCLUSTERS	(4096*1024/NBPG)
-#endif
+ * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
+ * logical pages.
+ */
+#define	NKMEMPAGES_MIN_DEFAULT	((4 * 1024 * 1024) >> PAGE_SHIFT)
+#define	NKMEMPAGES_MAX_DEFAULT	((4 * 1024 * 1024) >> PAGE_SHIFT)
 
 /*
  * Some macros for units conversion
@@ -214,7 +213,7 @@
 #ifndef	_LOCORE
 #include <machine/cpu.h>
 
-void	delay __P((int));
+void	delay(int);
 /* inline macros used inside kernel */
 #include <machine/macros.h>
 #endif

@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISKC,v 1.25 2001/10/10 23:43:43 millert Exp $
+#	$OpenBSD: RAMDISKC,v 1.28 2002/03/30 20:11:03 deraadt Exp $
 
 machine		i386		# architecture, used by config; REQUIRED
 
@@ -47,6 +47,7 @@ apm0	at bios0 flags 0x0000	# flags 0x0101 to force protocol version 1.1
 pcibios0 at bios0 flags 0x0000
 
 isa0	at mainbus0
+isa0	at pcib?
 eisa0	at mainbus0
 pci*	at mainbus0
 
@@ -57,6 +58,7 @@ pchb*	at pci? dev ? function ?	# PCI-Host bridges
 ppb*	at pci? dev ? function ?	# PCI-PCI bridges
 pci*	at ppb? bus ?
 pci*	at pchb? bus ?
+pcib*	at pci? dev ? function ?	# PCI-ISA bridge
 
 # ISA PCMCIA controllers
 pcic0	at isa? port 0x3e0 iomem 0xd0000 iosiz 0x4000
@@ -114,10 +116,12 @@ pccom*	at isapnp?
 #lpt1	at isa? port 0x278
 #lpt2	at isa? port 0x3bc
 
-#bt0	at isa? port 0x330 irq ? drq ?	# BusLogic [57]4X SCSI controllers
-#bt1	at isa? port 0x334 irq ? drq ?	# BusLogic [57]4X SCSI controllers
-#bt2	at isa? port ? irq ?
-#scsibus* at bt?
+#bha0	at isa? port 0x330 irq ? drq ?	# BusLogic [57]4X SCSI controllers
+#bha1	at isa? disable port 0x334 irq ? drq ? # BusLogic [57]4X SCSI controllers
+#bha2	at isa? disable port ? irq ?
+#bha*	at pci? dev ? function ?
+#bha*	at eisa? slot ?			# XXX eisa still runs in isa-compat
+#scsibus* at bha?
 #aha0	at isa? port 0x330 irq ? drq ?	# Adaptec 154[02] SCSI controllers
 #aha1	at isa? port 0x334 irq ? drq ?	# Adaptec 154[02] SCSI controllers
 #aha*	at isapnp?
@@ -231,6 +235,7 @@ dc*	at pci? dev ? function ?		# 21143, "tulip" clone ethernet
 dc*	at cardbus? dev ? function ?		# 21143, "tulip" clone ethernet
 
 # Wireless network cards
+wi*	at pci? dev ? function ?		# WaveLAN IEEE 802.11DS
 wi*	at pcmcia? function ?			# WaveLAN IEEE 802.11DS
 #awi*	at pcmcia? function ?			# Bay Networks IEEE 802.11FH
 an*	at pcmcia? function ?			# Aironet IEEE 802.11DS

@@ -1,4 +1,4 @@
-/*	$OpenBSD: biosvar.h,v 1.38 2001/02/28 16:45:25 mickey Exp $	*/
+/*	$OpenBSD: biosvar.h,v 1.40 2002/03/14 01:26:33 millert Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Michael Shalayeff
@@ -75,7 +75,7 @@ struct bios_romheader {
 	u_int8_t	len;		/* length in pages (512 bytes) */
 	u_int32_t	entry;		/* initialization entry point */
 	u_int8_t	reserved[19];
-	u_int16_t	pnpheaader;	/* offset to PnP expansion header */
+	u_int16_t	pnpheader;	/* offset to PnP expansion header */
 } *bios_romheader_t;
 
 /*
@@ -235,18 +235,17 @@ struct bios_attach_args {
 struct consdev;
 struct proc;
 
-int bios_sysctl
-	__P((int *, u_int, void *, size_t *, void *, size_t, struct proc *));
+int bios_sysctl(int *, u_int, void *, size_t *, void *, size_t, struct proc *);
 
-void bioscnprobe __P((struct consdev *));
-void bioscninit __P((struct consdev *));
-void bioscnputc __P((dev_t, int));
-int bioscngetc __P((dev_t));
-void bioscnpollc __P((dev_t, int));
-void bios_getopt __P((void));
+void bioscnprobe(struct consdev *);
+void bioscninit(struct consdev *);
+void bioscnputc(dev_t, int);
+int bioscngetc(dev_t);
+void bioscnpollc(dev_t, int);
+void bios_getopt(void);
 
 /* bios32.c */
-int  bios32_service __P((u_int32_t, bios32_entry_t, bios32_entry_info_t));
+int  bios32_service(u_int32_t, bios32_entry_t, bios32_entry_info_t);
 
 extern u_int bootapiver;
 extern bios_memmap_t *bios_memmap;

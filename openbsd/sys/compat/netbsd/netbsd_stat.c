@@ -1,4 +1,4 @@
-/*	$OpenBSD: netbsd_stat.c,v 1.11 2001/05/15 08:04:31 deraadt Exp $	*/
+/*	$OpenBSD: netbsd_stat.c,v 1.14 2002/03/14 01:26:50 millert Exp $	*/
 /*
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -59,7 +59,7 @@
 #include <compat/netbsd/netbsd_syscallargs.h>
 #include <compat/netbsd/netbsd_util.h>
 
-static void openbsd_to_netbsd_stat __P((struct stat *, struct netbsd_stat *));
+static void openbsd_to_netbsd_stat(struct stat *, struct netbsd_stat *);
 
 static void
 openbsd_to_netbsd_stat(obst, nbst)
@@ -192,11 +192,12 @@ netbsd_sys___fstat13(p, v, retval)
 	struct stat sb;
 	int error;
 
-	if ((u_int)fd >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[fd]) == NULL)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
 		return (EBADF);
 
+	FREF(fp);
 	error = (*fp->f_ops->fo_stat)(fp, &sb, p);
+	FRELE(fp);
 	if (error)
 		return (error);
 	openbsd_to_netbsd_stat(&sb, &nsb);

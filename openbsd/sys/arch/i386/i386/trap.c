@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.43 2001/09/20 11:57:18 art Exp $	*/
+/*	$OpenBSD: trap.c,v 1.49 2002/03/14 01:26:33 millert Exp $	*/
 /*	$NetBSD: trap.c,v 1.95 1996/05/05 06:50:02 mycroft Exp $	*/
 
 /*-
@@ -91,10 +91,10 @@ extern struct emul emul_bsdos;
 
 #include "npx.h"
 
-static __inline void userret __P((struct proc *, int, u_quad_t));
-void trap __P((struct trapframe));
-int trapwrite __P((unsigned));
-void syscall __P((struct trapframe));
+static __inline void userret(struct proc *, int, u_quad_t);
+void trap(struct trapframe);
+int trapwrite(unsigned);
+void syscall(struct trapframe);
 
 /*
  * Define the code needed before returning to user mode, for
@@ -262,7 +262,8 @@ trap(frame)
 		printf("trap type %d code %x eip %x cs %x eflags %x cr2 %x cpl %x\n",
 		    type, frame.tf_err, frame.tf_eip, frame.tf_cs, frame.tf_eflags, rcr2(), cpl);
 
-		panic("trap");
+		panic("trap type %d, code=%x, pc=%x",
+		    type, frame.tf_err, frame.tf_eip);
 		/*NOTREACHED*/
 
 	case T_PROTFLT:
@@ -416,16 +417,17 @@ trap(frame)
 		/* FALLTHROUGH */
 
 	case T_PAGEFLT|T_USER: {	/* page fault */
-		register vm_offset_t va;
-		register struct vmspace *vm = p->p_vmspace;
-		register vm_map_t map;
+		vm_offset_t va, fa;
+		struct vmspace *vm = p->p_vmspace;
+		struct vm_map *map;
 		int rv;
-		extern vm_map_t kernel_map;
+		extern struct vm_map *kernel_map;
 		unsigned nss;
 
 		if (vm == NULL)
 			goto we_re_toast;
-		va = trunc_page((vm_offset_t)rcr2());
+		fa = (vm_offset_t)rcr2();
+		va = trunc_page(fa);
 		/*
 		 * It is only a kernel address space fault iff:
 		 *	1. (type & T_USER) == 0  and
@@ -469,7 +471,7 @@ trap(frame)
 		p->p_addr->u_pcb.pcb_onfault = NULL;
 		rv = uvm_fault(map, va, 0, ftype);
 		p->p_addr->u_pcb.pcb_onfault = onfault;
-		if (rv == KERN_SUCCESS) {
+		if (rv == 0) {
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
 			if (type == T_PAGEFLT)
@@ -484,7 +486,7 @@ trap(frame)
 			    map, va, ftype, rv);
 			goto we_re_toast;
 		}
-		sv.sival_int = rcr2();
+		sv.sival_int = fa;
 		trapsignal(p, SIGSEGV, vftype, SEGV_MAPERR, sv);
 		break;
 	}
@@ -565,8 +567,7 @@ trapwrite(addr)
 			nss = 0;
 	}
 
-	if (uvm_fault(&vm->vm_map, va, 0, VM_PROT_READ | VM_PROT_WRITE)
-	    != KERN_SUCCESS)
+	if (uvm_fault(&vm->vm_map, va, 0, VM_PROT_READ | VM_PROT_WRITE))
 		return 1;
 
 	if (nss > vm->vm_ssize)
@@ -753,15 +754,16 @@ syscall(frame)
 }
 
 void
-child_return(p, frame)
-	struct proc *p;
-	struct trapframe frame;
+child_return(arg)
+	void *arg;
 {
+	struct proc *p = (struct proc *)arg;
+	struct trapframe *tf = p->p_md.md_regs;
 
-	frame.tf_eax = 0;
-	frame.tf_eflags &= ~PSL_C;
+	tf->tf_eax = 0;
+	tf->tf_eflags &= ~PSL_C;
 
-	userret(p, frame.tf_eip, 0);
+	userret(p, tf->tf_eip, 0);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
 		ktrsysret(p, SYS_fork, 0, 0);

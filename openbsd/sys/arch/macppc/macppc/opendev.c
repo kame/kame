@@ -1,4 +1,4 @@
-/*	$OpenBSD: opendev.c,v 1.2 2001/09/05 22:32:38 deraadt Exp $	*/
+/*	$OpenBSD: opendev.c,v 1.5 2002/03/15 18:19:52 millert Exp $	*/
 /*	$NetBSD: openfirm.c,v 1.1 1996/09/30 16:34:52 ws Exp $	*/
 
 /*
@@ -39,8 +39,8 @@
 #include <dev/ofw/openfirm.h>
 #include <lib/libkern/libkern.h>
 
-extern void ofw_stack __P((void));
-extern void ofbcopy __P((const void *, void *, size_t));
+extern void ofw_stack(void);
+extern void ofbcopy(const void *, void *, size_t);
 
 int
 OF_instance_to_package(ihandle)
@@ -100,16 +100,7 @@ OF_package_to_path(phandle, buf, buflen)
 
 
 int
-#ifdef	__STDC__
 OF_call_method(char *method, int ihandle, int nargs, int nreturns, ...)
-#else
-OF_call_method(method, ihandle, nargs, nreturns, va_alist)
-	char *method;
-	int ihandle;
-	int nargs;
-	int nreturns;
-	va_dcl
-#endif
 {
 	va_list ap;
 	static struct {
@@ -150,15 +141,7 @@ OF_call_method(method, ihandle, nargs, nreturns, va_alist)
 	return 0;
 }
 int
-#ifdef	__STDC__
 OF_call_method_1(char *method, int ihandle, int nargs, ...)
-#else
-OF_call_method_1(method, ihandle, nargs, va_alist)
-	char *method;
-	int ihandle;
-	int nargs;
-	va_dcl
-#endif
 {
 	va_list ap;
 	static struct {
@@ -185,14 +168,10 @@ OF_call_method_1(method, ihandle, nargs, va_alist)
 		*--ip = va_arg(ap, int);
 	va_end(ap);
 	ofw_stack();
-	if (openfirmware(&args) == -1) {
-		va_end(ap);
+	if (openfirmware(&args) == -1)
 		return -1;
-	}
-	if (args.args_n_results[nargs]) {
-		va_end(ap);
+	if (args.args_n_results[nargs])
 		return -1;
-	}
 	return args.args_n_results[nargs + 1];
 }
 

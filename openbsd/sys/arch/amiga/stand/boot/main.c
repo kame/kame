@@ -1,5 +1,5 @@
 /*
- * $OpenBSD: main.c,v 1.4 2000/02/12 15:29:06 espie Exp $
+ * $OpenBSD: main.c,v 1.6 2002/03/14 03:15:52 millert Exp $
  * $NetBSD: main.c,v 1.1.1.1 1996/11/29 23:36:29 is Exp $
  *
  *
@@ -60,10 +60,10 @@
 
 #define EXECMIN 36
 
-void startit __P((void *, u_long, u_long, void *, u_long, u_long, int, void *,
-	int, int, u_long, u_long, int));
-void startit_end __P((void));
-int get_cpuid __P((u_int32_t *));
+void startit(void *, u_long, u_long, void *, u_long, u_long, int, void *,
+	int, int, u_long, u_long, int);
+void startit_end(void);
+int get_cpuid(u_int32_t *);
 
 /*
  * Kernel startup interface version
@@ -382,7 +382,7 @@ pain()
 		printf("+%lu]", (unsigned long)stringsz);
                 if (read(io, (char *)nkcd, stringsz) != stringsz)
 			goto err;
-                nkcd = (int*)((char *)nkcd + ((stringsz + 3) & ~3));
+                nkcd = (int *)((char *)nkcd + ((stringsz + 3) & ~3));
                 esym = (char *)(textsz + eh->a_data + eh->a_bss
                     + eh->a_syms + 4 + ((stringsz + 3) & ~3));
         }

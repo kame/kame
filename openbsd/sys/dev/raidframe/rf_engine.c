@@ -1,5 +1,5 @@
-/*	$OpenBSD: rf_engine.c,v 1.6 2001/09/20 17:02:31 mpech Exp $	*/
-/*	$NetBSD: rf_engine.c,v 1.9 2000/01/08 22:57:31 oster Exp $	*/
+/*	$OpenBSD: rf_engine.c,v 1.11 2002/03/14 03:16:07 millert Exp $	*/
+/*	$NetBSD: rf_engine.c,v 1.10 2000/08/20 16:51:03 thorpej Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -67,7 +67,14 @@
 #include "rf_shutdown.h"
 #include "rf_raid.h"
 
-static void DAGExecutionThread(RF_ThreadArg_t arg);
+void	DAGExecutionThread(RF_ThreadArg_t arg);
+#ifdef RAID_AUTOCONFIG
+void	DAGExecutionThread_pre(RF_ThreadArg_t arg);
+#define	RF_ENGINE_PID	10
+extern pid_t	  lastpid;
+#endif	/* RAID_AUTOCONFIG */
+void		**rf_hook_cookies;
+extern int	  numraid;
 
 #define DO_INIT(_l_,_r_) { \
   int _rc; \
@@ -86,14 +93,28 @@ static void DAGExecutionThread(RF_ThreadArg_t arg);
 /*
  * XXX Is this spl-ing really necessary?
  */
-#define DO_LOCK(_r_)      { ks = splbio(); RF_LOCK_MUTEX((_r_)->node_queue_mutex); }
-#define DO_UNLOCK(_r_)    { RF_UNLOCK_MUTEX((_r_)->node_queue_mutex); splx(ks); }
-#define DO_WAIT(_r_)   tsleep(&(_r_)->node_queue, PRIBIO, "raidframe nq",0)
-#define DO_SIGNAL(_r_)    wakeup(&(_r_)->node_queue)
+#define DO_LOCK(_r_) \
+do { \
+	ks = splbio(); \
+	RF_LOCK_MUTEX((_r_)->node_queue_mutex); \
+} while (0)
 
-static void rf_ShutdownEngine(void *);
+#define DO_UNLOCK(_r_) \
+do { \
+	RF_UNLOCK_MUTEX((_r_)->node_queue_mutex); \
+	splx(ks); \
+} while (0)
 
-static void 
+#define DO_WAIT(_r_) \
+	RF_WAIT_COND((_r_)->node_queue, (_r_)->node_queue_mutex)
+
+/* XXX RF_SIGNAL_COND? */
+#define DO_SIGNAL(_r_) \
+	RF_BROADCAST_COND((_r_)->node_queue)
+
+void rf_ShutdownEngine(void *);
+
+void 
 rf_ShutdownEngine(arg)
 	void   *arg;
 {
@@ -111,6 +132,7 @@ rf_ConfigureEngine(
     RF_Config_t * cfgPtr)
 {
 	int     rc;
+	char	raidname[16];
 
 	DO_INIT(listp, raidPtr);
 
@@ -127,20 +149,36 @@ rf_ConfigureEngine(
 	if (rf_engineDebug) {
 		printf("raid%d: Creating engine thread\n", raidPtr->raidid);
 	}
-	if (RF_CREATE_THREAD(raidPtr->engine_thread, DAGExecutionThread, raidPtr,"raid")) {
-		RF_ERRORMSG("RAIDFRAME: Unable to create engine thread\n");
-		return (ENOMEM);
+	if (rf_hook_cookies == NULL) {
+		rf_hook_cookies =
+		    malloc(numraid * sizeof(void *),
+			   M_RAIDFRAME, M_NOWAIT);
+		if (rf_hook_cookies == NULL)
+			return (ENOMEM);
+		bzero(rf_hook_cookies, numraid * sizeof(void *));
 	}
-	if (rf_engineDebug) {
-		printf("raid%d: Created engine thread\n", raidPtr->raidid);
+#ifdef RAID_AUTOCONFIG
+	if (initproc == NULL) {
+		rf_hook_cookies[raidPtr->raidid] =
+			startuphook_establish(DAGExecutionThread_pre, raidPtr);
+	} else {
+#endif	/* RAID_AUTOCONFIG */
+		snprintf(&raidname[0], 16, "raid%d", raidPtr->raidid);
+		if (RF_CREATE_THREAD(raidPtr->engine_thread,
+		    DAGExecutionThread, raidPtr, &raidname[0])) {
+			RF_ERRORMSG("RAIDFRAME: Unable to create engine thread\n");
+			return (ENOMEM);
+		}
+		if (rf_engineDebug) {
+			printf("raid%d: Created engine thread\n", raidPtr->raidid);
+		}
+		RF_THREADGROUP_STARTED(&raidPtr->engine_tg);
+#ifdef RAID_AUTOCONFIG
 	}
-	RF_THREADGROUP_STARTED(&raidPtr->engine_tg);
+#endif
 	/* XXX something is missing here... */
 #ifdef debug
 	printf("Skipping the WAIT_START!!\n");
-#endif
-#if 0
-	RF_THREADGROUP_WAIT_START(&raidPtr->engine_tg);
 #endif
 	/* engine thread is now running and waiting for work */
 	if (rf_engineDebug) {
@@ -267,7 +305,7 @@ FireNode(RF_DagNode_t * node)
 			       node->dagHdr->raidPtr->raidid,
 			       (unsigned long) node, node->name);
 		}
-		if (node->flags & RF_DAGNODE_FLAG_YIELD)
+		if (node->flags & RF_DAGNODE_FLAG_YIELD) {
 #if (defined(__NetBSD__) || defined(__OpenBSD__)) && defined(_KERNEL)
 			/* thread_block(); */
 			/* printf("Need to block the thread here...\n"); */
@@ -276,6 +314,7 @@ FireNode(RF_DagNode_t * node)
 #else
 			thread_block();
 #endif
+                }
 		(*(node->undoFunc)) (node);
 		break;
 	default:
@@ -704,7 +743,48 @@ rf_DispatchDAG(
  * characteristics from the aio_completion_thread.
  */
 
-static void 
+#ifdef RAID_AUTOCONFIG
+void 
+DAGExecutionThread_pre(RF_ThreadArg_t arg)
+{
+	RF_Raid_t *raidPtr;
+	char raidname[16];
+	int len;
+	pid_t oldpid = lastpid;
+
+	raidPtr = (RF_Raid_t *) arg;
+
+	if (rf_hook_cookies && rf_hook_cookies[raidPtr->raidid] != NULL) {
+		startuphook_disestablish(rf_hook_cookies[raidPtr->raidid]);
+		rf_hook_cookies[raidPtr->raidid] = NULL;
+	}
+
+	if (rf_engineDebug) {
+		printf("raid%d: Creating engine thread\n", raidPtr->raidid);
+	}
+
+	lastpid = RF_ENGINE_PID + raidPtr->raidid - 1;
+	len = sprintf(&raidname[0], "raid%d", raidPtr->raidid);
+#ifdef DIAGNOSTIC
+	if (len >= sizeof(raidname))
+		panic("raidname expansion too long.");
+#endif /* DIAGNOSTIC */
+
+	if (RF_CREATE_THREAD(raidPtr->engine_thread, DAGExecutionThread,
+	    raidPtr, &raidname[0])) {
+		RF_ERRORMSG("RAIDFRAME: Unable to create engine thread\n");
+		return;
+	}
+
+	lastpid = oldpid;
+	if (rf_engineDebug) {
+		printf("raid%d: Created engine thread\n", raidPtr->raidid);
+	}
+	RF_THREADGROUP_STARTED(&raidPtr->engine_tg);
+}
+#endif	/* RAID_AUTOCONFIG */
+
+void 
 DAGExecutionThread(RF_ThreadArg_t arg)
 {
 	RF_DagNode_t *nd, *local_nq, *term_nq, *fire_nq;
@@ -714,6 +794,10 @@ DAGExecutionThread(RF_ThreadArg_t arg)
 
 	raidPtr = (RF_Raid_t *) arg;
 
+	while (!(&raidPtr->engine_tg)->created)
+		(void) tsleep((void *)&(&raidPtr->engine_tg)->created, PWAIT,
+				"raidinit", 0);
+
 	if (rf_engineDebug) {
 		printf("raid%d: Engine thread is running\n", raidPtr->raidid);
 	}
@@ -722,6 +806,9 @@ DAGExecutionThread(RF_ThreadArg_t arg)
 	s = splbio();
 
 	RF_THREADGROUP_RUNNING(&raidPtr->engine_tg);
+
+	rf_hook_cookies[raidPtr->raidid] =
+		shutdownhook_establish(rf_shutdown_hook, (void *)raidPtr);
 
 	DO_LOCK(raidPtr);
 	while (!raidPtr->shutdown_engine) {
@@ -790,6 +877,11 @@ DAGExecutionThread(RF_ThreadArg_t arg)
 			DO_WAIT(raidPtr);
 	}
 	DO_UNLOCK(raidPtr);
+
+	if (rf_hook_cookies && rf_hook_cookies[raidPtr->raidid] != NULL) {
+		shutdownhook_disestablish(rf_hook_cookies[raidPtr->raidid]);
+		rf_hook_cookies[raidPtr->raidid] = NULL;
+	}
 
 	RF_THREADGROUP_DONE(&raidPtr->engine_tg);
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: uni_n.c,v 1.1 2001/09/01 15:50:00 drahn Exp $	*/
+/*	$OpenBSD: uni_n.c,v 1.4 2002/03/14 03:15:55 millert Exp $	*/
 
 /*
  * Copyright (c) 1998-2001 Dale Rahn. All rights reserved.
@@ -39,8 +39,8 @@
 
 #include <dev/ofw/openfirm.h>
 
-static int	memcmatch __P((struct device *, void *, void *));
-static void	memcattach __P((struct device *, struct device *, void *));
+static int	memcmatch(struct device *, void *, void *);
+static void	memcattach(struct device *, struct device *, void *);
 
 struct memc_softc {
 	struct device sc_dev;
@@ -108,10 +108,10 @@ uni_n_config(int handle)
 			if (OF_getprop(handle, "reg", &address,
 			    sizeof address) > 0) {
 				baseaddr = mapiodev(address, NBPG);
-				ctladdr = (void*)(baseaddr + 0x20);
+				ctladdr = (void *)(baseaddr + 0x20);
 				*ctladdr |= 0x02;
+				return baseaddr;
 			}
-		return baseaddr;
 		}
 	}
 	return 0;

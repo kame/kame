@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmparam.h,v 1.10 2001/09/22 18:00:10 miod Exp $ */
+/*	$OpenBSD: vmparam.h,v 1.13 2002/02/17 22:59:53 maja Exp $ */
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -131,8 +131,6 @@
 #define VM_MAX_KERNEL_ADDRESS	((vm_offset_t)0xFFFFF000)
 
 /* virtual sizes (bytes) for various kernel submaps */
-#define VM_MBUF_SIZE		(NMBCLUSTERS*MCLBYTES)
-#define VM_KMEM_SIZE		(NKMEMCLUSTERS*PAGE_SIZE)
 #define VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
 
 /* # of kernel PT pages (initial only, can grow dynamically) */
@@ -155,6 +153,7 @@
 /*
  * pmap-specific data stored in the vm_physmem[] array.
  */
+#define __HAVE_PMAP_PHYSSEG
 struct pmap_physseg {
 	struct pv_entry *pvent;		/* pv table for this seg */
 	char *attrs;			/* page attributes for this seg */

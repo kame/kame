@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wivar.h,v 1.3 2001/06/09 20:17:21 millert Exp $	*/
+/*	$OpenBSD: if_wivar.h,v 1.10 2002/04/11 00:08:25 millert Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -31,20 +31,25 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	From: if_wireg.h,v 1.5 1999/07/20 20:03:42 wpaul Exp $
+ *	From: if_wireg.h,v 1.8.2.2 2001/08/25 00:48:25 nsayer Exp $
  */
+
+#include <dev/ic/if_wi_hostap.h>
 
 struct wi_softc	{
 #ifndef __FreeBSD__
 	struct device		sc_dev;
 #endif	/* !__FreeBSD__ */
 	struct arpcom		arpcom;
-	struct ifmedia		ifmedia;
+	struct ifmedia		sc_media;
 	bus_space_handle_t	wi_bhandle;
 	bus_space_tag_t		wi_btag;
+	bus_space_handle_t	wi_lhandle;
+	bus_space_tag_t		wi_ltag;
+	bus_size_t		wi_cor_offset;
 	int			wi_tx_data_id;
 	int			wi_tx_mgmt_id;
-	int			wi_gone;
+	int			wi_flags;
 	int			wi_if_flags;
 	u_int16_t		wi_ptype;
 	u_int16_t		wi_portnum;
@@ -59,22 +64,46 @@ struct wi_softc	{
 	u_int16_t		wi_max_sleep;
 	u_int16_t		wi_authtype;
 	u_int16_t		wi_roaming;
+	u_int16_t		wi_supprates;
+	u_int16_t		wi_diversity;
 
-	char			wi_node_name[32];
-	char			wi_net_name[32];
-	char			wi_ibss_name[32];
+	struct ieee80211_nwid	wi_node_name;
+	struct ieee80211_nwid	wi_net_name;
+	struct ieee80211_nwid	wi_ibss_name;
 
 	u_int8_t		wi_txbuf[1596];
-	int			wi_has_wep;
 	int			wi_use_wep;
+	int			wi_authmode;
 	int			wi_tx_key;
 	struct wi_ltv_keys	wi_keys;
 	struct wi_counters	wi_stats;
 	void			*sc_ih;
 	struct timeout		sc_timo;
-	int			sc_prism2;
-	int			sc_prism2_ver;
+	int			sc_firmware_type;
+	int			sc_sta_firmware_ver;
+	int			sc_pci;
+	struct wihap_info	wi_hostap_info;
+	u_int32_t		wi_icv;
+	int			wi_icv_flag;
+	int			wi_ibss_port;
 };
+
+/* Values for wi_flags. */
+#define WI_FLAGS_ATTACHED		0x01
+#define WI_FLAGS_INITIALIZED		0x02
+#define WI_FLAGS_HAS_WEP		0x04
+#define WI_FLAGS_HAS_IBSS		0x08
+#define WI_FLAGS_HAS_CREATE_IBSS	0x10
+#define WI_FLAGS_HAS_MOR		0x20
+#define WI_FLAGS_HAS_ROAMING		0x30
+#define WI_FLAGS_HAS_DIVERSITY		0x40
+
+/* Firmware types */
+#define WI_LUCENT	0
+#define WI_INTERSIL	1
+#define WI_SYMBOL	2
 
 #define WI_PRT_FMT "%s"
 #define WI_PRT_ARG(sc)	(sc)->sc_dev.dv_xname
+
+int wi_mgmt_xmit(struct wi_softc *, caddr_t, int);

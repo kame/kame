@@ -1,7 +1,7 @@
-/*	$OpenBSD: com_gsc.c,v 1.8 2000/03/13 14:39:59 mickey Exp $	*/
+/*	$OpenBSD: com_gsc.c,v 1.12 2002/03/14 01:26:31 millert Exp $	*/
 
 /*
- * Copyright (c) 1998 Michael Shalayeff
+ * Copyright (c) 1998-2002 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,8 +23,8 @@
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
  * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
  * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF MIND,
+ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
@@ -46,13 +46,12 @@
 #include <hppa/dev/cpudevs.h>
 #include <hppa/gsc/gscbusvar.h>
 
-#define	COMGSC_OFFSET	0x800
 struct com_gsc_regs {
 	u_int8_t reset;
 };
 
-int	com_gsc_probe __P((struct device *, void *, void *));
-void	com_gsc_attach __P((struct device *, struct device *, void *));
+int	com_gsc_probe(struct device *, void *, void *);
+void	com_gsc_attach(struct device *, struct device *, void *);
 
 struct cfattach com_gsc_ca = {
 	sizeof(struct com_softc), com_gsc_probe, com_gsc_attach
@@ -68,9 +67,10 @@ com_gsc_probe(parent, match, aux)
 	if (ga->ga_type.iodc_type != HPPA_TYPE_FIO ||
 	    (ga->ga_type.iodc_sv_model != HPPA_FIO_GRS232 &&
 	     (ga->ga_type.iodc_sv_model != HPPA_FIO_RS232)))
-		return 0;
+		return (0);
 
-	return comprobe1(ga->ga_iot, ga->ga_hpa + COMGSC_OFFSET);
+	return (1);
+	/* HOZER comprobe1(ga->ga_iot, ga->ga_hpa + IOMOD_DEVOFFSET); */
 }
 
 void
@@ -78,21 +78,27 @@ com_gsc_attach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
 {
-	register struct com_softc *sc = (void *)self;
-	register struct gsc_attach_args *ga = aux;
+	struct com_softc *sc = (void *)self;
+	struct gsc_attach_args *ga = aux;
+	struct com_gsc_regs *regs;
 
-	sc->sc_hwflags = 0;
-	sc->sc_swflags = 0;
+	sc->sc_iobase = (bus_addr_t)ga->ga_hpa + IOMOD_DEVOFFSET;
 	sc->sc_iot = ga->ga_iot;
-	sc->sc_ioh = ga->ga_hpa + COMGSC_OFFSET;
-	sc->sc_iobase = (bus_addr_t)ga->ga_hpa + COMGSC_OFFSET;
+	if (sc->sc_iobase == CONADDR)
+		sc->sc_ioh = comconsioh;
+	else if (bus_space_map(sc->sc_iot, sc->sc_iobase, COM_NPORTS,
+	    0, &sc->sc_ioh)) {
+		printf(": cannot map io space\n");
+		return;
+	}
 
-#if notyet
-	*(volatile u_int8_t *)ga->ga_hpa = 0xd0;	/* reset */
-	DELAY(1000);
-#endif
+	regs = (struct com_gsc_regs *)ga->ga_hpa;
+	if (sc->sc_iobase != CONADDR) {
+		regs->reset = 0xd0;
+		DELAY(1000);
+	}
 
-	/* com_attach_subr(sc); TODO */
+	com_attach_subr(sc);
 
 	sc->sc_ih = gsc_intr_establish((struct gsc_softc *)parent, IPL_TTY,
 				       ga->ga_irq, comintr, sc, &sc->sc_dev);

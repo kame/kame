@@ -1,4 +1,4 @@
-/*      $OpenBSD: criov.c,v 1.7 2001/08/12 20:06:08 mickey Exp $	*/
+/*      $OpenBSD: criov.c,v 1.10 2002/03/01 02:46:57 provos Exp $	*/
 
 /*
  * Copyright (c) 1999 Theo de Raadt
@@ -35,69 +35,9 @@
 #include <sys/kernel.h>
 #include <sys/mbuf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <crypto/cryptodev.h>
-
-int
-iov2pages(uio, np, pp, lp, maxp, nicep)
-	struct uio *uio;
-	int *np;
-	long *pp;
-	int *lp;
-	int maxp;
-	int *nicep;
-{
-	int npa = 0, tlen = 0;
-	int i;
-
-	for (i = 0; i < uio->uio_iovcnt; i++) {
-		vaddr_t va, off;
-		paddr_t pa;
-		int len;
-
-		if ((len = uio->uio_iov[i].iov_len) == 0)
-			continue;
-		tlen += len;
-		va = (vaddr_t)uio->uio_iov[i].iov_base;
-		off = va & PAGE_MASK;
-		va -= off;
-
-next_page:
-		
-		if (pmap_extract(pmap_kernel(), va, &pa) == FALSE)
-			panic("iov2pages: unmapped pages");
-
-		pa += off;
-
-		lp[npa] = len;
-		pp[npa] = pa;
-
-		if (++npa > maxp)
-			return (0);
-
-		if (len + off > PAGE_SIZE) {
-			lp[npa - 1] = PAGE_SIZE - off;
-			va += PAGE_SIZE;
-			len -= PAGE_SIZE;
-			goto next_page;
-		}
-	}
-			
-	if (nicep) {
-		int nice = 1;
-		int i;
-
-		/* see if each [pa,len] entry is long-word aligned */
-		for (i = 0; i < npa; i++)
-			if ((lp[i] & 3) || (pp[i] & 3))
-				nice = 0;
-		*nicep = nice;
-	}
-
-	*np = npa;
-	return (tlen);
-}
 
 void
 cuio_copydata(uio, off, len, cp)
@@ -169,4 +109,68 @@ cuio_copyback(uio, off, len, cp)
 		iol--;
 		iov++;
 	}
+}
+
+int
+cuio_getptr(struct uio *uio, int loc, int *off)
+{
+	int ind, len;
+
+	ind = 0;
+	while (loc >= 0 && ind < uio->uio_iovcnt) {
+		len = uio->uio_iov[ind].iov_len;
+		if (len > loc) {
+			*off = loc;
+			return (ind);
+		}
+		loc -= len;
+		ind++;
+	}
+
+	if (ind > 0 && loc == 0) {
+		ind--;
+		*off = uio->uio_iov[ind].iov_len;
+		return (ind);
+	}
+
+	return (-1);
+}
+
+int
+cuio_apply(struct uio *uio, int off, int len,
+    int (*f)(caddr_t, caddr_t, unsigned int), caddr_t fstate)
+{
+	int rval, ind, uiolen;
+	unsigned int count;
+
+	if (len < 0)
+		panic("%s: len %d < 0", __FUNCTION__, len);
+	if (off < 0)
+		panic("%s: off %d < 0", __FUNCTION__, off);
+	
+	ind = 0;
+	while (off > 0) {
+		if (ind >= uio->uio_iovcnt)
+			panic("m_apply: null mbuf in skip");
+		uiolen = uio->uio_iov[ind].iov_len;
+		if (off < uiolen)
+			break;
+		off -= uiolen;
+		ind++;
+	}
+	while (len > 0) {
+		if (ind >= uio->uio_iovcnt)
+			panic("m_apply: null mbuf");
+		count = min(uio->uio_iov[ind].iov_len - off, len);
+
+		rval = f(fstate, uio->uio_iov[ind].iov_base + off, count);
+		if (rval)
+			return (rval);
+
+		len -= count;
+		off = 0;
+		ind++;
+	}
+
+	return (0);
 }

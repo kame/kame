@@ -1,4 +1,4 @@
-/*	$OpenBSD: fd.c,v 1.42 2001/03/06 13:55:02 ho Exp $	*/
+/*	$OpenBSD: fd.c,v 1.44 2002/03/14 01:26:56 millert Exp $	*/
 /*	$NetBSD: fd.c,v 1.90 1996/05/12 23:12:03 mycroft Exp $	*/
 
 /*-
@@ -133,8 +133,8 @@ struct fd_softc {
 };
 
 /* floppy driver configuration */
-int fdprobe __P((struct device *, void *, void *));
-void fdattach __P((struct device *, struct device *, void *));
+int fdprobe(struct device *, void *, void *);
+void fdattach(struct device *, struct device *, void *);
 
 struct cfattach fd_ca = {
 	sizeof(struct fd_softc), fdprobe, fdattach
@@ -144,22 +144,22 @@ struct cfdriver fd_cd = {
 	NULL, "fd", DV_DISK
 };
 
-void fdgetdisklabel __P((struct fd_softc *));
-int fd_get_parms __P((struct fd_softc *));
-void fdstrategy __P((struct buf *));
-void fdstart __P((struct fd_softc *));
-int fdintr __P((struct fdc_softc *));
+void fdgetdisklabel(struct fd_softc *);
+int fd_get_parms(struct fd_softc *);
+void fdstrategy(struct buf *);
+void fdstart(struct fd_softc *);
+int fdintr(struct fdc_softc *);
 
 struct dkdriver fddkdriver = { fdstrategy };
 
-void fd_set_motor __P((struct fdc_softc *fdc, int reset));
-void fd_motor_off __P((void *arg));
-void fd_motor_on __P((void *arg));
-void fdfinish __P((struct fd_softc *fd, struct buf *bp));
-int fdformat __P((dev_t, struct fd_formb *, struct proc *));
-__inline struct fd_type *fd_dev_to_type __P((struct fd_softc *, dev_t));
-void fdretry __P((struct fd_softc *));
-void fdtimeout __P((void *));
+void fd_set_motor(struct fdc_softc *fdc, int reset);
+void fd_motor_off(void *arg);
+void fd_motor_on(void *arg);
+void fdfinish(struct fd_softc *fd, struct buf *bp);
+int fdformat(dev_t, struct fd_formb *, struct proc *);
+__inline struct fd_type *fd_dev_to_type(struct fd_softc *, dev_t);
+void fdretry(struct fd_softc *);
+void fdtimeout(void *);
 
 int
 fdprobe(parent, match, aux)
@@ -255,6 +255,13 @@ fdattach(parent, self, aux)
 		case 6:	/* 1.2 MB japanese format */
 			type = &fd_types[8];
 			break;
+#ifdef __alpha__
+		default:
+			/* 1.44MB, how to detect others?
+			 * idea from NetBSD -- jay@rootaction.net
+                         */
+			type = &fd_types[0];
+#endif
 		}
 	}
 
@@ -296,6 +303,12 @@ fd_nvtotype(fdc, nvraminfo, drive)
 	char *fdc;
 	int nvraminfo, drive;
 {
+#ifdef __alpha__
+	/* Alpha:  assume 1.44MB, idea from NetBSD sys/dev/isa/fd.c
+	 * -- jay@rootaction.net
+	 */
+	return &fd_types[0]; /* 1.44MB */
+#else
 	int type;
 
 	type = (drive == 0 ? nvraminfo : nvraminfo << 4) & 0xf0;
@@ -318,6 +331,7 @@ fd_nvtotype(fdc, nvraminfo, drive)
 		    fdc, drive, type);
 		return NULL;
 	}
+#endif
 }
 
 __inline struct fd_type *

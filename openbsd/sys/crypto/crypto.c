@@ -1,4 +1,4 @@
-/*	$OpenBSD: crypto.c,v 1.26 2001/08/05 09:36:38 deraadt Exp $	*/
+/*	$OpenBSD: crypto.c,v 1.33 2002/03/04 21:23:39 deraadt Exp $	*/
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
  *
@@ -77,7 +77,7 @@ crypto_newsession(u_int64_t *sid, struct cryptoini *cri, int hard)
 		/* See if all the algorithms are supported. */
 		for (cr = cri; cr; cr = cr->cri_next)
 			if (crypto_drivers[hid].cc_alg[cr->cri_alg] == 0)
-			break;
+				break;
 
 		/* Ok, all algorithms are supported. */
 		if (cr == NULL)
@@ -154,7 +154,7 @@ crypto_freesession(u_int64_t sid)
  * Find an empty slot.
  */
 int32_t
-crypto_get_driverid(void)
+crypto_get_driverid(u_int8_t flags)
 {
 	struct cryptocap *newdrv;
 	int i, s = splimp();
@@ -178,6 +178,7 @@ crypto_get_driverid(void)
 		    !(crypto_drivers[i].cc_flags & CRYPTOCAP_F_CLEANUP) &&
 		    crypto_drivers[i].cc_sessions == 0) {
 			crypto_drivers[i].cc_sessions = 1; /* Mark */
+			crypto_drivers[i].cc_flags = flags;
 			splx(s);
 			return i;
 		}
@@ -204,6 +205,7 @@ crypto_get_driverid(void)
 		    crypto_drivers_num * sizeof(struct cryptocap));
 
 		newdrv[i].cc_sessions = 1; /* Mark */
+		newdrv[i].cc_flags = flags;
 		crypto_drivers_num *= 2;
 
 		free(crypto_drivers, M_CRYPTO_DATA);
@@ -410,9 +412,9 @@ crypto_getreq(int num)
 
 	if (crypto_pool_initialized == 0) {
 		pool_init(&cryptop_pool, sizeof(struct cryptop), 0, 0,
-		    PR_FREEHEADER, "cryptop", 0, NULL, NULL, M_CRYPTO_OPS);
+		    0, "cryptop", NULL);
 		pool_init(&cryptodesc_pool, sizeof(struct cryptodesc), 0, 0,
-		    PR_FREEHEADER, "cryptodesc", 0, NULL, NULL, M_CRYPTO_OPS);
+		    0, "cryptodesc", NULL);
 		crypto_pool_initialized = 1;
 	}
 
@@ -471,35 +473,4 @@ void
 crypto_done(struct cryptop *crp)
 {
 	crp->crp_callback(crp);
-}
-
-/*
- * Return SYMMETRIC or PUBLIC_KEY, depending on the algorithm type.
- */
-int
-crypto_check_alg(struct cryptoini *cri)
-{
-	switch (cri->cri_alg)
-	{
-	case CRYPTO_DES_CBC:
-	case CRYPTO_3DES_CBC:
-	case CRYPTO_BLF_CBC:
-	case CRYPTO_CAST_CBC:
-	case CRYPTO_SKIPJACK_CBC:
-	case CRYPTO_RIJNDAEL128_CBC:
-	case CRYPTO_ARC4:
-		return SYMMETRIC;
-	case CRYPTO_DH_SEND:
-	case CRYPTO_DH_RECEIVE:
-	case CRYPTO_RSA_ENCRYPT:
-	case CRYPTO_RSA_DECRYPT:
-	case CRYPTO_DSA_SIGN:
-	case CRYPTO_DSA_VERIFY:
-		return PUBLIC_KEY;
-	}
-
-#ifdef DIAGNOSTIC
-	panic("crypto_check_alg: unknown algorithm %d", cri->cri_alg);
-#endif
-	return -1;
 }

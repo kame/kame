@@ -1,4 +1,4 @@
-/*	$OpenBSD: lfs_alloc.c,v 1.7 1999/01/11 05:12:38 millert Exp $	*/
+/*	$OpenBSD: lfs_alloc.c,v 1.9 2002/03/14 01:27:15 millert Exp $	*/
 /*	$NetBSD: lfs_alloc.c,v 1.4 1996/03/25 12:53:37 pk Exp $	*/
 
 /*
@@ -46,7 +46,7 @@
 #include <sys/mount.h>
 #include <sys/malloc.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
@@ -164,7 +164,7 @@ lfs_vcreate(mp, ino, vpp)
 	ino_t ino;
 	struct vnode **vpp;
 {
-	extern int (**lfs_vnodeop_p) __P((void *));
+	extern int (**lfs_vnodeop_p)(void *);
 	struct inode *ip;
 	struct ufsmount *ump;
 	int error;

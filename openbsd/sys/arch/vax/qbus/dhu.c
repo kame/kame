@@ -1,4 +1,4 @@
-/*	$OpenBSD: dhu.c,v 1.1 2000/04/27 03:14:47 bjc Exp $	*/
+/*	$OpenBSD: dhu.c,v 1.4 2002/03/14 01:26:48 millert Exp $	*/
 /*	$NetBSD: dhu.c,v 1.17 2000/01/24 02:40:28 matt Exp $	*/
 /*
  * Copyright (c) 1996  Ken C. Wellsch.  All rights reserved.
@@ -42,7 +42,6 @@
 #include <sys/ioctl.h>
 #include <sys/tty.h>
 #include <sys/proc.h>
-#include <sys/map.h>
 #include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/file.h>
@@ -132,21 +131,21 @@ static struct speedtab dhuspeedtab[] = {
   {      -1,	-1		}
 };
 
-static int	dhu_match __P((struct device *, struct cfdata *, void *));
-static void	dhu_attach __P((struct device *, struct device *, void *));
-static	void	dhurint __P((void *));
-static	void	dhuxint __P((void *));
-static	void	dhustart __P((struct tty *));
-static	int	dhuparam __P((struct tty *, struct termios *));
-static	int	dhuiflow __P((struct tty *, int));
-static unsigned	dhumctl __P((struct dhu_softc *,int, int, int));
-	int	dhuopen __P((dev_t, int, int, struct proc *));
-	int	dhuclose __P((dev_t, int, int, struct proc *));
-	int	dhuread __P((dev_t, struct uio *, int));
-	int	dhuwrite __P((dev_t, struct uio *, int));
-	int	dhuioctl __P((dev_t, u_long, caddr_t, int, struct proc *));
-	void	dhustop __P((struct tty *, int));
-struct tty *	dhutty __P((dev_t));
+static int	dhu_match(struct device *, struct cfdata *, void *);
+static void	dhu_attach(struct device *, struct device *, void *);
+static	void	dhurint(void *);
+static	void	dhuxint(void *);
+static	void	dhustart(struct tty *);
+static	int	dhuparam(struct tty *, struct termios *);
+static	int	dhuiflow(struct tty *, int);
+static unsigned	dhumctl(struct dhu_softc *,int, int, int);
+	int	dhuopen(dev_t, int, int, struct proc *);
+	int	dhuclose(dev_t, int, int, struct proc *);
+	int	dhuread(dev_t, struct uio *, int);
+	int	dhuwrite(dev_t, struct uio *, int);
+	int	dhuioctl(dev_t, u_long, caddr_t, int, struct proc *);
+	void	dhustop(struct tty *, int);
+struct tty *	dhutty(dev_t);
 
 struct	cfattach dhu_ca = {
 	sizeof(struct dhu_softc), (cfmatch_t)dhu_match, dhu_attach
@@ -382,7 +381,7 @@ dhuopen(dev, flag, mode, p)
 	s = spltty();
 	DHU_WRITE_BYTE(DHU_UBA_CSR, DHU_CSR_RXIE | line);
 	sc->sc_dhu[line].dhu_modem = DHU_READ_WORD(DHU_UBA_STAT);
-	(void) splx(s);
+	splx(s);
 
 	tp = sc->sc_dhu[line].dhu_tty;
 
@@ -414,7 +413,7 @@ dhuopen(dev, flag, mode, p)
 		if (error)
 			break;
 	}
-	(void) splx(s);
+	splx(s);
 	if (error)
 		return (error);
 	return ((*linesw[tp->t_line].l_open)(dev, tp));
@@ -584,7 +583,7 @@ dhustop(tp, flag)
 		if (!(tp->t_state & TS_TTSTOP))
 			tp->t_state |= TS_FLUSH;
 	}
-	(void) splx(s);
+	splx(s);
 }
 
 static void
@@ -646,7 +645,7 @@ dhustart(tp)
 		    DHU_READ_WORD(DHU_UBA_TBUFAD2) | DHU_TBUFAD2_DMA_START);
 	}
 out:
-	(void) splx(s);
+	splx(s);
 	return;
 }
 
@@ -737,7 +736,7 @@ dhuparam(tp, t)
 
 	DHU_WRITE_WORD(DHU_UBA_LNCTRL, lnctrl);
 
-	(void) splx(s);
+	splx(s);
 	return (0);
 }
 
@@ -817,7 +816,7 @@ dhumctl(sc, line, bits, how)
 		break;
 
 	case DMGET:
-		(void) splx(s);
+		splx(s);
 		return (mbits);
 	}
 
@@ -838,6 +837,6 @@ dhumctl(sc, line, bits, how)
 
 	DHU_WRITE_WORD(DHU_UBA_LNCTRL, lnctrl);
 
-	(void) splx(s);
+	splx(s);
 	return (mbits);
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.28 2001/09/14 06:04:58 art Exp $	*/
+/*	$OpenBSD: trap.c,v 1.36 2002/03/14 01:26:31 millert Exp $	*/
 /*	$NetBSD: trap.c,v 1.57 1998/02/16 20:58:31 thorpej Exp $	*/
 
 /*
@@ -72,8 +72,6 @@
  *	@(#)trap.c	8.5 (Berkeley) 1/4/94
  */
 
-#include <machine/hp300spu.h>	/* XXX param.h includes cpu.h */
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -97,10 +95,8 @@
 #include <machine/reg.h>
 #include <machine/intr.h>
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
-
 #include <uvm/uvm_extern.h>
+#include <uvm/uvm_pmap.h>
 
 #include <dev/cons.h>
 
@@ -114,18 +110,14 @@ extern struct emul emul_hpux;
 extern struct emul emul_sunos;
 #endif
 
-int	writeback __P((struct frame *fp, int docachepush));
-void	trap __P((int type, u_int code, u_int v, struct frame frame));
-void	syscall __P((register_t code, struct frame frame));
-void	child_return __P((struct proc *, struct frame));
+int	writeback(struct frame *fp, int docachepush);
+void	trap(int type, u_int code, u_int v, struct frame frame);
+void	syscall(register_t code, struct frame frame);
 
 #ifdef DEBUG
-void	dumpssw __P((u_short));
-void	dumpwb __P((int, u_short, u_int, u_int));
+void	dumpssw(u_short);
+void	dumpwb(int, u_short, u_int, u_int);
 #endif
-
-static inline void userret __P((struct proc *p, struct frame *fp,
-	    u_quad_t oticks, u_int faultaddr, int fromtrap));
 
 int	astpending;
 
@@ -209,7 +201,7 @@ int mmupid = -1;
  * trap and syscall both need the following work done before returning
  * to user mode.
  */
-static inline void
+void
 userret(p, fp, oticks, faultaddr, fromtrap)
 	struct proc *p;
 	struct frame *fp;
@@ -571,7 +563,7 @@ dopanic:
 	case T_SSIR:		/* software interrupt */
 	case T_SSIR|T_USER:
 		if (ssir & SIR_NET) {
-			void netintr __P((void));
+			void netintr(void);
 			siroff(SIR_NET);
 			uvmexp.softs++;
 			netintr();
@@ -609,10 +601,10 @@ dopanic:
 	    {
 		vaddr_t va;
 		struct vmspace *vm = p->p_vmspace;
-		vm_map_t map;
+		struct vm_map *map;
 		int rv;
 		vm_prot_t ftype, vftype;
-		extern vm_map_t kernel_map;
+		extern struct vm_map *kernel_map;
 
 #ifdef DEBUG
 		if ((mmudebug & MDB_WBFOLLOW) || MDB_ISPID(p->p_pid))
@@ -650,14 +642,14 @@ dopanic:
 
 #ifdef COMPAT_HPUX
 		if (ISHPMMADDR(va)) {
-			int pmap_mapmulti __P((pmap_t, vaddr_t));
+			int pmap_mapmulti(pmap_t, vaddr_t);
 			vaddr_t bva;
 
 			rv = pmap_mapmulti(map->pmap, va);
-			if (rv != KERN_SUCCESS) {
+			if (rv) {
 				bva = HPMMBASEADDR(va);
 				rv = uvm_fault(map, bva, 0, ftype);
-				if (rv == KERN_SUCCESS)
+				if (rv == 0)
 					(void) pmap_mapmulti(map->pmap, va);
 			}
 		} else
@@ -677,16 +669,16 @@ dopanic:
 		 */
 		if ((vm != NULL && (caddr_t)va >= vm->vm_maxsaddr)
 		    && map != kernel_map) {
-			if (rv == KERN_SUCCESS) {
+			if (rv == 0) {
 				unsigned nss;
 
 				nss = btoc(USRSTACK-(unsigned)va);
 				if (nss > vm->vm_ssize)
 					vm->vm_ssize = nss;
-			} else if (rv == KERN_PROTECTION_FAILURE)
-				rv = KERN_INVALID_ADDRESS;
+			} else if (rv == EACCES)
+				rv = EFAULT;
 		}
-		if (rv == KERN_SUCCESS) {
+		if (rv == 0) {
 			if (type == T_MMUFLT) {
 #ifdef M68040
 				if (cputype == CPU_68040)
@@ -789,12 +781,14 @@ writeback(fp, docachepush)
 			pmap_enter(pmap_kernel(), (vaddr_t)vmmap,
 				   trunc_page((vaddr_t)f->f_fa), VM_PROT_WRITE,
 				   VM_PROT_WRITE|PMAP_WIRED);
+			pmap_update(pmap_kernel());
 			fa = (u_int)&vmmap[(f->f_fa & PGOFSET) & ~0xF];
 			bcopy((caddr_t)&f->f_pd0, (caddr_t)fa, 16);
 			pmap_extract(pmap_kernel(), (vaddr_t)fa, &pa);
 			DCFL(pa);
 			pmap_remove(pmap_kernel(), (vaddr_t)vmmap,
 				    (vaddr_t)&vmmap[NBPG]);
+			pmap_update(pmap_kernel());
 		} else
 			printf("WARNING: pid %d(%s) uid %d: CPUSH not done\n",
 			       p->p_pid, p->p_comm, p->p_ucred->cr_uid);
@@ -1167,26 +1161,9 @@ bad:
 	if (error == ERESTART && (p->p_md.md_flags & MDP_STACKADJ))
 		frame.f_regs[SP] -= sizeof (int);
 #endif
-	userret(p, &frame, sticks, (u_int)0, 0);
+	userret(p, &frame, sticks, 0, 0);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
 		ktrsysret(p, code, error, rval[0]);
-#endif
-}
-
-void
-child_return(p, frame)
-	struct proc *p;
-	struct frame frame;
-{
-
-	frame.f_regs[D0] = 0;
-	frame.f_sr &= ~PSL_C;
-	frame.f_format = FMT0;
-
-	userret(p, &frame, 0, (u_int)0, 0);
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p, SYS_fork, 0, 0);
 #endif
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tp_inet.c,v 1.6 2001/06/27 03:49:54 angelos Exp $	*/
+/*	$OpenBSD: tp_inet.c,v 1.9 2002/03/26 19:12:56 niklas Exp $	*/
 /*	$NetBSD: tp_inet.c,v 1.11 1996/03/16 23:13:49 christos Exp $	*/
 
 /*-
@@ -374,13 +374,7 @@ tpip_mtu(v)
  */
 
 int
-#if __STDC__
 tpip_output(struct mbuf *m0, ...)
-#else
-tpip_output(m0, va_alist)
-	struct mbuf    *m0;
-	va_dcl
-#endif
 {
 	int             datalen;
 	struct inpcb   *inp;
@@ -417,13 +411,7 @@ tpip_output(m0, va_alist)
 
 /* ARGSUSED */
 int
-#if __STDC__
 tpip_output_dg(struct mbuf *m0, ...)
-#else
-tpip_output_dg(m0, va_alist)
-	struct mbuf    *m0;
-	va_dcl
-#endif
 {
 	int             datalen;
 	struct in_addr *laddr, *faddr;
@@ -512,13 +500,7 @@ bad:
  * NOTES:
  */
 void
-#if __STDC__
 tpip_input(struct mbuf *m, ...)
-#else
-tpip_input(m, va_alist)
-	struct mbuf    *m;
-	va_dcl
-#endif
 {
 	int             iplen;
 	struct sockaddr_in src, dst;
@@ -606,7 +588,6 @@ discard:
 		tptrace(TPPTmisc, "tpip_input DISCARD m", m, 0, 0, 0);
 	}
 #endif
-		m_freem(m);
 	IncStat(ts_recv_drop);
 	splx(s);
 }
@@ -665,7 +646,7 @@ tpip_ctlinput(cmd, sa, dummy)
 {
 	struct sockaddr_in *sin = (struct sockaddr_in *) sa;
 	extern int      inetctlerrmap[];
-	void            (*notify) __P((struct inpcb *, int));
+	void            (*notify)(struct inpcb *, int);
 	int             errno;
 
 	if (cmd < 0 || cmd >= PRC_NCMDS)

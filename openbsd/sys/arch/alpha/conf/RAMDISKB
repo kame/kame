@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISKB,v 1.13 2001/09/29 01:18:13 deraadt Exp $
+#	$OpenBSD: RAMDISKB,v 1.18 2002/03/30 20:21:25 deraadt Exp $
 #	$NetBSD: RAMDISK,v 1.9 1996/12/03 17:25:33 cgd Exp $
 
 machine	alpha			# architecture, used by config; REQUIRED
@@ -62,7 +62,8 @@ pci*	at	ppb?
 # PCI devices
 #ahc*	at	pci? dev ? function ?		# AHA-28xx SCSI (NOT 64-BIT)
 de*	at	pci? dev ? function ?		# 21x4[012]-based Ethernet
-#fxp*	at	pci? dev ? function ?		# EtherExpress 10/100B ethernet cards
+#dc*	at	pci? dev ? function ?		# 21143, "tulip" clone ethernet
+fxp*	at	pci? dev ? function ?		# EtherExpress 10/100B ethernet cards
 #ne*	at	pci? dev ? function ?		# NE2000-compat ethernet cards
 #en*	at	pci? dev ? function ?		# ENI PCI ATM (untested)
 #ep*	at	pci? dev ? function ?		# 3COM 3c59x (untested)
@@ -70,7 +71,7 @@ de*	at	pci? dev ? function ?		# 21x4[012]-based Ethernet
 #fpa*	at	pci? dev ? function ?		# DEC DEFPA FDDI cards
 #le*	at	pci? dev ? function ?		# PCI LANCE Ethernet (untested)
 siop*	at	pci? dev ? function ?		# NCR 53c8xx SCSI
-pceb*	at	pci? dev ? function ?		# Intel PCI-EISA brige
+pceb*	at	pci? dev ? function ?		# Intel PCI-EISA bridge
 vga*	at	pci? dev ? function ?		# PCI VGA graphics
 ppb*	at	pci? dev ? function ?		# PCI-PCI bridges
 sio*	at	pci? dev ? function ?		# Intel PCI-ISA bridge

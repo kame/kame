@@ -1,4 +1,4 @@
-/*	$OpenBSD: mainbus.c,v 1.1 2001/06/26 21:57:41 smurph Exp $	*/
+/*	$OpenBSD: mainbus.c,v 1.4 2002/03/14 03:15:58 millert Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
@@ -40,9 +40,9 @@ struct mainbus_softc {
 };
 
 /* Definition of the mainbus driver. */
-static int	mbmatch __P((struct device *, void *, void *));
-static void	mbattach __P((struct device *, struct device *, void *));
-static int	mbprint __P((void *, const char *));
+static int	mbmatch(struct device *, void *, void *);
+static void	mbattach(struct device *, struct device *, void *);
+static int	mbprint(void *, const char *);
 
 struct cfattach mainbus_ca = {
 	sizeof(struct device), mbmatch, mbattach
@@ -51,10 +51,10 @@ struct cfdriver mainbus_cd = {
 	NULL, "mainbus", DV_DULL, NULL, 0
 };
 
-void	mb_intr_establish __P((struct confargs *, int (*)(void *), void *));
-void	mb_intr_disestablish __P((struct confargs *));
-caddr_t	mb_cvtaddr __P((struct confargs *));
-int	mb_matchname __P((struct confargs *, char *));
+void	mb_intr_establish(struct confargs *, int (*)(void *), void *);
+void	mb_intr_disestablish(struct confargs *);
+caddr_t	mb_cvtaddr(struct confargs *);
+int	mb_matchname(struct confargs *, char *);
 
 static int attached = 0;
 
@@ -64,8 +64,6 @@ mbmatch(parent, cfdata, aux)
 	void *cfdata;
 	void *aux;
 {
-	struct cfdata *cf = cfdata;
-
 	/*
 	 * That one mainbus is always here.
 	 */
@@ -84,7 +82,6 @@ mbattach(parent, self, aux)
 {
 	struct mainbus_softc *sc = (struct mainbus_softc *)self;
 	struct confargs nca;
-	extern int system_type;
 
 	printf("\n");
 
@@ -129,7 +126,7 @@ mbprint(aux, pnp)
 void
 mb_intr_establish(ca, handler, val)
 	struct confargs *ca;
-	int (*handler) __P((void *));
+	int (*handler)(void *);
 	void *val;
 {
 	panic("can never mb_intr_establish");

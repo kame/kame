@@ -1,4 +1,4 @@
-/*	$OpenBSD: gscbus.c,v 1.14 2001/10/04 22:01:30 mickey Exp $	*/
+/*	$OpenBSD: gscbus.c,v 1.19 2002/03/14 01:26:31 millert Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -69,7 +69,7 @@
  *
  */
 
-#define GSCDEBUG
+/* #define GSCDEBUG */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -85,8 +85,8 @@
 
 #include <hppa/gsc/gscbusvar.h>
 
-int	gscmatch __P((struct device *, void *, void *));
-void	gscattach __P((struct device *, struct device *, void *));
+int	gscmatch(struct device *, void *, void *);
+void	gscattach(struct device *, struct device *, void *);
 
 struct cfattach gsc_ca = {
 	sizeof(struct gsc_softc), gscmatch, gscattach
@@ -96,25 +96,26 @@ struct cfdriver gsc_cd = {
 	NULL, "gsc", DV_DULL
 };
 
-int	gsc_dmamap_create __P((void *, bus_size_t, int,
-			       bus_size_t, bus_size_t, int, bus_dmamap_t *));
-void	gsc_dmamap_destroy __P((void *, bus_dmamap_t));
-int	gsc_dmamap_load __P((void *, bus_dmamap_t, void *,
-			     bus_size_t, struct proc *, int));
-int	gsc_dmamap_load_mbuf __P((void *, bus_dmamap_t, struct mbuf *, int));
-int	gsc_dmamap_load_uio __P((void *, bus_dmamap_t, struct uio *, int));
-int	gsc_dmamap_load_raw __P((void *, bus_dmamap_t,
-				 bus_dma_segment_t *, int, bus_size_t, int));
-void	gsc_dmamap_unload __P((void *, bus_dmamap_t));
-void	gsc_dmamap_sync __P((void *, bus_dmamap_t, bus_dmasync_op_t));
+int	gsc_dmamap_create(void *, bus_size_t, int,
+			       bus_size_t, bus_size_t, int, bus_dmamap_t *);
+void	gsc_dmamap_destroy(void *, bus_dmamap_t);
+int	gsc_dmamap_load(void *, bus_dmamap_t, void *,
+			     bus_size_t, struct proc *, int);
+int	gsc_dmamap_load_mbuf(void *, bus_dmamap_t, struct mbuf *, int);
+int	gsc_dmamap_load_uio(void *, bus_dmamap_t, struct uio *, int);
+int	gsc_dmamap_load_raw(void *, bus_dmamap_t,
+				 bus_dma_segment_t *, int, bus_size_t, int);
+void	gsc_dmamap_unload(void *, bus_dmamap_t);
+void	gsc_dmamap_sync(void *, bus_dmamap_t, bus_addr_t, bus_size_t,
+			     int);
 
-int	gsc_dmamem_alloc __P((void *, bus_size_t, bus_size_t,
-			      bus_size_t, bus_dma_segment_t *, int, int *, int));
-void	gsc_dmamem_free __P((void *, bus_dma_segment_t *, int));
-int	gsc_dmamem_map __P((void *, bus_dma_segment_t *,
-			    int, size_t, caddr_t *, int));
-void	gsc_dmamem_unmap __P((void *, caddr_t, size_t));
-paddr_t	gsc_dmamem_mmap __P((void *, bus_dma_segment_t *, int, off_t, int, int));
+int	gsc_dmamem_alloc(void *, bus_size_t, bus_size_t,
+			      bus_size_t, bus_dma_segment_t *, int, int *, int);
+void	gsc_dmamem_free(void *, bus_dma_segment_t *, int);
+int	gsc_dmamem_map(void *, bus_dma_segment_t *,
+			    int, size_t, caddr_t *, int);
+void	gsc_dmamem_unmap(void *, caddr_t, size_t);
+paddr_t	gsc_dmamem_mmap(void *, bus_dma_segment_t *, int, off_t, int, int);
 
 int
 gscmatch(parent, cfdata, aux)   
@@ -166,6 +167,7 @@ gscattach(parent, self, aux)
 	sc->sc_dmatag._dmamem_unmap = gsc_dmamem_unmap;
 	sc->sc_dmatag._dmamem_mmap = gsc_dmamem_mmap;
 
+	ga->ga_hpamask = HPPA_FLEX_MASK;
 	pdc_scanbus(self, &ga->ga_ca, ga->ga_mod, MAXMODBUS);
 }
 
@@ -174,6 +176,10 @@ gscprint(aux, pnp)
 	void *aux;
 	const char *pnp;
 {
+	struct gsc_attach_args *ga = aux;
+
+	if (pnp)
+		printf("%s at %s", ga->ga_name, pnp);
 	return (UNCONF);
 }
 
@@ -183,7 +189,7 @@ gsc_intr_establish(sc, pri, irq, handler, arg, dv)
 	struct gsc_softc *sc;
 	int pri;
 	int irq;
-	int (*handler) __P((void *v));
+	int (*handler)(void *v);
 	void *arg;
 	struct device *dv;
 {
@@ -255,7 +261,7 @@ gsc_intr(v)
 			printf("gsc_intr: calling %p for irq %d\n", v, i);
 #endif
 			iv->evcnt.ev_count++;
-			s = splx(iv->pri);
+			s = splraise(iv->pri);
 			ret = (iv->handler)(iv->arg);
 			splx(s);
 #ifdef GSCDEBUG_INTR
@@ -347,10 +353,12 @@ gsc_dmamap_unload(v, map)
 }
 
 void
-gsc_dmamap_sync(v, map, op)
+gsc_dmamap_sync(v, map, offset, len, op)
 	void *v;
 	bus_dmamap_t map;
-	bus_dmasync_op_t op;
+	bus_addr_t offset;
+	bus_size_t len;
+	int op;
 {
 
 }

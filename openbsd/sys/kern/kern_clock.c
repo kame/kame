@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_clock.c,v 1.28 2001/08/19 06:10:09 art Exp $	*/
+/*	$OpenBSD: kern_clock.c,v 1.34 2002/02/18 03:45:08 nordin Exp $	*/
 /*	$NetBSD: kern_clock.c,v 1.34 1996/06/09 04:51:03 briggs Exp $	*/
 
 /*-
@@ -49,7 +49,7 @@
 #include <sys/proc.h>
 #include <sys/resourcevar.h>
 #include <sys/signalvar.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>
 #include <sys/timex.h>
 #include <sys/sched.h>
@@ -84,12 +84,6 @@
  * If the statistics clock is running fast, it must be divided by the ratio
  * profhz/stathz for statistics.  (For profiling, every tick counts.)
  */
-
-/*
- * TODO:
- *	allocate more timeout table slots when table overflows.
- */
-
 
 #ifdef NTP	/* NTP phase-locked loop in kernel */
 /*
@@ -359,6 +353,9 @@ initclocks()
 		break;
 	case 1024:
 		shifthz = SHIFT_SCALE - 10;
+		break;
+	case 1200:
+		shifthz = SHIFT_SCALE - 11;
 		break;
 	default:
 		panic("weird hz");
@@ -767,6 +764,52 @@ hzto(tv)
 }
 
 /*
+ * Compute number of hz in the specified amount of time.
+ */
+int
+tvtohz(struct timeval *tv)
+{
+	unsigned long ticks;
+	long sec, usec;
+
+	/*
+	 * If the number of usecs in the whole seconds part of the time
+	 * fits in a long, then the total number of usecs will
+	 * fit in an unsigned long.  Compute the total and convert it to
+	 * ticks, rounding up and adding 1 to allow for the current tick
+	 * to expire.  Rounding also depends on unsigned long arithmetic
+	 * to avoid overflow.
+	 *
+	 * Otherwise, if the number of ticks in the whole seconds part of
+	 * the time fits in a long, then convert the parts to
+	 * ticks separately and add, using similar rounding methods and
+	 * overflow avoidance.  This method would work in the previous
+	 * case but it is slightly slower and assumes that hz is integral.
+	 *
+	 * Otherwise, round the time down to the maximum
+	 * representable value.
+	 *
+	 * If ints have 32 bits, then the maximum value for any timeout in
+	 * 10ms ticks is 248 days.
+	 */
+	sec = tv->tv_sec;
+	usec = tv->tv_usec;
+	if (sec < 0 || (sec == 0 && usec <= 0))
+		ticks = 0;
+	else if (sec <= LONG_MAX / 1000000)
+		ticks = (sec * 1000000 + (unsigned long)usec + (tick - 1))
+		    / tick + 1;
+	else if (sec <= LONG_MAX / hz)
+		ticks = sec * hz
+		    + ((unsigned long)usec + (tick - 1)) / tick + 1;
+	else
+		ticks = LONG_MAX;
+	if (ticks > INT_MAX)
+		ticks = INT_MAX;
+	return ((int)ticks);
+}
+
+/*
  * Start profiling on a process.
  *
  * Kernel profiling passes proc0 which never exits and hence
@@ -912,7 +955,7 @@ statclock(frame)
  * For uncompensated quartz crystal oscillatores and nominal update
  * intervals less than 1024 s, operation should be in phase-lock mode
  * (STA_FLL = 0), where the loop is disciplined to phase. For update
- * intervals greater than thiss, operation should be in frequency-lock
+ * intervals greater than this, operation should be in frequency-lock
  * mode (STA_FLL = 1), where the loop is disciplined to frequency.
  *
  * Note: splclock() is in effect.

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.29 2001/09/19 20:50:57 mickey Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.35 2002/03/14 01:26:47 millert Exp $	*/
 /*	$NetBSD: pmap.c,v 1.64 1996/11/20 18:57:35 gwr Exp $	*/
 
 /*-
@@ -77,9 +77,6 @@
 #include <sys/malloc.h>
 #include <sys/user.h>
 #include <sys/queue.h>
-
-#include <vm/vm.h>
-#include <vm/vm_page.h>
 
 #include <uvm/uvm.h>
 
@@ -194,7 +191,7 @@ typedef struct pv_entry *pv_entry_t;
 pv_entry_t pv_head_table = NULL;
 
 #ifdef	DIAGNOSTIC
-static struct pv_entry * pa_to_pvp __P((vm_offset_t pa));
+static struct pv_entry * pa_to_pvp(vm_offset_t pa);
 static struct pv_entry *
 pa_to_pvp(pa)
 	vm_offset_t pa;
@@ -317,12 +314,12 @@ struct pmeg_tailq pmeg_free_queue, pmeg_inactive_queue,
 static struct pmeg_state pmeg_array[NPMEG];
 
 #ifdef	PMAP_DEBUG
-void pmap_print __P((pmap_t pmap));
-void pv_print __P((vm_offset_t pa));
+void pmap_print(pmap_t pmap);
+void pv_print(vm_offset_t pa);
 
-static pmeg_t pmeg_p __P((int sme));
-static void pmeg_verify_empty __P((vm_offset_t va));
-static void pmeg_print __P((pmeg_t pmegp));
+static pmeg_t pmeg_p(int sme);
+static void pmeg_verify_empty(vm_offset_t va);
+static void pmeg_print(pmeg_t pmegp);
 
 static pmeg_t
 pmeg_p(sme)
@@ -361,54 +358,56 @@ int tmp_vpages_inuse;
 /*
  * prototypes
  */
-static int get_pte_pmeg __P((int, int));
-static void set_pte_pmeg __P((int, int, int));
+static int get_pte_pmeg(int, int);
+static void set_pte_pmeg(int, int, int);
 
-static void context_allocate __P((pmap_t pmap));
-static void context_free __P((pmap_t pmap));
-static void context_init __P((void));
+static void context_allocate(pmap_t pmap);
+static void context_free(pmap_t pmap);
+static void context_init(void);
 
-static pmeg_t pmeg_allocate __P((pmap_t pmap, vm_offset_t va));
-static void pmeg_release __P((pmeg_t pmegp));
-static void pmeg_free __P((pmeg_t pmegp, int segnum));
-static pmeg_t pmeg_cache __P((pmap_t pmap, vm_offset_t va));
-static void pmeg_set_wiring __P((pmeg_t pmegp, vm_offset_t va, int));
+static pmeg_t pmeg_allocate(pmap_t pmap, vm_offset_t va);
+static void pmeg_release(pmeg_t pmegp);
+static void pmeg_free(pmeg_t pmegp, int segnum);
+static pmeg_t pmeg_cache(pmap_t pmap, vm_offset_t va);
+static void pmeg_set_wiring(pmeg_t pmegp, vm_offset_t va, int);
 
-static int pv_link __P((pmap_t pmap, vm_offset_t, vm_offset_t, u_int));
-static void pv_unlink __P((pmap_t, vm_offset_t, vm_offset_t));
-static void pv_remove_all __P(( vm_offset_t pa));
-static void pv_changepte __P((pv_entry_t, int, int));
-static void pv_syncflags __P((pv_entry_t head));
+static int pv_link(pmap_t pmap, vm_offset_t, vm_offset_t, u_int);
+static void pv_unlink(pmap_t, vm_offset_t, vm_offset_t);
+static void pv_remove_all( vm_offset_t pa);
+static void pv_changepte(pv_entry_t, int, int);
+static void pv_syncflags(pv_entry_t head);
 
-static void pmeg_clean __P((pmeg_t pmegp));
-static void pmeg_clean_free __P((void));
+static void pmeg_clean(pmeg_t pmegp);
+static void pmeg_clean_free(void);
 
-static void sun3_protection_init __P((void));
+static void sun3_protection_init(void);
 
-static void pmap_common_init __P((pmap_t pmap));
+static void pmap_common_init(pmap_t pmap);
 
-static void pmap_user_pmap_init __P((pmap_t pmap));
-static void pmap_page_upload __P((void));
+static void pmap_user_pmap_init(pmap_t pmap);
+static void pmap_page_upload(void);
 
-static void pmap_remove_range_mmu __P((pmap_t, vm_offset_t, vm_offset_t));
-static void pmap_remove_range_noctx __P((pmap_t, vm_offset_t, vm_offset_t));
-static void pmap_remove_range __P((pmap_t pmap, vm_offset_t, vm_offset_t));
+static void pmap_remove_range_mmu(pmap_t, vm_offset_t, vm_offset_t);
+static void pmap_remove_range_noctx(pmap_t, vm_offset_t, vm_offset_t);
+static void pmap_remove_range(pmap_t pmap, vm_offset_t, vm_offset_t);
 
-static void pmap_enter_kernel __P((vm_offset_t va, vm_offset_t pa,
-	vm_prot_t prot, boolean_t wired, int pte_proto));
-static void pmap_enter_user __P((pmap_t pmap, vm_offset_t va, vm_offset_t pa,
-	vm_prot_t prot, boolean_t wired, int pte_proto));
+static void pmap_enter_kernel(vm_offset_t va, vm_offset_t pa,
+	vm_prot_t prot, boolean_t wired, int pte_proto);
+static void pmap_enter_user(pmap_t pmap, vm_offset_t va, vm_offset_t pa,
+	vm_prot_t prot, boolean_t wired, int pte_proto);
 
-static void pmap_protect_range_noctx __P((pmap_t, vm_offset_t, vm_offset_t));
-static void pmap_protect_range_mmu __P((pmap_t, vm_offset_t, vm_offset_t));
-static void pmap_protect_range __P((pmap_t, vm_offset_t, vm_offset_t));
+static void pmap_protect_range_noctx(pmap_t, vm_offset_t, vm_offset_t);
+static void pmap_protect_range_mmu(pmap_t, vm_offset_t, vm_offset_t);
+static void pmap_protect_range(pmap_t, vm_offset_t, vm_offset_t);
 
-void pmap_switch __P((pmap_t pmap));
+void pmap_switch(pmap_t pmap);
 
-extern int pmap_page_index __P((paddr_t));
-extern u_int pmap_free_pages __P((void));
-extern int pmap_next_page __P((vm_offset_t *));
+extern int pmap_page_index(paddr_t);
+extern u_int pmap_free_pages(void);
+extern int pmap_next_page(vm_offset_t *);
 
+void pmap_pinit(struct pmap *);
+void pmap_release(struct pmap *);
 
 /*
  * Debugging support.
@@ -2508,7 +2507,7 @@ pmap_enter(pmap, va, pa, prot, flags)
 	}
 	PMAP_UNLOCK();
 
-	return (KERN_SUCCESS);
+	return (0);
 }
 
 /*
@@ -3121,20 +3120,6 @@ pmap_resident_pages(pmap)
 	return (pages);
 }
 
-
-/*
- *	Require that all active physical maps contain no
- *	incorrect entries NOW.  [This update includes
- *	forcing updates of any address map caching.]
- *
- *	Generally used to insure that a thread about
- *	to run will see a semantically correct world.
- */
-void
-pmap_update()
-{
-}
-
 /*
  *	pmap_copy_page copies the specified (machine independent)
  *	page by mapping the page into virtual memory and using
@@ -3365,18 +3350,6 @@ void
 pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot)
 {
 	pmap_enter(pmap_kernel(), va, pa, prot, VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
-}
-
-void
-pmap_kenter_pgs(vaddr_t va, struct vm_page **pgs, int npgs)
-{
-	int i;
-
-	for (i = 0; i < npgs; i++, va += PAGE_SIZE) {
-		pmap_enter(pmap_kernel(), va, VM_PAGE_TO_PHYS(pgs[i]),
-			VM_PROT_READ|VM_PROT_WRITE,
-			VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
-	}
 }
 
 void

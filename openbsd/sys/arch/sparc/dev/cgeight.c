@@ -1,4 +1,4 @@
-/*	$OpenBSD: cgeight.c,v 1.10 2001/08/17 13:52:28 mickey Exp $	*/
+/*	$OpenBSD: cgeight.c,v 1.13 2002/03/14 01:26:42 millert Exp $	*/
 /*	$NetBSD: cgeight.c,v 1.13 1997/05/24 20:16:04 pk Exp $	*/
 
 /*
@@ -65,7 +65,7 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/fbio.h>
 #include <machine/autoconf.h>
@@ -92,7 +92,7 @@ struct cgeight_softc {
 static void	cgeightattach(struct device *, struct device *, void *);
 static int	cgeightmatch(struct device *, void *, void *);
 #if defined(SUN4)
-static void	cgeightunblank __P((struct device *));
+static void	cgeightunblank(struct device *);
 #endif
 
 struct cfattach cgeight_ca = {
@@ -112,9 +112,9 @@ static struct fbdriver cgeightfbdriver = {
 extern int fbnode;
 extern struct tty *fbconstty;
 
-static void cgeightloadcmap __P((struct cgeight_softc *, int, int));
-static int cgeight_get_video __P((struct cgeight_softc *));
-static void cgeight_set_video __P((struct cgeight_softc *, int));
+static void cgeightloadcmap(struct cgeight_softc *, int, int);
+static int cgeight_get_video(struct cgeight_softc *);
+static void cgeight_set_video(struct cgeight_softc *, int);
 #endif
 
 /*
@@ -381,10 +381,11 @@ cgeightioctl(dev, cmd, data, flags, p)
  * goes. Starting at 8MB, it maps the ramdac for NBPG, then the p4
  * register for NBPG, then the bootrom for 0x40000.
  */
-int
+paddr_t
 cgeightmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	register struct cgeight_softc *sc = cgeight_cd.cd_devs[minor(dev)];
 	int poff;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: hpux_exec.c,v 1.12 2001/08/11 23:21:14 art Exp $	*/
+/*	$OpenBSD: hpux_exec.c,v 1.15 2002/03/14 01:26:49 millert Exp $	*/
 /*	$NetBSD: hpux_exec.c,v 1.8 1997/03/16 10:14:44 thorpej Exp $	*/
 
 /*
@@ -47,7 +47,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/reg.h>
@@ -69,9 +69,9 @@ extern char *hpux_syscallnames[];
 #endif
 extern int bsdtohpuxerrnomap[];
 
-static	int exec_hpux_prep_nmagic __P((struct proc *, struct exec_package *));
-static	int exec_hpux_prep_zmagic __P((struct proc *, struct exec_package *));
-static	int exec_hpux_prep_omagic __P((struct proc *, struct exec_package *));
+static	int exec_hpux_prep_nmagic(struct proc *, struct exec_package *);
+static	int exec_hpux_prep_zmagic(struct proc *, struct exec_package *);
+static	int exec_hpux_prep_omagic(struct proc *, struct exec_package *);
 
 struct emul emul_hpux = {
 	"hpux",
@@ -192,7 +192,7 @@ exec_hpux_prep_zmagic(p, epp)
 	if ((execp->ha_text != 0 || execp->ha_data != 0) &&
 	    epp->ep_vp->v_writecount != 0)
 		return (ETXTBSY);
-	epp->ep_vp->v_flag |= VTEXT;
+	vn_marktext(epp->ep_vp);
 
 	/*
 	 * HP-UX ZMAGIC executables need to have their segment

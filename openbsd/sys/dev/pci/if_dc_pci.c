@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_dc_pci.c,v 1.18 2001/10/06 14:37:48 aaron Exp $	*/
+/*	$OpenBSD: if_dc_pci.c,v 1.30 2002/04/01 18:41:47 nate Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -65,14 +65,16 @@
 #include <net/bpf.h>
 #endif
 
-#include <vm/vm.h>              /* for vtophys */
-
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcidevs.h>
+
+#ifdef __sparc64__
+#include <dev/ofw/openfirm.h>
+#endif
 
 #define DC_USEIOSPACE
 
@@ -82,6 +84,7 @@
  * Various supported device vendors/types and their names.
  */
 struct dc_type dc_devs[] = {
+	{ PCI_VENDOR_DEC, PCI_PRODUCT_DEC_21140 },
 	{ PCI_VENDOR_DEC, PCI_PRODUCT_DEC_21142 },
 	{ PCI_VENDOR_DAVICOM, PCI_PRODUCT_DAVICOM_DM9100 },
 	{ PCI_VENDOR_DAVICOM, PCI_PRODUCT_DAVICOM_DM9102 },
@@ -99,13 +102,13 @@ struct dc_type dc_devs[] = {
 	{ 0, 0 }
 };
 
-int dc_pci_match		__P((struct device *, void *, void *));
-void dc_pci_attach		__P((struct device *, struct device *, void *));
-void dc_pci_acpi		__P((struct device *, void *));
+int dc_pci_match(struct device *, void *, void *);
+void dc_pci_attach(struct device *, struct device *, void *);
+void dc_pci_acpi(struct device *, void *);
 
-extern void dc_eeprom_width	__P((struct dc_softc *));
-extern void dc_read_srom	__P((struct dc_softc *, int));
-extern void dc_parse_21143_srom	__P((struct dc_softc *));
+extern void dc_eeprom_width(struct dc_softc *);
+extern void dc_read_srom(struct dc_softc *, int);
+extern void dc_parse_21143_srom(struct dc_softc *);
 
 /*
  * Probe for a 21143 or clone chip. Check the PCI vendor and device
@@ -119,11 +122,39 @@ dc_pci_match(parent, match, aux)
 	struct pci_attach_args *pa = (struct pci_attach_args *)aux;
 	struct dc_type *t;
 
+	/*
+	 * Support for the 21140 chip is experimental.  If it works for you,
+	 * that's great.  By default, this chip will use de.
+	 */
+        if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_DEC &&
+	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_DEC_21140)
+		return (1);
+
+	/*
+	 * The following chip revision doesn't seem to work so well with dc,
+	 * so let's have de handle it.  (de will return a match of 2)
+	 */
+        if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_DEC &&
+	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_DEC_21142 &&
+	    PCI_REVISION(pa->pa_class) == 0x21)
+		return (1);
+
+	/*
+	 * Since dc doesn't fit on the alpha floppy, we want de to win by
+	 * default on alpha so that RAMDISK* and GENERIC will use the same
+	 * driver.
+	 */
 	for (t = dc_devs; t->dc_vid != 0; t++) {
 		if ((PCI_VENDOR(pa->pa_id) == t->dc_vid) &&
-		    (PCI_PRODUCT(pa->pa_id) == t->dc_did))
+		    (PCI_PRODUCT(pa->pa_id) == t->dc_did)) {
+#ifdef __alpha__
 			return (1);
+#else
+			return (3);
+#endif
+		}
 	}
+
 	return (0);
 }
 
@@ -190,6 +221,7 @@ void dc_pci_attach(parent, self, aux)
 	int			found = 0;
 
 	s = splimp();
+	sc->sc_dmat = pa->pa_dmat;
 	sc->dc_unit = sc->sc_dev.dv_unit;
 
 	/*
@@ -260,7 +292,8 @@ void dc_pci_attach(parent, self, aux)
 
 	switch (PCI_VENDOR(pa->pa_id)) {
 	case PCI_VENDOR_DEC:
-		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_DEC_21142) {
+		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_DEC_21140 ||
+		    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_DEC_21142) {
 			found = 1;
 			sc->dc_type = DC_TYPE_21143;
 			sc->dc_flags |= DC_TX_POLL|DC_TX_USE_TX_INTR;
@@ -371,6 +404,8 @@ void dc_pci_attach(parent, self, aux)
 			sc->dc_flags |= DC_PNIC_RX_BUG_WAR;
 			sc->dc_pnic_rx_buf = malloc(DC_RXLEN * 5, M_DEVBUF,
 			    M_NOWAIT);
+			if (sc->dc_pnic_rx_buf == NULL)
+				panic("dc_pci_attach");
 			if (revision < DC_REVISION_82C169)
 				sc->dc_pmode = DC_PMODE_SYM;
 		}
@@ -443,12 +478,23 @@ void dc_pci_attach(parent, self, aux)
 	} else if (!sc->dc_pmode)
 		sc->dc_pmode = DC_PMODE_MII;
 
+#ifdef __sparc64__
+	{
+		extern void myetheraddr(u_char *);
+
+		if (OF_getprop(PCITAG_NODE(pa->pa_tag), "local-mac-address",
+		    sc->arpcom.ac_enaddr, ETHER_ADDR_LEN) <= 0)
+			myetheraddr(sc->arpcom.ac_enaddr);
+		sc->sc_hasmac = 1;
+	}
+#endif
+
 #ifdef SRM_MEDIA
 	sc->dc_srm_media = 0;
 
 	/* Remember the SRM console media setting */
 	if (DC_IS_INTEL(sc)) {
-		command = pci_read_config(dev, DC_PCI_CFDD, 4);
+		command = pci_conf_read(pc, pa->pa_tag, DC_PCI_CFDD);
 		command &= ~(DC_CFDD_SNOOZE_MODE|DC_CFDD_SLEEP_MODE);
 		switch ((command >> 8) & 0xff) {
 		case 3: 

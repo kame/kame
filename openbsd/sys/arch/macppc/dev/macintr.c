@@ -1,4 +1,4 @@
-/*	$OpenBSD: macintr.c,v 1.5 2001/10/03 14:07:05 drahn Exp $	*/
+/*	$OpenBSD: macintr.c,v 1.13 2002/03/14 01:26:36 millert Exp $	*/
 
 /*-
  * Copyright (c) 1995 Per Fogelstrom
@@ -47,8 +47,8 @@
 #include <sys/socket.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm.h>
+#include <ddb/db_var.h>
 
 #include <machine/autoconf.h>
 #include <machine/intr.h>
@@ -61,22 +61,22 @@
 #define ICU_LEN 64
 #define LEGAL_IRQ(x) ((x >= 0) && (x < ICU_LEN))
 
-static int intrtype[ICU_LEN], intrmask[ICU_LEN], intrlevel[ICU_LEN];
-static struct intrhand *intrhand[ICU_LEN];
-static int hwirq[ICU_LEN], virq[64];
-unsigned int imen = 0xffffffff;
-int virq_max = 0;
+int m_intrtype[ICU_LEN], m_intrmask[ICU_LEN], m_intrlevel[ICU_LEN];
+struct intrhand *m_intrhand[ICU_LEN];
+int m_hwirq[ICU_LEN], m_virq[64];
+unsigned int imen_m = 0xffffffff;
+int m_virq_max = 0;
 
 struct evcnt evirq[ICU_LEN*2];
 
-static int fakeintr __P((void *));
-static char *intr_typename __P((int type));
-static void intr_calculatemasks __P((void));
-static void enable_irq __P((int x));
-static __inline int cntlzw __P((int x));
-static int mapirq __P((int irq));
-static int read_irq __P((void));
-static void mac_intr_do_pending_int __P((void));
+static int fakeintr(void *);
+static char *intr_typename(int type);
+static void intr_calculatemasks(void);
+static void enable_irq(int x);
+static __inline int cntlzw(int x);
+static int mapirq(int irq);
+static int read_irq(void);
+static void mac_intr_do_pending_int(void);
 
 extern u_int32_t *heathrow_FCR;
 
@@ -96,10 +96,10 @@ struct macintr_softc {
 	struct device sc_dev;
 };
 
-int	macintr_match __P((struct device *parent, void *cf, void *aux));
-void	macintr_attach __P((struct device *, struct device *, void *));
-void	mac_do_pending_int __P((void));
-void	mac_ext_intr __P((void));
+int	macintr_match(struct device *parent, void *cf, void *aux);
+void	macintr_attach(struct device *, struct device *, void *);
+void	mac_do_pending_int(void);
+void	mac_ext_intr(void);
 
 struct cfattach macintr_ca = { 
 	sizeof(struct macintr_softc),
@@ -150,7 +150,7 @@ intr_establish_t macintr_establish;
 intr_disestablish_t macintr_disestablish;
 extern intr_establish_t *mac_intr_establish_func;
 extern intr_disestablish_t *mac_intr_disestablish_func;
-void macintr_collect_preconf_intr __P((void));
+void macintr_collect_preconf_intr(void);
 
 void
 macintr_attach(parent, self, aux)
@@ -210,7 +210,8 @@ int
 macintr_prog_button (void *arg)
 {
 #ifdef DDB
-        Debugger();
+	if (db_console)
+		Debugger();
 #else
 	printf("programmer button pressed, debugger not available\n");
 #endif
@@ -236,7 +237,7 @@ macintr_establish(lcv, irq, type, level, ih_fun, ih_arg, name)
 	int irq;
 	int type;
 	int level;
-	int (*ih_fun) __P((void *));
+	int (*ih_fun)(void *);
 	void *ih_arg;
 	char *name;
 {
@@ -264,18 +265,18 @@ printf("vI %d ", irq);
 	if (!LEGAL_IRQ(irq) || type == IST_NONE)
 		panic("intr_establish: bogus irq or type");
 
-	switch (intrtype[irq]) {
+	switch (m_intrtype[irq]) {
 	case IST_NONE:
-		intrtype[irq] = type;
+		m_intrtype[irq] = type;
 		break;
 	case IST_EDGE:
 	case IST_LEVEL:
-		if (type == intrtype[irq])
+		if (type == m_intrtype[irq])
 			break;
 	case IST_PULSE:
 		if (type != IST_NONE)
 			panic("intr_establish: can't share %s with %s",
-			    intr_typename(intrtype[irq]),
+			    intr_typename(m_intrtype[irq]),
 			    intr_typename(type));
 		break;
 	}
@@ -285,7 +286,7 @@ printf("vI %d ", irq);
 	 * This is O(N^2), but we want to preserve the order, and N is
 	 * generally small.
 	 */
-	for (p = &intrhand[irq]; (q = *p) != NULL; p = &q->ih_next)
+	for (p = &m_intrhand[irq]; (q = *p) != NULL; p = &q->ih_next)
 		;
 
 	/*
@@ -331,7 +332,7 @@ macintr_disestablish(lcp, arg)
 	 * Remove the handler from the chain.
 	 * This is O(n^2), too.
 	 */
-	for (p = &intrhand[irq]; (q = *p) != NULL && q != ih; p = &q->ih_next)
+	for (p = &m_intrhand[irq]; (q = *p) != NULL && q != ih; p = &q->ih_next)
 		;
 	if (q)
 		*p = q->ih_next;
@@ -341,8 +342,8 @@ macintr_disestablish(lcp, arg)
 
 	intr_calculatemasks();
 
-	if (intrhand[irq] == NULL)
-		intrtype[irq] = IST_NONE;
+	if (m_intrhand[irq] == NULL)
+		m_intrtype[irq] = IST_NONE;
 }
 
 
@@ -382,16 +383,16 @@ intr_calculatemasks()
 	/* First, figure out which levels each IRQ uses. */
 	for (irq = 0; irq < ICU_LEN; irq++) {
 		register int levels = 0;
-		for (q = intrhand[irq]; q; q = q->ih_next)
+		for (q = m_intrhand[irq]; q; q = q->ih_next)
 			levels |= 1 << q->ih_level;
-		intrlevel[irq] = levels;
+		m_intrlevel[irq] = levels;
 	}
 
 	/* Then figure out which IRQs use each level. */
 	for (level = 0; level < 5; level++) {
 		register int irqs = 0;
 		for (irq = 0; irq < ICU_LEN; irq++)
-			if (intrlevel[irq] & (1 << level))
+			if (m_intrlevel[irq] & (1 << level))
 				irqs |= 1 << irq;
 		imask[level] = irqs | SINT_MASK;
 	}
@@ -399,15 +400,14 @@ intr_calculatemasks()
 	/*
 	 * There are tty, network and disk drivers that use free() at interrupt
 	 * time, so imp > (tty | net | bio).
-	 */
-	imask[IPL_IMP] |= imask[IPL_TTY] | imask[IPL_NET] | imask[IPL_BIO];
-
-	/*
+	 *
 	 * Enforce a hierarchy that gives slow devices a better chance at not
 	 * dropping data.
 	 */
-	imask[IPL_TTY] |= imask[IPL_NET] | imask[IPL_BIO];
 	imask[IPL_NET] |= imask[IPL_BIO];
+	imask[IPL_TTY] |= imask[IPL_NET];
+	imask[IPL_IMP] |= imask[IPL_TTY];
+	imask[IPL_CLOCK] |= imask[IPL_IMP] | SPL_CLOCK;
 
 	/*
 	 * These are pseudo-levels.
@@ -418,20 +418,20 @@ intr_calculatemasks()
 	/* And eventually calculate the complete masks. */
 	for (irq = 0; irq < ICU_LEN; irq++) {
 		register int irqs = 1 << irq;
-		for (q = intrhand[irq]; q; q = q->ih_next)
+		for (q = m_intrhand[irq]; q; q = q->ih_next)
 			irqs |= imask[q->ih_level];
-		intrmask[irq] = irqs | SINT_MASK;
+		m_intrmask[irq] = irqs | SINT_MASK;
 	}
 
 	/* Lastly, determine which IRQs are actually in use. */
 	{
 		register int irqs = 0;
 		for (irq = 0; irq < ICU_LEN; irq++) {
-			if (intrhand[irq])
+			if (m_intrhand[irq])
 				irqs |= 1 << irq;
 		}
-		imen = ~irqs;
-		enable_irq(~imen);
+		imen_m = ~irqs;
+		enable_irq(~imen_m);
 	}
 }
 static void
@@ -446,7 +446,7 @@ enable_irq(x)
 	state0 = state1 = 0;
 	while (x) {
 		v = 31 - cntlzw(x);
-		irq = hwirq[v];
+		irq = m_hwirq[v];
 		if (irq < 32) {
 			state0 |= 1 << irq;
 		} else {
@@ -460,6 +460,9 @@ enable_irq(x)
 	}
 	out32rb(INT_ENABLE_REG0, state0);
 }
+
+int m_virq_inited = 0;
+
 /*
  * Map 64 irqs into 32 (bits).
  */
@@ -468,16 +471,30 @@ mapirq(irq)
 	int irq;
 {
 	int v;
+	int i;
+
+	if (m_virq_inited == 0) {
+		m_virq_max = 0;
+		for (i = 0; i < ICU_LEN; i++) {
+			m_virq[i] = 0;
+		}
+		m_virq_inited = 1;
+	}
+
+	/* irq in table already? */
+	if (m_virq[irq] != 0) {
+		return m_virq[irq];
+	}
 
 	if (irq < 0 || irq >= 64)
 		panic("invalid irq");
-	virq_max++;
-	v = virq_max;
+	m_virq_max++;
+	v = m_virq_max;
 	if (v > HWIRQ_MAX)
 		panic("virq overflow");
 
-	hwirq[v] = irq;
-	virq[irq] = v;
+	m_hwirq[v] = irq;
+	m_virq[irq] = v;
 #if 0
 printf("\nmapirq %x to %x\n", irq, v);
 #endif
@@ -511,38 +528,34 @@ mac_ext_intr()
 	struct intrhand *ih;
 	volatile unsigned long int_state;
 
-	pcpl = splhigh();	/* Turn off all */
+	pcpl = cpl;	/* Turn off all */
 
-#if 0
-printf("mac_intr \n");
-#endif
 	int_state = read_irq();
 	if (int_state == 0)
 		goto out;
 
 start:
 	irq = 31 - cntlzw(int_state);
-	intrcnt[hwirq[irq]]++;
+	intrcnt[m_hwirq[irq]]++;
 
-	o_imen = imen;
+	o_imen = imen_m;
 	r_imen = 1 << irq;
 
-	if ((pcpl & r_imen) != 0) {
+	if ((cpl & r_imen) != 0) {
 		ipending |= r_imen;	/* Masked! Mark this as pending */
-		imen |= r_imen;
-		enable_irq(~imen);
+		imen_m |= r_imen;
+		enable_irq(~imen_m);
 	} else {
-		ih = intrhand[irq];
+		splraise(m_intrmask[irq]);
+
+		ih = m_intrhand[irq];
 		while (ih) {
-#if 0
-printf("calling handler %x\n", ih->ih_fun);
-#endif
 			(*ih->ih_fun)(ih->ih_arg);
 			ih = ih->ih_next;
 		}
 
 		uvmexp.intrs++;
-		evirq[hwirq[irq]].ev_count++;
+		evirq[m_hwirq[irq]].ev_count++;
 	}
 	int_state &= ~r_imen;
 	if (int_state)
@@ -572,22 +585,22 @@ mac_intr_do_pending_int()
 	asm volatile("mtmsr %0" :: "r"(dmsr));
 
 	hwpend = ipending & ~pcpl;	/* Do now unmasked pendings */
-	imen &= ~hwpend;
-	enable_irq(~imen);
+	imen_m &= ~hwpend;
+	enable_irq(~imen_m);
 	hwpend &= HWIRQ_MASK;
 	while (hwpend) {
 		irq = 31 - cntlzw(hwpend);
 		hwpend &= ~(1L << irq);
-		ih = intrhand[irq];
+		ih = m_intrhand[irq];
 		while(ih) {
 			(*ih->ih_fun)(ih->ih_arg);
 			ih = ih->ih_next;
 		}
 
-		evirq[hwirq[irq]].ev_count++;
+		evirq[m_hwirq[irq]].ev_count++;
 	}
 
-	/*out32rb(INT_ENABLE_REG, ~imen);*/
+	/*out32rb(INT_ENABLE_REG, ~imen_m);*/
 
 	do {
 		if((ipending & SINT_CLOCK) & ~pcpl) {
@@ -625,7 +638,7 @@ read_irq()
 		state0save = state0;
 	while (state0) {
 		p = 31 - cntlzw(state0);
-		rv |= 1 << virq[p];
+		rv |= 1 << m_virq[p];
 		state0 &= ~(1 << p);
 	}
 
@@ -639,7 +652,7 @@ read_irq()
 	state1save = state1;
 	while (state1) {
 		p = 31 - cntlzw(state1);
-		rv |= 1 << virq[p + 32];
+		rv |= 1 << m_virq[p + 32];
 		state1 &= ~(1 << p);
 	}
 #if 0

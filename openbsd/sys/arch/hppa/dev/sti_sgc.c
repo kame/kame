@@ -1,4 +1,4 @@
-/*	$OpenBSD: sti_sgc.c,v 1.6 2001/09/11 20:05:24 miod Exp $	*/
+/*	$OpenBSD: sti_sgc.c,v 1.9 2002/03/14 01:26:31 millert Exp $	*/
 
 /*
  * Copyright (c) 2000 Michael Shalayeff
@@ -40,7 +40,6 @@
 #include <sys/systm.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm.h>
 
 #include <machine/bus.h>
@@ -58,8 +57,8 @@
 
 #define	STI_MEMSIZE	0x1000000
 
-int  sti_sgc_probe __P((struct device *, void *, void *));
-void sti_sgc_attach __P((struct device *, struct device *, void *));
+int  sti_sgc_probe(struct device *, void *, void *);
+void sti_sgc_attach(struct device *, struct device *, void *);
 
 struct cfattach sti_sgc_ca = {
 	sizeof(struct sti_softc), sti_sgc_probe, sti_sgc_attach
@@ -191,6 +190,8 @@ sti_sgc_attach(parent, self, aux)
 	printf("sti: hpa=%x, rom=%x\n", ca->ca_hpa, addr);
 	printf("sti: ioh=%x, romh=%x\n", sc->ioh, sc->romh);
 #endif
+	if (ca->ca_hpa == (hppa_hpa_t)PAGE0->mem_cons.pz_hpa)
+		sc->sc_flags |= STI_CONSOLE;
 	sti_attach_common(sc);
 }
 

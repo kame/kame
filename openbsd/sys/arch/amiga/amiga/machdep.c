@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.54 2001/09/19 20:50:56 mickey Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.69 2002/03/23 13:28:33 espie Exp $	*/
 /*	$NetBSD: machdep.c,v 1.95 1997/08/27 18:31:17 is Exp $	*/
 
 /*
@@ -47,7 +47,6 @@
 #include <sys/systm.h>
 #include <sys/signalvar.h>
 #include <sys/kernel.h>
-#include <sys/map.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
 #include <sys/reboot.h>
@@ -79,7 +78,6 @@
 #include <net/netisr.h>
 #define	MAXMEM	64*1024	/* XXX - from cmap.h */
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/db_machdep.h>
@@ -109,20 +107,20 @@
 #include <net/if.h>
 
 /* prototypes */
-void identifycpu __P((void));
-vm_offset_t reserve_dumppages __P((vm_offset_t));
-void dumpsys __P((void));
-void initcpu __P((void));
-void straytrap __P((int, u_short));
-void netintr __P((void));
-void call_sicallbacks __P((void));
-void _softintr_callit __P((void *, void *));
-void intrhand __P((int));
+void identifycpu(void);
+vm_offset_t reserve_dumppages(vm_offset_t);
+void dumpsys(void);
+void initcpu(void);
+void straytrap(int, u_short);
+void netintr(void);
+void call_sicallbacks(void);
+void _softintr_callit(void *, void *);
+void intrhand(int);
 #if NSER > 0
-void ser_outintr __P((void));
+void ser_outintr(void);
 #endif
 #if NFD > 0
-void fdintr __P((int));
+void fdintr(int);
 #endif
 
 /*
@@ -130,14 +128,12 @@ void fdintr __P((int));
  */
 u_int16_t amiga_ttyspl = PSL_S|PSL_IPL4;
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *phys_map = NULL;
 
 /*
  * Declare these as initialized data so we can patch them.
  */
-int	nswbuf = 0;
 #ifdef	NBUF
 int	nbuf = NBUF;
 #else
@@ -301,15 +297,17 @@ consinit()
 void
 cpu_startup()
 {
-	register unsigned i;
-	register caddr_t v, firstaddr;
+	unsigned i;
+	caddr_t v, firstaddr;
 	int base, residual;
 #ifdef DEBUG
 	extern int pmapdebug;
 	int opmapdebug = pmapdebug;
 #endif
-	vm_offset_t minaddr, maxaddr;
+	vaddr_t minaddr, maxaddr;
 	vm_size_t size = 0;
+	vaddr_t va;
+	paddr_t pa;
 
 	/*
 	 * Initialize error message buffer (at end of core).
@@ -324,10 +322,14 @@ cpu_startup()
 	/*
 	 * XXX - shouldn't this be msgbufp + i * PAGE_SIZE?
 	 */
-	for (i = 0; i < btoc(MSGBUFSIZE); i++)
-		pmap_enter(pmap_kernel(), (vm_offset_t)msgbufp,
-		    msgbufpa + i * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE,
-		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+	va = (vaddr_t)msgbufp;
+	pa = (paddr_t)msgbufpa;
+	for (i = 0; i < btoc(MSGBUFSIZE); i++) {
+		pmap_kenter_pa(va, pa, VM_PROT_READ|VM_PROT_WRITE);
+		va += PAGE_SIZE;
+		pa += PAGE_SIZE;
+	}
+	pmap_update(pmap_kernel());
 	initmsgbuf((caddr_t)msgbufp, round_page(MSGBUFSIZE));
 
 	/*
@@ -361,6 +363,9 @@ again:
 #define	valloclim(name, type, num, lim) \
 	    (name) = (type *)v; v = (caddr_t)((lim) = ((name)+(num)))
 #ifdef SYSVSHM
+	shminfo.shmmax = shmmaxpgs;
+	shminfo.shmall = shmmaxpgs;
+	shminfo.shmseg = shmseg;
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
 #ifdef SYSVSEM
@@ -394,11 +399,6 @@ again:
 			nbuf = 16;
 	}
 
-	if (nswbuf == 0) {
-		nswbuf = (nbuf * 3 / 4) &~ 1;	/* force even */
-		if (nswbuf > 256)
-			nswbuf = 256;		/* sanity */
-	}
 	valloc(buf, struct buf, nbuf);
 	/*
 	 * End of first pass, size has been calculated so allocate memory
@@ -423,9 +423,9 @@ again:
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *)&buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)))
 		panic("startup: cannot allocate buffers");
 	minaddr = (vaddr_t) buffers;
 	if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
@@ -453,10 +453,13 @@ again:
 			if (pg == NULL)
 				panic("cpu_startup: not enough memory for "
 				      "buffer cache");
-			pmap_kenter_pgs(curbuf, &pg, 1);
+
+			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
+			    VM_PROT_READ|VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
+		pmap_update(pmap_kernel());
 	}
 
 	/*
@@ -471,9 +474,6 @@ again:
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 				   VM_PHYS_SIZE, 0, FALSE, NULL);
-
-	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				 VM_MBUF_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
 
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
@@ -579,7 +579,6 @@ setregs(p, pack, stack, retval)
  * Info for CTL_HW
  */
 char cpu_model[120];
-extern char version[];
 
 #if defined(M68060)
 int m68060_pcr_init = 0x21;	/* make this patchable */
@@ -746,6 +745,12 @@ boot(howto)
 	if (curproc)
 		savectx(&curproc->p_addr->u_pcb);
 
+	/* If system is cold, just halt. */
+	if (cold) {
+		howto |= RB_HALT;
+		goto haltsys;
+	}
+
 	boothowto = howto;
 	if ((howto & RB_NOSYNC) == 0) {
 		bootsync();
@@ -769,6 +774,7 @@ boot(howto)
 	if (howto & RB_DUMP)
 		dumpsys();
 
+haltsys:
 	/* Run any shutdown hooks. */
 	doshutdownhooks();
 
@@ -847,7 +853,7 @@ dumpsys()
 	unsigned bytes, i, n, seg;
 	int     maddr, psize;
 	daddr_t blkno;
-	int     (*dump) __P((dev_t, daddr_t, caddr_t, size_t));
+	int     (*dump)(dev_t, daddr_t, caddr_t, size_t);
 	int     error = 0;
 	kcore_seg_t *kseg_p;
 	cpu_kcore_hdr_t *chdr_p;
@@ -988,7 +994,7 @@ microtime(tvp)
 void
 initcpu()
 {
-	typedef void trapfun __P((void));
+	typedef void trapfun(void);
 
 	/* XXX should init '40 vecs here, too */
 #if defined(M68060) || defined(M68040) || defined(DRACO) || defined(FPU_EMULATE)
@@ -1231,7 +1237,7 @@ netintr()
 
 struct si_callback {
 	struct si_callback *next;
-	void (*function) __P((void *rock1, void *rock2));
+	void (*function)(void *rock1, void *rock2);
 	void *rock1, *rock2;
 };
 static struct si_callback *si_callbacks;
@@ -1261,7 +1267,7 @@ _softintr_callit(rock1, rock2)
 void *
 softintr_establish(ipl, func, arg)
 	int ipl;
-	void func __P((void *));
+	void func(void *);
 	void *arg;
 {
 	struct si_callback *si;
@@ -1310,7 +1316,7 @@ softintr_schedule(vsi)
 
 void
 add_sicallback (function, rock1, rock2)
-	void (*function) __P((void *rock1, void *rock2));
+	void (*function)(void *rock1, void *rock2);
 	void *rock1, *rock2;
 {
 	struct si_callback *si;
@@ -1361,7 +1367,7 @@ add_sicallback (function, rock1, rock2)
 
 void
 rem_sicallback(function)
-	void (*function) __P((void *rock1, void *rock2));
+	void (*function)(void *rock1, void *rock2);
 {
 	struct si_callback *si, *psi, *nsi;
 	int s;
@@ -1394,7 +1400,7 @@ call_sicallbacks()
 	struct si_callback *si;
 	int s;
 	void *rock1, *rock2;
-	void (*function) __P((void *, void *));
+	void (*function)(void *, void *);
 
 	do {
 		s = splhigh ();
@@ -1715,7 +1721,7 @@ intrhand(sr)
 int panicbutton = 1;	/* non-zero if panic buttons are enabled */
 int crashandburn = 0;
 int candbdelay = 50;	/* give em half a second */
-void candbtimer __P((void));
+void candbtimer(void);
 
 void
 candbtimer()
@@ -1786,8 +1792,7 @@ cpu_exec_aout_makecmds(p, epp)
 #endif
 #ifdef COMPAT_SUNOS
 	{
-		extern int sunos_exec_aout_makecmds
-		    __P((struct proc *, struct exec_package *));
+		extern int sunos_exec_aout_makecmds(struct proc *, struct exec_package *);
 		if ((error = sunos_exec_aout_makecmds(p, epp)) == 0)
 			return(0);
 	}

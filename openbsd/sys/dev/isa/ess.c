@@ -1,4 +1,4 @@
-/*	$OpenBSD: ess.c,v 1.4 2001/07/18 21:37:52 deraadt Exp $	*/
+/*	$OpenBSD: ess.c,v 1.8 2002/03/14 03:16:05 millert Exp $	*/
 /*	$NetBSD: ess.c,v 1.44.4.1 1999/06/21 01:18:00 thorpej Exp $	*/
 
 /*
@@ -113,80 +113,80 @@ struct cfdriver ess_cd = {
 	NULL, "ess", DV_DULL
 };
 
-int	ess_setup_sc __P((struct ess_softc *, int));
+int	ess_setup_sc(struct ess_softc *, int);
 
-int	ess_open __P((void *, int));
-void	ess_1788_close __P((void *));
-void	ess_1888_close __P((void *));
-int	ess_getdev __P((void *, struct audio_device *));
-int	ess_drain __P((void *));
+int	ess_open(void *, int);
+void	ess_1788_close(void *);
+void	ess_1888_close(void *);
+int	ess_getdev(void *, struct audio_device *);
+int	ess_drain(void *);
 
-int	ess_query_encoding __P((void *, struct audio_encoding *));
+int	ess_query_encoding(void *, struct audio_encoding *);
 
-int	ess_set_params __P((void *, int, int, struct audio_params *,
-	    struct audio_params *));
+int	ess_set_params(void *, int, int, struct audio_params *,
+	    struct audio_params *);
 
-int	ess_round_blocksize __P((void *, int));
+int	ess_round_blocksize(void *, int);
 
-int	ess_audio1_trigger_output __P((void *, void *, void *, int,
-	    void (*)(void *), void *, struct audio_params *));
-int	ess_audio2_trigger_output __P((void *, void *, void *, int,
-	    void (*)(void *), void *, struct audio_params *));
-int	ess_audio1_trigger_input __P((void *, void *, void *, int,
-	    void (*)(void *), void *, struct audio_params *));
-int	ess_audio1_halt __P((void *));
-int	ess_audio2_halt __P((void *));
-int	ess_audio1_intr __P((void *));
-int	ess_audio2_intr __P((void *));
-void	ess_audio1_poll __P((void *));
-void	ess_audio2_poll __P((void *));
+int	ess_audio1_trigger_output(void *, void *, void *, int,
+	    void (*)(void *), void *, struct audio_params *);
+int	ess_audio2_trigger_output(void *, void *, void *, int,
+	    void (*)(void *), void *, struct audio_params *);
+int	ess_audio1_trigger_input(void *, void *, void *, int,
+	    void (*)(void *), void *, struct audio_params *);
+int	ess_audio1_halt(void *);
+int	ess_audio2_halt(void *);
+int	ess_audio1_intr(void *);
+int	ess_audio2_intr(void *);
+void	ess_audio1_poll(void *);
+void	ess_audio2_poll(void *);
 
-int	ess_speaker_ctl __P((void *, int));
+int	ess_speaker_ctl(void *, int);
 
-int	ess_getdev __P((void *, struct audio_device *));
+int	ess_getdev(void *, struct audio_device *);
 
-int	ess_set_port __P((void *, mixer_ctrl_t *));
-int	ess_get_port __P((void *, mixer_ctrl_t *));
+int	ess_set_port(void *, mixer_ctrl_t *);
+int	ess_get_port(void *, mixer_ctrl_t *);
 
-void   *ess_malloc __P((void *, unsigned long, int, int));
-void	ess_free __P((void *, void *, int));
-unsigned long ess_round_buffersize __P((void *, unsigned long));
-int	ess_mappage __P((void *, void *, int, int));
+void   *ess_malloc(void *, int, size_t, int, int);
+void	ess_free(void *, void *, int);
+size_t	ess_round_buffersize(void *, int, size_t);
+paddr_t	ess_mappage(void *, void *, off_t, int);
 
 
-int	ess_query_devinfo __P((void *, mixer_devinfo_t *));
-int	ess_1788_get_props __P((void *));
-int	ess_1888_get_props __P((void *));
+int	ess_query_devinfo(void *, mixer_devinfo_t *);
+int	ess_1788_get_props(void *);
+int	ess_1888_get_props(void *);
 
-void	ess_speaker_on __P((struct ess_softc *));
-void	ess_speaker_off __P((struct ess_softc *));
+void	ess_speaker_on(struct ess_softc *);
+void	ess_speaker_off(struct ess_softc *);
 
-int	ess_config_addr __P((struct ess_softc *));
-void	ess_config_irq __P((struct ess_softc *));
-void	ess_config_drq __P((struct ess_softc *));
-void	ess_setup __P((struct ess_softc *));
-int	ess_identify __P((struct ess_softc *));
+int	ess_config_addr(struct ess_softc *);
+void	ess_config_irq(struct ess_softc *);
+void	ess_config_drq(struct ess_softc *);
+void	ess_setup(struct ess_softc *);
+int	ess_identify(struct ess_softc *);
 
-int	ess_reset __P((struct ess_softc *));
-void	ess_set_gain __P((struct ess_softc *, int, int));
-int	ess_set_in_port __P((struct ess_softc *, int));
-int	ess_set_in_ports __P((struct ess_softc *, int));
-u_int	ess_srtotc __P((u_int));
-u_int	ess_srtofc __P((u_int));
-u_char	ess_get_dsp_status __P((struct ess_softc *));
-u_char	ess_dsp_read_ready __P((struct ess_softc *));
-u_char	ess_dsp_write_ready __P((struct ess_softc *));
-int	ess_rdsp __P((struct ess_softc *));
-int	ess_wdsp __P((struct ess_softc *, u_char));
-u_char	ess_read_x_reg __P((struct ess_softc *, u_char));
-int	ess_write_x_reg __P((struct ess_softc *, u_char, u_char));
-void	ess_clear_xreg_bits __P((struct ess_softc *, u_char, u_char));
-void	ess_set_xreg_bits __P((struct ess_softc *, u_char, u_char));
-u_char	ess_read_mix_reg __P((struct ess_softc *, u_char));
-void	ess_write_mix_reg __P((struct ess_softc *, u_char, u_char));
-void	ess_clear_mreg_bits __P((struct ess_softc *, u_char, u_char));
-void	ess_set_mreg_bits __P((struct ess_softc *, u_char, u_char));
-void	ess_read_multi_mix_reg __P((struct ess_softc *, u_char, u_int8_t *, bus_size_t));
+int	ess_reset(struct ess_softc *);
+void	ess_set_gain(struct ess_softc *, int, int);
+int	ess_set_in_port(struct ess_softc *, int);
+int	ess_set_in_ports(struct ess_softc *, int);
+u_int	ess_srtotc(u_int);
+u_int	ess_srtofc(u_int);
+u_char	ess_get_dsp_status(struct ess_softc *);
+u_char	ess_dsp_read_ready(struct ess_softc *);
+u_char	ess_dsp_write_ready(struct ess_softc *);
+int	ess_rdsp(struct ess_softc *);
+int	ess_wdsp(struct ess_softc *, u_char);
+u_char	ess_read_x_reg(struct ess_softc *, u_char);
+int	ess_write_x_reg(struct ess_softc *, u_char, u_char);
+void	ess_clear_xreg_bits(struct ess_softc *, u_char, u_char);
+void	ess_set_xreg_bits(struct ess_softc *, u_char, u_char);
+u_char	ess_read_mix_reg(struct ess_softc *, u_char);
+void	ess_write_mix_reg(struct ess_softc *, u_char, u_char);
+void	ess_clear_mreg_bits(struct ess_softc *, u_char, u_char);
+void	ess_set_mreg_bits(struct ess_softc *, u_char, u_char);
+void	ess_read_multi_mix_reg(struct ess_softc *, u_char, u_int8_t *, bus_size_t);
 
 static char *essmodel[] = {
 	"unsupported",
@@ -269,8 +269,8 @@ struct audio_hw_if ess_1888_hw_if = {
 };
 
 #ifdef AUDIO_DEBUG
-void ess_printsc __P((struct ess_softc *));
-void ess_dump_mixer __P((struct ess_softc *));
+void ess_printsc(struct ess_softc *);
+void ess_dump_mixer(struct ess_softc *);
 
 void
 ess_printsc(sc)
@@ -1282,7 +1282,7 @@ ess_audio1_trigger_output(addr, start, end, blksize, intr, arg, param)
 	void *addr;
 	void *start, *end;
 	int blksize;
-	void (*intr) __P((void *));
+	void (*intr)(void *);
 	void *arg;
 	struct audio_params *param;
 {
@@ -1360,7 +1360,7 @@ ess_audio2_trigger_output(addr, start, end, blksize, intr, arg, param)
 	void *addr;
 	void *start, *end;
 	int blksize;
-	void (*intr) __P((void *));
+	void (*intr)(void *);
 	void *arg;
 	struct audio_params *param;
 {
@@ -1429,7 +1429,7 @@ ess_audio1_trigger_input(addr, start, end, blksize, intr, arg, param)
 	void *addr;
 	void *start, *end;
 	int blksize;
-	void (*intr) __P((void *));
+	void (*intr)(void *);
 	void *arg;
 	struct audio_params *param;
 {
@@ -2157,9 +2157,10 @@ ess_query_devinfo(addr, dip)
 }
 
 void *
-ess_malloc(addr, size, pool, flags)
+ess_malloc(addr, direction, size, pool, flags)
 	void *addr;
-	unsigned long size;
+	int direction;
+	size_t size;
 	int pool, flags;
 {
 	struct ess_softc *sc = addr;
@@ -2181,21 +2182,22 @@ ess_free(addr, ptr, pool)
 	isa_free(ptr, pool);
 }
 
-unsigned long
-ess_round_buffersize(addr, size)
+size_t
+ess_round_buffersize(addr, direction, size)
 	void *addr;
-	unsigned long size;
+	int direction;
+	size_t size;
 {
 	if (size > MAX_ISADMA)
 		size = MAX_ISADMA;
 	return (size);
 }
 
-int
+paddr_t
 ess_mappage(addr, mem, off, prot)
 	void *addr;
 	void *mem;
-	int off;
+	off_t off;
 	int prot;
 {
 	return (isa_mappage(mem, off, prot));

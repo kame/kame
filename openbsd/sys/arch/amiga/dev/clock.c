@@ -1,4 +1,4 @@
-/*	$OpenBSD: clock.c,v 1.10 1997/09/18 13:39:43 niklas Exp $	*/
+/*	$OpenBSD: clock.c,v 1.15 2002/03/14 01:26:28 millert Exp $	*/
 /*	$NetBSD: clock.c,v 1.25 1997/01/02 20:59:42 is Exp $	*/
 
 /*
@@ -98,11 +98,11 @@ struct clockframe hardclock_frame;
  * periods where N is the value loaded into the counter.
  */
 
-int clockmatch __P((struct device *, void *, void *));
-void clockattach __P((struct device *, struct device *, void *));
-void cpu_initclocks __P((void));
-void calibrate_delay __P((struct device *));
-int clockintr __P((void *));
+int clockmatch(struct device *, void *, void *);
+void clockattach(struct device *, struct device *, void *);
+void cpu_initclocks(void);
+void calibrate_delay(struct device *);
+int clockintr(void *);
 
 struct cfattach clock_ca = {
 	sizeof(struct device), clockmatch, clockattach
@@ -403,7 +403,7 @@ clkread()
 #include <sys/resourcevar.h>
 #include <sys/ioctl.h>
 #include <sys/malloc.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <amiga/amiga/clockioctl.h>
 #include <sys/specdev.h>
 #include <sys/vnode.h>
@@ -559,7 +559,7 @@ stopclock()
  * The advantage of this is that the profiling timer can be turned up to
  * a higher interrupt rate, giving finer resolution timing. The profclock
  * routine is called from the lev6intr in locore, and is a specialized
- * routine that calls addupc. The overhead then is far less than if
+ * routine that calls addupc_task. The overhead then is far less than if
  * hardclock/softclock was called. Further, the context switch code in
  * locore has been changed to turn the profile clock on/off when switching
  * into/out of a process that is profiling (startprofclock/stopprofclock).
@@ -658,7 +658,7 @@ profclock(pc, ps)
 	 */
 	if (USERMODE(ps)) {
 		if (p->p_stats.p_prof.pr_scale)
-			addupc(pc, &curproc->p_stats.p_prof, 1);
+			addupc_task(&curproc, pc, 1);
 	}
 	/*
 	 * Came from kernel (supervisor) mode.

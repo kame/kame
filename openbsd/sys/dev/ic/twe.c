@@ -1,4 +1,4 @@
-/*	$OpenBSD: twe.c,v 1.13 2001/09/24 06:52:33 mickey Exp $	*/
+/*	$OpenBSD: twe.c,v 1.17 2002/03/14 01:26:55 millert Exp $	*/
 
 /*
  * Copyright (c) 2000, 2001 Michael Shalayeff.  All rights reserved.
@@ -67,7 +67,7 @@ struct cfdriver twe_cd = {
 	NULL, "twe", DV_DULL
 };
 
-int	twe_scsi_cmd __P((struct scsi_xfer *));
+int	twe_scsi_cmd(struct scsi_xfer *);
 
 struct scsi_adapter twe_switch = {
 	twe_scsi_cmd, tweminphys, 0, 0,
@@ -77,14 +77,14 @@ struct scsi_device twe_dev = {
 	NULL, NULL, NULL, NULL
 };
 
-static __inline struct twe_ccb *twe_get_ccb __P((struct twe_softc *sc));
-static __inline void twe_put_ccb __P((struct twe_ccb *ccb));
-void twe_dispose __P((struct twe_softc *sc));
-int  twe_cmd __P((struct twe_ccb *ccb, int flags, int wait));
-int  twe_start __P((struct twe_ccb *ccb, int wait));
-int  twe_complete __P((struct twe_ccb *ccb));
-int  twe_done __P((struct twe_softc *sc, int idx));
-void twe_copy_internal_data __P((struct scsi_xfer *xs, void *v, size_t size));
+static __inline struct twe_ccb *twe_get_ccb(struct twe_softc *sc);
+static __inline void twe_put_ccb(struct twe_ccb *ccb);
+void twe_dispose(struct twe_softc *sc);
+int  twe_cmd(struct twe_ccb *ccb, int flags, int wait);
+int  twe_start(struct twe_ccb *ccb, int wait);
+int  twe_complete(struct twe_ccb *ccb);
+int  twe_done(struct twe_softc *sc, int idx);
+void twe_copy_internal_data(struct scsi_xfer *xs, void *v, size_t size);
 
 
 static __inline struct twe_ccb *
@@ -397,9 +397,21 @@ twe_attach(sc)
 
 	config_found(&sc->sc_dev, &sc->sc_link, scsiprint);
 
+	TWE_DPRINTF(TWE_D_CMD, ("stat=%b ",
+	    bus_space_read_4(sc->iot, sc->ioh, TWE_STATUS), TWE_STAT_BITS));
+	/*
+	 * ack all before enable, cannot be done in one
+	 * operation as it seems clear is not processed
+	 * if enable is specified.
+	 */
+	bus_space_write_4(sc->iot, sc->ioh, TWE_CONTROL,
+	    TWE_CTRL_CHOSTI | TWE_CTRL_CATTNI | TWE_CTRL_CERR);
+	TWE_DPRINTF(TWE_D_CMD, ("stat=%b ",
+	    bus_space_read_4(sc->iot, sc->ioh, TWE_STATUS), TWE_STAT_BITS));
 	/* enable interrupts */
-	bus_space_write_4(sc->iot, sc->ioh, TWE_CONTROL, TWE_CTRL_EINT |
-	    /*TWE_CTRL_HOSTI |*/ TWE_CTRL_CATTNI | TWE_CTRL_ERDYI);
+	bus_space_write_4(sc->iot, sc->ioh, TWE_CONTROL,
+	    TWE_CTRL_EINT | TWE_CTRL_ERDYI |
+	    /*TWE_CTRL_HOSTI |*/ TWE_CTRL_MCMDI);
 
 	return 0;
 }
@@ -496,9 +508,11 @@ twe_cmd(ccb, flags, wait)
 			}
 		}
 		TWE_DPRINTF(TWE_D_DMA, ("> "));
-		bus_dmamap_sync(sc->dmat, dmap, BUS_DMASYNC_PREWRITE);
+		bus_dmamap_sync(sc->dmat, dmap, 0, dmap->dm_mapsize,
+		    BUS_DMASYNC_PREWRITE);
 	}
-	bus_dmamap_sync(sc->dmat, sc->sc_cmdmap, BUS_DMASYNC_PREWRITE);
+	bus_dmamap_sync(sc->dmat, sc->sc_cmdmap, 0, sc->sc_cmdmap->dm_mapsize,
+	    BUS_DMASYNC_PREWRITE);
 
 	if ((error = twe_start(ccb, wait))) {
 		bus_dmamap_unload(sc->dmat, dmap);
@@ -624,8 +638,8 @@ twe_done(sc, idx)
 	if (xs) {
 		if (xs->cmd->opcode != PREVENT_ALLOW &&
 		    xs->cmd->opcode != SYNCHRONIZE_CACHE) {
-			bus_dmamap_sync(sc->dmat, dmap,
-			    (xs->flags & SCSI_DATA_IN) ?
+			bus_dmamap_sync(sc->dmat, dmap, 0,
+			    dmap->dm_mapsize, (xs->flags & SCSI_DATA_IN) ?
 			    BUS_DMASYNC_POSTREAD : BUS_DMASYNC_POSTWRITE);
 			bus_dmamap_unload(sc->dmat, dmap);
 		}
@@ -633,12 +647,14 @@ twe_done(sc, idx)
 		switch (letoh16(cmd->cmd_op)) {
 		case TWE_CMD_GPARAM:
 		case TWE_CMD_READ:
-			bus_dmamap_sync(sc->dmat, dmap, BUS_DMASYNC_POSTREAD);
+			bus_dmamap_sync(sc->dmat, dmap, 0,
+			    dmap->dm_mapsize, BUS_DMASYNC_POSTREAD);
 			bus_dmamap_unload(sc->dmat, dmap);
 			break;
 		case TWE_CMD_SPARAM:
 		case TWE_CMD_WRITE:
-			bus_dmamap_sync(sc->dmat, dmap, BUS_DMASYNC_POSTWRITE);
+			bus_dmamap_sync(sc->dmat, dmap, 0,
+			    dmap->dm_mapsize, BUS_DMASYNC_POSTWRITE);
 			bus_dmamap_unload(sc->dmat, dmap);
 			break;
 		default:
@@ -656,13 +672,13 @@ twe_done(sc, idx)
 	lock = TWE_LOCK_TWE(sc);
 	TAILQ_REMOVE(&sc->sc_ccbq, ccb, ccb_link);
 	twe_put_ccb(ccb);
-	TWE_UNLOCK_TWE(sc, lock);
 
 	if (xs) {
 		xs->resid = 0;
 		xs->flags |= ITSDONE;
 		scsi_done(xs);
 	}
+	TWE_UNLOCK_TWE(sc, lock);
 
 	return 0;
 }
@@ -839,12 +855,12 @@ twe_scsi_cmd(xs)
 			}
 			if (blockno >= sc->sc_hdr[target].hd_size ||
 			    blockno + blockcnt > sc->sc_hdr[target].hd_size) {
-				TWE_UNLOCK_TWE(sc, lock);
 				printf("%s: out of bounds %u-%u >= %u\n",
 				    sc->sc_dev.dv_xname, blockno, blockcnt,
 				    sc->sc_hdr[target].hd_size);
 				xs->error = XS_DRIVER_STUFFUP;
 				scsi_done(xs);
+				TWE_UNLOCK_TWE(sc, lock);
 				return (COMPLETE);
 			}
 		}
@@ -858,9 +874,9 @@ twe_scsi_cmd(xs)
 		}
 
 		if ((ccb = twe_get_ccb(sc)) == NULL) {
-			TWE_UNLOCK_TWE(sc, lock);
 			xs->error = XS_DRIVER_STUFFUP;
 			scsi_done(xs);
+			TWE_UNLOCK_TWE(sc, lock);
 			return (COMPLETE);
 		}
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.13 2001/09/28 22:20:48 jason Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.23 2002/04/10 04:17:50 jason Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.51 2001/07/24 19:32:11 eeh Exp $ */
 
 /*
@@ -50,7 +50,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/map.h>
 #include <sys/buf.h>
 #include <sys/disklabel.h>
 #include <sys/device.h>
@@ -67,7 +66,6 @@
 
 #include <dev/cons.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
@@ -110,31 +108,32 @@ extern	int kgdb_debug_panic;
 static	int rootnode;
 char platform_type[32];
 
-static	char *str2hex __P((char *, int *));
-static	int mbprint __P((void *, const char *));
-static	void crazymap __P((char *, int *));
-int	st_crazymap __P((int));
-void	sync_crash __P((void));
-int	mainbus_match __P((struct device *, void *, void *));
-static	void mainbus_attach __P((struct device *, struct device *, void *));
-static	int getstr __P((char *, int));
-void	setroot __P((void));
-void	swapconf __P((void));
-void	diskconf __P((void));
-static	struct device *getdisk __P((char *, int, int, dev_t *));
-static int findblkmajor __P((struct device *));
+static	char *str2hex(char *, int *);
+static	int mbprint(void *, const char *);
+static	void crazymap(char *, int *);
+int	st_crazymap(int);
+void	sync_crash(void);
+int	mainbus_match(struct device *, void *, void *);
+static	void mainbus_attach(struct device *, struct device *, void *);
+static	int getstr(char *, int);
+void	setroot(void);
+void	swapconf(void);
+void	diskconf(void);
+static	struct device *getdisk(char *, int, int, dev_t *);
+int	findblkmajor(struct device *);
+char	*findblkname(int);
 
 struct device *booted_device;
 struct	bootpath bootpath[8];
 int	nbootpath;
-static	void bootpath_build __P((void));
-static	void bootpath_print __P((struct bootpath *));
-void bootpath_compat __P((struct bootpath *, int));
+static	void bootpath_build(void);
+static	void bootpath_print(struct bootpath *);
+void bootpath_compat(struct bootpath *, int);
 
-char *bus_compatible __P((struct bootpath *, struct device *));
-int bus_class __P((struct device *));
-int instance_match __P((struct device *, void *, struct bootpath *bp));
-void nail_bootdev __P((struct device *, struct bootpath *));
+char *bus_compatible(struct bootpath *, struct device *);
+int bus_class(struct device *);
+int instance_match(struct device *, void *, struct bootpath *bp);
+void nail_bootdev(struct device *, struct bootpath *);
 
 /* Global interrupt mappings for all device types.  Match against the OBP
  * 'device_type' property. 
@@ -230,8 +229,8 @@ bootstrap(nctx)
 	extern int end;	/* End of kernel */
 #ifndef	__arch64__
 	/* Assembly glue for the PROM */
-	extern void OF_sym2val32 __P((void *));
-	extern void OF_val2sym32 __P((void *));
+	extern void OF_sym2val32(void *);
+	extern void OF_val2sym32(void *);
 #endif
 
 	/* 
@@ -321,7 +320,7 @@ bootpath_build()
 	register long chosen;
 	char buf[128];
 
-	bzero((void*)bootpath, sizeof(bootpath));
+	bzero((void *)bootpath, sizeof(bootpath));
 	bp = bootpath;
 
 	/*
@@ -619,6 +618,22 @@ setroot()
 #endif
 
 	/*
+	 * (raid) device auto-configuration could have returned
+	 * the root device's id in rootdev.  Check this case.
+	 */
+	if (rootdev != NODEV) {
+		majdev = major(rootdev);
+		unit = DISKUNIT(rootdev);
+		part = DISKPART(rootdev);
+
+		len = sprintf(buf, "%s%d", findblkname(majdev), unit);
+		if (len >= sizeof(buf))
+			panic("setroot: device name too long");
+
+		bootdv = getdisk(buf, len, part, &rootdev);
+	}
+
+	/*
 	 * If `swap generic' and we couldn't determine boot device,
 	 * ask the user.
 	 */
@@ -732,6 +747,9 @@ gotswap:
 		 * `root DEV swap DEV': honour rootdev/swdevt.
 		 * rootdev/swdevt/mountroot already properly set.
 		 */
+		if (bootdv->dv_class == DV_DISK)
+			printf("root on %s%c\n", bootdv->dv_xname,
+			    part + 'a');
 		majdev = major(rootdev);
 		unit = DISKUNIT(rootdev);
 		part = DISKPART(rootdev);
@@ -785,13 +803,14 @@ struct nam2blk {
 	char *name;
 	int maj;
 } nam2blk[] = {
-	{ "sd",         7 },
-	{ "rd",         5 },
+	{ "sd",		 7 },
+	{ "rd",		 5 },
 	{ "wd",		12 },
-	{ "cd",         18 },
+	{ "cd",		18 },
+	{ "raid",	25 },
 };
 
-static int
+int
 findblkmajor(dv)
 	struct device *dv;
 {
@@ -799,9 +818,21 @@ findblkmajor(dv)
 	int i;
 
 	for (i = 0; i < sizeof(nam2blk)/sizeof(nam2blk[0]); ++i)
-		if (strncmp(name, nam2blk[i].name, strlen(nam2blk[0].name)) == 0)      
+		if (strncmp(name, nam2blk[i].name, strlen(nam2blk[i].name)) == 0)
 			return (nam2blk[i].maj);
 	return (-1);
+}
+
+char *
+findblkname(maj)
+	int maj;
+{
+	int i;
+
+	for (i = 0; i < sizeof(nam2blk)/sizeof(nam2blk[0]); ++i)
+		if (nam2blk[i].maj == maj)
+			return (nam2blk[i].name);
+	return (NULL);
 }
 
 static struct device *
@@ -1138,7 +1169,7 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 		ma.ma_upaid = portid;
 
 		if (getprop(node, "reg", sizeof(*ma.ma_reg), 
-			     &ma.ma_nreg, (void**)&ma.ma_reg) != 0)
+			     &ma.ma_nreg, (void **)&ma.ma_reg) != 0)
 			continue;
 #ifdef DEBUG
 		if (autoconf_debug & ACDB_PROBE) {
@@ -1151,7 +1182,7 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 		}
 #endif
 		rv = getprop(node, "interrupts", sizeof(*ma.ma_interrupts), 
-			&ma.ma_ninterrupts, (void**)&ma.ma_interrupts);
+			&ma.ma_ninterrupts, (void **)&ma.ma_interrupts);
 		if (rv != 0 && rv != ENOENT) {
 			free(ma.ma_reg, M_DEVBUF);
 			continue;
@@ -1166,7 +1197,7 @@ extern struct sparc_bus_space_tag mainbus_space_tag;
 		}
 #endif
 		rv = getprop(node, "address", sizeof(*ma.ma_address), 
-			&ma.ma_naddress, (void**)&ma.ma_address);
+			&ma.ma_naddress, (void **)&ma.ma_address);
 		if (rv != 0 && rv != ENOENT) {
 			free(ma.ma_reg, M_DEVBUF);
 			if (ma.ma_ninterrupts)
@@ -1325,47 +1356,30 @@ node_has_property(node, prop)	/* returns 1 if node has given property */
 	return (OF_getproplen(node, (caddr_t)prop) != -1);
 }
 
-#ifdef RASTERCONSOLE
-/* Pass a string to the FORTH PROM to be interpreted */
-void
-rominterpret(s)
-	register char *s;
-{
-
-	if (promvec->pv_romvec_vers < 2)
-		promvec->pv_fortheval.v0_eval(strlen(s), s);
-	else
-		promvec->pv_fortheval.v2_eval(s);
-}
-
 /*
  * Try to figure out where the PROM stores the cursor row & column
  * variables.  Returns nonzero on error.
  */
 int
 romgetcursoraddr(rowp, colp)
-	register int **rowp, **colp;
+	int **rowp, **colp;
 {
-	char buf[100];
+	cell_t row = NULL, col = NULL;
+
+	OF_interpret("stdout @ is my-self addr line# addr column# ",
+	    2, &col, &row);
 
 	/*
-	 * line# and column# are global in older proms (rom vector < 2)
-	 * and in some newer proms.  They are local in version 2.9.  The
-	 * correct cutoff point is unknown, as yet; we use 2.9 here.
+	 * We are running on a 64-bit machine, so these things point to
+	 * 64-bit values.  To convert them to pointers to interfaces, add
+	 * 4 to the address.
 	 */
-	if (promvec->pv_romvec_vers < 2 || promvec->pv_printrev < 0x00020009)
-		sprintf(buf,
-		    "' line# >body >user %lx ! ' column# >body >user %lx !",
-		    (u_long)rowp, (u_long)colp);
-	else
-		sprintf(buf,
-		    "stdout @ is my-self addr line# %lx ! addr column# %lx !",
-		    (u_long)rowp, (u_long)colp);
-	*rowp = *colp = NULL;
-	rominterpret(buf);
-	return (*rowp == NULL || *colp == NULL);
+	if (row == NULL || col == NULL)
+		return (-1);
+	*rowp = (int *)(row + 4);
+	*colp = (int *)(col + 4);
+	return (0);
 }
-#endif
 
 void
 callrom()
@@ -1456,7 +1470,10 @@ static struct {
 	{ "ide",	BUSCLASS_PCI,		"pciide" },
 	{ "disk",	BUSCLASS_NONE,		"wd" },
 	{ "cmdk",	BUSCLASS_NONE,		"wd" },
+	{ "pci108e,1101.1", BUSCLASS_NONE,	"gem" },
+	{ "dc",		BUSCLASS_NONE,		"dc" },
 	{ "network",	BUSCLASS_NONE,		"hme" },
+	{ "ethernet",	BUSCLASS_NONE,		"dc" },
 	{ "SUNW,fas",	BUSCLASS_NONE,		"esp" },
 	{ "SUNW,hme",	BUSCLASS_NONE,		"hme" },
 	{ "glm",	BUSCLASS_PCI,		"siop" },

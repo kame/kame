@@ -1,4 +1,4 @@
-/*	$OpenBSD: process_machdep.c,v 1.2 2001/08/20 20:23:53 jason Exp $	*/
+/*	$OpenBSD: process_machdep.c,v 1.4 2002/03/17 18:38:43 art Exp $	*/
 /*	$NetBSD: process_machdep.c,v 1.10 2000/09/26 22:05:50 eeh Exp $ */
 
 /*
@@ -97,6 +97,8 @@ process_read_regs(p, regs)
 		for (i = 0; i < 8; i++) {
 			regs->r_global[i] = tf->tf_global[i];
 			regs->r_out[i] = tf->tf_out[i];
+			regs->r_local[i] = tf->tf_local[i];
+			regs->r_in[i] = tf->tf_in[i];
 		}
 		return (0);
 	}
@@ -113,6 +115,35 @@ process_read_regs(p, regs)
 	/* We should also write out the ins and locals.  See signal stuff */
 	return (0);
 }
+
+int
+process_read_fpregs(p, regs)
+	struct proc	*p;
+	struct fpreg	*regs;
+{
+	extern struct fpstate64	initfpstate;
+	struct fpstate64	*statep = &initfpstate;
+	struct fpreg32		*regp = (struct fpreg32 *)regs;
+	int i;
+
+	if (!(curproc->p_flag & P_32)) {
+		/* 64-bit mode -- copy in fregs */
+		/* NOTE: struct fpreg == struct fpstate */
+		if (p->p_md.md_fpstate)
+			statep = p->p_md.md_fpstate;
+		bcopy(statep, regs, sizeof(struct fpreg64));
+		return 0;
+	}
+	/* 32-bit mode -- copy out & convert 32-bit fregs */
+	if (p->p_md.md_fpstate)
+		statep = p->p_md.md_fpstate;
+	for (i=0; i<32; i++)
+		regp->fr_regs[i] = statep->fs_regs[i];
+
+	return 0;
+}
+
+#ifdef PTRACE
 
 int
 process_write_regs(p, regs)
@@ -174,36 +205,9 @@ process_set_pc(p, addr)
 }
 
 int
-process_read_fpregs(p, regs)
-struct proc	*p;
-struct fpreg	*regs;
-{
-	extern struct fpstate64	initfpstate;
-	struct fpstate64	*statep = &initfpstate;
-	struct fpreg32		*regp = (struct fpreg32 *)regs;
-	int i;
-
-	if (!(curproc->p_flag & P_32)) {
-		/* 64-bit mode -- copy in fregs */
-		/* NOTE: struct fpreg == struct fpstate */
-		if (p->p_md.md_fpstate)
-			statep = p->p_md.md_fpstate;
-		bcopy(statep, regs, sizeof(struct fpreg64));
-		return 0;
-	}
-	/* 32-bit mode -- copy out & convert 32-bit fregs */
-	if (p->p_md.md_fpstate)
-		statep = p->p_md.md_fpstate;
-	for (i=0; i<32; i++)
-		regp->fr_regs[i] = statep->fs_regs[i];
-
-	return 0;
-}
-
-int
 process_write_fpregs(p, regs)
-struct proc	*p;
-struct fpreg	*regs;
+	struct proc	*p;
+	struct fpreg	*regs;
 {
 
 	extern struct fpstate64	initfpstate;
@@ -232,3 +236,5 @@ struct fpreg	*regs;
 
 	return 0;
 }
+
+#endif	/* PTRACE */

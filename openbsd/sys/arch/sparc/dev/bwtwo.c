@@ -1,4 +1,4 @@
-/*	$OpenBSD: bwtwo.c,v 1.17 2001/08/17 13:52:28 mickey Exp $	*/
+/*	$OpenBSD: bwtwo.c,v 1.20 2002/03/14 01:26:42 millert Exp $	*/
 /*	$NetBSD: bwtwo.c,v 1.33 1997/05/24 20:16:02 pk Exp $ */
 
 /*
@@ -64,7 +64,7 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/fbio.h>
 #include <machine/autoconf.h>
@@ -103,11 +103,11 @@ struct bwtwo_softc {
 };
 
 /* autoconfiguration driver */
-static void	bwtwoattach __P((struct device *, struct device *, void *));
-static int	bwtwomatch __P((struct device *, void *, void *));
-static void	bwtwounblank __P((struct device *));
-static void	bwtwo_set_video __P((struct bwtwo_softc *, int));
-static int	bwtwo_get_video __P((struct bwtwo_softc *));
+static void	bwtwoattach(struct device *, struct device *, void *);
+static int	bwtwomatch(struct device *, void *, void *);
+static void	bwtwounblank(struct device *);
+static void	bwtwo_set_video(struct bwtwo_softc *, int);
+static int	bwtwo_get_video(struct bwtwo_softc *);
 
 struct cfattach bwtwo_ca = {
 	sizeof(struct bwtwo_softc), bwtwomatch, bwtwoattach
@@ -444,10 +444,11 @@ bwtwounblank(dev)
  * Return the address that would map the given device at the given
  * offset, allowing for the given protection, or return -1 for error.
  */
-int
+paddr_t
 bwtwommap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	register struct bwtwo_softc *sc = bwtwo_cd.cd_devs[minor(dev)];
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.h,v 1.15 2000/01/07 23:08:18 gibbs Exp $
- * $OpenBSD: aic7xxxvar.h,v 1.13 2000/07/03 22:18:36 smurph Exp $
+ * $OpenBSD: aic7xxxvar.h,v 1.15 2002/03/26 00:56:10 krw Exp $
  */
 
 #ifndef _AIC7XXXVAR_H_
@@ -342,7 +342,6 @@ struct tmode_tstate {
 	u_int16_t		 ultraenb;	/* Using ultra sync rate  */
 	u_int16_t	 	 discenable;	/* Disconnection allowed  */
 	u_int16_t		 tagenable;	/* Tagged Queuing allowed */
-	u_int16_t		 tagdisable;	/* Tagged Queuing NOT allowed */
 };
 
 #define ALL_TARGETS -1
@@ -490,7 +489,7 @@ struct ahc_softc {
 	bus_dma_tag_t		 buffer_dmat;	/* dmat for buffer I/O */
 	struct scb_data		*scb_data;
 	void	*pci_data;			/* for pci config read/write */
-	int	(*pci_intr_func) __P((struct ahc_softc *));	/* for pci error interrupts  */
+	int	(*pci_intr_func)(struct ahc_softc *);	/* for pci error interrupts  */
 	LIST_HEAD(, scsi_xfer) sc_xxxq;	/* XXX software request queue */
 	struct scsi_xfer *sc_xxxqlast;	/* last entry in queue */
 	
@@ -619,16 +618,16 @@ extern int ahc_debug; /* Initialized in i386/scsi/aic7xxx.c */
 
 #define	ahc_name(ahc)	(ahc)->sc_dev.dv_xname
 
-void	ahc_construct __P((struct ahc_softc *ahc, bus_space_tag_t iot,
+void	ahc_construct(struct ahc_softc *ahc, bus_space_tag_t iot,
 		bus_space_handle_t ioh, ahc_chip chip, ahc_flag flags, 
-		ahc_feature features, u_char channel));
-int   ahc_probe_scbs __P((struct ahc_softc *ahc));
-void	ahc_free __P((struct ahc_softc *));
-int	ahc_init __P((struct ahc_softc *));
-int	ahc_attach __P((struct ahc_softc *));
-int	ahc_intr __P((void *arg));
-int	ahc_reset __P((struct ahc_softc *ahc));
-void  ahc_xxx_reset __P((char *devname, bus_space_tag_t iot, bus_space_handle_t ioh));
+		ahc_feature features, u_char channel);
+int   ahc_probe_scbs(struct ahc_softc *ahc);
+void	ahc_free(struct ahc_softc *);
+int	ahc_init(struct ahc_softc *);
+int	ahc_attach(struct ahc_softc *);
+int	ahc_intr(void *arg);
+int	ahc_reset(struct ahc_softc *ahc);
+void  ahc_xxx_reset(char *devname, bus_space_tag_t iot, bus_space_handle_t ioh);
 #define ahc_isa_reset ahc_xxx_reset
 #define ahc_eisa_reset ahc_xxx_reset
 

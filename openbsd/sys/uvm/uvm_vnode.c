@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm_vnode.c,v 1.20 2001/09/11 20:05:26 miod Exp $	*/
-/*	$NetBSD: uvm_vnode.c,v 1.33 2000/05/19 03:45:05 thorpej Exp $	*/
+/*	$OpenBSD: uvm_vnode.c,v 1.34 2002/03/17 18:28:48 art Exp $	*/
+/*	$NetBSD: uvm_vnode.c,v 1.36 2000/11/24 20:34:01 chs Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -62,9 +62,6 @@
 
 #include <miscfs/specfs/specdev.h>
 
-#include <vm/vm.h>
-#include <vm/vm_page.h>
-
 #include <uvm/uvm.h>
 #include <uvm/uvm_vnode.h>
 
@@ -87,24 +84,22 @@ lock_data_t uvn_sync_lock;			/* locks sync operation */
  * functions
  */
 
-static int		   uvn_asyncget __P((struct uvm_object *, voff_t,
-					    int));
-static void		   uvn_cluster __P((struct uvm_object *, voff_t,
-					   voff_t *, voff_t *));
-static void                uvn_detach __P((struct uvm_object *));
-static boolean_t           uvn_flush __P((struct uvm_object *, voff_t, 
-					 voff_t, int));
-static int                 uvn_get __P((struct uvm_object *, voff_t,
+static void		   uvn_cluster(struct uvm_object *, voff_t,
+					   voff_t *, voff_t *);
+static void                uvn_detach(struct uvm_object *);
+static boolean_t           uvn_flush(struct uvm_object *, voff_t, 
+					 voff_t, int);
+static int                 uvn_get(struct uvm_object *, voff_t,
 					vm_page_t *, int *, int, 
-					vm_prot_t, int, int));
-static void		   uvn_init __P((void));
-static int		   uvn_io __P((struct uvm_vnode *, vm_page_t *,
-				      int, int, int));
-static int		   uvn_put __P((struct uvm_object *, vm_page_t *,
-					int, boolean_t));
-static void                uvn_reference __P((struct uvm_object *));
-static boolean_t	   uvn_releasepg __P((struct vm_page *, 
-					      struct vm_page **));
+					vm_prot_t, int, int);
+static void		   uvn_init(void);
+static int		   uvn_io(struct uvm_vnode *, vm_page_t *,
+				      int, int, int);
+static int		   uvn_put(struct uvm_object *, vm_page_t *,
+					int, boolean_t);
+static void                uvn_reference(struct uvm_object *);
+static boolean_t	   uvn_releasepg(struct vm_page *, 
+					      struct vm_page **);
 
 /*
  * master pager structure
@@ -117,11 +112,9 @@ struct uvm_pagerops uvm_vnodeops = {
 	NULL,			/* no specialized fault routine required */
 	uvn_flush,
 	uvn_get,
-	uvn_asyncget,
 	uvn_put,
 	uvn_cluster,
 	uvm_mk_pcluster, /* use generic version of this: see uvm_pager.c */
-	NULL,		 /* AIO-DONE function (not until we have asyncio) */
 	uvn_releasepg,
 };
 
@@ -1549,28 +1542,6 @@ uvn_get(uobj, offset, pps, npagesp, centeridx, access_type, advice, flags)
 }
 
 /*
- * uvn_asyncget: start async I/O to bring pages into ram
- *
- * => caller must lock object(???XXX: see if this is best)
- * => could be called from uvn_get or a madvise() fault-ahead.
- * => if it fails, it doesn't matter.
- */
-
-static int
-uvn_asyncget(uobj, offset, npages)
-	struct uvm_object *uobj;
-	voff_t offset;
-	int npages;
-{
-
-	/*
-	 * XXXCDC: we can't do async I/O yet
-	 */
-	printf("uvn_asyncget called\n");
-	return (KERN_SUCCESS);
-}
-
-/*
  * uvn_io: do I/O to a vnode
  *
  * => prefer map unlocked (not required)
@@ -1638,7 +1609,7 @@ uvn_io(uvn, pps, npages, flags, rw)
 	mapinflags = (rw == UIO_READ) ?
 	    UVMPAGER_MAPIN_READ : UVMPAGER_MAPIN_WRITE;
 
-	kva = uvm_pagermapin(pps, npages, NULL, mapinflags);
+	kva = uvm_pagermapin(pps, npages, mapinflags);
 	if (kva == 0 && waitf == M_NOWAIT) {
 		simple_unlock(&uvn->u_obj.vmobjlock);
 		UVMHIST_LOG(maphist,"<- mapin failed (try again)",0,0,0,0);
@@ -1655,7 +1626,7 @@ uvn_io(uvn, pps, npages, flags, rw)
 	simple_unlock(&uvn->u_obj.vmobjlock);
 	/* NOTE: object now unlocked */
 	if (kva == 0)
-		kva = uvm_pagermapin(pps, npages, NULL,
+		kva = uvm_pagermapin(pps, npages,
 		    mapinflags | UVMPAGER_MAPIN_WAITOK);
 
 	/*
@@ -1698,7 +1669,7 @@ uvn_io(uvn, pps, npages, flags, rw)
 	 */
 	result = 0;
 	if ((uvn->u_flags & UVM_VNODE_VNISLOCKED) == 0)
-		result = vn_lock(vn, LK_EXCLUSIVE | LK_RETRY, curproc /*XXX*/);
+		result = vn_lock(vn, LK_EXCLUSIVE | LK_RECURSEFAIL, curproc);
 
 	if (result == 0) {
 		/* NOTE: vnode now locked! */
@@ -1709,7 +1680,7 @@ uvn_io(uvn, pps, npages, flags, rw)
 			result = VOP_WRITE(vn, &uio, 0, curproc->p_ucred);
 
 		if ((uvn->u_flags & UVM_VNODE_VNISLOCKED) == 0)
-			VOP_UNLOCK(vn, 0, curproc /*XXX*/);
+			VOP_UNLOCK(vn, 0, curproc);
 	}
 	
 	/* NOTE: vnode now unlocked (unless vnislocked) */
@@ -1845,9 +1816,9 @@ uvm_vnp_uncache(vp)
 	if (!VOP_ISLOCKED(vp)) {
 		boolean_t is_ok_anyway = FALSE;
 #if defined(NFSCLIENT)
-		extern int (**nfsv2_vnodeop_p) __P((void *));
-		extern int (**spec_nfsv2nodeop_p) __P((void *));
-		extern int (**fifo_nfsv2nodeop_p) __P((void *));
+		extern int (**nfsv2_vnodeop_p)(void *);
+		extern int (**spec_nfsv2nodeop_p)(void *);
+		extern int (**fifo_nfsv2nodeop_p)(void *);
 
 		/* vnode is NOT VOP_LOCKed: some vnode types _never_ lock */
 		if (vp->v_op == nfsv2_vnodeop_p ||
@@ -1873,9 +1844,9 @@ uvm_vnp_uncache(vp)
 	 * unlocked causing us to return TRUE when we should not.   we ignore
 	 * this as a false-positive return value doesn't hurt us.
 	 */
-	VOP_UNLOCK(vp, 0, curproc /*XXX*/);
+	VOP_UNLOCK(vp, 0, curproc);
 	uvn_detach(&uvn->u_obj);
-	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, curproc/*XXX*/);
+	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, curproc);
 	
 	/*
 	 * and return...
@@ -1957,7 +1928,7 @@ uvm_vnp_sync(mp)
 	 * step 1: ensure we are only ones using the uvn_sync_q by locking
 	 * our lock...
 	 */
-	lockmgr(&uvn_sync_lock, LK_EXCLUSIVE, (void *)0, curproc /*XXX*/);
+	lockmgr(&uvn_sync_lock, LK_EXCLUSIVE, NULL, curproc);
 
 	/*
 	 * step 2: build up a simpleq of uvns of interest based on the 
@@ -2053,5 +2024,5 @@ uvm_vnp_sync(mp)
 	/*
 	 * done!  release sync lock
 	 */
-	lockmgr(&uvn_sync_lock, LK_RELEASE, (void *)0, curproc /*XXX*/);
+	lockmgr(&uvn_sync_lock, LK_RELEASE, (void *)0, curproc);
 }

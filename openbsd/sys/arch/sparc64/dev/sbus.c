@@ -1,4 +1,4 @@
-/*	$OpenBSD: sbus.c,v 1.7 2001/10/15 03:36:16 jason Exp $	*/
+/*	$OpenBSD: sbus.c,v 1.14 2002/03/14 20:26:20 jason Exp $	*/
 /*	$NetBSD: sbus.c,v 1.46 2001/10/07 20:30:41 eeh Exp $ */
 
 /*-
@@ -123,6 +123,8 @@
 #include <sparc64/dev/sbusreg.h>
 #include <dev/sbus/sbusvar.h>
 
+#include <uvm/uvm_extern.h>
+
 #include <machine/autoconf.h>
 #include <machine/cpu.h>
 #include <machine/sparc64.h>
@@ -136,36 +138,35 @@ int sbus_debug = 0;
 #define DPRINTF(l, s)
 #endif
 
-void sbusreset __P((int));
+void sbusreset(int);
 
-static bus_space_tag_t sbus_alloc_bustag __P((struct sbus_softc *));
-static bus_dma_tag_t sbus_alloc_dmatag __P((struct sbus_softc *));
-static int sbus_get_intr __P((struct sbus_softc *, int,
-			      struct sbus_intr **, int *, int));
-int sbus_bus_mmap __P((bus_space_tag_t, bus_type_t, bus_addr_t,
-			      int, bus_space_handle_t *));
-bus_addr_t sbus_bus_addr __P((bus_space_tag_t, u_int, u_int));
-static int sbus_overtemp __P((void *));
-static int _sbus_bus_map __P((
+static bus_space_tag_t sbus_alloc_bustag(struct sbus_softc *);
+static bus_dma_tag_t sbus_alloc_dmatag(struct sbus_softc *);
+static int sbus_get_intr(struct sbus_softc *, int,
+			      struct sbus_intr **, int *, int);
+int sbus_bus_mmap(bus_space_tag_t, bus_type_t, bus_addr_t,
+			      int, bus_space_handle_t *);
+static int sbus_overtemp(void *);
+static int _sbus_bus_map(
 		bus_space_tag_t,
 		bus_type_t,
 		bus_addr_t,		/*offset*/
 		bus_size_t,		/*size*/
 		int,			/*flags*/
 		vaddr_t,		/*preferred virtual address */
-		bus_space_handle_t *));
-static void *sbus_intr_establish __P((
+		bus_space_handle_t *);
+static void *sbus_intr_establish(
 		bus_space_tag_t,
 		int,			/*Sbus interrupt level*/
 		int,			/*`device class' priority*/
 		int,			/*flags*/
-		int (*) __P((void *)),	/*handler*/
-		void *));		/*handler arg*/
+		int (*)(void *),	/*handler*/
+		void *);		/*handler arg*/
 
 
 /* autoconfiguration driver */
-int	sbus_match __P((struct device *, void *, void *));
-void	sbus_attach __P((struct device *, struct device *, void *));
+int	sbus_match(struct device *, void *, void *);
+void	sbus_attach(struct device *, struct device *, void *);
 
 
 struct cfattach sbus_ca = {
@@ -181,23 +182,23 @@ extern struct cfdriver sbus_cd;
 /*
  * DVMA routines
  */
-int sbus_dmamap_load __P((bus_dma_tag_t, bus_dmamap_t, void *,
-			  bus_size_t, struct proc *, int));
-void sbus_dmamap_unload __P((bus_dma_tag_t, bus_dmamap_t));
-int sbus_dmamap_load_raw __P((bus_dma_tag_t, bus_dmamap_t,
-		    bus_dma_segment_t *, int, bus_size_t, int));
-void sbus_dmamap_sync __P((bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
-			   bus_size_t, int));
-int sbus_dmamem_alloc __P((bus_dma_tag_t tag, bus_size_t size,
+int sbus_dmamap_load(bus_dma_tag_t, bus_dmamap_t, void *,
+			  bus_size_t, struct proc *, int);
+void sbus_dmamap_unload(bus_dma_tag_t, bus_dmamap_t);
+int sbus_dmamap_load_raw(bus_dma_tag_t, bus_dmamap_t,
+		    bus_dma_segment_t *, int, bus_size_t, int);
+void sbus_dmamap_sync(bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
+			   bus_size_t, int);
+int sbus_dmamem_alloc(bus_dma_tag_t tag, bus_size_t size,
 			   bus_size_t alignment, bus_size_t boundary,
 			   bus_dma_segment_t *segs, int nsegs, int *rsegs,
-			   int flags));
-void sbus_dmamem_free __P((bus_dma_tag_t tag, bus_dma_segment_t *segs,
-			   int nsegs));
-int sbus_dmamem_map __P((bus_dma_tag_t tag, bus_dma_segment_t *segs,
-			 int nsegs, size_t size, caddr_t *kvap, int flags));
-void sbus_dmamem_unmap __P((bus_dma_tag_t tag, caddr_t kva,
-			    size_t size));
+			   int flags);
+void sbus_dmamem_free(bus_dma_tag_t tag, bus_dma_segment_t *segs,
+			   int nsegs);
+int sbus_dmamem_map(bus_dma_tag_t tag, bus_dma_segment_t *segs,
+			 int nsegs, size_t size, caddr_t *kvap, int flags);
+void sbus_dmamem_unmap(bus_dma_tag_t tag, caddr_t kva,
+			    size_t size);
 
 /*
  * Child devices receive the Sbus interrupt level in their attach
@@ -211,10 +212,7 @@ void sbus_dmamem_unmap __P((bus_dma_tag_t tag, caddr_t kva,
  */
 
 /* Translate Sbus interrupt level to processor IPL */
-static int intr_sbus2ipl_4c[] = {
-	0, 1, 2, 3, 5, 7, 8, 9
-};
-static int intr_sbus2ipl_4m[] = {
+static int intr_sbus2ipl_4u[] = {
 	0, 2, 3, 5, 7, 9, 11, 13
 };
 
@@ -292,9 +290,7 @@ sbus_attach(parent, self, aux)
 	sc->sc_ign = ma->ma_interrupts[0] & INTMAP_IGN;		/* Find interrupt group no */
 
 	/* Setup interrupt translation tables */
-	sc->sc_intr2ipl = CPU_ISSUN4C
-				? intr_sbus2ipl_4c
-				: intr_sbus2ipl_4m;
+	sc->sc_intr2ipl = intr_sbus2ipl_4u;
 
 	/*
 	 * Record clock frequency for synchronous SCSI.
@@ -338,6 +334,8 @@ sbus_attach(parent, self, aux)
 	/* Enable the over temp intr */
 	ih = (struct intrhand *)
 		malloc(sizeof(struct intrhand), M_DEVBUF, M_NOWAIT);
+	if (ih == NULL)
+		panic("couldn't malloc intrhand");
 	ih->ih_map = &sc->sc_sysio->therm_int_map;
 	ih->ih_clr = NULL; /* &sc->sc_sysio->therm_clr_int; */
 	ih->ih_fun = sbus_overtemp;
@@ -512,10 +510,11 @@ sbus_bus_mmap(t, btype, paddr, flags, hp)
 
 		paddr = sc->sc_range[i].poffset + offset;
 		paddr |= ((bus_addr_t)sc->sc_range[i].pspace<<32);
-		return (bus_space_mmap(sc->sc_bustag, 0, paddr, flags, hp));
+		*hp = bus_space_mmap(sc->sc_bustag, paddr, 0,
+		    VM_PROT_READ|VM_PROT_WRITE, flags);
 	}
 
-		return (-1);
+	return (*hp == -1 ? -1 : 0);
 }
 
 bus_addr_t
@@ -702,7 +701,7 @@ sbus_intr_establish(t, pri, level, flags, handler, arg)
 	int pri;
 	int level;
 	int flags;
-	int (*handler) __P((void *));
+	int (*handler)(void *);
 	void *arg;
 {
 	struct sbus_softc *sc = t->cookie;
@@ -716,12 +715,18 @@ sbus_intr_establish(t, pri, level, flags, handler, arg)
 		return (NULL);
 
 	if ((flags & BUS_INTR_ESTABLISH_SOFTINTR) != 0)
-		ipl = vec;
+		ipl = 1 << vec;
 	else if ((vec & SBUS_INTR_COMPAT) != 0)
-		ipl = vec & ~SBUS_INTR_COMPAT;
+		ipl = 1 << (vec & ~SBUS_INTR_COMPAT);
 	else {
 		/* Decode and remove IPL */
-		ipl = INTLEV(vec);
+		ipl = level;
+		if (ipl == IPL_NONE)
+			ipl = 1 << INTLEV(vec);
+		if (ipl == IPL_NONE) {
+			printf("ERROR: no IPL, setting IPL 2.\n");
+			ipl = 2;
+		}
 		vec = INTVEC(vec);
 		DPRINTF(SDB_INTR,
 		    ("\nsbus: intr[%ld]%lx: %lx\nHunting for IRQ...\n",
@@ -785,8 +790,8 @@ sbus_intr_establish(t, pri, level, flags, handler, arg)
 	ih->ih_fun = handler;
 	ih->ih_arg = arg;
 	ih->ih_number = vec;
-	ih->ih_pil = (1<<ipl);
-	intr_establish(ipl, ih);
+	ih->ih_pil = ipl;
+	intr_establish(ih->ih_pil, ih);
 	return (ih);
 }
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: qec.c,v 1.13 2001/01/30 07:17:07 jason Exp $	*/
+/*	$OpenBSD: qec.c,v 1.15 2002/03/14 01:26:43 millert Exp $	*/
 
 /*
  * Copyright (c) 1998 Theo de Raadt and Jason L. Wright.
@@ -63,11 +63,11 @@
 #include <sparc/dev/qecreg.h>
 #include <sparc/dev/qecvar.h>
 
-int	qecprint	__P((void *, const char *));
-int	qecmatch	__P((struct device *, void *, void *));
-void	qecattach	__P((struct device *, struct device *, void *));
-void	qec_fix_range	__P((struct qec_softc *, struct sbus_softc *));
-void	qec_translate	__P((struct qec_softc *, struct confargs *));
+int	qecprint(void *, const char *);
+int	qecmatch(struct device *, void *, void *);
+void	qecattach(struct device *, struct device *, void *);
+void	qec_fix_range(struct qec_softc *, struct sbus_softc *);
+void	qec_translate(struct qec_softc *, struct confargs *);
 
 struct cfattach qec_ca = {
 	sizeof(struct qec_softc), qecmatch, qecattach
@@ -310,25 +310,21 @@ qec_reset(sc)
  * network buffer memory.
  */
 int
-qec_put(buf, m)
+qec_put(buf, m0)
 	u_int8_t *buf;
-	struct mbuf *m;
+	struct mbuf *m0;
 {
-	struct mbuf *n;
+	struct mbuf *m;
 	int len, tlen = 0;
 
-	for (; m != NULL; m = n) {
+	for (m = m0; m != NULL; m = m->m_next) {
 		len = m->m_len;
-		if (len == 0) {
-			MFREE(m, n);
-			continue;
-		}
 		bcopy(mtod(m, caddr_t), buf, len);
 		buf += len;
 		tlen += len;
-		MFREE(m, n);
 	}
-	return tlen;
+	m_freem(m0);
+	return (tlen);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: iommu.c,v 1.10 2001/09/19 20:50:57 mickey Exp $	*/
+/*	$OpenBSD: iommu.c,v 1.16 2002/03/14 20:30:00 jason Exp $	*/
 /*	$NetBSD: iommu.c,v 1.13 1997/07/29 09:42:04 fair Exp $ */
 
 /*
@@ -41,7 +41,6 @@
 #include <sys/systm.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm.h>
 
 #include <machine/pmap.h>
@@ -67,9 +66,9 @@ int	has_iocache;
 
 
 /* autoconfiguration driver */
-int	iommu_print __P((void *, const char *));
-void	iommu_attach __P((struct device *, struct device *, void *));
-int	iommu_match __P((struct device *, void *, void *));
+int	iommu_print(void *, const char *);
+void	iommu_attach(struct device *, struct device *, void *);
+int	iommu_match(struct device *, void *, void *);
 
 struct cfattach iommu_ca = {
 	sizeof(struct iommu_softc), iommu_match, iommu_attach
@@ -131,7 +130,7 @@ iommu_attach(parent, self, aux)
 	register iopte_t *tpte_p;
 	struct pglist mlist;
 	struct vm_page *m;
-	vaddr_t iopte_va;
+	vaddr_t va;
 	paddr_t iopte_pa;
 
 /*XXX-GCC!*/mmupcrsave=0;
@@ -187,22 +186,20 @@ iommu_attach(parent, self, aux)
 #define DVMA_PTESIZE ((0 - DVMA4M_BASE) / 1024)
 	if (uvm_pglistalloc(DVMA_PTESIZE, 0, 0xffffffff, DVMA_PTESIZE,
 			    0, &mlist, 1, 0) ||
-	    (iopte_va = uvm_km_valloc(kernel_map, DVMA_PTESIZE)) == 0)
+	    (va = uvm_km_valloc(kernel_map, DVMA_PTESIZE)) == 0)
 		panic("iommu_attach: can't allocate memory for pagetables");
 #undef DVMA_PTESIZE
 	m = TAILQ_FIRST(&mlist);
 	iopte_pa = VM_PAGE_TO_PHYS(m);
-	sc->sc_ptes = (iopte_t *) iopte_va;
+	sc->sc_ptes = (iopte_t *) va;
 
 	while (m) {
-		/* XXX - art, pagewire breaks the tailq */
-		uvm_pagewire(m);
-		pmap_enter(pmap_kernel(), iopte_va, VM_PAGE_TO_PHYS(m),
-			   VM_PROT_READ|VM_PROT_WRITE,
-			   VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
-		iopte_va += NBPG;
+		paddr_t pa = VM_PAGE_TO_PHYS(m);
+		pmap_kenter_pa(va, pa | PMAP_NC, VM_PROT_READ|VM_PROT_WRITE);
+		va += PAGE_SIZE;
 		m = TAILQ_NEXT(m, pageq);
 	}
+	pmap_update(pmap_kernel());
 
 	/*
 	 * Now we build our own copy of the IOMMU page tables. We need to
@@ -212,14 +209,6 @@ iommu_attach(parent, self, aux)
 	 *
 	 * XXX Note that this is rather messy.
 	 */
-
-
-	/*
-	 * Now discache the page tables so that the IOMMU sees our
-	 * changes.
-	 */
-	kvm_uncache((caddr_t)sc->sc_ptes,
-		(((0 - DVMA4M_BASE)/sc->sc_pagesize) * sizeof(iopte_t)) / NBPG);
 
 	/*
 	 * Ok. We've got to read in the original table using MMU bypass,
@@ -316,7 +305,7 @@ iommu_enter(va, pa)
 }
 
 /*
- * iommu_clear: clears mappings created by iommu_enter
+ * iommu_remove: clears mappings created by iommu_enter
  */
 void
 iommu_remove(va, len)
@@ -333,7 +322,7 @@ iommu_remove(va, len)
 #ifdef notyet
 #ifdef DEBUG
 		if ((sc->sc_ptes[atop(va - sc->sc_dvmabase)] & IOPTE_V) == 0)
-			panic("iommu_clear: clearing invalid pte at va 0x%x",
+			panic("iommu_remove: clearing invalid pte at va 0x%x",
 				va);
 #endif
 #endif
@@ -343,48 +332,3 @@ iommu_remove(va, len)
 		va += sc->sc_pagesize;
 	}
 }
-
-#if 0	/* These registers aren't there??? */
-void
-iommu_error()
-{
-	struct iommu_softc *sc = X;
-	struct iommureg *iop = sc->sc_reg;
-
-	printf("iommu: afsr 0x%x, afar 0x%x\n", iop->io_afsr, iop->io_afar);
-	printf("iommu: mfsr 0x%x, mfar 0x%x\n", iop->io_mfsr, iop->io_mfar);
-}
-int
-iommu_alloc(va, len)
-	u_int va, len;
-{
-	struct iommu_softc *sc = X;
-	int off, tva, pa, iovaddr, pte;
-
-	off = (int)va & PGOFSET;
-	len = round_page(len + off);
-	va -= off;
-
-if ((int)sc->sc_dvmacur + len > 0)
-	sc->sc_dvmacur = sc->sc_dvmabase;
-
-	iovaddr = tva = sc->sc_dvmacur;
-	sc->sc_dvmacur += len;
-	while (len) {
-		pmap_extract(pmap_kernel(), va, &pa);
-
-#define IOMMU_PPNSHIFT	8
-#define IOMMU_V		0x00000002
-#define IOMMU_W		0x00000004
-
-		pte = atop(pa) << IOMMU_PPNSHIFT;
-		pte |= IOMMU_V | IOMMU_W;
-		sta(sc->sc_ptes + atop(tva - sc->sc_dvmabase), ASI_BYPASS, pte);
-		sc->sc_reg->io_flushpage = tva;
-		len -= NBPG;
-		va += NBPG;
-		tva += NBPG;
-	}
-	return iovaddr + off;
-}
-#endif

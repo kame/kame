@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcb.h,v 1.6 2001/09/01 15:49:05 drahn Exp $	*/
+/*	$OpenBSD: pcb.h,v 1.8 2002/03/14 01:26:42 millert Exp $	*/
 /*	$NetBSD: pcb.h,v 1.1 1996/09/30 16:34:29 ws Exp $	*/
 
 /*-
@@ -57,6 +57,7 @@ struct pcb {
 		double fpr[32];
 		double fpcsr;	/* FPCSR stored as double for easier access */
 	} pcb_fpu;		/* Floating point processor */
+	struct vreg *pcb_vr;    /* Vector unit */
 };
 
 struct md_coredump {
@@ -67,6 +68,6 @@ struct md_coredump {
 extern struct pcb *curpcb;
 extern struct pmap *curpm;
 extern struct proc *fpuproc;
-int  setfault __P((faultbuf env));
+int  setfault(faultbuf env);
 #endif
 #endif	/* _POWERPC_PCB_H_ */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.h,v 1.4 2001/06/24 17:05:37 miod Exp $	*/
+/*	$OpenBSD: intr.h,v 1.6 2002/03/14 01:26:35 millert Exp $	*/
 /*	$NetBSD: intr.h,v 1.8 1997/11/07 07:33:18 scottr Exp $	*/
 
 /*
@@ -90,7 +90,6 @@ extern unsigned short	mac68k_netipl;
 extern unsigned short	mac68k_impipl;
 extern unsigned short	mac68k_clockipl;
 extern unsigned short	mac68k_statclockipl;
-extern unsigned short	mac68k_schedipl;
 
 /*
  * These should be used for:
@@ -111,7 +110,6 @@ extern unsigned short	mac68k_schedipl;
 #define	splvm()			_splraise(mac68k_impipl)
 #define	splclock()		_splraise(mac68k_clockipl)
 #define	splstatclock()		_splraise(mac68k_statclockipl)
-#define	splsched()		_splsched(mac68k_schedipl)
 #define	splserial()		spl4()
 #define	splhigh()		spl7()
 
@@ -141,7 +139,7 @@ extern volatile u_int8_t ssir;
 #define	setsoftadb()	siron(SIR_ADB)
 
 /* locore.s */
-int	spl0 __P((void));
+int	spl0(void);
 #endif /* _KERNEL */
 
 #endif /* _MAC68K_INTR_H_ */

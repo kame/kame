@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.h,v 1.3 2001/06/24 17:05:37 miod Exp $	*/
+/*	$OpenBSD: intr.h,v 1.6 2002/03/14 03:15:56 millert Exp $	*/
 /*
  * Copyright (C) 2000 Steve Murphree, Jr.
  * All rights reserved.
@@ -42,7 +42,7 @@ extern unsigned char ssir;
 #define setsoftint(x)	ssir |= (x)
 #define setsoftnet()	ssir |= SIR_NET
 #define setsoftclock()	ssir |= SIR_CLOCK
-u_long	allocate_sir __P((void (*proc)(), void *arg));
+u_long	allocate_sir(void (*proc)(), void *arg);
 
 #define _spl(s) \
 ({ \
@@ -73,12 +73,11 @@ u_long	allocate_sir __P((void (*proc)(), void *arg));
 #define	splclock()		spl5()
 #define	splstatclock()		spl5()
 #define	splhigh()		spl7()
-#define	splsched()		spl7()
 
 /* watch out for side effects */
 #define	splx(s)		(s & PSL_IPL ? _spl(s) : spl0())
 
 /* locore.s */
-int	spl0 __P((void));
+int	spl0(void);
 #endif /* _KERNEL */
 #endif /* _MVME68K_INTR_H_ */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: lca.c,v 1.12 2001/06/26 21:13:43 art Exp $	*/
+/*	$OpenBSD: lca.c,v 1.16 2002/03/14 01:26:27 millert Exp $	*/
 /*	$NetBSD: lca.c,v 1.14 1996/12/05 01:39:35 cgd Exp $	*/
 
 /*-
@@ -70,7 +70,7 @@
 #include <sys/malloc.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/rpb.h>
@@ -92,8 +92,8 @@
 #include <alpha/pci/pci_eb66.h>
 #endif
 
-int	lcamatch __P((struct device *, void *, void *));
-void	lcaattach __P((struct device *, struct device *, void *));
+int	lcamatch(struct device *, void *, void *);
+void	lcaattach(struct device *, struct device *, void *);
 
 struct cfattach lca_ca = {
 	sizeof(struct lca_softc), lcamatch, lcaattach,
@@ -103,11 +103,11 @@ struct cfdriver lca_cd = {
 	NULL, "lca", DV_DULL,
 };
 
-int	lcaprint __P((void *, const char *pnp));
+int	lcaprint(void *, const char *pnp);
 
 #if 0
-int	lca_bus_get_window __P((int, int,
-	    struct alpha_bus_space_translation *));
+int	lca_bus_get_window(int, int,
+	    struct alpha_bus_space_translation *);
 #endif
 
 /* There can be only one. */
@@ -151,8 +151,8 @@ lca_init(lcp, mallocsafe)
 
 	if (!lcp->lc_initted) {
 		/* don't do these twice since they set up extents */
-		lcp->lc_iot = lca_bus_io_init(lcp);
-		lcp->lc_memt = lca_bus_mem_init(lcp);
+		lca_bus_io_init(&lcp->lc_iot, lcp);
+		lca_bus_mem_init(&lcp->lc_memt, lcp);
 
 #if 0
 		/*
@@ -169,6 +169,8 @@ lca_init(lcp, mallocsafe)
 	alpha_pci_chipset = &lcp->lc_pc;
 	alpha_pci_chipset->pc_name = "lca";
 	alpha_pci_chipset->pc_mem = LCA_PCI_SPARSE;
+	alpha_pci_chipset->pc_ports = LCA_PCI_SIO;
+	alpha_pci_chipset->pc_hae_mask = IOC_HAE_ADDREXT;
 	alpha_pci_chipset->pc_dense = LCA_PCI_DENSE;
 	alpha_pci_chipset->pc_bwx = 0;
 
@@ -248,8 +250,8 @@ lcaattach(parent, self, aux)
 	}
 
 	pba.pba_busname = "pci";
-	pba.pba_iot = lcp->lc_iot;
-	pba.pba_memt = lcp->lc_memt;
+	pba.pba_iot = &lcp->lc_iot;
+	pba.pba_memt = &lcp->lc_memt;
 	pba.pba_dmat =
 	    alphabus_dma_get_tag(&lcp->lc_dmat_direct, ALPHA_BUS_PCI);
 	pba.pba_pc = &lcp->lc_pc;

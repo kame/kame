@@ -1,4 +1,4 @@
-/*	$OpenBSD: zs.c,v 1.3 2001/08/21 21:42:30 jason Exp $	*/
+/*	$OpenBSD: zs.c,v 1.9 2002/03/14 01:26:45 millert Exp $	*/
 /*	$NetBSD: zs.c,v 1.29 2001/05/30 15:24:24 lukem Exp $	*/
 
 /*-
@@ -68,13 +68,10 @@
 
 #include <dev/cons.h>
 #include <sparc64/dev/z8530reg.h>
-#include <dev/sun/kbd_ms_ttyvar.h>
 #include <ddb/db_output.h>
 
 #include <sparc64/dev/cons.h>
 
-#include "kbd.h"	/* NKBD */
-#include "ms.h"		/* NMS */
 #include "zs.h" 	/* NZS */
 
 struct cfdriver zs_cd = {
@@ -141,9 +138,9 @@ static u_char zs_init_reg[16] = {
 };
 
 /* Console ops */
-static int  zscngetc __P((dev_t));
-static void zscnputc __P((dev_t, int));
-static void zscnpollc __P((dev_t, int));
+static int  zscngetc(dev_t);
+static void zscnputc(dev_t, int);
+static void zscnpollc(dev_t, int);
 
 struct consdev zs_consdev = {
 	NULL,
@@ -160,11 +157,11 @@ struct consdev zs_consdev = {
  ****************************************************************/
 
 /* Definition of the driver for autoconfig. */
-static int  zs_match_mainbus __P((struct device *, void *, void *));
-static void zs_attach_mainbus __P((struct device *, struct device *, void *));
+static int  zs_match_mainbus(struct device *, void *, void *);
+static void zs_attach_mainbus(struct device *, struct device *, void *);
 
-static void zs_attach __P((struct zsc_softc *, struct zsdevice *, int));
-static int  zs_print __P((void *, const char *name));
+static void zs_attach(struct zsc_softc *, struct zsdevice *, int);
+static int  zs_print(void *, const char *name);
 
 /* Do we really need this ? */
 struct cfattach zs_ca = {
@@ -180,18 +177,18 @@ extern int stdinnode;
 extern int fbnode;
 
 /* Interrupt handlers. */
-int zscheckintr __P((void *));
-static int zshard __P((void *));
-static void zssoft __P((void *));
+int zscheckintr(void *);
+static int zshard(void *);
+static void zssoft(void *);
 
-static int zs_get_speed __P((struct zs_chanstate *));
+static int zs_get_speed(struct zs_chanstate *);
 
 /* Console device support */
-static int zs_console_flags __P((int, int, int));
+static int zs_console_flags(int, int, int);
 
 /* Power management hooks */
-int  zs_enable __P((struct zs_chanstate *));
-void zs_disable __P((struct zs_chanstate *));
+int  zs_enable(struct zs_chanstate *);
+void zs_disable(struct zs_chanstate *);
 
 /*
  * Is the zs chip present?
@@ -295,9 +292,14 @@ zs_attach(zsc, zsd, pri)
 	for (channel = 0; channel < 2; channel++) {
 		struct zschan *zc;
 		struct device *child;
-#if (NKBD > 0) || (NMS > 0)
-		extern struct cfdriver zstty_cd; /* in ioconf.c */
-#endif
+
+		zsc_args.type = "serial";
+		if (getproplen(zsc->zsc_node, "keyboard") == 0) {
+			if (channel == 0)
+				zsc_args.type = "keyboard";
+			if (channel == 1)
+				zsc_args.type = "mouse";
+		}
 
 		zsc_args.channel = channel;
 		cs = &zsc->zsc_cs_store[channel];
@@ -366,43 +368,6 @@ zs_attach(zsc, zsd, pri)
 			zs_write_reg(cs,  9, reset);
 			splx(s);
 		} 
-#if (NKBD > 0) || (NMS > 0)
-		/* 
-		 * If this was a zstty it has a keyboard
-		 * property on it we need to attach the
-		 * sunkbd and sunms line disciplines.
-		 */
-		if (child 
-		    && (child->dv_cfdata->cf_driver == &zstty_cd) 
-		    && (getproplen(zsc->zsc_node, "keyboard") == 0)) {
-			struct kbd_ms_tty_attach_args kma;
-			struct zstty_softc {	
-				/* The following are the only fields we need here */
-				struct	device zst_dev;
-				struct  tty *zst_tty;
-				struct	zs_chanstate *zst_cs;
-			} *zst = (struct zstty_softc *)child;
-			struct tty *tp;
-
-			kma.kmta_tp = tp = zst->zst_tty;
-			kma.kmta_dev = tp->t_dev;
-			kma.kmta_consdev = zsc_args.consdev;
-			
-			/* Attach 'em if we got 'em. */
-#if (NKBD > 0)
-			if (channel == 0) {
-				kma.kmta_name = "keyboard";
-				config_found(child, (void *)&kma, NULL);
-			}
-#endif
-#if (NMS > 0)
-			if (channel == 1) {
-				kma.kmta_name = "mouse";
-				config_found(child, (void *)&kma, NULL);
-			}
-#endif
-		}
-#endif
 	}
 
 	/*
@@ -692,7 +657,7 @@ void  zs_write_data(cs, val)
  * XXX - I think I like the mvme167 code better. -gwr
  ****************************************************************/
 
-extern void Debugger __P((void));
+extern void Debugger(void);
 
 /*
  * Handle user request to enter kernel debugger.

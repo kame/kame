@@ -1,4 +1,4 @@
-/* $OpenBSD: cpu.c,v 1.10 2001/04/15 05:54:39 art Exp $ */
+/* $OpenBSD: cpu.c,v 1.12 2002/03/14 01:26:26 millert Exp $ */
 /* $NetBSD: cpu.c,v 1.44 2000/05/23 05:12:53 thorpej Exp $ */
 
 /*-
@@ -72,7 +72,7 @@
 #include <sys/proc.h>
 #include <sys/user.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/atomic.h>
 #include <machine/autoconf.h>
@@ -93,7 +93,7 @@ struct cpu_info cpu_info[ALPHA_MAXPROCS];
 /* Bitmask of CPUs currently running. */
 __volatile u_long cpus_running;
 
-void	cpu_boot_secondary __P((struct cpu_info *));
+void	cpu_boot_secondary(struct cpu_info *);
 #else /* MULTIPROCESSOR */
 struct cpu_info cpu_info_store;
 #endif /* MULTIPROCESSOR */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_dc_cardbus.c,v 1.6 2001/08/22 16:38:38 aaron Exp $	*/
+/*	$OpenBSD: if_dc_cardbus.c,v 1.9 2002/03/14 01:26:53 millert Exp $	*/
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,15 +51,15 @@ struct dc_cardbus_softc {
 	int			sc_actype;
 };
 
-int dc_cardbus_match		__P((struct device *, void *, void *));
-void dc_cardbus_attach		__P((struct device *, struct device *,void *));
-int dc_cardbus_detach		__P((struct device *, int));
+int dc_cardbus_match(struct device *, void *, void *);
+void dc_cardbus_attach(struct device *, struct device *,void *);
+int dc_cardbus_detach(struct device *, int);
 
-void dc_cardbus_setup		__P((struct dc_cardbus_softc *csc));
+void dc_cardbus_setup(struct dc_cardbus_softc *csc);
 
-extern void dc_eeprom_width	__P((struct dc_softc *));
-extern void dc_read_srom	__P((struct dc_softc *, int));
-extern void dc_parse_21143_srom	__P((struct dc_softc *));
+extern void dc_eeprom_width(struct dc_softc *);
+extern void dc_read_srom(struct dc_softc *, int);
+extern void dc_parse_21143_srom(struct dc_softc *);
 
 struct cfattach dc_cardbus_ca = {
 	sizeof(struct dc_cardbus_softc), dc_cardbus_match, dc_cardbus_attach,
@@ -70,6 +70,7 @@ struct dc_type dc_cardbus_devs[] = {
 	{ PCI_VENDOR_DEC, PCI_PRODUCT_DEC_21142 },
 	{ PCI_VENDOR_XIRCOM, PCI_PRODUCT_XIRCOM_X3201_3_21143 },
 	{ PCI_VENDOR_ADMTEK, PCI_PRODUCT_ADMTEK_AN985 },
+	{ PCI_VENDOR_ACCTON, PCI_PRODUCT_ACCTON_EN2242 },
 	{ CARDBUS_VENDOR_ABOCOM, CARDBUS_PRODUCT_ABOCOM_FE2500 },
 	{ CARDBUS_VENDOR_ABOCOM, CARDBUS_PRODUCT_ABOCOM_PCM200 },
 	{ 0 }
@@ -106,6 +107,7 @@ dc_cardbus_attach(parent, self, aux)
 	cardbusreg_t reg;
 	bus_addr_t addr;
 
+	sc->sc_dmat = ca->ca_dmat;
 	sc->dc_unit = sc->sc_dev.dv_unit;
 	csc->sc_ct = ct;
 	csc->sc_tag = ca->ca_tag;
@@ -156,8 +158,10 @@ dc_cardbus_attach(parent, self, aux)
 		}
 		break;
 	case PCI_VENDOR_ADMTEK:
+	case PCI_VENDOR_ACCTON:
 	case CARDBUS_VENDOR_ABOCOM:
 		if (PCI_PRODUCT(ca->ca_id) == PCI_PRODUCT_ADMTEK_AN985 ||
+		    PCI_PRODUCT(ca->ca_id) == PCI_PRODUCT_ACCTON_EN2242 ||
 		    PCI_PRODUCT(ca->ca_id) == CARDBUS_PRODUCT_ABOCOM_FE2500 ||
 		    PCI_PRODUCT(ca->ca_id) == CARDBUS_PRODUCT_ABOCOM_PCM200) {
 			sc->dc_type = DC_TYPE_AN983;

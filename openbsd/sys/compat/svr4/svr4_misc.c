@@ -1,4 +1,4 @@
-/*	$OpenBSD: svr4_misc.c,v 1.35 2001/08/28 18:25:14 jason Exp $	 */
+/*	$OpenBSD: svr4_misc.c,v 1.41 2002/03/14 01:26:51 millert Exp $	 */
 /*	$NetBSD: svr4_misc.c,v 1.42 1996/12/06 03:22:34 christos Exp $	 */
 
 /*
@@ -89,24 +89,22 @@
 
 #include <compat/common/compat_dir.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
 
-static __inline clock_t timeval_to_clock_t __P((struct timeval *));
-static int svr4_setinfo	__P((struct proc *, int, svr4_siginfo_t *));
+static __inline clock_t timeval_to_clock_t(struct timeval *);
+static int svr4_setinfo(struct proc *, int, svr4_siginfo_t *);
 
 struct svr4_hrtcntl_args;
-static int svr4_hrtcntl	__P((struct proc *, struct svr4_hrtcntl_args *,
-    register_t *));
-static void bsd_statfs_to_svr4_statvfs __P((const struct statfs *,
-    struct svr4_statvfs *));
-static void bsd_statfs_to_svr4_statvfs64 __P((const struct statfs *,
-    struct svr4_statvfs64 *));
-static struct proc *svr4_pfind __P((pid_t pid));
+static int svr4_hrtcntl(struct proc *, struct svr4_hrtcntl_args *,
+    register_t *);
+static void bsd_statfs_to_svr4_statvfs(const struct statfs *,
+    struct svr4_statvfs *);
+static void bsd_statfs_to_svr4_statvfs64(const struct statfs *,
+    struct svr4_statvfs64 *);
+static struct proc *svr4_pfind(pid_t pid);
 
-static int svr4_mknod __P((struct proc *, register_t *, char *,
-			   svr4_mode_t, svr4_dev_t));
+static int svr4_mknod(struct proc *, register_t *, char *,
+			   svr4_mode_t, svr4_dev_t);
 
 int
 svr4_sys_wait(p, v, retval)
@@ -220,8 +218,8 @@ svr4_sys_time(p, v, retval)
  * This is quite ugly, but what do you expect from compatibility code?
  */
 
-int svr4_readdir_callback __P((void *, struct dirent *, off_t));
-int svr4_readdir64_callback __P((void *, struct dirent *, off_t));
+int svr4_readdir_callback(void *, struct dirent *, off_t);
+int svr4_readdir64_callback(void *, struct dirent *, off_t);
 
 struct svr4_readdir_callback_args {
 	caddr_t outp;
@@ -306,9 +304,12 @@ svr4_sys_getdents(p, v, retval)
 
 	args.resid = SCARG(uap, nbytes);
 	args.outp = (caddr_t)SCARG(uap, buf);
-	
-	if ((error = readdir_with_callback(fp, &fp->f_offset, SCARG(uap, nbytes),
-	    svr4_readdir_callback, &args)) != 0)
+
+	FREF(fp);
+	error = readdir_with_callback(fp, &fp->f_offset, SCARG(uap, nbytes),
+	    svr4_readdir_callback, &args);
+	FRELE(fp);
+	if (error)
 		return (error);
 
 	*retval = SCARG(uap, nbytes) - args.resid;
@@ -332,9 +333,12 @@ svr4_sys_getdents64(p, v, retval)
 
 	args.resid = SCARG(uap, nbytes);
 	args.outp = (caddr_t)SCARG(uap, dp);
-	
-	if ((error = readdir_with_callback(fp, &fp->f_offset, SCARG(uap, nbytes),
-	    svr4_readdir64_callback, &args)) != 0)
+
+	FREF(fp);
+	error = readdir_with_callback(fp, &fp->f_offset, SCARG(uap, nbytes),
+	    svr4_readdir64_callback, &args);
+	FRELE(fp);
+	if (error)
 		return (error);
 
 	*retval = SCARG(uap, nbytes) - args.resid;
@@ -426,6 +430,7 @@ svr4_sys_fchroot(p, v, retval)
 		return error;
 	if ((error = getvnode(fdp, SCARG(uap, fd), &fp)) != 0)
 		return error;
+	FREF(fp);
 	vp = (struct vnode *) fp->f_data;
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
 	if (vp->v_type != VDIR)
@@ -433,12 +438,15 @@ svr4_sys_fchroot(p, v, retval)
 	else
 		error = VOP_ACCESS(vp, VEXEC, p->p_ucred, p);
 	VOP_UNLOCK(vp, 0, p);
-	if (error)
+	if (error) {
+		FRELE(fp);
 		return error;
+	}
 	VREF(vp);
 	if (fdp->fd_rdir != NULL)
 		vrele(fdp->fd_rdir);
 	fdp->fd_rdir = vp;
+	FRELE(fp);
 	return 0;
 }
 
@@ -656,7 +664,7 @@ svr4_sys_break(p, v, retval)
 	struct svr4_sys_break_args *uap = v;
 	register struct vmspace *vm = p->p_vmspace;
 	vaddr_t		new, old;
-	int             rv;
+	int             error;
 	register int    diff;
 
 	old = (vaddr_t) vm->vm_daddr;
@@ -676,23 +684,19 @@ svr4_sys_break(p, v, retval)
 	DPRINTF(("break(3): old %lx new %lx diff %x\n", old, new, diff));
 
 	if (diff > 0) {
-		rv = uvm_map(&vm->vm_map, &old, diff, NULL, UVM_UNKNOWN_OFFSET,
-			UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
+		error = uvm_map(&vm->vm_map, &old, diff, NULL, UVM_UNKNOWN_OFFSET,
+			0, UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
 				    UVM_ADV_NORMAL,
 				    UVM_FLAG_AMAPPAD|UVM_FLAG_FIXED|
 				    UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW));
-		if (rv != KERN_SUCCESS) {
-			uprintf("sbrk: grow failed, return = %d\n", rv);
-			return ENOMEM;
+		if (error) {
+			uprintf("sbrk: grow failed, return = %d\n", error);
+			return error;
 		}
 		vm->vm_dsize += btoc(diff);
 	} else if (diff < 0) {
 		diff = -diff;
-		rv = uvm_deallocate(&vm->vm_map, new, diff);
-		if (rv != KERN_SUCCESS) {
-			uprintf("sbrk: shrink failed, return = %d\n", rv);
-			return ENOMEM;
-		}
+		uvm_deallocate(&vm->vm_map, new, diff);
 		vm->vm_dsize -= btoc(diff);
 	}
 	return 0;

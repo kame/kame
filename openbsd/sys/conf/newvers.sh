@@ -1,6 +1,6 @@
 #!/bin/sh -
 #
-#	$OpenBSD: newvers.sh,v 1.35 2001/10/15 00:50:29 deraadt Exp $
+#	$OpenBSD: newvers.sh,v 1.41 2002/04/11 02:29:19 deraadt Exp $
 #	$NetBSD: newvers.sh,v 1.17.2.1 1995/10/12 05:17:11 jtc Exp $
 #
 # Copyright (c) 1984, 1986, 1990, 1993
@@ -36,7 +36,7 @@
 #
 #	@(#)newvers.sh	8.1 (Berkeley) 4/20/94
 
-if [ ! -r version ]
+if [ ! -r version -o ! -s version ]
 then
 	echo 0 > version
 fi
@@ -61,16 +61,18 @@ id=`basename ${d}`
 #		VERSION
 #	src/etc/root/root.mail
 #		VERSION and other bits
+#	src/sys/arch/macppc/stand/tbxidata/bsd.tbxi
+#		change	/X.X/macppc/bsd.rd
 
 ost="OpenBSD"
-osr="3.0"
+osr="3.1"
 
 cat >vers.c <<eof
-char ostype[] = "${ost}";
-char osrelease[] = "${osr}";
-char osversion[] = "${id}#${v}";
-char sccs[8] = { ' ', ' ', ' ', ' ', '@', '(', '#', ')' };
-char version[] =
+const char ostype[] = "${ost}";
+const char osrelease[] = "${osr}";
+const char osversion[] = "${id}#${v}";
+const char sccs[8] = { ' ', ' ', ' ', ' ', '@', '(', '#', ')' };
+const char version[] =
     "${ost} ${osr} (${id}) #${v}: ${t}\n    ${u}@${h}:${d}\n";
 eof
 

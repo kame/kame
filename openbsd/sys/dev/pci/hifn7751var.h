@@ -1,4 +1,4 @@
-/*	$OpenBSD: hifn7751var.h,v 1.37 2001/08/28 21:40:54 jason Exp $	*/
+/*	$OpenBSD: hifn7751var.h,v 1.42 2002/04/08 17:49:42 jason Exp $	*/
 
 /*
  * Invertex AEON / Hifn 7751 driver
@@ -33,6 +33,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Effort sponsored in part by the Defense Advanced Research Projects
+ * Agency (DARPA) and Air Force Research Laboratory, Air Force
+ * Materiel Command, USAF, under agreement number F30602-01-2-0537.
  *
  */
 
@@ -104,7 +108,7 @@ struct hifn_session {
 };
 
 #define	HIFN_RING_SYNC(sc, r, i, f)					\
-	hifn_bus_dmamap_sync((sc)->sc_dmat, (sc)->sc_dmamap,		\
+	bus_dmamap_sync((sc)->sc_dmat, (sc)->sc_dmamap,		\
 	    offsetof(struct hifn_dma, r[i]), sizeof(struct hifn_desc), (f))
 
 #define	HIFN_CMDR_SYNC(sc, i, f)	HIFN_RING_SYNC((sc), cmdr, (i), (f))
@@ -113,12 +117,12 @@ struct hifn_session {
 #define	HIFN_DSTR_SYNC(sc, i, f)	HIFN_RING_SYNC((sc), dstr, (i), (f))
 
 #define	HIFN_CMD_SYNC(sc, i, f)						\
-	hifn_bus_dmamap_sync((sc)->sc_dmat, (sc)->sc_dmamap,		\
+	bus_dmamap_sync((sc)->sc_dmat, (sc)->sc_dmamap,		\
 	    offsetof(struct hifn_dma, command_bufs[(i)][0]),		\
 	    HIFN_MAX_COMMAND, (f))
 
 #define	HIFN_RES_SYNC(sc, i, f)						\
-	hifn_bus_dmamap_sync((sc)->sc_dmat, (sc)->sc_dmamap,		\
+	bus_dmamap_sync((sc)->sc_dmat, (sc)->sc_dmamap,		\
 	    offsetof(struct hifn_dma, result_bufs[(i)][0]),		\
 	    HIFN_MAX_RESULT, (f))
 
@@ -142,17 +146,22 @@ struct hifn_softc {
 
 	struct hifn_dma *sc_dma;
 	bus_dmamap_t sc_dmamap;
+	bus_dma_segment_t sc_dmasegs[1];
+	int sc_dmansegs;
 	int32_t sc_cid;
 	int sc_maxses;
 	int sc_ramsize;
 	int sc_flags;
 #define	HIFN_HAS_RNG		1
 #define	HIFN_HAS_PUBLIC		2
+#define	HIFN_IS_7811		4
 	struct timeout sc_rngto, sc_tickto;
 	int sc_rngfirst;
 	int sc_rnghz;
 	int sc_c_busy, sc_s_busy, sc_d_busy, sc_r_busy, sc_active;
 	struct hifn_session sc_sessions[2048];
+	pci_chipset_tag_t sc_pci_pc;
+	pcitag_t sc_pci_tag;
 };
 
 #define	WRITE_REG_0(sc,reg,val) \

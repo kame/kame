@@ -1,4 +1,4 @@
-/*	$OpenBSD: sio.c,v 1.24 2001/08/17 22:55:09 mickey Exp $	*/
+/*	$OpenBSD: sio.c,v 1.27 2002/03/14 01:26:27 millert Exp $	*/
 /*	$NetBSD: sio.c,v 1.15 1996/12/05 01:39:36 cgd Exp $	*/
 
 /*
@@ -45,19 +45,25 @@
 
 #include <alpha/pci/siovar.h>
 
+#include "isadma.h"
+
 struct sio_softc {
 	struct device	sc_dv;
 
 	bus_space_tag_t sc_iot, sc_memt;
+	bus_dma_tag_t	sc_dmat;
 	int		sc_haseisa;
 };
 
 #ifdef __BROKEN_INDIRECT_CONFIG
-int	siomatch __P((struct device *, void *, void *));
+int	siomatch(struct device *, void *, void *);
 #else
-int	siomatch __P((struct device *, struct cfdata *, void *));
+int	siomatch(struct device *, struct cfdata *, void *);
 #endif
-void	sioattach __P((struct device *, struct device *, void *));
+void	sioattach(struct device *, struct device *, void *);
+
+extern int sio_intr_alloc(isa_chipset_tag_t *, int, int, int *);
+
 
 struct cfattach sio_ca = {
 	sizeof(struct sio_softc), siomatch, sioattach,
@@ -68,9 +74,9 @@ struct cfdriver sio_cd = {
 };
 
 #ifdef __BROKEN_INDIRECT_CONFIG
-int	pcebmatch __P((struct device *, void *, void *));
+int	pcebmatch(struct device *, void *, void *);
 #else
-int	pcebmatch __P((struct device *, struct cfdata *, void *));
+int	pcebmatch(struct device *, struct cfdata *, void *);
 #endif
 
 struct cfattach pceb_ca = {
@@ -87,14 +93,14 @@ union sio_attach_args {
 	struct eisabus_attach_args sa_eba;
 };
 
-int	sioprint __P((void *, const char *pnp));
-void	sio_isa_attach_hook __P((struct device *, struct device *,
-	    struct isabus_attach_args *));
-void	sio_eisa_attach_hook __P((struct device *, struct device *,
-	    struct eisabus_attach_args *));
-int	sio_eisa_maxslots __P((void *));
-int	sio_eisa_intr_map __P((void *, u_int, eisa_intr_handle_t *));
-void	sio_bridge_callback __P((void *));
+int	sioprint(void *, const char *pnp);
+void	sio_isa_attach_hook(struct device *, struct device *,
+	    struct isabus_attach_args *);
+void	sio_eisa_attach_hook(struct device *, struct device *,
+	    struct eisabus_attach_args *);
+int	sio_eisa_maxslots(void *);
+int	sio_eisa_intr_map(void *, u_int, eisa_intr_handle_t *);
+void	sio_bridge_callback(void *);
 
 int
 siomatch(parent, match, aux)
@@ -154,6 +160,7 @@ sioattach(parent, self, aux)
 
 	sc->sc_iot = pa->pa_iot;
 	sc->sc_memt = pa->pa_memt;
+        sc->sc_dmat = pa->pa_dmat;
 	sc->sc_haseisa = (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_INTEL &&
 		PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_INTEL_PCEB);
 
@@ -193,10 +200,15 @@ sio_bridge_callback(v)
 	ic.ic_attach_hook = sio_isa_attach_hook;
 	ic.ic_intr_establish = sio_intr_establish;
 	ic.ic_intr_disestablish = sio_intr_disestablish;
+	ic.ic_intr_alloc = sio_intr_alloc;
 
 	sa.sa_iba.iba_busname = "isa";
 	sa.sa_iba.iba_iot = sc->sc_iot;
 	sa.sa_iba.iba_memt = sc->sc_memt;
+#if NISADMA > 0
+	sa.sa_iba.iba_dmat =
+		alphabus_dma_get_tag(sc->sc_dmat, ALPHA_BUS_ISA);
+#endif
 	sa.sa_iba.iba_ic = &ic;
 	config_found(&sc->sc_dv, &sa.sa_iba, sioprint);
 }

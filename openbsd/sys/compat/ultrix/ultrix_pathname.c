@@ -1,4 +1,4 @@
-/*	$OpenBSD: ultrix_pathname.c,v 1.4 2000/04/21 15:50:21 millert Exp $	*/
+/*	$OpenBSD: ultrix_pathname.c,v 1.7 2002/02/13 19:08:06 art Exp $	*/
 /*	$NetBSD: ultrix_pathname.c,v 1.2 1996/04/07 17:23:07 jonathan Exp $	*/
 
 /*
@@ -185,11 +185,15 @@ ultrix_sys_open(p, v, retval)
 
 	if (!ret && !noctty && SESS_LEADER(p) && !(p->p_flag & P_CONTROLT)) {
 		struct filedesc *fdp = p->p_fd;
-		struct file *fp = fdp->fd_ofiles[*retval];
+		struct file *fp;
 
+		if ((fd = fd_getfile(fdp, *retval)) == NULL)
+			return (EBADF);
+		FREF(fp);
 		/* ignore any error, just give it a try */
 		if (fp->f_type == DTYPE_VNODE)
 			(fp->f_ops->fo_ioctl)(fp, TIOCSCTTY, (caddr_t)0, p);
+		FRELE(fp);
 	}
 	return ret;
 }
@@ -280,9 +284,12 @@ ultrix_sys_fstatfs(p, v, retval)
 
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
+	FREF(fp);
 	mp = ((struct vnode *)fp->f_data)->v_mount;
 	sp = &mp->mnt_stat;
-	if ((error = VFS_STATFS(mp, sp, p)) != 0)
+	error = VFS_STATFS(mp, sp, p);
+	FRELE(fp);
+	if (error)
 		return (error);
 	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
 	return ultrixstatfs(sp, (caddr_t)SCARG(uap, buf));

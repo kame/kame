@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.17 2001/08/18 20:50:18 art Exp $	*/
+/*	$OpenBSD: pmap.h,v 1.26 2002/03/14 01:26:33 millert Exp $	*/
 /*	$NetBSD: pmap.h,v 1.44 2000/04/24 17:18:18 thorpej Exp $	*/
 
 /*
@@ -291,7 +291,7 @@ struct pmap {
 struct pv_entry;
 
 struct pv_head {
-	simple_lock_data_t pvh_lock;	/* locks every pv on this list */
+	struct simplelock pvh_lock;	/* locks every pv on this list */
 	struct pv_entry *pvh_list;	/* head of list (locked by pvh_lock) */
 };
 
@@ -375,14 +375,13 @@ extern int pmap_pg_g;			/* do we support PG_G? */
 
 #define	pmap_kernel()			(&kernel_pmap_store)
 #define	pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
-#define	pmap_update()			tlbflush()
+#define	pmap_update(pm)			/* nada */
 
 #define pmap_clear_modify(pg)		pmap_change_attrs(pg, 0, PG_M)
 #define pmap_clear_reference(pg)	pmap_change_attrs(pg, 0, PG_U)
-#define pmap_copy(DP,SP,D,L,S)		pmap_transfer(DP,SP,D,L,S, FALSE)
+#define pmap_copy(DP,SP,D,L,S)
 #define pmap_is_modified(pg)		pmap_test_attrs(pg, PG_M)
 #define pmap_is_referenced(pg)		pmap_test_attrs(pg, PG_U)
-#define pmap_move(DP,SP,D,L,S)		pmap_transfer(DP,SP,D,L,S, TRUE)
 #define pmap_phys_address(ppn)		i386_ptob(ppn)
 #define pmap_valid_entry(E) 		((E) & PG_V) /* is PDE or PTE valid? */
 
@@ -391,29 +390,29 @@ extern int pmap_pg_g;			/* do we support PG_G? */
  * prototypes
  */
 
-void		pmap_bootstrap __P((vaddr_t));
-boolean_t	pmap_change_attrs __P((struct vm_page *, int, int));
-static void	pmap_page_protect __P((struct vm_page *, vm_prot_t));
-void		pmap_page_remove  __P((struct vm_page *));
-static void	pmap_protect __P((struct pmap *, vaddr_t,
-				vaddr_t, vm_prot_t));
-void		pmap_remove __P((struct pmap *, vaddr_t, vaddr_t));
-boolean_t	pmap_test_attrs __P((struct vm_page *, int));
-void		pmap_transfer __P((struct pmap *, struct pmap *, vaddr_t,
-				   vsize_t, vaddr_t, boolean_t));
-static void	pmap_update_pg __P((vaddr_t));
-static void	pmap_update_2pg __P((vaddr_t,vaddr_t));
-void		pmap_write_protect __P((struct pmap *, vaddr_t,
-				vaddr_t, vm_prot_t));
+void		pmap_bootstrap(vaddr_t);
+boolean_t	pmap_change_attrs(struct vm_page *, int, int);
+static void	pmap_page_protect(struct vm_page *, vm_prot_t);
+void		pmap_page_remove(struct vm_page *);
+static void	pmap_protect(struct pmap *, vaddr_t,
+				vaddr_t, vm_prot_t);
+void		pmap_remove(struct pmap *, vaddr_t, vaddr_t);
+boolean_t	pmap_test_attrs(struct vm_page *, int);
+void		pmap_transfer(struct pmap *, struct pmap *, vaddr_t,
+				   vsize_t, vaddr_t, boolean_t);
+static void	pmap_update_pg(vaddr_t);
+static void	pmap_update_2pg(vaddr_t,vaddr_t);
+void		pmap_write_protect(struct pmap *, vaddr_t,
+				vaddr_t, vm_prot_t);
 
-vaddr_t reserve_dumppages __P((vaddr_t)); /* XXX: not a pmap fn */
+vaddr_t reserve_dumppages(vaddr_t); /* XXX: not a pmap fn */
 
 #define PMAP_GROWKERNEL		/* turn on pmap_growkernel interface */
 
 /*
  * Do idle page zero'ing uncached to avoid polluting the cache.
  */
-void		pmap_zero_page_uncached __P((paddr_t));
+boolean_t	pmap_zero_page_uncached(paddr_t);
 #define	PMAP_PAGEIDLEZERO(pa)	pmap_zero_page_uncached((pa))
 
 /*
@@ -431,7 +430,7 @@ pmap_update_pg(va)
 {
 #if defined(I386_CPU)
 	if (cpu_class == CPUCLASS_386)
-		pmap_update();
+		tlbflush();
 	else
 #endif
 		invlpg((u_int) va);
@@ -447,7 +446,7 @@ pmap_update_2pg(va, vb)
 {
 #if defined(I386_CPU)
 	if (cpu_class == CPUCLASS_386)
-		pmap_update();
+		tlbflush();
 	else
 #endif
 	{
@@ -502,10 +501,8 @@ pmap_protect(pmap, sva, eva, prot)
 	}
 }
 
-vaddr_t	pmap_map __P((vaddr_t, paddr_t, paddr_t, vm_prot_t));
-
 #if defined(USER_LDT)
-void	pmap_ldt_cleanup __P((struct proc *));
+void	pmap_ldt_cleanup(struct proc *);
 #define	PMAP_FORK
 #endif /* USER_LDT */
 

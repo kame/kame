@@ -1,4 +1,4 @@
-/*	$OpenBSD: gscbusvar.h,v 1.3 1999/08/16 02:48:39 mickey Exp $	*/
+/*	$OpenBSD: gscbusvar.h,v 1.7 2002/03/14 03:15:53 millert Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -34,10 +34,10 @@ struct gscbus_ic {
 	enum {gsc_unknown = 0, gsc_lasi, gsc_wax, gsc_asp} gsc_type;
 	void *gsc_dv;
 
-	void (*gsc_intr_establish) __P((void *v, u_int32_t mask));
-	void (*gsc_intr_disestablish) __P((void *v, u_int32_t mask));
-	u_int32_t (*gsc_intr_check) __P((void *v));
-	void (*gsc_intr_ack) __P((void *v, u_int32_t mask));
+	void (*gsc_intr_establish)(void *v, u_int32_t mask);
+	void (*gsc_intr_disestablish)(void *v, u_int32_t mask);
+	u_int32_t (*gsc_intr_check)(void *v);
+	void (*gsc_intr_ack)(void *v, u_int32_t mask);
 };
 
 struct gsc_attach_args {
@@ -47,15 +47,16 @@ struct gsc_attach_args {
 #define	ga_mod		ga_ca.ca_mod
 #define	ga_type		ga_ca.ca_type
 #define	ga_hpa		ga_ca.ca_hpa
+#define	ga_hpamask	ga_ca.ca_hpamask
 #define	ga_dmatag	ga_ca.ca_dmatag
 #define	ga_irq		ga_ca.ca_irq
-/*#define	ga_pdc_iodc_read	ga_ca.ca_pdc_iodc_read */
+#define	ga_pdc_iodc_read	ga_ca.ca_pdc_iodc_read
 	struct gscbus_ic *ga_ic;	/* IC pointer */
 }; 
 
 struct gscbus_intr {
 	int pri;
-	int (*handler) __P((void *));
+	int (*handler)(void *);
 	void *arg;
 	struct evcnt evcnt;
 };
@@ -73,11 +74,11 @@ struct gsc_softc {
 	u_int32_t sc_intrmask;
 };
 
-void *gsc_intr_establish __P((struct gsc_softc *sc, int pri, int irq,
-			       int (*handler) __P((void *v)), void *arg,
-			       struct device *name));
-void gsc_intr_disestablish __P((struct gsc_softc *sc, void *v));
-int gsc_intr __P((void *));
+void *gsc_intr_establish(struct gsc_softc *sc, int pri, int irq,
+			 int (*handler)(void *v), void *arg,
+			 struct device *name);
+void gsc_intr_disestablish(struct gsc_softc *sc, void *v);
+int gsc_intr(void *);
 
-int gscprint __P((void *, const char *));
+int gscprint(void *, const char *);
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.31 2001/08/12 23:52:59 miod Exp $	*/
+/*	$OpenBSD: locore.s,v 1.40 2002/03/25 19:41:03 niklas Exp $	*/
 /*	$NetBSD: locore.s,v 1.89 1997/07/17 16:22:54 is Exp $	*/
 
 /*
@@ -232,7 +232,7 @@ Lbe10:
 	btst	#8,d0			| data fault?
 	jne	Lbe10a
 	movql	#1,d0			| user program access FC
-					| (we dont seperate data/program)
+					| (we dont separate data/program)
 	btst	#5,sp@(FR_HW+8)		| supervisor mode?
 	jeq	Lbe10a			| if no, done
 	movql	#5,d0			| else supervisor program access
@@ -297,7 +297,7 @@ _fpemuli:
 _fpunsupp:
 #if defined(M68040)
 	cmpl	#MMU_68040,_mmutype	| 68040?
-	jne	_illinst		| no, treat as illinst
+	jgt	_illinst		| no, treat as illinst
 #ifdef FPSP
 	.globl	fpsp_unsupp
 	jmp	fpsp_unsupp		| yes, go handle it
@@ -953,6 +953,7 @@ Lsetcpu040:
 #ifndef BB060STUPIDROM
 	btst	#7,sp@(3)
 	jeq	Lstartnot040
+	movl	#MMU_68060,a0@
 	movl	#CPU_68060,a1@		| set cputype
 	orl	#IC60_CABC,d0		| XXX and clear all 060 branch cache
 #else
@@ -963,6 +964,7 @@ Lsetcpu040:
 	tstl	d0
 	jeq	Lstartnot040
 	bset	#7,sp@(3)		| note it is '60 family in machineid
+	movl	#MMU_68060,a0@
 	movl	#CPU_68060,a1@		| and in the cputype
 	orl	#IC60_CABC,d0		| XXX and clear all 060 branch cache 
 	.word	0x4e7a,0x1808		| movc	pcr,d1
@@ -1019,8 +1021,8 @@ Lunshadow:
 	.word	0xf4f8			| cpusha bc - push & invalidate caches
 	movl	#CACHE40_ON,d0
 #ifdef M68060
-	btst	#7,_machineid+3
-	jeq	Lcacheon
+	cmpl	#MMU_68060,_mmutype
+	jne	Lcacheon
 	movl	#CACHE60_ON,d0
 #endif
 Lcacheon:
@@ -1063,15 +1065,17 @@ Lcacheon:
 	addql	#4,sp			| pop args
 
 	cmpl	#MMU_68040,_mmutype	| 68040?
-	jne	Lnoflush		| no, skip
+	jgt	Lnoflush		| no, skip
 	.word	0xf478			| cpusha dc
 	.word	0xf498			| cinva ic
+#ifdef M68060
 | XXX dont need these; the cinva ic also clears the branch cache.
-|	btst	#7,_machineid+3
-|	jeq	Lnoflush
+|	cmpl	#MMU_68060,_mmutype
+|	jne	Lnoflush
 |	movc	cacr,d0
 |	orl	#IC60_CUBC,d0
 |	movc	d0,cacr
+#endif
 Lnoflush:
 	movl	sp@(FR_SP),a0		| grab and load
 	movl	a0,usp			|   user SP
@@ -1103,45 +1107,6 @@ _proc_trampoline:
  * Primitives
  */
 #include <m68k/m68k/support.s>
-
-/*
- * update profiling information for the user
- * addupc(pc, &u.u_prof, ticks)
- */
-ENTRY(addupc)
-	movl	a2,sp@-			| scratch register
-	movl	sp@(12),a2		| get &u.u_prof
-	movl	sp@(8),d0		| get user pc
-	subl	a2@(8),d0		| pc -= pr->pr_off
-	jlt	Lauexit			| less than 0, skip it
-	movl	a2@(12),d1		| get pr->pr_scale
-	lsrl	#1,d0			| pc /= 2
-	lsrl	#1,d1			| scale /= 2
-	mulul	d1,d0			| pc /= scale
-	moveq	#14,d1
-	lsrl	d1,d0			| pc >>= 14
-	bclr	#0,d0			| pc &= ~1
-	cmpl	a2@(4),d0		| too big for buffer?
-	jge	Lauexit			| yes, screw it
-	addl	a2@,d0			| no, add base
-	movl	d0,sp@-			| push address
-	jbsr	_fusword		| grab old value
-	movl	sp@+,a0			| grab address back
-	cmpl	#-1,d0			| access ok
-	jeq	Lauerror		| no, skip out
-	addw	sp@(18),d0		| add tick to current value
-	movl	d0,sp@-			| push value
-	movl	a0,sp@-			| push address
-	jbsr	_susword		| write back new value
-	addql	#8,sp			| pop params
-	tstl	d0			| fault?
-	jeq	Lauexit			| no, all done
-Lauerror:
-	clrl	a2@(12)			| clear scale (turn off prof)
-Lauexit:
-	movl	sp@+,a2			| restore scratch reg
-	rts
-
 
 	.globl	_whichqs,_qs,_panic
 	.globl	_curproc
@@ -1293,13 +1258,13 @@ Lsw2:
 	fsave	a2@			| save FP state
 #if defined(M68020) || defined(M68030) || defined(M68040)
 #ifdef M68060
-	btst	#7,_machineid+3
-	jne	Lsavfp60
+	cmpl	#MMU_68060,_mmutype	| is 68060?
+	jeq	Lsavfp60
 #endif
 	tstb	a2@			| null state frame?
 	jeq	Lswnofpsave		| yes, all done
-	fmovem	fp0-fp7,a2@(216)	| save FP general registers
-	fmovem	fpcr/fpsr/fpi,a2@(312)	| save FP control registers
+	fmovem	fp0-fp7,a2@(FPF_REGS)	| save FP general registers
+	fmovem	fpcr/fpsr/fpi,a2@(FPF_FPCR)	| save FP control registers
 #ifdef M68060
 	jra	Lswnofpsave
 #endif
@@ -1308,10 +1273,10 @@ Lsw2:
 Lsavfp60:
 	tstb	a2@(2)			| null state frame?
 	jeq	Lswnofpsave		| yes, all done
-	fmovem	fp0-fp7,a2@(216)	| save FP general registers
-	fmovem	fpcr,a2@(312)		| save FP control registers
-	fmovem	fpsr,a2@(316)
-	fmovem	fpi,a2@(320)
+	fmovem	fp0-fp7,a2@(FPF_REGS)	| save FP general registers
+	fmovem	fpcr,a2@(FPF_FPCR)	| save FP control registers
+	fmovem	fpsr,a2@(FPF_FPSR)
+	fmovem	fpi,a2@(FPF_FPI)
 #endif
 Lswnofpsave:
 
@@ -1353,13 +1318,13 @@ Lresnonofpatall:
 	lea	a1@(PCB_FPCTX),a0	| pointer to FP save area
 #if defined(M68020) || defined(M68030) || defined(M68040)
 #ifdef M68060
-	btst	#7,_machineid+3
-	jne	Lresfp60rest1
+	cmpl	#MMU_68060,_mmutype
+	jeq	Lresfp60rest1
 #endif
 	tstb	a0@			| null state frame?
 	jeq	Lresfprest2		| yes, easy
-	fmovem	a0@(312),fpcr/fpsr/fpi	| restore FP control registers
-	fmovem	a0@(216),fp0-fp7	| restore FP general registers
+	fmovem	a0@(FPF_FPCR),fpcr/fpsr/fpi	| restore FP control registers
+	fmovem	a0@(FPF_REGS),fp0-fp7	| restore FP general registers
 Lresfprest2:
 	frestore a0@			| restore state
 	movw	a1@(PCB_PS),sr		| no, restore PS
@@ -1371,10 +1336,10 @@ Lresfprest2:
 Lresfp60rest1:
 	tstb	a0@(2)			| null state frame?
 	jeq	Lresfp60rest2		| yes, easy
-	fmovem	a0@(312),fpcr		| restore FP control registers
-	fmovem	a0@(316),fpsr
-	fmovem	a0@(320),fpi
-	fmovem	a0@(216),fp0-fp7	| restore FP general registers
+	fmovem	a0@(FPF_FPCR),fpcr	| restore FP control registers
+	fmovem	a0@(FPF_FPSR),fpsr
+	fmovem	a0@(FPF_FPI),fpi
+	fmovem	a0@(FPF_REGS),fp0-fp7	| restore FP general registers
 Lresfp60rest2:
 	frestore a0@			| restore state
 	movw	a1@(PCB_PS),sr		| no, restore PS
@@ -1401,13 +1366,13 @@ ENTRY(savectx)
 	fsave	a0@			| save FP state
 #if defined(M68020) || defined(M68030) || defined(M68040)
 #ifdef M68060
-	btst	#7,_machineid+3
-	jne	Lsavctx60
+	cmpl	#MMU_68060,_mmutype
+	jeq	Lsavctx60
 #endif
 	tstb	a0@			| null state frame?
 	jeq	Lsavedone		| yes, all done
-	fmovem	fp0-fp7,a0@(216)	| save FP general registers
-	fmovem	fpcr/fpsr/fpi,a0@(312)	| save FP control registers
+	fmovem	fp0-fp7,a0@(FPF_REGS)	| save FP general registers
+	fmovem	fpcr/fpsr/fpi,a0@(FPF_FPCR)	| save FP control registers
 #ifdef	M68060
 	moveq	#0,d0
 	rts
@@ -1417,10 +1382,10 @@ ENTRY(savectx)
 Lsavctx60:
 	tstb	a0@(2)
 	jeq	Lsavedone
-	fmovem	fp0-fp7,a0@(216)	| save FP general registers
-	fmovem	fpcr,a0@(312)		| save FP control registers
-	fmovem	fpsr,a0@(316)
-	fmovem	fpi,a0@(320)
+	fmovem	fp0-fp7,a0@(FPF_REGS)	| save FP general registers
+	fmovem	fpcr,a0@(FPF_FPCR)	| save FP control registers
+	fmovem	fpsr,a0@(FPF_FPSR)
+	fmovem	fpi,a0@(FPF_FPI)
 #endif
 Lsavedone:
 	moveq	#0,d0			| return 0
@@ -1526,8 +1491,8 @@ Lmc68851a:
 Ltbia040:
 	.word	0xf518			| pflusha
 #ifdef M68060
-	btst	#7,_machineid+3
-	jeq	Ltbiano60
+	cmpl	#MMU_68060,_mmutype
+	jne	Ltbiano60
 	movc	cacr,d0
 	orl	#IC60_CABC,d0		| and clear all branch cache entries
 	movc	d0,cacr
@@ -1545,7 +1510,7 @@ ENTRY(TBIS)
 #endif
 	movl	sp@(4),a0		| get addr to flush
 	cmpl	#MMU_68040,_mmutype
-	jeq	Ltbis040
+	jle	Ltbis040
 	tstl	_mmutype
 	jpl	Lmc68851b		| is 68851?
 	pflush	#0,#0,a0@		| flush address from both sides
@@ -1563,8 +1528,8 @@ Ltbis040:
 	movc	d0,dfc
 	.word	0xf508			| pflush a0@
 #ifdef M68060
-	btst	#7,_machineid+3
-	jeq	Ltbisno60
+	cmpl	#MMU_68060,_mmutype
+	jne	Ltbisno60
 	movc	cacr,d0
 	orl	#IC60_CABC,d0		| and clear all branch cache entries
 	movc	d0,cacr
@@ -1581,7 +1546,7 @@ ENTRY(TBIAS)
 	jne	__TBIA			| yes, flush everything
 #endif
 	cmpl	#MMU_68040,_mmutype
-	jeq	Ltbias040
+	jle	Ltbias040
 	tstl	_mmutype
 	jpl	Lmc68851c		| 68851?
 	pflush #4,#4			| flush supervisor TLB entries
@@ -1595,8 +1560,8 @@ Ltbias040:
 | 68040 cannot specify supervisor/user on pflusha, so we flush all
 	.word	0xf518			| pflusha
 #ifdef M68060
-	btst	#7,_machineid+3
-	jeq	Ltbiasno60
+	cmpl	#MMU_68060,_mmutype
+	jne	Ltbiasno60
 	movc	cacr,d0
 	orl	#IC60_CABC,d0		| and clear all branch cache entries
 	movc	d0,cacr
@@ -1613,7 +1578,7 @@ ENTRY(TBIAU)
 	jne	__TBIA			| yes, flush everything
 #endif
 	cmpl	#MMU_68040,_mmutype
-	jeq	Ltbiau040
+	jle	Ltbiau040
 	tstl	_mmutype
 	jpl	Lmc68851d		| 68851?
 	pflush	#0,#4			| flush user TLB entries
@@ -1627,8 +1592,8 @@ Ltbiau040:
 | 68040 cannot specify supervisor/user on pflusha, so we flush all
 	.word	0xf518			| pflusha
 #ifdef M68060
-	btst	#7,_machineid+3
-	jeq	Ltbiauno60
+	cmpl	#MMU_68060,_mmutype
+	jne	Ltbiauno60
 	movc	cacr,d0
 	orl	#IC60_CUBC,d0		| but only user branch cache entries
 	movc	d0,cacr
@@ -1644,7 +1609,7 @@ ENTRY(ICPA)
 #if defined(M68030) || defined(M68020)
 #if defined(M68040) || defined(M68060)
 	cmpl	#MMU_68040,_mmutype
-	jeq	Licia040
+	jle	Licia040
 #endif
 	movl	#IC_CLEAR,d0
 	movc	d0,cacr			| invalidate i-cache
@@ -1666,7 +1631,7 @@ Licia040:
 ENTRY(DCIA)
 __DCIA:
 	cmpl	#MMU_68040,_mmutype
-	jne	Ldciax
+	jgt	Ldciax
 	.word	0xf478		| cpusha dc
 Ldciax:
 	rts
@@ -1674,7 +1639,7 @@ Ldciax:
 ENTRY(DCIS)
 __DCIS:
 	cmpl	#MMU_68040,_mmutype
-	jne	Ldcisx
+	jgt	Ldcisx
 	.word	0xf478		| cpusha dc
 	nop
 Ldcisx:
@@ -1683,7 +1648,7 @@ Ldcisx:
 ENTRY(DCIU)
 __DCIU:
 	cmpl	#MMU_68040,_mmutype
-	jne	Ldciux
+	jgt	Ldciux
 	.word	0xf478		| cpusha dc
 Ldciux:
 	rts
@@ -1692,7 +1657,7 @@ Ldciux:
 ENTRY(DCIAS)
 __DCIAS:
 	cmpl	#MMU_68040,_mmutype
-	jne	Ldciasx
+	jle	Ldciasx
 	movl	sp@(4),a0
 	.word	0xf468		| cpushl dc,a0@
 Ldciasx:
@@ -1731,7 +1696,7 @@ ENTRY(PCIA)
 #if defined(M68030) || defined(M68030)
 #if defined(M68040) || defined(M68060)
 	cmpl	#MMU_68040,_mmutype
-	jeq	Lpcia040
+	jle	Lpcia040
 #endif
 	movl	#DC_CLEAR,d0
 	movc	d0,cacr			| invalidate on-chip d-cache
@@ -1788,8 +1753,8 @@ ENTRY(loadustp)
 	moveq	#PGSHIFT,d1
 	lsll	d1,d0			| convert to addr
 #ifdef M68060
-	btst	#7,_machineid+3
-	jne	Lldustp060
+	cmpl	#MMU_68060,_mmutype
+	jeq	Lldustp060
 #endif
 	cmpl	#MMU_68040,_mmutype
 	jeq	Lldustp040
@@ -1821,13 +1786,13 @@ ENTRY(m68881_save)
 	fsave	a0@			| save state
 #if defined(M68020) || defined(M68030) || defined(M68040)
 #ifdef M68060
-	btst	#7,_machineid+3
-	jne	Lm68060fpsave
+	cmpl	#MMU_68060,_mmutype
+	jeq	Lm68060fpsave
 #endif
 	tstb	a0@			| null state frame?
 	jeq	Lm68881sdone		| yes, all done
-	fmovem fp0-fp7,a0@(216)		| save FP general registers
-	fmovem fpcr/fpsr/fpi,a0@(312)	| save FP control registers
+	fmovem fp0-fp7,a0@(FPF_REGS)	| save FP general registers
+	fmovem fpcr/fpsr/fpi,a0@(FPF_FPCR)	| save FP control registers
 Lm68881sdone:
 	rts
 #endif
@@ -1836,10 +1801,10 @@ Lm68881sdone:
 Lm68060fpsave:
 	tstb	a0@(2)			| null state frame?
 	jeq	Lm68060sdone		| yes, all done
-	fmovem fp0-fp7,a0@(216)		| save FP general registers
-	fmovem	fpcr,a0@(312)		| save FP control registers
-	fmovem	fpsr,a0@(316)
-	fmovem	fpi,a0@(320)
+	fmovem fp0-fp7,a0@(FPF_REGS)	| save FP general registers
+	fmovem	fpcr,a0@(FPF_FPCR)	| save FP control registers
+	fmovem	fpsr,a0@(FPF_FPSR)
+	fmovem	fpi,a0@(FPF_FPI)
 Lm68060sdone:
 	rts
 #endif
@@ -1848,13 +1813,13 @@ ENTRY(m68881_restore)
 	movl	sp@(4),a0		| save area pointer
 #if defined(M68020) || defined(M68030) || defined(M68040)
 #if defined(M68060)
-	btst	#7,_machineid+3
-	jne	Lm68060fprestore
+	cmpl	#MMU_68060,_mmutype
+	jeq	Lm68060fprestore
 #endif
 	tstb	a0@			| null state frame?
 	jeq	Lm68881rdone		| yes, easy
-	fmovem	a0@(312),fpcr/fpsr/fpi	| restore FP control registers
-	fmovem	a0@(216),fp0-fp7	| restore FP general registers
+	fmovem	a0@(FPF_FPCR),fpcr/fpsr/fpi	| restore FP control registers
+	fmovem	a0@(FPF_REGS),fp0-fp7	| restore FP general registers
 Lm68881rdone:
 	frestore a0@			| restore state
 	rts
@@ -1864,10 +1829,10 @@ Lm68881rdone:
 Lm68060fprestore:
 	tstb	a0@(2)			| null state frame?
 	jeq	Lm68060fprdone		| yes, easy
-	fmovem	a0@(312),fpcr		| restore FP control registers
-	fmovem	a0@(316),fpsr
-	fmovem	a0@(320),fpi
-	fmovem	a0@(216),fp0-fp7	| restore FP general registers
+	fmovem	a0@(FPF_FPCR),fpcr	| restore FP control registers
+	fmovem	a0@(FPF_FPSR),fpsr
+	fmovem	a0@(FPF_FPI),fpi
+	fmovem	a0@(FPF_REGS),fp0-fp7	| restore FP general registers
 Lm68060fprdone:
 	frestore a0@			| restore state
 	rts
@@ -1881,7 +1846,7 @@ Lm68060fprdone:
 _doboot:
 	movl	#CACHE_OFF,d0
 	cmpl	#MMU_68040,_mmutype	| is it 68040
-	jne	Ldoboot0
+	jgt	Ldoboot0
 	.word	0xf4f8		| cpusha bc - push and invalidate caches
 	nop
 	movl	#CACHE40_OFF,d0
@@ -1923,7 +1888,7 @@ Ldb2:
 	| ok, turn off MMU..
 Ldoreboot:
 	cmpl	#MMU_68040,_mmutype	| is it 68040
- 	jeq	Lmmuoff040
+ 	jle	Lmmuoff040
 	lea	zero,a0
 	pmove	a0@,tc			| Turn off MMU
 	lea	nullrp,a0
@@ -2021,7 +1986,7 @@ Lreload_ok:
 
 	movl	#CACHE_OFF,d0
 	cmpl	#MMU_68040,_mmutype
-	jne	Lreload1
+	jgt	Lreload1
 	.word	0xf4f8		| cpusha bc - push and invalidate caches
 	nop
 	movl	#CACHE40_OFF,d0
@@ -2052,7 +2017,7 @@ Lreload_copy:
 
 	| ok, turn off MMU..
 	cmpl	#MMU_68040,_mmutype
-	jeq	Lreload040
+	jle	Lreload040
 	lea	zero,a3
 	pmove	a3@,tc			| Turn off MMU
 	lea	nullrp,a3

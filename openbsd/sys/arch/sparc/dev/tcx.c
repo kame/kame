@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcx.c,v 1.3 2001/08/17 13:52:29 mickey Exp $	*/
+/*	$OpenBSD: tcx.c,v 1.6 2002/03/14 01:26:43 millert Exp $	*/
 /*	$NetBSD: tcx.c,v 1.8 1997/07/29 09:58:14 fair Exp $ */
 
 /* 
@@ -61,7 +61,7 @@
 #include <sys/syslog.h>
 #endif
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/pmap.h>
@@ -104,9 +104,9 @@ struct tcx_softc {
 };
 
 /* autoconfiguration driver */
-static void	tcxattach __P((struct device *, struct device *, void *));
-static int	tcxmatch __P((struct device *, void *, void *));
-static void	tcx_unblank __P((struct device *));
+static void	tcxattach(struct device *, struct device *, void *);
+static int	tcxmatch(struct device *, void *, void *);
+static void	tcx_unblank(struct device *);
 
 struct cfattach tcx_ca = {
 	sizeof(struct tcx_softc), tcxmatch, tcxattach
@@ -123,8 +123,8 @@ static struct fbdriver tcx_fbdriver = {
 
 extern int fbnode;
 
-static void tcx_reset __P((struct tcx_softc *));
-static void tcx_loadcmap __P((struct tcx_softc *, int, int));
+static void tcx_reset(struct tcx_softc *);
+static void tcx_loadcmap(struct tcx_softc *, int, int);
 
 #define OBPNAME	"SUNW,tcx"
 /*
@@ -437,10 +437,11 @@ struct mmo {
  *
  * XXX	needs testing against `demanding' applications (e.g., aviator)
  */
-int
+paddr_t
 tcxmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	register struct tcx_softc *sc = tcx_cd.cd_devs[minor(dev)];
 	register struct mmo *mo;

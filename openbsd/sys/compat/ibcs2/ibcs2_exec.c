@@ -1,4 +1,4 @@
-/*	$OpenBSD: ibcs2_exec.c,v 1.10 1999/11/10 15:55:21 mickey Exp $	*/
+/*	$OpenBSD: ibcs2_exec.c,v 1.13 2002/03/14 01:26:50 millert Exp $	*/
 /*	$NetBSD: ibcs2_exec.c,v 1.12 1996/10/12 02:13:52 thorpej Exp $	*/
 
 /*
@@ -43,35 +43,35 @@
 #include <sys/vnode.h>
 #include <sys/resourcevar.h>
 #include <sys/namei.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <compat/ibcs2/ibcs2_types.h>
 #include <compat/ibcs2/ibcs2_exec.h>
 #include <compat/ibcs2/ibcs2_util.h>
 #include <compat/ibcs2/ibcs2_syscall.h>
 
-int exec_ibcs2_coff_prep_omagic __P((struct proc *, struct exec_package *,
+int exec_ibcs2_coff_prep_omagic(struct proc *, struct exec_package *,
 				     struct coff_filehdr *, 
-				     struct coff_aouthdr *));
-int exec_ibcs2_coff_prep_nmagic __P((struct proc *, struct exec_package *,
+				     struct coff_aouthdr *);
+int exec_ibcs2_coff_prep_nmagic(struct proc *, struct exec_package *,
 				     struct coff_filehdr *, 
-				     struct coff_aouthdr *));
-int exec_ibcs2_coff_prep_zmagic __P((struct proc *, struct exec_package *,
+				     struct coff_aouthdr *);
+int exec_ibcs2_coff_prep_zmagic(struct proc *, struct exec_package *,
 				     struct coff_filehdr *, 
-				     struct coff_aouthdr *));
-int exec_ibcs2_coff_setup_stack __P((struct proc *, struct exec_package *));
-void cpu_exec_ibcs2_coff_setup __P((int, struct proc *, struct exec_package *,
-				    void *));
+				     struct coff_aouthdr *);
+int exec_ibcs2_coff_setup_stack(struct proc *, struct exec_package *);
+void cpu_exec_ibcs2_coff_setup(int, struct proc *, struct exec_package *,
+				    void *);
 
-int exec_ibcs2_xout_prep_nmagic __P((struct proc *, struct exec_package *,
-				     struct xexec *, struct xext *));
-int exec_ibcs2_xout_prep_zmagic __P((struct proc *, struct exec_package *,
-				     struct xexec *, struct xext *));
-int exec_ibcs2_xout_setup_stack __P((struct proc *, struct exec_package *));
-int coff_load_shlib __P((struct proc *, char *, struct exec_package *));
-static int coff_find_section __P((struct proc *, struct vnode *, 
+int exec_ibcs2_xout_prep_nmagic(struct proc *, struct exec_package *,
+				     struct xexec *, struct xext *);
+int exec_ibcs2_xout_prep_zmagic(struct proc *, struct exec_package *,
+				     struct xexec *, struct xext *);
+int exec_ibcs2_xout_setup_stack(struct proc *, struct exec_package *);
+int coff_load_shlib(struct proc *, char *, struct exec_package *);
+static int coff_find_section(struct proc *, struct vnode *, 
 				  struct coff_filehdr *, struct coff_scnhdr *,
-				  int));
+				  int);
 	
 
 extern int bsd2ibcs_errno[];
@@ -79,7 +79,7 @@ extern struct sysent ibcs2_sysent[];
 #ifdef SYSCALL_DEBUG
 extern char *ibcs2_syscallnames[];
 #endif
-extern void ibcs2_sendsig __P((sig_t, int, int, u_long, int, union sigval));
+extern void ibcs2_sendsig(sig_t, int, int, u_long, int, union sigval);
 extern char sigcode[], esigcode[];
 
 const char ibcs2_emul_path[] = "/emul/ibcs2";
@@ -368,7 +368,7 @@ n	 */
 #endif
 		return ETXTBSY;
 	}
-	epp->ep_vp->v_flag |= VTEXT;
+	vn_marktext(epp->ep_vp);
 #endif
 	
 	/* DPRINTF(("VMCMD: addr %x size %d offset %d\n", epp->ep_taddr,

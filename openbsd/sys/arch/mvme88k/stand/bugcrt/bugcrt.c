@@ -1,4 +1,4 @@
-/*	$OpenBSD: bugcrt.c,v 1.6 2001/01/13 05:19:01 smurph Exp $ */
+/*	$OpenBSD: bugcrt.c,v 1.8 2001/12/16 23:49:47 miod Exp $ */
 
 /* 
  * This is the startup file for single stage bootstraps or the first 

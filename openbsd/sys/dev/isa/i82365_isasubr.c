@@ -1,4 +1,4 @@
-/*	$OpenBSD: i82365_isasubr.c,v 1.15 2001/08/17 21:52:16 deraadt Exp $	*/
+/*	$OpenBSD: i82365_isasubr.c,v 1.17 2002/03/14 01:26:56 millert Exp $	*/
 /*	$NetBSD: i82365_isasubr.c,v 1.1 1998/06/07 18:28:31 sommerfe Exp $  */
 
 /*
@@ -39,7 +39,7 @@
 #include <sys/extent.h>
 #include <sys/malloc.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -188,7 +188,7 @@ pcic_isa_chip_intr_establish(pch, pf, ipl, fct, arg, xname)
 	pcmcia_chipset_handle_t pch;
 	struct pcmcia_function *pf;
 	int ipl;
-	int (*fct) __P((void *));
+	int (*fct)(void *);
 	void *arg;
 	char *xname;
 {

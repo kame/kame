@@ -1,10 +1,10 @@
-/*	$OpenBSD: uvm_meter.c,v 1.12 2001/08/11 10:57:22 art Exp $	*/
-/*	$NetBSD: uvm_meter.c,v 1.12 2000/05/26 00:36:53 thorpej Exp $	*/
+/*	$OpenBSD: uvm_meter.c,v 1.17 2002/03/14 01:27:18 millert Exp $	*/
+/*	$NetBSD: uvm_meter.c,v 1.21 2001/07/14 06:36:03 matt Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
  * Copyright (c) 1982, 1986, 1989, 1993
- *      The Regents of the University of California.  
+ *      The Regents of the University of California.
  *
  * All rights reserved.
  *
@@ -19,7 +19,7 @@
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *      This product includes software developed by Charles D. Cranor,
- *      Washington University, and the University of California, Berkeley 
+ *      Washington University, and the University of California, Berkeley
  *      and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
@@ -45,7 +45,7 @@
 #include <sys/proc.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>
 #include <sys/exec.h>
 
@@ -59,10 +59,10 @@
  */
 
 int maxslp = MAXSLP;	/* patchable ... */
-struct loadavg averunnable; /* decl. */
+struct loadavg averunnable;
 
 /*
- * constants for averages over 1, 5, and 15 minutes when sampling at 
+ * constants for averages over 1, 5, and 15 minutes when sampling at
  * 5 second intervals.
  */
 
@@ -76,7 +76,7 @@ static fixpt_t cexp[3] = {
  * prototypes
  */
 
-static void uvm_loadav __P((struct loadavg *));
+static void uvm_loadav(struct loadavg *);
 
 /*
  * uvm_meter: calculate load average and wake up the swapper (if needed)
@@ -87,11 +87,11 @@ uvm_meter()
 	if ((time.tv_sec % 5) == 0)
 		uvm_loadav(&averunnable);
 	if (proc0.p_slptime > (maxslp / 2))
-		wakeup((caddr_t)&proc0);
+		wakeup(&proc0);
 }
 
 /*
- * uvm_loadav: compute a tenex style load average of a quantity on 
+ * uvm_loadav: compute a tenex style load average of a quantity on
  * 1, 5, and 15 minute internvals.
  */
 static void
@@ -101,7 +101,8 @@ uvm_loadav(avg)
 	int i, nrun;
 	struct proc *p;
 
-	for (nrun = 0, p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
+	nrun = 0;
+	LIST_FOREACH(p, &allproc, p_list) {
 		switch (p->p_stat) {
 		case SSLEEP:
 			if (p->p_priority > PZERO || p->p_slptime > 1)
@@ -131,6 +132,7 @@ uvm_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	struct proc *p;
 {
 	struct vmtotal vmtotals;
+	int rv, t;
 	struct _ps_strings _ps = { PS_STRINGS };
 
 	switch (name[0]) {
@@ -168,6 +170,51 @@ uvm_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	case VM_PSSTRINGS:
 		return (sysctl_rdstruct(oldp, oldlenp, newp, &_ps,
 		    sizeof(_ps)));
+	case VM_ANONMIN:
+		t = uvmexp.anonminpct;
+		rv = sysctl_int(oldp, oldlenp, newp, newlen, &t);
+		if (rv) {
+			return rv;
+		}
+		if (t + uvmexp.vtextminpct + uvmexp.vnodeminpct > 95 || t < 0) {
+			return EINVAL;
+		}
+		uvmexp.anonminpct = t;
+		uvmexp.anonmin = t * 256 / 100;
+		return rv;
+
+	case VM_VTEXTMIN:
+		t = uvmexp.vtextminpct;
+		rv = sysctl_int(oldp, oldlenp, newp, newlen, &t);
+		if (rv) {
+			return rv;
+		}
+		if (uvmexp.anonminpct + t + uvmexp.vnodeminpct > 95 || t < 0) {
+			return EINVAL;
+		}
+		uvmexp.vtextminpct = t;
+		uvmexp.vtextmin = t * 256 / 100;
+		return rv;
+
+	case VM_VNODEMIN:
+		t = uvmexp.vnodeminpct;
+		rv = sysctl_int(oldp, oldlenp, newp, newlen, &t);
+		if (rv) {
+			return rv;
+		}
+		if (uvmexp.anonminpct + uvmexp.vtextminpct + t > 95 || t < 0) {
+			return EINVAL;
+		}
+		uvmexp.vnodeminpct = t;
+		uvmexp.vnodemin = t * 256 / 100;
+		return rv;
+
+	case VM_MAXSLP:
+		return (sysctl_rdint(oldp, oldlenp, newp, maxslp));
+
+	case VM_USPACE:
+		return (sysctl_rdint(oldp, oldlenp, newp, USPACE));
+
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -183,8 +230,8 @@ uvm_total(totalp)
 {
 	struct proc *p;
 #if 0
-	vm_map_entry_t	entry;
-	vm_map_t map;
+	struct vm_map_entry *	entry;
+	struct vm_map *map;
 	int paging;
 #endif
 
@@ -194,7 +241,7 @@ uvm_total(totalp)
 	 * calculate process statistics
 	 */
 
-	for (p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
+	LIST_FOREACH(p, &allproc, p_list) {
 		if (p->p_flag & P_SYSTEM)
 			continue;
 		switch (p->p_stat) {

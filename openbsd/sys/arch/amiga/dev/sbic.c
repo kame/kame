@@ -1,4 +1,4 @@
-/*	$OpenBSD: sbic.c,v 1.12 2001/09/11 20:05:20 miod Exp $	*/
+/*	$OpenBSD: sbic.c,v 1.17 2002/03/14 03:15:51 millert Exp $	*/
 /*	$NetBSD: sbic.c,v 1.28 1996/10/13 03:07:29 christos Exp $	*/
 
 /*
@@ -53,9 +53,7 @@
 #include <sys/buf.h>
 #include <scsi/scsi_all.h>
 #include <scsi/scsiconf.h>
-#include <vm/vm.h>
-#include <vm/vm_page.h>
-#include <machine/pmap.h>
+#include <uvm/uvm_extern.h>
 #include <machine/cpu.h>
 #include <amiga/amiga/device.h>
 #include <amiga/amiga/custom.h>
@@ -68,7 +66,7 @@
 #include <amiga/amiga/cc.h>
 #include <amiga/dev/zbusvar.h>
 
-#include <vm/pmap.h>
+#include <uvm/uvm_pmap.h>
 
 /* Since I can't find this in any other header files */
 #define SCSI_PHASE(reg)	(reg&0x07)
@@ -84,32 +82,32 @@
 #define	b_cylin		b_resid
 #define SBIC_WAIT(regs, until, timeo) sbicwait(regs, until, timeo, __LINE__)
 
-int  sbicicmd __P((struct sbic_softc *, int, int, void *, int, void *, int));
-int  sbicgo __P((struct sbic_softc *, struct scsi_xfer *));
-int  sbicdmaok __P((struct sbic_softc *, struct scsi_xfer *));
-int  sbicwait __P((sbic_regmap_p, char, int , int));
-int  sbiccheckdmap __P((void *, u_long, u_long));
-int  sbicselectbus __P((struct sbic_softc *, sbic_regmap_p, u_char, u_char, u_char));
-int  sbicxfstart __P((sbic_regmap_p, int, u_char, int));
-int  sbicxfout __P((sbic_regmap_p regs, int, void *, int));
-int  sbicfromscsiperiod __P((struct sbic_softc *, sbic_regmap_p, int));
-int  sbictoscsiperiod __P((struct sbic_softc *, sbic_regmap_p, int));
-int  sbicpoll __P((struct sbic_softc *));
-int  sbicnextstate __P((struct sbic_softc *, u_char, u_char));
-int  sbicmsgin __P((struct sbic_softc *));
-int  sbicxfin __P((sbic_regmap_p regs, int, void *));
-int  sbicabort __P((struct sbic_softc *, sbic_regmap_p, char *));
-void sbicxfdone __P((struct sbic_softc *, sbic_regmap_p, int));
-void sbicerror __P((struct sbic_softc *, sbic_regmap_p, u_char));
-void sbicstart __P((struct sbic_softc *));
-void sbicreset __P((struct sbic_softc *));
-void sbic_scsidone __P((struct sbic_acb *, int));
-void sbic_sched __P((struct sbic_softc *));
-void sbic_save_ptrs __P((struct sbic_softc *, sbic_regmap_p,int,int));
-void sbic_load_ptrs __P((struct sbic_softc *, sbic_regmap_p,int,int));
+int  sbicicmd(struct sbic_softc *, int, int, void *, int, void *, int);
+int  sbicgo(struct sbic_softc *, struct scsi_xfer *);
+int  sbicdmaok(struct sbic_softc *, struct scsi_xfer *);
+int  sbicwait(sbic_regmap_p, char, int , int);
+int  sbiccheckdmap(void *, u_long, u_long);
+int  sbicselectbus(struct sbic_softc *, sbic_regmap_p, u_char, u_char, u_char);
+int  sbicxfstart(sbic_regmap_p, int, u_char, int);
+int  sbicxfout(sbic_regmap_p regs, int, void *, int);
+int  sbicfromscsiperiod(struct sbic_softc *, sbic_regmap_p, int);
+int  sbictoscsiperiod(struct sbic_softc *, sbic_regmap_p, int);
+int  sbicpoll(struct sbic_softc *);
+int  sbicnextstate(struct sbic_softc *, u_char, u_char);
+int  sbicmsgin(struct sbic_softc *);
+int  sbicxfin(sbic_regmap_p regs, int, void *);
+int  sbicabort(struct sbic_softc *, sbic_regmap_p, char *);
+void sbicxfdone(struct sbic_softc *, sbic_regmap_p, int);
+void sbicerror(struct sbic_softc *, sbic_regmap_p, u_char);
+void sbicstart(struct sbic_softc *);
+void sbicreset(struct sbic_softc *);
+void sbic_scsidone(struct sbic_acb *, int);
+void sbic_sched(struct sbic_softc *);
+void sbic_save_ptrs(struct sbic_softc *, sbic_regmap_p,int,int);
+void sbic_load_ptrs(struct sbic_softc *, sbic_regmap_p,int,int);
 #ifdef DEBUG
-void sbicdumpstate __P((void));
-void sbic_dump_acb __P((struct sbic_acb *));
+void sbicdumpstate(void);
+void sbic_dump_acb(struct sbic_acb *);
 #endif
 
 /*
@@ -147,7 +145,7 @@ int	reselect_debug = 0;
 int	report_sense = 0;
 int	data_pointer_debug = 0;
 u_char	debug_asr, debug_csr, routine;
-void sbictimeout __P((struct sbic_softc *dev));
+void sbictimeout(struct sbic_softc *dev);
 
 #define CSR_TRACE_SIZE 32
 #if CSR_TRACE_SIZE
@@ -293,7 +291,7 @@ void sbic_load_ptrs(dev, regs, target, lun)
 	int target, lun;
 {
 	int s, count;
-	char* vaddr, * paddr;
+	char *vaddr, *paddr;
 	struct sbic_acb *acb;
 
 	SBIC_TRACE(dev);
@@ -324,7 +322,7 @@ void sbic_load_ptrs(dev, regs, target, lun)
 		count = acb->sc_kv.dc_count;
 		for(count = (NBPG - ((int)vaddr & PGOFSET));
 		    count < acb->sc_kv.dc_count
-		    && (char*)kvtop(vaddr + count + 4) == paddr + count + 4;
+		    && (char *)kvtop(vaddr + count + 4) == paddr + count + 4;
 		    count += NBPG);
 		/* If it's all contiguous... */
 		if(count > acb->sc_kv.dc_count ) {
@@ -1791,7 +1789,7 @@ sbicgo(dev, xs)
 	 * push the data cache ( I think this won't work (EH))
 	 */
 #if defined(M68040) || defined(M68060)
-	if (mmutype == MMU_68040 && usedma && count) {
+	if (mmutype <= MMU_68040 && usedma && count) {
 		dma_cachectl(addr, count);
 		if (((u_int)addr & 0xF) || (((u_int)addr + count) & 0xF))
 			dev->sc_flags |= SBICF_DCFLUSH;

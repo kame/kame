@@ -1,4 +1,4 @@
-/*	$OpenBSD: dcreg.h,v 1.14 2001/06/23 22:03:07 fgsch Exp $ */
+/*	$OpenBSD: dcreg.h,v 1.22 2002/03/14 01:26:54 millert Exp $ */
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -37,6 +37,10 @@
 /*
  * 21143 and clone common register definitions.
  */
+
+#ifdef __alpha__
+#define SRM_MEDIA
+#endif
 
 #define DC_BUSCTL		0x00	/* bus control */
 #define DC_TXSTART		0x08	/* tx start demand */
@@ -456,13 +460,19 @@ struct dc_desc {
 struct dc_list_data {
 	struct dc_desc		dc_rx_list[DC_RX_LIST_CNT];
 	struct dc_desc		dc_tx_list[DC_TX_LIST_CNT];
+	u_int32_t		dc_sbuf[DC_SFRAME_LEN/sizeof(u_int32_t)];
+	u_int8_t		dc_pad[DC_MIN_FRAMELEN];
+};
+
+/* software descriptor */
+struct dc_swdesc {
+	bus_dmamap_t		sd_map;
+	struct mbuf *		sd_mbuf;
 };
 
 struct dc_chain_data {
-	struct mbuf		*dc_rx_chain[DC_RX_LIST_CNT];
-	struct mbuf		*dc_tx_chain[DC_TX_LIST_CNT];
-	u_int32_t		dc_sbuf[DC_SFRAME_LEN/sizeof(u_int32_t)];
-	u_int8_t		dc_pad[DC_MIN_FRAMELEN];
+	struct dc_swdesc	dc_rx_chain[DC_RX_LIST_CNT];
+	struct dc_swdesc	dc_tx_chain[DC_TX_LIST_CNT];
 	int			dc_tx_prod;
 	int			dc_tx_cons;
 	int			dc_tx_cnt;
@@ -695,7 +705,6 @@ struct dc_softc {
 	u_int8_t		*dc_srom;
 	struct dc_mediainfo	*dc_mi;
 	struct dc_list_data	*dc_ldata;
-	caddr_t			dc_ldata_ptr;
 	struct dc_chain_data	dc_cdata;
 	u_int32_t		dc_csid;
 	u_int			dc_revision;
@@ -703,6 +712,14 @@ struct dc_softc {
 #ifdef SRM_MEDIA
 	int			dc_srm_media;
 #endif
+	bus_dma_tag_t		sc_dmat;
+	bus_dmamap_t		sc_listmap;
+	bus_dma_segment_t	sc_listseg[1];
+	int			sc_listnseg;
+	caddr_t			sc_listkva;
+	bus_dmamap_t		sc_rx_sparemap;
+	bus_dmamap_t		sc_tx_sparemap;
+	int			sc_hasmac;
 };
 
 #define DC_TX_POLL		0x00000001
@@ -987,12 +1004,14 @@ struct dc_eblock_reset {
 /*	u_int16_t		dc_reset_dat[n]; */
 };
 
-#ifdef __alpha__
-#undef vtophys
-#define vtophys(va)		alpha_XXX_dmamap((vm_offset_t)va)
-#endif
+extern void dc_attach(struct dc_softc *);
+extern int dc_detach(struct dc_softc *);
+extern int dc_intr(void *);
+extern void dc_reset(struct dc_softc *);
 
-extern void dc_attach	__P((struct dc_softc *));
-extern int dc_detach	__P((struct dc_softc *));
-extern int dc_intr	__P((void *));
-extern void dc_reset	__P((struct dc_softc *));
+#if BYTE_ORDER == BIG_ENDIAN
+#define	DC_SP_FIELD_C(x)	((x) << 16)
+#else
+#define	DC_SP_FIELD_C(x)	(x)
+#endif
+#define	DC_SP_FIELD(x,f)	DC_SP_FIELD_C(((u_int16_t *)(x))[(f)])

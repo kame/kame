@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.3 2001/09/19 20:50:57 mickey Exp $	*/
+/*	$OpenBSD: cpu.c,v 1.7 2002/03/14 01:26:45 millert Exp $	*/
 /*	$NetBSD: cpu.c,v 1.13 2001/05/26 21:27:15 chs Exp $ */
 
 /*
@@ -56,7 +56,6 @@
 #include <sys/systm.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
@@ -82,8 +81,8 @@ char	machine_arch[] = MACHINE_ARCH;	/* from <machine/param.h> */
 char	cpu_model[100];
 
 /* The CPU configuration driver. */
-static void cpu_attach __P((struct device *, struct device *, void *));
-int  cpu_match __P((struct device *, void *, void *));
+static void cpu_attach(struct device *, struct device *, void *);
+int  cpu_match(struct device *, void *, void *);
 
 struct cfattach cpu_ca = {
 	sizeof(struct device), cpu_match, cpu_attach
@@ -92,9 +91,9 @@ struct cfattach cpu_ca = {
 extern struct cfdriver cpu_cd;
 
 #if defined(SUN4C) || defined(SUN4M)
-static char *psrtoname __P((int, int, int, char *));
+static char *psrtoname(int, int, int, char *);
 #endif
-static char *fsrtoname __P((int, int, int, char *));
+static char *fsrtoname(int, int, int, char *);
 
 #define	IU_IMPL(v)	((((u_int64_t)(v))&VER_IMPL) >> VER_IMPL_SHIFT)
 #define	IU_VERS(v)	((((u_int64_t)(v))&VER_MASK) >> VER_MASK_SHIFT)
@@ -177,7 +176,7 @@ cpu_init(pa, cpu_num)
 			VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 		va += NBPG;
 	}
-	pmap_update();
+	pmap_update(pmap_kernel());
 
 	if (!cpus) cpus = (struct cpu_info *)va;
 	else {
@@ -293,10 +292,14 @@ cpu_attach(parent, dev, aux)
 	if ((1 << i) != l && l)
 		panic("bad icache line size %d", l);
 	cacheinfo.ic_l2linesize = i;
-	cacheinfo.ic_totalsize = l *
-		getpropint(node, "icache-nlines", 64) *
-		getpropint(node, "icache-associativity", 1);
-	
+	cacheinfo.ic_totalsize =
+	    getpropint(node, "icache-size", 0) *
+	    getpropint(node, "icache-associativity", 1);
+	if (cacheinfo.ic_totalsize == 0)
+		cacheinfo.ic_totalsize = l *
+		    getpropint(node, "icache-nlines", 64) *
+		    getpropint(node, "icache-associativity", 1);
+
 	cacheinfo.dc_linesize = l =
 		getpropint(node, "dcache-line-size",0);
 	for (i = 0; (1 << i) < l && l; i++)
@@ -304,9 +307,13 @@ cpu_attach(parent, dev, aux)
 	if ((1 << i) != l && l)
 		panic("bad dcache line size %d", l);
 	cacheinfo.dc_l2linesize = i;
-	cacheinfo.dc_totalsize = l *
-		getpropint(node, "dcache-nlines", 128) *
-		getpropint(node, "dcache-associativity", 1);
+	cacheinfo.dc_totalsize =
+	    getpropint(node, "dcache-size", 0) *
+	    getpropint(node, "dcache-associativity", 1);
+	if (cacheinfo.dc_totalsize == 0)
+		cacheinfo.dc_totalsize = l *
+		    getpropint(node, "dcache-nlines", 128) *
+		    getpropint(node, "dcache-associativity", 1);
 	
 	cacheinfo.ec_linesize = l =
 		getpropint(node, "ecache-line-size", 0);
@@ -315,9 +322,13 @@ cpu_attach(parent, dev, aux)
 	if ((1 << i) != l && l)
 		panic("bad ecache line size %d", l);
 	cacheinfo.ec_l2linesize = i;
-	cacheinfo.ec_totalsize = l *
-		getpropint(node, "ecache-nlines", 32768) *
+	cacheinfo.ec_totalsize =
+		getpropint(node, "ecache-size", 0) *
 		getpropint(node, "ecache-associativity", 1);
+	if (cacheinfo.ec_totalsize == 0)
+		cacheinfo.ec_totalsize = l *
+		    getpropint(node, "ecache-nlines", 32768) *
+		    getpropint(node, "ecache-associativity", 1);
 	
 	/*
 	 * XXX - The following will have to do until
@@ -355,7 +366,7 @@ cpu_attach(parent, dev, aux)
 		       (long)cacheinfo.ec_totalsize/1024,
 		       (long)cacheinfo.ec_linesize);
 	}
-	printf(" \n");
+	printf("\n");
 	cache_enable();
 }
 

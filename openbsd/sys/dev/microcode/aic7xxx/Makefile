@@ -1,4 +1,4 @@
-# $OpenBSD: Makefile,v 1.1 2000/03/22 02:50:49 smurph Exp $
+# $OpenBSD: Makefile,v 1.3 2002/03/19 02:49:20 millert Exp $
 # $FreeBSD: src/sys/dev/aic7xxx/Makefile,v 1.6 1999/08/28 00:41:22 peter Exp $
 
 PROG=	aicasm

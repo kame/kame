@@ -1,4 +1,4 @@
-/*      $OpenBSD: ip_gre.c,v 1.12 2001/09/04 00:57:44 angelos Exp $ */
+/*      $OpenBSD: ip_gre.c,v 1.17 2002/04/03 20:37:28 angelos Exp $ */
 /*	$NetBSD: ip_gre.c,v 1.9 1999/10/25 19:18:11 drochner Exp $ */
 
 /*
@@ -84,8 +84,8 @@
 /* Needs IP headers. */
 #include <net/if_gre.h>
 
-struct gre_softc *gre_lookup __P((struct mbuf *, u_int8_t));
-static int gre_input2 __P((struct mbuf *, int, u_char));
+struct gre_softc *gre_lookup(struct mbuf *, u_int8_t);
+static int gre_input2(struct mbuf *, int, u_char);
 
 /*
  * Decapsulate.
@@ -141,6 +141,20 @@ gre_input2(m , hlen, proto)
 			hlen += 4;
 
 		switch (ntohs(gip->gi_ptype)) { /* ethertypes */
+		case GREPROTO_WCCP:
+			/* WCCP/GRE:
+			 *   So far as I can see (and test) it seems that Cisco's WCCP
+			 *   GRE tunnel is precisely a IP-in-GRE tunnel that differs
+			 *   only in it's protocol number.  At least, it works for me.
+			 *
+			 *   The Internet Draft can be found if you look for
+			 *     draft-forster-wrec-wccp-v1-00.txt
+			 *
+			 *   So yes, we're doing a fall-through (unless, of course,
+			 *   net.inet.gre.wccp is 0).
+			 */
+			if (!gre_wccp)
+				return (0);
 		case ETHERTYPE_IP: /* shouldn't need a schednetisr(), as */
 			ifq = &ipintrq;          /* we are in ip_input */
 			af = AF_INET;
@@ -172,7 +186,7 @@ gre_input2(m , hlen, proto)
 		break;
 	default:
 		/* others not yet supported */
-		return(0);
+		return (0);
 	}
 		
 	m->m_data += hlen; 
@@ -216,13 +230,7 @@ gre_input2(m , hlen, proto)
  * IPPROTO_GRE and a local destination address).
  */
 void
-#if __STDC__
 gre_input(struct mbuf *m, ...)
-#else
-gre_input(m, va_alist)
-        struct mbuf *m;
-        va_dcl
-#endif
 {
 	register int hlen,ret;
 	va_list ap;
@@ -240,7 +248,9 @@ gre_input(m, va_alist)
 	/* 
  	 * ret == 0: packet not processed, but input from here
 	 * means no matching tunnel that is up is found,
-	 * so we can just free the mbuf and return
+	 * so we can just free the mbuf and return.  It is also
+	 * possible that we received a WCCPv1-style GRE packet
+	 * but we're not set to accept them.
 	 */
 	if (!ret)
 		m_freem(m);
@@ -254,13 +264,7 @@ gre_input(m, va_alist)
  */
 
 void
-#if __STDC__
 gre_mobile_input(struct mbuf *m, ...)
-#else
-gre_mobile_input(m, va_alist)
-        struct mbuf *m;
-        va_dcl
-#endif
 {
 	register struct ip *ip = mtod(m, struct ip *);
 	register struct mobip_h *mip = mtod(m, struct mobip_h *);
@@ -301,7 +305,7 @@ gre_mobile_input(m, va_alist)
 	mip->mi.ip_dst.s_addr = mip->mh.odst;
 	mip->mi.ip_p = (ntohs(mip->mh.proto) >> 8);
 	
-	if (gre_in_cksum((u_short*) &mip->mh,msiz) != 0) {
+	if (gre_in_cksum((u_short *) &mip->mh,msiz) != 0) {
 		m_freem(m);
 		return;
 	}
@@ -388,6 +392,8 @@ gre_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
         switch (name[0]) {
         case GRECTL_ALLOW:
                 return (sysctl_int(oldp, oldlenp, newp, newlen, &gre_allow));
+        case GRECTL_WCCP:
+                return (sysctl_int(oldp, oldlenp, newp, newlen, &gre_wccp));
         default:
                 return (ENOPROTOOPT);
         }

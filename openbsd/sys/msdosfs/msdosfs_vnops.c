@@ -1,4 +1,4 @@
-/*	$OpenBSD: msdosfs_vnops.c,v 1.27 2001/08/23 13:52:35 aaron Exp $	*/
+/*	$OpenBSD: msdosfs_vnops.c,v 1.36 2002/03/14 01:27:09 millert Exp $	*/
 /*	$NetBSD: msdosfs_vnops.c,v 1.63 1997/10/17 11:24:19 ws Exp $	*/
 
 /*-
@@ -65,7 +65,7 @@
 #include <sys/dirent.h>		/* defines dirent structure */
 #include <sys/lockf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <msdosfs/bpb.h>
 #include <msdosfs/direntry.h>
@@ -1779,12 +1779,12 @@ msdosfs_strategy(v)
 		biodone(bp);
 		return (error);
 	}
-#ifdef DIAGNOSTIC
-#endif
+
 	/*
 	 * Read/write the block from/to the disk that contains the desired
 	 * file block.
 	 */
+
 	vp = dep->de_devvp;
 	bp->b_dev = vp->v_rdev;
 	VOCALL(vp->v_op, VOFFSET(vop_strategy), ap);
@@ -1864,7 +1864,7 @@ msdosfs_pathconf(v)
 }
 
 /* Global vfs data structures for msdosfs */
-int (**msdosfs_vnodeop_p) __P((void *));
+int (**msdosfs_vnodeop_p)(void *);
 struct vnodeopv_entry_desc msdosfs_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, msdosfs_lookup },		/* lookup */
@@ -1902,7 +1902,7 @@ struct vnodeopv_entry_desc msdosfs_vnodeop_entries[] = {
 	{ &vop_advlock_desc, msdosfs_advlock },		/* advlock */
 	{ &vop_reallocblks_desc, msdosfs_reallocblks },	/* reallocblks */
 	{ &vop_bwrite_desc, vop_generic_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc *)NULL, (int (*) __P((void *)))NULL }
+	{ (struct vnodeop_desc *)NULL, (int (*)(void *))NULL }
 };
 struct vnodeopv_desc msdosfs_vnodeop_opv_desc =
 	{ &msdosfs_vnodeop_p, msdosfs_vnodeop_entries };

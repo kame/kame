@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci.c,v 1.22 2001/08/25 12:48:35 art Exp $	*/
+/*	$OpenBSD: pci.c,v 1.29 2002/04/04 17:11:46 jason Exp $	*/
 /*	$NetBSD: pci.c,v 1.31 1997/06/06 23:48:04 thorpej Exp $	*/
 
 /*
@@ -43,14 +43,19 @@
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcidevs.h>
 
-int pcimatch __P((struct device *, void *, void *));
-void pciattach __P((struct device *, struct device *, void *));
+int pcimatch(struct device *, void *, void *);
+void pciattach(struct device *, struct device *, void *);
 
 #ifdef USER_PCICONF
 struct pci_softc {
 	struct device sc_dev;
 	pci_chipset_tag_t sc_pc;
+	int sc_bus;		/* PCI configuration space bus # */
 };
+#endif
+
+#ifdef APERTURE
+extern int allowaperture;
 #endif
 
 struct cfattach pci_ca = {
@@ -65,8 +70,8 @@ struct cfdriver pci_cd = {
 	NULL, "pci", DV_DULL
 };
 
-int	pciprint __P((void *, const char *));
-int	pcisubmatch __P((struct device *, void *, void *));
+int	pciprint(void *, const char *);
+int	pcisubmatch(struct device *, void *, void *);
 
 /*
  * Callback so that ISA/EISA bridges can attach their child busses
@@ -89,7 +94,7 @@ int	pcisubmatch __P((struct device *, void *, void *));
  * up as an ISA device, and that can (bogusly) complicate the PCI device's
  * attach code, or make the PCI device not be properly attached at all.
  */
-static void	(*pci_isa_bridge_callback) __P((void *));
+static void	(*pci_isa_bridge_callback)(void *);
 static void	*pci_isa_bridge_callback_arg;
 
 int
@@ -151,6 +156,7 @@ pciattach(parent, self, aux)
 
 #ifdef USER_PCICONF
 	sc->sc_pc = pba->pba_pc;
+	sc->sc_bus = bus;
 #endif
 
 	if (bus == 0)
@@ -163,12 +169,32 @@ pciattach(parent, self, aux)
 	for (device = 0; device < maxndevs; device++) {
 #endif
 		pcitag_t tag;
-		pcireg_t id, class, intr, bhlcr;
+		pcireg_t id, class, intr;
+#ifndef __sparc64__
+		pcireg_t bhlcr;
+#endif
 		struct pci_attach_args pa;
 		int pin;
 
 		tag = pci_make_tag(pc, bus, device, 0);
 		id = pci_conf_read(pc, tag, PCI_ID_REG);
+
+#ifdef __sparc64__
+		pci_dev_funcorder(pc, bus, device, funcs);
+		nfunctions = 8;
+
+		/* Invalid vendor ID value or 0 (see below for zero)
+		 * ... of course, if the pci_dev_funcorder found
+		 *     functions other than zero, we probably want
+		 *     to attach them.
+		 */
+		if (PCI_VENDOR(id) == PCI_VENDOR_INVALID || PCI_VENDOR(id) == 0)
+			if (funcs[0] < 0)
+				continue;
+
+		for (j = 0; (function = funcs[j]) < nfunctions &&
+		    function >= 0; j++) {
+#else
 
 		/* Invalid vendor ID value? */
 		if (PCI_VENDOR(id) == PCI_VENDOR_INVALID)
@@ -186,6 +212,7 @@ pciattach(parent, self, aux)
 		    function >= 0; j++) {
 #else
 		for (function = 0; function < nfunctions; function++) {
+#endif
 #endif
 			tag = pci_make_tag(pc, bus, device, function);
 			id = pci_conf_read(pc, tag, PCI_ID_REG);
@@ -315,7 +342,7 @@ pcisubmatch(parent, match, aux)
 
 void
 set_pci_isa_bridge_callback(fn, arg)
-	void (*fn) __P((void *));
+	void (*fn)(void *);
 	void *arg;
 {
 
@@ -375,18 +402,24 @@ pci_get_capability(pc, tag, capid, offset, value)
 #endif
 
 
-int pciopen __P((dev_t dev, int oflags, int devtype, struct proc *p));
-int pciclose __P((dev_t dev, int flag, int devtype, struct proc *p));
-int pciioctl __P((dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p));
+int pciopen(dev_t dev, int oflags, int devtype, struct proc *p);
+int pciclose(dev_t dev, int flag, int devtype, struct proc *p);
+int pciioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p);
 
 int
 pciopen(dev_t dev, int oflags, int devtype, struct proc *p) 
 {
 	PCIDEBUG(("pciopen ndevs: %d\n" , pci_cd.cd_ndevs));
 
+#ifndef APERTURE
 	if ((oflags & FWRITE) && securelevel > 0) {
 		return EPERM;
 	}
+#else
+	if ((oflags & FWRITE) && securelevel > 0 && allowaperture == 0) {
+		return EPERM;
+	}
+#endif
 	return 0;
 }
 
@@ -424,18 +457,15 @@ pciioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 		error = ENXIO;
 		goto done;
 	}
-#ifdef __i386__
-	/* The i386 pci_make_tag function can panic if called with wrong 
-	   args, try to avoid that */
-	if (io->pi_sel.pc_bus >= 256 || 
-	    io->pi_sel.pc_dev >= pci_bus_maxdevs(pc, io->pi_sel.pc_bus) ||
+	/* Check bounds */
+	if (pci->sc_bus >= 256 || 
+	    io->pi_sel.pc_dev >= pci_bus_maxdevs(pc, pci->sc_bus) ||
 	    io->pi_sel.pc_func >= 8) {
 		error = EINVAL;
 		goto done;
 	}
-#endif
 
-	tag = pci_make_tag(pc, io->pi_sel.pc_bus, io->pi_sel.pc_dev,
+	tag = pci_make_tag(pc, pci->sc_bus, io->pi_sel.pc_dev,
 			   io->pi_sel.pc_func);
 
 	switch(cmd) {
@@ -465,9 +495,10 @@ pciioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 		switch(io->pi_width) {
 		case 4:
 			/* Make sure the register is properly aligned */
-			if (io->pi_reg & 0x3) 
+			if (io->pi_reg & 0x3)
 				return EINVAL;
 			pci_conf_write(pc, tag, io->pi_reg, io->pi_data);
+			error = 0;
 			break;
 		default:
 			error = ENODEV;

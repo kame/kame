@@ -1,4 +1,4 @@
-/*	$OpenBSD: lsi64854.c,v 1.3 2001/09/11 20:05:25 miod Exp $	*/
+/*	$OpenBSD: lsi64854.c,v 1.5 2002/03/14 01:26:54 millert Exp $	*/
 /*	$NetBSD: lsi64854.c,v 1.18 2001/06/04 20:56:51 mrg Exp $ */
 
 /*-
@@ -44,7 +44,6 @@
 #include <sys/errno.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
@@ -60,11 +59,11 @@
 #include <dev/ic/ncr53c9xreg.h>
 #include <dev/ic/ncr53c9xvar.h>
 
-void	lsi64854_reset	__P((struct lsi64854_softc *));
-int	lsi64854_setup	__P((struct lsi64854_softc *, caddr_t *, size_t *,
-			     int, size_t *));
-int	lsi64854_setup_pp __P((struct lsi64854_softc *, caddr_t *, size_t *,
-			     int, size_t *));
+void	lsi64854_reset(struct lsi64854_softc *);
+int	lsi64854_setup(struct lsi64854_softc *, caddr_t *, size_t *,
+			     int, size_t *);
+int	lsi64854_setup_pp(struct lsi64854_softc *, caddr_t *, size_t *,
+			     int, size_t *);
 
 #ifdef DEBUG
 #define LDB_SCSI	1

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_cluster.c,v 1.25 2001/06/22 14:14:10 deraadt Exp $	*/
+/*	$OpenBSD: vfs_cluster.c,v 1.27 2002/03/14 01:27:06 millert Exp $	*/
 /*	$NetBSD: vfs_cluster.c,v 1.12 1996/04/22 01:39:05 christos Exp $	*/
 
 /*-
@@ -45,20 +45,20 @@
 #include <sys/systm.h>
 #include <sys/resourcevar.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 /*
  * Local declarations
  */
-void	cluster_callback __P((struct buf *));
-struct buf *cluster_newbuf __P((struct vnode *, struct buf *, long, daddr_t,
-	    daddr_t, long, int));
-struct buf *cluster_rbuild __P((struct vnode *, u_quad_t, struct buf *,
-	    daddr_t, daddr_t, long, int, long));
-void	    cluster_wbuild __P((struct vnode *, struct buf *, long,
-	    daddr_t, int, daddr_t));
-struct cluster_save *cluster_collectbufs __P((struct vnode *, 
-	    struct cluster_info *, struct buf *));
+void	cluster_callback(struct buf *);
+struct buf *cluster_newbuf(struct vnode *, struct buf *, long, daddr_t,
+	    daddr_t, long, int);
+struct buf *cluster_rbuild(struct vnode *, u_quad_t, struct buf *,
+	    daddr_t, daddr_t, long, int, long);
+void	    cluster_wbuild(struct vnode *, struct buf *, long,
+	    daddr_t, int, daddr_t);
+struct cluster_save *cluster_collectbufs(struct vnode *, 
+	    struct cluster_info *, struct buf *);
 
 #ifdef DIAGNOSTIC
 /*

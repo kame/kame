@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_machdep.h,v 1.6 1999/07/09 21:33:37 art Exp $	*/
+/*	$OpenBSD: db_machdep.h,v 1.8 2002/03/14 01:26:43 millert Exp $	*/
 /*	$NetBSD: db_machdep.h,v 1.10 1997/08/31 21:23:40 pk Exp $ */
 
 /*
@@ -35,7 +35,7 @@
  */
 
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <machine/frame.h>
 #include <machine/psl.h>
 #include <machine/trap.h>
@@ -86,8 +86,8 @@ db_regs_t		ddb_regs;	/* register state */
 
 #define DB_MACHINE_COMMANDS
 
-void db_machine_init __P((void));
-int kdb_trap __P((int, struct trapframe *));
+void db_machine_init(void);
+int kdb_trap(int, struct trapframe *);
 
 /*
  * We use a.out symbols in DDB.

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cryptosoft.h,v 1.6 2001/07/05 08:26:05 jjbg Exp $	*/
+/*	$OpenBSD: cryptosoft.h,v 1.9 2002/03/19 23:24:53 angelos Exp $	*/
 
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
@@ -9,7 +9,7 @@
  *
  * Copyright (c) 2000 Angelos D. Keromytis
  *
- * Permission to use, copy, and modify this software without fee
+ * Permission to use, copy, and modify this software with or without fee
  * is hereby granted, provided that this entire notice is included in
  * all source code copies of any software which is or includes a copy or
  * modification of this software. 
@@ -36,7 +36,6 @@ struct swcr_data {
 		} SWCR_AUTH;
 		struct {
 			u_int8_t	 *SW_kschedule;
-			u_int8_t	 *SW_iv;
 			struct enc_xform *SW_exf;
 		} SWCR_ENC;
 		struct {
@@ -50,7 +49,6 @@ struct swcr_data {
 #define sw_klen		SWCR_UN.SWCR_AUTH.SW_klen
 #define sw_axf		SWCR_UN.SWCR_AUTH.SW_axf
 #define sw_kschedule	SWCR_UN.SWCR_ENC.SW_kschedule
-#define sw_iv		SWCR_UN.SWCR_ENC.SW_iv
 #define sw_exf		SWCR_UN.SWCR_ENC.SW_exf
 #define sw_size		SWCR_UN.SWCR_COMP.SW_size
 #define sw_cxf		SWCR_UN.SWCR_COMP.SW_cxf
@@ -63,7 +61,7 @@ extern u_int8_t hmac_ipad_buffer[64];
 extern u_int8_t hmac_opad_buffer[64];
 
 int	swcr_encdec(struct cryptodesc *, struct swcr_data *, caddr_t, int);
-int	swcr_authcompute(struct cryptodesc *, struct swcr_data *,
+int	swcr_authcompute(struct cryptop *, struct cryptodesc *, struct swcr_data *,
 	caddr_t, int);
 int	swcr_compdec(struct cryptodesc *, struct swcr_data *, caddr_t, int);
 int	swcr_process(struct cryptop *);

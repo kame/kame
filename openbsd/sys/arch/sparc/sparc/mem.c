@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.17 2001/09/19 20:50:57 mickey Exp $	*/
+/*	$OpenBSD: mem.c,v 1.20 2001/12/08 02:24:07 art Exp $	*/
 /*	$NetBSD: mem.c,v 1.13 1996/03/30 21:12:16 christos Exp $ */
 
 /*
@@ -57,7 +57,6 @@
 #include <machine/eeprom.h>
 #include <machine/conf.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 extern vaddr_t prom_vstart;
@@ -147,10 +146,12 @@ mmrw(dev, uio, flags)
 			pmap_enter(pmap_kernel(), mem_page,
 			    trunc_page(pa), uio->uio_rw == UIO_READ ?
 			    VM_PROT_READ : VM_PROT_WRITE, PMAP_WIRED);
+			pmap_update(pmap_kernel());
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)mem_page + o, c, uio);
 			pmap_remove(pmap_kernel(), mem_page, mem_page + NBPG);
+			pmap_update(pmap_kernel());
 			continue;
 
 		/* minor device 1 is kernel memory */
@@ -218,10 +219,11 @@ unlock:
 	return (error);
 }
 
-int
+paddr_t
 mmmmap(dev, off, prot)
         dev_t dev;
-        int off, prot;
+        off_t off;
+	int prot;
 {
 
 	return (-1);

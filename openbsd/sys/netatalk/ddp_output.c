@@ -1,4 +1,4 @@
-/*	$OpenBSD: ddp_output.c,v 1.3 2001/05/16 12:53:35 ho Exp $	*/
+/*	$OpenBSD: ddp_output.c,v 1.5 2002/03/15 18:19:52 millert Exp $	*/
 
 /*
  * Copyright (c) 1990,1991 Regents of The University of Michigan.
@@ -92,20 +92,14 @@
 #include <netatalk/ddp_var.h>
 #include <netatalk/at_extern.h>
 
-int ddp_output	__P(( struct mbuf *, ... ));
-u_int16_t at_cksum	__P(( struct mbuf *, int ));
-int ddp_route	__P((struct mbuf *, struct route * ));
+int ddp_output( struct mbuf *, ... );
+u_int16_t at_cksum( struct mbuf *, int );
+int ddp_route(struct mbuf *, struct route * );
 
 int	ddp_cksum = 1;
 
 int
-#if __STDC__
 ddp_output(struct mbuf *m, ...)
-#else
-ddp_output(m, va_alist)
-	struct mbuf	*m;
-	va_dcl
-#endif
 {
     struct ddpcb	*ddp;
     struct ddpehdr	*deh;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wi_ieee.h,v 1.3 2001/06/07 18:51:59 millert Exp $	*/
+/*	$OpenBSD: if_wi_ieee.h,v 1.6 2002/04/06 23:48:38 millert Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -31,11 +31,13 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	From: if_wavelan_ieee.h,v 1.1 1999/05/05 07:36:50 wpaul Exp $
+ *	From: if_wavelan_ieee.h,v 1.5.2.1 2001/07/04 00:12:34 brooks Exp $
  */
 
 #ifndef _IF_WI_IEEE_H
 #define _IF_WI_IEEE_H
+
+#pragma pack(1)
 
 /*
  * This header defines a simple command interface to the FreeBSD
@@ -82,6 +84,7 @@ struct wi_req {
  */
 #define WI_RID_IFACE_STATS	0x0100
 #define WI_RID_MGMT_XMIT	0x0200
+#define	WI_RID_MONITOR_MODE	0x0500
 
 struct wi_80211_hdr {
 	u_int16_t		frame_ctl;
@@ -120,6 +123,13 @@ struct wi_80211_hdr {
 #define WI_STYPE_MGMT_DISAS	0x00A0	/* disassociation */
 #define WI_STYPE_MGMT_AUTH	0x00B0	/* authentication */
 #define WI_STYPE_MGMT_DEAUTH	0x00C0	/* deauthentication */
+
+#define WI_STYPE_CTL_PSPOLL	0x00A0
+#define WI_STYPE_CTL_RTS	0x00B0
+#define WI_STYPE_CTL_CTS	0x00C0
+#define WI_STYPE_CTL_ACK	0x00D0
+#define WI_STYPE_CTL_CFEND	0x00E0
+#define WI_STYPE_CTL_CFENDACK	0x00F0
 
 struct wi_mgmt_hdr {
 	u_int16_t		frame_ctl;
@@ -161,7 +171,8 @@ struct wi_counters {
  */
 
 #define WI_RID_DNLD_BUF		0xFD01
-#define WI_RID_MEMSZ		0xFD02
+#define WI_RID_MEMSZ		0xFD02 /* memory size info (Lucent) */
+#define WI_RID_PRI_IDENTITY	0xFD02 /* primary firmware ident (PRISM2) */
 #define WI_RID_DOMAINS		0xFD11 /* List of intended regulatory domains */
 #define WI_RID_CIS		0xFD13 /* CIS info */
 #define WI_RID_COMMQUAL		0xFD43 /* Communications quality */
@@ -196,6 +207,7 @@ struct wi_counters {
 #define	WI_RID_MCAST_PM_BUF	0xFC17 /* PM buffering of mcast */
 #define	WI_RID_ENCRYPTION	0xFC20 /* enable/disable WEP */
 #define	WI_RID_AUTHTYPE		0xFC21 /* specify authentication type */
+#define	WI_RID_SYMBOL_MANDATORYBSSID 0xFC21
 #define	WI_RID_P2_TX_CRYPT_KEY	0xFC23
 #define	WI_RID_P2_CRYPT_KEY0	0xFC24
 #define	WI_RID_P2_CRYPT_KEY1	0xFC25
@@ -203,11 +215,23 @@ struct wi_counters {
 #define	WI_RID_P2_CRYPT_KEY2	0xFC26
 #define	WI_RID_P2_CRYPT_KEY3	0xFC27
 #define	WI_RID_P2_ENCRYPTION	0xFC28
+#define PRIVACY_INVOKED		0x01
+#define EXCLUDE_UNENCRYPTED	0x02
+#define HOST_ENCRYPT		0x10
+#define IV_EVERY_FRAME		0x00
+#define IV_EVERY10_FRAME	0x20
+#define IV_EVERY50_FRAME	0x40
+#define IV_EVERY100_FRAME	0x60
+#define HOST_DECRYPT		0x80
 #define	WI_RID_WEP_MAPTABLE	0xFC29
-#define	WI_RID_AUTH_CNTL	0xFC2A
+#define	WI_RID_CNFAUTHMODE	0xFC2A
+#define	WI_RID_SYMBOL_KEYLENGTH	0xFC2B
+#define	WI_RID_SYMBOL_PREAMBLE	0xFC2C /* Enable/disable short preamble */
 #define	WI_RID_ROAMING_MODE	0xFC2D /* Roaming mode (1:firm,3:disable) */
 #define	WI_RID_BASIC_RATE	0xFCB3
 #define	WI_RID_SUPPORT_RATE	0xFCB4
+#define WI_RID_SYMBOL_DIVERSITY	0xFC87 /* Symbol antenna diversity */
+#define WI_RID_SYMBOL_BASIC_RATE 0xFC90
 
 /*
  * Network parameters, dynamic configuration entities
@@ -273,6 +297,7 @@ struct wi_ltv_keys {
 #define WI_RID_STA_IDENTITY	0xFD20 /* station funcs firmware ident */
 #define WI_RID_STA_SUP_RANGE	0xFD21 /* station supplier compat */
 #define WI_RID_MFI_ACT_RANGE	0xFD22
+#define WI_RID_SYMBOL_IDENTITY	0xFD24 /* Symbol station firmware ident */
 #define WI_RID_CFI_ACT_RANGE	0xFD33
 
 /*
@@ -313,5 +338,7 @@ struct wi_ltv_keys {
 #define WI_RID_CCA_TIME		0xFDC4 /* clear chan assess time */
 #define WI_RID_MAC_PROC_DELAY	0xFDC5 /* MAC processing delay time */
 #define WI_RID_DATA_RATES	0xFDC6 /* supported data rates */
+
+#pragma pack()
 
 #endif

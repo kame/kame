@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.9 2001/09/28 04:13:12 drahn Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.34 2002/03/27 15:09:24 jason Exp $	*/
 /*	$NetBSD: machdep.c,v 1.4 1996/10/16 19:33:11 ws Exp $	*/
 
 /*
@@ -40,7 +40,6 @@
 #include <sys/timeout.h>
 #include <sys/exec.h>
 #include <sys/malloc.h>
-#include <sys/map.h>
 #include <sys/mbuf.h>
 #include <sys/mount.h>
 #include <sys/msgbuf.h>
@@ -53,7 +52,6 @@
 #include <sys/systm.h>
 #include <sys/user.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #ifdef SYSVSHM
@@ -103,27 +101,32 @@ struct pmap *curpm;
 struct proc *fpuproc;
 
 extern struct user *proc0paddr;
+struct pool ppc_vecpl;
 
 /*
  * Declare these as initialized data so we can patch them.
  */
-int	nswbuf = 0;
 #ifdef NBUF
 int	nbuf = NBUF;
 #else
 int	nbuf = 0;
 #endif
+
+#ifndef BUFCACHEPERCENT
+#define BUFCACHEPERCENT 5
+#endif
+
 #ifdef BUFPAGES
 int bufpages = BUFPAGES;
 #else
 int bufpages = 0;
 #endif
+int bufcachepercent = BUFCACHEPERCENT;
 
 struct bat battable[16];
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *phys_map = NULL;
 
 int astpending;
 int ppc_malloc_ok = 0;
@@ -145,20 +148,28 @@ struct firmware *fw = NULL;
 void * startsym, *endsym;
 #endif
 
+#ifdef APERTURE
+#ifdef INSECURE
+int allowaperture = 1;
+#else
+int allowaperture = 0;
+#endif
+#endif
+
 void ofw_dbg(char *str);
 
-caddr_t allocsys __P((caddr_t));
-void dumpsys __P((void));
-void systype __P((char *name));
-void lcsplx __P((int ipl));	/* called from LCore */
-int power4e_get_eth_addr __P((void));
-void nameinterrupt __P((int replace, char *newstr));
-void ppc_intr_setup __P((intr_establish_t *establish,
-    intr_disestablish_t *disestablish));
-void *ppc_intr_establish __P((void *lcv, pci_intr_handle_t ih, int type,
-    int level, int (*func) __P((void *)), void *arg, char *name));
-int bus_mem_add_mapping __P((bus_addr_t bpa, bus_size_t size, int cacheable,
-    bus_space_handle_t *bshp));
+caddr_t allocsys(caddr_t);
+void dumpsys(void);
+void systype(char *name);
+int lcsplx(int ipl);	/* called from LCore */
+int power4e_get_eth_addr(void);
+void nameinterrupt(int replace, char *newstr);
+void ppc_intr_setup(intr_establish_t *establish,
+    intr_disestablish_t *disestablish);
+void *ppc_intr_establish(void *lcv, pci_intr_handle_t ih, int type,
+    int level, int (*func)(void *), void *arg, char *name);
+int bus_mem_add_mapping(bus_addr_t bpa, bus_size_t size, int cacheable,
+    bus_space_handle_t *bshp);
 
 /*
  * Extent maps to manage I/O. Allocate storage for 8 regions in each,
@@ -195,18 +206,13 @@ initppc(startkernel, endkernel, args)
 #if NIPKDB > 0
 	extern ipkdblow, ipkdbsize;
 #endif
-	extern void consinit __P((void));
-	extern void callback __P((void *));
+	extern void consinit(void);
+	extern void callback(void *);
+	extern void *msgbuf_addr;
 	int exc, scratch;
 
 	proc0.p_addr = proc0paddr;
 	bzero(proc0.p_addr, sizeof *proc0.p_addr);
-
-	/*
-	 * XXX We use the page just above the interrupt vector as
-	 * message buffer
-	 */
-	initmsgbuf((void *)0x3000, MSGBUFSIZE);
 
 where = 3;
 	curpcb = &proc0paddr->u_pcb;
@@ -232,16 +238,6 @@ where = 3;
 	battable[0].batl = BATL(0x00000000, BAT_M);
 	battable[0].batu = BATU(0x00000000);
 
-#if 0
-	battable[0x8].batl = BATL(0x80000000, BAT_I);
-	battable[0x8].batu = BATU(0x80000000);
-	battable[0x9].batl = BATL(0x90000000, BAT_I);
-	battable[0x9].batu = BATU(0x90000000);
-	battable[0xa].batl = BATL(0xa0000000, BAT_I);
-	battable[0xa].batu = BATU(0xa0000000);
-	segment8_a_mapped = 1;
-#endif
-
 	/*
 	 * Now setup fixed bat registers
 	 *
@@ -255,16 +251,12 @@ where = 3;
 	__asm__ volatile ("mtdbatl 0,%0; mtdbatu 0,%1"
 		      :: "r"(battable[0].batl), "r"(battable[0].batu));
 
-#if 0
-	__asm__ volatile ("mtdbatl 1,%0; mtdbatu 1,%1"
-		      :: "r"(battable[1].batl), "r"(battable[1].batu));
-	__asm__ volatile ("sync;isync");
-#endif
+
 
 	/*
 	 * Set up trap vectors
 	 */
-	for (exc = EXC_RSVD; exc <= EXC_LAST; exc += 0x100)
+	for (exc = EXC_RSVD; exc <= EXC_LAST; exc += 0x100) {
 		switch (exc) {
 		default:
 			bcopy(&trapcode, (void *)exc, (size_t)&trapsize);
@@ -274,7 +266,7 @@ where = 3;
 			 * This one is (potentially) installed during autoconf
 			 */
 			break;
-#if 1
+
 		case EXC_DSI:
 			bcopy(&dsitrap, (void *)EXC_DSI, (size_t)&dsisize);
 			break;
@@ -284,7 +276,6 @@ where = 3;
 		case EXC_ALI:
 			bcopy(&alitrap, (void *)EXC_ALI, (size_t)&alisize);
 			break;
-#endif
 		case EXC_DECR:
 			bcopy(&decrint, (void *)EXC_DECR, (size_t)&decrsize);
 			break;
@@ -309,6 +300,18 @@ where = 3;
 #endif
 			break;
 		}
+	}
+
+	/* Grr, ALTIVEC_UNAVAIL is a vector not ~0xff aligned: 0x0f20 */
+	bcopy(&trapcode, (void *)0xf20, (size_t)&trapsize);
+
+	/*
+	 * since trapsize is > 0x20, we just overwrote the EXC_PERF handler
+	 * since we do not use it, we will "share" it with the EXC_VEC,
+	 * we dont support EXC_VEC either.
+	 * should be a 'ba 0xf20 written' at address 0xf00, but we
+	 * do not generate EXC_PERF exceptions...
+	 */
 
 	syncicache((void *)EXC_RST, EXC_LAST - EXC_RST + 0x100);
 
@@ -321,6 +324,23 @@ where = 3;
 	 */
 	pmap_bootstrap(startkernel, endkernel);
 
+	/* use BATs to map 1GB memory, no pageable BATs now */
+	if (physmem > btoc(0x10000000)) {
+		__asm__ volatile ("mtdbatl 1,%0; mtdbatu 1,%1"
+			      :: "r"(BATL(0x10000000, BAT_M)),
+			      "r"(BATU(0x10000000)));
+	}
+	if (physmem > btoc(0x20000000)) {
+		__asm__ volatile ("mtdbatl 2,%0; mtdbatu 2,%1"
+			      :: "r"(BATL(0x20000000, BAT_M)),
+			      "r"(BATU(0x20000000)));
+	}
+	if (physmem > btoc(0x30000000)) {
+		__asm__ volatile ("mtdbatl 3,%0; mtdbatu 3,%1"
+			      :: "r"(BATL(0x30000000, BAT_M)),
+			      "r"(BATU(0x30000000)));
+	}
+#if 0
 	/* now that we know physmem size, map physical memory with BATs */
 	if (physmem > btoc(0x10000000)) {
 		battable[0x1].batl = BATL(0x10000000, BAT_M);
@@ -350,6 +370,7 @@ where = 3;
 		battable[0x7].batl = BATL(0x70000000, BAT_M);
 		battable[0x7].batu = BATU(0x70000000);
 	}
+#endif
 
 	/*
 	 * Now enable translation (and machine checks/recoverable interrupts).
@@ -358,6 +379,11 @@ where = 3;
 
 	__asm__ volatile ("eieio; mfmsr %0; ori %0,%0,%1; mtmsr %0; sync;isync"
 		      : "=r"(scratch) : "K"(PSL_IR|PSL_DR|PSL_ME|PSL_RI));
+
+	/*
+	 * use the memory provided by pmap_bootstrap for message buffer
+	 */
+	initmsgbuf(msgbuf_addr, MSGBUFSIZE);
 
 	/*
 	 * Look at arguments passed to us and compute boothowto.
@@ -469,6 +495,8 @@ where = 3;
 	 */
 	(void)power4e_get_eth_addr();
 
+        pool_init(&ppc_vecpl, sizeof(struct vreg), 16, 0, 0, "ppcvec", NULL);
+
 }
 void ofw_dbg(char *str)
 {
@@ -479,10 +507,10 @@ void ofw_dbg(char *str)
 
 void
 install_extint(handler)
-	void (*handler) __P((void));
+	void (*handler)(void);
 {
-	void extint __P((void));
-	void extsize __P((void));
+	void extint(void);
+	void extsize(void);
 	extern u_long extint_call;
 	u_long offset = (u_long)handler - (u_long)&extint_call;
 	int omsr, msr;
@@ -534,9 +562,9 @@ cpu_startup()
 	 */
 	sz = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(sz),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)))
 		panic("cpu_startup: cannot allocate VM for buffers");
 	/*
 	addr = (vaddr_t)buffers;
@@ -566,6 +594,7 @@ cpu_startup()
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -580,9 +609,6 @@ cpu_startup()
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 	    VM_PHYS_SIZE, 0, FALSE, NULL);
 	ppc_malloc_ok = 1;
-
-	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-	    VM_MBUF_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
 
 	printf("avail mem = %d (%dK)\n", ptoa(uvmexp.free),
 	    ptoa(uvmexp.free)/1024);
@@ -608,6 +634,9 @@ allocsys(v)
 	v = (caddr_t)(((name) = (type *)v) + (num))
 
 #ifdef	SYSVSHM
+	shminfo.shmmax = shmmaxpgs;
+	shminfo.shmall = shmmaxpgs;
+	shminfo.shmseg = shmseg;
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
 #ifdef	SYSVSEM
@@ -622,14 +651,11 @@ allocsys(v)
 	valloc(msqids, struct msqid_ds, msginfo.msgmni);
 #endif
 
-#ifndef BUFCACHEPERCENT
-#define BUFCACHEPERCENT 5
-#endif
 	/*
 	 * Decide on buffer space to use.
 	 */
 	if (bufpages == 0)
-		bufpages = physmem * BUFCACHEPERCENT / 100;
+		bufpages = physmem * bufcachepercent / 100;
 	if (nbuf == 0) {
 		nbuf = bufpages;
 		if (nbuf < 16)
@@ -645,11 +671,6 @@ allocsys(v)
 	if (bufpages > nbuf * MAXBSIZE / PAGE_SIZE)
 		bufpages = nbuf * MAXBSIZE / PAGE_SIZE;
 
-	if (nswbuf == 0) {
-		nswbuf = (nbuf / 2) & ~1;
-		if (nswbuf > 256)
-			nswbuf = 256;
-	}
 	valloc(buf, struct buf, nbuf);
 
 	return v;
@@ -688,7 +709,7 @@ setregs(p, pack, stack, retval)
 	pargs = -roundup(-stack + 8, 16);
 	newstack = (u_int32_t)(pargs - 32);
 
-	copyin ((void*)(VM_MAX_ADDRESS-0x10), &args, 0x10);
+	copyin ((void *)(VM_MAX_ADDRESS-0x10), &args, 0x10);
 
 	bzero(tf, sizeof *tf);
 	tf->fixreg[1] = newstack;
@@ -813,6 +834,17 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	if (namelen != 1)
 		return ENOTDIR;
 	switch (name[0]) {
+	case CPU_ALLOWAPERTURE:
+#ifdef APERTURE
+		if (securelevel > 0) 
+			return (sysctl_rdint(oldp, oldlenp, newp, 
+			    allowaperture));
+		else
+			return (sysctl_int(oldp, oldlenp, newp, newlen, 
+			    &allowaperture));
+#else
+		return (sysctl_rdint(oldp, oldlenp, newp, 0));
+#endif
 	default:
 		return EOPNOTSUPP;
 	}
@@ -850,56 +882,22 @@ void
 softnet(isr)
 	int isr;
 {
-#ifdef	INET
-#include "ether.h"
-#if NETHER > 0
-	if (isr & (1 << NETISR_ARP))
-		arpintr();
-#endif
-	if (isr & (1 << NETISR_IP))
-		ipintr();
-#endif
-#ifdef INET6
-	if (isr & (1 << NETISR_IPV6))
-		ip6intr();
-#endif
-#ifdef NETATALK
-	if (isr & (1 << NETISR_ATALK))
-		atintr();
-#endif
-#ifdef	IMP
-	if (isr & (1 << NETISR_IMP))
-		impintr();
-#endif
-#ifdef	NS
-	if (isr & (1 << NETISR_NS))
-		nsintr();
-#endif
-#ifdef	ISO
-	if (isr & (1 << NETISR_ISO))
-		clnlintr();
-#endif
-#ifdef	CCITT
-	if (isr & (1 << NETISR_CCITT))
-		ccittintr();
-#endif
-#include "ppp.h"
-#if NPPP > 0
-	if (isr & (1 << NETISR_PPP))
-		pppintr();
-#endif
-#include "bridge.h"
-#if NBRIDGE > 0
-	if (isr & (1 << NETISR_BRIDGE))
-		bridgeintr();
-#endif
+#define DONETISR(flag, func) \
+	if (isr & (1 << flag))\
+		func();
+
+#include <net/netisr_dispatch.h>
 }
 
-void
+int
 lcsplx(ipl)
 	int ipl;
 {
+	int oldcpl;
+
+	oldcpl = cpl;
 	splx(ipl);
+	return oldcpl;
 }
 
 /*
@@ -1059,7 +1057,7 @@ ppc_intr_establish(lcv, ih, type, level, func, arg, name)
 	pci_intr_handle_t ih;
 	int type;
 	int level;
-	int (*func) __P((void *));
+	int (*func)(void *);
 	void *arg;
 	char *name;
 {
@@ -1153,10 +1151,10 @@ bus_space_map(t, bpa, size, cacheable, bshp)
 	}
 	return 0;
 }
-bus_addr_t bus_space_unmap_p __P((bus_space_tag_t t, bus_space_handle_t bsh,
-			  bus_size_t size));
-void bus_space_unmap __P((bus_space_tag_t t, bus_space_handle_t bsh,
-			  bus_size_t size));
+bus_addr_t bus_space_unmap_p(bus_space_tag_t t, bus_space_handle_t bsh,
+			  bus_size_t size);
+void bus_space_unmap(bus_space_tag_t t, bus_space_handle_t bsh,
+			  bus_size_t size);
 bus_addr_t
 bus_space_unmap_p(t, bsh, size)
 	bus_space_tag_t t;
@@ -1183,10 +1181,10 @@ bus_space_unmap(t, bsh, size)
 	off = bsh - sva;
 	len = size+off;
 
+	/* do not free memory which was stolen from the vm system */
 	if (ppc_malloc_ok &&
 	  ((sva >= VM_MIN_KERNEL_ADDRESS) && (sva < VM_MAX_KERNEL_ADDRESS)) )
 	{
-		/* do not free memory which was stolen from the vm system */
 		uvm_km_free(phys_map, sva, len);
 	}
 #if 0
@@ -1200,7 +1198,10 @@ bus_space_unmap(t, bsh, size)
 	}
 #endif
 	pmap_remove(vm_map_pmap(phys_map), sva, sva+len);
+	pmap_update(pmap_kernel());
 }
+
+vm_offset_t ppc_kvm_stolen = VM_KERN_ADDRESS_SIZE;
 
 int
 bus_mem_add_mapping(bpa, size, cacheable, bshp)
@@ -1229,9 +1230,12 @@ bus_mem_add_mapping(bpa, size, cacheable, bshp)
 
 		/* need to steal vm space before kernel vm is initialized */
 		alloc_size = round_page(size);
-		ppc_kvm_size -= alloc_size;
 
-		vaddr = VM_MIN_KERNEL_ADDRESS + ppc_kvm_size;
+		vaddr = VM_MIN_KERNEL_ADDRESS + ppc_kvm_stolen;
+		ppc_kvm_stolen += alloc_size;
+		if (ppc_kvm_stolen > SEGMENT_LENGTH) {
+			panic("ppc_kvm_stolen, out of space");
+		}
 	} else {
 		vaddr = uvm_km_valloc_wait(phys_map, len);
 	}
@@ -1302,7 +1306,7 @@ mapiodev(pa, len)
 		spa += PAGE_SIZE;
 		vaddr += PAGE_SIZE;
 	}
-	return (void*) (va+off);
+	return (void *) (va+off);
 }
 void
 unmapiodev(kva, p_size)
@@ -1326,7 +1330,7 @@ unmapiodev(kva, p_size)
 #endif
 		vaddr += PAGE_SIZE;
 	}
-	return;
+	pmap_update(pmap_kernel());
 }
 
 

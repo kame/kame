@@ -1,4 +1,4 @@
-/*	$OpenBSD: vgafb.c,v 1.3 2001/09/17 15:10:36 drahn Exp $	*/
+/*	$OpenBSD: vgafb.c,v 1.8 2002/04/05 02:36:06 drahn Exp $	*/
 /*	$NetBSD: vga.c,v 1.3 1996/12/02 22:24:54 cgd Exp $	*/
 
 /*
@@ -34,7 +34,6 @@
 #include <sys/device.h>
 #include <sys/buf.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
@@ -64,16 +63,15 @@ struct cfdriver vgafb_cd = {
 	NULL, "vgafb", DV_DULL,
 };
 
-void	vgafb_cursor __P((void *, int, int, int));
-void	vgafb_putchar __P((void *, int, int, u_int, long));
-void	vgafb_copycols __P((void *, int, int, int, int));
-void	vgafb_erasecols __P((void *, int, int, int));
-void	vgafb_copyrows __P((void *, int, int, int));
-void	vgafb_eraserows __P((void *, int, int));
-void	vgafb_alloc_attr __P((void *c, int fg, int bg, int flags, long *));
+void	vgafb_cursor(void *, int, int, int);
+void	vgafb_putchar(void *, int, int, u_int, long);
+void	vgafb_copycols(void *, int, int, int, int);
+void	vgafb_erasecols(void *, int, int, int);
+void	vgafb_copyrows(void *, int, int, int);
+void	vgafb_eraserows(void *, int, int);
+void	vgafb_alloc_attr(void *c, int fg, int bg, int flags, long *);
 
-void vgafb_setcolor __P((unsigned int index, u_int8_t r, u_int8_t g, u_int8_t b));
-extern const char fontdata_8x16[];
+void vgafb_setcolor(unsigned int index, u_int8_t r, u_int8_t g, u_int8_t b);
 
 struct vgafb_devconfig {
 	struct rcons dc_ri;
@@ -120,9 +118,8 @@ struct wsdisplay_accessops vgafb_accessops = {
 	0 /* load_font */
 };
 
-int	vgafb_print __P((void *, const char *));
-int	vgafb_getcmap __P((struct vgafb_config *vc, struct wsdisplay_cmap *cm));
-int	vgafb_putcmap __P((struct vgafb_config *vc, struct wsdisplay_cmap *cm));
+int	vgafb_getcmap(struct vgafb_config *vc, struct wsdisplay_cmap *cm);
+int	vgafb_putcmap(struct vgafb_config *vc, struct wsdisplay_cmap *cm);
 
 #define FONT_WIDTH 8
 #define FONT_HEIGHT 16
@@ -327,18 +324,6 @@ vgafb_wsdisplay_attach(parent, vc, console)
         config_found(parent, &aa, wsemuldisplaydevprint);
 }
 
-
-int
-vgafb_print(aux, pnp)
-	void *aux;
-	const char *pnp;
-{
-
-	if (pnp)
-		printf("wsdisplay at %s", pnp);
-	return (UNCONF);
-}
-
 int
 vgafb_ioctl(v, cmd, data, flag, p)
 	void *v;
@@ -396,7 +381,7 @@ vgafb_mmap(v, offset, prot)
 	bus_space_handle_t h;
 
 	/* memsize... */
-	if (offset >= 0x00000 && offset < 0x800000)	/* 8MB of mem??? */
+	if (offset >= 0x00000 && offset < vc->memsize)
 		h = vc->vc_paddr + offset;
 	/* XXX the following are probably wrong. we want physical addresses 
 	   here, not virtual ones */
@@ -409,18 +394,18 @@ vgafb_mmap(v, offset, prot)
 	else if (offset >= 0x18880000 && offset < 0x100c0000)
 		/* 256KB of iohd */
 		h = vc->vc_ioh_d;
-	else if (offset >= 0x20000000 && offset < 0x30000000)
+	else if (offset >= 0x20000000 && offset < 0x20000000+vc->mmiosize)
 		/* mmiosize... */
 		h = vc->vc_mmioh + (offset - 0x20000000);
-	else {
-		/* XXX - allow mapping of the actual physical
-		 * device address, if the address is read from
-		 * pci bus config space
-		 */
-
-		/* NEEDS TO BE RESTRICTED to valid addresses for this device */
-		 
+	else if (offset >= vc->membase && (offset < vc->membase+vc->memsize)) {
+		/* allow mmapping of memory */
 		h = offset;
+	} else if (offset >= vc->mmiobase &&
+	    (offset < vc->mmiobase+vc->mmiosize)) {
+		/* allow mmapping of mmio space */
+		h = offset;
+	} else {
+		h = -1;
 	}
 
 #ifdef alpha
@@ -463,7 +448,6 @@ vgafb_cnprobe(cp)
 
 }
 
-extern struct raster_font fontdata8x16;
 void
 vgafb_cnattach(iot, memt, pc, bus, device, function)
 	void * pc;
@@ -520,12 +504,22 @@ vgafb_cnattach(iot, memt, pc, bus, device, function)
 	wsdisplay_cnattach(&vgafb_stdscreen, ri, 0, 0, defattr);
 }
 
+struct {
+	u_int8_t r;
+	u_int8_t g;
+	u_int8_t b;
+	u_int8_t pad;
+} vgafb_color[256];
 void
 vgafb_setcolor(index, r, g, b) 
 	unsigned int index;
 	u_int8_t r, g, b;
 {
-	OF_call_method_1("color!", cons_display_ofh, 4, r, g, b, index);
+	vgafb_color[0].r = r;
+	vgafb_color[0].g = g;
+	vgafb_color[0].b = b;
+	OF_call_method_1("set-colors", cons_display_ofh, 3,
+	    &vgafb_color, index, 1);
 }
 
 int
@@ -579,8 +573,12 @@ vgafb_putcmap(vc, cm)
 	b = &(vc->vc_cmap_blue[index]);
 
 	for (i = 0; i < count; i++) {
-		OF_call_method_1("color!", vc->vc_ofh, 4, *r, *g, *b, index);
+		vgafb_color[i].r = *r;
+		vgafb_color[i].g = *g;
+		vgafb_color[i].b = *b;
 		r++, g++, b++, index++;
 	}
+	OF_call_method_1("set-colors", cons_display_ofh, 3,
+	    &vgafb_color, cm->index, count);
 	return 0;
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: p9100.c,v 1.4 2001/08/17 13:52:29 mickey Exp $	*/
+/*	$OpenBSD: p9100.c,v 1.7 2002/03/14 01:26:43 millert Exp $	*/
 
 /*
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
@@ -48,7 +48,7 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/fbio.h>
 #include <machine/autoconf.h>
@@ -99,9 +99,9 @@ struct fbdriver p9100fbdriver = {
 extern int fbnode;
 extern struct tty *fbconstty;
 
-void p9100loadcmap __P((struct p9100_softc *, int, int));
-void p9100_set_video __P((struct p9100_softc *, int));
-int p9100_get_video __P((struct p9100_softc *));
+void p9100loadcmap(struct p9100_softc *, int, int);
+void p9100_set_video(struct p9100_softc *, int);
+int p9100_get_video(struct p9100_softc *);
 
 /*
  * System control and command registers
@@ -449,10 +449,11 @@ p9100loadcmap(sc, start, ncolors)
  * Return the address that would map the given device at the given
  * offset, allowing for the given protection, or return -1 for error.
  */
-int
+paddr_t
 p9100mmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	struct p9100_softc *sc = pnozz_cd.cd_devs[minor(dev)];
 

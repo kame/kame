@@ -1,4 +1,4 @@
-/*	$OpenBSD: portal_vnops.c,v 1.9 2001/06/23 02:14:25 csapuntz Exp $	*/
+/*	$OpenBSD: portal_vnops.c,v 1.12 2002/03/14 01:27:08 millert Exp $	*/
 /*	$NetBSD: portal_vnops.c,v 1.17 1996/02/13 13:12:57 mycroft Exp $	*/
 
 /*
@@ -67,47 +67,47 @@
 
 static int portal_fileid = PORTAL_ROOTFILEID+1;
 
-static void	portal_closefd __P((struct proc *, int));
-static int	portal_connect __P((struct socket *, struct socket *));
+static void	portal_closefd(struct proc *, int);
+static int	portal_connect(struct socket *, struct socket *);
 
 
-int portal_badop __P((void *));
+int portal_badop(void *);
 
-int	portal_lookup	__P((void *));
+int	portal_lookup(void *);
 #define	portal_create	eopnotsupp
 #define	portal_mknod	eopnotsupp
-int	portal_open	__P((void *));
+int	portal_open(void *);
 #define	portal_close	nullop
 #define	portal_access	nullop
-int	portal_getattr	__P((void *));
-int	portal_setattr	__P((void *));
+int	portal_getattr(void *);
+int	portal_setattr(void *);
 #define	portal_read	eopnotsupp
 #define	portal_write	eopnotsupp
-#define	portal_ioctl    (int (*) __P((void *)))enoioctl
+#define	portal_ioctl    (int (*)(void *))enoioctl
 #define	portal_select	eopnotsupp
 #define	portal_fsync	nullop
 #define	portal_remove	eopnotsupp
-int	portal_link	__P((void *));
+int	portal_link(void *);
 #define	portal_rename	eopnotsupp
 #define	portal_mkdir	eopnotsupp
 #define	portal_rmdir	eopnotsupp
-int	portal_symlink	__P((void *));
-int	portal_readdir	__P((void *));
+int	portal_symlink(void *);
+int	portal_readdir(void *);
 #define portal_revoke   vop_generic_revoke
 #define	portal_readlink	eopnotsupp
-int	portal_inactive	__P((void *));
-int	portal_reclaim	__P((void *));
+int	portal_inactive(void *);
+int	portal_reclaim(void *);
 #define	portal_lock	vop_generic_lock
 #define	portal_unlock	vop_generic_unlock
 #define	portal_bmap	portal_badop
 #define	portal_strategy	portal_badop
-int	portal_print	__P((void *));
+int	portal_print(void *);
 #define	portal_islocked	vop_generic_islocked
-int	portal_pathconf	__P((void *));
+int	portal_pathconf(void *);
 #define	portal_advlock	eopnotsupp
 #define	portal_bwrite	eopnotsupp
 
-int (**portal_vnodeop_p) __P((void *));
+int (**portal_vnodeop_p)(void *);
 struct vnodeopv_entry_desc portal_vnodeop_entries[] = {
 	{ &vop_default_desc, vn_default_error },
 	{ &vop_lookup_desc, portal_lookup },		/* lookup */
@@ -144,7 +144,7 @@ struct vnodeopv_entry_desc portal_vnodeop_entries[] = {
 	{ &vop_pathconf_desc, portal_pathconf },	/* pathconf */
 	{ &vop_advlock_desc, portal_advlock },		/* advlock */
 	{ &vop_bwrite_desc, portal_bwrite },		/* bwrite */
-	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+	{ NULL, NULL }
 };
 struct vnodeopv_desc portal_vnodeop_opv_desc =
 	{ &portal_vnodeop_p, portal_vnodeop_entries };
@@ -475,7 +475,11 @@ portal_open(v)
 	 * Check that the mode the file is being opened for is a subset 
 	 * of the mode of the existing descriptor.
 	 */
- 	fp = p->p_fd->fd_ofiles[fd];
+	if ((fp = fd_getfile(p->p_fd, fd)) == NULL) {
+		portal_closefd(p, fd);
+		error = EBADF;
+		goto bad;
+	}
 	if (((ap->a_mode & (FREAD|FWRITE)) | fp->f_flag) != fp->f_flag) {
 		portal_closefd(p, fd);
 		error = EACCES;

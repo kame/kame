@@ -1,4 +1,4 @@
-/*	$OpenBSD: igmp.c,v 1.11 2001/06/08 03:53:45 angelos Exp $	*/
+/*	$OpenBSD: igmp.c,v 1.14 2002/03/15 18:19:52 millert Exp $	*/
 /*	$NetBSD: igmp.c,v 1.15 1996/02/13 23:41:25 christos Exp $	*/
 
 /*
@@ -35,9 +35,9 @@
 int		igmp_timers_are_running;
 static struct router_info *rti_head;
 
-void igmp_sendpkt __P((struct in_multi *, int));
-static int rti_fill __P((struct in_multi *));
-static struct router_info * rti_find __P((struct ifnet *));
+void igmp_sendpkt(struct in_multi *, int, in_addr_t);
+static int rti_fill(struct in_multi *);
+static struct router_info * rti_find(struct ifnet *);
 
 void
 igmp_init()
@@ -118,13 +118,7 @@ rti_delete(ifp)
 }
 
 void
-#if __STDC__
 igmp_input(struct mbuf *m, ...)
-#else
-igmp_input(m, va_alist)
-	struct mbuf *m;
-	va_dcl
-#endif
 {
 	register int iphlen;
 	register struct ifnet *ifp = m->m_pkthdr.rcvif;
@@ -409,7 +403,7 @@ igmp_joingroup(inm)
 	    (inm->inm_ifp->if_flags & IFF_LOOPBACK) == 0) {
 		if ((i = rti_fill(inm)) == -1)
 			return;
-		igmp_sendpkt(inm, i);
+		igmp_sendpkt(inm, i, 0);
 		inm->inm_state = IGMP_DELAYING_MEMBER;
 		inm->inm_timer = IGMP_RANDOM_DELAY(
 		    IGMP_MAX_HOST_REPORT_DELAY * PR_FASTHZ);
@@ -430,7 +424,8 @@ igmp_leavegroup(inm)
 		if (!IN_LOCAL_GROUP(inm->inm_addr.s_addr) &&
 		    (inm->inm_ifp->if_flags & IFF_LOOPBACK) == 0)
 			if (inm->inm_rti->rti_type != IGMP_v1_ROUTER)
-				igmp_sendpkt(inm, IGMP_HOST_LEAVE_MESSAGE);
+ 				igmp_sendpkt(inm, IGMP_HOST_LEAVE_MESSAGE, 
+ 				    INADDR_ALLROUTERS_GROUP);
 		break;
 	case IGMP_LAZY_MEMBER:
 	case IGMP_AWAKENING_MEMBER:
@@ -463,10 +458,10 @@ igmp_fasttimo()
 			if (inm->inm_state == IGMP_DELAYING_MEMBER) {
 				if (inm->inm_rti->rti_type == IGMP_v1_ROUTER)
 					igmp_sendpkt(inm,
-					    IGMP_v1_HOST_MEMBERSHIP_REPORT);
+					    IGMP_v1_HOST_MEMBERSHIP_REPORT, 0);
 				else
 					igmp_sendpkt(inm,
-					    IGMP_v2_HOST_MEMBERSHIP_REPORT);
+					    IGMP_v2_HOST_MEMBERSHIP_REPORT, 0);
 				inm->inm_state = IGMP_IDLE_MEMBER;
 			}
 		} else {
@@ -494,9 +489,10 @@ igmp_slowtimo()
 }
 
 void
-igmp_sendpkt(inm, type)
+igmp_sendpkt(inm, type, addr)
 	struct in_multi *inm;
 	int type;
+ 	in_addr_t addr;
 {
 	struct mbuf *m;
 	struct igmp *igmp;
@@ -523,7 +519,11 @@ igmp_sendpkt(inm, type)
 	ip->ip_off = 0;
 	ip->ip_p = IPPROTO_IGMP;
 	ip->ip_src.s_addr = INADDR_ANY;
-	ip->ip_dst = inm->inm_addr;
+ 	if (addr) {
+ 		ip->ip_dst.s_addr = addr;
+ 	} else {
+ 		ip->ip_dst = inm->inm_addr;
+ 	}
 
 	m->m_data += sizeof(struct ip);
 	m->m_len -= sizeof(struct ip);

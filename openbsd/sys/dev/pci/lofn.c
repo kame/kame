@@ -1,4 +1,4 @@
-/*	$OpenBSD: lofn.c,v 1.10 2001/08/25 10:13:29 art Exp $	*/
+/*	$OpenBSD: lofn.c,v 1.13 2002/04/08 17:49:42 jason Exp $	*/
 
 /*
  * Copyright (c) 2001 Jason L. Wright (jason@thought.net)
@@ -29,6 +29,11 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Effort sponsored in part by the Defense Advanced Research Projects
+ * Agency (DARPA) and Air Force Research Laboratory, Air Force
+ * Materiel Command, USAF, under agreement number F30602-01-2-0537.
+ *
  */
 
 /*
@@ -44,7 +49,7 @@
 #include <sys/mbuf.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <crypto/cryptodev.h>
 #include <dev/rndvar.h>
@@ -59,8 +64,8 @@
 /*
  * Prototypes and count for the pci_device structure
  */
-int lofn_probe		__P((struct device *, void *, void *));
-void lofn_attach	__P((struct device *, struct device *, void *));
+int lofn_probe(struct device *, void *, void *);
+void lofn_attach(struct device *, struct device *, void *);
 
 struct cfattach lofn_ca = {
 	sizeof(struct lofn_softc), lofn_probe, lofn_attach,
@@ -70,12 +75,12 @@ struct cfdriver lofn_cd = {
 	0, "lofn", DV_DULL
 };
 
-int lofn_intr	__P((void *));
+int lofn_intr(void *);
 
-void lofn_putnum __P((struct lofn_softc *, u_int32_t, u_int32_t,
-    u_int32_t *, u_int32_t));
-int lofn_getnum __P((struct lofn_softc *, u_int32_t, u_int32_t,
-    u_int32_t *num, u_int32_t *numlen));
+void lofn_putnum(struct lofn_softc *, u_int32_t, u_int32_t,
+    u_int32_t *, u_int32_t);
+int lofn_getnum(struct lofn_softc *, u_int32_t, u_int32_t,
+    u_int32_t *num, u_int32_t *numlen);
 
 int
 lofn_probe(parent, match, aux)

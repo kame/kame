@@ -1,4 +1,4 @@
-/*	$OpenBSD: ibcs2_stat.c,v 1.5 2000/09/07 17:52:23 ericj Exp $	*/
+/*	$OpenBSD: ibcs2_stat.c,v 1.9 2002/03/14 20:31:31 mickey Exp $	*/
 /*	$NetBSD: ibcs2_stat.c,v 1.5 1996/05/03 17:05:32 christos Exp $	*/
 
 /*
@@ -42,7 +42,7 @@
 #include <sys/vnode.h>
 #include <sys/syscallargs.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <compat/ibcs2/ibcs2_types.h>
 #include <compat/ibcs2/ibcs2_fcntl.h>
@@ -54,8 +54,8 @@
 #include <compat/ibcs2/ibcs2_util.h>
 #include <compat/ibcs2/ibcs2_utsname.h>
 
-static void bsd_stat2ibcs_stat __P((struct ostat *, struct ibcs2_stat *));
-static int cvt_statfs __P((struct statfs *, caddr_t, int));
+static void bsd_stat2ibcs_stat(struct ostat *, struct ibcs2_stat *);
+static int cvt_statfs(struct statfs *, caddr_t, int);
 
 static void
 bsd_stat2ibcs_stat(st, st4)
@@ -149,7 +149,10 @@ ibcs2_sys_fstatfs(p, v, retval)
 		return (error);
 	mp = ((struct vnode *)fp->f_data)->v_mount;
 	sp = &mp->mnt_stat;
-	if ((error = VFS_STATFS(mp, sp, p)) != 0)
+	FREF(fp);
+	error = VFS_STATFS(mp, sp, p);
+	FRELE(fp);
+	if (error)
 		return (error);
 	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
 	return cvt_statfs(sp, (caddr_t)SCARG(uap, buf), SCARG(uap, len));
@@ -256,7 +259,7 @@ ibcs2_sys_utssys(p, v, retval)
 	case 0:			/* uname(2) */
 	{
 		struct ibcs2_utsname sut;
-		extern char ostype[], machine[], osrelease[];
+		extern char machine[];
 
 		bzero(&sut, ibcs2_utsname_len);
 		bcopy(ostype, sut.sysname, sizeof(sut.sysname) - 1);

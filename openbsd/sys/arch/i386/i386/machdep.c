@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.178 2001/10/04 21:25:03 mickey Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.204 2002/03/30 09:42:28 mickey Exp $	*/
 /*	$NetBSD: machdep.c,v 1.214 1996/11/10 03:16:17 thorpej Exp $	*/
 
 /*-
@@ -82,7 +82,6 @@
 #include <sys/systm.h>
 #include <sys/signalvar.h>
 #include <sys/kernel.h>
-#include <sys/map.h>
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/exec.h>
@@ -119,8 +118,6 @@
 #include <dev/cons.h>
 #include <stand/boot/bootarg.h>
 
-#include <vm/vm.h>
-#include <vm/vm_page.h>
 #include <uvm/uvm_extern.h>
 
 #include <sys/sysctl.h>
@@ -209,17 +206,22 @@ char machine_arch[] = "i386";		/* machine == machine_arch */
 int	cpu_apmhalt = 0;	/* sysctl'd to 1 for halt -p hack */
 #endif
 
-int	nswbuf = 0;
 #ifdef	NBUF
 int	nbuf = NBUF;
 #else
 int	nbuf = 0;
 #endif
+
+#ifndef BUFCACHEPERCENT
+#define BUFCACHEPERCENT 5
+#endif
+
 #ifdef	BUFPAGES
 int	bufpages = BUFPAGES;
 #else
 int	bufpages = 0;
 #endif
+int	bufcachepercent = BUFCACHEPERCENT;
 
 extern int	boothowto;
 int	physmem;
@@ -245,9 +247,8 @@ int	i386_fpu_fdivbug;
 bootarg_t *bootargp;
 vm_offset_t avail_end;
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *phys_map = NULL;
 
 int kbd_reset;
 
@@ -269,18 +270,18 @@ struct	extent *ioport_ex;
 struct	extent *iomem_ex;
 static	int ioport_malloc_safe;
 
-caddr_t	allocsys __P((caddr_t));
-void	setup_buffers __P((vm_offset_t *));
-void	dumpsys __P((void));
-int	cpu_dump __P((void));
-void	identifycpu __P((void));
-void	init386 __P((vm_offset_t));
-void	consinit __P((void));
+caddr_t	allocsys(caddr_t);
+void	setup_buffers(vm_offset_t *);
+void	dumpsys(void);
+int	cpu_dump(void);
+void	identifycpu(void);
+void	init386(vm_offset_t);
+void	consinit(void);
 
-int	bus_mem_add_mapping __P((bus_addr_t, bus_size_t,
-	    int, bus_space_handle_t *));
-int	_bus_dmamap_load_buffer __P((bus_dma_tag_t, bus_dmamap_t, void *,
-    bus_size_t, struct proc *, int, paddr_t *, int *, int));
+int	bus_mem_add_mapping(bus_addr_t, bus_size_t,
+	    int, bus_space_handle_t *);
+int	_bus_dmamap_load_buffer(bus_dma_tag_t, bus_dmamap_t, void *,
+    bus_size_t, struct proc *, int, paddr_t *, int *, int);
 
 #ifdef KGDB
 #ifndef KGDB_DEVNAME
@@ -305,7 +306,7 @@ int comkgdbrate = KGDBRATE;
 #endif
 int comkgdbmode = KGDBMODE;
 #endif /* NCOM  || NPCCOM */
-void kgdb_port_init __P((void));
+void kgdb_port_init(void);
 #endif /* KGDB */
 
 #ifdef APERTURE
@@ -316,12 +317,13 @@ int allowaperture = 0;
 #endif
 #endif
 
-void	winchip_cpu_setup __P((const char *, int, int));
-void	cyrix3_cpu_setup __P((const char *, int, int));
-void	cyrix6x86_cpu_setup __P((const char *, int, int));
-void	intel586_cpu_setup __P((const char *, int, int));
-void	intel686_cpu_setup __P((const char *, int, int));
-char *	intel686_cpu_name __P((int));
+void	winchip_cpu_setup(const char *, int, int);
+void	cyrix3_cpu_setup(const char *, int, int);
+void	cyrix6x86_cpu_setup(const char *, int, int);
+void	intel586_cpu_setup(const char *, int, int);
+void	intel686_cpu_setup(const char *, int, int);
+char *	intel686_cpu_name(int);
+char *	cyrix3_cpu_name(int, int);
 
 #if defined(I486_CPU) || defined(I586_CPU) || defined(I686_CPU)
 static __inline u_char
@@ -348,18 +350,21 @@ cpu_startup()
 	unsigned i;
 	caddr_t v;
 	int sz;
-	vm_offset_t minaddr, maxaddr, pa;
+	vaddr_t minaddr, maxaddr, va;
+	paddr_t pa;
 
 	/*
 	 * Initialize error message buffer (at end of core).
 	 * (space reserved in pmap_bootstrap)
 	 */
 	pa = avail_end;
-	for (i = 0; i < btoc(MSGBUFSIZE); i++, pa += NBPG)
-		pmap_enter(pmap_kernel(),
-		    (vm_offset_t)((caddr_t)msgbufp + i * NBPG), pa,
-		    VM_PROT_READ|VM_PROT_WRITE,
-		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+	va = (vaddr_t)msgbufp;
+	for (i = 0; i < btoc(MSGBUFSIZE); i++) {
+		pmap_kenter_pa(va, pa, VM_PROT_READ|VM_PROT_WRITE);
+		va += PAGE_SIZE;
+		pa += PAGE_SIZE;
+	}
+	pmap_update(pmap_kernel());
 	initmsgbuf((caddr_t)msgbufp, round_page(MSGBUFSIZE));
 
 	printf("%s", version);
@@ -397,9 +402,6 @@ cpu_startup()
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 				   VM_PHYS_SIZE, 0, FALSE, NULL);
 
-	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-	    VM_MBUF_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
-
 	printf("avail mem = %lu (%uK)\n", ptoa(uvmexp.free),
 	    ptoa(uvmexp.free)/1024);
 	printf("using %d buffers containing %u bytes (%uK) of memory\n",
@@ -432,7 +434,6 @@ i386_proc0_tss_ldt_init()
 	struct pcb *pcb;
 	int x;
 
-	gdt_init();
 	curpcb = pcb = &proc0.p_addr->u_pcb;
 	pcb->pcb_flags = 0;
 	pcb->pcb_tss.tss_ioopt =
@@ -470,6 +471,9 @@ allocsys(v)
 #define	valloc(name, type, num) \
 	    v = (caddr_t)(((name) = (type *)v) + (num))
 #ifdef SYSVSHM
+	shminfo.shmmax = shmmaxpgs;
+	shminfo.shmall = shmmaxpgs;
+	shminfo.shmseg = shmseg;
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
 #ifdef SYSVSEM
@@ -485,9 +489,6 @@ allocsys(v)
 	valloc(msqids, struct msqid_ds, msginfo.msgmni);
 #endif
 
-#ifndef BUFCACHEPERCENT
-#define BUFCACHEPERCENT 5
-#endif
 	/*
 	 * Determine how many buffers to allocate.  We use 10% of the
 	 * first 2MB of memory, and 5% of the rest, with a minimum of 16
@@ -499,7 +500,7 @@ allocsys(v)
 			bufpages = physmem / 10;
 		else
 			bufpages = (btoc(2 * 1024 * 1024) + physmem) *
-			    BUFCACHEPERCENT / 100;
+			    bufcachepercent / 100;
 	}
 	if (nbuf == 0) {
 		nbuf = bufpages;
@@ -517,11 +518,6 @@ allocsys(v)
 	if (bufpages > nbuf * MAXBSIZE / PAGE_SIZE)
 		bufpages = nbuf * MAXBSIZE / PAGE_SIZE;
 
-	if (nswbuf == 0) {
-		nswbuf = (nbuf / 2) &~ 1;	/* force even */
-		if (nswbuf > 256)
-			nswbuf = 256;		/* sanity */
-	}
 	valloc(buf, struct buf, nbuf);
 	return v;
 }
@@ -534,13 +530,13 @@ setup_buffers(maxaddr)
 	vm_offset_t addr;
 	int base, residual, left, chunk, i;
 	struct pglist pgs, saved_pgs;
-	vm_page_t pg;
+	struct vm_page *pg;
 
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)))
 		panic("cpu_startup: cannot allocate VM for buffers");
 	addr = (vaddr_t)buffers;
 
@@ -606,7 +602,7 @@ setup_buffers(maxaddr)
 	if (!TAILQ_EMPTY(&saved_pgs))
 		FREE_PGS(saved_pgs);
 
-	pg = pgs.tqh_first;
+	pg = TAILQ_FIRST(&pgs);
 	for (i = 0; i < nbuf; i++) {
 		/*
 		 * First <residual> buffers get (base+1) physical pages
@@ -617,20 +613,19 @@ setup_buffers(maxaddr)
 		 */
 		addr = (vm_offset_t)buffers + i * MAXBSIZE;
 		for (size = PAGE_SIZE * (i < residual ? base + 1 : base);
-		    size > 0; size -= NBPG, addr += NBPG) {
-			pmap_enter(pmap_kernel(), addr, pg->phys_addr,
-			    VM_PROT_READ|VM_PROT_WRITE,
-			    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
-			pg = pg->pageq.tqe_next;
+		    size > 0; size -= PAGE_SIZE, addr += PAGE_SIZE) {
+			pmap_kenter_pa(addr, VM_PAGE_TO_PHYS(pg),
+			    VM_PROT_READ|VM_PROT_WRITE);
+			pg = TAILQ_NEXT(pg, pageq);
 		}
 	}
+	pmap_update(pmap_kernel());
 }
 
 /*  
  * Info for CTL_HW
  */
 char	cpu_model[120];
-extern	char version[];
 
 /*
  * Note: these are just the ones that may not have a cpuid instruction.
@@ -793,7 +788,9 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 			{
 				0, "Athlon Model 1", "Athlon Model 2",
 				"Duron", "Athlon Model 4 (Thunderbird)",
-				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				0, "Athlon Model 6 (Palomino)",
+				"Athlon Model 7 (Morgan)", 0,
+				0, 0, 0, 0, 0, 0, 0,
 				"K7 (Athlon)"		/* Default */
 			},
 			NULL
@@ -862,9 +859,10 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 		{
 			CPUCLASS_686,
 			{
-				0, 0, 0, 0, 0, 0, "VIA Cyrix III", 0,
-				0, 0, 0, 0, 0, 0, 0, 0,
-				"VIA Cyrix III"		/* Default */
+				0, 0, 0, 0, 0, 0, "C3 Samuel 1",
+				"C3 Samule 2/Ezra",
+				"C3 Ezra-T", 0, 0, 0, 0, 0, 0, 0,
+				"C3"		/* Default */
 			},
 			cyrix3_cpu_setup
 		} }
@@ -938,6 +936,31 @@ const struct cpu_cpuid_nameclass i386_cpuid_cpus[] = {
 			},
 			NULL
 		} }
+	},
+	{
+		"Geode by NSC",
+		CPUVENDOR_NS,
+		"National Semiconductor",
+		/* Family 4, not available from National Semiconductor */
+		{ {
+			CPUCLASS_486,
+			{
+				0, 0, 0, 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0, 0, 0,
+				"486 class"	/* Default */
+			},
+			NULL
+		},
+		/* Family 5 */
+		{
+			CPUCLASS_586,
+			{
+				0, 0, 0, 0, "Geode GX1", 0, 0, 0, 0, 0,
+				0, 0, 0, 0, 0, 0,
+				"M1 class"	/* Default */
+			},
+			cyrix6x86_cpu_setup
+		} }
 	}
 };
 
@@ -997,7 +1020,9 @@ cyrix3_cpu_setup(cpu_device, model, step)
 	unsigned int val;
 
 	switch (model) {
-	case 6: /* VIA Cyrix III */
+	case 6: /* C3 Samuel 1 */
+	case 7: /* C3 Samuel 2 or C3 Ezra */
+	case 8: /* C3 Ezra-T */
 		__asm __volatile("cpuid"
 		    : "=d" (val) : "a" (0x80000001) : "ebx", "ecx");
 		if (val & (1U << 31)) {
@@ -1135,6 +1160,27 @@ intel686_cpu_name(model)
 	return (ret);
 }
 
+char *
+cyrix3_cpu_name(model, step)
+	int model, step;
+{
+	char	*name = NULL;
+
+	switch (model) {
+	case 7:
+		if (step < 8)
+			name = "C3 Samuel 2";
+		else
+			name = "C3 Ezra";
+		break;
+	case 8:
+		if (step < 8)
+			name = "C3 Ezra-T";
+		break;
+	}
+	return name;
+}
+
 void
 identifycpu()
 {
@@ -1151,7 +1197,7 @@ identifycpu()
 	int class = CPUCLASS_386, vendor, i, max;
 	int family, model, step, modif, cachesize;
 	const struct cpu_cpuid_nameclass *cpup = NULL;
-	void (*cpu_setup) __P((const char *, int, int));
+	void (*cpu_setup)(const char *, int, int);
 
 	if (cpuid_level == -1) {
 #ifdef DIAGNOSTIC
@@ -1201,6 +1247,8 @@ identifycpu()
 			if (family > CPU_MAXFAMILY)
 				family = CPU_MAXFAMILY;
 			class = family - 3;
+			if (class > CPUCLASS_686)
+				class = CPUCLASS_686;
 			modifier = "";
 			name = "";
 			token = "";
@@ -1209,6 +1257,11 @@ identifycpu()
 			token = cpup->cpu_id;
 			vendor = cpup->cpu_vendor;
 			vendorname = cpup->cpu_vendorname;
+			/* Special hack for the VIA C3 series. */
+			if (vendor == CPUVENDOR_IDT && family >= 6) {
+				vendor = CPUVENDOR_VIA;
+				vendorname = "VIA";
+			}
 			modifier = modifiers[modif];
 			if (family > CPU_MAXFAMILY) {
 				family = CPU_MAXFAMILY;
@@ -1221,10 +1274,17 @@ identifycpu()
 			if (vendor == CPUVENDOR_INTEL && family == 6 &&
 			    (model == 5 || model == 7)) {
 				name = intel686_cpu_name(model);
+			/* Special hack for the VIA C3 series. */
+			} else if (vendor == CPUVENDOR_VIA && family == 6 &&
+				   model >= 7 && model <= 8) {
+				name = cyrix3_cpu_name(model, step);
 			} else
 				name = cpup->cpu_family[i].cpu_models[model];
-			if (name == NULL)
+			if (name == NULL) {
 				name = cpup->cpu_family[i].cpu_models[CPU_DEFMODEL];
+				if (name == NULL)
+					name = "";
+			}
 			class = cpup->cpu_family[i].cpu_class;
 			cpu_setup = cpup->cpu_family[i].cpu_setup;
 		}
@@ -1359,7 +1419,7 @@ identifycpu()
 }
 
 #ifdef COMPAT_IBCS2
-void ibcs2_sendsig __P((sig_t, int, int, u_long, int, union sigval));
+void ibcs2_sendsig(sig_t, int, int, u_long, int, union sigval);
 
 void
 ibcs2_sendsig(catcher, sig, mask, code, type, val)
@@ -1441,8 +1501,8 @@ sendsig(catcher, sig, mask, code, type, val)
 	} else
 #endif
 	{
-		__asm("movl %%gs,%w0" : "=r" (frame.sf_sc.sc_gs));
-		__asm("movl %%fs,%w0" : "=r" (frame.sf_sc.sc_fs));
+		__asm("movw %%gs,%w0" : "=r" (frame.sf_sc.sc_gs));
+		__asm("movw %%fs,%w0" : "=r" (frame.sf_sc.sc_fs));
 		frame.sf_sc.sc_es = tf->tf_es;
 		frame.sf_sc.sc_ds = tf->tf_ds;
 		frame.sf_sc.sc_eflags = tf->tf_eflags;
@@ -1481,8 +1541,8 @@ sendsig(catcher, sig, mask, code, type, val)
 	/*
 	 * Build context to run handler in.
 	 */
-	__asm("movl %w0,%%gs" : : "r" (GSEL(GUDATA_SEL, SEL_UPL)));
-	__asm("movl %w0,%%fs" : : "r" (GSEL(GUDATA_SEL, SEL_UPL)));
+	__asm("movw %w0,%%gs" : : "r" (GSEL(GUDATA_SEL, SEL_UPL)));
+	__asm("movw %w0,%%fs" : : "r" (GSEL(GUDATA_SEL, SEL_UPL)));
 	tf->tf_es = GSEL(GUDATA_SEL, SEL_UPL);
 	tf->tf_ds = GSEL(GUDATA_SEL, SEL_UPL);
 	tf->tf_eip = (int)(((char *)PS_STRINGS) - (esigcode - sigcode));
@@ -1611,12 +1671,8 @@ boot(howto)
 	splhigh();
 
 	/* Do a dump if requested. */
-	if ((howto & (RB_DUMP | RB_HALT)) == RB_DUMP) {
-		/* Save registers. */
-		savectx(&dumppcb);
-
+	if (howto & RB_DUMP)
 		dumpsys();
-	}
 
 haltsys:
 	doshutdownhooks();
@@ -1713,7 +1769,7 @@ dumpconf()
 int
 cpu_dump()
 {
-	int (*dump) __P((dev_t, daddr_t, caddr_t, size_t));
+	int (*dump)(dev_t, daddr_t, caddr_t, size_t);
 	long buf[dbtob(1) / sizeof (long)];
 	kcore_seg_t	*segp;
 
@@ -1752,7 +1808,7 @@ dumpsys()
 	register u_int i, j, npg;
 	register int maddr;
 	daddr_t blkno;
-	int (*dump) __P((dev_t, daddr_t, caddr_t, size_t));
+	int (*dump)(dev_t, daddr_t, caddr_t, size_t);
 	int error;
 	register char *str;
 	extern int msgbufmapped;
@@ -1887,8 +1943,8 @@ setregs(p, pack, stack, retval)
 	pcb->pcb_flags = 0;
 
 	tf = p->p_md.md_regs;
-	__asm("movl %w0,%%gs" : : "r" (LSEL(LUDATA_SEL, SEL_UPL)));
-	__asm("movl %w0,%%fs" : : "r" (LSEL(LUDATA_SEL, SEL_UPL)));
+	__asm("movw %w0,%%gs" : : "r" (LSEL(LUDATA_SEL, SEL_UPL)));
+	__asm("movw %w0,%%fs" : : "r" (LSEL(LUDATA_SEL, SEL_UPL)));
 	tf->tf_es = LSEL(LUDATA_SEL, SEL_UPL);
 	tf->tf_ds = LSEL(LUDATA_SEL, SEL_UPL);
 	tf->tf_ebp = 0;
@@ -2217,7 +2273,7 @@ init386(first_avail)
 #ifdef DEBUG
 	printf("\n");
 #endif
-	pmap_update();
+	tlbflush();
 #if 0
 #if NISADMA > 0
 	/*
@@ -2385,7 +2441,7 @@ cpu_reset()
 	 * entire address space.
 	 */
 	bzero((caddr_t)PTD, NBPG);
-	pmap_update(); 
+	tlbflush(); 
 #endif
 
 	for (;;);
@@ -2677,7 +2733,7 @@ bus_mem_add_mapping(bpa, size, cacheable, bshp)
 			pmap_update_pg(va);
 		}
 	}
-	pmap_update();
+	pmap_update(pmap_kernel());
 
 	return 0;
 }
@@ -3012,10 +3068,12 @@ _bus_dmamap_unload(t, map)
  * by bus-specific DMA map synchronization functions.
  */
 void
-_bus_dmamap_sync(t, map, op)
+_bus_dmamap_sync(t, map, addr, size, op)
 	bus_dma_tag_t t;
 	bus_dmamap_t map;
-	bus_dmasync_op_t op;
+	bus_addr_t addr;
+	bus_size_t size;
+	int op;
 {
 
 	/* Nothing to do here. */
@@ -3049,7 +3107,7 @@ _bus_dmamem_free(t, segs, nsegs)
 	bus_dma_segment_t *segs;
 	int nsegs;
 {
-	vm_page_t m;
+	struct vm_page *m;
 	bus_addr_t addr;
 	struct pglist mlist;
 	int curseg;
@@ -3105,7 +3163,7 @@ _bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 			    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
 		}
 	}
-	pmap_update();
+	pmap_update(pmap_kernel());
 
 	return (0);
 }
@@ -3280,7 +3338,7 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 	vm_offset_t high;
 {
 	vm_offset_t curaddr, lastaddr;
-	vm_page_t m;
+	struct vm_page *m;
 	struct pglist mlist;
 	int curseg, error;
 
@@ -3332,3 +3390,6 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 
 	return (0);
 }
+
+/* If SMALL_KERNEL this results in an out of line definition of splx.  */
+SPLX_OUTLINED_BODY

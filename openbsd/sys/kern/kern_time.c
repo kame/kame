@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_time.c,v 1.24 2001/06/25 03:28:03 csapuntz Exp $	*/
+/*	$OpenBSD: kern_time.c,v 1.29 2002/03/14 01:27:04 millert Exp $	*/
 /*	$NetBSD: kern_time.c,v 1.20 1996/02/18 11:57:06 fvdl Exp $	*/
 
 /*
@@ -55,7 +55,8 @@
 
 #include <machine/cpu.h>
 
-void	settime __P((struct timeval *));
+void	settime(struct timeval *);
+void	itimerround(struct timeval *);
 
 /* 
  * Time of day and interval timer support.
@@ -188,13 +189,13 @@ sys_nanosleep(p, v, retval)
 	register_t *retval;
 {
 	static int nanowait;
-	register struct sys_nanosleep_args/* {
+	struct sys_nanosleep_args/* {
 		syscallarg(const struct timespec *) rqtp;
 		syscallarg(struct timespec *) rmtp;
 	} */ *uap = v;
 	struct timespec rqt;
 	struct timespec rmt;
-	struct timeval atv, utv;
+	struct timeval stv, etv, atv;
 	int error, s, timo;
 
 	error = copyin((const void *)SCARG(uap, rqtp), (void *)&rqt,
@@ -206,13 +207,15 @@ sys_nanosleep(p, v, retval)
 	if (itimerfix(&atv))
 		return (EINVAL);
 
-	s = splclock();
-	timeradd(&atv,&time,&atv);
-	timo = hzto(&atv);
-	splx(s);
-	/* 
-	 * Avoid inadvertantly sleeping forever
-	 */
+	if (SCARG(uap, rmtp)) {
+		s = splclock();
+		stv = mono_time;
+		splx(s);
+	}
+
+	timo = tvtohz(&atv);
+
+	/* Avoid sleeping forever. */
 	if (timo <= 0)
 		timo = 1;
 
@@ -226,14 +229,16 @@ sys_nanosleep(p, v, retval)
 		int error;
 
 		s = splclock();
-		utv = time;
+		etv = mono_time;
 		splx(s);
 
-		timersub(&atv, &utv, &utv);
-		if (utv.tv_sec < 0)
-			timerclear(&utv);
+		timersub(&etv, &stv, &stv);
+		timersub(&atv, &stv, &atv);
 
-		TIMEVAL_TO_TIMESPEC(&utv, &rmt);
+		if (atv.tv_sec < 0)
+			timerclear(&atv);
+
+		TIMEVAL_TO_TIMESPEC(&atv, &rmt);
 		error = copyout((void *)&rmt, (void *)SCARG(uap,rmtp),
 		    sizeof(rmt));		
 		if (error)
@@ -493,8 +498,10 @@ sys_setitimer(p, v, retval)
 			timeout_add(&p->p_realit_to, timo);
 		}
 		p->p_realtimer = aitv;
-	} else
+	} else {
+		itimerround(&aitv.it_interval);
 		p->p_stats->p_timer[SCARG(uap, which)] = aitv;
+	}
 	splx(s);
 	return (0);
 }
@@ -550,6 +557,18 @@ itimerfix(tv)
 		return (EINVAL);
 
 	return (0);
+}
+
+/*
+ * Timer interval smaller than the resolution of the system clock are
+ * rounded up.
+ */
+void
+itimerround(tv)
+	struct timeval *tv;
+{
+	if (tv->tv_sec == 0 && tv->tv_usec < tick)
+		tv->tv_usec = tick;
 }
 
 /*

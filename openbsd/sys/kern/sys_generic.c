@@ -1,4 +1,4 @@
-/*	$OpenBSD: sys_generic.c,v 1.29 2001/05/16 12:52:58 ho Exp $	*/
+/*	$OpenBSD: sys_generic.c,v 1.39 2002/03/14 01:27:04 millert Exp $	*/
 /*	$NetBSD: sys_generic.c,v 1.24 1996/03/29 00:25:32 cgd Exp $	*/
 
 /*
@@ -63,9 +63,11 @@
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 
-int selscan __P((struct proc *, fd_set *, fd_set *, int, register_t *));
-int seltrue __P((dev_t, int, struct proc *));
-void pollscan __P((struct proc *, struct pollfd *, int, register_t *));
+#include <uvm/uvm_extern.h>
+
+int selscan(struct proc *, fd_set *, fd_set *, int, register_t *);
+int seltrue(dev_t, int, struct proc *);
+void pollscan(struct proc *, struct pollfd *, int, register_t *);
 
 /*
  * Read system call.
@@ -86,18 +88,14 @@ sys_read(p, v, retval)
 	struct file *fp;
 	struct filedesc *fdp = p->p_fd;
 
-	if ((u_int)fd >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[fd]) == NULL ||
-#if notyet
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0 ||
-#endif
-	    (fp->f_flag & FREAD) == 0)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
+		return (EBADF);
+	if ((fp->f_flag & FREAD) == 0)
 		return (EBADF);
 
-#if notyet
-	FILE_USE(fp);
-#endif
-	/* dofileread() will unuse the descriptor for us */
+	FREF(fp);
+
+	/* dofileread() will FRELE the descriptor for us */
 	return (dofileread(p, fd, fp, SCARG(uap, buf), SCARG(uap, nbyte),
 	    &fp->f_offset, retval));
 }
@@ -158,9 +156,7 @@ dofileread(p, fd, fp, buf, nbyte, offset, retval)
 #endif
 	*retval = cnt;
  out:
-#if notyet
-	FILE_UNUSE(fp, p);
-#endif
+	FRELE(fp);
 	return (error);
 }
 
@@ -182,18 +178,14 @@ sys_readv(p, v, retval)
 	struct file *fp;
 	struct filedesc *fdp = p->p_fd;
 
-	if ((u_int)fd >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[fd]) == NULL ||
-#if notyet
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0 ||
-#endif
-	    (fp->f_flag & FREAD) == 0)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
+		return (EBADF);
+	if ((fp->f_flag & FREAD) == 0)
 		return (EBADF);
 
-#if notyet
-	FILE_USE(fp);
-#endif
-	/* dofilereadv() will unuse the descriptor for us */
+	FREF(fp);
+
+	/* dofilereadv() will FRELE the descriptor for us */
 	return (dofilereadv(p, fd, fp, SCARG(uap, iovp), SCARG(uap, iovcnt),
 	    &fp->f_offset, retval));
 }
@@ -285,9 +277,7 @@ dofilereadv(p, fd, fp, iovp, iovcnt, offset, retval)
 	if (needfree)
 		free(needfree, M_IOV);
  out:
-#if notyet
-	FILE_UNUSE(fp, p);
-#endif
+	FRELE(fp);
 	return (error);
 }
 
@@ -309,18 +299,14 @@ sys_write(p, v, retval)
 	struct file *fp;
 	struct filedesc *fdp = p->p_fd;
 
-	if ((u_int)fd >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[fd]) == NULL ||
-#if notyet
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0 ||
-#endif
-	    (fp->f_flag & FWRITE) == 0)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
+		return (EBADF);
+	if ((fp->f_flag & FWRITE) == 0)
 		return (EBADF);
 
-#if notyet
-	FILE_USE(fp);
-#endif
-	/* dofilewrite() will unuse the descriptor for us */
+	FREF(fp);
+
+	/* dofilewrite() will FRELE the descriptor for us */
 	return (dofilewrite(p, fd, fp, SCARG(uap, buf), SCARG(uap, nbyte),
 	    &fp->f_offset, retval));
 }
@@ -384,9 +370,7 @@ dofilewrite(p, fd, fp, buf, nbyte, offset, retval)
 #endif
 	*retval = cnt;
  out:
-#if notyet
-	FILE_UNUSE(fp, p);
-#endif
+	FRELE(fp);
 	return (error);
 }
 
@@ -408,18 +392,14 @@ sys_writev(p, v, retval)
 	struct file *fp;
 	struct filedesc *fdp = p->p_fd;
 
-	if ((u_int)fd >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[fd]) == NULL ||
-#if notyet
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0 ||
-#endif
-	    (fp->f_flag & FWRITE) == 0)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
+		return (EBADF);
+	if ((fp->f_flag & FWRITE) == 0)
 		return (EBADF);
 
-#if notyet
-	FILE_USE(fp);
-#endif
-	/* dofilewritev() will unuse the descriptor for us */
+	FREF(fp);
+
+	/* dofilewritev() will FRELE the descriptor for us */
 	return (dofilewritev(p, fd, fp, SCARG(uap, iovp), SCARG(uap, iovcnt),
 	    &fp->f_offset, retval));
 }
@@ -512,9 +492,7 @@ dofilewritev(p, fd, fp, iovp, iovcnt, offset, retval)
 	if (needfree)
 		free(needfree, M_IOV);
  out:
-#if notyet
-	FILE_UNUSE(fp, p);
-#endif
+	FRELE(fp);
 	return (error);
 }
 
@@ -528,24 +506,23 @@ sys_ioctl(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct sys_ioctl_args /* {
+	struct sys_ioctl_args /* {
 		syscallarg(int) fd;
 		syscallarg(u_long) com;
 		syscallarg(caddr_t) data;
 	} */ *uap = v;
-	register struct file *fp;
-	register struct filedesc *fdp;
-	register u_long com;
-	register int error;
-	register u_int size;
+	struct file *fp;
+	struct filedesc *fdp;
+	u_long com;
+	int error;
+	u_int size;
 	caddr_t data, memp;
 	int tmp;
 #define STK_PARAMS	128
 	char stkbuf[STK_PARAMS];
 
 	fdp = p->p_fd;
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
 
 	if ((fp->f_flag & (FREAD | FWRITE)) == 0)
@@ -567,6 +544,7 @@ sys_ioctl(p, v, retval)
 	size = IOCPARM_LEN(com);
 	if (size > IOCPARM_MAX)
 		return (ENOTTY);
+	FREF(fp);
 	memp = NULL;
 	if (size > sizeof (stkbuf)) {
 		memp = (caddr_t)malloc((u_long)size, M_IOCTLOPS, M_WAITOK);
@@ -577,9 +555,7 @@ sys_ioctl(p, v, retval)
 		if (size) {
 			error = copyin(SCARG(uap, data), data, (u_int)size);
 			if (error) {
-				if (memp)
-					free(memp, M_IOCTLOPS);
-				return (error);
+				goto out;
 			}
 		} else
 			*(caddr_t *)data = SCARG(uap, data);
@@ -655,6 +631,8 @@ sys_ioctl(p, v, retval)
 			error = copyout(data, SCARG(uap, data), (u_int)size);
 		break;
 	}
+out:
+	FRELE(fp);
 	if (memp)
 		free(memp, M_IOCTLOPS);
 	return (error);
@@ -812,13 +790,14 @@ selscan(p, ibits, obits, nfd, retval)
 			bits = pibits->fds_bits[i/NFDBITS];
 			while ((j = ffs(bits)) && (fd = i + --j) < nfd) {
 				bits &= ~(1 << j);
-				fp = fdp->fd_ofiles[fd];
-				if (fp == NULL)
+				if ((fp = fd_getfile(fdp, fd)) == NULL)
 					return (EBADF);
+				FREF(fp);
 				if ((*fp->f_ops->fo_select)(fp, flag[msk], p)) {
 					FD_SET(fd, pobits);
 					n++;
 				}
+				FRELE(fp);
 			}
 		}
 	}
@@ -909,20 +888,16 @@ pollscan(p, pl, nfd, retval)
 	 */
 	for (i = 0; i < nfd; i++) {
 		/* Check the file descriptor. */
-		if (pl[i].fd < 0)
+		if (pl[i].fd < 0) {
+			pl[i].revents = 0;
 			continue;
-		if (pl[i].fd >= fdp->fd_nfiles) {
+		}
+		if ((fp = fd_getfile(fdp, pl[i].fd)) == NULL) {
 			pl[i].revents = POLLNVAL;
 			n++;
 			continue;
 		}
-
-		fp = fdp->fd_ofiles[pl[i].fd];
-		if (fp == NULL) {
-			pl[i].revents = POLLNVAL;
-			n++;
-			continue;
-		}
+		FREF(fp);
 		for (x = msk = 0; msk < 3; msk++) {
 			if (pl[i].events & pflag[msk]) {
 				if ((*fp->f_ops->fo_select)(fp, flag[msk], p)) {
@@ -932,6 +907,7 @@ pollscan(p, pl, nfd, retval)
 				}
 			}
 		}
+		FRELE(fp);
 		if (x)
 			n++;
 	}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_file.c,v 1.17 2001/07/03 15:32:34 jasoni Exp $	*/
+/*	$OpenBSD: linux_file.c,v 1.21 2002/03/14 01:26:50 millert Exp $	*/
 /*	$NetBSD: linux_file.c,v 1.15 1996/05/20 01:59:09 fvdl Exp $	*/
 
 /*
@@ -59,12 +59,12 @@
 
 #include <machine/linux_machdep.h>
 
-static int linux_to_bsd_ioflags __P((int));
-static int bsd_to_linux_ioflags __P((int));
-static void bsd_to_linux_flock __P((struct flock *, struct linux_flock *));
-static void linux_to_bsd_flock __P((struct linux_flock *, struct flock *));
-static void bsd_to_linux_stat __P((struct stat *, struct linux_stat *));
-static int linux_stat1 __P((struct proc *, void *, register_t *, int));
+static int linux_to_bsd_ioflags(int);
+static int bsd_to_linux_ioflags(int);
+static void bsd_to_linux_flock(struct flock *, struct linux_flock *);
+static void linux_to_bsd_flock(struct linux_flock *, struct flock *);
+static void bsd_to_linux_stat(struct stat *, struct linux_stat *);
+static int linux_stat1(struct proc *, void *, register_t *, int);
 
 
 /*
@@ -192,11 +192,14 @@ linux_sys_open(p, v, retval)
 	 */ 
         if (!(fl & O_NOCTTY) && SESS_LEADER(p) && !(p->p_flag & P_CONTROLT)) {
                 struct filedesc *fdp = p->p_fd;
-                struct file     *fp = fdp->fd_ofiles[*retval];
+                struct file     *fp;
 
-                /* ignore any error, just give it a try */
+		if ((fp = fd_getfile(fdp, *retval)) == NULL)
+			return (EBADF);
+		FREF(fp);
                 if (fp->f_type == DTYPE_VNODE)
                         (fp->f_ops->fo_ioctl) (fp, TIOCSCTTY, (caddr_t) 0, p);
+		FRELE(fp);
         }
 	return 0;
 }
@@ -317,7 +320,7 @@ linux_sys_fcntl(p, v, retval)
 	struct vattr va;
 	long pgid;
 	struct pgrp *pgrp;
-	struct tty *tp, *(*d_tty) __P((dev_t));
+	struct tty *tp, *(*d_tty)(dev_t);
 
 	fd = SCARG(uap, fd);
 	cmd = SCARG(uap, cmd);
@@ -390,9 +393,8 @@ linux_sys_fcntl(p, v, retval)
 		 * does not exist.
 		 */
 		fdp = p->p_fd;
-		if ((u_int)fd >= fdp->fd_nfiles ||
-		    (fp = fdp->fd_ofiles[fd]) == NULL)
-			return EBADF;
+		if ((fp = fd_getfile(fdp, fd)) == NULL)
+			return (EBADF);
 		if (fp->f_type == DTYPE_SOCKET) {
 			cmd = cmd == LINUX_F_SETOWN ? F_SETOWN : F_GETOWN;
 			break;
@@ -400,7 +402,10 @@ linux_sys_fcntl(p, v, retval)
 		vp = (struct vnode *)fp->f_data;
 		if (vp->v_type != VCHR)
 			return EINVAL;
-		if ((error = VOP_GETATTR(vp, &va, p->p_ucred, p)))
+		FREF(fp);
+		error = VOP_GETATTR(vp, &va, p->p_ucred, p);
+		FRELE(fp);
+		if (error)
 			return error;
 		d_tty = cdevsw[major(va.va_rdev)].d_tty;
 		if (!d_tty || (!(tp = (*d_tty)(va.va_rdev))))

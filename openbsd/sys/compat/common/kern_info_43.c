@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_info_43.c,v 1.10 2001/06/27 04:58:41 art Exp $	*/
+/*	$OpenBSD: kern_info_43.c,v 1.12 2002/03/14 20:31:31 mickey Exp $	*/
 /*	$NetBSD: kern_info_43.c,v 1.5 1996/02/04 02:02:22 christos Exp $	*/
 
 /*
@@ -52,7 +52,7 @@
 #include <sys/syslog.h>
 #include <sys/unistd.h>
 #include <sys/resourcevar.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>
 
 #include <sys/mount.h>
@@ -205,7 +205,7 @@ compat_43_sys_getkerninfo(p, v, retval)
 	int error, name[5];
 	size_t size;
 
-	extern char ostype[], osrelease[], machine[];
+	extern char machine[];
 
 	if (SCARG(uap, size) && (error = copyin((caddr_t)SCARG(uap, size),
 	    (caddr_t)&size, sizeof(size))))

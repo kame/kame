@@ -1,4 +1,4 @@
-/*	$OpenBSD: ofw_machdep.c,v 1.3 2001/10/01 22:47:48 drahn Exp $	*/
+/*	$OpenBSD: ofw_machdep.c,v 1.8 2002/03/14 01:26:36 millert Exp $	*/
 /*	$NetBSD: ofw_machdep.c,v 1.1 1996/09/30 16:34:50 ws Exp $	*/
 
 /*
@@ -43,7 +43,7 @@
 #include <sys/stat.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/powerpc.h>
 #include <machine/autoconf.h>
@@ -59,10 +59,10 @@
 int save_ofw_mapping(void);
 int restore_ofw_mapping(void);
 
-void OF_exit __P((void)) __attribute__((__noreturn__));
-void OF_boot __P((char *bootspec)) __attribute__((__noreturn__));
-void ofw_mem_regions __P((struct mem_region **memp, struct mem_region **availp));
-void ofw_vmon __P((void));
+void OF_exit(void) __attribute__((__noreturn__));
+void OF_boot(char *bootspec) __attribute__((__noreturn__));
+void ofw_mem_regions(struct mem_region **memp, struct mem_region **availp);
+void ofw_vmon(void);
 
 struct firmware ofw_firmware = {
 	ofw_mem_regions,
@@ -109,7 +109,7 @@ ofw_mem_regions(memp, availp)
 	*availp = OFavail;
 }
 
-typedef void (fwcall_f) __P((int, int));
+typedef void (fwcall_f)(int, int);
 extern fwcall_f *fwcall;
 fwcall_f fwentry;
 extern u_int32_t ofmsr;
@@ -197,6 +197,7 @@ restore_ofw_mapping()
 			size -= NBPG;
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	return 0;
 }
@@ -294,43 +295,6 @@ static int processing;
 	__asm__ volatile("mtmsr %0" :: "r"(emsr));
 	processing = 0;
 }
-#if 0
-u_int32_t ppc_console_iomem=0;
-u_int32_t ppc_console_addr=0;
-u_int32_t ppc_console_qhandle=0;
-u_int32_t ppc_console_serfreq;
-
-void
-ofwtrysercon(char *name, int qhandle)
-{
-/* for serial we want regs field */
-	int regs[4];
-	int freq;
-	int regn;
-	if ((regn = OF_getprop(qhandle, "reg", &regs[0], sizeof regs)) >= 0) {
-
-		if (regs[1] == 0x3f8) {
-			/* found preferred console */
-			ppc_console_addr = regs[1];
-			ppc_console_qhandle = qhandle;
-			ppc_console_iomem=0; /* 0 means io, 1 means mem */
-		}
-		if ((regs[1] == 0x2e8) && (ppc_console_addr == 0)) {
-			/* found nonpreferred console */
-			ppc_console_addr = regs[1];
-			ppc_console_qhandle = qhandle;
-			ppc_console_iomem=0; /* 0 means io, 1 means mem */
-		}
-	}
-	if ((OF_getprop(qhandle, "clock-frequency", &freq, sizeof regs)) >= 0) {
-		/* MCG value for this does not agree with PC value,
-		 * but works correctly (while PC value does not),
-		 * does VI set this correctly???
-		 */
-		ppc_console_serfreq=freq;
-	}
-}
-#endif
 
 #include <dev/pci/pcivar.h>
 #include <arch/macppc/pci/vgafb_pcivar.h>
@@ -345,17 +309,6 @@ ofw_make_tag(cpv, bus, dev, fnc)
         return (bus << 16) | (dev << 11) | (fnc << 8);
 }
 
-#if 0
-/* XXX */
-void
-ofwenablepcimemio(char *name, int qhandle)
-{
-	/* THIS PROBABLY IS A MAJOR HACK
-	 * AND IT WOULD PREVENT ofdisk and ofnet from working 
-	 * on MCG, VI machines.
-	 */
-}
-#endif
 #define       OFW_PCI_PHYS_HI_BUSMASK         0x00ff0000
 #define       OFW_PCI_PHYS_HI_BUSSHIFT        16
 #define       OFW_PCI_PHYS_HI_DEVICEMASK      0x0000f800
@@ -387,15 +340,148 @@ struct usb_kbd_ihandles {
 	int ihandle;
 };
 
+void of_display_console(void);
 
 void
 ofwconprobe()
 {
-#if NVGAFB_PCI > 0
+	char type[32];
+	int stdout_node;
+
+	stdout_node = OF_instance_to_package(OF_stdout);
+
+	/* handle different types of console */
+
+	bzero(type, sizeof(type));
+	if (OF_getprop(stdout_node,  "device_type", type, sizeof(type)) == -1) {
+		return; /* XXX */
+	}
+	if (strcmp(type, "display") == 0) {
+		of_display_console();
+		return;
+	}
+	if (strcmp(type, "serial") == 0) {
+		/* serial console not supported, forcing to screen for now */
+		OF_stdout = OF_open("screen");
+		OF_stdin = OF_open("keyboard");
+
+		/* cross fingers that this works. */
+		of_display_console();
+		return;
+	}
+
+	return;
+}
+	
+#define DEVTREE_UNKNOWN 0
+#define DEVTREE_USB	1
+#define DEVTREE_ADB	2
+#define DEVTREE_HID	3
+int ofw_devtree = DEVTREE_UNKNOWN;
+
+#define OFW_HAVE_USBKBD 1
+#define OFW_HAVE_ADBKBD 2
+int ofw_have_kbd = 0;
+
+void ofw_recurse_keyboard(int pnode);
+void ofw_find_keyboard(void);
+
+void
+ofw_recurse_keyboard(int pnode)
+{
 	char name[32];
+	int old_devtree;
+	int len;
+	int node;
+
+	for (node = OF_child(pnode); node != 0; node = OF_peer(node)) {
+
+		len = OF_getprop(node, "name", name, 20);
+		if (len == 0)
+			continue;
+		name[len] = 0;
+		if (strcmp(name, "keyboard") == 0) {
+			/* found a keyboard node, where is it? */
+			if (ofw_devtree == DEVTREE_USB) {
+				ofw_have_kbd |= OFW_HAVE_USBKBD;
+			} else if (ofw_devtree == DEVTREE_ADB) {
+				ofw_have_kbd |= OFW_HAVE_ADBKBD;
+			} else {
+				/* hid or some other keyboard? igore */
+			}
+			continue;
+		}
+
+		old_devtree = ofw_devtree;
+
+		if (strcmp(name, "adb") == 0) {
+			ofw_devtree = DEVTREE_ADB;
+		}
+		if (strcmp(name, "usb") == 0) {
+			ofw_devtree = DEVTREE_USB;
+		}
+
+		ofw_recurse_keyboard(node);
+
+		ofw_devtree = old_devtree; /* nest? */
+	}
+}
+
+void
+ofw_find_keyboard()
+{
+	int stdin_node;
 	char iname[32];
 	int len;
-	int stdout_node, stdin_node;
+	int node;
+
+	stdin_node = OF_instance_to_package(OF_stdin);
+	len = OF_getprop(stdin_node, "name", iname, 20);
+	iname[len] = 0;
+	printf("console in [%s] ", iname);
+
+	/* GRR, apple removed the interface once used for keyboard
+	 * detection walk the OFW tree to find keyboards and what type.
+	 */
+
+	node = OF_peer(0);
+	ofw_recurse_keyboard(node);
+
+	if (ofw_have_kbd == 0) {
+		printf("no keyboard found, hoping USB will be present\n");
+#if NUKBD > 0
+		ukbd_cnattach();
+#endif
+	}
+
+	if (ofw_have_kbd == (OFW_HAVE_USBKBD|OFW_HAVE_ADBKBD)) {
+#if NUKBD > 0
+		printf("USB and ADB found, using USB\n");
+		ukbd_cnattach();
+#else 		
+		ofw_have_kbd = OFW_HAVE_ADBKBD; /* ??? */
+#endif
+	}
+	if (ofw_have_kbd == OFW_HAVE_USBKBD) {
+#if NUKBD > 0
+		printf("USB found\n");
+		ukbd_cnattach();
+#endif
+	} else if (ofw_have_kbd == OFW_HAVE_ADBKBD) {
+#if NAKBD >0
+		printf("ADB found\n");
+		akbd_cnattach();
+#endif 
+	}
+}
+
+void
+of_display_console()
+{
+#if NVGAFB_PCI > 0
+	char name[32];
+	int len;
+	int stdout_node;
 	int err;
 	u_int32_t memtag, iotag;
 	struct ppc_pci_chipset pa;
@@ -433,41 +519,7 @@ ofwconprobe()
 		OF_interpret("frame-buffer-adr", 1, &cons_addr);
 	}
 
-	stdin_node = OF_instance_to_package(OF_stdin);
-	len = OF_getprop(stdin_node, "name", iname, 20);
-	iname[len] = 0;
-	printf("console in [%s] ", iname);
-	/* what to do about serial console? */
-	if (strcmp ("keyboard", iname) == 0) {
-		struct usb_kbd_ihandles *ukbds;
-#if NAKBD > 0
-		int akbd;
-#endif
-		/* if there is a usb keyboard, we want it, do not 
-		 * dereference the pointer that is returned
-		 */
-		if (OF_call_method("`usb-kbd-ihandles", OF_stdin, 0, 1, &ukbds)
-			!= -1 && ukbds != NULL)
-		{
-			printf("USB");
-			ukbd_cnattach();
-			goto kbd_found;
-		}
-#if NAKBD > 0
-		if (OF_call_method("`adb-kbd-ihandle", OF_stdin, 0, 1, &akbd)
-			!= -1 &&
-		   akbd != 0 &&
-		   OF_instance_to_package(akbd) != -1)
-		{
-			printf("ADB");
-			akbd_cnattach();
-			goto kbd_found;
-		}
-#endif
-		panic("no console keyboard");
-kbd_found:
-	}
-	printf("\n");
+	ofw_find_keyboard();
 
 	len = OF_getprop(stdout_node, "assigned-addresses", addr, sizeof(addr));
 	if (len == -1) {

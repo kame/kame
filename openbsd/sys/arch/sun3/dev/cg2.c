@@ -1,4 +1,4 @@
-/*	$OpenBSD: cg2.c,v 1.7 2001/09/16 00:42:44 millert Exp $	*/
+/*	$OpenBSD: cg2.c,v 1.11 2002/03/14 03:16:01 millert Exp $	*/
 /*	$NetBSD: cg2.c,v 1.7 1996/10/13 03:47:26 christos Exp $	*/
 
 /*
@@ -62,7 +62,7 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/conf.h>
 #include <machine/fbio.h>
@@ -95,8 +95,8 @@ struct cg2_softc {
 };
 
 /* autoconfiguration driver */
-static void	cg2attach __P((struct device *, struct device *, void *));
-static int	cg2match __P((struct device *, void *, void *));
+static void	cg2attach(struct device *, struct device *, void *);
+static int	cg2match(struct device *, void *, void *);
 
 struct cfattach cgtwo_ca = {
 	sizeof(struct cg2_softc), cg2match, cg2attach
@@ -106,11 +106,11 @@ struct cfdriver cgtwo_cd = {
 	NULL, "cgtwo", DV_DULL
 };
 
-static int	cg2gattr __P((struct fbdevice *, struct fbgattr *));
-static int	cg2gvideo __P((struct fbdevice *, int *));
-static int	cg2svideo __P((struct fbdevice *, int *));
-static int	cg2getcmap __P((struct fbdevice *, struct fbcmap *));
-static int	cg2putcmap __P((struct fbdevice *, struct fbcmap *));
+static int	cg2gattr(struct fbdevice *, struct fbgattr *);
+static int	cg2gvideo(struct fbdevice *, int *);
+static int	cg2svideo(struct fbdevice *, int *);
+static int	cg2getcmap(struct fbdevice *, struct fbcmap *);
+static int	cg2putcmap(struct fbdevice *, struct fbcmap *);
 
 static struct fbdriver cg2fbdriver = {
 	cg2open, cg2close, cg2mmap, cg2gattr,
@@ -118,7 +118,7 @@ static struct fbdriver cg2fbdriver = {
 	cg2getcmap, cg2putcmap
 };
 
-static int	cg2intr __P((void*));
+static int	cg2intr(void *);
 
 /*
  * Match a cg2.
@@ -166,7 +166,7 @@ cg2attach(parent, self, args)
 	sc->sc_ctlreg = (struct cg2fb *) bus_mapin(ca->ca_bustype,
 			ca->ca_paddr + CTLREGS_OFF, CTLREGS_SIZE);
 
-	isr_add_vectored(cg2intr, (void*)sc,
+	isr_add_vectored(cg2intr, (void *)sc,
 					 ca->ca_intpri, ca->ca_intvec);
 
 	/*
@@ -232,10 +232,11 @@ cg2ioctl(dev, cmd, data, flags, p)
  * Return the address that would map the given device at the given
  * offset, allowing for the given protection, or return -1 for error.
  */
-int
+paddr_t
 cg2mmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	struct cg2_softc *sc = cgtwo_cd.cd_devs[minor(dev)];
 

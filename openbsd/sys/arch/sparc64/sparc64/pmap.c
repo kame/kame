@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.5 2001/09/26 17:32:19 deraadt Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.12 2002/03/14 03:16:01 millert Exp $	*/
 /*	$NetBSD: pmap.c,v 1.107 2001/08/31 16:47:41 eeh Exp $	*/
 #undef	NO_VCACHE /* Don't forget the locked TLB in dostart */
 #define	HWREF
@@ -39,7 +39,6 @@
 #include <sys/core.h>
 #include <sys/kcore.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm.h>
 
 #include <machine/pcb.h>
@@ -68,19 +67,19 @@
 
 paddr_t cpu0paddr;/* XXXXXXXXXXXXXXXX */
 
-extern int64_t asmptechk __P((int64_t *pseg[], int addr)); /* DEBUG XXXXX */
+extern int64_t asmptechk(int64_t *pseg[], int addr); /* DEBUG XXXXX */
 
 #define IS_VM_PHYSADDR(PA) (vm_physseg_find(atop(PA), NULL) != -1)
 
 #if 0
-static int pseg_check __P((struct pmap*, vaddr_t addr, int64_t tte, paddr_t spare));
+static int pseg_check(struct pmap*, vaddr_t addr, int64_t tte, paddr_t spare);
 static int
 pseg_check(struct pmap *pm, vaddr_t addr, int64_t tte, paddr_t spare)
 {
 	int i, k, s;
 	paddr_t *pdir, *ptbl;
-	extern int pseg_set __P((struct pmap*, vaddr_t addr, int64_t tte,
-		paddr_t spare));
+	extern int pseg_set(struct pmap*, vaddr_t addr, int64_t tte,
+		paddr_t spare);
 
 	if (!spare) return pseg_set(pm, addr, tte, spare);
 
@@ -111,13 +110,13 @@ pseg_check(struct pmap *pm, vaddr_t addr, int64_t tte, paddr_t spare)
 
 /* These routines are in assembly to allow access thru physical mappings */
 #if 1
-extern int64_t pseg_get __P((struct pmap*, vaddr_t addr));
-extern int pseg_set __P((struct pmap*, vaddr_t addr, int64_t tte, paddr_t spare));
-extern paddr_t pseg_find __P((struct pmap*, vaddr_t addr, paddr_t spare));
+extern int64_t pseg_get(struct pmap*, vaddr_t addr);
+extern int pseg_set(struct pmap*, vaddr_t addr, int64_t tte, paddr_t spare);
+extern paddr_t pseg_find(struct pmap*, vaddr_t addr, paddr_t spare);
 #else
-static int64_t pseg_get __P((struct pmap*, vaddr_t addr));
-static int pseg_set __P((struct pmap*, vaddr_t addr, int64_t tte, paddr_t spare));
-static paddr_t pseg_find __P((struct pmap*, vaddr_t addr, paddr_t spare));
+static int64_t pseg_get(struct pmap*, vaddr_t addr);
+static int pseg_set(struct pmap*, vaddr_t addr, int64_t tte, paddr_t spare);
+static paddr_t pseg_find(struct pmap*, vaddr_t addr, paddr_t spare);
 
 static int64_t pseg_get(struct pmap* pm, vaddr_t addr) {
 	paddr_t *pdir, *ptbl;
@@ -173,8 +172,8 @@ static paddr_t pseg_find(struct pmap* pm, vaddr_t addr, paddr_t spare) {
 
 #endif
 
-extern struct vm_page *vm_page_alloc1 __P((void));
-extern void vm_page_free1 __P((struct vm_page *));
+extern struct vm_page *vm_page_alloc1(void);
+extern void vm_page_free1(struct vm_page *);
 
 
 #ifdef DEBUG
@@ -244,9 +243,13 @@ typedef struct pv_entry {
 
 pv_entry_t	pv_table;	/* array of entries, one per page */
 static struct pool pv_pool;
-extern void	pmap_remove_pv __P((struct pmap *pm, vaddr_t va, paddr_t pa));
-extern void	pmap_enter_pv __P((struct pmap *pm, vaddr_t va, paddr_t pa));
-extern void	pmap_page_cache __P((struct pmap *pm, paddr_t pa, int mode));
+static struct pool pmap_pool;
+extern void	pmap_remove_pv(struct pmap *pm, vaddr_t va, paddr_t pa);
+extern void	pmap_enter_pv(struct pmap *pm, vaddr_t va, paddr_t pa);
+extern void	pmap_page_cache(struct pmap *pm, paddr_t pa, int mode);
+
+void	pmap_pinit(struct pmap *);
+void	pmap_release(struct pmap *);
 
 /*
  * First and last managed physical addresses.  XXX only used for dumping the system.
@@ -302,9 +305,9 @@ static int memh = 0, vmemh = 0;	/* Handles to OBP devices */
 
 int avail_start, avail_end;	/* These are used by ps & family */
 
-static int ptelookup_va __P((vaddr_t va)); /* sun4u */
+static int ptelookup_va(vaddr_t va); /* sun4u */
 #if notyet
-static void tsb_enter __P((int ctx, int64_t va, int64_t data));
+static void tsb_enter(int ctx, int64_t va, int64_t data);
 #endif
 
 struct pmap_stats {
@@ -380,7 +383,7 @@ int	pmap_pages_stolen = 0;
 #endif
 
 #ifdef NOTDEF_DEBUG
-void pv_check __P((void));
+void pv_check(void);
 void
 pv_check()
 {
@@ -468,7 +471,7 @@ do {									\
  * can lose ref/mod info!!!!
  *
  */
-static void pmap_enter_kpage __P((vaddr_t, int64_t));
+static void pmap_enter_kpage(vaddr_t, int64_t);
 static void
 pmap_enter_kpage(va, data)
 	vaddr_t va;
@@ -502,7 +505,7 @@ pmap_enter_kpage(va, data)
  * See checp bootargs to see if we need to enable bootdebug.
  */
 #ifdef DEBUG
-void pmap_bootdebug __P((void));
+void pmap_bootdebug(void);
 void
 pmap_bootdebug() 
 {
@@ -540,7 +543,7 @@ pmap_bootdebug()
  * size of the E$/NBPG.  However, different CPUs can have different sized
  * E$, so we need to take the GCM of the E$ size.
  */
-static int pmap_calculate_colors __P((void));
+static int pmap_calculate_colors(void);
 static int 
 pmap_calculate_colors() {
 	int node = 0;
@@ -877,7 +880,7 @@ remap_data:
 	 */
 	sz = OF_getproplen(vmemh, "translations");
 	valloc(prom_map, struct prom_map, sz);
-	if (OF_getprop(vmemh, "translations", (void*)prom_map, sz) <= 0) {
+	if (OF_getprop(vmemh, "translations", (void *)prom_map, sz) <= 0) {
 		prom_printf("no translations installed?");
 		OF_exit();
 	}
@@ -957,7 +960,7 @@ remap_data:
 		/*
 		 * Re-fetch translations -- they've certainly changed.
 		 */
-		if (OF_getprop(vmemh, "translations", (void*)prom_map, sz) <=
+		if (OF_getprop(vmemh, "translations", (void *)prom_map, sz) <=
 			0) {
 			prom_printf("no translations installed?");
 			OF_exit();
@@ -1092,7 +1095,7 @@ remap_data:
 	bzero(tsb, TSBSIZE);
 
 	BDPRINTF(PDB_BOOT1, ("firstaddr after TSB=%lx\r\n", (u_long)firstaddr));
-	BDPRINTF(PDB_BOOT1, ("TSB allocated at %p size %08x\r\n", (void*)tsb,
+	BDPRINTF(PDB_BOOT1, ("TSB allocated at %p size %08x\r\n", (void *)tsb,
 	    (int)TSBSIZE));
 
 	first_phys_addr = mem->start;
@@ -1356,7 +1359,7 @@ remap_data:
 	{ 
 		extern vaddr_t u0[2];
 		extern struct pcb* proc0paddr;
-		extern void main __P((void));
+		extern void main(void);
 		paddr_t pa;
 
 		/* Initialize all the pointers to u0 */
@@ -1524,8 +1527,9 @@ pmap_init()
 	}
 
 	/* Setup a pool for additional pvlist structures */
-	pool_init(&pv_pool, sizeof(struct pv_entry), 0, 0, 0, "pv_entry", 0,
-		  NULL, NULL, 0);
+	pool_init(&pv_pool, sizeof(struct pv_entry), 0, 0, 0, "pv_entry", NULL);
+	pool_init(&pmap_pool, sizeof(struct pmap), 0, 0, 0, "pmappl",
+	    &pool_allocator_nointr);
 
 	vm_first_phys = avail_start;
 	vm_num_phys = avail_end - avail_start;
@@ -1621,7 +1625,7 @@ pmap_create()
 
 	DPRINTF(PDB_CREATE, ("pmap_create()\n"));
 
-	pm = (struct pmap *)malloc(sizeof *pm, M_VMPMAP, M_WAITOK);
+	pm = pool_get(&pmap_pool, PR_WAITOK);
 	bzero((caddr_t)pm, sizeof *pm);
 #ifdef DEBUG
 	if (pmapdebug & PDB_CREATE)
@@ -1664,7 +1668,7 @@ pmap_pinit(pm)
 		pm->pm_segs = (int64_t *)(u_long)pm->pm_physaddr;
 		if (!pm->pm_physaddr) panic("pmap_pinit");
 #ifdef NOTDEF_DEBUG
-		printf("pmap_pinit: segs %p == %p\n", pm->pm_segs, (void*)page->phys_addr);
+		printf("pmap_pinit: segs %p == %p\n", pm->pm_segs, (void *)page->phys_addr);
 #endif
 		ctx_alloc(pm);
 	}
@@ -1705,7 +1709,7 @@ pmap_destroy(pm)
 			printf("pmap_destroy: freeing pmap %p\n", pm);
 #endif
 		pmap_release(pm);
-		free((caddr_t)pm, M_VMPMAP);
+		pool_put(&pmap_pool, pm);
 	}
 }
 
@@ -2636,7 +2640,7 @@ pmap_dumpsize()
 int
 pmap_dumpmmu(dump, blkno)
 	register daddr_t blkno;
-	register int (*dump)	__P((dev_t, daddr_t, caddr_t, size_t));
+	register int (*dump)(dev_t, daddr_t, caddr_t, size_t);
 {
 	kcore_seg_t	*kseg;
 	cpu_kcore_hdr_t	*kcpu;
@@ -3827,7 +3831,7 @@ vm_page_free1(mem)
 
 #ifdef DDB
 
-void db_dump_pv __P((db_expr_t, int, db_expr_t, char *));
+void db_dump_pv(db_expr_t, int, db_expr_t, char *);
 void
 db_dump_pv(addr, have_addr, count, modif)
 	db_expr_t addr;
@@ -3855,7 +3859,7 @@ db_dump_pv(addr, have_addr, count, modif)
 /*
  * Test ref/modify handling.
  */
-void pmap_testout __P((void));
+void pmap_testout(void);
 void
 pmap_testout()
 {
@@ -3869,12 +3873,12 @@ pmap_testout()
 	/* Allocate a page */
 	va = (vaddr_t)(vmmap - NBPG);
 	ASSERT(va != NULL);
-	loc = (int*)va;
+	loc = (int *)va;
 
 	pg = vm_page_alloc1();
 	pa = (paddr_t)VM_PAGE_TO_PHYS(pg);
 	pmap_enter(pmap_kernel(), va, pa, VM_PROT_ALL, VM_PROT_ALL);
-	pmap_update();
+	pmap_update(pmap_kernel());
 
 	/* Now clear reference and modify */
 	ref = pmap_clear_reference(pg);
@@ -3935,7 +3939,7 @@ pmap_testout()
 
 	/* Check pmap_protect() */
 	pmap_protect(pmap_kernel(), va, va+1, VM_PROT_READ);
-	pmap_update();
+	pmap_update(pmap_kernel());
 	ref = pmap_is_referenced(pg);
 	mod = pmap_is_modified(pg);
 	printf("pmap_protect(VM_PROT_READ): ref %d, mod %d\n",
@@ -3950,7 +3954,7 @@ pmap_testout()
 
 	/* Modify page */
 	pmap_enter(pmap_kernel(), va, pa, VM_PROT_ALL, VM_PROT_ALL);
-	pmap_update();
+	pmap_update(pmap_kernel());
 	*loc = 1;
 
 	ref = pmap_is_referenced(pg);
@@ -3960,7 +3964,7 @@ pmap_testout()
 
 	/* Check pmap_protect() */
 	pmap_protect(pmap_kernel(), va, va+1, VM_PROT_NONE);
-	pmap_update();
+	pmap_update(pmap_kernel());
 	ref = pmap_is_referenced(pg);
 	mod = pmap_is_modified(pg);
 	printf("pmap_protect(VM_PROT_READ): ref %d, mod %d\n",
@@ -3975,7 +3979,7 @@ pmap_testout()
 
 	/* Modify page */
 	pmap_enter(pmap_kernel(), va, pa, VM_PROT_ALL, VM_PROT_ALL);
-	pmap_update();
+	pmap_update(pmap_kernel());
 	*loc = 1;
 
 	ref = pmap_is_referenced(pg);
@@ -4000,7 +4004,7 @@ pmap_testout()
 
 	/* Modify page */
 	pmap_enter(pmap_kernel(), va, pa, VM_PROT_ALL, VM_PROT_ALL);
-	pmap_update();
+	pmap_update(pmap_kernel());
 	*loc = 1;
 
 	ref = pmap_is_referenced(pg);
@@ -4024,7 +4028,7 @@ pmap_testout()
 
 	/* Unmap page */
 	pmap_remove(pmap_kernel(), va, va+1);
-	pmap_update();
+	pmap_update(pmap_kernel());
 	ref = pmap_is_referenced(pg);
 	mod = pmap_is_modified(pg);
 	printf("Unmapped page: ref %d, mod %d\n", ref, mod);
@@ -4042,7 +4046,7 @@ pmap_testout()
 	       ref, mod);
 
 	pmap_remove(pmap_kernel(), va, va+1);
-	pmap_update();
+	pmap_update(pmap_kernel());
 	vm_page_free1(pg);
 }
 #endif

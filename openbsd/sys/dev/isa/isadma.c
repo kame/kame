@@ -1,4 +1,4 @@
-/*	$OpenBSD: isadma.c,v 1.22 1999/01/11 01:49:00 millert Exp $	*/
+/*	$OpenBSD: isadma.c,v 1.26 2002/03/14 01:26:56 millert Exp $	*/
 /*	$NetBSD: isadma.c,v 1.32 1997/09/05 01:48:33 thorpej Exp $	*/
 
 /*-
@@ -47,7 +47,7 @@
 #include <sys/proc.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 
@@ -90,8 +90,8 @@ static u_int8_t dmamode[4] = {
 	DMA37MD_WRITE | DMA37MD_SINGLE | DMA37MD_LOOP
 };
 
-int isadmamatch __P((struct device *, void *, void *));
-void isadmaattach __P((struct device *, struct device *, void *));
+int isadmamatch(struct device *, void *, void *);
+void isadmaattach(struct device *, struct device *, void *);
 
 struct cfattach isadma_ca = {
 	sizeof(struct device), isadmamatch, isadmaattach
@@ -138,8 +138,8 @@ isadmaattach(parent, self, aux)
 	printf("\n");
 }
 
-static inline void isa_dmaunmask __P((struct isa_softc *, int));
-static inline void isa_dmamask __P((struct isa_softc *, int));
+static inline void isa_dmaunmask(struct isa_softc *, int);
+static inline void isa_dmamask(struct isa_softc *, int);
 
 static inline void
 isa_dmaunmask(sc, chan)
@@ -352,10 +352,14 @@ isa_dmastart(isadev, chan, addr, nbytes, p, flags, busdmaflags)
 #endif
 
 	if (flags & DMAMODE_READ) {
-		bus_dmamap_sync(sc->sc_dmat, dmam, BUS_DMASYNC_PREREAD);
+		bus_dmamap_sync(sc->sc_dmat, dmam, 0,
+		dmam->dm_mapsize,
+		BUS_DMASYNC_PREREAD);
 		sc->sc_dmareads |= (1 << chan);
 	} else {
-		bus_dmamap_sync(sc->sc_dmat, dmam, BUS_DMASYNC_PREWRITE);
+		bus_dmamap_sync(sc->sc_dmat, dmam, 0,
+		dmam->dm_mapsize,
+		BUS_DMASYNC_PREWRITE);
 		sc->sc_dmareads &= ~(1 << chan);
 	}
 
@@ -531,7 +535,8 @@ isa_dmadone(isadev, chan)
 		printf("%s: isa_dmadone: channel %d not finished\n",
 		    sc->sc_dev.dv_xname, chan);
 
-	bus_dmamap_sync(sc->sc_dmat, dmam,
+	bus_dmamap_sync(sc->sc_dmat, dmam, 0,
+	    dmam->dm_mapsize,
 	    (sc->sc_dmareads & (1 << chan)) ? BUS_DMASYNC_POSTREAD :
 	    BUS_DMASYNC_POSTWRITE);
 
@@ -726,10 +731,10 @@ isa_free(addr, pool)
 	free(m, pool);
 }
 
-int
+paddr_t
 isa_mappage(mem, off, prot)
 	void *mem;
-	int off;
+	off_t off;
 	int prot;
 {
 	struct isa_mem *m;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.14 2001/06/25 00:43:19 mickey Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.17 2002/04/04 23:47:33 deraadt Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.45 1999/10/23 14:56:05 ragge Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #include <sys/reboot.h>
 #include <sys/conf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/sid.h>
@@ -59,9 +59,9 @@
 
 #include <vax/bi/bireg.h>
 
-void	cpu_dumpconf __P((void));	/* machdep.c */
-void	gencnslask __P((void));
-void	setroot __P((void));		/* rootfil.c */
+void	cpu_dumpconf(void);	/* machdep.c */
+void	gencnslask(void);
+void	setroot(void);		/* rootfil.c */
 
 struct cpu_dep *dep_call;
 int	mastercpu;	/* chief of the system */
@@ -90,9 +90,11 @@ cpu_configure()
 	cold = 0;
 
 	if (mountroot == NULL) {
-		if (B_TYPE(bootdev) >= BDEV_NET) 
+		if (B_TYPE(bootdev) >= BDEV_NET) {
+#ifdef NFSCLIENT
 			mountroot = nfs_mountroot;
-		else
+#endif
+		} else
 			mountroot = dk_mountroot;
 	}
 
@@ -100,9 +102,9 @@ cpu_configure()
 		(*dep_call->cpu_clrf)();
 }
 
-int	mainbus_print __P((void *, const char *));
-int	mainbus_match __P((struct device *, struct cfdata *, void *));
-void	mainbus_attach __P((struct device *, struct device *, void *));
+int	mainbus_print(void *, const char *);
+int	mainbus_match(struct device *, struct cfdata *, void *);
+void	mainbus_attach(struct device *, struct device *, void *);
 
 int
 mainbus_print(aux, hej)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: midwayvar.h,v 1.9 1997/03/20 22:03:05 chuck Exp $	*/
+/*	$OpenBSD: midwayvar.h,v 1.11 2002/03/15 01:20:04 millert Exp $	*/
 
 /*
  *
@@ -104,8 +104,7 @@ struct en_softc {
   bus_space_tag_t en_memt;	/* for EN_READ/EN_WRITE */
   bus_space_handle_t en_base;	/* base of en card */
   bus_size_t en_obmemsz;	/* size of en card (bytes) */
-  void (*en_busreset) __P((void *));
-				/* bus specific reset function */
+  void (*en_busreset)(void *);	/* bus specific reset function */
 
   /* serv list */
   u_int32_t hwslistp;		/* hw pointer to service list (byte offset) */
@@ -200,6 +199,6 @@ struct en_softc {
  * exported functions
  */
 
-void	en_attach __P((struct en_softc *));
-EN_INTR_TYPE	en_intr __P((void *));
-void	en_reset __P((struct en_softc *));
+void	en_attach(struct en_softc *);
+EN_INTR_TYPE	en_intr(void *);
+void	en_reset(struct en_softc *);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: bus.h,v 1.13 2001/01/15 12:03:42 art Exp $	*/
+/*	$OpenBSD: bus.h,v 1.17 2002/03/14 01:26:27 millert Exp $	*/
 /*	$NetBSD: bus.h,v 1.10 1996/12/02 22:19:32 cgd Exp $	*/
 
 /*
@@ -211,8 +211,10 @@ struct alpha_bus_space {
  */
 #define	bus_space_map(t, a, s, c, hp)					\
 	(*(t)->abs_map)((t)->abs_cookie, (a), (s), (c), (hp))
+#define alpha_bus_space_map_noacct bus_space_map
 #define	bus_space_unmap(t, h, s)					\
 	(*(t)->abs_unmap)((t)->abs_cookie, (h), (s))
+#define alpha_bus_space_unmap_noacct bus_space_unmap
 #define	bus_space_subregion(t, h, o, s, hp)				\
 	(*(t)->abs_subregion)((t)->abs_cookie, (h), (o), (s), (hp))
 
@@ -345,9 +347,9 @@ struct alpha_bus_space {
 
 
 /*
- *	void bus_space_write_raw_region_N __P((bus_space_tag_t tag,
+ *	void bus_space_write_raw_region_N(bus_space_tag_t tag,
  *	    bus_space_handle_t bsh, bus_size_t offset,
- *	    const u_int8_t *addr, size_t count));
+ *	    const u_int8_t *addr, size_t count);
  *
  * Write `count' bytes in 2, 4 or 8 byte wide quantities to bus space
  * described by tag/handle and starting at `offset' from the
@@ -406,14 +408,17 @@ struct alpha_bus_space {
 /*
  * Flags used in various bus DMA methods.
  */
-#define	BUS_DMA_WAITOK		0x00	/* safe to sleep (pseudo-flag) */
-#define	BUS_DMA_NOWAIT		0x01	/* not safe to sleep */
-#define	BUS_DMA_ALLOCNOW	0x02	/* perform resource allocation now */
-#define	BUS_DMA_COHERENT	0x04	/* hint: map memory DMA coherent */
-#define	BUS_DMA_BUS1		0x10	/* placeholders for bus functions... */
-#define	BUS_DMA_BUS2		0x20
-#define	BUS_DMA_BUS3		0x40
-#define	BUS_DMA_BUS4		0x80
+#define	BUS_DMA_WAITOK		0x000	/* safe to sleep (pseudo-flag) */
+#define	BUS_DMA_NOWAIT		0x001	/* not safe to sleep */
+#define	BUS_DMA_ALLOCNOW	0x002	/* perform resource allocation now */
+#define	BUS_DMA_COHERENT	0x004	/* hint: map memory DMA coherent */
+#define	BUS_DMA_BUS1		0x010	/* placeholders for bus functions... */
+#define	BUS_DMA_BUS2		0x020
+#define	BUS_DMA_BUS3		0x040
+#define	BUS_DMA_BUS4		0x080
+#define	BUS_DMA_STREAMING	0x100	/* hint: sequential, unidirectional */
+#define	BUS_DMA_READ		0x200	/* mapping is device -> memory only */
+#define	BUS_DMA_WRITE		0x400	/* mapping is memory -> device only */
 
 /*
  * Private flags stored in the DMA map.
@@ -428,16 +433,12 @@ struct uio;
 struct alpha_sgmap;
 
 /*
- * bus_dmasync_op_t
- *
  * Operations performed by bus_dmamap_sync().
  */
-typedef enum {
-	BUS_DMASYNC_PREREAD,
-	BUS_DMASYNC_POSTREAD,
-	BUS_DMASYNC_PREWRITE,
-	BUS_DMASYNC_POSTWRITE,
-} bus_dmasync_op_t;
+#define BUS_DMASYNC_PREREAD	0x01
+#define BUS_DMASYNC_POSTREAD	0x02
+#define BUS_DMASYNC_PREWRITE	0x04
+#define BUS_DMASYNC_POSTWRITE	0x08
 
 /*
  *	alpha_bus_t
@@ -535,7 +536,7 @@ struct alpha_bus_dma_tag {
 		    bus_dma_segment_t *, int, bus_size_t, int);
 	void	(*_dmamap_unload)(bus_dma_tag_t, bus_dmamap_t);
 	void	(*_dmamap_sync)(bus_dma_tag_t, bus_dmamap_t,
-		    bus_dmasync_op_t);
+		    bus_addr_t, bus_size_t, int);
 
 	/*
 	 * DMA memory utility functions.
@@ -568,8 +569,8 @@ struct alpha_bus_dma_tag {
 	(*(t)->_dmamap_load_raw)((t), (m), (sg), (n), (s), (f))
 #define	bus_dmamap_unload(t, p)					\
 	(*(t)->_dmamap_unload)((t), (p))
-#define	bus_dmamap_sync(t, p, op)				\
-	(*(t)->_dmamap_sync)((t), (p), (op))
+#define	bus_dmamap_sync(t, p, a, s, op)				\
+	(*(t)->_dmamap_sync)((t), (p), (a), (s), (op))
 #define	bus_dmamem_alloc(t, s, a, b, sg, n, r, f)		\
 	(*(t)->_dmamem_alloc)((t), (s), (a), (b), (sg), (n), (r), (f))
 #define	bus_dmamem_free(t, sg, n)				\
@@ -633,7 +634,8 @@ int	_bus_dmamap_load_raw_direct(bus_dma_tag_t,
 	    bus_dmamap_t, bus_dma_segment_t *, int, bus_size_t, int);
 
 void	_bus_dmamap_unload(bus_dma_tag_t, bus_dmamap_t);
-void	_bus_dmamap_sync(bus_dma_tag_t, bus_dmamap_t, bus_dmasync_op_t);
+void	_bus_dmamap_sync(bus_dma_tag_t, bus_dmamap_t, bus_addr_t,
+	    bus_size_t, int);
 
 int	_bus_dmamem_alloc(bus_dma_tag_t tag, bus_size_t size,
 	    bus_size_t alignment, bus_size_t boundary,

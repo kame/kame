@@ -1,4 +1,4 @@
-/*	$OpenBSD: bw2.c,v 1.8 1997/01/16 04:03:42 kstailey Exp $	*/
+/*	$OpenBSD: bw2.c,v 1.11 2002/03/14 01:26:46 millert Exp $	*/
 /*	$NetBSD: bw2.c,v 1.8 1996/10/13 03:47:25 christos Exp $	*/
 
 /*
@@ -60,7 +60,7 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/conf.h>
 #include <machine/cpu.h>
@@ -82,8 +82,8 @@ struct bw2_softc {
 };
 
 /* autoconfiguration driver */
-static void	bw2attach __P((struct device *, struct device *, void *));
-static int	bw2match __P((struct device *, void *, void *));
+static void	bw2attach(struct device *, struct device *, void *);
+static int	bw2match(struct device *, void *, void *);
 
 struct cfattach bwtwo_ca = {
 	sizeof(struct bw2_softc), bw2match, bw2attach
@@ -95,8 +95,8 @@ struct cfdriver bwtwo_cd = {
 
 /* XXX we do not handle frame buffer interrupts */
 
-static int	bw2gvideo __P((struct fbdevice *, int *));
-static int	bw2svideo __P((struct fbdevice *, int *));
+static int	bw2gvideo(struct fbdevice *, int *);
+static int	bw2svideo(struct fbdevice *, int *);
 
 static struct fbdriver bw2fbdriver = {
 	bw2open, bw2close, bw2mmap,
@@ -223,10 +223,11 @@ bw2ioctl(dev, cmd, data, flags, p)
  * Return the address that would map the given device at the given
  * offset, allowing for the given protection, or return -1 for error.
  */
-int
+paddr_t
 bw2mmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	struct bw2_softc *sc = bwtwo_cd.cd_devs[minor(dev)];
 

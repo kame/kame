@@ -1,5 +1,5 @@
-/*	$OpenBSD: ukbd.c,v 1.7 2001/07/25 04:54:37 mickey Exp $	*/
-/*      $NetBSD: ukbd.c,v 1.66 2001/04/06 22:54:15 augustss Exp $        */
+/*	$OpenBSD: ukbd.c,v 1.11 2002/04/03 17:27:58 jason Exp $	*/
+/*      $NetBSD: ukbd.c,v 1.69 2001/10/24 21:02:18 augustss Exp $        */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -76,6 +76,7 @@
 
 #if defined(__NetBSD__)
 #include "opt_wsdisplay_compat.h"
+#include "opt_ddb.h"
 #endif
 
 #ifdef UKBD_DEBUG
@@ -433,7 +434,7 @@ ukbd_enable(void *v, int on)
 
 	/* Should only be called to change state */
 	if (sc->sc_enabled == on) {
-#ifdef DIAGNOSTIC
+#ifdef UKBD_DEBUG
 		printf("ukbd_enable: %s: bad call on=%d\n", 
 		       USBDEVNAME(sc->sc_dev), on);
 #endif
@@ -453,6 +454,7 @@ ukbd_enable(void *v, int on)
 		/* Disable interrupts. */
 		usbd_abort_pipe(sc->sc_intrpipe);
 		usbd_close_pipe(sc->sc_intrpipe);
+		sc->sc_intrpipe = NULL;
 	}
 	sc->sc_enabled = on;
 
@@ -514,6 +516,13 @@ USB_DETACH(ukbd)
 	if (sc->sc_wskbddev != NULL)
 		rv = config_detach(sc->sc_wskbddev, flags);
 
+	/* The console keyboard does not get a disable call, so check pipe. */
+	if (sc->sc_intrpipe != NULL) {
+		usbd_abort_pipe(sc->sc_intrpipe);
+		usbd_close_pipe(sc->sc_intrpipe);
+		sc->sc_intrpipe = NULL;
+	}
+
 	usbd_add_drv_event(USB_EVENT_DRIVER_DETACH, sc->sc_udev,
 			   USBDEV(sc->sc_dev));
 
@@ -535,11 +544,12 @@ ukbd_intr(xfer, addr, status)
 
 	if (status) {
 		DPRINTF(("ukbd_intr: status=%d\n", status));
-		usbd_clear_endpoint_stall_async(sc->sc_intrpipe);
+		if (status == USBD_STALLED)
+			usbd_clear_endpoint_stall_async(sc->sc_intrpipe);
 		return;
 	}
 
-	if (sc->sc_debounce) {
+	if (sc->sc_debounce && !sc->sc_polling) {
 		/*
 		 * Some keyboards have a peculiar quirk.  They sometimes
 		 * generate a key up followed by a key down for the same
@@ -551,6 +561,21 @@ ukbd_intr(xfer, addr, status)
 		timeout_add(&sc->sc_delay, hz / 50);
 #else
 		callout_reset(&sc->sc_delay, hz / 50, ukbd_delayed_decode, sc);
+#endif
+#if DDB
+	} else if (sc->sc_console_keyboard && !sc->sc_polling) {
+		/*
+		 * For the console keyboard we can't deliver CTL-ALT-ESC
+		 * from the interrupt routine.  Doing so would start
+		 * polling from inside the interrupt routine and that
+		 * loses bigtime.
+		 */
+		sc->sc_data = *ud;
+#if defined(__OpenBSD__)
+		timeout_add(&sc->sc_delay, 1);  /* NOT an immediate timeout */
+#else
+		callout_reset(&sc->sc_delay, 0, ukbd_delayed_decode, sc);
+#endif
 #endif
 	} else {
 		ukbd_decode(sc, ud);

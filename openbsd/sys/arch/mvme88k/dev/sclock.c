@@ -1,4 +1,4 @@
-/*	$OpenBSD: sclock.c,v 1.6 2001/08/26 02:37:07 miod Exp $ */
+/*	$OpenBSD: sclock.c,v 1.12 2002/03/14 01:26:39 millert Exp $ */
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
  * 
@@ -90,7 +90,6 @@
 #include <machine/board.h>
 #include <machine/psl.h>
 #include <machine/autoconf.h>
-#include <machine/bugio.h>
 #include <machine/cpu.h>
 #include "pcctwo.h"
 #if NPCCTWO > 0 
@@ -117,14 +116,14 @@ struct simplelock cio_lock;
 int statvar = 8192;
 int statmin;			/* statclock interval - 1/2*variance */
 
-int	sclockmatch	__P((struct device *, void *, void *));
-void	sclockattach	__P((struct device *, struct device *, void *));
+int	sclockmatch(struct device *, void *, void *);
+void	sclockattach(struct device *, struct device *, void *);
 
-void	sbc_initstatclock	__P((void));
-void	m188_initstatclock	__P((void));
-void	m188_cio_init		__P((unsigned));
-u_char	read_cio		__P((unsigned));
-void	write_cio		__P((unsigned, unsigned));
+void	sbc_initstatclock(void);
+void	m188_initstatclock(void);
+void	m188_cio_init(unsigned);
+u_char	read_cio(unsigned);
+void	write_cio(unsigned, unsigned);
 
 struct sclocksoftc {
 	struct device			sc_dev;
@@ -139,8 +138,8 @@ struct cfdriver sclock_cd = {
         NULL, "sclock", DV_DULL, 0
 }; 
 
-int	sbc_statintr	__P((void *));
-int	m188_statintr	__P((void *));
+int	sbc_statintr(void *);
+int	m188_statintr(void *);
 
 int	sclockbus;
 u_char	stat_reset;
@@ -191,7 +190,7 @@ sclockattach(parent, self, args)
 		sc->sc_statih.ih_ipl = ca->ca_ipl;
 		stat_reset = ca->ca_ipl | PCC2_IRQ_IEN | PCC2_IRQ_ICLR;
 		pcctwointr_establish(PCC2V_TIMER2, &sc->sc_statih);
-		mdfp.statclock_init_func = &sbc_initstatclock;
+		md.statclock_init_func = sbc_initstatclock;
 		printf(": VME1x7");
 		break;
 #endif /* NPCCTWO */
@@ -202,7 +201,7 @@ sclockattach(parent, self, args)
 		sc->sc_statih.ih_wantframe = 1;
 		sc->sc_statih.ih_ipl = ca->ca_ipl;
 		sysconintr_establish(SYSCV_TIMER2, &sc->sc_statih);
-		mdfp.statclock_init_func = &m188_initstatclock;
+		md.statclock_init_func = m188_initstatclock;
 		printf(": VME188");
 		break;
 #endif /* NSYSCON */
@@ -353,7 +352,7 @@ write_cio(reg, val)
 	unsigned reg,val;
 {
 	int s, i;
-	volatile int *cio_ctrl = (volatile int *)CIO_CNTRL;
+	int *volatile cio_ctrl = (int *volatile)CIO_CNTRL;
 	
 	s = splclock();
 	CIO_LOCK;
@@ -376,7 +375,7 @@ read_cio(reg)
 {
 	int c;
 	int s, i;
-	volatile int *cio_ctrl = (volatile int *)CIO_CNTRL;
+	int *volatile cio_ctrl = (int *volatile)CIO_CNTRL;
 
 	s = splclock();
 	CIO_LOCK;

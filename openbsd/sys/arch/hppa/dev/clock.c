@@ -1,4 +1,4 @@
-/*	$OpenBSD: clock.c,v 1.10 2001/08/31 03:13:42 mickey Exp $	*/
+/*	$OpenBSD: clock.c,v 1.13 2002/03/14 01:26:31 millert Exp $	*/
 
 /*
  * Copyright (c) 1998,1999 Michael Shalayeff
@@ -46,7 +46,7 @@
 #include <machine/autoconf.h>
 
 #if defined(DDB)
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <machine/db_machdep.h>
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
@@ -54,7 +54,7 @@
 
 struct timeval time;
 
-void startrtclock __P((void));
+void startrtclock(void);
 
 void
 cpu_initclocks()
@@ -119,7 +119,7 @@ inittodr(t)
 
 		if (dt < 2 * SECDAY)
 			return;
-		printf("WARNING: clock %s %d days",
+		printf("WARNING: clock %s %ld days",
 		    time.tv_sec < t? "lost" : "gained", dt / SECDAY);
 	}
 

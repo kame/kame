@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.32 2001/09/19 20:50:57 mickey Exp $	*/
+/*	$OpenBSD: trap.c,v 1.37 2002/03/26 01:00:30 miod Exp $	*/
 /*	$NetBSD: trap.c,v 1.58 1997/09/12 08:55:01 pk Exp $ */
 
 /*
@@ -65,7 +65,6 @@
 #include <sys/ktrace.h>
 #endif
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <sparc/sparc/asm.h>
@@ -193,12 +192,12 @@ const char *trap_type[] = {
 
 #define	N_TRAP_TYPES	(sizeof trap_type / sizeof *trap_type)
 
-static __inline void userret __P((struct proc *, int,  u_quad_t));
-void trap __P((unsigned, int, int, struct trapframe *));
-static __inline void share_fpu __P((struct proc *, struct trapframe *));
-void mem_access_fault __P((unsigned, int, u_int, int, int, struct trapframe *));
-void mem_access_fault4m __P((unsigned, u_int, u_int, struct trapframe *));
-void syscall __P((register_t, struct trapframe *, register_t));
+static __inline void userret(struct proc *, int,  u_quad_t);
+void trap(unsigned, int, int, struct trapframe *);
+static __inline void share_fpu(struct proc *, struct trapframe *);
+void mem_access_fault(unsigned, int, u_int, int, int, struct trapframe *);
+void mem_access_fault4m(unsigned, u_int, u_int, struct trapframe *);
+void syscall(register_t, struct trapframe *, register_t);
 
 int ignore_bogus_traps = 0;
 
@@ -238,8 +237,11 @@ userret(p, pc, oticks)
 	/*
 	 * If profiling, charge recent system time to the trapped pc.
 	 */
-	if (p->p_flag & P_PROFIL)
-		addupc_task(p, pc, (int)(p->p_sticks - oticks));
+	if (p->p_flag & P_PROFIL) {
+		extern int psratio;
+
+		addupc_task(p, pc, (int)(p->p_sticks - oticks) * psratio);
+	}
 
 	curpriority = p->p_priority;
 }
@@ -696,7 +698,7 @@ mem_access_fault(type, ser, v, pc, psr, tf)
 		if (cold)
 			goto kfault;
 		if (va >= KERNBASE) {
-			if (uvm_fault(kernel_map, va, 0, ftype) == KERN_SUCCESS)
+			if (uvm_fault(kernel_map, va, 0, ftype) == 0)
 				return;
 			goto kfault;
 		}
@@ -727,14 +729,14 @@ mem_access_fault(type, ser, v, pc, psr, tf)
 	 * error.
 	 */
 	if ((caddr_t)va >= vm->vm_maxsaddr) {
-		if (rv == KERN_SUCCESS) {
+		if (rv == 0) {
 			unsigned nss = btoc(USRSTACK - va);
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
-		} else if (rv == KERN_PROTECTION_FAILURE)
-			rv = KERN_INVALID_ADDRESS;
+		} else if (rv == EACCES)
+			rv = EFAULT;
 	}
-	if (rv == KERN_SUCCESS) {
+	if (rv == 0) {
 		/*
 		 * pmap_enter() does not enter all requests made from
 		 * vm_fault into the MMU (as that causes unnecessary
@@ -900,7 +902,7 @@ mem_access_fault4m(type, sfsr, sfva, tf)
 		 */
 		if (mmumod == SUN4M_MMU_HS) { /* On HS, we have va for both */
 			if (vm_fault(kernel_map, trunc_page(pc),
-				     VM_PROT_READ, 0) != KERN_SUCCESS)
+				     VM_PROT_READ, 0))
 #ifdef DEBUG
 				printf("mem_access_fault: "
 					"can't pagein 1st text fault.\n")
@@ -936,7 +938,7 @@ mem_access_fault4m(type, sfsr, sfva, tf)
 		if (cold)
 			goto kfault;
 		if (va >= KERNBASE) {
-			if (uvm_fault(kernel_map, va, 0, ftype) == KERN_SUCCESS)
+			if (uvm_fault(kernel_map, va, 0, ftype) == 0)
 				return;
 			goto kfault;
 		}
@@ -955,14 +957,14 @@ mem_access_fault4m(type, sfsr, sfva, tf)
 	 * error.
 	 */
 	if ((caddr_t)va >= vm->vm_maxsaddr) {
-		if (rv == KERN_SUCCESS) {
+		if (rv == 0) {
 			unsigned nss = btoc(USRSTACK - va);
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
-		} else if (rv == KERN_PROTECTION_FAILURE)
-			rv = KERN_INVALID_ADDRESS;
+		} else if (rv == EACCES)
+			rv = EFAULT;
 	}
-	if (rv != KERN_SUCCESS) {
+	if (rv != 0) {
 		/*
 		 * Pagein failed.  If doing copyin/out, return to onfault
 		 * address.  Any other page fault in kernel, die; if user
@@ -1150,9 +1152,10 @@ syscall(code, tf, pc)
  * Process the tail end of a fork() for the child.
  */
 void
-child_return(p)
-	struct proc *p;
+child_return(arg)
+	void *arg;
 {
+	struct proc *p = arg;
 
 	/*
 	 * Return values in the frame set by cpu_fork().

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ext2fs_vfsops.c,v 1.15 2001/09/18 01:46:40 art Exp $	*/
+/*	$OpenBSD: ext2fs_vfsops.c,v 1.22 2002/03/14 01:27:14 millert Exp $	*/
 /*	$NetBSD: ext2fs_vfsops.c,v 1.1 1997/06/11 09:34:07 bouyer Exp $	*/
 
 /*
@@ -59,6 +59,7 @@
 
 #include <miscfs/specfs/specdev.h>
 
+#include <ufs/ufs/extattr.h>
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/ufsmount.h>
 #include <ufs/ufs/inode.h>
@@ -70,8 +71,8 @@
 
 extern struct lock ufs_hashlock;
 
-int ext2fs_sbupdate __P((struct ufsmount *, int));
-static int ext2fs_checksb __P((struct ext2fs *, int));
+int ext2fs_sbupdate(struct ufsmount *, int);
+static int ext2fs_checksb(struct ext2fs *, int);
 
 extern struct vnodeopv_desc ext2fs_vnodeop_opv_desc;
 extern struct vnodeopv_desc ext2fs_specop_opv_desc;
@@ -97,7 +98,8 @@ struct vfsops ext2fs_vfsops = {
 	ext2fs_vptofh,
 	ext2fs_init,
 	ext2fs_sysctl,
-	ufs_check_export
+	ufs_check_export,
+	vfs_stdextattrctl
 };
 
 struct pool ext2fs_inode_pool;
@@ -317,6 +319,58 @@ ext2fs_mount(mp, path, data, ndp, p)
 	return (0);
 }
 
+int ext2fs_reload_vnode(struct vnode *, void *args);
+
+struct ext2fs_reload_args {
+	struct m_ext2fs *fs;
+	struct proc *p;
+	struct ucred *cred;
+	struct vnode *devvp;
+};
+
+int
+ext2fs_reload_vnode(struct vnode *vp, void *args) {
+	struct ext2fs_reload_args *era = args;
+	struct buf *bp;
+	struct inode *ip;
+	int error;
+	caddr_t cp;
+
+	/*
+	 * Step 4: invalidate all inactive vnodes.
+	 */
+	if (vp->v_usecount == 0) {
+		vgonel(vp, era->p);
+		return (0);
+	}
+
+	/*
+	 * Step 5: invalidate all cached file data.
+	 */
+	if (vget(vp, LK_EXCLUSIVE  | LK_INTERLOCK, era->p))
+		return (0);
+	
+	if (vinvalbuf(vp, 0, era->cred, era->p, 0, 0))
+		panic("ext2fs_reload: dirty2");
+	/*
+	 * Step 6: re-read inode data for all active vnodes.
+	 */
+	ip = VTOI(vp);
+	error = bread(era->devvp, 
+	    fsbtodb(era->fs, ino_to_fsba(era->fs, ip->i_number)),
+	    (int)era->fs->e2fs_bsize, NOCRED, &bp);
+	if (error) {
+		vput(vp);
+		return (error);
+	}
+	cp = (caddr_t)bp->b_data +
+	    (ino_to_fsbo(era->fs, ip->i_number) * EXT2_DINODE_SIZE);
+	e2fs_iload((struct ext2fs_dinode *)cp, &ip->i_din.e2fs_din);
+	brelse(bp);
+	vput(vp);
+	return (0);
+}
+
 /*
  * Reload all incore data for a filesystem (used after running fsck on
  * the root filesystem and finding things to fix). The filesystem must
@@ -336,14 +390,13 @@ ext2fs_reload(mountp, cred, p)
 	struct ucred *cred;
 	struct proc *p;
 {
-	register struct vnode *vp, *nvp, *devvp;
-	struct inode *ip;
+	struct vnode *devvp;
 	struct buf *bp;
 	struct m_ext2fs *fs;
 	struct ext2fs *newfs;
 	struct partinfo dpart;
 	int i, size, error;
-	caddr_t cp;
+	struct ext2fs_reload_args era;
 
 	if ((mountp->mnt_flag & MNT_RDONLY) == 0)
 		return (EINVAL);
@@ -409,50 +462,15 @@ ext2fs_reload(mountp, cred, p)
 		    fs->e2fs_bsize);
 		brelse(bp);
 	}
-	
-loop:
-	simple_lock(&mntvnode_slock);
-	for (vp = mountp->mnt_vnodelist.lh_first; vp != NULL; vp = nvp) {
-		if (vp->v_mount != mountp) {
-			simple_unlock(&mntvnode_slock);
-			goto loop;
-		}
 
-		nvp = vp->v_mntvnodes.le_next;
-		/*
-		 * Step 4: invalidate all inactive vnodes.
-		 */
-		if (vrecycle(vp, &mntvnode_slock, p))
-			goto loop;
+	era.p = p;
+	era.cred = cred;
+	era.fs = fs;
+	era.devvp = devvp;
 
-		/*
-		 * Step 5: invalidate all cached file data.
-		 */
-		simple_lock(&vp->v_interlock);
-		simple_unlock(&mntvnode_slock);
-		if (vget(vp, LK_EXCLUSIVE  | LK_INTERLOCK, p))
-			goto loop;
-		if (vinvalbuf(vp, 0, cred, p, 0, 0))
-			panic("ext2fs_reload: dirty2");
-		/*
-		 * Step 6: re-read inode data for all active vnodes.
-		 */
-		ip = VTOI(vp);
-		error = bread(devvp, fsbtodb(fs, ino_to_fsba(fs, ip->i_number)),
-				  (int)fs->e2fs_bsize, NOCRED, &bp);
-		if (error) {
-			vput(vp);
-			return (error);
-		}
-		cp = (caddr_t)bp->b_data +
-		    (ino_to_fsbo(fs, ip->i_number) * EXT2_DINODE_SIZE);
-		e2fs_iload((struct ext2fs_dinode *)cp, &ip->i_din.e2fs_din);
-		brelse(bp);
-		vput(vp);
-		simple_lock(&mntvnode_slock);
-	}
-	simple_unlock(&mntvnode_slock);
-	return (0);
+	error = vfs_mount_foreach_vnode(mountp, ext2fs_reload_vnode, &era);
+
+	return (error);
 }
 
 /*
@@ -710,6 +728,39 @@ ext2fs_statfs(mp, sbp, p)
 	return (0);
 }
 
+int ext2fs_sync_vnode(struct vnode *vp, void *);
+
+struct ext2fs_sync_args {
+	int allerror;
+	int waitfor;
+	struct proc *p;
+	struct ucred *cred;
+};
+
+int
+ext2fs_sync_vnode(struct vnode *vp, void *args) 
+{
+	struct ext2fs_sync_args *esa = args;
+	struct inode *ip;
+	int error;
+
+	ip = VTOI(vp);
+	if (vp->v_type == VNON || 
+	    ((ip->i_flag & (IN_ACCESS | IN_CHANGE | IN_MODIFIED | IN_UPDATE)) == 0 &&
+		vp->v_dirtyblkhd.lh_first == NULL) ||
+	    esa->waitfor == MNT_LAZY) {
+		simple_unlock(&vp->v_interlock);
+		return (0);
+	}
+
+	if (vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK, esa->p))
+		return (0);
+
+	if ((error = VOP_FSYNC(vp, esa->cred, esa->waitfor, esa->p)) != 0)
+		esa->allerror = error;
+	vput(vp);
+	return (0);
+}
 /*
  * Go through the disk queues to initiate sandbagged IO;
  * go through the inodes to write those that have been modified;
@@ -724,11 +775,10 @@ ext2fs_sync(mp, waitfor, cred, p)
 	struct ucred *cred;
 	struct proc *p;
 {
-	register struct vnode *vp, *nvp;
-	register struct inode *ip;
-	register struct ufsmount *ump = VFSTOUFS(mp);
-	register struct m_ext2fs *fs;
+	struct ufsmount *ump = VFSTOUFS(mp);
+	struct m_ext2fs *fs;
 	int error, allerror = 0;
+	struct ext2fs_sync_args esa;
 
 	fs = ump->um_e2fs;
 	if (fs->e2fs_ronly != 0) {		/* XXX */
@@ -739,39 +789,15 @@ ext2fs_sync(mp, waitfor, cred, p)
 	/*
 	 * Write back each (modified) inode.
 	 */
-	simple_lock(&mntvnode_slock);
-loop:
-	for (vp = mp->mnt_vnodelist.lh_first; vp != NULL; vp = nvp) {
-		/*
-		 * If the vnode that we are about to sync is no longer
-		 * associated with this mount point, start over.
-		 */
-		if (vp->v_mount != mp)
-			goto loop;
-		simple_lock(&vp->v_interlock);
-		nvp = vp->v_mntvnodes.le_next;
-		ip = VTOI(vp);
-		if (vp->v_type == VNON || ((ip->i_flag &
-		     (IN_ACCESS | IN_CHANGE | IN_MODIFIED | IN_UPDATE)) == 0 &&
-		     vp->v_dirtyblkhd.lh_first == NULL) ||
-		     waitfor == MNT_LAZY) {
-			simple_unlock(&vp->v_interlock);
-			continue;
-		}
-		simple_unlock(&mntvnode_slock);
-		error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK, p);
-		if (error) {
-			simple_lock(&mntvnode_slock);
-			if (error == ENOENT)
-				goto loop;
-			continue;
-		}
-		if ((error = VOP_FSYNC(vp, cred, waitfor, p)) != 0)
-			allerror = error;
-		vput(vp);
-		simple_lock(&mntvnode_slock);
-	}
-	simple_unlock(&mntvnode_slock);
+	esa.p = p;
+	esa.cred = cred;
+	esa.allerror = 0;
+	esa.waitfor = waitfor;
+
+	vfs_mount_foreach_vnode(mp, ext2fs_sync_vnode, &esa);
+	if (esa.allerror != 0)
+		allerror = esa.allerror;
+
 	/*
 	 * Force stale file system control information to be flushed.
 	 */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wireg.h,v 1.5 2001/06/25 18:04:23 drahn Exp $	*/
+/*	$OpenBSD: if_wireg.h,v 1.18 2002/04/06 23:48:38 millert Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -31,10 +31,12 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	From: if_wireg.h,v 1.5 1999/07/20 20:03:42 wpaul Exp $
+ *	From: if_wireg.h,v 1.8.2.2 2001/08/25 00:48:25 nsayer Exp $
  */
 
-#define WI_TIMEOUT	50000	/* XXX just a guess at a good value.  */
+#pragma pack(1)
+
+#define WI_TIMEOUT	50000	/* 10x XXX just a guess at a good value.  */
 
 #define WI_PORT0	0
 #define WI_PORT1	1
@@ -74,29 +76,37 @@
 
 #define	WI_DEFAULT_AUTHTYPE	1
 
+#define	WI_DEFAULT_DIVERSITY	0
+
 /*
  * register space access macros
  */
 #define CSR_WRITE_4(sc, reg, val)	\
-	bus_space_write_4(sc->wi_btag, sc->wi_bhandle, reg, val)
+	bus_space_write_4(sc->wi_btag, sc->wi_bhandle,	\
+	    (sc->sc_pci? reg * 2: reg) , val)
 #define CSR_WRITE_2(sc, reg, val)	\
-	bus_space_write_2(sc->wi_btag, sc->wi_bhandle, reg, val)
+	bus_space_write_2(sc->wi_btag, sc->wi_bhandle,	\
+	    (sc->sc_pci? reg * 2: reg) , val)
 #define CSR_WRITE_1(sc, reg, val)	\
-	bus_space_write_1(sc->wi_btag, sc->wi_bhandle, reg, val)
+	bus_space_write_1(sc->wi_btag, sc->wi_bhandle,	\
+	    (sc->sc_pci? reg * 2: reg) , val)
 
 #define CSR_READ_4(sc, reg)		\
-	bus_space_read_4(sc->wi_btag, sc->wi_bhandle, reg)
+	bus_space_read_4(sc->wi_btag, sc->wi_bhandle,	\
+	    (sc->sc_pci? reg * 2: reg))
 #define CSR_READ_2(sc, reg)		\
-	bus_space_read_2(sc->wi_btag, sc->wi_bhandle, reg)
+	bus_space_read_2(sc->wi_btag, sc->wi_bhandle,	\
+	    (sc->sc_pci? reg * 2: reg))
 #define CSR_READ_1(sc, reg)		\
-	bus_space_read_1(sc->wi_btag, sc->wi_bhandle, reg)
+	bus_space_read_1(sc->wi_btag, sc->wi_bhandle,	\
+	    (sc->sc_pci? reg * 2: reg))
 
 #define CSR_READ_RAW_2(sc, ba, dst, sz) \
-	bus_space_read_raw_multi_2((sc)->wi_btag, (sc)->wi_bhandle, (ba), \
-		(dst), (sz))
+	bus_space_read_raw_multi_2((sc)->wi_btag, (sc)->wi_bhandle, \
+	    (sc->sc_pci? ba * 2: ba), (dst), (sz))
 #define CSR_WRITE_RAW_2(sc, ba, dst, sz) \
-	bus_space_write_raw_multi_2((sc)->wi_btag, (sc)->wi_bhandle, (ba), \
-		(dst), (sz))
+	bus_space_write_raw_multi_2((sc)->wi_btag, (sc)->wi_bhandle, \
+	    (sc->sc_pci? ba * 2: ba), (dst), (sz))
 
 /*
  * The WaveLAN/IEEE cards contain an 802.11 MAC controller which Lucent
@@ -138,7 +148,7 @@
  */
 
 /*
- * Size of Hermes I/O space.
+ * Size of Hermes & Prism2 I/O space.
  */
 #define WI_IOSIZ		0x40
 
@@ -263,8 +273,43 @@
 #define WI_AUX_OFFSET		0x3C
 #define WI_AUX_DATA		0x3E
 
-#define WI_COR_OFFSET		0x3E0
-#define WI_COR_VALUE		0x41
+#define WI_COR_OFFSET		0x3E0	/* COR attribute offset of card */
+
+#define WI_PLX_LOCALRES		0x14	/* PLX chip's local registers */
+#define WI_PLX_MEMRES		0x18	/* Prism attribute memory (PLX) */
+#define WI_PLX_IORES		0x1C	/* Prism I/O space (PLX) */
+#define WI_PLX_INTCSR		0x4C	/* PLX Interrupt CSR */
+#define WI_PLX_INTEN		0x40	/* Interrupt Enable bit */
+#define WI_PLX_COR_VALUE	0x41	/* Enable with irq in level trigger */
+
+#define WI_TMD_LOCALRES		0x14	/* TMD chip's local registers */
+#define WI_TMD_IORES		0x18	/* Prism I/O space (TMD) */
+#define WI_TMD_COR_OFFSET	0x00	/* COR attribute offset of Prism2 */
+#define WI_TMD_COR_VALUE	0x45
+
+/*
+ * PCI Host Interface Registers (HFA3842 Specific)
+ * The value of all Register's Offset, such as WI_INFO_FID and WI_PARAM0,
+ * has doubled.
+ * About WI_PCI_COR: In this Register, only soft-reset bit implement; Bit(7).
+ */
+#define WI_PCI_CBMA		0x10
+#define WI_PCI_COR_OFFSET	0x4C
+#define WI_PCI_HCR		0x5C
+#define WI_PCI_MASTER0_ADDRH	0x80
+#define WI_PCI_MASTER0_ADDRL	0x84
+#define WI_PCI_MASTER0_LEN	0x88
+#define WI_PCI_MASTER0_CON	0x8C
+
+#define WI_PCI_STATUS		0x98
+
+#define WI_PCI_MASTER1_ADDRH	0xA0
+#define WI_PCI_MASTER1_ADDRL	0xA4
+#define WI_PCI_MASTER1_LEN	0xA8
+#define WI_PCI_MASTER1_CON	0xAC
+
+#define WI_COR_SOFT_RESET	(1 << 7)
+#define WI_COR_CLEAR		0x00
 
 /*
  * One form of communication with the Hermes is with what Lucent calls
@@ -299,12 +344,12 @@ struct wi_ltv_str {
 		struct wi_ltv_str	s;			\
 		int			l;			\
 								\
-		l = (strlen(str) + 1) & ~0x1;			\
+		l = (str.i_len + 1) & ~0x1;			\
 		bzero((char *)&s, sizeof(s));			\
 		s.wi_len = (l / 2) + 2;				\
 		s.wi_type = recno;				\
-		s.wi_str[0] = htole16(strlen(str));		\
-		bcopy(str, (char *)&s.wi_str[1], strlen(str));	\
+		s.wi_str[0] = htole16(str.i_len);		\
+		bcopy(str.i_nwid, &s.wi_str[1], str.i_len);	\
 		wi_write_record(sc, (struct wi_ltv_gen *)&s);	\
 	} while (0)
 
@@ -338,14 +383,19 @@ struct wi_ltv_ver {
 	u_int16_t	wi_len;
 	u_int16_t	wi_type;
 	u_int16_t	wi_ver[4];
-#define	WI_NIC_EVB2	0x8000
-#define	WI_NIC_HWB3763	0x8001
-#define	WI_NIC_HWB3163	0x8002
-#define	WI_NIC_HWB3163B	0x8003
-#define	WI_NIC_EVB3	0x8004
-#define	WI_NIC_HWB1153	0x8007
-#define	WI_NIC_P2_SST	0x8008  /* Prism2 with SST flush */
-#define	WI_NIC_PRISM2_5	0x800C
+#define	WI_NIC_LUCENT		0x0001
+#define	WI_NIC_SONY		0x0002
+#define	WI_NIC_LUCENT_EM	0x0005
+#define	WI_NIC_EVB2		0x8000
+#define	WI_NIC_HWB3763		0x8001
+#define	WI_NIC_HWB3163		0x8002
+#define	WI_NIC_HWB3163B		0x8003
+#define	WI_NIC_EVB3		0x8004
+#define	WI_NIC_HWB1153		0x8007
+#define	WI_NIC_P2_SST		0x8008  /* Prism2 with SST flush */
+#define	WI_NIC_PRISM2_5		0x800C
+#define	WI_NIC_3874A		0x8013	/* Prism2.5 Mini-PCI */
+#define	WI_NIC_37300P		0x801a
 };
 
 /*
@@ -410,9 +460,11 @@ struct wi_ltv_pcf {
  * 2 == Wireless Distribudion System (WDS)
  * 3 == Pseudo IBSS
  */
+#define WI_PORTTYPE_IBSS	0x0
 #define WI_PORTTYPE_BSS		0x1
 #define WI_PORTTYPE_WDS		0x2
 #define WI_PORTTYPE_ADHOC	0x3
+#define WI_PORTTYPE_AP		0x6
 
 /*
  * Mac addresses.
@@ -452,6 +504,15 @@ struct wi_ltv_mcast {
 };
 
 /*
+ * Supported rates.
+ */
+#define WI_SUPPRATES_1M		0x0001
+#define WI_SUPPRATES_2M		0x0002
+#define WI_SUPPRATES_5M		0x0004
+#define WI_SUPPRATES_11M	0x0008
+#define	WI_RATES_BITS	"\20\0011M\0022M\0035.5M\00411M"
+
+/*
  * Information frame types.
  */
 #define WI_INFO_NOTIFY		0xF000	/* Handover address */
@@ -469,7 +530,8 @@ struct wi_frame {
 	u_int16_t		wi_rsvd1;	/* 0x04 */
 	u_int16_t		wi_q_info;	/* 0x06 */
 	u_int16_t		wi_rsvd2;	/* 0x08 */
-	u_int16_t		wi_rsvd3;	/* 0x0A */
+	u_int8_t		wi_tx_rtry;	/* 0x0A */
+	u_int8_t		wi_tx_rate;	/* 0x0A */
 	u_int16_t		wi_tx_ctl;	/* 0x0C */
 	u_int16_t		wi_frame_ctl;	/* 0x0E */
 	u_int16_t		wi_id;		/* 0x10 */
@@ -489,6 +551,7 @@ struct wi_frame {
 #define WI_802_3_OFFSET		0x2E
 #define WI_802_11_OFFSET	0x44
 #define WI_802_11_OFFSET_RAW	0x3C
+#define WI_802_11_OFFSET_HDR	0x0E
 
 #define WI_STAT_BADCRC		0x0001
 #define WI_STAT_UNDECRYPTABLE	0x0002
@@ -497,10 +560,12 @@ struct wi_frame {
 #define WI_STAT_1042		0x2000	/* RFC1042 encoded */
 #define WI_STAT_TUNNEL		0x4000	/* Bridge-tunnel encoded */
 #define WI_STAT_WMP_MSG		0x6000	/* WaveLAN-II management protocol */
+#define WI_STAT_MGMT		0x8000	/* 802.11b management frames */
 #define WI_RXSTAT_MSG_TYPE	0xE000
 
 #define WI_ENC_TX_802_3		0x00
 #define WI_ENC_TX_802_11	0x11
+#define	WI_ENC_TX_MGMT		0x08
 #define WI_ENC_TX_E_II		0x0E
 
 #define WI_ENC_TX_1042		0x00
@@ -508,6 +573,10 @@ struct wi_frame {
 
 #define WI_TXCNTL_MACPORT	0x00FF
 #define WI_TXCNTL_STRUCTTYPE	0xFF00
+#define WI_TXCNTL_TX_EX		0x0004
+#define WI_TXCNTL_TX_OK		0x0002
+#define WI_TXCNTL_NOCRYPT	0x0080
+
 
 /*
  * SNAP (sub-network access protocol) constants for transmission
@@ -521,3 +590,6 @@ struct wi_frame {
 #define WI_SNAP_WORD0		(WI_SNAP_K1 | (WI_SNAP_K1 << 8))
 #define WI_SNAP_WORD1		(WI_SNAP_K2 | (WI_SNAP_CONTROL << 8))
 #define WI_SNAPHDR_LEN		0x6
+#define WI_FCS_LEN		0x4
+
+#pragma pack()

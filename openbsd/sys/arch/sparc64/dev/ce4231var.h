@@ -1,4 +1,4 @@
-/*	$OpenBSD: ce4231var.h,v 1.2 2001/10/02 00:26:24 jason Exp $	*/
+/*	$OpenBSD: ce4231var.h,v 1.5 2002/04/08 17:49:42 jason Exp $	*/
 
 /*
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
@@ -29,6 +29,11 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Effort sponsored in part by the Defense Advanced Research Projects
+ * Agency (DARPA) and Air Force Research Laboratory, Air Force
+ * Materiel Command, USAF, under agreement number F30602-01-2-0537.
+ *
  */
 
 /*
@@ -66,10 +71,10 @@ struct ce4231_softc {
 	int	sc_open;		/* already open? */
 	int	sc_locked;		/* locked? */
 
-	void	(*sc_rintr)(void*);	/* input completion intr handler */
-	void *	sc_rarg;		/* arg for sc_rintr() */
-	void	(*sc_pintr)(void*);	/* output completion intr handler */
-	void *	sc_parg;		/* arg for sc_pintr() */
+	void	(*sc_rintr)(void *);	/* input completion intr handler */
+	void	*sc_rarg;		/* arg for sc_rintr() */
+	void	(*sc_pintr)(void *);	/* output completion intr handler */
+	void	*sc_parg;		/* arg for sc_pintr() */
 
 	char		sc_mute[9];	/* which devs are muted */
 	u_int8_t	sc_out_port;	/* output port */
@@ -88,4 +93,5 @@ struct ce4231_softc {
 	u_int32_t	sc_lastaddr;
 	struct cs_dma	*sc_dmas;	/* dma list */
 	struct cs_dma	*sc_nowplaying;
+	void *sc_pih, *sc_cih;
 };

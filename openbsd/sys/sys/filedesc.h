@@ -1,4 +1,4 @@
-/*	$OpenBSD: filedesc.h,v 1.11 2001/10/07 22:42:07 art Exp $	*/
+/*	$OpenBSD: filedesc.h,v 1.15 2002/03/14 01:27:14 millert Exp $	*/
 /*	$NetBSD: filedesc.h,v 1.14 1996/04/09 20:55:28 cgd Exp $	*/
 
 /*
@@ -36,6 +36,7 @@
  *	@(#)filedesc.h	8.1 (Berkeley) 6/2/93
  */
 
+#include <sys/lock.h>
 /*
  * This structure is used for the management of descriptors.  It may be
  * shared by multiple processes.
@@ -71,6 +72,7 @@ struct filedesc {
 	int	fd_freefile;		/* approx. next free file */
 	u_short	fd_cmask;		/* mask for file creation */
 	u_short	fd_refcnt;		/* reference count */
+	struct lock fd_lock;		/* lock for growing the structure */
 
 	int	fd_knlistsize;		/* size of knlist */
 	struct	klist *fd_knlist;	/* list of attached knotes */
@@ -112,21 +114,21 @@ struct filedesc0 {
 /*
  * Kernel global variables and routines.
  */
-void	filedesc_init __P((void));
-int	dupfdopen __P((struct filedesc *fdp, int indx, int dfd, int mode,
-	    int error));
-int	fdalloc __P((struct proc *p, int want, int *result));
-int	fdavail __P((struct proc *p, int n));
-int	falloc __P((struct proc *p, struct file **resultfp, int *resultfd));
-void	ffree __P((struct file *));
-struct	filedesc *fdinit __P((struct proc *p));
-struct	filedesc *fdshare __P((struct proc *p));
-struct	filedesc *fdcopy __P((struct proc *p));
-void	fdfree __P((struct proc *p));
-int	fdrelease __P((struct proc *p, int));
-void	fdremove __P((struct filedesc *, int));
-void	fdcloseexec __P((struct proc *));
+void	filedesc_init(void);
+int	dupfdopen(struct filedesc *fdp, int indx, int dfd, int mode,
+	    int error);
+int	fdalloc(struct proc *p, int want, int *result);
+void	fdexpand(struct proc *);
+int	falloc(struct proc *p, struct file **resultfp, int *resultfd);
+struct	filedesc *fdinit(struct proc *p);
+struct	filedesc *fdshare(struct proc *p);
+struct	filedesc *fdcopy(struct proc *p);
+void	fdfree(struct proc *p);
+int	fdrelease(struct proc *p, int);
+void	fdremove(struct filedesc *, int);
+void	fdcloseexec(struct proc *);
+struct file *fd_getfile(struct filedesc *, int fd);
 
-int	closef __P((struct file *, struct proc *));
-int	getsock __P((struct filedesc *, int, struct file **));
+int	closef(struct file *, struct proc *);
+int	getsock(struct filedesc *, int, struct file **);
 #endif

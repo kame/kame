@@ -1,4 +1,4 @@
-/*	$OpenBSD: raven.c,v 1.1 2001/06/26 21:57:41 smurph Exp $ */
+/*	$OpenBSD: raven.c,v 1.4 2002/03/14 01:26:41 millert Exp $ */
 
 /*
  * Copyright (c) 2001 Steve Murphree, Jr.
@@ -42,15 +42,15 @@
 #include <sys/malloc.h>
 #include <sys/device.h>
 #include <sys/proc.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 
 #include <mvmeppc/dev/ravenreg.h>
 #include <mvmeppc/dev/ravenvar.h>
 
-int	 raven_match __P((struct device *, void *, void *));
-void	 raven_attach __P((struct device *, struct device *, void *));
+int	 raven_match(struct device *, void *, void *);
+void	 raven_attach(struct device *, struct device *, void *);
 
 struct cfattach raven_ca = {
         sizeof(struct raven_softc), raven_match, raven_attach,
@@ -65,7 +65,6 @@ raven_match(parent, match, aux)
 	struct device *parent;
 	void *match, *aux;
 {
-	struct confargs *ca = aux;
 	unsigned *reg = (unsigned *)RAVEN_REG;
 
 	/* check for a live address */
@@ -84,8 +83,6 @@ raven_attach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
 {
-	struct raven_softc *sc = (struct raven_softc *)self;
-	struct confargs *ca = aux;
 	struct mpic_feature *feature = (struct mpic_feature *)MPCIC_FEATURE;
 
 	/* set system type */

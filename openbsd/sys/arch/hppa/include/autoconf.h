@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.h,v 1.10 2001/05/05 22:33:42 art Exp $	*/
+/*	$OpenBSD: autoconf.h,v 1.15 2002/03/16 01:13:42 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -39,12 +39,14 @@ struct confargs {
 	int		ca_mod;		/* module number on the bus */
 	struct iodc_data ca_type;	/* iodc-specific type descrition */
 	hppa_hpa_t	ca_hpa;		/* module HPA */
+	hppa_hpa_t	ca_hpamask;	/* mask for modules on the bus */
 	bus_dma_tag_t	ca_dmatag;	/* DMA tag */
 	int		ca_irq;		/* module IRQ */
 	struct pdc_iodc_read *ca_pdc_iodc_read;
 }; 
 
-#define	hppacf_irq	cf_loc[0]
+#define	hppacf_off	cf_loc[0]
+#define	hppacf_irq	cf_loc[1]
 
 /* this is used for hppa_knownmodules table
  * describing known to this port modules,
@@ -56,14 +58,20 @@ struct hppa_mod_info {
 	const char *mi_name;
 };
 
+extern void (*cold_hook)(int);
+#define	HPPA_COLD_COLD	0
+#define	HPPA_COLD_HOT	1   
+#define	HPPA_COLD_OFF	2
+
 struct device;
 
-const char *hppa_mod_info __P((int, int));
-void	pdc_scanbus __P((struct device *, struct confargs *, int bus, int));
-int	mbprint __P((void *, const char *));
-int	mbsubmatch __P((struct device *, void *, void *));
-void	*cpu_intr_establish __P((int pri, int, int (*handler) __P((void *)),
-				void *arg, struct device *name));
-int	clock_intr __P((void *));
+const char *hppa_mod_info(int, int);
+void	pdc_scanbus(struct device *, struct confargs *, int bus, int);
+int	mbprint(void *, const char *);
+int	mbsubmatch(struct device *, void *, void *);
+void	*cpu_intr_establish(int pri, int, int (*handler)(void *),
+	    void *arg, struct device *name);
+void	cpu_intr(struct trapframe *frame);
+int	clock_intr(void *);
 
-void	dumpconf	__P((void));
+void	dumpconf(void);

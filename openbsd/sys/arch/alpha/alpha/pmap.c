@@ -1,4 +1,4 @@
-/* $OpenBSD: pmap.c,v 1.17 2001/08/12 12:03:02 heko Exp $ */
+/* $OpenBSD: pmap.c,v 1.33 2002/01/23 00:39:46 art Exp $ */
 /* $NetBSD: pmap.c,v 1.154 2000/12/07 22:18:55 thorpej Exp $ */
 
 /*-
@@ -380,9 +380,6 @@ u_long	pmap_asn_generation[ALPHA_MAXPROCS]; /* current ASN generation */
  *	* pmap_growkernel_slock - This lock protects pmap_growkernel()
  *	  and the virtual_end variable.
  *
- *	* pmap_growkernel_slock - This lock protects pmap_growkernel()
- *	  and the virtual_end variable.
- *
  *	Address space number management (global ASN counters and per-pmap
  *	ASN state) are not locked; they use arrays of values indexed
  *	per-processor.
@@ -515,8 +512,12 @@ void	pmap_l3pt_delref(pmap_t, vaddr_t, pt_entry_t *, long,
 void	pmap_l2pt_delref(pmap_t, pt_entry_t *, pt_entry_t *, long);
 void	pmap_l1pt_delref(pmap_t, pt_entry_t *, long);
 
-void	*pmap_l1pt_alloc(unsigned long, int, int);
-void	pmap_l1pt_free(void *, unsigned long, int);
+void	*pmap_l1pt_alloc(struct pool *, int);
+void	pmap_l1pt_free(struct pool *, void *);
+
+struct pool_allocator pmap_l1pt_allocator = {
+	pmap_l1pt_alloc, pmap_l1pt_free, 0,
+};
 
 int	pmap_l1pt_ctor(void *, void *, int);
 
@@ -528,8 +529,11 @@ void	pmap_pv_remove(pmap_t, paddr_t, vaddr_t, boolean_t,
 	    struct pv_entry **);
 struct	pv_entry *pmap_pv_alloc(void);
 void	pmap_pv_free(struct pv_entry *);
-void	*pmap_pv_page_alloc(u_long, int, int);
-void	pmap_pv_page_free(void *, u_long, int);
+void	*pmap_pv_page_alloc(struct pool *, int);
+void	pmap_pv_page_free(struct pool *, void *);
+struct pool_allocator pmap_pv_allocator = {
+	pmap_pv_page_alloc, pmap_pv_page_free, 0,
+};
 #ifdef DEBUG
 void	pmap_pv_dump(paddr_t);
 #endif
@@ -805,14 +809,16 @@ pmap_bootstrap(paddr_t ptaddr, u_int maxasn, u_long ncpuids)
 #endif
 
 	/*
+	 * Compute the number of pages kmem_map will have.
+	 */
+	kmeminit_nkmempages();
+
+	/*
 	 * Figure out how many PTE's are necessary to map the kernel.
-	 * The '512' comes from PAGER_MAP_SIZE in vm_pager_init().
-	 * This should be kept in sync.
-	 * We also reserve space for kmem_alloc_pageable() for vm_fork().
 	 */
 	lev3mapsize = (VM_PHYS_SIZE +
-		nbuf * MAXBSIZE + 16 * NCARGS) / NBPG + 512 +
-		(maxproc * UPAGES) + NKMEMCLUSTERS;
+		nbuf * MAXBSIZE + 16 * NCARGS + PAGER_MAP_SIZE) / NBPG +
+		(maxproc * UPAGES) + nkmempages;
 
 #ifdef SYSVSHM
 	lev3mapsize += shminfo.shmall;
@@ -921,9 +927,6 @@ pmap_bootstrap(paddr_t ptaddr, u_int maxasn, u_long ncpuids)
 	/* Initialize the pmap_growkernel_slock. */
 	simple_lock_init(&pmap_growkernel_slock);
 
-	/* Initialize the pmap_growkernel_slock. */
-	simple_lock_init(&pmap_growkernel_slock);
-
 	/*
 	 * Set up level three page table (lev3map)
 	 */
@@ -951,19 +954,17 @@ pmap_bootstrap(paddr_t ptaddr, u_int maxasn, u_long ncpuids)
 	 */
 	pmap_ncpuids = ncpuids;
 	pool_init(&pmap_pmap_pool, sizeof(struct pmap), 0, 0, 0, "pmappl",
-	    0, pool_page_alloc_nointr, pool_page_free_nointr, M_VMPMAP);
+	    &pool_allocator_nointr);
 	pool_init(&pmap_l1pt_pool, PAGE_SIZE, 0, 0, 0, "l1ptpl",
-	    0, pmap_l1pt_alloc, pmap_l1pt_free, M_VMPMAP);
+	    &pmap_l1pt_allocator);
 	pool_cache_init(&pmap_l1pt_cache, &pmap_l1pt_pool, pmap_l1pt_ctor,
 	    NULL, NULL);
 	pool_init(&pmap_asn_pool, pmap_ncpuids * sizeof(u_int), 0, 0, 0,
-	    "pmasnpl",
-	    0, pool_page_alloc_nointr, pool_page_free_nointr, M_VMPMAP);
+	    "pmasnpl", &pool_allocator_nointr);
 	pool_init(&pmap_asngen_pool, pmap_ncpuids * sizeof(u_long), 0, 0, 0,
-	    "pmasngenpl",
-	    0, pool_page_alloc_nointr, pool_page_free_nointr, M_VMPMAP);
+	    "pmasngenpl", &pool_allocator_nointr);
 	pool_init(&pmap_pv_pool, sizeof(struct pv_entry), 0, 0, 0, "pvpl",
-	    0, pmap_pv_page_alloc, pmap_pv_page_free, M_VMPMAP);
+	    &pmap_pv_allocator);
 
 	TAILQ_INIT(&pmap_all_pmaps);
 
@@ -1007,7 +1008,7 @@ pmap_bootstrap(paddr_t ptaddr, u_int maxasn, u_long ncpuids)
 	 */
 	pool_init(&pmap_tlb_shootdown_job_pool,
 	    sizeof(struct pmap_tlb_shootdown_job), 0, 0, 0, "pmaptlbpl",
-	    0, NULL, NULL, M_VMPMAP);
+	    NULL);
 	for (i = 0; i < ALPHA_MAXPROCS; i++) {
 		TAILQ_INIT(&pmap_tlb_shootdown_q[i].pq_head);
 		simple_lock_init(&pmap_tlb_shootdown_q[i].pq_slock);
@@ -1044,6 +1045,13 @@ pmap_uses_prom_console(void)
 #endif /* NEW_SCC_DRIVER */
 }
 #endif /* _PMAP_MAY_USE_PROM_CONSOLE */
+
+void
+pmap_virtual_space(vaddr_t *vstartp, vaddr_t *vendp)
+{
+	*vstartp = VM_MIN_KERNEL_ADDRESS;
+	*vendp = VM_MAX_KERNEL_ADDRESS;
+}
 
 /*
  * pmap_steal_memory:		[ INTERFACE ]
@@ -1297,6 +1305,7 @@ pmap_destroy(pmap_t pmap)
 			printf("pmap_release: %ld level 3 tables left\n",
 			    pmap->pm_nlev3);
 		pmap_remove(pmap, VM_MIN_ADDRESS, VM_MAX_ADDRESS);
+		pmap_update(pmap);
 		if (pmap->pm_lev1map != kernel_lev1map)
 			panic("pmap_release: pmap_remove() didn't");
 	}
@@ -1517,7 +1526,7 @@ pmap_do_remove(pmap_t pmap, vaddr_t sva, vaddr_t eva, boolean_t dowired)
  *	the permissions specified.
  */
 void
-pmap_page_protect(vm_page_t pg, vm_prot_t prot)
+pmap_page_protect(struct vm_page *pg, vm_prot_t prot)
 {
 	pmap_t pmap;
 	struct pv_head *pvh;
@@ -1696,12 +1705,12 @@ pmap_enter(pmap_t pmap, vaddr_t va, paddr_t pa, vm_prot_t prot, int flags)
 	boolean_t isactive;
 	boolean_t wired;
 	long cpu_id = cpu_number();
-	int error = KERN_SUCCESS;
+	int error = 0;
 
 #ifdef DEBUG
 	if (pmapdebug & (PDB_FOLLOW|PDB_ENTER))
 		printf("pmap_enter(%p, %lx, %lx, %x, %x)\n",
-		       pmap, va, pa, prot, access_type);
+		       pmap, va, pa, prot, flags);
 #endif
 	managed = PAGE_IS_MANAGED(pa);
 	isactive = PMAP_ISACTIVE(pmap, cpu_id);
@@ -1753,7 +1762,7 @@ pmap_enter(pmap_t pmap, vaddr_t va, paddr_t pa, vm_prot_t prot, int flags)
 		 */
 		if (pmap->pm_lev1map == kernel_lev1map) {
 			error = pmap_lev1map_create(pmap, cpu_id);
-			if (error != KERN_SUCCESS) {
+			if (error) {
 				if (flags & PMAP_CANFAIL)
 					goto out;
 				panic("pmap_enter: unable to create lev1map");
@@ -1770,7 +1779,7 @@ pmap_enter(pmap_t pmap, vaddr_t va, paddr_t pa, vm_prot_t prot, int flags)
 		if (pmap_pte_v(l1pte) == 0) {
 			pmap_physpage_addref(l1pte);
 			error = pmap_ptpage_alloc(pmap, l1pte, PGU_L2PT);
-			if (error != KERN_SUCCESS) {
+			if (error) {
 				pmap_l1pt_delref(pmap, l1pte, cpu_id);
 				if (flags & PMAP_CANFAIL)
 					goto out;
@@ -1795,7 +1804,7 @@ pmap_enter(pmap_t pmap, vaddr_t va, paddr_t pa, vm_prot_t prot, int flags)
 		if (pmap_pte_v(l2pte) == 0) {
 			pmap_physpage_addref(l2pte);
 			error = pmap_ptpage_alloc(pmap, l2pte, PGU_L3PT);
-			if (error != KERN_SUCCESS) {
+			if (error) {
 				pmap_l2pt_delref(pmap, l1pte, l2pte, cpu_id);
 				if (flags & PMAP_CANFAIL)
 					goto out;
@@ -1901,7 +1910,7 @@ pmap_enter(pmap_t pmap, vaddr_t va, paddr_t pa, vm_prot_t prot, int flags)
 	 */
 	if (managed) {
 		error = pmap_pv_enter(pmap, pa, va, pte, TRUE);
-		if (error != KERN_SUCCESS) {
+		if (error) {
 			pmap_l3pt_delref(pmap, va, pte, cpu_id, NULL);
 			if (flags & PMAP_CANFAIL)
 				goto out;
@@ -2056,35 +2065,9 @@ pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot)
 }
 
 /*
- * pmap_kenter_pgs:		[ INTERFACE ]
- *
- *	Enter a va -> pa mapping for the array of vm_page's into the
- *	kernel pmap without any physical->virtual tracking, starting
- *	at address va, for npgs pages.
- *
- *	Note: no locking is necessary in this function.
- */
-void
-pmap_kenter_pgs(vaddr_t va, vm_page_t *pgs, int npgs)
-{
-	int i;
-
-#ifdef DEBUG
-	if (pmapdebug & (PDB_FOLLOW|PDB_ENTER))
-		printf("pmap_kenter_pgs(%lx, %p, %d)\n",
-		    va, pgs, npgs);
-#endif
-
-	for (i = 0; i < npgs; i++)
-		pmap_kenter_pa(va + (PAGE_SIZE * i),
-		    VM_PAGE_TO_PHYS(pgs[i]),
-		    VM_PROT_READ|VM_PROT_WRITE);
-}
-
-/*
  * pmap_kremove:		[ INTERFACE ]
  *
- *	Remove a mapping entered with pmap_kenter_pa() or pmap_kenter_pgs()
+ *	Remove a mapping entered with pmap_kenter_pa()
  *	starting at va, for size bytes (assumed to be page rounded).
  */
 void
@@ -2191,7 +2174,8 @@ boolean_t
 pmap_extract(pmap_t pmap, vaddr_t va, paddr_t *pap)
 {
 	pt_entry_t *l1pte, *l2pte, *l3pte;
-	paddr_t pa = 0;
+	boolean_t rv = FALSE;
+	paddr_t pa;
 
 #ifdef DEBUG
 	if (pmapdebug & PDB_FOLLOW)
@@ -2212,18 +2196,19 @@ pmap_extract(pmap_t pmap, vaddr_t va, paddr_t *pap)
 		goto out;
 
 	pa = pmap_pte_pa(l3pte) | (va & PGOFSET);
+	*pap = pa;
+	rv = TRUE;
  out:
 	PMAP_UNLOCK(pmap);
 #ifdef DEBUG
 	if (pmapdebug & PDB_FOLLOW) {
-		if (pa)
+		if (rv)
 			printf("0x%lx\n", pa);
 		else
 			printf("failed\n");
 	}
 #endif
-	*pap = pa;
-	return (pa != 0);
+	return (rv);
 }
 
 /*
@@ -2244,27 +2229,6 @@ pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vaddr_t dst_addr, vsize_t len,
 		printf("pmap_copy(%p, %p, %lx, %lx, %lx)\n",
 		       dst_pmap, src_pmap, dst_addr, len, src_addr);
 #endif
-}
-
-/*
- * pmap_update:			[ INTERFACE ]
- *
- *	Require that all active physical maps contain no
- *	incorrect entries NOW, by processing any deferred
- *	pmap operations.
- */
-void
-pmap_update(void)
-{
-
-#ifdef DEBUG
-	if (pmapdebug & PDB_FOLLOW)
-		printf("pmap_update()\n");
-#endif
-
-	/*
-	 * Nothing to do; this pmap module does not defer any operations.
-	 */
 }
 
 /*
@@ -2459,7 +2423,7 @@ pmap_copy_page(paddr_t src, paddr_t dst)
  *	Clear the modify bits on the specified physical page.
  */
 boolean_t
-pmap_clear_modify(vm_page_t pg)
+pmap_clear_modify(struct vm_page *pg)
 {
 	struct pv_head *pvh;
 	paddr_t pa = VM_PAGE_TO_PHYS(pg);
@@ -2494,7 +2458,7 @@ pmap_clear_modify(vm_page_t pg)
  *	Clear the reference bit on the specified physical page.
  */
 boolean_t
-pmap_clear_reference(vm_page_t pg)
+pmap_clear_reference(struct vm_page *pg)
 {
 	struct pv_head *pvh;
 	paddr_t pa = VM_PAGE_TO_PHYS(pg);
@@ -2530,7 +2494,7 @@ pmap_clear_reference(vm_page_t pg)
  *	by any physical maps.
  */
 boolean_t
-pmap_is_referenced(vm_page_t pg)
+pmap_is_referenced(struct vm_page *pg)
 {
 	struct pv_head *pvh;
 	paddr_t pa = VM_PAGE_TO_PHYS(pg);
@@ -2553,7 +2517,7 @@ pmap_is_referenced(vm_page_t pg)
  *	by any physical maps.
  */
 boolean_t
-pmap_is_modified(vm_page_t pg)
+pmap_is_modified(struct vm_page *pg)
 {
 	struct pv_head *pvh;
 	paddr_t pa = VM_PAGE_TO_PHYS(pg);
@@ -3059,7 +3023,7 @@ pmap_pv_enter(pmap_t pmap, paddr_t pa, vaddr_t va, pt_entry_t *pte,
 	 */
 	newpv = pmap_pv_alloc();
 	if (newpv == NULL)
-		return (KERN_RESOURCE_SHORTAGE);
+		return (ENOMEM);
 	newpv->pv_va = va;
 	newpv->pv_pmap = pmap;
 	newpv->pv_pte = pte;
@@ -3092,7 +3056,7 @@ pmap_pv_enter(pmap_t pmap, paddr_t pa, vaddr_t va, pt_entry_t *pte,
 	if (dolock)
 		simple_unlock(&pvh->pvh_slock);
 
-	return (KERN_SUCCESS);
+	return (0);
 }
 
 /*
@@ -3244,7 +3208,7 @@ pmap_pv_free(struct pv_entry *pv)
  *	Allocate a page for the pv_entry pool.
  */
 void *
-pmap_pv_page_alloc(u_long size, int flags, int mtype)
+pmap_pv_page_alloc(struct pool *pp, int flags)
 {
 	paddr_t pg;
 
@@ -3259,7 +3223,7 @@ pmap_pv_page_alloc(u_long size, int flags, int mtype)
  *	Free a pv_entry pool page.
  */
 void
-pmap_pv_page_free(void *v, u_long size, int mtype)
+pmap_pv_page_free(struct pool *pp, void *v)
 {
 
 	pmap_physpage_free(ALPHA_K0SEG_TO_PHYS((vaddr_t)v));
@@ -3285,10 +3249,9 @@ pmap_physpage_alloc(int usage, paddr_t *pap)
 	 * properly initialize it in the constructor.
 	 */
 
-	pg = uvm_pagealloc(NULL, 0, NULL, UVM_PGA_USERESERVE);
+	pg = uvm_pagealloc(NULL, 0, NULL, usage == PGU_L1PT ?
+	    UVM_PGA_USERESERVE : UVM_PGA_USERESERVE|UVM_PGA_ZERO);
 	if (pg != NULL) {
-		if (usage != PGU_L1PT)
-			uvm_pagezero(pg);
 		pa = VM_PAGE_TO_PHYS(pg);
 
 		pvh = pa_to_pvh(pa);
@@ -3495,6 +3458,9 @@ pmap_growkernel(vaddr_t maxkvaddr)
 		va += ALPHA_L2SEG_SIZE;
 	}
 
+	/* Invalidate the L1 PT cache. */
+	pool_cache_invalidate(&pmap_l1pt_cache);
+
 	virtual_end = va;
 
 	simple_unlock(&pmap_growkernel_slock);
@@ -3532,7 +3498,7 @@ pmap_lev1map_create(pmap_t pmap, long cpu_id)
 	l1pt = pool_cache_get(&pmap_l1pt_cache, PR_NOWAIT);
 	if (l1pt == NULL) {
 		simple_unlock(&pmap_growkernel_slock);
-		return (KERN_RESOURCE_SHORTAGE);
+		return (ENOMEM);
 	}
 
 	pmap->pm_lev1map = l1pt;
@@ -3547,7 +3513,7 @@ pmap_lev1map_create(pmap_t pmap, long cpu_id)
 		pmap_asn_alloc(pmap, cpu_id);
 		PMAP_ACTIVATE(pmap, curproc, cpu_id);
 	}
-	return (KERN_SUCCESS);
+	return (0);
 }
 
 /*
@@ -3639,7 +3605,7 @@ pmap_l1pt_ctor(void *arg, void *object, int flags)
  *	Page alloctor for L1 PT pages.
  */
 void *
-pmap_l1pt_alloc(unsigned long sz, int flags, int mtype)
+pmap_l1pt_alloc(struct pool *pp, int flags)
 {
 	paddr_t ptpa;
 
@@ -3666,7 +3632,7 @@ pmap_l1pt_alloc(unsigned long sz, int flags, int mtype)
  *	Page freer for L1 PT pages.
  */
 void
-pmap_l1pt_free(void *v, unsigned long sz, int mtype)
+pmap_l1pt_free(struct pool *pp, void *v)
 {
 
 	pmap_physpage_free(ALPHA_K0SEG_TO_PHYS((vaddr_t) v));
@@ -3694,7 +3660,7 @@ pmap_ptpage_alloc(pmap_t pmap, pt_entry_t *pte, int usage)
 		 * another pmap!
 		 */
 		if (pmap_ptpage_steal(pmap, usage, &ptpa) == FALSE)
-			return (KERN_RESOURCE_SHORTAGE);
+			return (ENOMEM);
 	}
 
 	/*
@@ -3704,7 +3670,7 @@ pmap_ptpage_alloc(pmap_t pmap, pt_entry_t *pte, int usage)
 	    PG_V | PG_KRE | PG_KWE | PG_WIRED |
 	    (pmap == pmap_kernel() ? PG_ASM : 0));
 
-	return (KERN_SUCCESS);
+	return (0);
 }
 
 /*

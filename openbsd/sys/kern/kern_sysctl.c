@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_sysctl.c,v 1.58 2001/09/28 01:42:54 millert Exp $	*/
+/*	$OpenBSD: kern_sysctl.c,v 1.64 2002/03/14 20:31:31 mickey Exp $	*/
 /*	$NetBSD: kern_sysctl.c,v 1.17 1996/05/20 17:49:05 mrg Exp $	*/
 
 /*-
@@ -57,14 +57,12 @@
 #include <sys/tty.h>
 #include <sys/disklabel.h>
 #include <sys/disk.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>
 #include <sys/msgbuf.h>
 #include <sys/dkstat.h>
 #include <sys/vmmeter.h>
 #include <sys/namei.h>
-
-#include <uvm/uvm_extern.h>
 
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
@@ -189,12 +187,14 @@ sys___sysctl(p, v, retval)
 	if (SCARG(uap, old) != NULL) {
 		if ((error = lockmgr(&sysctl_lock, LK_EXCLUSIVE, NULL, p)) != 0)
 			return (error);
-		if (dolock)
-			if (uvm_vslock(p, SCARG(uap, old), oldlen,
-			    VM_PROT_READ|VM_PROT_WRITE) != KERN_SUCCESS) {
+		if (dolock) {
+			error = uvm_vslock(p, SCARG(uap, old), oldlen,
+			    VM_PROT_READ|VM_PROT_WRITE);
+			if (error) {
 				lockmgr(&sysctl_lock, LK_RELEASE, NULL, p);
-				return EFAULT;
+				return (error);
 			}
+		}
 		savelen = oldlen;
 	}
 	error = (*fn)(name + 1, SCARG(uap, namelen) - 1, SCARG(uap, old),
@@ -241,11 +241,14 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	struct proc *p;
 {
 	int error, level, inthostid, oldsgap;
-	extern char ostype[], osrelease[], osversion[], version[];
 	extern int somaxconn, sominconn;
 	extern int usermount, nosuidcoredump;
 	extern long cp_time[CPUSTATES];
 	extern int stackgap_random;
+#ifdef CRYPTO
+	extern int usercrypto;
+	extern int cryptodevallowsoft;
+#endif
 
 	/* all sysctl names at this level are terminal */
 	if (namelen != 1 && !(name[0] == KERN_PROC || name[0] == KERN_PROF ||
@@ -422,6 +425,13 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 #if defined(SYSVMSG) || defined(SYSVSEM) || defined(SYSVSHM)  
 	case KERN_SYSVIPC_INFO:
 		return (sysctl_sysvipc(name + 1, namelen - 1, oldp, oldlenp));
+#endif
+#ifdef CRYPTO
+	case KERN_USERCRYPTO:
+		return (sysctl_int(oldp, oldlenp, newp, newlen, &usercrypto));
+	case KERN_CRYPTODEVALLOWSOFT:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+			    &cryptodevallowsoft));
 #endif
 	default:
 		return (EOPNOTSUPP);
@@ -703,7 +713,7 @@ sysctl_rdstring(oldp, oldlenp, newp, str)
 	void *oldp;
 	size_t *oldlenp;
 	void *newp;
-	char *str;
+	const char *str;
 {
 	int len, error = 0;
 
@@ -754,7 +764,8 @@ int
 sysctl_rdstruct(oldp, oldlenp, newp, sp, len)
 	void *oldp;
 	size_t *oldlenp;
-	void *newp, *sp;
+	void *newp;
+	const void *sp;
 	int len;
 {
 	int error = 0;

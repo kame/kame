@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile.hp300,v 1.22 2001/08/30 22:10:18 miod Exp $
+#	$OpenBSD: Makefile.hp300,v 1.26 2001/12/24 23:12:14 miod Exp $
 #	$NetBSD: Makefile.hp300,v 1.54 1997/04/01 23:16:41 scottr Exp $
 
 # Makefile for OpenBSD
@@ -24,11 +24,13 @@
 
 .include <bsd.own.mk>
 
+AS?=	as
 CC?=	cc
+CPP?=	cpp
 LD?=	ld
 MKDEP?=	mkdep
+SIZE?=	size
 STRIP?=	strip
-COPTS?=		-O2
 
 # source tree is located via $S relative to the compilation directory
 .ifndef S
@@ -40,16 +42,54 @@ M68K=	$S/arch/m68k
 INCLUDES=	-I. -I$S/arch -I$S -nostdinc
 CPPFLAGS=	${INCLUDES} ${IDENT} ${PARAM} -D_KERNEL \
 		-Dmc68020 -Dhp300
-CWARNFLAGS=	-Werror -Wall -Wstrict-prototypes -Wno-uninitialized \
-		-Wno-format -Wno-main
-CFLAGS=		${DEBUG} ${COPTS} ${CWARNFLAGS} -msoft-float
+CWARNFLAGS=	-Werror -Wall -Wstrict-prototypes -Wmissing-prototypes \
+		-Wno-uninitialized -Wno-format -Wno-main
+CMACHFLAGS=	-msoft-float
+COPTS?=	-O2
+CFLAGS=		${DEBUG} ${COPTS} ${CWARNFLAGS} ${CMACHFLAGS}
 AFLAGS=		-x assembler-with-cpp -traditional-cpp -D_LOCORE
 LINKFLAGS=	-n -Ttext 0 -e start
 STRIPFLAGS=	-d
 
-HOSTCC=	${CC}
+HOSTCC?=	${CC}
 HOSTED_CPPFLAGS=${CPPFLAGS:S/^-nostdinc$//}
 HOSTED_CFLAGS=	${CFLAGS}
+
+### CPU and MMU configuration
+
+.if (${IDENT:M-DHP320} != "" || ${IDENT:M-DHP350} != "")
+_OPTIONS+=	-DM68020 -DM68K_MMU_HP
+CPPFLAGS+=	-DCACHE_HAVE_VAC
+.endif
+.if (${IDENT:M-DHP330} != "")
+_OPTIONS+=	-DM68020 -DM68K_MMU_MOTOROLA
+.endif
+.if (${IDENT:M-DHP340} != "")
+_OPTIONS+=	-DM68030 -DM68K_MMU_MOTOROLA
+.endif
+.if (${IDENT:M-DHP345} != "" || ${IDENT:M-DHP360} != "" || \
+     ${IDENT:M-DHP370} != "" || ${IDENT:M-DHP375} != "" || \
+     ${IDENT:M-DHP400} != "")
+_OPTIONS+=	-DM68030 -DM68K_MMU_MOTOROLA
+CPPFLAGS+=	-DCACHE_HAVE_PAC
+.endif
+.if (${IDENT:M-DHP380} != "" || ${IDENT:M-DHP385} != "" || \
+     ${IDENT:M-DHP425} != "" || ${IDENT:M-DHP433} != "")
+_OPTIONS+=	-DM68K_MMU_MOTOROLA
+CPPFLAGS+=	-DM68040 -DFPSP
+.endif
+.if ${_OPTIONS:M-DM68020} != ""
+CPPFLAGS+=	-DM68020
+.endif
+.if ${_OPTIONS:M-DM68030} != ""
+CPPFLAGS+=	-DM68030
+.endif
+.if ${_OPTIONS:M-DM68K_MMU_HP} != ""
+CPPFLAGS+=	-DM68K_MMU_HP
+.endif
+.if ${_OPTIONS:M-DM68K_MMU_MOTOROLA} != ""
+CPPFLAGS+=	-DM68K_MMU_MOTOROLA
+.endif
 
 ### find out what to use for libkern
 .include "$S/lib/libkern/Makefile.inc"
@@ -95,7 +135,7 @@ SYSTEM_DEP=	Makefile ${SYSTEM_OBJ}
 SYSTEM_LD_HEAD=	@rm -f $@
 SYSTEM_LD=	@echo ${LD} ${LINKFLAGS} -o $@ '$${SYSTEM_OBJ}' vers.o; \
 		${LD} ${LINKFLAGS} -o $@ ${SYSTEM_OBJ} vers.o
-SYSTEM_LD_TAIL=	@size $@; chmod 755 $@
+SYSTEM_LD_TAIL=	@${SIZE} $@; chmod 755 $@
 
 DEBUG?=
 .if ${DEBUG} == "-g"

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_txpreg.h,v 1.31 2001/08/24 21:11:14 jason Exp $ */
+/*	$OpenBSD: if_txpreg.h,v 1.34 2001/11/05 17:25:58 art Exp $ */
 
 /*
  * Copyright (c) 2001 Aaron Campbell <aaron@monkey.org>.
@@ -157,6 +157,7 @@
 #define	TXP_CMD_FILTER_TABLE_MODE_WRITE		0x3d
 #define	TXP_CMD_FILTER_TCL_WRITE		0x3e
 #define	TXP_CMD_FILTER_TBL_READ			0x3f
+#define	TXP_CMD_VERSIONS_READ			0x43
 #define	TXP_CMD_FILTER_DEFINE			0x45
 #define	TXP_CMD_ADD_WAKEUP_PKT			0x46
 #define	TXP_CMD_ADD_SLEEP_PKT			0x47
@@ -373,6 +374,7 @@ struct txp_frag_desc {
 #define	FRAG_FLAGS_TYPE_OPT	0x03		/* type: options */
 #define	FRAG_FLAGS_TYPE_RX	0x04		/* type: command */
 #define	FRAG_FLAGS_TYPE_RESP	0x05		/* type: response */
+#define	FRAG_FLAGS_VALID	0x80		/* valid descriptor */
 
 struct txp_opt_desc {
 	u_int8_t		opt_desctype:3,
@@ -619,10 +621,3 @@ struct txp_fw_section_header {
 #define	READ_REG(sc,reg) \
     bus_space_read_4((sc)->sc_bt, (sc)->sc_bh, reg)
 
-#ifdef __HAS_NEW_BUS_DMAMAP_SYNC
-#define	txp_bus_dmamap_sync(tag, map, off, len, op)	\
-    bus_dmamap_sync((tag), (map), (off), (len), (op))
-#else
-#define	txp_bus_dmamap_sync(tag, map, off, len, op)	\
-    bus_dmamap_sync((tag), (map), (op))
-#endif

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ufs_vnops.c,v 1.37 2001/09/05 19:22:23 deraadt Exp $	*/
+/*	$OpenBSD: ufs_vnops.c,v 1.44 2002/03/14 01:27:18 millert Exp $	*/
 /*	$NetBSD: ufs_vnops.c,v 1.18 1996/05/11 18:28:04 mycroft Exp $	*/
 
 /*
@@ -58,13 +58,12 @@
 #include <sys/lockf.h>
 #include <sys/event.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <miscfs/specfs/specdev.h>
 #include <miscfs/fifofs/fifo.h>
 
+#include <ufs/ufs/extattr.h>
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/dir.h>
@@ -72,13 +71,12 @@
 #include <ufs/ufs/ufs_extern.h>
 #include <ufs/ext2fs/ext2fs_extern.h>
 
-static int ufs_chmod __P((struct vnode *, int, struct ucred *, struct proc *));
-static int ufs_chown
-	__P((struct vnode *, uid_t, gid_t, struct ucred *, struct proc *));
-int filt_ufsread __P((struct knote *kn, long hint));
-int filt_ufswrite __P((struct knote *kn, long hint));
-int filt_ufsvnode __P((struct knote *kn, long hint));
-void filt_ufsdetach __P((struct knote *kn));
+static int ufs_chmod(struct vnode *, int, struct ucred *, struct proc *);
+static int ufs_chown(struct vnode *, uid_t, gid_t, struct ucred *, struct proc *);
+int filt_ufsread(struct knote *kn, long hint);
+int filt_ufswrite(struct knote *kn, long hint);
+int filt_ufsvnode(struct knote *kn, long hint);
+void filt_ufsdetach(struct knote *kn);
 
 union _qcvt {
 	int64_t	qcvt;
@@ -259,18 +257,15 @@ ufs_access(v)
 	 */
 	if (mode & VWRITE) {
 		switch (vp->v_type) {
-#ifdef QUOTA
 			int error;
-#endif
 		case VDIR:
 		case VLNK:
 		case VREG:
 			if (vp->v_mount->mnt_flag & MNT_RDONLY)
 				return (EROFS);
-#ifdef QUOTA
+
 			if ((error = getinoquota(ip)) != 0)
 				return (error);
-#endif
 			break;
 		case VBAD:
 		case VBLK:
@@ -495,10 +490,8 @@ ufs_chown(vp, uid, gid, cred, p)
 	uid_t ouid;
 	gid_t ogid;
 	int error = 0;
-#ifdef QUOTA
-	int i;
-	long change;
-#endif
+	ufs_daddr_t change;
+	enum ufs_quota_flags quota_flags = 0;
 
 	if (uid == (uid_t)VNOVAL)
 		uid = ip->i_ffs_uid;
@@ -515,68 +508,40 @@ ufs_chown(vp, uid, gid, cred, p)
 		return (error);
 	ogid = ip->i_ffs_gid;
 	ouid = ip->i_ffs_uid;
-#ifdef QUOTA
+	change = ip->i_ffs_blocks;
+
+	if (ouid == uid)
+		quota_flags |= UFS_QUOTA_NOUID;
+	
+	if (ogid == gid)
+		quota_flags |= UFS_QUOTA_NOGID;
+
 	if ((error = getinoquota(ip)) != 0)
 		return (error);
-	if (ouid == uid) {
-		dqrele(vp, ip->i_dquot[USRQUOTA]);
-		ip->i_dquot[USRQUOTA] = NODQUOT;
-	}
-	if (ogid == gid) {
-		dqrele(vp, ip->i_dquot[GRPQUOTA]);
-		ip->i_dquot[GRPQUOTA] = NODQUOT;
-	}
-	change = ip->i_ffs_blocks;
-	(void) chkdq(ip, -change, cred, CHOWN);
-	(void) chkiq(ip, -1, cred, CHOWN);
-	for (i = 0; i < MAXQUOTAS; i++) {
-		dqrele(vp, ip->i_dquot[i]);
-		ip->i_dquot[i] = NODQUOT;
-	}
-#endif
+	(void) ufs_quota_free_blocks2(ip, change, cred, quota_flags);
+	(void) ufs_quota_free_inode2(ip, cred, quota_flags);
+	(void) ufs_quota_delete(ip);
+
 	ip->i_ffs_gid = gid;
 	ip->i_ffs_uid = uid;
-#ifdef QUOTA
-	if ((error = getinoquota(ip)) == 0) {
-		if (ouid == uid) {
-			dqrele(vp, ip->i_dquot[USRQUOTA]);
-			ip->i_dquot[USRQUOTA] = NODQUOT;
-		}
-		if (ogid == gid) {
-			dqrele(vp, ip->i_dquot[GRPQUOTA]);
-			ip->i_dquot[GRPQUOTA] = NODQUOT;
-		}
-		if ((error = chkdq(ip, change, cred, CHOWN)) == 0) {
-			if ((error = chkiq(ip, 1, cred, CHOWN)) == 0)
-				goto good;
-			else
-				(void) chkdq(ip, -change, cred, CHOWN|FORCE);
-		}
-		for (i = 0; i < MAXQUOTAS; i++) {
-			dqrele(vp, ip->i_dquot[i]);
-			ip->i_dquot[i] = NODQUOT;
-		}
+
+	if ((error = getinoquota(ip)) != 0)
+		goto error;
+
+	if ((error = ufs_quota_alloc_blocks2(ip, change, cred, 
+		 quota_flags)) != 0) 
+		goto error;
+
+	if ((error = ufs_quota_alloc_inode2(ip, cred ,
+		 quota_flags)) != 0) {
+		(void)ufs_quota_free_blocks2(ip, change, cred, 
+		    quota_flags);		
+		goto error;
 	}
-	ip->i_ffs_gid = ogid;
-	ip->i_ffs_uid = ouid;
-	if (getinoquota(ip) == 0) {
-		if (ouid == uid) {
-			dqrele(vp, ip->i_dquot[USRQUOTA]);
-			ip->i_dquot[USRQUOTA] = NODQUOT;
-		}
-		if (ogid == gid) {
-			dqrele(vp, ip->i_dquot[GRPQUOTA]);
-			ip->i_dquot[GRPQUOTA] = NODQUOT;
-		}
-		(void) chkdq(ip, change, cred, FORCE|CHOWN);
-		(void) chkiq(ip, 1, cred, FORCE|CHOWN);
-		(void) getinoquota(ip);
-	}
-	return (error);
-good:
+
 	if (getinoquota(ip))
 		panic("chown: lost quota");
-#endif /* QUOTA */
+
 	if (ouid != uid || ogid != gid)
 		ip->i_flag |= IN_CHANGE;
 	if (ouid != uid && cred->cr_uid != 0)
@@ -584,6 +549,21 @@ good:
 	if (ogid != gid && cred->cr_uid != 0)
 		ip->i_ffs_mode &= ~ISGID;
 	return (0);
+
+error:
+	(void) ufs_quota_delete(ip);
+
+	ip->i_ffs_gid = ogid;
+	ip->i_ffs_uid = ouid;
+	if (getinoquota(ip) == 0) {
+		(void) ufs_quota_alloc_blocks2(ip, change, cred, 
+		    quota_flags | UFS_QUOTA_FORCE);
+		(void) ufs_quota_alloc_inode2(ip, cred,
+		    quota_flags | UFS_QUOTA_FORCE);
+		(void) getinoquota(ip);
+	}
+	return (error);
+
 }
 
 /* ARGSUSED */
@@ -623,28 +603,6 @@ ufs_select(v)
 	 * We should really check to see if I/O is possible.
 	 */
 	return (1);
-}
-
-/*
- * Mmap a file
- *
- * NB Currently unsupported.
- */
-/* ARGSUSED */
-int
-ufs_mmap(v)
-	void *v;
-{
-#if 0
-	struct vop_mmap_args /* {
-		struct vnode *a_vp;
-		int  a_fflags;
-		struct ucred *a_cred;
-		struct proc *a_p;
-	} */ *ap = v;
-#endif
-
-	return (EINVAL);
 }
 
 /*
@@ -1319,16 +1277,16 @@ ufs_mkdir(v)
 	ip = VTOI(tvp);
 	ip->i_ffs_uid = cnp->cn_cred->cr_uid;
 	ip->i_ffs_gid = dp->i_ffs_gid;
-#ifdef QUOTA
+
 	if ((error = getinoquota(ip)) ||
-	    (error = chkiq(ip, 1, cnp->cn_cred, 0))) {
+	    (error = ufs_quota_alloc_inode(ip, cnp->cn_cred))) {
 		free(cnp->cn_pnbuf, M_NAMEI);
 		UFS_INODE_FREE(ip, ip->i_number, dmode);
 		vput(tvp);
 		vput(dvp);
 		return (error);
 	}
-#endif
+
 	ip->i_flag |= IN_ACCESS | IN_CHANGE | IN_UPDATE;
 	ip->i_ffs_mode = dmode;
 	tvp->v_type = VDIR;	/* Rest init'd in getnewvnode(). */
@@ -1916,7 +1874,7 @@ ufsfifo_read(v)
 		int  a_ioflag;
 		struct ucred *a_cred;
 	} */ *ap = v;
-	extern int (**fifo_vnodeop_p) __P((void *));
+	extern int (**fifo_vnodeop_p)(void *);
 
 	/*
 	 * Set access flag.
@@ -1938,7 +1896,7 @@ ufsfifo_write(v)
 		int  a_ioflag;
 		struct ucred *a_cred;
 	} */ *ap = v;
-	extern int (**fifo_vnodeop_p) __P((void *));
+	extern int (**fifo_vnodeop_p)(void *);
 
 	/*
 	 * Set update and change flags.
@@ -1962,7 +1920,7 @@ ufsfifo_close(v)
 		struct ucred *a_cred;
 		struct proc *a_p;
 	} */ *ap = v;
-	extern int (**fifo_vnodeop_p) __P((void *));
+	extern int (**fifo_vnodeop_p)(void *);
 	struct vnode *vp = ap->a_vp;
 	struct inode *ip = VTOI(vp);
 
@@ -2039,8 +1997,8 @@ ufs_advlock(v)
 int
 ufs_vinit(mntp, specops, fifoops, vpp)
 	struct mount *mntp;
-	int (**specops) __P((void *));
-	int (**fifoops) __P((void *));
+	int (**specops)(void *);
+	int (**fifoops)(void *);
 	struct vnode **vpp;
 {
 	struct inode *ip;
@@ -2131,16 +2089,16 @@ ufs_makeinode(mode, dvp, vpp, cnp)
 	ip = VTOI(tvp);
 	ip->i_ffs_gid = pdir->i_ffs_gid;
 	ip->i_ffs_uid = cnp->cn_cred->cr_uid;
-#ifdef QUOTA
+
 	if ((error = getinoquota(ip)) ||
-	    (error = chkiq(ip, 1, cnp->cn_cred, 0))) {
+	    (error = ufs_quota_alloc_inode(ip, cnp->cn_cred))) {
 		free(cnp->cn_pnbuf, M_NAMEI);
 		UFS_INODE_FREE(ip, ip->i_number, mode);
 		vput(tvp);
 		vput(dvp);
 		return (error);
 	}
-#endif
+
 	ip->i_flag |= IN_ACCESS | IN_CHANGE | IN_UPDATE;
 	ip->i_ffs_mode = mode;
 	tvp->v_type = IFTOVT(mode);	/* Rest init'd in getnewvnode(). */

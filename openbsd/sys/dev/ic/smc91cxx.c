@@ -1,4 +1,4 @@
-/*	$OpenBSD: smc91cxx.c,v 1.13 2001/07/08 23:38:06 fgsch Exp $	*/
+/*	$OpenBSD: smc91cxx.c,v 1.15 2002/03/22 00:04:29 vincent Exp $	*/
 /*	$NetBSD: smc91cxx.c,v 1.11 1998/08/08 23:51:41 mycroft Exp $	*/
 
 /*-
@@ -132,7 +132,6 @@
 /* XXX Hardware padding doesn't work yet(?) */
 #define	SMC91CXX_SW_PAD
 
-#ifdef SMC_DEBUG
 const char *smc91cxx_idstrs[] = {
 	NULL,				/* 0 */
 	NULL,				/* 1 */
@@ -151,7 +150,6 @@ const char *smc91cxx_idstrs[] = {
 	NULL,				/* 14 */
 	NULL,				/* 15 */
 };
-#endif
 
 /* Supported media types. */
 const int smc91cxx_media[] = {
@@ -164,22 +162,22 @@ struct cfdriver sm_cd = {
 	NULL, "sm", DV_IFNET
 };
 
-int	smc91cxx_mediachange __P((struct ifnet *));
-void	smc91cxx_mediastatus __P((struct ifnet *, struct ifmediareq *));
+int	smc91cxx_mediachange(struct ifnet *);
+void	smc91cxx_mediastatus(struct ifnet *, struct ifmediareq *);
 
-int	smc91cxx_set_media __P((struct smc91cxx_softc *, int));
+int	smc91cxx_set_media(struct smc91cxx_softc *, int);
 
-void	smc91cxx_read __P((struct smc91cxx_softc *));
-void	smc91cxx_reset __P((struct smc91cxx_softc *));
-void	smc91cxx_start __P((struct ifnet *));
-void	smc91cxx_resume __P((struct smc91cxx_softc *));
-void	smc91cxx_watchdog __P((struct ifnet *));
-int	smc91cxx_ioctl __P((struct ifnet *, u_long, caddr_t));
+void	smc91cxx_read(struct smc91cxx_softc *);
+void	smc91cxx_reset(struct smc91cxx_softc *);
+void	smc91cxx_start(struct ifnet *);
+void	smc91cxx_resume(struct smc91cxx_softc *);
+void	smc91cxx_watchdog(struct ifnet *);
+int	smc91cxx_ioctl(struct ifnet *, u_long, caddr_t);
 
-int	smc91cxx_enable __P((struct smc91cxx_softc *));
-void	smc91cxx_disable __P((struct smc91cxx_softc *));
+int	smc91cxx_enable(struct smc91cxx_softc *);
+void	smc91cxx_disable(struct smc91cxx_softc *);
 
-static __inline int ether_cmp __P((void *, void *));
+static __inline int ether_cmp(void *, void *);
 static __inline int
 ether_cmp(va, vb)
 	void *va, *vb;

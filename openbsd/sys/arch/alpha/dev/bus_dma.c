@@ -1,4 +1,4 @@
-/* $OpenBSD: bus_dma.c,v 1.4 2001/09/19 20:50:56 mickey Exp $ */
+/* $OpenBSD: bus_dma.c,v 1.9 2002/03/14 01:26:26 millert Exp $ */
 /* $NetBSD: bus_dma.c,v 1.40 2000/07/17 04:47:56 thorpej Exp $ */
 
 /*-
@@ -47,15 +47,14 @@
 #include <sys/proc.h>
 #include <sys/mbuf.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
 
-int	_bus_dmamap_load_buffer_direct_common __P((bus_dma_tag_t,
+int	_bus_dmamap_load_buffer_direct_common(bus_dma_tag_t,
 	    bus_dmamap_t, void *, bus_size_t, struct proc *, int,
-	    paddr_t *, int *, int));
+	    paddr_t *, int *, int);
 
 extern paddr_t avail_start, avail_end;	/* from pmap.c */
 
@@ -429,10 +428,12 @@ _bus_dmamap_unload(t, map)
  * by chipset-specific DMA map synchronization functions.
  */
 void
-_bus_dmamap_sync(t, map, op)
+_bus_dmamap_sync(t, map, offset, len, op)
 	bus_dma_tag_t t;
 	bus_dmamap_t map;
-	bus_dmasync_op_t op;
+	bus_addr_t offset;
+	bus_size_t len;
+	int op;
 {
 
 	/*
@@ -476,7 +477,7 @@ _bus_dmamem_alloc_range(t, size, alignment, boundary, segs, nsegs, rsegs,
 	paddr_t high;
 {
 	paddr_t curaddr, lastaddr;
-	vm_page_t m;    
+	struct vm_page *m;    
 	struct pglist mlist;
 	int curseg, error;
 
@@ -538,7 +539,7 @@ _bus_dmamem_free(t, segs, nsegs)
 	bus_dma_segment_t *segs;
 	int nsegs;
 {
-	vm_page_t m;
+	struct vm_page *m;
 	bus_addr_t addr;
 	struct pglist mlist;
 	int curseg;
@@ -605,6 +606,7 @@ _bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 			    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.4 2001/09/11 03:50:46 jason Exp $	*/
+/*	$OpenBSD: param.h,v 1.8 2002/03/14 01:26:45 millert Exp $	*/
 /*	$NetBSD: param.h,v 1.25 2001/05/30 12:28:51 mrg Exp $ */
 
 /*
@@ -199,23 +199,26 @@ extern int nbpg, pgofset, pgshift;
  * of the hardware page size.
  */
 #define	MSIZE		256		/* size of an mbuf */
-#define	MCLBYTES	2048		/* enough for whole Ethernet packet */
 #define	MCLSHIFT	11		/* log2(MCLBYTES) */
+#define	MCLBYTES	(1 << MCLSHIFT)	/* enough for whole Ethernet packet */
 #define	MCLOFSET	(MCLBYTES - 1)
 
 #ifndef NMBCLUSTERS
 #ifdef GATEWAY
-#define	NMBCLUSTERS	512		/* map size, max cluster allocation */
+#define	NMBCLUSTERS	2048		/* map size, max cluster allocation */
 #else
-#define	NMBCLUSTERS	256		/* map size, max cluster allocation */
+#define	NMBCLUSTERS	1024		/* map size, max cluster allocation */
 #endif
 #endif
 
 #define MSGBUFSIZE	NBPG
 
-#ifndef NKMEMCLUSTERS
-#define NKMEMCLUSTERS	(16 * 1024 * 1024 / PAGE_SIZE)
-#endif
+/*
+ * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
+ * logical pages.
+ */
+#define	NKMEMPAGES_MIN_DEFAULT	((6 * 1024 * 1024) >> PAGE_SHIFT)
+#define	NKMEMPAGES_MAX_DEFAULT	((128 * 1024 * 1024) >> PAGE_SHIFT)
 
 /* pages ("clicks") to disk blocks */
 #define	ctod(x)		((x) << (PGSHIFT - DEV_BSHIFT))
@@ -260,12 +263,12 @@ extern struct map	*dvmamap;
 #define rctov(n)		(ctob(((n)-1))+dvma_base)
 #define vtorc(v)		((btoc((v)-dvma_base))+1)
 
-extern caddr_t	kdvma_mapin __P((caddr_t, int, int));
-extern caddr_t	dvma_malloc __P((size_t, void *, int));
-extern void	dvma_free __P((caddr_t, size_t, void *));
+extern caddr_t	kdvma_mapin(caddr_t, int, int);
+extern caddr_t	dvma_malloc(size_t, void *, int);
+extern void	dvma_free(caddr_t, size_t, void *);
 #endif
 
-extern void	delay __P((unsigned int));
+extern void	delay(unsigned int);
 #define	DELAY(n)	delay(n)
 
 extern int cputyp;

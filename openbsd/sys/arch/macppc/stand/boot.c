@@ -1,4 +1,4 @@
-/*	$OpenBSD: boot.c,v 1.2 2001/09/21 16:58:41 drahn Exp $	*/
+/*	$OpenBSD: boot.c,v 1.5 2002/03/14 03:15:56 millert Exp $	*/
 /*	$NetBSD: boot.c,v 1.1 1997/04/16 20:29:17 thorpej Exp $	*/
 
 /*
@@ -67,11 +67,11 @@ int boothowto;
 int debug;
 
 #ifdef POWERPC_BOOT_ELF
-int	elf_exec __P((int, Elf32_Ehdr *, u_int32_t *, void **));
+int	elf_exec(int, Elf32_Ehdr *, u_int32_t *, void **);
 #endif
 
 #ifdef POWERPC_BOOT_AOUT
-int	aout_exec __P((int, struct exec *, u_int32_t *, void **));
+int	aout_exec(int, struct exec *, u_int32_t *, void **);
 #endif
 
 static void
@@ -202,7 +202,7 @@ main()
 	parseargs(bootline, &boothowto);
 	for (;;) {
 		if (boothowto & RB_ASKNAME) {
-			printf("Boot: ");
+			printf("Boot (or \"exit\"): ");
 			gets(bootline);
 			parseargs(bootline, &boothowto);
 		}
@@ -245,7 +245,7 @@ main()
 	ssym = (void *)marks[MARK_SYM];
 	esym = (void *)marks[MARK_END];
 
-	chain ((void*)entry, bootline, ssym, esym);
+	chain ((void *)entry, bootline, ssym, esym);
 
 	_rtt();
 	return 0;

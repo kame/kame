@@ -1,4 +1,4 @@
-/*	$OpenBSD: apecs.c,v 1.13 2001/06/26 21:13:43 art Exp $	*/
+/*	$OpenBSD: apecs.c,v 1.17 2002/03/14 01:26:27 millert Exp $	*/
 /*	$NetBSD: apecs.c,v 1.16 1996/12/05 01:39:34 cgd Exp $	*/
 
 /*-
@@ -69,7 +69,7 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/rpb.h>
@@ -94,8 +94,8 @@
 #include <alpha/pci/pci_1000.h>
 #endif
 
-int	apecsmatch __P((struct device *, void *, void *));
-void	apecsattach __P((struct device *, struct device *, void *));
+int	apecsmatch(struct device *, void *, void *);
+void	apecsattach(struct device *, struct device *, void *);
 
 struct cfattach apecs_ca = {
 	sizeof(struct apecs_softc), apecsmatch, apecsattach,
@@ -105,7 +105,7 @@ struct cfdriver apecs_cd = {
 	NULL, "apecs", DV_DULL,
 };
 
-int	apecsprint __P((void *, const char *pnp));
+int	apecsprint(void *, const char *pnp);
 
 /* There can be only one. */
 int apecsfound;
@@ -149,8 +149,8 @@ apecs_init(acp, mallocsafe)
 
 	if (!acp->ac_initted) {
 		/* don't do these twice since they set up extents */
-		acp->ac_iot = apecs_bus_io_init(acp);
-		acp->ac_memt = apecs_bus_mem_init(acp);
+		apecs_bus_io_init(&acp->ac_iot, acp);
+		apecs_bus_mem_init(&acp->ac_memt, acp);
 
 #if 0
 		/*
@@ -168,7 +168,9 @@ apecs_init(acp, mallocsafe)
 	alpha_pci_chipset->pc_name = "apecs";
 	alpha_pci_chipset->pc_mem = APECS_PCI_SPARSE;
 	alpha_pci_chipset->pc_dense = APECS_PCI_DENSE;
+	alpha_pci_chipset->pc_ports = APECS_PCI_SIO;
 	alpha_pci_chipset->pc_bwx = 0;
+	alpha_pci_chipset->pc_hae_mask = EPIC_HAXR1_EADDR;
 
 	acp->ac_initted = 1;
 }
@@ -237,8 +239,8 @@ apecsattach(parent, self, aux)
 	}
 
 	pba.pba_busname = "pci";
-	pba.pba_iot = acp->ac_iot;
-	pba.pba_memt = acp->ac_memt;
+	pba.pba_iot = &acp->ac_iot;
+	pba.pba_memt = &acp->ac_memt;
 	pba.pba_dmat =
 	    alphabus_dma_get_tag(&acp->ac_dmat_direct, ALPHA_BUS_PCI);
 	pba.pba_pc = &acp->ac_pc;

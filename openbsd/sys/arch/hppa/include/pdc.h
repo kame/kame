@@ -1,4 +1,4 @@
-/*	$OpenBSD: pdc.h,v 1.15 2000/12/06 17:18:57 deraadt Exp $	*/
+/*	$OpenBSD: pdc.h,v 1.19 2002/03/14 01:26:32 millert Exp $	*/
 
 /*
  * Copyright (c) 1990 mt Xinu, Inc.  All rights reserved.
@@ -262,8 +262,8 @@
 
 struct iomod;
 
-typedef int (*pdcio_t) __P((int, int, ...));
-typedef int (*iodcio_t) __P((struct iomod *, int, ...));
+typedef int (*pdcio_t)(int, int, ...);
+typedef int (*iodcio_t)(struct iomod *, int, ...);
 
 /*
  * Commonly used PDC calls and the structures they return.
@@ -518,9 +518,18 @@ struct device_path {
 };
 
 /* dp_flags */
-#define	PF_AUTOBOOT	0x80	/* These two are PDC flags for how to locate */
-#define	PF_AUTOSEARCH	0x40	/*	the "boot device" */
-#define	PF_TIMER	0x0f	/* power of 2 # secs "boot timer" (0 == dflt) */
+#define	PZF_AUTOBOOT	0x80	/* These two are PDC flags for how to locate */
+#define	PZF_AUTOSEARCH	0x40	/*	the "boot device" */
+#define	PZF_TIMER	0x0f	/* power of 2 # secs "boot timer" (0 == dflt) */
+#define	PZF_BITS	"\020\010autoboot\07autosearch"
+
+/* macros to decode serial parameters out of dp_layers */
+#define	PZL_BITS(l)	(((l) & 0x03) + 5)
+#define	PZL_PARITY(l)	(((l) & 0x18) >> 3)
+#define	PZL_SPEED(l)	(((l) & 0x3c0) >> 6)
+#define	PZL_ENCODE(bits, parity, speed) \
+	(((bits) - 5) & 0x03) | (((parity) & 0x3) << 3) | \
+	(((speed) & 0x0f) << 6)
 
 /*
  * A processors Stable Storage is accessed through the PDC.  There are
@@ -620,14 +629,14 @@ struct consdev;
 
 extern int kernelmapped;
 
-void pdc_init __P((void));
-int pdc_call __P((iodcio_t, int, ...));
+void pdc_init(void);
+int pdc_call(iodcio_t, int, ...);
 
-void pdccnprobe __P((struct consdev *));
-void pdccninit __P((struct consdev *));
-int pdccngetc __P((dev_t));
-void pdccnputc __P((dev_t, int));
-void pdccnpollc __P((dev_t, int));
+void pdccnprobe(struct consdev *);
+void pdccninit(struct consdev *);
+int pdccngetc(dev_t);
+void pdccnputc(dev_t, int);
+void pdccnpollc(dev_t, int);
 #endif
 
 #endif	/* !(_LOCORE) */

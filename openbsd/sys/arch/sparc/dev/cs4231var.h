@@ -1,4 +1,4 @@
-/*	$OpenBSD: cs4231var.h,v 1.3 2001/10/05 17:32:20 jason Exp $	*/
+/*	$OpenBSD: cs4231var.h,v 1.6 2002/03/14 03:15:59 millert Exp $	*/
 
 /*
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
@@ -53,7 +53,7 @@ struct cs_volume {
 struct cs4231_softc {
 	struct	device sc_dev;		/* base device */
 	struct	sbusdev sc_sd;		/* sbus device */
-	struct	intrhand sc_hwih;	/* hardware interrupt vectoring */
+	struct	intrhand sc_ih;		/* hardware interrupt vectoring */
 	struct	cs4231_regs *sc_regs;	/* CS4231/APC registers */
 	struct	evcnt sc_intrcnt;	/* statistics */
 	int	sc_node;		/* which sbus node */
@@ -61,9 +61,9 @@ struct cs4231_softc {
 	int	sc_open;		/* already open? */
 	int	sc_locked;		/* locked? */
 
-	void	(*sc_rintr)(void*);	/* input completion intr handler */
+	void	(*sc_rintr)(void *);	/* input completion intr handler */
 	void *	sc_rarg;		/* arg for sc_rintr() */
-	void	(*sc_pintr)(void*);	/* output completion intr handler */
+	void	(*sc_pintr)(void *);	/* output completion intr handler */
 	void *	sc_parg;		/* arg for sc_pintr() */
 
 	char		sc_mute[9];	/* which devs are muted */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: netbsd_getdents.c,v 1.4 2001/09/05 23:38:28 art Exp $	*/
+/*	$OpenBSD: netbsd_getdents.c,v 1.6 2002/03/14 01:26:50 millert Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -53,8 +53,8 @@
 #include <compat/netbsd/netbsd_signal.h>
 #include <compat/netbsd/netbsd_syscallargs.h>
 
-static int netbsd_vn_readdir __P((struct file *, char *, int, u_int, int *,
-	struct proc *, off_t **, int *));
+static int netbsd_vn_readdir(struct file *, char *, int, u_int, int *,
+	struct proc *, off_t **, int *);
 
 static int
 netbsd_vn_readdir(fp, buf, segflg, count, done, p, cookies, ncookies)
@@ -92,8 +92,8 @@ unionread:
 
 #ifdef UNION
 {
-	extern int (**union_vnodeop_p) __P((void *));
-	extern struct vnode *union_dircache __P((struct vnode *));
+	extern int (**union_vnodeop_p)(void *);
+	extern struct vnode *union_dircache(struct vnode *);
 
 	if (count == auio.uio_resid && (vp->v_op == union_vnodeop_p)) {
 		struct vnode *lvp;
@@ -167,9 +167,11 @@ netbsd_sys_getdents(p, v, retval)
 		return (error);
 	if ((fp->f_flag & FREAD) == 0)
 		return (EBADF);
+	FREF(fp);
 	error = netbsd_vn_readdir(fp, SCARG(uap, buf), UIO_USERSPACE,
 			SCARG(uap, count), &done, p, 0, 0);
 	*retval = done;
+	FRELE(fp);
 	return (error);
 }
 

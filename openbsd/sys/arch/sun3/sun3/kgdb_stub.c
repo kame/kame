@@ -1,4 +1,4 @@
-/*	$OpenBSD: kgdb_stub.c,v 1.7 2001/09/20 17:02:31 mpech Exp $	*/
+/*	$OpenBSD: kgdb_stub.c,v 1.9 2002/03/14 01:26:47 millert Exp $	*/
 /*	$NetBSD: kgdb_stub.c,v 1.6 1996/10/23 16:30:48 gwr Exp $	*/
 
 /*
@@ -52,7 +52,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/control.h>
 #include <machine/cpu.h>
@@ -81,14 +81,14 @@ int kgdb_active = 0;		/* remote debugging active if != 0 */
 int kgdb_debug_init = 0;	/* != 0 waits for remote at system init */
 int kgdb_debug_panic = 0;	/* != 0 waits for remote on panic */
 
-static void kgdb_send __P((u_int, u_char *, int));
-static int kgdb_recv __P((u_char *, int *));
-static int computeSignal __P((int));
-int kgdb_trap __P((int, struct trapframe *));
-int kgdb_acc __P((caddr_t, int));
+static void kgdb_send(u_int, u_char *, int);
+static int kgdb_recv(u_char *, int *);
+static int computeSignal(int);
+int kgdb_trap(int, struct trapframe *);
+int kgdb_acc(caddr_t, int);
 
-static int (*kgdb_getc) __P((void *));
-static void (*kgdb_putc) __P((void *, int));
+static int (*kgdb_getc)(void *);
+static void (*kgdb_putc)(void *, int);
 static void *kgdb_ioarg;
 
 #define GETC()	((*kgdb_getc)(kgdb_ioarg))
@@ -113,8 +113,8 @@ static void *kgdb_ioarg;
  */
 void
 kgdb_attach(getfn, putfn, ioarg)
-	int (*getfn) __P((void *));
-	void (*putfn) __P((void *, int));
+	int (*getfn)(void *);
+	void (*putfn)(void *, int);
 	void *ioarg;
 {
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.15 2001/09/11 20:05:24 miod Exp $	*/
+/*	$OpenBSD: mem.c,v 1.19 2002/03/14 01:26:47 millert Exp $	*/
 /*	$NetBSD: mem.c,v 1.19 1995/08/08 21:09:01 gwr Exp $	*/
 
 /*
@@ -55,7 +55,7 @@
 #include <sys/proc.h>
 #include <sys/uio.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/conf.h>
 #include <machine/cpu.h>
@@ -64,7 +64,7 @@
 #include <machine/pte.h>
 #include <machine/pmap.h>
 
-extern int ledrw __P((struct uio *));
+extern int ledrw(struct uio *);
 
 static caddr_t devzeropage;
 
@@ -171,10 +171,12 @@ mmrw(dev, uio, flags)
 			pmap_enter(pmap_kernel(), vmmap,
 			    trunc_page(v), uio->uio_rw == UIO_READ ?
 			    VM_PROT_READ : VM_PROT_WRITE, PMAP_WIRED);
+			pmap_update(pmap_kernel());
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)vmmap + o, c, uio);
 			pmap_remove(pmap_kernel(), vmmap, vmmap + NBPG);
+			pmap_update(pmap_kernel());
 			continue;
 
 /* minor device 1 is kernel memory */
@@ -262,10 +264,11 @@ unlock:
 	return (error);
 }
 
-int
+paddr_t
 mmmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	register int v = off;
 

@@ -1,7 +1,7 @@
-/*	$OpenBSD: cpu.c,v 1.8 2000/08/15 20:38:24 mickey Exp $	*/
+/*	$OpenBSD: cpu.c,v 1.16 2002/03/26 05:29:02 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998,1999 Michael Shalayeff
+ * Copyright (c) 1998-2002 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,6 +37,7 @@
 
 #include <machine/cpufunc.h>
 #include <machine/pdc.h>
+#include <machine/reg.h>
 #include <machine/iomod.h>
 #include <machine/autoconf.h>
 
@@ -49,8 +50,8 @@ struct cpu_softc {
 	void *sc_ih;
 };
 
-int	cpumatch __P((struct device *, void *, void *));
-void	cpuattach __P((struct device *, struct device *, void *));
+int	cpumatch(struct device *, void *, void *);
+void	cpuattach(struct device *, struct device *, void *);
 
 struct cfattach cpu_ca = {
 	sizeof(struct cpu_softc), cpumatch, cpuattach
@@ -89,6 +90,7 @@ cpuattach(parent, self, aux)
 	extern struct pdc_cache pdc_cache;
 	extern struct pdc_btlb pdc_btlb;
 	extern u_int cpu_ticksnum, cpu_ticksdenom;
+	extern u_int fpu_enable;
 
 	struct pdc_model pdc_model PDC_ALIGNMENT;
 	struct pdc_cpuid pdc_cpuid PDC_ALIGNMENT;
@@ -116,56 +118,76 @@ cpuattach(parent, self, aux)
 		/* XXX p = hppa_mod_info(HPPA_TYPE_CPU,pdc_cversion[0]); */
 	}
 
-	printf (": %s rev %d, ", p? p : cpu_typename, (*cpu_desidhash)());
+	printf (": %s rev %d ", p? p : cpu_typename, (*cpu_desidhash)());
 
 	if ((err = pdc_call((iodcio_t)pdc, 0, PDC_MODEL, PDC_MODEL_INFO,
 			    &pdc_model)) < 0) {
 #ifdef DEBUG
-		printf("WARNING: PDC_MODEL failed (%d)\n", err);
+		printf("PDC_MODEL(%d) ", err);
 #endif
 	} else {
 		static const char lvls[4][4] = { "0", "1", "1.5", "2" };
 
-		printf("lev %s, cat %c, ",
-		       lvls[pdc_model.pa_lvl], "AB"[pdc_model.mc]);
+		printf("L%s-%c ", lvls[pdc_model.pa_lvl], "AB"[pdc_model.mc]);
 	}
 
 	printf ("%d", mhz / 100);
 	if (mhz % 100 > 9)
 		printf(".%02d", mhz % 100);
+	printf("MHz, ");
 
-	printf(" MHz clk\n%s: %s", self->dv_xname,
-	       pdc_model.sh? "shadows, ": "");
+	if (fpu_enable) {
+		const char *name;
+		u_int ver;
 
-	if (pdc_cache.dc_conf.cc_sh)
-		printf("%uK cache", pdc_cache.dc_size / 1024);
-	else
-		printf("%uK/%uK D/I caches",
-		       pdc_cache.dc_size / 1024,
-		       pdc_cache.ic_size / 1024);
-	if (pdc_cache.dt_conf.tc_sh)
-		printf(", %u shared TLB", pdc_cache.dt_size);
-	else
-		printf(", %u/%u D/I TLBs",
-		       pdc_cache.dt_size, pdc_cache.it_size);
+		mtctl(fpu_enable, CR_CCR);
+		__asm volatile(
+		    "copr,0,0\n\t"
+		    "fstws   %%fr0,0(%0)"
+		    :: "r" (&ver) : "memory");
+		mtctl(0, CR_CCR);
+		ver = HPPA_FPUVER(ver);
+		name = hppa_mod_info(HPPA_TYPE_FPU, ver >> 5);
+		if (name)
+			printf("FPU %s rev %d", name, ver & 0x1f);
+		else
+			printf("FPU v%d.%02d", ver >> 5, ver & 0x1f);
+	}
+
+	/* if (pdc_model.sh)
+		printf("shadows, "); */
+
+	printf("\n%s: ", self->dv_xname);
+	p = "";
+	if (!pdc_cache.dc_conf.cc_sh) {
+		printf("%uK(%db/l) Icache, ",
+		    pdc_cache.ic_size / 1024, pdc_cache.ic_conf.cc_line * 16);
+		p = "D";
+	}
+	/* TODO decode associativity */
+	printf("%uK(%db/l) wr-%s %scoherent %scache, ",
+	    pdc_cache.dc_size / 1024, pdc_cache.dc_conf.cc_line * 16,
+	    pdc_cache.dc_conf.cc_wt? "thru" : "back",
+	    pdc_cache.dc_conf.cc_cst? "" : "in", p);
+
+	p = "";
+	if (!pdc_cache.dt_conf.tc_sh) {
+		printf("%u ITLB, ", pdc_cache.it_size);
+		p = "D";
+	}
+	printf("%u %scoherent %sTLB",
+	    pdc_cache.dt_size, pdc_cache.dt_conf.tc_cst? "" : "in", p);
 
 	if (pdc_btlb.finfo.num_c)
-		printf(", %u shared BTLB", pdc_btlb.finfo.num_c);
-	else {
-		printf(", %u/%u D/I BTLBs",
-		       pdc_btlb.finfo.num_i,
-		       pdc_btlb.finfo.num_d);
-	}
+		printf(", %u BTLB\n", pdc_btlb.finfo.num_c);
+	else
+		printf(", %u/%u D/I BTLBs\n",
+		    pdc_btlb.finfo.num_i, pdc_btlb.finfo.num_d);
 
-	printf("\n");
-
-	/* sanity against luser amongst config editors */
-	if (ca->ca_irq == 31) {
+	/* sanity against lusers amongst config editors */
+	if (ca->ca_irq == 31)
 		sc->sc_ih = cpu_intr_establish(IPL_CLOCK, ca->ca_irq,
-					       clock_intr, NULL /*trapframe*/,
-					       &sc->sc_dev);
-	} else {
-		printf ("%s: bad irq number %d\n", sc->sc_dev.dv_xname,
-			ca->ca_irq);
-	}
+		    clock_intr, NULL /*trapframe*/, &sc->sc_dev);
+	else
+		printf ("%s: bad irq %d\n", sc->sc_dev.dv_xname, ca->ca_irq);
 }

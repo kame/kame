@@ -1,4 +1,4 @@
-/*	$OpenBSD: procfs_ctl.c,v 1.7 1997/08/29 04:24:37 millert Exp $	*/
+/*	$OpenBSD: procfs_ctl.c,v 1.10 2002/03/14 01:27:08 millert Exp $	*/
 /*	$NetBSD: procfs_ctl.c,v 1.14 1996/02/09 22:40:48 christos Exp $	*/
 
 /*
@@ -63,6 +63,8 @@
 	 (p)->p_pptr == (curp) && \
 	 ISSET((p)->p_flag, P_TRACED))
 
+#ifdef PTRACE
+
 #define PROCFS_CTL_ATTACH	1
 #define PROCFS_CTL_DETACH	2
 #define PROCFS_CTL_STEP		3
@@ -78,6 +80,8 @@ static vfs_namemap_t ctlnames[] = {
 	{ "wait",	PROCFS_CTL_WAIT },
 	{ 0 },
 };
+
+#endif
 
 static vfs_namemap_t signames[] = {
 	/* regular signal names */
@@ -100,12 +104,8 @@ static vfs_namemap_t signames[] = {
 	{ 0 },
 };
 
-static int procfs_control __P((struct proc *, struct proc *, int));
-
-/* Macros to clear/set/test flags. */
-#define	SET(t, f)	(t) |= (f)
-#define	CLR(t, f)	(t) &= ~(f)
-#define	ISSET(t, f)	((t) & (f))
+#ifdef PTRACE
+static int procfs_control(struct proc *, struct proc *, int);
 
 static int
 procfs_control(curp, p, op)
@@ -248,14 +248,17 @@ procfs_control(curp, p, op)
 		}
 		return (error);
 
+#ifdef DIAGNOSTIC
 	default:
 		panic("procfs_control");
+#endif
 	}
 
 	if (p->p_stat == SSTOP)
 		setrunnable(p);
 	return (0);
 }
+#endif
 
 int
 procfs_doctl(curp, p, pfs, uio)
@@ -288,10 +291,13 @@ procfs_doctl(curp, p, pfs, uio)
 	 */
 	error = EOPNOTSUPP;
 
+#ifdef PTRACE
 	nm = vfs_findname(ctlnames, msg, xlen);
 	if (nm) {
 		error = procfs_control(curp, p, nm->nm_val);
-	} else {
+	} else
+#endif
+	{
 		nm = vfs_findname(signames, msg, xlen);
 		if (nm) {
 			if (TRACE_WAIT_P(curp, p)) {

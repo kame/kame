@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.24 2001/09/21 17:33:15 miod Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.33 2002/03/28 07:21:12 deraadt Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.1 1996/09/30 16:34:57 ws Exp $	*/
 
 /*
@@ -34,12 +34,12 @@
 #include <sys/param.h>
 #include <sys/core.h>
 #include <sys/exec.h>
+#include <sys/pool.h>
 #include <sys/proc.h>
 #include <sys/signalvar.h>
 #include <sys/user.h>
 #include <sys/vnode.h>
-
-#include <vm/vm.h>
+#include <sys/ptrace.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -50,27 +50,39 @@
  * Finish a fork operation, with process p2 nearly set up.
  */
 void
-cpu_fork(p1, p2, stack, stacksize)
+cpu_fork(p1, p2, stack, stacksize, func, arg)
 	struct proc *p1, *p2;
 	void *stack;
 	size_t stacksize;
+	void (*func)(void *);
+	void *arg;
 {
 	struct trapframe *tf;
 	struct callframe *cf;
 	struct switchframe *sf;
 	caddr_t stktop1, stktop2;
-	extern void fork_trampoline __P((void));
-	extern void child_return __P((struct proc *));
+	extern void fork_trampoline(void);
 	struct pcb *pcb = &p2->p_addr->u_pcb;
 
 	if (p1 == fpuproc)
 		save_fpu(p1);
 	*pcb = p1->p_addr->u_pcb;
 	
+#ifdef ALTIVEC
+	if (p1->p_addr->u_pcb.pcb_vr != NULL) {
+		if (p1 == ppc_vecproc)
+			save_vec(p1);
+		pcb->pcb_vr = pool_get(&ppc_vecpl, PR_WAITOK);
+		*pcb->pcb_vr = *p1->p_addr->u_pcb.pcb_vr;
+	} else {
+		pcb->pcb_vr = NULL;
+	}
+#endif /* ALTIVEC */
+
 	pcb->pcb_pm = p2->p_vmspace->vm_map.pmap;
 
 	pmap_extract(pmap_kernel(),
-		 (vm_offset_t)pcb->pcb_pm, (paddr_t *)&pcb->pcb_pmreal);
+		(vm_offset_t)pcb->pcb_pm, (paddr_t *)&pcb->pcb_pmreal);
 	
 	/*
 	 * Setup the trap frame for the new process
@@ -100,8 +112,8 @@ cpu_fork(p1, p2, stack, stacksize)
 	 */
 	stktop2 -= 16;
 	cf = (struct callframe *)stktop2;
-	cf->r31 = (register_t)child_return;
-	cf->r30 = (register_t)p2;
+	cf->r31 = (register_t)func;
+	cf->r30 = (register_t)arg;
 	
 	/*
 	 * Below that, we allocate the switch frame:
@@ -115,23 +127,6 @@ cpu_fork(p1, p2, stack, stacksize)
 	pcb->pcb_spl = 0;
 }
 
-/*
- * Set initial pc of process forked by above.
- */
-void
-cpu_set_kpc(p, pc, arg)
-	struct proc *p;
-	void (*pc) __P((void *));
-	void *arg;
-{
-	struct switchframe *sf = (struct switchframe *)p->p_addr->u_pcb.pcb_sp;
-	struct callframe *cf = (struct callframe *)sf->sp;
-	
-	cf->r30 = (register_t)arg;
-	cf->r31 = (register_t)pc;
-	cf++->lr = (register_t)pc;
-}
-
 void
 cpu_swapin(p)
 	struct proc *p;
@@ -139,7 +134,7 @@ cpu_swapin(p)
 	struct pcb *pcb = &p->p_addr->u_pcb;
 	
 	pmap_extract(pmap_kernel(),
-		(vm_offset_t)pcb->pcb_pm, (paddr_t *)pcb->pcb_pmreal);
+		(vm_offset_t)pcb->pcb_pm, (paddr_t *)&pcb->pcb_pmreal);
 }
 
 /*
@@ -161,6 +156,7 @@ pagemove(from, to, size)
 		va += NBPG;
 		to += NBPG;
 	}
+	pmap_update(pmap_kernel());
 }
 
 /*
@@ -176,8 +172,19 @@ void
 cpu_exit(p)
 	struct proc *p;
 {
+#ifdef ALTIVEC
+	struct pcb *pcb = &p->p_addr->u_pcb;
+#endif /* ALTIVEC */
+	
 	if (p == fpuproc)	/* release the fpu */
 		fpuproc = 0;
+
+#ifdef ALTIVEC
+	if (p == ppc_vecproc)
+		ppc_vecproc = NULL; 	/* release the Altivec Unit */
+	if (pcb->pcb_vr != NULL)
+		pool_put(&ppc_vecpl, pcb->pcb_vr);
+#endif /* ALTIVEC */
 	
 	(void)splhigh();
 	switchexit(p);
@@ -197,14 +204,14 @@ cpu_coredump(p, vp, cred, chdr)
 	struct md_coredump md_core;
 	int error;
 	
-	CORE_SETMAGIC(*chdr, COREMAGIC, MID_ZERO, 0);
+	CORE_SETMAGIC(*chdr, COREMAGIC, MID_HPPA, 0);
 	chdr->c_hdrsize = ALIGN(sizeof *chdr);
 	chdr->c_seghdrsize = ALIGN(sizeof cseg);
 	chdr->c_cpusize = sizeof md_core;
 
 	process_read_regs(p, &(md_core.regs));
 	
-	CORE_SETMAGIC(cseg, CORESEGMAGIC, MID_ZERO, CORE_CPU);
+	CORE_SETMAGIC(cseg, CORESEGMAGIC, MID_HPPA, CORE_CPU);
 	cseg.c_addr = 0;
 	cseg.c_size = chdr->c_cpusize;
 
@@ -248,6 +255,7 @@ vmapbuf(bp, len)
 		faddr += NBPG;
 		taddr += NBPG;
 	}
+	pmap_update(pmap_kernel());
 }
 
 /*

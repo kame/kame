@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.15 2001/06/25 00:43:10 mickey Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.18 2002/03/14 01:26:31 millert Exp $	*/
 
 /*
  * Copyright (c) 1998-2001 Michael Shalayeff
@@ -61,13 +61,13 @@
 
 #include <hppa/dev/cpudevs.h>
 
-void	setroot __P((void));
-void	swapconf __P((void));
-void	dumpconf __P((void));
+void	setroot(void);
+void	swapconf(void);
+void	dumpconf(void);
 
-static int findblkmajor __P((struct device *dv));
+static int findblkmajor(struct device *dv);
 
-void (*cold_hook) __P((void)); /* see below */
+void (*cold_hook)(int); /* see below */
 register_t	kpsw = PSW_Q | PSW_P | PSW_C | PSW_D;
 
 /*
@@ -75,7 +75,7 @@ register_t	kpsw = PSW_Q | PSW_P | PSW_C | PSW_D;
  */
 #ifdef USELEDS
 struct timeout heartbeat_tmo;
-void heartbeat __P((void *));
+void heartbeat(void *);
 extern int hz;
 #endif
 
@@ -100,7 +100,7 @@ cpu_configure()
 	dumpconf();
 	cold = 0;
 	if (cold_hook)
-		(*cold_hook)();
+		(*cold_hook)(HPPA_COLD_HOT);
 
 #ifdef USELEDS
 	timeout_set(&heartbeat_tmo, heartbeat, NULL);
@@ -389,6 +389,18 @@ pdc_scanbus(self, ca, bus, maxmod)
 		nca.ca_pdc_iodc_read = &pdc_iodc_read;
 		nca.ca_name = hppa_mod_info(nca.ca_type.iodc_type,
 					    nca.ca_type.iodc_sv_model);
+
+		if (autoconf_verbose) {
+			printf(">> probing: flags %b bc %d/%d/%d/%d/%d/%d ",
+			    dp.dp_flags, PZF_BITS,
+			    dp.dp_bc[0], dp.dp_bc[1], dp.dp_bc[2],
+			    dp.dp_bc[3], dp.dp_bc[4], dp.dp_bc[5]);
+			printf("mod %x layers %x/%x/%x/%x/%x/%x\n",
+			    dp.dp_mod,
+			    dp.dp_layers[0], dp.dp_layers[1],
+			    dp.dp_layers[2], dp.dp_layers[3],
+			    dp.dp_layers[4], dp.dp_layers[5]);
+		}
 
 		config_found_sm(self, &nca, mbprint, mbsubmatch);
 	}

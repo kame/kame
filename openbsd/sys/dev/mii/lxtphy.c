@@ -1,4 +1,4 @@
-/*	$OpenBSD: lxtphy.c,v 1.6 2001/04/14 03:22:43 aaron Exp $	*/
+/*	$OpenBSD: lxtphy.c,v 1.8 2002/03/14 01:26:57 millert Exp $	*/
 /*	$NetBSD: lxtphy.c,v 1.19 2000/02/02 23:34:57 thorpej Exp $	*/
 
 /*-
@@ -68,7 +68,7 @@
  */
 
 /*
- * driver for Level One's LXT-970 ethernet 10/100 PHY
+ * driver for Level One's LXT-970/971 ethernet 10/100 PHY
  * datasheet from www.level1.com
  */
 
@@ -89,8 +89,8 @@
 
 #include <dev/mii/lxtphyreg.h>
 
-int	lxtphymatch __P((struct device *, void *, void *));
-void	lxtphyattach __P((struct device *, struct device *, void *));
+int	lxtphymatch(struct device *, void *, void *);
+void	lxtphyattach(struct device *, struct device *, void *);
 
 struct cfattach lxtphy_ca = {
 	sizeof(struct mii_softc), lxtphymatch, lxtphyattach, mii_phy_detach,
@@ -101,9 +101,9 @@ struct cfdriver lxtphy_cd = {
 	NULL, "lxtphy", DV_DULL
 };
 
-int	lxtphy_service __P((struct mii_softc *, struct mii_data *, int));
-void	lxtphy_status __P((struct mii_softc *));
-void	lxtphy_reset __P((struct mii_softc *));
+int	lxtphy_service(struct mii_softc *, struct mii_data *, int);
+void	lxtphy_status(struct mii_softc *);
+void	lxtphy_reset(struct mii_softc *);
 
 int
 lxtphymatch(parent, match, aux)
@@ -117,6 +117,10 @@ lxtphymatch(parent, match, aux)
 	    MII_MODEL(ma->mii_id2) == MII_MODEL_xxLEVEL1_LXT970)
 		return (10);
 
+	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_xxLEVEL1a &&
+	    MII_MODEL(ma->mii_id2) == MII_MODEL_xxLEVEL1a_LXT971)
+		return (10);
+   
 	return (0);
 }
 
@@ -129,13 +133,22 @@ lxtphyattach(parent, self, aux)
 	struct mii_attach_args *ma = aux;
 	struct mii_data *mii = ma->mii_data;
 
-	printf(": %s, rev. %d\n", MII_STR_xxLEVEL1_LXT970,
-	    MII_REV(ma->mii_id2));
-
+	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_xxLEVEL1 &&
+	    MII_MODEL(ma->mii_id2) == MII_MODEL_xxLEVEL1_LXT970) {
+		printf(": %s, rev. %d\n", MII_STR_xxLEVEL1_LXT970,
+		    MII_REV(ma->mii_id2));
+		sc->mii_status = lxtphy_status;
+	}
+	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_xxLEVEL1a &&
+	    MII_MODEL(ma->mii_id2) == MII_MODEL_xxLEVEL1a_LXT971) {
+		printf(": %s, rev. %d\n", MII_STR_xxLEVEL1a_LXT971,
+		    MII_REV(ma->mii_id2));
+		sc->mii_status = ukphy_status;
+	}
+   
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
 	sc->mii_service = lxtphy_service;
-	sc->mii_status = lxtphy_status;
 	sc->mii_pdata = mii;
 	sc->mii_flags = mii->mii_flags;
 

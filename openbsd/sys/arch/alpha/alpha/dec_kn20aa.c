@@ -1,4 +1,4 @@
-/* $OpenBSD: dec_kn20aa.c,v 1.11 2000/11/16 23:32:20 ericj Exp $ */
+/* $OpenBSD: dec_kn20aa.c,v 1.14 2002/03/14 01:26:26 millert Exp $ */
 /* $NetBSD: dec_kn20aa.c,v 1.42 2000/05/22 20:13:32 thorpej Exp $ */
 
 /*
@@ -66,9 +66,9 @@
 #endif
 static int comcnrate = CONSPEED;
 
-void dec_kn20aa_init __P((void));
-static void dec_kn20aa_cons_init __P((void));
-static void dec_kn20aa_device_register __P((struct device *, void *));
+void dec_kn20aa_init(void);
+static void dec_kn20aa_cons_init(void);
+static void dec_kn20aa_device_register(struct device *, void *);
 
 const struct alpha_variation_table dec_kn20aa_variations[] = {
 	{ 0, "AlphaStation 500 or 600 (KN20AA)" },
@@ -107,7 +107,7 @@ dec_kn20aa_cons_init()
 	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
 
 	switch (ctb->ctb_term_type) {
-	case 2: 
+	case CTB_PRINTERPORT: 
 		/* serial console ... */
 		/* XXX */
 		{
@@ -118,7 +118,7 @@ dec_kn20aa_cons_init()
 			 */
 			DELAY(160000000 / comcnrate);
 
-			if(comcnattach(ccp->cc_iot, 0x3f8, comcnrate,
+			if(comcnattach(&ccp->cc_iot, 0x3f8, comcnrate,
 			    COM_FREQ,
 			    (TTYDEF_CFLAG & ~(CSIZE | PARENB)) | CS8))
 				panic("can't init serial console");
@@ -126,18 +126,18 @@ dec_kn20aa_cons_init()
 			break;
 		}
 
-	case 3:
+	case CTB_GRAPHICS:
 #if NPCKBD > 0
 		/* display console ... */
 		/* XXX */
-		(void) pckbc_cnattach(ccp->cc_iot, IO_KBD, KBCMDP,
+		(void) pckbc_cnattach(&ccp->cc_iot, IO_KBD, KBCMDP,
 		    PCKBC_KBD_SLOT);
 
 		if (CTB_TURBOSLOT_TYPE(ctb->ctb_turboslot) ==
 		    CTB_TURBOSLOT_TYPE_ISA)
-			isa_display_console(ccp->cc_iot, ccp->cc_memt);
+			isa_display_console(&ccp->cc_iot, &ccp->cc_memt);
 		else
-			pci_display_console(ccp->cc_iot, ccp->cc_memt,
+			pci_display_console(&ccp->cc_iot, &ccp->cc_memt,
 			    &ccp->cc_pc, CTB_TURBOSLOT_BUS(ctb->ctb_turboslot),
 			    CTB_TURBOSLOT_SLOT(ctb->ctb_turboslot), 0);
 #else

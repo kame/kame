@@ -1,4 +1,4 @@
-/*	$OpenBSD: stivar.h,v 1.3 2001/03/20 08:32:20 mickey Exp $	*/
+/*	$OpenBSD: stivar.h,v 1.5 2002/03/14 01:26:55 millert Exp $	*/
 
 /*
  * Copyright (c) 2000 Michael Shalayeff
@@ -43,6 +43,7 @@ struct sti_softc {
 	u_int	sc_flags;
 #define	STI_TEXTMODE	0x0001
 #define	STI_CLEARSCR	0x0002
+#define	STI_CONSOLE	0x0004
 	int	sc_devtype;
 	
 	bus_space_tag_t iot, memt;
@@ -71,7 +72,7 @@ struct sti_softc {
 	sti_util_t	util;
 };
 
-void sti_attach_common __P((struct sti_softc *sc));
-int sti_intr __P((void *v));
+void sti_attach_common(struct sti_softc *sc);
+int sti_intr(void *v);
 
 #endif /* _IC_STIVAR_H_ */

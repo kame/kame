@@ -1,4 +1,4 @@
-/*	$OpenBSD: flsc.c,v 1.9 2001/09/11 20:05:20 miod Exp $	*/
+/*	$OpenBSD: flsc.c,v 1.12 2002/03/14 01:26:28 millert Exp $	*/
 /*	$NetBSD: flsc.c,v 1.14 1996/12/23 09:10:00 veego Exp $	*/
 
 /*
@@ -44,9 +44,7 @@
 #include <sys/device.h>
 #include <scsi/scsi_all.h>
 #include <scsi/scsiconf.h>
-#include <vm/vm.h>
-#include <vm/vm_page.h>
-#include <machine/pmap.h>
+#include <uvm/uvm_extern.h>
 #include <amiga/amiga/custom.h>
 #include <amiga/amiga/cc.h>
 #include <amiga/amiga/device.h>
@@ -57,8 +55,8 @@
 #include <amiga/dev/flscreg.h>
 #include <amiga/dev/flscvar.h>
 
-void flscattach __P((struct device *, struct device *, void *));
-int  flscmatch  __P((struct device *, void *, void *));
+void flscattach(struct device *, struct device *, void *);
+int  flscmatch(struct device *, void *, void *);
 
 struct scsi_adapter flsc_scsiswitch = {
 	sfas_scsicmd,
@@ -82,16 +80,16 @@ struct cfdriver flsc_cd = {
 	NULL, "flsc", DV_DULL, NULL, 0
 };
 
-int flsc_intr		 __P((void *));
-void flsc_set_dma_adr	 __P((struct sfas_softc *sc, vm_offset_t ptr));
-void flsc_set_dma_tc	 __P((struct sfas_softc *sc, unsigned int len));
-void flsc_set_dma_mode	 __P((struct sfas_softc *sc, int mode));
-int flsc_setup_dma	 __P((struct sfas_softc *sc, vm_offset_t ptr, int len,
-			      int mode));
-int flsc_build_dma_chain __P((struct sfas_softc *sc,
-			      struct sfas_dma_chain *chain, void *p, int l));
-int flsc_need_bump	 __P((struct sfas_softc *sc, vm_offset_t ptr, int len));
-void flsc_led		 __P((struct sfas_softc *sc, int mode));
+int flsc_intr(void *);
+void flsc_set_dma_adr(struct sfas_softc *sc, vm_offset_t ptr);
+void flsc_set_dma_tc(struct sfas_softc *sc, unsigned int len);
+void flsc_set_dma_mode(struct sfas_softc *sc, int mode);
+int flsc_setup_dma(struct sfas_softc *sc, vm_offset_t ptr, int len,
+			      int mode);
+int flsc_build_dma_chain(struct sfas_softc *sc,
+			      struct sfas_dma_chain *chain, void *p, int l);
+int flsc_need_bump(struct sfas_softc *sc, vm_offset_t ptr, int len);
+void flsc_led(struct sfas_softc *sc, int mode);
 
 /*
  * if we are an Advanced Systems & Software FastlaneZ3
@@ -363,7 +361,7 @@ do { chain[n].ptr = (p); chain[n].len = (l); chain[n++].flg = (f); } while(0)
 		set_link(n, (vm_offset_t)p, l, SFAS_CHAIN_BUMP);
 	else if ((p >= (void *)0xFF000000)
 #if defined(M68040) || defined(M68060)
-		 && ((mmutype == MMU_68040) && (p >= (void *)0xFFFC0000))
+		 && ((mmutype <= MMU_68040) && (p >= (void *)0xFFFC0000))
 #endif
 		 ) {
 		while(l != 0) {

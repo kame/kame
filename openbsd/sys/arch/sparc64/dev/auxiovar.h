@@ -1,4 +1,4 @@
-/*	$OpenBSD: auxiovar.h,v 1.2 2001/08/29 02:47:58 jason Exp $	*/
+/*	$OpenBSD: auxiovar.h,v 1.4 2002/03/14 01:26:44 millert Exp $	*/
 /*	$NetBSD: auxiovar.h,v 1.4 2000/04/15 03:08:13 mrg Exp $	*/
 
 /*
@@ -39,26 +39,19 @@
  * (to deal with multiple auxio's that may appear.)
  */
 
-struct auxio_registers {
-#if 0	/* these do not exist on the Ebus2 */
-	volatile u_int32_t *auxio_fd;
-	volatile u_int32_t *auxio_audio;
-	volatile u_int32_t *auxio_power;
-#endif
-	volatile u_int32_t *auxio_led;
-	volatile u_int32_t *auxio_pci;
-	volatile u_int32_t *auxio_freq;
-	volatile u_int32_t *auxio_scsi;
-	volatile u_int32_t *auxio_temp;
-};
-
 struct auxio_softc {
 	struct device		sc_dev;
-	struct auxio_registers	sc_registers;
+	bus_space_tag_t		sc_tag;
+	bus_space_handle_t	sc_led;
+	bus_space_handle_t	sc_pci;
+	bus_space_handle_t	sc_scsi;
+	bus_space_handle_t	sc_freq;
+	bus_space_handle_t	sc_temp;
 	int			sc_flags;
 #define	AUXIO_LEDONLY		0x1
 #define	AUXIO_EBUS		0x2
 #define	AUXIO_SBUS		0x4
+	struct timeout		sc_to;
 };
 
 /*
@@ -70,5 +63,6 @@ struct auxio_softc {
  * as AUXREG_VA depends on NBPG which is not a constant.
  */
 volatile u_char *auxio_reg;
-unsigned int auxregbisc __P((int, int));
+unsigned int auxregbisc(int, int);
+void auxio_led_blink(void *);
 #endif

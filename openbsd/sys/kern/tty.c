@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty.c,v 1.47 2001/10/07 22:27:01 art Exp $	*/
+/*	$OpenBSD: tty.c,v 1.51 2002/03/14 01:27:05 millert Exp $	*/
 /*	$NetBSD: tty.c,v 1.68.4.2 1996/06/06 16:04:52 thorpej Exp $	*/
 
 /*-
@@ -62,19 +62,19 @@
 
 #include <sys/namei.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <dev/rndvar.h>
 
-static int ttnread __P((struct tty *));
-static void ttyblock __P((struct tty *));
-void ttyunblock __P((struct tty *));
-static void ttyecho __P((int, struct tty *));
-static void ttyrubo __P((struct tty *, int));
-static int proc_compare __P((struct proc *, struct proc *));
-int	filt_ttyread __P((struct knote *kn, long hint));
-void 	filt_ttyrdetach __P((struct knote *kn));
-int	filt_ttywrite __P((struct knote *kn, long hint));
-void 	filt_ttywdetach __P((struct knote *kn));
+static int ttnread(struct tty *);
+static void ttyblock(struct tty *);
+void ttyunblock(struct tty *);
+static void ttyecho(int, struct tty *);
+static void ttyrubo(struct tty *, int);
+static int proc_compare(struct proc *, struct proc *);
+int	filt_ttyread(struct knote *kn, long hint);
+void 	filt_ttyrdetach(struct knote *kn);
+int	filt_ttywrite(struct knote *kn, long hint);
+void 	filt_ttywdetach(struct knote *kn);
 
 /* Symbolic sleep message strings. */
 char ttclos[]	= "ttycls";
@@ -155,11 +155,6 @@ u_char const char_type[] = {
 #undef	NO
 #undef	TB
 #undef	VT
-
-/* Macros to clear/set/test flags. */
-#define	SET(t, f)	(t) |= (f)
-#define	CLR(t, f)	(t) &= ~((unsigned)(f))
-#define	ISSET(t, f)	((t) & (f))
 
 #define	islower(c)	((c) >= 'a' && (c) <= 'z')
 #define	isupper(c)	((c) >= 'A' && (c) <= 'Z')
@@ -982,6 +977,7 @@ ttioctl(tp, cmd, data, flag, p)
 		    ((p->p_session->s_ttyvp || tp->t_session) &&
 		     (tp->t_session != p->p_session)))
 			return (EPERM);
+		SESSHOLD(p->p_session);
 		tp->t_session = p->p_session;
 		tp->t_pgrp = p->p_pgrp;
 		p->p_session->s_ttyp = tp;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: grf.c,v 1.16 2001/09/11 20:05:24 miod Exp $	*/
+/*	$OpenBSD: grf.c,v 1.21 2002/03/14 01:26:35 millert Exp $	*/
 /*	$NetBSD: grf.c,v 1.41 1997/02/24 06:20:04 scottr Exp $	*/
 
 /*
@@ -67,8 +67,6 @@
 
 #include <miscfs/specfs/specdev.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm.h>
 
 #include "nubus.h"
@@ -83,8 +81,8 @@
 #define	iteoff(u,f)
 #endif
 
-int	grfmatch __P((struct device *, void *, void *));
-void	grfattach __P((struct device *, struct device *, void *));
+int	grfmatch(struct device *, void *, void *);
+void	grfattach(struct device *, struct device *, void *);
 
 struct cfdriver grf_cd = {
 	NULL, "grf", DV_DULL
@@ -271,10 +269,10 @@ grfselect(dev, rw, p)
 }
 
 /*ARGSUSED*/
-int
+paddr_t
 grfmmap(dev, off, prot)
 	dev_t dev;
-	int off;
+	off_t off;
 	int prot;
 {
 	int     unit = GRFUNIT(dev);
@@ -410,5 +408,5 @@ grfunmap(dev, addr, p)
 	rv = uvm_unmap(&p->p_vmspace->vm_map, (vm_offset_t)addr,
 	    (vm_offset_t)addr + size);
 
-	return (rv == KERN_SUCCESS ? 0 : EINVAL);
+	return (rv == 0 ? 0 : EINVAL);
 }

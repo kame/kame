@@ -1,4 +1,4 @@
-/* $OpenBSD: tsp_pci.c,v 1.1 2000/11/16 04:50:18 ericj Exp $ */
+/* $OpenBSD: tsp_pci.c,v 1.3 2002/03/14 01:26:27 millert Exp $ */
 /* $NetBSD: tsp_pci.c,v 1.1 1999/06/29 06:46:47 ross Exp $ */
 
 /*-
@@ -37,7 +37,6 @@
 #include <sys/kernel.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <dev/pci/pcireg.h>
@@ -51,14 +50,14 @@
 
 #define tsp_pci() { Generate ctags(1) key. }
 
-void		tsp_attach_hook __P((struct device *, struct device *,
-		    struct pcibus_attach_args *));
-int		tsp_bus_maxdevs __P((void *, int));
-pcitag_t	tsp_make_tag __P((void *, int, int, int));
-void		tsp_decompose_tag __P((void *, pcitag_t, int *, int *,
-		    int *));
-pcireg_t	tsp_conf_read __P((void *, pcitag_t, int));
-void		tsp_conf_write __P((void *, pcitag_t, int, pcireg_t));
+void		tsp_attach_hook(struct device *, struct device *,
+		    struct pcibus_attach_args *);
+int		tsp_bus_maxdevs(void *, int);
+pcitag_t	tsp_make_tag(void *, int, int, int);
+void		tsp_decompose_tag(void *, pcitag_t, int *, int *,
+		    int *);
+pcireg_t	tsp_conf_read(void *, pcitag_t, int);
+void		tsp_conf_write(void *, pcitag_t, int, pcireg_t);
 
 void
 tsp_pci_init(pc, v)

@@ -1,4 +1,4 @@
-#	$OpenBSD: files,v 1.227 2001/10/04 21:43:37 gluk Exp $
+#	$OpenBSD: files,v 1.245 2002/03/28 18:23:07 mickey Exp $
 #	$NetBSD: files,v 1.87 1996/05/19 17:17:50 jonathan Exp $
 
 #	@(#)files.newconf	7.5 (Berkeley) 5/10/93
@@ -101,6 +101,7 @@ file	dev/ic/wdc.c wdc_base
 # Adaptec 2[789]4X, 394X, aic7770 and aic78[5678]0 SCSI controllers
 device	ahc: scsi
 file	dev/ic/aic7xxx.c	ahc
+file	dev/ic/smc93cx6.c	ahc
 
 # Adaptec AIC-6[23]60 SCSI controllers
 device	aic: scsi
@@ -120,7 +121,7 @@ file	dev/ic/adw.c		adw
 
 # BusLogic MultiMaster and MultiMaster Ultra SCSI controllers
 device	bha: scsi
-file	dev/ic/bha.c		bha
+file	dev/ic/bha.c		bha & (bha_pci | bha_isa | bha_eisa) needs-flag
 
 # ICP Vortex GDT RAID controllers
 device	gdt: scsi
@@ -175,6 +176,7 @@ file	dev/ic/lemac.c		lc
 # WaveLan
 device	wi: ether, ifnet, ifmedia
 file	dev/ic/if_wi.c		wi
+file	dev/ic/if_wi_hostap.c	wi
 
 # Aironet 802.11 DS Ethernet controller
 device	an: ether, ifnet, ifmedia
@@ -255,7 +257,7 @@ file	dev/ic/cy.c		cy & (cy_isa | cy_pci)	needs-flag
 
 # PC parallel ports (IEEE 1284)
 device	lpt
-file	dev/ic/lpt.c		lpt & (lpt_isa | lpt_pica | lpt_algor | lpt_gsc | lpt_puc) needs-flag
+file	dev/ic/lpt.c		lpt & (lpt_isa | lpt_pica | lpt_algor | lpt_gsc | lpt_puc | lpt_apio | lpt_ebus) needs-flag
 
 # STI (hp graphics)
 device	sti: wsemuldisplaydev
@@ -264,6 +266,10 @@ file	dev/ic/sti.c		sti & (sti_pci | sti_sgc)	needs-flag
 # Initio ULTRA WIDE/ULTRA2 WIDE SCSI Controllers
 device	iha: scsi
 file	dev/ic/iha.c		iha
+
+# Tekram TRM-S1040 SCSI Cards (DC395U/UW/F,DC315/U)
+device	trm: scsi
+file	dev/ic/trm.c		trm
 
 # Attributes which machine-independent bus support can be attached to.
 # These should be defined here, because some of these busses can have
@@ -492,12 +498,11 @@ file kern/subr_log.c
 file kern/subr_pool.c
 file kern/subr_prf.c
 file kern/subr_prof.c
-file kern/subr_rmap.c
 file kern/subr_userconf.c		boot_config
 file kern/subr_xxx.c
 file kern/sys_generic.c
 file kern/sys_pipe.c
-file kern/sys_process.c
+file kern/sys_process.c			ptrace
 file kern/sys_socket.c
 file kern/syscalls.c			syscall_debug
 file kern/sysv_ipc.c			sysvshm | sysvsem | sysvmsg
@@ -559,11 +564,11 @@ file miscfs/portal/portal_vfsops.c	portal
 file miscfs/portal/portal_vnops.c	portal
 file miscfs/procfs/procfs_cmdline.c	procfs
 file miscfs/procfs/procfs_ctl.c		procfs
-file miscfs/procfs/procfs_fpregs.c
+file miscfs/procfs/procfs_fpregs.c	ptrace
 file miscfs/procfs/procfs_linux.c	procfs
 file miscfs/procfs/procfs_mem.c
 file miscfs/procfs/procfs_note.c	procfs
-file miscfs/procfs/procfs_regs.c
+file miscfs/procfs/procfs_regs.c	ptrace
 file miscfs/procfs/procfs_status.c	procfs
 file miscfs/procfs/procfs_subr.c	procfs
 file miscfs/procfs/procfs_vfsops.c	procfs
@@ -597,7 +602,7 @@ file net/if_ppp.c			ppp			needs-count
 file net/ppp_tty.c			ppp
 file net/bsd-comp.c			ppp_bsdcomp
 file net/ppp-deflate.c			ppp_deflate
-file net/zlib.c				ppp_deflate | ipsec
+file net/zlib.c				ppp_deflate | ipsec | crypto
 file net/if_tokensubr.c			token			needs-flag
 file net/if_tun.c			tun			needs-count
 file net/if_bridge.c			bridge			needs-count
@@ -655,7 +660,7 @@ file netinet/ip_gre.c			inet
 file netinet/ip_ipsp.c			(inet | inet6) & (ipsec | tcp_signature)
 file netinet/ip_spd.c			(inet | inet6) & (ipsec | tcp_signature)
 file netinet/ip_ipip.c			inet | inet6
-file netinet/ip_ether.c			inet & ipsec
+file netinet/ip_ether.c			inet
 file netinet/ipsec_input.c		(inet | inet6) & ipsec
 file netinet/ipsec_output.c		(inet | inet6) & ipsec
 file netinet/ip_esp.c			inet & ipsec
@@ -674,7 +679,6 @@ file crypto/crypto.c			(inet & ipsec) | crypto
 file crypto/cryptodev.c			((inet & ipsec) | crypto)	needs-flag
 file crypto/criov.c			(inet & ipsec) | crypto
 file crypto/cryptosoft.c		(inet & ipsec) | crypto
-file crypto/cryptombuf.c		(inet & ipsec) | crypto
 file crypto/xform.c			(inet & ipsec) | crypto
 file crypto/deflate.c			(inet & ipsec) | crypto
 file netatalk/aarp.c			netatalk
@@ -767,10 +771,12 @@ file ufs/ffs/ffs_softdep.c		ffs_softupdates
 file ufs/mfs/mfs_vfsops.c		mfs
 file ufs/mfs/mfs_vnops.c		mfs
 file ufs/ufs/ufs_bmap.c			ffs | mfs | ext2fs
+file ufs/ufs/ufs_extattr.c		ffs | mfs
 file ufs/ufs/ufs_ihash.c		ffs | mfs | ext2fs
 file ufs/ufs/ufs_inode.c		ffs | mfs | ext2fs
 file ufs/ufs/ufs_lookup.c		ffs | mfs | ext2fs
 file ufs/ufs/ufs_quota.c		quota & ( ffs | mfs | ext2fs )
+file ufs/ufs/ufs_quota_stub.c		ffs | mfs
 file ufs/ufs/ufs_vfsops.c		ffs | mfs | ext2fs
 file ufs/ufs/ufs_vnops.c		ffs | mfs | ext2fs
 file ufs/ext2fs/ext2fs_alloc.c		ext2fs

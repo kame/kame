@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_fxp_pci.c,v 1.10 2001/09/04 23:46:23 provos Exp $	*/
+/*	$OpenBSD: if_fxp_pci.c,v 1.12 2002/03/14 01:26:58 millert Exp $	*/
 
 /*
  * Copyright (c) 1995, David Greenman
@@ -64,7 +64,7 @@
 
 #include <netinet/if_ether.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -79,8 +79,8 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcidevs.h>
 
-int fxp_pci_match __P((struct device *, void *, void *));
-void fxp_pci_attach __P((struct device *, struct device *, void *));
+int fxp_pci_match(struct device *, void *, void *);
+void fxp_pci_attach(struct device *, struct device *, void *);
 
 struct cfattach fxp_pci_ca = {
 	sizeof(struct fxp_softc), fxp_pci_match, fxp_pci_attach

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pte.h,v 1.3 2001/09/01 15:49:05 drahn Exp $	*/
+/*	$OpenBSD: pte.h,v 1.5 2002/03/14 01:26:42 millert Exp $	*/
 /*	$NetBSD: pte.h,v 1.1 1996/09/30 16:34:32 ws Exp $	*/
 
 /*-
@@ -48,7 +48,7 @@ struct pte {
 #endif	/* _LOCORE */
 /* High word: */
 #define	PTE_VALID	0x80000000
-#define	PTE_VSID_SHFT	7
+#define	PTE_VSID_SHIFT	7
 #define	PTE_HID		0x00000040
 #define	PTE_API		0x0000003f
 /* Low word: */
@@ -71,10 +71,10 @@ typedef	struct pte pte_t;
 /*
  * Extract bits from address
  */
-#define	ADDR_SR_SHFT	28
+#define	ADDR_SR_SHIFT	28
 #define	ADDR_PIDX	0x0ffff000
-#define	ADDR_PIDX_SHFT	12
-#define	ADDR_API_SHFT	22
+#define	ADDR_PIDX_SHIFT	12
+#define	ADDR_API_SHIFT	22
 #define	ADDR_POFF	0x00000fff
 
 #ifndef	_LOCORE
@@ -106,8 +106,8 @@ extern int ptab_cnt;
 
 #ifdef	_KERNEL
 #ifndef	_LOCORE
-extern u_int dsisr __P((void));
-extern vm_offset_t dar __P((void));
+extern u_int dsisr(void);
+extern vm_offset_t dar(void);
 #endif	/* _KERNEL */
 #endif	/* _LOCORE */
 #endif	/* _POWERPC_PTE_H_ */

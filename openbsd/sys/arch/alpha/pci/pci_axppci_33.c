@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci_axppci_33.c,v 1.13 2001/08/17 22:26:58 mickey Exp $	*/
+/*	$OpenBSD: pci_axppci_33.c,v 1.17 2002/03/14 03:15:50 millert Exp $	*/
 /*	$NetBSD: pci_axppci_33.c,v 1.10 1996/11/13 21:13:29 cgd Exp $	*/
 
 /*
@@ -34,7 +34,7 @@
 #include <sys/systm.h>
 #include <sys/errno.h>
 #include <sys/device.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/bus.h>
@@ -52,13 +52,13 @@
 
 #include "sio.h"
 
-int     dec_axppci_33_intr_map __P((void *, pcitag_t, int, int,
-	    pci_intr_handle_t *));
-const char *dec_axppci_33_intr_string __P((void *, pci_intr_handle_t));
-int	dec_axppci_33_intr_line __P((void *, pci_intr_handle_t));
-void    *dec_axppci_33_intr_establish __P((void *, pci_intr_handle_t,
-	    int, int (*func)(void *), void *, char *));
-void    dec_axppci_33_intr_disestablish __P((void *, void *));
+int     dec_axppci_33_intr_map(void *, pcitag_t, int, int,
+	    pci_intr_handle_t *);
+const char *dec_axppci_33_intr_string(void *, pci_intr_handle_t);
+int	dec_axppci_33_intr_line(void *, pci_intr_handle_t);
+void    *dec_axppci_33_intr_establish(void *, pci_intr_handle_t,
+	    int, int (*func)(void *), void *, char *);
+void    dec_axppci_33_intr_disestablish(void *, void *);
 
 #define	LCA_SIO_DEVICE	7	/* XXX */
 
@@ -66,7 +66,7 @@ void
 pci_axppci_33_pickintr(lcp)
 	struct lca_config *lcp;
 {
-	bus_space_tag_t iot = lcp->lc_iot;
+	bus_space_tag_t iot = &lcp->lc_iot;
 	pci_chipset_tag_t pc = &lcp->lc_pc;
 	pcireg_t sioclass;
 	int sioII;
@@ -234,7 +234,7 @@ dec_axppci_33_intr_establish(lcv, ih, level, func, arg, name)
 	void *lcv, *arg;
 	pci_intr_handle_t ih;
 	int level;
-	int (*func) __P((void *));
+	int (*func)(void *);
 	char *name;
 {
 	return sio_intr_establish(NULL /*XXX*/, ih, IST_LEVEL, level, func,

@@ -1,4 +1,4 @@
-/* $OpenBSD: pfkeyv2.c,v 1.77 2001/08/05 11:03:07 angelos Exp $ */
+/* $OpenBSD: pfkeyv2.c,v 1.81 2002/03/03 21:47:00 angelos Exp $ */
 
 /*
  *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
@@ -551,6 +551,12 @@ pfkeyv2_get(struct tdb *sa, void **headers, void **buffer)
 
     if (sa->tdb_remote_auth)
       i += PADUP(sa->tdb_remote_auth->ref_len) + sizeof(struct sadb_x_cred);
+
+    if (sa->tdb_amxkey)
+	    i+= PADUP(sa->tdb_amxkeylen) + sizeof(struct sadb_key);
+
+    if (sa->tdb_emxkey)
+	    i+= PADUP(sa->tdb_emxkeylen) + sizeof(struct sadb_key);
 
     if (!(p = malloc(i, M_PFKEY, M_DONTWAIT)))
     {
@@ -1543,8 +1549,7 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 		{
 		    ipsec_policy_pool_initialized = 1;
 		    pool_init(&ipsec_policy_pool, sizeof(struct ipsec_policy),
-			      0, 0, PR_FREEHEADER, "ipsec policy", 0, NULL,
-			      NULL, M_IPSEC_POLICY);
+			      0, 0, 0, "ipsec policy", NULL);
 		}
 
 		/* Allocate policy entry */
@@ -2016,8 +2021,8 @@ pfkeyv2_acquire(struct ipsec_policy *ipo, union sockaddr_union *gw,
             if (!strncasecmp(ipsec_def_comp, "deflate", sizeof("deflate")))
             {
                 sadb_comb->sadb_comb_encrypt = SADB_X_CALG_DEFLATE;
-                sadb_comb->sadb_comb_encrypt = 0;
-                sadb_comb->sadb_comb_encrypt = 0;
+                sadb_comb->sadb_comb_encrypt_minbits = 0;
+                sadb_comb->sadb_comb_encrypt_maxbits = 0;
             }
         }
 

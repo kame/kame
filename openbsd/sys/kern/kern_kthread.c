@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_kthread.c,v 1.14 2001/08/08 02:37:40 millert Exp $	*/
+/*	$OpenBSD: kern_kthread.c,v 1.17 2002/03/15 18:19:52 millert Exp $	*/
 /*	$NetBSD: kern_kthread.c,v 1.3 1998/12/22 21:21:36 kleink Exp $	*/
 
 /*-
@@ -61,17 +61,8 @@
  * The VM space and limits, etc. will be shared with proc0.
  */
 int
-#if __STDC__
 kthread_create(void (*func)(void *), void *arg,
     struct proc **newpp, const char *fmt, ...)
-#else
-kthread_create(func, arg, newpp, fmt, va_alist)
-	void (*func) __P((void *));
-	void *arg;
-	struct proc **newpp;
-	const char *fmt;
-	va_dcl
-#endif
 {
 	struct proc *p2;
 	register_t rv[2];
@@ -84,14 +75,11 @@ kthread_create(func, arg, newpp, fmt, va_alist)
 	 * parent to wait for.
 	 */
 	error = fork1(&proc0, 0,
-	    FORK_SHAREVM|FORK_NOZOMBIE|FORK_SIGHAND, NULL, 0, rv);
+	    FORK_SHAREVM|FORK_NOZOMBIE|FORK_SIGHAND, NULL, 0, func, arg, rv);
 	if (error)
 		return (error);
 
 	p2 = pfind(rv[0]);
-
-	/* Arrange for it to start at the specified function. */
-	cpu_set_kpc(p2, func, arg);
 
 	/*
 	 * Mark it as a system process and not a candidate for
@@ -139,7 +127,7 @@ kthread_exit(ecode)
 
 struct kthread_q {
 	SIMPLEQ_ENTRY(kthread_q) kq_q;
-	void (*kq_func) __P((void *));
+	void (*kq_func)(void *);
 	void *kq_arg;
 };
 
@@ -152,7 +140,7 @@ SIMPLEQ_HEAD(, kthread_q) kthread_q = SIMPLEQ_HEAD_INITIALIZER(kthread_q);
  */
 void
 kthread_create_deferred(func, arg)
-	void (*func) __P((void *));
+	void (*func)(void *);
 	void *arg;
 {
 	struct kthread_q *kq;

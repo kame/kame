@@ -1,4 +1,4 @@
-/*	$OpenBSD: ibcs2_misc.c,v 1.18 2001/07/10 11:07:25 espie Exp $	*/
+/*	$OpenBSD: ibcs2_misc.c,v 1.23 2002/03/14 03:16:03 millert Exp $	*/
 /*	$NetBSD: ibcs2_misc.c,v 1.23 1997/01/15 01:37:49 perry Exp $	*/
 
 /*
@@ -86,7 +86,7 @@
 
 #include <miscfs/specfs/specdev.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>		/* must be included after vm.h */
 
 #include <i386/include/reg.h>
@@ -336,8 +336,8 @@ ibcs2_sys_mount(p, v, retval)
  * This is quite ugly, but what do you expect from compatibility code?
  */
 
-int ibcs2_readdir_callback __P((void *, struct dirent *, off_t));
-int ibcs2_classicread_callback __P((void *, struct dirent *, off_t));
+int ibcs2_readdir_callback(void *, struct dirent *, off_t);
+int ibcs2_classicread_callback(void *, struct dirent *, off_t);
 
 struct ibcs2_readdir_callback_args {
 	caddr_t outp;
@@ -434,15 +434,16 @@ ibcs2_sys_getdents(p, v, retval)
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
 
+	FREF(fp);
 	args.resid = SCARG(uap, nbytes);
 	args.outp = (caddr_t)SCARG(uap, buf);
-	
-	if ((error = readdir_with_callback(fp, &fp->f_offset, args.resid,
-	    ibcs2_readdir_callback, &args)) != 0)
+	error = readdir_with_callback(fp, &fp->f_offset, args.resid,
+	    ibcs2_readdir_callback, &args);
+	FRELE(fp);
+	if (error)
 		return (error);
 
 	*retval = SCARG(uap, nbytes) - args.resid;
-
 	return (0);
 }
 
@@ -474,15 +475,17 @@ ibcs2_sys_read(p, v, retval)
 	if (vp->v_type != VDIR)
 		return sys_read(p, uap, retval);
 
+	FREF(fp);
 	args.resid = SCARG(uap, nbytes);
 	args.outp = (caddr_t)SCARG(uap, buf);
-	
-	if ((error = readdir_with_callback(fp, &fp->f_offset, args.resid,
-	    ibcs2_classicread_callback, &args)) != 0)
+
+	error = readdir_with_callback(fp, &fp->f_offset, args.resid,
+	    ibcs2_classicread_callback, &args);
+	FRELE(fp);
+	if (error)
 		return (error);
-	
-	*retval = SCARG(uap, nbytes) - args.resid;
-	
+
+	*retval = SCARG(uap, nbytes) - args.resid;	
 	return (0);
 }
 
@@ -1142,7 +1145,7 @@ xenix_sys_rdchk(p, v, retval)
 	SCARG(&sa, data) = stackgap_alloc(&sg, sizeof(int));
 	if ((error = sys_ioctl(p, &sa, retval)) != 0)
 		return error;
-	*retval = (*((int*)SCARG(&sa, data))) ? 1 : 0;
+	*retval = (*((int *)SCARG(&sa, data))) ? 1 : 0;
 	return 0;
 }
 

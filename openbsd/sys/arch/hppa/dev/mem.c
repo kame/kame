@@ -1,7 +1,7 @@
-/*	$OpenBSD: mem.c,v 1.5 2001/05/05 20:56:36 art Exp $	*/
+/*	$OpenBSD: mem.c,v 1.12 2002/03/16 22:05:19 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998,1999 Michael Shalayeff
+ * Copyright (c) 1998-2002 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,53 +47,58 @@
  * CSL requests users of this software to return to csl-dist@cs.utah.edu any
  * improvements that they make and grant CSL redistribution rights.
  *
- * 	Utah $Hdr: mem.c 1.9 94/12/16$
+ *	Utah $Hdr: mem.c 1.9 94/12/16$
  */
-/* 
+/*
  * Mach Operating System
  * Copyright (c) 1992 Carnegie Mellon University
  * All Rights Reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
  * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND FOR
  * ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
- * 
+ *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
  *  School of Computer Science
  *  Carnegie Mellon University
  *  Pittsburgh PA 15213-3890
- * 
- * any improvements or extensions that they make and grant Carnegie Mellon 
+ *
+ * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  */
 
 #include <sys/param.h>
+#include <sys/systm.h>
+#include <sys/buf.h>
+#include <sys/malloc.h>
+#include <sys/proc.h>
+#include <sys/uio.h>
 #include <sys/types.h>
 #include <sys/device.h>
-
-#include <sys/conf.h>
 #include <sys/errno.h>
-#include <sys/systm.h>
-#include <sys/uio.h>
-#include <sys/buf.h>
 #include <sys/ioctl.h>
 #include <sys/file.h>
-#include <sys/proc.h>
 
+#include <uvm/uvm.h>
+
+#include <machine/conf.h>
 #include <machine/bus.h>
 #include <machine/iomod.h>
 #include <machine/autoconf.h>
+#include <machine/pmap.h>
 
 #include <hppa/dev/cpudevs.h>
 #include <hppa/dev/viper.h>
+
+#define	VIPER_HPA	0xfffbf000
 
 struct mem_softc {
 	struct device sc_dev;
@@ -101,8 +106,8 @@ struct mem_softc {
 	volatile struct vi_trs *sc_vp;
 };
 
-int	memmatch __P((struct device *, void *, void *));
-void	memattach __P((struct device *, struct device *, void *));
+int	memmatch(struct device *, void *, void *);
+void	memattach(struct device *, struct device *, void *);
 
 struct cfattach mem_ca = {
 	sizeof(struct mem_softc), memmatch, memattach
@@ -112,14 +117,13 @@ struct cfdriver mem_cd = {
 	NULL, "mem", DV_DULL
 };
 
-#define mmread  mmrw
-#define mmwrite mmrw
-cdev_decl(mm);
-
+/* A lock for the vmmap, 16-byte aligned as PA-RISC semaphores must be. */
+static volatile int32_t vmmap_lock __attribute__ ((aligned (32))) = 1;
+extern char *vmmap;
 caddr_t zeropage;
 
 int
-memmatch(parent, cfdata, aux)   
+memmatch(parent, cfdata, aux)
 	struct device *parent;
 	void *cfdata;
 	void *aux;
@@ -129,6 +133,7 @@ memmatch(parent, cfdata, aux)
 	if (ca->ca_type.iodc_type != HPPA_TYPE_MEMORY ||
 	    ca->ca_type.iodc_sv_model != HPPA_MEMORY_PDEP)
 		return 0;
+
 	return 1;
 }
 
@@ -147,25 +152,28 @@ memattach(parent, self, aux)
 
 	/* XXX check if we are dealing w/ Viper */
 	if (ca->ca_hpa == (hppa_hpa_t)VIPER_HPA) {
-		int s;
 
 		sc->sc_vp = (struct vi_trs *)
 			&((struct iomod *)ca->ca_hpa)->priv_trs;
 
-		printf (" viper rev %x, ctrl %b",
-			sc->sc_vp->vi_status.hw_rev,
-			VI_CTRL, VIPER_BITS);
+		printf(" viper rev %x,", sc->sc_vp->vi_status.hw_rev);
+#if 0
+		{
+			int s;
 
-		s = splhigh();
-		VI_CTRL |= VI_CTRL_ANYDEN;
-		((struct vi_ctrl *)&VI_CTRL)->core_den = 0;
-		((struct vi_ctrl *)&VI_CTRL)->sgc0_den = 0;
-		((struct vi_ctrl *)&VI_CTRL)->sgc1_den = 0;
-		((struct vi_ctrl *)&VI_CTRL)->core_prf = 1;
-		sc->sc_vp->vi_control = VI_CTRL;
-		splx(s);
-#ifdef DEBUG
-		printf (" >> %b", VI_CTRL, VIPER_BITS);
+			printf(" ctrl %b", VI_CTRL, VIPER_BITS);
+
+			s = splhigh();
+			VI_CTRL |= VI_CTRL_ANYDEN;
+			((struct vi_ctrl *)&VI_CTRL)->core_den = 0;
+			((struct vi_ctrl *)&VI_CTRL)->sgc0_den = 0;
+			((struct vi_ctrl *)&VI_CTRL)->sgc1_den = 0;
+			((struct vi_ctrl *)&VI_CTRL)->core_prf = 1;
+			sc->sc_vp->vi_control = VI_CTRL;
+			splx(s);
+
+			printf (" >> %b, ", VI_CTRL, VIPER_BITS);
+		}
 #endif
 	} else
 		sc->sc_vp = NULL;
@@ -216,7 +224,7 @@ mmopen(dev, flag, ioflag, p)
 /*ARGSUSED*/
 int
 mmclose(dev, flag, mode, p)
-	dev_t dev;  
+	dev_t dev;
 	int flag, mode;
 	struct proc *p;
 {
@@ -229,9 +237,14 @@ mmrw(dev, uio, flags)
 	struct uio *uio;
 	int flags;
 {
-	register u_int	 	c;
-	register struct iovec 	*iov;
-	int 			error = 0;
+	extern u_int totalphysmem;
+	extern vaddr_t virtual_avail;
+	struct iovec	*iov;
+	int32_t lockheld = 0;
+	vaddr_t	v, o;
+	vm_prot_t prot;
+	int rw, error = 0;
+	u_int	c;
 
 	while (uio->uio_resid > 0 && error == 0) {
 		iov = uio->uio_iov;
@@ -244,43 +257,112 @@ mmrw(dev, uio, flags)
 		}
 		switch (minor(dev)) {
 
-		/* minor device 0 is physical memory */
-		case 0:
-			break;
-		/* minor device 1 is kernel memory */
-		case 1:
+		case 0:				/*  /dev/mem  */
+
+			/* If the address isn't in RAM, bail. */
+			v = uio->uio_offset;
+			if (btoc(v) > totalphysmem) {
+				error = EFAULT;
+				/* this will break us out of the loop */
+				continue;
+			}
+
+			/*
+			 * If the address is inside our large
+			 * directly-mapped kernel BTLB entry,
+			 * use kmem instead.
+			 */
+			if (v < virtual_avail)
+				goto use_kmem;
+
+			/*
+			 * If we don't already hold the vmmap lock,
+			 * acquire it.
+			 */
+			while (!lockheld) {
+				__asm __volatile("ldcws 0(%1), %0\n\tsync"
+				    : "=r" (lockheld) : "r" (&vmmap_lock));
+				if (lockheld)
+					break;
+				error = tsleep((caddr_t)&vmmap_lock,
+				    PZERO | PCATCH,
+				    "mmrw", 0);
+				if (error)
+					return (error);
+			}
+
+			/* Temporarily map the memory at vmmap. */
+			prot = uio->uio_rw == UIO_READ ? VM_PROT_READ :
+			    VM_PROT_WRITE;
+			pmap_enter(pmap_kernel(), (vaddr_t)vmmap,
+			    trunc_page(v), prot, prot|PMAP_WIRED);
+			pmap_update(pmap_kernel());
+			o = v & PGOFSET;
+			c = min(uio->uio_resid, (int)(PAGE_SIZE - o));
+			error = uiomove((caddr_t)vmmap + o, c, uio);
+			pmap_remove(pmap_kernel(), (vaddr_t)vmmap,
+			    (vaddr_t)vmmap + PAGE_SIZE);
+			pmap_update(pmap_kernel());
 			break;
 
-		case 2:
+		case 1:				/*  /dev/kmem  */
+			v = uio->uio_offset;
+use_kmem:
+			o = v & PGOFSET;
+			c = min(uio->uio_resid, (int)(PAGE_SIZE - o));
+			rw = (uio->uio_rw == UIO_READ) ? B_READ : B_WRITE;
+			if (!uvm_kernacc((caddr_t)v, c, rw)) {
+				error = EFAULT;
+				/* this will break us out of the loop */
+				continue;
+			}
+			error = uiomove((caddr_t)v, c, uio);
+			break;
+
+		case 2:				/*  /dev/null  */
 			if (uio->uio_rw == UIO_WRITE)
 				uio->uio_resid = 0;
 			return (0);
 
-		case 12:
+		case 12:			/*  /dev/zero  */
+			/* Write to /dev/zero is ignored. */
 			if (uio->uio_rw == UIO_WRITE) {
-				c = iov->iov_len;
-				break;
+				uio->uio_resid = 0;
+				return (0);
+			}
+			/*
+			 * On the first call, allocate and zero a page
+			 * of memory for use with /dev/zero.
+			 */
+			if (zeropage == NULL) {
+				zeropage = (caddr_t)
+				    malloc(PAGE_SIZE, M_TEMP, M_WAITOK);
+				memset(zeropage, 0, PAGE_SIZE);
 			}
 			c = min(iov->iov_len, PAGE_SIZE);
 			error = uiomove(zeropage, c, uio);
-			continue;
+			break;
+
 		default:
 			return (ENXIO);
 		}
-		if (error)
-			break;
-		iov->iov_base += c;
-		iov->iov_len -= c;
-		uio->uio_offset += c;
-		uio->uio_resid -= c;
 	}
+
+	/* If we hold the vmmap lock, release it. */
+	if (lockheld) {
+		__asm __volatile("sync\n\tstw	%1, 0(%0)"
+		    :: "r" (&vmmap_lock), "r" (1));
+		wakeup((caddr_t)&vmmap_lock);
+	}
+
 	return (error);
 }
 
-int
+paddr_t
 mmmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;  
+	off_t off;
+	int prot;
 {
 	if (minor(dev) != 0)
 		return (-1);

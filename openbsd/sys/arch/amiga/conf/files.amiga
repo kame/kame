@@ -1,4 +1,4 @@
-#	$OpenBSD: files.amiga,v 1.43 2001/08/25 11:37:26 espie Exp $
+#	$OpenBSD: files.amiga,v 1.49 2002/03/25 19:41:03 niklas Exp $
 #	$NetBSD: files.amiga,v 1.62 1997/08/27 19:32:47 is Exp $
 
 
@@ -349,8 +349,8 @@ file	arch/amiga/dev/com_supio.c	com_supio
 # list of standard files...
 include	"arch/m68k/fpe/files.fpe"
 
-file	dev/cons.c			ite | ser
-file	dev/cninit.c			ite | ser
+file	dev/cons.c
+file	dev/cninit.c
 file	arch/amiga/amiga/amiga_init.c
 file	arch/amiga/amiga/autoconf.c
 file	arch/amiga/amiga/cia.c
@@ -374,12 +374,6 @@ major	{vnd = 6}
 major	{cd = 7}
 major	{ccd = 8}
 major	{rd = 16}
-
-# Compatibility modules
-
-# SunOS Binary Compatibility (COMPAT_SUNOS)
-include "../../../compat/sunos/files.sunos"
-file	arch/m68k/m68k/sunos_machdep.c	compat_sunos
 
 # PCIC pcmcia controller
 # XXX this needs to be done very late, so it's done here.  This feels

@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr_extent.c,v 1.18 2001/08/06 11:19:26 art Exp $	*/
+/*	$OpenBSD: subr_extent.c,v 1.21 2002/03/21 16:24:16 jason Exp $	*/
 /*	$NetBSD: subr_extent.c,v 1.7 1996/11/21 18:46:34 cgd Exp $	*/
 
 /*-
@@ -69,13 +69,12 @@
 #define db_printf printf
 #endif
 
-static	void extent_insert_and_optimize __P((struct extent *, u_long, u_long,
-	    int, struct extent_region *, struct extent_region *));
-static	struct extent_region *extent_alloc_region_descriptor
-	    __P((struct extent *, int));
-static	void extent_free_region_descriptor __P((struct extent *,
-	    struct extent_region *));
-static	void extent_register __P((struct extent *));
+static	void extent_insert_and_optimize(struct extent *, u_long, u_long,
+	    int, struct extent_region *, struct extent_region *);
+static	struct extent_region *extent_alloc_region_descriptor(struct extent *, int);
+static	void extent_free_region_descriptor(struct extent *,
+	    struct extent_region *);
+static	void extent_register(struct extent *);
 
 /*
  * Macro to align to an arbitrary power-of-two boundary.
@@ -114,7 +113,7 @@ extent_pool_init(void)
 
 	if (!inited) {
 		pool_init(&ex_region_pl, sizeof(struct extent_region), 0, 0, 0,
-		    "extentpl", 0, 0, 0, 0);
+		    "extentpl", NULL);
 		inited = 1;
 	}
 }
@@ -184,8 +183,8 @@ extent_create(name, start, end, mtype, storage, storagesize, flags)
 		panic("extent_create: end < start");
 	}
 	if (fixed_extent && (storagesize < sizeof(struct extent_fixed)))
-		panic("extent_create: fixed extent, bad storagesize 0x%x",
-		    storagesize);
+		panic("extent_create: fixed extent, bad storagesize 0x%lx",
+		    (u_long)storagesize);
 	if (fixed_extent == 0 && (storagesize != 0 || storage != NULL))
 		panic("extent_create: storage provided for non-fixed");
 #endif
@@ -534,7 +533,7 @@ extent_alloc_subregion(ex, substart, subend, size, alignment, skew, boundary,
 	u_long *result;
 {
 	struct extent_region *rp, *myrp, *last, *bestlast;
-	u_long newstart, newend, beststart, bestovh, ovh;
+	u_long newstart, newend, exend, beststart, bestovh, ovh;
 	u_long dontcross;
 	int error;
 
@@ -606,6 +605,12 @@ extent_alloc_subregion(ex, substart, subend, size, alignment, skew, boundary,
 	bestlast = NULL;
 
 	/*
+	 * Keep track of end of free region.  This is either the end of extent
+	 * or the start of a region past the subend.
+	 */
+	exend = ex->ex_end;
+
+	/*
 	 * For N allocated regions, we must make (N + 1)
 	 * checks for unallocated space.  The first chunk we
 	 * check is the area from the beginning of the subregion
@@ -646,6 +651,15 @@ extent_alloc_subregion(ex, substart, subend, size, alignment, skew, boundary,
 
 	for (; rp != NULL; rp = rp->er_link.le_next) {
 		/*
+		 * If the region pasts the subend, bail out and see
+		 * if we fit against the subend.
+		 */
+		if (rp->er_start >= subend) {
+			exend = rp->er_start;
+			break;
+		}
+
+		/*
 		 * Check the chunk before "rp".  Note that our
 		 * comparison is safe from overflow conditions.
 		 */
@@ -662,7 +676,7 @@ extent_alloc_subregion(ex, substart, subend, size, alignment, skew, boundary,
 				 * Calculate the next boundary after the start
 				 * of this region.
 				 */
-				dontcross = EXTENT_ALIGN(newstart+1, boundary,
+				dontcross = EXTENT_ALIGN(newstart+1, boundary, 
 				    (flags & EX_BOUNDZERO) ? 0 : ex->ex_start)
 				    - 1;
 
@@ -685,7 +699,7 @@ extent_alloc_subregion(ex, substart, subend, size, alignment, skew, boundary,
 					newend = newstart + (size - 1);
 					dontcross += boundary;
 					if (!LE_OV(newstart, size, rp->er_start))
-						continue;
+						goto skip;
 				}
 
 				/*
@@ -720,6 +734,7 @@ extent_alloc_subregion(ex, substart, subend, size, alignment, skew, boundary,
 			}
 		}
 
+skip:
 		/*
 		 * Skip past the current region and check again.
 		 */
@@ -732,14 +747,7 @@ extent_alloc_subregion(ex, substart, subend, size, alignment, skew, boundary,
 			 */
 			goto fail;
 		}
-
-		/*
-		 * Check that the current region don't run past the
-		 * end of the subregion.
-		 */
-		if (!LE_OV(newstart, (size - 1), subend))
-			goto fail;
-
+		
 		last = rp;
 	}
 
@@ -763,7 +771,7 @@ extent_alloc_subregion(ex, substart, subend, size, alignment, skew, boundary,
 			 * Calculate the next boundary after the start
 			 * of this region.
 			 */
-			dontcross = EXTENT_ALIGN(newstart+1, boundary,
+			dontcross = EXTENT_ALIGN(newstart+1, boundary, 
 			    (flags & EX_BOUNDZERO) ? 0 : ex->ex_start)
 			    - 1;
 
@@ -806,7 +814,7 @@ extent_alloc_subregion(ex, substart, subend, size, alignment, skew, boundary,
 		 * fit, or we're taking the first fit, insert
 		 * ourselves into the region list.
 		 */
-		ovh = ex->ex_end - newstart - (size - 1);
+		ovh = exend - newstart - (size - 1);
 		if ((flags & EX_FAST) || (ovh == 0))
 			goto found;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ne_pcmcia.c,v 1.55 2001/10/08 14:20:16 aaron Exp $	*/
+/*	$OpenBSD: if_ne_pcmcia.c,v 1.59 2002/03/14 01:27:01 millert Exp $	*/
 /*	$NetBSD: if_ne_pcmcia.c,v 1.17 1998/08/15 19:00:04 thorpej Exp $	*/
 
 /*
@@ -67,13 +67,13 @@
 #include <dev/ic/ax88190reg.h>
 #include <dev/ic/ax88190var.h>
 
-int	ne_pcmcia_match __P((struct device *, void *, void *));
-void	ne_pcmcia_attach __P((struct device *, struct device *, void *));
-int	ne_pcmcia_detach __P((struct device *, int));
-int	ne_pcmcia_activate __P((struct device *, enum devact));
+int	ne_pcmcia_match(struct device *, void *, void *);
+void	ne_pcmcia_attach(struct device *, struct device *, void *);
+int	ne_pcmcia_detach(struct device *, int);
+int	ne_pcmcia_activate(struct device *, enum devact);
 
-int	ne_pcmcia_enable __P((struct dp8390_softc *));
-void	ne_pcmcia_disable __P((struct dp8390_softc *));
+int	ne_pcmcia_enable(struct dp8390_softc *);
+void	ne_pcmcia_disable(struct dp8390_softc *);
 
 struct ne_pcmcia_softc {
 	struct ne2000_softc sc_ne2000;		/* real "ne2000" softc */
@@ -87,12 +87,12 @@ struct ne_pcmcia_softc {
 };
 
 u_int8_t *
-	ne_pcmcia_get_enaddr __P((struct ne_pcmcia_softc *, int,
-	    u_int8_t[ETHER_ADDR_LEN]));
+	ne_pcmcia_get_enaddr(struct ne_pcmcia_softc *, int,
+	    u_int8_t[ETHER_ADDR_LEN]);
 u_int8_t *
-	ne_pcmcia_dl10019_get_enaddr __P((struct ne_pcmcia_softc *,
-	    u_int8_t[ETHER_ADDR_LEN]));
-int	ne_pcmcia_ax88190_set_iobase __P((struct ne_pcmcia_softc *));
+	ne_pcmcia_dl10019_get_enaddr(struct ne_pcmcia_softc *,
+	    u_int8_t[ETHER_ADDR_LEN]);
+int	ne_pcmcia_ax88190_set_iobase(struct ne_pcmcia_softc *);
 
 struct cfattach ne_pcmcia_ca = {
 	sizeof(struct ne_pcmcia_softc), ne_pcmcia_match, ne_pcmcia_attach,
@@ -220,6 +220,10 @@ const struct ne2000dev {
       PCMCIA_CIS_LINKSYS_ECARD_1,
       0, -1, { 0x00, 0x80, 0xc8 } },
 
+    { PCMCIA_VENDOR_LINKSYS, PCMCIA_PRODUCT_LINKSYS_PCM100,
+      PCMCIA_CIS_LINKSYS_PCM100,
+      0, -1, { 0x00, 0x04, 0x5a } },
+
     { PCMCIA_VENDOR_LINKSYS, PCMCIA_PRODUCT_LINKSYS_COMBO_ECARD,
       PCMCIA_CIS_LINKSYS_COMBO_ECARD,
       0, -1, { 0x00, 0x04, 0x5a }, NE2000DVF_AX88190 },
@@ -323,6 +327,10 @@ const struct ne2000dev {
       PCMCIA_CIS_COREGA_ETHER_PCC_T,
       0, -1, { 0x00, 0x00, 0xf4 } },
 
+    { PCMCIA_VENDOR_COREGA, PCMCIA_PRODUCT_COREGA_ETHER_PCC_TD,
+      PCMCIA_CIS_COREGA_ETHER_PCC_TD,
+      0, -1, { 0x00, 0x00, 0xf4 } },
+
     { PCMCIA_VENDOR_COREGA, PCMCIA_PRODUCT_COREGA_ETHER_II_PCC_T,
       PCMCIA_CIS_COREGA_ETHER_II_PCC_T,
       0, -1, { 0x00, 0x00, 0xf4 } },
@@ -390,6 +398,10 @@ const struct ne2000dev {
     { PCMCIA_VENDOR_NETGEAR, PCMCIA_PRODUCT_NETGEAR_FA410TXC,
       PCMCIA_CIS_NETGEAR_FA410TXC,
       0, -1, { 0x00, 0x48, 0x54 } },
+
+    { PCMCIA_VENDOR_NETGEAR, PCMCIA_PRODUCT_NETGEAR_FA411,
+      PCMCIA_CIS_NETGEAR_FA411,
+      0, -1, { 0x00, 0x40, 0xf4 } },
 
 #if 0
     /* the rest of these are stolen from the linux pcnet pcmcia device

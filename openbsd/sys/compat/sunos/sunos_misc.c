@@ -1,4 +1,4 @@
-/*	$OpenBSD: sunos_misc.c,v 1.27 2001/05/16 12:50:20 ho Exp $	*/
+/*	$OpenBSD: sunos_misc.c,v 1.37 2002/03/14 20:31:31 mickey Exp $	*/
 /*	$NetBSD: sunos_misc.c,v 1.65 1996/04/22 01:44:31 christos Exp $	*/
 
 /*
@@ -101,13 +101,13 @@
 #include <nfs/nfsproto.h>
 #include <nfs/nfs.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #ifdef sun3
 # include <machine/machdep.h>	/* for prototype of reboot2() */
 #endif
 
-static int sunstatfs __P((struct statfs *, caddr_t));
+static int sunstatfs(struct statfs *, caddr_t);
 
 int
 sunos_sys_wait4(p, v, retval)
@@ -378,7 +378,7 @@ sunos_sys_sigpending(p, v, retval)
  *
  * This is quite ugly, but what do you expect from compatibility code?
  */
-int sunos_readdir_callback __P((void *, struct dirent *, off_t));
+int sunos_readdir_callback(void *, struct dirent *, off_t);
 
 struct sunos_readdir_callback_args {
 	caddr_t outp;
@@ -441,9 +441,12 @@ sunos_sys_getdents(p, v, retval)
 
 	args.resid = SCARG(uap, nbytes);
 	args.outp = (caddr_t)SCARG(uap, buf);
-	
-	if ((error = readdir_with_callback(fp, &fp->f_offset, args.resid,
-	    sunos_readdir_callback, &args)) != 0)
+
+	FREF(fp);
+	error = readdir_with_callback(fp, &fp->f_offset, args.resid,
+	    sunos_readdir_callback, &args);
+	FRELE(fp);
+	if (error)
 		return (error);
 
 	*retval = SCARG(uap, nbytes) - args.resid;
@@ -456,15 +459,12 @@ sunos_sys_getdents(p, v, retval)
 
 int
 sunos_sys_mmap(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
-	register struct sunos_sys_mmap_args *uap = v;
+	struct sunos_sys_mmap_args *uap = v;
 	struct sys_mmap_args ouap;
-	register struct filedesc *fdp;
-	register struct file *fp;
-	register struct vnode *vp;
 
 	/*
 	 * Verify the arguments.
@@ -487,19 +487,6 @@ sunos_sys_mmap(p, v, retval)
 	SCARG(&ouap, prot) = SCARG(uap, prot);
 	SCARG(&ouap, fd) = SCARG(uap, fd);
 	SCARG(&ouap, pos) = SCARG(uap, pos);
-
-	/*
-	 * Special case: if fd refers to /dev/zero, map as MAP_ANON.  (XXX)
-	 */
-	fdp = p->p_fd;
-	if ((unsigned)SCARG(&ouap, fd) < fdp->fd_nfiles &&		/*XXX*/
-	    (fp = fdp->fd_ofiles[SCARG(&ouap, fd)]) != NULL &&		/*XXX*/
-	    fp->f_type == DTYPE_VNODE &&				/*XXX*/
-	    (vp = (struct vnode *)fp->f_data)->v_type == VCHR &&	/*XXX*/
-	    iszerodev(vp->v_rdev)) {					/*XXX*/
-		SCARG(&ouap, flags) |= MAP_ANON;
-		SCARG(&ouap, fd) = -1;
-	}
 
 	return (sys_mmap(p, &ouap, retval));
 }
@@ -535,20 +522,23 @@ sunos_sys_setsockopt(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct sunos_sys_setsockopt_args *uap = v;
+	struct sunos_sys_setsockopt_args *uap = v;
 	struct file *fp;
 	struct mbuf *m = NULL;
 	int error;
 
 	if ((error = getsock(p->p_fd, SCARG(uap, s), &fp)) != 0)
 		return (error);
+	FREF(fp);
 #define	SO_DONTLINGER (~SO_LINGER)
 	if (SCARG(uap, name) == SO_DONTLINGER) {
 		m = m_get(M_WAIT, MT_SOOPTS);
 		mtod(m, struct linger *)->l_onoff = 0;
 		m->m_len = sizeof(struct linger);
-		return (sosetopt((struct socket *)fp->f_data, SCARG(uap, level),
+		error = (sosetopt((struct socket *)fp->f_data, SCARG(uap, level),
 		    SO_LINGER, m));
+		FRELE(fp);
+		return (error);
 	}
 	if (SCARG(uap, level) == IPPROTO_IP) {
 #define		SUNOS_IP_MULTICAST_IF		2
@@ -569,20 +559,25 @@ sunos_sys_setsockopt(p, v, retval)
 			    ipoptxlat[SCARG(uap, name) - SUNOS_IP_MULTICAST_IF];
 		}
 	}
-	if (SCARG(uap, valsize) > MLEN)
+	if (SCARG(uap, valsize) > MLEN) {
+		FRELE(fp);
 		return (EINVAL);
+	}
 	if (SCARG(uap, val)) {
 		m = m_get(M_WAIT, MT_SOOPTS);
 		error = copyin(SCARG(uap, val), mtod(m, caddr_t),
 		    (u_int)SCARG(uap, valsize));
 		if (error) {
+			FRELE(fp);
 			(void) m_free(m);
 			return (error);
 		}
 		m->m_len = SCARG(uap, valsize);
 	}
-	return (sosetopt((struct socket *)fp->f_data, SCARG(uap, level),
+	error = (sosetopt((struct socket *)fp->f_data, SCARG(uap, level),
 	    SCARG(uap, name), m));
+	FRELE(fp);
+	return (error);
 }
 
 int
@@ -602,18 +597,22 @@ sunos_sys_fchroot(p, v, retval)
 	if ((error = getvnode(fdp, SCARG(uap, fd), &fp)) != 0)
 		return (error);
 	vp = (struct vnode *)fp->f_data;
+	FREF(fp);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
 	if (vp->v_type != VDIR)
 		error = ENOTDIR;
 	else
 		error = VOP_ACCESS(vp, VEXEC, p->p_ucred, p);
 	VOP_UNLOCK(vp, 0, p);
-	if (error)
+	if (error) {
+		FRELE(fp);
 		return (error);
+	}
 	VREF(vp);
 	if (fdp->fd_rdir != NULL)
 		vrele(fdp->fd_rdir);
 	fdp->fd_rdir = vp;
+	FRELE(fp);
 	return (0);
 }
 
@@ -637,7 +636,7 @@ sunos_sys_uname(p, v, retval)
 {
 	struct sunos_sys_uname_args *uap = v;
 	struct sunos_utsname sut;
-	extern char ostype[], machine[], osrelease[];
+	extern char machine[];
 
 	bzero(&sut, sizeof(sut));
 
@@ -701,11 +700,15 @@ sunos_sys_open(p, v, retval)
 
 	if (!ret && !noctty && SESS_LEADER(p) && !(p->p_flag & P_CONTROLT)) {
 		struct filedesc *fdp = p->p_fd;
-		struct file *fp = fdp->fd_ofiles[*retval];
+		struct file *fp;
 
+		if ((fp = fd_getfile(fdp, *retval)) == NULL)
+			return (EBADF);
+		FREF(fp);
 		/* ignore any error, just give it a try */
 		if (fp->f_type == DTYPE_VNODE)
 			(fp->f_ops->fo_ioctl)(fp, TIOCSCTTY, (caddr_t)0, p);
+		FRELE(fp);
 	}
 	return ret;
 }
@@ -855,14 +858,17 @@ sunos_sys_fstatfs(p, v, retval)
 	struct sunos_sys_fstatfs_args *uap = v;
 	struct file *fp;
 	struct mount *mp;
-	register struct statfs *sp;
+	struct statfs *sp;
 	int error;
 
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
 	mp = ((struct vnode *)fp->f_data)->v_mount;
 	sp = &mp->mnt_stat;
-	if ((error = VFS_STATFS(mp, sp, p)) != 0)
+	FREF(fp);
+	error = VFS_STATFS(mp, sp, p);
+	FRELE(fp);
+	if (error)
 		return (error);
 	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
 	return sunstatfs(sp, (caddr_t)SCARG(uap, buf));
@@ -988,13 +994,7 @@ sunos_sys_setrlimit(p, v, retval)
 	return compat_43_sys_setrlimit(p, uap, retval);
 }
 
-/* for the m68k machines */
-#ifndef PT_GETFPREGS
-#define PT_GETFPREGS -1
-#endif
-#ifndef PT_SETFPREGS
-#define PT_SETFPREGS -1
-#endif
+#ifdef PTRACE
 
 static int sreq2breq[] = {
 	PT_TRACE_ME,    PT_READ_I,      PT_READ_D,      -1,
@@ -1030,6 +1030,8 @@ sunos_sys_ptrace(p, v, retval)
 
 	return sys_ptrace(p, &pa, retval);
 }
+
+#endif	/* PTRACE */
 
 /*
  * SunOS reboot system call (for compatibility).

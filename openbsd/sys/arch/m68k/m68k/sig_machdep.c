@@ -1,4 +1,4 @@
-/*	$OpenBSD: sig_machdep.c,v 1.6 2001/06/27 04:39:06 art Exp $	*/
+/*	$OpenBSD: sig_machdep.c,v 1.8 2002/03/14 01:26:35 millert Exp $	*/
 /*	$NetBSD: sig_machdep.c,v 1.3 1997/04/30 23:28:03 gwr Exp $	*/
 
 /*
@@ -84,7 +84,6 @@
 #include <sys/malloc.h>
 #include <sys/buf.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <sys/syscallargs.h>
@@ -94,8 +93,8 @@
 
 extern int fputype;
 extern short exframesize[];
-void	m68881_save __P((struct fpframe *));
-void	m68881_restore __P((struct fpframe *));
+void	m68881_save(struct fpframe *);
+void	m68881_restore(struct fpframe *);
 
 #define SS_RTEFRAME	1
 #define SS_FPSTATE	2

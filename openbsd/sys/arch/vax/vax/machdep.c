@@ -1,4 +1,4 @@
-/* $OpenBSD: machdep.c,v 1.41 2001/10/04 00:21:12 miod Exp $ */
+/* $OpenBSD: machdep.c,v 1.58 2002/04/05 18:14:53 deraadt Exp $ */
 /* $NetBSD: machdep.c,v 1.108 2000/09/13 15:00:23 thorpej Exp $	 */
 
 /*
@@ -49,7 +49,8 @@
 #include <sys/signal.h>
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/map.h>
+#include <sys/extent.h>
+#include <sys/malloc.h>
 #include <sys/proc.h>
 #include <sys/signalvar.h>
 #include <sys/user.h>
@@ -66,12 +67,10 @@
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 #include <sys/ptrace.h>
-#include <vm/vm.h>
 #include <sys/sysctl.h>
 
 #include <dev/cons.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #ifdef SYSVMSG
@@ -122,7 +121,7 @@
 
 #include "smg.h"
 
-caddr_t allocsys __P((caddr_t));
+caddr_t allocsys(caddr_t);
 
 #ifndef BUFCACHEPERCENT
 #define BUFCACHEPERCENT 5
@@ -138,6 +137,7 @@ int bufpages = BUFPAGES;
 #else
 int bufpages = 0;
 #endif
+int bufcachepercent = BUFCACHEPERCENT;
 
 extern int *chrtoblktbl;
 extern int virtual_avail, virtual_end;
@@ -153,12 +153,18 @@ int		physmem;
 int		dumpsize = 0;
 int		cold = 1; /* coldstart */
 
+/*
+ * XXX some storage space must be allocated statically because of
+ * early console init
+ */
 #define	IOMAPSZ	100
-static	struct map iomap[IOMAPSZ];
+char extiospace[EXTENT_FIXED_STORAGE_SIZE(IOMAPSZ)];
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct extent *extio;
+extern vaddr_t iospace;
+
+struct vm_map *exec_map = NULL;
+struct vm_map *phys_map = NULL;
 
 #ifdef DEBUG
 int iospace_inited = 0;
@@ -168,7 +174,6 @@ void
 cpu_startup()
 {
 	caddr_t		v;
-	extern char	version[];
 	int		base, residual, i, sz;
 	vm_offset_t	minaddr, maxaddr;
 	vm_size_t	size;
@@ -213,9 +218,9 @@ cpu_startup()
 
 	/* allocate VM for buffers... area is not managed by VM system */
 	if (uvm_map(kernel_map, (vm_offset_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-			UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+			UVM_ADV_NORMAL, 0)))
 		panic("cpu_startup: cannot allocate VM for buffers");
 
 	minaddr = (vm_offset_t) buffers;
@@ -252,6 +257,7 @@ cpu_startup()
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(kernel_map->pmap);
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively limits
@@ -267,9 +273,6 @@ cpu_startup()
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 				   VM_PHYS_SIZE, 0, FALSE, NULL);
 
-	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr, 
-		VM_MBUF_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
-	
 	printf("avail memory = %ld\n", ptoa(uvmexp.free));
 	printf("using %d buffers containing %d bytes of memory\n", nbuf, bufpages * PAGE_SIZE);
 
@@ -278,6 +281,10 @@ cpu_startup()
 	 */
 
 	bufinit();
+#ifdef DDB
+	if (boothowto & RB_KDB)
+		Debugger();
+#endif
 
 	/*
 	 * Configure the system.
@@ -342,8 +349,13 @@ consinit()
 	/*
 	 * Init I/O memory resource map. Must be done before cninit()
 	 * is called; we may want to use iospace in the console routines.
+	 *
+	 * XXX console code uses the first page at iospace, so do not make
+	 * the extent start at iospace.
 	 */
-	rminit(iomap, IOSPSZ, (long)1, "iomap", IOMAPSZ);
+	extio = extent_create("extio",
+	    (u_long)iospace + VAX_NBPG, (u_long)iospace + IOSPSZ * VAX_NBPG,
+	    M_DEVBUF, extiospace, sizeof(extiospace), EX_NOWAIT);
 #ifdef DEBUG
 	iospace_inited = 1;
 #endif
@@ -353,10 +365,6 @@ consinit()
 #ifdef DEBUG
 	if (sizeof(struct user) > REDZONEADDR)
 		panic("struct user inside red zone");
-#endif
-#ifdef donotworkbyunknownreason
-	if (boothowto & RB_KDB)
-		Debugger();
 #endif
 #endif
 }
@@ -410,6 +418,9 @@ struct trampframe {
 				 * argument */
 };
 
+/*
+ * XXX no siginfo implementation!!!!
+ */
 void
 sendsig(catcher, sig, mask, code, type, val)
 	sig_t		catcher;
@@ -490,6 +501,12 @@ void
 boot(howto)
 	register int howto;
 {
+	/* If system is cold, just halt. */
+	if (cold) {
+		howto |= RB_HALT;
+		goto haltsys;
+	}
+
 	if ((howto & RB_NOSYNC) == 0 && waittime < 0) {
 		waittime = 0;
 		vfs_shutdown();
@@ -500,12 +517,20 @@ boot(howto)
 		resettodr();
 	}
 	splhigh();		/* extreme priority */
+
+	/* If rebooting and a dump is requested, do it. */
+	if (howto & RB_DUMP)
+		dumpsys();
+
+	/* Run any shutdown hooks. */
+	doshutdownhooks();
+
+haltsys:
 	if (howto & RB_HALT) {
 		if (dep_call->cpu_halt)
 			(*dep_call->cpu_halt) ();
 		printf("halting (in tight loop); hit\n\t^P\n\tHALT\n\n");
-		for (;;)
-			;
+		for (;;) ;
 	} else {
 		showto = howto;
 #ifdef notyet
@@ -542,13 +567,6 @@ boot(howto)
 		");
 #endif
 
-		/* If rebooting and a dump is requested, do it. */
-		if (showto & RB_DUMP)
-			dumpsys();
-
-		/* Run any shutdown hooks. */
-		doshutdownhooks();
-
 		if (dep_call->cpu_reboot)
 			(*dep_call->cpu_reboot)(showto);
 
@@ -561,7 +579,8 @@ boot(howto)
 	asm("movl %0, r5":: "g" (showto)); /* How to boot */
 	asm("movl %0, r11":: "r"(showto)); /* ??? */
 	asm("halt");
-	panic("Halt sket sej");
+	for (;;) ;
+	/* NOTREACHED */
 }
 
 void
@@ -626,6 +645,8 @@ process_read_regs(p, regs)
 	return 0;
 }
 
+#ifdef PTRACE
+
 int
 process_write_regs(p, regs)
 	struct proc    *p;
@@ -683,6 +704,8 @@ process_sstep(p, sstep)
 	return (0);
 }
 
+#endif	/* PTRACE */
+
 #undef PHYSMEMDEBUG
 /*
  * Allocates a virtual range suitable for mapping in physical memory.
@@ -702,9 +725,8 @@ vax_map_physmem(phys, size)
 	paddr_t phys;
 	int size;
 {
-	extern vaddr_t iospace;
 	vaddr_t addr;
-	int pageno;
+	int error;
 	static int warned = 0;
 
 #ifdef DEBUG
@@ -716,13 +738,13 @@ vax_map_physmem(phys, size)
 		if (addr == 0)
 			panic("vax_map_physmem: kernel map full");
 	} else {
-		pageno = rmalloc(iomap, size);
-		if (pageno == 0) {
+		error = extent_alloc(extio, size * VAX_NBPG, VAX_NBPG, 0,
+		    EX_NOBOUNDARY, EX_NOWAIT | EX_MALLOCOK, (u_long *)&addr);
+		if (error != 0) {
 			if (warned++ == 0) /* Warn only once */
 				printf("vax_map_physmem: iomap too small");
 			return 0;
 		}
-		addr = iospace + (pageno * VAX_NBPG);
 	}
 	ioaccess(addr, phys, size);
 #ifdef PHYSMEMDEBUG
@@ -740,8 +762,6 @@ vax_unmap_physmem(addr, size)
 	vaddr_t addr;
 	int size;
 {
-	extern vaddr_t iospace;
-	int pageno = (addr - iospace) / VAX_NBPG;
 #ifdef PHYSMEMDEBUG
 	printf("vax_unmap_physmem: unmapping %d pages at addr %lx\n", 
 	    size, addr);
@@ -750,7 +770,8 @@ vax_unmap_physmem(addr, size)
 	if (size >= LTOHPN)
 		uvm_km_free(kernel_map, addr, size * VAX_NBPG);
 	else
-		rmfree(iomap, size, pageno);
+		extent_free(extio, (u_long)addr & ~VAX_PGOFSET,
+		    size * VAX_NBPG, EX_NOWAIT);
 }
 
 /*
@@ -770,6 +791,9 @@ allocsys(v)
 {
 
 #ifdef SYSVSHM
+    shminfo.shmmax = shmmaxpgs;
+    shminfo.shmall = shmmaxpgs;
+    shminfo.shmseg = shmseg;
     VALLOC(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
 #ifdef SYSVSEM
@@ -795,7 +819,7 @@ allocsys(v)
 	        bufpages = physmem / 10;
 	    else
 		bufpages = (btoc(2 * 1024 * 1024) + physmem) *
-		    BUFCACHEPERCENT / 100;
+		    bufcachepercent / 100;
 	}
     if (nbuf == 0) 
         nbuf = bufpages < 16 ? 16 : bufpages;
@@ -810,12 +834,6 @@ allocsys(v)
     if (bufpages > nbuf * MAXBSIZE / PAGE_SIZE)
         bufpages = nbuf * MAXBSIZE / PAGE_SIZE;
 
-    /* Allocate 1/2 as many swap buffer headers as file i/o buffers.  */
-    if (nswbuf == 0) {
-        nswbuf = (nbuf / 2) & ~1;   /* force even */
-        if (nswbuf > 256)
-            nswbuf = 256;       /* sanity */
-    }
     VALLOC(buf, struct buf, nbuf);
     return (v);
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.9 2001/08/18 20:50:18 art Exp $	*/
+/*	$OpenBSD: pmap.h,v 1.13 2002/03/14 01:26:46 millert Exp $	*/
 /*	$NetBSD: pmap.h,v 1.18 1997/01/27 19:41:06 gwr Exp $	*/
 
 /*-
@@ -46,7 +46,7 @@
 
 struct pmap {
 	int	                pm_refcount;	/* pmap reference count */
-	simple_lock_data_t      pm_lock;	/* lock on pmap */
+	struct simplelock	pm_lock;	/* lock on pmap */
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
 	int                     pm_version;
 	int                     pm_ctxnum;
@@ -60,7 +60,7 @@ extern struct pmap	kernel_pmap_store;
 #define	pmap_kernel()			(&kernel_pmap_store)
 
 /* This is called from locore.s:cpu_switch() */
-void pmap_switch __P((pmap_t pmap));
+void pmap_switch(pmap_t pmap);
 
 /* This lets us have some say in choosing VA locations. */
 extern void pmap_prefer(vm_offset_t, vm_offset_t *);
@@ -69,6 +69,8 @@ extern void pmap_prefer(vm_offset_t, vm_offset_t *);
 /* This needs to be a macro to get code in kern_sysctl.c */
 extern segsz_t pmap_resident_pages(pmap_t);
 #define	pmap_resident_count(pmap)	pmap_resident_pages(pmap)
+
+#define pmap_update(pmap)	/* nothing (yet) */
 
 /*
  * Since PTEs also contain type bits, we have to have some way

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pfour.c,v 1.6 1997/08/08 08:25:20 downsj Exp $ */
+/*	$OpenBSD: pfour.c,v 1.8 2002/03/14 01:26:43 millert Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -39,7 +39,7 @@
 #include <sys/syslog.h>
 #endif
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/pmap.h>
@@ -56,8 +56,8 @@ struct pfour_softc {
 	int	nothing;
 };
 
-static int	pfourmatch __P((struct device *, void *, void *));
-static void	pfourattach __P((struct device *, struct device *, void *));
+static int	pfourmatch(struct device *, void *, void *);
+static void	pfourattach(struct device *, struct device *, void *);
 struct cfdriver pfourcd = { NULL, "pfour", pfourmatch, pfourattach,
 	DV_DULL, sizeof(struct pfour_softc)
 };

@@ -1,3 +1,4 @@
+/*	$OpenBSD: ext2fs_readwrite.c,v 1.14 2002/03/30 10:37:40 niklas Exp $	*/
 /*	$NetBSD: ext2fs_readwrite.c,v 1.16 2001/02/27 04:37:47 chs Exp $	*/
 
 /*-
@@ -194,6 +195,13 @@ ext2fs_write(v)
 	if (uio->uio_rw != UIO_WRITE)
 		panic("%s: mode", "ext2fs_write");
 #endif
+
+	/*
+	 * If writing 0 bytes, succeed and do not change
+	 * update time or file offset (standards compliance)
+	 */
+	if (uio->uio_resid == 0)
+		return (0);
 
 	switch (vp->v_type) {
 	case VREG:

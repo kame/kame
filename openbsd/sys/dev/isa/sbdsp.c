@@ -1,4 +1,4 @@
-/*	$OpenBSD: sbdsp.c,v 1.16 2001/04/12 07:46:46 csapuntz Exp $	*/
+/*	$OpenBSD: sbdsp.c,v 1.21 2002/03/14 01:26:56 millert Exp $	*/
 
 /*
  * Copyright (c) 1991-1993 Regents of the University of California.
@@ -54,7 +54,7 @@
 #include <sys/device.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/intr.h>
@@ -174,25 +174,25 @@ static struct sbmode sbrmodes[] = {
  { -1 }
 };
 
-void	sbversion __P((struct sbdsp_softc *));
-void	sbdsp_jazz16_probe __P((struct sbdsp_softc *));
-void	sbdsp_set_mixer_gain __P((struct sbdsp_softc *sc, int port));
-void	sbdsp_to __P((void *));
-void	sbdsp_pause __P((struct sbdsp_softc *));
-int	sbdsp_set_timeconst __P((struct sbdsp_softc *, int));
-int	sbdsp16_set_rate __P((struct sbdsp_softc *, int, int));
-int	sbdsp_set_in_ports __P((struct sbdsp_softc *, int));
-void	sbdsp_set_ifilter __P((void *, int));
-int	sbdsp_get_ifilter __P((void *));
+void	sbversion(struct sbdsp_softc *);
+void	sbdsp_jazz16_probe(struct sbdsp_softc *);
+void	sbdsp_set_mixer_gain(struct sbdsp_softc *sc, int port);
+void	sbdsp_to(void *);
+void	sbdsp_pause(struct sbdsp_softc *);
+int	sbdsp_set_timeconst(struct sbdsp_softc *, int);
+int	sbdsp16_set_rate(struct sbdsp_softc *, int, int);
+int	sbdsp_set_in_ports(struct sbdsp_softc *, int);
+void	sbdsp_set_ifilter(void *, int);
+int	sbdsp_get_ifilter(void *);
 
-int	sbdsp_block_output __P((void *));
-int	sbdsp_block_input __P((void *));
-static	int sbdsp_adjust __P((int, int));
+int	sbdsp_block_output(void *);
+int	sbdsp_block_input(void *);
+static	int sbdsp_adjust(int, int);
 
-int	sbdsp_midi_intr __P((void *));
+int	sbdsp_midi_intr(void *);
 
 #ifdef AUDIO_DEBUG
-void	sb_printsc __P((struct sbdsp_softc *));
+void	sb_printsc(struct sbdsp_softc *);
 
 void
 sb_printsc(sc)
@@ -525,7 +525,7 @@ sbdsp_set_params(addr, setmode, usemode, play, rec)
 	struct sbdsp_softc *sc = addr;
 	struct sbmode *m;
 	u_int rate, tc, bmode;
-	void (*swcode) __P((void *, u_char *buf, int cnt));
+	void (*swcode)(void *, u_char *buf, int cnt);
 	int factor;
 	int model;
 	int chan;
@@ -570,7 +570,7 @@ sbdsp_set_params(addr, setmode, usemode, play, rec)
 			    p->channels == m->channels &&
 			    p->precision == m->precision &&
 			    p->sample_rate >= m->lowrate &&
-			    p->sample_rate < m->highrate)
+			    p->sample_rate <= m->highrate)
 				break;
 		}
 		if (m->model == -1)
@@ -1168,7 +1168,7 @@ sbdsp_trigger_input(addr, start, end, blksize, intr, arg, param)
 	void *addr;
 	void *start, *end;
 	int blksize;
-	void (*intr) __P((void *));
+	void (*intr)(void *);
 	void *arg;
 	struct audio_params *param;
 {
@@ -1302,7 +1302,7 @@ sbdsp_trigger_output(addr, start, end, blksize, intr, arg, param)
 	void *addr;
 	void *start, *end;
 	int blksize;
-	void (*intr) __P((void *));
+	void (*intr)(void *);
 	void *arg;
 	struct audio_params *param;
 {
@@ -2189,9 +2189,10 @@ sbdsp_mixer_query_devinfo(addr, dip)
 }
 
 void *
-sb_malloc(addr, size, pool, flags)
+sb_malloc(addr, direction, size, pool, flags)
 	void *addr;
-	unsigned long size;
+	int direction;
+	size_t size;
 	int pool;
 	int flags;
 {
@@ -2216,21 +2217,22 @@ sb_free(addr, ptr, pool)
 	isa_free(ptr, pool);
 }
 
-unsigned long
-sb_round(addr, size)
+size_t
+sb_round(addr, direction, size)
 	void *addr;
-	unsigned long size;
+	int direction;
+	size_t size;
 {
 	if (size > MAX_ISADMA)
 		size = MAX_ISADMA;
 	return size;
 }
 
-int
+paddr_t
 sb_mappage(addr, mem, off, prot)
 	void *addr;
         void *mem;
-        int off;
+        off_t off;
 	int prot;
 {
 	return isa_mappage(mem, off, prot);
@@ -2254,8 +2256,8 @@ int
 sbdsp_midi_open(addr, flags, iintr, ointr, arg)
 	void *addr;
 	int flags;
-	void (*iintr)__P((void *, int));
-	void (*ointr)__P((void *));
+	void (*iintr)(void *, int);
+	void (*ointr)(void *);
 	void *arg;
 {
 	struct sbdsp_softc *sc = addr;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: hpux_file.c,v 1.7 2000/09/07 17:52:22 ericj Exp $	*/
+/*	$OpenBSD: hpux_file.c,v 1.12 2002/03/14 01:26:49 millert Exp $	*/
 /*	$NetBSD: hpux_file.c,v 1.5 1997/04/27 21:40:48 thorpej Exp $	*/
 
 /*
@@ -85,9 +85,9 @@
 
 #include <machine/hpux_machdep.h>
 
-static int	hpux_stat1 __P((struct proc *, void *, register_t *, int));
-static void	bsd_to_hpux_stat __P((struct stat *, struct hpux_stat *));
-static void	bsd_to_hpux_ostat __P((struct stat *, struct hpux_ostat *));
+static int	hpux_stat1(struct proc *, void *, register_t *, int);
+static void	bsd_to_hpux_stat(struct stat *, struct hpux_stat *);
+static void	bsd_to_hpux_ostat(struct stat *, struct hpux_ostat *);
 
 /*
  * HP-UX creat(2) system call.
@@ -218,10 +218,11 @@ hpux_sys_fcntl(p, v, retval)
 	struct flock fl;
 	struct vnode *vp;
 	struct sys_fcntl_args fa;
+	struct filedesc *fdp;
 
-	if ((u_int)SCARG(uap, fd) > p->p_fd->fd_nfiles ||
-	    (fp = p->p_fd->fd_ofiles[SCARG(uap, fd)]) == NULL)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
+	FREF(fp);
 
 	pop = &p->p_fd->fd_ofileflags[SCARG(uap, fd)];
 	arg = SCARG(uap, arg);
@@ -257,8 +258,10 @@ hpux_sys_fcntl(p, v, retval)
 		/* Fall into F_SETLK */
 
 	case HPUXF_SETLK:
-		if (fp->f_type != DTYPE_VNODE)
-			return (EBADF);
+		if (fp->f_type != DTYPE_VNODE) {
+			error = EBADF;
+			goto out;
+		}
 
 		vp = (struct vnode *)fp->f_data;
 
@@ -266,7 +269,7 @@ hpux_sys_fcntl(p, v, retval)
 		error = copyin((caddr_t)SCARG(uap, arg), (caddr_t)&hfl,
 		    sizeof (hfl));
 		if (error)
-			return (error);
+			goto out;
 
 		fl.l_start = hfl.hl_start;
 		fl.l_len = hfl.hl_len;
@@ -278,30 +281,39 @@ hpux_sys_fcntl(p, v, retval)
 
 		switch (fl.l_type) {
 		case F_RDLCK:
-			if ((fp->f_flag & FREAD) == 0)
-				return (EBADF);
+			if ((fp->f_flag & FREAD) == 0) {
+				error = EBADF;
+				goto out;
+			}
 
 			p->p_flag |= P_ADVLOCK;
-			return (VOP_ADVLOCK(vp, (caddr_t)p, F_SETLK, &fl, flg));
+			error = VOP_ADVLOCK(vp, (caddr_t)p, F_SETLK, &fl, flg);
+			goto out;
 
 		case F_WRLCK:
-			if ((fp->f_flag & FWRITE) == 0)
-				return (EBADF);
+			if ((fp->f_flag & FWRITE) == 0) {
+				error = EBADF;
+				goto out;
+			}
 			p->p_flag |= P_ADVLOCK;
-			return (VOP_ADVLOCK(vp, (caddr_t)p, F_SETLK, &fl, flg));
+			error = VOP_ADVLOCK(vp, (caddr_t)p, F_SETLK, &fl, flg);
+			goto out;
 
 		case F_UNLCK:
-			return (VOP_ADVLOCK(vp, (caddr_t)p, F_UNLCK, &fl,
-			    F_POSIX));
+			error = VOP_ADVLOCK(vp, (caddr_t)p, F_UNLCK, &fl,
+			    F_POSIX);
+			goto out;
 
 		default:
-			return (EINVAL);
+			error = EINVAL;
+			goto out;
 		}
 		/* NOTREACHED */
 
 	case F_GETLK:
 		if (fp->f_type != DTYPE_VNODE)
-		return (EBADF);
+		error = EBADF;
+		goto out;
 
 		vp = (struct vnode *)fp->f_data;
 
@@ -309,7 +321,7 @@ hpux_sys_fcntl(p, v, retval)
 		error = copyin((caddr_t)SCARG(uap, arg), (caddr_t)&hfl,
 		    sizeof (hfl));
 		if (error)
-			return (error);
+			goto out;
 
 		fl.l_start = hfl.hl_start;
 		fl.l_len = hfl.hl_len;
@@ -321,18 +333,20 @@ hpux_sys_fcntl(p, v, retval)
 
 		if ((error =
 		    VOP_ADVLOCK(vp, (caddr_t)p, F_GETLK, &fl, F_POSIX)))
-			return (error);
+			goto out;
 
 		hfl.hl_start = fl.l_start;
 		hfl.hl_len = fl.l_len;
 		hfl.hl_pid = fl.l_pid;
 		hfl.hl_type = fl.l_type;
 		hfl.hl_whence = fl.l_whence;
-		return (copyout((caddr_t)&hfl, (caddr_t)SCARG(uap, arg),
-		    sizeof (hfl)));
+		error = copyout((caddr_t)&hfl, (caddr_t)SCARG(uap, arg),
+		    sizeof (hfl));
+		goto out;
 
 	default:
-		return (EINVAL);
+		error = EINVAL;
+		goto out;
 	}
 
 	/*
@@ -363,6 +377,8 @@ hpux_sys_fcntl(p, v, retval)
 		if (mode & O_EXCL)
 			*retval |= HPUXFEXCL;
 	}
+out:
+	FRELE(fp);
 	return (error);
 }
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap_bootstrap.c,v 1.14 2001/05/08 17:30:41 aaron Exp $	*/
+/*	$OpenBSD: pmap_bootstrap.c,v 1.21 2002/03/14 03:15:55 millert Exp $	*/
 /*	$NetBSD: pmap_bootstrap.c,v 1.50 1999/04/07 06:14:33 scottr Exp $	*/
 
 /* 
@@ -45,7 +45,7 @@
 #include <sys/msgbuf.h>
 #include <sys/reboot.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/pte.h>
 #include <mac68k/mac68k/clockreg.h>
@@ -71,7 +71,6 @@ extern paddr_t avail_start;
 extern paddr_t avail_end;
 extern vaddr_t virtual_avail, virtual_end;
 extern vsize_t mem_size;
-extern int protection_codes[];
 
 /*
  * These are used to map the RAM:
@@ -101,8 +100,8 @@ extern caddr_t	ROMBase;
  */
 caddr_t		CADDR1, CADDR2, vmmap;
 
-void	pmap_bootstrap __P((paddr_t, paddr_t));
-void	bootstrap_mac68k __P((int));
+void	pmap_bootstrap(paddr_t, paddr_t);
+void	bootstrap_mac68k(int);
 
 /*
  * Bootstrap the VM system.
@@ -253,14 +252,14 @@ pmap_bootstrap(nextpa, firstpa)
 		 * Initialize the final level 1 descriptor to map the last
 		 * block of level 2 descriptors.
 		 */
-		ste = &(PA2VA(kstpa, u_int*))[SG4_LEV1SIZE-1];
-		pte = &(PA2VA(kstpa, u_int*))[kstsize*NPTEPG - SG4_LEV2SIZE];
+		ste = &(PA2VA(kstpa, u_int *))[SG4_LEV1SIZE-1];
+		pte = &(PA2VA(kstpa, u_int *))[kstsize*NPTEPG - SG4_LEV2SIZE];
 		*ste = (u_int)pte | SG_U | SG_RW | SG_V;
 		/*
 		 * Now initialize the final portion of that block of
 		 * descriptors to map the "last PT page".
 		 */
-		pte = &(PA2VA(kstpa, u_int*))
+		pte = &(PA2VA(kstpa, u_int *))
 				[kstsize*NPTEPG - NPTEPG/SG4_LEV3SIZE];
 		epte = &pte[NPTEPG/SG4_LEV3SIZE];
 		protoste = lkptpa | SG_U | SG_RW | SG_V;
@@ -296,8 +295,8 @@ pmap_bootstrap(nextpa, firstpa)
 		 * and the software Sysptmap.  Note that Sysptmap is also
 		 * considered a PT page hence the +1.
 		 */
-		ste = PA2VA(kstpa, u_int*);
-		pte = PA2VA(kptmpa, u_int*);
+		ste = PA2VA(kstpa, u_int *);
+		pte = PA2VA(kptmpa, u_int *);
 		epte = &pte[nptpages+1];
 		protoste = kptpa | SG_RW | SG_V;
 		protopte = kptpa | PG_RW | PG_CI | PG_V;
@@ -485,25 +484,6 @@ pmap_bootstrap(nextpa, firstpa)
 	virtual_end = VM_MAX_KERNEL_ADDRESS;
 
 	/*
-	 * Initialize protection array.
-	 * XXX don't use a switch statement, it might produce an
-	 * absolute "jmp" table.
-	 */
-	{
-		int *kp;
-
-		kp = (int *) &protection_codes;
-		kp[VM_PROT_NONE|VM_PROT_NONE|VM_PROT_NONE] = 0;
-		kp[VM_PROT_READ|VM_PROT_NONE|VM_PROT_NONE] = PG_RO;
-		kp[VM_PROT_READ|VM_PROT_NONE|VM_PROT_EXECUTE] = PG_RO;
-		kp[VM_PROT_NONE|VM_PROT_NONE|VM_PROT_EXECUTE] = PG_RO;
-		kp[VM_PROT_NONE|VM_PROT_WRITE|VM_PROT_NONE] = PG_RW;
-		kp[VM_PROT_NONE|VM_PROT_WRITE|VM_PROT_EXECUTE] = PG_RW;
-		kp[VM_PROT_READ|VM_PROT_WRITE|VM_PROT_NONE] = PG_RW;
-		kp[VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE] = PG_RW;
-	}
-
-	/*
 	 * Kernel page/segment table allocated in locore,
 	 * just initialize pointers.
 	 */
@@ -563,7 +543,7 @@ void
 bootstrap_mac68k(tc)
 	int	tc;
 {
-	extern void	zs_init __P((void));
+	extern void	zs_init(void);
 	extern caddr_t	esym;
 	paddr_t		nextpa;
 	caddr_t		oldROMBase;
@@ -641,4 +621,23 @@ bootstrap_mac68k(tc)
 		zs_init();
 
 	videoaddr = newvideoaddr;
+}
+
+void
+pmap_init_md()
+{
+	vaddr_t addr;
+
+	/*
+	 * Mark as unavailable the regions which we have mapped in
+	 * pmap_bootstrap().
+	 */
+	addr = (vaddr_t)IOBase;
+	if (uvm_map(kernel_map, &addr,
+		    m68k_ptob(IIOMAPSIZE + ROMMAPSIZE + VIDMAPSIZE),
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
+		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE,
+				UVM_INH_NONE, UVM_ADV_RANDOM,
+				UVM_FLAG_FIXED)))
+		panic("pmap_init: bogons in the VM system!\n");
 }

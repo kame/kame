@@ -1,4 +1,4 @@
-/*	$OpenBSD: auconv.h,v 1.3 2001/05/01 01:49:48 aaron Exp $ */
+/*	$OpenBSD: auconv.h,v 1.5 2002/03/14 01:26:51 millert Exp $ */
 /*	$NetBSD: auconv.h,v 1.5 1999/11/01 18:12:19 augustss Exp $	*/
 
 /*-
@@ -38,20 +38,33 @@
  */
 
 /* Convert between signed and unsigned. */
-extern void change_sign8 __P((void *, u_char *, int));
-extern void change_sign16_le __P((void *, u_char *, int));
-extern void change_sign16_be __P((void *, u_char *, int));
+extern void change_sign8(void *, u_char *, int);
+extern void change_sign16_le(void *, u_char *, int);
+extern void change_sign16_be(void *, u_char *, int);
 /* Convert between little and big endian. */
-extern void swap_bytes __P((void *, u_char *, int));
-extern void swap_bytes_change_sign16_le __P((void *, u_char *, int));
-extern void swap_bytes_change_sign16_be __P((void *, u_char *, int));
-extern void change_sign16_swap_bytes_le __P((void *, u_char *, int));
-extern void change_sign16_swap_bytes_be __P((void *, u_char *, int));
+extern void swap_bytes(void *, u_char *, int);
+extern void swap_bytes_change_sign16_le(void *, u_char *, int);
+extern void swap_bytes_change_sign16_be(void *, u_char *, int);
+extern void change_sign16_swap_bytes_le(void *, u_char *, int);
+extern void change_sign16_swap_bytes_be(void *, u_char *, int);
 /* Byte expansion/contraction */
-extern void linear8_to_linear16_le __P((void *, u_char *, int));
-extern void linear8_to_linear16_be __P((void *, u_char *, int));
-extern void linear16_to_linear8_le __P((void *, u_char *, int));
-extern void linear16_to_linear8_be __P((void *, u_char *, int));
+extern void linear8_to_linear16_le(void *, u_char *, int);
+extern void linear8_to_linear16_be(void *, u_char *, int);
+extern void linear16_to_linear8_le(void *, u_char *, int);
+extern void linear16_to_linear8_be(void *, u_char *, int);
+extern void ulinear8_to_linear16_le(void *, u_char *, int);
+extern void ulinear8_to_linear16_be(void *, u_char *, int);
+/* same as above, plus converting mono to stereo */
+extern void noswap_bytes_mts(void *, u_char *, int);
+extern void swap_bytes_mts(void *, u_char *, int);
+extern void linear8_to_linear16_le_mts(void *, u_char *, int);
+extern void linear8_to_linear16_be_mts(void *, u_char *, int);
+extern void ulinear8_to_linear16_le_mts(void *, u_char *, int);
+extern void ulinear8_to_linear16_be_mts(void *, u_char *, int);
+extern void change_sign16_le_mts(void *, u_char *, int);
+extern void change_sign16_be_mts(void *, u_char *, int);
+extern void change_sign16_swap_bytes_le_mts(void *, u_char *, int);
+extern void change_sign16_swap_bytes_be_mts(void *, u_char *, int);
 
 /* backwards compat for now */
 #if BYTE_ORDER == LITTLE_ENDIAN
@@ -59,9 +72,19 @@ extern void linear16_to_linear8_be __P((void *, u_char *, int));
 #define change_sign16_swap_bytes swap_bytes_change_sign16_le
 #define swap_bytes_change_sign16 swap_bytes_change_sign16_le
 #define linear8_to_linear16 linear8_to_linear16_le
+#define ulinear8_to_linear16 ulinear8_to_linear16_le
+#define linear8_to_linear16_mts linear8_to_linear16_le_mts
+#define ulinear8_to_linear16_mts ulinear8_to_linear16_le_mts
+#define change_sign16_mts change_sign16_le_mts
+#define change_sign16_swap_bytes_mts change_sign16_swap_bytes_le_mts
 #else
 #define change_sign16 change_sign16_be
 #define change_sign16_swap_bytes swap_bytes_change_sign16_be
 #define swap_bytes_change_sign16 swap_bytes_change_sign16_be
 #define linear8_to_linear16 linear8_to_linear16_be
+#define ulinear8_to_linear16 ulinear8_to_linear16_be
+#define linear8_to_linear16_mts linear8_to_linear16_be_mts
+#define ulinear8_to_linear16_mts ulinear8_to_linear16_be_mts
+#define change_sign16_mts change_sign16_be_mts
+#define change_sign16_swap_bytes_mts change_sign16_swap_bytes_be_mts
 #endif

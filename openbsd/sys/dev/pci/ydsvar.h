@@ -1,4 +1,4 @@
-/*	$OpenBSD: ydsvar.h,v 1.2 2001/07/08 06:43:27 fgsch Exp $	*/
+/*	$OpenBSD: ydsvar.h,v 1.4 2002/01/04 20:42:18 ericj Exp $	*/
 /*	$NetBSD$	*/
 
 /*
@@ -60,6 +60,7 @@ struct yds_softc {
 	pci_chipset_tag_t	sc_pc;
 	pcitag_t		sc_pcitag;
 	pcireg_t		sc_id;
+	int			sc_revision;
 	void			*sc_ih;		/* interrupt vectoring */
 	bus_space_tag_t		memt;
 	bus_space_handle_t	memh;
@@ -109,8 +110,16 @@ struct yds_softc {
 	bus_space_handle_t	sc_opl_ioh;
 	struct device		*sc_mpu;
 	bus_space_handle_t	sc_mpu_ioh;
+
+	/*
+	 * Suspend/resume support
+	 */
+	void			*powerhook;
+	int			suspend;
 };
 #define sc_opl_iot	sc_legacy_iot
 #define sc_mpu_iot	sc_legacy_iot
+
+int ac97_id2;
 
 #endif /* _DEV_PCI_YDSVAR_H_ */

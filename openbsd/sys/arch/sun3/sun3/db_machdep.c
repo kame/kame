@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_machdep.c,v 1.11 2001/05/30 20:35:57 miod Exp $	*/
+/*	$OpenBSD: db_machdep.c,v 1.13 2002/03/14 01:26:47 millert Exp $	*/
 /*	$NetBSD: db_machdep.c,v 1.8 1996/11/20 18:57:27 gwr Exp $	*/
 
 /*-
@@ -45,7 +45,7 @@
 #include <sys/systm.h>
 #include <sys/proc.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/control.h>
 #include <machine/db_machdep.h>
@@ -55,10 +55,10 @@
 #include <ddb/db_command.h>
 #include <ddb/db_output.h>
 
-static void db_mach_pagemap __P((db_expr_t, int, db_expr_t, char *));
-static void db_mach_abort   __P((db_expr_t, int, db_expr_t, char *));
+static void db_mach_pagemap(db_expr_t, int, db_expr_t, char *);
+static void db_mach_abort(db_expr_t, int, db_expr_t, char *);
 
-static void pte_print __P((int));
+static void pte_print(int);
 
 static char *pgt_names[] = {
 	"MEM", "OBIO", "VMES", "VMEL" };

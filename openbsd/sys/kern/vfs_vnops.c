@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_vnops.c,v 1.33 2001/07/16 18:25:43 millert Exp $	*/
+/*	$OpenBSD: vfs_vnops.c,v 1.41 2002/03/17 18:22:25 art Exp $	*/
 /*	$NetBSD: vfs_vnops.c,v 1.20 1996/02/04 02:18:41 christos Exp $	*/
 
 /*
@@ -55,19 +55,17 @@
 #include <sys/tty.h>
 #include <sys/cdio.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
 
-int	vn_read __P((struct file *fp, off_t *off, struct uio *uio, 
-	    struct ucred *cred));
-int	vn_write __P((struct file *fp, off_t *off, struct uio *uio, 
-	    struct ucred *cred));
-int	vn_select __P((struct file *fp, int which, struct proc *p));
-int	vn_kqfilter __P((struct file *fp, struct knote *kn));
-int 	vn_closefile __P((struct file *fp, struct proc *p));
-int	vn_ioctl __P((struct file *fp, u_long com, caddr_t data,
-	    struct proc *p));
+int	vn_read(struct file *fp, off_t *off, struct uio *uio, 
+	    struct ucred *cred);
+int	vn_write(struct file *fp, off_t *off, struct uio *uio, 
+	    struct ucred *cred);
+int	vn_select(struct file *fp, int which, struct proc *p);
+int	vn_kqfilter(struct file *fp, struct knote *kn);
+int 	vn_closefile(struct file *fp, struct proc *p);
+int	vn_ioctl(struct file *fp, u_long com, caddr_t data,
+	    struct proc *p);
 
 struct 	fileops vnops =
 	{ vn_read, vn_write, vn_ioctl, vn_select, vn_kqfilter, vn_statfile,
@@ -207,6 +205,16 @@ vn_writechk(vp)
 		return (ETXTBSY);
 
 	return (0);
+}
+
+/*
+ * Mark a vnode as being the text image of a running process.
+ */
+void
+vn_marktext(vp)
+	struct vnode *vp;
+{
+	vp->v_flag |= VTEXT;
 }
 
 /*
@@ -481,12 +489,12 @@ vn_select(fp, which, p)
  * acquire requested lock.
  */
 int
-vn_lock(vp, flags, p)
-	struct vnode *vp;
-	int flags;
-	struct proc *p;
+vn_lock(struct vnode *vp, int flags, struct proc *p)
 {
 	int error;
+
+	if ((flags & LK_RECURSEFAIL) == 0)
+		flags |= LK_CANRECURSE;
 	
 	do {
 		if ((flags & LK_INTERLOCK) == 0)
@@ -497,7 +505,7 @@ vn_lock(vp, flags, p)
 			tsleep((caddr_t)vp, PINOD, "vn_lock", 0);
 			error = ENOENT;
 		} else {
-			error = VOP_LOCK(vp, flags | LK_INTERLOCK | LK_CANRECURSE, p);
+			error = VOP_LOCK(vp, flags | LK_INTERLOCK, p);
 			if (error == 0)
 				return (error);
 		}

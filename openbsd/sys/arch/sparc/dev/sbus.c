@@ -1,4 +1,4 @@
-/*	$OpenBSD: sbus.c,v 1.8 1999/04/18 03:24:25 jason Exp $	*/
+/*	$OpenBSD: sbus.c,v 1.11 2002/03/14 01:26:43 millert Exp $	*/
 /*	$NetBSD: sbus.c,v 1.17 1997/06/01 22:10:39 pk Exp $ */
 
 /*
@@ -53,7 +53,7 @@
 #include <sys/malloc.h>
 #include <sys/systm.h>
 #include <sys/device.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 
@@ -63,12 +63,12 @@
 #include <sparc/dev/xboxvar.h>
 #include <sparc/dev/dmareg.h>
 
-int sbus_print __P((void *, const char *));
-void sbusreset __P((int));
+int sbus_print(void *, const char *);
+void sbusreset(int);
 
 /* autoconfiguration driver */
-void	sbus_attach __P((struct device *, struct device *, void *));
-int	sbus_match __P((struct device *, void *, void *));
+void	sbus_attach(struct device *, struct device *, void *);
+int	sbus_match(struct device *, void *, void *);
 
 struct cfattach sbus_ca = {
 	sizeof(struct sbus_softc), sbus_match, sbus_attach
@@ -329,7 +329,7 @@ sbus_testdma(sc, ca)
         struct romaux *ra = &ca->ca_ra;
 
 	/*
-	 * XXX how to handle more then one sbus?
+	 * XXX how to handle more than one sbus?
 	 */
 
 	if (getpropint(0, "slave-only", 0) & (1 << ca->ca_slot)) {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: grf_cc.c,v 1.7 2000/05/27 21:32:47 art Exp $	*/
+/*	$OpenBSD: grf_cc.c,v 1.10 2002/03/14 01:26:28 millert Exp $	*/
 /*	$NetBSD: grf_cc.c,v 1.23 1996/12/23 09:10:02 veego Exp $	*/
 
 /*
@@ -44,7 +44,7 @@
 #include <sys/queue.h>
 #include <sys/device.h>
 #include <sys/systm.h>
-#include <vm/vm_param.h>
+#include <uvm/uvm_param.h>
 #include <machine/cpu.h>
 #include <amiga/amiga/color.h>	/* DEBUG */
 #include <amiga/amiga/device.h>
@@ -58,14 +58,14 @@
 
 #include <sys/conf.h>
 #include <machine/conf.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include "view.h" 
 
-int grfccmatch __P((struct device *, void *, void *));
-int grfccprint __P((void *, const char *));
-void grfccattach __P((struct device *, struct device *, void *));
-void grf_cc_on __P((struct grf_softc *));
+int grfccmatch(struct device *, void *, void *);
+int grfccprint(void *, const char *);
+void grfccattach(struct device *, struct device *, void *);
+void grf_cc_on(struct grf_softc *);
 
 struct cfattach grfcc_ca = {
 	sizeof(struct grf_softc), grfccmatch, grfccattach

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_hme_pci.c,v 1.3 2001/08/25 10:13:29 art Exp $	*/
+/*	$OpenBSD: if_hme_pci.c,v 1.6 2002/03/14 01:26:58 millert Exp $	*/
 /*	$NetBSD: if_hme_pci.c,v 1.3 2000/12/28 22:59:13 sommerfeld Exp $	*/
 
 /*
@@ -57,6 +57,7 @@
 
 #ifdef __sparc64__
 #include <machine/autoconf.h>
+#include <dev/ofw/openfirm.h>
 #endif
 #include <machine/cpu.h>
 
@@ -73,8 +74,8 @@ struct hme_pci_softc {
 	void			*hsc_ih;
 };
 
-int	hmematch_pci __P((struct device *, void *, void *));
-void	hmeattach_pci __P((struct device *, struct device *, void *));
+int	hmematch_pci(struct device *, void *, void *);
+void	hmeattach_pci(struct device *, struct device *, void *);
 
 struct cfattach hme_pci_ca = {
 	sizeof(struct hme_pci_softc), hmematch_pci, hmeattach_pci
@@ -105,7 +106,7 @@ hmeattach_pci(parent, self, aux)
 	struct hme_softc *sc = &hsc->hsc_hme;
 	pci_intr_handle_t intrhandle;
 	/* XXX the following declarations should be elsewhere */
-	extern void myetheraddr __P((u_char *));
+	extern void myetheraddr(u_char *);
 	pcireg_t csr;
 	const char *intrstr;
 	int type;
@@ -158,7 +159,15 @@ hmeattach_pci(parent, self, aux)
 	sc->sc_mac = hsc->hsc_memh + 0x6000;
 	sc->sc_mif = hsc->hsc_memh + 0x7000;
 
-	myetheraddr(sc->sc_enaddr);
+#ifdef __sparc__
+	if (OF_getprop(PCITAG_NODE(pa->pa_tag), "local-mac-address",
+	    sc->sc_enaddr, ETHER_ADDR_LEN) <= 0)
+		myetheraddr(sc->sc_enaddr);
+#endif
+#ifdef __powerpc__
+	pci_ether_hw_addr(pa->pa_pc, sc->sc_enaddr);
+#endif
+
 
 	sc->sc_burst = 16;	/* XXX */
 

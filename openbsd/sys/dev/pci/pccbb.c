@@ -1,4 +1,4 @@
-/*	$OpenBSD: pccbb.c,v 1.26 2001/08/25 10:13:30 art Exp $ */
+/*	$OpenBSD: pccbb.c,v 1.30 2002/03/14 03:16:06 millert Exp $ */
 /*	$NetBSD: pccbb.c,v 1.42 2000/06/16 23:41:35 cgd Exp $	*/
 
 /*
@@ -86,117 +86,117 @@ struct cfdriver cbb_cd = {
 #define DPRINTF(x)
 #endif
 
-int	pcicbbmatch __P((struct device *, void *, void *));
-void	pccbbattach __P((struct device *, struct device *, void *));
-int	pccbbintr __P((void *));
-void	pccbb_shutdown __P((void *));
-void	pci113x_insert __P((void *));
-int	pccbbintr_function __P((struct pccbb_softc *));
+int	pcicbbmatch(struct device *, void *, void *);
+void	pccbbattach(struct device *, struct device *, void *);
+int	pccbbintr(void *);
+void	pccbb_shutdown(void *);
+void	pci113x_insert(void *);
+int	pccbbintr_function(struct pccbb_softc *);
 
-int	pccbb_detect_card __P((struct pccbb_softc *));
+int	pccbb_detect_card(struct pccbb_softc *);
 
-void	pccbb_pcmcia_write __P((struct pcic_handle *, int, int));
-u_int8_t pccbb_pcmcia_read __P((struct pcic_handle *, int));
+void	pccbb_pcmcia_write(struct pcic_handle *, int, int);
+u_int8_t pccbb_pcmcia_read(struct pcic_handle *, int);
 #define Pcic_read(ph, reg) ((ph)->ph_read((ph), (reg)))
 #define Pcic_write(ph, reg, val) ((ph)->ph_write((ph), (reg), (val)))
 
-int	cb_reset __P((struct pccbb_softc *));
-int	cb_detect_voltage __P((struct pccbb_softc *));
-int	cbbprint __P((void *, const char *));
+int	cb_reset(struct pccbb_softc *);
+int	cb_detect_voltage(struct pccbb_softc *);
+int	cbbprint(void *, const char *);
 
-int	cb_chipset __P((u_int32_t, int *));
-void	pccbb_pcmcia_attach_setup __P((struct pccbb_softc *,
-    struct pcmciabus_attach_args *));
+int	cb_chipset(u_int32_t, int *);
+void	pccbb_pcmcia_attach_setup(struct pccbb_softc *,
+    struct pcmciabus_attach_args *);
 #if 0
-void	pccbb_pcmcia_attach_card __P((struct pcic_handle *));
-void	pccbb_pcmcia_detach_card __P((struct pcic_handle *, int));
-void	pccbb_pcmcia_deactivate_card __P((struct pcic_handle *));
+void	pccbb_pcmcia_attach_card(struct pcic_handle *);
+void	pccbb_pcmcia_detach_card(struct pcic_handle *, int);
+void	pccbb_pcmcia_deactivate_card(struct pcic_handle *);
 #endif
 
-int	pccbb_ctrl __P((cardbus_chipset_tag_t, int));
-int	pccbb_power __P((cardbus_chipset_tag_t, int));
-int	pccbb_cardenable __P((struct pccbb_softc * sc, int function));
+int	pccbb_ctrl(cardbus_chipset_tag_t, int);
+int	pccbb_power(cardbus_chipset_tag_t, int);
+int	pccbb_cardenable(struct pccbb_softc * sc, int function);
 #if !rbus
-int	pccbb_io_open __P((cardbus_chipset_tag_t, int, u_int32_t, u_int32_t));
-int	pccbb_io_close __P((cardbus_chipset_tag_t, int));
-int	pccbb_mem_open __P((cardbus_chipset_tag_t, int, u_int32_t, u_int32_t));
-int	pccbb_mem_close __P((cardbus_chipset_tag_t, int));
+int	pccbb_io_open(cardbus_chipset_tag_t, int, u_int32_t, u_int32_t);
+int	pccbb_io_close(cardbus_chipset_tag_t, int);
+int	pccbb_mem_open(cardbus_chipset_tag_t, int, u_int32_t, u_int32_t);
+int	pccbb_mem_close(cardbus_chipset_tag_t, int);
 #endif /* !rbus */
-void   *pccbb_intr_establish __P((struct pccbb_softc *, int irq, int level,
-    int (*ih) (void *), void *sc));
-void	pccbb_intr_disestablish __P((struct pccbb_softc *, void *ih));
+void   *pccbb_intr_establish(struct pccbb_softc *, int irq, int level,
+    int (*ih) (void *), void *sc);
+void	pccbb_intr_disestablish(struct pccbb_softc *, void *ih);
 
-void   *pccbb_cb_intr_establish __P((cardbus_chipset_tag_t, int irq, int level,
-    int (*ih) (void *), void *sc));
-void	pccbb_cb_intr_disestablish __P((cardbus_chipset_tag_t ct, void *ih));
+void   *pccbb_cb_intr_establish(cardbus_chipset_tag_t, int irq, int level,
+    int (*ih) (void *), void *sc);
+void	pccbb_cb_intr_disestablish(cardbus_chipset_tag_t ct, void *ih);
 
-cardbustag_t pccbb_make_tag __P((cardbus_chipset_tag_t, int, int, int));
-void	pccbb_free_tag __P((cardbus_chipset_tag_t, cardbustag_t));
-cardbusreg_t pccbb_conf_read __P((cardbus_chipset_tag_t, cardbustag_t, int));
-void	pccbb_conf_write __P((cardbus_chipset_tag_t, cardbustag_t, int,
-    cardbusreg_t));
-void	pccbb_chipinit __P((struct pccbb_softc *));
+cardbustag_t pccbb_make_tag(cardbus_chipset_tag_t, int, int, int);
+void	pccbb_free_tag(cardbus_chipset_tag_t, cardbustag_t);
+cardbusreg_t pccbb_conf_read(cardbus_chipset_tag_t, cardbustag_t, int);
+void	pccbb_conf_write(cardbus_chipset_tag_t, cardbustag_t, int,
+    cardbusreg_t);
+void	pccbb_chipinit(struct pccbb_softc *);
 
-int	pccbb_pcmcia_mem_alloc __P((pcmcia_chipset_handle_t, bus_size_t,
-    struct pcmcia_mem_handle *));
-void	pccbb_pcmcia_mem_free __P((pcmcia_chipset_handle_t,
-    struct pcmcia_mem_handle *));
-int	pccbb_pcmcia_mem_map __P((pcmcia_chipset_handle_t, int, bus_addr_t,
-    bus_size_t, struct pcmcia_mem_handle *, bus_addr_t *, int *));
-void	pccbb_pcmcia_mem_unmap __P((pcmcia_chipset_handle_t, int));
-int	pccbb_pcmcia_io_alloc __P((pcmcia_chipset_handle_t, bus_addr_t,
-    bus_size_t, bus_size_t, struct pcmcia_io_handle *));
-void	pccbb_pcmcia_io_free __P((pcmcia_chipset_handle_t,
-    struct pcmcia_io_handle *));
-int	pccbb_pcmcia_io_map __P((pcmcia_chipset_handle_t, int, bus_addr_t,
-    bus_size_t, struct pcmcia_io_handle *, int *));
-void	pccbb_pcmcia_io_unmap __P((pcmcia_chipset_handle_t, int));
-void   *pccbb_pcmcia_intr_establish __P((pcmcia_chipset_handle_t,
-    struct pcmcia_function *, int, int (*)(void *), void *, char *));
-void	pccbb_pcmcia_intr_disestablish __P((pcmcia_chipset_handle_t,
-    void *));
-void	pccbb_pcmcia_socket_enable __P((pcmcia_chipset_handle_t));
-void	pccbb_pcmcia_socket_disable __P((pcmcia_chipset_handle_t));
-int	pccbb_pcmcia_card_detect __P((pcmcia_chipset_handle_t pch));
+int	pccbb_pcmcia_mem_alloc(pcmcia_chipset_handle_t, bus_size_t,
+    struct pcmcia_mem_handle *);
+void	pccbb_pcmcia_mem_free(pcmcia_chipset_handle_t,
+    struct pcmcia_mem_handle *);
+int	pccbb_pcmcia_mem_map(pcmcia_chipset_handle_t, int, bus_addr_t,
+    bus_size_t, struct pcmcia_mem_handle *, bus_addr_t *, int *);
+void	pccbb_pcmcia_mem_unmap(pcmcia_chipset_handle_t, int);
+int	pccbb_pcmcia_io_alloc(pcmcia_chipset_handle_t, bus_addr_t,
+    bus_size_t, bus_size_t, struct pcmcia_io_handle *);
+void	pccbb_pcmcia_io_free(pcmcia_chipset_handle_t,
+    struct pcmcia_io_handle *);
+int	pccbb_pcmcia_io_map(pcmcia_chipset_handle_t, int, bus_addr_t,
+    bus_size_t, struct pcmcia_io_handle *, int *);
+void	pccbb_pcmcia_io_unmap(pcmcia_chipset_handle_t, int);
+void   *pccbb_pcmcia_intr_establish(pcmcia_chipset_handle_t,
+    struct pcmcia_function *, int, int (*)(void *), void *, char *);
+void	pccbb_pcmcia_intr_disestablish(pcmcia_chipset_handle_t,
+    void *);
+void	pccbb_pcmcia_socket_enable(pcmcia_chipset_handle_t);
+void	pccbb_pcmcia_socket_disable(pcmcia_chipset_handle_t);
+int	pccbb_pcmcia_card_detect(pcmcia_chipset_handle_t pch);
 
-void	pccbb_pcmcia_do_io_map __P((struct pcic_handle *, int));
-void	pccbb_pcmcia_wait_ready __P((struct pcic_handle *));
-void	pccbb_pcmcia_do_mem_map __P((struct pcic_handle *, int));
-void	pccbb_powerhook __P((int, void *));
+void	pccbb_pcmcia_do_io_map(struct pcic_handle *, int);
+void	pccbb_pcmcia_wait_ready(struct pcic_handle *);
+void	pccbb_pcmcia_do_mem_map(struct pcic_handle *, int);
+void	pccbb_powerhook(int, void *);
 
 /* bus-space allocation and deallocation functions */
 #if rbus
 
-int	pccbb_rbus_cb_space_alloc __P((cardbus_chipset_tag_t, rbus_tag_t,
+int	pccbb_rbus_cb_space_alloc(cardbus_chipset_tag_t, rbus_tag_t,
     bus_addr_t addr, bus_size_t size, bus_addr_t mask, bus_size_t align,
-    int flags, bus_addr_t * addrp, bus_space_handle_t * bshp));
-int	pccbb_rbus_cb_space_free __P((cardbus_chipset_tag_t, rbus_tag_t,
-    bus_space_handle_t, bus_size_t));
+    int flags, bus_addr_t * addrp, bus_space_handle_t * bshp);
+int	pccbb_rbus_cb_space_free(cardbus_chipset_tag_t, rbus_tag_t,
+    bus_space_handle_t, bus_size_t);
 
 #endif /* rbus */
 
 #if rbus
 
-int	pccbb_open_win __P((struct pccbb_softc *, bus_space_tag_t,
-    bus_addr_t, bus_size_t, bus_space_handle_t, int flags));
-int	pccbb_close_win __P((struct pccbb_softc *, bus_space_tag_t,
-    bus_space_handle_t, bus_size_t));
-int	pccbb_winlist_insert __P((struct pccbb_win_chain_head *, bus_addr_t,
-    bus_size_t, bus_space_handle_t, int));
-int	pccbb_winlist_delete __P((struct pccbb_win_chain_head *,
-    bus_space_handle_t, bus_size_t));
-void	pccbb_winset __P((bus_addr_t align, struct pccbb_softc *,
-    bus_space_tag_t));
+int	pccbb_open_win(struct pccbb_softc *, bus_space_tag_t,
+    bus_addr_t, bus_size_t, bus_space_handle_t, int flags);
+int	pccbb_close_win(struct pccbb_softc *, bus_space_tag_t,
+    bus_space_handle_t, bus_size_t);
+int	pccbb_winlist_insert(struct pccbb_win_chain_head *, bus_addr_t,
+    bus_size_t, bus_space_handle_t, int);
+int	pccbb_winlist_delete(struct pccbb_win_chain_head *,
+    bus_space_handle_t, bus_size_t);
+void	pccbb_winset(bus_addr_t align, struct pccbb_softc *,
+    bus_space_tag_t);
 void	pccbb_winlist_show(struct pccbb_win_chain *);
 
 #endif /* rbus */
 
 /* for config_defer */
-void	pccbb_pci_callback __P((struct device *));
+void	pccbb_pci_callback(struct device *);
 
 #if defined SHOW_REGS
-void	cb_show_regs __P((pci_chipset_tag_t, pcitag_t, bus_space_tag_t,
-    bus_space_handle_t memh));
+void	cb_show_regs(pci_chipset_tag_t, pcitag_t, bus_space_tag_t,
+    bus_space_handle_t memh);
 #endif
 
 struct cfattach cbb_pci_ca = {
@@ -266,7 +266,7 @@ pcicbbmatch(parent, match, aux)
 }
 
 #define MAKEID(vendor, prod) (((vendor) << PCI_VENDOR_SHIFT) \
-                              | ((prod) << PCI_PRODUCT_SHIFT))
+				| ((prod) << PCI_PRODUCT_SHIFT))
 
 struct yenta_chipinfo {
 	pcireg_t yc_id;		       /* vendor tag | product tag */
@@ -291,6 +291,8 @@ struct yenta_chipinfo {
 	{ MAKEID(PCI_VENDOR_TI, PCI_PRODUCT_TI_PCI1251B), CB_TI12XX,
 	    PCCBB_PCMCIA_IO_RELOC | PCCBB_PCMCIA_MEM_32},
 	{ MAKEID(PCI_VENDOR_TI, PCI_PRODUCT_TI_PCI1211), CB_TI12XX,
+	    PCCBB_PCMCIA_IO_RELOC | PCCBB_PCMCIA_MEM_32},
+	{ MAKEID(PCI_VENDOR_TI, PCI_PRODUCT_TI_PCI1410), CB_TI12XX,
 	    PCCBB_PCMCIA_IO_RELOC | PCCBB_PCMCIA_MEM_32},
 	{ MAKEID(PCI_VENDOR_TI, PCI_PRODUCT_TI_PCI1420), CB_TI12XX,
 	    PCCBB_PCMCIA_IO_RELOC | PCCBB_PCMCIA_MEM_32},
@@ -404,7 +406,7 @@ pccbbattach(parent, self, aux)
 
 	sc->sc_base_memh = 0;
 
-	/* 
+	/*
 	 * MAP socket registers and ExCA registers on memory-space
 	 * When no valid address is set on socket base registers (on pci
 	 * config space), get it not polite way.
@@ -432,7 +434,7 @@ pccbbattach(parent, self, aux)
 				/* give up... allocate reg space via rbus. */
 				sc->sc_base_memh = 0;
 				pci_conf_write(pc, pa->pa_tag, PCI_SOCKBASE, 0);
-		 	}
+			}
 		} else {
 			DPRINTF(("%s: socket base address 0x%lx\n",
 			    sc->sc_dev.dv_xname, sockbase));
@@ -442,14 +444,14 @@ pccbbattach(parent, self, aux)
 	sc->sc_mem_start = 0;	       /* XXX */
 	sc->sc_mem_end = 0xffffffff;   /* XXX */
 
-	/* 
+	/*
 	 * When bus number isn't set correctly, give up using 32-bit CardBus
 	 * mode.
 	 */
 	busreg = pci_conf_read(pc, pa->pa_tag, PCI_BUSNUM);
 #if notyet
 	if (((busreg >> 8) & 0xff) == 0) {
-    		printf(": CardBus support disabled because of unconfigured bus number\n");
+		printf(": CardBus support disabled because of unconfigured bus number\n");
 		flags |= PCCBB_PCMCIA_16BITONLY;
 	}
 #endif
@@ -513,7 +515,7 @@ pccbbattach(parent, self, aux)
 	/* The RX5C47X-series requires writes to the PCI_LEGACY register. */
 	case CB_RX5C47X:
 #endif
-		/* 
+		/*
 		 * The legacy pcic io-port on Ricoh RX5C46X CardBus bridges
 		 * cannot be disabled by substituting 0 into PCI_LEGACY
 		 * register.  Ricoh CardBus bridges have special bits on Bridge
@@ -615,8 +617,8 @@ pccbb_pci_callback(self)
 		}
 	}
 
-	/* 
-	 * attach cardbus 
+	/*
+	 * attach cardbus
 	 */
 	if (!(sc->sc_pcmcia_flags & PCCBB_PCMCIA_16BITONLY)) {
 		pcireg_t busreg = pci_conf_read(pc, sc->sc_tag, PCI_BUSNUM);
@@ -699,7 +701,7 @@ pccbb_chipinit(sc)
 	pcitag_t tag = sc->sc_tag;
 	pcireg_t reg;
 
-	/* 
+	/*
 	 * Set PCI command reg.
 	 * Some laptop's BIOSes (i.e. TICO) do not enable CardBus chip.
 	 */
@@ -709,7 +711,7 @@ pccbb_chipinit(sc)
 	    PCI_COMMAND_MASTER_ENABLE);
 	pci_conf_write(pc, tag, PCI_COMMAND_STATUS_REG, reg);
 
-	/* 
+	/*
 	 * Set CardBus latency timer.
 	 */
 	reg = pci_conf_read(pc, tag, PCI_CB_LSCP_REG);
@@ -721,7 +723,7 @@ pccbb_chipinit(sc)
 	DPRINTF(("CardBus latency timer 0x%x (%x)\n",
 	    PCI_CB_LATENCY(reg), pci_conf_read(pc, tag, PCI_CB_LSCP_REG)));
 
-	/* 
+	/*
 	 * Set PCI latency timer.
 	 */
 	reg = pci_conf_read(pc, tag, PCI_BHLC_REG);
@@ -977,7 +979,7 @@ pccbbintr_function(sc)
 	int retval = 0, val;
 	struct pccbb_intrhand_list *pil;
 	int s, splchanged;
- 
+
 	for (pil = sc->sc_pil; pil != NULL; pil = pil->pil_next) {
 		/*
 		 * XXX priority change.  gross.  I use if-else
@@ -1271,7 +1273,7 @@ pccbb_power(ct, command)
 #if defined CB_PCMCIA_POLL
 struct cb_poll_str {
 	void *arg;
-	int (*func) __P((void *));
+	int (*func)(void *);
 	int level;
 	pccard_chipset_tag_t ct;
 	int count;
@@ -1281,7 +1283,7 @@ static struct cb_poll_str cb_poll[10];
 static int cb_poll_n = 0;
 static struct timeout cb_poll_timeout;
 
-void cb_pcmcia_poll __P((void *arg));
+void cb_pcmcia_poll(void *arg);
 
 void
 cb_pcmcia_poll(arg)
@@ -1380,8 +1382,8 @@ int
 cb_reset(sc)
 	struct pccbb_softc *sc;
 {
-	/* 
-	 * Reset Assert at least 20 ms 
+	/*
+	 * Reset Assert at least 20 ms
 	 * Some machines request longer duration.
 	 */
 	int reset_duration =
@@ -1603,7 +1605,7 @@ pccbb_mem_close(ct, win)
  * void *pccbb_cb_intr_establish(cardbus_chipset_tag_t ct,
  *					int irq,
  *					int level,
- *					int (* func) __P((void *)),
+ *					int (* func)(void *),
  *					void *arg)
  *
  *   This function registers an interrupt handler at the bridge, in
@@ -1616,7 +1618,7 @@ void *
 pccbb_cb_intr_establish(ct, irq, level, func, arg)
 	cardbus_chipset_tag_t ct;
 	int irq, level;
-	int (*func) __P((void *));
+	int (*func)(void *);
 	void *arg;
 {
 	struct pccbb_softc *sc = (struct pccbb_softc *)ct;
@@ -1646,7 +1648,7 @@ pccbb_cb_intr_disestablish(ct, ih)
  * void *pccbb_intr_establish(struct pccbb_softc *sc,
  *				     int irq,
  *				     int level,
- *				     int (* func) __P((void *)),
+ *				     int (* func)(void *),
  *				     void *arg)
  *
  *   This function registers an interrupt handler at the bridge, in
@@ -1659,7 +1661,7 @@ void *
 pccbb_intr_establish(sc, irq, level, func, arg)
 	struct pccbb_softc *sc;
 	int irq, level;
-	int (*func) __P((void *));
+	int (*func)(void *);
 	void *arg;
 {
 	struct pccbb_intrhand_list *pil, *newpil;
@@ -1685,7 +1687,7 @@ pccbb_intr_establish(sc, irq, level, func, arg)
 		}
 	}
 
-	/* 
+	/*
 	 * Allocate a room for interrupt handler structure.
 	 */
 	newpil = (struct pccbb_intrhand_list *)
@@ -1897,7 +1899,7 @@ pccbb_pcmcia_io_alloc(pch, start, size, align, pcihp)
 		align = size;	       /* XXX: funny??? */
 	}
 
-	/* 
+	/*
 	 * Allocate some arbitrary I/O space.
 	 */
 
@@ -2235,7 +2237,7 @@ pccbb_pcmcia_socket_enable(pch)
 
 	pccbb_power(sc, CARDBUS_VCC_0V | CARDBUS_VPP_0V);
 
-	/* 
+	/*
 	 * wait 200ms until power fails (Tpf).  Then, wait 100ms since
 	 * we are changing Vcc (Toff).
 	 */
@@ -2245,14 +2247,14 @@ pccbb_pcmcia_socket_enable(pch)
 	intr = Pcic_read(ph, PCIC_INTR);
 	intr &= ~(PCIC_INTR_RESET | PCIC_INTR_CARDTYPE_MASK);
 	Pcic_write(ph, PCIC_INTR, intr);
- 
+
 	/* power up the socket and output enable */
 	power = Pcic_read(ph, PCIC_PWRCTL);
 	power |= PCIC_PWRCTL_OE;
 	Pcic_write(ph, PCIC_PWRCTL, power);
 	pccbb_power(sc, voltage);
 
-	/* 
+	/*
 	 * hold RESET at least 10us.
 	 */
 	delay(10);
@@ -2331,7 +2333,7 @@ pccbb_pcmcia_socket_disable(pch)
 	power &= ~PCIC_PWRCTL_OE;
 	Pcic_write(ph, PCIC_PWRCTL, power);
 	pccbb_power(sc, CARDBUS_VCC_0V | CARDBUS_VPP_0V);
-	/* 
+	/*
 	 * wait 300ms until power fails (Tpf).
 	 */
 	delay(300 * 1000);
@@ -2388,7 +2390,7 @@ pccbb_pcmcia_mem_alloc(pch, size, pcmhp)
 	/* out of sc->memh, allocate as many pages as necessary */
 
 	/* convert size to PCIC pages */
-	/* 
+	/*
 	 * This is not enough; when the requested region is on the page
 	 * boundaries, this may calculate wrong result.
 	 */
@@ -2608,7 +2610,7 @@ pccbb_pcmcia_mem_map(pch, kind, card_addr, size, pcmhp, offsetp, windowp)
 
 	busaddr = pcmhp->addr;
 
-	/* 
+	/*
 	 * compute the address offset to the pcmcia address space for the
 	 * pcic.  this is intentionally signed.  The masks and shifts below
 	 * will cause TRT to happen in the pcic registers.  Deal with making
@@ -2622,7 +2624,7 @@ pccbb_pcmcia_mem_map(pch, kind, card_addr, size, pcmhp, offsetp, windowp)
 	    "%lx\n", win, (u_long) busaddr, (u_long) * offsetp, (u_long) size,
 	    (u_long) card_addr));
 
-	/* 
+	/*
 	 * include the offset in the size, and decrement size by one, since
 	 * the hw wants start/stop
 	 */
@@ -2669,7 +2671,7 @@ pccbb_pcmcia_mem_unmap(pch, window)
 #if defined PCCBB_PCMCIA_POLL
 struct pccbb_poll_str {
 	void *arg;
-	int (*func) __P((void *));
+	int (*func)(void *);
 	int level;
 	struct pcic_handle *ph;
 	int count;
@@ -2680,7 +2682,7 @@ static struct pccbb_poll_str pccbb_poll[10];
 static int pccbb_poll_n = 0;
 static struct timeout pccbb_poll_timeout;
 
-void pccbb_pcmcia_poll __P((void *arg));
+void pccbb_pcmcia_poll(void *arg);
 
 void
 pccbb_pcmcia_poll(arg)
@@ -2719,7 +2721,7 @@ pccbb_pcmcia_poll(arg)
 	{
 		if ((*poll->func) (poll->arg) > 0) {
 			++poll->count;
-//      printf("intr: reported from poller, 0x%x\n", spsr);
+	/* printf("intr: reported from poller, 0x%x\n", spsr); */
 #if defined LEVEL2
 		} else {
 			printf("intr: miss! 0x%x\n", spsr);
@@ -2744,7 +2746,7 @@ pccbb_pcmcia_intr_establish(pch, pf, ipl, func, arg, xname)
 	pcmcia_chipset_handle_t pch;
 	struct pcmcia_function *pf;
 	int ipl;
-	int (*func) __P((void *));
+	int (*func)(void *);
 	void *arg;
 	char *xname;
 {
@@ -2759,7 +2761,7 @@ pccbb_pcmcia_intr_establish(pch, pf, ipl, func, arg, xname)
 			    sc->sc_dev.dv_xname));
 			return NULL;
 		}
-		/* 
+		/*
 		 * XXX Noooooo!  The interrupt flag must set properly!!
 		 * dumb pcmcia driver!!
 		 */

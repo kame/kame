@@ -1,4 +1,4 @@
-/* $OpenBSD: dec_axppci_33.c,v 1.13 2001/01/20 20:27:40 art Exp $ */
+/* $OpenBSD: dec_axppci_33.c,v 1.16 2002/03/14 01:26:26 millert Exp $ */
 /* $NetBSD: dec_axppci_33.c,v 1.44 2000/05/22 20:13:32 thorpej Exp $ */
 
 /*
@@ -65,16 +65,16 @@
 #endif
 static int comcnrate = CONSPEED;
 
-void dec_axppci_33_init __P((void));
-static void dec_axppci_33_cons_init __P((void));
-static void dec_axppci_33_device_register __P((struct device *, void *));
+void dec_axppci_33_init(void);
+static void dec_axppci_33_cons_init(void);
+static void dec_axppci_33_device_register(struct device *, void *);
 
 const struct alpha_variation_table dec_axppci_33_variations[] = {
 	{ 0, "Alpha PC AXPpci33 (\"NoName\")" },
 	{ 0, NULL },
 };
 
-static struct lca_config *lca_preinit __P((void));
+static struct lca_config *lca_preinit(void);
 
 static struct lca_config *
 lca_preinit()
@@ -120,7 +120,7 @@ dec_axppci_33_init()
 	platform.device_register = dec_axppci_33_device_register;
 
 	lcp = lca_preinit();
-	iot = lcp->lc_iot;
+	iot = &lcp->lc_iot;
 	if (bus_space_map(iot, NSIO_PORT, NSIO_SIZE, 0, &nsio))
 		return;
 
@@ -150,7 +150,7 @@ dec_axppci_33_cons_init()
 	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
 
 	switch (ctb->ctb_term_type) {
-	case 2: 
+	case CTB_PRINTERPORT: 
 		/* serial console ... */
 		/* XXX */
 		{
@@ -161,7 +161,7 @@ dec_axppci_33_cons_init()
 			 */
 			DELAY(160000000 / comcnrate);
 
-			if(comcnattach(lcp->lc_iot, 0x3f8, comcnrate,
+			if(comcnattach(&lcp->lc_iot, 0x3f8, comcnrate,
 			    COM_FREQ,
 			    (TTYDEF_CFLAG & ~(CSIZE | PARENB)) | CS8))
 				panic("can't init serial console");
@@ -169,18 +169,18 @@ dec_axppci_33_cons_init()
 			break;
 		}
 
-	case 3:
+	case CTB_GRAPHICS:
 #if NPCKBD > 0
 		/* display console ... */
 		/* XXX */
-		(void) pckbc_cnattach(lcp->lc_iot, IO_KBD, KBCMDP,
+		(void) pckbc_cnattach(&lcp->lc_iot, IO_KBD, KBCMDP,
 		    PCKBC_KBD_SLOT);
 
 		if (CTB_TURBOSLOT_TYPE(ctb->ctb_turboslot) ==
 		    CTB_TURBOSLOT_TYPE_ISA)
-			isa_display_console(lcp->lc_iot, lcp->lc_memt);
+			isa_display_console(&lcp->lc_iot, &lcp->lc_memt);
 		else
-			pci_display_console(lcp->lc_iot, lcp->lc_memt,
+			pci_display_console(&lcp->lc_iot, &lcp->lc_memt,
 			    &lcp->lc_pc, CTB_TURBOSLOT_BUS(ctb->ctb_turboslot),
 			    CTB_TURBOSLOT_SLOT(ctb->ctb_turboslot), 0);
 #else

@@ -24,18 +24,16 @@ hardware manuals (man4.hppa/*):				mickey@
 * hil manual
 * add more to lasi and asp (also wax when studied enough)
 
-gcc/egcs/binutils:					espie@ mickey@
-* binutils 2.10.1 do not grok it, i use -current (;
+gcc/egcs/binutils:					fgsch@ mickey@
+* binutils 2.10.1 do not grok it, i use 2.11.2(in port) or later
 
-boots (sys/arch/hppa/stand/*):				mickey@ fries@
+boots (sys/arch/hppa/stand/*):				mickey@ miod@
 * almost could be considered working/done, fixes and such (;
 
 kernel (sys/arch/hppa/*):				mickey@
-* user-land support (signal stuff)
 * clkf_intr() is not accurate, but we can mark any
   inner frame by looking at the top-level one in tlabel(all)
 * several harware problems (ie disfunctional/untested drivers)
-* proper serial console (com driver resets on autoconf)
 * wscons devices (hil/*, pckbc/*) unfinished
 * 7300lc-based machines, 8k-based machines
 * dino pci bridge support (found on 7300lc machines, FE)
@@ -57,7 +55,7 @@ userland (*):						mickey@
 X11 (X11/*):						fries@ mickey@
 * patch is available, nothing to run at tho (;
 
-$OpenBSD: TODO,v 1.13 2001/03/29 21:55:52 mickey Exp $
+$OpenBSD: TODO,v 1.16 2002/03/15 20:58:26 mickey Exp $
 
 --
 	paranoic mickey

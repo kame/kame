@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcmcia_cis.c,v 1.5 2000/06/06 01:02:26 fgsch Exp $	*/
+/*	$OpenBSD: pcmcia_cis.c,v 1.7 2002/03/14 01:27:01 millert Exp $	*/
 /*	$NetBSD: pcmcia_cis.c,v 1.9 1998/08/22 23:41:48 msaitoh Exp $	*/
 
 /*
@@ -57,7 +57,7 @@ struct cis_state {
 	struct pcmcia_function *pf;
 };
 
-int	pcmcia_parse_cis_tuple __P((struct pcmcia_tuple *, void *));
+int	pcmcia_parse_cis_tuple(struct pcmcia_tuple *, void *);
 
 void
 pcmcia_read_cis(sc)
@@ -91,7 +91,7 @@ pcmcia_read_cis(sc)
 int
 pcmcia_scan_cis(dev, fct, arg)
 	struct device *dev;
-	int (*fct) __P((struct pcmcia_tuple *, void *));
+	int (*fct)(struct pcmcia_tuple *, void *);
 	void *arg;
 {
 	struct pcmcia_softc *sc = (struct pcmcia_softc *) dev;
@@ -803,6 +803,8 @@ pcmcia_parse_cis_tuple(tuple, arg)
 		if (state->pf == NULL) {
 			state->pf = malloc(sizeof(*state->pf), M_DEVBUF,
 			    M_NOWAIT);
+			if (state->pf == NULL)
+				panic("pcmcia_parse_cis_tuple");
 			bzero(state->pf, sizeof(*state->pf));
 			state->pf->number = state->count++;
 			state->pf->last_config_index = -1;
@@ -842,6 +844,8 @@ pcmcia_parse_cis_tuple(tuple, arg)
 			if (state->pf == NULL) {
 				state->pf = malloc(sizeof(*state->pf),
 				    M_DEVBUF, M_NOWAIT);
+				if (state->pf == NULL)
+					panic("pcmcia_parse_cis_tuple");
 				bzero(state->pf, sizeof(*state->pf));
 				state->pf->number = state->count++;
 				state->pf->last_config_index = -1;
@@ -919,6 +923,8 @@ pcmcia_parse_cis_tuple(tuple, arg)
 			if (num != state->default_cfe->number) {
 				cfe = (struct pcmcia_config_entry *)
 				    malloc(sizeof(*cfe), M_DEVBUF, M_NOWAIT);
+				if (cfe == NULL)
+					panic("pcmcia_parse_cis_tuple");
 
 				*cfe = *state->default_cfe;
 

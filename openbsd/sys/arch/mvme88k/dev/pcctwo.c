@@ -1,6 +1,4 @@
-
-/*	$OpenBSD: pcctwo.c,v 1.10 2001/03/08 00:03:14 miod Exp $ */
-
+/*	$OpenBSD: pcctwo.c,v 1.16 2002/03/14 01:26:39 millert Exp $ */
 /*
  * Copyright (c) 1995 Theo de Raadt
  * All rights reserved.
@@ -56,6 +54,8 @@
 #include <mvme88k/dev/pcctwofunc.h>
 #include <mvme88k/dev/pcctworeg.h>
 
+#include "bussw.h"
+
 struct pcctwosoftc {
 	struct device	sc_dev;
 	void		*sc_vaddr;	/* PCC2 space */
@@ -63,8 +63,8 @@ struct pcctwosoftc {
 	struct pcctworeg *sc_pcc2;	/* the actual registers */
 };
 
-void pcctwoattach __P((struct device *, struct device *, void *));
-int  pcctwomatch __P((struct device *, void *, void *));
+void pcctwoattach(struct device *, struct device *, void *);
+int  pcctwomatch(struct device *, void *, void *);
 
 struct cfattach pcctwo_ca = {
 	sizeof(struct pcctwosoftc), pcctwomatch, pcctwoattach
@@ -76,37 +76,39 @@ struct cfdriver pcctwo_cd = {
 
 struct pcctworeg *sys_pcc2 = NULL;
 
-int pcctwo_print __P((void *args, const char *bus));
-int pcctwo_scan __P((struct device *parent, void *child, void *args));
+int pcc2bus;
+
+int pcctwo_print(void *args, const char *bus);
+int pcctwo_scan(struct device *parent, void *child, void *args);
 
 int
 pcctwomatch(parent, vcf, args)
-	struct device *parent;
-	void *vcf, *args;
+struct device *parent;
+void *vcf, *args;
 {
 	struct confargs *ca = args;
 	struct pcctworeg *pcc2;
 
 	/* Bomb if wrong cpu */
-	switch (cputyp) {
-   case CPU_187:
-      pcc2 = (struct pcctworeg *)(IIOV(ca->ca_paddr) + PCC2_PCC2CHIP_OFF);
-      break;
-   case CPU_197: /* pcctwo is a child of buswitch XXX smurph */
-      pcc2 = (struct pcctworeg *)(IIOV(ca->ca_paddr));
-      break;
-   default:
-	   /* Bomb if wrong cpu */
-      return (0);
-   }
-	
-   if (badvaddr((vm_offset_t)pcc2, 4) <= 0){
-	    printf("==> pcctwo: failed address check.\n");
-	    return (0);
+	switch (brdtyp) {
+	case BRD_187:
+		pcc2 = (struct pcctworeg *)(IIOV(ca->ca_paddr) + PCC2_PCC2CHIP_OFF);
+		break;
+	case BRD_197: /* pcctwo is a child of buswitch XXX smurph */
+		pcc2 = (struct pcctworeg *)(IIOV(ca->ca_paddr));
+		break;
+	default:
+		/* Bomb if wrong board */
+		return (0);
 	}
-	if (pcc2->pcc2_chipid != PCC2_CHIPID){
-	    printf("==> pcctwo: wrong chip id %x.\n", pcc2->pcc2_chipid);
-	    return (0);
+
+	if (badvaddr((vm_offset_t)pcc2, 4)) {
+		printf("==> pcctwo: failed address check.\n");
+		return (0);
+	}
+	if (pcc2->pcc2_chipid != PCC2_CHIPID) {
+		printf("==> pcctwo: wrong chip id %x.\n", pcc2->pcc2_chipid);
+		return (0);
 	}
 	return (1);
 }
@@ -160,8 +162,8 @@ pcctwo_scan(parent, child, args)
 
 void
 pcctwoattach(parent, self, args)
-	struct device *parent, *self;
-	void *args;
+struct device *parent, *self;
+void *args;
 {
 	struct confargs *ca = args;
 	struct pcctwosoftc *sc = (struct pcctwosoftc *)self;
@@ -175,14 +177,27 @@ pcctwoattach(parent, self, args)
 	 */
 	sc->sc_paddr = ca->ca_paddr;
 	sc->sc_vaddr = (void *)IIOV(sc->sc_paddr);
-	switch (cputyp) {
-   case CPU_187:
-      sc->sc_pcc2 = (struct pcctworeg *)(sc->sc_vaddr + PCC2_PCC2CHIP_OFF);
-      break;
-   case CPU_197: /* pcctwo is a child of buswitch XXX smurph */
-      sc->sc_pcc2 = (struct pcctworeg *)sc->sc_vaddr;
-      break;
-   }
+	
+	pcc2bus = ca->ca_bustype;
+
+	switch (pcc2bus) {
+	case BUS_MAIN:
+		sc->sc_pcc2 = (struct pcctworeg *)(sc->sc_vaddr + PCC2_PCC2CHIP_OFF);
+		break;
+#if NBUSSW > 0
+	case BUS_BUSSWITCH:
+		sc->sc_pcc2 = (struct pcctworeg *)sc->sc_vaddr;
+		/* 
+		 * fake up our address so that pcc2 child devices
+		 * are offeset of 0xFFF00000 - XXX smurph
+		 */
+                sc->sc_paddr -= PCC2_PCC2CHIP_OFF;
+                sc->sc_vaddr -= PCC2_PCC2CHIP_OFF;
+                /* make sure the bus is mc68040 compatible */
+		sc->sc_pcc2->pcc2_genctl |= PCC2_GENCTL_C040;	
+		break;
+#endif 
+	}
 	sys_pcc2 = sc->sc_pcc2;
 
 	printf(": rev %d\n", sc->sc_pcc2->pcc2_chiprev);
@@ -190,11 +205,6 @@ pcctwoattach(parent, self, args)
 	sc->sc_pcc2->pcc2_vecbase = PCC2_VECBASE;
 	sc->sc_pcc2->pcc2_genctl |= PCC2_GENCTL_IEN;	/* global irq enable */
 
-	/*
-	 * Set pcc2intr_mask and pcc2intr_ipl.
-	 */
-	pcc2intr_ipl = (u_char *)&(sc->sc_pcc2->pcc2_ipl);
-	pcc2intr_mask = (u_char *)&(sc->sc_pcc2->pcc2_mask);
 	config_search(pcctwo_scan, self, args);
 }
 

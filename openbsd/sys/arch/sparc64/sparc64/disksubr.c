@@ -1,4 +1,4 @@
-/*	$OpenBSD: disksubr.c,v 1.6 2001/10/15 04:03:45 jason Exp $	*/
+/*	$OpenBSD: disksubr.c,v 1.8 2002/03/14 01:26:45 millert Exp $	*/
 /*	$NetBSD: disksubr.c,v 1.13 2000/12/17 22:39:18 pk Exp $ */
 
 /*
@@ -55,9 +55,9 @@
 #include <dev/sbus/sbusvar.h>
 #include "cd.h"
 
-static	char *disklabel_sun_to_bsd __P((char *, struct disklabel *));
-static	int disklabel_bsd_to_sun __P((struct disklabel *, char *));
-static __inline u_int sun_extended_sum __P((struct sun_disklabel *));
+static	char *disklabel_sun_to_bsd(char *, struct disklabel *);
+static	int disklabel_bsd_to_sun(struct disklabel *, char *);
+static __inline u_int sun_extended_sum(struct sun_disklabel *);
 
 extern struct device *bootdv;
 
@@ -68,12 +68,12 @@ dk_establish(struct disk *dk, struct device *dev)
 }
 
 #if NCD > 0
-extern void cdstrategy __P((struct buf *));
+extern void cdstrategy(struct buf *);
 #endif
 
 /*
  * Attempt to read a disk label from a device
- * using the indicated stategy routine.
+ * using the indicated strategy routine.
  * The label must be partly set up before this:
  * secpercyl, secsize and anything required for a block i/o read
  * operation in the driver's strategy/start routines
@@ -86,7 +86,7 @@ extern void cdstrategy __P((struct buf *));
 char *
 readdisklabel(dev, strat, lp, clp, spoofonly)
 	dev_t dev;
-	void (*strat) __P((struct buf *));
+	void (*strat)(struct buf *);
 	struct disklabel *lp;
 	struct cpu_disklabel *clp;
 	int spoofonly;
@@ -213,7 +213,7 @@ setdisklabel(olp, nlp, openmask, clp)
 int
 writedisklabel(dev, strat, lp, clp)
 	dev_t dev;
-	void (*strat) __P((struct buf *));
+	void (*strat)(struct buf *);
 	struct disklabel *lp;
 	struct cpu_disklabel *clp;
 {

@@ -1,4 +1,4 @@
-#	$OpenBSD: files.alpha,v 1.50 2001/06/26 02:37:28 mickey Exp $
+#	$OpenBSD: files.alpha,v 1.56 2002/03/23 14:14:25 deraadt Exp $
 #	$NetBSD: files.alpha,v 1.32 1996/11/25 04:03:21 cgd Exp $
 #
 # alpha-specific configuration info
@@ -11,7 +11,8 @@ maxusers 2 8 64
 # this loses, but there's no way to define attributes which have attributes
 define	alpha_shared_intr
 file	arch/alpha/dev/shared_intr.c	alpha_shared_intr | dec_eb164 |
-					dec_kn20aa | dec_6600 | dec_550
+					dec_kn20aa | dec_6600 | dec_550 |
+					dec_eb64plus
 
 define	alpha_sgmap
 file	arch/alpha/dev/sgmap_common.c alpha_sgmap | dec_3000_500
@@ -31,7 +32,7 @@ major { ccd = 7 }
 major { vnd = 9 }
 
 #
-# Media Indepedent Interface (mii)
+# Media Independent Interface (mii)
 #
 include "../../../dev/mii/files.mii"
 
@@ -133,6 +134,12 @@ major { wd = 0 }
 
 file	arch/alpha/isa/isa_machdep.c	isa
 
+define isadma_bounce
+file arch/alpha/isa/isadma_bounce.c	isadma_bounce
+
+device isabeep
+attach isabeep at pcppi
+
 include "dev/pckbc/files.pckbc"
 
 # National Semiconductor DS8390/WD83C690-based boards
@@ -143,6 +150,17 @@ attach	ed at isa with ed_isa
 attach	ed at pcmcia with ed_pcmcia
 attach	ed at pci with ed_pci
 file	dev/isa/if_ed.c			ed & (ed_isa | ed_pcmcia | ed_pci) needs-flag
+
+# Floppy disk controller
+#device	fdc {drive = -1}: isa_dma
+device	fdc {drive = -1}
+attach	fdc at isa
+file	dev/isa/fdc.c	fdc needs-flag
+
+device	fd: disk, isa_dma
+attach	fd at fdc
+file	dev/isa/fd.c	fd needs-flag
+major	{fd = 4}
 
 #
 # EISA Bus support
@@ -188,7 +206,7 @@ file	arch/alpha/pci/cia_bus_mem.c	cia
 file	arch/alpha/pci/cia_bwx_bus_io.c	cia
 file	arch/alpha/pci/cia_bwx_bus_mem.c	cia
 
-device	irongate: pcibus
+device	irongate: pcibus, isadma_bounce
 attach	irongate at mainbus
 file	arch/alpha/pci/irongate.c		irongate
 file	arch/alpha/pci/irongate_bus_io.c	irongate
@@ -207,14 +225,16 @@ file    arch/alpha/pci/tsp_pci.c        tsp
 file    arch/alpha/pci/tsp_bus_io.c     tsp
 file    arch/alpha/pci/tsp_bus_mem.c    tsp
 
-file	arch/alpha/pci/pci_2100_a50.c	dec_2100_a50
-file	arch/alpha/pci/pci_axppci_33.c	dec_axppci_33
-file	arch/alpha/pci/pci_eb164.c	dec_eb164
-file	arch/alpha/pci/pci_eb164_intr.s	dec_eb164
-file	arch/alpha/pci/pci_kn20aa.c	dec_kn20aa
-file	arch/alpha/pci/pci_550.c	dec_550
-file	arch/alpha/pci/pci_6600.c	dec_6600
-file	arch/alpha/pci/pci_up1000.c	api_up1000
+file	arch/alpha/pci/pci_2100_a50.c		dec_2100_a50
+file	arch/alpha/pci/pci_axppci_33.c		dec_axppci_33
+file	arch/alpha/pci/pci_eb164.c		dec_eb164
+file	arch/alpha/pci/pci_eb164_intr.s		dec_eb164
+file	arch/alpha/pci/pci_eb64plus.c		dec_eb64plus
+file	arch/alpha/pci/pci_eb64plus_intr.s	dec_eb64plus
+file	arch/alpha/pci/pci_kn20aa.c		dec_kn20aa
+file	arch/alpha/pci/pci_550.c		dec_550
+file	arch/alpha/pci/pci_6600.c		dec_6600
+file	arch/alpha/pci/pci_up1000.c		api_up1000
 
 #
 # PCI Bus devices
@@ -266,7 +286,6 @@ file	arch/alpha/alpha/mem.c
 file	arch/alpha/alpha/pmap.c
 file	arch/alpha/alpha/process_machdep.c
 file	arch/alpha/alpha/prom.c
-file	arch/alpha/alpha/support.c
 file	arch/alpha/alpha/sys_machdep.c
 file	arch/alpha/alpha/trap.c
 file	arch/alpha/alpha/vm_machdep.c
@@ -295,6 +314,7 @@ file	arch/alpha/alpha/dec_3000_300.c		dec_3000_300	needs-flag
 file	arch/alpha/alpha/dec_3000_500.c		dec_3000_500	needs-flag
 file	arch/alpha/alpha/dec_axppci_33.c	dec_axppci_33	needs-flag
 file	arch/alpha/alpha/dec_eb164.c		dec_eb164	needs-flag
+file	arch/alpha/alpha/dec_eb64plus.c		dec_eb64plus	needs-flag
 file	arch/alpha/alpha/dec_kn20aa.c		dec_kn20aa	needs-flag
 file	arch/alpha/alpha/dec_550.c		dec_550		needs-flag
 file    arch/alpha/alpha/dec_6600.c             dec_6600	needs-flag

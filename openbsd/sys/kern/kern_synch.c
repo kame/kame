@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_synch.c,v 1.38 2001/09/13 14:41:50 art Exp $	*/
+/*	$OpenBSD: kern_synch.c,v 1.42 2002/03/14 01:27:04 millert Exp $	*/
 /*	$NetBSD: kern_synch.c,v 1.37 1996/04/22 01:38:37 christos Exp $	*/
 
 /*-
@@ -48,11 +48,9 @@
 #include <sys/buf.h>
 #include <sys/signalvar.h>
 #include <sys/resourcevar.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sched.h>
 #include <sys/timeout.h>
-
-#include <uvm/uvm_extern.h>
 
 #ifdef KTRACE
 #include <sys/ktrace.h>
@@ -63,12 +61,12 @@
 u_char	curpriority;		/* usrpri of curproc */
 int	lbolt;			/* once a second sleep address */
 
-void scheduler_start __P((void));
+void scheduler_start(void);
 
-void roundrobin __P((void *));
-void schedcpu __P((void *));
-void updatepri __P((struct proc *));
-void endtsleep __P((void *));
+void roundrobin(void *);
+void schedcpu(void *);
+void updatepri(struct proc *);
+void endtsleep(void *);
 
 void
 scheduler_start()
@@ -346,7 +344,7 @@ int
 ltsleep(ident, priority, wmesg, timo, interlock)
 	void *ident;
 	int priority, timo;
-	char *wmesg;
+	const char *wmesg;
 	volatile struct simplelock *interlock;
 {
 	struct proc *p = curproc;
@@ -429,7 +427,7 @@ ltsleep(ident, priority, wmesg, timo, interlock)
 	mi_switch();
 #ifdef	DDB
 	/* handy breakpoint location after process "wakes" */
-	__asm(".globl bpendtsleep ; bpendtsleep:");
+	__asm(".globl bpendtsleep\nbpendtsleep:");
 #endif
 resume:
 	curpriority = p->p_usrpri;
@@ -547,7 +545,7 @@ sleep(ident, priority)
 	mi_switch();
 #ifdef	DDB
 	/* handy breakpoint location after process "wakes" */
-	__asm(".globl bpendsleep ; bpendsleep:");
+	__asm(".globl bpendsleep\nbpendsleep:");
 #endif
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_CSW))

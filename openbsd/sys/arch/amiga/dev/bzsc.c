@@ -1,4 +1,4 @@
-/*	$OpenBSD: bzsc.c,v 1.7 2001/09/11 20:05:20 miod Exp $	*/
+/*	$OpenBSD: bzsc.c,v 1.10 2002/03/14 01:26:28 millert Exp $	*/
 
 /*	$NetBSD: bzsc.c,v 1.14 1996/12/23 09:09:53 veego Exp $	*/
 
@@ -45,9 +45,7 @@
 #include <sys/device.h>
 #include <scsi/scsi_all.h>
 #include <scsi/scsiconf.h>
-#include <vm/vm.h>
-#include <vm/vm_page.h>
-#include <machine/pmap.h>
+#include <uvm/uvm_extern.h>
 #include <amiga/amiga/custom.h>
 #include <amiga/amiga/cc.h>
 #include <amiga/amiga/device.h>
@@ -58,8 +56,8 @@
 #include <amiga/dev/bzscreg.h>
 #include <amiga/dev/bzscvar.h>
 
-void bzscattach __P((struct device *, struct device *, void *));
-int  bzscmatch  __P((struct device *, void *, void *));
+void bzscattach(struct device *, struct device *, void *);
+int  bzscmatch(struct device *, void *, void *);
 
 struct scsi_adapter bzsc_scsiswitch = {
 	sfas_scsicmd,
@@ -83,15 +81,15 @@ struct cfdriver bzsc_cd = {
 	NULL, "bzsc", DV_DULL, NULL, 0
 };
 
-int bzsc_intr		__P((void *));
-void bzsc_set_dma_adr	__P((struct sfas_softc *sc, vm_offset_t ptr, int mode));       
-void bzsc_set_dma_tc	__P((struct sfas_softc *sc, unsigned int len));
-int bzsc_setup_dma	__P((struct sfas_softc *sc, vm_offset_t ptr, int len,
-			     int mode));
-int bzsc_build_dma_chain __P((struct sfas_softc *sc,
-				struct sfas_dma_chain *chain, void *p, int l));
-int bzsc_need_bump	__P((struct sfas_softc *sc, vm_offset_t ptr, int len));
-void bzsc_led_dummy	__P((struct sfas_softc *sc, int mode));
+int bzsc_intr(void *);
+void bzsc_set_dma_adr(struct sfas_softc *sc, vm_offset_t ptr, int mode);       
+void bzsc_set_dma_tc(struct sfas_softc *sc, unsigned int len);
+int bzsc_setup_dma(struct sfas_softc *sc, vm_offset_t ptr, int len,
+			     int mode);
+int bzsc_build_dma_chain(struct sfas_softc *sc,
+				struct sfas_dma_chain *chain, void *p, int l);
+int bzsc_need_bump(struct sfas_softc *sc, vm_offset_t ptr, int len);
+void bzsc_led_dummy(struct sfas_softc *sc, int mode);
 
 /*
  * if we are an Advanced Systems & Software FastlaneZ3
@@ -334,7 +332,7 @@ do { chain[n].ptr = (p); chain[n].len = (l); chain[n++].flg = (f); } while(0)
 		set_link(n, (vm_offset_t)p, l, SFAS_CHAIN_BUMP);
 	else if (
 #if defined(M68040) || defined(M68060)
-		 ((mmutype == MMU_68040) && ((vm_offset_t)p >= 0xFFFC0000)) &&
+		 ((mmutype <= MMU_68040) && ((vm_offset_t)p >= 0xFFFC0000)) &&
 #endif
 		 ((vm_offset_t)p >= 0xFF000000)) {
 		int	len;

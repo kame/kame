@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ti.c,v 1.30 2001/09/11 20:05:25 miod Exp $	*/
+/*	$OpenBSD: if_ti.c,v 1.35 2002/03/14 01:26:59 millert Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -110,7 +110,7 @@
 #include <net/bpf.h>
 #endif
 
-#include <vm/vm.h>              /* for vtophys */
+#include <uvm/uvm_extern.h>              /* for vtophys */
 #include <machine/bus.h>
 
 #include <dev/pci/pcireg.h>
@@ -127,58 +127,58 @@
 
 #define bootverbose	1
 
-int ti_probe		__P((struct device *, void *, void *));
-void ti_attach		__P((struct device *, struct device *, void *));
+int ti_probe(struct device *, void *, void *);
+void ti_attach(struct device *, struct device *, void *);
 
-void ti_txeof		__P((struct ti_softc *));
-void ti_rxeof		__P((struct ti_softc *));
+void ti_txeof(struct ti_softc *);
+void ti_rxeof(struct ti_softc *);
 
-void ti_stats_update	__P((struct ti_softc *));
-int ti_encap		__P((struct ti_softc *, struct mbuf *, u_int32_t *));
+void ti_stats_update(struct ti_softc *);
+int ti_encap(struct ti_softc *, struct mbuf *, u_int32_t *);
 
-int ti_intr		__P((void *));
-void ti_start		__P((struct ifnet *));
-int ti_ioctl		__P((struct ifnet *, u_long, caddr_t));
-void ti_init		__P((void *));
-void ti_init2		__P((struct ti_softc *));
-void ti_stop		__P((struct ti_softc *));
-void ti_watchdog	__P((struct ifnet *));
-void ti_shutdown	__P((void *));
-int ti_ifmedia_upd	__P((struct ifnet *));
-void ti_ifmedia_sts	__P((struct ifnet *, struct ifmediareq *));
+int ti_intr(void *);
+void ti_start(struct ifnet *);
+int ti_ioctl(struct ifnet *, u_long, caddr_t);
+void ti_init(void *);
+void ti_init2(struct ti_softc *);
+void ti_stop(struct ti_softc *);
+void ti_watchdog(struct ifnet *);
+void ti_shutdown(void *);
+int ti_ifmedia_upd(struct ifnet *);
+void ti_ifmedia_sts(struct ifnet *, struct ifmediareq *);
 
-u_int32_t ti_eeprom_putbyte	__P((struct ti_softc *, int));
-u_int8_t ti_eeprom_getbyte	__P((struct ti_softc *, int, u_int8_t *));
-int ti_read_eeprom	__P((struct ti_softc *, caddr_t, int, int));
+u_int32_t ti_eeprom_putbyte(struct ti_softc *, int);
+u_int8_t ti_eeprom_getbyte(struct ti_softc *, int, u_int8_t *);
+int ti_read_eeprom(struct ti_softc *, caddr_t, int, int);
 
-void ti_add_mcast	__P((struct ti_softc *, struct ether_addr *));
-void ti_del_mcast	__P((struct ti_softc *, struct ether_addr *));
-void ti_setmulti	__P((struct ti_softc *));
+void ti_add_mcast(struct ti_softc *, struct ether_addr *);
+void ti_del_mcast(struct ti_softc *, struct ether_addr *);
+void ti_setmulti(struct ti_softc *);
 
-void ti_mem		__P((struct ti_softc *, u_int32_t, u_int32_t, caddr_t));
-void ti_loadfw		__P((struct ti_softc *));
-void ti_cmd		__P((struct ti_softc *, struct ti_cmd_desc *));
-void ti_cmd_ext		__P((struct ti_softc *, struct ti_cmd_desc *,
-    caddr_t, int));
-void ti_handle_events	__P((struct ti_softc *));
-int ti_alloc_jumbo_mem	__P((struct ti_softc *));
-void *ti_jalloc		__P((struct ti_softc *));
-void ti_jfree		__P((caddr_t, u_int, void *));
-int ti_newbuf_std		__P((struct ti_softc *, int, struct mbuf *));
-int ti_newbuf_mini		__P((struct ti_softc *, int, struct mbuf *));
-int ti_newbuf_jumbo		__P((struct ti_softc *, int, struct mbuf *));
-int ti_init_rx_ring_std		__P((struct ti_softc *));
-void ti_free_rx_ring_std	__P((struct ti_softc *));
-int ti_init_rx_ring_jumbo	__P((struct ti_softc *));
-void ti_free_rx_ring_jumbo	__P((struct ti_softc *));
-int ti_init_rx_ring_mini	__P((struct ti_softc *));
-void ti_free_rx_ring_mini	__P((struct ti_softc *));
-void ti_free_tx_ring		__P((struct ti_softc *));
-int ti_init_tx_ring		__P((struct ti_softc *));
+void ti_mem(struct ti_softc *, u_int32_t, u_int32_t, caddr_t);
+void ti_loadfw(struct ti_softc *);
+void ti_cmd(struct ti_softc *, struct ti_cmd_desc *);
+void ti_cmd_ext(struct ti_softc *, struct ti_cmd_desc *,
+    caddr_t, int);
+void ti_handle_events(struct ti_softc *);
+int ti_alloc_jumbo_mem(struct ti_softc *);
+void *ti_jalloc(struct ti_softc *);
+void ti_jfree(caddr_t, u_int, void *);
+int ti_newbuf_std(struct ti_softc *, int, struct mbuf *);
+int ti_newbuf_mini(struct ti_softc *, int, struct mbuf *);
+int ti_newbuf_jumbo(struct ti_softc *, int, struct mbuf *);
+int ti_init_rx_ring_std(struct ti_softc *);
+void ti_free_rx_ring_std(struct ti_softc *);
+int ti_init_rx_ring_jumbo(struct ti_softc *);
+void ti_free_rx_ring_jumbo(struct ti_softc *);
+int ti_init_rx_ring_mini(struct ti_softc *);
+void ti_free_rx_ring_mini(struct ti_softc *);
+void ti_free_tx_ring(struct ti_softc *);
+int ti_init_tx_ring(struct ti_softc *);
 
-int ti_64bitslot_war	__P((struct ti_softc *));
-int ti_chipinit		__P((struct ti_softc *));
-int ti_gibinit		__P((struct ti_softc *));
+int ti_64bitslot_war(struct ti_softc *);
+int ti_chipinit(struct ti_softc *);
+int ti_gibinit(struct ti_softc *);
 
 /*
  * Send an instruction or address to the EEPROM, check for ACK.
@@ -1071,6 +1071,8 @@ void ti_setmulti(sc)
 	ETHER_FIRST_MULTI(step, ac, enm);
 	while (enm != NULL) {
 		mc = malloc(sizeof(struct ti_mc_entry), M_DEVBUF, M_NOWAIT);
+		if (mc == NULL)
+			panic("ti_setmulti");
 		bcopy(enm->enm_addrlo, (char *)&mc->mc_addr, ETHER_ADDR_LEN);
 		LIST_INSERT_HEAD(&sc->ti_mc_listhead, mc, mc_entries);
 		ti_add_mcast(sc, &mc->mc_addr);
@@ -2120,7 +2122,8 @@ void ti_init2(sc)
 	}
 
 	/* Init RX ring. */
-	ti_init_rx_ring_std(sc);
+	if (ti_init_rx_ring_std(sc) == ENOBUFS)
+		panic("not enough mbufs for rx ring");
 
 	/* Init jumbo RX ring. */
 	if (ifp->if_mtu > (ETHERMTU + ETHER_HDR_LEN + ETHER_CRC_LEN))
@@ -2362,7 +2365,7 @@ int ti_ioctl(ifp, command, data)
 		break;
 	}
 
-	(void)splx(s);
+	splx(s);
 
 	return(error);
 }

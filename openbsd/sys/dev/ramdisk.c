@@ -1,4 +1,4 @@
-/*	$OpenBSD: ramdisk.c,v 1.15 2001/09/19 20:50:58 mickey Exp $	*/
+/*	$OpenBSD: ramdisk.c,v 1.18 2002/03/14 01:26:52 millert Exp $	*/
 /*	$NetBSD: ramdisk.c,v 1.8 1996/04/12 08:30:09 leo Exp $	*/
 
 /*
@@ -59,7 +59,6 @@
 #include <sys/disklabel.h>
 #include <sys/dkio.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <dev/ramdisk.h>
@@ -81,12 +80,7 @@
  * XXX Assumption: 16 RAM-disks are enough!
  */
 #define RD_MAX_UNITS	0x10
-#define RD_UNIT(unit)    (unit / MAXPARTITIONS)
-#define RD_PART(unit)    (unit % MAXPARTITIONS)
-#define RD_IS_CTRL(unit) (RD_PART(unit) == RAW_PART)
-#define	MAKERDDEV(maj, unit, part)	MAKEDISKDEV(maj, unit, part)
-
-#define	RDLABELDEV(dev)	(MAKERDDEV(major(dev), RD_UNIT(minor(dev)), RAW_PART))
+#define RD_IS_CTRL(dev) (DISKPART(dev) == RAW_PART)
 
 /* autoconfig stuff... */
 
@@ -105,9 +99,9 @@ struct rd_softc {
 #define RD_ISOPEN	0x01
 #define RD_SERVED	0x02
 
-void rdattach __P((int));
-static void rd_attach __P((struct device *, struct device *, void *));
-struct disklabel *rdgetdisklabel __P((dev_t dev, struct rd_softc *sc));
+void rdattach(int);
+static void rd_attach(struct device *, struct device *, void *);
+struct disklabel *rdgetdisklabel(dev_t dev, struct rd_softc *sc);
 
 /*
  * Some ports (like i386) use a swapgeneric that wants to
@@ -119,7 +113,7 @@ struct cfdriver rd_cd = {
 	NULL, "rd", DV_DULL, NULL, 0
 };
 
-void rdstrategy __P((struct buf *bp));
+void rdstrategy(struct buf *bp);
 struct dkdriver rddkdriver = { rdstrategy };
 
 static int   ramdisk_ndevs;
@@ -197,12 +191,12 @@ rd_attach(parent, self, aux)
  */
 
 #if RAMDISK_SERVER
-static int rd_server_loop __P((struct rd_softc *sc));
-static int rd_ioctl_server __P((struct rd_softc *sc,
-		struct rd_conf *urd, struct proc *proc));
+static int rd_server_loop(struct rd_softc *sc);
+static int rd_ioctl_server(struct rd_softc *sc,
+		struct rd_conf *urd, struct proc *proc);
 #endif
-static int rd_ioctl_kalloc __P((struct rd_softc *sc,
-		struct rd_conf *urd, struct proc *proc));
+static int rd_ioctl_kalloc(struct rd_softc *sc,
+		struct rd_conf *urd, struct proc *proc);
 
 dev_type_open(rdopen);
 dev_type_close(rdclose);
@@ -246,11 +240,10 @@ rdopen(dev, flag, fmt, proc)
 	int     flag, fmt;
 	struct proc *proc;
 {
-	int md, unit;
+	int unit;
 	struct rd_softc *sc;
 
-	md = minor(dev);
-	unit = RD_UNIT(md);
+	unit = DISKUNIT(dev);
 	if (unit >= ramdisk_ndevs)
 		return ENXIO;
 	sc = ramdisk_devs[unit];
@@ -261,7 +254,7 @@ rdopen(dev, flag, fmt, proc)
 	 * The control device is not exclusive, and can
 	 * open uninitialized units (so you can setconf).
 	 */
-	if (RD_IS_CTRL(md))
+	if (RD_IS_CTRL(dev))
 		return 0;
 
 #ifdef	RAMDISK_HOOKS
@@ -287,14 +280,13 @@ rdclose(dev, flag, fmt, proc)
 	int     flag, fmt;
 	struct proc *proc;
 {
-	int md, unit;
+	int unit;
 	struct rd_softc *sc;
 
-	md = minor(dev);
-	unit = RD_UNIT(md);
+	unit = DISKUNIT(dev);
 	sc = ramdisk_devs[unit];
 
-	if (RD_IS_CTRL(md))
+	if (RD_IS_CTRL(dev))
 		return 0;
 
 	/* Normal device. */
@@ -329,13 +321,12 @@ void
 rdstrategy(bp)
 	struct buf *bp;
 {
-	int md, unit;
+	int unit;
 	struct rd_softc *sc;
 	caddr_t addr;
 	size_t  off, xfer;
 
-	md = minor(bp->b_dev);
-	unit = RD_UNIT(md);
+	unit = DISKUNIT(bp->b_dev);
 	sc = ramdisk_devs[unit];
 
 	switch (sc->sc_type) {
@@ -392,15 +383,14 @@ rdioctl(dev, cmd, data, flag, proc)
 	caddr_t	data;
 	struct proc	*proc;
 {
-	int md, unit;
+	int unit;
 	struct rd_softc *sc;
 	struct rd_conf *urd;
 	struct cpu_disklabel clp;
 	struct disklabel lp, *lpp;
 	int error;
 
-	md = minor(dev);
-	unit = RD_UNIT(md);
+	unit = DISKUNIT(dev);
 	sc = ramdisk_devs[unit];
 
 	urd = (struct rd_conf *)data;
@@ -426,7 +416,7 @@ rdioctl(dev, cmd, data, flag, proc)
 		    /*sd->sc_dk.dk_openmask : */0, &clp);
 		if (error == 0) {
 			if (cmd == DIOCWDINFO)
-				error = writedisklabel(RDLABELDEV(dev),
+				error = writedisklabel(DISKLABELDEV(dev),
 				    rdstrategy, &lp, &clp);
 		}
 
@@ -442,7 +432,7 @@ rdioctl(dev, cmd, data, flag, proc)
 
 	case RD_GETCONF:
 		/* If this is not the control device, punt! */
-		if (RD_IS_CTRL(md) == 0) {
+		if (RD_IS_CTRL(dev) == 0) {
 			break;
 		}
 		*urd = sc->sc_rd;
@@ -450,7 +440,7 @@ rdioctl(dev, cmd, data, flag, proc)
 
 	case RD_SETCONF:
 		/* If this is not the control device, punt! */
-		if (RD_IS_CTRL(md) == 0) {
+		if (RD_IS_CTRL(dev) == 0) {
 			break;
 		}
 		/* Can only set it once. */
@@ -515,7 +505,7 @@ rdgetdisklabel(dev, sc)
 	/*
 	 * Call the generic disklabel extraction routine
 	 */
-	errstring = readdisklabel(RDLABELDEV(dev), rdstrategy, &lp, &clp, 0);
+	errstring = readdisklabel(DISKLABELDEV(dev), rdstrategy, &lp, &clp, 0);
 	if (errstring) {
 		/*printf("%s: %s\n", sc->sc_dev.dv_xname, errstring);*/
 		return NULL;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pchb.c,v 1.27 2001/01/22 23:11:21 deraadt Exp $	*/
+/*	$OpenBSD: pchb.c,v 1.29 2002/03/14 01:26:33 millert Exp $	*/
 /*	$NetBSD: pchb.c,v 1.6 1997/06/06 23:29:16 thorpej Exp $	*/
 
 /*
@@ -115,10 +115,10 @@ struct pchb_softc {
 	struct timeout sc_tmo;
 };
 
-int	pchbmatch __P((struct device *, void *, void *));
-void	pchbattach __P((struct device *, struct device *, void *));
+int	pchbmatch(struct device *, void *, void *);
+void	pchbattach(struct device *, struct device *, void *);
 
-int	pchb_print __P((void *, const char *));
+int	pchb_print(void *, const char *);
 
 struct cfattach pchb_ca = {
 	sizeof(struct pchb_softc), pchbmatch, pchbattach
@@ -128,7 +128,7 @@ struct cfdriver pchb_cd = {
 	NULL, "pchb", DV_DULL
 };
 
-void pchb_rnd __P((void *v));
+void pchb_rnd(void *v);
 
 int
 pchbmatch(parent, match, aux)
@@ -289,7 +289,7 @@ pchbattach(parent, self, aux)
 		case PCI_PRODUCT_INTEL_82860_HB:
 			sc->bt = pa->pa_memt;
 			if (bus_space_map(sc->bt, I82802_IOBASE, I82802_IOSIZE,
-			    0, &sc->bh) < 0)
+			    0, &sc->bh))
 				break;
 
 			/* probe and init rng */

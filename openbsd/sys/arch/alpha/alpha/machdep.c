@@ -1,4 +1,4 @@
-/* $OpenBSD: machdep.c,v 1.55 2001/09/30 13:08:45 art Exp $ */
+/* $OpenBSD: machdep.c,v 1.69 2002/03/23 13:28:33 espie Exp $ */
 /* $NetBSD: machdep.c,v 1.210 2000/06/01 17:12:38 thorpej Exp $ */
 
 /*-
@@ -69,7 +69,6 @@
 #include <sys/systm.h>
 #include <sys/signalvar.h>
 #include <sys/kernel.h>
-#include <sys/map.h>
 #include <sys/proc.h>
 #include <sys/sched.h>
 #include <sys/buf.h>
@@ -86,7 +85,7 @@
 #include <sys/user.h>
 #include <sys/exec.h>
 #include <sys/exec_ecoff.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>
 #include <sys/core.h>
 #include <sys/kcore.h>
@@ -126,14 +125,14 @@
 
 #include "le_ioasic.h"			/* for le_iomem creation */
 
-int	cpu_dump __P((void));
-int	cpu_dumpsize __P((void));
-u_long	cpu_dump_mempagecnt __P((void));
-void	dumpsys __P((void));
-caddr_t allocsys __P((caddr_t));
-void	identifycpu __P((void));
-void	regdump __P((struct trapframe *framep));
-void	printregs __P((struct reg *));
+int	cpu_dump(void);
+int	cpu_dumpsize(void);
+u_long	cpu_dump_mempagecnt(void);
+void	dumpsys(void);
+caddr_t allocsys(caddr_t);
+void	identifycpu(void);
+void	regdump(struct trapframe *framep);
+void	printregs(struct reg *);
 
 /*
  * Declare these as initialized data so we can patch them.
@@ -143,15 +142,20 @@ int	nbuf = NBUF;
 #else
 int	nbuf = 0;
 #endif
+
+#ifndef BUFCACHEPERCENT
+#define BUFCACHEPERCENT 10
+#endif
+
 #ifdef	BUFPAGES
 int	bufpages = BUFPAGES;
 #else
 int	bufpages = 0;
 #endif
+int	bufcachepercent = BUFCACHEPERCENT;
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *phys_map = NULL;
 
 int	maxmem;			/* max memory per process */
 
@@ -802,6 +806,9 @@ allocsys(v)
 	    (name) = (type *)v; v = (caddr_t)ALIGN((name)+(num))
 
 #ifdef SYSVSHM
+	shminfo.shmmax = shmmaxpgs;
+	shminfo.shmall = shmmaxpgs;
+	shminfo.shmseg = shmseg;
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
 #ifdef SYSVSEM
@@ -817,16 +824,13 @@ allocsys(v)
 	valloc(msqids, struct msqid_ds, msginfo.msgmni);
 #endif
 
-#ifndef BUFCACHEPERCENT
-#define BUFCACHEPERCENT 10
-#endif
 	/*
 	 * Determine how many buffers to allocate.
 	 * We allocate 10% of memory for buffer space.  Insure a
 	 * minimum of 16 buffers.
 	 */
 	if (bufpages == 0)
-		bufpages = (physmem / (100/BUFCACHEPERCENT));
+		bufpages = (physmem / (100/bufcachepercent));
 	if (nbuf == 0) {
 		nbuf = bufpages;
 		if (nbuf < 16)
@@ -860,7 +864,7 @@ consinit()
 #include <dev/ic/pckbcvar.h>
 
 /*
- * This is called by the pbkbc driver if no pckbd is configured.
+ * This is called by the pckbc driver if no pckbd is configured.
  * On the i386, it is used to glue in the old, deprecated console
  * code.  On the Alpha, it does nothing.
  */
@@ -912,9 +916,9 @@ cpu_startup()
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)))
 		panic("startup: cannot allocate VM for buffers");
 	base = bufpages / nbuf;
 	residual = bufpages % nbuf;
@@ -942,6 +946,7 @@ cpu_startup()
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
+		pmap_update(pmap_kernel());
 	}
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -955,9 +960,6 @@ cpu_startup()
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 				   VM_PHYS_SIZE, 0, FALSE, NULL);
-
-	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-			VM_MBUF_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
 
 #if defined(DEBUG)
 	pmapdebug = opmapdebug;
@@ -1120,11 +1122,7 @@ boot(howto)
 	splhigh();
 
 	/* If rebooting and a dump is requested do it. */
-#if 0
-	if ((howto & (RB_DUMP | RB_HALT)) == RB_DUMP)
-#else
 	if (howto & RB_DUMP)
-#endif
 		dumpsys();
 
 haltsys:
@@ -1206,7 +1204,7 @@ cpu_dump_mempagecnt()
 int
 cpu_dump()
 {
-	int (*dump) __P((dev_t, daddr_t, caddr_t, size_t));
+	int (*dump)(dev_t, daddr_t, caddr_t, size_t);
 	char buf[dbtob(1)];
 	kcore_seg_t *segp;
 	cpu_kcore_hdr_t *cpuhdrp;
@@ -1302,7 +1300,7 @@ dumpsys()
 	u_long maddr;
 	int psize;
 	daddr_t blkno;
-	int (*dump) __P((dev_t, daddr_t, caddr_t, size_t));
+	int (*dump)(dev_t, daddr_t, caddr_t, size_t);
 	int error;
 	extern int msgbufmapped;
 
@@ -1956,8 +1954,8 @@ delay(n)
 }
 
 #if defined(COMPAT_OSF1) || 1		/* XXX */
-void	cpu_exec_ecoff_setregs __P((struct proc *, struct exec_package *,
-	    u_long, register_t *));
+void	cpu_exec_ecoff_setregs(struct proc *, struct exec_package *,
+	    u_long, register_t *);
 
 void
 cpu_exec_ecoff_setregs(p, epp, stack, retval)
@@ -1985,18 +1983,14 @@ cpu_exec_ecoff_hook(p, epp)
 	struct exec_package *epp;
 {
 	struct ecoff_exechdr *execp = (struct ecoff_exechdr *)epp->ep_hdr;
-#ifdef COMPAT_OSF1
-	extern struct emul emul_osf1;
-#endif
 	extern struct emul emul_native;
 	int error;
-	extern int osf1_exec_ecoff_hook(struct proc *p,
-					struct exec_package *epp);
+	extern int osf1_exec_ecoff_hook(struct proc *, struct exec_package *);
 
 	switch (execp->f.f_magic) {
 #ifdef COMPAT_OSF1
 	case ECOFF_MAGIC_ALPHA:
-		epp->ep_emul = &emul_osf1;
+		error = osf1_exec_ecoff_hook(p, epp);
 		break;
 #endif
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: copy.s,v 1.11 2001/06/27 04:39:05 art Exp $	*/
+/*	$OpenBSD: copy.s,v 1.13 2002/01/21 20:35:49 miod Exp $	*/
 /*	$NetBSD: copy.s,v 1.30 1998/03/04 06:39:14 thorpej Exp $	*/
 
 /*-
@@ -261,6 +261,11 @@ Lcisloop:
 	bcc	Lcisloop		| more room, keep going
 Lcistoolong:
 	moveq	#ENAMETOOLONG,d0	| ran out of space
+Lcisnull:
+	cmpl	sp@(8),a1		| do not attempt to clear last byte
+	beq	Lcisdone		| if we faulted on first write
+	subql	#1, a1
+	clrb	a1@+			| clear last byte
 Lcisdone:
 	tstl	sp@(16)			| length desired?
 	beq	Lcisexit
@@ -273,7 +278,7 @@ Lcisexit:
 	rts
 Lcisfault:
 	moveq	#EFAULT,d0
-	bra	Lcisdone
+	bra	Lcisnull
 
 /*
  * copyoutstr(caddr_t from, caddr_t to, size_t maxlen, size_t *lencopied);

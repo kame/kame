@@ -1,4 +1,4 @@
-/*	$OpenBSD: disksubr.c,v 1.1 2001/06/26 21:57:53 smurph Exp $	*/
+/*	$OpenBSD: disksubr.c,v 1.4 2002/03/14 01:26:41 millert Exp $	*/
 /*	$NetBSD: disksubr.c,v 1.21 1996/05/03 19:42:03 christos Exp $	*/
 
 /*
@@ -79,7 +79,7 @@ dk_establish(dk, dev)
 char *
 readdisklabel(dev, strat, lp, osdep, spoofonly)
 	dev_t dev;
-	void (*strat) __P((struct buf *));
+	void (*strat)(struct buf *);
 	register struct disklabel *lp;
 	struct cpu_disklabel *osdep;
 	int spoofonly;
@@ -124,6 +124,8 @@ readdisklabel(dev, strat, lp, osdep, spoofonly)
 		while (wander && n < 8 && loop < 8) {
 		        loop++;
 			wander = 0;
+			if (part_blkno < extoff)
+				part_blkno = extoff;
 
 			/* read boot record */
 			bp->b_blkno = part_blkno;
@@ -229,8 +231,10 @@ donot:
 				case DOSPTYP_EXTEND:
 				case DOSPTYP_EXTENDL:
 					part_blkno = get_le(&dp2->dp_start) + extoff;
-					if (!extoff)
+					if (!extoff) {
 						extoff = get_le(&dp2->dp_start);
+						part_blkno = 0;
+					}
 					wander = 1;
 					break;
 				default:
@@ -337,8 +341,8 @@ setdisklabel(olp, nlp, openmask, osdep)
 	u_long openmask;
 	struct cpu_disklabel *osdep;
 {
-	register i;
-	register struct partition *opp, *npp;
+	int i;
+	struct partition *opp, *npp;
 
 	/* sanity clause */
 	if (nlp->d_secpercyl == 0 || nlp->d_secsize == 0 ||
@@ -391,7 +395,7 @@ setdisklabel(olp, nlp, openmask, osdep)
 int
 writedisklabel(dev, strat, lp, osdep)
 	dev_t dev;
-	void (*strat) __P((struct buf *));
+	void (*strat)(struct buf *);
 	register struct disklabel *lp;
 	struct cpu_disklabel *osdep;
 {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_machdep.h,v 1.13 2001/08/31 01:06:29 miod Exp $ */
+/*	$OpenBSD: db_machdep.h,v 1.21 2002/03/14 03:15:57 millert Exp $ */
 /*
  * Mach Operating System
  * Copyright (c) 1993-1991 Carnegie Mellon University
@@ -36,25 +36,38 @@
 #ifndef  _M88K_DB_MACHDEP_H_
 #define  _M88K_DB_MACHDEP_H_
 
+/* trap numbers used by ddb */
+#define	DDB_ENTRY_BKPT_NO	130
+#define	DDB_ENTRY_TRACE_NO	131
+#define DDB_ENTRY_TRAP_NO	132
+
+#ifndef	_LOCORE
+
 #include <machine/pcb.h>	/* m88100_saved_state */
 #include <machine/psl.h>
 #include <machine/trap.h>
 
-#include <vm/vm_param.h>
+#include <uvm/uvm_param.h>
 
-#define BKPT_SIZE	(4)		/* number of bytes in bkpt inst. */
-#define BKPT_INST	(0xF000D082U)	/* tb0, 0,r0, vector 132 */
+/* 
+ * This is a hack so that mc88100 can use software single step
+ * and mc88110 can use the wonderful hardware single step 
+ * feature. XXX smurph
+ */
+#define INTERNAL_SSTEP		/* Use local Single Step routines */
+
+#define BKPT_SIZE	(4)	/* number of bytes in bkpt inst. */
+#define BKPT_INST	(0xF000D000 | DDB_ENTRY_BKPT_NO) /* tb0, 0,r0, vector 130 */
 #define BKPT_SET(inst)	(BKPT_INST)
 
 /* Entry trap for the debugger - used for inline assembly breaks*/
 #define ENTRY_ASM       	"tb0 0, r0, 132"
-#define DDB_ENTRY_TRAP_NO	132
 
-typedef vm_offset_t   db_addr_t;
-typedef int           db_expr_t;
-typedef struct m88100_saved_state db_regs_t;
-db_regs_t	      ddb_regs;	/* register state */
-#define DDB_REGS      (&ddb_regs)
+typedef	vm_offset_t		db_addr_t;
+typedef	int			db_expr_t;
+typedef	struct m88100_saved_state db_regs_t;
+extern db_regs_t	ddb_regs;	/* register state */
+#define	DDB_REGS	(&ddb_regs)
 
 /*
  * the low two bits of sxip, snip, sfip have valid bits
@@ -65,7 +78,9 @@ db_regs_t	      ddb_regs;	/* register state */
 ({ \
     int ret; \
  \
-    if (regs->sxip & 2) /* is valid */ \
+    if (cputyp == CPU_88110) \
+	ret = regs->exip & ~3; \
+    else if (regs->sxip & 2) /* is valid */ \
 	ret = regs->sxip & ~3; \
     else if (regs->snip & 2) \
 	ret = regs->snip & ~3; \
@@ -79,12 +94,15 @@ db_regs_t	      ddb_regs;	/* register state */
  * This is an actual function due to the fact that the sxip
  * or snip could be nooped out due to a jmp or rte
  */
-#define PC_REGS(regs) ((regs->sxip & 2) ?  regs->sxip & ~3 : \
+#define PC_REGS(regs) cputyp == CPU_88110 ? (regs->exip & ~3) :\
+	((regs->sxip & 2) ?  regs->sxip & ~3 : \
 	(regs->snip & 2 ? regs->snip & ~3 : regs->sfip & ~3))
-#define l_PC_REGS(regs) ((regs->sxip & 2) ?  regs->sxip : \
+#define l_PC_REGS(regs) cputyp == CPU_88110 ? (regs->exip & ~3) :\
+	((regs->sxip & 2) ?  regs->sxip : \
 	(regs->snip & 2 ? regs->snip : regs->sfip ))
 
-#define pC_REGS(regs) (regs->sxip & 2) ? regs->sxip : (regs->snip & 2 ? \
+#define pC_REGS(regs) cputyp == CPU_88110 ? (regs->exip & ~3) :\
+	(regs->sxip & 2) ? regs->sxip : (regs->snip & 2 ? \
 				regs->snip : regs->sfip)
 extern int db_noisy;
 #define NOISY(x) if (db_noisy) x
@@ -98,14 +116,14 @@ extern int quiet_db_read_bytes;
 /*#define	cngetc		db_getc*/
 /*#define	cnputc		db_putc*/
 
-unsigned inst_load __P((unsigned));
-unsigned inst_store __P((unsigned));
-boolean_t inst_branch __P((unsigned));
-db_addr_t next_instr_address __P((db_addr_t, unsigned));
-db_addr_t branch_taken __P((u_int, db_addr_t,
-    db_expr_t (*) __P((db_regs_t *, int)), db_regs_t *));
-int ddb_break_trap __P((int type, db_regs_t *eframe));
-int ddb_entry_trap __P((int level, db_regs_t *eframe));
+unsigned inst_load(unsigned);
+unsigned inst_store(unsigned);
+boolean_t inst_branch(unsigned);
+db_addr_t next_instr_address(db_addr_t, unsigned);
+db_addr_t branch_taken(u_int, db_addr_t, db_expr_t (*)(db_regs_t *, int),
+		       db_regs_t *);
+int ddb_break_trap(int type, db_regs_t *eframe);
+int ddb_entry_trap(int level, db_regs_t *eframe);
 
 /* breakpoint/watchpoint foo */
 #define IS_BREAKPOINT_TRAP(type,code) ((type)==T_KDB_BREAK)
@@ -118,8 +136,14 @@ int ddb_entry_trap __P((int level, db_regs_t *eframe));
 /* we don't want coff support */
 #define DB_NO_COFF 1
 
+#ifdef INTERNAL_SSTEP
+extern register_t getreg_val(db_regs_t *, int);
+void db_set_single_step(register db_regs_t *);
+void db_clear_single_step(register db_regs_t *);
+#else
 /* need software single step */
-#define SOFTWARE_SSTEP 1 /* we need this XXX nivas */
+#define SOFTWARE_SSTEP 1 /* we need this for mc88100 */
+#endif 
 
 /*
  * Debugger can get to any address space
@@ -127,7 +151,7 @@ int ddb_entry_trap __P((int level, db_regs_t *eframe));
 
 #define DB_ACCESS_LEVEL DB_ACCESS_ANY
 
-#define DB_VALID_KERN_ADDR(addr) (!badaddr((void*)(addr), 1))
+#define DB_VALID_KERN_ADDR(addr) (!badaddr((void *)(addr), 1))
 #define DB_VALID_ADDRESS(addr,user) \
   (user ? db_check_user_addr(addr) : DB_VALID_KERN_ADDR(addr))
 
@@ -175,6 +199,8 @@ int ddb_entry_trap __P((int level, db_regs_t *eframe));
 
 #define	db_printf_enter	db_printing
 
-int m88k_print_instruction __P((unsigned iadr, long inst));
+int m88k_print_instruction(unsigned iadr, long inst);
+
+#endif	/* _LOCORE */
 
 #endif	/* _M88K_DB_MACHDEP_H_ */

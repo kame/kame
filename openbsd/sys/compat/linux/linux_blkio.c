@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_blkio.c,v 1.1 2001/04/09 06:53:44 tholo Exp $	*/
+/*	$OpenBSD: linux_blkio.c,v 1.5 2002/03/14 01:26:50 millert Exp $	*/
 /*	$NetBSD: linux_blkio.c,v 1.3 2001/01/18 17:48:04 tv Exp $	*/
 
 /*
@@ -64,23 +64,14 @@ linux_ioctl_blkio(struct proc *p, struct linux_sys_ioctl_args *uap,
 	int error;
 	struct filedesc *fdp;
 	struct file *fp;
-	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *));
+	int (*ioctlf)(struct file *, u_long, caddr_t, struct proc *);
 	struct partinfo partp;
 	struct disklabel label;
 
         fdp = p->p_fd;
-#if 1
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
-#else
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0)
-		return (EBADF);
-
-	FILE_USE(fp);
-#endif
+	FREF(fp);
 	error = 0;
 	ioctlf = fp->f_ops->fo_ioctl;
 	com = SCARG(uap, com);
@@ -125,9 +116,6 @@ linux_ioctl_blkio(struct proc *p, struct linux_sys_ioctl_args *uap,
 		error = ENOTTY;
 	}
 
-#ifdef notyet
-	FILE_UNUSE(fp, p);
-#endif
-
+	FRELE(fp);
 	return error;
 }

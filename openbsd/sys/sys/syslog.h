@@ -1,4 +1,4 @@
-/*	$OpenBSD: syslog.h,v 1.5 1998/02/10 18:41:57 deraadt Exp $	*/
+/*	$OpenBSD: syslog.h,v 1.7 2002/03/14 01:27:14 millert Exp $	*/
 /*	$NetBSD: syslog.h,v 1.14 1996/04/03 20:46:44 christos Exp $	*/
 
 /*
@@ -35,6 +35,9 @@
  *
  *	@(#)syslog.h	8.1 (Berkeley) 6/2/93
  */
+
+#ifndef _SYS_SYSLOG_H_
+#define _SYS_SYSLOG_H_
 
 #define	_PATH_LOG	"/dev/log"
 
@@ -144,6 +147,20 @@ CODE facilitynames[] = {
 };
 #endif
 
+/* Used by reentrant functions */
+
+struct syslog_data {
+	int	log_file;
+	int	connected;
+	int	opened;
+	int	log_stat;
+	const char 	*log_tag;
+	int 	log_fac;
+	int 	log_mask;
+};
+
+#define SYSLOG_DATA_INIT {-1, 0, 0, 0, NULL, LOG_USER, 0xff}
+
 #ifdef _KERNEL
 #define	LOG_PRINTF	-1	/* pseudo-priority to indicate use of printf */
 #endif
@@ -180,21 +197,30 @@ CODE facilitynames[] = {
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-void	closelog __P((void));
-void	openlog __P((const char *, int, int));
-int	setlogmask __P((int));
-void	syslog __P((int, const char *, ...))
+void	closelog(void);
+void	openlog(const char *, int, int);
+int	setlogmask(int);
+void	syslog(int, const char *, ...)
     __attribute__((__format__(__printf__,2,3)));
-void	vsyslog __P((int, const char *, _BSD_VA_LIST_));
+void	vsyslog(int, const char *, _BSD_VA_LIST_);
+void	closelog_r(struct syslog_data *);
+void	openlog_r(const char *, int, int, struct syslog_data *);
+int	setlogmask_r(int, struct syslog_data *);
+void	syslog_r(int, struct syslog_data *, const char *, ...)
+     __attribute__((__format__(__printf__,3,4)));
+void	vsyslog_r(int, struct syslog_data *, const char *, 
+     _BSD_VA_LIST_);
 __END_DECLS
 
 #else /* !_KERNEL */
 
-void	logpri __P((int));
-void	log __P((int, const char *, ...))
+void	logpri(int);
+void	log(int, const char *, ...)
     __kprintf_attribute__((__format__(__kprintf__,2,3)));
-int	addlog __P((const char *, ...))
+int	addlog(const char *, ...)
     __kprintf_attribute__((__format__(__kprintf__,1,2)));
-void	logwakeup __P((void));
+void	logwakeup(void);
 
 #endif /* !_KERNEL */
+#endif /* !_SYS_SYSLOG_H_ */
+

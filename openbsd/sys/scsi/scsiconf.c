@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsiconf.c,v 1.62 2001/10/08 01:50:48 drahn Exp $	*/
+/*	$OpenBSD: scsiconf.c,v 1.67 2002/03/14 01:27:13 millert Exp $	*/
 /*	$NetBSD: scsiconf.c,v 1.57 1996/05/02 01:09:01 neil Exp $	*/
 
 /*
@@ -74,8 +74,8 @@
 /*
  * Declarations
  */
-void scsi_probedev __P((struct scsibus_softc *, int, int));
-int scsi_probe_bus __P((int bus, int target, int lun));
+void scsi_probedev(struct scsibus_softc *, int, int);
+int scsi_probe_bus(int bus, int target, int lun);
 
 struct scsi_device probe_switch = {
 	NULL,
@@ -84,13 +84,13 @@ struct scsi_device probe_switch = {
 	NULL,
 };
 
-int scsibusmatch __P((struct device *, void *, void *));
-void scsibusattach __P((struct device *, struct device *, void *));
-int  scsibusactivate __P((struct device *, enum devact));
-int  scsibusdetach __P((struct device *, int));
-void scsibuszeroref __P((struct device *));
+int scsibusmatch(struct device *, void *, void *);
+void scsibusattach(struct device *, struct device *, void *);
+int  scsibusactivate(struct device *, enum devact);
+int  scsibusdetach(struct device *, int);
+void scsibuszeroref(struct device *);
 
-int scsibussubmatch __P((struct device *, void *, void *));
+int scsibussubmatch(struct device *, void *, void *);
 
 
 
@@ -109,7 +109,7 @@ int scsidebug_level = SCSIDEBUG_LEVEL;
 
 int scsi_autoconf = SCSI_AUTOCONF;
 
-int scsibusprint __P((void *, const char *));
+int scsibusprint(void *, const char *);
 
 int
 scsiprint(aux, pnp)
@@ -325,28 +325,48 @@ scsi_strvis(dst, src, len)
 	u_char *dst, *src;
 	int len;
 {
+	u_char last;
 
-	/* Trim leading and trailing blanks and NULs. */
-	while (len > 0 && (src[0] == ' ' || src[0] == '\0' || src[0] == 0xff))
+	/* Trim leading and trailing whitespace and NULs. */
+	while (len > 0 && (src[0] == ' ' || src[0] == '\t' || src[0] == '\n' ||
+	    src[0] == '\0' || src[0] == 0xff))
 		++src, --len;
-	while (len > 0 && (src[len-1] == ' ' || src[len-1] == '\0' ||
-	    src[len-1] == 0xff))
+	while (len > 0 && (src[len-1] == ' ' || src[len-1] == '\t' || 
+	    src[len-1] == '\n' || src[len-1] == '\0' || src[len-1] == 0xff))
 		--len;
 
+	last = 0xff;
 	while (len > 0) {
-		if (*src < 0x20 || *src >= 0x80) {
-			/* non-printable characters */
-			*dst++ = '\\';
-			*dst++ = ((*src & 0300) >> 6) + '0';
-			*dst++ = ((*src & 0070) >> 3) + '0';
-			*dst++ = ((*src & 0007) >> 0) + '0';
-		} else if (*src == '\\') {
+		switch (*src) {
+		case ' ':
+		case '\t':
+		case '\n':
+		case '\0':
+		case 0xff:
+			/* collapse whitespace and NULs to a single space */
+			if (last != ' ')
+				*dst++ = ' ';
+			last = ' ';
+			break;
+		case '\\':
 			/* quote characters */
 			*dst++ = '\\';
 			*dst++ = '\\';
-		} else {
-			/* normal characters */
-			*dst++ = *src;
+			last = '\\';
+			break;
+		default:
+			if (*src < 0x20 || *src >= 0x80) {
+				/* non-printable characters */
+				*dst++ = '\\';
+				*dst++ = ((*src & 0300) >> 6) + '0';
+				*dst++ = ((*src & 0070) >> 3) + '0';
+				*dst++ = ((*src & 0007) >> 0) + '0';
+			} else {
+				/* normal characters */
+				*dst++ = *src;
+			}
+			last = *src;
+			break;
 		}
 		++src, --len;
 	}
@@ -526,6 +546,10 @@ struct scsi_quirk_inquiry_pattern scsi_quirk_patterns[] = {
          "MICROP", "4421-07",		 ""},     SDEV_NOTAGS},
         {{T_DIRECT, T_FIXED,
          "SEAGATE", "ST150176LW",        "0002"}, SDEV_NOTAGS},
+        {{T_DIRECT, T_FIXED,
+         "HP", "C3725S",		 ""},     SDEV_NOTAGS},
+        {{T_DIRECT, T_FIXED,
+         "IBM", "DCAS",			 ""},     SDEV_NOTAGS},
 
 	/* XXX: QIC-36 tape behind Emulex adapter.  Very broken. */
 	{{T_SEQUENTIAL, T_REMOV,
@@ -758,6 +782,15 @@ scsi_probedev(scsi, target, lun)
 	sc_link->inquiry_flags2 = 0;
 
 	/*
+	 * Tell drivers that are paying attention to avoid
+	 * sync/wide/tags until INQUIRY data and quirks information
+	 * are available. Since bits in quirks may have already been
+	 * set by some drivers (e.g. NOLUNS for atapiscsi), just add
+	 * NOTAGS, NOWIDE and NOSYNC.
+	 */
+	sc_link->quirks |= SDEV_NOSYNC | SDEV_NOWIDE | SDEV_NOTAGS;
+
+	/*
 	 * Ask the device what it is
 	 */
 #ifdef SCSIDEBUG
@@ -804,15 +837,15 @@ scsi_probedev(scsi, target, lun)
 
 	/*
 	 * Based upon the inquiry flags we got back, and if we're
-	 * at SCSI-2 or better, set some limiting quirks.
+	 * at SCSI-2 or better, remove some limiting quirks.
 	 */
 	if ((inqbuf.version & SID_ANSII) >= 2) {
-		if ((inqbuf.flags & SID_CmdQue) == 0)
-			sc_link->quirks |= SDEV_NOTAGS;
-		if ((inqbuf.flags & SID_Sync) == 0) 
-			sc_link->quirks |= SDEV_NOSYNC;
-		if ((inqbuf.flags & SID_WBus16) == 0)
-			sc_link->quirks |= SDEV_NOWIDE;
+		if ((inqbuf.flags & SID_CmdQue) != 0)
+			sc_link->quirks &= ~SDEV_NOTAGS;
+		if ((inqbuf.flags & SID_Sync) != 0) 
+			sc_link->quirks &= ~SDEV_NOSYNC;
+		if ((inqbuf.flags & SID_WBus16) != 0)
+			sc_link->quirks &= ~SDEV_NOWIDE;
 	}
 	/*
 	 * Now apply any quirks from the table.
@@ -880,14 +913,25 @@ scsi_probedev(scsi, target, lun)
 	sa.sa_sc_link = sc_link;
 	sa.sa_inqbuf = &inqbuf;
 
-	if ((cf = config_search(scsibussubmatch, (struct device *)scsi, &sa)) != 0) {
-		scsi->sc_link[target][lun] = sc_link;
-		config_attach((struct device *)scsi, cf, &sa, scsibusprint);
-	} else {
+	if ((cf = config_search(scsibussubmatch, (struct device *)scsi, &sa)) == 0) {
 		scsibusprint(&sa, scsi->sc_dev.dv_xname);
 		printf(" not configured\n");
 		goto bad;
 	}
+
+	scsi->sc_link[target][lun] = sc_link;
+
+	/* 
+	 * Generate another TEST_UNIT_READY command. This gives
+	 * drivers waiting for valid quirks data a chance to set
+	 * wide/sync/tag options appropriately. Do this now so that
+	 * any messages generated by config_attach() do not have
+	 * negotiation messages inserted into their midst.
+	 */
+	(void) scsi_test_unit_ready(sc_link,
+	    scsi_autoconf | SCSI_IGNORE_ILLEGAL_REQUEST | SCSI_IGNORE_NOT_READY | SCSI_IGNORE_MEDIA_CHANGE);
+
+	config_attach((struct device *)scsi, cf, &sa, scsibusprint);
 
 	return;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.12 2001/09/23 02:52:27 miod Exp $ */
+/*	$OpenBSD: cpu.h,v 1.18 2002/03/14 01:26:39 millert Exp $ */
 /*
  * Copyright (c) 1996 Nivas Madhur
  * Copyright (c) 1992, 1993
@@ -66,8 +66,6 @@
  * definitions of cpu-dependent requirements
  * referenced in generic code
  */
-#define	COPY_SIGCODE		/* copy sigcode above user stack in exec */
-
 #define	cpu_exec(p)	/* nothing */
 #define	cpu_wait(p)	/* nothing */
 #define	cpu_swapout(p)	/* nothing */
@@ -152,14 +150,14 @@ extern int	want_resched;		/* resched() was called */
 #define	signotify(p)		(want_ast = 1)
 
 struct intrhand {
-	int	(*ih_fn) __P((void *));
+	int	(*ih_fn)(void *);
 	void	*ih_arg;
 	int	ih_ipl;
 	int	ih_wantframe;
 	struct	intrhand *ih_next;
 };
 
-int	intr_establish __P((int vec, struct intrhand *));
+int	intr_establish(int vec, struct intrhand *);
 
 /*
  * return values for intr_establish()
@@ -186,21 +184,23 @@ struct switchframe {
 	void	*sf_proc;		/* proc pointer */
 };
 
-/* This struct defines the machine dependant function pointers */
-
-struct funcp {
-	void (*clock_init_func) __P((void));      /* interval clock init function */
-	void (*statclock_init_func) __P((void));  /* statistics clock init function */
-	void (*delayclock_init_func) __P((void)); /* delay clock init function */
-	void (*delay_func) __P((void));           /* delay clock function */
-   void (*interrupt_func) __P((u_int, struct m88100_saved_state *));       /* interrupt func */
-   void (*fp_precise_func) __P((void));      /* floating point precise function */
+/* This struct defines the machine dependant pointers */
+struct md_p {
+	void (*clock_init_func)(void);      /* interval clock init function */
+	void (*statclock_init_func)(void);  /* statistics clock init function */
+	void (*delayclock_init_func)(void); /* delay clock init function */
+	void (*delay_func)(void);           /* delay clock function */
+	void (*interrupt_func)(u_int, struct m88100_saved_state *);       /* interrupt func */
+	u_char *volatile intr_mask;
+	u_char *volatile intr_ipl;
+	u_char *volatile intr_src;
 };
 
-extern struct funcp mdfp;
+extern struct md_p md;
 
-int badvaddr __P((vm_offset_t va, int size));
-void nmihand __P((void *framep));
+
+int badvaddr(vm_offset_t va, int size);
+void nmihand(void *framep);
 
 #endif /* _KERNEL */
 #endif /* __MACHINE_CPU_H__ */

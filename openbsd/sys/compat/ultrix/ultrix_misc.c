@@ -1,4 +1,4 @@
-/*	$OpenBSD: ultrix_misc.c,v 1.19 2001/07/27 21:29:53 miod Exp $	*/
+/*	$OpenBSD: ultrix_misc.c,v 1.26 2002/03/14 20:31:31 mickey Exp $	*/
 /*	$NetBSD: ultrix_misc.c,v 1.23 1996/04/07 17:23:04 jonathan Exp $	*/
 
 /*
@@ -123,7 +123,7 @@
 #include <nfs/nfsproto.h>
 #include <nfs/nfs.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <sys/conf.h>					/* iszerodev() */
 #include <sys/socketvar.h>				/* sosetopt() */
@@ -145,8 +145,8 @@ extern char *ultrix_syscallnames[];
 #endif /* __vax__ */
 
 
-extern void ULTRIX_EXEC_SETREGS __P((struct proc *, struct exec_package *,
-					u_long, register_t *));
+extern void ULTRIX_EXEC_SETREGS(struct proc *, struct exec_package *,
+					u_long, register_t *);
 extern char sigcode[], esigcode[];
 
 struct emul emul_ultrix = {
@@ -279,7 +279,7 @@ ultrix_sys_select(p, v, retval)
 #endif
 
 	}
-	error = sys_select(p, (void*) uap, retval);
+	error = sys_select(p, (void *) uap, retval);
 	if (error == EINVAL)
 		printf("ultrix select: bad args?\n");
 
@@ -308,15 +308,12 @@ async_daemon(p, v, retval)
 
 int
 ultrix_sys_mmap(p, v, retval)
-	register struct proc *p;
+	struct proc *p;
 	void *v;
 	register_t *retval;
 {
-	register struct ultrix_sys_mmap_args *uap = v;
+	struct ultrix_sys_mmap_args *uap = v;
 	struct sys_mmap_args ouap;
-	register struct filedesc *fdp;
-	register struct file *fp;
-	register struct vnode *vp;
 
 	/*
 	 * Verify the arguments.
@@ -340,19 +337,6 @@ ultrix_sys_mmap(p, v, retval)
 	SCARG(&ouap, fd) = SCARG(uap, fd);
 	SCARG(&ouap, pos) = SCARG(uap, pos);
 
-	/*
-	 * Special case: if fd refers to /dev/zero, map as MAP_ANON.  (XXX)
-	 */
-	fdp = p->p_fd;
-	if ((unsigned)SCARG(&ouap, fd) < fdp->fd_nfiles &&		/*XXX*/
-	    (fp = fdp->fd_ofiles[SCARG(&ouap, fd)]) != NULL &&		/*XXX*/
-	    fp->f_type == DTYPE_VNODE &&				/*XXX*/
-	    (vp = (struct vnode *)fp->f_data)->v_type == VCHR &&	/*XXX*/
-	    iszerodev(vp->v_rdev)) {					/*XXX*/
-		SCARG(&ouap, flags) |= MAP_ANON;
-		SCARG(&ouap, fd) = -1;
-	}
-
 	return (sys_mmap(p, &ouap, retval));
 }
 
@@ -369,27 +353,35 @@ ultrix_sys_setsockopt(p, v, retval)
 
 	if ((error = getsock(p->p_fd, SCARG(uap, s), &fp))  != 0)
 		return (error);
+	FREF(fp);
 #define	SO_DONTLINGER (~SO_LINGER)
 	if (SCARG(uap, name) == SO_DONTLINGER) {
 		m = m_get(M_WAIT, MT_SOOPTS);
 		mtod(m, struct linger *)->l_onoff = 0;
 		m->m_len = sizeof(struct linger);
-		return (sosetopt((struct socket *)fp->f_data, SCARG(uap, level),
+		error = (sosetopt((struct socket *)fp->f_data, SCARG(uap, level),
 		    SO_LINGER, m));
+		FRELE(fp);
+		return (error);
 	}
-	if (SCARG(uap, valsize) > MLEN)
+	if (SCARG(uap, valsize) > MLEN) {
+		FRELE(fp);
 		return (EINVAL);
+	}
 	if (SCARG(uap, val)) {
 		m = m_get(M_WAIT, MT_SOOPTS);
 		if ((error = copyin(SCARG(uap, val), mtod(m, caddr_t),
 				    (u_int)SCARG(uap, valsize))) != 0) {
+			FRELE(fp);
 			(void) m_free(m);
 			return (error);
 		}
 		m->m_len = SCARG(uap, valsize);
 	}
-	return (sosetopt((struct socket *)fp->f_data, SCARG(uap, level),
+	error = (sosetopt((struct socket *)fp->f_data, SCARG(uap, level),
 	    SCARG(uap, name), m));
+	FRELE(fp);
+	return (error);
 }
 
 struct ultrix_utsname {
@@ -409,7 +401,7 @@ ultrix_sys_uname(p, v, retval)
 {
 	struct ultrix_sys_uname_args *uap = v;
 	struct ultrix_utsname sut;
-	extern char ostype[], machine[], osrelease[];
+	extern char machine[];
 
 	bzero(&sut, sizeof(sut));
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: procfs_subr.c,v 1.13 2001/04/09 07:14:23 tholo Exp $	*/
+/*	$OpenBSD: procfs_subr.c,v 1.17 2002/03/14 00:42:25 miod Exp $	*/
 /*	$NetBSD: procfs_subr.c,v 1.15 1996/02/12 15:01:42 christos Exp $	*/
 
 /*
@@ -52,7 +52,7 @@
 #include <miscfs/procfs/procfs.h>
 
 static TAILQ_HEAD(, pfsnode)	pfshead;
-static int pfsvplock;
+struct lock pfs_vlock;
 
 /*ARGSUSED*/
 int
@@ -60,6 +60,7 @@ procfs_init(vfsp)
 	struct vfsconf *vfsp;
 
 {
+	lockinit(&pfs_vlock, PVFS, "procfsl", 0, 0);
 	TAILQ_INIT(&pfshead);
 	return (0);
 }
@@ -116,15 +117,9 @@ loop:
 	}
 
 	/*
-	 * otherwise lock the vp list while we call getnewvnode
-	 * since that can block.
+	 * Lock the vp list, getnewvnode can sleep.
 	 */
-	if (pfsvplock & PROCFS_LOCKED) {
-		pfsvplock |= PROCFS_WANT;
-		sleep((caddr_t) &pfsvplock, PINOD);
-		goto loop;
-	}
-	pfsvplock |= PROCFS_LOCKED;
+	lockmgr(&pfs_vlock, LK_EXCLUSIVE, NULL, p);
 
 	if ((error = getnewvnode(VT_PROCFS, mp, procfs_vnodeop_p, vpp)) != 0)
 		goto out;
@@ -186,14 +181,9 @@ loop:
 
 	/* add to procfs vnode list */
 	TAILQ_INSERT_TAIL(&pfshead, pfs, list);
-
+	uvm_vnp_setsize(vp, 0);
 out:
-	pfsvplock &= ~PROCFS_LOCKED;
-
-	if (pfsvplock & PROCFS_WANT) {
-		pfsvplock &= ~PROCFS_WANT;
-		wakeup((caddr_t) &pfsvplock);
-	}
+	lockmgr(&pfs_vlock, LK_RELEASE, NULL, p);
 
 	return (error);
 }
@@ -221,7 +211,7 @@ procfs_rw(v)
 	struct pfsnode *pfs = VTOPFS(vp);
 	struct proc *p;
 
-	p = PFIND(pfs->pfs_pid);
+	p = pfind(pfs->pfs_pid);
 	if (p == 0)
 		return (EINVAL);
 	/* Do not permit games to be played with init(8) */
@@ -233,11 +223,13 @@ procfs_rw(v)
 	case Pnotepg:
 		return (procfs_donote(curp, p, pfs, uio));
 
+#ifdef PTRACE
 	case Pregs:
 		return (procfs_doregs(curp, p, pfs, uio));
 
 	case Pfpregs:
 		return (procfs_dofpregs(curp, p, pfs, uio));
+#endif
 
 	case Pctl:
 		return (procfs_doctl(curp, p, pfs, uio));

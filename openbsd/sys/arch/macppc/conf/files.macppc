@@ -1,4 +1,4 @@
-#	$OpenBSD: files.macppc,v 1.4 2001/10/03 14:45:37 drahn Exp $
+#	$OpenBSD: files.macppc,v 1.6 2002/03/23 14:14:25 deraadt Exp $
 
 #
 # macppc-specific configuration info
@@ -26,7 +26,7 @@ file	arch/macppc/macppc/db_trace.c			ddb
 file	arch/macppc/macppc/ofwreal.S
 
 #
-# Media Indepedent Interface (mii)
+# Media Independent Interface (mii)
 #
 include "../../../dev/mii/files.mii"
 
@@ -242,3 +242,10 @@ include "dev/pcmcia/files.pcmcia"
 # Machine-independent USB drivers
 #
 include "dev/usb/files.usb"
+
+# Sun HME Ethernet controllers
+device  hme: ether, ifnet, mii, ifmedia
+file    dev/ic/hme.c                   
+
+attach	hme at pci with hme_pci
+file	dev/pci/if_hme_pci.c		hme_pci

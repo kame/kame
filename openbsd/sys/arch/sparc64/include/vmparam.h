@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmparam.h,v 1.3 2001/08/20 20:23:52 jason Exp $	*/
+/*	$OpenBSD: vmparam.h,v 1.8 2002/03/14 01:26:45 millert Exp $	*/
 /*	$NetBSD: vmparam.h,v 1.18 2001/05/01 02:19:19 thorpej Exp $ */
 
 /*
@@ -85,7 +85,7 @@
 #define	DFLDSIZ		(128L*1024*1024)	/* initial data size limit */
 #endif
 #ifndef MAXDSIZ
-#define	MAXDSIZ		(1L<<39)		/* max data size */
+#define	MAXDSIZ		(512L*1024*1024*1024)	/* max data size */
 #endif
 #ifndef	DFLSSIZ
 #define	DFLSSIZ		(1024*1024)		/* initial stack size limit */
@@ -152,9 +152,6 @@
 #define VM_MIN_KERNEL_ADDRESS	((vaddr_t)KERNBASE)
 #define VM_MAX_KERNEL_ADDRESS	((vaddr_t)KERNEND)
 
-#define VM_MBUF_SIZE		(NMBCLUSTERS*MCLBYTES)
-#define VM_KMEM_SIZE		(NKMEMCLUSTERS*PAGE_SIZE)
-
 #define VM_PHYSSEG_MAX          32       /* up to 32 segments */
 #define VM_PHYSSEG_STRAT        VM_PSTRAT_BSEARCH
 #define VM_PHYSSEG_NOADD                /* can't add RAM after vm_mem_init */
@@ -168,13 +165,14 @@
  * pmap specific data stored in the vm_physmem[] array
  */
 
+#define __HAVE_PMAP_PHYSSEG
 struct pmap_physseg {
 	struct pv_entry *pvent;
 };
 
 #if defined (_KERNEL) && !defined(_LOCORE)
 struct vm_map;
-vaddr_t		dvma_mapin __P((struct vm_map *, vaddr_t, int, int));
-void		dvma_mapout __P((vaddr_t, vaddr_t, int));
+vaddr_t		dvma_mapin(struct vm_map *, vaddr_t, int, int);
+void		dvma_mapout(vaddr_t, vaddr_t, int);
 #endif
 #endif

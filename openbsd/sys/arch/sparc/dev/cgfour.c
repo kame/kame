@@ -1,4 +1,4 @@
-/*	$OpenBSD: cgfour.c,v 1.10 2001/08/17 13:52:28 mickey Exp $	*/
+/*	$OpenBSD: cgfour.c,v 1.13 2002/03/14 01:26:42 millert Exp $	*/
 /*	$NetBSD: cgfour.c,v 1.13 1997/05/24 20:16:06 pk Exp $	*/
 
 /*
@@ -69,7 +69,7 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/fbio.h>
 #include <machine/autoconf.h>
@@ -93,10 +93,10 @@ struct cgfour_softc {
 };
 
 /* autoconfiguration driver */
-static void	cgfourattach __P((struct device *, struct device *, void *));
-static int	cgfourmatch __P((struct device *, void *, void *));
+static void	cgfourattach(struct device *, struct device *, void *);
+static int	cgfourmatch(struct device *, void *, void *);
 #if defined(SUN4)
-static void	cgfourunblank __P((struct device *));
+static void	cgfourunblank(struct device *);
 #endif
 
 struct cfattach cgfour_ca = {
@@ -116,9 +116,9 @@ static struct fbdriver cgfourfbdriver = {
 extern int fbnode;
 extern struct tty *fbconstty;
 
-static void cgfourloadcmap __P((struct cgfour_softc *, int, int));
-static int cgfour_get_video __P((struct cgfour_softc *));
-static void cgfour_set_video __P((struct cgfour_softc *, int));
+static void cgfourloadcmap(struct cgfour_softc *, int, int);
+static int cgfour_get_video(struct cgfour_softc *);
+static void cgfour_set_video(struct cgfour_softc *, int);
 #endif
 
 /*
@@ -381,10 +381,11 @@ cgfourioctl(dev, cmd, data, flags, p)
  * As well, mapping at an offset of 0x04000000 causes the cg4 to map
  * only it's colour plane, at 0.
  */
-int
+paddr_t
 cgfourmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	register struct cgfour_softc *sc = cgfour_cd.cd_devs[minor(dev)];
 	int poff;

@@ -1,4 +1,4 @@
-/* $OpenBSD: wsmouse.c,v 1.7 2001/10/04 19:37:52 mickey Exp $ */
+/* $OpenBSD: wsmouse.c,v 1.9 2002/03/27 18:54:09 jbm Exp $ */
 /* $NetBSD: wsmouse.c,v 1.12 2000/05/01 07:36:58 takemura Exp $ */
 
 /*
@@ -139,17 +139,17 @@ struct wsmouse_softc {
 #endif
 };
 
-int	wsmouse_match __P((struct device *, void *, void *));
-void	wsmouse_attach __P((struct device *, struct device *, void *));
-int	wsmouse_detach __P((struct device *, int));
-int	wsmouse_activate __P((struct device *, enum devact));
+int	wsmouse_match(struct device *, void *, void *);
+void	wsmouse_attach(struct device *, struct device *, void *);
+int	wsmouse_detach(struct device *, int);
+int	wsmouse_activate(struct device *, enum devact);
 
-int	wsmouse_do_ioctl __P((struct wsmouse_softc *, u_long, caddr_t, 
-			      int, struct proc *));
+int	wsmouse_do_ioctl(struct wsmouse_softc *, u_long, caddr_t, 
+			      int, struct proc *);
 
-int	wsmousedoclose __P((struct device *, int, int, struct proc *));
-int	wsmousedoioctl __P((struct device *, u_long, caddr_t, int, 
-			    struct proc *));
+int	wsmousedoclose(struct device *, int, int, struct proc *);
+int	wsmousedoioctl(struct device *, u_long, caddr_t, int, 
+			    struct proc *);
 
 struct cfdriver wsmouse_cd = {
 	NULL, "wsmouse", DV_TTY
@@ -435,6 +435,16 @@ wsmouse_input(wsmousedev, btns, x, y, z, flags)
 		ADVANCE;
 		ub ^= d;
 	}
+
+	/* XXX fake wscons_event notifying wsmoused(8) to close mouse device */
+	if (flags & WSMOUSE_INPUT_WSMOUSED_CLOSE) {
+			NEXT;
+			ev->type = WSCONS_EVENT_WSMOUSED_CLOSE;
+			ev->value = 0;
+			TIMESTAMP;
+			ADVANCE;
+	}
+
 out:
 	if (any) {
 		sc->sc_ub = ub;

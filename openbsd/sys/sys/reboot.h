@@ -1,4 +1,4 @@
-/*	$OpenBSD: reboot.h,v 1.9 1998/03/18 12:10:14 pefo Exp $	*/
+/*	$OpenBSD: reboot.h,v 1.11 2002/03/14 01:27:14 millert Exp $	*/
 /*	$NetBSD: reboot.h,v 1.9 1996/04/22 01:23:25 christos Exp $	*/
 
 /*
@@ -93,14 +93,13 @@
 	((controller) << B_CONTROLLERSHIFT) | ((unit) << B_UNITSHIFT) | \
 	((partition) << B_PARTITIONSHIFT) | B_DEVMAGIC)
 
-#if	defined(_KERNEL) && !defined(_STANDALONE)
+#if	defined(_KERNEL) && !defined(_STANDALONE) && !defined(_LOCORE)
 
 __BEGIN_DECLS
 
-void	boot __P((int))
+void	boot(int)
     __attribute__((__noreturn__));
 
 __END_DECLS
 
 #endif /* _KERNEL */
-

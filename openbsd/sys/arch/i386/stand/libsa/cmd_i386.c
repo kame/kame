@@ -1,4 +1,4 @@
-/*	$OpenBSD: cmd_i386.c,v 1.22 1999/08/25 00:54:19 mickey Exp $	*/
+/*	$OpenBSD: cmd_i386.c,v 1.24 2002/03/14 03:15:54 millert Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Michael Shalayeff
@@ -46,13 +46,13 @@
 
 extern const char version[];
 
-int Xboot __P((void));
-int Xdiskinfo __P((void));
-int Xmemory __P((void));
-int Xregs __P((void));
+int Xboot(void);
+int Xdiskinfo(void);
+int Xmemory(void);
+int Xregs(void);
 
 /* From gidt.S */
-int bootbuf __P((void*, int));
+int bootbuf(void *, int);
 
 const struct cmd_table cmd_machine[] = {
 	{ "boot",     CMDT_CMD, Xboot },
@@ -87,7 +87,7 @@ Xboot()
 {
 #ifndef _TEST
 	int dev, part, st;
-	char buf[DEV_BSIZE], *dest = (void*)BOOTBIOS_ADDR;
+	char buf[DEV_BSIZE], *dest = (void *)BOOTBIOS_ADDR;
 
 	if(cmd.argc != 2) {
 		printf("machine boot {fd,hd}<0123>[abcd]\n");

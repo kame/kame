@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_subr.c,v 1.68 2001/10/02 17:21:02 csapuntz Exp $	*/
+/*	$OpenBSD: vfs_subr.c,v 1.83 2002/03/14 01:27:06 millert Exp $	*/
 /*	$NetBSD: vfs_subr.c,v 1.53 1996/04/22 01:39:13 christos Exp $	*/
 
 /*
@@ -64,12 +64,10 @@
 #include <sys/syscallargs.h>
 #include <sys/pool.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>
 
 #include <miscfs/specfs/specdev.h>
-
-#include <uvm/uvm_extern.h>
 
 enum vtype iftovt_tab[16] = {
 	VNON, VFIFO, VCHR, VNON, VDIR, VNON, VBLK, VNON,
@@ -103,19 +101,21 @@ struct simplelock mntvnode_slock;
 struct simplelock vnode_free_list_slock;
 struct simplelock spechash_slock;
 
-void	vclean __P((struct vnode *, int, struct proc *));
+void	vclean(struct vnode *, int, struct proc *);
 
-void insmntque __P((struct vnode *, struct mount *));
-int getdevvp __P((dev_t, struct vnode **, enum vtype));
+void insmntque(struct vnode *, struct mount *);
+int getdevvp(dev_t, struct vnode **, enum vtype);
 
-int vfs_hang_addrlist __P((struct mount *, struct netexport *,
-				  struct export_args *));
-int vfs_free_netcred __P((struct radix_node *, void *));
-void vfs_free_addrlist __P((struct netexport *));
-static __inline__ void vputonfreelist __P((struct vnode *));
+int vfs_hang_addrlist(struct mount *, struct netexport *,
+				  struct export_args *);
+int vfs_free_netcred(struct radix_node *, void *);
+void vfs_free_addrlist(struct netexport *);
+static __inline__ void vputonfreelist(struct vnode *);
+
+int vflush_vnode(struct vnode *, void *);
 
 #ifdef DEBUG
-void printlockedvnodes __P((void));
+void printlockedvnodes(void);
 #endif
 
 #define VN_KNOTE(vp, b) \
@@ -131,7 +131,7 @@ vntblinit()
 {
 
 	pool_init(&vnode_pool, sizeof(struct vnode), 0, 0, 0, "vnodes",
-		0, pool_page_alloc_nointr, pool_page_free_nointr, M_VNODE);
+	    &pool_allocator_nointr);
 	simple_lock_init(&mntvnode_slock);
 	simple_lock_init(&mntid_slock);
 	simple_lock_init(&spechash_slock);
@@ -198,6 +198,12 @@ vfs_unbusy(mp, p)
 	lockmgr(&mp->mnt_lock, LK_RELEASE, NULL, p);
 }
 
+int
+vfs_isbusy(struct mount *mp) 
+{
+	return (lockstatus(&mp->mnt_lock));
+}
+
 /*
  * Lookup a filesystem type, and if found allocate and initialize
  * a mount structure for it.
@@ -248,7 +254,6 @@ int
 vfs_mountroot()
 {
 	struct vfsconf *vfsp;
-	extern int (*mountroot)(void);
 	int error;
 
 	if (mountroot != NULL)
@@ -358,7 +363,7 @@ vattr_null(vap)
 /*
  * Routines having to do with the management of the vnode table.
  */
-extern int (**dead_vnodeop_p) __P((void *));
+extern int (**dead_vnodeop_p)(void *);
 long numvnodes;
 
 /*
@@ -368,7 +373,7 @@ int
 getnewvnode(tag, mp, vops, vpp)
 	enum vtagtype tag;
 	struct mount *mp;
-	int (**vops) __P((void *));
+	int (**vops)(void *);
 	struct vnode **vpp;
 {
 	struct proc *p = curproc;			/* XXX */
@@ -417,7 +422,7 @@ getnewvnode(tag, mp, vops, vpp)
 		 * the first NCPUS items on the free list are
 		 * locked, so this is close enough to being empty.
 		 */
-		if (vp == NULLVP) {
+		if (vp == NULL) {
 			splx(s);
 			simple_unlock(&vnode_free_list_slock);
 			tablefull("vnode");
@@ -449,7 +454,6 @@ getnewvnode(tag, mp, vops, vpp)
 		splx(s);
 #endif
 		vp->v_flag = 0;
-		vp->v_bioflag = 0;
 		vp->v_socket = 0;
 	}
 	vp->v_type = VNON;
@@ -826,7 +830,7 @@ vrele(vp)
 		VOP_INACTIVE(vp, p);
 }
 
-void vhold __P((struct vnode *vp));
+void vhold(struct vnode *vp);
 
 /*
  * Page or buffer structure gets a reference.
@@ -866,14 +870,10 @@ struct ctldebug debug1 = { "busyprt", &busyprt };
 #endif
 
 int
-vflush(mp, skipvp, flags)
-	struct mount *mp;
-	struct vnode *skipvp;
-	int flags;
-{
-	struct proc *p = curproc;
-	register struct vnode *vp, *nvp;
-	int busy = 0;
+vfs_mount_foreach_vnode(struct mount *mp, 
+    int (*func)(struct vnode *, void *), void *arg) {
+	struct vnode *vp, *nvp;
+	int error = 0;
 
 	simple_lock(&mntvnode_slock);
 loop:
@@ -881,65 +881,101 @@ loop:
 		if (vp->v_mount != mp)
 			goto loop;
 		nvp = vp->v_mntvnodes.le_next;
-		/*
-		 * Skip over a selected vnode.
-		 */
-		if (vp == skipvp)
-			continue;
+		simple_lock(&vp->v_interlock);		
+		simple_unlock(&mntvnode_slock);
 
-		simple_lock(&vp->v_interlock);
-		/*
-		 * Skip over a vnodes marked VSYSTEM.
-		 */
-		if ((flags & SKIPSYSTEM) && (vp->v_flag & VSYSTEM)) {
-			simple_unlock(&vp->v_interlock);
-			continue;
-		}
-		/*
-		 * If WRITECLOSE is set, only flush out regular file
-		 * vnodes open for writing.
-		 */
-		if ((flags & WRITECLOSE) &&
-		    (vp->v_writecount == 0 || vp->v_type != VREG)) {
-			simple_unlock(&vp->v_interlock);
-			continue;
-		}
-		/*
-		 * With v_usecount == 0, all we need to do is clear
-		 * out the vnode data structures and we are done.
-		 */
-		if (vp->v_usecount == 0) {
-			simple_unlock(&mntvnode_slock);
-			vgonel(vp, p);
-			simple_lock(&mntvnode_slock);
-			continue;
-		}
-		/*
-		 * If FORCECLOSE is set, forcibly close the vnode.
-		 * For block or character devices, revert to an
-		 * anonymous device. For all other files, just kill them.
-		 */
-		if (flags & FORCECLOSE) {
-			simple_unlock(&mntvnode_slock);
-			if (vp->v_type != VBLK && vp->v_type != VCHR) {
-				vgonel(vp, p);
-			} else {
-				vclean(vp, 0, p);
-				vp->v_op = spec_vnodeop_p;
-				insmntque(vp, (struct mount *)0);
-			}
-			simple_lock(&mntvnode_slock);
-			continue;
-		}
-#ifdef DEBUG
-		if (busyprt)
-			vprint("vflush: busy vnode", vp);
-#endif
-		simple_unlock(&vp->v_interlock);
-		busy++;
+		error = func(vp, arg);
+
+		simple_lock(&mntvnode_slock);
+
+		if (error != 0)
+			break;
 	}
 	simple_unlock(&mntvnode_slock);
-	if (busy)
+
+	return (error);
+}
+
+
+struct vflush_args {
+	struct vnode *skipvp;
+	int busy;
+	int flags;
+};
+
+int
+vflush_vnode(struct vnode *vp, void *arg) {
+	struct vflush_args *va = arg;
+	struct proc *p = curproc;
+
+	if (vp == va->skipvp) {
+		simple_unlock(&vp->v_interlock);
+		return (0);
+	}
+
+	if ((va->flags & SKIPSYSTEM) && (vp->v_flag & VSYSTEM)) {
+		simple_unlock(&vp->v_interlock);
+		return (0);
+	}
+
+	/*
+	 * If WRITECLOSE is set, only flush out regular file
+	 * vnodes open for writing.
+	 */
+	if ((va->flags & WRITECLOSE) &&
+	    (vp->v_writecount == 0 || vp->v_type != VREG)) {
+		simple_unlock(&vp->v_interlock);
+		return (0);
+	}
+
+	/*
+	 * With v_usecount == 0, all we need to do is clear
+	 * out the vnode data structures and we are done.
+	 */
+	if (vp->v_usecount == 0) {
+		vgonel(vp, p);
+		return (0);
+	}
+		
+	/*
+	 * If FORCECLOSE is set, forcibly close the vnode.
+	 * For block or character devices, revert to an
+	 * anonymous device. For all other files, just kill them.
+	 */
+	if (va->flags & FORCECLOSE) {
+		if (vp->v_type != VBLK && vp->v_type != VCHR) {
+			vgonel(vp, p);
+		} else {
+			vclean(vp, 0, p);
+			vp->v_op = spec_vnodeop_p;
+			insmntque(vp, (struct mount *)0);
+		}
+		return (0);
+	}
+
+#ifdef DEBUG
+	if (busyprt)
+		vprint("vflush: busy vnode", vp);
+#endif
+	simple_unlock(&vp->v_interlock);
+	va->busy++;
+	return (0);
+}
+
+int
+vflush(mp, skipvp, flags)
+	struct mount *mp;
+	struct vnode *skipvp;
+	int flags;
+{
+	struct vflush_args va;
+	va.skipvp = skipvp;
+	va.busy = 0;
+	va.flags = flags;
+
+	vfs_mount_foreach_vnode(mp, vflush_vnode, &va);
+
+	if (va.busy)
 		return (EBUSY);
 	return (0);
 }
@@ -2151,16 +2187,12 @@ buf_replacevnode(bp, newvp)
  */
 void
 reassignbuf(bp)
-	register struct buf *bp;
+	struct buf *bp;
 {
 	struct buflists *listheadp;
 	int delay;
 	struct vnode *vp = bp->b_vp;
 
-	if (vp == NULL) {
-		printf("reassignbuf: NULL");
-		return;
-	}
 	/*
 	 * Delete from old vnode list, if on one.
 	 */

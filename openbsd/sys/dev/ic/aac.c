@@ -1,4 +1,4 @@
-/*	$OpenBSD: aac.c,v 1.8 2001/09/21 17:55:43 miod Exp $	*/
+/*	$OpenBSD: aac.c,v 1.14 2002/03/27 15:02:59 niklas Exp $	*/
 
 /*-
  * Copyright (c) 2000 Michael Smith
@@ -51,7 +51,7 @@
 
 #include <machine/bus.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <scsi/scsi_all.h>
 #include <scsi/scsi_disk.h>
@@ -71,44 +71,44 @@
 #define AAC_BIGSECS		63	/* mapping 255*63 */
 #define AAC_SECS32		0x1f	/* round capacity */
 
-void	aac_bio_complete __P((struct aac_ccb *));
-void	aac_complete __P((void *, int));
-void	aac_copy_internal_data __P((struct scsi_xfer *, u_int8_t *, size_t));
-struct scsi_xfer *aac_dequeue __P((struct aac_softc *));
-int	aac_dequeue_fib __P((struct aac_softc *, int, u_int32_t *,
-    struct aac_fib **));
-char   *aac_describe_code __P((struct aac_code_lookup *, u_int32_t));
-void	aac_describe_controller __P((struct aac_softc *));
-void	aac_enqueue __P((struct aac_softc *, struct scsi_xfer *, int));
-void	aac_enqueue_ccb __P((struct aac_softc *, struct aac_ccb *));
-int	aac_enqueue_fib __P((struct aac_softc *, int, u_int32_t, u_int32_t));
-void	aac_eval_mapping __P((u_int32_t, int *, int *, int *));
-int	aac_exec_ccb __P((struct aac_ccb *));
-void	aac_free_ccb __P((struct aac_softc *, struct aac_ccb *));
-struct aac_ccb *aac_get_ccb __P((struct aac_softc *, int));
+void	aac_bio_complete(struct aac_ccb *);
+void	aac_complete(void *, int);
+void	aac_copy_internal_data(struct scsi_xfer *, u_int8_t *, size_t);
+struct scsi_xfer *aac_dequeue(struct aac_softc *);
+int	aac_dequeue_fib(struct aac_softc *, int, u_int32_t *,
+    struct aac_fib **);
+char   *aac_describe_code(struct aac_code_lookup *, u_int32_t);
+void	aac_describe_controller(struct aac_softc *);
+void	aac_enqueue(struct aac_softc *, struct scsi_xfer *, int);
+void	aac_enqueue_ccb(struct aac_softc *, struct aac_ccb *);
+int	aac_enqueue_fib(struct aac_softc *, int, struct aac_ccb *);
+void	aac_eval_mapping(u_int32_t, int *, int *, int *);
+int	aac_exec_ccb(struct aac_ccb *);
+void	aac_free_ccb(struct aac_softc *, struct aac_ccb *);
+struct aac_ccb *aac_get_ccb(struct aac_softc *, int);
 #if 0
-void	aac_handle_aif __P((struct aac_softc *, struct aac_aif_command *));
+void	aac_handle_aif(struct aac_softc *, struct aac_aif_command *);
 #endif
-void	aac_host_command __P((struct aac_softc *));
-void	aac_host_response __P((struct aac_softc *));
-int	aac_init __P((struct aac_softc *));
-int	aac_internal_cache_cmd __P((struct scsi_xfer *));
-int	aac_map_command __P((struct aac_ccb *));
+void	aac_host_command(struct aac_softc *);
+void	aac_host_response(struct aac_softc *);
+int	aac_init(struct aac_softc *);
+int	aac_internal_cache_cmd(struct scsi_xfer *);
+int	aac_map_command(struct aac_ccb *);
 #ifdef AAC_DEBUG
-void	aac_print_fib __P((struct aac_softc *, struct aac_fib *, char *));
+void	aac_print_fib(struct aac_softc *, struct aac_fib *, char *);
 #endif
-int	aac_raw_scsi_cmd __P((struct scsi_xfer *));
-int	aac_scsi_cmd __P((struct scsi_xfer *));
-int	aac_start __P((struct aac_ccb *));
-void	aac_start_ccbs __P((struct aac_softc *));
-void	aac_startup __P((struct aac_softc *));
-int	aac_sync_command __P((struct aac_softc *, u_int32_t, u_int32_t,
-    u_int32_t, u_int32_t, u_int32_t, u_int32_t *));
-int	aac_sync_fib __P((struct aac_softc *, u_int32_t, u_int32_t, void *,
-    u_int16_t, void *, u_int16_t *));
-void	aac_timeout __P((void *));
-void	aac_unmap_command __P((struct aac_ccb *));
-void	aac_watchdog __P((void *));
+int	aac_raw_scsi_cmd(struct scsi_xfer *);
+int	aac_scsi_cmd(struct scsi_xfer *);
+int	aac_start(struct aac_ccb *);
+void	aac_start_ccbs(struct aac_softc *);
+void	aac_startup(struct aac_softc *);
+int	aac_sync_command(struct aac_softc *, u_int32_t, u_int32_t,
+    u_int32_t, u_int32_t, u_int32_t, u_int32_t *);
+int	aac_sync_fib(struct aac_softc *, u_int32_t, u_int32_t, void *,
+    u_int16_t, void *, u_int16_t *);
+void	aac_timeout(void *);
+void	aac_unmap_command(struct aac_ccb *);
+void	aac_watchdog(void *);
 
 struct cfdriver aac_cd = {
 	NULL, "aac", DV_DULL
@@ -127,24 +127,24 @@ struct scsi_device aac_dev = {
 };
 
 /* i960Rx interface */    
-int	aac_rx_get_fwstatus __P((struct aac_softc *));
-void	aac_rx_qnotify __P((struct aac_softc *, int));
-int	aac_rx_get_istatus __P((struct aac_softc *));
-void	aac_rx_clear_istatus __P((struct aac_softc *, int));
-void	aac_rx_set_mailbox __P((struct aac_softc *, u_int32_t, u_int32_t,
-    u_int32_t, u_int32_t, u_int32_t));
-int	aac_rx_get_mailboxstatus __P((struct aac_softc *));
-void	aac_rx_set_interrupts __P((struct aac_softc *, int));
+int	aac_rx_get_fwstatus(struct aac_softc *);
+void	aac_rx_qnotify(struct aac_softc *, int);
+int	aac_rx_get_istatus(struct aac_softc *);
+void	aac_rx_clear_istatus(struct aac_softc *, int);
+void	aac_rx_set_mailbox(struct aac_softc *, u_int32_t, u_int32_t,
+    u_int32_t, u_int32_t, u_int32_t);
+int	aac_rx_get_mailboxstatus(struct aac_softc *);
+void	aac_rx_set_interrupts(struct aac_softc *, int);
 
 /* StrongARM interface */
-int	aac_sa_get_fwstatus __P((struct aac_softc *));
-void	aac_sa_qnotify __P((struct aac_softc *, int));
-int	aac_sa_get_istatus __P((struct aac_softc *));
-void	aac_sa_clear_istatus __P((struct aac_softc *, int));
-void	aac_sa_set_mailbox __P((struct aac_softc *, u_int32_t, u_int32_t,
-    u_int32_t, u_int32_t, u_int32_t));
-int	aac_sa_get_mailboxstatus __P((struct aac_softc *));
-void	aac_sa_set_interrupts __P((struct aac_softc *, int));
+int	aac_sa_get_fwstatus(struct aac_softc *);
+void	aac_sa_qnotify(struct aac_softc *, int);
+int	aac_sa_get_istatus(struct aac_softc *);
+void	aac_sa_clear_istatus(struct aac_softc *, int);
+void	aac_sa_set_mailbox(struct aac_softc *, u_int32_t, u_int32_t,
+    u_int32_t, u_int32_t, u_int32_t);
+int	aac_sa_get_mailboxstatus(struct aac_softc *);
+void	aac_sa_set_interrupts(struct aac_softc *, int);
 
 struct aac_interface aac_rx_interface = {
 	aac_rx_get_fwstatus,
@@ -727,16 +727,12 @@ aac_scsi_cmd(xs)
 			ccb = aac_get_ccb(sc, xs->flags);
 
 			/*
-			 * Are we out of commands, something is wrong.
-			 * 
+			 * We are out of commands, try again in a little while.
 			 */
 			if (ccb == NULL) {
-				printf("%s: no ccb in aac_scsi_cmd",
-				    sc->sc_dev.dv_xname);
 				xs->error = XS_DRIVER_STUFFUP;
-				xs->flags |= ITSDONE;
-				scsi_done(xs);
-				goto ready;
+				AAC_UNLOCK(sc, lock);
+				return (TRY_AGAIN_LATER);
 			}
 
 			ccb->ac_blockno = blockno;
@@ -1602,8 +1598,7 @@ aac_start(struct aac_ccb *ccb)
 	ccb->ac_fib->Header.SenderData = (u_int32_t)ccb; /* XXX ack, sizing */
 
 	/* put the FIB on the outbound queue */
-	if (aac_enqueue_fib(sc, AAC_ADAP_NORM_CMD_QUEUE,
-	    ccb->ac_fib->Header.Size, ccb->ac_fib->Header.ReceiverFibAddress))
+	if (aac_enqueue_fib(sc, AAC_ADAP_NORM_CMD_QUEUE, ccb))
 		return (EBUSY);
 
 	return (0);
@@ -1640,7 +1635,8 @@ aac_map_command(struct aac_ccb *ccb)
 			return (error);
 		}
 
-		bus_dmamap_sync(sc->sc_dmat, ccb->ac_dmamap_xfer,
+		bus_dmamap_sync(sc->sc_dmat, ccb->ac_dmamap_xfer, 0,
+		    ccb->ac_dmamap_xfer->dm_mapsize,
 		    (xs->flags & SCSI_DATA_IN) ? BUS_DMASYNC_PREREAD :
 		    BUS_DMASYNC_PREWRITE);
 	}
@@ -1666,7 +1662,8 @@ aac_unmap_command(struct aac_ccb *ccb)
 #endif
 
 	if (xs->datalen != 0) {
-		bus_dmamap_sync(sc->sc_dmat, ccb->ac_dmamap_xfer,
+		bus_dmamap_sync(sc->sc_dmat, ccb->ac_dmamap_xfer, 0,
+		    ccb->ac_dmamap_xfer->dm_mapsize,
 		    (xs->flags & SCSI_DATA_IN) ? BUS_DMASYNC_POSTREAD :
 		    BUS_DMASYNC_POSTWRITE);
 
@@ -1781,12 +1778,16 @@ static struct {
  * but implementing this usefully is difficult.
  */
 int
-aac_enqueue_fib(struct aac_softc *sc, int queue, u_int32_t fib_size,
-    u_int32_t fib_addr)
+aac_enqueue_fib(struct aac_softc *sc, int queue, struct aac_ccb *ccb)
 {
 	u_int32_t pi, ci;
 	int error;
 	aac_lock_t lock;
+	u_int32_t fib_size;
+	u_int32_t fib_addr;
+
+	fib_size = ccb->ac_fib->Header.Size;
+	fib_addr = ccb->ac_fib->Header.ReceiverFibAddress;
 
 	lock = AAC_LOCK(sc);
 
@@ -1831,6 +1832,7 @@ aac_dequeue_fib(struct aac_softc *sc, int queue, u_int32_t *fib_size,
     struct aac_fib **fib_addr)
 {
 	u_int32_t pi, ci;
+	int notify;
 	int error;
 	aac_lock_t lock;
 
@@ -1845,7 +1847,11 @@ aac_dequeue_fib(struct aac_softc *sc, int queue, u_int32_t *fib_size,
 		error = ENOENT;
 		goto out;
 	}
-    
+
+	notify = 0;
+	if (ci == pi + 1)
+		notify++;
+
 	/* wrap the queue? */
 	if (ci >= aac_qinfo[queue].size)
 		ci = 0;
@@ -1859,7 +1865,7 @@ aac_dequeue_fib(struct aac_softc *sc, int queue, u_int32_t *fib_size,
 	sc->sc_queues->qt_qindex[queue][AAC_CONSUMER_INDEX] = ci + 1;
 
 	/* if we have made the queue un-full, notify the adapter */
-	if (((pi + 1) == ci) && (aac_qinfo[queue].notify != 0))
+	if (notify && (aac_qinfo[queue].notify != 0))
 		AAC_QNOTIFY(sc, aac_qinfo[queue].notify);
 	error = 0;
 

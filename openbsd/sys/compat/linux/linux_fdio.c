@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_fdio.c,v 1.1 2001/04/09 06:53:44 tholo Exp $	*/
+/*	$OpenBSD: linux_fdio.c,v 1.6 2002/03/14 01:26:50 millert Exp $	*/
 /*	$NetBSD: linux_fdio.c,v 1.1 2000/12/10 14:12:16 fvdl Exp $	*/
 
 /*
@@ -66,7 +66,7 @@ linux_ioctl_fdio(struct proc *p, struct linux_sys_ioctl_args *uap,
 	struct filedesc *fdp;
 	struct file *fp;
 	int error;
-	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *));
+	int (*ioctlf)(struct file *, u_long, caddr_t, struct proc *);
 	u_long com;
 	struct fd_type fparams;
 	struct linux_floppy_struct lflop;
@@ -75,19 +75,10 @@ linux_ioctl_fdio(struct proc *p, struct linux_sys_ioctl_args *uap,
 	com = (u_long)SCARG(uap, data);
 
 	fdp = p->p_fd;
-#if 1
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL)
-		return (EBADF);
-#else
-	if ((u_int)SCARG(uap, fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL ||
-	    (fp->f_iflags & FIF_WANTCLOSE) != 0)
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
 		return (EBADF);
 
-	FILE_USE(fp);
-#endif
-
+	FREF(fp);
 	com = SCARG(uap, com);
 	ioctlf = fp->f_ops->fo_ioctl;
 
@@ -154,9 +145,6 @@ linux_ioctl_fdio(struct proc *p, struct linux_sys_ioctl_args *uap,
 		error = EINVAL;
 	}
 
-#ifdef notdef
-	FILE_UNUSE(fp, p);
-#endif
-
+	FRELE(fp);
 	return 0;
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_bio.c,v 1.45 2001/10/11 14:44:10 art Exp $	*/
+/*	$OpenBSD: vfs_bio.c,v 1.58 2002/03/14 01:27:06 millert Exp $	*/
 /*	$NetBSD: vfs_bio.c,v 1.44 1996/06/11 11:15:36 pk Exp $	*/
 
 /*-
@@ -56,18 +56,14 @@
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/malloc.h>
+#include <sys/pool.h>
 #include <sys/resourcevar.h>
 #include <sys/conf.h>
 #include <sys/kernel.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <miscfs/specfs/specdev.h>
-
-/* Macros to clear/set/test flags. */
-#define	SET(t, f)	(t) |= (f)
-#define	CLR(t, f)	(t) &= ~(f)
-#define	ISSET(t, f)	((t) & (f))
 
 /*
  * Definitions for the buffer hash lists.
@@ -99,14 +95,18 @@ int nobuffers;
 struct bio_ops bioops;
 
 /*
+ * Buffer pool for I/O buffers.
+ */
+struct pool bufpool;
+
+/*
  * Insq/Remq for the buffer free lists.
  */
 #define	binsheadfree(bp, dp)	TAILQ_INSERT_HEAD(dp, bp, b_freelist)
 #define	binstailfree(bp, dp)	TAILQ_INSERT_TAIL(dp, bp, b_freelist)
 
-static __inline struct buf *bio_doread __P((struct vnode *, daddr_t, int,
-					    struct ucred *, int));
-int getnewbuf __P((int slpflag, int slptimeo, struct buf **));
+static __inline struct buf *bio_doread(struct vnode *, daddr_t, int, int);
+int getnewbuf(int slpflag, int slptimeo, struct buf **);
 
 /*
  * We keep a few counters to monitor the utilization of the buffer cache
@@ -183,6 +183,7 @@ bufinit()
 	register int i;
 	int base, residual;
 
+	pool_init(&bufpool, sizeof(struct buf), 0, 0, 0, "bufpl", NULL);
 	for (dp = bufqueues; dp < &bufqueues[BQUEUES]; dp++)
 		TAILQ_INIT(dp);
 	bufhashtbl = hashinit(nbuf, M_CACHE, M_WAITOK, &bufhash);
@@ -192,8 +193,6 @@ bufinit()
 		bp = &buf[i];
 		bzero((char *)bp, sizeof *bp);
 		bp->b_dev = NODEV;
-		bp->b_rcred = NOCRED;
-		bp->b_wcred = NOCRED;
 		bp->b_vnbufs.le_next = NOLIST;
 		bp->b_data = buffers + i * MAXBSIZE;
 		LIST_INIT(&bp->b_dep);
@@ -238,11 +237,10 @@ bufinit()
 }
 
 static __inline struct buf *
-bio_doread(vp, blkno, size, cred, async)
+bio_doread(vp, blkno, size, async)
 	struct vnode *vp;
 	daddr_t blkno;
 	int size;
-	struct ucred *cred;
 	int async;
 {
 	register struct buf *bp;
@@ -255,12 +253,7 @@ bio_doread(vp, blkno, size, cred, async)
 	 * Therefore, it's valid if it's I/O has completed or been delayed.
 	 */
 	if (!ISSET(bp->b_flags, (B_DONE | B_DELWRI))) {
-		/* Start I/O for the buffer (keeping credentials). */
 		SET(bp->b_flags, B_READ | async);
-		if (cred != NOCRED && bp->b_rcred == NOCRED) {
-			crhold(cred);
-			bp->b_rcred = cred;
-		}
 		VOP_STRATEGY(bp);
 
 		/* Pay for the read. */
@@ -287,7 +280,7 @@ bread(vp, blkno, size, cred, bpp)
 	register struct buf *bp;
 
 	/* Get buffer for block. */
-	bp = *bpp = bio_doread(vp, blkno, size, cred, 0);
+	bp = *bpp = bio_doread(vp, blkno, size, 0);
 
 	/* Wait for the read to complete, and return result. */
 	return (biowait(bp));
@@ -309,7 +302,7 @@ breadn(vp, blkno, size, rablks, rasizes, nrablks, cred, bpp)
 	register struct buf *bp;
 	int i;
 
-	bp = *bpp = bio_doread(vp, blkno, size, cred, 0);
+	bp = *bpp = bio_doread(vp, blkno, size, 0);
 
 	/*
 	 * For each of the read-ahead blocks, start a read, if necessary.
@@ -320,7 +313,7 @@ breadn(vp, blkno, size, rablks, rasizes, nrablks, cred, bpp)
 			continue;
 
 		/* Get a buffer for the read-ahead block */
-		(void) bio_doread(vp, rablks[i], rasizes[i], cred, B_ASYNC);
+		(void) bio_doread(vp, rablks[i], rasizes[i], B_ASYNC);
 	}
 
 	/* Otherwise, we had to start a read for it; wait until it's valid. */
@@ -903,16 +896,6 @@ start:
 	bp->b_bcount = 0;
 	bp->b_dirtyoff = bp->b_dirtyend = 0;
 	bp->b_validoff = bp->b_validend = 0;
-
-	/* nuke any credentials we were holding */
-	if (bp->b_rcred != NOCRED) {
-		crfree(bp->b_rcred);
-		bp->b_rcred = NOCRED;
-	}
-	if (bp->b_wcred != NOCRED) {
-		crfree(bp->b_wcred);
-		bp->b_wcred = NOCRED;
-	}
 
 	bremhash(bp);
 	*bpp = bp;

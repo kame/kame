@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_command.c,v 1.22 2001/07/04 22:15:15 espie Exp $	*/
+/*	$OpenBSD: db_command.c,v 1.28 2002/03/14 03:16:03 millert Exp $	*/
 /*	$NetBSD: db_command.c,v 1.20 1996/03/30 22:30:05 christos Exp $	*/
 
 /* 
@@ -35,8 +35,9 @@
 #include <sys/proc.h>
 #include <sys/reboot.h>
 #include <sys/extent.h>
+#include <sys/pool.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <machine/db_machdep.h>		/* type definitions */
 
 #include <ddb/db_lex.h>
@@ -50,9 +51,6 @@
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
 
-#include <vm/vm.h>
-
-#include <uvm/uvm_extern.h>
 #include <uvm/uvm_ddb.h>
 
 /*
@@ -293,7 +291,7 @@ db_map_print_cmd(addr, have_addr, count, modif)
         if (modif[0] == 'f')
                 full = TRUE;
 
-        uvm_map_printit((vm_map_t) addr, full, db_printf);
+        uvm_map_printit((struct vm_map *) addr, full, db_printf);
 }
 /*ARGSUSED*/
 void
@@ -304,7 +302,7 @@ db_malloc_print_cmd(addr, have_addr, count, modif)
 	char *		modif;
 {
 #if defined(MALLOC_DEBUG)
-	extern void debug_malloc_printit __P((int (*) __P((const char *, ...)), vaddr_t));
+	extern void debug_malloc_printit(int (*)(const char *, ...), vaddr_t);
 
 	if (!have_addr)
 		addr = 0;
@@ -333,6 +331,22 @@ db_object_print_cmd(addr, have_addr, count, modif)
 
 /*ARGSUSED*/
 void
+db_page_print_cmd(addr, have_addr, count, modif)
+	db_expr_t	addr;
+	int		have_addr;
+	db_expr_t	count;
+	char *		modif;
+{
+        boolean_t full = FALSE;
+        
+        if (modif[0] == 'f')
+                full = TRUE;
+
+	uvm_page_printit((struct vm_page *) addr, full, db_printf);
+}
+
+/*ARGSUSED*/
+void
 db_extent_print_cmd(addr, have_addr, count, modif)
 	db_expr_t	addr;
 	int		have_addr;
@@ -340,6 +354,28 @@ db_extent_print_cmd(addr, have_addr, count, modif)
 	char *		modif;
 {
 	extent_print_all();
+}
+
+/*ARGSUSED*/
+void
+db_pool_print_cmd(addr, have_addr, count, modif)
+	db_expr_t	addr;
+	int		have_addr;
+	db_expr_t	count;
+	char *		modif;
+{
+	pool_printit((struct pool *)addr, modif, db_printf);
+}
+
+/*ARGSUSED*/
+void
+db_uvmexp_print_cmd(addr, have_addr, count, modif)
+	db_expr_t	addr;
+	int		have_addr;
+	db_expr_t	count;
+	char *		modif;
+{
+	uvmexp_print(db_printf);
 }
 
 /*
@@ -354,14 +390,17 @@ struct db_command db_show_all_cmds[] = {
 
 struct db_command db_show_cmds[] = {
 	{ "all",	NULL,			0,	db_show_all_cmds },
-	{ "registers",	db_show_regs,		0,	NULL },
 	{ "breaks",	db_listbreak_cmd, 	0,	NULL },
-	{ "watches",	db_listwatch_cmd, 	0,	NULL },
-	{ "map",	db_map_print_cmd,	0,	NULL },
-	{ "object",	db_object_print_cmd,	0,	NULL },
 	{ "extents",	db_extent_print_cmd,	0,	NULL },
 	{ "malloc",	db_malloc_print_cmd,	0,	NULL },
-	{ NULL,		NULL,			0,	NULL, }
+	{ "map",	db_map_print_cmd,	0,	NULL },
+	{ "object",	db_object_print_cmd,	0,	NULL },
+	{ "page",	db_page_print_cmd,	0,	NULL },
+	{ "pool",	db_pool_print_cmd,	0,	NULL },
+	{ "registers",	db_show_regs,		0,	NULL },
+	{ "uvmexp",	db_uvmexp_print_cmd,	0,	NULL },
+	{ "watches",	db_listwatch_cmd, 	0,	NULL },
+	{ NULL,		NULL,			0,	NULL }
 };
 
 struct db_command db_boot_cmds[] = {
@@ -369,6 +408,8 @@ struct db_command db_boot_cmds[] = {
 	{ "crash",	db_boot_crash_cmd,	0,	0 },
 	{ "dump",	db_boot_dump_cmd,	0,	0 },
 	{ "halt",	db_boot_halt_cmd,	0,	0 },
+	{ "reboot",	db_boot_reboot_cmd,	0,	0 },
+	{ "poweroff",	db_boot_poweroff_cmd,	0,	0 },
 	{ NULL, }
 };
 
@@ -493,7 +534,7 @@ db_fncall(addr, have_addr, count, modif)
 	db_expr_t	args[MAXARGS];
 	int		nargs = 0;
 	db_expr_t	retval;
-	db_expr_t	(*func) __P((db_expr_t, ...));
+	db_expr_t	(*func)(db_expr_t, ...);
 	int		t;
 
 	if (!db_expression(&fn_addr)) {
@@ -501,7 +542,7 @@ db_fncall(addr, have_addr, count, modif)
 	    db_flush_lex();
 	    return;
 	}
-	func = (db_expr_t (*) __P((db_expr_t, ...))) fn_addr;
+	func = (db_expr_t (*)(db_expr_t, ...)) fn_addr;
 
 	t = db_read_token();
 	if (t == tLPAREN) {
@@ -577,4 +618,24 @@ db_boot_halt_cmd(addr, haddr, count, modif)
 	char *modif;
 {
 	boot(RB_NOSYNC | RB_HALT | RB_TIMEBAD);
+}
+
+void
+db_boot_reboot_cmd(addr, haddr, count, modif)
+	db_expr_t addr;
+	int haddr;
+	db_expr_t count;
+	char *modif;
+{
+	boot(RB_AUTOBOOT | RB_NOSYNC | RB_TIMEBAD);
+}
+
+void
+db_boot_poweroff_cmd(addr, haddr, count, modif)
+	db_expr_t addr;
+	int haddr;
+	db_expr_t count;
+	char *modif;
+{
+	boot(RB_NOSYNC | RB_HALT | RB_POWERDOWN | RB_TIMEBAD);
 }

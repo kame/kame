@@ -1,4 +1,4 @@
-/* $OpenBSD: bootxx.c,v 1.2 2000/10/04 04:16:40 bjc Exp $ */
+/* $OpenBSD: bootxx.c,v 1.4 2002/03/14 03:16:02 millert Exp $ */
 /* $NetBSD: bootxx.c,v 1.2 1999/10/23 14:40:38 ragge Exp $ */
 /*-
  * Copyright (c) 1982, 1986 The Regents of the University of California.
@@ -64,8 +64,8 @@ struct rom_softc {
 	int unit;
 } rom_softc;
 
-int	romstrategy __P((void *, int, daddr_t, size_t, void *, size_t *));
-int romopen __P((struct open_file *, int, int, int, int));
+int	romstrategy(void *, int, daddr_t, size_t, void *, size_t *);
+int romopen(struct open_file *, int, int, int, int);
 
 struct fs_ops	file_system[] = {
 	{ ufs_open, ufs_close, ufs_read, ufs_write, ufs_seek, ufs_stat }
@@ -77,7 +77,7 @@ struct devsw	devsw[] = {
 };
 int	ndevs = (sizeof(devsw)/sizeof(devsw[0]));
 
-int	command __P((int cmd, int arg));
+int	command(int cmd, int arg);
 
 /*
  * Boot program... argume passed in r10 and r11 determine whether boot
@@ -118,11 +118,11 @@ Xmain()
 		/*
 		 * now relocate rpb/bqo (which are used by ROM-routines)
 		 */
-		rpb = (void*)XXRPB;
-		bcopy ((void*)bootregs[11], rpb, 512);
+		rpb = (void *)XXRPB;
+		bcopy ((void *)bootregs[11], rpb, 512);
 		rpb->rpb_base = rpb;
-		bqo = (void*)(512+(int)rpb);
-		bcopy ((void*)rpb->iovec, bqo, rpb->iovecsz);
+		bqo = (void *)(512+(int)rpb);
+		bcopy ((void *)rpb->iovec, bqo, rpb->iovecsz);
 		rpb->iovec = (int)bqo;
 		bootregs[11] = (int)rpb;
 		bootdev = rpb->devtyp;
@@ -431,7 +431,7 @@ hpread(block, size, buf)
 	char           *buf;
 {
 	volatile struct mba_regs *mr = (void *) bootregs[1];
-	volatile struct hp_drv *hd = (void*)&mr->mba_md[bootregs[3]];
+	volatile struct hp_drv *hd = (void *)&mr->mba_md[bootregs[3]];
 	struct disklabel *dp = &lp;
 	u_int           pfnum, nsize, mapnr, bn, cn, sn, tn;
 
@@ -457,7 +457,7 @@ hpread(block, size, buf)
 }
 
 extern char end[];
-static char *top = (char*)end;
+static char *top = (char *)end;
 
 void *
 alloc(size)

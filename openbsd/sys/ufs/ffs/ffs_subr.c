@@ -1,4 +1,4 @@
-/*	$OpenBSD: ffs_subr.c,v 1.9 2001/07/06 08:29:29 deraadt Exp $	*/
+/*	$OpenBSD: ffs_subr.c,v 1.12 2002/03/14 01:27:14 millert Exp $	*/
 /*	$NetBSD: ffs_subr.c,v 1.6 1996/03/17 02:16:23 christos Exp $	*/
 
 /*
@@ -43,6 +43,7 @@
 #include <sys/systm.h>
 #include <sys/vnode.h>
 #include <sys/buf.h>
+#include <ufs/ufs/extattr.h>
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ffs/ffs_extern.h>
@@ -148,7 +149,7 @@ ffs_checkoverlap(bp, ip)
 #endif /* DIAGNOSTIC */
 
 #ifndef _KERNEL
-void panic __P((const char *, ...));
+void panic(const char *, ...);
 #endif
 
 /*
@@ -244,23 +245,21 @@ ffs_setblock(fs, cp, h)
  */
 int
 ffs_isfreeblock(fs, cp, h)
-      struct fs *fs;
-      unsigned char *cp;
-      daddr_t h;
+	struct fs *fs;
+	unsigned char *cp;
+	daddr_t h;
 {
 
-      switch ((int)fs->fs_frag) {
-      case 8:
-              return (cp[h] == 0);
-      case 4:
-              return ((cp[h >> 1] & (0x0f << ((h & 0x1) << 2))) == 0);
-      case 2:
-              return ((cp[h >> 2] & (0x03 << ((h & 0x3) << 1))) == 0);
-      case 1:
-              return ((cp[h >> 3] & (0x01 << (h & 0x7))) == 0);
-      default:
-              panic("ffs_isfreeblock");
-      }
+	switch ((int)fs->fs_frag) {
+	case 8:
+		return (cp[h] == 0);
+	case 4:
+		return ((cp[h >> 1] & (0x0f << ((h & 0x1) << 2))) == 0);
+	case 2:
+		return ((cp[h >> 2] & (0x03 << ((h & 0x3) << 1))) == 0);
+	case 1:
+		return ((cp[h >> 3] & (0x01 << (h & 0x7))) == 0);
+	default:
+		panic("ffs_isfreeblock");
+	}
 }
-
-

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_usrreq.c,v 1.54 2001/06/26 06:55:32 aaron Exp $	*/
+/*	$OpenBSD: tcp_usrreq.c,v 1.59 2002/03/14 01:27:11 millert Exp $	*/
 /*	$NetBSD: tcp_usrreq.c,v 1.20 1996/02/13 23:44:16 christos Exp $	*/
 
 /*
@@ -81,6 +81,7 @@
 #include <sys/stat.h>
 #include <sys/sysctl.h>
 #include <sys/domain.h>
+#include <sys/kernel.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -110,7 +111,7 @@ extern int tcp_rst_ppslim;
 /* from in_pcb.c */
 extern	struct baddynamicports baddynamicports;
 
-int tcp_ident __P((void *, size_t *, void *, size_t));
+int tcp_ident(void *, size_t *, void *, size_t);
 
 #ifdef INET6
 int
@@ -321,7 +322,7 @@ tcp_usrreq(so, req, m, nam, control)
 		soisconnecting(so);
 		tcpstat.tcps_connattempt++;
 		tp->t_state = TCPS_SYN_SENT;
-		tp->t_timer[TCPT_KEEP] = tcptv_keep_init;	
+		TCP_TIMER_ARM(tp, TCPT_KEEP, tcptv_keep_init);	
 #ifdef TCP_COMPAT_42
 		tp->iss = tcp_iss;
 		tcp_iss += TCP_ISSINCR/2;
@@ -421,7 +422,7 @@ tcp_usrreq(so, req, m, nam, control)
 
 	case PRU_SENSE:
 		((struct stat *) m)->st_blksize = so->so_snd.sb_hiwat;
-		(void) splx(s);
+		splx(s);
 		return (0);
 
 	case PRU_RCVOOB:
@@ -479,15 +480,6 @@ tcp_usrreq(so, req, m, nam, control)
 		else
 #endif
 			in_setpeeraddr(inp, nam);
-		break;
-
-	/*
-	 * TCP slow timer went off; going through this
-	 * routine for tracing's sake.
-	 */
-	case PRU_SLOWTIMO:
-		tp = tcp_timers(tp, (long)nam);
-		req |= (long)nam << 8;		/* for debug's sake */
 		break;
 
 	default:
@@ -774,7 +766,7 @@ tcp_usrclosed(tp)
 		 * not left in FIN_WAIT_2 forever.
 		 */
 		if (tp->t_state == TCPS_FIN_WAIT_2)
-			tp->t_timer[TCPT_2MSL] = tcp_maxidle;
+			TCP_TIMER_ARM(tp, TCPT_2MSL, tcp_maxidle);
 	}
 	return (tp);
 }
@@ -929,6 +921,9 @@ tcp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case TCPCTL_RSTPPSLIMIT:
 		return (sysctl_int(oldp, oldlenp, newp, newlen,
 		    &tcp_rst_ppslim));
+	case TCPCTL_ACK_ON_PUSH:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &tcp_ack_on_push));
 	default:
 		return (ENOPROTOOPT);
 	}

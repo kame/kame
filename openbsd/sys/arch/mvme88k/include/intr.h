@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.h,v 1.3 2001/08/26 14:31:07 miod Exp $	*/
+/*	$OpenBSD: intr.h,v 1.8 2002/03/14 01:26:39 millert Exp $	*/
 /*
  * Copyright (C) 2000 Steve Murphree, Jr.
  * All rights reserved.
@@ -47,7 +47,7 @@
 #define M88K_LEVEL6_IRQ	6
 #define M88K_LEVEL7_IRQ	7
 /* 
- * We keep track of these seperately, but   
+ * We keep track of these separately, but   
  * they will be reflected with the above also.
  */
 #define M88K_CLK_IRQ	8
@@ -73,21 +73,20 @@ extern int intrcnt[M88K_NIRQ];
 #define IPL_NET		3
 #define IPL_IMP		3
 #define IPL_TTY		3
+#define IPL_VM		3
 #define IPL_CLOCK	5
 #define IPL_STATCLOCK	5
-#define IPL_VM		6
 #define IPL_HIGH	6
-#define IPL_SCHED	6
 #define IPL_NMI		7
 #define IPL_ABORT	7
 
 #ifdef _KERNEL
 #ifndef _LOCORE
-unsigned setipl __P((unsigned level));
+unsigned setipl(unsigned level);
 #ifdef DDB
-unsigned db_setipl __P((unsigned level));
+unsigned db_setipl(unsigned level);
 #endif 
-int spl0 __P((void));
+int spl0(void);
 #endif /* _LOCORE */
 
 /* needs major cleanup - XXX nivas */
@@ -117,7 +116,6 @@ above...
 #define splimp()		setipl(IPL_IMP)
 #define splvm()			setipl(IPL_VM)
 #define splhigh()		setipl(IPL_HIGH)
-#define splsched()		setipl(IPL_SCHED)
 
 #define splx(x)		((x) ? setipl((x)) : spl0())
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipx_usrreq.c,v 1.9 2001/09/23 10:22:13 mickey Exp $	*/
+/*	$OpenBSD: ipx_usrreq.c,v 1.11 2002/03/15 18:19:53 millert Exp $	*/
 
 /*-
  *
@@ -52,7 +52,7 @@
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/proc.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>
 
 #include <net/if.h>
@@ -81,13 +81,7 @@ int ipx_recvspace = IPXRCVQ;
  *  This may also be called for raw listeners.
  */
 void
-#if __STDC__
 ipx_input(struct mbuf *m, ...)
-#else
-ipx_input(m, va_alist)
-	struct mbuf *m;
-	va_decl
-#endif
 {
 	register struct ipxpcb *ipxp;
 	register struct ipx *ipx = mtod(m, struct ipx *);
@@ -172,13 +166,7 @@ ipx_drop(ipxp, errno)
 }
 
 int
-#if __STDC__
 ipx_output(struct mbuf *m0, ...)
-#else
-ipx_output(m0, va_alist)
-	struct mbuf *m0;
-	va_decl
-#endif
 {
 	register struct mbuf *m;
 	register struct ipx *ipx;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.1 2001/09/01 15:44:20 drahn Exp $	*/
+/*	$OpenBSD: mem.c,v 1.5 2002/02/23 17:17:04 matthieu Exp $	*/
 /*	$NetBSD: mem.c,v 1.1 1996/09/30 16:34:50 ws Exp $ */
 
 /*
@@ -55,10 +55,15 @@
 
 #include <machine/cpu.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/conf.h>
+
+/* open counter for aperture */
+#ifdef APERTURE
+static int ap_open_count = 0;
+extern int allowaperture;
+#endif
 
 /*ARGSUSED*/
 int
@@ -73,10 +78,22 @@ mmopen(dev, flag, mode, p)
 		case 1:
 		case 2:
 		case 12:
-			return (0);
+			break;
+#ifdef APERTURE
+	case 4:
+	        if (suser(p->p_ucred, &p->p_acflag) != 0 || !allowaperture)
+			return (EPERM);
+
+		/* authorize only one simultaneous open() */
+		if (ap_open_count > 0)
+			return(EPERM);
+		ap_open_count++;
+		break;
+#endif
 		default:
 			return (ENXIO);
 	}
+	return (0);
 }
 
 /*ARGSUSED*/
@@ -86,7 +103,10 @@ mmclose(dev, flag, mode, p)
 	int flag, mode;
 	struct proc *p;
 {
-
+#ifdef APERTURE
+	if (minor(dev) == 4)
+		ap_open_count--;
+#endif
 	return 0;
 }
 
@@ -163,10 +183,11 @@ mmrw(dev, uio, flags)
 	return error;
 }
 
-int
+paddr_t
 mmmmap(dev, off, prot)
         dev_t dev;
-        int off, prot;
+        off_t off;
+	int prot;
 {
 	return (-1);
 }

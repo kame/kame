@@ -1,4 +1,4 @@
-/*	$OpenBSD: akbdvar.h,v 1.1 2001/09/01 15:50:00 drahn Exp $	*/
+/*	$OpenBSD: akbdvar.h,v 1.3 2002/03/27 21:48:12 drahn Exp $	*/
 /*	$NetBSD: akbdvar.h,v 1.4 1999/02/17 14:56:56 tsubai Exp $	*/
 
 /*
@@ -49,6 +49,15 @@ struct akbd_softc {
 
 	u_int8_t	sc_leds;	/* current LED state */
 	struct device	*sc_wskbddev;
+#ifdef WSDISPLAY_COMPAT_RAWKBD
+#define MAXKEYS 20
+#define REP_DELAY1 400
+#define REP_DELAYN 100
+	int sc_rawkbd;
+	int sc_nrep;
+	char sc_rep[MAXKEYS];
+	struct timeout sc_rawrepeat_ch;
+#endif /* defined(WSDISPLAY_COMPAT_RAWKBD) */
 };
 
 /* LED register bits, inverse of actual register value */
@@ -56,7 +65,7 @@ struct akbd_softc {
 #define LED_CAPSLOCK	0x2
 #define LED_SCROLL_LOCK	0x4
 
-void kbd_adbcomplete __P((caddr_t buffer, caddr_t data_area, int adb_command));
+void kbd_adbcomplete(caddr_t buffer, caddr_t data_area, int adb_command);
 int akbd_cnattach(void);
 
 #endif /* _MACPPC_KBDVAR_H_ */

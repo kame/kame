@@ -1,4 +1,4 @@
-/*	$OpenBSD: adwlib.h,v 1.8 2001/04/06 04:42:06 csapuntz Exp $ */
+/*	$OpenBSD: adwlib.h,v 1.10 2002/03/14 01:26:53 millert Exp $ */
 /*      $NetBSD: adwlib.h,v 1.14 2000/07/03 18:14:18 dante Exp $        */
 
 /*
@@ -874,21 +874,6 @@ typedef struct adw_scsi_req_q {
 #define QHSTA_M_SGBACKUP_ERROR      0x47 /* Scatter-Gather backup error */
 
 /*
- * ADW_SCSI_REQ_Q 'scsi_status' return values.
- */
-#define SCSI_STATUS_GOOD		0x00
-#define SCSI_STATUS_CHECK_CONDITION	0x02
-#define SCSI_STATUS_CONDITION_MET	0x04
-#define SCSI_STATUS_TARGET_BUSY		0x08
-#define SCSI_STATUS_INTERMID		0x10
-#define SCSI_STATUS_INTERMID_COND_MET	0x14
-#define SCSI_STATUS_RSERV_CONFLICT	0x18
-#define SCSI_STATUS_CMD_TERMINATED	0x22
-#define SCSI_STATUS_QUEUE_FULL		0x28
-#define SCSI_STATUS_ACA_ACTIVE		0x30
-
-
-/*
  * Microcode idle loop commands
  */
 #define IDLE_CMD_COMPLETED           0
@@ -1116,13 +1101,13 @@ typedef struct {
  * Adw Library functions available to drivers.
  */
 
-int	AdwInitFromEEPROM __P((ADW_SOFTC *));
-int	AdwInitDriver __P((ADW_SOFTC *));
-int	AdwExeScsiQueue __P((ADW_SOFTC *, ADW_SCSI_REQ_Q *));
-int	AdwISR __P((ADW_SOFTC *));
-void	AdwResetChip __P((bus_space_tag_t, bus_space_handle_t));
-int	AdwSendIdleCmd __P((ADW_SOFTC *, u_int16_t, u_int32_t));
-int	AdwResetSCSIBus __P((ADW_SOFTC *));
-int	AdwResetCCB __P((ADW_SOFTC *));
+int	AdwInitFromEEPROM(ADW_SOFTC *);
+int	AdwInitDriver(ADW_SOFTC *);
+int	AdwExeScsiQueue(ADW_SOFTC *, ADW_SCSI_REQ_Q *);
+int	AdwISR(ADW_SOFTC *);
+void	AdwResetChip(bus_space_tag_t, bus_space_handle_t);
+int	AdwSendIdleCmd(ADW_SOFTC *, u_int16_t, u_int32_t);
+int	AdwResetSCSIBus(ADW_SOFTC *);
+int	AdwResetCCB(ADW_SOFTC *);
 
 #endif	/* _ADVANSYS_WIDE_LIBRARY_H_ */

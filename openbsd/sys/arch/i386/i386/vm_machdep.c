@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.30 2001/09/21 02:11:57 miod Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.36 2001/12/08 02:24:06 art Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.61 1996/05/03 19:42:35 christos Exp $	*/
 
 /*-
@@ -58,7 +58,6 @@
 #include <sys/exec.h>
 #include <sys/ptrace.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
@@ -71,8 +70,6 @@
 extern struct proc *npxproc;
 #endif
 
-void	setredzone __P((u_short *, caddr_t));
-
 /*
  * Finish a fork operation, with process p2 nearly set up.
  * Copy and update the kernel stack and pcb, making the child
@@ -83,14 +80,16 @@ void	setredzone __P((u_short *, caddr_t));
  * the frame pointers on the stack after copying.
  */
 void
-cpu_fork(p1, p2, stack, stacksize)
-	register struct proc *p1, *p2;
+cpu_fork(p1, p2, stack, stacksize, func, arg)
+	struct proc *p1, *p2;
 	void *stack;
 	size_t stacksize;
+	void (*func)(void *);
+	void *arg;
 {
-	register struct pcb *pcb = &p2->p_addr->u_pcb;
-	register struct trapframe *tf;
-	register struct switchframe *sf;
+	struct pcb *pcb = &p2->p_addr->u_pcb;
+	struct trapframe *tf;
+	struct switchframe *sf;
 
 #if NNPX > 0
 	/*
@@ -127,7 +126,7 @@ cpu_fork(p1, p2, stack, stacksize)
 
 	/*
 	 * Copy the trapframe, and arrange for the child to return directly
-	 * through rei().  Note the inline version of cpu_set_kpc().
+	 * through rei().
 	 */
 	p2->p_md.md_regs = tf = (struct trapframe *)pcb->pcb_tss.tss_esp0 - 1;
 	*tf = *p1->p_md.md_regs;
@@ -140,24 +139,10 @@ cpu_fork(p1, p2, stack, stacksize)
 
 	sf = (struct switchframe *)tf - 1;
 	sf->sf_ppl = 0;
-	sf->sf_esi = (int)child_return;
-	sf->sf_ebx = (int)p2;
-	sf->sf_eip = (int)proc_trampoline;
-	pcb->pcb_esp = (int)sf;
-}
-
-void
-cpu_set_kpc(p, pc, arg)
-	struct proc *p;
-	void (*pc) __P((void *));
-	void *arg;
-{
-	struct switchframe *sf =
-	    (struct switchframe *)p->p_addr->u_pcb.pcb_esp;
-
-	sf->sf_esi = (int)pc;
+	sf->sf_esi = (int)func;
 	sf->sf_ebx = (int)arg;
 	sf->sf_eip = (int)proc_trampoline;
+	pcb->pcb_esp = (int)sf;
 }
 
 void
@@ -259,26 +244,6 @@ cpu_coredump(p, vp, cred, chdr)
 	return 0;
 }
 
-#if 0
-/*
- * Set a red zone in the kernel stack after the u. area.
- */
-void
-setredzone(pte, vaddr)
-	u_short *pte;
-	caddr_t vaddr;
-{
-/* eventually do this by setting up an expand-down stack segment
-   for ss0: selector, allowing stack access down to top of u.
-   this means though that protection violations need to be handled
-   thru a double fault exception that must do an integral task
-   switch to a known good context, within which a dump can be
-   taken. a sensible scheme might be to save the initial context
-   used by sched (that has physical memory mapped 1:1 at bottom)
-   and take the dump while still in mapped mode */
-}
-#endif
-
 /*
  * Move pages from one kernel virtual address to another.
  * Both addresses are assumed to reside in the Sysmap.
@@ -312,9 +277,9 @@ pagemove(from, to, size)
 				pmap_update_pg((vm_offset_t) from);
 		}
 
-		from += NBPG;
-		to += NBPG;
-		size -= NBPG;
+		from += PAGE_SIZE;
+		to += PAGE_SIZE;
+		size -= PAGE_SIZE;
 	}
 #if defined(I386_CPU)
 	if (cpu_class != CPUCLASS_386)
@@ -384,13 +349,12 @@ vmapbuf(bp, len)
 	while (len) {
 		pmap_extract(vm_map_pmap(&bp->b_proc->p_vmspace->vm_map),
 		    faddr, &fpa);
-		pmap_enter(vm_map_pmap(phys_map), taddr, fpa,
-		    VM_PROT_READ | VM_PROT_WRITE,
-		    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
+		pmap_kenter_pa(taddr, fpa, VM_PROT_READ|VM_PROT_WRITE);
 		faddr += PAGE_SIZE;
 		taddr += PAGE_SIZE;
 		len -= PAGE_SIZE;
 	}
+	pmap_update(pmap_kernel());
 }
 
 /*
@@ -409,6 +373,8 @@ vunmapbuf(bp, len)
 	addr = trunc_page((vaddr_t)bp->b_data);
 	off = (vm_offset_t)bp->b_data - addr;
 	len = round_page(off + len);
+	pmap_kremove(addr, len);
+	pmap_update(pmap_kernel());
 	uvm_km_free_wakeup(phys_map, addr, len);
 	bp->b_data = bp->b_saveaddr;
 	bp->b_saveaddr = 0;

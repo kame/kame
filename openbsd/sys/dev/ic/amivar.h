@@ -1,4 +1,4 @@
-/*	$OpenBSD: amivar.h,v 1.3 2001/04/30 15:45:05 mickey Exp $	*/
+/*	$OpenBSD: amivar.h,v 1.5 2002/03/14 01:26:54 millert Exp $	*/
 
 /*
  * Copyright (c) 2001 Michael Shalayeff
@@ -66,9 +66,9 @@ struct ami_softc {
 	u_int	sc_flags;
 
 	/* low-level interface */
-	int (*sc_init) __P((struct ami_softc *sc));
-	int (*sc_exec) __P((struct ami_softc *sc, struct ami_iocmd *));
-	int (*sc_done) __P((struct ami_softc *sc, struct ami_iocmd *));
+	int (*sc_init)(struct ami_softc *sc);
+	int (*sc_exec)(struct ami_softc *sc, struct ami_iocmd *);
+	int (*sc_done)(struct ami_softc *sc, struct ami_iocmd *);
 
 	bus_space_tag_t	iot;
 	bus_space_handle_t ioh;
@@ -77,7 +77,7 @@ struct ami_softc {
 	volatile struct ami_iocmd *sc_mbox;
 	paddr_t		sc_mbox_pa;
 	struct ami_ccb	sc_ccbs[AMI_MAXCMDS];
-	ami_queue_head	sc_free_ccb, sc_ccbq, sc_ccb2q, sc_ccbdone;
+	ami_queue_head	sc_free_ccb, sc_ccbq, sc_ccbdone;
 
 	void		*sc_cmds;
 	bus_dmamap_t	sc_cmdmap;
@@ -116,14 +116,14 @@ struct ami_softc {
 #define AMI_UNLOCK_AMI(sc, lock) splx(lock)
 typedef int ami_lock_t;
 
-int  ami_attach __P((struct ami_softc *sc));
-int  ami_intr __P((void *));
+int  ami_attach(struct ami_softc *sc);
+int  ami_intr(void *);
 
-int ami_quartz_init __P((struct ami_softc *sc));
-int ami_quartz_exec __P((struct ami_softc *sc, struct ami_iocmd *));
-int ami_quartz_done __P((struct ami_softc *sc, struct ami_iocmd *));
+int ami_quartz_init(struct ami_softc *sc);
+int ami_quartz_exec(struct ami_softc *sc, struct ami_iocmd *);
+int ami_quartz_done(struct ami_softc *sc, struct ami_iocmd *);
 
-int ami_schwartz_init __P((struct ami_softc *sc));
-int ami_schwartz_exec __P((struct ami_softc *sc, struct ami_iocmd *));
-int ami_schwartz_done __P((struct ami_softc *sc, struct ami_iocmd *));
+int ami_schwartz_init(struct ami_softc *sc);
+int ami_schwartz_exec(struct ami_softc *sc, struct ami_iocmd *);
+int ami_schwartz_done(struct ami_softc *sc, struct ami_iocmd *);
 

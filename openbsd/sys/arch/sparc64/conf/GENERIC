@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.26 2001/10/15 18:44:56 jason Exp $
+#	$OpenBSD: GENERIC,v 1.57 2002/04/04 23:16:21 jason Exp $
 # 	$NetBSD: GENERIC32,v 1.18 2001/07/20 00:07:12 eeh Exp $
 
 machine		sparc64
@@ -9,6 +9,8 @@ option		SUN4U
 option		_LP64
 
 option		PCIVERBOSE
+option		USER_PCICONF	# user-space PCI configuration
+option		APERTURE
 
 maxusers	64
 
@@ -27,30 +29,89 @@ pci*	at ppb?
 ppb*	at pci? dev ? function ?
 ebus*	at pci?
 
+# PCI Ethernet
 hme*	at pci? dev ? function ?
 gem*	at pci? dev ? function ?
+dc*	at pci? dev ? function ?
+
+# PCI SCSI
 siop*	at pci? dev ? function ?
 scsibus* at siop?
+
+# PCI Display
+vgafb*		at pci? dev ? function ?
+wsdisplay*	at vgafb?
+
+# PCI crypto
+hifn*		at pci? dev ? function ?
+ubsec*		at pci? dev ? function ?
+
+# PCI sound
+autri*		at pci? dev ? function ?	# Trident 4D WAVE
+eap*		at pci? dev ? function ?	# Ensoniq
+midi*		at autri?
+audio*		at autri?
+audio*		at eap?
+
+# USB bridges
+ohci*	at pci? dev ? function ?
+usb*	at ohci? flags 0x1
+
+# USB devices
+uhub*	at usb?
+uhub*	at uhub? port ? configuration ?
+ukbd*	at uhub?				# USB keyboard
+wskbd*	at ukbd? console ?
+ums*	at uhub? port ? configuration ?		# USB mouse
+wsmouse* at ums?
+uhid*	at uhub? port ? configuration ?		# USB generic human interface
+ugen*	at uhub? port ? configuration ?		# USB generic device
 
 #### Standard system devices -- all required for a given architecture
 
 auxio*	at ebus?
 beeper*	at ebus?
 
-#com*	at ebus?	#*BROKEN*
+# SAB82532 based serial ports
+sab*	at ebus?
+sabtty* at sab?
+
+# NS16550 based serial ports
+com*	at ebus?
+comkbd*	at ebus?
+wskbd* at comkbd?
+
+# i8042 based serial ports (PS/2 ports)
+pckbc*	at ebus?				# controller
+pckbd*	at pckbc?				#  ps2 keyboard
+wskbd*	at pckbd? console ?			#   generic keyboard layer
+pms*	at pckbc?				#  ps2 mouse
+wsmouse* at pms?				#   generic mouse
+pmsi*	at pckbc?				#  ps2 "intelli"mouse
+wsmouse* at pmsi?				#   generic mouse
 
 audioce*	at ebus?
 audio*		at audioce?
 
+# parallel ports
+lpt*	at ebus?
+
+# performance counters
+uperf*	at ebus?
+uperf*	at sbus? slot ? offset ?
+
 zs*	at sbus? slot ? offset ?
 zstty*	at zs? channel ?
+zskbd*	at zs? channel ?
+wskbd*	at zskbd? console ?
 
 ## PROM console driver -- if all else fails
 pcons0	at mainbus0				# PROM console
 
-## Mostek clock 
+## Mostek/DS1287 clocks
 clock*	at sbus? slot ? offset ?
 clock*	at ebus?
+rtc*	at ebus?
 
 ## Timer chip found on (some) sun4u systems.
 timer*	at mainbus0
@@ -66,6 +127,16 @@ qe*		at qec?
 be*		at qec?
 
 hme*		at sbus? slot ? offset ?
+
+# Magma serial/parallel port devices
+magma*		at sbus? slot ? offset ?
+mtty*		at magma?
+mbpp*		at magma?
+
+# Magma serial/parallel port devices
+spif*		at sbus? slot ? offset ?
+stty*		at spif?
+sbpp*		at spif?
 
 pciide*	at pci? dev ? function ? flags 0x0000
 wd*	at pciide? channel ? drive ? flags 0x0a00
@@ -105,8 +176,22 @@ uk*		at scsibus? target ? lun ?	# unknown SCSI devices
 # Media Independent Interface (mii) drivers)
 nsphy*	at mii? phy ?				# NS and compatible PHYs
 qsphy*	at mii? phy ?				# Quality Semi QS6612 PHYs
+dcphy*	at mii? phy ?				# Digital clone PHYs
 ukphy*	at mii? phy ?				# Unknown PHYs
+
+cgsix*		at sbus? slot ? offset ?
+wsdisplay*	at cgsix?
+
+cgthree*	at sbus? slot ? offset ?
+wsdisplay*	at cgthree?
 
 audiocs*	at sbus? slot ? offset ?
 audio*		at audiocs?
 
+asio*		at sbus? slot ? offset ?	# Aurora 210SJ
+com*		at asio?
+apio*		at sbus? slot ? offset ?	# Aurora 210SJ
+lpt*		at apio?
+
+# mouse & keyboard multiplexor pseudo-devices
+#pseudo-device	wsmux 	2

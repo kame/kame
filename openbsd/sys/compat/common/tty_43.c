@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty_43.c,v 1.5 1996/12/16 20:04:52 tholo Exp $	*/
+/*	$OpenBSD: tty_43.c,v 1.7 2002/03/14 01:26:49 millert Exp $	*/
 /*	$NetBSD: tty_43.c,v 1.5 1996/05/20 14:29:17 mark Exp $	*/
 
 /*-
@@ -85,14 +85,9 @@ static int compatspcodes[] = {
 	1800, 2400, 4800, 9600, 19200, 38400, 57600, 115200
 };
 
-/* Macros to clear/set/test flags. */
-#define	SET(t, f)	(t) |= (f)
-#define	CLR(t, f)	(t) &= ~(f)
-#define	ISSET(t, f)	((t) & (f))
-
-int ttcompatgetflags __P((struct tty *));
-void ttcompatsetflags __P((struct tty *, struct termios *));
-void ttcompatsetlflags __P((struct tty *, struct termios *));
+int ttcompatgetflags(struct tty *);
+void ttcompatsetflags(struct tty *, struct termios *);
+void ttcompatsetlflags(struct tty *, struct termios *);
 
 /*ARGSUSED*/
 int

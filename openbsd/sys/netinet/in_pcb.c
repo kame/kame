@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_pcb.c,v 1.56 2001/07/05 16:45:54 jjbg Exp $	*/
+/*	$OpenBSD: in_pcb.c,v 1.60 2002/03/14 01:27:11 millert Exp $	*/
 /*	$NetBSD: in_pcb.c,v 1.25 1996/02/13 23:41:53 christos Exp $	*/
 
 /*
@@ -403,84 +403,6 @@ in_pcbconnect(v, nam)
 			sin->sin_addr = in_ifaddr.tqh_first->ia_broadaddr.sin_addr;
 	}
 	if (inp->inp_laddr.s_addr == INADDR_ANY) {
-#if 0
-		register struct route *ro;
-		struct sockaddr_in *sin2;
-		struct in_ifaddr *ia;
-
-		ia = (struct in_ifaddr *)0;
-		/* 
-		 * If route is known or can be allocated now,
-		 * our src addr is taken from the i/f, else punt.
-		 */
-		ro = &inp->inp_route;
-		if (ro->ro_rt &&
-		    (satosin(&ro->ro_dst)->sin_addr.s_addr !=
-			sin->sin_addr.s_addr || 
-		    inp->inp_socket->so_options & SO_DONTROUTE)) {
-			RTFREE(ro->ro_rt);
-			ro->ro_rt = (struct rtentry *)0;
-		}
-		if ((inp->inp_socket->so_options & SO_DONTROUTE) == 0 && /*XXX*/
-		    (ro->ro_rt == (struct rtentry *)0 ||
-		    ro->ro_rt->rt_ifp == (struct ifnet *)0)) {
-			/* No route yet, so try to acquire one */
-			ro->ro_dst.sa_family = AF_INET;
-			ro->ro_dst.sa_len = sizeof(struct sockaddr_in);
-			satosin(&ro->ro_dst)->sin_addr = sin->sin_addr;
-			rtalloc(ro);
-
-			/*
-			 * It is important to bzero out the rest of the
-			 * struct sockaddr_in when mixing v6 & v4!
-			 */
-			sin2 = (struct sockaddr_in *)&ro->ro_dst;
-			bzero(sin2->sin_zero, sizeof(sin2->sin_zero));
-		}
-		/*
-		 * If we found a route, use the address
-		 * corresponding to the outgoing interface
-		 * unless it is the loopback (in case a route
-		 * to our address on another net goes to loopback).
-		 */
-		if (ro->ro_rt && !(ro->ro_rt->rt_ifp->if_flags & IFF_LOOPBACK))
-			ia = ifatoia(ro->ro_rt->rt_ifa);
-		if (ia == 0) {
-			u_int16_t fport = sin->sin_port;
-
-			sin->sin_port = 0;
-			ia = ifatoia(ifa_ifwithdstaddr(sintosa(sin)));
-			if (ia == 0)
-				ia = ifatoia(ifa_ifwithnet(sintosa(sin)));
-			sin->sin_port = fport;
-			if (ia == 0)
-				ia = in_ifaddr.tqh_first;
-			if (ia == 0)
-				return (EADDRNOTAVAIL);
-		}
-		/*
-		 * If the destination address is multicast and an outgoing
-		 * interface has been set as a multicast option, use the
-		 * address of that interface as our source address.
-		 */
-		if (IN_MULTICAST(sin->sin_addr.s_addr) &&
-		    inp->inp_moptions != NULL) {
-			struct ip_moptions *imo;
-			struct ifnet *ifp;
-
-			imo = inp->inp_moptions;
-			if (imo->imo_multicast_ifp != NULL) {
-				ifp = imo->imo_multicast_ifp;
-				for (ia = in_ifaddr.tqh_first; ia != 0;
-				    ia = ia->ia_list.tqe_next)
-					if (ia->ia_ifp == ifp)
-						break;
-				if (ia == 0)
-					return (EADDRNOTAVAIL);
-			}
-		}
-		ifaddr = satosin(&ia->ia_addr);
-#else
 		int error;
 		ifaddr = in_selectsrc(sin, &inp->inp_route,
 			inp->inp_socket->so_options, inp->inp_moptions, &error);
@@ -489,7 +411,6 @@ in_pcbconnect(v, nam)
 				error = EADDRNOTAVAIL;
 			return error;
 		}
-#endif
 	}
 	if (in_pcbhashlookup(inp->inp_table, sin->sin_addr, sin->sin_port,
 	    inp->inp_laddr.s_addr ? inp->inp_laddr : ifaddr->sin_addr,
@@ -543,14 +464,6 @@ in_pcbdetach(v)
 	struct socket *so = inp->inp_socket;
 	int s;
 
-#if 0 /*KAME IPSEC*/
-	if (so->so_pcb) {
-		KEYDEBUG(KEYDEBUG_KEY_STAMP,
-			printf("DP call free SO=%p from in_pcbdetach\n", so));
-		key_freeso(so);
-	}
-	ipsec4_delete_pcbpolicy(inp);
-#endif /*IPSEC*/
 	so->so_pcb = 0;
 	sofree(so);
 	if (inp->inp_options)
@@ -650,7 +563,7 @@ in_pcbnotify(table, dst, fport_arg, laddr, lport_arg, errno, notify)
 	u_int fport_arg, lport_arg;
 	struct in_addr laddr;
 	int errno;
-	void (*notify) __P((struct inpcb *, int));
+	void (*notify)(struct inpcb *, int);
 {
 	register struct inpcb *inp, *oinp;
 	struct in_addr faddr;
@@ -698,7 +611,7 @@ in_pcbnotifyall(table, dst, errno, notify)
 	struct inpcbtable *table;
 	struct sockaddr *dst;
 	int errno;
-	void (*notify) __P((struct inpcb *, int));
+	void (*notify)(struct inpcb *, int);
 {
 	register struct inpcb *inp, *oinp;
 	struct in_addr faddr;
@@ -813,16 +726,6 @@ in_pcblookup(table, faddrp, fport_arg, laddrp, lport_arg, flags)
 			struct in6_addr *laddr6 = (struct in6_addr *)laddrp;
 			struct in6_addr *faddr6 = (struct in6_addr *)faddrp;
 
-			/* 
-			 * Always skip AF_INET sockets when looking
-			 * for AF_INET6 addresses.  The only problem
-			 * with this comes if the PF_INET6 addresses
-			 * are v4-mapped addresses.  From what I've
-			 * been able to see, none of the callers cause
-			 * such a situation to occur.  If such a
-			 * situation DID occur, then it is possible to
-			 * miss a matching PCB.
-			 */
 			if (!(inp->inp_flags & INP_IPV6))
 				continue;
 

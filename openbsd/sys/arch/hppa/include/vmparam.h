@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmparam.h,v 1.17 2001/09/22 18:00:09 miod Exp $	*/
+/*	$OpenBSD: vmparam.h,v 1.22 2002/03/15 21:44:18 mickey Exp $	*/
 
 /* 
  * Copyright (c) 1988-1994, The University of Utah and
@@ -92,8 +92,6 @@
 #define	VM_MAX_KERNEL_ADDRESS	((vaddr_t)0xf0000000)
 
 /* virtual sizes (bytes) for various kernel submaps */
-#define VM_MBUF_SIZE		(NMBCLUSTERS*MCLBYTES)
-#define VM_KMEM_SIZE		(NKMEMCLUSTERS*PAGE_SIZE)
 #define VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
 
 #define	VM_PHYSSEG_MAX	8	/* this many physmem segments */
@@ -105,9 +103,10 @@
 #define	VM_FREELIST_DEFAULT	0
 #define	VM_FREELIST_FIRST16	1
 
-#ifdef _KERNEL
+#ifndef _LOCORE
+#define __HAVE_PMAP_PHYSSEG
 struct pmap_physseg {
-	struct pv_entry *pvent;
+	struct pv_head *pvhead;
 };
 #endif
 

@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISK_CD,v 1.51 2001/10/10 23:43:43 millert Exp $
+#	$OpenBSD: RAMDISK_CD,v 1.57 2002/04/02 17:14:47 deraadt Exp $
 
 machine		i386		# architecture, used by config; REQUIRED
 
@@ -45,6 +45,7 @@ apm0	at bios0 flags 0x0000	# flags 0x0101 to force protocol version 1.1
 pcibios0 at bios0 flags 0x0000
 
 isa0	at mainbus0
+isa0	at pcib?
 eisa0	at mainbus0
 pci*	at mainbus0
 
@@ -55,6 +56,7 @@ pchb*	at pci? dev ? function ?	# PCI-Host bridges
 ppb*	at pci? dev ? function ?	# PCI-PCI bridges
 pci*	at ppb? bus ?
 pci*	at pchb? bus ?
+pcib*	at pci? dev ? function ?	# PCI-ISA bridge
 
 # CardBus bus support
 cardbus*	at cardslot?
@@ -145,10 +147,12 @@ pccom*	at isapnp?
 #lpt1	at isa? port 0x278
 #lpt2	at isa? port 0x3bc
 
-bt0	at isa? port 0x330 irq ? drq ?	# BusLogic [57]4X SCSI controllers
-bt1	at isa? disable port 0x334 irq ? drq ?	# BusLogic [57]4X SCSI controllers
-#bt2	at isa? disable port ? irq ?
-scsibus* at bt?
+bha0	at isa? port 0x330 irq ? drq ?	# BusLogic [57]4X SCSI controllers
+bha1	at isa? disable port 0x334 irq ? drq ? # BusLogic [57]4X SCSI controllers
+bha2	at isa? disable port ? irq ?
+bha*	at pci? dev ? function ?
+#bha*	at eisa? slot ?			# XXX eisa still runs in isa-compat
+scsibus* at bha?
 aha0	at isa? port 0x330 irq ? drq ?	# Adaptec 154[02] SCSI controllers
 aha1	at isa? port 0x334 irq ? drq ?	# Adaptec 154[02] SCSI controllers
 aha*	at isapnp?
@@ -192,6 +196,8 @@ pcscp*	at pci? dev ? function ?	# AMD 53c974 PCscsi-PCI SCSI
 scsibus* at pcscp?
 sea0	at isa? disable iomem 0xc8000 irq 5	# Seagate ST0[12] SCSI controllers
 scsibus* at sea?
+trm*	at pci? dev ? function ?	# Tekram DC-3x5U SCSI Controllers
+scsibus* at trm?
 uha0	at isa? port 0x330 irq ? drq ?	# UltraStor [13]4f SCSI controllers
 uha1	at isa? disable port 0x334 irq ? drq ?	# UltraStor [13]4f SCSI controllers
 uha*	at eisa? slot ?			# UltraStor 24f SCSI controllers
@@ -199,6 +205,11 @@ scsibus* at uha?
 wds0	at isa? disable port 0x350 irq 15 drq 6	# WD7000 and TMC-7000 controllers
 #wds1	at isa? port 0x358 irq 11 drq 5
 scsibus* at wds?
+
+# I2O
+iop*	at pci? dev ? function ?	# I2O
+ioprbs*	at iop? tid ?			# Random block storage
+scsibus* at ioprbs?
 
 sd*	at scsibus? target ? lun ?	# SCSI disk drives
 st*	at scsibus? target ? lun ?	# SCSI tape drives
@@ -278,13 +289,14 @@ wb*	at pci? dev ? function ?		# Winbond W89C840F ethernet
 ti*	at pci? dev ? function ?		# Alteon Tigon 1Gb ethernet
 skc*	at pci? dev ? function ?		# SysKonnect GEnesis 984x
 sk*	at skc?					#  each port of above
-wx*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
+gx*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
 txp*	at pci? dev ? function ?		# 3com 3CR990
 nge*	at pci? dev ? function ?		# NS DP83820/DP83821 GigE
 bge*	at pci? dev ? function ?		# Broadcom BCM570x (aka Tigon3)
 #lge*	at pci? dev ? function ?		# Level1 LXT1001 GigE
 
 # Wireless network cards
+wi*	at pci? dev ? function ?		# WaveLAN IEEE 802.11DS
 wi*	at pcmcia? function ?			# WaveLAN IEEE 802.11DS
 #awi*	at pcmcia? function ?			# Bay Networks IEEE 802.11FH
 an*	at pcmcia? function ?			# Aironet IEEE 802.11DS

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cd9660_vfsops.c,v 1.22 2001/06/23 02:14:22 csapuntz Exp $	*/
+/*	$OpenBSD: cd9660_vfsops.c,v 1.31 2002/03/14 03:16:09 millert Exp $	*/
 /*	$NetBSD: cd9660_vfsops.c,v 1.26 1997/06/13 15:38:58 pk Exp $	*/
 
 /*-
@@ -53,6 +53,8 @@
 #include <sys/file.h>
 #include <sys/disklabel.h>
 #include <sys/ioctl.h>
+#include <sys/cdio.h>
+#include <sys/conf.h>
 #include <sys/errno.h>
 #include <sys/malloc.h>
 #include <sys/stat.h>
@@ -63,7 +65,6 @@
 #include <isofs/cd9660/cd9660_extern.h>
 #include <isofs/cd9660/iso_rrip.h>
 #include <isofs/cd9660/cd9660_node.h>
-#include <isofs/cd9660/cd9660_mount.h>
 
 struct vfsops cd9660_vfsops = {
 	cd9660_mount,
@@ -85,10 +86,10 @@ struct vfsops cd9660_vfsops = {
  * Called by vfs_mountroot when iso is going to be mounted as root.
  */
 
-static	int iso_mountfs __P((struct vnode *devvp, struct mount *mp,
-    struct proc *p, struct iso_args *argp));
-int	iso_disklabelspoof __P((dev_t dev, void (*strat) __P((struct buf *)),
-    struct disklabel *lp));
+static	int iso_mountfs(struct vnode *devvp, struct mount *mp,
+	    struct proc *p, struct iso_args *argp);
+int	iso_disklabelspoof(dev_t dev, void (*strat)(struct buf *),
+	    struct disklabel *lp);
 
 int
 cd9660_mountroot()
@@ -122,6 +123,7 @@ cd9660_mountroot()
 	simple_unlock(&mountlist_slock);
         (void)cd9660_statfs(mp, &mp->mnt_stat, p);
 	vfs_unbusy(mp, p);
+	inittodr(0);
         return (0);
 }
 
@@ -239,6 +241,7 @@ iso_mountfs(devvp, mp, p, argp)
 	struct iso_supplementary_descriptor *sup = NULL;
 	struct iso_directory_record *rootp;
 	int logical_block_size;
+	int sess = 0;
 	
 	if (!ronly)
 		return (EROFS);
@@ -266,11 +269,16 @@ iso_mountfs(devvp, mp, p, argp)
 	 * whichever is greater.  For now, we'll just use a constant.
 	 */
 	iso_bsize = ISO_DEFAULT_BLOCK_SIZE;
+
+	error = VOP_IOCTL(devvp, CDIOREADMSADDR, (caddr_t)&sess, 0, FSCRED, p);
+	if (error)
+		sess = 0;
 	
 	joliet_level = 0;
 	for (iso_blknum = 16; iso_blknum < 100; iso_blknum++) {
-		if ((error = bread(devvp, iso_blknum * btodb(iso_bsize),
-				   iso_bsize, NOCRED, &bp)) != 0)
+		if ((error = bread(devvp,
+		    (iso_blknum + sess) * btodb(iso_bsize),
+		    iso_bsize, NOCRED, &bp)) != 0)
 			goto out;
 		
 		vdp = (struct iso_volume_descriptor *)bp->b_data;
@@ -443,7 +451,7 @@ out:
 int
 iso_disklabelspoof(dev, strat, lp)
 	dev_t dev;
-	void (*strat) __P((struct buf *));
+	void (*strat)(struct buf *);
 	register struct disklabel *lp;
 {
 	struct buf *bp = NULL;
@@ -926,7 +934,9 @@ retry:
 	case VSOCK:
 	case VDIR:
 	case VBAD:
+		break;
 	case VREG:
+		uvm_vnp_setsize(vp, ip->i_size);
 		break;
 	}
 	

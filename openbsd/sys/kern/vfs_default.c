@@ -1,5 +1,4 @@
-/*       $OpenBSD: vfs_default.c,v 1.7 2001/06/25 03:28:03 csapuntz Exp $  */
-
+/*	$OpenBSD: vfs_default.c,v 1.19 2002/03/14 01:27:06 millert Exp $  */
 
 /*
  *    Portions of this code are:
@@ -55,8 +54,8 @@
 
 extern struct simplelock spechash_slock;
 
-int filt_generic_readwrite __P((struct knote *kn, long hint));
-void filt_generic_detach __P((struct knote *kn));
+int filt_generic_readwrite(struct knote *kn, long hint);
+void filt_generic_detach(struct knote *kn);
 
 /*
  * Eliminate all activity associated with  the requested vnode
@@ -309,4 +308,20 @@ int
 lease_check(void *v)
 {
 	return (0);
+}
+
+/* 
+ * vfs default ops
+ * used to fill the vfs function table to get reasonable default return values.
+ */
+int
+vfs_stdextattrctl(mp, cmd, filename_vp, attrnamespace, attrname, td)
+	struct mount *mp;
+	int cmd;
+	struct vnode *filename_vp;
+	int attrnamespace;
+	const char *attrname;
+	struct proc *td;
+{
+	return(EOPNOTSUPP);
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: npx.c,v 1.19 2001/05/05 23:25:51 art Exp $	*/
+/*	$OpenBSD: npx.c,v 1.25 2002/03/14 01:26:33 millert Exp $	*/
 /*	$NetBSD: npx.c,v 1.57 1996/05/12 23:12:24 mycroft Exp $	*/
 
 #if 0
@@ -54,7 +54,6 @@
 #include <sys/ioctl.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
@@ -106,19 +105,19 @@
 #define	clts()			__asm("clts")
 #define	stts()			lcr0(rcr0() | CR0_TS)
 
-int npxdna __P((struct proc *));
-void npxexit __P((void));
-int npxintr __P((void *));
-static int npxprobe1 __P((struct isa_attach_args *));
-static void npxsave1 __P((void));
+int npxdna(struct proc *);
+void npxexit(void);
+int npxintr(void *);
+static int npxprobe1(struct isa_attach_args *);
+static void npxsave1(void);
 
 struct npx_softc {
 	struct device sc_dev;
 	void *sc_ih;
 };
 
-int npxprobe __P((struct device *, void *, void *));
-void npxattach __P((struct device *, struct device *, void *));
+int npxprobe(struct device *, void *, void *);
+void npxattach(struct device *, struct device *, void *);
 
 struct cfattach npx_ca = {
 	sizeof(struct npx_softc), npxprobe, npxattach
@@ -151,31 +150,27 @@ extern int i386_fpu_fdivbug;
  * interrupts.  We'll still need a special exception 16 handler.  The busy
  * latch stuff in probintr() can be moved to npxprobe().
  */
-void probeintr __P((void));
-asm ("
-	.text
-_probeintr:
-	ss
-	incl	_npx_intrs_while_probing
-	pushl	%eax
-	movb	$0x20,%al	# EOI (asm in strings loses cpp features)
-	outb	%al,$0xa0	# IO_ICU2
-	outb	%al,$0x20	# IO_ICU1
-	movb	$0,%al
-	outb	%al,$0xf0	# clear BUSY# latch
-	popl	%eax
-	iret
-");
+void probeintr(void);
+asm (".text\n\t"
+"_probeintr:\n\t"
+	"ss\n\t"
+	"incl	_npx_intrs_while_probing\n\t"
+	"pushl	%eax\n\t"
+	"movb	$0x20,%al	# EOI (asm in strings loses cpp features)\n\t"
+	"outb	%al,$0xa0	# IO_ICU2\n\t"
+	"outb	%al,$0x20	# IO_ICU1\n\t"
+	"movb	$0,%al\n\t"
+	"outb	%al,$0xf0	# clear BUSY# latch\n\t"
+	"popl	%eax\n\t"
+	"iret\n\t");
 
-void probetrap __P((void));
-asm ("
-	.text
-_probetrap:
-	ss
-	incl	_npx_traps_while_probing
-	fnclex
-	iret
-");
+void probetrap(void);
+asm (".text\n\t"
+"_probetrap:\n\t"
+	"ss\n\t"
+	"incl	_npx_traps_while_probing\n\t"
+	"fnclex\n\t"
+	"iret\n\t");
 
 static inline int
 npxprobe1(ia)
@@ -310,21 +305,19 @@ npxprobe(parent, match, aux)
 	return (result);
 }
 
-int npx586bug1 __P((int, int));
-asm ("
-	.text
-_npx586bug1:
-	fildl	4(%esp)		# x
-	fildl	8(%esp)		# y
-	fld	%st(1)
-	fdiv	%st(1),%st	# x/y
-	fmulp	%st,%st(1)	# (x/y)*y
-	fsubrp	%st,%st(1)	# x-(x/y)*y
-	pushl	$0
-	fistpl	(%esp)
-	popl	%eax
-	ret
-");
+int npx586bug1(int, int);
+asm (".text\n\t"
+"_npx586bug1:\n\t"
+	"fildl	4(%esp)		# x\n\t"
+	"fildl	8(%esp)		# y\n\t"
+	"fld	%st(1)\n\t"
+	"fdiv	%st(1),%st	# x/y\n\t"
+	"fmulp	%st,%st(1)	# (x/y)*y\n\t"
+	"fsubrp	%st,%st(1)	# x-(x/y)*y\n\t"
+	"pushl	$0\n\t"
+	"fistpl	(%esp)\n\t"
+	"popl	%eax\n\t"
+	"ret\n\t");
 
 /*
  * Attach routine - announce which it is, and wire into system
@@ -538,7 +531,7 @@ npxdna(p)
 	}
 
 #ifdef DIAGNOSTIC
-	if (cpl != 0 || npx_nointr != 0)
+	if (cpl != IPL_NONE || npx_nointr != 0)
 		panic("npxdna: masked");
 #endif
 
@@ -613,7 +606,7 @@ npxsave()
 {
 
 #ifdef DIAGNOSTIC
-	if (cpl != 0 || npx_nointr != 0)
+	if (cpl != IPL_NONE || npx_nointr != 0)
 		panic("npxsave: masked");
 #endif
 	iprintf(("Fork"));

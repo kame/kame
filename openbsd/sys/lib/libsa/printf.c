@@ -1,4 +1,4 @@
-/*	$OpenBSD: printf.c,v 1.14 1999/08/16 09:21:38 downsj Exp $	*/
+/*	$OpenBSD: printf.c,v 1.17 2002/03/15 18:19:52 millert Exp $	*/
 /*	$NetBSD: printf.c,v 1.10 1996/11/30 04:19:21 gwr Exp $	*/
 
 /*-
@@ -61,19 +61,15 @@
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
-#ifdef __STDC__
 #include <machine/stdarg.h>
-#else
-#include <machine/varargs.h>
-#endif
 
 #include "stand.h"
 
-static void kprintn __P((void (*)(int), u_long, int));
-static void kdoprnt __P((void (*)(int), const char *, va_list));
+static void kprintn(void (*)(int), u_long, int);
+static void kdoprnt(void (*)(int), const char *, va_list);
 
 #ifndef	STRIPPED
-static void sputchar __P((int));
+static void sputchar(int);
 static char *sbuf;
 
 static void
@@ -84,21 +80,12 @@ sputchar(c)
 }
 
 void
-#ifdef __STDC__
 sprintf(char *buf, const char *fmt, ...)
-#else
-sprintf(buf, fmt, va_alist)
-	char *buf, *fmt;
-#endif
 {
 	va_list ap;
 
 	sbuf = buf;
-#ifdef __STDC__
 	va_start(ap, fmt);
-#else
-	va_start(ap);
-#endif
 	kdoprnt(sputchar, fmt, ap);
 	va_end(ap);
 	*sbuf = '\0';
@@ -106,20 +93,11 @@ sprintf(buf, fmt, va_alist)
 #endif	/* NO_SPRINTF */
 
 void
-#ifdef __STDC__
 printf(const char *fmt, ...)
-#else
-printf(fmt, va_alist)
-	char *fmt;
-#endif
 {
 	va_list ap;
 
-#ifdef __STDC__
 	va_start(ap, fmt);
-#else
-	va_start(ap);
-#endif
 	kdoprnt(putchar, fmt, ap);
 	va_end(ap);
 }
@@ -132,7 +110,7 @@ vprintf(const char *fmt, va_list ap)
 
 static void
 kdoprnt(put, fmt, ap)
-	void (*put)__P((int));
+	void (*put)(int);
 	const char *fmt;
 	va_list ap;
 {
@@ -226,7 +204,7 @@ reswitch:	switch (ch = *fmt++) {
 
 static void
 kprintn(put, ul, base)
-	void (*put)__P((int));
+	void (*put)(int);
 	unsigned long ul;
 	int base;
 {

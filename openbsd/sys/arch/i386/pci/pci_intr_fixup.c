@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci_intr_fixup.c,v 1.16 2001/05/13 15:33:18 mickey Exp $	*/
+/*	$OpenBSD: pci_intr_fixup.c,v 1.22 2002/03/14 01:26:33 millert Exp $	*/
 /*	$NetBSD: pci_intr_fixup.c,v 1.10 2000/08/10 21:18:27 soda Exp $	*/
 
 /*
@@ -126,18 +126,18 @@ pciintr_icu_handle_t pciintr_icu_handle;
 int pcibios_irqs_hint = PCIBIOS_IRQS_HINT;
 #endif
 
-struct pciintr_link_map *pciintr_link_lookup __P((int));
-struct pcibios_intr_routing *pciintr_pir_lookup __P((int, int));
-int	pciintr_bitmap_count_irq __P((int, int *));
+struct pciintr_link_map *pciintr_link_lookup(int);
+struct pcibios_intr_routing *pciintr_pir_lookup(int, int);
+int	pciintr_bitmap_count_irq(int, int *);
 
 SIMPLEQ_HEAD(, pciintr_link_map) pciintr_link_map_list;
 
 const struct pciintr_icu_table {
 	pci_vendor_id_t	piit_vendor;
 	pci_product_id_t piit_product;
-	int (*piit_init) __P((pci_chipset_tag_t,
+	int (*piit_init)(pci_chipset_tag_t,
 		bus_space_tag_t, pcitag_t, pciintr_icu_tag_t *,
-		pciintr_icu_handle_t *));
+		pciintr_icu_handle_t *);
 } pciintr_icu_table[] = {
 	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82371MX,
 	  piix_init },
@@ -148,6 +148,10 @@ const struct pciintr_icu_table {
 	{ PCI_VENDOR_INTEL,	PCI_PRODUCT_INTEL_82371SB_ISA,
 	  piix_init },
 	{ PCI_VENDOR_INTEL,     PCI_PRODUCT_INTEL_82801AA_LPC,
+	  piix_init },
+	{ PCI_VENDOR_INTEL,     PCI_PRODUCT_INTEL_82801BA_LPC,
+	  piix_init },
+	{ PCI_VENDOR_INTEL,     PCI_PRODUCT_INTEL_82801BAM_LPC,
 	  piix_init },
 
 	{ PCI_VENDOR_OPTI,	PCI_PRODUCT_OPTI_82C558,
@@ -165,14 +169,19 @@ const struct pciintr_icu_table {
 	{ PCI_VENDOR_SIS,	PCI_PRODUCT_SIS_85C503,
 	  sis85c503_init },
 
-	{ PCI_VENDOR_AMD,	PCI_PRODUCT_AMD_PBC756_ISA,
+	{ PCI_VENDOR_AMD,	PCI_PRODUCT_AMD_PBC756_PMC,
 	  amd756_init },
+	{ PCI_VENDOR_AMD,	PCI_PRODUCT_AMD_766_ISA,
+	  amd756_init },
+
+	{ PCI_VENDOR_ALI,	PCI_PRODUCT_ALI_M1543,
+	  ali1543_init },
 
 	{ 0,			0,
 	  NULL },
 };
 
-const struct pciintr_icu_table *pciintr_icu_lookup __P((pcireg_t));
+const struct pciintr_icu_table *pciintr_icu_lookup(pcireg_t);
 
 const struct pciintr_icu_table *
 pciintr_icu_lookup(id)

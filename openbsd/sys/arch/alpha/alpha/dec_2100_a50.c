@@ -1,4 +1,4 @@
-/* $OpenBSD: dec_2100_a50.c,v 1.12 2000/11/16 23:32:20 ericj Exp $ */
+/* $OpenBSD: dec_2100_a50.c,v 1.15 2002/03/14 01:26:26 millert Exp $ */
 /* $NetBSD: dec_2100_a50.c,v 1.43 2000/05/22 20:13:31 thorpej Exp $ */
 
 /*
@@ -66,9 +66,9 @@
 #endif
 static int comcnrate = CONSPEED;
 
-void dec_2100_a50_init __P((void));
-static void dec_2100_a50_cons_init __P((void));
-static void dec_2100_a50_device_register __P((struct device *, void *));
+void dec_2100_a50_init(void);
+static void dec_2100_a50_cons_init(void);
+static void dec_2100_a50_device_register(struct device *, void *);
 
 const struct alpha_variation_table dec_2100_a50_variations[] = {
 	{ SV_ST_AVANTI,	"AlphaStation 400 4/233 (\"Avanti\")" },
@@ -116,7 +116,7 @@ dec_2100_a50_cons_init()
 	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
 
 	switch (ctb->ctb_term_type) {
-	case 2: 
+	case CTB_PRINTERPORT: 
 		/* serial console ... */
 		/* XXX */
 		{
@@ -127,7 +127,7 @@ dec_2100_a50_cons_init()
 			 */
 			DELAY(160000000 / comcnrate);
 
-			if(comcnattach(acp->ac_iot, 0x3f8, comcnrate,
+			if(comcnattach(&acp->ac_iot, 0x3f8, comcnrate,
 			    COM_FREQ,
 			    (TTYDEF_CFLAG & ~(CSIZE | PARENB)) | CS8))
 				panic("can't init serial console");
@@ -135,18 +135,18 @@ dec_2100_a50_cons_init()
 			break;
 		}
 
-	case 3:
+	case CTB_GRAPHICS:
 #if NPCKBD > 0
 		/* display console ... */
 		/* XXX */
-		(void) pckbc_cnattach(acp->ac_iot, IO_KBD, KBCMDP,
+		(void) pckbc_cnattach(&acp->ac_iot, IO_KBD, KBCMDP,
 		    PCKBC_KBD_SLOT);
 
 		if (CTB_TURBOSLOT_TYPE(ctb->ctb_turboslot) ==
 		    CTB_TURBOSLOT_TYPE_ISA)
-			isa_display_console(acp->ac_iot, acp->ac_memt);
+			isa_display_console(&acp->ac_iot, &acp->ac_memt);
 		else
-			pci_display_console(acp->ac_iot, acp->ac_memt,
+			pci_display_console(&acp->ac_iot, &acp->ac_memt,
 			    &acp->ac_pc, CTB_TURBOSLOT_BUS(ctb->ctb_turboslot),
 			    CTB_TURBOSLOT_SLOT(ctb->ctb_turboslot), 0);
 #else

@@ -1,4 +1,4 @@
-/*	$OpenBSD: svr4_fcntl.c,v 1.18 2001/03/25 05:20:01 csapuntz Exp $	 */
+/*	$OpenBSD: svr4_fcntl.c,v 1.22 2002/03/14 01:26:51 millert Exp $	 */
 /*	$NetBSD: svr4_fcntl.c,v 1.14 1995/10/14 20:24:24 christos Exp $	 */
 
 /*
@@ -50,14 +50,14 @@
 #include <compat/svr4/svr4_util.h>
 #include <compat/svr4/svr4_fcntl.h>
 
-static u_long svr4_to_bsd_cmd __P((u_long));
-static int svr4_to_bsd_flags __P((int));
-static int bsd_to_svr4_flags __P((int));
-static void bsd_to_svr4_flock __P((struct flock *, struct svr4_flock *));
-static void svr4_to_bsd_flock __P((struct svr4_flock *, struct flock *));
-static void bsd_to_svr3_flock __P((struct flock *, struct svr4_flock_svr3 *));
-static void svr3_to_bsd_flock __P((struct svr4_flock_svr3 *, struct flock *));
-static int fd_truncate __P((struct proc *, int, struct flock *, register_t *));
+static u_long svr4_to_bsd_cmd(u_long);
+static int svr4_to_bsd_flags(int);
+static int bsd_to_svr4_flags(int);
+static void bsd_to_svr4_flock(struct flock *, struct svr4_flock *);
+static void svr4_to_bsd_flock(struct svr4_flock *, struct flock *);
+static void bsd_to_svr3_flock(struct flock *, struct svr4_flock_svr3 *);
+static void svr3_to_bsd_flock(struct svr4_flock_svr3 *, struct flock *);
+static int fd_truncate(struct proc *, int, struct flock *, register_t *);
 
 static u_long
 svr4_to_bsd_cmd(cmd)
@@ -265,15 +265,17 @@ fd_truncate(p, fd, flp, retval)
 	/*
 	 * We only support truncating the file.
 	 */
-	if ((u_int)fd >= fdp->fd_nfiles || (fp = fdp->fd_ofiles[fd]) == NULL)
+	if ((fp = fd_getfile(fdp, fd)) == NULL)
 		return EBADF;
 
 	vp = (struct vnode *)fp->f_data;
 	if (fp->f_type != DTYPE_VNODE || vp->v_type == VFIFO)
 		return ESPIPE;
 
+	FREF(fp);
+
 	if ((error = VOP_GETATTR(vp, &vattr, p->p_ucred, p)) != 0)
-		return error;
+		goto out;
 
 	length = vattr.va_size;
 
@@ -291,18 +293,23 @@ fd_truncate(p, fd, flp, retval)
 		break;
 
 	default:
-		return EINVAL;
+		error = EINVAL;
+		goto out;
 	}
 
 	if (start + flp->l_len < length) {
 		/* We don't support free'ing in the middle of the file */
-		return EINVAL;
+		error = EINVAL;
+		goto out;
 	}
 
 	SCARG(&ft, fd) = fd;
 	SCARG(&ft, length) = start;
 
-	return sys_ftruncate(p, &ft, retval);
+	error = sys_ftruncate(p, &ft, retval);
+out:
+	FRELE(fp);
+	return (error);
 }
 
 int
@@ -334,11 +341,15 @@ svr4_sys_open(p, v, retval)
 	if (!(SCARG(&cup, flags) & O_NOCTTY) && SESS_LEADER(p) &&
 	    !(p->p_flag & P_CONTROLT)) {
 		struct filedesc	*fdp = p->p_fd;
-		struct file	*fp = fdp->fd_ofiles[*retval];
+		struct file	*fp;
 
+		if ((fp = fd_getfile(fdp, *retval)) == NULL)
+			return (EBADF);
+		FREF(fp);
 		/* ignore any error, just give it a try */
 		if (fp->f_type == DTYPE_VNODE)
 			(fp->f_ops->fo_ioctl) (fp, TIOCSCTTY, (caddr_t) 0, p);
+		FRELE(fp);
 	}
 	return 0;
 }

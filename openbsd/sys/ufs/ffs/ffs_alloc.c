@@ -1,4 +1,4 @@
-/*	$OpenBSD: ffs_alloc.c,v 1.31 2001/10/09 23:12:19 csapuntz Exp $	*/
+/*	$OpenBSD: ffs_alloc.c,v 1.41 2002/03/14 03:16:13 millert Exp $	*/
 /*	$NetBSD: ffs_alloc.c,v 1.11 1996/05/11 18:27:09 mycroft Exp $	*/
 
 /*
@@ -45,10 +45,11 @@
 #include <sys/kernel.h>
 #include <sys/syslog.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <dev/rndvar.h>
 
+#include <ufs/ufs/extattr.h>
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/ufs_extern.h>
@@ -58,20 +59,19 @@
 
 extern u_long nextgennumber;
 
-static daddr_t	ffs_alloccg __P((struct inode *, int, daddr_t, int));
-static daddr_t	ffs_alloccgblk __P((struct inode *, struct buf *, daddr_t));
-static daddr_t	ffs_clusteralloc __P((struct inode *, int, daddr_t, int));
-static ino_t	ffs_dirpref __P((struct inode *));
-static daddr_t	ffs_fragextend __P((struct inode *, int, long, int, int));
-static void	ffs_fserr __P((struct fs *, u_int, char *));
-static u_long	ffs_hashalloc __P((struct inode *, int, long, int,
-				   daddr_t (*)(struct inode *, int, daddr_t,
-					       int)));
-static daddr_t	ffs_nodealloccg __P((struct inode *, int, daddr_t, int));
-static daddr_t	ffs_mapsearch __P((struct fs *, struct cg *, daddr_t, int));
+static daddr_t	ffs_alloccg(struct inode *, int, daddr_t, int);
+static daddr_t	ffs_alloccgblk(struct inode *, struct buf *, daddr_t);
+static daddr_t	ffs_clusteralloc(struct inode *, int, daddr_t, int);
+static ino_t	ffs_dirpref(struct inode *);
+static daddr_t	ffs_fragextend(struct inode *, int, long, int, int);
+static void	ffs_fserr(struct fs *, u_int, char *);
+static u_long	ffs_hashalloc(struct inode *, int, long, int,
+		    daddr_t (*)(struct inode *, int, daddr_t, int));
+static daddr_t	ffs_nodealloccg(struct inode *, int, daddr_t, int);
+static daddr_t	ffs_mapsearch(struct fs *, struct cg *, daddr_t, int);
 
 #ifdef DIAGNOSTIC
-static int      ffs_checkblk __P((struct inode *, daddr_t, long));
+static int      ffs_checkblk(struct inode *, daddr_t, long);
 #endif
 
 /*
@@ -104,9 +104,7 @@ ffs_alloc(ip, lbn, bpref, size, cred, bnp)
 	register struct fs *fs;
 	daddr_t bno;
 	int cg;
-#ifdef QUOTA
 	int error;
-#endif
 
 	*bnp = 0;
 	fs = ip->i_fs;
@@ -123,10 +121,10 @@ ffs_alloc(ip, lbn, bpref, size, cred, bnp)
 		goto nospace;
 	if (cred->cr_uid != 0 && freespace(fs, fs->fs_minfree) <= 0)
 		goto nospace;
-#ifdef QUOTA
-	if ((error = chkdq(ip, (long)btodb(size), cred, 0)) != 0)
+
+	if ((error = ufs_quota_alloc_blocks(ip, btodb(size), cred)) != 0)
 		return (error);
-#endif
+
 	if (bpref >= fs->fs_size)
 		bpref = 0;
 	if (bpref == 0)
@@ -141,12 +139,12 @@ ffs_alloc(ip, lbn, bpref, size, cred, bnp)
 		*bnp = bno;
 		return (0);
 	}
-#ifdef QUOTA
+
 	/*
 	 * Restore user's disk quota because allocation failed.
 	 */
-	(void) chkdq(ip, (long)-btodb(size), cred, FORCE);
-#endif
+	(void) ufs_quota_free_blocks(ip, btodb(size), cred);
+
 nospace:
 	ffs_fserr(fs, cred->cr_uid, "file system full");
 	uprintf("\n%s: write failed, file system is full\n", fs->fs_fsmnt);
@@ -162,20 +160,23 @@ nospace:
  * invoked to get an appropriate block.
  */
 int
-ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp)
+ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp, blknop)
 	register struct inode *ip;
 	daddr_t lbprev;
 	daddr_t bpref;
 	int osize, nsize;
 	struct ucred *cred;
 	struct buf **bpp;
+	ufs_daddr_t *blknop;
 {
 	register struct fs *fs;
-	struct buf *bp;
+	struct buf *bp = NULL;
+	ufs_daddr_t quota_updated = 0;
 	int cg, request, error;
 	daddr_t bprev, bno;
 
-	*bpp = 0;
+	if (bpp != NULL)
+		*bpp = NULL;
 	fs = ip->i_fs;
 #ifdef DIAGNOSTIC
 	if ((u_int)osize > fs->fs_bsize || fragoff(fs, osize) != 0 ||
@@ -198,29 +199,34 @@ ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp)
 	/*
 	 * Allocate the extra space in the buffer.
 	 */
-	if ((error = bread(ITOV(ip), lbprev, osize, NOCRED, &bp)) != 0) {
-		brelse(bp);
-		return (error);
-	}
-#ifdef QUOTA
-	if ((error = chkdq(ip, (long)btodb(nsize - osize), cred, 0)) != 0) {
-		brelse(bp);
-		return (error);
-	}
-#endif
+	if (bpp != NULL &&
+	    (error = bread(ITOV(ip), lbprev, osize, NOCRED, &bp)) != 0)
+		goto error;
+
+	if ((error = ufs_quota_alloc_blocks(ip, btodb(nsize - osize), cred))
+	    != 0)
+		goto error;
+
+	quota_updated = btodb(nsize - osize);
+
 	/*
 	 * Check for extension in the existing location.
 	 */
 	cg = dtog(fs, bprev);
 	if ((bno = ffs_fragextend(ip, cg, (long)bprev, osize, nsize)) != 0) {
-		if (bp->b_blkno != fsbtodb(fs, bno))
-			panic("ffs_realloccg: bad blockno");
 		ip->i_ffs_blocks += btodb(nsize - osize);
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
-		allocbuf(bp, nsize);
-		bp->b_flags |= B_DONE;
-		bzero((char *)bp->b_data + osize, (u_int)nsize - osize);
-		*bpp = bp;
+		if (bpp != NULL) {
+			if (bp->b_blkno != fsbtodb(fs, bno))
+				panic("ffs_realloccg: bad blockno");
+			allocbuf(bp, nsize);
+			bp->b_flags |= B_DONE;
+			bzero((char *)bp->b_data + osize, (u_int)nsize - osize);
+			*bpp = bp;
+		}
+		if (blknop != NULL) {
+			*blknop = bno;
+		}
 		return (0);
 	}
 	/*
@@ -273,36 +279,50 @@ ffs_realloccg(ip, lbprev, bpref, osize, nsize, cred, bpp)
 	}
 	bno = (daddr_t)ffs_hashalloc(ip, cg, (long)bpref, request,
 	    			     ffs_alloccg);
-	if (bno > 0) {
+	if (bno <= 0) 
+		goto nospace;
+
+	(void) uvm_vnp_uncache(ITOV(ip));
+	if (!DOINGSOFTDEP(ITOV(ip)))
+		ffs_blkfree(ip, bprev, (long)osize);
+	if (nsize < request)
+		ffs_blkfree(ip, bno + numfrags(fs, nsize),
+		    (long)(request - nsize));
+	ip->i_ffs_blocks += btodb(nsize - osize);
+	ip->i_flag |= IN_CHANGE | IN_UPDATE;
+	if (bpp != NULL) {
 		bp->b_blkno = fsbtodb(fs, bno);
-		(void) uvm_vnp_uncache(ITOV(ip));
-		if (!DOINGSOFTDEP(ITOV(ip)))
-			ffs_blkfree(ip, bprev, (long)osize);
-		if (nsize < request)
-			ffs_blkfree(ip, bno + numfrags(fs, nsize),
-			    (long)(request - nsize));
-		ip->i_ffs_blocks += btodb(nsize - osize);
-		ip->i_flag |= IN_CHANGE | IN_UPDATE;
 		allocbuf(bp, nsize);
 		bp->b_flags |= B_DONE;
 		bzero((char *)bp->b_data + osize, (u_int)nsize - osize);
 		*bpp = bp;
-		return (0);
 	}
-#ifdef QUOTA
-	/*
-	 * Restore user's disk quota because allocation failed.
-	 */
-	(void) chkdq(ip, (long)-btodb(nsize - osize), cred, FORCE);
-#endif
-	brelse(bp);
+	if (blknop != NULL) {
+		*blknop = bno;
+	}
+	return (0);
+
 nospace:
 	/*
 	 * no space available
 	 */
 	ffs_fserr(fs, cred->cr_uid, "file system full");
 	uprintf("\n%s: write failed, file system is full\n", fs->fs_fsmnt);
-	return (ENOSPC);
+	error = ENOSPC;
+
+error:
+	if (bp != NULL) {
+		brelse(bp);
+		bp = NULL;
+	}
+
+ 	/*
+	 * Restore user's disk quota because allocation failed.
+	 */
+	if (quota_updated != 0)
+		(void)ufs_quota_free_blocks(ip, quota_updated, cred);
+		
+	return error;
 }
 
 /*
@@ -843,7 +863,7 @@ ffs_hashalloc(ip, cg, pref, size, allocator)
 	int cg;
 	long pref;
 	int size;	/* size for data blocks, mode for inodes */
-	daddr_t (*allocator) __P((struct inode *, int, daddr_t, int));
+	daddr_t (*allocator)(struct inode *, int, daddr_t, int);
 {
 	register struct fs *fs;
 	long result;

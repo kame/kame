@@ -1,4 +1,4 @@
-/*	$OpenBSD: pk_subr.c,v 1.4 1998/04/04 02:55:54 don Exp $	*/
+/*	$OpenBSD: pk_subr.c,v 1.6 2002/03/15 18:19:52 millert Exp $	*/
 /*	$NetBSD: pk_subr.c,v 1.12 1996/03/30 21:54:33 christos Exp $	*/
 
 /*
@@ -85,8 +85,8 @@ struct x25bitslice x25_bitslice[] = {
 };
 
 
-static struct x25_ifaddr *pk_ifwithaddr __P((struct sockaddr_x25 *));
-static void pk_reset __P((struct pklcd *, int));
+static struct x25_ifaddr *pk_ifwithaddr(struct sockaddr_x25 *);
+static void pk_reset(struct pklcd *, int);
 
 /*
  * Attach X.25 protocol to socket, allocate logical channel descripter and
@@ -424,7 +424,7 @@ int
 pk_protolisten(spi, spilen, callee)
 	int		spi;
 	int		spilen;
-	int             (*callee) __P((struct mbuf *, void *));
+	int             (*callee)(struct mbuf *, void *);
 {
 	register struct pklcd *lcp = pk_attach((struct socket *) 0);
 	register struct mbuf *nam;
@@ -1142,15 +1142,7 @@ format_ntn(xcp)
 
 /* VARARGS1 */
 void
-#if __STDC__
 pk_message(int lcn, struct x25config * xcp, char * fmt,...)
-#else
-pk_message(lcn, xcp, fmt, va_alist)
-	int             lcn;
-	struct x25config *xcp;
-	char           *fmt;
-	va_dcl
-#endif
 {
 	va_list         ap;
 

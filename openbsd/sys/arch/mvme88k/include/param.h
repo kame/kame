@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.21 2001/09/28 20:46:09 miod Exp $ */
+/*	$OpenBSD: param.h,v 1.27 2002/03/14 01:26:39 millert Exp $ */
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
  * Copyright (c) 1988 University of Utah.
@@ -40,7 +40,6 @@
  * from: Utah $Hdr: machparam.h 1.11 89/08/14$
  *
  *	@(#)param.h	7.8 (Berkeley) 6/28/91
- *	$Id: param.h,v 1.21 2001/09/28 20:46:09 miod Exp $
  */
 #ifndef _MACHINE_PARAM_H_
 #define _MACHINE_PARAM_H_
@@ -80,10 +79,6 @@
 #define	PAGE_MASK	(PAGE_SIZE - 1)
 
 #define NPTEPG		(PAGE_SIZE / (sizeof(u_int)))
-
-#define SEGSHIFT	22		/* LOG2(NBSEG) */
-#define NBSEG		(1 << SEGSHIFT)	/* bytes/segment */
-#define SEGOFSET	(NBSEG - 1)	/* byte offset into segment */
 
 /*
  * 187 Bug uses the bottom 64k. We allocate ptes to map this into the
@@ -135,11 +130,11 @@
 #endif
 
 /*
- * Size of kernel malloc arena in logical pages
- */ 
-#ifndef NKMEMCLUSTERS
-#define NKMEMCLUSTERS	(4096*1024/PAGE_SIZE)
-#endif
+ * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
+ * logical pages.
+ */
+#define	NKMEMPAGES_MIN_DEFAULT	((4 * 1024 * 1024) >> PAGE_SHIFT)
+#define	NKMEMPAGES_MAX_DEFAULT	((4 * 1024 * 1024) >> PAGE_SHIFT)
 
 #define MSGBUFSIZE	PAGE_SIZE
 
@@ -174,20 +169,34 @@
 #include <machine/intr.h>
 
 #ifdef   _KERNEL
-extern int delay __P((int));
+extern int delay(int);
 #define  DELAY(x)             delay(x)
 
 extern int cputyp;
+extern int brdtyp;
 extern int cpumod;
 #endif
 
 /*
+ * Values for the brdtyp variable.
+ */
+#define BRD_187		0x187
+#define BRD_188		0x188
+#define BRD_197		0x197
+#define BRD_8120	0x8120
+
+/*
  * Values for the cputyp variable.
  */
-#define CPU_187		0x187
-#define CPU_188		0x188
-#define CPU_197		0x197
-#define CPU_8120	0x8120
+#define CPU_88100	0x100
+#define CPU_88110	0x110
+
+/*
+ * Values for the cpumod variable.
+ */
+#define MOD_LE		0x01
+#define MOD_SP		0x02
+#define MOD_DP		0x03
 
 #endif /* !_MACHINE_PARAM_H_ */
 

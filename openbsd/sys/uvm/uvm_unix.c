@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm_unix.c,v 1.13 2001/08/11 10:57:22 art Exp $	*/
-/*	$NetBSD: uvm_unix.c,v 1.12 2000/03/30 12:31:50 augustss Exp $	*/
+/*	$OpenBSD: uvm_unix.c,v 1.20 2001/12/19 08:58:07 art Exp $	*/
+/*	$NetBSD: uvm_unix.c,v 1.18 2000/09/13 15:00:25 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -60,9 +60,7 @@
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm.h>
-
 
 /*
  * sys_obreak: set break
@@ -79,13 +77,13 @@ sys_obreak(p, v, retval)
 	} */ *uap = v;
 	struct vmspace *vm = p->p_vmspace;
 	vaddr_t new, old;
+	ssize_t diff;
 	int rv;
-	long diff;
 
 	old = (vaddr_t)vm->vm_daddr;
 	new = round_page((vaddr_t)SCARG(uap, nsize));
 	if ((new - old) > p->p_rlimit[RLIMIT_DATA].rlim_cur)
-		return(ENOMEM);
+		return (ENOMEM);
 
 	old = round_page(old + ptoa(vm->vm_dsize));
 	diff = new - old;
@@ -98,7 +96,7 @@ sys_obreak(p, v, retval)
 	 */
 	if (diff > 0) {
 		rv = uvm_map(&vm->vm_map, &old, diff, NULL, UVM_UNKNOWN_OFFSET,
-		    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
+		    0, UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
 		    UVM_ADV_NORMAL, UVM_FLAG_AMAPPAD|UVM_FLAG_FIXED|
 		    UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW));
 		if (rv == KERN_SUCCESS) {
@@ -114,9 +112,9 @@ sys_obreak(p, v, retval)
 	}
 
 	uprintf("sbrk: %s %ld failed, return = %d\n",
-		diff > 0 ? "grow" : "shrink",
-		(long)(diff > 0 ? diff : -diff), rv);
-	return(ENOMEM);
+	    diff > 0 ? "grow" : "shrink",
+	    (long)(diff > 0 ? diff : -diff), rv);
+	return (ENOMEM);
 }
 
 /*
@@ -199,12 +197,13 @@ uvm_coredump(p, vp, cred, chdr)
 	struct vmspace *vm = p->p_vmspace;
 	vm_map_t map = &vm->vm_map;
 	vm_map_entry_t entry;
-	vaddr_t start, end;
+	vaddr_t start, end, maxstack;
 	struct coreseg cseg;
 	off_t offset;
 	int flag, error = 0;
 
 	offset = chdr->c_hdrsize + chdr->c_seghdrsize + chdr->c_cpusize;
+	maxstack = trunc_page(USRSTACK - ctob(vm->vm_ssize));
 
 	for (entry = map->header.next; entry != &map->header;
 	    entry = entry->next) {
@@ -255,7 +254,7 @@ uvm_coredump(p, vp, cred, chdr)
 
 		offset += chdr->c_seghdrsize;
 		error = vn_rdwr(UIO_WRITE, vp,
-		    (caddr_t)cseg.c_addr, (int)cseg.c_size,
+		    (caddr_t)(u_long)cseg.c_addr, (int)cseg.c_size,
 		    offset, UIO_USERSPACE,
 		    IO_NODELOCKED|IO_UNIT, cred, NULL, p);
 		if (error)

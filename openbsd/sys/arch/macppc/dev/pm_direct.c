@@ -1,4 +1,4 @@
-/*	$OpenBSD: pm_direct.c,v 1.4 2001/10/03 14:45:37 drahn Exp $	*/
+/*	$OpenBSD: pm_direct.c,v 1.6 2002/04/10 17:35:14 drahn Exp $	*/
 /*	$NetBSD: pm_direct.c,v 1.9 2000/06/08 22:10:46 tsubai Exp $	*/
 
 /*
@@ -168,37 +168,37 @@ signed char pm_receive_cmd_type[] = {
 
 /* for debugging */
 #ifdef ADB_DEBUG
-void	pm_printerr __P((char *, int, int, char *));
+void	pm_printerr(char *, int, int, char *);
 #endif
 
-int	pm_wait_busy __P((int));
-int	pm_wait_free __P((int));
+int	pm_wait_busy(int);
+int	pm_wait_free(int);
 
 /* these functions are for the PB1XX series */
-int	pm_receive_pm1 __P((u_char *));
-int	pm_send_pm1 __P((u_char,int));
-int	pm_pmgrop_pm1 __P((PMData *));
-void	pm_intr_pm1 __P((void));
+int	pm_receive_pm1(u_char *);
+int	pm_send_pm1(u_char,int);
+int	pm_pmgrop_pm1(PMData *);
+void	pm_intr_pm1(void);
 
 /* these functions are for the PB Duo series and the PB 5XX series */
-int	pm_receive_pm2 __P((u_char *));
-int	pm_send_pm2 __P((u_char));
-int	pm_pmgrop_pm2 __P((PMData *));
-void	pm_intr_pm2 __P((void));
+int	pm_receive_pm2(u_char *);
+int	pm_send_pm2(u_char);
+int	pm_pmgrop_pm2(PMData *);
+void	pm_intr_pm2(void);
 
 /* this function is MRG-Based (for testing) */
-int	pm_pmgrop_mrg __P((PMData *));
+int	pm_pmgrop_mrg(PMData *);
 
 /* these functions are called from adb_direct.c */
-void	pm_setup_adb __P((void));
-void	pm_check_adb_devices __P((int));
-void	pm_intr __P((void));
-int	pm_adb_op __P((u_char *, void *, void *, int));
+void	pm_setup_adb(void);
+void	pm_check_adb_devices(int);
+void	pm_intr(void);
+int	pm_adb_op(u_char *, void *, void *, int);
 
 /* these functions also use the variables of adb_direct.c */
-void	pm_adb_get_TALK_result __P((PMData *));
-void	pm_adb_get_ADB_data __P((PMData *));
-void	pm_adb_poll_next_device_pm1 __P((PMData *));
+void	pm_adb_get_TALK_result(PMData *);
+void	pm_adb_get_ADB_data(PMData *);
+void	pm_adb_poll_next_device_pm1(PMData *);
 
 
 /*
@@ -223,13 +223,13 @@ struct adbCommand {
 	u_int	unsol;		/* 1 if packet was unsolicited */
 	u_int	ack_only;	/* 1 for no special processing */
 };
-extern	void	adb_pass_up __P((struct adbCommand *));
+extern	void	adb_pass_up(struct adbCommand *);
 
 #if 0
 /*
  * Define the external functions
  */
-extern int	zshard __P((int));		/* from zs.c */
+extern int	zshard(int);		/* from zs.c */
 #endif
 
 #ifdef ADB_DEBUG
@@ -1044,7 +1044,7 @@ pm_adb_op(buffer, compRout, data, command)
 		return 1;
 	}
 
-	delay(10000);
+	delay (1000);
 
 	adbWaiting = 1;
 	adbWaitingCmd = command;
@@ -1052,9 +1052,9 @@ pm_adb_op(buffer, compRout, data, command)
 	PM_VIA_INTR_ENABLE();
 
 	/* wait until the PM interrupt is occurred */
-	ndelay = 0x80000;
+	ndelay = 0x8000;
 	while (adbWaiting == 1) {
-		if (read_via_reg(VIA1, vIFR) & 0x14)
+		if (read_via_reg(VIA1, vIFR) != 0)
 			pm_intr();
 #ifdef PM_GRAB_SI
 #if 0
@@ -1067,6 +1067,7 @@ pm_adb_op(buffer, compRout, data, command)
 			splx(s);
 			return 1;
 		}
+		delay(10);
 	}
 
 	/* this command enables the interrupt by operating ADB devices */

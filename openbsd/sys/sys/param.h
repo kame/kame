@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.41 2001/09/11 13:11:18 deraadt Exp $	*/
+/*	$OpenBSD: param.h,v 1.47 2002/03/22 23:29:28 deraadt Exp $	*/
 /*	$NetBSD: param.h,v 1.23 1996/03/17 01:02:29 thorpej Exp $	*/
 
 /*-
@@ -45,8 +45,8 @@
 #define BSD4_3	1
 #define BSD4_4	1
 
-#define OpenBSD	200111		/* OpenBSD version (year & month). */
-#define OpenBSD3_0 1		/* OpenBSD 3.0 */
+#define OpenBSD	200206		/* OpenBSD version (year & month). */
+#define OpenBSD3_1 1		/* OpenBSD 3.1 */
 
 #ifndef NULL
 #ifdef 	__GNUG__
@@ -157,6 +157,13 @@
  */
 #define	MAXPATHLEN	PATH_MAX
 #define MAXSYMLINKS	32
+
+/* Macros to set/clear/test flags. */
+#ifdef _KERNEL
+#define SET(t, f)	((t) |= (f))
+#define CLR(t, f)	((t) &= ~(f))
+#define ISSET(t, f)	((t) & (f))
+#endif
 
 /* Bit map related macros. */
 #define	setbit(a,i)	((a)[(i)/NBBY] |= 1<<((i)%NBBY))

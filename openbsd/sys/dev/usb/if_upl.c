@@ -1,5 +1,5 @@
-/*	$OpenBSD: if_upl.c,v 1.3 2001/06/15 03:38:35 itojun Exp $ */
-/*	$NetBSD: if_upl.c,v 1.10 2000/12/08 02:24:07 augustss Exp $	*/
+/*	$OpenBSD: if_upl.c,v 1.5 2002/03/12 09:51:20 kjc Exp $ */
+/*	$NetBSD: if_upl.c,v 1.15 2001/06/14 05:44:27 itojun Exp $	*/
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -317,7 +317,7 @@ USB_ATTACH(upl)
 		USB_ATTACH_ERROR_RETURN;
 	}
 
-	s = splimp();
+	s = splnet();
 
 	/* Initialize interface info.*/
 	ifp = &sc->sc_if;
@@ -337,13 +337,14 @@ USB_ATTACH(upl)
 	ifp->if_input = upl_input;
 #endif
 	ifp->if_baudrate = 12000000;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Attach the interface. */
 	if_attach(ifp);
 
 #if NBPFILTER > 0
 #if defined(__NetBSD__) || defined(__FreeBSD__)
-	bpfattach(ifp, DLT_EN10MB, 0);
+	bpfattach(ifp, DLT_RAW, 0);
 #endif
 #endif
 #if NRND > 0
@@ -572,7 +573,7 @@ upl_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 
 	m->m_pkthdr.rcvif = ifp;
 
-	s = splimp();
+	s = splnet();
 
 	/* XXX ugly */
 	if (upl_newbuf(sc, c, NULL) == ENOBUFS) {
@@ -632,7 +633,7 @@ upl_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	if (sc->sc_dying)
 		return;
 
-	s = splimp();
+	s = splnet();
 
 	DPRINTFN(10,("%s: %s: enter status=%d\n", USBDEVNAME(sc->sc_dev),
 		    __FUNCTION__, status));
@@ -659,7 +660,7 @@ upl_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	m_freem(c->upl_mbuf);
 	c->upl_mbuf = NULL;
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		upl_start(ifp);
 
 	splx(s);
@@ -718,15 +719,16 @@ upl_start(struct ifnet *ifp)
 	if (ifp->if_flags & IFF_OACTIVE)
 		return;
 
-	IF_DEQUEUE(&ifp->if_snd, m_head);
+	IFQ_POLL(&ifp->if_snd, m_head);
 	if (m_head == NULL)
 		return;
 
 	if (upl_send(sc, m_head, 0)) {
-		IF_PREPEND(&ifp->if_snd, m_head);
 		ifp->if_flags |= IFF_OACTIVE;
 		return;
 	}
+
+	IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 #if NBPFILTER > 0
 	/*
@@ -760,7 +762,7 @@ upl_init(void *xsc)
 	if (ifp->if_flags & IFF_RUNNING)
 		return;
 
-	s = splimp();
+	s = splnet();
 
 	/* Init TX ring. */
 	if (upl_tx_list_init(sc) == ENOBUFS) {
@@ -892,7 +894,7 @@ upl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	DPRINTFN(5,("%s: %s: cmd=0x%08lx\n",
 		    USBDEVNAME(sc->sc_dev), __FUNCTION__, command));
 
-	s = splimp();
+	s = splnet();
 
 	switch(command) {
 	case SIOCSIFADDR:
@@ -965,7 +967,7 @@ upl_watchdog(struct ifnet *ifp)
 	upl_stop(sc);
 	upl_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		upl_start(ifp);
 }
 
@@ -1059,24 +1061,32 @@ Static int
 upl_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	   struct rtentry *rt0)
 {
-	int s;
+	int s, len, error;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	DPRINTFN(10,("%s: %s: enter\n",
 		     USBDEVNAME(((struct upl_softc *)ifp->if_softc)->sc_dev),
 		     __FUNCTION__));
 
-	s = splimp();
+	/*
+	 * if the queueing discipline needs packet classification,
+	 * do it now.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+
+	len = m->m_pkthdr.len;
+	s = splnet();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (IF_QFULL(&ifp->if_snd)) {
-		IF_DROP(&ifp->if_snd);
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+	if (error) {
+		/* mbuf is already freed */
 		splx(s);
-		return (ENOBUFS);
+		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	IF_ENQUEUE(&ifp->if_snd, m);
+	ifp->if_obytes += len;
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
@@ -1095,7 +1105,7 @@ upl_input(struct ifnet *ifp, struct mbuf *m)
 	schednetisr(NETISR_IP);
 	inq = &ipintrq;
 
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
 		splx(s);

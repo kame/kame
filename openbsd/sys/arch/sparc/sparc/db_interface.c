@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_interface.c,v 1.8 2000/01/01 19:44:24 deraadt Exp $	*/
+/*	$OpenBSD: db_interface.c,v 1.10 2002/03/14 01:26:44 millert Exp $	*/
 /*	$NetBSD: db_interface.c,v 1.18 1997/09/01 00:16:31 pk Exp $ */
 
 /*
@@ -37,7 +37,7 @@
 #include <sys/reboot.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <dev/cons.h>
 
@@ -159,8 +159,8 @@ int	db_active = 0;
 
 extern char *trap_type[];
 
-void kdb_kbd_trap __P((struct trapframe *));
-void db_prom_cmd __P((db_expr_t, int, db_expr_t, char *));
+void kdb_kbd_trap(struct trapframe *);
+void db_prom_cmd(db_expr_t, int, db_expr_t, char *);
 
 /*
  * Received keyboard interrupt sequence.

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ka410.c,v 1.7 2001/09/11 20:05:25 miod Exp $ */
+/*	$OpenBSD: ka410.c,v 1.9 2002/03/14 01:26:48 millert Exp $ */
 /*	$NetBSD: ka410.c,v 1.21 1999/09/06 19:52:53 ragge Exp $ */
 /*
  * Copyright (c) 1996 Ludd, University of Lule}, Sweden.
@@ -39,7 +39,7 @@
 #include <sys/kernel.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/pte.h>
 #include <machine/cpu.h>
@@ -53,13 +53,13 @@
 #include <machine/clock.h>
 #include <machine/vsbus.h>
 
-static	void	ka410_conf __P((void));
-static	void	ka410_memerr __P((void));
-static	int	ka410_mchk __P((caddr_t));
-static	void	ka410_halt __P((void));
-static	void	ka410_reboot __P((int));
-static	void	ka41_cache_enable __P((void));
-static	void	ka410_clrf __P((void));
+static	void	ka410_conf(void);
+static	void	ka410_memerr(void);
+static	int	ka410_mchk(caddr_t);
+static	void	ka410_halt(void);
+static	void	ka410_reboot(int);
+static	void	ka41_cache_enable(void);
+static	void	ka410_clrf(void);
 
 static	caddr_t	l2cache;	/* mapped in address */
 static	long 	*cacr;		/* l2csche ctlr reg */

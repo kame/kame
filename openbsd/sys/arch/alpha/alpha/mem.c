@@ -1,4 +1,4 @@
-/* $OpenBSD: mem.c,v 1.13 2001/01/20 20:29:53 art Exp $ */
+/* $OpenBSD: mem.c,v 1.16 2001/11/06 19:53:13 miod Exp $ */
 /* $NetBSD: mem.c,v 1.26 2000/03/29 03:48:20 simonb Exp $ */
 
 /*
@@ -55,8 +55,6 @@
 #include <sys/conf.h>
 
 #include <machine/cpu.h>
-
-#include <vm/vm.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -193,10 +191,10 @@ kmemphys:
 	return (error);
 }
 
-int
+paddr_t
 mmmmap(dev, off, prot)
 	dev_t dev;
-	int off;			/* XXX */
+	off_t off;
 	int prot;
 {
 	/*
@@ -213,7 +211,7 @@ mmmmap(dev, off, prot)
 	/*
 	 * Allow access only in RAM.
 	 */
-	if ((prot & alpha_pa_access(atop((paddr_t)off))) != prot)
+	if ((prot & alpha_pa_access(atop(off))) != prot)
 		return (-1);
 	return (alpha_btop(off));
 }

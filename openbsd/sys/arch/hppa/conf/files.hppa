@@ -1,4 +1,4 @@
-#	$OpenBSD: files.hppa,v 1.31 2001/06/26 02:41:25 mickey Exp $
+#	$OpenBSD: files.hppa,v 1.35 2002/03/16 01:14:27 mickey Exp $
 #
 # hppa-specific configuration info
 
@@ -11,6 +11,7 @@ maxusers 2 8 64
 # "workstation console" routines
 #
 include "dev/wscons/files.wscons"
+file	arch/hppa/hppa/wscons_machdep.c	wsdisplay
 
 #
 # Media Independent Interface (mii)
@@ -33,8 +34,6 @@ include "dev/i2o/files.i2o"
 #
 #include "dev/atapiscsi/files.atapiscsi"
 #include "dev/ata/files.ata"
-
-include "dev/pckbc/files.pckbc"
 
 #
 # ISA Bus support
@@ -62,7 +61,7 @@ define	gscbus	{ }
 # Mainbus
 #
 
-define	mainbus {[irq = -1]}
+define	mainbus {[offset = -1], [irq = -1]}
 device	mainbus
 attach	mainbus at root
 file	arch/hppa/hppa/mainbus.c	mainbus
@@ -120,22 +119,22 @@ major	{rd = 3}
 # GSC bus devices
 #
 
-device	gsc {[irq = -1]}
+device	gsc {[offset = -1], [irq = -1]}
 attach	gsc at gscbus
 file	arch/hppa/gsc/gscbus.c		gsc
 
 # com and lpt are both on WD 16C552
 attach	com at gsc with com_gsc
-file	arch/hppa/gsc/com_gsc.c		com
+file	arch/hppa/gsc/com_gsc.c		com_gsc
 
 attach	lpt at gsc with lpt_gsc
-file	arch/hppa/gsc/lpt_gsc.c		lpt
+file	arch/hppa/gsc/lpt_gsc.c		lpt_gsc
 
 #include "dev/fdc/files.fdc"
 #major	{ fd = 7 }
 #major	{ ft = 8 }
 #attach	fdc at gsc with fdc_gsc
-#file	arch/hppa/gsc/fdc_gsc.c		fdc
+#file	arch/hppa/gsc/fdc_gsc.c		fdc_gsc
 
 attach	ie at gsc with ie_gsc
 file	arch/hppa/gsc/if_ie_gsc.c	ie_gsc
@@ -182,11 +181,10 @@ file	arch/hppa/gsc/com_harmony.c	com_harmony
 #attach	myri at pci
 #file	dev/pci/myri.c			myri
 
-#
-# PC Keyboard controller (ps2)
-#
-
-#include "dev/pckbc/files.pckbc"
+device	ps2p: wskbddev, wsmousedev
+attach	ps2p at gsc
+file	arch/hppa/gsc/ps2p.c		ps2p needs-flag
+file	arch/hppa/gsc/ps2kbd_map.c	ps2p
 
 #
 # Compatibility
@@ -213,6 +211,7 @@ file	arch/hppa/hppa/pmap.c
 file	arch/hppa/hppa/process_machdep.c
 file	arch/hppa/hppa/sys_machdep.c
 file	arch/hppa/hppa/trap.c
+file	arch/hppa/hppa/intr.c
 file	arch/hppa/hppa/vm_machdep.c
 file	arch/hppa/hppa/in_cksum.c		inet
 file	arch/hppa/dev/clock.c

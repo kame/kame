@@ -1,4 +1,4 @@
-/*	$OpenBSD: anvar.h,v 1.5 2001/09/29 21:54:00 mickey Exp $	*/
+/*	$OpenBSD: anvar.h,v 1.9 2002/03/25 19:48:49 mickey Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -90,10 +90,8 @@ struct an_req {
  */
 #define AN_RID_IFACE_STATS	0x0100
 #define AN_RID_MGMT_XMIT	0x0200
-#ifdef ANCACHE
 #define AN_RID_ZERO_CACHE	0x0300
 #define AN_RID_READ_CACHE	0x0400
-#endif
 
 struct an_80211_hdr {
 	u_int16_t		frame_ctl;
@@ -151,7 +149,6 @@ struct an_mgmt_hdr {
  *
  * Each entry in the wi_sigcache has a unique macsrc.
  */
-#ifdef ANCACHE
 #define MAXANCACHE      10
 
 struct an_sigcache {
@@ -161,7 +158,6 @@ struct an_sigcache {
 	int	noise;		/* noise value */
 	int	quality;	/* quality of the packet */
 };
-#endif
 
 struct an_ltv_key {
 	u_int16_t		an_len;
@@ -573,7 +569,7 @@ struct an_ltv_status {
 	u_int16_t		an_max_noise_prev_sec;	/* 0x7A */
 	u_int16_t		an_avg_noise_prev_min;	/* 0x7C */
 	u_int16_t		an_max_noise_prev_min;	/* 0x7E */
-	u_int16_t		an_spare[3];		/* 0x80 */
+	u_int16_t		an_spare[5];		/* 0x80 */
 };
 
 #define AN_STATUS_OPMODE_CONFIGURED		0x0001
@@ -647,6 +643,7 @@ struct an_softc	{
 	struct arpcom	arpcom;
 	struct ifmedia	an_ifmedia;
 	void		*sc_ih;
+	struct timeout	an_stat_ch;
 
 	bus_space_tag_t		an_btag;
 	bus_space_handle_t	an_bhandle;
@@ -664,27 +661,25 @@ struct an_softc	{
 	struct an_ltv_stats	an_stats;
 	struct an_ltv_status	an_status;
 	u_int8_t		an_associated;
-#ifdef ANCACHE
+
+	/* ANCACHE stuff */
 	int			an_cache_iponly;
 	int			an_cache_mcastonly;
-
 	int			an_sigitems;
 	struct an_sigcache	an_sigcache[MAXANCACHE];
 	int			an_nextitem;
-#endif
-	struct timeout		an_stat_ch;
 };
 
-void	an_release_resources    __P((struct device *));
-int	an_alloc_port           __P((struct device *, int, int));
-int	an_alloc_memory         __P((struct device *, int, int));
-int	an_alloc_irq            __P((struct device *, int, int));
-int	an_probe                __P((struct device *));
-void	an_shutdown             __P((void *));
-int	an_attach               __P((struct an_softc *));
-void	an_init                 __P((struct an_softc *));
-void	an_stop                 __P((struct an_softc *));
-int	an_intr                 __P((void *));
+void	an_release_resources(struct device *);
+int	an_alloc_port(struct device *, int, int);
+int	an_alloc_memory(struct device *, int, int);
+int	an_alloc_irq(struct device *, int, int);
+int	an_probe(struct device *);
+void	an_shutdown(void *);
+int	an_attach(struct an_softc *);
+void	an_init(struct an_softc *);
+void	an_stop(struct an_softc *);
+int	an_intr(void *);
 #endif
 
 #endif

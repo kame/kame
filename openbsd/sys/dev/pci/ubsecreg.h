@@ -1,7 +1,8 @@
-/*	$OpenBSD: ubsecreg.h,v 1.14 2001/06/29 21:52:42 jason Exp $	*/
+/*	$OpenBSD: ubsecreg.h,v 1.17 2002/04/08 17:49:42 jason Exp $	*/
 
 /*
  * Copyright (c) 2000 Theo de Raadt
+ * Copyright (c) 2001 Patrik Lindergren (patrik@ipunplugged.com)
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,6 +26,11 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Effort sponsored in part by the Defense Advanced Research Projects
+ * Agency (DARPA) and Air Force Research Laboratory, Air Force
+ * Materiel Command, USAF, under agreement number F30602-01-2-0537.
+ *
  */
 
 /*
@@ -33,7 +39,19 @@
  * datasheet.
  */
 
-#define BS_BAR		0x10	/* DMA and status base address register */
+#define BS_BAR			0x10	/* DMA base address register */
+#define	BS_TRDY_TIMEOUT		0x40	/* TRDY timeout */
+#define	BS_RETRY_TIMEOUT	0x41	/* DMA retry timeout */
+
+#define	UBS_PCI_RTY_SHIFT			8
+#define	UBS_PCI_RTY_MASK			0xff
+#define	UBS_PCI_RTY(misc) \
+    (((misc) >> UBS_PCI_RTY_SHIFT) & UBS_PCI_RTY_MASK)
+
+#define	UBS_PCI_TOUT_SHIFT			0
+#define	UBS_PCI_TOUT_MASK			0xff
+#define	UBS_PCI_TOUT(misc) \
+    (((misc) >> PCI_TOUT_SHIFT) & PCI_TOUT_MASK)
 
 /*
  * DMA Control & Status Registers (offset from BS_BAR)

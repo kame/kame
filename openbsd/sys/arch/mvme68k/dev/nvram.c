@@ -1,4 +1,4 @@
-/*	$OpenBSD: nvram.c,v 1.7 2001/01/04 04:00:51 smurph Exp $ */
+/*	$OpenBSD: nvram.c,v 1.9 2002/03/14 01:26:37 millert Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -58,8 +58,8 @@ struct nvramsoftc {
 	struct clockreg *sc_regs;
 };
 
-void    nvramattach __P((struct device *, struct device *, void *));
-int     nvrammatch __P((struct device *, void *, void *));
+void    nvramattach(struct device *, struct device *, void *);
+int     nvrammatch(struct device *, void *, void *);
 
 struct cfattach nvram_ca = {
 	sizeof(struct nvramsoftc), nvrammatch, nvramattach
@@ -409,10 +409,11 @@ int flags;
  * will also be mmap'd, due to NBPG being 4K. On the MVME147 the NVRAM
  * repeats, so userland gets two copies back-to-back.
  */
-int
+paddr_t
 nvrammmap(dev, off, prot)
-dev_t dev;
-int off, prot;
+	dev_t dev;
+	off_t off;
+	int prot;
 {
 	int unit = minor(dev);
 	struct nvramsoftc *sc = (struct nvramsoftc *) nvram_cd.cd_devs[unit];

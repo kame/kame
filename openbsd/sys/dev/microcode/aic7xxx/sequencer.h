@@ -1,4 +1,4 @@
-/* $OpenBSD: sequencer.h,v 1.1 2000/03/22 02:50:50 smurph Exp $ */
+/* $OpenBSD: sequencer.h,v 1.3 2002/03/19 02:49:20 millert Exp $ */
 /*
  * Instruction formats for the sequencer program downloaded to
  * Aic7xxx SCSI host adapters

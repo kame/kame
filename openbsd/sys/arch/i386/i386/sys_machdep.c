@@ -1,4 +1,4 @@
-/*	$OpenBSD: sys_machdep.c,v 1.15 2001/09/19 20:50:56 mickey Exp $	*/
+/*	$OpenBSD: sys_machdep.c,v 1.18 2002/03/14 01:26:33 millert Exp $	*/
 /*	$NetBSD: sys_machdep.c,v 1.28 1996/05/03 19:42:29 christos Exp $	*/
 
 /*-
@@ -57,7 +57,6 @@
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
@@ -71,15 +70,15 @@
 #include <machine/vm86.h>
 #endif
 
-extern vm_map_t kernel_map;
+extern struct vm_map *kernel_map;
 
 #ifdef USER_LDT
-int i386_get_ldt __P((struct proc *, void *, register_t *));
-int i386_set_ldt __P((struct proc *, void *, register_t *));
+int i386_get_ldt(struct proc *, void *, register_t *);
+int i386_set_ldt(struct proc *, void *, register_t *);
 #endif
-int i386_iopl __P((struct proc *, void *, register_t *));
-int i386_get_ioperm __P((struct proc *, void *, register_t *));
-int i386_set_ioperm __P((struct proc *, void *, register_t *));
+int i386_iopl(struct proc *, void *, register_t *);
+int i386_get_ioperm(struct proc *, void *, register_t *);
+int i386_set_ioperm(struct proc *, void *, register_t *);
 
 #ifdef USER_LDT
 /*

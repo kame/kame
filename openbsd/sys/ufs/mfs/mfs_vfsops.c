@@ -1,4 +1,4 @@
-/*	$OpenBSD: mfs_vfsops.c,v 1.15 2001/07/05 08:24:33 espie Exp $	*/
+/*	$OpenBSD: mfs_vfsops.c,v 1.19 2002/03/14 01:27:15 millert Exp $	*/
 /*	$NetBSD: mfs_vfsops.c,v 1.10 1996/02/09 22:31:28 christos Exp $	*/
 
 /*
@@ -48,6 +48,7 @@
 #include <sys/malloc.h>
 #include <sys/kthread.h>
 
+#include <ufs/ufs/extattr.h>
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/ufsmount.h>
@@ -64,7 +65,7 @@ u_long	mfs_rootsize;	/* size of mini-root in bytes */
 
 static	int mfs_minor;	/* used for building internal dev_t */
 
-extern int (**mfs_vnodeop_p) __P((void *));
+extern int (**mfs_vnodeop_p)(void *);
 
 /*
  * mfs vfs operations.
@@ -82,7 +83,8 @@ struct vfsops mfs_vfsops = {
 	ffs_vptofh,
 	mfs_init,
 	ffs_sysctl,
-	mfs_checkexp
+	mfs_checkexp,
+	vfs_stdextattrctl
 };
 
 /*
@@ -144,7 +146,7 @@ mfs_initminiroot(base)
 	caddr_t base;
 {
 	struct fs *fs = (struct fs *)(base + SBOFF);
-	extern int (*mountroot) __P((void));
+	extern int (*mountroot)(void);
 
 	/* check for valid super block */
 	if (fs->fs_magic != FS_MAGIC || fs->fs_bsize > MAXBSIZE ||
@@ -214,7 +216,7 @@ mfs_mount(mp, path, data, ndp, p)
 	if (checkalias(devvp, makedev(255, mfs_minor), (struct mount *)0))
 		panic("mfs_mount: dup dev");
 	mfs_minor++;
-	mfsp = (struct mfsnode *)malloc(sizeof *mfsp, M_MFSNODE, M_WAITOK);
+	mfsp = malloc(sizeof *mfsp, M_MFSNODE, M_WAITOK);
 	devvp->v_data = mfsp;
 	mfsp->mfs_baseoff = args.base;
 	mfsp->mfs_size = args.size;
@@ -259,6 +261,7 @@ mfs_start(mp, flags, p)
 	register struct mfsnode *mfsp = VTOMFS(vp);
 	register struct buf *bp;
 	register caddr_t base;
+	int sleepreturn = 0;
 
 	base = mfsp->mfs_baseoff;
 	while (mfsp->mfs_buflist != (struct buf *)-1) {
@@ -275,11 +278,14 @@ mfs_start(mp, flags, p)
 		 * otherwise we will loop here, as tsleep will always return
 		 * EINTR/ERESTART.
 		 */
-		if (tsleep((caddr_t)vp, mfs_pri, "mfsidl", 0)) {
+		if (sleepreturn != 0) {
 			if (vfs_busy(mp, LK_NOWAIT, NULL, p) ||
 			    dounmount(mp, 0, p))
 				CLRSIG(p, CURSIG(p));
+			sleepreturn = 0;
+			continue;
 		}
+		sleepreturn = tsleep((caddr_t)vp, mfs_pri, "mfsidl", 0);
 	}
 	return (0);
 }

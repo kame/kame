@@ -1,4 +1,4 @@
-/*	$OpenBSD: clock.c,v 1.9 2001/01/04 22:34:48 miod Exp $	*/
+/*	$OpenBSD: clock.c,v 1.11 2002/03/14 03:16:01 millert Exp $	*/
 /*	$NetBSD: clock.c,v 1.31 1996/10/30 00:24:42 gwr Exp $	*/
 
 /*
@@ -68,8 +68,8 @@
 
 #define	CLOCK_PRI	5
 
-void cpu_initclocks __P((void));
-void clock_intr __P((struct clockframe *));
+void cpu_initclocks(void);
+void clock_intr(struct clockframe *);
 
 extern volatile u_char *interrupt_reg;
 volatile char *clock_va;
@@ -82,8 +82,8 @@ volatile char *clock_va;
 
 #define intersil_clear() (void)intersil_clock->clk_intr_reg
 
-static int  clock_match __P((struct device *, void *vcf, void *args));
-static void clock_attach __P((struct device *, struct device *, void *));
+static int  clock_match(struct device *, void *vcf, void *args);
+static void clock_attach(struct device *, struct device *, void *);
 
 struct cfattach clock_ca = {
 	sizeof(struct device), clock_match, clock_attach
@@ -222,7 +222,7 @@ void
 cpu_initclocks()
 {
 	int s;
-	extern void _isr_clock __P((void));	/* in locore.s */
+	extern void _isr_clock(void);	/* in locore.s */
 
 	if (!intersil_clock)
 		panic("cpu_initclocks");
@@ -329,12 +329,12 @@ microtime(tvp)
 #define SECDAY		86400L
 #define SECYR		(SECDAY * 365)
 
-static void clk_get_dt __P((struct date_time *));
-static void clk_set_dt __P((struct date_time *));
-void gmt_to_dt __P((long *, struct date_time *));
-void dt_to_gmt __P((struct date_time *, long *));
-static long clk_get_secs __P((void));
-static void clk_set_secs __P((long));
+static void clk_get_dt(struct date_time *);
+static void clk_set_dt(struct date_time *);
+void gmt_to_dt(long *, struct date_time *);
+void dt_to_gmt(struct date_time *, long *);
+static long clk_get_secs(void);
+static void clk_set_secs(long);
 
 /*
  * Initialize the time of day register, based on the time base
@@ -425,7 +425,7 @@ clk_get_dt(dt)
 	dt++;	/* end marker */
 	do {
 		*dst++ = *src++;
-	} while (dst < (char*)dt);
+	} while (dst < (char *)dt);
 
 	intersil_clock->clk_cmd_reg =
 		intersil_command(INTERSIL_CMD_RUN, INTERSIL_CMD_IENABLE);
@@ -605,9 +605,9 @@ clkdebug()
 	long gmt;
 	long *lp;
 
-	bzero((char*)&dt, sizeof(dt));
+	bzero((char *)&dt, sizeof(dt));
 	clk_get_dt(&dt);
-	lp = (long*)&dt;
+	lp = (long *)&dt;
 	printf("clkdebug: dt=[%x,%x]\n", lp[0], lp[1]);
 
 	dt_to_gmt(&dt, &gmt);

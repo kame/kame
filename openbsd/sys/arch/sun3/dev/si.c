@@ -1,4 +1,4 @@
-/*	$OpenBSD: si.c,v 1.14 2001/05/16 12:49:49 ho Exp $	*/
+/*	$OpenBSD: si.c,v 1.16 2002/03/14 03:16:01 millert Exp $	*/
 /*	$NetBSD: si.c,v 1.31 1996/11/20 18:56:59 gwr Exp $	*/
 
 /*-
@@ -115,7 +115,7 @@ static int si_link_flags = 0 /* | SDEV_DB2 */ ;
 /* How long to wait for DMA before declaring an error. */
 int si_dma_intr_timo = 500;	/* ticks (sec. X 100) */
 
-static void	si_minphys __P((struct buf *));
+static void	si_minphys(struct buf *);
 
 static struct scsi_adapter	si_ops = {
 	ncr5380_scsi_cmd,		/* scsi_cmd()		*/
@@ -382,7 +382,7 @@ found:
 
 	dh = &sc->sc_dma[i];
 	dh->dh_flags = SIDH_BUSY;
-	dh->dh_addr = (u_char*) addr;
+	dh->dh_addr = (u_char *) addr;
 	dh->dh_maplen  = xlen;
 	dh->dh_dvma = 0;
 

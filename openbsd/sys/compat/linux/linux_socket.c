@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_socket.c,v 1.20 2001/06/21 01:43:57 itojun Exp $	*/
+/*	$OpenBSD: linux_socket.c,v 1.23 2002/03/14 01:26:50 millert Exp $	*/
 /*	$NetBSD: linux_socket.c,v 1.14 1996/04/05 00:01:50 christos Exp $	*/
 
 /*
@@ -76,33 +76,33 @@
  * are copied to structures.
  */
 
-int linux_to_bsd_domain __P((int));
-int linux_socket __P((struct proc *, void *, register_t *));
-int linux_bind __P((struct proc *, void *, register_t *));
-int linux_connect __P((struct proc *, void *, register_t *));
-int linux_listen __P((struct proc *, void *, register_t *));
-int linux_accept __P((struct proc *, void *, register_t *));
-int linux_getsockname __P((struct proc *, void *, register_t *));
-int linux_getpeername __P((struct proc *, void *, register_t *));
-int linux_socketpair __P((struct proc *, void *, register_t *));
-int linux_send __P((struct proc *, void *, register_t *));
-int linux_recv __P((struct proc *, void *, register_t *));
-int linux_sendto __P((struct proc *, void *, register_t *));
-int linux_recvfrom __P((struct proc *, void *, register_t *));
-int linux_shutdown __P((struct proc *, void *, register_t *));
-int linux_to_bsd_sopt_level __P((int));
-int linux_to_bsd_so_sockopt __P((int));
-int linux_to_bsd_ip_sockopt __P((int));
-int linux_to_bsd_tcp_sockopt __P((int));
-int linux_to_bsd_udp_sockopt __P((int));
-int linux_setsockopt __P((struct proc *, void *, register_t *));
-int linux_getsockopt __P((struct proc *, void *, register_t *));
-int linux_recvmsg __P((struct proc *, void *, register_t *));
-int linux_sendmsg __P((struct proc *, void *, register_t *));
+int linux_to_bsd_domain(int);
+int linux_socket(struct proc *, void *, register_t *);
+int linux_bind(struct proc *, void *, register_t *);
+int linux_connect(struct proc *, void *, register_t *);
+int linux_listen(struct proc *, void *, register_t *);
+int linux_accept(struct proc *, void *, register_t *);
+int linux_getsockname(struct proc *, void *, register_t *);
+int linux_getpeername(struct proc *, void *, register_t *);
+int linux_socketpair(struct proc *, void *, register_t *);
+int linux_send(struct proc *, void *, register_t *);
+int linux_recv(struct proc *, void *, register_t *);
+int linux_sendto(struct proc *, void *, register_t *);
+int linux_recvfrom(struct proc *, void *, register_t *);
+int linux_shutdown(struct proc *, void *, register_t *);
+int linux_to_bsd_sopt_level(int);
+int linux_to_bsd_so_sockopt(int);
+int linux_to_bsd_ip_sockopt(int);
+int linux_to_bsd_tcp_sockopt(int);
+int linux_to_bsd_udp_sockopt(int);
+int linux_setsockopt(struct proc *, void *, register_t *);
+int linux_getsockopt(struct proc *, void *, register_t *);
+int linux_recvmsg(struct proc *, void *, register_t *);
+int linux_sendmsg(struct proc *, void *, register_t *);
 
-int linux_check_hdrincl __P((struct proc *, int, register_t *));
-int linux_sendto_hdrincl __P((struct proc *, struct sys_sendto_args *,
-    register_t *));
+int linux_check_hdrincl(struct proc *, int, register_t *);
+int linux_sendto_hdrincl(struct proc *, struct sys_sendto_args *,
+    register_t *);
 
 /*
  * Convert between Linux and BSD socket domain values
@@ -993,13 +993,53 @@ linux_ioctl_socket(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct linux_sys_ioctl_args /* {
+	struct linux_sys_ioctl_args /* {
 		syscallarg(int) fd;
 		syscallarg(u_long) com;
 		syscallarg(caddr_t) data;
 	} */ *uap = v;
 	u_long com;
 	struct sys_ioctl_args ia;
+	struct file *fp;
+	struct filedesc *fdp;
+	struct vnode *vp;
+	int (*ioctlf)(struct file *, u_long, caddr_t, struct proc *);
+	struct ioctl_pt pt;
+	int error = 0, isdev = 0, dosys = 1;
+
+	fdp = p->p_fd;
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL)
+		return (EBADF);
+	FREF(fp);
+
+	if (fp->f_type == DTYPE_VNODE) {
+		vp = (struct vnode *)fp->f_data;
+		isdev = vp->v_type == VCHR;
+	}
+
+	/*
+	 * Don't try to interpret socket ioctl calls that are done
+	 * on a device filedescriptor, just pass them through, to
+	 * emulate Linux behaviour. Use PTIOCLINUX so that the
+	 * device will only handle these if it's prepared to do
+	 * so, to avoid unexpected things from happening.
+	 */
+	if (isdev) {
+		dosys = 0;
+		ioctlf = fp->f_ops->fo_ioctl;
+		pt.com = SCARG(uap, com);
+		pt.data = SCARG(uap, data);
+		error = ioctlf(fp, PTIOCLINUX, (caddr_t)&pt, p);
+		/*
+		 * XXX hack: if the function returns EJUSTRETURN,       
+		 * it has stuffed a sysctl return value in pt.data.
+		 */
+		if (error == EJUSTRETURN) {
+			retval[0] = (register_t)pt.data;
+			error = 0;
+		}
+		goto out;
+	}
 
 	com = SCARG(uap, com);
 	retval[0] = 0;
@@ -1074,19 +1114,27 @@ linux_ioctl_socket(p, v, retval)
 				if ((sdl = (struct sockaddr_dl *)ifa->ifa_addr) &&
 				    (sdl->sdl_family == AF_LINK) &&
 				    (sdl->sdl_type == IFT_ETHER)) {
-					return copyout(LLADDR(sdl),
+					error = copyout(LLADDR(sdl),
 					    (caddr_t)&ifr->ifr_hwaddr.sa_data,
 					    LINUX_IFHWADDRLEN);
+					dosys = 0;
+					goto out;
 				}
 			}
 		}
-		return ENOENT;
+		error = ENOENT;
 	    }
 	default:
-		return EINVAL;
+		error = EINVAL;
 	}
 
-	SCARG(&ia, fd) = SCARG(uap, fd);
-	SCARG(&ia, data) = SCARG(uap, data);
-	return sys_ioctl(p, &ia, retval);
+out:
+	if (error == 0 && dosys) {
+		SCARG(&ia, fd) = SCARG(uap, fd);
+		SCARG(&ia, data) = SCARG(uap, data);
+		error = sys_ioctl(p, &ia, retval);
+	}
+
+	FRELE(fp);
+	return (error);
 }

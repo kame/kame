@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.c,v 1.40 2000/01/07 23:08:17 gibbs Exp $
- * $OpenBSD: aic7xxx.c,v 1.31 2001/09/20 17:02:31 mpech Exp $
+ * $OpenBSD: aic7xxx.c,v 1.38 2002/03/26 00:56:10 krw Exp $
  */
 /*
  * A few notes on features of the driver.
@@ -100,7 +100,7 @@
 #include <scsi/scsi_debug.h>
 #include <scsi/scsiconf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <dev/ic/aic7xxxreg.h>
 #include <dev/ic/aic7xxxvar.h>
@@ -211,43 +211,38 @@ void ahc_pci_intr(struct ahc_softc *ahc);
 STATIC int	ahcinitscbdata(struct ahc_softc *ahc);
 STATIC void	ahcfiniscbdata(struct ahc_softc *ahc);
 
-STATIC int	ahc_poll __P((struct ahc_softc *ahc, int wait));
-STATIC void	ahc_shutdown __P((void *arg));
-STATIC int	ahc_execute_scb __P((void *arg, bus_dma_segment_t *dm_segs,
-				     int nsegments));
-STATIC int	ahc_setup_data __P((struct ahc_softc *ahc,
-				    struct scsi_xfer *xs, struct scb *scb));
-STATIC void	ahc_freeze_devq __P((struct ahc_softc *ahc,
-				     struct scsi_link *sc_link));
-STATIC void	ahcallocscbs __P((struct ahc_softc *ahc));
-STATIC void	ahc_fetch_devinfo __P((struct ahc_softc *ahc,
-				       struct ahc_devinfo *devinfo));
-STATIC void	ahc_compile_devinfo __P((struct ahc_devinfo *devinfo,
-					 u_int our_id, u_int target,
-					 u_int lun, char channel,
-					 role_t role));
-STATIC u_int	ahc_abort_wscb __P((struct ahc_softc *ahc,
-				    u_int scbpos, u_int prev));
-STATIC void	ahc_done __P((struct ahc_softc *ahc, struct scb *scbp));
+STATIC int	ahc_poll(struct ahc_softc *ahc, int wait);
+STATIC void	ahc_shutdown(void *arg);
+STATIC int	ahc_execute_scb(void *arg, bus_dma_segment_t *dm_segs,
+		    int nsegments);
+STATIC int	ahc_setup_data(struct ahc_softc *ahc, struct scsi_xfer *xs,
+		    struct scb *scb);
+STATIC void	ahc_freeze_devq(struct ahc_softc *ahc,
+		    struct scsi_link *sc_link);
+STATIC void	ahcallocscbs(struct ahc_softc *ahc);
+STATIC void	ahc_fetch_devinfo(struct ahc_softc *ahc,
+		    struct ahc_devinfo *devinfo);
+STATIC void	ahc_compile_devinfo(struct ahc_devinfo *devinfo, u_int our_id,
+		    u_int target, u_int lun, char channel, role_t role);
+STATIC u_int	ahc_abort_wscb(struct ahc_softc *ahc, u_int scbpos, u_int prev);
+STATIC void	ahc_done(struct ahc_softc *ahc, struct scb *scbp);
 STATIC struct tmode_tstate *
-		ahc_alloc_tstate __P((struct ahc_softc *ahc, u_int scsi_id,
-				      char channel));
-STATIC void	ahc_handle_seqint __P((struct ahc_softc *ahc, u_int intstat));
-STATIC void	ahc_handle_scsiint __P((struct ahc_softc *ahc, u_int intstat));
-STATIC void	ahc_build_transfer_msg __P((struct ahc_softc *ahc,
-					    struct ahc_devinfo *devinfo));
-STATIC void	ahc_setup_initiator_msgout __P((struct ahc_softc *ahc,
-						struct ahc_devinfo *devinfo,
-						struct scb *scb));
-STATIC void	ahc_setup_target_msgin __P((struct ahc_softc *ahc,
-					    struct ahc_devinfo *devinfo));
-STATIC int	ahc_handle_msg_reject __P((struct ahc_softc *ahc,
-					   struct ahc_devinfo *devinfo));
-STATIC void	ahc_clear_msg_state __P((struct ahc_softc *ahc));
-STATIC void	ahc_handle_message_phase __P((struct ahc_softc *ahc,
-					      struct scsi_link *sc_link));
-STATIC int	ahc_sent_msg __P((struct ahc_softc *ahc, u_int msgtype,
-				  int full));
+		ahc_alloc_tstate(struct ahc_softc *ahc, u_int scsi_id,
+		    char channel);
+STATIC void	ahc_handle_seqint(struct ahc_softc *ahc, u_int intstat);
+STATIC void	ahc_handle_scsiint(struct ahc_softc *ahc, u_int intstat);
+STATIC void	ahc_build_transfer_msg(struct ahc_softc *ahc,
+		    struct ahc_devinfo *devinfo);
+STATIC void	ahc_setup_initiator_msgout(struct ahc_softc *ahc,
+		    struct ahc_devinfo *devinfo, struct scb *scb);
+STATIC void	ahc_setup_target_msgin(struct ahc_softc *ahc,
+		    struct ahc_devinfo *devinfo);
+STATIC int	ahc_handle_msg_reject(struct ahc_softc *ahc,
+		    struct ahc_devinfo *devinfo);
+STATIC void	ahc_clear_msg_state(struct ahc_softc *ahc);
+STATIC void	ahc_handle_message_phase(struct ahc_softc *ahc,
+		    struct scsi_link *sc_link);
+STATIC int	ahc_sent_msg(struct ahc_softc *ahc, u_int msgtype, int full);
 
 typedef enum {
 	MSGLOOP_IN_PROG,
@@ -255,141 +250,117 @@ typedef enum {
 	MSGLOOP_TERMINATED
 } msg_loop_stat;
 
-#ifdef __HAS_NEW_BUS_DMAMAP_SYNC
-#define	ahc_bus_dmamap_sync(tag, map, off, len, op)	\
-    bus_dmamap_sync((tag), (map), (off), (len), (op))
-#else
-#define	ahc_bus_dmamap_sync(tag, map, off, len, op)	\
-    bus_dmamap_sync((tag), (map), (op))
-#endif
-
-STATIC int	ahc_parse_msg __P((struct ahc_softc *ahc,
-				   struct scsi_link *sc_link,
-				   struct ahc_devinfo *devinfo));
-STATIC void	ahc_handle_ign_wide_residue __P((struct ahc_softc *ahc,
-						 struct ahc_devinfo *devinfo));
-STATIC void	ahc_handle_devreset __P((struct ahc_softc *ahc,
-					 struct ahc_devinfo *devinfo,
-					 int status, char *message,
-					 int verbose_level));
+STATIC int	ahc_parse_msg(struct ahc_softc *ahc, struct scsi_link *sc_link,
+		    struct ahc_devinfo *devinfo);
+STATIC void	ahc_handle_ign_wide_residue(struct ahc_softc *ahc,
+		    struct ahc_devinfo *devinfo);
+STATIC void	ahc_handle_devreset(struct ahc_softc *ahc,
+		    struct ahc_devinfo *devinfo, int status, char *message,
+		    int verbose_level);
 #ifdef AHC_DUMP_SEQ
-STATIC void	ahc_dumpseq __P((struct ahc_softc *ahc));
+STATIC void	ahc_dumpseq(struct ahc_softc *ahc);
 #endif
-STATIC void	ahc_loadseq __P((struct ahc_softc *ahc));
-STATIC int	ahc_check_patch __P((struct ahc_softc *ahc,
-				     struct patch **start_patch,
-				     int start_instr, int *skip_addr));
-STATIC void	ahc_download_instr __P((struct ahc_softc *ahc,
-					int instrptr, u_int8_t *dconsts));
-STATIC int	ahc_match_scb __P((struct scb *scb, int target, char channel,
-				   int lun, u_int tag, role_t role));
+STATIC void	ahc_loadseq(struct ahc_softc *ahc);
+STATIC int	ahc_check_patch(struct ahc_softc *ahc,
+		    struct patch **start_patch, int start_instr,
+		    int *skip_addr);
+STATIC void	ahc_download_instr(struct ahc_softc *ahc, int instrptr,
+		    u_int8_t *dconsts);
+STATIC int	ahc_match_scb(struct scb *scb, int target, char channel,
+		    int lun, u_int tag, role_t role);
 #ifdef AHC_DEBUG
-STATIC void	ahc_print_scb __P((struct scb *scb));
+STATIC void	ahc_print_scb(struct scb *scb);
 #endif
-STATIC int	ahc_search_qinfifo __P((struct ahc_softc *ahc, int target,
-					char channel, int lun, u_int tag,
-					role_t role, u_int32_t status,
-					ahc_search_action action));
-STATIC int	ahc_reset_channel __P((struct ahc_softc *ahc, char channel,
-				       int initiate_reset));
-STATIC int	ahc_abort_scbs __P((struct ahc_softc *ahc, int target,
-				    char channel, int lun, u_int tag,
-				    role_t role, u_int32_t status));
-STATIC int	ahc_search_disc_list __P((struct ahc_softc *ahc, int target,
-					  char channel, int lun, u_int tag,
-					  int stop_on_first, int remove,
-					  int save_state));
-STATIC u_int	ahc_rem_scb_from_disc_list __P((struct ahc_softc *ahc,
-						u_int prev, u_int scbptr));
-STATIC void	ahc_add_curscb_to_free_list __P((struct ahc_softc *ahc));
-STATIC void	ahc_clear_intstat __P((struct ahc_softc *ahc));
-STATIC void	ahc_reset_current_bus __P((struct ahc_softc *ahc));
+STATIC int	ahc_search_qinfifo(struct ahc_softc *ahc, int target,
+		    char channel, int lun, u_int tag, role_t role,
+		    u_int32_t status, ahc_search_action action);
+STATIC int	ahc_reset_channel(struct ahc_softc *ahc, char channel,
+		    int initiate_reset);
+STATIC int	ahc_abort_scbs(struct ahc_softc *ahc, int target, char channel,
+		    int lun, u_int tag, role_t role, u_int32_t status);
+STATIC int	ahc_search_disc_list(struct ahc_softc *ahc, int target,
+		    char channel, int lun, u_int tag, int stop_on_first,
+		    int remove, int save_state);
+STATIC u_int	ahc_rem_scb_from_disc_list(struct ahc_softc *ahc, u_int prev,
+		    u_int scbptr);
+STATIC void	ahc_add_curscb_to_free_list(struct ahc_softc *ahc);
+STATIC void	ahc_clear_intstat(struct ahc_softc *ahc);
+STATIC void	ahc_reset_current_bus(struct ahc_softc *ahc);
 STATIC struct ahc_syncrate *
-		ahc_devlimited_syncrate __P((struct ahc_softc *ahc, u_int *period));
+		ahc_devlimited_syncrate(struct ahc_softc *ahc, u_int *period);
 STATIC struct ahc_syncrate *
-		ahc_find_syncrate __P((struct ahc_softc *ahc, u_int *period,
-				       u_int maxsync));
-STATIC u_int ahc_find_period __P((struct ahc_softc *ahc, u_int scsirate,
-				  u_int maxsync));
-STATIC void	ahc_validate_offset __P((struct ahc_softc *ahc,
+		ahc_find_syncrate(struct ahc_softc *ahc, u_int *period,
+		    u_int maxsync);
+STATIC u_int ahc_find_period(struct ahc_softc *ahc, u_int scsirate,
+		u_int maxsync);
+STATIC void	ahc_validate_offset(struct ahc_softc *ahc,
 					 struct ahc_syncrate *syncrate,
-					 u_int *offset, int wide)); 
-STATIC void	ahc_update_target_msg_request __P((struct ahc_softc *ahc,
-					      struct ahc_devinfo *devinfo,
-					      struct ahc_initiator_tinfo *tinfo,
-					      int force, int paused));
-STATIC void	ahc_set_syncrate __P((struct ahc_softc *ahc,
-				      struct ahc_devinfo *devinfo,
-				      struct ahc_syncrate *syncrate,
-				      u_int period, u_int offset,
-				      u_int type, int paused, int done));
-STATIC void	ahc_set_width __P((struct ahc_softc *ahc,
-			      struct ahc_devinfo *devinfo,
-			      u_int width, u_int type, int paused, int done));
-STATIC void	ahc_set_tags __P((struct ahc_softc *ahc,
-				  struct ahc_devinfo *devinfo,int enable));
-STATIC int      ahc_istagged_device __P((struct ahc_softc *ahc,
-					 struct scsi_xfer *xs,
-					 int nocmdcheck));
-STATIC void     ahc_check_tags __P((struct ahc_softc *ahc,
-				    struct scsi_xfer *xs));
-STATIC void	ahc_construct_sdtr __P((struct ahc_softc *ahc,
-				   u_int period, u_int offset));
-STATIC void	ahc_construct_wdtr __P((struct ahc_softc *ahc, u_int bus_width));
+					 u_int *offset, int wide); 
+STATIC void	ahc_update_target_msg_request(struct ahc_softc *ahc,
+		    struct ahc_devinfo *devinfo,
+		    struct ahc_initiator_tinfo *tinfo, int force, int paused);
+STATIC void	ahc_set_syncrate(struct ahc_softc *ahc,
+		    struct ahc_devinfo *devinfo, struct ahc_syncrate *syncrate,
+		    u_int period, u_int offset, u_int type, int paused,
+		    int done);
+STATIC void	ahc_set_width(struct ahc_softc *ahc,
+		    struct ahc_devinfo *devinfo, u_int width, u_int type,
+		    int paused, int done);
+STATIC void	ahc_set_tags(struct ahc_softc *ahc,
+		    struct ahc_devinfo *devinfo,int enable);
+STATIC int      ahc_istagged_device(struct ahc_softc *ahc,
+		    struct scsi_xfer *xs, int nocmdcheck);
+STATIC void     ahc_check_tags(struct ahc_softc *ahc, struct scsi_xfer *xs);
+STATIC void	ahc_construct_sdtr(struct ahc_softc *ahc, u_int period,
+		    u_int offset);
+STATIC void	ahc_construct_wdtr(struct ahc_softc *ahc, u_int bus_width);
 
-STATIC void	ahc_calc_residual __P((struct scb *scb));
+STATIC void	ahc_calc_residual(struct scb *scb);
 
-STATIC void	ahc_update_pending_syncrates __P((struct ahc_softc *ahc));
+STATIC void	ahc_update_pending_syncrates(struct ahc_softc *ahc);
 
-STATIC void	ahc_set_recoveryscb __P((struct ahc_softc *ahc,
-					 struct scb *scb));
-STATIC void ahc_timeout __P((void *));
+STATIC void	ahc_set_recoveryscb(struct ahc_softc *ahc, struct scb *scb);
+STATIC void ahc_timeout(void *);
 
-static __inline int  sequencer_paused __P((struct ahc_softc *ahc));
-static __inline void pause_sequencer __P((struct ahc_softc *ahc));
-static __inline void unpause_sequencer __P((struct ahc_softc *ahc));
-STATIC void restart_sequencer __P((struct ahc_softc *ahc));
-static __inline u_int ahc_index_busy_tcl __P((struct ahc_softc *ahc,
-					      u_int tcl, int unbusy));
+static __inline int  sequencer_paused(struct ahc_softc *ahc);
+static __inline void pause_sequencer(struct ahc_softc *ahc);
+static __inline void unpause_sequencer(struct ahc_softc *ahc);
+STATIC void restart_sequencer(struct ahc_softc *ahc);
+static __inline u_int ahc_index_busy_tcl(struct ahc_softc *ahc, u_int tcl,
+		    int unbusy);
  
-static __inline void	ahc_busy_tcl __P((struct ahc_softc *ahc,
-					  struct scb *scb));
-static __inline int	ahc_isbusy_tcl __P((struct ahc_softc *ahc,
-					    struct scb *scb));
-static __inline void ahc_freeze_ccb __P((struct scb* scb));
-static __inline void ahcsetccbstatus __P((struct scsi_xfer *xs, int status));
-STATIC void ahc_run_qoutfifo __P((struct ahc_softc *ahc));
+static __inline void	ahc_busy_tcl(struct ahc_softc *ahc, struct scb *scb);
+static __inline int	ahc_isbusy_tcl(struct ahc_softc *ahc, struct scb *scb);
+static __inline void ahc_freeze_ccb(struct scb* scb);
+static __inline void ahcsetccbstatus(struct scsi_xfer *xs, int status);
+STATIC void ahc_run_qoutfifo(struct ahc_softc *ahc);
 
 static __inline struct ahc_initiator_tinfo *
-	ahc_fetch_transinfo __P((struct ahc_softc *ahc, char channel,
-				 u_int our_id, u_int target,
-				 struct tmode_tstate **tstate));
-STATIC void ahcfreescb __P((struct ahc_softc *ahc, struct scb *scb));
-static __inline struct scb *ahcgetscb __P((struct ahc_softc *ahc));
-int    ahc_createdmamem __P((struct ahc_softc *ahc, int size,
-			     bus_dmamap_t *mapp, caddr_t *vaddr,
-			     bus_addr_t *baddr, bus_dma_segment_t *segs,
-			     int *nseg, const char *what));
-STATIC void ahc_freedmamem __P((bus_dma_tag_t tag, int size,
-				bus_dmamap_t map, caddr_t vaddr,
-				bus_dma_segment_t *seg, int nseg));
-STATIC void ahcminphys __P((struct buf *bp));
+	ahc_fetch_transinfo(struct ahc_softc *ahc, char channel, u_int our_id,
+	    u_int target, struct tmode_tstate **tstate);
+STATIC void ahcfreescb(struct ahc_softc *ahc, struct scb *scb);
+static __inline struct scb *ahcgetscb(struct ahc_softc *ahc);
+int    ahc_createdmamem(struct ahc_softc *ahc, int size, bus_dmamap_t *mapp,
+	    caddr_t *vaddr, bus_addr_t *baddr, bus_dma_segment_t *segs,
+	    int *nseg, const char *what);
+STATIC void ahc_freedmamem(bus_dma_tag_t tag, int size, bus_dmamap_t map,
+	    caddr_t vaddr, bus_dma_segment_t *seg, int nseg);
+STATIC void ahcminphys(struct buf *bp);
 
-STATIC INLINE	struct scsi_xfer *ahc_first_xs __P((struct ahc_softc *));
-STATIC INLINE	void   ahc_list_insert_before __P((struct ahc_softc *ahc,
-						   struct scsi_xfer *xs,
-						   struct scsi_xfer *next_xs));
-STATIC INLINE	void   ahc_list_insert_head __P((struct ahc_softc *ahc,
-						 struct scsi_xfer *xs));
-STATIC INLINE	void   ahc_list_insert_tail __P((struct ahc_softc *ahc,
-						 struct scsi_xfer *xs));
-STATIC INLINE	void   ahc_list_remove __P((struct ahc_softc *ahc,
-					    struct scsi_xfer *xs));
-STATIC INLINE	struct scsi_xfer *ahc_list_next __P((struct ahc_softc *ahc,
-						     struct scsi_xfer *xs));
-STATIC int32_t ahc_scsi_cmd __P((struct scsi_xfer *xs));
-static __inline void ahc_swap_hscb __P((struct hardware_scb *));
-static __inline void ahc_swap_sg __P((struct ahc_dma_seg *));
+STATIC INLINE	struct scsi_xfer *ahc_first_xs(struct ahc_softc *);
+STATIC INLINE	void   ahc_list_insert_before(struct ahc_softc *ahc,
+			    struct scsi_xfer *xs, struct scsi_xfer *next_xs);
+STATIC INLINE	void   ahc_list_insert_head(struct ahc_softc *ahc,
+			    struct scsi_xfer *xs);
+STATIC INLINE	void   ahc_list_insert_tail(struct ahc_softc *ahc,
+			    struct scsi_xfer *xs);
+STATIC INLINE	void   ahc_list_remove(struct ahc_softc *ahc,
+			    struct scsi_xfer *xs);
+STATIC INLINE	struct scsi_xfer *ahc_list_next(struct ahc_softc *ahc,
+			    struct scsi_xfer *xs);
+STATIC int32_t ahc_scsi_cmd(struct scsi_xfer *xs);
+static __inline void ahc_swap_hscb(struct hardware_scb *);
+static __inline void ahc_swap_sg(struct ahc_dma_seg *);
 
 struct cfdriver ahc_cd = {
 	NULL, "ahc", DV_DULL
@@ -531,7 +502,7 @@ ahc_index_busy_tcl(ahc, tcl, unbusy)
 	scbid = ahc->untagged_scbs[tcl];
 	if (unbusy) {
 		ahc->untagged_scbs[tcl] = SCB_LIST_NULL;
-		ahc_bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap,
+		bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap,
 		    UNTAGGEDSCB_OFFSET * 256, 256, BUS_DMASYNC_PREWRITE);
 	}
 
@@ -544,7 +515,7 @@ ahc_busy_tcl(ahc, scb)
 	struct scb *scb;
 {
 	ahc->untagged_scbs[scb->hscb->tcl] = scb->hscb->tag;
-	ahc_bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
+	bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
 	    UNTAGGEDSCB_OFFSET * 256, 256, BUS_DMASYNC_PREWRITE);
 }
 
@@ -606,7 +577,7 @@ ahc_run_qoutfifo(ahc)
 	struct scb *scb;
 	u_int  scb_index;
 
-	ahc_bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
+	bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
 	    0, 256, BUS_DMASYNC_POSTREAD);
 
 	while (ahc->qoutfifo[ahc->qoutfifonext] != SCB_LIST_NULL) {
@@ -651,7 +622,7 @@ ahcfreescb(ahc, scb)
 	hscb = scb->hscb;
 
 #ifdef AHC_DEBUG
-	if (ahc_debug & AHC_SHOWSCBALLOC)
+	if (ahc_debug & AHC_SHOWSCBS)
 		printf("%s: free SCB tag %x\n", ahc_name(ahc), hscb->tag);
 #endif
 
@@ -1501,7 +1472,6 @@ ahc_set_tags(ahc, devinfo, enable)
 		tstate->tagenable |= devinfo->target_mask;
 	else {
 		tstate->tagenable &= ~devinfo->target_mask;
-		tstate->tagdisable |= devinfo->target_mask;
 	}
 }
 
@@ -2431,7 +2401,7 @@ ahc_handle_scsiint(ahc, intstat)
 			u_int tag;
 
 			tag = SCB_LIST_NULL;
-			if ((scb->hscb->control & MSG_SIMPLE_Q_TAG) != 0)
+			if ((scb->hscb->control & TAG_ENB) != 0)
 				tag = scb->hscb->tag;
 
 			ahc_abort_scbs(ahc, SCB_TARGET(scb), SCB_CHANNEL(scb),
@@ -2668,7 +2638,7 @@ ahc_handle_msg_reject(ahc, devinfo)
 			       "Using asynchronous transfers\n",
 			       ahc_name(ahc),
 			       devinfo->channel, devinfo->target);
-	} else if ((scb->hscb->control & MSG_SIMPLE_Q_TAG) != 0) {
+	} else if ((scb->hscb->control & TAG_ENB) != 0) {
 		if (bootverbose)
 			printf("%s:%c:%d: refuses tagged commands.  Performing "
 			       "non-tagged I/O\n", ahc_name(ahc),
@@ -2682,7 +2652,7 @@ ahc_handle_msg_reject(ahc, devinfo)
 		 */
 		ahc_outb(ahc, SCB_CONTROL, ahc_inb(ahc, SCB_CONTROL)
 					  & ~MSG_SIMPLE_Q_TAG);
-	 	scb->hscb->control &= ~MSG_SIMPLE_Q_TAG;
+	 	scb->hscb->control &= ~TAG_ENB;
 		ahc_outb(ahc, MSG_OUT, MSG_IDENTIFYFLAG);
 		ahc_outb(ahc, SCSISIGO, ahc_inb(ahc, SCSISIGO) | ATNO);
 
@@ -3455,13 +3425,13 @@ ahc_done(ahc, scb)
 	target = sc_link->target;
 	
 	if (xs->datalen) {
-		bus_dmasync_op_t op;
+		int op;
 	
 		if ((xs->flags & SCSI_DATA_IN) != 0)
 			op = BUS_DMASYNC_POSTREAD;
 		else
 			op = BUS_DMASYNC_POSTWRITE;
-		ahc_bus_dmamap_sync(ahc->sc_dmat, scb->dmamap,
+		bus_dmamap_sync(ahc->sc_dmat, scb->dmamap,
 		    0, scb->dmamap->dm_mapsize, op);
 		bus_dmamap_unload(ahc->sc_dmat, scb->dmamap);
 	}
@@ -3550,8 +3520,10 @@ ahc_done(ahc, scb)
 		ahc_list_insert_head(ahc, xs);
 		splx(s);
 	} else {
+		if (((xs->flags & SCSI_POLL) != 0) &&
+		    (xs->error == XS_NOERROR))
+			ahc_check_tags(ahc, xs);
 		xs->flags |= ITSDONE;
-		ahc_check_tags(ahc, xs);
 		scsi_done(xs);
 	}
 
@@ -3681,7 +3653,7 @@ ahc_init(ahc)
 	for (i = 0; i < 256; i++)
 		ahc->qoutfifo[i] = SCB_LIST_NULL;
 
-	ahc_bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap,
+	bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap,
 		 0, driver_data_size, BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
 	
 	/*
@@ -3880,7 +3852,6 @@ ahc_init(ahc)
 		tstate->ultraenb = ultraenb;
 		tstate->discenable = discenable;
 		tstate->tagenable = 0; /* Wait until the XPT says its okay */
-		tstate->tagdisable = 0;
 	}
 	ahc->user_discenable = discenable;
 	ahc->user_tagenable = tagenable;
@@ -3928,10 +3899,8 @@ ahc_init(ahc)
 
 #ifdef AHC_DEBUG
 	if (ahc_debug & AHC_SHOWMISC)
-		printf("NEEDSDTR == 0x%x\nNEEDWDTR == 0x%x\n"
-		       "DISCENABLE == 0x%x\nULTRAENB == 0x%x\n",
-		       ahc->needsdtr_orig, ahc->needwdtr_orig,
-		       discenable, ultraenb);
+		printf("DISCENABLE == 0x%x\nULTRAENB == 0x%x\n",
+		    discenable, ultraenb);
 #endif
 
 	/* Don't have any special messages to send to targets */
@@ -4225,7 +4194,7 @@ get_scb:
 	timeout_set(&xs->stimeout, ahc_timeout, scb);
 
 	if (ahc_istagged_device(ahc, xs, 0))
-		scb->hscb->control |= MSG_SIMPLE_Q_TAG;
+		scb->hscb->control |= TAG_ENB;
 	else
 		ahc_busy_tcl(ahc, scb);
 
@@ -4297,9 +4266,9 @@ ahc_execute_scb(arg, dm_segs, nsegments)
 
 
 	if (nsegments != 0) {
-		struct	  ahc_dma_seg *sg;
+		struct ahc_dma_seg *sg;
 		bus_dma_segment_t *end_seg;
-		bus_dmasync_op_t op;
+		int op;
 
 		end_seg = dm_segs + nsegments;
 
@@ -4323,7 +4292,7 @@ ahc_execute_scb(arg, dm_segs, nsegments)
 			op = BUS_DMASYNC_PREREAD;
 		else
 			op = BUS_DMASYNC_PREWRITE;
-		ahc_bus_dmamap_sync(ahc->sc_dmat, scb->dmamap,
+		bus_dmamap_sync(ahc->sc_dmat, scb->dmamap,
 		    0, scb->dmamap->dm_mapsize, op);
 	} else {
 		scb->hscb->SG_pointer = 0;
@@ -4379,7 +4348,7 @@ ahc_execute_scb(arg, dm_segs, nsegments)
 
 		ahc->qinfifo[ahc->qinfifonext++] = scb->hscb->tag;
 
-		ahc_bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
+		bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
 		    QINFIFO_OFFSET * 256, 256, BUS_DMASYNC_PREWRITE);
 		
 		if ((ahc->features & AHC_QUEUE_REGS) != 0) {
@@ -5001,7 +4970,7 @@ bus_reset:
 			sc_print_addr(active_scb->xs->sc_link);
 			printf("BDR message in message buffer\n");
 			active_scb->flags |=  SCB_DEVICE_RESET;
-			    timeout_add(&active_scb->xs->stimeout, 2 * hz);
+			timeout_add(&active_scb->xs->stimeout, 2 * hz);
 			unpause_sequencer(ahc);
 		} else {
 			int	 disconnected;
@@ -5080,7 +5049,7 @@ bus_reset:
 				ahc->qinfifo[ahc->qinfifonext++] =
 				    scb->hscb->tag;
 
-				ahc_bus_dmamap_sync(ahc->sc_dmat,
+				bus_dmamap_sync(ahc->sc_dmat,
 				    ahc->shared_data_dmamap,
 				    QINFIFO_OFFSET * 256, 256,
 				    BUS_DMASYNC_PREWRITE);
@@ -5134,7 +5103,7 @@ ahc_search_qinfifo(ahc, target, channel, lun, tag, role, status, action)
 	 * for removal will be re-added to the queue as we go.
 	 */
 	ahc->qinfifonext = qinpos;
-	ahc_bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
+	bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
 	    QINFIFO_OFFSET * 256, 256, BUS_DMASYNC_POSTREAD);
 
 	while (qinpos != qintail) {
@@ -5165,7 +5134,7 @@ ahc_search_qinfifo(ahc, target, channel, lun, tag, role, status, action)
 		}
 		qinpos++;
 	}
-	ahc_bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
+	bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
 	    QINFIFO_OFFSET * 256, 256, BUS_DMASYNC_PREWRITE);
 	
 	if ((ahc->features & AHC_QUEUE_REGS) != 0) {
@@ -5833,57 +5802,40 @@ ahc_check_tags(ahc, xs)
 struct ahc_softc *ahc;
 struct scsi_xfer *xs;
 {
-	struct scsi_inquiry_data *inq;
 	struct ahc_devinfo devinfo;
-	struct tmode_tstate *tstate;
-	int target_id, our_id;
-	char channel;
-
-	if (xs->cmd->opcode != INQUIRY || xs->error != XS_NOERROR)
-		return;
 
 	if (xs->sc_link->quirks & SDEV_NOTAGS)
 		return;
 
-	target_id = xs->sc_link->target;
-	our_id = SIM_SCSI_ID(ahc, xs->sc_link);
-	channel = SIM_CHANNEL(ahc, xs->sc_link);
+	if (ahc_istagged_device(ahc, xs, 1))
+ 		return;
 
-	(void)ahc_fetch_transinfo(ahc, channel, our_id, target_id, &tstate);
-	ahc_compile_devinfo(&devinfo, our_id, target_id,
-	    xs->sc_link->lun, channel, ROLE_INITIATOR);
+	ahc_compile_devinfo(&devinfo,
+	    SIM_SCSI_ID(ahc, xs->sc_link),
+	    xs->sc_link->target,
+	    xs->sc_link->lun,
+	    SIM_CHANNEL(ahc, xs->sc_link),
+	    ROLE_INITIATOR);
 
-	if (tstate->tagdisable & devinfo.target_mask)
-		return;
+	ahc_set_tags(ahc, &devinfo, TRUE);
 
-	/*
-	 * Sneak a look at the results of the SCSI Inquiry
-	 * command and see if we can do Tagged queing.  This
-	 * should really be done by the higher level drivers.
-	 */
-	inq = (struct scsi_inquiry_data *)xs->data;
-	if ((inq->flags & SID_CmdQue) && !(ahc_istagged_device(ahc, xs, 1))) {
-#ifdef AHC_DEBUG 
-		printf("%s: target %d using tagged queuing\n",
-			ahc_name(ahc), xs->sc_link->target);
-#endif 
-		ahc_set_tags(ahc, &devinfo, TRUE);
+	printf("%s: target %d using tagged queuing\n",
+	    ahc_name(ahc), xs->sc_link->target);
 
-		if (ahc->scb_data->maxhscbs >= 16 ||
-		    (ahc->flags & AHC_PAGESCBS)) {
-			/* Default to 16 tags */
-			xs->sc_link->openings += 14;
-		} else {
-			/*
-			 * Default to 4 tags on whimpy
-			 * cards that don't have much SCB
-			 * space and can't page.  This prevents
-			 * a single device from hogging all
-			 * slots.  We should really have a better
-			 * way of providing fairness.
-			 */
-			xs->sc_link->openings += 2;
-		}
+	if (ahc->scb_data->maxhscbs >= 16 ||
+	    (ahc->flags & AHC_PAGESCBS)) {
+		/* Default to 16 tags */
+		xs->sc_link->openings += 14;
+	} else {
+		/*	
+		 * Default to 4 tags on whimpy
+		 * cards that don't have much SCB
+		 * space and can't page.  This prevents
+		 * a single device from hogging all
+		 * slots.  We should really have a better
+		 * way of providing fairness.
+		 */
+		xs->sc_link->openings += 2;
 	}
 }
 

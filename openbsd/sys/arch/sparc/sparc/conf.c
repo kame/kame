@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.29 2001/09/28 02:53:13 mickey Exp $	*/
+/*	$OpenBSD: conf.c,v 1.31 2001/12/11 23:19:02 miod Exp $	*/
 /*	$NetBSD: conf.c,v 1.40 1996/04/11 19:20:03 thorpej Exp $ */
 
 /*
@@ -103,7 +103,7 @@ struct bdevsw	bdevsw[] =
 	bdev_notdef(),			/* 1 */
 	bdev_notdef(),			/* 2 */
 	bdev_disk_init(NXY,xy),		/* 3: SMD disk */
-	bdev_swap_init(1,sw),		/* 4 */
+	bdev_swap_init(1,sw),		/* 4 swap pseudo-device */
 	bdev_notdef(),			/* 5 */
 	bdev_notdef(),			/* 6 */
 	bdev_disk_init(NSD,sd),		/* 7: SCSI disk */
@@ -424,6 +424,19 @@ static int chrtoblktbl[] = {
 	/*108 */	NODEV,
 	/*109 */	NODEV,
 	/*110 */	8,
+	/*111 */	NODEV,
+	/*112 */	NODEV,
+	/*113 */	NODEV,
+	/*114 */	NODEV,
+	/*115 */	NODEV,
+	/*116 */	NODEV,
+	/*117 */	NODEV,
+	/*118 */	NODEV,
+	/*119 */	NODEV,
+	/*120 */	NODEV,
+	/*121 */	NODEV,
+	/*122 */	NODEV,
+	/*123 */	25,
 };
 
 /*

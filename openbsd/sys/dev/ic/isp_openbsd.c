@@ -1,4 +1,4 @@
-/* 	$OpenBSD: isp_openbsd.c,v 1.20 2001/09/01 07:16:40 mjacob Exp $ */
+/* 	$OpenBSD: isp_openbsd.c,v 1.22 2001/12/14 00:20:55 mjacob Exp $ */
 /*
  * Platform (OpenBSD) dependent common attachment code for Qlogic adapters.
  *
@@ -288,9 +288,9 @@ ispcmd(XS_T *xs)
 	/*
 	 * Make sure that there's *some* kind of sane setting.
 	 */
-	timeout_set(&xs->stimeout, isp_wdog, isp);
-
 	isp = XS_ISP(xs);
+
+	timeout_set(&xs->stimeout, isp_wdog, isp);
 
 	if (XS_LUN(xs) >= isp->isp_maxluns) {
 		xs->error = XS_SELTIMEOUT;;
@@ -529,8 +529,8 @@ isp_wdog(void *arg)
 			XS_CMD_S_CLEAR(xs);
 			isp_done(xs);
 		} else {
-			u_int16_t iptr, optr;
-			ispreq_t *mp;
+			u_int16_t nxti, optr;
+			ispreq_t local, *mp = &local, *qe;
 
 			isp_prt(isp, ISP_LOGWARN,
 			    "possible command timeout on handle %x", handle);
@@ -538,7 +538,7 @@ isp_wdog(void *arg)
 			XS_CMD_C_WDOG(xs);
 			timeout_add(&xs->stimeout, _XT(xs));
 			XS_CMD_S_TIMER(xs);
-			if (isp_getrqentry(isp, &iptr, &optr, (void **) &mp)) {
+			if (isp_getrqentry(isp, &nxti, &optr, (void **) &qe)) {
 				ISP_UNLOCK(isp);
 				return;
 			}
@@ -548,8 +548,8 @@ isp_wdog(void *arg)
 			mp->req_header.rqs_entry_type = RQSTYPE_MARKER;
 			mp->req_modifier = SYNC_ALL;
 			mp->req_target = XS_CHANNEL(xs) << 7;
-			ISP_SWIZZLE_REQUEST(isp, mp);
-			ISP_ADD_REQUEST(isp, iptr);
+			isp_put_request(isp, mp, qe);
+			ISP_ADD_REQUEST(isp, nxti);
 		}
 	} else if (isp->isp_dblev) {
 		isp_prt(isp, ISP_LOGDEBUG1, "watchdog with no command");

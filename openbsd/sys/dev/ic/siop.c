@@ -1,4 +1,4 @@
-/*	$OpenBSD: siop.c,v 1.14 2001/10/08 01:25:06 krw Exp $ */
+/*	$OpenBSD: siop.c,v 1.19 2002/03/14 01:26:55 millert Exp $ */
 /*	$NetBSD: siop.c,v 1.39 2001/02/11 18:04:49 bouyer Exp $	*/
 
 /*
@@ -74,18 +74,18 @@
 /* number of scheduler slots (needs to match script) */
 #define SIOP_NSLOTS 40
 
-void	siop_reset __P((struct siop_softc *));
-void	siop_handle_reset __P((struct siop_softc *));
-int	siop_handle_qtag_reject __P((struct siop_cmd *));
-void	siop_scsicmd_end __P((struct siop_cmd *));
-void	siop_start __P((struct siop_softc *));
-void 	siop_timeout __P((void *));
-int	siop_scsicmd __P((struct scsi_xfer *));
-void	siop_dump_script __P((struct siop_softc *));
-int	siop_morecbd __P((struct siop_softc *));
-struct siop_lunsw *siop_get_lunsw __P((struct siop_softc *));
-void	siop_add_reselsw __P((struct siop_softc *, int));
-void	siop_update_scntl3 __P((struct siop_softc *, struct siop_target *));
+void	siop_reset(struct siop_softc *);
+void	siop_handle_reset(struct siop_softc *);
+int	siop_handle_qtag_reject(struct siop_cmd *);
+void	siop_scsicmd_end(struct siop_cmd *);
+void	siop_start(struct siop_softc *);
+void 	siop_timeout(void *);
+int	siop_scsicmd(struct scsi_xfer *);
+void	siop_dump_script(struct siop_softc *);
+int	siop_morecbd(struct siop_softc *);
+struct siop_lunsw *siop_get_lunsw(struct siop_softc *);
+void	siop_add_reselsw(struct siop_softc *, int);
+void	siop_update_scntl3(struct siop_softc *, struct siop_target *);
 
 struct cfdriver siop_cd = {
 	NULL, "siop", DV_DULL
@@ -113,24 +113,24 @@ static int siop_stat_intr_done = 0;
 static int siop_stat_intr_xferdisc = 0;
 static int siop_stat_intr_lunresel = 0;
 static int siop_stat_intr_qfull = 0;
-void siop_printstats __P((void));
+void siop_printstats(void);
 #define INCSTAT(x) x++
 #else
 #define INCSTAT(x) 
 #endif
 
-static __inline__ void siop_script_sync __P((struct siop_softc *, int));
+static __inline__ void siop_script_sync(struct siop_softc *, int);
 static __inline__ void
 siop_script_sync(sc, ops)
 	struct siop_softc *sc;
 	int ops;
 {
 	if ((sc->features & SF_CHIP_RAM) == 0)
-		siop_bus_dmamap_sync(sc->sc_dmat, sc->sc_scriptdma,
+		bus_dmamap_sync(sc->sc_dmat, sc->sc_scriptdma,
 		    0, PAGE_SIZE, ops);
 }
 
-static __inline__ u_int32_t siop_script_read __P((struct siop_softc *, u_int));
+static __inline__ u_int32_t siop_script_read(struct siop_softc *, u_int);
 static __inline__ u_int32_t
 siop_script_read(sc, offset)
 	struct siop_softc *sc;
@@ -143,8 +143,8 @@ siop_script_read(sc, offset)
 	}
 }
 
-static __inline__ void siop_script_write __P((struct siop_softc *, u_int,
-	u_int32_t));
+static __inline__ void siop_script_write(struct siop_softc *, u_int,
+	u_int32_t);
 static __inline__ void
 siop_script_write(sc, offset, val)
 	struct siop_softc *sc;
@@ -212,6 +212,8 @@ siop_attach(sc)
 	    sc->sc_dev.dv_xname, (int)sizeof(siop_script),
 	    (u_int32_t)sc->sc_scriptaddr, sc->sc_script);
 #endif
+	/* Start with one page worth of commands */
+	siop_morecbd(sc);
 
 	/*
 	 * sc->sc_link is the template for all device sc_link's
@@ -903,7 +905,7 @@ scintr:
 			if (offset < SIOP_NSG) {
 				bcopy(&siop_cmd->siop_tables.data[offset],
 				    &siop_cmd->siop_tables.data[0],
-				    (SIOP_NSG - offset) * sizeof(scr_table_t));
+				    (SIOP_NSG - offset) * sizeof(struct scr_table));
 				siop_table_sync(siop_cmd,
 				    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 			}
@@ -1047,7 +1049,7 @@ siop_scsicmd_end(siop_cmd)
 	}
 	if (siop_cmd->status != CMDST_SENSE_DONE &&
 	    xs->flags & (SCSI_DATA_IN | SCSI_DATA_OUT)) {
-		siop_bus_dmamap_sync(sc->sc_dmat, siop_cmd->dmamap_data,
+		bus_dmamap_sync(sc->sc_dmat, siop_cmd->dmamap_data,
 		    0, siop_cmd->dmamap_data->dm_mapsize,
 		    (xs->flags & SCSI_DATA_IN) ?
 		    BUS_DMASYNC_POSTREAD : BUS_DMASYNC_POSTWRITE);
@@ -1084,11 +1086,11 @@ siop_scsicmd_end(siop_cmd)
 			bus_dmamap_unload(sc->sc_dmat, siop_cmd->dmamap_cmd);
 			goto out;
 		}
-		siop_bus_dmamap_sync(sc->sc_dmat, siop_cmd->dmamap_data,
+		bus_dmamap_sync(sc->sc_dmat, siop_cmd->dmamap_data,
 		    0, siop_cmd->dmamap_data->dm_mapsize,
 		    BUS_DMASYNC_PREREAD);
-		siop_bus_dmamap_sync(sc->sc_dmat, siop_cmd->dmamap_cmd,
-		    0, siop_cmd->dmamap_data->dm_mapsize,
+		bus_dmamap_sync(sc->sc_dmat, siop_cmd->dmamap_cmd,
+		    0, siop_cmd->dmamap_cmd->dm_mapsize,
 		    BUS_DMASYNC_PREWRITE);
 
 		siop_setuptables(siop_cmd);
@@ -1096,7 +1098,7 @@ siop_scsicmd_end(siop_cmd)
 		TAILQ_INSERT_HEAD(&sc->urgent_list, siop_cmd, next);
 		return;
 	} else if (siop_cmd->status == CMDST_SENSE_DONE) {
-		siop_bus_dmamap_sync(sc->sc_dmat, siop_cmd->dmamap_data,
+		bus_dmamap_sync(sc->sc_dmat, siop_cmd->dmamap_data,
 		    0, siop_cmd->dmamap_data->dm_mapsize,
 		    BUS_DMASYNC_POSTREAD);
 		bus_dmamap_unload(sc->sc_dmat, siop_cmd->dmamap_data);
@@ -1249,7 +1251,7 @@ siop_scsicmd(xs)
 {
 	struct siop_softc *sc = (struct siop_softc *)xs->sc_link->adapter_softc;
 	struct siop_cmd *siop_cmd;
-	int s, error, i;
+	int s, error, i, j;
 	const int target = xs->sc_link->target;
 	const int lun = xs->sc_link->lun;
 
@@ -1258,19 +1260,9 @@ siop_scsicmd(xs)
 	printf("starting cmd 0x%02x for %d:%d\n", xs->cmd->opcode, target, lun);
 #endif
 	siop_cmd = TAILQ_FIRST(&sc->free_list);
-	if (siop_cmd) {
+	if (siop_cmd != NULL) {
 		TAILQ_REMOVE(&sc->free_list, siop_cmd, next);
 	} else {
-		if (siop_morecbd(sc) == 0) {
-			siop_cmd = TAILQ_FIRST(&sc->free_list);
-#ifdef DIAGNOSTIC
-			if (siop_cmd == NULL)
-				panic("siop_morecbd succeed and does nothing");
-#endif
-			TAILQ_REMOVE(&sc->free_list, siop_cmd, next);
-		}
-	}
-	if (siop_cmd == NULL) {
 		xs->error = XS_DRIVER_STUFFUP;
 		splx(s);
 		return(TRY_AGAIN_LATER);
@@ -1356,13 +1348,13 @@ siop_scsicmd(xs)
 			splx(s);
 			return(TRY_AGAIN_LATER);
 		}
-		siop_bus_dmamap_sync(sc->sc_dmat, siop_cmd->dmamap_data,
+		bus_dmamap_sync(sc->sc_dmat, siop_cmd->dmamap_data,
 		    0, siop_cmd->dmamap_data->dm_mapsize,
 		    (xs->flags & SCSI_DATA_IN) ?
 		    BUS_DMASYNC_PREREAD : BUS_DMASYNC_PREWRITE);
 	}
-	siop_bus_dmamap_sync(sc->sc_dmat, siop_cmd->dmamap_cmd,
-	    0, siop_cmd->dmamap_data->dm_mapsize,
+	bus_dmamap_sync(sc->sc_dmat, siop_cmd->dmamap_cmd,
+	    0, siop_cmd->dmamap_cmd->dm_mapsize,
 	    BUS_DMASYNC_PREWRITE);
 
 	siop_setuptables(siop_cmd);
@@ -1379,6 +1371,15 @@ siop_scsicmd(xs)
 				    && (xs->error == XS_NOERROR)) {
 					error = ((struct scsi_inquiry_data *)xs->data)->device & SID_QUAL;
 					if (error != SID_QUAL_BAD_LU) {
+						/* 
+						 * Allocate enough commands to hold at least max openings
+						 * worth of commands. Do this statically now 'cuz 
+						 * a) We can't rely on the upper layers to ask for more
+						 * b) Doing it dynamically in siop_startcmd may cause 
+						 *    calls to bus_dma* functions in interrupt context
+						 */
+						for (j = 0; j < SIOP_NTAG; j += SIOP_NCMDPB)
+							siop_morecbd(sc);
 						if (sc->targets[target]->status == TARST_PROBING)
 							sc->targets[target]->status = TARST_ASYNC;
 						/* Can't do lun 0 here, because flags not set yet */
@@ -1608,7 +1609,7 @@ siop_timeout(v)
 	int s;
 
 	sc_print_addr(siop_cmd->xs->sc_link);
-	printf("command timeout\n");
+	printf("timeout on SCSI command 0x%x\n", siop_cmd->xs->cmd->opcode);
 
 	s = splbio();
 	/* reset the scsi bus */
@@ -1705,7 +1706,7 @@ siop_morecbd(sc)
 	printf("%s: alloc newcdb at PHY addr 0x%lx\n", sc->sc_dev.dv_xname,
 	    (unsigned long)newcbd->xferdma->dm_segs[0].ds_addr);
 #endif
-	
+
 	for (i = 0; i < SIOP_NCMDPB; i++) {
 		error = bus_dmamap_create(sc->sc_dmat, MAXPHYS, SIOP_NSG,
 		    MAXPHYS, 0, BUS_DMA_NOWAIT | BUS_DMA_ALLOCNOW,

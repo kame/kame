@@ -1,4 +1,4 @@
-/*	$OpenBSD: sram.c,v 1.2 2001/06/14 21:30:34 miod Exp $ */
+/*	$OpenBSD: sram.c,v 1.8 2002/03/14 01:26:39 millert Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -43,7 +43,7 @@
 #include <machine/cpu.h>
 #include <machine/autoconf.h>
 #include <machine/mioctl.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 struct sramsoftc {
 	struct device	sc_dev;
@@ -52,8 +52,8 @@ struct sramsoftc {
 	int		sc_len;
 };
 
-void sramattach __P((struct device *, struct device *, void *));
-int  srammatch __P((struct device *, void *, void *));
+void sramattach(struct device *, struct device *, void *);
+int  srammatch(struct device *, void *, void *);
 
 struct cfattach sram_ca = {
 	sizeof(struct sramsoftc), srammatch, sramattach
@@ -72,7 +72,7 @@ srammatch(parent, vcf, args)
 	struct confargs *ca = args;
 	int ret;
 
-	if (cputyp != CPU_187)
+	if (brdtyp != BRD_187)	/* The only one... */
 		return (0);
 
 	ca->ca_paddr = (void *)0xffe00000;
@@ -101,20 +101,20 @@ sramattach(parent, self, args)
 	struct mcreg *mc;
 	int i;
 
-	switch (cputyp) {
+	switch (brdtyp) {
 #ifdef MVME167
-	case CPU_167:
-	case CPU_166:
+	case BRD_167:
+	case BRD_166:
 		sc->sc_len = 128*1024;		/* always 128K */
 		break;
 #endif
 #ifdef MVME177
-	case CPU_177:
+	case BRD_177:
 		sc->sc_len = 128*1024;		/* always 128K */
 		break;
 #endif
 #ifdef MVME187
-	case CPU_187:
+	case BRD_187:
 		sc->sc_len = 128*1024;		/* always 128K */
 		break;
 #endif
@@ -205,10 +205,11 @@ sramwrite(dev, uio, flags)
 	return (memdevrw(sc->sc_vaddr, sc->sc_len, uio, flags));
 }
 
-int
+paddr_t
 srammmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	int unit = minor(dev);
 	struct sramsoftc *sc = (struct sramsoftc *) sram_cd.cd_devs[unit];

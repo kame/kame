@@ -1,4 +1,4 @@
-/*	$OpenBSD: sshdma.c,v 1.6 2001/09/23 02:50:25 miod Exp $	*/
+/*	$OpenBSD: sshdma.c,v 1.11 2002/03/14 01:26:39 millert Exp $	*/
 
 /*
  * Copyright (c) 1996 Nivas Madhur
@@ -43,9 +43,8 @@
 #include <sys/kernel.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
 #include <uvm/uvm_extern.h>
+#include <uvm/uvm_pmap.h>
 
 #include <machine/autoconf.h>
 #include <machine/board.h>
@@ -64,13 +63,13 @@
 #include <mvme88k/dev/pcctworeg.h>
 #endif
 
-int	afscmatch	__P((struct device *, void *, void *));
-void	afscattach	__P((struct device *, struct device *, void *));
+int	afscmatch(struct device *, void *, void *);
+void	afscattach(struct device *, struct device *, void *);
 
-int	afscprint	__P((void *auxp, char *));
-int	sshintr		__P((struct ssh_softc *));
-int	afsc_dmaintr	__P((void *));
-void	sshinitialize	__P((struct ssh_softc *));
+int	afscprint(void *auxp, char *);
+int	sshintr(struct ssh_softc *);
+int	afsc_dmaintr(void *);
+void	sshinitialize(struct ssh_softc *);
 
 struct scsi_adapter afsc_scsiswitch = {
 	ssh_scsicmd,
@@ -100,10 +99,8 @@ afscmatch(pdp, vcf, args)
 	void *vcf, *args;
 {
 	struct confargs *ca = args;
-	int ret;
 
-	if ((ret = badvaddr((vm_offset_t)IIOV(ca->ca_vaddr), 4)) <=0){
-	    printf("==> ssh: failed address check returning %ld.\n", ret);
+	if (badvaddr((vm_offset_t)IIOV(ca->ca_vaddr), 4)) {
 	    return(0);
 	}
 
@@ -177,10 +174,8 @@ afscattach(parent, self, auxp)
 			CACHE_INH);
 
 		pcctwointr_establish(PCC2V_NCR, &sc->sc_ih);
-/*		intr_establish(PCC2_VECT + SCSIIRQ, &sc->sc_ih);*/
 		/* enable interrupts at ca_ipl */
 		pcc2->pcc2_ncrirq = ca->ca_ipl | PCC2_IRQ_IEN;
-/*		pcc2->pcc2_scsiirq = ca->ca_ipl | PCC2_SCSIIRQ_IEN;*/
 		break;
 	    }
 #endif

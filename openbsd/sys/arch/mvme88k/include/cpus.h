@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpus.h,v 1.8 2001/08/12 12:03:02 heko Exp $ */
+/*	$OpenBSD: cpus.h,v 1.11 2001/12/19 07:04:41 smurph Exp $ */
 /* 
  * Mach Operating System
  * Copyright (c) 1993-1992 Carnegie Mellon University
@@ -58,8 +58,8 @@ union cpupid {
 };
 #endif /* _LOCORE */
 
-#define M88100 0
-#define M88200 5
-#define M88204 6
+#define M88100_ID 0
+#define M88200_ID 5
+#define M88204_ID 6
 
 #endif /* __MACHINE_CPUS_H__ */

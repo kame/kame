@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ether.c,v 1.33 2001/07/08 12:31:12 niklas Exp $	*/
+/*	$OpenBSD: if_ether.c,v 1.40 2002/03/27 17:13:47 ian Exp $	*/
 /*	$NetBSD: if_ether.c,v 1.31 1996/05/11 12:59:58 mycroft Exp $	*/
 
 /*
@@ -44,6 +44,8 @@
 
 #ifdef INET
 
+#include "bridge.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
@@ -76,10 +78,10 @@ int	arpt_keep = (20*60);	/* once resolved, good for 20 more minutes */
 int	arpt_down = 20;		/* once declared down, don't send for 20 secs */
 #define	rt_expire rt_rmx.rmx_expire
 
-void arptfree __P((struct llinfo_arp *));
-void arptimer __P((void *));
-struct llinfo_arp *arplookup __P((u_int32_t, int, int));
-void in_arpinput __P((struct mbuf *));
+void arptfree(struct llinfo_arp *);
+void arptimer(void *);
+struct llinfo_arp *arplookup(u_int32_t, int, int);
+void in_arpinput(struct mbuf *);
 
 LIST_HEAD(, llinfo_arp) llinfo_arp;
 struct	ifqueue arpintrq = {0, 0, 0, 50};
@@ -95,12 +97,12 @@ static int revarp_in_progress = 0;
 struct ifnet *myip_ifp = NULL;
 
 #ifdef DDB
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
-void	db_print_sa __P((struct sockaddr *));
-void	db_print_ifa __P((struct ifaddr *));
-void	db_print_llinfo __P((caddr_t));
-int	db_show_radix_node __P((struct radix_node *, void *));
+void	db_print_sa(struct sockaddr *);
+void	db_print_ifa(struct ifaddr *);
+void	db_print_llinfo(caddr_t);
+int	db_show_radix_node(struct radix_node *, void *);
 #endif
 
 /*
@@ -450,7 +452,10 @@ in_arpinput(m)
 	struct ether_header *eh;
 	register struct llinfo_arp *la = 0;
 	register struct rtentry *rt;
-	struct in_ifaddr *ia, *maybe_ia = 0;
+	struct in_ifaddr *ia;
+#if NBRIDGE > 0
+	struct in_ifaddr *bridge_ia = NULL;
+#endif
 	struct sockaddr_dl *sdl;
 	struct sockaddr sa;
 	struct in_addr isaddr, itaddr, myaddr;
@@ -467,20 +472,51 @@ in_arpinput(m)
 		goto out;
 	}
 #endif
-	bcopy((caddr_t)ea->arp_spa, (caddr_t)&isaddr, sizeof (isaddr));
-	bcopy((caddr_t)ea->arp_tpa, (caddr_t)&itaddr, sizeof (itaddr));
-	for (ia = in_ifaddr.tqh_first; ia != 0; ia = ia->ia_list.tqe_next)
-		if (ia->ia_ifp == &ac->ac_if ||
-		    (ia->ia_ifp->if_bridge &&
-		    ia->ia_ifp->if_bridge == ac->ac_if.if_bridge)) {
-			maybe_ia = ia;
-			if (itaddr.s_addr == ia->ia_addr.sin_addr.s_addr ||
-			    isaddr.s_addr == ia->ia_addr.sin_addr.s_addr)
+
+	bcopy((caddr_t)ea->arp_tpa, (caddr_t)&itaddr, sizeof(itaddr));
+	bcopy((caddr_t)ea->arp_spa, (caddr_t)&isaddr, sizeof(isaddr));
+
+	TAILQ_FOREACH(ia, &in_ifaddr, ia_list) {
+		if (itaddr.s_addr != ia->ia_addr.sin_addr.s_addr)
+			continue;
+
+		if (ia->ia_ifp == m->m_pkthdr.rcvif)
+			break;
+#if NBRIDGE > 0
+		/*
+		 * If the interface we received the packet on
+		 * is part of a bridge, check to see if we need
+		 * to "bridge" the packet to ourselves at this
+		 * layer.  Note we still prefer a perfect match,
+		 * but allow this weaker match if necessary.
+		 */
+		if (m->m_pkthdr.rcvif->if_bridge != NULL &&
+		    m->m_pkthdr.rcvif->if_bridge == ia->ia_ifp->if_bridge)
+			bridge_ia = ia;
+#endif
+	}
+
+#if NBRIDGE > 0
+	if (ia == NULL && bridge_ia != NULL) {
+		ia = bridge_ia;
+		ac = (struct arpcom *)bridge_ia->ia_ifp;
+	}
+#endif
+
+	if (ia == NULL) {
+		TAILQ_FOREACH(ia, &in_ifaddr, ia_list) {
+			if (isaddr.s_addr != ia->ia_addr.sin_addr.s_addr)
+				continue;
+			if (ia->ia_ifp == m->m_pkthdr.rcvif)
 				break;
 		}
-	if (maybe_ia == 0)
+	}
+
+	if (ia == NULL)
 		goto out;
-	myaddr = ia ? ia->ia_addr.sin_addr : maybe_ia->ia_addr.sin_addr;
+
+	myaddr = ia->ia_addr.sin_addr;
+
 	if (!bcmp((caddr_t)ea->arp_sha, (caddr_t)ac->ac_enaddr,
 	    sizeof (ea->arp_sha)))
 		goto out;	/* it's from me, ignore it. */
@@ -496,7 +532,7 @@ in_arpinput(m)
 			inet_ntoa(isaddr));
 		goto out;
 	}
-	if (isaddr.s_addr == myaddr.s_addr) {
+	if (myaddr.s_addr && isaddr.s_addr == myaddr.s_addr) {
 		log(LOG_ERR,
 		   "duplicate IP address %s sent from ethernet address %s\n",
 		   inet_ntoa(isaddr), ether_sprintf(ea->arp_sha));
@@ -513,7 +549,7 @@ in_arpinput(m)
 				   "entry for %s by %s on %s\n", 
 				   inet_ntoa(isaddr),
 				   ether_sprintf(ea->arp_sha),
-				   (&ac->ac_if)->if_xname);
+				   ac->ac_if.if_xname);
 				goto out;
 			} else if (rt->rt_ifp != &ac->ac_if) {
 			        log(LOG_WARNING,
@@ -521,14 +557,14 @@ in_arpinput(m)
 				   "on %s by %s on %s\n",
 				   inet_ntoa(isaddr), rt->rt_ifp->if_xname,
 				   ether_sprintf(ea->arp_sha),
-				   (&ac->ac_if)->if_xname);
+				   ac->ac_if.if_xname);
 				goto out;
 			} else {
 				log(LOG_INFO,
 				   "arp info overwritten for %s by %s on %s\n",
 			    	   inet_ntoa(isaddr), 
 				   ether_sprintf(ea->arp_sha),
-				   (&ac->ac_if)->if_xname);
+				   ac->ac_if.if_xname);
 				rt->rt_expire = 1; /* no longer static */
 			}
 		    }
@@ -539,7 +575,7 @@ in_arpinput(m)
 			"on %s by %s on %s\n",
 			inet_ntoa(isaddr), rt->rt_ifp->if_xname,
 			ether_sprintf(ea->arp_sha),
-			(&ac->ac_if)->if_xname);
+			ac->ac_if.if_xname);
 		    goto out;
 		}
 		bcopy((caddr_t)ea->arp_sha, LLADDR(sdl),
@@ -858,7 +894,7 @@ db_print_sa(sa)
 		return;
 	}
 
-	p = (u_char*)sa;
+	p = (u_char *)sa;
 	len = sa->sa_len;
 	db_printf("[");
 	while (len > 0) {

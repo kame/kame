@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.65 2001/09/19 20:50:57 mickey Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.82 2002/03/23 13:28:34 espie Exp $	*/
 /*	$NetBSD: machdep.c,v 1.85 1997/09/12 08:55:02 pk Exp $ */
 
 /*
@@ -50,7 +50,6 @@
 #include <sys/signalvar.h>
 #include <sys/proc.h>
 #include <sys/user.h>
-#include <sys/map.h>
 #include <sys/buf.h>
 #include <sys/device.h>
 #include <sys/reboot.h>
@@ -77,8 +76,9 @@
 #include <sys/sysctl.h>
 #include <sys/extent.h>
 
-#include <vm/vm.h>
-#include <vm/vm_page.h>
+#include <uvm/uvm_extern.h>
+
+#include <dev/rndvar.h>
 
 #include <machine/autoconf.h>
 #include <machine/frame.h>
@@ -111,24 +111,28 @@
 #include "led.h"
 #endif
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *phys_map = NULL;
 
 /*
  * Declare these as initialized data so we can patch them.
  */
-int	nswbuf = 0;
 #ifdef	NBUF
 int	nbuf = NBUF;
 #else
 int	nbuf = 0;
 #endif
+
+#ifndef BUFCACHEPERCENT
+#define BUFCACHEPERCENT 5
+#endif
+
 #ifdef	BUFPAGES
 int	bufpages = BUFPAGES;
 #else
 int	bufpages = 0;
 #endif
+int	bufcachepercent = BUFCACHEPERCENT;
 
 int	physmem;
 
@@ -149,9 +153,9 @@ int   safepri = 0;
 vaddr_t dvma_base, dvma_end;
 struct extent *dvmamap_extent;
 
-caddr_t allocsys __P((caddr_t));
-void	dumpsys __P((void));
-void	stackdump __P((void));
+caddr_t allocsys(caddr_t);
+void	dumpsys(void);
+void	stackdump(void);
 
 /*
  * Machine-dependent startup code
@@ -178,8 +182,7 @@ cpu_startup()
 	/*
 	 * fix message buffer mapping, note phys addr of msgbuf is 0
 	 */
-	pmap_enter(pmap_kernel(), MSGBUF_VA, 0x0, VM_PROT_READ|VM_PROT_WRITE,
-	    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
+	pmap_map(MSGBUF_VA, 0, MSGBUFSIZE, VM_PROT_READ|VM_PROT_WRITE);
 	initmsgbuf((caddr_t)(MSGBUF_VA + (CPU_ISSUN4 ? 4096 : 0)), MSGBUFSIZE);
 
 	proc0.p_addr = proc0paddr;
@@ -210,9 +213,9 @@ cpu_startup()
 
         /* allocate VM for buffers... area is not managed by VM system */
         if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-                    NULL, UVM_UNKNOWN_OFFSET,
+                    NULL, UVM_UNKNOWN_OFFSET, 0,
                     UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-                                UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+                                UVM_ADV_NORMAL, 0)))
         	panic("cpu_startup: cannot allocate VM for buffers");
 
         minaddr = (vaddr_t) buffers;
@@ -277,8 +280,6 @@ cpu_startup()
 	if (dvmamap_extent == 0)
 		panic("unable to allocate extent for dvma");
 
-	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				 VM_MBUF_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
 #endif
@@ -309,6 +310,9 @@ allocsys(v)
 #define	valloc(name, type, num) \
 	    v = (caddr_t)(((name) = (type *)v) + (num))
 #ifdef SYSVSHM
+	shminfo.shmmax = shmmaxpgs;
+	shminfo.shmall = shmmaxpgs;
+	shminfo.shmseg = shmseg;
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
 #ifdef SYSVSEM
@@ -324,16 +328,13 @@ allocsys(v)
 	valloc(msqids, struct msqid_ds, msginfo.msgmni);
 #endif
 
-#ifndef BUFCACHEPERCENT
-#define BUFCACHEPERCENT 5
-#endif
 	/*
 	 * Determine how many buffers to allocate (enough to
 	 * hold 5% of total physical memory, but at least 16).
 	 * Allocate 1/2 as many swap buffer headers as file i/o buffers.
 	 */
 	if (bufpages == 0)
-		bufpages = physmem * BUFCACHEPERCENT / 100;
+		bufpages = physmem * bufcachepercent / 100;
 	if (nbuf == 0) {
 		nbuf = bufpages;
 		if (nbuf < 16)
@@ -351,11 +352,6 @@ allocsys(v)
 	if (bufpages > nbuf * MAXBSIZE / PAGE_SIZE)
 		bufpages = nbuf * MAXBSIZE / PAGE_SIZE;
 
-	if (nswbuf == 0) {
-		nswbuf = (nbuf / 2) &~ 1;	/* force even */
-		if (nswbuf > 256)
-			nswbuf = 256;		/* sanity */
-	}
 	valloc(buf, struct buf, nbuf);
 	return (v);
 }
@@ -376,6 +372,27 @@ setregs(p, pack, stack, retval)
 	struct trapframe *tf = p->p_md.md_tf;
 	struct fpstate *fs;
 	int psr;
+
+	/* Setup the process StackGhost cookie which will be XORed into
+	 * the return pointer as register windows are over/underflowed
+	 */
+	p->p_addr->u_pcb.pcb_wcookie = 0;	/* XXX later arc4random(); */
+
+	/* The cookie needs to guarantee invalid alignment after the XOR */
+	switch (p->p_addr->u_pcb.pcb_wcookie % 3) {
+	case 0: /* Two lsb's already both set except if the cookie is 0 */
+		p->p_addr->u_pcb.pcb_wcookie |= 0x3;
+		break;
+	case 1: /* Set the lsb */
+		p->p_addr->u_pcb.pcb_wcookie = 1 |
+			(p->p_addr->u_pcb.pcb_wcookie & ~0x3);
+		break;
+	case 2: /* Set the second most lsb */
+		p->p_addr->u_pcb.pcb_wcookie = 2 |
+			(p->p_addr->u_pcb.pcb_wcookie & ~0x3);
+		break;
+	}
+
 
 	/* Don't allow misaligned code by default */
 	p->p_md.md_flags &= ~MDP_FIXALIGN;
@@ -683,9 +700,10 @@ boot(howto)
 	int i;
 	static char str[4];	/* room for "-sd\0" */
 
+	/* If system is cold, just halt. */
 	if (cold) {
-		printf("halted\n\n");
-		romhalt();
+		howto |= RB_HALT;
+		goto haltsys;
 	}
 
 	fb_unblank();
@@ -711,8 +729,15 @@ boot(howto)
 		}
 	}
 	(void) splhigh();		/* ??? */
+
+	if (howto & RB_DUMP)
+		dumpsys();
+
+haltsys:
+	/* Run any shutdown hooks */
+	doshutdownhooks();
+
 	if ((howto & RB_HALT) || (howto & RB_POWERDOWN)) {
-		doshutdownhooks();
 #if defined(SUN4M)
 		if (howto & RB_POWERDOWN) {
 #if NPOWER > 0 || NTCTRL >0
@@ -730,10 +755,7 @@ boot(howto)
 		printf("halted\n\n");
 		romhalt();
 	}
-	if (howto & RB_DUMP)
-		dumpsys();
 
-	doshutdownhooks();
 	printf("rebooting\n\n");
 	i = 1;
 	if (howto & RB_SINGLE)
@@ -807,7 +829,7 @@ dumpsys()
 {
 	int psize;
 	daddr_t blkno;
-	int (*dump)	__P((dev_t, daddr_t, caddr_t, size_t));
+	int (*dump)(dev_t, daddr_t, caddr_t, size_t);
 	int error = 0;
 	struct memarr *mp;
 	int nmem;
@@ -945,7 +967,7 @@ mapdev(phys, virt, offset, size)
 	struct rom_reg *phys;
 	int offset, virt, size;
 {
-	vaddr_t v;
+	vaddr_t va;
 	paddr_t pa;
 	void *ret;
 	static vaddr_t iobase;
@@ -959,23 +981,23 @@ mapdev(phys, virt, offset, size)
 		panic("mapdev: zero size");
 
 	if (virt)
-		v = trunc_page(virt);
+		va = trunc_page(virt);
 	else {
-		v = iobase;
+		va = iobase;
 		iobase += size;
 		if (iobase > IODEV_END)	/* unlikely */
 			panic("mapiodev");
 	}
-	ret = (void *)(v | (((u_long)phys->rr_paddr + offset) & PGOFSET));
+	ret = (void *)(va | (((u_long)phys->rr_paddr + offset) & PGOFSET));
 			/* note: preserve page offset */
 
 	pa = trunc_page((vaddr_t)phys->rr_paddr + offset);
 	pmtype = PMAP_IOENC(phys->rr_iospace);
 
 	do {
-		pmap_enter(pmap_kernel(), v, pa | pmtype | PMAP_NC,
-			   VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
-		v += PAGE_SIZE;
+		pmap_kenter_pa(va, pa | pmtype | PMAP_NC,
+		    VM_PROT_READ | VM_PROT_WRITE);
+		va += PAGE_SIZE;
 		pa += PAGE_SIZE;
 	} while ((size -= PAGE_SIZE) > 0);
 	return (ret);
@@ -989,7 +1011,7 @@ cpu_exec_aout_makecmds(p, epp)
 	int error = ENOEXEC;
 
 #ifdef COMPAT_SUNOS
-	extern int sunos_exec_aout_makecmds __P((struct proc *, struct exec_package *));
+	extern int sunos_exec_aout_makecmds(struct proc *, struct exec_package *);
 	if ((error = sunos_exec_aout_makecmds(p, epp)) == 0)
 		return 0;
 #endif

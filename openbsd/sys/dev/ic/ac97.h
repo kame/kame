@@ -1,4 +1,4 @@
-/*	$OpenBSD: ac97.h,v 1.8 2001/05/16 23:34:53 mickey Exp $	*/
+/*	$OpenBSD: ac97.h,v 1.12 2002/04/08 01:43:13 frantzen Exp $	*/
 
 /*
  * Copyright (c) 1999 Constantine Sapuntzakis
@@ -42,7 +42,8 @@ struct ac97_host_if {
 
 	enum ac97_host_flags {
 		AC97_HOST_DONT_READ = 0x1,
-		AC97_HOST_DONT_READANY = 0x2
+		AC97_HOST_DONT_READANY = 0x2,
+		AC97_HOST_SWAPPED_CHANNELS = 0x4
 	};
 
 	enum ac97_host_flags (*flags)(void *arg);
@@ -71,11 +72,22 @@ struct ac97_codec_if {
 	struct ac97_codec_if_vtbl *vtbl;
 };
 
-int ac97_attach __P((struct ac97_host_if *));
-int ac97_set_rate __P((struct ac97_codec_if *, struct audio_params *, int));
+int ac97_attach(struct ac97_host_if *);
+int ac97_set_rate(struct ac97_codec_if *, struct audio_params *, int);
 
 #define	AC97_REG_RESET			0x00
-#define	AC97_SOUND_ENHANCEMENT(reg)	(((reg) >> 10) & 0x1f)
+#define	AC97_CAPS_MICIN			0x0001
+#define	AC97_CAPS_TONECTRL		0x0004
+#define	AC97_CAPS_SIMSTEREO		0x0008
+#define	AC97_CAPS_HEADPHONES		0x0010
+#define	AC97_CAPS_LOUDNESS		0x0020
+#define	AC97_CAPS_DAC18			0x0040
+#define	AC97_CAPS_DAC20			0x0080
+#define	AC97_CAPS_ADC18			0x0100
+#define	AC97_CAPS_ADC20			0x0200
+#define	AC97_CAPS_ENHANCEMENT_MASK	0xfc00
+#define	AC97_CAPS_ENHANCEMENT_SHIFT	10
+#define	AC97_CAPS_ENHANCEMENT(reg)	(((reg) >> 10) & 0x1f)
 #define	AC97_REG_MASTER_VOLUME		0x02
 #define	AC97_REG_HEADPHONE_VOLUME	0x04
 #define	AC97_REG_MASTER_VOLUME_MONO	0x06
@@ -124,6 +136,7 @@ int ac97_set_rate __P((struct ac97_codec_if *, struct audio_params *, int));
 #define	AC97_EXT_AUDIO_REV_MASK		0x0c00
 #define	AC97_EXT_AUDIO_ID		0xc000
 #define	AC97_EXT_AUDIO_BITS		"\020\01vra\02dra\03spdif\04vrm\05dsa0\06dsa1\07cdac\010sdac\011ldac\012amap\013rev0\014rev1\017id0\020id1"
+#define	AC97_SINGLERATE			48000
 #define	AC97_REG_FRONT_DAC_RATE		0x2c
 #define	AC97_REG_SURROUND_DAC_RATE	0x2e
 #define	AC97_REG_PCM_DAC_RATE		0x30

@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_script.c,v 1.13 2001/06/22 14:14:08 deraadt Exp $	*/
+/*	$OpenBSD: exec_script.c,v 1.15 2001/11/06 19:53:20 miod Exp $	*/
 /*	$NetBSD: exec_script.c,v 1.13 1996/02/04 02:15:06 christos Exp $	*/
 
 /*
@@ -41,7 +41,7 @@
 #include <sys/filedesc.h>
 #include <sys/exec.h>
 #include <sys/resourcevar.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <sys/exec_script.h>
 
@@ -180,6 +180,7 @@ check_shell:
 		fp->f_ops = &vnops;
 		fp->f_data = (caddr_t) epp->ep_vp;
 		fp->f_flag = FREAD;
+		FILE_SET_MATURE(fp);
 	}
 #endif
 

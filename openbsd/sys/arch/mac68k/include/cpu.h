@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.21 2001/08/20 19:49:03 miod Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.24 2002/03/14 03:15:55 millert Exp $	*/
 /*	$NetBSD: cpu.h,v 1.45 1997/02/10 22:13:40 scottr Exp $	*/
 
 /*
@@ -297,33 +297,30 @@ struct fpframe;
 struct pcb;
 
 /* machdep.c */
-void	mac68k_set_bell_callback __P((int (*)(void *, int, int, int), void *));
-int	mac68k_ring_bell __P((int, int, int));
-u_int	get_mapping __P((void));
+void	mac68k_set_bell_callback(int (*)(void *, int, int, int), void *);
+int	mac68k_ring_bell(int, int, int);
+u_int	get_mapping(void);
 
 /* locore.s */
-void	m68881_restore __P((struct fpframe *));
-void	m68881_save __P((struct fpframe *));
-void	TBIA __P((void));
-void	TBIAS __P((void));
-void	TBIS __P((vm_offset_t));
-void	DCFP __P((vm_offset_t));
-void	ICPP __P((vm_offset_t));
-void	DCIU __P((void));
-void	DCIS __P((void));
-void	ICIA __P((void));
-void	DCFL __P((vm_offset_t));
-int	suline __P((caddr_t, caddr_t));
-void	savectx __P((struct pcb *));
-void	proc_trampoline __P((void));
-void	loadustp __P((int));
-
-/* trap.c */
-void    child_return __P((struct proc *, struct frame));
+void	m68881_restore(struct fpframe *);
+void	m68881_save(struct fpframe *);
+void	TBIA(void);
+void	TBIAS(void);
+void	TBIS(vm_offset_t);
+void	DCFP(vm_offset_t);
+void	ICPP(vm_offset_t);
+void	DCIU(void);
+void	DCIS(void);
+void	ICIA(void);
+void	DCFL(vm_offset_t);
+int	suline(caddr_t, caddr_t);
+void	savectx(struct pcb *);
+void	proc_trampoline(void);
+void	loadustp(int);
 
 /* vm_machdep.c */
-void	physaccess __P((caddr_t, caddr_t, register int, register int));
-void	physunaccess __P((caddr_t, register int));
+void	physaccess(caddr_t, caddr_t, register int, register int);
+void	physunaccess(caddr_t, register int);
 
 #endif
 

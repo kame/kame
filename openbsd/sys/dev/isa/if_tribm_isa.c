@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tribm_isa.c,v 1.1 1999/12/27 21:51:35 fgsch Exp $	*/
+/*	$OpenBSD: if_tribm_isa.c,v 1.3 2002/03/14 01:26:56 millert Exp $	*/
 /*	$NetBSD: if_tribm_isa.c,v 1.2 1999/03/22 23:01:37 bad Exp $	*/
 
 /*
@@ -41,6 +41,7 @@
 #include <sys/systm.h>
 #include <sys/socket.h>
 #include <sys/device.h>
+#include <sys/timeout.h>
 
 #include <net/if.h>
 #include <net/if_media.h>
@@ -54,11 +55,11 @@
 #include <dev/ic/tropicreg.h>
 #include <dev/ic/tropicvar.h>
 
-int	tribm_isa_probe __P((struct device *, void *, void *));
-int	tr_isa_map_io __P((struct isa_attach_args *, bus_space_handle_t *,
-	    bus_space_handle_t *));
-void	tr_isa_unmap_io __P((struct isa_attach_args *, bus_space_handle_t,
-	    bus_space_handle_t));
+int	tribm_isa_probe(struct device *, void *, void *);
+int	tr_isa_map_io(struct isa_attach_args *, bus_space_handle_t *,
+	    bus_space_handle_t *);
+void	tr_isa_unmap_io(struct isa_attach_args *, bus_space_handle_t,
+	    bus_space_handle_t);
 
 int
 tribm_isa_probe(parent, match, aux)

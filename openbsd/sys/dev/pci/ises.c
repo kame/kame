@@ -1,4 +1,4 @@
-/*	$OpenBSD: ises.c,v 1.16 2001/09/21 19:41:13 ho Exp $	*/
+/*	$OpenBSD: ises.c,v 1.20 2002/03/14 03:16:06 millert Exp $	*/
 
 /*
  * Copyright (c) 2000, 2001 Håkan Olsson (ho@crt.se)
@@ -61,30 +61,29 @@
 /*
  * Prototypes and count for the pci_device structure
  */
-int	ises_match __P((struct device *, void *, void *));
-void	ises_attach __P((struct device *, struct device *, void *));
+int	ises_match(struct device *, void *, void *);
+void	ises_attach(struct device *, struct device *, void *);
 
-void	ises_initstate __P((void *));
-void	ises_hrng_init __P((struct ises_softc *));
-void	ises_hrng __P((void *));
-void	ises_process_oqueue __P((struct ises_softc *));
-int	ises_queue_cmd __P((struct ises_softc *, u_int32_t, u_int32_t *, 
-			    u_int32_t (*)(struct ises_softc *, 
-					  struct ises_cmd *)));
-u_int32_t ises_get_fwversion __P((struct ises_softc *));
-int	ises_assert_cmd_mode __P((struct ises_softc *));
+void	ises_initstate(void *);
+void	ises_hrng_init(struct ises_softc *);
+void	ises_hrng(void *);
+void	ises_process_oqueue(struct ises_softc *);
+int	ises_queue_cmd(struct ises_softc *, u_int32_t, u_int32_t *, 
+		       u_int32_t (*)(struct ises_softc *, struct ises_cmd *));
+u_int32_t ises_get_fwversion(struct ises_softc *);
+int	ises_assert_cmd_mode(struct ises_softc *);
 
-int	ises_intr __P((void *));
-int	ises_newsession __P((u_int32_t *, struct cryptoini *));
-int	ises_freesession __P((u_int64_t));
-int	ises_process __P((struct cryptop *));
-void	ises_callback __P((struct ises_q *));
-int	ises_feed __P((struct ises_softc *));
-int	ises_bchu_switch_session __P((struct ises_softc *, 
-				      struct ises_session *, int));
-u_int32_t ises_bchu_switch_final __P((struct ises_softc *, struct ises_cmd *));
+int	ises_intr(void *);
+int	ises_newsession(u_int32_t *, struct cryptoini *);
+int	ises_freesession(u_int64_t);
+int	ises_process(struct cryptop *);
+void	ises_callback(struct ises_q *);
+int	ises_feed(struct ises_softc *);
+int	ises_bchu_switch_session(struct ises_softc *, 
+				      struct ises_session *, int);
+u_int32_t ises_bchu_switch_final(struct ises_softc *, struct ises_cmd *);
 
-void	ises_read_dma __P((struct ises_softc *));
+void	ises_read_dma(struct ises_softc *);
 
 #define READ_REG(sc,r) \
     bus_space_read_4((sc)->sc_memt, (sc)->sc_memh,r)
@@ -102,12 +101,12 @@ void	ises_read_dma __P((struct ises_softc *));
 #endif
 
 #ifdef ISESDEBUG
-void	ises_debug_init __P((struct ises_softc *));
-void	ises_debug_2 __P((void));
-void	ises_debug_loop __P((void *));
-void	ises_showreg __P((void));
-void	ises_debug_parse_omr __P((struct ises_softc *));
-void	ises_debug_simple_cmd __P((struct ises_softc *, u_int32_t, u_int32_t));
+void	ises_debug_init(struct ises_softc *);
+void	ises_debug_2(void);
+void	ises_debug_loop(void *);
+void	ises_showreg(void);
+void	ises_debug_parse_omr(struct ises_softc *);
+void	ises_debug_simple_cmd(struct ises_softc *, u_int32_t, u_int32_t);
 struct ises_softc *ises_sc;
 struct timeout ises_db_timeout;
 int ises_db;
@@ -245,7 +244,7 @@ ises_attach(struct device *parent, struct device *self, void *aux)
 
 	bzero(&isesstats, sizeof(isesstats));
 
-	sc->sc_cid = crypto_get_driverid();
+	sc->sc_cid = crypto_get_driverid(0);
 
 	if (sc->sc_cid < 0)
 		goto fail;
@@ -751,8 +750,8 @@ ises_intr(void *arg)
 		    (dma_status & ISES_DMA_STATUS_R_RUN) == 0) {
 			DPRINTF(("%s: DMA read complete\n", dv));
 
-			bus_dmamap_sync(sc->sc_dmat, sc->sc_dmamap, 
-			    BUS_DMASYNC_POSTREAD);
+			bus_dmamap_sync(sc->sc_dmat, sc->sc_dmamap, 0,
+			    sc->sc_dmamap->dm_mapsize, BUS_DMASYNC_POSTREAD);
 
 			/* XXX Pick up and return the data.*/
 
@@ -762,8 +761,8 @@ ises_intr(void *arg)
 		    (dma_status & ISES_DMA_STATUS_W_RUN) == 0) {
 			DPRINTF(("%s: DMA write complete\n", dv));
 
-			bus_dmamap_sync(sc->sc_dmat, sc->sc_dmamap, 
-			    BUS_DMASYNC_POSTWRITE);
+			bus_dmamap_sync(sc->sc_dmat, sc->sc_dmamap, 0,
+			    sc->sc_dmamap->dm_mapsize, BUS_DMASYNC_POSTWRITE);
 
 			WRITE_REG(sc, ISES_DMA_RESET, 0);
 			ises_feed(sc);
@@ -902,7 +901,8 @@ ises_feed(struct ises_softc *sc)
 	/* ... else */	
 
 	/* Start writing data to the ises. */
-	bus_dmamap_sync(sc->sc_dmat, sc->sc_dmamap, BUS_DMASYNC_PREWRITE);
+	bus_dmamap_sync(sc->sc_dmat, sc->sc_dmamap, 0,
+	    sc->sc_dmamap->dm_mapsize, BUS_DMASYNC_PREWRITE);
 	
 	DPRINTF(("%s:ises_feed: writing DMA\n", dv));
 	DELAY(1000000);
@@ -1763,7 +1763,8 @@ ises_read_dma (struct ises_softc *sc)
 	bus_dma_segment_t *ds = &sc->sc_dmamap->dm_segs[0];
 	u_int32_t dma_status;
 
-	bus_dmamap_sync(sc->sc_dmat, sc->sc_dmamap, BUS_DMASYNC_PREREAD);
+	bus_dmamap_sync(sc->sc_dmat, sc->sc_dmamap, 0,
+	    sc->sc_dmamap->dm_mapsize, BUS_DMASYNC_PREREAD);
 
 	WRITE_REG(sc, ISES_DMA_READ_START, ds->ds_addr);
 	WRITE_REG(sc, ISES_DMA_READ_START, ISES_DMA_RCOUNT(ds->ds_len));

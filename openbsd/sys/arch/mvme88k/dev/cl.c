@@ -1,4 +1,4 @@
-/*	$OpenBSD: cl.c,v 1.14 2001/08/31 01:05:44 miod Exp $ */
+/*	$OpenBSD: cl.c,v 1.23 2002/03/14 03:15:57 millert Exp $ */
 
 /*
  * Copyright (c) 1995 Dale Rahn. All rights reserved.
@@ -80,8 +80,8 @@
 #endif
 struct cl_cons {
 	void	*cl_paddr;
-	volatile struct clreg *cl_vaddr;
-	volatile struct pcctworeg *pcctwoaddr;
+	struct clreg *volatile cl_vaddr;
+	struct pcctworeg *volatile pcctwoaddr;
 	u_char	channel;
 } cl_cons;
 
@@ -155,50 +155,50 @@ struct {
 };
 
 /* prototypes */
-int clcnprobe __P((struct consdev *cp));
-int clcninit __P((struct consdev *cp));
-int cl_instat __P((struct clsoftc *sc));
-int clcngetc __P((dev_t dev));
-int clcnputc __P((dev_t dev, u_char c));
-void clcnpollc __P((dev_t, int));
-u_char cl_clkdiv __P((int speed));
-u_char cl_clknum __P((int speed));
-u_char cl_clkrxtimeout __P((int speed));
-void clstart __P((struct tty *tp));
-void cl_unblock __P((struct tty *tp));
-int clccparam __P((struct clsoftc *sc, struct termios *par, int channel));
+int clcnprobe(struct consdev *cp);
+int clcninit(struct consdev *cp);
+int cl_instat(struct clsoftc *sc);
+int clcngetc(dev_t dev);
+int clcnputc(dev_t dev, u_char c);
+void clcnpollc(dev_t, int);
+u_char cl_clkdiv(int speed);
+u_char cl_clknum(int speed);
+u_char cl_clkrxtimeout(int speed);
+void clstart(struct tty *tp);
+void cl_unblock(struct tty *tp);
+int clccparam(struct clsoftc *sc, struct termios *par, int channel);
 
-int clparam __P((struct tty *tp, struct termios *t));
-int cl_mintr __P((void *));
-int cl_txintr __P((void *));
-int cl_rxintr __P((void *));
-void cl_overflow __P((struct clsoftc *sc, int channel, long *ptime, u_char *msg));
-void cl_parity __P((struct clsoftc *sc, int channel));
-void cl_frame __P((struct clsoftc *sc, int channel));
-void cl_break __P(( struct clsoftc *sc, int channel));
-int clmctl __P((dev_t dev, int bits, int how));
+int clparam(struct tty *tp, struct termios *t);
+int cl_mintr(void *);
+int cl_txintr(void *);
+int cl_rxintr(void *);
+void cl_overflow(struct clsoftc *sc, int channel, long *ptime, u_char *msg);
+void cl_parity(struct clsoftc *sc, int channel);
+void cl_frame(struct clsoftc *sc, int channel);
+void cl_break( struct clsoftc *sc, int channel);
+int clmctl(dev_t dev, int bits, int how);
 #ifdef DEBUG
-void cl_dumpport __P((int channel));
+void cl_dumpport(int channel);
 #endif
 
-int	clprobe __P((struct device *parent, void *self, void *aux));
-void	clattach __P((struct device *parent, struct device *self, void *aux));
+int	clprobe(struct device *parent, void *self, void *aux);
+void	clattach(struct device *parent, struct device *self, void *aux);
 
-int clopen  __P((dev_t dev, int flag, int mode, struct proc *p));
-int clclose __P((dev_t dev, int flag, int mode, struct proc *p));
-int clread  __P((dev_t dev, struct uio *uio, int flag));
-int clwrite __P((dev_t dev, struct uio *uio, int flag));
-int clioctl __P((dev_t dev, int cmd, caddr_t data, int flag, struct proc *p));
-int clstop  __P((struct tty *tp, int flag));
+int clopen(dev_t dev, int flag, int mode, struct proc *p);
+int clclose(dev_t dev, int flag, int mode, struct proc *p);
+int clread(dev_t dev, struct uio *uio, int flag);
+int clwrite(dev_t dev, struct uio *uio, int flag);
+int clioctl(dev_t dev, int cmd, caddr_t data, int flag, struct proc *p);
+int clstop(struct tty *tp, int flag);
 
-void cl_initchannel __P((struct clsoftc *sc, int channel));
-void clputc __P((struct clsoftc *sc, int unit, u_char c));
-u_char clgetc __P((struct clsoftc *sc, int *channel));
+void cl_initchannel(struct clsoftc *sc, int channel);
+void clputc(struct clsoftc *sc, int unit, u_char c);
+u_char clgetc(struct clsoftc *sc, int *channel);
 #if 0
-void cloutput __P( (struct tty *tp));
+void cloutput(struct tty *tp);
 #endif
 #ifdef	CLCD_DO_POLLED_INPUT
-void cl_chkinput __P((void));
+void cl_chkinput(void);
 #endif
 
 struct cfattach cl_ca = {       
@@ -217,9 +217,7 @@ int dopoll = 1;
 #define CL_CHANNEL(x) (minor(x) & 3)
 #define CL_TTY(x) (minor(x))
 
-extern int cputyp;
-
-struct tty *cltty __P((dev_t dev));
+struct tty *cltty(dev_t dev);
 
 struct tty *cltty(dev)
 	dev_t dev;
@@ -247,20 +245,17 @@ clprobe(parent, self, aux)
 	 */
 	struct clreg *cl_reg;
 	struct confargs *ca = aux;
-	int ret;
-	if (cputyp != CPU_187)
+	
+	if (brdtyp == BRD_188)
 		return 0;
 
 	ca->ca_ipl = IPL_TTY;
-	ca->ca_paddr = (void *)CD2400_BASE_ADDR;
+	ca->ca_vaddr = ca->ca_paddr = (void *)CD2400_BASE_ADDR;
 	cl_reg = (struct clreg *)ca->ca_vaddr;
 
-#if 0
-	ret = !badvaddr(&cl_reg->cl_gfrcr,1);
-#else
-	ret = 1;
-#endif
-	return ret;
+	if (badvaddr((vm_offset_t)&cl_reg->cl_gfrcr,1))
+		return 0;
+	return 1;
 }
 
 void
@@ -502,7 +497,7 @@ int clmctl (dev, bits, how)
 		}
 		break;
 	}
-	(void)splx(s);
+	splx(s);
 #if 0
 	bits = 0;
 	/* proper defaults? */
@@ -928,7 +923,7 @@ clcnprobe(cp)
 	int maj;
 
 	/* bomb if it'a a MVME188 */
-	if (cputyp == CPU_188) {
+	if (brdtyp == BRD_188) {
 		cp->cn_pri = CN_DEAD;
 		return 0;
 	}
@@ -946,9 +941,9 @@ int
 clcninit(cp)
 	struct consdev *cp;
 {
-	volatile struct clreg *cl_reg;
+	struct clreg *volatile cl_reg;
 	
-	cl_cons.cl_paddr = (void *)0xfff45000;
+	cl_cons.cl_paddr = (void *)CD2400_BASE_ADDR;
 	cl_cons.cl_vaddr   = (struct clreg *)IIOV(cl_cons.cl_paddr);
 	cl_cons.pcctwoaddr = (void *)IIOV(0xfff42000);
 	cl_reg = cl_cons.cl_vaddr;
@@ -988,7 +983,7 @@ int
 cl_instat(sc)
 	struct clsoftc *sc;
 {
-	volatile struct clreg *cl_reg;
+	struct clreg *volatile cl_reg;
 	if ( NULL == sc) {
 		cl_reg = cl_cons.cl_vaddr;
 	} else {
@@ -1006,8 +1001,8 @@ clcngetc(dev)
 #endif
 	int got_char = 0;
 	u_char ier_old = 0xff;
-	volatile struct clreg *cl_reg = cl_cons.cl_vaddr;
-	volatile struct pcctworeg *pcc2_base = cl_cons.pcctwoaddr;
+	struct clreg *volatile cl_reg = cl_cons.cl_vaddr;
+	struct pcctworeg *volatile pcc2_base = cl_cons.pcctwoaddr;
 	cl_reg->cl_car = 0;
 	if (!(cl_reg->cl_ier & 0x08)) {
 		ier_old = cl_reg->cl_ier;
@@ -1092,7 +1087,7 @@ clputc(sc, unit, c)
 	int s;
 	u_char schar;
 	u_char oldchannel;
-	volatile struct clreg *cl_reg;
+	struct clreg *volatile cl_reg;
 	if (0 == sc) {
 		/* output on console */
 		cl_reg = cl_cons.cl_vaddr;
@@ -1188,8 +1183,8 @@ clgetc(sc, channel)
 	struct clsoftc *sc;
 	int *channel;
 {
-	volatile struct clreg *cl_reg;
-	volatile struct pcctworeg *pcc2_base;
+	struct clreg *volatile cl_reg;
+	struct pcctworeg *volatile pcc2_base;
 	u_char val, reoir, licr, isrl, fifo_cnt, data;
 	if (0 == sc) {
 		cl_reg = cl_cons.cl_vaddr;
@@ -1648,9 +1643,6 @@ cl_rxintr(arg)
 	int i;
 	u_char reoir;
 	u_char buffer[CL_FIFO_MAX +1];
-#ifdef DDB
-	int wantddb = 0;
-#endif
 	
 	rir = sc->cl_reg->cl_rir;
 	if((rir & 0x40) == 0x0) {
@@ -1671,7 +1663,7 @@ cl_rxintr(arg)
 	} else
 	/* We don't need no sinkin special characters */
 	if (risrl & 0x08) {
-		cl_overflow (sc, channel, (long*)&sc->sc_fotime, "fifo");
+		cl_overflow (sc, channel, (long *)&sc->sc_fotime, "fifo");
 		reoir = 0x08;
 	} else
 	if (risrl & 0x04) {
@@ -1683,10 +1675,6 @@ cl_rxintr(arg)
 		reoir = 0x08;
 	} else
 	if (risrl & 0x01) {
-#ifdef DDB
-		if (sc->sc_cl[channel].cl_consio)
-			wantddb = 1;
-#endif
 		cl_break(sc, channel);
 		reoir = 0x08;
 	}
@@ -1810,10 +1798,6 @@ log(LOG_WARNING, "cl_txintr: DMAMODE channel %x dmabsts %x risrl %x risrh %x\n",
 		reoir = 0x08;
 		sc->cl_reg->cl_reoir = reoir;
 	}
-#ifdef DDB
-	if (wantddb != 0 && db_console != 0)
-		Debugger();
-#endif
 	return 1;
 }
 
@@ -1858,7 +1842,7 @@ cl_break (sc, channel)
 	int channel;
 {
 #ifdef DDB
-	if (db_console != 0)
+	if (sc->sc_cl[channel].cl_consio && db_console != 0)
 		Debugger();
 #else
 	log(LOG_WARNING, "%s%d[%d]: break detected\n", cl_cd.cd_name, 0, channel);
@@ -1876,14 +1860,15 @@ cl_dumpport(channel)
 		rbpr, rcor, tbpr, tcor, rpilr, rir, tpr, ier, ccr,
 		dmabsts, arbsts, brbsts, atbsts, btbsts,
 		csr, rts, dtr, rtprl, rtprh;
-	volatile void * parbadru, *parbadrl,  *parbsts, *parbcnt;
+	void *volatile parbadru, *volatile parbadrl,
+	     *volatile parbsts, *volatile parbcnt;
 	u_short rcbadru, rcbadrl, arbadru, arbadrl, arbcnt,
 		brbadru, brbadrl, brbcnt;
 	u_short tcbadru, tcbadrl, atbadru, atbadrl, atbcnt,
 		btbadru, btbadrl, btbcnt;
 	struct clsoftc *sc;
 
-	volatile struct clreg *cl_reg;
+	struct clreg *volatile cl_reg;
 	int s;
 
 	cl_reg = cl_cons.cl_vaddr;

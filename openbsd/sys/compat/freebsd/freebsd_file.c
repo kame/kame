@@ -1,4 +1,4 @@
-/*	$OpenBSD: freebsd_file.c,v 1.10 2001/02/03 02:45:31 mickey Exp $	*/
+/*	$OpenBSD: freebsd_file.c,v 1.15 2002/03/14 01:26:49 millert Exp $	*/
 /*	$NetBSD: freebsd_file.c,v 1.3 1996/05/03 17:03:09 christos Exp $	*/
 
 /*
@@ -57,8 +57,8 @@
 
 const char freebsd_emul_path[] = "/emul/freebsd";
 
-static char * convert_from_freebsd_mount_type __P((int));
-void statfs_to_freebsd_statfs __P((struct proc *, struct mount *, struct statfs *, struct freebsd_statfs *));
+static char * convert_from_freebsd_mount_type(int);
+void statfs_to_freebsd_statfs(struct proc *, struct mount *, struct statfs *, struct freebsd_statfs *);
 
 struct freebsd_statfs {
 	long	f_spare2;		/* placeholder */
@@ -623,7 +623,10 @@ freebsd_sys_fstatfs(p, v, retval)
 		return (error);
 	mp = ((struct vnode *)fp->f_data)->v_mount;
 	sp = &mp->mnt_stat;
-	if ((error = VFS_STATFS(mp, sp, p)) != 0)
+	FREF(fp);
+	error = VFS_STATFS(mp, sp, p);
+	FRELE(fp);
+	if (error)
 		return (error);
 	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
 
@@ -796,7 +799,7 @@ freebsd_sys_fcntl(p, v, retval)
 		syscallarg(int) cmd;
 		syscallarg(void *) arg;
 	} */ *uap = v;
-	int fd, cmd;
+	int fd, cmd, error;
 	struct filedesc *fdp;
 	struct file *fp;
 
@@ -808,13 +811,16 @@ freebsd_sys_fcntl(p, v, retval)
 	case F_SETOWN:
 		/* Our pipes does not understand F_[GS]ETOWN.  */ 
 		fdp = p->p_fd;
-		if ((u_int)fd >= fdp->fd_nfiles ||
-		    (fp = fdp->fd_ofiles[fd]) == NULL)
+		if ((fp = fd_getfile(fdp, fd)) == NULL)
 			return (EBADF);
-		if (fp->f_type == DTYPE_PIPE)
-			return ((*fp->f_ops->fo_ioctl)(fp,
+		if (fp->f_type == DTYPE_PIPE) {
+			FREF(fp);
+			error = (*fp->f_ops->fo_ioctl)(fp,
 			    cmd == F_GETOWN ? SIOCGPGRP : SIOCSPGRP,
-			    (caddr_t)&SCARG(uap, arg), p));
+			    (caddr_t)&SCARG(uap, arg), p);
+			FRELE(fp);
+			return (error);
+		}
 		break;
 	}
 

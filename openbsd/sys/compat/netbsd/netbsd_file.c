@@ -1,4 +1,4 @@
-/*	$OpenBSD: netbsd_file.c,v 1.1 1999/09/17 22:14:09 kstailey Exp $	*/
+/*	$OpenBSD: netbsd_file.c,v 1.3 2002/03/14 01:26:50 millert Exp $	*/
 /*	$NetBSD: freebsd_file.c,v 1.3 1996/05/03 17:03:09 christos Exp $	*/
 
 /*
@@ -60,9 +60,9 @@
 const char netbsd_emul_path[] = "/emul/netbsd";
 
 #if 0
-static char * convert_from_netbsd_mount_type __P((int));
-void statfs_to_netbsd_statfs __P((struct proc *, struct mount *,
-	struct statfs *, struct netbsd_statfs *));
+static char * convert_from_netbsd_mount_type(int);
+void statfs_to_netbsd_statfs(struct proc *, struct mount *,
+	struct statfs *, struct netbsd_statfs *);
 
 struct netbsd_statfs {
 	long	f_spare2;		/* placeholder */
@@ -597,7 +597,10 @@ netbsd_sys_fstatfs(p, v, retval)
 		return (error);
 	mp = ((struct vnode *)fp->f_data)->v_mount;
 	sp = &mp->mnt_stat;
-	if ((error = VFS_STATFS(mp, sp, p)) != 0)
+	FREF(fp);
+	error = VFS_STATFS(mp, sp, p);
+	FRELE(fp);
+	if (error)
 		return (error);
 	sp->f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.c,v 1.8 2001/06/27 04:05:45 art Exp $	*/
+/*	$OpenBSD: intr.c,v 1.10 2002/03/14 01:26:30 millert Exp $	*/
 /*	$NetBSD: intr.c,v 1.5 1998/02/16 20:58:30 thorpej Exp $	*/
 
 /*-
@@ -48,14 +48,13 @@
 #include <sys/malloc.h>
 #include <sys/vmmeter.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <net/netisr.h>
 #include "ppp.h"
 #include "bridge.h"
 
-void	netintr __P((void));
+void	netintr(void);
 
 #include <machine/cpu.h>
 #include <machine/intr.h>
@@ -67,7 +66,7 @@ u_short	hp300_bioipl, hp300_netipl, hp300_ttyipl, hp300_impipl;
 
 extern	int intrcnt[];		/* from locore.s */
 
-void	intr_computeipl __P((void));
+void	intr_computeipl(void);
 
 void
 intr_init()
@@ -162,7 +161,7 @@ intr_printlevels()
  */
 void *
 intr_establish(func, arg, ipl, priority)
-	int (*func) __P((void *));
+	int (*func)(void *);
 	void *arg;
 	int ipl;
 	int priority;

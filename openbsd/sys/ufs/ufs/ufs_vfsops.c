@@ -1,4 +1,4 @@
-/*	$OpenBSD: ufs_vfsops.c,v 1.7 2000/02/07 04:57:19 assar Exp $	*/
+/*	$OpenBSD: ufs_vfsops.c,v 1.9 2002/02/22 20:51:24 drahn Exp $	*/
 /*	$NetBSD: ufs_vfsops.c,v 1.4 1996/02/09 22:36:12 christos Exp $	*/
 
 /*
@@ -51,6 +51,7 @@
 
 #include <miscfs/specfs/specdev.h>
 
+#include <ufs/ufs/extattr.h>
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/ufsmount.h>
@@ -87,84 +88,6 @@ ufs_root(mp, vpp)
 	*vpp = nvp;
 	return (0);
 }
-
-/*
- * Do operations associated with quotas
- */
-int
-ufs_quotactl(mp, cmds, uid, arg, p)
-	struct mount *mp;
-	int cmds;
-	uid_t uid;
-	caddr_t arg;
-	struct proc *p;
-{
-
-#ifndef QUOTA
-	return (EOPNOTSUPP);
-#else
-	int cmd, type, error;
-
-	if (uid == -1)
-		uid = p->p_cred->p_ruid;
-	cmd = cmds >> SUBCMDSHIFT;
-
-	switch (cmd) {
-	case Q_SYNC:
-		break;
-	case Q_GETQUOTA:
-		if (uid == p->p_cred->p_ruid)
-			break;
-		/* fall through */
-	default:
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
-			return (error);
-	}
-
-	type = cmds & SUBCMDMASK;
-	if ((u_int)type >= MAXQUOTAS)
-		return (EINVAL);
-
-	if (vfs_busy(mp, LK_NOWAIT, 0, p))
-		return (0);
- 
-
-	switch (cmd) {
-
-	case Q_QUOTAON:
-		error = quotaon(p, mp, type, arg);
-		break;
-
-	case Q_QUOTAOFF:
-		error = quotaoff(p, mp, type);
-		break;
-
-	case Q_SETQUOTA:
-		error = setquota(mp, uid, type, arg) ;
-		break;
-
-	case Q_SETUSE:
-		error = setuse(mp, uid, type, arg);
-		break;
-
-	case Q_GETQUOTA:
-		error = getquota(mp, uid, type, arg);
-		break;
-
-	case Q_SYNC:
-		error = qsync(mp);
-		break;
-
-	default:
-		error = EINVAL;
-		break;
-	}
-
-	vfs_unbusy(mp, p);
-	return (error);
-#endif
-}
-
 
 /*
  * Verify a remote client has export rights and return these rights via.
@@ -205,9 +128,8 @@ ufs_init(vfsp)
 		return (0);
 	done = 1;
 	ufs_ihashinit();
-#ifdef QUOTA
-	dqinit();
-#endif
+	ufs_quota_init();
+
 	return (0);
 }
 

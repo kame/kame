@@ -1,4 +1,4 @@
-/*	$OpenBSD: cardbus.c,v 1.3 2001/06/24 21:29:05 mickey Exp $ */
+/*	$OpenBSD: cardbus.c,v 1.6 2002/03/14 03:16:04 millert Exp $ */
 /*	$NetBSD: cardbus.c,v 1.24 2000/04/02 19:11:37 mycroft Exp $	*/
 
 /*
@@ -62,26 +62,26 @@
 #define DPRINTF(a)
 #endif
 
-STATIC void cardbusattach __P((struct device *, struct device *, void *));
-/* STATIC int cardbusprint __P((void *, const char *)); */
-int cardbus_attach_card __P((struct cardbus_softc *));
+STATIC void cardbusattach(struct device *, struct device *, void *);
+/* STATIC int cardbusprint(void *, const char *); */
+int cardbus_attach_card(struct cardbus_softc *);
 
-STATIC int cardbusmatch __P((struct device *, void *, void *));
-static int cardbussubmatch __P((struct device *, void *, void *));
-static int cardbusprint __P((void *, const char *));
+STATIC int cardbusmatch(struct device *, void *, void *);
+static int cardbussubmatch(struct device *, void *, void *);
+static int cardbusprint(void *, const char *);
 
-typedef void (*tuple_decode_func)(u_int8_t*, int, void*);
+typedef void (*tuple_decode_func)(u_int8_t*, int, void *);
 
-static int decode_tuples __P((u_int8_t *, int, tuple_decode_func, void*));
+static int decode_tuples(u_int8_t *, int, tuple_decode_func, void *);
 #ifdef CARDBUS_DEBUG
-static void print_tuple __P((u_int8_t*, int, void*));
+static void print_tuple(u_int8_t*, int, void *);
 #endif
 
-static int cardbus_read_tuples __P((struct cardbus_attach_args *,
-				    cardbusreg_t, u_int8_t *, size_t));
+static int cardbus_read_tuples(struct cardbus_attach_args *,
+				    cardbusreg_t, u_int8_t *, size_t);
 
-static void enable_function __P((struct cardbus_softc *, int, int));
-static void disable_function __P((struct cardbus_softc *, int));
+static void enable_function(struct cardbus_softc *, int, int);
+static void disable_function(struct cardbus_softc *, int);
 
 
 struct cfattach cardbus_ca = {
@@ -501,6 +501,7 @@ cardbus_attach_card(sc)
     ca.ca_dmat = sc->sc_dmat;
 
     ca.ca_tag = tag;
+    ca.ca_bus = sc->sc_bus;
     ca.ca_device = sc->sc_device;
     ca.ca_function = function;
     ca.ca_id = id;
@@ -651,7 +652,7 @@ cardbus_intr_establish(cc, cf, irq, level, func, arg)
      cardbus_function_tag_t cf;
      cardbus_intr_handle_t irq;
      int level;
-     int (*func) __P((void *));
+     int (*func)(void *);
      void *arg;
 {
   DPRINTF(("- cardbus_intr_establish: irq %d\n", irq));
@@ -827,7 +828,7 @@ cardbus_get_capability(cc, cf, tag, capid, offset, value)
  */
 
 static u_int8_t *
-decode_tuple __P((u_int8_t *tuple, tuple_decode_func func, void *data));
+decode_tuple(u_int8_t *tuple, tuple_decode_func func, void *data);
 
 static int
 decode_tuples(tuple, buflen, func, data)
@@ -876,7 +877,7 @@ decode_tuple(tuple, func, data)
 
 
 #ifdef CARDBUS_DEBUG
-static char *tuple_name __P((int type));
+static char *tuple_name(int type);
 
 static char *
 tuple_name(type)

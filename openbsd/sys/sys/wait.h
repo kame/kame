@@ -1,4 +1,4 @@
-/*	$OpenBSD: wait.h,v 1.6 2001/04/02 21:43:12 niklas Exp $	*/
+/*	$OpenBSD: wait.h,v 1.8 2002/03/14 01:27:14 millert Exp $	*/
 /*	$NetBSD: wait.h,v 1.11 1996/04/09 20:55:51 cgd Exp $	*/
 
 /*
@@ -86,7 +86,7 @@
 #endif
 
 #ifndef _POSIX_SOURCE
-/* POSIX extensions and 4.2/4.3 compatability: */
+/* POSIX extensions and 4.2/4.3 compatibility: */
 
 /*
  * Tokens for special values of the "pid" parameter to wait4.
@@ -155,11 +155,11 @@ union wait {
 __BEGIN_DECLS
 struct rusage;	/* forward declaration */
 
-pid_t	wait __P((int *));
-pid_t	waitpid __P((pid_t, int *, int));
+pid_t	wait(int *);
+pid_t	waitpid(pid_t, int *, int);
 #ifndef _POSIX_SOURCE
-pid_t	wait3 __P((int *, int, struct rusage *));
-pid_t	wait4 __P((pid_t, int *, int, struct rusage *));
+pid_t	wait3(int *, int, struct rusage *);
+pid_t	wait4(pid_t, int *, int, struct rusage *);
 #endif
 __END_DECLS
 #endif

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ubavar.h,v 1.9 2001/08/12 12:03:03 heko Exp $	*/
+/*	$OpenBSD: ubavar.h,v 1.12 2002/03/15 01:20:04 millert Exp $	*/
 /*	$NetBSD: ubavar.h,v 1.21 1999/01/19 21:04:48 ragge Exp $	*/
 
 /*
@@ -70,6 +70,7 @@
  * the unibus driver in resource wait (mrwant, bdpwant); these
  * wait states are also recorded here.
  */
+struct extent;
 struct	uba_softc {
 	struct	device uh_dev;		/* Device struct, autoconfig */
 	SIMPLEQ_HEAD(, uba_unit) uh_resq;	/* resource wait chain */
@@ -78,7 +79,7 @@ struct	uba_softc {
 	struct	pte *uh_mr;		/* start of page map */
 	int	uh_memsize;		/* size of uba memory, pages */
 	caddr_t	uh_iopage;		/* start of uba io page */
-	void	(**uh_reset) __P((int));/* UBA reset function array */
+	void	(**uh_reset)(int);	/* UBA reset function array */
 	int	*uh_resarg;		/* array of ubareset args */
 	int	uh_resno;		/* Number of devices to reset */
 	short	uh_mrwant;		/* someone is waiting for map reg */
@@ -91,12 +92,13 @@ struct	uba_softc {
 	short	uh_users;		/* transient bdp use count */
 	short	uh_xclu;		/* an rk07 is using this uba! */
 	int	uh_lastmem;		/* limit of any unibus memory */
-	struct	map *uh_map;		/* register free map */
-	int	(*uh_errchk) __P((struct uba_softc *));
-	void	(*uh_beforescan) __P((struct uba_softc *));
-	void	(*uh_afterscan) __P((struct uba_softc *));
-	void	(*uh_ubainit) __P((struct uba_softc *));
-	void	(*uh_ubapurge) __P((struct uba_softc *, int));
+	struct	extent *uh_ext;		/* register free map */
+	char	*uh_extspace;		/* storage space for uh_ext */
+	int	(*uh_errchk)(struct uba_softc *);
+	void	(*uh_beforescan)(struct uba_softc *);
+	void	(*uh_afterscan)(struct uba_softc *);
+	void	(*uh_ubainit)(struct uba_softc *);
+	void	(*uh_ubapurge)(struct uba_softc *, int);
 	short	uh_nr;			/* Unibus sequential number */
 	short	uh_nbdp;		/* # of BDP's */
 	int	uh_ibase;		/* Base address for vectors */
@@ -115,7 +117,7 @@ struct	uba_unit {
 	void	*uu_softc;	/* Pointer to units softc */
 	int	uu_ubinfo;	/* save unibus registers, etc */
 	int	uu_bdp;		/* for controllers that hang on to bdp's */
-	int    (*uu_ready) __P((struct uba_unit *));
+	int    (*uu_ready)(struct uba_unit *);
 	short   uu_xclu;        /* want exclusive use of bdp's */
 	short   uu_keepbdp;     /* hang on to bdp's once allocated */
 };
@@ -127,9 +129,9 @@ struct	uba_unit {
 struct uba_attach_args {
 	caddr_t	ua_addr;
 	    /* Pointer to int routine, filled in by probe*/
-	void	(*ua_ivec) __P((int));
+	void	(*ua_ivec)(int);
 	    /* UBA reset routine, filled in by probe */
-	void	(*ua_reset) __P((int));
+	void	(*ua_reset)(int);
 	int	ua_iaddr;
 	int	ua_br;
 	int	ua_cvec;
@@ -173,13 +175,13 @@ struct ubinfo {
 #define	ubago(ui)	ubaqueue(ui)
 #define b_forw  b_hash.le_next	/* Nice to have when handling uba queues */
 
-void	uba_attach __P((struct uba_softc *, unsigned long));
-int	uballoc __P((struct uba_softc *, caddr_t, int, int));
-void	ubarelse __P((struct uba_softc *, int *));
-int	ubaqueue __P((struct uba_unit *, struct buf *));
-void	ubadone __P((struct uba_unit *));
-void	ubareset __P((int));
-int	ubasetup __P((struct uba_softc *, struct buf *, int));
+void	uba_attach(struct uba_softc *, unsigned long);
+int	uballoc(struct uba_softc *, caddr_t, int, int);
+void	ubarelse(struct uba_softc *, int *);
+int	ubaqueue(struct uba_unit *, struct buf *);
+void	ubadone(struct uba_unit *);
+void	ubareset(int);
+int	ubasetup(struct uba_softc *, struct buf *, int);
 
 #endif /* _KERNEL */
 #endif /* !_LOCORE */

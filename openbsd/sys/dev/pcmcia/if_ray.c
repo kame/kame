@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ray.c,v 1.17 2001/08/17 21:52:16 deraadt Exp $	*/
+/*	$OpenBSD: if_ray.c,v 1.19 2002/03/24 20:53:56 mickey Exp $	*/
 /*	$NetBSD: if_ray.c,v 1.21 2000/07/05 02:35:54 onoe Exp $	*/
 
 /*
@@ -112,8 +112,6 @@
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member))
 #endif
 
-#define RAY_USE_AMEM 0
-
 /*#define	RAY_DEBUG*/
 
 #ifndef	RAY_PID_COUNTRY_CODE_DEFAULT
@@ -173,10 +171,6 @@ struct ray_softc {
 	struct pcmcia_function		*sc_pf;
 	struct pcmcia_mem_handle	sc_mem;
 	int				sc_window;
-#if RAY_USE_AMEM
-	struct pcmcia_mem_handle	sc_amem;
-	int				sc_awindow;
-#endif
 	void				*sc_ih;
 	void				*sc_sdhook;
 	void				*sc_pwrhook;
@@ -242,6 +236,7 @@ struct ray_softc {
 #define	sc_memh	sc_mem.memh
 #define	sc_ccrt	sc_pf->pf_ccrt
 #define	sc_ccrh	sc_pf->pf_ccrh
+#define	sc_ccroff	sc_pf->pf_ccr_offset
 #define	sc_startup_4	sc_u.u_params_4
 #define	sc_startup_5	sc_u.u_params_5
 #define	sc_version	sc_ecf_startup.e_fw_build_string
@@ -299,63 +294,63 @@ typedef	void (*ray_cmd_func_t)(struct ray_softc *);
 #define BROADCAST_DEAUTH (0xc0)
 
 /* prototypes */
-int ray_alloc_ccs __P((struct ray_softc *, bus_size_t *, u_int, u_int));
-bus_size_t ray_fill_in_tx_ccs __P((struct ray_softc *, size_t, u_int, u_int));
-void ray_attach __P((struct device *, struct device *, void *));
-ray_cmd_func_t ray_ccs_done __P((struct ray_softc *, bus_size_t));
-void ray_check_ccs __P((void *));
-void ray_check_scheduled __P((void *));
-void ray_cmd_cancel __P((struct ray_softc *, int));
-void ray_cmd_schedule __P((struct ray_softc *, int));
-void ray_cmd_ran __P((struct ray_softc *, int));
-int ray_cmd_is_running __P((struct ray_softc *, int));
-int ray_cmd_is_scheduled __P((struct ray_softc *, int));
-void ray_cmd_done __P((struct ray_softc *, int));
-int ray_detach __P((struct device *, int));
-int ray_activate __P((struct device *, enum devact));
-void ray_disable __P((struct ray_softc *));
-void ray_download_params __P((struct ray_softc *));
-int ray_enable __P((struct ray_softc *));
-u_int ray_find_free_tx_ccs __P((struct ray_softc *, u_int));
-u_int8_t ray_free_ccs __P((struct ray_softc *, bus_size_t));
-void ray_free_ccs_chain __P((struct ray_softc *, u_int));
-void ray_if_start __P((struct ifnet *));
-int ray_init __P((struct ray_softc *));
-int ray_intr __P((void *));
-void ray_intr_start __P((struct ray_softc *));
-int ray_ioctl __P((struct ifnet *, u_long, caddr_t));
-int ray_issue_cmd __P((struct ray_softc *, bus_size_t, u_int));
-int ray_match __P((struct device *, struct cfdata *, void *));
-int ray_media_change __P((struct ifnet *));
-void ray_media_status __P((struct ifnet *, struct ifmediareq *));
-void ray_power __P((int, void *));
-ray_cmd_func_t ray_rccs_intr __P((struct ray_softc *, bus_size_t));
-void ray_recv __P((struct ray_softc *, bus_size_t));
-void ray_recv_auth __P((struct ray_softc *,struct ieee80211_frame*));
-void ray_report_params __P((struct ray_softc *));
-void ray_reset __P((struct ray_softc *));
-void ray_reset_resetloop __P((void *));
-int ray_send_auth __P((struct ray_softc *, u_int8_t *, u_int8_t));
-void ray_set_pending __P((struct ray_softc *, u_int));
-void ray_shutdown __P((void *));
-int ray_simple_cmd __P((struct ray_softc *, u_int, u_int));
-void ray_start_assoc __P((struct ray_softc *));
-void ray_start_join_net __P((struct ray_softc *));
-ray_cmd_func_t ray_start_join_net_done __P((struct ray_softc *,
-    u_int, bus_size_t, u_int));
-void ray_start_join_timo __P((void *));
-void ray_stop __P((struct ray_softc *));
-void ray_update_error_counters __P((struct ray_softc *));
-void ray_update_mcast __P((struct ray_softc *));
-ray_cmd_func_t ray_update_params_done __P((struct ray_softc *,
-    bus_size_t, u_int));
-void ray_update_params __P((struct ray_softc *));
-void ray_update_promisc __P((struct ray_softc *));
-void ray_update_subcmd __P((struct ray_softc *));
-int ray_user_report_params __P((struct ray_softc *,
-    struct ray_param_req *));
-int ray_user_update_params __P((struct ray_softc *,
-    struct ray_param_req *));
+int ray_alloc_ccs(struct ray_softc *, bus_size_t *, u_int, u_int);
+bus_size_t ray_fill_in_tx_ccs(struct ray_softc *, size_t, u_int, u_int);
+void ray_attach(struct device *, struct device *, void *);
+ray_cmd_func_t ray_ccs_done(struct ray_softc *, bus_size_t);
+void ray_check_ccs(void *);
+void ray_check_scheduled(void *);
+void ray_cmd_cancel(struct ray_softc *, int);
+void ray_cmd_schedule(struct ray_softc *, int);
+void ray_cmd_ran(struct ray_softc *, int);
+int ray_cmd_is_running(struct ray_softc *, int);
+int ray_cmd_is_scheduled(struct ray_softc *, int);
+void ray_cmd_done(struct ray_softc *, int);
+int ray_detach(struct device *, int);
+int ray_activate(struct device *, enum devact);
+void ray_disable(struct ray_softc *);
+void ray_download_params(struct ray_softc *);
+int ray_enable(struct ray_softc *);
+u_int ray_find_free_tx_ccs(struct ray_softc *, u_int);
+u_int8_t ray_free_ccs(struct ray_softc *, bus_size_t);
+void ray_free_ccs_chain(struct ray_softc *, u_int);
+void ray_if_start(struct ifnet *);
+int ray_init(struct ray_softc *);
+int ray_intr(void *);
+void ray_intr_start(struct ray_softc *);
+int ray_ioctl(struct ifnet *, u_long, caddr_t);
+int ray_issue_cmd(struct ray_softc *, bus_size_t, u_int);
+int ray_match(struct device *, struct cfdata *, void *);
+int ray_media_change(struct ifnet *);
+void ray_media_status(struct ifnet *, struct ifmediareq *);
+void ray_power(int, void *);
+ray_cmd_func_t ray_rccs_intr(struct ray_softc *, bus_size_t);
+void ray_recv(struct ray_softc *, bus_size_t);
+void ray_recv_auth(struct ray_softc *,struct ieee80211_frame*);
+void ray_report_params(struct ray_softc *);
+void ray_reset(struct ray_softc *);
+void ray_reset_resetloop(void *);
+int ray_send_auth(struct ray_softc *, u_int8_t *, u_int8_t);
+void ray_set_pending(struct ray_softc *, u_int);
+void ray_shutdown(void *);
+int ray_simple_cmd(struct ray_softc *, u_int, u_int);
+void ray_start_assoc(struct ray_softc *);
+void ray_start_join_net(struct ray_softc *);
+ray_cmd_func_t ray_start_join_net_done(struct ray_softc *,
+    u_int, bus_size_t, u_int);
+void ray_start_join_timo(void *);
+void ray_stop(struct ray_softc *);
+void ray_update_error_counters(struct ray_softc *);
+void ray_update_mcast(struct ray_softc *);
+ray_cmd_func_t ray_update_params_done(struct ray_softc *,
+    bus_size_t, u_int);
+void ray_update_params(struct ray_softc *);
+void ray_update_promisc(struct ray_softc *);
+void ray_update_subcmd(struct ray_softc *);
+int ray_user_report_params(struct ray_softc *,
+    struct ray_param_req *);
+int ray_user_update_params(struct ray_softc *,
+    struct ray_param_req *);
 
 #define	ray_read_region(sc,off,p,c) \
 	bus_space_read_region_1((sc)->sc_memt, (sc)->sc_memh, (off), (p), (c))
@@ -363,7 +358,7 @@ int ray_user_update_params __P((struct ray_softc *,
 	bus_space_write_region_1((sc)->sc_memt, (sc)->sc_memh, (off), (p), (c))
 
 #ifdef RAY_DO_SIGLEV
-void ray_update_siglev __P((struct ray_softc *, u_int8_t *, u_int8_t));
+void ray_update_siglev(struct ray_softc *, u_int8_t *, u_int8_t);
 #endif
 
 #ifdef RAY_DEBUG
@@ -394,7 +389,7 @@ struct timeval rtv, tv1, tv2, *ttp, *ltp;
 #define	HEXDF_NOOFFSET		0x2
 #define HEXDF_NOASCII		0x4
 void hexdump(const u_int8_t *, int, int, int, int);
-void ray_dump_mbuf __P((struct ray_softc *, struct mbuf *));
+void ray_dump_mbuf(struct ray_softc *, struct mbuf *);
 
 #else	/* !RAY_DEBUG */
 
@@ -407,21 +402,14 @@ void ray_dump_mbuf __P((struct ray_softc *, struct mbuf *));
  * macros for writing to various regions in the mapped memory space
  */
 
-#if RAY_USE_AMEM
-/* read and write the registers in the CCR (attribute) space */
-#define	REG_WRITE(sc, off, val) \
-	bus_space_write_1((sc)->sc_amem.memt, (sc)->sc_amem.memh, (off), (val))
-
-#define	REG_READ(sc, off) \
-	bus_space_read_1((sc)->sc_amem.memt, (sc)->sc_amem.memh, (off))
-#else
 	/* use already mapped ccrt */
 #define	REG_WRITE(sc, off, val) \
-	bus_space_write_1((sc)->sc_ccrt, (sc)->sc_ccrh, (off), (val))
+	bus_space_write_1((sc)->sc_ccrt, (sc)->sc_ccrh, \
+	((sc)->sc_ccroff + (off)), (val))
 
 #define	REG_READ(sc, off) \
-	bus_space_read_1((sc)->sc_ccrt, (sc)->sc_ccrh, (off))
-#endif
+	bus_space_read_1((sc)->sc_ccrt, (sc)->sc_ccrh, \
+	((sc)->sc_ccroff + (off)))
 
 #define	SRAM_READ_1(sc, off) \
 	((u_int8_t)bus_space_read_1((sc)->sc_memt, (sc)->sc_memh, (off)))
@@ -540,9 +528,6 @@ ray_attach(parent, self, aux)
 	sc->sc_pf = pa->pf;
 	ifp = &sc->sc_if;
 	sc->sc_window = -1;
-#if RAY_USE_AMEM
-	sc->sc_awindow = -1;
-#endif
 
 	printf("\n");
 
@@ -569,23 +554,6 @@ ray_attach(parent, self, aux)
 		goto fail;
 	}
 
-#if RAY_USE_AMEM
-	/* use the already mapped ccrt in our pf */
-	/*
-	 * map in the memory
-	 */
-	if (pcmcia_mem_alloc(sc->sc_pf, 0x1000, &sc->sc_amem)) {
-		printf(": can\'t alloc attr memory\n");
-		goto fail;
-	}
-
-	if (pcmcia_mem_map(sc->sc_pf, PCMCIA_MEM_ATTR, 0,
-	    0x1000, &sc->sc_amem, &memoff, &sc->sc_awindow)) {
-		printf(": can\'t map attr memory\n");
-		pcmcia_mem_free(sc->sc_pf, &sc->sc_amem);
-		goto fail;
-	}
-#endif
 	/* get startup results */
 	ep = &sc->sc_ecf_startup;
 	ray_read_region(sc, RAY_ECF_TO_HOST_BASE, ep,
@@ -680,12 +648,6 @@ fail:
 	pcmcia_function_disable(sc->sc_pf);
 
 	/* free the alloc/map */
-#if RAY_USE_AMEM
-	if (sc->sc_awindow != -1) {
-		pcmcia_mem_unmap(sc->sc_pf, sc->sc_awindow);
-		pcmcia_mem_free(sc->sc_pf, &sc->sc_amem);
-	}
-#endif
 	if (sc->sc_window != -1) {
 		pcmcia_mem_unmap(sc->sc_pf, sc->sc_window);
 		pcmcia_mem_free(sc->sc_pf, &sc->sc_mem);
@@ -746,12 +708,6 @@ ray_detach(self, flags)
 		ray_disable(sc);
 
 	/* give back the memory */
-#if RAY_USE_AMEM
-	if (sc->sc_awindow != -1) {
-		pcmcia_mem_unmap(sc->sc_pf, sc->sc_awindow);
-		pcmcia_mem_free(sc->sc_pf, &sc->sc_amem);
-	}
-#endif
 	if (sc->sc_window != -1) {
 		pcmcia_mem_unmap(sc->sc_pf, sc->sc_window);
 		pcmcia_mem_free(sc->sc_pf, &sc->sc_mem);

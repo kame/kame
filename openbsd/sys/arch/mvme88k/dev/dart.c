@@ -1,4 +1,4 @@
-/*	$OpenBSD: dart.c,v 1.12 2001/08/31 08:18:24 miod Exp $	*/
+/*	$OpenBSD: dart.c,v 1.16 2002/03/14 01:26:39 millert Exp $	*/
 
 /*
  * Mach Operating System
@@ -81,8 +81,8 @@ struct dartsoftc {
 	int			sc_vec;
 };
 
-int dartmatch __P((struct device *parent, void *self, void *aux));
-void dartattach __P((struct device *parent, struct device *self, void *aux));
+int dartmatch(struct device *parent, void *self, void *aux);
+void dartattach(struct device *parent, struct device *self, void *aux);
 
 struct cfattach dart_ca = {       
 	sizeof(struct dartsoftc), dartmatch, dartattach
@@ -94,27 +94,27 @@ struct cfdriver dart_cd = {
 
 int dart_cons = -1;
 /* prototypes */
-int dartcnprobe __P((struct consdev *cp));
-int dartcninit __P((struct consdev *cp));
-int dartcngetc __P((dev_t dev));
-void dartcnputc __P((dev_t dev, char c));
-int dart_speed __P((int));
-struct tty* darttty __P((dev_t));
-void dartstart __P((struct tty *));
-int dartmctl __P((dev_t, int, int));
-int dartparam __P((struct tty *, struct termios *));
-void dartmodemtrans __P((struct dartsoftc *, unsigned int, unsigned int));
-void dartrint __P((struct dartsoftc *, int));
-void dartxint __P((struct dartsoftc *, int));
+int dartcnprobe(struct consdev *cp);
+int dartcninit(struct consdev *cp);
+int dartcngetc(dev_t dev);
+void dartcnputc(dev_t dev, char c);
+int dart_speed(int);
+struct tty* darttty(dev_t);
+void dartstart(struct tty *);
+int dartmctl(dev_t, int, int);
+int dartparam(struct tty *, struct termios *);
+void dartmodemtrans(struct dartsoftc *, unsigned int, unsigned int);
+void dartrint(struct dartsoftc *, int);
+void dartxint(struct dartsoftc *, int);
 
-int dartopen __P((dev_t dev, int flag, int mode, struct proc *p));
-int dartclose __P((dev_t dev, int flag, int mode, struct proc *p));
-int dartread __P((dev_t dev, struct uio *uio, int flag));
-int dartwrite __P((dev_t dev, struct uio *uio, int flag));
-int dartioctl __P((dev_t dev, int cmd, caddr_t data, int flag, struct proc *p));
-int dartstop __P((struct tty *tp, int flag));
-int dartintr __P((void *));
-void dartbreak __P((dev_t dev, int state));
+int dartopen(dev_t dev, int flag, int mode, struct proc *p);
+int dartclose(dev_t dev, int flag, int mode, struct proc *p);
+int dartread(dev_t dev, struct uio *uio, int flag);
+int dartwrite(dev_t dev, struct uio *uio, int flag);
+int dartioctl(dev_t dev, int cmd, caddr_t data, int flag, struct proc *p);
+int dartstop(struct tty *tp, int flag);
+int dartintr(void *);
+void dartbreak(dev_t dev, int state);
 
 /*
  * Lock strategy in that driver:
@@ -185,10 +185,11 @@ dartmatch(parent, vcf, args)
 	union dartreg *addr;
 
 	/* Don't match if wrong cpu */
-	if (cputyp != CPU_188) return (0);
+	if (brdtyp != BRD_188) return (0);
 	ca->ca_vaddr = ca->ca_paddr; /* 1:1 */
 	addr = (union dartreg *)ca->ca_vaddr;
-	if (badvaddr((vaddr_t)addr, 2) <= 0) {
+	
+	if (badvaddr((vaddr_t)addr, 2)) {
 		printf("==> dart: failed address check.\n");
 		return (0);
 	}
@@ -1138,7 +1139,7 @@ dartcnprobe(cp)
 {
 	int maj;
 
-	if (cputyp != CPU_188) {
+	if (brdtyp != BRD_188) {
 		cp->cn_pri = CN_DEAD;
 		return 0;
 	}

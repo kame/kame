@@ -1,4 +1,4 @@
-/*	$OpenBSD: proc.h,v 1.48 2001/08/22 10:29:42 niklas Exp $	*/
+/*	$OpenBSD: proc.h,v 1.59 2002/03/18 07:48:11 hugh Exp $	*/
 /*	$NetBSD: proc.h,v 1.44 1996/04/22 01:23:21 christos Exp $	*/
 
 /*-
@@ -83,19 +83,19 @@ struct	emul {
 	char	e_name[8];		/* Symbolic name */
 	int	*e_errno;		/* Errno array */
 					/* Signal sending function */
-	void	(*e_sendsig) __P((sig_t, int, int, u_long, int, union sigval));
+	void	(*e_sendsig)(sig_t, int, int, u_long, int, union sigval);
 	int	e_nosys;		/* Offset of the nosys() syscall */
 	int	e_nsysent;		/* Number of system call entries */
 	struct sysent *e_sysent;	/* System call array */
 	char	**e_syscallnames;	/* System call name array */
 	int	e_arglen;		/* Extra argument size in words */
 					/* Copy arguments on the stack */
-	void	*(*e_copyargs) __P((struct exec_package *, struct ps_strings *,
-				    void *, void *));
+	void	*(*e_copyargs)(struct exec_package *, struct ps_strings *,
+				    void *, void *);
 					/* Set registers before execution */
-	void	(*e_setregs) __P((struct proc *, struct exec_package *,
-				  u_long, register_t *));
-	int	(*e_fixup) __P((struct proc *, struct exec_package *));
+	void	(*e_setregs)(struct proc *, struct exec_package *,
+				  u_long, register_t *);
+	int	(*e_fixup)(struct proc *, struct exec_package *);
 	char	*e_sigcode;		/* Start of sigcode */
 	char	*e_esigcode;		/* End of sigcode */
 };
@@ -107,8 +107,8 @@ struct	emul {
  * control, known in UN*X as a process; it has references to substructures
  * containing descriptions of things that the process uses, but may share
  * with related processes.  The process structure and the substructures
- * are always addressible except for those marked "(PROC ONLY)" below,
- * which might be addressible only on a processor on which the process
+ * are always addressable except for those marked "(PROC ONLY)" below,
+ * which might be addressable only on a processor on which the process
  * is running.
  */
 struct	proc {
@@ -152,7 +152,7 @@ struct	proc {
 	fixpt_t	p_pctcpu;	 /* %cpu for this process during p_swtime */
 	void	*p_wchan;	 /* Sleep address. */
 	struct	timeout p_sleep_to;/* timeout for tsleep() */
-	char	*p_wmesg;	 /* Reason for sleep. */
+	const char *p_wmesg;	 /* Reason for sleep. */
 	u_int	p_swtime;	 /* Time swapped in or out. */
 	u_int	p_slptime;	 /* Time since last blocked. */
 	int	p_schedflags;	 /* PSCHED_* flags */
@@ -233,6 +233,7 @@ struct	proc {
 #define	P_TIMEOUT	0x000400	/* Timing out during sleep. */
 #define	P_TRACED	0x000800	/* Debugged process being traced. */
 #define	P_WAITED	0x001000	/* Debugging proc has waited for child. */
+/* XXX - Should be merged with INEXEC */
 #define	P_WEXIT		0x002000	/* Working on exiting. */
 #define	P_EXEC		0x004000	/* Process called exec. */
 
@@ -246,6 +247,7 @@ struct	proc {
 
 #define	P_NOCLDWAIT	0x080000	/* Let pid 1 wait for my children */
 #define	P_NOZOMBIE	0x100000	/* Pid 1 waits for me instead of dad */
+#define P_INEXEC	0x200000	/* Process is doing an exec right now */
 
 /* Macro to compute the exit signal to be delivered. */
 #define P_EXITSIG(p) \
@@ -289,7 +291,7 @@ struct	pcred {
 #define	SESSHOLD(s)	((s)->s_count++)
 #define	SESSRELE(s) {							\
 	if (--(s)->s_count == 0)					\
-		FREE(s, M_SESSION);					\
+		pool_put(&session_pool, s);				\
 }
 
 #define	PHOLD(p) {							\
@@ -338,6 +340,10 @@ extern struct proc *initproc;		/* Process slots for init, pager. */
 extern struct proc *syncerproc;		/* filesystem syncer daemon */
 
 extern struct pool proc_pool;		/* memory pool for procs */
+extern struct pool rusage_pool;		/* memory pool for zombies */
+extern struct pool ucred_pool;		/* memory pool for ucreds */
+extern struct pool session_pool;	/* memory pool for sessions */
+extern struct pool pcred_pool;		/* memory pool for pcreds */
 
 #define	NQS	32			/* 32 run queues. */
 int	whichqs;			/* Bit mask summary of non-empty Q's. */
@@ -348,43 +354,54 @@ struct	prochd {
 
 struct simplelock;
 
-struct proc *pfind __P((pid_t));	/* Find process by id. */
-struct pgrp *pgfind __P((pid_t));	/* Find process group by id. */
+struct proc *pfind(pid_t);	/* Find process by id. */
+struct pgrp *pgfind(pid_t);	/* Find process group by id. */
 
-int	chgproccnt __P((uid_t uid, int diff));
-int	enterpgrp __P((struct proc *p, pid_t pgid, int mksess));
-void	fixjobc __P((struct proc *p, struct pgrp *pgrp, int entering));
-int	inferior __P((struct proc *p));
-int	leavepgrp __P((struct proc *p));
-void	yield __P((void));
-void	preempt __P((struct proc *));
-void	mi_switch __P((void));
-void	pgdelete __P((struct pgrp *pgrp));
-void	procinit __P((void));
-void	remrunqueue __P((struct proc *));
-void	resetpriority __P((struct proc *));
-void	setrunnable __P((struct proc *));
-void	setrunqueue __P((struct proc *));
-void	sleep __P((void *chan, int pri));
-void	uvm_swapin __P((struct proc *));  /* XXX: uvm_extern.h? */
-int	ltsleep __P((void *chan, int pri, char *wmesg, int timo,
-	    volatile struct simplelock *));
+int	chgproccnt(uid_t uid, int diff);
+int	enterpgrp(struct proc *p, pid_t pgid, int mksess);
+void	fixjobc(struct proc *p, struct pgrp *pgrp, int entering);
+int	inferior(struct proc *p);
+int	leavepgrp(struct proc *p);
+void	yield(void);
+void	preempt(struct proc *);
+void	mi_switch(void);
+void	pgdelete(struct pgrp *pgrp);
+void	procinit(void);
+#if !defined(remrunqueue)
+void	remrunqueue(struct proc *);
+#endif
+void	resetpriority(struct proc *);
+void	setrunnable(struct proc *);
+#if !defined(setrunqueue)
+void	setrunqueue(struct proc *);
+#endif
+void	sleep(void *chan, int pri);
+void	uvm_swapin(struct proc *);  /* XXX: uvm_extern.h? */
+int	ltsleep(void *chan, int pri, const char *wmesg, int timo,
+	    volatile struct simplelock *);
 #define tsleep(chan, pri, wmesg, timo) ltsleep(chan, pri, wmesg, timo, NULL)
-void	unsleep __P((struct proc *));
-void    wakeup_n __P((void *chan, int));
-void    wakeup __P((void *chan));
+void	unsleep(struct proc *);
+void    wakeup_n(void *chan, int);
+void    wakeup(void *chan);
 #define wakeup_one(c) wakeup_n((c), 1)
-void	reaper __P((void));
-void	exit1 __P((struct proc *, int));
-void	exit2 __P((struct proc *));
-int	fork1 __P((struct proc *, int, int, void *, size_t, register_t *));
-void	rqinit __P((void));
-int	groupmember __P((gid_t, struct ucred *));
-void	cpu_switch __P((struct proc *));
-void	cpu_wait __P((struct proc *));
-void	cpu_exit __P((struct proc *));
+void	reaper(void);
+void	exit1(struct proc *, int);
+void	exit2(struct proc *);
+int	fork1(struct proc *, int, int, void *, size_t, void (*)(void *),
+	    void *, register_t *);
+void	rqinit(void);
+int	groupmember(gid_t, struct ucred *);
+#if !defined(cpu_switch)
+void	cpu_switch(struct proc *);
+#endif
+#if !defined(cpu_wait)
+void	cpu_wait(struct proc *);
+#endif
+void	cpu_exit(struct proc *);
 
-int	proc_cansugid __P((struct proc *));
-void	proc_zap __P((struct proc *));
+void	child_return(void *);
+
+int	proc_cansugid(struct proc *);
+void	proc_zap(struct proc *);
 #endif	/* _KERNEL */
 #endif	/* !_SYS_PROC_H_ */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ffs_vfsops.c,v 1.43 2001/06/23 02:07:55 csapuntz Exp $	*/
+/*	$OpenBSD: ffs_vfsops.c,v 1.52 2002/03/14 01:27:14 millert Exp $	*/
 /*	$NetBSD: ffs_vfsops.c,v 1.19 1996/02/09 22:22:26 christos Exp $	*/
 
 /*
@@ -58,6 +58,7 @@
 
 #include <miscfs/specfs/specdev.h>
 
+#include <ufs/ufs/extattr.h>
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/ufsmount.h>
 #include <ufs/ufs/inode.h>
@@ -67,7 +68,9 @@
 #include <ufs/ffs/fs.h>
 #include <ufs/ffs/ffs_extern.h>
 
-int ffs_sbupdate __P((struct ufsmount *, int));
+int ffs_sbupdate(struct ufsmount *, int);
+int ffs_reload_vnode(struct vnode *, void *);
+int ffs_sync_vnode(struct vnode *, void *);
 
 struct vfsops ffs_vfsops = {
 	ffs_mount,
@@ -82,7 +85,12 @@ struct vfsops ffs_vfsops = {
 	ffs_vptofh,
 	ffs_init,
 	ffs_sysctl,
-	ufs_check_export
+	ufs_check_export,
+#ifdef UFS_EXTATTR
+	ufs_extattrctl,
+#else
+	vfs_stdextattrctl,
+#endif
 };
 
 struct inode_vtbl ffs_vtbl = {
@@ -435,6 +443,57 @@ error_1:	/* no state to back out */
 	return (error);
 }
 
+
+struct ffs_reload_args {
+	struct fs *fs;
+	struct proc *p;
+	struct ucred *cred;
+	struct vnode *devvp;
+};
+
+int
+ffs_reload_vnode(struct vnode *vp, void *args) 
+{
+	struct ffs_reload_args *fra = args;
+	struct inode *ip;
+	struct buf *bp;
+	int error;
+
+	/*
+	 * Step 4: invalidate all inactive vnodes.
+	 */
+	if (vp->v_usecount == 0) {
+		vgonel(vp, fra->p);
+		return (0);
+	}
+
+	/*
+	 * Step 5: invalidate all cached file data.
+	 */
+	if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, fra->p))
+		return (0);
+
+	if (vinvalbuf(vp, 0, fra->cred, fra->p, 0, 0))
+		panic("ffs_reload: dirty2");
+	/*
+	 * Step 6: re-read inode data for all active vnodes.
+	 */
+	ip = VTOI(vp);
+	error = bread(fra->devvp, 
+	    fsbtodb(fra->fs, ino_to_fsba(fra->fs, ip->i_number)),
+	    (int)fra->fs->fs_bsize, NOCRED, &bp);
+	if (error) {
+		vput(vp);
+		return (error);
+	}
+	ip->i_din.ffs_din = *((struct dinode *)bp->b_data +
+	    ino_to_fsbo(fra->fs, ip->i_number));
+	ip->i_effnlink = ip->i_ffs_nlink;
+	brelse(bp);
+	vput(vp);
+	return (0);
+}
+
 /*
  * Reload all incore data for a filesystem (used after running fsck on
  * the root filesystem and finding things to fix). The filesystem must
@@ -454,14 +513,14 @@ ffs_reload(mountp, cred, p)
 	struct ucred *cred;
 	struct proc *p;
 {
-	register struct vnode *vp, *nvp, *devvp;
-	struct inode *ip;
+	struct vnode *devvp;
 	caddr_t space;
-	struct buf *bp;
 	struct fs *fs, *newfs;
 	struct partinfo dpart;
 	int i, blks, size, error;
 	int32_t *lp;
+	struct buf *bp = NULL;
+	struct ffs_reload_args fra;
 
 	if ((mountp->mnt_flag & MNT_RDONLY) == 0)
 		return (EINVAL);
@@ -535,49 +594,14 @@ ffs_reload(mountp, cred, p)
 			*lp++ = fs->fs_contigsumsize;
 	}
 
-loop:
-	simple_lock(&mntvnode_slock);
-	for (vp = LIST_FIRST(&mountp->mnt_vnodelist); vp != NULL; vp = nvp) {
-		if (vp->v_mount != mountp) {
-			simple_unlock(&mntvnode_slock);
-			goto loop;
-		}
+	fra.p = p;
+	fra.cred = cred;
+	fra.fs = fs;
+	fra.devvp = devvp;
 
-		nvp = LIST_NEXT(vp, v_mntvnodes);
-		/*
-		 * Step 4: invalidate all inactive vnodes.
-		 */
-		if (vrecycle(vp, &mntvnode_slock, p))
-			goto loop;
+	error = vfs_mount_foreach_vnode(mountp, ffs_reload_vnode, &fra);
 
-		/*
-		 * Step 5: invalidate all cached file data.
-		 */
-		simple_lock(&vp->v_interlock);
-		simple_unlock(&mntvnode_slock);
-		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, p))
-			goto loop;
-		if (vinvalbuf(vp, 0, cred, p, 0, 0))
-			panic("ffs_reload: dirty2");
-		/*
-		 * Step 6: re-read inode data for all active vnodes.
-		 */
-		ip = VTOI(vp);
-		error = bread(devvp, fsbtodb(fs, ino_to_fsba(fs, ip->i_number)),
-			      (int)fs->fs_bsize, NOCRED, &bp);
-		if (error) {
-			vput(vp);
-			return (error);
-		}
-		ip->i_din.ffs_din = *((struct dinode *)bp->b_data +
-		    ino_to_fsbo(fs, ip->i_number));
-		ip->i_effnlink = ip->i_ffs_nlink;
-		brelse(bp);
-		vput(vp);
-		simple_lock(&mntvnode_slock);
-	}
-	simple_unlock(&mntvnode_slock);
-	return (0);
+	return (error);
 }
 
 /*
@@ -728,6 +752,10 @@ ffs_mountfs(devvp, mp, p)
 	ump->um_seqinc = fs->fs_frag;
 	for (i = 0; i < MAXQUOTAS; i++)
 		ump->um_quotas[i] = NULLVP;
+#ifdef UFS_EXTATTR
+	ufs_extattr_uepm_init(&ump->um_extattr);
+#endif
+
 	devvp->v_specmountpoint = mp;
 	ffs_oldfscompat(fs);
 
@@ -778,6 +806,21 @@ ffs_mountfs(devvp, mp, p)
 			fs->fs_flags &= ~FS_DOSOFTDEP;
 		(void) ffs_sbupdate(ump, MNT_WAIT);
 	}
+#ifdef UFS_EXTATTR
+#ifdef UFS_EXTATTR_AUTOSTART
+	/*
+	 *
+	 * Auto-starting does the following:
+	 *	- check for /.attribute in the fs, and extattr_start if so
+	 *	- for each file in .attribute, enable that file with
+	 *	  an attribute of the same name.
+	 * Not clear how to report errors -- probably eat them.
+	 * This would all happen while the file system was busy/not
+	 * available, so would effectively be "atomic".
+	 */
+	(void) ufs_extattr_autostart(mp, p);
+#endif /* !UFS_EXTATTR_AUTOSTART */
+#endif /* !UFS_EXTATTR */
 	return (0);
 out:
 	devvp->v_specmountpoint = NULL;
@@ -844,6 +887,15 @@ ffs_unmount(mp, mntflags, p)
 
 	ump = VFSTOUFS(mp);
 	fs = ump->um_fs;
+#ifdef UFS_EXTATTR
+	if ((error = ufs_extattr_stop(mp, p))) {
+		if (error != EOPNOTSUPP)
+			printf("ffs_unmount: ufs_extattr_stop returned %d\n",
+			    error);
+	} else {
+		ufs_extattr_uepm_destroy(&ump->um_extattr);
+	}
+#endif
 	if (mp->mnt_flag & MNT_SOFTDEP)
 		error = softdep_flushfiles(mp, flags, p);
 	else
@@ -887,7 +939,6 @@ ffs_flushfiles(mp, flags, p)
 	int error;
 
 	ump = VFSTOUFS(mp);
-#ifdef QUOTA
 	if (mp->mnt_flag & MNT_QUOTA) {
 		int i;
 		if ((error = vflush(mp, NULLVP, SKIPSYSTEM|flags)) != 0)
@@ -902,7 +953,7 @@ ffs_flushfiles(mp, flags, p)
 		 * that we have gotten rid of all the system vnodes.
 		 */
 	}
-#endif
+
 	/*
 	 * Flush all the files.
 	 */
@@ -951,6 +1002,41 @@ ffs_statfs(mp, sbp, p)
 	return (0);
 }
 
+
+struct ffs_sync_args {
+	int allerror;
+	struct proc *p;
+	int waitfor;
+	struct ucred *cred;
+};
+
+int
+ffs_sync_vnode(struct vnode *vp, void *arg) {
+	struct ffs_sync_args *fsa = arg;
+	struct inode *ip;
+	int error;
+
+	ip = VTOI(vp);
+	if (fsa->waitfor == MNT_LAZY ||
+	    vp->v_type == VNON || 
+	    ((ip->i_flag &
+		(IN_ACCESS | IN_CHANGE | IN_MODIFIED | IN_UPDATE)) == 0	&&
+		LIST_EMPTY(&vp->v_dirtyblkhd)) ) {
+		simple_unlock(&vp->v_interlock);
+		return (0);
+	}
+
+	if (vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK, fsa->p))
+		return (0);
+
+	if ((error = VOP_FSYNC(vp, fsa->cred, fsa->waitfor, fsa->p)))
+		fsa->allerror = error;
+	VOP_UNLOCK(vp, 0, fsa->p);
+	vrele(vp);
+
+	return (0);
+}
+
 /*
  * Go through the disk queues to initiate sandbagged IO;
  * go through the inodes to write those that have been modified;
@@ -965,11 +1051,10 @@ ffs_sync(mp, waitfor, cred, p)
 	struct ucred *cred;
 	struct proc *p;
 {
-	register struct vnode *vp, *nvp;
-	register struct inode *ip;
-	register struct ufsmount *ump = VFSTOUFS(mp);
-	register struct fs *fs;
+	struct ufsmount *ump = VFSTOUFS(mp);
+	struct fs *fs;
 	int error, allerror = 0, count;
+	struct ffs_sync_args fsa;
 
 	fs = ump->um_fs;
 	/*
@@ -982,44 +1067,19 @@ ffs_sync(mp, waitfor, cred, p)
 		panic("update: rofs mod");
 	}
 
+ loop:
 	/*
 	 * Write back each (modified) inode.
 	 */
-	simple_lock(&mntvnode_slock);
-loop:
-	for (vp = LIST_FIRST(&mp->mnt_vnodelist); vp != NULL; vp = nvp) {
-		/*
-		 * If the vnode that we are about to sync is no longer
-		 * associated with this mount point, start over.
-		 */
-		if (vp->v_mount != mp)
-			goto loop;
+	fsa.allerror = 0;
+	fsa.p = p;
+	fsa.cred = cred;
+	fsa.waitfor = waitfor;
 
-		simple_lock(&vp->v_interlock);
-		nvp = LIST_NEXT(vp, v_mntvnodes);
-		ip = VTOI(vp);
-		if (vp->v_type == VNON || ((ip->i_flag &
-		    (IN_ACCESS | IN_CHANGE | IN_MODIFIED | IN_UPDATE)) == 0 &&
-		    LIST_EMPTY(&vp->v_dirtyblkhd)) ||
-		    waitfor == MNT_LAZY) {
-			simple_unlock(&vp->v_interlock);
-			continue;
-		}
-		simple_unlock(&mntvnode_slock);
-		error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK, p);
-		if (error) {
-			simple_lock(&mntvnode_slock);
-			if (error == ENOENT)
-				goto loop;
-			continue;
-		}
-		if ((error = VOP_FSYNC(vp, cred, waitfor, p)))
-			allerror = error;
-		VOP_UNLOCK(vp, 0, p);
-		vrele(vp);
-		simple_lock(&mntvnode_slock);
-	}
-	simple_unlock(&mntvnode_slock);
+	vfs_mount_foreach_vnode(mp, ffs_sync_vnode, &fsa);
+
+	if (fsa.allerror != 0)
+		allerror = fsa.allerror;
 	/*
 	 * Force stale file system control information to be flushed.
 	 */
@@ -1027,10 +1087,8 @@ loop:
 		if ((error = softdep_flushworklist(ump->um_mountp, &count, p)))
 			allerror = error;
 		/* Flushed work items may create new vnodes to clean */
-		if (count) {
-			simple_lock(&mntvnode_slock);
+		if (count) 
 			goto loop;
-		}
 	}
 	if (waitfor != MNT_LAZY) {
 		if (ump->um_mountp->mnt_flag & MNT_SOFTDEP)
@@ -1040,9 +1098,7 @@ loop:
 			allerror = error;
 		VOP_UNLOCK(ump->um_devvp, 0, p);
 	}
-#ifdef QUOTA
 	qsync(mp);
-#endif
 	/*
 	 * Write back modified superblock.
 	 */
@@ -1099,14 +1155,6 @@ retry:
 	ip->i_number = ino;
 	ip->i_vtbl = &ffs_vtbl;
 
-#ifdef QUOTA
-	{
-		int i;
-
-		for (i = 0; i < MAXQUOTAS; i++)
-			ip->i_dquot[i] = NODQUOT;
-	}
-#endif
 	/*
 	 * Put it onto its hash chain and lock it so that other requests for
 	 * this inode will block if they arrive while we are sleeping waiting
@@ -1114,7 +1162,7 @@ retry:
 	 * disk portion of this inode to be read.
 	 */
 	error = ufs_ihashins(ip);
-
+	
 	if (error) {
 		/*
 		 * VOP_INACTIVE will treat this as a stale file
@@ -1311,7 +1359,7 @@ ffs_init(vfsp)
 		return (0);
 	done = 1;
 	pool_init(&ffs_ino_pool, sizeof(struct inode), 0, 0, 0, "ffsino",
-	    0, pool_page_alloc_nointr, pool_page_free_nointr, M_FFSNODE);
+	    &pool_allocator_nointr);
 	softdep_initialize();
 	return (ufs_init(vfsp));
 }
@@ -1330,6 +1378,12 @@ ffs_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	struct proc *p;
 {
 	extern int doclusterread, doclusterwrite, doreallocblks, doasyncfree;
+#ifdef FFS_SOFTUPDATES
+	extern int max_softdeps, tickdelay, stat_worklist_push;
+	extern int stat_blk_limit_push, stat_ino_limit_push, stat_blk_limit_hit;
+	extern int stat_ino_limit_hit, stat_sync_limit_hit, stat_indir_blk_ptrs;
+	extern int stat_inode_bitmap, stat_direct_blk_ptrs, stat_dir_entry;
+#endif
 
 	/* all sysctl names at this level are terminal */
 	if (namelen != 1)
@@ -1347,9 +1401,34 @@ ffs_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		    &doreallocblks));
 	case FFS_ASYNCFREE:
 		return (sysctl_int(oldp, oldlenp, newp, newlen, &doasyncfree));
+#ifdef FFS_SOFTUPDATES
+	case FFS_MAX_SOFTDEPS:
+		return (sysctl_int(oldp, oldlenp, newp, newlen, &max_softdeps));
+	case FFS_SD_TICKDELAY:
+		return (sysctl_int(oldp, oldlenp, newp, newlen, &tickdelay));
+	case FFS_SD_WORKLIST_PUSH:
+		return (sysctl_rdint(oldp, oldlenp, newp, stat_worklist_push));
+	case FFS_SD_BLK_LIMIT_PUSH:
+		return (sysctl_rdint(oldp, oldlenp, newp, stat_blk_limit_push));
+	case FFS_SD_INO_LIMIT_PUSH:
+		return (sysctl_rdint(oldp, oldlenp, newp, stat_ino_limit_push));
+	case FFS_SD_BLK_LIMIT_HIT:
+		return (sysctl_rdint(oldp, oldlenp, newp, stat_blk_limit_hit));
+	case FFS_SD_INO_LIMIT_HIT:
+		return (sysctl_rdint(oldp, oldlenp, newp, stat_ino_limit_hit));
+	case FFS_SD_SYNC_LIMIT_HIT:
+		return (sysctl_rdint(oldp, oldlenp, newp, stat_sync_limit_hit));
+	case FFS_SD_INDIR_BLK_PTRS:
+		return (sysctl_rdint(oldp, oldlenp, newp, stat_indir_blk_ptrs));
+	case FFS_SD_INODE_BITMAP:
+		return (sysctl_rdint(oldp, oldlenp, newp, stat_inode_bitmap));
+	case FFS_SD_DIRECT_BLK_PTRS:
+		return (sysctl_rdint(oldp, oldlenp, newp, stat_direct_blk_ptrs));
+	case FFS_SD_DIR_ENTRY:
+		return (sysctl_rdint(oldp, oldlenp, newp, stat_dir_entry));
+#endif
 	default:
 		return (EOPNOTSUPP);
 	}
 	/* NOTREACHED */
 }
-

@@ -1,4 +1,4 @@
-/*       $OpenBSD: vfs_sync.c,v 1.19 2001/06/22 14:14:11 deraadt Exp $  */
+/*       $OpenBSD: vfs_sync.c,v 1.23 2002/03/14 01:27:06 millert Exp $  */
 
 /*
  *  Portions of this code are:
@@ -56,7 +56,7 @@
 #include <sys/kernel.h>
 
 #ifdef FFS_SOFTUPDATES
-int   softdep_process_worklist __P((struct mount *));
+int   softdep_process_worklist(struct mount *);
 #endif
 
 /*
@@ -130,8 +130,8 @@ vn_syncer_add_to_worklist(vp, delay)
 	if (vp->v_bioflag & VBIOONSYNCLIST)
 		LIST_REMOVE(vp, v_synclist);
 
-	LIST_INSERT_HEAD(&syncer_workitem_pending[slot], vp, v_synclist);
 	vp->v_bioflag |= VBIOONSYNCLIST;
+	LIST_INSERT_HEAD(&syncer_workitem_pending[slot], vp, v_synclist);
 	splx(s);
 }
 
@@ -257,15 +257,15 @@ speedup_syncer()
  * Routine to create and manage a filesystem syncer vnode.
  */
 #define sync_close nullop
-int   sync_fsync __P((void *));
-int   sync_inactive __P((void *));
+int   sync_fsync(void *);
+int   sync_inactive(void *);
 #define sync_reclaim nullop
 #define sync_lock vop_generic_lock
 #define sync_unlock vop_generic_unlock
-int   sync_print __P((void *));
+int   sync_print(void *);
 #define sync_islocked vop_generic_islocked
 
-int (**sync_vnodeop_p) __P((void *));
+int (**sync_vnodeop_p)(void *);
 struct vnodeopv_entry_desc sync_vnodeop_entries[] = {
       { &vop_default_desc, vn_default_error },
       { &vop_close_desc, sync_close },                /* close */
@@ -276,7 +276,7 @@ struct vnodeopv_entry_desc sync_vnodeop_entries[] = {
       { &vop_unlock_desc, sync_unlock },              /* unlock */
       { &vop_print_desc, sync_print },                /* print */
       { &vop_islocked_desc, sync_islocked },          /* islocked */
-      { (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
+      { (struct vnodeop_desc*)NULL, (int(*)(void *))NULL }
 };
 struct vnodeopv_desc sync_vnodeop_opv_desc = {
 	&sync_vnodeop_p, sync_vnodeop_entries
@@ -387,6 +387,7 @@ sync_inactive(v)
 	}
 	vp->v_mount->mnt_syncer = NULL;
 	LIST_REMOVE(vp, v_synclist);
+	vp->v_bioflag &= ~VBIOONSYNCLIST;
 	vp->v_writecount = 0;
 	vput(vp);
 	return (0);

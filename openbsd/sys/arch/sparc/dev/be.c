@@ -1,4 +1,4 @@
-/*	$OpenBSD: be.c,v 1.28 2001/07/30 21:50:06 jason Exp $	*/
+/*	$OpenBSD: be.c,v 1.31 2002/03/14 01:26:42 millert Exp $	*/
 
 /*
  * Copyright (c) 1998 Theo de Raadt and Jason L. Wright.
@@ -70,33 +70,33 @@
 #include <sparc/dev/bereg.h>
 #include <sparc/dev/bevar.h>
 
-int	bematch __P((struct device *, void *, void *));
-void	beattach __P((struct device *, struct device *, void *));
+int	bematch(struct device *, void *, void *);
+void	beattach(struct device *, struct device *, void *);
 
-void	beinit __P((struct besoftc *));
-void	bestart __P((struct ifnet *));
-void	bestop __P((struct besoftc *));
-void	bewatchdog __P((struct ifnet *));
-int	beioctl __P((struct ifnet *, u_long, caddr_t));
-void	bereset __P((struct besoftc *));
+void	beinit(struct besoftc *);
+void	bestart(struct ifnet *);
+void	bestop(struct besoftc *);
+void	bewatchdog(struct ifnet *);
+int	beioctl(struct ifnet *, u_long, caddr_t);
+void	bereset(struct besoftc *);
 
-int	beintr __P((void *));
-int	berint __P((struct besoftc *));
-int	betint __P((struct besoftc *));
-int	beqint __P((struct besoftc *, u_int32_t));
-int	beeint __P((struct besoftc *, u_int32_t));
-void	be_read __P((struct besoftc *, int, int));
+int	beintr(void *);
+int	berint(struct besoftc *);
+int	betint(struct besoftc *);
+int	beqint(struct besoftc *, u_int32_t);
+int	beeint(struct besoftc *, u_int32_t);
+void	be_read(struct besoftc *, int, int);
 
-void	be_tcvr_idle __P((struct besoftc *));
-void	be_tcvr_init __P((struct besoftc *));
-void	be_tcvr_write __P((struct besoftc *, u_int8_t, u_int16_t));
-void	be_tcvr_write_bit __P((struct besoftc *, int));
-int	be_tcvr_read_bit1 __P((struct besoftc *));
-int	be_tcvr_read_bit2 __P((struct besoftc *));
-int	be_tcvr_read __P((struct besoftc *, u_int8_t));
-void	be_ifmedia_sts __P((struct ifnet *, struct ifmediareq *));
-int	be_ifmedia_upd __P((struct ifnet *));
-void	be_mcreset __P((struct besoftc *));
+void	be_tcvr_idle(struct besoftc *);
+void	be_tcvr_init(struct besoftc *);
+void	be_tcvr_write(struct besoftc *, u_int8_t, u_int16_t);
+void	be_tcvr_write_bit(struct besoftc *, int);
+int	be_tcvr_read_bit1(struct besoftc *);
+int	be_tcvr_read_bit2(struct besoftc *);
+int	be_tcvr_read(struct besoftc *, u_int8_t);
+void	be_ifmedia_sts(struct ifnet *, struct ifmediareq *);
+int	be_ifmedia_upd(struct ifnet *);
+void	be_mcreset(struct besoftc *);
 
 struct cfdriver be_cd = {
 	NULL, "be", DV_IFNET
@@ -130,7 +130,7 @@ beattach(parent, self, aux)
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	struct confargs *ca = aux;
 	struct bootpath *bp;
-	extern void myetheraddr __P((u_char *));
+	extern void myetheraddr(u_char *);
 	int pri, bmsr;
 
 	if (ca->ca_ra.ra_nintr != 1) {
@@ -258,9 +258,11 @@ bestart(ifp)
 	bix = sc->sc_last_td;
 
 	for (;;) {
-		IFQ_DEQUEUE(&ifp->if_snd, m);
+		IFQ_POLL(&ifp->if_snd, m);
 		if (m == NULL)
 			break;
+
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 
 #if NBPFILTER > 0
 		/*
@@ -454,7 +456,6 @@ betint(sc)
 		if (txd.tx_flags & BE_TXD_OWN)
 			break;
 
-		ifp->if_flags &= ~IFF_OACTIVE;
 		ifp->if_opackets++;
 
 		if (++bix == BE_TX_RING_MAXSIZE)
@@ -463,14 +464,22 @@ betint(sc)
 		--sc->sc_no_td;
 	}
 
-	sc->sc_first_td = bix;
-
-	bestart(ifp);
-
 	if (sc->sc_no_td == 0)
 		ifp->if_timer = 0;
 
-	return 1;
+	/*
+	 * If we freed up at least one descriptor and tx is blocked,
+	 * unblock it and start it up again.
+	 */
+	if (sc->sc_first_td != bix) {
+		sc->sc_first_td = bix;
+		if (ifp->if_flags & IFF_OACTIVE) {
+			ifp->if_flags &= ~IFF_OACTIVE;
+			bestart(ifp);
+		}
+	}
+
+	return (1);
 }
 
 /*
@@ -620,8 +629,6 @@ beinit(sc)
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	int s = splimp();
 	int i;
-
-	sc->sc_nticks = 0;
 
 	/*
 	 * Allocate descriptor ring and buffers, if not already done

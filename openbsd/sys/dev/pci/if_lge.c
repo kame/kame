@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_lge.c,v 1.3 2001/09/11 20:05:25 miod Exp $	*/
+/*	$OpenBSD: if_lge.c,v 1.9 2002/03/14 01:26:58 millert Exp $	*/
 /*
  * Copyright (c) 2001 Wind River Systems
  * Copyright (c) 1997, 1998, 1999, 2000, 2001
@@ -106,8 +106,8 @@
 #include <net/bpf.h>
 #endif
 
-#include <vm/vm.h>              /* for vtophys */
-#include <vm/pmap.h>            /* for vtophys */
+#include <uvm/uvm_extern.h>              /* for vtophys */
+#include <uvm/uvm_pmap.h>            /* for vtophys */
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
@@ -120,43 +120,43 @@
 
 #include <dev/pci/if_lgereg.h>
 
-int lge_probe		__P((struct device *, void *, void *));
-void lge_attach		__P((struct device *, struct device *, void *));
+int lge_probe(struct device *, void *, void *);
+void lge_attach(struct device *, struct device *, void *);
 
-int lge_alloc_jumbo_mem	__P((struct lge_softc *));
-void lge_free_jumbo_mem	__P((struct lge_softc *));
-void *lge_jalloc	__P((struct lge_softc *));
-void lge_jfree		__P((caddr_t, u_int, void *));
+int lge_alloc_jumbo_mem(struct lge_softc *);
+void lge_free_jumbo_mem(struct lge_softc *);
+void *lge_jalloc(struct lge_softc *);
+void lge_jfree(caddr_t, u_int, void *);
 
-int lge_newbuf		__P((struct lge_softc *, struct lge_rx_desc *,
-			     struct mbuf *));
-int lge_encap		__P((struct lge_softc *, struct mbuf *, u_int32_t *));
-void lge_rxeof		__P((struct lge_softc *, int));
-void lge_rxeoc		__P((struct lge_softc *));
-void lge_txeof		__P((struct lge_softc *));
-int lge_intr		__P((void *));
-void lge_tick		__P((void *));
-void lge_start		__P((struct ifnet *));
-int lge_ioctl		__P((struct ifnet *, u_long, caddr_t));
-void lge_init		__P((void *));
-void lge_stop		__P((struct lge_softc *));
-void lge_watchdog	__P((struct ifnet *));
-void lge_shutdown	__P((void *));
-int lge_ifmedia_upd	__P((struct ifnet *));
-void lge_ifmedia_sts	__P((struct ifnet *, struct ifmediareq *));
+int lge_newbuf(struct lge_softc *, struct lge_rx_desc *,
+			     struct mbuf *);
+int lge_encap(struct lge_softc *, struct mbuf *, u_int32_t *);
+void lge_rxeof(struct lge_softc *, int);
+void lge_rxeoc(struct lge_softc *);
+void lge_txeof(struct lge_softc *);
+int lge_intr(void *);
+void lge_tick(void *);
+void lge_start(struct ifnet *);
+int lge_ioctl(struct ifnet *, u_long, caddr_t);
+void lge_init(void *);
+void lge_stop(struct lge_softc *);
+void lge_watchdog(struct ifnet *);
+void lge_shutdown(void *);
+int lge_ifmedia_upd(struct ifnet *);
+void lge_ifmedia_sts(struct ifnet *, struct ifmediareq *);
 
-void lge_eeprom_getword	__P((struct lge_softc *, int, u_int16_t *));
-void lge_read_eeprom	__P((struct lge_softc *, caddr_t, int, int, int));
+void lge_eeprom_getword(struct lge_softc *, int, u_int16_t *);
+void lge_read_eeprom(struct lge_softc *, caddr_t, int, int, int);
 
-int lge_miibus_readreg	__P((struct device *, int, int));
-void lge_miibus_writereg	__P((struct device *, int, int, int));
-void lge_miibus_statchg	__P((struct device *));
+int lge_miibus_readreg(struct device *, int, int);
+void lge_miibus_writereg(struct device *, int, int, int);
+void lge_miibus_statchg(struct device *);
 
-void lge_setmulti	__P((struct lge_softc *));
-u_int32_t lge_crc	__P((struct lge_softc *, caddr_t));
-void lge_reset		__P((struct lge_softc *));
-int lge_list_rx_init	__P((struct lge_softc *));
-int lge_list_tx_init	__P((struct lge_softc *));
+void lge_setmulti(struct lge_softc *);
+u_int32_t lge_crc(struct lge_softc *, caddr_t);
+void lge_reset(struct lge_softc *);
+int lge_list_rx_init(struct lge_softc *);
+int lge_list_tx_init(struct lge_softc *);
 
 #ifdef LGE_USEIOSPACE
 #define LGE_RES			SYS_RES_IOPORT
@@ -648,7 +648,8 @@ void lge_attach(parent, self, aux)
 	ifp->if_start = lge_start;
 	ifp->if_watchdog = lge_watchdog;
 	ifp->if_baudrate = 1000000000;
-	ifp->if_snd.ifq_maxlen = LGE_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, LGE_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 	DPRINTFN(5, ("bcopy\n"));
 	bcopy(sc->sc_dv.dv_xname, ifp->if_xname, IFNAMSIZ);
 
@@ -959,7 +960,6 @@ void lge_rxeof(sc, cnt)
 	struct lge_softc	*sc;
 	int			cnt;
 {
-        struct ether_header	*eh;
         struct mbuf		*m;
         struct ifnet		*ifp;
 	struct lge_rx_desc	*cur_rx;
@@ -1015,10 +1015,6 @@ void lge_rxeof(sc, cnt)
 		}
 
 		ifp->if_ipackets++;
-		eh = mtod(m, struct ether_header *);
-
-		/* Remove header from mbuf and pass it on. */
-		m_adj(m, sizeof(struct ether_header));
 
 #if NBPFILTER > 0
 		/*
@@ -1063,7 +1059,7 @@ void lge_rxeof(sc, cnt)
 				m->m_pkthdr.csum |= M_UDP_CSUM_IN_OK;
 		}
 
-		ether_input(ifp, eh, m);
+		ether_input_mbuf(ifp, m);
 	}
 
 	sc->lge_cdata.lge_rx_cons = i;
@@ -1154,7 +1150,7 @@ void lge_tick(xsc)
 			    IFM_SUBTYPE(mii->mii_media_active) == IFM_1000_TX)
 				printf("%s: gigabit link up\n",
 				       sc->sc_dv.dv_xname);
-			if (ifp->if_snd.ifq_head != NULL)
+			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				lge_start(ifp);
 		}
 	}
@@ -1215,7 +1211,7 @@ int lge_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, LGE_IMR, LGE_IMR_SETRST_CTL0|LGE_IMR_INTR_ENB);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		lge_start(ifp);
 
 	return claimed;
@@ -1281,6 +1277,7 @@ void lge_start(ifp)
 	struct lge_softc	*sc;
 	struct mbuf		*m_head = NULL;
 	u_int32_t		idx;
+	int			pkts = 0;
 
 	sc = ifp->if_softc;
 
@@ -1296,15 +1293,18 @@ void lge_start(ifp)
 		if (CSR_READ_1(sc, LGE_TXCMDFREE_8BIT) == 0)
 			break;
 
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		if (lge_encap(sc, m_head, &idx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		/* now we are committed to transmit the packet */
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		pkts++;
 
 #if NBPFILTER > 0
 		/*
@@ -1315,6 +1315,8 @@ void lge_start(ifp)
 			bpf_mtap(ifp->if_bpf, m_head);
 #endif
 	}
+	if (pkts == 0)
+		return;
 
 	sc->lge_cdata.lge_tx_prod = idx;
 
@@ -1353,7 +1355,7 @@ void lge_init(xsc)
 		printf("%s: initialization failed: no "
 		       "memory for rx buffers\n", sc->sc_dv.dv_xname);
 		lge_stop(sc);
-		(void)splx(s);
+		splx(s);
 		return;
 	}
 
@@ -1450,7 +1452,7 @@ void lge_init(xsc)
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
-	(void)splx(s);
+	splx(s);
 
 	timeout_add(&sc->lge_timeout, hz);
 
@@ -1575,7 +1577,7 @@ int lge_ioctl(ifp, command, data)
 		break;
 	}
 
-	(void)splx(s);
+	splx(s);
 
 	return(error);
 }
@@ -1595,7 +1597,7 @@ void lge_watchdog(ifp)
 	ifp->if_flags &= ~IFF_RUNNING;
 	lge_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		lge_start(ifp);
 
 	return;

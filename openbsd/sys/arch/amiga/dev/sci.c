@@ -1,4 +1,4 @@
-/*	$OpenBSD: sci.c,v 1.6 2001/09/11 20:05:20 miod Exp $	*/
+/*	$OpenBSD: sci.c,v 1.8 2002/03/14 01:26:29 millert Exp $	*/
 /*	$NetBSD: sci.c,v 1.19 1996/10/13 03:07:31 christos Exp $	*/
 
 /*
@@ -52,9 +52,7 @@
 #include <sys/buf.h>
 #include <scsi/scsi_all.h>
 #include <scsi/scsiconf.h>
-#include <vm/vm.h>
-#include <vm/vm_page.h>
-#include <machine/pmap.h>
+#include <uvm/uvm_extern.h>
 #include <machine/cpu.h>
 #include <amiga/amiga/device.h>
 #include <amiga/amiga/custom.h>
@@ -72,17 +70,17 @@
 
 #define	b_cylin		b_resid
 
-int  sciicmd __P((struct sci_softc *, int, void *, int, void *, int,u_char));
-int  scigo __P((struct sci_softc *, struct scsi_xfer *));
-int  scigetsense __P((struct sci_softc *, struct scsi_xfer *));
-int  sciselectbus __P((struct sci_softc *, u_char, u_char));
-void sciabort __P((struct sci_softc *, char *));
-void scierror __P((struct sci_softc *, u_char));
-void scisetdelay __P((int));
-void sci_scsidone __P((struct sci_softc *, int));
-void sci_donextcmd __P((struct sci_softc *));
-int  sci_ixfer_out __P((struct sci_softc *, int, register u_char *, int)); 
-void sci_ixfer_in __P((struct sci_softc *, int, register u_char *, int)); 
+int  sciicmd(struct sci_softc *, int, void *, int, void *, int,u_char);
+int  scigo(struct sci_softc *, struct scsi_xfer *);
+int  scigetsense(struct sci_softc *, struct scsi_xfer *);
+int  sciselectbus(struct sci_softc *, u_char, u_char);
+void sciabort(struct sci_softc *, char *);
+void scierror(struct sci_softc *, u_char);
+void scisetdelay(int);
+void sci_scsidone(struct sci_softc *, int);
+void sci_donextcmd(struct sci_softc *);
+int  sci_ixfer_out(struct sci_softc *, int, register u_char *, int); 
+void sci_ixfer_in(struct sci_softc *, int, register u_char *, int); 
 
 int sci_cmd_wait = SCI_CMD_WAIT;
 int sci_data_wait = SCI_DATA_WAIT;

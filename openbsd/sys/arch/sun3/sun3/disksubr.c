@@ -1,4 +1,4 @@
-/*	$OpenBSD: disksubr.c,v 1.15 2000/07/02 17:51:35 miod Exp $	*/
+/*	$OpenBSD: disksubr.c,v 1.17 2002/03/14 01:26:47 millert Exp $	*/
 /*	$NetBSD: disksubr.c,v 1.14 1996/09/26 18:10:21 gwr Exp $	*/
 
 /*
@@ -65,13 +65,13 @@
 #error	"Default value of LABELSECTOR no longer zero?"
 #endif
 
-static char * disklabel_sun_to_bsd __P((char *, struct disklabel *));
-static int disklabel_bsd_to_sun __P((struct disklabel *, char *));
-static __inline u_long sun_extended_sum __P((struct sun_disklabel *));
+static char * disklabel_sun_to_bsd(char *, struct disklabel *);
+static int disklabel_bsd_to_sun(struct disklabel *, char *);
+static __inline u_long sun_extended_sum(struct sun_disklabel *);
 
 /*
  * Attempt to read a disk label from a device
- * using the indicated stategy routine.
+ * using the indicated strategy routine.
  * The label must be partly set up before this:
  * secpercyl, secsize and anything required for a block i/o read
  * operation in the driver's strategy/start routines
@@ -84,7 +84,7 @@ static __inline u_long sun_extended_sum __P((struct sun_disklabel *));
 char *
 readdisklabel(dev, strat, lp, clp, spoofonly)
 	dev_t dev;
-	void (*strat) __P((struct buf *));
+	void (*strat)(struct buf *);
 	struct disklabel *lp;
 	struct cpu_disklabel *clp;
 	int spoofonly;
@@ -208,7 +208,7 @@ setdisklabel(olp, nlp, openmask, clp)
 int
 writedisklabel(dev, strat, lp, clp)
 	dev_t dev;
-	void (*strat) __P((struct buf *));
+	void (*strat)(struct buf *);
 	struct disklabel *lp;
 	struct cpu_disklabel *clp;
 {

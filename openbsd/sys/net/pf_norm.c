@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf_norm.c,v 1.14 2001/10/17 22:21:42 markus Exp $ */
+/*	$OpenBSD: pf_norm.c,v 1.21 2002/03/27 18:16:21 mickey Exp $ */
 
 /*
  * Copyright 2001 Niels Provos <provos@citi.umich.edu>
@@ -72,7 +72,7 @@ struct pf_fragment {
 	u_int8_t	fr_flags;	/* status flags */
 	u_int16_t	fr_id;		/* fragment id for reassemble */
 	u_int16_t	fr_max;		/* fragment data max */
-	struct timeval	fr_timeout;
+	u_int32_t	fr_timeout;
 	LIST_HEAD(pf_fragq, pf_frent) fr_queue;
 };
 
@@ -89,9 +89,6 @@ struct mbuf		*pf_reassemble(struct mbuf **, struct pf_fragment *,
 u_int16_t		 pf_cksum_fixup(u_int16_t, u_int16_t, u_int16_t);
 int			 pf_normalize_tcp(int, struct ifnet *, struct mbuf *,
 			    int, int, void *, struct pf_pdesc *);
-
-#define PFFRAG_FRENT_HIWAT	5000	/* Number of fragment entries */
-#define PFFRAG_FRAG_HIWAT	1000	/* Number of fragmented packets */
 
 #define DPFPRINTF(x)		if (pf_status.debug) printf x
 
@@ -122,9 +119,9 @@ void
 pf_normalize_init(void)
 {
 	pool_init(&pf_frent_pl, sizeof(struct pf_frent), 0, 0, 0, "pffrent",
-	    0, NULL, NULL, 0);
+	    NULL);
 	pool_init(&pf_frag_pl, sizeof(struct pf_fragment), 0, 0, 0, "pffrag",
-	    0, NULL, NULL, 0);
+	    NULL);
 
 	pool_sethiwat(&pf_frag_pl, PFFRAG_FRAG_HIWAT);
 	pool_sethardlimit(&pf_frent_pl, PFFRAG_FRENT_HIWAT, NULL, 0);
@@ -136,16 +133,10 @@ void
 pf_purge_expired_fragments(void)
 {
 	struct pf_fragment *frag;
-	struct timeval now, expire;
-
-	microtime(&now);
-
-	timerclear(&expire);
-	expire.tv_sec = pftm_frag;
-	timersub(&now, &expire, &expire);
+	u_int32_t expire = time.tv_sec - pftm_frag;
 
 	while ((frag = TAILQ_LAST(&pf_fragqueue, pf_fragqueue)) != NULL) {
-		if (timercmp(&frag->fr_timeout, &expire, >))
+		if (frag->fr_timeout > expire)
 			break;
 
 		DPFPRINTF((__FUNCTION__": expiring %p\n", frag));
@@ -216,7 +207,7 @@ pf_find_fragment(struct ip *ip)
 	frag = (struct pf_fragment *)pf_find_state(tree_fragment, &key);
 
 	if (frag != NULL) {
-		microtime(&frag->fr_timeout);
+		frag->fr_timeout = time.tv_sec;
 		TAILQ_REMOVE(&pf_fragqueue, frag, frag_next);
 		TAILQ_INSERT_HEAD(&pf_fragqueue, frag, frag_next);
 	}
@@ -279,6 +270,7 @@ pf_reassemble(struct mbuf **m0, struct pf_fragment *frag,
 		frag->fr_dst = frent->fr_ip->ip_dst;
 		frag->fr_p = frent->fr_ip->ip_p;
 		frag->fr_id = frent->fr_ip->ip_id;
+		frag->fr_timeout = time.tv_sec;
 		LIST_INIT(&frag->fr_queue);
 
 		pf_ip2key(&key, frent->fr_ip);
@@ -429,6 +421,7 @@ pf_reassemble(struct mbuf **m0, struct pf_fragment *frag,
 
  drop_fragment:
 	/* Oops - fail safe - drop packet */
+	pool_put(&pf_frent_pl, frent);
 	m_freem(m);
 	return (NULL);
 }
@@ -445,9 +438,27 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 	u_int16_t fragoff = (h->ip_off & IP_OFFMASK) << 3;
 	u_int16_t max;
 
-	TAILQ_FOREACH(r, pf_rules_active, entries) {
-		if ((r->action == PF_SCRUB) &&
-		    MATCH_TUPLE(h, r, dir, ifp, AF_INET))
+	r = TAILQ_FIRST(pf_rules_active);
+	while (r != NULL) {
+		if (r->action != PF_SCRUB)
+			r = r->skip[PF_SKIP_ACTION];
+		else if (r->ifp != NULL && r->ifp != ifp)
+			r = r->skip[PF_SKIP_IFP];
+		else if (r->direction != dir)
+			r = r->skip[PF_SKIP_DIR];
+		else if (r->af && r->af != AF_INET)
+			r = r->skip[PF_SKIP_AF];
+		else if (r->proto && r->proto != h->ip_p)
+			r = r->skip[PF_SKIP_PROTO];
+		else if (!PF_AZERO(&r->src.mask, AF_INET) &&
+		    !PF_MATCHA(r->src.not, &r->src.addr, &r->src.mask,
+		    (struct pf_addr *)&h->ip_src.s_addr, AF_INET))
+			r = r->skip[PF_SKIP_SRC_ADDR];
+		else if (!PF_AZERO(&r->dst.mask, AF_INET) &&
+		    !PF_MATCHA(r->dst.not, &r->dst.addr, &r->dst.mask,
+		    (struct pf_addr *)&h->ip_dst.s_addr, AF_INET))
+			r = r->skip[PF_SKIP_DST_ADDR];
+		else
 			break;
 	}
 
@@ -560,40 +571,40 @@ pf_normalize_tcp(int dir, struct ifnet *ifp, struct mbuf *m, int ipoff,
 {
 	struct pf_rule *r, *rm = NULL;
 	struct tcphdr *th = pd->hdr.tcp;
-	int rewrite = 0, reason;
+	int rewrite = 0;
+	u_short reason;
 	u_int8_t flags, af = pd->af;
 
 	r = TAILQ_FIRST(pf_rules_active);
 	while (r != NULL) {
-		if (r->action != PF_SCRUB) {
-			r = TAILQ_NEXT(r, entries);
-			continue;
-		}
-		if (r->ifp != NULL && r->ifp != ifp)
-			r = r->skip[0];
+		if (r->action != PF_SCRUB)
+			r = r->skip[PF_SKIP_ACTION];
+		else if (r->ifp != NULL && r->ifp != ifp)
+			r = r->skip[PF_SKIP_IFP];
+		else if (r->direction != dir)
+			r = r->skip[PF_SKIP_DIR];
 		else if (r->af && r->af != af)
-			r = r->skip[1];
+			r = r->skip[PF_SKIP_AF];
 		else if (r->proto && r->proto != pd->proto)
-			r = r->skip[2];
-		else if (!PF_AZERO(&r->src.mask, af) &&
+			r = r->skip[PF_SKIP_PROTO];
+		else if (r->src.noroute && pf_routable(pd->src, af))  
+			r = TAILQ_NEXT(r, entries);
+		else if (!r->src.noroute && !PF_AZERO(&r->src.mask, af) &&
 		    !PF_MATCHA(r->src.not, &r->src.addr, &r->src.mask,
 			    pd->src, af))
-			r = r->skip[3];
+			r = r->skip[PF_SKIP_SRC_ADDR];
 		else if (r->src.port_op && !pf_match_port(r->src.port_op,
 			    r->src.port[0], r->src.port[1], th->th_sport))
-			r = r->skip[4];
-		else if (!PF_AZERO(&r->dst.mask, af) &&
-			    !PF_MATCHA(r->dst.not,
-			    &r->dst.addr, &r->dst.mask,
+			r = r->skip[PF_SKIP_SRC_PORT];
+		else if (r->dst.noroute && pf_routable(pd->dst, af))
+			r = TAILQ_NEXT(r, entries);
+		else if (!r->dst.noroute && !PF_AZERO(&r->dst.mask, af) &&
+		    !PF_MATCHA(r->dst.not, &r->dst.addr, &r->dst.mask,
 			    pd->dst, af))
-			r = r->skip[5];
+			r = r->skip[PF_SKIP_DST_ADDR];
 		else if (r->dst.port_op && !pf_match_port(r->dst.port_op,
 			    r->dst.port[0], r->dst.port[1], th->th_dport))
-			r = r->skip[6];
-		else if (r->direction != dir)
-			r = TAILQ_NEXT(r, entries);
-		else if (r->ifp != NULL && r->ifp != ifp)
-			r = TAILQ_NEXT(r, entries);
+			r = r->skip[PF_SKIP_DST_PORT];
 		else {
 			rm = r;
 			break;

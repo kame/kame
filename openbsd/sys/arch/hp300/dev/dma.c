@@ -1,4 +1,4 @@
-/*	$OpenBSD: dma.c,v 1.10 2001/05/11 23:24:56 millert Exp $	*/
+/*	$OpenBSD: dma.c,v 1.12 2002/03/14 01:26:30 millert Exp $	*/
 /*	$NetBSD: dma.c,v 1.19 1997/05/05 21:02:39 thorpej Exp $	*/
 
 /*
@@ -41,8 +41,6 @@
 /*
  * DMA driver
  */
-
-#include <machine/hp300spu.h>	/* XXX param.h includes cpu.h */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -104,7 +102,7 @@ struct dma_softc {
 #define DMAF_VCFLUSH	0x02
 #define DMAF_NOINTR	0x04
 
-int	dmaintr __P((void *));
+int	dmaintr(void *);
 
 #ifdef DEBUG
 int	dmadebug = 0;
@@ -113,7 +111,7 @@ int	dmadebug = 0;
 #define	DDB_FOLLOW	0x04
 #define DDB_IO		0x08
 
-void	dmatimeout __P((void *));
+void	dmatimeout(void *);
 int	dmatimo[NDMACHAN];
 
 long	dmahits[NDMACHAN];

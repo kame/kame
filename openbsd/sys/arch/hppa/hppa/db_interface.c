@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_interface.c,v 1.16 2001/03/22 23:31:45 mickey Exp $	*/
+/*	$OpenBSD: db_interface.c,v 1.18 2002/03/14 03:15:53 millert Exp $	*/
 
 /*
  * Copyright (c) 1999-2000 Michael Shalayeff
@@ -51,7 +51,7 @@
 
 #include <dev/cons.h>
 
-void kdbprinttrap __P((int, int));
+void kdbprinttrap(int, int);
 
 extern label_t *db_recover;
 extern int db_active;
@@ -142,7 +142,7 @@ db_read_bytes(addr, size, data)
 	size_t size;
 	char *data;
 {
-	register char *src = (char*)addr;
+	register char *src = (char *)addr;
 
 	while (size--)
 		*data++ = *src++;

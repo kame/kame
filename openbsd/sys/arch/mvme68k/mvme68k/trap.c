@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.35 2001/09/14 09:15:19 art Exp $ */
+/*	$OpenBSD: trap.c,v 1.42 2002/03/14 01:26:38 millert Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -96,9 +96,8 @@
 extern struct emul emul_sunos;
 #endif
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
 #include <uvm/uvm_extern.h>
+#include <uvm/uvm_pmap.h>
 
 #ifdef COMPAT_HPUX
 #include <compat/hpux/hpux.h>
@@ -167,16 +166,13 @@ void (*sir_routines[NSIR])();
 void *sir_args[NSIR];
 u_char next_sir;
 
-int  writeback __P((struct frame *fp, int docachepush));
-
-static inline void userret __P((struct proc *p, struct frame *fp,
-										  u_quad_t oticks, u_int faultaddr, int fromtrap));
+int  writeback(struct frame *fp, int docachepush);
 
 /*
  * trap and syscall both need the following work done before returning
  * to user mode.
  */
-static inline void
+void
 userret(p, fp, oticks, faultaddr, fromtrap)
 	register struct proc *p;
 	register struct frame *fp;
@@ -539,12 +535,12 @@ copyfault:
 
 	case T_MMUFLT|T_USER:	/* page fault */
 		{
-			register vm_offset_t va;
-			register struct vmspace *vm = NULL;
-			register vm_map_t map;
+			vm_offset_t va;
+			struct vmspace *vm = NULL;
+			struct vm_map *map;
 			int rv;
 			vm_prot_t ftype, vftype;
-			extern vm_map_t kernel_map;
+			extern struct vm_map *kernel_map;
 
 			/* vmspace only significant if T_USER */
 			if (p)
@@ -584,10 +580,10 @@ copyfault:
 				vm_offset_t bva;
 
 				rv = pmap_mapmulti(map->pmap, va);
-				if (rv != KERN_SUCCESS) {
+				if (rv) {
 					bva = HPMMBASEADDR(va);
 					rv = uvm_fault(map, bva, 0, ftype);
-					if (rv == KERN_SUCCESS)
+					if (rv == 0)
 						(void) pmap_mapmulti(map->pmap, va);
 				}
 			} else
@@ -606,16 +602,16 @@ copyfault:
 			 * error.
 			 */
 			if ((caddr_t)va >= vm->vm_maxsaddr && map != kernel_map) {
-				if (rv == KERN_SUCCESS) {
+				if (rv == 0) {
 					unsigned nss;
 
 					nss = btoc(USRSTACK-(unsigned)va);
 					if (nss > vm->vm_ssize)
 						vm->vm_ssize = nss;
-				} else if (rv == KERN_PROTECTION_FAILURE)
-					rv = KERN_INVALID_ADDRESS;
+				} else if (rv == EACCES)
+					rv = EFAULT;
 			}
-			if (rv == KERN_SUCCESS) {
+			if (rv == 0) {
 				if (type == T_MMUFLT) {
 #if defined(M68040)
 					if (mmutype == MMU_68040)
@@ -717,12 +713,14 @@ writeback(fp, docachepush)
 
 			pmap_enter(pmap_kernel(), (vm_offset_t)vmmap,
 						  trunc_page(f->f_fa), VM_PROT_WRITE, VM_PROT_WRITE|PMAP_WIRED);
+			pmap_update(pmap_kernel());
 			fa = (u_int)&vmmap[(f->f_fa & PGOFSET) & ~0xF];
 			bcopy((caddr_t)&f->f_pd0, (caddr_t)fa, 16);
 			pmap_extract(pmap_kernel(), (vm_offset_t)fa, &pa);
 			DCFL(pa);
 			pmap_remove(pmap_kernel(), (vm_offset_t)vmmap,
 							(vm_offset_t)&vmmap[NBPG]);
+			pmap_update(pmap_kernel());
 		} else
 			printf("WARNING: pid %d(%s) uid %d: CPUSH not done\n",
 					 p->p_pid, p->p_comm, p->p_ucred->cr_uid);
@@ -1097,27 +1095,10 @@ bad:
 	if (error == ERESTART && (p->p_md.md_flags & MDP_STACKADJ))
 		frame.f_regs[SP] -= sizeof (int);
 #endif
-	userret(p, &frame, sticks, (u_int)0, 0);
+	userret(p, &frame, sticks, 0, 0);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
 		ktrsysret(p, code, error, rval[0]);
-#endif
-}
-
-void
-child_return(p, frame)
-	struct proc *p;
-	struct frame frame;
-{
-
-	frame.f_regs[D0] = 0;
-	frame.f_sr &= ~PSL_C;
-	frame.f_format = FMT0;
-
-	userret(p, &frame, 0, (u_int)0, 0);
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p, SYS_fork, 0, 0);
 #endif
 }
 

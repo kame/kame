@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.15 2001/07/25 13:25:32 art Exp $ */
+/*	$OpenBSD: mem.c,v 1.18 2001/12/08 02:24:06 art Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -82,7 +82,6 @@
 
 #include <machine/cpu.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 extern u_int lowram;
@@ -166,12 +165,13 @@ mmrw(dev, uio, flags)
 				   trunc_page(v), 
 				   uio->uio_rw == UIO_READ ? VM_PROT_READ : VM_PROT_WRITE,
 				   (uio->uio_rw == UIO_READ ? VM_PROT_READ : VM_PROT_WRITE) | PMAP_WIRED); 
-
+			pmap_update(pmap_kernel());
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)vmmap + o, c, uio);
 			pmap_remove(pmap_kernel(), (vm_offset_t)vmmap,
 			    (vm_offset_t)vmmap + NBPG);
+			pmap_update(pmap_kernel());
 			continue;
 
 /* minor device 1 is kernel memory */
@@ -232,10 +232,11 @@ unlock:
 	return (error);
 }
 
-int
+paddr_t
 mmmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	/*
 	 * /dev/mem is the only one that makes sense through this

@@ -1,4 +1,4 @@
-/*	$OpenBSD: adw.c,v 1.22 2001/09/21 17:55:43 miod Exp $ */
+/*	$OpenBSD: adw.c,v 1.26 2002/03/14 01:26:53 millert Exp $ */
 /* $NetBSD: adw.c,v 1.23 2000/05/27 18:24:50 dante Exp $	 */
 
 /*
@@ -54,7 +54,7 @@
 #include <machine/bus.h>
 #include <machine/intr.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <scsi/scsi_all.h>
 #include <scsi/scsiconf.h>
@@ -70,30 +70,30 @@
 /******************************************************************************/
 
 
-void adw_enqueue __P((ADW_SOFTC *, struct scsi_xfer *, int));
-struct scsi_xfer *adw_dequeue __P((ADW_SOFTC *));
+void adw_enqueue(ADW_SOFTC *, struct scsi_xfer *, int);
+struct scsi_xfer *adw_dequeue(ADW_SOFTC *);
 
-int adw_alloc_controls __P((ADW_SOFTC *));
-int adw_alloc_carriers __P((ADW_SOFTC *));
-int adw_create_ccbs __P((ADW_SOFTC *, ADW_CCB *, int));
-void adw_free_ccb __P((ADW_SOFTC *, ADW_CCB *));
-void adw_reset_ccb __P((ADW_CCB *));
-int adw_init_ccb __P((ADW_SOFTC *, ADW_CCB *));
-ADW_CCB *adw_get_ccb __P((ADW_SOFTC *, int));
-int adw_queue_ccb __P((ADW_SOFTC *, ADW_CCB *, int));
+int adw_alloc_controls(ADW_SOFTC *);
+int adw_alloc_carriers(ADW_SOFTC *);
+int adw_create_ccbs(ADW_SOFTC *, ADW_CCB *, int);
+void adw_free_ccb(ADW_SOFTC *, ADW_CCB *);
+void adw_reset_ccb(ADW_CCB *);
+int adw_init_ccb(ADW_SOFTC *, ADW_CCB *);
+ADW_CCB *adw_get_ccb(ADW_SOFTC *, int);
+int adw_queue_ccb(ADW_SOFTC *, ADW_CCB *, int);
 
-int adw_scsi_cmd __P((struct scsi_xfer *));
-int adw_build_req __P((struct scsi_xfer *, ADW_CCB *, int));
-void adw_build_sglist __P((ADW_CCB *, ADW_SCSI_REQ_Q *, ADW_SG_BLOCK *));
-void adw_minphys __P((struct buf *));
-void adw_isr_callback __P((ADW_SOFTC *, ADW_SCSI_REQ_Q *));
-void adw_async_callback __P((ADW_SOFTC *, u_int8_t));
+int adw_scsi_cmd(struct scsi_xfer *);
+int adw_build_req(struct scsi_xfer *, ADW_CCB *, int);
+void adw_build_sglist(ADW_CCB *, ADW_SCSI_REQ_Q *, ADW_SG_BLOCK *);
+void adw_minphys(struct buf *);
+void adw_isr_callback(ADW_SOFTC *, ADW_SCSI_REQ_Q *);
+void adw_async_callback(ADW_SOFTC *, u_int8_t);
 
-void adw_print_info __P((ADW_SOFTC *, int));
+void adw_print_info(ADW_SOFTC *, int);
 
-int adw_poll __P((ADW_SOFTC *, struct scsi_xfer *, int));
-void adw_timeout __P((void *));
-void adw_reset_bus __P((ADW_SOFTC *));
+int adw_poll(ADW_SOFTC *, struct scsi_xfer *, int);
+void adw_timeout(void *);
+void adw_reset_bus(ADW_SOFTC *);
 
 
 /******************************************************************************/
@@ -854,7 +854,7 @@ adw_build_req(xs, ccb, flags)
 			adw_free_ccb(sc, ccb);
 			return (0);
 		}
-		adw_bus_dmamap_sync(dmat, ccb->dmamap_xfer,
+		bus_dmamap_sync(dmat, ccb->dmamap_xfer,
 		    0, ccb->dmamap_xfer->dm_mapsize,
 		    (xs->flags & SCSI_DATA_IN) ?
 		    BUS_DMASYNC_PREREAD : BUS_DMASYNC_PREWRITE);
@@ -1206,7 +1206,7 @@ adw_isr_callback(sc, scsiq)
          */
 	dmat = sc->sc_dmat;
 	if (xs->datalen) {
-		adw_bus_dmamap_sync(dmat, ccb->dmamap_xfer,
+		bus_dmamap_sync(dmat, ccb->dmamap_xfer,
 		    0, ccb->dmamap_xfer->dm_mapsize,
 		    ((xs->flags & SCSI_DATA_IN) ?
 		        BUS_DMASYNC_POSTREAD : BUS_DMASYNC_POSTWRITE));
@@ -1233,32 +1233,32 @@ NO_ERROR:
 		switch (scsiq->host_status) {
 		case QHSTA_NO_ERROR:
 			switch (scsiq->scsi_status) {
-			case SCSI_STATUS_CONDITION_MET:
-			case SCSI_STATUS_INTERMID:
-			case SCSI_STATUS_INTERMID_COND_MET:
+			case SCSI_COND_MET:
+			case SCSI_INTERM:
+			case SCSI_INTERM_COND_MET:
 				/*
 				 * These non-zero status values are 
 				 * not really error conditions.
 				 *
 				 * XXX - would it be too paranoid to 
-				 *       add SCSI_STATUS_GOOD here in
+				 *       add SCSI_OK here in
 				 *       case the docs are wrong re
 				 *       QD_NO_ERROR?
 				 */
 				goto NO_ERROR;
 
-			case SCSI_STATUS_CHECK_CONDITION:
-			case SCSI_STATUS_CMD_TERMINATED:
-			case SCSI_STATUS_ACA_ACTIVE:
+			case SCSI_CHECK:
+			case SCSI_TERMINATED:
+			case SCSI_ACA_ACTIVE:
 				s1 = &ccb->scsi_sense;
 				s2 = &xs->sense;
 				*s2 = *s1;
 				xs->error = XS_SENSE;
 				break;
 
-			case SCSI_STATUS_TARGET_BUSY:
-			case SCSI_STATUS_QUEUE_FULL:
-			case SCSI_STATUS_RSERV_CONFLICT:
+			case SCSI_BUSY:
+			case SCSI_QUEUE_FULL:
+			case SCSI_RESV_CONFLICT:
 				sc->sc_freeze_dev[scsiq->target_id] = 1;
 				xs->error = XS_BUSY;
 				break;

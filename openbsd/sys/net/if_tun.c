@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tun.c,v 1.39 2001/08/21 11:03:45 brian Exp $	*/
+/*	$OpenBSD: if_tun.c,v 1.41 2002/03/14 01:27:09 millert Exp $	*/
 /*	$NetBSD: if_tun.c,v 1.24 1996/05/07 02:40:48 thorpej Exp $	*/
 
 /*
@@ -99,21 +99,21 @@ int ntun;
 
 extern int ifqmaxlen;
 
-void	tunattach __P((int));
-int	tunopen	__P((dev_t, int, int, struct proc *));
-int	tunclose __P((dev_t, int, int, struct proc *));
-int	tun_ioctl __P((struct ifnet *, u_long, caddr_t));
-int	tun_output __P((struct ifnet *, struct mbuf *, struct sockaddr *,
-		        struct rtentry *rt));
-int	tunioctl __P((dev_t, u_long, caddr_t, int, struct proc *));
-int	tunread	__P((dev_t, struct uio *, int));
-int	tunwrite __P((dev_t, struct uio *, int));
-int	tunselect __P((dev_t, int, struct proc *));
+void	tunattach(int);
+int	tunopen(dev_t, int, int, struct proc *);
+int	tunclose(dev_t, int, int, struct proc *);
+int	tun_ioctl(struct ifnet *, u_long, caddr_t);
+int	tun_output(struct ifnet *, struct mbuf *, struct sockaddr *,
+		        struct rtentry *rt);
+int	tunioctl(dev_t, u_long, caddr_t, int, struct proc *);
+int	tunread(dev_t, struct uio *, int);
+int	tunwrite(dev_t, struct uio *, int);
+int	tunselect(dev_t, int, struct proc *);
 
 
-static int tuninit __P((struct tun_softc *));
+static int tuninit(struct tun_softc *);
 #ifdef ALTQ
-static void tunstart __P((struct ifnet *));
+static void tunstart(struct ifnet *);
 #endif
 
 void
@@ -222,8 +222,7 @@ tunclose(dev, flag, mode, p)
 		if (ifp->if_flags & IFF_RUNNING) {
 			/* find internet addresses and delete routes */
 			register struct ifaddr *ifa;
-			for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
-			     ifa = ifa->ifa_list.tqe_next) {
+			TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 #ifdef INET
 				if (ifa->ifa_addr->sa_family == AF_INET) {
 					rtinit(ifa, (int)RTM_DELETE,
@@ -254,8 +253,7 @@ tuninit(tp)
 	ifp->if_flags |= IFF_UP | IFF_RUNNING;
 
 	tp->tun_flags &= ~(TUN_IASET|TUN_DSTADDR|TUN_BRDADDR);
-	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
-	    ifa = ifa->ifa_list.tqe_next) {
+	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 #ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET) {
 			struct sockaddr_in *sin;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: init_main.c,v 1.79 2001/10/11 08:07:12 gluk Exp $	*/
+/*	$OpenBSD: init_main.c,v 1.94 2002/03/14 20:31:31 mickey Exp $	*/
 /*	$NetBSD: init_main.c,v 1.84.4.1 1996/06/02 09:08:06 mrg Exp $	*/
 
 /*
@@ -50,7 +50,6 @@
 #include <sys/kernel.h>
 #include <sys/kthread.h>
 #include <sys/mount.h>
-#include <sys/map.h>
 #include <sys/proc.h>
 #include <sys/resourcevar.h>
 #include <sys/signalvar.h>
@@ -61,6 +60,7 @@
 #include <sys/conf.h>
 #include <sys/buf.h>
 #include <sys/device.h>
+#include <sys/socketvar.h>
 #include <sys/protosw.h>
 #include <sys/reboot.h>
 #include <sys/user.h>
@@ -84,8 +84,6 @@
 
 #include <machine/cpu.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm.h>
 
 #include <net/if.h>
@@ -97,13 +95,13 @@
 #endif
 
 #if defined(NFSSERVER) || defined(NFSCLIENT)
-extern void nfs_init __P((void));
+extern void nfs_init(void);
 #endif
 
-char	copyright[] =
+const char	copyright[] =
 "Copyright (c) 1982, 1986, 1989, 1991, 1993\n"
 "\tThe Regents of the University of California.  All rights reserved.\n"
-"Copyright (c) 1995-2001 OpenBSD. All rights reserved.  http://www.OpenBSD.org\n";
+"Copyright (c) 1995-2002 OpenBSD. All rights reserved.  http://www.OpenBSD.org\n";
 
 /* Components of the first process -- never freed. */
 struct	session session0;
@@ -122,21 +120,20 @@ struct	proc *initproc;
 int	cmask = CMASK;
 extern	struct user *proc0paddr;
 
-void	(*md_diskconf) __P((void)) = NULL;
+void	(*md_diskconf)(void) = NULL;
 struct	vnode *rootvp, *swapdev_vp;
 int	boothowto;
 struct	timeval boottime;
 struct	timeval runtime;
 
 /* XXX return int so gcc -Werror won't complain */
-int	main __P((void *));
-void	check_console __P((struct proc *));
-void	start_init __P((void *));
-void	start_pagedaemon __P((void *));
-void	start_cleaner __P((void *));
-void	start_update __P((void *));
-void	start_reaper __P((void *));
-void    start_crypto __P((void *));
+int	main(void *);
+void	check_console(struct proc *);
+void	start_init(void *);
+void	start_cleaner(void *);
+void	start_update(void *);
+void	start_reaper(void *);
+void    start_crypto(void *);
 
 extern char sigcode[], esigcode[];
 #ifdef SYSCALL_DEBUG
@@ -181,10 +178,10 @@ main(framep)
 	int s;
 	register_t rval[2];
 	extern struct pdevinit pdevinit[];
-	extern void scheduler_start __P((void));
-	extern void disk_init __P((void));
-	extern void endtsleep __P((void *));
-	extern void realitexpire __P((void *));
+	extern void scheduler_start(void);
+	extern void disk_init(void);
+	extern void endtsleep(void *);
+	extern void realitexpire(void *);
 
 	/*
 	 * Initialize the current process pointer (curproc) before
@@ -212,6 +209,9 @@ main(framep)
 	 * allocate mbufs or mbuf clusters during autoconfiguration.
 	 */
 	mbinit();
+
+	/* Initalize sockets. */
+	soinit();
 
 	/*
 	 * Initialize timeouts.
@@ -243,6 +243,7 @@ main(framep)
 	 */
 	LIST_INSERT_HEAD(&allproc, p, p_list);
 	p->p_pgrp = &pgrp0;
+	LIST_INSERT_HEAD(PIDHASH(0), p, p_hash);
 	LIST_INSERT_HEAD(PGRPHASH(0), &pgrp0, pg_hash);
 	LIST_INIT(&pgrp0.pg_members);
 	LIST_INSERT_HEAD(&pgrp0.pg_members, p, p_pglist);
@@ -401,13 +402,11 @@ main(framep)
 	p->p_rtime.tv_sec = p->p_rtime.tv_usec = 0;
 
 	/* Create process 1 (init(8)). */
-	if (fork1(p, SIGCHLD, FORK_FORK, NULL, 0, rval))
+	if (fork1(p, SIGCHLD, FORK_FORK, NULL, 0, start_init, NULL, rval))
 		panic("fork init");
-	initproc = pfind(rval[0]);
-	cpu_set_kpc(initproc, start_init, initproc);
 
 	/* Create process 2, the pageout daemon kernel thread. */
-	if (kthread_create(start_pagedaemon, NULL, NULL, "pagedaemon"))
+	if (kthread_create(uvm_pageout, NULL, NULL, "pagedaemon"))
 		panic("fork pagedaemon");
 
 	/* Create process 3, the reaper daemon kernel thread. */
@@ -422,8 +421,12 @@ main(framep)
 	if (kthread_create(start_update, NULL, NULL, "update"))
 		panic("fork update");
 
+	/* Create process 6, the aiodone daemon kernel thread. */ 
+	if (kthread_create(uvm_aiodone_daemon, NULL, NULL, "aiodoned"))
+		panic("fork aiodoned");
+
 #ifdef CRYPTO
-	/* Create process 6, the crypto kernel thread. */
+	/* Create process 7, the crypto kernel thread. */
 	if (kthread_create(start_crypto, NULL, NULL, "crypto"))
 		panic("crypto thread");
 #endif /* CRYPTO */
@@ -488,6 +491,8 @@ start_init(arg)
 	char flags[4], *flagsp;
 	char **pathp, *path, *ucp, **uap, *arg0, *arg1 = NULL;
 
+	initproc = p;
+
 	/*
 	 * Now in process 1.
 	 */
@@ -502,10 +507,9 @@ start_init(arg)
 	addr = USRSTACK - PAGE_SIZE;
 #endif
 	if (uvm_map(&p->p_vmspace->vm_map, &addr, PAGE_SIZE, 
-	    NULL, UVM_UNKNOWN_OFFSET, 
+	    NULL, UVM_UNKNOWN_OFFSET, 0,
 	    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
-	    UVM_ADV_NORMAL, UVM_FLAG_FIXED|UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW))
-	    != KERN_SUCCESS)
+	    UVM_ADV_NORMAL, UVM_FLAG_FIXED|UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW)))
 		panic("init: couldn't allocate argument space");
 #ifdef MACHINE_STACK_GROWS_UP
 	p->p_vmspace->vm_maxsaddr = (caddr_t)addr + PAGE_SIZE;
@@ -601,14 +605,6 @@ start_init(arg)
 	}
 	printf("init: not found\n");
 	panic("no init");
-}
-
-void
-start_pagedaemon(arg)
-	void *arg;
-{
-	uvm_pageout();
-	/* NOTREACHED */
 }
 
 void

@@ -1,4 +1,4 @@
-/*	$OpenBSD: iop.c,v 1.18 2001/07/27 09:55:08 niklas Exp $	*/
+/*	$OpenBSD: iop.c,v 1.21 2001/11/06 19:53:18 miod Exp $	*/
 /*	$NetBSD: iop.c,v 1.12 2001/03/21 14:27:05 ad Exp $	*/
 
 /*-
@@ -53,7 +53,6 @@
 #include <sys/conf.h>
 #include <sys/kthread.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
@@ -400,22 +399,23 @@ iop_init(struct iop_softc *sc, const char *intrstr)
 	    sc->sc_maxob, letoh32(sc->sc_status.maxoutboundmframes));
 #endif
 
-	lockinit(&sc->sc_conflock, PRIBIO, "iopconf", hz * 30, 0);
+	lockinit(&sc->sc_conflock, PRIBIO, "iopconf", 0, 0);
 
 	startuphook_establish((void (*)(void *))iop_config_interrupts, sc);
 	kthread_create_deferred(iop_create_reconf_thread, sc);
 	return;
 
  bail_out:
-	if (state > 3)
+	if (state > 4)
 		free(im, M_DEVBUF);
-	if (state > 2)
+	if (state > 3)
 		bus_dmamap_unload(sc->sc_dmat, sc->sc_scr_dmamap);
-	if (state > 1)
+	if (state > 2)
 		bus_dmamem_unmap(sc->sc_dmat, sc->sc_scr, PAGE_SIZE);
-	if (state > 0)
+	if (state > 1)
 		bus_dmamem_free(sc->sc_dmat, sc->sc_scr_seg, nsegs);
-	bus_dmamap_destroy(sc->sc_dmat, sc->sc_scr_dmamap);
+	if (state > 0)
+		bus_dmamap_destroy(sc->sc_dmat, sc->sc_scr_dmamap);
 }
 
 /*
@@ -913,15 +913,16 @@ iop_status_get(struct iop_softc *sc, int nosleep)
 	mf.length = sizeof(*st);
 
 	bzero(st, sizeof(*st));
-	bus_dmamap_sync(sc->sc_dmat, sc->sc_scr_dmamap, BUS_DMASYNC_PREREAD);
+	bus_dmamap_sync(sc->sc_dmat, sc->sc_scr_dmamap, 0, sizeof(*st),
+	    BUS_DMASYNC_PREREAD);
 
 	if ((rv = iop_post(sc, (u_int32_t *)&mf)))
 		return (rv);
 
 	/* XXX */
 	POLL(2500,
-	    (bus_dmamap_sync(sc->sc_dmat, sc->sc_scr_dmamap,
-	    BUS_DMASYNC_POSTREAD), st->syncbyte == 0xff));
+	    (bus_dmamap_sync(sc->sc_dmat, sc->sc_scr_dmamap, 0,
+	        sizeof(*st), BUS_DMASYNC_POSTREAD), st->syncbyte == 0xff));
 
 	if (st->syncbyte != 0xff)
 		return (EIO);
@@ -956,7 +957,8 @@ iop_ofifo_init(struct iop_softc *sc)
 	mb[0] += 2 << 16;
 
 	*sw = 0;
-	bus_dmamap_sync(sc->sc_dmat, sc->sc_scr_dmamap, BUS_DMASYNC_PREREAD);
+	bus_dmamap_sync(sc->sc_dmat, sc->sc_scr_dmamap, 0, sizeof(*sw),
+	    BUS_DMASYNC_PREREAD);
 
 	/*
 	 * The I2O spec says that there are two SGLs: one for the status
@@ -969,7 +971,7 @@ iop_ofifo_init(struct iop_softc *sc)
 
 	/* XXX */
 	POLL(5000,
-	    (bus_dmamap_sync(sc->sc_dmat, sc->sc_scr_dmamap,
+	    (bus_dmamap_sync(sc->sc_dmat, sc->sc_scr_dmamap, 0, sizeof(*sw),
 	    BUS_DMASYNC_POSTREAD),
 	    *sw == htole32(I2O_EXEC_OUTBOUND_INIT_COMPLETE)));
 	if (*sw != htole32(I2O_EXEC_OUTBOUND_INIT_COMPLETE)) {
@@ -1366,14 +1368,15 @@ iop_reset(struct iop_softc *sc)
 	mf.statushigh = sizeof pa > sizeof mf.statuslow ? pa >> 32 : 0;
 
 	*sw = htole32(0);
-	bus_dmamap_sync(sc->sc_dmat, sc->sc_scr_dmamap, BUS_DMASYNC_PREREAD);
+	bus_dmamap_sync(sc->sc_dmat, sc->sc_scr_dmamap, 0, sizeof(*sw),
+	    BUS_DMASYNC_PREREAD);
 
 	if ((rv = iop_post(sc, (u_int32_t *)&mf)))
 		return (rv);
 
 	/* XXX */
 	POLL(2500,
-	    (bus_dmamap_sync(sc->sc_dmat, sc->sc_scr_dmamap,
+	    (bus_dmamap_sync(sc->sc_dmat, sc->sc_scr_dmamap, 0, sizeof(*sw),
 	    BUS_DMASYNC_POSTREAD), *sw != htole32(0)));
 	if (*sw != htole32(I2O_RESET_IN_PROGRESS)) {
 		printf("%s: reset rejected, status 0x%x\n",
@@ -1461,10 +1464,11 @@ iop_handle_reply(struct iop_softc *sc, u_int32_t rmfa)
 	rb = (struct i2o_reply *)(sc->sc_rep + off);
 
 	/* Perform reply queue DMA synchronisation.  XXX This is rubbish. */
-	bus_dmamap_sync(sc->sc_dmat, sc->sc_rep_dmamap, BUS_DMASYNC_POSTREAD);
+	bus_dmamap_sync(sc->sc_dmat, sc->sc_rep_dmamap, off,
+	    sc->sc_rep_dmamap->dm_mapsize, BUS_DMASYNC_POSTREAD);
 	if (--sc->sc_curib != 0)
-		bus_dmamap_sync(sc->sc_dmat, sc->sc_rep_dmamap,
-		    BUS_DMASYNC_PREREAD);
+		bus_dmamap_sync(sc->sc_dmat, sc->sc_rep_dmamap, 0,
+		    sc->sc_rep_size, BUS_DMASYNC_PREREAD);
 
 #ifdef I2ODEBUG
 	if ((letoh32(rb->msgflags) & I2O_MSGFLAGS_64BIT) != 0)
@@ -1760,7 +1764,7 @@ iop_msg_map(struct iop_softc *sc, struct iop_msg *im, u_int32_t *mb,
 	/* Fix up the transfer record, and sync the map. */
 	ix->ix_flags = (out ? IX_OUT : IX_IN);
 	ix->ix_size = xfersize;
-	bus_dmamap_sync(sc->sc_dmat, ix->ix_map,
+	bus_dmamap_sync(sc->sc_dmat, ix->ix_map, 0, xfersize,
 	    out ? BUS_DMASYNC_POSTWRITE : BUS_DMASYNC_POSTREAD);
 
 	/*
@@ -1865,7 +1869,8 @@ iop_msg_map_bio(struct iop_softc *sc, struct iop_msg *im, u_int32_t *mb,
 	/* Fix up the transfer record, and sync the map. */
 	ix->ix_flags = (out ? IX_OUT : IX_IN);
 	ix->ix_size = xfersize;
-	bus_dmamap_sync(sc->sc_dmat, ix->ix_map,
+	bus_dmamap_sync(sc->sc_dmat, ix->ix_map, 0,
+	    ix->ix_map->dm_mapsize,
 	    out ? BUS_DMASYNC_POSTWRITE : BUS_DMASYNC_POSTREAD);
 
 	/*
@@ -1891,7 +1896,7 @@ iop_msg_unmap(struct iop_softc *sc, struct iop_msg *im)
 #endif
 
 	for (ix = im->im_xfer, i = 0;;) {
-		bus_dmamap_sync(sc->sc_dmat, ix->ix_map, 
+		bus_dmamap_sync(sc->sc_dmat, ix->ix_map, 0, ix->ix_size,
 		    ix->ix_flags & IX_OUT ? BUS_DMASYNC_POSTWRITE :
 		    BUS_DMASYNC_POSTREAD);
 		bus_dmamap_unload(sc->sc_dmat, ix->ix_map);
@@ -1947,8 +1952,8 @@ iop_post(struct iop_softc *sc, u_int32_t *mb)
 
 	/* Perform reply buffer DMA synchronisation.  XXX This is rubbish. */
 	if (sc->sc_curib++ == 0)
-		bus_dmamap_sync(sc->sc_dmat, sc->sc_rep_dmamap,
-		    BUS_DMASYNC_PREREAD);
+		bus_dmamap_sync(sc->sc_dmat, sc->sc_rep_dmamap, 0,
+		    sc->sc_rep_size, BUS_DMASYNC_PREREAD);
 
 	/* Copy out the message frame. */
 	bus_space_write_region_4(sc->sc_iot, sc->sc_ioh, mfa, mb,

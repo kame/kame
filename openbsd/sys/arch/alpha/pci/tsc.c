@@ -1,4 +1,4 @@
-/* $OpenBSD: tsc.c,v 1.4 2001/06/26 21:13:44 art Exp $ */
+/* $OpenBSD: tsc.c,v 1.7 2002/03/14 01:26:27 millert Exp $ */
 /* $NetBSD: tsc.c,v 1.3 2000/06/25 19:17:40 thorpej Exp $ */
 
 /*-
@@ -53,8 +53,8 @@
 
 #define tsc() { Generate ctags(1) key. }
 
-int	tscmatch __P((struct device *, void *, void *));
-void	tscattach __P((struct device *, struct device *, void *));
+int	tscmatch(struct device *, void *, void *);
+void	tscattach(struct device *, struct device *, void *);
 
 struct cfattach tsc_ca = {
 	sizeof(struct tsc_softc), tscmatch, tscattach,
@@ -66,10 +66,10 @@ struct cfdriver tsc_cd = {
 
 struct tsp_config tsp_configuration[2];
 
-static int tscprint __P((void *, const char *pnp));
+static int tscprint(void *, const char *pnp);
 
-int	tspmatch __P((struct device *, void *, void *));
-void	tspattach __P((struct device *, struct device *, void *));
+int	tspmatch(struct device *, void *, void *);
+void	tspattach(struct device *, struct device *, void *);
 
 struct cfattach tsp_ca = {
 	sizeof(struct tsp_softc), tspmatch, tspattach,
@@ -80,11 +80,11 @@ struct cfdriver tsp_cd = {
 };
 
 
-static int tspprint __P((void *, const char *pnp));
+static int tspprint(void *, const char *pnp);
 
 #if	0
-static int tsp_bus_get_window __P((int, int,
-	struct alpha_bus_space_translation *));
+static int tsp_bus_get_window(int, int,
+	struct alpha_bus_space_translation *);
 #endif
 
 /* There can be only one */
@@ -194,8 +194,8 @@ tspattach(parent, self, aux)
 	pci_6600_pickintr(pcp);
 
 	pba.pba_busname = "pci";
-	pba.pba_iot = pcp->pc_iot;
-	pba.pba_memt = pcp->pc_memt;
+	pba.pba_iot = &pcp->pc_iot;
+	pba.pba_memt = &pcp->pc_memt;
 	pba.pba_dmat =
 	    alphabus_dma_get_tag(&pcp->pc_dmat_direct, ALPHA_BUS_PCI);
 	pba.pba_pc = &pcp->pc_pc;
@@ -220,8 +220,8 @@ tsp_init(mallocsafe, n)
 	pcp->pc_iobase = TS_Pn(n, 0);
 	pcp->pc_csr = S_PAGE(TS_Pn(n, P_CSRBASE));
 	if (!pcp->pc_initted) {
-		pcp->pc_iot = tsp_bus_io_init(pcp);
-		pcp->pc_memt = tsp_bus_mem_init(pcp);
+		tsp_bus_io_init(&pcp->pc_iot, pcp);
+		tsp_bus_mem_init(&pcp->pc_memt, pcp);
 #if 0
 		alpha_bus_window_count[ALPHA_BUS_TYPE_PCI_IO] = 1;
 		alpha_bus_window_count[ALPHA_BUS_TYPE_PCI_MEM] = 1;
@@ -234,6 +234,8 @@ tsp_init(mallocsafe, n)
 	alpha_pci_chipset = &pcp->pc_pc;
 	alpha_pci_chipset->pc_name = "tsunami";
 	alpha_pci_chipset->pc_mem = TS_P0(0);
+	alpha_pci_chipset->pc_ports = P_PCI_IO;
+	alpha_pci_chipset->pc_hae_mask = 0;
 	alpha_pci_chipset->pc_dense = TS_P0(0);
 	alpha_pci_chipset->pc_bwx = 1;
 	pcp->pc_initted = 1;

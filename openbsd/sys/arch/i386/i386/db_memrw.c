@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_memrw.c,v 1.3 2001/05/05 23:25:35 art Exp $	*/
+/*	$OpenBSD: db_memrw.c,v 1.5 2001/11/28 15:02:58 art Exp $	*/
 /*	$NetBSD: db_memrw.c,v 1.6 1999/04/12 20:38:19 pk Exp $	*/
 
 /* 
@@ -38,7 +38,7 @@
 #include <sys/proc.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/db_machdep.h>
 
@@ -91,7 +91,7 @@ db_write_bytes(addr, size, data)
 			oldmap1 = *ptep1;
 			*(int *)ptep1 |= /* INTEL_PTE_WRITE */ PG_RW;
 		}
-		pmap_update();
+		tlbflush();
 	}
 
 	dst = (char *)addr;
@@ -103,6 +103,6 @@ db_write_bytes(addr, size, data)
 		*ptep0 = oldmap0;
 		if (ptep1)
 			*ptep1 = oldmap1;
-		pmap_update();
+		tlbflush();
 	}
 }

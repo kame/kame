@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ve.c,v 1.10 2001/09/11 20:05:24 miod Exp $ */
+/*	$OpenBSD: if_ve.c,v 1.17 2002/03/14 01:26:39 millert Exp $ */
 /*-
  * Copyright (c) 1999 Steve Murphree, Jr.
  * Copyright (c) 1982, 1992, 1993
@@ -66,12 +66,11 @@
 #include <net/bpfdesc.h>
 #endif
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/cpu.h>
-#include <machine/bugio.h>
-#include <machine/mmu.h>	/* DMA_CACHE_SYNC, etc... */
+#include <machine/cmmu.h>	/* DMA_CACHE_SYNC, etc... */
 
 #include <mvme88k/dev/if_vereg.h>
 #include <mvme88k/dev/if_vevar.h>
@@ -82,18 +81,18 @@
 
 
 #ifdef LEDEBUG
-void ve_recv_print __P((struct vam7990_softc *, int));
-void ve_xmit_print __P((struct vam7990_softc *, int));
+void ve_recv_print(struct vam7990_softc *, int);
+void ve_xmit_print(struct vam7990_softc *, int);
 #endif
 
-void ve_rint __P((struct vam7990_softc *));
-void ve_tint __P((struct vam7990_softc *));
+void ve_rint(struct vam7990_softc *);
+void ve_tint(struct vam7990_softc *);
 
-int ve_put __P((struct vam7990_softc *, int, struct mbuf *));
-struct mbuf *ve_get __P((struct vam7990_softc *, int, int));
-void ve_read __P((struct vam7990_softc *, int, int)); 
+int ve_put(struct vam7990_softc *, int, struct mbuf *);
+struct mbuf *ve_get(struct vam7990_softc *, int, int);
+void ve_read(struct vam7990_softc *, int, int); 
 
-void ve_shutdown __P((void *));
+void ve_shutdown(void *);
 
 #define	ifp	(&sc->sc_arpcom.ac_if)
 #ifndef	ETHER_CMP
@@ -135,12 +134,12 @@ struct cfattach ve_ca = {
 	sizeof(struct ve_softc), vematch, veattach
 };
 
-void vewrcsr __P((struct vam7990_softc *, u_int16_t, u_int16_t));
-u_int16_t verdcsr __P((struct vam7990_softc *, u_int16_t));
-void nvram_cmd __P((struct vam7990_softc *, u_char, u_short));
-u_int16_t nvram_read __P((struct vam7990_softc *, u_char));
-void vereset __P((struct vam7990_softc *));
-void ve_ackint __P((struct vam7990_softc *));
+void vewrcsr(struct vam7990_softc *, u_int16_t, u_int16_t);
+u_int16_t verdcsr(struct vam7990_softc *, u_int16_t);
+void nvram_cmd(struct vam7990_softc *, u_char, u_short);
+u_int16_t nvram_read(struct vam7990_softc *, u_char);
+void vereset(struct vam7990_softc *);
+void ve_ackint(struct vam7990_softc *);
 
 /* send command to the nvram controller */
 void
@@ -247,11 +246,9 @@ vematch(parent, vcf, args)
 {
 
 	struct confargs *ca = args;
-	if (!badvaddr((unsigned)ca->ca_vaddr, 1)) {
-		return (1);
-	} else {
+	if (badvaddr((unsigned)ca->ca_vaddr, 1))
 		return (0);
-	}           
+		return (1);
 }
 
 /*

@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm_loan.c,v 1.9 2001/09/11 20:05:26 miod Exp $	*/
-/*	$NetBSD: uvm_loan.c,v 1.20 2000/04/10 00:32:46 thorpej Exp $	*/
+/*	$OpenBSD: uvm_loan.c,v 1.19 2002/03/14 01:27:18 millert Exp $	*/
+/*	$NetBSD: uvm_loan.c,v 1.22 2000/06/27 17:29:25 mrg Exp $	*/
 
 /*
  *
@@ -45,9 +45,6 @@
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/mman.h>
-
-#include <vm/vm.h>
-#include <vm/vm_page.h>
 
 #include <uvm/uvm.h>
 
@@ -108,12 +105,12 @@
  * local prototypes
  */
 
-static int	uvm_loananon __P((struct uvm_faultinfo *, void ***, 
-				int, struct vm_anon *));
-static int	uvm_loanentry __P((struct uvm_faultinfo *, void ***, int));
-static int	uvm_loanuobj __P((struct uvm_faultinfo *, void ***, 
-				int, vaddr_t));
-static int	uvm_loanzero __P((struct uvm_faultinfo *, void ***, int));
+static int	uvm_loananon(struct uvm_faultinfo *, void ***, 
+				int, struct vm_anon *);
+static int	uvm_loanentry(struct uvm_faultinfo *, void ***, int);
+static int	uvm_loanuobj(struct uvm_faultinfo *, void ***, 
+				int, vaddr_t);
+static int	uvm_loanzero(struct uvm_faultinfo *, void ***, int);
 
 /*
  * inlines
@@ -651,11 +648,11 @@ uvm_loanzero(ufi, output, flags)
 	/* loaning to an anon */
 	while ((anon = uvm_analloc()) == NULL || 
 	    (pg = uvm_pagealloc(NULL, 0, anon, UVM_PGA_ZERO)) == NULL) {
-		
+
 		/* unlock everything */
 		uvmfault_unlockall(ufi, ufi->entry->aref.ar_amap,
 		       ufi->entry->object.uvm_obj, NULL);
-		
+
 		/* out of swap causes us to fail */
 		if (anon == NULL)
 			return(-1);

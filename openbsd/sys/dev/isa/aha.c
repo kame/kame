@@ -1,4 +1,4 @@
-/*	$OpenBSD: aha.c,v 1.39 2001/06/27 04:45:58 art Exp $	*/
+/*	$OpenBSD: aha.c,v 1.44 2002/03/14 03:16:05 millert Exp $	*/
 /*	$NetBSD: aha.c,v 1.11 1996/05/12 23:51:23 mycroft Exp $	*/
 
 #undef AHADIAG
@@ -60,6 +60,9 @@
 #include <sys/proc.h>
 #include <sys/user.h>
 #include <sys/timeout.h>
+
+#include <uvm/uvm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/intr.h>
 #include <machine/pio.h>
@@ -136,25 +139,25 @@ struct aha_softc {
 int	aha_debug = 1;
 #endif /* AHADEBUG */
 
-int aha_cmd __P((int, struct aha_softc *, int, u_char *, int, u_char *));
-integrate void aha_finish_ccbs __P((struct aha_softc *));
-int ahaintr __P((void *));
-integrate void aha_reset_ccb __P((struct aha_softc *, struct aha_ccb *));
-void aha_free_ccb __P((struct aha_softc *, struct aha_ccb *));
-integrate void aha_init_ccb __P((struct aha_softc *, struct aha_ccb *));
-struct aha_ccb *aha_get_ccb __P((struct aha_softc *, int));
-struct aha_ccb *aha_ccb_phys_kv __P((struct aha_softc *, u_long));
-void aha_queue_ccb __P((struct aha_softc *, struct aha_ccb *));
-void aha_collect_mbo __P((struct aha_softc *));
-void aha_start_ccbs __P((struct aha_softc *));
-void aha_done __P((struct aha_softc *, struct aha_ccb *));
-int aha_find __P((struct isa_attach_args *, struct aha_softc *, int));
-void aha_init __P((struct aha_softc *));
-void aha_inquire_setup_information __P((struct aha_softc *));
-void ahaminphys __P((struct buf *));
-int aha_scsi_cmd __P((struct scsi_xfer *));
-int aha_poll __P((struct aha_softc *, struct scsi_xfer *, int));
-void aha_timeout __P((void *arg));
+int aha_cmd(int, struct aha_softc *, int, u_char *, int, u_char *);
+integrate void aha_finish_ccbs(struct aha_softc *);
+int ahaintr(void *);
+integrate void aha_reset_ccb(struct aha_softc *, struct aha_ccb *);
+void aha_free_ccb(struct aha_softc *, struct aha_ccb *);
+integrate void aha_init_ccb(struct aha_softc *, struct aha_ccb *);
+struct aha_ccb *aha_get_ccb(struct aha_softc *, int);
+struct aha_ccb *aha_ccb_phys_kv(struct aha_softc *, u_long);
+void aha_queue_ccb(struct aha_softc *, struct aha_ccb *);
+void aha_collect_mbo(struct aha_softc *);
+void aha_start_ccbs(struct aha_softc *);
+void aha_done(struct aha_softc *, struct aha_ccb *);
+int aha_find(struct isa_attach_args *, struct aha_softc *, int);
+void aha_init(struct aha_softc *);
+void aha_inquire_setup_information(struct aha_softc *);
+void ahaminphys(struct buf *);
+int aha_scsi_cmd(struct scsi_xfer *);
+int aha_poll(struct aha_softc *, struct scsi_xfer *, int);
+void aha_timeout(void *arg);
 
 struct scsi_adapter aha_switch = {
 	aha_scsi_cmd,
@@ -171,9 +174,9 @@ struct scsi_device aha_dev = {
 	NULL,			/* Use default 'done' routine */
 };
 
-int	aha_isapnp_probe __P((struct device *, void *, void *));
-int	ahaprobe __P((struct device *, void *, void *));
-void	ahaattach __P((struct device *, struct device *, void *));
+int	aha_isapnp_probe(struct device *, void *, void *);
+int	ahaprobe(struct device *, void *, void *);
+void	ahaattach(struct device *, struct device *, void *);
 
 struct cfattach aha_isapnp_ca = {
 	sizeof(struct aha_softc), aha_isapnp_probe, ahaattach
@@ -190,7 +193,7 @@ struct cfdriver aha_cd = {
 #define AHA_RESET_TIMEOUT	2000	/* time to wait for reset (mSec) */
 #define	AHA_ABORT_TIMEOUT	2000	/* time to wait for abort (mSec) */
 
-#include "bt.h"
+#include "bha.h"
 
 /*
  * aha_cmd(iobase, sc, icnt, ibuf, ocnt, obuf)
@@ -345,7 +348,7 @@ ahaprobe(parent, match, aux)
 	void *match, *aux;
 {
 	register struct isa_attach_args *ia = aux;
-#if NBT > 0
+#if NBHA > 0
 	extern int btports[], nbtports;
 	int i;
 
@@ -448,7 +451,7 @@ AGAIN:
 
 #ifdef AHADEBUG
 		if (aha_debug) {
-			u_char *cp = (u_char*)&ccb->scsi_cmd;
+			u_char *cp = (u_char *)&ccb->scsi_cmd;
 			printf("op=%x %x %x %x %x %x\n",
 			    cp[0], cp[1], cp[2], cp[3], cp[4], cp[5]);
 			printf("stat %x for mbi addr = 0x%08x, ",
@@ -1011,6 +1014,10 @@ aha_init(sc)
 	struct aha_devices devices;
 	struct aha_setup setup;
 	struct aha_mailbox mailbox;
+	struct pglist pglist;
+	struct vm_page *pg;
+	vaddr_t va;
+	vsize_t size;
 	int i;
 
 	/*
@@ -1082,11 +1089,26 @@ aha_init(sc)
 	 * Set up initial mail box for round-robin operation.
 	 */
 
-	/* XXX KLUDGE!  Should use bus_dmamem_alloc when busified.  */
-	wmbx = (struct aha_mbx *)uvm_pagealloc_contig(sizeof(struct aha_mbx),
-	    0, 0xffffff, PAGE_SIZE);
-	if (wmbx == NULL)
+	/*
+	 * XXX - this vm juggling is so wrong. use bus_dma instead!
+	 */
+	size = round_page(sizeof(struct aha_mbx));
+	if (uvm_pglistalloc(size, 0, 0xffffff, PAGE_SIZE, 0, &pglist, 1, 0) ||
+	    uvm_map(kernel_map, &va, size, NULL, UVM_UNKNOWN_OFFSET, 0,
+		UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_NONE,
+			UVM_ADV_RANDOM, 0)))
 		panic("aha_init: could not allocate mailbox");
+
+	wmbx = (struct aha_mbx *)va;
+	for (pg = TAILQ_FIRST(&pglist); pg != NULL;pg = TAILQ_NEXT(pg, pageq)) {
+		pmap_kenter_pa(va, VM_PAGE_TO_PHYS(pg),
+			VM_PROT_READ|VM_PROT_WRITE);
+		va += PAGE_SIZE;
+	}
+	pmap_update(pmap_kernel());
+	/*
+	 * XXXEND
+	 */
 
 	for (i = 0; i < AHA_MBX_SIZE; i++) {
 		wmbx->mbo[i].cmd = AHA_MBO_FREE;

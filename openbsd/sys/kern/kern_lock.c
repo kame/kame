@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_lock.c,v 1.9 1999/07/09 15:17:59 art Exp $	*/
+/*	$OpenBSD: kern_lock.c,v 1.13 2002/03/17 18:26:51 art Exp $	*/
 
 /* 
  * Copyright (c) 1995
@@ -46,8 +46,8 @@
 
 #include <machine/cpu.h>
 
-void record_stacktrace __P((int *, int));
-void playback_stacktrace __P((int *, int));
+void record_stacktrace(int *, int);
+void playback_stacktrace(int *, int);
 
 /*
  * Locking primitives implementation.
@@ -205,6 +205,13 @@ lockmgr(lkp, flags, interlkp, p)
 		if ((flags & LK_REENABLE) == 0)
 			lkp->lk_flags |= LK_DRAINED;
 	}
+
+	/*
+	 * Check if the caller is asking us to be schizophrenic.
+	 */
+	if ((lkp->lk_flags & (LK_CANRECURSE|LK_RECURSEFAIL)) ==
+	    (LK_CANRECURSE|LK_RECURSEFAIL))
+		panic("lockmgr: make up your mind");
 #endif /* DIAGNOSTIC */
 
 	switch (flags & LK_TYPE_MASK) {
@@ -318,8 +325,13 @@ lockmgr(lkp, flags, interlkp, p)
 			/*
 			 *	Recursive lock.
 			 */
-			if ((extflags & LK_CANRECURSE) == 0)
+			if ((extflags & LK_CANRECURSE) == 0) {
+				if (extflags & LK_RECURSEFAIL) {
+					error = EDEADLK;
+					break;
+				}
 				panic("lockmgr: locking against myself");
+			}
 			lkp->lk_exclusivecount++;
 			COUNT(p, 1);
 			break;
@@ -521,6 +533,7 @@ _simple_unlock(lkp, id, l)
 void
 _simple_lock_assert(lkp, state, id, l)
 	__volatile struct simplelock *lkp;
+	int state;
 	const char *id;
 	int l;
 {

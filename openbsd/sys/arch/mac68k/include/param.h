@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.13 2001/05/13 02:37:29 millert Exp $	*/
+/*	$OpenBSD: param.h,v 1.18 2002/03/14 01:26:35 millert Exp $	*/
 /*	$NetBSD: param.h,v 1.28 1997/03/01 06:57:45 scottr Exp $	*/
 
 /*
@@ -98,10 +98,6 @@
 
 #define	KERNBASE	0x00000000	/* start of kernel virtual */
 
-#define	SEGSHIFT	22		/* LOG2(NBSEG) */
-#define NBSEG		(1 << SEGSHIFT)	/* bytes/segment */
-#define	SEGOFSET	(NBSEG-1)	/* byte offset into segment */
-
 #define	UPAGES		3  		/* pages of u-area */
 
 #include <m68k/param.h>
@@ -109,16 +105,16 @@
 #define	NPTEPG		(NBPG/(sizeof (pt_entry_t)))
 
 /*
- * Size of kernel malloc arena in logical pages
- */ 
-#ifndef NKMEMCLUSTERS
-#define	NKMEMCLUSTERS	(2048 * 1024 / PAGE_SIZE)
-#endif
+ * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
+ * logical pages.
+ */
+#define	NKMEMPAGES_MIN_DEFAULT	((3 * 1024 * 1024) >> PAGE_SHIFT)
+#define	NKMEMPAGES_MAX_DEFAULT	((3 * 1024 * 1024) >> PAGE_SHIFT)
 
 #define MSGBUFSIZE	4096
 
 #if defined(_KERNEL) && !defined(_LOCORE)
-void	delay		__P((unsigned));
+void	delay(unsigned);
 #define DELAY(ms)	delay(ms)
 #endif	/* _KERNEL && !_LOCORE */
 

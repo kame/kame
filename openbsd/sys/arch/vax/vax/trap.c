@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.16 2001/09/19 20:50:57 mickey Exp $     */
+/*	$OpenBSD: trap.c,v 1.22 2002/03/14 03:16:02 millert Exp $     */
 /*	$NetBSD: trap.c,v 1.47 1999/08/21 19:26:20 matt Exp $     */
 /*
  * Copyright (c) 1994 Ludd, University of Lule}, Sweden.
@@ -40,9 +40,6 @@
 #include <sys/signalvar.h>
 #include <sys/exec.h>
 
-#include <vm/vm.h>
-#include <vm/vm_page.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <machine/mtpr.h>
@@ -64,8 +61,10 @@
 volatile int startsysc = 0, faultdebug = 0;
 #endif
 
-void	arithflt __P((struct trapframe *));
-void	syscall __P((struct trapframe *));
+static __inline void userret(struct proc *, struct trapframe *, u_quad_t);
+
+void	arithflt(struct trapframe *);
+void	syscall(struct trapframe *);
 
 char *traptypes[]={
 	"reserved addressing",
@@ -99,6 +98,45 @@ int no_traps = 18;
 		return;						\
 	}
 
+/*
+ * userret:
+ *
+ *	Common code used by various exception handlers to
+ *	return to usermode.
+ */
+static __inline void
+userret(p, frame, oticks)
+	struct proc *p;
+	struct trapframe *frame;
+	u_quad_t oticks;
+{
+	int sig;
+
+	/* Take pending signals. */
+	while ((sig = CURSIG(p)) !=0)
+		postsig(sig);
+	p->p_priority = p->p_usrpri;
+	if (want_resched) {
+		/*
+		 * We're being preempted.
+		 */
+		preempt(NULL);
+		while ((sig = CURSIG(p)) != 0)
+			postsig(sig);
+	}
+
+	/*
+	 * If profiling, charge system time to the trapped pc.
+	 */
+	if (p->p_flag & P_PROFIL) { 
+		extern int psratio;
+
+		addupc_task(p, frame->pc,
+		    (int)(p->p_sticks - oticks) * psratio);
+	}
+	curpriority = p->p_priority;
+}
+
 void
 arithflt(frame)
 	struct trapframe *frame;
@@ -107,7 +145,7 @@ arithflt(frame)
 	u_int	rv, addr, umode;
 	struct	proc *p = curproc;
 	u_quad_t oticks = 0;
-	vm_map_t map;
+	struct vm_map *map;
 	vm_prot_t ftype;
 	int typ;
 	union sigval sv;
@@ -193,13 +231,13 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 			ftype = VM_PROT_READ;
 
 		rv = uvm_fault(map, addr, 0, ftype);
-		if (rv != KERN_SUCCESS) {
+		if (rv) {
 			if (umode == 0) {
 				FAULTCHK;
 				panic("Segv in kernel mode: pc %x addr %x",
 				    (u_int)frame->pc, (u_int)frame->code);
 			}
-			if (rv == KERN_RESOURCE_SHORTAGE) {
+			if (rv == ENOMEM) {
 				printf("UVM: pid %d (%s), uid %d killed: "
 				       "out of swap\n",
 				       p->p_pid, p->p_comm,
@@ -282,22 +320,7 @@ if(faultdebug)printf("trap accflt type %lx, code %lx, pc %lx, psl %lx\n",
 	if (umode == 0)
 		return;
 
-	while ((sig = CURSIG(p)) !=0)
-		postsig(sig);
-	p->p_priority = p->p_usrpri;
-	if (want_resched) {
-		/*
-		 * We're being preempted.
-		 */
-		preempt(NULL);
-		while ((sig = CURSIG(p)) != 0)
-			postsig(sig);
-	}
-	if (p->p_flag & P_PROFIL) { 
-		extern int psratio;
-		addupc_task(p, frame->pc, (int)(p->p_sticks-oticks) * psratio);
-	}
-	curpriority = p->p_priority;
+	userret(p, frame, oticks);
 }
 
 void
@@ -326,7 +349,7 @@ syscall(frame)
 {
 	struct sysent *callp;
 	u_quad_t oticks;
-	int nsys, sig;
+	int nsys;
 	int err, rval[2], args[8];
 	struct trapframe *exptr;
 	struct proc *p = curproc;
@@ -359,7 +382,7 @@ if(startsysc)printf("trap syscall %s pc %lx, psl %lx, sp %lx, pid %d, frame %p\n
 	rval[0] = 0;
 	rval[1] = frame->r1;
 	if(callp->sy_narg) {
-		err = copyin((char*)frame->ap + 4, args, callp->sy_argsize);
+		err = copyin((char *)frame->ap + 4, args, callp->sy_argsize);
 		if (err) {
 #ifdef KTRACE
 			if (KTRPOINT(p, KTR_SYSCALL))
@@ -425,24 +448,25 @@ bad:
 		exptr->psl |= PSL_C;
 		break;
 	}
-	p = curproc;
-	while ((sig = CURSIG(p)) !=0)
-		postsig(sig);
-	p->p_priority = p->p_usrpri;
-	if (want_resched) {
-		/*
-		 * We're being preempted.
-		 */
-		preempt(NULL);
-		while ((sig = CURSIG(p)) != 0)
-			postsig(sig);
-	}
-	if (p->p_flag & P_PROFIL) { 
-		extern int psratio;
-		addupc_task(p, frame->pc, (int)(p->p_sticks-oticks) * psratio);
-	}
+
+	userret(p, frame, oticks);
+
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
 		ktrsysret(p, frame->code, err, rval[0]);
+#endif
+}
+
+void
+child_return(arg)
+	void *arg;
+{
+	struct proc *p = arg;
+
+	userret(p, p->p_addr->u_pcb.framep, 0);
+
+#ifdef KTRACE
+	if (KTRPOINT(p, KTR_SYSRET))
+		ktrsysret(p, SYS_fork, 0, 0);
 #endif
 }

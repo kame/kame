@@ -1,4 +1,4 @@
-/* $OpenBSD: ip_spd.c,v 1.40 2001/09/24 16:22:08 angelos Exp $ */
+/* $OpenBSD: ip_spd.c,v 1.44 2002/02/18 04:46:29 angelos Exp $ */
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
  *
@@ -476,6 +476,7 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 			    tdbp, inp, ipo);
 
   nomatchin: /* Nothing needed here, falling through */
+  	;
 		}
 
 		/* Check whether cached entry applies. */
@@ -614,8 +615,7 @@ ipsec_add_policy(struct sockaddr_encap *dst, struct sockaddr_encap *mask,
 	if (ipsec_policy_pool_initialized == 0) {
 		ipsec_policy_pool_initialized = 1;
 		pool_init(&ipsec_policy_pool, sizeof(struct ipsec_policy),
-		    0, 0, PR_FREEHEADER, "ipsec policy", 0, NULL, NULL,
-		    M_IPSEC_POLICY);
+		    0, 0, 0, "ipsec policy", NULL);
 	}
 
 	ipon = pool_get(&ipsec_policy_pool, 0);
@@ -707,8 +707,7 @@ ipsp_acquire_sa(struct ipsec_policy *ipo, union sockaddr_union *gw,
 	if (ipsec_acquire_pool_initialized == 0) {
 		ipsec_acquire_pool_initialized = 1;
 		pool_init(&ipsec_acquire_pool, sizeof(struct ipsec_acquire),
-		    0, 0, PR_FREEHEADER, "ipsec acquire", 0, NULL,
-		    NULL, M_IPSEC_POLICY);		
+		    0, 0, 0, "ipsec acquire", NULL);
 	}
 
 	ipa = pool_get(&ipsec_acquire_pool, 0);
@@ -848,7 +847,7 @@ ipsec_get_acquire(u_int32_t seq)
 {
 	struct ipsec_acquire *ipa;
 
-	TAILQ_FOREACH (ipa, &ipsec_acquire_head, ipa_ipo_next)
+	TAILQ_FOREACH (ipa, &ipsec_acquire_head, ipa_next)
 		if (ipa->ipa_seq == seq)
 			return ipa;
 

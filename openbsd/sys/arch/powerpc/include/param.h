@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.18 2001/09/01 15:49:05 drahn Exp $	*/
+/*	$OpenBSD: param.h,v 1.21 2002/03/21 02:08:40 drahn Exp $	*/
 /*	$NetBSD: param.h,v 1.1 1996/09/30 16:34:28 ws Exp $	*/
 
 /*-
@@ -53,12 +53,12 @@
 #define	ALIGN(p)	(((u_int)(p) + ALIGNBYTES) & ~ALIGNBYTES)
 #define ALIGNED_POINTER(p,t)	((((u_long)(p)) & (sizeof(t)-1)) == 0)
 
-#define	PGSHIFT		12
-#define	NBPG		4096
-#define	PGOFSET		(NBPG - 1)
-#define PAGE_SIZE	NBPG
-#define PAGE_MASK	PGOFSET
-#define PAGE_SHIFT	PGSHIFT
+#define	PAGE_SHIFT	12
+#define	PAGE_SIZE	4096
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+#define	PGSHIFT		PAGE_SHIFT
+#define	NBPG		PAGE_SIZE
+#define	PGOFSET		PAGE_MASK
 
 #define	DEV_BSHIFT	9		/* log2(DEV_BSIZE) */
 #define	DEV_BSIZE	(1 << DEV_BSHIFT)
@@ -122,9 +122,9 @@
  */
 #define	USER_SR		13
 #define	KERNEL_SR	14
-#define	KERNEL_SEGMENT	(0xfffff0 + KERNEL_SR)
-#define	EMPTY_SEGMENT	0xfffff0
-#define	USER_ADDR	((void *)(USER_SR << ADDR_SR_SHFT))
+#define	KERNEL_SEG0	0xfffff0
+#define	KERNEL_SEGMENT	(KERNEL_SEG0 + KERNEL_SR)
+#define	USER_ADDR	((void *)(USER_SR << ADDR_SR_SHIFT))
 
 /*
  * Some system constants

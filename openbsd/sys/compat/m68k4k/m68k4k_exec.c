@@ -1,4 +1,4 @@
-/*	$OpenBSD: m68k4k_exec.c,v 1.3 1999/11/26 16:44:28 art Exp $	*/
+/*	$OpenBSD: m68k4k_exec.c,v 1.6 2002/03/14 01:26:50 millert Exp $	*/
 /*	$NetBSD: m68k4k_exec.c,v 1.1 1996/09/10 22:01:20 thorpej Exp $	*/
 
 /*
@@ -54,13 +54,13 @@
 #include <sys/exec.h>
 #include <sys/resourcevar.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <compat/m68k4k/m68k4k_exec.h>
 
-int	exec_m68k4k_prep_zmagic __P((struct proc *, struct exec_package *));
-int	exec_m68k4k_prep_nmagic __P((struct proc *, struct exec_package *));
-int	exec_m68k4k_prep_omagic __P((struct proc *, struct exec_package *));
+int	exec_m68k4k_prep_zmagic(struct proc *, struct exec_package *);
+int	exec_m68k4k_prep_nmagic(struct proc *, struct exec_package *);
+int	exec_m68k4k_prep_omagic(struct proc *, struct exec_package *);
 
 /*
  * exec_m68k4k_makecmds(): Check if it's an a.out-format executable
@@ -154,7 +154,7 @@ exec_m68k4k_prep_zmagic(p, epp)
 #endif
 		return ETXTBSY;
 	}
-	epp->ep_vp->v_flag |= VTEXT;
+	vn_marktext(epp->ep_vp);
 
 	/* set up command for text segment */
 	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_pagedvn, execp->a_text,

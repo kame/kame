@@ -1,4 +1,4 @@
-/*	$OpenBSD: bus_space.c,v 1.11 2001/09/19 20:50:56 mickey Exp $	*/
+/*	$OpenBSD: bus_space.c,v 1.16 2002/03/14 01:26:35 millert Exp $	*/
 /*	$NetBSD: bus_space.c,v 1.5 1999/03/26 23:41:30 mycroft Exp $	*/
 
 /*-
@@ -45,15 +45,13 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/extent.h>
-#include <sys/map.h>
 
 #include <machine/bus.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
-int	bus_mem_add_mapping __P((bus_addr_t, bus_size_t,
-	    int, bus_space_handle_t *));
+int	bus_mem_add_mapping(bus_addr_t, bus_size_t,
+	    int, bus_space_handle_t *);
 
 extern struct extent *iomem_ex;
 extern int iomem_malloc_safe;
@@ -181,8 +179,9 @@ bus_mem_add_mapping(bpa, size, flags, bshp)
 			*pte &= ~PG_CI;
 		else
 			*pte |= PG_CI;
-		pmap_update();
+		TBIA();
 	}
+	pmap_update(pmap_kernel());
  
 	return 0;
 }

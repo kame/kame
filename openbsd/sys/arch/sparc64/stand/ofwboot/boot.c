@@ -1,4 +1,4 @@
-/*	$OpenBSD: boot.c,v 1.4 2001/08/23 14:35:53 art Exp $	*/
+/*	$OpenBSD: boot.c,v 1.6 2002/03/14 03:16:01 millert Exp $	*/
 /*	$NetBSD: boot.c,v 1.3 2001/05/31 08:55:19 mrg Exp $	*/
 /*
  * Copyright (c) 1997, 1999 Eduardo E. Horvath.  All rights reserved.
@@ -81,12 +81,12 @@ int debug;
 
 
 #ifdef SPARC_BOOT_ELF
-int	elf32_exec __P((int, Elf32_Ehdr *, u_int64_t *, void **, void **));
-int	elf64_exec __P((int, Elf64_Ehdr *, u_int64_t *, void **, void **));
+int	elf32_exec(int, Elf32_Ehdr *, u_int64_t *, void **, void **);
+int	elf64_exec(int, Elf64_Ehdr *, u_int64_t *, void **, void **);
 #endif
 
 #ifdef SPARC_BOOT_AOUT
-int	aout_exec __P((int, struct exec *, u_int64_t *, void **));
+int	aout_exec(int, struct exec *, u_int64_t *, void **);
 #endif
 
 #if 0
@@ -166,7 +166,7 @@ chain(pentry, args, ssym, esym)
 	int l, machine_tag;
 	long newargs[3];
 
-	entry = (void*)(long)pentry;
+	entry = (void *)(long)pentry;
 
 	freeall();
 	/*
@@ -442,7 +442,7 @@ elf32_exec(fd, elf, entryp, ssymp, esymp)
 		if (phdr.p_filesz < phdr.p_memsz) {
 			printf("+%lu@0x%lx", phdr.p_memsz - phdr.p_filesz,
 			    (u_long)(phdr.p_vaddr + phdr.p_filesz));
-			bzero((void*)phdr.p_vaddr + phdr.p_filesz,
+			bzero((void *)phdr.p_vaddr + phdr.p_filesz,
 			    phdr.p_memsz - phdr.p_filesz);
 		}
 		first = 0;

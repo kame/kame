@@ -1,7 +1,7 @@
-/*	$OpenBSD: lasi.c,v 1.4 2001/06/09 03:57:19 mickey Exp $	*/
+/*	$OpenBSD: lasi.c,v 1.8 2002/03/14 01:26:31 millert Exp $	*/
 
 /*
- * Copyright (c) 1998,1999 Michael Shalayeff
+ * Copyright (c) 1998-2002 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,8 +23,8 @@
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
  * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
  * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF MIND,
+ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
@@ -47,6 +47,8 @@
 
 struct lasi_hwr {
 	u_int32_t lasi_power;
+#define	LASI_BLINK	0x01
+#define	LASI_ON		0x02
 	u_int32_t lasi_error;
 	u_int32_t lasi_version;
 	u_int32_t lasi_reset;
@@ -67,10 +69,12 @@ struct lasi_softc {
 
 	struct lasi_hwr volatile *sc_hw;
 	struct lasi_trs volatile *sc_trs;
+	struct gsc_attach_args ga;	/* for deferred attach */
 };
 
-int	lasimatch __P((struct device *, void *, void *));
-void	lasiattach __P((struct device *, struct device *, void *));
+int	lasimatch(struct device *, void *, void *);
+void	lasiattach(struct device *, struct device *, void *);
+void	lasi_gsc_attach(struct device *);
 
 struct cfattach lasi_ca = {
 	sizeof(struct lasi_softc), lasimatch, lasiattach
@@ -80,10 +84,11 @@ struct cfdriver lasi_cd = {
 	NULL, "lasi", DV_DULL
 };
 
-void lasi_intr_establish __P((void *v, u_int32_t mask));
-void lasi_intr_disestablish __P((void *v, u_int32_t mask));
-u_int32_t lasi_intr_check __P((void *v));
-void lasi_intr_ack __P((void *v, u_int32_t mask));
+void lasi_intr_establish(void *v, u_int32_t mask);
+void lasi_intr_disestablish(void *v, u_int32_t mask);
+u_int32_t lasi_intr_check(void *v);
+void lasi_intr_ack(void *v, u_int32_t mask);
+void lasi_cold_hook(int on);
 
 
 int
@@ -110,7 +115,6 @@ lasiattach(parent, self, aux)
 {
 	register struct confargs *ca = aux;
 	register struct lasi_softc *sc = (struct lasi_softc *)self;
-	struct gsc_attach_args ga;
 	bus_space_handle_t ioh;
 	int s, in;
 
@@ -146,10 +150,48 @@ lasiattach(parent, self, aux)
 	sc->sc_ic.gsc_intr_check = lasi_intr_check;
 	sc->sc_ic.gsc_intr_ack = lasi_intr_ack;
 
-	ga.ga_ca = *ca;	/* clone from us */
-	ga.ga_name = "gsc";
-	ga.ga_ic = &sc->sc_ic;
-	config_found(self, &ga, gscprint);
+	sc->ga.ga_ca = *ca;	/* clone from us */
+	if (sc->sc_dev.dv_unit)
+		config_defer(self, lasi_gsc_attach);
+	else {
+		extern void (*cold_hook)(int);
+
+		lasi_gsc_attach(self);
+		cold_hook = lasi_cold_hook;
+	}
+}
+
+void
+lasi_gsc_attach(self)
+	struct device *self;
+{
+	struct lasi_softc *sc = (struct lasi_softc *)self;
+
+	sc->ga.ga_name = "gsc";
+	sc->ga.ga_ic = &sc->sc_ic;
+	config_found(self, &sc->ga, gscprint);
+}
+
+void
+lasi_cold_hook(on)
+	int on;
+{
+	register struct lasi_softc *sc = lasi_cd.cd_devs[0];
+
+	if (!sc)
+		return;
+
+	switch (on) {
+	case HPPA_COLD_COLD:
+		sc->sc_hw->lasi_power = LASI_BLINK;
+		break;
+	case HPPA_COLD_HOT:
+		sc->sc_hw->lasi_power = 0;
+		break;
+	case HPPA_COLD_OFF:
+		sc->sc_hw->lasi_power = LASI_BLINK;
+		break;
+	}
 }
 
 void
@@ -182,8 +224,7 @@ lasi_intr_check(v)
 	imr = sc->sc_trs->lasi_imr;
 	ipr = sc->sc_trs->lasi_ipr;
 	irr = sc->sc_trs->lasi_irr;
-	sc->sc_trs->lasi_imr = 0;
-	sc->sc_trs->lasi_imr = imr &= ~irr;
+	sc->sc_trs->lasi_irr = irr;
 
 #ifdef LASIDEBUG
 	printf ("%s: imr=0x%x, irr=0x%x, ipr=0x%x, iar=0x%x, icr=0x%x\n",

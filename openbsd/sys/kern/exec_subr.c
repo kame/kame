@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_subr.c,v 1.12 2001/06/27 04:49:40 art Exp $	*/
+/*	$OpenBSD: exec_subr.c,v 1.18 2002/03/14 01:27:04 millert Exp $	*/
 /*	$NetBSD: exec_subr.c,v 1.9 1994/12/04 03:10:42 mycroft Exp $	*/
 
 /*
@@ -41,8 +41,6 @@
 #include <sys/mman.h>
 #include <sys/resourcevar.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm.h>
 
 #ifdef DEBUG
@@ -58,7 +56,7 @@
 void
 new_vmcmd(evsp, proc, len, addr, vp, offset, prot)
 	struct	exec_vmcmd_set *evsp;
-	int	(*proc) __P((struct proc * p, struct exec_vmcmd *));
+	int	(*proc)(struct proc * p, struct exec_vmcmd *);
 	u_long	len;
 	u_long	addr;
 	struct	vnode *vp;
@@ -175,7 +173,7 @@ vmcmd_map_pagedvn(p, cmd)
 	 */
 
 	retval = uvm_map(&p->p_vmspace->vm_map, &cmd->ev_addr, cmd->ev_len,
-	    uobj, cmd->ev_offset,
+	    uobj, cmd->ev_offset, 0,
 	    UVM_MAPFLAG(cmd->ev_prot, VM_PROT_ALL, UVM_INH_COPY,
 	    UVM_ADV_NORMAL, UVM_FLAG_COPYONW|UVM_FLAG_FIXED));
 
@@ -208,23 +206,23 @@ vmcmd_map_readvn(p, cmd)
 	int error;
 
 	if (cmd->ev_len == 0)
-		return(KERN_SUCCESS); /* XXXCDC: should it happen? */
+		return (0);
 	
 	cmd->ev_addr = trunc_page(cmd->ev_addr); /* required by uvm_map */
 	error = uvm_map(&p->p_vmspace->vm_map, &cmd->ev_addr,
-	    round_page(cmd->ev_len), NULL, UVM_UNKNOWN_OFFSET,
+	    round_page(cmd->ev_len), NULL, UVM_UNKNOWN_OFFSET, 0,
 	    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
 	    UVM_ADV_NORMAL,
 	    UVM_FLAG_FIXED|UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW));
 
 	if (error)
-		return error;
+		return (error);
 
 	error = vn_rdwr(UIO_READ, cmd->ev_vp, (caddr_t)cmd->ev_addr,
 	    cmd->ev_len, cmd->ev_offset, UIO_USERSPACE, IO_UNIT|IO_NODELOCKED,
 	    p->p_ucred, NULL, p);
 	if (error)
-		return error;
+		return (error);
 
 	if (cmd->ev_prot != (VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE)) {
 		/*
@@ -233,13 +231,12 @@ vmcmd_map_readvn(p, cmd)
 		 * it mapped read-only, so now we are going to have to call
 		 * uvm_map_protect() to fix up the protection.  ICK.
 		 */
-		return(uvm_map_protect(&p->p_vmspace->vm_map,
+		return (uvm_map_protect(&p->p_vmspace->vm_map,
 		    trunc_page(cmd->ev_addr),
 		    round_page(cmd->ev_addr + cmd->ev_len),
 		    cmd->ev_prot, FALSE));
-	} else {
-		return(KERN_SUCCESS);
 	}
+	return (0);
 }
 
 /*
@@ -256,18 +253,18 @@ vmcmd_map_zero(p, cmd)
 	int error;
 
 	if (cmd->ev_len == 0)
-		return(KERN_SUCCESS); /* XXXCDC: should it happen? */
+		return (0);
 	
 	cmd->ev_addr = trunc_page(cmd->ev_addr); /* required by uvm_map */
 	error = uvm_map(&p->p_vmspace->vm_map, &cmd->ev_addr,
-	    round_page(cmd->ev_len), NULL, UVM_UNKNOWN_OFFSET,
+	    round_page(cmd->ev_len), NULL, UVM_UNKNOWN_OFFSET, 0,
 	    UVM_MAPFLAG(cmd->ev_prot, UVM_PROT_ALL, UVM_INH_COPY,
 	    UVM_ADV_NORMAL, UVM_FLAG_FIXED|UVM_FLAG_COPYONW));
 
 	if (error)
 		return error;
 
-	return(KERN_SUCCESS);
+	return (0);
 }
 
 /*

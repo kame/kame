@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.27 2001/08/18 20:29:53 miod Exp $
+#	$OpenBSD: GENERIC,v 1.30 2002/01/31 11:49:02 hugh Exp $
 #	$NetBSD: GENERIC,v 1.61 2000/04/19 06:50:36 itojun Exp $
 
 machine 	vax			# machine type; required
@@ -13,9 +13,9 @@ include "../../../conf/GENERIC"
 #option		VAX750		# 11/750
 option		VAX630		# MV II
 option		VAX650		# MV III, 3300, 3600, 3800, 3900
-option		VAX660		# VAX 4000/200
-option		VAX670		# VAX 4000/300
-option		VAX680		# VAX 4000/[45]00
+option		VAX660		# VAX 4000 200
+option		VAX670		# VAX 4000 300
+option		VAX680		# VAX 4000 {4,5,6,7}0{0,5}{,A}
 option		VAX410		# VS 2000, 3100/{30,}
 option		VAX43		# VS 3100/76
 option		VAX46		# VS 4000/60
@@ -36,7 +36,7 @@ option		WSDISPLAY_DEFAULTSCREENS=8
 # Note that if COMPAT_ULTRIX is set, you lose compatibility with
 # 4.3BSD Reno programs and get Ultrix compatibility instead.
 # (They cannot coexist).
-#option		COMPAT_VAX1K	# Must be present to run pre-1.4 binaries.
+option		COMPAT_VAX1K	# Must be present to run old binaries.
 #option		COMPAT_ULTRIX
 
 option		INSN_EMULATE	# CPU lacks some hardware instructions.
@@ -103,8 +103,8 @@ le0		at ibus0		# LANCE ethernet (MV3400)
 #hp*		at mba? drive?		# RM/RP disk drives
 
 # Devices on Unibus/Qbus adapters
-#uda0		at uba?	csr 0172150	# UDA50/RQDX?
-#uda1		at uba?	csr 0160334
+uda0		at uba?	csr 0172150	# UDA50/RQDX?
+uda1		at uba?	csr 0160334
 mtc0		at uba? csr 0174500	# Tape MSCP ctlr
 #ts0		at uba? csr 0172520	# TS11/TSV05 tape.
 #qd0		at uba? csr 0177400	# 4- or 8-bitplans color graphics
@@ -116,11 +116,11 @@ mtc0		at uba? csr 0174500	# Tape MSCP ctlr
 #dl0		at uba? csr 0176500	# DL-11
 
 # MSCP devices
-#mscpbus*	at uda?
+mscpbus*	at uda?
 mscpbus*	at mtc?
 #mscpbus*	at kdb?
 
-#ra*		at mscpbus? drive?	# MSCP disk
+ra*		at mscpbus? drive?	# MSCP disk
 rx*		at mscpbus? drive?	# MSCP floppy
 mt*		at mscpbus? drive?	# MSCP tape
 

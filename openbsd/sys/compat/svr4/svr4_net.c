@@ -1,4 +1,4 @@
-/*	$OpenBSD: svr4_net.c,v 1.11 2001/05/14 12:38:48 art Exp $	 */
+/*	$OpenBSD: svr4_net.c,v 1.15 2002/03/14 01:26:51 millert Exp $	 */
 /*	$NetBSD: svr4_net.c,v 1.12 1996/09/07 12:40:51 mycroft Exp $	 */
 
 /*
@@ -77,9 +77,9 @@ enum {
 	dev_unix_ord_stream	= 40
 };
 
-int svr4_netattach __P((int));
+int svr4_netattach(int);
 
-static int svr4_soo_close __P((struct file *fp, struct proc *p));
+static int svr4_soo_close(struct file *fp, struct proc *p);
 
 static struct fileops svr4_netops = {
 	soo_read, soo_write, soo_ioctl, soo_select, soo_kqfilter,
@@ -173,7 +173,7 @@ svr4_netopen(dev, flag, mode, p)
 	if ((error = socreate(family, &so, type, protocol)) != 0) {
 		DPRINTF(("socreate error %d\n", error));
 		fdremove(p->p_fd, fd);
-		ffree(fp);
+		closef(fp, p);
 		return error;
 	}
 
@@ -187,6 +187,7 @@ svr4_netopen(dev, flag, mode, p)
 	DPRINTF(("ok);\n"));
 
 	p->p_dupfd = fd;
+	FILE_SET_MATURE(fp);
 	return ENXIO;
 }
 

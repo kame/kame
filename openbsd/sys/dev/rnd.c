@@ -1,4 +1,4 @@
-/*	$OpenBSD: rnd.c,v 1.50 2001/09/24 02:23:44 mickey Exp $	*/
+/*	$OpenBSD: rnd.c,v 1.57 2002/04/01 08:25:58 mickey Exp $	*/
 
 /*
  * random.c -- A strong random number generator
@@ -312,7 +312,7 @@ int	rnd_debug = 0x0000;
 
 /*
  * For the purposes of better mixing, we use the CRC-32 polynomial as
- * well to make a twisted Generalized Feedback Shift Reigster
+ * well to make a twisted Generalized Feedback Shift Register
  *
  * (See M. Matsumoto & Y. Kurita, 1992.  Twisted GFSR generators.  ACM
  * Transactions on Modeling and Computer Simulation 2(3):179-194.
@@ -346,7 +346,7 @@ int	rnd_debug = 0x0000;
  * modulo the generator polymnomial.  Now, for random primitive polynomials,
  * this is a universal class of hash functions, meaning that the chance
  * of a collision is limited by the attacker's knowledge of the generator
- * polynomail, so if it is chosen at random, an attacker can never force
+ * polynomial, so if it is chosen at random, an attacker can never force
  * a collision.  Here, we use a fixed polynomial, but we *can* assume that
  * ###--> it is unknown to the processes generating the input entropy. <-###
  * Because of this important property, this is a good, collision-resistant
@@ -356,7 +356,7 @@ int	rnd_debug = 0x0000;
 /* pIII/333 reported to have some drops w/ these numbers */
 #define QEVLEN (1024 / sizeof(struct rand_event))
 #define QEVSLOW (QEVLEN * 3 / 4) /* yet another 0.75 for 60-minutes hour /-; */
-#define QEVSBITS 12
+#define QEVSBITS 10
 
 /* There is actually only one of these, globally. */
 struct random_bucket {
@@ -453,15 +453,15 @@ rnd_qlen(void)
 	return (len < 0)? -len : len;
 }
 
-void dequeue_randomness __P((void *));
+void dequeue_randomness(void *);
 
-static __inline void add_entropy_words __P((const u_int32_t *, u_int n));
-static __inline void extract_entropy __P((register u_int8_t *, int));
+static __inline void add_entropy_words(const u_int32_t *, u_int n);
+static __inline void extract_entropy(register u_int8_t *, int);
 
-static __inline u_int8_t arc4_getbyte __P((void));
-static __inline void arc4_stir __P((void));
-void arc4_reinit __P((void *v));
-void arc4maybeinit __P((void));
+static __inline u_int8_t arc4_getbyte(void);
+static __inline void arc4_stir(void);
+void arc4_reinit(void *v);
+void arc4maybeinit(void);
 
 /* Arcfour random stream generator.  This code is derived from section
  * 17.1 of Applied Cryptography, second edition, which describes a
@@ -474,7 +474,7 @@ void arc4maybeinit __P((void));
  * old state, and its input always includes the time of day in
  * microseconds.  Moreover, bytes from the stream may at any point be
  * diverted to multiple processes or even kernel functions desiring
- * random numbers.  This increases the strenght of the random stream,
+ * random numbers.  This increases the strength of the random stream,
  * but makes it impossible to use this code for encryption--There is
  * no way ever to reproduce the same stream of random bytes.
  *
@@ -544,7 +544,7 @@ arc4maybeinit(void)
 
 /*
  * called by timeout to mark arc4 for stirring,
- * actuall stirring happens on any access attempt.
+ * actual stirring happens on any access attempt.
  */
 void
 arc4_reinit(v)
@@ -850,23 +850,25 @@ extract_entropy(buf, nbytes)
 	int	nbytes;
 {
 	struct random_bucket *rs = &random_state;
-	MD5_CTX tmp;
 	u_char buffer[16];
 
 	add_timer_randomness(nbytes);
 
-	if (rs->entropy_count / 8 > nbytes)
-		rs->entropy_count -= nbytes*8;
-	else
-		rs->entropy_count = 0;
-
 	while (nbytes) {
-		int i;
+		MD5_CTX tmp;
+		int i, s;
 
 		/* Hash the pool to get the output */
 		MD5Init(&tmp);
+		s = splhigh();
 		MD5Update(&tmp, (u_int8_t*)rs->pool, sizeof(rs->pool));
+		if (rs->entropy_count / 8 > nbytes)
+			rs->entropy_count -= nbytes * 8;
+		else
+			rs->entropy_count = 0;
+		splx(s);
 		MD5Final(buffer, &tmp);
+		bzero(&tmp, sizeof(tmp));
 
 		/*
 		 * In case the hash function has some recognizable
@@ -881,9 +883,6 @@ extract_entropy(buf, nbytes)
 		buffer[6] ^= buffer[ 9];
 		buffer[7] ^= buffer[ 8];
 
-		/* Modify pool so next hash will produce different results */
-		add_entropy_words((u_int32_t*)buffer, sizeof(buffer)/8);
-
 		/* Copy data to destination buffer */
 		if (nbytes < sizeof(buffer) / 2)
 			bcopy(buffer, buf, i = nbytes);
@@ -891,11 +890,13 @@ extract_entropy(buf, nbytes)
 			bcopy(buffer, buf, i = sizeof(buffer) / 2);
 		nbytes -= i;
 		buf += i;
+
+		/* Modify pool so next hash will produce different results */
 		add_timer_randomness(nbytes);
+		dequeue_randomness(&random_state);
 	}
 
 	/* Wipe data from memory */
-	bzero(&tmp, sizeof(tmp));
 	bzero(&buffer, sizeof(buffer));
 }
 
@@ -920,7 +921,7 @@ randomread(dev, uio, ioflag)
 	int	ioflag;
 {
 	int	ret = 0;
-	int	s, i;
+	int	i;
 
 	if (uio->uio_resid == 0)
 		return 0;
@@ -929,7 +930,6 @@ randomread(dev, uio, ioflag)
 		u_int32_t buf[ POOLWORDS ];
 		int	n = min(sizeof(buf), uio->uio_resid);
 
-		s = splhigh();
 		switch(minor(dev)) {
 		case RND_RND:
 			ret = EIO;	/* no chip -- error */
@@ -986,7 +986,6 @@ randomread(dev, uio, ioflag)
 		default:
 			ret = ENXIO;
 		}
-		splx(s);
 		if (n != 0 && ret == 0)
 			ret = uiomove((caddr_t)buf, n, uio);
 	}
@@ -1109,7 +1108,7 @@ randomioctl(dev, cmd, data, flag, p)
 		}
 		break;
 	default:
-		ret = EINVAL;
+		ret = ENOTTY;
 	}
 
 	add_timer_randomness((u_long)p ^ (u_long)data ^ cmd);

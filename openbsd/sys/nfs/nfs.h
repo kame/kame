@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs.h,v 1.13 2001/09/16 00:42:44 millert Exp $	*/
+/*	$OpenBSD: nfs.h,v 1.17 2002/02/10 22:02:05 nate Exp $	*/
 /*	$NetBSD: nfs.h,v 1.10.4.1 1996/05/27 11:23:56 fvdl Exp $	*/
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.10 2001/09/19 20:50:57 mickey Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.24 2002/03/23 13:28:34 espie Exp $	*/
 /*	$NetBSD: machdep.c,v 1.4 1996/10/16 19:33:11 ws Exp $	*/
 
 /*
@@ -31,14 +31,15 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+/*
 #include "machine/ipkdb.h"
+*/
 
 #include <sys/param.h>
 #include <sys/buf.h>
 #include <sys/timeout.h>
 #include <sys/exec.h>
 #include <sys/malloc.h>
-#include <sys/map.h>
 #include <sys/mbuf.h>
 #include <sys/mount.h>
 #include <sys/msgbuf.h>
@@ -51,7 +52,6 @@
 #include <sys/systm.h>
 #include <sys/user.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #ifdef SYSVSHM
@@ -96,11 +96,11 @@ extern struct user *proc0paddr;
  */
 #include <dev/cons.h>
 
-int  bootcnprobe __P((struct consdev *));
-int  bootcninit __P((struct consdev *));
-void bootcnputc __P((dev_t, char));
-int  bootcngetc __P((dev_t));
-extern void nullcnpollc __P((dev_t, int));
+int  bootcnprobe(struct consdev *);
+int  bootcninit(struct consdev *);
+void bootcnputc(dev_t, char);
+int  bootcngetc(dev_t);
+extern void nullcnpollc(dev_t, int);
 #define bootcnpollc nullcnpollc
 static struct consdev bootcons = {
 	(void (*))NULL, 
@@ -113,29 +113,33 @@ static struct consdev bootcons = {
    1
 };
 
-u_int32_t	ppc_get_msr __P((void));
-u_int32_t	ppc_set_msr __P((u_int32_t));
+u_int32_t	ppc_get_msr(void);
+u_int32_t	ppc_set_msr(u_int32_t);
 
 /* 
  * Declare these as initialized data so we can patch them.
  */
-int	nswbuf = 0;
 #ifdef NBUF
 int	nbuf = NBUF;
 #else
 int	nbuf = 0;
 #endif
+
+#ifndef BUFCACHEPERCENT
+#define BUFCACHEPERCENT 5
+#endif
+
 #ifdef BUFPAGES
 int bufpages = BUFPAGES;
 #else
 int bufpages = 0;
 #endif
+int bufcachepercent = BUFCACHEPERCENT;
 
 struct bat battable[16];
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *phys_map = NULL;
 
 int astpending;
 int ppc_malloc_ok = 0;
@@ -153,7 +157,7 @@ char bootpathbuf[512];
 struct firmware *fw = NULL;
 extern struct firmware ppc1_firmware;
 
-caddr_t allocsys __P((caddr_t));
+caddr_t allocsys(caddr_t);
 
 /*
  * Extent maps to manage I/O. Allocate storage for 8 regions in each,
@@ -176,27 +180,23 @@ initppc(startkernel, endkernel, args)
 	u_int startkernel, endkernel;
 	char *args;
 {
-	int phandle, qhandle;
-	char name[32];
-	struct machvec *mp;
-	extern trapcode, trapsize;
-	extern dsitrap, dsisize;
-	extern isitrap, isisize;
-	extern alitrap, alisize;
-	extern decrint, decrsize;
-	extern tlbimiss, tlbimsize;
-	extern tlbdlmiss, tlbdlmsize;
-	extern tlbdsmiss, tlbdsmsize;
+	extern caddr_t trapcode, trapsize;
+	extern caddr_t dsitrap, dsisize;
+	extern caddr_t isitrap, isisize;
+	extern caddr_t alitrap, alisize;
+	extern caddr_t decrint, decrsize;
+	extern caddr_t tlbimiss, tlbimsize;
+	extern caddr_t tlbdlmiss, tlbdlmsize;
+	extern caddr_t tlbdsmiss, tlbdsmsize;
 #ifdef DDB
-	extern ddblow, ddbsize;
+	extern caddr_t ddblow, ddbsize;
 #endif 
 #if NIPKDB > 0
-	extern ipkdblow, ipkdbsize;
+	extern caddr_t ipkdblow, ipkdbsize;
 #endif
-	extern void consinit __P((void));
-	extern void callback __P((void *));
+	extern void consinit(void);
+	extern void callback(void *);
 	int exc, scratch;
-	u_int32_t msr;
 
 	proc0.p_addr = proc0paddr;
 	bzero(proc0.p_addr, sizeof *proc0.p_addr);
@@ -470,9 +470,9 @@ initppc(startkernel, endkernel, args)
 
 void
 install_extint(handler)
-	void (*handler) __P((void));
+	void (*handler)(void);
 {
-	extern extint, extsize;
+	extern caddr_t extint, extsize;
 	extern u_long extint_call;
 	u_long offset = (u_long)handler - (u_long)&extint_call;
 	int omsr, msr;
@@ -524,9 +524,9 @@ cpu_startup()
 	 */
 	sz = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(sz),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)))
 		panic("cpu_startup: cannot allocate VM for buffers");
 	/*
 	addr = (vaddr_t)buffers;
@@ -571,10 +571,6 @@ cpu_startup()
 	    VM_PHYS_SIZE, 0, FALSE, NULL);
 	ppc_malloc_ok = 1;
 	
-
-	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-	    VM_MBUF_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
-
 	printf("avail mem = %d\n", ptoa(uvmexp.free));
 	printf("using %d buffers containing %d bytes of memory\n", nbuf,
 	    bufpages * PAGE_SIZE);
@@ -600,6 +596,9 @@ allocsys(v)
 	v = (caddr_t)(((name) = (type *)v) + (num))
 
 #ifdef	SYSVSHM
+	shminfo.shmmax = shmmaxpgs;
+	shminfo.shmall = shmmaxpgs;
+	shminfo.shmseg = shmseg;
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
 #ifdef	SYSVSEM
@@ -614,14 +613,11 @@ allocsys(v)
 	valloc(msqids, struct msqid_ds, msginfo.msgmni);
 #endif
 
-#ifndef BUFCACHEPERCENT
-#define BUFCACHEPERCENT 5
-#endif
 	/*
 	 * Decide on buffer space to use.
 	 */
 	if (bufpages == 0)
-		bufpages = physmem * BUFCACHEPERCENT / 100;
+		bufpages = physmem * bufcachepercent / 100;
 	if (nbuf == 0) {
 		nbuf = bufpages;
 		if (nbuf < 16)
@@ -637,11 +633,6 @@ allocsys(v)
 	if (bufpages > nbuf * MAXBSIZE / PAGE_SIZE)
 		bufpages = nbuf * MAXBSIZE / PAGE_SIZE;
 
-	if (nswbuf == 0) {
-		nswbuf = (nbuf / 2) & ~1;
-		if (nswbuf > 256)
-			nswbuf = 256;
-	}
 	valloc(buf, struct buf, nbuf);
 	
 	return v;
@@ -681,7 +672,7 @@ setregs(p, pack, stack, retval)
 	pargs = -roundup(-stack + 8, 16);
 	newstack = (u_int32_t)(pargs - 32);
 
-	copyin ((void*)(VM_MAX_ADDRESS-0x10), &args, 0x10);
+	copyin ((void *)(VM_MAX_ADDRESS-0x10), &args, 0x10);
 	
 	bzero(tf, sizeof *tf);
 	tf->fixreg[1] = newstack;
@@ -710,7 +701,9 @@ sendsig(catcher, sig, mask, code, type, val)
 	struct sigframe *fp, frame;
 	struct sigacts *psp = p->p_sigacts;
 	int oldonstack;
+#if WHEN_WE_ONLY_FLUSH_DATA_WHEN_DOING_PMAP_ENTER
 	int pa;
+#endif
 	
 	frame.sf_signum = sig;
 	
@@ -775,7 +768,7 @@ sys_sigreturn(p, v, retval)
 	struct trapframe *tf;
 	int error;
 	
-	if (error = copyin(SCARG(uap, sigcntxp), &sc, sizeof sc))
+	if ((error = copyin(SCARG(uap, sigcntxp), &sc, sizeof sc)) != 0)
 		return error;
 	tf = trapframe(p);
 	if ((sc.sc_frame.srr1 & PSL_USERSTATIC) != (tf->srr1 & PSL_USERSTATIC))
@@ -892,7 +885,7 @@ boot(howto)
 {
 	static int syncing;
 	static char str[256];
-	char *ap = str, *ap1 = ap;
+	char *ap = str;
 
 	boothowto = howto;
 	if (!cold && !(howto & RB_NOSYNC) && !syncing) {
@@ -994,9 +987,9 @@ systype(char *name)
  *
  */
 #include <dev/pci/pcivar.h>
-typedef void     *(intr_establish_t) __P((void *, pci_intr_handle_t,
-            int, int, int (*func)(void *), void *, char *));
-typedef void     (intr_disestablish_t) __P((void *, void *));
+typedef void     *(intr_establish_t)(void *, pci_intr_handle_t,
+            int, int, int (*func)(void *), void *, char *);
+typedef void     (intr_disestablish_t)(void *, void *);
 
 int ppc_configed_intr_cnt = 0;
 struct intrhand ppc_configed_intr[MAX_PRECONF_INTR];
@@ -1007,7 +1000,7 @@ ppc_intr_establish(lcv, ih, type, level, func, arg, name)
 	pci_intr_handle_t ih;
 	int type;
 	int level;
-	int (*func) __P((void *));
+	int (*func)(void *);
 	void *arg;
 	char *name;
 {
@@ -1119,10 +1112,10 @@ bus_space_map(t, bpa, size, cacheable, bshp)
 	}
 	return 0;
 }
-bus_addr_t bus_space_unmap_p __P((bus_space_tag_t t, bus_space_handle_t bsh,
-			  bus_size_t size));
-void bus_space_unmap __P((bus_space_tag_t t, bus_space_handle_t bsh,
-			  bus_size_t size));
+bus_addr_t bus_space_unmap_p(bus_space_tag_t t, bus_space_handle_t bsh,
+			  bus_size_t size);
+void bus_space_unmap(bus_space_tag_t t, bus_space_handle_t bsh,
+			  bus_size_t size);
 bus_addr_t
 bus_space_unmap_p(t, bsh, size)
 	bus_space_tag_t t;
@@ -1162,6 +1155,7 @@ bus_space_unmap(t, bsh, size)
 	}
 #endif
 	pmap_remove(vm_map_pmap(phys_map), sva, sva+len);
+	pmap_update(vm_map_pmap(phys_map));
 }
 
 int
@@ -1203,12 +1197,9 @@ bus_mem_add_mapping(bpa, size, cacheable, bshp)
 		bpa, size, *bshp, spa);
 #endif
 	for (; len > 0; len -= NBPG) {
-#if 0
-		pmap_enter(vm_map_pmap(phys_map), vaddr, spa,
-#else
-		pmap_enter(pmap_kernel(), vaddr, spa,
-#endif
-			VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED /* XXX */);
+		pmap_kenter_cache(vaddr, spa,
+			VM_PROT_READ | VM_PROT_WRITE,
+			cacheable ? PMAP_CACHE_WT : PMAP_CACHE_DEFAULT);
 		spa += NBPG;
 		vaddr += NBPG;
 	}
@@ -1241,16 +1232,12 @@ mapiodev(pa, len)
 		return NULL;
 
 	for (; size > 0; size -= NBPG) {
-#if 0
-		pmap_enter(vm_map_pmap(phys_map), vaddr, spa,
-#else
-		pmap_enter(pmap_kernel(), vaddr, spa,
-#endif
-			VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED/* XXX */);
+		pmap_kenter_cache(vaddr, spa,
+			VM_PROT_READ | VM_PROT_WRITE, PMAP_CACHE_DEFAULT);
 		spa += NBPG;
 		vaddr += NBPG;
 	}
-	return (void*) (va+off);
+	return (void *) (va+off);
 }
 void 
 unmapiodev(kva, p_size)
@@ -1274,7 +1261,7 @@ unmapiodev(kva, p_size)
 #endif
 		vaddr += NBPG;
 	}
-	return;
+	pmap_update(pmap_kernel());
 }
 
 #if 0
@@ -1408,7 +1395,7 @@ kcopy(from, to, size)
 	register void *oldh = curproc->p_addr->u_pcb.pcb_onfault;
 
 	if (setfault(env)) {
-		curpcb->pcb_onfault = 0;
+		curproc->p_addr->u_pcb.pcb_onfault = oldh;
 		return EFAULT;
 	}
 	bcopy(from, to, size);

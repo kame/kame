@@ -1,10 +1,10 @@
-/*	$OpenBSD: miidevs.h,v 1.26 2001/10/05 00:09:10 nate Exp $	*/
+/*	$OpenBSD: miidevs.h,v 1.33 2002/04/08 20:54:21 nate Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	OpenBSD: miidevs,v 1.23 2001/10/05 00:08:51 nate Exp 
+ *	OpenBSD: miidevs,v 1.30 2002/04/08 20:54:09 nate Exp 
  */
 /* $NetBSD: miidevs,v 1.3 1998/11/05 03:43:43 thorpej Exp $ */
 
@@ -86,12 +86,15 @@
 /* Level 1 is completely different - from right to left.
 	(Two bits get lost in the third OUI byte.) */
 #define	MII_OUI_xxLEVEL1	0x1e0400	/* Level 1 */
+#define	MII_OUI_xxLEVEL1a	0x0004de	/* Level 1 */
 
 /* Don't know what's going on here. */
 #define	MII_OUI_xxDAVICOM	0x006040	/* Davicom Semiconductor */
 
 /* Contrived vendor for dcphy */
 #define	MII_OUI_xxDEC	0x040440	/* Digital Clone */
+
+#define	MII_OUI_xxMARVELL	0x000ac2	/* Marvell Semiconductor */
 
 /*
  * List of known models.  Grouped by oui.
@@ -114,6 +117,10 @@
 #define	MII_STR_xxBROADCOM_BCM5401	"BCM5401 10/100/1000baseTX PHY"
 #define	MII_MODEL_xxBROADCOM_BCM5411	0x0007
 #define	MII_STR_xxBROADCOM_BCM5411	"BCM5411 10/100/1000baseTX PHY"
+#define	MII_MODEL_xxBROADCOM_BCM5421S	0x000e
+#define	MII_STR_xxBROADCOM_BCM5421S	"BCM5421S 10/100/1000baseTX PHY"
+#define	MII_MODEL_xxBROADCOM_BCM5701	0x0011
+#define	MII_STR_xxBROADCOM_BCM5701	"BCM5701 10/100/1000baseTX PHY"
 #define	MII_MODEL_BROADCOM_BCM5400	0x0004
 #define	MII_STR_BROADCOM_BCM5400	"BCM5400 1000baseTX PHY"
 #define	MII_MODEL_BROADCOM_BCM5401	0x0005
@@ -128,12 +135,28 @@
 #define	MII_STR_BROADCOM_BCM5201	"BCM5201 10/100 media interface"
 
 /* Davicom Semiconductor PHYs */
+#define	MII_MODEL_DAVICOM_DM9102	0x0004
+#define	MII_STR_DAVICOM_DM9102	"DM9102 10/100 media interface"
 #define	MII_MODEL_xxDAVICOM_DM9101	0x0000
 #define	MII_STR_xxDAVICOM_DM9101	"DM9101 10/100 media interface"
 
+/* Enable Semiconductor PHYs */
+#define	MII_MODEL_ENABLESEMI_88E1000	0x0005
+#define	MII_STR_ENABLESEMI_88E1000	"Enable 88E1000"
+#define	MII_MODEL_ENABLESEMI_88E1000S	0x0004
+#define	MII_STR_ENABLESEMI_88E1000S	"Enable 88E1000S"
+
 /* Marvell Semiconductor PHYs */
 #define	MII_MODEL_MARVELL_E1000	0x0000
-#define	MII_STR_MARVELL_E1000	"Marvell Semiconductor 88E1000* Gigabit"
+#define	MII_STR_MARVELL_E1000	"Marvell 88E1000* Gigabit PHY"
+#define	MII_MODEL_MARVELL_E1000_3	0x0003
+#define	MII_STR_MARVELL_E1000_3	"Marvell 88E1000 Gigabit PHY"
+#define	MII_MODEL_MARVELL_E1000_6	0x0006
+#define	MII_STR_MARVELL_E1000_6	"Marvell 88E1000 Gigabit PHY"
+#define	MII_MODEL_xxMARVELL_E1000_3	0x0003
+#define	MII_STR_xxMARVELL_E1000_3	"Marvell 88E1000 Gigabit PHY"
+#define	MII_MODEL_xxMARVELL_E1000_5	0x0005
+#define	MII_STR_xxMARVELL_E1000_5	"Marvell 88E1000 Gigabit PHY"
 
 /* Contrived vendor/model for dcphy */
 #define	MII_MODEL_xxDEC_xxDC	0x0001
@@ -160,6 +183,8 @@
 /* Level 1 PHYs */
 #define	MII_MODEL_xxLEVEL1_LXT970	0x0000
 #define	MII_STR_xxLEVEL1_LXT970	"LXT970 10/100 media interface"
+#define	MII_MODEL_xxLEVEL1a_LXT971	0x000e
+#define	MII_STR_xxLEVEL1a_LXT971	"LXT971 10/100 media interface"
 
 /* Myson Technology PHYs */
 #define	MII_MODEL_MYSON_MTD972	0x0000

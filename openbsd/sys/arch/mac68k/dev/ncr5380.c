@@ -1,4 +1,4 @@
-/*	$OpenBSD: ncr5380.c,v 1.16 2001/08/26 00:45:08 fgsch Exp $	*/
+/*	$OpenBSD: ncr5380.c,v 1.18 2002/03/14 03:15:55 millert Exp $	*/
 /*	$NetBSD: ncr5380.c,v 1.38 1996/12/19 21:48:18 scottr Exp $	*/
 
 /*
@@ -73,9 +73,9 @@ static volatile int	main_running = 0;
  */
 static u_char	busy;
 
-static void	ncr5380_minphys __P((struct buf *bp));
-static int	ncr5380_scsi_cmd __P((struct scsi_xfer *xs));
-static void	ncr5380_show_scsi_cmd __P((struct scsi_xfer *xs));
+static void	ncr5380_minphys(struct buf *bp);
+static int	ncr5380_scsi_cmd(struct scsi_xfer *xs);
+static void	ncr5380_show_scsi_cmd(struct scsi_xfer *xs);
 
 struct scsi_adapter ncr5380_switch = {
 	ncr5380_scsi_cmd,		/* scsi_cmd()			*/
@@ -197,8 +197,8 @@ extern __inline__ void finish_req(SC_REQ *reqp)
 /*
  * Auto config stuff....
  */
-void	ncr_attach __P((struct device *, struct device *, void *));
-int	ncr_match __P((struct device *, void *, void *));
+void	ncr_attach(struct device *, struct device *, void *);
+int	ncr_match(struct device *, void *, void *);
 
 /*
  * Tricks to make driver-name configurable
@@ -325,7 +325,7 @@ ncr5380_scsi_cmd(struct scsi_xfer *xs)
 	reqp->xs        = xs;
 	reqp->targ_id   = xs->sc_link->target;
 	reqp->targ_lun  = xs->sc_link->lun;
-	reqp->xdata_ptr = (u_char*)xs->data;
+	reqp->xdata_ptr = (u_char *)xs->data;
 	reqp->xdata_len = xs->datalen;
 	memcpy(&reqp->xcmd, xs->cmd, sizeof(struct scsi_generic));
 	reqp->xcmd.bytes[0] |= reqp->targ_lun << 5;
@@ -1768,7 +1768,7 @@ SC_REQ	*reqp;
 	 * Initialize locals and requests' DMA-chain.
 	 */
 	req_len        = reqp->xdata_len;
-	req_addr       = (void*)reqp->xdata_ptr;
+	req_addr       = (void *)reqp->xdata_ptr;
 	dm             = reqp->dm_cur = reqp->dm_last = reqp->dm_chain;
 	dm->dm_count   = dm->dm_addr = 0;
 	reqp->dr_flag &= ~DRIVER_BOUNCING;

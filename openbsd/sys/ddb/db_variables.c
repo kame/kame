@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_variables.c,v 1.7 1997/07/19 22:31:21 niklas Exp $	*/
+/*	$OpenBSD: db_variables.c,v 1.9 2002/03/14 01:26:51 millert Exp $	*/
 /*	$NetBSD: db_variables.c,v 1.8 1996/02/05 01:57:19 christos Exp $	*/
 
 /* 
@@ -30,7 +30,7 @@
 #include <sys/param.h>
 #include <sys/proc.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/db_machdep.h>
 
@@ -111,7 +111,7 @@ db_read_variable(vp, valuep)
 	struct db_variable *vp;
 	db_expr_t	*valuep;
 {
-	int	(*func) __P((struct db_variable *, db_expr_t *, int)) = vp->fcn;
+	int	(*func)(struct db_variable *, db_expr_t *, int) = vp->fcn;
 
 	if (func == FCN_NULL)
 	    *valuep = *(vp->valuep);
@@ -124,7 +124,7 @@ db_write_variable(vp, valuep)
 	struct db_variable *vp;
 	db_expr_t	*valuep;
 {
-	int	(*func) __P((struct db_variable *, db_expr_t *, int)) = vp->fcn;
+	int	(*func)(struct db_variable *, db_expr_t *, int) = vp->fcn;
 
 	if (func == FCN_NULL)
 	    *(vp->valuep) = *valuep;

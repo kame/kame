@@ -1,4 +1,4 @@
-/*	$OpenBSD: union_vfsops.c,v 1.11 2001/02/20 01:50:11 assar Exp $	*/
+/*	$OpenBSD: union_vfsops.c,v 1.13 2002/03/14 01:27:08 millert Exp $	*/
 /*	$NetBSD: union_vfsops.c,v 1.10 1995/06/18 14:47:47 cgd Exp $	*/
 
 /*
@@ -59,12 +59,12 @@
 
 #include <miscfs/union/union.h>
 
-int union_mount __P((struct mount *, const char *, void *, struct nameidata *,
-		     struct proc *));
-int union_start __P((struct mount *, int, struct proc *));
-int union_unmount __P((struct mount *, int, struct proc *));
-int union_root __P((struct mount *, struct vnode **));
-int union_statfs __P((struct mount *, struct statfs *, struct proc *));
+int union_mount(struct mount *, const char *, void *, struct nameidata *,
+		     struct proc *);
+int union_start(struct mount *, int, struct proc *);
+int union_unmount(struct mount *, int, struct proc *);
+int union_root(struct mount *, struct vnode **);
+int union_statfs(struct mount *, struct statfs *, struct proc *);
 
 /*
  * Mount union filesystem
@@ -273,6 +273,18 @@ union_start(mp, flags, p)
 	return (0);
 }
 
+
+int union_unmount_count_vnode(struct vnode *vp, void *args);
+
+int
+union_unmount_count_vnode(struct vnode *vp, void *args) {
+	int *n = args;
+
+	*n = *n + 1;
+	simple_unlock(&vp->v_interlock);
+	return (0);
+}
+
 /*
  * Free reference to union layer
  */
@@ -309,14 +321,10 @@ union_unmount(mp, mntflags, p)
 	 * in the filesystem.
 	 */
 	for (freeing = 0; vflush(mp, um_rootvp, flags) != 0;) {
-		struct vnode *vp;
 		int n;
 
 		/* count #vnodes held on mount list */
-		for (n = 0, vp = mp->mnt_vnodelist.lh_first;
-				vp != NULLVP;
-				vp = vp->v_mntvnodes.le_next)
-			n++;
+		vfs_mount_foreach_vnode(mp, union_unmount_count_vnode, &n);
 
 		/* if this is unchanged then stop */
 		if (n == freeing)
@@ -476,20 +484,20 @@ union_statfs(mp, sbp, p)
 	return (0);
 }
 
-#define union_sync ((int (*) __P((struct mount *, int, struct ucred *, \
-				  struct proc *)))nullop)
+#define union_sync ((int (*)(struct mount *, int, struct ucred *, \
+				  struct proc *))nullop)
 
-#define union_fhtovp ((int (*) __P((struct mount *, struct fid *, \
-	    struct vnode **)))eopnotsupp)
-#define union_quotactl ((int (*) __P((struct mount *, int, uid_t, caddr_t, \
-	    struct proc *)))eopnotsupp)
-#define union_sysctl ((int (*) __P((int *, u_int, void *, size_t *, void *, \
-	    size_t, struct proc *)))eopnotsupp)
-#define union_vget ((int (*) __P((struct mount *, ino_t, struct vnode **))) \
+#define union_fhtovp ((int (*)(struct mount *, struct fid *, \
+	    struct vnode **))eopnotsupp)
+#define union_quotactl ((int (*)(struct mount *, int, uid_t, caddr_t, \
+	    struct proc *))eopnotsupp)
+#define union_sysctl ((int (*)(int *, u_int, void *, size_t *, void *, \
+	    size_t, struct proc *))eopnotsupp)
+#define union_vget ((int (*)(struct mount *, ino_t, struct vnode **)) \
 	    eopnotsupp)
-#define union_vptofh ((int (*) __P((struct vnode *, struct fid *)))eopnotsupp)
-#define union_checkexp ((int (*) __P((struct mount *, struct mbuf *,	\
-	int *, struct ucred **)))eopnotsupp)
+#define union_vptofh ((int (*)(struct vnode *, struct fid *))eopnotsupp)
+#define union_checkexp ((int (*)(struct mount *, struct mbuf *,	\
+	int *, struct ucred **))eopnotsupp)
 
 struct vfsops union_vfsops = {
 	union_mount,

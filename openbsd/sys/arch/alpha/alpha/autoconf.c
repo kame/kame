@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.14 2001/09/30 13:08:45 art Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.19 2002/03/14 01:26:26 millert Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.16 1996/11/13 21:13:04 cgd Exp $	*/
 
 /*
@@ -68,18 +68,18 @@ int			booted_partition;
 struct bootdev_data	*bootdev_data;
 char			boot_dev[128];
 
-void	parse_prom_bootdev __P((void));
-int	atoi __P((char *));
-void	setroot __P((void));
-void	swapconf __P((void));
+void	parse_prom_bootdev(void);
+int	atoi(char *);
+void	setroot(void);
+void	swapconf(void);
 
-static struct device *parsedisk __P((char *str, int len, int defpart,
-				     dev_t *devp));
-static struct device *getdisk __P((char *str, int len, int defpart,
-				   dev_t *devp));
-static int findblkmajor __P((struct device *dv));
-static char *findblkname __P((int));
-static int getstr __P((char *cp, int size));
+static struct device *parsedisk(char *str, int len, int defpart,
+				     dev_t *devp);
+static struct device *getdisk(char *str, int len, int defpart,
+				   dev_t *devp);
+int findblkmajor(struct device *dv);
+char *findblkname(int);
+static int getstr(char *cp, int size);
 
 /*
  * cpu_configure:
@@ -91,13 +91,13 @@ cpu_configure()
 	parse_prom_bootdev();
 	softintr_init();
 
-        /*
-         * Disable interrupts during autoconfiguration.  splhigh() won't
-         * work, because it simply _raises_ the IPL, so if machine checks
-         * are disabled, they'll stay disabled.  Machine checks are needed
-         * during autoconfig.
-         */
-        (void)alpha_pal_swpipl(ALPHA_PSL_IPL_HIGH);
+	/*
+	 * Disable interrupts during autoconfiguration.  splhigh() won't
+	 * work, because it simply _raises_ the IPL, so if machine checks
+	 * are disabled, they'll stay disabled.  Machine checks are needed
+	 * during autoconfig.
+	 */
+	(void)alpha_pal_swpipl(ALPHA_PSL_IPL_HIGH);
 	if (config_rootfound("mainbus", "mainbus") == NULL)
 		panic("no mainbus found");
 	(void)spl0();
@@ -142,37 +142,36 @@ struct nam2blk {
 } nam2blk[] = {
 	{ "st",		2 },
 	{ "cd",		3 },
+	{ "fd",		4 },
 	{ "rd",		6 },
 	{ "sd",		8 },
 	{ "wd",		0 },
-#if 0
-	{ "fd",		XXX },
-#endif
+	{ "raid",	16 },
 };
 
 #ifdef RAMDISK_HOOKS
 static struct device fakerdrootdev = { DV_DISK, {}, NULL, 0, "rd0", NULL };
 #endif
 
-static int
+int
 findblkmajor(dv)
 	struct device *dv;
 {
 	char *name = dv->dv_xname;
-	register int i;
+	int i;
 
 	for (i = 0; i < sizeof(nam2blk)/sizeof(nam2blk[0]); ++i)
-		if (strncmp(name, nam2blk[i].name, strlen(nam2blk[0].name))
+		if (strncmp(name, nam2blk[i].name, strlen(nam2blk[i].name))
 		    == 0)
 			return (nam2blk[i].maj);
 	return (-1);
 }
 
-static char *
+char *
 findblkname(maj)
 	int maj;
 {
-	register int i;
+	int i;
 
 	for (i = 0; i < sizeof(nam2blk)/sizeof(nam2blk[0]); ++i)
 		if (maj == nam2blk[i].maj)
@@ -276,7 +275,7 @@ setroot()
 {
 	struct swdevt *swp;
 	struct device *dv;
-        register int len;
+	int len, majdev, unit, part;
 	dev_t nrootdev, nswapdev = NODEV;
 	char buf[128], *rootdevname;
 	dev_t temp;
@@ -293,6 +292,22 @@ setroot()
 	bootdv = booted_device;
 	bootpartition = booted_partition;
 #endif
+
+	/*
+	 * (raid) device auto-configuration could have returned
+	 * the root device's id in rootdev.  Check this case.
+	 */
+	if (rootdev != NODEV) {
+		majdev = major(rootdev);
+		unit = DISKUNIT(rootdev);
+		part = DISKPART(rootdev);
+
+		len = sprintf(buf, "%s%d", findblkname(majdev), unit);
+		if (len >= sizeof(buf))
+			panic("setroot: device name too long");
+
+		bootdv = getdisk(buf, len, part, &rootdev);
+	}
 
 	/*
 	 * If 'swap generic' and we couldn't determine root device,
@@ -380,7 +395,6 @@ gotswap:
 		swdevt[0].sw_dev = nswapdev;
 		swdevt[1].sw_dev = NODEV;
 	} else if (mountroot == NULL) {
-		int majdev;
 		
 		/*
 		 * "swap generic"
@@ -404,7 +418,7 @@ gotswap:
 		}
 		swdevt[0].sw_dev = nswapdev;
 		swdevt[1].sw_dev = NODEV;
-        } else {
+	} else {
 		/*
 		 * `root DEV swap DEV': honor rootdev/swdevt.
 		 * rootdev/swdevt/mountroot already properly set.
@@ -609,7 +623,6 @@ device_register(dev, aux)
 		/*
 		 * There is no hope.
 		 */
-
 		return;
 	}
 

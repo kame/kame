@@ -1,4 +1,4 @@
-/* $OpenBSD: trap.c,v 1.26 2001/07/09 18:55:21 millert Exp $ */
+/* $OpenBSD: trap.c,v 1.32 2002/03/16 03:21:28 art Exp $ */
 /* $NetBSD: trap.c,v 1.52 2000/05/24 16:48:33 thorpej Exp $ */
 
 /*-
@@ -105,8 +105,8 @@
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
+#include <sys/ptrace.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
@@ -120,23 +120,23 @@
 #include <compat/osf1/osf1_syscall.h>
 #endif
 
-void		userret __P((struct proc *, u_int64_t, u_quad_t));
+void		userret(struct proc *, u_int64_t, u_quad_t);
 
-unsigned long	Sfloat_to_reg __P((unsigned int));
-unsigned int	reg_to_Sfloat __P((unsigned long));
-unsigned long	Tfloat_reg_cvt __P((unsigned long));
+unsigned long	Sfloat_to_reg(unsigned int);
+unsigned int	reg_to_Sfloat(unsigned long);
+unsigned long	Tfloat_reg_cvt(unsigned long);
 #ifdef FIX_UNALIGNED_VAX_FP
-unsigned long	Ffloat_to_reg __P((unsigned int));
-unsigned int	reg_to_Ffloat __P((unsigned long));
-unsigned long	Gfloat_reg_cvt __P((unsigned long));
+unsigned long	Ffloat_to_reg(unsigned int);
+unsigned int	reg_to_Ffloat(unsigned long);
+unsigned long	Gfloat_reg_cvt(unsigned long);
 #endif
 
-int		unaligned_fixup __P((unsigned long, unsigned long,
-		    unsigned long, struct proc *));
+int		unaligned_fixup(unsigned long, unsigned long,
+		    unsigned long, struct proc *);
 int		handle_opdec(struct proc *p, u_int64_t *ucodep);
 
-static void printtrap __P((const unsigned long, const unsigned long,
-      const unsigned long, const unsigned long, struct trapframe *, int, int));
+static void printtrap(const unsigned long, const unsigned long,
+      const unsigned long, const unsigned long, struct trapframe *, int, int);
 
 /*
  * Initialize the trap vectors for the current processor.
@@ -385,6 +385,12 @@ trap(a0, a1, a2, entry, framep)
 			/* FALLTHROUTH */
 		case ALPHA_IF_CODE_BPT:
 		case ALPHA_IF_CODE_BUGCHK:
+#ifdef PTRACE
+			if (p->p_md.md_flags & (MDP_STEP1|MDP_STEP2)) {
+				process_sstep(p, 0);
+				p->p_md.md_tf->tf_regs[FRAME_PC] -= 4;
+			}
+#endif
 			ucode = a0;		/* trap type */
 			i = SIGTRAP;
 			break;
@@ -435,12 +441,12 @@ trap(a0, a1, a2, entry, framep)
 		case ALPHA_MMCSR_INVALTRANS:
 		case ALPHA_MMCSR_ACCESS:
 	    	{
-			register vaddr_t va;
-			register struct vmspace *vm = NULL;
-			register vm_map_t map;
+			vaddr_t va;
+			struct vmspace *vm = NULL;
+			struct vm_map *map;
 			vm_prot_t ftype;
 			int rv;
-			extern vm_map_t kernel_map;
+			extern struct vm_map *kernel_map;
 
 			/*
 			 * If it was caused by fuswintr or suswintr,
@@ -502,17 +508,17 @@ trap(a0, a1, a2, entry, framep)
 			if (map != kernel_map &&
 			    (caddr_t)va >= vm->vm_maxsaddr &&
 			    va < USRSTACK) {
-				if (rv == KERN_SUCCESS) {
+				if (rv == 0) {
 					unsigned nss;
 	
 					nss = btoc(USRSTACK -
 					    (unsigned long)va);
 					if (nss > vm->vm_ssize)
 						vm->vm_ssize = nss;
-				} else if (rv == KERN_PROTECTION_FAILURE)
-					rv = KERN_INVALID_ADDRESS;
+				} else if (rv == EACCES)
+					rv = EFAULT;
 			}
-			if (rv == KERN_SUCCESS) {
+			if (rv == 0) {
 				goto out;
 			}
 
@@ -530,7 +536,7 @@ trap(a0, a1, a2, entry, framep)
 			ucode = ftype;
 			v = (caddr_t)a0;
 			typ = SEGV_MAPERR;
-			if (rv == KERN_RESOURCE_SHORTAGE) {
+			if (rv == ENOMEM) {
 				printf("UVM: pid %d (%s), uid %d killed: "
 				       "out of swap\n", p->p_pid, p->p_comm,
 				       p->p_cred && p->p_ucred ?

@@ -1,4 +1,4 @@
-/*	$OpenBSD: wdvar.h,v 1.3 2001/01/25 03:50:50 todd Exp $	*/
+/*	$OpenBSD: wdvar.h,v 1.5 2002/03/14 03:16:04 millert Exp $	*/
 /*	$NetBSD: wdvar.h,v 1.3 1998/11/11 19:38:27 bouyer Exp $	*/
 
 /*
@@ -51,7 +51,7 @@ struct ata_bio {
     daddr_t nblks; /* number of block currently transfering */
     int     nbytes; /* number of bytes currently transfering */
     long    bcount; /* total number of bytes */
-    char*   databuf; /* data buffer adress */
+    char   *databuf; /* data buffer adress */
     volatile int error;
 #define NOERROR 0 /* There was no error (r_error invalid) */
 #define ERROR   1 /* check r_error */
@@ -77,6 +77,6 @@ struct ata_bio {
 #define MULTIMODE_WAIT 9
 #define READY          10
 
-int wdc_ata_bio __P((struct ata_drive_datas*, struct ata_bio*)); 
+int wdc_ata_bio(struct ata_drive_datas*, struct ata_bio*); 
 
-void wddone __P((void *));
+void wddone(void *);

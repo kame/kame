@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISKB,v 1.45 2001/10/10 23:43:43 millert Exp $
+#	$OpenBSD: RAMDISKB,v 1.51 2002/04/10 03:54:18 deraadt Exp $
 
 machine		i386		# architecture, used by config; REQUIRED
 
@@ -47,6 +47,7 @@ apm0	at bios0 flags 0x0000	# flags 0x0101 to force protocol version 1.1
 pcibios0 at bios0 flags 0x0000
 
 isa0	at mainbus0
+isa0	at pcib?
 eisa0	at mainbus0
 pci*	at mainbus0
 
@@ -57,6 +58,7 @@ pchb*	at pci? dev ? function ?	# PCI-Host bridges
 ppb*	at pci? dev ? function ?	# PCI-PCI bridges
 pci*	at ppb? bus ?
 pci*	at pchb? bus ?
+pcib*	at pci? dev ? function ?	# PCI-ISA bridge
 
 # ISA PCMCIA controllers
 #pcic0	at isa? port 0x3e0 iomem 0xd0000 iosiz 0x4000
@@ -105,10 +107,12 @@ pccom*	at isapnp?
 #lpt1	at isa? port 0x278
 #lpt2	at isa? port 0x3bc
 
-#bt0	at isa? port 0x330 irq ? drq ?	# BusLogic [57]4X SCSI controllers
-#bt1	at isa? port 0x334 irq ? drq ?	# BusLogic [57]4X SCSI controllers
-#bt2	at isa? port ? irq ?
-#scsibus* at bt?
+#bha0	at isa? port 0x330 irq ? drq ?	# BusLogic [57]4X SCSI controllers
+#bha1	at isa? disable port 0x334 irq ? drq ? # BusLogic [57]4X SCSI controllers
+#bha2	at isa? disable port ? irq ?
+#bha*	at pci? dev ? function ?
+#bha*	at eisa? slot ?			# XXX eisa still runs in isa-compat
+#scsibus* at bha?
 #aha0	at isa? port 0x330 irq ? drq ?	# Adaptec 154[02] SCSI controllers
 #aha1	at isa? port 0x334 irq ? drq ?	# Adaptec 154[02] SCSI controllers
 #aha*	at isapnp?
@@ -131,8 +135,8 @@ scsibus* at ami?
 cac*	at pci? dev ? function ?	# Compaq Smart ARRAY RAID controllers
 cac*	at eisa? slot ?
 scsibus* at cac?
-#twe*	at pci? dev ? function ?	# 3ware Escalade RAID controllers
-#scsibus* at twe?
+twe*	at pci? dev ? function ?	# 3ware Escalade RAID controllers
+scsibus* at twe?
 iha*	at pci? dev ? function ?	# Initio Ultra/UltraWide SCSI controllers
 scsibus* at iha?
 isp*	at pci? dev ? function ?	# Qlogic ISP [12]0x0 SCSI/FibreChannel
@@ -151,13 +155,15 @@ pcscp*	at pci? dev ? function ?	# AMD 53c974 PCscsi-PCI SCSI
 scsibus* at pcscp?
 #sea0	at isa? iomem 0xc8000 irq 5	# Seagate ST0[12] SCSI controllers
 #scsibus* at sea?
+trm*	at pci? dev ? function ?	# Tekram DC-3x5U SCSI Controllers
+scsibus* at trm?
 uha0	at isa? port 0x330 irq ? drq ?	# UltraStor [13]4f SCSI controllers
 uha1	at isa? port 0x334 irq ? drq ?	# UltraStor [13]4f SCSI controllers
 uha*	at eisa? slot ?			# UltraStor 24f SCSI controllers
 scsibus* at uha?
-wds0	at isa? port 0x350 irq 15 drq 6	# WD7000 and TMC-7000 controllers
+#wds0	at isa? port 0x350 irq 15 drq 6	# WD7000 and TMC-7000 controllers
 #wds1	at isa? port 0x358 irq 11 drq 5
-scsibus* at wds?
+#scsibus* at wds?
 
 sd*	at scsibus? target ? lun ?	# SCSI disk drives
 st*	at scsibus? target ? lun ?	# SCSI tape drives
@@ -183,6 +189,11 @@ wdc1	at isa? port 0x170 irq 15 flags 0x00
 wd*	at wdc? channel ? drive ? flags 0x0000
 wd*	at pciide? channel ? drive ? flags 0x0000
 
+# I2O
+iop*	at pci? dev ? function ?	# I2O
+ioprbs*	at iop? tid ?			# Random block storage
+scsibus* at ioprbs?
+
 # ATAPI<->SCSI
 atapiscsi* at wdc? channel ?
 atapiscsi* at pciide? channel ?
@@ -190,34 +201,34 @@ scsibus* at atapiscsi?
 
 #wt0	at isa? port 0x308 irq 5 drq 1		# Archive/Wangtek QIC tapes
 
-we0	at isa? port 0x280 iomem 0xd0000 irq 9	# WD/SMC 80x3 ethernet series
-we1	at isa? port 0x300 iomem 0xcc000 irq 10	#
-we*	at isapnp?
-ec0	at isa? port 0x250 iomem 0xd8000 irq 9	# 3C503 ethernet card
-ne0	at isa? port 0x240 irq 9		# NE[12]000 ethernet card
-ne1	at isa? port 0x300 irq 10		# NE[12]000 ethernet card
-ne2	at isa? port 0x280 irq 9		# NE[12]000 ethernet
-ne*	at isapnp?				# NE[12]000 PnP ethernet cards
+#we0	at isa? port 0x280 iomem 0xd0000 irq 9	# WD/SMC 80x3 ethernet series
+#we1	at isa? port 0x300 iomem 0xcc000 irq 10	#
+#we*	at isapnp?
+#ec0	at isa? port 0x250 iomem 0xd8000 irq 9	# 3C503 ethernet card
+#ne0	at isa? port 0x240 irq 9		# NE[12]000 ethernet card
+#ne1	at isa? port 0x300 irq 10		# NE[12]000 ethernet card
+#ne2	at isa? port 0x280 irq 9		# NE[12]000 ethernet
+#ne*	at isapnp?				# NE[12]000 PnP ethernet cards
 #eg0	at isa? port 0x310 irq 5		# 3C505/Etherlink+ ethernet cards
 #el0	at isa? port 0x300 irq 9		# 3C501 ethernet cards
-ep0	at isa? port ? irq ?			# 3C509 ethernet cards
-ep*	at isa? port ? irq ?			# 3C509 ethernet cards
-ef*	at isapnp?				# 3C515 PnP ethernet
-ie0	at isa? port 0x360 iomem 0xd0000 irq 7	# StarLAN and 3C507
+#ep0	at isa? port ? irq ?			# 3C509 ethernet cards
+#ep*	at isa? port ? irq ?			# 3C509 ethernet cards
+#ef*	at isapnp?				# 3C515 PnP ethernet
+#ie0	at isa? port 0x360 iomem 0xd0000 irq 7	# StarLAN and 3C507
 #ie1	at isa? port 0x300 irq 10		# EtherExpress
-le0	at isa? port 0x360 irq 15 drq 6		# IsoLan, NE2100, and DEPCA
-ex0	at isa? port 0x320 irq 5		# Intel EtherExpress PRO/10
-ep0	at eisa? slot ?
-ep*	at eisa? slot ?				# 3C579 ethernet cards
+#le0	at isa? port 0x360 irq 15 drq 6		# IsoLan, NE2100, and DEPCA
+#ex0	at isa? port 0x320 irq 5		# Intel EtherExpress PRO/10
+#ep0	at eisa? slot ?
+#ep*	at eisa? slot ?				# 3C579 ethernet cards
 #fea*	at eisa? slot ?				# DEC DEFEA FDDI cards
-le*	at pci? dev ? function ?		# PCnet-PCI based ethernet cards
-ep*	at isapnp?				# 3C509 PnP ethernet cards
-le*	at isapnp?
+#le*	at pci? dev ? function ?		# PCnet-PCI based ethernet cards
+#ep*	at isapnp?				# 3C509 PnP ethernet cards
+#le*	at isapnp?
 de*	at pci? dev ? function ?		# DC21X4X-based ethernet cards
 fxp*	at pci? dev ? function ?		# EtherExpress 10/100B ethernet cards
 ep0	at pci? dev ? function ?		# 3C59x ethernet cards
 ep*	at pci? dev ? function ?		# 3C59x ethernet cards
-ne*	at pci? dev ? function ?		# NE2000-compat ethernet cards
+#ne*	at pci? dev ? function ?		# NE2000-compat ethernet cards
 #ne*	at pcmcia? function ?			# PCMCIA based NE2000 cards
 #ep*	at pcmcia? function ?			# PCMCIA based 3c5xx cards
 #sm*	at pcmcia? function ?			# PCMCIA based sm cards
@@ -235,7 +246,9 @@ dc*	at pci? dev ? function ?		# 21143, "tulip" clone ethernet
 #sk*	at skc?					#  each port of above
 #wx*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
 
-#wi*	at pcmcia? function ?			# WaveLAN IEEE 802.11
+# Wireless network cards
+wi*	at pci? dev ? function ?		# WaveLAN IEEE 802.11DS
+#wi*	at pcmcia? function ?			# WaveLAN IEEE 802.11DS
 #awi*	at pcmcia? function ?			# Bay Networks IEEE 802.11FH
 #an*	at pcmcia? function ?			# Aironet IEEE 802.11DS
 #cnw*	at pcmcia? function ?			# Xircom Netwave

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ce4231.c,v 1.2 2001/10/02 00:26:24 jason Exp $	*/
+/*	$OpenBSD: ce4231.c,v 1.8 2002/04/08 17:49:41 jason Exp $	*/
 
 /*
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
@@ -34,6 +34,11 @@
 /*
  * Driver for CS4231 based audio found in some sun4m systems (cs4231)
  * based on ideas from the S/Linux project and the NetBSD project.
+ *
+ * Effort sponsored in part by the Defense Advanced Research Projects
+ * Agency (DARPA) and Air Force Research Laboratory, Air Force
+ * Materiel Command, USAF, under agreement number F30602-01-2-0537.
+ *
  */
 
 #include "audio.h"
@@ -128,39 +133,39 @@
 #define	C_READ(sc,r)		\
     bus_space_read_4((sc)->sc_bustag, (sc)->sc_cdmahandle, (r))
 
-int	ce4231_match	__P((struct device *, void *, void *));
-void	ce4231_attach	__P((struct device *, struct device *, void *));
-int	ce4231_cintr	__P((void *));
-int	ce4231_pintr	__P((void *));
+int	ce4231_match(struct device *, void *, void *);
+void	ce4231_attach(struct device *, struct device *, void *);
+int	ce4231_cintr(void *);
+int	ce4231_pintr(void *);
 
-int	ce4231_set_speed	__P((struct ce4231_softc *, u_long *));
-void	ce4231_setup_output	__P((struct ce4231_softc *sc));
+int	ce4231_set_speed(struct ce4231_softc *, u_long *);
+void	ce4231_setup_output(struct ce4231_softc *sc);
 
-void		ce4231_write	__P((struct ce4231_softc *, u_int8_t, u_int8_t));
-u_int8_t	ce4231_read	__P((struct ce4231_softc *, u_int8_t));
+void		ce4231_write(struct ce4231_softc *, u_int8_t, u_int8_t);
+u_int8_t	ce4231_read(struct ce4231_softc *, u_int8_t);
 
 /* Audio interface */
-int	ce4231_open		__P((void *, int));
-void	ce4231_close		__P((void *));
-int	ce4231_query_encoding	__P((void *, struct audio_encoding *));
-int	ce4231_set_params	__P((void *, int, int, struct audio_params *,
-    struct audio_params *));
-int	ce4231_round_blocksize	__P((void *, int));
-int	ce4231_commit_settings	__P((void *));
-int	ce4231_halt_output	__P((void *));
-int	ce4231_halt_input	__P((void *));
-int	ce4231_getdev		__P((void *, struct audio_device *));
-int	ce4231_set_port		__P((void *, mixer_ctrl_t *));
-int	ce4231_get_port		__P((void *, mixer_ctrl_t *));
-int	ce4231_query_devinfo	__P((void *addr, mixer_devinfo_t *));
-void *	ce4231_alloc		__P((void *, u_long, int, int));
-void	ce4231_free		__P((void *, void *, int));
-u_long	ce4231_round_buffersize	__P((void *, u_long));
-int	ce4231_get_props	__P((void *));
-int	ce4231_trigger_output __P((void *, void *, void *, int,
-    void (*intr)__P((void *)), void *arg, struct audio_params *));
-int	ce4231_trigger_input __P((void *, void *, void *, int,
-    void (*intr)__P((void *)), void *arg, struct audio_params *));
+int	ce4231_open(void *, int);
+void	ce4231_close(void *);
+int	ce4231_query_encoding(void *, struct audio_encoding *);
+int	ce4231_set_params(void *, int, int, struct audio_params *,
+    struct audio_params *);
+int	ce4231_round_blocksize(void *, int);
+int	ce4231_commit_settings(void *);
+int	ce4231_halt_output(void *);
+int	ce4231_halt_input(void *);
+int	ce4231_getdev(void *, struct audio_device *);
+int	ce4231_set_port(void *, mixer_ctrl_t *);
+int	ce4231_get_port(void *, mixer_ctrl_t *);
+int	ce4231_query_devinfo(void *addr, mixer_devinfo_t *);
+void *	ce4231_alloc(void *, int, size_t, int, int);
+void	ce4231_free(void *, void *, int);
+size_t	ce4231_round_buffersize(void *, int, size_t);
+int	ce4231_get_props(void *);
+int	ce4231_trigger_output(void *, void *, void *, int,
+    void (*intr)(void *), void *arg, struct audio_params *);
+int	ce4231_trigger_input(void *, void *, void *, int,
+    void (*intr)(void *), void *arg, struct audio_params *);
 
 struct audio_hw_if ce4231_sa_hw_if = {
 	ce4231_open,
@@ -243,14 +248,16 @@ ce4231_attach(parent, self, aux)
 		return;
 	}
 
-	if (bus_intr_establish(ea->ea_bustag, ea->ea_intrs[0], IPL_AUDIO, 0,
-	    ce4231_cintr, sc) == NULL) {
-		printf(": couldn't establish interrupt1\n");
+	sc->sc_cih = bus_intr_establish(ea->ea_bustag, ea->ea_intrs[0],
+	    IPL_AUDIO, 0, ce4231_cintr, sc);
+	if (sc->sc_cih == NULL) {
+		printf(": couldn't establish capture interrupt\n");
 		return;
 	}
-	if (bus_intr_establish(ea->ea_bustag, ea->ea_intrs[1], IPL_AUDIO, 0,
-	    ce4231_pintr, sc) == NULL) {
-		printf(": couldn't establish interrupt1\n");
+	sc->sc_pih = bus_intr_establish(ea->ea_bustag, ea->ea_intrs[1],
+	    IPL_AUDIO, 0, ce4231_pintr, sc);
+	if (sc->sc_pih == NULL) {
+		printf(": couldn't establish play interrupt1\n");
 		return;
 	}
 
@@ -433,6 +440,10 @@ ce4231_open(addr, flags)
 	    ce4231_read(sc, SP_MISC_INFO) | MODE2);
 
 	ce4231_setup_output(sc);
+
+	ce4231_write(sc, SP_PIN_CONTROL,
+	    ce4231_read(sc, SP_PIN_CONTROL) | INTERRUPT_ENABLE);
+
 	return (0);
 }
 
@@ -490,6 +501,8 @@ ce4231_close(addr)
 
 	ce4231_halt_input(sc);
 	ce4231_halt_output(sc);
+	ce4231_write(sc, SP_PIN_CONTROL,
+	    ce4231_read(sc, SP_PIN_CONTROL) & (~INTERRUPT_ENABLE));
 	sc->sc_open = 0;
 }
 
@@ -569,8 +582,8 @@ ce4231_set_params(addr, setmode, usemode, p, r)
 {
 	struct ce4231_softc *sc = (struct ce4231_softc *)addr;
 	int err, bits, enc;
-	void (*pswcode) __P((void *, u_char *, int cnt));
-	void (*rswcode) __P((void *, u_char *, int cnt));
+	void (*pswcode)(void *, u_char *, int cnt);
+	void (*rswcode)(void *, u_char *, int cnt);
 
 	enc = p->encoding;
 	pswcode = rswcode = 0;
@@ -1274,10 +1287,11 @@ ce4231_query_devinfo(addr, dip)
 	return (err);
 }
 
-u_long
-ce4231_round_buffersize(addr, size)
+size_t
+ce4231_round_buffersize(addr, direction, size)
 	void *addr;
-	u_long size;
+	int direction;
+	size_t size;
 {
 	return (size);
 }
@@ -1353,9 +1367,10 @@ ce4231_pintr(v)
 }
 
 void *
-ce4231_alloc(addr, size, pool, flags)
+ce4231_alloc(addr, direction, size, pool, flags)
 	void *addr;
-	u_long size;
+	int direction;
+	size_t size;
 	int pool;
 	int flags;
 {
@@ -1428,7 +1443,7 @@ int
 ce4231_trigger_output(addr, start, end, blksize, intr, arg, param)
 	void *addr, *start, *end;
 	int blksize;
-	void (*intr) __P((void *));
+	void (*intr)(void *);
 	void *arg;
 	struct audio_params *param;
 {
@@ -1500,7 +1515,7 @@ int
 ce4231_trigger_input(addr, start, end, blksize, intr, arg, param)
 	void *addr, *start, *end;
 	int blksize;
-	void (*intr) __P((void *));
+	void (*intr)(void *);
 	void *arg;
 	struct audio_params *param;
 {

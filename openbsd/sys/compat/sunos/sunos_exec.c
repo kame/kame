@@ -1,4 +1,4 @@
-/*	$OpenBSD: sunos_exec.c,v 1.13 2001/09/11 20:05:25 miod Exp $	*/
+/*	$OpenBSD: sunos_exec.c,v 1.16 2002/03/14 01:26:50 millert Exp $	*/
 /*	$NetBSD: sunos_exec.c,v 1.11 1996/05/05 12:01:47 briggs Exp $	*/
 
 /*
@@ -44,7 +44,7 @@
 #include <sys/wait.h>
 
 #include <sys/mman.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/reg.h>
@@ -60,10 +60,10 @@
 #define	sunos_exec_aout_prep_omagic exec_aout_prep_omagic
 #endif
 
-int sunos_exec_aout_makecmds __P((struct proc *, struct exec_package *));
-int sunos_exec_aout_prep_zmagic __P((struct proc *, struct exec_package *));
-int sunos_exec_aout_prep_nmagic __P((struct proc *, struct exec_package *));
-int sunos_exec_aout_prep_omagic __P((struct proc *, struct exec_package *));
+int sunos_exec_aout_makecmds(struct proc *, struct exec_package *);
+int sunos_exec_aout_prep_zmagic(struct proc *, struct exec_package *);
+int sunos_exec_aout_prep_nmagic(struct proc *, struct exec_package *);
+int sunos_exec_aout_prep_omagic(struct proc *, struct exec_package *);
 
 extern int nsunos_sysent;
 extern struct sysent sunos_sysent[];
@@ -175,7 +175,7 @@ sunos_exec_aout_prep_zmagic(p, epp)
 #endif
 		return ETXTBSY;
 	}
-	epp->ep_vp->v_flag |= VTEXT;
+	vn_marktext(epp->ep_vp);
 
 	/* set up command for text segment */
 	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_pagedvn, execp->a_text,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ie.c,v 1.18 2001/07/25 13:25:33 art Exp $	*/
+/*	$OpenBSD: if_ie.c,v 1.23 2002/03/14 01:26:43 millert Exp $	*/
 /*	$NetBSD: if_ie.c,v 1.33 1997/07/29 17:55:38 fair Exp $	*/
 
 /*-
@@ -135,8 +135,7 @@ Mode of operation:
 #include <netns/ns_if.h>
 #endif
 
-#include <vm/vm.h>
-
+#include <uvm/uvm_extern.h>
 #include <uvm/uvm_map.h>
 
 /*
@@ -154,7 +153,7 @@ Mode of operation:
 #include <sparc/dev/i82586.h>
 
 static struct mbuf *last_not_for_us;
-vm_map_t ie_map; /* for obio */
+struct vm_map *ie_map; /* for obio */
 
 #define	IED_RINT	0x01
 #define	IED_TINT	0x02
@@ -233,15 +232,15 @@ struct ie_softc {
 
 	struct arpcom sc_arpcom;/* system arpcom structure */
 
-	void (*reset_586) __P((struct ie_softc *));
+	void (*reset_586)(struct ie_softc *);
 				/* card dependent reset function */
-	void (*chan_attn) __P((struct ie_softc *));
+	void (*chan_attn)(struct ie_softc *);
 				/* card dependent attn function */
-	void (*run_586) __P((struct ie_softc *));
+	void (*run_586)(struct ie_softc *);
 				/* card depenent "go on-line" function */
-	void (*memcopy) __P((const void *, void *, u_int));
+	void (*memcopy)(const void *, void *, u_int);
 	                        /* card dependent memory copy function */
-        void (*memzero) __P((void *, u_int));
+        void (*memzero)(void *, u_int);
 	                        /* card dependent memory zero function */
 
 
@@ -293,55 +292,55 @@ struct ie_softc {
 #endif
 };
 
-static void ie_obreset __P((struct ie_softc *));
-static void ie_obattend __P((struct ie_softc *));
-static void ie_obrun __P((struct ie_softc *));
-static void ie_vmereset __P((struct ie_softc *));
-static void ie_vmeattend __P((struct ie_softc *));
-static void ie_vmerun __P((struct ie_softc *));
+static void ie_obreset(struct ie_softc *);
+static void ie_obattend(struct ie_softc *);
+static void ie_obrun(struct ie_softc *);
+static void ie_vmereset(struct ie_softc *);
+static void ie_vmeattend(struct ie_softc *);
+static void ie_vmerun(struct ie_softc *);
 
-void iewatchdog __P((struct ifnet *));
-int ieintr __P((void *));
-int ieinit __P((struct ie_softc *));
-int ieioctl __P((struct ifnet *, u_long, caddr_t));
-void iestart __P((struct ifnet *));
-void iereset __P((struct ie_softc *));
-static void ie_readframe __P((struct ie_softc *, int));
-static void ie_drop_packet_buffer __P((struct ie_softc *));
-int ie_setupram __P((struct ie_softc *));
-static int command_and_wait __P((struct ie_softc *, int,
-    void volatile *, int));
-/*static*/ void ierint __P((struct ie_softc *));
-/*static*/ void ietint __P((struct ie_softc *));
-static int ieget __P((struct ie_softc *, struct mbuf **,
-		      struct ether_header *, int *));
-static void setup_bufs __P((struct ie_softc *));
-static int mc_setup __P((struct ie_softc *, void *));
-static void mc_reset __P((struct ie_softc *));
-static __inline int ether_equal __P((u_char *, u_char *));
-static __inline void ie_ack __P((struct ie_softc *, u_int));
-static __inline void ie_setup_config __P((volatile struct ie_config_cmd *,
-					  int, int));
-static __inline int check_eh __P((struct ie_softc *, struct ether_header *,
-				  int *));
-static __inline int ie_buflen __P((struct ie_softc *, int));
-static __inline int ie_packet_len __P((struct ie_softc *));
-static __inline void iexmit __P((struct ie_softc *));
-static __inline caddr_t Align __P((caddr_t));
+void iewatchdog(struct ifnet *);
+int ieintr(void *);
+int ieinit(struct ie_softc *);
+int ieioctl(struct ifnet *, u_long, caddr_t);
+void iestart(struct ifnet *);
+void iereset(struct ie_softc *);
+static void ie_readframe(struct ie_softc *, int);
+static void ie_drop_packet_buffer(struct ie_softc *);
+int ie_setupram(struct ie_softc *);
+static int command_and_wait(struct ie_softc *, int,
+    void volatile *, int);
+/*static*/ void ierint(struct ie_softc *);
+/*static*/ void ietint(struct ie_softc *);
+static int ieget(struct ie_softc *, struct mbuf **,
+		      struct ether_header *, int *);
+static void setup_bufs(struct ie_softc *);
+static int mc_setup(struct ie_softc *, void *);
+static void mc_reset(struct ie_softc *);
+static __inline int ether_equal(u_char *, u_char *);
+static __inline void ie_ack(struct ie_softc *, u_int);
+static __inline void ie_setup_config(volatile struct ie_config_cmd *,
+					  int, int);
+static __inline int check_eh(struct ie_softc *, struct ether_header *,
+				  int *);
+static __inline int ie_buflen(struct ie_softc *, int);
+static __inline int ie_packet_len(struct ie_softc *);
+static __inline void iexmit(struct ie_softc *);
+static __inline caddr_t Align(caddr_t);
 
-static void chan_attn_timeout __P((void *));
-static void run_tdr __P((struct ie_softc *, struct ie_tdr_cmd *));
-static void iestop __P((struct ie_softc *));
+static void chan_attn_timeout(void *);
+static void run_tdr(struct ie_softc *, struct ie_tdr_cmd *);
+static void iestop(struct ie_softc *);
 
 #ifdef IEDEBUG
-void print_rbd __P((volatile struct ie_recv_buf_desc *));
+void print_rbd(volatile struct ie_recv_buf_desc *);
 
 int in_ierint = 0;
 int in_ietint = 0;
 #endif
 
-int iematch __P((struct device *, void *, void *));
-void ieattach __P((struct device *, struct device *, void *));
+int iematch(struct device *, void *, void *);
+void ieattach(struct device *, struct device *, void *);
 
 struct cfattach ie_ca = {
 	sizeof(struct ie_softc), iematch, ieattach
@@ -566,6 +565,7 @@ ieattach(parent, self, aux)
 		pmap_enter(pmap_kernel(), trunc_page(IEOB_ADBASE+IE_SCP_ADDR),
                     (paddr_t)pa | PMAP_NC /*| PMAP_IOC*/,
                     VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
+		pmap_update(pmap_kernel());
 
 		sc->scp = (volatile struct ie_sys_conf_ptr *)
 			(IEOB_ADBASE + IE_SCP_ADDR);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: openpic.c,v 1.6 2001/10/03 14:07:05 drahn Exp $	*/
+/*	$OpenBSD: openpic.c,v 1.16 2002/03/14 03:15:55 millert Exp $	*/
 
 /*-
  * Copyright (c) 1995 Per Fogelstrom
@@ -47,8 +47,8 @@
 #include <sys/socket.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm.h>
+#include <ddb/db_var.h>
 
 #include <machine/autoconf.h>
 #include <machine/intr.h>
@@ -61,43 +61,43 @@
 #define ICU_LEN 128
 #define LEGAL_IRQ(x) ((x >= 0) && (x < ICU_LEN))
 
-static int intrtype[ICU_LEN], intrmask[ICU_LEN], intrlevel[ICU_LEN];
-static struct intrhand *intrhand[ICU_LEN] = { 0 };
-static int hwirq[ICU_LEN], virq[ICU_LEN];
-unsigned int imen /* = 0xffffffff */; /* XXX */
-static int virq_max = 0;
+int o_intrtype[ICU_LEN], o_intrmask[ICU_LEN], o_intrlevel[ICU_LEN];
+struct intrhand *o_intrhand[ICU_LEN] = { 0 };
+int o_hwirq[ICU_LEN], o_virq[ICU_LEN];
+unsigned int imen_o = 0xffffffff;
+int o_virq_max;
 
 struct evcnt evirq[ICU_LEN];
 
-static int fakeintr __P((void *));
-static char *intr_typename __P((int type));
-static void intr_calculatemasks __P((void));
-static __inline int cntlzw __P((int x));
-static int mapirq __P((int irq));
-int openpic_prog_button __P((void *arg));
-void openpic_enable_irq_mask __P((int irq_mask));
+static int fakeintr(void *);
+static char *intr_typename(int type);
+static void intr_calculatemasks(void);
+static __inline int cntlzw(int x);
+static int mapirq(int irq);
+int openpic_prog_button(void *arg);
+void openpic_enable_irq_mask(int irq_mask);
 
 #define HWIRQ_MAX 27
 #define HWIRQ_MASK 0x0fffffff
 
-static __inline u_int openpic_read __P((int));
-static __inline void openpic_write __P((int, u_int));
-void openpic_enable_irq __P((int, int));
-void openpic_disable_irq __P((int));
-void openpic_init __P((void));
-void openpic_set_priority __P((int, int));
-static __inline int openpic_read_irq __P((int));
-static __inline void openpic_eoi __P((int));
+static __inline u_int openpic_read(int);
+static __inline void openpic_write(int, u_int);
+void openpic_enable_irq(int, int);
+void openpic_disable_irq(int);
+void openpic_init(void);
+void openpic_set_priority(int, int);
+static __inline int openpic_read_irq(int);
+static __inline void openpic_eoi(int);
 
 struct openpic_softc {
 	struct device sc_dev;
 };
 
-int	openpic_match __P((struct device *parent, void *cf, void *aux));
-void	openpic_attach __P((struct device *, struct device *, void *));
-void	openpic_do_pending_int __P((void));
-void	openpic_collect_preconf_intr __P((void));
-void	ext_intr_openpic __P((void));
+int	openpic_match(struct device *parent, void *cf, void *aux);
+void	openpic_attach(struct device *, struct device *, void *);
+void	openpic_do_pending_int(void);
+void	openpic_collect_preconf_intr(void);
+void	ext_intr_openpic(void);
 
 struct cfattach openpic_ca = { 
 	sizeof(struct openpic_softc),
@@ -134,9 +134,9 @@ extern void_f *pending_int_f;
 
 vaddr_t openpic_base;
 void * openpic_intr_establish( void * lcv, int irq, int type, int level,
-	int (*ih_fun) __P((void *)), void *ih_arg, char *name);
+	int (*ih_fun)(void *), void *ih_arg, char *name);
 void openpic_intr_disestablish( void *lcp, void *arg);
-void openpic_collect_preconf_intr __P((void));
+void openpic_collect_preconf_intr(void);
 
 void
 openpic_attach(parent, self, aux)
@@ -169,7 +169,7 @@ openpic_attach(parent, self, aux)
 
 #if 1
 	mac_intr_establish(parent, 0x37, IST_LEVEL,
-		IPL_HIGH, openpic_prog_button, (void*)0x37, "prog button");
+		IPL_HIGH, openpic_prog_button, (void *)0x37, "prog button");
 #endif
 	ppc_intr_enable(1);
 
@@ -204,6 +204,7 @@ fakeintr(arg)
 
 void nameinterrupt( int replace, char *newstr);
 
+
 /*
  * Register an interrupt handler.
  */
@@ -213,7 +214,7 @@ openpic_intr_establish(lcv, irq, type, level, ih_fun, ih_arg, name)
 	int irq;
 	int type;
 	int level;
-	int (*ih_fun) __P((void *));
+	int (*ih_fun)(void *);
 	void *ih_arg;
 	char *name;
 {
@@ -241,18 +242,18 @@ printf("vI %d ", irq);
 	if (!LEGAL_IRQ(irq) || type == IST_NONE)
 		panic("intr_establish: bogus irq or type");
 
-	switch (intrtype[irq]) {
+	switch (o_intrtype[irq]) {
 	case IST_NONE:
-		intrtype[irq] = type;
+		o_intrtype[irq] = type;
 		break;
 	case IST_EDGE:
 	case IST_LEVEL:
-		if (type == intrtype[irq])
+		if (type == o_intrtype[irq])
 			break;
 	case IST_PULSE:
 		if (type != IST_NONE)
 			panic("intr_establish: can't share %s with %s",
-			    intr_typename(intrtype[irq]),
+			    intr_typename(o_intrtype[irq]),
 			    intr_typename(type));
 		break;
 	}
@@ -262,7 +263,7 @@ printf("vI %d ", irq);
 	 * This is O(N^2), but we want to preserve the order, and N is
 	 * generally small.
 	 */
-	for (p = &intrhand[irq]; (q = *p) != NULL; p = &q->ih_next)
+	for (p = &o_intrhand[irq]; (q = *p) != NULL; p = &q->ih_next)
 		;
 
 	/*
@@ -308,7 +309,7 @@ openpic_intr_disestablish(lcp, arg)
 	 * Remove the handler from the chain.
 	 * This is O(n^2), too.
 	 */
-	for (p = &intrhand[irq]; (q = *p) != NULL && q != ih; p = &q->ih_next)
+	for (p = &o_intrhand[irq]; (q = *p) != NULL && q != ih; p = &q->ih_next)
 		;
 	if (q)
 		*p = q->ih_next;
@@ -318,8 +319,8 @@ openpic_intr_disestablish(lcp, arg)
 
 	intr_calculatemasks();
 
-	if (intrhand[irq] == NULL)
-		intrtype[irq] = IST_NONE;
+	if (o_intrhand[irq] == NULL)
+		o_intrtype[irq] = IST_NONE;
 }
 
 
@@ -360,16 +361,16 @@ intr_calculatemasks()
 	/* First, figure out which levels each IRQ uses. */
 	for (irq = 0; irq < ICU_LEN; irq++) {
 		register int levels = 0;
-		for (q = intrhand[irq]; q; q = q->ih_next)
+		for (q = o_intrhand[irq]; q; q = q->ih_next)
 			levels |= 1 << q->ih_level;
-		intrlevel[irq] = levels;
+		o_intrlevel[irq] = levels;
 	}
 
 	/* Then figure out which IRQs use each level. */
 	for (level = 0; level < 5; level++) {
 		register int irqs = 0;
 		for (irq = 0; irq < ICU_LEN; irq++)
-			if (intrlevel[irq] & (1 << level))
+			if (o_intrlevel[irq] & (1 << level))
 				irqs |= 1 << irq;
 		imask[level] = irqs | SINT_MASK;
 	}
@@ -377,15 +378,14 @@ intr_calculatemasks()
 	/*
 	 * There are tty, network and disk drivers that use free() at interrupt
 	 * time, so imp > (tty | net | bio).
-	 */
-	imask[IPL_IMP] |= imask[IPL_TTY] | imask[IPL_NET] | imask[IPL_BIO];
-
-	/*
+	 *
 	 * Enforce a hierarchy that gives slow devices a better chance at not
 	 * dropping data.
 	 */
-	imask[IPL_TTY] |= imask[IPL_NET] | imask[IPL_BIO];
 	imask[IPL_NET] |= imask[IPL_BIO];
+	imask[IPL_TTY] |= imask[IPL_NET];
+	imask[IPL_IMP] |= imask[IPL_TTY];
+	imask[IPL_CLOCK] |= imask[IPL_IMP] | SPL_CLOCK;
 
 	/*
 	 * These are pseudo-levels.
@@ -396,25 +396,27 @@ intr_calculatemasks()
 	/* And eventually calculate the complete masks. */
 	for (irq = 0; irq < ICU_LEN; irq++) {
 		register int irqs = 1 << irq;
-		for (q = intrhand[irq]; q; q = q->ih_next)
+		for (q = o_intrhand[irq]; q; q = q->ih_next)
 			irqs |= imask[q->ih_level];
-		intrmask[irq] = irqs | SINT_MASK;
+		o_intrmask[irq] = irqs | SINT_MASK;
 	}
 
 	/* Lastly, determine which IRQs are actually in use. */
 	{
 		register int irqs = 0;
 		for (irq = 0; irq < ICU_LEN; irq++) {
-			if (intrhand[irq]) {
+			if (o_intrhand[irq]) {
 				irqs |= 1 << irq;
-				openpic_enable_irq(hwirq[irq], intrtype[irq]);
+				openpic_enable_irq(o_hwirq[irq],
+				    o_intrtype[irq]);
 			} else {
-				openpic_disable_irq(hwirq[irq]);
+				openpic_disable_irq(o_hwirq[irq]);
 			}
 		}
-		imen = ~irqs;
+		imen_o = ~irqs;
 	}
 }
+int o_virq_inited = 0;
 /*
  * Map 64 irqs into 32 (bits).
  */
@@ -423,16 +425,30 @@ mapirq(irq)
 	int irq;
 {
 	int v;
+	int i;
+
+	if (o_virq_inited == 0) {
+		o_virq_max = 0;
+		for (i = 0; i < ICU_LEN; i++) {
+			o_virq[i] = 0;
+		}
+		o_virq_inited = 1;
+	}
+
+	/* irq in table already? */
+	if (o_virq[irq] != 0) {
+		return o_virq[irq];
+	}
 
 	if (irq < 0 || irq >= ICU_LEN)
 		panic("invalid irq");
-	virq_max++;
-	v = virq_max;
+	o_virq_max++;
+	v = o_virq_max;
 	if (v > HWIRQ_MAX)
 		panic("virq overflow");
 
-	hwirq[v] = irq;
-	virq[irq] = v;
+	o_hwirq[v] = irq;
+	o_virq[irq] = v;
 #if 0
 printf("\nmapirq %x to %x\n", irq, v);
 #endif
@@ -475,22 +491,22 @@ openpic_do_pending_int()
 	asm volatile("mtmsr %0" :: "r"(dmsr));
 
 	hwpend = ipending & ~pcpl;	/* Do now unmasked pendings */
-	imen &= ~hwpend;
-	openpic_enable_irq_mask(~imen);
+	imen_o &= ~hwpend;
+	openpic_enable_irq_mask(~imen_o);
 	hwpend &= HWIRQ_MASK;
 	while (hwpend) {
 		irq = 31 - cntlzw(hwpend);
 		hwpend &= ~(1L << irq);
-		ih = intrhand[irq];
+		ih = o_intrhand[irq];
 		while(ih) {
 			(*ih->ih_fun)(ih->ih_arg);
 			ih = ih->ih_next;
 		}
 
-		evirq[hwirq[irq]].ev_count++;
+		evirq[o_hwirq[irq]].ev_count++;
 	}
 
-	/*out32rb(INT_ENABLE_REG, ~imen);*/
+	/*out32rb(INT_ENABLE_REG, ~imen_o);*/
 
 	do {
 		if((ipending & SINT_CLOCK) & ~pcpl) {
@@ -539,11 +555,11 @@ openpic_enable_irq_mask(irq_mask)
 int irq_mask;
 {
 	int irq;
-	for ( irq = 0; irq <= virq_max; irq++) {
+	for ( irq = 0; irq <= o_virq_max; irq++) {
 		if (irq_mask & (1 << irq)) {
-			openpic_enable_irq(hwirq[irq], intrtype[irq]);
+			openpic_enable_irq(o_hwirq[irq], o_intrtype[irq]);
 		} else {
-			openpic_disable_irq(hwirq[irq]);
+			openpic_disable_irq(o_hwirq[irq]);
 		}
 	}
 }
@@ -610,12 +626,12 @@ ext_intr_openpic()
 	int pcpl;
 	struct intrhand *ih;
 
-	pcpl = splhigh();       /* Turn off all */
+	pcpl = cpl;
 
 	realirq = openpic_read_irq(0);
 
 	while (realirq != 255) {
-		irq = virq[realirq];
+		irq = o_virq[realirq];
 		intrcnt[realirq]++;
 
 		/* XXX check range */
@@ -626,7 +642,9 @@ ext_intr_openpic()
 			ipending |= r_imen;     /* Masked! Mark this as pending */
 			openpic_disable_irq(realirq);
 		} else {
-			ih = intrhand[irq];
+			splraise(o_intrmask[irq]);
+
+			ih = o_intrhand[irq];
 			while (ih) {
 				(*ih->ih_fun)(ih->ih_arg);
 				ih = ih->ih_next;
@@ -695,7 +713,8 @@ int
 openpic_prog_button (void *arg)
 {
 #ifdef DDB
-        Debugger();
+	if (db_console)
+		Debugger();
 #else
 	printf("programmer button pressed, debugger not available\n");
 #endif

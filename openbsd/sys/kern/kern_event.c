@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_event.c,v 1.9 2001/07/17 01:51:37 provos Exp $	*/
+/*	$OpenBSD: kern_event.c,v 1.17 2002/03/01 12:17:58 art Exp $	*/
 
 /*-
  * Copyright (c) 1999,2000,2001 Jonathan Lemon <jlemon@FreeBSD.org>
@@ -80,9 +80,8 @@ void	knote_attach(struct knote *kn, struct filedesc *fdp);
 void	knote_drop(struct knote *kn, struct proc *p);
 void	knote_enqueue(struct knote *kn);
 void	knote_dequeue(struct knote *kn);
-void	knote_init(void);
-struct	knote *knote_alloc(void);
-void	knote_free(struct knote *kn);
+#define knote_alloc() ((struct knote *)pool_get(&knote_pool, PR_WAITOK))
+#define knote_free(kn) (pool_put(&knote_pool, kn))
 
 void	filt_kqdetach(struct knote *kn);
 int	filt_kqueue(struct knote *kn, long hint);
@@ -99,6 +98,7 @@ struct filterops file_filtops =
 	{ 1, filt_fileattach, NULL, NULL };
 
 struct	pool knote_pool;
+struct	pool kqueue_pool;
 
 #define KNOTE_ACTIVATE(kn) do {						\
 	kn->kn_status |= KN_ACTIVE;					\
@@ -125,6 +125,22 @@ struct filterops *sysfilt_ops[] = {
 	&proc_filtops,			/* EVFILT_PROC */
 	&sig_filtops,			/* EVFILT_SIGNAL */
 };
+
+/* XXX - call this on startup instead. */
+void kqueue_init(void);
+
+int kqueue_initialized;
+
+void
+kqueue_init(void)
+{
+	pool_init(&kqueue_pool, sizeof(struct kqueue), 0, 0, 0, "kqeuepl",
+	    &pool_allocator_nointr);
+	pool_init(&knote_pool, sizeof(struct knote), 0, 0, 0, "knotepl",
+	    &pool_allocator_nointr);
+
+	kqueue_initialized = 1;
+}
 
 int
 filt_fileattach(struct knote *kn)
@@ -280,13 +296,16 @@ sys_kqueue(struct proc *p, void *v, register_t *retval)
 	struct file *fp;
 	int fd, error;
 
+	if (!kqueue_initialized)
+		kqueue_init();
+
 	error = falloc(p, &fp, &fd);
 	if (error)
 		return (error);
 	fp->f_flag = FREAD | FWRITE;
 	fp->f_type = DTYPE_KQUEUE;
 	fp->f_ops = &kqueueops;
-	kq = malloc(sizeof(struct kqueue), M_TEMP, M_WAITOK);
+	kq = pool_get(&kqueue_pool, PR_WAITOK);
 	bzero(kq, sizeof(*kq));
 	TAILQ_INIT(&kq->kq_head);
 	fp->f_data = (caddr_t)kq;
@@ -294,7 +313,8 @@ sys_kqueue(struct proc *p, void *v, register_t *retval)
 	if (fdp->fd_knlistsize < 0)
 		fdp->fd_knlistsize = 0;		/* this process has a kq */
 	kq->kq_fdp = fdp;
-	return (error);
+	FILE_SET_MATURE(fp);
+	return (0);
 }
 
 int
@@ -311,16 +331,15 @@ sys_kevent(struct proc *p, void *v, register_t *retval)
 	} */ *uap = v;
 	struct kevent *kevp;
 	struct kqueue *kq;
-	struct file *fp = NULL;
+	struct file *fp;
 	struct timespec ts;
 	int i, n, nerrors, error;
 
-	if (((u_int)SCARG(uap, fd)) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[SCARG(uap, fd)]) == NULL ||
+	if ((fp = fd_getfile(fdp, SCARG(uap, fd))) == NULL ||
 	    (fp->f_type != DTYPE_KQUEUE))
 		return (EBADF);
 
-	fp->f_count++;
+	FREF(fp);
 
 	if (SCARG(uap, timeout) != NULL) {
 		error = copyin(SCARG(uap, timeout), &ts, sizeof(ts));
@@ -371,8 +390,7 @@ sys_kevent(struct proc *p, void *v, register_t *retval)
 			    SCARG(uap, timeout), p, &n);
 	*retval = n;
  done:
-	if (fp != NULL)
-		closef(fp, p);
+	FRELE(fp);
 	return (error);
 }
 
@@ -397,15 +415,14 @@ kqueue_register(struct kqueue *kq, struct kevent *kev, struct proc *p)
 		 * filter attach routine is responsible for insuring that
 		 * the identifier can be attached to it.
 		 */
-		printf("unknown filter: %d\n", kev->filter);
 		return (EINVAL);
 	}
 
 	if (fops->f_isfd) {
 		/* validate descriptor */
-		if ((u_int)kev->ident >= fdp->fd_nfiles ||
-		    (fp = fdp->fd_ofiles[kev->ident]) == NULL)
+		if ((fp = fd_getfile(fdp, kev->ident)) == NULL)
 			return (EBADF);
+		FREF(fp);
 		fp->f_count++;
 
 		if (kev->ident < fdp->fd_knlistsize) {
@@ -452,6 +469,8 @@ kqueue_register(struct kqueue *kq, struct kevent *kev, struct proc *p)
 			 * apply reference count to knote structure, and
 			 * do not release it at the end of this routine.
 			 */
+			if (fp != NULL)
+				FRELE(fp);
 			fp = NULL;
 
 			kn->kn_sfflags = kev->fflags;
@@ -710,6 +729,7 @@ kqueue_close(struct file *fp, struct proc *p)
 		while (kn != NULL) {
 			kn0 = SLIST_NEXT(kn, kn_link);
 			if (kq == kn->kn_kq) {
+				FREF(kn->kn_fp);
 				kn->kn_fop->f_detach(kn);
 				closef(kn->kn_fp, p);
 				knote_free(kn);
@@ -738,7 +758,7 @@ kqueue_close(struct file *fp, struct proc *p)
 			}
 		}
 	}
-	free(kq, M_TEMP);
+	pool_put(&kqueue_pool, kq);
 	fp->f_data = NULL;
 
 	return (0);
@@ -816,15 +836,14 @@ knote_attach(struct knote *kn, struct filedesc *fdp)
 		size = fdp->fd_knlistsize;
 		while (size <= kn->kn_id)
 			size += KQEXTENT;
-		MALLOC(list, struct klist *,
-		    size * sizeof(struct klist *), M_TEMP, M_WAITOK);
+		list = malloc(size * sizeof(struct klist *), M_TEMP, M_WAITOK);
 		bcopy((caddr_t)fdp->fd_knlist, (caddr_t)list,
 		    fdp->fd_knlistsize * sizeof(struct klist *));
 		bzero((caddr_t)list +
 		    fdp->fd_knlistsize * sizeof(struct klist *),
 		    (size - fdp->fd_knlistsize) * sizeof(struct klist *));
 		if (fdp->fd_knlist != NULL)
-			FREE(fdp->fd_knlist, M_TEMP);
+			free(fdp->fd_knlist, M_TEMP);
 		fdp->fd_knlistsize = size;
 		fdp->fd_knlist = list;
 	}
@@ -852,8 +871,10 @@ knote_drop(struct knote *kn, struct proc *p)
 	SLIST_REMOVE(list, kn, knote, kn_link);
 	if (kn->kn_status & KN_QUEUED)
 		knote_dequeue(kn);
-	if (kn->kn_fop->f_isfd)
+	if (kn->kn_fop->f_isfd) {
+		FREF(kn->kn_fp);
 		closef(kn->kn_fp, p);
+	}
 	knote_free(kn);
 }
 
@@ -885,30 +906,4 @@ knote_dequeue(struct knote *kn)
 	kn->kn_status &= ~KN_QUEUED;
 	kq->kq_count--;
 	splx(s);
-}
-
-void
-knote_init(void)
-{
-	pool_init(&knote_pool, sizeof(struct knote), 0, 0, 0, "knotepl",
-	    0, pool_page_alloc_nointr, pool_page_free_nointr, M_KNOTE);
-}
-
-struct knote *
-knote_alloc(void)
-{
-	static int knote_pool_initialised;
-
-	if (!knote_pool_initialised) { 
-		knote_init();
-		knote_pool_initialised++;
-	}
-
-	return (pool_get(&knote_pool, PR_WAITOK));
-}
-
-void
-knote_free(struct knote *kn)
-{
-	pool_put(&knote_pool, kn);
 }

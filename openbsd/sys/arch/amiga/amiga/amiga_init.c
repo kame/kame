@@ -1,4 +1,4 @@
-/*	$OpenBSD: amiga_init.c,v 1.19 2001/05/14 15:43:11 jj Exp $	*/
+/*	$OpenBSD: amiga_init.c,v 1.28 2002/03/25 19:41:03 niklas Exp $	*/
 /*	$NetBSD: amiga_init.c,v 1.56 1997/06/10 18:22:24 veego Exp $	*/
 
 /*
@@ -34,7 +34,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/user.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
@@ -48,7 +48,7 @@
 #include <sys/dkbad.h>
 #include <sys/reboot.h>
 #include <sys/exec.h>
-#include <vm/pmap.h>
+#include <uvm/uvm_pmap.h>
 #include <machine/vmparam.h>
 #include <machine/pte.h>
 #include <machine/cpu.h>
@@ -108,15 +108,15 @@ static u_long boot_flags;
 u_long scsi_nosync;
 int shift_nosync;
 
-void  start_c __P((int, u_int, u_int, u_int, char *, u_int, u_long));
-void rollcolor __P((int));
-static int kernel_image_magic_size __P((void));
-static void kernel_image_magic_copy __P((u_char *));
-int kernel_reload_write __P((struct uio *));
-extern void kernel_reload __P((char *, u_long, u_long, u_long, u_long,
-	u_long, u_long, u_long, u_long, u_long));
-extern void etext __P((void));
-void start_c_cleanup __P((void));
+void  start_c(int, u_int, u_int, u_int, char *, u_int, u_long);
+void rollcolor(int);
+static int kernel_image_magic_size(void);
+static void kernel_image_magic_copy(u_char *);
+int kernel_reload_write(struct uio *);
+extern void kernel_reload(char *, u_long, u_long, u_long, u_long,
+	u_long, u_long, u_long, u_long, u_long);
+extern void etext(void);
+void start_c_cleanup(void);
 
 void *
 chipmem_steal(amount)
@@ -326,7 +326,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync)
 	avail -= vstart;
 
 #if defined(M68040) || defined(M68060)
-	if (RELOC(mmutype, int) == MMU_68040)
+	if (RELOC(mmutype, int) <= MMU_68040)
 		kstsize = MAXKL2SIZE / (NPTEPG/SG4_LEV2SIZE);
 	else
 #endif
@@ -400,7 +400,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync)
 	 * initialize segment table and page table map
 	 */
 #if defined(M68040) || defined(M68060)
-	if (RELOC(mmutype, int) == MMU_68040) {
+	if (RELOC(mmutype, int) <= MMU_68040) {
 		/*
 		 * First invalidate the entire "segment table" pages
 		 * (levels 1 and 2 have the same "invalid" values).
@@ -568,7 +568,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync)
 	 * these machines (for the 68040 not strictly necessary, but
 	 * recommended by Motorola; for the 68060 mandatory)
 	 */
-	if (RELOC(mmutype, int) == MMU_68040) {
+	if (RELOC(mmutype, int) <= MMU_68040) {
 
 		if (RELOC(kernel_copyback, int))
 			pg_proto |= PG_CCB;
@@ -599,7 +599,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync)
 	/*
 	 * invalidate remainder of kernel PT
 	 */
-	while (pg < (u_int *) (ptpa + ptsize))
+	while ((paddr_t)pg < (paddr_t) (ptpa + ptsize))
 		*pg++ = PG_NV;
 
 	/*
@@ -704,7 +704,9 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync)
 	 * dumps more readable, with guaranteed 16MB of.
 	 * XXX depends on Sysmap being last.
 	 * XXX 16 MB instead of 256 MB should be enough, but...
-	 * we need to fix the fastmem loading first. (see comment at line 375)
+	 * we need to fix the fastmem loading first. (see Zorro-related
+	 * comment before ``What to do, what to do'' earlier in this
+	 * function)
 	 */
 	RELOC(amiga_uptbase, vaddr_t) =
 	    roundup(RELOC(Sysmap, u_int) + 0x10000000, 0x10000000);
@@ -805,7 +807,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync)
 	 * prepare to enable the MMU
 	 */
 #if defined(M68040) || defined(M68060)
-	if (RELOC(mmutype, int) == MMU_68040) {
+	if (RELOC(mmutype, int) <= MMU_68040) {
 		/*
 		 * movel Sysseg_pa,a0;
 		 * movec a0,SRP;
@@ -814,7 +816,7 @@ start_c(id, fphystart, fphysize, cphysize, esym_addr, flags, inh_sync)
 		 * movec d0,TC
 		 */
 
-		if (id & AMIGA_68060) {
+		if (RELOC(mmutype, int) <= MMU_68060) {
 			/* do i need to clear the branch cache? */
 			asm volatile (	".word 0x4e7a,0x0002;" 
 					"orl #0x400000,d0;" 
@@ -1051,7 +1053,7 @@ static void
 kernel_image_magic_copy(dest)
 	u_char *dest;
 {
-	*((int*)dest) = ncfdev;
+	*((int *)dest) = ncfdev;
 	dest += 4;
 	bcopy(cfdev, dest, ncfdev * sizeof(struct cfdev)
 	    + memlist->m_nseg * sizeof(struct boot_memseg) + 4);

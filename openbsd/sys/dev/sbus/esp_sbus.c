@@ -1,4 +1,4 @@
-/*	$OpenBSD: esp_sbus.c,v 1.5 2001/09/27 04:01:42 jason Exp $	*/
+/*	$OpenBSD: esp_sbus.c,v 1.8 2002/04/09 22:33:58 jason Exp $	*/
 /*	$NetBSD: esp_sbus.c,v 1.14 2001/04/25 17:53:37 bouyer Exp $	*/
 
 /*-
@@ -77,6 +77,8 @@ struct scsi_device esp_dev = {
 
 /* #define ESP_SBUS_DEBUG */
 
+static int esp_unit_offset;
+
 struct esp_softc {
 	struct ncr53c9x_softc sc_ncr53c9x;	/* glue to MI code */
 	struct sbusdev	sc_sd;			/* sbus device */
@@ -90,9 +92,9 @@ struct esp_softc {
 	int	sc_pri;				/* SBUS priority */
 };
 
-void	espattach_sbus	__P((struct device *, struct device *, void *));
-void	espattach_dma	__P((struct device *, struct device *, void *));
-int	espmatch_sbus	__P((struct device *, void *, void *));
+void	espattach_sbus(struct device *, struct device *, void *);
+void	espattach_dma(struct device *, struct device *, void *);
+int	espmatch_sbus(struct device *, void *, void *);
 
 
 /* Linkup to the rest of the kernel */
@@ -106,18 +108,18 @@ struct cfattach esp_dma_ca = {
 /*
  * Functions and the switch for the MI code.
  */
-static u_char	esp_read_reg __P((struct ncr53c9x_softc *, int));
-static void	esp_write_reg __P((struct ncr53c9x_softc *, int, u_char));
-static u_char	esp_rdreg1 __P((struct ncr53c9x_softc *, int));
-static void	esp_wrreg1 __P((struct ncr53c9x_softc *, int, u_char));
-static int	esp_dma_isintr __P((struct ncr53c9x_softc *));
-static void	esp_dma_reset __P((struct ncr53c9x_softc *));
-static int	esp_dma_intr __P((struct ncr53c9x_softc *));
-static int	esp_dma_setup __P((struct ncr53c9x_softc *, caddr_t *,
-				    size_t *, int, size_t *));
-static void	esp_dma_go __P((struct ncr53c9x_softc *));
-static void	esp_dma_stop __P((struct ncr53c9x_softc *));
-static int	esp_dma_isactive __P((struct ncr53c9x_softc *));
+static u_char	esp_read_reg(struct ncr53c9x_softc *, int);
+static void	esp_write_reg(struct ncr53c9x_softc *, int, u_char);
+static u_char	esp_rdreg1(struct ncr53c9x_softc *, int);
+static void	esp_wrreg1(struct ncr53c9x_softc *, int, u_char);
+static int	esp_dma_isintr(struct ncr53c9x_softc *);
+static void	esp_dma_reset(struct ncr53c9x_softc *);
+static int	esp_dma_intr(struct ncr53c9x_softc *);
+static int	esp_dma_setup(struct ncr53c9x_softc *, caddr_t *,
+				    size_t *, int, size_t *);
+static void	esp_dma_go(struct ncr53c9x_softc *);
+static void	esp_dma_stop(struct ncr53c9x_softc *);
+static int	esp_dma_isactive(struct ncr53c9x_softc *);
 
 static struct ncr53c9x_glue esp_sbus_glue = {
 	esp_read_reg,
@@ -145,7 +147,7 @@ static struct ncr53c9x_glue esp_sbus_glue1 = {
 	NULL,			/* gl_clear_latched_intr */
 };
 
-static void	espattach __P((struct esp_softc *, struct ncr53c9x_glue *));
+static void	espattach(struct esp_softc *, struct ncr53c9x_glue *);
 
 int
 espmatch_sbus(parent, vcf, aux)
@@ -191,6 +193,10 @@ espattach_sbus(parent, self, aux)
 #endif
 
 	if (strcmp("SUNW,fas", sa->sa_name) == 0) {
+		/*
+		 * offset searches for other esp/dma devices.
+		 */
+		esp_unit_offset++;
 
 		/*
 		 * fas has 2 register spaces: dma(lsi64854) and SCSI core (ncr53c9x)
@@ -303,7 +309,7 @@ espattach_sbus(parent, self, aux)
 	 * find the matching esp driver.
 	 */
 	esc->sc_dma = (struct lsi64854_softc *)
-				getdevunit("dma", sc->sc_dev.dv_unit);
+	    getdevunit("dma", sc->sc_dev.dv_unit - esp_unit_offset);
 
 	/*
 	 * and a back pointer to us, for DMA
@@ -725,7 +731,7 @@ esp_dma_isactive(sc)
 #include <machine/db_machdep.h>
 #include <ddb/db_output.h>
 
-void db_esp __P((db_expr_t, int, db_expr_t, char*));
+void db_esp(db_expr_t, int, db_expr_t, char *);
 
 void
 db_esp(addr, have_addr, count, modif)

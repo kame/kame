@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcscp.c,v 1.7 2001/09/27 04:01:42 jason Exp $	*/
+/*	$OpenBSD: pcscp.c,v 1.9 2002/03/14 01:26:59 millert Exp $	*/
 /*	$NetBSD: pcscp.c,v 1.11 2000/11/14 18:42:58 thorpej Exp $	*/
 
 /*-
@@ -103,8 +103,8 @@ struct pcscp_softc {
 #undef	NCR_WRITE_REG
 #define	NCR_WRITE_REG(sc, reg, val)	pcscp_write_reg((sc), (reg), (val))
 
-int	pcscp_match __P((struct device *, void *, void *)); 
-void	pcscp_attach __P((struct device *, struct device *, void *));  
+int	pcscp_match(struct device *, void *, void *); 
+void	pcscp_attach(struct device *, struct device *, void *);  
 
 struct cfattach pcscp_ca = {
 	sizeof(struct pcscp_softc), pcscp_match, pcscp_attach
@@ -118,16 +118,16 @@ struct cfdriver pcscp_cd = {
  * Functions and the switch for the MI code.
  */
 
-u_char	pcscp_read_reg __P((struct ncr53c9x_softc *, int));
-void	pcscp_write_reg __P((struct ncr53c9x_softc *, int, u_char));
-int	pcscp_dma_isintr __P((struct ncr53c9x_softc *));
-void	pcscp_dma_reset __P((struct ncr53c9x_softc *));
-int	pcscp_dma_intr __P((struct ncr53c9x_softc *));
-int	pcscp_dma_setup __P((struct ncr53c9x_softc *, caddr_t *,
-			       size_t *, int, size_t *));
-void	pcscp_dma_go __P((struct ncr53c9x_softc *));
-void	pcscp_dma_stop __P((struct ncr53c9x_softc *));
-int	pcscp_dma_isactive __P((struct ncr53c9x_softc *));
+u_char	pcscp_read_reg(struct ncr53c9x_softc *, int);
+void	pcscp_write_reg(struct ncr53c9x_softc *, int, u_char);
+int	pcscp_dma_isintr(struct ncr53c9x_softc *);
+void	pcscp_dma_reset(struct ncr53c9x_softc *);
+int	pcscp_dma_intr(struct ncr53c9x_softc *);
+int	pcscp_dma_setup(struct ncr53c9x_softc *, caddr_t *,
+			       size_t *, int, size_t *);
+void	pcscp_dma_go(struct ncr53c9x_softc *);
+void	pcscp_dma_stop(struct ncr53c9x_softc *);
+int	pcscp_dma_isactive(struct ncr53c9x_softc *);
 
 struct scsi_adapter pcscp_adapter = {
 	ncr53c9x_scsi_cmd,	/* cmd */
@@ -148,14 +148,6 @@ struct ncr53c9x_glue pcscp_glue = {
 	pcscp_dma_isactive,
 	NULL,			/* gl_clear_latched_intr */
 };
-
-#ifdef __HAS_NEW_BUS_DMAMAP_SYNC
-#define pcscp_bus_dmamap_sync(t, m, o, l, f) \
-    bus_dmamap_sync((t), (m), (o), (l), (f))
-#else
-#define pcscp_bus_dmamap_sync(t, m, o, l, f) \
-    bus_dmamap_sync((t), (m), (f))
-#endif
 
 int
 pcscp_match(parent, match, aux)
@@ -494,7 +486,7 @@ pcscp_dma_intr(sc)
 
 	WRITE_DMAREG(esc, DMA_CMD, DMACMD_IDLE | (datain ? DMACMD_DIR : 0));
 
-	pcscp_bus_dmamap_sync(esc->sc_dmat, dmap, 0, dmap->dm_mapsize,
+	bus_dmamap_sync(esc->sc_dmat, dmap, 0, dmap->dm_mapsize,
 	    datain ? BUS_DMASYNC_POSTREAD : BUS_DMASYNC_POSTWRITE);
 	bus_dmamap_unload(esc->sc_dmat, dmap);
 
@@ -643,11 +635,11 @@ pcscp_dma_go(sc)
 		return;
 
 	/* sync transfer buffer */
-	pcscp_bus_dmamap_sync(esc->sc_dmat, dmap, 0, dmap->dm_mapsize,
+	bus_dmamap_sync(esc->sc_dmat, dmap, 0, dmap->dm_mapsize,
 	    datain ? BUS_DMASYNC_PREREAD : BUS_DMASYNC_PREWRITE);
 
 	/* sync MDL */
-	pcscp_bus_dmamap_sync(esc->sc_dmat, mdldmap, 0, mdldmap->dm_mapsize,
+	bus_dmamap_sync(esc->sc_dmat, mdldmap, 0, mdldmap->dm_mapsize,
 	    BUS_DMASYNC_PREWRITE);
 
 	/* set Starting MDL Address */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.35 2001/09/23 02:51:36 miod Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.48 2002/03/14 01:26:40 millert Exp $	*/
 
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
@@ -50,33 +50,31 @@
 #include <sys/proc.h>
 #include <sys/signalvar.h>
 #include <sys/malloc.h>
-#include <sys/map.h>
 #include <sys/buf.h>
 #include <sys/user.h>
 #include <sys/vnode.h>
 #include <sys/extent.h>
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
 
+#include <machine/mmu.h>
+#include <machine/board.h>
 #include <machine/cmmu.h>
 #include <machine/cpu.h>
 #include <machine/cpu_number.h>
 #include <machine/locore.h>
-#include <machine/pte.h>
 #include <machine/trap.h>
 
 extern struct extent *iomap_extent;
-extern vm_map_t   iomap_map;
+extern struct vm_map *iomap_map;
 
-vm_offset_t iomap_mapin __P((vm_offset_t, vm_size_t, boolean_t));
-void iomap_mapout __P((vm_offset_t, vm_size_t));
-void *mapiodev __P((void *, int));
-void unmapiodev __P((void *, int));
-vm_offset_t mapiospace __P((caddr_t, int));
-void unmapiospace __P((vm_offset_t));
-int badpaddr __P((caddr_t, int));
+vm_offset_t iomap_mapin(vm_offset_t, vm_size_t, boolean_t);
+void iomap_mapout(vm_offset_t, vm_size_t);
+void *mapiodev(void *, int);
+void unmapiodev(void *, int);
+vm_offset_t mapiospace(caddr_t, int);
+void unmapiospace(vm_offset_t);
+int badpaddr(caddr_t, int);
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -89,17 +87,22 @@ int badpaddr __P((caddr_t, int));
  */
 
 void
-cpu_fork(struct proc *p1, struct proc *p2, void *stack, size_t stacksize)
+cpu_fork(p1, p2, stack, stacksize, func, arg)
+	struct proc *p1, *p2;
+	void *stack;
+	size_t stacksize;
+	void (*func)(void *);
+	void *arg;
 {
 	struct switchframe *p2sf;
 	int cpu;
 	struct ksigframe {
-		void (*func)(struct proc *);
+		void (*func)(void *);
 		void *proc;
 	} *ksfp;
 	extern struct pcb *curpcb;
-	extern void proc_trampoline __P((void));
-        extern void save_u_area __P((struct proc *, vm_offset_t));
+	extern void proc_trampoline(void);
+        extern void save_u_area(struct proc *, vm_offset_t);
 
 	cpu = cpu_number();
 /*	
@@ -136,8 +139,8 @@ cpu_fork(struct proc *p1, struct proc *p2, void *stack, size_t stacksize)
 
 	ksfp = (struct ksigframe *)p2->p_addr->u_pcb.kernel_state.pcb_sp - 1;
 
-	ksfp->func = child_return;
-	ksfp->proc = p2;
+	ksfp->func = func;
+	ksfp->proc = arg;
 
 	/*
 	 * When this process resumes, r31 will be ksfp and
@@ -149,24 +152,6 @@ cpu_fork(struct proc *p1, struct proc *p2, void *stack, size_t stacksize)
 
 	p2->p_addr->u_pcb.kernel_state.pcb_sp = (u_int)ksfp;
 	p2->p_addr->u_pcb.kernel_state.pcb_pc = (u_int)proc_trampoline;
-}
-
-void
-cpu_set_kpc(struct proc *p, void (*func)(void *), void *arg)
-{
-	/*
-	 * override func pointer in ksigframe with func.
-	 */
-
-	struct ksigframe {
-		void (*func)(void *);
-		void *arg;
-	} *ksfp;
-
-	ksfp = (struct ksigframe *)p->p_addr->u_pcb.kernel_state.pcb_sp;
-
-	ksfp->func = func;
-	ksfp->arg = arg;
 }
 
 /*
@@ -203,7 +188,7 @@ cpu_coredump(struct proc *p, struct vnode *vp, struct ucred *cred, struct core *
 void
 cpu_swapin(struct proc *p)
 {
-        extern void save_u_area __P((struct proc *, vm_offset_t));
+        extern void save_u_area(struct proc *, vm_offset_t);
 
 	save_u_area(p, (vm_offset_t)p->p_addr);
 }
@@ -277,6 +262,7 @@ vmapbuf(bp, len)
 		kva += PAGE_SIZE;
 		len -= PAGE_SIZE;
 	}
+	pmap_update(pmap_kernel());
 }
 
 /*
@@ -351,6 +337,7 @@ iomap_mapin(vm_offset_t pa, vm_size_t len, boolean_t canwait)
 		tva += PAGE_SIZE;
 		ppa += PAGE_SIZE;
 	}
+	pmap_update(pmap_kernel());
 #ifndef NEW_MAPPING
 	return (iova + off);
 #else
@@ -373,6 +360,7 @@ iomap_mapout(vm_offset_t kva, vm_size_t len)
 	len = round_page(off + len);
 
 	pmap_remove(vm_map_pmap(iomap_map), kva, kva + len);
+	pmap_update(vm_map_pmap(iomap_map));
 
 	s = splhigh();
 	error = extent_free(iomap_extent, kva, len, EX_NOWAIT);
@@ -422,6 +410,7 @@ mapiospace(caddr_t pa, int len)
 
 	pmap_kenter_pa(phys_map_vaddr1, (vm_offset_t)pa,
 	    VM_PROT_READ|VM_PROT_WRITE);
+	pmap_update(pmap_kernel());
 	
 	return (phys_map_vaddr1 + off);
 }
@@ -436,29 +425,31 @@ unmapiospace(vm_offset_t va)
 	va = trunc_page(va);
 
 	pmap_kremove(va, PAGE_SIZE);
+	pmap_update(pmap_kernel());
 }
 
 int
 badvaddr(vm_offset_t va, int size)
 {
 	register int 	x;
-
 	if (badaddr(va, size)) {
 		return -1;
 	}
 
 	switch (size) {
 	case 1:
-		x = *(volatile unsigned char *)va;
+		x = *(unsigned char *volatile)va;
 		break;
 	case 2:
-		x = *(volatile unsigned short *)va;
+		x = *(unsigned short *volatile)va;
 		break;
 	case 4:
-		x = *(volatile unsigned long *)va;
+		x = *(unsigned long *volatile)va;
 		break;
+	default:
+                return -1;
 	}
-	return(x);
+	return(0);
 }
 
 int
@@ -509,6 +500,7 @@ pagemove(from, to, size)
 		to += PAGE_SIZE;
 		size -= PAGE_SIZE;
 	}
+	pmap_update(pmap_kernel());
 }
 
 u_int

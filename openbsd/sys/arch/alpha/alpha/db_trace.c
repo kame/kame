@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_trace.c,v 1.7 2001/03/04 19:19:42 niklas Exp $	*/
+/*	$OpenBSD: db_trace.c,v 1.9 2002/03/14 01:26:26 millert Exp $	*/
 
 /*
  * Copyright (c) 1997 Niklas Hallqvist.  All rights reserverd.
@@ -35,7 +35,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/db_machdep.h>
 #include <machine/frame.h>
@@ -117,11 +117,11 @@ struct opcode opcode[] = {
 	{ OPC_BR, "bgt", 1 },		/* 3F */
 };
 
-static __inline int sext __P((u_int));
-static __inline int rega __P((u_int));
-static __inline int regb __P((u_int));
-static __inline int regc __P((u_int));
-static __inline int disp __P((u_int));
+static __inline int sext(u_int);
+static __inline int rega(u_int);
+static __inline int regb(u_int);
+static __inline int regc(u_int);
+static __inline int disp(u_int);
 
 static __inline int
 sext(x)

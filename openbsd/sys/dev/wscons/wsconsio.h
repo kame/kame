@@ -1,4 +1,4 @@
-/* $OpenBSD: wsconsio.h,v 1.13 2001/09/16 00:42:44 millert Exp $ */
+/* $OpenBSD: wsconsio.h,v 1.16 2002/03/31 17:34:15 jason Exp $ */
 /* $NetBSD: wsconsio.h,v 1.31.2.1 2000/07/07 09:49:17 hannken Exp $ */
 
 /*
@@ -73,8 +73,15 @@ struct wscons_event {
 #define	WSCONS_EVENT_MOUSE_ABSOLUTE_Y	9	/* Y location */
 #define	WSCONS_EVENT_MOUSE_DELTA_Z	10	/* Z delta amount */
 #define	WSCONS_EVENT_MOUSE_ABSOLUTE_Z	11	/* Z location */
+/* 
+ * Following events are not real wscons_event but are used as parameters of the
+ * WSDISPLAYIO_WSMOUSED ioctl 
+ */
 #define WSCONS_EVENT_WSMOUSED_ON	12	/* wsmoused(8) active */
 #define WSCONS_EVENT_WSMOUSED_OFF	13	/* wsmoused(8) inactive */
+#define WSCONS_EVENT_WSMOUSED_SLEEP	14	/* wsmoused(8) sleeping */
+#define WSCONS_EVENT_WSMOUSED_CLOSE	15	/* notify wsmoused(8) to close 
+						   mouse device */
 
 #define IS_MOTION_EVENT(type) (((type) == WSCONS_EVENT_MOUSE_DELTA_X) || \
 			       ((type) == WSCONS_EVENT_MOUSE_DELTA_Y) || \
@@ -82,7 +89,9 @@ struct wscons_event {
 #define IS_BUTTON_EVENT(type) (((type) == WSCONS_EVENT_MOUSE_UP) || \
 			       ((type) == WSCONS_EVENT_MOUSE_DOWN))
 #define IS_CTRL_EVENT(type) ((type == WSCONS_EVENT_WSMOUSED_ON) || \
-			     (type == WSCONS_EVENT_WSMOUSED_OFF))
+			     (type == WSCONS_EVENT_WSMOUSED_OFF)|| \
+			     (type == WSCONS_EVENT_WSMOUSED_SLEEP))
+
 /*
  * Keyboard ioctls (0 - 31)
  */
@@ -99,6 +108,7 @@ struct wscons_event {
 #define		WSKBD_TYPE_HPC_BTN	8	/* HPC/PsPC buttons */
 #define		WSKBD_TYPE_ARCHIMEDES	9	/* Archimedes keyboard */
 #define		WSKBD_TYPE_ADB		10	/* Apple ADB keyboard */
+#define		WSKBD_TYPE_SUN		11	/* Sun Type3/4/5 */
 
 /* Manipulate the keyboard bell. */
 struct wskbd_bell_data {
@@ -304,6 +314,7 @@ struct wsdisplay_cursor {
 #define	WSDISPLAYIO_SMODE	_IOW('W', 76, u_int)
 #define		WSDISPLAYIO_MODE_EMUL	0	/* emulation (text) mode */
 #define		WSDISPLAYIO_MODE_MAPPED	1	/* mapped (graphics) mode */
+#define		WSDISPLAYIO_MODE_DUMBFB	2	/* mapped (graphics) fb mode */
 
 struct wsdisplay_font {
 	char name[WSFONT_NAME_SIZE];

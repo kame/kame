@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.1 2001/09/01 15:44:20 drahn Exp $ */
+/*	$OpenBSD: cpu.c,v 1.4 2002/03/21 17:37:57 drahn Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom
@@ -53,6 +53,7 @@
 #define MPC7400         12
 #define MPC7410         0x800c
 #define MPC7450         0x8000
+#define MPC7455         0x8001
 
 /* only valid on 603(e,ev) and G3, G4 */
 #define HID0_DOZE	(1 << (31-8))
@@ -75,7 +76,7 @@ struct cfdriver cpu_cd = {
 	NULL, "cpu", DV_DULL, NULL, 0
 };
 
-void config_l2cr __P((void));
+void config_l2cr(void);
 
 int
 cpumatch(parent, cfdata, aux)
@@ -134,7 +135,14 @@ cpuattach(parent, dev, aux)
 		sprintf(cpu_model, "7410");
 		break;
 	case MPC7450:
-		sprintf(cpu_model, "7450");
+		if ((pvr & 0xf) < 3) {
+			sprintf(cpu_model, "7450");
+		} else {
+			sprintf(cpu_model, "7451");
+		}
+		break;
+	case MPC7455:
+		sprintf(cpu_model, "7455");
 		break;
 	default:
 		sprintf(cpu_model, "Version %x", cpu);
@@ -177,6 +185,7 @@ cpuattach(parent, dev, aux)
 	case MPC7400:
 	case MPC7410:
 	case MPC7450:
+	case MPC7455:
 		/* select DOZE mode */
 		hid0 &= ~(HID0_NAP | HID0_SLEEP);
 		hid0 |= HID0_DOZE | HID0_DPM; 

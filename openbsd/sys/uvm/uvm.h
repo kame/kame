@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm.h,v 1.12 2001/08/11 10:57:22 art Exp $	*/
-/*	$NetBSD: uvm.h,v 1.22 2000/06/08 05:52:34 thorpej Exp $	*/
+/*	$OpenBSD: uvm.h,v 1.16 2001/12/19 08:58:07 art Exp $	*/
+/*	$NetBSD: uvm.h,v 1.24 2000/11/27 08:40:02 chs Exp $	*/
 
 /*
  *
@@ -74,6 +74,7 @@
 
 struct uvm {
 	/* vm_page related parameters */
+
 		/* vm_page queues */
 	struct pgfreelist page_free[VM_NFREELIST]; /* unallocated pages */
 	struct pglist page_active;	/* allocated pages, in use */
@@ -84,10 +85,17 @@ struct uvm {
 	boolean_t page_init_done;	/* TRUE if uvm_page_init() finished */
 	boolean_t page_idle_zero;	/* TRUE if we should try to zero
 					   pages in the idle loop */
+
 		/* page daemon trigger */
 	int pagedaemon;			/* daemon sleeps on this */
 	struct proc *pagedaemon_proc;	/* daemon's pid */
 	simple_lock_data_t pagedaemon_lock;
+
+		/* aiodone daemon trigger */
+	int aiodoned;			/* daemon sleeps on this */
+	struct proc *aiodoned_proc;	/* daemon's pid */
+	simple_lock_data_t aiodoned_lock;
+
 		/* page hash */
 	struct pglist *page_hash;	/* page hash table (vp/off->page) */
 	int page_nhash;			/* number of buckets */
@@ -103,7 +111,7 @@ struct uvm {
 	simple_lock_data_t kentry_lock;
 
 	/* aio_done is locked by uvm.pagedaemon_lock and splbio! */
-	struct uvm_aiohead aio_done;	/* done async i/o reqs */
+	TAILQ_HEAD(, buf) aio_done;		/* done async i/o reqs */
 
 	/* pager VM area bounds */
 	vaddr_t pager_sva;		/* start of pager VA area */
@@ -130,12 +138,11 @@ struct uvm {
 #define UVM_ET_ISCOPYONWRITE(E)	(((E)->etype & UVM_ET_COPYONWRITE) != 0)
 #define UVM_ET_ISNEEDSCOPY(E)	(((E)->etype & UVM_ET_NEEDSCOPY) != 0)
 
-/*
- * macros
- */
-
 #ifdef _KERNEL
 
+/*
+ * holds all the internal UVM data
+ */
 extern struct uvm uvm;
 
 /*
@@ -144,6 +151,7 @@ extern struct uvm uvm;
 
 UVMHIST_DECL(maphist);
 UVMHIST_DECL(pdhist);
+UVMHIST_DECL(ubchist);
 
 /*
  * UVM_UNLOCK_AND_WAIT: atomic unlock+wait... wrapper around the

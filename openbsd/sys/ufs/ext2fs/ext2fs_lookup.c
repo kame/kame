@@ -1,4 +1,4 @@
-/*	$OpenBSD: ext2fs_lookup.c,v 1.11 2001/09/18 01:21:55 art Exp $	*/
+/*	$OpenBSD: ext2fs_lookup.c,v 1.13 2002/03/14 01:27:14 millert Exp $	*/
 /*	$NetBSD: ext2fs_lookup.c,v 1.16 2000/08/03 20:29:26 thorpej Exp $	*/
 
 /* 
@@ -62,6 +62,7 @@
 #include <sys/malloc.h>
 #include <sys/dirent.h>
 
+#include <ufs/ufs/extattr.h>
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/ufsmount.h>
@@ -73,11 +74,11 @@
 
 extern	int dirchk;
 
-static void	ext2fs_dirconv2ffs __P((struct ext2fs_direct *e2dir,
-					  struct dirent *ffsdir));
-static int	ext2fs_dirbadentry __P((struct vnode *dp,
+static void	ext2fs_dirconv2ffs(struct ext2fs_direct *e2dir,
+					  struct dirent *ffsdir);
+static int	ext2fs_dirbadentry(struct vnode *dp,
 					  struct ext2fs_direct *de,
-					  int entryoffsetinblock));
+					  int entryoffsetinblock);
 
 /*
  * the problem that is tackled below is the fact that FFS

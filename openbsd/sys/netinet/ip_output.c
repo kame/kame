@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_output.c,v 1.137 2001/08/26 21:12:06 niklas Exp $	*/
+/*	$OpenBSD: ip_output.c,v 1.143 2002/03/15 18:19:52 millert Exp $	*/
 /*	$NetBSD: ip_output.c,v 1.28 1996/02/13 23:43:07 christos Exp $	*/
 
 /*
@@ -79,7 +79,7 @@
 #define DPRINTF(x)
 #endif
 
-extern u_int8_t get_sa_require  __P((struct inpcb *));
+extern u_int8_t get_sa_require(struct inpcb *);
 
 extern int ipsec_auth_default_level;
 extern int ipsec_esp_trans_default_level;
@@ -87,9 +87,8 @@ extern int ipsec_esp_network_default_level;
 extern int ipsec_ipcomp_default_level;
 #endif /* IPSEC */
 
-static struct mbuf *ip_insertoptions __P((struct mbuf *, struct mbuf *, int *));
-static void ip_mloopback
-	__P((struct ifnet *, struct mbuf *, struct sockaddr_in *));
+static struct mbuf *ip_insertoptions(struct mbuf *, struct mbuf *, int *);
+static void ip_mloopback(struct ifnet *, struct mbuf *, struct sockaddr_in *);
 
 /*
  * IP output.  The packet in mbuf chain m contains a skeletal IP
@@ -98,13 +97,7 @@ static void ip_mloopback
  * The mbuf opt, if present, will not be freed.
  */
 int
-#if __STDC__
 ip_output(struct mbuf *m0, ...)
-#else
-ip_output(m0, va_alist)
-	struct mbuf *m0;
-	va_dcl
-#endif
 {
 	register struct ip *ip, *mhip;
 	register struct ifnet *ifp;
@@ -452,7 +445,15 @@ ip_output(m0, va_alist)
 			 * If we belong to the destination multicast group
 			 * on the outgoing interface, and the caller did not
 			 * forbid loopback, loop back a copy.
+			 * Can't defer TCP/UDP checksumming, do the
+			 * computation now.
 			 */
+			if (m->m_pkthdr.csum &
+			    (M_TCPV4_CSUM_OUT | M_UDPV4_CSUM_OUT)) {
+				in_delayed_cksum(m);
+				m->m_pkthdr.csum &=
+				    ~(M_UDPV4_CSUM_OUT | M_TCPV4_CSUM_OUT);
+			}
 			ip_mloopback(ifp, m, dst);
 		}
 #ifdef MROUTING
@@ -546,6 +547,10 @@ sendit:
 			m_freem(m);
 			goto done;
 		}
+		if (m == NULL) {
+			splx(s);
+			goto done;
+		}
 		ip = mtod(m, struct ip *);
 		hlen = ip->ip_hl << 2;
 #endif
@@ -563,7 +568,7 @@ sendit:
 		        tdb_add_inp(tdb, inp, 0);
 
 		/* Check if we are allowed to fragment */
-		if ((ip->ip_off & IP_DF) && tdb->tdb_mtu &&
+		if (ip_mtudisc && (ip->ip_off & IP_DF) && tdb->tdb_mtu &&
 		    (u_int16_t)ip->ip_len > tdb->tdb_mtu &&
 		    tdb->tdb_mtutimeout > time.tv_sec) {
 			struct rtentry *rt = NULL;
@@ -646,6 +651,9 @@ sendit:
 		m_freem(m);
 		goto done;
 	}
+	if (m == NULL)
+		goto done;
+
 	ip = mtod(m, struct ip *);
 	hlen = ip->ip_hl << 2;
 #endif
@@ -689,9 +697,9 @@ sendit:
 		 * them, there is no way for one to update all its
 		 * routes when the MTU is changed.
 		 */
-		if ((ro->ro_rt->rt_flags & (RTF_UP | RTF_HOST))
-		    && !(ro->ro_rt->rt_rmx.rmx_locks & RTV_MTU)
-		    && (ro->ro_rt->rt_rmx.rmx_mtu > ifp->if_mtu)) {
+		if ((ro->ro_rt->rt_flags & (RTF_UP | RTF_HOST)) &&
+		    !(ro->ro_rt->rt_rmx.rmx_locks & RTV_MTU) &&
+		    (ro->ro_rt->rt_rmx.rmx_mtu > ifp->if_mtu)) {
 			ro->ro_rt->rt_rmx.rmx_mtu = ifp->if_mtu;
 		}
 		ipstat.ips_cantfrag++;
@@ -805,7 +813,7 @@ done:
 	return (error);
 bad:
 #ifdef IPSEC
-	if (error == EMSGSIZE && icmp_mtu != 0)
+	if (error == EMSGSIZE && ip_mtudisc && icmp_mtu != 0)
 		ipsec_adjust_mtu(m, icmp_mtu);
 #endif
 	m_freem(m0);
@@ -1167,9 +1175,9 @@ ip_ctloutput(op, so, level, optname, mp)
 			switch (optname) {
 			case IP_IPSEC_LOCAL_ID:
 				/* Check valid types and NUL-termination */
-				if (ipr->ref_type < IPSP_IDENTITY_PREFIX
-				    || ipr->ref_type > IPSP_IDENTITY_CONNECTION
-				    || ((char *)(ipr + 1))[ipr->ref_len - 1]) {
+				if (ipr->ref_type < IPSP_IDENTITY_PREFIX ||
+				    ipr->ref_type > IPSP_IDENTITY_CONNECTION ||
+				    ((char *)(ipr + 1))[ipr->ref_len - 1]) {
 					FREE(ipr, M_CREDENTIALS);
 					error = EINVAL;
 				} else {
@@ -1180,9 +1188,9 @@ ip_ctloutput(op, so, level, optname, mp)
 				break;
 			case IP_IPSEC_REMOTE_ID:
 				/* Check valid types and NUL-termination */
-				if (ipr->ref_type < IPSP_IDENTITY_PREFIX
-				    || ipr->ref_type > IPSP_IDENTITY_CONNECTION
-				    || ((char *)(ipr + 1))[ipr->ref_len - 1]) {
+				if (ipr->ref_type < IPSP_IDENTITY_PREFIX ||
+				    ipr->ref_type > IPSP_IDENTITY_CONNECTION ||
+				    ((char *)(ipr + 1))[ipr->ref_len - 1]) {
 					FREE(ipr, M_CREDENTIALS);
 					error = EINVAL;
 				} else {

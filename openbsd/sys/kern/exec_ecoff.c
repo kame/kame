@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_ecoff.c,v 1.7 2001/06/22 14:14:07 deraadt Exp $	*/
+/*	$OpenBSD: exec_ecoff.c,v 1.9 2001/11/15 06:22:30 art Exp $	*/
 /*	$NetBSD: exec_ecoff.c,v 1.8 1996/05/19 20:36:06 jonathan Exp $	*/
 
 /*
@@ -39,7 +39,7 @@
 #include <sys/vnode.h>
 #include <sys/exec.h>
 #include <sys/resourcevar.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #if defined(_KERN_DO_ECOFF)
 
@@ -198,7 +198,7 @@ exec_ecoff_prep_zmagic(p, epp)
 #endif
 		return ETXTBSY;
 	}
-	epp->ep_vp->v_flag |= VTEXT;
+	vn_marktext(epp->ep_vp);
 
 	/* set up command for text segment */
 	NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_pagedvn, eap->tsize,

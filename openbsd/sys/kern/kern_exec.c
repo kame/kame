@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_exec.c,v 1.57 2001/09/19 20:50:58 mickey Exp $	*/
+/*	$OpenBSD: kern_exec.c,v 1.66 2002/03/14 17:17:23 mickey Exp $	*/
 /*	$NetBSD: kern_exec.c,v 1.75 1996/02/09 18:59:28 christos Exp $	*/
 
 /*-
@@ -58,7 +58,6 @@
 
 #include <sys/syscallargs.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
@@ -71,7 +70,7 @@
  * to it. Must be a n^2. If non-zero, the stack gap will be calculated as:
  * (arc4random() * ALIGNBYTES) & (stackgap_random - 1) + STACKGAPLEN.
  */
-int stackgap_random;
+int stackgap_random = 1024;
 
 /*
  * check exec:
@@ -251,6 +250,12 @@ sys_execve(p, v, retval)
 	extern struct emul emul_native;
 
 	/*
+	 * Cheap solution to complicated problems.
+	 * Mark this process as "leave me alone, I'm execing".
+	 */
+	p->p_flag |= P_INEXEC;
+
+	/*
 	 * figure out the maximum size of an exec header, if necessary.
 	 * XXX should be able to keep LKM code from modifying exec switch
 	 * when we're still using it, but...
@@ -315,7 +320,7 @@ sys_execve(p, v, retval)
 
 	/* Now get argv & environment */
 	if (!(cpp = SCARG(uap, argp))) {
-		error = EINVAL;
+		error = EFAULT;
 		goto bad;
 	}
 
@@ -384,7 +389,7 @@ sys_execve(p, v, retval)
 	 * Prepare vmspace for remapping. Note that uvmspace_exec can replace
 	 * p_vmspace!
 	 */
-	uvmspace_exec(p);
+	uvmspace_exec(p, VM_MIN_ADDRESS, VM_MAXUSER_ADDRESS);
 
 	vm = p->p_vmspace;
 	/* Now map address space */
@@ -506,9 +511,12 @@ sys_execve(p, v, retval)
 		for (i = 0; i < 3; i++) {
 			struct file *fp = NULL;
 
-			if (i < p->p_fd->fd_nfiles)
-				fp = p->p_fd->fd_ofiles[i];
-
+			/*
+			 * NOTE - This will never return NULL because of
+			 * unmature fds. The file descriptor table is not
+			 * shared because we're suid.
+			 */
+			fp = fd_getfile(p->p_fd, i);
 #ifdef PROCFS
 			/*
 			 * Close descriptors that are writing to procfs.
@@ -542,13 +550,13 @@ sys_execve(p, v, retval)
 					panic("sys_execve: falloc indx != i");
 #endif
 				if ((error = cdevvp(getnulldev(), &vp)) != 0) {
-					ffree(fp);
 					fdremove(p->p_fd, indx);
+					closef(fp, p);
 					break;
 				}
 				if ((error = VOP_OPEN(vp, flags, p->p_ucred, p)) != 0) {
-					ffree(fp);
 					fdremove(p->p_fd, indx);
+					closef(fp, p);
 					vrele(vp);
 					break;
 				}
@@ -558,6 +566,7 @@ sys_execve(p, v, retval)
 				fp->f_type = DTYPE_VNODE;
 				fp->f_ops = &vnops;
 				fp->f_data = (caddr_t)vp;
+				FILE_SET_MATURE(fp);
 			}
 		}
 	} else
@@ -611,6 +620,7 @@ sys_execve(p, v, retval)
 	if (KTRPOINT(p, KTR_EMUL))
 		ktremul(p, p->p_emul->e_name);
 #endif
+	p->p_flag &= ~P_INEXEC;
 	return (0);
 
 bad:
@@ -629,6 +639,7 @@ bad:
 
 freehdr:
 	free(pack.ep_hdr, M_EXEC);
+	p->p_flag &= ~P_INEXEC;
 	return (error);
 
 exec_abort:
@@ -652,6 +663,7 @@ free_pack_abort:
 	exit1(p, -1);
 
 	/* NOTREACHED */
+	p->p_flag &= ~P_INEXEC;
 	return (0);
 }
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.22 2001/09/13 15:35:05 art Exp $	*/
+/*	$OpenBSD: trap.c,v 1.32 2002/03/25 18:09:13 niklas Exp $	*/
 /*	$NetBSD: trap.c,v 1.56 1997/07/16 00:01:47 is Exp $	*/
 
 /*
@@ -56,11 +56,9 @@
 #include <sys/ktrace.h>
 #endif
 
-#include <vm/vm.h>
 #include <sys/user.h>
-#include <vm/pmap.h>
-
 #include <uvm/uvm_extern.h>
+#include <uvm/uvm_pmap.h>
 
 #include <machine/psl.h>
 #include <machine/trap.h>
@@ -180,29 +178,29 @@ extern struct pcb *curpcb;
 extern char fubail[], subail[];
 
 /* XXX until we get it from m68k/cpu.h */
-extern void    regdump __P((struct trapframe *, int));
+extern void    regdump(struct trapframe *, int);
 
-int	_write_back __P((u_int, u_int, u_int, u_int, vm_map_t));
-void	userret __P((struct proc *, int, u_quad_t));
-void	panictrap __P((int, u_int, u_int, struct frame *));
-void	trapcpfault __P((struct proc *, struct frame *));
-void	trapmmufault __P((int, u_int, u_int, struct frame *, struct proc *,
-    u_quad_t));
-void	trap __P((int, u_int, u_int, struct frame));
+int	_write_back(u_int, u_int, u_int, u_int, struct vm_map *);
+void	panictrap(int, u_int, u_int, struct frame *);
+void	trapcpfault(struct proc *, struct frame *);
+void	trapmmufault(int, u_int, u_int, struct frame *, struct proc *,
+    u_quad_t);
+void	trap(int, u_int, u_int, struct frame);
 #ifdef DDB
 #include <m68k/db_machdep.h>
-int	db_trap __P((int, db_regs_t *));
+int	db_trap(int, db_regs_t *);
 #endif
-void	syscall __P((register_t, struct frame));
-void	child_return __P((struct proc *, struct frame));
-void	_wb_fault __P((void));
+void	syscall(register_t, struct frame);
+void	_wb_fault(void);
 
-
+/*ARGSUSED*/
 void
-userret(p, pc, oticks)
+userret(p, fp, oticks, faultaddr, fromtrap)
 	struct proc *p;
-	int pc;
+	struct frame *fp;
 	u_quad_t oticks;
+	u_int faultaddr;
+	int fromtrap;
 {
 	int sig;
 
@@ -225,7 +223,7 @@ userret(p, pc, oticks)
 	if (p->p_flag & P_PROFIL) {
 		extern int psratio;
 		
-		addupc_task(p, pc, (int)(p->p_sticks - oticks) * psratio);
+		addupc_task(p, fp->f_pc, (int)(p->p_sticks - oticks) * psratio);
 	}
 	curpriority = p->p_priority;
 }
@@ -284,11 +282,11 @@ trapmmufault(type, code, v, fp, p, sticks)
 	static u_int oldcode=0, oldv=0;
 	static struct proc *oldp=0;
 #endif
-	extern vm_map_t kernel_map;
+	extern struct vm_map *kernel_map;
 	struct vmspace *vm = NULL;
 	vm_prot_t ftype, vftype;
 	vm_offset_t va;
-	vm_map_t map;
+	struct vm_map *map;
 	u_int nss;
 	int rv;
 	union sigval sv;
@@ -309,9 +307,9 @@ trapmmufault(type, code, v, fp, p, sticks)
 	if (v < NBPG)					/* XXX PAGE0 */
 		mmudebug |= 0x100;			/* XXX PAGE0 */
 #endif
-	if (mmudebug && mmutype == MMU_68040) {
+	if (mmudebug && mmutype <= MMU_68040) {
 #ifdef M68060
-		if (machineid & AMIGA_68060) {
+		if (mmutype == MMU_68060) {
 			if (--donomore == 0 || mmudebug & 1)
 				printf ("68060 access error: pc %x, code %b,"
 				     " ea %x\n", fp->f_pc, 
@@ -328,9 +326,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 		printf("68040 access error: pc %x, code %x,"
 		    " ea %x, fa %x\n", fp->f_pc, code, fp->f_fmt7.f_ea, v);
 		if (curpcb)
-			printf(" curpcb %p ->pcb_ustp %x / %x\n",
-			    curpcb, curpcb->pcb_ustp, 
-			    curpcb->pcb_ustp << PG_SHIFT);
+			printf(" curpcb %p\n", curpcb);
 				
 
 #ifdef DDB						/* XXX PAGE0 */
@@ -349,7 +345,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 	if (type == T_MMUFLT && 
 	    (!p || !p->p_addr || p->p_addr->u_pcb.pcb_onfault == 0 || (
 #ifdef M68060
-	     machineid & AMIGA_68060 ? code & FSLW_TM_SV :
+	     mmutype == MMU_68060 ? code & FSLW_TM_SV :
 #endif
 	     mmutype == MMU_68040 ? (code & SSW_TMMASK) == FC_SUPERD :
 	     (code & (SSW_DF|FC_SUPERD)) == (SSW_DF|FC_SUPERD))))
@@ -359,7 +355,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 
 	if (
 #ifdef M68060
-	    machineid & AMIGA_68060 ? code & FSLW_RW_W :
+	    mmutype == MMU_68060 ? code & FSLW_RW_W :
 #endif
 	    mmutype == MMU_68040 ? (code & SSW_RW040) == 0 :
 	    (code & (SSW_DF|SSW_RW)) == SSW_DF) {	/* what about RMW? */
@@ -382,7 +378,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 	if (map != kernel_map && (caddr_t)va >= vm->vm_maxsaddr) {
 		nss = btoc(USRSTACK - (unsigned)va);
 		if (nss > btoc(p->p_rlimit[RLIMIT_STACK].rlim_cur)) {
-			rv = KERN_FAILURE;
+			rv = EFAULT;
 			goto nogo;
 		}
 	}
@@ -400,12 +396,8 @@ trapmmufault(type, code, v, fp, p, sticks)
 		printf("vmfault %s %lx returned %d\n",
 		    map == kernel_map ? "kernel" : "user", va, rv);
 #endif
-#ifdef M68060
-	if ((machineid & AMIGA_68060) == 0 && mmutype == MMU_68040) {
-#else
-	if (mmutype == MMU_68040) {
-#endif
-		if(rv != KERN_SUCCESS) {
+	if (mmutype == MMU_68040) {	/* explicitely NOT MMU_68060 */
+		if (rv) {
 			goto nogo;
 		}
 
@@ -437,8 +429,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 		if (fp->f_fmt7.f_wb2s & WBS_VALID &&
 		   ((fp->f_fmt7.f_wb2s & WBS_TTMASK)==WBS_TT_MOVE16) == 0) {
 			if (_write_back(2, fp->f_fmt7.f_wb2s, 
-			    fp->f_fmt7.f_wb2d, fp->f_fmt7.f_wb2a, map)
-			    != KERN_SUCCESS)
+			    fp->f_fmt7.f_wb2d, fp->f_fmt7.f_wb2a, map))
 				goto nogo;
 			if ((fp->f_fmt7.f_wb2s & WBS_TMMASK) 
 			    != (code & SSW_TMMASK))
@@ -447,15 +438,14 @@ trapmmufault(type, code, v, fp, p, sticks)
 
 		/* Check WB3 */
 		if(fp->f_fmt7.f_wb3s & WBS_VALID) {
-			vm_map_t wb3_map;
+			struct vm_map *wb3_map;
 
 			if ((fp->f_fmt7.f_wb3s & WBS_TMMASK) == WBS_TM_SDATA)
 				wb3_map = kernel_map;
 			else
 				wb3_map = &vm->vm_map;
 			if (_write_back(3, fp->f_fmt7.f_wb3s, 
-			    fp->f_fmt7.f_wb3d, fp->f_fmt7.f_wb3a, wb3_map)
-			    != KERN_SUCCESS)
+			    fp->f_fmt7.f_wb3d, fp->f_fmt7.f_wb3a, wb3_map))
 				goto nogo;
 		}
 	}
@@ -469,22 +459,22 @@ trapmmufault(type, code, v, fp, p, sticks)
 	 * error.
 	 */
 	if (map != kernel_map && (caddr_t)va >= vm->vm_maxsaddr) {
-		if (rv == KERN_SUCCESS) {
+		if (rv == 0) {
 			nss = btoc(USRSTACK-(unsigned)va);
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
-		} else if (rv == KERN_PROTECTION_FAILURE)
-			rv = KERN_INVALID_ADDRESS;
+		} else if (rv == EACCES)
+			rv = EFAULT;
 	}
 
-	if (rv == KERN_SUCCESS) {
+	if (rv == 0) {
 		if (type == T_MMUFLT)
 			return;
-		userret(p, fp->f_pc, sticks); 
+		userret(p, fp, sticks, 0, 0); 
 		return;
 	}
 #else /* use hacky 386bsd_code */
-	if (rv == KERN_SUCCESS) {
+	if (rv == 0) {
 		/*
 		 * XXX: continuation of rude stack hack
 		 */
@@ -492,7 +482,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 			vm->vm_ssize = nss;
 		if (type == T_MMUFLT)
 			return;
-		userret(p, fp->f_pc, sticks); 
+		userret(p, fp, sticks, 0, 0); 
 		return;
 	}
 nogo:
@@ -510,7 +500,7 @@ nogo:
 	trapsignal(p, SIGSEGV, vftype, SEGV_MAPERR, sv);
 	if ((type & T_USER) == 0)
 		return;
-	userret(p, fp->f_pc, sticks); 
+	userret(p, fp, sticks, 0, 0); 
 }
 
 /*
@@ -753,7 +743,7 @@ trap(type, code, v, frame)
 			p->p_flag &= ~P_OWEUPC;
 			ADDUPROF(p);
 		}
-		userret(p, frame.f_pc, sticks); 
+		userret(p, &frame, sticks, 0, 0); 
 		return;
 
 	/*
@@ -784,7 +774,7 @@ trap(type, code, v, frame)
 	}
 	if ((type & T_USER) == 0)
 		return;
-	userret(p, frame.f_pc, sticks); 
+	userret(p, &frame, sticks, 0, 0); 
 }
 
 /*
@@ -939,28 +929,10 @@ syscall(code, frame)
 	if (error == ERESTART && (p->p_md.md_flags & MDP_STACKADJ))
 		frame.f_regs[SP] -= sizeof (int);
 #endif
-	userret(p, frame.f_pc, sticks);
+	userret(p, &frame, sticks, 0, 0);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
 		ktrsysret(p, code, error, rval[0]);
-#endif
-}
-
-/*
- * Process the tail end of a fork() for the child
- */
-void
-child_return(p, frame)
-	struct proc *p;
-	struct frame frame;
-{
-	frame.f_regs[D0] = 0;
-	frame.f_sr &= ~PSL_C;	/* carry bit */
-
-	userret(p, frame.f_pc, p->p_sticks);
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p, SYS_fork, 0, 0);
 #endif
 }
 
@@ -973,10 +945,15 @@ _write_back (wb, wb_sts, wb_data, wb_addr, wb_map)
 	u_int wb_sts;	/* writeback status information */
 	u_int wb_data;	/* data to writeback */
 	u_int wb_addr;	/* address to writeback to */
-	vm_map_t wb_map;
+	struct vm_map *wb_map;
 {
 	u_int wb_extra_page = 0;
 	u_int wb_rc, mmusr;
+	caddr_t oonfault = curpcb->pcb_onfault;
+	int rv = 0;
+
+	/* A fault in here must *not* go to the registered fault handler.  */
+	curpcb->pcb_onfault = NULL;
 
 #ifdef DEBUG
 	if (mmudebug)
@@ -1014,8 +991,10 @@ _write_back (wb, wb_sts, wb_data, wb_addr, wb_map)
 			    trunc_page((vm_offset_t)wb_addr), 
 			    0, VM_PROT_READ | VM_PROT_WRITE);
 
-			if (wb_rc != KERN_SUCCESS)
-				return (wb_rc);
+			if (wb_rc) {
+				rv = wb_rc;
+				goto out;
+			}
 #ifdef DEBUG
 			if (mmudebug)
 				printf("wb3: first page brought in.\n");
@@ -1046,9 +1025,10 @@ _write_back (wb, wb_sts, wb_data, wb_addr, wb_map)
 			wb_rc = uvm_fault(wb_map,
 			    trunc_page((vm_offset_t)wb_addr + wb_extra_page),
 			    0, VM_PROT_READ | VM_PROT_WRITE);
-
-			if (wb_rc != KERN_SUCCESS)
-				return (wb_rc);
+			if (wb_rc) {
+				rv = wb_rc;
+				goto out;
+			}
 		}
 #ifdef DEBUG
 		if (mmudebug)
@@ -1057,8 +1037,9 @@ _write_back (wb, wb_sts, wb_data, wb_addr, wb_map)
 	}
 
 	/* Actually do the write now */
-	if ((wb_sts & WBS_TMMASK) == FC_USERD && !curpcb->pcb_onfault)
-	    	curpcb->pcb_onfault = (caddr_t)_wb_fault;
+	if ((wb_sts & WBS_TMMASK) == FC_USERD && oonfault != NULL)
+		__asm volatile("movl #Lwberr,%0@" : :
+		     "a" (&curpcb->pcb_onfault));
 
 	switch(wb_sts & WBS_SZMASK) {
 	case WBS_SIZE_BYTE :
@@ -1076,22 +1057,19 @@ _write_back (wb, wb_sts, wb_data, wb_addr, wb_map)
 		    "d" (wb_sts & WBS_TMMASK), "d" (wb_data), "a" (wb_addr));
 		break;
 
+	default:
+		/*
+		 * This is trickery, we need this assembly somewhere out
+		 * of the default execution path, but still not detectable as
+		 * dead code that the compiler can throw away erroneously.
+		 */
+		__asm volatile("Lwberr: addql #1,%0" : "=d" (rv));
 	}
-	if (curpcb->pcb_onfault == (caddr_t)_wb_fault)
-		curpcb->pcb_onfault = NULL;
+	curpcb->pcb_onfault = NULL;
 	if ((wb_sts & WBS_TMMASK) != FC_USERD)
 		__asm volatile("movec %0,dfc\n" : : "d" (FC_USERD));
-	return (KERN_SUCCESS);
-}
 
-/*
- * fault handler for write back
- */
-void
-_wb_fault()
-{
-#ifdef DEBUG
-	printf ("trap: writeback fault\n");
-#endif
-	return;
+ out:
+	curpcb->pcb_onfault = oonfault;
+	return (rv);
 }

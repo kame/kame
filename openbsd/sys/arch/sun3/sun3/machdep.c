@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.42 2001/09/19 20:50:57 mickey Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.55 2002/03/23 13:28:34 espie Exp $	*/
 /*	$NetBSD: machdep.c,v 1.77 1996/10/13 03:47:51 christos Exp $	*/
 
 /*
@@ -48,7 +48,6 @@
 #include <sys/systm.h>
 #include <sys/signalvar.h>
 #include <sys/kernel.h>
-#include <sys/map.h>
 #include <sys/proc.h>
 #include <sys/buf.h>
 #include <sys/reboot.h>
@@ -79,8 +78,6 @@
 #include <sys/shm.h>
 #endif
 
-#include <vm/vm.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <dev/cons.h>
@@ -96,7 +93,6 @@
 #include <machine/reg.h>
 
 extern char *cpu_string;
-extern char version[];
 extern short exframesize[];
 
 int physmem;
@@ -104,15 +100,18 @@ int fputype;
 label_t *nofault;
 vm_offset_t vmmap;
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;
+struct vm_map *phys_map = NULL;
 
 /*
  * safepri is a safe priority for sleep to set for a spin-wait
  * during autoconfiguration or after a panic.
  */
 int	safepri = PSL_LOWIPL;
+
+#ifndef BUFCACHEPERCENT
+#define BUFCACHEPERCENT 5
+#endif
 
 /*
  * Declare these as initialized data so we can patch them.
@@ -127,14 +126,15 @@ int	bufpages = BUFPAGES;
 #else
 int	bufpages = 0;
 #endif
+int	bufcachepercent = BUFCACHEPERCENT;
 
-static caddr_t allocsys __P((caddr_t));
-static void identifycpu __P((void));
-static void initcpu __P((void));
-static void reboot_sync __P((void));
-int  reboot2 __P((int, char *)); /* share with sunos_misc.c */
+static caddr_t allocsys(caddr_t);
+static void identifycpu(void);
+static void initcpu(void);
+static void reboot_sync(void);
+int  reboot2(int, char *); /* share with sunos_misc.c */
 
-void straytrap __P((struct trapframe));	/* called from locore.s */
+void straytrap(struct trapframe);	/* called from locore.s */
 
 /*
  * Console initialization: called early on from main,
@@ -184,6 +184,9 @@ allocsys(v)
 {
 
 #ifdef SYSVSHM
+	shminfo.shmmax = shmmaxpgs;
+	shminfo.shmall = shmmaxpgs;
+	shminfo.shmseg = shmseg;
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
 #ifdef SYSVSEM
@@ -199,9 +202,6 @@ allocsys(v)
 	valloc(msqids, struct msqid_ds, msginfo.msgmni);
 #endif
 
-#ifndef BUFCACHEPERCENT
-#define BUFCACHEPERCENT 5
-#endif
 	/*
 	 * Determine how many buffers to allocate. By default we allocate
 	 * the BSD standard of use 10% of memory for the first 2 Meg,
@@ -214,7 +214,7 @@ allocsys(v)
 	if (bufpages == 0) {
 		/* We always have more than 2MB of memory. */
 		bufpages = (btoc(2 * 1024 * 1024) + physmem) *
-		    BUFCACHEPERCENT / 100;
+		    bufcachepercent / 100;
 	}
 	if (nbuf == 0) {
 		nbuf = bufpages;
@@ -282,9 +282,9 @@ cpu_startup()
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-	    NULL, UVM_UNKNOWN_OFFSET,
+	    NULL, UVM_UNKNOWN_OFFSET, 0,
 	    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-	                UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+	                UVM_ADV_NORMAL, 0)))
 		panic("startup: cannot allocate buffers");
 	minaddr = (vm_offset_t)buffers;
 	if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
@@ -319,6 +319,7 @@ cpu_startup()
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(kernel_map->pmap);
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -333,9 +334,6 @@ cpu_startup()
 	 * the kernel map (any kernel mapping is OK) and then the
 	 * device drivers clone the kernel mappings into DVMA space.
 	 */
-
-	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-	    VM_MBUF_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
 
 	printf("avail mem = %ld\n", ptoa(uvmexp.free));
 	printf("using %d buffers containing %d bytes of memory\n",
@@ -645,7 +643,7 @@ dumpconf()
 {
 	int nblks;	/* size of dump area */
 	int maj;
-	int (*getsize) __P((dev_t));
+	int (*getsize)(dev_t);
 
 	if (dumpdev == NODEV)
 		return;
@@ -774,7 +772,7 @@ dumpsys()
 	do {
 		if ((todo & 0xf) == 0)
 			printf("\r%4d", todo);
-		vaddr = (char*)(paddr + KERNBASE);
+		vaddr = (char *)(paddr + KERNBASE);
 		error = (*dsw->d_dump)(dumpdev, blkno, vaddr, NBPG);
 		if (error)
 			goto fail;
@@ -784,14 +782,16 @@ dumpsys()
 	} while (--chunk > 0);
 
 	/* Do the second chunk (avail_start <= PA < dumpsize) */
-	vaddr = (char*)vmmap;	/* Borrow /dev/mem VA */
+	vaddr = (char *)vmmap;	/* Borrow /dev/mem VA */
 	do {
 		if ((todo & 0xf) == 0)
 			printf("\r%4d", todo);
 		pmap_enter(pmap_kernel(), vmmap, paddr | PMAP_NC,
 			VM_PROT_READ, VM_PROT_READ);
+		pmap_update(pmap_kernel());
 		error = (*dsw->d_dump)(dumpdev, blkno, vaddr, NBPG);
 		pmap_remove(pmap_kernel(), vmmap, vmmap + NBPG);
+		pmap_update(pmap_kernel());
 		if (error)
 			goto fail;
 		paddr += NBPG;
@@ -845,8 +845,7 @@ cpu_exec_aout_makecmds(p, epp)
 	int error = ENOEXEC;
 
 #ifdef COMPAT_SUNOS
-	extern int sunos_exec_aout_makecmds
-		__P((struct proc *, struct exec_package *));
+	extern int sunos_exec_aout_makecmds(struct proc *, struct exec_package *);
 	if ((error = sunos_exec_aout_makecmds(p, epp)) == 0)
 		return 0;
 #endif

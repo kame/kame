@@ -1,4 +1,4 @@
-/*	$OpenBSD: fms.c,v 1.4 2001/08/25 10:13:29 art Exp $ */
+/*	$OpenBSD: fms.c,v 1.8 2002/03/14 03:16:06 millert Exp $ */
 /*	$NetBSD: fms.c,v 1.5.4.1 2000/06/30 16:27:50 simonb Exp $	*/
 
 /*-
@@ -76,31 +76,31 @@ struct fms_dma {
 
 
 
-int	fms_match __P((struct device *, void *, void *));
-void	fms_attach __P((struct device *, struct device *, void *));
-int	fms_intr __P((void *));
+int	fms_match(struct device *, void *, void *);
+void	fms_attach(struct device *, struct device *, void *);
+int	fms_intr(void *);
 
-int	fms_open __P((void *, int));
-void	fms_close __P((void *));
-int	fms_query_encoding __P((void *, struct audio_encoding *));
-int	fms_set_params __P((void *, int, int, struct audio_params *, 
-			    struct audio_params *));
-int	fms_round_blocksize __P((void *, int));
-int	fms_halt_output __P((void *));
-int	fms_halt_input __P((void *));
-int	fms_getdev __P((void *, struct audio_device *));
-int	fms_set_port __P((void *, mixer_ctrl_t *));
-int	fms_get_port __P((void *, mixer_ctrl_t *));
-int	fms_query_devinfo __P((void *, mixer_devinfo_t *));
-void	*fms_malloc __P((void *, int, size_t, int, int));
-void	fms_free __P((void *, void *, int));
-size_t	fms_round_buffersize __P((void *, int, size_t));
-int	fms_mappage __P((void *, void *, int, int));
-int	fms_get_props __P((void *));
-int	fms_trigger_output __P((void *, void *, void *, int, void (*)(void *),
-				void *, struct audio_params *));
-int	fms_trigger_input __P((void *, void *, void *, int, void (*)(void *),
-			       void *, struct audio_params *));
+int	fms_open(void *, int);
+void	fms_close(void *);
+int	fms_query_encoding(void *, struct audio_encoding *);
+int	fms_set_params(void *, int, int, struct audio_params *, 
+			    struct audio_params *);
+int	fms_round_blocksize(void *, int);
+int	fms_halt_output(void *);
+int	fms_halt_input(void *);
+int	fms_getdev(void *, struct audio_device *);
+int	fms_set_port(void *, mixer_ctrl_t *);
+int	fms_get_port(void *, mixer_ctrl_t *);
+int	fms_query_devinfo(void *, mixer_devinfo_t *);
+void	*fms_malloc(void *, int, size_t, int, int);
+void	fms_free(void *, void *, int);
+size_t	fms_round_buffersize(void *, int, size_t);
+paddr_t	fms_mappage(void *, void *, off_t, int);
+int	fms_get_props(void *);
+int	fms_trigger_output(void *, void *, void *, int, void (*)(void *),
+			   void *, struct audio_params *);
+int	fms_trigger_input(void *, void *, void *, int, void (*)(void *),
+			  void *, struct audio_params *);
 
 struct  cfdriver fms_cd = {
 	NULL, "fms", DV_DULL
@@ -137,25 +137,23 @@ struct audio_hw_if fms_hw_if = {
 	fms_set_port,
 	fms_get_port,
 	fms_query_devinfo,
-	NULL,
+	fms_malloc,
 	fms_free,
-	NULL,
+	fms_round_buffersize,
 	fms_mappage,
 	fms_get_props,
 	fms_trigger_output,
-	fms_trigger_input,
-	fms_malloc,
-	fms_round_buffersize,
+	fms_trigger_input
 };
 
-int	fms_attach_codec __P((void *, struct ac97_codec_if *));
-int	fms_read_codec __P((void *, u_int8_t, u_int16_t *));
-int	fms_write_codec __P((void *, u_int8_t, u_int16_t));
-void	fms_reset_codec __P((void *));
+int	fms_attach_codec(void *, struct ac97_codec_if *);
+int	fms_read_codec(void *, u_int8_t, u_int16_t *);
+int	fms_write_codec(void *, u_int8_t, u_int16_t);
+void	fms_reset_codec(void *);
 
-int	fms_allocmem __P((struct fms_softc *, size_t, size_t,
-			  struct fms_dma *));
-int	fms_freemem __P((struct fms_softc *, struct fms_dma *));
+int	fms_allocmem(struct fms_softc *, size_t, size_t,
+			  struct fms_dma *);
+int	fms_freemem(struct fms_softc *, struct fms_dma *);
 
 #define FM_PCM_VOLUME		0x00
 #define FM_FM_VOLUME		0x02
@@ -852,11 +850,11 @@ fms_round_buffersize(addr, direction, size)
 	return size;
 }
 
-int
+paddr_t
 fms_mappage(addr, mem, off, prot)
 	void *addr;
 	void *mem;
-	int off;
+	off_t off;
 	int prot;
 {
 	struct fms_softc *sc = addr;
@@ -897,7 +895,7 @@ fms_trigger_output(addr, start, end, blksize, intr, arg, param)
 	void *addr;
 	void *start, *end;
 	int blksize;
-	void (*intr) __P((void *));
+	void (*intr)(void *);
 	void *arg;
 	struct audio_params *param;
 {
@@ -935,7 +933,7 @@ fms_trigger_input(addr, start, end, blksize, intr, arg, param)
 	void *addr;
 	void *start, *end;
 	int blksize;
-	void (*intr) __P((void *));
+	void (*intr)(void *);
 	void *arg;
 	struct audio_params *param;
 {

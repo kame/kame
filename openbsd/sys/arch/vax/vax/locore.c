@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.c,v 1.19 2001/10/01 12:56:43 hugh Exp $	*/
+/*	$OpenBSD: locore.c,v 1.23 2002/03/14 01:26:48 millert Exp $	*/
 /*	$NetBSD: locore.c,v 1.43 2000/03/26 11:39:45 ragge Exp $	*/
 /*
  * Copyright (c) 1994, 1998 Ludd, University of Lule}, Sweden.
@@ -39,7 +39,7 @@
 #include <sys/systm.h>
 #include <sys/user.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/sid.h>
@@ -50,8 +50,8 @@
 #include <machine/pmap.h>
 #include <machine/nexus.h>
 
-void	start __P((void));
-void	main __P((void));
+void	start(void);
+void	main(void);
 
 extern	paddr_t avail_end;
 paddr_t	esym;
@@ -246,17 +246,32 @@ start()
 		dep_call = &ka680_calls;
 		switch((vax_siedata & 0xff00) >> 8) {
 		case VAX_STYP_675:
-			strcpy(cpu_model,"VAX 4000 400"); break;
+			strcpy(cpu_model,"VAX 4000 400");
+			break;
 		case VAX_STYP_680:
-			strcpy(cpu_model,"VAX 4000 500"); break;
-		case VAX_STYP_681:
-			strcpy(cpu_model,"VAX 4000 500A"); break;
+			strcpy(cpu_model,"VAX 4000 500");
+			break;
 		case VAX_STYP_690:
-			strcpy(cpu_model,"VAX 4000 600"); break;
-		case VAX_STYP_691:
-			strcpy(cpu_model,"VAX 4000 605A"); break;
+			strcpy(cpu_model,"VAX 4000 600");
+			break;
 		default:
 			strcpy(cpu_model,"VAX - Unknown Omega Class");
+		}
+		break;
+	case VAX_BTYP_1305:
+		dep_call = &ka680_calls;
+		switch((vax_siedata & 0xff00) >> 8) {
+		case VAX_STYP_681:
+			strcpy(cpu_model,"VAX 4000 500A");
+			break;
+		case VAX_STYP_691:
+			strcpy(cpu_model,"VAX 4000 605A");
+			break;
+		case VAX_STYP_694:
+			strcpy(cpu_model,"VAX 4000 705A");
+			break;
+		default:
+			strcpy(cpu_model,"VAX - Unknown Legacy Class");
 		}
 		break;
 #endif

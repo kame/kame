@@ -1,4 +1,4 @@
-/*	$OpenBSD: cgtwo.c,v 1.16 2001/09/16 00:42:44 millert Exp $	*/
+/*	$OpenBSD: cgtwo.c,v 1.20 2002/03/14 03:15:59 millert Exp $	*/
 /*	$NetBSD: cgtwo.c,v 1.22 1997/05/24 20:16:12 pk Exp $ */
 
 /*
@@ -63,7 +63,7 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/fbio.h>
 #include <machine/autoconf.h>
@@ -90,11 +90,11 @@ struct cgtwo_softc {
 };
 
 /* autoconfiguration driver */
-static void	cgtwoattach __P((struct device *, struct device *, void *));
-static int	cgtwomatch __P((struct device *, void *, void *));
-static void	cgtwounblank __P((struct device *));
-int		cgtwogetcmap __P((struct cgtwo_softc *, struct fbcmap *));
-int		cgtwoputcmap __P((struct cgtwo_softc *, struct fbcmap *));
+static void	cgtwoattach(struct device *, struct device *, void *);
+static int	cgtwomatch(struct device *, void *, void *);
+static void	cgtwounblank(struct device *);
+int		cgtwogetcmap(struct cgtwo_softc *, struct fbcmap *);
+int		cgtwoputcmap(struct cgtwo_softc *, struct fbcmap *);
 
 struct cfattach cgtwo_ca = {
 	sizeof(struct cgtwo_softc), cgtwomatch, cgtwoattach
@@ -305,7 +305,7 @@ cgtwoioctl(dev, cmd, data, flags, p)
 		break;
 
 	case FBIOSVIDEO:
-		sc->sc_reg->video_enab = (*(int*)data) & 1;
+		sc->sc_reg->video_enab = (*(int *)data) & 1;
 		break;
 
 	default:
@@ -415,10 +415,11 @@ cgtwoputcmap(sc, cmap)
  * Return the address that would map the given device at the given
  * offset, allowing for the given protection, or return -1 for error.
  */
-int
+paddr_t
 cgtwommap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	register struct cgtwo_softc *sc = cgtwo_cd.cd_devs[minor(dev)];
 

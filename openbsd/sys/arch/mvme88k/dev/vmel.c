@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmel.c,v 1.5 2001/08/26 02:37:07 miod Exp $ */
+/*	$OpenBSD: vmel.c,v 1.9 2002/03/14 03:15:57 millert Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -48,8 +48,8 @@
  * functions will decide how many address bits are relevant.
  */
 
-void vmelattach __P((struct device *, struct device *, void *));
-int  vmelmatch __P((struct device *, void *, void *));
+void vmelattach(struct device *, struct device *, void *);
+int  vmelmatch(struct device *, void *, void *);
 
 struct cfattach vmel_ca = {
         sizeof(struct vmelsoftc), vmelmatch, vmelattach
@@ -59,13 +59,13 @@ struct cfdriver vmel_cd = {
         NULL, "vmel", DV_DULL, 0
 };
 
-int vmelscan __P((struct device *, void *, void*));
-int vmelopen __P((dev_t, int, int));
-int vmelclose __P((dev_t, int, int));
-int vmelioctl __P((dev_t, int, caddr_t, int, struct proc *));
-int vmelread __P((dev_t, struct uio *, int));
-int vmelwrite __P((dev_t, struct uio *, int));
-int vmelmmap __P((dev_t, int, int));
+int vmelscan(struct device *, void *, void *);
+int vmelopen(dev_t, int, int);
+int vmelclose(dev_t, int, int);
+int vmelioctl(dev_t, int, caddr_t, int, struct proc *);
+int vmelread(dev_t, struct uio *, int);
+int vmelwrite(dev_t, struct uio *, int);
+paddr_t vmelmmap(dev_t, off_t, int);
 
 int
 vmelmatch(parent, cf, args)
@@ -161,16 +161,17 @@ vmelwrite(dev, uio, flags)
 	return (vmerw(sc->sc_vme, uio, flags, BUS_VMEL));
 }
 
-int
+paddr_t
 vmelmmap(dev, off, prot)
 	dev_t dev;
-	int off, prot;
+	off_t off;
+	int prot;
 {
 	int unit = minor(dev);
 	struct vmelsoftc *sc = (struct vmelsoftc *) vmel_cd.cd_devs[unit];
 	void * pa;
 
-	pa = vmepmap(sc->sc_vme, (void *)off, NBPG, BUS_VMEL);
+	pa = vmepmap(sc->sc_vme, off, NBPG, BUS_VMEL);
 	printf("vmel %x pa %x\n", off, pa);
 	if (pa == NULL)
 		return (-1);

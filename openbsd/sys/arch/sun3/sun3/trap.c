@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.26 2001/09/14 09:12:21 art Exp $	*/
+/*	$OpenBSD: trap.c,v 1.32 2002/03/14 01:26:47 millert Exp $	*/
 /*	$NetBSD: trap.c,v 1.63-1.65ish 1997/01/16 15:41:40 gwr Exp $	*/
 
 /*
@@ -58,8 +58,8 @@
 #include <sys/ktrace.h>
 #endif
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
+#include <uvm/uvm_extern.h>
+#include <uvm/uvm_pmap.h>
 
 #include <machine/cpu.h>
 #include <machine/db_machdep.h>
@@ -78,15 +78,13 @@ extern struct emul emul_sunos;
 extern char fubail[], subail[];
 
 /* These are called from locore.s */
-void syscall __P((register_t code, struct frame));
-void trap __P((int type, u_int code, u_int v, struct frame));
-int  nodb_trap __P((int type, struct frame *));
+void syscall(register_t code, struct frame);
+void trap(int type, u_int code, u_int v, struct frame);
+int  nodb_trap(int type, struct frame *);
 
 
 int astpending;
 int want_resched;
-
-static void userret __P((struct proc *, struct frame *, u_quad_t));
 
 char	*trap_type[] = {
 	"Bus error",
@@ -147,11 +145,14 @@ int mmupid = -1;
  * trap and syscall both need the following work done before
  * returning to user mode.
  */
-static void
-userret(p, fp, oticks)
-	register struct proc *p;
-	register struct frame *fp;
+/*ARGSUSED*/
+void
+userret(p, fp, oticks, faultaddr, fromtrap)
+	struct proc *p;
+	struct frame *fp;
 	u_quad_t oticks;
+	u_int faultaddr;
+	int fromtrap;
 {
 	int sig;
 
@@ -450,12 +451,12 @@ trap(type, code, v, frame)
 		/*FALLTHROUGH*/
 
 	case T_MMUFLT|T_USER: { 	/* page fault */
-		register vm_offset_t va;
-		register struct vmspace *vm = NULL;
-		register vm_map_t map;
+		vm_offset_t va;
+		struct vmspace *vm = NULL;
+		struct vm_map *map;
 		int rv;
 		vm_prot_t ftype, vftype;
-		extern vm_map_t kernel_map;
+		extern struct vm_map *kernel_map;
 
 		/* vmspace only significant if T_USER */
 		if (p)
@@ -543,16 +544,16 @@ trap(type, code, v, frame)
 		 * error.
 		 */
 		if ((map != kernel_map) && ((caddr_t)va >= vm->vm_maxsaddr)) {
-			if (rv == KERN_SUCCESS) {
+			if (rv == 0) {
 				unsigned nss;
 
 				nss = btoc((u_int)(USRSTACK-va));
 				if (nss > vm->vm_ssize)
 					vm->vm_ssize = nss;
-			} else if (rv == KERN_PROTECTION_FAILURE)
-				rv = KERN_INVALID_ADDRESS;
+			} else if (rv == EACCES)
+				rv = EFAULT;
 		}
-		if (rv == KERN_SUCCESS)
+		if (rv == 0)
 			goto finish;
 
 		if ((type & T_USER) == 0) {
@@ -590,7 +591,7 @@ finish:
 		trapsignal(p, sig, ucode, si_type, sv);
 	}
 douret:
-	userret(p, &frame, sticks);
+	userret(p, &frame, sticks, 0, 0);
 }
 
 /*
@@ -740,36 +741,10 @@ syscall(code, frame)
 			frame.f_regs[SP] -= sizeof (int);
 	}
 #endif
-	userret(p, &frame, sticks);
+	userret(p, &frame, sticks, 0, 0);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
 		ktrsysret(p, code, error, rval[0]);
-#endif
-}
-
-/*
- * Set up return-value registers as fork() libc stub expects,
- * and do normal return-to-user-mode stuff.
- */
-void
-child_return(p)
-	void *p;
-{
-	struct frame *f;
-
-	f = (struct frame *)((struct proc *)p)->p_md.md_regs;
-	f->f_regs[D0] = 0;
-	f->f_sr &= ~PSL_C;
-	f->f_format = FMT0;
-
-	/*
-	 * Old ticks (3rd arg) is zero so we will charge the child
-	 * for any clock ticks that might happen before this point.
-	 */
-	userret((struct proc *)p, f, 0);
-#ifdef KTRACE
-	if (KTRPOINT((struct proc *)p, KTR_SYSRET))
-		ktrsysret(((struct proc *)p), SYS_fork, 0, 0);
 #endif
 }
 

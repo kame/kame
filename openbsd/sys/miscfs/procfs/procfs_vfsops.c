@@ -1,4 +1,4 @@
-/*	$OpenBSD: procfs_vfsops.c,v 1.14 2001/06/27 04:58:44 art Exp $	*/
+/*	$OpenBSD: procfs_vfsops.c,v 1.16 2002/03/14 01:27:08 millert Exp $	*/
 /*	$NetBSD: procfs_vfsops.c,v 1.25 1996/02/09 22:40:53 christos Exp $	*/
 
 /*
@@ -58,15 +58,13 @@
 
 #include <miscfs/procfs/procfs.h>
 
-#include <vm/vm.h>			/* for PAGE_SIZE */
-
 #include <uvm/uvm_extern.h>
 
-int	procfs_mount __P((struct mount *, const char *, void *,
-			  struct nameidata *, struct proc *));
-int	procfs_start __P((struct mount *, int, struct proc *));
-int	procfs_unmount __P((struct mount *, int, struct proc *));
-int	procfs_statfs __P((struct mount *, struct statfs *, struct proc *));
+int	procfs_mount(struct mount *, const char *, void *,
+			  struct nameidata *, struct proc *);
+int	procfs_start(struct mount *, int, struct proc *);
+int	procfs_unmount(struct mount *, int, struct proc *);
+int	procfs_statfs(struct mount *, struct statfs *, struct proc *);
 /*
  * VFS Operations.
  *
@@ -199,20 +197,20 @@ procfs_statfs(mp, sbp, p)
 }
 
 
-#define procfs_sync ((int (*) __P((struct mount *, int, struct ucred *, \
-				  struct proc *)))nullop)
+#define procfs_sync ((int (*)(struct mount *, int, struct ucred *, \
+				  struct proc *))nullop)
 
-#define procfs_fhtovp ((int (*) __P((struct mount *, struct fid *, \
-	    struct vnode **)))eopnotsupp)
-#define procfs_quotactl ((int (*) __P((struct mount *, int, uid_t, caddr_t, \
-	    struct proc *)))eopnotsupp)
-#define procfs_sysctl ((int (*) __P((int *, u_int, void *, size_t *, void *, \
-	    size_t, struct proc *)))eopnotsupp)
-#define procfs_vget ((int (*) __P((struct mount *, ino_t, struct vnode **))) \
+#define procfs_fhtovp ((int (*)(struct mount *, struct fid *, \
+	    struct vnode **))eopnotsupp)
+#define procfs_quotactl ((int (*)(struct mount *, int, uid_t, caddr_t, \
+	    struct proc *))eopnotsupp)
+#define procfs_sysctl ((int (*)(int *, u_int, void *, size_t *, void *, \
+	    size_t, struct proc *))eopnotsupp)
+#define procfs_vget ((int (*)(struct mount *, ino_t, struct vnode **)) \
 	    eopnotsupp)
-#define procfs_vptofh ((int (*) __P((struct vnode *, struct fid *)))eopnotsupp)
-#define procfs_checkexp ((int (*) __P((struct mount *, struct mbuf *,	\
-	int *, struct ucred **)))eopnotsupp)
+#define procfs_vptofh ((int (*)(struct vnode *, struct fid *))eopnotsupp)
+#define procfs_checkexp ((int (*)(struct mount *, struct mbuf *,	\
+	int *, struct ucred **))eopnotsupp)
 
 struct vfsops procfs_vfsops = {
 	procfs_mount,

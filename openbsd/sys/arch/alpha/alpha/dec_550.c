@@ -1,4 +1,4 @@
-/* $OpenBSD: dec_550.c,v 1.5 2001/09/29 03:20:46 millert Exp $ */
+/* $OpenBSD: dec_550.c,v 1.7 2002/03/14 01:26:26 millert Exp $ */
 /* $NetBSD: dec_550.c,v 1.10 2000/06/20 03:48:53 matt Exp $ */
 
 /*
@@ -73,10 +73,10 @@ static int comcnrate = CONSPEED;
 
 #define	DR_VERBOSE(f) while (0)
 
-void dec_550_init __P((void));
-static void dec_550_cons_init __P((void));
-static void dec_550_device_register __P((struct device *, void *));
-static void dec_550_powerdown __P((void));
+void dec_550_init(void);
+static void dec_550_cons_init(void);
+static void dec_550_device_register(struct device *, void *);
+static void dec_550_powerdown(void);
 
 void
 dec_550_init()
@@ -119,7 +119,7 @@ dec_550_cons_init()
 			 */
 			DELAY(160000000 / comcnrate);
 
-			if(comcnattach(ccp->cc_iot, 0x3f8, comcnrate,
+			if(comcnattach(&ccp->cc_iot, 0x3f8, comcnrate,
 			    COM_FREQ,
 			    (TTYDEF_CFLAG & ~(CSIZE | PARENB)) | CS8))
 				panic("can't init serial console");
@@ -131,14 +131,14 @@ dec_550_cons_init()
 #if NPCKBD > 0
 		/* display console ... */
 		/* XXX */
-		(void) pckbc_cnattach(ccp->cc_iot, IO_KBD, KBCMDP,
+		(void) pckbc_cnattach(&ccp->cc_iot, IO_KBD, KBCMDP,
 		    PCKBC_KBD_SLOT);
 
 		if (CTB_TURBOSLOT_TYPE(ctb->ctb_turboslot) ==
 		    CTB_TURBOSLOT_TYPE_ISA)
-			isa_display_console(ccp->cc_iot, ccp->cc_memt);
+			isa_display_console(&ccp->cc_iot, &ccp->cc_memt);
 		else
-			pci_display_console(ccp->cc_iot, ccp->cc_memt,
+			pci_display_console(&ccp->cc_iot, &ccp->cc_memt,
 			    &ccp->cc_pc, CTB_TURBOSLOT_BUS(ctb->ctb_turboslot),
 			    CTB_TURBOSLOT_SLOT(ctb->ctb_turboslot), 0);
 #else

@@ -1,4 +1,4 @@
-/*	$OpenBSD: obio.c,v 1.8 1998/10/14 02:23:45 deraadt Exp $	*/
+/*	$OpenBSD: obio.c,v 1.12 2002/03/14 01:26:43 millert Exp $	*/
 /*	$NetBSD: obio.c,v 1.37 1997/07/29 09:58:11 fair Exp $	*/
 
 /*
@@ -42,7 +42,7 @@
 #include <sys/syslog.h>
 #endif
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/pmap.h>
@@ -74,20 +74,20 @@ struct bus_softc {
 
 
 /* autoconfiguration driver */
-static int	busmatch __P((struct device *, void *, void *));
-static void	obioattach __P((struct device *, struct device *, void *));
-static void	vmesattach __P((struct device *, struct device *, void *));
-static void	vmelattach __P((struct device *, struct device *, void *));
-static void	vmeattach __P((struct device *, struct device *, void *));
+static int	busmatch(struct device *, void *, void *);
+static void	obioattach(struct device *, struct device *, void *);
+static void	vmesattach(struct device *, struct device *, void *);
+static void	vmelattach(struct device *, struct device *, void *);
+static void	vmeattach(struct device *, struct device *, void *);
 
-int		busprint __P((void *, const char *));
-int		vmeprint __P((void *, const char *));
-static int	busattach __P((struct device *, void *, void *, int));
-int		obio_scan __P((struct device *, void *, void *));
-int 		vmes_scan __P((struct device *, void *, void *));
-int 		vmel_scan __P((struct device *, void *, void *));
-void		vmebus_translate __P((struct device *, struct confargs *, int));
-int 		vmeintr __P((void *));
+int		busprint(void *, const char *);
+int		vmeprint(void *, const char *);
+static int	busattach(struct device *, void *, void *, int);
+int		obio_scan(struct device *, void *, void *);
+int 		vmes_scan(struct device *, void *, void *);
+int 		vmel_scan(struct device *, void *, void *);
+void		vmebus_translate(struct device *, struct confargs *, int);
+int 		vmeintr(void *);
 
 struct cfattach obio_ca = {
 	sizeof(struct bus_softc), busmatch, obioattach
@@ -302,6 +302,8 @@ vmesattach(parent, self, args)
 	if (vmeints == NULL) {
 		vmeints = (struct intrhand **)malloc(256 *
 		    sizeof(struct intrhand *), M_TEMP, M_NOWAIT);
+		if (vmeints == NULL)
+			panic("vmesattach: can't allocate intrhand");
 		bzero(vmeints, 256 * sizeof(struct intrhand *));
 	}
 	(void)config_search(vmes_scan, self, args);
@@ -323,6 +325,8 @@ vmelattach(parent, self, args)
 	if (vmeints == NULL) {
 		vmeints = (struct intrhand **)malloc(256 *
 		    sizeof(struct intrhand *), M_TEMP, M_NOWAIT);
+		if (vmeints == NULL)
+			panic("vmelattach: can't allocate intrhand");
 		bzero(vmeints, 256 * sizeof(struct intrhand *));
 	}
 	(void)config_search(vmel_scan, self, args);
@@ -663,4 +667,5 @@ void
 bus_untmp()
 {
 	pmap_remove(pmap_kernel(), TMPMAP_VA, TMPMAP_VA+NBPG);
+	pmap_update(pmap_kernel());
 }

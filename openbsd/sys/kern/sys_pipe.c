@@ -1,4 +1,4 @@
-/*	$OpenBSD: sys_pipe.c,v 1.38 2001/09/19 20:50:58 mickey Exp $	*/
+/*	$OpenBSD: sys_pipe.c,v 1.43 2002/03/14 01:27:04 millert Exp $	*/
 
 /*
  * Copyright (c) 1996 John S. Dyson
@@ -47,7 +47,6 @@
 #include <sys/event.h>
 #include <sys/lock.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <sys/pipe.h>
@@ -55,13 +54,13 @@
 /*
  * interfaces to the outside world
  */
-int	pipe_read __P((struct file *, off_t *, struct uio *, struct ucred *));
-int	pipe_write __P((struct file *, off_t *, struct uio *, struct ucred *));
-int	pipe_close __P((struct file *, struct proc *));
-int	pipe_select __P((struct file *, int which, struct proc *));
-int	pipe_kqfilter __P((struct file *fp, struct knote *kn));
-int	pipe_ioctl __P((struct file *, u_long, caddr_t, struct proc *));
-int	pipe_stat __P((struct file *fp, struct stat *ub, struct proc *p));
+int	pipe_read(struct file *, off_t *, struct uio *, struct ucred *);
+int	pipe_write(struct file *, off_t *, struct uio *, struct ucred *);
+int	pipe_close(struct file *, struct proc *);
+int	pipe_select(struct file *, int which, struct proc *);
+int	pipe_kqfilter(struct file *fp, struct knote *kn);
+int	pipe_ioctl(struct file *, u_long, caddr_t, struct proc *);
+int	pipe_stat(struct file *fp, struct stat *ub, struct proc *p);
 
 static struct fileops pipeops = {
 	pipe_read, pipe_write, pipe_ioctl, pipe_select, pipe_kqfilter,
@@ -94,12 +93,12 @@ static int amountpipekva;
 
 struct pool pipe_pool;
 
-void	pipeclose __P((struct pipe *));
-void	pipeinit __P((struct pipe *));
-static __inline int pipelock __P((struct pipe *));
-static __inline void pipeunlock __P((struct pipe *));
-static __inline void pipeselwakeup __P((struct pipe *));
-void	pipespace __P((struct pipe *));
+void	pipeclose(struct pipe *);
+void	pipeinit(struct pipe *);
+static __inline int pipelock(struct pipe *);
+static __inline void pipeunlock(struct pipe *);
+static __inline void pipeselwakeup(struct pipe *);
+void	pipespace(struct pipe *);
 
 /*
  * The pipe system call for the DTYPE_PIPE type of pipes
@@ -143,13 +142,17 @@ sys_opipe(p, v, retval)
 	rpipe->pipe_peer = wpipe;
 	wpipe->pipe_peer = rpipe;
 
+	FILE_SET_MATURE(rf);
+	FILE_SET_MATURE(wf);
 	return (0);
 free3:
-	ffree(rf);
 	fdremove(fdp, retval[0]);
+	closef(rf, p);
+	rpipe = NULL;
 free2:
 	(void)pipeclose(wpipe);
-	(void)pipeclose(rpipe);
+	if (rpipe != NULL)
+		(void)pipeclose(rpipe);
 	return (error);
 }
 
@@ -845,7 +848,6 @@ void
 pipe_init()
 {
 	pool_init(&pipe_pool, sizeof(struct pipe), 0, 0, 0, "pipepl",
-		0, pool_page_alloc_nointr, pool_page_free_nointr,
-		M_PIPE);
+	    &pool_allocator_nointr);
 }
 

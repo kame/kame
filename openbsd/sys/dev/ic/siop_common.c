@@ -1,4 +1,4 @@
-/*	$OpenBSD: siop_common.c,v 1.11 2001/10/08 01:25:07 krw Exp $ */
+/*	$OpenBSD: siop_common.c,v 1.13 2002/03/14 01:26:55 millert Exp $ */
 /*	$NetBSD: siop_common.c,v 1.12 2001/02/11 18:04:50 bouyer Exp $	*/
 
 /*
@@ -55,7 +55,7 @@
 #undef DEBUG
 #undef DEBUG_DR
 
-int siop_find_lun0_quirks __P((struct siop_softc *, u_int8_t, u_int16_t));
+int siop_find_lun0_quirks(struct siop_softc *, u_int8_t, u_int16_t);
 
 void
 siop_common_reset(sc)
@@ -560,7 +560,7 @@ siop_sdp(siop_cmd)
 	/* save data pointer. Handle async only for now */
 	int offset, dbc, sstat;
 	struct siop_softc *sc = siop_cmd->siop_sc;
-	scr_table_t *table; /* table to patch */
+	struct scr_table *table; /* table to patch */
 
 	if ((siop_cmd->xs->flags & (SCSI_DATA_OUT | SCSI_DATA_IN))
 	    == 0)

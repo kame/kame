@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.37 2001/10/18 08:43:16 jj Exp $
+#	$OpenBSD: GENERIC,v 1.39 2002/01/23 19:16:09 fgsch Exp $
 #	$NetBSD: GENERIC,v 1.85 1997/08/27 19:32:49 is Exp $
 
 #
@@ -40,10 +40,10 @@ option		FPU_EMULATE	# FPU emulation
 option		ADOSFS		# AmigaDOS file system
 
 #
-# Compatability options for various existing systems
+# Compatibility options for various existing systems
 #
 option		COMPAT_SUNOS	# Support to run Sun (m68k) executables
-#option		COMPAT_HPUX	# HP300 compatability
+#option		COMPAT_HPUX	# HP300 compatibility
 
 #
 # Support for various kernel options
@@ -62,7 +62,6 @@ option		GENERIC		# Mini-root boot support
 #
 # Amiga specific options
 #
-option		MACHINE_NONCONTIG # Non-contiguous memory support
 # ATTENTION: There is NO WARRANTY AT ALL that the sync will be complete
 # before the 10 secondinterval ends, or that KBDRESET does work at all.
 #option		KBDRESET	# sync on Ctrl-Amiga-Amiga

@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_input.c,v 1.7 1997/07/19 22:31:18 niklas Exp $	*/
+/*	$OpenBSD: db_input.c,v 1.9 2002/03/14 01:26:51 millert Exp $	*/
 /*	$NetBSD: db_input.c,v 1.7 1996/02/05 01:57:02 christos Exp $	*/
 
 /* 
@@ -33,7 +33,7 @@
 #include <sys/param.h>
 #include <sys/proc.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/db_machdep.h>
 
@@ -72,7 +72,7 @@ char *  db_history_prev = (char *) 0;	/* start of previous line */
 #define	BLANK		' '
 #define	BACKUP		'\b'
 
-static int cnmaygetc __P((void));
+static int cnmaygetc(void);
 
 void
 db_putstring(s, count)

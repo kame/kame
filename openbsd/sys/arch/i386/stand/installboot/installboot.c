@@ -1,4 +1,4 @@
-/*	$OpenBSD: installboot.c,v 1.34 1999/05/23 17:19:22 aaron Exp $	*/
+/*	$OpenBSD: installboot.c,v 1.36 2002/03/14 01:26:34 millert Exp $	*/
 /*	$NetBSD: installboot.c,v 1.5 1995/11/17 23:23:50 gwr Exp $ */
 
 /*
@@ -44,7 +44,7 @@
 #include <ufs/ffs/fs.h>
 #include <sys/reboot.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>
 
 #include <machine/cpu.h>
@@ -77,12 +77,11 @@ int	maxblocknum;		/* size of this array */
 
 int biosdev;
 
-char		*loadprotoblocks __P((char *, long *));
-int		loadblocknums __P((char *, int, struct disklabel *));
-static void	devread __P((int, void *, daddr_t, size_t, char *));
-static void	usage __P((void));
-static int	record_block
-	__P((u_int8_t *, daddr_t, u_int, struct disklabel *));
+char		*loadprotoblocks(char *, long *);
+int		loadblocknums(char *, int, struct disklabel *);
+static void	devread(int, void *, daddr_t, size_t, char *);
+static void	usage(void);
+static int	record_block(u_int8_t *, daddr_t, u_int, struct disklabel *);
 
 static void
 usage()

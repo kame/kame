@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_elf.c,v 1.35 2001/09/19 13:28:43 art Exp $	*/
+/*	$OpenBSD: exec_elf.c,v 1.38 2002/03/14 01:27:03 millert Exp $	*/
 
 /*
  * Copyright (c) 1996 Per Fogelstrom
@@ -48,7 +48,7 @@
 #include <sys/stat.h>
 
 #include <sys/mman.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/reg.h>
@@ -71,8 +71,8 @@
 #endif
 
 struct ELFNAME(probe_entry) {
-	int (*func) __P((struct proc *, struct exec_package *, char *,
-	    u_long *, u_int8_t *));
+	int (*func)(struct proc *, struct exec_package *, char *,
+	    u_long *, u_int8_t *);
 	int os_mask;
 } ELFNAME(probes)[] = {
 	/* XXX - bogus, shouldn't be size independent.. */
@@ -636,7 +636,7 @@ native:
 #endif
 
 	free((char *)ph, M_TEMP);
-	epp->ep_vp->v_flag |= VTEXT;
+	vn_marktext(epp->ep_vp);
 	return (exec_setup_stack(p, epp));
 
 bad:

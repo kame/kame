@@ -1,5 +1,5 @@
-/*	$OpenBSD: uyap.c,v 1.1 2001/01/29 00:43:40 aaron Exp $ */
-/*	$NetBSD: uyap.c,v 1.2 2001/01/02 23:08:54 augustss Exp $	*/
+/*	$OpenBSD: uyap.c,v 1.3 2001/12/17 01:39:08 deraadt Exp $ */
+/*	$NetBSD: uyap.c,v 1.4 2001/07/11 04:53:18 augustss Exp $	*/
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -51,7 +51,7 @@
 #include <dev/usb/ezload.h>
 
 const struct ezdata uyap_firmware[] = {
-#include "dev/usb/uyap_firmware.h"
+#include "dev/microcode/uyap/uyap_firmware.h"
 };
 const struct ezdata *uyap_firmwares[] = { uyap_firmware, NULL };
 
@@ -69,8 +69,8 @@ USB_MATCH(uyap)
 		return (UMATCH_NONE);
 
 	/* Match the boot device. */
-	if ((uaa->vendor == USB_VENDOR_SILICONPORTALS &&
-	     (uaa->product == USB_PRODUCT_SILICONPORTALS_YAPPH_NF))) 
+	if (uaa->vendor == USB_VENDOR_SILICONPORTALS &&
+	    uaa->product == USB_PRODUCT_SILICONPORTALS_YAPPH_NF) 
 		return (UMATCH_VENDOR_PRODUCT);
 
 	return (UMATCH_NONE);

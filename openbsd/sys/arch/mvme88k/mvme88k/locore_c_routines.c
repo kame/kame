@@ -1,4 +1,4 @@
-/* $OpenBSD: locore_c_routines.c,v 1.13 2001/08/26 14:31:12 miod Exp $	*/
+/* $OpenBSD: locore_c_routines.c,v 1.25 2002/03/14 01:26:40 millert Exp $	*/
 /*
  * Mach Operating System
  * Copyright (c) 1993-1991 Carnegie Mellon University
@@ -28,17 +28,20 @@
 
 #include "assym.h"
 
+#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
 
+#include <machine/cpu_number.h>		/* cpu_number()		*/
+#include <machine/board.h>		/* m188 bit defines	*/
+#include <machine/cmmu.h>		/* DMT_VALID		*/
 #include <machine/asm.h>		/* END_OF_VECTOR_LIST, etc.	*/
 #include <machine/asm_macro.h>		/* enable/disable interrupts	*/
-#include <machine/board.h>		/* m188 bit defines	*/
-#include <machine/cmmu.h>
 #include <machine/cpu_number.h>		/* cpu_number()		*/
 #include <machine/locore.h>
+#ifdef M88100
 #include <machine/m88100.h>		/* DMT_VALID		*/
-#include <machine/param.h>
+#endif
 
 #ifdef DDB
 #include <ddb/db_output.h>		/* db_printf()		*/
@@ -61,8 +64,18 @@
 #define DMT_HALF	2
 #define DMT_WORD	4
 
-extern volatile u_char *int_mask_level;	/* machdep.c */
+typedef struct {
+   unsigned word_one,
+   word_two;
+} m88k_exception_vector_area;
 
+extern unsigned int *volatile int_mask_reg[MAX_CPUS]; /* in machdep.c */
+extern unsigned master_cpu;      /* in cmmu.c */
+
+/* FORWARDS */
+void vector_init(m88k_exception_vector_area *vector, unsigned *vector_init_list);
+
+#ifdef M88100
 static struct {
 	unsigned char    offset;
 	unsigned char    size;
@@ -72,6 +85,7 @@ static struct {
 	{0, DMT_BYTE}, {0, 0}, {0, 0}, {0, 0},
 	{0, DMT_HALF}, {0, 0}, {0, 0}, {0, DMT_WORD}
 };
+#endif 
 
 #ifdef DATA_DEBUG
 int data_access_emulation_debug = 0;
@@ -88,12 +102,12 @@ static char *bytes[] =
 #define DAE_DEBUG(stuff)
 #endif
 
-void setlevel __P((int));
+void setlevel(int);
 #ifdef DDB
-void db_setlevel __P((int));
+void db_setlevel(int);
 #endif
 
-#if defined(MVME187) || defined(MVME188)
+#ifdef M88100
 void 
 dae_print(unsigned *eframe)
 {
@@ -135,7 +149,6 @@ dae_print(unsigned *eframe)
 
 	}
 }
-#endif /* defined(MVME187) || defined(MVME188) */
 
 void
 data_access_emulation(unsigned *eframe)
@@ -280,6 +293,7 @@ data_access_emulation(unsigned *eframe)
    }
    eframe[EF_DMT0] = 0;
 }
+#endif /* M88100 */
 
 /*
  ***********************************************************************
@@ -290,13 +304,6 @@ data_access_emulation(unsigned *eframe)
 
 #define EMPTY_BR	0xC0000000U      /* empty "br" instruction */
 #define NO_OP 		0xf4005800U      /* "or r0, r0, r0" */
-
-typedef struct {
-   unsigned word_one,
-   word_two;
-} m88k_exception_vector_area;
-
-void vector_init __P((m88k_exception_vector_area *, unsigned *));
 
 #define BRANCH(FROM, TO) (EMPTY_BR | ((unsigned)(TO) - (unsigned)(FROM)) >> 2)
 
@@ -321,35 +328,34 @@ vector_init(m88k_exception_vector_area *vector, unsigned *vector_init_list)
 	for (num = 0; (vec = vector_init_list[num]) != END_OF_VECTOR_LIST; num++) {
 		if (vec != PREDEFINED_BY_ROM)
 			SET_VECTOR(num, to, vec);
-		__asm__ ("or  r0, r0, r0");
-		__asm__ ("or  r0, r0, r0");
-		__asm__ ("or  r0, r0, r0");
-		__asm__ ("or  r0, r0, r0");
+		__asm__ (NOP_STRING);
+		__asm__ (NOP_STRING);
+		__asm__ (NOP_STRING);
+		__asm__ (NOP_STRING);
 	}
 
 	switch (cputyp) {
-#ifdef MVME197
-	case CPU_197:
+#ifdef M88110
+	case CPU_88110:
 		while (num < 496) {
-			SET_VECTOR(num, to, m197_sigsys);
+			SET_VECTOR(num, to, m88110_sigsys);
 			num++;
 		}
 		num++; /* skip 496, BUG ROM vector */
-		SET_VECTOR(450, to, m197_syscall_handler);
+		SET_VECTOR(450, to, m88110_syscall_handler);
 
 		while (num <= SIGSYS_MAX)
-			SET_VECTOR(num++, to, m197_sigsys);
+			SET_VECTOR(num++, to, m88110_sigsys);
 
 		while (num <= SIGTRAP_MAX)
-			SET_VECTOR(num++, to, m197_sigtrap);
+			SET_VECTOR(num++, to, m88110_sigtrap);
 
-		SET_VECTOR(504, to, m197_stepbpt);
-		SET_VECTOR(511, to, m197_userbpt);
+		SET_VECTOR(504, to, m88110_stepbpt);
+		SET_VECTOR(511, to, m88110_userbpt);
 		break;
-#endif /* MVME197 */
-#if defined(MVME187) || defined(MVME188)
-	case CPU_187:
-	case CPU_188:
+#endif /* M88110 */
+#ifdef M88100
+	case CPU_88100:
 		while (num < 496) {
 			SET_VECTOR(num, to, sigsys);
 			num++;
@@ -367,7 +373,7 @@ vector_init(m88k_exception_vector_area *vector, unsigned *vector_init_list)
 		SET_VECTOR(504, to, stepbpt);
 		SET_VECTOR(511, to, userbpt);
 		break;
-#endif /* defined(MVME187) || defined(MVME188) */
+#endif /* M88100 */
 	}
 }
 
@@ -402,9 +408,8 @@ safe_level(mask, curlevel)
 	for (i = curlevel; i < 8; i++)
 		if (! (int_mask_val[i] & mask))
 			return i;
-	printf("safe_level: no safe level for mask 0x%08x level %d found\n",
+	panic("safe_level: no safe level for mask 0x%08x level %d found",
 	       mask, curlevel);
-	panic("safe_level");
 	/* NOTREACHED */
 }
 
@@ -460,19 +465,6 @@ db_setlevel(int level)
 }
 #endif /* DDB */
 
-#if 0
-void
-block_obio_interrupt(unsigned mask)
-{
-	blocked_interrupts_mask |= mask;
-}
-
-void
-unblock_obio_interrupt(unsigned mask)
-{
-	blocked_interrupts_mask |= ~mask;
-}
-#endif
 #endif  /* MVME188 */
 
 unsigned 
@@ -484,17 +476,17 @@ spl(void)
 	int cpu = 0;	/* prevent warning */
 #endif 
 	psr = disable_interrupts_return_psr();
-	switch (cputyp) {
+	switch (brdtyp) {
 #ifdef MVME188
-	case CPU_188:
+	case BRD_188:
 		cpu = cpu_number();
 		curspl = m188_curspl[cpu];
 		break;
 #endif /* MVME188 */
 #if defined(MVME187) || defined(MVME197)
-	case CPU_187:
-	case CPU_197:
-		curspl = *int_mask_level;
+	case BRD_187:
+	case BRD_197:
+		curspl = *md.intr_mask;
 		break;
 #endif /* defined(MVME187) || defined(MVME197) */
 	}
@@ -513,17 +505,17 @@ db_spl(void)
 #endif 
 
 	psr = disable_interrupts_return_psr();
-	switch (cputyp) {
+	switch (brdtyp) {
 #ifdef MVME188
-	case CPU_188:
+	case BRD_188:
 		cpu = cpu_number();
 		curspl = m188_curspl[cpu];
 		break;
 #endif /* MVME188 */
 #if defined(MVME187) || defined(MVME197)
-	case CPU_187:
-	case CPU_197:
-		curspl = *int_mask_level;
+	case BRD_187:
+	case BRD_197:
+		curspl = *md.intr_mask;
 		break;
 #endif /* defined(MVME187) || defined(MVME197) */
 	}
@@ -559,19 +551,19 @@ setipl(unsigned level)
 	}
 
 	psr = disable_interrupts_return_psr();
-	switch (cputyp) {
+	switch (brdtyp) {
 #ifdef MVME188
-	case CPU_188:
+	case BRD_188:
 		cpu = cpu_number();
 		curspl = m188_curspl[cpu];
 		setlevel(level);
 		break;
 #endif /* MVME188 */
 #if defined(MVME187) || defined(MVME197)
-	case CPU_187:
-	case CPU_197:
-		curspl = *int_mask_level;
-		*int_mask_level = level;
+	case BRD_187:
+	case BRD_197:
+		curspl = *md.intr_mask;
+		*md.intr_mask = level;
 		break;
 #endif /* defined(MVME187) || defined(MVME197) */
 	}
@@ -597,19 +589,19 @@ db_setipl(unsigned level)
 #endif 
 
 	psr = disable_interrupts_return_psr();
-	switch (cputyp) {
+	switch (brdtyp) {
 #ifdef MVME188
-	case CPU_188:
+	case BRD_188:
 		cpu = cpu_number();
 		curspl = m188_curspl[cpu];
 		db_setlevel(level);
 		break;
 #endif /* MVME188 */
 #if defined(MVME187) || defined(MVME197)
-	case CPU_187:
-	case CPU_197:
-		curspl = *int_mask_level;
-		*int_mask_level = level;
+	case BRD_187:
+	case BRD_197:
+		curspl = *md.intr_mask;
+		*md.intr_mask = level;
 		break;
 #endif /* defined(MVME187) || defined(MVME197) */
 	}
@@ -629,14 +621,14 @@ db_setipl(unsigned level)
 #include <sys/simplelock.h>
 void
 simple_lock_init(lkp)
-	__volatile struct simplelock *lkp;
+	struct simplelock *volatile lkp;
 {
 	lkp->lock_data = 0;
 }
 
 int 
 test_and_set(lock)
-	__volatile int *lock;
+	int *volatile lock;
 {   
 #if 0
 	int oldlock = *lock;

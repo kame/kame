@@ -1,4 +1,4 @@
-/*	$OpenBSD: cac.c,v 1.7 2001/10/18 20:24:10 mickey Exp $	*/
+/*	$OpenBSD: cac.c,v 1.11 2002/03/14 01:26:54 millert Exp $	*/
 /*	$NetBSD: cac.c,v 1.15 2000/11/08 19:20:35 ad Exp $	*/
 
 /*
@@ -87,7 +87,6 @@
 #include <sys/malloc.h>
 #include <sys/pool.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
@@ -103,8 +102,8 @@ struct cfdriver cac_cd = {
 	NULL, "cac", DV_DULL
 };
 
-int     cac_scsi_cmd __P((struct scsi_xfer *));
-void	cacminphys __P((struct buf *bp));
+int     cac_scsi_cmd(struct scsi_xfer *);
+void	cacminphys(struct buf *bp);
 
 struct scsi_adapter cac_switch = {
 	cac_scsi_cmd, cacminphys, 0, 0,
@@ -121,10 +120,10 @@ int	cac_ccb_poll(struct cac_softc *, struct cac_ccb *, int);
 int	cac_ccb_start(struct cac_softc *, struct cac_ccb *);
 int	cac_cmd(struct cac_softc *sc, int command, void *data, int datasize,
 	int drive, int blkno, int flags, struct scsi_xfer *xs);
-int	cac_get_dinfo __P((struct cac_softc *sc, int target));
-int	cac_flush __P((struct cac_softc *sc));
-void	cac_shutdown __P((void *));
-void	cac_copy_internal_data __P((struct scsi_xfer *xs, void *v, size_t size));
+int	cac_get_dinfo(struct cac_softc *sc, int target);
+int	cac_flush(struct cac_softc *sc);
+void	cac_shutdown(void *);
+void	cac_copy_internal_data(struct scsi_xfer *xs, void *v, size_t size);
 
 struct	cac_ccb *cac_l0_completed(struct cac_softc *);
 int	cac_l0_fifo_full(struct cac_softc *);
@@ -331,7 +330,7 @@ cac_cmd(struct cac_softc *sc, int command, void *data, int datasize,
 #endif
 
 	if ((ccb = cac_ccb_alloc(sc, 0)) == NULL) {
-		printf("%s: unable to alloc CCB", sc->sc_dv.dv_xname);
+		printf("%s: unable to alloc CCB\n", sc->sc_dv.dv_xname);
 		return (ENOMEM);
 	}
 
@@ -339,7 +338,8 @@ cac_cmd(struct cac_softc *sc, int command, void *data, int datasize,
 		bus_dmamap_load(sc->sc_dmat, ccb->ccb_dmamap_xfer,
 		    (void *)data, datasize, NULL, BUS_DMA_NOWAIT);
 
-		bus_dmamap_sync(sc->sc_dmat, ccb->ccb_dmamap_xfer,
+		bus_dmamap_sync(sc->sc_dmat, ccb->ccb_dmamap_xfer, 0,
+		    ccb->ccb_dmamap_xfer->dm_mapsize,
 		    (flags & CAC_CCB_DATA_IN) != 0 ? BUS_DMASYNC_PREREAD :
 		    BUS_DMASYNC_PREWRITE);
 	
@@ -464,7 +464,8 @@ cac_ccb_done(struct cac_softc *sc, struct cac_ccb *ccb)
 	ccb->ccb_flags &= ~CAC_CCB_ACTIVE;
 
 	if ((ccb->ccb_flags & (CAC_CCB_DATA_IN | CAC_CCB_DATA_OUT)) != 0) {
-		bus_dmamap_sync(sc->sc_dmat, ccb->ccb_dmamap_xfer,
+		bus_dmamap_sync(sc->sc_dmat, ccb->ccb_dmamap_xfer, 0,
+		    ccb->ccb_dmamap_xfer->dm_mapsize,
 		    ccb->ccb_flags & CAC_CCB_DATA_IN ?
 		    BUS_DMASYNC_POSTREAD : BUS_DMASYNC_POSTWRITE);
 		bus_dmamap_unload(sc->sc_dmat, ccb->ccb_dmamap_xfer);
@@ -795,7 +796,8 @@ cac_l0_submit(struct cac_softc *sc, struct cac_ccb *ccb)
 #ifdef CAC_DEBUG
 	printf("submit-%x ", ccb->ccb_paddr);
 #endif
-	bus_dmamap_sync(sc->sc_dmat, sc->sc_dmamap,
+	bus_dmamap_sync(sc->sc_dmat, sc->sc_dmamap, 0,
+	    sc->sc_dmamap->dm_mapsize,
 	    BUS_DMASYNC_PREWRITE | BUS_DMASYNC_PREREAD);
 	cac_outl(sc, CAC_REG_CMD_FIFO, ccb->ccb_paddr);
 }
@@ -815,7 +817,8 @@ cac_l0_completed(sc)
 	ccb = (struct cac_ccb *)(sc->sc_ccbs +
 	    ((off & ~3) - sc->sc_ccbs_paddr));
 
-	bus_dmamap_sync(sc->sc_dmat, sc->sc_dmamap,
+	bus_dmamap_sync(sc->sc_dmat, sc->sc_dmamap, 0,
+	    sc->sc_dmamap->dm_mapsize,
 	    BUS_DMASYNC_POSTWRITE | BUS_DMASYNC_POSTREAD);
 
 	return (ccb);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.14 2001/07/25 13:25:31 art Exp $	*/
+/*	$OpenBSD: mem.c,v 1.18 2002/03/14 01:26:28 millert Exp $	*/
 /*	$NetBSD: mem.c,v 1.18 1997/02/02 07:17:14 thorpej Exp $	*/
 
 /*
@@ -55,18 +55,17 @@
 
 #include <machine/cpu.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 extern int kernel_reload_write(struct uio *uio);
 extern u_int lowram;
 caddr_t devzeropage;
 
-int mmopen __P((dev_t, int, int, struct proc *));
-int mmclose __P((dev_t, int, int, struct proc *));
-int mmrw __P((dev_t, struct uio *, int));
-int mmmmap __P((dev_t, int, int));
-int mmioctl __P((dev_t, u_long, caddr_t, int, struct proc *));
+int mmopen(dev_t, int, int, struct proc *);
+int mmclose(dev_t, int, int, struct proc *);
+int mmrw(dev_t, struct uio *, int);
+paddr_t mmmmap(dev_t, off_t, int);
+int mmioctl(dev_t, u_long, caddr_t, int, struct proc *);
 
 /*ARGSUSED*/
 int
@@ -147,11 +146,13 @@ mmrw(dev, uio, flags)
 			pmap_enter(pmap_kernel(), (vm_offset_t)vmmap,
 			    trunc_page(v), uio->uio_rw == UIO_READ ?
 			    VM_PROT_READ : VM_PROT_WRITE, PMAP_WIRED);
+			pmap_update(pmap_kernel());
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)vmmap + o, c, uio);
 			pmap_remove(pmap_kernel(), (vm_offset_t)vmmap,
 			    (vm_offset_t)vmmap + NBPG);
+			pmap_update(pmap_kernel());
 			continue;
 
 		/* minor device 1 is kernel memory */
@@ -239,10 +240,10 @@ unlock:
 	return (error);
 }
 
-int
+paddr_t
 mmmmap(dev, off, prot)
 	dev_t dev;
-	int off;
+	off_t off;
 	int prot;
 {
 	return (-1);

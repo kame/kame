@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.c,v 1.16 2001/08/23 12:02:04 art Exp $	*/
+/*	$OpenBSD: param.c,v 1.19 2002/03/23 13:28:34 espie Exp $	*/
 /*	$NetBSD: param.c,v 1.16 1996/03/12 03:08:40 mrg Exp $	*/
 
 /*
@@ -92,7 +92,7 @@ int	maxproc = NPROC;
 #define	NVNODE (NPROC * 2 + NTEXT + 100)
 int	desiredvnodes = NVNODE;
 int	maxfiles = 3 * (NPROC + MAXUSERS) + 80;
-int	nmbclusters = NMBCLUSTERS;
+int	nmbclust = NMBCLUSTERS;
 
 #ifndef MBLOWAT
 #define MBLOWAT		16
@@ -107,6 +107,8 @@ int	mcllowat = MCLLOWAT;
 
 int	fscale = FSCALE;	/* kernel uses `FSCALE', user uses `fscale' */
 
+int	shmseg = 8;
+int 	shmmaxpgs = SHMMAXPGS;
 /*
  * Values in support of System V compatible shared memory.	XXX
  */
@@ -162,7 +164,7 @@ struct	msginfo msginfo = {
  * These are initialized at bootstrap time
  * to values dependent on memory size
  */
-int	nbuf, nswbuf;
+int	nbuf;
 
 /*
  * These have to be allocated somewhere; allocating

@@ -1,4 +1,4 @@
-/*	$OpenBSD: netbsd_machdep.c,v 1.5 2001/09/05 23:39:13 art Exp $	*/
+/*	$OpenBSD: netbsd_machdep.c,v 1.7 2002/03/14 01:26:26 millert Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -39,7 +39,7 @@
 #include <sys/user.h>
 #include <machine/cpu.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <compat/netbsd/netbsd_types.h>
 #include <compat/netbsd/netbsd_signal.h>
@@ -56,11 +56,11 @@ extern int sigpid;
 #define SDB_KSTACK      0x02
 #endif
 
-static void netbsd_to_openbsd_sigcontext __P ((struct netbsd_sigcontext *,
-	struct sigcontext *));
+static void netbsd_to_openbsd_sigcontext(struct netbsd_sigcontext *,
+	struct sigcontext *);
 
-static void openbsd_to_netbsd_sigcontext __P ((struct sigcontext *,
-	struct netbsd_sigcontext *));
+static void openbsd_to_netbsd_sigcontext(struct sigcontext *,
+	struct netbsd_sigcontext *);
 
 static void
 netbsd_to_openbsd_sigcontext(nbsc, obsc)

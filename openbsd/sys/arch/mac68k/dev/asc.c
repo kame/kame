@@ -1,4 +1,4 @@
-/*	$OpenBSD: asc.c,v 1.11 2001/08/23 08:17:40 miod Exp $	*/
+/*	$OpenBSD: asc.c,v 1.14 2002/03/14 01:26:35 millert Exp $	*/
 /*	$NetBSD: asc.c,v 1.20 1997/02/24 05:47:33 scottr Exp $	*/
 
 /*
@@ -78,8 +78,8 @@
 #include <sys/fcntl.h>
 #include <sys/timeout.h>
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
+#include <uvm/uvm_extern.h>
+#include <uvm/uvm_pmap.h>
 
 #include <machine/autoconf.h>
 #include <machine/cpu.h>
@@ -93,11 +93,11 @@
 
 static u_int8_t		asc_wave_tab[0x800];
 
-static int	asc_ring_bell __P((void *, int, int, int));
-static void	asc_stop_bell __P((void *));
+static int	asc_ring_bell(void *, int, int, int);
+static void	asc_stop_bell(void *);
 
-static int	ascmatch __P((struct device *, void *, void *));
-static void	ascattach __P((struct device *, struct device *, void *));
+static int	ascmatch(struct device *, void *, void *);
+static void	ascattach(struct device *, struct device *, void *);
 
 struct cfattach asc_ca = {
 	sizeof(struct asc_softc), ascmatch, ascattach
@@ -272,10 +272,10 @@ ascselect(dev, rw, p)
 	return (0);
 }
 
-int
+paddr_t
 ascmmap(dev, off, prot)
 	dev_t dev;
-	int off;
+	off_t off;
 	int prot;
 {
 	int unit = ASCUNIT(dev);

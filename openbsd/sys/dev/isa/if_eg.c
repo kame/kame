@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_eg.c,v 1.21 2001/06/27 06:34:45 kjc Exp $	*/
+/*	$OpenBSD: if_eg.c,v 1.23 2002/03/14 03:16:05 millert Exp $	*/
 /*	$NetBSD: if_eg.c,v 1.26 1996/05/12 23:52:27 mycroft Exp $	*/
 
 /*
@@ -105,8 +105,8 @@ struct eg_softc {
 	u_char	*eg_outbuf;		/* Outgoing packet buffer */
 };
 
-int egprobe __P((struct device *, void *, void *));
-void egattach __P((struct device *, struct device *, void *));
+int egprobe(struct device *, void *, void *);
+void egattach(struct device *, struct device *, void *);
 
 struct cfattach eg_ca = {
 	sizeof(struct eg_softc), egprobe, egattach
@@ -116,24 +116,24 @@ struct cfdriver eg_cd = {
 	NULL, "eg", DV_IFNET
 };
 
-int egintr __P((void *));
-void eginit __P((struct eg_softc *));
-int egioctl __P((struct ifnet *, u_long, caddr_t));
-void egrecv __P((struct eg_softc *));
-void egstart __P((struct ifnet *));
-void egwatchdog __P((struct ifnet *));
-void egreset __P((struct eg_softc *));
-void egread __P((struct eg_softc *, caddr_t, int));
-struct mbuf *egget __P((struct eg_softc *, caddr_t, int));
-void egstop __P((struct eg_softc *));
+int egintr(void *);
+void eginit(struct eg_softc *);
+int egioctl(struct ifnet *, u_long, caddr_t);
+void egrecv(struct eg_softc *);
+void egstart(struct ifnet *);
+void egwatchdog(struct ifnet *);
+void egreset(struct eg_softc *);
+void egread(struct eg_softc *, caddr_t, int);
+struct mbuf *egget(struct eg_softc *, caddr_t, int);
+void egstop(struct eg_softc *);
 
-static __inline void egprintpcb __P((struct eg_softc *));
-static __inline void egprintstat __P((u_char));
-static int egoutPCB __P((struct eg_softc *, u_char));
-static int egreadPCBstat __P((struct eg_softc *, u_char));
-static int egreadPCBready __P((struct eg_softc *));
-static int egwritePCB __P((struct eg_softc *));
-static int egreadPCB __P((struct eg_softc *));
+static __inline void egprintpcb(struct eg_softc *);
+static __inline void egprintstat(u_char);
+static int egoutPCB(struct eg_softc *, u_char);
+static int egreadPCBstat(struct eg_softc *, u_char);
+static int egreadPCBready(struct eg_softc *);
+static int egwritePCB(struct eg_softc *);
+static int egreadPCB(struct eg_softc *);
 
 /*
  * Support stuff
@@ -651,13 +651,13 @@ egintr(arg)
 			dprintf(("Receive Packets %d\n", i));
 			bcopy(&sc->eg_pcb[6], &i, sizeof(i));
 			dprintf(("Transmit Packets %d\n", i));
-			dprintf(("CRC errors %d\n", *(short*)&sc->eg_pcb[10]));
+			dprintf(("CRC errors %d\n", *(short *)&sc->eg_pcb[10]));
 			dprintf(("alignment errors %d\n",
-			    *(short*)&sc->eg_pcb[12]));
+			    *(short *)&sc->eg_pcb[12]));
 			dprintf(("no resources errors %d\n",
-			    *(short*)&sc->eg_pcb[14]));
+			    *(short *)&sc->eg_pcb[14]));
 			dprintf(("overrun errors %d\n",
-			    *(short*)&sc->eg_pcb[16]));
+			    *(short *)&sc->eg_pcb[16]));
 			break;
 			
 		default:

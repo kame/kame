@@ -1,4 +1,4 @@
-/*	$OpenBSD: gdt.c,v 1.16 2001/09/19 20:50:56 mickey Exp $	*/
+/*	$OpenBSD: gdt.c,v 1.19 2002/03/14 01:26:32 millert Exp $	*/
 /*	$NetBSD: gdt.c,v 1.8 1996/05/03 19:42:06 christos Exp $	*/
 
 /*-
@@ -42,7 +42,6 @@
 #include <sys/proc.h>
 #include <sys/user.h>
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/gdt.h>
@@ -60,13 +59,13 @@ int gdt_flags;
 #define	GDT_LOCKED	0x1
 #define	GDT_WANTED	0x2
 
-static __inline void gdt_lock __P((void));
-static __inline void gdt_unlock __P((void));
-void gdt_compact __P((void));
-void gdt_grow __P((void));
-void gdt_shrink __P((void));
-int gdt_get_slot __P((void));
-void gdt_put_slot __P((int));
+static __inline void gdt_lock(void);
+static __inline void gdt_unlock(void);
+void gdt_compact(void);
+void gdt_grow(void);
+void gdt_shrink(void);
+int gdt_get_slot(void);
+void gdt_put_slot(int);
 
 /*
  * Lock and unlock the GDT, to avoid races in case gdt_{ge,pu}t_slot() sleep
@@ -223,9 +222,8 @@ gdt_get_slot()
 			if (gdt_size >= MAXGDTSIZ)
 				panic("gdt_get_slot botch 2");
 			if (dynamic_gdt == gdt)
-				gdt_init();
-			else
-				gdt_grow();
+				panic("gdt_get_slot called before gdt_init");
+			gdt_grow();
 		}
 		slot = gdt_next++;
 	}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: siopvar_common.h,v 1.7 2001/08/26 02:39:05 krw Exp $ */
+/*	$OpenBSD: siopvar_common.h,v 1.10 2002/03/14 01:26:55 millert Exp $ */
 /*	$NetBSD: siopvar_common.h,v 1.10 2001/01/26 21:58:56 bouyer Exp $	*/
 
 /*
@@ -38,10 +38,10 @@
 #endif
 
 /* tables used by SCRIPT */
-typedef struct scr_table {
+struct scr_table {
 	u_int32_t count;
 	u_int32_t addr;
-} scr_table_t ;
+} __attribute__((__packed__));
 
 /* Number of scatter/gather entries */
 #define SIOP_NSG	(MAXPHYS/NBPG + 1)	/* XXX NBPG */
@@ -57,19 +57,19 @@ typedef struct scr_table {
  * transfer. 
  */
 struct siop_xfer_common {
-	u_int8_t msg_out[16];	    /*  0 */
-	u_int8_t msg_in[16];	    /* 16 */
-	u_int32_t status;	    /* 32 */
-	u_int32_t pad1;		    /* 36 */
-	u_int32_t id;		    /* 40 */
-	u_int32_t pad2;		    /* 44 */
-	scr_table_t t_msgin;	    /* 48 */
-	scr_table_t t_extmsgin;	    /* 56 */
-	scr_table_t t_extmsgdata;   /* 64 */
-	scr_table_t t_msgout;	    /* 72 */
-	scr_table_t cmd;	    /* 80 */
-	scr_table_t t_status;	    /* 88 */
-	scr_table_t data[SIOP_NSG]; /* 96 */
+	u_int8_t msg_out[16];	         /*  0 */
+	u_int8_t msg_in[16];	         /* 16 */
+	u_int32_t status;	         /* 32 */
+	u_int32_t pad1;		         /* 36 */
+	u_int32_t id;		         /* 40 */
+	u_int32_t pad2;		         /* 44 */
+	struct scr_table t_msgin;	 /* 48 */
+	struct scr_table t_extmsgin;	 /* 56 */
+	struct scr_table t_extmsgdata;   /* 64 */
+	struct scr_table t_msgout;	 /* 72 */
+	struct scr_table cmd;	         /* 80 */
+	struct scr_table t_status;	 /* 88 */
+	struct scr_table data[SIOP_NSG]; /* 96 */
 } __attribute__((__packed__));
 
 /* status can hold the SCSI_* status values, and 2 additional values: */
@@ -182,15 +182,7 @@ struct siop_lunsw {
 	u_int32_t lunsw_size; /* size of this lun sw */
 };
 
-#ifdef __HAS_NEW_BUS_DMAMAP_SYNC
-#define	siop_bus_dmamap_sync(tag, map, off, len, op)	\
-    bus_dmamap_sync((tag), (map), (off), (len), (op))
-#else
-#define	siop_bus_dmamap_sync(tag, map, off, len, op)	\
-    bus_dmamap_sync((tag), (map), (op))
-#endif
-
-static __inline__ void siop_table_sync __P((struct siop_cmd *, int));
+static __inline__ void siop_table_sync(struct siop_cmd *, int);
 static __inline__ void
 siop_table_sync(siop_cmd, ops)
 	struct siop_cmd *siop_cmd;
@@ -201,20 +193,20 @@ siop_table_sync(siop_cmd, ops)
         
         offset = siop_cmd->dsa -
 		siop_cmd->siop_cbdp->xferdma->dm_segs[0].ds_addr;
-	siop_bus_dmamap_sync(sc->sc_dmat, siop_cmd->siop_cbdp->xferdma, offset,
+	bus_dmamap_sync(sc->sc_dmat, siop_cmd->siop_cbdp->xferdma, offset,
             sizeof(struct siop_xfer), ops);
 }
 
-void	siop_common_reset __P((struct siop_softc *));
-void	siop_setuptables __P((struct siop_cmd *));
-int	siop_modechange __P((struct siop_softc *));
+void	siop_common_reset(struct siop_softc *);
+void	siop_setuptables(struct siop_cmd *);
+int	siop_modechange(struct siop_softc *);
 
-int	siop_wdtr_neg __P((struct siop_cmd *));
-int	siop_sdtr_neg __P((struct siop_cmd *));
-int     siop_ppr_neg  __P((struct siop_cmd *));
-void	siop_sdtr_msg __P((struct siop_cmd *, int, int, int));
-void	siop_wdtr_msg __P((struct siop_cmd *, int, int));
-void    siop_ppr_msg  __P((struct siop_cmd *, int, int, int));
+int	siop_wdtr_neg(struct siop_cmd *);
+int	siop_sdtr_neg(struct siop_cmd *);
+int     siop_ppr_neg(struct siop_cmd *);
+void	siop_sdtr_msg(struct siop_cmd *, int, int, int);
+void	siop_wdtr_msg(struct siop_cmd *, int, int);
+void    siop_ppr_msg(struct siop_cmd *, int, int, int);
 
 /* actions to take at return of siop_<xxx>_neg() */
 #define SIOP_NEG_NOP	0x0
@@ -222,15 +214,15 @@ void    siop_ppr_msg  __P((struct siop_cmd *, int, int, int));
 #define SIOP_NEG_ACK	0x2
 #define SIOP_NEG_MSGREJ	0x3
 
-void	siop_print_info __P((struct siop_softc *, int));
-void	siop_minphys __P((struct buf *));
-void 	siop_sdp __P((struct siop_cmd *));
-void	siop_clearfifo __P((struct siop_softc *));
-void	siop_resetbus __P((struct siop_softc *));
+void	siop_print_info(struct siop_softc *, int);
+void	siop_minphys(struct buf *);
+void 	siop_sdp(struct siop_cmd *);
+void	siop_clearfifo(struct siop_softc *);
+void	siop_resetbus(struct siop_softc *);
 
-int     siop_period_factor_to_scf __P((struct siop_softc *, int, int));
-int     siop_scf_to_period_factor __P((struct siop_softc *, int, int));
+int     siop_period_factor_to_scf(struct siop_softc *, int, int);
+int     siop_scf_to_period_factor(struct siop_softc *, int, int);
 
 /* XXXX should be  callbacks */
-void	siop_add_dev __P((struct siop_softc *, int, int));
-void	siop_del_dev __P((struct siop_softc *, int, int));
+void	siop_add_dev(struct siop_softc *, int, int);
+void	siop_del_dev(struct siop_softc *, int, int);

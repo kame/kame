@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm_map_i.h,v 1.8 2001/08/11 10:57:22 art Exp $	*/
-/*	$NetBSD: uvm_map_i.h,v 1.17 2000/05/08 22:59:35 thorpej Exp $	*/
+/*	$OpenBSD: uvm_map_i.h,v 1.15 2002/02/28 18:50:26 provos Exp $	*/
+/*	$NetBSD: uvm_map_i.h,v 1.18 2000/11/27 08:40:04 chs Exp $	*/
 
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -114,6 +114,7 @@ uvm_map_setup(map, min, max, flags)
 	int flags;
 {
 
+	RB_INIT(&map->rbhead);
 	map->header.next = map->header.prev = &map->header;
 	map->nentries = 0;
 	map->size = 0;
@@ -196,16 +197,6 @@ MAP_INLINE void
 uvm_map_reference(map)
 	vm_map_t map;
 {
-	if (__predict_false(map == NULL)) {
-#ifdef DIAGNOSTIC
-		printf("uvm_map_reference: reference to NULL map\n");
-#ifdef DDB
-		Debugger();
-#endif
-#endif
-		return;
-	}
-
 	simple_lock(&map->ref_lock);
 	map->ref_count++; 
 	simple_unlock(&map->ref_lock);
@@ -224,20 +215,9 @@ uvm_map_deallocate(map)
 {
 	int c;
 
-	if (__predict_false(map == NULL)) {
-#ifdef DIAGNOSTIC
-		printf("uvm_map_deallocate: reference to NULL map\n");
-#ifdef DDB
-		Debugger();
-#endif
-#endif
-		return;
-	}
-
 	simple_lock(&map->ref_lock);
 	c = --map->ref_count;
 	simple_unlock(&map->ref_lock);
-
 	if (c > 0) {
 		return;
 	}
@@ -248,7 +228,6 @@ uvm_map_deallocate(map)
 
 	uvm_unmap(map, map->min_offset, map->max_offset);
 	pmap_destroy(map->pmap);
-
 	FREE(map, M_VMMAP);
 }
 

@@ -1,4 +1,4 @@
-#	$OpenBSD: genassym.cf,v 1.12 2001/09/16 14:28:04 miod Exp $
+#	$OpenBSD: genassym.cf,v 1.14 2001/11/17 21:35:12 mickey Exp $
 
 #
 # Copyright (c) 1995 Theo de Raadt
@@ -73,8 +73,6 @@ include <sys/syscall.h>
 include <sys/types.h>
 include <sys/user.h>
 
-include <vm/vm.h>
-
 include <uvm/uvm_extern.h>
 
 include <machine/cpu.h>
@@ -92,13 +90,8 @@ export	USRSTACK
 
 # proc fields and values
 struct	proc
-member	p_addr
 member	P_MD_FLAGS		p_md.md_flags
 member	P_MD_REGS		p_md.md_regs
-
-# interrupt/fault metering
-struct	uvmexp			UVMEXP_
-member	intrs
 
 # PSL values
 export	PSL_S

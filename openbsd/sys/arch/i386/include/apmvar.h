@@ -1,4 +1,4 @@
-/*	$OpenBSD: apmvar.h,v 1.13 2001/08/18 06:08:08 mickey Exp $	*/
+/*	$OpenBSD: apmvar.h,v 1.15 2002/03/14 01:26:33 millert Exp $	*/
 
 /*
  *  Copyright (c) 1995 John T. Kohl
@@ -51,6 +51,7 @@
 #define	APM_MINOR(f)		((f) & 0xff)
 #define	APM_VERMASK		0x0000ffff
 #define	APM_NOCLI		0x00010000
+#define	APM_BEBATT		0x00020000
 
 /* APM error codes */
 #define	APM_ERR_CODE(regs)	(((regs)->ax & 0xff00) >> 8)
@@ -288,11 +289,11 @@ struct apm_ctl {
 					   if the percentage changes */
 
 #ifdef _KERNEL
-extern void apm_cpu_busy __P((void));
-extern void apm_cpu_idle __P((void));
-extern void apminit __P((void));
-int apm_set_powstate __P((u_int devid, u_int powstate));
-int apm_kqfilter __P((dev_t dev, struct knote *kn));
+extern void apm_cpu_busy(void);
+extern void apm_cpu_idle(void);
+extern void apminit(void);
+int apm_set_powstate(u_int devid, u_int powstate);
+int apm_kqfilter(dev_t dev, struct knote *kn);
 #endif /* _KERNEL */
 
 #endif /* _I386_APMVAR_H_ */

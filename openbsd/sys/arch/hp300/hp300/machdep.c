@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.65 2001/09/20 17:02:30 mpech Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.81 2002/03/23 13:28:33 espie Exp $	*/
 /*	$NetBSD: machdep.c,v 1.121 1999/03/26 23:41:29 mycroft Exp $	*/
 
 /*
@@ -55,7 +55,7 @@
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
-#include <sys/map.h>
+#include <sys/extent.h>
 #include <sys/mbuf.h>
 #include <sys/mount.h>
 #include <sys/msgbuf.h>
@@ -98,7 +98,6 @@
 #include <dev/cons.h>
 
 #define	MAXMEM	64*1024	/* XXX - from cmap.h */
-#include <vm/vm_param.h>
 #include <uvm/uvm_extern.h>
 
 #include <arch/hp300/dev/hilreg.h>
@@ -111,16 +110,14 @@
 /* the following is used externally (sysctl_hw) */
 char	machine[] = MACHINE;	/* from <machine/param.h> */
 
-vm_map_t exec_map = NULL;  
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;  
+struct vm_map *phys_map = NULL;
 
 extern paddr_t avail_start, avail_end;
 
 /*
  * Declare these as initialized data so we can patch them.
  */
-int	nswbuf = 0;
 #ifdef	NBUF
 int	nbuf = NBUF;
 #else
@@ -149,21 +146,27 @@ extern struct emul emul_hpux;
 extern struct emul emul_sunos;
 #endif
 
+/*
+ * XXX some storage space must be allocated statically because of
+ * early console init
+ */
+char	extiospace[EXTENT_FIXED_STORAGE_SIZE(EIOMAPSIZE / 16)];
+
 /* prototypes for local functions */
-caddr_t	allocsys __P((caddr_t));
-void	parityenable __P((void));
-int	parityerror __P((struct frame *));
-int	parityerrorfind __P((void));
-void    identifycpu __P((void));
-void    initcpu __P((void));
-void	dumpmem __P((int *, int, int));
-char	*hexstr __P((int, int));
+caddr_t	allocsys(caddr_t);
+void	parityenable(void);
+int	parityerror(struct frame *);
+int	parityerrorfind(void);
+void    identifycpu(void);
+void    initcpu(void);
+void	dumpmem(int *, int, int);
+char	*hexstr(int, int);
 
 /* functions called from locore.s */
-void    dumpsys __P((void));
-void	hp300_init __P((void));
-void    straytrap __P((int, u_short));
-void	nmihand __P((struct frame));
+void    dumpsys(void);
+void	hp300_init(void);
+void    straytrap(int, u_short);
+void	nmihand(struct frame);
 
 /*
  * Select code of console.  Set to -1 if console is on
@@ -212,7 +215,8 @@ hp300_init()
 void
 consinit()
 {
-	extern struct map extiomap[];
+	extern struct extent *extio;
+	extern char *extiobase;
 
 	/*
 	 * Initialize some variables for sanity.
@@ -225,8 +229,10 @@ consinit()
 	/*
 	 * Initialize the DIO resource map.
 	 */
-	rminit(extiomap, (long)EIOMAPSIZE, (long)1, "extio", EIOMAPSIZE/16);
-
+	extio = extent_create("extio",
+	    (u_long)extiobase, (u_long)extiobase + ctob(EIOMAPSIZE),
+	    M_DEVBUF, extiospace, sizeof(extiospace), EX_NOWAIT);
+	    
 	/*
 	 * Initialize the console before we print anything out.
 	 */
@@ -268,6 +274,7 @@ cpu_startup()
 	for (i = 0; i < btoc(MSGBUFSIZE); i++)
 		pmap_enter(pmap_kernel(), (vaddr_t)msgbufp + i * NBPG,
 		    avail_end + i * NBPG, VM_PROT_ALL, VM_PROT_ALL|PMAP_WIRED);
+	pmap_update(pmap_kernel());
 	initmsgbuf((caddr_t)msgbufp, round_page(MSGBUFSIZE));
 
 	/*
@@ -293,9 +300,9 @@ cpu_startup()
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)))
 		panic("startup: cannot allocate VM for buffers");
 	minaddr = (vaddr_t)buffers;
 	base = bufpages / nbuf;
@@ -319,11 +326,14 @@ cpu_startup()
 			if (pg == NULL) 
 				panic("cpu_startup: not enough memory for "
 				    "buffer cache");
-			pmap_kenter_pgs(curbuf, &pg, 1);
+
+			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
+			    VM_PROT_READ|VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -337,9 +347,6 @@ cpu_startup()
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 				   VM_PHYS_SIZE, 0, FALSE, NULL);
-
-	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				 VM_MBUF_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
 
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
@@ -355,8 +362,7 @@ cpu_startup()
 	 * XXX This is bogus; should just fix KERNBASE and
 	 * XXX VM_MIN_KERNEL_ADDRESS, but not right now.
 	 */
-	if (uvm_map_protect(kernel_map, 0, NBPG, UVM_PROT_NONE, TRUE)
-	    != KERN_SUCCESS)
+	if (uvm_map_protect(kernel_map, 0, NBPG, UVM_PROT_NONE, TRUE))
 		panic("can't mark page 0 off-limits");
 
 	/*
@@ -367,7 +373,7 @@ cpu_startup()
 	 * XXX of NBPG.
 	 */
 	if (uvm_map_protect(kernel_map, NBPG, round_page((vaddr_t)&etext),
-	    UVM_PROT_READ|UVM_PROT_EXEC, TRUE) != KERN_SUCCESS)
+	    UVM_PROT_READ|UVM_PROT_EXEC, TRUE))
 		panic("can't protect kernel text");
 
 	/*
@@ -412,6 +418,9 @@ allocsys(v)
 	    (name) = (type *)v; v = (caddr_t)((lim) = ((name)+(num)))
 
 #ifdef SYSVSHM
+	shminfo.shmmax = shmmaxpgs;
+	shminfo.shmall = shmmaxpgs;
+	shminfo.shmseg = shmseg;
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
 #ifdef SYSVSEM 
@@ -441,11 +450,6 @@ allocsys(v)
 		nbuf = bufpages;
 		if (nbuf < 16)
 			nbuf = 16;
-	}
-	if (nswbuf == 0) {
-		nswbuf = (nbuf / 2) &~ 1;	/* force even */
-		if (nswbuf > 256)
-			nswbuf = 256;		/* sanity */
 	}
 	valloc(buf, struct buf, nbuf);
 	return (v);
@@ -504,7 +508,6 @@ setregs(p, pack, stack, retval)
  * Info for CTL_HW
  */
 char	cpu_model[120];
-extern	char version[];
 
 /*
  * Text description of models we support, indexed by machineid.
@@ -865,7 +868,7 @@ dumpsys()
 {
 	daddr_t blkno;		/* current block to write */
 				/* dump routine */
-	int (*dump) __P((dev_t, daddr_t, caddr_t, size_t));
+	int (*dump)(dev_t, daddr_t, caddr_t, size_t);
 	int pg;			/* page being dumped */
 	paddr_t maddr;		/* PA being dumped */
 	int error;		/* error code from (*dump)() */
@@ -957,6 +960,7 @@ dumpsys()
 		pmap_enter(pmap_kernel(), (vaddr_t)vmmap, maddr,
 		    VM_PROT_READ, VM_PROT_READ|PMAP_WIRED);
 
+		pmap_update(pmap_kernel());
 		error = (*dump)(dumpdev, blkno, vmmap, NBPG);
 		switch (error) {
 		case 0:
@@ -996,17 +1000,6 @@ void
 initcpu()
 {
 
-#ifdef MAPPEDCOPY
-	/*
-	 * Initialize lower bound for doing copyin/copyout using
-	 * page mapping (if not already set).  We don't do this on
-	 * VAC machines as it loses big time.
-	 */
-	if (ectype == EC_VIRT)
-		mappedcopysize = -1;	/* in case it was patched */
-	else
-		mappedcopysize = NBPG;
-#endif
 	parityenable();
 #ifdef USELEDS
 	ledinit();
@@ -1077,27 +1070,11 @@ nmihand(frame)
 
 	/* Check for keyboard <CRTL>+<SHIFT>+<RESET>. */
 	if (kbdnmi()) {
-		printf("Got a keyboard NMI");
-
-		/*
-		 * We can:
-		 *
-		 *	- enter DDB
-		 *
-		 *	- Start the crashandburn sequence
-		 *
-		 *	- Ignore it.
-		 */
 #ifdef DDB
 		if (db_console) {
-			printf(": entering debugger\n");
 			Debugger();
-		} else
-			printf("\n");
-#else
-			printf(": ignoring\n");
+		}
 #endif /* DDB */
-
 		goto nmihand_out;	/* no more work to do */
 	}
 
@@ -1220,6 +1197,7 @@ parityerrorfind()
 	for (pg = btoc(lowram); pg < btoc(lowram)+physmem; pg++) {
 		pmap_enter(pmap_kernel(), (vaddr_t)vmmap, ctob(pg),
 		    VM_PROT_READ, VM_PROT_READ|PMAP_WIRED);
+		pmap_update(pmap_kernel());
 		ip = (int *)vmmap;
 		for (o = 0; o < NBPG; o += sizeof(int))
 			i = *ip++;
@@ -1232,6 +1210,7 @@ parityerrorfind()
 done:
 	looking = 0;
 	pmap_remove(pmap_kernel(), (vaddr_t)vmmap, (vaddr_t)&vmmap[NBPG]);
+	pmap_update(pmap_kernel());
 	ecacheon();
 	splx(s);
 	return(found);
@@ -1260,8 +1239,7 @@ cpu_exec_aout_makecmds(p, epp)
 	int error;
 	struct exec *execp = epp->ep_hdr;
 #ifdef COMPAT_SUNOS
-	extern int sunos_exec_aout_makecmds
-		__P((struct proc *, struct exec_package *));
+	extern int sunos_exec_aout_makecmds(struct proc *, struct exec_package *);
 #endif
 
 	midmag = ntohl(execp->a_midmag);

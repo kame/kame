@@ -1,4 +1,4 @@
-/*	$OpenBSD: svr4_stat.c,v 1.19 2000/09/07 17:52:24 ericj Exp $	 */
+/*	$OpenBSD: svr4_stat.c,v 1.22 2002/03/14 20:31:31 mickey Exp $	 */
 /*	$NetBSD: svr4_stat.c,v 1.21 1996/04/22 01:16:07 christos Exp $	 */
 
 /*
@@ -43,7 +43,7 @@
 
 #include <sys/time.h>
 #include <sys/ucred.h>
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>
 
 #include <sys/syscallargs.h>
@@ -68,10 +68,10 @@
 # define SVR4_NO_OSTAT
 #endif
 
-static void bsd_to_svr4_xstat __P((struct stat *, struct svr4_xstat *));
-static void bsd_to_svr4_stat64 __P((struct stat *, struct svr4_stat64 *));
-int svr4_ustat __P((struct proc *, void *, register_t *));
-static int svr4_to_bsd_pathconf __P((int));
+static void bsd_to_svr4_xstat(struct stat *, struct svr4_xstat *);
+static void bsd_to_svr4_stat64(struct stat *, struct svr4_stat64 *);
+int svr4_ustat(struct proc *, void *, register_t *);
+static int svr4_to_bsd_pathconf(int);
 
 /*
  * SVR4 uses named pipes as named sockets, so we tell programs
@@ -81,7 +81,7 @@ static int svr4_to_bsd_pathconf __P((int));
 
 
 #ifndef SVR4_NO_OSTAT
-static void bsd_to_svr4_stat __P((struct stat *, struct svr4_stat *));
+static void bsd_to_svr4_stat(struct stat *, struct svr4_stat *);
 
 static void
 bsd_to_svr4_stat(st, st4)
@@ -523,8 +523,9 @@ svr4_sys_uname(p, v, retval)
 {
 	struct svr4_sys_uname_args *uap = v;
 	struct svr4_utsname	sut;
-	extern char ostype[], hostname[], osrelease[], version[], machine[];
-	char *cp, *dp, *ep;
+	extern char hostname[], machine[];
+	const char *cp;
+	char *dp, *ep;
 
 	bzero(&sut, sizeof(sut));
 
@@ -563,12 +564,11 @@ svr4_sys_systeminfo(p, v, retval)
 	register_t *retval;
 {
 	struct svr4_sys_systeminfo_args *uap = v;
-	char *str;
+	const char *str;
 	int name;
 	int error;
 	long len;
-	extern char ostype[], hostname[], osrelease[],
-		    version[], machine[], domainname[];
+	extern char hostname[], machine[], domainname[];
 #ifdef __sparc__
 	extern char *cpu_class;
 #endif

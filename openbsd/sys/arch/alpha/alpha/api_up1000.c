@@ -1,4 +1,4 @@
-/*	$OpenBSD: api_up1000.c,v 1.2 2001/04/17 14:51:32 art Exp $	*/
+/*	$OpenBSD: api_up1000.c,v 1.5 2002/03/14 01:26:26 millert Exp $	*/
 /* $NetBSD: api_up1000.c,v 1.4 2000/06/20 03:48:53 matt Exp $ */
 
 /*
@@ -74,9 +74,9 @@ int bootdev_debug;
 #define DPRINTF(x)
 #endif
 
-void api_up1000_init __P((void));
-static void api_up1000_cons_init __P((void));
-static void api_up1000_device_register __P((struct device *, void *));
+void api_up1000_init(void);
+static void api_up1000_cons_init(void);
+static void api_up1000_device_register(struct device *, void *);
 
 void
 api_up1000_init()
@@ -107,7 +107,7 @@ api_up1000_cons_init()
 	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
 
 	switch (ctb->ctb_term_type) {
-	case 2: 
+	case CTB_PRINTERPORT: 
 		/* serial console ... */
 		/* XXX */
 		{
@@ -118,7 +118,7 @@ api_up1000_cons_init()
 			 */
 			DELAY(160000000 / comcnrate);
 
-			if (comcnattach(icp->ic_iot, 0x3f8, comcnrate,
+			if (comcnattach(&icp->ic_iot, 0x3f8, comcnrate,
 			    COM_FREQ,
 			    (TTYDEF_CFLAG & ~(CSIZE | PARENB)) | CS8))
 				panic("can't init serial console");
@@ -126,18 +126,18 @@ api_up1000_cons_init()
 			break;
 		}
 
-	case 3:
+	case CTB_GRAPHICS:
 #if NPCKBD > 0
 		/* display console ... */
 		/* XXX */
-		(void) pckbc_cnattach(icp->ic_iot, IO_KBD, KBCMDP,
+		(void) pckbc_cnattach(&icp->ic_iot, IO_KBD, KBCMDP,
 		    PCKBC_KBD_SLOT);
 
 		if (CTB_TURBOSLOT_TYPE(ctb->ctb_turboslot) ==
 		    CTB_TURBOSLOT_TYPE_ISA)
-			isa_display_console(icp->ic_iot, icp->ic_memt);
+			isa_display_console(&icp->ic_iot, &icp->ic_memt);
 		else
-			pci_display_console(icp->ic_iot, icp->ic_memt,
+			pci_display_console(&icp->ic_iot, &icp->ic_memt,
 			    &icp->ic_pc, CTB_TURBOSLOT_BUS(ctb->ctb_turboslot),
 			    CTB_TURBOSLOT_SLOT(ctb->ctb_turboslot), 0);
 #else

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_subr.c,v 1.52 2001/07/21 09:26:06 itojun Exp $	*/
+/*	$OpenBSD: tcp_subr.c,v 1.61 2002/03/14 01:27:11 millert Exp $	*/
 /*	$NetBSD: tcp_subr.c,v 1.22 1996/02/13 23:44:00 christos Exp $	*/
 
 /*
@@ -123,7 +123,7 @@ int	tcp_rttdflt = TCPTV_SRTTDFLT / PR_SLOWHZ;
 #ifndef TCP_DO_RFC1323
 #define TCP_DO_RFC1323	1
 #endif
-int    tcp_do_rfc1323 = TCP_DO_RFC1323;
+int	tcp_do_rfc1323 = TCP_DO_RFC1323;
 
 #ifndef TCP_DO_SACK
 #ifdef TCP_SACK
@@ -132,7 +132,8 @@ int    tcp_do_rfc1323 = TCP_DO_RFC1323;
 #define TCP_DO_SACK	0
 #endif
 #endif
-int    tcp_do_sack = TCP_DO_SACK;		/* RFC 2018 selective ACKs */
+int	tcp_do_sack = TCP_DO_SACK;		/* RFC 2018 selective ACKs */
+int	tcp_ack_on_push = 0;	/* set to enable immediate ACK-on-PUSH */
 
 #ifndef TCBHASHSIZE
 #define	TCBHASHSIZE	128
@@ -142,6 +143,13 @@ int	tcbhashsize = TCBHASHSIZE;
 #ifdef INET6
 extern int ip6_defhlim;
 #endif /* INET6 */
+
+struct pool tcpcb_pool;
+#ifdef TCP_SACK
+struct pool sackhl_pool;
+#endif
+
+int	tcp_freeq(struct tcpcb *);
 
 struct tcpstat tcpstat;		/* tcp statistics */
 
@@ -154,6 +162,12 @@ tcp_init()
 #ifdef TCP_COMPAT_42
 	tcp_iss = 1;		/* wrong */
 #endif /* TCP_COMPAT_42 */
+	pool_init(&tcpcb_pool, sizeof(struct tcpcb), 0, 0, 0, "tcpcbpl",
+	    NULL);
+#ifdef TCP_SACK
+	pool_init(&sackhl_pool, sizeof(struct sackhole), 0, 0, 0, "sackhlpl",
+	    NULL);
+#endif /* TCP_SACK */
 	in_pcbinit(&tcbtable, tcbhashsize);
 	tcp_now = arc4random() / 2;
 
@@ -170,6 +184,9 @@ tcp_init()
 
 	icmp6_mtudisc_callback_register(tcp6_mtudisc_callback);
 #endif /* INET6 */
+
+	/* Initialize timer state. */
+	tcp_timer_init();
 }
 
 /*
@@ -446,19 +463,23 @@ tcp_respond(tp, template, m, ack, seq, flags)
  * protocol control block.
  */
 struct tcpcb *
-tcp_newtcpcb(inp)
-	struct inpcb *inp;
+tcp_newtcpcb(struct inpcb *inp)
 {
-	register struct tcpcb *tp;
+	struct tcpcb *tp;
+	int i;
 
-	tp = malloc(sizeof(*tp), M_PCB, M_NOWAIT);
+	tp = pool_get(&tcpcb_pool, PR_NOWAIT);
 	if (tp == NULL)
 		return ((struct tcpcb *)0);
 	bzero((char *) tp, sizeof(struct tcpcb));
 	LIST_INIT(&tp->segq);
 	tp->t_maxseg = tcp_mssdflt;
 	tp->t_maxopd = 0;
-  
+
+	TCP_INIT_DELACK(tp);
+	for (i = 0; i < TCPT_NTIMERS; i++)
+		TCP_TIMER_INIT(tp, i);
+
 #ifdef TCP_SACK
 	tp->sack_disable = tcp_do_sack ? 0 : 1;
 #endif
@@ -528,10 +549,8 @@ tcp_drop(tp, errno)
  *	wake up any sleepers
  */
 struct tcpcb *
-tcp_close(tp)
-	register struct tcpcb *tp;
+tcp_close(struct tcpcb *tp)
 {
-	register struct ipqent *qe;
 	struct inpcb *inp = tp->t_inpcb;
 	struct socket *so = inp->inp_socket;
 #ifdef TCP_SACK
@@ -649,42 +668,43 @@ tcp_close(tp)
 #endif /* RTV_RTT */
 
 	/* free the reassembly queue, if any */
-#ifdef INET6
-	/* Reassembling TCP segments in v6 might be sufficiently different
-	 * to merit two codepaths to free the reasssembly queue.
-	 * If an undecided TCP socket, then the IPv4 codepath will be used 
-	 * because it won't matter much anyway.
-	 */
-	if (tp->pf == AF_INET6) {
-		while ((qe = tp->segq.lh_first) != NULL) {
-			LIST_REMOVE(qe, ipqe_q);
-			m_freem(qe->ipqe_m);
-			FREE(qe, M_IPQ);
-		}
-	} else
-#endif /* INET6 */
-		while ((qe = tp->segq.lh_first) != NULL) {
-			LIST_REMOVE(qe, ipqe_q);
-			m_freem(qe->ipqe_m);
-			FREE(qe, M_IPQ);
-		}
+	tcp_freeq(tp);
+
+	tcp_canceltimers(tp);
+	TCP_CLEAR_DELACK(tp);
+
 #ifdef TCP_SACK
 	/* Free SACK holes. */
 	q = p = tp->snd_holes;
 	while (p != 0) {
 		q = p->next;
-		free(p, M_PCB);
+		pool_put(&sackhl_pool, p);
 		p = q;
 	}
 #endif
 	if (tp->t_template)
 		(void) m_free(tp->t_template);
-	free(tp, M_PCB);
+	pool_put(&tcpcb_pool, tp);
 	inp->inp_ppcb = 0;
 	soisdisconnected(so);
 	in_pcbdetach(inp);
 	tcpstat.tcps_closed++;
 	return ((struct tcpcb *)0);
+}
+
+int
+tcp_freeq(struct tcpcb *tp)
+{
+	struct ipqent *qe;
+	int rv = 0;
+
+	while ((qe = LIST_FIRST(&tp->segq)) != NULL) {
+		LIST_REMOVE(qe, ipqe_q);
+		m_freem(qe->ipqe_m);
+		pool_put(&ipqent_pool, qe);
+		rv = 1;
+	}
+	return (rv);
 }
 
 void
@@ -748,7 +768,7 @@ tcp6_ctlinput(cmd, sa, d)
 	void *d;
 {
 	struct tcphdr th;
-	void (*notify) __P((struct inpcb *, int)) = tcp_notify;
+	void (*notify)(struct inpcb *, int) = tcp_notify;
 	struct ip6_hdr *ip6;
 	const struct sockaddr_in6 *sa6_src = NULL;
 	struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
@@ -853,7 +873,7 @@ tcp_ctlinput(cmd, sa, v)
 	register struct ip *ip = v;
 	register struct tcphdr *th;
 	extern int inetctlerrmap[];
-	void (*notify) __P((struct inpcb *, int)) = tcp_notify;
+	void (*notify)(struct inpcb *, int) = tcp_notify;
 	int errno;
 
 	if (sa->sa_family != AF_INET)

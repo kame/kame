@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.11 2001/09/28 14:43:13 art Exp $	*/
+/*	$OpenBSD: trap.c,v 1.18 2002/03/26 01:00:30 miod Exp $	*/
 /*	$NetBSD: trap.c,v 1.73 2001/08/09 01:03:01 eeh Exp $ */
 
 /*
@@ -67,7 +67,6 @@
 #include <sys/ktrace.h>
 #endif
 
-#include <vm/vm.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
@@ -88,7 +87,7 @@
 #include <machine/svr4_32_machdep.h>
 #endif
 
-#include <sparc/fpu/fpu_extern.h>
+#include <sparc64/fpu/fpu_extern.h>
 #include <sparc64/sparc64/cache.h>
 
 #ifndef offsetof
@@ -320,19 +319,19 @@ const char *trap_type[] = {
 
 #define	N_TRAP_TYPES	(sizeof trap_type / sizeof *trap_type)
 
-static __inline void userret __P((struct proc *, int,  u_quad_t));
-static __inline void share_fpu __P((struct proc *, struct trapframe64 *));
+static __inline void userret(struct proc *, int,  u_quad_t);
+static __inline void share_fpu(struct proc *, struct trapframe64 *);
 
-void trap __P((struct trapframe64 *tf, unsigned type, vaddr_t pc, long tstate));
-void data_access_fault __P((struct trapframe64 *tf, unsigned type, vaddr_t pc, 
-	vaddr_t va, vaddr_t sfva, u_long sfsr));
-void data_access_error __P((struct trapframe64 *tf, unsigned type, 
-	vaddr_t afva, u_long afsr, vaddr_t sfva, u_long sfsr));
-void text_access_fault __P((struct trapframe64 *tf, unsigned type, 
-	vaddr_t pc, u_long sfsr));
-void text_access_error __P((struct trapframe64 *tf, unsigned type, 
-	vaddr_t pc, u_long sfsr, vaddr_t afva, u_long afsr));
-void syscall __P((struct trapframe64 *, register_t code, register_t pc));
+void trap(struct trapframe64 *tf, unsigned type, vaddr_t pc, long tstate);
+void data_access_fault(struct trapframe64 *tf, unsigned type, vaddr_t pc, 
+	vaddr_t va, vaddr_t sfva, u_long sfsr);
+void data_access_error(struct trapframe64 *tf, unsigned type, 
+	vaddr_t afva, u_long afsr, vaddr_t sfva, u_long sfsr);
+void text_access_fault(struct trapframe64 *tf, unsigned type, 
+	vaddr_t pc, u_long sfsr);
+void text_access_error(struct trapframe64 *tf, unsigned type, 
+	vaddr_t pc, u_long sfsr, vaddr_t afva, u_long afsr);
+void syscall(struct trapframe64 *, register_t code, register_t pc);
 
 /*
  * Define the code needed before returning to user mode, for
@@ -369,8 +368,11 @@ userret(p, pc, oticks)
 	/*
 	 * If profiling, charge recent system time to the trapped pc.
 	 */
-	if (p->p_flag & P_PROFIL)
-		addupc_task(p, pc, (int)(p->p_sticks - oticks));
+	if (p->p_flag & P_PROFIL) {
+		extern int psratio;
+
+		addupc_task(p, pc, (int)(p->p_sticks - oticks) * psratio);
+	}
 
 #ifdef notyet
 	curcpu()->ci_schedstate.spc_curpriority = p->p_priority;
@@ -618,6 +620,7 @@ badtrap:
 			ADVANCE;
 			break;
 		}
+		/* XXX sv.sival_ptr should be the fault address! */
 		trapsignal(p, SIGBUS, 0, BUS_ADRALN, sv);	/* XXX code?? */
 		break;
 
@@ -786,7 +789,7 @@ data_access_fault(tf, type, pc, addr, sfva, sfsr)
 	u_quad_t sticks;
 	union sigval sv;
 
-	sv.sival_ptr = (void *)pc;
+	sv.sival_ptr = (void *)addr;
 
 	uvmexp.traps++;
 	if ((p = curproc) == NULL)	/* safety check */
@@ -857,8 +860,8 @@ data_access_fault(tf, type, pc, addr, sfva, sfsr)
 			segsz_t nss = btoc(USRSTACK - va);
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
-		} else if (rv == KERN_PROTECTION_FAILURE)
-			rv = KERN_INVALID_ADDRESS;
+		} else if (rv == EACCES)
+			rv = EFAULT;
 	}
 	if (rv != 0) {
 		/*
@@ -883,7 +886,7 @@ kfault:
 			tf->tf_npc = onfault + 4;
 			return;
 		}
-		if (rv == KERN_RESOURCE_SHORTAGE) {
+		if (rv == ENOMEM) {
 			printf("UVM: pid %d (%s), uid %d killed: out of swap\n",
 			       p->p_pid, p->p_comm,
 			       p->p_cred && p->p_ucred ?
@@ -1036,8 +1039,8 @@ text_access_fault(tf, type, pc, sfsr)
 			segsz_t nss = btoc(USRSTACK - va);
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
-		} else if (rv == KERN_PROTECTION_FAILURE)
-			rv = KERN_INVALID_ADDRESS;
+		} else if (rv == EACCES)
+			rv = EFAULT;
 	}
 	if (rv != 0) {
 		/*
@@ -1052,7 +1055,6 @@ text_access_fault(tf, type, pc, sfsr)
 			panic("kernel fault");
 			/* NOTREACHED */
 		}
-		sv.sival_ptr = (void *)va;
 		trapsignal(p, SIGSEGV, access_type, SEGV_MAPERR, sv);
 	}
 	if ((tstate & TSTATE_PRIV) == 0) {
@@ -1130,7 +1132,7 @@ text_access_error(tf, type, pc, sfsr, afva, afsr)
 
 	vm = p->p_vmspace;
 	/* alas! must call the horrible vm code */
-	rv = uvm_fault(&vm->vm_map, (vaddr_t)va, 0, access_type);
+	rv = uvm_fault(&vm->vm_map, va, 0, access_type);
 
 	/*
 	 * If this was a stack access we keep track of the maximum
@@ -1144,8 +1146,8 @@ text_access_error(tf, type, pc, sfsr, afva, afsr)
 			segsz_t nss = btoc(USRSTACK - va);
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
-		} else if (rv == KERN_PROTECTION_FAILURE)
-			rv = KERN_INVALID_ADDRESS;
+		} else if (rv == EACCES)
+			rv = EFAULT;
 	}
 	if (rv != 0) {
 		/*
@@ -1162,7 +1164,6 @@ text_access_error(tf, type, pc, sfsr, afva, afsr)
 			panic("kernel fault");
 			/* NOTREACHED */
 		}
-		sv.sival_ptr = (void *)va;
 		trapsignal(p, SIGSEGV, access_type, SEGV_MAPERR, sv);
 	}
 out:
@@ -1415,9 +1416,10 @@ syscall(tf, code, pc)
  * Process the tail end of a fork() for the child.
  */
 void
-child_return(p)
-	struct proc *p;
+child_return(arg)
+	void *arg;
 {
+	struct proc *p = (struct proc *)arg;
 
 	/*
 	 * Return values in the frame set by cpu_fork().

@@ -1,4 +1,4 @@
-/*	$OpenBSD: in.h,v 1.54 2001/07/05 08:40:12 angelos Exp $	*/
+/*	$OpenBSD: in.h,v 1.56 2002/03/14 01:27:11 millert Exp $	*/
 /*	$NetBSD: in.h,v 1.20 1996/02/13 23:41:47 christos Exp $	*/
 
 /*
@@ -201,6 +201,7 @@ struct in_addr {
 
 #define	INADDR_UNSPEC_GROUP	__IPADDR(0xe0000000)	/* 224.0.0.0 */
 #define	INADDR_ALLHOSTS_GROUP	__IPADDR(0xe0000001)	/* 224.0.0.1 */
+#define	INADDR_ALLROUTERS_GROUP __IPADDR(0xe0000002)	/* 224.0.0.2 */
 #define INADDR_MAX_LOCAL_GROUP	__IPADDR(0xe00000ff)	/* 224.0.0.255 */
 
 #define	IN_LOOPBACKNET		127			/* official! */
@@ -510,9 +511,9 @@ struct ip_mreq {
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-int	   bindresvport __P((int, struct sockaddr_in *));
+int	   bindresvport(int, struct sockaddr_in *);
 struct sockaddr;
-int	   bindresvport_sa __P((int, struct sockaddr *));
+int	   bindresvport_sa(int, struct sockaddr *);
 __END_DECLS
 
 #else
@@ -563,14 +564,14 @@ in_cksum_addword(u_int16_t a, u_int16_t b)
 	return (sum);
 }
 
-int	   in_broadcast __P((struct in_addr, struct ifnet *));
-int	   in_canforward __P((struct in_addr));
-int	   in_cksum __P((struct mbuf *, int));
-int	   in4_cksum __P((struct mbuf *, u_int8_t, int, int));
-void	   in_delayed_cksum __P((struct mbuf *));
-int	   in_localaddr __P((struct in_addr));
-void	   in_socktrim __P((struct sockaddr_in *));
-char	  *inet_ntoa __P((struct in_addr));
+int	   in_broadcast(struct in_addr, struct ifnet *);
+int	   in_canforward(struct in_addr);
+int	   in_cksum(struct mbuf *, int);
+int	   in4_cksum(struct mbuf *, u_int8_t, int, int);
+void	   in_delayed_cksum(struct mbuf *);
+int	   in_localaddr(struct in_addr);
+void	   in_socktrim(struct sockaddr_in *);
+char	  *inet_ntoa(struct in_addr);
 
 #define	in_hosteq(s,t)	((s).s_addr == (t).s_addr)
 #define	in_nullhost(x)	((x).s_addr == INADDR_ANY)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.35 2001/09/19 20:50:56 mickey Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.48 2002/03/25 19:41:52 niklas Exp $	*/
 /*	$NetBSD: pmap.c,v 1.68 1999/06/19 19:44:09 is Exp $	*/
 
 /*-
@@ -117,11 +117,8 @@
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/msgbuf.h>
-#include <vm/vm.h>
 #include <sys/user.h>
-#include <vm/vm_page.h>
 #include <uvm/uvm.h>
-#include <uvm/uvm_extern.h>
 #include <machine/pte.h>
 #include <machine/cpu.h>
 #include <machine/vmparam.h>
@@ -274,7 +271,7 @@ u_int	*Segtabzero, *Segtabzeropa;
 vsize_t	Sysptsize = VM_KERNEL_PT_PAGES;
 
 struct pmap	kernel_pmap_store;
-vm_map_t	pt_map;
+struct vm_map	*pt_map;
 struct vm_map	pt_map_store;
 
 vsize_t		mem_size;	/* memory size in bytes */
@@ -504,17 +501,17 @@ pmap_init()
 	addr = (vaddr_t) amigahwaddr;
 	if (uvm_map(kernel_map, &addr,
 		    ptoa(namigahwpg),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE,
 				UVM_INH_NONE, UVM_ADV_RANDOM,
-				UVM_FLAG_FIXED)) != KERN_SUCCESS)
+				UVM_FLAG_FIXED)))
 		goto bogons;
 	addr = (vaddr_t) Sysmap;
 	if (uvm_map(kernel_map, &addr, AMIGA_KPTSIZE,
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE,
 				UVM_INH_NONE, UVM_ADV_RANDOM,
-				UVM_FLAG_FIXED)) != KERN_SUCCESS) {
+				UVM_FLAG_FIXED))) {
 		/*
 		 * If this fails, it is probably because the static
 		 * portion of the kernel page table isn't big enough
@@ -602,14 +599,12 @@ bogons:
 	 * we already have kernel PT pages.
 	 */
 	addr = 0;
-	rv = uvm_map(kernel_map, &addr, s, NULL, UVM_UNKNOWN_OFFSET,
+	rv = uvm_map(kernel_map, &addr, s, NULL, UVM_UNKNOWN_OFFSET, 0,
 		     UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
 				 UVM_ADV_RANDOM, UVM_FLAG_NOMERGE));
-	if (rv != KERN_SUCCESS || (addr + s) >= (vaddr_t)Sysmap)
+	if (rv || (addr + s) >= (vaddr_t)Sysmap)
 		panic("pmap_init: kernel PT too small");
-	rv = uvm_unmap(kernel_map, addr, addr + s);
-	if (rv != KERN_SUCCESS)
-		panic("pmap_init: uvm_unmap failed");
+	uvm_unmap(kernel_map, addr, addr + s);
 	/*
 	 * Now allocate the space and link the pages together to
 	 * form the KPT free list.
@@ -795,7 +790,7 @@ pmap_create(void)
 
 #ifdef DEBUG
 	if (pmapdebug & (PDB_FOLLOW|PDB_CREATE))
-		printf("pmap_create(%lx)\n", size);
+		printf("pmap_create()\n");
 #endif
 
 	pmap = (struct pmap *)malloc(sizeof *pmap, M_VMPMAP, M_WAITOK);
@@ -1378,7 +1373,7 @@ validate:
 	}
 #endif
 
-	return (KERN_SUCCESS);
+	return (0);
 }
 
 /*
@@ -1485,27 +1480,6 @@ void pmap_copy(dst_pmap, src_pmap, dst_addr, len, src_addr)
 		printf("pmap_copy(%p, %p, %lx, %lx, %lx)\n", dst_pmap,
 		    src_pmap, dst_addr, len, src_addr);
 #endif
-}
-
-/*
- *	Require that all active physical maps contain no
- *	incorrect entries NOW.  [This update includes
- *	forcing updates of any address map caching.]
- *
- *	Generally used to insure that a thread about
- *	to run will see a semantically correct world.
- */
-void pmap_update()
-{
-#ifdef DEBUG
-	if (pmapdebug & PDB_FOLLOW)
-		printf("pmap_update()\n");
-#endif
-#if defined(M68060)
-	if (machineid & AMIGA_68060)
-		DCIA();
-#endif
-	TBIA();
 }
 
 /*
@@ -2092,7 +2066,7 @@ void
 pmap_ptpage_addref(ptpva)
 	vaddr_t ptpva;
 {
-	vm_page_t m;
+	struct vm_page *m;
 
 	simple_lock(&uvm.kernel_object->vmobjlock);
 	m = uvm_pagelookup(uvm.kernel_object, ptpva - vm_map_min(kernel_map));
@@ -2109,7 +2083,7 @@ int
 pmap_ptpage_delref(ptpva)
 	vaddr_t ptpva;
 {
-	vm_page_t m;
+	struct vm_page *m;
 	int rv;
 
 	simple_lock(&uvm.kernel_object->vmobjlock);
@@ -2437,7 +2411,7 @@ pmap_enter_ptpage(pmap, va)
 #endif
 		s = uvm_fault_wire(pt_map, va, va + PAGE_SIZE,
 		    VM_PROT_READ|VM_PROT_WRITE);
-		if (s != KERN_SUCCESS) {
+		if (s) {
 			printf("uvm_fault_wire(pt_map, 0x%lx, 0%lx, RW) "
 				"-> %d\n", va, va + PAGE_SIZE, s);
 			panic("pmap_enter: uvm_fault_wire failed");
@@ -2555,7 +2529,7 @@ pmap_check_wiring(str, va)
 {
 	pt_entry_t *pte;
 	paddr_t pa;
-	vm_page_t m;
+	struct vm_page *m;
 	int count;
 
 	if (!pmap_ste_v(pmap_kernel(), va) ||
@@ -2601,18 +2575,6 @@ pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot)
 {
 	pmap_enter(pmap_kernel(), va, pa, prot,
 		VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
-}
-
-void
-pmap_kenter_pgs(vaddr_t va, struct vm_page **pgs, int npgs)
-{
-	int i;
-
-	for (i = 0; i < npgs; i++, va += PAGE_SIZE) {
-		pmap_enter(pmap_kernel(), va, VM_PAGE_TO_PHYS(pgs[i]),
-			VM_PROT_READ|VM_PROT_WRITE,
-			VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
-	}
 }
 
 void

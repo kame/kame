@@ -1,4 +1,4 @@
-/*	$OpenBSD: ppc1_machdep.c,v 1.2 2001/09/11 20:05:24 miod Exp $	*/
+/*	$OpenBSD: ppc1_machdep.c,v 1.6 2002/03/14 03:15:58 millert Exp $	*/
 /*	$NetBSD: ofw_machdep.c,v 1.1 1996/09/30 16:34:50 ws Exp $	*/
 
 /*
@@ -43,7 +43,7 @@
 #include <sys/stat.h>
 #include <sys/systm.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/powerpc.h>
 #include <machine/autoconf.h>
@@ -52,18 +52,18 @@
 
 #include <dev/cons.h>
 
-void PPC1_exit __P((void)) __attribute__((__noreturn__));
-void PPC1_boot __P((char *bootspec)) __attribute__((__noreturn__));
-void PPC1_mem_regions __P((struct mem_region **memp, struct mem_region **availp));
-void PPC1_vmon __P((void));
-unsigned char PPC1_nvram_rd __P((unsigned long offset));
-void PPC1_nvram_wr __P((unsigned long offset, unsigned char val));
-unsigned long PPC1_tps __P((void));
+void PPC1_exit(void) __attribute__((__noreturn__));
+void PPC1_boot(char *bootspec) __attribute__((__noreturn__));
+void PPC1_mem_regions(struct mem_region **memp, struct mem_region **availp);
+void PPC1_vmon(void);
+unsigned char PPC1_nvram_rd(unsigned long offset);
+void PPC1_nvram_wr(unsigned long offset, unsigned char val);
+unsigned long PPC1_tps(void);
 
-int PPC1_clock_read __P((int *sec, int *min, int *hour, int *day,
-								 int *mon, int *yr));
-int PPC1_clock_write __P((int sec, int min, int hour, int day,
-								  int mon, int yr));
+int PPC1_clock_read(int *sec, int *min, int *hour, int *day,
+								 int *mon, int *yr);
+int PPC1_clock_write(int sec, int min, int hour, int day,
+								  int mon, int yr);
 
 struct firmware ppc1_firmware = {
 	PPC1_mem_regions,
@@ -102,7 +102,11 @@ size_memory(void)
 	volatile unsigned int *look;
 	unsigned int *max;
 	extern char *end;
-	vm_offset_t local_mem, total_mem;
+	vm_offset_t total_mem;
+#ifdef USE_BUG
+	vm_offset_t local_mem;
+#endif
+
 #ifdef USE_BUG
 	bugenvrd();	/* read the bug environment */
 	local_mem = (vm_offset_t)bug_localmemsize();
@@ -113,9 +117,9 @@ size_memory(void)
 	/*
 	 * count it up.
 	 */
-	max = (void*)MAXPHYSMEM;
-	for (look = (void*)Roundup(end, STRIDE); look < max;
-		 look = (int*)((unsigned)look + STRIDE)) {
+	max = (void *)MAXPHYSMEM;
+	for (look = (void *)Roundup(end, STRIDE); look < max;
+		 look = (int *)((unsigned)look + STRIDE)) {
 		unsigned save;
 
 		/* if can't access, we've reached the end */
@@ -161,7 +165,6 @@ void
 PPC1_mem_regions(memp, availp)
 struct mem_region **memp, **availp;
 {
-	int phandle, i, j, cnt;
 	extern int avail_start;
 
 	bzero(&PPC1mem[0], sizeof(struct mem_region) * PPC1_REGIONS);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ptrace.h,v 1.3 2001/06/18 09:01:52 art Exp $	*/
+/*	$OpenBSD: ptrace.h,v 1.7 2002/03/14 01:27:14 millert Exp $	*/
 /*	$NetBSD: ptrace.h,v 1.21 1996/02/09 18:25:26 christos Exp $	*/
 
 /*-
@@ -48,34 +48,52 @@
 #define	PT_KILL		8	/* kill the child process */
 #define	PT_ATTACH	9	/* attach to running process */
 #define	PT_DETACH	10	/* detach from running process */
+#define PT_IO		11	/* do I/O to/from the stopped process. */
+
+struct ptrace_io_desc {
+	int	piod_op;	/* I/O operation */
+	void	*piod_offs;	/* child offset */
+	void	*piod_addr;	/* parent offset */
+	size_t	piod_len;	/* request length */
+};
+
+/*
+ * Operations in piod_op.
+ */
+#define PIOD_READ_D	1	/* Read from D space */
+#define PIOD_WRITE_D	2	/* Write to D space */
+#define PIOD_READ_I	3	/* Read from I space */
+#define PIOD_WRITE_I	4	/* Write to I space */
 
 #define	PT_FIRSTMACH	32	/* for machine-specific requests */
 #include <machine/ptrace.h>	/* machine-specific requests, if any */
 
 #ifdef _KERNEL
 
-#if defined(PT_GETREGS) || defined(PT_SETREGS)
-struct reg;
+/*
+ * There is a bunch of PT_ requests that are machine dependent, but not
+ * optional. Check if they were defined by MD code here.
+ */
+#if !defined(PT_GETREGS) || !defined(PT_SETREGS)
+#error Machine dependent ptrace not complete.
 #endif
+
+struct reg;
 #if defined(PT_GETFPREGS) || defined(PT_SETFPREGS)
 struct fpreg;
 #endif
 
-void	proc_reparent __P((struct proc *child, struct proc *newparent));
+void	proc_reparent(struct proc *child, struct proc *newparent);
 #ifdef PT_GETFPREGS
-int	process_read_fpregs __P((struct proc *p, struct fpreg *regs));
+int	process_read_fpregs(struct proc *p, struct fpreg *regs);
 #endif
-#ifdef PT_GETREGS
-int	process_read_regs __P((struct proc *p, struct reg *regs));
-#endif
-int	process_set_pc __P((struct proc *p, caddr_t addr));
-int	process_sstep __P((struct proc *p, int sstep));
+int	process_read_regs(struct proc *p, struct reg *regs);
+int	process_set_pc(struct proc *p, caddr_t addr);
+int	process_sstep(struct proc *p, int sstep);
 #ifdef PT_SETFPREGS
-int	process_write_fpregs __P((struct proc *p, struct fpreg *regs));
+int	process_write_fpregs(struct proc *p, struct fpreg *regs);
 #endif
-#ifdef PT_SETREGS
-int	process_write_regs __P((struct proc *p, struct reg *regs));
-#endif
+int	process_write_regs(struct proc *p, struct reg *regs);
 
 #ifndef FIX_SSTEP
 #define FIX_SSTEP(p)
@@ -86,7 +104,7 @@ int	process_write_regs __P((struct proc *p, struct reg *regs));
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-int	ptrace __P((int _request, pid_t _pid, caddr_t _addr, int _data));
+int	ptrace(int _request, pid_t _pid, caddr_t _addr, int _data);
 __END_DECLS
 
 #endif /* !_KERNEL */

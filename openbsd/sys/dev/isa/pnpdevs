@@ -1,4 +1,4 @@
-#	$OpenBSD: pnpdevs,v 1.104 2001/08/07 10:20:03 deraadt Exp $
+#	$OpenBSD: pnpdevs,v 1.106 2002/01/02 19:41:11 mickey Exp $
 
 #
 # NOTE: All `com' devices also need pccom identifiers.
@@ -406,6 +406,8 @@ com/pccom	PNPC001	# Compaq 2400/9600 Modem (TBD)
 #ep		TCM5094 # 3COM 3c509B		(PNP80F7)
 #ep		TCM5095 # 3COM 3c509B		(PNP80F7)
 #ep		TCM5098 # 3COM 3c509B		(PNP80F7)
+#ep		TCM5150 # 3COM 3c515-TX
+#ep		TCM5151 # 3COM 3c515-T4
 #le		TKN0010	# Lance Ethernet on TEKNOR board (PNP828C)
 #le		ADV55AA	# AMD PCnet-ISA II Ethernet Netwo (PNP828C)
 le		CSI2203	# Cabletron E22xx Adapter
@@ -436,7 +438,7 @@ joy		ESS0001	# ESS ES1869 Plug and Play AudioD
 joy		ESS0005	# ESS ES1878 Plug and Play AudioD
 joy		OPT0001	# OPTi Audio 16
 joy		CDC0001	# OPL3-SAx Sound Board joy
-#joy		ASB16FD	# AdLib NSC 16 PNP (PNPB02F)
+joy		ASB16FD	# AdLib NSC 16 PNP (PNPB02F)
 #joy		YMH0022	# OPL3-SA3 Snd System (PNPB02F)
 
 ess		ESS1868	# ESS ES1868 Plug and Play AudioD
@@ -461,6 +463,7 @@ sb		CTL0042	# SB AWE64 Value
 sb		CTL0043	# Creative ViBRA16X PnP
 sb		CTL0044	# SB AWE64 Gold
 sb		CTL0045	# SB AWE64 Value
+wss		ASB1631	# AdLib MSC 16 PNP V3SB
 wss		CSC0000	# AW35/Pro sound emulation (both SB *and* WSS, somewhat weird)
 wss		CSC0100	# On Board Audio Chip
 wss		CSCA800	# AdLib NSC 16 PNP
