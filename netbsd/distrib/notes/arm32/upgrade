@@ -1,0 +1,3 @@
+.\" $NetBSD: upgrade,v 1.4 1999/03/26 09:22:52 mark Exp $
+.
+.so ../common/upgrade
