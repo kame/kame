@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: setkey.c,v 1.10 2000/04/16 16:11:17 itojun Exp $ */
+/* KAME $Id: setkey.c,v 1.11 2000/04/16 16:14:09 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -74,7 +74,6 @@ int f_verbose = 0;
 int f_mode = 0;
 int f_cmddump = 0;
 int f_policy = 0;
-int f_promisc = 0;
 int f_hexdump = 0;
 char *pname;
 
