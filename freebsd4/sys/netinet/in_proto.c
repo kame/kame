@@ -76,6 +76,7 @@
 #ifdef IPSEC_ESP
 #include <netinet6/esp.h>
 #endif
+#include <netinet6/ipcomp.h>
 #endif /* IPSEC */
 
 #include "gif.h"
