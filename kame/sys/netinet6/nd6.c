@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.337 2004/02/03 07:25:23 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.338 2004/02/04 05:53:39 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2739,7 +2739,7 @@ fill_prlist(req)
 	struct in6_prefix *p = NULL;
 #ifdef __FreeBSD__
 	struct in6_prefix pfx;
-	struct sockaddr_in6 advrtr;
+	struct in6_addr advrtr;
 #else
 	struct in6_prefix *pe = NULL;
 	size_t l;
