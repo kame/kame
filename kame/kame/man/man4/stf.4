@@ -1,4 +1,4 @@
-.\"     $KAME: stf.4,v 1.41 2003/01/08 05:31:52 itojun Exp $
+.\"     $KAME: stf.4,v 1.42 2003/01/09 03:24:14 suz Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -188,7 +188,7 @@ you must not advertise your 6to4 address to others.
 .Ss ISATAP
 For ordinary nodes in ISATAP site, you need
 .Nm
-interface configured in ISATAP mode.
+interface configured in ISATAP mode (stf1, by default).
 The
 .Nm
 interface is also necessary for site border router
@@ -228,9 +228,9 @@ It is available in many ways, such as a sepecial domain name
 .El
 .Pp
 If you would like the node to behave as an ISATAP router,
-you have to assign the non-linklocal IPv6 address to the ISATAP interface
-and distribute the prefix by Router-Advertisement as is done with normal 
-physical interfaces.
+you have to assign non-linklocal IPv6 addresses to the ISATAP interface
+in addition to the above two, and distribute the prefixes by Router-Advertisement 
+as is done with normal physical interfaces.
 .Pp
 .Nm
 can also be configured to be ECN friendly in ISATAP mode by
@@ -278,10 +278,10 @@ Ingress filter can be turned off by
 bit.
 .It
 The same set of rules are applied against the IPv4 address embedded into
-inner IPv6 address, if the IPv6 address matches ISATAP prefix.
+inner IPv6 address, if the IPv6 address matches on-line prefixes on ISATAP interface.
 .It
 Packets not from any of the ISATAP routers in terms of IPv4, if the 
-inner IPv6 source does not match with ISATAP prefix.
+inner IPv6 source does not match with on-line prefixes on ISATAP interface.
 .It
 Packets with multicast address as inner IPv6 source/destination
 .El
@@ -355,22 +355,20 @@ Router Solicitation periodically by
 unsolicited Router Advertisements.
 .Bd -literal
 # ifconfig ne0 inet 133.4.5.6 netmask 0xffffff00
-# ifconfig stf0 isatapmode on
-# ifconfig stf0 isataprtr 133.4.1.1
-# ifconfig stf0 isataprtr 133.4.1.2
-# ifconfig stf0 inet6 fe80::5efe:133.4.5.6 prefixlen 64
-# rtsold stf0
+# ifconfig stf1 isataprtr 133.4.1.1
+# ifconfig stf1 isataprtr 133.4.1.2
+# ifconfig stf1 inet6 fe80::5efe:133.4.5.6 prefixlen 64
+# rtsold stf1
 .Ed
 .Pp
 Here's the router side configuration.
 .Bd -literal
 # ifconfig ne0 inet 133.4.1.1 netmask 0xffffff00
-# ifconfig stf0 isatapmode on
-# ifconfig stf0 isataprtr 133.4.1.1
-# ifconfig stf0 isataprtr 133.4.1.2
-# ifconfig stf0 inet6 fe80::5efe:133.4.1.1 prefixlen 64
-# ifconfig stf0 inet6 3ffe:ffff:ffff:1::5efe:133.4.1.1 prefixlen 64 alias
-# rtadvd stf0
+# ifconfig stf1 isataprtr 133.4.1.1
+# ifconfig stf1 isataprtr 133.4.1.2
+# ifconfig stf1 inet6 fe80::5efe:133.4.1.1 prefixlen 64
+# ifconfig stf1 inet6 3ffe:ffff:ffff:1::5efe:133.4.1.1 prefixlen 64 alias
+# rtadvd stf1
 .Ed
 .Pp
 .Sh SEE ALSO
@@ -400,7 +398,7 @@ Here's the router side configuration.
 .%A Mohit Talwar
 .%A Dave Thaler
 .%T "Intra-Site Automatic Tunneling Addressing Protocol (ISATAP)"
-.%D July 2000
+.%D Dec 2002
 .%N draft-ietf-ngtrans-isatap-08.txt
 .Re
 .\"
@@ -424,9 +422,3 @@ and to cope with ingress filtering rule on the other side.
 This is a feature to make
 .Nm
 work right for all occasions.
-.Pp
-When 
-.Nm
-interface mode changes from ISATAP to 6to4, there still remains
-.Nm
-linklocal prefix in routing table.
