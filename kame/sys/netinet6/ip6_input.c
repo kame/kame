@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.111 2000/08/15 02:24:53 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.112 2000/08/15 02:33:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -523,9 +523,7 @@ ip6_input(m)
 		goto bad;
 	}
 #endif
-#ifdef MEASURE_PERFORMANCE
-	ctr_beg = read_tsc();
-#endif
+
 	if (IN6_IS_ADDR_LOOPBACK(&ip6->ip6_src) ||
 	    IN6_IS_ADDR_LOOPBACK(&ip6->ip6_dst)) {
 		if (m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) {
@@ -594,6 +592,9 @@ ip6_input(m)
 	/*
 	 *  Unicast check
 	 */
+#ifdef MEASURE_PERFORMANCE
+	ctr_beg = read_tsc();
+#endif
 	switch(ip6_ours_check_algorithm) {
 #ifdef MEASURE_PERFORMANCE
 	case OURS_CHECK_ALG_LINEAR:
@@ -607,6 +608,13 @@ ip6_input(m)
 					       &ip6->ip6_dst)) {
 				if ((ia->ia6_flags & IN6_IFF_ANYCAST) != 0)
 					m->m_flags |= M_ANYCAST6;
+#ifdef MEASURE_PERFORMANCE
+				ctr_end = read_tsc();
+#ifdef MEASURE_PERFORMANCE_UDPONLY
+				if (ip6->ip6_nxt == IPPROTO_UDP)
+#endif
+					add_performance_log(ctr_end - ctr_beg);
+#endif
 				ours = 1;
 				deliverifp = ia->ia_ifp;
 				goto hbhcheck;
@@ -624,6 +632,13 @@ ip6_input(m)
 		    (ia = ih->in6h_ifa) != NULL) {
 			if ((ia->ia6_flags & IN6_IFF_ANYCAST) != 0)
 				m->m_flags |= M_ANYCAST6;
+#ifdef MEASURE_PERFORMANCE
+				ctr_end = read_tsc();
+#ifdef MEASURE_PERFORMANCE_UDPONLY
+				if (ip6->ip6_nxt == IPPROTO_UDP)
+#endif
+					add_performance_log(ctr_end - ctr_beg);
+#endif
 			ours = 1;
 			deliverifp = m->m_pkthdr.rcvif;
 			goto hbhcheck;
@@ -695,6 +710,15 @@ ip6_input(m)
 	    ip6_forward_rt.ro_rt->rt_ifp->if_type == IFT_LOOP) {
 		struct in6_ifaddr *ia6 =
 			(struct in6_ifaddr *)ip6_forward_rt.ro_rt->rt_ifa;
+
+#ifdef MEASURE_PERFORMANCE
+		ctr_end = read_tsc();
+#ifdef MEASURE_PERFORMANCE_UDPONLY
+		if (ip6->ip6_nxt == IPPROTO_UDP)
+#endif
+			add_performance_log(ctr_end - ctr_beg);
+#endif
+
 		if (ia6->ia6_flags & IN6_IFF_ANYCAST)
 			m->m_flags |= M_ANYCAST6;
 		/*
@@ -717,6 +741,15 @@ ip6_input(m)
 		}
 	}
 	} /* XXX indentation (see above) */
+
+#ifdef MEASURE_PERFORMANCE
+	/* we detected that packet is not ours thru the basic algorithm */
+	ctr_end = read_tsc();
+#ifdef MEASURE_PERFORMANCE_UDPONLY
+	if (ip6->ip6_nxt == IPPROTO_UDP)
+#endif
+		add_performance_log(ctr_end - ctr_beg);
+#endif
 
 	/*
 	 * FAITH(Firewall Aided Internet Translator)
@@ -791,13 +824,6 @@ ip6_input(m)
 	 * and we're not a router.
 	 */
 	if (!ip6_forwarding) {
-#ifdef MEASURE_PERFORMANCE
-		ctr_end = read_tsc();
-#ifdef MEASURE_PERFORMANCE_UDPONLY
-		if (ip6->ip6_nxt == IPPROTO_UDP)
-#endif
-		add_performance_log(ctr_end - ctr_beg);
-#endif
 		ip6stat.ip6s_cantforward++;
 		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_discard);
 		goto bad;
