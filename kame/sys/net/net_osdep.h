@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.34 2001/02/06 01:31:45 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.35 2001/02/06 01:33:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,9 +55,9 @@
  *		      note that cloned routes from an interface direct route
  *		      still remain.
  *	NetBSD: official release versions (the latest is 1.5 as of Jan. 2001)
- *              have no side effects.  KAME for NetBSD has the same effects
- *              as of BSDI.
- *      OpenBSD: no side effects.
+ *		have no side effects.  KAME for NetBSD has the same effects
+ *		as of BSDI.
+ *	OpenBSD: no side effects.
  *
  * - privileged process
  *	NetBSD, FreeBSD 3
