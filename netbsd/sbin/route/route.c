@@ -646,6 +646,7 @@ newroute(argc, argv)
 			case K_INET6:
 				af = AF_INET6;
 				aflen = sizeof(struct sockaddr_in6);
+#if 0 /* this is harmful against "route get" */
 				if (prefixlen("64") != 64) {
 					fprintf(stderr, "internal error:"
 						"setting prefixlen=64\n");
@@ -653,6 +654,7 @@ newroute(argc, argv)
 				}
 				forcenet = 0;
 				ishost = 1;
+#endif
 				break;
 #endif
 
