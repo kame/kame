@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.12 2002/10/25 05:11:05 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.13 2002/10/28 11:10:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1039,6 +1039,8 @@ mip6_bu_pri_fsm(mbu, event, data)
 			}
 			break;
 		}
+		break;
+
 	default:
 		panic("the state of the primary fsm is unknown.");
 	}
