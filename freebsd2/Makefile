@@ -44,6 +44,9 @@ afterinstall:
 	cp ${.CURDIR}/INSTALL ${DESTDIR}${PREFIX}/share/doc/kame/INSTALL.freebsd2
 	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
 		${.CURDIR}/kame/etc/MAKEDEV.altq ${DESTDIR}/dev
+	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
+		${.CURDIR}/kame/send-pr/send-pr \
+		${DESTDIR}${PREFIX}/bin/kame-send-pr
 
 .include <bsd.subdir.mk>
 .include "../Makefile.inc"

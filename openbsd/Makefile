@@ -38,6 +38,9 @@ afterinstall:
 	done
 	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
 		kame/etc/MAKEDEV.altq /dev
+	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
+		${.CURDIR}/kame/send-pr/send-pr \
+		${DESTDIR}${PREFIX}/bin/kame-send-pr
 
 .include <bsd.subdir.mk>
 .include "../Makefile.inc"
