@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1788 2001/07/20 21:31:17 itojun Exp $
+$KAME: CHANGELOG,v 1.1789 2001/07/20 21:32:06 itojun Exp $
 
 <200107>
 Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
@@ -24,7 +24,7 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	    if you specify rt_gateway.  rt_gateway is still optional,
 	    and the first route is returned if it is not specified.
 	  - IPv4 and IPv6 output logic will pick a route out of multiple
-	    gateways, by very simple hash(ip.ip_dst).
+	    gateways, by very simple hash based on ip{,6}_dst bits.
 	  
 	  DEMO:
 	  (adding multipath routes)
