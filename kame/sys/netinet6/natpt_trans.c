@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.133 2002/07/02 15:29:01 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.134 2002/07/05 06:27:13 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -43,6 +43,7 @@
 #include <sys/socket.h>
 #include <sys/syslog.h>
 
+#include <net/ethernet.h>		/* for #define ETHERMTU */
 #include <net/route.h>			/* for <netinet6/ip6_var.h> */
 
 #include <netinet/in.h>
@@ -1072,7 +1073,10 @@ natpt_icmp4Unreach(struct icmp *icmp4, struct icmp6_hdr *icmp6)
 		if (icmp4->icmp_nextmtu == 0)
 			icmp6->icmp6_mtu = IPV6_MMTU;	/* xxx */
 		else
-			icmp6->icmp6_mtu = ntohs(icmp4->icmp_nextmtu);	/* xxx */
+			icmp6->icmp6_mtu =
+				min(ETHERMTU,
+				    ntohs(icmp4->icmp_nextmtu) +
+				    (sizeof(struct ip6_hdr) - sizeof(struct ip)));
 		HTONL(icmp6->icmp6_mtu);
 		break;
 
