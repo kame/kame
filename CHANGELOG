@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1168 2000/07/31 15:22:02 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1169 2000/07/31 19:06:53 sakane Exp $
 
 <200007>
+Tue Aug  1 04:03:29 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	No weak key check perform on racoon.  She leaves this check to kernel.
+
 Tue Aug  1 00:20:44 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/freebsd3/lib/libftpio: try IPv4 if IPv6 connecting was
 	failed.
