@@ -1,4 +1,4 @@
-.\"	$KAME: vrrp6d.8,v 1.1 2002/07/09 07:28:59 ono Exp $
+.\"	$KAME: vrrp6d.8,v 1.2 2002/08/26 07:34:52 ono Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -92,6 +92,10 @@ This utility doesn't quit properly if you use the -KILL signal. If you want to s
 .Sh BUGS
 .Nm vrrp6d
 is in active developpement, please send me bugs report and suggestions.
+.Bl -bullet -compact
+.It
+Don't use vrrp with netgraph/bridge/vlan. (We have not checked it. Perhaps, it does not work correctly.)
+.El
 .\"
 .Sh FILES
 .Bl -tag -width Pa -compact

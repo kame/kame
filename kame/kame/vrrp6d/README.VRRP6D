@@ -1,5 +1,5 @@
 #
-#	$KAME: README.VRRP6D,v 1.2 2002/07/10 04:54:15 itojun Exp $
+#	$KAME: README.VRRP6D,v 1.3 2002/08/26 07:34:52 ono Exp $
 #
 
 USAGE:
@@ -40,22 +40,15 @@ USAGE:
            * You should not specify real interface of vrrp interfaces
            as argument of rtadvd.
 
-
 RESTRICTIONS:
-        * Don't use with netgraph/bridge/vlan.
-        * Cannot set own address as vrrp address.
+	see vrrp6d(8).
 
 TODO:
 	* Support configure.
-	* Create vrrp interface dynamically.
 	* Filtering with hardware to get packets addressed to virtual
           MAC. (not promiscous mode).
 	* Change MTU of vrrp interface if MTU of parent interface is changed.
-	* IF_TYPE change
-	* Enable to set own link local address as vrrp address.
-	* Allocate individual numbers to SIOCGETVRRP/SIOCSETVRRP.
 	* More debug messages.
 	* rtadvd: enable to get advertising prefixes from parent
           interfaces. (Now, you must specify it manually)
 	* Porting to other *BSD. (NetBSD, OpenBSD, BSD/OS, ...)
-	* Manual pages. vrrp6d.8
