@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.32 2001/06/21 09:06:29 sumikawa Exp $	*/
+/*	$KAME: frag6.c,v 1.33 2002/01/07 11:34:48 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -52,6 +52,8 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
+#include <netinet/in_systm.h>	/* for ECN definitions */
+#include <netinet/ip.h>		/* for ECN definitions */
 
 #ifdef __OpenBSD__
 #include <dev/rndvar.h>
@@ -165,6 +167,7 @@ frag6_input(mp, offp, proto)
 #endif
 	struct sockaddr_in6 *dst;
 #endif
+	u_int8_t ecn, ecn0;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 #ifndef PULLDOWN_TEST
@@ -368,6 +371,26 @@ frag6_input(mp, offp, proto)
 	if (first_frag) {
 		af6 = (struct ip6asfrag *)q6;
 		goto insert;
+	}
+
+	/*
+	 * Handle ECN by comparing this segment with the first one;
+	 * if CE is set, do not lose CE.
+	 * drop if CE and not-ECT are mixed for the same packet.
+	 */
+	ecn = (ntohl(ip6->ip6_flow) >> 20) & IPTOS_ECN_MASK;
+	ecn0 = (ntohl(q6->ip6q_down->ip6af_head) >> 20) & IPTOS_ECN_MASK;
+	if (ecn == IPTOS_ECN_CE) {
+		if (ecn0 == IPTOS_ECN_NOTECT) {
+			free(ip6af, M_FTABLE);
+			goto dropfrag;
+		}
+		if (ecn0 != IPTOS_ECN_CE)
+			q6->ip6q_down->ip6af_head |= htonl(IPTOS_ECN_CE << 20);
+	}
+	if (ecn == IPTOS_ECN_NOTECT && ecn0 != IPTOS_ECN_NOTECT) {
+		goto dropfrag;
+		free(ip6af, M_FTABLE);
 	}
 
 	/*

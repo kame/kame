@@ -1,4 +1,4 @@
-/*	$KAME: ip_ecn.h,v 1.7 2001/12/06 02:18:47 itojun Exp $	*/
+/*	$KAME: ip_ecn.h,v 1.8 2002/01/07 11:34:47 kjc Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -49,10 +49,10 @@
 
 #if defined(KERNEL) || defined(_KERNEL)
 extern void ip_ecn_ingress __P((int, u_int8_t *, const u_int8_t *));
-extern void ip_ecn_egress __P((int, const u_int8_t *, u_int8_t *));
+extern int ip_ecn_egress __P((int, const u_int8_t *, u_int8_t *));
 #ifdef INET6
 extern void ip6_ecn_ingress __P((int, u_int32_t *, const u_int32_t *));
-extern void ip6_ecn_egress __P((int, const u_int32_t *, u_int32_t *));
+extern int ip6_ecn_egress __P((int, const u_int32_t *, u_int32_t *));
 #endif
 #endif
 #endif

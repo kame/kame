@@ -811,6 +811,7 @@ ip_reass(ipqe, fp)
 	struct mbuf *t;
 	int hlen = ipqe->ipqe_ip->ip_hl << 2;
 	int i, next;
+	u_int8_t ecn, ecn0;
 
 	IPQ_LOCK_CHECK();
 
@@ -850,6 +851,22 @@ ip_reass(ipqe, fp)
 		p = NULL;
 		goto insert;
 	}
+
+	/*
+	 * Handle ECN by comparing this segment with the first one;
+	 * if CE is set, do not lose CE.
+	 * drop if CE and not-ECT are mixed for the same packet.
+	 */
+	ecn = ipqe->ipqe_ip->ip_tos & IPTOS_ECN_MASK;
+	ecn0 = fp->ipq_fragq.lh_first->ipqe_ip->ip_tos & IPTOS_ECN_MASK;
+	if (ecn == IPTOS_ECN_CE) {
+		if (ecn0 == IPTOS_ECN_NOTECT)
+			goto dropfrag;
+		if (ecn0 != IPTOS_ECN_CE)
+			fp->ipq_fragq.lh_first->ipqe_ip->ip_tos |= IPTOS_ECN_CE;
+	}
+	if (ecn == IPTOS_ECN_NOTECT && ecn0 != IPTOS_ECN_NOTECT)
+		goto dropfrag;
 
 	/*
 	 * Find a segment which begins after this one does.
