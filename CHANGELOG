@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.413 2000/01/07 08:58:52 jinmei Exp $
+$Id: CHANGELOG,v 1.414 2000/01/07 15:08:45 sumikawa Exp $
 
 <200001>
+Sat Jan  8 00:09:44 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/openssh: upgrade to current source of OpenBSD,
+	  which support IPv6 in default.  Any additional patches does not
+	  neccesary anymore.
+
 2000-01-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_output): do not insert a
 	dest options header (even if specified by a user) that should be
