@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.207 2005/01/20 09:14:05 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.208 2005/01/24 06:04:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -115,6 +115,7 @@ static struct mip6_bul_internal *mip6_bul_create(const struct in6_addr *,
     const struct in6_addr *, const struct in6_addr *, u_int16_t, u_int8_t,
     struct mip_softc *, u_int16_t);
 int mip6_bul_encapcheck(const struct mbuf *, int, int, void *arg);
+static void mip6_bul_update_ipsecdb(struct mip6_bul_internal *);
 #endif /* NMIP > 0 */
 int mip6_rev_encapcheck(const struct mbuf *, int, int, void *arg);
 
@@ -123,6 +124,7 @@ static struct mip6_bc_internal *mip6_bce_new_entry(struct in6_addr *,
     u_int16_t);
 static void mip6_bc_list_insert(struct mip6_bc_internal *);
 static void mip6_bc_list_remove(struct mip6_bc_internal *);
+static void mip6_bce_update_ipsecdb(struct mip6_bc_internal *);
 
 #if NMIP > 0
 static int mip6_rr_hint_ratelimit(const struct in6_addr *,
@@ -468,9 +470,6 @@ mip6_bce_update(cnaddr, hoa, coa, flags, bid)
 	int error = 0;
 	struct mip6_bc_internal *bce = NULL;
 	struct ifaddr *ifa;
-#if defined(IPSEC) && !defined(__OpenBSD__)
-	struct sockaddr_in6 hoa_sa, coa_sa, haaddr_sa;
-#endif /* IPSEC && !__OpenBSD__ */
 
 	/* Non IPv6 address is not support (only for MIP6) */
 	if ((cnaddr->sin6_family != AF_INET6) ||
@@ -532,25 +531,7 @@ mip6_bce_update(cnaddr, hoa, coa, flags, bid)
 	if (MIP6_IS_HA && bce != NULL &&
 	    (flags & IP6_MH_BU_HOME) != 0) {
 #if defined(IPSEC) && !defined(__OpenBSD__)
-/* racoon2 guys want us to update ipsecdb. (2004.10.8) */
-		/* update the ipsecdb. */
-		bzero(&hoa_sa, sizeof(struct sockaddr_in6));
-		hoa_sa.sin6_len = sizeof(struct sockaddr_in6);
-		hoa_sa.sin6_family = AF_INET6;
-		hoa_sa.sin6_addr = bce->mbc_hoa;
-
-		bzero(&coa_sa, sizeof(struct sockaddr_in6));
-		coa_sa.sin6_len = sizeof(struct sockaddr_in6);
-		coa_sa.sin6_family = AF_INET6;
-		coa_sa.sin6_addr = bce->mbc_coa;
-
-		bzero(&haaddr_sa, sizeof(struct sockaddr_in6));
-		haaddr_sa.sin6_len = sizeof(struct sockaddr_in6);
-		haaddr_sa.sin6_family = AF_INET6;
-		haaddr_sa.sin6_addr = bce->mbc_cnaddr;
-
-		key_mip6_update_home_agent_ipsecdb(&hoa_sa, NULL, &coa_sa,
-		    &haaddr_sa);
+		mip6_bce_update_ipsecdb(bce);
 #endif /* IPSEC && !__OpenBSD__ */
 	}
 
@@ -621,12 +602,44 @@ mip6_bce_remove(cnaddr, hoa, coa, flags, bid)
 #if 0
 		}
 #endif
+#ifdef IPSEC
+		mip6_bce_update_ipsecdb(mbc);
+#endif /* IPSEC */
 	}
 	FREE(mbc, M_TEMP);
 
 	splx(s);
 
 	return (error);
+}
+
+static void
+mip6_bce_update_ipsecdb(bce)
+	struct mip6_bc_internal *bce;
+{
+#ifdef IPSEC
+/* racoon2 guys want us to update ipsecdb. (2004.10.8) */
+	struct sockaddr_in6 hoa_sa, coa_sa, haaddr_sa;
+
+	/* update the ipsecdb. */
+	bzero(&hoa_sa, sizeof(struct sockaddr_in6));
+	hoa_sa.sin6_len = sizeof(struct sockaddr_in6);
+	hoa_sa.sin6_family = AF_INET6;
+	hoa_sa.sin6_addr = bce->mbc_hoa;
+
+	bzero(&coa_sa, sizeof(struct sockaddr_in6));
+	coa_sa.sin6_len = sizeof(struct sockaddr_in6);
+	coa_sa.sin6_family = AF_INET6;
+	coa_sa.sin6_addr = bce->mbc_coa;
+
+	bzero(&haaddr_sa, sizeof(struct sockaddr_in6));
+	haaddr_sa.sin6_len = sizeof(struct sockaddr_in6);
+	haaddr_sa.sin6_family = AF_INET6;
+	haaddr_sa.sin6_addr = bce->mbc_cnaddr;
+
+	key_mip6_update_home_agent_ipsecdb(&hoa_sa, NULL, &coa_sa,
+	    &haaddr_sa);
+#endif /* IPSEC */
 }
 
 void
@@ -741,9 +754,6 @@ mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state, bid)
 	int error = 0;
 	struct in6_ifaddr *ia6_hoa;
 	struct mip6_bul_internal *mbul;
-#ifdef IPSEC
-	struct sockaddr_in6 hoa_sa, coa_sa, haaddr_sa;
-#endif
 
 #if 0
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
@@ -800,27 +810,8 @@ mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state, bid)
 			
 			return (error);
 		}
-
 #ifdef IPSEC
-/* racoon2 guys want us to update ipsecdb. (2004.10.8) */
-		/* update ipsecdb. */
-		bzero(&hoa_sa, sizeof(struct sockaddr_in6));
-		hoa_sa.sin6_len = sizeof(struct sockaddr_in6);
-		hoa_sa.sin6_family = AF_INET6;
-		hoa_sa.sin6_addr = mbul->mbul_hoa;
-
-		bzero(&coa_sa, sizeof(struct sockaddr_in6));
-		coa_sa.sin6_len = sizeof(struct sockaddr_in6);
-		coa_sa.sin6_family = AF_INET6;
-		coa_sa.sin6_addr = mbul->mbul_coa;
-
-		bzero(&haaddr_sa, sizeof(struct sockaddr_in6));
-		haaddr_sa.sin6_len = sizeof(struct sockaddr_in6);
-		haaddr_sa.sin6_family = AF_INET6;
-		haaddr_sa.sin6_addr = mbul->mbul_peeraddr;
-
-		key_mip6_update_mobile_node_ipsecdb(&hoa_sa, NULL, &coa_sa,
-		    &haaddr_sa);
+		mip6_bul_update_ipsecdb(mbul);
 #endif
 	}
 	
@@ -850,11 +841,43 @@ mip6_bul_remove(mbul)
 			mip6log((LOG_ERR, "mip6_bul_remove: "
 			    "tunnel deletione failed.\n"));
 		}
+#ifdef IPSEC
+		mip6_bul_update_ipsecdb(mbul);
+#endif
 	}
 
 	FREE(mbul, M_TEMP);
 
 	splx(s);
+}
+
+static void
+mip6_bul_update_ipsecdb(mbul)
+	struct mip6_bul_internal *mbul;
+{
+#ifdef IPSEC
+/* racoon2 guys want us to update ipsecdb. (2004.10.8) */
+	struct sockaddr_in6 hoa_sa, coa_sa, haaddr_sa;
+
+	/* update ipsecdb. */
+	bzero(&hoa_sa, sizeof(struct sockaddr_in6));
+	hoa_sa.sin6_len = sizeof(struct sockaddr_in6);
+	hoa_sa.sin6_family = AF_INET6;
+	hoa_sa.sin6_addr = mbul->mbul_hoa;
+
+	bzero(&coa_sa, sizeof(struct sockaddr_in6));
+	coa_sa.sin6_len = sizeof(struct sockaddr_in6);
+	coa_sa.sin6_family = AF_INET6;
+	coa_sa.sin6_addr = mbul->mbul_coa;
+
+	bzero(&haaddr_sa, sizeof(struct sockaddr_in6));
+	haaddr_sa.sin6_len = sizeof(struct sockaddr_in6);
+	haaddr_sa.sin6_family = AF_INET6;
+	haaddr_sa.sin6_addr = mbul->mbul_peeraddr;
+
+	key_mip6_update_mobile_node_ipsecdb(&hoa_sa, NULL, &coa_sa,
+	    &haaddr_sa);
+#endif
 }
 
 void
