@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.61 2001/09/26 08:52:03 itojun Exp $
+$KAME: FAQ,v 1.62 2001/09/26 08:54:13 itojun Exp $
 
 
 GENERAL
@@ -503,6 +503,15 @@ Q: I see a lot of messages like follows:
 
 	The message gets generated only with older KAME SNAP kit.  Kernel
 	upgrade is suggested if you see these messages.
+
+Q: I have problem dianosing IPsec issues.  Are there any good tools?
+	tcpdump and netstat -sn are your friend.  Always try to take packet
+	dumps during your tests.  Also, you can reveal many things with the
+	following operations:
+	% netstat -sn >/tmp/1
+	% (some operation)
+	% netstat -sn >/tmp/2
+	% diff -c1 /tmp/1 /tmp/2
 
 
 LICENSE AND CRYPTO EXPORT
