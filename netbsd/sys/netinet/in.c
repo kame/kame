@@ -868,7 +868,7 @@ in_ifinit(ifp, ia, sin, scrub)
 	 * and to validate the address if necessary.
 	 */
 	ifacount = 0;
-	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
+	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next) {
 		if (ifa->ifa_addr == NULL)
 			continue;
 		if (ifa->ifa_addr->sa_family != AF_INET)
