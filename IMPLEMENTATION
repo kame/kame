@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.263 2001/08/18 06:13:39 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.264 2001/08/19 07:35:38 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -664,10 +664,10 @@ sent from a user application as follows:
    - prefer addresses on alive interfaces, that is, interfaces with
      the UP flag being on.  This rule is particularly useful for
      routers, since some routing daemons stop advertising prefixes
-    (addresses) on interfaces that has become down.
-   Addresses that break the scope zone of the destination, or
-   addresses whose zone do not contain the outgoing interface are
-   never chosen.
+    (addresses) on interfaces that have become down.
+   In any case, addresses that break the scope zone of the
+   destination, or addresses whose zone do not contain the outgoing
+   interface are never chosen.
 
 When the procedure above fails, the kernel usually returns
 EADDRNOTAVAIL to the application.
