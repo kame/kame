@@ -299,7 +299,7 @@ char *ifname(ifp)
 #endif
 
 	KREAD(ifp, &ifnet, struct ifnet);
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 502010)
 	strlcpy(buf, ifnet.if_xname, sizeof(buf));
 #else
 	KREAD(ifnet.if_name, ifnamebuf, sizeof(ifnamebuf));
