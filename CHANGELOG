@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2399 2003/05/23 07:16:41 sakane Exp $
+$KAME: CHANGELOG,v 1.2400 2003/05/27 07:14:53 jinmei Exp $
 
 <200305>
+2003-05-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/setkey/{token.l, parse.y}: added a new keyword "null"
+	as the null encryption algorithm.  The old keyword "simple" was
+	obsoleted.  Backward compatibility is provided with a warning
+	message. [KAME PR 475]
+
 Fri May 23 16:00:26 JST 2003 sakane@kame.net
 	* kame/racoon
 	applyed RFC compliance patches from <toml@us.ibm.com>.
