@@ -3,7 +3,7 @@
 # Date created:		Fri Dec 25 14:47:35 JST 1998
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.2 1999/08/20 00:41:01 itojun Exp $
+# $Id: Makefile,v 1.3 1999/10/09 02:30:58 itojun Exp $
 #
 
 DISTNAME=	bind-8.1.2
@@ -11,9 +11,8 @@ CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.isc.org/isc/bind/src/8.1.2/
 DISTFILES=	bind-8.1.2-src.tar.gz bind-8.1.2-doc.tar.gz
 
-PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
-		ftp://ftp.v6.kame.net/pub/kame/misc/
-PATCHFILES=	bind8-812-v6-19990820a.diff.gz
+PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
+PATCHFILES=	bind8-812-v6-19991009a.diff.gz
 PATCH_DIST_STRIP=	-p2
 
 # Based on jsager's bind8 port, imported 18 July 1997
