@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.62 2003/04/22 05:50:00 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.63 2004/05/10 02:01:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -73,22 +73,17 @@ static const struct afd {
 	int a_addrlen;
 	int a_socklen;
 	int a_off;
+	int a_portoff;
 } afdl [] = {
 #ifdef INET6
 	{PF_INET6, sizeof(struct in6_addr), sizeof(struct sockaddr_in6),
-		offsetof(struct sockaddr_in6, sin6_addr)},
+	 offsetof(struct sockaddr_in6, sin6_addr),
+	 offsetof(struct sockaddr_in6, sin6_port)},
 #endif
 	{PF_INET, sizeof(struct in_addr), sizeof(struct sockaddr_in),
-		offsetof(struct sockaddr_in, sin_addr)},
-	{0, 0, 0},
-};
-
-struct sockinet {
-#ifdef HAVE_SA_LEN
-	u_char	si_len;
-#endif
-	u_char	si_family;
-	u_short	si_port;
+	 offsetof(struct sockaddr_in, sin_addr),
+	 offsetof(struct sockaddr_in, sin_port)},
+	{0, 0, 0, 0},
 };
 
 #ifdef INET6
@@ -143,7 +138,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		return EAI_FAIL;
 
 	/* network byte order */
-	port = ((const struct sockinet *)sa)->si_port;
+	memcpy(&port, (const char *)sa + afd->a_portoff, sizeof(port));
 	addr = (const char *)sa + afd->a_off;
 
 	if (serv == NULL || servlen == 0) {
