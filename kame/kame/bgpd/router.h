@@ -138,8 +138,6 @@ u_int32_t        get_32id     __P((void));
 struct rpcb     *rpcblookup   __P((struct rpcb *, u_int32_t));
 struct rt_entry *find_rte     __P((struct rt_entry *, struct rt_entry *));
 struct rtproto  *find_rtp     __P((struct rtproto  *, struct rtproto *));
-int              find_nexthop __P((struct in6_addr *, struct in6_addr *,
-				   struct ifinfo *));
 
 /*
  * nexthop resolution
