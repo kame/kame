@@ -1,6 +1,11 @@
-$Id: CHANGELOG,v 1.508 2000/02/02 03:57:49 itojun Exp $
+$Id: CHANGELOG,v 1.509 2000/02/02 06:47:15 kjc Exp $
 
 <200002>
+Wed Feb  2 15:39:40 JST 2000  kjc@csl.sony.co.jp
+	* add a new traffic conditioner type, tswtcm (time sliding
+	  window three color marker) to altq.  it is described
+	  in draft-fang-diffserv-tc-tswtcm-00.txt.
+
 Wed Feb  2 12:55:44 JST 2000  itojun@iijlab.net
 	* kame/rtadvd: router renumbering input needs to be explicitly
 	  enabled with command line option (-R).  this is for security issue
