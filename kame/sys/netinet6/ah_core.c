@@ -1086,7 +1086,7 @@ ah6_calccksum(m0, ahdat, algo, sa)
 	u_char sumbuf[AH_MAXSUMSIZE];
 	int nest;
 
-	hdrtype = -1;	/*dummy, it is called IPPROTO_IP*/
+	hdrtype = -1;	/*dummy, it is called IPPROTO_IPV6 */
 
 	m = m0;
 
@@ -1216,7 +1216,7 @@ again:
 			 }
 		 }
 		 advancewidth = hdrlen;
-		 (algo->update)(&algos, lastp, p - lastp);
+		 (algo->update)(&algos, lastp, p + hdrlen - lastp);
 		 break;
 	 }
 	 case IPPROTO_ROUTING:
