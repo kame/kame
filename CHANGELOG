@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.329 1999/12/10 05:00:36 sumikawa Exp $
+$Id: CHANGELOG,v 1.330 1999/12/10 17:56:06 itojun Exp $
 
 <199912>
+Sat Dec 11 02:55:23 JST 1999  itojun@iijlab.net
+	* kame/sys/netinet6/nd6.c: add missing splx().
+
 Fri Dec 10 13:57:35 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/sys/i386/isa/if_ed.c, if_ep.c, if_fe.c, if_sr.c: remove
 	  calling in6_ifattach() from all of drivers. These are no need
