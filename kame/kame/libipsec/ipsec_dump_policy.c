@@ -77,7 +77,7 @@ ipsec_dump_policy(policy, delimiter)
 	if (policy == NULL)
 		return NULL;
 	if (xpl->sadb_x_policy_exttype != SADB_X_EXT_POLICY) {
-		ipsec_errcode = EIPSEC_INVAL_EXTTYPE;
+		__ipsec_errcode = EIPSEC_INVAL_EXTTYPE;
 		return NULL;
 	}
 
@@ -91,7 +91,7 @@ ipsec_dump_policy(policy, delimiter)
 	case IPSEC_DIR_OUTBOUND:
 		break;
 	default:
-		ipsec_errcode = EIPSEC_INVAL_DIR;
+		__ipsec_errcode = EIPSEC_INVAL_DIR;
 		return NULL;
 	}
 
@@ -103,7 +103,7 @@ ipsec_dump_policy(policy, delimiter)
 	case IPSEC_POLICY_ENTRUST:
 		break;
 	default:
-		ipsec_errcode = EIPSEC_INVAL_POLICY;
+		__ipsec_errcode = EIPSEC_INVAL_POLICY;
 		return NULL;
 	}
 
@@ -113,7 +113,7 @@ ipsec_dump_policy(policy, delimiter)
 		+ 1;	/* NUL */
 
 	if ((buf = malloc(buflen)) == NULL) {
-		ipsec_errcode = EIPSEC_NO_BUFS;
+		__ipsec_errcode = EIPSEC_NO_BUFS;
 		return NULL;
 	}
 	strcpy(buf, ipsp_dir_strs[xpl->sadb_x_policy_dir]);
@@ -121,7 +121,7 @@ ipsec_dump_policy(policy, delimiter)
 	strcat(buf, ipsp_policy_strs[xpl->sadb_x_policy_type]);
 
 	if (xpl->sadb_x_policy_type != IPSEC_POLICY_IPSEC) {
-		ipsec_errcode = EIPSEC_NO_ERROR;
+		__ipsec_errcode = EIPSEC_NO_ERROR;
 		return buf;
 	}
 
@@ -140,13 +140,13 @@ ipsec_dump_policy(policy, delimiter)
 
 	/* validity check */
 	if (xtlen < 0) {
-		ipsec_errcode = EIPSEC_INVAL_SADBMSG;
+		__ipsec_errcode = EIPSEC_INVAL_SADBMSG;
 		free(buf);
 		return NULL;
 	}
 
 	if ((buf = realloc(buf, buflen)) == NULL) {
-		ipsec_errcode = EIPSEC_NO_BUFS;
+		__ipsec_errcode = EIPSEC_NO_BUFS;
 		return NULL;
 	}
 
@@ -167,7 +167,7 @@ ipsec_dump_policy(policy, delimiter)
 			strcat(buf, "ipcomp");
 			break;
 		default:
-			ipsec_errcode = EIPSEC_INVAL_PROTO;
+			__ipsec_errcode = EIPSEC_INVAL_PROTO;
 			free(buf);
 			return NULL;
 		}
@@ -185,7 +185,7 @@ ipsec_dump_policy(policy, delimiter)
 			strcat(buf, "tunnel");
 			break;
 		default:
-			ipsec_errcode = EIPSEC_INVAL_MODE;
+			__ipsec_errcode = EIPSEC_INVAL_MODE;
 			free(buf);
 			return NULL;
 		}
@@ -195,7 +195,7 @@ ipsec_dump_policy(policy, delimiter)
 		if (xisr->sadb_x_ipsecrequest_len > sizeof(*xisr)) {
 			error = set_addresses(buf, (caddr_t)(xisr + 1));
 			if (error) {
-				ipsec_errcode = EIPSEC_INVAL_MODE;
+				__ipsec_errcode = EIPSEC_INVAL_MODE;
 				free(buf);
 				return NULL;
 			}
@@ -215,7 +215,7 @@ ipsec_dump_policy(policy, delimiter)
 			strcat(buf, "/unique");
 			break;
 		default:
-			ipsec_errcode = EIPSEC_INVAL_LEVEL;
+			__ipsec_errcode = EIPSEC_INVAL_LEVEL;
 			free(buf);
 			return NULL;
 		}
@@ -237,7 +237,7 @@ ipsec_dump_policy(policy, delimiter)
 				+ xisr->sadb_x_ipsecrequest_len);
 	}
 
-	ipsec_errcode = EIPSEC_NO_ERROR;
+	__ipsec_errcode = EIPSEC_NO_ERROR;
 	return buf;
 }
 
