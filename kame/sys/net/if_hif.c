@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.41 2003/02/07 12:42:47 t-momose Exp $	*/
+/*	$KAME: if_hif.c,v 1.42 2003/02/13 15:15:42 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1024,6 +1024,11 @@ hif_output(ifp, m, dst, rt)
      struct sockaddr *dst;
      struct rtentry *rt;
 {
+	struct sockaddr_in6 src_sa, dst_sa;
+	struct mip6_bu *mbu;
+	struct hif_softc *hif = (struct hif_softc *)ifp;
+	struct ip6_hdr *ip6;
+
 	/* This function is copyed from looutput */
 
 	if ((m->m_flags & M_PKTHDR) == 0)
@@ -1096,64 +1101,54 @@ hif_output(ifp, m, dst, rt)
 	 * if ! link-local, prepend an outer ip header and send it.
 	 * if link-local, discard it.
 	 */
-	{
-		struct sockaddr_in6 *src_sa, *dst_sa;
-		struct mip6_bu *mbu;
-		struct hif_softc *hif = (struct hif_softc *)ifp;
-		struct ip6_hdr *ip6;
+	if (ip6_getpktaddrs(m, &src_sa, &dst_sa))
+		goto done;
 
-		if (ip6_getpktaddrs(m, src_sa, dst_sa))
-			goto done;
-
-		if (IN6_IS_ADDR_LINKLOCAL(&src_sa->sin6_addr)
-		    || IN6_IS_ADDR_LINKLOCAL(&dst_sa->sin6_addr)
+	if (IN6_IS_ADDR_LINKLOCAL(&src_sa.sin6_addr)
+	    || IN6_IS_ADDR_LINKLOCAL(&dst_sa.sin6_addr)
 #ifdef MIP6_DISABLE_SITELOCAL
-		    || IN6_IS_ADDR_SITELOCAL(&src_sa->sin6_addr)
-		    || IN6_IS_ADDR_SITELOCAL(&dst_sa->sin6_addr)
+	    || IN6_IS_ADDR_SITELOCAL(&src_sa.sin6_addr)
+	    || IN6_IS_ADDR_SITELOCAL(&dst_sa.sin6_addr)
 #endif
-		    )
-			goto done;
+		)
+		goto done;
 
-		mbu = mip6_bu_list_find_home_registration(&hif->hif_bu_list,
-							  src_sa);
-		if (!mbu)
-			goto done;
+	mbu = mip6_bu_list_find_home_registration(&hif->hif_bu_list, &src_sa);
+	if (!mbu)
+		goto done;
 
-		if (IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr.sin6_addr))
-			goto done;
+	if (IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr.sin6_addr))
+		goto done;
 
-		M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
-		if (m && m->m_len < sizeof(struct ip6_hdr))
-			m = m_pullup(m, sizeof(struct ip6_hdr));
-		if (m == NULL)
-			return (0);
+	M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
+	if (m && m->m_len < sizeof(struct ip6_hdr))
+		m = m_pullup(m, sizeof(struct ip6_hdr));
+	if (m == NULL)
+		return (0);
 
-		ip6 = mtod(m, struct ip6_hdr *);
-		ip6->ip6_flow = 0;
-		ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
-		ip6->ip6_vfc |= IPV6_VERSION;
-		ip6->ip6_plen = htons((u_short)m->m_pkthdr.len - sizeof(*ip6));
-		ip6->ip6_nxt = IPPROTO_IPV6;
-		ip6->ip6_hlim = ip6_defhlim;
-		ip6->ip6_src = mbu->mbu_coa.sin6_addr;
-		ip6->ip6_dst = mbu->mbu_paddr.sin6_addr;
-		if (!ip6_setpktaddrs(m, &mbu->mbu_coa, &mbu->mbu_paddr))
-			goto done;
-		in6_clearscope(&ip6->ip6_src);
-		in6_clearscope(&ip6->ip6_dst);
-		mip6stat.mip6s_orevtunnel++;
+	ip6 = mtod(m, struct ip6_hdr *);
+	ip6->ip6_flow = 0;
+	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
+	ip6->ip6_vfc |= IPV6_VERSION;
+	ip6->ip6_plen = htons((u_short)m->m_pkthdr.len - sizeof(*ip6));
+	ip6->ip6_nxt = IPPROTO_IPV6;
+	ip6->ip6_hlim = ip6_defhlim;
+	ip6->ip6_src = mbu->mbu_coa.sin6_addr;
+	ip6->ip6_dst = mbu->mbu_paddr.sin6_addr;
+	if (!ip6_setpktaddrs(m, &mbu->mbu_coa, &mbu->mbu_paddr))
+		goto done;
+	in6_clearscope(&ip6->ip6_src);
+	in6_clearscope(&ip6->ip6_dst);
+	mip6stat.mip6s_orevtunnel++;
 #ifdef IPV6_MINMTU
-		/* XXX */
-		return (ip6_output(m, 0, 0, IPV6_MINMTU, 0, &ifp));
+	/* XXX */
+	return (ip6_output(m, 0, 0, IPV6_MINMTU, 0, &ifp));
 #else
-		return (ip6_output(m, 0, 0, 0, 0, &ifp));
+	return (ip6_output(m, 0, 0, 0, 0, &ifp));
 #endif
-	}
  done:
-
 	m_freem(m);
 	return (0);
-
 }
 
 #endif /* NHIF > 0 */
