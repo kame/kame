@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.30 2000/08/22 08:41:57 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.31 2000/08/23 03:20:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -80,8 +80,6 @@
 #include <net/route.h>
 #include <net/raw_cb.h>
 
-#include <net/net_osdep.h>
-
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 
@@ -90,6 +88,8 @@
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/pim6.h>
 #include <netinet6/pim6_var.h>
+
+#include <net/net_osdep.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static MALLOC_DEFINE(M_MRTABLE, "mf6c", "multicast forwarding cache entry");
