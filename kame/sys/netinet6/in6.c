@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.92 2000/07/04 05:57:16 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.93 2000/07/04 08:55:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -570,6 +570,9 @@ in6_control(so, cmd, data, ifp)
 	}
 
 	switch (cmd) {
+	case SIOCSIFADDR_IN6:
+		/* we decided to obsolete this command (20000704) */
+		return(EINVAL);
 
 	case SIOCDIFADDR_IN6:
 		/*
@@ -583,7 +586,6 @@ in6_control(so, cmd, data, ifp)
 			return(EADDRNOTAVAIL);
 		/* FALLTHROUGH */
 	case SIOCAIFADDR_IN6:
-	case SIOCSIFADDR_IN6:
 #ifdef COMPAT_IN6IFIOCTL
 	case SIOCSIFDSTADDR_IN6:
 	case SIOCSIFNETMASK_IN6:
@@ -808,58 +810,6 @@ in6_control(so, cmd, data, ifp)
 		} else
 			ia->ia6_lifetime.ia6t_preferred = 0;
 		break;
-
-	case SIOCSIFADDR_IN6:
-		/* XXX: should be obsoleted */
-		error = in6_ifinit(ifp, ia, &ifr->ifr_addr, 1, 1, 1);
-#if 0
-		/*
-		 * the code chokes if we are to assign multiple addresses with
-		 * the same address prefix (rtinit() will return EEXIST, which
-		 * is not fatal actually).  we will get memory leak if we
-		 * don't do it.
-		 * -> we may want to hide EEXIST from rtinit().
-		 */
-  undo:
-		if (error && newifaddr) {
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-			if ((ifa = ifp->if_addrlist) == ia62ifa(ia))
-				ifp->if_addrlist = ifa->ifa_next;
-			else {
-				while (ifa->ifa_next &&
-				       (ifa->ifa_next != ia62ifa(ia)))
-					ifa = ifa->ifa_next;
-				if (ifa->ifa_next)
-					ifa->ifa_next = ia62ifa(ia)->ifa_next;
-				else {
-					printf("Couldn't unlink in6_ifaddr "
-					    "from ifp\n");
-				}
-			}
-#else
-			TAILQ_REMOVE(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
-#endif
-			/* release a refcnt for the link from if_addrlist */
-			IFAFREE(&ia->ia_ifa);
-
-			oia = ia;
-			if (oia == (ia = in6_ifaddr))
-				in6_ifaddr = ia->ia_next;
-			else {
-				while (ia->ia_next && (ia->ia_next != oia))
-					ia = ia->ia_next;
-				if (ia->ia_next)
-					ia->ia_next = oia->ia_next;
-				else {
-					printf("Didn't unlink in6_ifaddr "
-					    "from list\n");
-				}
-			}
-			/* release another refcnt for the link from in6_ifaddr */
-			IFAFREE(&oia->ia_ifa);
-		}
-#endif
-		return error;
 
 #ifdef COMPAT_IN6IFIOCTL		/* XXX should be unused */
 	case SIOCSIFNETMASK_IN6:
