@@ -1303,7 +1303,7 @@ tcp_notify(inp, error)
 	} else if ((tp->t_state == TCPS_SYN_SENT ||
 	    tp->t_state == TCPS_SYN_RECEIVED) &&
 	    (error == EHOSTUNREACH || error == EHOSTDOWN)) {
-		tcp_drop(tp, error);
+		so->so_error = error;
 	} else if (TCPS_HAVEESTABLISHED(tp->t_state) == 0 &&
 	    tp->t_rxtshift > 3 && tp->t_softerror)
 		so->so_error = error;
@@ -1338,7 +1338,7 @@ tcp6_notify(in6p, error)
 	    tp->t_state == TCPS_SYN_RECEIVED) &&
 	    (error == EHOSTUNREACH || error == EHOSTDOWN)) {
 		/* further optimization (see above) */
-		tcp_drop(tp, error);
+		so->so_error = error;
 	} else if (TCPS_HAVEESTABLISHED(tp->t_state) == 0 &&
 	    tp->t_rxtshift > 3 && tp->t_softerror)
 		so->so_error = error;
