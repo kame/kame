@@ -1,4 +1,4 @@
-/*	$OpenBSD: time.h,v 1.12 2002/10/25 21:55:28 millert Exp $	*/
+/*	$OpenBSD: time.h,v 1.16 2003/08/01 17:38:33 avsm Exp $	*/
 /*	$NetBSD: time.h,v 1.9 1994/10/26 00:56:35 cgd Exp $	*/
 
 /*
@@ -19,11 +19,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -97,11 +93,14 @@ double difftime(time_t, time_t);
 struct tm *gmtime(const time_t *);
 struct tm *localtime(const time_t *);
 time_t mktime(struct tm *);
-size_t strftime(char *, size_t, const char *, const struct tm *);
+size_t strftime(char *, size_t, const char *, const struct tm *)
+		__attribute__ ((__bounded__(__string__,1,2)));
 char *strptime(const char *, const char *, struct tm *);
 time_t time(time_t *);
-char *asctime_r(const struct tm *, char *);
-char *ctime_r(const time_t *, char *);
+char *asctime_r(const struct tm *, char *)
+		__attribute__ ((__bounded__(__minbytes__,2,26)));
+char *ctime_r(const time_t *, char *)
+		__attribute__ ((__bounded__(__minbytes__,2,26)));
 struct tm *gmtime_r(const time_t *, struct tm *);
 struct tm *localtime_r(const time_t *, struct tm *);
 int nanosleep(const struct timespec *, struct timespec *);

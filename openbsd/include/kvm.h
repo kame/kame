@@ -1,4 +1,4 @@
-/*	$OpenBSD: kvm.h,v 1.5 2002/06/08 22:31:24 art Exp $	*/
+/*	$OpenBSD: kvm.h,v 1.9 2003/08/01 17:38:33 avsm Exp $	*/
 /*	$NetBSD: kvm.h,v 1.7 1996/04/19 12:02:50 leo Exp $	*/
 
 /*-
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -74,8 +70,10 @@ kvm_t	 *kvm_open
 (const char *, const char *, const char *, int, const char *);
 kvm_t	 *kvm_openfiles
 (const char *, const char *, const char *, int, char *);
-ssize_t	  kvm_read(kvm_t *, u_long, void *, size_t);
-ssize_t	  kvm_write(kvm_t *, u_long, const void *, size_t);
+ssize_t	  kvm_read(kvm_t *, u_long, void *, size_t)
+		__attribute__((__bounded__(__buffer__,3,4)));
+ssize_t	  kvm_write(kvm_t *, u_long, const void *, size_t)
+		__attribute__((__bounded__(__buffer__,3,4)));
 
 __END_DECLS
 

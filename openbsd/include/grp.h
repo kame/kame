@@ -1,4 +1,4 @@
-/*	$OpenBSD: grp.h,v 1.5 2002/04/22 21:28:49 millert Exp $	*/
+/*	$OpenBSD: grp.h,v 1.7 2003/06/25 21:06:33 deraadt Exp $	*/
 /*	$NetBSD: grp.h,v 1.7 1995/04/29 05:30:40 cgd Exp $	*/
 
 /*-
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -60,7 +56,11 @@ struct group {
 
 __BEGIN_DECLS
 struct group	*getgrgid(gid_t);
+int		getgrgid_r(gid_t, struct group *, char *,
+		    size_t, struct group **);
 struct group	*getgrnam(const char *);
+int		getgrnam_r(const char *, struct group *, char *,
+		    size_t, struct group **);
 #ifndef _POSIX_SOURCE
 struct group	*getgrent(void);
 void		 setgrent(void);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: stdio.h,v 1.25 2002/12/30 21:36:06 millert Exp $	*/
+/*	$OpenBSD: stdio.h,v 1.29 2003/08/01 17:38:33 avsm Exp $	*/
 /*	$NetBSD: stdio.h,v 1.18 1996/04/25 18:29:21 jtc Exp $	*/
 
 /*-
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -218,12 +214,14 @@ int	 ferror(FILE *);
 int	 fflush(FILE *);
 int	 fgetc(FILE *);
 int	 fgetpos(FILE *, fpos_t *);
-char	*fgets(char *, int, FILE *);
+char	*fgets(char *, int, FILE *)
+		__attribute__((__bounded__ (__string__,1,2)));
 FILE	*fopen(const char *, const char *);
 int	 fprintf(FILE *, const char *, ...);
 int	 fputc(int, FILE *);
 int	 fputs(const char *, FILE *);
-size_t	 fread(void *, size_t, size_t, FILE *);
+size_t	 fread(void *, size_t, size_t, FILE *)
+		__attribute__((__bounded__ (__size__,1,3,2)));
 FILE	*freopen(const char *, const char *, FILE *);
 int	 fscanf(FILE *, const char *, ...);
 int	 fseek(FILE *, long, int);
@@ -231,7 +229,8 @@ int	 fseeko(FILE *, off_t, int);
 int	 fsetpos(FILE *, const fpos_t *);
 long	 ftell(FILE *);
 off_t	 ftello(FILE *);
-size_t	 fwrite(const void *, size_t, size_t, FILE *);
+size_t	 fwrite(const void *, size_t, size_t, FILE *)
+		__attribute__((__bounded__ (__size__,1,3,2)));
 int	 getc(FILE *);
 int	 getchar(void);
 char	*gets(char *);
@@ -317,13 +316,15 @@ int	 setlinebuf(FILE *);
 char	*tempnam(const char *, const char *);
 int	 snprintf(char *, size_t, const char *, ...)
 		__attribute__((__format__ (printf, 3, 4)))
-		__attribute__((__nonnull__ (3)));
+		__attribute__((__nonnull__ (3)))
+		__attribute__((__bounded__ (__string__,1,2)));
 int	 vasprintf(char **, const char *, _BSD_VA_LIST_)
 		__attribute__((__format__ (printf, 2, 0)))
 		__attribute__((__nonnull__ (2)));
 int	 vsnprintf(char *, size_t, const char *, _BSD_VA_LIST_)
 		__attribute__((__format__ (printf, 3, 0)))
-		__attribute__((__nonnull__ (3)));
+		__attribute__((__nonnull__ (3)))
+		__attribute__((__bounded__(__string__,1,2)));
 int	 vscanf(const char *, _BSD_VA_LIST_)
 		__attribute__((__format__ (scanf, 1, 0)))
 		__attribute__((__nonnull__ (1)));

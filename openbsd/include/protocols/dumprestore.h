@@ -1,4 +1,4 @@
-/*	$OpenBSD: dumprestore.h,v 1.4 2001/01/09 03:15:16 angelos Exp $	*/
+/*	$OpenBSD: dumprestore.h,v 1.6 2003/08/25 23:28:34 tedu Exp $	*/
 /*	$NetBSD: dumprestore.h,v 1.6 1994/10/26 00:56:49 cgd Exp $	*/
 
 /*
@@ -18,11 +18,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -78,7 +74,7 @@ union u_spcl {
 		ino_t	c_inumber;	    /* number of inode */
 		int32_t	c_magic;	    /* magic number (see above) */
 		int32_t	c_checksum;	    /* record checksum */
-		struct	dinode	c_dinode;   /* ownership and mode of inode */
+		struct	ufs1_dinode	c_dinode;   /* ownership and mode of inode */
 		int32_t	c_count;	    /* number of valid c_addr entries,
 					       unless c_type is TS_BITS or
 					       TS_CLRI. */

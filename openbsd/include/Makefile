@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.115 2003/01/20 18:12:52 marc Exp $
+#	$OpenBSD: Makefile,v 1.121 2003/07/21 21:13:18 millert Exp $
 #	$NetBSD: Makefile,v 1.59 1996/05/15 21:36:43 jtc Exp $
 
 #	@(#)Makefile	5.45.1.1 (Berkeley) 5/6/91
@@ -10,15 +10,15 @@
 
 FILES=	a.out.h ar.h assert.h bitstring.h blf.h bm.h bsd_auth.h cast.h \
 	cpio.h ctype.h curses.h db.h dbm.h des.h dirent.h disktab.h \
-	dlfcn.h elf_abi.h err.h fnmatch.h fstab.h fts.h getopt.h glob.h grp.h \
-	ifaddrs.h inttypes.h iso646.h kvm.h langinfo.h libgen.h limits.h \
-	locale.h login_cap.h malloc.h math.h md4.h md5.h memory.h mpool.h \
-	ndbm.h netdb.h netgroup.h nlist.h nl_types.h ohash.h olf_abi.h \
-	paths.h poll.h pwd.h ranlib.h re_comp.h readpassphrase.h regex.h \
-	resolv.h rmd160.h search.h setjmp.h sgtty.h sha1.h skipjack.h \
-	signal.h stab.h stdbool.h stddef.h stdio.h stdlib.h string.h \
-	strings.h struct.h sysexits.h tar.h time.h ttyent.h tzfile.h \
-	unistd.h utime.h utmp.h vis.h
+	dlfcn.h elf_abi.h err.h fnmatch.h fstab.h fts.h ftw.h getopt.h \
+	glob.h grp.h ifaddrs.h inttypes.h iso646.h kvm.h langinfo.h \
+	libgen.h limits.h locale.h login_cap.h malloc.h math.h md4.h \
+	md5.h memory.h mpool.h ndbm.h netdb.h netgroup.h nlist.h nl_types.h \
+	ohash.h olf_abi.h paths.h poll.h pwd.h ranlib.h re_comp.h \
+	readpassphrase.h regex.h resolv.h rmd160.h search.h setjmp.h \
+	sgtty.h sha1.h sha2.h skipjack.h signal.h stab.h stdbool.h stddef.h \
+	stdio.h stdlib.h string.h strings.h struct.h sysexits.h tar.h \
+	time.h ttyent.h tzfile.h unistd.h utime.h utmp.h vis.h
 
 FILES+=	link.h link_aout.h link_elf.h
 
@@ -34,7 +34,7 @@ LDIRS=	crypto ddb dev isofs miscfs net netatalk netccitt netinet altq \
 	netinet6 netipx netiso netnatm netns nfs scsi sys ufs uvm xfs
 
 # Directories with an includes target
-RDIRS=	../lib/libpthread ../lib/libcom_err ../lib/libcompat ../lib/libcurses \
+RDIRS=	../lib/libpthread ../lib/libcompat ../lib/libcurses \
 	../lib/libcurses++ ../lib/libform ../lib/libssl ../lib/libmenu \
 	../lib/libocurses ../lib/libossaudio ../lib/libpanel ../lib/librpcsvc \
 	../lib/libskey ../lib/libsectok ../lib/libedit ../lib/libpcap \
@@ -60,12 +60,8 @@ NOOBJ=	noobj
 # Change SYS_INCLUDE in bsd.own.mk to "symlinks" if you don't want copies
 .include <bsd.own.mk>
 SYS_INCLUDE?=	copies
-.if ${KERBEROS:L} == "yes"
-RDIRS+=	../kerberosIV/lib
-PRDIRS+=../kerberosIV/lib/kadm ../kerberosIV/lib/krb
-.endif
 .if ${KERBEROS5:L} == "yes"
-RDIRS+=	../kerberosV/lib
+RDIRS+= ../lib/libkrb5 ../lib/libgssapi ../lib/libkadm5srv
 .endif
 
 prereq:
@@ -93,8 +89,11 @@ includes:
 			${INSTALL} ${INSTALL_COPY} -m 444 $$j ${DESTDIR}/usr/include/$$i/$$j; \
 		done; \
 	done
-	@rm -f ${DESTDIR}/usr/include/openssl
-	@ln -sf ssl ${DESTDIR}/usr/include/openssl
+	@rm -rf ${DESTDIR}/usr/include/openssl ${DESTDIR}/usr/include/ssl \
+		${DESTDIR}/usr/libdata/perl5/site_perl/${MACHINE_ARCH}-openbsd/ssl \
+		${DESTDIR}/usr/libdata/perl5/site_perl/${MACHINE_ARCH}-openbsd/openssl
+	@mkdir ${DESTDIR}/usr/include/openssl
+	@ln -sf openssl ${DESTDIR}/usr/include/ssl
 	@echo installing ${LFILES}
 	@for i in ${LFILES}; do \
 		rm -f ${DESTDIR}/usr/include/$$i && \

@@ -1,4 +1,4 @@
-/*	$OpenBSD: dlfcn.h,v 1.6 2002/06/02 22:49:59 deraadt Exp $	*/
+/*	$OpenBSD: dlfcn.h,v 1.8 2003/09/02 15:14:54 drahn Exp $	*/
 /*	$NetBSD: dlfcn.h,v 1.2 1995/06/05 19:38:00 pk Exp $	*/
 
 /*
@@ -48,8 +48,11 @@ extern const char	*dlerror(void);
 __END_DECLS
 
 /* Values for dlopen `mode'. */
-#define DL_LAZY		1
-#define RTLD_LAZY	DL_LAZY		/* SunOS Compat */
+#define RTLD_LAZY	1
+#define RTLD_NOW	2
+#define RTLD_GLOBAL	0x100
+#define RTLD_LOCAL	0x000
+#define	DL_LAZY		RTLD_LAZY	/* Compat */
 
 /*
  * dlctl() commands
@@ -59,5 +62,6 @@ __END_DECLS
 #define DL_GETLIST	x
 #define DL_GETREFCNT	x
 #define DL_GETLOADADDR	x
+#define DL_SETTHREADLCK	2
 
 #endif /* _DLFCN_H_ */
