@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.62 2001/11/08 08:42:14 keiichi Exp $	*/
+/*	$KAME: icmp6.h,v 1.63 2001/11/16 07:51:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -292,9 +292,9 @@ struct ind_neighbor_advert {	/* inverse neighbor advertisement */
 
 struct ha_discov_req {          /* HA Address Discovery Request */
 	struct icmp6_hdr	ha_dreq_hdr;
+#ifdef MIP6_DRAFT13
 	u_int32_t		ha_dreq_reserved1;
 	u_int32_t		ha_dreq_reserved2;
-#ifdef MIP6_DRAFT13
 	struct in6_addr		ha_dreq_home;	/* MN home address */
 #endif /* MIP6_DRAFT13 */
 } __attribute__((__packed__));

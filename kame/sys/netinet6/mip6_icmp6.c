@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.19 2001/11/08 08:42:14 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.20 2001/11/16 07:51:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -83,6 +83,7 @@
 #include <netinet6/mip6.h>
 
 extern struct mip6_bc_list mip6_bc_list;
+extern struct mip6_subnet_list mip6_subnet_list;
 
 u_int16_t mip6_hadiscovid = 0;
 
@@ -466,11 +467,33 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 	struct mbuf *n;
 	int error = 0;
 
+	/* check packet length. */
+	if (icmp6len < sizeof(struct ha_discov_req)) {
+		mip6log((LOG_ERR,
+			 "%s:%d: too short HHAAD request\n",
+			 __FILE__, __LINE__));
+		return (EINVAL);
+	}
+
 	ip6 = mtod(m, struct ip6_hdr *);
-	/* ha_discov_req may not continuous */
-	IP6_EXTHDR_GET(hdreq, struct ha_discov_req *, m,
-		       off, sizeof(*hdreq));
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, sizeof(*hdreq), EINVAL);
+	hdreq = (struct ha_discov_req *)((caddr_t)ip6 + off);
+#else 
+	IP6_EXTHDR_GET(hdreq, struct ha_discov_req *, m, off, sizeof(*hdreq));
+	if (hdreq == NULL) {
+		mip6log((LOG_ERR,
+			 "%s:%d: failed to EXTHDR_GET\n",
+			 __FILE__, __LINE__));
+		return (EINVAL);
+	}
+#endif
+
 #ifdef MIP6_DRAFT13
+	/*
+	 * the DHAAD request format of draft-13 has a field for the
+	 * home address of the mobile node sending this DHAAD packet.
+	 */
 	haddr = &hdreq->ha_dreq_home;
 #endif /* MIP6_DRAFT13 */
 
@@ -478,29 +501,41 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 	 * find a home agent address based on the homeaddress of the
 	 * mobile node.
 	 */
-    {
-	struct sockaddr_in6 sin6;
+	{
+		struct sockaddr_in6 sin6;
 
-	bzero(&sin6, sizeof(sin6));
-	sin6.sin6_len = sizeof(sin6);
-	sin6.sin6_family = AF_INET6;
+		bzero((caddr_t)&sin6, sizeof(sin6));
+		sin6.sin6_len = sizeof(sin6);
+		sin6.sin6_family = AF_INET6;
 #ifdef MIP6_DRAFT13
-	sin6.sin6_addr = *haddr;
+		sin6.sin6_addr = *haddr;
 #else
-	sin6.sin6_addr = ip6->ip6_dst;
+		/*
+		 * the destination ip address of a DHAAD request
+		 * packet contains a subnet home agent anycast
+		 * address.  we can find the home link by searching
+		 * all interfaces with the prefix of the anycast
+		 * address as a search key.
+		 */
+		sin6.sin6_addr = ip6->ip6_dst;
 #endif /* MIP6_DRAFT13 */
+		haifa = (struct in6_ifaddr *)
+			ifa_ifwithnet((struct sockaddr *)&sin6);
+	}
 
-	haifa = (struct in6_ifaddr *)
-		ifa_ifwithnet((struct sockaddr *)&sin6);
-    }
+        /*
+	 * XXX: TODO
+	 *
+	 * here, we should collect all home agents on the home link
+	 * and create the home agent list.  is it easier to do DHAAD
+	 * work in a user space than in a kernel space?  we should
+	 * consider creating a daemon program for this work.
+	 */
 
-        /* XXX TODO */
-	/* collect ha list on the home link and create a list */
-
-	/* create a home agent address list */
-	/* XXX */
-	halistlen = sizeof(struct in6_addr) * 1; /* XXX */
-	MALLOC(halist, struct in6_addr *, halistlen, M_TEMP, M_NOWAIT);
+	/* create the home agent list. */
+	/* XXX: currently we provide only one home agent as a reply. */
+	halistlen = sizeof(struct in6_addr) * 1;
+	halist = malloc(halistlen, M_TEMP, M_NOWAIT);
 	if (halist == NULL) {
 		m_freem(m);
 		return (ENOBUFS);
@@ -509,51 +544,58 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 	      sizeof(struct in6_addr));
 	
 	/*
-	 * create a ha discovery reply packet
+	 * create a DHAAD reply packet.
 	 */
 #ifdef MIP6_DRAFT13
 	if (IN6_IS_ADDR_UNSPECIFIED(haddr)) {
 		/*
-		 * in case that a mn has no valid home address.  the
-		 * mobile node will send a home agent discovery from
-		 * its CoA.  use the CoA as a dest addr of the reply
-		 * message.
+		 * the case that a mobile node has no valid home
+		 * address.  such a mobile node will send a DHAAD
+		 * request packet from its CoA.  use the CoA as a
+		 * destination addr of the DHAAD reply packet.
 		 */
 		haddr = &ip6->ip6_src;
 	}
 #endif /* MIP6_DRAFT13 */
 	hdreplen = sizeof(*hdrep);
-	n = mip6_create_ip6hdr(&haifa->ia_addr.sin6_addr, &ip6->ip6_src,
+	n = mip6_create_ip6hdr(&haifa->ia_addr.sin6_addr,
+#ifdef MIP6_DRAFT13
+			       haddr, /* XXX: true? */
+#else
+			       &ip6->ip6_src, /* XXX: true? */
+#endif /* MIP6_DRAFT13 */
 			       IPPROTO_ICMPV6, hdreplen + halistlen);
 	if (n == NULL) {
 		mip6log((LOG_ERR,
-			 "%s:%d: mbuf allocation failed\n",
+			 "%s:%d: mbuf for DHAAD reply allocation failed\n",
 			 __FILE__, __LINE__));
 		/* free the input packet */
 		m_freem(m);
-		FREE(halist, M_TEMP);
+		free(halist, M_TEMP);
 		return (ENOBUFS);
 	}
 	ip6_rep = mtod(n, struct ip6_hdr *);
 	hdrep = (struct ha_discov_rep *)(ip6_rep + 1);
+	bzero((caddr_t)hdrep, sizeof(*hdrep));
 	hdrep->discov_rep_type = ICMP6_HADISCOV_REPLY;
 	hdrep->discov_rep_code = 0;
 	hdrep->discov_rep_cksum = 0;
 	hdrep->discov_rep_id = hdreq->discov_req_id;
-	/* copy halist at the end of the hdrep packet */
+	/* copy the home agent addresses at the end of a DHAAD reply packet. */
 	bcopy((caddr_t)halist, (caddr_t)(hdrep + 1), halistlen);
-	FREE(halist, M_TEMP);
+	free(halist, M_TEMP);
 
-	/* calcurate checksum */
-	hdrep->discov_rep_cksum = in6_cksum(n, IPPROTO_ICMPV6,
-					    sizeof(struct ip6_hdr),
-					    n->m_pkthdr.len
-					    - sizeof(struct ip6_hdr));
+	/* calcurate a checksum. */
+	hdrep->discov_rep_cksum
+		= in6_cksum(n, IPPROTO_ICMPV6,
+			    sizeof(struct ip6_hdr),
+			    n->m_pkthdr.len - sizeof(struct ip6_hdr));
 
 	error = ip6_output(n, NULL, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
-			 "%s:%d: send failed (errno = %d)\n",
+			 "%s:%d: "
+			 "failed to send a DHAAD reply packet (errno = %d)\n",
 			 __FILE__, __LINE__, error));
 	}
 
@@ -575,15 +617,34 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 
+	/* check packet length. */
+	if (icmp6len < sizeof(struct ha_discov_rep)) {
+		mip6log((LOG_ERR,
+			 "%s:%d: too short DHAAD reply.\n",
+			 __FILE__, __LINE__));
+		return (EINVAL);
+	}
+
 	ip6 = mtod(m, struct ip6_hdr *);
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
 	hdrep = (struct ha_discov_rep *)(ip6 + 1);
+#else
+	IP6_EXTHDR_GET(hdrep, struct ha_discov_rep *, m, off, icmp6len);
+	if (hdrep == NULL) {
+		mip6log((LOG_ERR,
+			 "%s:%d: failed to EXTHDR_GET.\n",
+			 __FILE__, __LINE__));
+		return (EINVAL);
+	}
+#endif
 	haaddrs = (struct in6_addr *)(hdrep + 1);
 
-	/* sainty check ... */
+	/* sainty check. */
 	if (hdrep->discov_rep_code != 0)
 		return (EINVAL);
 
-	/* find hif that matches this receiving hadiscovid. */
+	/* find hif that matches this receiving hadiscovid of DHAAD reply. */
 	hdrep_id = hdrep->discov_rep_id;
 	hdrep_id = ntohs(hdrep_id);
 	for (sc = TAILQ_FIRST(&hif_softc_list);
@@ -594,14 +655,14 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	}
 	if (sc == NULL) {
 		/*
-		 * no matching hif.  maybe this reply is too late.
+		 * no matching hif.  maybe this DHAAD reply is too late.
 		 */
 		return (0);
 	}
 
 	/*
-	 * check if the home agent list contains sending home agent's
-	 * address.
+	 * check if the home agent list contains sending the home
+	 * agent's own address.
 	 */
 	hacount = (icmp6len - sizeof(struct ha_discov_rep)) 
 		/ sizeof(struct in6_addr);
@@ -616,27 +677,46 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	}
 
 	/*
-	 * install homeagent to the list.
+	 * install home agents to the internal home agent list.
 	 */
 	if (found == 0) {
 		/* 
-		 * if the HA list doesn't include an addr of 
-		 * ip_src field, the addr is considered as a most 
+		 * if the home agent list of the DHAAD reply doesn't
+		 * include the address of ip6_src field (that is, the
+		 * address of the home agent sending this DHAAD reply
+		 * packet), the address is considered as a most
 		 * preferable.
-		 * draft-13 9.2
 		 */
-		/* XXX how do we make the HA specified in the ip src field
-		   as a most preferable one ? */
+		/* XXX: TODO
+		 * 
+		 * how do we make the HA specified in the ip src field
+		 * as a most preferable one ?
+		 */
 		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &ip6->ip6_src);
 		if (mha) {
 			/*
-			 * if this ha already exists in the list,
+			 * if this home agent already exists in the list,
 			 * update its lifetime.
 			 */
-			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME;
+			/*
+			 * XXX: TODO
+			 *
+			 * how to get the REAL lifetime of the home agent?
+			 */
+			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME; /* XXX */
 		} else {
 			/*
-			 * create a new ha entry and insert to mip6_ha_list.
+			 * create a new home agent entry and insert it
+			 * to the internal home agent list
+			 * (mip6_ha_list).
+			 */
+			/*
+			 * XXX: TODO
+			 *
+			 * DHAAD reply doesn't include home agents'
+			 * link-local addresses.  how we decide for
+			 * each hoem agent link-local address?  and
+			 * lifetime determination is a problem, also.
 			 */
 			mip6_icmp6_create_linklocal(&lladdr, &ip6->ip6_src);
 			mha = mip6_ha_create(&lladdr, &ip6->ip6_src,
@@ -659,8 +739,10 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	for (i = 0; i < hacount; i++) {
 		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, haaddrptr);
 		if (mha) {
+			/* XXX: TODO the same problem above. */
 			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME;
 		} else {
+			/* XXX: TODO the same problem above. */
 			mip6_icmp6_create_linklocal(&lladdr, haaddrptr);
 			mha = mip6_ha_create(&lladdr, haaddrptr,
 					     ND_RA_FLAG_HOME_AGENT,
@@ -674,27 +756,29 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 			mip6_ha_list_insert(&mip6_ha_list, mha);
 			mip6_ha_discov_ha_list_insert(sc, mha);
 		}
-		if (mha_prefered == NULL)
+		if (mha_prefered == NULL) {
+			/*
+			 * the home agent listed at the top of the
+			 * DHAAD reply packet is the most preferable
+			 * one.  of course, if the reply includes the
+			 * address which is the same to the ip6_src
+			 * address, it is the one.
+			 */
 			mha_prefered = mha;
+		}
 	}
 
-#if 0
-	/* register to the new home agent. */
-	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		if (sc->hif_location == HIF_LOCATION_HOME)
-			continue;
-
-		mip6_home_registration(sc);
-	}
-#endif
-	/* XXX */
-	/* search bu_list and do home registration pending. */
+	/*
+	 * search bu_list and do home registration pending.  each
+	 * binding update entry which can't proceed because of no home
+	 * agent has an field of a home agent address equals to an
+	 * unspecified address.
+	 */
 	for (mbu = LIST_FIRST(&sc->hif_bu_list); mbu;
 	     mbu = LIST_NEXT(mbu, mbu_entry)) {
 		if ((mbu->mbu_flags & IP6_BUF_HOME)
 		    && IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr)) {
-			/* home registration */
+			/* home registration. */
 			mbu->mbu_paddr = mha_prefered->mha_gaddr;
 		}
 	}
@@ -714,9 +798,9 @@ mip6_ha_discov_ha_list_insert(sc, mha)
 
 	hs = TAILQ_FIRST(&sc->hif_hs_list_home);
 	if (hs == NULL) {
-		/* must not happen */
+		/* must not happen. */
 		mip6log((LOG_ERR,
-			 "%s:%d: receive dhaad reply.  "
+			 "%s:%d: receive a DHAAD reply.  "
 			 "but we have no home subnet???\n",
 			 __FILE__, __LINE__));
 		return (EINVAL);
@@ -757,23 +841,39 @@ mip6_icmp6_ha_discov_req_output(sc)
 	u_int32_t icmp6len, off;
 	int error;
 
+	/* pick up one home subnet. */
 	hs = TAILQ_FIRST(&sc->hif_hs_list_home);
 	if ((hs == NULL) || (hs->hs_ms == NULL)) {
+		/* we must have at least one home subnet. */
 		return (EINVAL);
 	}
+
+	/*
+	 * XXX: TODO
+	 *
+	 * rate limitation.
+	 */
+
+	/*
+	 * we must determine the home agent subnet anycast address.
+	 * to do this, we pick up one home prefix from the home subnet
+	 * information.
+	 */
 	mspfx = TAILQ_FIRST(&hs->hs_ms->ms_mspfx_list);
 	if ((mspfx == NULL) || ((mpfx = mspfx->mspfx_mpfx) == NULL)) {
 		return (EINVAL);
 	}
-	
 	if (mip6_icmp6_create_haanyaddr(&haanyaddr, mpfx))
 		return (EINVAL);
 
+	/* allocate the buffer for the ip packet and DHAAD request. */
 	icmp6len = sizeof(struct ha_discov_req);
 	m = mip6_create_ip6hdr(&hif_coa, &haanyaddr,
 			       IPPROTO_ICMPV6, icmp6len);
 	if (m == NULL) {
-		mip6log((LOG_ERR, "%s:%d: mbuf allocation failed\n",
+		mip6log((LOG_ERR,
+			 "%s:%d: "
+			 "mbuf allocation for a DHAAD request failed\n",
 			 __FILE__, __LINE__));
 
 		return (ENOBUFS);
@@ -788,18 +888,23 @@ mip6_icmp6_ha_discov_req_output(sc)
 	hdreq->discov_req_code = 0;
 	hdreq->discov_req_id = htons(sc->hif_hadiscovid);
 #ifdef MIP6_DRAFT13
+	/*
+	 * the format of draft-13 has a home address field for the
+	 * sending mobile node.
+	 */
 	hdreq->ha_dreq_home = mpfx->mpfx_haddr;
 #endif /* MIP6_DRAFT13 */
 
-	/* calculate checksum for ICMP6 packet */
+	/* calculate checksum for this DHAAD request packet. */
 	off = sizeof(struct ip6_hdr);
-	hdreq->discov_req_cksum = in6_cksum(m, IPPROTO_ICMPV6,
-					       off, icmp6len);
+	hdreq->discov_req_cksum = in6_cksum(m, IPPROTO_ICMPV6, off, icmp6len);
 
-	/* send the ICMP6 packet to the home agent anycast address. */
+	/* send the DHAAD request packet to the home agent anycast address. */
 	error = ip6_output(m, NULL, NULL, 0, NULL, NULL);
 	if (error) {
-		mip6log((LOG_ERR, "%s:%d: send failed (errno = %d)\n",
+		mip6log((LOG_ERR,
+			 "%s:%d: "
+			 "failed to send a DHAAD request (errno = %d)\n",
 			 __FILE__, __LINE__, error));
 	}
 
@@ -812,7 +917,7 @@ mip6_icmp6_create_haanyaddr(haanyaddr, mpfx)
 	struct mip6_prefix *mpfx;
 {
 	if (mpfx == NULL)
-		return (-1);
+		return (EINVAL);
 
 	if (mpfx->mpfx_prefixlen == 64) {
 	  mip6_create_addr(haanyaddr, &haanyaddr_ifid64,
