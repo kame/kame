@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.25 2000/02/22 14:04:20 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.26 2000/02/24 05:55:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -358,9 +358,17 @@ struct	in6_rrenumreq {
 
 #define SIOCSIFADDR_IN6		 _IOW('i', 12, struct in6_ifreq)
 #define SIOCGIFADDR_IN6		_IOWR('i', 33, struct in6_ifreq)
+
+#ifdef COMPAT_IFIOCTL
+/*
+ * SIOCSxxx ioctls should be unused (see comments in in6.c), but
+ * we do not shift numbers for binary compatibility.
+ */
 #define SIOCSIFDSTADDR_IN6	 _IOW('i', 14, struct in6_ifreq)
-#define SIOCGIFDSTADDR_IN6	_IOWR('i', 34, struct in6_ifreq)
 #define SIOCSIFNETMASK_IN6	 _IOW('i', 22, struct in6_ifreq)
+#endif 
+
+#define SIOCGIFDSTADDR_IN6	_IOWR('i', 34, struct in6_ifreq)
 #define SIOCGIFNETMASK_IN6	_IOWR('i', 37, struct in6_ifreq)
 
 #define SIOCDIFADDR_IN6		 _IOW('i', 25, struct in6_ifreq)

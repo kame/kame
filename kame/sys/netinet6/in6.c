@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.49 2000/02/24 05:39:58 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.50 2000/02/24 05:55:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -623,8 +623,15 @@ in6_control(so, cmd, data, ifp)
 		/* FALLTHROUGH */
 	case SIOCAIFADDR_IN6:
 	case SIOCSIFADDR_IN6:
+#ifdef COMPAT_IFIOCTL
 	case SIOCSIFDSTADDR_IN6:
-	case SIOCSIFNETMASK_IN6: /* XXX: should be obsoleted? */
+	case SIOCSIFNETMASK_IN6:
+		/*
+		 * Since IPv6 allows a node to assign multiple addresses
+		 * on a single interface, SIOCSxxx ioctls are not suitable
+		 * and should be unused.
+		 */
+#endif 
 		if (ifra->ifra_addr.sin6_family != AF_INET6)
 			return(EAFNOSUPPORT);
 		if (!privileged)
@@ -764,6 +771,7 @@ in6_control(so, cmd, data, ifp)
 				*icmp6_ifstat[ifp->if_index];
 		break;
 
+#ifdef COMPAT_IFIOCTL		/* should be unused */
 	case SIOCSIFDSTADDR_IN6:
 		if ((ifp->if_flags & IFF_POINTOPOINT) == 0)
 			return(EINVAL);
@@ -798,6 +806,7 @@ in6_control(so, cmd, data, ifp)
 		}
 		break;
 
+#endif 
 	case SIOCGIFALIFETIME_IN6:
 		ifr->ifr_ifru.ifru_lifetime = ia->ia6_lifetime;
 		break;
@@ -820,6 +829,7 @@ in6_control(so, cmd, data, ifp)
 	case SIOCSIFADDR_IN6:
 		return(in6_ifinit(ifp, ia, &ifr->ifr_addr, 1));
 
+#ifdef COMPAT_IFIOCTL		/* XXX should be unused */
 	case SIOCSIFNETMASK_IN6:
 		ia->ia_prefixmask = ifr->ifr_addr;
 		bzero(&net, sizeof(net));
@@ -841,6 +851,7 @@ in6_control(so, cmd, data, ifp)
 				ia->ia_prefixmask.sin6_addr.s6_addr32[3];
 		ia->ia_net = net;
 		break;
+#endif 
 
 	case SIOCAIFADDR_IN6:
 		prefixIsNew = 0;
