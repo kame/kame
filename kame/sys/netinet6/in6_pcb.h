@@ -179,7 +179,7 @@ struct	in6pcb {
 	  (laddr)->sin6_addr.s6_addr32[0] ^ \
           (laddr)->sin6_addr.s6_addr32[1] ^ \
 	  (laddr)->sin6_addr.s6_addr32[2] ^ \
-	  (laddr)->sin6_addr.s6_addr32[3] \
+	  (laddr)->sin6_addr.s6_addr32[3] ^ \
 	  (laddr)->sin6_scope_id) + (fport) + (lport)) 
 
 #define sotoin6pcb(so)	((struct in6pcb *)(so)->so_pcb)

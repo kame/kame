@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.51 2002/02/02 08:42:52 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.52 2002/02/02 08:44:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -742,7 +742,7 @@ findpcb:
 			 */
 			dropsocket++;
 			in6p = sotoin6pcb(so);
-			sa6_copy_addr(dst_sa6, &inp->in6p_lsa);
+			sa6_copy_addr(dst_sa6, &in6p->in6p_lsa);
 			in6p->in6p_lport = th->th_dport;
 
 			/* Inherit socket options from the listening socket. */
