@@ -3647,7 +3647,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
     }
 
     /* Forward the BSR Message first and then update the RP-set list */
-    /* XXX: should we do sanity checks befor forwarding?? */
+    /* XXX: should we do sanity checks before forwarding?? */
     /* TODO: if the message was unicasted to me, resend? */
 
     for (mifi = 0; mifi < numvifs; mifi++)
