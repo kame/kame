@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.168 2002/08/12 20:23:47 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.169 2002/09/01 05:38:42 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2309,7 +2309,7 @@ ipsec6_encapsulate(m, sav)
 #ifdef MIP6
 	/*
 	 * check if this tunnel is from the mobile node to the home
-	 * agent or not.  if the packet if from the mobile node to the
+	 * agent or not.  if the packet is from the mobile node to the
 	 * home agent, the packet must have a HAO.
 	 */
 	*m_hao = NULL;
