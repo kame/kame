@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.252 2001/12/07 06:10:46 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.253 2001/12/14 09:18:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -854,14 +854,14 @@ in6_control(so, cmd, data, ifp)
 					    e);
 				}
 			}
-
-			/*
-			 * this might affect the status of autoconfigured
-			 * addresses, that is, this address might make
-			 * other addresses detached.
-			 */
-			pfxlist_onlink_check();
 		}
+
+		/*
+		 * this might affect the status of autoconfigured addresses,
+		 * that is, this address might make other addresses detached.
+		 */
+		pfxlist_onlink_check();
+
 		break;
 	}
 
