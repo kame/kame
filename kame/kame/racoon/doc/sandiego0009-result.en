@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.22 2000/09/20 23:30:50 itojun Exp $
+$KAME: sandiego0009-result.en,v 1.23 2000/09/21 17:38:01 sakane Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -36,6 +36,9 @@ vs XXX
 -->8
 
 Result:
+
+* No body has base mode with RSA signature.
+
 vs Cryptek
 	phase 1: responder, main
 	    preshared, 3des-cbc, md5, DH group 1, lifetime 600 <== choiced
@@ -114,6 +117,8 @@ vs HITACHI
 	    rsasig, 3des-cbc, sha1, DH group 2, lifetime 600
 	    both subjectAltName and DN are OK.
 	    multiple subjectAltName is OK.
+		subjectAltName = email
+		subjectAltName = dns
 	phase 2:
 	    des, hmac-sha1, tunnel mode, lifetime 300	<== choiced
 	    des, hmac-md5, tunnel mode, lifetime 300
@@ -155,6 +160,7 @@ vs HiFn
 	phase 1: initiator, main
 	    rsasig, 3des-cbc, md5, DH group 2, lifetime 180 <== choiced
 	    rsasig, 3des-cbc, sha1, DH group 2, lifetime 600
+		subjectAltName = email
 	phase 2: PFS group 2
 	    ESP 3des-cbc, hmac-sha1, tunnel mode, lifetime 600
 	Notes:
@@ -173,17 +179,24 @@ vs HiFn
 vs NxNetworks
 	phase 1: main
 	    preshared, 3des-cbc, sha1, DH group 2
-	phase 2: PFS group 2
+	phase 2:
 	    ESP 3des-cbc, hmac-sha1, tunnel mode, PFS 2
 
 	phase 1: main
 	    preshared, 3des-cbc, md5, DH group 2
-	phase 2: PFS group 2
+	phase 2:
 	    ESP blowfish, hmac-md5, tunnel mode, no PFS
-
 	Notes:
 	- fragmented packets did not get through NxNet gw.
 	- phase 2 ID: (KAME) the gw itself (NxNet) net10 addr behind NxNet
+
+	phase 1: aggressive
+	    rsasig, 3des, sha1, DH group 2
+	    rsasig, 3des, md5, DH group 2
+		subjectAltName = email
+	phase 2:
+	    3des, sha1, tunnel, pfs 2
+	- parsing the type of subjectaltname fault in racoon. (fixed)
 
 vs Intel (Packet Protect Pro/100S)
 	phase 1: main
