@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.24 2000/02/23 08:06:32 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.25 2000/02/23 10:36:03 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -106,7 +106,7 @@ static struct cipher_algorithm cipher[] = {
 
 static int oakley_compute_keymat_x __P((struct ph2handle *iph2, int side, int sa_dir));
 #ifdef HAVE_SIGNING_C
-static char *oakley_getidstr __P((char *id, int len));
+static char *oakley_getidstr __P((struct ipsecdoi_id_b *id, int len));
 #endif
 static char *getdirnamebyid __P((int identtype));
 
@@ -1126,7 +1126,7 @@ oakley_validate_auth(iph1)
 			plog(logp, LOCATION, NULL, "SIGN passed:\n"));
 		YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->sig_p));
 
-		idstr = oakley_getidstr(iph1->id_p->v, iph1->id_p->l);
+		idstr = oakley_getidstr((struct ipsecdoi_id_b *)iph1->id_p->v, iph1->id_p->l);
 		if (idstr == NULL) {
 			plog(logp, LOCATION, NULL,
 				"failed to get idstr name\n");
@@ -1222,7 +1222,7 @@ oakley_validate_auth(iph1)
 
 			YIPSDEBUG(DEBUG_CERT,
 				plog(logp, LOCATION, NULL,
-					"get peer's CERT from cache:"));
+					"get peer's CERT from cache:\n"));
 			YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert_p));
 		} else {
 			/* check signer of certificate */
@@ -1321,7 +1321,7 @@ oakley_getmycert(iph1)
 	vchar_t *cert = NULL;
 	int error = -1;
 
-	idstr = oakley_getidstr(iph1->id->v, iph1->id->l);
+	idstr = oakley_getidstr((struct ipsecdoi_id_b *)iph1->id->v, iph1->id->l);
 	if (idstr == NULL) {
 		plog(logp, LOCATION, NULL, "failed to get idstr name\n");
 		return -1;
@@ -1426,7 +1426,7 @@ oakley_getsign(iph1)
 	vchar_t *privkey = NULL;
 	int error = -1;
 
-	idstr = oakley_getidstr(iph1->id->v, iph1->id->l);
+	idstr = oakley_getidstr((struct ipsecdoi_id_b *)iph1->id->v, iph1->id->l);
 	if (idstr == NULL) {
 		plog(logp, LOCATION, NULL, "failed to get idstr name\n");
 		return -1;
@@ -1481,10 +1481,10 @@ end:
 /* get idstr name from ID payload */
 static char *
 oakley_getidstr(id, len)
-	char *id;
+	struct ipsecdoi_id_b *id;
 	int len;
 {
-	char *idstr;
+	char *idstr, *idsrc;
 	int idstrlen;
 
 	if (len < sizeof(struct ipsecdoi_id_b)) {
@@ -1492,14 +1492,45 @@ oakley_getidstr(id, len)
 		return NULL;
 	}
 
-	idstrlen = len - sizeof(struct ipsecdoi_id_b);
+	switch (id->type) {
+	case IPSECDOI_ID_IPV4_ADDR:
+	case IPSECDOI_ID_IPV6_ADDR:
+	{
+		struct sockaddr_storage sa;
+		char addr[NI_MAXHOST];
+
+		memcpy(&sa, id, len);
+		sa.ss_family = id->type == IPSECDOI_ID_IPV4_ADDR
+				? AF_INET : AF_INET6;
+		sa.ss_len = id->type == IPSECDOI_ID_IPV4_ADDR
+				? 16 : 28;
+
+		if (getnameinfo((struct sockaddr *)&sa, sa.ss_len, addr, sizeof(addr), NULL, 0,
+                        NI_NUMERICHOST) != 0) {
+			plog(logp, LOCATION, NULL, "failed to getnameinfo\n");
+		}
+		idstrlen = strlen(addr);
+		idsrc = addr;
+	}
+		break;
+	case IPSECDOI_ID_FQDN:
+	case IPSECDOI_ID_USER_FQDN:
+		idstrlen = len - sizeof(*id);
+		idsrc = (char *)id + 1;
+		break;
+	default:
+		plog(logp, LOCATION, NULL,
+			"not supported id type %d\n", id->type);
+		return NULL;
+	}
 
 	idstr = malloc(idstrlen + 1);
 	if (idstr == NULL) {
-		plog(logp, LOCATION, NULL, "malloc (%s)\n", strerror(errno));
+		plog(logp, LOCATION, NULL,
+			"malloc (%s)\n", strerror(errno));
 		return NULL;
 	}
-	memcpy(idstr, id + sizeof(struct ipsecdoi_id_b), idstrlen);
+	memcpy(idstr, idsrc, idstrlen);
 	idstr[idstrlen] = '\0';
 
 	return idstr;
