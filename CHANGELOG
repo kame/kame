@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1302 2000/09/26 21:26:41 sakane Exp $
+$KAME: CHANGELOG,v 1.1303 2000/09/29 03:13:34 sumikawa Exp $
 
 <200009>
+Fri Sep 29 12:12:16 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/fetchmail: upgrade to 5.5.3.
+	* freebsd3/ports/lftp: upgrade to 2.3.2.
+
+Wed Sep 27 00:56:03 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/wget: use latest IPv6 patch(9/15).
+
 Tue Sep 26 17:40:30 JST 2000  itojun@iijlab.net
 	* sys/netkey/key.c: attach sadb_comb for IPComp SADB_ACQUIRE message.
 	  the use of sadb_comb is not on RFC2367; it was discussed in
