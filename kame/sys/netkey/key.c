@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.318 2003/10/27 07:43:57 itojun Exp $	*/
+/*	$KAME: key.c,v 1.319 2003/11/10 10:53:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -8291,8 +8291,15 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 			int err2 = 0;
 			char *p, *ep;
 			size_t l;
+			int s;
 
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+			s = splsoftnet();
+#else
+			s = splnet();
+#endif
 			m = key_setdump(name[1], &error);
+			splx(s);
 			if (!m)
 				return (error);
 			if (!oldp)
@@ -8329,8 +8336,15 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 			int err2 = 0;
 			char *p, *ep;
 			size_t l;
+			int s;
 
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+			s = splsoftnet();
+#else
+			s = splnet();
+#endif
 			m = key_setspddump(&error);
+			splx(s);
 			if (!m)
 				return (error);
 			if (!oldp)
