@@ -796,9 +796,7 @@ udp6_ctlinput(cmd, sa, d)
 #endif
 
 		if (cmd == PRC_MSGSIZE) {
-			int updatemtu;
-
-			updatemtu = 0;
+			int valid = 0;
 
 			/*
 			 * Check to see if we have a valid UDP socket
@@ -807,11 +805,11 @@ udp6_ctlinput(cmd, sa, d)
 			 */
 			if (in6_pcbhashlookup(&udbtable, &finaldst,
 			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport))
-				updatemtu = 1;
+				valid = 1;
 			else if (in_pcblookup(&udbtable, &sa6.sin6_addr,
 			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport,
 			    INPLOOKUP_IPV6))
-				updatemtu = 1;
+				valid = 1;
 #if 0
 			/*
 			 * As the use of sendto(2) is fairly popular,
@@ -823,18 +821,16 @@ udp6_ctlinput(cmd, sa, d)
 			else if (in_pcblookup(&udbtable, &sa6.sin6_addr,
 			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport,
 			    INPLOOKUP_WILDCARD | INPLOOKUP_IPV6))
-				updatemtu = 1;
+				valid = 1;
 #endif
 
-			if (updatemtu) {
-				/*
-				 * Now that we've validated that we are actually
-				 * communicating with the host indicated in the
-				 * ICMPv6 message, recalculate the new MTU, and
-				 * create the corresponding routing entry.
-				 */
-				icmp6_mtudisc_update((struct ip6ctlparam *)d);
-			}
+			/*
+			 * Now that we've validated that we are actually
+			 * communicating with the host indicated in the
+			 * ICMPv6 message, recalculate the new MTU, and
+			 * create the corresponding routing entry.
+			 */
+			icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
 
 			/*
 			 * regardless of if we called icmp6_mtudisc_update(),

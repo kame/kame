@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.81 2000/12/03 00:54:01 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.82 2000/12/08 23:28:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -559,9 +559,7 @@ udp6_ctlinput(cmd, sa, d)
 
 #ifdef __NetBSD__
 		if (cmd == PRC_MSGSIZE) {
-			int updatemtu;
-
-			updatemtu = 0;
+			int valid = 0;
 
 			/*
 			 * Check to see if we have a valid UDP socket
@@ -571,7 +569,7 @@ udp6_ctlinput(cmd, sa, d)
 			if (in6_pcblookup_connect(&udb6, &sa6->sin6_addr,
 			    uh.uh_dport, (struct in6_addr *)&sa6_src->sin6_addr,
 			    uh.uh_sport, 0))
-				updatemtu = 1;
+				valid = 1;
 #if 0
 			/*
 			 * As the use of sendto(2) is fairly popular,
@@ -582,18 +580,16 @@ udp6_ctlinput(cmd, sa, d)
 			 */
 			else if (in6_pcblookup_bind(&udb6, &sa6->sin6_addr,
 						    uh.uh_dport, 0))
-				updatemtu = 1;
+				valid = 1;
 #endif
 
-			if (updatemtu) {
-				/*
-				 * Now that we've validated that we are actually
-				 * communicating with the host indicated in the
-				 * ICMPv6 message, recalculate the new MTU, and
-				 * create the corresponding routing entry.
-				 */
-				icmp6_mtudisc_update((struct ip6ctlparam *)d);
-			}
+			/*
+			 * Now that we've validated that we are actually
+			 * communicating with the host indicated in the
+			 * ICMPv6 message, recalculate the new MTU, and
+			 * create the corresponding routing entry.
+			 */
+			icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
 
 			/*
 			 * regardless of if we called icmp6_mtudisc_update(),

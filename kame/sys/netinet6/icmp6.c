@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.169 2000/12/07 11:51:07 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.170 2000/12/08 23:28:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1164,7 +1164,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 			notifymtu = ntohl(icmp6->icmp6_mtu);
 			ip6cp.ip6c_cmdarg = (void *)&notifymtu;
 #if !(defined(__NetBSD__) || defined(__OpenBSD__))
-			icmp6_mtudisc_update(&ip6cp);
+			icmp6_mtudisc_update(&ip6cp, 1);	/*XXX*/
 #endif
 		}
 
@@ -1183,8 +1183,9 @@ icmp6_notify_error(m, off, icmp6len, code)
 }
 
 void
-icmp6_mtudisc_update(ip6cp)
+icmp6_mtudisc_update(ip6cp, validated)
 	struct ip6ctlparam *ip6cp;
+	int validated;
 {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	struct icmp6_mtudisc_callback *mc;
@@ -1202,6 +1203,12 @@ icmp6_mtudisc_update(ip6cp)
 	struct route_in6 ro6;
 #endif
 #endif
+
+	/*
+	 * XXX should allow non-validated cases if memory is plenty
+	 */
+	if (!validated)
+		return;
 
 	bzero(&sin6, sizeof(sin6));
 	sin6.sin6_family = PF_INET6;

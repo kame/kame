@@ -1197,15 +1197,17 @@ tcp6_ctlinput(cmd, sa, d)
 		m_copydata(m, off, sizeof(th), (caddr_t)&th);
 
 		if (cmd == PRC_MSGSIZE) {
+			int valid = 0;
+
 			/*
 			 * Check to see if we have a valid TCP connection
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (!in6_pcblookup_connect(&tcb6, &sa6->sin6_addr,
+			if (in6_pcblookup_connect(&tcb6, &sa6->sin6_addr,
 			    th.th_dport, (struct in6_addr *)&sa6_src->sin6_addr,
 			    th.th_sport, 0))
-				return;
+				valid++;
 
 			/*
 			 * Now that we've validated that we are actually
@@ -1213,7 +1215,7 @@ tcp6_ctlinput(cmd, sa, d)
 			 * message, recalculate the new MTU, and create the
 			 * corresponding routing entry.
 			 */
-			icmp6_mtudisc_update((struct ip6ctlparam *)d);
+			icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
 
 			return;
 		}
