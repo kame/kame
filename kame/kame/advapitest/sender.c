@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.5 2000/10/01 04:13:31 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.6 2000/11/14 12:54:26 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -59,6 +59,7 @@ struct cmsghdr *cmsgp = NULL;
 static int calc_opthlen __P((int));
 static void setopthdr __P((int, int));
 static void usage __P((void));
+static int mflag;
 
 int
 main(argc, argv)
@@ -77,7 +78,7 @@ main(argc, argv)
 	extern void *malloc();
 	extern char *optarg;
 
-	while ((ch = getopt(argc, argv, "d:D:h:l:p:s:")) != EOF)
+	while ((ch = getopt(argc, argv, "d:D:h:l:mp:s:")) != EOF)
 		switch(ch) {
 		case 'D':
 			dsthdr1len = atoi(optarg);
@@ -90,6 +91,9 @@ main(argc, argv)
 			break;
 		case 'l':
 			hlimp = optarg;
+			break;
+		case 'm':
+			mflag++;
 			break;
 		case 'p':
 			portstr = optarg;
@@ -192,6 +196,14 @@ main(argc, argv)
 		err(1, "socket");
 	freeaddrinfo(res);
 
+	if (mflag) {
+		int on = 1;
+
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVPATHMTU, &on,
+			       sizeof(on)) != 0)
+			err(1, "setsockopt(IPV6_RECVPATHMTU)");
+	}
+
 #if 0
 	bzero(&local, sizeof(local));
 	local.sin6_family = AF_INET6;
@@ -209,6 +221,21 @@ main(argc, argv)
 
 	if (sendmsg(s, &msg, 0) != datalen)
 		err(1, "sendmsg");
+
+	if (mflag) {
+		struct sockaddr_storage ss_from;
+		u_char cbuf[1024]; /* XXX: do not hardcode */
+
+		memset(&msg, 0, sizeof(msg));
+		msg.msg_name = (caddr_t)&ss_from;
+		msg.msg_namelen = sizeof(ss_from);
+		msg.msg_control = (caddr_t)cbuf;
+		msg.msg_controllen = sizeof(cbuf);
+
+		if ((cc = recvmsg(s, &msg, 0)) < 0)
+			err(1, "recvmsg");
+		print_options(&msg);
+	}
 
 	exit(0);
 }
@@ -268,10 +295,115 @@ setopthdr(optlen, hdrtype)
 	cmsgp = CMSG_NXTHDR(&msg, cmsgp);
 }
 
+/* should be a library */
+void
+print_options(mh)
+	struct msghdr *mh;
+{
+	struct cmsghdr *cm;
+	struct in6_pktinfo *pi = NULL;
+	int *hlimp = NULL;
+	char ntop_buf[INET6_ADDRSTRLEN];
+	void *hbh = NULL, *dst1 = NULL, *dst2 = NULL, *rthdr = NULL;
+	char ifnambuf[IF_NAMESIZE];
+	/* XXX: KAME specific at this moment */
+	struct ip6_mtuinfo *mtuinfo = NULL;
+
+	if (mh->msg_controllen == 0) {
+		printf("No IPv6 option is received\n");
+		return;
+	}
+	
+	/* extract optional information via Advanced API */
+	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(mh);
+	     cm;
+	     cm = (struct cmsghdr *)CMSG_NXTHDR(mh, cm)) {
+		if (cm->cmsg_level != IPPROTO_IPV6)
+			continue;
+
+		switch(cm->cmsg_type) {
+		case IPV6_PKTINFO:
+			if (cm->cmsg_len ==
+			    CMSG_LEN(sizeof(struct in6_pktinfo)))
+				pi = (struct in6_pktinfo *)(CMSG_DATA(cm));
+		break;
+
+		case IPV6_HOPLIMIT:
+			if (cm->cmsg_len == CMSG_LEN(sizeof(int)))
+				hlimp = (int *)CMSG_DATA(cm);
+			break;
+
+		case IPV6_RTHDR:
+			if (rthdr)
+				printf("there're more than one rthdr (ignored).\n");
+			else
+				rthdr = CMSG_DATA(cm);
+			break;
+
+		case IPV6_HOPOPTS:
+			hbh = CMSG_DATA(cm);
+			break;
+
+		case IPV6_RTHDRDSTOPTS:
+			if (dst1)
+				printf("there's more than one dstopt hdr "
+				       "before a rthdr (ignored)\n");
+			else
+				dst1 = CMSG_DATA(cm);
+			break;
+
+		case IPV6_DSTOPTS:
+			if (dst2)
+				printf("there's more than one dstopt hdr "
+				       "after a rthdr (ignored)\n");
+			else
+				dst2 = CMSG_DATA(cm);
+			break;
+
+		case IPV6_PATHMTU:
+			if (cm->cmsg_len == CMSG_LEN(sizeof(*mtuinfo)))
+				mtuinfo = (struct ip6_mtuinfo *)CMSG_DATA(cm);
+		}
+	}
+
+	printf("Received IPv6 options (size %d):\n", mh->msg_controllen);
+	if (pi) {
+		printf("  Packetinfo: dst=%s, I/F=(%s, id=%d)\n",
+		       inet_ntop(AF_INET6, &pi->ipi6_addr, ntop_buf,
+				 sizeof(ntop_buf)),
+		       if_indextoname(pi->ipi6_ifindex, ifnambuf),
+		       pi->ipi6_ifindex);
+	}
+	if (hlimp)
+		printf("  Hoplimit = %d\n", *hlimp);
+	if (hbh) {
+		printf("  HbH Options Header\n");
+		print_opthdr(hbh);
+	}
+	if (dst1) {
+		printf("  Destination Options Header (before rthdr)\n");
+		print_opthdr(dst1);
+	}
+	if (rthdr) {
+		printf("  Routing Header\n");
+		print_rthdr(rthdr);
+	}
+	if (dst2) {
+		printf("  Destination Options Header (after rthdr)\n");
+		print_opthdr(dst2);
+	}
+	if (mtuinfo) {
+#ifdef notyet
+		printf("  Path MTU: destination=%s, from=%s, mtu=%lu",
+		       );
+#endif
+	}
+}
+
 static void
 usage()
 {
 	fprintf(stderr, "usage: sender [-d optlen] [-D optlen] [-h optlen] "
-		"[-l hoplimit] [-p port] [-s packetsize] IPv6addrs...\n");
+		"[-l hoplimit] [-m] [-p port] [-s packetsize] IPv6addrs...\n");
 	exit(1);
 }
