@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.51 2001/04/26 23:40:56 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.52 2001/04/26 23:52:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -315,8 +315,7 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 	int numaddrlen;
 	char numaddr[512];
 
-	if (inet_ntop(AF_INET6, addr, numaddr, sizeof(numaddr))
-	    == NULL)
+	if (inet_ntop(AF_INET6, addr, numaddr, sizeof(numaddr)) == NULL)
 		return EAI_SYSTEM;
 
 	numaddrlen = strlen(numaddr);
@@ -324,37 +323,21 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 		return EAI_MEMORY;
 	strcpy(host, numaddr);
 
-#ifdef NI_WITHSCOPEID
-	if (
-#ifdef DONT_OPAQUE_SCOPEID
-	    (IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)addr) ||
-	     IN6_IS_ADDR_MULTICAST((struct in6_addr *)addr)) &&
-#endif
-	    ((const struct sockaddr_in6 *)sa)->sin6_scope_id) {
-#ifndef ALWAYS_WITHSCOPE
-		if (flags & NI_WITHSCOPEID)
-#endif /* !ALWAYS_WITHSCOPE */
-		{
-			char scopebuf[MAXHOSTNAMELEN];
-			int scopelen;
+	if (((const struct sockaddr_in6 *)sa)->sin6_scope_id) {
+		char zonebuf[MAXHOSTNAMELEN];
+		int zonelen;
 
-			/* ip6_sa2str never fails */
-			scopelen = ip6_sa2str((const struct sockaddr_in6 *)sa,
-					      scopebuf, sizeof(scopebuf),
-					      flags);
-			if (scopelen + 1 + numaddrlen + 1 > hostlen)
-				return EAI_MEMORY;
+		/* ip6_sa2str never fails */
+		zonelen = ip6_sa2str((const struct sockaddr_in6 *)sa,
+				      zonebuf, sizeof(zonebuf), flags);
+		if (zonelen + 1 + numaddrlen + 1 > hostlen)
+			return EAI_MEMORY;
 
-			/*
-			 * construct <numeric-addr><delim><zoneid>
-			 */
-			memcpy(host + numaddrlen + 1, scopebuf,
-			       scopelen);
-			host[numaddrlen] = SCOPE_DELIMITER;
-			host[numaddrlen + 1 + scopelen] = '\0';
-		}
+		/* construct <numeric-addr><delim><zoneid> */
+		memcpy(host + numaddrlen + 1, zonebuf, zonelen);
+		host[numaddrlen] = SCOPE_DELIMITER;
+		host[numaddrlen + 1 + zonelen] = '\0';
 	}
-#endif /* NI_WITHSCOPEID */
 
 	return 0;
 }
@@ -371,7 +354,7 @@ ip6_sa2str(sa6, buf, bufsiz, flags)
 	const struct in6_addr *a6 = &sa6->sin6_addr;
 
 #ifdef NI_NUMERICSCOPE
-	if (flags & NI_NUMERICSCOPE) {
+	if ((flags & NI_NUMERICSCOPE) != 0) {
 		return(snprintf(buf, bufsiz, "%d", sa6->sin6_scope_id));
 	}
 #endif
