@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.20 2002/12/15 04:23:23 suz Exp $	*/
+/*	$KAME: rp.c,v 1.21 2002/12/24 09:21:14 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -97,6 +97,7 @@
 #include "pimd.h"
 #include "debug.h"
 #include "crc.h"
+#include "cfparse-defs.h"
 
 /*
  * The hash function. Stollen from Eddy's (eddy@isi.edu) implementation (for
@@ -229,6 +230,8 @@ init_rp6()
 	/* Setup the Cand-RP-Adv-Timer */
 	SET_TIMER(pim_cand_rp_adv_timer, RANDOM() % my_cand_rp_adv_period);
     }
+
+    grp_prefix_config();
 }
 
 void

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse-defs.h,v 1.1 2002/04/03 04:12:55 suz Exp $	*/
+/*	$KAME: cfparse-defs.h,v 1.2 2002/12/24 09:22:32 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -48,6 +48,7 @@ extern int re_cfparse __P((void));
 #endif
 extern int cf_post_config __P((void));
 extern int yyparse __P((void));
+extern int grp_prefix_config __P((void));
 
 /* cftoken.l */
 extern void yyerror __P((char *, ...));

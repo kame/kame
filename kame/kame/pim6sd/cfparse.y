@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.26 2002/12/15 06:18:18 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.27 2002/12/24 09:21:14 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -529,7 +529,6 @@ static int param_config __P((void));
 static int phyint_config __P((void));
 static int rp_config __P((void));
 static int bsr_config __P((void));
-static int grp_prefix_config __P((void));
 static int regthres_config __P((void));
 static int datathres_config __P((void));
 
@@ -920,11 +919,16 @@ bsr_config()
 	return(0);
 }
 
-static int
+/* called from init_rp6() */
+int
 grp_prefix_config()
 {
 	struct attr_list *pl;
 
+	if (grp_prefix == NULL) {
+		log(LOG_DEBUG, 0, "no group_prefix was specified");
+		return 0;
+	}
 	if (cand_rp_flag != TRUE) {
 		log(LOG_WARNING, 0,
 		    "group_prefix was specified without cand_rp(ignored)");
@@ -959,6 +963,8 @@ grp_prefix_config()
 	cand_rp_adv_message.message_size =
 		cand_rp_adv_message.insert_data_ptr - cand_rp_adv_message.buffer;
 
+	if (grp_prefix) 
+		free_attr_list(grp_prefix);
 	return(0);
 }
 
@@ -1076,9 +1082,6 @@ cf_post_config()
 	if (cand_rp_flag == TRUE)
 		rp_config();
 
-	if (grp_prefix)		/* this must be called after rp_config() */
-		grp_prefix_config();
-
 	if (cand_rp_flag == TRUE)
 		regthres_config();
 
@@ -1101,7 +1104,6 @@ cf_post_config()
 	if (cand_bsr_ifname) free(cand_bsr_ifname);
 	if (rp_attr) free_attr_list(rp_attr);
 	if (bsr_attr) free_attr_list(bsr_attr);
-	if (grp_prefix) free_attr_list(grp_prefix);
 	if (regthres_attr) free_attr_list(regthres_attr);
 	if (datathres_attr) free_attr_list(datathres_attr);
 	for (vifi = 0, v = uvifs; vifi < numvifs ; ++vifi , ++v)
