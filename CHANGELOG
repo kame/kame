@@ -1,6 +1,11 @@
-$KAME: CHANGELOG,v 1.2460 2003/08/20 13:34:17 keiichi Exp $
+$KAME: CHANGELOG,v 1.2461 2003/08/22 00:29:10 suz Exp $
 
 <200308>
+2003-08-22 SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/freebsd[45]/sys/netinet/igmp.c, kame/sys/netinet/in_msf.c
+	fixed an IGMPv3-related buffer overrun in freebsd[45].
+	Reported by: Hitoshi Asaeda <Hitoshi.Asaeda@sophia.inria.fr>
+
 Wed Aug 20 22:31:22 JST 2003	keiichi@iij.ad.jp
 	* kame/kame/sys/netinet6/mip6_mncore.c,mip6_mncore.h,mip6_icmp6.c
 	  kame/kame/sys/netinet6/nd6.c
