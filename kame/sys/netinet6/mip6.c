@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.53 2001/09/20 06:21:47 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.54 2001/09/20 06:34:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -76,7 +76,9 @@
 #include <netinet6/nd6.h>
 #include <netinet6/in6_ifattach.h>
 
+#if defined(IPSEC) && !defined(__OpenBSD__)
 #include <netinet6/ipsec.h>
+#endif
 
 #include <netinet6/mip6.h>
 
