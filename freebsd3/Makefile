@@ -21,24 +21,31 @@ DOCS=	CHANGELOG COPYRIGHT COPYRIGHT.jp IMPLEMENTATION INSTALL INSTALL.cvsup \
 
 beforeinstall:
 	for i in $(DIRS); do \
-		[ -d $$i ] || mkdir -p $$i; \
+		[ -d ${DESTDIR}$$i ] || mkdir -p $${DESTDIR}$i; \
 	done
 	for i in $(SECTIONS); do \
-		[ -d $(PREFIX)/man/man$$i ] || mkdir -p $(PREFIX)/man/man$$i; \
-		[ -d $(PREFIX)/man/cat$$i ] || mkdir -p $(PREFIX)/man/cat$$i; \
+		[ -d ${DESTDIR}$(PREFIX)/man/man$$i ] || \
+			mkdir -p ${DESTDIR}$(PREFIX)/man/man$$i; \
+		[ -d ${DESTDIR}$(PREFIX)/man/cat$$i ] ||\
+			mkdir -p ${DESTDIR}$(PREFIX)/man/cat$$i; \
 	done
 
 afterinstall:
-	cp ${.CURDIR}/kame/rtadvd/rtadvd.conf $(PREFIX)/etc/rtadvd.conf.sample
-	cp ${.CURDIR}/kame/bgpd/bgpd.conf $(PREFIX)/etc/bgpd.conf.sample
-	if test -x $(PREFIX)/sbin/inet6d || test -x $(PREFIX)/sbin/inet46d; \
-	then \
-		cp ${.CURDIR}/kame/inet6d/inet6d.conf $(PREFIX)/etc/inet6d.conf.sample; \
+	cp ${.CURDIR}/kame/rtadvd/rtadvd.conf \
+		${DESTDIR}$(PREFIX)/etc/rtadvd.conf.sample
+	cp ${.CURDIR}/kame/bgpd/bgpd.conf \
+		${DESTDIR}$(PREFIX)/etc/bgpd.conf.sample
+	if test -x ${DESTDIR}$(PREFIX)/sbin/inet6d || \
+	test -x ${DESTDIR}$(PREFIX)/sbin/inet46d; then \
+		cp ${.CURDIR}/kame/inet6d/inet6d.conf \
+			${DESTDIR}$(PREFIX)/etc/inet6d.conf.sample; \
 	fi
-	cp ${.CURDIR}/kame/etc/rc.net6 $(PREFIX)/etc/rc.net6.sample
+	cp ${.CURDIR}/kame/etc/rc.net6 \
+		${DESTDIR}$(PREFIX)/etc/rc.net6.sample
 	for i in $(DOCS); do \
 		if test -f ${.CURDIR}/../$$i; then \
-			cp ${.CURDIR}/../$$i $(PREFIX)/share/doc/kame; \
+			cp ${.CURDIR}/../$$i \
+				${DESTDIR}$(PREFIX)/share/doc/kame; \
 		fi \
 	done
 
