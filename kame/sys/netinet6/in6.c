@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.50 2000/02/24 05:55:24 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.51 2000/02/24 06:46:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -628,7 +628,7 @@ in6_control(so, cmd, data, ifp)
 	case SIOCSIFNETMASK_IN6:
 		/*
 		 * Since IPv6 allows a node to assign multiple addresses
-		 * on a single interface, SIOCSxxx ioctls are not suitable
+		 * on a single interface, SIOCSIFxxx ioctls are not suitable
 		 * and should be unused.
 		 */
 #endif 
