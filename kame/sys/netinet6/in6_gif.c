@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.95 2002/02/05 12:23:38 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.96 2002/02/20 14:34:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -545,6 +545,7 @@ gif_validate6(m, sc, ifp)
 /*
  * we know that we are in IFF_UP, outer address available, and outer family
  * matched the physical addr family.  see gif_encapcheck().
+ * sanity check for arg should have been done in the caller. 
  */
 int
 gif_encapcheck6(m, off, proto, arg)
@@ -553,16 +554,12 @@ gif_encapcheck6(m, off, proto, arg)
 	int proto;
 	void *arg;
 {
-	struct gif_softc *sc;
-	struct ifnet *ifp;
+	if (!(m->m_flags & M_PKTHDR)) {
+		/* we do not expect this case, but check it for safety. */
+		return(EINVAL);
+	}
 
-	/* sanity check done in caller */
-	sc = (struct gif_softc *)arg;
-
-	/* XXX is there a case that m_flags does not have M_PKTHDR? */
-	ifp = ((m->m_flags & M_PKTHDR) != 0) ? m->m_pkthdr.rcvif : NULL;
-
-	return gif_validate6(m, sc, ifp);
+	return gif_validate6(m, (struct gif_softc *)arg, m->m_pkthdr.rcvif);
 }
 
 int
