@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.225 1999/10/27 08:17:34 jinmei Exp $
+$Id: CHANGELOG,v 1.226 1999/10/27 12:09:28 itojun Exp $
 
 <199910>
+Wed Oct 27 20:58:42 JST 1999  itojun@iijlab.net
+	* netbsd/usr.bin/netstat: use getnameinfo() with KAME hack.
+	  add support for -v into interface info and pcb info printing,
+	  which avoids address truncation on printing.
+
 1999-10-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd/rp.c (delete_grp_mask_entry): 
 	  fixed a bug of rearraging the group list.
