@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.245 2002/04/22 12:32:35 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.246 2002/04/22 12:34:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -312,7 +312,7 @@ nd6_setmtu(ifp)
 
 	if (ndi->maxmtu < IPV6_MMTU) {
 		log(LOG_INFO, "nd6_setmtu: "
-		    "link MTU for %s (%ld) is too small for IPv6\n",
+		    "link MTU for %s (%d) is too small for IPv6\n",
 		    if_name(ifp), ndi->maxmtu);
 	}
 
