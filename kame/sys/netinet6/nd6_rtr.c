@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.252 2004/05/21 07:07:31 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.253 2004/07/05 03:10:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,8 +89,8 @@
 static int rtpref __P((struct nd_defrouter *));
 static struct nd_defrouter *defrtrlist_update __P((struct nd_defrouter *));
 static int prelist_update __P((struct nd_prefixctl *, struct nd_defrouter *,
-    struct mbuf *));
-static struct in6_ifaddr *in6_ifadd __P((struct nd_prefixctl *));
+    struct mbuf *, int));
+static struct in6_ifaddr *in6_ifadd __P((struct nd_prefixctl *, int));
 static struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
 	struct nd_defrouter *));
 static void pfxrtr_add __P((struct nd_prefix *, struct nd_defrouter *));
@@ -248,6 +248,7 @@ nd6_ra_input(m, off, icmp6len)
 #endif
 	char *lladdr = NULL;
 	int lladdrlen = 0;
+	int mcast = 0;
 
 	/*
 	 * We only accept RAs only when
@@ -293,6 +294,10 @@ nd6_ra_input(m, off, icmp6len)
 		/* nd6_options have incremented stats */
 		goto freeit;
 	}
+
+	/* remember if this is a multicasted advertisement */
+	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
+		mcast = 1;
 
 	/*
 	 * Default Router Information 
@@ -424,7 +429,7 @@ nd6_ra_input(m, off, icmp6len)
 			if (in6_init_prefix_ltimes(&pr))
 				continue; /* prefix lifetime init failed */
 #endif
-			(void)prelist_update(&pr, dr, m);
+			(void)prelist_update(&pr, dr, m, mcast);
 		}
 	}
 
@@ -1265,10 +1270,11 @@ prelist_remove(pr)
 }
 
 static int
-prelist_update(new, dr, m)
+prelist_update(new, dr, m, mcast)
 	struct nd_prefixctl *new;
 	struct nd_defrouter *dr; /* may be NULL */
 	struct mbuf *m;
+	int mcast;
 {
 	struct in6_ifaddr *ia6 = NULL, *ia6_match = NULL;
 	struct ifaddr *ifa;
@@ -1559,7 +1565,7 @@ prelist_update(new, dr, m)
 		 * No address matched and the valid lifetime is non-zero.
 		 * Create a new address.
 		 */
-		if ((ia6 = in6_ifadd(new)) != NULL) {
+		if ((ia6 = in6_ifadd(new, mcast)) != NULL) {
 			/*
 			 * note that we should use pr (not new) for reference.
 			 */
@@ -1580,7 +1586,7 @@ prelist_update(new, dr, m)
 			 */
 			if (ip6_use_tempaddr) {
 				int e;
-				if ((e = in6_tmpifadd(ia6, 1)) != 0) {
+				if ((e = in6_tmpifadd(ia6, 1, 1)) != 0) {
 					nd6log((LOG_NOTICE, "prelist_update: "
 					    "failed to create a temporary "
 					    "address, errno=%d\n",
@@ -1810,7 +1816,8 @@ pfxlist_onlink_check()
 			if (ifa->ia6_flags & IN6_IFF_DETACHED) {
 				ifa->ia6_flags &= ~IN6_IFF_DETACHED;
 				ifa->ia6_flags |= IN6_IFF_TENTATIVE;
-				nd6_dad_start((struct ifaddr *)ifa, NULL);
+				/* Do we need a delay in this case? */
+				nd6_dad_start((struct ifaddr *)ifa, 0);
 			}
 		}
 	}
@@ -2027,8 +2034,9 @@ nd6_prefix_offlink(pr)
 }
 
 static struct in6_ifaddr *
-in6_ifadd(pr)
+in6_ifadd(pr, mcast)
 	struct nd_prefixctl *pr;
+	int mcast;
 {
 	struct ifnet *ifp = pr->ndpr_ifp;
 	struct ifaddr *ifa;
@@ -2037,6 +2045,7 @@ in6_ifadd(pr)
 	int error, plen0;
 	struct in6_addr mask;
 	int prefixlen = pr->ndpr_plen;
+	int updateflags;
 
 	in6_prefixlen2mask(&mask, prefixlen);
 
@@ -2124,8 +2133,16 @@ in6_ifadd(pr)
 
 	ifra.ifra_flags |= IN6_IFF_AUTOCONF; /* obey autoconf */
 
-	/* allocate ifaddr structure, link into chain, etc. */
-	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
+	/*
+	 * Allocate ifaddr structure, link into chain, etc.
+	 * If we are going to create a new address upon receiving a multicasted
+	 * RA, we need to impose a random delay before starting DAD.
+	 * [draft-ietf-ipv6-rfc2462bis-02.txt, Section 5.4.2]
+	 */
+	updateflags = 0;
+	if (mcast)
+		updateflags |= IN6_IFAUPDATE_DADDELAY;
+	if ((error = in6_update_ifa(ifp, &ifra, NULL, updateflags)) != 0) {
 		nd6log((LOG_ERR,
 		    "in6_ifadd: failed to make ifaddr %s on %s (errno=%d)\n",
 		    ip6_sprintf(&ifra.ifra_addr.sin6_addr), if_name(ifp),
@@ -2139,15 +2156,16 @@ in6_ifadd(pr)
 }
 
 int
-in6_tmpifadd(ia0, forcegen)
+in6_tmpifadd(ia0, forcegen, delay)
 	const struct in6_ifaddr *ia0; /* corresponding public address */
-	int forcegen;
+	int forcegen, delay;
 {
 	struct ifnet *ifp = ia0->ia_ifa.ifa_ifp;
 	struct in6_ifaddr *newia, *ia;
 	struct in6_aliasreq ifra;
 	int i, error;
 	int trylimit = 3;	/* XXX: adhoc value */
+	int updateflags;
 	u_int32_t randid[2];
 	u_int32_t vltime0, pltime0;
 #ifndef __FreeBSD__
@@ -2240,7 +2258,10 @@ in6_tmpifadd(ia0, forcegen)
 	ifra.ifra_flags |= (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY);
 
 	/* allocate ifaddr structure, link into chain, etc. */
-	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0)
+	updateflags = 0;
+	if (delay)
+		updateflags |= IN6_IFAUPDATE_DADDELAY;
+	if ((error = in6_update_ifa(ifp, &ifra, NULL, updateflags)) != 0)
 		return (error);
 
 	newia = in6ifa_ifpwithaddr(ifp, &ifra.ifra_addr.sin6_addr);

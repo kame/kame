@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.30 2004/06/02 05:53:16 itojun Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.31 2004/07/05 03:10:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -717,7 +717,7 @@ mip6_dad_start(mbc)
 	in6_embedscope(&ia->ia_addr.sin6_addr, &ia->ia_addr);
 	IFAREF(&ia->ia_ifa);
 	mbc->mbc_dad = ia;
-	nd6_dad_start((struct ifaddr *)ia, NULL);
+	nd6_dad_start((struct ifaddr *)ia, 0);
 
 	return (0);
 }

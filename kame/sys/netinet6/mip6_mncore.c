@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.52 2004/06/09 07:17:04 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.53 2004/07/05 03:10:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1151,7 +1151,7 @@ mip6_add_haddrs(sc, ifp)
 			ifra.ifra_lifetime.ia6t_preferred = mono_time.tv_sec
 			    + ifra.ifra_lifetime.ia6t_pltime;
 		ia6 = in6ifa_ifpwithaddr(ifp, &ifra.ifra_addr.sin6_addr);
-		error = in6_update_ifa(ifp, &ifra, ia6);
+		error = in6_update_ifa(ifp, &ifra, ia6, 0);
 		if (error) {
 			mip6log((LOG_ERR,
 			    "%s:%d: add address (%s) failed. errno = %d\n",

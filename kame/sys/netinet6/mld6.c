@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.102 2004/06/15 12:53:10 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.103 2004/07/05 03:10:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -148,7 +148,7 @@ struct multi6_kludge {
 
 /*
  * time between repetitions of a node's initial report of interest in a
- * multicast address(in seconds)
+ * multicast address (in seconds)
  */
 #define MLD_UNSOLICITED_REPORT_INTERVAL	10
 
@@ -159,18 +159,20 @@ int mldalways_v2 = 0;
 struct router6_info *Head6;
 
 static struct ip6_pktopts ip6_opts;
-static int mld_group_timers_are_running;
-static int mld_interface_timers_are_running;
-static int mld_state_change_timers_are_running;
 static const struct sockaddr_in6 *all_nodes_linklocal;
 static const struct sockaddr_in6 *all_routers_linklocal;
 static const int ignflags = (IN6_IFF_NOTREADY|IN6_IFF_ANYCAST) & 
 			    ~IN6_IFF_TENTATIVE;
 
+static void mld_start_listening(struct in6_multi *);
 static void mld_sendpkt(struct in6_multi *, int, const struct in6_addr *);
 
 static struct mld_hdr * mld_allocbuf(struct mbuf **, int, struct in6_multi *,
 	int);
+static void mld_starttimer(struct in6_multi *);
+static void mld_stoptimer(struct in6_multi *);
+static void mld_timeo(struct in6_multi *);
+static u_long mld_timerresid(struct in6_multi *);
 
 void
 mld_init()
@@ -181,10 +183,6 @@ mld_init()
 
 	static struct sockaddr_in6 all_nodes_linklocal0;
 	static struct sockaddr_in6 all_routers_linklocal0;
-
-	mld_group_timers_are_running = 0;
-	mld_interface_timers_are_running = 0;
-	mld_state_change_timers_are_running = 0;
 
 	/* ip6h_nxt will be fill in later */
 	hbh->ip6h_len = 0;	/* (8 >> 3) - 1 */
@@ -214,8 +212,104 @@ mld_init()
 	Head6 = NULL;
 }
 
+static void
+mld_starttimer(in6m)
+	struct in6_multi *in6m;
+{
+	struct timeval now;
 
-void
+	microtime(&now);
+	in6m->in6m_timer_expire.tv_sec = now.tv_sec + in6m->in6m_timer / hz;
+	in6m->in6m_timer_expire.tv_usec = now.tv_usec +
+	    (in6m->in6m_timer % hz) * (1000000 / hz);
+	if (in6m->in6m_timer_expire.tv_usec > 1000000) {
+		in6m->in6m_timer_expire.tv_sec++;
+		in6m->in6m_timer_expire.tv_usec -= 1000000;
+	}
+
+	/* start or restart the timer */
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+	callout_reset(&in6m->in6m_timer_ch, in6m->in6m_timer,
+	    (void (*) __P((void *)))mld_timeo, in6m);
+#else
+	timeout_set(&in6m->in6m_timer_ch,
+	    (void (*) __P((void *)))mld_timeo, in6m);
+	timeout_add(&in6m->in6m_timer_ch, in6m->timer);
+#endif
+}
+
+static void
+mld_stoptimer(in6m)
+	struct in6_multi *in6m;
+{
+	if (in6m->in6m_timer == IN6M_TIMER_UNDEF)
+		return;
+
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+	callout_stop(&in6m->in6m_timer_ch);
+#elif defined(__OpenBSD__)
+	timeout_del(&in6m->in6m_timer_ch);
+#endif
+
+	in6m->in6m_timer = IN6M_TIMER_UNDEF;
+}
+
+static void
+mld_timeo(in6m)
+	struct in6_multi *in6m;
+{
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	int s = splsoftnet();
+#else
+	int s = splnet();
+#endif
+
+	in6m->in6m_timer = IN6M_TIMER_UNDEF;
+
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+	callout_stop(&in6m->in6m_timer_ch);
+#elif defined(__OpenBSD__)
+	timeout_del(&in6m->in6m_timer_ch);
+#endif
+
+	switch (in6m->in6m_state) {
+	case MLD_REPORTPENDING:
+		mld_start_listening(in6m);
+		break;
+	default:
+		mld_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
+		break;
+	}
+
+	splx(s);
+}
+
+static u_long
+mld_timerresid(in6m)
+	struct in6_multi *in6m;
+{
+	struct timeval now, diff;
+
+	microtime(&now);
+
+	if (now.tv_sec > in6m->in6m_timer_expire.tv_sec ||
+	    (now.tv_sec == in6m->in6m_timer_expire.tv_sec &&
+	    now.tv_usec > in6m->in6m_timer_expire.tv_usec)) {
+		return (0);
+	}
+	diff = in6m->in6m_timer_expire;
+	diff.tv_sec -= now.tv_sec;
+	diff.tv_usec -= now.tv_usec;
+	if (diff.tv_usec < 0) {
+		diff.tv_sec--;
+		diff.tv_usec += 1000000;
+	}
+
+	/* return the remaining time in milliseconds */
+	return (((u_long)(diff.tv_sec * 1000000 + diff.tv_usec)) / 1000);
+}
+
+static void
 mld_start_listening(in6m)
 	struct in6_multi *in6m;
 {
@@ -245,7 +339,7 @@ mld_start_listening(in6m)
 	if (in6_addr2zoneid(in6m->in6m_ifp, &all_sa.sin6_addr,
 	    &all_sa.sin6_scope_id)) {
 		/* XXX: this should not happen! */
-		in6m->in6m_timer = 0;
+		in6m->in6m_timer = IN6M_TIMER_UNDEF;
 		in6m->in6m_state = MLD_OTHERLISTENER;
 	}
 	if (in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
@@ -255,15 +349,15 @@ mld_start_listening(in6m)
 	if (IN6_ARE_ADDR_EQUAL(&in6m->in6m_addr, &all_sa.sin6_addr) ||
 	    IPV6_ADDR_MC_SCOPE(&in6m->in6m_addr) <
 	    IPV6_ADDR_SCOPE_LINKLOCAL) {
-		in6m->in6m_timer = 0;
+		in6m->in6m_timer = IN6M_TIMER_UNDEF;
 		in6m->in6m_state = MLD_OTHERLISTENER;
 	} else {
 		mld_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
-		in6m->in6m_timer =
-		    MLD_RANDOM_DELAY(MLD_UNSOLICITED_REPORT_INTERVAL *
-		    PR_FASTHZ);
+		in6m->in6m_timer = arc4random() %
+		    (MLD_UNSOLICITED_REPORT_INTERVAL * hz);
 		in6m->in6m_state = MLD_IREPORTEDLAST;
-		mld_group_timers_are_running = 1;
+
+		mld_starttimer(in6m);
 	}
 	splx(s);
 }
@@ -407,21 +501,11 @@ mld_input(m, off)
 		 *   which the query arrived excl. those that belong
 		 *   to the "all-nodes" group (ff02::1).
 		 * - Restart any timer that is already running but has
-		 *   A value longer than the requested timeout.
+		 *   a value longer than the requested timeout.
 		 * - Use the value specified in the query message as
 		 *   the maximum timeout.
 		 */
-
-		/*
-		 * XXX: System timer resolution is too low to handle Max
-		 * Response Delay, so set the internal timer to 1 even if
-		 * the calculated value equals to zero when Max Response
-		 * Delay is positive.
-		 */
-		timer = ntohs(mldh->mld_maxdelay) * PR_FASTHZ / MLD_TIMER_SCALE;
-		if (timer == 0 && mldh->mld_maxdelay)
-			timer = 1;
-
+		timer = ntohs(mldh->mld_maxdelay);
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
@@ -444,6 +528,9 @@ mld_input(m, off)
 			in6m = (struct in6_multi *)ifma->ifma_protospec;
 #endif
 
+			if (in6m->in6m_state == MLD_REPORTPENDING)
+				continue; /* we are not yet ready */
+
 			if (IN6_ARE_ADDR_EQUAL(&in6m->in6m_addr,
 			    &all_sa.sin6_addr) ||
 			    IPV6_ADDR_MC_SCOPE(&in6m->in6m_addr) <
@@ -457,13 +544,14 @@ mld_input(m, off)
 
 			if (timer == 0) {
 				/* send a report immediately */
+				mld_stoptimer(in6m);
 				mld_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
-				in6m->in6m_timer = 0; /* reset timer */
 				in6m->in6m_state = MLD_IREPORTEDLAST;
-			} else if (in6m->in6m_timer == 0 || /*idle state*/
-				   in6m->in6m_timer > timer) {
-				in6m->in6m_timer = MLD_RANDOM_DELAY(timer);
-				mld_group_timers_are_running = 1;
+			} else if (in6m->in6m_timer == IN6M_TIMER_UNDEF ||
+			    mld_timerresid(in6m) > (u_long)timer) {
+				in6m->in6m_timer = arc4random() %
+				    (int)(((long)timer * hz) / 1000);
+				mld_starttimer(in6m);
 			}
 		}
 		break;
@@ -490,7 +578,7 @@ mld_input(m, off)
 		 */
 		IN6_LOOKUP_MULTI(mc_sa.sin6_addr, ifp, in6m);
 		if (in6m) {
-			in6m->in6m_timer = 0; /* transit to idle state */
+			mld_stoptimer(in6m); /* transit to idle state */
 			in6m->in6m_state = MLD_OTHERLISTENER; /* clear flag */
 		}
 		break;
@@ -512,56 +600,9 @@ mld_input(m, off)
 void
 mld_fasttimeo()
 {
-	struct in6_multi *in6m;
-	struct in6_multistep step;
-	struct ifnet *ifp = NULL;
-	int s;
-
-	/*
-	 * Quick check to see if any work needs to be done, in order
-	 * to minimize the overhead of fasttimo processing.
-	 */
-	if (!mld_group_timers_are_running && !mld_interface_timers_are_running
-	    && !mld_state_change_timers_are_running)
-		return;
-
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
-
-	if (!mld_group_timers_are_running) {
-		splx(s);
-		return;
-	}
-
-	mld_group_timers_are_running = 0;
-	IN6_FIRST_MULTI(step, in6m);
-	if (in6m == NULL) {
-		splx(s);
-		return;
-	}
-	ifp = in6m->in6m_ifp;
-	while (in6m != NULL) {
-		if (in6m->in6m_timer == 0)
-			goto next_in6m; /* do nothing */
-
-		--in6m->in6m_timer;
-		if (in6m->in6m_timer > 0) {
-			mld_group_timers_are_running = 1;
-			goto next_in6m;
-		}
-		mld_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
-		in6m->in6m_state = MLD_IREPORTEDLAST;
-
-	next_in6m:
-		IN6_NEXT_MULTI(step, in6m);
-	}
-
-	splx(s);
+	/* we don't have to do anything */
+	return;
 }
-
 
 static void
 mld_sendpkt(in6m, type, dst)
@@ -707,10 +748,10 @@ mld_allocbuf(mh, len, in6m, type)
  * and the number of source is not 0.
  */
 struct	in6_multi *
-in6_addmulti(maddr6, ifp, errorp)
+in6_addmulti(maddr6, ifp, errorp, delay)
 	struct in6_addr *maddr6;
 	struct ifnet *ifp;
-	int *errorp;
+	int *errorp, delay;
 {
 	struct	in6_ifaddr *ia;
 	struct	in6_ifreq ifr;
@@ -749,6 +790,7 @@ in6_addmulti(maddr6, ifp, errorp)
 		in6m->in6m_addr = *maddr6;
 		in6m->in6m_ifp = ifp;
 		in6m->in6m_refcount = 1;
+		in6m->in6m_timer = IN6M_TIMER_UNDEF;
 		IFP_TO_IA6(ifp, ia);
 		if (ia == NULL) {
 			free(in6m, M_IPMADDR);
@@ -780,6 +822,21 @@ in6_addmulti(maddr6, ifp, errorp)
 			splx(s);
 			return (NULL);
 		}
+
+#ifdef __NetBSD__
+		callout_init(&in6m->in6m_timer_ch);
+#elif defined(__OpenBSD__)
+		bzero(&in6m->in6m_timer_ch, sizeof(in6m->in6m_timer_ch));
+#endif
+		in6m->timer = delay;
+		if (in6m->timer > 0) {
+			in6m->in6m_state = MLD_REPORTPENDING;
+			mld_starttimer(in6m);
+
+			splx(s);
+			return (in6m);
+		}
+
 		/*
 		 * Let MLD6 know that we have joined a new IP6 multicast
 		 * group.
@@ -804,6 +861,8 @@ in6_delmulti(in6m)
 #else
 	int	s = splnet();
 #endif
+
+	mld_stoptimer(in6m);
 
 	if (--in6m->in6m_refcount == 0) {
 		/*
@@ -856,10 +915,10 @@ in6_delmulti(in6m)
  * and the number of source is not 0.
  */
 struct	in6_multi *
-in6_addmulti(maddr6, ifp, errorp)
+in6_addmulti(maddr6, ifp, errorp, delay)
 	struct in6_addr *maddr6;
 	struct ifnet *ifp;
-	int *errorp;
+	int *errorp, delay;
 {
 	struct in6_multi *in6m;
 	struct ifmultiaddr *ifma;
@@ -905,8 +964,23 @@ in6_addmulti(maddr6, ifp, errorp)
 	in6m->in6m_ifp = ifp;
 	in6m->in6m_refcount = 1;
 	in6m->in6m_ifma = ifma;
+	in6m->in6m_timer = IN6M_TIMER_UNDEF;
 	ifma->ifma_protospec = in6m;
 	LIST_INSERT_HEAD(&in6_multihead, in6m, in6m_entry);
+
+#if __FreeBSD_version >= 500000
+	callout_init(&in6m->in6m_timer_ch, 0);
+#else
+	callout_init(&in6m->in6m_timer_ch);
+#endif
+	in6m->in6m_timer = delay;
+	if (in6m->in6m_timer > 0) {
+		in6m->in6m_state = MLD_REPORTPENDING;
+		mld_starttimer(in6m);
+
+		splx(s);
+		return (in6m);
+	}
 
 	/*
 	 * Let MLD6 know that we have joined a new IPv6 multicast
@@ -925,13 +999,14 @@ in6_delmulti(in6m)
 	struct in6_multi *in6m;
 {
 	struct ifmultiaddr *ifma = in6m->in6m_ifma;
-	int	s = splnet();
+	int s = splnet();
 
 	if (ifma->ifma_refcount == 1) {
 		/*
 		 * No remaining claims to this record; let MLD6 know
 		 * that we are leaving the multicast group.
 		 */
+		mld_stoptimer(in6m);
 		mld_stop_listening(in6m);
 		ifma->ifma_protospec = 0;
 		LIST_REMOVE(in6m, in6m_entry);
@@ -944,10 +1019,10 @@ in6_delmulti(in6m)
 #endif /* not FreeBSD */
 
 struct in6_multi_mship *
-in6_joingroup(ifp, addr, errorp)
+in6_joingroup(ifp, addr, errorp, delay)
 	struct ifnet *ifp;
 	struct in6_addr *addr;
-	int *errorp;
+	int *errorp, delay;
 {
 	struct in6_multi_mship *imm;
 
@@ -958,7 +1033,7 @@ in6_joingroup(ifp, addr, errorp)
 	}
 
 	bzero(imm, sizeof(*imm));
-	imm->i6mm_maddr = in6_addmulti(addr, ifp, errorp);
+	imm->i6mm_maddr = in6_addmulti(addr, ifp, errorp, delay);
 	if (!imm->i6mm_maddr) {
 		/* *errorp is alrady set */
 		free(imm, M_IPMADDR);
@@ -996,7 +1071,7 @@ in6_savemkludge(oia)
 
 	IFP_TO_IA6(oia->ia_ifp, ia);
 	if (ia) {	/* there is another address */
-		for (in6m = oia->ia6_multiaddrs.lh_first; in6m; in6m = next){
+		for (in6m = oia->ia6_multiaddrs.lh_first; in6m; in6m = next) {
 			next = in6m->in6m_entry.le_next;
 			IFAFREE(&in6m->in6m_ia->ia_ifa);
 			IFAREF(&ia->ia_ifa);
@@ -1013,7 +1088,7 @@ in6_savemkludge(oia)
 		if (mk == NULL) /* this should not happen! */
 			panic("in6_savemkludge: no kludge space");
 
-		for (in6m = oia->ia6_multiaddrs.lh_first; in6m; in6m = next){
+		for (in6m = oia->ia6_multiaddrs.lh_first; in6m; in6m = next) {
 			next = in6m->in6m_entry.le_next;
 			IFAFREE(&in6m->in6m_ia->ia_ifa); /* release reference */
 			in6m->in6m_ia = NULL;

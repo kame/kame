@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.452 2004/07/03 06:54:48 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.453 2004/07/05 03:10:13 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3716,7 +3716,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * Even this request doesn't add any source filter, create
 		 * msf entry list. This is needed to indicate current msf state.
 		 */
-		imm = in6_joingroup(ifp, &sa6_mc.sin6_addr, &error);
+		imm = in6_joingroup(ifp, &sa6_mc.sin6_addr, &error, 0);
 		if (imm == NULL)
 			break;
 #ifdef MLDV2
@@ -3852,7 +3852,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * address list for the given interface.
 		 */
 		init = 1;
-		imm = in6_joingroup(ifp, &SIN6(&ss_grp)->sin6_addr, &error);
+		imm = in6_joingroup(ifp, &SIN6(&ss_grp)->sin6_addr, &error, 0);
 		if (error != 0)
 			break;
 		msf = imm->i6mm_msf;

@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.99 2004/06/16 02:44:02 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.100 2004/07/05 03:10:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -557,12 +557,28 @@ struct	in6_multi {
 					 * (meaningless for FreeBSD)
 					 */
 	u_int	in6m_state;		/* state of the membership */
-	u_int	in6m_timer;		/* MLD6 listener report timer */
 	struct	router6_info *in6m_rti;	/* router info */
 	struct	in6_multi_source *in6m_source;	/* filtered source list */
+
+#ifdef MLDv2
+	u_int	in6m_timer;		/* MLD6 listener report timer */
+#else
+	int	in6m_timer;		/* delay to send the 1st report */
+	struct timeval in6m_timer_expire; /* when the timer expires */
+#if defined(__NetBSD__) || defined(__FreeBSD__)
+	struct callout in6m_timer_ch;
+#elif defined(__OpenBSD__)
+	struct timeout in6m_timer_ch;
+#endif
+#endif
 };
 
+#define IN6M_TIMER_UNDEF -1
+
 #ifdef _KERNEL
+/* flags to in6_update_ifa */
+#define IN6_IFAUPDATE_DADDELAY	0x1 /* first time to configure an address */
+
 #ifdef __FreeBSD__
 extern LIST_HEAD(in6_multihead, in6_multi) in6_multihead;
 #endif
@@ -717,10 +733,11 @@ do {									\
 	}								\
 } while (/*CONSTCOND*/ 0)
 
-struct	in6_multi *in6_addmulti __P((struct in6_addr *, struct ifnet *, int *));
+struct	in6_multi *in6_addmulti __P((struct in6_addr *,
+	struct ifnet *, int *, int));
 void	in6_delmulti __P((struct in6_multi *));
 struct in6_multi_mship *in6_joingroup __P((struct ifnet *,
-	struct in6_addr *, int *));
+	struct in6_addr *, int *, int));
 int	in6_leavegroup __P((struct in6_multi_mship *));
 #ifdef MLDV2
 struct	in6_multi *in6_addmulti2(struct in6_addr *, struct ifnet *,
@@ -742,7 +759,7 @@ int	in6_control __P((struct socket *, u_long, caddr_t, struct ifnet *,
 	struct proc *));
 #endif
 int	in6_update_ifa __P((struct ifnet *, struct in6_aliasreq *,
-	struct in6_ifaddr *));
+	struct in6_ifaddr *, int));
 void	in6_purgeaddr __P((struct ifaddr *));
 int	in6if_do_dad __P((struct ifnet *));
 void	in6_purgeif __P((struct ifnet *));

@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.197 2004/06/02 05:53:14 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.198 2004/07/05 03:10:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -637,12 +637,14 @@ in6_ifattach_linklocal(ifp, altifp)
 	ifra.ifra_lifetime.ia6t_vltime = ND6_INFINITE_LIFETIME;
 	ifra.ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;
 
+#if 0				/* temporarily disabled by jinmei */
 	/*
 	 * Do not let in6_update_ifa() do DAD, since we need a random delay
 	 * before sending an NS at the first time the interface becomes up.
 	 * Instead, in6_if_up() will start DAD with a proper random delay.
 	 */
 	ifra.ifra_flags |= IN6_IFF_NODAD;
+#endif
 
 	/*
 	 * Now call in6_update_ifa() to do a bunch of procedures to configure
@@ -650,7 +652,8 @@ in6_ifattach_linklocal(ifp, altifp)
 	 * we know there's no other link-local address on the interface
 	 * and therefore we are adding one (instead of updating one).
 	 */
-	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
+	if ((error = in6_update_ifa(ifp, &ifra, NULL,
+	    IN6_IFAUPDATE_DADDELAY)) != 0) {
 		/*
 		 * XXX: When the interface does not support IPv6, this call
 		 * would fail in the SIOCSIFADDR ioctl.  I believe the
@@ -764,7 +767,7 @@ in6_ifattach_loopback(ifp)
 	 * We are sure that this is a newly assigned address, so we can set
 	 * NULL to the 3rd arg.
 	 */
-	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
+	if ((error = in6_update_ifa(ifp, &ifra, NULL, 0)) != 0) {
 		nd6log((LOG_ERR, "in6_ifattach_loopback: failed to configure "
 		    "the loopback address on %s (errno=%d)\n",
 		    if_name(ifp), error));

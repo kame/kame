@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.373 2004/06/16 02:24:19 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.374 2004/07/05 03:10:13 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -816,7 +816,7 @@ in6_control(so, cmd, data, ifp, p)
 		 * first, make or update the interface address structure,
 		 * and link it to the list.
 		 */
-		if ((error = in6_update_ifa(ifp, ifra, ia)) != 0)
+		if ((error = in6_update_ifa(ifp, ifra, ia, 0)) != 0)
 			return (error);
 		if ((ia = in6ifa_ifpwithaddr(ifp, &ifra->ifra_addr.sin6_addr))
 		    == NULL) {
@@ -896,7 +896,7 @@ in6_control(so, cmd, data, ifp, p)
 			if ((ia->ia6_flags & IN6_IFF_AUTOCONF) &&
 			    ip6_use_tempaddr && pr->ndpr_refcnt == 1) {
 				int e;
-				if ((e = in6_tmpifadd(ia, 1)) != 0) {
+				if ((e = in6_tmpifadd(ia, 1, 0)) != 0) {
 					log(LOG_NOTICE, "in6_control: failed "
 					    "to create a temporary address, "
 					    "errno=%d\n", e);
@@ -950,20 +950,23 @@ in6_control(so, cmd, data, ifp, p)
  * XXX: should this be performed under splnet()?
  */
 int
-in6_update_ifa(ifp, ifra, ia)
+in6_update_ifa(ifp, ifra, ia, flags)
 	struct ifnet *ifp;
 	struct in6_aliasreq *ifra;
 	struct in6_ifaddr *ia;
+	int flags;
 {
 	int error = 0, hostIsNew = 0, plen = -1;
 	struct in6_ifaddr *oia;
 	struct sockaddr_in6 dst6;
 	struct in6_addrlifetime *lt;
 	struct in6_multi_mship *imm;
+	struct in6_multi *in6m_sol;
 #ifndef __FreeBSD__
 	time_t time_second = (time_t)time.tv_sec;
 #endif
 	struct rtentry *rt;
+	int delay;
 
 	/* Validate parameters */
 	if (ifp == NULL || ifra == NULL) /* this maybe redundant */
@@ -1151,7 +1154,7 @@ in6_update_ifa(ifp, ifra, ia)
 		 */
 		if (ia->ia_prefixmask.sin6_len &&
 		    in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL) != plen) {
-			nd6log((LOG_INFO, "in6_update_ifa: the prefix length of an"
+			nd6log((LOG_INFO, "in6_update_ifa: the plen of an "
 			    " existing (%s) address should not be changed\n",
 			    ip6_sprintf(&ia->ia_addr.sin6_addr)));
 			error = EINVAL;
@@ -1238,6 +1241,7 @@ in6_update_ifa(ifp, ifra, ia)
 	 */
 
 	/* Join necessary multicast groups */
+	in6m_sol = NULL;
 	if ((ifp->if_flags & IFF_MULTICAST) != 0) {
 		struct sockaddr_in6 mltaddr, mltmask;
 #ifndef SCOPEDROUTING
@@ -1263,7 +1267,19 @@ in6_update_ifa(ifp, ifra, ia)
 			goto cleanup;
 		}
 		in6_embedscope(&llsol.sin6_addr, &llsol);
-		imm = in6_joingroup(ifp, &llsol.sin6_addr, &error);
+		delay = 0;
+		if ((flags & IN6_IFAUPDATE_DADDELAY)) {
+			/*
+			 * We need a random delay for DAD on the address
+			 * being configured.  It also means delaying
+			 * transmission of the corresponding MLD report to
+			 * avoid report collision.
+			 * [draft-ietf-ipv6-rfc2462bis-02.txt]
+			 */
+			delay = arc4random() %
+			    (MAX_RTR_SOLICITATION_DELAY * hz);
+		}
+		imm = in6_joingroup(ifp, &llsol.sin6_addr, &error, delay);
 		if (!imm) {
 			nd6log((LOG_ERR, "in6_update_ifa: "
 			    "addmulti failed for %s on %s "
@@ -1274,6 +1290,7 @@ in6_update_ifa(ifp, ifra, ia)
 		}
 		LIST_INSERT_HEAD(&ia->ia6_memberships,
 		    imm, i6mm_chain);
+		in6m_sol = imm->i6mm_maddr;
 
 		bzero(&mltmask, sizeof(mltmask));
 		mltmask.sin6_len = sizeof(struct sockaddr_in6);
@@ -1345,7 +1362,7 @@ in6_update_ifa(ifp, ifra, ia)
 		} else {
 			RTFREE(rt);
 		}
-		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
+		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error, 0);
 		if (!imm) {
 			nd6log((LOG_WARNING,
 			    "in6_update_ifa: addmulti failed for "
@@ -1362,8 +1379,18 @@ in6_update_ifa(ifp, ifra, ia)
 #ifdef __FreeBSD__
 #define hostnamelen	strlen(hostname)
 #endif
+		delay = 0;
+		if ((flags & IN6_IFAUPDATE_DADDELAY)) {
+			/*
+			 * The spec doesn't say anything about delay for this
+			 * group, but the same logic should apply.
+			 */
+			delay = arc4random() %
+			    (MAX_RTR_SOLICITATION_DELAY * hz);
+		}
 		if (in6_nigroup(ifp, hostname, hostnamelen, &mltaddr) == 0) {
-			imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
+			imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error,
+			    delay); /* XXX jinmei */
 			if (!imm) {
 				nd6log((LOG_WARNING, "in6_update_ifa: "
 				    "addmulti failed for %s on %s "
@@ -1434,7 +1461,7 @@ in6_update_ifa(ifp, ifra, ia)
 		} else {
 			RTFREE(rt);
 		}
-		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
+		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error, 0);
 		if (!imm) {
 			nd6log((LOG_WARNING, "in6_update_ifa: "
 			    "addmulti failed for %s on %s "
@@ -1459,7 +1486,33 @@ in6_update_ifa(ifp, ifra, ia)
 	    (ifra->ifra_flags & IN6_IFF_NODAD) == 0)
 #endif /* MIP6 && MIP6_MOBILE_NODE */
 	{
-		nd6_dad_start((struct ifaddr *)ia, NULL);
+		int mindelay, maxdelay;
+
+		delay = 0;
+		if ((flags & IN6_IFAUPDATE_DADDELAY)) {
+			/*
+			 * We need to impose a delay before sending an NS
+			 * for DAD.  Check if we also needed a delay for the
+			 * corresponding MLD message.  If we did, the delay
+			 * should be larger than the MLD delay (this could be
+			 * relaxed a bit, but this simple logic is at least
+			 * safe).
+			 */
+			mindelay = 0;
+			if (in6m_sol != NULL &&
+			    in6m_sol->in6m_state == MLD_REPORTPENDING) {
+				mindelay = in6m_sol->in6m_timer;
+			}
+			maxdelay = MAX_RTR_SOLICITATION_DELAY * hz;
+			if (maxdelay - mindelay == 0)
+				delay = 0;
+			else {
+				delay =
+				    (arc4random() % (maxdelay - mindelay)) +
+				    mindelay;
+			}
+		}
+		nd6_dad_start((struct ifaddr *)ia, delay);
 	}
 
 	return (error);
@@ -2319,26 +2372,27 @@ in6_if_up(ifp)
 {
 	struct ifaddr *ifa;
 	struct in6_ifaddr *ia;
-	int dad_delay;		/* delay ticks before DAD output */
 
-	/*
-	 * special cases, like 6to4, are handled in in6_ifattach
-	 */
-	in6_ifattach(ifp, NULL);
-
-	dad_delay = 0;
 #ifdef __FreeBSD__
 	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #else
-	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
+	for (ifa = ifp->if_addrlist.tqh_first; ifa;
+	    ifa = ifa->ifa_list.tqe_next)
 #endif
 	{
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
 		ia = (struct in6_ifaddr *)ifa;
-		if (ia->ia6_flags & IN6_IFF_TENTATIVE)
-			nd6_dad_start(ifa, &dad_delay);
+		if (ia->ia6_flags & IN6_IFF_TENTATIVE) {
+			nd6_dad_start(ifa,
+			    arc4random() % (MAX_RTR_SOLICITATION_DELAY * hz));
+		}
 	}
+
+	/*
+	 * special cases, like 6to4, are handled in in6_ifattach
+	 */
+	in6_ifattach(ifp, NULL);
 }
 
 int

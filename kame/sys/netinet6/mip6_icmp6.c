@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.92 2004/06/02 05:53:16 itojun Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.93 2004/07/05 03:10:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1029,7 +1029,7 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 
 			/* assign a new home address. */
 			error = in6_update_ifa((struct ifnet *)hif, &ifra,
-			    ia6);
+			    ia6, 0);
 			if (error) {
 				mip6log((LOG_ERR,
 				    "%s:%d: add address (%s) failed. errno = %d\n",

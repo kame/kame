@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.149 2004/06/02 05:53:17 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.150 2004/07/05 03:10:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1254,9 +1254,9 @@ nd6_dad_stoptimer(dp)
  * Start Duplicate Address Detection (DAD) for specified interface address.
  */
 void
-nd6_dad_start(ifa, tick)
+nd6_dad_start(ifa, delay)
 	struct ifaddr *ifa;
-	int *tick;	/* minimum delay ticks for IFF_UP event */
+	int delay;
 {
 	struct in6_ifaddr *ia = (struct in6_ifaddr *)ifa;
 	struct dadq *dp;
@@ -1342,20 +1342,12 @@ nd6_dad_start(ifa, tick)
 	dp->dad_count = ip6_dad_count;
 	dp->dad_ns_icount = dp->dad_na_icount = 0;
 	dp->dad_ns_ocount = dp->dad_ns_tcount = 0;
-	if (tick == NULL) {
+	if (delay == 0) {
 		nd6_dad_ns_output(dp, ifa);
 		nd6_dad_starttimer(dp,
 		    (long)ND_IFINFO(ifa->ifa_ifp)->retrans * hz / 1000);
-	} else {
-		int ntick;
-
-		if (*tick == 0)
-			ntick = arc4random() % (MAX_RTR_SOLICITATION_DELAY * hz);
-		else
-			ntick = *tick + arc4random() % (hz / 2);
-		*tick = ntick;
-		nd6_dad_starttimer(dp, ntick);
-	}
+	} else
+		nd6_dad_starttimer(dp, delay);
 }
 
 /*
@@ -1499,7 +1491,7 @@ nd6_dad_timer(ifa)
 		} else {
 			/*
 			 * We are done with DAD.  No NA came, no NS came.
-			 * duplicated address found.
+			 * No duplicated address found.
 			 */
 			ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
 

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.359 2004/05/26 09:41:05 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.360 2004/07/05 03:10:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -870,9 +870,13 @@ regen_tmpaddr(ia6)
 	if (public_ifa6 != NULL) {
 		int e;
 
-		if ((e = in6_tmpifadd(public_ifa6, 0)) != 0) {
+		/*
+		 * Random factor is introduced in the preferred lifetime, so
+		 * we do not need additional delay (3rd arg to in6_tmpifadd).
+		 */
+		if ((e = in6_tmpifadd(public_ifa6, 0, 0)) != 0) {
 			log(LOG_NOTICE, "regen_tmpaddr: failed to create a new"
-			    " tmp addr,errno=%d\n", e);
+			    " tmp addr, errno=%d\n", e);
 			return (-1);
 		}
 		return (0);
@@ -1536,8 +1540,8 @@ nd6_rtrequest(req, rt, info)
 					break;
 				if (in6_embedscope(&llsol.sin6_addr, &llsol))
 					break;
-				if (in6_addmulti(&llsol.sin6_addr, ifp, &error)
-				    == NULL) {
+				if (in6_addmulti(&llsol.sin6_addr,
+				    ifp, &error, 0) == NULL) {
 					nd6log((LOG_ERR, "%s: failed to join "
 					    "%s (errno=%d)\n", if_name(ifp),
 					    ip6_sprintf(&llsol.sin6_addr),

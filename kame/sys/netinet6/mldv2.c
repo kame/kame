@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.24 2004/06/14 07:30:54 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.25 2004/07/05 03:10:14 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2073,10 +2073,11 @@ mld_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
  * provided for backward compatibility
  */
 struct	in6_multi *
-in6_addmulti(maddr6, ifp, errorp)
+in6_addmulti(maddr6, ifp, errorp, delay)
 	struct in6_addr *maddr6;
 	struct ifnet *ifp;
 	int *errorp;
+	int delay;		/* XXX unused */
 {
 	return in6_addmulti2(maddr6, ifp, errorp, 0, NULL, MCAST_EXCLUDE, 1);
 }
@@ -2769,7 +2770,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 			 */
 			in6_clear_all_pending_report(in6m);
 			imm = in6_joingroup(in6m->in6m_ifp, &in6m->in6m_addr,
-			    error);
+			    error, 0);
 			if (imm) {
 				LIST_INSERT_HEAD(&ia->ia6_multiaddrs, in6m,
 				    in6m_entry);
@@ -3393,7 +3394,8 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 			 * If MSF's pending records exist, they must be deleted.
 			 */
 			in6_clear_all_pending_report(in6m);
-			in6_joingroup(in6m->in6m_ifp, &in6m->in6m_addr, error);
+			in6_joingroup(in6m->in6m_ifp, &in6m->in6m_addr,
+			    error, 0);
 #if 0
 			if (imm) {
 				LIST_INSERT_HEAD(in6m->, imm,
@@ -3443,10 +3445,11 @@ in6_is_mld_target(group)
 }
 
 struct in6_multi_mship *
-in6_joingroup(ifp, addr, errorp)
+in6_joingroup(ifp, addr, errorp, delay)
 	struct ifnet *ifp;
 	struct in6_addr *addr;
 	int *errorp;
+	int delay;		/* unused for now */
 {
 	struct in6_multi_mship *imm;
 	int error = 0;
@@ -3463,7 +3466,7 @@ in6_joingroup(ifp, addr, errorp)
 		*errorp = error;
 		return NULL;
 	}
-	imm->i6mm_maddr = in6_addmulti(addr, ifp, errorp);
+	imm->i6mm_maddr = in6_addmulti(addr, ifp, errorp, delay);
 	imm->i6mm_msf->msf_grpjoin++;
 	if (*errorp != 0) {
 		IMO_MSF_FREE(imm->i6mm_msf);

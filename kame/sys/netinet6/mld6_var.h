@@ -1,4 +1,4 @@
-/*	$KAME: mld6_var.h,v 1.12 2004/05/26 07:41:31 itojun Exp $	*/
+/*	$KAME: mld6_var.h,v 1.13 2004/07/05 03:10:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -41,6 +41,7 @@
  */
 #define MLD_OTHERLISTENER			0
 #define MLD_IREPORTEDLAST			1
+#define MLD_REPORTPENDING			2 /* implementation specific */
 
 /*
  * States for the MLDv2's state table.
@@ -86,8 +87,6 @@ struct	router6_info * rt6i_init(struct ifnet *);
 void	mld_input(struct mbuf *, int);
 #ifdef MLDV2
 void	mld_start_listening(struct in6_multi *, u_int8_t type);
-#else
-void	mld_start_listening(struct in6_multi *);
 #endif
 void	mld_stop_listening(struct in6_multi *);
 void	mld_slowtimeo(void);

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.111 2004/06/02 05:53:16 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.112 2004/07/05 03:10:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -434,7 +434,7 @@ void nd6_ns_input __P((struct mbuf *, int, int));
 void nd6_ns_output __P((struct ifnet *, const struct in6_addr *,
 	const struct in6_addr *, struct llinfo_nd6 *, int));
 caddr_t nd6_ifptomac __P((struct ifnet *));
-void nd6_dad_start __P((struct ifaddr *, int *));
+void nd6_dad_start __P((struct ifaddr *, int));
 void nd6_dad_stop __P((struct ifaddr *));
 void nd6_dad_duplicated __P((struct ifaddr *));
 
@@ -456,7 +456,7 @@ struct nd_defrouter *defrouter_lookup __P((struct in6_addr *, struct ifnet *));
 struct nd_prefix *nd6_prefix_lookup __P((struct nd_prefixctl *));
 void rt6_flush __P((struct in6_addr *, struct ifnet *));
 int nd6_setdefaultiface __P((int));
-int in6_tmpifadd __P((const struct in6_ifaddr *, int));
+int in6_tmpifadd __P((const struct in6_ifaddr *, int, int));
 
 #endif /* _KERNEL */
 
