@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.71 2002/12/18 07:26:41 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.72 2002/12/18 12:06:13 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -117,8 +117,7 @@ static void	 natpt_expireTSlot	__P((void *));
 static void	 natpt_removeTSlotEntry	__P((struct tSlot *, int));
 
 static caddr_t	 natpt_duplicateXLate	__P((void));
-static void	 natpt_releaseXLate	__P((void));
-void		 natpt_clearXLate	__P((void *));
+static void	 natpt_releaseXLate	__P((void *));
 
 
 /*
@@ -983,7 +982,7 @@ natpt_xlate(caddr_t addr)
 		break;
 
 	case NATPT_releaseXLate:
-		natpt_releaseXLate();
+		natpt_releaseXLate((void *)NULL);
 		break;
 	}
 
@@ -998,10 +997,19 @@ natpt_duplicateXLate()
 	struct tSlot	*tslq, *tsln;
 	struct tcpstate	*ts;
 
+#if 0
+	/*
+	 * This check is unnecessary because translator call
+	 * natpt_releaseXLate() always.
+	 */
 	if (!TAILQ_EMPTY(&tsl_xlate_head)) {
 		natpt_error = EBUSY;
 		return (NULL);
 	}
+#endif
+
+	/* Release the copied tSlot whenever duplicate a tSlot tree. */
+	natpt_releaseXLate((void *)NULL);
 
 	TAILQ_INIT(&tsl_xlate_head);
 
@@ -1035,31 +1043,14 @@ natpt_duplicateXLate()
 	splx(s);
 
 	if (!TAILQ_EMPTY(&tsl_xlate_head))
-		timeout(natpt_clearXLate, (caddr_t)0, xlateTimer * hz);
+		timeout(natpt_releaseXLate, (caddr_t)0, xlateTimer * hz);
 
 	return ((caddr_t)&tsl_xlate_head);
 }
 
 
 static void
-natpt_releaseXLate()
-{
-	struct tSlot *tsl, *tsln;
-
-	tsl = TAILQ_FIRST(&tsl_xlate_head);
-	while (tsl) {
-		tsln = TAILQ_NEXT(tsl, tsl_list);
-
-		natpt_removeTSlotEntry(tsl, FALSE);
-		tsl = tsln;
-	}
-
-	TAILQ_INIT(&tsl_xlate_head);
-}
-
-
-void
-natpt_clearXLate(void *ignored_arg)
+natpt_releaseXLate(void *ignored_arg)
 {
 	struct tSlot *tsl, *tsln;
 
@@ -1268,7 +1259,7 @@ natpt_init_tslot()
 	tSlotEntryMax = MAXTSLOTENTRY;
 	tSlotEntryUsed = 0;
 
-	xlateTimer = 8;
+	xlateTimer = 180;				/* about 3 min] */
 
 	tSlotTimer = 10;
 	frgmntTimer = 10;
