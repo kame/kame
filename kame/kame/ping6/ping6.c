@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.105 2000/12/02 02:48:41 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.106 2000/12/21 23:56:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -945,6 +945,9 @@ main(argc, argv)
 		       sizeof(optval)) < 0)
 		warn("setsockopt(IPV6_HOPLIMIT)"); /* XXX err? */
 #endif
+
+	/* revoke root privilege */
+	setuid(getuid());
 
 	printf("PING6(%d=40+8+%d bytes) ", datalen + 48, datalen);
 	printf("%s --> ", pr_addr(&src));
