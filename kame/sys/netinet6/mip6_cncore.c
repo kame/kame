@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.3 2003/05/11 20:56:46 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.4 2003/05/11 23:27:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -2584,7 +2584,7 @@ mip6_tunnel_control(action, entry, func, ep)
 	case MIP6_TUNNEL_CHANGE:
 		*ep = encap_attach_func(AF_INET6, IPPROTO_IPV6,
 					func,
-					&mip6_tunnel_protosw,
+					(struct protosw *)&mip6_tunnel_protosw,
 					(void *)entry);
 		if (*ep == NULL) {
 			mip6log((LOG_ERR,
