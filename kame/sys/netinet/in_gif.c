@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.74 2001/10/23 12:42:22 jinmei Exp $	*/
+/*	$KAME: in_gif.c,v 1.75 2001/10/24 01:03:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -50,8 +50,8 @@
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <sys/errno.h>
-#ifdef __FreeBSD__
 #include <sys/kernel.h>
+#ifdef __FreeBSD__
 #include <sys/sysctl.h>
 #endif
 #if !defined(__FreeBSD__) || __FreeBSD__ < 3
