@@ -1,7 +1,24 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2012 2001/12/18 04:07:26 jinmei Exp $
+$KAME: CHANGELOG,v 1.2013 2001/12/19 14:50:27 jinmei Exp $
 
 <200112>
+2001-12-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c (get_addrselectpolicy): enabled
+	for FreeBSD.
+
+2001-12-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/addrselect/addrselect.c: used ioctl()s just added below
+	to set/delete policy entries.
+
+2001-12-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/{in6.c, in6_src.c}:
+	- implemented two new ioctls to set/delete address selection
+	  policy entry
+	- disabled write operation of net.inet6.ip6.addrselpolicy
+	  accordingly
+	with these changes, address selection policy can now be installed
+	on all supported platforms.
+
 2001-12-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/{kame,sys}/(many files): replaced mld6_xxx and MLD6_XXX
 	with mld_xxx and MLD_XXX according to the change below.
