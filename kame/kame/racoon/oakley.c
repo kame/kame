@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.100 2001/08/16 14:09:43 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.101 2001/08/17 10:49:24 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1545,8 +1545,8 @@ oakley_getsign(iph1)
 				"failed to get private key.\n");
 			goto end;
 		}
-		plog(LLV_DEBUG, LOCATION, NULL, "private key:\n");
-		plogdump(LLV_DEBUG, privkey->v, privkey->l);
+		plog(LLV_DEBUG2, LOCATION, NULL, "private key:\n");
+		plogdump(LLV_DEBUG2, privkey->v, privkey->l);
 
 		iph1->sig = eay_get_x509sign(iph1->hash,
 					privkey, &iph1->cert->cert);
