@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.39 2000/09/13 05:58:34 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.40 2000/09/15 21:00:10 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -498,9 +498,6 @@ remote 172.168.2.2 [7000]
 
 	# specify the bytes length of nonce.
 	nonce_size 16;
-
-	# means to do keep-a-live.  This should not be used in dial-up.
-	keepalive;
 
 	# default lifetime, will be copied into each proposals.
 	lifetime time 10 min;	# sec,min,hour
