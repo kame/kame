@@ -1,4 +1,4 @@
-/*	$KAME: mld6_var.h,v 1.5 2002/05/28 11:27:07 itojun Exp $	*/
+/*	$KAME: mld6_var.h,v 1.6 2002/09/05 08:09:37 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -35,22 +35,73 @@
 #ifdef _KERNEL
 
 #ifdef __bsdi__
-#define MLD6_RANDOM_DELAY(X) (random() % (X) + 1)
+#define MLD_RANDOM_DELAY(X) (random() % (X) + 1)
 #else
-#define MLD6_RANDOM_DELAY(X) (arc4random() % (X) + 1)
+#define MLD_RANDOM_DELAY(X) (arc4random() % (X) + 1)
 #endif
 
 /*
  * States for MLD stop-listening processing
  */
-#define MLD6_OTHERLISTENER			0
-#define MLD6_IREPORTEDLAST			1
+#define MLD_OTHERLISTENER			0
+#define MLD_IREPORTEDLAST			1
 
-void	mld6_init __P((void));
-void	mld6_input __P((struct mbuf *, int));
-void	mld6_start_listening __P((struct in6_multi *));
-void	mld6_stop_listening __P((struct in6_multi *));
-void	mld6_fasttimeo __P((void));
+/*
+ * States for the MLDv2's state table.
+ */
+#define	MLD_QUERY_PENDING_MEMBER	2	/* pending General Query */
+#define	MLD_G_QUERY_PENDING_MEMBER	3	/* pending Grp-specific Query */
+#define	MLD_SG_QUERY_PENDING_MEMBER	4	/* pending Grp-Src-specific Q.*/
+
+/*
+ * We must remember what version the subnet's querier is.
+ * We conveniently use the MLD message type for the proper
+ * membership report to keep this state.
+ */
+#define MLD_V1_ROUTER				MLD_LISTENER_REPORT
+#define MLD_V2_ROUTER				MLDV2_LISTENER_REPORT
+
+/*
+ * MLDv2 default variables
+ */
+#define	MLD_DEF_RV		2	/* Default Robustness Variable */
+#define	MLD_DEF_QI		125	/* Query Interval (125 sec.) */
+#define	MLD_DEF_QRI		100	/* Query Response Interval (10 sec.) */
+#define	MLD_OQPI		((MLD_DEF_RV * MLD_DEF_QI) + MLD_DEF_QRI/2)
+#define	MLD_GMI			((MLD_DEF_RV * MLD_DEF_QI) + MLD_DEF_QRI)
+#define	MLD_START_INTVL		MLD_DEF_QI/4
+#define	MLD_START_CNT		MLD_DEF_RV
+#define	MLD_LAST_INTVL		1	/* Last Member Query Interval (sec.) */
+#define	MLD_LAST_CNT		MLD_DEF_RV
+#define MLD_UNSOL_INTVL         10      /* Unsolicited Report Interval (sec) */
+#define	MLDV2_UNSOL_INTVL	1	/* Unsolicited Report Interval (sec) */
+#define	MLD_DEF_QUERY		10	/* v1 Max. Response Time (sec.) */
+
+extern	struct router6_info *Head6;
+
+void	mld6_init(void);
+struct	router6_info * rt6i_init(struct ifnet *);
+void	mld6_input(struct mbuf *, int);
+#ifdef MLDV2
+void	mld6_start_listening(struct in6_multi *, u_int8_t type);
+#else
+void	mld6_start_listening(struct in6_multi *);
+#endif
+void	mld6_stop_listening(struct in6_multi *);
+void	mld_slowtimeo(void);
+void	mld6_fasttimeo(void);
+void	mld_send_state_change_report(struct mbuf **, int *,
+				     struct in6_multi *, u_int8_t, int);
+#if defined(MLDV2) && !defined(__FreeBSD__)
+int	mld_sysctl(int *, u_int, void *, size_t *, void *, size_t);
+#endif
 #endif /* _KERNEL */
+
+/* definitions to provide backward compatibility to old KAME applications */
+#ifndef _KERNEL
+#define MLD6_RANDOM_DELAY(X)	MLD_RANDOM_DELAY(X)
+#define MLD6_OTHERLISTENER	MLD_OTHERLISTENER
+#define MLD6_IREPORTEDLAST	MLD_IREPORTEDLAST
+#endif
 
 #endif /* _NETINET6_MLD6_VAR_H_ */

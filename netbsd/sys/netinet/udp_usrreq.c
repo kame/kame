@@ -33,8 +33,9 @@
  */
 /*
  * Implementation of Internet Group Management Protocol, Version 3.
+ * Implementation of Multicast Listener Discovery, Version 2.
  *
- * Developed by Hitoshi Asaeda, INRIA, February 2002.
+ * Developed by Hitoshi Asaeda, INRIA, February, August 2002.
  */
 
 /*
@@ -125,7 +126,7 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
-#ifdef IGMPV3
+#if defined(IGMPV3) || defined(MLDV2)
 #include <netinet/in_msf.h>
 #endif
 #include <netinet/ip.h>
@@ -770,6 +771,11 @@ udp6_realinput(af, src, dst, m, off)
 	int rcvcnt;
 	const struct in_addr *dst4;
 	struct in6pcb *in6p;
+#ifdef MLDV2
+	struct ip6_moptions *im6o;
+	struct in6_multi_mship *imm;
+	struct sock_msf_source *msfsrc;
+#endif
 
 	rcvcnt = 0;
 	off += sizeof(struct udphdr);	/* now, offset of payload */
@@ -833,9 +839,100 @@ udp6_realinput(af, src, dst, m, off)
 					continue;
 			}
 
+#ifdef MLDV2
+#define PASS_TO_PCB6() \
+	do { \
+		last = in6p; \
+		udp6_sendup(m, off, (struct sockaddr *)src, \
+			    in6p->in6p_socket); \
+		rcvcnt++; \
+	} while (0)
+			
+			/*
+			 * Receive multicast data which fits MSF condition.
+			 */
+			im6o = in6p->in6p_moptions;
+			for (imm = LIST_FIRST(&im6o->im6o_memberships);
+			     imm != NULL;
+			     imm = LIST_NEXT(imm, i6mm_chain)) {
+				if (SS_CMP(&imm->i6mm_maddr->in6m_sa, !=, src))
+					continue;
+				
+				if (imm->i6mm_msf == NULL) {
+#ifdef MLDV2_DEBUG
+					printf("XXX: unexpected case occured at %s:%d",
+					       __FILE__, __LINE__);
+#endif
+					continue;
+				}
+				 				
+				/* receive data from any source */
+				if (imm->i6mm_msf->msf_grpjoin != 0) {
+					PASS_TO_PCB6();
+					break;
+				}
+				goto search_allow_list;
+				
+			search_allow_list:
+				if (imm->i6mm_msf->msf_numsrc == 0)
+					goto search_block_list;
+				
+				LIST_FOREACH(msfsrc,
+					     imm->i6mm_msf->msf_head,
+					     list) {
+					if (msfsrc->src.ss_family != AF_INET6)
+						continue;
+					if (SS_CMP(&msfsrc->src, <, src))
+						continue;
+					if (SS_CMP(&msfsrc->src, >, src)) {
+						/* terminate search, as there
+						 * will be no match */
+						break;
+					}
+					
+					PASS_TO_PCB6();
+					break;
+				}
+			
+			search_block_list:
+				if (imm->i6mm_msf->msf_blknumsrc == 0)
+					goto end_of_search;
+
+				LIST_FOREACH(msfsrc,
+					     imm->i6mm_msf->msf_blkhead,
+					     list) {
+					if (msfsrc->src.ss_family != AF_INET6)
+						continue;
+					if (SS_CMP(&msfsrc->src, <, src))
+						continue;
+					if (SS_CMP(&msfsrc->src, ==, src)) {
+						/* blocks since the src matched
+						 * with block list */
+						break;
+					}
+					
+					/* terminate search, as there will be
+					 * no match */
+					msfsrc = NULL;
+					break;
+				}
+				/* blocks since the source matched with block
+				 * list */
+				if (msfsrc == NULL)
+					PASS_TO_PCB6();
+				
+			end_of_search:
+				goto next_inp;
+			}
+			if (imm == NULL)
+				continue;
+#undef PASS_TO_PCB6
+#else /* MLDv2 */
 			last = in6p;
 			udp6_sendup(m, off, (struct sockaddr *)src,
 				in6p->in6p_socket);
+#endif /* MLDv2 */
+
 			/*
 			 * XXX: m_copy in udp6_sendup() may remove m_aux that
 			 * contains the packet addresses, while we
@@ -858,6 +955,10 @@ udp6_realinput(af, src, dst, m, off)
 			if ((in6p->in6p_socket->so_options &
 			    (SO_REUSEPORT|SO_REUSEADDR)) == 0)
 				break;
+#ifdef MLDV2
+		next_inp:
+#endif
+		
 		}
 	} else {
 		/*

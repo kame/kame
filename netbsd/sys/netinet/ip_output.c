@@ -193,8 +193,6 @@ static int in_getmopt_ifargs
 static int ip_getmopt_sgaddr
 	__P((struct mbuf *, int, struct ifnet **, struct sockaddr_storage *,
 		struct sockaddr_storage *));
-static int ip_setmopt_source_addr
-	__P((struct sockaddr_storage *, struct sock_msf *, int));
 #endif
 static void ip_mloopback
 	__P((struct ifnet *, struct mbuf *, struct sockaddr_in *));
@@ -1527,7 +1525,7 @@ ip_setmoptions(optname, imop, m)
 		 * membership points if there is no member.
 		 */
 #ifdef IGMPV3
-		error = ip_getmopt_msflist(imo->imo_msf[i], &numsrc,
+		error = in_getmopt_source_list(imo->imo_msf[i], &numsrc,
 					   &del_ss, &mode);
 		if (error != 0) {
 			in_undomopt_source_addr(imo->imo_msf[i], optname);
@@ -1618,7 +1616,7 @@ ip_setmoptions(optname, imop, m)
 			break;
 		}
 
-		error = ip_getmopt_msflist(imo->imo_msf[i], &numsrc,
+		error = in_getmopt_source_list(imo->imo_msf[i], &numsrc,
 					   &del_ss, &mode);
 		if (error != 0) {
 			in_undomopt_source_addr(imo->imo_msf[i], optname);
@@ -1703,7 +1701,7 @@ ip_setmoptions(optname, imop, m)
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
-		error = ip_setmopt_source_addr(&ss_src, imo->imo_msf[i],
+		error = in_setmopt_source_addr(&ss_src, imo->imo_msf[i],
 					       optname);
 		if (error != 0) {
 			if (init)
@@ -1765,7 +1763,7 @@ ip_setmoptions(optname, imop, m)
 			error = EINVAL;
 			break;
 		}
-		error = ip_setmopt_source_addr(&ss_src, imo->imo_msf[i],
+		error = in_setmopt_source_addr(&ss_src, imo->imo_msf[i],
 					       optname);
 		if (error != 0)
 			break;
@@ -1845,7 +1843,7 @@ ip_setmoptions(optname, imop, m)
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
-		error = ip_setmopt_source_addr(&ss_src, imo->imo_msf[i],
+		error = in_setmopt_source_addr(&ss_src, imo->imo_msf[i],
 					       optname);
 		if (error != 0) {
 			if (init)
@@ -1925,7 +1923,7 @@ ip_setmoptions(optname, imop, m)
 			error = EINVAL;
 			break;
 		}
-		error = ip_setmopt_source_addr(&ss_src, imo->imo_msf[i],
+		error = in_setmopt_source_addr(&ss_src, imo->imo_msf[i],
 					       optname);
 		if (error != 0)
 			break;
@@ -2050,7 +2048,7 @@ ip_freemoptions(imo)
 	if (imo != NULL) {
 		for (i = 0; i < imo->imo_num_memberships; ++i) {
 #ifdef IGMPV3
-			error = ip_getmopt_msflist(imo->imo_msf[i], &numsrc,
+			error = in_getmopt_source_list(imo->imo_msf[i], &numsrc,
 						   &del_ss, &mode);
 			if (error != 0) {
 				/* XXX strange... panic or skip ? */
@@ -2371,210 +2369,6 @@ ip_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 	}
 
 	return error;
-}
-
-/*
- * In order to clean up filtered source list when group leave is requested,
- * each source address is inserted in a buffer.
- */
-int
-ip_getmopt_msflist(msf, numsrc, oss, mode)
-	struct sock_msf *msf;
-	u_int16_t *numsrc;
-	struct sockaddr_storage **oss;
-	u_int *mode;
-{
-	struct sockaddr_storage *ss = NULL;
-	struct sock_msf_source *msfsrc;
-	struct sockaddr_in *sin;
-	int i;
-
-	if (msf->msf_numsrc != 0) {
-		MALLOC(ss, struct sockaddr_storage *,
-		       sizeof(*ss) * msf->msf_numsrc, M_IPMOPTS, M_WAITOK);
-		for (i = 0, msfsrc = LIST_FIRST(msf->msf_head);
-				i < msf->msf_numsrc && msfsrc;
-				i++, msfsrc = LIST_NEXT(msfsrc, list)) {
-			/* Move unneeded sources to ss */
-			sin = SIN(&ss[i]);
-			sin->sin_addr.s_addr
-				= htonl(SIN(&msfsrc->src)->sin_addr.s_addr);
-		}
-		if (i != msf->msf_numsrc || msfsrc != NULL)
-			return EOPNOTSUPP; /* panic ? */
-		*numsrc = msf->msf_numsrc;
-		*mode = MCAST_INCLUDE;
-	} else if (msf->msf_blknumsrc != 0) {
-		MALLOC(ss, struct sockaddr_storage *,
-		       sizeof(*ss) * msf->msf_blknumsrc, M_IPMOPTS, M_WAITOK);
-		for (i = 0, msfsrc = LIST_FIRST(msf->msf_blkhead);
-				i < msf->msf_blknumsrc && msfsrc;
-				i++, msfsrc = LIST_NEXT(msfsrc, list)) {
-			/* Move unneeded sources to ss */
-			sin = SIN(&ss[i]);
-			sin->sin_addr.s_addr
-				= htonl(SIN(&msfsrc->src)->sin_addr.s_addr);
-		}
-		if (i != msf->msf_blknumsrc || msfsrc != NULL)
-			return EOPNOTSUPP; /* panic ? */
-		*numsrc = msf->msf_blknumsrc;
-		*mode = MCAST_EXCLUDE;
-	} else if (msf->msf_grpjoin == 1) {
-		*numsrc = 0;
-		*mode = MCAST_EXCLUDE;
-	} else
-		return EADDRNOTAVAIL;
-
-	/* This allocated buffer must be freed by caller */
-	*oss = ss;
-	return 0;
-}
-
-/*
- * Set or delete source address to/from the msf.
- * If requested source address was already in the socket list when the
- * command is to add source filter, or if requested source address was not in
- * the socket list when the command is to delete source filter, return
- * EADDRNOTAVAIL.
- * If there is not enough memory, return ENOBUFS.
- * Otherwise, 0 will be returned, which means okay.
- */
-static int
-ip_setmopt_source_addr(ss, msf, optname)
-	struct sockaddr_storage *ss;
-	struct sock_msf *msf;
-	int optname;
-{
-	struct sockaddr_in *sin, *listsin;
-	struct sock_msf_source *msfsrc, *newsrc, *lastp;
-	struct msf_head head;
-	u_int16_t *curnumsrc;
-	u_int32_t src_h, lsrc_h;
-	int s = splsoftnet();
-
-	/*
-	 * Create multicast source filter list on the socket.
-	 */
-	if (IGMP_JOINLEAVE_OPS(optname)) {
-		if (!LIST_EMPTY(msf->msf_head)) {
-			LIST_FIRST(&head) = LIST_FIRST(msf->msf_head);
-			curnumsrc = &msf->msf_numsrc;
-			goto merge_msf_list;
-		}
-		if (IGMP_MSFOFF_OPS(optname)) {
-			splx(s);
-			return EADDRNOTAVAIL;
-		}
-		msfsrc = (struct sock_msf_source *)malloc(sizeof(*msfsrc),
-							  M_IPMOPTS, M_NOWAIT);
-		if (msfsrc == NULL) {
-			splx(s);
-			return ENOBUFS;
-		}
-		sin = SIN(&ss[0]);
-		SIN(&msfsrc->src)->sin_family = AF_INET;
-		SIN(&msfsrc->src)->sin_len = sizeof(*sin);
-		SIN(&msfsrc->src)->sin_addr.s_addr = ntohl(sin->sin_addr.s_addr);
-		msfsrc->refcount = 2;
-		LIST_INSERT_HEAD(msf->msf_head, msfsrc, list);
-		msf->msf_numsrc = 1;
-		splx(s);
-		return 0;
-	} else if (IGMP_BLOCK_OPS(optname)) {
-		if (!LIST_EMPTY(msf->msf_blkhead)) {
-			LIST_FIRST(&head) = LIST_FIRST(msf->msf_blkhead);
-			curnumsrc = &msf->msf_blknumsrc;
-			goto merge_msf_list;
-		}
-		if (IGMP_MSFOFF_OPS(optname)) {
-			splx(s);
-			return EADDRNOTAVAIL;
-		}
-		msfsrc = (struct sock_msf_source *)malloc(sizeof(*msfsrc),
-							  M_IPMOPTS, M_NOWAIT);
-		if (msfsrc == NULL) {
-			splx(s);
-			return ENOBUFS;
-		}
-		sin = SIN(&ss[0]);
-		SIN(&msfsrc->src)->sin_family = AF_INET;
-		SIN(&msfsrc->src)->sin_len = sizeof(*sin);
-		SIN(&msfsrc->src)->sin_addr.s_addr = ntohl(sin->sin_addr.s_addr);
-		msfsrc->refcount = 2;
-		LIST_INSERT_HEAD(msf->msf_blkhead, msfsrc, list);
-		msf->msf_blknumsrc = 1;
-		splx(s);
-		return 0;
-	} else {
-		splx(s);
-		return EINVAL;
-	}
-
-	/*
-	 * Merge to recorded msf list.
-	 */
-merge_msf_list:
-	sin = SIN(ss);
-	src_h = ntohl(sin->sin_addr.s_addr);
-	LIST_FOREACH(msfsrc, &head, list) {
-		lastp = msfsrc;
-		listsin = SIN(&msfsrc->src);
-		lsrc_h = listsin->sin_addr.s_addr;
-
-		if (lsrc_h < src_h)
-			continue;
-		if (lsrc_h == src_h) {
-			if (IGMP_MSFON_OPS(optname)) {
-				splx(s);
-				return EADDRNOTAVAIL;
-			}
-			msfsrc->refcount = 0;
-			msfsrc = LIST_FIRST(&head); /* set non NULL */
-			break;
-		} 
-		/* creates a new entry here */
-		if (!IGMP_MSFON_OPS(optname)) {
-			splx(s);
-			return EADDRNOTAVAIL;
-		}
-		newsrc = (struct sock_msf_source *)malloc(sizeof(*newsrc),
-							  M_IPMOPTS, M_NOWAIT);
-		if (newsrc == NULL) {
-			splx(s);
-			return ENOBUFS;
-		}
-		SIN(&newsrc->src)->sin_family = AF_INET;
-		SIN(&newsrc->src)->sin_len = sizeof(*sin);
-		SIN(&newsrc->src)->sin_addr.s_addr = src_h;
-		newsrc->refcount = 2;
-		LIST_INSERT_BEFORE(msfsrc, newsrc, list);
-		break;
-	}
-	if (!msfsrc) {
-		if (!IGMP_MSFON_OPS(optname)) {
-			splx(s);
-			return EADDRNOTAVAIL;
-		}
-		newsrc = (struct sock_msf_source *)malloc(sizeof(*newsrc),
-							  M_IPMOPTS, M_NOWAIT);
-		if (newsrc == NULL) {
-			splx(s);
-			return ENOBUFS;
-		}
-		SIN(&newsrc->src)->sin_family = AF_INET;
-		SIN(&newsrc->src)->sin_len = sizeof(*sin);
-		SIN(&newsrc->src)->sin_addr.s_addr = src_h;
-		newsrc->refcount = 2;
-		LIST_INSERT_AFTER(lastp, newsrc, list);
-	}
-
-	if (IGMP_MSFON_OPS(optname))
-		++(*curnumsrc);
-	else if (IGMP_MSFOFF_OPS(optname))
-		--(*curnumsrc);
-
-	splx(s);
-	return 0;
 }
 #endif /* IGMPV3 */
 

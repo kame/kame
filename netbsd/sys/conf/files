@@ -898,7 +898,7 @@ file netinet/if_atm.c			atm
 file netinet/igmp.c			inet
 file netinet/in.c			inet
 file netinet/in_gif.c			gif & inet
-file netinet/in_msf.c			inet
+file netinet/in_msf.c			inet & (igmpv3 | mldv2)
 file netinet/in_pcb.c			inet
 file netinet/in_proto.c			inet
 file netinet/ip_auth.c			ipfilter		needs-flag
@@ -952,6 +952,7 @@ file netinet6/icmp6.c			inet6
 file netinet6/in6.c			inet6
 file netinet6/in6_cksum.c		inet6
 file netinet6/in6_gif.c			gif & inet6
+file netinet6/in6_msf.c			inet6 & mldv2
 file netinet6/in6_ifattach.c		inet6
 file netinet6/in6_pcb.c			inet6
 file netinet6/in6_proto.c		inet6

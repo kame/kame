@@ -871,6 +871,7 @@ netinet/if_ether.c	optional ether
 netinet/in_gif.c	optional gif inet
 netinet/igmp.c		optional inet
 netinet/in_msf.c	optional igmpv3
+netinet/in_msf.c	optional mldv2
 netinet/in.c		optional inet
 #netinet/in_hostcache.c	optional inet
 netinet/ip_id.c		optional inet
@@ -926,6 +927,7 @@ netinet6/icmp6.c	optional inet6
 netinet6/in6.c		optional inet6
 netinet6/in6_cksum.c	optional inet6
 netinet6/in6_gif.c	optional gif inet6
+netinet6/in6_msf.c	optional inet6 mldv2
 netinet6/ip6_forward.c	optional inet6
 netinet6/ip6_fw.c	optional inet6 ipv6firewall
 netinet6/in6_ifattach.c	optional inet6

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.291 2002/08/27 00:18:06 t-momose Exp $	*/
+/*	$KAME: ip6_input.c,v 1.292 2002/09/05 08:09:36 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -711,6 +711,7 @@ ip6_input(m)
 		 * See if we belong to the destination multicast group on the
 		 * arrival interface.
 		 */
+		/* ToDo: SSM consideration for non-UDP packet here */
 		IN6_LOOKUP_MULTI(&sa6_dst, m->m_pkthdr.rcvif, in6m);
 		if (in6m)
 			ours = 1;

@@ -636,7 +636,7 @@ in_pcbpurgeif0(table, ifp)
 			    i++) {
 				if (imo->imo_membership[i]->inm_ifp == ifp) {
 #ifdef IGMPV3
-					error = ip_getmopt_msflist
+					error = in_getmopt_source_list
 						(imo->imo_msf[i], &numsrc,
 						 &del_ss, &mode);
 					if (error != 0) {

@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.8 2002/04/28 05:40:26 suz Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.51 2002/06/21 12:04:19 suz Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.52 2002/08/21 17:55:14 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,6 +96,10 @@
 #include <netinet/ip6.h>
 #include <netinet/ip_var.h>
 #include <netinet6/ip6_var.h>
+#ifdef MLDV2
+#include <netinet/in_msf.h>
+#include <netinet6/in6_msf.h>
+#endif
 #include <netinet6/nd6.h>
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_pcb.h>
@@ -756,6 +760,12 @@ in6_pcbpurgeif0(head, ifp)
 	struct in6pcb *in6p;
 	struct ip6_moptions *im6o;
 	struct in6_multi_mship *imm, *nimm;
+#ifdef MLDV2
+	struct sockaddr_storage *del_ss;
+	u_int16_t numsrc;
+	u_int mode;
+	int final, error;
+#endif
 
 	for (in6p = head; in6p != NULL; in6p = LIST_NEXT(in6p, inp_list)) {
 		im6o = in6p->in6p_moptions;
@@ -779,7 +789,30 @@ in6_pcbpurgeif0(head, ifp)
 				nimm = imm->i6mm_chain.le_next;
 				if (imm->i6mm_maddr->in6m_ifp == ifp) {
 					LIST_REMOVE(imm, i6mm_chain);
+#ifdef MLDV2
+					error = in_getmopt_source_list
+						(imm->i6mm_msf, &numsrc,
+						 &del_ss, &mode);
+					if (error != 0) {
+						/* XXX strange... panic/skip? */
+						if (del_ss != NULL)
+							FREE(del_ss, M_IPMOPTS);
+						continue;
+					}
+					final = 1;
+					in6_delmulti(imm->i6mm_maddr, &error,
+						     numsrc, del_ss, mode,
+						     final);
+					if (del_ss != NULL)
+						FREE(del_ss, M_IPMOPTS);
+					in6_freemopt_source_list
+						(imm->i6mm_msf,
+						 imm->i6mm_msf->msf_head,
+						 imm->i6mm_msf->msf_blkhead);
+					IMO_MSF_FREE(imm->i6mm_msf);
+#else
 					in6_delmulti(imm->i6mm_maddr);
+#endif
 					free(imm, M_IPMADDR);
 				}
 			}

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.295 2002/09/04 07:21:16 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.296 2002/09/05 08:09:37 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1442,7 +1442,12 @@ nd6_rtrequest(req, rt, sa)
 					break;
 				in6_embedscope(&llsol.sin6_addr,
 					       &llsol); /* XXX */
-				if (in6_addmulti(&llsol, ifp, &error)) {
+#ifdef MLDV2
+				if (in6_addmulti(&llsol, ifp, &error, 0, NULL, MCAST_EXCLUDE, 0))
+#else
+				if (in6_addmulti(&llsol, ifp, &error))
+#endif
+				{
 					nd6log((LOG_ERR, "%s: failed to join "
 					    "%s (errno=%d)\n", if_name(ifp),
 					    ip6_sprintf(&llsol.sin6_addr),
@@ -1478,8 +1483,14 @@ nd6_rtrequest(req, rt, sa)
 			if (in6_addr2zoneid(ifp, &llsol.sin6_addr,
 			    &llsol.sin6_scope_id) == 0) {
 				IN6_LOOKUP_MULTI(&llsol, ifp, in6m);
-				if (in6m)
+				if (in6m) {
+#ifdef MLDV2
+					int error;
+					in6_delmulti(in6m, &error, 0, NULL, MCAST_EXCLUDE, 0);
+#else
 					in6_delmulti(in6m);
+#endif
+				}
 			} else {
 				/* XXX: this should not fail.  bark here? */
 			}

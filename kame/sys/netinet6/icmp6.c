@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.319 2002/07/31 09:54:18 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.320 2002/09/05 08:09:36 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -98,6 +98,7 @@
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #endif
+#include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
@@ -2666,6 +2667,15 @@ icmp6_fasttimo()
 	mld6_fasttimeo();
 }
 
+void
+icmp6_slowtimo()
+{
+
+#ifdef MLDV2
+	mld_slowtimeo();
+#endif
+}
+
 static const char *
 icmp6_redirect_diag(src6, dst6, tgt6)
 	struct sockaddr_in6 *src6, *dst6, *tgt6;
@@ -3737,6 +3747,14 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case ICMPV6CTL_ND6_DRLIST:
 	case ICMPV6CTL_ND6_PRLIST:
 		return nd6_sysctl(name[0], oldp, oldlenp, newp, newlen);
+
+#ifdef MLDV2
+	case ICMPV6CTL_MLD_MAXSRCFILTER:
+	case ICMPV6CTL_MLD_SOMAXSRC:
+	case ICMPV6CTL_MLD_ALWAYSV2:
+		return mld_sysctl(name[0], oldp, oldlenp, newp, newlen);
+#endif
+
 	default:
 		return (sysctl_int_arr(icmp6_sysvars, name, namelen,
 		    oldp, oldlenp, newp, newlen));

@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.9 2002/04/28 05:40:27 suz Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.52 2002/07/30 02:21:44 keiichi Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.53 2002/09/05 08:09:34 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -97,6 +97,9 @@
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
+#ifdef MLDV2
+#include <netinet6/in6_msf.h>
+#endif
 #include <netinet/icmp6.h>
 #include <netinet6/udp6_var.h>
 #include <netinet6/ip6protosw.h>
@@ -127,6 +130,12 @@ udp6_input(mp, offp, proto)
 	int off = *offp;
 	int plen, ulen;
 	struct sockaddr_in6 *src, *dst, src_storage, dst_storage, fromsa;
+#ifdef MLDV2
+	struct ip6_moptions *im6o;
+	struct in6_multi_mship *imm;
+	struct sockaddr_in6 src_h;
+	struct sock_msf_source *msfsrc;
+#endif	
 
 	bzero(&opts, sizeof(opts));
 
@@ -252,6 +261,172 @@ udp6_input(mp, offp, proto)
 				}
 			}
 
+#ifdef MLDV2
+#ifdef IPSEC
+#define PASS_TO_PCB6() \
+	do { \
+		if (last != NULL) { \
+			struct mbuf *n; \
+			/* check AH/ESP integrity. */ \
+			if (ipsec6_in_reject_so(m, last->in6p_socket)) \
+				ipsec6stat.in_polvio++; \
+				/* do not inject data to pcb */ \
+			else \
+			if ((n = m_copy(m, 0, M_COPYALL)) != NULL) { \
+				/* \
+				 * KAME NOTE: do not m_copy(m, offset, ...) above. \
+				 * sbappendaddr() expects M_PKTHDR, and m_copy() \
+				 * only if offset is 0. will copy M_PKTHDR \
+				 *  \
+				 */ \
+				if (last->in6p_flags & IN6P_CONTROLOPTS \
+				    || last->in6p_socket->so_options & SO_TIMESTAMP) \
+					ip6_savecontrol(last, ip6, \
+							n, &opts); \
+				m_adj(n, off + sizeof(struct udphdr)); \
+				if (sbappendaddr(&last->in6p_socket->so_rcv, \
+						(struct sockaddr *)&fromsa, \
+						n, opts.head) == 0) { \
+					m_freem(n); \
+					if (opts.head) \
+						m_freem(opts.head); \
+					udpstat.udps_fullsock++; \
+				} else \
+					sorwakeup(last->in6p_socket); \
+				bzero(&opts, sizeof(opts)); \
+			} \
+			/* \
+			 * XXX: m_copy above removes m_aux that \
+			 * contains the packet addresses, while we \
+			 * still need them for IPsec. \
+			 */ \
+			if (!ip6_setpktaddrs(m, src, dst)) \
+				goto bad; /* XXX */ \
+		} \
+		last = in6p; \
+	} while (0)
+#else /* !IPSEC */
+#define PASS_TO_PCB6() \
+	do { \
+		if (last != NULL) { \
+			/* \
+			 * KAME NOTE: do not m_copy(m, offset, ...) above. \
+			 * sbappendaddr() expects M_PKTHDR, and m_copy() \
+			 * only if offset is 0. will copy M_PKTHDR \
+			 *  \
+			 */ \
+			if (last->in6p_flags & IN6P_CONTROLOPTS \
+			    || last->in6p_socket->so_options & SO_TIMESTAMP) \
+				ip6_savecontrol(last, ip6, \
+						n, &opts); \
+			m_adj(n, off + sizeof(struct udphdr)); \
+			if (sbappendaddr(&last->in6p_socket->so_rcv, \
+					(struct sockaddr *)&fromsa, \
+					n, opts.head) == 0) { \
+				m_freem(n); \
+				if (opts.head) \
+					m_freem(opts.head); \
+				udpstat.udps_fullsock++; \
+			} else { \
+				sorwakeup(last->in6p_socket); \
+				bzero(&opts, sizeof(opts)); \
+			} \
+			/* \
+			 * XXX: m_copy above removes m_aux that \
+			 * contains the packet addresses, while we \
+			 * still need them for IPsec. \
+			 */ \
+			if (!ip6_setpktaddrs(m, src, dst)) \
+				goto bad; /* XXX */ \
+		} \
+		last = inp; \
+	} while (0)
+#endif /* IPSEC */
+			/*
+			 * Receive multicast data which fits MSF condition.
+			 */
+			im6o = in6p->in6p_moptions;
+			bzero(&src_h, sizeof(src_h));
+			src_h.sin6_family = AF_INET6;
+			src_h.sin6_len = sizeof(src_h);
+			bcopy(&ip6->ip6_src, &src_h.sin6_addr, sizeof(ip6->ip6_src));
+			for (imm = LIST_FIRST(&im6o->im6o_memberships);
+			     imm != NULL;
+			     imm = LIST_NEXT(imm, i6mm_chain)) {
+				
+				if (SS_CMP(&imm->i6mm_maddr->in6m_sa, !=, &src_h))
+					continue;
+				
+				if (imm->i6mm_msf == NULL) {
+#ifdef MLDV2_DEBUG
+					printf("XXX: unexpected case occured at %s:%d",
+					       __FILE__, __LINE__);
+#endif
+					continue;
+				}
+				     
+				/* receive data from any source */
+				if (imm->i6mm_msf->msf_grpjoin != 0) {
+					PASS_TO_PCB6();
+					break;
+				}
+				goto search_allow_list;
+				     
+			search_allow_list:
+				if (imm->i6mm_msf->msf_numsrc == 0)
+					goto search_block_list;
+				     
+				LIST_FOREACH(msfsrc,
+					     imm->i6mm_msf->msf_head,
+					     list) {
+					if (msfsrc->src.ss_family != AF_INET6)
+						continue;
+					if (SS_CMP(&msfsrc->src, <, &src_h))
+						continue;
+					if (SS_CMP(&msfsrc->src, >, &src_h)) {
+						/* terminate search, as there
+						 * will be no match */
+						break;
+					}
+					
+					PASS_TO_PCB6();
+					break;
+				}
+				
+			search_block_list:
+				if (imm->i6mm_msf->msf_blknumsrc == 0)
+					goto end_of_search;
+
+				LIST_FOREACH(msfsrc,
+					     imm->i6mm_msf->msf_blkhead,
+					     list) {
+					if (msfsrc->src.ss_family != AF_INET6)
+						continue;
+					if (SS_CMP(&msfsrc->src, <, &src_h))
+						continue;
+					if (SS_CMP(&msfsrc->src, >, &src_h)) {
+						/* blocks since the src matched
+						 * with block list */
+						break;
+					}
+					
+					/* terminate search, as there will be
+					 * no match */
+					msfsrc = NULL;
+					break;
+				}
+				/* blocks since the source matched with block
+				 * list */
+				if (msfsrc == NULL)
+					PASS_TO_PCB6();
+				
+			end_of_search:
+				goto next_inp;
+			}
+			if (imm == NULL)
+				continue;
+#undef PASS_TO_PCB6
+#else /* MLDV2 */
 			if (last != NULL) {
 				struct	mbuf *n;
 
@@ -297,6 +472,7 @@ udp6_input(mp, offp, proto)
 				if (!ip6_setpktaddrs(m, src, dst))
 					goto bad; /* XXX */
 			}
+#endif /* !MLDV2 */
 			last = in6p;
 			/*
 			 * Don't look for additional matches if this one does
@@ -309,6 +485,8 @@ udp6_input(mp, offp, proto)
 			if ((last->in6p_socket->so_options &
 			     (SO_REUSEPORT|SO_REUSEADDR)) == 0)
 				break;
+		next_inp:
+
 		}
 
 		if (last == NULL) {

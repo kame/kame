@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.324 2002/08/27 06:18:56 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.325 2002/09/05 08:09:37 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,6 +89,7 @@
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/systm.h>
+#include <sys/syslog.h>
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/kernel.h>
 #endif
@@ -120,6 +121,10 @@
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>
+#endif
+#ifdef MLDV2
+#include <netinet/in_msf.h>
+#include <netinet6/in6_msf.h>
 #endif
 #include <netinet6/nd6.h>
 #include <netinet6/ip6protosw.h>
@@ -168,7 +173,7 @@ extern int ipsec_ipcomp_default_level;
 
 #include <net/net_osdep.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifndef M_IPMOPTS
 static MALLOC_DEFINE(M_IPMOPTS, "ip6_moptions", "internet multicast options");
 #endif
 
@@ -196,6 +201,12 @@ static int ip6_getpcbopt __P((struct ip6_pktopts *, int, struct mbuf **));
 #endif
 static int ip6_setpktoption __P((int, u_char *, int, struct ip6_pktopts *, int,
 	int, int, int));
+#ifdef MLDV2
+static int in6_getmopt_ifargs(int, struct ifnet **, struct sockaddr_in6 *, u_int32_t);
+static int ip6_getmopt_sgaddr(struct mbuf *, int, struct ifnet **, struct sockaddr_storage *,
+			      struct sockaddr_storage *);
+#endif
+
 static int ip6_setmoptions __P((int, struct ip6_moptions **, struct mbuf *));
 static int ip6_getmoptions __P((int, struct ip6_moptions *, struct mbuf **));
 static int ip6_copyexthdr __P((struct mbuf **, caddr_t, int));
@@ -2376,8 +2387,27 @@ do { \
 			case IPV6_LEAVE_GROUP:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 			    {
-				struct mbuf *m;
 				if (sopt->sopt_valsize > MLEN) {
+					error = EMSGSIZE;
+					break;
+				}
+				/* XXX */
+			    }
+			    /* FALLTHROUGH */
+#endif
+#ifdef MLDV2
+			case MCAST_JOIN_GROUP:
+			case MCAST_BLOCK_SOURCE:
+			case MCAST_UNBLOCK_SOURCE:
+			case MCAST_LEAVE_GROUP:
+			case MCAST_JOIN_SOURCE_GROUP:
+			case MCAST_LEAVE_SOURCE_GROUP:
+#endif
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			    {
+				struct mbuf *m;
+
+				if (sopt->sopt_valsize > MCLBYTES) {
 					error = EMSGSIZE;
 					break;
 				}
@@ -2386,6 +2416,14 @@ do { \
 				if (m == 0) {
 					error = ENOBUFS;
 					break;
+				}
+				if (sopt->sopt_valsize > MLEN) {
+					MCLGET(m, sopt->sopt_p ? M_WAIT : M_DONTWAIT);
+					if ((m->m_flags & M_EXT) == 0) {
+						m_free(m);
+						error = ENOBUFS;
+						break;
+					}
 				}
 				m->m_len = sopt->sopt_valsize;
 				error = sooptcopyin(sopt, mtod(m, char *),
@@ -3502,6 +3540,11 @@ ip6_setmoptions(optname, im6op, m)
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
 #endif
+#ifdef MLDV2
+	struct sockaddr_storage ss_src, ss_grp;
+	int init;		/* indicate initial group join */
+	int final;		/* indicate final group leave */
+#endif	
 
 	if (im6o == NULL) {
 		/*
@@ -3691,9 +3734,16 @@ ip6_setmoptions(optname, im6op, m)
 		 * Everything looks good; add a new record to the multicast
 		 * address list for the given interface.
 		 */
+		/*
+		 * Even this request doesn't add any source filter, create
+		 * msf entry list. This is needed to indicate current msf state.
+		 */
 		imm = in6_joingroup(ifp, &sa6_mc, &error);
-		if (!imm)
+		if (imm == NULL)
 			break;
+#ifdef MLDV2
+		imm->i6mm_msf->msf_grpjoin = 1;
+#endif
 		LIST_INSERT_HEAD(&im6o->im6o_memberships, imm, i6mm_chain);
 		break;
 
@@ -3787,9 +3837,389 @@ ip6_setmoptions(optname, im6op, m)
 		 * Give up the multicast address record to which the
 		 * membership points.
 		 */
+#ifndef MLDV2
 		LIST_REMOVE(imm, i6mm_chain);
+#endif
 		in6_leavegroup(imm);
 		break;
+
+#ifdef MLDV2
+	case MCAST_JOIN_GROUP:
+		error = ip6_getmopt_sgaddr(m, optname, &ifp, &ss_grp, NULL);
+		if (error != 0)
+			break;
+		/* check for duplication */
+		for (imm = im6o->im6o_memberships.lh_first;
+		     imm != NULL; imm = imm->i6mm_chain.le_next) {
+			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
+			    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, &ss_grp))
+				break;
+		}
+		if (imm != NULL) {
+			error = EADDRINUSE;
+			break;
+		}
+		
+		/* ToDo: upper limit */
+
+		/*
+		 * Everything looks good; add a new record to the multicast
+		 * address list for the given interface.
+		 */
+		init = 1;
+		imm = in6_joingroup(ifp, SIN6(&ss_grp), &error);
+		if (error != 0)
+			break;
+		imm->i6mm_msf->msf_grpjoin = 1;
+                LIST_INSERT_HEAD(&im6o->im6o_memberships, imm, i6mm_chain);
+		break;
+
+	case MCAST_LEAVE_GROUP:
+		error = ip6_getmopt_sgaddr(m, optname, &ifp, &ss_grp, NULL);
+		if (error != 0)
+			break;
+		/*
+		 * Find the membership in the membership array.
+		 */
+		for (imm = im6o->im6o_memberships.lh_first;
+		     imm != NULL; imm = imm->i6mm_chain.le_next) {
+			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
+			    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, &ss_grp))
+				break;
+		}
+		if (imm == NULL) {
+			error = EADDRNOTAVAIL;
+			break;
+		}
+
+		error = in6_leavegroup(imm);
+		if (error != 0)
+			 printf("ip6_setmoptions: in6_leavegroup returned error. panic!\n");
+		break;
+
+	case MCAST_JOIN_SOURCE_GROUP:
+		error = ip6_getmopt_sgaddr(m, optname, &ifp, &ss_grp, &ss_src);
+		if (error != 0)
+			break;
+		/*
+		 * Find the membership in the membership array.
+		 */
+		for (imm = im6o->im6o_memberships.lh_first;
+		     imm != NULL; imm = imm->i6mm_chain.le_next) {
+			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
+			    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, &ss_grp))
+				break;
+		}
+		
+		/* ToDo: upper limit check */
+		
+		if (imm != NULL) {
+			/*
+			 * If Any-Source join was already requested, return
+			 * EINVAL.
+			 */
+			if (imm->i6mm_msf->msf_grpjoin != 0) {
+				error = EINVAL;
+				break;
+			}
+			/*
+			 * If there is EXCLUDE msf state, return EINVAL.
+			 */
+			if (imm->i6mm_msf->msf_blknumsrc != 0) {
+				error = EINVAL;
+				break;
+			}
+			/*
+			 * If the implementation imposes a limit on the
+			 * maximum number of sources in a source filter,
+			 * ENOBUFS is generated.
+			 */
+			if (imm->i6mm_msf->msf_numsrc >= mldsomaxsrc) {
+				error = ENOBUFS;
+				break;
+			}
+			init = 0;
+		} else {
+			imm = malloc(sizeof(*imm), M_IPMADDR, M_NOWAIT);
+			if (imm == NULL) {
+				error = ENOBUFS;
+				break;
+			}
+			IMO_MSF_ALLOC(imm->i6mm_msf);
+			if (error != 0) {
+				FREE(imm, M_IPMADDR);
+				break;
+			}
+			init = 1;
+		}
+
+		/*
+		 * Set source address to the msf.
+		 * If requested source address was already in the socket list,
+		 * return EADDRNOTAVAIL. 
+		 * If there is not enough memory, return ENOBUFS.
+		 * Otherwise, 0 will be returned, which means okay.
+		 */
+		error = in6_setmopt_source_addr(SIN6(&ss_src), imm->i6mm_msf,
+						optname);
+		if (error != 0) {
+			if (init) {
+				IMO_MSF_FREE(imm->i6mm_msf);
+				LIST_REMOVE(imm, i6mm_chain);
+				FREE(imm, M_IPMADDR);
+			} 
+			break;
+		}
+
+		/*
+		 * Everything looks good; add a new record to the multicast
+		 * address list for the given interface.
+		 * But if some error occurs when source list is added to
+		 * the list, undo added msf list from the socket.
+		 */
+		imm->i6mm_maddr = in6_addmulti(SIN6(&ss_grp), ifp, &error, 1,
+				    SIN6(&ss_src), MCAST_INCLUDE, init);
+		if (error != 0) {
+			if (init) {
+				IMO_MSF_FREE(imm->i6mm_msf);
+				LIST_REMOVE(imm, i6mm_chain);
+			} else {
+				in6_undomopt_source_addr(imm->i6mm_msf, optname);
+			}
+			break;
+		}
+                in6_cleanmopt_source_addr(imm->i6mm_msf, optname);
+		if (init)
+			 LIST_INSERT_HEAD(&im6o->im6o_memberships, imm, i6mm_chain);
+                break;
+
+	case MCAST_LEAVE_SOURCE_GROUP:
+		error = ip6_getmopt_sgaddr(m, optname, &ifp, &ss_grp, &ss_src);
+		if (error != 0)
+			break;
+		/*
+		 * Find the membership in the membership array.
+		 */
+		for (imm = im6o->im6o_memberships.lh_first;
+		     imm != NULL; imm = imm->i6mm_chain.le_next) {
+			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
+			    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, &ss_grp))
+				break;
+		}
+		if (imm == NULL) {
+			error = EADDRNOTAVAIL;
+			break;
+		}
+		/*
+		 * Remove source address from the msf.
+		 * If (*,G) join or EXCLUDE join was requested previously,
+		 * return EINVAL.
+		 * If requested source address was not in the socket list,
+		 * return EADDRNOTAVAIL. 
+		 * If there is not enough memory, return ENOBUFS.
+		 * Otherwise, 0 will be returned, which means okay.
+		 */
+		if ((imm->i6mm_msf->msf_grpjoin != 0) ||
+		    (imm->i6mm_msf->msf_blknumsrc != 0)) {
+			error = EINVAL;
+			break;
+		}
+		error = in6_setmopt_source_addr(SIN6(&ss_src), imm->i6mm_msf,
+						optname);
+		if (error != 0)
+			break;
+		if (imm->i6mm_msf->msf_numsrc == 0)
+			final = 1;
+		else
+			final = 0;
+
+		/*
+		 * Give up the multicast address record to which the
+		 * membership points.
+		 */
+		in6_delmulti(imm->i6mm_maddr, &error, 1, SIN6(&ss_src),
+			     MCAST_INCLUDE, final);
+		if (error != 0) {
+			printf("ip6_setmoptions: error must be 0! panic!\n");
+			in6_undomopt_source_addr(imm->i6mm_msf, optname);
+			break; /* strange... */
+		}
+		in6_cleanmopt_source_addr(imm->i6mm_msf, optname);
+
+
+		/*
+		 * Remove the gap in the membership array if there is no
+		 * msf member.
+		 */
+		if (final) {
+			LIST_REMOVE(imm, i6mm_chain);
+			FREE(imm, M_IPMADDR);
+		}
+		break;
+
+	case MCAST_BLOCK_SOURCE:
+		error = ip6_getmopt_sgaddr(m, optname, &ifp, &ss_grp, &ss_src);
+		if (error != 0)
+			break;
+		/*
+		 * Find the membership in the membership array.
+		 */
+		for (imm = im6o->im6o_memberships.lh_first;
+		     imm != NULL; imm = imm->i6mm_chain.le_next) {
+			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
+			    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, &ss_grp))
+				break;
+		}
+		/* ToDo: upper limit check */
+		if (imm != NULL) {
+			/*
+			 * If there is INCLUDE msf state, return EINVAL.
+			 */
+			if (imm->i6mm_msf->msf_numsrc != 0) {
+				error = EINVAL;
+				break;
+			}
+			if (imm->i6mm_msf->msf_blknumsrc >= igmpsomaxsrc) {
+				error = ENOBUFS;
+				break;
+			}
+			init = 0;
+		} else {
+			imm = malloc(sizeof(*imm), M_IPMADDR, M_NOWAIT);
+			if (imm == NULL) {
+				error = ENOBUFS;
+				break;
+			}
+			IMO_MSF_ALLOC(imm->i6mm_msf);
+			if (error != 0)
+				break;
+			init = 1;
+		}
+
+		/*
+		 * Set source address to the msf.
+		 * If requested source address was already in the socket list,
+		 * return EADDRNOTAVAIL. 
+		 * If there is not enough memory, return ENOBUFS.
+		 * Otherwise, 0 will be returned, which means okay.
+		 */
+		error = in6_setmopt_source_addr(SIN6(&ss_src), imm->i6mm_msf,
+						optname);
+		if (error != 0) {
+			if (init)
+				IMO_MSF_FREE(imm->i6mm_msf);
+			break;
+		}
+
+		/*
+		 * Everything looks good; add a new record to the multicast
+		 * address list for the given interface.
+		 * But if some error occurs when source list is added to
+		 * the list, undo added msf list from the socket.
+		 */
+		if (imm->i6mm_msf->msf_grpjoin == 0) {
+			/* IN{NULL}/EX{non NULL} -> EX{non NULL} */
+			imm->i6mm_maddr = 
+				in6_addmulti(SIN6(&ss_grp), ifp, &error, 1,
+					     SIN6(&ss_src), MCAST_EXCLUDE,
+					     init);
+			if (error != 0) {
+				if (init) {
+					IMO_MSF_FREE(imm->i6mm_msf);
+					FREE(imm, M_IPMADDR);
+				} else {
+					in6_undomopt_source_addr(imm->i6mm_msf, optname);
+				}
+				break;
+			}
+		} else {
+			/* EX{NULL} -> EX{non NULL} */
+			imm->i6mm_maddr =
+				in6_modmulti(SIN6(&ss_grp), ifp, &error, 1,
+					     SIN6(&ss_src), MCAST_EXCLUDE,
+					     0, NULL, MCAST_EXCLUDE, init,
+					     imm->i6mm_msf->msf_grpjoin);
+			if (imm->i6mm_maddr == NULL) {
+				if (init) {
+					IMO_MSF_FREE(imm->i6mm_msf);
+					FREE(imm, M_IPMADDR);
+				} else {
+					 in6_undomopt_source_addr(imm->i6mm_msf, optname);
+				}
+				break;
+			}
+			imm->i6mm_msf->msf_grpjoin = 0;
+		}
+		in6_cleanmopt_source_addr(imm->i6mm_msf, optname);
+		if (init)
+			LIST_INSERT_HEAD(&im6o->im6o_memberships, imm,
+					 i6mm_chain);
+		break;
+
+	case MCAST_UNBLOCK_SOURCE:
+		error = ip6_getmopt_sgaddr(m, optname, &ifp, &ss_grp, &ss_src);
+		if (error != 0)
+			break;
+		/*
+		 * Find the membership in the membership array.
+		 */
+		for (imm = im6o->im6o_memberships.lh_first;
+		     imm != NULL; imm = imm->i6mm_chain.le_next) {
+			if ((ifp == NULL || imm->i6mm_maddr->in6m_ifp == ifp) &&
+			    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, &ss_grp))
+				break;
+		}		
+		if (imm == NULL) {
+			error = EADDRNOTAVAIL;
+			break;
+		}
+
+		/*
+		 * Remove source address from the msf.
+		 * If (*,G) join or INCLUDE join was requested previously,
+		 * return EINVAL.
+		 * If requested source address was not in the socket list,
+		 * return EADDRNOTAVAIL. 
+		 * If there is not enough memory, return ENOBUFS.
+		 * Otherwise, 0 will be returned, which means okay.
+		 */
+		if ((imm->i6mm_msf->msf_grpjoin != 0) ||
+		    (imm->i6mm_msf->msf_numsrc != 0)) {
+			error = EINVAL;
+			break;
+		}
+		error = in6_setmopt_source_addr(SIN6(&ss_src), imm->i6mm_msf,
+						optname);
+		if (error != 0)
+			break;
+		if (imm->i6mm_msf->msf_blknumsrc == 0)
+			final = 1;
+		else
+			final = 0;
+
+		/*
+		 * Give up the multicast address record to which the
+		 * membership points.
+		 */
+		in6_delmulti(imm->i6mm_maddr, &error, 1, SIN6(&ss_src),
+			     MCAST_EXCLUDE, final);
+		if (error != 0) {
+			printf("ip6_setmoptions: error must be 0! panic!\n");
+			in6_undomopt_source_addr(imm->i6mm_msf, optname);
+			break; /* strange... */
+		}
+		in6_cleanmopt_source_addr(imm->i6mm_msf, optname);
+
+		/*
+		 * Remove the gap in the membership array if there is no
+		 * msf member.
+		 */
+		if (final) {
+			LIST_REMOVE(imm, i6mm_chain);
+			free(imm, M_IPMADDR);
+		}
+		break;
+#endif /* MLDV2 */
 
 	default:
 		error = EOPNOTSUPP;
@@ -3874,7 +4304,9 @@ ip6_freemoptions(im6o)
 		return;
 
 	while ((imm = im6o->im6o_memberships.lh_first) != NULL) {
+#ifndef MLDV2
 		LIST_REMOVE(imm, i6mm_chain);
+#endif
 		in6_leavegroup(imm);
 	}
 	free(im6o, M_IPMOPTS);
@@ -4514,3 +4946,178 @@ ip6_optlen(in6p)
 # undef in6pcb
 # undef in6p_outputopts
 #endif
+
+
+#ifdef MLDV2
+static int
+in6_getmopt_ifargs(optname, ifp, ia_grp, index)
+	int optname;
+	struct ifnet **ifp;
+	struct sockaddr_in6  *ia_grp;
+	u_int32_t index;
+{
+	struct route ro;
+	struct sockaddr_in6 *dst;
+	int error = 0;
+
+	/*
+	 * If the interface is specified, validate it.
+	 */
+	if (index < 0 || if_index < index)
+		return ENXIO;	/* XXX EINVAL? */
+
+	switch (optname) {
+	case MCAST_JOIN_GROUP:
+	case MCAST_BLOCK_SOURCE:
+	case MCAST_JOIN_SOURCE_GROUP:
+		/*
+		 * If no interface was explicitly specified, choose an
+		 * appropriate one according to the given multicast address.
+		 */
+		if (index == 0) {
+			bzero((caddr_t)&ro, sizeof(ro));
+			ro.ro_rt = NULL;
+			dst = satosin6(&ro.ro_dst);
+			bcopy(ia_grp, dst, sizeof(*dst));
+			rtalloc((struct route *)&ro);
+			if (ro.ro_rt == NULL) {
+				error = EADDRNOTAVAIL;
+				break;
+			}
+			*ifp = ro.ro_rt->rt_ifp;
+			rtfree(ro.ro_rt);
+		} else
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			*ifp = ifnet_byindex(index);
+#else
+			*ifp = ifindex2ifnet[index];
+#endif
+
+		if (*ifp == NULL || ((*ifp)->if_flags & IFF_MULTICAST) == 0) {
+#ifdef MLDV2_DEBUG
+			printf("invalid interface (#%d) specified", index);
+#endif
+			error = EINVAL;
+		}
+
+		break;
+
+	case MCAST_LEAVE_GROUP:
+	case MCAST_UNBLOCK_SOURCE:
+	case MCAST_LEAVE_SOURCE_GROUP:
+		/*
+		 * If an interface address was specified, get a pointer
+		 * to its ifnet structure.
+		 */
+		if (index == 0)
+			*ifp = NULL;
+		else {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			*ifp = ifnet_byindex(index);
+#else
+			*ifp = ifindex2ifnet[index];
+#endif
+			if (*ifp == NULL) {
+				error = EADDRNOTAVAIL;
+				break;
+			}
+		}
+		break;
+	}
+	return error;
+}
+
+static int
+ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
+	struct mbuf *m;
+	int optname;
+	struct ifnet **ifp;
+	struct sockaddr_storage *ss_grp;
+	struct sockaddr_storage *ss_src;
+{
+	int error = 0;
+
+	switch (optname) {
+	case MCAST_JOIN_GROUP:
+	case MCAST_LEAVE_GROUP:
+	    {
+		struct group_req *greq;
+
+		if (m == NULL || m->m_len != sizeof(struct group_req)) {
+			error = EINVAL;
+			break;
+		}
+
+		greq = mtod(m, struct group_req *);
+		if (error)
+			break;
+		if (greq->gr_group.ss_family != AF_INET6) {
+			error = EPFNOSUPPORT;
+			break;
+		}
+
+		bcopy(&greq->gr_group, ss_grp, greq->gr_group.ss_len);
+		if (!SS_IS_ADDR_MULTICAST(ss_grp)) {
+			error = EINVAL;
+			break;
+		}
+
+		/*
+		 * Get a pointer to the ifnet structure.
+		 */
+		error = in6_getmopt_ifargs(optname, ifp, SIN6(&ss_grp), greq->gr_interface);
+
+		break;
+	    }
+
+	case MCAST_BLOCK_SOURCE:
+	case MCAST_UNBLOCK_SOURCE:
+	case MCAST_JOIN_SOURCE_GROUP:
+	case MCAST_LEAVE_SOURCE_GROUP:
+	    {
+		struct group_source_req *gsreq;
+
+		if (ss_src == NULL || ss_grp == NULL || m == NULL ||
+		    m->m_len != sizeof(struct group_source_req)) {
+			error = EINVAL;
+			break;
+		}
+
+		gsreq = mtod(m, struct group_source_req *);
+		if ((gsreq->gsr_group.ss_family != AF_INET6) ||
+		    (gsreq->gsr_source.ss_family != AF_INET6)) {
+			error = EPFNOSUPPORT;
+			break;
+		}
+
+		bcopy(&gsreq->gsr_source, ss_src, gsreq->gsr_source.ss_len);
+		bcopy(&gsreq->gsr_group, ss_grp,  gsreq->gsr_group.ss_len);
+		if (!SS_IS_ADDR_MULTICAST(ss_grp) ||
+		    SS_IS_LOCAL_GROUP(ss_grp)) {
+#ifdef MLDV2_DEBUG
+			printf("invalid group %s specified\n",
+			       ip6_sprintf(&SIN6(ss_grp)->sin6_addr));
+#endif
+			error = EINVAL;
+			break;
+		}
+		if (SS_IS_ADDR_MULTICAST(ss_src) ||
+		    SS_IS_ADDR_UNSPECIFIED(ss_src)) {
+#ifdef MLDV2_DEBUG
+			printf("invalid source %s specified\n",
+			       ip6_sprintf(&SIN6(&ss_src)->sin6_addr));
+#endif
+			error = EINVAL;
+			break;
+		}
+
+		error = in6_getmopt_ifargs(optname, ifp, SIN6(&ss_grp),
+					   gsreq->gsr_interface);
+
+		break;
+	    }
+	}
+
+	return error;
+}
+#endif /* MLDV2 */  

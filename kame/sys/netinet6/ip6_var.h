@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.101 2002/08/06 11:00:54 k-sugyou Exp $	*/
+/*	$KAME: ip6_var.h,v 1.102 2002/09/05 08:09:37 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -369,6 +369,10 @@ struct sockopt;
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */
 struct inpcb;
 #endif
+
+extern int	mldmaxsrcfilter;       /* maximum num .of msf per interface */
+extern int	mldsomaxsrc;           /* maximum num .of msf per socket */
+extern int	mldalways_v2;
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 int	icmp6_ctloutput __P((struct socket *, struct sockopt *sopt));

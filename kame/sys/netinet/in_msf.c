@@ -64,6 +64,8 @@
 #include <netinet/igmp.h>
 #include <netinet/igmp_var.h>
 
+#if defined(IGMPV3) || defined(MLDV2)
+
 #ifdef IGMPV3
 
 static int in_merge_msf_head __P((struct in_multi *, struct in_addr_slist *,
@@ -74,9 +76,6 @@ static int in_merge_pending_report __P((struct in_multi *,
 		struct in_addr_source *, u_int8_t));
 static int in_copy_msf_source_list __P((struct in_addr_slist *,
 		struct in_addr_slist *, u_int));
-static int in_setmopt_source_list __P((struct sock_msf *, u_int16_t,
-		struct sockaddr_storage *, u_int, u_int16_t *,
-		u_int16_t *, struct sockaddr_storage *));
 
 #define IAS_LIST_ALLOC(iasl) do {					\
 	MALLOC((iasl), struct in_addr_slist *,				\
@@ -100,10 +99,6 @@ static int in_setmopt_source_list __P((struct sock_msf *, u_int16_t,
 #define	INM_SOURCE_LIST(mode)						\
 	(((mode) == MCAST_INCLUDE) ? inm->inm_source->ims_in		\
 				   : inm->inm_source->ims_ex)
-
-#define SIN(x)		((struct sockaddr_in *)(x))
-#define SIN_ADDR(x)	(SIN(x)->sin_addr.s_addr)
-
 #ifndef in_hosteq
 #define in_hosteq(s,t)	((s).s_addr == (t).s_addr)
 #endif
@@ -145,6 +140,10 @@ in_addmultisrc(inm, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 	u_int16_t i, j;
 	int ref_count;
 	int error = 0;
+	extern int igmpmaxsrcfilter;
+
+	if (mode != MCAST_INCLUDE && mode != MCAST_EXCLUDE)
+		return EOPNOTSUPP;
 
 	if (inm->inm_source == NULL) {
 		/*
@@ -3230,6 +3229,200 @@ sock_getmopt_srcfilter(sop, grpfp)
 
 	return 0;
 }
+#endif /* IGMPV3 */
+
+/*
+ * Followings are Protocol-Independent functions.
+ * Keep the ability when these are modified.
+ */
+
+/*
+ * In order to clean up filtered source list when group leave is requested,
+ * each source address is inserted in a buffer.
+ */
+int
+in_getmopt_source_list(msf, numsrc, oss, mode)
+	struct sock_msf *msf;
+	u_int16_t *numsrc;
+	struct sockaddr_storage **oss;
+	u_int *mode;
+{
+	struct sockaddr_storage *ss = NULL;
+	struct sock_msf_source *msfsrc;
+	int i;
+
+	if (msf->msf_numsrc != 0) {
+		MALLOC(ss, struct sockaddr_storage *,
+		       sizeof(*ss) * msf->msf_numsrc, M_IPMOPTS, M_WAITOK);
+		for (i = 0, msfsrc = LIST_FIRST(msf->msf_head);
+				i < msf->msf_numsrc && msfsrc;
+				i++, msfsrc = LIST_NEXT(msfsrc, list)) {
+			/* Move unneeded sources to ss */
+			bcopy(&msfsrc->src, &ss[i], sizeof(ss[i]));
+		}
+		if (i != msf->msf_numsrc || msfsrc != NULL)
+			return EOPNOTSUPP; /* panic ? */
+		*numsrc = msf->msf_numsrc;
+		*mode = MCAST_INCLUDE;
+	} else if (msf->msf_blknumsrc != 0) {
+		MALLOC(ss, struct sockaddr_storage *,
+		       sizeof(*ss) * msf->msf_blknumsrc, M_IPMOPTS, M_WAITOK);
+		for (i = 0, msfsrc = LIST_FIRST(msf->msf_blkhead);
+				i < msf->msf_blknumsrc && msfsrc;
+				i++, msfsrc = LIST_NEXT(msfsrc, list)) {
+			/* Move unneeded sources to ss */
+			bcopy(&msfsrc->src, &ss[i], sizeof(ss[i]));
+		}
+		if (i != msf->msf_blknumsrc || msfsrc != NULL)
+			return EOPNOTSUPP; /* panic ? */
+		*numsrc = msf->msf_blknumsrc;
+		*mode = MCAST_EXCLUDE;
+	} else if (msf->msf_grpjoin == 1) {
+		*numsrc = 0;
+		*mode = MCAST_EXCLUDE;
+	} else
+		return EADDRNOTAVAIL;
+
+	/* This allocated buffer must be freed by caller */
+	*oss = ss;
+	return 0;
+}
+
+
+/*
+ * Set or delete source address to/from the msf.
+ * If requested source address was already in the socket list when the
+ * command is to add source filter, or if requested source address was not in
+ * the socket list when the command is to delete source filter, return
+ * EADDRNOTAVAIL.
+ * If there is not enough memory, return ENOBUFS.
+ * Otherwise, 0 will be returned, which means okay.
+ */
+int
+in_setmopt_source_addr(ss, msf, optname)
+	struct sockaddr_storage *ss;
+	struct sock_msf *msf;
+	int optname;
+{
+	struct sock_msf_source *msfsrc, *newsrc, *lastp = NULL;
+	struct msf_head head;
+	u_int16_t *curnumsrc;
+#if defined(__NetBSD__) || defined(__OpenBSD__)	
+	int s = splsoftnet();
+#else
+	int s = splnet();
+#endif
+
+	/*
+	 * Create multicast source filter list on the socket.
+	 */
+	if (IGMP_JOINLEAVE_OPS(optname)) {
+		if (!LIST_EMPTY(msf->msf_head)) {
+			LIST_FIRST(&head) = LIST_FIRST(msf->msf_head);
+			curnumsrc = &msf->msf_numsrc;
+			goto merge_msf_list;
+		}
+		if (IGMP_MSFOFF_OPS(optname)) {
+			splx(s);
+			return EADDRNOTAVAIL;
+		}
+		msfsrc = (struct sock_msf_source *)malloc(sizeof(*msfsrc),
+							  M_IPMOPTS, M_NOWAIT);
+		if (msfsrc == NULL) {
+			splx(s);
+			return ENOBUFS;
+		}
+		bcopy(&ss[0], &msfsrc->src, sizeof(ss[0]));
+		msfsrc->refcount = 2;
+		LIST_INSERT_HEAD(msf->msf_head, msfsrc, list);
+		msf->msf_numsrc = 1;
+		splx(s);
+		return 0;
+	} else if (IGMP_BLOCK_OPS(optname)) {
+		if (!LIST_EMPTY(msf->msf_blkhead)) {
+			LIST_FIRST(&head) = LIST_FIRST(msf->msf_blkhead);
+			curnumsrc = &msf->msf_blknumsrc;
+			goto merge_msf_list;
+		}
+		if (IGMP_MSFOFF_OPS(optname)) {
+			splx(s);
+			return EADDRNOTAVAIL;
+		}
+		msfsrc = (struct sock_msf_source *)malloc(sizeof(*msfsrc),
+							  M_IPMOPTS, M_NOWAIT);
+		if (msfsrc == NULL) {
+			splx(s);
+			return ENOBUFS;
+		}
+		bcopy(&ss[0], &msfsrc->src, sizeof(ss[0]));
+		msfsrc->refcount = 2;
+		LIST_INSERT_HEAD(msf->msf_blkhead, msfsrc, list);
+		msf->msf_blknumsrc = 1;
+		splx(s);
+		return 0;
+	} else {
+		splx(s);
+		return EINVAL;
+	}
+
+	/*
+	 * Merge to recorded msf list.
+	 */
+merge_msf_list:
+	LIST_FOREACH(msfsrc, &head, list) {
+		lastp = msfsrc;
+
+		if (SS_CMP(ss, >, &msfsrc->src))
+			continue;
+		if (SS_CMP(ss, ==, &msfsrc->src)) {
+			if (IGMP_MSFON_OPS(optname)) {
+				splx(s);
+				return EADDRNOTAVAIL;
+			}
+			msfsrc->refcount = 0;
+			msfsrc = LIST_FIRST(&head); /* set non NULL */
+			break;
+		}
+		/* creates a new entry here */
+		if (!IGMP_MSFON_OPS(optname)) {
+			splx(s);
+			return EADDRNOTAVAIL;
+		}
+		newsrc = (struct sock_msf_source *)malloc(sizeof(*newsrc),
+							  M_IPMOPTS, M_NOWAIT);
+		if (newsrc == NULL) {
+			splx(s);
+			return ENOBUFS;
+		}
+		bcopy(&msfsrc->src, &newsrc->src, sizeof(newsrc->src));
+		newsrc->refcount = 2;
+		LIST_INSERT_BEFORE(msfsrc, newsrc, list);
+		break;
+	}
+	if (!msfsrc) {
+		if (!IGMP_MSFON_OPS(optname)) {
+			splx(s);
+			return EADDRNOTAVAIL;
+		}
+		newsrc = (struct sock_msf_source *)malloc(sizeof(*newsrc),
+							  M_IPMOPTS, M_NOWAIT);
+		if (newsrc == NULL) {
+			splx(s);
+			return ENOBUFS;
+		}
+		bcopy(&msfsrc->src, &newsrc->src, sizeof(newsrc->src));
+		newsrc->refcount = 2;
+		LIST_INSERT_AFTER(lastp, newsrc, list);
+	}
+
+	if (IGMP_MSFON_OPS(optname))
+		++(*curnumsrc);
+	else if (IGMP_MSFOFF_OPS(optname))
+		--(*curnumsrc);
+
+	splx(s);
+	return 0;
+}
 
 /*
  * Set or delete source addresses to/from the msf.
@@ -3242,7 +3435,7 @@ sock_getmopt_srcfilter(sop, grpfp)
  * If the argument is invalid, return EINVAL.
  * Otherwise, 0 will be returned, which means okay.
  */
-static int
+int
 in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 	struct sock_msf *msf;
 	u_int16_t numsrc;
@@ -3250,18 +3443,18 @@ in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 	u_int mode;
 	u_int16_t *add_num, *old_num;
 {
-	struct sockaddr_in *sin;
-	struct sock_msf_source *msfsrc = NULL, *nmsfsrc, *cursrc, *newsrc, *lastp = NULL;
+	struct sockaddr *src = NULL, *lsrc;
+	struct sock_msf_source *msfsrc, *nmsfsrc, *cursrc, *newsrc, *lastp;
 	struct msf_head head;
 	u_int16_t *curnumsrc;
 	u_int curmode;
-	u_int32_t src_h, lsrc_h;
 	u_int16_t i, j;
 
 	if (mode != MCAST_INCLUDE && mode != MCAST_EXCLUDE) {
 		return EINVAL;
 	}
 	i = j = 0;
+	msfsrc = lastp = NULL;
 
 	/*
 	 * Create multicast source filter list on the socket.
@@ -3272,8 +3465,8 @@ in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 			     j < msf->msf_numsrc && cursrc;
 			     j++, cursrc = LIST_NEXT(cursrc, list)) {
 				/* Move unneeded sources to old_ss */
-				sin = SIN(&old_ss[j]);
-				SIN_ADDR(sin) = htonl(SIN_ADDR(&cursrc->src));
+				bcopy(&cursrc->src, &old_ss[j],
+				      cursrc->src.ss_len);
 				cursrc->refcount = 0;
 			}
 			msf->msf_numsrc = 0;
@@ -3282,8 +3475,8 @@ in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 			     j < msf->msf_blknumsrc && cursrc;
 			     j++, cursrc = LIST_NEXT(cursrc, list)) {
 				/* Move unneeded sources to old_ss */
-				sin = SIN(&old_ss[j]);
-				SIN_ADDR(sin) = htonl(SIN_ADDR(&cursrc->src));
+				bcopy(&cursrc->src, &old_ss[j],
+				      cursrc->src.ss_len);
 				cursrc->refcount = 0;
 			}
 			msf->msf_blknumsrc = 0;
@@ -3299,8 +3492,8 @@ in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 			     j < msf->msf_blknumsrc && cursrc;
 			     j++, cursrc = LIST_NEXT(cursrc, list)) {
 				/* Move unneeded sources to old_ss */
-				sin = SIN(&old_ss[j]);
-				SIN_ADDR(sin) = htonl(SIN_ADDR(&cursrc->src));
+				bcopy(&cursrc->src, &old_ss[j],
+				      cursrc->src.ss_len);
 				cursrc->refcount = 0;
 			}
 			msf->msf_blknumsrc = 0;
@@ -3317,9 +3510,8 @@ in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 			     j < msf->msf_numsrc && cursrc;
 			     j++, cursrc = LIST_NEXT(cursrc, list)) {
 				/* Move unneeded sources to old_ss */
-				sin = SIN(&old_ss[j]);
-				SIN_ADDR(sin)
-					= htonl(SIN_ADDR(&cursrc->src));
+				bcopy(&cursrc->src, &old_ss[j],
+				      cursrc->src.ss_len);
 				cursrc->refcount = 0;
 			}
 			msf->msf_numsrc = 0;
@@ -3332,34 +3524,51 @@ in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 	}
 
 	for (i = 0; i < numsrc; i++) {
-		/* Note that ss lists were already ordered smaller first. */
-		sin = SIN(&ss[i]);
-		if (SIN_ADDR(sin) == INADDR_ANY)
+		u_char len = src->sa_len;
+		u_char family = src->sa_family;
+
+		src = (struct sockaddr *)&ss[i];
+
+		/* Note that ss lists are already ordered smaller first. */
+		if (src->sa_family != AF_INET && src->sa_family != AF_INET6)
+			continue; /* XXX unexpected */
+
+		if (SS_IS_ADDR_UNSPECIFIED(src))
 			continue; /* skip */
-		src_h = ntohl(SIN_ADDR(sin));
+
 		LIST_FOREACH(msfsrc, &head, list) {
 			lastp = msfsrc;
-			lsrc_h = SIN_ADDR(&msfsrc->src);
-			if (lsrc_h == src_h) {
+			lsrc = (struct sockaddr *)&msfsrc->src;
+
+			/* sanity check */
+			if (lsrc->sa_len != src->sa_len ||
+			    lsrc->sa_family != src->sa_family)
+				continue;
+			if (lsrc->sa_family != AF_INET && 
+			    lsrc->sa_family != AF_INET6)
+				continue;
+
+			if (SS_CMP(lsrc, ==, src)) {
 				/*
-				 * Overwrite INADDR_ANY to ss[i]. This entry
-				 * will be ignored by in_addmultisrc() or
-				 * in_modmultisrc() in order to skip the join
-				 * procedure for this source.
+				 * Overwrite unspecified address to ss[i]. 
+				 * This entry will be ignored by 
+				 * in*_addmultisrc() or in*_modmultisrc() 
+				 * in order to skip the join procedure for 
+				 * this source.
 				 */
-				SIN_ADDR(sin) = INADDR_ANY;
+				bzero(src, len);
+				src->sa_len = len;
+				src->sa_family = family;
 				LIST_FIRST(&head) = LIST_NEXT(msfsrc, list);
 				break;
-			} else if (lsrc_h > src_h) {
+			} else if (SS_CMP(lsrc, >, src)) {
 				MALLOC(newsrc, struct sock_msf_source *,
 					sizeof(*newsrc), M_IPMOPTS, M_NOWAIT);
 				if (newsrc == NULL) {
 					in_undomopt_source_list(msf, mode);
 					return ENOBUFS;
 				}
-				SIN(&newsrc->src)->sin_family = AF_INET;
-				SIN(&newsrc->src)->sin_len = newsrc->src.ss_len;
-				SIN_ADDR(&newsrc->src) = src_h;
+				bcopy(src, &newsrc->src, len);
 				newsrc->refcount = 2;
 				LIST_INSERT_BEFORE(msfsrc, newsrc, list);
 				LIST_FIRST(&head) = msfsrc;
@@ -3376,9 +3585,7 @@ in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 				in_undomopt_source_list(msf, mode);
 				return ENOBUFS;
 			}
-			SIN(&newsrc->src)->sin_family = AF_INET;
-			SIN(&newsrc->src)->sin_len = newsrc->src.ss_len;
-			SIN_ADDR(&newsrc->src) = src_h;
+			bcopy(src, &newsrc->src, src->sa_len);
 			newsrc->refcount = 2;
 			if (mode == MCAST_INCLUDE && LIST_EMPTY(msf->msf_head)) {
 				LIST_INSERT_HEAD(msf->msf_head, newsrc, list);
@@ -3421,13 +3628,12 @@ in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 			if (msfsrc->refcount == 0) {
 				if (old_ss) {
 					/* Move unneeded sources to old_ss */
-					sin = SIN(&old_ss[j]);
-					SIN_ADDR(sin)
-						= htonl(SIN_ADDR(&msfsrc->src));
+					bcopy(&msfsrc->src, &old_ss[j],
+					      msfsrc->src.ss_len);
 					j++;
 				} else {
 					in_undomopt_source_list(msf, mode);
-#ifdef IGMPV3_DEBUG
+#if defined(IGMPV3_DEBUG) || defined(MLDV2_DEBUG)
 					printf("in_setmopt_source_list: cannot insert to old_ss. undo\n");
 #endif
 					return EOPNOTSUPP;
@@ -3677,4 +3883,4 @@ dump_in_multisrc(void)
 }
 #endif /* IGMPV3_DEBUG */
 #endif /* FreeBSD */
-#endif /* IGMPV3 */
+#endif /* IGMPV3 or MLDV2 */

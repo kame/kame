@@ -1,4 +1,41 @@
-/*	$KAME: icmp6.h,v 1.74 2002/08/15 03:11:53 k-sugyou Exp $	*/
+/*	$KAME: icmp6.h,v 1.75 2002/09/05 08:09:35 suz Exp $	*/
+
+/*
+ * Copyright (c) 2002 INRIA. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by INRIA and its
+ *	contributors.
+ * 4. Neither the name of INRIA nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/*
+ * Implementation of Multicast Listener Discovery, Version 2.
+ *
+ * Developed by Hitoshi Asaeda, INRIA, August 2002.
+ */
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -207,6 +244,65 @@ struct mld_hdr {
 #define mld_cksum	mld_icmp6_hdr.icmp6_cksum
 #define mld_maxdelay	mld_icmp6_hdr.icmp6_data16[0]
 #define mld_reserved	mld_icmp6_hdr.icmp6_data16[1]
+
+/*
+ * Multicast Listener Discovery Version 2
+ */
+struct mldv2_hdr {
+	struct icmp6_hdr	mld_icmp6_hdr;
+	struct in6_addr		mld_addr;	/* multicast address */
+	u_int8_t		mld_rtval;	/* Reserved, S Flag and QRV */
+	u_int8_t	 	mld_qqi;	/* querier's query interval (QQI) */
+	u_int16_t		mld_numsrc;	/* number of sources (0 for general */
+						/* and group-specific queries) */
+	struct in6_addr		mld_src[1];	/* source address list */	
+} __attribute__((__packed__));
+
+#define MLD_EXP(x)	((ntohs(x) >> 12) & 0x0007)
+#define MLD_MANT(x)	(ntohs(x) & 0x0fff)
+#define MLD_QRESV(x)	(((x) >> 4) & 0x0f)
+#define MLD_SFLAG(x)	(((x) >> 3) & 0x01)
+#define MLD_QRV(x)	((x) & 0x07)	/* querier's robustness variable   */
+
+/*
+ * MLDv2 Membership Report Message header.
+ */
+struct mld_report_hdr {
+	struct icmp6_hdr	mld_icmp6_hdr;	/* version & type of MLD message */
+} __attribute__((__packed__));
+
+/* shortcut macro definition */
+#define mld_grpnum	mld_icmp6_hdr.icmp6_data16[1]
+
+/*
+ * MLDv2 Group Record header.
+ */
+struct mld_group_record_hdr {
+	u_int8_t	record_type;	/* record types for membership report */
+	u_int8_t	auxlen;		/* aux data length (must be zero)     */
+	u_int16_t               numsrc;         /* number of sources        */
+        struct in6_addr         group;          /* group address            */
+        struct in6_addr         src[1];         /* source address list      */
+} __attribute__((__packed__));
+
+#define MLD_V1_QUERY			0
+#define MLD_V2_GENERAL_QUERY		1
+#define MLD_V2_GROUP_QUERY		2
+#define MLD_V2_GROUP_SOURCE_QUERY	3
+
+#define MLD_MINLEN			24
+#define MLD_V2_QUERY_MINLEN		28
+
+
+/*
+ * Group Record Types in the MLD Membership Report
+ */
+#define MODE_IS_INCLUDE                 1
+#define MODE_IS_EXCLUDE                 2
+#define CHANGE_TO_INCLUDE_MODE          3
+#define CHANGE_TO_EXCLUDE_MODE          4
+#define ALLOW_NEW_SOURCES               5
+#define BLOCK_OLD_SOURCES               6
 
 /*
  * Neighbor Discovery
@@ -722,7 +818,10 @@ struct icmp6stat {
 #define ICMPV6CTL_ND6_DEBUG	18
 #define ICMPV6CTL_ND6_DRLIST	19
 #define ICMPV6CTL_ND6_PRLIST	20
-#define ICMPV6CTL_MAXID		21
+#define ICMPV6CTL_MLD_MAXSRCFILTER	21
+#define ICMPV6CTL_MLD_SOMAXSRC	22
+#define ICMPV6CTL_MLD_ALWAYSV2	23
+#define ICMPV6CTL_MAXID		24
 
 #define ICMPV6CTL_NAMES { \
 	{ 0, 0 }, \
@@ -746,6 +845,9 @@ struct icmp6stat {
 	{ "nd6_debug", CTLTYPE_INT }, \
 	{ 0, 0 }, \
 	{ 0, 0 }, \
+	{ "mldmaxsrcfilter", CTLTYPE_INT }, \
+	{ "mldsomaxsrc", CTLTYPE_INT }, \
+	{ "mldalwaysv2", CTLTYPE_INT }, \
 }
 
 #ifdef __bsdi__
@@ -771,6 +873,9 @@ struct icmp6stat {
 	&nd6_debug, \
 	0, \
 	0, \
+	&mldmaxsrcfilter, \
+	&mldsomaxsrc, \
+	&mldalwaysv2, \
 }
 #endif
 
@@ -787,6 +892,7 @@ void	icmp6_paramerror __P((struct mbuf *, int));
 void	icmp6_error __P((struct mbuf *, int, int, int));
 int	icmp6_input __P((struct mbuf **, int *, int));
 void	icmp6_fasttimo __P((void));
+void	icmp6_slowtimo __P((void));
 void	icmp6_reflect __P((struct mbuf *, size_t));
 void	icmp6_prepare __P((struct mbuf *));
 void	icmp6_redirect_input __P((struct mbuf *, int));
@@ -842,6 +948,7 @@ do { \
 			 icmp6_ifstat_inc(ifp, ifs6_out_mldquery); \
 			 break; \
 		 case MLD_LISTENER_REPORT: \
+		 case MLDV2_LISTENER_REPORT: \
 			 icmp6_ifstat_inc(ifp, ifs6_out_mldreport); \
 			 break; \
 		 case MLD_LISTENER_DONE: \

@@ -325,6 +325,7 @@ options 	TCP_ECN		# ECN support in TCP
 
 # Source-Specific Multicast (SSM)
 #options 	IGMPV3		# IPv4
+#options 	MLDV2		# IPv6
 
 #pseudo-device	atm
 #pseudo-device	dummy	1

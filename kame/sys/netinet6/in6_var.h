@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.81 2002/06/08 11:16:51 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.82 2002/09/05 08:09:36 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -534,7 +534,23 @@ do {									\
  */
 struct in6_multi_mship {
 	struct	in6_multi *i6mm_maddr;	/* Multicast address pointer */
+	struct	sock_msf *i6mm_msf;	/* Multicast source filters */
 	LIST_ENTRY(in6_multi_mship) i6mm_chain;  /* multicast options chain */
+};
+
+/*
+ * Per-interface router version information; referred to when MLDv1/v2 coexists.
+ */
+
+struct router6_info {
+        struct  ifnet *rt6i_ifp;
+	int    rt6i_type; /* type of router which is querier on this interface */
+	u_int	rt6i_timer1;	/* MLDv1 Querier Present timer */
+	u_int	rt6i_timer2;	/* MLDv2 Querier Present timer */
+	u_int	rt6i_qrv;	/* Querier Robustness Variable */
+	u_int	rt6i_qqi;	/* Querier Interval Variable */
+	u_int	rt6i_qri;	/* Querier Response Interval */
+	struct router6_info *rt6i_next;
 };
 
 struct	in6_multi {
@@ -549,6 +565,8 @@ struct	in6_multi {
 	u_int	in6m_refcount;		/* # membership claims by sockets */
 	u_int	in6m_state;		/* state of the membership */
 	u_int	in6m_timer;		/* MLD6 listener report timer */
+	struct router6_info *in6m_rti;	/* router info */
+	struct in6_multi_source *in6m_source;	/* filtered source list */
 };
 
 #ifdef _KERNEL
@@ -667,9 +685,23 @@ do {						\
 
 #endif /* not FreeBSD3 */
 
+#ifdef MLDV2
+struct	in6_multi * in6_addmulti(struct sockaddr_in6 *, struct ifnet *,
+				 int *, u_int16_t, struct sockaddr_in6 *,
+				 u_int, int);
+void	in6_delmulti(struct in6_multi *, int *,
+		     u_int16_t, struct sockaddr_in6 *,
+		     u_int, int);
+struct	in6_multi * in6_modmulti(struct sockaddr_in6 *, struct ifnet *,
+				 int *, u_int16_t,
+				 struct sockaddr_in6 *, u_int, u_int16_t,
+				 struct sockaddr_in6 *, u_int, int, u_int);
+#else
 struct	in6_multi *in6_addmulti __P((struct sockaddr_in6 *, struct ifnet *,
 	int *));
 void	in6_delmulti __P((struct in6_multi *));
+#endif
+
 struct in6_multi_mship *in6_joingroup __P((struct ifnet *,
 	struct sockaddr_in6 *, int *));
 int	in6_leavegroup __P((struct in6_multi_mship *));

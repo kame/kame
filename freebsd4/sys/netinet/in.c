@@ -112,8 +112,6 @@ struct in_multihead in_multihead; /* XXX BSS initialization */
 extern struct inpcbinfo	ripcbinfo;
 extern struct inpcbinfo udbinfo;
 
-#define SIN_ADDR(x) (((struct sockaddr_in *)(x))->sin_addr.s_addr)
-
 /*
  * Return 1 if an internet address is for a ``local'' host
  * (one to which we have a connection).  If subnetsarelocal

@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.130 2002/07/31 09:28:35 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.131 2002/09/05 08:09:36 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -221,12 +221,21 @@ extern const struct in6_addr in6mask128;
 #define IN6ADDR_LINKLOCAL_ALLROUTERS_INIT \
 	{{{ 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
 	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02 }}}
+#ifdef MLDV2
+/* XXX temp. we wait IANA's decision */
+#define IN6ADDR_LINKLOCAL_ALLV2ROUTERS_INIT \
+	{{{ 0xff, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
+	    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0f }}}
+#endif
 
 extern const struct in6_addr in6addr_any;
 extern const struct in6_addr in6addr_loopback;
 extern const struct in6_addr in6addr_nodelocal_allnodes;
 extern const struct in6_addr in6addr_linklocal_allnodes;
 extern const struct in6_addr in6addr_linklocal_allrouters;
+#ifdef MLDV2
+extern const struct in6_addr in6addr_linklocal_allv2routers;
+#endif
 
 /*
  * Equality
