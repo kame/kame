@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.65 2003/09/02 23:32:07 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.66 2003/09/02 23:32:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -83,11 +83,13 @@ char *serverarg[MAXARGV + 1];
 static char *faithdname = NULL;
 char logname[BUFSIZ];
 char procname[BUFSIZ];
+
 struct myaddrs {
 	struct myaddrs *next;
 	struct sockaddr *addr;
 };
 struct myaddrs *myaddrs = NULL;
+
 static const char *service;
 #ifdef USE_ROUTE
 static int sockfd = 0;
