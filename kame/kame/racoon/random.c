@@ -1,4 +1,4 @@
-/*	$KAME: random.c,v 1.3 2000/10/05 06:46:31 itojun Exp $	*/
+/*	$KAME: random.c,v 1.4 2000/10/06 13:11:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -65,7 +65,11 @@ random()
 
 void
 srandom(seed)
+#ifdef __bsdi__
+	unsigned int seed;
+#else
 	unsigned long seed;
+#endif
 {
 
 	/* nothing to do */
