@@ -1,4 +1,4 @@
-/*	$KAME: handler.h,v 1.38 2001/03/05 18:37:07 thorpej Exp $	*/
+/*	$KAME: handler.h,v 1.39 2001/04/06 14:23:47 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -247,6 +247,7 @@ struct ph2handle {
 	struct sainfo *sainfo;		/* place holder of sainfo */
 	struct saprop *proposal;	/* SA(s) proposal. */
 	struct saprop *approval;	/* SA(s) approved. */
+	caddr_t spidx_gen;		/* policy from peer's proposal */
 
 	struct dhgroup *pfsgrp;		/* DH; prime number */
 	vchar_t *dhpriv;		/* DH; private value */

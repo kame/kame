@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.h,v 1.22 2001/03/27 02:39:57 thorpej Exp $	*/
+/*	$KAME: remoteconf.h,v 1.23 2001/04/06 14:23:48 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -63,7 +63,7 @@ struct remoteconf {
 	int nonce_size;			/* the number of bytes of nonce */
 	int keepalive;			/* XXX may not use */
 	int support_mip6;		/* support mip6 */
-	int gen_policy;			/* XXX not yet, for anonymous client. */
+	int gen_policy;			/* generate policy if no policy found */
 	int ini_contact;		/* initial contact */
 	int pcheck_level;		/* level of propocl checking */
 

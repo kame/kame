@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.30 2001/04/03 15:51:56 thorpej Exp $	*/
+/*	$KAME: proposal.c,v 1.31 2001/04/06 14:23:48 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1009,4 +1009,61 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 	return 0;
 err:
 	return -1;
+}
+
+/*
+ * generate a policy from peer's proposal.
+ * this function unconditionally choices first proposal in SA payload
+ * passed by peer.
+ */
+int
+set_proposal_from_proposal(iph2)
+	struct ph2handle *iph2;
+{
+	struct prop_pair **pair;
+	struct saprop *pp;
+	struct saproto *pr;
+	int error = -1;
+	int i;
+
+	/* get proposal pair */
+	pair = get_proppair(iph2->sa, IPSECDOI_TYPE_PH2);
+	if (pair == NULL)
+		goto end;
+
+	/* choice the first proposal */
+	for (i = 0; i < MAXPROPPAIRLEN; i++) {
+		if (pair[i] != NULL)
+			break;
+	}
+
+	if (i == MAXPROPPAIRLEN)
+		goto end;
+
+	pp = aproppair2saprop(pair[i]);
+	if (!pp)
+		goto end;
+
+	/* reverse SPI */
+	for (pr = pp->head; pr; pr = pr->next) {
+		pr->spi_p = pr->spi;	/* copy peer's SPI */
+		pr->spi = 0;		/* initialize */
+	}
+
+	plog(LLV_DEBUG, LOCATION, NULL, "choice a proposal from peer's:\n");
+	printsaprop0(LLV_DEBUG, pp);  
+
+	iph2->approval = pp;
+
+	/* make a SA to be replayed. */ 
+	/* SPI must be updated later. */
+	iph2->sa_ret = get_sabyproppair(pair[i], iph2->ph1);
+	if (iph2->sa_ret == NULL)
+		goto end;
+
+	error = 0;
+
+end:
+	free_proppair(pair);
+	return error;
 }

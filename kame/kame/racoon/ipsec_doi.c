@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.132 2001/04/04 04:58:15 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.133 2001/04/06 14:23:47 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -98,7 +98,6 @@ static void free_proppair0 __P((struct prop_pair *));
 
 static int get_transform
 	__P((struct isakmp_pl_p *, struct prop_pair **, int *));
-static vchar_t *get_sabyproppair __P((struct prop_pair *, struct ph1handle *));
 static u_int32_t ipsecdoi_set_ld __P((vchar_t *));
 
 static int check_doi __P((u_int32_t));
@@ -1314,7 +1313,7 @@ get_transform(prop, pair, num_p)
  * make a new SA payload from prop_pair.
  * NOTE: this function make spi value clear.
  */
-static vchar_t *
+vchar_t *
 get_sabyproppair(pair, iph1)
 	struct prop_pair *pair;
 	struct ph1handle *iph1;
@@ -2914,6 +2913,21 @@ ipproto2doi(proto)
 		return IPSECDOI_PROTO_IPSEC_ESP;
 	case IPPROTO_IPCOMP:
 		return IPSECDOI_PROTO_IPCOMP;
+	}
+	return -1;	/* XXX */
+}
+
+int
+doi2ipproto(proto)
+	int proto;
+{
+	switch (proto) {
+	case IPSECDOI_PROTO_IPSEC_AH:
+		return IPPROTO_AH;
+	case IPSECDOI_PROTO_IPSEC_ESP:
+		return IPPROTO_ESP;
+	case IPSECDOI_PROTO_IPCOMP:
+		return IPPROTO_IPCOMP;
 	}
 	return -1;	/* XXX */
 }

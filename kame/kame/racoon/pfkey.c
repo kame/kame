@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.108 2001/04/03 15:51:56 thorpej Exp $	*/
+/*	$KAME: pfkey.c,v 1.109 2001/04/06 14:23:48 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1720,6 +1720,110 @@ pk_recvspdupdate(mhp)
 			"inappropriate sadb spdupdate message passed.\n");
 		return -1;
 	}
+
+	return 0;
+}
+
+/*
+ * this function has to be used by responder side.
+ */
+int
+pk_sendspdadd2(iph2)
+	struct ph2handle *iph2;
+{
+	struct policyindex *spidx;
+	struct saproto *pr;
+	u_int64_t ltime, vtime;
+	struct sadb_x_policy *xpl;
+	struct sadb_x_ipsecrequest *xisr;
+	u_int satype, mode;
+	caddr_t policy = NULL, p;
+	int policylen;
+
+	spidx = (struct policyindex *)iph2->spidx_gen;
+
+	ltime = iph2->approval->lifetime;
+	vtime = 0;
+
+	/* get policy buffer size */
+	policylen = sizeof(struct sadb_x_policy);
+	for (pr = iph2->approval->head; pr; pr = pr->next) {
+		policylen += PFKEY_ALIGN8(sizeof(*xisr)
+		                   + iph2->src->sa_len
+		                   + iph2->dst->sa_len);
+	}
+
+	/* make policy structure */
+	policy = racoon_malloc(policylen);
+	if (!policy) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"buffer allocation failed.\n");
+		return -1;
+	}
+
+	xpl = (struct sadb_x_policy *)policy;
+	xpl->sadb_x_policy_len = PFKEY_UNIT64(policylen);
+	xpl->sadb_x_policy_exttype = SADB_X_EXT_POLICY;
+	xpl->sadb_x_policy_type = IPSEC_POLICY_IPSEC;
+	xpl->sadb_x_policy_dir = spidx->dir;	/* always inbound */
+	xpl->sadb_x_policy_id = 0;
+	xisr = (struct sadb_x_ipsecrequest *)(xpl + 1);
+
+	for (pr = iph2->approval->head; pr; pr = pr->next) {
+
+		satype = doi2ipproto(pr->proto_id);
+		if (satype == ~0) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"invalid proto_id %d\n", pr->proto_id);
+			goto end;
+		}
+		mode = ipsecdoi2pfkey_mode(pr->encmode);
+		if (mode == ~0) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"invalid encmode %d\n", pr->encmode);
+			goto end;
+		}
+
+		/* 
+		 * the policy level cannot be unique because the policy
+		 * is defined later than SA, so req_id cannot be bound to SA.
+		 */
+		xisr->sadb_x_ipsecrequest_proto = satype;
+		xisr->sadb_x_ipsecrequest_mode = mode;
+		xisr->sadb_x_ipsecrequest_level = IPSEC_LEVEL_REQUIRE;
+		xisr->sadb_x_ipsecrequest_reqid = 0;
+		p = (caddr_t)(xisr + 1);
+
+		memcpy(p, iph2->src, iph2->src->sa_len);
+		p += iph2->src->sa_len;
+
+		memcpy(p, iph2->dst, iph2->dst->sa_len);
+		p += iph2->dst->sa_len;
+
+		xisr->sadb_x_ipsecrequest_len = PFKEY_ALIGN8(sizeof(*xisr)
+		                                           + iph2->src->sa_len
+		                                           + iph2->dst->sa_len);
+	}
+
+	if (pfkey_send_spdadd2(
+			lcconf->sock_pfkey,
+			(struct sockaddr *)&spidx->src,
+			spidx->prefs,
+			(struct sockaddr *)&spidx->dst,
+			spidx->prefd,
+			spidx->ul_proto,
+			ltime, vtime,
+			policy, policylen, 0) < 0) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"libipsec failed send spdadd2 (%s)\n",
+			ipsec_strerror());
+		goto end;
+	}
+	plog(LLV_DEBUG, LOCATION, NULL, "call pfkey_send_spdadd2\n");
+
+end:
+	if (policy)
+		racoon_free(policy);
 
 	return 0;
 }

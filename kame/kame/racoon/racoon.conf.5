@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.77 2001/02/22 02:40:06 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.78 2001/04/06 14:23:48 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -373,6 +373,17 @@ the initiator's one, then the responder will reject the proposal.
 If this value is set on then both values of ID payloads in phase 2 exchange
 are always used as the addresses of end-point of IPsec-SAs.
 The default is off.
+.\"
+.It Ic generate_policy (on \(ba off) ;
+This directive is for the responder.
+If the responder does not have any policy in SPD during phase 2 negotiation,
+and the directive is set on, then racoon will choice the first proposal in the
+SA payload from the initiator, and generate policy entries from the proposal.
+It is useful to negotiate with the client which is allocated IP address
+dynamically and the communication needs IPSec tunnel mode.
+This directive is ignored in the initiator case.
+The default value is
+.Ic off .
 .\"
 .It Ic nonce_size Ar number ;
 define the byte size of nonce value.

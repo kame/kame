@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.47 2001/04/03 15:51:55 thorpej Exp $	*/
+/*	$KAME: handler.c,v 1.48 2001/04/06 14:23:47 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -478,6 +478,10 @@ initph2(iph2)
 	if (iph2->approval) {
 		flushsaprop(iph2->approval);
 		iph2->approval = NULL;
+	}
+	if (iph2->spidx_gen) {
+		racoon_free(iph2->spidx_gen);
+		iph2->spidx_gen = NULL;
 	}
 
 	if (iph2->pfsgrp) {

@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.h,v 1.16 2001/03/05 18:37:07 thorpej Exp $	*/
+/*	$KAME: pfkey.h,v 1.17 2001/04/06 14:23:48 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -51,6 +51,7 @@ extern int pk_sendgetspi __P((struct ph2handle *));
 extern int pk_sendupdate __P((struct ph2handle *));
 extern int pk_sendadd __P((struct ph2handle *));
 extern int pk_sendeacquire __P((struct ph2handle *));
+extern int pk_sendspdadd2 __P((struct ph2handle *));
 
 extern void pfkey_timeover_stub __P((void *));
 extern void pfkey_timeover __P((struct ph2handle *));
