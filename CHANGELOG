@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1427 2000/12/05 01:46:29 itojun Exp $
+$KAME: CHANGELOG,v 1.1428 2000/12/05 15:23:17 itojun Exp $
 
 <200012>
+Wed Dec  6 00:22:31 JST 2000  itojun@iijlab.net
+	* openbsd: use shared raw ip6 logic.
+
 Tue Dec  5 10:44:53 JST 2000  itojun@iijlab.net
 	* sys/netinet6/nd6_nbr.c: (non-bsdi) make sure we don't have DAD
 	  process, for an IPv6 interface address on detached PCMCIA interfaces.
