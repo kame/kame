@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.17 2000/01/14 01:33:08 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.18 2000/01/17 06:43:42 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -410,7 +410,7 @@ quick_i2recv(iph2, msg0)
 
 			if (memcmp(vp->v, (caddr_t)pa->ptr + sizeof(struct isakmp_gen), vp->l)) {
 
-				isakmp_info_send_n2(iph2, ISAKMP_NTYPE_ATTRIBUTES_NOT_SUPPORTED, NULL, 0);
+				isakmp_info_send_n2(iph2, ISAKMP_NTYPE_ATTRIBUTES_NOT_SUPPORTED, NULL);
 				plog(logp, LOCATION, NULL,
 					"mismatched ID was returned.\n");
 				goto end;
@@ -476,7 +476,7 @@ quick_i2recv(iph2, msg0)
 
 	if (result) {
 		plog(logp, LOCATION, iph2->ph1->remote, "HASH(2) mismatch.\n");
-		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL, iph2->flags);
+		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL);
 		goto end;
 	}
     }
@@ -743,7 +743,7 @@ quick_i3recv(iph2, msg0)
 
 	if (result) {
 		plog(logp, LOCATION, iph2->ph1->remote, "HASH(4) mismatch.\n");
-		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL, iph2->flags);
+		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL);
 		goto end;
 	}
     }
@@ -1025,7 +1025,7 @@ quick_r1recv(iph2, msg0)
 
 	if (result) {
 #if 0	/* XXX can't get SA's values because before checking SA */
-		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL, iph2->flags);
+		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL);
 #endif
 		plog(logp, LOCATION, iph2->ph1->remote, "HASH(1) mismatch.\n");
 		error = ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
@@ -1457,7 +1457,7 @@ quick_r3recv(iph2, msg0)
 
 	if (result) {
 		plog(logp, LOCATION, iph2->ph1->remote, "HASH(3) mismatch.\n");
-		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL, iph2->flags);
+		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL);
 		goto end;
 	}
     }
