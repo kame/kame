@@ -308,6 +308,9 @@ p_sockaddr(sa, flags, width)
 		cp = IN6_IS_ADDR_UNSPECIFIED(&sin->sin6_addr) ? "default" :
 			((flags & RTF_HOST) ?
 			routename(sa) :	netname(sa));
+		/* make sure numeric address is not truncated */
+		if (strchr(cp, ':') != NULL && strlen(cp) > width)
+			width = strlen(cp);
 		break;
 	    }
 #endif /* INET6 */
