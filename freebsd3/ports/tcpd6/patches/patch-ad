@@ -1,0 +1,10 @@
+--- tcpd.c-	Sun Jan 10 22:33:04 1999
++++ tcpd.c	Sun Jan 10 22:32:41 1999
+@@ -12,6 +12,7 @@
+ #endif
+ 
+ #include <stdio.h>
++#include <sys/types.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <string.h>

@@ -1,0 +1,15 @@
+--- agent/mibgroup/mibII/tcp.c.orig	Fri Jun 26 21:12:35 1998
++++ agent/mibgroup/mibII/tcp.c	Fri Jun 26 21:17:14 1998
+@@ -55,6 +55,12 @@
+ #include <netinet/ip_var.h>
+ #endif
+ #if HAVE_NETINET_IN_PCB_H
++#  if defined(__FreeBSD__) && (__FreeBSD__ >= 2)
++#    include <osreldate.h>
++#    if __FreeBSD_version >= 300000
++#      include <sys/socketvar.h>
++#    endif
++#  endif
+ #include <netinet/in_pcb.h>
+ #endif
+ #if HAVE_INET_MIB2_H

@@ -1,0 +1,23 @@
+*** configure.in.orig	Thu Jul  9 01:41:10 1998
+--- configure.in	Sat Jul 18 17:17:43 1998
+***************
+*** 317,325 ****
+  
+  export CFLAGS CC
+  
+! # Socket pairs appear to be broken on several systems.  I don't know exactly
+! # where, so I'll use pipes everywhere for now.
+! AC_DEFINE(USE_PIPES)
+  
+  AC_MSG_CHECKING([that the compiler works])
+  AC_TRY_RUN([ main(int ac, char **av) { return 0; } ],
+--- 317,325 ----
+  
+  export CFLAGS CC
+  
+! dnl # Socket pairs appear to be broken on several systems.  I don't know exactly
+! dnl # where, so I'll use pipes everywhere for now.
+! dnl AC_DEFINE(USE_PIPES)
+  
+  AC_MSG_CHECKING([that the compiler works])
+  AC_TRY_RUN([ main(int ac, char **av) { return 0; } ],

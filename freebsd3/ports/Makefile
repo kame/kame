@@ -1,0 +1,57 @@
+# $Id: Makefile,v 1.1.1.1 1999/08/17 09:09:11 itojun Exp $
+#
+
+#SUBDIR+=	XFree86
+SUBDIR+=	altq
+SUBDIR+=	apache12
+SUBDIR+=	apache13
+SUBDIR+=	bind8
+SUBDIR+=	ct
+SUBDIR+=	ethereal
+SUBDIR+=	emacs20
+SUBDIR+=	fetchmail
+SUBDIR+=	fwtk6
+SUBDIR+=	gated-ipv6
+SUBDIR+=	geta
+SUBDIR+=	heimdal
+SUBDIR+=	icecast
+SUBDIR+=	irc
+SUBDIR+=	inn
+SUBDIR+=	kaffe
+SUBDIR+=	libident6
+SUBDIR+=	lynx
+SUBDIR+=	mediator
+SUBDIR+=	mozilla
+SUBDIR+=	mpg123
+SUBDIR+=	mrt
+SUBDIR+=	ncftp3
+SUBDIR+=	netperf
+SUBDIR+=	newbie
+SUBDIR+=	perl5
+SUBDIR+=	pident6d
+SUBDIR+=	popper
+SUBDIR+=	ppp
+SUBDIR+=	python
+SUBDIR+=	qmail
+SUBDIR+=	rev_v6_address
+SUBDIR+=	rsync
+SUBDIR+=	ruby
+SUBDIR+=	sendmail6
+SUBDIR+=	socks64
+SUBDIR+=	squid11
+SUBDIR+=	ssh
+SUBDIR+=	tcp_wrapper
+SUBDIR+=	tcpd6
+SUBDIR+=	tcptrace
+#SUBDIR+=	ucd-snmp
+SUBDIR+=	v6eval
+SUBDIR+=	v6tun
+SUBDIR+=	vat6
+SUBDIR+=	vic6
+SUBDIR+=	vnc
+SUBDIR+=	wbd
+SUBDIR+=	wget
+SUBDIR+=	wu-ftpd
+SUBDIR+=	zebra
+
+.include <bsd.port.subdir.mk>

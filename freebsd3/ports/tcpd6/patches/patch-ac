@@ -1,0 +1,11 @@
+--- tcpd_exec.c-	Fri Jan  8 08:50:08 1999
++++ tcpd_exec.c	Fri Jan  8 08:50:15 1999
+@@ -61,7 +61,7 @@
+ static int set_newumask(char *v)
+ {
+ 	char *ss;
+-	if (!isnumber(*v))
++	if (!isdigit(*v))
+ 		return 0;
+ 	newumask = strtol(v, &ss, 8);
+ 	return 1;

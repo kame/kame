@@ -1,0 +1,51 @@
+tcl/tk version change.
+
+--- configure.in-dist	Fri Feb 26 15:18:11 1999
++++ configure.in	Fri Feb 26 15:00:47 1999
+@@ -15,9 +15,9 @@
+ 	;;
+ freebsd*)
+ 	TK_BASE=/usr/local
+-	PATH_TCL=$TK_BASE/lib/tcl7.6
+-	PATH_TK=$TK_BASE/lib/tk4.2
+-	CFLAGS="$CFLAGS -I/usr/local/include/tk4.2 -I/usr/local/include/tcl7.6"
++	PATH_TCL=$TK_BASE/lib/tcl8.0
++	PATH_TK=$TK_BASE/lib/tk8.0
++	CFLAGS="$CFLAGS -I/usr/local/include/tk8.0 -I/usr/local/include/tcl8.0"
+ 	;;
+ solaris*)	AC_DEFINE(FNDELAY, O_NDELAY)
+ 	;;
+@@ -31,7 +31,7 @@
+ XLIBS="$X_PRE_LIBS $X_LIBS -lX11 $X_EXTRA_LIBS"
+ tcl_vars=
+ tk_vars=
+-for i in tcl7.6 tcl76; do
++for i in tcl8.0 tcl80; do
+ 	AC_CHECK_LIB($i, Tcl_CreateCommand, [dnl
+ 		LIBS="-l$i $LIBS"
+ 		tcl_vars=$i
+@@ -41,7 +41,7 @@
+ 	echo "FATAL: no tcl library found."
+ 	exit 1
+ fi
+-for i in tk4.2 tk42; do
++for i in tk8.0 tk80; do
+ 	AC_CHECK_LIB($i, Tk_NameToWindow, [dnl
+ 		LIBS="-l$i $LIBS"
+ 		tk_vars=$i
+--- main.c-dist	Fri Feb 26 15:18:25 1999
++++ main.c	Fri Feb 26 15:02:13 1999
+@@ -225,13 +225,11 @@
+         datarate = 8192;
+ 
+     /* Initialise Tcl and Tk. */
+-#ifndef STAND_ALONE
+     if (Tcl_Init (tcl) != TCL_OK)
+     {
+         printf ("Failed to initialise tcl: %s\n", tcl->result);
+         exit (-1);
+     }
+-#endif
+     if (Tk_Init (tcl) != TCL_OK)
+     {
+         printf ("Failed to initialise tk: %s\n", tcl->result);

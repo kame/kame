@@ -1,0 +1,28 @@
+--- Makefile.orig	Tue Jan  6 16:14:25 1998
++++ Makefile	Sun Jan 10 22:31:41 1999
+@@ -17,7 +17,7 @@
+ 
+ $(LIB):	$(LIBWRAPO)
+ 	@rm -f $(LIB)
+-	ar cTq $(LIB) `lorder $(LIBWRAPO) | tsort`
++	ar cq $(LIB) `lorder $(LIBWRAPO) | tsort`
+ 	ranlib $(LIB)
+ 
+ $(LIBWRAPO):	tcpd.h tcpd_local.h
+@@ -26,10 +26,12 @@
+ 	-rm $(EXEC) $(LIB) *~ *.o
+ 
+ install:	all
+-	install -c -g bin -o bin -m 644 libwrap.a /usr/lib/
+-	ranlib /usr/lib/libwrap.a
+-	install -c -g bin -o bin -m 644 tcpd.h /usr/include/
+-	install -c -g bin -o bin -m 755 tcpd /usr/libexec/
++	install -c -g bin -o bin -m 644 libwrap.a ${PREFIX}/v6/lib/
++	ranlib ${PREFIX}/v6/lib/libwrap.a
++	install -c -g bin -o bin -m 644 tcpd.h ${PREFIX}/v6/include/
++	install -c -g bin -o bin -m 755 tcpd ${PREFIX}/v6/libexec/
++	install -c -g bin -o bin -m 644 hosts.access \
++		${PREFIX}/v6/etc/hosts.access.sample
+ 
+ pack:	clean
+ 	(cd ..; tar cvzf tcpd-v6-`cat tcpd/VERSION`.tar.gz tcpd)

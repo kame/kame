@@ -1,0 +1,10 @@
+The directory contains apache 1.2.5, modified for v4-v6 proxy.
+
+  httpd -6		listen to v6 socket
+  httpd -4		listen to v4 socket
+
+By adding "ProxyRequests on" in httpd.conf, each of the server
+will be able to handle http proxy requests.
+
+NOTE: Most of complex configuration directives will not be
+available in v6 mode.

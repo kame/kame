@@ -1,0 +1,4 @@
+bin/wbd
+share/doc/wbd/COPYRIGHT
+share/doc/wbd/README
+@dirrm share/doc/wbd

@@ -1,0 +1,20 @@
+--- configure.in.dist	Tue Jul 15 01:24:02 1997
++++ configure.in	Sat Jan 10 21:57:50 1998
+@@ -255,8 +255,15 @@
+ fi
+ AC_CHECK_LIB(bsd, main)
+ AC_CHECK_LIB(regex, main, [REGEXLIB="-lregex"])
+-AC_CHECK_LIB(resolv, inet_aton, AC_CHECK_LIB(44bsd, inet_aton))
+-AC_CHECK_LIB(resolv, main)
++case "$host" in
++	i386-*-freebsd*)
++		echo "skipping libresolv checks for $host"
++		;;
++	*)
++		AC_CHECK_LIB(resolv, inet_aton, AC_CHECK_LIB(44bsd, inet_aton))
++		AC_CHECK_LIB(resolv, main)
++		;;
++esac
+ AC_CHECK_LIB(m, main)
+ 
+ dnl Check for libcrypt

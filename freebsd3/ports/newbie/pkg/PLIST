@@ -1,0 +1,35 @@
+sbin/newbie
+sbin/cnameupd
+sbin/zone2db
+sbin/nconsole
+sbin/newbie.kill
+sbin/ncl
+sbin/nsdump
+sbin/newkey
+lib/libnewres.a
+share/doc/newbie/html/aaaa-L.gif
+share/doc/newbie/html/contrib.html
+share/doc/newbie/html/copyrights.txt
+share/doc/newbie/html/features-j.html
+share/doc/newbie/html/features.html
+share/doc/newbie/html/guide.html
+share/doc/newbie/html/index-j.html
+share/doc/newbie/html/index.html
+share/doc/newbie/html/install-j.html
+share/doc/newbie/html/install.html
+share/doc/newbie/html/libnewres.html
+share/doc/newbie/html/ncl.html
+share/doc/newbie/html/nconsole.html
+share/doc/newbie/html/newbie.html
+share/doc/newbie/html/newkey.html
+share/doc/newbie/html/template-j.html
+share/doc/newbie/html/template.html
+share/doc/newbie/html/todo.html
+share/doc/newbie/html/whatisnew.html
+share/doc/newbie/html/zone2db.html
+share/doc/newbie/sample/newbie.boot
+share/doc/newbie/sample/res_core.conf
+share/doc/newbie/sample/root.cache
+@dirrm share/doc/newbie/html
+@dirrm share/doc/newbie/sample
+@dirrm share/doc/newbie

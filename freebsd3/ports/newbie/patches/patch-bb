@@ -1,0 +1,40 @@
+use /var/run instead of /etc.
+
+--- config.h.in.orig	Wed Aug 12 04:15:48 1998
++++ config.h.in	Wed Aug 12 04:15:58 1998
+@@ -27,10 +27,10 @@
+ #undef USE_DMALLOC
+ 
+ /* pid file -- if NULL no pid file.*/
+-#define NS_PID_FILE "/etc/newbie.pid"
++#define NS_PID_FILE "/var/run/newbie.pid"
+ 
+ /* mode file -- if NULL no mode file */
+-#define NS_MODE_FILE "/etc/newbie.mode"
++#define NS_MODE_FILE "/var/run/newbie.mode"
+ 
+ /* this is the location of config file */
+ #define NS_CONFIG_FILE "/etc/newbie.boot"
+--- newbie.kill.in.orig	Wed Aug 12 04:18:41 1998
++++ newbie.kill.in	Wed Aug 12 04:18:49 1998
+@@ -1,7 +1,7 @@
+ #!/bin/sh
+ 
+-if [ -f /etc/newbie.pid ]; then
+-	PID=`cat /etc/newbie.pid`
++if [ -f /var/run/newbie.pid ]; then
++	PID=`cat /var/run/newbie.pid`
+ 	echo pid is $PID
+ 	if [ `ps $PID | grep newbie | wc -l` -ne 0 ]; then
+ 		echo trying to kill $PID...
+@@ -11,8 +11,8 @@
+ 
+ # failsafe
+ sleep 1
+-if [ -f /etc/newbie.pid ]; then
+-	rm /etc/newbie.pid
++if [ -f /var/run/newbie.pid ]; then
++	rm /var/run/newbie.pid
+ 	echo 'there was no newbie, but pid file. -- deleted.'
+ fi
+ 

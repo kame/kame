@@ -1,0 +1,11 @@
+netperf/netperf
+netperf/netserver
+netperf/tcp_range_script
+netperf/tcp_stream_script
+netperf/tcp_rr_script
+netperf/udp_stream_script
+netperf/udp_rr_script
+netperf/snapshot_script
+share/doc/netperf/netperf.ps.gz
+@dirrm netperf
+@dirrm share/doc/netperf

@@ -1,0 +1,17 @@
+bin/socks64
+bin/runsocks
+bin/stopsocks
+bin/rarchie
+bin/rfinger
+bin/rftp
+bin/rping
+bin/rtelnet
+bin/rtraceroute
+bin/rwhois
+include/socks.h
+man/man5/socks5.passwd.5
+lib/libsocks5.a
+@exec ranlib -m %D/lib/libsocks5.a
+lib/libsocks5_sh.so
+@exec /sbin/ldconfig -m %D/lib
+@unexec /sbin/ldconfig -R

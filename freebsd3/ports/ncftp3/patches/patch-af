@@ -1,0 +1,11 @@
+--- Strn/Makefile.orig	Mon Feb  8 18:10:17 1999
++++ Strn/Makefile	Thu Feb 18 01:23:16 1999
+@@ -42,7 +42,7 @@
+ 
+ $(LIBSO): $(SOBJS)
+ 	/bin/rm -f "$(LIBSO)"
+-	gcc -shared "-Wl,-soname,$(LIBSO)" -o "$(LIBSO)" $(SOBJS)
++	$(CC) -shared "-Wl,-soname,$(LIBSO)" -o "$(LIBSO)" $(SOBJS)
+ 	/bin/ln -s "$(LIBSO)" "$(LIBSOS)"
+ 	-@/bin/ls -l "$(LIBSOS)" "$(LIBSO)"
+ 

@@ -1,0 +1,19 @@
+# this is sample netperm-table file for IPv6 connections.
+# Note that addresses are designated by address/prefixlen.
+
+netacl-telnetd: permit-hosts ::1 -exec /usr/local/v6/libexec/telnetd
+netacl-telnetd: permit-hosts 3ffe:gggg:gggg:gggg::/64 -exec /usr/local/v6/libexec/telnetd
+netacl-telnetd: permit-hosts * -exec /usr/local/v6/libexec/tn-gw
+
+tn-gw:		permit-hosts * -auth
+rlogin-gw:	permit-hosts * -auth
+
+ftp-gw:		timeout 3600
+ftp-gw:		permit-hosts * -log { retr stor }
+
+authsrv:	hosts ::1
+authsrv:	database /usr/local/etc/fw-authdb
+authsrv:	badsleep 1200
+authsrv:	nobogus true
+
+*:		authserver ::1 7777

@@ -1,0 +1,30 @@
+--- Makefile.in.orig	Tue Jul 14 17:31:33 1998
++++ Makefile.in	Tue Jul 14 17:31:48 1998
+@@ -36,7 +36,7 @@
+ .SUFFIXES: .cc $(.SUFFIXES)
+ 
+ ALL = @V_ALL@
+-all:	$(ALL)
++all:	clean $(ALL)
+ 
+ .cc.o:
+ 	rm -f $@; $(C++) -c $(CFLAGS) $*.cc
+@@ -82,7 +82,8 @@
+ OBJ_AUDIO = @V_OBJ_AUDIO@
+ OBJ_CRYPT = @V_OBJ_CRYPT@
+ SRC_AUDIO = $(OBJ_AUDIO:.o=.cc) 
+-LIB = $(LIB_AUDIO) @V_LIB_TK@ @V_LIB_TCL@ @V_LIB_GSM@ @V_LIB_X11@ @V_LIB@ -lm
++LIB = $(LIB_AUDIO) @V_LIB_TK@ @V_LIB_TCL@ @V_LIB_GSM@ @V_LIB_X11@ @V_LIB@ -lm \
++	@V_LIB_V6@
+ INCLUDE = $(INCLUDE_MISC) $(INCLUDE_AUDIO) $(INCLUDE_TK) $(INCLUDE_TCL) \
+ 	$(INCLUDE_X11) $(MD_INC)
+ DEFINE = @V_DEFINE@ -DSIGRET=@V_SIGRET@ -DFRAMESIZE=160
+@@ -223,7 +223,7 @@
+ 
+ CLEAN = vat core core.vat tcl2c++ config.log config.cache
+ clean:
+-	rm -f $(CLEAN) $(OBJ1) $(OBJ2) $(OBJ4) $(OBJ_AUDIO) $(OBJ_CRYPT) \
++	rm -f $(CLEAN) $(OBJ1) $(OBJ2) $(OBJ3) $(OBJ4) $(OBJ_AUDIO) $(OBJ_CRYPT) $(BROKEN_OBJ) \
+ 	      $(TCL_VAT_C)
+ 		
+ c++-clean:

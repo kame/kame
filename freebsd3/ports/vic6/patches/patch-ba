@@ -1,0 +1,11 @@
+--- net-ipv6.cc.orig	Thu Aug 12 19:25:41 1999
++++ net-ipv6.cc	Thu Aug 12 19:45:05 1999
+@@ -471,7 +471,7 @@
+ #else
+ 		u_char t;
+ #endif
+-		t=1;//t = (ttl > 255) ? 255 : (ttl < 0) ? 0 : ttl;
++		t = (ttl > 255) ? 255 : (ttl < 0) ? 0 : ttl;
+ 		if (setsockopt(fd, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
+ 			       (char*)&t, sizeof(t)) < 0) {
+ 			perror("IPV6_MULTICAST_HOPS");

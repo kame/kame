@@ -1,0 +1,7 @@
+include/tcpd.h
+libexec/tcpd
+sbin/tcpdchk
+sbin/tcpdmatch
+bin/safe_finger
+bin/try-from
+lib/libwrap.a

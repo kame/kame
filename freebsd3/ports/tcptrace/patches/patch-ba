@@ -1,0 +1,14 @@
+--- Makefile.in.orig	Wed Jan 20 05:25:25 1999
++++ Makefile.in	Wed Jan 20 05:28:39 1999
+@@ -28,9 +28,9 @@
+ # list.
+ # 
+ ################################################################## 
+-PCAP_LDLIBS = -lpcap
++PCAP_LDLIBS = -lpcap -linet6
+ PCAP_INCS    = -I${PREFIX}/include -I. -I../pcap
+-PCAP_LDFLAGS = -L${PREFIX}/lib -Llib -Lpcap -L../pcap
++PCAP_LDFLAGS = -L/usr/local/v6/lib -L${PREFIX}/lib -Llib -Lpcap -L../pcap
+ 
+ 
+ 
