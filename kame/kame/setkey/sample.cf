@@ -147,7 +147,7 @@ spdadd fec0:0:0:1::1[any] fec0:0:0:2::2[80] tcp -P out ipsec
 	esp/transport/fec0:0:0:1::1-fec0:0:0:2::2/use
 	esp/tunnel/fec0:0:0:1::1-fec0:0:0:2::1/require ;
 spdadd fec0:0:0:2::1[80] fec0:0:0:1::1[any] tcp -P in ipsec
-	esp/transport/fec0:0:0:2::2-fec0:0:0:l::1/use
+	esp/transport/fec0:0:0:2::2-fec0:0:0:1::1/use
 	esp/tunnel/fec0:0:0:2::1-fec0:0:0:1::1/require ;
 add fec0:0:0:1::1 fec0:0:0:2::2 esp 0x10001
 	-m transport
@@ -204,15 +204,14 @@ add ::1 ::1 esp 10015 -m transport -f zero-pad -E simple ;
 add ::1 ::1 esp 10016 -m tunnel -f random-pad -r 8 -lh 100 -ls 80 -E simple ;
 add ::1 ::1 esp 10017 -m transport -f seq-pad -f cyclic-seq -E simple ;
 add ::1 ::1 esp 10018 -m transport -E simple ;
-add ::1 ::1 ah 20000 -m transport -A null ;
+#add ::1 ::1 ah 20000 -m transport -A null ;
 add ::1 ::1 ah 20001 -m any -A hmac-md5 "1234123412341234";
 add ::1 ::1 ah 20002 -m tunnel -A hmac-sha1 "12341234123412341234";
 add ::1 ::1 ah 20003 -m transport -A keyed-md5 "1234123412341234";
 add ::1 ::1 ah-old 20004 -m transport -A keyed-md5 "1234123412341234";
 add ::1 ::1 ah 20005 -m transport -A keyed-sha1 "12341234123412341234";
-add ::1 ::1 ipcomp 30000 -C oui ;
+#add ::1 ::1 ipcomp 30000 -C oui ;
 add ::1 ::1 ipcomp 30001 -C deflate ;
-add ::1 ::1 ipcomp 30002 -C lzs ;
-add ::1 ::1 ipcomp 30005 -R ;
+#add ::1 ::1 ipcomp 30002 -C lzs ;
 
 # enjoy.
