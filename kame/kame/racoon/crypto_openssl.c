@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.53 2001/07/11 10:33:56 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.54 2001/07/11 13:17:53 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,6 +62,7 @@
 #include <openssl/dh.h>
 #include <openssl/md5.h>
 #include <openssl/sha.h>
+#include <openssl/hmac.h>
 #include <openssl/des.h>
 #include <openssl/crypto.h>
 #ifdef HAVE_OPENSSL_IDEA_H
@@ -91,7 +92,11 @@
 static int cb_check_cert __P((int, X509_STORE_CTX *));
 static void eay_setgentype __P((char *, int *));
 static X509 *mem2x509 __P((vchar_t *));
+#endif
 
+static caddr_t eay_hmac_init __P((vchar_t *, const EVP_MD *));
+
+#ifdef HAVE_SIGNING_C
 /* X509 Certificate */
 /*
  * convert the string of the subject name into DER
@@ -375,12 +380,12 @@ eay_get_x509asn1subjectname(cert)
 			vfree(name);
 			name = NULL;
 		}
+	}
 #ifndef EAYDEBUG
 		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
 #else
 		printf("%s\n", eay_strerror());
 #endif
-	}
 	if (x509)
 		X509_free(x509);
 
@@ -1284,6 +1289,21 @@ eay_cast_weakkey(key)
 }
 
 /*
+ * HMAC functions
+ */
+static caddr_t
+eay_hmac_init(key, md)
+	vchar_t *key;
+	const EVP_MD *md;
+{
+	HMAC_CTX *c = racoon_malloc(sizeof(*c));
+
+	HMAC_Init(c, key->v, key->l, md);
+
+	return (caddr_t)c;
+}
+
+/*
  * HMAC SHA1
  */
 vchar_t *
@@ -1342,6 +1362,47 @@ eay_hmacsha1_one(key, data)
 	SHA1_Update(&c, k_opad, 64);
 	SHA1_Update(&c, res->v, SHA_DIGEST_LENGTH);
 	SHA1_Final(res->v, &c);
+
+	return(res);
+}
+
+caddr_t
+eay_hmacsha1_init(key)
+	vchar_t *key;
+{
+	return eay_hmac_init(key, EVP_sha1());
+}
+
+void
+eay_hmacsha1_update(c, data)
+	caddr_t c;
+	vchar_t *data;
+{
+	HMAC_Update((HMAC_CTX *)c, data->v, data->l);
+}
+
+vchar_t *
+eay_hmacsha1_final(c)
+	caddr_t c;
+{
+	vchar_t *res;
+
+	if ((res = vmalloc(SHA_DIGEST_LENGTH)) == 0)
+		return NULL;
+
+	HMAC_Final((HMAC_CTX *)c, res->v, &res->l);
+	(void)racoon_free(c);
+
+	if (SHA_DIGEST_LENGTH != res->l) {
+#ifndef EAYDEBUG
+		plog(LLV_ERROR, LOCATION, NULL,
+			"hmac sha1 length mismatch %d.\n", res->l);
+#else
+		printf("hmac sha1 length mismatch %d.\n", res->l);
+#endif
+		vfree(res);
+		return NULL;
+	}
 
 	return(res);
 }
@@ -1405,6 +1466,47 @@ eay_hmacmd5_one(key, data)
 	MD5_Update(&c, k_opad, 64);
 	MD5_Update(&c, res->v, MD5_DIGEST_LENGTH);
 	MD5_Final(res->v, &c);
+
+	return(res);
+}
+
+caddr_t
+eay_hmacmd5_init(key)
+	vchar_t *key;
+{
+	return eay_hmac_init(key, EVP_md5());
+}
+
+void
+eay_hmacmd5_update(c, data)
+	caddr_t c;
+	vchar_t *data;
+{
+	HMAC_Update((HMAC_CTX *)c, data->v, data->l);
+}
+
+vchar_t *
+eay_hmacmd5_final(c)
+	caddr_t c;
+{
+	vchar_t *res;
+
+	if ((res = vmalloc(MD5_DIGEST_LENGTH)) == 0)
+		return NULL;
+
+	HMAC_Final((HMAC_CTX *)c, res->v, &res->l);
+	(void)racoon_free(c);
+
+	if (MD5_DIGEST_LENGTH != res->l) {
+#ifndef EAYDEBUG
+		plog(LLV_ERROR, LOCATION, NULL,
+			"hmac md5 length mismatch %d.\n", res->l);
+#else
+		printf("hmac md5 length mismatch %d.\n", res->l);
+#endif
+		vfree(res);
+		return NULL;
+	}
 
 	return(res);
 }
