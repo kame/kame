@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.121 2001/02/15 11:10:38 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.122 2001/02/15 14:21:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -231,8 +231,14 @@ nd6_ifattach(ifp)
 
 #define ND nd_ifinfo[ifp->if_index]
 
-	/* don't initialize if called twice */
-	if (ND.linkmtu)
+	/*
+	 * Don't initialize if called twice.
+	 * XXX: to detect this, we should choose a member that is never set
+	 * before initialization of the ND structure itself.  We formaly used
+	 * the linkmtu member, which was not suitable because it could be 
+	 * initialized via "ifconfig mtu".
+	 */
+	if (ND.basereachable)
 		return;
 
 	ND.linkmtu = ifindex2ifnet[ifp->if_index]->if_mtu;
@@ -2317,6 +2323,7 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 		return EINVAL;
 	ol = oldlenp ? *oldlenp : 0;
 	switch (name) {
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	case ICMPV6CTL_ND6_DRLIST:
 		if (oldp) {
 			d = (struct in6_defrouter *)oldp;
@@ -2352,6 +2359,7 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 		} else
 			*oldlenp = l;
 		break;
+#endif
 	default:
 		error = ENOPROTOOPT;
 		break;
