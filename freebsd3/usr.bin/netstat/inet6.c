@@ -406,6 +406,28 @@ ip6_stats(off, name)
 	p(ip6s_nogif, "\t%qu tunneling packet%s that can't find gif\n");
 	p(ip6s_toomanyhdr, "\t%qu packet%s discarded due to too may headers\n");
 
+	p(ip6s_pulldown, "\t%qu call%s to m_pulldown\n");
+	p(ip6s_pulldown_alloc, "\t%qu mbuf allocation%s in m_pulldown\n");
+	if (ip6stat.ip6s_pulldown_copy != 1) {
+		p1(ip6s_pulldown_copy, "\t%qu mbuf copies in m_pulldown\n");
+	} else {
+		p1(ip6s_pulldown_copy, "\t%qu mbuf copy in m_pulldown\n");
+	}
+	p(ip6s_pullup_alloc, "\t%qu mbuf allocation%s in m_pullup\n");
+	if (ip6stat.ip6s_pullup_copy != 1) {
+		p1(ip6s_pullup_copy, "\t%qu mbuf copies in m_pullup\n");
+	} else {
+		p1(ip6s_pullup_copy, "\t%qu mbuf copy in m_pullup\n");
+	}
+	p(ip6s_pullup_copy, "\t%qu failure%s in m_pullup\n");
+	p(ip6s_pullup2_alloc, "\t%qu mbuf allocation%s in m_pullup2\n");
+	if (ip6stat.ip6s_pullup2_copy != 1) {
+		p1(ip6s_pullup2_copy, "\t%qu mbuf copies in m_pullup2\n");
+	} else {
+		p1(ip6s_pullup2_copy, "\t%qu mbuf copy in m_pullup2\n");
+	}
+	p(ip6s_pullup2_copy, "\t%qu failure%s in m_pullup2\n");
+
 	/* for debugging source address selection */
 #define PRINT_SCOPESTAT(s,i) do {\
 		switch(i) { /* XXX hardcoding in each case */\
