@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.559 2000/02/14 15:43:37 sumikawa Exp $
+$Id: CHANGELOG,v 1.560 2000/02/15 13:28:04 jinmei Exp $
 
 <200002>
+2000-02-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet6/raw_ipv6.c (rip6_input): re-enabled filter
+	for incoming ICMPv6 packets.
+
 Tue Feb 15 00:42:32 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/pident6d: upgrade to latest IPv6 patch and sync
 	  with FreeBSD-current.
