@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.7 2000/05/31 04:02:42 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.8 2000/05/31 05:46:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -49,6 +49,7 @@
 #endif
 
 #include "mdnsd.h"
+#include "db.h"
 
 #define MAXSOCK		20
 
@@ -74,6 +75,7 @@ static int join __P((int, int, const char *));
 static int join0 __P((int, const struct addrinfo *));
 static int setif __P((int, int, const char *));
 static int iscanon __P((const char *));
+static int addserv __P((const char *));
 
 int
 main(argc, argv)
@@ -82,8 +84,9 @@ main(argc, argv)
 {
 	int ch;
 	int i;
+	int ready4, ready6;
 
-	while ((ch = getopt(argc, argv, "46d:h:i:p:P:")) != EOF) {
+	while ((ch = getopt(argc, argv, "46d:h:i:p:P:u:")) != EOF) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -113,6 +116,12 @@ main(argc, argv)
 			dstport = optarg;
 			mcastloop = 1;
 			break;
+		case 'u':
+			if (addserv(optarg) != 0) {
+				errx(1, "%s: failed to add it to db", optarg);
+				/*NOTREACHED*/
+			}
+			break;
 		default:
 			usage();
 			exit(1);
@@ -141,20 +150,37 @@ main(argc, argv)
 	}
 	dprintf("%d sockets available\n", nsock);
 
+	ready4 = ready6 = 0;
 	for (i = 0; i < nsock; i++) {
 		switch (sockaf[i]) {
 		case AF_INET6:
+			ready6++;
 			if (join(sock[0], sockaf[i], MDNS_GROUP6) < 0) {
 				err(1, "join");
 				/*NOTREACHED*/
 			}
 			break;
+#if 0
+		case AF_INET:
+			ready4++;
+			break;
+#endif
 		}
 
 		if (setif(sock[0], sockaf[i], intface) < 0) {
 			errx(1, "setif");
 			/*NOTREACHED*/
 		}
+	}
+
+	if (ready4)
+		(void)addserv(MDNS_GROUP4);
+	if (ready6)
+		(void)addserv(MDNS_GROUP6);
+
+	if (LIST_FIRST(&nsdb) == NULL) {
+		errx(1, "no DNS server to contact");
+		/*NOTREACHED*/
 	}
 
 	if (!hostname) {
@@ -173,7 +199,9 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "usage: mdnsd [-46D] [-d server] [-h hostname] [-p srcport] [-P dstport] -i iface\n");
+	fprintf(stderr,
+"usage: mdnsd [-46D] [-d server] [-h hostname] [-p srcport] [-P dstport]\n"
+"             [-u userv] -i iface\n");
 }
 
 static int
@@ -408,6 +436,55 @@ iscanon(n)
 #endif
 }
 
+static int
+addserv(n)
+	const char *n;
+{
+	struct addrinfo hints, *res;
+	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
+	int flags;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;		/*dummy*/
+	hints.ai_flags = AI_NUMERICHOST;
+	if (getaddrinfo(n, dstport, &hints, &res) != 0)
+		return -1;
+	if (res->ai_next) {
+		freeaddrinfo(res);
+		return -1;
+	}
+	switch (res->ai_family) {
+	case AF_INET:
+		sin = (struct sockaddr_in *)res->ai_addr;
+		if (IN_MULTICAST(sin->sin_addr.s_addr))
+			flags = NSDB_MULTICAST;
+		else
+			flags = NSDB_UNICAST;
+		break;
+	case AF_INET6:
+		sin6 = (struct sockaddr_in6 *)res->ai_addr;
+		if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr))
+			flags = NSDB_MULTICAST;
+		else
+			flags = NSDB_UNICAST;
+		break;
+	default:
+		flags = 0;
+		break;
+	}
+	if (newnsdb(res->ai_addr, n, flags) == NULL) {
+		freeaddrinfo(res);
+		return -1;
+	}
+
+	dprintf("added server %s\n", n);
+
+	freeaddrinfo(res);
+	return 0;
+}
+
 int
 ismyaddr(sa)
 	const struct sockaddr *sa;
@@ -419,9 +496,9 @@ ismyaddr(sa)
 	char h1[NI_MAXHOST], h2[NI_MAXHOST];
 	char p[NI_MAXSERV];
 #ifdef NI_WITHSCOPEID
-	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
+	const int niflag = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
 #else
-	const int niflag = NI_NUMERICHOST;
+	const int niflag = NI_NUMERICHOST | NI_NUMERICSERV;
 #endif
 
 	if (sa->sa_len > sizeof(ss[0]))
@@ -445,7 +522,7 @@ ismyaddr(sa)
 #endif
 	h1[0] = h2[0] = '\0';
 	if (getnameinfo((struct sockaddr *)&ss[0], ss[0].ss_len, h1, sizeof(h1),
-	    p, sizeof(p), niflag | NI_NUMERICSERV) != 0)
+	    p, sizeof(p), niflag) != 0)
 		return 0;
 #if 1	/*just for experiment - to run two servers on a single node*/
 	if (strcmp(p, dstport) == 0)

@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.10 2000/05/31 04:02:42 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.11 2000/05/31 05:46:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -32,11 +32,16 @@
 /*
  * TODO:
  * - query timeout
- * - negative cache on explicit failure reply, or query timeout
+ * - negative cache on explicit failure reply
+ * - negative cache on NXRRSET reply on query timeout
  * - attach additional section on reply
  * - random delay before reply
- * - spec conformance check
  * - EDNS0 receiver buffer size notification
+ * - multiple replies
+ *	- how long should we wait for subsequent replies?
+ *	- conflict resolution
+ * - [phmb]-mode configuration - is it necessary?
+ * - spec conformance check
  */
 
 #include <sys/types.h>
@@ -66,9 +71,11 @@ static int hexdump __P((const char *, const char *, int,
 	const struct sockaddr *));
 static int encode_myaddrs __P((const char *, u_int16_t, u_int16_t, char *,
 	int, int, int *));
+#if 0
 static const struct sockaddr *getsa __P((const char *, const char *, int));
+#endif
 static int getans __P((int, char *, int, struct sockaddr *));
-static int relay __P((int, char *, int, struct sockaddr *));
+static int relay __P((char *, int, struct sockaddr *));
 static int serve __P((int, char *, int, struct sockaddr *));
 
 void
@@ -136,7 +143,7 @@ mainloop0(i)
 		 * node to multicast-capable servers.
 		 */
 		if (serve(sock[0], buf, l, (struct sockaddr *)&from) != 0)
-			relay(sock[0], buf, l, (struct sockaddr *)&from);
+			relay(buf, l, (struct sockaddr *)&from);
 	} else {
 		/*
 		 * if got a query from remote, try to transmit answer.
@@ -467,6 +474,7 @@ fail:
 	return -1;
 }
 
+#if 0
 static const struct sockaddr *
 getsa(host, port, socktype)
 	const char *host;
@@ -489,6 +497,7 @@ getsa(host, port, socktype)
 	freeaddrinfo(res);
 	return (const struct sockaddr *)&ss;
 }
+#endif
 
 static int
 getans(s, buf, len, from)
@@ -533,8 +542,7 @@ getans(s, buf, len, from)
 }
 
 static int
-relay(s, buf, len, from)
-	int s;
+relay(buf, len, from)
 	char *buf;
 	int len;
 	struct sockaddr *from;
@@ -542,6 +550,9 @@ relay(s, buf, len, from)
 	const struct sockaddr *sa;
 	HEADER *hp;
 	struct qcache *qc;
+	struct nsdb *ns;
+	int i, sent;
+	int ord;
 
 	if (sizeof(*hp) > len)
 		return -1;
@@ -552,22 +563,37 @@ relay(s, buf, len, from)
 		/* query, no recurse - multicast it */
 		qc = newqcache(from, buf, len);
 
-		/* never ask for recursion */
-		hp->rd = 0;
+		ord = hp->rd;
 
 		qc->id = hp->id = htons(dnsid);
 		dnsid = (dnsid + 1) % 0x10000;
 
-		sa = getsa(MDNS_GROUP6, dstport, SOCK_DGRAM);
-		if (!sa) {
+		sent = 0;
+		for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
+			for (i = 0; i < nsock; i++) {
+				if (sockaf[i] != ns->addr.ss_family)
+					continue;
+
+				hp->rd = ord;
+				/* never ask for recursion on multicast query */
+				if (ns->flags == NSDB_MULTICAST)
+					hp->rd = 0;
+
+				sa = (struct sockaddr *)&ns->addr;
+
+				hexdump("relay O", buf, len, sa);
+				if (sendto(sock[i], buf, len, 0, sa,
+				    sa->sa_len) == len) {
+					sent++;
+				}
+			}
+		}
+
+		if (sent == 0) {
 			delqcache(qc);
 			return -1;
 		}
-		hexdump("relay O", buf, len, sa);
-		if (sendto(s, buf, len, 0, sa, sa->sa_len) != len) {
-			delqcache(qc);
-			return -1;
-		}
+
 		return 0;
 	} else
 		return -1;

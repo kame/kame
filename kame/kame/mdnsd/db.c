@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.1 2000/05/31 04:02:42 itojun Exp $	*/
+/*	$KAME: db.c,v 1.2 2000/05/31 05:46:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -54,6 +54,7 @@ struct qchead qcache;
 struct achead acache;
 #endif
 struct schead scache;
+struct nshead nsdb;
 
 int
 dbtimeo()
@@ -168,4 +169,40 @@ delscache(sc)
 	if (sc->sbuf)
 		free(sc->sbuf);
 	free(sc);
+}
+
+struct nsdb *
+newnsdb(addr, comment, flags)
+	const struct sockaddr *addr;
+	const char *comment;
+	int flags;
+{
+	struct nsdb *ns;
+
+	if (addr->sa_len > sizeof(ns->addr))
+		return NULL;
+
+	ns = (struct nsdb *)malloc(sizeof(*ns));
+	if (ns == NULL)
+		return NULL;
+	memset(ns, 0, sizeof(*ns));
+
+	memcpy(&ns->addr, addr, addr->sa_len);
+	if (comment)
+		ns->comment = strdup(comment);
+	ns->flags = flags;
+
+	LIST_INSERT_HEAD(&nsdb, ns, link);
+	return ns;
+}
+
+void
+delnsdb(ns)
+	struct nsdb *ns;
+{
+
+	LIST_REMOVE(ns, link);
+	if (ns->comment)
+		free(ns->comment);
+	free(ns);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.h,v 1.4 2000/05/31 04:02:42 itojun Exp $	*/
+/*	$KAME: mdnsd.h,v 1.5 2000/05/31 05:46:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -30,7 +30,8 @@
  */
 
 #define MDNS_PORT	"53"
-#define MDNS_GROUP6	"ff02::1"
+#define MDNS_GROUP4	"239.255.255.253"
+#define MDNS_GROUP6	"ff02::1"	/* XXX not declared in i-d */
 
 extern u_int16_t dnsid;
 extern const char *srcport;
@@ -38,6 +39,7 @@ extern const char *dstport;
 extern const char *dnsserv;
 extern const char *intface;
 extern int sock[];
+extern int sockaf[];
 extern int nsock;
 extern int family;
 extern const char *hostname;

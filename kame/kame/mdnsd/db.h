@@ -1,4 +1,4 @@
-/*	$KAME: db.h,v 1.1 2000/05/31 04:02:42 itojun Exp $	*/
+/*	$KAME: db.h,v 1.2 2000/05/31 05:46:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -51,11 +51,23 @@ struct scache {
 	int sockidx;
 };
 
+struct nsdb {
+	LIST_ENTRY(nsdb) link;
+	struct sockaddr_storage addr;
+	char *comment;
+	int flags;
+};
+
 extern LIST_HEAD(qchead, qcache) qcache;
 #if 0
 extern LIST_HEAD(achead, acache) acache;
 #endif
 extern LIST_HEAD(schead, scache) scache;
+extern LIST_HEAD(nshead, nsdb) nsdb;
+
+#define NSDB_ANY	0
+#define NSDB_UNICAST	1
+#define NSDB_MULTICAST	2
 
 extern int dbtimeo __P((void));
 extern struct qcache *newqcache __P((const struct sockaddr *, char *, int));
@@ -63,3 +75,5 @@ extern void delqcache __P((struct qcache *));
 extern struct scache *newscache __P((int, const struct sockaddr *,
 	const struct sockaddr *, char *, int));
 extern void delscache __P((struct scache *));
+extern struct nsdb *newnsdb __P((const struct sockaddr *, const char *, int));
+extern void delnsdb __P((struct nsdb *));
