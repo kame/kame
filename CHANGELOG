@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1514 2001/01/27 07:12:26 jinmei Exp $
+$KAME: CHANGELOG,v 1.1515 2001/01/28 15:27:18 itojun Exp $
 
 <200101>
+Mon Jan 29 00:24:00 JST 2001  itojun@iijlab.net
+	* sys/netinet/icmp6.h: synchronize some of declarations, like RA packet
+	  header structure and value #defines with 2292bis-02.
+
+Sun Jan 28 JST 2001  itojun@iijlab.net
+	* netbsd: synchronize with netbsd-current change to cloning routes.
+	  (1) cloning routes will be marked with RTF_CLONED.  (2) RTF_CLONED
+	  routes go away when RTF_CLONING routes go away (= ARP cache goes away
+	  when interface address goes away)  (3) permit overwrite of RTF_CLONED 
+	  by static route settings.
+
 2001-01-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c: obsoleted EAI_ADDRFAMILY and
 	EAI_NODATA according to the rfc2553bis-02 draft.
