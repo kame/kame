@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.801 2000/04/21 14:37:21 jinmei Exp $
+$Id: CHANGELOG,v 1.802 2000/04/23 03:42:04 jinmei Exp $
 
 <200004>
+2000-04-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_mroute.c (ip6_mdq): do not check scope
+	boundary check for packets through the PIM register
+	tunnel. Without this change, an RP will not be able to forward
+	packets received on a register tunnel. However, this blindly
+	relies on the routing daemon's behavior. We'll eventually need
+	more reliable fix.
+
 2000-04-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd3/usr.bin/netstat/route.c (routename6): fill in the
 	sin6_socpe_id field of a local variable to support
