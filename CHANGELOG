@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1902 2001/10/09 17:03:52 jinmei Exp $
+$KAME: CHANGELOG,v 1.1903 2001/10/10 02:06:04 itojun Exp $
 
 <200110>
+Wed Oct 10 10:27:24 JST 2001  itojun@iijlab.net
+	* netbsd/sys/netinet/raw_ip.c: fix a typo which could lead to kernel
+	  panic when ICMPv4 is returned against raw ip socket.
+	  reported by kato@wide
+
 2001-10-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/rtadvd.c (find_prefix, prefix_match): corrected
 	prefix calculation:
