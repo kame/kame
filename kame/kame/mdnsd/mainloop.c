@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.62 2001/06/23 03:01:42 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.63 2001/06/23 03:04:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1196,6 +1196,8 @@ getans_icmp6(buf, len, from)
 	dprintf("validate reply: query=%s reply=%s\n", on, n);
 	if (!on || qc->qlen - (p - qc->qbuf) < 4)
 		goto fail;
+	if (strlen(n) == 0 || strlen(on) == 0)
+		goto fail;
 	if (strcmp(on, n) == 0)
 		;
 	else if (strlen(on) > strlen(n) && strncmp(on, n, strlen(n)) == 0 &&
@@ -1205,6 +1207,7 @@ getans_icmp6(buf, len, from)
 	     strcmp(on + strlen(n), "." MDNS_LOCALDOM) == 0)
 		;
 	else if (strlen(on) > strlen(n) && strncmp(on, n, strlen(n)) == 0 &&
+	     n[strlen(n) - 1] == '.' &&
 	     strcmp(on + strlen(n), MDNS_LOCALDOM) == 0)
 		;
 	else
