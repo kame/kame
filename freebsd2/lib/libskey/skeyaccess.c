@@ -272,15 +272,15 @@ char   *addr;
 	int     i;
 	char hostbuf[MAXHOSTNAMELEN];
 
-	for (i = 0; login_info.internet_addr[i].__ss_len; i++) {
-	    if (login_info.internet_addr[i].__ss_family == 0)
+	for (i = 0; login_info.internet_addr[i].ss_len; i++) {
+	    if (login_info.internet_addr[i].ss_family == 0)
 		strcpy(hostbuf, "(see error log)");
 	    else {
 		addr2numstr((struct sockaddr *)&login_info.internet_addr[i],
 			hostbuf, sizeof(hostbuf));
 	    }
 	    printf("%s%s", hostbuf, 
-		   login_info.internet_addr[i + 1].__ss_len ? " " : "\n");
+		   login_info.internet_addr[i + 1].ss_len ? " " : "\n");
 	}
     }
 #endif
@@ -397,9 +397,9 @@ struct login_info *login_info;
 	}
 
 	memset(&mask, 0, sizeof(mask));
-	mask.__ss_family = pattern.__ss_family;
-	mask.__ss_len = pattern.__ss_len;
-	switch (pattern.__ss_family) {
+	mask.ss_family = pattern.ss_family;
+	mask.ss_len = pattern.ss_len;
+	switch (pattern.ss_family) {
 	case AF_INET:
 	    p = (char *)&((struct sockaddr_in *)&mask)->sin_addr;
 	    max = 32;
@@ -431,7 +431,7 @@ struct login_info *login_info;
 	    return (0);
 	if (numstr2addr(&mask, tok))
 	    return 0;
-	if (pattern.__ss_family != mask.__ss_family)
+	if (pattern.ss_family != mask.ss_family)
 	    return 0;
     }
 
@@ -440,10 +440,10 @@ struct login_info *login_info;
      * have already tried to drop addresses that belong to someone else.
      */
 
-    for (addrp = login_info->internet_addr; addrp->__ss_len; addrp++) {
-	if (pattern.__ss_family != addrp->__ss_family)
+    for (addrp = login_info->internet_addr; addrp->ss_len; addrp++) {
+	if (pattern.ss_family != addrp->ss_family)
 	    continue;
-	switch (addrp->__ss_family) {
+	switch (addrp->ss_family) {
 	case AF_INET:
 	  {
 	    struct sockaddr_in *sin = (struct sockaddr_in *)addrp;
@@ -704,12 +704,12 @@ char   *host;
     while (--i >= 0) {
 	if (addr2str((struct sockaddr *)&list[i], hostbuf, sizeof(hostbuf))) {
 	    syslog(LOG_ERR, "some of address not registered for host %s", buf);
-	    list[i].__ss_family = 0;
+	    list[i].ss_family = 0;
 	}
 	if (NEQ(buf, hostbuf) && NEQ3(buf, "localhost.", 10)) {
 	    syslog(LOG_ERR, "address registered for host %s and %s",
 		   hostbuf, buf);
-	    list[i].__ss_family = 0;
+	    list[i].ss_family = 0;
 	}
     }
     return (list);

@@ -3,7 +3,7 @@
 PROG=	tftp
 SRCS=	main.c tftp.c tftpsubs.c
 
-CFLAGS+=-DINET6
+CFLAGS+=-DINET6 -Dss_len=__ss_len -Dss_family=__ss_family
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
 	-L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6

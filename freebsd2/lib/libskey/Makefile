@@ -11,6 +11,7 @@ MAN5=	skey.access.5
 
 CFLAGS+=-DPERMIT_CONSOLE -D_SKEY_INTERNAL -I${.CURDIR}
 CFLAGS+=-W -Wall -Werror
+CFLAGS+=-Dss_len=__ss_len -Dss_family=__ss_family
 
 CFLAGS+=-DINET6
 #CFLAGS+=-DHAVE_GETADDRINFO -DHAVE_GETNAMEINFO

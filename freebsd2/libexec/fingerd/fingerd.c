@@ -107,7 +107,7 @@ main(argc, argv)
 		sval = sizeof(ss);
 		if (getsockname(0, (struct sockaddr *)&ss, &sval) < 0)
 			logerr("getpeername: %s", strerror(errno));
-		if (ss.__ss_family == AF_INET	/*XXX*/
+		if (((struct sockaddr *)&ss)->sa_family == AF_INET	/*XXX*/
 		 && setsockopt(STDOUT_FILENO, IPPROTO_TCP, TCP_NOPUSH, &one, 
 			       sizeof one) < 0) {
 			logerr("setsockopt(TCP_NOPUSH) failed: %m");
@@ -135,9 +135,9 @@ main(argc, argv)
 		sval = sizeof(ss);
 		if (getpeername(0, (struct sockaddr *)&ss, &sval) < 0)
 			logerr("getpeername: %s", strerror(errno));
-		if (getnameinfo((struct sockaddr *)&ss, ss.__ss_len,
+		if (getnameinfo((struct sockaddr *)&ss, sval,
 				hbuf, sizeof(hbuf), NULL, 0, 0) == 0) {
-			(void)getnameinfo((struct sockaddr *)&ss, ss.__ss_len,
+			(void)getnameinfo((struct sockaddr *)&ss, sval,
 				hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST);
 		}
 		syslog(LOG_NOTICE, "query from %s: `%s'", hbuf, t);

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: key_debug.c,v 1.7 1999/11/30 18:36:08 sakane Exp $ */
+/* KAME @(#)$Id: key_debug.c,v 1.8 1999/12/16 04:27:38 itojun Exp $ */
 
 #ifdef _KERNEL
 # ifndef KERNEL
@@ -512,9 +512,11 @@ kdebug_secpolicyindex(spidx)
 	printf("secpolicyindex{ dir=%u prefs=%u prefd=%u ul_proto=%u\n",
 		spidx->dir, spidx->prefs, spidx->prefd, spidx->ul_proto);
 
-	ipsec_hexdump((caddr_t)&spidx->src, spidx->src.__ss_len);
+	ipsec_hexdump((caddr_t)&spidx->src,
+		((struct sockaddr *)&spidx->src)->sa_len);
 	printf("\n");
-	ipsec_hexdump((caddr_t)&spidx->dst, spidx->dst.__ss_len);
+	ipsec_hexdump((caddr_t)&spidx->dst,
+		((struct sockaddr *)&spidx->dst)->sa_len);
 	printf("}\n");
 
 	return;
@@ -531,9 +533,11 @@ kdebug_secasindex(saidx)
 	printf("secasindex{ mode=%u proto=%u\n",
 		saidx->mode, saidx->proto);
 
-	ipsec_hexdump((caddr_t)&saidx->src, saidx->src.__ss_len);
+	ipsec_hexdump((caddr_t)&saidx->src,
+		((struct sockaddr *)&saidx->src)->sa_len);
 	printf("\n");
-	ipsec_hexdump((caddr_t)&saidx->dst, saidx->dst.__ss_len);
+	ipsec_hexdump((caddr_t)&saidx->dst,
+		((struct sockaddr *)&saidx->dst)->sa_len);
 	printf("\n");
 
 	return;

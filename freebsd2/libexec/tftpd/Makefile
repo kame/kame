@@ -7,7 +7,7 @@ MAN8=	tftpd.8
 CFLAGS+=-I${.CURDIR}/../../usr.bin/tftp
 .PATH:	${.CURDIR}/../../usr.bin/tftp
 
-CFLAGS+=-DINET6
+CFLAGS+=-DINET6 -Dss_family=__ss_family -Dss_len=__ss_len
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
 	-L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
