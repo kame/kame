@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.153 2001/02/05 08:40:48 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.154 2001/02/06 01:26:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1092,7 +1092,7 @@ skip_ipsec2:;
 		 * passed to looutput, and the kernel would hang.
 		 * The following last resort would prevent such disaster.
 		 */
-		if (origifp == NULL);
+		if (origifp == NULL)
 			origifp = ifp;
 	}
 	else
