@@ -706,7 +706,7 @@ rtrequest1(req, info, ret_nrt)
 #ifdef RADIX_MPATH
 		/* do not permit exactly the same dst/mask/gw pair */
 		if (rn_mpath_capable(rnh) &&
-		    rn_mpath_conflict(rnh, rt, netmask))
+		    rt_mpath_conflict(rnh, rt, netmask))
 			senderr(EEXIST);
 #endif
 		rn = rnh->rnh_addaddr((caddr_t)ndst, (caddr_t)netmask,

@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.c,v 1.8 2001/07/22 15:34:30 itojun Exp $	*/
+/*	$KAME: radix_mpath.c,v 1.9 2001/07/22 15:35:45 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -144,10 +144,9 @@ rt_mpath_matchgate(rt, gate)
 
 /*
  * check if we have the same key/mask/gateway on the table already.
- * a bit of layer violation between radix.c and route.c.
  */
 int
-rn_mpath_conflict(rnh, rt, netmask)
+rt_mpath_conflict(rnh, rt, netmask)
 	struct radix_node_head *rnh;
 	struct rtentry *rt;
 	struct sockaddr *netmask;
