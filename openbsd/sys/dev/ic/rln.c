@@ -765,12 +765,12 @@ rlnget(sc, hdr, totlen)
 			}
 			len = MLEN;
 		}
-		if (totlen + ((!top) ? pad : 0) >= MINCLSIZE) {
+		if (totlen + pad >= MINCLSIZE) {
 			MCLGET(m, M_DONTWAIT);
 			if (m->m_flags & M_EXT)
 				len = MCLBYTES;
 		}
-		if (!top) {
+		if (!top && pad) {
 			/*
 			 * Insert some leading padding in the mbuf, so that
 			 * payload data is aligned.
@@ -789,6 +789,7 @@ rlnget(sc, hdr, totlen)
 		totlen -= len;
 		*mp = m;
 		mp = &m->m_next;
+		pad = 0;
 	}
 #ifdef RLNDUMP
 	printf("\n");
