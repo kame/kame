@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.106 2000/12/21 23:56:07 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.107 2000/12/22 00:32:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -573,6 +573,44 @@ main(argc, argv)
 
 	(void)memcpy(&dst, res->ai_addr, res->ai_addrlen);
 
+	if ((s = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0)
+		err(1, "socket");
+
+	/*
+	 * let the kerel pass extension headers of incoming packets,
+	 * for privileged socket options
+	 */
+	if ((options & F_VERBOSE) != 0) {
+		int opton = 1;
+
+#ifdef IPV6_RECVHOPOPTS
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPOPTS, &opton,
+			       sizeof(opton)))
+			err(1, "setsockopt(IPV6_RECVHOPOPTS)");
+#else  /* old adv. API */
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_HOPOPTS, &opton,
+			       sizeof(opton)))
+			err(1, "setsockopt(IPV6_HOPOPTS)");
+#endif
+#ifdef IPV6_RECVDSTOPTS
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVDSTOPTS, &opton,
+			       sizeof(opton)))
+			err(1, "setsockopt(IPV6_RECVDSTOPTS)");
+#else  /* old adv. API */
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_DSTOPTS, &opton,
+			       sizeof(opton)))
+			err(1, "setsockopt(IPV6_DSTOPTS)");
+#endif
+#ifdef IPV6_RECVRTHDRDSTOPTS
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDRDSTOPTS, &opton,
+			       sizeof(opton)))
+			err(1, "setsockopt(IPV6_RECVRTHDRDSTOPTS)");
+#endif
+	}
+
+	/* revoke root privilege */
+	setuid(getuid());
+
 	if (options & F_FLOOD && options & F_INTERVAL)
 		errx(1, "-f and -i incompatible options");
 
@@ -606,9 +644,6 @@ main(argc, argv)
 	for (i = 0; i < sizeof(nonce); i += sizeof(u_int32_t))
 		*((u_int32_t *)&nonce[i]) = arc4random();
 #endif
-
-	if ((s = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) < 0)
-		err(1, "socket");
 
 	hold = 1;
 
@@ -687,7 +722,6 @@ main(argc, argv)
 #endif /*ICMP6_FILTER*/
 
 	/* let the kerel pass extension headers of incoming packets */
-	/* TODO: implement parsing routine */
 	if ((options & F_VERBOSE) != 0) {
 		int opton = 1;
 
@@ -699,29 +733,6 @@ main(argc, argv)
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_RTHDR, &opton,
 			       sizeof(opton)))
 			err(1, "setsockopt(IPV6_RTHDR)");
-#endif
-#ifdef IPV6_RECVHOPOPTS
-		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPOPTS, &opton,
-			       sizeof(opton)))
-			err(1, "setsockopt(IPV6_RECVHOPOPTS)");
-#else  /* old adv. API */
-		if (setsockopt(s, IPPROTO_IPV6, IPV6_HOPOPTS, &opton,
-			       sizeof(opton)))
-			err(1, "setsockopt(IPV6_HOPOPTS)");
-#endif
-#ifdef IPV6_RECVDSTOPTS
-		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVDSTOPTS, &opton,
-			       sizeof(opton)))
-			err(1, "setsockopt(IPV6_RECVDSTOPTS)");
-#else  /* old adv. API */
-		if (setsockopt(s, IPPROTO_IPV6, IPV6_DSTOPTS, &opton,
-			       sizeof(opton)))
-			err(1, "setsockopt(IPV6_DSTOPTS)");
-#endif
-#ifdef IPV6_RECVRTHDRDSTOPTS
-		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDRDSTOPTS, &opton,
-			       sizeof(opton)))
-			err(1, "setsockopt(IPV6_RECVRTHDRDSTOPTS)");
 #endif
 	}
 
@@ -945,9 +956,6 @@ main(argc, argv)
 		       sizeof(optval)) < 0)
 		warn("setsockopt(IPV6_HOPLIMIT)"); /* XXX err? */
 #endif
-
-	/* revoke root privilege */
-	setuid(getuid());
 
 	printf("PING6(%d=40+8+%d bytes) ", datalen + 48, datalen);
 	printf("%s --> ", pr_addr(&src));
