@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.381 2005/01/12 06:06:10 suz Exp $
+	$KAME: IMPLEMENTATION,v 1.382 2005/01/14 04:14:40 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1919,9 +1919,9 @@ Currently supported algorithms are:
 	3DES-CBC with explicit IV (rfc2451.txt)
 	BLOWFISH CBC (rfc2451.txt)
 	CAST128 CBC (rfc2451.txt)
-	RIJNDAEL/AES CBC (rfc3602.txt)
+	AES (rijndael) CBC (rfc3602.txt)
 	TWOFISH CBC (draft-ietf-ipsec-ciph-aes-cbc-01.txt)
-	AES counter mode (draft-ietf-ipsec-ciph-aes-ctr-03.txt)
+	AES counter mode (rfc3686.txt)
 
 	each of the above can be combined with new IPsec AH schemes for
 	ESP authentication.
@@ -1933,6 +1933,7 @@ The following algorithms are NOT supported:
 	HMAC MD5 with 128bit crypto checksum + 64bit replay prevention
 		(rfc2085.txt)
 	keyed SHA1 with 160bit crypto checksum + 32bit padding (rfc1852.txt)
+	HMAC with 128bit crypto checksum (microsoft)
 
 The key/policy management API is based on the following document, with fair
 amount of extensions:
