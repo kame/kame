@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.c,v 1.1 1999/08/08 23:31:24 itojun Exp $ */
+/* YIPS @(#)$Id: misc.c,v 1.2 1999/08/20 07:17:01 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -697,10 +697,18 @@ debug_location(file, line, func)
 	char *func;
 {
 	static char buf[1024];
+	char *p;
+
+	/* truncate pathname */
+	p = strrchr(file, '/');
+	if (p)
+		p++;
+	else
+		p = file;
 
 	if (func)
-		snprintf(buf, sizeof(buf), "%s:%d:%s()", file, line, func);
+		snprintf(buf, sizeof(buf), "%s:%d:%s()", p, line, func);
 	else
-		snprintf(buf, sizeof(buf), "%s:%d", file, line);
+		snprintf(buf, sizeof(buf), "%s:%d", p, line);
 	return buf;
 }
