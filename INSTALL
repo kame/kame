@@ -1,6 +1,6 @@
 	Installation procedure - preparation of the tree
 	KAME project
-	$KAME: INSTALL,v 1.26 2001/03/14 05:05:29 itojun Exp $
+	$KAME: INSTALL,v 1.27 2001/07/11 00:53:25 itojun Exp $
 
 Let's call the entire file-tree under this directory "the KAME tree".
 
@@ -92,8 +92,8 @@ perform "make obj" unless you are ready to tackle those troubles.
 
    We support the following installations.
 
-   - Your system has OpenSSL installed by default.  FreeBSD 4.2-RELEASE,
-     BSD/OS 4.2 and NetBSD 1.5 fall into this category.
+   - Your system has OpenSSL installed by default.  FreeBSD 4.3-RELEASE,
+     BSD/OS 4.2 and NetBSD 1.5.1 fall into this category.
 
    - A system with OpenSSL, installed manually with default installation path.
 	This means that you gave no option to "./configure".  In this case

@@ -2,11 +2,11 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.228 2001/07/07 06:06:29 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.229 2001/07/11 00:53:25 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
-of the latest KAME/*BSD stack (like KAME/NetBSD 1.5).  The description
+of the latest KAME/*BSD stack (like KAME/NetBSD 1.5.1).  The description
 here may not be applicable to KAME-integrated *BSD releases (like stock
 NetBSD 1.5.1), as we have certain amount of changes between them.  Still,
 some of the content can be useful for KAME-integrated *BSD releases.
