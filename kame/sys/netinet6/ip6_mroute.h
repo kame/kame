@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.h,v 1.16 2000/12/02 16:14:19 itojun Exp $	*/
+/*	$KAME: ip6_mroute.h,v 1.17 2001/02/10 02:05:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -78,7 +78,7 @@ typedef u_short mifi_t;		/* type of a mif index */
 #define	IF_SETSIZE	256
 #endif
 
-typedef	long	if_mask;
+typedef	u_int32_t	if_mask;
 #define	NIFBITS	(sizeof(if_mask) * NBBY)	/* bits per mask */
 
 #ifndef howmany
