@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.61 2003/09/06 09:13:52 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.62 2003/09/06 10:11:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -55,6 +55,7 @@
 #define MIP6CTL_MAXID			7
 
 #define MIP6CTL_NAMES {				\
+	{ 0, 0 },				\
 	{ "debug", CTLTYPE_INT },		\
 	{ "use_ipsec", CTLTYPE_INT },		\
 	{ "bc_maxlifetime", CTLTYPE_INT},	\
