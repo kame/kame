@@ -21,7 +21,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-ip.c,v 1.2 1999/08/26 13:34:40 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-ip.c,v 1.3 1999/10/14 08:27:16 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -376,6 +376,10 @@ ip_print(register const u_char *bp, register u_int length)
 		return;
 	}
 	hlen = ip->ip_hl * 4;
+	if (hlen < sizeof (struct ip)) {
+		(void)printf("bad-hlen %d", hlen);
+		return;
+	}
 
 	len = ntohs(ip->ip_len);
 	if (length < len)
