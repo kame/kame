@@ -35,7 +35,9 @@
  */
 
 #define _IP_VHL
-
+#ifdef __FreeBSD__
+#include "opt_mpath.h"
+#endif
 #include "opt_ipfw.h"
 #include "opt_ipdn.h"
 #include "opt_ipdivert.h"
@@ -267,8 +269,14 @@ ip_output(m0, opt, ro, flags, imo)
 		 * the link layer, as this is probably required in all cases
 		 * for correct operation (as it is for ARP).
 		 */
-		if (ro->ro_rt == 0)
+		if (ro->ro_rt == 0){
+#ifdef RADIX_MPATH
+			rtalloc_mpath(ro,
+			    ntohl(ip->ip_src.s_addr ^ ip->ip_dst.s_addr));
+#else
 			rtalloc_ign(ro, RTF_PRCLONING);
+#endif
+		}
 		if (ro->ro_rt == 0) {
 			ipstat.ips_noroute++;
 			error = EHOSTUNREACH;

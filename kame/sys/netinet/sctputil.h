@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.h,v 1.3 2002/06/09 16:29:55 itojun Exp $	*/
+/*	$KAME: sctputil.h,v 1.4 2002/07/04 01:57:02 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.h,v 1.36 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctputil_h__
@@ -131,8 +131,11 @@ const char * sctp_ntop4(const u_char *src, char *dst, size_t size);
 const char * sctp_ntop6(const u_char *src, char *dst, size_t size);
 void sctp_print_address(struct sockaddr *sa);
 
-int	sbappendaddr_nocheck __P((struct sockbuf *sb, struct sockaddr *asa,
-	    struct mbuf *m0, struct mbuf *control));
+int sbappendaddr_nocheck __P((struct sockbuf *sb, struct sockaddr *asa,
+	struct mbuf *m0, struct mbuf *control));
+
+struct rtentry *rtalloc_alternate __P((struct sockaddr *,struct rtentry *,
+	int));
 
 #endif /* KERNEL */
 #endif

@@ -108,7 +108,14 @@ struct mbuf;
  */
 #ifndef RNF_NORMAL
 #include <net/radix.h>
+#if RADIX_ART
+#include <net/radix_art.h>
 #endif
+#if RADIX_MPATH
+#include <net/radix_mpath.h>
+#endif
+#endif
+
 struct rtentry {
 	struct	radix_node rt_nodes[2];	/* tree glue, and other values */
 #define	rt_key(r)	((struct sockaddr *)((r)->rt_nodes->rn_key))

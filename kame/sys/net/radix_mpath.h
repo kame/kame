@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.h,v 1.7 2001/07/23 12:31:30 itojun Exp $	*/
+/*	$KAME: radix_mpath.h,v 1.8 2002/07/04 01:57:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -52,7 +52,12 @@ int rt_mpath_conflict __P((struct radix_node_head *, struct rtentry *,
 void rtalloc_mpath __P((struct route *, int));
 struct radix_node *rn_mpath_lookup __P((void *, void *,
 	struct radix_node_head *));
+#ifdef __FreeBSD__
+int	rn4_mpath_inithead __P((void **, int));
+int	rn6_mpath_inithead __P((void **, int));
+#else
 int	rn_mpath_inithead __P((void **, int));
+#endif
 #endif
 
 #endif /* _NET_RADIX_MPATH_H_ */

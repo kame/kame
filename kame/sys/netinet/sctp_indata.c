@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.5 2002/06/09 16:29:54 itojun Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.6 2002/07/04 01:57:02 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_indata.c,v 1.124 2002/04/04 18:48:39 randall Exp	*/
 
 /*
@@ -725,7 +725,11 @@ sctp_queue_data_to_stream(struct sctp_tcb *stcb,
 	int queue_needed;
 	u_int16_t nxt_todel;
 
-
+/*** FIX FIX FIX
+ * Need to add code to deal with 16 bit seq wrap
+ * without a TSN wrap for ordered delivery.
+ * FIX FIX FIX
+ */
 	queue_needed = 1;
 	asoc->size_on_all_streams += chk->send_size;
 	asoc->cnt_on_all_streams++;

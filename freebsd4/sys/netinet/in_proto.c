@@ -39,8 +39,10 @@
 #include "opt_ipsec.h"
 #include "opt_inet6.h"
 #include "opt_natpt.h"
+#ifdef __FreeBSD__
+#include "opt_mpath.h"
+#endif
 #include "opt_sctp.h"
-
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
@@ -51,6 +53,9 @@
 
 #include <net/if.h>
 #include <net/route.h>
+#if defined(RADIX_MPATH)
+#include <net/radix_mpath.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -250,7 +255,12 @@ struct domain inetdomain =
     { AF_INET, "internet", 0, 0, 0, 
       (struct protosw *)inetsw,
       (struct protosw *)&inetsw[sizeof(inetsw)/sizeof(inetsw[0])], 0,
-      in_inithead, 32, sizeof(struct sockaddr_in)
+#if defined(RADIX_MPATH)
+      rn4_mpath_inithead,
+#else
+      in_inithead,
+#endif
+      32, sizeof(struct sockaddr_in)
     };
 
 DOMAIN_SET(inet);

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.10 2002/06/09 16:29:54 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.11 2002/07/04 01:57:02 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c,v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -145,9 +145,6 @@
 extern u_int32_t sctp_debug_on;
 #endif
 
-#ifdef SCTP_ALTERNATE_ROUTE
-struct rtentry * rtalloc_alternate __P((struct sockaddr *,struct rtentry *));
-#endif
 
 static int
 sctp_find_cmsg(int c_type,
@@ -520,14 +517,14 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 			}
 			/* Now get the route for this guy */
 #ifdef SCTP_ALTERNATE_ROUTE
-			rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, NULL);
+			rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, NULL, 0);
 			/* is it the same as my kin network dest */
 			if (rtp->ro_rt && (rtp->ro_rt == t_rt)) {
 				/* Yep so we need to free this and try
 				 * for a more diverse route.
 				 */
 				RTFREE(rtp->ro_rt);
-				rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, t_rt);
+				rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, t_rt, 0);
 			}
 #else
 #ifdef __FreeBSD__
@@ -537,15 +534,7 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 #endif
 #endif
 		}else{
-#ifdef SCTP_ALTERNATE_ROUTE
-			rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, NULL);
-#else
-#ifdef __FreeBSD__
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1, 0UL);
-#else
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1);
-#endif
-#endif
+			rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, NULL, 0);
 		}
 	}
 	rt = rtp->ro_rt;
@@ -1158,11 +1147,11 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 				}
 			}
 #ifdef SCTP_ALTERNATE_ROUTE
-			rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst,NULL);
+			rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst,NULL,0);
 			if (rtp->ro_rt && (rtp->ro_rt == t_rt)) {
 				/* Now we need a better route if one exits */
 				RTFREE(rtp->ro_rt);
-				rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst,t_rt);
+				rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst,t_rt,0);
 			}
 #else
 #ifdef __FreeBSD__
@@ -1172,15 +1161,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 #endif
 #endif
 		} else {
-#ifdef SCTP_ALTERNATE_ROUTE
-			rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst,NULL);
-#else
-#ifdef __FreeBSD__
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1, 0UL);
-#else
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1);
-#endif
-#endif
+  		        rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst,NULL,0);
 		}
 	}
 	loc_scope = site_scope = loopscope = 0;

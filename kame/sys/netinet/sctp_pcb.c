@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.9 2002/06/11 17:54:30 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.10 2002/07/04 01:57:02 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -123,10 +123,6 @@
 #include <netinet/sctp_header.h>
 #include <netinet/sctp_asconf.h>
 #include <netinet/sctp_output.h>
-#ifdef SCTP_ALTERNATE_ROUTE
-struct rtentry * rtalloc_alternate __P((struct sockaddr *,struct rtentry *));
-#endif
-
 
 
 #ifndef SCTP_PCBHASHSIZE
@@ -2032,16 +2028,8 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 	/* Init the timer structure */
 	callout_init(&netp->rxt_timer.timer);
 	/* Now generate a route for this guy */
-#ifdef SCTP_ALTERNATE_ROUTE
 	netp->ra.ro_rt = rtalloc_alternate((struct sockaddr *)&netp->ra._l_addr,
-					   NULL);
-#else
-#ifdef __FreeBSD__
-	netp->ra.ro_rt = rtalloc1((struct sockaddr *)&netp->ra._l_addr, 1, 0UL);
-#else
-	netp->ra.ro_rt = rtalloc1((struct sockaddr *)&netp->ra._l_addr, 1);
-#endif
-#endif
+					   NULL,0);
 	netfirst = TAILQ_FIRST(&tasoc->asoc.nets);
 	if (netp->ra.ro_rt == NULL) {
 		/* Since we have no route put it at the back */

@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.c,v 1.12 2001/09/28 07:49:58 itojun Exp $	*/
+/*	$KAME: radix_art.c,v 1.13 2002/07/04 01:57:01 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -179,6 +179,9 @@
 #define RADIX_ART_STAT
 #endif
 
+#ifdef __FreeBSD__
+#include "opt_mpath.h"
+#endif
 #ifdef RADIX_MPATH
 #error RADIX_ART cannot be used with RADIX_MPATH
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.6 2002/06/09 16:29:55 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.7 2002/07/04 01:57:02 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_timer.c,v 1.60 2002/04/04 17:47:19 randall Exp	*/
 
 /*
@@ -115,11 +115,6 @@
 #include <netinet/sctp_indata.h>
 #include <netinet/sctp_asconf.h>
 
-#ifdef SCTP_ALTERNATE_ROUTE
-struct rtentry * rtalloc_alternate __P((struct sockaddr *,struct rtentry *));
-#endif
-
-
 #ifdef SCTP_DEBUG
 extern u_int32_t sctp_debug_on;
 #endif /* SCTP_DEBUG */
@@ -186,7 +181,7 @@ sctp_threshold_management(struct sctp_inpcb *ep,
 			struct rtentry *rt;
 			if (net->ra.ro_rt) {
 				rt = rtalloc_alternate((struct sockaddr *)&net->ra._l_addr,
-						       net->ra.ro_rt);
+						       net->ra.ro_rt, 0);
 				if (rt != net->ra.ro_rt) {
 #ifdef SCTP_DEBUG
 					if (sctp_debug_on & SCTP_DEBUG_TIMER2){
@@ -257,16 +252,8 @@ sctp_find_alternate_net(struct sctp_tcb *tcb,
 			alt = TAILQ_FIRST(&tcb->asoc.nets);
 		}
 		if (alt->ra.ro_rt == NULL) {
-#ifdef SCTP_ALTERNATE_ROUTE
 			alt->ra.ro_rt = rtalloc_alternate((struct sockaddr *)&alt->ra._l_addr,
-							  NULL);
-#else
-#ifdef __FreeBSD__
-			alt->ra.ro_rt = rtalloc1((struct sockaddr *)&alt->ra._l_addr, 1, 0UL);
-#else
-			alt->ra.ro_rt = rtalloc1((struct sockaddr *)&alt->ra._l_addr, 1);
-#endif
-#endif
+							  NULL, 0);
 		}
 		if (((alt->dest_state & SCTP_ADDR_REACHABLE) ==
 		     SCTP_ADDR_REACHABLE) && (alt->ra.ro_rt != NULL)) {
@@ -714,7 +701,7 @@ void sctp_asconf_timer(struct sctp_inpcb *ep,
 		 * cleared theshold management
 		 * now lets backoff the address & select an alternate
 		 */
-		sctp_backoff_on_timeout(ep, asconf->whoTo,0);
+		sctp_backoff_on_timeout(ep, asconf->whoTo, 0);
 		alt = sctp_find_alternate_net(tcb, asconf->whoTo);
 		sctp_free_remote_addr(asconf->whoTo);
 		asconf->whoTo = alt;

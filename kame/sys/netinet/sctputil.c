@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.6 2002/06/09 16:29:55 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.7 2002/07/04 01:57:02 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.c,v 1.153 2002/04/04 16:59:01 randall Exp	*/
 
 /*
@@ -39,6 +39,7 @@
 #include "opt_compat.h"
 #include "opt_inet6.h"
 #include "opt_inet.h"
+#include "opt_mpath.h"
 #endif
 #if defined(__NetBSD__)
 #include "opt_inet.h"
@@ -63,6 +64,10 @@
 #include <sys/proc.h>
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
+
+
+#include <net/radix.h>
+#include <net/route.h>
 
 #ifdef INET6
 #ifndef __OpenBSD__
@@ -878,12 +883,11 @@ unsigned int update_adler32(u_int32_t adler,
 		 * this way and avoid the divide. Have not -pg'd on sparc.
 		 */
 		if (s2 >= SCTP_ADLER32_BASE) {
-			/*      s2 %= BASE; */
 			s2 -= SCTP_ADLER32_BASE;
 		}
 	}
 	/* Return the adler32 of the bytes buf[0..len-1] */
-	return ((unsigned int)htonl((s2 << 16) + s1));
+	return ((s2 << 16) + s1);
 }
 #endif /* SCTP_USE_ADLER32 */
 
@@ -923,7 +927,7 @@ sctp_calculate_sum(m, pktlen, offset)
 		base = update_adler32(base, at->m_data+offset,
 				      at->m_len-offset);
 #else
-		base = update_crc32(base,at->m_data+offset, at->m_len-offset);
+		base = update_crc32(base, at->m_data+offset, at->m_len-offset);
 #endif /* SCTP_USE_ADLER32 */
 		tlen += at->m_len - offset;
 		/* we only offset once into the first mbuf */
@@ -935,7 +939,11 @@ sctp_calculate_sum(m, pktlen, offset)
 	if (pktlen != NULL) {
 		*pktlen = tlen;
 	}
-#ifndef SCTP_USE_ADLER32
+#ifdef SCTP_USE_ADLER32
+	/* Adler32 */
+	base = htonl(base);
+#else
+	/* CRC-32c */
 	base = sctp_csum_finalize(base);
 #endif
 	return(base);
@@ -2243,3 +2251,289 @@ sbappendaddr_nocheck(sb, asa, m0, control)
 }
 
 
+#ifdef SCTP_ALTERNATE_ROUTE
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+#define rn_offset rn_off
+#define rn_bit rn_b
+#define rn_parent rn_p
+#endif
+static struct rtentry *
+rtfinalize_route(struct sockaddr *dst, struct rtentry *rt, int s)
+{
+	/*
+	 * We handle cloning in this module (if needed). 
+	 * This could probably be put inline but I don't want
+	 * to clone it multiple times :>
+	 */
+	struct rt_addrinfo info;
+	struct rtentry *newrt;
+	int err;
+	if (rt->rt_flags & (RTF_CLONING
+#ifdef __FreeBSD__
+	    | RTF_PRCLONING
+#endif
+	    )) {
+		newrt = rt;
+		bzero((caddr_t)&info, sizeof(info));
+		err = rtrequest(RTM_RESOLVE, dst, (struct sockaddr *)0,
+				(struct sockaddr *)0, 0, &newrt);
+		if (err) {
+			info.rti_info[RTAX_DST] = dst;
+			rt_missmsg(RTM_MISS, &info, 0, err);
+			rt->rt_refcnt++;
+			splx(s);
+			return(rt);
+		} else {
+			rt = newrt;
+			if (rt->rt_flags & RTF_XRESOLVE) {
+				info.rti_info[RTAX_DST] = dst;
+				rt_missmsg(RTM_RESOLVE, &info, 0, err);
+				splx(s);
+				return(rt);
+			}
+			/* Inform listeners of the new route */
+			info.rti_info[RTAX_DST] = rt_key(rt);
+			info.rti_info[RTAX_NETMASK] = rt_mask(rt);
+			info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
+		}
+	} else {
+		/* No cloning needed */
+		rt->rt_refcnt++;
+	}
+	splx(s);
+	return(rt);
+}
+
+static int
+sctp_rn_are_keys_same(struct radix_node *exist,
+		      struct radix_node *cmp)
+{
+	caddr_t e, c, cplim;
+	int len;
+
+	if (exist->rn_key == cmp->rn_key) {
+		/* Mask holds same pointer. Must be same */
+		return(1);
+	}
+	if ((exist->rn_key == NULL) || (cmp->rn_key == NULL)) {
+		/*
+		 * One is null (host route) the other is not. Can't be same.
+		 */
+		return(0);
+	}
+	e = exist->rn_key;
+	c = cmp->rn_key;
+	len = (int)*((u_char *)e);
+	cplim = e + len;
+	while (e < cplim)
+		if (*e++ != *c++)
+			return(0);
+	/* so far the keys are the same */
+	if (exist->rn_mask != cmp->rn_mask) {
+		/* different masks */
+		return(0);
+	}
+	/* They are the same :-) */
+	return(1);
+}
+
+static struct rtentry *
+sctp_rt_scan_dups(struct sockaddr *dst,struct rtentry *existing,int s)
+{
+	struct radix_node *exist, *cmp;
+
+	exist = (struct radix_node *)existing;
+
+	cmp = exist->rn_dupedkey;
+	while (cmp != NULL) {
+		if (sctp_rn_are_keys_same(exist, cmp)) {
+			/* Keys are no longer the same */
+			return (rtfinalize_route(dst,
+			    (struct rtentry *)cmp, s));
+		} else {
+			cmp = cmp->rn_dupedkey;
+		}
+	}
+	return(NULL);
+}
+
+/*
+ * Look up the route that matches the address given
+ * Or, at least try.. Create a cloned route if needed.
+ */
+static struct rtentry *
+sctp_rtalloc_alternate(struct sockaddr *dst,
+		       struct rtentry *existing,
+		       int peer_dest_route)
+{
+	int i, cursalen, s;
+	struct rtentry *tmp, *tmp2;
+	struct radix_node *cmp, *curparent;
+	struct sockaddr_storage s_store;
+	struct sockaddr *sa;
+	s = splnet();
+
+	if (existing == NULL){
+		/* No existing route, we just to rtalloc1() */
+		goto noexisting;
+	}
+	if ((((struct radix_node *)existing)->rn_dupedkey == NULL)  ||
+	    (peer_dest_route)){
+		/* No duplicated routes that we can access sorry :-< 
+		 * or the existing route is to one of the other
+		 * destinations.
+		 */
+		goto atendofchain;
+	}
+	/*
+	 * ok if we reach here there is a chance we can allocate
+	 * an alternate route. Qualifications are:
+	 *
+	 * - We look for a route with a matching key but differnt IFP.
+	 * - If we hit the end of the chain, we go ahead and rtalloc1()
+	 *   and start at the top again in case there are some ahead
+	 *   of existing.
+	 * - The end of the chain is either a NULL or where the netmask
+	 *   changes.
+	 * - When we reach the end of the chain we have a choice we
+	 *   can give up, or we can do a search for a higher level
+	 *   route with a less specific key. So if some one put in
+	 *   say a network route to 128.10.1.0 and we found no duplicate
+	 *   to it we could look upwards with a less specific route
+	 *   say to 128.10.0.0 or default by backing up the tree after
+	 *   modifying the dst we are searching for.
+	 *
+	 */
+
+	/* first lets look in the rn_dupedkey chain of the
+	 * existing route.
+	 */
+	tmp = sctp_rt_scan_dups(dst,
+				(struct rtentry *)&existing->rt_nodes[0],s);
+	if(tmp)
+	    return(tmp);
+
+	/* We have scanned from existing to the end of the
+	 * dupedkey chain, but it could be that existing
+	 * was in the middle of the chain. So now we
+	 * allocate a route to dst (to get the head of the chain)
+	 * and work our way back around.
+	 */
+ atendofchain:
+	tmp = rtalloc1(dst, 0, (RTF_CLONING | RTF_PRCLONING));
+	if (tmp == NULL) {
+		goto noexisting;
+	}
+	tmp->rt_refcnt--;
+	while (tmp != existing) {
+		tmp2 = sctp_rt_scan_dups(dst, tmp, s);
+		if (tmp2) {
+			/* found it */
+			return(tmp2);
+		} else {
+			/*
+			 * Move on to next element. 
+			 * If it turns to NULL it won't match existing and
+			 * the while will end.
+			 */
+			cmp = &tmp->rt_nodes[0];
+			tmp = (struct rtentry *)cmp->rn_dupedkey;
+		}
+	}
+	/*
+	 * There were no rn_dupedkey's on the existing route/
+	 * direct route that comes by lookup of the full destination. 
+	 * Now at this point we have two choices. We give up or
+	 * move up the tree to see if a less specific route has
+	 * a different outbound interface.
+	 */
+
+	/* save off the address */
+	memcpy(&s_store, dst, dst->sa_len);
+	sa = (struct sockaddr *)&s_store;
+	cursalen = sa->sa_len;
+	curparent = existing->rt_nodes[1].rn_parent;
+
+	/* Lets go up the tree zapping the bits in the
+	 * destination so we can see if a different answer
+	 * is possible.
+	 */
+	while (curparent) {
+		caddr_t tc;
+		if (curparent->rn_bit < 0) {
+			/* Not a internal node, up man up. */
+			if(curparent->rn_flags & RNF_ROOT){
+			    /* we are at the ROOT node i.e.
+			     * all routes lead to default.
+			     */
+			    goto noexisting;
+			}
+			curparent = curparent->rn_parent;
+			continue;
+		}
+		/* Zap ther proper number of bits */
+		for (i = (curparent->rn_offset + 1), tc = (caddr_t)sa; 
+		     i < cursalen; i++) {
+			*tc++ = 0;
+		}
+		/* reset the length */
+		cursalen = curparent->rn_offset + 1;
+		/*
+		 * now we must handle rn_offset by turning OFF the bit 
+		 * of the last branch.
+		 */
+		/* Turn off all the bits below the current mask */
+		tc = (caddr_t)sa + curparent->rn_offset;
+		*tc &= ~(curparent->rn_bmask - 1);
+		/* Turn off the bit in question */
+		*tc &= ~curparent->rn_bmask - 1;
+
+		/* now our sa has a shortened dst pointer */
+		tmp = rtalloc1(sa,0,(RTF_CLONING | RTF_PRCLONING));
+		if (tmp == NULL) {
+			goto noexisting;
+		}
+		tmp->rt_refcnt--;
+		if (tmp == existing) {
+			/* Got the same result, move up */
+			if (curparent->rn_flags & RNF_ROOT) {
+				/*
+			 	 * we are at the ROOT node i.e.
+				 * all routes lead to default.
+				 */
+				goto noexisting;
+			}
+			curparent = curparent->rn_parent;
+			continue;
+		}
+		/* Ok it is NOT the same so we have a new route */
+		return(rtfinalize_route(dst, tmp, s));
+	}
+ noexisting:
+	tmp = rtalloc1(dst, 1, 0);
+	splx(s);
+	return(tmp);
+}
+#endif /* SCTP_ALTERNATE_ROUTE */
+
+
+struct rtentry *
+rtalloc_alternate (struct sockaddr *dst ,struct rtentry *old,
+		   int peer_dest_route)
+{
+#if defined(SCTP_ALTERNATE_ROUTE) && defined(RADIX_MPATH)
+	/*
+	 * In order for this routine to work the KAME RADIX_MPATH option in
+	 * order for this to work. Right now this is only supported under
+	 * netbsd.
+	 */
+	return(sctp_rtalloc_alternate(dst,old,peer_dest_route));
+#else
+#ifdef __FreeBSD__
+	return(rtalloc1(dst, 1, 0UL));
+#else
+	return(rtalloc1(dst, 1));
+#endif
+#endif
+}

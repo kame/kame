@@ -37,6 +37,10 @@
 #include "opt_inet.h"
 #include "opt_mrouting.h"
 
+#ifdef __FreeBSD__
+#include "opt_mpath.h"
+#endif
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -610,7 +614,18 @@ rtrequest1(req, info, ret_nrt)
 		if (rn->rn_flags & (RNF_ACTIVE | RNF_ROOT))
 			panic ("rtrequest delete");
 		rt = (struct rtentry *)rn;
-
+#ifdef RADIX_MPATH
+		/*
+		 * if we got multipath routes, we require users to specify
+		 * a matching RTAX_GATEWAY.
+		 */
+		if (rn_mpath_capable(rnh)) {
+			rt = rt_mpath_matchgate(rt, gateway);
+			rn = (struct radix_node *)rt;
+			if (!rt)
+				senderr(ESRCH);
+		}
+#endif
 		/*
 		 * Now search what's left of the subtree for any cloned
 		 * routes which might have been formed from this node.
@@ -733,6 +748,12 @@ rtrequest1(req, info, ret_nrt)
 		ifa->ifa_refcnt++;
 		rt->rt_ifa = ifa;
 		rt->rt_ifp = ifa->ifa_ifp;
+#ifdef RADIX_MPATH
+		/* do not permit exactly the same dst/mask/gw pair */
+		if (rn_mpath_capable(rnh) &&
+		    rt_mpath_conflict(rnh, rt, netmask))
+			senderr(EEXIST);
+#endif
 		/* XXX mtu manipulation will be done in rnh_addaddr -- itojun */
 
 		rn = rnh->rnh_addaddr((caddr_t)ndst, (caddr_t)netmask,

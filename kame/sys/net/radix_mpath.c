@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.c,v 1.10 2001/07/23 03:11:00 itojun Exp $	*/
+/*	$KAME: radix_mpath.c,v 1.11 2002/07/04 01:57:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -140,8 +140,11 @@ rt_mpath_conflict(rnh, rt, netmask)
 
 	/* key was the same.  compare netmask.  hairy... */
 	if (rt_mask(rt1) && netmask) {
+#ifdef __FreeBSD__
+		skip = rnh->rnh_treetop->rn_offset;
+#else
 		skip = rnh->rnh_treetop->rn_off;
-
+#endif
 		if (rt_mask(rt1)->sa_len > netmask->sa_len) {
 			/*
 			 * as rt_mask(rt1) is made optimal by radix.c,
@@ -224,8 +227,11 @@ rtalloc_mpath(ro, hash)
 	 */
 	if (ro->ro_rt && ro->ro_rt->rt_ifp && (ro->ro_rt->rt_flags & RTF_UP))
 		return;				 /* XXX */
+#ifdef __FreeBSD__
+	ro->ro_rt = rtalloc1(&ro->ro_dst, 1, 0UL);
+#else
 	ro->ro_rt = rtalloc1(&ro->ro_dst, 1);
-
+#endif
 	/* if the route does not exist or it is not multipath, don't care */
 	if (!ro->ro_rt || !rn_mpath_next((struct radix_node *)ro->ro_rt))
 		return;
@@ -266,7 +272,42 @@ rn_mpath_lookup(v_arg, m_arg, head)
 
 	return rn_lookup(v_arg, m_arg, head);
 }
+#ifdef __FreeBSD__
 
+extern int	in6_inithead __P((void **head, int off));
+extern int	in_inithead __P((void **head, int off));
+
+int
+rn4_mpath_inithead(head, off)
+	void **head;
+	int off;
+{
+	struct radix_node_head *rnh;
+
+	if (in_inithead(head, off) == 1) {
+		rnh = (struct radix_node_head *)*head;
+		rnh->rnh_lookup = rn_mpath_lookup;
+		return 1;
+	} else
+		return 0;
+}
+
+int
+rn6_mpath_inithead(head, off)
+	void **head;
+	int off;
+{
+	struct radix_node_head *rnh;
+
+	if (in6_inithead(head, off) == 1) {
+		rnh = (struct radix_node_head *)*head;
+		rnh->rnh_lookup = rn_mpath_lookup;
+		return 1;
+	} else
+		return 0;
+}
+
+#else
 int
 rn_mpath_inithead(head, off)
 	void **head;
@@ -281,3 +322,4 @@ rn_mpath_inithead(head, off)
 	} else
 		return 0;
 }
+#endif
