@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.28 2001/07/13 03:47:24 jinmei Exp $
+$KAME: FAQ,v 1.29 2001/07/13 03:48:05 jinmei Exp $
 
 
 GENERAL
@@ -236,7 +236,7 @@ Q: How can I restrict RIPng route announcement for some of the interfaces?
 	configuration file, which makes it possible to skip some
 	of the interfaces.
 
-	bgpd(contributed from Toshiba) also has the configuration
+	bgpd (contributed from Toshiba) also has the configuration
 	file.  You can specify not to listen and/or advertise RIPng
 	messages on the specified interfaces.
 
