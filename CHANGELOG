@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.910 2000/05/21 15:27:39 itojun Exp $
+$Id: CHANGELOG,v 1.911 2000/05/22 03:08:08 itojun Exp $
 
 <200005>
+Mon May 22 12:07:28 JST 2000  itojun@iijlab.net
+	* kame/gifconfig/gifconfig.c: correct gif outer (physical) address
+	  printing, on non-IPv6 kernel.
+
 Sat May 20 04:59:26 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_{forward,output,input}.c:
 	  correct link-local scoped address handling on loopback interface.
