@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1588 2001/03/05 02:27:26 jinmei Exp $
+$KAME: CHANGELOG,v 1.1589 2001/03/05 18:22:16 thorpej Exp $
 
 <200103>
+2001-03-05  Jason R. Thorpe  <thorpej@zembu.com>
+
+	* kame/libipsec/pfkey.c: Add pfkey_send_delete_all(), which
+	sends an SADB_DELETE with satype/mode/src/dst.
+
 Mon Mar  5 JST 2001  itojun@iijlab.net
 	* sys/netinet6/raw_ip6.c: avoid 1-byte mbuf buffer overrun, and/or
 	  unaligned memory access, in rip6_output().  commented by yoshfuji.
