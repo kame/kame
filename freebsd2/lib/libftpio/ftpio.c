@@ -737,8 +737,6 @@ ftp_login_session(FTP_t ftp, char *host, char *user, char *passwd, int port, int
 	    (void)close(s);
 	    s = -1;
 	    continue;
-	    ftp->error = errno;
-	    return FAILURE;
 	}
 
 	break;
