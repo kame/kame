@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.50 2001/01/20 16:37:01 sumikawa Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.51 2001/01/20 17:27:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -686,7 +686,11 @@ nd6_na_input(m, off, icmp6len)
 					nd_ifinfo[rt->rt_ifp->if_index].reachable;
 		} else {
 			ln->ln_state = ND6_LLINFO_STALE;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+			ln->ln_expire = time.tv_sec + nd6_gctimer;
+#else
 			ln->ln_expire = time_second + nd6_gctimer;
+#endif
 		}
 		ln->ln_router = is_router;
 	} else {
@@ -733,7 +737,11 @@ nd6_na_input(m, off, icmp6len)
 			 */
 			if (ln->ln_state == ND6_LLINFO_REACHABLE) {
 				ln->ln_state = ND6_LLINFO_STALE;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+				ln->ln_expire = time.tv_sec + nd6_gctimer;
+#else
 				ln->ln_expire = time_second + nd6_gctimer;
+#endif
 			}
 			goto freeit;
 		} else if (is_override				   /* (2a) */
@@ -766,7 +774,11 @@ nd6_na_input(m, off, icmp6len)
 			} else {
 				if (lladdr && llchange) {
 					ln->ln_state = ND6_LLINFO_STALE;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+					ln->ln_expire = time.tv_sec + nd6_gctimer;
+#else
 					ln->ln_expire = time_second + nd6_gctimer;
+#endif
 				}
 			}
 		}
