@@ -503,7 +503,7 @@ ip6_input(m)
 		if (!(ia6->ia6_flags & IN6_IFF_NOTREADY)) {
 			/* this interface is ready */
 			ours = 1;
-			deliverifp = NULL;	/*XXX*/
+			deliverifp = ia6->ia_ifp;	/* correct? */
 			goto hbhcheck;
 		} else {
 			/* this interface is not ready, fall through */
@@ -567,7 +567,7 @@ ip6_input(m)
 	plen = (u_int32_t)ntohs(ip6->ip6_plen);
 	if (ip6->ip6_nxt == IPPROTO_HOPOPTS) {
 		if (ip6_hopopts_input(&plen, &rtalert, &m, &off)) {
-			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_discard);/*XXX*/
+			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_discard);
 			return;	/* m have already been freed */
 		}
 		/* adjust pointer */

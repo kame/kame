@@ -557,6 +557,7 @@ skip_ipsec2:;
 		if (ro->ro_rt == 0) {
 			ip6stat.ip6s_noroute++;
 			error = EHOSTUNREACH;
+			/* XXX in6_ifstat_inc(ifp, ifs6_out_discard); */
 			goto bad;
 		}
 		ia = ifatoia6(ro->ro_rt->rt_ifa);
@@ -565,6 +566,8 @@ skip_ipsec2:;
 		if (ro->ro_rt->rt_flags & RTF_GATEWAY)
 			dst = (struct sockaddr_in6 *)ro->ro_rt->rt_gateway;
 		m->m_flags &= ~(M_BCAST | M_MCAST);	/* just in case */
+
+		in6_ifstat_inc(ifp, ifs6_out_request);
 
 		/*
 		 * Check if there is the outgoing interface conflicts with
@@ -578,6 +581,7 @@ skip_ipsec2:;
 			if (!(ifp->if_flags & IFF_LOOPBACK)
 			 && ifp->if_index != opt->ip6po_pktinfo->ipi6_ifindex) {
 				ip6stat.ip6s_noroute++;
+				in6_ifstat_inc(ifp, ifs6_out_discard);
 				error = EHOSTUNREACH;
 				goto bad;
 			}
@@ -622,6 +626,8 @@ skip_ipsec2:;
 			if (ifp && (ifp->if_flags & IFF_LOOPBACK) == 0) {
 				ip6stat.ip6s_badscope++;
 				error = ENETUNREACH; /* XXX: better error? */
+				/* XXX correct ifp? */
+				in6_ifstat_inc(ifp, ifs6_out_discard);
 				goto bad;
 			}
 			else {
@@ -655,17 +661,24 @@ skip_ipsec2:;
 			if (ro->ro_rt == 0) {
 				ip6stat.ip6s_noroute++;
 				error = EHOSTUNREACH;
+				/* XXX in6_ifstat_inc(ifp, ifs6_out_discard) */
 				goto bad;
 			}
 			ia = ifatoia6(ro->ro_rt->rt_ifa);
 			ifp = ro->ro_rt->rt_ifp;
 			ro->ro_rt->rt_use++;
 		}
+
+		if ((flags & IPV6_FORWARDING) == 0)
+			in6_ifstat_inc(ifp, ifs6_out_request);
+		in6_ifstat_inc(ifp, ifs6_out_mcast);
+
 		/*
 		 * Confirm that the outgoing interface supports multicast.
 		 */
 		if ((ifp->if_flags & IFF_MULTICAST) == 0) {
 			ip6stat.ip6s_noroute++;
+			in6_ifstat_inc(ifp, ifs6_out_discard);
 			error = ENETUNREACH;
 			goto bad;
 		}
@@ -853,9 +866,11 @@ skip_ipsec2:;
 		 * (see icmp6_input).
 		 */
 		error = EMSGSIZE;
+		in6_ifstat_inc(ifp, ifs6_out_fragfail);
 		goto bad;
 	} else if (ip6->ip6_plen == 0) { /* jumbo payload cannot be fragmented */
 		error = EMSGSIZE;
+		in6_ifstat_inc(ifp, ifs6_out_fragfail);
 		goto bad;
 	} else {
 		struct mbuf **mnext, *m_frgpart;
@@ -874,6 +889,7 @@ skip_ipsec2:;
 		len = (mtu - hlen - sizeof(struct ip6_frag)) & ~7;
 		if (len < 8) {
 			error = EMSGSIZE;
+			in6_ifstat_inc(ifp, ifs6_out_fragfail);
 			goto bad;
 		}
 
@@ -944,7 +960,10 @@ skip_ipsec2:;
 			ip6f->ip6f_ident = id;
 			ip6f->ip6f_nxt = nextproto;
 			ip6stat.ip6s_ofragments++;
+			in6_ifstat_inc(ifp, ifs6_out_fragcreat);
 		}
+
+		in6_ifstat_inc(ifp, ifs6_out_fragok);
 	}
 
 	/*

@@ -91,13 +91,15 @@ ip6_forward(m, srcrt)
 	   in6_canforward(&ip6->ip6_src, &ip6->ip6_dst) == 0) {
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
+		/* XXX in6_ifstat_inc(rt->rt_ifp, ifs6_in_discard) */
 		if (ip6_log_time + ip6_log_interval < time_second) {
+			char addr[INET6_ADDRSTRLEN];
 			ip6_log_time = time_second;
+			strncpy(addr, ip6_sprintf(&ip6->ip6_src), sizeof(addr));
 			log(LOG_DEBUG,
 			    "cannot forward "
 			    "from %s to %s nxt %d received on %s\n",
-			    ip6_sprintf(&ip6->ip6_src), /* XXX meaningless */
-			    ip6_sprintf(&ip6->ip6_dst),
+			    addr, ip6_sprintf(&ip6->ip6_dst),
 			    ip6->ip6_nxt,
 			    if_name(m->m_pkthdr.rcvif));
 		}
@@ -106,6 +108,7 @@ ip6_forward(m, srcrt)
 	}
 
 	if (ip6->ip6_hlim <= IPV6_HLIMDEC) {
+		/* XXX in6_ifstat_inc(rt->rt_ifp, ifs6_in_discard) */
 		icmp6_error(m, ICMP6_TIME_EXCEEDED,
 				ICMP6_TIME_EXCEED_TRANSIT, 0);
 		return;
@@ -134,6 +137,7 @@ ip6_forward(m, srcrt)
 		
 		if (ip6_forward_rt.ro_rt == 0) {
 			ip6stat.ip6s_noroute++;
+			/* XXX in6_ifstat_inc(rt->rt_ifp, ifs6_in_noroute) */
 			icmp6_error(m, ICMP6_DST_UNREACH,
 				    ICMP6_DST_UNREACH_NOROUTE, 0);
 			return;
@@ -156,6 +160,7 @@ ip6_forward(m, srcrt)
 #endif
 		if (ip6_forward_rt.ro_rt == 0) {
 			ip6stat.ip6s_noroute++;
+			/* XXX in6_ifstat_inc(rt->rt_ifp, ifs6_in_noroute) */
 			icmp6_error(m, ICMP6_DST_UNREACH,
 				    ICMP6_DST_UNREACH_NOROUTE, 0);
 			return;
@@ -163,6 +168,7 @@ ip6_forward(m, srcrt)
 	}
 	rt = ip6_forward_rt.ro_rt;
 	if (m->m_pkthdr.len > rt->rt_ifp->if_mtu){
+		in6_ifstat_inc(rt->rt_ifp, ifs6_in_toobig);
  		icmp6_error(m, ICMP6_PACKET_TOO_BIG, 0, rt->rt_ifp->if_mtu);
 		return;
  	}
@@ -208,10 +214,12 @@ ip6_forward(m, srcrt)
 	error = (*rt->rt_ifp->if_output)(rt->rt_ifp, m,
 					 (struct sockaddr *)dst,
 					 ip6_forward_rt.ro_rt);
-	if (error)
+	if (error) {
+		in6_ifstat_inc(rt->rt_ifp, ifs6_out_discard);
 		ip6stat.ip6s_cantforward++;
-	else {
+	} else {
 		ip6stat.ip6s_forward++;
+		in6_ifstat_inc(rt->rt_ifp, ifs6_out_forward);
 		if (type)
 			ip6stat.ip6s_redirectsent++;
 		else {

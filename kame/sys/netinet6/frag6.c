@@ -125,6 +125,9 @@ frag6_input(mp, offp, proto)
 	}
 
 	ip6stat.ip6s_fragments++;
+	/* XXX wrong ifp */
+	if (m->m_flags & M_PKTHDR)
+		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_reass_reqd);
 	
 	/*
 	 * Presence of header sizes in mbufs
@@ -156,6 +159,9 @@ frag6_input(mp, offp, proto)
 		 */
 		if (frag6_nfragpackets >= (u_int)ip6_maxfragpackets) {
 			ip6stat.ip6s_fragoverflow++;
+			/* XXX wrong ifp */
+			if (m->m_flags & M_PKTHDR)
+				in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_reass_fail);
 			frag6_freef(ip6q.ip6q_prev);
 		}
 		q6 = (struct ip6q *)malloc(sizeof(struct ip6q), M_FTABLE,
@@ -428,6 +434,9 @@ insert:
 	}
 	
 	ip6stat.ip6s_reassembled++;
+	/*XXX wrong ifp */
+	if (m->m_flags & M_PKTHDR)
+		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_reass_ok);
 
 	/*
 	 * Tell launch routine the next header
@@ -558,6 +567,7 @@ frag6_slowtimo()
 			q6 = q6->ip6q_next;
 			if (q6->ip6q_prev->ip6q_ttl == 0) {
 				ip6stat.ip6s_fragtimeout++;
+				/* XXX in6_ifstat_inc(ifp, ifs6_reass_fail) */
 				frag6_freef(q6->ip6q_prev);
 			}
 		}
@@ -568,6 +578,7 @@ frag6_slowtimo()
 	 */
 	while (frag6_nfragpackets > (u_int)ip6_maxfragpackets) {
 		ip6stat.ip6s_fragoverflow++;
+		/* XXX in6_ifstat_inc(ifp, ifs6_reass_fail) */
 		frag6_freef(ip6q.ip6q_prev);
 	}
 	frag6_doing_reass = 0;
@@ -601,6 +612,7 @@ frag6_drain()
 		return;
 	while (ip6q.ip6q_next != &ip6q) {
 		ip6stat.ip6s_fragdropped++;
+		/* XXX in6_ifstat_inc(ifp, ifs6_reass_fail) */
 		frag6_freef(ip6q.ip6q_next);
 	}
 }

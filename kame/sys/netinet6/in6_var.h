@@ -134,7 +134,7 @@ struct in6_ifstat {
 					/* NOTE: this is # after fragment */
 	u_int64_t ifs6_reass_reqd;	/* # of incoming fragmented packets */
 					/* NOTE: increment on final dst if */
-	u_int64_t ifs6_reass_ok;		/* # of reassembled packets */
+	u_int64_t ifs6_reass_ok;	/* # of reassembled packets */
 					/* NOTE: this is # after reass */
 					/* NOTE: increment on final dst if */
 	u_int64_t ifs6_reass_fail;	/* # of reass failures */
