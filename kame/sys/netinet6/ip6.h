@@ -212,7 +212,8 @@ struct ip6_frag {
  */
 
 #define IP6_EXTHDR_CHECK(m, off, hlen, ret)				\
-if ((m)->m_next != NULL) {						\
+do {									\
+    if ((m)->m_next != NULL) {						\
 	if (((m)->m_flags & M_LOOP) &&					\
 	    ((m)->m_len < (off) + (hlen)) &&				\
 	    (((m) = m_pullup((m), (off) + (hlen))) == NULL)) {		\
@@ -233,6 +234,7 @@ if ((m)->m_next != NULL) {						\
 			return ret;					\
 		}							\
 	}								\
-}
+    }									\
+} while (0)
 
 #endif /* not _NETINET_IPV6_H_ */

@@ -295,7 +295,7 @@ MALLOC_DECLARE(M_IPMADDR);
 #define IFP_TO_IA6(ifp, ia)				\
 /* struct ifnet *ifp; */				\
 /* struct in6_ifaddr *ia; */				\
-{									\
+do {									\
 	struct ifaddr *ifa;						\
 	for (ifa = (ifp)->if_addrlist; ifa; ifa = ifa->ifa_next) {	\
 		if (!ifa->ifa_addr)					\
@@ -304,7 +304,7 @@ MALLOC_DECLARE(M_IPMADDR);
 			break;						\
 	}								\
 	(ia) = (struct in6_ifaddr *)ifa;				\
-}
+} while (0)
 
 #else
 
