@@ -1,4 +1,4 @@
-/*	$NetBSD: externs.h,v 1.18.4.1 2000/06/22 07:09:06 thorpej Exp $	*/
+/*	$NetBSD: externs.h,v 1.22 2001/08/20 12:20:08 wiz Exp $	*/
 
 /*
  * Copyright (c) 1988, 1990, 1993
@@ -40,7 +40,7 @@
 #endif
 
 /*
- * ucb stdio.h defines BSD as something wierd
+ * ucb stdio.h defines BSD as something weird
  */
 #if defined(sun) && defined(__svr4__) && !defined(BSD)
 #define BSD 43
@@ -209,7 +209,7 @@ extern int (*decrypt_input) P((int));
 #define	set_my_want_state_wont(opt)	{options[opt] &= ~MY_WANT_STATE_WILL;}
 
 /*
- * Make everything symetrical
+ * Make everything symmetrical
  */
 
 #define	HIS_STATE_WILL			MY_STATE_DO
@@ -545,7 +545,7 @@ extern char
     *Ibackp,		/* Oldest byte of 3270 data */
     Ibuf[],		/* 3270 buffer */
     *Ifrontp,		/* Where next 3270 byte goes */
-    tline[],
+    tline[200],
     *transcom;		/* Transparent command */
 
 /* tn3270.c */

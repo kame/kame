@@ -1,6 +1,7 @@
 .include <bsd.own.mk>			# for EXPORTABLE_SYSTEM definition
 
-#SUBDIR+=rlogin rsh telnet finger whois fstat
+#SUBDIR+=rlogin rsh finger whois fstat
+SUBDIR+=telnet
 SUBDIR+=netstat vmstat systat
 
 SUBDIR+=mcastread mcastsend mchat
