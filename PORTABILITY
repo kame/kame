@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.18 1999/11/06 15:25:46 itojun Exp $
+$Id: PORTABILITY,v 1.19 1999/11/06 15:28:00 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -99,7 +99,7 @@ across those possibilities.
 	} while (0)
   Without this wrapper nasty mistakes can happen.
 
-- Compiler options needs to be configured differently into Makefile.
+- Compiler options need to be configured differently into Makefile.
   For NetBSD and OpenBSD, CFLAGS and CPPFLAGS are defined separately:
 	CPPFLAGS+=-I/usr/local/include
 	CFLAGS+=-g
