@@ -1,4 +1,4 @@
-.\"	$KAME: ping6.8,v 1.44 2001/07/02 06:16:01 sumikawa Exp $
+.\"	$KAME: ping6.8,v 1.45 2001/07/05 06:28:04 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -444,35 +444,11 @@ ping6 -a agl dst.foo.com
 .%D August 2000
 .%O work in progress material
 .Re
-.Sh BUGS
-There have been many discussions on why we separate
-.Xr ping6 8
-and
-.Xr ping 8 .
-Some people argued that it would be more convenient to uniform the
-ping command for both IPv4 and IPv6.
-The followings are an answer to the request.
-.Pp
-From a developer's point of view:
-since the underling raw sockets API is totally different between IPv4
-and IPv6, we would end up having two types of code base.
-There would actually be less benefit to uniform the two commands
-into a single command from the developer's standpoint.
-.Pp
-From an operator's point of view: unlike ordinary network applications
-like remote login tools, we are usually aware of address family when using
-network management tools.
-We do not just want to know the reachability to the host, but want to know the
-reachability to the host via a particular network protocol such as
-IPv6.
-Thus, even if we had a unified
-.Xr ping 8
-command for both IPv4 and IPv6, we would usually type a
-.Fl 6
-or
-.Fl 4
-option (or something like those) to specify the particular address family.
-This essentially means that we have two different commands.
+.\".Sh BUGS
+.\" except for bsdi - do we need this wording here?
+.\".Xr ping6 8
+.\"is intentionally separate from
+.\".Xr ping 8 .
 .Sh HISTORY
 The
 .Xr ping 8
