@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.319 1999/12/07 11:40:16 jinmei Exp $
+$Id: CHANGELOG,v 1.320 1999/12/07 11:41:48 sumikawa Exp $
 
 <199912>
+Tue Dec  7 20:38:34 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/pc98/conf/GENERIC.v6, Makefile.pc98: support IPv6 on
+	  NEC PC-98 architecture.
+	  submited by: Wada Keiji <keiji@tamlab.dnj.ynu.ac.jp>
+
 1999-12-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/mping: was added for debugging IPv6 multicast.
 	Contributed by: kato@wide.ad.jp
