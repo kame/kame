@@ -1,7 +1,21 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2106 2002/03/25 08:01:15 jinmei Exp $
+$KAME: CHANGELOG,v 1.2107 2002/03/27 02:52:02 fujisawa Exp $
 
 <200203>
+2002-03-27 Shin'ichi Fujisawa <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_*.[ch]:
+	- Fix some fragmentation related bugs.
+	- Revise the following fragmentation related nonconformance
+	  to RFC2765.
+	  - Set DF flag when IPv6->IPv4 translation and there is no
+	    IPv6 fragment header.  According to RFC2765 4.1.
+	  - Add fragment header when IPv4 packet does not set DF flag
+	    (Tested ICMPv4->ICMPv6 translation only).  According to
+	    RFC2765 3.1.
+	  - Translate IPv4 packet (ICMP Echo/Echoreply) which DF flag
+	    is not set and larger than 1232 bytes (excluding IPv4
+	    header) into two IPv6 packet.
+
 2002-03-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_purge): zero-cleard the
 	corresponding ND info.  Otherwise, parameters for removed
