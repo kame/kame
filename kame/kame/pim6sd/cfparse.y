@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.34 2003/09/02 09:48:44 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.35 2003/10/21 08:15:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -426,7 +426,7 @@ staticrp_statement:
 
 		if ((new = malloc(sizeof(*new))) == NULL) {
 			yyerror("malloc failed");
-			return(NULL);
+			return(0);
 		}
 		memset(new, 0, sizeof(*new));
 		new->type = STATICRP;
@@ -474,7 +474,7 @@ grppfx_statement:
 
 			if ((new = malloc(sizeof(*new))) == NULL) {
 				yyerror("malloc failed");
-				return(NULL);
+				return(0);
 			}
 			memset(new, 0, sizeof(*new));
 

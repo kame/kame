@@ -1,4 +1,4 @@
-/*	$KAME: routesock.c,v 1.20 2003/09/02 09:48:46 suz Exp $	*/
+/*	$KAME: routesock.c,v 1.21 2003/10/21 08:15:45 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -368,7 +368,7 @@ getmsg(rtm, msglen, rpfinfop)
 	    p2pif = local_address(sin6);
 	    if (p2pif == NO_VIF)
 	    	return (FALSE);
-	    if ((uvifs[p2pif].uv_flags & VIFF_POINT_TO_POINT) == NULL)
+	    if ((uvifs[p2pif].uv_flags & VIFF_POINT_TO_POINT) == 0)
 	    	return (FALSE);
 	    	
 	    /* the 1st peer would be the RPF */
