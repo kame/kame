@@ -46,6 +46,7 @@ int	aflag;		/* show all sockets (including servers) */
 int	dflag;		/* show i/f dropped packets */
 int	gflag;		/* show group (multicast) routing or stats */
 int	iflag;		/* show interfaces */
+int	lflag;		/* show routing table with use and ref */
 int	mflag;		/* show memory stats */
 int	nflag;		/* show addresses numerically */
 int	pflag;		/* show given protocol */
@@ -92,6 +93,20 @@ void	rt_stats __P((u_long));
 char	*ns_phost __P((struct sockaddr *));
 char	*ipx_phost __P((struct sockaddr *));
 void	upHex __P((char *));
+
+#ifdef INET6
+struct in6_addr;
+void	ip6protopr __P((u_long, char *));
+void	ip6_stats __P((u_long, char *));
+void	ip6_ifstats __P((char *));
+void	icmp6_stats __P((u_long, char *));
+void	icmp6_ifstats __P((char *));
+void	pim6_stats __P((u_long, char *));
+void	mroute6pr __P((u_long, u_long, u_long));
+void	mrt6_stats __P((u_long, u_long));
+char	*routename6 __P((char *));
+char	*netname6 __P((struct in6_addr *, struct in6_addr *));
+#endif /*INET6*/
 
 char	*routename __P((in_addr_t));
 char	*netname __P((in_addr_t, in_addr_t));

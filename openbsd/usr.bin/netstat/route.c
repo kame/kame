@@ -64,6 +64,8 @@ static char *rcsid = "$OpenBSD: route.c,v 1.27 1999/03/15 15:59:08 deraadt Exp $
 
 #include <sys/sysctl.h>
 
+#include <arpa/inet.h>
+
 #include <limits.h>
 #include <netdb.h>
 #include <stdio.h>
@@ -80,6 +82,11 @@ static char *rcsid = "$OpenBSD: route.c,v 1.27 1999/03/15 15:59:08 deraadt Exp $
 #include "netstat.h"
 
 #define kget(p, d) (kread((u_long)(p), (char *)&(d), sizeof (d)))
+
+/* alignment constraint for routing socket */
+#define ROUNDUP(a) \
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+#define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 
 /*
  * Definitions for showing gateway flags.
@@ -126,6 +133,10 @@ static void p_sockaddr __P((struct sockaddr *, struct sockaddr *, int, int));
 static void p_flags __P((int, char *));
 static void p_rtentry __P((struct rtentry *));
 static void encap_print __P((struct rtentry *));
+#ifdef INET6
+char *netname6 __P((struct in6_addr *, struct in6_addr *));
+static char ntop_buf[INET6_ADDRSTRLEN];
+#endif 
 
 /*
  * Print routing tables.
@@ -183,6 +194,11 @@ pr_family(af)
 	case AF_INET:
 		afname = "Internet";
 		break;
+#ifdef INET6
+	case AF_INET6:
+		afname = "Internet6";
+		break;
+#endif 
 	case AF_NS:
 		afname = "XNS";
 		break;
@@ -212,8 +228,13 @@ pr_family(af)
 }
 
 /* column widths; each followed by one space */
+#ifndef INET6
 #define	WID_DST		18	/* width of destination column */
 #define	WID_GW		18	/* width of gateway column */
+#else
+#define	WID_DST	(nflag ? 28 : 18)	/* width of destination column */
+#define	WID_GW	(nflag ? 26 : 18)	/* width of gateway column */
+#endif /* INET6 */
 
 /*
  * Print header for routing table columns.
@@ -389,9 +410,11 @@ np_rtentry(rtm)
 		p_sockaddr(sa, 0, 0, 36);
 	else {
 		p_sockaddr(sa, 0, rtm->rtm_flags, 16);
+#if 0
 		if (sa->sa_len == 0)
 			sa->sa_len = sizeof(in_addr_t);
-		sa = (struct sockaddr *)(sa->sa_len + (char *)sa);
+#endif
+		sa = (struct sockaddr *)(ROUNDUP(sa->sa_len) + (char *)sa);
 		p_sockaddr(sa, 0, 0, 18);
 	}
 	p_flags(rtm->rtm_flags & interesting, "%-6.6s ");
@@ -420,6 +443,23 @@ p_sockaddr(sa, mask, flags, width)
 
 		break;
 	    }
+
+#ifdef INET6
+	case AF_INET6:
+	    {
+		struct in6_addr *in6 = &((struct sockaddr_in6 *)sa)->sin6_addr;
+
+		if (flags & RTF_HOST)
+			cp = routename6((char *)in6);
+		else if (mask) {
+			cp = netname6(in6,
+				&((struct sockaddr_in6 *)mask)->sin6_addr);
+		} else
+			cp = (char *)inet_ntop(AF_INET6, in6, ntop_buf,
+						sizeof(ntop_buf));
+		break;
+	    }
+#endif 
 
 	case AF_NS:
 		cp = ns_print(sa);
@@ -640,6 +680,95 @@ netname(in, mask)
 			C(in >> 16), C(in >> 8), C(in), mbits);
 	return (line);
 }
+
+#ifdef INET6
+char *
+netname6(in6, mask)
+	struct in6_addr *in6;
+	struct in6_addr *mask;
+{
+	static char line[MAXHOSTNAMELEN + 1];
+	struct in6_addr net6;
+	u_char *p;
+	u_char *lim;
+	int masklen, final = 0, illegal = 0;
+	int i;
+
+	net6 = *in6;
+	for (i = 0; i < sizeof(net6); i++)
+		net6.s6_addr[i] &= mask->s6_addr[i];
+	
+	masklen = 0;
+	lim = (u_char *)mask + 16;
+	for (p = (u_char *)mask; p < lim; p++) {
+		if (final && *p) {
+			illegal++;
+			continue;
+		}
+
+		switch (*p & 0xff) {
+		case 0xff:
+			masklen += 8;
+			break;
+		case 0xfe:
+			masklen += 7;
+			final++;
+			break;
+		case 0xfc:
+			masklen += 6;
+			final++;
+			break;
+		case 0xf8:
+			masklen += 5;
+			final++;
+			break;
+		case 0xf0:
+			masklen += 4;
+			final++;
+			break;
+		case 0xe0:
+			masklen += 3;
+			final++;
+			break;
+		case 0xc0:
+			masklen += 2;
+			final++;
+			break;
+		case 0x80:
+			masklen += 1;
+			final++;
+			break;
+		case 0x00:
+			final++;
+			break;
+		default:
+			final++;
+			illegal++;
+			break;
+		}
+	}
+
+	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(in6))
+		return("default");
+
+	if (illegal)
+		fprintf(stderr, "illegal prefixlen\n");
+	sprintf(line, "%s/%d", inet_ntop(AF_INET6, &net6, ntop_buf,
+					sizeof(ntop_buf)),
+				masklen);
+	return line;
+}
+
+char *
+routename6(in6)
+	char *in6;
+{
+	static char line[MAXHOSTNAMELEN + 1];
+	sprintf(line, "%s", inet_ntop(AF_INET6, in6, ntop_buf,
+				sizeof(ntop_buf)));
+	return line;
+}
+#endif /*INET6*/
 
 /*
  * Print routing statistics

@@ -92,6 +92,10 @@ struct	socket sockb;
 
 char	*inetname __P((struct in_addr *));
 void	inetprint __P((struct in_addr *, int, char *, int));
+#ifdef INET6
+char	*inet6name __P((struct in6_addr *));
+void	inet6print __P((struct in6_addr *, int, char *, int));
+#endif
 
 /*
  * Print a summary of connections related to an Internet
@@ -109,7 +113,10 @@ protopr(off, name)
 	struct inpcb inpcb;
 	int istcp;
 	static int first = 1;
+	char *name0;
+	char namebuf[20];
 
+	name0 = name;
 	if (off == 0)
 		return;
 	istcp = strcmp(name, "tcp") == 0;
@@ -157,10 +164,30 @@ protopr(off, name)
 				printf("%*p ", PLEN, inpcb.inp_ppcb);
 			else
 				printf("%*p ", PLEN, prev);
+#ifdef INET6
+		if (inpcb.inp_flags & INP_IPV6) {
+			strcpy(namebuf, name);
+			strcat(namebuf, "6");
+			name = namebuf;
+		} else
+			name = name0;
+#endif
 		printf("%-5.5s %6ld %6ld ", name, sockb.so_rcv.sb_cc,
 			sockb.so_snd.sb_cc);
-		inetprint(&inpcb.inp_laddr, (int)inpcb.inp_lport, name, 1);
-		inetprint(&inpcb.inp_faddr, (int)inpcb.inp_fport, name, 0);
+#ifdef INET6
+		if (inpcb.inp_flags & INP_IPV6) {
+			inet6print(&inpcb.inp_laddr6, (int)inpcb.inp_lport,
+				name, 1);
+			inet6print(&inpcb.inp_faddr6, (int)inpcb.inp_fport,
+				name, 0);
+		} else
+#endif
+		{
+			inetprint(&inpcb.inp_laddr, (int)inpcb.inp_lport,
+				name, 1);
+			inetprint(&inpcb.inp_faddr, (int)inpcb.inp_fport,
+				name, 0);
+		}
 		if (istcp) {
 			if (tcpcb.t_state < 0 || tcpcb.t_state >= TCP_NSTATES)
 				printf(" %d", tcpcb.t_state);

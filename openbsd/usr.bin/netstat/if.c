@@ -88,6 +88,9 @@ intpr(interval, ifnetaddr)
 	union {
 		struct ifaddr ifa;
 		struct in_ifaddr in;
+#ifdef INET6
+		struct in6_ifaddr in6;
+#endif
 		struct ns_ifaddr ns;
 		struct ipx_ifaddr ipx;
 		struct iso_ifaddr iso;
@@ -127,6 +130,9 @@ intpr(interval, ifnetaddr)
 	ifaddraddr = 0;
 	while (ifnetaddr || ifaddraddr) {
 		struct sockaddr_in *sin;
+#ifdef INET6
+		struct sockaddr_in6 *sin6;
+#endif
 		register char *cp;
 		int n, m;
 
@@ -193,6 +199,16 @@ intpr(interval, ifnetaddr)
 					}
 				}
 				break;
+#ifdef INET6
+			case AF_INET6:
+				sin6 = (struct sockaddr_in6 *)sa;
+				printf("%-11.11s ",
+				    netname6(&ifaddr.in6.ia_addr.sin6_addr,
+					&ifaddr.in6.ia_prefixmask.sin6_addr));
+				printf("%-17.17s ",
+				    routename6((char *)&sin6->sin6_addr));
+				break;
+#endif
 			case AF_IPX:
 				{
 				struct sockaddr_ipx *sipx =
