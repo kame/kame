@@ -541,6 +541,7 @@ int	ether_output(struct ifnet *,
 char	*ether_sprintf(u_char *);
 
 void	if_attach(struct ifnet *);
+void	if_attachdomain(void);
 void	if_attachtail(struct ifnet *);
 void	if_attachhead(struct ifnet *);
 void	if_detach(struct ifnet *);
