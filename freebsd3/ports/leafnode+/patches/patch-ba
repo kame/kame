@@ -1,0 +1,41 @@
+Index: nntputil.c
+diff -u nntputil.c.orig nntputil.c
+--- nntputil.c.orig	Thu Jun 29 02:37:51 2000
++++ nntputil.c	Thu Jun 29 02:45:25 2000
+@@ -298,15 +298,17 @@
+ #endif
+ #ifdef INET6
+ 	    sock = socket(res->ai_family, res->ai_socktype, 0);
++	    if (sock < 0)
++		continue;
+ #else
+ 	    s_in.sin_family = hp->h_addrtype;
+ 	    s_in.sin_port = sp->s_port;
+ 	    s_in.sin_addr = incopy(hp->h_addr_list[i]);
+ 
+ 	    sock = socket(AF_INET, SOCK_STREAM, 0);
+-#endif
+ 	    if (sock < 0)
+ 		break;
++#endif
+ 
+ 	    if (setjmp(timeout) != 0) {
+ 		(void)close(sock);
+@@ -318,11 +320,15 @@
+ 	    (void)signal(SIGALRM, timer);
+ 	    (void)alarm((unsigned)60); /* 60 seconds to open conn */
+ #ifdef INET6
+-	    if (connect(sock, res->ai_addr, res->ai_addrlen) < 0)
++	    if (connect(sock, res->ai_addr, res->ai_addrlen) < 0) {
++		(void)alarm((unsigned)0);
++		close(sock);
++		continue;
++	    }
+ #else
+ 	    if (connect(sock, (struct sockaddr*)&s_in, sizeof(s_in)) < 0)
+-#endif
+ 		break;
++#endif
+ 	    (void)alarm((unsigned)0);
+ 
+ 	    nntpout = fdopen(sock, "w");

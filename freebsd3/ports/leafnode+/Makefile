@@ -11,7 +11,7 @@ CATEGORIES=	news
 MASTER_SITES=	ftp://hiroshima.isdn.uiuc.edu/leafnode+/
 
 PATCH_SITES=	ftp://ftp2.v6.linux.or.jp/pub/Linux/IPv6-2/leafnode+/
-PATCHFILES=	leafnode+-2.10-v6-20000111.diff.gz
+PATCHFILES=	leafnode+-2.10-v6-20000629.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	sumikawa@kame.net
