@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.36 2003/01/21 12:05:37 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.37 2003/01/22 04:53:32 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -128,6 +128,7 @@ struct dhcp6_optinfo {
 
 	int rapidcommit;	/* bool */
 	int pref;		/* server preference */
+	int32_t elapsed_time;	/* elapsed time (from client to server only) */
 
 	struct dhcp6_list iapd_list; /* list of IA_PD */
 	struct dhcp6_list reqopt_list; /* options in option request */
@@ -159,6 +160,7 @@ struct dhcp6 {
 #  define DH6OPT_PREF_UNDEF -1
 #  define DH6OPT_PREF_MAX 255
 #define DH6OPT_ELAPSED_TIME 8
+#  define DH6OPT_ELAPSED_TIME_UNDEF -1
 #define DH6OPT_CLIENT_MSG 9
 #define DH6OPT_SERVER_MSG 10
 #define DH6OPT_AUTH 11

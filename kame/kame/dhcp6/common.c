@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.71 2003/01/21 12:05:36 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.72 2003/01/22 04:53:32 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -767,6 +767,7 @@ dhcp6_init_options(optinfo)
 	memset(optinfo, 0, sizeof(*optinfo));
 
 	optinfo->pref = DH6OPT_PREF_UNDEF;
+	optinfo->pref = DH6OPT_ELAPSED_TIME_UNDEF;
 
 	TAILQ_INIT(&optinfo->iapd_list);
 	TAILQ_INIT(&optinfo->reqopt_list);
@@ -938,6 +939,15 @@ dhcp6_get_options(p, ep, optinfo)
 			if (optlen != 1)
 				goto malformed;
 			optinfo->pref = (int)*(u_char *)cp;
+			break;
+		case DH6OPT_ELAPSED_TIME:
+			if (optlen != 2)
+				goto malformed;
+			memcpy(&val16, cp, sizeof(val16));
+			val16 = ntohs(val16);
+			dprintf(LOG_DEBUG, "  elapsed time: %lu",
+			    (u_int32_t)val16);
+			optinfo->elapsed_time = val16;
 			break;
 		case DH6OPT_RAPID_COMMIT:
 			if (optlen != 0)
@@ -1693,6 +1703,8 @@ dhcp6optstr(type)
 		return ("option request");
 	case DH6OPT_PREFERENCE:
 		return ("preference");
+	case DH6OPT_ELAPSED_TIME:
+		return ("elapsed time");
 	case DH6OPT_STATUS_CODE:
 		return ("status code");
 	case DH6OPT_RAPID_COMMIT:
