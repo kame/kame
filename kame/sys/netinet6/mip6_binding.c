@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.158 2002/12/13 04:29:56 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.159 2002/12/13 10:56:12 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1216,6 +1216,15 @@ mip6_process_hrbu(bi)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
+	/*
+	   10.3.1. Primary Care-of Address Registration
+	   ...
+	    -  L=0:  Defend the given address.  The Single Address Only (S) bit
+	       is ignored in this case since we cannot derive other on-link
+	       addresses without knowing the interface identifier.
+	*/
+	if (bi->mbc_flags & IP6MU_LINK) == 0)
+		bi->mbc_flags |= IP6MU_SINGLE;
 
 	/* find the home ifp of this homeaddress. */
 	for (pr = nd_prefix.lh_first;
