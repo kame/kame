@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.281 2002/06/07 05:49:12 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.282 2002/06/07 05:57:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -992,12 +992,11 @@ in6_update_ifa(ifp, ifra, ia)
 		return(EINVAL);
 	if (ifra->ifra_prefixmask.sin6_len != 0) {
 		plen = in6_mask2len(&ifra->ifra_prefixmask.sin6_addr,
-				    (u_char *)&ifra->ifra_prefixmask +
-				    ifra->ifra_prefixmask.sin6_len);
+		    (u_char *)&ifra->ifra_prefixmask +
+		    ifra->ifra_prefixmask.sin6_len);
 		if (plen <= 0)
 			return(EINVAL);
-	}
-	else {
+	} else {
 		/*
 		 * In this case, ia must not be NULL.  We just use its prefix
 		 * length.
@@ -1016,8 +1015,7 @@ in6_update_ifa(ifp, ifra, ia)
 
 #ifndef SCOPEDROUTING
 		if ((error = in6_recoverscope(&dst6,
-					      &ifra->ifra_dstaddr.sin6_addr,
-					      ifp)) != 0)
+		    &ifra->ifra_dstaddr.sin6_addr, ifp)) != 0)
 			return(error);
 #endif
 		if (in6_addr2zoneid(ifp, &dst6.sin6_addr, &zoneid))
@@ -1058,11 +1056,11 @@ in6_update_ifa(ifp, ifra, ia)
 			 * prefixlen 126, we override the specified
 			 * prefixmask as if the prefix length was 128.
 			 */
-			ifra->ifra_prefixmask.sin6_len
-				= sizeof(struct sockaddr_in6); 
+			ifra->ifra_prefixmask.sin6_len =
+			    sizeof(struct sockaddr_in6); 
 			for (i = 0; i < 4; i++)
 				ifra->ifra_prefixmask.sin6_addr.s6_addr32[i] =
-					0xffffffff;
+				    0xffffffff;
 			plen = 128;
 #else
 			return(EINVAL);
@@ -1097,8 +1095,8 @@ in6_update_ifa(ifp, ifra, ia)
 		 * RA, it is called under an interrupt context.  So, we should
 		 * call malloc with M_NOWAIT.
 		 */
-		ia = (struct in6_ifaddr *)
-			malloc(sizeof(*ia), M_IFADDR, M_NOWAIT);
+		ia = (struct in6_ifaddr *) malloc(sizeof(*ia), M_IFADDR,
+		    M_NOWAIT);
 		if (ia == NULL)
 			return (ENOBUFS);
 		bzero((caddr_t)ia, sizeof(*ia));
@@ -1113,13 +1111,13 @@ in6_update_ifa(ifp, ifra, ia)
 			 * XXX: some functions expect that ifa_dstaddr is not
 			 * NULL for p2p interfaces.
 			 */
-			ia->ia_ifa.ifa_dstaddr
-				= (struct sockaddr *)&ia->ia_dstaddr;
+			ia->ia_ifa.ifa_dstaddr =
+			    (struct sockaddr *)&ia->ia_dstaddr;
 		} else {
 			ia->ia_ifa.ifa_dstaddr = NULL;
 		}
-		ia->ia_ifa.ifa_netmask
-			= (struct sockaddr *)&ia->ia_prefixmask;
+		ia->ia_ifa.ifa_netmask =
+		    (struct sockaddr *)&ia->ia_prefixmask;
 
 		ia->ia_ifp = ifp;
 		if ((oia = in6_ifaddr) != NULL) {
@@ -1180,14 +1178,12 @@ in6_update_ifa(ifp, ifra, ia)
 		int e;
 
 		if ((ia->ia_flags & IFA_ROUTE) != 0 &&
-		    (e = rtinit(&(ia->ia_ifa), (int)RTM_DELETE, RTF_HOST))
-		    != 0) {
+		    (e = rtinit(&(ia->ia_ifa), (int)RTM_DELETE, RTF_HOST)) != 0) {
 			log(LOG_ERR, "in6_update_ifa: failed to remove "
 			    "a route to the old destination: %s\n",
 			    ip6_sprintf(&ia->ia_addr.sin6_addr));
 			/* proceed anyway... */
-		}
-		else
+		} else
 			ia->ia_flags &= ~IFA_ROUTE;
 		ia->ia_dstaddr = dst6;
 	}
@@ -1200,12 +1196,12 @@ in6_update_ifa(ifp, ifra, ia)
 	ia->ia6_lifetime = ifra->ifra_lifetime;
 	if (ia->ia6_lifetime.ia6t_vltime != ND6_INFINITE_LIFETIME) {
 		ia->ia6_lifetime.ia6t_expire =
-			time_second + ia->ia6_lifetime.ia6t_vltime;
+		    time_second + ia->ia6_lifetime.ia6t_vltime;
 	} else
 		ia->ia6_lifetime.ia6t_expire = 0;
 	if (ia->ia6_lifetime.ia6t_pltime != ND6_INFINITE_LIFETIME) {
 		ia->ia6_lifetime.ia6t_preferred =
-			time_second + ia->ia6_lifetime.ia6t_pltime;
+		    time_second + ia->ia6_lifetime.ia6t_pltime;
 	} else
 		ia->ia6_lifetime.ia6t_preferred = 0;
 
@@ -1249,10 +1245,10 @@ in6_update_ifa(ifp, ifra, ia)
 			llsol.sin6_addr.s6_addr32[1] = 0;
 			llsol.sin6_addr.s6_addr32[2] = htonl(1);
 			llsol.sin6_addr.s6_addr32[3] =
-				ifra->ifra_addr.sin6_addr.s6_addr32[3];
+			    ifra->ifra_addr.sin6_addr.s6_addr32[3];
 			llsol.sin6_addr.s6_addr8[12] = 0xff;
 			if (in6_addr2zoneid(ifp, &llsol.sin6_addr,
-					    &llsol.sin6_scope_id)) {
+			    &llsol.sin6_scope_id)) {
 				/* XXX: should not happen */
 				log(LOG_ERR, "in6_update_ifa: "
 				    "in6_addr2zoneid failed\n");
@@ -1262,7 +1258,7 @@ in6_update_ifa(ifp, ifra, ia)
 			imm = in6_joingroup(ifp, &llsol, &error);
 			if (imm) {
 				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
-						 i6mm_chain);
+				    i6mm_chain);
 			} else {
 				log(LOG_ERR, "in6_update_ifa: addmulti "
 				    "failed for %s on %s (errno=%d)\n",
@@ -1285,7 +1281,7 @@ in6_update_ifa(ifp, ifra, ia)
 		mltaddr.sin6_family = AF_INET6;
 		mltaddr.sin6_addr = in6addr_linklocal_allnodes;
 		if (in6_addr2zoneid(ifp, &mltaddr.sin6_addr,
-				    &mltaddr.sin6_scope_id)) {
+		    &mltaddr.sin6_scope_id)) {
 			goto cleanup; /* XXX: should not fail */
 		}
 		in6_embedscope(&mltaddr.sin6_addr, &mltaddr); /* XXX */
@@ -1324,21 +1320,19 @@ in6_update_ifa(ifp, ifra, ia)
 			bzero(&info, sizeof(info));
 			info.rti_info[RTAX_DST] = (struct sockaddr *)&mltaddr;
 			info.rti_info[RTAX_GATEWAY] =
-				(struct sockaddr *)&ia->ia_addr;
+			    (struct sockaddr *)&ia->ia_addr;
 			info.rti_info[RTAX_NETMASK] =
-				(struct sockaddr *)&mltmask;
+			    (struct sockaddr *)&mltmask;
 			info.rti_info[RTAX_IFA] =
-				(struct sockaddr *)&ia->ia_addr;
+			    (struct sockaddr *)&ia->ia_addr;
 			/* XXX: we need RTF_CLONING to fake nd6_rtrequest */
 			info.rti_flags = RTF_UP | RTF_CLONING;
 			error = rtrequest1(RTM_ADD, &info, NULL);
 #else
-			error = rtrequest(RTM_ADD,
-					  (struct sockaddr *)&mltaddr,
-					  (struct sockaddr *)&ia->ia_addr,
-					  (struct sockaddr *)&mltmask,
-					  RTF_UP | RTF_CLONING,
-					  (struct rtentry **)0);
+			error = rtrequest(RTM_ADD, (struct sockaddr *)&mltaddr,
+			    (struct sockaddr *)&ia->ia_addr,
+			    (struct sockaddr *)&mltmask, RTF_UP | RTF_CLONING,
+			    (struct rtentry **)0);
 #endif
 			if (error)
 				goto cleanup;
@@ -1367,16 +1361,14 @@ in6_update_ifa(ifp, ifra, ia)
 #ifdef __FreeBSD__
 #define hostnamelen	strlen(hostname)
 #endif
-		if (in6_nigroup(ifp, hostname, hostnamelen, &mltaddr)
-		    == 0) {
+		if (in6_nigroup(ifp, hostname, hostnamelen, &mltaddr) == 0) {
 			imm = in6_joingroup(ifp, &mltaddr, &error);
 			if (imm) {
 				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
 				    i6mm_chain);
 			} else {
 				log(LOG_WARNING, "in6_update_ifa: "
-				    "addmulti failed for "
-				    "%s on %s (errno=%d)\n",
+				    "addmulti failed for %s on %s (errno=%d)\n",
 				    ip6_sprintf(&mltaddr.sin6_addr), 
 				    if_name(ifp), error);
 				/* XXX not very fatal, go on... */
@@ -1392,7 +1384,7 @@ in6_update_ifa(ifp, ifra, ia)
 		 */
 		mltaddr.sin6_addr = in6addr_nodelocal_allnodes;
 		if (in6_addr2zoneid(ifp, &mltaddr.sin6_addr,
-				    &mltaddr.sin6_scope_id)) {
+		    &mltaddr.sin6_scope_id)) {
 			goto cleanup; /* XXX: should not fail */
 		}
 		in6_embedscope(&mltaddr.sin6_addr, &mltaddr); /* XXX */
@@ -1423,20 +1415,18 @@ in6_update_ifa(ifp, ifra, ia)
 			bzero(&info, sizeof(info));
 			info.rti_info[RTAX_DST] = (struct sockaddr *)&mltaddr;
 			info.rti_info[RTAX_GATEWAY] =
-				(struct sockaddr *)&ia->ia_addr;
+			    (struct sockaddr *)&ia->ia_addr;
 			info.rti_info[RTAX_NETMASK] =
-				(struct sockaddr *)&mltmask;
+			    (struct sockaddr *)&mltmask;
 			info.rti_info[RTAX_IFA] =
-				(struct sockaddr *)&ia->ia_addr;
+			    (struct sockaddr *)&ia->ia_addr;
 			info.rti_flags = RTF_UP | RTF_CLONING;
 			error = rtrequest1(RTM_ADD, &info, NULL);
 #else
-			error = rtrequest(RTM_ADD,
-					  (struct sockaddr *)&mltaddr,
-					  (struct sockaddr *)&ia->ia_addr,
-					  (struct sockaddr *)&mltmask,
-					  RTF_UP | RTF_CLONING,
-					  (struct rtentry **)0);
+			error = rtrequest(RTM_ADD, (struct sockaddr *)&mltaddr,
+			    (struct sockaddr *)&ia->ia_addr,
+			    (struct sockaddr *)&mltmask, RTF_UP | RTF_CLONING,
+			    (struct rtentry **)0);
 #endif
 			if (error)
 				goto cleanup;
