@@ -40,6 +40,11 @@
 #define	_SYS_SOCKET_H_
 
 /*
+ * needed for CMSG_ALIGN
+ */
+#include <machine/param.h>
+
+/*
  * Definitions related to sockets: types, address families, options.
  */
 
@@ -356,7 +361,7 @@ struct cmsghdr {
 #define	CMSG_FIRSTHDR(mhdr)	((struct cmsghdr *)(mhdr)->msg_control)
 
 /* Round len up to next alignment boundary */
-#define	CMSG_ALIGN(len)	(((len)+sizeof(long)-1) & ~(sizeof(long)-1))
+#define	CMSG_ALIGN(len)	(((len)+ ALIGNBYTES) & ~ALIGNBYTES)
 
 /* Length of the contents of a control message of length len */
 #define	CMSG_LEN(len)	(CMSG_ALIGN(sizeof(struct cmsghdr)) + (len))
