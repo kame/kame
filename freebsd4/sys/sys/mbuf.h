@@ -80,6 +80,7 @@ struct pkthdr {
 	int	len;			/* total packet length */
 	/* variables for ip and tcp reassembly */
 	caddr_t	header;			/* pointer to packet header */
+	struct	mbuf *aux;		/* extra data buffer; ipsec/others */
 };
 
 /* description of external storage mapped into mbuf, valid if M_EXT set */
@@ -122,7 +123,7 @@ struct mbuf {
 #define	M_PKTHDR	0x0002	/* start of record */
 #define	M_EOR		0x0004	/* end of record */
 #define	M_PROTO1	0x0008	/* protocol-specific */
-#define	M_PROTO2	0x0010	/* protocol-specific */
+#define	M_MIP6TUNNEL	0x0010	/* MIP6 temporary use */
 #define	M_PROTO3	0x0020	/* protocol-specific */
 #define	M_PROTO4	0x0040	/* protocol-specific */
 #define	M_PROTO5	0x0080	/* protocol-specific */
@@ -131,10 +132,13 @@ struct mbuf {
 #define	M_BCAST		0x0100	/* send/received as link-level broadcast */
 #define	M_MCAST		0x0200	/* send/received as link-level multicast */
 #define	M_FRAG		0x0400	/* packet is a fragment of a larger packet */
+#define	M_ANYCAST6	0x0800	/* received as IPv6 anycast */
+#define	M_LOOP		0x4000	/* for Mbuf statistics */
 
 /* flags copied when copying m_pkthdr */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_PROTO1|M_PROTO2|M_PROTO3 | \
-			    M_PROTO4|M_PROTO5|M_BCAST|M_MCAST|M_FRAG)
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_PROTO1|M_MIP6TUNNEL|M_PROTO3 | \
+			    M_PROTO4|M_PROTO5|M_BCAST|M_MCAST|M_FRAG | \
+			    M_ANYCAST6|M_LOOP)
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */
@@ -302,6 +306,7 @@ union mcluster {
 		_mm->m_nextpkt = NULL;					\
 		_mm->m_data = _mm->m_pktdat;				\
 		_mm->m_flags = M_PKTHDR;				\
+		_mm->m_pkthdr.aux = (struct mbuf *)NULL;		\
 		(m) = _mm;						\
 		splx(_ms);						\
 	} else {							\
@@ -409,6 +414,7 @@ union mcluster {
 /*
  * Copy mbuf pkthdr from "from" to "to".
  * from must have M_PKTHDR set, and to must be empty.
+ * aux pointer will be moved to `to'.
  */
 #define	M_COPY_PKTHDR(to, from) do {					\
 	struct mbuf *_mfrom = (from);					\
@@ -417,6 +423,7 @@ union mcluster {
 	_mto->m_data = _mto->m_pktdat;					\
 	_mto->m_flags = _mfrom->m_flags & M_COPYFLAGS;			\
 	_mto->m_pkthdr = _mfrom->m_pkthdr;				\
+	_mfrom->m_pkthdr.aux = (struct mbuf *)NULL;			\
 } while (0)
 
 /*
@@ -499,6 +506,14 @@ union mcluster {
 /* compatibility with 4.3 */
 #define	m_copy(m, o, l)	m_copym((m), (o), (l), M_DONTWAIT)
 
+/*
+ * pkthdr.aux type tags.
+ */
+struct mauxtag {
+	int	af;
+	int	type;
+};
+
 #ifdef _KERNEL
 extern	u_int		 m_clalloc_wid;	/* mbuf cluster wait count */
 extern	u_int		 m_mballoc_wid;	/* mbuf wait count */
@@ -535,11 +550,15 @@ struct	mbuf *m_gethdr __P((int, int));
 int	m_mballoc __P((int, int));
 struct	mbuf *m_mballoc_wait __P((int, int));
 struct	mbuf *m_prepend __P((struct mbuf *,int,int));
+struct	mbuf *m_pulldown __P((struct mbuf *, int, int, int *));
 void	m_print __P((const struct mbuf *m));
 struct	mbuf *m_pullup __P((struct mbuf *, int));
 struct	mbuf *m_retry __P((int, int));
 struct	mbuf *m_retryhdr __P((int, int));
 struct	mbuf *m_split __P((struct mbuf *,int,int));
+struct	mbuf *m_aux_add __P((struct mbuf *, int, int));
+struct	mbuf *m_aux_find __P((struct mbuf *, int, int));
+void	m_aux_delete __P((struct mbuf *, struct mbuf *));
 #endif /* _KERNEL */
 
 #endif /* !_SYS_MBUF_H_ */
