@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.317 2002/07/30 23:26:16 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.318 2002/07/31 09:53:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -162,7 +162,6 @@
 
 extern struct domain inet6domain;
 extern struct ip6protosw inet6sw[];
-extern u_char ip6_protox[];
 
 struct icmp6stat icmp6stat;
 
