@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.119 2000/08/26 10:00:45 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.120 2000/08/28 07:41:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -188,6 +188,7 @@ int ip6_logentry;
 int ip6_logsize = IP6_PERFORM_LOGSIZE;
 unsigned long long ip6_performance_log[IP6_PERFORM_LOGSIZE];
 unsigned long long ip6_performance_log2[IP6_PERFORM_LOGSIZE];
+struct in6_addr ip6_performance_addrlog[IP6_PERFORM_LOGSIZE];
 #endif
 #ifdef MEASURE_PERFORMANCE
 #define OURS_CHECK_ALG_RTABLE 0
@@ -238,7 +239,8 @@ int (*mip6_route_optimize_hook)(struct mbuf *m) = 0;
 static unsigned long long ctr_beg, ctr_end;
 
 static __inline unsigned long long read_tsc __P((void));
-static __inline void add_performance_log __P((unsigned long long)); 
+static __inline void add_performance_log __P((unsigned long long,
+					      struct in6_addr *)); 
 #endif
 
 #ifdef MEASURE_PERFORMANCE
@@ -252,11 +254,13 @@ read_tsc(void)
 }
 
 static __inline void
-add_performance_log(val)
+add_performance_log(val, addr)
 	unsigned long long val;
+	struct in6_addr *addr;
 {
 	ip6_logentry = (ip6_logentry + 1) % ip6_logsize;
 	ip6_performance_log[ip6_logentry] = val;
+	ip6_performance_addrlog[ip6_logentry] = *addr;
 }
 #endif
 
@@ -618,7 +622,8 @@ ip6_input(m)
 #ifdef MEASURE_PERFORMANCE_UDPONLY
 				if (ip6->ip6_nxt == IPPROTO_UDP)
 #endif
-					add_performance_log(ctr_end - ctr_beg);
+					add_performance_log(ctr_end - ctr_beg,
+							    &ip6->ip6_dst);
 #endif
 				ours = 1;
 				deliverifp = ia->ia_ifp;
@@ -643,7 +648,8 @@ ip6_input(m)
 #ifdef MEASURE_PERFORMANCE_UDPONLY
 				if (ip6->ip6_nxt == IPPROTO_UDP)
 #endif
-					add_performance_log(ctr_end - ctr_beg);
+					add_performance_log(ctr_end - ctr_beg,
+							    &ip6->ip6_dst);
 #endif
 			ours = 1;
 			deliverifp = m->m_pkthdr.rcvif;
@@ -722,7 +728,7 @@ ip6_input(m)
 #ifdef MEASURE_PERFORMANCE_UDPONLY
 		if (ip6->ip6_nxt == IPPROTO_UDP)
 #endif
-			add_performance_log(ctr_end - ctr_beg);
+			add_performance_log(ctr_end - ctr_beg, &ip6->ip6_dst);
 #endif
 
 		if (ia6->ia6_flags & IN6_IFF_ANYCAST)
@@ -754,7 +760,7 @@ ip6_input(m)
 #ifdef MEASURE_PERFORMANCE_UDPONLY
 	if (ip6->ip6_nxt == IPPROTO_UDP)
 #endif
-		add_performance_log(ctr_end - ctr_beg);
+		add_performance_log(ctr_end - ctr_beg, &ip6->ip6_dst);
 #endif
 
 	/*
