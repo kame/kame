@@ -34,7 +34,7 @@
  * Author:  Hesham Soliman <Hesham.Soliman@ericsson.com.au>
  *          Magnus Braathen <Magnus.Braathen@era.ericsson.se>
  *
- * $Id: mip6config.c,v 1.4 2000/02/09 16:02:19 itojun Exp $
+ * $Id: mip6config.c,v 1.5 2000/02/14 10:04:50 itojun Exp $
  *
  */
 
@@ -63,7 +63,7 @@ static char *configfilename;
 extern void print_err __P((int));
 
 static int
-upd_kernel(int cmd, struct mip6_input_data *args)
+upd_kernel(u_long cmd, struct mip6_input_data *args)
 {
     struct mip6_input_data dummy;
 
@@ -167,7 +167,7 @@ getaddress(char *address, struct in6_addr *in6addr)
 
 /* Parsing functions */
 static int
-set_homeaddr(char *homeaddr, int command)
+set_homeaddr(char *homeaddr, u_long command)
 {
     struct mip6_input_data input;
     char *address, *interface, *homeagent = NULL;
@@ -217,7 +217,7 @@ set_homeaddr(char *homeaddr, int command)
 }
 
 static int
-del_coaddr(char *coaddr, int command)
+del_coaddr(char *coaddr, u_long command)
 {
     struct mip6_input_data input;
     char *address, *interface;
@@ -251,7 +251,7 @@ del_coaddr(char *coaddr, int command)
 }
 
 static int
-set_coaddr(char *coaddr, int command)
+set_coaddr(char *coaddr, u_long command)
 {
     struct mip6_input_data input;
     char *address, *interface;
@@ -285,13 +285,13 @@ set_coaddr(char *coaddr, int command)
 }
 
 static int
-set_enable(char *enable, int command)
+set_enable(char *enable, u_long command)
 {
     struct mip6_input_data input;
     int retval;
 
 #ifdef DEBUG
-    printf("set_enable: %s, command: %d\n", enable, command);
+    printf("set_enable: %s, command: %lu\n", enable, command);
 #endif /* DEBUG */
 
     if ((enable == NULL) || (enable != NULL && atoi(enable) >= 1))
@@ -311,13 +311,13 @@ set_enable(char *enable, int command)
 }
 
 static int
-set_value(char *value, int command)
+set_value(char *value, u_long command)
 {
     struct mip6_input_data input;
     int retval;
 
 #ifdef DEBUG
-    printf("set_value: %s, command: %d\n", value, command);
+    printf("set_value: %s, command: %lu\n", value, command);
 #endif /* DEBUG */
 
     if (value == NULL)
@@ -334,10 +334,10 @@ set_value(char *value, int command)
 }
 
 static int
-set_enable_ha(char *value, int command)
+set_enable_ha(char *value, u_long command)
 {
 #ifdef DEBUG
-    printf("set_enable_ha: %s, command: %d\n", value, command);
+    printf("set_enable_ha: %s, command: %lu\n", value, command);
 #endif /* DEBUG */
 
     startmip6 = 1;
