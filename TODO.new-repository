@@ -1,23 +1,17 @@
 TODOs for new repository
 KAME project
-$Id: TODO.new-repository,v 1.7 1999/10/06 05:09:15 itojun Exp $
+$Id: TODO.new-repository,v 1.8 2000/01/18 15:18:44 itojun Exp $
 
 
 kernel part:
 - share sys/netnatm and other atm stuff across platforms
-- share and support netpm (v4-v4 NAT), ptr (v4-v6 NAT)
+- share and support netpm (v4-v4 NAT), natpt (v4-v6 NAT)
 	KAME/FreeBSD228 compiles fine
 	KAME/BSDI3 compiles fine
-- update netpm/ptr for KNF
-- update netpm/ptr for better kernel-user interface (do not occupy IPPROTO_xx)
-- support ip6fw on platforms
+- update netpm/natpt for KNF
+- update netpm/natpt for better kernel-user interface (do not occupy IPPROTO_xx)
+- support ip6fw on other platforms
 	KAME/FreeBSD228 is okay
-	KAME/NetBSD is okay
-- fix tcp code in each of operating system to support both AFs
-	KAME/NetBSD is okay
-	KAME/FreeBSD33 is okay
-	(they are totally different, so we may need to sync)
-
-userland part:
-- import IPv6 install floppy generator (src/release for FreeBSD, src/distrib
-  for NetBSD)
+	KAME/NetBSD looks okay
+- support ALTQ on other platforms
+	KAME/BSDI{31,41} may need support
