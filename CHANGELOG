@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.592 2000/02/23 06:09:52 jinmei Exp $
+$Id: CHANGELOG,v 1.593 2000/02/23 06:10:18 jinmei Exp $
 
 <200002>
 2000-02-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* (all OSes)/usr.sbin/{pim6dd, bgpd}/Makefile: added the -DHAVE_GETIFADDRS
-	compile option.
+	* (all OSes)/usr.sbin/{pim6dd, bgpd}/Makefile: added the
+	-DHAVE_GETIFADDRS compile option.
 	Note: please be sure to update the whole tree, do "make prepare",
 	update include files, and then rebuild the whole kit.
 
@@ -13,7 +13,7 @@ $Id: CHANGELOG,v 1.592 2000/02/23 06:09:52 jinmei Exp $
 	* kame/kame/pim6dd/config.c (config_vifs_from_kernel): used
 	getifaddrs().
 
-2000-02-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+2000-02-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.pco.jp>
 	* kame/kame/bgpd/if.c (ifconfig): use getifaddrs (if available)
 	instead of SIOCGIFCONF, since the former interface is more
 	friendly and safer.
