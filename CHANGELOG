@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2139 2002/04/24 13:55:28 jinmei Exp $
+$KAME: CHANGELOG,v 1.2140 2002/04/25 02:52:19 jinmei Exp $
 
 <200204>
+2002-04-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6c.c (client6_recvreply):
+	tightened DUID validation.
+	* kame/kame/dhcp6/dhcp6s.c (server6_react_informreq):
+	processed server and client DUID correctly.
+
+2002-04-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/common.c (get_dhcp6_option): newly added as a
+	shared routine to parse DHCPv6 options.
+
 2002-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6c.c: corrected handling DUID for the client
 	side according to dhcpv6-24.
