@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.93 2003/07/24 07:11:19 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.94 2003/07/25 08:12:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -245,8 +245,15 @@ struct mip6_ha {
 	u_int32_t           mha_refcnt;
 };
 LIST_HEAD(mip6_ha_list, mip6_ha);
-#define MIP6_HA_REF(mha) do {(mha)->mha_refcnt++;} while(0);
-#define MIP6_HA_FREE(mha) do {if(((mha)->mha_refcnt--) == 0) FREE(mha, M_TEMP); /* XXX */} while(0);
+#define MIP6_HA_REF(mha)	\
+do {				\
+	(mha)->mha_refcnt++;	\
+} while(0);
+#define MIP6_HA_FREE(mha)		\
+do {					\
+	if (((mha)->mha_refcnt--) == 0)	\
+		FREE(mha, M_TEMP);	\
+} while(0);
 
 struct mip6_prefix_ha {
 	LIST_ENTRY(mip6_prefix_ha) mpfxha_entry;
