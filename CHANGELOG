@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1132 2000/07/16 04:28:34 itojun Exp $
+$Id: CHANGELOG,v 1.1133 2000/07/16 05:35:26 itojun Exp $
 
 <200006>
+Sun Jul 16 14:32:58 JST 2000  itojun@iijlab.net
+	* kame/ping6: 
+	  - check duplicated replies for node information query (*)
+	  - fill nonce field for node information query (*)
+	  - use generic icmp6 printer for echo/echo reply/ni reply/ni reply,
+	    when ident/nonce does not match
+	  - clarlify outgoign packet construction a bit
+	  (*) based on patch from yoshfuji, cleaned up by itojun
+
 Sun Jul 16 13:26:12 JST 2000  itojun@iijlab.net
 	* sys/netinet6/icmp6.c: ICMPv6 node information query now based on
 	  06 draft (ping6 -w).
