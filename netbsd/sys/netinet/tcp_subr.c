@@ -515,7 +515,7 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			family = AF_INET6;
 			hlen = sizeof(struct ip6_hdr);
 			ip6 = mtod(m, struct ip6_hdr *);
-			if (!ip6_getpktaddrs(m, &src6, &dst6)) {
+			if (ip6_getpktaddrs(m, &src6, &dst6)) {
 				m_freem(m);
 				return EINVAL; /* XXX */
 			}
