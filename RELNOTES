@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/12/12 00:53:34 $
+		     $Date: 2000/01/16 07:28:33 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -23,15 +23,12 @@ and the next STABLE release,
   trouble with IPv6 commuincation (which heavily uses multicast).
   This is not a KAME problem (*BSD problem), but please be warned.
   Workaround: perform "ifconfig down", then "ifconfig up" after resume.
-- racoon daemon may not work correctly due to code synchronization problem
-  between userland and the kernel.  Because of STABLE cut-off date we do not
-  supply fixes for this.  If you would like to use racoon, please use more
-  recent SNAP kit instead.
 - Intel EtherExpress Pro (fxp driver) has some problem with the
   initialization sequence KAME is using (a set of ioctl calls).  The driver
   will become unusable if consequtive calls to fxp_init() are made, or
   consequtive multicast configurations are made.
-  This problem occurs only with specific revision of the card.
+  This problem occurs only with specific revision of the card, and with
+  specific operating system platform (openbsd, and maybe freebsd[23]).
   It is not KAME problem, it is problem in fxp driver.
 
 PLATFORM DIFFERENCES
@@ -47,5 +44,7 @@ those platforms.  Here is a brief list of important differences:
 		(you can enjoy OpenBSD IPsec for IPv4)
 - TCP
 	see IMPLEMENTATION for details.
+- NAT/PT
+	KAME/FreeBSD228 only at this moment.
 
 							<end of RELNOTES>

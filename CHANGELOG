@@ -1,12 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.440 2000/01/15 07:24:38 itojun Exp $
+$Id: CHANGELOG,v 1.441 2000/01/16 07:28:33 itojun Exp $
 
 <200001>
 Sat Jan 15 03:56:50 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet6/ipcomp_core.c: change default deflate window size
 	  for inbound to default (2^15).  without this change we can't
-	  interop with some of IPcomp implementations.
+	  interoperate with some of IPcomp implementations.
 	  see changelog entry on Nov 5 1999.
 
 2000-01-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
