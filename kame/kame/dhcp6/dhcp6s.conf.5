@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6s.conf.5,v 1.7 2004/03/21 15:02:18 jinmei Exp $
+.\"	$KAME: dhcp6s.conf.5,v 1.8 2004/03/22 09:04:00 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -204,13 +204,13 @@ based on required parameters by the client.
 .Sh Examples
 The followings are a sample configuration to provide a DNS server
 address for every client as well as to delegate a permanent IPv6
-prefix 3ffe:ffff:1111::/48 to a client whose DUID is 00:01:00:01:aa:bb.
+prefix 2001:db8:1111::/48 to a client whose DUID is 00:01:00:01:aa:bb.
 .Bd -literal -offset
-option domain-name-servers 3ffe:ffff::35;
+option domain-name-servers 2001:db8::35;
 
 host kame {
 	duid 00:01:00:01:aa:bb;
-	prefix 3ffe:ffff:1111::/48 infinity;
+	prefix 2001:db8:1111::/48 infinity;
 };
 .Ed
 .Sh SEE ALSO

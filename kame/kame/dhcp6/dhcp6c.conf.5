@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.12 2004/03/21 15:03:56 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.13 2004/03/22 09:04:00 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -288,10 +288,10 @@ must be a decimal integer which fits in the length of SLA IDs
 For example,
 if
 .Ar ID
-is 1 and the client is delegated an IPv6 prefix 3ffe:ffff::/48,
+is 1 and the client is delegated an IPv6 prefix 2001:db8:ffff::/48,
 .Nm dhcp6c
 will combine the two values into a single IPv6 prefix,
-3ffe:ffff:0:1::/64,
+2001:db8:ffff:1::/64,
 and will configure the prefix on the specified
 .Ar interface .
 .It Xo
