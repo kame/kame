@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.44 2000/04/04 11:20:13 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.45 2000/04/17 14:48:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -670,7 +670,7 @@ udp6_output(in6p, m, addr6, control)
 				 (mopt = in6p->in6p_moptions) &&
 				 mopt->im6o_multicast_ifp) {
 				oifp = mopt->im6o_multicast_ifp;
-				faddr->s6_addr16[1] = oifp->if_index;
+				faddr->s6_addr16[1] = htons(oifp->if_index);
 			} else if (sin6->sin6_scope_id) {
 				/* boundary check */
 				if (sin6->sin6_scope_id < 0
