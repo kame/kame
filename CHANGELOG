@@ -1,7 +1,22 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2028 2001/12/25 04:18:54 jinmei Exp $
+$KAME: CHANGELOG,v 1.2029 2001/12/27 02:46:26 keiichi Exp $
 
 <200112>
+Thu Dec 27 11:42:38 JST 2001 keiichi@iij.ad.jp
+	* kame/sys/netinet6/mip6*
+	- implemented authdata sub-optoin.  this implementation uses
+	  KAME/IPSEC spd/sa database.  because of this reason, OpenBSD can't
+	  use authdata sub-option.  the spd and sa can be set using
+	  setkey program.  the protocol number is currently ipv6-opts(60).
+	  it needs some discussion how to set spd/sa for authdata/mip6.
+
+	  currently, i do not provide a switch to disable authdata
+	  feature.  the users must specify spd and sa between the mn and
+	  ha/cn.  otherwise, the home registration/bu operation will fail.
+
+	  take a look into TODO.mobile-ip6 to understand how to set up
+	  spd/sa for authdata sub-option.
+
 2001-12-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/ip6opt.c (inet6_opt_next, inet6_opt_find):
 	- corrected the calculation of the "previous length" returned by
