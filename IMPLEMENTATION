@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.276 2001/09/19 11:21:51 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.277 2001/09/21 04:19:47 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1478,17 +1478,22 @@ The following table lists the network drivers we have tried so far.
 	---		---	---		---
 	(Ethernet)
 	awi pcmcia/i386	ok	ok		-
-	bah zbus/amiga	NG(*)
+	bah zbus/amiga	NG(*1)
 	cnw pcmcia/i386	ok	ok		yes
 	ep pcmcia/i386	ok	ok		-
+	fxp pci/i386	ok(*2)	ok		-
+	tlp pci/i386	ok	ok		-
 	le sbus/sparc	ok	ok		yes
 	ne pci/i386	ok	ok		yes
 	ne pcmcia/i386	ok	ok		yes
+	rtk pci/i386	ok	ok		-
 	wi pcmcia/i386	ok	ok		yes
 	(ATM)
 	en pci/i386	ok	ok		-
 
-(*) This may need some fix, but I'm not sure what arcnet interfaces assume...
+(*1) This may need some fix, but I'm not sure what arcnet interfaces assume...
+(*2) Note that there are a lot of minor revision differences in fxp cards.
+     Some of them can choke while some of them do not.
 
 2.4 FreeBSD 3.x-RELEASE
 
@@ -1509,7 +1514,7 @@ Here is a list of FreeBSD 3.x-RELEASE drivers and its conditions:
 
 (*) These drivers are distributed with PAO as PAO3
     (http://www.jp.freebsd.org/PAO/).
-(**) there are trouble reports with multicast filter initialization.
+(**) there were trouble reports with multicast filter initialization.
 
 More drivers will just simply work on KAME FreeBSD 3.x-RELEASE but have not
 been checked yet.
@@ -2116,9 +2121,9 @@ IPsec, and/or 2292bis API, needs further study.
 KAME mobile-ip6 code is now under reconstruction.  The code contributed
 by Ericsson integrated before has been removed.
 
-The last snap that includes mobile-ip6 code is 20010604.  We at least
-will provide the mobile-ip6 patch for the snap 20010611.  The patch is
-available from the location shown bellow.
+The last snap that includes Ericsson mobile-ip6 code is 20010604.  We at
+least will provide the mobile-ip6 patch for the snap 20010611.  The Ericsson
+mobile-ip6 patch is available from the location shown bellow.
 
 	ftp://ftp.kame.net/kame/contrib/mip6/ericsson/
 
@@ -2141,6 +2146,9 @@ Complete documentation can be found in sys/net/radix_art.c as comment.
 IPv4 and IPv6 (see COVERAGE document for platform support details).
 The code is still being stabilized, and there could be kernel panic depending
 on your setups.
+
+ART currently has a bug or two, and can be unstable depening on your systems
+setup (like the MAC address you have on your ethernet card).
 
 RADIX_ART kernel compilation option conflicts with RADIX_MPATH.
 
@@ -2247,7 +2255,7 @@ to make the distributed develoment smooth.
   included automatically.
 - when editting a third-party package, keep its own coding style as
   much as possible, even if the style does not follow the items above.
-- it is recommended to always surround an expression containing
+- it is recommended to always wrap an expression containing
   bitwise operators by parentheses, especially when the expression is
   combined with relational operators, in order to avoid unintentional
   mismatch of operators.  Thus, we should write
@@ -2293,9 +2301,11 @@ to make the distributed develoment smooth.
 		...
 	     }
 	}
-- Do not use printf() in the packet input path of the kernel code.
+- Do not use printf() or log() in the packet input path of the kernel code.
+  They can make the system vulnerable to packet flooding attacks (results in
+  /var overflow).
 - (not a style issue)
-  To disable a module that is mistakenly imported (by CVS), just to
+  To disable a module that is mistakenly imported (by CVS), just
   remove the source tree in the repository.  Note, however, that the
   removal might annoy other developers who have already checked the
   module out, so you should announce the removal as soon as possible.
