@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.58 2001/05/16 03:06:16 jinmei Exp $	*/
+/*	$KAME: ah_input.c,v 1.59 2001/05/16 04:01:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -302,7 +302,7 @@ ah4_input(m, va_alist)
 	 */
 #ifdef WITH_CONVERT_AND_STRIP_IP_LEN
 	ip->ip_len = htons(ip->ip_len + hlen);
-#elif WITH_CONVERT_IP_LEN
+#elif defined(WITH_CONVERT_IP_LEN)
 	ip->ip_len = htons(ip->ip_len);
 #endif
 #ifdef WITH_CONVERT_IP_ID
@@ -322,7 +322,7 @@ ah4_input(m, va_alist)
 	 */
 #ifdef WITH_CONVERT_AND_STRIP_IP_LEN
 	ip->ip_len = ntohs(ip->ip_len) - hlen;
-#elif WITH_CONVERT_IP_LEN
+#elif defined(WITH_CONVERT_IP_LEN)
 	ip->ip_len = ntohs(ip->ip_len);
 #endif
 #ifdef WITH_CONVERT_IP_ID
