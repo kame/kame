@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.66 2002/08/19 10:24:58 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.67 2002/12/04 05:00:32 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1048,8 +1048,14 @@ natpt_removeTSlotEntry(struct tSlot *ats)
 	int	s;
 
 	if ((ats->ip_p == IPPROTO_TCP)
-	    && (ats->suit.tcps != NULL))
+	    && (ats->suit.tcps != NULL)) {
+		if (ats->suit.tcps->pkthdr[0] != NULL)
+			FREE(ats->suit.tcps->pkthdr[0], M_NATPT);
+		if (ats->suit.tcps->pkthdr[1] != NULL)
+			FREE(ats->suit.tcps->pkthdr[1], M_NATPT);
+
 		FREE(ats->suit.tcps, M_NATPT);
+	}
 
 	if (ats->frg)
 		natpt_removeFragmentEntry(ats->frg);

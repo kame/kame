@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.152 2002/12/03 09:02:05 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.153 2002/12/04 05:00:32 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -840,6 +840,11 @@ natpt_translatePYLD6To4(struct pcv *cv4)
 	int		fromto = 0;
 	struct tcphdr	*th4 = cv4->pyld.tcp4;
 	struct tcpstate	*ts  = NULL;
+	caddr_t		tp6;
+	char		tcphdr6[TCPHDRSZ];
+
+	/* Save unmodified tcp header for a check of packet retransmission. */
+	bcopy(cv4->pyld.tcp4, tcphdr6, TCPHDRSZ);
 
 	if ((htons(cv4->pyld.tcp4->th_dport) == FTP_CONTROL)
 	    || (htons(cv4->pyld.tcp4->th_sport) == FTP_CONTROL)) {
@@ -885,9 +890,23 @@ natpt_translatePYLD6To4(struct pcv *cv4)
 			printf("  delta, seq, ack: %5ld, %11lu, %11lu\n",
 			       ts->delta[fromto], htonl(ts->seq[fromto]), htonl(ts->ack[fromto]));
 #endif
-			ts->delta[fromto] += delta;
-			ts->seq[fromto] = th4->th_seq;
-			ts->ack[fromto] = th4->th_ack;
+
+			tp6 = ts->pkthdr[fromto];
+			if (tp6 == NULL) {
+				MALLOC(tp6, caddr_t, TCPHDRSZ, M_NATPT, M_NOWAIT);
+			}
+
+			if ((ts->pkthdr[fromto] == NULL)
+			    || ((tp6 != NULL)
+				&& (bcmp(tp6, tcphdr6, TCPHDRSZ) != 0))) {
+				bcopy(tcphdr6, tp6, TCPHDRSZ);
+				ts->delta[fromto] += delta;
+				ts->seq[fromto] = th4->th_seq;
+				ts->ack[fromto] = th4->th_ack;
+			}
+
+			ts->pkthdr[fromto] = tp6;
+
 #ifdef NATPT_DEBUG
 			printf("  delta, seq, ack: %5ld, %11lu, %11lu\n",
 			       ts->delta[fromto], htonl(ts->seq[fromto]), htonl(ts->ack[fromto]));
@@ -1576,6 +1595,11 @@ natpt_translatePYLD4To6(struct pcv *cv6)
 	int		fromto = 0;
 	struct tcphdr	*th6 = cv6->pyld.tcp6;
 	struct tcpstate	*ts  = NULL;
+	caddr_t		tp4;
+	char		tcphdr4[TCPHDRSZ];
+
+	/* Save unmodified tcp header for a check of packet retransmission. */
+	bcopy(cv6->pyld.tcp6, tcphdr4, TCPHDRSZ);
 
 	if ((htons(cv6->pyld.tcp6->th_sport) == FTP_CONTROL)
 	    || (htons(cv6->pyld.tcp6->th_dport) == FTP_CONTROL)) {
@@ -1621,9 +1645,23 @@ natpt_translatePYLD4To6(struct pcv *cv6)
 			printf("  delta, seq, ack: %5ld, %11lu, %11lu\n",
 			       ts->delta[fromto], htonl(ts->seq[fromto]), htonl(ts->ack[fromto]));
 #endif
-			ts->delta[fromto] += delta;
-			ts->seq[fromto] = th6->th_seq;
-			ts->ack[fromto] = th6->th_ack;
+
+			tp4 = ts->pkthdr[fromto];
+			if (tp4 == NULL) {
+				MALLOC(tp4, caddr_t, TCPHDRSZ, M_NATPT, M_NOWAIT);
+			}
+
+			if ((ts->pkthdr[fromto] == NULL)
+			    || ((tp4 != NULL)
+				&& (bcmp(tp4, tcphdr4, TCPHDRSZ) != 0))) {
+				bcopy(tcphdr4, tp4, TCPHDRSZ);
+				ts->delta[fromto] += delta;
+				ts->seq[fromto] = th6->th_seq;
+				ts->ack[fromto] = th6->th_ack;
+			}
+
+			ts->pkthdr[fromto] = tp4;
+
 #ifdef NATPT_DEBUG
 			printf("  delta, seq, ack: %5ld, %11lu, %11lu\n",
 			       ts->delta[fromto], htonl(ts->seq[fromto]), htonl(ts->ack[fromto]));

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.59 2002/08/19 10:24:58 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.60 2002/12/04 05:00:32 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -42,6 +42,9 @@
 #define	SIN6(s)		((struct sockaddr_in6 *)s)
 #define	SZSIN4		sizeof(struct sockaddr_in)
 #define	SZSIN6		sizeof(struct sockaddr_in6)
+#define	IP4HDRSZ	sizeof(struct ip)
+#define	IP6HDRSZ	sizeof(struct ip6_hdr)
+#define	TCPHDRSZ	sizeof(struct tcphdr)
 
 #ifdef _KERNEL
 #define	isDebug(d)	(natpt_debug & (d))
@@ -354,4 +357,12 @@ struct tcpstate {
 					/*	outgoingAck - decrement */
 	u_int32_t	seq[2];
 	u_int32_t	ack[2];
+
+	/*
+	 * For a check of packet retransmission when TCP payload was
+	 * modified in FTP translation.  These areas are MALLOCKed
+	 * when needed and they hold TCP header before translation.
+	 */
+	caddr_t		pkthdr[2];	/* [0]: "local"  -> "remote" */
+					/* [1]: "remote" -> "local"  */
 };
