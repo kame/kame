@@ -1,4 +1,4 @@
-$KAME: README,v 1.17 2000/11/20 17:53:51 sumikawa Exp $
+$KAME: README,v 1.18 2000/12/20 22:59:48 sumikawa Exp $
 
 This directory contains kame related ports only. Generic IPv6-enable
 ports are distributed by original FreeBSD ports.
@@ -12,7 +12,7 @@ kernel/application from different versions. You need to use
 ports-current at your own risk and you may require some knowledge to
 mix them.
 
-ports merging status at $Date: 2000/11/20 17:53:51 $
+ports merging status at $Date: 2000/12/20 22:59:48 $
 	KAME/FreeBSD3	ports-current
         -----------------------------
 	XFree86		not yet(based version in KAME ports is old
@@ -52,7 +52,7 @@ ports merging status at $Date: 2000/11/20 17:53:51 $
 	mtr		merged as net/mtr
 	ncftp3		not yet
 	netcat		not yet
-	netperf		not yet
+	netperf		merged as benchmarks/netperf
 	netris		merged as games/netris
 	newbie		not yet
 	openssh		merged in original distribution
