@@ -124,6 +124,8 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
  *	connections.
  */
 
+#define PULLDOWN_TEST
+
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 
@@ -158,6 +160,13 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_var.h>
 #include <netinet/icmp6.h>
+#endif
+
+#ifdef PULLDOWN_TEST
+#ifndef INET6
+/* always need ip6.h for IP6_EXTHDR_GET */
+#include <netinet/ip6.h>
+#endif
 #endif
 
 #include <netinet/tcp.h>

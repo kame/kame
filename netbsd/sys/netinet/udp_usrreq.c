@@ -168,7 +168,7 @@ udp_input(m, va_alist)
 {
 	va_list ap;
 	struct sockaddr_in src, dst;
-	struct ip *ip, save_ip;
+	struct ip *ip;
 	struct udphdr *uh;
 	int iphlen, proto;
 	int len;
@@ -225,16 +225,20 @@ udp_input(m, va_alist)
 		}
 		m_adj(m, iphlen + len - ip->ip_len);
 	}
-	/*
-	 * Save a copy of the IP header in case we want restore it
-	 * for sending an ICMP error message in response.
-	 */
-	save_ip = *ip;
 
 	/*
 	 * Checksum extended UDP header and data.
 	 */
 	if (uh->uh_sum) {
+#ifndef PULLDOWN_TEST
+		struct ip save_ip;
+
+		/*
+		 * Save a copy of the IP header in case we want restore it
+		 * for sending an ICMP error message in response.
+		 */
+		save_ip = *ip;
+
 		bzero(((struct ipovly *)ip)->ih_x1,
 		    sizeof ((struct ipovly *)ip)->ih_x1);
 		((struct ipovly *)ip)->ih_len = uh->uh_ulen;
@@ -243,9 +247,16 @@ udp_input(m, va_alist)
 			m_freem(m);
 			return;
 		}
-	}
 
-	*ip = save_ip;
+		*ip = save_ip;
+#else
+		if (in_cksum4(m, IPPROTO_UDP, iphlen, len) != 0) {
+			udpstat.udps_badsum++;
+			m_freem(m);
+			return;
+		}
+#endif
+	}
 
 	/* construct source and dst sockaddrs. */
 	bzero(&src, sizeof(src));
