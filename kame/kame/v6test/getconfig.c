@@ -575,22 +575,25 @@ make_icmperr(char *name)
 	pbp += sizeof(*icmp6);
 }
 
-static void
-make_mld(char *name)
-{
-	char mldbuf[BUFSIZ], area[BUFSIZ];
-	char *bp = area, *target;
-#ifdef HAVE_MLD_HDR
-	struct mld_hdr *mld = (struct mld_hdr *)pbp;
-#else
-	struct mld6_hdr *mld = (struct mld6_hdr *)pbp;
+#ifndef MLD_LISTENER_QUERY
+#define MLD_LISTENER_QUERY	MLD6_LISTENER_QUERY
+#define MLD_LISTENER_REPORT	MLD6_LISTENER_REPORT
+#define MLD_LISTENER_DONE	MLD6_LISTENER_DONE
 #define mld_type	mld6_type
 #define mld_code	mld6_code
 #define mld_cksum	mld6_cksum
 #define mld_reserved	mld6_reserved
 #define mld_addr	mld6_addr
 #define mld_maxdelay	mld6_maxdelay
+#define mld_hdr		mld6_hdr
 #endif
+
+static void
+make_mld(char *name)
+{
+	char mldbuf[BUFSIZ], area[BUFSIZ];
+	char *bp = area, *target;
+	struct mld_hdr *mld = (struct mld_hdr *)pbp;
     
 	if (tgetent(mldbuf, name) <= 0) {
 		fprintf(stderr, "v6test: unknown header %s\n", name);
@@ -610,11 +613,6 @@ make_mld(char *name)
 		exit(1);
 	}
 
-#ifndef MLD_LISTENER_QUERY
-#define MLD_LISTENER_QUERY	MLD6_LISTENER_QUERY
-#define MLD_LISTENER_REPORT	MLD6_LISTENER_REPORT
-#define MLD_LISTENER_DONE	MLD6_LISTENER_DONE
-#endif
 	switch(mld->mld_type) {
 	case MLD_LISTENER_QUERY:
 		MUSTHAVE(mld->mld_maxdelay, "mld_maxdelay", mldbuf);

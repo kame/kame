@@ -1310,72 +1310,8 @@ else
 	echo "$ac_t"""no"" 1>&6
 fi
 
-echo $ac_n "checking for mld_hdr""... $ac_c" 1>&6
-echo "configure:1315: checking for mld_hdr" >&5
-if eval "test \"`echo '$''{'ts1_cv_mld_hdr'+set}'`\" = set"; then
-  echo $ac_n "(cached) $ac_c" 1>&6
-else
-  cat > conftest.$ac_ext <<EOF
-#line 1320 "configure"
-#include "confdefs.h"
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <netinet/icmp6.h>
-int main() {
-struct mld_hdr mldhdr;
-; return 0; }
-EOF
-if { (eval echo configure:1329: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
-  rm -rf conftest*
-  ts1_cv_mld_hdr="yes"
-        cat >> confdefs.h <<\EOF
-#define HAVE_MLD_HDR 1
-EOF
-
-else
-  echo "configure: failed program was:" >&5
-  cat conftest.$ac_ext >&5
-  rm -rf conftest*
-  ts1_cv_mld_hdr="no"
-fi
-rm -f conftest*
-fi
-
-echo "$ac_t""$ts1_cv_mld_hdr" 1>&6
-
-echo $ac_n "checking for libresolv""... $ac_c" 1>&6
-echo "configure:1348: checking for libresolv" >&5
-if eval "test \"`echo '$''{'ts_cv_ntop'+set}'`\" = set"; then
-  echo $ac_n "(cached) $ac_c" 1>&6
-else
-  cat > conftest.$ac_ext <<EOF
-#line 1353 "configure"
-#include "confdefs.h"
-#include <sys/types.h>
-#include <sys/socket.h>
-int main() {
-char *a, *b; inet_ntop(AF_INET6, a, b)
-; return 0; }
-EOF
-if { (eval echo configure:1361: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
-  rm -rf conftest*
-  ts_cv_ntop="yes"
-else
-  echo "configure: failed program was:" >&5
-  cat conftest.$ac_ext >&5
-  rm -rf conftest*
-  ts_cv_ntop="no"
-fi
-rm -f conftest*
-fi
-
-echo "$ac_t""$ts_cv_ntop" 1>&6
-if test "$ts_cv_ntop" = no; then
-	LIBFLAGS="-lresolv $LIBFLAGS"
-fi
-
 echo $ac_n "checking if --with-pcap option is specified""... $ac_c" 1>&6
-echo "configure:1379: checking if --with-pcap option is specified" >&5
+echo "configure:1315: checking if --with-pcap option is specified" >&5
 # Check whether --with-pcap or --without-pcap was given.
 if test "${with_pcap+set}" = set; then
   withval="$with_pcap"
@@ -1385,7 +1321,7 @@ fi
 echo "$ac_t""${pcap_dir-"default"}" 1>&6
 
 echo $ac_n "checking for libpcap""... $ac_c" 1>&6
-echo "configure:1389: checking for libpcap" >&5
+echo "configure:1325: checking for libpcap" >&5
 pcap_lib=no
 pcap_include=no
 for dir in $pcap_dir /usr/local/v6 /usr/local /usr/pkg /usr; do
@@ -1408,7 +1344,7 @@ for dir in $pcap_dir /usr/local/v6 /usr/local /usr/pkg /usr; do
 		CPPFLAGS="-I$pcap_include $CPPFLAGS"
 		echo "$ac_t"""$pcap_lib and $pcap_include"" 1>&6
 		echo $ac_n "checking for pcap_lookupdev in -lpcap""... $ac_c" 1>&6
-echo "configure:1412: checking for pcap_lookupdev in -lpcap" >&5
+echo "configure:1348: checking for pcap_lookupdev in -lpcap" >&5
 ac_lib_var=`echo pcap'_'pcap_lookupdev | sed 'y%./+-%__p_%'`
 if eval "test \"`echo '$''{'ac_cv_lib_$ac_lib_var'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1416,7 +1352,7 @@ else
   ac_save_LIBS="$LIBS"
 LIBS="-lpcap  $LIBS"
 cat > conftest.$ac_ext <<EOF
-#line 1420 "configure"
+#line 1356 "configure"
 #include "confdefs.h"
 /* Override any gcc2 internal prototype to avoid an error.  */
 /* We use char because int might match the return type of a gcc2
@@ -1427,7 +1363,7 @@ int main() {
 pcap_lookupdev()
 ; return 0; }
 EOF
-if { (eval echo configure:1431: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
+if { (eval echo configure:1367: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}; then
   rm -rf conftest*
   eval "ac_cv_lib_$ac_lib_var=yes"
 else
