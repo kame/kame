@@ -1,4 +1,4 @@
-/*	$KAME: command.c,v 1.1 2004/12/09 02:18:31 t-momose Exp $	*/
+/*	$KAME: command.c,v 1.2 2005/02/12 15:22:39 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -31,6 +31,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
@@ -46,12 +47,12 @@
 static struct sockaddr_in6 sin6_ci;
 char *prompt = "> ";
 
-
 void command_help(int, char *);
 void quit_ui(int, char *);
 int command_in(int);
 int new_connection(int);
 #define disp_prompt(s)	write((s), prompt, strlen(prompt))
+static void dispatch_command(int, char *, struct command_table *);
 
 struct command_table basic_command_table[] = {
 	{"help", command_help, "Show help"},
@@ -145,33 +146,66 @@ command_in(s)
 {
 	int bytes;
 	char buffer[2048];
-	struct command_table *ctbl;
-	char *errmsg = "??? unknown command\n";
 	
 	bytes = read(s, buffer, 2048);
 
 	buffer[bytes] = '\0';
 	while (strlen(buffer) && isspace(buffer[strlen(buffer) - 1]))
 		buffer[strlen(buffer) - 1] = '\0';
-	if (strlen(buffer) == 0)
-		goto prompt;
+	if (strlen(buffer) > 0)
+		dispatch_command(s, buffer, commands);
 
-	for (ctbl = commands; ctbl->command != NULL; ctbl++) {
-		if (strncmp(ctbl->command, buffer, strlen(ctbl->command)) == 0) {
-			char *arg = buffer + strlen(ctbl->command);
+	disp_prompt(s);
 
-			while (isspace(*arg))
-				arg++;
+	return (0);
+}
+
+static void
+dispatch_command(s, command_line, command_table)
+	int s;
+	char *command_line;
+	struct command_table *command_table;
+{
+	char *arg;
+	struct command_table *ctbl;
+	char *errmsg = "??? unknown command\n";
+	
+	if ((strncmp(command_line, "help", 4) == 0) ||
+	    (strncmp(command_line, "?", 1) == 0)) {
+		command_help(s, (char *)command_table);
+		return;
+	}
+	
+	for (ctbl = command_table; ctbl->command != NULL; ctbl++) {
+		if ((strncmp(ctbl->command, command_line, strlen(ctbl->command)) != 0))
+			continue;
+
+		arg = command_line + strlen(ctbl->command);
+
+		while (isspace(*arg))
+			arg++;
+
+		if (ctbl->sub_cmds)
+			dispatch_command(s, arg, ctbl->sub_cmds);
+		else
 			(*ctbl->cmdfunc)(s, arg);
-			goto prompt;
-		}
+		return;
 	}
 
 	write(s, errmsg, strlen(errmsg));
+	return;
+}
 
- prompt:
-	disp_prompt(s);
-	return (0);
+void
+command_printf(int s, const char *fmt, ...)
+{
+	va_list ap;
+	char buffer[512];
+	
+	va_start(ap, fmt);
+	vsnprintf(buffer, 512, fmt, ap);
+	va_end(ap);
+	write(s, buffer, strlen(buffer));
 }
 
 void
@@ -179,12 +213,13 @@ command_help(s, line)
 	int s;
 	char *line;
 {
-	char msg[1024];
-	struct command_table *ctbl;
+	struct command_table *ctbl, *base;
+
+	base =(struct command_table *)line;
 	
-	for (ctbl = commands; ctbl->command != NULL; ctbl++) {
-		sprintf(msg, "%-10s - %s\n", ctbl->command, ctbl->helpmsg);
-		write(s, msg, strlen(msg));
+	for (ctbl = base; ctbl->command != NULL; ctbl++) {
+		command_printf(s, "%-10s - %s\n",
+			       ctbl->command, ctbl->helpmsg);
 	}
 }
 
@@ -193,9 +228,7 @@ quit_ui(s, line)
 	int s;
 	char *line;
 {
-	char *msg = "bye bye\n";
-
-	write(s, msg, strlen(msg));
+	command_printf(s, "bye bye\n");
 	delete_fd_list_entry(s);
 	close(s);
 }

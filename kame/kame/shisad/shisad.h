@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.7 2005/01/28 02:12:07 ryuji Exp $	*/
+/*	$KAME: shisad.h,v 1.8 2005/02/12 15:22:40 t-momose Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -415,11 +415,11 @@ void mip6_flush_kernel_bc(void);
 void mip6_bc_delete(struct binding_cache *);
 void mip6_bc_refresh_timer(void *);
 void mipscok_bc_request(struct binding_cache *, u_char);
-void command_show_bc(int);
-void command_show_kbc(int);
+void command_show_bc(int, char *);
+void command_show_kbc(int, char *);
 
-void command_show_bul(int);
-void command_show_kbul(int);
+void command_show_bul(int, char *);
+void command_show_kbul(int, char *);
 struct binding_cache *mip6_bc_lookup(struct in6_addr *, struct in6_addr *, 
     u_int16_t);
 struct binding_cache *mip6_bc_add(struct in6_addr *, struct in6_addr *, 
@@ -462,7 +462,7 @@ void mip6_delete_hpfxlist(struct in6_addr *, u_int16_t,
 void hal_set_expire_timer(struct home_agent_list *, int);
 void hal_stop_expire_timer(struct home_agent_list *);
 void hal_expire_timer(void *);
-void command_show_stat(int);
+void command_show_stat(int, char *);
 
 /* mnd.c */
 int mipsock_bul_request(struct binding_update_list *, u_char);
@@ -511,7 +511,7 @@ struct nemo_hptable *nemo_hpt_add(struct in6_addr *, struct in6_addr *,
 
 #define NEMOPREFIXINFO "./nemo_prefixtable.conf"
 void nemo_parse_conf(char *);
-void command_show_pt(int s);
+void command_show_pt(int, char *);
 
 #endif /* MIP_NEMO */
 #endif /* _SHISAD_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.6 2005/01/28 02:12:07 ryuji Exp $	*/
+/*	$KAME: mnd.c,v 1.7 2005/02/12 15:22:39 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -82,20 +82,10 @@ struct mip6stat mip6stat;
 
 static int default_lifetime = MIP6_DEFAULT_BINDING_LIFE;
 
-static void command_show_status(int, char *);
+/*static void command_show_status(int, char *);*/
 static void command_flush(int, char *);
-static void command_show_hal(int);
-static void show_current_config(int);
-
-struct command_table command_table[] = {
-#ifndef MIP_NEMO
-	{"show", command_show_status, "Show stat, bul, hal, kbul, noro, config"},
-#else
-	{"show", command_show_status, "Show stat, bul, hal, kbul, noro, config, pt"},
-#endif /* MIP_NEMO */
-	{"flush", command_flush, "Flush stat, bul, hal, noro"},
-};
-
+static void command_show_hal(int, char *);
+static void show_current_config(int, char *);
 
 static void mn_lists_init(void);
 static int mipsock_recv_rr_hint(struct mip_msghdr *);
@@ -107,9 +97,33 @@ static int mipsock_md_dereg_bul_fl(struct in6_addr *, struct in6_addr *,
 
 static int add_hal_by_commandline_xxx(char *);
 
-static void noro_show(int);
 static void noro_init(void);
+static void noro_show(int, char *);
 static void noro_sync(void);
+
+struct command_table show_command_table[] = {
+	{"bul", command_show_bul, "Binding Update List in Shisa"},
+	{"kbul", command_show_kbul, "Binding Update List in kernel"},
+	{"hal", command_show_hal, "Home Agent List"},
+	{"stat", command_show_stat, "statistics"},
+	{"noro", noro_show, ""},
+	{"config", show_current_config, ""},
+	{"callout", show_callout_table, ""},
+#ifdef MIP_NEMO
+	{"pt", command_show_pt, "Prefix Table, MR only"},
+#endif /* MIP_NEMO */
+	{NULL}
+};
+
+struct command_table command_table[] = {
+	{"show", NULL, "Show stat, bul, hal, kbul, noro, config"
+#ifdef MIP_NEMO
+	 ", pt"
+#endif /* MIP_NEMO */
+	 , show_command_table
+	},
+	{"flush", command_flush, "Flush stat, bul, hal, noro"},
+};
 
 #ifdef MIP_NEMO
 #define NODETYPE MIP6_NODETYPE_MOBILE_ROUTER
@@ -385,6 +399,7 @@ mipsock_recv_mdinfo(miphdr)
 {
 	struct mipm_md_info *mdinfo;
 	struct sockaddr *sin;
+	struct sockaddr_in6 sin6;
 	struct in6_addr *hoa, *coa, *acoa;
 	int err = 0;
 	u_int16_t bid = 0;
@@ -400,10 +415,10 @@ mipsock_recv_mdinfo(miphdr)
 	hoa = &((struct sockaddr_in6 *)sin)->sin6_addr;
 
 	/* Get CoA */
-	sin = MIPD_COA(mdinfo); 
-	if (sin->sa_family != AF_INET6)
+	if (MIPD_COA(mdinfo)->sa_family != AF_INET6)
 		return (0);
-	coa = &((struct sockaddr_in6 *)sin)->sin6_addr;
+	memcpy(&sin6, MIPD_COA(mdinfo), sizeof(sin6));
+	coa = &sin6.sin6_addr;
 
 	/* If new CoA is not global, ignore */
 	if (IN6_IS_ADDR_LINKLOCAL(coa)
@@ -900,7 +915,6 @@ send_haadreq(hoainfo, hoa_plen, src)
 #if defined(MIP_MN) && defined(MIP_NEMO)
 	struct sockaddr_in6 *ar_sin6 = NULL, ar_sin6_orig;
 #endif
-
 
         memset(&to, 0, sizeof(to));
         if (mip6_icmp6_create_haanyaddr(&to.sin6_addr, 
@@ -1413,17 +1427,15 @@ noro_get(tgt)
 
 
 static void
-noro_show(s)
+noro_show(s, dummy)
 	int s;
+	char *dummy;
 { 
-	char buff[2048];
 	struct noro_host_list *noro = NULL;
 
         for (noro = LIST_FIRST(&noro_head); noro; 
 	     noro = LIST_NEXT(noro, noro_entry)) {
-		
-		sprintf(buff, "%s\n", ip6_sprintf(&noro->noro_host));
-		write(s, buff, strlen(buff));
+		command_printf(s, "%s\n", ip6_sprintf(&noro->noro_host));
 	}
 };
 
@@ -1447,10 +1459,10 @@ noro_sync()
 
 
 static void
-command_show_hal(s)
+command_show_hal(s, dummy)
 	int s;
+	char *dummy;
 {
-	char buff[2048];
         struct home_agent_list *hal = NULL, *haln = NULL;
         struct mip6_hpfxl *hpfx;
 	struct mip6_mipif *mipif = NULL;
@@ -1460,82 +1472,18 @@ command_show_hal(s)
 			for (hal = LIST_FIRST(&hpfx->hpfx_hal_head); hal; hal = haln) {
 				haln =  LIST_NEXT(hal, hal_entry);
 				
-				sprintf(buff, "%s ", ip6_sprintf(&hal->hal_ip6addr));
-				sprintf(buff + strlen(buff), "%s\n", 
+				command_printf(s, "%s ", ip6_sprintf(&hal->hal_ip6addr));
+				command_printf(s, "%s\n", 
 					ip6_sprintf(&hal->hal_lladdr));
 #ifdef MIP_HA
-				sprintf(buff + strlen(buff), 
+				command_printf(s,
 					"     lif=%d pref=%d flag=%s%s\n",
 					hal->hal_lifetime, hal->hal_preference, 
 					(hal->hal_flag & MIP6_HA_OWN)  ? "mine" : ""
 					(hal->hal_flag & MIP6_HA_STATIC)  ? "static" : "");
 #endif /* MIP_HA */
-				write(s, buff, strlen(buff));
-				
 			}
 		}
-	}
-
-	return;
-}
-
-
-static void
-command_show_status(s, arg)
-	int s;
-	char *arg;
-{
-	char msg[1024];
-
-	if (strcmp(arg, "bul") == 0) {
-		sprintf(msg, "-- Binding Update List (Shisa) --\n");
-		write(s, msg, strlen(msg));
-
-		command_show_bul(s);
-
-	} else if (strcmp(arg, "kbul") == 0) {
-		sprintf(msg, "-- Binding Update List (kernel) --\n");
-		write(s, msg, strlen(msg));
-
-		command_show_kbul(s);
-	} else if (strcmp(arg, "hal") == 0) {
-		sprintf(msg, "-- Home Agent List --\n");
-		write(s, msg, strlen(msg));
-
-		command_show_hal(s);
-	} else if (strcmp(arg, "bc") == 0) {
-		sprintf(msg, "Wrong port!\nPlease find Binding Cache at cnd\n");
-		write(s, msg, strlen(msg));
- 	} else if (strcmp(arg, "stat") == 0) {
-		sprintf(msg, "-- Shisa Statistics --\n");
-		write(s, msg, strlen(msg));
-
-		command_show_stat(s);
-	} else if (strcmp(arg, "noro") == 0) {
-		sprintf(msg, "-- No Route Optimization --\n");
-		write(s, msg, strlen(msg));
-
-		noro_show(s);
-	} else if (strcmp(arg, "config") == 0) {
-		show_current_config(s);
-	} else if (strcmp(arg, "callout") == 0) {
-		sprintf(msg, "-- List of callout table --\n");
-		write(s, msg, strlen(msg));
-
-		show_callout_table(s);
-	}
-#ifdef MIP_NEMO
-	else if (strcmp(arg, "pt") == 0) {
-		sprintf(msg, "-- Prefix Table --\n");
-		write(s, msg, strlen(msg));
-		
-		command_show_pt(s);
-	}
-#endif /* MIP_NEMO */
-	else {
-		sprintf(msg, "Available options are:\n");
-		sprintf(msg + strlen(msg), "\tbul (Binding Update List in Shisa)\n\tkbul (Binding Update List in kernel)\n\thal (Home Agent List)\n\tstat (Statistics)\n\tpt (Prefix Table, MR only)\n\n");
-		write(s, msg, strlen(msg));
 	}
 
 	return;
@@ -1573,12 +1521,10 @@ command_flush(s, arg)
 }
 
 static void
-show_current_config(s)
+show_current_config(s, dummy)
 	int s;
+	char *dummy;
 {
-	char msg[1024];
-	
-	sprintf(msg, "Binding Update Lifetime for Home registration: %d(s)\n",
+	command_printf(s, "Binding Update Lifetime for Home registration: %d(s)\n",
 		default_lifetime * 4);
-	write(s, msg, strlen(msg));
 }

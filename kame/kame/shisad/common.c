@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.10 2005/02/05 09:15:02 t-momose Exp $  */
+/*      $KAME: common.c,v 1.11 2005/02/12 15:22:39 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -62,6 +62,7 @@
 #include <arpa/inet.h>
 
 #include "callout.h"
+#include "command.h"
 #include "stat.h"
 #include "shisad.h"
 #include "fsm.h"
@@ -109,7 +110,7 @@ mipsock_open()
 
 int
 mipsock_input_common(fd)
-     int fd;
+	int fd;
 {
 	int n;
         char msg[1280];
@@ -1722,20 +1723,18 @@ static const char *binding_error_status_desc[] = {
 
 
 void
-command_show_stat(s)
+command_show_stat(s, line)
 	int s;
+	char *line; /* dummy */
 {
 	int i;
 	u_quad_t mip6s_mh;
-	char buff[2048];
 
 #define PS(msg, value) do {\
-         sprintf(buff, "     %qu " msg "\n", value);\
-         write(s, buff, strlen(buff));\
+         command_printf(s, "     %qu " msg "\n", value);\
 	} while(/*CONSTCOND*/0)
 
-	sprintf(buff, "Input Statistic:\n");
-	write(s, buff, strlen(buff));
+	command_printf(s, "Input Statistic:\n");
 
 	mip6s_mh = 0;
 	for (i = 0; i < sizeof(mip6stat.mip6s_mobility) / sizeof(u_quad_t); i++)
@@ -1750,18 +1749,18 @@ command_show_stat(s)
 	PS("BA messages", mip6stat.mip6s_ba);
 	for (i =0; i < 256; i++) {
 		if ((&mip6stat)->mip6s_ba_hist[i] != 0) {
-			sprintf(buff, "\t\t%qu %s\n", (&mip6stat)->mip6s_ba_hist[i],
-			    binding_ack_status_desc[i]);
-			write(s, buff, strlen(buff));
+			command_printf(s, "\t\t%qu %s\n",
+				       (&mip6stat)->mip6s_ba_hist[i],
+				       binding_ack_status_desc[i]);
 		}
 	}
 	PS("BR messages", mip6stat.mip6s_br);
 	PS("BE messages", mip6stat.mip6s_be);
-	for (i =0; i < 2; i++) { /* currently only 2 codes are available */
+	for (i = 1; i <= 2; i++) { /* currently only 2 codes are available */
 		if ((&mip6stat)->mip6s_be_hist[i] != 0) {
-			sprintf(buff, "\t\t%qu %s\n", (&mip6stat)->mip6s_be_hist[i],
-			    binding_error_status_desc[i]);
-			write(s, buff, strlen(buff));
+			command_printf(s, "\t\t%qu %s\n",
+				       (&mip6stat)->mip6s_be_hist[i],
+				       binding_error_status_desc[i]);
 		}
 	}
 	PS("DHAAD request", mip6stat.mip6s_dhreq);
@@ -1786,8 +1785,7 @@ command_show_stat(s)
 	PS("Invalid Care-of address", mip6stat.mip6s_invalidcoa);
 	PS("Invalid mobility options", mip6stat.mip6s_invalidopt);
 
-	sprintf(buff, "Output Statistic:\n");
-	write(s, buff, strlen(buff));
+	command_printf(s, "Output Statistic:\n");
 
 	mip6s_mh = 0;
 	for (i = 0; i < sizeof(mip6stat.mip6s_omobility) / sizeof(u_quad_t); i++)
@@ -1801,18 +1799,18 @@ command_show_stat(s)
 	PS("BA messages", mip6stat.mip6s_oba);
 	for (i =0; i < 256; i++) {
 		if ((&mip6stat)->mip6s_oba_hist[i] != 0) {
-			sprintf(buff, "\t\t%qu %s\n", (&mip6stat)->mip6s_oba_hist[i],
-			    binding_ack_status_desc[i]);
-			write(s, buff, strlen(buff));
+			command_printf(s, "\t\t%qu %s\n",
+				       (&mip6stat)->mip6s_oba_hist[i],
+				       binding_ack_status_desc[i]);
 		}
 	}
 	PS("BR messages", mip6stat.mip6s_obr);
 	PS("BE messages", mip6stat.mip6s_obe);
-	for (i =0; i < 2; i++) { /* currently only 2 codes are available */
+	for (i = 1; i <= 2; i++) { /* currently only 2 codes are available */
 		if ((&mip6stat)->mip6s_obe_hist[i] != 0) {
-			printf("\t\t%qu %s\n", (&mip6stat)->mip6s_obe_hist[i],
-			    binding_error_status_desc[i]);
-			write(s, buff, strlen(buff));
+			command_printf(s, "\t\t%qu %s\n",
+				       (&mip6stat)->mip6s_obe_hist[i],
+				       binding_error_status_desc[i]);
 		}
 	}
 	PS("DHAAD request", mip6stat.mip6s_odhreq);

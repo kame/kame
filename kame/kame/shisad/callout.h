@@ -1,4 +1,4 @@
-/*	$KAME: callout.h,v 1.2 2005/01/26 07:41:59 t-momose Exp $	*/
+/*	$KAME: callout.h,v 1.3 2005/02/12 15:22:38 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -50,5 +50,5 @@ CALLOUT_HANDLE new_callout_entry(int, void (*)(), void *, char *);
 void remove_callout_entry(CALLOUT_HANDLE ch);
 void update_callout_entry(CALLOUT_HANDLE ch, int);
 int get_next_timeout();
-void show_callout_table(int);
+void show_callout_table(int, char *);
 

@@ -1,4 +1,4 @@
-/*      $KAME: nemo_var.c,v 1.4 2005/01/24 04:14:44 ryuji Exp $  */
+/*      $KAME: nemo_var.c,v 1.5 2005/02/12 15:22:40 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -58,6 +58,7 @@
 #include <arpa/inet.h>
 
 #include "callout.h"
+#include "command.h"
 #include "shisad.h"
 #include "stat.h"
 #include "fsm.h"
@@ -128,10 +129,10 @@ nemo_mpt_add(hoainfo, nemoprefix, prefixlen, mode)
 }
 
 void
-command_show_pt(s)
+command_show_pt(s, dummy)
 	int s;
+	char *dummy;
 {
-	char buff[2048];
 	struct nemo_mptable *mpt, *mptn;
         struct mip6_hoainfo *hoainfo = NULL;
 	
@@ -142,14 +143,12 @@ command_show_pt(s)
 		     mpt; mpt = mptn) {
 			mptn = LIST_NEXT(mpt, mpt_entry);
 			
-			sprintf(buff, "%s ", ip6_sprintf(&hoainfo->hinfo_hoa));
-			sprintf(buff + strlen(buff), "%s%%%d ", 
+			command_printf(s, "%s ", ip6_sprintf(&hoainfo->hinfo_hoa));
+			command_printf(s, "%s%%%d ", 
 				ip6_sprintf(&mpt->mpt_prefix), mpt->mpt_prefixlen);
-			sprintf(buff + strlen(buff), "%s\n", 
+			command_printf(s, "%s\n", 
 				(mpt->mpt_regmode == NEMO_IMPLICIT) ? 
 				"implicit" : "explicit");
-			
-			write(s, buff, strlen(buff));
 		}
 	}
 }

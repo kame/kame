@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.6 2005/02/05 10:04:45 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.7 2005/02/12 15:22:39 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -62,7 +62,6 @@
 #include "callout.h"
 #include "stat.h"
 #include "shisad.h"
-#include "fsm.h"
 #include "fdlist.h"
 #include "command.h"
 
@@ -96,12 +95,20 @@ struct ha_ifinfo {
 
 static void ha_lists_init(void);
 static void had_init_homeprefix(char *, int);
-static void command_show_status(int, char *);
+/*static void command_show_status(int, char *);*/
 static void command_flush(int, char *);
 static void terminate(int);
 
+struct command_table show_command_table[] = {
+	{"bc", command_show_bc, "binding chache"},
+	{"kbc", command_show_kbc, "binding chache in kernel"},
+	{"stat", command_show_stat, "statisticts"},
+	{"callout", show_callout_table, "show callout table "},
+	{NULL}
+};
+
 struct command_table command_table[] = {
-	{"show", command_show_status, "Show status"},
+	{"show", NULL, "Show status", show_command_table},
         {"flush", command_flush, "Flush stat, bc, hal"},
 };
 
@@ -638,40 +645,6 @@ send_haadrep(dst, anycastaddr, dhreq, ifindex)
 		mip6stat.mip6s_odhreply++;
 
 	return (errno);
-}
-
-static void
-command_show_status(s, arg)
-	int s;
-	char *arg;
-{
-        char msg[1024];
-
-	if (strcmp(arg, "bc") == 0) {
-                sprintf(msg, "-- Binding Cache (Shisa) --\n");
-                write(s, msg, strlen(msg));
-		
-                command_show_bc(s);
-
-        } else if (strcmp(arg, "kbc") == 0) {
-                sprintf(msg, "-- Binding Cache (kernel) --\n");
-                write(s, msg, strlen(msg));
-
-                command_show_kbc(s);
-
-        } else if (strcmp(arg, "stat") == 0) {
-                sprintf(msg, "-- Shisa Statistics --\n");
-                write(s, msg, strlen(msg));
-
-                command_show_stat(s);
-
-        } else {
-                sprintf(msg, "Available options are:\n");
-                sprintf(msg + strlen(msg), "\tbc (Binding Cache in Shisa)\n\tkbc (Binding Cache in kernel)\n\tstat (Statistics)\n");
-                write(s, msg, strlen(msg));
-        }
-
-	return;
 }
 
 static void

@@ -1,4 +1,4 @@
-/*	$KAME: callout.c,v 1.2 2005/01/26 07:41:59 t-momose Exp $	*/
+/*	$KAME: callout.c,v 1.3 2005/02/12 15:22:38 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -51,6 +51,13 @@ struct callout_queue_t_head callout_head;
 
 static void insert_callout_queue(struct callout_queue_t *);
 
+/* 
+ * You have to include following header prior including "callout.h"
+ *
+ * #include <sys/queue.h>
+ * #include <sys/time.h>
+ */
+
 /*
  *  The data structures in this libarary like a list of callout 
  *  table are assumed to use in synchronized sequence. Don't operate
@@ -65,7 +72,6 @@ static void insert_callout_queue(struct callout_queue_t *);
  *    's' seconds. A returned value is a handle of this callout
  *    table which can be used to remove it. 
  */
-
 
 void
 callout_init()
@@ -197,8 +203,9 @@ get_next_timeout()
 }
 
 void
-show_callout_table(s)
+show_callout_table(s, line)
 	int s;
+	char *line; /* dummy */
 {
 	struct timeval current_time, t;
 	struct callout_queue_t *cq;

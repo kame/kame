@@ -1,4 +1,4 @@
-/*	$KAME: command.h,v 1.1 2004/12/09 02:18:31 t-momose Exp $	*/
+/*	$KAME: command.h,v 1.2 2005/02/12 15:22:39 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -33,7 +33,9 @@ struct command_table {
 	char *command;
 	void (*cmdfunc)(int, char *);
 	char *helpmsg;
+	struct command_table *sub_cmds;
 };
 
 int command_init(char *, struct command_table *, size_t, u_short);
+void command_printf(int s, const char *fmt, ...);
 

@@ -1,4 +1,4 @@
-/*      $KAME: binding.c,v 1.5 2005/01/26 07:41:59 t-momose Exp $	*/
+/*      $KAME: binding.c,v 1.6 2005/02/12 15:22:38 t-momose Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -57,8 +57,8 @@
 
 #include "callout.h"
 #include "shisad.h"
-#include "fsm.h"
 #include "stat.h"
+#include "command.h"
 
 #ifdef MIP_MN
 void bul_flush(struct mip6_hoainfo *);
@@ -232,19 +232,19 @@ mip6_bc_lookup(hoa, src, bid)
 };
 
 void
-command_show_bc(s)
+command_show_bc(s, line)
 	int s;
+	char *line;
 {
 	time_t now;
-	char buff[2048];
 	struct binding_cache *bc;
 
 	now = time(NULL);
         for (bc = LIST_FIRST(&bchead); bc; bc = LIST_NEXT(bc, bc_entry)) {
-		sprintf(buff, "%s ", ip6_sprintf(&bc->bc_hoa));
-		sprintf(buff + strlen(buff), "%s ", ip6_sprintf(&bc->bc_coa));
-		sprintf(buff + strlen(buff), "%s ", ip6_sprintf(&bc->bc_myaddr));
-		sprintf(buff + strlen(buff), "%d/%d %c%c%c%c %d\n",
+		command_printf(s, "%s ", ip6_sprintf(&bc->bc_hoa));
+		command_printf(s, "%s ", ip6_sprintf(&bc->bc_coa));
+		command_printf(s, "%s ", ip6_sprintf(&bc->bc_myaddr));
+		command_printf(s, "%d/%d %c%c%c%c %d\n",
 			(int)(bc->bc_expire - now),
 			bc->bc_lifetime,
 			(bc->bc_flags & IP6_MH_BU_ACK)  ? 'A' : '-',
@@ -252,18 +252,15 @@ command_show_bc(s)
 			(bc->bc_flags & IP6_MH_BU_LLOCAL) ? 'L' : '-',
 			(bc->bc_flags & IP6_MH_BU_KEYM)  ? 'K' : '-',
 			bc->bc_seqno);
-		write(s, buff, strlen(buff));
 	}
 }
 
 void
-command_show_kbc(s)
+command_show_kbc(s, line)
 	int s;
+	char *line;
 {
-	char buff[2048];
-
-	sprintf(buff, "Not Supported yet\n");
-	write(s, buff, strlen(buff));
+	command_printf(s, "Not Supported yet\n");
 }
 
 
@@ -783,10 +780,10 @@ bul_get_nohoa(cookie, coa, peer)
 };
 
 void
-command_show_bul(s)
+command_show_bul(s, dummy)
 	int s;
+	char *dummy;
 {
-	char buff[2048];
 	struct mip6_hoainfo *hoainfo = NULL;
 	struct binding_update_list *bul = NULL;
         struct timeval now;
@@ -799,23 +796,22 @@ command_show_bul(s)
 		for (bul = LIST_FIRST(&hoainfo->hinfo_bul_head); bul;
 		     bul = LIST_NEXT(bul, bul_entry)) {
 
-			sprintf(buff, "%s ", ip6_sprintf(&bul->bul_peeraddr));
+			command_printf(s, "%s ", ip6_sprintf(&bul->bul_peeraddr));
 #ifndef MIP_MCOA
-			sprintf(buff + strlen(buff), "%s ", 
+			command_printf(s, "%s ", 
 				ip6_sprintf(&hoainfo->hinfo_hoa));
 #else
 			if (bul->bul_bid)
-				sprintf(buff + strlen(buff), "%s$%d ", 
+				command_printf(s, "%s$%d ", 
 					ip6_sprintf(&hoainfo->hinfo_hoa), bul->bul_bid);
 			else
-				sprintf(buff + strlen(buff), "%s ", 
+				command_printf(s, "%s ", 
 					ip6_sprintf(&hoainfo->hinfo_hoa));
 #endif /* MIP_MCOA */
-			sprintf(buff + strlen(buff), "%s\n", 
+			command_printf(s, "%s\n", 
 				ip6_sprintf(&bul->bul_coa));
-			write(s, buff, strlen(buff));
 			
-			sprintf(buff,
+			command_printf(s,
 				"     lif=%d, ref=%d, seq=%d, %c%c%c%c%c%c, %c, ", 
 				bul->bul_lifetime,
 				bul->bul_refresh,
@@ -828,7 +824,7 @@ command_show_bul(s)
 				(bul->bul_flags & IP6_MH_BU_MCOA)  ? 'M' : '-',
 				(bul->bul_state & MIP6_BUL_STATE_DISABLE) ? 'D' : '-');
 
-			sprintf(buff + strlen(buff),
+			command_printf(s,
 				"reg=%d, rr=%d, ret=%ld, exp=%ld\n",
 				bul->bul_reg_fsm_state,
 				bul->bul_rr_fsm_state,
@@ -836,20 +832,18 @@ command_show_bul(s)
 				(bul->bul_retrans->exptime.tv_sec - now.tv_sec) : -1,
 				(bul->bul_expire) ? 
 				(bul->bul_expire->exptime.tv_sec - now.tv_sec) : -1);
-			write(s, buff, strlen(buff));
 		}
 	}
 } 
 
 void
-command_show_kbul(s)
+command_show_kbul(s, dummy)
 	int s;
+	char *dummy;
 {
-        struct if_bulreq bulreq;
-        struct bul6info *bul6;
-        int sock, i;
-
-	char buff[2048];
+	struct if_bulreq bulreq;
+	struct bul6info *bul6;
+	int sock, i;
 	struct mip6_hoainfo *hoainfo = NULL;
 	char ifname[IFNAMSIZ];
 
@@ -885,25 +879,24 @@ command_show_kbul(s)
 		/* dump bul */
 		for (i = 0; i < bulreq.ifbu_count; i ++) {
 			bul6 = bulreq.ifbu_info + i * sizeof(struct bul6info);
-			sprintf(buff, "%s ", ip6_sprintf(&bul6->bul_peeraddr));
+			command_printf(s, "%s ", ip6_sprintf(&bul6->bul_peeraddr));
 
 #ifndef MIP_MCOA
-			sprintf(buff + strlen(buff), "%s ", 
+			command_printf(s, "%s ", 
 				ip6_sprintf(&bul6->bul_hoa));
 #else
 			if (bul6->bul_bid)
-				sprintf(buff + strlen(buff), "%s$%d ", 
+				command_printf(s, "%s$%d ", 
 					ip6_sprintf(&bul6->bul_hoa), bul6->bul_bid);
 			else
-				sprintf(buff + strlen(buff), "%s ", 
+				command_printf(s, "%s ", 
 					ip6_sprintf(&bul6->bul_hoa));
 #endif /* MIP_MCOA */
 
-			sprintf(buff + strlen(buff), "%s\n", 
+			command_printf(s, "%s\n", 
 				ip6_sprintf(&bul6->bul_coa));
-			write(s, buff, strlen(buff));
 
-			sprintf(buff,
+			command_printf(s,
 				"     %s, %c%c%c%c%c%c\n", 
 				if_indextoname(bul6->bul_ifindex, ifname), 
 				(bul6->bul_flags & IP6_MH_BU_ACK)  ? 'A' : '-',
@@ -912,8 +905,6 @@ command_show_kbul(s)
 				(bul6->bul_flags & IP6_MH_BU_KEYM)  ? 'K' : '-',
 				(bul6->bul_flags & IP6_MH_BU_ROUTER)  ? 'R' : '-',
 				(bul6->bul_flags & IP6_MH_BU_MCOA)  ? 'M' : '-');
-
-			write(s, buff, strlen(buff));
 		}
         }
 

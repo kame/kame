@@ -1,4 +1,4 @@
-/*	$KAME: cnd.c,v 1.3 2005/02/03 13:22:08 t-momose Exp $	*/
+/*	$KAME: cnd.c,v 1.4 2005/02/12 15:22:39 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -55,16 +55,23 @@
 #include "callout.h"
 #include "stat.h"
 #include "shisad.h"
-#include "fsm.h"
 #include "fdlist.h"
 #include "command.h"
 
-static void command_show_status(int, char *);
+/*static void command_show_status(int, char *);*/
 static void command_flush(int, char *);
 static void terminate(int);
 
+struct command_table show_command_table[] = {
+	{"bc", command_show_bc, "binding chache"},
+	{"kbc", command_show_kbc, "binding chache in kernel"},
+	{"stat", command_show_stat, "statisticts"},
+	{"callout", show_callout_table, "show callout table "},
+	{NULL}
+};
+
 struct command_table command_table[] = {
-	{"show", command_show_status, "Show status"},
+	{"show", NULL, "Show status", show_command_table},
 	{"flush", command_flush, "Flush binding caches"},
 };
 
@@ -103,20 +110,9 @@ main(argc, argv)
 	int pfds;
 	int pid;
 	int ch = 0;
-	char *arg_string;	/* XXX Bad var name; what is used for ? */
 	FILE *pidfp;
 
-#if 0
-	/* XXX Is this check needed ? */
-        if (argc < 2) {
-		cn_usage(argv[0]);
-		/* Not reach */
-		return (EINVAL);
-	}
-#endif
-
 	/* get options */
-	arg_string = NULL;
 	while ((ch = getopt(argc, argv, "dni:")) != -1) {
 		switch (ch) {
 		case 'd':
@@ -124,9 +120,6 @@ main(argc, argv)
 			break;
 		case 'n':
 			numerichost = 1;
-			break;
-		case 'i':
-			arg_string = optarg;
 			break;
 		default:
 			fprintf(stderr, "unknown option\n");
@@ -139,7 +132,7 @@ main(argc, argv)
 
 	/* open syslog infomation. */
 	openlog("shisad(cnd)", 0, LOG_DAEMON);
-	syslog(LOG_INFO, "-- Start CN daemon at %s -- \n", arg_string);
+	syslog(LOG_INFO, "-- Start CN daemon at -- \n");
 
 	/* open sockets */
 	mhsock_open();
@@ -227,45 +220,6 @@ mipsock_input(miphdr)
 }
 
 static void
-command_show_status(s, arg)
-	int s;
-	char *arg;
-{
-        char msg[1024];
-
-	if (strcmp(arg, "bc") == 0) {
-                sprintf(msg, "-- Binding Cache (Shisa) --\n");
-                write(s, msg, strlen(msg));
-		
-                command_show_bc(s);
-
-        } else if (strcmp(arg, "kbc") == 0) {
-                sprintf(msg, "-- Binding Cache (kernel) --\n");
-                write(s, msg, strlen(msg));
-
-                command_show_kbc(s);
-
-        } else if (strcmp(arg, "stat") == 0) {
-                sprintf(msg, "-- Shisa Statistics --\n");
-                write(s, msg, strlen(msg));
-
-                command_show_stat(s);
-
-	} else if (strcmp(arg, "callout") == 0) {
-		sprintf(msg, "-- List of callout table --\n");
-		write(s, msg, strlen(msg));
-
-		show_callout_table(s);
-        } else {
-                sprintf(msg, "Available options are:\n");
-                sprintf(msg + strlen(msg), "\tbc (Binding Cache in Shisa)\n\tkbc (Binding Cache in kernel)\n\tstat (Statistics)\n");
-                write(s, msg, strlen(msg));
-        }
-
-	return;
-}
-
-static void
 command_flush(s, arg)
 	int s;
 	char *arg;
@@ -281,4 +235,3 @@ terminate(dummy)
 	unlink(pid_file);
 	exit(1);
 }
-
