@@ -1,11 +1,6 @@
-$Id: CHANGELOG,v 1.491 2000/01/27 08:25:16 itojun Exp $
+$Id: CHANGELOG,v 1.492 2000/01/27 09:30:47 itojun Exp $
 
 <200001>
-Thu Jan 27 17:24:14 JST 2000  itojun@iijlab.net
-	* kame/libinet6/getaddrinfo.c: now freeaddrinfo(NULL) will not die.
-	  there's nothing talked in the spec, however, since NRL freeaddrinfo
-	  allows it, we need to. (notified by shin@kame)
-
 Thu Jan 27 15:04:12 JST 2000  itojun@iiljab.net
 	* netbsd/pkgsrc/net/rsync: upgrade to 2.3.2 with latest IPv6 patch.
 
