@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.949 2000/05/28 17:30:50 itojun Exp $
+$Id: CHANGELOG,v 1.950 2000/05/28 23:37:22 itojun Exp $
 
 <200005>
+Mon May 29 08:34:58 JST 2000  itojun@iijlab.net
+	* kame/sys/netinet/in6_pcb.c (affects netbsd only):
+	  bind(2) on AF_INET6 socket with IPv4 mapped address will raise error,
+	  instead of making port number duplicate on pcb struct.
+
 Mon May 29 02:26:25 JST 2000  itojun@iijlab.net
 	* bsdi4/sys/netinet/tcp_input.c: correct critical typo.  prior to the
 	  change, if we have inbound IPv4 TCP traffic to AF_INET6 socket.
