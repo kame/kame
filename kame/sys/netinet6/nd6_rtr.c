@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.244 2004/02/05 12:38:11 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.245 2004/02/11 10:30:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2375,9 +2375,8 @@ rt6_deleteroute(rn, arg)
 	if (rt->rt_gateway == NULL || rt->rt_gateway->sa_family != AF_INET6)
 		return (0);
 
-	if (!IN6_ARE_ADDR_EQUAL(gate, &SIN6(rt->rt_gateway)->sin6_addr)) {
+	if (!IN6_ARE_ADDR_EQUAL(gate, &SIN6(rt->rt_gateway)->sin6_addr))
 		return (0);
-	}
 
 	/*
 	 * Do not delete a static route.
