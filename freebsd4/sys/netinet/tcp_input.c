@@ -356,7 +356,6 @@ tcp_input(m, off0)
 #ifdef INET6
 	struct sockaddr_in6 *src_sa6, *dst_sa6;
 #endif
-	int iss = 0;
 	u_long tiwin;
 	struct tcpopt to;		/* options in this segment */
 	struct rmxp_tao *taop;		/* pointer to our TAO cache entry */
