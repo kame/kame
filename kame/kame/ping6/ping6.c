@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.131 2001/07/24 06:01:09 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.132 2001/07/24 06:02:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -582,10 +582,8 @@ main(argc, argv)
 	hints.ai_protocol = IPPROTO_ICMPV6;
 
 	ret_ga = getaddrinfo(target, NULL, &hints, &res);
-	if (ret_ga) {
-		fprintf(stderr, "ping6: %s\n", gai_strerror(ret_ga));
-		exit(1);
-	}
+	if (ret_ga)
+		errx(1, "ping6: %s\n", gai_strerror(ret_ga));
 	if (res->ai_canonname)
 		hostname = res->ai_canonname;
 	else
