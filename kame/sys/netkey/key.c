@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.119 2000/06/03 15:52:07 itojun Exp $	*/
+/*	$KAME: key.c,v 1.120 2000/06/03 15:58:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3946,8 +3946,8 @@ key_sockaddrcmp(sa1, sa2, port)
  */
 static int
 key_bbcmp(p1, p2, bits)
-	register caddr_t p1, p2;
-	register u_int bits;
+	caddr_t p1, p2;
+	u_int bits;
 {
 	u_int8_t mask;
 
