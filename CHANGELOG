@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1966 2001/11/06 11:04:46 jinmei Exp $
+$KAME: CHANGELOG,v 1.1967 2001/11/06 11:07:46 jinmei Exp $
 
 <200111>
 2001-11-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -7,7 +7,7 @@ $KAME: CHANGELOG,v 1.1966 2001/11/06 11:04:46 jinmei Exp $
 	before calling in6_ifinit().  The previous code should be correct,
 	but at least this one should not be wrong.  Additionally, it
 	surely solves the situation that configuring an IPv6 address on
-	some NetBSD PCMCIA card cause kernel panic.
+	some NetBSD PCMCIA cards causes kernel panic.
 	Suggested by {karino, sugyo}@kame.
 
 Tue Nov  6 17:03:39 JST 2001 sakane@kame.net
