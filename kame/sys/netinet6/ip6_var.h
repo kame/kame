@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.86 2002/02/07 05:31:00 keiichi Exp $	*/
+/*	$KAME: ip6_var.h,v 1.87 2002/02/08 04:51:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -169,6 +169,7 @@ struct	ip6_pktopts {
 #define IP6PO_REACHCONF	0x01	/* upper-layer reachability confirmation */
 #define IP6PO_MINMTU	0x02	/* use minimum MTU (IPV6_USE_MIN_MTU) */
 #define IP6PO_DONTFRAG	0x04	/* disable fragmentation (IPV6_DONTFRAG) */
+#define IP6PO_USECOA	0x08	/* use care of address */
 
 	int	needfree;	/* members dynamically allocated */
 };

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.113 2002/02/02 07:06:12 jinmei Exp $	*/
+/*	$KAME: mip6.c,v 1.114 2002/02/08 04:51:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2683,6 +2683,7 @@ mip6_addr_exchange(m, dstm)
 	struct in6_addr ip6_src;
 	u_int8_t *opt;
 	int ii, dstoptlen;
+	struct mbuf *n;
 
 	/* sanity check */
 	if (!MIP6_IS_MN) {
@@ -2735,6 +2736,14 @@ mip6_addr_exchange(m, dstm)
 	/* Swap the IPv6 homeaddress and the care-of address. */
 	ip6 = mtod(m, struct ip6_hdr *);
 	bcopy(&ip6->ip6_src, &ip6_src, sizeof(ip6->ip6_src));
+	n = ip6_findaux(m);
+	if (n) {
+		struct ip6aux *ip6a;
+		ip6a = mtod(n, struct ip6aux *);
+		/* XXX scope */
+		bcopy(haopt->ip6oh_addr, &ip6a->ip6a_src.sin6_addr,
+		      sizeof(haopt->ip6oh_addr));
+	}
 	bcopy(haopt->ip6oh_addr, &ip6->ip6_src, sizeof(haopt->ip6oh_addr));
 	bcopy(&ip6_src, haopt->ip6oh_addr, sizeof(ip6_src));
 

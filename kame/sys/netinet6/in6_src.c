@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.105 2002/02/02 07:06:12 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.106 2002/02/08 04:51:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -382,14 +382,22 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		 */
 #ifdef MIP6
 		/*
-		 * If SA is simultaneously a home address and care-of address
-		 * and SB is not, then prefer SA. Similarly, if SB is
-		 * simultaneously a home address and care-of address and SA is
-		 * not, then prefer SB.
+		 * a caller can specify IP6PO_USECOA to not to use a
+		 * home address.  for example, the case that the
+		 * neighbour unreachability detection to the global
+		 * address.
 		 */
-		{
+		if (!((opts != NULL) &&
+		      ((opts->ip6po_flags & IP6PO_USECOA) != 0))) {
 			struct mip6_bu *mbu_ia_best = NULL, *mbu_ia = NULL;
 
+			/*
+			 * If SA is simultaneously a home address and
+			 * care-of address and SB is not, then prefer
+			 * SA. Similarly, if SB is simultaneously a
+			 * home address and care-of address and SA is
+			 * not, then prefer SB.
+			 */
 			if (ia_best->ia6_flags & IN6_IFF_HOME) {
 				/*
 				 * find a binding update entry for ia_best.
@@ -442,47 +450,48 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 			      == MIP6_BU_REG_STATE_NOTREG))) {
 				REPLACE(4);
 			}
-		}
 #ifdef MIP6_ALLOW_COA_FALLBACK
-		if (coafallback) {
-			/*
-			 * if the peer doesn't recognize a home
-			 * address destination option, we will use a
-			 * CoA as a source address instead of a home
-			 * address we have registered before.  Though
-			 * this behavior may arouse a mip6 beleiver's
-			 * anger, is very useful in the current
-			 * transition period that many hosts don't
-			 * recognize a home address destination
-			 * option...
-			 */
-			if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
-			    (ia->ia6_flags & IN6_IFF_HOME) != 0) {
-				/* XXX will break stat! */
-				NEXT(0);
-			}
-			if ((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
-			    (ia->ia6_flags & IN6_IFF_HOME) == 0) {
-				/* XXX will break stat! */
-				REPLACE(0);
-			}
-		} else
+			if (coafallback) {
+				/*
+				 * if the peer doesn't recognize a
+				 * home address destination option, we
+				 * will use a CoA as a source address
+				 * instead of a home address we have
+				 * registered before.  Though this
+				 * behavior breaks the mobility, this
+				 * is very useful in the current
+				 * transition period that many hosts
+				 * don't recognize a home address
+				 * destination option...
+				 */
+				if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
+				    (ia->ia6_flags & IN6_IFF_HOME) != 0) {
+					/* XXX will break stat! */
+					NEXT(0);
+				}
+				if ((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
+				    (ia->ia6_flags & IN6_IFF_HOME) == 0) {
+					/* XXX will break stat! */
+					REPLACE(0);
+				}
+			} else
 #endif
-		{
-			/*
-			 * If SA is just a home address and SB is just
-			 * a care-of address, then prefer
-			 * SA. Similarly, if SB is just a home address
-			 * and SA is just a care-of address, then
-			 * prefer SB.
-			 */
-			if ((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
-			    (ia->ia6_flags & IN6_IFF_HOME) == 0) {
-				NEXT(4);
-			}
-			if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
-			    (ia->ia6_flags & IN6_IFF_HOME) != 0) {
-				REPLACE(4);
+			{
+				/*
+				 * If SA is just a home address and SB
+				 * is just a care-of address, then
+				 * prefer SA. Similarly, if SB is just
+				 * a home address and SA is just a
+				 * care-of address, then prefer SB.
+				 */
+				if ((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
+				    (ia->ia6_flags & IN6_IFF_HOME) == 0) {
+					NEXT(4);
+				}
+				if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
+				    (ia->ia6_flags & IN6_IFF_HOME) != 0) {
+					REPLACE(4);
+				}
 			}
 		}
 #endif /* MIP6 */

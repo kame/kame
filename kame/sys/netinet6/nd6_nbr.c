@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.92 2002/02/04 08:37:37 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.93 2002/02/08 04:51:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -563,10 +563,22 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 		else {
 			struct sockaddr_in6 *src0;
 			int error;
+#ifdef MIP6
+			struct ip6_pktopts opts;
+#endif /* MIP6 */
 
+#ifdef MIP6
+			init_ip6pktopts(&opts);
+			opts.ip6po_flags |= IP6PO_USECOA;
+#endif /* MIP6 */
 			bcopy(&dst_sa, &ro.ro_dst, sizeof(dst_sa));
-			src0 = in6_selectsrc(&dst_sa, NULL, NULL, &ro,
-					     NULL, NULL, &error);
+			src0 = in6_selectsrc(&dst_sa,
+#ifdef MIP6
+					     &opts,
+#else
+					     NULL,
+#endif /* MIP6 */
+					     NULL, &ro, NULL, NULL, &error);
 			if (src0 == NULL) {
 				nd6log((LOG_DEBUG,
 					"nd6_ns_output: source can't be "
@@ -1001,6 +1013,9 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 #else
 	struct route_in6 ro;
 #endif
+#ifdef MIP6
+	struct ip6_pktopts opts;
+#endif /* MIP6 */
 
 	bzero(&ro, sizeof(ro));
 
@@ -1067,8 +1082,18 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	/*
 	 * Select a source whose scope is the same as that of the dest.
 	 */
+#ifdef MIP6
+	init_ip6pktopts(&opts);
+	opts.ip6po_flags |= IP6PO_USECOA;
+#endif /* MIP6 */
 	bcopy(&dst_sa, &ro.ro_dst, sizeof(dst_sa));
-	src0 = in6_selectsrc(&dst_sa, NULL, NULL, &ro, NULL, NULL, &error);
+	src0 = in6_selectsrc(&dst_sa,
+#ifdef MIP6
+			     &opts,
+#else
+			     NULL,
+#endif /* MIP6 */
+			     NULL, &ro, NULL, NULL, &error);
 	if (src0 == NULL) {
 		nd6log((LOG_DEBUG, "nd6_na_output: source can't be "
 			"determined: dst=%s, error=%d\n",
