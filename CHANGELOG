@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1200 2000/08/15 07:43:33 itojun Exp $
+$KAME: CHANGELOG,v 1.1201 2000/08/15 09:18:11 itojun Exp $
 
 <200008>
+Tue Aug 15 18:16:14 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/lang/python: use latest IPv6 patch.
+	* netbsd/pkgsrc/lang/python-current: python 1.6b1 + IPv6 patch
+
 Tue Aug 15 16:41:23 JST 2000  itojun@iijlab.net
 	* netbsd: change kernel headers to use "NEW_STRUCT_ROUTE" definition.
 	  kernel can panic if you don't define it in kernel configuration file.
