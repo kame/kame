@@ -401,8 +401,6 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 	if (inp->in6p_route.ro_rt)
 		ifp = inp->in6p_route.ro_rt->rt_ifp;
 
-	inp->in6p_ip6_hlim = (u_int8_t)in6_selecthlim(inp, ifp);
-
 	return(0);
 }
 

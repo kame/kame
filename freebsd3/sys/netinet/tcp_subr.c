@@ -464,20 +464,12 @@ tcp_newtcpcb(inp)
 {
 	struct inp_tp *it;
 	register struct tcpcb *tp;
-#ifdef INET6
-	int isipv6 = (inp->inp_vflag & INP_IPV4) == 0;
-#endif /* INET6 */
 
 	it = (struct inp_tp *)inp;
 	tp = &it->tcb;
 	bzero((char *) tp, sizeof(struct tcpcb));
 	tp->segq.lh_first = NULL;
-	tp->t_maxseg = tp->t_maxopd =
-#ifdef INET6
-		isipv6 ? tcp_v6mssdflt :
-#endif /* INET6 */
-		tcp_mssdflt;
-
+	/* t_maxseg value is now set at tcp{,6}_usr_{accept,connect} */
 	if (tcp_do_rfc1323)
 		tp->t_flags = (TF_REQ_SCALE|TF_REQ_TSTMP);
 	if (tcp_do_rfc1644)
@@ -494,13 +486,6 @@ tcp_newtcpcb(inp)
 	tp->t_rxtcur = TCPTV_RTOBASE;
 	tp->snd_cwnd = TCP_MAXWIN << TCP_MAX_WINSHIFT;
 	tp->snd_ssthresh = TCP_MAXWIN << TCP_MAX_WINSHIFT;
-#ifdef INET6
-	if (isipv6 != 0)
-		inp->in6p_ip6_hlim = in6_selecthlim(inp,
-						    inp->in6p_route.ro_rt ?
-						    inp->in6p_route.ro_rt->rt_ifp :
-						    NULL);
-#endif
 	/*
 	 * IPv4 TTL initialization is necessary for an IPv6 socket as well,
 	 * because the socket may be bound to an IPv6 wildcard address,
