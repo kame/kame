@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1106 2000/07/06 11:30:21 itojun Exp $
+$Id: CHANGELOG,v 1.1107 2000/07/07 12:41:24 itojun Exp $
 
 <200006>
+Fri Jul  7 21:39:33 JST 2000  itojun@iijlab.net
+	* various places: audit use of printf-like functions, including
+	  errx?, warnx?, setproctitle, and syslog.  if we pass user-supplied
+	  variable alone to these functions, they can be hosed by malicious
+	  %-format string.  from openbsd.
+
 Thu Jul  6 20:43:57 JST 2000  itojun@iijlab.net
 	* openbsd/sys/netinet/tcp_*.c: remove IPv4 mapped support completely
 	  from inbound packet processing.  there were some corner cases not
