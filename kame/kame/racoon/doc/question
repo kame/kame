@@ -1,4 +1,4 @@
-$Id: question,v 1.21 2000/09/21 20:05:00 sakane Exp $
+$Id: question,v 1.22 2000/09/22 00:43:09 itojun Exp $
 
 Q: how may policy matters are.  can we interoperate ?
 
@@ -466,3 +466,48 @@ Q: rekey.
 		assume everyone will be using the latest SA in IPsec layer.
 		assume that phase 2 responder will install new key when the
 		responder got 1st packet of phase 2 (not the 3rd packet).
+
+Q: for responder side, is it allowed to reorder proposals?  for example,
+is it allowed to reply to the following proposal:
+with this:
+
+46:51.456226 3ffe:501:ffff:0:250:daff:fe87:4bbe:500 -> 3ffe:501:ffff:0:2a0:ccff:fe3c:4093:500: isakmp 1.0 msgid 3827457a: phase 2/others ? oakley-quick:
+    (hash: len=20)
+    (sa: doi=ipsec situation=identity
+        (p: #1 protoid=ipsec-esp transform=15 spi=058a15c0
+            (t: #1 id=blowfish (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=keylen value=0080)(type=auth value=hmac-md5)(type=group desc value=modp1024))
+            (t: #2 id=blowfish (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=keylen value=0080)(type=auth value=hmac-sha1)(type=group desc value=modp1024))
+            (t: #3 id=blowfish (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=keylen value=0080)(type=group desc value=modp1024))
+            (t: #4 id=3des (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=auth value=hmac-md5)(type=group desc value=modp1024))
+            (t: #5 id=3des (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=auth value=hmac-sha1)(type=group desc value=modp1024))
+            (t: #6 id=3des (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=group desc value=modp1024))
+            (t: #7 id=1des (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=auth value=hmac-md5)(type=group desc value=modp1024))
+            (t: #8 id=1des (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=auth value=hmac-sha1)(type=group desc value=modp1024))
+            (t: #9 id=1des (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=group desc value=modp1024))
+            (t: #10 id=cast (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=keylen value=0080)(type=auth value=hmac-md5)(type=group desc value=modp1024))
+            (t: #11 id=cast (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=keylen value=0080)(type=auth value=hmac-sha1)(type=group desc value=modp1024))
+            (t: #12 id=cast (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=keylen value=0080)(type=group desc value=modp1024))
+            (t: #13 id=null (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=auth value=hmac-md5)(type=group desc value=modp1024))
+            (t: #14 id=null (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=auth value=hmac-sha1)(type=group desc value=modp1024))
+            (t: #15 id=null (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=group desc value=modp1024)))
+        (p: #1 protoid=ipsec-ah transform=2 spi=0f316870
+            (t: #1 id=md5 (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=auth value=hmac-md5)(type=group desc value=modp1024))
+            (t: #2 id=sha (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=auth value=hmac-sha1)(type=group desc value=modp1024))))
+    (nonce: n len=16)
+    (ke: key len=128)
+    (id: idtype=IPv6 protoid=tcp port=0 len=16 3ffe:501:ffff:0:250:daff:fe87:4bbe)
+    (id: idtype=IPv6 protoid=tcp port=0 len=16 3ffe:501:ffff:0:2a0:ccff:fe3c:4093)
+
+(swap order)
+
+46:53.368883 3ffe:501:ffff:0:2a0:ccff:fe3c:4093:500 -> 3ffe:501:ffff:0:250:daff:fe87:4bbe:500: isakmp 1.0 msgid 3827457a: phase 2/others ? oakley-quick:
+    (hash: len=20)
+    (sa: doi=ipsec situation=identity
+        (p: #1 protoid=ipsec-ah transform=1 spi=f8dc5700
+            (t: #1 id=md5 (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=auth value=hmac-md5)(type=group desc value=modp1024)))
+        (p: #1 protoid=ipsec-esp transform=1 spi=f8dc5701
+            (t: #4 id=3des (type=lifetype value=sec)(type=life value=0e10)(type=enc mode value=transport)(type=auth value=hmac-md5)(type=group desc value=modp1024))))
+    (nonce: n len=16)
+    (ke: key len=128)
+    (id: idtype=IPv6 protoid=tcp port=0 len=16 3ffe:501:ffff:0:250:daff:fe87:4bbe)
+    (id: idtype=IPv6 protoid=tcp port=0 len=16 3ffe:501:ffff:0:2a0:ccff:fe3c:4093)
