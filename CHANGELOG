@@ -1,8 +1,24 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.610 2000/02/24 17:28:48 itojun Exp $
+$Id: CHANGELOG,v 1.611 2000/02/24 18:07:54 jinmei Exp $
 
 <200002>
+2000-02-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	RFC2292bis support:
+	* bsdi4/sys/netinet/tcp_output.c (tcp_output): 	
+	  pass ip6 output options to ip6_ouput().
+	* bsdi4/sys/netinet/tcp_input.c: 
+	  passed specified IPv6 optional data to a user as ancillary data.
+	* bsdi4/sys/netinet/in_pcb.c (in_pcbdetach):
+	  fixed memory leak of received IPv6 options.
+
+2000-02-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getnameinfo.c (ip6_sa2str, getnameinfo):
+	  changes according to the recent discussion:
+	  - always print scope_id of an IPv6 address with non-zero
+	    sin6_scope_id (by default), even for a global unicast address.
+	  - use numeric numbers as the last resort of a scope_id string.
+
 Fri Feb 25 02:26:07 JST 2000  itojun@iijlab.net
 	* kame/rtadvd/rtadvd.c: on startup, transmit multicast RA.
 	  without this, reboot of a router will result in absense of router
