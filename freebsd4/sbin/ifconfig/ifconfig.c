@@ -270,8 +270,8 @@ struct	cmd {
 	{ "-vlandev",	NEXTARG,	unsetvlandev },
 #endif
 #ifdef USE_VRRPS
-	{ "vrrpdev",	NEXTARG,	setvrrpdev },
-	{ "-vrrpdev",	NEXTARG,	unsetvrrpdev },
+	{ "vrrpdev",	NEXTARG2,	NULL,  setvrrpdev },
+	{ "-vrrpdev",	0, 	        unsetvrrpdev },
 #endif
 #if 0
 	/* XXX `create' special-cased below */

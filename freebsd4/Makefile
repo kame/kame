@@ -34,6 +34,8 @@ afterinstall:
 		${DESTDIR}$(PREFIX)/etc/
 	cp ${.CURDIR}/kame/racoon/samples/psk.txt.sample \
 		${DESTDIR}$(PREFIX)/etc/
+	cp ${.CURDIR}/kame/vrrp6d/vrrp6d.conf.sample \
+		${DESTDIR}$(PREFIX)/etc/
 	for i in $(DOCS); do \
 		if test -f ${.CURDIR}/../$$i; then \
 			cp ${.CURDIR}/../$$i \

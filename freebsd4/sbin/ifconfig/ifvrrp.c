@@ -45,6 +45,7 @@
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/if_vrrp_var.h>
+#include <net/if_dl.h>
 #include <net/route.h>
 
 #include <ctype.h>
@@ -61,6 +62,8 @@
 static const char rcsid[] =
   "$FreeBSD: src/sbin/ifconfig/ifvlan.c,v 1.2 1999/08/28 00:13:09 peter Exp $";
 #endif
+
+void vrrp_link_getaddr(const char *addr, struct sockaddr *sa);
 
 void vrrp_status(s, info)
 	int			s;
@@ -80,23 +83,43 @@ void vrrp_status(s, info)
 	return;
 }
 
-void setvrrpdev(val, d, s, afp)
-	const char		*val;
-	int			d, s;
+void vrrp_link_getaddr(addr, sa)
+	const char *addr;
+	struct sockaddr *sa;
+{
+	char *temp;
+	struct sockaddr_dl sdl;
+
+	if ((temp = malloc(strlen(addr) + 1)) == NULL)
+		errx(1, "malloc failed");
+	temp[0] = ':';
+	strcpy(temp + 1, addr);
+	sdl.sdl_len = sizeof(sdl);
+	link_addr(temp, &sdl);
+	free(temp);
+	if (sdl.sdl_alen > sizeof(sa->sa_data))
+		errx(1, "malformed link-level address");
+	sa->sa_family = AF_LINK;
+	sa->sa_len = sdl.sdl_alen;
+	bcopy(LLADDR(&sdl), sa->sa_data, sdl.sdl_alen);
+}
+
+void setvrrpdev(val, lladdr, s, afp)
+	const char     *val, *lladdr;
+	int			   s;
 	const struct afswtch	*afp;
 {
-	unsigned int ifindex = 0;
-	
-	ifr.ifr_data = (caddr_t)&ifindex;
+	struct vrrpreq vr;
 
-#if 0
-	if (ioctl(s, SIOCGETVRRP, (caddr_t)&ifr) == -1)
-		err(1, "SIOCGETVRRP");
-#endif
+	memset(&vr, 0, sizeof(vr));
+	ifr.ifr_data = (caddr_t)&vr;
 
-	if ((ifindex = if_nametoindex(val)) == 0)
+	if ((vr.vr_parent_index = if_nametoindex(val)) == 0) {
 		err(1, "if_nametoindex");
+	}
 	
+	vrrp_link_getaddr(lladdr, &vr.vr_lladdr);
+		
 	if (ioctl(s, SIOCSETVRRP, (caddr_t)&ifr) == -1)
 		err(1, "SIOCSETVRRP");
 
@@ -108,13 +131,12 @@ void unsetvrrpdev(val, d, s, afp)
 	int			d, s;
 	const struct afswtch	*afp;
 {
-	unsigned int ifindex = 0;
+	struct vrrpreq vr;
 
-	ifr.ifr_data = (caddr_t)&ifindex;
-#if 0
-	if (ioctl(s, SIOCGETVRRP, (caddr_t)&ifr) == -1)
-		err(1, "SIOCGETVRRP");
-#endif
+	memset(&vr, 0, sizeof(vr));
+
+	ifr.ifr_data = (caddr_t)&vr;
+	vr.vr_parent_index = 0;
 
 	if (ioctl(s, SIOCSETVRRP, (caddr_t)&ifr) == -1)
 		err(1, "SIOCSETVRRP");

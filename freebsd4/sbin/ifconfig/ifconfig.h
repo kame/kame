@@ -51,7 +51,7 @@ extern void setvlandev(const char *, int, int, const struct afswtch *rafp);
 extern void unsetvlandev(const char *, int, int, const struct afswtch *rafp);
 extern void vlan_status(int s, struct rt_addrinfo *);
 
-extern void setvrrpdev(const char *, int, int, const struct afswtch *rafp);
+extern void setvrrpdev(const char *, const char *, int, const struct afswtch *rafp);
 extern void unsetvrrpdev(const char *, int, int, const struct afswtch *rafp);
 extern void vrrp_status(int s, struct rt_addrinfo *);
 

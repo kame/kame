@@ -40,6 +40,7 @@
 #include "opt_ipx.h"
 #include "opt_bdg.h"
 #include "opt_netgraph.h"
+#include "vrrp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -59,6 +60,10 @@
 #include <net/bpf.h>
 #include <net/ethernet.h>
 #include <net/bridge.h>
+#if NVRRP > 0
+#include <net/if_arp.h>
+#include <net/if_vrrp_var.h>
+#endif
 
 #if defined(INET) || defined(INET6)
 #include <netinet/in.h>
@@ -108,7 +113,6 @@ int	(*ng_ether_output_p)(struct ifnet *ifp, struct mbuf **mp);
 void	(*ng_ether_attach_p)(struct ifnet *ifp);
 void	(*ng_ether_detach_p)(struct ifnet *ifp);
 
-int	(*vrrp_input_p)(struct ether_header *eh, struct mbuf *m);
 int	(*vlan_input_p)(struct ether_header *eh, struct mbuf *m);
 int	(*vlan_input_tag_p)(struct ether_header *eh, struct mbuf *m,
 		u_int16_t t);
@@ -560,6 +564,7 @@ void
 ether_input(struct ifnet *ifp, struct ether_header *eh, struct mbuf *m)
 {
 	struct ether_header save_eh;
+	struct m_tag *mtag;
 
 	if (eh == NULL) {
 		if (m->m_len < sizeof(struct ether_header)) {
@@ -594,9 +599,12 @@ ether_input(struct ifnet *ifp, struct ether_header *eh, struct mbuf *m)
 			return;
 	}
 
-	if (vrrp_input_p != NULL) {
-		(*vrrp_input_p)(eh, m);
+#if NVRRP > 0
+	if (nvrrp_active > 0 &&
+	    (mtag = m_tag_find(m, PACKET_TAG_VRRP, NULL)) == NULL) {
+		vrrp_input(eh, m);
 	}
+#endif
 
 	/* Check for bridging mode */
 	if (BDG_ACTIVE(ifp) ) {
