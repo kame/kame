@@ -64,6 +64,7 @@ static const char rcsid[] =
 #include <netiso/iso_var.h>
 #endif
 #include <arpa/inet.h>
+#include <netdb.h>		/* for getnameinfo */
 
 #include <signal.h>
 #include <stdio.h>
@@ -154,6 +155,14 @@ intpr(interval, ifnetaddr, pfunc)
 	u_long ifnetfound;
 	struct sockaddr *sa = NULL;
 	char name[32], tname[16];
+#ifdef INET6
+	char hbuf[NI_MAXHOST];		/* for getnameinfo() */
+#ifdef KAME_SCOPEID
+	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflag = NI_NUMERICHOST;
+#endif /* KAME_SCOPEID */
+#endif /* INET6 */
 
 	if (ifnetaddr == 0) {
 		printf("ifnet: symbol not defined\n");
@@ -254,13 +263,37 @@ intpr(interval, ifnetaddr, pfunc)
 #ifdef INET6
 			case AF_INET6:
 				sin6 = (struct sockaddr_in6 *)sa;
-				printf("%-11.11s ",
-				       netname6(&ifaddr.in6.ia_addr,
-						&ifaddr.in6.ia_prefixmask.sin6_addr));
-				printf("%-17.17s ",
-				    (char *)inet_ntop(AF_INET6,
-					&sin6->sin6_addr,
-					ntop_buf, sizeof(ntop_buf)));
+#ifdef KAME_SCOPEID
+				if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+					sin6->sin6_scope_id =
+						ntohs(*(u_int16_t *)
+						  &sin6->sin6_addr.s6_addr[2]);
+					/* too little width */
+					if (!lflag)
+						sin6->sin6_scope_id = 0;
+					sin6->sin6_addr.s6_addr[2] = 0;
+					sin6->sin6_addr.s6_addr[3] = 0;
+				}
+#endif
+				cp = netname6(&ifaddr.in6.ia_addr,
+					      &ifaddr.in6.ia_prefixmask.sin6_addr);
+				if (lflag)
+					n = strlen(cp) < 13 ? 13 : strlen(cp);
+				else
+					n = 13;
+				printf("%-*.*s ", n, n, cp);
+				if (getnameinfo((struct sockaddr *)sin6,
+						sin6->sin6_len,
+						hbuf, sizeof(hbuf), NULL, 0,
+						niflag) != 0) {
+					cp = "?";
+				} else
+					cp = hbuf;
+				if (lflag)
+					n = strlen(cp) < 17 ? 17 : strlen(cp);
+				else
+					n = 17;
+				printf("%-*.*s ", n, n, cp);
 				break;
 #endif /*INET6*/
 			case AF_IPX:
@@ -372,17 +405,41 @@ intpr(interval, ifnetaddr, pfunc)
 				
 				fmt = 0;
 				switch (msa.sa.sa_family) {
+#ifdef INET6
+					struct sockaddr_in6 sin6;
+#endif
 				case AF_INET:
 					fmt = routename(msa.in.sin_addr.s_addr);
 					break;
 #ifdef INET6
 				case AF_INET6:
-					printf("%23s %-19.19s(refs: %d)\n", "",
-					       inet_ntop(AF_INET6,
-							 &msa.in6.sin6_addr,
-							 ntop_buf,
-							 sizeof(ntop_buf)),
-					       ifma.ifma_refcount);
+					memset(&sin6, 0, sizeof(sin6));
+					sin6.sin6_len = sizeof(sin6);
+					sin6.sin6_family = AF_INET6;
+					sin6.sin6_addr = msa.in6.sin6_addr;
+#ifdef KAME_SCOPEID
+					if (IN6_IS_ADDR_MC_LINKLOCAL(&sin6.sin6_addr)) {
+						sin6.sin6_scope_id =
+							ntohs(*(u_int16_t *)
+							      &sin6.sin6_addr.s6_addr[2]);
+						sin6.sin6_addr.s6_addr[2] = 0;
+						sin6.sin6_addr.s6_addr[3] = 0;
+					}
+#endif /* KAME_SCOPEID */
+					if (getnameinfo((struct sockaddr *)&sin6,
+							sin6.sin6_len, hbuf,
+							sizeof(hbuf), NULL, 0,
+							niflag) != 0) {
+						strcpy(hbuf, "??");
+					}
+					cp = hbuf;
+					if (lflag)
+						n = strlen(cp) < 17
+							? 17 : strlen(cp);
+					else
+						n = 17;
+					printf("\n%25s %-*.*s ", "",
+					       n, n, cp);
 #endif /* INET6 */
 				case AF_LINK:
 					switch (ifnet.if_type) {
