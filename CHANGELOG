@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2205 2002/07/29 02:35:17 itojun Exp $
+$KAME: CHANGELOG,v 1.2206 2002/07/30 04:47:19 jinmei Exp $
 
 <200207>
+2002-07-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/: added a new socket option/cmsg type
+	"IPV6_PREFER_TEMPADDR" to control source address selection wrt
+	temporary addresses per socket/packet.
+
 Fri Jul 26 17:20:25 JST 2002 suz@crl.hitacih.co.jp
 	* freebsd4/sys/netinet/{ip_output.c, udp_usrreq.c}: IPv4 multicast 
 	packet is accepted/rejected properly as specified in IGMPv2/v3.
