@@ -292,7 +292,7 @@ options 	NEW_STRUCT_ROUTE	# mandatory
 
 #options 	RADIX_MPATH	# equal cost multipath
 
-#options 	SCTP		# adds SCTP stack to kernel - requires INET6
+options 	SCTP		# adds SCTP stack to kernel - requires INET6
 #options 	SCTP_DEBUG	# adds debugging support for SCTP
 #options 	SCTP_TCP_MODEL_SUPPORT	# adds TCP model support
 #options 	SCTP_USE_ADLER32	# use obsolete Adler32 checksum,
@@ -341,10 +341,10 @@ device		ist	1	# ISATAP
 #options 	MIP6
 #device		mip	1
 
-device		pf
+#device		pf
 #device		pflog
 #device		pfsync
 
 # Datagram Congestion Control Protocol
-#options	DCCP
+options 	DCCP
 #options	DCCP_TFRC
