@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.50 2000/08/14 18:47:26 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.51 2000/08/15 01:57:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -98,6 +98,7 @@ struct	route_in6 ip6_forward_rt;
 extern int ip6_logentry;
 extern int ip6_logsize;
 extern unsigned long long ip6_performance_log[];
+extern long long ip6_performance_log2[];
 extern int ip6_ours_check_algorithm;
 
 static unsigned long long ctr_beg, ctr_end;
@@ -120,6 +121,7 @@ add_performance_log2(val)
 	unsigned long long val;
 {
 	ip6_performance_log[ip6_logentry] += val;
+	ip6_performance_log2[ip6_logentry] = val;
 }
 #endif
 
@@ -374,6 +376,12 @@ ip6_forward(m, srcrt)
 				RTFREE(ip6_forward_rt.ro_rt);
 				ip6_forward_rt.ro_rt = 0;
 			}
+#ifdef MEASURE_PERFORMANCE
+			bzero(dst, sizeof(*dst));
+			dst->sin6_family = AF_INET6;
+			dst->sin6_len = sizeof(*dst);
+			dst->sin6_addr = ip6->ip6_dst;
+#endif
 			/* this probably fails but give it a try again */
 #ifdef __FreeBSD__
 			rtalloc_ign((struct route *)&ip6_forward_rt,

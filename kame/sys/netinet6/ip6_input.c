@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.109 2000/08/14 18:40:10 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.110 2000/08/15 01:57:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -187,6 +187,7 @@ const int int6intrq_present = 1;
 int ip6_logentry;
 int ip6_logsize = IP6_PERFORM_LOGSIZE;
 unsigned long long ip6_performance_log[IP6_PERFORM_LOGSIZE];
+unsigned long long ip6_performance_log2[IP6_PERFORM_LOGSIZE];
 #endif
 #ifdef MEASURE_PERFORMANCE
 #define OURS_CHECK_ALG_RTABLE 0
