@@ -1,4 +1,4 @@
-/*	$KAME: blowfish.h,v 1.7 2000/08/31 06:21:55 itojun Exp $	*/
+/*	$KAME: blowfish.h,v 1.8 2000/08/31 07:09:12 itojun Exp $	*/
 
 /* crypto/bf/blowfish.h */
 /* Copyright (C) 1995-1997 Eric Young (eay@mincom.oz.au)
@@ -81,15 +81,9 @@ typedef struct bf_key_st
 	} BF_KEY;
 
 void BF_set_key __P((BF_KEY *, int, unsigned char *));
-void BF_ecb_encrypt __P((unsigned char *, unsigned char *, BF_KEY *, int));
 void BF_encrypt __P((BF_LONG *, BF_KEY *, int));
 void BF_cbc_encrypt __P((unsigned char *, unsigned char *, long,
 	BF_KEY *, unsigned char *, int));
-void BF_cfb64_encrypt __P((unsigned char *, unsigned char *, long,
-	BF_KEY *, unsigned char *, int *, int));
-void BF_ofb64_encrypt __P((unsigned char *, unsigned char *, long,
-	BF_KEY *, unsigned char *, int *));
-char *BF_options __P((void));
 
 /* added by itojun */
 struct mbuf;
