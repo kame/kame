@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.47 2001/08/02 14:32:24 jinmei Exp $
+$KAME: FAQ,v 1.48 2001/08/02 15:31:09 itojun Exp $
 
 
 GENERAL
@@ -411,7 +411,22 @@ Q: Don't you release new IPv6 patch for apache1.3.x?
 	IPv6 patch are available at ftp://ftp.piuha.net/pub/misc/.
 
 Q: Why don't KAME's getaddrinfo/getnameinfo support PF_LOCAL?
-	A: TBD
+	We do not really like to support PF_LOCAL, unless there's
+	clear standard behavior for AF_LOCAL case.  For AF independent
+	programming point of view, unlink(2) call issue is really
+	bitching us.  NI_NUMERICxx, AI_NAMEREQD and AI_NUMERICxx has no
+	valid meaning on PF_LOCAL.  Also, we cannot just add incompatible
+	functionality from others.   Note that glibc now drops it for
+	security risks with /tmp race conditions (they supported PF_LOCAL in
+	the past), so we are now compatible with glibc at this point.
+
+	getaddrinfo/getnameinfo behavior itself is rather vaguely
+	defined in the standards (POSIX drafts as well as RFC2553/bis),
+	and we don't want to add more jitter to it.
+
+	If it is really really necessary to play with it, we can probably
+	do that on KAME tree - but not on *BSD-current nor *BSD official
+	releases.
 
 LICENSE AND CRYPTO EXPORT
 =========================
