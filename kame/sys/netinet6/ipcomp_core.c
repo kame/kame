@@ -66,7 +66,7 @@ static int deflate_compress __P((struct mbuf *, struct mbuf *, size_t *));
 static int deflate_decompress __P((struct mbuf *, struct mbuf *, size_t *));
 
 static int deflate_policy = Z_DEFAULT_COMPRESSION;
-static int deflate_window = 12;		/* 2^12 = 4Kbytes */
+static int deflate_window = MAX_WBITS;		/* 2^12 = 4Kbytes */
 static int deflate_memlevel = MAX_MEM_LEVEL; 
 
 struct ipcomp_algorithm ipcomp_algorithms[] = {
