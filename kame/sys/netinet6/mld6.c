@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.40 2002/02/09 07:30:50 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.41 2002/02/14 05:27:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -168,6 +168,14 @@ mld6_start_listening(in6m)
 #else
 	int s = splnet();
 #endif
+
+	/*
+	 * This function must not be called before mld6_init().
+	 * We've experienced the violation of the order once, so we put an
+	 * explicit assertion here.
+	 */
+	if (all_nodes_linklocal == NULL)
+		panic("mld6_start_listening: called too early");
 
 	/*
 	 * RFC2710 page 10:
