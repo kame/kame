@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.56 2001/02/03 15:30:53 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.57 2001/02/09 06:17:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -306,6 +306,7 @@ extern int	ip6_dad_count;		/* DupAddrDetectionTransmits */
 
 extern u_int32_t ip6_flow_seq;
 extern int ip6_auto_flowlabel;
+extern int ip6_auto_linklocal;
 
 extern int   ip6_anonportmin;		/* minimum ephemeral port */
 extern int   ip6_anonportmax;		/* maximum ephemeral port */

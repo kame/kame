@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.108 2001/02/08 16:30:29 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.109 2001/02/09 06:17:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,11 +74,10 @@ size_t in6_ifstatmax = 0;
 size_t icmp6_ifstatmax = 0;
 unsigned long in6_maxmtu = 0;
 
-/* #define IN6_LINLLOCAL_AUTO 0	 for debug */
-#ifdef IN6_LINLLOCAL_AUTO
-int in6_linklocal_auto = IN6_LINLLOCAL_AUTO;
+#ifdef IN6_AUTO_LINLLOCAL
+int ip6_auto_linklocal = IN6_LINLLOCAL_AUTO;
 #else
-int in6_linklocal_auto = 1;
+int ip6_auto_linklocal = 1;	/* enable by default */
 #endif
 
 #ifdef __NetBSD__
@@ -913,7 +912,7 @@ in6_ifattach(ifp, altifp)
 	/*
 	 * assign a link-local address, if there's none. 
 	 */
-	if (!in6_linklocal_auto)
+	if (!ip6_auto_linklocal)
 		goto statinit;
 
 	ia = in6ifa_ifpforlinklocal(ifp, 0);
