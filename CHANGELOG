@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1673 2001/05/16 03:06:24 sakane Exp $
+$KAME: CHANGELOG,v 1.1674 2001/05/17 03:52:55 itojun Exp $
 
 <200105>
+Thu May 17 12:50:40 JST 2001  itojun@iijlab.net
+	* sys/netinet6: remove OLDIP6OUTPUT codepath.  notified from sumikawa
+	  (i remember i said i would do this, a long time ago)
+
 Wed May 16 12:04:57 JST 2001 sakane@ydc.co.jp
 	* sys/netinet6/ah_input.c:
 	don't flip ip_id *back* in freebsd4.x case.
