@@ -1347,7 +1347,7 @@ rip_sendmsg(sin, pktinfo, len)
     syslog(LOG_ERR,                            /* spoofing or misconfig ? */
 	   "<rip_sendmsg>: sendmsg on %s (src=%s): %s",
 	   if_indextoname(pktinfo->ipi6_ifindex, ifname),
-	   ip6str(&sa6, 0), strerror(errno));
+	   ip6str(&sa6.sin6_addr, 0), strerror(errno));
     return;
   }
 
