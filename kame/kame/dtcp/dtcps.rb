@@ -32,7 +32,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: dtcps.rb,v 1.5 2001/01/20 18:13:46 jinmei Exp $
+# $Id: dtcps.rb,v 1.6 2001/11/09 05:59:57 itojun Exp $
 #
 
 require "socket"
@@ -345,7 +345,7 @@ def getpopauth(user)
     debugmsg("no relevant password database item found\n")
     return nil
   end
-  if p[p.length - 1] == 0
+  while p.length > 0 && p[p.length - 1] == 0
     p = p[0, p.length - 1]
   end
   for i in 0 .. p.length - 1
