@@ -1,4 +1,4 @@
-/*	$KAME: natpt_usrreq.c,v 1.11 2000/04/19 06:48:58 fujisawa Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.12 2001/02/05 06:42:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -327,14 +327,19 @@ natpt_uabort(struct socket *so)
 int
 natpt_uattach(struct socket *so, int proto, struct proc *p)
 {
-#ifndef NATPT_NOSUSER
-    int		error;
+	int privileged;
 
-    if (p && (error = suser(p->p_ucred, &p->p_acflag)) != 0)
-	return (error);
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
+	privileged = (p == 0 || suser(p->p_ucred, &p->p_acflag)) ? 0 : 1;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+	privileged = (p == 0 || suser(p)) ? 0 : 1;
+#else
+	privileged = (so->so_state & SS_PRIV);
 #endif
 
-    return (natpt_attach(so, proto));
+	return(EPERM);
+
+	return (natpt_attach(so, proto));
 }
 
 
