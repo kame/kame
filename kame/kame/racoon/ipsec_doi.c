@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.55 2000/04/24 07:37:43 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.56 2000/04/24 07:39:40 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -3026,7 +3026,7 @@ ipsecdoi_printsa(s0)
 }
 #endif
 
-#ifdef 0
+#if 0
 static void
 ipsecdoi_printsa_bundle(s0)
 	const struct ipsecsa *s0;
