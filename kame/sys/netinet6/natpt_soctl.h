@@ -1,4 +1,4 @@
-/*	$KAME: natpt_soctl.h,v 1.9 2000/04/06 08:30:48 sumikawa Exp $	*/
+/*	$KAME: natpt_soctl.h,v 1.10 2001/05/05 11:19:04 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -63,7 +63,6 @@ typedef	struct natpt_msgBox				/* sizeof():  44[byte]	*/
 #ifndef NATPT_STATIC
 #define	NATPT_STATIC		(0x01)
 #define	NATPT_DYNAMIC		(0x02)
-#define NATPT_FAITH		(0x03)
 #endif
 
 /* in case SIOCFLUSHRULE ... bitwise	*/
@@ -71,7 +70,6 @@ typedef	struct natpt_msgBox				/* sizeof():  44[byte]	*/
 #define	FLUSH_DYNAMIC		(0x02)
 
 /* in case SIOC(GET|SET)PREFIX		*/
-#define	PREFIX_FAITH		(0x01)
 #define	PREFIX_NATPT		(0x02)
 
 /* in case SIOC(GET|SET)VALUE		*/

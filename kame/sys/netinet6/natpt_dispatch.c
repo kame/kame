@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.19 2001/03/23 07:51:29 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.20 2001/05/05 11:19:04 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,8 +77,6 @@ u_long		mtuOutside;
 
 
 static	struct _cell	*ifBox;
-
-struct ifnet	*natpt_ip6src;
 
 struct in6_addr	 faith_prefix
 			= {{{0x00000000, 0x00000000, 0x00000000, 0x00000000}}};
@@ -851,8 +849,6 @@ natpt_setIfBox(char *ifName)
 #endif
 	if (strcmp(ifName, Wow) != SAME)
 	    continue;
-
-	natpt_ip6src = p;
 
 	MALLOC(q, struct ifBox *, sizeof(struct ifBox), M_NATPT, M_WAITOK);
 	bzero(q, sizeof(struct ifBox));

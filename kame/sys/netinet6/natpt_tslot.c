@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.16 2001/03/23 07:51:29 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.17 2001/05/05 11:19:04 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -598,22 +598,8 @@ fillupOutgoing4Remote(struct _cSlot *acs, struct _cv *cv4, struct pAddr *remote)
 	    remote->_dport = cv4->_payload._tcp4->th_dport;
 	}
 
-	if (acs->type == NATPT_FAITH)
-	{
-	    struct in6_ifaddr	*ia6;
-
-	    remote->in6dst.s6_addr32[0] = faith_prefix.s6_addr32[0];
-	    remote->in6dst.s6_addr32[1] = faith_prefix.s6_addr32[1];
-	    remote->in6dst.s6_addr32[3] = cv4->_ip._ip4->ip_dst.s_addr;
-
-	    ia6 = in6_ifawithscope(natpt_ip6src, &remote->in6dst);
-	    remote->in6src = ia6->ia_addr.sin6_addr;
-	}
-	else
-	{
-	    remote->in6src.s6_addr32[3] = cv4->_ip._ip4->ip_src.s_addr;
-	    remote->in6dst = acs->remote.in6src;
-	}
+	remote->in6src.s6_addr32[3] = cv4->_ip._ip4->ip_src.s_addr;
+	remote->in6dst = acs->remote.in6src;
     }
 
     return (remote);

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.12 2001/03/18 10:28:26 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.13 2001/05/05 11:19:03 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -246,7 +246,6 @@ struct pAddr					/* sizeof():  44[byte]	*/
 #define	ADDR_SINGLE		(1)
 #define	ADDR_MASK		(2)
 #define	ADDR_RANGE		(3)
-#define	ADDR_FAITH		(4)
 
 	u_char		prefix;
     }			ad;
@@ -260,7 +259,6 @@ struct	_cSlot					/* sizeof(): 100[byte]	*/
     u_char		 type;
 #define	NATPT_STATIC		(1)	/* Rule was set statically	*/
 #define	NATPT_DYNAMIC		(2)	/* Rule was set dynamically	*/
-#define NATPT_FAITH		(3)
 
     u_char		 dir;
 #define	NATPT_UNSPEC		(0x00)
@@ -312,7 +310,6 @@ struct	_tSlot					/* sizeof(): 104[byte]	*/
 
 /* #define NATPT_STATIC		(0x1)			 */
 /* #define NATPT_DYNAMIC	(0x2)			 */
-/* #define NATPT_FAITH		(0x3)			 */
 
     struct pAddr	local;
     struct pAddr	remote;

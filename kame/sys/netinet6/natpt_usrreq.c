@@ -1,4 +1,4 @@
-/*	$KAME: natpt_usrreq.c,v 1.14 2001/03/23 07:51:29 fujisawa Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.15 2001/05/05 11:19:04 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -519,7 +519,6 @@ _natptSetIf(caddr_t addr)
 	char	 WoW[LBFSZ];
 	char	*s;
 
-	natpt_ip6src = ifb->ifnet;
 	if (mbx->flags == IF_EXTERNAL)
 	    ifb->side = outSide, s = "outside";
 	else

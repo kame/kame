@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.16 2001/03/23 07:51:29 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.17 2001/05/05 11:19:04 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -415,9 +415,6 @@ _natptSetRule(caddr_t addr)
      return (ENXIO);
 #endif
 
-    if (mbx->flags == NATPT_FAITH)
-	return (_natptSetFaithRule(addr));
-
     MALLOC(cst, struct _cSlot *, sizeof(struct _cSlot), M_NATPT, M_WAITOK);
     copyin(mbx->freight, cst, sizeof(struct _cSlot));
 
@@ -463,21 +460,6 @@ _natptSetRule(caddr_t addr)
 
 
 int
-_natptSetFaithRule(caddr_t addr)
-{
-    struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
-    struct _cSlot	*cst;
-
-    MALLOC(cst, struct _cSlot *, sizeof(struct _cSlot), M_NATPT, M_WAITOK);
-    copyin(mbx->freight, cst, sizeof(struct _cSlot));
-
-    LST_hookup_list(&natptFaith, cst);
-
-    return (0);
-}
-
-
-int
 _natptFlushRule(caddr_t addr)
 {
     struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
@@ -501,15 +483,7 @@ _natptSetPrefix(caddr_t addr)
     MALLOC(load, struct pAddr *, sizeof(struct pAddr), M_NATPT, M_WAITOK);
     copyin(mbx->freight, load, SZSIN6 * 2);
 
-    if (mbx->flags & PREFIX_FAITH)
-    {
-	faith_prefix	 =  load->addr[0].in6;
-	faith_prefixmask =  load->addr[1].in6;
-	
-	natpt_logIN6addr(LOG_INFO, "FAITH prefix: ", &faith_prefix);
-	natpt_logIN6addr(LOG_INFO, "FAITH prefixmask: ", &faith_prefixmask);
-    }
-    else if (mbx->flags & PREFIX_NATPT)
+    if (mbx->flags & PREFIX_NATPT)
     {
 	natpt_prefix	 =  load->addr[0].in6;
 	natpt_prefixmask =  load->addr[1].in6;

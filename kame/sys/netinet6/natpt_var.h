@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.10 2000/10/17 14:23:56 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.11 2001/05/05 11:19:04 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,8 +36,6 @@ extern int		 natpt_gotoOneself;
 extern u_int		 natpt_debug;
 extern u_int		 natpt_dump;
 
-extern struct ifnet	*natpt_ip6src;
-
 /*	natpt_dispatch.c	*/
 char		*ip4_sprintf			__P((struct in_addr *));
 
@@ -63,7 +61,6 @@ struct _cSlot	*lookingForOutgoingV6Rule	__P((struct ifBox *, struct _cv *));
 int		 _natptEnableTrans		__P((caddr_t));
 int		 _natptDisableTrans		__P((caddr_t));
 int		 _natptSetRule			__P((caddr_t));
-int		 _natptSetFaithRule		__P((caddr_t));
 int		 _natptFlushRule		__P((caddr_t));
 int		 _natptSetPrefix		__P((caddr_t));
 
