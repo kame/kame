@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.109 2002/01/28 07:57:05 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.110 2002/01/28 08:25:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -97,7 +97,11 @@
 #endif
 #endif /* !MIP6_CONFIG_DEBUG */
 #ifndef MIP6_CONFIG_USE_IPSEC
+#ifdef MIP6_DRAFT13
 #define MIP6_CONFIG_USE_IPSEC 1
+#else /* MIP6_DRAFT13 */
+#define MIP6_CONFIG_USE_IPSEC 0
+#endif /* MIP6_DRAFT13 */
 #endif /* !MIP6_CONFIG_USE_IPSEC */
 #ifndef MIP6_CONFIG_USE_AUTHDATA
 #define MIP6_CONFIG_USE_AUTHDATA 1
