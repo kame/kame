@@ -1270,10 +1270,6 @@ findpcb:
 		tp->t_timer[TCPT_KEEP] = tcp_keepinit;
 		dropsocket = 0;		/* committed to socket */
 		tcpstat.tcps_accepts++;
-#ifdef INET6
-		if (isipv6)
-			ND6_HINT((struct tcpcb *)inp->inp_ppcb);
-#endif
 		goto trimthenstep6;
 		}
 
