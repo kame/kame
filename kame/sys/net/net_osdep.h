@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.55 2001/07/26 08:28:35 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.56 2001/07/26 08:34:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -39,7 +39,7 @@
  *   to escape the macro explicitly.
  *   e.g.
  *	if (rt) {
- *		RTFREE();
+ *		RTFREE(rt);
  *	}
  *
  * - whether the IPv4 input routine convert the byte order of some fileds
