@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.21 2001/02/20 07:59:26 itojun Exp $	*/
+/*	$KAME: if_faith.c,v 1.22 2001/07/07 06:07:30 sumikawa Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -344,6 +344,7 @@ faithioctl(ifp, cmd, data)
 	return (error);
 }
 
+#ifdef INET6
 /*
  * XXX could be slow
  * XXX could be layer violation to call sys/net from sys/netinet6
@@ -377,4 +378,5 @@ faithprefix(in6)
 		RTFREE(rt);
 	return ret;
 }
+#endif
 #endif /* NFAITH > 0 */
