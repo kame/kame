@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.41 2000/11/08 14:50:45 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.42 2000/11/08 16:11:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -197,9 +197,9 @@ main(argc, argv)
 	if (argc == 0) {
 		fprintf(stderr,
 #ifdef MIP6
-			"usage: rtadvd [-dDfmRs] [-c conffile] "
+			"usage: rtadvd [-dDfMmRs] [-c conffile] "
 #else
-			"usage: rtadvd [-dDfRs] [-c conffile] "
+			"usage: rtadvd [-dDfMRs] [-c conffile] "
 #endif
 			"interfaces...\n");
 		exit(1);
