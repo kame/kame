@@ -84,6 +84,10 @@ extern struct protosw inetsw[];
 extern u_char ip_protox[];
 #endif
 
+#define ESPMAXLEN \
+	(sizeof(struct esp) < sizeof(struct newesp) \
+		? sizeof(struct newesp) \
+		: sizeof(struct esp))
 void
 #if __STDC__
 esp4_input(struct mbuf *m, ...)
@@ -95,7 +99,7 @@ esp4_input(m, va_alist)
 {
 	struct ip *ip;
 	struct esp *esp;
-	struct esptail *esptail;
+	struct esptail esptail;
 	u_int32_t spi;
 	struct secasvar *sav = NULL;
 	size_t taillen;
@@ -121,8 +125,8 @@ esp4_input(m, va_alist)
 		goto bad;
 	}
 
-	if (m->m_len < off + sizeof(struct esp)) {
-		m = m_pullup(m, off + sizeof(struct esp));
+	if (m->m_len < off + ESPMAXLEN) {
+		m = m_pullup(m, off + ESPMAXLEN);
 		if (!m) {
 			ipseclog((LOG_DEBUG,
 			    "IPv4 ESP input: can't pullup in esp4_input\n"));
@@ -375,31 +379,13 @@ noreplaycheck:
     }
 #endif
 
-    {
 	/*
-	 * find the trailer of the ESP.
+	 * grab content of ESP trailer.
 	 */
-	struct mbuf *n;		/*the last mbuf on the mbuf chain, m_len > 0 */
-	struct mbuf *o;		/*the last mbuf on the mbuf chain */
-	
-	o = m;
-	n = NULL;
-	while (o) {
-		if (0 < o->m_len)
-			n = o;
-		o = o->m_next;
-	}
-	if (!n || n->m_len < sizeof(struct esptail)) {
-		ipseclog((LOG_DEBUG,
-		    "IPv4 ESP input: assertion on pad part failed\n"));
-		ipsecstat.in_inval++;
-		goto bad;
-	}
-
-	esptail = (struct esptail *)
-		(mtod(n, u_int8_t *) + n->m_len - sizeof(struct esptail));
-	nxt = esptail->esp_nxt;
-	taillen = esptail->esp_padlen + 2;
+	m_copydata(m, m->m_pkthdr.len - sizeof(esptail), sizeof(esptail),
+	    (caddr_t)&esptail);
+	nxt = esptail.esp_nxt;
+	taillen = esptail.esp_padlen + sizeof(esptail);
 
 	if (m->m_pkthdr.len < taillen
 	 || m->m_pkthdr.len - taillen < hlen) {	/*?*/
@@ -418,7 +404,6 @@ noreplaycheck:
 #else
 	ip->ip_len = htons(ntohs(ip->ip_len) - taillen);
 #endif
-    }
 
 	/* was it transmitted over the IPsec tunnel SA? */
 	if (ipsec4_tunnel_validate(ip, nxt, sav)) {
@@ -535,7 +520,7 @@ esp6_input(mp, offp, proto)
 	int off = *offp;
 	struct ip6_hdr *ip6;
 	struct esp *esp;
-	struct esptail *esptail;
+	struct esptail esptail;
 	u_int32_t spi;
 	struct secasvar *sav = NULL;
 	size_t taillen;
@@ -553,10 +538,7 @@ esp6_input(mp, offp, proto)
 		goto bad;
 	}
 
-	IP6_EXTHDR_CHECK(m, off, sizeof(struct esp), IPPROTO_DONE);
-
 	ip6 = mtod(m, struct ip6_hdr *);
-	esp = (struct esp *)(((u_int8_t *)ip6) + off);
 
 	if (ntohs(ip6->ip6_plen) == 0) {
 		ipseclog((LOG_ERR, "IPv6 ESP input: "
@@ -564,6 +546,17 @@ esp6_input(mp, offp, proto)
 		ipsec6stat.in_inval++;
 		goto bad;
 	}
+
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, ESPMAXLEN, IPPROTO_DONE);
+	esp = (struct esp *)(((u_int8_t *)ip6) + off);
+#else
+	IP6_EXTHDR_GET(esp, struct esp *, m, off, ESPMAXLEN);
+	if (esp == NULL) {
+		ipsec6stat.in_nomem++;
+		return IPPROTO_DONE;
+	}
+#endif
 
 	/* find the sassoc. */
 	spi = esp->esp_spi;
@@ -788,31 +781,13 @@ noreplaycheck:
     }
 #endif
 
-    {
 	/*
-	 * find the trailer of the ESP.
+	 * grab content of ESP trailer.
 	 */
-	struct mbuf *n;		/*the last mbuf on the mbuf chain, m_len > 0 */
-	struct mbuf *o;		/*the last mbuf on the mbuf chain */
-	
-	o = m;
-	n = NULL;
-	while (o) {
-		if (0 < o->m_len)
-			n = o;
-		o = o->m_next;
-	}
-	if (!n || n->m_len < sizeof(struct esptail)) {
-		ipseclog((LOG_DEBUG,
-		    "IPv6 ESP input: assertion on pad part failed\n"));
-		ipsec6stat.in_inval++;
-		goto bad;
-	}
-
-	esptail = (struct esptail *)
-		(mtod(n, u_int8_t *) + n->m_len - sizeof(struct esptail));
-	nxt = esptail->esp_nxt;
-	taillen = esptail->esp_padlen + 2;
+	m_copydata(m, m->m_pkthdr.len - sizeof(esptail), sizeof(esptail),
+	    (caddr_t)&esptail);
+	nxt = esptail.esp_nxt;
+	taillen = esptail.esp_padlen + 2;
 
 	if (m->m_pkthdr.len < taillen
 	 || m->m_pkthdr.len - taillen < sizeof(struct ip6_hdr)) {	/*?*/
@@ -823,11 +798,10 @@ noreplaycheck:
 		goto bad;
 	}
 
-	/* strip off the padding. */
+	/* strip off the trailing pad area. */
 	m_adj(m, -taillen);
 
 	ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - taillen);
-    }
 
 	/* was it transmitted over the IPsec tunnel SA? */
 	if (ipsec6_tunnel_validate(ip6, nxt, sav)) {
@@ -842,10 +816,14 @@ noreplaycheck:
 		flowinfo = ip6->ip6_flow;
 		m_adj(m, off + esplen + ivlen);
 		if (m->m_len < sizeof(*ip6)) {
+#ifndef PULLDOWN_TEST
 			/*
 			 * m_pullup is prohibited in KAME IPv6 input processing
 			 * but there's no other way!
 			 */
+#endif
+			/* okay to pullup in m_pulldown world. */
+#endif
 			m = m_pullup(m, sizeof(*ip6));
 			if (!m) {
 				ipsec6stat.in_inval++;
