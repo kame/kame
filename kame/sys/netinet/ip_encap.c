@@ -96,7 +96,7 @@ struct encaptab {
 	struct sockaddr_storage srcmask;
 	struct sockaddr_storage dst;	/* remote addr */
 	struct sockaddr_storage dstmask;
-	struct protosw *psw;		/* only pr_input will be used */
+	const struct protosw *psw;	/* only pr_input will be used */
 	void *arg;			/* passed via m->m_pkthdr.aux */
 };
 
@@ -240,9 +240,9 @@ void *
 encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 	int af;
 	int proto;
-	struct sockaddr *sp, *sm;
-	struct sockaddr *dp, *dm;
-	struct protosw *psw;
+	const struct sockaddr *sp, *sm;
+	const struct sockaddr *dp, *dm;
+	const struct protosw *psw;
 	void *arg;
 {
 	struct encaptab *ep;

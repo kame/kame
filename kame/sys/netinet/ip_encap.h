@@ -34,9 +34,9 @@
 void	encap_init __P((void));
 void	encap4_input __P((struct mbuf *, ...));
 int	encap6_input __P((struct mbuf **, int *, int));
-void	*encap_attach __P((int, int, struct sockaddr *, struct sockaddr *,
-		struct sockaddr *, struct sockaddr *, struct protosw *,
-		void *));
+void	*encap_attach __P((int, int, const struct sockaddr *,
+		const struct sockaddr *, const struct sockaddr *,
+		const struct sockaddr *, const struct protosw *, void *));
 int	encap_detach __P((void *));
 #endif
 
