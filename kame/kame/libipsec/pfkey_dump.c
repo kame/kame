@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.39 2003/04/15 07:38:42 itojun Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.40 2003/04/17 07:21:41 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -496,8 +496,8 @@ str_prefport(family, pref, port, ulp)
 	u_int family, pref, port, ulp;
 {
 	static char buf[128];
-	char prefbuf[20];
-	char portbuf[20];
+	char prefbuf[128];
+	char portbuf[128];
 	int plen;
 
 	switch (family) {
