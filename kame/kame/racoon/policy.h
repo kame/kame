@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.h,v 1.7 2000/03/24 16:32:02 sakane Exp $ */
+/* YIPS @(#)$Id: policy.h,v 1.8 2000/04/05 04:54:41 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -70,7 +70,7 @@ struct ipsecsa {
 
 	int enctype;			/* encryption algorithm */
 	int encklen;
-	int authtype			/* authentication algorithm */;
+	int authtype;			/* authentication algorithm */
 	int comptype;			/* compression algorithm */
 
 	int pfs_group;			/* only perpose for acceptable check. */
