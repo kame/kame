@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.292 2002/08/19 23:18:18 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.293 2002/08/19 23:21:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2442,7 +2442,7 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 	int name;
 	void *oldp;	/* syscall arg, need copyout */
 	size_t *oldlenp;
-	void *newp;	/* syscall arg, need in */
+	void *newp;	/* syscall arg, need copyin */
 	size_t newlen;
 {
 	void *p;
