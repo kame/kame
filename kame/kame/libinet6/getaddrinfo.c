@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.114 2001/07/04 11:45:53 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.115 2001/07/04 16:45:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -261,7 +261,7 @@ static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
 #endif
 static int gai_addr2scopetype __P((struct sockaddr *));
 #ifdef USE_LOG_REORDER
-static void log_reorder __P((struct timeval *, struct timeval *, int));
+static void log_reorder __P((struct timeval *, struct timeval *, int, int));
 #endif
 
 /* functions in OS dependent portion */
@@ -411,6 +411,9 @@ getaddrinfo(hostname, servname, hints, res)
 	struct addrinfo *afailist[sizeof(afdl)/sizeof(afdl[0])];
 	struct addrinfo *afai_unspec;
 	int found;
+#ifdef USE_LOG_REORDER
+	int numeric = 0;
+#endif
 
 	/* ensure we return NULL on errors */
 	*res = NULL;
@@ -553,8 +556,12 @@ getaddrinfo(hostname, servname, hints, res)
 		if (!error && afailist[afd - afdl])
 			found++;
 	}
-	if (found)
+	if (found) {
+#ifdef USE_LOG_REORDER
+		numeric = 1;
+#endif
 		goto globcopy;
+	}
 
 	if (pai->ai_flags & AI_NUMERICHOST)
 		ERR(EAI_NONAME);
@@ -683,7 +690,7 @@ globcopy:
 				n = reorder(&sentinel);
 #ifdef USE_LOG_REORDER
 				gettimeofday(&end, NULL);
-				log_reorder(&start, &end, n);
+				log_reorder(&start, &end, numeric, n);
 #endif
 			}
 			*res = sentinel.ai_next;
@@ -867,14 +874,15 @@ struct gai_orderstat
 	struct timeval start;
 	struct timeval end;
 	pid_t pid;
+	int numeric;
 	int entries;
 };
 #define PATH_STATFILE "/var/run/gaistat"
 
 static void
-log_reorder(start, end, n)
+log_reorder(start, end, numeric, n)
 	struct timeval *start, *end;
-	int n;
+	int numeric, n;
 {
 	struct gai_orderstat stat;
 	struct sockaddr_un sun;
@@ -884,6 +892,7 @@ log_reorder(start, end, n)
 	stat.start = *start;
 	stat.end = *end;
 	stat.pid = getpid();
+	stat.numeric = numeric;
 	stat.entries = n;
 
 	if ((s = socket(AF_LOCAL, SOCK_DGRAM, 0)) < 0)

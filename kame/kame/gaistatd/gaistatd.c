@@ -1,4 +1,4 @@
-/*	$KAME: gaistatd.c,v 1.2 2001/07/04 12:58:32 jinmei Exp $	*/
+/*	$KAME: gaistatd.c,v 1.3 2001/07/04 16:45:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -50,6 +50,7 @@ struct gai_orderstat
 	struct timeval start;
 	struct timeval end;
 	pid_t pid;
+	int numeric;
 	int entries;
 };
 
@@ -119,10 +120,10 @@ main()
 		if ((fp = fopen(PATH_LOGIFLE, "a+")) == NULL)
 			continue;
 		fprintf(fp, "%s (%lu.%06lu): pid=%d, proc=%s, "
-			"delay=%lu.%06lu, entries=%d\n", timebuf,
+			"delay=%lu.%06lu, numeric=%d, entries=%d\n", timebuf,
 			(u_long)stat.start.tv_sec, (u_long)stat.start.tv_usec,
 			stat.pid, procname, (u_long)delay.tv_sec,
-			(u_long)delay.tv_usec, stat.entries);
+			(u_long)delay.tv_usec, stat.numeric, stat.entries);
 		fclose(fp);
 	}
 }
