@@ -27,13 +27,12 @@
  * SUCH DAMAGE.
  */
 /*
- * $Id: bindtest.c,v 1.7 1999/10/06 08:08:22 itojun Exp $
+ * $Id: bindtest.c,v 1.8 1999/10/06 08:10:05 itojun Exp $
  */
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/param.h>
-#include <sys/queue.h>
 
 #include <stdio.h>
 #include <stdlib.h>
