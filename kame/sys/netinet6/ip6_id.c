@@ -1,4 +1,4 @@
-/*	$KAME: ip6_id.c,v 1.13 2003/09/16 09:11:19 itojun Exp $	*/
+/*	$KAME: ip6_id.c,v 1.14 2003/11/25 18:37:16 itojun Exp $	*/
 /*	$OpenBSD: ip_id.c,v 1.6 2002/03/15 18:19:52 millert Exp $	*/
 
 /*
@@ -123,7 +123,7 @@ struct randomtab {
 	u_int32_t ru_msb;
 
 	u_int32_t ru_x;
-	u_int32_t ru_seed, ru_seed2;
+	u_int32_t ru_seed;
 	u_int32_t ru_a, ru_b;
 	u_int32_t ru_g;
 	long ru_reseed;
@@ -196,7 +196,6 @@ initid(struct randomtab *p)
 
 	/* (bits - 1) bits of random seed */
 	p->ru_seed = arc4random() & (~0U >> (32 - p->ru_bits + 1));
-	p->ru_seed2 = arc4random() & (~0U >> (32 - p->ru_bits + 1));
 
 	/* Determine the LCG we use */
 	p->ru_b = (arc4random() & (~0U >> (32 - p->ru_bits))) | 1;
@@ -261,7 +260,7 @@ randomid(struct randomtab *p)
 
 	p->ru_counter += i;
 
-	return (p->ru_seed ^ pmod(p->ru_g, p->ru_seed2 ^ p->ru_x, p->ru_n)) |
+	return (p->ru_seed ^ pmod(p->ru_g, p->ru_x, p->ru_n)) |
 	    p->ru_msb;
 }
 
