@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1465 2001/01/05 13:51:50 itojun Exp $
+$KAME: CHANGELOG,v 1.1466 2001/01/06 05:32:32 jinmei Exp $
 
 <200101>
+2001-01-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/etc/rc.net6: prohibit the prefix command by default.
+        Since the command has recently caused many problems, we should
+	reconsider the prefix management mechanism.
+
 Fri Jan  5 22:51:16 JST 2001  itojun@iijlab.net
 	* libinet6/name6.c: nuke getnodeby{name,addr}, which was mentioned
 	  only in draft-ietf-ipngwg-bsd-api-new-01.txt.
