@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.1 1999/08/08 23:30:00 itojun Exp $ */
+/* $Id: name6.c,v 1.2 1999/08/16 03:23:44 jinmei Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -408,6 +408,7 @@ gethostbyname2(const char *name, int af)
 
 	if (saved_hp != NULL)
 		freehostent(saved_hp);
+	saved_hp = NULL;
 
 	/* special case for literal address */
 	/* XXX: use inet_aton to handle nonstandard format for IPv4 */
