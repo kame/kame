@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.401 2003/11/03 04:20:52 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.402 2003/11/06 06:09:32 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3727,8 +3727,8 @@ ip6_setmoptions(optname, im6op, m)
 		/*
 		 * If the interface is specified, validate it.
 		 */
-		if (mreq->ipv6mr_interface < 0
-		 || if_index < mreq->ipv6mr_interface) {
+		if (mreq->ipv6mr_interface < 0 ||
+		    if_index < mreq->ipv6mr_interface) {
 			error = ENXIO;	/* XXX EINVAL? */
 			break;
 		}
