@@ -1,5 +1,5 @@
 /* 
- * $Id: startup.c,v 1.5 1999/12/21 12:00:44 jinmei Exp $
+ * $Id: startup.c,v 1.6 2001/02/01 07:42:34 itojun Exp $
  */
 
 /*
@@ -154,11 +154,6 @@ initialize_sockets(void)
 		exit_route6d();
 	}
 #endif 
-	if (setsockopt(rip6_sock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
-		       (void *)&hops, sizeof(int)) < 0) {
-		syslog(LOG_ERR, "sockopt PKTINFO: %m");
-		exit_route6d();
-	}
 	if ((admin_sock = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) {
 		syslog(LOG_ERR, "admin socket: %m");
 		exit_route6d();
