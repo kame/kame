@@ -41,6 +41,7 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "interface.h"
 #include "addrtoname.h"
