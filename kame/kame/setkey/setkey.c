@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.21 2001/08/16 10:32:01 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.22 2001/08/16 10:39:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -100,7 +100,6 @@ Usage()
 	printf("\t%s [-Padlv] -D\n", pname);
 	printf("\t%s [-Pdv] -F\n", pname);
 	printf("\t%s [-h] -x\n", pname);
-	pfkey_close(so);
 	exit(1);
 }
 
@@ -165,13 +164,18 @@ main(ac, av)
 		}
 	}
 
+	so = pfkey_open();
+	if (so < 0) {
+		perror("pfkey_open");
+		exit(1);
+	}
+
 	switch (f_mode) {
 	case MODE_CMDDUMP:
 		sendkeyshort(f_policy ? SADB_X_SPDDUMP: SADB_DUMP);
 		break;
 	case MODE_CMDFLUSH:
 		sendkeyshort(f_policy ? SADB_X_SPDFLUSH: SADB_FLUSH);
-		pfkey_close(so);
 		break;
 	case MODE_SCRIPT:
 		if (get_supported() < 0) {
@@ -195,12 +199,6 @@ main(ac, av)
 int
 get_supported()
 {
-	int so;
-
-	if ((so = pfkey_open()) < 0) {
-		perror("pfkey_open");
-		return -1;
-	}
 
 	/* debug mode ? */
 	if (f_debug)
@@ -240,7 +238,6 @@ promisc()
 {
 	struct sadb_msg msg;
 	u_char rbuf[1024 * 32];	/* XXX: Enough ? Should I do MSG_PEEK ? */
-	int so;
 	ssize_t l;
 
 	msg.sadb_msg_version = PF_KEY_V2;
@@ -251,11 +248,6 @@ promisc()
 	msg.sadb_msg_reserved = 0;
 	msg.sadb_msg_seq = 0;
 	msg.sadb_msg_pid = getpid();
-
-	if ((so = socket(PF_KEY, SOCK_RAW, PF_KEY_V2)) < 0) {
-		err(1, "socket(PF_KEY)");
-		/*NOTREACHED*/
-	}
 
 	if ((l = send(so, &msg, sizeof(msg), 0)) < 0) {
 		err(1, "send");
@@ -312,16 +304,9 @@ sendkeymsg(buf, len)
 	char *buf;
 	size_t len;
 {
-	int so;
-
 	u_char rbuf[1024 * 32];	/* XXX: Enough ? Should I do MSG_PEEK ? */
 	ssize_t l;
 	struct sadb_msg *msg;
-
-	if ((so = pfkey_open()) < 0) {
-		perror("pfkey_open");
-		return -1;
-	}
 
     {
 	struct timeval tv;
@@ -373,7 +358,6 @@ again:
 	}
 
 end:
-	pfkey_close(so);
 	return(0);
 }
 
@@ -385,7 +369,7 @@ postproc(msg, len)
 
 	if (msg->sadb_msg_errno != 0) {
 		char inf[80];
-		char *errmsg = NULL;
+		const char *errmsg = NULL;
 
 		if (f_mode == MODE_SCRIPT)
 			snprintf(inf, sizeof(inf), "The result of line %d: ", lineno);
@@ -460,13 +444,13 @@ postproc(msg, len)
 }
 
 /*------------------------------------------------------------*/
-static char *satype[] = {
+static const char *satype[] = {
 	NULL, NULL, "ah", "esp"
 };
-static char *sastate[] = {
+static const char *sastate[] = {
 	"L", "M", "D", "d"
 };
-static char *ipproto[] = {
+static const char *ipproto[] = {
 /*0*/	"ip", "icmp", "igmp", "ggp", "ip4",
 	NULL, "tcp", NULL, "egp", NULL,
 /*10*/	NULL, NULL, NULL, NULL, NULL,
