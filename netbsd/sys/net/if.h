@@ -268,6 +268,8 @@ struct ifnet {				/* and the entries */
 #endif
 	struct	sockaddr_dl *if_sadl;	/* pointer to our sockaddr_dl */
 	u_int8_t *if_broadcastaddr;	/* linklevel broadcast bytestring */
+
+	void	*if_afdata[AF_MAX];
 };
 #define	if_mtu		if_data.ifi_mtu
 #define	if_type		if_data.ifi_type

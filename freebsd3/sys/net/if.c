@@ -79,6 +79,7 @@
 #include <sys/sockio.h>
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
+#include <sys/domain.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -162,6 +163,7 @@ if_attach(ifp)
 	register struct ifaddr *ifa;
 	static int if_indexlim = 8;
 	static int inited;
+	struct domain *dp;
 
 	if (!inited) {
 		TAILQ_INIT(&ifnet);
@@ -248,6 +250,14 @@ if_attach(ifp)
 	ifp->if_snd.altq_tbr  = NULL;
 	ifp->if_snd.altq_ifp  = ifp;
 #endif
+
+	/* address family dependent data region */
+	bzero(ifp->if_afdata, sizeof(ifp->if_afdata));
+	for (dp = domains; dp; dp = dp->dom_next) {
+		if (dp->dom_ifattach)
+			ifp->if_afdata[dp->dom_family] =
+			    (*dp->dom_ifattach)(ifp);
+	}
 }
 
 /*

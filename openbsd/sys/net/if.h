@@ -171,6 +171,8 @@ struct ifnet {				/* and the entries */
 					/* timer routine */
 	void	(*if_watchdog)(struct ifnet *);
 	struct	ifaltq if_snd;		/* output queue (includes altq) */
+
+	void	*if_afdata[AF_MAX];
 };
 #define	if_mtu		if_data.ifi_mtu
 #define	if_type		if_data.ifi_type

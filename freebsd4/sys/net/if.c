@@ -50,6 +50,7 @@
 #include <sys/sockio.h>
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
+#include <sys/domain.h>
 
 #include <net/if.h>
 #include <net/if_arp.h>
@@ -152,6 +153,7 @@ if_attach(ifp)
 	register struct ifaddr *ifa;
 	static int if_indexlim = 8;
 	static int inited;
+	struct domain *dp;
 
 	if (!inited) {
 		TAILQ_INIT(&ifnet);
@@ -168,7 +170,6 @@ if_attach(ifp)
 	 * this unlikely case.
 	 */
 	TAILQ_INIT(&ifp->if_addrhead);
-	TAILQ_INIT(&ifp->if_prefixhead);
 	LIST_INIT(&ifp->if_multiaddrs);
 	getmicrotime(&ifp->if_lastchange);
 	if (ifnet_addrs == 0 || if_index >= if_indexlim) {
@@ -235,6 +236,14 @@ if_attach(ifp)
 	ifp->if_snd.altq_tbr  = NULL;
 	ifp->if_snd.altq_ifp  = ifp;
 #endif
+
+	/* address family dependent data region */
+	bzero(ifp->if_afdata, sizeof(ifp->if_afdata));
+	for (dp = domains; dp; dp = dp->dom_next) {
+		if (dp->dom_ifattach)
+			ifp->if_afdata[dp->dom_family] =
+			    (*dp->dom_ifattach)(ifp);
+	}
 }
 
 /*
@@ -249,6 +258,7 @@ if_detach(ifp)
 	struct radix_node_head	*rnh;
 	int s;
 	int i;
+	struct domain *dp;
 
 	/*
 	 * Remove routes and flush queues.
@@ -317,6 +327,12 @@ if_detach(ifp)
 		if ((rnh = rt_tables[i]) == NULL)
 			continue;
 		(void) rnh->rnh_walktree(rnh, if_rtdel, ifp);
+	}
+
+	for (dp = domains; dp; dp = dp->dom_next) {
+		if (dp->dom_ifdetach)
+			(*dp->dom_ifdetach)(ifp,
+			    ifp->if_afdata[dp->dom_family]);
 	}
 
 	TAILQ_REMOVE(&ifnet, ifp, if_link);

@@ -77,6 +77,7 @@
 #include <sys/protosw.h>
 #include <sys/kernel.h>
 #include <sys/ioctl.h>
+#include <sys/domain.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -159,6 +160,7 @@ if_attachsetup(ifp)
 	register struct sockaddr_dl *sdl;
 	register struct ifaddr *ifa;
 	static int if_indexlim = 8;
+	struct domain *dp;
 
 	ifp->if_index = ++if_index;
 
@@ -239,6 +241,14 @@ if_attachsetup(ifp)
 	ifp->if_snd.altq_tbr  = NULL;
 	ifp->if_snd.altq_ifp  = ifp;
 #endif
+
+	/* address family dependent data region */
+	bzero(ifp->if_afdata, sizeof(ifp->if_afdata));
+	for (dp = domains; dp; dp = dp->dom_next) {
+		if (dp->dom_ifattach)
+			ifp->if_afdata[dp->dom_family] =
+			    (*dp->dom_ifattach)(ifp);
+	}
 }
 
 void
@@ -328,6 +338,7 @@ if_detach(ifp)
 	struct ifaddr *ifa;
 	int i, s = splimp();
 	struct radix_node_head *rnh;
+	struct domain *dp;
 
 	ifp->if_flags &= ~IFF_OACTIVE;
 	ifp->if_start = if_detached_start;
@@ -393,6 +404,13 @@ if_detach(ifp)
 #endif
 		free(ifa, M_IFADDR);
 	}
+
+	for (dp = domains; dp; dp = dp->dom_next) {
+		if (dp->dom_ifdetach)
+			(*dp->dom_ifdetach)(ifp,
+			    ifp->if_afdata[dp->dom_family]);
+	}
+
 	splx(s);
 }
 

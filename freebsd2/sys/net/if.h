@@ -171,6 +171,8 @@ struct ifnet {
 	struct	ifqueue if_snd;		/* output queue */
 #endif
 	struct	ifqueue *if_poll_slowq;	/* input queue for slow devices */
+
+	void	*if_afdata[AF_MAX];
 };
 typedef void if_init_f_t __P((void *));       
 

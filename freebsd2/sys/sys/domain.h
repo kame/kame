@@ -74,6 +74,7 @@
  * Forward structure declarations for function prototypes [sic].
  */
 struct	mbuf;
+struct	ifnet;
 
 struct	domain {
 	int	dom_family;		/* AF_xxx */
@@ -86,18 +87,13 @@ struct	domain {
 		__P((struct mbuf *));
 	struct	protosw *dom_protosw, *dom_protoswNPROTOSW;
 	struct	domain *dom_next;
-#ifdef RADISH
-	int	(*dom_rtattach)	__P((void **, int, int, int, int, int (*)()));
-	int	dom_maxrtkey;		/* bytes of sockaddr */
-	int	dom_rtoffset;		/* bytes of address start offset */
-	int	dom_addrlen;		/* bytes of address length */
-	int	(*dom_match)();
-#else /* RADISH */
 	int	(*dom_rtattach)		/* initialize routing table */
 		__P((void **, int));
 	int	dom_rtoffset;		/* an arg to rtattach, in bits */
 	int	dom_maxrtkey;		/* for routing layer */
-#endif /* RADISH */
+	void	*(*dom_ifattach) __P((struct ifnet *));
+	void	(*dom_ifdetach) __P((struct ifnet *, void *));
+					/* af-dependent data on ifnet */
 };
 
 #ifdef KERNEL

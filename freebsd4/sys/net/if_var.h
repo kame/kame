@@ -81,7 +81,6 @@ struct	ether_header;
 
 TAILQ_HEAD(ifnethead, ifnet);	/* we use TAILQs so that the order of */
 TAILQ_HEAD(ifaddrhead, ifaddr);	/* instantiation is preserved in the list */
-TAILQ_HEAD(ifprefixhead, ifprefix);
 LIST_HEAD(ifmultihead, ifmultiaddr);
 
 /*
@@ -180,7 +179,8 @@ struct ifnet {
 	struct	ifqueue if_snd;		/* output queue */
 #endif
 	struct	ifqueue *if_poll_slowq;	/* input queue for slow devices */
-	struct	ifprefixhead if_prefixhead; /* list of prefixes per if */
+
+	void	*if_afdata[AF_MAX];
 };
 typedef void if_init_f_t __P((void *));
 
@@ -442,20 +442,6 @@ struct ifaddr {
 
 /* for compatibility with other BSDs */
 #define	ifa_list	ifa_link
-
-/*
- * The prefix structure contains information about one prefix
- * of an interface.  They are maintained by the different address families,
- * are allocated and attached when an prefix or an address is set,
- * and are linked together so all prefixes for an interface can be located.
- */
-struct ifprefix {
-	struct	sockaddr *ifpr_prefix;	/* prefix of interface */
-	struct	ifnet *ifpr_ifp;	/* back-pointer to interface */
-	TAILQ_ENTRY(ifprefix) ifpr_list; /* queue macro glue */
-	u_char	ifpr_plen;		/* prefix length in bits */
-	u_char	ifpr_type;		/* protocol dependent prefix type */
-};
 
 /*
  * Multicast address structure.  This is analogous to the ifaddr
