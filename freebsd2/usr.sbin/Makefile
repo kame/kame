@@ -7,6 +7,5 @@ SUBDIR+=natptconfig natptd natptlog
 SUBDIR+=racoon
 SUBDIR+=altqd pvcbridge pvcsif pvctxctl tbrconfig
 #SUBDIR+=inet6d
-SUBDIR+=mip6config mip6stat
 
 .include <bsd.subdir.mk>

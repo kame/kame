@@ -11,7 +11,7 @@
 # device lines is present in the ./LINT configuration file. If you are 
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-#	$Id: GENERIC.v6,v 1.34 2001/05/22 08:06:50 itojun Exp $
+#	$Id: GENERIC.v6,v 1.35 2001/06/04 07:41:21 keiichi Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -73,10 +73,6 @@ options 	ALTQ_PRIQ	#priority queue
 
 # Network Address Translation - Protocol Translation (NAT-PT)
 #options 	NATPT
-
-# mobile-ip6 options
-#options 	"MIP6"
-##options 	"MIP6_DEBUG"
 
 options		FFS			#Berkeley Fast Filesystem
 options		NFS			#Network Filesystem
