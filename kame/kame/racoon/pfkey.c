@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.103 2001/02/02 05:44:04 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.104 2001/02/02 12:14:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1535,6 +1535,7 @@ pk_recvacquire(mhp)
 			"failed to allocate phase2 entry.\n");
 		return -1;
 	}
+	iph2[n]->side = INITIATOR;
 	iph2[n]->spid = xpl->sadb_x_policy_id;
 	iph2[n]->satype = msg->sadb_msg_satype;
 	iph2[n]->seq = msg->sadb_msg_seq;
