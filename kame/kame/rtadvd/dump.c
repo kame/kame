@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.18 2001/06/01 17:48:58 jinmei Exp $	*/
+/*	$KAME: dump.c,v 1.19 2001/06/08 04:49:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -65,7 +65,7 @@ extern struct rainfo *ralist;
 static char *ether_str __P((struct sockaddr_dl *));
 static void if_dump __P((void));
 
-#ifdef __FreeBSD__		/* XXX: see PORTABILITY */
+#ifdef defined(__FreeBSD__) && __FreeBSD__ <= 3	/* XXX: see PORTABILITY */
 #define LONGLONG "%qu"
 #else
 #define LONGLONG "%llu"
