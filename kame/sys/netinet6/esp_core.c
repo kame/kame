@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.41 2000/09/18 21:05:43 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.42 2000/09/18 21:06:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -155,10 +155,6 @@ esp_algorithm_lookup(idx)
 		{ 1, 0, esp_null_mature, 0, 2048, 0, "null",
 			esp_common_ivlen, esp_null_decrypt,
 			esp_null_encrypt, NULL, },
-		/*
-		 * XXX it seems that old blowfish code had a bug.
-		 * hardcode to esp_cbc_{en,de}crypt.
-		 */
 		{ 8, 8, esp_cbc_mature, 40, 448, sizeof(BF_KEY), "blowfish-cbc",
 			esp_common_ivlen, esp_cbc_decrypt,
 			esp_cbc_encrypt, esp_blowfish_schedule,
