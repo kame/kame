@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf.c,v 1.382 2003/08/09 14:56:48 cedric Exp $ */
+/*	$OpenBSD: pf.c,v 1.384 2003/08/17 15:36:48 dhartmei Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -1354,6 +1354,7 @@ pf_send_tcp(const struct pf_rule *r, sa_family_t af,
 #else
 		ip6_output(m, NULL, NULL, 0, NULL, NULL);
 #endif
+		break;
 #endif /* INET6 */
 	}
 }
