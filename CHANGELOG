@@ -1,7 +1,68 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2386 2003/04/17 13:49:04 jinmei Exp $
+$KAME: CHANGELOG,v 1.2387 2003/04/21 06:27:04 itojun Exp $
 
 <200304>
+Mon Apr 21 16:39:26 JST 2003  itojun@iijlab.net
+	* sctp patch 8 from randall
+
+	1) Problem with source address selection for v6
+	   found by Itojun when sending to ::1
+
+	2) Security upgrade to report addresses in three
+	   states ACTIVE/IN-ACTIVE and UN-CONFIRMED. This
+	   also includes fixes to HB un-confirmed address
+	   more rapidly. The idea behind this is to
+	   keep folks from specifying addresses that are
+	   not theres to do a "masqurade". This fix is
+	   a result of discussions with Steve Bellovin.
+
+	3) Same issue, #2 but also added in is when a 
+	   user sends to an address, if the address is
+	   un-cofirmed we treat it just like a MSG_OVERIDE
+	   so we will send to the address the user thinks
+	   OR we get an abort from the peer if the association
+	   that had the address was really masqurading.
+
+	4) Minor formatting problems to match BSD style
+
+	5) Implementors Guide update. We had failed to
+	   send a INIT-ACK back to the same place we sent
+	   the INIT to when we had a collision scenario.
+	   Missed this issue in putting all the IG in
+	   the code. This comes as a result of the LONG
+	   discussion with B B on the sctp-impl list. 
+
+	6) Michael Tuexen found that user caused abort
+	   when the user did a SO_LINGER = 0 and a close
+	   has incorrect lengths in the TLV. This was
+	   through ANY code that did a optional param
+	   on the ABORT.. the m_len's were not properly
+	   set.
+
+	7) When sending to a loopback in V6 we listed
+	   all Link Locals... but none of these are
+	   really sendable since the peer (on our
+	   host) has no scope. Found while investaging
+	   Itojuns ::1 send issue. Now we will never
+	   list link-local address so the only way
+	   they can show up is as a source address.
+
+	8) Include file and various other issues reported
+	   by kame. We kill off the sysctrls that somehow
+	   historically got in and are not used. Only ones
+	   now are the ASCONF, RECV Buf default and Snd
+	   buf default.
+
+	9) Will now send up to max-bursts hb's to unconfirmed
+	   addresses and we use only the RTO for HB setting
+	   when we are in a unconfirmed mode.. aka not
+	   all addresses have HB'd yet.
+
+	10) Fixes to better recognize the various ICMP's during
+	    initial INIT sending. If the assoc is up we better
+	    recognize unreachable host messages too (reported
+	    by kame-core group).
+
 2003-04-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c (getaddrinfo): when AI_PASSIVE
 	is specified, put non-SCTP protocols before SCTP not to break
