@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.c,v 1.6 2000/01/11 01:02:19 itojun Exp $ */
+/* YIPS @(#)$Id: sockmisc.c,v 1.7 2000/01/13 05:46:33 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -107,7 +107,8 @@ cmpsaddr(addr1, addr2)
 	 || addr1->sa_family != addr2->sa_family)
 		return 1;
 
-	if (_INPORTBYSA(addr1) != _INPORTBYSA(addr2))
+	if (!(_INPORTBYSA(addr1) == 0 || _INPORTBYSA(addr2) == 0 ||
+	      _INPORTBYSA(addr1) == _INPORTBYSA(addr2)))
 		return 1;
 
 	if (memcmp(_INADDRBYSA(addr1), _INADDRBYSA(addr2),
