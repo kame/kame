@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.6 2002/06/29 13:11:45 itojun Exp $	*/
+/*	$KAME: config.h,v 1.7 2003/04/16 11:02:21 ono Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -35,6 +35,11 @@ extern void invalidate_prefix __P((struct prefix *));
 extern void update_prefix __P((struct prefix *));
 extern void make_prefix __P((struct rainfo *, int, struct in6_addr *, int));
 extern void make_packet __P((struct rainfo *));
+extern void get_prefix __P((struct rainfo *));
+#ifdef VRRP
+extern void delete_prefix_from_kernel __P((struct rainfo *));
+#endif
+
 
 /*
  * it is highly unlikely to have 100 prefix information options,

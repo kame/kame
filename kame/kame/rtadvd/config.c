@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.76 2003/04/10 11:56:34 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.77 2003/04/16 11:02:21 ono Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -76,7 +76,6 @@ extern struct rainfo *ralist;
 
 static struct rtadvd_timer *prefix_timeout __P((void *));
 static void makeentry __P((char *, size_t, int, char *));
-static void get_prefix __P((struct rainfo *));
 static int getinet6sysctl __P((int));
 
 void
@@ -631,7 +630,7 @@ getconfig(intface)
 	rtadvd_set_timer(&tmp->timer->tm, tmp->timer);
 }
 
-static void
+void
 get_prefix(struct rainfo *rai)
 {
 	struct ifaddrs *ifap, *ifa;
@@ -812,6 +811,21 @@ add_prefix(struct rainfo *rai, struct in6_prefixreq *ipr)
 	rai->pfxs++;
 	make_packet(rai);
 }
+
+#ifdef VRRP
+void
+delete_prefix_from_kernel(struct rainfo *rai)
+{
+	struct prefix *pp, *next;
+	
+	for (pp = rai->prefix.next; pp != &rai->prefix; pp = next) {
+		next = pp->next;
+		if (pp->origin == PREFIX_FROM_KERNEL) {
+			delete_prefix(pp);
+		}
+	}
+}
+#endif
 
 /*
  * Delete a prefix to the list of specified interface and reconstruct
@@ -1189,13 +1203,3 @@ getinet6sysctl(int code)
 	else
 		return(value);
 }
-
-#ifdef VRRP
-void
-getvrrpcfg(struct rainfo *rai)
-{
-	if (rai == NULL)
-		return;
-	
-}
-#endif
