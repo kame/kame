@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.183 2001/03/01 15:15:23 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.184 2001/03/01 22:54:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1204,7 +1204,7 @@ ip6_input(m)
 		}
 #endif
 
-#ifdef IPSEC
+#if defined(IPSEC) && !defined(__OpenBSD__)
 		/*
 		 * enforce IPsec policy checking if we are seeing last header.
 		 * note that we do not visit this with protocols with pcb layer
