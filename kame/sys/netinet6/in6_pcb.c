@@ -138,18 +138,9 @@ in6_pcballoc(so, head)
 	in6p->in6p_fsa.sin6_family = in6p->in6p_lsa.sin6_family = AF_INET6;
 	in6p->in6p_fsa.sin6_len =
 		in6p->in6p_lsa.sin6_len = sizeof(struct sockaddr_in6);
-	/* XXX: we should allocate inputopts only when we need it. */
-	MALLOC(in6p->in6p_inputopts, struct ip6_recvpktopts *,
-	       sizeof(struct ip6_recvpktopts), M_IP6OPT, M_NOWAIT);
-	if (in6p->in6p_inputopts == NULL) {
-		FREE(in6p, M_PCB);
-		return (ENOBUFS); /* XXX */
-	}
-	bzero(in6p->in6p_inputopts, sizeof(struct ip6_recvpktopts));
 #ifdef IPSEC
 	error = ipsec_init_pcbpolicy(so, &in6p->in6p_sp);
 	if (error != 0) {
-		FREE(in6p->in6p_inputopts, M_IP6OPT);
 		FREE(in6p, M_PCB);
 		return error;
 	}
@@ -533,12 +524,6 @@ in6_pcbdetach(in6p)
 	if (so) {
 		sotoin6pcb(so) = 0;
 		sofree(so);
-	}
-
-	/* Free all received options. */
-	if (in6p->in6p_inputopts) {
-		m_freem(in6p->in6p_inputopts->head); /* this safe */
-		FREE(in6p->in6p_inputopts, M_IP6OPT);
 	}
 
 	ip6_freepcbopts(in6p->in6p_outputopts);
