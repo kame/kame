@@ -1,4 +1,4 @@
- /*	$KAME: wru.c,v 1.3 2002/01/21 07:57:11 jinmei Exp $	*/
+ /*	$KAME: wru.c,v 1.4 2002/01/21 08:23:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -659,8 +659,8 @@ set_zone(dst)
 		struct sockaddr *sa;
 
 		rtm = (struct rt_msghdr *)next;
-		if ((rtm->rtm_addrs & (RTA_DST | RTA_NETMASK | RTA_IFP)) !=
-		    (RTA_DST | RTA_NETMASK | RTA_IFP)) {
+		if ((rtm->rtm_addrs & (RTA_DST | RTA_NETMASK)) !=
+		    (RTA_DST | RTA_NETMASK)) {
 			continue;
 		}
 
@@ -678,14 +678,7 @@ set_zone(dst)
 		if (sa->sa_family != AF_UNSPEC || sa->sa_len > 0)
 			continue;
 
-		/* get the outgoing interface */
-		NEXTSA(sa);
-		if ((rtm->rtm_addrs & RTA_GENMASK))
-			NEXTSA(sa);
-		if (sa->sa_family != AF_LINK) /* XXX: should not happen */
-			continue;
-
-		defif = ((struct sockaddr_dl *)sa)->sdl_index;
+		defif = rtm->rtm_index;
 		goto setzone;
 	}
 	warnx("can't find the default interface");
