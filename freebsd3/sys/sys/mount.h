@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mount.h	8.21 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/sys/mount.h,v 1.73.2.1 1999/08/29 16:32:33 peter Exp $
+ * $FreeBSD: src/sys/sys/mount.h,v 1.73.2.2 1999/11/22 07:08:11 julian Exp $
  */
 
 #ifndef _SYS_MOUNT_H_
@@ -373,7 +373,7 @@ struct vfsops {
 
 #include <net/radix.h>
 
-#define	AF_MAX		31	/* XXX */
+#define	AF_MAX		33	/* XXX */
 
 /*
  * Network address lookup element

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_serv.c  8.8 (Berkeley) 7/31/95
- * $FreeBSD: src/sys/nfs/nfs_serv.c,v 1.72.2.5 1999/08/29 16:30:28 peter Exp $
+ * $FreeBSD: src/sys/nfs/nfs_serv.c,v 1.72.2.8 1999/12/16 17:03:10 dillon Exp $
  */
 
 /*
@@ -129,7 +129,9 @@ extern struct nfsstats nfsstats;
 int nfsrvw_procrastinate = NFS_GATHERDELAY * 1000;
 int nfsrvw_procrastinate_v3 = 0;
 
+static struct timeval nfsver = { 0 };
 static int nfs_async;
+
 SYSCTL_INT(_vfs_nfs, OID_AUTO, async, CTLFLAG_RW, &nfs_async, 0, "");
 
 static int nfsrv_access __P((struct vnode *,int,struct ucred *,int,
@@ -243,7 +245,7 @@ nfsrv_getattr(nfsd, slp, procp, mrq)
 	register struct nfs_fattr *fp;
 	struct vattr va;
 	register struct vattr *vap = &va;
-	struct vnode *vp;
+	struct vnode *vp = NULL;
 	nfsfh_t nfh;
 	fhandle_t *fhp;
 	register u_int32_t *tl;
@@ -447,7 +449,7 @@ nfsrv_lookup(nfsd, slp, procp, mrq)
 	struct ucred *cred = &nfsd->nd_cr;
 	register struct nfs_fattr *fp;
 	struct nameidata nd, ind, *ndp = &nd;
-	struct vnode *vp, *dirp;
+	struct vnode *vp, *dirp = NULL;
 	nfsfh_t nfh;
 	fhandle_t *fhp;
 	register caddr_t cp;
@@ -769,7 +771,7 @@ nfsrv_read(nfsd, slp, procp, mrq)
 	char *cp2;
 	struct mbuf *mb, *mb2, *mreq;
 	struct mbuf *m2;
-	struct vnode *vp;
+	struct vnode *vp = NULL;
 	nfsfh_t nfh;
 	fhandle_t *fhp;
 	struct uio io, *uiop = &io;
@@ -1120,8 +1122,10 @@ nfsrv_write(nfsd, slp, procp, mrq)
 		 * but it may make the values more human readable,
 		 * for debugging purposes.
 		 */
-		*tl++ = txdr_unsigned(boottime.tv_sec);
-		*tl = txdr_unsigned(boottime.tv_usec);
+		if (nfsver.tv_sec == 0)
+			nfsver = boottime;
+		*tl++ = txdr_unsigned(nfsver.tv_sec);
+		*tl = txdr_unsigned(nfsver.tv_usec);
 	} else {
 		nfsm_build(fp, struct nfs_fattr *, NFSX_V2FATTR);
 		nfsm_srvfillattr(vap, fp);
@@ -1162,7 +1166,7 @@ nfsrv_writegather(ndp, slp, procp, mrq)
 	int ioflags, aftat_ret = 1, s, adjust, v3, zeroing;
 	char *cp2;
 	struct mbuf *mb, *mb2, *mreq, *mrep, *md;
-	struct vnode *vp;
+	struct vnode *vp = NULL;
 	struct uio io, *uiop = &io;
 	u_quad_t frev, cur_usec;
 
@@ -1406,8 +1410,10 @@ loop1:
 			     * but it may make the values more human readable,
 			     * for debugging purposes.
 			     */
-			    *tl++ = txdr_unsigned(boottime.tv_sec);
-			    *tl = txdr_unsigned(boottime.tv_usec);
+			    if (nfsver.tv_sec == 0)
+				    nfsver = boottime;
+			    *tl++ = txdr_unsigned(nfsver.tv_sec);
+			    *tl = txdr_unsigned(nfsver.tv_usec);
 			} else {
 			    nfsm_build(fp, struct nfs_fattr *, NFSX_V2FATTR);
 			    nfsm_srvfillattr(&va, fp);
@@ -3021,11 +3027,13 @@ nfsrv_readdir(nfsd, slp, procp, mrq)
 	nqsrv_getl(vp, ND_READ);
 	if (v3) {
 		error = getret = VOP_GETATTR(vp, &at, cred, procp);
+#if 0
 		/*
 		 * XXX This check may be too strict for Solaris 2.5 clients.
 		 */
 		if (!error && toff && verf && verf != at.va_filerev)
 			error = NFSERR_BAD_COOKIE;
+#endif
 	}
 	if (!error)
 		error = nfsrv_access(vp, VEXEC, cred, rdonly, procp, 0);
@@ -3304,8 +3312,10 @@ nfsrv_readdirplus(nfsd, slp, procp, mrq)
 	/*
 	 * XXX This check may be too strict for Solaris 2.5 clients.
 	 */
+#if 0
 	if (!error && toff && verf && verf != at.va_filerev)
 		error = NFSERR_BAD_COOKIE;
+#endif
 	if (!error) {
 		nqsrv_getl(vp, ND_READ);
 		error = nfsrv_access(vp, VEXEC, cred, rdonly, procp, 0);
@@ -3632,8 +3642,10 @@ nfsrv_commit(nfsd, slp, procp, mrq)
 	nfsm_srvwcc_data(for_ret, &bfor, aft_ret, &aft);
 	if (!error) {
 		nfsm_build(tl, u_int32_t *, NFSX_V3WRITEVERF);
-		*tl++ = txdr_unsigned(boottime.tv_sec);
-		*tl = txdr_unsigned(boottime.tv_usec);
+		if (nfsver.tv_sec == 0)
+			nfsver = boottime;
+		*tl++ = txdr_unsigned(nfsver.tv_sec);
+		*tl = txdr_unsigned(nfsver.tv_usec);
 	} else {
 		error = 0;
 	}

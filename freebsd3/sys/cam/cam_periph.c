@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_periph.c,v 1.9.2.7 1999/08/29 16:21:38 peter Exp $
+ * $FreeBSD: src/sys/cam/cam_periph.c,v 1.9.2.9 1999/12/04 00:14:37 mjacob Exp $
  */
 
 #include <sys/param.h>
@@ -560,7 +560,7 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 		}
 
 		if (dirs[i] & CAM_DIR_OUT) {
-			flags[i] = B_READ;
+			flags[i] = B_WRITE;
 			if (useracc(*data_ptrs[i], lengths[i], B_READ) == 0){
 				printf("cam_periph_mapmem: error, "
 					"address %p, length %lu isn't "
@@ -576,7 +576,7 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 		 * is all 0's, and so it is "set" all the time.
 		 */
 		if (dirs[i] & CAM_DIR_IN) {
-			flags[i] |= B_WRITE;
+			flags[i] |= B_READ;
 			if (useracc(*data_ptrs[i], lengths[i], B_WRITE) == 0){
 				printf("cam_periph_mapmem: error, "
 					"address %p, length %lu isn't "
@@ -1522,15 +1522,18 @@ cam_periph_error(union ccb *ccb, cam_flags camflags,
 			/*
 			 * Restart the queue after either another
 			 * command completes or a 1 second timeout.
+			 * If we have any retries left, that is.
 			 */
-			/* 
-			 * XXX KDM ask JTG about this again, do we need to
-			 * be looking at the retry count here?
-			 */
-			error = ERESTART;
-			relsim_flags = RELSIM_RELEASE_AFTER_TIMEOUT
+			retry = ccb->ccb_h.retry_count > 0;
+			if (retry) {
+				ccb->ccb_h.retry_count--;
+				error = ERESTART;
+				relsim_flags = RELSIM_RELEASE_AFTER_TIMEOUT
 				     | RELSIM_RELEASE_AFTER_CMDCMPLT;
-			timeout = 1000;
+				timeout = 1000;
+			} else {
+				error = EIO;
+			}
 			break;
 		case SCSI_STATUS_RESERV_CONFLICT:
 			error = EIO;

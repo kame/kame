@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/pc98gdc.c,v 1.3.2.3 1999/08/29 16:31:13 peter Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pc98gdc.c,v 1.3.2.4 1999/12/09 12:00:30 nyan Exp $
  */
 
 #include "gdc.h"
@@ -612,11 +612,10 @@ gdc_get_info(video_adapter_t *adp, int mode, video_info_t *info)
 static int
 gdc_query_mode(video_adapter_t *adp, video_info_t *info)
 {
-    video_info_t buf;
     int i;
 
     if (!init_done)
-	return -1;
+	return ENXIO;
 
     for (i = 0; bios_vmode[i].vi_mode != EOT; ++i) {
 	if (bios_vmode[i].vi_mode == NA)
@@ -646,11 +645,11 @@ gdc_query_mode(video_adapter_t *adp, video_info_t *info)
 		continue;
 
 	/* verify if this mode is supported on this adapter */
-	if (gdc_get_info(adp, bios_vmode[i].vi_mode, &buf))
+	if (gdc_get_info(adp, bios_vmode[i].vi_mode, info))
 		continue;
-	return bios_vmode[i].vi_mode;
+	return 0;
     }
-    return -1;
+    return ENODEV;
 }
 
 /*

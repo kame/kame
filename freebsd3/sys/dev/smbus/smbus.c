@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/smbus/smbus.c,v 1.7.2.1 1999/08/29 16:24:02 peter Exp $
+ * $FreeBSD: src/sys/dev/smbus/smbus.c,v 1.7.2.2 1999/11/01 22:48:30 nsouch Exp $
  *
  */
 #include <sys/param.h>
@@ -159,4 +159,4 @@ smbus_read_ivar(device_t bus, device_t dev, int index, u_long* result)
 DRIVER_MODULE(smbus, iicsmb, smbus_driver, smbus_devclass, 0, 0);
 DRIVER_MODULE(smbus, bti2c, smbus_driver, smbus_devclass, 0, 0);
 DRIVER_MODULE(smbus, intsmb, smbus_driver, smbus_devclass, 0, 0);
-DRIVER_MODULE(smbus, smbv, smbus_driver, smbus_devclass, 0, 0);
+DRIVER_MODULE(smbus, alsmb, smbus_driver, smbus_devclass, 0, 0);

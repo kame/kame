@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_bio.c	8.9 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfs/nfs_bio.c,v 1.65.2.2 1999/08/29 16:30:27 peter Exp $
+ * $FreeBSD: src/sys/nfs/nfs_bio.c,v 1.65.2.4 1999/12/14 19:12:19 dillon Exp $
  */
 
 
@@ -758,10 +758,18 @@ again:
 			vnode_pager_setsize(vp, np->n_size);
 		}
 		bufsize = biosize;
+#if 0
+		/*
+		 * This optimization causes problems if the file grows while
+		 * blocked in nfs_getcacheblk().  Not only can data be lost,
+		 * but b_dirtyoff/end/b_validoff/end can wind up greater then
+		 * b_bufsize, resulting in general memory corruption.
+		 */
 		if ((off_t)(lbn + 1) * biosize > np->n_size) {
 			bufsize = np->n_size - (off_t)lbn * biosize;
 			bufsize = (bufsize + DEV_BSIZE - 1) & ~(DEV_BSIZE - 1);
 		}
+#endif
 		bp = nfs_getcacheblk(vp, lbn, bufsize, p);
 		if (!bp)
 			return (EINTR);
@@ -773,6 +781,8 @@ again:
 
 		if ((off_t)bp->b_blkno * DEV_BSIZE + bp->b_dirtyend > np->n_size)
 			bp->b_dirtyend = np->n_size - (off_t)bp->b_blkno * DEV_BSIZE;
+		if (bp->b_dirtyend <= bp->b_dirtyoff)
+			bp->b_dirtyend = bp->b_dirtyoff = 0;
 
 		/*
 		 * If the new write will leave a contiguous dirty
@@ -812,7 +822,7 @@ again:
 		}
 
 		error = uiomove((char *)bp->b_data + on, n, uio);
-		bp->b_flags &= ~B_NEEDCOMMIT;
+		bp->b_flags &= ~(B_NEEDCOMMIT | B_CLUSTEROK);
 		if (error) {
 			bp->b_flags |= B_ERROR;
 			brelse(bp);
@@ -844,7 +854,7 @@ again:
 		 * Since this block is being modified, it must be written
 		 * again and not just committed.
 		 */
-		bp->b_flags &= ~B_NEEDCOMMIT;
+		bp->b_flags &= ~(B_NEEDCOMMIT | B_CLUSTEROK);
 
 		/*
 		 * If the lease is non-cachable or IO_SYNC do bwrite().
@@ -1239,7 +1249,7 @@ nfs_doio(bp, cr, p)
 			&& bp->b_dirtyend == bp->b_bufsize)
 			bp->b_flags |= B_CLUSTEROK;
 		} else
-		    bp->b_flags &= ~B_NEEDCOMMIT;
+		    bp->b_flags &= ~(B_NEEDCOMMIT | B_CLUSTEROK);
 		bp->b_flags &= ~B_WRITEINPROG;
 
 		/*
@@ -1277,6 +1287,7 @@ nfs_doio(bp, cr, p)
 		}
 	    } else {
 		bp->b_resid = 0;
+		bp->b_dirtyend = bp->b_dirtyoff = 0;
 		biodone(bp);
 		return (0);
 	    }

@@ -1,6 +1,10 @@
-# $FreeBSD: src/sys/boot/pc98/btx/btx/Makefile,v 1.1.2.2 1999/08/29 16:21:22 peter Exp $
+# $FreeBSD: src/sys/boot/pc98/btx/btx/Makefile,v 1.1.2.3 1999/11/14 01:51:15 nyan Exp $
 
 M4?=	m4
+
+.if defined(PAGING)
+M4FLAGS+=	-DPAGING
+.endif
 
 ORG=	0x9000
 
@@ -18,7 +22,8 @@ btx: btx.o
 .endif
 
 btx.o: btx.m4 btx.s
-	(cd ${.CURDIR}; ${M4} btx.m4 btx.s) | ${AS} ${AFLAGS} -o ${.TARGET}
+	(cd ${.CURDIR}; ${M4} ${M4FLAGS} btx.m4 btx.s) | \
+	   ${AS} ${AFLAGS} -o ${.TARGET}
 
 CLEANFILES+= btx btx.out btx.o
 

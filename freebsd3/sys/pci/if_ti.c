@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_ti.c,v 1.4.2.7 1999/08/29 16:31:45 peter Exp $
+ * $FreeBSD: src/sys/pci/if_ti.c,v 1.4.2.9 1999/12/13 02:02:25 jkh Exp $
  */
 
 /*
@@ -128,7 +128,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_ti.c,v 1.4.2.7 1999/08/29 16:31:45 peter Exp $";
+  "$FreeBSD: src/sys/pci/if_ti.c,v 1.4.2.9 1999/12/13 02:02:25 jkh Exp $";
 #endif
 
 /*
@@ -1418,7 +1418,7 @@ static int ti_gibinit(sc)
 	rcb = &sc->ti_rdata->ti_info.ti_mini_rx_rcb;
 	TI_HOSTADDR(rcb->ti_hostaddr) =
 	    vtophys(&sc->ti_rdata->ti_rx_mini_ring);
-	rcb->ti_max_len = MHLEN;
+	rcb->ti_max_len = MHLEN - ETHER_ALIGN;
 	if (sc->ti_hwrev == TI_HWREV_TIGON)
 		rcb->ti_flags = TI_RCB_FLAG_RING_DISABLED;
 	else
@@ -1830,7 +1830,8 @@ static void ti_rxeof(sc)
 		 * to vlan_input() instead of ether_input().
 		 */
 		if (have_tag) {
-			vlan_input_tag(eh, m, vlan_tag);
+			if (vlan_input_tag(eh, m, vlan_tag) < 0)
+				ifp->if_data.ifi_noproto++;
 			have_tag = vlan_tag = 0;
 			continue;
 		}

@@ -15,7 +15,7 @@
 # device lines is also present in the ./LINT configuration file. If you are
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-# $FreeBSD: src/sys/pc98/conf/GENERIC98,v 1.63.2.15 1999/09/02 12:19:00 nyan Exp $
+# $FreeBSD: src/sys/pc98/conf/GENERIC98,v 1.63.2.23 1999/12/09 01:26:25 nyan Exp $
 
 # GENERIC98 -- Generic PC98 machine with WD/SCSI disks
 
@@ -53,8 +53,6 @@ options 	KTRACE			#ktrace(1) syscall trace support
 options 	SYSVSHM			#SYSV-style shared memory
 options 	SYSVMSG			#SYSV-style message queues
 options 	SYSVSEM			#SYSV-style semaphores
-
-options 	COM_MULTIPORT
 
 #
 #	IBM-PC HDD support
@@ -101,6 +99,7 @@ device		acd0		#IDE CD-ROM
 # sufficient for any number of installed devices.
 controller	ncr0		# NCR/Symbios Logic
 controller	ahc0		# AHA2940 and onboard AIC7xxx devices
+controller	amd0		# AMD 53C974 (Teckram DC-390(T))
 controller	isp0		# Qlogic family
 controller	adv0
 
@@ -111,17 +110,20 @@ controller	adv0
 options	BS_TARG_SAFEMODE
 
 # PC-9801-92
-controller bs0 at isa? port IO_SCSI bio irq 5 drq 3 flags 0
+controller bs0 at isa? port IO_SCSI cam irq 5 drq 3 flags 0
 # SC-98
-# controller bs0 at isa? port IO_SCSI bio irq 5 drq 3 flags 0x10000
+# controller bs0 at isa? port IO_SCSI cam irq 5 drq 3 flags 0x10000
 # HA-55BS2 and later
-#controller bs0 at isa? port IO_SCSI bio irq 5 drq 3 flags 0x20000
+#controller bs0 at isa? port IO_SCSI cam irq 5 drq 3 flags 0x20000
 # ELECOM type
-#controller bs0 at isa? port IO_SCSI bio irq 5 drq 3 flags 0x30000
+#controller bs0 at isa? port IO_SCSI cam irq 5 drq 3 flags 0x30000
 # SMIT
-#controller bs0 at isa? port IO_SCSI bio irq 5 drq 3 iomem 0xdd000 iosiz 0x1000 flags 0x40000
+#controller bs0 at isa? port IO_SCSI cam irq 5 drq 3 iomem 0xdd000 iosiz 0x1000 flags 0x40000
 # Logitec LHA-20x
-#controller bs0 at isa? port IO_SCSI bio irq 5 drq 3 flags 0x50000
+#controller bs0 at isa? port IO_SCSI cam irq 5 drq 3 flags 0x50000
+
+# PC-9801-100
+controller	aic0	at isa? port 0x1840 cam irq 5 flags 0x10000
 
 # SCSI peripherals
 # Only one of each of these is needed, they are dynamically allocated.
@@ -132,7 +134,7 @@ device		cd0		# CD
 device		pass0		# Passthrough device (direct SCSI)
 
 # Proprietary or custom CD-ROM Interfaces
-controller	matcd0	at isa? port? bio
+device		matcd0	at isa? port? bio
 
 # keyboard driver
 device		pckbd0	at isa? port IO_KBD tty irq 1
@@ -143,6 +145,7 @@ device		gdc0	at isa?
 # splash screen/screen saver
 pseudo-device	splash
 
+# syscons is the default console driver, resembling an SCO console
 device		sc0	at isa? tty
 
 # Floating point support - do not disable.
@@ -157,6 +160,8 @@ device		apm0    at isa?	disable	flags 0x31 # Advanced Power Management
 #device		pcic1	at card?
 
 # Serial (COM) ports
+#
+options 	COM_MULTIPORT
 #
 # COM1
 device		sio0	at isa? port "IO_COM1" tty irq 4
@@ -180,18 +185,18 @@ device		sio1	at isa? port 0x238 tty irq 5 flags 0x12000000
 #device		sio1	at isa? port 0x50e0 tty irq 5 flags 0x18000101
 #device		sio2	at isa? port 0x51e0 tty flags 0x18000101
 # ESP98
-#options	COM_ESP
+#options 	COM_ESP
 #device		sio1	at isa? port 0x18b0 tty irq 5 flags 0x19000000
 
 device		mse0	at isa? port IO_MSE tty irq 13
 
 # NEW Parallel port
 device		ppc0	at isa? port? tty irq 14
-controller	ppbus0
-device		lpt0	at ppbus?
-device		plip0	at ppbus?
-device		ppi0	at ppbus?
-#controller	vpo0	at ppbus?
+controller	ppbus0			# Parallel port bus (required)
+device		lpt0	at ppbus?	# Printer
+device		plip0	at ppbus?	# TCP/IP over parallel
+device		ppi0	at ppbus?	# Parallel port interface device
+#controller	vpo0	at ppbus?	# Requires scbus and da0
 # OLD Parallel port
 # Please stay olpt driver after ppc driver
 device		olpt0	at isa? port IO_LPT  tty
@@ -205,6 +210,8 @@ device		mx0		# Macronix 98713/98715/98725 (``PMAC'')
 device		pn0		# Lite-On 82c168/82c169 (``PNIC'')
 device		rl0		# RealTek 8129/8139
 device		sf0		# Adaptec AIC-6915 DuraLAN (``Starfire'')
+device		sis0		# Silicon Integrated Systems SiS 900/SiS 7016
+device		ste0		# Sundance ST201 (D-Link DFE-550)
 device		tl0		# Texas Instruments ThunderLAN
 device		tx0		# SMC 9432TX (83c170 ``EPIC'')
 device		vr0		# VIA Rhine, Rhine II
@@ -231,6 +238,10 @@ device		xl0		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 # ed7: LA-98
 # ed8: C-NET(98)
 # ed9: C-NET(98)E/L
+# ed10: EC/EP-98X
+#
+# MB86960A NIC
+#
 # fe0: RE1000/1000Plus/AccessPC N98C+/LAC-98
 # fe1: C-NET(98)P2/C-NET(9N)E
 #
@@ -246,17 +257,18 @@ device ed7 at isa? port 0x00d0 net irq 6 flags 0x900000
 device ed6 at isa? port 0x0770 net irq 6 flags 0x800000
 device ed9 at isa? port 0x03d0 net irq 6 flags 0xb00000
 device ed8 at isa? port 0xa3d0 net irq 6 iomem 0xd0000 iosiz 16384 flags 0xa00000
+device ed10 at isa? port 0x00d0 net irq 3 flags 0xd10000
 device ep0 at isa? port 0x40d0 net irq 3
 device fe0 at isa? port 0x00d0 net irq 3
 device fe1 at isa? port 0x73d0 net irq 5
 device lnc0 at isa? port 0x03d0 net irq 6
 
-options "FE_8BIT_SUPPORT"	# LAC-98 support
+options 	"FE_8BIT_SUPPORT"	# LAC-98 support
 
 # PCCARD NIC drivers.
 # ze and zp take over the pcic and cannot coexist with generic pccard
 # support, nor the ed and ep drivers they replace.
-device zp0 at isa? port 0x00d0 net irq 10 iomem 0xe0000
+device		zp0	at isa? port 0x00d0 net irq 10 iomem 0xe0000
 
 #controller	snd0
 #device	sb0	at isa? port 0x20d2 irq 10 conflicts drq 3
@@ -272,7 +284,7 @@ pseudo-device	loop		# Network loopback
 pseudo-device	ether		# Ethernet support
 pseudo-device	sl	1	# Kernel SLIP
 pseudo-device	ppp	1	# Kernel PPP
-pseudo-device	tun	1	# Packet tunnel, for ppp(1)
+pseudo-device	tun	1	# Packet tunnel
 pseudo-device	pty	16	# Pseudo-ttys (telnet etc)
 pseudo-device	gzip		# Exec gzipped a.out's
 

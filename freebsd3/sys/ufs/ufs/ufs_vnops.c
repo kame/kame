@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_vnops.c	8.27 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_vnops.c,v 1.104.2.2 1999/08/29 16:33:23 peter Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_vnops.c,v 1.104.2.3 1999/11/21 16:58:50 bde Exp $
  */
 
 #include "opt_quota.h"
@@ -383,7 +383,8 @@ ufs_getattr(ap)
 	vap->va_fsid = ip->i_dev;
 	vap->va_fileid = ip->i_number;
 	vap->va_mode = ip->i_mode & ~IFMT;
-	vap->va_nlink = ip->i_effnlink;
+	vap->va_nlink = VFSTOUFS(vp->v_mount)->um_i_effnlink_valid ?
+	    ip->i_effnlink : ip->i_nlink;
 	vap->va_uid = ip->i_uid;
 	vap->va_gid = ip->i_gid;
 	vap->va_rdev = (dev_t)ip->i_rdev;

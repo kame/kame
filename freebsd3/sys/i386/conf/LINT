@@ -2,7 +2,7 @@
 # LINT -- config file for checking all the sources, tries to pull in
 #	as much of the source tree as it can.
 #
-# $FreeBSD: src/sys/i386/conf/LINT,v 1.539.2.38 1999/09/14 22:53:31 jkh Exp $
+# $FreeBSD: src/sys/i386/conf/LINT,v 1.539.2.52 1999/12/15 19:35:13 joe Exp $
 #
 # NB: You probably don't want to try running a kernel built from this
 # file.  Instead, you should start from GENERIC, and add options from
@@ -376,14 +376,40 @@ options		NETATALK		#Appletalk communications protocols
 
 # These are currently broken and are no longer shipped due to lack
 # of interest.
-#options		CCITT			#X.25 network layer
-#options		ISO
-#options		TPIP			#ISO TP class 4 over IP
-#options		TPCONS			#ISO TP class 0 over X.25
-#options		LLC			#X.25 link layer for Ethernets
-#options		HDLC			#X.25 link layer for serial lines
-#options		EON			#ISO CLNP over IP
-#options		NSIP			#XNS over IP
+#options 	CCITT			#X.25 network layer
+#options 	ISO
+#options 	TPIP			#ISO TP class 4 over IP
+#options 	TPCONS			#ISO TP class 0 over X.25
+#options 	LLC			#X.25 link layer for Ethernets
+#options 	HDLC			#X.25 link layer for serial lines
+#options 	EON			#ISO CLNP over IP
+#options 	NSIP			#XNS over IP
+
+# netgraph(4). Enable the base netgraph code with the NETGRAPH option.
+# Individual node types can be enabled with the corresponding option
+# listed below; however, this is not strictly necessary as netgraph
+# will automatically load the corresponding KLD module if the node type
+# is not already compiled into the kernel. Each type below has a
+# corresponding man page, e.g., ng_async(8).
+options 	NETGRAPH		#netgraph(4) system
+options 	NETGRAPH_ASYNC
+options 	NETGRAPH_BPF
+options 	NETGRAPH_CISCO
+options 	NETGRAPH_ECHO
+options 	NETGRAPH_FRAME_RELAY
+options 	NETGRAPH_HOLE
+options 	NETGRAPH_IFACE
+options 	NETGRAPH_KSOCKET
+options 	NETGRAPH_LMI
+options 	NETGRAPH_PPP
+options 	NETGRAPH_PPPOE
+options 	NETGRAPH_PPTPGRE
+options 	"NETGRAPH_RFC1490"
+options 	NETGRAPH_SOCKET
+options 	NETGRAPH_TEE
+options 	NETGRAPH_TTY
+options 	NETGRAPH_UI
+options 	NETGRAPH_VJC
 
 #
 # Network interfaces:
@@ -442,7 +468,7 @@ options PPP_FILTER			#enable bpf filtering (needs bpfilter)
 #
 # WARNING:  IPFIREWALL defaults to a policy of "deny ip from any to any"
 # and if you do not add other rules during startup to allow access,
-# YOU WILL LOCK YOURSELF OUT.  It is suggested that you set firewall=open
+# YOU WILL LOCK YOURSELF OUT.  It is suggested that you set firewall_type=open
 # in /etc/rc.conf when first enabling this feature, then refining the
 # firewall rules in /etc/rc.firewall after you've tested that the new kernel
 # feature works properly.
@@ -461,6 +487,10 @@ options PPP_FILTER			#enable bpf filtering (needs bpfilter)
 # IPFILTER_LOG enables ipfilter's logging.
 # IPFILTER_LKM enables LKM support for an ipfilter module (untested).
 #
+# IPSTEALTH enables code to support stealth forwarding (i.e., forwarding
+# packets without touching the ttl).  This can be useful to hide firewalls
+# from traceroute and similar tools.
+#
 # TCPDEBUG is undocumented.
 #
 options		"TCP_COMPAT_42"		#emulate 4.2BSD TCP bugs
@@ -475,7 +505,22 @@ options		IPDIVERT		#divert sockets
 options		IPFILTER		#kernel ipfilter support
 options		IPFILTER_LOG		#ipfilter logging
 #options	IPFILTER_LKM		#kernel support for ip_fil.o LKM
+options		IPSTEALTH		#support for stealth forwarding
 options		TCPDEBUG
+
+# The following options add sysctl variables for controlling how certain
+# TCP packets are handled.
+# 
+# TCP_DROP_SYNFIN adds support for ignoring TCP packets with SYN+FIN. This
+# prevents nmap et al. from identifying the TCP/IP stack, but breaks support
+# for RFC1644 extensions and is not recommended for web servers.
+# 
+# TCP_RESTRICT_RST adds support for blocking the emission of TCP RST packets.
+# This is useful on systems which are exposed to SYN floods (e.g. IRC servers)
+# or any system which one does not want to be easily portscannable.
+# 
+options 	TCP_DROP_SYNFIN		#drop TCP packets with SYN+FIN
+options 	TCP_RESTRICT_RST	#restrict emission of TCP RST
 
 # ICMP_BANDLIM enables icmp error response bandwidth limiting.   You
 # typically want this option as it will help protect the machine from
@@ -758,9 +803,11 @@ options		"CHANGER_MAX_BUSY_SECONDS=10"
 # SA_SPACE_TIMEOUT: Timeout for space operations, in minutes
 # SA_REWIND_TIMEOUT: Timeout for rewind operations, in minutes
 # SA_ERASE_TIMEOUT: Timeout for erase operations, in minutes
+# SA_1FM_AT_EOD: Default to model which only has a default one filemark at EOT.
 options		"SA_SPACE_TIMEOUT=(60)"
 options		"SA_REWIND_TIMEOUT=(2*60)"
 options		"SA_ERASE_TIMEOUT=(4*60)"
+options		"SA_1FM_AT_EOD"
 
 # Optional timeout for the CAM processor target (pt) device
 # This is specified in seconds.  The default is 60 seconds.
@@ -973,12 +1020,13 @@ device		npx0	at isa? port IO_NPX iosiz 0x0 flags 0x0 irq 13
 #
 
 #
-# SCSI host adapters: `aha', `bt'
+# SCSI host adapters: `aha', `aic', `bt'
 #
 # adv: All Narrow SCSI bus AdvanSys controllers.
 # adw: Second Generation AdvanSys controllers including the ADV940UW.
 # aha: Adaptec 154x
 # ahc: Adaptec 274x/284x/294x
+# aic: Adaptec 152x
 # bt: Most Buslogic controllers
 #
 # Note that the order is important in order for Buslogic cards to be
@@ -988,7 +1036,8 @@ device		npx0	at isa? port IO_NPX iosiz 0x0 flags 0x0 irq 13
 controller	bt0	at isa? port "IO_BT0" cam irq ?
 controller	adv0	at isa? port ? cam irq ?
 controller	adw0
-controller      aha0    at isa? port ? cam irq ?
+controller	aha0	at isa? port ? cam irq ?
+controller	aic0	at isa? port ? cam irq ?
 
 
 #
@@ -1240,7 +1289,7 @@ device oltr0 at isa?
 #
 # the current driver supports only PVC operations (no atm-arp, no multicast).
 # for more details, please read the original documents at 
-# http://www.ccrc.wustl.edu/pub/chuck/bsdatm/wucs.html
+# http://www.ccrc.wustl.edu/pub/chuck/tech/bsdatm/bsdatm.html
 #
 pseudo-device	atm
 device en0
@@ -1266,7 +1315,7 @@ options		NATM			#native ATM
 # mpu: Roland MPU-401 stand-alone card
 # 
 # Beware!  The addresses specified below are also hard-coded in
-# i386/isa/sound/sound_config.h.  If you change the values here, you
+# src/sys/i386/isa/sound/sound_config.h.  If you change the values here, you
 # must also change the values in the include file.
 #
 # pcm: PCM audio through various sound cards.
@@ -1274,7 +1323,7 @@ options		NATM			#native ATM
 # This has support for a large number of new audio cards, based on
 # CS423x, OPTi931, Yamaha OPL-SAx, and also for SB16, GusPnP.
 # For more information about this driver and supported cards,
-# see the  pcm.4 man page  and /sys/i386/isa/snd/CARDS.
+# see the pcm.4 man page and src/sys/i386/isa/snd/CARDS.
 #
 # The flags of the device tells the device a bit more info about the
 # device that normally is obtained through the PnP interface.
@@ -1306,7 +1355,7 @@ options		NATM			#native ATM
 # options GUS_DMA
 # options GUS_IRQ
 #
-# The i386/isa/sound/sound.doc has more information.
+# The src/sys/i386/isa/sound/sound.doc has more information.
 
 # Controls all "VOXWARE" driver sound devices.  See Luigi's driver
 # below for an alternate which may work better for some cards.
@@ -1431,10 +1480,11 @@ device pca0 at isa? port "IO_TIMER1" tty
 #  The cards can use an IRQ of 11, 12 or 15.
 
 # Notes on the Stallion stl and stli drivers:
-#  See src/i386/isa/README.stl for complete instructions.
+#  See src/sys/i386/isa/README.stl for complete instructions.
 #  This is version 0.0.5alpha, unsupported by Stallion.
 #  The stl driver has a secondary IO port hard coded at 0x280.  You need
-#     to change src/i386/isa/stallion.c if you reconfigure this on the boards.
+#     to change src/sys/i386/isa/stallion.c if you reconfigure this on
+#     the boards.
 #  The "flags" and "iosiz" settings on the stli driver depend on the board:
 #	EasyConnection 8/64 ISA:     flags 23         iosiz 0x1000
 #	EasyConnection 8/64 EISA:    flags 24         iosiz 0x10000
@@ -1473,7 +1523,7 @@ device		stl0	at isa? port 0x2a0 tty irq 10
 device		stli0	at isa? port 0x2a0 tty iomem 0xcc000 flags 23 iosiz 0x1000
 # You are unlikely to have the hardware for loran0 <phk@FreeBSD.org>
 device		loran0	at isa? port ? tty irq 5
-# HOT1 Xilinx 6200 card (www.vcc.com)
+# HOT1 Xilinx 6200 card (http://www.vcc.com/)
 device		xrpu0
 
 #
@@ -1570,6 +1620,14 @@ options	"EISA_SLOTS=12"
 # The driver will autodetect the number of ports on the card and
 # attach each one as a separate network interface.
 #
+# The 'ste' device provides support for adapters based on the Sundance
+# Technologies ST201 PCI fast ethernet controller. This includes the
+# D-Link DFE-550TX.
+#
+# The 'sis' device provides support for adapters based on the Silicon
+# Integrated Systems SiS 900 and SiS 7016 PCI fast ethernet controller
+# chips.
+#
 # The 'ti' device provides support for PCI gigabit ethernet NICs based
 # on the Alteon Networks Tigon 1 and Tigon 2 chipsets. This includes the
 # Alteon AceNIC, the 3Com 3c985, the Netgear GA620 and various others.
@@ -1625,7 +1683,7 @@ options	"EISA_SLOTS=12"
 #   options OVERRIDE_TUNER=xxx
 #   options OVERRIDE_MSP=1
 #   options OVERRIDE_DBX=1
-# The current values are found in /usr/src/sys/pci/brooktree848.c
+# The current values are found in src/sys/dev/bktr/bktr_card.h
 #
 #   option BROOKTREE_SYSTEM_DEFAULT=BROOKTREE_PAL
 # This is required for Dual Crystal (28&35Mhz) boards where PAL is used
@@ -1672,17 +1730,29 @@ controller	isp0
 #				  to disable the loading of firmware on.
 #	SCSI_ISP_FABRIC		  enable loading of Fabric f/w flavor (2100).
 #	SCSI_ISP_SCCLUN		  enable loading of expanded lun f/w (2100).
+#	SCSI_ISP_WWN		- define a WWN to use as a default
 #
 #	ISP_DISABLE_1020_SUPPORT	Disable support for 1020/1040 cards
 #	ISP_DISABLE_1080_SUPPORT	Disable support for 1080/1240 cards
 #	ISP_DISABLE_2100_SUPPORT	Disable support for 2100 cards
 #	(these really just to save code space)
 #	(use of all three will cause the driver to not compile)
-options	"SCSI_ISP_NO_FWLOAD_MASK=0x12"	# disable FW load for isp1 and isp4
-options "SCSI_ISP_NO_NVRAM_MASK=0x1"	# disable NVRAM for isp0
-options "SCSI_ISP_PREFER_MEM_MAP=0"	# prefer I/O mapping
-options	"ISP_DISABLE_1080_SUPPORT=1"	# Disable support for Qlogic 1080
-options	"SCSI_ISP_FCDUPLEX=0x4"		# isp2 is a Fibre Channel card
+#
+#	ISP_COMPILE_FW		-	compile all firmware in
+#	ISP_COMPILE_1020_FW	-	compile in 1020/1040 firmware
+#	ISP_COMPILE_1080_FW	-	compile in 1080/1240/1280 firmware
+#	ISP_COMPILE_2100_FW	-	compile in 2100 firmware
+#	ISP_COMPILE_2200_FW	-	compile in 2200 firmware
+#
+options 	SCSI_ISP_NO_FWLOAD_MASK=0x12	# disable FW load for isp1, isp4
+options		SCSI_ISP_WWN=\"0x5000000099990000\"
+#options 	"ISP_DISABLE_1020_SUPPORT"
+#options 	"ISP_DISABLE_1080_SUPPORT"
+#options 	"ISP_DISABLE_2100_SUPPORT"
+#options	"ISP_COMPILE_1020_FW=1"
+#options	"ISP_COMPILE_1080_FW=1"
+#options	"ISP_COMPILE_2100_FW=1"
+#options	"ISP_COMPILE_2200_FW=1"
 					# we want in full duplex mode.
 
 device		al0
@@ -1757,8 +1827,12 @@ options		POWERFAIL_NMI	# make it beep instead of panicing
 # Supported interfaces:
 # iicsmb I2C to SMB bridge with any iicbus interface
 # bktr	brooktree848 I2C hardware interface
+# intpm	Intel PIIX4 Power Management Unit
+# alpm	Acer Aladdin-IV/V/Pro2 Power Management Unit
 #
 controller smbus0
+controller intpm0
+controller alpm0
 
 device smb0	at smbus?
 
@@ -1816,9 +1890,13 @@ options "AVM_A1"
 options "USR_STI"
 #device isic0 at isa? port 0x268 net irq 5 flags 7
 #
-# ITK ix1 Micro
+# ITK ix1 Micro ( < V.3, non-PnP version )
 options "ITKIX1"
-#device isic0 at isa? port 0x398 net irq 10 flags 18
+#device isic0 at isa? port 0x398 irq 10 flags 18
+#
+# ELSA PCC-16
+options "ELSA_PCC16"
+#device isic0 at isa? port 0x360 irq 10 flags 19
 #
 # PnP-Cards:
 # ----------
@@ -1845,7 +1923,19 @@ options "DYNALINK"
 #
 # ELSA QuickStep 1000pro ISA
 options "ELSA_QS1ISA"
-#device	isic0 at isa? port ? net irq ?
+#device	isic0 at isa? port ? irq ?
+#
+# ITK ix1 Micro ( V.3, PnP version )
+options "ITKIX1"
+#device isic0 at isa? port ? irq ?
+#
+# AVM Fritz!Card PnP
+options "AVM_PNP"  
+#device isic0 at isa? port ? irq ?
+#
+# Siemens I-Surf 2.0 
+options "SIEMENS_ISURF2"  
+#device isic0 at isa? port ? irq ?
 #
 # PCI-Cards:
 # ----------
@@ -1865,7 +1955,7 @@ device	isic0 at isa? port 0x340 net irq 5 flags 10
 # -------------
 #
 # Stollmann Tina-dd control device
-device tina0 at isa? port 0x260 net irq 10
+#device tina0 at isa? port 0x260 net irq 10
 #
 # ISDN Protocol Stack
 # -------------------
@@ -2062,7 +2152,7 @@ options		VFS_BIO_DEBUG
 # some controllers by Olivetti, Dec, HP, AT&T, SNI, AST, Alphatronic, NEC and
 # Compaq are actually DPT controllers.
 #
-# See sys/dev/dpt for debugging and other subtle options.
+# See src/sys/dev/dpt/ sources for debugging and other subtle options.
 #   DPT_VERIFY_HINTR        Performs some strict hardware interrupts testing.
 #                           Only use if you suspect PCI bus corruption problems
 #   DPT_RESTRICTED_FREELIST Normally, the freelisat used by the DPT for queue
@@ -2082,7 +2172,7 @@ options		VFS_BIO_DEBUG
 #                           option will create more trouble than solve.
 #   DPT_TIMEOUT_FACTOR      Used to compute the excessive amount of time to
 #                           wait when timing out with the above option.
-#  DPT_DEBUG_xxxx           These are controllable from sys/dev/dpt/dpt.h
+#  DPT_DEBUG_xxxx           These are controllable from src/sys/dev/dpt/dpt.h
 #  DPT_LOST_IRQ             When enabled, will try, once per second, to catch
 #                           any interrupt that got lost.  Seems to help in some
 #                           DPT-firmware/Motherboard combinations.  Minimal

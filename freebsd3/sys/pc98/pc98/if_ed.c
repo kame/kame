@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/if_ed.c,v 1.58.2.4 1999/08/29 16:31:09 peter Exp $
+ * $FreeBSD: src/sys/pc98/pc98/if_ed.c,v 1.58.2.7 1999/12/09 01:26:27 nyan Exp $
  */
 
 /*
@@ -201,6 +201,8 @@ static int ed_probe_Novell_generic __P((struct ed_softc *, int, int, int));
 static int ed_probe_SIC98	__P((struct isa_device *));
 static int ed_probe_CNET98	__P((struct isa_device *));
 static int ed_probe_CNET98EL	__P((struct isa_device *));
+static int ed_probe_NEC77	__P((struct isa_device *));
+static int ed_probe_NW98X	__P((struct isa_device *));
 #endif
 static int ed_probe_HP_pclanp	__P((struct isa_device *));
 
@@ -514,11 +516,12 @@ ed_probe(isa_dev)
 
 	/*
 	 * IO-DATA LA/T-98
+	 * NEC PC-9801-77
 	 */
 	if (ED_TYPE98(isa_dev->id_flags) == ED_TYPE98_LA98) {
 		/* LA-98 */
 		nports98 = pc98_set_register(isa_dev, ED_TYPE98_LA98);
-		nports = ed_probe_Novell(isa_dev);
+		nports = ed_probe_NEC77(isa_dev);
 		if (nports)
 			return (EDNPORTS);
 	}
@@ -552,6 +555,17 @@ ed_probe(isa_dev)
 		/* C-NET(98) */
 		nports98 = pc98_set_register(isa_dev, ED_TYPE98_CNET98);
 		nports = ed_probe_CNET98(isa_dev);
+		if (nports)
+			return (EDNPORTS);
+	}
+
+	/*
+	 * Networld EC/EP-98X
+	 */
+	if (ED_TYPE98(isa_dev->id_flags) == ED_TYPE98_NW98X) {
+		/* EC/EP-98X */
+		nports98 = pc98_set_register(isa_dev, ED_TYPE98_NW98X);
+		nports = ed_probe_NW98X(isa_dev);
 		if (nports)
 			return (EDNPORTS);
 	}
@@ -1408,8 +1422,8 @@ ed_probe_Novell_generic(sc, port, unit, flags)
 	case ED_TYPE98_ICM:
 		sc->type_str = "ICM";
 		break;
-	case ED_TYPE98_SIC:
-		sc->type_str = "SIC-98";
+	case ED_TYPE98_NW98X:
+		sc->type_str = "NW98X";
 		break;
 	case ED_TYPE98_108:
 		sc->type_str = "PC-9801-108";
@@ -1538,12 +1552,14 @@ ed_probe_Novell(isa_dev)
 	struct isa_device *isa_dev;
 {
 	struct ed_softc *sc = &ed_softc[isa_dev->id_unit];
+	int     nports;
 
-#ifndef PC98
-	isa_dev->id_maddr = 0;
-#endif
-	return ed_probe_Novell_generic(sc, isa_dev->id_iobase, 
+	nports = ed_probe_Novell_generic(sc, isa_dev->id_iobase, 
 				       isa_dev->id_unit, isa_dev->id_flags);
+	if (nports)
+		isa_dev->id_maddr = 0;
+
+	return (nports);
 }
 
 #if NCARD > 0
@@ -2330,8 +2346,10 @@ static int ed_probe_CNET98EL(struct isa_device* isa_dev)
 		break;
 #endif
 	default:
-printf("ed%d: Invalid irq configuration (%d) must be 3,5,6 for CNET98E/L\n",
-		    isa_dev->id_unit, ffs(isa_dev->id_irq) - 1);
+		printf("ed%d: Invalid irq configuration (%d) must be "
+			"%s for %s\n",
+			isa_dev->id_unit, ffs(isa_dev->id_irq) - 1,
+			"3,5,6", "CNET98E/L");
 		return (0);
 	}
 	outb(sc->asic_addr + ED_CNET98EL_IMR, 0x7e);
@@ -2373,6 +2391,106 @@ printf("ed%d: Invalid irq configuration (%d) must be 3,5,6 for CNET98E/L\n",
 	outb(sc->nic_addr + ED_P0_ISR, 0xff);
 
 	return (ED_CNET98EL_IO_PORTS);
+}
+
+/*
+ * Probe and vendor-specific initialization routine for PC-9801-77 boards
+ */
+static int
+ed_probe_NEC77(isa_dev)
+	struct isa_device *isa_dev;
+{
+	struct ed_softc *sc = &ed_softc[isa_dev->id_unit];
+	int nports;
+	u_char tmp;
+
+	nports = ed_probe_Novell(isa_dev);
+	if (nports == 0)
+		return (0);
+
+	/* LA/T-98 does not need IRQ setting. */
+	if (ED_TYPE98SUB(isa_dev->id_flags) == 0)
+		return (1);
+
+	/*
+	 * Set IRQ. PC-9801-77 only allows a choice of irq 3,5,6,12,13.
+	 */
+	switch (isa_dev->id_irq) {
+	case IRQ3:
+		tmp = ED_NEC77_IRQ3;
+		break;
+	case IRQ5:
+		tmp = ED_NEC77_IRQ5;
+		break;
+	case IRQ6:
+		tmp = ED_NEC77_IRQ6;
+		break;
+	case IRQ12:
+		tmp = ED_NEC77_IRQ12;
+		break;
+	case IRQ13:
+		tmp = ED_NEC77_IRQ13;
+		break;
+	default:
+		printf("ed%d: Invalid irq configuration (%d) must be "
+			"%s for %s\n",
+			isa_dev->id_unit, ffs(isa_dev->id_irq) - 1,
+			"3,5,6,12,13", "PC-9801-77");
+		return (0);
+	}
+	outb(sc->asic_addr + ED_NEC77_IRQ, tmp);
+
+	return (1);
+}
+
+/*
+ * Probe and vendor-specific initialization routine for EC/EP-98X boards
+ */
+static int
+ed_probe_NW98X(isa_dev)
+	struct isa_device *isa_dev;
+{
+	struct ed_softc *sc = &ed_softc[isa_dev->id_unit];
+	int nports;
+	u_char tmp;
+
+	nports = ed_probe_Novell(isa_dev);
+	if (nports == 0)
+		return (0);
+
+	/* Networld 98X3 does not need IRQ setting. */
+	if (ED_TYPE98SUB(isa_dev->id_flags) == 0)
+		return (1);
+
+	/*
+	 * Set IRQ. EC/EP-98X only allows a choice of irq 3,5,6,12,13.
+	 */
+	switch (isa_dev->id_irq) {
+	case IRQ3:
+		tmp = ED_NW98X_IRQ3;
+		break;
+	case IRQ5:
+		tmp = ED_NW98X_IRQ5;
+		break;
+	case IRQ6:
+		tmp = ED_NW98X_IRQ6;
+		break;
+	case IRQ12:
+		tmp = ED_NW98X_IRQ12;
+		break;
+	case IRQ13:
+		tmp = ED_NW98X_IRQ13;
+		break;
+	default:
+		printf("ed%d: Invalid irq configuration (%d) must be "
+			"%s for %s\n",
+			isa_dev->id_unit, ffs(isa_dev->id_irq) - 1,
+			"3,5,6,12,13", "EC/EP-98X");
+		return (0);
+	}
+	outb(sc->asic_addr + ED_NW98X_IRQ, tmp);
+
+	return (1);
 }
 #endif
 
@@ -2683,13 +2801,8 @@ ed_init(xsc)
 	/*
 	 * Copy out our station address
 	 */
-#ifdef PC98
-		for (i = 0; i < ETHER_ADDR_LEN; ++i)
-			outb(sc->nic_addr + ED_P1_PAR(i), sc->arpcom.ac_enaddr[i]);
-#else
-		for (i = 0; i < ETHER_ADDR_LEN; ++i)
-			outb(sc->nic_addr + ED_P1_PAR0 + i, sc->arpcom.ac_enaddr[i]);
-#endif
+	for (i = 0; i < ETHER_ADDR_LEN; ++i)
+		outb(sc->nic_addr + ED_P1_PAR(i), sc->arpcom.ac_enaddr[i]);
 
 	/*
 	 * Set Current Page pointer to next_packet (initialized above)
@@ -3616,6 +3729,7 @@ ed_pio_readmem(sc, src, dst, amount)
 		insw(sc->asic_addr + ED_NOVELL_DATA, dst, amount / 2);
 	} else
 		insb(sc->asic_addr + ED_NOVELL_DATA, dst, amount);
+
 #ifdef PC98
 	if (sc->type == ED_TYPE98_LPC)
 		LPCT_1d0_OFF();
@@ -4127,13 +4241,9 @@ ed_setrcr(sc)
 		/*
 		 * Reconfigure the multicast filter.
 		 */
-#ifdef PC98
-			for (i = 0; i < 8; i++)
-				outb(sc->nic_addr + ED_P1_MAR(i), 0xff);
-#else
-			for (i = 0; i < 8; i++)
-				outb(sc->nic_addr + ED_P1_MAR0 + i, 0xff);
-#endif
+		for (i = 0; i < 8; i++)
+			outb(sc->nic_addr + ED_P1_MAR(i), 0xff);
+
 		/*
 		 * And turn on promiscuous mode. Also enable reception of
 		 * runts and packets with CRC & alignment errors.
@@ -4157,13 +4267,9 @@ ed_setrcr(sc)
 			/*
 			 * Set multicast filter on chip.
 			 */
-#ifdef PC98
 			for (i = 0; i < 8; i++)
 				outb(sc->nic_addr + ED_P1_MAR(i), ((u_char *) mcaf)[i]);
-#else
-			for (i = 0; i < 8; i++)
-				outb(sc->nic_addr + ED_P1_MAR0 + i, ((u_char *) mcaf)[i]);
-#endif
+
 			/* Set page 0 registers */
 			outb(sc->nic_addr + ED_P0_CR, sc->cr_proto | ED_CR_STP);
 
@@ -4174,13 +4280,8 @@ ed_setrcr(sc)
 			 * Initialize multicast address hashing registers to
 			 * not accept multicasts.
 			 */
-#ifdef PC98
 			for (i = 0; i < 8; ++i)
 				outb(sc->nic_addr + ED_P1_MAR(i), 0x00);
-#else
-			for (i = 0; i < 8; ++i)
-				outb(sc->nic_addr + ED_P1_MAR0 + i, 0x00);
-#endif
 
 			/* Set page 0 registers */
 			outb(sc->nic_addr + ED_P0_CR, sc->cr_proto | ED_CR_STP);

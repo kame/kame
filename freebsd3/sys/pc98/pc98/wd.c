@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)wd.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/pc98/pc98/wd.c,v 1.71.2.4 1999/08/29 16:31:19 peter Exp $
+ * $FreeBSD: src/sys/pc98/pc98/wd.c,v 1.71.2.5 1999/12/01 13:57:10 nyan Exp $
  */
 
 /* TODO:
@@ -655,9 +655,6 @@ wdattach(struct isa_device *dvp)
 		}
 	}
 
-#ifdef PC98
-	outb(0x432,(du->dk_unit)%2);
-#endif
 #ifdef ATAPI
 	/*
 	 * Probe all free IDE units, searching for ATAPI drives.

@@ -33,7 +33,7 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $FreeBSD: src/sys/dev/vinum/vinumio.c,v 1.7.2.9 1999/08/29 16:24:18 peter Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumio.c,v 1.7.2.11 1999/10/13 08:39:08 grog Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -58,7 +58,7 @@ open_drive(struct drive *drive, struct proc *p, int verbose)
     NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, drive->devicename, p);
     error = vn_open(&nd, FREAD | FWRITE, 0);		    /* open the device */
     if (error != 0) {					    /* can't open? */
-	set_drive_state(drive->driveno, drive_down, setstate_force);
+	drive->state = drive_down;			    /* just force it down */
 	drive->lasterror = error;
 	if (verbose)
 	    log(LOG_WARNING,
@@ -204,7 +204,8 @@ close_drive(struct drive *drive)
 	LOCKDRIVE(drive);				    /* keep the daemon out */
     if (drive->vp)
 	close_locked_drive(drive);			    /* and close it */
-    drive->state = drive_down;				    /* don't tell the system about this one at all */
+    if (drive->state > drive_down)			    /* if it's up */
+	drive->state = drive_down;			    /* make sure it's down */
     unlockdrive(drive);
 }
 
@@ -259,9 +260,8 @@ remove_drive(int driveno)
 }
 
 /*
- * Read data from a drive
- *
- * Return error number
+ * Read data from a drive.
+ * Return error number.
  */
 int
 read_drive(struct drive *drive, void *buf, size_t length, off_t offset)
@@ -513,7 +513,8 @@ check_drive(char *devicename)
     } else {
 	if (drive->lasterror == 0)
 	    drive->lasterror = ENODEV;
-	set_drive_state(drive->driveno, drive_down, setstate_force);
+        close_drive(drive);
+        drive->state = drive_down;
     }
     return drive;
 }
@@ -991,8 +992,14 @@ vinum_scandisk(char *devicename[], int drives)
 	else
 	    log(LOG_INFO, "vinum: updating configuration from %s\n", drive->devicename);
 
+	if (drive->state == drive_up)
 	/* Read in both copies of the configuration information */
-	error = read_drive(drive, config_text, MAXCONFIG * 2, VINUM_CONFIG_OFFSET);
+	  error = read_drive(drive, config_text, MAXCONFIG * 2, VINUM_CONFIG_OFFSET);
+	else
+	  {
+	  error = EIO;
+	  printf("vinum_scandisk: %s is %s\n", drive->devicename, drive_state(drive->state));
+	  }
 
 	if (error != 0) {
 	    log(LOG_ERR, "vinum: Can't read device %s, error %d\n", drive->devicename, error);

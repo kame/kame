@@ -33,9 +33,9 @@
  *	ELSA MicroLink MC/all card specific routines
  *	--------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_elsa_mcall.c,v 1.1.2.1 1999/08/29 16:25:11 peter Exp $
+ * $FreeBSD: src/sys/i4b/layer1/i4b_elsa_mcall.c,v 1.1.2.2 1999/11/15 22:40:24 joe Exp $
  *
- *      last edit-date: [Tue Dec  1 07:45:53 1998]
+ *      last edit-date: [Sun Feb 14 10:26:29 1999]
  *
  *	-mh	started support for ELSA MC/all
  *

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ttycom.h	8.1 (Berkeley) 3/28/94
- * $FreeBSD: src/sys/sys/ttycom.h,v 1.13.2.1 1999/08/29 16:32:53 peter Exp $
+ * $FreeBSD: src/sys/sys/ttycom.h,v 1.13.2.2 1999/11/17 18:37:45 julian Exp $
  */
 
 #ifndef	_SYS_TTYCOM_H_
@@ -135,5 +135,6 @@ struct winsize {
 #define	TABLDISC	3		/* tablet discipline */
 #define	SLIPDISC	4		/* serial IP discipline */
 #define	PPPDISC		5		/* PPP discipline */
+#define	NETGRAPHDISC	6		/* Netgraph tty node discipline */
 
 #endif /* !_SYS_TTYCOM_H_ */

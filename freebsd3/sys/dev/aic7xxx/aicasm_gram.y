@@ -10,7 +10,7 @@
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions, and the following disclaimer,
- *    without modification, immediately at the beginning of the file.
+ *    without modification.
  * 2. The name of the author may not be used to endorse or promote products
  *    derived from this software without specific prior written permission.
  *
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aicasm_gram.y,v 1.6.2.1 1999/08/29 16:22:38 peter Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aicasm_gram.y,v 1.6.2.2 1999/12/12 05:02:31 gibbs Exp $
  */
 
 #include <stdio.h>

@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD: src/sys/boot/forth/loader.conf.5,v 1.1.2.3 1999/08/29 16:20:39 peter Exp $
+.\" $FreeBSD: src/sys/boot/forth/loader.conf.5,v 1.1.2.5 1999/11/26 08:46:58 dcs Exp $
 .Dd April 18, 1999
 .Dt LOADER.CONF 5
 .Os
@@ -43,7 +43,7 @@ described in
 .Pp
 The file
 .Pa /boot/loader.rc
-must have the follow two lines for
+must contain the following two lines for
 .Nm
 to be automatically processed:
 .Pp
@@ -103,6 +103,9 @@ Name of the kernel to be loaded. If no kernel name is set, no additional
 modules will be loaded.
 .It Ar kernel_options
 Flags to be passed to the kernel.
+.It Ar password
+Provides a password to be asked by check-password before execution is
+allowed to continue.
 .It Ar verbose_loading
 If set to
 .Dq YES ,
@@ -152,7 +155,13 @@ Name of the bitmap to be loaded. Any other name can be used.
 .Pq Dq NO
 If set to
 .Dq YES ,
-will load the splash screen module, making possible to display a bitmap
+will load the splash screen module, making possible to display a bmp image
+on the screen while booting.
+.It Va splash_pcx_load
+.Pq Dq NO
+If set to
+.Dq YES ,
+will load the splash screen module, making possible to display a pcx image
 on the screen while booting.
 .It Va userconfig_script_load
 .Pq Dq NO

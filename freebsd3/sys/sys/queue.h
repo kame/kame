@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)queue.h	8.5 (Berkeley) 8/20/94
- * $FreeBSD: src/sys/sys/queue.h,v 1.24.2.1 1999/08/29 16:32:39 peter Exp $
+ * $FreeBSD: src/sys/sys/queue.h,v 1.24.2.2 1999/12/17 01:34:30 jkh Exp $
  */
 
 #ifndef _SYS_QUEUE_H_
@@ -96,7 +96,7 @@
  * _NEXT		+	+	+	+	+
  * _PREV		-	-	-	+	+
  * _LAST		-	-	+	+	+
- * _FOREACH		+	+	-	+	+
+ * _FOREACH		+	+	+	+	+
  * _INSERT_HEAD		+	+	+	+	+
  * _INSERT_BEFORE	-	+	-	+	+
  * _INSERT_AFTER	+	+	+	+	+
@@ -113,6 +113,9 @@
 struct name {								\
 	struct type *slh_first;	/* first element */			\
 }
+
+#define SLIST_HEAD_INITIALIZER(head)					\
+	{ NULL }
  
 #define SLIST_ENTRY(type)						\
 struct {								\
@@ -192,6 +195,9 @@ struct {								\
 #define STAILQ_FIRST(head)	((head)->stqh_first)
 #define STAILQ_LAST(head)	(*(head)->stqh_last)
 
+#define STAILQ_FOREACH(var, head, field)				\
+	for((var) = (head)->stqh_first; (var); (var) = (var)->field.stqe_next)
+
 #define STAILQ_INSERT_HEAD(head, elm, field) do {			\
 	if (((elm)->field.stqe_next = (head)->stqh_first) == NULL)	\
 		(head)->stqh_last = &(elm)->field.stqe_next;		\
@@ -222,7 +228,6 @@ struct {								\
 	if (((head)->stqh_first = (elm)->field.stqe_next) == NULL)	\
 		(head)->stqh_last = &(head)->stqh_first;		\
 } while (0)
-
 
 #define STAILQ_REMOVE(head, elm, type, field) do {			\
 	if ((head)->stqh_first == (elm)) {				\

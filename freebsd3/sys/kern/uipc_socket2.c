@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket2.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.43.2.5 1999/08/29 16:26:12 peter Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.43.2.6 1999/10/01 17:08:50 pb Exp $
  */
 
 #include <sys/param.h>
@@ -717,8 +717,15 @@ sbflush(sb)
 
 	if (sb->sb_flags & SB_LOCK)
 		panic("sbflush: locked");
-	while (sb->sb_mbcnt && sb->sb_cc)
+	while (sb->sb_mbcnt) {
+		/*
+		 * Don't call sbdrop(sb, 0) if the leading mbuf is non-empty:
+		 * we would loop forever. Panic instead.
+		 */
+		if (!sb->sb_cc && (sb->sb_mb == NULL || sb->sb_mb->m_len))
+			break;
 		sbdrop(sb, (int)sb->sb_cc);
+	}
 	if (sb->sb_cc || sb->sb_mb || sb->sb_mbcnt)
 		panic("sbflush: cc %ld || mb %p || mbcnt %ld", sb->sb_cc, (void *)sb->sb_mb, sb->sb_mbcnt);
 }

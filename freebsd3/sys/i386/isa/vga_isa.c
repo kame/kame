@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/vga_isa.c,v 1.1.2.4 1999/08/29 16:07:34 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/vga_isa.c,v 1.1.2.5 1999/12/09 10:58:40 yokota Exp $
  */
 
 #include "vga.h"
@@ -1304,11 +1304,10 @@ vga_get_info(video_adapter_t *adp, int mode, video_info_t *info)
 static int
 vga_query_mode(video_adapter_t *adp, video_info_t *info)
 {
-    video_info_t buf;
     int i;
 
     if (!init_done)
-	return -1;
+	return ENXIO;
 
     for (i = 0; bios_vmode[i].vi_mode != EOT; ++i) {
 	if (bios_vmode[i].vi_mode == NA)
@@ -1338,11 +1337,11 @@ vga_query_mode(video_adapter_t *adp, video_info_t *info)
 		continue;
 
 	/* verify if this mode is supported on this adapter */
-	if (vga_get_info(adp, bios_vmode[i].vi_mode, &buf))
+	if (vga_get_info(adp, bios_vmode[i].vi_mode, info))
 		continue;
-	return bios_vmode[i].vi_mode;
+	return 0;
     }
-    return -1;
+    return ENODEV;
 }
 
 /*

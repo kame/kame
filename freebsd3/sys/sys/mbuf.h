@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.31.2.1 1999/08/29 16:32:31 peter Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.31.2.3 1999/12/03 07:49:37 julian Exp $
  */
 
 #ifndef _SYS_MBUF_H_
@@ -257,13 +257,34 @@ union mcluster {
 	  } \
 	}
 
+#define	MCLFREE1(p) \
+	do { \
+	  	if (--mclrefcnt[mtocl(p)] == 0) { \
+			((union mcluster *)(p))->mcl_next = mclfree; \
+			mclfree = (union mcluster *)(p); \
+			mbstat.m_clfree++; \
+	  	} \
+	} while (0)
+
 #define	MCLFREE(p) \
-	MBUFLOCK ( \
-	  if (--mclrefcnt[mtocl(p)] == 0) { \
-		((union mcluster *)(p))->mcl_next = mclfree; \
-		mclfree = (union mcluster *)(p); \
-		mbstat.m_clfree++; \
-	  } \
+	MBUFLOCK( \
+		MCLFREE1(p); \
+	)
+
+#define	MEXTFREE1(m) \
+	do { \
+		if ((m)->m_ext.ext_free) \
+			(*((m)->m_ext.ext_free))((m)->m_ext.ext_buf, \
+		    	(m)->m_ext.ext_size); \
+		else { \
+			char *p = (m)->m_ext.ext_buf; \
+			MCLFREE1(p); \
+		} \
+	} while (0)
+
+#define	MEXTFREE(m) \
+	MBUFLOCK( \
+		MCLEXTFREE1(m); \
 	)
 
 /*
@@ -275,17 +296,7 @@ union mcluster {
 	MBUFLOCK(  \
 	  mbstat.m_mtypes[(m)->m_type]--; \
 	  if ((m)->m_flags & M_EXT) { \
-		if ((m)->m_ext.ext_free) \
-			(*((m)->m_ext.ext_free))((m)->m_ext.ext_buf, \
-			    (m)->m_ext.ext_size); \
-		else { \
-			char *p = (m)->m_ext.ext_buf; \
-			if (--mclrefcnt[mtocl(p)] == 0) { \
-				((union mcluster *)(p))->mcl_next = mclfree; \
-				mclfree = (union mcluster *)(p); \
-				mbstat.m_clfree++; \
-			} \
-		} \
+		MEXTFREE1(m); \
 	  } \
 	  (n) = (m)->m_next; \
 	  (m)->m_type = MT_FREE; \
@@ -402,6 +413,7 @@ struct	mbuf *m_copym __P((struct mbuf *, int, int, int));
 struct	mbuf *m_copypacket __P((struct mbuf *, int));
 struct	mbuf *m_devget __P((char *, int, int, struct ifnet *,
 			    void (*copy)(char *, caddr_t, u_int)));
+struct	mbuf *m_dup __P((struct mbuf *, int));
 struct	mbuf *m_free __P((struct mbuf *));
 struct	mbuf *m_get __P((int, int));
 struct	mbuf *m_getclr __P((int, int));

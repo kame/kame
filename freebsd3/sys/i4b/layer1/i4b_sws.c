@@ -47,9 +47,9 @@
  *		EXPERIMENTAL !!!!
  *		=================
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_sws.c,v 1.1.2.1 1999/08/29 16:25:21 peter Exp $
+ * $FreeBSD: src/sys/i4b/layer1/i4b_sws.c,v 1.1.2.2 1999/11/15 22:40:30 joe Exp $
  *
- *	last edit-date: [Sun Dec 13 10:49:25 1998]
+ *	last edit-date: [Sun Feb 14 10:28:31 1999]
  *
  *	-hm	adding driver to i4b
  *	-hm	adjustments for FreeBSD < 2.2.6, no PnP support yet

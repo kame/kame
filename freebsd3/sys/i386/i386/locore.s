@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)locore.s	7.3 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/locore.s,v 1.118.2.2 1999/08/29 16:05:42 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/locore.s,v 1.118.2.4 1999/12/04 13:13:58 kato Exp $
  *
  *		originally from: locore.s, by William F. Jolitz
  *
@@ -228,10 +228,9 @@ NON_GPROF_ENTRY(btext)
 	movb	$1,R(_bdb_exists)
 1:
 #endif
-#endif	/* PC98 */
-
 /* Tell the bios to warmboot next time */
 	movw	$0x1234,0x472
+#endif	/* PC98 */
 
 /* Set up a real frame in case the double return in newboot is executed. */
 	pushl	%ebp
@@ -433,13 +432,17 @@ NON_GPROF_ENTRY(prepare_usermode)
  */
 NON_GPROF_ENTRY(sigcode)
 	call	SIGF_HANDLER(%esp)
-	lea	SIGF_SC(%esp),%eax		/* scp (the call may have clobbered the */
-						/* copy at 8(%esp)) */
-	pushl	%eax
-	pushl	%eax				/* junk to fake return address */
+	lea	SIGF_SC(%esp),%eax		/* scp (the copy at 8(%esp) */
+	pushl	%eax				/* may have been clobbered) */
+	testl	$PSL_VM,SC_PS(%eax)
+	jne	9f
+	movl	SC_FS(%eax),%fs			/* restore %fs */
+	movl	SC_GS(%eax),%gs			/* restore %gs */
+9:
+	pushl	%eax				/* junk to fake return addr */
 	movl	$SYS_sigreturn,%eax		/* sigreturn() */
-	LCALL(0x7,0)				/* enter kernel with args on stack */
-	hlt					/* never gets here */
+	LCALL(0x7,0)				/* enter kernel with args */
+0:	jmp	0b
 	ALIGN_TEXT
 _esigcode:
 

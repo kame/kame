@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.31 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.95.2.1 1999/08/29 16:33:12 peter Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.95.2.2 1999/11/21 16:58:49 bde Exp $
  */
 
 #include "opt_quota.h"
@@ -666,6 +666,7 @@ ffs_mountfs(devvp, mp, p, malloctype)
 	ump = malloc(sizeof *ump, M_UFSMNT, M_WAITOK);
 	bzero((caddr_t)ump, sizeof *ump);
 	ump->um_malloctype = malloctype;
+	ump->um_i_effnlink_valid = 1;
 	ump->um_fs = malloc((u_long)fs->fs_sbsize, M_UFSMNT,
 	    M_WAITOK);
 	ump->um_blkatoff = ffs_blkatoff;

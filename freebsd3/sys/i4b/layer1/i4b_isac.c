@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 1998 Hellmuth Michaelis. All rights reserved.
+ * Copyright (c) 1997, 1999 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,9 +27,9 @@
  *	i4b_isac.c - i4b siemens isdn chipset driver ISAC handler
  *	---------------------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_isac.c,v 1.1.2.1 1999/08/29 16:25:15 peter Exp $ 
+ * $FreeBSD: src/sys/i4b/layer1/i4b_isac.c,v 1.1.2.2 1999/11/15 22:40:26 joe Exp $ 
  *
- *      last edit-date: [Sat Dec  5 18:23:59 1998]
+ *      last edit-date: [Sun Feb 14 10:27:09 1999]
  *
  *---------------------------------------------------------------------------*/
 
@@ -58,7 +58,9 @@
 #include <machine/clock.h>
 #include <i386/isa/isa_device.h>
 #else
+#ifndef __bsdi__
 #include <machine/bus.h>
+#endif
 #include <sys/device.h>
 #endif
 

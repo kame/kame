@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/pnp.c,v 1.9.2.1 1999/08/29 16:07:30 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/pnp.c,v 1.9.2.2 1999/09/22 14:44:31 nyan Exp $
  */
 
 #include <sys/param.h>
@@ -487,6 +487,9 @@ config_pnp_device(pnp_id *p, int csn)
 		printf(" msize %d", nod->dev.id_msize);
 	    if (nod->dev.id_flags)
 		printf(" flags 0x%x", nod->dev.id_flags);
+#ifdef PC98
+	    printf (" on isa");
+#else
 	    if (nod->dev.id_iobase && !(nod->dev.id_iobase & 0xf300)) {
 		printf(" on motherboard");
 		printf(" id %d", nod->dev.id_id);
@@ -497,6 +500,7 @@ config_pnp_device(pnp_id *p, int csn)
 	    } else {
 		printf (" on isa");
 	    }
+#endif
 	    printf("\n");
 	    if (pnp_device_list_last_ptr == NULL)
 		pnp_device_list = nod;

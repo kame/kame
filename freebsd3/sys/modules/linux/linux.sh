@@ -1,12 +1,21 @@
 #!/bin/sh
 
-# $FreeBSD: src/sys/modules/linux/linux.sh,v 1.6.2.1 1999/08/29 16:27:25 peter Exp $
+# $FreeBSD: src/sys/modules/linux/linux.sh,v 1.6.2.2 1999/12/13 08:52:19 cracauer Exp $
 
 FOUND=`kldstat -v | egrep 'linux(aout|elf)'`
 
+exitcode=0
+
 if [ "x$FOUND" != x ] ; then           
 	echo Linux driver already loaded
-	exit 1
+	exitcode=1
 else    
 	kldload linux                                                
+	exitcode=$?
 fi
+
+if [ -f /compat/linux/sbin/ldconfig ] ; then
+	/compat/linux/sbin/ldconfig
+fi
+
+exit $exitcode

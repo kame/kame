@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/i686_mem.c,v 1.6.2.1 1999/08/31 01:19:17 msmith Exp $
+ * $FreeBSD: src/sys/i386/i386/i686_mem.c,v 1.6.2.2 1999/10/12 22:58:01 green Exp $
  */
 
 #include "opt_smp.h"
@@ -39,7 +39,7 @@
 #include <machine/specialreg.h>
 
 #ifdef SMP
-#include "machine/smp.h"
+#include <machine/smp.h>
 #endif
 
 /*
@@ -576,9 +576,10 @@ static void
 i686_mem_drvinit(void *unused)
 {
     /* Try for i686 MTRRs */
-    if (!strcmp(cpu_vendor, "GenuineIntel") &&
-	cpu_feature & CPUID_MTRR &&
-	(cpu_id & 0xf00) == 0x600) {
+    if ((cpu_feature & CPUID_MTRR) &&
+	((cpu_id & 0xf00) == 0x600) &&
+	((strcmp(cpu_vendor, "GenuineIntel") == 0) ||
+	(strcmp(cpu_vendor, "AuthenticAMD") == 0))) {
 	mem_range_softc.mr_op = &i686_mrops;
     }
 }

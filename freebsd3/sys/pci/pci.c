@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/pci.c,v 1.93.2.2 1999/08/29 16:31:55 peter Exp $
+ * $FreeBSD: src/sys/pci/pci.c,v 1.93.2.3 1999/12/08 05:04:11 ken Exp $
  *
  */
 
@@ -339,9 +339,9 @@ pci_readcfg(pcicfgregs *probe)
 		if (devlist_entry == NULL)
 			return (NULL);
 
-		cfg = &devlist_entry->cfg;
+		bzero(devlist_entry, sizeof(*devlist_entry));
 
-		bzero(cfg, sizeof *cfg);
+		cfg = &devlist_entry->cfg;
 
 		cfg->bus		= probe->bus;
 		cfg->slot		= probe->slot;

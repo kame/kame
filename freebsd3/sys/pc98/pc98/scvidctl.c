@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/scvidctl.c,v 1.2.2.3 1999/08/29 16:31:15 peter Exp $
+ * $FreeBSD: src/sys/pc98/pc98/scvidctl.c,v 1.2.2.4 1999/12/09 12:00:30 nyan Exp $
  */
 
 #include "sc.h"
@@ -410,8 +410,7 @@ sc_vid_ioctl(struct tty *tp, u_long cmd, caddr_t data, int flag, struct proc *p)
 		? ENODEV : 0);
 
     case CONS_FINDMODE:		/* find a matching video mode */
-	return ((*vidsw[scp->ad]->query_mode)(scp->adp, (video_info_t *)data) 
-		? ENODEV : 0);
+	return (*vidsw[scp->ad]->query_mode)(scp->adp, (video_info_t *)data);
 
     case CONS_SETWINORG:
 	return ((*vidsw[scp->ad]->set_win_org)(scp->adp, *(u_int *)data) 

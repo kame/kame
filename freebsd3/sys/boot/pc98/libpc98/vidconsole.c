@@ -26,7 +26,7 @@
  *
  * 	From Id: probe_keyboard.c,v 1.13 1997/06/09 05:10:55 bde Exp
  *
- * $FreeBSD: src/sys/boot/pc98/libpc98/vidconsole.c,v 1.1.2.3 1999/08/29 16:21:30 peter Exp $
+ * $FreeBSD: src/sys/boot/pc98/libpc98/vidconsole.c,v 1.1.2.4 1999/12/03 13:23:16 nyan Exp $
  */
 
 #include <stand.h>
@@ -144,6 +144,17 @@ vidc_init(int arg)
     return(0);	/* XXX reinit? */
 }
 
+#ifdef PC98
+static void
+beep(void)
+{
+	outb(0x37, 6);
+	delay(40000);
+	outb(0x37, 7);
+}
+#endif
+
+#if 0
 static void
 vidc_biosputchar(int c)
 {
@@ -196,6 +207,7 @@ vidc_biosputchar(int c)
     v86int();
 #endif
 }
+#endif
 
 static void
 vidc_rawputchar(int c)
@@ -207,13 +219,17 @@ vidc_rawputchar(int c)
 	for (i = 0; i < 8; i++)
 	    vidc_rawputchar(' ');
     else {
-#ifndef TERM_EMU
+#if !defined(TERM_EMU) && !defined(PC98)
         vidc_biosputchar(c);
 #else
 	/* Emulate AH=0eh (teletype output) */
 	switch(c) {
 	case '\a':
+#ifdef PC98
+		beep();
+#else
 		vidc_biosputchar(c);
+#endif
 		return;
 	case '\r':
 		curx=0;

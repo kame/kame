@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_vnops.c	8.2 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/vfs_vnops.c,v 1.62.2.2 1999/08/29 16:26:15 peter Exp $
+ * $FreeBSD: src/sys/kern/vfs_vnops.c,v 1.62.2.3 1999/11/18 08:15:12 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -375,6 +375,14 @@ vn_stat(vp, sb, p)
 	error = VOP_GETATTR(vp, vap, p->p_ucred, p);
 	if (error)
 		return (error);
+
+	/*
+	 * Zero the spare stat fields
+	 */
+	sb->st_lspare = 0;
+	sb->st_qspare[0] = 0;
+	sb->st_qspare[1] = 0;
+
 	/*
 	 * Copy from vattr table
 	 */

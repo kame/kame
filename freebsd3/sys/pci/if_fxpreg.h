@@ -24,11 +24,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_fxpreg.h,v 1.13.2.2 1999/08/29 16:31:38 peter Exp $
+ * $FreeBSD: src/sys/pci/if_fxpreg.h,v 1.13.2.3 1999/12/06 20:11:53 peter Exp $
  */
 
 #define FXP_VENDORID_INTEL	0x8086
-#define FXP_DEVICEID_i82557	0x1229
+#define FXP_DEVICEID_i82557	0x1229	/* 82557 - 82559 "classic" */
+#define FXP_DEVICEID_i82559	0x1030	/* New 82559 device id.. */
 
 #define FXP_PCI_MMBA	0x10
 #define FXP_PCI_IOBA	0x14

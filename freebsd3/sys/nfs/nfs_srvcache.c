@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_srvcache.c	8.3 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfs/nfs_srvcache.c,v 1.17.2.1 1999/08/29 16:30:30 peter Exp $
+ * $FreeBSD: src/sys/nfs/nfs_srvcache.c,v 1.17.2.2 1999/12/13 17:10:47 dillon Exp $
  */
 
 /*
@@ -293,6 +293,18 @@ loop:
 				goto loop;
 			}
 			rp->rc_flag |= RC_LOCKED;
+			if (rp->rc_state == RC_DONE) {
+				/*
+				 * This can occur if the cache is too small.
+				 * Retransmits of the same request aren't 
+				 * dropped so we may see the operation 
+				 * complete more then once.
+				 */
+				if (rp->rc_flag & RC_REPMBUF) {
+					m_freem(rp->rc_reply);
+					rp->rc_flag &= ~RC_REPMBUF;
+				}
+			}
 			rp->rc_state = RC_DONE;
 			/*
 			 * If we have a valid reply update status and save
@@ -332,6 +344,10 @@ nfsrv_cleancache()
 		nextrp = rp->rc_lru.tqe_next;
 		LIST_REMOVE(rp, rc_hash);
 		TAILQ_REMOVE(&nfsrvlruhead, rp, rc_lru);
+		if (rp->rc_flag & RC_REPMBUF)
+			m_freem(rp->rc_reply);
+		if (rp->rc_flag & RC_NAM)
+			free(rp->rc_nam, M_SONAME);
 		free(rp, M_NFSD);
 	}
 	numnfsrvcache = 0;

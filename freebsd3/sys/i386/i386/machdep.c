@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.322.2.8 1999/08/29 16:05:43 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.322.2.9 1999/11/15 20:19:25 luoqi Exp $
  */
 
 #include "apm.h"
@@ -579,6 +579,8 @@ sendsig(catcher, sig, mask, code)
 	sf.sf_sc.sc_ds = regs->tf_ds;
 	sf.sf_sc.sc_ss = regs->tf_ss;
 	sf.sf_sc.sc_es = regs->tf_es;
+	sf.sf_sc.sc_fs = rfs();
+	sf.sf_sc.sc_gs = rgs();
 	sf.sf_sc.sc_isp = regs->tf_isp;
 
 	/*
@@ -643,6 +645,8 @@ sendsig(catcher, sig, mask, code)
 	regs->tf_cs = _ucodesel;
 	regs->tf_ds = _udatasel;
 	regs->tf_es = _udatasel;
+	load_fs(_udatasel);
+	load_gs(_udatasel);
 	regs->tf_ss = _udatasel;
 }
 

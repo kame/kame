@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 1998 Hellmuth Michaelis. All rights reserved.
+ * Copyright (c) 1997, 1999 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,9 +27,9 @@
  *	isic - I4B Siemens ISDN Chipset Driver for Creatix PnP cards
  *	============================================================
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_ctx_s0P.c,v 1.1.2.1 1999/08/29 16:25:09 peter Exp $ 
+ * $FreeBSD: src/sys/i4b/layer1/i4b_ctx_s0P.c,v 1.1.2.3 1999/11/22 14:08:16 joe Exp $ 
  *
- *      last edit-date: [Mon Dec 14 17:26:30 1998]
+ *      last edit-date: [Sun Feb 14 10:25:33 1999]
  *
  *---------------------------------------------------------------------------*/
 

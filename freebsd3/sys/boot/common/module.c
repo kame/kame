@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/module.c,v 1.7.2.3 1999/08/29 16:20:32 peter Exp $
+ * $FreeBSD: src/sys/boot/common/module.c,v 1.7.2.4 1999/12/01 18:31:47 dcs Exp $
  */
 
 /*
@@ -74,6 +74,10 @@ command_load(int argc, char *argv[])
     optind = 1;
     optreset = 1;
     typestr = NULL;
+    if (argc == 1) {
+	command_errmsg = "no filename specified";
+	return(CMD_ERROR);
+    }
     while ((ch = getopt(argc, argv, "t:")) != -1) {
 	switch(ch) {
 	case 't':

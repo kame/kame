@@ -37,7 +37,7 @@
  *
  *      @(#)bpf_filter.c	8.1 (Berkeley) 6/10/93
  *
- * $FreeBSD: src/sys/net/bpf_filter.c,v 1.12.2.2 1999/08/29 16:28:11 peter Exp $
+ * $FreeBSD: src/sys/net/bpf_filter.c,v 1.12.2.3 1999/12/06 20:38:24 archie Exp $
  */
 
 #include <sys/param.h>
@@ -183,7 +183,7 @@ m_xhalf(m, k, err)
  */
 u_int
 bpf_filter(pc, p, wirelen, buflen)
-	register struct bpf_insn *pc;
+	register const struct bpf_insn *pc;
 	register u_char *p;
 	u_int wirelen;
 	register u_int buflen;
@@ -510,19 +510,17 @@ bpf_filter(pc, p, wirelen, buflen)
  * Return true if the 'fcode' is a valid filter program.
  * The constraints are that each jump be forward and to a valid
  * code.  The code must terminate with either an accept or reject.
- * 'valid' is an array for use by the routine (it must be at least
- * 'len' bytes long).
  *
  * The kernel needs to be able to verify an application's filter code.
  * Otherwise, a bogus program could easily crash the system.
  */
 int
 bpf_validate(f, len)
-	struct bpf_insn *f;
+	const struct bpf_insn *f;
 	int len;
 {
 	register int i;
-	register struct bpf_insn *p;
+	register const struct bpf_insn *p;
 
 	for (i = 0; i < len; ++i) {
 		/*

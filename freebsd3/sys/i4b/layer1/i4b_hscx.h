@@ -30,9 +30,9 @@
  *
  *---------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_hscx.h,v 1.1.2.1 1999/08/29 16:25:14 peter Exp $ 
+ * $FreeBSD: src/sys/i4b/layer1/i4b_hscx.h,v 1.1.2.2 1999/11/15 22:40:26 joe Exp $ 
  *
- *      last edit-date: [Thu Feb  5 13:38:50 1998]
+ *      last edit-date: [Sun Feb 14 10:26:56 1999]
  *
  *	-hm	added AVM config register defs
  *	-hm	split up for rewrite of Siemens chipset driver

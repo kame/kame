@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/wfd.c,v 1.17.2.3 1999/08/29 16:07:35 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/wfd.c,v 1.17.2.4 1999/11/03 07:59:28 nyan Exp $
  */
 
 /*
@@ -205,7 +205,7 @@ wfdattach (struct atapi *ata, int unit, struct atapi_params *ap, int debug)
 	bufq_init(&t->buf_queue);
 	t->ata = ata;
 	t->unit = unit;
-	lun = t->lun = wfdnlun++;
+	lun = t->lun = wfdnlun;
 	t->param = ap;
 	t->flags = F_MEDIA_CHANGED;
 	t->refcnt = 0;
@@ -271,10 +271,11 @@ wfdattach (struct atapi *ata, int unit, struct atapi_params *ap, int debug)
 	 * Export the drive to the devstat interface.
 	 */
 	devstat_add_entry(&t->device_stats, "wfd", 
-			  wfdnlun, t->cap.sector_size,
+			  t->lun, t->cap.sector_size,
 			  DEVSTAT_NO_ORDERED_TAGS,
 			  DEVSTAT_TYPE_FLOPPY | DEVSTAT_TYPE_IF_IDE,
 			  DEVSTAT_PRIORITY_WFD);
+	wfdnlun++;
 	return (1);
 }
 

@@ -17,7 +17,7 @@
  *
  * From: Version 2.4, Thu Apr 30 17:17:21 MSD 1997
  *
- * $FreeBSD: src/sys/net/if_spppsubr.c,v 1.52.2.1 1999/08/29 16:28:24 peter Exp $
+ * $FreeBSD: src/sys/net/if_spppsubr.c,v 1.52.2.2 1999/10/29 18:03:17 joerg Exp $
  */
 
 #include <sys/param.h>
@@ -1380,7 +1380,7 @@ sppp_cp_input(const struct cp *cp, struct sppp *sp, struct mbuf *m)
 			(cp->tld)(sp);
 			/* fall through */
 		case STATE_ACK_RCVD:
-			sppp_cp_change_state(cp, sp, STATE_ACK_SENT);
+			sppp_cp_change_state(cp, sp, STATE_REQ_SENT);
 			(cp->scr)(sp);
 			break;
 		case STATE_CLOSING:

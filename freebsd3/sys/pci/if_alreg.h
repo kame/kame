@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_alreg.h,v 1.2.2.2 1999/08/29 16:31:33 peter Exp $
+ * $FreeBSD: src/sys/pci/if_alreg.h,v 1.2.2.3 1999/10/10 19:43:06 wpaul Exp $
  */
 
 /*
@@ -214,6 +214,10 @@
 #define AL_SIO_EESEL		0x00000800
 #define AL_SIO_ROMCTL_WRITE	0x00002000
 #define AL_SIO_ROMCTL_READ	0x00004000
+#define AL_SIO_MII_CLK		0x00010000	/* MDIO clock */
+#define AL_SIO_MII_DATAOUT	0x00020000	/* MDIO data out */
+#define AL_SIO_MII_DIR		0x00040000	/* MDIO dir */
+#define AL_SIO_MII_DATAIN	0x00080000	/* MDIO data in */
 
 #define AL_EECMD_WRITE		0x140
 #define AL_EECMD_READ		0x180
@@ -530,6 +534,11 @@ struct al_softc {
  * AL981 device IDs.
  */
 #define AL_DEVICEID_AL981	0x0981
+
+/*
+ * AN985 device ID.
+ */
+#define AL_DEVICEID_AN985	0x0985
 
 /*
  * Texas Instruments PHY identifiers

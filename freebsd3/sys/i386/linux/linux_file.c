@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_file.c,v 1.23.2.4 1999/08/29 16:07:50 peter Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_file.c,v 1.23.2.6 1999/12/08 18:35:31 marcel Exp $
  */
 
 #include "opt_compat.h"
@@ -537,7 +537,7 @@ again:
 	    linux_dirent.doff = (linux_off_t) linuxreclen;
 	    linux_dirent.dreclen = (u_short) bdp->d_namlen;
 	} else {
-	    linux_dirent.doff = (linux_off_t) off;
+	    linux_dirent.doff = (linux_off_t)(off + reclen);
 	    linux_dirent.dreclen = (u_short) linuxreclen;
 	}
 	strcpy(linux_dirent.dname, bdp->d_name);
@@ -857,13 +857,38 @@ linux_getcwd(p, args)
 	struct linux_getcwd_args *args;
 {
 	struct __getcwd_args bsd;
+	caddr_t sg;
+	int error, len;
 
 #ifdef DEBUG
 	printf("Linux-emul(%ld): getcwd(%p, %ld)\n", (long)p->p_pid,
 	       args->buf, args->bufsize);
 #endif
 
-	bsd.buf = args->buf;
-	bsd.buflen = args->bufsize;
-	return (__getcwd(p, &bsd));
+	sg = stackgap_init();
+	bsd.buf = stackgap_alloc(&sg, SPARE_USRSPACE);
+	bsd.buflen = SPARE_USRSPACE;
+	error = __getcwd(p, &bsd);
+	if (!error) {
+		len = strlen(bsd.buf) + 1;
+		if (len <= args->bufsize) {
+			p->p_retval[0] = len;
+			error = copyout(bsd.buf, args->buf, len);
+		}
+		else
+			error = ERANGE;
+	}
+	return (error);
 }
+
+int
+linux_fdatasync(p, uap)
+	struct proc *p;
+	struct linux_fdatasync_args *uap;
+{
+	struct fsync_args bsd;
+
+	bsd.fd = uap->fd;
+	return fsync(p, &bsd);
+}
+

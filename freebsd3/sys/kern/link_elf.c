@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/link_elf.c,v 1.11.2.1 1999/08/29 16:26:04 peter Exp $
+ * $FreeBSD: src/sys/kern/link_elf.c,v 1.11.2.3 1999/11/28 14:46:45 peter Exp $
  */
 
 #include <sys/param.h>
@@ -175,6 +175,7 @@ link_elf_init(void* arg)
 	}
 	(void)parse_module_symbols(linker_kernel_file);
 	linker_current_file = linker_kernel_file;
+	linker_kernel_file->flags |= LINKER_FILE_LINKED;
     }
 #endif
 }
@@ -384,6 +385,7 @@ link_elf_load_module(const char *filename, linker_file_t *result)
 	return error;
     }
     (void)parse_module_symbols(lf);
+    lf->flags |= LINKER_FILE_LINKED;
     *result = lf;
     return (0);
 }
@@ -673,6 +675,8 @@ link_elf_load_file(const char* filename, linker_file_t* result)
     ef->ddbstrcnt = strcnt;
     ef->ddbstrtab = ef->strbase;
 
+    lf->flags |= LINKER_FILE_LINKED;
+
 nosyms:
 
     *result = lf;
@@ -956,17 +960,19 @@ link_elf_search_symbol(linker_file_t lf, caddr_t value,
 	const Elf_Sym* es;
 	const Elf_Sym* best = 0;
 	int i;
+	u_long st_value;
 
 	for (i = 0, es = ef->ddbsymtab; i < ef->ddbsymcnt; i++, es++) {
 		if (es->st_name == 0)
 			continue;
-		if (off >= es->st_value) {
-			if (off - es->st_value < diff) {
-				diff = off - es->st_value;
+		st_value = es->st_value + (u_long)ef->address;
+		if (off >= st_value) {
+			if (off - st_value < diff) {
+				diff = off - st_value;
 				best = es;
 				if (diff == 0)
 					break;
-			} else if (off - es->st_value == diff) {
+			} else if (off - st_value == diff) {
 				best = es;
 			}
 		}

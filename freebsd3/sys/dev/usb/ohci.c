@@ -1,5 +1,5 @@
 /*	$NetBSD: ohci.c,v 1.27 1999/01/13 10:33:53 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ohci.c,v 1.10.2.2 1999/05/18 22:31:49 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ohci.c,v 1.10.2.3 1999/10/29 20:28:14 nsayer Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -2138,7 +2138,6 @@ ohci_device_intr_abort(reqh)
 	if (reqh->pipe->intrreqh == reqh) {
 		DPRINTF(("ohci_device_intr_abort: remove\n"));
 		reqh->pipe->intrreqh = 0;
-		ohci_intr_done((ohci_softc_t *)reqh->pipe->device->bus, reqh);
 	}
 }
 

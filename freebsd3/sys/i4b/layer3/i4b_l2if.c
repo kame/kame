@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 1998 Hellmuth Michaelis. All rights reserved.
+ * Copyright (c) 1997, 1999 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,9 +27,9 @@
  *	i4b_l2if.c - Layer 3 interface to Layer 2
  *	-------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer3/i4b_l2if.c,v 1.1.2.1 1999/08/29 16:25:34 peter Exp $ 
+ * $FreeBSD: src/sys/i4b/layer3/i4b_l2if.c,v 1.1.2.2 1999/11/15 22:40:40 joe Exp $ 
  *
- *      last edit-date: [Sat Dec  5 18:31:26 1998]
+ *      last edit-date: [Tue May 25 11:55:15 1999]
  *
  *---------------------------------------------------------------------------*/
 
@@ -570,7 +570,7 @@ i4b_l3_tx_status(call_desc_t *cd, u_char q850cause)
 	*ptr++ = IEI_CAUSE;		/* cause ie */
 	*ptr++ = CAUSE_LEN;
 	*ptr++ = CAUSE_STD_LOC_OUT;
-	*ptr++ = q850cause;
+	*ptr++ = q850cause | EXT_LAST;
 
 	*ptr++ = IEI_CALLSTATE;		/* call state ie */
 	*ptr++ = CALLSTATE_LEN;

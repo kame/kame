@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_icmp.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/ip_icmp.h,v 1.12.2.1 1999/08/29 16:29:45 peter Exp $
+ * $FreeBSD: src/sys/netinet/ip_icmp.h,v 1.12.2.2 1999/11/18 08:51:44 peter Exp $
  */
 
 #ifndef _NETINET_IP_ICMP_H_
@@ -165,7 +165,9 @@ struct icmp {
 #define		ICMP_TIMXCEED_INTRANS	0		/* ttl==0 in transit */
 #define		ICMP_TIMXCEED_REASS	1		/* ttl==0 in reass */
 #define	ICMP_PARAMPROB		12		/* ip header bad */
+#define		ICMP_PARAMPROB_ERRATPTR 0		/* error at param ptr */
 #define		ICMP_PARAMPROB_OPTABSENT 1		/* req. opt. absent */
+#define		ICMP_PARAMPROB_LENGTH 2			/* bad length */
 #define	ICMP_TSTAMP		13		/* timestamp request */
 #define	ICMP_TSTAMPREPLY	14		/* timestamp reply */
 #define	ICMP_IREQ		15		/* information request */

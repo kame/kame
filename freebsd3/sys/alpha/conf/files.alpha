@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/alpha/conf/files.alpha,v 1.15.2.2 1999/08/29 15:56:43 peter Exp $
+# $FreeBSD: src/sys/alpha/conf/files.alpha,v 1.15.2.3 1999/12/06 21:03:17 archie Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -137,6 +137,10 @@ libkern/strcpy.c		standard
 libkern/strlen.c		standard
 libkern/strncmp.c		standard
 libkern/strncpy.c		standard
+libkern/strtol.c		standard
+libkern/strtoq.c		standard
+libkern/strtoul.c		standard
+libkern/strtouq.c		standard
 libkern/alpha/htonl.S		standard
 libkern/alpha/htons.S		standard
 libkern/alpha/ntohl.S		standard

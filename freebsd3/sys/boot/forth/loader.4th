@@ -22,7 +22,7 @@
 \ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 \ SUCH DAMAGE.
 \
-\ $FreeBSD: src/sys/boot/forth/loader.4th,v 1.2.2.3 1999/08/29 16:20:38 peter Exp $
+\ $FreeBSD: src/sys/boot/forth/loader.4th,v 1.2.2.4 1999/11/24 18:04:45 dcs Exp $
 
 include /boot/support.4th
 
@@ -36,6 +36,30 @@ only forth definitions also support-functions
   load_kernel
   load_modules
   0 autoboot
+;
+
+\ ***** check-password
+\
+\	If a password was defined, execute autoboot and ask for
+\	password if autoboot returns.
+
+: check-password
+  password .addr @ if
+    0 autoboot
+    false >r
+    begin
+      bell emit bell emit
+      ." Password: "
+      password .len @ read-password
+      dup password .len @ = if
+        2dup password .addr @ password .len @
+        compare 0= if r> drop true >r then
+      then
+      drop free drop
+      r@
+    until
+    r> drop
+  then
 ;
 
 \ ***** start

@@ -33,9 +33,9 @@
  *	pcmcia_isic.c - pcmcia bus frontend for i4b_isic driver
  *	-------------------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer1/pcmcia_isic.c,v 1.1.2.1 1999/08/29 16:25:26 peter Exp $ 
+ * $FreeBSD: src/sys/i4b/layer1/pcmcia_isic.c,v 1.1.2.2 1999/11/15 22:40:34 joe Exp $ 
  *
- *      last edit-date: [Fri Dec  4 10:38:43 1998]
+ *      last edit-date: [Tue Apr 20 14:09:16 1999]
  *
  *	-mh	original implementation
  *
@@ -98,7 +98,7 @@ struct isic_pcmcia_card_entry {
 
 static const struct isic_pcmcia_card_entry card_list[] = {
 
-#ifdef AVM_PCMCIA
+#ifdef AVM_A1_PCMCIA
     {   PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID,
     	{ "AVM", "ISDN A", NULL, NULL },
         "AVM Fritz!Card", PCMCIA_FUNCTION_NETWORK,

@@ -15,7 +15,7 @@
  *
  * Sep, 1994	Implemented on FreeBSD 1.1.5.1R (Toshiba AVS001WD)
  *
- * $FreeBSD: src/sys/i386/apm/apm.c,v 1.77.2.8 1999/09/12 01:06:28 iwasaki Exp $
+ * $FreeBSD: src/sys/i386/apm/apm.c,v 1.77.2.14 1999/10/31 06:04:40 iwasaki Exp $
  */
 
 #include "opt_devfs.h"
@@ -46,46 +46,23 @@
 #include <vm/pmap.h>
 #include <sys/syslog.h>
 #include <i386/apm/apm_setup.h>
+#include <i386/apm/apm.h>
 
 #ifdef VM86
 #include <machine/psl.h>
 #include <machine/vm86.h>
 #endif
 
-static int apm_display __P((int newstate));
+/* Used by the apm_saver screen saver module */
+int apm_display __P((int newstate));
+struct apm_softc apm_softc;
+
 static int apm_int __P((u_long *eax, u_long *ebx, u_long *ecx, u_long *edx));
 static void apm_resume __P((void));
 static int apm_check_function_supported __P((u_int version, u_int func));
 
-#define APM_NEVENTS 16
-#define APM_NPMEV   13
-
 int	apm_evindex;
 
-/* static data */
-struct apm_softc {
-	int	initialized, active, bios_busy;
-	int	always_halt_cpu, slow_idle_cpu;
-	int	disabled, disengaged;
- 	int	standby_countdown, suspend_countdown;
-	u_int	minorversion, majorversion;
-	u_int	cs32_base, cs16_base, ds_base;
-	u_int	cs16_limit, cs32_limit, ds_limit;
-	u_int	cs_entry;
-	u_int	intversion;
- 	u_int	standbys, suspends;
-	struct apmhook sc_suspend;
-	struct apmhook sc_resume;
-	struct selinfo sc_rsel;
-	int	sc_flags;
-	int	event_count;
-	int	event_ptr;
-	struct	apm_event_info event_list[APM_NEVENTS];
-	u_char	event_filter[APM_NPMEV];
-#ifdef DEVFS
-	void 	*sc_devfs_token;
-#endif
-};
 #define	SCFLAG_ONORMAL	0x0000001
 #define	SCFLAG_OCTL	0x0000002
 #define	SCFLAG_OPEN	(SCFLAG_ONORMAL|SCFLAG_OCTL)
@@ -94,7 +71,6 @@ struct apm_softc {
 #define APMDEV_NORMAL	0
 #define APMDEV_CTL	8
 
-static struct apm_softc apm_softc;
 static struct apmhook	*hook[NAPM_HOOK];		/* XXX */
 
 #define is_enabled(foo) ((foo) ? "enabled" : "disabled")
@@ -330,7 +306,7 @@ apm_suspend_system(int state)
  * If your laptop can control the display via APM, please inform me.
  *                            HOSOKAWA, Tatsumi <hosokawa@jp.FreeBSD.org>
  */
-static int
+int
 apm_display(int newstate)
 {
 	u_long eax, ebx, ecx, edx;
@@ -474,6 +450,7 @@ apm_default_resume(void *arg)
 
 	/* modified for adjkerntz */
 	pl = splsoftclock();
+	i8254_restore();		/* restore timer_freq and hz */
 	inittodr(0);			/* adjust time to RTC */
 	microtime(&resume_time);
 	getmicrotime(&tmp_time);
@@ -621,6 +598,9 @@ void
 apm_suspend(int state)
 {
 	struct apm_softc *sc = &apm_softc;
+
+	if (!sc->initialized)
+		return;
 
 	switch (state) {
 	case PMST_SUSPEND:
@@ -1413,7 +1393,7 @@ apmpoll(dev_t dev, int events, struct proc *p)
 }
 
 
-static apm_devsw_installed = 0;
+static int apm_devsw_installed = 0;
 
 static void
 apm_drvinit(void *unused)

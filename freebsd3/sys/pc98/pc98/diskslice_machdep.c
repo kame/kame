@@ -35,7 +35,7 @@
  *
  *	from: @(#)ufs_disksubr.c	7.16 (Berkeley) 5/4/91
  *	from: ufs_disksubr.c,v 1.8 1994/06/07 01:21:39 phk Exp $
- * $FreeBSD: src/sys/pc98/pc98/diskslice_machdep.c,v 1.17.2.2 1999/08/29 16:31:07 peter Exp $
+ * $FreeBSD: src/sys/pc98/pc98/diskslice_machdep.c,v 1.17.2.4 1999/11/25 13:40:08 nyan Exp $
  */
 
 /*
@@ -321,9 +321,9 @@ reread_mbr:
 	 */
 	if (((cp[4] != 'I') || (cp[5] != 'P') || (cp[6] != 'L') ||
 		 (cp[7] != '1')) &&
-		((strncmp(dname, "sd", 2) == 0) || (strncmp(dname, "wd", 2) == 0))) {
+		((strncmp(dname, "da", 2) == 0) || (strncmp(dname, "wd", 2) == 0))) {
 		/* IBM-PC HDD */
-		bp->b_flags = B_INVAL | B_AGE;
+		bp->b_flags |= B_INVAL | B_AGE;
 		brelse(bp);
 		return atcompat_dsinit(dname, dev, strat, lp, sspp);
 	}
@@ -370,7 +370,7 @@ reread_mbr:
 
 
 #ifdef PC98
-		ncyls = lp->d_secpercyl;
+		ncyls = lp->d_ncylinders;
 #else
 		ncyls = DPCYL(dp->dp_ecyl, dp->dp_esect) + 1;
 #endif

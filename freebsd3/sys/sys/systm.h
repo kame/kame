@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
- * $FreeBSD: src/sys/sys/systm.h,v 1.84.2.2 1999/08/29 16:32:48 peter Exp $
+ * $FreeBSD: src/sys/sys/systm.h,v 1.84.2.4 1999/12/06 21:03:31 archie Exp $
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -122,8 +122,10 @@ int     vsprintf __P((char *buf, const char *, _BSD_VA_LIST_)) __printflike(2, 0
 void	ttyprintf __P((struct tty *, const char *, ...)) __printflike(2, 3);
 int	sscanf __P((const char *, char const *, ...));
 int	vsscanf __P((const char *, char const *, _BSD_VA_LIST_));
+long	strtol __P((const char *, char **, int));
+u_long	strtoul __P((const char *, char **, int));
+quad_t	strtoq __P((const char *, char **, int));
 u_quad_t strtouq __P((const char *, char **, int));
-quad_t	strtoq __P((const char *, char **, int base));
 
 void	bcopy __P((const void *from, void *to, size_t len));
 void	ovbcopy __P((const void *from, void *to, size_t len));
@@ -162,6 +164,7 @@ void	setstatclockrate __P((int hzrate));
 
 char	*getenv __P((char *name));
 int	getenv_int __P((char *name, int *data));
+quad_t	getenv_quad __P((char *name, quad_t *data));
 extern char *kern_envp;
 
 #ifdef APM_FIXUP_CALLTODO 

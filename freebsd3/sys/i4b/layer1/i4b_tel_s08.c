@@ -3,7 +3,7 @@
  *
  *   Copyright (c) 1996 Gary Jennejohn. All rights reserved. 
  *
- *   Copyright (c) 1997, 1998 Hellmuth Michaelis. All rights reserved.
+ *   Copyright (c) 1997, 1999 Hellmuth Michaelis. All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
  *   modification, are permitted provided that the following conditions
@@ -37,9 +37,9 @@
  *	isic - I4B Siemens ISDN Chipset Driver for Teles S0/8 and clones
  *	================================================================
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_tel_s08.c,v 1.1.2.1 1999/08/29 16:25:23 peter Exp $ 
+ * $FreeBSD: src/sys/i4b/layer1/i4b_tel_s08.c,v 1.1.2.2 1999/11/15 22:40:31 joe Exp $ 
  *
- *      last edit-date: [Fri Dec  4 10:39:12 1998]
+ *      last edit-date: [Sun Feb 14 10:28:53 1999]
  *
  *	-hm	clean up
  *	-hm	more cleanup

@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.88.2.4 1999/09/02 23:56:46 msmith Exp $
+ * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.88.2.5 1999/10/30 20:14:26 tegge Exp $
  */
 
 #include "opt_smp.h"
@@ -1065,15 +1065,6 @@ fix_mp_table(void)
 			else if (io_apic_ints[x].src_bus_id == 0) {
 				io_apic_ints[x].src_bus_id = id;
 			}
-		}
-	}
-	/* sanity check if more than 1 PCI bus */
-	else if (num_pci_bus > 1) {
-		for (x = 0; x < mp_nbusses; ++x) {
-			if (bus_data[x].bus_type != PCI)
-				continue;
-			if (bus_data[x].bus_id >= num_pci_bus)
-				panic("bad PCI bus numbering");
 		}
 	}
 }

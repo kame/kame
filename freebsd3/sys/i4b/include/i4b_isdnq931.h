@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 1998 Hellmuth Michaelis. All rights reserved.
+ * Copyright (c) 1997, 1999 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,9 +27,9 @@
  *	i4b_isdnq931.h - DSS1 layer 3 message types
  *	-------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/include/i4b_isdnq931.h,v 1.1.2.1 1999/08/29 16:25:04 peter Exp $
+ * $FreeBSD: src/sys/i4b/include/i4b_isdnq931.h,v 1.1.2.2 1999/11/15 22:40:19 joe Exp $
  *
- *	last edit-date: [Sat Dec  5 18:04:01 1998]
+ *	last edit-date: [Sun Feb 14 10:04:01 1999]
  *
  *---------------------------------------------------------------------------*/
 

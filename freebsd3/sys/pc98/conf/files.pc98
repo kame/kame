@@ -3,7 +3,7 @@
 #
 # modified for PC-9801
 #
-# $FreeBSD: src/sys/pc98/conf/files.pc98,v 1.81.2.14 1999/09/07 12:25:36 nyan Exp $
+# $FreeBSD: src/sys/pc98/conf/files.pc98,v 1.81.2.19 1999/12/06 21:03:28 archie Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -43,6 +43,7 @@ msysosak.o			optional	fla			\
 	no-implicit-rule
 
 #
+pc98/pc98/aic_pc98.c		optional	aic	device-driver
 dev/fb/fb.c			optional	fb	device-driver
 dev/fb/fb.c			optional	gdc	device-driver
 dev/fb/splash.c			optional	splash
@@ -286,7 +287,7 @@ pc98/pc98/scvidctl.c		optional	sc	device-driver
 i386/isa/tw.c			optional	tw	device-driver
 pc98/pc98/wd.c			optional	wdc	device-driver
 pc98/pc98/wd.c			optional	wd	device-driver
-i386/isa/atapi.c		optional	atapi	device-driver
+pc98/pc98/atapi.c		optional	atapi	device-driver
 i386/isa/atapi-cd.c		optional	acd	device-driver
 i386/isa/wfd.c			optional	wfd	device-driver
 i386/isa/wst.c			optional	wst	device-driver
@@ -320,8 +321,11 @@ i4b/layer1/i4b_tel_s016.c	optional	isic	device-driver
 i4b/layer1/i4b_tel_s0163.c	optional	isic	device-driver
 i4b/layer1/i4b_tel_s0P.c	optional	isic	device-driver
 i4b/layer1/i4b_ctx_s0P.c	optional	isic	device-driver
+i4b/layer1/i4b_asuscom_ipac.c	optional	isic	device-driver
 i4b/layer1/i4b_avm_a1.c		optional	isic	device-driver
+i4b/layer1/i4b_avm_fritz_pci.c	optional	isic	device-driver
 i4b/layer1/i4b_avm_fritz_pcmcia.c optional	isic	device-driver
+i4b/layer1/i4b_avm_fritz_pnp.c	optional	isic	device-driver
 i4b/layer1/i4b_usr_sti.c	optional	isic	device-driver
 i4b/layer1/i4b_itk_ix1.c	optional	isic	device-driver
 i4b/layer1/i4b_drn_ngo.c	optional	isic	device-driver
@@ -329,6 +333,7 @@ i4b/layer1/i4b_sws.c		optional	isic	device-driver
 i4b/layer1/i4b_dynalink.c	optional	isic	device-driver
 i4b/layer1/i4b_elsa_qs1i.c	optional	isic	device-driver
 i4b/layer1/i4b_elsa_qs1p.c	optional	isic	device-driver
+i4b/layer1/i4b_siemens_isurf.c	optional	isic	device-driver
 libkern/bcd.c			standard
 libkern/divdi3.c		standard
 libkern/inet_ntoa.c		standard
@@ -347,6 +352,10 @@ libkern/strcpy.c		standard
 libkern/strlen.c		standard
 libkern/strncmp.c		standard
 libkern/strncpy.c		standard
+libkern/strtol.c		standard
+libkern/strtoq.c		standard
+libkern/strtoul.c		standard
+libkern/strtouq.c		standard
 libkern/udivdi3.c		standard
 libkern/umoddi3.c		standard
 gnu/i386/fpemul/div_small.s	optional	gpl_math_emulate
@@ -384,4 +393,5 @@ gnu/i386/isa/dgb.c		optional	dgb	device-driver
 gnu/i386/isa/dgm.c		optional	dgm	device-driver
 gnu/i386/isa/sound/awe_wave.c	optional	awe	device-driver
 pci/es1370.c			optional	pcm	device-driver
+pci/es1371.c			optional	pcm	device-driver
 #pci/ide_pci.c			optional	wd	device-driver

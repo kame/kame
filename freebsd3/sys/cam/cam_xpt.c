@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.42.2.19 1999/08/29 16:21:40 peter Exp $
+ * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.42.2.20 1999/10/16 23:45:28 mjacob Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -4285,10 +4285,11 @@ void
 xpt_release_devq(struct cam_ed *dev, int run_queue)
 {
 	int	rundevq;
-	int	s;
+	int	s0, s1;
 
 	rundevq = 0;
-	s = splcam();
+	s0 = splsoftcam();
+	s1 = splcam();
 	if (dev->qfrozen_cnt > 0) {
 
 		dev->qfrozen_cnt--;
@@ -4322,9 +4323,10 @@ xpt_release_devq(struct cam_ed *dev, int run_queue)
 			}
 		}
 	}
-	splx(s);
+	splx(s1);
 	if (rundevq != 0)
 		xpt_run_dev_sendq(dev->target->bus);
+	splx(s0);
 }
 
 void

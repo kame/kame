@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/sio.c,v 1.220.2.2 1999/08/29 16:25:46 peter Exp $
+ * $FreeBSD: src/sys/isa/sio.c,v 1.220.2.3 1999/10/11 15:07:21 steve Exp $
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
  *	from: i386/isa sio.c,v 1.215
  */
@@ -3109,6 +3109,7 @@ static pnpid_t siopnp_ids[] = {
 	{ 0x9012b04e, "Supra1290"},
 	{ 0x7121b04e, "SupraExpress 56i Sp"},
 	{ 0x11007256, "USR0011"},
+	{ 0x01017256, "USR0101"},
 	{ 0x30207256, "USR2030"},
 	{ 0x31307256, "USR3031"},
 	{ 0 }

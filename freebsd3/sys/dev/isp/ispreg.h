@@ -1,11 +1,11 @@
-/* $FreeBSD: src/sys/dev/isp/ispreg.h,v 1.4.2.2 1999/08/29 16:23:32 peter Exp $ */
-/* release_5_11_99 */
+/* $FreeBSD: src/sys/dev/isp/ispreg.h,v 1.4.2.4 1999/10/17 19:47:17 mjacob Exp $ */
+
 /*
  * Machine Independent (well, as best as possible) register
  * definitions for Qlogic ISP SCSI adapters.
  *
  *---------------------------------------
- * Copyright (c) 1997 by Matthew Jacob
+ * Copyright (c) 1997, 1998, 1999 by Matthew Jacob
  * NASA/Ames Research Center
  * All rights reserved.
  *---------------------------------------
@@ -223,6 +223,8 @@
 #define	BIU2100_ISR_RXDMA_INT_PENDING	0x0002	/* Global interrupt pending */
 #define	BIU2100_ISR_TXDMA_INT_PENDING	0x0001	/* Global interrupt pending */
 
+#define	INT_PENDING(isp, isr)	(IS_FC(isp)? \
+	((isr & BIU2100_ISR_RISC_INT) != 0) : ((isr & BIU_ISR_RISC_INT) != 0))
 
 /* BUS SEMAPHORE REGISTER */
 #define	BIU_SEMA_STATUS		0x0002	/* Semaphore Status Bit */

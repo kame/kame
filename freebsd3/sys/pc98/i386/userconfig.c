@@ -46,7 +46,7 @@
  ** (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  ** THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **
- ** $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.65.2.11 1999/09/02 12:17:09 nyan Exp $
+ ** $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.65.2.13 1999/12/06 21:03:29 archie Exp $
  **/
 
 /**
@@ -388,7 +388,9 @@ static DEV_INFO device_info[] = {
 {"le",          "DEC Etherworks 2 and 3 Ethernet adapters",	0,	CLS_NETWORK},
 {"lnc",         "Isolan, Novell NE2100/NE32-VL Ethernet adapters",	0,CLS_NETWORK},
 {"sf",          "Adaptec AIC-6915 PCI Ethernet adapters ",		0,CLS_NETWORK},
+{"sis",         "SiS 900/SiS 7016 Ethernet adapters ",			0,CLS_NETWORK},
 {"sk",          "SysKonnect SK-984x gigabit Ethernet adapters ",	0,CLS_NETWORK},
+{"ste",         "Sundance ST201 PCI Ethernet adapters ",		0,CLS_NETWORK},
 {"ti",          "Alteon Networks Tigon gigabit Ethernet adapters ",	0,CLS_NETWORK},
 {"tl",          "Texas Instruments ThunderLAN Ethernet adapters",	0,CLS_NETWORK},
 {"tx",          "SMC 9432TX Ethernet adapters",			0,	CLS_NETWORK},
@@ -2534,7 +2536,7 @@ visuserconfig(void)
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.65.2.11 1999/09/02 12:17:09 nyan Exp $
+ * $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.65.2.13 1999/12/06 21:03:29 archie Exp $
  */
 
 #include "scbus.h"
@@ -2573,7 +2575,6 @@ static struct isa_device *search_devtable(struct isa_device *, char *, int);
 static void cngets(char *, int);
 static Cmd *parse_cmd(char *);
 static int parse_args(char *, CmdParm *);
-static unsigned long strtoul(const char *, char **, int);
 static int save_dev(struct isa_device *);
 
 static int list_devices(CmdParm *);
@@ -3395,89 +3396,6 @@ cngets(char *input, int maxin)
 	}
 	*input++ = (u_char)c;
     }
-}
-
-
-/*
- * Kludges to get the library sources of strtoul.c to work in our
- * environment.  isdigit() and isspace() could be used above too.
- */
-#define	isalpha(c)	(((c) >= 'A' && (c) <= 'Z') \
-			 || ((c) >= 'a' && (c) <= 'z'))		/* unsafe */
-#define	isdigit(c)	((unsigned)((c) - '0') <= '9' - '0')
-#define	isspace(c)	((c) == ' ' || (c) == '\t')		/* unsafe */
-#define	isupper(c)	((unsigned)((c) - 'A') <= 'Z' - 'A')
-
-static int errno;
-
-/*
- * The following should be identical with the library sources for strtoul.c.
- */
-
-/*
- * Convert a string to an unsigned long integer.
- *
- * Ignores `locale' stuff.  Assumes that the upper and lower case
- * alphabets and digits are each contiguous.
- */
-static unsigned long
-strtoul(nptr, endptr, base)
-	const char *nptr;
-	char **endptr;
-	register int base;
-{
-	register const char *s = nptr;
-	register unsigned long acc;
-	register int c;
-	register unsigned long cutoff;
-	register int neg = 0, any, cutlim;
-
-	/*
-	 * See strtol for comments as to the logic used.
-	 */
-	do {
-		c = *s++;
-	} while (isspace(c));
-	if (c == '-') {
-		neg = 1;
-		c = *s++;
-	} else if (c == '+')
-		c = *s++;
-	if ((base == 0 || base == 16) &&
-	    c == '0' && (*s == 'x' || *s == 'X')) {
-		c = s[1];
-		s += 2;
-		base = 16;
-	}
-	if (base == 0)
-		base = c == '0' ? 8 : 10;
-	cutoff = (unsigned long)ULONG_MAX / (unsigned long)base;
-	cutlim = (unsigned long)ULONG_MAX % (unsigned long)base;
-	for (acc = 0, any = 0;; c = *s++) {
-		if (isdigit(c))
-			c -= '0';
-		else if (isalpha(c))
-			c -= isupper(c) ? 'A' - 10 : 'a' - 10;
-		else
-			break;
-		if (c >= base)
-			break;
-		if (any < 0 || acc > cutoff || acc == cutoff && c > cutlim)
-			any = -1;
-		else {
-			any = 1;
-			acc *= base;
-			acc += c;
-		}
-	}
-	if (any < 0) {
-		acc = ULONG_MAX;
-		errno = ERANGE;
-	} else if (neg)
-		acc = -acc;
-	if (endptr != 0)
-		*endptr = (char *)(any ? s - 1 : nptr);
-	return (acc);
 }
 
 #if 0

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_skreg.h,v 1.6.2.2 1999/08/29 16:31:44 peter Exp $
+ * $FreeBSD: src/sys/pci/if_skreg.h,v 1.6.2.3 1999/10/10 18:41:38 wpaul Exp $
  */
 
 /*
@@ -1159,6 +1159,7 @@ struct sk_if_softc {
 	SLIST_HEAD(__sk_jinusehead, sk_jpool_entry)	sk_jinuse_listhead;
 };
 
+#define SK_MAXUNIT	256
 #define SK_TIMEOUT	1000
 #define ETHER_ALIGN	2
 

@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/imgact_elf.c,v 1.44.2.7 1999/09/01 06:12:01 sef Exp $
+ * $FreeBSD: src/sys/kern/imgact_elf.c,v 1.44.2.8 1999/11/27 03:07:10 bp Exp $
  */
 
 #include "opt_rlimit.h"
@@ -216,8 +216,10 @@ elf_load_section(struct proc *p, struct vmspace *vmspace, struct vnode *vp, vm_o
 				      VM_PROT_ALL,
 				      MAP_COPY_NEEDED | MAP_COPY_ON_WRITE);
 		vm_map_unlock(&vmspace->vm_map);
-		if (rv != KERN_SUCCESS)
+		if (rv != KERN_SUCCESS) {
+			vm_object_deallocate(object);
 			return EINVAL;
+		}
 
 		/* prefault the page tables */
 		pmap_object_init_pt(&vmspace->vm_pmap,

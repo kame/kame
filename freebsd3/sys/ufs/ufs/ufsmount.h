@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufsmount.h	8.6 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/ufs/ufs/ufsmount.h,v 1.14.2.1 1999/08/29 16:33:24 peter Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufsmount.h,v 1.14.2.2 1999/11/21 16:58:52 bde Exp $
  */
 
 #ifndef _UFS_UFS_UFSMOUNT_H_
@@ -95,6 +95,7 @@ struct ufsmount {
 	struct	netexport um_export;		/* export information */
 	int64_t	um_savedmaxfilesize;		/* XXX - limit maxfilesize */
 	struct malloc_type *um_malloctype;	/* The inodes malloctype */
+	int	um_i_effnlink_valid;		/* i_effnlink valid? */
 	int	(*um_blkatoff) __P((struct vnode *, off_t, char **, struct buf **));
 	int	(*um_truncate) __P((struct vnode *, off_t, int, struct ucred *, struct proc *));
 	int	(*um_update) __P((struct vnode *, int));

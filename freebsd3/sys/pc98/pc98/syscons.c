@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/syscons.c,v 1.109.2.10 1999/08/29 16:31:17 peter Exp $
+ * $FreeBSD: src/sys/pc98/pc98/syscons.c,v 1.109.2.12 1999/12/09 00:06:48 nyan Exp $
  */
 
 #include "sc.h"
@@ -1053,6 +1053,7 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 	};
 	mouse_info_t *mouse = (mouse_info_t*)data;
 	mouse_info_t buf;
+	int f;
 
 #ifndef PC98
 	/* FIXME: */
@@ -1150,6 +1151,19 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 	    /* this should maybe only be settable from /dev/consolectl SOS */
 	    /* send out mouse event on /dev/sysmouse */
 
+	    s = spltty();
+	    if (mouse->u.data.x != 0 || mouse->u.data.y != 0) {
+		cur_console->mouse_xpos += mouse->u.data.x;
+		cur_console->mouse_ypos += mouse->u.data.y;
+		set_mouse_pos(cur_console);
+	    }
+	    f = 0;
+	    if (mouse->operation == MOUSE_ACTION) {
+		f = cur_console->mouse_buttons ^ mouse->u.data.buttons;
+		cur_console->mouse_buttons = mouse->u.data.buttons;
+	    }
+	    splx(s);
+
 	    mouse_status.dx += mouse->u.data.x;
 	    mouse_status.dy += mouse->u.data.y;
 	    mouse_status.dz += mouse->u.data.z;
@@ -1193,7 +1207,6 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 	    }
 
 	    if (cur_console->mouse_signal) {
-		cur_console->mouse_buttons = mouse->u.data.buttons;
     		/* has controlling process died? */
 		if (cur_console->mouse_proc && 
 		    (cur_console->mouse_proc != pfind(cur_console->mouse_pid))){
@@ -1204,11 +1217,9 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 		else
 		    psignal(cur_console->mouse_proc, cur_console->mouse_signal);
 	    }
-	    else if (mouse->operation == MOUSE_ACTION && cut_buffer != NULL) {
+	    else if ((mouse->operation == MOUSE_ACTION) && f) {
 		/* process button presses */
-		if ((cur_console->mouse_buttons ^ mouse->u.data.buttons) && 
-		    ISTEXTSC(cur_console)) {
-		    cur_console->mouse_buttons = mouse->u.data.buttons;
+		if (cut_buffer && ISTEXTSC(cur_console)) {
 		    if (cur_console->mouse_buttons & MOUSE_BUTTON1DOWN)
 			mouse_cut_start(cur_console);
 		    else
@@ -1217,12 +1228,6 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 			cur_console->mouse_buttons & MOUSE_BUTTON3DOWN)
 			mouse_paste(cur_console);
 		}
-	    }
-
-	    if (mouse->u.data.x != 0 || mouse->u.data.y != 0) {
-		cur_console->mouse_xpos += mouse->u.data.x;
-		cur_console->mouse_ypos += mouse->u.data.y;
-		set_mouse_pos(cur_console);
 	    }
 
 	    break;
@@ -2249,8 +2254,8 @@ scrn_update(scr_stat *scp, int show_cursor)
         if (scp->status & MOUSE_MOVED) {
             /* do we need to remove old mouse pointer image ? */
             if (scp->mouse_cut_start != NULL ||
-                (scp->mouse_pos-scp->scr_buf) <= scp->start ||
-                (scp->mouse_pos+scp->xsize + 1 - scp->scr_buf) >= scp->end) {
+                (scp->mouse_oldpos-scp->scr_buf) <= scp->start ||
+                (scp->mouse_oldpos+scp->xsize + 1 - scp->scr_buf) >= scp->end) {
                 remove_mouse_image(scp);
             }
             scp->status &= ~MOUSE_MOVED;
@@ -3874,14 +3879,18 @@ kanji_end:
 #ifdef PC98
 	    scp->cursor_atr += (8 - scp->xpos % 8u);
 #endif
+	    if ((scp->xpos += (8 - scp->xpos % 8u)) >= scp->xsize) {
+	        scp->xpos = 0;
+	        scp->ypos++;
+		scp->cursor_pos = scp->scr_buf + scp->ypos * scp->xsize;
+#ifdef PC98
+		scp->cursor_atr = scp->atr_buf + scp->ypos * scp->xsize;
+#endif
+	    }
 	    mark_for_update(scp, scp->cursor_pos - scp->scr_buf);
 #ifdef PC98
 	    mark_for_update(scp, scp->cursor_atr - scp->atr_buf);
 #endif
-	    if ((scp->xpos += (8 - scp->xpos % 8u)) >= scp->xsize) {
-	        scp->xpos = 0;
-	        scp->ypos++;
-	    }
 	    break;
 
 	case 0x0a:  /* newline, same pos */

@@ -3,7 +3,7 @@
  * Garrett Wollman, September 1994.
  * This file is in the public domain.
  *
- * $FreeBSD: src/sys/i386/include/clock.h,v 1.34.2.2 1999/08/29 16:06:23 peter Exp $
+ * $FreeBSD: src/sys/i386/include/clock.h,v 1.34.2.3 1999/10/31 06:04:47 iwasaki Exp $
  */
 
 #ifndef _MACHINE_CLOCK_H_
@@ -44,6 +44,7 @@ int	acquire_timer1 __P((int mode));
 int	release_timer1 __P((void));
 #endif
 int	sysbeep __P((int pitch, int period));
+void	i8254_restore __P((void));
 
 #endif /* KERNEL */
 

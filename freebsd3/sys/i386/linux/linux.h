@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux.h,v 1.26.2.7 1999/08/29 16:07:50 peter Exp $
+ * $FreeBSD: src/sys/i386/linux/linux.h,v 1.26.2.9 1999/12/08 18:35:30 marcel Exp $
  */
 
 #ifndef _I386_LINUX_LINUX_H_
@@ -66,6 +66,13 @@ typedef struct {
 	void		(*lsa_restorer)(void);
 	linux_new_sigset_t lsa_mask;
 } linux_new_sigaction_t;
+
+typedef unsigned int linux_size_t;
+typedef struct {
+	void	*ss_sp;
+	int	ss_flags;
+	linux_size_t ss_size;
+} linux_stack_t;
 
 /*
  * The Linux sigcontext, pretty much a standard 386 trapframe.
@@ -583,6 +590,7 @@ struct trapframe;
 #define LINUX_SNDCTL_DSP_SETTRIGGER	0x5010
 #define LINUX_SNDCTL_DSP_GETIPTR	0x5011
 #define LINUX_SNDCTL_DSP_GETOPTR	0x5012
+#define LINUX_SNDCTL_DSP_GETODELAY	0x5017
 #define LINUX_SOUND_MIXER_WRITE_VOLUME	0x4d00
 #define LINUX_SOUND_MIXER_WRITE_BASS	0x4d01
 #define LINUX_SOUND_MIXER_WRITE_TREBLE	0x4d02

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_nqlease.c	8.9 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/nfs/nfs_nqlease.c,v 1.39.2.2 1999/08/29 16:30:28 peter Exp $
+ * $FreeBSD: src/sys/nfs/nfs_nqlease.c,v 1.39.2.3 1999/12/12 07:16:17 dillon Exp $
  */
 
 
@@ -754,8 +754,10 @@ nqnfsrv_getlease(nfsd, slp, procp, mrq)
 	nfsd->nd_duration = fxdr_unsigned(int, *tl);
 	error = nfsrv_fhtovp(fhp, 1, &vp, cred, slp, nam, &rdonly,
 		(nfsd->nd_flag & ND_KERBAUTH), TRUE);
-	if (error)
+	if (error) {
 		nfsm_reply(0);
+		goto nfsmout;
+	}
 	if (rdonly && flags == ND_WRITE) {
 		error = EROFS;
 		vput(vp);

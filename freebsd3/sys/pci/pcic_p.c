@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/pcic_p.c,v 1.7.2.2 1999/08/29 16:31:56 peter Exp $
+ * $FreeBSD: src/sys/pci/pcic_p.c,v 1.7.2.3 1999/11/23 11:05:16 kuriyama Exp $
  */
 
 #include "pci.h"
@@ -86,13 +86,13 @@ pcic_pci_probe(pcici_t tag, pcidi_t type)
 	case PCI_DEVICE_ID_TOSHIBA_TOPIC97:
 		return ("Toshiba ToPIC97 PCI-CardBus Bridge");
  	case PCI_DEVICE_ID_RICOH_RL5C465:
-		return ("Ricoh RL5C465 PCI-CardBus Brige");
+		return ("Ricoh RL5C465 PCI-CardBus Bridge");
 	case PCI_DEVICE_ID_RICOH_RL5C475:
-		return ("Ricoh RL5C475 PCI-CardBus Brige");
+		return ("Ricoh RL5C475 PCI-CardBus Bridge");
 	case PCI_DEVICE_ID_RICOH_RL5C476:
-		return ("Ricoh RL5C476 PCI-CardBus Brige");
+		return ("Ricoh RL5C476 PCI-CardBus Bridge");
 	case PCI_DEVICE_ID_RICOH_RL5C478:
-		return ("Ricoh RL5C478 PCI-CardBus Brige");
+		return ("Ricoh RL5C478 PCI-CardBus Bridge");
 	/* 16bit PC-card bridges */
 	case PCI_DEVICE_ID_PCIC_CLPD6729:
 		return ("Cirrus Logic PD6729/6730 PC-Card Controller");

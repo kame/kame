@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_subs.c  8.8 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/nfs/nfs_subs.c,v 1.70.2.3 1999/08/29 16:30:30 peter Exp $
+ * $FreeBSD: src/sys/nfs/nfs_subs.c,v 1.70.2.5 1999/12/12 07:16:18 dillon Exp $
  */
 
 /*
@@ -1986,6 +1986,7 @@ nfsrv_fhtovp(fhp, lockflag, vpp, cred, slp, nam, rdonlyp, kerbflag, pubflag)
 		if (saddr->sin_family == AF_INET &&
 		    ntohs(saddr->sin_port) >= IPPORT_RESERVED) {
 			vput(*vpp);
+			*vpp = NULL;
 			return (NFSERR_AUTHERR | AUTH_TOOWEAK);
 		}
 	}
@@ -1996,10 +1997,12 @@ nfsrv_fhtovp(fhp, lockflag, vpp, cred, slp, nam, rdonlyp, kerbflag, pubflag)
 	if (exflags & MNT_EXKERB) {
 		if (!kerbflag) {
 			vput(*vpp);
+			*vpp = NULL;
 			return (NFSERR_AUTHERR | AUTH_TOOWEAK);
 		}
 	} else if (kerbflag) {
 		vput(*vpp);
+		*vpp = NULL;
 		return (NFSERR_AUTHERR | AUTH_TOOWEAK);
 	} else if (cred->cr_uid == 0 || (exflags & MNT_EXPORTANON)) {
 		cred->cr_uid = credanon->cr_uid;
@@ -2186,7 +2189,7 @@ loop:
 			nbp = TAILQ_NEXT(bp, b_vnbufs);
 			if ((bp->b_flags & (B_BUSY | B_DELWRI | B_NEEDCOMMIT))
 				== (B_DELWRI | B_NEEDCOMMIT))
-				bp->b_flags &= ~B_NEEDCOMMIT;
+				bp->b_flags &= ~(B_NEEDCOMMIT | B_CLUSTEROK);
 		}
 	}
 	splx(s);

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/cpufunc.h,v 1.85.2.1 1999/08/29 16:06:26 peter Exp $
+ * $FreeBSD: src/sys/i386/include/cpufunc.h,v 1.85.2.2 1999/11/15 20:19:28 luoqi Exp $
  */
 
 /*
@@ -424,6 +424,34 @@ static __inline void
 wrmsr(u_int msr, u_int64_t newval)
 {
 	__asm __volatile(".byte 0x0f, 0x30" : : "A" (newval), "c" (msr));
+}
+
+static __inline u_int
+rfs(void)
+{
+	u_int sel;
+	__asm __volatile("movl %%fs,%0" : "=rm" (sel));
+	return (sel);
+}
+
+static __inline u_int
+rgs(void)
+{
+	u_int sel;
+	__asm __volatile("movl %%gs,%0" : "=rm" (sel));
+	return (sel);
+}
+
+static __inline void
+load_fs(u_int sel)
+{
+	__asm __volatile("movl %0,%%fs" : : "rm" (sel));
+}
+
+static __inline void
+load_gs(u_int sel)
+{
+	__asm __volatile("movl %0,%%gs" : : "rm" (sel));
 }
 
 #else /* !__GNUC__ */

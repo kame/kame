@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ether.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/if_ether.c,v 1.52.2.5 1999/09/16 00:50:37 lile Exp $
+ * $FreeBSD: src/sys/netinet/if_ether.c,v 1.52.2.6 1999/10/18 11:59:31 sheldonh Exp $
  */
 
 /*
@@ -556,7 +556,7 @@ in_arpinput(m)
 				ac->ac_if.if_name, ac->ac_if.if_unit);
 			else {
 			    log(LOG_ERR,
-				"arp: %6D attempts to modify permanent entry for %s on %s%d",
+				"arp: %6D attempts to modify permanent entry for %s on %s%d\n",
 				ea->arp_sha, ":", inet_ntoa(isaddr),
 				ac->ac_if.if_name, ac->ac_if.if_unit);
 			    goto reply;

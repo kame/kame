@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_vnops.c	8.16 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/nfs/nfs_vnops.c,v 1.116.2.7 1999/08/29 16:30:32 peter Exp $
+ * $FreeBSD: src/sys/nfs/nfs_vnops.c,v 1.116.2.8 1999/12/12 06:52:34 dillon Exp $
  */
 
 
@@ -2850,7 +2850,7 @@ again:
 		 */
 		for (i = 0; i < bvecpos; i++) {
 			bp = bvec[i];
-			bp->b_flags &= ~(B_NEEDCOMMIT | B_WRITEINPROG);
+			bp->b_flags &= ~(B_NEEDCOMMIT | B_WRITEINPROG | B_CLUSTEROK);
 			if (retv) {
 			    vfs_unbusy_pages(bp);
 			    brelse(bp);
@@ -2907,7 +2907,7 @@ loop:
 		if (passone || !commit)
 		    bp->b_flags |= (B_BUSY|B_ASYNC);
 		else
-		    bp->b_flags |= (B_BUSY|B_ASYNC|B_WRITEINPROG|B_NEEDCOMMIT);
+		    bp->b_flags |= (B_BUSY|B_ASYNC|B_WRITEINPROG);
 		splx(s);
 		VOP_BWRITE(bp);
 		goto loop;
@@ -3053,7 +3053,7 @@ nfs_writebp(bp, force)
 		bp->b_flags &= ~B_WRITEINPROG;
 		if (!retv) {
 			bp->b_dirtyoff = bp->b_dirtyend = 0;
-			bp->b_flags &= ~B_NEEDCOMMIT;
+			bp->b_flags &= ~(B_NEEDCOMMIT | B_CLUSTEROK);
 			biodone(bp);
 		} else if (retv == NFSERR_STALEWRITEVERF)
 			nfs_clearcommit(bp->b_vp->v_mount);

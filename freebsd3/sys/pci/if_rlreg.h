@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.4.2.8 1999/08/29 16:31:42 peter Exp $
+ * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.4.2.9 1999/11/01 17:24:52 wpaul Exp $
  */
 
 /*
@@ -299,7 +299,8 @@
 #define RL_RXBUFLEN		(1 << ((RL_RX_BUF_SZ >> 11) + 13))
 #define RL_TX_LIST_CNT		4
 #define RL_MIN_FRAMELEN		60
-#define RL_TX_EARLYTHRESH	(256 << 11)
+#define RL_TXTHRESH(x)		((x) << 11)
+#define RL_TX_THRESH_INIT	96
 #define RL_RX_FIFOTHRESH	RL_RXFIFO_256BYTES
 #define RL_RX_MAXDMA		RL_RXDMA_256BYTES
 #define RL_TX_MAXDMA		RL_TXDMA_256BYTES
@@ -370,6 +371,7 @@ struct rl_softc {
 	u_int8_t		rl_want_auto;
 	u_int8_t		rl_autoneg;
 	u_int8_t		rl_stats_no_timeout;
+	int			rl_txthresh;
 	struct rl_chain_data	rl_cdata;
 };
 

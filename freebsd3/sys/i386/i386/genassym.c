@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)genassym.c	5.11 (Berkeley) 5/10/91
- * $FreeBSD: src/sys/i386/i386/genassym.c,v 1.62.2.2 1999/08/29 16:05:40 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/genassym.c,v 1.62.2.3 1999/11/15 20:19:23 luoqi Exp $
  */
 
 #include "opt_vm86.h"
@@ -173,6 +173,9 @@ main()
 	printf("#define\tSIGF_SCP %#x\n", OS(sigframe, sf_scp));
 	printf("#define\tSIGF_HANDLER %#x\n", OS(sigframe, sf_handler));
 	printf("#define\tSIGF_SC %#x\n", OS(sigframe, sf_sc));
+	printf("#define\tSC_PS %#x\n", OS(sigcontext, sc_ps));
+	printf("#define\tSC_FS %#x\n", OS(sigcontext, sc_fs));
+	printf("#define\tSC_GS %#x\n", OS(sigcontext, sc_gs));
 
 	printf("#define\tB_READ %#x\n", B_READ);
 	printf("#define\tENOENT %d\n", ENOENT);

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_descrip.c	8.6 (Berkeley) 4/19/94
- * $FreeBSD: src/sys/kern/kern_descrip.c,v 1.58.2.2 1999/08/29 16:25:58 peter Exp $
+ * $FreeBSD: src/sys/kern/kern_descrip.c,v 1.58.2.3 1999/11/18 08:09:08 dillon Exp $
  */
 
 #include "opt_compat.h"
@@ -548,9 +548,10 @@ ofstat(p, uap)
 		panic("ofstat");
 		/*NOTREACHED*/
 	}
-	cvtstat(&ub, &oub);
-	if (error == 0)
+	if (error == 0) {
+		cvtstat(&ub, &oub);
 		error = copyout((caddr_t)&oub, (caddr_t)uap->sb, sizeof (oub));
+	}
 	return (error);
 }
 #endif /* COMPAT_43 || COMPAT_SUNOS */

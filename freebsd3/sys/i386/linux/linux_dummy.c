@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_dummy.c,v 1.9.2.1 1999/08/29 16:07:50 peter Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_dummy.c,v 1.9.2.2 1999/12/08 18:35:31 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -151,13 +151,6 @@ int
 linux_olduname(struct proc *p, struct linux_olduname_args *args)
 {
     printf("Linux-emul(%d): olduname() not supported\n", p->p_pid);
-    return ENOSYS;
-}
-
-int
-linux_ustat(struct proc *p, struct linux_ustat_args *args)
-{
-    printf("Linux-emul(%d): ustat() not supported\n", p->p_pid);
     return ENOSYS;
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 1998 Hellmuth Michaelis. All rights reserved.
+ * Copyright (c) 1997, 1999 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,9 +27,9 @@
  *	i4b_drn_ngo.c - Dr. Neuhaus Niccy GO@ and SAGEM Cybermod
  *	--------------------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_drn_ngo.c,v 1.1.2.1 1999/08/29 16:25:10 peter Exp $
+ * $FreeBSD: src/sys/i4b/layer1/i4b_drn_ngo.c,v 1.1.2.2 1999/11/15 22:40:24 joe Exp $
  *
- *      last edit-date: [Mon Dec 14 17:26:03 1998]
+ *      last edit-date: [Sun Feb 14 10:25:39 1999]
  *
  *---------------------------------------------------------------------------*/
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/ida.c,v 1.1.2.3 1999/08/29 16:07:18 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/ida.c,v 1.1.2.4 1999/10/09 03:51:19 jlemon Exp $
  *
  */
 
@@ -1206,7 +1206,8 @@ ida_queue_buf(int unit, struct buf *bp)
 
   if (PCI_CONTROLLER(ida)) {
     qcbp->hdr.priority = 0x00;
-    qcbp->hdr.flags = 0x24;
+    qcbp->hdr.flags =
+      (sizeof(struct ida_req) + sizeof(struct ida_sgb) * IDA_MAX_SGLEN) >> 2;
   } else {
     qcbp->hdr.priority = IDA_DEF_PRIORITY;
     qcbp->hdr.flags = 0x10;

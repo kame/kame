@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/if_ed.c,v 1.148.2.2 1999/08/29 16:07:19 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/if_ed.c,v 1.148.2.4 1999/09/25 13:08:18 nyan Exp $
  */
 
 /*
@@ -1282,10 +1282,14 @@ ed_probe_Novell(isa_dev)
 	struct isa_device *isa_dev;
 {
 	struct ed_softc *sc = &ed_softc[isa_dev->id_unit];
+	int     nports;
 
-	isa_dev->id_maddr = 0;
-	return ed_probe_Novell_generic(sc, isa_dev->id_iobase, 
+	nports = ed_probe_Novell_generic(sc, isa_dev->id_iobase, 
 				       isa_dev->id_unit, isa_dev->id_flags);
+	if (nports)
+		isa_dev->id_maddr = 0;
+
+	return (nports);
 }
 
 #if NCARD > 0
@@ -1937,7 +1941,7 @@ ed_init(xsc)
 	 * Copy out our station address
 	 */
 	for (i = 0; i < ETHER_ADDR_LEN; ++i)
-		outb(sc->nic_addr + ED_P1_PAR0 + i, sc->arpcom.ac_enaddr[i]);
+		outb(sc->nic_addr + ED_P1_PAR(i), sc->arpcom.ac_enaddr[i]);
 
 	/*
 	 * Set Current Page pointer to next_packet (initialized above)
@@ -3327,7 +3331,7 @@ ed_setrcr(sc)
 		 * Reconfigure the multicast filter.
 		 */
 		for (i = 0; i < 8; i++)
-			outb(sc->nic_addr + ED_P1_MAR0 + i, 0xff);
+			outb(sc->nic_addr + ED_P1_MAR(i), 0xff);
 
 		/*
 		 * And turn on promiscuous mode. Also enable reception of
@@ -3353,7 +3357,7 @@ ed_setrcr(sc)
 			 * Set multicast filter on chip.
 			 */
 			for (i = 0; i < 8; i++)
-				outb(sc->nic_addr + ED_P1_MAR0 + i, ((u_char *) mcaf)[i]);
+				outb(sc->nic_addr + ED_P1_MAR(i), ((u_char *) mcaf)[i]);
 
 			/* Set page 0 registers */
 			outb(sc->nic_addr + ED_P0_CR, sc->cr_proto | ED_CR_STP);
@@ -3366,7 +3370,7 @@ ed_setrcr(sc)
 			 * not accept multicasts.
 			 */
 			for (i = 0; i < 8; ++i)
-				outb(sc->nic_addr + ED_P1_MAR0 + i, 0x00);
+				outb(sc->nic_addr + ED_P1_MAR(i), 0x00);
 
 			/* Set page 0 registers */
 			outb(sc->nic_addr + ED_P0_CR, sc->cr_proto | ED_CR_STP);

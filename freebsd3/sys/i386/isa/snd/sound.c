@@ -1,3 +1,4 @@
+/* $FreeBSD: src/sys/i386/isa/snd/sound.c,v 1.26.2.2 1999/11/30 01:16:51 alfred Exp $ */
 /*
  * snd/sound.c
  * 
@@ -1025,7 +1026,12 @@ sndioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct proc * p)
 	    d->rec_fmt = *(int *)arg ;
 	splx(s);
 	if (ask_init(d))
-	    *(int *)arg = d->play_fmt ;
+	{
+	    if (d->play_fmt)
+		*(int *)arg = d->play_fmt ;
+	    if (d->rec_fmt) 
+		*(int *)arg = d->rec_fmt ;
+	}
 	break ;
 
     case SNDCTL_DSP_SUBDIVIDE:
@@ -1144,6 +1150,16 @@ sndioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct proc * p)
 		*(int *) arg |= DSP_CAP_DUPLEX ;
 	*(int *) arg |= DSP_CAP_REALTIME ;
 	break ;
+
+    case SNDCTL_DSP_GETODELAY:
+	if (FULL_DUPLEX(d)) {
+		snd_dbuf *b = &(d->dbuf_out);
+		if (b->dl)
+			dsp_wr_dmaupdate( b );
+		*arg = b->total;
+	} else
+		ret = EINVAL;
+	break;
 
     case SOUND_PCM_READ_BITS:
 	if (d->play_fmt == AFMT_S16_LE)

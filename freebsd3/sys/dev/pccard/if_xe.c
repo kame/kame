@@ -23,8 +23,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pccard/if_xe.c,v 1.2.2.5 1999/08/29 16:23:40 peter Exp $
- * $FreeBSD: src/sys/dev/pccard/if_xe.c,v 1.2.2.5 1999/08/29 16:23:40 peter Exp $
+ *	$Id: if_xe.c,v 1.1.1.2 1999/12/27 07:34:40 sumikawa Exp $
+ * $FreeBSD: src/sys/dev/pccard/if_xe.c,v 1.2.2.6 1999/09/18 19:33:08 obrien Exp $
  */
 
 /*
@@ -508,6 +508,13 @@ xe_card_init(struct pccard_devinfo *devi)
   /* Re-attach an existing device */
   if (scp->gone) {
     scp->gone = 0;
+
+    /* Hack RealPorts into submission */
+    if (scp->dingo && xe_cem56fix(scp) < 0) {
+      printf( "xe%d: Unable to fix your RealPort\n", unit );
+      return ENODEV;
+    }
+
     return 0;
   }
 

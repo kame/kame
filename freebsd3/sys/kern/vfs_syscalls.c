@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_syscalls.c	8.13 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.112.2.6 1999/08/29 16:26:15 peter Exp $
+ * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.112.2.7 1999/11/18 08:15:10 dillon Exp $
  */
 
 /* For 4.3 integer FS ID compatibility */
@@ -1677,6 +1677,8 @@ cvtnstat(sb, nsb)
 	nsb->st_blksize = sb->st_blksize;
 	nsb->st_flags = sb->st_flags;
 	nsb->st_gen = sb->st_gen;
+	nsb->st_qspare[0] = sb->st_qspare[0];
+	nsb->st_qspare[1] = sb->st_qspare[1];
 }
 
 #ifndef _SYS_SYSPROTO_H_

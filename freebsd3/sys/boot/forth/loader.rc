@@ -1,10 +1,14 @@
 \ Loader.rc
+\ $FreeBSD: src/sys/boot/forth/loader.rc,v 1.1.2.2 1999/11/24 18:04:45 dcs Exp $
 \
 \ Includes additional commands
 include /boot/loader.4th
 
 \ Reads and processes loader.rc
 start
+
+\ Tests for password -- executes autoboot first if a password was defined
+check-password
 
 \ Unless set otherwise, autoboot is automatic at this point
 

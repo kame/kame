@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 1998 Hellmuth Michaelis. All rights reserved.
+ * Copyright (c) 1997, 1999 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,9 +27,9 @@
  *	i4b_tei.c - tei handling procedures
  *	-----------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer2/i4b_tei.c,v 1.1.2.1 1999/08/29 16:25:32 peter Exp $ 
+ * $FreeBSD: src/sys/i4b/layer2/i4b_tei.c,v 1.1.2.2 1999/11/15 22:40:38 joe Exp $ 
  *
- *      last edit-date: [Sat Dec  5 18:30:20 1998]
+ *      last edit-date: [Fri May 28 16:14:14 1999]
  *
  *---------------------------------------------------------------------------*/
 
@@ -213,6 +213,7 @@ build_tei_mgmt_frame(l2_softc_t *l2sc, unsigned char type)
 			panic("build_tei_mgmt_frame: invalid type");
 			break;
 	}
+	l2sc->stat.tx_tei++;
 	return(m);
 }
 

@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.105.2.7 1999/08/29 16:31:03 peter Exp $
+ * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.105.2.10 1999/11/15 20:34:48 luoqi Exp $
  */
 
 #include "apm.h"
@@ -153,7 +153,7 @@ SYSINIT(cpu, SI_SUB_CPU, SI_ORDER_FIRST, cpu_startup, NULL)
 static MALLOC_DEFINE(M_MBUF, "mbuf", "mbuf");
 
 #ifdef PC98
-int	need_pre_dma_flush;		/* If 1, use wbinvd befor DMA transfer. */
+int	need_pre_dma_flush;	/* If 1, use wbinvd befor DMA transfer. */
 int	need_post_dma_flush;	/* If 1, use invd after DMA transfer. */
 #endif
 
@@ -169,9 +169,9 @@ SYSCTL_INT(_debug, OID_AUTO, tlb_flush_count,
 #endif
 
 #ifdef PC98
-int	ispc98 = 1;
+static int	ispc98 = 1;
 #else
-int	ispc98 = 0;
+static int	ispc98 = 0;
 #endif
 SYSCTL_INT(_machdep, OID_AUTO, ispc98, CTLFLAG_RD, &ispc98, 0, "");
 
@@ -592,6 +592,8 @@ sendsig(catcher, sig, mask, code)
 	sf.sf_sc.sc_ds = regs->tf_ds;
 	sf.sf_sc.sc_ss = regs->tf_ss;
 	sf.sf_sc.sc_es = regs->tf_es;
+	sf.sf_sc.sc_fs = rfs();
+	sf.sf_sc.sc_gs = rgs();
 	sf.sf_sc.sc_isp = regs->tf_isp;
 
 	/*
@@ -656,6 +658,8 @@ sendsig(catcher, sig, mask, code)
 	regs->tf_cs = _ucodesel;
 	regs->tf_ds = _udatasel;
 	regs->tf_es = _udatasel;
+	load_fs(_udatasel);
+	load_gs(_udatasel);
 	regs->tf_ss = _udatasel;
 }
 
@@ -1037,31 +1041,31 @@ struct soft_segment_descriptor gdt_segs[
 	0  			/* limit granularity (byte/page units)*/ },
 /* GAPMCODE32_SEL 8 APM BIOS 32-bit interface (32bit Code) */
 {	0,			/* segment base address (overwritten by APM)  */
-	0xfffff,		/* length */
+	0xffff,			/* length (overwritten by APM)  */
 	SDT_MEMERA,		/* segment type */
 	0,			/* segment descriptor priority level */
 	1,			/* segment descriptor present */
 	0, 0,
 	1,			/* default 32 vs 16 bit size */
-	1  			/* limit granularity (byte/page units)*/ },
+	0  			/* limit granularity (byte/page units)*/ },
 /* GAPMCODE16_SEL 9 APM BIOS 32-bit interface (16bit Code) */
 {	0,			/* segment base address (overwritten by APM)  */
-	0xfffff,		/* length */
+	0xffff,			/* length (overwritten by APM)  */
 	SDT_MEMERA,		/* segment type */
 	0,			/* segment descriptor priority level */
 	1,			/* segment descriptor present */
 	0, 0,
 	0,			/* default 32 vs 16 bit size */
-	1  			/* limit granularity (byte/page units)*/ },
+	0  			/* limit granularity (byte/page units)*/ },
 /* GAPMDATA_SEL	10 APM BIOS 32-bit interface (Data) */
 {	0,			/* segment base address (overwritten by APM) */
-	0xfffff,		/* length */
+	0xffff,			/* length (overwritten by APM)  */
 	SDT_MEMRWA,		/* segment type */
 	0,			/* segment descriptor priority level */
 	1,			/* segment descriptor present */
 	0, 0,
-	1,			/* default 32 vs 16 bit size */
-	1  			/* limit granularity (byte/page units)*/ },
+	0,			/* default 32 vs 16 bit size */
+	0  			/* limit granularity (byte/page units)*/ },
 };
 
 static struct soft_segment_descriptor ldt_segs[] = {

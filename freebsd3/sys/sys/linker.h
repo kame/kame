@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/linker.h,v 1.11.2.1 1999/08/29 16:32:28 peter Exp $
+ * $FreeBSD: src/sys/sys/linker.h,v 1.11.2.2 1999/11/28 14:46:45 peter Exp $
  */
 
 #ifndef _SYS_LINKER_H_
@@ -86,6 +86,8 @@ struct common_symbol {
 struct linker_file {
     int			refs;		/* reference count */
     int			userrefs;	/* kldload(2) count */
+    int			flags;
+#define LINKER_FILE_LINKED	0x1	/* file has been fully linked */
     TAILQ_ENTRY(linker_file) link;	/* list of all loaded files */
     char*		filename;	/* file which was loaded */
     int			id;		/* unique id */

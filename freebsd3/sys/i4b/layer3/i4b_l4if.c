@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 1998 Hellmuth Michaelis. All rights reserved.
+ * Copyright (c) 1997, 1999 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,9 +27,9 @@
  *	i4b_l4if.c - Layer 3 interface to Layer 4
  *	-------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer3/i4b_l4if.c,v 1.1.2.1 1999/08/29 16:25:38 peter Exp $ 
+ * $FreeBSD: src/sys/i4b/layer3/i4b_l4if.c,v 1.1.2.2 1999/11/15 22:40:42 joe Exp $ 
  *
- *      last edit-date: [Sat Dec  5 18:33:16 1998]
+ *      last edit-date: [Tue Apr 27 16:46:51 1999]
  *
  *---------------------------------------------------------------------------*/
 
@@ -304,7 +304,7 @@ n_connect_response(u_int cdid, int response, int cause)
 	}
 	else
 	{
-		DBGL3(L3_ERR, "n_connect_response", ("ERROR, invalid channel %d\n", cd->channelid));
+		DBGL3(L3_MSG, "n_connect_response", ("Warning, invalid channelid %d, response = %d\n", cd->channelid, response));
 	}
 }
 

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_target.c,v 1.7.2.5 1999/08/29 16:21:51 peter Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_target.c,v 1.7.2.6 1999/10/27 21:52:21 mjacob Exp $
  */
 #include <stddef.h>	/* For offsetof */
 
@@ -598,12 +598,13 @@ targallocinstance(struct ioc_alloc_unit *alloc_unit)
 				 alloc_unit->path_id,
 				 alloc_unit->target_id,
 				 alloc_unit->lun_id);
-	free_path_on_return++;
-
 	if (status != CAM_REQ_CMP) {
 		printf("Couldn't Allocate Path %x\n", status);
 		goto fail;
 	}
+
+	free_path_on_return++;
+
 
 	xpt_setup_ccb(&cpi.ccb_h, path, /*priority*/1);
 	cpi.ccb_h.func_code = XPT_PATH_INQ;

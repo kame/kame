@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/iicbus/iicbus.c,v 1.7.2.1 1999/08/29 16:23:14 peter Exp $
+ * $FreeBSD: src/sys/dev/iicbus/iicbus.c,v 1.7.2.2 1999/11/01 22:48:28 nsouch Exp $
  *
  */
 
@@ -76,7 +76,7 @@ struct iicbus_device {
  *
  * XXX only one smb driver should exist for each I2C interface
  */
-struct iicbus_device iicbus_children[] = {
+static struct iicbus_device iicbus_children[] = {
 	{ "iicsmb", IICBUS_DRIVER_CLASS, "I2C to SMB bridge" },
 	{ "iic", IICBUS_DRIVER_CLASS, "I2C general purpose I/O" },
 #if 0

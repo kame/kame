@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_ioctl.c,v 1.30.2.9 1999/08/29 16:07:51 peter Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_ioctl.c,v 1.30.2.11 1999/11/30 01:17:52 alfred Exp $
  */
 
 #include <sys/param.h>
@@ -511,7 +511,7 @@ set_linux_cdrom_addr(union linux_cdrom_addr *addr, int format, int lba)
         addr->lba = lba;
 }
 
-static unsigned dirbits[4] = { IOC_VOID, IOC_OUT, IOC_IN, IOC_INOUT };
+static unsigned dirbits[4] = { IOC_VOID, IOC_IN, IOC_OUT, IOC_INOUT };
 
 #define SETDIR(c)       (((c) & ~IOC_DIRMASK) | dirbits[args->cmd >> 30])
 
@@ -883,6 +883,10 @@ linux_ioctl(struct proc *p, struct linux_ioctl_args *args)
     case LINUX_SNDCTL_DSP_GETBLKSIZE:
       /* LINUX_SNDCTL_DSP_SETBLKSIZE */
 	args->cmd = SNDCTL_DSP_GETBLKSIZE;
+	return ioctl(p, (struct ioctl_args *)args);
+
+    case LINUX_SNDCTL_DSP_GETODELAY:
+	args->cmd = SNDCTL_DSP_GETODELAY;
 	return ioctl(p, (struct ioctl_args *)args);
 
     case LINUX_SNDCTL_DSP_SETFMT:

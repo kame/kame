@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_linker.c,v 1.21.2.2 1999/08/29 16:25:59 peter Exp $
+ * $FreeBSD: src/sys/kern/kern_linker.c,v 1.21.2.3 1999/11/28 14:46:44 peter Exp $
  */
 
 #include "opt_ddb.h"
@@ -355,6 +355,7 @@ linker_make_file(const char* pathname, void* priv, struct linker_file_ops* ops)
 
     lf->refs = 1;
     lf->userrefs = 0;
+    lf->flags = 0;
     lf->filename = (char*) (lf + 1);
     strcpy(lf->filename, filename);
     lf->id = next_file_id++;
@@ -410,7 +411,9 @@ linker_file_unload(linker_file_t file)
 	goto out;
     }
 
-    linker_file_sysuninit(file);
+    /* Don't try to run SYSUNINITs if we are unloaded due to a link error */
+    if (file->flags & LINKER_FILE_LINKED)
+	linker_file_sysuninit(file);
 
     TAILQ_REMOVE(&linker_files, file, link);
     lockmgr(&lock, LK_RELEASE, 0, curproc);
