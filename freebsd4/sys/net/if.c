@@ -1493,9 +1493,9 @@ if_addmulti(ifp, sa, retifma)
 	struct sockaddr *sa;	/* address to add */
 	struct ifmultiaddr **retifma;
 {
-	struct sockaddr *llsa, *dupsa;
+	struct sockaddr *llsa, *dupsa, *dupsa_ll;
 	int error, s;
-	struct ifmultiaddr *ifma;
+	struct ifmultiaddr *ifma, *ifma_ll;
 
 	/*
 	 * If the matching multicast address already exists
@@ -1522,8 +1522,39 @@ if_addmulti(ifp, sa, retifma)
 		llsa = 0;
 	}
 
-	MALLOC(ifma, struct ifmultiaddr *, sizeof *ifma, M_IFMADDR, M_WAITOK);
-	MALLOC(dupsa, struct sockaddr *, sa->sa_len, M_IFMADDR, M_WAITOK);
+	MALLOC(ifma, struct ifmultiaddr *, sizeof *ifma, M_IFMADDR, M_NOWAIT);
+	if (ifma == 0)
+		return (ENOBUFS);
+	MALLOC(dupsa, struct sockaddr *, sa->sa_len, M_IFMADDR, M_NOWAIT);
+	if (dupsa == 0) {
+		free(ifma, M_IFMADDR);
+		return (ENOBUFS);
+	}
+	dupsa_ll = 0;
+	if (llsa != 0) {
+		LIST_FOREACH(ifma_ll, &ifp->if_multiaddrs, ifma_link) {
+			if (equal(ifma_ll->ifma_addr, llsa))
+				break;
+		}
+		if (!ifma_ll) {
+			MALLOC(ifma_ll, struct ifmultiaddr *, sizeof *ifma_ll,
+			       M_IFMADDR, M_NOWAIT);
+			if (ifma_ll == 0) {
+				free(ifma, M_IFMADDR);
+				free(dupsa, M_IFMADDR);
+				return (ENOBUFS);
+			}
+			MALLOC(dupsa_ll, struct sockaddr *, llsa->sa_len,
+			       M_IFMADDR, M_NOWAIT);
+			if (dupsa_ll == 0) {
+				free(ifma, M_IFMADDR);
+				free(dupsa, M_IFMADDR);
+				free(ifma_ll, M_IFMADDR);
+				return (ENOBUFS);
+			}
+		}
+	}
+
 	bcopy(sa, dupsa, sa->sa_len);
 
 	ifma->ifma_addr = dupsa;
@@ -1543,27 +1574,18 @@ if_addmulti(ifp, sa, retifma)
 	*retifma = ifma;
 
 	if (llsa != 0) {
-		LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-			if (equal(ifma->ifma_addr, llsa))
-				break;
-		}
-		if (ifma) {
-			ifma->ifma_refcount++;
-		} else {
-			MALLOC(ifma, struct ifmultiaddr *, sizeof *ifma,
-			       M_IFMADDR, M_WAITOK);
-			MALLOC(dupsa, struct sockaddr *, llsa->sa_len,
-			       M_IFMADDR, M_WAITOK);
-			bcopy(llsa, dupsa, llsa->sa_len);
-			ifma->ifma_addr = dupsa;
-			ifma->ifma_lladdr = NULL;
-			ifma->ifma_ifp = ifp;
-			ifma->ifma_refcount = 1;
-			ifma->ifma_protospec = 0;
+		if (dupsa_ll) {
+			bcopy(llsa, dupsa_ll, llsa->sa_len);
+			ifma_ll->ifma_addr = dupsa_ll;
+			ifma_ll->ifma_lladdr = NULL;
+			ifma_ll->ifma_ifp = ifp;
+			ifma_ll->ifma_refcount = 0;
+			ifma_ll->ifma_protospec = 0;
 			s = splimp();
-			LIST_INSERT_HEAD(&ifp->if_multiaddrs, ifma, ifma_link);
+			LIST_INSERT_HEAD(&ifp->if_multiaddrs, ifma_ll, ifma_link);
 			splx(s);
 		}
+		ifma_ll->ifma_refcount++;
 	}
 	/*
 	 * We are certain we have added something, so call down to the
