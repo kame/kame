@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1695 2001/05/29 12:41:19 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1696 2001/05/30 18:20:57 jinmei Exp $
 
 <200105>
+2001-05-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c (explore_numeric): when a
+	numeric address is given to getaddrinfo() with the AI_CANONNAME
+	flag, set the name itself to each ai_canonname field of the
+	returned addrinfo chain.
+	Without the change, getaddrinfo would leave the field NULL, which
+	would annoy some applications.
+
 2001-05-29  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_trans.c
 	- Translate LPSV to PASV.
