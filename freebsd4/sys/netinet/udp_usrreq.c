@@ -335,9 +335,9 @@ udp_input(m, off)
 				    inp->inp_fport != uh->uh_sport)
 					continue;
 			}
+
 			/*
 			 * Receive multicast data which fits MSF condition.
-			 * Broadcast data needs no further check.
 			 */
 #ifdef IGMPV3
 			if (match_msf4_per_socket(inp, &ip->ip_src,
