@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.74 2003/10/23 04:55:28 suz Exp $	*/
+/*	$KAME: rtsold.c,v 1.75 2004/01/03 00:00:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,6 +62,27 @@
 
 #include "rtsold.h"
 
+#ifdef __bsdi__
+#define	timeradd(tvp, uvp, vvp)						\
+	do {								\
+		(vvp)->tv_sec = (tvp)->tv_sec + (uvp)->tv_sec;		\
+		(vvp)->tv_usec = (tvp)->tv_usec + (uvp)->tv_usec;	\
+		if ((vvp)->tv_usec >= 1000000) {			\
+			(vvp)->tv_sec++;				\
+			(vvp)->tv_usec -= 1000000;			\
+		}							\
+	} while (/* CONSTCOND */ 0)
+#define	timersub(tvp, uvp, vvp)						\
+	do {								\
+		(vvp)->tv_sec = (tvp)->tv_sec - (uvp)->tv_sec;		\
+		(vvp)->tv_usec = (tvp)->tv_usec - (uvp)->tv_usec;	\
+		if ((vvp)->tv_usec < 0) {				\
+			(vvp)->tv_sec--;				\
+			(vvp)->tv_usec += 1000000;			\
+		}							\
+	} while (/* CONSTCOND */ 0)
+#endif
+
 struct ifinfo *iflist;
 struct timeval tm_max =	{0x7fffffff, 0x7fffffff};
 static int log_upto = 999;
@@ -83,20 +104,6 @@ char *otherconf_script;
  */
 #define PROBE_INTERVAL 60
 
-/* utility macros */
-/* a < b */
-#define TIMEVAL_LT(a, b) (((a).tv_sec < (b).tv_sec) ||\
-			  (((a).tv_sec == (b).tv_sec) && \
-			    ((a).tv_usec < (b).tv_usec)))
-
-/* a <= b */
-#define TIMEVAL_LEQ(a, b) (((a).tv_sec < (b).tv_sec) ||\
-			   (((a).tv_sec == (b).tv_sec) &&\
-			    ((a).tv_usec <= (b).tv_usec)))
-
-/* a == b */
-#define TIMEVAL_EQ(a, b) (((a).tv_sec==(b).tv_sec) && ((a).tv_usec==(b).tv_usec))
-
 int main __P((int, char **));
 
 /* static variables and functions */
@@ -110,10 +117,6 @@ static int ifreconfig __P((char *));
 #endif
 static int make_packet __P((struct ifinfo *));
 static struct timeval *rtsol_check_timer __P((void));
-static void TIMEVAL_ADD __P((struct timeval *, struct timeval *,
-	struct timeval *));
-static void TIMEVAL_SUB __P((struct timeval *, struct timeval *,
-	struct timeval *));
 
 static void rtsold_set_dump_file __P((int));
 static void usage __P((char *));
@@ -579,7 +582,7 @@ rtsol_check_timer(void)
 	rtsol_timer = tm_max;
 
 	for (ifinfo = iflist; ifinfo; ifinfo = ifinfo->next) {
-		if (TIMEVAL_LEQ(ifinfo->expire, now)) {
+		if (timercmp(&ifinfo->expire, &now, <=)) {
 			if (dflag > 1)
 				warnmsg(LOG_DEBUG, __func__,
 				    "timer expiration on %s, "
@@ -653,18 +656,18 @@ rtsol_check_timer(void)
 			rtsol_timer_update(ifinfo);
 		}
 
-		if (TIMEVAL_LT(ifinfo->expire, rtsol_timer))
+		if (timercmp(&ifinfo->expire, &rtsol_timer, <))
 			rtsol_timer = ifinfo->expire;
 	}
 
-	if (TIMEVAL_EQ(rtsol_timer, tm_max)) {
+	if (timercmp(&rtsol_timer, &tm_max, ==)) {
 		warnmsg(LOG_DEBUG, __func__, "there is no timer");
 		return(NULL);
-	} else if (TIMEVAL_LT(rtsol_timer, now))
+	} else if (timercmp(&rtsol_timer, &now, <))
 		/* this may occur when the interval is too small */
 		returnval.tv_sec = returnval.tv_usec = 0;
 	else
-		TIMEVAL_SUB(&rtsol_timer, &now, &returnval);
+		timersub(&rtsol_timer, &now, &returnval);
 
 	if (dflag > 1)
 		warnmsg(LOG_DEBUG, __func__, "New timer is %ld:%08ld",
@@ -730,13 +733,13 @@ rtsol_timer_update(struct ifinfo *ifinfo)
 	}
 
 	/* reset the timer */
-	if (TIMEVAL_EQ(ifinfo->timer, tm_max)) {
+	if (timercmp(&ifinfo->timer, &tm_max, ==)) {
 		ifinfo->expire = tm_max;
 		warnmsg(LOG_DEBUG, __func__,
 		    "stop timer for %s", ifinfo->ifname);
 	} else {
 		gettimeofday(&now, NULL);
-		TIMEVAL_ADD(&now, &ifinfo->timer, &ifinfo->expire);
+		timeradd(&now, &ifinfo->timer, &ifinfo->expire);
 
 		if (dflag > 1)
 			warnmsg(LOG_DEBUG, __func__,
@@ -750,39 +753,6 @@ rtsol_timer_update(struct ifinfo *ifinfo)
 
 /* timer related utility functions */
 #define MILLION 1000000
-
-/* result = a + b */
-static void
-TIMEVAL_ADD(struct timeval *a, struct timeval *b, struct timeval *result)
-{
-	long l;
-
-	if ((l = a->tv_usec + b->tv_usec) < MILLION) {
-		result->tv_usec = l;
-		result->tv_sec = a->tv_sec + b->tv_sec;
-	} else {
-		result->tv_usec = l - MILLION;
-		result->tv_sec = a->tv_sec + b->tv_sec + 1;
-	}
-}
-
-/*
- * result = a - b
- * XXX: this function assumes that a >= b.
- */
-void
-TIMEVAL_SUB(struct timeval *a, struct timeval *b, struct timeval *result)
-{
-	long l;
-
-	if ((l = a->tv_usec - b->tv_usec) >= 0) {
-		result->tv_usec = l;
-		result->tv_sec = a->tv_sec - b->tv_sec;
-	} else {
-		result->tv_usec = MILLION + l;
-		result->tv_sec = a->tv_sec - b->tv_sec - 1;
-	}
-}
 
 static void
 rtsold_set_dump_file(int sig)
