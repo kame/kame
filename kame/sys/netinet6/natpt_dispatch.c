@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.35 2001/12/13 05:43:56 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.36 2001/12/13 06:06:48 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -268,7 +268,6 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 		bzero(&destif, sizeof(struct ifnet));
 		destif.if_mtu = IPV6_MMTU;
 
-		NTOHS(cv4.ip.ip4->ip_id);
 		icmp_error(cv4.m, ICMP_UNREACH, ICMP_UNREACH_NEEDFRAG, dest, &destif);
 		return (IPPROTO_DONE);	/* discard this packet without free. */
 	}
