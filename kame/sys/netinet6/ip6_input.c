@@ -647,6 +647,17 @@ ip6_input(m)
 			ip6stat.ip6s_toomanyhdr++;
 			goto bad;
 		}
+
+		/*
+		 * protection against faulty packet - there should be
+		 * more sanity checks in header chain processing.
+		 */
+		if (m->m_pkthdr.len < off) {
+			ip6stat.ip6s_tooshort++;
+			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_truncated);
+			goto bad;
+		}
+
 		nxt = (*inet6sw[ip6_protox[nxt]].pr_input)(&m, &off, nxt);
 	}
 	return;
