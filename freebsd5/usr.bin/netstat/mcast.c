@@ -78,7 +78,6 @@ ifmalist_dump(void)
 	char myifname[MYIFNAME_SIZE];
 	char addrbuf[INET6_ADDRSTRLEN];
 	char *pcolon;
-	void *addr;
 	char *pifname, *plladdr, *pgroup;
 
 	if (getifmaddrs(&ifmap))
@@ -95,13 +94,21 @@ ifmalist_dump(void)
 		/* Group address */
 		psa = (sockunion_t *)ifma->ifma_addr;
 		switch (psa->sa.sa_family) {
-		case AF_INET:
-			pgroup = inet_ntoa(psa->sin.sin_addr);
-			break;
 		case AF_INET6:
-			addr = &psa->sin6.sin6_addr;
-			inet_ntop(psa->sa.sa_family, addr, addrbuf,
-			    sizeof(addrbuf));
+			/* XXX: This is a special workaround for KAME kernels */
+			if (IN6_IS_ADDR_LINKLOCAL(&psa->sin6.sin6_addr) ||
+			    IN6_IS_ADDR_MC_LINKLOCAL(&psa->sin6.sin6_addr) ||
+			    IN6_IS_ADDR_MC_NODELOCAL(&psa->sin6.sin6_addr)) {
+				/* XXX: override is ok? */
+				psa->sin6.sin6_scope_id = 
+				    (u_int32_t)ntohs(*(u_short *)&psa->sin6.sin6_addr.s6_addr[2]);
+				psa->sin6.sin6_addr.s6_addr[2] = 0;
+				psa->sin6.sin6_addr.s6_addr[3] = 0;
+			}
+			/* FALLTHROUGH */
+		case AF_INET:
+			getnameinfo(&psa->sa, psa->sa.sa_len, addrbuf,
+			    sizeof(addrbuf), NULL, 0, NI_NUMERICHOST);
 			pgroup = addrbuf;
 			break;
 		default:
