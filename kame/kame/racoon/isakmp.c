@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.158 2001/10/02 03:34:51 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.159 2001/10/02 03:51:44 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -461,7 +461,7 @@ isakmp_main(msg, remote, local)
 					"exchange received.\n");
 				return -1;
 			}
-			if (cmpsaddrwild(iph1->remote, remote) != 0) {
+			if (cmpsaddrstrict(iph1->remote, remote) != 0) {
 				plog(LLV_WARNING, LOCATION, remote,
 					"remote address mismatched. "
 					"db=%s\n",
