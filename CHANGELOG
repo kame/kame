@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1049 2000/06/20 12:35:39 jinmei Exp $
+$Id: CHANGELOG,v 1.1050 2000/06/20 18:22:15 sumikawa Exp $
 
 <200006>
+Wed Jun 21 03:18:47 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/leafnode+: IPv6 enabled leafnode+-2.10
+	  From: yoshfuji@ecei.tohoku.ac.jp
+
 2000-06-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/net/if_gif.c (gif_ioctl): made sure to cast the
 	argument to in6_aliasreq{} for the SIOCSIFPHYADDR_IN6 command.
