@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2058 2002/01/21 12:11:07 keiichi Exp $
+$KAME: CHANGELOG,v 1.2059 2002/01/23 05:16:39 jinmei Exp $
 
 <200201>
+2002-01-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_output): checked the
+	IPV6_MINMTU flag in ip6_output as well as the IP6PO_MINMTU flag in
+	the outgoing packet options.  The former can still be set by
+	icmp6_reflect or gif_output.
+
 Mon Jan 21 21:07:25 JST 2002 keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6*,kame/kame/mip6control/
 	add swithces to enable/disable
