@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.24 2003/08/01 00:40:29 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.25 2003/08/06 19:52:53 jinmei Exp $	*/
 
 %{
 /*
@@ -116,7 +116,7 @@ ecl		\}
 %}
 	/* interface configuration */
 <S_CNF>interface { DECHO; BEGIN S_IFACE; return (INTERFACE); }
-<S_IFACE>{string} {
+<S_IFACE>{ifname} {
 	DECHO;
 	yylval.str = strdup(yytext);
 	BEGIN S_CNF;
