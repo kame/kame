@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.111 2003/02/07 09:34:40 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.112 2003/06/02 06:43:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -277,8 +277,7 @@ udp6_input(mp, offp, proto)
 					continue;
 			}
 			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
-				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa,
-							&src) ||
+				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, &src) ||
 				    in6p->in6p_fport != uh->uh_sport)
 					continue;
 			}
@@ -309,13 +308,13 @@ udp6_input(mp, offp, proto)
 #endif
 					    ) {
 						ip6_savecontrol(last, ip6,
-								n, &opts);
+						    n, &opts);
 					}
 
 					m_adj(n, off + sizeof(struct udphdr));
 					if (sbappendaddr(&last->in6p_socket->so_rcv,
-							(struct sockaddr *)&fromsa,
-							n, opts.head) == 0) {
+					    (struct sockaddr *)&fromsa,
+					    n, opts.head) == 0) {
 						m_freem(n);
 						if (opts.head)
 							m_freem(opts.head);
@@ -368,8 +367,7 @@ udp6_input(mp, offp, proto)
 
 		m_adj(m, off + sizeof(struct udphdr));
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-				(struct sockaddr *)&fromsa,
-				m, opts.head) == 0) {
+		    (struct sockaddr *)&fromsa, m, opts.head) == 0) {
 			udp6stat.udp6s_fullsock++;
 			goto bad;
 		}
@@ -385,7 +383,7 @@ udp6_input(mp, offp, proto)
 	   !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, &src) ||
 	   !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &dst)) {
 		in6p = in6_pcblookup(&udb6, &src, uh->uh_sport,
-				     &dst, uh->uh_dport, IN6PLOOKUP_WILDCARD);
+		    &dst, uh->uh_dport, IN6PLOOKUP_WILDCARD);
 		if (in6p)
 			udp6_last_in6pcb = in6p;
 		udp6stat.udp6ps_pcbcachemiss++;
@@ -435,8 +433,7 @@ udp6_input(mp, offp, proto)
 
 	m_adj(m, off + sizeof(struct udphdr));
 	if (sbappendaddr(&in6p->in6p_socket->so_rcv,
-			(struct sockaddr *)&fromsa,
-			m, opts.head) == 0) {
+	    (struct sockaddr *)&fromsa, m, opts.head) == 0) {
 		udp6stat.udp6s_fullsock++;
 		goto bad;
 	}
@@ -529,8 +526,7 @@ udp6_ctlinput(cmd, sa, d)
 		if (m->m_pkthdr.len < off + sizeof(*uhp)) {
 			if (cmd == PRC_MSGSIZE)
 				icmp6_mtudisc_update((struct ip6ctlparam *)d,
-						     (struct sockaddr_in6 *)sa,
-						     0);
+				    (struct sockaddr_in6 *)sa, 0);
 			return;
 		}
 
@@ -546,10 +542,8 @@ udp6_ctlinput(cmd, sa, d)
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (in6_pcblookup_connect(&udb6, sa6,
-						  uh.uh_dport,
-						  (struct sockaddr_in6 *)sa6_src,
-						  uh.uh_sport, 0))
+			if (in6_pcblookup_connect(&udb6, sa6, uh.uh_dport,
+			    (struct sockaddr_in6 *)sa6_src, uh.uh_sport, 0))
 				valid++;
 #if 0
 			/*
@@ -559,8 +553,7 @@ udp6_ctlinput(cmd, sa, d)
 			 * We should at least check if the local address (= s)
 			 * is really ours.
 			 */
-			else if (in6_pcblookup_bind(&udb6, sa6,
-						    uh.uh_dport, 0))
+			else if (in6_pcblookup_bind(&udb6, sa6, uh.uh_dport, 0))
 				valid++;
 #endif
 
@@ -572,7 +565,7 @@ udp6_ctlinput(cmd, sa, d)
 			 * - ignore the MTU change notification.
 			 */
 			icmp6_mtudisc_update((struct ip6ctlparam *)d,
-					     (struct sockaddr_in6 *)sa, valid);
+			    (struct sockaddr_in6 *)sa, valid);
 
 			/*
 			 * regardless of if we called icmp6_mtudisc_update(),
@@ -626,7 +619,7 @@ udp6_usrreq(so, req, m, addr6, control)
 	 */
 	if (req == PRU_CONTROL)
 		return (in6_control(so, (u_long)m, (caddr_t)addr6,
-				   (struct ifnet *)control
+		    (struct ifnet *)control
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 				   , p
 #endif
