@@ -2782,11 +2782,17 @@ sourceroute(ai, arg, cpp, protop, optp)
 
 	*cpp = NULL;
 	if (ai->ai_family == AF_INET6) {
+#ifdef IPV6_PKTOPTIONS
+		/* RFC2292 */
 		cmsg = inet6_rthdr_init(buf, IPV6_RTHDR_TYPE_0);
 		if (*arg != '@')
 			return -1;
 		*protop = IPPROTO_IPV6;
 		*optp = IPV6_PKTOPTIONS;
+#else
+		/* no advanced API */
+		return -1;
+#endif
 	} else {
 		lsrp = buf;
 		if (*arg == '!') {
