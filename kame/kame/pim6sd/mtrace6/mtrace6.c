@@ -236,7 +236,8 @@ show_ip6_result(from6, datalen)
 		*rp, *rp_end;
 	int i;
 
-	if (datalen < sizeof(*mld6_tr_resp) + sizeof(*tr6_resp)) {
+	if (datalen < sizeof(*mld6_tr_resp) + sizeof(*tr6_rquery) +
+	    sizeof(*tr6_resp)) {
 		warnx("show_ip6_result: receive data length(%d) is short",
 		      datalen);
 		return;
@@ -244,12 +245,13 @@ show_ip6_result(from6, datalen)
 
 	switch(mld6_tr_resp->mld6_type) {
 	case MLD6_MTRACE_RESP:
-		if ((datalen - sizeof(*mld6_tr_resp)) % sizeof(*tr6_resp)) {
+		if ((datalen - sizeof(*mld6_tr_resp) - sizeof(*tr6_rquery)) %
+		    sizeof(*tr6_resp)) {
 			warnx("show_ip6_result: incomplete response (%d bytes)",
 			      datalen);
 			return;
 		}
-		rp_end = (struct tr6_resp *)((char *)tr6_resp + datalen);
+		rp_end = (struct tr6_resp *)((char *)mld6_tr_resp + datalen);
 
 		/* sanity check for the response */
 		if (tr6_query->tr_qid != tr6_rquery->tr_qid ||
