@@ -98,11 +98,6 @@ static int	ip_setmoptions
 
 extern	struct protosw inetsw[];
 
-#if defined(PM)
-extern	int	doNatFil;
-extern	int	pm_out	__P((struct ifnet *, struct ip *, struct mbuf *));
-#endif
-
 /*
  * IP output.  The packet in mbuf chain m contains a skeletal IP
  * header (with len, off, ttl, proto, tos, src, dst).
@@ -199,22 +194,11 @@ ip_output(m0, opt, ro, flags, imo)
 	 * check that it is to the same destination
 	 * and is still up.  If not, free it and try again.
 	 */
-#if defined(PM)
-	if (ro->ro_rt
-	    && !(flags & IP_PROTOCOLROUTE)
-	    && ((ro->ro_rt->rt_flags & RTF_UP) == 0
-		|| dst->sin_addr.s_addr != ip->ip_dst.s_addr))
-	{
-		RTFREE(ro->ro_rt);
-		ro->ro_rt = (struct rtentry *)0;
-	}
-#else
 	if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
 	   dst->sin_addr.s_addr != ip->ip_dst.s_addr)) {
 		RTFREE(ro->ro_rt);
 		ro->ro_rt = (struct rtentry *)0;
 	}
-#endif
 	if (ro->ro_rt == 0) {
 		dst->sin_family = AF_INET;
 		dst->sin_len = sizeof(*dst);
@@ -466,17 +450,6 @@ sendit:
 	    }
 	}
 #endif /* COMPAT_IPFW */
-
-#if defined(PM)
-	/*
-	 * Processing IP filter/NAT.
-	 * Return TRUE  iff this packet is discarded.
-	 * Return FALSE iff this packet is accepted.
-	 */
-
-	if (doNatFil && pm_out(ro->ro_rt->rt_ifp, ip, m))
-	    goto done;
-#endif
 
 #ifdef IPSEC
 	/* get SP for this packet */

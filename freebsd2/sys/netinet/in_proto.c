@@ -140,14 +140,6 @@ int	tp_ctloutput(), tp_usrreq();
 void	eoninput(), eonctlinput(), eonprotoinit();
 #endif /* EON */
 
-#if defined(PM)
-void	pm_init		__P((void));
-void	pm_input	__P((struct mbuf *, int));
-int	pm_ctloutput	__P((int, struct socket *, int, int, struct mbuf **));
-int	pm_usrreq	__P((struct socket *,
-			     int, struct mbuf *, struct mbuf *, struct mbuf *));
-#endif
-
 #if defined(NATPT)
 void	natpt_init	__P((void));
 int	natpt_ctloutput	__P((int, struct socket *, int, int, struct mbuf **));
@@ -265,13 +257,6 @@ struct protosw inetsw[] = {
   idpip_input,	0,		nsip_ctlinput,	0,
   rip_usrreq,
   0,		0,		0,		0,
-},
-#endif
-#if defined(PM)
-{ SOCK_RAW,	&inetdomain,	IPPROTO_PM,	PR_ATOMIC|PR_ADDR,
-  pm_input,	0,		0,		pm_ctloutput,
-  pm_usrreq,
-  pm_init,	0,		0,		0,
 },
 #endif
 #if defined(NATPT)

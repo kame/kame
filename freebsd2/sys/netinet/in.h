@@ -176,9 +176,6 @@
 #define	IPPROTO_GMTP		100		/* GMTP*/
 #define	IPPROTO_IPCOMP		108		/* payload compression (IPComp) */
 /* 101-254: Unassigned */
-#if defined(PM)
-#define	IPPROTO_PM		101		/* PM - Packet Management by SuMiRe */
-#endif
 #define IPPROTO_PIM		103		/* Protocol Independent Mcast */
 /* 255: Reserved */
 /* BSD Private, local use, namespace incursion */

@@ -241,14 +241,6 @@ static struct in_ifaddr *
 	 ip_rtaddr __P((struct in_addr));
 static void	ipintr __P((void));
 
-#if defined(PM)
-extern	int	doNatFil;
-extern	int	doRoute;
-
-extern	int		 pm_in	    __P((struct ifnet *, struct ip *, struct mbuf *));
-extern	struct route	*pm_route   __P((struct mbuf *));
-#endif
-
 #if defined(NATPT)
 extern	int		ip6_protocol_tr;
 
@@ -476,17 +468,6 @@ iphack:
 
 	if (ip_nat_ptr && !(*ip_nat_ptr)(&ip, &m, m->m_pkthdr.rcvif, IP_NAT_IN))
 		return;
-#endif
-
-#if defined(PM)
-	/*
-	 * Process ip-filter/NAT.
-	 * Return TRUE	if this packed is discarded.
-	 * Return FALSE if this packed is accepted.
-	 */
-
-	if (doNatFil && pm_in(m->m_pkthdr.rcvif, ip, m))
-	    return;
 #endif
 
 #if defined(NATPT)
@@ -1552,31 +1533,6 @@ ip_forward(m, srcrt)
 	}
 	ip->ip_ttl -= IPTTLDEC;
 
-#if defined(PM)
-	if (doRoute)
-	{
-	    struct  route   *ipfw_rt;
-
-	    if ((ipfw_rt = pm_route(m)) != NULL)
-	    {
-		mcopy = m_copy(m, 0, imin((int)ip->ip_len, 64));
-		if (mcopy) {
-#ifdef _IP_VHL
-			mcopy = m_pullup(mcopy, IP_VHL_HL(ip->ip_vhl) << 2);
-#else
-			mcopy = m_pullup(mcopy, ip->ip_hl << 2);
-#endif
-		}
-#ifdef IPSEC
-		ipsec_setsocket(m, NULL);
-#endif /*IPSEC*/
-		error = ip_output(m, (struct mbuf *)0, ipfw_rt,
-				  IP_FORWARDING | IP_PROTOCOLROUTE , 0);
-		goto    clearAway;
-	    }
-	}
-#endif
-
 	sin = (struct sockaddr_in *)&ipforward_rt.ro_dst;
 	if ((rt = ipforward_rt.ro_rt) == 0 ||
 	    ip->ip_dst.s_addr != sin->sin_addr.s_addr) {
@@ -1647,9 +1603,6 @@ ip_forward(m, srcrt)
 #endif /*IPSEC*/
 	error = ip_output(m, (struct mbuf *)0, &ipforward_rt, 
 			  IP_FORWARDING, 0);
-#if defined(PM)
-      clearAway:;
-#endif
 	if (error)
 		ipstat.ips_cantforward++;
 	else {
