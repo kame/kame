@@ -1,4 +1,4 @@
-/*	$KAME: natpt_soctl.h,v 1.16 2002/02/01 15:05:40 fujisawa Exp $	*/
+/*	$KAME: natpt_soctl.h,v 1.17 2002/02/21 21:17:31 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -29,55 +29,51 @@
  * SUCH DAMAGE.
  */
 
-/* cmd for use with ioctl at the socket						*/
-/*	_IO()		no parameters						*/
-/*	_IOR()		copy out parameters					*/
-/*	_IOW()		copy in	 parameters					*/
-/*	_IOWR()		copy in/out parameters					*/
+/*
+ * cmd for use with ioctl at the socket
+ *	_IO()		no parameters
+ *	_IOR()		copy out parameters
+ *	_IOW()		copy in	 parameters
+ *	_IOWR()		copy in/out parameters
+ */
 
-#define	NATPT_SETIF	_IOW ('n',   0, struct natpt_msgBox)	/* Set interface side	*/
-#define NATPT_GETIF	_IOWR('n',   1, struct natpt_msgBox)	/* Get interface sidde	*/
-#define	NATPT_ENBTRANS	_IOW ('n',   2, struct natpt_msgBox)	/* Enable  translation	*/
-#define NATPT_DSBTRANS	_IOW ('n',   3, struct natpt_msgBox)	/* Disable translation	*/
-#define	NATPT_SETRULES	_IOW ('n',   4, struct natpt_msgBox)	/* Set rules		*/
-#define	NATPT_RMRULE	_IOW ('n',   5, struct natpt_msgBox)	/* Get rule		*/
-#define NATPT_RENUMRULE	_IOW ('n',   6, struct natpt_msgBox)	/* Flush rule		*/
-#define NATPT_FLUSHRULE	_IOW ('n',   7, struct natpt_msgBox)	/* Renumber rule	*/
-#define	NATPT_SETPREFIX	_IOW ('n',   8, struct natpt_msgBox)	/* Set prefix		*/
-#define	NATPT_GETPREFIX	_IOWR('n',   9, struct natpt_msgBox)	/* Get prefix		*/
-#define	NATPT_SETVALUE	_IOW ('n',  10, struct natpt_msgBox)	/* Set value		*/
-#define	NATPT_GETVALUE	_IOWR('n',  11, struct natpt_msgBox)	/* Get value		*/
-
-#define	NATPT_TESTLOG	_IOW ('n',  12, struct natpt_msgBox)	/* Test log		*/
-
-#define NATPT_BREAK	_IO  ('n', 255)				/* stop			*/
-
+#define NATPT_SETIF	_IOW ('n', 0, struct natpt_msgBox) /* Set interface side */
+#define NATPT_GETIF	_IOWR('n', 1, struct natpt_msgBox) /* Get interface sidde */
+#define NATPT_ENBTRANS	_IOW ('n', 2, struct natpt_msgBox) /* Enable translation */
+#define NATPT_DSBTRANS	_IOW ('n', 3, struct natpt_msgBox) /* Disable translation */
+#define NATPT_SETRULES	_IOW ('n', 4, struct natpt_msgBox) /* Set rules */
+#define NATPT_RMRULE	_IOW ('n', 5, struct natpt_msgBox) /* Get rule */
+#define NATPT_RENUMRULE	_IOW ('n', 6, struct natpt_msgBox) /* Flush rule */
+#define NATPT_FLUSHRULE	_IOW ('n', 7, struct natpt_msgBox) /* Renumber rule */
+#define NATPT_SETPREFIX	_IOW ('n', 8, struct natpt_msgBox) /* Set prefix */
+#define NATPT_GETPREFIX	_IOWR('n', 9, struct natpt_msgBox) /* Get prefix */
+#define NATPT_SETVALUE	_IOW ('n', 10, struct natpt_msgBox) /* Set value */
+#define NATPT_GETVALUE	_IOWR('n', 11, struct natpt_msgBox) /* Get value */
+#define NATPT_TESTLOG	_IOW ('n', 12, struct natpt_msgBox) /* Test log */
+#define NATPT_BREAK	_IO  ('n', 255)		        /* stop */
 
 /*
  *
  */
 
-struct natpt_msgBox
-{
-	int	size;
-	int	flags;
-#define NATPT_FLUSH		0
-#define NATPT_FLUSHALL		1
-#define	NATPT_FLUSHPREFIX	2
+struct natpt_msgBox {
+	int size;
+	int flags;
+#define NATPT_FLUSH	0
+#define NATPT_FLUSHALL	1
+#define NATPT_FLUSHPREFIX	2
 
-#define	NATPT_DEBUG		1
-#define	NATPT_DUMP		2
-
-	caddr_t	freight;
+#define NATPT_DEBUG	1
+#define NATPT_DUMP	2
+	caddr_t freight;
 	union {
-		u_int		M_uint;
-		int		M_int[2];
-		struct in6_addr	M_in6addr;
-	}	M_data;
+		u_int M_uint;
+		int M_int[2];
+		struct in6_addr M_in6addr;
+	} M_data;
 };
 
-
-#define	m_uint		M_data.M_uint
-#define	m_int0		M_data.M_int[0]
-#define	m_int1		M_data.M_int[1]
+#define m_uint	M_data.M_uint
+#define m_int0	M_data.M_int[0]
+#define m_int1	M_data.M_int[1]
 #define m_in6addr	M_data.M_in6addr

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.37 2002/01/31 13:43:09 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.38 2002/02/21 21:17:31 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -29,35 +29,35 @@
  * SUCH DAMAGE.
  */
 
-#define	NATPTHASHSZ		(397)
-#define	MAXTSLOTENTRY		(4096)
+#define	NATPTHASHSZ	(397)
+#define	MAXTSLOTENTRY	(4096)
 
-#define	NATPT_FRGHDRSZ		(sizeof(struct ip6_hdr) + sizeof(struct ip6_frag))
-#define	NATPT_MAXULP		(IPV6_MMTU - NATPT_FRGHDRSZ)
+#define	NATPT_FRGHDRSZ	(sizeof(struct ip6_hdr) + sizeof(struct ip6_frag))
+#define	NATPT_MAXULP	(IPV6_MMTU - NATPT_FRGHDRSZ)
 
-#define	SIN4(s)			((struct sockaddr_in  *)s)
-#define	SIN6(s)			((struct sockaddr_in6 *)s)
-#define	SZSIN4			sizeof(struct sockaddr_in)
-#define	SZSIN6			sizeof(struct sockaddr_in6)
+#define	SIN4(s)		((struct sockaddr_in  *)s)
+#define	SIN6(s)		((struct sockaddr_in6 *)s)
+#define	SZSIN4		sizeof(struct sockaddr_in)
+#define	SZSIN6		sizeof(struct sockaddr_in6)
 
 #ifdef _KERNEL
-#define	isDebug(d)		(natpt_debug & (d))
-#define	D_CHECKSUM		0x00000001
+#define	isDebug(d)	(natpt_debug & (d))
+#define	D_CHECKSUM	0x00000001
 
-#define	isDump(d)		(natpt_dump  & (d))
+#define	isDump(d)	(natpt_dump  & (d))
 
-#define	D_DIVEIN4		0x00000001
-#define	D_MATCHINGRULE4		0x00000004
-#define	D_TRANSLATEIPV4		0x00000010
-#define	D_FRAGMENTED		0x00000100
+#define	D_DIVEIN4	0x00000001
+#define	D_MATCHINGRULE4	0x00000004
+#define	D_TRANSLATEIPV4	0x00000010
+#define	D_FRAGMENTED	0x00000100
 #define	D_TRANSLATEDIPV4	0x00001000
 #define	D_FAKETRACEROUTE	0x00004000
 
-#define	D_DIVEIN6		0x00010000
-#define	D_IN6REJECT		0x00020000
-#define	D_IN6ACCEPT		0x00040000
-#define	D_MATCHINGRULE6		0x00080000
-#define	D_TRANSLATEIPV6		0x00100000
+#define	D_DIVEIN6	0x00010000
+#define	D_IN6REJECT	0x00020000
+#define	D_IN6ACCEPT	0x00040000
+#define	D_MATCHINGRULE6	0x00080000
+#define	D_TRANSLATEIPV6	0x00100000
 #endif	/* _KERNEL */
 
 
@@ -68,10 +68,10 @@
 /* I assign semantics to each bit, but even numerical value may be good. */
 
 #define	NATPTCTL_DEFAULT	0x01
-#define	NATPTCTL_TSLOT		0x02
-#define	NATPTCTL_ALL		0x80
+#define	NATPTCTL_TSLOT	0x02
+#define	NATPTCTL_ALL	0x80
 
-#define	NATPTCTL_INT		1
+#define	NATPTCTL_INT	1
 #define	NATPTCTL_IN6ADDR	2
 
 #define	NATPTCTL_ENABLE		0
@@ -88,18 +88,18 @@
 #define	NATPTCTL_NULL		11
 #define	NATPTCTL_NUM		12
 
-#define	NATPTCTL_NAMES	{						\
-	{ "translation", NATPTCTL_INT,		NATPTCTL_DEFAULT },	\
-	{ "debug",	NATPTCTL_INT,		NATPTCTL_DEFAULT },	\
-	{ "dump",	NATPTCTL_INT,		NATPTCTL_DEFAULT },	\
+#define	NATPTCTL_NAMES {						\
+	{ "translation", NATPTCTL_INT,	NATPTCTL_DEFAULT },	\
+	{ "debug",	NATPTCTL_INT,	NATPTCTL_DEFAULT },	\
+	{ "dump",	NATPTCTL_INT,	NATPTCTL_DEFAULT },	\
 	{ "prefix",	NATPTCTL_IN6ADDR,	NATPTCTL_DEFAULT },	\
-	{ "maxTTLany",	NATPTCTL_INT,		NATPTCTL_TSLOT },	\
-	{ "maxTTLicmp",	NATPTCTL_INT,		NATPTCTL_TSLOT },	\
-	{ "maxTTLudp",	NATPTCTL_INT,		NATPTCTL_TSLOT },	\
-	{ "maxTTLtcp",	NATPTCTL_INT,		NATPTCTL_TSLOT },	\
-	{ "tcpt_2msl",	NATPTCTL_INT,		NATPTCTL_TSLOT },	\
-	{ "tcp_maxidle", NATPTCTL_INT,		NATPTCTL_TSLOT },	\
-	{ "maxFragment", NATPTCTL_INT,		NATPTCTL_TSLOT },	\
+	{ "maxTTLany",	NATPTCTL_INT,	NATPTCTL_TSLOT },		\
+	{ "maxTTLicmp",	NATPTCTL_INT,	NATPTCTL_TSLOT },		\
+	{ "maxTTLudp",	NATPTCTL_INT,	NATPTCTL_TSLOT },		\
+	{ "maxTTLtcp",	NATPTCTL_INT,	NATPTCTL_TSLOT },		\
+	{ "tcpt_2msl",	NATPTCTL_INT,	NATPTCTL_TSLOT },		\
+	{ "tcp_maxidle", NATPTCTL_INT,	NATPTCTL_TSLOT },		\
+	{ "maxFragment", NATPTCTL_INT,	NATPTCTL_TSLOT },		\
 	{  NULL,	0,			0 },			\
 }
 
@@ -111,11 +111,10 @@
 }
 
 
-struct natptctl_names
-{
-	char		*ctl_name;
-	u_short		 ctl_type;
-	u_short		 ctl_attr;
+struct natptctl_names {
+	char	*ctl_name;
+	u_short	ctl_type;
+	u_short	ctl_attr;
 };
 
 
@@ -123,23 +122,23 @@ struct natptctl_names
  *
  */
 
-struct pcv					/* sizeof(): 32[byte]	*/
-{
+struct pcv {
+	/* sizeof(): 32[byte] */
 	u_char	 sa_family;
-	u_char	 ip_p;			/* IPPROTO_(ICMP[46]|TCP|UDP)	*/
+	u_char	 ip_p;		/* IPPROTO_(ICMP[46]|TCP|UDP) */
 
 	u_char	 fromto;
-#define	NATPT_FROM		0
+#define	NATPT_FROM	0
 #define	NATPT_TO		1
 
 	u_char	 flags;
-#define	NATPT_TRACEROUTE	0x01
+#define	NATPT_TRACEROUTE		0x01
 
-/* The following flags are used in IPv4->IPv6 translation.		*/
-#define	FIRST_FRAGMENT		0x02	/* is first fragment?		*/
-#define	NEXT_FRAGMENT		0x04	/* is fragment after the first?	*/
-#define	NEED_FRAGMENT		0x08	/* need fragment?		*/
-#define	SET_DF			0x80	/* is DF bit set?		*/
+/* The following flags are used in IPv4->IPv6 translation */
+#define	FIRST_FRAGMENT		0x02	/* is first fragment? */
+#define	NEXT_FRAGMENT		0x04	/* is fragment after the first? */
+#define	NEED_FRAGMENT		0x08	/* need fragment? */
+#define	SET_DF			0x80	/* is DF bit set? */
 
 #define	IS_FRAGMENT		(FIRST_FRAGMENT | NEXT_FRAGMENT)
 
@@ -149,8 +148,8 @@ struct pcv					/* sizeof(): 32[byte]	*/
 #define	needFragment(cv)	((cv)->flags & NEED_FRAGMENT)
 #define	isDFset(cv)		((cv)->flags & SET_DF)
 
-	u_int16_t	 poff;		/* payload offset		*/
-	u_int16_t	 plen;		/* payload length		*/
+	u_int16_t	poff;		/* payload offset */
+	u_int16_t	plen;		/* payload length */
 
 	struct ip6_frag	*fh;		/* Fragment header */
 	struct pcvaux	*aux;
@@ -167,12 +166,11 @@ struct pcv					/* sizeof(): 32[byte]	*/
 		struct tcphdr	 *tcp4;
 		struct tcp6hdr	 *tcp6;
 		struct udphdr	 *udp;
-	}		pyld;
+	} pyld;
 };
 
 
-struct pcvaux
-{
+struct pcvaux {
 	u_short		 cksum6;
 	u_short		 cksum4;
 	struct ulc6	*ulc6;
@@ -180,19 +178,17 @@ struct pcvaux
 };
 
 
-union inaddr					/* sizeof():  16[byte]	*/
-{
+union inaddr {
 	struct in_addr	in4;
 	struct in6_addr	in6;
 };
 
 
-struct fragment					/* sizeof(): 52[byte]	*/
-{
+struct fragment {
 	TAILQ_ENTRY(fragment)	frg_list;
 	u_int8_t	 fg_family;		/* AF_INET{,6} (sa_family_t)	*/
 	u_int8_t	 fg_proto;		/* protocol			*/
-	u_short		 fg_id;			/* identification in v4 header	*/
+	u_short		 fg_id;		/* identification in v4 header	*/
 	union inaddr	 fg_src;		/* source address		*/
 	union inaddr	 fg_dst;		/* destination address		*/
 	struct tSlot	*tslot;
@@ -200,16 +196,15 @@ struct fragment					/* sizeof(): 52[byte]	*/
 };
 
 
-struct pAddr					/* sizeof():  40[byte]	*/
-{
-	u_char		sa_family;		/* address family	*/
+struct pAddr {
+	u_char		sa_family;	/* address family	*/
 
-	u_char		pType;			/* port range type	*/
+	u_char		pType;		/* port range type	*/
 #define	PORT_MINUS		1
 #define	PORT_COLON		2
 
-	u_char		prefix;			/* address mask length */
-	u_char		aType;			/* address type	*/
+	u_char		prefix;		/* address mask length */
+	u_char		aType;		/* address type	*/
 #define	ADDR_ANY		0
 #define	ADDR_SINGLE		1
 #define	ADDR_MASK		2
@@ -246,7 +241,7 @@ struct mAddr					/* sizeof(): 60[byte]	*/
 
 /* Configuration slot entry						*/
 
-struct	cSlot					/* sizeof(): 144[byte]	*/
+struct cSlot					/* sizeof(): 144[byte]	*/
 {
 	TAILQ_ENTRY(cSlot)	csl_list;
 
