@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: pim6stat.1,v 1.1 1999/08/08 23:31:00 itojun Exp $
+.\"     $Id: pim6stat.1,v 1.2 1999/12/03 08:53:32 jinmei Exp $
 .\"
 .Dd July 28, 1999
 .Dt PIM6STAT 1
@@ -38,10 +38,11 @@
 .Op Fl d
 .Op Fl f dumpfile
 .Op Fl p pidfile
+.Op Fl s
 .Op Fl w waitsec
 .Sh DESCRIPTION
 .Nm Pim6stat
-shows status of the PIM for IPv6 daemon currently running.
+shows status or statistics of the PIM for IPv6 daemon currently running.
 When invoked, it sends a signal to let the daemon dump its internal
 status to a file, waits for dumping, and outputs the content of the file
 to standard output.
@@ -58,6 +59,8 @@ assumes sparse mode.
 specifies the dumpfile to which the PIM daemon dumps its status.
 .It Fl p
 specifies the PID file of the currently running daemon.
+.It Fl s
+specifies to dump statistics instead of status (for sparse mode only).
 .It Fl w
 specifies the wait period in seconds between sending a signal to the
 daemon and outputs the dumpfile.
@@ -72,6 +75,8 @@ The default PID file for a dense mode daemon.
 The default dump file for a sparse mode daemon.
 .It Pa /var/tmp/pim6dd.dump
 The default dump file for a dense mode daemon.
+.It Pa /var/tmp/pim6sd.stat
+The default statistics dump file for a sparse mode daemon.
 .El
 .Sh SEE ALSO
 .Xr pim6sd 8 ,
