@@ -2248,7 +2248,7 @@ ip_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 
 		sin_grp = SIN(ss_grp);
 		sin_grp->sin_addr = SIN(&greq->gr_group)->sin_addr;
-		sin_grp->sin_len = sizeof(struct sockaddr_in);
+		sin_grp->sin_len = sizeof(*sin_grp);
 
 		if (!IN_MULTICAST(sin_grp->sin_addr.s_addr)) {
 			error = EINVAL;
@@ -2281,10 +2281,10 @@ ip_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 
 		sin_src = SIN(ss_src);
 		sin_src->sin_addr = mreqsrc->imr_sourceaddr;
+		sin_src->sin_len = sizeof(*sin_src);
 		sin_grp = SIN(ss_grp);
 		sin_grp->sin_addr = mreqsrc->imr_multiaddr;
-		sin_grp->sin_len = sin_src->sin_len
-					= sizeof(struct sockaddr_in);
+		sin_grp->sin_len = sizeof(*sin_grp);
 		sin_ifa.sin_addr = mreqsrc->imr_interface;
 
 		/*
@@ -2337,10 +2337,10 @@ ip_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 
 		sin_src = SIN(ss_src);
 		sin_src->sin_addr = SIN(&gsreq->gsr_source)->sin_addr;
+		sin_src->sin_len = sizeof(*sin_src);
 		sin_grp = SIN(ss_grp);
 		sin_grp->sin_addr = SIN(&gsreq->gsr_group)->sin_addr;
-		sin_src->sin_len = sin_grp->sin_len
-					= sizeof(struct sockaddr_in);
+		sin_grp->sin_len = sizeof(*sin_grp);
 
 		if (!IN_MULTICAST(sin_grp->sin_addr.s_addr) ||
 				IN_LOCAL_GROUP(sin_grp->sin_addr.s_addr)) {
@@ -2464,7 +2464,7 @@ ip_setmopt_source_addr(ss, msf, optname)
 		}
 		sin = SIN(&ss[0]);
 		SIN(&msfsrc->src)->sin_family = AF_INET;
-		SIN(&msfsrc->src)->sin_len = sizeof(struct sockaddr_in);
+		SIN(&msfsrc->src)->sin_len = sizeof(*sin);
 		SIN(&msfsrc->src)->sin_addr.s_addr = ntohl(sin->sin_addr.s_addr);
 		msfsrc->refcount = 2;
 		LIST_INSERT_HEAD(msf->msf_head, msfsrc, list);
@@ -2489,7 +2489,7 @@ ip_setmopt_source_addr(ss, msf, optname)
 		}
 		sin = SIN(&ss[0]);
 		SIN(&msfsrc->src)->sin_family = AF_INET;
-		SIN(&msfsrc->src)->sin_len = sizeof(struct sockaddr_in);
+		SIN(&msfsrc->src)->sin_len = sizeof(*sin);
 		SIN(&msfsrc->src)->sin_addr.s_addr = ntohl(sin->sin_addr.s_addr);
 		msfsrc->refcount = 2;
 		LIST_INSERT_HEAD(msf->msf_blkhead, msfsrc, list);
@@ -2535,7 +2535,7 @@ merge_msf_list:
 			return ENOBUFS;
 		}
 		SIN(&newsrc->src)->sin_family = AF_INET;
-		SIN(&newsrc->src)->sin_len = sizeof(struct sockaddr_in);
+		SIN(&newsrc->src)->sin_len = sizeof(*sin);
 		SIN(&newsrc->src)->sin_addr.s_addr = src_h;
 		newsrc->refcount = 2;
 		LIST_INSERT_BEFORE(msfsrc, newsrc, list);
@@ -2553,7 +2553,7 @@ merge_msf_list:
 			return ENOBUFS;
 		}
 		SIN(&newsrc->src)->sin_family = AF_INET;
-		SIN(&newsrc->src)->sin_len = sizeof(struct sockaddr_in);
+		SIN(&newsrc->src)->sin_len = sizeof(*sin);
 		SIN(&newsrc->src)->sin_addr.s_addr = src_h;
 		newsrc->refcount = 2;
 		LIST_INSERT_AFTER(lastp, newsrc, list);
