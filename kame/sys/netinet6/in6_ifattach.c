@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.75 2001/01/05 01:24:10 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.76 2001/01/18 06:47:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1255,11 +1255,11 @@ in6_ifdetach(ifp)
 	sin6.sin6_addr = in6addr_linklocal_allnodes;
 	sin6.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
 #ifndef __FreeBSD__
-	if ((rt = rtalloc1((struct sockaddr *)&sin6, 0)) != NULL)
+	rt = rtalloc1((struct sockaddr *)&sin6, 0);
 #else
-	if ((rt = rtalloc1((struct sockaddr *)&sin6, 0, 0UL)) != NULL)
+	rt = rtalloc1((struct sockaddr *)&sin6, 0, 0UL);
 #endif
-	{
+	if (rt && rt->rt_ifp == ifp) {
 		rtrequest(RTM_DELETE, (struct sockaddr *)rt_key(rt),
 			rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
 		rtfree(rt);
