@@ -1,4 +1,4 @@
-/*	$KAME: quip_server.c,v 1.2 2000/10/18 09:15:21 kjc Exp $	*/
+/*	$KAME: quip_server.c,v 1.3 2001/08/06 10:36:34 itojun Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -169,22 +169,24 @@ static int
 expand_classname(struct classinfo *clinfo, char *name)
 {
 	struct classinfo *ci = clinfo;
-	char buf[2][256], *b0, *b1, *tmp;
+#define CLASSNAMEMAX	256
+	char buf[2][CLASSNAMEMAX], *b0, *b1, *tmp;
 
 	b0 = buf[0]; b1 = buf[1];
 	b1[0] = '\0';
 	while (ci != NULL) {
-		strcpy(b0, "/");
-		strcat(b0, ci->clname);
-		strcat(b0, b1);
+		strlcpy(b0, "/", CLASSNAMEMAX);
+		strlcat(b0, ci->clname, CLASSNAMEMAX);
+		strlcat(b0, b1, CLASSNAMEMAX);
 
 		ci = ci->parent;
 		tmp = b0; b0 = b1; b1 = tmp;
 	}
-	sprintf(b0, "%s:", clinfo->ifinfo->ifname);
-	strcat(b0, b1);
-	strcpy(name, b0);
+	snprintf(b0, CLASSNAMEMAX, "%s:", clinfo->ifinfo->ifname);
+	strlcat(b0, b1, CLASSNAMEMAX);
+	strlcpy(name, b0, CLASSNAMEMAX);
 	return (strlen(name));
+#undef CLASSNAMEMAX
 }
 
 /*
@@ -211,7 +213,7 @@ query_handle2name(const char *cmd, const char *arg, char *msg)
 	u_long handle;
 	int len, size;
 
-	strcpy(buf, arg);
+	strlcpy(buf, arg, sizeof(buf));
 	cp = buf;
 	ifname = strsep(&cp, ":");
 	class_field = strsep(&cp, ":");
@@ -265,7 +267,7 @@ query_filterspec(const char *cmd, const char *arg, char *msg)
 	u_long handle;
 	int size;
 
-	strcpy(buf, arg);
+	strlcpy(buf, arg, sizeof(buf));
 	cp = buf;
 	ifname = strsep(&cp, ":");
 	class_field = strsep(&cp, ":");
@@ -451,7 +453,7 @@ query_list(const char *cmd, const char *arg, char *msg)
 	cp = msg;
 	LIST_FOREACH(ifinfo, &qop_iflist, next) {
 		if (print_if) {
-			strcpy(tmp, ifinfo->ifname);
+			strlcpy(tmp, ifinfo->ifname, sizeof(tmp));
 			if (arg == NULL || string_match(arg, tmp))
 				cp += sprintf(cp, "%#010x\t%s\n",
 					      ifinfo->ifindex, tmp);
