@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.61 2003/02/20 04:31:20 t-momose Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.62 2003/02/20 05:34:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -597,6 +597,15 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 
 	/* sainty check. */
 	if (hdrep->dhaad_rep_code != 0) {
+		m_freem(m);
+		return (EINVAL);
+	}
+	hacount = (icmp6len - sizeof(struct dhaad_rep))
+		/ sizeof(struct in6_addr);
+	if (hacount == 0) {
+		mip6log((LOG_ERR,
+		    "%s:%d: DHAAD reply includes no home agent.\n",
+		    __FILE__, __LINE__));
 		m_freem(m);
 		return (EINVAL);
 	}
