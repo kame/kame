@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1619 2001/03/21 23:07:36 sakane Exp $
+$KAME: CHANGELOG,v 1.1620 2001/03/23 06:15:31 jinmei Exp $
 
 <200103>
+2001-03-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (ni6_addrs, ni6_store_addrs):
+	If the 3rd bit of the icmp6_nodeinfo sysctl variable is clear,
+	- do not respond to node info FQDN to an RFC3041 temporary address.
+	- do not include temporary addresses in a node info Node Addresses
+	  reply.
+	This bit is clear by default based on privacy consideration.
+
 Thu Mar 22 08:06:30 JST 2001 sakane@ydc.co.jp
 	* racoon:
 	fixed to parse modp1536 of DH group. reported by <shigeru@iij.ad.jp>
