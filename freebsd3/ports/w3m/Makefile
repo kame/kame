@@ -3,7 +3,7 @@
 # Date created:		Thu Sep 30 10:05:36 JST 1999
 # Whom:			sumikawa@kame.net
 #
-# $Id: Makefile,v 1.1 1999/09/30 01:18:52 sumikawa Exp $
+# $Id: Makefile,v 1.1.1.1 1999/09/30 01:18:52 sumikawa Exp $
 #
 
 DISTNAME=	w3m-990902
