@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.162 2001/02/10 04:42:52 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.163 2001/02/10 04:44:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2719,8 +2719,8 @@ ip6_pcbopts(pktopt, m, so)
 }
 
 /*
- * Set up an IP6 option in pcb for insertion in output packets or
- * specifying behavior of outgoing packets.
+ * initialize ip6_pktopts.  beware that there are non-zero default values in
+ * the struct.
  */
 void
 init_ip6pktopts(opt)
