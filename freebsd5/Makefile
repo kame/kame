@@ -1,6 +1,6 @@
 .include <bsd.own.mk>			# for configuration variables.
 
-SUBDIR= lib libexec sbin share usr.bin usr.sbin
+SUBDIR= lib sbin share usr.bin usr.sbin
 
 includes:
 	(cd ${.CURDIR}/include; $(MAKE))
@@ -9,7 +9,7 @@ install-includes:
 
 PREFIX= /usr/local/v6
 DIRS=	$(PREFIX) $(PREFIX)/bin $(PREFIX)/sbin $(PREFIX)/lib $(PREFIX)/etc \
-	$(PREFIX)/libexec $(PREFIX)/man $(PREFIX)/share/doc/kame
+	$(PREFIX)/man $(PREFIX)/share/doc/kame
 SECTIONS=1 2 3 4 5 6 7 8 9 n
 
 beforeinstall:
