@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.348 2003/08/06 23:33:26 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.349 2003/08/06 23:34:03 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -2382,9 +2382,9 @@ right (IPR) restriction.  KAME's stance is stated below.
     By doing so KAME is (implicitly) trying to advocate no-license-contract,
     royality-free, release of IPRs.
 
-However, as documented in README, we do not guarantee that KAME code is free
-of IPR infringement, you MUST check it if you are to integrate KAME into your
-product:
+Note however, as documented in README, we do not guarantee that KAME code
+is free of IPR infringement, you MUST check it if you are to integrate
+KAME into your product (or whatever):
     READ CAREFULLY: Several countries have legal enforcement for
     export/import/use of cryptographic software.  Check it before playing
     with the kit.  We do not intend to be your legalease clearing house
