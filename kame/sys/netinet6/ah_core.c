@@ -397,11 +397,7 @@ ah_keyed_sha1_loop(state, addr, len)
 		panic("ah_keyed_sha1_loop: what?");
 	ctxt = (SHA1_CTX *)state->foo;
 
-#ifdef HAVE_SHA1
 	SHA1Update(ctxt, (caddr_t)addr, (size_t)len);
-#else
-	sha1_loop(ctxt, (caddr_t)addr, (size_t)len);
-#endif
 }
 
 static void
