@@ -1,0 +1,99 @@
+#!/bin/sh
+# $Id: mobileip6,v 1.1 2003/04/07 10:27:05 keiichi Exp $
+
+# REQUIRE: network
+# PROVIDE: mobileip6
+# BEFORE: LOGIN
+
+. /etc/rc.subr
+
+name="mobileip6"
+start_cmd="mobileip6_start"
+stop_cmd="mobileip6_stop"
+
+
+mobileip6_start() 
+{
+	echo -n 'Doing Mobile IPv6 network setup:'
+
+	case ${ipv6_mobile_nodetype} in
+	[Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
+		case ${ipv6_mobile_home_prefixes} in
+		'')
+			echo ' '
+			echo -n '	Please specify home prefix!!' 
+			;;
+		*)
+			echo -n ' Mobile Node:'
+			# setup SPD/SA
+			echo -n ' security'
+			for node_dir in ${ipv6_mobile_config_dir}/*
+			do
+				if [ ! -e ${node_dir}/add ]; then
+					continue;
+				fi
+				setkey -f ${node_dir}/add
+				setkey -f ${node_dir}/spdadd_mobile_node
+			done
+			mip6control -S 1
+			for home_prefix in ${ipv6_mobile_home_prefixes}
+			do
+				prefix=`expr "${home_prefix}" : "\(.*\)/.*"`
+				prefixlen=`expr "${home_prefix}" : ".*/\(.*\)"`
+				mip6control -H ${prefix} -P ${prefixlen}
+			done
+			echo -n ' enable'
+			mip6control -m
+			echo -n ' rtsold'
+			rtsold -a -m
+			;;
+		esac
+		;;
+	[Hh][Oo][Mm][Ee]_[Aa][Gg][Ee][Nn][Tt])
+		case ${ipv6_mobile_home_link} in
+		'')
+			;;
+		*)
+			echo -n ' Home Agent:'
+			# setup SPD/SA
+			echo ' security'
+			for node_dir in ${ipv6_mobile_config_dir}/*
+			do
+				if [ ! -e ${node_dir}/add ]; then
+					continue;
+				fi
+				setkey -f ${node_dir}/add
+				setkey -f ${node_dir}/spdadd_home_agent
+			done
+			mip6control -S 1
+			echo -n ' enable'
+			for home_prefix in ${ipv6_mobile_home_prefixes}
+			do
+				prefix=`expr "${home_prefix}" : "\(.*\)/.*"`
+				# XXX desribe the case plen != 64
+				ifconfig ${ipv6_mobile_home_link} inet6 ${prefix}:fdff:ffff:ffff:fffe prefixlen 64 anycast alias
+			done
+			mip6control -g
+			echo -n ' rtadvd'
+			rtadvd -m ${ipv6_mobile_home_link}
+			echo -n ' had'
+			had ${ipv6_mobile_home_link}
+			# take in Router Advertisement
+			rtsol ${ipv6_mobile_home_link} > /dev/null 2>&1
+			;;
+		esac
+		;;
+	*)
+		echo -n ' Correspondent Node'
+		;;
+	esac
+
+	echo ''
+}
+
+mobileip6_stop() {
+
+}
+
+load_rc_config $name
+run_rc_command "$1"
