@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.h,v 1.7 2000/04/28 14:29:45 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.h,v 1.8 2000/05/24 05:18:34 sakane Exp $ */
 
 /* local configuration */
 
@@ -103,7 +103,7 @@ struct localconf {
 extern struct localconf *lcconf;
 
 extern void initlcconf __P((void));
-extern vchar_t *getpsk __P((vchar_t *id0));
+extern vchar_t *getpskbyname __P((vchar_t *id0));
 extern vchar_t *getpskbyaddr __P((struct sockaddr *remote));
 extern int doi2idtype __P((int idtype));
 extern int idtype2doi __P((int idtype));

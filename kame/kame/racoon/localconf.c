@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.9 2000/05/23 16:25:09 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.10 2000/05/24 05:18:34 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -50,10 +50,12 @@
 #include "ipsec_doi.h"
 #include "admin_var.h"
 #include "vendorid.h"
+#include "str2val.h"
 
 struct localconf *lcconf;
 
 static struct algorithm_strength **initalgstrength __P((void));
+static vchar_t *getpsk __P((const char *str, const int len));
 
 static struct algorithm_strength **
 initalgstrength()
@@ -128,24 +130,15 @@ initlcconf()
     }
 }
 
+/*
+ * get PSK by string.
+ */
 vchar_t *
-getpsk(id0)
+getpskbyname(id0)
 	vchar_t *id0;
 {
-	FILE *fp;
 	char *id;
-	char buf[1024];	/* XXX how is variable length ? */
-	char *p, *q;
 	vchar_t *key = NULL;
-	int len;
-
-	fp = fopen(lcconf->pathinfo[LC_PATHTYPE_PSK], "r");
-	if (fp == NULL) {
-		plog(logp, LOCATION, NULL,
-			"failed to open pre_share_key file %s\n",
-			lcconf->pathinfo[LC_PATHTYPE_PSK]);
-		return NULL;
-	}
 
 	id = CALLOC(1 + id0->l - sizeof(struct ipsecdoi_id_b), char *);
 	if (id == NULL) {
@@ -157,40 +150,11 @@ getpsk(id0)
 		id0->l - sizeof(struct ipsecdoi_id_b));
 	id[id0->l - sizeof(struct ipsecdoi_id_b)] = '\0';
 
-	while (fgets(buf, sizeof(buf), fp) != NULL) {
-		/* search the end of 1st string. */
-		for (p = buf; *p != '\0' && !isspace(*p); p++)
-			;
-		if (*p == '\0')
-			continue;	/* no 2nd parameter */
-		*p = '\0';
-		/* search the fist of 2nd string. */
-		while (isspace(*++p))
-			;
-		if (*p == '\0')
-			continue;	/* no 2nd parameter */
-		p--;
-		if (strcmp(id, buf) == 0) {
-			p++;
-			len = 0;
-			for (q = p; *q != '\0' && *q != '\n'; q++)
-				len++;
-			*q = '\0';
-			key = vmalloc(len);
-			if (key == NULL) {
-				plog(logp, LOCATION, NULL,
-					"failed to get psk buffer.\n");
-				goto end;
-			}
-			memcpy(key->v, p, key->l);
-			goto end;
-		}
-	}
+	key = getpsk(id, id0->l - sizeof(struct ipsecdoi_id_b));
 
 end:
 	if (id)
 		free(id);
-	fclose(fp);
 	return key;
 }
 
@@ -201,12 +165,26 @@ vchar_t *
 getpskbyaddr(remote)
 	struct sockaddr *remote;
 {
-	FILE *fp;
-	char addr[NI_MAXHOST], port[NI_MAXSERV];
-	char buf[1024];	/* XXX how is variable length ? */
-	char *p, *q;
 	vchar_t *key = NULL;
-	int len;
+	char addr[NI_MAXHOST], port[NI_MAXSERV];
+
+	GETNAMEINFO(remote, addr, port);
+
+	key = getpsk(addr, strlen(addr));
+
+	return key;
+}
+
+static vchar_t *
+getpsk(str, len)
+	const char *str;
+	const int len;
+{
+	FILE *fp;
+	char buf[1024];	/* XXX how is variable length ? */
+	vchar_t *key = NULL;
+	char *p, *q;
+	int keylen;
 
 	fp = fopen(lcconf->pathinfo[LC_PATHTYPE_PSK], "r");
 	if (fp == NULL) {
@@ -215,8 +193,6 @@ getpskbyaddr(remote)
 			lcconf->pathinfo[LC_PATHTYPE_PSK]);
 		return NULL;
 	}
-
-	GETNAMEINFO(remote, addr, port);
 
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
 		/* search the end of 1st string. */
@@ -231,13 +207,27 @@ getpskbyaddr(remote)
 		if (*p == '\0')
 			continue;	/* no 2nd parameter */
 		p--;
-		if (strcmp(buf, addr) == 0) {
+		if (strncmp(buf, str, len) == 0 && buf[len] == '\0') {
 			p++;
-			len = 0;
+			keylen = 0;
 			for (q = p; *q != '\0' && *q != '\n'; q++)
-				len++;
+				keylen++;
 			*q = '\0';
-			key = vmalloc(len);
+
+			/* fix key if hex string */
+			if (strncmp(p, "0x", 2) == 0) {
+				char *k;
+
+				k = str2val(p + 2, 16, &keylen);
+				if (k == NULL) {
+					plog(logp, LOCATION, NULL,
+						"failed to get psk buffer.\n");
+					goto end;
+				}
+				p = k;
+			}
+
+			key = vmalloc(keylen);
 			if (key == NULL) {
 				plog(logp, LOCATION, NULL,
 					"failed to allocate key buffer.\n");

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.32 2000/05/23 16:25:09 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.33 2000/05/24 05:18:34 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1649,7 +1649,7 @@ oakley_skeyid(iph1)
 	switch(iph1->approval->authmethod) {
 	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
 		if (iph1->etype != ISAKMP_ETYPE_IDENT)
-			iph1->authstr = getpsk(iph1->id_p);
+			iph1->authstr = getpskbyname(iph1->id_p);
 		if (iph1->authstr == NULL) {
 			/*
 			 * If main mode or If failed to get psk by ID,
