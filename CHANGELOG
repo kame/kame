@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.216 1999/10/26 08:55:09 itojun Exp $
+$Id: CHANGELOG,v 1.217 1999/10/26 09:51:19 itojun Exp $
 
 <199910>
+Tue Oct 26 18:50:16 JST 1999  itojun@iijlab.net
+	* netbsd/sys/netinet/ip_input.c: disable ipflow (IPv4 fast forwading)
+	  if IPsec is configured in the kernel.
+
+	  From: Hans-Joachim Knobloch <hansi@xlink.net>
+
 Tue Oct 26 17:52:12 JST 1999  itojun@iijlab.net
 	* (bunch of source code): fix inet_pton() error check.  we need to
 	  check if the return value equals to 1, or not equal to 1.
