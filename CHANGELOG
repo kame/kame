@@ -1,7 +1,21 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2036 2002/01/02 16:12:53 jinmei Exp $
+$KAME: CHANGELOG,v 1.2037 2002/01/07 12:42:35 kjc Exp $
 
 <200201>
+2002/01/07 21:26:21 JST kjc@csl.sony.co.jp
+	add ECN (Explicit Congestion Notification) support (RFC3168).
+	the ECN implementation consists of 3 independent components:
+	  - marking mechanism in ALTQ
+	  - tunnel-egress and fragment reassenbly rules in layer-3
+	  - TCP mechanisms
+
+	to enable ECN support in TCP, build a kernel with TCP_ECN
+	and turn it on by sysctl -w net.inet.tcp.ecn=1
+	netstat(1) shows the ECN related statistics.
+
+	a simple example setup for ALTQ to mark packets on interface xl0:
+		interface xl0 bandwidth 3M red ecn
+
 2002-01-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet/ip_icmp.c (icmp_input): passed applications
 	icmp6 error packets that contained ipv6 over ipv4 packets,
