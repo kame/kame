@@ -1,4 +1,4 @@
-.\"	$KAME: dsadd.8,v 1.1 2003/01/10 03:46:47 sakane Exp $
+.\"	$KAME: dsadd.8,v 1.2 2003/01/10 06:12:45 sakane Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -97,12 +97,10 @@ debug mode.
 .\"
 .Sh BUGS
 .Nm
-can only detect SA which based IP address.
-When the SA is only applyed to TCP session
-and there is no SA parameter on the peer,
+can only detect the dead SAs which based an IP address.
+For example, when the SA is only for a TCP session,
 .Nm
-cannot detect this dead SA because
+cannot detect if the SA is dead or alive because
 .Nm
-uses the ICMP echo request and ICMP packets is not applyed the SA.
-.Nm
-should use the packets accroding to SPD in order to check SAs.
+uses ICMP packets.
+the peer sends back a response even if the SA is dead.
