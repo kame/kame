@@ -1,7 +1,7 @@
-/*	$KAME: ah_aesxcbcmac.c,v 1.1 2003/07/19 10:42:36 itojun Exp $	*/
+/*	$KAME: ah_aesxcbcmac.c,v 1.2 2003/07/20 00:29:37 itojun Exp $	*/
 
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998 and 2003 WIDE Project.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
