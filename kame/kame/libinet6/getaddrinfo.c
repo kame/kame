@@ -190,6 +190,9 @@ static struct addrinfo *get_ai __P((const struct addrinfo *,
 static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
+#ifndef USE_GETIPNODEBY
+static struct addrinfo *res_append __P((struct addrinfo *, struct addrinfo *));
+#endif
 
 static char *ai_errlist[] = {
 	"Success",
@@ -761,7 +764,6 @@ get_addr(hostname, servname, af, res0, pai)
 	return get_addr0(hostname, servname, af, res0, pai);
 #else
 	int i, error, ekeep;
-	struct addrinfo *cur;
 	struct addrinfo *res;
 	int retry;
 	int s;
@@ -1070,3 +1072,20 @@ find_afd(af)
 	}
 	return NULL;
 }
+
+#ifndef USE_GETIPNODEBY
+static struct addrinfo *
+res_append(a, b)
+	struct addrinfo *a;
+	struct addrinfo *b;
+{
+	struct addrinfo *p;
+
+	if (a == NULL)
+		return b;
+	for (p = a; p && p->ai_next; p = p->ai_next)
+		;
+	p->ai_next = b;
+	return a;
+}
+#endif
