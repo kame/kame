@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.84 2002/02/12 01:45:28 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.85 2002/04/24 02:31:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -967,7 +967,7 @@ ifinfo(argc, argv)
 #undef SETFLAG
 	}
 
-	if (!ND.linkmtu) {
+	if (!ND.initialized) {
 		errx(1, "%s: not initialized yet", ifname);
 		/* NOTREACHED */
 	}
