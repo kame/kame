@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.67 2002/06/10 19:59:46 itojun Exp $	*/
+/*	$KAME: config.c,v 1.68 2002/06/15 02:50:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -205,7 +205,7 @@ getconfig(intface)
 		syslog(LOG_ERR,
 		       "<%s> router lifetime (%ld) on %s is invalid "
 		       "(must be 0 or between %d and %d)",
-		       __func__, val, intface, tmp->maxinterval,
+		       __func__, val, intface,
 		       tmp->maxinterval, MAXROUTERLIFETIME);
 		exit(1);
 	}
