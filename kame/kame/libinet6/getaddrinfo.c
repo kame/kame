@@ -1044,20 +1044,19 @@ ip6_str2scopeid(scope, sin6)
 		return(scopeid);
 	}
 
-	/* still unclear about literal, allow numeric only */
+	/* still unclear about literal, allow numeric only - placeholder */
 	if (IN6_IS_ADDR_SITELOCAL(a6) || IN6_IS_ADDR_MC_SITELOCAL(a6))
 		goto trynumeric;
 	if (IN6_IS_ADDR_MC_ORGLOCAL(a6))
 		goto trynumeric;
-
-	/* it is invalid to specify scope id against global address. */
-	return(-1);
+	else
+		goto trynumeric;	/* global */
 
 	/* try to convert to a numeric id as a last resort */
   trynumeric:
 	scopeid = (int)strtoul(scope, &ep, 10);
 	if (*ep == '\0')
-		return scopeid == 0 ? -1 : scopeid;
+		return scopeid;
 	else
 		return -1;
 }
