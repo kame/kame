@@ -500,6 +500,15 @@ union mcluster {
 } while (0)
 
 /*
+ * Determine if an mbuf's data area is read-only.  This is true
+ * for non-cluster external storage and for clusters that are
+ * being referenced by more than one mbuf.
+ */
+#define	M_READONLY(m) \
+	(((m)->m_flags & M_EXT) != 0 && \
+	 ((m)->m_ext.ext_free || mclrefcnt[mtocl((m)->m_ext.ext_buf)] > 1))
+
+/*
  * Compute the amount of space available
  * before the current start of data in an mbuf.
  */
