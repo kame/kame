@@ -1,4 +1,4 @@
-/*	$KAME: rtsock.c,v 1.4 2001/09/19 06:59:41 sakane Exp $	*/
+/*	$KAME: rtsock.c,v 1.5 2002/06/10 20:00:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -117,7 +117,7 @@ rtsock_input(s)
 			break;
 
 		if (dflag > 1) {
-			warnmsg(LOG_INFO, __FUNCTION__,
+			warnmsg(LOG_INFO, __func__,
 			    "rtmsg type %d, len=%lu", rtm->rtm_type,
 			    (u_long)len);
 		}
@@ -126,7 +126,7 @@ rtsock_input(s)
 			if (rtm->rtm_type != rtsock_dispatch[idx].type)
 				continue;
 			if (rtm->rtm_msglen < rtsock_dispatch[idx].minlen) {
-				warnmsg(LOG_INFO, __FUNCTION__,
+				warnmsg(LOG_INFO, __func__,
 				    "rtmsg type %d too short!", rtm->rtm_type);
 				continue;
 			}
@@ -161,16 +161,16 @@ rtsock_input_ifannounce(s, rtm, lim)
 		 * we may be able to do a name-based interface match,
 		 * and call ifreconfig() to enable the interface again.
 		 */
-		warnmsg(LOG_INFO, __FUNCTION__,
+		warnmsg(LOG_INFO, __func__,
 		    "interface %s inserted", ifan->ifan_name);
 		break;
 	case IFAN_DEPARTURE:
-		warnmsg(LOG_WARNING, __FUNCTION__,
+		warnmsg(LOG_WARNING, __func__,
 		    "interface %s removed", ifan->ifan_name);
 		ifinfo = find_ifinfo(ifan->ifan_index);
 		if (ifinfo) {
 			if (dflag > 1) {
-				warnmsg(LOG_INFO, __FUNCTION__,
+				warnmsg(LOG_INFO, __func__,
 				    "bring interface %s to DOWN state",
 				    ifan->ifan_name);
 			}

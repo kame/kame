@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.30 2002/05/31 13:30:37 jinmei Exp $	*/
+/*	$KAME: dump.c,v 1.31 2002/06/10 19:59:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -258,12 +258,12 @@ void
 rtadvd_dump_file(dumpfile)
 	char *dumpfile;
 {
-	syslog(LOG_DEBUG, "<%s> dump current status to %s", __FUNCTION__,
+	syslog(LOG_DEBUG, "<%s> dump current status to %s", __func__,
 	    dumpfile);
 
 	if ((fp = fopen(dumpfile, "w")) == NULL) {
 		syslog(LOG_WARNING, "<%s> open a dump file(%s)",
-		    __FUNCTION__, dumpfile);
+		    __func__, dumpfile);
 		return;
 	}
 

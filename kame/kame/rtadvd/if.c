@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.21 2002/05/21 14:26:55 itojun Exp $	*/
+/*	$KAME: if.c,v 1.22 2002/06/10 19:59:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -200,7 +200,7 @@ if_getifaflag(char *name, struct in6_addr *addr)
 	int s;
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-		syslog(LOG_ERR, "<%s> socket: %s", __FUNCTION__,
+		syslog(LOG_ERR, "<%s> socket: %s", __func__,
 		       strerror(errno));
 		return (0);
 	}
@@ -211,7 +211,7 @@ if_getifaflag(char *name, struct in6_addr *addr)
 	ifr.ifr_addr.sin6_addr = *addr;
 	if (ioctl(s, SIOCGIFAFLAG_IN6, (caddr_t)&ifr) < 0) {
 		syslog(LOG_ERR, "<%s> ioctl:SIOCGIFALAG_IN6: failed for %s",
-		       __FUNCTION__, ifr.ifr_name);
+		       __func__, ifr.ifr_name);
 		close(s);
 		return (0);
 	}
@@ -228,7 +228,7 @@ if_getflags(int ifindex, int oifflags)
 	int s;
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-		syslog(LOG_ERR, "<%s> socket: %s", __FUNCTION__,
+		syslog(LOG_ERR, "<%s> socket: %s", __func__,
 		       strerror(errno));
 		return (oifflags & ~IFF_UP);
 	}
@@ -236,7 +236,7 @@ if_getflags(int ifindex, int oifflags)
 	if_indextoname(ifindex, ifr.ifr_name);
 	if (ioctl(s, SIOCGIFFLAGS, (caddr_t)&ifr) < 0) {
 		syslog(LOG_ERR, "<%s> ioctl:SIOCGIFFLAGS: failed for %s",
-		       __FUNCTION__, ifr.ifr_name);
+		       __func__, ifr.ifr_name);
 		close(s);
 		return (oifflags & ~IFF_UP);
 	}
@@ -273,7 +273,7 @@ lladdropt_fill(struct sockaddr_dl *sdl, struct nd_opt_hdr *ndopt)
 		break;
 	default:
 		syslog(LOG_ERR, "<%s> unsupported link type(%d)",
-		    __FUNCTION__, sdl->sdl_type);
+		    __func__, sdl->sdl_type);
 		exit(1);
 	}
 
@@ -310,7 +310,7 @@ get_next_msg(char *buf, char *lim, int ifindex, size_t *lenp, int filter)
 		/* just for safety */
 		if (!rtm->rtm_msglen) {
 			syslog(LOG_WARNING, "<%s> rtm_msglen is 0 "
-				"(buf=%p lim=%p rtm=%p)", __FUNCTION__,
+				"(buf=%p lim=%p rtm=%p)", __func__,
 				buf, lim, rtm);
 			break;
 		}
@@ -529,16 +529,16 @@ get_iflist(char **buf, size_t *size)
 
 	if (sysctl(mib, 6, NULL, size, NULL, 0) < 0) {
 		syslog(LOG_ERR, "<%s> sysctl: iflist size get failed",
-		       __FUNCTION__);
+		       __func__);
 		exit(1);
 	}
 	if ((*buf = malloc(*size)) == NULL) {
-		syslog(LOG_ERR, "<%s> malloc failed", __FUNCTION__);
+		syslog(LOG_ERR, "<%s> malloc failed", __func__);
 		exit(1);
 	}
 	if (sysctl(mib, 6, *buf, size, NULL, 0) < 0) {
 		syslog(LOG_ERR, "<%s> sysctl: iflist get failed",
-		       __FUNCTION__);
+		       __func__);
 		exit(1);
 	}
 	return;
@@ -564,7 +564,7 @@ parse_iflist(struct if_msghdr ***ifmlist_p, char *buf, size_t bufsize)
 	/* roughly estimate max list size of pointers to each if_msghdr */
 	malloc_size = (bufsize/iflentry_size) * sizeof(size_t);
 	if ((*ifmlist_p = (struct if_msghdr **)malloc(malloc_size)) == NULL) {
-		syslog(LOG_ERR, "<%s> malloc failed", __FUNCTION__);
+		syslog(LOG_ERR, "<%s> malloc failed", __func__);
 		exit(1);
 	}
 
@@ -572,7 +572,7 @@ parse_iflist(struct if_msghdr ***ifmlist_p, char *buf, size_t bufsize)
 	for (ifm = (struct if_msghdr *)buf; ifm < (struct if_msghdr *)lim;) {
 		if (ifm->ifm_msglen == 0) {
 			syslog(LOG_WARNING, "<%s> ifm_msglen is 0 "
-			       "(buf=%p lim=%p ifm=%p)", __FUNCTION__,
+			       "(buf=%p lim=%p ifm=%p)", __func__,
 			       buf, lim, ifm);
 			return;
 		}
@@ -595,7 +595,7 @@ parse_iflist(struct if_msghdr ***ifmlist_p, char *buf, size_t bufsize)
 			/* just for safety */
 			if (!ifam->ifam_msglen) {
 				syslog(LOG_WARNING, "<%s> ifa_msglen is 0 "
-				       "(buf=%p lim=%p ifam=%p)", __FUNCTION__,
+				       "(buf=%p lim=%p ifam=%p)", __func__,
 				       buf, lim, ifam);
 				return;
 			}

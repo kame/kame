@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.8 2002/05/31 13:30:38 jinmei Exp $	*/
+/*	$KAME: timer.c,v 1.9 2002/06/10 19:59:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -66,7 +66,7 @@ rtadvd_add_timer(struct rtadvd_timer *(*timeout) __P((void *)),
 
 	if ((newtimer = malloc(sizeof(*newtimer))) == NULL) {
 		syslog(LOG_ERR,
-		       "<%s> can't allocate memory", __FUNCTION__);
+		       "<%s> can't allocate memory", __func__);
 		exit(1);
 	}
 
@@ -74,7 +74,7 @@ rtadvd_add_timer(struct rtadvd_timer *(*timeout) __P((void *)),
 
 	if (timeout == NULL) {
 		syslog(LOG_ERR,
-		       "<%s> timeout function unspecified", __FUNCTION__);
+		       "<%s> timeout function unspecified", __func__);
 		exit(1);
 	}
 	newtimer->expire = timeout;
@@ -165,7 +165,7 @@ rtadvd_timer_rest(struct rtadvd_timer *timer)
 	if (TIMEVAL_LEQ(timer->tm, now)) {
 		syslog(LOG_DEBUG,
 		       "<%s> a timer must be expired, but not yet",
-		       __FUNCTION__);
+		       __func__);
 		returnval.tv_sec = returnval.tv_usec = 0;
 	}
 	else
