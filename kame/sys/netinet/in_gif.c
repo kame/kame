@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.45 2000/11/06 06:46:30 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.46 2000/11/06 07:06:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -487,7 +487,7 @@ gif_encapcheck4(m, off, proto, arg)
 	}
 
 	/* ingress filters on outer source */
-	if ((sc->gif_if.if_flags & IFF_LINK2) != 0 &&
+	if ((sc->gif_if.if_flags & IFF_LINK2) == 0 &&
 	    (m->m_flags & M_PKTHDR) != 0 && m->m_pkthdr.rcvif) {
 		struct sockaddr_in sin;
 		struct rtentry *rt;

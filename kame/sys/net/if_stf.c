@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.43 2000/11/06 06:46:29 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.44 2000/11/06 07:06:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -584,7 +584,7 @@ stf_checkaddr4(sc, in, inifp)
 	/*
 	 * perform ingress filter
 	 */
-	if (sc && (sc->sc_if.if_flags & IFF_LINK2) != 0 && inifp) {
+	if (sc && (sc->sc_if.if_flags & IFF_LINK2) == 0 && inifp) {
 		struct sockaddr_in sin;
 		struct rtentry *rt;
 
