@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.69 2002/01/23 04:33:26 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.70 2002/01/23 05:13:28 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1095,7 +1095,19 @@ mip6_process_bu(m, opt)
 						  &ip6->ip6_dst);
 			} else {
 				/* this is not acting as a homeagent. */
-				/* XXX: TODO send a binding ack. */
+				if (mip6_bc_send_ba(&ip6->ip6_dst,
+						    &ip6a->ip6a_home, pcoa,
+						    MIP6_BA_STATUS_NOT_HOME_AGENT,
+						    seqno,
+						    0,
+						    0)) {
+					mip6log((LOG_ERR,
+						 "%s:%d: sending BA to %s(%s) failed. "
+						 "send it later.\n",
+						 __FILE__, __LINE__,
+						 ip6_sprintf(&ip6a->ip6a_home),
+						 ip6_sprintf(pcoa)));
+				}
 				return (0); /* XXX is 0 OK? */
 			}
 		} else {
@@ -1140,7 +1152,19 @@ mip6_process_bu(m, opt)
 			}
 			
 			if (bu_opt->ip6ou_flags & IP6_BUF_ACK) {
-				/* XXX send BA */
+				if (mip6_bc_send_ba(&ip6->ip6_dst,
+						    &ip6a->ip6a_home, pcoa,
+						    MIP6_BA_STATUS_ACCEPTED,
+						    seqno,
+						    lifetime,
+						    lifetime)) {
+					mip6log((LOG_ERR,
+						 "%s:%d: sending BA to %s(%s) failed. "
+						 "send it later.\n",
+						 __FILE__, __LINE__,
+						 ip6_sprintf(&ip6a->ip6a_home),
+						 ip6_sprintf(pcoa)));
+				}
 			}
 		}
 	}
@@ -1163,7 +1187,20 @@ mip6_process_bu(m, opt)
 						   &ip6->ip6_dst);
 			} else {
 				/* this is not HA.  return BA with error. */
-				/* XXX */
+				if (mip6_bc_send_ba(&ip6->ip6_dst,
+						    &ip6a->ip6a_home, pcoa,
+						    MIP6_BA_STATUS_NOT_HOME_AGENT,
+						    seqno,
+						    0,
+						    0)) {
+					mip6log((LOG_ERR,
+						 "%s:%d: sending BA to %s(%s) failed. "
+						 "send it later.\n",
+						 __FILE__, __LINE__,
+						 ip6_sprintf(&ip6a->ip6a_home),
+						 ip6_sprintf(pcoa)));
+				}
+				return (0); /* XXX is 0 OK? */
 			}
 		} else {
 			/* a request to delete binding. */
@@ -1180,7 +1217,19 @@ mip6_process_bu(m, opt)
 				}
 			}
 			if (bu_opt->ip6ou_flags & IP6_BUF_ACK) {
-				/* XXX send BA */
+				if (mip6_bc_send_ba(&ip6->ip6_dst,
+						    &ip6a->ip6a_home, pcoa,
+						    MIP6_BA_STATUS_ACCEPTED,
+						    seqno,
+						    lifetime,
+						    lifetime)) {
+					mip6log((LOG_ERR,
+						 "%s:%d: sending BA to %s(%s) failed. "
+						 "send it later.\n",
+						 __FILE__, __LINE__,
+						 ip6_sprintf(&ip6a->ip6a_home),
+						 ip6_sprintf(pcoa)));
+				}
 			}
 		}
 	}
