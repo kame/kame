@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.14 2000/04/27 03:01:36 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.15 2000/04/27 03:36:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -663,6 +663,8 @@ explore_null(pai, servname, res)
 		return 0;
 
 	afd = find_afd(pai->ai_family);
+	if (afd == NULL)
+		return 0;
 
 	if (pai->ai_flags & AI_PASSIVE) {
 		GET_AI(cur->ai_next, afd, afd->a_addrany);
@@ -715,6 +717,8 @@ explore_numeric(pai, hostname, servname, res)
 		return 0;
 
 	afd = find_afd(pai->ai_family);
+	if (afd == NULL)
+		return 0;
 
 	switch (afd->a_af) {
 #if 0 /*X/Open spec*/
@@ -781,6 +785,9 @@ explore_numeric_scope(pai, hostname, servname, res)
 		return 0;
 
 	afd = find_afd(pai->ai_family);
+	if (afd == NULL)
+		return 0;
+
 	if (!afd->a_scoped)
 		return explore_numeric(pai, hostname, servname, res);
 
