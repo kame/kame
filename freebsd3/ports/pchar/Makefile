@@ -1,21 +1,31 @@
 # ex:ts=8
-# New ports collection makefile for:    pchar
-# Version required:     1.0
-# Date created:         Thu Nov  4 14:11:56 JST 1999
-# Whom:                 sumikawa@kame.net
+# Ports collection makefile for:  pchar
+# Version required:     	  1.0
+# Date created:			  Wed Nov 03, 1999
+# Whom:				  David O'Brien (obrien@NUXI.com)
 #
-# $Id: Makefile,v 1.1 1999/11/04 05:50:18 sumikawa Exp $
+# $FreeBSD: ports/net/pchar/Makefile,v 1.2 2000/01/08 22:25:56 sumikawa Exp $
 #
 
-DISTNAME=       pchar-1.0
+DISTNAME=	pchar-1.0
 CATEGORIES=	net
 MASTER_SITES=	http://www.ca.sandia.gov/~bmah/Software/pchar/
 
-MAINTAINER=	sumikawa@kame.net
+MAINTAINER=     obrien@FreeBSD.org
 
 GNU_CONFIGURE=	yes
-CONFIGURE_ARGS=	--with-ipv6=/usr/local/v6
+#.if defined(USE_INET6)
+CONFIGURE_ARGS= --with-ipv6
+#.endif
+MAN8=		pchar.8
 
-MAN1=		pchar.1
+do-install:
+	${INSTALL_PROGRAM} ${WRKSRC}/pchar ${PREFIX}/sbin
+	@${PERL} -pi.orig -e 's/pchar 1/pchar 8/g' ${WRKSRC}/pchar.1
+	${INSTALL_MAN} ${WRKSRC}/pchar.1 ${PREFIX}/man/man8/pchar.8
+.if !defined(NOPORTDOCS)
+	@${MKDIR} ${PREFIX}/share/doc/pchar
+	cd ${WRKSRC} ; ${INSTALL_DATA} README FAQ ${PREFIX}/share/doc/pchar
+.endif
 
 .include <bsd.port.mk>

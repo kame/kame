@@ -1,11 +1,19 @@
---- Makefile.in.orig	Thu Nov  4 02:12:36 1999
-+++ Makefile.in	Thu Nov  4 14:42:00 1999
-@@ -179,7 +179,7 @@
+--- PctestIpv6.cc-	Sun Jan  9 04:11:20 2000
++++ PctestIpv6.cc	Sun Jan  9 04:12:13 2000
+@@ -21,7 +21,6 @@
+ #include <netdb.h>
+ #include <netinet/in.h>
+ #include <netinet/in_systm.h>
+-#include <netinet6/in6.h>
+ #include <netinet/ip6.h>
+ #include <netinet/udp.h>
+ #include <netinet/icmp6.h>
+@@ -196,7 +195,7 @@
+ static char PctestIpv6PrintableAddress[INET6_ADDRSTRLEN];
+ char *PctestIpv6::GetPrintableAddress(void *a)
+ {
+-    return inet_ntop(AF_INET6, a, PctestIpv6PrintableAddress, INET6_ADDRSTRLEN);
++    return (char *)inet_ntop(AF_INET6, a, PctestIpv6PrintableAddress, INET6_ADDRSTRLEN);
+ }
  
- install-man:
- 	$(MKINSTALLDIRS) ${mandir}/man1
--	$(INSTALL_PROGRAM) pchar.1 ${mandir}/man1/pchar.1
-+	$(INSTALL_DATA) pchar.1 ${mandir}/man1/pchar.1
- 
- #
- # clean
+ //
