@@ -116,11 +116,6 @@
  *
  * MULTICAST 1.3
  */
-/*
- * Implementation of Internet Group Management Protocol, Version 3.
- *
- * Developed by Hitoshi Asaeda, INRIA, February 2002.
- */
 
 #include <netinet/igmp.h>
 #ifdef IGMPV3

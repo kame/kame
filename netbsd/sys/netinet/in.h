@@ -63,12 +63,6 @@
  */
 
 /*
- * Implementation of Internet Group Management Protocol, Version 3.
- *
- * Developed by Hitoshi Asaeda, INRIA, February 2002.
- */
-
-/*
  * Constants and structures defined by the internet system,
  * Per RFC 790, September 1981, and numerous additions.
  */

@@ -28,11 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * Implementation of Internet Group Management Protocol, Version 3.
- *
- * Developed by Hitoshi Asaeda, INRIA, February 2002.
- */
 
 #ifdef __FreeBSD__
 #include "opt_inet.h"

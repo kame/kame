@@ -1,6 +1,9 @@
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
  *
+ * Implementation of Internet Group Management Protocol, Version 3.
+ * Developed by Hitoshi Asaeda, INRIA, Feb 2002.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -29,12 +32,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * Source Specific Multicast (SSM) implementation.
- *
- * Developed by Hitoshi Asaeda, INRIA, Feb 2002.
- */
-
 /*
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.

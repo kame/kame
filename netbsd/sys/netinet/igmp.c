@@ -69,11 +69,6 @@
  *
  * MULTICAST Revision: 1.3
  */
-/*
- * Implementation of Internet Group Management Protocol, Version 3.
- *
- * Developed by Hitoshi Asaeda, INRIA, February 2002.
- */
 
 #include <sys/cdefs.h>
 __KERNEL_RCSID(0, "$NetBSD: igmp.c,v 1.36 2003/08/22 21:53:02 itojun Exp $");

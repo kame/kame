@@ -128,13 +128,6 @@
  *	@(#)in.c	8.4 (Berkeley) 1/9/95
  */
 
-/*
- * Implementation of Internet Group Management Protocol, Version 3.
- *
- * Developed by Hitoshi Asaeda, INRIA, February 2002.
- */
-
-
 #include <sys/cdefs.h>
 __KERNEL_RCSID(0, "$NetBSD: in.c,v 1.93.2.1 2004/07/10 12:42:37 tron Exp $");
 

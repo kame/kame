@@ -1,4 +1,4 @@
-/* $KAME: in_msf.h,v 1.15 2004/05/26 10:08:00 itojun Exp $	*/
+/* $KAME: in_msf.h,v 1.16 2004/12/24 07:38:17 suz Exp $	*/
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
@@ -57,11 +57,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
-/*
- * Implementation of Internet Group Management Protocol, Version 3.
- *
- * Developed by Hitoshi Asaeda, INRIA, February 2002.
  */
 #ifndef _NETINET_INMSF_H_
 #define _NETINET_INMSF_H_
