@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.90 2002/02/04 05:22:20 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.91 2002/02/04 08:28:29 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -551,14 +551,14 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 		 * Otherwise, we perform the source address selection as usual.
 		 */
 		struct ip6_hdr *hip6;		/* hold ip6 */
+		struct sockaddr_in6 *hsrc = NULL;
 
 		if (ln && ln->ln_hold) {
-			struct sockaddr_in6 *hsrc;
-
 			hip6 = mtod(ln->ln_hold, struct ip6_hdr *);
 			if (ip6_getpktaddrs(ln->ln_hold, &hsrc, NULL))
 				goto bad; /* XXX: impossible */
-			if (in6ifa_ifpwithaddr(ifp, &hsrc->sin6_addr))
+		}
+		if (hsrc && in6ifa_ifpwithaddr(ifp, &hsrc->sin6_addr)) {
 				src_sa = *hsrc;
 		} else {
 			struct sockaddr_in6 *src0;
