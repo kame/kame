@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.140 2000/12/04 05:37:56 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.141 2000/12/04 09:13:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -233,7 +233,11 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct route_in6 *ro_pmtu = NULL;
 #endif
 	int hdrsplit = 0;
+#ifdef __OpenBSD__
+	u_int8_t sproto = 0;
+#else
 	int needipsec = 0;
+#endif
 #if defined(__NetBSD__) && defined(PFIL_HOOKS)
 	struct packet_filter_hook *pfh;
 	struct mbuf *m1;
@@ -241,9 +245,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #endif /* PFIL_HOOKS */
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
-#endif
-#ifdef __OpenBSD__
-	u_int8_t sproto = 0;
 #endif
 #ifdef IPSEC
 #ifdef __OpenBSD__
