@@ -216,6 +216,11 @@ pr_family(af)
 		afname = "Internet";
 		break;
 #ifndef SMALL
+#ifdef INET6
+	case AF_INET6:
+		afname = "Internet6";
+		break;
+#endif /* INET6 */
 	case AF_NS:
 		afname = "XNS";
 		break;
@@ -295,6 +300,21 @@ p_sockaddr(sa, flags, width)
 	    }
 
 #ifndef SMALL
+#ifdef INET6
+	case AF_INET6:
+	    {
+		struct sockaddr_in6 *sin = (struct sockaddr_in6 *)sa;
+
+		cp = (sin->sin6_addr.s6_addr32[0] == 0 &&
+		      sin->sin6_addr.s6_addr32[1] == 0 &&
+		      sin->sin6_addr.s6_addr32[2] == 0 &&
+		      sin->sin6_addr.s6_addr32[3] == 0) ? "default" :
+			((flags & RTF_HOST) ?
+			routename(sa) :	netname(sa));
+		break;
+	    }
+#endif /* INET6 */
+
 	case AF_NS:
 		cp = ns_print((struct sockaddr_ns *)sa);
 		break;

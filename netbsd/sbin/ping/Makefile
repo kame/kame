@@ -6,5 +6,10 @@ MAN=	ping.8
 BINOWN=	root
 BINMODE=4555
 LDADD=	-lm
+CPPFLAGS+=	-DIPSEC
+LDADD+= -L${.CURDIR}/../../src/libipsec -L${.CURDIR}/../../src/libipsec/obj \
+	-L/usr/local/v6/lib -lipsec
+LDADD+= -L${.CURDIR}/../../src/libinet6 -L${.CURDIR}/../../src/libinet6/obj \
+	-L/usr/local/v6/lib -linet6
 
 .include <bsd.prog.mk>

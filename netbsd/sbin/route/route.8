@@ -137,8 +137,9 @@ When the address family is specified by any of the
 .Fl osi ,
 .Fl xns ,
 .Fl atalk ,
+.Fl inet ,
 or
-.Fl inet
+.Fl inet6
 modifiers, only routes having destinations with addresses in the
 delineated family will be deleted.
 .Pp
@@ -230,6 +231,8 @@ The implicit network mask generated in the
 .Dv AF_INET
 case
 can be overridden by making sure this option follows the destination parameter.
+.Fl prefixlen
+is also available for similar purpose, in IPv6 case.
 .Pp
 Routes have associated flags which influence operation of the protocols
 when sending to destinations matched by the routes.
@@ -351,3 +354,16 @@ command appeared in
 The first paragraph may have slightly exaggerated
 .Xr routed 8 Ns 's
 abilities.
+.Pp
+Some uses of the
+.Fl ifa
+or
+.Fl ifp
+modifiers with the add command will incorrectly fail with a
+.Dq Network is unreachable
+message if there is no default route.
+See case
+.Dv RTM_ADD
+in
+.Pa sys/net/rtsock.c:route_output
+for details.

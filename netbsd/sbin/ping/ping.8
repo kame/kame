@@ -50,6 +50,9 @@ packets to network hosts
 .Op Fl c Ar count
 .Ek
 .Bk -words
+.Op Fl E Ar policy
+.Ek
+.Bk -words
 .Op Fl g Ar gateway
 .Ek
 .Bk -words
@@ -110,6 +113,19 @@ Set the
 .Dv Don't Fragment
 bit in the IP header.
 This can be used to determine the path MTU.
+.It Fl E Ar policy
+Use IPsec policy specification string
+.Ar policy
+for packets.
+For the format of specification string, please refer
+.Xr ipsec_set_policy 3 .
+Please note that this option is same as
+.Fl P
+in KAME/FreeBSD and KAME/BSDI
+.Po
+.Fl P
+was already occupied in NetBSD
+.Pc .
 .It Fl f
 Flood ping.
 Outputs packets as fast as they come back or one hundred times per second,
@@ -452,3 +468,4 @@ The
 .Nm
 command appeared in
 .Bx 4.3 .
+IPsec support was added by WIDE/KAME project.

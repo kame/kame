@@ -1,5 +1,38 @@
 /*	$NetBSD: rlogind.c,v 1.18 1998/08/29 17:31:56 tsarna Exp $	*/
 
+/*
+ * Copyright (C) 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *    This product includes software developed by WIDE Project and
+ *    its contributors.
+ * 4. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 /*-
  * Copyright (c) 1983, 1988, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -95,15 +128,28 @@ int	log_success = 0;
 
 struct	passwd *pwd;
 
-void	doit __P((int, struct sockaddr_in *));
+union sockunion {
+	struct sockinet {
+		u_char si_len;
+		u_char si_family;
+		u_short si_port;
+	} su_si;
+	struct sockaddr_in  su_sin;
+	struct sockaddr_in6 su_sin6;
+};
+#define su_len		su_si.si_len
+#define su_family	su_si.si_family
+#define su_port		su_si.si_port
+
+void	doit __P((int, union sockunion *));
 int	control __P((int, char *, int));
 void	protocol __P((int, int));
 void	cleanup __P((int));
 void	fatal __P((int, char *, int));
-int	do_rlogin __P((struct sockaddr_in *, char *));
+int	do_rlogin __P((union sockunion *, char *));
 void	getstr __P((char *, int, char *));
 void	setup_term __P((int));
-int	do_krb_login __P((struct sockaddr_in *));
+int	do_krb_login __P((union sockunion *));
 void	usage __P((void));
 int	local_domain __P((char *));
 char	*topdomain __P((char *));
@@ -115,7 +161,7 @@ main(argc, argv)
 	char *argv[];
 {
 	extern int __check_rhosts_file;
-	struct sockaddr_in from;
+	union sockunion from;
 	int ch, fromlen, on;
 
 	openlog("rlogind", LOG_PID, LOG_AUTH);
@@ -143,7 +189,7 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
-	fromlen = sizeof (from);
+	fromlen = sizeof (from); /* xxx */
 	if (getpeername(0, (struct sockaddr *)&from, &fromlen) < 0) {
 		syslog(LOG_ERR,"Can't get peer name of remote host: %m");
 		fatal(STDERR_FILENO, "Can't get peer name of remote host", 1);
@@ -152,9 +198,13 @@ main(argc, argv)
 	if (keepalive &&
 	    setsockopt(0, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof (on)) < 0)
 		syslog(LOG_WARNING, "setsockopt (SO_KEEPALIVE): %m");
-	on = IPTOS_LOWDELAY;
-	if (setsockopt(0, IPPROTO_IP, IP_TOS, (char *)&on, sizeof(int)) < 0)
-		syslog(LOG_WARNING, "setsockopt (IP_TOS): %m");
+#if defined(IP_TOS)
+	if (from.su_family == AF_INET) {
+		on = IPTOS_LOWDELAY;
+		if (setsockopt(0, IPPROTO_IP, IP_TOS, (char *)&on, sizeof(int)) < 0)
+			syslog(LOG_WARNING, "setsockopt (IP_TOS): %m");
+	}
+#endif
 	doit(0, &from);
 	/* NOTREACHED */
 #ifdef __GNUC__
@@ -173,15 +223,19 @@ struct winsize win = { 0, 0, 0, 0 };
 void
 doit(f, fromp)
 	int f;
-	struct sockaddr_in *fromp;
+	union sockunion *fromp;
 {
 	int master, pid, on = 1;
 	int authenticated = 0;
 	struct hostent *hp;
+	int error;
 	char utmphost[UT_HOSTSIZE + 1];
 	char *hostname;
 	char hostnamebuf[2 * MAXHOSTNAMELEN + 1];
 	char c;
+	char nameinfo[INET6_ADDRSTRLEN];
+	int af = fromp->su_family, alen;
+	char *addr;
 
 	alarm(60);
 	read(f, &c, 1);
@@ -190,9 +244,24 @@ doit(f, fromp)
 		exit(1);
 
 	alarm(0);
-	fromp->sin_port = ntohs((in_port_t)fromp->sin_port);
-	hp = gethostbyaddr((char *)&fromp->sin_addr, sizeof(struct in_addr),
-	    fromp->sin_family);
+	fromp->su_port = ntohs((u_short)fromp->su_port);
+	switch (af) {
+	case AF_INET:
+		alen = sizeof(struct in_addr);
+		addr = (char *)&fromp->su_sin.sin_addr;
+		break;
+	case AF_INET6:
+		alen = sizeof(struct in6_addr);
+		addr = (char *)&fromp->su_sin6.sin6_addr;
+		break;
+	default:
+		syslog(LOG_ERR, "malformed \"from\" address (af %d)\n", af);
+		exit(1);
+	}
+	getnameinfo((struct sockaddr *)fromp, fromp->su_len,
+		    nameinfo, sizeof(nameinfo), NULL, 0, NI_NUMERICHOST);
+
+	hp = gethostbyaddr(addr, alen, af);
 	if (hp) {
 		/*
 		 * If name returned by gethostbyaddr is in our domain,
@@ -205,24 +274,24 @@ doit(f, fromp)
 			strncpy(hostnamebuf, hp->h_name,
 			    sizeof(hostnamebuf) - 1);
 			hostnamebuf[sizeof(hostnamebuf) - 1] = 0;
-			hp = gethostbyname(hostnamebuf);
+			hp = gethostbyname2(hostnamebuf, af);
 			if (hp == NULL) {
 				syslog(LOG_INFO,
 				    "Couldn't look up address for %s",
 				    hostnamebuf);
-				hostname = inet_ntoa(fromp->sin_addr);
+				hostname = nameinfo;
 			} else for (; ; hp->h_addr_list++) {
 				if (hp->h_addr_list[0] == NULL) {
 					syslog(LOG_NOTICE,
 					  "Host addr %s not listed for host %s",
-					    inet_ntoa(fromp->sin_addr),
+					    nameinfo,
 					    hp->h_name);
-					hostname = inet_ntoa(fromp->sin_addr);
+					hostname = nameinfo;
 					break;
 				}
 				if (!memcmp(hp->h_addr_list[0],
-				    (caddr_t)&fromp->sin_addr,
-				    sizeof(fromp->sin_addr))) {
+				    addr,
+				    alen)) {
 					hostname = hp->h_name;
 					break;
 				}
@@ -231,7 +300,7 @@ doit(f, fromp)
 		hostname = strncpy(hostnamebuf, hostname,
 				   sizeof(hostnamebuf) - 1);
 	} else
-		hostname = strncpy(hostnamebuf, inet_ntoa(fromp->sin_addr),
+		hostname = strncpy(hostnamebuf, nameinfo,
 				   sizeof(hostnamebuf) - 1);
 
 	hostnamebuf[sizeof(hostnamebuf) - 1] = '\0';
@@ -239,19 +308,21 @@ doit(f, fromp)
 	if (strlen(hostname) < sizeof(utmphost))
 		(void)strcpy(utmphost, hostname);
 	else
-		(void)strncpy(utmphost, inet_ntoa(fromp->sin_addr),
-				sizeof(utmphost));
+		(void)strncpy(utmphost, hostname, sizeof(utmphost));
 	utmphost[sizeof(utmphost) - 1] = '\0';
 
-	if (fromp->sin_family != AF_INET ||
-	    fromp->sin_port >= IPPORT_RESERVED ||
-	    fromp->sin_port < IPPORT_RESERVED/2) {
+	if ((fromp->su_family != AF_INET && fromp->su_family != AF_INET6) ||
+	    fromp->su_port >= IPPORT_RESERVED ||
+	    fromp->su_port < IPPORT_RESERVED/2) {
+		error = getnameinfo((struct sockaddr *)fromp, fromp->su_len,
+				  nameinfo, sizeof(nameinfo), NULL, 0,
+				  NI_NUMERICHOST);
 		syslog(LOG_NOTICE, "Connection from %s on illegal port",
-			inet_ntoa(fromp->sin_addr));
+		       nameinfo);
 		fatal(f, "Permission denied", 0);
 	}
 #ifdef IP_OPTIONS
-	{
+	if (fromp->su_family == AF_INET) {
 		u_char optbuf[BUFSIZ/3], *cp;
 		char lbuf[BUFSIZ], *lp;
 		int optsize = sizeof(optbuf), ipproto;
@@ -306,7 +377,7 @@ doit(f, fromp)
 		fatal(STDERR_FILENO, _PATH_LOGIN, 1);
 		/*NOTREACHED*/
 	}
-		ioctl(f, FIONBIO, &on);
+	ioctl(f, FIONBIO, &on);
 	ioctl(master, FIONBIO, &on);
 	ioctl(master, TIOCPKT, &on);
 	signal(SIGCHLD, cleanup);
@@ -538,11 +609,13 @@ fatal(f, msg, syserr)
 
 int
 do_rlogin(dest, host)
-	struct sockaddr_in *dest;
+	union sockunion *dest;
 	char *host;
 {
 	extern char *__rcmd_errstr;	/* syslog hook from libc/net/rcmd.c */
 	int retval;
+	int af;
+	char *addr = NULL;
 
 	getstr(rusername, sizeof(rusername), "remuser too long");
 	getstr(lusername, sizeof(lusername), "locuser too long");
@@ -554,8 +627,17 @@ do_rlogin(dest, host)
 		    "%s@%s as %s: unknown login.", rusername, host, lusername);
 		return (-1);
 	}
-	retval = iruserok(dest->sin_addr.s_addr, pwd->pw_uid == 0, rusername,
-			    lusername);
+
+	af = dest->su_family;
+	switch (af) {
+	case AF_INET:
+		addr = (char *)&dest->su_sin.sin_addr;
+		break;
+	case AF_INET6:
+		addr = (char *)&dest->su_sin6.sin6_addr;
+		break;
+	}
+	retval = iruserok_af(addr, pwd->pw_uid == 0, rusername, lusername, af);
 /* XXX put inet_ntoa(dest->sin_addr.s_addr) into all messages below */
 	if (retval == 0) {
 		if (log_success)
