@@ -364,14 +364,14 @@ getifaddrs(struct ifaddrs **pif)
 		ift->ifa_next = NULL;
 		*pif = ifa;
 	} else {
+		*pif = NULL;
+		free(ifa);
+	}
+	return (0);
 }
 
 void
 freeifaddrs(struct ifaddrs *ifp)
 {
 	free(ifp);
-		*pif = NULL;
-		free(ifa);
-	}
-	return (0);
 }
