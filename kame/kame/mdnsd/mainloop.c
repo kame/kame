@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.3 2000/05/21 03:53:31 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.4 2000/05/21 05:15:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -323,6 +323,8 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs)
 			    ifa->ifa_addr->sa_family == AF_INET6)
 				break;
 			continue;
+		default:
+			goto fail;
 		}
 
 		switch (ifa->ifa_addr->sa_family) {
@@ -381,8 +383,8 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs)
 		p += sizeof(u_int16_t);
 		*(u_int16_t *)p = htons(nclass);
 		p += sizeof(u_int16_t);
-		*(u_int32_t *)p = htonl(30);	/*TTL*/
-		p += sizeof(u_int32_t);
+		*(int32_t *)p = htonl(30);	/*TTL*/
+		p += sizeof(int32_t);
 		*(u_int16_t *)p = htons(alen);
 		p += sizeof(u_int16_t);
 		memcpy(p, abuf, alen);
@@ -419,7 +421,7 @@ serve(buf, len, from)
 	const char *n = NULL;
 	u_int16_t type, class;
 	const char *d;
-	char *p;
+	char *p, *q;
 	char replybuf[8 * 1024];
 	int l;
 	int count;
@@ -442,51 +444,87 @@ serve(buf, len, from)
 	d += 4;		/* "d" points to end of question section */
 	if (class != C_IN)
 		goto fail;
-	switch (type) {
-	case T_A:
-	case T_AAAA:
-	case T_ANY:
-		break;
-	default:
-		goto fail;
-	}
 
 	/* validate hostname for forward query  XXX reverse query*/
 	printf("%s %s %u %u\n", hostname, n, type, class);
-	if (strcmp(hostname, n) == 0)
-		;
-	else if (strlen(hostname) + 1 == strlen(n) &&
-		 strncmp(hostname, n, strlen(hostname)) == 0)
-		;
-	else
-		goto fail;
+	if (strcmp(hostname, n) == 0 ||
+	    (strlen(hostname) + 1 == strlen(n) &&
+	     strncmp(hostname, n, strlen(hostname)) == 0)) {
+		/* advertise my name */
+		memcpy(replybuf, buf, d - buf);
+		hp = (HEADER *)replybuf;
+		p = replybuf + (d - buf);
+		hp->qr = 1;	/* it is response */
+		hp->aa = 1;	/* authoritative answer */
+		hp->ra = 0;	/* recursion not available */
+		hp->rcode = NOERROR;
 
-	/* construct reply packet */
-	memcpy(replybuf, buf, d - buf);
-	hp = (HEADER *)replybuf;
-	p = replybuf + (d - buf);
-	hp->qr = 1;	/* it is response */
-	hp->aa = 1;	/* authoritative answer */
-	hp->ra = 0;	/* recursion not available */
-	hp->rcode = NOERROR;
+		count = 0;
+		l = encode_myaddrs(n, type, class, replybuf, d - buf,
+		    sizeof(replybuf), &count);
+		if (l < 0)
+			goto fail;
+		p += l;
+		hp->ancount = htons(count);
 
-	count = 0;
-	l = encode_myaddrs(n, type, class, replybuf, d - buf, sizeof(replybuf),
-	    &count);
-	if (l < 0)
-		goto fail;
-	p += l;
-	hp->ancount = htons(count);
+		hexdump(replybuf, p - replybuf, from);
 
-	hexdump(replybuf, p - replybuf, from);
+		sendto(insock, replybuf, p - replybuf, 0, from, from->sa_len);
 
-	sendto(insock, replybuf, p - replybuf, 0, from, from->sa_len);
+		if (n) {
+			/* LINTED const cast */
+			free((char *)n);
+		}
+		return 0;
+	} else if (type == T_SRV && dnsserv &&
+		   strcmp("_dns._udp.lcl.", n) == 0) {
+		/* advert DNS server */
+		memcpy(replybuf, buf, d - buf);
+		hp = (HEADER *)replybuf;
+		p = replybuf + (d - buf);
+		hp->qr = 1;	/* it is response */
+		hp->aa = 1;	/* authoritative answer */
+		hp->ra = 0;	/* recursion not available */
+		hp->rcode = NOERROR;
 
-	if (n) {
-		/* LINTED const cast */
-		free((char *)n);
+		/* answers section */
+		if (encode_name(&p, sizeof(replybuf) - (p - replybuf), n)
+				== NULL) {
+			goto fail;
+		}
+		/* XXX alignment */
+		*(u_int16_t *)p = htons(type);
+		p += sizeof(u_int16_t);
+		*(u_int16_t *)p = htons(class);
+		p += sizeof(u_int16_t);
+		*(int32_t *)p = htonl(30);	/*TTL*/
+		p += sizeof(int32_t);
+		q = p;
+		*(u_int16_t *)p = htons(0);	/*filled later*/
+		p += sizeof(u_int16_t);
+		*(u_int16_t *)p = htons(0);	/*priority*/
+		p += sizeof(u_int16_t);
+		*(u_int16_t *)p = htons(0);	/*weight*/
+		p += sizeof(u_int16_t);
+		*(u_int16_t *)p = htons(53);	/*port*/
+		p += sizeof(u_int16_t);
+		if (encode_name(&p, sizeof(replybuf) - (p - replybuf), dnsserv)
+				== NULL) {
+			goto fail;
+		}
+		*(u_int16_t *)q = htons(p - q - sizeof(u_int16_t));
+		hp->ancount = htons(1);
+
+		hexdump(replybuf, p - replybuf, from);
+
+		sendto(insock, replybuf, p - replybuf, 0, from, from->sa_len);
+
+		if (n) {
+			/* LINTED const cast */
+			free((char *)n);
+		}
+		return 0;
 	}
-	return 0;
 
 fail:
 	if (n) {

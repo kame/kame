@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.2 2000/05/21 03:20:04 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.3 2000/05/21 05:15:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -40,6 +40,7 @@
 #include <netdb.h>
 #include <err.h>
 #include <errno.h>
+#include <string.h>
 #include <ifaddrs.h>
 
 #include "mdnsd.h"
@@ -57,6 +58,7 @@ static int getsock0 __P((const struct addrinfo *));
 static int join __P((int, const char *));
 static int join0 __P((int, const struct addrinfo *));
 static int setif __P((int, const char *));
+static int iscanon __P((const char *));
 
 int
 main(argc, argv)
@@ -75,6 +77,10 @@ main(argc, argv)
 			af = AF_INET6;
 			break;
 		case 'd':
+			if (iscanon(optarg) == 0) {
+				errx(1, "%s: not a canonical name", optarg);
+				/*NOTREACHED*/
+			}
 			dnsserv = optarg;
 			break;
 		case 'i':
@@ -275,6 +281,38 @@ setif(s, iface)
 		errno = EAFNOSUPPORT;
 		return -1;
 	}
+}
+
+static int
+iscanon(n)
+	const char *n;
+{
+	struct addrinfo hints, *res;
+	int ret;
+
+	if (strlen(n) == 0)
+		return 0;
+	if (n[strlen(n) - 1] != '.')
+		return 0;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;		/*dummy*/
+	hints.ai_flags = AI_CANONNAME;
+	if (getaddrinfo(n, "0", &hints, &res) != 0)
+		return 0;
+	if (!res->ai_canonname) {
+		freeaddrinfo(res);
+		return 0;
+	}
+	if (strcmp(res->ai_canonname, n) == 0 ||
+	    (strlen(n) == strlen(res->ai_canonname) + 1 &&
+	     strncmp(res->ai_canonname, n, strlen(res->ai_canonname)) == 0))
+		ret = 1;
+	else
+		ret = 0;
+	freeaddrinfo(res);
+	return ret;
 }
 
 int
