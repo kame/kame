@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.369 2004/04/13 12:51:34 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.370 2004/06/10 18:20:39 suz Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -227,11 +227,11 @@ RFC3678: Socket Interface Extensions for Multicast Source Filters
     * works for kame/freebsd4, kame/netbsd, and kame/openbsd.
 RFC3736: Stateless Dynamic Host Configuration Protocol (DHCP) Service for IPv6
     * KAME's dhcp6 implementation contains the "stateless" subset of DHCPv6.
-draft-ietf-ipngwg-icmp-name-lookups-09: IPv6 Name Lookups Through ICMP
-draft-ietf-mobileip-ipv6-24.txt: Mobility Support in IPv6
-draft-ietf-mobileip-mipv6-ha-ipsec-06.txt: 
-	Using IPsec to Protect Mobile IPv6 Signaling between Mobile 
+RFC3775: Mobility Support in IPv6
+RFC3776: Using IPsec to Protect Mobile IPv6 Signaling between Mobile 
 	Nodes and Home Agents
+RFC3810: Multicast Listener Discovery Version 2 (MLDv2) for IPv6
+    * host-side implementation & router-side implementation (pim6sd).
 draft-chakrabarti-mobileip-mipext-advapi-02.txt:
 	Extension to Sockets API for Mobile IPv6
     * See section 6 about these MIP6 related issues.
@@ -248,7 +248,7 @@ draft-ietf-ipv6-scoping-arch-01.txt:
 draft-ietf-ipngwg-temp-addresses-v2-00.txt:
 	Privacy Extensions for Stateless Address Autoconfiguration in IPv6
     * a revised version of RFC 3041.
-draft-ietf-pim-sm-v2-new-08.txt
+draft-ietf-pim-sm-v2-new-09.txt
 	A revised version of RFC2362, which includes the IPv6 specific
 	packet format and protocol descriptions.
 draft-ietf-dnsext-mdns-03.txt: Multicast DNS
@@ -271,9 +271,6 @@ draft-itojun-ipv6-transition-abuse-01.txt:
     * See section 1.12.6 and 1.14 for more details.
 draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
     * no consideration is made against the use of routing headers and such.
-draft-vida-mld-v2-05.txt: Multicast Listener Discovery Version 2 (MLDv2) for IPv6
-    * host-side & router-side implementation on kame/freebsd4 and kame/netbsd.
-    * Multicast Source Filter works only for UDP packets.
 draft-ietf-dhc-lifetime-00.txt: Lifetime Option for DHCPv6
 
 1.2 Neighbor Discovery
