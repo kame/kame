@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.38 2002/11/01 03:31:29 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.39 2002/11/05 03:04:19 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -114,6 +114,8 @@ struct nlist nl[] = {
 #define N_MIP6_BC_LIST 2
 	{ "_mip6_unuse_hoa" },
 #define N_MIP6_UNUSE_HOA 3
+	{ "_mip6_preferred_ifnames" },
+#define N_MIP6_PREFERRED_IFNAMES 4
 	{ "" },
 };
 
@@ -288,7 +290,9 @@ main(argc, argv)
 
 	if (optind <= 1) {
 		struct mip6_config mip6_config;
+		struct mip6_preferred_ifnames preferred;
 		char *type = "corresponding node";
+		int i;
 
 		if (nl[N_MIP6_CONFIG].n_value == 0) {
 			fprintf(stderr, "mip6 not found\n");
@@ -297,6 +301,8 @@ main(argc, argv)
 		KREAD(nl[N_MIP6_CONFIG].n_value, &mip6_config, mip6_config);
 		switch (mip6_config.mcfg_type) {
 		case MIP6_CONFIG_TYPE_MOBILENODE:
+			KREAD(nl[N_MIP6_PREFERRED_IFNAMES].n_value,
+			      &preferred, struct mip6_preferred_ifnames);
 			type = "mobile node";
 			break;
 		case MIP6_CONFIG_TYPE_HOMEAGENT:
@@ -315,6 +321,16 @@ main(argc, argv)
 		printf("authentication sub-option: %s\n",
 		       mip6_config.mcfg_use_authdata ? "enable" : "disable");
 #endif
+		if (mip6_config.mcfg_type == MIP6_CONFIG_TYPE_MOBILENODE) {
+			printf("preferred IF names: ");
+			for (i = 0; i < 3; i++) {
+				if (preferred.mip6pi_ifname[i][0] == '\0')
+					break;
+				printf("%s%s", (i == 0 ? "" : ":"),
+				       preferred.mip6pi_ifname[i]);
+			}
+			printf("\n");
+		}
 		printf("debug: %s\n",
 		       mip6_config.mcfg_debug ? "enable" : "disable");
 	}
