@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.33 2000/05/11 07:22:28 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.34 2000/05/11 09:29:55 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -779,7 +779,7 @@ pfkey_timeover(iph2)
 /* send getspi message per ipsec protocol per remote address */
 /*
  * the local address and remote address in ph1handle are dealed
- * with destination and srouce address respectively.
+ * with destination address and source address respectively.
  * Because SPI is decided by responder.
  */
 int
@@ -1013,7 +1013,7 @@ pk_recvupdate(mhp)
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
 		plog(logp, LOCATION, NULL,
-			"inappropriate sadb acquire message passed.\n");
+			"inappropriate sadb update message passed.\n");
 		return -1;
 	}
 	msg = (struct sadb_msg *)mhp[0];
@@ -1185,7 +1185,7 @@ pk_recvadd(mhp)
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
 		plog(logp, LOCATION, NULL,
-			"inappropriate sadb acquire message passed.\n");
+			"inappropriate sadb add message passed.\n");
 		return -1;
 	}
 	msg = (struct sadb_msg *)mhp[0];
@@ -1297,7 +1297,7 @@ pk_recvacquire(mhp)
 	struct saprop *newpp = NULL;
 	int n;	/* # of phase 2 handler */
 
-	/* ignore this message becauase of local test mode. */
+	/* ignore this message because of local test mode. */
 	if (f_local)
 		return 0;
 
@@ -1516,7 +1516,7 @@ pk_recvdelete(mhp)
 	/* sanity check */
 	if (mhp[0] == NULL) {
 		plog(logp, LOCATION, NULL,
-			"inappropriate sadb acquire message passed.\n");
+			"inappropriate sadb delete message passed.\n");
 		return -1;
 	}
 	isakmp_info_send_d2_pf((struct sadb_msg *)mhp[0]);
@@ -1531,7 +1531,7 @@ pk_recvspdupdate(mhp)
 	/* sanity check */
 	if (mhp[0] == NULL) {
 		plog(logp, LOCATION, NULL,
-			"inappropriate sadb acquire message passed.\n");
+			"inappropriate sadb spdupdate message passed.\n");
 		return -1;
 	}
 
@@ -1553,7 +1553,7 @@ pk_recvspdadd(mhp)
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
 	 || mhp[SADB_X_EXT_POLICY] == NULL) {
 		plog(logp, LOCATION, NULL,
-			"inappropriate sadb acquire message passed.\n");
+			"inappropriate sadb spdadd message passed.\n");
 		return -1;
 	}
 	saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
@@ -1599,7 +1599,7 @@ pk_recvspddelete(mhp)
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
 	 || mhp[SADB_X_EXT_POLICY] == NULL) {
 		plog(logp, LOCATION, NULL,
-			"inappropriate sadb acquire message passed.\n");
+			"inappropriate sadb spddelete message passed.\n");
 		return -1;
 	}
 	saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
@@ -1635,7 +1635,7 @@ pk_recvspdget(mhp)
 	/* sanity check */
 	if (mhp[0] == NULL) {
 		plog(logp, LOCATION, NULL,
-			"inappropriate sadb acquire message passed.\n");
+			"inappropriate sadb spdget message passed.\n");
 		return -1;
 	}
 
@@ -1655,7 +1655,7 @@ pk_recvspddump(mhp)
 	/* sanity check */
 	if (mhp[0] == NULL) {
 		plog(logp, LOCATION, NULL,
-			"inappropriate sadb acquire message passed.\n");
+			"inappropriate sadb spddump message passed.\n");
 		return -1;
 	}
 
@@ -1703,7 +1703,7 @@ pk_recvspdflush(mhp)
 	/* sanity check */
 	if (mhp[0] == NULL) {
 		plog(logp, LOCATION, NULL,
-			"inappropriate sadb acquire message passed.\n");
+			"inappropriate sadb spdflush message passed.\n");
 		return -1;
 	}
 
@@ -1778,7 +1778,7 @@ addnewsp(mhp)
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
 	 || mhp[SADB_X_EXT_POLICY] == NULL) {
 		plog(logp, LOCATION, NULL,
-			"inappropriate sadb acquire message passed.\n");
+			"inappropriate sadb spd management message passed.\n");
 		return -1;
 	}
 
