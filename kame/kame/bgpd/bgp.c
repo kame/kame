@@ -170,11 +170,17 @@ connect_try(struct rpcb *bnp)
 
   if (bnp->rp_mode & BGPO_IFSTATIC) {
     struct in6_pktinfo *pktinfo;
-    struct cmsghdr     *cmsgp;
+#ifndef USE_RFC2292BIS
+    static struct cmsghdr     *cmsgp = NULL;
+#endif 
 
-    if ((cmsgp =
+#ifdef USE_RFC2292BIS
+    
+#else  /* old advanced API */
+    if (cmsgp == NULL &&
+	(cmsgp =
 	 (struct cmsghdr *)malloc(CMSG_SPACE(sizeof(struct in6_pktinfo))))
-	== 0)
+	== NULL)
       fatalx("<connect_try>: malloc");
 
     memset(cmsgp, 0, CMSG_SPACE(sizeof(struct in6_pktinfo)));
@@ -189,6 +195,7 @@ connect_try(struct rpcb *bnp)
 		   CMSG_SPACE(sizeof(struct in6_pktinfo)))
 	< 0)
       fatal("<connect_try>: setsockopt");
+#endif 
   }
 #endif /* ADVANCEDAPI */
 
