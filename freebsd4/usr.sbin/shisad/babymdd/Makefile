@@ -34,7 +34,7 @@ CFLAGS+= -I${.OBJDIR} -I${.CURDIR}/../../../kame/shisad
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6 -lssl -lcrypto
 
-MAN8=	mdd.8
+MAN8=	babymdd.8
 
 .PATH:	${SRCDIR}
 
