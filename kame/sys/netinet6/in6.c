@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.361 2004/02/05 10:09:23 suz Exp $	*/
+/*	$KAME: in6.c,v 1.362 2004/02/05 11:32:51 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -223,24 +223,8 @@ static int in6_ifinit __P((struct ifnet *, struct in6_ifaddr *,
 	struct sockaddr_in6 *, int));
 static void in6_unlink_ifa __P((struct in6_ifaddr *, struct ifnet *));
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-struct in6_multihead in6_multihead;	/* XXX BSS initialization */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 int	(*faithprefix_p)(struct in6_addr *);
-#endif
-#else
-/*
- * This structure is used to keep track of in6_multi chains which belong to
- * deleted interface addresses.
- */
-static LIST_HEAD(, multi6_kludge) in6_mk; /* XXX BSS initialization */
-
-struct multi6_kludge {
-	LIST_ENTRY(multi6_kludge) mk_entry;
-	struct ifnet *mk_ifp;
-	struct in6_multihead mk_head;
-};
-
 #endif
 
 /*
