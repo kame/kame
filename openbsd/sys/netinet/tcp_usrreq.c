@@ -554,11 +554,11 @@ tcp_ctloutput(op, so, level, optname, mp)
 	if (level != IPPROTO_TCP) {
 		switch (so->so_proto->pr_domain->dom_family) {
 #ifdef INET6
-		case AF_INET6:
+		case PF_INET6:
 			error = ip6_ctloutput(op, so, level, optname, mp);
 			break;
 #endif /* INET6 */
-		case AF_INET:
+		case PF_INET:
 			error = ip_ctloutput(op, so, level, optname, mp);
 			break;
 		default:
