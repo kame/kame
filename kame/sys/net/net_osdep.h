@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.20 2000/06/16 12:44:36 jinmei Exp $	*/
+/*	$KAME: net_osdep.h,v 1.21 2000/07/02 23:34:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -159,7 +159,7 @@
 #define if_name(ifp)	((ifp)->if_xname)
 #else
 struct ifnet;
-extern char *if_name __P((struct ifnet *));
+extern const char *if_name __P((struct ifnet *));
 #endif
 
 #ifdef __FreeBSD__
