@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.51 2001/06/14 09:07:19 sumikawa Exp $	*/
+/*	$KAME: icmp6.h,v 1.52 2001/06/14 11:24:12 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -303,8 +303,8 @@ struct nd_opt_hdr {		/* Neighbor discovery option header */
 #define ND_OPT_MTU			5
 #define ND_OPT_ADVINTERVAL		7	/* 2292bis-02 */
 #define ND_OPT_HOMEAGENT_INFO		8	/* 2292bis-02 */
-#deifne ND_OPT_SOURCE_ADDRLIST		9	/* will be renamed */
-#deifne ND_OPT_TARGET_ADDRLIST		10	/* will be renamed */
+#define ND_OPT_SOURCE_ADDRLIST		9	/* will be renamed */
+#define ND_OPT_TARGET_ADDRLIST		10	/* will be renamed */
 
 #define ND_OPT_ROUTE_INFO		200	/* draft-ietf-ipngwg-router-preference, not officially assigned yet */
 
