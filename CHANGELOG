@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1782 2001/07/18 12:32:22 jinmei Exp $
+$KAME: CHANGELOG,v 1.1783 2001/07/18 12:49:47 jinmei Exp $
 
 <200107>
+2001-07-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c (getaddrinfo): enabled
+	destination address reordering (that I introduced on July 3) by
+	default, and removed the environment variable knob.
+
 2001-07-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_free): if the reason for the
 	deletion is just garbage collection, and the neighbor is an active
