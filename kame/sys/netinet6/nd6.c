@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.102 2001/02/04 04:19:15 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.103 2001/02/04 04:19:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -762,7 +762,7 @@ regen_tmpaddr(ia6)
 		/*
 		 * This is a public autoconf address that has the same prefix
 		 * as ours.  If it is preferred, keep it.  We can't break the
-		 * loop here, because there is a still-preferred temporary
+		 * loop here, because there may be a still-preferred temporary
 		 * address with the prefix.
 		 */
 		if (it6->ia6_lifetime.ia6t_preferred == 0 ||
