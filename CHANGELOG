@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1042 2000/06/19 09:23:04 sakane Exp $
+$Id: CHANGELOG,v 1.1043 2000/06/19 09:50:51 jinmei Exp $
 
 <200006>
+2000-06-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput): corrected logic
+	of error detection for sooptcopyin(). This will fix the problem
+	that traditional RFC2292 compatible mode did not work for some
+	socket options (e.g. IPV6_PKTINFO) on freebsd[34].
+
 Mon Jun 19 18:23:15 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	A path name in configuration file is always complemented if it is
