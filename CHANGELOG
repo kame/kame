@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.303 1999/11/29 18:23:01 sakane Exp $
+$Id: CHANGELOG,v 1.304 1999/11/30 13:20:47 sumikawa Exp $
 
 <199911>
+Tue Nov 30 22:14:58 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd[23]/ports/sock5: add new port, SOCKS based translator by NEC
+
 Tue Nov 30 03:19:33 JST 1999 sakane@ydc.co.jp
 	* kame/sys/netkey/key.c,netinet6/ipsec.c:
 	Changed the order to select SA. the oldest SA is seleted in outbound
@@ -28,6 +31,7 @@ Fri Nov 26 19:50:19 JST 1999  itojun@iijlab.net
 Thu Nov 25 19:57:44 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd2/ports/openssh: IPv6-enable openssh.
 	  obtained from fujiwara@rcac.tdi.co.jp
+	* freebsd3/ports/ethereal: upgrade to 0.7.8.
 
 Thu Nov 25 18:37:59 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/in6_cksum.c: changed length-related argument
