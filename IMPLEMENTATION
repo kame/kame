@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.266 2001/08/28 12:05:48 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.267 2001/08/28 12:06:50 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -576,7 +576,7 @@ Routers periodically generate Router Advertisement packets.  To
 request an adjacent router to generate RA packet, a host can transmit
 Router Solicitation.  To generate an RS packet at any time, use the
 "rtsol" command.  The "rtsold" daemon is also available. "rtsold"
-generates Router Solicitation whenever necessary, and it works great
+generates Router Solicitation whenever necessary, and it works greatly
 for nomadic usage (notebooks/laptops).  If one wishes to ignore Router
 Advertisements, use sysctl to set net.inet6.ip6.accept_rtadv to 0.
 
