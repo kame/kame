@@ -171,11 +171,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		if (IN_MULTICAST(v4a) || IN_EXPERIMENTAL(v4a))
 			flags |= NI_NUMERICHOST;
 		v4a >>= IN_CLASSA_NSHIFT;
-#if 0
-		if (v4a == 0 || v4a == IN_LOOPBACKNET)
-#else
 		if (v4a == 0)
-#endif
 			flags |= NI_NUMERICHOST;			
 		break;
 #ifdef INET6
