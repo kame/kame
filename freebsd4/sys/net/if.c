@@ -1385,11 +1385,13 @@ if_allmulti(ifp, onswitch)
 {
 	int error = 0;
 	int s = splimp();
+	struct ifreq ifr;
 
 	if (onswitch) {
 		if (ifp->if_amcount++ == 0) {
 			ifp->if_flags |= IFF_ALLMULTI;
-			error = ifp->if_ioctl(ifp, SIOCSIFFLAGS, 0);
+			ifr.ifr_flags = ifp->if_flags;
+			error = ifp->if_ioctl(ifp, SIOCSIFFLAGS, &ifr);
 		}
 	} else {
 		if (ifp->if_amcount > 1) {
@@ -1397,7 +1399,8 @@ if_allmulti(ifp, onswitch)
 		} else {
 			ifp->if_amcount = 0;
 			ifp->if_flags &= ~IFF_ALLMULTI;
-			error = ifp->if_ioctl(ifp, SIOCSIFFLAGS, 0);
+			ifr.ifr_flags = ifp->if_flags;
+			error = ifp->if_ioctl(ifp, SIOCSIFFLAGS, &ifr);
 		}
 	}
 	splx(s);
@@ -1585,6 +1588,7 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 {
 	struct sockaddr_dl *sdl;
 	struct ifaddr *ifa;
+	struct ifreq ifr;
 
 	ifa = ifnet_addrs[ifp->if_index - 1];
 	if (ifa == NULL)
@@ -1613,9 +1617,11 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 	 */
 	if ((ifp->if_flags & IFF_UP) != 0) {
 		ifp->if_flags &= ~IFF_UP;
-		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, NULL);
+		ifr.ifr_flags = ifp->if_flags;
+		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, &ifr);
 		ifp->if_flags |= IFF_UP;
-		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, NULL);
+		ifr.ifr_flags = ifp->if_flags;
+		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, &ifr);
 	}
 	return (0);
 }
