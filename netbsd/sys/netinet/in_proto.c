@@ -146,6 +146,12 @@
 #include <netinet/ip_gre.h>
 #endif
 
+#ifdef NATPT
+void	natpt_init	__P((void));
+int	natpt_usrreq	__P((struct socket *, int,
+			     struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
+#endif /* NATPT */
+
 extern	struct domain inetdomain;
 
 struct protosw inetsw[] = {
@@ -254,6 +260,13 @@ struct protosw inetsw[] = {
   0,		0,		0,		0,
 },
 #endif /* NSIP */
+#ifdef NATPT
+{ SOCK_RAW,	&inetdomain,	IPPROTO_AHIP,	PR_ATOMIC|PR_ADDR,
+  0,		0,		0,		0,
+  natpt_usrreq,
+  natpt_init,	0,		0,		0,
+},
+#endif /* NATPT */
 /* raw wildcard */
 { SOCK_RAW,	&inetdomain,	0,		PR_ATOMIC|PR_ADDR,
   rip_input,	rip_output,	0,		rip_ctloutput,

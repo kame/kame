@@ -613,13 +613,13 @@ file netinet6/ipcomp_core.c		ipsec
 file netinet6/ipcomp_input.c		ipsec
 file netinet6/ipcomp_output.c		ipsec
 file netinet6/ip6_fw.c			ipv6firewall
-file netinet6/ptr_dispatch.c		inet6 & ptr
-file netinet6/ptr_list.c		inet6 & ptr
-file netinet6/ptr_log.c			inet6 & ptr
-file netinet6/ptr_rule.c		inet6 & ptr
-file netinet6/ptr_trans.c		inet6 & ptr
-file netinet6/ptr_tslot.c		inet6 & ptr
-file netinet6/ptr_usrreq.c		inet6 & ptr
+file netinet6/natpt_dispatch.c		inet6 & natpt
+file netinet6/natpt_list.c		inet6 & natpt
+file netinet6/natpt_log.c		inet6 & natpt
+file netinet6/natpt_rule.c		inet6 & natpt
+file netinet6/natpt_trans.c		inet6 & natpt
+file netinet6/natpt_tslot.c		inet6 & natpt
+file netinet6/natpt_usrreq.c		inet6 & natpt
 file netpm/pm_aTT.c			pm
 file netpm/pm_ams.c			pm
 file netpm/pm_dispatch.c		pm

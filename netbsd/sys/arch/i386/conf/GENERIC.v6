@@ -28,8 +28,8 @@ pseudo-device	gif		4
 #options 	PM_USE_SOCKET		# Use socket instead of ioctl.
 #options 	PMDEBUG			# Enable debug feature.
 
-# Protocol Translator - may not work
-#options 	PTR
+# Network Address Translation - Protocol Translation (NAT-PT)
+#options         NATPT
 
 # a pseudo device needed for ALTQ
 pseudo-device	altq			# altq pseudo-device

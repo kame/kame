@@ -280,6 +280,13 @@ static	struct ip_srcrt {
 
 static void save_rte __P((u_char *, struct in_addr));
 
+#ifdef NATPT
+extern	int	ip6_protocol_tr;
+
+int	natpt_in4	__P((struct mbuf *, struct mbuf **));
+void	ip6_forward	__P((struct mbuf *, int));
+#endif /* NATPT */
+
 /*
  * IP initialization: fill in IP protocol switch table.
  * All protocols not implemented in kernel go to raw IP protocol handler.
@@ -476,6 +483,30 @@ ip_input(struct mbuf *m)
 			ip = mtod(m, struct ip *);
 		}
 #endif /* PFIL_HOOKS */
+
+#ifdef NATPT
+	if (ip6_protocol_tr)
+	{
+	    struct mbuf *m1 = NULL;
+
+	    switch (natpt_in4(m, &m1))
+	    {
+	      case IPPROTO_IP:					goto dooptions;
+	      case IPPROTO_IPV4:	ip_forward(m1, 0);	break;
+	      case IPPROTO_IPV6:	ip6_forward(m1, 1);	break;
+	      case IPPROTO_MAX:			/* discard this packet	*/
+	      default:						break;
+
+	      case IPPROTO_DONE:		/* discard without free	*/
+		return;
+	    }
+	    
+	    if (m != m1)
+		m_freem(m);
+	    return;
+	}
+  dooptions:
+#endif /* NATPT */
 
 	/*
 	 * Process options and, if not destined for us,

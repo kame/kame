@@ -148,7 +148,9 @@
 #define	M_IP6NDP	96	/* IPv6 Neighbour Discovery */
 #define	M_IP6RR		97	/* IPv6 Router Renumbering Prefix */
 #define	M_RR_ADDR	98	/* IPv6 Router Renumbering Ifid */
-#define	M_LAST		99	/* Must be last type + 1 */
+#define	M_PM		99	/* Packet Management by SuMiRe */
+#define	M_NATPT		100	/* Network Address Translation - Protocol Translation */
+#define	M_LAST		101	/* Must be last type + 1 */
 
 #define	INITKMEMNAMES { \
 	"free",		/* 0 M_FREE */ \
@@ -250,7 +252,9 @@
 	"NDP",		/* 96 M_IP6NDP */ \
 	"ip6rr",	/* 97 M_IP6RR */ \
 	"rp_addr",	/* 98 M_RR_ADDR */ \
-	NULL,		/* 99 */ \
+	"pm",		/* 99 M_PM */ \
+	"natpt",	/* 100 M_NATPT */ \
+	NULL,		/* 101 */ \
 }
 
 struct kmemstats {

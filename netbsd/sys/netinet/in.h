@@ -71,6 +71,7 @@
 #define IPPROTO_ICMPV6		58		/* ICMP6 */
 #define IPPROTO_NONE		59		/* IP6 no next header */
 #define IPPROTO_DSTOPTS		60		/* IP6 destination option */
+#define IPPROTO_AHIP		61		/* any host internal protocol */
 #define	IPPROTO_EON		80		/* ISO cnlp */
 #define	IPPROTO_ENCAP		98		/* encapsulation header */
 #define IPPROTO_PIM		103		/* Protocol indep. multicast */
