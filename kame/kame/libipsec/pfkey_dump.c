@@ -51,7 +51,7 @@
 #include "ipsec_strerror.h"
 
 #define GETMSGSTR(str, num) \
-{ \
+do { \
 	if (sizeof((str)[0]) == 0 \
 	 || num >= sizeof(str)/sizeof((str)[0])) \
 		printf("%d ", (num)); \
@@ -59,7 +59,7 @@
 		printf("%d ", (num)); \
 	else \
 		printf("%s ", (str)[(num)]); \
-}
+} while (0)
 
 #define GETAF(p) \
 	(((struct sockaddr *)(p))->sa_family)
