@@ -23,4 +23,8 @@ beforeinstall:
 		[ -d $(PREFIX)/man/cat$$i ] || mkdir -p $(PREFIX)/man/cat$$i; \
 	done
 
+afterinstall:
+	cp kame/rtadvd/rtadvd.conf $(PREFIX)/etc/rtadvd.conf.sample
+	cp kame/bgpd/bgpd.conf $(PREFIX)/etc/bgpd.conf.sample
+
 .include <bsd.subdir.mk>
