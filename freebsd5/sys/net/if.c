@@ -668,7 +668,6 @@ int
 if_clone_create(char *name, int len)
 {
 	struct if_clone *ifc;
-	struct ifnet *ifp;
 	char *dp;
 	int wildcard, bytoff, bitoff;
 	int unit;
@@ -733,12 +732,7 @@ if_clone_create(char *name, int len)
 	}
 
 	s = splimp();
-	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list)) {
-		if (ifp == ifunit(name)) {
-			if_attachdomain1(ifp);
-			break;
-		}
-	}
+	if_attachdomain1(ifunit(name));
 	splx(s);
 
 	return (0);

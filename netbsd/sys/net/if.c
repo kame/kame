@@ -750,7 +750,6 @@ if_clone_create(name)
 	const char *name;
 {
 	struct if_clone *ifc;
-	struct ifnet *ifp;
 	int unit;
 	int error;
 	int s;
@@ -767,12 +766,7 @@ if_clone_create(name)
 		return (error);
 
 	s = splnet();
-	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list)) {
-		if (strcmp(name, ifp->if_xname) == 0) {
-			if_attachdomain1(ifp);
-			break;
-		}
-	}
+	if_attachdomain1(ifunit(name));
 	splx(s);
 
 	return (error);
