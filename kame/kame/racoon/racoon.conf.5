@@ -143,7 +143,7 @@ defines my KEY_ID included ID payload.
 .Ss Timer Specification
 .Bl -tag -width Ds -compact
 .It Ic timer { Ar statements Ic }
-specifys default various timer.
+specifys various timer.
 .Pp
 .Bl -tag -width Ds -compact
 .It Ic counter Ar number ;
@@ -234,7 +234,10 @@ means a file name of secret key.
 .\"
 .It Ic lifetime time Ar number Ar timeunit ;
 .It Ic lifetime byte Ar number Ar byteunit ;
-define default lifetime of phase 1 SA.
+define each lifetime of time or bytes which are to be proposed on phase 1.
+Any proposal will be accepted, and the attribute(s) will be not proposed to
+the peer if you don't specify it(them).
+Their individually can be specified in each proposals.
 .\"
 .It Ic initial_contact (on \(ba off) ;
 enable to send INITIAL-CONTACT message.
@@ -242,7 +245,7 @@ default value is
 .Ic on .
 .\"
 .It Ic proposal_check Ar level ;
-specifies the action of lifetime length and PFS selection on the responder side.
+specifies the action of lifetime length and PFS of phase 2 selection on the responder side.
 default level is
 .Ic strict .
 If the
@@ -290,6 +293,7 @@ Default size is 16 bytes.
 .\"
 .It Ic encryption_algorithm Ar algorithm ;
 define encryption algorithm for phase 1 negotiation.
+This directive must be defined.
 .Ar algorithm
 is one of following:
 .Ic des , 3des , idea , blowfish , rc5 , cast
@@ -298,6 +302,7 @@ In the case of other transform, must not use this statement.
 .\"
 .It Ic hash_algorithm Ar algorithm;
 define hash algorithm for phase 1 negotiation.
+This directive must be defined.
 .Ar algorithm
 is one of following:
 .Ic md5, sha1
@@ -305,12 +310,14 @@ for oakley.
 .\"
 .It Ic authentication_method Ar type ;
 define the authentication method for phase 1 negotiation.
+This directive must be defined.
 .Ar type
 is only one:
 .Ic pre_shared_key, rsasig , dsssig , rsaenc , rsarev .
 .\"
 .It Ic dh_group Ar group ;
 define the group of Diffie-Hellman exponentiations.
+This directive must be defined.
 .Ar group
 is one of following:
 .Ic modp768 , modp1024 , modp1536 .
@@ -319,6 +326,11 @@ you must define same DH group in each proposals.
 .It Ic lifetime time Ar number Ar timeunit ;
 .It Ic lifetime byte Ar number Ar byteunit ;
 define lifetime of phase 1 SA eay proposal.
+Refer to the avobe description of
+.Ic lifetime
+directive immediately defined in
+.Ic remote
+directive.
 .El
 .El
 .El
@@ -344,17 +356,31 @@ or
 .\"
 .It Ic pfs_group Ar group ;
 define the group of Diffie-Hellman exponentiations.
+If you don't require PFS then you can ommit this direcitive.
+Any proposal will be accepted if you don't specify it.
 .Ar group
 is one of following:
 .Ic modp768 , modp1024 , modp1536 .
 .\"
 .It Ic lifetime time Ar number Ar timeunit ;
 .It Ic lifetime byte Ar number Ar byteunit ;
-define default lifetime of IPSec-SA.
+define each lifetime of time or bytes which are to be used IPsec-SA.
+Any proposal will be accepted, and the attribute(s) will be not proposed to
+the peer if you don't specify it(them).
+See
+.Ic proposal_check
+direcitive.
 .\"
 .It Ic identifier Ar idtype ;
 specifies ID type to use phase 2 negociation.
+the type of address is used as defualt.
+.El
 .\"
+.Pp
+Below three directives must be defined.
+The use each of them is decided by SPD.
+.\"
+.Bl -tag -width Ds -compact
 .It Ic encryption_algorithm Ar algorithms ;
 .Ic des , 3des , des_iv64 , des_iv32 ,
 .Ic rc5 , rc4 , idea , 3idea ,
@@ -362,6 +388,7 @@ specifies ID type to use phase 2 negociation.
 for esp.
 .\"
 .It Ic authentication_algorithm Ar algorithms ;
+.Ic des , 3des , des_iv64 , des_iv32 ,
 .Ic hmac_md5, hmac_sha1, non_auth
 for esp and ah.
 .\"
@@ -369,8 +396,6 @@ for esp and ah.
 .Ic deflate
 for ipcomp.
 .El
-Above three directives must be defined.
-The use each of them is decided by SPD.
 .El
 .\"
 .Ss Static SA configuration
@@ -381,7 +406,7 @@ This
 .Ar parameters
 will be passed to
 .Xr setkey 8 .
-Not yet, but only define.
+Not yet.
 .El
 .\"
 .Ss Specifying log file
