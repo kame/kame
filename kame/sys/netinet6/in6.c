@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.120 2000/12/12 10:54:06 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.121 2001/01/02 08:15:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -825,8 +825,10 @@ in6_update_ifa(ifp, ifra, ia)
 			oia->ia_next = ia;
 		} else
 			in6_ifaddr = ia;
+#ifdef __NetBSD__
 		/* gain a refcnt for the link from in6_ifaddr */
 		IFAREF(&ia->ia_ifa);
+#endif
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 		if ((ifa = ifp->if_addrlist) != NULL) {
@@ -839,8 +841,10 @@ in6_update_ifa(ifp, ifra, ia)
 		TAILQ_INSERT_TAIL(&ifp->if_addrlist, &ia->ia_ifa,
 				  ifa_list);
 #endif
+#ifdef __NetBSD__
 		/* gain another refcnt for the link from if_addrlist */
 		IFAREF(&ia->ia_ifa);
+#endif
 
 #ifdef MEASURE_PERFORMANCE
 		new_ifa = 1;
@@ -1110,8 +1114,10 @@ in6_unlink_ifa(ia, ifp)
 #else
 	TAILQ_REMOVE(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
 #endif
+#ifdef __NetBSD__
 	/* release a refcnt for the link from if_addrlist */
 	IFAFREE(&ia->ia_ifa);
+#endif
 
 	oia = ia;
 	if (oia == (ia = in6_ifaddr))
@@ -1142,8 +1148,10 @@ in6_unlink_ifa(ia, ifp)
 	in6h_delifa(oia);
 #endif
 
+#if 1
 	/* release another refcnt for the link from in6_ifaddr */
 	IFAFREE(&oia->ia_ifa);
+#endif
 
 	splx(s);
 }
