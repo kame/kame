@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.38 2000/04/21 11:37:27 jinmei Exp $	*/
+/*	$KAME: in_gif.c,v 1.39 2000/04/26 05:33:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -60,7 +60,6 @@
 
 #include <net/if.h>
 #include <net/route.h>
-#include <net/if_gif.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
