@@ -1787,11 +1787,14 @@ bgp_selectroute(rte, bnp)
 		if (orte->rt_flags & RTF_UP) {
 #ifdef DEBUG_BGP
 			syslog(LOG_NOTICE,
-			       "<%s>: %s/%d from %s was overwritten",
+			       "<%s>: %s/%d from %s was overwritten "
+			       "nexthop=(old:%s, new:%s)",
 			       __FUNCTION__,
 			       ip6str(&orte->rt_ripinfo.rip6_dest, 0),
 			       orte->rt_ripinfo.rip6_plen,
-			       bgp_peerstr(bnp));
+			       bgp_peerstr(bnp),
+			       ip6str(&orte->rt_bgw, 0),
+			       ip6str(&rte->rt_bgw, 0));
 #endif 
 			crte = *orte;
 			crte.rt_next = crte.rt_prev = &crte;
