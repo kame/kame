@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.25 2001/07/13 02:33:27 jinmei Exp $
+$KAME: FAQ,v 1.26 2001/07/13 03:09:45 jinmei Exp $
 
 
 GENERAL
@@ -62,15 +62,15 @@ Q: Why does KAME separate ping6 from ping (for IPv4), and traceroute6 from
 	command from the developer's standpoint.
 
 	From an operator's point of view: unlike ordinary network
-	applications like remote login tools, we are usually aware
-	of address family when using network management tools.  We
-	do not just want to know the reachability to the host, but
-	want to know the reachability to the host via a particular
-	network protocol such as IPv6.  Thus, even if we had a
-	unified ping(8) command for both IPv4 and IPv6, we would
-	usually type a -6 or -4 option (or something like those)
-	to specify the particular address family.  This essentially
-	means that we have two different commands.
+	applications like web, mail, and remote login tools, we are
+	usually aware of address family when using network management
+	tools.  We do not just want to know the reachability to the
+	host, but want to know the reachability to the host via a
+	particular network protocol such as IPv6.  Thus, even if we
+	had a unified ping(8) command for both IPv4 and IPv6, we would
+	usually type a -6 or -4 option (or something like those) to
+	specify the particular address family.  This essentially means
+	that we have two different commands.
 
 Q: Are there other documents/FAQ lists I may want to check?
 	- Depending on which BSD you are using, you will want to check the
