@@ -67,7 +67,7 @@ static int rrcmd2pco[RPM_PCO_MAX] = {0,
 				     SIOCCIFPREFIX_IN6,
 				     SIOCSGIFPREFIX_IN6
 				    };
-static int s;
+static int s = -1;
 
 /*
  * Check validity of a Prefix Control Operation(PCO).
@@ -200,7 +200,7 @@ do_pco(struct icmp6_router_renum *rr, int len, struct rr_pco_match *rpm)
 	if ((rr_pco_check(len, rpm) != NULL))
 		return 1;
 
-	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
+	if (s == -1 && (s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
 		syslog(LOG_ERR, "<%s> socket: %s", __FUNCTION__,
 		       strerror(errno));
 		exit(1);
