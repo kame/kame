@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1261 2000/09/10 07:17:39 jinmei Exp $
+$KAME: CHANGELOG,v 1.1262 2000/09/10 09:51:36 jinmei Exp $
 
 <200009>
+2000-09-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/pim6_proto.c (receive_pim6_join_prune):
+	improved the algorithm of random delay calculation; the result of
+	the previous algorithm was always 0 in spite of using random().
+        This fix was based on a comment from
+	Toshiaki.Nakatsu@fujixerox.co.jp.
+
 2000-09-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.c (pim6_input): added validation
 	for the IP version of inner packets.
