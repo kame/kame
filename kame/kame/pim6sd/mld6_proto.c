@@ -202,10 +202,12 @@ accept_listener_query(src, dst, group, tmo)
     if (v->uv_querier == NULL || inet6_equal(&v->uv_querier->al_addr, src))
     {
 	/*
-	 * This might be: - A query from a new querier, with a lower source
-	 * address than the current querier (who might be me) - A query from
-	 * a new router that just started up and doesn't know who the querier
-	 * is. - A query from the current querier
+	 * This might be:
+	 * - A query from a new querier, with a lower source address than
+	 *   the current querier (who might be me).
+	 * - A query from a new router that just started up and doesn't know
+	 *   who the querier is.
+	 * - A query from the current querier.
 	 */
 
 	if (inet6_lessthan(src, (v->uv_querier ? &v->uv_querier->al_addr
