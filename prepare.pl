@@ -10,6 +10,9 @@ die if (scalar(@ARGV) != 2);
 $src = $ARGV[0];
 $dst = $ARGV[1];
 
+die "$src not found" if (! -d $src);
+die "$dst not found" if (! -d $dst);
+
 &dig($src, "../$src", $dst);
 
 sub dig {
@@ -42,6 +45,11 @@ sub dig {
 		next if ($i eq 'CVS');
 		next if ($i =~ /\.orig$/);
 		next if ($i =~ /\.rej$/);
+
+		if ($exclude{$i}) {
+			print "exclude $dst/$i\n" if $debug;
+			next;
+		}
 		if (-d "$curdir/$i") {
 			&dig("$curdir/$i", "../$src/$i", "$dst/$i");
 		} elsif (-f "$curdir/$i") {
@@ -57,12 +65,8 @@ sub dig {
 					print "unlink $dst/$i (symlink)\n" if $debug;
 					unlink "$dst/$i";
 				}
-				if ($exclude{$i}) {
-					print "exclude $dst/$i\n" if $debug;
-				} else {
-					print "ln -s $src/$i $dst/$i\n" if $debug;
-					symlink "$src/$i", "$dst/$i" if (!$test);
-				}
+				print "ln -s $src/$i $dst/$i\n" if $debug;
+				symlink "$src/$i", "$dst/$i" if (!$test);
 			}
 		}
 	}
