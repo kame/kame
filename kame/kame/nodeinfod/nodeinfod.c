@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.26 2001/11/16 05:42:11 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.27 2002/01/11 08:36:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -134,10 +134,11 @@ main(argc, argv)
 	func[NI_QTYPE_NODEADDR] = ni6_input;
 	func[NI_QTYPE_IPV4ADDR] = ni6_input;
 
-	sockinit();
-	joingroups(hostname);
 	if (!foreground)
 		daemon(0, 0);
+
+	sockinit();
+	joingroups(hostname);
 	setkernmode(0);
 	mainloop();
 	exit(0);
