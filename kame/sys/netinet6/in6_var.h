@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.90 2003/10/15 00:20:52 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.91 2003/10/15 06:48:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -287,6 +287,10 @@ struct	in6_aliasreq {
 /*
  * prefix related flags passed between kernel(NDP related part) and
  * user land command(ifconfig) and daemon(rtadvd).
+ * Note: We originally intended to use prf_ra{} only within in6_prflags{}, but
+ * it was (probably unintentionally) used in nd6.h as well.  Since C++ does
+ * not allow such a reference, prf_ra{} was then moved outside.  In general,
+ * however, this structure should not be used directly.
  */
 struct prf_ra {
 	u_char onlink : 1;
