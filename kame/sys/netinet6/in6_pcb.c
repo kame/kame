@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.80 2000/12/04 09:08:21 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.81 2001/01/06 06:40:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -247,7 +247,7 @@ in6_pcbbind(in6p, nam)
 			/*
 			 * XXX: bind to an anycast address might accidentally
 			 * cause sending a packet with anycast source address.
-			 * We should allow to bind a deprecated address, since
+			 * We should allow to bind to a deprecated address, since
 			 * the application dare to use it.
 			 */
 			if (ia &&
