@@ -184,6 +184,7 @@ lzs		{ PREPROC; yylval.num = SADB_X_CALG_LZS; return(ALG_COMP); }
 {hyphen}m	{ PREPROC; return(F_MODE); }
 transport	{ PREPROC; yylval.num = IPSEC_MODE_TRANSPORT; return(MODE); }
 tunnel		{ PREPROC; yylval.num = IPSEC_MODE_TUNNEL; return(MODE); }
+{hyphen}u	{ PREPROC; return(F_REQID); }
 {hyphen}f	{ PREPROC; return(F_EXT); }
 random-pad	{ PREPROC; yylval.num = SADB_X_EXT_PRAND; return(EXTENSION); }
 seq-pad		{ PREPROC; yylval.num = SADB_X_EXT_PSEQ; return(EXTENSION); }

@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ipsec_set_policy.3,v 1.5 1999/10/20 00:21:06 sakane Exp $
+.\"     $Id: ipsec_set_policy.3,v 1.6 1999/11/04 00:34:15 sakane Exp $
 .\"
 .Dd May 5, 1998
 .Dt IPSEC_SET_POLICY 3
@@ -169,9 +169,9 @@ is the other node
 .Pp
 .Ar level
 must be set to one of the following: 
-.Li default , use
+.Li default , use , require
 or
-.Li require .
+.Li unique .
 .Li default
 means that the kernel should consult the system default policy
 defined by
@@ -191,6 +191,19 @@ or encrypted
 .Li require
 means that a relevant SA is required,
 since the kernel must perform IPsec operation against packets.
+.Li unique
+is the same as
+.Li require ,
+but adds the restriction that the SA for outbound traffic is used
+only for this policy.
+You may need the identifier in order to relate the policy and the SA
+when you define the SA by manual keying.
+You can put the decimal number as the identifier after
+.Li unique
+like
+.Li unique : number .
+.Li number
+must be between 1 and 32767 .
 If the
 .Ar request
 string is kept unambiguous,
@@ -221,8 +234,8 @@ Here are several examples
 in discard
 out ipsec esp/transport/10.1.1.1-10.1.1.2/require
 in ipsec ah/transport/10.1.1.2-10.1.1.1/require
-in ipsec esp/transport/10.1.1.2-10.1.1.1/use
-        ah/tunnel/10.1.1.2-10.1.1.1/require
+out ipsec esp/transport/10.1.1.2-10.1.1.1/use
+        ah/tunnel/10.1.1.2-10.1.1.1/unique:1000
 in ipsec ipcomp/transport/10.1.1.2-10.1.1.1/use
         esp/transport/10.1.1.2-10.1.1.1/use
 .Ed

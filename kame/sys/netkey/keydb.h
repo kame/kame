@@ -47,6 +47,8 @@ struct secasindex {
 	struct sockaddr_storage dst;	/* destination address for SA */
 	u_int16_t proto;		/* IPPROTO_ESP or IPPROTO_AH */
 	u_int8_t mode;			/* mode of protocol, see ipsec.h */
+	u_int32_t reqid;		/* reqid id who owned this SA */
+					/* see IPSEC_MANUAL_REQID_MAX. */
 };
 
 /* Security Association Data Base */

@@ -206,11 +206,11 @@ pfkey_sadump(m)
 	printf("mode=");
 	GETMSGSTR(_str_mode, m->sadb_msg_mode);
 
-	printf("spi=%u(0x%08x) replay=%u flags=0x%08x\n",
+	printf("spi=%u(0x%08x) reqid=%lu(0x%08x)\n",
 		(u_int32_t)ntohl(m_sa->sadb_sa_spi),
 		(u_int32_t)ntohl(m_sa->sadb_sa_spi),
-		m_sa->sadb_sa_replay,
-		m_sa->sadb_sa_flags);
+		(u_int32_t)m->sadb_msg_reqid,
+		(u_int32_t)m->sadb_msg_reqid);
 
 	/* encryption key */
 	if (m->sadb_msg_satype == SADB_X_SATYPE_IPCOMP) {
@@ -235,8 +235,13 @@ pfkey_sadump(m)
 		printf("\n");
 	}
 
+	/* replay windoe size & flags */
+	printf("\treplay=%u flags=0x%08x ",
+		m_sa->sadb_sa_replay,
+		m_sa->sadb_sa_flags);
+
 	/* state */
-	printf("\tstate=");
+	printf("state=");
 	GETMSGSTR(_str_state, m_sa->sadb_sa_state);
 
 	printf("seq=%lu pid=%lu\n",
@@ -286,7 +291,7 @@ pfkey_sadump(m)
 	}
 
 	/* XXX DEBUG */
-	printf("\trefcnt=%d\n", m->sadb_msg_reserved);
+	printf("\trefcnt=%lu\n", m->sadb_msg_reserved2);
 
 	return;
 }
@@ -365,7 +370,7 @@ pfkey_spdump(m)
 		(u_long)m->sadb_msg_pid);
 
 	/* XXX TEST */
-	printf("\trefcnt=%d\n", m->sadb_msg_reserved);
+	printf("\trefcnt=%lu\n", m->sadb_msg_reserved2);
 
 	return;
 }

@@ -104,12 +104,17 @@ any		{ return(ANY); }
 default		{ yylval.num = IPSEC_LEVEL_DEFAULT; return(LEVEL); }
 use		{ yylval.num = IPSEC_LEVEL_USE; return(LEVEL); }
 require		{ yylval.num = IPSEC_LEVEL_REQUIRE; return(LEVEL); }
+unique{colon}{decstring} {
+			yylval.val.len = strlen(yytext + 7);
+			yylval.val.buf = yytext + 7;
+			return(LEVEL_SPECIFY);
+		}
 unique		{ yylval.num = IPSEC_LEVEL_UNIQUE; return(LEVEL); }
 {slash}		{ return(SLASH); }
 
 {ipaddress}	{
 			yylval.val.len = strlen(yytext);
-			yylval.val.buf = strdup(yytext);
+			yylval.val.buf = yytext;
 			return(IPADDRESS);
 		}
 

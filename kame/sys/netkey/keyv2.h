@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: keyv2.h,v 1.9 1999/11/03 12:57:01 sakane Exp $ */
+/* $Id: keyv2.h,v 1.10 1999/11/04 00:32:25 sakane Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -86,9 +86,12 @@ struct sadb_msg {
   u_int8_t sadb_msg_satype;
   u_int16_t sadb_msg_len;
   u_int8_t sadb_msg_mode;	/* XXX */
-  u_int8_t sadb_msg_reserved;
+  u_int8_t sadb_msg_reserved1;
   u_int32_t sadb_msg_seq;
   u_int32_t sadb_msg_pid;
+  u_int32_t sadb_msg_reqid;	/* XXX */
+  				/* when policy mng, value is zero. */
+  u_int32_t sadb_msg_reserved2;
 };
 
 struct sadb_ext {
@@ -383,14 +386,16 @@ u_int pfkey_set_softrate __P((u_int type, u_int rate));
 u_int pfkey_get_softrate __P((u_int type));
 int pfkey_send_getspi __P((int so, u_int satype, u_int mode,
 	struct sockaddr *src, struct sockaddr *dst,
-	u_int32_t min, u_int32_t max, u_int32_t seq));
+	u_int32_t min, u_int32_t max, u_int32_t reqid, u_int32_t seq));
 int pfkey_send_update __P((int so, u_int satype, u_int mode,
-	struct sockaddr *src, struct sockaddr *dst, u_int32_t spi, u_int wsize,
+	struct sockaddr *src, struct sockaddr *dst, u_int32_t spi,
+	u_int32_t reqid, u_int wsize,
 	caddr_t keymat, u_int e_type, u_int e_keylen, u_int a_type,
 	u_int a_keylen, u_int flags, u_int32_t l_alloc, u_int64_t l_bytes,
 	u_int64_t l_addtime, u_int64_t l_usetime, u_int32_t seq));
 int pfkey_send_add __P((int so, u_int satype, u_int mode,
-	struct sockaddr *src, struct sockaddr *dst, u_int32_t spi, u_int wsize,
+	struct sockaddr *src, struct sockaddr *dst, u_int32_t spi,
+	u_int32_t reqid, u_int wsize,
 	caddr_t keymat, u_int e_type, u_int e_keylen, u_int a_type,
 	u_int a_keylen, u_int flags, u_int32_t l_alloc, u_int64_t l_bytes,
 	u_int64_t l_addtime, u_int64_t l_usetime, u_int32_t seq));

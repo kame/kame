@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: setkey.c,v 1.5 1999/10/26 09:39:37 sakane Exp $ */
+/* KAME $Id: setkey.c,v 1.6 1999/11/04 00:34:18 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -213,10 +213,12 @@ sendkeyshort(type)
 	m_msg->sadb_msg_errno = 0;
 	m_msg->sadb_msg_satype = SADB_SATYPE_UNSPEC;
 	m_msg->sadb_msg_len = PFKEY_UNIT64(m_len);
-	m_msg->sadb_msg_reserved = 0;
-	m_msg->sadb_msg_reserved = 0;
+	m_msg->sadb_msg_mode = IPSEC_MODE_ANY;
+	m_msg->sadb_msg_reserved1 = 0;
 	m_msg->sadb_msg_seq = 0;
 	m_msg->sadb_msg_pid = getpid();
+	m_msg->sadb_msg_reqid = 0;
+	m_msg->sadb_msg_reserved2 = 0;
 
 	sendkeymsg();
 
@@ -237,10 +239,12 @@ promisc()
 	m_msg->sadb_msg_errno = 0;
 	m_msg->sadb_msg_satype = 1;
 	m_msg->sadb_msg_len = PFKEY_UNIT64(m_len);
-	m_msg->sadb_msg_reserved = 0;
-	m_msg->sadb_msg_reserved = 0;
+	m_msg->sadb_msg_mode = IPSEC_MODE_ANY;
+	m_msg->sadb_msg_reserved1 = 0;
 	m_msg->sadb_msg_seq = 0;
 	m_msg->sadb_msg_pid = getpid();
+	m_msg->sadb_msg_reqid = 0;
+	m_msg->sadb_msg_reserved2 = 0;
 
 	if ((so = socket(PF_KEY, SOCK_RAW, PF_KEY_V2)) < 0) {
 		err(1, "socket(PF_KEY)");
@@ -323,8 +327,10 @@ sendkeymsg()
 	if (f_forever)
 		shortdump_hdr();
 again:
-	if (f_verbose)
+	if (f_verbose) {
 		kdebug_sadb((struct sadb_msg *)m_buf);
+		printf("\n");
+	}
 
 	if ((len = send(so, m_buf, m_len, 0)) < 0) {
 		perror("send");
@@ -343,8 +349,10 @@ again:
 			break;
 		}
 
-		if (f_verbose)
+		if (f_verbose) {
 			kdebug_sadb((struct sadb_msg *)rbuf);
+			printf("\n");
+		}
 		if (postproc(msg, len) < 0)
 			break;
 	} while (msg->sadb_msg_errno || msg->sadb_msg_seq);
@@ -421,8 +429,10 @@ postproc(msg, len)
 			pfkey_sadump(msg);
 		msg = (struct sadb_msg *)((caddr_t)msg +
 				     PFKEY_UNUNIT64(msg->sadb_msg_len));
-		if (f_verbose)
+		if (f_verbose) {
 			kdebug_sadb((struct sadb_msg *)msg);
+			printf("\n");
+		}
 		break;
 
 	case SADB_X_SPDDUMP:
@@ -430,8 +440,10 @@ postproc(msg, len)
 		if (msg->sadb_msg_seq == 0) break;
 		msg = (struct sadb_msg *)((caddr_t)msg +
 				     PFKEY_UNUNIT64(msg->sadb_msg_len));
-		if (f_verbose)
+		if (f_verbose) {
 			kdebug_sadb((struct sadb_msg *)msg);
+			printf("\n");
+		}
 		break;
 	}
 

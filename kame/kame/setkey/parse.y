@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.7 1999/10/27 17:08:57 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.8 1999/11/04 00:34:17 sakane Exp $ */
 
 %{
 #include <sys/types.h>
@@ -56,6 +56,7 @@ u_int32_t p_spi;
 struct sockaddr *p_src, *p_dst;
 u_int p_prefs, p_prefd, p_upper;
 u_int p_satype, p_ext, p_alg_enc, p_alg_auth, p_replay, p_mode;
+u_int32_t p_reqid;
 u_int p_key_enc_len, p_key_auth_len;
 caddr_t p_key_enc, p_key_auth;
 time_t p_lt_hard, p_lt_soft;
@@ -96,7 +97,7 @@ extern void yyerror __P((char *));
 %token IP4_ADDRESS IP6_ADDRESS PREFIX PORT PORTANY
 %token UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %token F_PROTOCOL F_AUTH F_ENC F_REPLAY F_COMP F_RAWCPI
-%token F_MODE MODE
+%token F_MODE MODE F_REQID
 %token F_EXT EXTENSION
 %token ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
 %token F_LIFETIME_HARD F_LIFETIME_SOFT
@@ -358,6 +359,7 @@ extension
 	:	F_EXT EXTENSION { p_ext |= $1.num; }
 	|	F_MODE MODE { p_mode = $2.num; }
 	|	F_MODE ANY { p_mode = IPSEC_MODE_ANY; }
+	|	F_REQID DECSTRING { p_reqid = $2.num; }
 	|	F_REPLAY DECSTRING
 		{
 			if (p_ext & SADB_X_EXT_OLD) {
@@ -522,9 +524,11 @@ setkeymsg()
 	m_msg.sadb_msg_errno = 0;
 	m_msg.sadb_msg_satype = p_satype;
 	m_msg.sadb_msg_mode = p_mode;
-	m_msg.sadb_msg_reserved = 0;
+	m_msg.sadb_msg_reserved1 = 0;
 	m_msg.sadb_msg_seq = 0;
 	m_msg.sadb_msg_pid = getpid();
+	m_msg.sadb_msg_reqid = p_reqid;
+	m_msg.sadb_msg_reserved2 = 0;
 
 	m_len = sizeof(struct sadb_msg);
 	memcpy(m_buf, &m_msg, m_len);
@@ -736,6 +740,7 @@ parse_init()
 	p_alg_enc = SADB_EALG_NONE;
 	p_alg_auth = SADB_AALG_NONE;
 	p_mode = IPSEC_MODE_ANY;
+	p_reqid = 0;
 	p_replay = 4;
 	p_key_enc_len = p_key_auth_len = 0;
 	p_key_enc = p_key_auth = 0;

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.24 1999/11/03 13:22:15 sakane Exp $ */
+/* KAME $Id: key.c,v 1.25 1999/11/04 00:32:24 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -234,10 +234,11 @@ typedef void (timeout_t)(void *);
  * set parameters into secasindex buffer.
  * Must allocate secasindex buffer before calling this function.
  */
-#define KEY_SETSECASIDX(p, m, s, d, idx) do {                                \
+#define KEY_SETSECASIDX(p, m, s, d, idx) do {                             \
 	bzero((idx), sizeof(struct secasindex));                             \
 	(idx)->proto = (p);                                                  \
-	(idx)->mode = (m);                                                   \
+	(idx)->mode = (m)->sadb_msg_mode;                                    \
+	(idx)->reqid = (m)->sadb_msg_reqid;                                  \
 	bcopy((s), &(idx)->src, ((struct sockaddr *)(s))->sa_len);           \
 	bcopy((d), &(idx)->dst, ((struct sockaddr *)(d))->sa_len);           \
 } while (0)
@@ -253,6 +254,7 @@ static struct secasvar *key_do_allocsa_policy __P((struct secashead *sah,
 						u_int state));
 static void key_delsp __P((struct secpolicy *sp));
 static struct secpolicy *key_getsp __P((struct secpolicyindex *spidx));
+static u_int32_t key_newreqid __P((void));
 static struct sadb_msg *key_spdadd __P((caddr_t *mhp));
 static struct sadb_msg *key_spddelete __P((caddr_t *mhp));
 static struct sadb_msg *key_spdflush __P((caddr_t *mhp));
@@ -278,7 +280,8 @@ static u_int key_setdumpsa __P((struct sadb_msg *newmsg, struct secasvar *sav,
 				u_int32_t seq, u_int32_t pid));
 static caddr_t key_setsadbmsg __P((caddr_t buf, u_int8_t type, int tlen,
 				u_int8_t satype, u_int32_t seq, pid_t pid,
-				u_int8_t reserved1, u_int8_t reserved2));
+				u_int8_t mode, u_int32_t reqid,
+				u_int8_t reserved1, u_int32_t reserved2));
 static caddr_t key_setsadbsa __P((caddr_t buf, struct secasvar *sav));
 static caddr_t key_setsadbaddr __P((caddr_t buf, u_int16_t exttype,
 	struct sockaddr *saddr, u_int8_t prefixlen, u_int16_t ul_proto));
@@ -968,6 +971,38 @@ key_msg2sp(xpl0, error)
 			case IPSEC_LEVEL_USE:
 			case IPSEC_LEVEL_REQUIRE:
 				break;
+			case IPSEC_LEVEL_UNIQUE:
+				/* validity check */
+				/*
+				 * If range violation of reqid, kernel will
+				 * update it, don't refuse it.
+				 */
+				if (xisr->sadb_x_ipsecrequest_reqid
+						> IPSEC_MANUAL_REQID_MAX) {
+					printf("key_msg2sp: reqid=%d "
+						"range violation, "
+						"updated by kernel.\n",
+						xisr->sadb_x_ipsecrequest_reqid);
+					xisr->sadb_x_ipsecrequest_reqid = 0;
+				}
+
+				/* allocate new reqid id if reqid is zero. */
+				if (xisr->sadb_x_ipsecrequest_reqid == 0) {
+					u_int32_t reqid;
+					if ((reqid = key_newreqid()) == 0) {
+						key_freesp(newsp);
+						*error = ENOBUFS;
+						return NULL;
+					}
+					(*p_isr)->saidx.reqid = reqid;
+					xisr->sadb_x_ipsecrequest_reqid = reqid;
+				} else {
+				/* set it for manual keying. */
+					(*p_isr)->saidx.reqid =
+						xisr->sadb_x_ipsecrequest_reqid;
+				}
+				break;
+
 			default:
 				printf("key_msg2sp: invalid level=%u\n",
 					xisr->sadb_x_ipsecrequest_level);
@@ -1042,6 +1077,19 @@ key_msg2sp(xpl0, error)
 	return newsp;
 }
 
+static u_int32_t
+key_newreqid()
+{
+	static u_int32_t auto_reqid = IPSEC_MANUAL_REQID_MAX + 1;
+
+	auto_reqid = (auto_reqid == ~0
+			? IPSEC_MANUAL_REQID_MAX + 1 : auto_reqid + 1);
+
+	/* XXX should be unique check */
+
+	return auto_reqid;
+}
+
 /*
  * copy secpolicy struct to sadb_x_policy structure indicated.
  */
@@ -1084,6 +1132,7 @@ key_sp2msg(sp)
 			xisr->sadb_x_ipsecrequest_proto = isr->saidx.proto;
 			xisr->sadb_x_ipsecrequest_mode = isr->saidx.mode;
 			xisr->sadb_x_ipsecrequest_level = isr->level;
+			xisr->sadb_x_ipsecrequest_reqid = isr->saidx.reqid;
 
 			p += sizeof(*xisr);
 			bcopy(&isr->saidx.src, p, isr->saidx.src.__ss_len);
@@ -1225,7 +1274,12 @@ key_spdadd(mhp)
 	newmsg->sadb_msg_len = PFKEY_UNIT64(len);
 	p = (caddr_t)newmsg + sizeof(*msg0);
 
+	/*
+	 * reqid may had been updated at key_msg2sp() if reqid's
+	 * range violation.
+	 */
 	p = key_setsadbext(p, mhp[SADB_X_EXT_POLICY]);
+
 	p = key_setsadbext(p, mhp[SADB_EXT_ADDRESS_SRC]);
 	p = key_setsadbext(p, mhp[SADB_EXT_ADDRESS_DST]);
 
@@ -1476,7 +1530,8 @@ key_setdumpsp(newmsg, sp, type, seq, pid)
 
 	p = key_setsadbmsg((caddr_t)newmsg, type, tlen,
 	                   SADB_SATYPE_UNSPEC, seq, pid,
-	                   IPSEC_MODE_ANY, sp->refcnt);
+	                   IPSEC_MODE_ANY, 0,
+			   0, sp->refcnt);
 
 	p = key_setsadbaddr(p,
 	                    SADB_EXT_ADDRESS_SRC,
@@ -2445,7 +2500,8 @@ key_setdumpsa(newmsg, sav, type, satype, seq, pid)
 
 	p = key_setsadbmsg((caddr_t)newmsg, type, tlen,
 	                   satype, seq, pid,
-	                   sav->sah->saidx.mode, sav->refcnt);
+	                   sav->sah->saidx.mode, sav->sah->saidx.reqid,
+			   0, sav->refcnt);
 
 	for (i = 1; i <= SADB_EXT_MAX; i++) {
 		switch (i) {
@@ -2523,14 +2579,17 @@ key_setdumpsa(newmsg, sav, type, satype, seq, pid)
  * `buf' must has been allocated sufficiently.
  */
 static caddr_t
-key_setsadbmsg(buf, type, tlen, satype, seq, pid, reserved1, reserved2)
+key_setsadbmsg(buf, type, tlen, satype, seq, pid, mode, reqid,
+		reserved1, reserved2)
 	caddr_t buf;
 	u_int8_t type, satype;
 	u_int16_t tlen;
 	u_int32_t seq;
 	pid_t pid;
+	u_int8_t mode;
+	u_int32_t reqid;
 	u_int8_t reserved1;
-	u_int8_t reserved2;
+	u_int32_t reserved2;
 {
 	struct sadb_msg *p;
 	u_int len;
@@ -2544,10 +2603,12 @@ key_setsadbmsg(buf, type, tlen, satype, seq, pid, reserved1, reserved2)
 	p->sadb_msg_errno = 0;
 	p->sadb_msg_satype = satype;
 	p->sadb_msg_len = PFKEY_UNIT64(tlen);
-	p->sadb_msg_mode = reserved1;
-	p->sadb_msg_reserved = reserved2;
+	p->sadb_msg_mode = mode;
+	p->sadb_msg_reserved1 = reserved1;
 	p->sadb_msg_seq = seq;
 	p->sadb_msg_pid = (u_int32_t)pid;
+	p->sadb_msg_reqid = reqid;
+	p->sadb_msg_reserved2 = reserved2;
 
 	return(buf + len);
 }
@@ -2814,7 +2875,7 @@ key_isloopback(family, addr)
  * compare two secasindex structure exactly.
  * IN:
  *	saidx0: source, it can be in SAD.
- *	saidx1: object, it can be from SPD.
+ *	saidx1: object.
  * OUT:
  *	1 : equal
  *	0 : not equal
@@ -2831,7 +2892,8 @@ key_cmpsaidx_exactly(saidx0, saidx1)
 		return 0;
 
 	if (saidx0->proto != saidx1->proto
-	 || saidx0->mode != saidx1->mode)
+	 || saidx0->mode != saidx1->mode
+	 || saidx0->reqid != saidx1->reqid)
 		return 0;
 
 	if (bcmp(&saidx0->src, &saidx1->src, saidx0->src.__ss_len) != 0
@@ -2865,6 +2927,11 @@ key_cmpsaidx_withmode(saidx0, saidx1)
 	if (saidx0->proto != saidx1->proto
 	 || saidx0->src.__ss_family != saidx1->src.__ss_family
 	 || saidx0->dst.__ss_family != saidx1->dst.__ss_family)
+		return 0;
+
+	/* If reqid of SPD is equal to 0, unique SA is required. */
+	if (saidx1->reqid != 0
+	 && saidx0->reqid != saidx1->reqid)
 		return 0;
 
 	if (saidx0->mode != IPSEC_MODE_ANY
@@ -3370,7 +3437,7 @@ key_getspi(mhp)
 		return NULL;
 	}
 
-	KEY_SETSECASIDX(proto, msg0->sadb_msg_mode, src0+1, dst0+1, &saidx);
+	KEY_SETSECASIDX(proto, msg0, src0+1, dst0+1, &saidx);
 
 	/* SPI allocation */
 	spi = key_do_getnewspi((struct sadb_spirange *)mhp[SADB_EXT_SPIRANGE],
@@ -3586,7 +3653,7 @@ key_update(mhp)
 	src0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
 
-	KEY_SETSECASIDX(proto, msg0->sadb_msg_mode, src0+1, dst0+1, &saidx);
+	KEY_SETSECASIDX(proto, msg0, src0+1, dst0+1, &saidx);
 
 	/* get a SA header */
 	if ((sah = key_getsah(&saidx)) == NULL) {
@@ -3757,7 +3824,7 @@ key_add(mhp)
 	src0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
 
-	KEY_SETSECASIDX(proto, msg0->sadb_msg_mode, src0+1, dst0+1, &saidx);
+	KEY_SETSECASIDX(proto, msg0, src0+1, dst0+1, &saidx);
 
 	/* get a SA header */
 	if ((newsah = key_getsah(&saidx)) == NULL) {
@@ -4014,7 +4081,7 @@ key_delete(mhp)
 	src0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
 
-	KEY_SETSECASIDX(proto, msg0->sadb_msg_mode, src0+1, dst0+1, &saidx);
+	KEY_SETSECASIDX(proto, msg0, src0+1, dst0+1, &saidx);
 
 	/* get a SA header */
 	if ((sah = key_getsah(&saidx)) == NULL) {
@@ -4117,7 +4184,7 @@ key_get(mhp)
 	src0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
 
-	KEY_SETSECASIDX(proto, msg0->sadb_msg_mode, src0+1, dst0+1, &saidx);
+	KEY_SETSECASIDX(proto, msg0, src0+1, dst0+1, &saidx);
 
 	/* get a SA header */
 	if ((sah = key_getsah(&saidx)) == NULL) {
@@ -4256,6 +4323,8 @@ key_acquire(saidx, spidx)
 	newmsg->sadb_msg_errno = 0;
 	newmsg->sadb_msg_satype = satype;
 	newmsg->sadb_msg_len = PFKEY_UNIT64(len);
+	newmsg->sadb_msg_mode = saidx->mode;
+	newmsg->sadb_msg_reqid = saidx->reqid;
 
 #ifndef IPSEC_NONBLOCK_ACQUIRE
 	newmsg->sadb_msg_seq = newacq->seq;
@@ -4518,7 +4587,7 @@ key_acquire2(mhp)
 	src0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
 
-	KEY_SETSECASIDX(proto, msg0->sadb_msg_mode, src0+1, dst0+1, &saidx);
+	KEY_SETSECASIDX(proto, msg0, src0+1, dst0+1, &saidx);
 
 	/* get a SA index */
 	if ((sah = key_getsah(&saidx)) != NULL) {
@@ -4798,7 +4867,8 @@ key_expire(sav)
 	/* set msg header */
 	p = key_setsadbmsg((caddr_t)newmsg, SADB_EXPIRE, len,
 	                   satype, sav->seq, 0,
-	                   sav->sah->saidx.mode, sav->refcnt);
+	                   sav->sah->saidx.mode, sav->sah->saidx.reqid,
+			   0, sav->refcnt);
 
 	/* create SA extension */
 	p = key_setsadbsa(p, sav);
@@ -4901,17 +4971,10 @@ key_flush(mhp)
 				nextsav = LIST_NEXT(sav, chain);
 
 				key_sa_chgstate(sav, SADB_SASTATE_DEAD);
-#if 0 /* XXX "sav" is only marked DEAD, and free later. */
-				key_freesav(sav);
-				sav = NULL;
-#endif
 			}
 		}
 
 		sah->state = SADB_SASTATE_DEAD;
-#if 0 /* XXX "sah" is only marked DEAD, and free later. */
-		key_delsah(sah);
-#endif
 	}
 
     {

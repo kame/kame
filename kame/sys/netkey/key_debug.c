@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: key_debug.c,v 1.5 1999/10/25 14:52:20 sakane Exp $ */
+/* KAME @(#)$Id: key_debug.c,v 1.6 1999/11/04 00:32:25 sakane Exp $ */
 
 #ifdef _KERNEL
 # ifndef KERNEL
@@ -105,9 +105,11 @@ kdebug_sadb(base)
 	printf("sadb_msg{ version=%u type=%u errno=%u satype=%u\n",
 	    base->sadb_msg_version, base->sadb_msg_type,
 	    base->sadb_msg_errno, base->sadb_msg_satype);
-	printf("  len=%u mode=%u reserved=%u seq=%u pid=%u }\n",
+	printf("  len=%u mode=%u seq=%u pid=%u reqid=%u\n",
 	    base->sadb_msg_len, base->sadb_msg_mode,
-	    base->sadb_msg_reserved, base->sadb_msg_seq, base->sadb_msg_pid);
+	    base->sadb_msg_seq, base->sadb_msg_pid, base->sadb_msg_reqid);
+	printf("  reserved1=%u reserved2=%u\n",
+	    base->sadb_msg_reserved1, base->sadb_msg_reserved2);
 
 	tlen = PFKEY_UNUNIT64(base->sadb_msg_len) - sizeof(struct sadb_msg);
 	ext = (struct sadb_ext *)((caddr_t)base + sizeof(struct sadb_msg));

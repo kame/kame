@@ -142,6 +142,17 @@ struct inpcbpolicy {
 #define	IPSEC_LEVEL_REQUIRE	2	/* require SA. */
 #define	IPSEC_LEVEL_UNIQUE	3	/* unique SA. */
 
+#define IPSEC_MANUAL_REQID_MAX	0x3fff
+				/*
+				 * if security policy level == unique, this id
+				 * indicate to a relative SA for use, else is
+				 * zero.
+				 * 1 - 0x3fff are reserved for manual keying.
+				 * 0 are reserved for above reason.  Others is
+				 * for kernel use.
+				 * Note that this id doesn't identify SA
+				 * by only itself.
+				 */
 #define IPSEC_REPLAYWSIZE  32
 
 /* statistics for ipsec processing */

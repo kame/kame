@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: setkey.8,v 1.14 1999/10/27 17:08:58 sakane Exp $
+.\"     $Id: setkey.8,v 1.15 1999/11/04 00:34:18 sakane Exp $
 .\"
 .Dd May 17, 1998
 .Dt SETKEY 8
@@ -226,6 +226,7 @@ attached
 .It Ar extensions
 takes some of the following:
 .Bl -tag -width Fl -compact 
+.\"
 .It Fl m Ar mode
 Specify an security protocol mode for use.  By default,
 .Li any .
@@ -234,20 +235,28 @@ is one of following:
 .Li transport , tunnel
 or
 .Li any .
+.\"
 .It Fl r Ar size
 Specify window size of bytes for replay prevention.
 .Ar size
 must be decimal number in 32-bit word.  If
 .Ar size
 is zero or not specified, replay check don't take place.
+.\"
+.It Fl u Ar id
+Specify the identifier of policy.  See also
+.Xr ipsec_set_policy 3 .
+.\"
 .It Fl f Ar pad_option
 .Ar pad_option
 is one of following:
 .Li zero-pad , random-pad
 or
 .Li seq-pad
+.\"
 .It Fl f Li cyclic-seq
 Allow cyclic sequence number.
+.\"
 .It Fl lh Ar time
 .It Fl ls Ar time
 Specify hard/soft lifetime.

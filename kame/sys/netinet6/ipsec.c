@@ -1172,6 +1172,7 @@ ipsec_deepcopy_policy(src)
 		(*q)->saidx.proto = p->saidx.proto;
 		(*q)->saidx.mode = p->saidx.mode;
 		(*q)->level = p->level;
+		(*q)->saidx.reqid = p->saidx.reqid;
 
 		bcopy(&p->saidx.src, &(*q)->saidx.src, sizeof((*q)->saidx.src));
 		bcopy(&p->saidx.dst, &(*q)->saidx.dst, sizeof((*q)->saidx.dst));
@@ -1451,7 +1452,7 @@ ipsec6_delete_pcbpolicy(in6p)
 
 /*
  * return current level.
- * IPSEC_LEVEL_USE or IPSEC_LEVEL_REQUIRE are always returned.
+ * Either IPSEC_LEVEL_USE or IPSEC_LEVEL_REQUIRE are always returned.
  */
 u_int
 ipsec_get_reqlevel(isr)
@@ -1466,11 +1467,13 @@ ipsec_get_reqlevel(isr)
 	if (isr->sp->spidx.src.__ss_family != isr->sp->spidx.dst.__ss_family)
 		panic("ipsec_get_reqlevel: family mismatched.\n");
 
-#define IPSEC_CHECK_DEFAULT(lev) \
-        (((lev) != IPSEC_LEVEL_USE && (lev) != IPSEC_LEVEL_REQUIRE) \
-                ? (printf("fixed system default level " #lev ":%d->%d\n", \
-			(lev), IPSEC_LEVEL_USE), \
-			(lev) = IPSEC_LEVEL_USE) : (lev))
+#define IPSEC_CHECK_DEFAULT(lev)                                              \
+        (((lev) != IPSEC_LEVEL_USE && (lev) != IPSEC_LEVEL_REQUIRE            \
+			&& (lev) != IPSEC_LEVEL_UNIQUE)                       \
+                ? (printf("fixed system default level " #lev ":%d->%d\n",     \
+			(lev), IPSEC_LEVEL_REQUIRE),                          \
+			(lev) = IPSEC_LEVEL_REQUIRE,                          \
+			(lev)) : (lev))
 
 	/* set default level */
 	switch (isr->sp->spidx.src.__ss_family) {
@@ -1522,6 +1525,9 @@ ipsec_get_reqlevel(isr)
 	case IPSEC_LEVEL_USE:
 	case IPSEC_LEVEL_REQUIRE:
 		level = isr->level;
+		break;
+	case IPSEC_LEVEL_UNIQUE:
+		level = IPSEC_LEVEL_REQUIRE;
 		break;
 
 	default:

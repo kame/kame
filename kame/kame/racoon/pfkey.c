@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.5 1999/10/21 06:12:05 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.6 1999/11/04 00:34:17 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1018,7 +1018,7 @@ pfkey_send_getspi_wrap(sock_pfkey, iph2)
 			mode,
 			iph2->pst->dst,
 			iph2->pst->src,
-			0, 0, iph2->pst->seq) < 0) {
+			0, 0, 0, iph2->pst->seq) < 0) {
 		plog(LOCATION, "%s.\n", ipsec_strerror());
 		return -1;
 	}
@@ -1082,6 +1082,7 @@ pfkey_send_update_wrap(sock_pfkey, iph2)
 			iph2->pst->dst,
 			iph2->pst->src,
 			iph2->pst->spi,
+			0,
 			4,	/* XXX static size of window */
 			iph2->pst->keymat->v,
 			e_type, e_keylen, a_type, a_keylen, flags,
@@ -1126,6 +1127,7 @@ pfkey_send_add_wrap(sock_pfkey, iph2)
 			iph2->pst->src,
 			iph2->pst->dst,
 			iph2->pst->spi_p,
+			0,
 			4,	/* XXX static size of window */
 			iph2->pst->keymat_p->v,
 			e_type, e_keylen, a_type, a_keylen, flags,

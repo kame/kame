@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: policy_parse.y,v 1.1 1999/10/20 01:26:41 sakane Exp $ */
+/* KAME $Id: policy_parse.y,v 1.2 1999/11/04 00:34:15 sakane Exp $ */
 
 /*
  * IN/OUT bound policy configuration take place such below:
@@ -68,7 +68,7 @@
 static caddr_t pbuf = NULL;		/* sadb_x_policy buffer */
 static int tlen = 0;			/* total length of pbuf */
 static int offset = 0;			/* offset of pbuf */
-static int p_dir, p_type, p_protocol, p_mode, p_level;
+static int p_dir, p_type, p_protocol, p_mode, p_level, p_reqid;
 static struct sockaddr *p_src = NULL;
 static struct sockaddr *p_dst = NULL;
 
@@ -95,12 +95,12 @@ extern int yylex();
 	} val;
 }
 
-%token DIR ACTION PROTOCOL MODE LEVEL
+%token DIR ACTION PROTOCOL MODE LEVEL LEVEL_SPECIFY
 %token IPADDRESS
 %token ME ANY
 %token SLASH HYPHEN
 %type <num> DIR ACTION PROTOCOL MODE LEVEL
-%type <val> IPADDRESS
+%type <val> IPADDRESS LEVEL_SPECIFY
 
 %%
 policy_spec
@@ -154,7 +154,14 @@ mode
 	;
 
 level
-	:	LEVEL { p_level = $1; }
+	:	LEVEL {
+			p_level = $1;
+			p_reqid = 0;
+		}
+	|	LEVEL_SPECIFY {
+			p_level = IPSEC_LEVEL_UNIQUE;
+			p_reqid = atol($1.buf);	/* atol() is good. */
+		}
 	;
 
 addresses
@@ -311,6 +318,7 @@ set_x_request(src, dst)
 	p->sadb_x_ipsecrequest_proto = p_protocol;
 	p->sadb_x_ipsecrequest_mode = p_mode;
 	p->sadb_x_ipsecrequest_level = p_level;
+	p->sadb_x_ipsecrequest_reqid = p_reqid;
 	offset += sizeof(*p);
 
 	if (set_sockaddr(src) || set_sockaddr(dst))
@@ -345,6 +353,7 @@ policy_parse_request_init()
 	p_protocol = IPPROTO_IP;
 	p_mode = IPSEC_MODE_ANY;
 	p_level = IPSEC_LEVEL_DEFAULT;
+	p_reqid = 0;
 	if (p_src != NULL) {
 		free(p_src);
 		p_src = NULL;

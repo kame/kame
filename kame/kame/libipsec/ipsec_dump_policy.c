@@ -130,9 +130,8 @@ ipsec_dump_policy(policy, delimiter)
 	/* count length of buffer for use */
 	/* XXX non-seriously */
 	while (xtlen > 0) {
-		buflen += 20;
-		if (xisr->sadb_x_ipsecrequest_mode ==IPSEC_MODE_TUNNEL)
-			buflen += 50;
+		/* protocol/mode/addresses/level */
+		buflen += (10 + 10 + 82 + 20);
 		xtlen -= xisr->sadb_x_ipsecrequest_len;
 		xisr = (struct sadb_x_ipsecrequest *)((caddr_t)xisr
 				+ xisr->sadb_x_ipsecrequest_len);
@@ -218,6 +217,18 @@ ipsec_dump_policy(policy, delimiter)
 			ipsec_errcode = EIPSEC_INVAL_LEVEL;
 			free(buf);
 			return NULL;
+		}
+
+		if (xisr->sadb_x_ipsecrequest_reqid != 0) {
+			char id[16];
+			if (xisr->sadb_x_ipsecrequest_reqid
+					> IPSEC_MANUAL_REQID_MAX)
+				strcat(buf, "#");
+			else
+				strcat(buf, ":");
+			snprintf(id, sizeof(id), "%d",
+				xisr->sadb_x_ipsecrequest_reqid);
+			strcat(buf, id);
 		}
 
 		xtlen -= xisr->sadb_x_ipsecrequest_len;
