@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.42 2001/02/06 09:14:39 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.43 2001/02/07 10:48:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -267,7 +267,9 @@ extern int nd6_debug;
 
 #define nd6log(x)	do { if (nd6_debug) log x; } while (0)
 
+#ifdef __NetBSD__
 extern struct callout nd6_timer_ch;
+#endif
 
 /* nd6_rtr.c */
 extern struct ifnet *nd6_defifp;  /* XXXYYY */
