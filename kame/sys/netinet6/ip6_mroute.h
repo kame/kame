@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.h,v 1.10 2000/05/19 02:38:53 itojun Exp $	*/
+/*	$KAME: ip6_mroute.h,v 1.11 2000/07/11 02:25:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -83,7 +83,7 @@ typedef	long	if_mask;
 #endif
 
 typedef	struct if_set {
-	fd_mask	ifs_bits[howmany(IF_SETSIZE, NIFBITS)];
+	if_mask	ifs_bits[howmany(IF_SETSIZE, NIFBITS)];
 } if_set;
 
 #define	IF_SET(n, p)	((p)->ifs_bits[(n)/NIFBITS] |= (1 << ((n) % NIFBITS)))
