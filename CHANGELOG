@@ -1,9 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1708 2001/06/04 14:17:41 itojun Exp $
+$KAME: CHANGELOG,v 1.1709 2001/06/04 22:04:09 itojun Exp $
 
 <200106>
 Mon Jun  4 22:45:23 JST 2001  itojun@iijlab.net
 	* openbsd: switch base version to 2.9.
+
+Mon Jun  4 JST 2001  itojun@iijlab.net
+	* *bsd*/sys/net/rtsock.c: adjust routing socket message length
+	  on route_output().  previous code may send up garbage at the end of
+	  the message.
+	* netbsd/sys/net/rtsock.c: check mbuf allocation failure in rt_msg1().
 
 2001-06-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/config.c (getconfig): forced users to specify
