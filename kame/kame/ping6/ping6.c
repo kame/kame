@@ -93,7 +93,7 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 /*
  * NOTE:
  * USE_SIN6_SCOPE_ID assumes that sin6_scope_id has the same semantics
- * as IPV6_PKTINFO.  Some objects it (sin6_scope_id specifies *link* while
+ * as IPV6_PKTINFO.  Some people object it (sin6_scope_id specifies *link* while
  * IPV6_PKTINFO specifies *interface*.  Link is defined as collection of
  * network attached to 1 or more interfaces)
  */
@@ -224,6 +224,7 @@ char *scmsg = 0;
 int	 main __P((int, char *[]));
 void	 fill __P((char *, char *));
 int	 get_hoplim __P((struct msghdr *));
+struct in6_pktinfo *get_rcvpktinfo __P((struct msghdr *));
 void	 onalrm __P((int));
 void	 oninfo __P((int));
 void	 onint __P((int));
@@ -532,6 +533,45 @@ main(argc, argv)
     }
 #endif /*ICMP6_FILTER*/
 
+	/* let the kerel pass extension headers of incoming packets */
+	/* TODO: implement parsing routine */
+	if ((options & F_VERBOSE) != 0) {
+		int opton = 1;
+
+#ifdef IPV6_RECVRTHDR
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDR, &opton,
+			       sizeof(opton)))
+			err(1, "setsockopt(IPV6_RECVRTHDR)");
+#else  /* old adv. API */
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_RTHDR, &opton,
+			       sizeof(opton)))
+			err(1, "setsockopt(IPV6_RTHDR)");
+#endif 
+#ifdef IPV6_RECVHOPOPTS
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPOPTS, &opton,
+			       sizeof(opton)))
+			err(1, "setsockopt(IPV6_RECVHOPOPTS)");
+#else  /* old adv. API */
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_HOPOPTS, &opton,
+			       sizeof(opton)))
+			err(1, "setsockopt(IPV6_HOPOPTS)");
+#endif 
+#ifdef IPV6_RECVDSTOPTS
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVDSTOPTS, &opton,
+			       sizeof(opton)))
+			err(1, "setsockopt(IPV6_RECVDSTOPTS)");
+#else  /* olad adv. API */
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_DSTOPTS, &opton,
+			       sizeof(opton)))
+			err(1, "setsockopt(IPV6_DSTOPTS)");
+#endif 
+#ifdef IPV6_RECVRTHDRDSTOPTS
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDRDSTOPTS, &opton,
+			       sizeof(opton)))
+			err(1, "setsockopt(IPV6_RECVRTHDRDSTOPTS)");
+#endif 
+	}
+
 /*
 	optval = 1; 
 	if (IN6_IS_ADDR_MULTICAST(&dst.sin6_addr))
@@ -678,9 +718,25 @@ main(argc, argv)
 
 	optval = 1;
 #ifndef USE_SIN6_SCOPE_ID
-	setsockopt(s, IPPROTO_IPV6, IPV6_PKTINFO, &optval, sizeof(optval));
-#endif
-	setsockopt(s, IPPROTO_IPV6, IPV6_HOPLIMIT, &optval, sizeof(optval));
+#ifdef IPV6_RECVPKTINFO
+	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &optval,
+		       sizeof(optval)) < 0)
+		warn("setsockopt(IPV6_RECVPKTINFO)"); /* XXX err? */
+#else  /* old adv. API */
+	if (setsockopt(s, IPPROTO_IPV6, IPV6_PKTINFO, &optval,
+		       sizeof(optval)) < 0)
+		warn("setsockopt(IPV6_PKTINFO)"); /* XXX err? */
+#endif 
+#endif /* USE_SIN6_SCOPE_ID */
+#ifdef IPV6_RECVHOPLIMIT
+	if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &optval,
+		       sizeof(optval)) < 0)
+		warn("setsockopt(IPV6_RECVHOPLIMIT)"); /* XXX err? */
+#else  /* old adv. API */
+	if (setsockopt(s, IPPROTO_IPV6, IPV6_HOPLIMIT, &optval,
+		       sizeof(optval)) < 0)
+		warn("setsockopt(IPV6_HOPLIMIT)"); /* XXX err? */
+#endif 
 
 	printf("PING6(%d=40+8+%d bytes) ", datalen + 48, datalen);
 	printf("%s --> ", inet_ntop(AF_INET6, &src.sin6_addr, ntop_buf, sizeof(ntop_buf)));
@@ -748,6 +804,7 @@ main(argc, argv)
  * onalrm --
  *	This routine transmits another ping6.
  */
+/* ARGSUSED */
 void
 onalrm(signo)
 	int signo;
@@ -871,6 +928,7 @@ pr_pack(buf, cc, mhdr)
 	int hoplim;
 	struct sockaddr_in6 *from = (struct sockaddr_in6 *)mhdr->msg_name;
 	u_char *cp = NULL, *dp, *end = buf + cc;
+	struct in6_pktinfo *pktinfo = NULL;
 #ifdef OLD_RAWSOCKET
 	struct ip6_hdr *ip;
 #endif
@@ -947,6 +1005,10 @@ pr_pack(buf, cc, mhdr)
 		warnx("failed to get receiving hop limit");
 		return;
 	}
+	if ((pktinfo = get_rcvpktinfo(mhdr)) == NULL) {
+		warnx("failed to get receiving pakcet information");
+		return;
+	}
 
 	if (icp->icmp6_type == ICMP6_ECHO_REPLY) {
 		/* XXX the following line overwrites the original packet */
@@ -985,6 +1047,16 @@ pr_pack(buf, cc, mhdr)
 				     pr_addr(from),
 				     icp->icmp6_seq);
 			(void)printf(" hlim=%d", hoplim);
+			if ((options & F_VERBOSE) != 0) {
+				struct sockaddr_in6 dstsa;
+
+				memset(&dstsa, 0, sizeof(dstsa));
+				dstsa.sin6_family = AF_INET6;
+				dstsa.sin6_len = sizeof(dstsa);
+				dstsa.sin6_scope_id = pktinfo->ipi6_ifindex;
+				dstsa.sin6_addr = pktinfo->ipi6_addr;
+				(void)printf(" dst=%s", pr_addr(&dstsa));
+			}
 			if (timing)
 				(void)printf(" time=%g ms", triptime);
 			if (dupflag)
@@ -1129,6 +1201,23 @@ get_hoplim(mhdr)
 	return(-1);
 }
 
+struct in6_pktinfo *
+get_rcvpktinfo(mhdr)
+	struct msghdr *mhdr;
+{
+	struct cmsghdr *cm;
+
+	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(mhdr); cm;
+	     cm = (struct cmsghdr *)CMSG_NXTHDR(mhdr, cm)) {
+		if (cm->cmsg_level == IPPROTO_IPV6 &&
+		    cm->cmsg_type == IPV6_PKTINFO &&
+		    cm->cmsg_len == CMSG_LEN(sizeof(struct in6_pktinfo)))
+			return((struct in6_pktinfo *)CMSG_DATA(cm));
+	}
+
+	return(NULL);
+}
+
 /*
  * tvsub --
  *	Subtract 2 timeval structs:  out = out - in.  Out is assumed to
@@ -1149,6 +1238,7 @@ tvsub(out, in)
  * oninfo --
  *	SIGINFO handler.
  */
+/* ARGSUSED */
 void
 oninfo(notused)
 	int notused;
@@ -1160,6 +1250,7 @@ oninfo(notused)
  * onint --
  *	SIGINT handler.
  */
+/* ARGSUSED */
 void
 onint(notused)
 	int notused;
