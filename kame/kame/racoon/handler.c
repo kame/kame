@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.55 2002/01/02 08:09:47 jinmei Exp $	*/
+/*	$KAME: handler.c,v 1.56 2002/01/02 09:05:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -745,9 +745,8 @@ check_recvdpkt(remote, local, rbuf)
 		plog(LLV_DEBUG, LOCATION, NULL,
 			"deleted the retransmission packet to %s.\n",
 			saddr2str(remote));
-	}
-
-	r->time_send = t;
+	} else
+		r->time_send = t;
 
 	return 0;
 }
