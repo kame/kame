@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1576 2001/03/01 10:01:05 itojun Exp $
+$KAME: CHANGELOG,v 1.1577 2001/03/01 11:10:16 suz Exp $
 
 <200103>
+Thu Mar  1 20:01:14 JST 2001	suz@sdl.hitachi.co.jp
+	* bsdi3/sys/netinet/raw_ip.c
+	fixed a bug that bsdi3 KAME with IPsec crashes when it receives 	
+	an ICMP packet
+
 Thu Mar  1 18:28:48 JST 2001  itojun@iijlab.net
 	* sys/netinet/ip_input.c, sys/netinet6/ip6_input.c (except openbsd):
 	  enforce inbound policy match on all final protocol headers.
