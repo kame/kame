@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1458 2000/12/31 20:46:34 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1459 2001/01/02 08:17:34 itojun Exp $
 
 <200101>
+Tue Jan  2 17:15:44 JST 2001  itojun@iijlab.net
+	* sys/netinet6/in6.c: correct use of IFAREF/IFFREE on non-netsd
+	  operating systems.  old code had memory leak possibility on
+	  SIOCDIFADDR_IN6.  reported by hitachi guys.
+
 2001-01-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/lib/libinet6:
 	* bsdi4/contrib/bind/src/lib:
