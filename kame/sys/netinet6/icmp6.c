@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.342 2003/04/01 00:56:57 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.343 2003/04/02 10:18:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -789,7 +789,6 @@ icmp6_input(mp, offp, proto)
 			n->m_pkthdr.len -= (off + sizeof(struct icmp6_hdr));
 			m_adj(n0, off + sizeof(struct icmp6_hdr));
 			n->m_next = n0;
-			n0->m_flags &= ~M_PKTHDR;
 		} else {
 	 deliverecho:
 			nip6 = mtod(n, struct ip6_hdr *);
@@ -3197,12 +3196,8 @@ icmp6_redirect_output(m0, rt)
 		m->m_pkthdr.len = m->m_len = p - (u_char *)ip6;
 
 		/* connect m0 to m */
-#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
-		m_tag_delete_chain(m0, NULL);
-#endif
 		m_cat(m, m0);
 		m->m_pkthdr.len += m0->m_pkthdr.len;
-		m0->m_flags &= ~M_PKTHDR;
 		m0 = NULL;
 	}
 noredhdropt:

@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.78 2003/02/19 07:21:31 keiichi Exp $	*/
+/*	$KAME: esp_input.c,v 1.79 2003/04/02 10:18:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -976,10 +976,6 @@ noreplaycheck:
 				n->m_pkthdr.len = m->m_pkthdr.len;
 				n->m_next = m;
 				m_adj(m, maxlen);
-				m->m_flags &= ~M_PKTHDR;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ < 5)
-				m_tag_delete_chain(m, NULL);
-#endif
 			}
 			m = n;
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.44 2003/03/28 09:54:32 suz Exp $	*/
+/*	$KAME: if_hif.c,v 1.45 2003/04/02 10:18:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1079,10 +1079,6 @@ hif_output(ifp, m, dst, rt)
 			m_adj(m, maxlen);
 			n->m_len = maxlen;
 			n->m_next = m;
-			m->m_flags &= ~M_PKTHDR;
-#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ < 5)
-			m_tag_delete_chain(m, NULL);
-#endif
 		}
 		m = n;
 	}

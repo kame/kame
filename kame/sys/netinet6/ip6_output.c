@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.362 2003/02/28 10:25:14 k-sugyou Exp $	*/
+/*	$KAME: ip6_output.c,v 1.363 2003/04/02 10:18:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4945,7 +4945,6 @@ ip6_splithdr(m, exthdrs)
 		M_COPY_PKTHDR(mh, m);
 #endif
 		MH_ALIGN(mh, sizeof(*ip6));
-		m->m_flags &= ~M_PKTHDR;
 		m->m_len -= sizeof(*ip6);
 		m->m_data += sizeof(*ip6);
 		mh->m_next = m;

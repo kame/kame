@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.181 2003/02/19 03:19:16 keiichi Exp $	*/
+/*	$KAME: ipsec.c,v 1.182 2003/04/02 10:18:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3542,7 +3542,6 @@ ipsec4_splithdr(m)
 		M_COPY_PKTHDR(mh, m);
 #endif
 		MH_ALIGN(mh, hlen);
-		m->m_flags &= ~M_PKTHDR;
 		m->m_len -= hlen;
 		m->m_data += hlen;
 		mh->m_next = m;
@@ -3583,7 +3582,6 @@ ipsec6_splithdr(m)
 		M_COPY_PKTHDR(mh, m);
 #endif
 		MH_ALIGN(mh, hlen);
-		m->m_flags &= ~M_PKTHDR;
 		m->m_len -= hlen;
 		m->m_data += hlen;
 		mh->m_next = m;
