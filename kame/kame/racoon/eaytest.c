@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: eaytest.c,v 1.5 2000/08/10 12:27:47 sakane Exp $ */
+/* YIPS @(#)$Id: eaytest.c,v 1.6 2000/08/10 12:37:09 sakane Exp $ */
 
 #include <sys/types.h>
 
@@ -71,6 +71,7 @@ char cert1[] =
 
 /* test */
 
+#include <sys/stat.h>
 void
 certtest()
 {
@@ -80,6 +81,16 @@ certtest()
 	printf("\n**Test for Certificate.**\n");
 
 	eay_init_error();
+
+    {
+	struct stat sb;
+
+	stat(capath, &sb);
+	if (!(sb.st_mode & S_IFDIR)) {
+		printf("ERROR: %s is not directory.\n", capath);
+		return;
+	}
+    }
 
 	CApath.v = capath;
 	CApath.l = strlen(capath);
