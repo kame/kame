@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.44 2002/08/27 03:31:39 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.45 2002/08/27 06:18:56 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1262,6 +1262,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 	}
 
 	mip6stat.mip6s_oba++;
+	mip6stat.mip6s_oba_hist[status]++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.323 2002/08/26 14:26:59 t-momose Exp $	*/
+/*	$KAME: ip6_output.c,v 1.324 2002/08/27 06:18:56 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -440,6 +440,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	}
 
 	if (exthdrs.ip6e_mobility) {
+		mip6stat.mip6s_omobility++;
 		if (ip6->ip6_nxt != IPPROTO_NONE || m->m_next != NULL)
 			panic("not supported piggyback");
 		exthdrs.ip6e_mobility->m_next = m->m_next;

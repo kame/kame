@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.50 2002/08/27 03:31:39 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.51 2002/08/27 06:18:56 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -303,6 +303,7 @@ struct mip6stat {
 	u_quad_t mip6s_ba;		/* BA received */
 	u_quad_t mip6s_ba_hist[256];	/* BA status input histgram */
 	u_quad_t mip6s_oba;		/* BA sent */
+	u_quad_t mip6s_oba_hist[256];	/* BA status output histgram */
 	u_quad_t mip6s_br;		/* BR received */
 	u_quad_t mip6s_obr;		/* BR sent */
 	u_quad_t mip6s_be;		/* BE received */
