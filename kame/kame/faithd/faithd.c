@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.56 2002/06/25 07:13:58 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.57 2002/08/20 23:01:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -361,10 +361,14 @@ again:
 	setproctitle("%s", procname);
 
 	FD_ZERO(&rfds);
+	if (s_wld >= FD_SETSIZE)
+		exit_failure("descriptor too big");
 	FD_SET(s_wld, &rfds);
 	maxfd = s_wld;
 #ifdef USE_ROUTE
 	if (sockfd) {
+		if (sockfd >= FD_SETSIZE)
+			exit_failure("descriptor too big");
 		FD_SET(sockfd, &rfds);
 		maxfd = (maxfd < sockfd) ? sockfd : maxfd;
 	}

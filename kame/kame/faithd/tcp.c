@@ -1,4 +1,4 @@
-/*	$KAME: tcp.c,v 1.9 2002/05/26 01:17:02 itojun Exp $	*/
+/*	$KAME: tcp.c,v 1.10 2002/08/20 23:01:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -155,6 +155,8 @@ send_data(int s_rcv, int s_snd, const char *service, int direction)
 		if (cc == -1)
 			goto retry_or_err;
 		oob_exists = 0;
+		if (s_rcv >= FD_SETSIZE)
+			exit_failure("descriptor too big");
 		FD_SET(s_rcv, &exceptfds);
 	}
 
@@ -173,12 +175,18 @@ send_data(int s_rcv, int s_snd, const char *service, int direction)
 	}
 #endif /* DEBUG */
 	tblen = 0; tboff = 0;
+	if (s_snd >= FD_SETSIZE)
+		exit_failure("descriptor too big");
 	FD_CLR(s_snd, &writefds);
+	if (s_rcv >= FD_SETSIZE)
+		exit_failure("descriptor too big");
 	FD_SET(s_rcv, &readfds);
 	return;
     retry_or_err:
 	if (errno != EAGAIN)
 		exit_failure("writing relay data failed: %s", strerror(errno));
+	if (s_snd >= FD_SETSIZE)
+		exit_failure("descriptor too big");
 	FD_SET(s_snd, &writefds);
 }
 
@@ -194,6 +202,8 @@ relay(int s_rcv, int s_snd, const char *service, int direction)
 	FD_ZERO(&exceptfds);
 	fcntl(s_snd, F_SETFD, O_NONBLOCK);
 	oreadfds = readfds; owritefds = writefds; oexceptfds = exceptfds;
+	if (s_rcv >= FD_SETSIZE)
+		exit_failure("descriptor too big");
 	FD_SET(s_rcv, &readfds);
 	FD_SET(s_rcv, &exceptfds);
 	oob_exists = 0;
@@ -228,7 +238,11 @@ relay(int s_rcv, int s_snd, const char *service, int direction)
 			    oob_read_retry:
 				cc = read(s_rcv, atmark_buf, 1);
 				if (cc == 1) {
+					if (s_rcv >= FD_SETSIZE)
+						exit_failure("descriptor too big");
 					FD_CLR(s_rcv, &exceptfds);
+					if (s_snd >= FD_SETSIZE)
+						exit_failure("descriptor too big");
 					FD_SET(s_snd, &writefds);
 					oob_exists = 1;
 				} else if (cc == -1) {
@@ -261,7 +275,11 @@ relay(int s_rcv, int s_snd, const char *service, int direction)
 				exit_success("terminating %s relay", service);
 				/* NOTREACHED */
 			default:
+				if (s_rcv >= FD_SETSIZE)
+					exit_failure("descriptor too big");
 				FD_CLR(s_rcv, &readfds);
+				if (s_snd >= FD_SETSIZE)
+					exit_failure("descriptor too big");
 				FD_SET(s_snd, &writefds);
 				break;
 			}
