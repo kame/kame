@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.96 2002/02/14 08:47:04 sakane Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.97 2002/02/18 06:09:46 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -366,6 +366,20 @@ ip6_forward(m, srcrt)
 		if (mbc &&
 		    (mbc->mbc_flags & IP6_BUF_HOME) &&
 		    (mbc->mbc_encap != NULL)) {
+			if (IN6_IS_ADDR_LINKLOCAL(&mbc->mbc_phaddr)
+#ifdef MIP6_DISABLE_SITELOCAL
+			    || IN6_IS_ADDR_SITELOCAL(&mbc->mbc_phaddr)
+#endif
+			    )
+			{
+				ip6stat.ip6s_cantforward++;
+				if (mcopy) {
+					icmp6_error(mcopy, ICMP6_DST_UNREACH,
+						    ICMP6_DST_UNREACH_ADDR, 0);
+				}
+				m_freem(m);
+				return;
+			}
 			/*
 			 * if we have a binding cache entry for the
 			 * ip6_dst, we are acting as a home agent for

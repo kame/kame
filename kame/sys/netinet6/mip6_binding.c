@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.82 2002/02/13 03:37:03 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.83 2002/02/18 06:09:46 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1687,10 +1687,8 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 					 &pr->ndpr_prefix.sin6_addr,
 					 pr->ndpr_plen);
 
-			if (IN6_IS_ADDR_LINKLOCAL(&haddr)) {
+			if (IN6_IS_ADDR_LINKLOCAL(&haddr))
 				lladdr = haddr;
-				continue;
-			}
 
 			mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
 							   &haddr);
