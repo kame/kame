@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1182 2000/08/09 16:21:33 itojun Exp $
+$KAME: CHANGELOG,v 1.1183 2000/08/09 19:52:29 sakane Exp $
 
 <200007>
+Thu Aug 10 04:42:35 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	Implemented responder lifetime selection.  It does not conform to
+	the description of RFC2407 completely.  There are three type of the
+	behavior by specifing the value of "proposal_check" in "remote"
+	directive.
+	In phase 2 case, a RESPONDER-LIFETIME notify payload includes into
+	the exchange if needed.  To send the payload is not processed in
+	phase 1 case yet.
+
 Thu Aug 10 01:19:58 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/bind9: upgrade to 9.0.0rc2.
 
