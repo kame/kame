@@ -475,7 +475,7 @@ bgp_enable_rte_by_igp(rte)
 						}
 					}
 				}
-				if ((brte = brte->rt_next) == brte)
+				if ((brte = brte->rt_next) == bnp->rp_adj_ribs_in)
 					break;
 			}
 		}
@@ -562,7 +562,7 @@ bgp_disable_rte_by_igp(rte)
 						break;
 					}
 				}
-				if ((brte = brte->rt_next) == brte)
+				if ((brte = brte->rt_next) == bnp->rp_adj_ribs_in)
 					break;
 			}
 		}
