@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.151 2000/10/18 17:30:44 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.152 2000/10/18 18:14:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -156,8 +156,7 @@ static void icmp6_errcount __P((struct icmp6errstat *, int, int));
 #ifndef HAVE_NRL_INPCB
 static int icmp6_rip6_input __P((struct mbuf **, int));
 #endif
-static void icmp6_mtudisc_update __P((struct in6_addr *, struct icmp6_hdr *,
-				      struct mbuf *));
+static void icmp6_mtudisc_update __P((struct ip6ctlparam *));
 static int icmp6_ratelimit __P((const struct in6_addr *, const int, const int));
 static const char *icmp6_redirect_diag __P((struct in6_addr *,
 	struct in6_addr *, struct in6_addr *));
@@ -1043,20 +1042,21 @@ icmp6_input(mp, offp, proto)
 			return IPPROTO_DONE;
 		}
 #endif
-		if (icmp6type == ICMP6_PACKET_TOO_BIG) {
-			if (finaldst == NULL)
-				finaldst = &((struct ip6_hdr *)(icmp6 + 1))->ip6_dst;
-			icmp6_mtudisc_update(finaldst, icmp6, m);
-		}
+		if (finaldst == NULL)
+			finaldst = &((struct ip6_hdr *)(icmp6 + 1))->ip6_dst;
+		ip6cp.ip6c_m = m;
+		ip6cp.ip6c_icmp6 = icmp6;
+		ip6cp.ip6c_ip6 = (struct ip6_hdr *)(icmp6 + 1);
+		ip6cp.ip6c_off = eoff;
+		ip6cp.ip6c_finaldst = finaldst;
 
+		if (icmp6type == ICMP6_PACKET_TOO_BIG)
+			icmp6_mtudisc_update(&ip6cp);
 		ctlfunc = (void (*) __P((int, struct sockaddr *, void *)))
 			(inet6sw[ip6_protox[nxt]].pr_ctlinput);
 		if (ctlfunc) {
-			ip6cp.ip6c_m = m;
-			ip6cp.ip6c_ip6 = (struct ip6_hdr *)(icmp6 + 1);
-			ip6cp.ip6c_off = eoff;
-			ip6cp.ip6c_finaldst = finaldst;
-			(*ctlfunc)(code, (struct sockaddr *)&icmp6src, &ip6cp);
+			(void) (*ctlfunc)(code, (struct sockaddr *)&icmp6src,
+			    &ip6cp);
 		}
 	    }
 		break;
@@ -1083,11 +1083,14 @@ icmp6_input(mp, offp, proto)
 }
 
 static void
-icmp6_mtudisc_update(dst, icmp6, m)
-	struct in6_addr *dst;
-	struct icmp6_hdr *icmp6;/* we can assume the validity of the pointer */
-	struct mbuf *m;	/* currently unused but added for scoped addrs */
+icmp6_mtudisc_update(ip6cp)
+	struct ip6ctlparam *ip6cp;
 {
+	struct in6_addr *dst = ip6cp->ip6c_finaldst;
+	struct icmp6_hdr *icmp6 = ip6cp->ip6c_icmp6;
+#if 0
+	struct mbuf *m = ip6cp->ip6c_m;	/* will be necessary for scope issue */
+#endif
 	u_int mtu = ntohl(icmp6->icmp6_mtu);
 	struct rtentry *rt = NULL;
 	struct sockaddr_in6 sin6;

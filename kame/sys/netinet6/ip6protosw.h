@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.12 2000/10/18 17:30:45 itojun Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.13 2000/10/18 18:14:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,9 +89,20 @@ struct pr_usrreqs;
 /*
  * argument type for the last arg of pr_ctlinput().
  * should be consulted only with AF_INET6 family.
+ *
+ * IPv6 ICMP IPv6 [exthdrs] finalhdr paylaod
+ * ^    ^    ^              ^
+ * |    |    ip6c_ip6       ip6c_off
+ * |    ip6c_icmp6
+ * ip6c_m
+ *
+ * ip6c_finaldst usually points to ip6c_ip6->ip6_dst.  if the original
+ * (internal) packet carries a routing header, it may point the final
+ * dstination address in the routing header.
  */
 struct ip6ctlparam {
 	struct mbuf *ip6c_m;		/* start of mbuf chain */
+	struct icmp6_hdr *ip6c_icmp6;	/* icmp6 header of target packet */
 	struct ip6_hdr *ip6c_ip6;	/* ip6 header of target packet */
 	int ip6c_off;			/* offset of the target proto header */
 	struct in6_addr *ip6c_finaldst;	/* final destination address */
