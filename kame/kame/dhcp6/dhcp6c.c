@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.100 2003/01/06 16:12:02 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.101 2003/01/15 13:57:19 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1207,8 +1207,13 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	newserver->next = *sp;
 	*sp = newserver;
 
-	/* if the server has an extremely high preference, just use it. */
 	if (newserver->pref == DH6OPT_PREF_MAX) {
+		/*
+		 * If the client receives an Advertise message that includes a
+		 * Preference option with a preference value of 255, the client
+		 * immediately begins a client-initiated message exchange.
+		 * [dhcpv6-28, Section 17.1.2]
+		 */
 		ev->timeouts = 0;
 		ev->state = DHCP6S_REQUEST;
 		ifp->current_server = newserver;
