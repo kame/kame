@@ -81,12 +81,15 @@ MALLOC_DEFINE(M_FTABLE, "fragment", "fragment reassembly header");
 void
 frag6_init()
 {
+	struct timeval tv;
+
+	/*
+	 * in many cases, random() here does NOT return random number
+	 * as initialization during bootstrap time occur in fixed order.
+	 */
+	microtime(&tv);
 	ip6q.ip6q_next = ip6q.ip6q_prev = &ip6q;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	ip6_id = time.tv_sec & 0xffff;
-#else
-	ip6_id = time_second & 0xffff;
-#endif
+	ip6_id = random() ^ tv.tv_usec;
 }
 
 /*
