@@ -1,4 +1,4 @@
-$Id: TODO,v 1.17 2000/09/20 20:47:37 sakane Exp $
+$Id: TODO,v 1.18 2000/09/20 20:48:55 sakane Exp $
 
 Please send any questions or bug reports to snap-users@kame.net.
 
@@ -23,6 +23,10 @@ o Informational Exchange processing properly.
 o mandatory configuration check.
 
 SHOULD
+o how to support multi interfaces ?
+  - perform a dummy connect(2), like ping6.
+  - bind multi address, like named.
+  now racoon uses the former way.
 o DSA signature authentication method.
 o more acceptable check.
 o New group mode should be considered.
