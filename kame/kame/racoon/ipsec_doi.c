@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.104 2000/09/19 21:20:29 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.105 2000/09/20 01:02:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.104 2000/09/19 21:20:29 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.105 2000/09/20 01:02:55 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2579,11 +2579,6 @@ setph2proposal0(iph2, pp, pr)
 		attrlen += sizeof(struct isakmp_data);	/* enc mode */
 		if (tr->encklen)
 			attrlen += sizeof(struct isakmp_data);
-
-		if ((pr->proto_id == IPSECDOI_PROTO_IPSEC_ESP && tr->authtype != IPSECDOI_ATTR_AUTH_NONE)
-		 || pr->proto_id == IPSECDOI_PROTO_IPSEC_AH)
-			attrlen += sizeof(struct isakmp_data);
-		else
 
 		switch (pr->proto_id) {
 		case IPSECDOI_PROTO_IPSEC_ESP:
