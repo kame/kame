@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.54 2004/11/17 16:46:21 jinmei Exp $	*/
+/*	$KAME: route6.c,v 1.55 2004/11/19 04:50:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,15 +111,6 @@ route6_input(mp, offp, proto)
 	switch (rh->ip6r_type) {
 	case IPV6_RTHDR_TYPE_0:
 		rhlen = (rh->ip6r_len + 1) << 3;
-		/* 
-		 * if the routing header length is greater than the remaining
-		 * packet size, we don't skip the routing header even if
-		 * its segment-left field is 0, although it appears to be 
-		 * violating RFC2460 4.4.  This is to prevent buffer overrun.
-		 * (such buffer overrun case is not taken into consideration in
-		 *  an algorithm in RFC2460 p.16, so we think the algorithm 
-		 *  should be updated)
-		 */
 #ifndef PULLDOWN_TEST
 		/*
 		 * note on option length:
