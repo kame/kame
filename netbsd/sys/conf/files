@@ -1306,7 +1306,6 @@ file	net80211/ieee80211_rssadapt.c	wlan
 # should be dccp & ( inet | inet6 )
 file	netinet/dccp_cc_sw.c		dccp & inet
 file	netinet/dccp_tcplike.c		dccp & inet
-file	netinet/dccp_tfrc.c		dccp & dccp_tfrc & inet
 file	netinet/dccp_usrreq.c		dccp & inet
 file	netinet/if_arp.c		arp | netatalk		needs-flag
 file	netinet/if_atm.c		atm
