@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.255 2001/12/19 14:30:34 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.256 2001/12/24 10:39:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -464,8 +464,8 @@ in6_control(so, cmd, data, ifp)
 	}
 
 	switch(cmd) {
-	case SIOCASRCSEL_POLICY:
-	case SIOCDSRCSEL_POLICY:
+	case SIOCAADDRCTL_POLICY:
+	case SIOCDADDRCTL_POLICY:
 		if (!privileged)
 			return(EPERM);
 		return(in6_src_ioctl(cmd, data));
@@ -2906,6 +2906,8 @@ int in6_hash_nullhit;
 /*
  * Initialize the hash by adding entries for IN6ADDR_ANY
  */
+struct in6hash *ih_cache = NULL;
+
 void
 in6h_hashinit()
 {
@@ -2984,6 +2986,8 @@ in6h_delhash(ih)
 {
 	struct in6hash **prev;
 
+	ih_cache = NULL;
+
 	for (prev = &in6hash[HASH6(&ih->in6h_addr) % in6_nhash];
 	     *prev != ih; prev = &((*prev)->in6h_next)) {
 #ifdef DEBUG
@@ -3016,14 +3020,18 @@ in6h_lookup(addr, ifp)
 			ih->in6h_hit++;
 
 			if (ih->in6h_ifa == NULL ||
-			    ih->in6h_ifa->ia_ifp == ifp || ifp == NULL)
+			    ih->in6h_ifa->ia_ifp == ifp || ifp == NULL) {
+				ih_cache = ih;
 				return (ih);
+			}
 			if (maybe_ih == NULL)
 				maybe_ih = ih;
 		}
 		else
 			ih->in6h_miss++;
 	}
+	if (maybe_ih)
+		ih_cache = maybe_ih;
 	return (maybe_ih);
 }
 #endif /* MEASURE_PERFORMANCE */

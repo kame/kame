@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.95 2001/12/22 05:02:25 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.96 2001/12/24 10:39:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1277,7 +1277,7 @@ static int in6_src_sysctl SYSCTL_HANDLER_ARGS;
 #ifdef SYSCTL_DECL
 SYSCTL_DECL(_net_inet6_ip6);
 #endif
-SYSCTL_NODE(_net_inet6_ip6, IPV6CTL_ADDRSELPOLICY, addrselpolicy,
+SYSCTL_NODE(_net_inet6_ip6, IPV6CTL_ADDRCTLPOLICY, addrctlpolicy,
 	CTLFLAG_RD, in6_src_sysctl, "");
 
 static int
@@ -1307,7 +1307,7 @@ in6_src_ioctl(cmd, data)
 	int i;
 	struct in6_addrpolicy ent0;
 
-	if (cmd != SIOCASRCSEL_POLICY && cmd != SIOCDSRCSEL_POLICY)
+	if (cmd != SIOCAADDRCTL_POLICY && cmd != SIOCDADDRCTL_POLICY)
 		return(EOPNOTSUPP); /* check for safety */
 
 	ent0 = *(struct in6_addrpolicy *)data;
@@ -1325,9 +1325,9 @@ in6_src_ioctl(cmd, data)
 	ent0.use = 0;
 
 	switch (cmd) {
-	case SIOCASRCSEL_POLICY:
+	case SIOCAADDRCTL_POLICY:
 		return(add_addrsel_policyent(&ent0));
-	case SIOCDSRCSEL_POLICY:
+	case SIOCDADDRCTL_POLICY:
 		return(delete_addrsel_policyent(&ent0));
 	}
 

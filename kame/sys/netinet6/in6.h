@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.113 2001/12/21 08:14:06 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.114 2001/12/24 10:39:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -660,7 +660,7 @@ struct ip6_mtuinfo {
 #define IPV6CTL_AUTO_LINKLOCAL	35	/* automatic link-local addr assign */
 #define IPV6CTL_RIP6STATS	36	/* raw_ip6 stats */
 #define IPV6CTL_PREFER_TEMPADDR	37	/* prefer temporary addr as src */
-#define IPV6CTL_ADDRSELPOLICY	38	/* get/set address selection policy */
+#define IPV6CTL_ADDRCTLPOLICY	38	/* get/set address selection policy */
 #define IPV6CTL_USE_DEFAULTZONE	39	/* use default scope zone */
 
 /* New entries should be added here from current IPV6CTL_MAXID value. */
