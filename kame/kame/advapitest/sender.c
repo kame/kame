@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.16 2001/06/20 12:35:12 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.17 2001/08/01 16:56:50 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -56,6 +56,8 @@ char *hlimp = NULL;
 int hlim;
 
 struct msghdr msg;
+struct sockaddr *sa_next;
+struct sockaddr_storage ss_next;
 struct cmsghdr *cmsgp = NULL;
 
 static int calc_opthlen __P((int));
@@ -76,6 +78,7 @@ main(argc, argv)
 	int rthlen = 0, ip6optlen = 0, hops = 0, error;
 	char *portstr = DEFAULTPORT;
 	char *finaldst;
+	char *nexthop = NULL;
 	struct iovec msgiov;
 	char *e, *databuf;
 	int datalen = 1, ch;
@@ -87,7 +90,7 @@ main(argc, argv)
 	int socktype = SOCK_DGRAM;
 	int proto = IPPROTO_UDP;
 
-	while ((ch = getopt(argc, argv, "d:D:h:l:M:mp:s:")) != -1)
+	while ((ch = getopt(argc, argv, "d:D:h:l:M:mn:p:s:")) != -1)
 		switch(ch) {
 		case 'D':
 			dsthdr1len = atoi(optarg);
@@ -103,6 +106,9 @@ main(argc, argv)
 			break;
 		case 'm':
 			mflag++;
+			break;
+		case 'n':
+			nexthop = optarg;
 			break;
 		case 'p':
 			portstr = optarg;
@@ -136,6 +142,21 @@ main(argc, argv)
 #endif
 		ip6optlen += CMSG_SPACE(sizeof(int));
 	}
+	if (nexthop != NULL) {
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_INET6;
+		hints.ai_socktype = SOCK_DGRAM; /* not used */
+		hints.ai_protocol = IPPROTO_UDP; /* not used */
+		if ((error = getaddrinfo(nexthop, NULL, &hints, &res)) < 0) {
+			errx(1, "getaddrinfo for nexthop: ",
+			     gai_strerror(error));
+		}
+		memcpy(&ss_next, res->ai_addr, res->ai_addrlen);
+		sa_next = (struct sockaddr *)&ss_next;
+		freeaddrinfo(res);
+
+		ip6optlen += CMSG_SPACE(sa_next->sa_len);
+	}
 	if (argc > 1) {		/* intermediate node(s) exist(s) */
 		hops = argc - 1;
 		rthlen = inet6_rth_space(IPV6_RTHDR_TYPE_0, hops);
@@ -166,6 +187,13 @@ main(argc, argv)
 	if (hbhlen > 0) setopthdr(hbhlen, IPV6_HOPOPTS);
 	if (dsthdr1len > 0) setopthdr(dsthdr1len, IPV6_RTHDRDSTOPTS);
 	if (dsthdr2len > 0) setopthdr(dsthdr2len, IPV6_DSTOPTS);
+	if (sa_next != NULL) {
+		cmsgp->cmsg_len = CMSG_LEN(sa_next->sa_len);
+		cmsgp->cmsg_level = IPPROTO_IPV6;
+		cmsgp->cmsg_type = IPV6_NEXTHOP;
+		memcpy(CMSG_DATA(cmsgp), sa_next, sa_next->sa_len);
+		cmsgp = CMSG_NXTHDR(&msg, cmsgp);
+	}
 	if (argc > 1) {
 		struct ip6_rthdr *rthdr;
 		struct in6_addr middle;
@@ -334,7 +362,7 @@ static void
 usage()
 {
 	fprintf(stderr, "usage: sender [-d optlen] [-D optlen] [-h optlen] "
-		"[-l hoplimit] [-m] [-p port] [-s packetsize] "
+		"[-l hoplimit] [-m] [-n nexthop] [-p port] [-s packetsize] "
 		"IPv6addrs...\n");
 	exit(1);
 }
