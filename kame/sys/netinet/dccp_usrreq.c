@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.8 2003/10/18 08:26:22 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.9 2003/10/18 08:29:33 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -308,6 +308,7 @@ dccp_input(struct mbuf *m, int off)
 		 * Get IP and DCCP header together in first mbuf.
 		 */
 		ip = mtod(m, struct ip *);
+#ifndef PULLDOWN_TEST
 		if (m->m_len < iphlen + sizeof(struct dccphdr)) {
 			if ((m = m_pullup(m, iphlen + sizeof(struct dccphdr))) == 0) {
 				DCCP_DEBUG((LOG_INFO, "Dropping packet, to short?\n"));
@@ -316,7 +317,6 @@ dccp_input(struct mbuf *m, int off)
 			}
 			ip = mtod(m, struct ip *);
 		}
-#ifndef PULLDOWN_TEST
 		dh = (struct dccphdr *)((caddr_t)ip + iphlen);
 #else
 		IP6_EXTHDR_GET(dh, struct dccphdr *, m, iphlen, sizeof(*dh));
