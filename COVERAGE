@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.102 2001/02/25 01:36:47 itojun Exp $
+$KAME: COVERAGE,v 1.103 2001/03/20 13:25:39 itojun Exp $
 
 
 x: supported/integrated
@@ -127,6 +127,9 @@ icmp6 nodeinfo	07	07	07	05	06	06	05	?
     (all) spec conformance is still low.  "05-" means 05/03 chimera.
     (*1) does not join NI group address
     (*2) node addresses reply does not have TTL attached
+
+net.inet6.icmp6.nodeinfo is a bitmap
+		x	-	x	-	-	-	-	-
 
 nd6_proxyall	-	-	-	-	-	-	-	-
 
