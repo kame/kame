@@ -1,4 +1,4 @@
-/*	$KAME: rrenumd.c,v 1.20 2000/11/08 02:40:53 itojun Exp $	*/
+/*	$KAME: rrenumd.c,v 1.21 2001/07/02 14:30:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -552,7 +552,7 @@ main(int argc, char *argv[])
 	while ((ch = getopt(argc, argv, "c:sdf"
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
-			    "P"
+			    "P:"
 #else /* IPSEC_POLICY_IPSEC */
 			    "AE"
 #endif /* IPSEC_POLICY_IPSEC */
