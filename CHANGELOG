@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.846 2000/05/01 05:05:47 itojun Exp $
+$Id: CHANGELOG,v 1.847 2000/05/01 09:25:34 itojun Exp $
 
 <200005>
+Mon May  1 18:24:04 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_output.c: avoid panic on ip6fw kernel configuration
+	  on IPv6 packet outputs (usually, DAD on reboot).
+
 Mon May  1 14:05:02 JST 2000  itojun@iijlab.net
 	* kame/libinet6/name6.c: use BIND 4.9.7 DNS answer parser to remove
 	  any of vulnerability old name6.c might have.
