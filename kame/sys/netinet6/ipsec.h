@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.39 2000/12/27 11:47:10 sakane Exp $	*/
+/*	$KAME: ipsec.h,v 1.40 2001/01/04 11:47:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -160,9 +160,9 @@ struct secspacq {
 
 /* Policy level */
 /*
- * IPSEC, ENTRUST and BYPASS are allowd for setsockopt() in PCB,
- * DISCARD, IPSEC and NONE are allowd for setkey() in SPD.
- * DISCARD and NONE are allowd for system default.
+ * IPSEC, ENTRUST and BYPASS are allowed for setsockopt() in PCB,
+ * DISCARD, IPSEC and NONE are allowed for setkey() in SPD.
+ * DISCARD and NONE are allowed for system default.
  */
 #define IPSEC_POLICY_DISCARD	0	/* discarding packet */
 #define IPSEC_POLICY_NONE	1	/* through IPsec engine */
