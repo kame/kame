@@ -1593,6 +1593,8 @@ ip_forward(m, srcrt)
 	    }
 
 	}
+#endif
+
 	sin = (struct sockaddr_in *)&ipforward_rt.ro_dst;
 	if ((rt = ipforward_rt.ro_rt) == 0 ||
 	    ip->ip_dst.s_addr != sin->sin_addr.s_addr) {
