@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.371 2004/05/26 07:41:30 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.372 2004/06/14 08:14:21 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -959,6 +959,7 @@ in6_update_ifa(ifp, ifra, ia)
 	struct in6_ifaddr *oia;
 	struct sockaddr_in6 dst6;
 	struct in6_addrlifetime *lt;
+	struct in6_multi *in6m;
 	struct in6_multi_mship *imm;
 #ifndef __FreeBSD__
 	time_t time_second = (time_t)time.tv_sec;
@@ -1258,16 +1259,20 @@ in6_update_ifa(ifp, ifra, ia)
 				goto cleanup;
 			}
 			in6_embedscope(&llsol.sin6_addr, &llsol);
-			imm = in6_joingroup(ifp, &llsol.sin6_addr, &error);
-			if (imm) {
-				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
-				    i6mm_chain);
-			} else {
-				nd6log((LOG_ERR, "in6_update_ifa: addmulti "
-				    "failed for %s on %s (errno=%d)\n",
-				    ip6_sprintf(&llsol.sin6_addr),
-				    if_name(ifp), error));
-				goto cleanup;
+			IN6_LOOKUP_MULTI(llsol.sin6_addr, ifp, in6m);
+			if (!in6m) {
+				imm = in6_joingroup(ifp, &llsol.sin6_addr,
+				    &error);
+				if (!imm) {
+					nd6log((LOG_ERR, "in6_update_ifa: "
+					    "addmulti failed for %s on %s "
+					    "(errno=%d)\n",
+					    ip6_sprintf(&llsol.sin6_addr),
+					    if_name(ifp), error));
+					goto cleanup;
+				}
+				LIST_INSERT_HEAD(&ia->ia6_memberships,
+				    imm, i6mm_chain);
 			}
 		}
 
@@ -1341,17 +1346,18 @@ in6_update_ifa(ifp, ifra, ia)
 		} else {
 			RTFREE(rt);
 		}
-		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
-		if (imm) {
-			LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
-			    i6mm_chain);
-		} else {
-			nd6log((LOG_WARNING,
-			    "in6_update_ifa: addmulti failed for "
-			    "%s on %s (errno=%d)\n",
-			    ip6_sprintf(&mltaddr.sin6_addr),
-			    if_name(ifp), error));
-			goto cleanup;
+		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
+		if (!in6m) {
+			imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
+			if (!imm) {
+				nd6log((LOG_WARNING,
+				    "in6_update_ifa: addmulti failed for "
+				    "%s on %s (errno=%d)\n",
+				    ip6_sprintf(&mltaddr.sin6_addr),
+				    if_name(ifp), error));
+				goto cleanup;
+			}
+			LIST_INSERT_HEAD(&ia->ia6_memberships, imm, i6mm_chain);
 		}
 
 		/*
@@ -1361,16 +1367,21 @@ in6_update_ifa(ifp, ifra, ia)
 #define hostnamelen	strlen(hostname)
 #endif
 		if (in6_nigroup(ifp, hostname, hostnamelen, &mltaddr) == 0) {
-			imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
-			if (imm) {
-				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
-				    i6mm_chain);
-			} else {
-				nd6log((LOG_WARNING, "in6_update_ifa: "
-				    "addmulti failed for %s on %s (errno=%d)\n",
-				    ip6_sprintf(&mltaddr.sin6_addr),
-				    if_name(ifp), error));
-				/* XXX not very fatal, go on... */
+			IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
+			if (!in6m) {
+				imm = in6_joingroup(ifp, &mltaddr.sin6_addr,
+				    &error);
+				if (!imm) {
+					nd6log((LOG_WARNING, "in6_update_ifa: "
+					    "addmulti failed for %s on %s "
+					    "(errno=%d)\n",
+					    ip6_sprintf(&mltaddr.sin6_addr),
+					    if_name(ifp), error));
+					/* XXX not very fatal, go on... */
+				} else {
+					LIST_INSERT_HEAD(&ia->ia6_memberships,
+					    imm, i6mm_chain);
+				}
 			}
 		}
 #ifdef __FreeBSD__
@@ -1431,17 +1442,18 @@ in6_update_ifa(ifp, ifra, ia)
 		} else {
 			RTFREE(rt);
 		}
-		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
-		if (imm) {
-			LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
-			    i6mm_chain);
-		} else {
-			nd6log((LOG_WARNING, "in6_update_ifa: "
-			    "addmulti failed for %s on %s "
-			    "(errno=%d)\n",
-			    ip6_sprintf(&mltaddr.sin6_addr),
-			    if_name(ifp), error));
-			goto cleanup;
+		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
+		if (!in6m) {
+			imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
+			if (!imm) {
+				nd6log((LOG_WARNING, "in6_update_ifa: "
+				    "addmulti failed for %s on %s "
+				    "(errno=%d)\n",
+				    ip6_sprintf(&mltaddr.sin6_addr),
+				    if_name(ifp), error));
+				goto cleanup;
+			}
+			LIST_INSERT_HEAD(&ia->ia6_memberships, imm, i6mm_chain);
 		}
 	}
 
