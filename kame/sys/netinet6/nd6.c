@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.46 2000/03/16 07:05:34 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.47 2000/03/16 11:58:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -191,7 +191,7 @@ nd6_ifattach(ifp)
 	ND.reachable = ND_COMPUTE_RTIME(ND.basereachable);
 	ND.retrans = RETRANS_TIMER;
 	ND.receivedra = 0;
-	ND.flags = ND6_IFF_PERFOMNUD;
+	ND.flags = ND6_IFF_PERFORMNUD;
 	nd6_setmtu(ifp);
 #undef ND
 }
@@ -495,7 +495,7 @@ nd6_timer(ignored_arg)
 		 * routine.
 		 */
 		case ND6_LLINFO_DELAY:
-			if (ndi && (ndi->flags & ND6_IFF_PERFOMNUD) != 0) {
+			if (ndi && (ndi->flags & ND6_IFF_PERFORMNUD) != 0) {
 				/* We need NUD */
 				ln->ln_asked = 1;
 				ln->ln_state = ND6_LLINFO_PROBE;

@@ -864,7 +864,7 @@ ifinfo(argc, argv)
 			else\
 				newflags |= (f);\
 		}
-		SETFLAG("nud", ND6_IFF_PERFOMNUD);
+		SETFLAG("nud", ND6_IFF_PERFORMNUD);
 
 		ND.flags = newflags;
 		if (ioctl(s, SIOCSIFINFO_FLAGS, (caddr_t)&nd) < 0) {
@@ -882,8 +882,8 @@ ifinfo(argc, argv)
 	printf(", retrans=%ds%dms", ND.retrans / 1000, ND.retrans % 1000);
 	if (ND.flags) {
 		printf("\nFlags: ");
-		if ((ND.flags & ND6_IFF_PERFOMNUD) != 0)
-			printf("PERFOMNUD ");
+		if ((ND.flags & ND6_IFF_PERFORMNUD) != 0)
+			printf("PERFORMNUD ");
 	}
 	putc('\n', stdout);
 #undef ND
