@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2385 2003/04/17 08:38:49 jinmei Exp $
+$KAME: CHANGELOG,v 1.2386 2003/04/17 13:49:04 jinmei Exp $
 
 <200304>
+2003-04-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c (getaddrinfo): when AI_PASSIVE
+	is specified, put non-SCTP protocols before SCTP not to break
+	buggy-but-deployed applications.
+
 2003-04-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c (getaddrinfo): corrected the
 	initial check for socktype/protocol combination of hints.
