@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.27 2000/06/04 05:18:23 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.28 2000/06/04 05:20:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -693,7 +693,7 @@ status(sig)
 		return;
 
 	t = time(NULL);
-	fprintf(fp, "mdnsd dump at %s", ctime(&t));
+	fprintf(fp, "mdnsd status dump at %s", ctime(&t));
 	fprintf(fp, "\n");
 
 	fprintf(fp, "DNS servers:\n");
@@ -756,6 +756,8 @@ status(sig)
 		}
 		fprintf(fp, "%*s%s port %s (%s)\n", 4, "", hbuf, sbuf, p);
 	}
+
+	fprintf(fp, "\n");
 
 	if (!fflag)
 		fclose(fp);
