@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ping6.8,v 1.8 1999/12/23 09:33:25 jinmei Exp $
+.\"     $Id: ping6.8,v 1.9 1999/12/23 09:37:58 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt PING6 8
@@ -38,7 +38,7 @@ packets to network hosts
 .Sh SYNOPSIS
 .Nm
 .\" without ipsec, or new ipsec
-.Op Fl dfnqrvw
+.Op Fl dfnqvw
 .\" old ipsec
 .\" .Op Fl AdEfnqRrvw
 .Op Fl a Ar addrtype
@@ -173,16 +173,6 @@ specifies IPsec policy to be used for the probe.
 Quiet output.
 Nothing is displayed except the summary lines at startup time and
 when finished.
-.It Fl r
-Bypass the normal routing tables and send directly to a host on an attached
-network.
-If the host is not on a directly-attached network, an error is returned.
-This option can be used to ping a local host through an interface
-that has no route through it 
-.Po
-e.g., after the interface was dropped by
-.Xr routed 8
-.Pc .
 .It Fl S Ar sourceaddr
 Specifies the source address of request packets.
 The source address must be one of the unicast addresses of the sending
