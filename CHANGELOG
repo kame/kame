@@ -1,7 +1,20 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2507 2003/11/18 05:24:12 ono Exp $
+$KAME: CHANGELOG,v 1.2508 2003/11/25 07:05:12 ono Exp $
 
 <200311>
+2003-11-25  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
+	* sys/netinet/sctp*: sctp patch 15 from rrs@cisco.com.
+
+	1) Updated to a consisten comment in copyright section
+	2) Fixes so tie-tags are new 32 bit nonces not the v-tags (I-G.10)
+	3) Fixes so a primary cannot be set to a UNCONFIRMED address (I-G.10)
+	4) Updates ICMP handling to fix a bug/incompleteness (I-G.10)
+	5) Expanded forms of logging as an option during optimization.
+	6) Expanded pegs.
+	7) Fixes to utilize larger MTU sizes
+	8) Fixes a stray shutdown that was being sent when it
+	   was not supposed to (in SHUTDOWN-ACK-SENT state).
+
 2003-11-18  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
 	* kame/sys/netinet/dccp_*, kame/sys/netinet6/dccp6_*:
 	makes DCCP compilable on openbsd.
