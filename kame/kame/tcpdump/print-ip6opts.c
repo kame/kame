@@ -37,6 +37,9 @@
 #include <netinet/ip6.h>
 
 #include <net/if.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <net/if_var.h>
+#endif
 #include <netinet6/in6_var.h>
 #include <netinet6/mip6.h>
 
