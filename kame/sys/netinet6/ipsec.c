@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.164 2002/07/09 08:17:01 k-sugyou Exp $	*/
+/*	$KAME: ipsec.c,v 1.165 2002/07/10 05:07:21 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2246,12 +2246,6 @@ ipsec6_encapsulate(m, sav)
 	struct ip6_hdr *ip6;
 	size_t plen;
 	size_t encap_hdr_len;
-#ifdef MIP6
-	int need_hao, need_rthdr2;
-	struct hif_softc *hif_sc;
-	struct mip6_bu *mbu;
-	struct mip6_bc *mbc;
-#endif /* MIP6 */
 
 	/* can't tunnel between different AFs */
 	if (((struct sockaddr *)&sav->sah->saidx.src)->sa_family
@@ -2306,16 +2300,27 @@ ipsec6_encapsulate(m, sav)
 	in6_clearscope(&oip6->ip6_src);
 	in6_clearscope(&oip6->ip6_dst);
 
+	/* construct new IPv6 header. see RFC 2401 5.1.2.2 */
+	/* ECN consideration. */
+	ip6_ecn_ingress(ip6_ipsec_ecn, &ip6->ip6_flow, &oip6->ip6_flow);
+	encap_hdr_len = sizeof(struct ip6_hdr);
+	ip6->ip6_nxt = IPPROTO_IPV6;
+
 #ifdef MIP6
 	/*
 	 * check if this tunnel is from the mobile node to the home
 	 * agent or not.  if the packet if from the mobile node to the
 	 * home agent, the packet must have a HAO.
 	 */
-	need_hao = 0;
 	*m_hao = NULL;
-	mbu = NULL;
 	if (MIP6_IS_MN) {
+		struct hif_softc *hif_sc;
+		struct mip6_bu *mbu;
+		struct ip6_dest *dest;
+		unsigned char pad4[4] = {IP6OPT_PADN, 2, 0, 0};
+		unsigned char hao[2] = {IP6OPT_HOME_ADDRESS, 16};
+		caddr_t ptr;
+
 		hif_sc = hif_list_find_withhaddr(
 		    (struct sockaddr_in6 *)&sav->sah->saidx.src);
 		if (hif_sc != NULL) {
@@ -2328,8 +2333,6 @@ ipsec6_encapsulate(m, sav)
 				 * this is a tunnel from a mobile node
 				 * to a home agent.
 				 */
-				need_hao = 1;
-
 				/* allocate mbuf for HAO. */
 				MGET(*m_hao, M_NOWAIT, MT_DATA);
 				if (!*m_hao) {
@@ -2338,11 +2341,30 @@ ipsec6_encapsulate(m, sav)
 				}
 				(*m_hao)->m_len = sizeof(struct ip6_dest)
 				    + 4 /* pad 4. */
-				    /* XXX + 2 type, len */
 				    + sizeof(struct ip6_opt_home_address);
+
+				dest = mtod(*m_hao, struct ip6_dest *);
+				bzero((caddr_t)dest, (*m_hao)->m_len);
+				dest->ip6d_nxt = ip6->ip6_nxt;
+				ip6->ip6_nxt = IPPROTO_DSTOPTS;
+				dest->ip6d_len = 2;
+				/* insert pad4. */
+				ptr = (caddr_t)(dest + 1);
+				bcopy((caddr_t)&pad4[0], ptr, 4);
+				ptr += 4;
+				/* insert HAO. */
+				bcopy((caddr_t)&hao[0], ptr, 2);
+				ptr += 2;
+				bcopy((caddr_t)&mbu->mbu_coa.sin6_addr, ptr,
+				    sizeof(struct in6_addr));
+				in6_clearscope((struct in6_addr *)ptr);
+
 				(*m_hao)->m_next = m->m_next;
 				m->m_next = *m_hao;
+
+				/* add the size of HAO. */
 				m->m_pkthdr.len += (*m_hao)->m_len;
+				encap_hdr_len += (*m_hao)->m_len;
 				plen += (*m_hao)->m_len;
 			}
 		}
@@ -2353,10 +2375,11 @@ ipsec6_encapsulate(m, sav)
 	 * node or not.  if the packet is from the home agent to the
 	 * mobile node, the packet must have a RTHDR type 2.
 	 */
-	need_rthdr2 = 0;
 	*m_rthdr2 = NULL;
-	mbc = NULL;
 	if (MIP6_IS_HA) {
+		struct mip6_bc *mbc;
+		struct ip6_rthdr2 *rthdr2;
+
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
 		    (struct sockaddr_in6 *)&sav->sah->saidx.dst);
 		if ((mbc != NULL)
@@ -2365,7 +2388,6 @@ ipsec6_encapsulate(m, sav)
 			 * this is a tunnel from a home agent to a
 			 * mobile node.
 			 */
-			need_rthdr2 = 1;
 
 			/* allocate mbuf for RTHDR. */
 			MGET(*m_rthdr2, M_NOWAIT, MT_DATA);
@@ -2375,62 +2397,27 @@ ipsec6_encapsulate(m, sav)
 			}
 			(*m_rthdr2)->m_len = sizeof(struct ip6_rthdr2)
 			    + sizeof(struct in6_addr);
+
+			rthdr2 = mtod(*m_rthdr2, struct ip6_rthdr2 *);
+			bzero((caddr_t)rthdr2, (*m_rthdr2)->m_len);
+			rthdr2->ip6r2_nxt = ip6->ip6_nxt;
+			ip6->ip6_nxt = IPPROTO_ROUTING;
+			rthdr2->ip6r2_len = 2;
+			rthdr2->ip6r2_type = 2;
+			rthdr2->ip6r2_segleft = 0;	/* = 1 */
+			rthdr2->ip6r2_reserved = 0;
+			bcopy((caddr_t)&mbc->mbc_pcoa.sin6_addr,
+			    (caddr_t)(rthdr2 + 1), sizeof(struct in6_addr));
+			in6_clearscope((struct in6_addr *)(rthdr2 + 1));
+
 			(*m_rthdr2)->m_next = m->m_next;
 			m->m_next = *m_rthdr2;
+
+			/* add the size of RTHDR type 2. */
 			m->m_pkthdr.len += (*m_rthdr2)->m_len;
+			encap_hdr_len += (*m_rthdr2)->m_len;
 			plen += (*m_rthdr2)->m_len;
 		}
-	}
-#endif /* MIP6 */
-
-	/* construct new IPv6 header. see RFC 2401 5.1.2.2 */
-	/* ECN consideration. */
-	ip6_ecn_ingress(ip6_ipsec_ecn, &ip6->ip6_flow, &oip6->ip6_flow);
-	encap_hdr_len = sizeof(struct ip6_hdr);
-	ip6->ip6_nxt = IPPROTO_IPV6;
-#ifdef MIP6
-	if (need_hao != 0) {
-		struct ip6_dest *dest;
-		unsigned char pad4[4] = {IP6OPT_PADN, 2, 0, 0};
-		unsigned char hao[2] = {IP6OPT_HOME_ADDRESS, 16};
-		caddr_t ptr;
-
-		/* add the size of HAO. */
-		encap_hdr_len += (*m_hao)->m_len;
-
-		dest = mtod(*m_hao, struct ip6_dest *);
-		bzero((caddr_t)dest, (*m_hao)->m_len);
-		dest->ip6d_nxt = ip6->ip6_nxt;
-		ip6->ip6_nxt = IPPROTO_DSTOPTS;
-		dest->ip6d_len = 2;
-		/* insert pad4. */
-		ptr = (caddr_t)(dest + 1);
-		bcopy((caddr_t)&pad4[0], ptr, 4);
-		ptr += 4;
-		/* insert HAO. */
-		bcopy((caddr_t)&hao[0], ptr, 2);
-		ptr += 2;
-		bcopy((caddr_t)&mbu->mbu_coa.sin6_addr, ptr,
-		    sizeof(struct in6_addr));
-		in6_clearscope((struct in6_addr *)ptr);
-	}
-	if (need_rthdr2 != 0) {
-		struct ip6_rthdr2 *rthdr2;
-
-		/* add the size of RTHDR type 2. */
-		encap_hdr_len += (*m_rthdr2)->m_len;
-
-		rthdr2 = mtod(*m_rthdr2, struct ip6_rthdr2 *);
-		bzero((caddr_t)rthdr2, (*m_rthdr2)->m_len);
-		rthdr2->ip6r2_nxt = ip6->ip6_nxt;
-		ip6->ip6_nxt = IPPROTO_ROUTING;
-		rthdr2->ip6r2_len = 2;
-		rthdr2->ip6r2_type = 2;
-		rthdr2->ip6r2_segleft = 0;	/* = 1 */
-		rthdr2->ip6r2_reserved = 0;
-		bcopy((caddr_t)&mbc->mbc_pcoa.sin6_addr,
-		    (caddr_t)(rthdr2 + 1), sizeof(struct in6_addr));
-		in6_clearscope((struct in6_addr *)(rthdr2 + 1));
 	}
 #endif /* MIP6 */
 	if (plen < IPV6_MAXPACKET - encap_hdr_len)
