@@ -11,8 +11,6 @@ PATCH_DIST_STRIP=	-p1
 MAINTAINER=	itojun@itojun.org
 HOMEPAGE=	http://www.BitWizard.nl/mtr/
 
-BROKEN=		"security issues (local root compromise possible)"
-
 GNU_CONFIGURE=	yes
 USE_GMAKE=	yes
 CONFIGURE_ARGS+=--enable-ipv6
@@ -24,5 +22,9 @@ CONFIGURE_ARGS+=--with-gtk-prefix=${X11BASE}
 .else
 CONFIGURE_ARGS+=--with-gtk-prefix=/nopath
 .endif
+
+do-install:
+	${INSTALL_PROGRAM} ${WRKSRC}/mtr ${PREFIX}/sbin
+	${INSTALL_MAN} ${WRKSRC}/mtr.8 ${PREFIX}/man/man8
 
 .include "../../mk/bsd.pkg.mk"
