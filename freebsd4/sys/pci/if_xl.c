@@ -854,6 +854,7 @@ static void xl_testpacket(sc)
 {
 	struct mbuf		*m;
 	struct ifnet		*ifp;
+	int			error;
 
 	ifp = &sc->arpcom.ac_if;
 
@@ -1418,7 +1419,8 @@ static int xl_attach(dev)
 	ifp->if_watchdog = xl_watchdog;
 	ifp->if_init = xl_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = XL_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, XL_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Now we have to see what sort of media we have.
@@ -2073,7 +2075,7 @@ static void xl_intr(arg)
 		}
 	}
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		(*ifp->if_start)(ifp);
 
 	return;
@@ -2852,7 +2854,7 @@ static void xl_watchdog(ifp)
 	xl_reset(sc);
 	xl_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		(*ifp->if_start)(ifp);
 
 	return;

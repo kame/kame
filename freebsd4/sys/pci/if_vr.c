@@ -785,7 +785,8 @@ static int vr_attach(dev)
 	ifp->if_watchdog = vr_watchdog;
 	ifp->if_init = vr_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = VR_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, VR_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Do MII setup.
@@ -1227,7 +1228,7 @@ static void vr_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, VR_IMR, VR_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL) {
+	if (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 		vr_start(ifp);
 	}
 
@@ -1334,7 +1335,7 @@ static void vr_start(ifp)
 	start_tx = sc->vr_cdata.vr_tx_free;
 
 	while(sc->vr_cdata.vr_tx_free->vr_mbuf == NULL) {
-		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -1344,7 +1345,6 @@ static void vr_start(ifp)
 
 		/* Pack the data into the descriptor. */
 		if (vr_encap(sc, cur_tx, m_head)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			cur_tx = NULL;
 			break;
@@ -1352,6 +1352,9 @@ static void vr_start(ifp)
 
 		if (cur_tx != start_tx)
 			VR_TXOWN(cur_tx) = VR_TXSTAT_OWN;
+
+		/* now we are committed to transmit the packet */
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1570,7 +1573,7 @@ static void vr_watchdog(ifp)
 	vr_reset(sc);
 	vr_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		vr_start(ifp);
 
 	return;

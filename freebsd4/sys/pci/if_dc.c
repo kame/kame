@@ -1912,7 +1912,8 @@ static int dc_attach(dev)
 	ifp->if_watchdog = dc_watchdog;
 	ifp->if_init = dc_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = DC_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, DC_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Do MII setup. If this is a 21143, check for a PHY on the
@@ -2540,7 +2541,7 @@ static void dc_tick(xsc)
 		if (mii->mii_media_status & IFM_ACTIVE &&
 		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 			sc->dc_link++;
-			if (ifp->if_snd.ifq_head != NULL)
+			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				dc_start(ifp);
 		}
 	}
@@ -2678,7 +2679,7 @@ static void dc_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, DC_IMR, DC_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		dc_start(ifp);
 
 	return;
@@ -2811,7 +2812,7 @@ static void dc_start(ifp)
 	idx = sc->dc_cdata.dc_tx_prod;
 
 	while(sc->dc_cdata.dc_tx_chain[idx] == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -2823,17 +2824,21 @@ static void dc_start(ifp)
 #endif
 			IFQ_DEQUEUE(&ifp->if_snd, m_head);
 			if (dc_coal(sc, &m_head)) {
-				IF_PREPEND(&ifp->if_snd, m_head);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			}
 		}
 
 		if (dc_encap(sc, m_head, &idx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		/* now we are committed to transmit the packet */
+		if (sc->dc_flags & DC_TX_COALESCE) {
+			/* if mbuf is coalesced, it is already dequeued */
+		} else
+			IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -2847,6 +2852,8 @@ static void dc_start(ifp)
 			break;
 		}
 	}
+	if (idx == sc->dc_cdata.dc_tx_prod)
+		return;
 
 	/* Transmit */
 	sc->dc_cdata.dc_tx_prod = idx;
@@ -3153,7 +3160,7 @@ static void dc_watchdog(ifp)
 	dc_reset(sc);
 	dc_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		dc_start(ifp);
 
 	return;
