@@ -118,9 +118,6 @@ struct nd_drhead nd_defrouter;
 struct nd_prhead nd_prefix = { 0 };
 
 int nd6_recalc_reachtm_interval = ND6_RECALC_REACHTM_INTERVAL;
-#if 0
-extern	int ip6_forwarding;
-#endif
 static struct sockaddr_in6 all1_sa;
 
 static void nd6_slowtimo __P((void *));
@@ -568,59 +565,95 @@ nd6_timer(ignored_arg)
 }
 
 /*
- * nuke neighbor cache/prefix/default router management table, right before
+ * Nuke neighbor cache/prefix/default router management table, right before
  * ifp goes away.
  */
 void
 nd6_purge(ifp)
 	struct ifnet *ifp;
 {
-	struct llinfo_nd6 *ln;
-	struct nd_defrouter *dr;
-	struct nd_prefix *pr;
-	int s;
+	struct llinfo_nd6 *ln, *nln;
+	struct nd_defrouter *dr, *ndr, drany;
+	struct nd_prefix *pr, *npr;
 
-#ifdef __NetBSD__
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
-
-	/* nuke neighbor cache entries toward ifp */
-	while (ln && ln != &llinfo_nd6) {
-		struct rtentry *rt;
-		struct llinfo_nd6 *next;
-
-		next = ln->ln_next;
-		rt = ln->ln_rt;
-		if (rt != NULL && rt->rt_ifp == ifp)
-			nd6_free(rt);
-		ln = next;
-	}
-		
-	/* nuke default router list entries toward ifp */
-	dr = TAILQ_FIRST(&nd_defrouter);
-	while (dr) {
-		struct nd_defrouter *next;
-
-		next = TAILQ_NEXT(dr, dr_entry);
+	/* Nuke default router list entries toward ifp */
+	if ((dr = TAILQ_FIRST(&nd_defrouter)) != NULL) {
+		/*
+		 * The first entry of the list may be stored in
+		 * the routing table, so we'll delete it later.
+		 */
+		for (dr = TAILQ_NEXT(dr, dr_entry); dr; dr = ndr) {
+			ndr = TAILQ_NEXT(dr, dr_entry);
+			if (dr->ifp == ifp)
+				defrtrlist_del(dr);
+		}
+		dr = TAILQ_FIRST(&nd_defrouter);
 		if (dr->ifp == ifp)
 			defrtrlist_del(dr);
-		dr = next;
 	}
 
-	/* nuke prefix list entries toward ifp */
-	pr = nd_prefix.lh_first;
-	while (pr) {
-		struct nd_prefix *next;
-
-		next = pr->ndpr_next;
-		if (pr->ndpr_ifp == ifp)
+	/* Nuke prefix list entries toward ifp */
+	for (pr = nd_prefix.lh_first; pr; pr = npr) {
+		npr = pr->ndpr_next;
+		if (pr->ndpr_ifp == ifp) {
+			if (!IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
+				in6_ifdel(pr->ndpr_ifp, &pr->ndpr_addr);
 			prelist_remove(pr);
-		pr = next;
+		}
 	}
 
-	splx(s);
+	/* cancel default outgoing interface setting */
+	if (nd6_defifindex == ifp->if_index)
+		nd6_setdefaultiface(0);
+
+	/* refresh default router list */
+	bzero(&drany, sizeof(drany));
+	defrouter_delreq(&drany, 0);
+	defrouter_select();
+
+	/*
+	 * Nuke neighbor cache entries for the ifp.
+	 * Note that rt->rt_ifp may not be the same as ifp,
+	 * due to KAME goto ours hack.  See RTM_RESOLVE case in
+	 * nd6_rtrequest(), and ip6_input()).
+	 */
+	ln = llinfo_nd6.ln_next;
+	while (ln && ln != &llinfo_nd6) {
+		struct rtentry *rt;
+		struct sockaddr_dl *sdl;
+
+		nln = ln->ln_next;
+		rt = ln->ln_rt;
+		if (rt && rt->rt_gateway &&
+		    rt->rt_gateway->sa_family == AF_LINK) {
+			sdl = (struct sockaddr_dl *)rt->rt_gateway;
+			if (sdl->sdl_index == ifp->if_index)
+				nd6_free(rt);
+		}
+		ln = nln;
+	}
+
+	/*
+	 * Interface route will be retained by nd6_free().  Nuke it.
+	 */
+	ln = llinfo_nd6.ln_next;
+	while (ln && ln != &llinfo_nd6) {
+		struct rtentry *rt;
+		struct sockaddr_dl *sdl;
+
+		nln = ln->ln_next;
+		rt = ln->ln_rt;
+		if (rt && rt->rt_gateway &&
+		    rt->rt_gateway->sa_family == AF_LINK) {
+			sdl = (struct sockaddr_dl *)rt->rt_gateway;
+			if (sdl->sdl_index == ifp->if_index) {
+				rtrequest(RTM_DELETE, rt_key(rt),
+				    (struct sockaddr *)0, rt_mask(rt), 0,
+				    (struct rtentry **)0);
+			}
+		}
+		ln = nln;
+	}
 }
 
 struct rtentry *

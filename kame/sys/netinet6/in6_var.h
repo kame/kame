@@ -652,6 +652,7 @@ int	in6_prefix_ioctl __P((struct socket *so, u_long cmd, caddr_t data,
 			      struct ifnet *ifp));
 int	in6_prefix_add_ifid __P((int iilen, struct in6_ifaddr *ia));
 void	in6_prefix_remove_ifid __P((int iilen, struct in6_ifaddr *ia));
+void	in6_purgeprefix __P((struct ifnet *));
 #endif /* _KERNEL */
 
 #endif /* _NETINET6_IN6_VAR_H_ */

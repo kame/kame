@@ -516,6 +516,22 @@ in6_prefix_remove_ifid(int iilen, struct in6_ifaddr *ia)
 	}
 }
 
+void
+in6_purgeprefix(ifp)
+	struct ifnet *ifp;
+{
+	struct ifprefix *ifpr, *nextifpr;
+
+	/* delete prefixes before ifnet goes away */
+	for (ifpr = ifp->if_prefixlist; ifpr; ifpr = nextifpr) {
+		nextifpr = ifpr->ifpr_next;
+		if (ifpr->ifpr_prefix->sa_family != AF_INET6 ||
+		    ifpr->ifpr_type != IN6_PREFIX_RR)
+ 			continue;
+		(void)delete_each_prefix(ifpr2rp(ifpr), PR_ORIG_KERNEL);
+	}
+}
+
 static void
 add_each_addr(struct socket *so, struct rr_prefix *rpp, struct rp_addr *rap)
 {

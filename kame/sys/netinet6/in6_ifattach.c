@@ -696,6 +696,12 @@ in6_ifdetach(ifp)
 	struct in6_multi *in6m_next;
 #endif
 
+	/* nuke prefix list.  this may try to remove some of ifaddrs as well */
+	in6_purgeprefix(ifp);
+
+	/* remove neighbor management table */
+	nd6_purge(ifp);
+
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
 #else
