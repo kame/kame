@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.180 2001/11/05 02:35:04 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.181 2001/11/05 02:49:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -804,9 +804,6 @@ defrouter_reset()
  * 1) Routers that are reachable or probably reachable should be preferred.
  *    If we have more than one (probably) reachable router, prefer ones
  *    with the highest router preference.
- *    If there are multiple routers with the same (highest) router preference,
- *    try to install them all to the routing table.  It could be useful in
- *    equal-cost-multipath environment.
  * 2) When no routers on the list are known to be reachable or
  *    probably reachable, routers SHOULD be selected in a round-robin
  *    fashion, regardless of router preference values.
@@ -816,6 +813,11 @@ defrouter_reset()
  * We assume nd_defrouter is sorted by router preference value.
  * Since the code below covers both with and without router preference cases,
  * we do not need to classify the cases by ifdef.
+ *
+ * At this moment, we do not try to install more than one default router,
+ * even when the multipath routing is available, because we're not sure about
+ * the benefits for stub hosts comparing to the risk of making the code
+ * complicated and the possibility of introducing bugs.
  */
 void
 defrouter_select()
@@ -825,11 +827,9 @@ defrouter_select()
 #else
 	int s = splnet();
 #endif
-	struct nd_defrouter *dr;
+	struct nd_defrouter *dr, *selected_dr = NULL, *installed_dr = NULL;
 	struct rtentry *rt = NULL;
 	struct llinfo_nd6 *ln = NULL;
-	int installedpref, installcount, install;
-	int i;
 
 	/*
 	 * This function should be called only when acting as an autoconfigured
@@ -895,67 +895,58 @@ defrouter_select()
 
 	/*
 	 * Search for a (probably) reachable router from the list.
-	 * mark preferable routers with dr->install bit.
+	 * We just pick up the first reachable one (if any), assuming that
+	 * the ordering rule of the list described in defrtrlist_update().
 	 */
-	installedpref = RTPREF_INVALID;
 	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
 	     dr = TAILQ_NEXT(dr, dr_entry)) {
-		install = 0;
-
-		if ((rt = nd6_lookup(&dr->rtaddr, 0, dr->ifp)) &&
+		if (!selected_dr &&
+		    (rt = nd6_lookup(&dr->rtaddr, 0, dr->ifp)) &&
 		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
 		    ND6_IS_LLINFO_PROBREACH(ln)) {
-			/*
-			 * The router looks reachable.
-			 * If it is a fresh default router, or it has the
-			 * same preference as the previously installed one,
-			 * we install it.
-			 */
-			if (installedpref == RTPREF_INVALID) {
-				installedpref = rtpref(dr);
-				install++;
-			} else if (installedpref == rtpref(dr))
-				install++;
+			selected_dr = dr;
 		}
 
-		dr->install = install;
+		if (dr->installed && !installed_dr)
+			installed_dr = dr;
+		else if (dr->installed && installed_dr) {
+			/* this should not happen.  warn for diagnosis. */
+			log(LOG_ERR, "defrouter_select: more than one router"
+			    " is installed\n");
+		}
+	}
+	/*
+	 * If none of the default routers was found to be reachable,
+	 * round-robin the list regardless of preference.
+	 * Otherwise, if we have an installed router, check if the selected
+	 * (reachable) router should really be preferred to the installed one.
+	 * We only prefer the new router when the old one is not reachable
+	 * or when the new one has a really higher preference value.
+	 */
+	if (!selected_dr) {
+		if (!installed_dr ||
+		    installed_dr == TAILQ_LAST(&nd_defrouter, nd_drhead))
+			selected_dr = TAILQ_FIRST(&nd_defrouter);
+		else
+ 			selected_dr = TAILQ_NEXT(installed_dr, dr_entry);
+	} else if (installed_dr &&
+		   (rt = nd6_lookup(&installed_dr->rtaddr, 0,
+				    installed_dr->ifp)) &&
+		   (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
+		   ND6_IS_LLINFO_PROBREACH(ln) &&
+		   rtpref(selected_dr) <= rtpref(installed_dr)) {
+			selected_dr = installed_dr;
 	}
 
-	/* remove routers that are no longer reachable/preferred */
-	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
-	     dr = TAILQ_NEXT(dr, dr_entry))
-		if (!dr->install && dr->installed)
-			defrouter_delreq(dr);
-	/* install routers that are now reachable/preferred */
-	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
-	     dr = TAILQ_NEXT(dr, dr_entry))
-		if (dr->install && !dr->installed)
-			defrouter_addreq(dr);
-
-	installcount = 0;
-	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
-	     dr = TAILQ_NEXT(dr, dr_entry))
-		if (dr->installed)
-			installcount++;
-
-	if (installcount == 0) {
-		/*
-		 * None of the default routers was found to be reachable.
-		 * Install all routers with the highest preference.
-		 */
-		installedpref = rtpref(TAILQ_FIRST(&nd_defrouter));
-		for (dr = TAILQ_FIRST(&nd_defrouter); dr;
-		     dr = TAILQ_NEXT(dr, dr_entry)) {
-			if (installedpref != rtpref(dr))
-				break;
-
-			if (!dr->installed)
-				defrouter_addreq(dr);
-			/* no need to defrouter_delreq(), it's already done */
-
-			if (dr->installed)
-				installcount++;
-		}
+	/*
+	 * If the selected router is different than the installed one,
+	 * remove the installed router and install the selected one.
+	 * Note that the selected router is never NULL here.
+	 */
+	if (installed_dr != selected_dr) {
+		if (installed_dr)
+			defrouter_delreq(installed_dr);
+		defrouter_addreq(selected_dr);
 	}
 
 	splx(s);
