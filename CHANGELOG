@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.348 1999/12/19 01:55:42 itojun Exp $
+$Id: CHANGELOG,v 1.349 1999/12/19 04:13:02 itojun Exp $
 
 <199912>
+Sun Dec 19 13:11:11 JST 1999  itojun@iijlab.net
+	* openbsd/sys: disable IPv4 mapped address support (RFC1933: AF_INET6
+	  wildcard bind can accept IPv4 traffic).  This is for possible
+	  security risks due to complexity introduced into access control.
+	  (sync with openbsd-current)
+
 Sun Dec 19 10:57:37 JST 1999  itojun@iijlab.net
 	* {net,open}bsd/sys/netinet/ip_output.c: avoid kernel panic on
 	  multicast loopback.  shared cluster mbuf will be overwritten
