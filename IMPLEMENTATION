@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/04 15:05:34 $
+			$Date: 1999/10/04 15:06:57 $
 
 1. IPv6
 
@@ -834,6 +834,10 @@ IPsec is mainly organized by three components.
 (1) Policy Management
 (2) Key Management
 (3) AH and ESP handling
+
+Note that KAME/OpenBSD does NOT include support for KAME IPsec code,
+as OpenBSD team has their home-brew IPsec stack and they have no plan
+to replace it.  IPv6 support for IPsec is, therefore, lacking on KAME/OpenBSD.
 
 4.1 Policy Management
 
