@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.53 2001/10/09 17:05:00 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.54 2001/10/09 17:07:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -433,91 +433,91 @@ rtmsg_input()
 		oldifflags = iflist[ifindex]->ifm_flags;
 
 		switch(type) {
-		 case RTM_ADD:
-			 /* init ifflags because it may have changed */
-			 iflist[ifindex]->ifm_flags =
+		case RTM_ADD:
+			/* init ifflags because it may have changed */
+			iflist[ifindex]->ifm_flags =
 			 	if_getflags(ifindex,
 					    iflist[ifindex]->ifm_flags);
 
-			 if (sflag)
-				 break;	/* we aren't interested in prefixes  */
+			if (sflag)
+				break;	/* we aren't interested in prefixes  */
 
-			 addr = get_addr(msg);
-			 plen = get_prefixlen(msg);
-			 /* sanity check for plen */
-			 if (plen < 4 /* as RFC2373, prefixlen is at least 4 */
-			     || plen > 127) {
+			addr = get_addr(msg);
+			plen = get_prefixlen(msg);
+			/* sanity check for plen */
+			if (plen < 4 /* as RFC2373, prefixlen is at least 4 */
+			    || plen > 127) {
 				syslog(LOG_INFO, "<%s> new interface route's"
 				       "plen %d is invalid for a prefix",
 				       __FUNCTION__, plen);
 				break;
-			 }
-			 prefix = find_prefix(rai, addr, plen);
-			 if (prefix) {
-				 if (dflag > 1) {
-					 syslog(LOG_DEBUG,
-						"<%s> new prefix(%s/%d) "
-						"added on %s, "
-						"but it was already in list",
-						__FUNCTION__,
-						inet_ntop(AF_INET6,
-							  addr, (char *)addrbuf,
-							  INET6_ADDRSTRLEN),
-						plen,
-						rai->ifname);
-				 }
-				 break;
-			 }
-			 make_prefix(rai, ifindex, addr, plen);
-			 break;
-		 case RTM_DELETE:
-			 /* init ifflags because it may have changed */
-			 iflist[ifindex]->ifm_flags =
+			}
+			prefix = find_prefix(rai, addr, plen);
+			if (prefix) {
+				if (dflag > 1) {
+					syslog(LOG_DEBUG,
+					       "<%s> new prefix(%s/%d) "
+					       "added on %s, "
+					       "but it was already in list",
+					       __FUNCTION__,
+					       inet_ntop(AF_INET6,
+							 addr, (char *)addrbuf,
+							 INET6_ADDRSTRLEN),
+					       plen,
+					       rai->ifname);
+				}
+				break;
+			}
+			make_prefix(rai, ifindex, addr, plen);
+			break;
+		case RTM_DELETE:
+			/* init ifflags because it may have changed */
+			iflist[ifindex]->ifm_flags =
 			 	if_getflags(ifindex,
 					    iflist[ifindex]->ifm_flags);
 
-			 if (sflag)
-				 break;
+			if (sflag)
+				break;
 
-			 addr = get_addr(msg);
-			 plen = get_prefixlen(msg);
-			 /* sanity check for plen */
-			 if (plen < 4 /* as RFC2373, prefixlen is at least 4 */
-			     || plen > 127) {
+			addr = get_addr(msg);
+			plen = get_prefixlen(msg);
+			/* sanity check for plen */
+			if (plen < 4 /* as RFC2373, prefixlen is at least 4 */
+			    || plen > 127) {
 				syslog(LOG_INFO, "<%s> deleted interface"
 				       "route's"
 				       "plen %d is invalid for a prefix",
 				       __FUNCTION__, plen);
 				break;
-			 }
-			 prefix = find_prefix(rai, addr, plen);
-			 if (prefix == NULL) {
-				 if (dflag > 1) {
-					 syslog(LOG_DEBUG,
-						"<%s> prefix(%s/%d) was "
-						"deleted on %s, "
-						"but it was not in list",
-						__FUNCTION__,
-						inet_ntop(AF_INET6,
-							  addr, (char *)addrbuf,
-							  INET6_ADDRSTRLEN),
-						plen,
-						rai->ifname);
-				 }
-				 break;
-			 }
-			 delete_prefix(rai, prefix);
-			 break;
+			}
+			prefix = find_prefix(rai, addr, plen);
+			if (prefix == NULL) {
+				if (dflag > 1) {
+					syslog(LOG_DEBUG,
+					       "<%s> prefix(%s/%d) was "
+					       "deleted on %s, "
+					       "but it was not in list",
+					       __FUNCTION__,
+					       inet_ntop(AF_INET6,
+							 addr, (char *)addrbuf,
+							 INET6_ADDRSTRLEN),
+					       plen,
+					       rai->ifname);
+				}
+				break;
+			}
+			delete_prefix(rai, prefix);
+			break;
 		case RTM_NEWADDR:
 		case RTM_DELADDR:
-			 /* init ifflags because it may have changed */
-			 iflist[ifindex]->ifm_flags =
+			/* init ifflags because it may have changed */
+			iflist[ifindex]->ifm_flags =
 			 	if_getflags(ifindex,
 					    iflist[ifindex]->ifm_flags);
-			 break;
+			break;
 		case RTM_IFINFO:
-			 iflist[ifindex]->ifm_flags = get_ifm_flags(next);
-			 break;
+			iflist[ifindex]->ifm_flags = get_ifm_flags(next);
+			break;
 		default:
 			/* should not reach here */
 			if (dflag > 1) {
