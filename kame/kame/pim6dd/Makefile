@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.4 2000/12/04 06:45:01 itojun Exp $
+#	$KAME: Makefile,v 1.5 2003/07/30 06:49:21 itojun Exp $
 #
 # Copyright (c) 1998 WIDE Project. All rights reserved.
 #
@@ -103,11 +103,11 @@ DPADD+= ${.OBJDIR}/../libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 .endif
 
-.if (${OPSYS} != "NetBSD")
+.if (${OPSYS} == "NetBSD") || (${OPSYS} == "OpenBSD")
+MAN=	pim6dd.8 pim6dd.conf.5
+.else
 MAN5=	pim6dd.conf.5
 MAN8=	pim6dd.8
-.else
-MAN=	pim6dd.8 pim6dd.conf.5
 .endif
 
 .include <bsd.prog.mk>
