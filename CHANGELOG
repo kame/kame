@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1096 2000/07/04 12:36:55 sakane Exp $
+$Id: CHANGELOG,v 1.1097 2000/07/04 13:34:29 itojun Exp $
 
 <200006>
 Tue Jul  4 21:36:16 JST 2000 sakane@ydc.co.jp
@@ -97,6 +97,11 @@ Sun Jul  2 11:24:52 JST 2000  itojun@iijlab.net
 
 Sat Jul  1 20:57:57 JST 2000  itojun@iijlab.net
 	* kame/faithd: make it possible to invoke faithd(8) from inetd(8).
+	  benefits: allows us to access-control inbound traffic by using
+		hosts.allow(5).
+	  possible drawbacks: inetd mode has no chance for multi-connection-
+		per-single-process enhancement.  current faithd(8) needs 1
+		process per 1 connection anyways.
 
 Fri Jun 30 17:45:23 JST 2000 sakane@ydc.co.jp
 	* freebsd[34]/usr.bin/whois.c:
