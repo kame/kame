@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.42 2003/07/20 11:23:06 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.43 2003/07/20 11:43:47 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -597,6 +597,15 @@ relay6_recv(s, fromclient)
 			    (struct sockaddr_in6 *)&from,
 			    ifname, htonl(pi->ipi6_ifindex));
 			break;
+		case DH6_RELAY_REPLY:
+			/*
+			 * The server may send a replay reply to the client
+			 * port.
+			 * XXX: need to clarify the port issue
+			 */
+			relay_to_client((struct dhcp6_relay *)dh6, len,
+			    (struct sockaddr *)&from);
+			break;
 		default:
 			dprintf(LOG_INFO, FNAME,
 			    "unexpected message (%s) on the client side "
@@ -679,6 +688,15 @@ relay_to_server(dh6, len, from, ifname, ifid)
 	if (p == NULL) {
 		dprintf(LOG_NOTICE, FNAME,
 		    "failed to find a global address on %s", ifname);
+
+		/*
+		 * When relaying a message from a client, we need a global
+		 * link address.
+		 * XXX: this may be too strong for the stateless case, but
+		 * the DHCPv6 specification seems to require the behavior. 
+		 */
+		if (dh6->dh6_msgtype != DH6_RELAY_FORW)
+			goto out;
 	}
 
 	if (dh6->dh6_msgtype == DH6_RELAY_FORW) {
@@ -706,15 +724,6 @@ relay_to_server(dh6, len, from, ifname, ifid)
 		 */
 	} else {
 		/* Relaying a Message from a Client */
-
-		/*
-		 * Fill in the link address field.
-		 * XXX: the spec is not clear what if we do not have a global
-		 * address on the link.  We can deal with the situation,
-		 * however, because we always include the Interface-id option.
-		 * In this case, the unspecified address will be set in the
-		 * link address field.
-		 */
 		memcpy(&dh6relay->dh6relay_linkaddr, &linkaddr,
 		    sizeof (dh6relay->dh6relay_linkaddr));
 		dh6relay->dh6relay_hcnt = 0;
