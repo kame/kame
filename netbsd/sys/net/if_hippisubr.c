@@ -58,7 +58,7 @@
 #include <net/if_hippi.h>
 
 #include <netinet/in.h>
-#ifdef INET
+#if defined(INET) || defined(INET6)
 #include <netinet/in_var.h>
 #endif
 
@@ -270,12 +270,15 @@ hippi_input(ifp, hh, m)
 	m_adj(m, 8);
 	switch (htype) {
 #ifdef INET
-#ifdef INET6
-	case ETHERTYPE_IPV6:
-#endif
 	case ETHERTYPE_IP:
 		schednetisr(NETISR_IP);
 		inq = &ipintrq;
+		break;
+#endif
+#ifdef INET6
+	case ETHERTYPE_IPV6:
+		schednetisr(NETISR_IPV6);
+		inq = &ip6intrq;
 		break;
 #endif
 	default:
@@ -296,6 +299,7 @@ hippi_input(ifp, hh, m)
  * Handle packet from HIPPI that has no MAC header
  */
 
+#ifdef INET
 void
 hippi_ip_input(ifp, m)
 	struct ifnet *ifp;
@@ -318,6 +322,7 @@ hippi_ip_input(ifp, m)
 		IF_ENQUEUE(inq, m);
 	splx(s);
 }
+#endif
 
 
 /*
