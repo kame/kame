@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.23 1999/12/13 11:31:49 itojun Exp $
+	$Id: PORTABILITY,v 1.24 1999/12/14 05:27:38 jinmei Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -203,8 +203,10 @@ across those possibilities.
   like to see them defined in standard document.
 
 - Developers are advised to use pedantic compilation options (like -Wall
-  -Werror).  To configure default make settings, /etc/make.conf (freebsd)
-  and/or /etc/mk.conf (netbsd/openbsd) should be useful.
+  -Werror).  To configure default make settings, /etc/make.conf (freebsd),
+  /etc/mk.conf (netbsd/openbsd), and/or /usr/share/mk/sys.mk (bsdi) should be
+  useful. Note, however, that the default compiler of bsdi3 (/usr/ucb/cc)
+  does not suppport the -Werror option.
 
   Note that the meaning of -Wall is different across *BSD because *BSD uses
   different version of gnu cc.  Sometimes -Wall raises bogus warning due to
