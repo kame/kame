@@ -1,0 +1,20 @@
+F AUTHENC.C                         	authenc.c
+F COMMANDS.C                        	commands.c
+D CVS                               	CVS
+F DEFINES.H                         	defines.h
+F EXTERNS.H                         	externs.h
+F MAIN.C                            	main.c
+F MAKEFILE                          	Makefile
+F NETWORK.C                         	network.c
+L OBJ                               	obj	/usr/obj/usr.bin/telnet
+F README                            	README
+F RING.C                            	ring.c
+F RING.H                            	ring.h
+F SYS_BSD.C                         	sys_bsd.c
+F TELNET.1                          	telnet.1
+F TELNET.C                          	telnet.c
+F TELNET_L.H                        	telnet_locl.h
+F TERMINAL.C                        	terminal.c
+F TN3270.C                          	tn3270.c
+F TYPES.H                           	types.h
+F UTILITIE.C                        	utilities.c
