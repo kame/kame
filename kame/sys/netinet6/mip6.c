@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.5 2000/02/09 13:39:27 itojun Exp $
+ * $Id: mip6.c,v 1.6 2000/02/09 13:48:40 itojun Exp $
  *
  */
 
@@ -524,6 +524,7 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 
     /* Make sure that the BU contains a valid AH or ESP header. */
 #ifdef IPSEC
+#ifndef __OpenBSD__
     if ( !((m_in->m_flags & M_AUTHIPHDR && m_in->m_flags & M_AUTHIPDGM) ||
            (m_in->m_flags & M_AUTHIPDGM && m_in->m_flags & M_DECRYPTED)) ) {
         ip6stat.ip6s_badoptions++;
@@ -532,6 +533,7 @@ int          off;   /* Offset from start of mbuf to start of dest option */
             ip6_sprintf(coa));
         return IPPROTO_DONE;
     }
+#endif
 #endif
 
     /* Make sure that the BU contains a valid Home Address option. */

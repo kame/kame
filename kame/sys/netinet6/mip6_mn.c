@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_mn.c,v 1.3 2000/02/08 04:21:36 itojun Exp $
+ * $Id: mip6_mn.c,v 1.4 2000/02/09 13:48:42 itojun Exp $
  *
  */
 
@@ -451,12 +451,14 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 
     /* Make sure that the BA contains a valid AH or ESP header. */
 #ifdef IPSEC
+#ifndef __OpenBSD__
     if ( !((m_in->m_flags & M_AUTHIPHDR && m_in->m_flags & M_AUTHIPDGM) ||
            (m_in->m_flags & M_AUTHIPDGM && m_in->m_flags & M_DECRYPTED)) ) {
         ip6stat.ip6s_badoptions++;
         log(LOG_ERR, "%s: No AH or ESP included in BA\n", __FUNCTION__);
         return IPPROTO_DONE;
     }
+#endif
 #endif
 
     /* Make sure that the length field in the BA is >= 11. */

@@ -33,7 +33,7 @@
  *
  * Author:  Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  *
- * $Id: mip6_md.c,v 1.3 2000/02/08 04:21:36 itojun Exp $
+ * $Id: mip6_md.c,v 1.4 2000/02/09 13:48:41 itojun Exp $
  *
  */
 
@@ -586,7 +586,9 @@ mip6_select_defrtr()
 #endif
                 
 #ifdef IPSEC
+#ifndef __OpenBSD__
                 key_sa_routechange(rt_key(rt));
+#endif
 #endif
                 
 #ifdef MIP6_DEBUG
