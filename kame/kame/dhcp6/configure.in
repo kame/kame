@@ -96,6 +96,7 @@ AC_PROG_GCC_TRADITIONAL
 AC_FUNC_SETPGRP
 AC_TYPE_SIGNAL
 AC_CHECK_FUNCS(mktime select socket)
+AC_CHECK_FUNCS(clock_gettime)
 
 dnl configure local DB directory
 AC_MSG_CHECKING(for local DB directory)
