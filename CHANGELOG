@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1033 2000/06/18 06:25:56 jinmei Exp $
+$Id: CHANGELOG,v 1.1034 2000/06/18 17:13:01 itojun Exp $
 
 <200006>
 2000-06-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -22,6 +22,10 @@ Fri Jun 16 05:01:24 JST 2000  itojun@iijlab.net
 	  If you wish to upgrade to KAME-on-OpenBSD 2.7, make sure to
 	  perform "make clean" at the top level to nuke symlinks, like:
 	  % make TARGET=openbsd clean update prepare
+
+	  make VERY sure that you use kame-supplied tools (like
+	  /usr/local/v6/sbin/ping6) instead of normal ones (/sbin/ping6)
+	  if you use KAME-enabled kernel.  there are API changes between them.
 
 Thu Jun 15 22:41:16 JST 2000  itojun@iijlab.net
 	* kame/sys/netkey/key.c: correct compilation without IPSEC_ESP.
