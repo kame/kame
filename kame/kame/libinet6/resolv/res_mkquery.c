@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_mkquery.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_mkquery.c,v 1.1 1999/08/08 23:30:06 itojun Exp $";
+static char rcsid[] = "$Id: res_mkquery.c,v 1.2 2000/03/29 22:15:45 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -185,3 +185,46 @@ res_mkquery(op, dname, class, type, data, datalen, newrr_in, buf, buflen)
 	}
 	return (cp - buf);
 }
+
+#if 0
+/* attach OPT pseudo-RR, as documented in RFC2671 (EDNS0). */
+#ifndef T_OPT
+#define T_OPT	41
+#endif
+
+int
+res_opt(n0, buf, buflen, anslen)
+	int n0;
+	u_char *buf;		/* buffer to put query */
+	int buflen;		/* size of buffer */
+	int anslen;		/* answer buffer length */
+{
+	register HEADER *hp;
+	register u_char *cp;
+
+	hp = (HEADER *) buf;
+	cp = buf + n0;
+	buflen -= n0;
+
+	if (buflen < 1 + RRFIXEDSZ)
+		return -1;
+
+	*cp++ = 0;	/* "." */
+	buflen--;
+
+	__putshort(T_OPT, cp);	/* TYPE */
+	cp += INT16SZ;
+	__putshort(anslen & 0xffff, cp);	/* CLASS = UDP payload size */
+	cp += INT16SZ;
+	*cp++ = NOERROR;	/* extended RCODE */
+	*cp++ = 0;		/* EDNS version */
+	__putshort(0, cp);	/* MBZ */
+	cp += INT16SZ;
+	__putshort(0, cp);	/* RDLEN */
+	cp += INT16SZ;
+	hp->arcount = htons(ntohs(hp->arcount) + 1);
+	buflen -= RRFIXEDSZ;
+
+	return cp - buf;
+}
+#endif
