@@ -1,4 +1,4 @@
-$Id: CHANGELOG,v 1.458 2000/01/18 09:38:55 kjc Exp $
+$Id: CHANGELOG,v 1.459 2000/01/18 09:51:29 itojun Exp $
 
 
 <200001>
@@ -15,6 +15,9 @@ Tue Jan 18 16:30:05 JST 2000 kjc@csl.sony.co.jp
 	- the following altq tools are added to the tree:
 	  lib/altqlib, usr.sbin/altqd, user.bin/altqstat.
 	- install MAKEDEV.altq to /dev.
+
+	NOTE: be sure to cleanup old symlinks, by "make TARGET=netbsd clean",
+	in the top directory.
 
 2000-01-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.h: changed the type of the
