@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_syscalls.c	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.65 1999/12/12 05:52:49 green Exp $
+ * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.65.2.4 2000/11/13 07:15:44 dg Exp $
  */
 
 #include "opt_compat.h"
@@ -46,6 +46,7 @@
 #include <sys/sysproto.h>
 #include <sys/malloc.h>
 #include <sys/filedesc.h>
+#include <sys/event.h>
 #include <sys/proc.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
@@ -256,6 +257,9 @@ accept1(p, uap, compat)
 	} else
 		p->p_retval[0] = fd;
 
+	/* connection has been removed from the listen queue */
+	KNOTE(&head->so_rcv.sb_sel.si_note, 0);
+
 	so->so_state &= ~SS_COMP;
 	so->so_head = NULL;
 	if (head->so_sigio != NULL)
@@ -266,28 +270,22 @@ accept1(p, uap, compat)
 	fp->f_ops = &socketops;
 	fp->f_type = DTYPE_SOCKET;
 	sa = 0;
-	(void) soaccept(so, &sa);
-	if (sa == 0) {
-		namelen = 0;
-		if (uap->name)
-			goto gotnoname;
-		splx(s);
-		return 0;
-	}
-	if (uap->name) {
+	error = soaccept(so, &sa);
+	if (!error && uap->name) {
 		/* check sa_len before it is destroyed */
-		if (namelen > sa->sa_len)
-			namelen = sa->sa_len;
+		if (sa) {
+			if (namelen > sa->sa_len)
+				namelen = sa->sa_len;
 #ifdef COMPAT_OLDSOCK
-		if (compat)
-			((struct osockaddr *)sa)->sa_family =
-			    sa->sa_family;
+			if (compat)
+				((struct osockaddr *)sa)->sa_family =
+				    sa->sa_family;
 #endif
-		error = copyout(sa, (caddr_t)uap->name, (u_int)namelen);
-		if (!error)
-gotnoname:
-			error = copyout((caddr_t)&namelen,
-			    (caddr_t)uap->anamelen, sizeof (*uap->anamelen));
+			error = copyout(sa, (caddr_t)uap->name, (u_int)namelen);
+		} else
+			namelen = 0;
+		error = copyout((caddr_t)&namelen,
+		    (caddr_t)uap->anamelen, sizeof (*uap->anamelen));
 	}
 	if (sa)
 		FREE(sa, M_SONAME);
@@ -447,6 +445,7 @@ sendit(p, s, mp, flags)
 	struct socket *so;
 #ifdef KTRACE
 	struct iovec *ktriov = NULL;
+	struct uio ktruio;
 #endif
 
 	error = getsock(p->p_fd, s, &fp);
@@ -507,6 +506,7 @@ sendit(p, s, mp, flags)
 
 		MALLOC(ktriov, struct iovec *, iovlen, M_TEMP, M_WAITOK);
 		bcopy((caddr_t)auio.uio_iov, (caddr_t)ktriov, iovlen);
+		ktruio = auio;
 	}
 #endif
 	len = auio.uio_resid;
@@ -524,9 +524,11 @@ sendit(p, s, mp, flags)
 		p->p_retval[0] = len - auio.uio_resid;
 #ifdef KTRACE
 	if (ktriov != NULL) {
-		if (error == 0)
-			ktrgenio(p->p_tracep, s, UIO_WRITE,
-				ktriov, p->p_retval[0], error);
+		if (error == 0) {
+			ktruio.uio_iov = ktriov;
+			ktruio.uio_resid = p->p_retval[0];
+			ktrgenio(p->p_tracep, s, UIO_WRITE, &ktruio, error);
+		}
 		FREE(ktriov, M_TEMP);
 	}
 #endif
@@ -684,6 +686,7 @@ recvit(p, s, mp, namelenp)
 	struct sockaddr *fromsa = 0;
 #ifdef KTRACE
 	struct iovec *ktriov = NULL;
+	struct uio ktruio;
 #endif
 
 	error = getsock(p->p_fd, s, &fp);
@@ -707,6 +710,7 @@ recvit(p, s, mp, namelenp)
 
 		MALLOC(ktriov, struct iovec *, iovlen, M_TEMP, M_WAITOK);
 		bcopy((caddr_t)auio.uio_iov, (caddr_t)ktriov, iovlen);
+		ktruio = auio;
 	}
 #endif
 	len = auio.uio_resid;
@@ -721,9 +725,11 @@ recvit(p, s, mp, namelenp)
 	}
 #ifdef KTRACE
 	if (ktriov != NULL) {
-		if (error == 0)
-			ktrgenio(p->p_tracep, s, UIO_READ,
-				ktriov, len - auio.uio_resid, error);
+		if (error == 0) {
+			ktruio.uio_iov = ktriov;
+			ktruio.uio_resid = len - auio.uio_resid;
+			ktrgenio(p->p_tracep, s, UIO_READ, &ktruio, error);
+		}
 		FREE(ktriov, M_TEMP);
 	}
 #endif
@@ -1428,9 +1434,8 @@ sendfile(struct proc *p, struct sendfile_args *uap)
 	 * Do argument checking. Must be a regular file in, stream
 	 * type and connected socket out, positive offset.
 	 */
-	if (((u_int)uap->fd) >= fdp->fd_nfiles ||
-	    (fp = fdp->fd_ofiles[uap->fd]) == NULL ||
-	    (fp->f_flag & FREAD) == 0) {
+	fp = getfp(fdp, uap->fd, FREAD);
+	if (fp == NULL) {
 		error = EBADF;
 		goto done;
 	}
@@ -1596,8 +1601,10 @@ retry_lookup:
 				 */
 				if (pg->wire_count == 0 && pg->valid == 0 &&
 				    pg->busy == 0 && !(pg->flags & PG_BUSY) &&
-				    pg->hold_count == 0)
+				    pg->hold_count == 0) {
+					vm_page_busy(pg);
 					vm_page_free(pg);
+				}
 				sbunlock(&so->so_snd);
 				goto done;
 			}
