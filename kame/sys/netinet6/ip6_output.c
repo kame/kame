@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.393 2003/08/26 19:46:12 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.394 2003/08/26 20:00:06 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3101,11 +3101,6 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 #endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	int level, op, optname;
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	struct thread *p;
-#else
-	struct proc *p;
-#endif
 #else
 	struct mbuf *m = *mp;
 #endif /* FreeBSD >= 3 */
@@ -3116,11 +3111,6 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 		op = sopt->sopt_dir;
 		optname = sopt->sopt_name;
 		optlen = sopt->sopt_valsize;
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-		p = sopt->sopt_td;
-#else
-		p = sopt->sopt_p;
-#endif
 	} else {
 		panic("ip6_raw_ctloutput: arg soopt is NULL");
 	}
