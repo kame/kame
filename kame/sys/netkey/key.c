@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.280 2003/06/27 06:55:13 sakane Exp $	*/
+/*	$KAME: key.c,v 1.281 2003/06/27 06:58:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1914,7 +1914,7 @@ key_spdadd(so, m, mhp)
 		/*
 		 * port spec is not permitted for tunnel mode
 		 */
-		if (isr->saidx.mode == IPSEC_MODE_TUNNEL) {
+		if (isr->saidx.mode == IPSEC_MODE_TUNNEL && src0 && dst0) {
 			sa = (struct sockaddr *)(src0 + 1);
 			switch (sa->sa_family) {
 			case AF_INET:
@@ -1960,14 +1960,14 @@ key_spdadd(so, m, mhp)
 	for (isr = newsp->req; isr; isr = isr->next) {
 		struct sockaddr *sa;
 
-		if (isr->saidx.src.ss_family) {
+		if (isr->saidx.src.ss_family && src0) {
 			sa = (struct sockaddr *)(src0 + 1);
 			if (sa->sa_family != isr->saidx.src.ss_family) {
 				keydb_delsecpolicy(newsp);
 				return key_senderror(so, m, EINVAL);
 			}
 		}
-		if (isr->saidx.dst.ss_family) {
+		if (isr->saidx.dst.ss_family && dst0) {
 			sa = (struct sockaddr *)(dst0 + 1);
 			if (sa->sa_family != isr->saidx.dst.ss_family) {
 				keydb_delsecpolicy(newsp);
@@ -7406,6 +7406,7 @@ key_align(m, mhp)
 		case SADB_EXT_SPIRANGE:
 		case SADB_X_EXT_POLICY:
 		case SADB_X_EXT_SA2:
+		case SADB_X_EXT_TAG:
 			/* duplicate check */
 			/*
 			 * XXX Are there duplication payloads of either
