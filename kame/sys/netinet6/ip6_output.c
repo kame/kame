@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.215 2001/08/12 08:05:48 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.216 2001/08/16 13:33:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -702,8 +702,8 @@ skip_ipsec2:;
 	}
 
 	/* Source address validation */
-	if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src) &&
-	    !(flags & IPV6_UNSPECSRC)) {
+	if (!(flags & IPV6_UNSPECSRC) &&
+	    IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
 		/*
 		 * XXX: we can probably assume validation in the caller, but
 		 * we explicitly check the address here for safety.
