@@ -1398,7 +1398,7 @@ rm -f conftest*
 fi
 rm -f conftest*
 LIBS="$ac_func_search_save_LIBS"
-test "$ac_cv_search_CAST_cfb64_encrypt" = "no" && for i in ${crypto_dir}/lib ${crypto_dir}/lib ${crypto_dir}/lib; do
+test "$ac_cv_search_CAST_cfb64_encrypt" = "no" && for i in ${crypto_dir}/lib; do
 LIBS="-L$i -lcrypto $ac_func_search_save_LIBS"
 cat > conftest.$ac_ext <<EOF
 #line 1405 "configure"

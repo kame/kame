@@ -91,8 +91,7 @@ if test "x$crypto_dir" = "x"; then
 fi
 dnl for some reason, past version of freebsd port requires us to set -I for
 dnl BOTH openssl/cast.h and cast.h.  who should I blame (or am I mistaken?)
-RACOON_PATH_LIBS(CAST_cfb64_encrypt, crypto,
-	${crypto_dir}/lib ${crypto_dir}/lib ${crypto_dir}/lib)
+RACOON_PATH_LIBS(CAST_cfb64_encrypt, crypto, ${crypto_dir}/lib)
 RACOON_SEARCH_OPENSSL(${crypto_dir}/include)
 if test "x$include_path_openssl" = "x"; then
 	RACOON_SEARCH_HEADER(cast.h,
