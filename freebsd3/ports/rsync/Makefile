@@ -6,8 +6,8 @@
 #
 
 PORTNAME=	rsync
-PORTVERSION=	2.4.3
-CATEGORIES=	net #ipv6
+PORTVERSION=	2.4.5
+CATEGORIES=	net ipv6
 MASTER_SITES=	ftp://samba.anu.edu.au/pub/rsync/  \
 		ftp://sunsite.auc.dk/pub/unix/rsync/  \
 		ftp://ftp.sunet.se/pub/unix/admin/rsync/  \
@@ -15,7 +15,7 @@ MASTER_SITES=	ftp://samba.anu.edu.au/pub/rsync/  \
 
 PATCH_SITES=    ftp://ftp.kame.net/pub/kame/misc/ \
                 ftp://ftp.pasta.cs.uit.no/pub/IPv6/misc/
-PATCHFILES=     rsync-243-v6-20000428.diff.gz
+PATCHFILES=     rsync-245-v6-20000820.diff.gz
 PATCH_DIST_STRIP=       -p1
 
 MAINTAINER=     itojun@itojun.org
