@@ -3,7 +3,7 @@
 # Date created:		Fri Jun 19 15:07:04 JST 1998
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.1 1999/08/10 09:14:49 itojun Exp $
+# $Id: Makefile,v 1.2 1999/12/08 03:09:49 itojun Exp $
 #
 
 DISTNAME=	heimdal-0.1c
@@ -11,6 +11,8 @@ CATEGORIES=	security
 MASTER_SITES=	ftp://ftp.pdc.kth.se/pub/heimdal/src/
 
 MAINTAINER=	itojun@itojun.org
+
+BROKEN=		"use of nonstandard header field, old version"
 
 GNU_CONFIGURE=	yes
 
