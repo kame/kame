@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1767 2001/07/12 08:00:34 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1768 2001/07/14 06:19:13 sakane Exp $
 
 <200107>
+Sun Jul 15 00:01:44 JST 2001 sakane@kame.net
+	* kame/racoon:
+	the time of execution of several cipher function and the taking time
+	of each phase can be logged when ENABLE_STATS is defined.
+
 2001-07-12 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{rule,tslot}.c
 	- You can connect from outside (IPv4 world) to inside (IPv6
