@@ -85,7 +85,10 @@ main(argc, argv)
 		}
 		if (strncasecmp(readbuf, "rthdr", 5) == 0) {
 			struct ip6_rthdr *rthdr = NULL;
-			int i, hops = atoi(&readbuf[5]), rthlen;
+			int i, hops = atoi(&readbuf[5]), rthlen = 0;
+
+			if (hops == 0)
+				goto setrth; /* remove the header */
 
 			rthlen = inet6_rth_space(IPV6_RTHDR_TYPE_0, hops);
 			if ((rthdr = malloc(rthlen)) == NULL) {
@@ -104,6 +107,7 @@ main(argc, argv)
 				}
 			}
 
+		  setrth:
 			if (setsockopt(s, IPPROTO_IPV6, IPV6_RTHDR,
 				       (void *)rthdr, rthlen))
 				warn("setsockopt(IPV6_RTHDR)");
