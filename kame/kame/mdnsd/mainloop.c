@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.84 2001/11/07 02:04:47 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.85 2001/11/07 02:08:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1759,7 +1759,7 @@ relay_dns(sd, buf, len, from, fromlen)
 	enum sdtype servtype;	/* type of server we want to relay to */
 	size_t rbuflen = PACKETSZ;
 	int edns0len = -1;
-	char *edns0;
+	char *edns0 = NULL;
 	struct timeval tv;
 
 	if (sizeof(*hp) > len)
@@ -1793,7 +1793,7 @@ relay_dns(sd, buf, len, from, fromlen)
 		dnsdump("relay I", buf, len, from, fromlen);
 
 	/* if the querier's buffer size is bigger than mine, lower it */
-	if (rbuflen > RECVBUFSIZ) {
+	if (rbuflen > RECVBUFSIZ && edns0) {
 		if (update_edns0(hp, edns0, len - (edns0 - buf),
 		    RECVBUFSIZ) < 0) {
 			/* LINTED const cast */
@@ -1920,7 +1920,6 @@ relay_icmp6(sd, buf, len, from, fromlen)
 {
 	HEADER *hp;
 	struct qcache *qc;
-	struct nsdb *ns;
 	int sent;
 	const char *n = NULL;
 	const char *d;
@@ -2018,7 +2017,6 @@ relay_icmp6(sd, buf, len, from, fromlen)
 			dprintf("sock %d sent\n", i);
 #endif
 			sent++;
-			gettimeofday(&ns->lasttx, NULL);
 		}
 
 		if (sent == 0) {
