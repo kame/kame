@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.338 2003/07/22 03:49:37 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.339 2003/07/24 09:27:48 t-momose Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -217,7 +217,7 @@ draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
       (and extensions can appear unaligned).  our code follows the comment.
     * Some parts of the 24 draft, especially the relay agent function,
       have not been implemented.
-draft-ietf-mobileip-ipv6-20.txt: Mobility Support in IPv6
+draft-ietf-mobileip-ipv6-21.txt: Mobility Support in IPv6
     * See section 6.
 draft-ietf-ipngwg-router-selection-01.txt:
 	Default Router Preferences and More-Specific Routes
