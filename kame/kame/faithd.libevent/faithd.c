@@ -138,6 +138,13 @@ main(argc, argv)
 				close(s[smax]);
 				continue;
 			}
+#ifdef IPV6_V6ONLY
+			if (setsockopt(s[smax], IPPROTO_IPV6, IPV6_V6ONLY, &yes,
+			    sizeof(yes)) < 0) {
+				close(s[smax]);
+				continue;
+			}
+#endif
 			if (bind(s[smax], res->ai_addr, res->ai_addrlen) < 0) {
 				close(s[smax]);
 				continue;
