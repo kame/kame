@@ -93,17 +93,7 @@ extern int     	check_ipsec_policy  __P((struct inpcb *, u_int32_t));
 #include <netinet6/icmp6.h>
 #include <netinet6/ip6protosw.h>
 
-#ifndef CREATE_IPV6_MAPPED
-#define CREATE_IPV6_MAPPED(a6, a4) \
-do { \
-	bzero(&(a6), sizeof(a6));			\
-	(a6).s6_addr[10] = (a6).s6_addr[11] = 0xff;	\
-	*(u_int32_t *)&(a6).s6_addr[12] = (a4);		\
-} while (0)
-#endif
-
 extern int ip6_defhlim;
-
 #endif /* INET6 */
 
 /*
@@ -182,7 +172,6 @@ udp_input(m, va_alist)
 	} srcsa, dstsa;
 #ifdef INET6
 	struct ip6_hdr *ipv6;
-	struct sockaddr_in6 src_v4mapped;
 #endif /* INET6 */
 #ifdef IPSEC
 	struct tdb  *tdb = NULL;
@@ -321,14 +310,6 @@ udp_input(m, va_alist)
 		srcsa.sin.sin_port = uh->uh_sport;
 		srcsa.sin.sin_addr = ip->ip_src;
 
-#ifdef INET6
-		bzero(&src_v4mapped, sizeof(struct sockaddr_in6));
-		src_v4mapped.sin6_len = sizeof(struct sockaddr_in6);
-		src_v4mapped.sin6_family = AF_INET6;
-		src_v4mapped.sin6_port = uh->uh_sport;
-		CREATE_IPV6_MAPPED(src_v4mapped.sin6_addr, ip->ip_src.s_addr);
-#endif /* INET6 */
-
 		bzero(&dstsa, sizeof(struct sockaddr_in));
 		dstsa.sin.sin_len = sizeof(struct sockaddr_in);
 		dstsa.sin.sin_family = AF_INET;
@@ -447,16 +428,6 @@ udp_input(m, va_alist)
 #endif /* INET6 */
 					m_adj(n, iphlen);
 					if (sbappendaddr(&last->so_rcv,
-#ifdef INET6							 
-					/*
-					 * This cruft is needed in (the rare)
-					 * case I deliver a {multi,broad}cast
-					 * IPv4 packet to an AF_INET6 socket.
-					 */
-					    ((((struct inpcb *)last->so_pcb)->inp_flags
-					    & INP_IPV6) && ip) ?
-					    (struct sockaddr *)&src_v4mapped :
-#endif /* INET6 */
 					    &srcsa.sa, n, opts) == 0) {
 						m_freem(n);
 						if (opts)
@@ -497,15 +468,6 @@ udp_input(m, va_alist)
 #endif /* INET6 */
 		m_adj(m, iphlen);
 		if (sbappendaddr(&last->so_rcv, 
-#ifdef INET6
-	        /*
-		 * This cruft is needed in (the rare) case I
-		 * deliver a {multi,broad}cast IPv4 packet to
-		 * an AF_INET6 socket.
-		 */
-		    ((((struct inpcb *)last->so_pcb)->inp_flags & INP_IPV6) && ip) ?
-		    (struct sockaddr *)&src_v4mapped :
-#endif /* INET6 */
 		    &srcsa.sa, m, opts) == 0) {
 			udpstat.udps_fullsock++;
 			goto bad;
@@ -618,14 +580,6 @@ udp_input(m, va_alist)
 	iphlen += sizeof(struct udphdr);
 	m_adj(m, iphlen);
 	if (sbappendaddr(&inp->inp_socket->so_rcv,
-#ifdef INET6
-	    /*
-	     * This cruft is needed to deliver a IPv4 packet to
-	     * an AF_INET6 socket.
-	     */
-	    ((((struct inpcb *)inp->inp_socket->so_pcb)->inp_flags & INP_IPV6)
-	    && ip) ? (struct sockaddr *)&src_v4mapped : 
-#endif /* INET6 */
 		&srcsa.sa, m, opts) == 0) {
 		udpstat.udps_fullsock++;
 		goto bad;
