@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.36 2002/03/15 10:46:40 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.37 2002/04/26 10:25:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -562,7 +562,7 @@ insert:
 	offset = ip6af->ip6af_offset - sizeof(struct ip6_frag);
 	free(ip6af, M_FTABLE);
 	ip6 = mtod(m, struct ip6_hdr *);
-	ip6->ip6_plen = htons((u_short)next + offset - sizeof(struct ip6_hdr));
+	ip6->ip6_plen = htons(next + offset - sizeof(struct ip6_hdr));
 	/* XXX: ip6q_src, dst may have an embedded zone ID */
 	ip6->ip6_src = q6->ip6q_src.sin6_addr;
 	ip6->ip6_dst = q6->ip6q_dst.sin6_addr;
