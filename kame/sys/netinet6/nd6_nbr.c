@@ -335,6 +335,13 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	/* estimate the size of message */
 	maxlen = sizeof(*ip6) + sizeof(*nd_ns);
 	maxlen += (sizeof(struct nd_opt_hdr) + ifp->if_addrlen + 7) & ~7;
+	if (max_linkhdr + maxlen >= MCLBYTES) {
+#ifdef DIAGNOSTIC
+		printf("nd6_ns_output: max_linkhdr + maxlen >= MCLBYTES "
+		    "(%d + %d > %d)\n", max_linkhdr, maxlen, MCLBYTES);
+#endif
+		return;
+	}
 
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (m && max_linkhdr + maxlen >= MHLEN) {
@@ -774,6 +781,13 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr)
 	/* estimate the size of message */
 	maxlen = sizeof(*ip6) + sizeof(*nd_na);
 	maxlen += (sizeof(struct nd_opt_hdr) + ifp->if_addrlen + 7) & ~7;
+	if (max_linkhdr + maxlen >= MCLBYTES) {
+#ifdef DIAGNOSTIC
+		printf("nd6_na_output: max_linkhdr + maxlen >= MCLBYTES "
+		    "(%d + %d > %d)\n", max_linkhdr, maxlen, MCLBYTES);
+#endif
+		return;
+	}
 
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (m && max_linkhdr + maxlen >= MHLEN) {
