@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.77 2001/12/18 02:34:04 jinmei Exp $	*/
+/*	$KAME: route6d.c,v 1.78 2001/12/19 09:40:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.77 2001/12/18 02:34:04 jinmei Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.78 2001/12/19 09:40:39 jinmei Exp $";
 #endif
 
 #include <stdio.h>
@@ -2067,7 +2067,7 @@ ifrt(ifcp, again)
 /*
  * there are couple of p2p interface routing models.  "behavior" lets
  * you pick one.  it looks that gated behavior fits best with BSDs,
- * since BSD kernels does not look at prefix length on p2p interfaces.
+ * since BSD kernels do not look at prefix length on p2p interfaces.
  */
 void
 ifrt_p2p(ifcp, again)
