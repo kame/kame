@@ -29,7 +29,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-dhcp6.c,v 1.3 1999/09/12 10:31:04 itojun Exp $";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-dhcp6.c,v 1.4 1999/09/13 13:31:56 itojun Exp $";
 #endif
 
 #include <sys/param.h>
@@ -50,6 +50,7 @@ struct rtentry;
 #endif
 #include <stdio.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 #include "interface.h"
 #include "addrtoname.h"
