@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.6 2000/01/12 21:00:04 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.7 2000/01/12 21:03:49 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -459,8 +459,9 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 		if (res == NULL)
 			goto end;
 
-		/* a guess: ESP: 128bit minimum, AH: 128 bit minimum */
-		dupkeymat = ((k->len ? k->len : 128)+ 128) / 8 / res->l;
+		/* a guess: ESP: 128bit minimum, AH: 160 bit minimum */
+		dupkeymat = ((k->len ? k->len : 128) + 160) / 8 / res->l;
+		dupkeymat += 2;	/* safety mergin */
 		if (dupkeymat < 3)
 			dupkeymat = 3;
 		YIPSDEBUG(DEBUG_DKEY,
