@@ -156,6 +156,8 @@ struct inpcb {
 	struct {
 		/* IP options */
 		struct mbuf *inp6_options;
+		/* IP6 options for incoming packets */
+		struct ip6_recvpktopts inp6_inputopts;
 		/* IP6 options for outgoing packets */
 		struct ip6_pktopts *inp6_outputopts;
 		/* IP multicast options */
@@ -175,6 +177,7 @@ struct inpcb {
 #define in6p_flowinfo	inp_flow
 #define in6p_vflag	inp_vflag
 #define in6p_options	inp_depend6.inp6_options
+#define in6p_inputopts	inp_depend6.inp6_inputopts
 #define in6p_outputopts	inp_depend6.inp6_outputopts
 #define in6p_moptions	inp_depend6.inp6_moptions
 #define in6p_icmp6filt	inp_depend6.inp6_icmp6filt

@@ -95,10 +95,10 @@
 #include <netinet6/nd6.h>
 #include <netinet/icmp6.h>
 
-#include <netinet/in_pcb.h>
-#include <netinet6/in6_pcb.h>
 #include <netinet/ip_var.h>
 #include <netinet6/ip6_var.h>
+#include <netinet/in_pcb.h>
+#include <netinet6/in6_pcb.h>
 #include <netinet/icmp_var.h>	/* for ICMP_BANDLIM		*/
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
@@ -733,10 +733,7 @@ findpcb:
 #ifdef INET6
 	/* save packet options if user wanted */
 	if (inp->in6p_flags & INP_CONTROLOPTS) {
-		if (inp->in6p_options) {
-			m_freem(inp->in6p_options);
-			inp->in6p_options = 0;
-		}
+		struct ip6_recvpktopts opts6;
 
 		/*
 		 * Temporarily re-adjusting the mbuf before ip6_savecontrol(),
@@ -749,7 +746,14 @@ findpcb:
 		m->m_data -= hdroptlen;
 		m->m_len  += hdroptlen;
 #endif
-		ip6_savecontrol(inp, &inp->in6p_options, ip6, m);
+		ip6_savecontrol(inp, ip6, m, &opts6, &inp->in6p_inputopts);
+		ip6_update_recvpcbopt(&inp->in6p_inputopts, &opts6);
+		if (opts6.head) {
+			if (sbappendcontrol(&in6p->in6p_socket->so_rcv,
+					    NULL, opts6.head)
+			    == 0)
+				m_freem(opts6.head);
+		}
 #ifndef DEFER_MADJ
 		m->m_data += hdroptlen;	/* XXX */
 		m->m_len  -= hdroptlen;	/* XXX */
@@ -880,6 +884,8 @@ findpcb:
 #endif
 #ifdef INET6
 			if (isipv6) {
+				struct ip6_recvpktopts newopts;
+
 				/*
 				 * inherit socket options from the listening
 				 * socket.
@@ -887,10 +893,7 @@ findpcb:
 				inp->inp_flags |=
 					oinp->inp_flags & INP_CONTROLOPTS;
 				if (inp->inp_flags & INP_CONTROLOPTS) {
-					if (inp->in6p_options) {
-						m_freem(inp->in6p_options);
-						inp->in6p_options = 0;
-					}
+					bzero(&newopts6, sizeof(newopts6));
 					/*
 					 * Temporarily re-adjusting the mbuf
 					 * before ip6_savecontrol().
@@ -902,9 +905,18 @@ findpcb:
 					m->m_data -= hdroptlen;
 					m->m_len  += hdroptlen;
 #endif
-					ip6_savecontrol(inp,
-							&inp->in6p_options,
-							ip6, m);
+					ip6_savecontrol(inp, ip6, m,
+							&newopts6,
+							&inp->in6p_options);
+					ip6_update_recvpcbopt(&inp->in6p_inputopts,
+							      &newopts6);
+					if (newopts.head) {
+						if (sbappendcontrol(&so->so_rcv,
+								    NULL,
+								    newopts6.head)
+						    == 0)
+							m_freem(newopts6.head);
+					}
 #ifndef DEFER_MADJ
 					m->m_data += hdroptlen;	/* XXX */
 					m->m_len  -= hdroptlen;	/* XXX */

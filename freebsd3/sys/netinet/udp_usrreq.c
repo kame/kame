@@ -90,13 +90,10 @@
 #include <netinet/ip.h>
 #if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
 #include <netinet/ip6.h>
+#include <netinet6/ip6_var.h>
 #endif
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
-#include <netinet/ip_var.h>
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
-#include <netinet6/ip6_var.h>
-#endif
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp_var.h>
 #include <netinet/udp.h>
@@ -181,11 +178,17 @@ udp_input(m, off, proto)
 	register struct udphdr *uh;
 	register struct inpcb *inp;
 	struct mbuf *opts = 0;
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+	struct ip6_recvpktopts opts6;
+#endif 
 	int len;
 	struct ip save_ip;
 	struct sockaddr *append_sa;
 
 	udpstat.udps_ipackets++;
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+	bzero(&opts6, sizeof(opts6));
+#endif
 
 	/*
 	 * Strip IP options, if any; should skip this,
@@ -394,7 +397,8 @@ udp_input(m, off, proto)
 			ip_2_ip6_hdr(&udp_ip6.uip6_ip6, ip);
 			savedflags = inp->inp_flags;
 			inp->inp_flags &= ~INP_UNMAPPABLEOPTS;
-			ip6_savecontrol(inp, &opts, &udp_ip6.uip6_ip6, m);
+			ip6_savecontrol(inp, &udp_ip6.uip6_ip6, m,
+					&opts6, NULL);
 			inp->inp_flags = savedflags;
 		} else
 #endif
@@ -466,7 +470,8 @@ udp_append(last, ip, n, off)
 			}
 			savedflags = last->inp_flags;
 			last->inp_flags &= ~INP_UNMAPPABLEOPTS;
-			ip6_savecontrol(last, &opts, &udp_ip6.uip6_ip6, n);
+			ip6_savecontrol(last, &udp_ip6.uip6_ip6, n,
+					&opts6, NULL);
 			last->inp_flags = savedflags;
 		} else
 #endif
