@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.99 2001/05/24 06:43:24 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.100 2001/05/24 08:09:57 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -1050,7 +1050,7 @@ remote_spec
 		}
 		dh_group_num EOS
 	|	KEEPALIVE { cur_rmconf->keepalive = TRUE; } EOS
-	|	PASSIVE SWITH { cur_rmconf->passive = TRUE; } EOS
+	|	PASSIVE SWITCH { cur_rmconf->passive = $2; } EOS
 	|	GENERATE_POLICY SWITCH { cur_rmconf->gen_policy = $2; } EOS
 	|	SUPPORT_MIP6 SWITCH { cur_rmconf->support_mip6 = $2; } EOS
 	|	INITIAL_CONTACT SWITCH { cur_rmconf->ini_contact = $2; } EOS
