@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.291 1999/11/24 10:52:56 itojun Exp $
+$Id: CHANGELOG,v 1.292 1999/11/25 01:27:46 itojun Exp $
 
 <199911>
+Thu Nov 25 10:26:39 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/devel/ipv6socket_scrub: a new pkgsrc directory for
+	  IPv6 socket scrubber (IPv6-readiness checking tool for source code
+	  tree).
+	* netbsd/pkgsrc/net/ethereal: upgrade to 0.7.8.
+
 Wed Nov 24 19:48:36 JST 1999  itojun@iijlab.net
 	* tcp_input.c (all platforms)
 	  do not remove ip header and tcp header/option until we pass the mbuf
