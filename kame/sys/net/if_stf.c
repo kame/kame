@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.83 2002/09/17 05:57:09 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.84 2002/09/17 06:32:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -817,7 +817,6 @@ isrfc1918addr(in)
 	/*
 	 * returns 1 if private address range:
 	 * 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
-	 * (requirement from RFC3056 section 2 1st paragraph)
 	 */
 	if ((ntohl(in->s_addr) & 0xff000000) >> 24 == 10 ||
 	    (ntohl(in->s_addr) & 0xfff00000) >> 16 == 172 * 256 + 16 ||
