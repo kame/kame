@@ -1,4 +1,4 @@
-SUBDIR+=libinet6 libpcap
+SUBDIR+=libinet6
 .if ${MACHINE_ARCH} == "i386"
 SUBDIR+=libaltq
 .endif
