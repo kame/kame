@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.863 2000/05/09 17:09:28 itojun Exp $
+$Id: CHANGELOG,v 1.864 2000/05/10 05:08:58 itojun Exp $
 
 <200005>
+Wed May 10 14:07:22 JST 2000  itojun@iijlab.net
+	* sys/netinet/* (all platforms): correct more boundary checking issues
+	  in ip options processing.
+	  
 Wed May 10 02:07:33 JST 2000  itojun@iijlab.net
 	* sbin/ping6: correct outbound NI query packet with -aw.
 	  we should have attached Subject data, which was defined in
