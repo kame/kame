@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.32 2003/01/14 06:10:15 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.33 2003/01/14 06:14:50 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -13,6 +13,10 @@ KAME project
 	- Simultaniously use with the privacy extention doesn't work.
 	- Accept HoT/CoT messages with HAO.
 	- Incorrect DHAAD reply message format.
+	- Incorrect auth data calculation of the BU message
+	  when a mobile node is home.
+	- Incorrect lifetime calculation at a correspondent node
+	  when a binding cache is already exists.
 
 - Missing features
 	- The mobile prefix sol/adv.
