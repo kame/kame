@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.394 2000/01/02 13:09:05 itojun Exp $
+$Id: CHANGELOG,v 1.395 2000/01/02 14:00:24 itojun Exp $
 
 <200001>
+Sun Jan  2 22:59:45 JST 2000  itojun@iijlab.net
+	* kame/libinet6/name6.c: don't bark even if we see T_SIG and other
+	  record types.
+
+	  KAME PR: 184
+	  From: Assar Westerlund <assar@sics.se>
+
 Sun Jan  2 22:07:54 JST 2000  itojun@iijlab.net
 	* kame/tcpdump/isakmp.h, kame/racoon/isakmp.h:
 	  avoid use of bitfield on packet format definition.  it is
