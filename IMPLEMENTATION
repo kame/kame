@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/24 16:22:00 $
+			$Date: 1999/10/30 02:17:08 $
 
 1. IPv6
 
@@ -885,8 +885,10 @@ The key management code implemented in this kit (sys/netkey) is a
 home-brew PFKEY v2 implementation.  This conforms to RFC2367.
 
 The home-brew IKE daemon, "racoon" is included in the kit
-(kame/kame/racoon).  It can perform key exchanges in some limited
-conditions, however, it may take some more time to be stabilized.
+(kame/kame/racoon).
+Basically you'll need to run racoon as daemon, then setup a policy
+to require keys (like ping -P 'out ipsec esp/transport//use').
+The kernel will contact racoon daemon as necessary to exchange keys.
 
 4.3 AH and ESP handling
 
@@ -1026,6 +1028,16 @@ For more information, please refer to:
 	KAME sys/netinet6/{ah,esp}_input.c
 
 (Thanks goes to Kenjiro Cho <kjc@csl.sony.co.jp> for detailed analysis)
+
+4.6 Interoperability
+
+Here are (some of) platforms we have tested IPsec/IKE interoperability
+in the past.  Note that both ends (KAME and others) may have modified their
+implementation, so use the following list just for reference purposes.
+	Altiga, Ashley-laurent (vpcom.com), Data Fellows (F-Secure), Ericsson
+	ACC, FreeS/WAN, HITACHI, IBM AIX, IIJ, Intel, Microsoft WinNT, NIST
+	(linux IPsec + plutoplus), Netscreen, OpenBSD, RedCreek, Routerware,
+	SSH, Secure Computing, Soliton, Toshiba, VPNet, Yamaha RT100i
 
 5. IPComp
 
