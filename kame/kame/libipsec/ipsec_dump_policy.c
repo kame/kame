@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_dump_policy.c,v 1.9 2000/05/07 05:26:08 itojun Exp $	*/
+/*	$KAME: ipsec_dump_policy.c,v 1.10 2000/05/07 05:28:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -45,8 +45,6 @@
 #include <netdb.h>
 
 #include "ipsec_strerror.h"
-
-#define USE_GETNAMEINFO
 
 static const char *ipsp_dir_strs[] = {
 	"any", "in", "out",
