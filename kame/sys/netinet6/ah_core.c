@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.27 2000/03/09 19:18:39 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.28 2000/03/09 19:36:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -855,32 +855,35 @@ again:
 		siz = (*algo->sumsiz)(sav);
 		totlen = (ah.ah_len + 2) << 2;
 
-		if (totlen > m->m_pkthdr.len - off || totlen > MCLBYTES) {
-			error = EMSGSIZE;
-			goto fail;
-		}
-		MGET(n, M_DONTWAIT, MT_DATA);
-		if (n && totlen > MLEN) {
-			MCLGET(n, M_DONTWAIT);
-			if ((n->m_flags & M_EXT) == 0) {
-				m_free(n);
-				n = NULL;
-			}
-		}
-		if (n == NULL) {
-			error = ENOBUFS;
-			goto fail;
-		}
-		m_copydata(m, off, totlen, mtod(n, caddr_t));
-
 		/*
 		 * special treatment is necessary for the first one, not others
 		 */
-		if (!ahseen)
+		if (!ahseen) {
+			if (totlen > m->m_pkthdr.len - off ||
+			    totlen > MCLBYTES) {
+				error = EMSGSIZE;
+				goto fail;
+			}
+			MGET(n, M_DONTWAIT, MT_DATA);
+			if (n && totlen > MLEN) {
+				MCLGET(n, M_DONTWAIT);
+				if ((n->m_flags & M_EXT) == 0) {
+					m_free(n);
+					n = NULL;
+				}
+			}
+			if (n == NULL) {
+				error = ENOBUFS;
+				goto fail;
+			}
+			m_copydata(m, off, totlen, mtod(n, caddr_t));
+			n->m_len = totlen;
 			bzero(mtod(n, caddr_t) + hdrsiz, siz);
-		(algo->update)(&algos, mtod(n, caddr_t), totlen);
-		m_free(n);
-		n = NULL;
+			(algo->update)(&algos, mtod(n, caddr_t), n->m_len);
+			m_free(n);
+			n = NULL;
+		} else
+			ah_update_mbuf(m, off, totlen, algo, &algos);
 		ahseen++;
 
 		hdrtype = ah.ah_nxt;
