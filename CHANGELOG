@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2024 2001/12/24 10:56:30 jinmei Exp $
+$KAME: CHANGELOG,v 1.2025 2001/12/25 04:09:42 jinmei Exp $
 
 <200112>
+2001-12-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/ip6opt.c (inet6_opt_next, inet6_opt_find):
+	corrected the calculation of the "previous length" returned by
+	these functions.  The returned length should contain the length of
+	the returned option.
+
 2001-12-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd/sbin/ip6addrctl: a dedicated directory was digged in order
 	for the tool to be compiled as a standard package.
