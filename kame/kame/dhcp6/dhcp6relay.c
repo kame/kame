@@ -421,6 +421,9 @@ relay6_init()
 	ICMP6_FILTER_SETBLOCKALL(&filt);
 	for (type = 0; type < 128; type++)
 		ICMP6_FILTER_SETPASS(type, &filt);
+	if (setsockopt(icmp6sock, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
+		       sizeof(filt)) < 0)
+		err(1, "setsockopt(ICMP6_FILTER)");
 }
 
 static void
