@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.50 2001/09/21 05:46:05 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.51 2001/11/09 09:34:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -114,7 +114,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.50 2001/09/21 05:46:05 itojun Exp $"; 
+static char *versionstr = "$KAME: bindtest.c,v 1.51 2001/11/09 09:34:33 itojun Exp $"; 
 static char *port = NULL;
 static char *otheraddr = NULL;
 static char *bcastaddr = NULL;
@@ -178,6 +178,10 @@ main(argc, argv)
 			break;
 		case 'p':
 			port = strdup(optarg);
+			if (!port) {
+				fprintf(stderr, "strdup failed\n");
+				exit(1);
+			}
 			break;
 		case 's':
 			summary = 1;

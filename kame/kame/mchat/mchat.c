@@ -1,4 +1,4 @@
-/*	$KAME: mchat.c,v 1.14 2001/06/08 04:36:39 jinmei Exp $	*/
+/*	$KAME: mchat.c,v 1.15 2001/11/09 09:38:57 itojun Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
  * All rights reserved.
@@ -194,14 +194,25 @@ main(argc, argv)
 
 	strncpy(session->myname, getlogin(), sizeof(session->myname));
 
-	if (iface)
+	if (iface) {
 		session->s_mif = strdup(iface);
+		if (!session->s_mif)
+			errx(1, "strdup");
+	}
 	session->s_mport = strdup(port);
+	if (!session->s_mport)
+		errx(1, "strdup");
 	snprintf(pbuf, sizeof(pbuf), "%d", atoi(port) + 1);
 	session->s_uport = strdup(pbuf);
+	if (!session->s_uport)
+		errx(1, "strdup");
 	if (policy) {
 		session->s_rpolicy = strdup(policy);
+		if (!session->s_rpolicy)
+			errx(1, "strdup");
 		session->s_upolicy = strdup(policy);
+		if (!session->s_upolicy)
+			errx(1, "strdup");
 	}
 
 	/* configure multicast sender port */
