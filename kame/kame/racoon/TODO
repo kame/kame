@@ -1,4 +1,4 @@
-$Id: TODO,v 1.32 2000/09/23 15:22:40 itojun Exp $
+$Id: TODO,v 1.33 2000/09/23 15:24:22 itojun Exp $
 
 Please send any questions or bug reports to snap-users@kame.net.
 
@@ -153,7 +153,7 @@ o interaction between IKE/IPsec and socket layer.
   - kick tcp retransmission timer on first SA establishment
 o IKE daemon should handle situations where peer does not run IKE daemon
   (UDP port unreach for port 500) better.
-  should send connected UDP sockets for sending IKE datagrams.
+  should use connected UDP sockets for sending IKE datagrams.
 o rate-limit log messages from kernel IPsec errors, like "no SA found".
 
 TO BE TESTED.
