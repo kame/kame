@@ -46,6 +46,11 @@ fi
 AC_MSG_RESULT($ac_add_path)
 ])])
 
+dnl
+dnl openssl 0.94 or higher recommends user to include header files as
+dnl openssl/foo.h, not foo.h with -Ipath/openssl.
+dnl RACOON_SEARCH_OPENSSL copes with this.
+dnl
 AC_DEFUN(RACOON_SEARCH_OPENSSL,
 [AC_PREREQ([2.13])
 AC_MSG_CHECKING(for openssl include path)
