@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.51 2002/09/11 02:34:18 itojun Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.52 2002/09/18 07:54:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -222,7 +222,7 @@ mip6_icmp6_input(m, off, icmp6len)
 			switch (*(u_int8_t *)(origip6 + pptr)) {
 			case IP6OPT_HOME_ADDRESS:
 				/*
-				 * a peer doesn't recognize HAO.
+				 * the peer doesn't recognize HAO.
 				 */
 				mip6stat.mip6s_paramprobhao++;
 
@@ -242,10 +242,7 @@ mip6_icmp6_input(m, off, icmp6len)
 				     sc;
 				     sc = TAILQ_NEXT(sc, hif_entry)) {
 					mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &paddr, &laddr);
-					if (mbu) {
-						mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
-						mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
-					}
+					mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_ICMP_PARAMPROB_RECEIVED, NULL);
 				}
 				break;
 			}
@@ -272,10 +269,7 @@ mip6_icmp6_input(m, off, icmp6len)
 				     sc;
 				     sc = TAILQ_NEXT(sc, hif_entry)) {
 					mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &paddr, &laddr);
-					if (mbu) {
-						mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
-						mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
-					}
+					mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_ICMP_PARAMPROB_RECEIVED, NULL);
 				}
 				break;
 			}

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.9 2002/09/11 02:34:18 itojun Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.10 2002/09/18 07:54:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -104,14 +104,21 @@ mip6_bu_fsm(mbu, event, data)
 		case MIP6_BU_FSM_EVENT_RO_DESIRED:
 			/*
 			 * send HoTI, CoTI, start retrans timer and
-			 * failure timers.
+			 * failure timers.  if we fail to send
+			 * messages, the state remains unchanged and
+			 * we wait for a next event.
 			 */
-
-			/* XXX error handling */
-			mip6_bu_send_hoti(mbu);
-			mip6_bu_send_coti(mbu);
+			if (mip6_bu_send_hoti(mbu) != 0)
+				break;
+			if (mip6_bu_send_coti(mbu) != 0)
+				break;
 
 			*mbu_fsm_state = MIP6_BU_FSM_STATE_WAITHC;
+			break;
+
+		case MIP6_BU_FSM_EVENT_ICMP_PARAMPROB_RECEIVED:
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
 			break;
 		}
 		break;
@@ -174,6 +181,9 @@ mip6_bu_fsm(mbu, event, data)
 			break;
 
 		case MIP6_BU_FSM_EVENT_ICMP_PARAMPROB_RECEIVED:
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+
 			/*
 			 * stop timers.
 			 */
@@ -256,6 +266,11 @@ mip6_bu_fsm(mbu, event, data)
 			/* XXX */
 
 			break;
+
+		case MIP6_BU_FSM_EVENT_ICMP_PARAMPROB_RECEIVED:
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+			break;
 		}
 		break;
 
@@ -322,6 +337,11 @@ mip6_bu_fsm(mbu, event, data)
 			/* XXX */
 
 			break;
+
+		case MIP6_BU_FSM_EVENT_ICMP_PARAMPROB_RECEIVED:
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+			break;
 		}
 		break;
 
@@ -385,6 +405,11 @@ mip6_bu_fsm(mbu, event, data)
 			/* XXX */
 
 			*mbu_fsm_state = MIP6_BU_FSM_STATE_WAITC;
+			break;
+
+		case MIP6_BU_FSM_EVENT_ICMP_PARAMPROB_RECEIVED:
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
 			break;
 		}
 		break;
@@ -452,6 +477,11 @@ mip6_bu_fsm(mbu, event, data)
 
 			*mbu_fsm_state = MIP6_BU_FSM_STATE_WAITHC;
 			break;
+
+		case MIP6_BU_FSM_EVENT_ICMP_PARAMPROB_RECEIVED:
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+			break;
 		}
 		break;
 
@@ -501,6 +531,11 @@ mip6_bu_fsm(mbu, event, data)
 			/* XXX */
 
 			*mbu_fsm_state = MIP6_BU_FSM_STATE_WAITHC;
+			break;
+
+		case MIP6_BU_FSM_EVENT_ICMP_PARAMPROB_RECEIVED:
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
 			break;
 		}
 		break;
@@ -580,12 +615,22 @@ mip6_bu_fsm(mbu, event, data)
 			 * send HoTI, CoTI, start retrans and failure
 			 * timers.
 			 */
-
-			/* XXX error handling */
-			mip6_bu_send_hoti(mbu);
-			mip6_bu_send_coti(mbu);
+			/* XXX */
+			if (mip6_bu_send_hoti(mbu) !=0) {
+				*mbu_fsm_state = MIP6_BU_FSM_STATE_IDLE;
+				break;
+			}
+			if (mip6_bu_send_coti(mbu) !=0) {
+				*mbu_fsm_state = MIP6_BU_FSM_STATE_IDLE;
+				break;
+			}
 
 			*mbu_fsm_state = MIP6_BU_FSM_STATE_WAITHC;
+			break;
+
+		case MIP6_BU_FSM_EVENT_ICMP_PARAMPROB_RECEIVED:
+			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
 			break;
 		}
 		break;
