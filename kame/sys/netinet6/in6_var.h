@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.86 2002/11/05 03:48:32 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.87 2002/11/06 07:43:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -691,15 +691,15 @@ do {						\
 
 #ifdef MLDV2
 struct	in6_multi * in6_addmulti(struct sockaddr_in6 *, struct ifnet *,
-				 int *, u_int16_t, struct sockaddr_in6 *,
+				 int *, u_int16_t, struct sockaddr_storage *,
 				 u_int, int);
 void	in6_delmulti(struct in6_multi *, int *,
-		     u_int16_t, struct sockaddr_in6 *,
+		     u_int16_t, struct sockaddr_storage *,
 		     u_int, int);
 struct	in6_multi * in6_modmulti(struct sockaddr_in6 *, struct ifnet *,
 				 int *, u_int16_t,
-				 struct sockaddr_in6 *, u_int, u_int16_t,
-				 struct sockaddr_in6 *, u_int, int, u_int);
+				 struct sockaddr_storage *, u_int, u_int16_t,
+				 struct sockaddr_storage *, u_int, int, u_int);
 #else
 struct	in6_multi *in6_addmulti __P((struct sockaddr_in6 *, struct ifnet *,
 	int *));

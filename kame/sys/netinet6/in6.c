@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.328 2002/11/04 06:43:53 suz Exp $	*/
+/*	$KAME: in6.c,v 1.329 2002/11/06 07:43:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2221,7 +2221,7 @@ in6_addmulti(maddr6, ifp, errorp)
 	int *errorp;
 #ifdef MLDV2
 	u_int16_t numsrc;
-	struct sockaddr_in6 *src;
+	struct sockaddr_storage *src;
 	u_int mode;			/* requested filter mode by socket */
 	int init;			/* indicate initial join by socket */
 #endif
@@ -2475,7 +2475,7 @@ in6_delmulti(in6m)
 #ifdef MLDV2
 	int *errorp;			/* return code of each sub routine */	
 	u_int16_t numsrc;
-	struct sockaddr_in6 *src;
+	struct sockaddr_storage *src;
 	u_int mode;			/* requested filter mode by socket */
 	int final;			/* indicate complete leave by socket */
 #endif	
@@ -2937,7 +2937,7 @@ in6_addmulti(maddr6, ifp, errorp)
 	int *errorp;
 #ifdef MLDV2
 	u_int16_t numsrc;
-	struct sockaddr_in6 *src;
+	struct sockaddr_storage *src;
 	u_int mode;			/* requested filter mode by socket */
 	int init;			/* indicate initial join by socket */
 #endif
@@ -3196,7 +3196,7 @@ in6_delmulti(in6m)
 #ifdef MLDV2
 	int *error;			/* return code of each sub routine */	
 	u_int16_t numsrc;
-	struct sockaddr_in6 *src;
+	struct sockaddr_storage *src;
 	u_int mode;			/* requested filter mode by socket */
 	int final;			/* indicate complete leave by socket */
 #endif
@@ -3353,7 +3353,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	struct ifnet *ifp;
 	int *error;			/* return code of each sub routine */
 	u_int16_t numsrc, old_num;
-	struct sockaddr_in6 *src, *old_src;
+	struct sockaddr_storage *src, *old_src;
 	u_int mode, old_mode;		/* requested/current filter mode */
 	int init;			/* indicate initial join by socket */
 	u_int grpjoin;			/* on/off of (*,G) join by socket */
@@ -3665,7 +3665,7 @@ in6_leavegroup(imm)
 				FREE(del_ss, M_IPMOPTS);
 			return error;
 		}
-		in6_delmulti(imm->i6mm_maddr, &error, numsrc, SIN6(del_ss),
+		in6_delmulti(imm->i6mm_maddr, &error, numsrc, del_ss,
 			     mode, final);
 		if (del_ss != NULL)
 			FREE(del_ss, M_IPMOPTS);

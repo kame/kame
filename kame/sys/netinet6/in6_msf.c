@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.11 2002/11/05 03:48:32 itojun Exp $	*/
+/*	$KAME: in6_msf.c,v 1.12 2002/11/06 07:43:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -152,7 +152,7 @@ int
 in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 	struct in6_multi *in6m;
 	u_int16_t numsrc;
-	struct sockaddr_in6 *ss;
+	struct sockaddr_storage *ss;
 	u_int mode;
 	int init;
 	struct i6as_head **newhead;
@@ -227,7 +227,7 @@ in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 			if (ias == NULL)
 				return ENOBUFS;
 
-			bcopy(&ss[0], &ias->i6as_addr, ss[0].sin6_len);
+			bcopy(&ss[0], &ias->i6as_addr, ss[0].ss_len);
 			ias->i6as_refcount = 1;
 			if (IN6M_SOURCE_LIST(mode) == NULL) {
 				I6AS_LIST_ALLOC(IN6M_SOURCE_LIST(mode));
@@ -260,10 +260,10 @@ in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 	for (; i < numsrc; i++) {
 		if (SS_IS_ADDR_UNSPECIFIED((struct sockaddr *)&ss[i]))
 			continue; /* skip */
-		ref_count = in6_merge_msf_source_addr(iasl, &ss[i],
+		ref_count = in6_merge_msf_source_addr(iasl, SIN6(&ss[i]),
 						      IMS_ADD_SOURCE);
 		if (ref_count < 0) {
-			in6_undomultisrc(in6m, i, SIN6(ss), mode, IMS_ADD_SOURCE);
+			in6_undomultisrc(in6m, i, ss, mode, IMS_ADD_SOURCE);
 			return ENOBUFS;
 		} else if (ref_count != 1)
 			continue;
@@ -314,7 +314,7 @@ after_source_list_addition:
 		if (numsrc != 0) {
 			/* numsrc must be returned back before undo */
 			*fnumsrc -= j;
-			in6_undomultisrc(in6m, i, SIN6(ss), mode, IMS_ADD_SOURCE);
+			in6_undomultisrc(in6m, i,ss, mode, IMS_ADD_SOURCE);
 		}
 		return error;
 	}
@@ -329,7 +329,7 @@ int
 in6_delmultisrc(in6m, numsrc, ss, mode, final, newhead, newmode, newnumsrc)
 	struct in6_multi *in6m;
 	u_int16_t numsrc;
-	struct sockaddr_in6 *ss;
+	struct sockaddr_storage *ss;
 	u_int mode;
 	int final;
 	struct i6as_head **newhead;
@@ -371,12 +371,12 @@ in6_delmultisrc(in6m, numsrc, ss, mode, final, newhead, newmode, newnumsrc)
 	for (; i < numsrc; i++) {
 		if (SS_IS_ADDR_UNSPECIFIED(&ss[i]))
 			continue; /* skip */
-		ref_count = in6_merge_msf_source_addr(iasl, &ss[i],
+		ref_count = in6_merge_msf_source_addr(iasl, SIN6(&ss[i]),
 						     IMS_DELETE_SOURCE);
 		if (ref_count < 0) {
 #ifdef MLDV2_DEBUG
 			printf("in6_delmultisrc: found source %s not exist in %s mode?\n",
-			       ip6_sprintf(&ss[i].sin6_addr),
+			       ip6_sprintf(&SIN6(&ss[i])->sin6_addr),
 			       mode == MCAST_INCLUDE ? "include" :
 			       mode == MCAST_EXCLUDE ? "exclude" :
 			       "???");
@@ -448,7 +448,7 @@ in6_modmultisrc(in6m, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 			newhead, newmode, newnumsrc)
 	struct in6_multi *in6m;
 	u_int16_t numsrc, old_num;
-	struct sockaddr_in6 *ss, *old_ss;
+	struct sockaddr_storage *ss, *old_ss;
 	u_int mode, old_mode;
 	u_int grpjoin;
 	struct i6as_head **newhead;
@@ -510,7 +510,7 @@ in6_modmultisrc(in6m, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 
 	i = j = k = 0;
 	for (; i < old_num; i++) {
-		ref_count = in6_merge_msf_source_addr(oiasl, &old_ss[i],
+		ref_count = in6_merge_msf_source_addr(oiasl, SIN6(&old_ss[i]),
 						      IMS_DELETE_SOURCE);
 		if (ref_count < 0) {
 			in6_undomultisrc(in6m, i, old_ss, old_mode,
@@ -543,7 +543,7 @@ in6_modmultisrc(in6m, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 			       M_MSFILTER, M_NOWAIT);
 			if (ias == NULL)
 				return ENOBUFS;
-			bcopy(&ss[i], &ias->i6as_addr, ss[i].sin6_len);
+			bcopy(&ss[i], &ias->i6as_addr, ss[i].ss_len);
 			ias->i6as_refcount = 1;
 			if (IN6M_SOURCE_LIST(mode) == NULL) {
 				I6AS_LIST_ALLOC(IN6M_SOURCE_LIST(mode));
@@ -575,7 +575,7 @@ in6_modmultisrc(in6m, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 	for (; i < numsrc; i++) {
 		if (SS_IS_ADDR_UNSPECIFIED((struct sockaddr *)&ss[i]))
 			continue; /* skip */
-		ref_count = in6_merge_msf_source_addr(iasl, &ss[i],
+		ref_count = in6_merge_msf_source_addr(iasl, SIN6(&ss[i]),
 						      IMS_ADD_SOURCE);
 		if (ref_count < 0) {
 			in6_undomultisrc(in6m, i, ss, mode, IMS_ADD_SOURCE);
@@ -677,7 +677,7 @@ void
 in6_undomultisrc(in6m, numsrc, ss, mode, req)
 	struct in6_multi *in6m;
 	u_int16_t numsrc;
-	struct sockaddr_in6 *ss;
+	struct sockaddr_storage *ss;
 	u_int mode;
 	int req;
 {
@@ -695,7 +695,7 @@ in6_undomultisrc(in6m, numsrc, ss, mode, req)
 		for (ias = LIST_FIRST(&head); ias; ias = nias) {
 			nias = LIST_NEXT(ias, i6as_list);
 			/* sanity check */
-			if (ias->i6as_addr.sin6_family != ss[i].sin6_family)
+			if (ias->i6as_addr.sin6_family != ss[i].ss_family)
 				continue;
 
 			if (SS_CMP(&ias->i6as_addr, <, &ss[i]))
@@ -2139,7 +2139,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	struct group_filter ogrpf;
 	struct group_filter *grpf;
 	struct sockaddr *sa_grp;
-	struct sockaddr_in6 *ss, *ss_src, *old_ss;
+	struct sockaddr_storage *ss, *ss_src, *old_ss;
 	u_int16_t add_num, old_num;
 	u_int old_mode;
 	struct sockaddr *dst;
@@ -2299,7 +2299,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			splx(s);
 			return error;
 		}
-		MALLOC(ss, struct sockaddr_in6 *, sizeof(*ss),
+		MALLOC(ss, struct sockaddr_storage *, sizeof(*ss),
 		       M_IPMOPTS, M_NOWAIT);
 		if (ss == NULL) {
 			error = ENOBUFS;
@@ -2311,7 +2311,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 				       (*grpfp)->gf_slist[j].ss_len);
 			if (error != 0) /* EFAULT */
 				break;
-			if (ss->sin6_family == AF_INET) {
+			if (ss->ss_family == AF_INET) {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 				if (IN_BADCLASS(SIN_ADDR(ss)) || 
 				    (SIN_ADDR(ss) & IN_CLASSA_NET) == 0) 
@@ -2323,7 +2323,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 					error = EINVAL;
 					break;
 				}
-			} else if (ss->sin6_family == AF_INET6) {
+			} else if (ss->ss_family == AF_INET6) {
 #if 0
 				IN6_SG_ADDR_SCOPE_CHECK(SIN6_ADDR(sa_grp),
 							SIN6_ADDR(ss));
@@ -2369,8 +2369,8 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		/*
 		 * Copy source lists to ss_src.
 		 */
-		MALLOC(ss_src, struct sockaddr_in6 *,
-		       sizeof(struct sockaddr_in6) * grpf->gf_numsrc,
+		MALLOC(ss_src, struct sockaddr_storage *,
+		       sizeof(struct sockaddr_storage) * grpf->gf_numsrc,
 		       M_IPMOPTS, M_NOWAIT);
 		if (ss_src == NULL) {
 			in6_free_msf_source_list(iasl->head);
@@ -2405,7 +2405,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	if (msf->msf_grpjoin != 0)
 		old_mode = MCAST_EXCLUDE;
 	else if (msf->msf_numsrc != 0) {
-		MALLOC(old_ss, struct sockaddr_in6 *,
+		MALLOC(old_ss, struct sockaddr_storage *,
 		       sizeof(*old_ss) * msf->msf_numsrc,
 		       M_IPMOPTS, M_NOWAIT);
 		if (old_ss == NULL) {
@@ -2416,7 +2416,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		}
 		old_mode = MCAST_INCLUDE;
 	} else if (msf->msf_blknumsrc != 0) {
-		MALLOC(old_ss, struct sockaddr_in6 *,
+		MALLOC(old_ss, struct sockaddr_storage *,
 			sizeof(*old_ss) * msf->msf_blknumsrc,
 			M_IPMOPTS, M_NOWAIT);
 		if (old_ss == NULL) {
@@ -2843,7 +2843,7 @@ print_in6_addr_slist(struct in6_addr_slist *ias, char *heading)
 	log(LOG_DEBUG, "\t\t%s(%d)\n", heading, ias->numsrc);
 
 	LIST_FOREACH(tmp, ias->head, i6as_list) {
-		struct in6_addr dummy = tmp->i6as_addr.sin6_addr;
+		struct in6_addr dummy = SIN6(&tmp->i6as_addr)->sin6_addr;
 		log(LOG_DEBUG, "\t\tsrc %s (ref=%d)\n",
 		    ip6_sprintf(&dummy), tmp->i6as_refcount);
 	}

@@ -1,4 +1,4 @@
-/* $KAME: in6_msf.h,v 1.2 2002/10/22 01:58:06 suz Exp $	*/
+/* $KAME: in6_msf.h,v 1.3 2002/11/06 07:43:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -106,17 +106,17 @@ struct in6_multi_source {
 
 #ifdef _KERNEL
 int	in6_addmultisrc(struct in6_multi *, u_int16_t,
-		struct sockaddr_in6 *, u_int, int, struct i6as_head **,
+		struct sockaddr_storage *, u_int, int, struct i6as_head **,
 		u_int *, u_int16_t *);
 int	in6_delmultisrc(struct in6_multi *, u_int16_t,
-		struct sockaddr_in6 *, u_int, int, struct i6as_head **,
+		struct sockaddr_storage *, u_int, int, struct i6as_head **,
 		u_int *, u_int16_t *);
 int	in6_modmultisrc(struct in6_multi *, u_int16_t,
-		struct sockaddr_in6 *, u_int, u_int16_t,
-		struct sockaddr_in6 *, u_int, u_int, struct i6as_head **,
+		struct sockaddr_storage *, u_int, u_int16_t,
+		struct sockaddr_storage *, u_int, u_int, struct i6as_head **,
 		u_int *, u_int16_t *);
 void	in6_undomultisrc(struct in6_multi *, u_int16_t,
-		struct sockaddr_in6 *, u_int, int);
+		struct sockaddr_storage *, u_int, int);
 int	in6_get_new_msf_state(struct in6_multi *, struct i6as_head **,
 		u_int *, u_int16_t *);
 int	in6_merge_msf_state(struct in6_multi *, struct i6as_head *, u_int, u_int16_t);
