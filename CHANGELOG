@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.19 1999/08/15 16:36:48 itojun Exp $
+$Id: CHANGELOG,v 1.20 1999/08/16 02:30:23 jinmei Exp $
 
 <199908>
 Mon Aug 16 01:34:36 JST 1999  itojun@iijlab.net
@@ -50,7 +50,7 @@ Fri Aug 13 19:39:33 JST 1999 sakane@ydc.co.jp
 
 1999-08-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* pim6dd/pim6_proto.c (receive_pim6_assert): added a sanity check
-	in order prevent core dump when receiving an assert message from a
+	in order to prevent core dump when receiving an assert message from a
 	router that the receiving node doesn't regard as a PIM neighbor.
 
 1999-08-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
