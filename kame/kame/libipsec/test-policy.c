@@ -47,6 +47,7 @@ struct req_t {
 	int result;	/* expected result; 0:ok 1:ng */
 	char *str;
 } reqs[] = {
+{ 0, "out ipsec" },
 { 1, "must_error" },
 { 1, "in ipsec must_error" },
 { 1, "out ipsec esp/must_error" },
@@ -78,33 +79,45 @@ struct req_t {
 { 0, "out ipsec esp/transport/fec0::10-fec0::11/use" },
 };
 
-int test1 __P((struct req_t *req));
-int test1sub __P((char *buf, int family));
+int test1 __P((void));
+int test1sub1 __P((struct req_t *req));
+int test1sub2 __P((char *buf, int family));
+int test2 __P((void));
 
 int
 main(ac, av)
 	int ac;
 	char **av;
 {
-	int i;
-	int result;
-
-	for (i = 0; i < sizeof(reqs)/sizeof(reqs[0]); i++) {
-		printf("#%d [%s]\n", i + 1, reqs[i].str);
-
-		result = test1(&reqs[i]);
-		if (result == 0 && reqs[i].result == 1) {
-			printf("ERROR: expecting failure.\n");
-		} else if (result == 1 && reqs[i].result == 0) {
-			printf("ERROR: expecting success.\n");
-		}
-	}
+	test1();
+	test2();
 
 	exit(0);
 }
 
 int
-test1(req)
+test1()
+{
+	int i;
+	int result;
+
+	printf("TEST1\n");
+	for (i = 0; i < sizeof(reqs)/sizeof(reqs[0]); i++) {
+		printf("#%d [%s]\n", i + 1, reqs[i].str);
+
+		result = test1sub1(&reqs[i]);
+		if (result == 0 && reqs[i].result == 1) {
+			errx(1, "ERROR: expecting failure.\n");
+		} else if (result == 1 && reqs[i].result == 0) {
+			errx(1, "ERROR: expecting success.\n");
+		}
+	}
+
+	return 0;
+}
+
+int
+test1sub1(req)
 	struct req_t *req;
 {
 	char *buf;
@@ -115,8 +128,8 @@ test1(req)
 		return 1;
 	}
 
-	if (test1sub(buf, PF_INET) != 0
-	 || test1sub(buf, PF_INET6) != 0) {
+	if (test1sub2(buf, PF_INET) != 0
+	 || test1sub2(buf, PF_INET6) != 0) {
 		free(buf);
 		return 1;
 	}
@@ -129,7 +142,7 @@ test1(req)
 }
 
 int
-test1sub(policy, family)
+test1sub2(policy, family)
 	char *policy;
 	int family;
 {
@@ -193,3 +206,71 @@ test1sub(policy, family)
 	return 0;
 }
 
+char addr[] = {
+	28, 28, 0, 0,
+	0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+	0, 0, 0, 0,
+};
+
+int
+test2()
+{
+	int so;
+	char *pol;
+	int len;
+
+	printf("TEST2\n");
+	if (getuid() != 0)
+		errx(1, "root privilege required.\n");
+
+	pol = ipsec_set_policy(reqs[0].str, strlen(reqs[0].str));
+	len = ipsec_get_policylen(pol);
+
+	if ((so = pfkey_open()) < 0)
+		errx(1, "ERROR: %s\n", ipsec_strerror());
+
+	printf("spdflush()\n");
+	if (pfkey_send_spdflush(so) < 0)
+		errx(1, "ERROR: %s\n", ipsec_strerror());
+
+	printf("spdsetidx()\n");
+	if (pfkey_send_spdsetidx(so, (struct sockaddr *)addr, 128,
+				(struct sockaddr *)addr, 128,
+				255, pol, len, 0) < 0)
+		errx(1, "ERROR: %s\n", ipsec_strerror());
+
+	printf("spdget()\n");
+	if (pfkey_send_spdupdate(so, (struct sockaddr *)addr, 128,
+				(struct sockaddr *)addr, 128,
+				255, pol, len, 0) < 0)
+		errx(1, "ERROR: %s\n", ipsec_strerror());
+
+	printf("spdupdate()\n");
+	if (pfkey_send_spdupdate(so, (struct sockaddr *)addr, 128,
+				(struct sockaddr *)addr, 128,
+				255, pol, len, 0) < 0)
+		errx(1, "ERROR: %s\n", ipsec_strerror());
+
+	printf("spdget()\n");
+	if (pfkey_send_spdupdate(so, (struct sockaddr *)addr, 128,
+				(struct sockaddr *)addr, 128,
+				255, pol, len, 0) < 0)
+		errx(1, "ERROR: %s\n", ipsec_strerror());
+
+	printf("spddelete()\n");
+	if (pfkey_send_spddelete(so, (struct sockaddr *)addr, 128,
+				(struct sockaddr *)addr, 128,
+				255, pol, len, 0) < 0)
+		errx(1, "ERROR: %s\n", ipsec_strerror());
+
+	/* expecting failure */
+	printf("spdupdate()\n");
+	if (pfkey_send_spdupdate(so, (struct sockaddr *)addr, 128,
+				(struct sockaddr *)addr, 128,
+				255, pol, len, 0) == 0) {
+		errx(1, "ERROR: expecting failure.\n");
+	}
+
+	return 0;
+}
