@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.68 2000/03/09 00:46:11 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.69 2000/03/09 00:49:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1791,8 +1791,10 @@ ip6_lasthdr(m, off, proto, nxtp)
 	}
 	while (1) {
 		newoff = ip6_nexthdr(m, off, proto, nxtp);
-		if (newoff < 0 || newoff < off)
-			return -1;
+		if (newoff < 0)
+			return off;
+		else if (newoff < off)
+			return -1;	/* invalid */
 		else if (newoff == off)
 			return newoff;
 
