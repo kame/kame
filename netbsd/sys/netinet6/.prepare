@@ -23,5 +23,3 @@ exclude natpt_usrreq.c
 exclude natpt_var.h
 exclude ip6_fw.c
 exclude ip6_fw.h
-conflict in6_pcb.c
-conflict in6_pcb.h
