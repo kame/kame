@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.118 2001/07/27 23:39:22 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.119 2001/07/31 08:55:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3729,6 +3729,14 @@ ipsec_addhist(m, proto, spi)
 	p->ih_proto = proto;
 	p->ih_spi = spi;
 	return 0;
+}
+
+int
+ipsec_getnhist(m)
+	struct mbuf *m;
+{
+
+	return ipsec_gethist(m, NULL) ? 1 : 0;
 }
 
 struct ipsec_history *

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.209 2001/07/29 09:23:05 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.210 2001/07/31 08:55:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -559,7 +559,7 @@ ip6_input(m)
 	 * not the decapsulated packet.
 	 */
 #ifdef IPSEC
-	if (!ipsec_gethist(m, NULL))
+	if (!ipsec_getnhist(m))
 #else
 	if (1 /* CONSTCOND */)
 #endif

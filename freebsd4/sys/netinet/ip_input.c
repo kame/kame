@@ -405,7 +405,7 @@ tooshort:
 	}
 
 #ifdef IPSEC
-	if (ipsec_gethist(m, NULL))
+	if (ipsec_getnhist(m))
 		goto pass;
 #endif
 

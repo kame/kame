@@ -493,7 +493,7 @@ ip_input(struct mbuf *m)
 	 * let ipfilter look at packet on the wire,
 	 * not the decapsulated packet.
 	 */
-	if (ipsec_gethist(m, NULL))
+	if (ipsec_getnhist(m))
 		goto nofilt;
 #endif
 	/*
@@ -508,7 +508,7 @@ ip_input(struct mbuf *m)
 	 * let ipfilter look at packet on the wire,
 	 * not the decapsulated packet.
 	 */
-	if (!ipsec_gethist(m, NULL))
+	if (!ipsec_getnhist(m))
 #else
 	if (1 /*CONSTCOND*/)
 #endif
