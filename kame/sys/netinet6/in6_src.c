@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.146 2004/06/02 05:53:15 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.147 2004/07/07 10:16:04 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -867,6 +867,10 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 #ifdef __FreeBSD__
 				ro->ro_rt = rtalloc1(&((struct route *)ro)
 						     ->ro_dst, 0, 0UL);
+#if __FreeBSD_version >= 502010
+				if (ro->ro_rt)
+					RT_UNLOCK(ro->ro_rt);
+#endif
 #else
 #ifdef RADIX_MPATH
 				rtalloc_mpath((struct route *)ro,

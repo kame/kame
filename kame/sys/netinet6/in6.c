@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.375 2004/07/07 08:43:05 suz Exp $	*/
+/*	$KAME: in6.c,v 1.376 2004/07/07 10:16:04 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -280,7 +280,19 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 	 *      omit the second report?
 	 */
 	if (nrt) {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+		RT_LOCK(nrt);
+#endif
 		rt_newaddrmsg(cmd, ifa, e, nrt);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+		if (cmd == RTM_DELETE) {
+			rtfree(nrt);
+		} else {
+			/* the cmd must be RTM_ADD here */
+			RT_REMREF(nrt);
+			RT_UNLOCK(nrt);
+		}
+#else
 		if (cmd == RTM_DELETE) {
 			if (nrt->rt_refcnt <= 0) {
 				/* XXX: we should free the entry ourselves. */
@@ -291,6 +303,7 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 			/* the cmd must be RTM_ADD here */
 			nrt->rt_refcnt--;
 		}
+#endif
 	}
 }
 
@@ -305,13 +318,19 @@ static void
 in6_ifaddloop(struct ifaddr *ifa)
 {
 	struct rtentry *rt;
+	int need_loop;
 
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
+	/* If there is no loopback entry, allocate one. */
 	rt = rtalloc1(ifa->ifa_addr, 0
 #ifdef __FreeBSD__
 		      , 0
 #endif /* __FreeBSD__ */
 		);
+	
+	need_loop = (rt == NULL || (rt->rt_flags & RTF_HOST) == 0 ||
+	    (rt->rt_ifp->if_flags & IFF_LOOPBACK) == 0);
+
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	/*
 	 * XXX delete a loopback rtentry for my own address before
 	 * adding a new loopback entry.  there is a case that the same
@@ -322,25 +341,16 @@ in6_ifaddloop(struct ifaddr *ifa)
 	 * rtentry for CoA (this is eventually HoA) is installed
 	 * correctly.
 	 */
-	if (rt
-	    && ((rt->rt_flags & RTF_HOST) != 0)
-	    && ((rt->rt_ifp->if_flags & IFF_LOOPBACK) != 0)) {
-		rt->rt_refcnt--;
+	if (!need_loop) {
+		rtfree(rt);
 		in6_ifloop_request(RTM_DELETE, ifa);
 	}
 #endif /* MIP6 && MIP6_MOBILE_NODE */
-
-	/* If there is no loopback entry, allocate one. */
-	rt = rtalloc1(ifa->ifa_addr, 0
-#ifdef __FreeBSD__
-		      , 0
-#endif /* __FreeBSD__ */
-		);
-	if (rt == NULL || (rt->rt_flags & RTF_HOST) == 0 ||
-	    (rt->rt_ifp->if_flags & IFF_LOOPBACK) == 0)
+	if (need_loop) {
 		in6_ifloop_request(RTM_ADD, ifa);
+	}
 	if (rt)
-		rt->rt_refcnt--;
+		rtfree(rt);
 }
 
 /*
@@ -391,11 +401,22 @@ in6_ifremloop(struct ifaddr *ifa)
 			      , 0
 #endif /* __FreeBSD__ */
 			);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+		if (rt != NULL) {
+			if ((rt->rt_flags & RTF_HOST) != 0 &&
+			    (rt->rt_ifp->if_flags & IFF_LOOPBACK) != 0) {
+				rtfree(rt);
+				in6_ifloop_request(RTM_DELETE, ifa);
+			} else
+				RT_UNLOCK(rt);
+		}
+#else
 		if (rt != NULL && (rt->rt_flags & RTF_HOST) != 0 &&
 		    (rt->rt_ifp->if_flags & IFF_LOOPBACK) != 0) {
 			rt->rt_refcnt--;
 			in6_ifloop_request(RTM_DELETE, ifa);
 		}
+#endif
 	}
 }
 
@@ -969,7 +990,9 @@ in6_update_ifa(ifp, ifra, ia, flags)
 #ifndef __FreeBSD__
 	time_t time_second = (time_t)time.tv_sec;
 #endif
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 502010)
 	struct rtentry *rt;
+#endif
 	int delay;
 
 	/* Validate parameters */
@@ -1142,10 +1165,6 @@ in6_update_ifa(ifp, ifra, ia, flags)
 #endif
 
 		TAILQ_INSERT_TAIL(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version > 501000)
-		/* gain another refcnt for the link from if_addrlist */
-		IFAREF(&ia->ia_ifa);
-#endif
 	}
 
 	/* set prefix mask */
@@ -1317,6 +1336,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		zoneid = mltaddr.sin6_scope_id;
 		mltaddr.sin6_scope_id = 0;
 
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 502010)
 		/*
 		 * XXX: do we really need this automatic routes?
 		 * We should probably reconsider this stuff.  Most applications
@@ -1366,6 +1386,8 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		} else {
 			RTFREE(rt);
 		}
+#endif /* if !(FreeBSD_version >= 502010) */
+
 		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error, 0);
 		if (!imm) {
 			nd6log((LOG_WARNING,
@@ -1425,6 +1447,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		zoneid = mltaddr.sin6_scope_id;
 		mltaddr.sin6_scope_id = 0;
 
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 502010)
 		/* XXX: again, do we really need the route? */
 #ifdef __FreeBSD__
 		rt = rtalloc1((struct sockaddr *)&mltaddr, 0, 0UL);
@@ -1465,6 +1488,8 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		} else {
 			RTFREE(rt);
 		}
+#endif /* if !(FreeBSD_version >= 502010) */
+
 		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error, 0);
 		if (!imm) {
 			nd6log((LOG_WARNING, "in6_update_ifa: "

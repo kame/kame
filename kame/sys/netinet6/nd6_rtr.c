@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.257 2004/07/05 07:58:42 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.258 2004/07/07 10:16:04 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -586,8 +586,15 @@ defrouter_addreq(new)
 	    (struct sockaddr *)&gate, (struct sockaddr *)&mask,
 	    RTF_GATEWAY, &newrt);
 	if (newrt) {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+		RT_LOCK(newrt);
+		nd6_rtmsg(RTM_ADD, newrt); /* tell user process */
+		RT_REMREF(newrt);
+		RT_UNLOCK(newrt);
+#else
 		nd6_rtmsg(RTM_ADD, newrt); /* tell user process */
 		newrt->rt_refcnt--;
+#endif
 	}
 	if (error == 0)
 		new->installed = 1;
@@ -654,8 +661,15 @@ defrouter_addifreq(ifp)
 			newrt->rt_refcnt--;
 	} else {
 		if (newrt) {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+			RT_LOCK(newrt);
+			nd6_rtmsg(RTM_ADD, newrt);
+			RT_REMREF(newrt);
+			RT_UNLOCK(newrt);
+#else
 			nd6_rtmsg(RTM_ADD, newrt);
 			newrt->rt_refcnt--;
+#endif
 		}
 	}
 
@@ -1926,8 +1940,15 @@ nd6_prefix_onlink(pr)
 		    ip6_sprintf(&mask6.sin6_addr), rtflags, error));
 	}
 
-	if (rt != NULL)
+	if (rt != NULL) {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+		RT_LOCK(rt);
+		RT_REMREF(rt);
+		RT_UNLOCK(rt);
+#else
 		rt->rt_refcnt--;
+#endif
+	}
 
 	return (error);
 }
@@ -2350,7 +2371,13 @@ rt6_flush(gateway, ifp)
 		return;
 	}
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+	RADIX_NODE_HEAD_LOCK(rnh);
+#endif
 	rnh->rnh_walktree(rnh, rt6_deleteroute, (void *)gateway);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+	RADIX_NODE_HEAD_UNLOCK(rnh);
+#endif
 	splx(s);
 }
 

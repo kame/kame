@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.360 2004/07/05 03:10:14 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.361 2004/07/07 10:16:04 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -995,7 +995,11 @@ nd6_lookup(addr6, create, ifp)
 		 * interface route.
 		 */
 		if (create) {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+			RTFREE_LOCKED(rt);
+#else
 			RTFREE(rt);
+#endif
 			rt = NULL;
 		}
 	}
@@ -1037,6 +1041,9 @@ nd6_lookup(addr6, create, ifp)
 			}
 			if (rt == NULL)
 				return (NULL);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+			RT_LOCK(rt);
+#endif
 			if (rt->rt_llinfo) {
 				struct llinfo_nd6 *ln =
 				    (struct llinfo_nd6 *)rt->rt_llinfo;
@@ -1045,7 +1052,12 @@ nd6_lookup(addr6, create, ifp)
 		} else
 			return (NULL);
 	}
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+	RT_LOCK_ASSERT(rt);
+	RT_REMREF(rt);
+#else
 	rt->rt_refcnt--;
+#endif
 	/*
 	 * Validation for the entry.
 	 * Note that the check for rt_llinfo is necessary because a cloned
@@ -1071,8 +1083,14 @@ nd6_lookup(addr6, create, ifp)
 			    ip6_sprintf(addr6),
 			    ifp ? if_name(ifp) : "unspec"));
 		}
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+		RT_UNLOCK(rt);
+#endif
 		return (NULL);
 	}
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+	RT_UNLOCK(rt);
+#endif
 	return (rt);
 }
 
@@ -1330,6 +1348,10 @@ nd6_rtrequest(req, rt, info)
 	struct ifnet *ifp = rt->rt_ifp;
 	struct ifaddr *ifa;
 	int mine = 0;
+
+#if defined(__FreeBSD__) && __FreeBSD_version > 502010
+	RT_LOCK_ASSERT(rt);
+#endif
 
 	if ((rt->rt_flags & RTF_GATEWAY) != 0)
 		return;
@@ -2193,7 +2215,12 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 			    1)) != NULL)
 #endif
 			{
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+				RT_REMREF(rt);
+				RT_UNLOCK(rt);
+#else
 				rt->rt_refcnt--;
+#endif
 				if (rt->rt_ifp != ifp)
 					senderr(EHOSTUNREACH);
 			} else
@@ -2227,6 +2254,9 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 			if (rt->rt_gwroute == 0)
 				goto lookup;
 			if (((rt = rt->rt_gwroute)->rt_flags & RTF_UP) == 0) {
+#if defined(__FreeBSD__) && __FreeBSD_version_ >= 502010
+				RT_LOCK(rt);
+#endif
 				rtfree(rt); rt = rt0;
 			lookup:
 #ifdef __FreeBSD__
@@ -2236,6 +2266,9 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 #endif
 				if ((rt = rt->rt_gwroute) == 0)
 					senderr(EHOSTUNREACH);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
+				RT_UNLOCK(rt);
+#endif
 #ifdef __NetBSD__
 				/* the "G" test below also prevents rt == rt0 */
 				if ((rt->rt_flags & RTF_GATEWAY) ||
