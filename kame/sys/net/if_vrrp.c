@@ -1,4 +1,4 @@
-/*      $KAME: if_vrrp.c,v 1.5 2003/02/19 10:13:16 ono Exp $ */
+/*      $KAME: if_vrrp.c,v 1.6 2003/02/19 17:04:46 suz Exp $ */
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -434,7 +434,7 @@ vrrp_start(struct ifnet *ifp)
 			bpf_mtap(ifp, m);
 #else
 #if NBPFILTER > 0
- 		        bpf_mtap(ifp->if_bpf, m);
+			bpf_mtap(ifp->if_bpf, m);
 #endif
 #endif
 		/*
