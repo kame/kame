@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.272 2002/01/12 09:01:15 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.273 2002/01/12 12:29:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2294,7 +2294,11 @@ icmp6_rip6_input(mp, off)
 			    m->m_len <= MHLEN) {
 				MGET(n, M_DONTWAIT, m->m_type);
 				if (n != NULL) {
+#ifdef __OpenBSD__
+					M_MOVE_PKTHDR(n, m);
+#else
 					M_COPY_PKTHDR(n, m);
+#endif
 					bcopy(m->m_data, n->m_data, m->m_len);
 					n->m_len = m->m_len;
 				}
@@ -2333,7 +2337,11 @@ icmp6_rip6_input(mp, off)
 
 			MGET(n, M_DONTWAIT, m->m_type);
 			if (n != NULL) {
+#ifdef __OpenBSD__
+				M_MOVE_PKTHDR(n, m);
+#else
 				M_COPY_PKTHDR(n, m);
+#endif
 				bcopy(m->m_data, n->m_data, m->m_len);
 				n->m_len = m->m_len;
 				
