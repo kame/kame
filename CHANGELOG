@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1757 2001/07/04 07:06:05 itojun Exp $
+$KAME: CHANGELOG,v 1.1758 2001/07/05 07:50:31 jinmei Exp $
 
 <200107>
+2001-07-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/net/if_tun.c (tunifioctl): returned EAFNOSUPPORT if
+	the SIOCSIFADDR command is issued for an unsupported address
+	family (i.e. all AFs except AF_INET).  This helps the IPv6 layer
+	detect the unavailability of the interface before going further on
+	initialization, and, as a result, suppress unexpected warning
+	messages.
+
 Wed Jul  4 16:02:26 JST 2001  itojun@iijlab.net
 	* openbsd/usr.sbin/inetd/inetd.c: correct UDP source address checks.
 	  2.9 code did not check it for IPv6 traffic.  sync with openbsd.
