@@ -722,11 +722,6 @@ read_len:
 			if ((long) timeout.tv_sec <= 0)
 				timeout.tv_sec = 1;
 			timeout.tv_usec = 0;
-#if original
-			TIMEVAL_TO_TIMESPEC(&timeout, &ts);
-			(void) gettimeofday(&ctv, NULL);
-			timeradd(&timeout, &ctv, &timeout);
-#endif
 			gettimeofday(&ctv, NULL);
 			if (timo_limit != NULL) {
 				struct timeval diff_to_limit;
