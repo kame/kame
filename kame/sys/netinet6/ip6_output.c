@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.414 2004/01/20 00:14:43 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.415 2004/01/22 23:23:42 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -5079,6 +5079,7 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		 * group management.
 		 */
 		sin6_grp = SIN6(ss_grp);
+		bzero(sin6_grp, sizeof(*sin6_grp));
 		sin6_grp->sin6_addr = SIN6(&greq->gr_group)->sin6_addr;
 		sin6_grp->sin6_len = sizeof(*sin6_grp);
 		sin6_grp->sin6_family = AF_INET6;
@@ -5124,18 +5125,20 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		 * group management.
 		 */
 		sin6_src = SIN6(ss_src);
+		bzero(sin6_src, sizeof(*sin6_src));
 		sin6_src->sin6_addr = SIN6(&gsreq->gsr_source)->sin6_addr;
 		sin6_src->sin6_len = sizeof(*sin6_src);
 		sin6_src->sin6_family = AF_INET6;
 		sin6_src->sin6_scope_id =SIN6(&gsreq->gsr_source)->sin6_scope_id;
 		sin6_grp = SIN6(ss_grp);
+		bzero(sin6_grp, sizeof(*sin6_grp));
 		sin6_grp->sin6_addr = SIN6(&gsreq->gsr_group)->sin6_addr;
 		sin6_grp->sin6_len = sizeof(*sin6_grp);
 		sin6_grp->sin6_family = AF_INET6;
 		sin6_grp->sin6_scope_id =SIN6(&gsreq->gsr_group)->sin6_scope_id;
 
-		if (!SS_IS_ADDR_MULTICAST(&ss_grp) ||
-		    SS_IS_LOCAL_GROUP(&ss_grp)) {
+		if (!SS_IS_ADDR_MULTICAST(ss_grp) ||
+		    SS_IS_LOCAL_GROUP(ss_grp)) {
 #ifdef MLDV2_DEBUG
 			printf("invalid group %s specified\n",
 			       ip6_sprintf(&sin6_grp->sin6_addr));
