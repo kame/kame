@@ -1,4 +1,4 @@
-/*	$KAME: yylex.c,v 1.19 2002/05/17 05:56:39 fujisawa Exp $	*/
+/*	$KAME: yylex.c,v 1.20 2002/06/06 12:33:59 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -74,6 +74,7 @@ struct
 	{ "renum",	SRENUM,		"SRENUM",	},
 	{ "rules",	SRULES,		"SRULES",	},
 	{ "set",	SSET,		"SSET",		},
+	{ "short",	SSHORT,		"SSHORT",	},
 	{ "show",	SSHOW,		"SSHOW",	},
 	{ "tcp",	STCP,		"STCP",		},
 	{ "test",	STEST,		"STEST",	},

@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.18 2002/06/06 07:45:16 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.19 2002/06/06 12:33:59 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -50,6 +50,7 @@
 
 #include <netinet6/natpt_defs.h>
 
+#include "cfparse.h"
 
 /*
  *
@@ -67,6 +68,19 @@ struct logmsg
 
 extern char	*tcpstates[];
 
+char *tcpstatesshort[] = {
+	"CL",		/* "CLOSED" */
+	"LI",		/* "LISTEN" */
+	"SS",		/* "SYN_SENT" */
+	"SR",		/* "SYN_RCVD" */
+	"ES",		/* "ESTABLISHED" */
+	"CW",		/* "CLOSE_WAIT" */
+	"F1",		/* "FIN_WAIT_1" */
+	"CG",		/* "CLOSING" */
+	"LA",		/* "LAST_ACK" */
+	"F2",		/* "FIN_WAIT_2" */
+	"TW",		/* "TIME_WAIT" */
+};
 
 /*
  *
@@ -84,7 +98,7 @@ void	 appendProto		__P((struct logmsg *, struct cSlot *));
 void	 makeTSlotLine		__P((char *, int, struct tSlot *,
 				     struct tcpstate *, int));
 void	 appendPAddrXL		__P((struct logmsg *, struct pAddr *, int, int));
-void	 appendPAddrXL4		__P((struct logmsg *, struct pAddr *, int));
+void	 appendPAddrXL4		__P((struct logmsg *, struct pAddr *, int, int));
 void	 appendPAddrXL6		__P((struct logmsg *, struct pAddr *, int, int));
 void	 appendpAddrXL6long	__P((struct logmsg *, struct in6_addr *, u_short));
 void	 appendpAddrXL6short	__P((struct logmsg *, struct in6_addr *, u_short));
@@ -361,9 +375,12 @@ makeTSlotLine(char *wow, int size, struct tSlot *tsl,
 		if (ts == NULL)
 			break;
 
-		if (ts->state < TCP_NSTATES)
-			concat(&lmsg, "%s ", tcpstates[ts->state]);
-		else
+		if (ts->state < TCP_NSTATES) {
+			if (type == SSHORT)
+				concat(&lmsg, "%s ", tcpstatesshort[ts->state]);
+			else
+				concat(&lmsg, "%s ", tcpstates[ts->state]);
+		} else
 			concat(&lmsg, "%d ", ts->state);
 		break;
 	}
@@ -377,34 +394,54 @@ void
 appendPAddrXL(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 {
 	if (pad->sa_family == AF_INET)
-		appendPAddrXL4(lmsg, pad, inv);
+		appendPAddrXL4(lmsg, pad, type, inv);
 	else
 		appendPAddrXL6(lmsg, pad, type, inv);
 }
 
 
 void
-appendPAddrXL4(struct logmsg *lmsg, struct pAddr *pad, int inv)
+appendPAddrXL4(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 {
 	char	Bow[128];
 	char	Wow[128];
 
 	if (inv == 0) {
-	    inet_ntop(AF_INET, &pad->in4src, Bow, sizeof(Bow));
-	    snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[0]));
-	    concat(lmsg, "%-22s", Wow);
+		switch (type) {
+		case SSHORT:
+			inet_ntop(AF_INET, &pad->in4src, Bow, sizeof(Bow));
+			snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[0]));
+			concat(lmsg, "%-22s", Wow);
+			break;
 
-	    inet_ntop(AF_INET, &pad->in4dst, Bow, sizeof(Bow));
-	    snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[1]));
-	    concat(lmsg, "%-22s", Wow);
+		default:
+			inet_ntop(AF_INET, &pad->in4src, Bow, sizeof(Bow));
+			snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[0]));
+			concat(lmsg, "%-22s", Wow);
+
+			inet_ntop(AF_INET, &pad->in4dst, Bow, sizeof(Bow));
+			snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[1]));
+			concat(lmsg, "%-22s", Wow);
+			break;
+		}
 	} else {
-	    inet_ntop(AF_INET, &pad->in4dst, Bow, sizeof(Bow));
-	    snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[1]));
-	    concat(lmsg, "%-22s", Wow);
+		switch (type) {
+		case SSHORT:
+			inet_ntop(AF_INET, &pad->in4dst, Bow, sizeof(Bow));
+			snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[1]));
+			concat(lmsg, "%-22s", Wow);
+			break;
 
-	    inet_ntop(AF_INET, &pad->in4src, Bow, sizeof(Bow));
-	    snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[0]));
-	    concat(lmsg, "%-22s", Wow);
+		default:
+			inet_ntop(AF_INET, &pad->in4dst, Bow, sizeof(Bow));
+			snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[1]));
+			concat(lmsg, "%-22s", Wow);
+
+			inet_ntop(AF_INET, &pad->in4src, Bow, sizeof(Bow));
+			snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[0]));
+			concat(lmsg, "%-22s", Wow);
+			break;
+		}
 	}
 }
 
@@ -413,23 +450,37 @@ void
 appendPAddrXL6(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 {
 	if (inv == 0) {
-	    if (type != 0) {
-		    appendpAddrXL6long(lmsg, &pad->in6src, pad->port[0]);
-		    appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
+		switch (type) {
+		case SSHORT:
+			appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
+			break;
 
-	    } else {
-		    appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
-		    appendpAddrXL6short(lmsg, &pad->in6dst, pad->port[1]);
-	    }
+		case SLONG:
+			appendpAddrXL6long(lmsg, &pad->in6src, pad->port[0]);
+			appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
+			break;
+
+		default:
+			appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
+			appendpAddrXL6short(lmsg, &pad->in6dst, pad->port[1]);
+			break;
+		}
 	} else {
-	    if (type != 0) {
-		    appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
-		    appendpAddrXL6long(lmsg, &pad->in6src, pad->port[0]);
+		switch (type) {
+		case SSHORT:
+			appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
+			break;
 
-	    } else {
-		    appendpAddrXL6short(lmsg, &pad->in6dst, pad->port[1]);
-		    appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
-	    }
+		case SLONG:
+			appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
+			appendpAddrXL6long(lmsg, &pad->in6src, pad->port[0]);
+			break;
+
+		default:
+			appendpAddrXL6short(lmsg, &pad->in6dst, pad->port[1]);
+			appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
+			break;
+		}
 	}
 }
 

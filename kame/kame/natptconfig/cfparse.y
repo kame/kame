@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.31 2002/05/17 05:56:39 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.32 2002/06/06 12:33:59 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -137,6 +137,7 @@ yyerror(char *msg, ...)
 %token		SRENUM
 %token		SRULES
 %token		SSET
+%token		SSHORT
 %token		SSHOW
 %token		SSYSLOG
 %token		STCP
@@ -507,7 +508,9 @@ opt_long
 		:
 		    { $$ = 0; }
 		| SLONG
-		    { $$ = 1; }
+		    { $$ = SLONG; }
+		| SSHORT
+		    { $$ = SSHORT; }
 		;
 
 opt_decimal
