@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.52 2001/11/21 04:22:24 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.53 2002/01/11 08:26:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -170,42 +170,83 @@ main(argc, argv)
 		}
 		argv++;
 	}
+	if (LIST_FIRST(&nsdb) == NULL) {
+		errx(1, "no DNS server to contact");
+		/*NOTREACHED*/
+	}
 
 	srandom(time(NULL) ^ getpid());
 	dnsid = random() & 0xffff;
 
+	if (!hostname) {
+		if (gethostname(hostnamebuf, sizeof(hostnamebuf)) != 0) {
+			err(1, "gethostname");
+			/*NOTREACHED*/
+		}
+
+		/* append trailing dot to make it look like FQDN */
+		if (strlen(hostnamebuf) > 0 &&
+		    hostnamebuf[strlen(hostnamebuf) - 1] != '.' &&
+		    strlen(hostnamebuf) + 2 < sizeof(hostnamebuf)) {
+			char *p;
+			p = hostnamebuf + strlen(hostnamebuf);
+			*p++ = '.';
+			*p = '\0';
+		}
+		if (iscanon(hostnamebuf) == 0) {
+			errx(1, "%s: hostname is not a canonical name",
+			    hostnamebuf);
+			/*NOTREACHED*/
+		}
+
+		hostname = hostnamebuf;
+	}
+	dprintf("hostname=\"%s\"\n", hostname);
+
+	if (!fflag) {
+		daemon(0, 0);
+		syslog(LOG_INFO, "started with %d listening sockets\n", nsock);
+	} else
+		dprintf("started with %d listening sockets\n", nsock);
+
 	if (getsock(family, NULL, srcport, SOCK_DGRAM, AI_PASSIVE,
 	    S_MULTICAST) != 0) {
-		err(1, "getsock");
+		syslog(LOG_ERR, "getsock: %m");
+		exit(1);
 		/*NOTREACHED*/
 	}
 	if (LIST_FIRST(&sockdb) == NULL) {
-		errx(1, "no socket");
+		syslog(LOG_ERR, "no socket");
+		exit(1);
 		/*NOTREACHED*/
 	}
 
 	if (getsock(family, NULL, "0", SOCK_DGRAM, AI_PASSIVE, S_UNICAST)
 	    != 0) {
-		err(1, "getsock");
+		syslog(LOG_ERR, "getsock: %m");
+		exit(1);
 		/*NOTREACHED*/
 	}
 
 	if (getsock(family, NULL, srcport, SOCK_STREAM, AI_PASSIVE, S_TCP)
 	    != 0) {
-		err(1, "getsock");
+		syslog(LOG_ERR, "getsock: %m");
+		exit(1);
 		/*NOTREACHED*/
 	}
 
 	if (getsock(AF_INET6, "::", NULL, SOCK_RAW, AI_PASSIVE, S_ICMP6)
 	    != 0) {
-		err(1, "getsock");
+		syslog(LOG_ERR, "getsock: %m");
+		exit(1);
 		/*NOTREACHED*/
 	}
 
 	if (mflag) {
 		if (getsock(AF_INET, NULL, MEDIATOR_CTRL_PORT, SOCK_DGRAM, 0,
 		    S_MEDIATOR) != 0) {
-			err(1, "getsock(mediator)");
+			syslog(LOG_ERR, "getsock(mediator): %m");
+			exit(1);
 			/*NOTREACHED*/
 		}
 	}
@@ -241,7 +282,9 @@ main(argc, argv)
 				continue;
 			}
 			if (setif(sd->s, sd->af, intface) < 0) {
-				errx(1, "interface %s unusable", intface);
+				syslog(LOG_ERR, "interface %s unusable",
+				    intface);
+				exit(1);
 				/*NOTREACHED*/
 			}
 			break;
@@ -259,12 +302,13 @@ main(argc, argv)
 				continue;
 			}
 			if (setif(sd->s, sd->af, intface) < 0) {
-				errx(1, "interface %s unusable", intface);
+				syslog(LOG_ERR, "interface %s unusable",
+				    intface);
+				exit(1);
 				/*NOTREACHED*/
 			}
 			break;
 		}
-
 	}
 
 	if (ready4)
@@ -272,43 +316,7 @@ main(argc, argv)
 	if (ready6)
 		(void)addserv(MDNS_GROUP6, -1, "mcast");
 
-	if (LIST_FIRST(&nsdb) == NULL) {
-		errx(1, "no DNS server to contact");
-		/*NOTREACHED*/
-	}
-
-	if (!hostname) {
-		if (gethostname(hostnamebuf, sizeof(hostnamebuf)) != 0) {
-			err(1, "gethostname");
-			/*NOTREACHED*/
-		}
-
-		/* append trailing dot to make it look like FQDN */
-		if (strlen(hostnamebuf) > 0 &&
-		    hostnamebuf[strlen(hostnamebuf) - 1] != '.' &&
-		    strlen(hostnamebuf) + 2 < sizeof(hostnamebuf)) {
-			char *p;
-			p = hostnamebuf + strlen(hostnamebuf);
-			*p++ = '.';
-			*p = '\0';
-		}
-		if (iscanon(hostnamebuf) == 0) {
-			errx(1, "%s: hostname is not a canonical name",
-			    hostnamebuf);
-			/*NOTREACHED*/
-		}
-
-		hostname = hostnamebuf;
-	}
-	dprintf("hostname=\"%s\"\n", hostname);
-
 	signal(SIGUSR1, sighandler);
-
-	if (!fflag) {
-		daemon(0, 0);
-		syslog(LOG_INFO, "started with %d listening sockets\n", nsock);
-	} else
-		dprintf("started with %d listening sockets\n", nsock);
 
 	send_updates();
 
