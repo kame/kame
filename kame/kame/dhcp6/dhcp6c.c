@@ -180,7 +180,7 @@ mainloop()
 		switch (nfd) {
 		case -1:
 			err(1, "select");
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		case 0:
 			/* timeout */
 			dprintf((stderr, "timeout\n"));
@@ -211,11 +211,11 @@ callback_register(fd, cap, func)
 	if (MAXCALLBACK <= ncallbacks) {
 		errx(1, "callback exceeds limit(%d), try increase MAXCALLBACK",
 			MAXCALLBACK);
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	if (fd && cap) {
 		errx(1, "internal error: both fd and cap are present");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 
 	if (maxfd < fd)
@@ -250,12 +250,12 @@ client6_init()
 	error = getaddrinfo(NULL, DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	insock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (insock < 0) {
 		err(1, "socket(inbound)");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	if (setsockopt(insock, SOL_SOCKET, SO_REUSEPORT,
 		       &on, sizeof(on)) < 0) {
@@ -264,7 +264,7 @@ client6_init()
 	}
 	if (bind(insock, res->ai_addr, res->ai_addrlen) < 0) {
 		err(1, "bind(inbonud)");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	freeaddrinfo(res);
 
@@ -272,17 +272,17 @@ client6_init()
 	error = getaddrinfo(NULL, DH6PORT_UPSTREAM, &hints, &res);
 	if (error) {
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	outsock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (outsock < 0) {
 		err(1, "socket(outbound)");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	if (setsockopt(outsock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
 			&ifidx, sizeof(ifidx)) < 0) {
 		err(1, "setsockopt(outbound, IPV6_MULTICAST_IF)");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	if (setsockopt(outsock, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &on,
 		       sizeof(on)) < 0) {
@@ -319,7 +319,7 @@ client6_mainloop()
 
 	if (TAILQ_FIRST(&servtab) == NULL) {
 		errx(1, "no server found");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	p = TAILQ_FIRST(&servtab);
 	dprintf((stderr, "primary server: pref=%u addr=%s\n",
@@ -394,7 +394,7 @@ client6_findserv()
 		switch (ret) {
 		case -1:
 			err(1, "select");
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		case 0:
 			if (mode == WAIT && TAILQ_FIRST(&servtab) != NULL) {
 				/* we have more than 1 reply and timeouted */
@@ -457,7 +457,7 @@ client6_getreply(p)
 		switch (ret) {
 		case -1:
 			err(1, "select");
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		case 0:
 			timeo++;
 			if (timeo >= REQUEST_RETRY)
@@ -490,11 +490,11 @@ client6_sendsolicit(s)
 	dh6s->dh6sol_msgtype = DH6_SOLICIT;
 	if (inet_pton(AF_INET6, "fe80::", &target) != 1) {
 		errx(1, "inet_pton failed");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	if (getifaddr(&dh6s->dh6sol_cliaddr, device, &target, 10) != 0) {
 		errx(1, "getifaddr failed");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 #ifdef __KAME__
 	dh6s->dh6sol_cliaddr.s6_addr[2] = 0;
@@ -510,7 +510,7 @@ client6_sendsolicit(s)
 
 	if (transmit(s, DH6ADDR_ALLAGENT, DH6PORT_UPSTREAM, 1, buf, len) != 0) {
 		err(1, "transmit failed");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 }
 
@@ -532,7 +532,7 @@ client6_recvadvert(s, serv)
 	if ((len = recvfrom(s, buf, sizeof(buf), 0,
 			(struct sockaddr *)&from, &fromlen)) < 0) {
 		err(1, "recvfrom(inbound)");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 
 	if (len < sizeof(*dh6a))
@@ -582,11 +582,11 @@ client6_sendrequest(s, p)
 	dh6r->dh6req_xid = p->st_xid;
 	if (inet_pton(AF_INET6, "fe80::", &target) != 1) {
 		errx(1, "inet_pton failed");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	if (getifaddr(&dh6r->dh6req_cliaddr, device, &target, 10) != 0) {
 		errx(1, "getifaddr failed");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 #ifdef __KAME__
 	dh6r->dh6req_cliaddr.s6_addr[2] = 0;
@@ -601,7 +601,7 @@ client6_sendrequest(s, p)
 	error = getaddrinfo("::", DH6PORT_UPSTREAM, &hints, &res);
 	if (error) {
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 	memcpy(&dst, res->ai_addr, res->ai_addrlen);
 	freeaddrinfo(res);
@@ -613,12 +613,12 @@ client6_sendrequest(s, p)
 		offlink = 1;
 		if (inet_pton(AF_INET6, "2000::", &target) != 1) {
 			errx(1, "inet_pton failed");
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		}
 		if (getifaddr(&myaddr, device, &target, 3) != 0) {
 			if (inet_pton(AF_INET6, "fec0::", &target) != 1) {
 				errx(1, "inet_pton failed");
-				/*NOTREACHED*/
+				/* NOTREACHED */
 			}
 			if (getifaddr(&myaddr, device, &target, 10) != 0)
 				offlink = 0;
@@ -630,11 +630,11 @@ client6_sendrequest(s, p)
 	if (!offlink) {
 		if (inet_pton(AF_INET6, "fe80::", &target) != 1) {
 			errx(1, "inet_pton failed");
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		}
 		if (getifaddr(&myaddr, device, &target, 10) != 0) {
 			errx(1, "getifaddr failed");
-			/*NOTREACHED*/
+			/* NOTREACHED */
 		}
 	}
 
@@ -660,7 +660,7 @@ client6_sendrequest(s, p)
 
 	if (transmit_sa(s, (struct sockaddr *)&dst, hlim, buf, len) != 0) {
 		err(1, "transmit failed");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 }
 
@@ -684,7 +684,7 @@ client6_recvreply(s, serv)
 	if ((len = recvfrom(s, rbuf, sizeof(rbuf), 0,
 			(struct sockaddr *)&from, &fromlen)) < 0) {
 		err(1, "recvfrom(inbound)");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 	}
 
 	if (len < sizeof(*dh6r))
