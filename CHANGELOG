@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.277 1999/11/19 04:41:38 sumikawa Exp $
+$Id: CHANGELOG,v 1.278 1999/11/19 12:44:46 jinmei Exp $
 
 <199911>
+1999-11-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/config.c (config_vifs_from_kernel): considers
+	loopback and non multicast-capable interfaces, since some routers
+	have global addresses only on such interfaces.
+	Also, anycast addresses are now ignored.
+
 Fri Nov 19 13:20:24 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/kame/{pim6dd, pim6sd, rtadvd, rtsold}: in looking up
 	interface information, comparing interface name between IFs which
