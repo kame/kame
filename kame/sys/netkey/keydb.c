@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.7 1999/09/01 05:27:41 sakane Exp $ */
+/* KAME $Id: keydb.c,v 1.8 1999/09/01 16:30:33 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -646,8 +646,8 @@ void
 key_freeso(so)
 	struct socket *so;
 {
-	struct secpolicy **sp_in;
-	struct secpolicy **sp_out;
+	struct secpolicy **sp_in = NULL;
+	struct secpolicy **sp_out = NULL;
 
 	/* sanity check */
 	if (so == NULL)
@@ -670,7 +670,7 @@ key_freeso(so)
 #ifdef INET6
 	case PF_INET6:
 	    {
-		struct in6pcb *pcb = sotoin6pcb(so);
+		struct inpcb *pcb  = sotoin6pcb(so);
 
 		/* Does it have a PCB ? */
 		if (pcb == NULL)
