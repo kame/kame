@@ -233,6 +233,7 @@ getdev(addr)
 
 	if (ifa)
 		strncpy(ret_ifname, ifa->ifa_name, sizeof(ret_ifname));
+	ret_ifname[sizeof(ret_ifname) - 1] = '\0';
 	freeifaddrs(ifap);
 
 	return(ifa ? ret_ifname : NULL);
