@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.313 2002/05/31 08:22:55 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.314 2002/06/09 14:43:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -913,7 +913,7 @@ icmp6_input(mp, offp, proto)
 			u_char *p;
 			int maxlen, maxhlen;
 
-			if ((icmp6_nodeinfo & 5) != 5) 
+			if ((icmp6_nodeinfo & 5) != 5)
 				break;
 
 			if (code != 0)
@@ -1167,7 +1167,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 					return(-1);
 				}
 #endif
-				
+
 				if (nxt == IPPROTO_AH)
 					eoff += (eh->ip6e_len + 2) << 2;
 				else
@@ -1493,7 +1493,7 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 /*
  * Process a Node Information Query packet, based on
  * draft-ietf-ipngwg-icmp-name-lookups-07.
- * 
+ *
  * Spec incompatibilities:
  * - IPv6 Subject address handling
  * - IPv4 Subject address handling support missing
@@ -2247,7 +2247,7 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 			if (ltime > 0x7fffffff)
 				ltime = 0x7fffffff;
 			ltime = htonl(ltime);
-			
+
 			bcopy(&ltime, cp, sizeof(u_int32_t));
 			cp += sizeof(u_int32_t);
 
@@ -2256,7 +2256,7 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 			      sizeof(struct in6_addr));
 			in6_clearscope((struct in6_addr *)cp); /* XXX */
 			cp += sizeof(struct in6_addr);
-			
+
 			resid -= (sizeof(struct in6_addr) + sizeof(u_int32_t));
 			copied += (sizeof(struct in6_addr) +
 				   sizeof(u_int32_t));
@@ -2419,7 +2419,7 @@ icmp6_rip6_input(mp, off, src, dst)
 #endif
 				bcopy(m->m_data, n->m_data, m->m_len);
 				n->m_len = m->m_len;
-				
+
 				m_freem(m);
 				m = n;
 			}
@@ -2529,7 +2529,7 @@ icmp6_reflect(m, off)
 			if (!(ia->ia6_flags &
 			      (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY)))
 				src = &ia->ia_addr;
-		} else { 
+		} else {
 #ifndef SCOPEDROUTING		/* XXX: ifa_ifwithaddr expects 0 */
 			struct sockaddr_in6 d = *odst;
 
@@ -3310,7 +3310,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		if (m)
 			(void)m_freem(m);
-#endif		
+#endif
 		break;
 
 	case PRCO_GETOPT:
@@ -3381,7 +3381,7 @@ ppsratecheck(lasttime, curpps, maxpps)
 	struct timeval tv, delta;
 	int s, rv;
 
-	s = splclock(); 
+	s = splclock();
 #ifndef __FreeBSD__
 	tv = mono_time;
 #else
@@ -3482,7 +3482,7 @@ icmp6_recover_src(m)
 	struct in6_addr t;
 	int error = 0;
 
-#ifndef PULLDOWN_TEST 
+#ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, 0, sizeof(struct ip6_hdr), ENOBUFS);
 	oip6 = mtod(m, struct ip6_hdr *);
 #else
@@ -3502,7 +3502,7 @@ icmp6_recover_src(m)
 	while (off + 2 < m->m_pkthdr.len) {
 		switch (nxt) {
 		case IPPROTO_DSTOPTS:
-#ifndef PULLDOWN_TEST 
+#ifndef PULLDOWN_TEST
 			IP6_EXTHDR_CHECK(m, off, sizeof(struct ip6_dest),
 					 ENOBUFS);
 			dstopts = (struct ip6_dest *)(mtod(m, caddr_t) + off);
@@ -3516,7 +3516,7 @@ icmp6_recover_src(m)
 #endif
 
 			dstoptlen = (dstopts->ip6d_len + 1) << 3;
-#ifndef PULLDOWN_TEST 
+#ifndef PULLDOWN_TEST
 			IP6_EXTHDR_CHECK(m, off, dstoptlen, ENOBUFS);
 			dstopts = (struct ip6_dest *)(mtod(m, caddr_t) + off);
 #else
@@ -3581,7 +3581,7 @@ icmp6_recover_src(m)
 			break;
 
 		default:
-#ifndef PULLDOWN_TEST 
+#ifndef PULLDOWN_TEST
 			IP6_EXTHDR_CHECK(m, off, sizeof(struct ip6_ext),
 					 ENOBUFS);
 			exts = (struct ip6_ext *)(mtod(m, caddr_t) + off);

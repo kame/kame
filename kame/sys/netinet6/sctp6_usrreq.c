@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.6 2002/06/08 19:52:07 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.7 2002/06/09 14:44:03 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -98,7 +98,7 @@
 #endif
 
 extern struct protosw inetsw[];
-extern struct sctp_epinfo sctppcbinfo;					      
+extern struct sctp_epinfo sctppcbinfo;
 
 static	int sctp6_detach __P((struct socket *so));
 
@@ -121,7 +121,7 @@ in6_sin6_2_sin(struct sockaddr_in *sin, struct sockaddr_in6 *sin6)
 	sin->sin_len = sizeof(struct sockaddr_in);
 	sin->sin_family = AF_INET;
 	sin->sin_port = sin6->sin6_port;
-	sin->sin_addr.s_addr = sin6->sin6_addr.s6_addr32[3];	
+	sin->sin_addr.s_addr = sin6->sin6_addr.s6_addr32[3];
 }
 
 /* Convert sockaddr_in to sockaddr_in6 in v4 mapped addr format. */
@@ -201,7 +201,7 @@ sctp6_input(mp, offp, proto)
 		m_freem(m);
 		return IPPROTO_DONE;
 	}
-#else 
+#else
 	if(faithprefix(&ip6->ip6_dst)){
 		m_freem(m);
 		return IPPROTO_DONE;
@@ -367,7 +367,7 @@ sctp6_notify_mbuf(struct sctp_inpcb *inp,
 		  struct sctphdr *sh,
 		  struct sctp_tcb *stcb,
 		  struct sctp_nets *netp)
-		  
+
 {
 	int nxtsz;
 
@@ -406,7 +406,7 @@ sctp6_notify_mbuf(struct sctp_inpcb *inp,
 		/* Adjust that too */
 		stcb->asoc.smallest_mtu = nxtsz;
 		/* now off to subtract IP_DF flag if needed */
-    
+
 		TAILQ_FOREACH(chk, &stcb->asoc.send_queue, sctp_next) {
 			if ((chk->send_size+IP_HDR_SIZE) > nxtsz) {
 				chk->flags |= CHUNK_FLAGS_FRAGMENT_OK;
@@ -477,7 +477,7 @@ sctp6_ctlinput(cmd, pktdst, d)
 		if (ip6cp->ip6c_m == NULL ||
 		    ip6cp->ip6c_m->m_pkthdr.len < (ip6cp->ip6c_off + sizeof(sh)))
 			return;
-	  
+
 		bzero(&sh, sizeof(sh));
 		bzero(&final, sizeof(final));
 		inp = NULL;
@@ -531,7 +531,7 @@ sctp6_ctlinput(cmd, pktdst, d)
 
 /*
  * this routine can probably be collasped into the one in sctp_userreq.c
- * since they do the same thing and now we lookup with a sockaddr 
+ * since they do the same thing and now we lookup with a sockaddr
  */
 #ifdef __FreeBSD__
 static int
@@ -615,7 +615,7 @@ sctp6_attach(struct socket *so, int proto, struct proc *p)
 	inp->sctp_flags |= SCTP_PCB_FLAGS_BOUND_V6;	/* I'm v6! */
 	inp6 = (struct in6pcb *)inp;
 
-#if defined(__FreeBSD__) 
+#if defined(__FreeBSD__)
 	inp6->inp_vflag |= INP_IPV6;
 #else
 #if defined(__OpenBSD__)
@@ -771,7 +771,7 @@ sctp6_disconnect(struct socket *so)
 	struct sctp_inpcb *inp;
 	int s;
 
-	s = splnet();		/* XXX */  
+	s = splnet();		/* XXX */
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == NULL) {
 		splx(s);
@@ -796,7 +796,7 @@ sctp6_disconnect(struct socket *so)
 			if (!TAILQ_EMPTY(&asoc->out_wheel)) {
 				/* Check to see if some data queued */
 				struct sctp_stream_out *outs;
-				TAILQ_FOREACH(outs, &asoc->out_wheel, 
+				TAILQ_FOREACH(outs, &asoc->out_wheel,
 					      next_spoke){
 					if (!TAILQ_EMPTY(&outs->outqueue)) {
 						some_on_streamwheel = 1;
@@ -893,8 +893,8 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	    (in_inp->inp_flags & IN6P_IPV6_V6ONLY)
 #endif
 	    ){
-		/* 
-		 * if IPV6_V6ONLY flag, we discard datagrams 
+		/*
+		 * if IPV6_V6ONLY flag, we discard datagrams
 		 * destined to a v4 addr or v4-mapped addr
 		 */
 		if (addr->sa_family == AF_INET) {
@@ -961,7 +961,7 @@ sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		}
 	}
 #ifdef SCTP_TCP_MODEL_SUPPORT
-	if ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) && 
+	if ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) &&
 	    (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED)) {
 		/* We are already connected AND the TCP model */
 		splx(s);
@@ -978,7 +978,7 @@ sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	    (inp->ip_inp.inp.inp_flags & IN6P_IPV6_V6ONLY)
 #endif
 	    ) {
-		/* 
+		/*
 		 * if IPV6_V6ONLY flag, ignore connections
 		 * destined to a v4 addr or v4-mapped addr
 		 */
@@ -1034,7 +1034,7 @@ sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	tcb->asoc.state = SCTP_STATE_COOKIE_WAIT;
 	SCTP_GETTIME_TIMEVAL(&tcb->asoc.time_entered);
 	sctp_send_initiate(inp, tcb);
-	splx(s); 
+	splx(s);
 	return error;
 }
 
@@ -1070,7 +1070,7 @@ sctp6_getaddr(struct socket *so,
 #endif
 		return ECONNRESET;
 	}
-	
+
 	sin6->sin6_port = inp->sctp_lport;
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) {
 		/* For the bound all case you get back 0 */
@@ -1280,7 +1280,7 @@ sctp6_getpeeraddr(struct socket *so,
 
 #if defined(__FreeBSD__)
 struct pr_usrreqs sctp6_usrreqs = {
-	sctp6_abort, sctp_accept, sctp6_attach, sctp6_bind, 
+	sctp6_abort, sctp_accept, sctp6_attach, sctp6_bind,
 	sctp6_connect, pru_connect2_notsupp, in6_control,
 	sctp6_detach, sctp6_disconnect, sctp_listen, sctp6_getpeeraddr,
 	sctp_usr_recvd, pru_rcvoob_notsupp, sctp6_send, pru_sense_null,
@@ -1337,7 +1337,7 @@ sctp6_usrreq(so, req, m, nam, control)
 #ifdef __NetBSD__
 	if (req == PRU_PURGEIF) {
 		struct ifnet *ifn;
-		struct ifaddr *ifa;      
+		struct ifaddr *ifa;
 		ifn = (struct ifnet *)control;
 		TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 			if (ifa->ifa_addr->sa_family == family) {

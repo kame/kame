@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.23 2002/06/08 21:42:40 itojun Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.24 2002/06/09 14:44:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -114,7 +114,7 @@ mip6_subnet_create(void)
 	bzero(ms, sizeof(*ms));
 	TAILQ_INIT(&ms->ms_mspfx_list);
 	TAILQ_INIT(&ms->ms_msha_list);
-	
+
 	return (ms);
 }
 
@@ -444,7 +444,7 @@ mip6_subnet_prefix_list_get_minimum_lifetime(mspfx_list)
 			lifetime = mpfx->mpfx_pltime;
 		}
 	}
-	
+
 	return (lifetime);
 }
 
@@ -505,7 +505,7 @@ mip6_subnet_ha_list_find_preferable(msha_list)
 			return (msha);
 		}
 	}
-	
+
 	/* not found. */
 	return (NULL);
 }

@@ -1,9 +1,9 @@
-/*	$KAME: scope6.c,v 1.36 2002/06/08 21:42:41 itojun Exp $	*/
+/*	$KAME: scope6.c,v 1.37 2002/06/09 14:44:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -118,7 +118,7 @@ scope6_set(ifp, idlist)
 
 	/*
 	 * TODO(XXX): after setting, we should reflect the changes to
-	 * interface addresses, routing table entries, PCB entries... 
+	 * interface addresses, routing table entries, PCB entries...
 	 */
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -308,7 +308,7 @@ in6_addr2zoneid(ifp, addr, ret_id)
 	}
 
 	*ret_id = zoneid;
-	return(0);	
+	return(0);
 }
 
 void
@@ -349,7 +349,7 @@ scope6_addr2default(addr)
 {
 	/*
 	 * special case: The loopback address should be considered as
-	 * link-local, but there's no ambiguity in the syntax. 
+	 * link-local, but there's no ambiguity in the syntax.
 	 */
 	if (IN6_IS_ADDR_LOOPBACK(addr))
 		return(0);
@@ -381,7 +381,7 @@ scope6_setzoneid(ifp, sin6)
 	}
 
 	return(0);
-}	
+}
 
 /*
  * Check if the zone ID in SIN6 is valid according to the scope of the

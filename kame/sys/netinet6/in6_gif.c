@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.97 2002/05/30 04:12:16 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.98 2002/06/09 14:43:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -185,7 +185,7 @@ in6_gif_output(ifp, family, m)
 		m_freem(m);
 		return EAFNOSUPPORT;
 	}
-	
+
 #if NBRIDGE > 0
 	if (family == AF_LINK) {
 	        mp = NULL;
@@ -307,7 +307,7 @@ in6_gif_output(ifp, family, m)
 		m_freem(m);
 		return EAFNOSUPPORT;
 	}
-	
+
 	/* prepend new IP header */
 	M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
 	if (m && m->m_len < sizeof(struct ip6_hdr))
@@ -472,7 +472,7 @@ int in6_gif_input(mp, offp, proto)
 		m_freem(m);
 		return IPPROTO_DONE;
 	}
-		
+
 	gif_input(m, af, gifp);
 	return IPPROTO_DONE;
 #endif
@@ -542,7 +542,7 @@ gif_validate6(m, sc, ifp)
 /*
  * we know that we are in IFF_UP, outer address available, and outer family
  * matched the physical addr family.  see gif_encapcheck().
- * sanity check for arg should have been done in the caller. 
+ * sanity check for arg should have been done in the caller.
  */
 int
 gif_encapcheck6(m, off, proto, arg)
@@ -568,7 +568,7 @@ in6_gif_attach(sc)
 
 	bzero(&mask6, sizeof(mask6));
 	mask6.sin6_len = sizeof(struct sockaddr_in6);
-	mask6.sin6_addr.s6_addr32[0] = mask6.sin6_addr.s6_addr32[1] = 
+	mask6.sin6_addr.s6_addr32[0] = mask6.sin6_addr.s6_addr32[1] =
 	    mask6.sin6_addr.s6_addr32[2] = mask6.sin6_addr.s6_addr32[3] = ~0;
 	mask6.sin6_scope_id = ~0;
 

@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.120 2002/06/07 15:11:57 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.121 2002/06/09 14:43:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -188,7 +188,7 @@
 #include <netinet6/ip6protosw.h>
 
 #ifdef MIP6
-#include <net/if_hif.h> 
+#include <net/if_hif.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 #endif /* MIP6 */
@@ -370,7 +370,7 @@ struct ip6protosw inet6sw[] = {
 },
 { SOCK_RAW,	&inet6domain,	IPPROTO_DSTOPTS,PR_ATOMIC|PR_ADDR,
   dest6_input,	0,	 	0,		0,
-  0,	
+  0,
   0,		0,		0,		0,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   &nousrreqs
@@ -378,7 +378,7 @@ struct ip6protosw inet6sw[] = {
 },
 { SOCK_RAW,	&inet6domain,	IPPROTO_ROUTING,PR_ATOMIC|PR_ADDR,
   route6_input,	0,	 	0,		0,
-  0,	
+  0,
   0,		0,		0,		0,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   &nousrreqs
@@ -386,7 +386,7 @@ struct ip6protosw inet6sw[] = {
 },
 { SOCK_RAW,	&inet6domain,	IPPROTO_FRAGMENT,PR_ATOMIC|PR_ADDR,
   frag6_input,	0,	 	0,		0,
-  0,	
+  0,
   0,		0,		0,		0,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   &nousrreqs
@@ -395,7 +395,7 @@ struct ip6protosw inet6sw[] = {
 #ifdef MIP6
 { SOCK_RAW,	&inet6domain,	IPPROTO_MOBILITY,PR_ATOMIC|PR_ADDR,
   mobility6_input,	0,	 	0,		0,
-  0,	
+  0,
   0,		0,		0,		0,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   &nousrreqs
@@ -411,7 +411,7 @@ struct ip6protosw inet6sw[] = {
   0,
 #endif
   0,
-  0,	
+  0,
   0,		0,		0,		0,
 #ifdef __OpenBSD__
   ah_sysctl,
@@ -444,7 +444,7 @@ struct ip6protosw inet6sw[] = {
 #ifndef __OpenBSD__
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPCOMP,	PR_ATOMIC|PR_ADDR,
   ipcomp6_input, 0,	 	0,		0,
-  0,	
+  0,
   0,		0,		0,		0,
 #ifndef __FreeBSD__
   ipsec6_sysctl,

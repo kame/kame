@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.18 2002/03/12 11:57:55 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.19 2002/06/09 14:44:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -120,7 +120,7 @@ int mip6_prefix_haddr_assign(mpfx, sc)
 {
 	struct in6_addr ifid;
 	int error = 0;
-	
+
 	if ((mpfx == NULL) || (sc == NULL)) {
 		return (EINVAL);
 	}
@@ -183,7 +183,7 @@ mip6_prefix_list_remove(mpfx_list, mpfx)
 			FREE(mspfx, M_TEMP);
 		}
 	}
-	
+
 	LIST_REMOVE(mpfx, mpfx_entry);
 	FREE(mpfx, M_TEMP);
 

@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.44 2001/07/26 06:53:15 jinmei Exp $	*/
+/*	$KAME: esp_output.c,v 1.45 2002/06/09 14:43:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -358,7 +358,7 @@ esp_output(m, nexthdrp, md, isr, af)
 		m->m_pkthdr.len += esphlen;
 		esp = mtod(md, struct esp *);
 	}
-	
+
 	nxt = *nexthdrp;
 	*nexthdrp = IPPROTO_ESP;
 	switch (af) {
@@ -427,7 +427,7 @@ esp_output(m, nexthdrp, md, isr, af)
 	/* ESP packet, including nxthdr field, must be length of 4n */
 	if (padbound < 4)
 		padbound = 4;
-	
+
 	extendsiz = padbound - (plen % padbound);
 	if (extendsiz == 1)
 		extendsiz = padbound + 1;

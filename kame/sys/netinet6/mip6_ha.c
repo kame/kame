@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.35 2002/03/12 11:57:55 keiichi Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.36 2002/06/09 14:44:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -259,7 +259,7 @@ mip6_ha_list_update_withndpr(mha_list, addr, ndpr)
 		return (0);
 	}
 	mha->mha_gaddr = ndpr->ndpr_prefix;
-	
+
 	return (0);
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.96 2002/06/08 06:57:10 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.97 2002/06/09 14:44:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -153,7 +153,7 @@ struct	ip6_pktopts {
 
 	/* Next-hop address information */
 	struct	ip6po_nhinfo ip6po_nhinfo;
-	
+
 	struct	ip6_hbh *ip6po_hbh; /* Hop-by-Hop options header */
 
 	/* Destination options header (before a routing header) */
@@ -167,10 +167,10 @@ struct	ip6_pktopts {
 
 	/* Destination options header (after a routing header) */
 	struct	ip6_dest *ip6po_dest2;
-	
+
 	/* Mobility header (just before an upper layer header) */
 	struct	ip6_mobility *ip6po_mobility;
-	
+
 	int	ip6po_tclass;	/* traffic class */
 
 	int	ip6po_minmtu;  /* fragment vs PMTU discovery policy */

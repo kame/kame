@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.103 2002/06/08 21:42:40 itojun Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.104 2002/06/09 14:44:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -126,7 +126,7 @@ static void mip6_bu_starttimer __P((void));
 static void mip6_bu_stoptimer __P((void));
 
 /* binding cache functions. */
-static struct mip6_bc *mip6_bc_create 
+static struct mip6_bc *mip6_bc_create
     __P((struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *,
 	 u_int8_t, u_int16_t, u_int32_t, struct ifnet *));
 static int mip6_bc_list_insert __P((struct mip6_bc_list *, struct mip6_bc *));
@@ -168,7 +168,7 @@ static const struct sockaddr_in6 sin6_any = {
 void
 mip6_bu_init()
 {
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) 
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
         callout_init(&mip6_bu_ch);
 #endif
 }
@@ -398,7 +398,7 @@ mip6_home_registration(sc)
 				long time_second = time.tv_sec;
 #endif
 
-				/* 
+				/*
 				 * a binding update entry exists.
 				 * update information.
 				 */
@@ -718,7 +718,7 @@ mip6_bu_list_insert(bu_list, mbu)
 		mip6_bu_starttimer();
 	}
 	mip6_bu_count++;
-		
+
 	return (0);
 }
 
@@ -784,7 +784,7 @@ mip6_bdt_create(sc, paddr)
 #ifndef SCOPEDROUTING
 	dst.sin6_scope_id = 0;
 	mask.sin6_scope_id = 0;
-#endif	
+#endif
 	error = rtrequest1(RTM_ADD, &rti, &retrt);
 	if (error == 0) {
 		retrt->rt_refcnt--;
@@ -1364,7 +1364,7 @@ mip6_dad_success(ifa)
 	    mbc;
 	    mbc = LIST_NEXT(mbc, mbc_entry)) {
 		if (mbc->mbc_ifp != prim->mbc_ifp ||
-		    (mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) == 0) 
+		    (mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) == 0)
 			continue;
 		if (!mip6_are_ifid_equal(&mbc->mbc_phaddr.sin6_addr,
 					 &prim->mbc_phaddr.sin6_addr,
@@ -1426,7 +1426,7 @@ mip6_dad_duplicated(ifa)
 		if (prim == mbc)
 			continue;
 		if (mbc->mbc_ifp != prim->mbc_ifp ||
-		    (mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) == 0) 
+		    (mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) == 0)
 			continue;
 		if (!mip6_are_ifid_equal(&mbc->mbc_phaddr.sin6_addr,
 					 &prim->mbc_phaddr.sin6_addr,
@@ -1824,7 +1824,7 @@ mip6_process_br(m, opt)
 void
 mip6_bc_init()
 {
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) 
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
         callout_init(&mip6_bc_ch);
 #endif
 	bzero(&mip6_bc_hash, sizeof(mip6_bc_hash));
@@ -2120,7 +2120,7 @@ mip6_bc_timeout(dummy)
 		/* XXX send BA if BA_WAITSENT is remained not
 		   piggybacked before */
 		if (mbc->mbc_state & MIP6_BC_STATE_BA_WAITSENT) {
-			
+
 		}
 	}
 #endif
@@ -2497,22 +2497,22 @@ mip6_tunnel_output(mp, mbc)
  * <034BEFD03799D411A59F00508BDF754603008B1F@esealnt448.al.sw.ericsson.se>
  *
  * - Did the packet contain a routing header ?
- * - Did the routing header contain the Home address of the 
+ * - Did the routing header contain the Home address of the
  *  MN as the last segment and its CoA (as specified in the BU list) ?
  *
  * If the answer to both is yes then the packet was route optimised.
- * if no then it wasn't and it doesn't really matter whether it was 
- * tunnelled by THE HA or another node. 
+ * if no then it wasn't and it doesn't really matter whether it was
+ * tunnelled by THE HA or another node.
  * This will have two advantages (outside the HMIPv6 area) :
  *
  * - Simpler processing in the kernel since the MIPv6 code would
  *   not have to "remember" whether the inner packet being processed
  *   now was originally tunnelled.
  *
- * - Will allow for future HA redundancy mechanisms because if the 
- *   HA crashes and another HA starts tunnelling the packet the 
- *   MN does not need to know or care. Excet of course when it's 
- *   about to refresh the Binding Cache but that can be handled 
+ * - Will allow for future HA redundancy mechanisms because if the
+ *   HA crashes and another HA starts tunnelling the packet the
+ *   MN does not need to know or care. Excet of course when it's
+ *   about to refresh the Binding Cache but that can be handled
  *   by the HA redundancy protocol.
  */
 int
@@ -2548,7 +2548,7 @@ mip6_route_optimize(m)
 	    IN6_IS_ADDR_MULTICAST(&sin6dst->sin6_addr)) {
 		return (0);
 	}
-	
+
 	n = ip6_findaux(m);
 	if (n) {
 		ip6a = mtod(n, struct ip6aux *);

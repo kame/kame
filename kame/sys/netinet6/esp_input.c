@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.66 2002/03/17 22:02:11 jinmei Exp $	*/
+/*	$KAME: esp_input.c,v 1.67 2002/06/09 14:43:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -839,7 +839,7 @@ noreplaycheck:
 		}
 
 		key_sa_recordxfer(sav, m);
-		if (ipsec_addhist(m, IPPROTO_ESP, spi) != 0 || 
+		if (ipsec_addhist(m, IPPROTO_ESP, spi) != 0 ||
 		    ipsec_addhist(m, IPPROTO_IPV6, 0) != 0) {
 			ipsec6stat.in_nomem++;
 			goto bad;

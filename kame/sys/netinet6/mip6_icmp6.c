@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.45 2002/05/14 13:31:34 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.46 2002/06/09 14:44:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -260,7 +260,7 @@ mip6_icmp6_input(m, off, icmp6len)
 				/*
 				 * the peer doesn't recognize mobility header.
 				 */
-				
+
 				mip6_icmp6_find_addr(m, off, icmp6len,
 						     &laddr, &paddr);
 				mip6log((LOG_NOTICE,
@@ -310,7 +310,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		 */
 		return (0);
 	}
-	
+
 	/* check if we have enough icmp payload size. */
 	if (icmp6len < sizeof(*otip6) + sizeof(oip6)) {
 		/*
@@ -344,7 +344,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		 * relay.
 		 */
 		return (0);
-	} 
+	}
 
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off + sizeof(*icmp6), sizeof(*otip6), -1);
@@ -428,7 +428,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 
 	/* calculate the checksum. */
 	nicmp6->icmp6_cksum = 0;
-	nicmp6->icmp6_cksum = in6_cksum(n, IPPROTO_ICMPV6, 
+	nicmp6->icmp6_cksum = in6_cksum(n, IPPROTO_ICMPV6,
 					sizeof(*nip6), ntohs(nip6->ip6_plen));
 
 	/* XXX IPSEC? */
@@ -464,7 +464,7 @@ mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
 	struct in6_addr *la;                    /* Local home address */
 	struct in6_addr *pa;                    /* Peer home address */
 	struct ip6_rthdr0 *rh;                  /* Routing header */
-	u_int8_t *eopt, nxt, optlen;     
+	u_int8_t *eopt, nxt, optlen;
 	int off, elen, eoff;
 	int rlen, addr_off;
 
@@ -509,7 +509,7 @@ mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
 			nxt = ehdr->ip6e_nxt;
 			off += (ehdr->ip6e_len + 1) << 3;
 			continue;
-		} 
+		}
 		if (nxt == IPPROTO_ROUTING) {
 			rh = (struct ip6_rthdr0 *)(icmp6 + off);
 			rlen = (rh->ip6r0_len + 1) << 3;
@@ -534,7 +534,7 @@ mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
 			continue;
 		}
 
-		
+
 		/* Only look at the unfragmentable part.  Other headers
 		   may be present but they are of no interest. */
 		break;
@@ -614,7 +614,7 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	 * check if the home agent list contains sending the home
 	 * agent's own address.
 	 */
-	hacount = (icmp6len - sizeof(struct ha_discov_rep)) 
+	hacount = (icmp6len - sizeof(struct ha_discov_rep))
 		/ sizeof(struct in6_addr);
 	haaddrptr = haaddrs;
 	for (i = 0; i < hacount; i++) {
@@ -630,7 +630,7 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	 * install home agents to the internal home agent list.
 	 */
 	if (found == 0) {
-		/* 
+		/*
 		 * if the home agent list of the DHAAD reply doesn't
 		 * include the address of ip6_src field (that is, the
 		 * address of the home agent sending this DHAAD reply
@@ -638,7 +638,7 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 		 * preferable.
 		 */
 		/* XXX: TODO
-		 * 
+		 *
 		 * how do we make the HA specified in the ip src field
 		 * as a most preferable one ?
 		 */
@@ -949,7 +949,7 @@ mip6_icmp6_mp_sol_output(mpfx, mha)
 	int icmp6len;
 	int maxlen;
 	int error;
-	
+
 	/* estimate the size of message. */
 	maxlen = sizeof(*ip6) + sizeof(*mp_sol);
 	/* XXX we must determine the link type of our home address

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_output.c,v 1.21 2002/06/08 19:52:07 itojun Exp $	*/
+/*	$KAME: tcp6_output.c,v 1.22 2002/06/09 14:44:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -363,7 +363,7 @@ send:
 			mss = htons((u_short) tcp6_send_mss(t6p));
 			bcopy((caddr_t)&mss, (caddr_t)(opt + 2), sizeof(mss));
 			optlen = 4;
-	
+
 			if (t6p->t_flags & TF_USE_SCALE) {
 				*((u_long *) (opt + optlen)) = htonl(
 					TCP6OPT_NOP << 24 |

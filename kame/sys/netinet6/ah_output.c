@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.31 2001/07/26 06:53:15 jinmei Exp $	*/
+/*	$KAME: ah_output.c,v 1.32 2002/06/09 14:43:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -337,7 +337,7 @@ ah_hdrlen(sav)
 {
 	const struct ah_algorithm *algo;
 	int plen, ahlen;
-	
+
 	algo = ah_algorithm_lookup(sav->alg_auth);
 	if (!algo)
 		return 0;

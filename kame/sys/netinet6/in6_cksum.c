@@ -1,4 +1,4 @@
-/*	$KAME: in6_cksum.c,v 1.11 2002/01/31 14:14:50 jinmei Exp $	*/
+/*	$KAME: in6_cksum.c,v 1.12 2002/06/09 14:43:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,7 +102,7 @@ in6_cksum(m, nxt, off, len)
 #if 0
 	int srcifid = 0, dstifid = 0;
 #endif
-	struct ip6_hdr *ip6;	
+	struct ip6_hdr *ip6;
 	union {
 		u_int16_t phs[4];
 		struct {
@@ -235,7 +235,7 @@ in6_cksum(m, nxt, off, len)
 	/*
 	 * Lastly calculate a summary of the rest of mbufs.
 	 */
-	
+
 	for (;m && len; m = m->m_next) {
 		if (m->m_len == 0)
 			continue;

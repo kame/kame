@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.139 2002/06/08 21:42:40 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.140 2002/06/09 14:44:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -534,7 +534,7 @@ ipsec4_getpolicybysock(m, dir, so, error)
 			*error = 0;
 			ipsec_fillpcbcache(pcbsp, m, &ip4_def_policy, dir);
 			return &ip4_def_policy;
-			
+
 		case IPSEC_POLICY_IPSEC:
 			currsp->refcnt++;
 			*error = 0;
@@ -761,7 +761,7 @@ ipsec6_getpolicybysock(m, dir, so, error)
 			*error = 0;
 			ipsec_fillpcbcache(pcbsp, m, &ip6_def_policy, dir);
 			return &ip6_def_policy;
-			
+
 		case IPSEC_POLICY_IPSEC:
 			currsp->refcnt++;
 			*error = 0;
@@ -1873,7 +1873,7 @@ ipsec_in_reject(sp, m)
 	case IPSEC_POLICY_BYPASS:
 	case IPSEC_POLICY_NONE:
 		return 0;
-	
+
 	case IPSEC_POLICY_IPSEC:
 		break;
 
@@ -2059,7 +2059,7 @@ ipsec_hdrsiz(sp)
 	case IPSEC_POLICY_BYPASS:
 	case IPSEC_POLICY_NONE:
 		return 0;
-	
+
 	case IPSEC_POLICY_IPSEC:
 		break;
 
@@ -3475,9 +3475,9 @@ ipsec4_tunnel_validate(m, off, nxt0, sav)
 	bzero(&odst, sizeof(odst));
 	bzero(&isrc, sizeof(isrc));
 	bzero(&idst, sizeof(idst));
-	osrc.sin_family = odst.sin_family = isrc.sin_family = idst.sin_family = 
+	osrc.sin_family = odst.sin_family = isrc.sin_family = idst.sin_family =
 	    AF_INET;
-	osrc.sin_len = odst.sin_len = isrc.sin_len = idst.sin_len = 
+	osrc.sin_len = odst.sin_len = isrc.sin_len = idst.sin_len =
 	    sizeof(struct sockaddr_in);
 	osrc.sin_addr = oip->ip_src;
 	odst.sin_addr = oip->ip_dst;
@@ -3574,7 +3574,7 @@ ipsec6_tunnel_validate(m, off, nxt0, sav)
 	bzero(&isrc, sizeof(isrc));
 	bzero(&idst, sizeof(idst));
 	isrc.sin6_family = idst.sin6_family = AF_INET6;
-	isrc.sin6_len = idst.sin6_len = sizeof(struct sockaddr_in6); 
+	isrc.sin6_len = idst.sin6_len = sizeof(struct sockaddr_in6);
 	m_copydata(m, off + offsetof(struct ip6_hdr, ip6_src),
 	    sizeof(isrc.sin6_addr), (caddr_t)&isrc.sin6_addr);
 	m_copydata(m, off + offsetof(struct ip6_hdr, ip6_dst),
@@ -3861,7 +3861,7 @@ ipsec_clearhist(m)
 
 	n = ipsec_findaux(m);
 	if ((n) && n->m_len > sizeof(struct ipsecaux))
-		n->m_len = sizeof(struct ipsecaux); 
+		n->m_len = sizeof(struct ipsecaux);
 	ipsec_optaux(m, n);
 }
 
@@ -3911,7 +3911,7 @@ ipsec_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		    oldp, oldlenp, newp, newlen));
 	case IPSECCTL_DEF_ESP_TRANSLEV:
 	case IPSECCTL_DEF_ESP_NETLEV:
-	case IPSECCTL_DEF_AH_TRANSLEV:	
+	case IPSECCTL_DEF_AH_TRANSLEV:
 	case IPSECCTL_DEF_AH_NETLEV:
 		if (newp != NULL && newlen == sizeof(int)) {
 			switch (*(int *)newp) {
@@ -3977,7 +3977,7 @@ ipsec6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		    oldp, oldlenp, newp, newlen));
 	case IPSECCTL_DEF_ESP_TRANSLEV:
 	case IPSECCTL_DEF_ESP_NETLEV:
-	case IPSECCTL_DEF_AH_TRANSLEV:	
+	case IPSECCTL_DEF_AH_TRANSLEV:
 	case IPSECCTL_DEF_AH_NETLEV:
 		if (newp != NULL && newlen == sizeof(int)) {
 			switch (*(int *)newp) {

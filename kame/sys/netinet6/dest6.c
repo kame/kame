@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.41 2002/06/08 19:52:07 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.42 2002/06/09 14:43:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -208,7 +208,7 @@ dest6_input(mp, offp, proto)
 #endif /* MIP6 */
 
 			/* store the CoA in a aux. */
-			bcopy(&ip6a->ip6a_src.sin6_addr, &ip6a->ip6a_coa, 
+			bcopy(&ip6a->ip6a_src.sin6_addr, &ip6a->ip6a_coa,
 			    sizeof(ip6a->ip6a_coa));
 			ip6a->ip6a_flags |= IP6A_HASEEN;
 
@@ -302,7 +302,7 @@ dest6_send_bm(src, dst, home)
 		m_freem(m);
 		goto free_ip6pktopts;
 	}
-				  
+
 	/* output a binding missing message. */
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
 	if (error)

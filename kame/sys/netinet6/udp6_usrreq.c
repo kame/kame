@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.105 2002/06/08 21:42:42 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.106 2002/06/09 14:44:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -202,7 +202,7 @@ udp6_input(mp, offp, proto)
 	 */
 	if (ulen == 0 && plen > 0xffff)
 		ulen = plen;
-	
+
 	if (plen != ulen) {
 		udp6stat.udp6s_badlen++;
 		goto bad;
@@ -833,7 +833,7 @@ udp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case UDP6CTL_STATS:
 		return sysctl_rdtrunc(oldp, oldlenp, newp, &udp6stat,
 		    sizeof(udp6stat));
-	
+
 	default:
 		return (sysctl_int_arr(udp6_sysvars, name, namelen,
 		    oldp, oldlenp, newp, newlen));

@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.127 2002/06/08 07:07:27 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.128 2002/06/09 14:43:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -410,7 +410,7 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 /*
  * IP6 route structure
  */
-#if !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__FreeBSD__) && !(defined(__bsdi__) && _BSDI_VERSION >= 200105) 
+#if !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__FreeBSD__) && !(defined(__bsdi__) && _BSDI_VERSION >= 200105)
 #if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 #ifndef NEW_STRUCT_ROUTE
 struct route_in6 {
@@ -557,7 +557,7 @@ struct in6_pktinfo {
  * Control structure for IPV6_RECVPATHMTU socket option.
  * Note that this structure is not fully conformant to rfc2292bis-02.
  * However, since how to tell the destination of the path (or the path itself)
- * to the application is not determined, we use our original structure.  
+ * to the application is not determined, we use our original structure.
  */
 struct ip6_mtuinfo {
 	struct sockaddr_in6 ip6m_addr;	/* or sockaddr_storage? */

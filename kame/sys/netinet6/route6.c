@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.35 2002/05/14 13:31:34 keiichi Exp $	*/
+/*	$KAME: route6.c,v 1.36 2002/06/09 14:44:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -412,7 +412,7 @@ ip6_rthdr2(m, ip6, rh2)
 		}
 	}
 	if (rh2_has_hoa == 0) {
-		/* 
+		/*
 		 * this rh2 includes an address that is not one of our
 		 * home addresses.
 		 */

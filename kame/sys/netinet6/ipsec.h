@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.53 2001/11/20 08:32:38 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.54 2002/06/09 14:44:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -130,7 +130,7 @@ struct inpcbpolicy {
 	struct secpolicy *cache[3];
 	struct secpolicyindex cacheidx[3];
 	int cachegen[3]; 	/* cache generation #, the time we filled it */
-	int cacheflags;	
+	int cacheflags;
 #define IPSEC_PCBSP_CONNECTED	1
 };
 
@@ -485,7 +485,7 @@ extern struct mbuf *ipsec_copypkt __P((struct mbuf *));
 extern void ipsec_delaux __P((struct mbuf *));
 extern int ipsec_setsocket __P((struct mbuf *, struct socket *));
 extern struct socket *ipsec_getsocket __P((struct mbuf *));
-extern int ipsec_addhist __P((struct mbuf *, int, u_int32_t)); 
+extern int ipsec_addhist __P((struct mbuf *, int, u_int32_t));
 extern int ipsec_getnhist __P((struct mbuf *));
 extern struct ipsec_history *ipsec_gethist __P((struct mbuf *, int *));
 extern void ipsec_clearhist __P((struct mbuf *));

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.311 2002/06/07 21:23:51 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.312 2002/06/09 14:44:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -161,7 +161,7 @@ extern int ipsec_ipcomp_default_level;
 
 #ifdef MIP6
 #include <sys/syslog.h>
-#include <net/if_hif.h> 
+#include <net/if_hif.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 #endif /* MIP6 */
@@ -331,7 +331,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			goto freehdrs;					\
 	}								\
     } while (0)
-	
+
 	bzero(&exthdrs, sizeof(exthdrs));
 
 	if (opt) {
@@ -542,7 +542,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		/* no need to do IPsec. */
 		needipsec = 0;
 		break;
-	
+
 	case IPSEC_POLICY_IPSEC:
 		if (sp->req == NULL) {
 			/* acquire a policy */
@@ -1069,7 +1069,7 @@ skip_ipsec2:;
 	if (rt == NULL) {
 		/*
 		 * If in6_selectroute() does not return a route entry,
-		 * dst may not have been updated. 
+		 * dst may not have been updated.
 		 */
 		*dst = *dst_sa;	/* XXX */
 	}
@@ -1190,7 +1190,7 @@ skip_ipsec2:;
 				 * when it is called from the originating path.
 				 * However, it is not always the case, since
 				 * some versions of MGETHDR() does not
-				 * initialize the field.  
+				 * initialize the field.
 				 */
 				m->m_pkthdr.rcvif = NULL;
 				if (ip6_mforward(ip6, ifp, m) != 0) {
@@ -1347,7 +1347,7 @@ skip_ipsec2:;
 		goto done;
 	}
 	ip6 = mtod(m, struct ip6_hdr *);
-#endif 
+#endif
 
 	/*
 	 * Send the packet to the outgoing interface.
@@ -2441,12 +2441,12 @@ do { \
 				}
 				optval = *mtod(m, int *);
 
-				if (optval < IPSEC_LEVEL_BYPASS || 
+				if (optval < IPSEC_LEVEL_BYPASS ||
 				    optval > IPSEC_LEVEL_UNIQUE) {
 					error = EINVAL;
 					break;
 				}
-					
+
 				switch (optname) {
 				case IPV6_AUTH_LEVEL:
 				        if (optval < ipsec_auth_default_level &&
@@ -2649,7 +2649,7 @@ do { \
 					break;
 
 				case IPV6_V6ONLY:
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) 
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 					optval = OPTBIT(IN6P_IPV6_V6ONLY);
 #else
 					optval = (ip6_v6only != 0); /* XXX */
@@ -2996,7 +2996,7 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 #endif
 		return(EINVAL);
 	}
-		
+
 	switch (optname) {
 	case IPV6_CHECKSUM:
 		/*
@@ -3168,7 +3168,7 @@ ip6_pcbopt(optname, buf, len, pktopt, priv, uproto)
 	int uproto;
 {
 	struct ip6_pktopts *opt;
-	
+
 	if (*pktopt == NULL) {
 		*pktopt = malloc(sizeof(struct ip6_pktopts), M_IP6OPT,
 		    M_WAITOK);
@@ -4111,7 +4111,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		} else
 			opt->ip6po_nexthop = (struct sockaddr *)buf;
 		break;
-		
+
 	case IPV6_2292HOPOPTS:
 	case IPV6_HOPOPTS:
 	{
@@ -4254,7 +4254,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 			bcopy(rth, opt->ip6po_rthdr, rthlen);
 		} else
 			opt->ip6po_rthdr = rth;
-		
+
 		break;
 	}
 
@@ -4311,7 +4311,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		break;
 
 	default:
-		return(ENOPROTOOPT);	
+		return(ENOPROTOOPT);
 	} /* end of switch */
 
 	return(0);

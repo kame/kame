@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.55 2002/02/27 01:33:59 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.56 2002/06/09 14:43:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -599,7 +599,7 @@ esp_3des_blockdecrypt(algo, sav, s, d)
 	/* assumption: d has a good alignment */
 	p = (des_key_schedule *)sav->sched;
 	bcopy(s, d, sizeof(DES_LONG) * 2);
-	des_ecb3_encrypt((des_cblock *)d, (des_cblock *)d, 
+	des_ecb3_encrypt((des_cblock *)d, (des_cblock *)d,
 			 p[0], p[1], p[2], DES_DECRYPT);
 	return 0;
 }
@@ -616,7 +616,7 @@ esp_3des_blockencrypt(algo, sav, s, d)
 	/* assumption: d has a good alignment */
 	p = (des_key_schedule *)sav->sched;
 	bcopy(s, d, sizeof(DES_LONG) * 2);
-	des_ecb3_encrypt((des_cblock *)d, (des_cblock *)d, 
+	des_ecb3_encrypt((des_cblock *)d, (des_cblock *)d,
 			 p[0], p[1], p[2], DES_ENCRYPT);
 	return 0;
 }
@@ -1138,6 +1138,6 @@ esp_auth(m0, skip, length, sav, sum)
 	}
 	(*algo->result)(&s, sumbuf);
 	bcopy(sumbuf, sum, siz);	/* XXX */
-	
+
 	return 0;
 }

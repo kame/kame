@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.115 2002/06/08 21:42:39 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.116 2002/06/09 14:43:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,10 +108,10 @@
 #endif
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
-#include <netinet6/scope6_var.h> 
+#include <netinet6/scope6_var.h>
 
 #ifdef MIP6
-#include <net/if_hif.h> 
+#include <net/if_hif.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 #endif /* MIP6 */
@@ -136,12 +136,12 @@ struct mip6_unuse_hoa_list mip6_unuse_hoa;
 
 #ifdef NEW_STRUCT_ROUTE
 static int in6_selectif __P((struct sockaddr_in6 *, struct ip6_pktopts *,
-			     struct ip6_moptions *, 
+			     struct ip6_moptions *,
 			     struct route *ro,
 			     struct ifnet **));
 #else
 static int in6_selectif __P((struct sockaddr_in6 *, struct ip6_pktopts *,
-			     struct ip6_moptions *, 
+			     struct ip6_moptions *,
 			     struct route_in6 *ro,
 			     struct ifnet **));
 #endif
@@ -818,12 +818,12 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 	/*
 	 * Use a cached route if it exists and is valid, else try to allocate
 	 * a new one.  Note that we should check the address family of the
-	 * cached destination, in case of sharing the cache with IPv4. 
+	 * cached destination, in case of sharing the cache with IPv4.
 	 */
 	if (ro) {
 		if (ro->ro_rt &&
 		    (!(ro->ro_rt->rt_flags & RTF_UP) ||
-		     ro->ro_dst.sa_family != AF_INET6 || 
+		     ro->ro_dst.sa_family != AF_INET6 ||
 #ifdef SCOPEDROUTING
 		     !SA6_ARE_ADDR_EQUAL(&satosin6(&ro->ro_dst), dstsock)
 #else
@@ -923,7 +923,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 		*retifp = ifp;
 	if (retrt != NULL)
 		*retrt = rt;	/* rt may be NULL */
-	
+
 	return(error);
 }
 
@@ -936,7 +936,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 */
 #ifdef HAVE_NRL_INPCB
 #define in6pcb		inpcb
-#define in6p_hops	inp_hops	
+#define in6p_hops	inp_hops
 #endif
 int
 in6_selecthlim(in6p, ifp)
@@ -1300,7 +1300,7 @@ lookup_addrsel_policy(key)
 }
 
 /*
- * Subroutines to manage the address selection policy table via sysctl. 
+ * Subroutines to manage the address selection policy table via sysctl.
  */
 #ifdef __FreeBSD__
 struct walkarg {

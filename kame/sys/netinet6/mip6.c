@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.127 2002/06/08 21:42:40 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.128 2002/06/09 14:44:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -196,7 +196,7 @@ mip6_init()
 	mip6_config.mcfg_hrbu_maxlifetime = MIP6_CONFIG_HRBU_MAXLIFETIME;
 	mip6_config.mcfg_bu_use_single = MIP6_CONFIG_BU_USE_SINGLE;
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) 
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
         callout_init(&mip6_pfx_ch);
 #endif
 
@@ -387,7 +387,7 @@ mip6_prefix_list_update_sub(sc, rtaddr, ndpr, dr)
 	} else {
 		/* this is a new ha. */
 		mha_is_new = 1;
-		
+
 		mha = mip6_ha_create(rtaddr,
 				     ndpr->ndpr_raf_router ?
 				     &ndpr->ndpr_prefix : NULL,
@@ -542,7 +542,7 @@ mip6_prefix_list_update_sub(sc, rtaddr, ndpr, dr)
 						  &ndpr->ndpr_prefix.sin6_addr,
 						  ndpr->ndpr_plen);
 	if (sc->hif_hs_current == NULL) {
-		sc->hif_hs_current = 
+		sc->hif_hs_current =
 			hif_subnet_list_find_withprefix(&sc->hif_hs_list_foreign,
 							&ndpr->ndpr_prefix.sin6_addr,
 							ndpr->ndpr_plen);
@@ -648,7 +648,7 @@ mip6_haddr_config(sc)
 		 * address autoconfiguration manner.
 		 */
 		error = mip6_detach_haddrs(sc);
-		
+
 		break;
 
 	case HIF_LOCATION_FOREIGN:
@@ -784,7 +784,7 @@ mip6_select_coa(preferedifp)
 		ret = -1;
 		goto select_coa_end;
 	}
-	
+
 	hcoa = hif_coa_list_find_withifp(&hif_coa_list, preferedifp);
 	if (hcoa == NULL) {
 		hcoa = hif_coa_create(preferedifp);
@@ -1362,21 +1362,21 @@ mip6_ioctl(cmd, data)
 				 __FILE__, __LINE__));
 			mip6_config.mcfg_use_ipsec = 1;
 			break;
-			
+
 		case SIOCSMIP6CFG_DISABLEIPSEC:
 			mip6log((LOG_INFO,
 				 "%s:%d: IPsec protection disabled\n",
 				 __FILE__, __LINE__));
 			mip6_config.mcfg_use_ipsec = 0;
 			break;
-			
+
 		case SIOCSMIP6CFG_ENABLEAUTHDATA:
 			mip6log((LOG_INFO,
 				 "%s:%d: Authdata protection enabled\n",
 				 __FILE__, __LINE__));
 			mip6_config.mcfg_use_authdata = 1;
 			break;
-			
+
 		case SIOCSMIP6CFG_DISABLEAUTHDATA:
 			mip6log((LOG_INFO,
 				 "%s:%d: Authdata protection disabled\n",
@@ -1390,7 +1390,7 @@ mip6_ioctl(cmd, data)
 				 __FILE__, __LINE__));
 			mip6_config.mcfg_debug = 1;
 			break;
-			
+
 		case SIOCSMIP6CFG_DISABLEDEBUG:
 			mip6log((LOG_INFO,
 				 "%s:%d: debug message disabled\n",
@@ -1431,7 +1431,7 @@ mip6_ioctl(cmd, data)
 			for (uh = LIST_FIRST(&mip6_unuse_hoa);
 			     uh;
 			     uh = LIST_NEXT(uh, unuse_entry)) {
-				if (IN6_ARE_ADDR_EQUAL(&uh->unuse_addr, 
+				if (IN6_ARE_ADDR_EQUAL(&uh->unuse_addr,
 				    &mr->mip6r_ru.mip6r_sin6.sin6_addr) &&
 				    uh->unuse_port
 				    == mr->mip6r_ru.mip6r_sin6.sin6_port) {
@@ -1462,7 +1462,7 @@ mip6_ioctl(cmd, data)
 
 			for (uh = LIST_FIRST(&mip6_unuse_hoa); uh; uh = nxt) {
 				nxt = LIST_NEXT(uh, unuse_entry);
-				if (IN6_ARE_ADDR_EQUAL(&uh->unuse_addr, 
+				if (IN6_ARE_ADDR_EQUAL(&uh->unuse_addr,
 				    &mr->mip6r_ru.mip6r_sin6.sin6_addr) &&
 				    uh->unuse_port
 				    == mr->mip6r_ru.mip6r_sin6.sin6_port) {
@@ -1753,7 +1753,7 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 		/* already allocated ? */
 		return (0);
 	}
-	
+
 	bzero(&haddr_opt, sizeof(struct ip6_opt_home_address));
 	haddr_opt.ip6oh_type = IP6OPT_HOME_ADDRESS;
 	haddr_opt.ip6oh_len = IP6OPT_HALEN;
@@ -1785,7 +1785,7 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	return (0);
 }
 
-#ifdef MIP6XXX 
+#ifdef MIP6XXX
 int
 mip6_babr_destopt_create(pktopt_mip6dest2, dst, opts)
 	struct ip6_dest **pktopt_mip6dest2;
@@ -1861,12 +1861,12 @@ mip6_babr_destopt_create(pktopt_mip6dest2, dst, opts)
 		 */
 		/* alignment will be done at the end of this function. */
 	}
-	
+
 	if ((mbc->mbc_state & MIP6_BC_STATE_BA_WAITSENT) != 0) {
 		/* add a binding ack. */
 		/* XXX TODO */
 	}
-	
+
 	mip6_align_destopt(&optbuf);
 
 	if (*pktopt_mip6dest2 != NULL)
@@ -2161,10 +2161,10 @@ mip6_add_opt2dh(opt, dh)
 			len = IP6OPT_HALEN + IP6OPT_MINLEN;
 			off = dh->off;
 			ha = (struct ip6_opt_home_address *)opt;
-			
+
 			bzero((caddr_t)dh->buf + off, len);
 			bcopy((caddr_t)ha, (caddr_t)dh->buf + off, len);
-			
+
 			pos = dh->buf + off;
 			dh->off += len;
 			break;
@@ -2269,7 +2269,7 @@ mip6_addr_exchange(m, dstm)
 		/* home address destopt does not exist. */
 		return (0);
 	}
-	
+
 	/* Find Home Address option */
 	dstopt = mtod(dstm, struct ip6_dest *);
 	dstoptlen = (dstopt->ip6d_len + 1) << 3;
@@ -2282,7 +2282,7 @@ mip6_addr_exchange(m, dstm)
 
 	haopt = NULL;
 	ii = 2;
-	
+
 	opt = (u_int8_t *)dstopt + ii;
 	while (ii < dstoptlen) {
 		switch (*opt) {

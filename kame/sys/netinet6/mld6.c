@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.46 2002/06/08 21:42:40 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.47 2002/06/09 14:44:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -348,7 +348,7 @@ mld6_input(m, off)
 		timer = ntohs(mldh->mld_maxdelay)*PR_FASTHZ/MLD6_TIMER_SCALE;
 		if (timer == 0 && mldh->mld_maxdelay)
 			timer = 1;
-		
+
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 		LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
 #else

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_ind.c,v 1.4 2002/01/31 14:14:54 jinmei Exp $	*/
+/*	$KAME: nd6_ind.c,v 1.5 2002/06/09 14:44:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -139,7 +139,7 @@ nd6_ins_input(m, off, icmp6len)
 		tlladdrlen = ndopts.nd_opts_tgt_lladdr->nd_opt_len << 3;
 	} else
 		goto freeit;
-	
+
  freeit:
 	m_freem(m);
 	return;

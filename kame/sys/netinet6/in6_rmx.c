@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.17 2002/06/08 19:52:07 itojun Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.18 2002/06/09 14:43:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -267,17 +267,17 @@ static int rtq_reallyold = 60*60;
 	/* one hour is ``really old'' */
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_RTEXPIRE, rtexpire,
 	CTLFLAG_RW, &rtq_reallyold , 0, "");
-				
+
 static int rtq_minreallyold = 10;
 	/* never automatically crank down to less */
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_RTMINEXPIRE, rtminexpire,
 	CTLFLAG_RW, &rtq_minreallyold , 0, "");
-				
+
 static int rtq_toomany = 128;
 	/* 128 cached routes is ``too many'' */
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_RTMAXCACHE, rtmaxcache,
 	CTLFLAG_RW, &rtq_toomany , 0, "");
-				
+
 
 /*
  * On last reference drop, mark the route as belong to us so that it can be

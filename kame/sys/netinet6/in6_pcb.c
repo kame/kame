@@ -252,7 +252,7 @@ in6_pcbbind(in6p, nam)
 		else if (!SA6_IS_ADDR_UNSPECIFIED(sin6)) {
 			struct ifaddr *ia = NULL;
 #ifndef SCOPEDROUTING
-			u_int32_t lzone; 
+			u_int32_t lzone;
 #endif
 
 			sin6->sin6_port = 0;		/* yech... */

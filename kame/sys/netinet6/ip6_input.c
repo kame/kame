@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.283 2002/06/08 19:52:07 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.284 2002/06/09 14:43:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -137,7 +137,7 @@
 #include <netinet6/raw_ip6.h>
 #endif
 #ifdef MIP6
-#include <net/if_hif.h> 
+#include <net/if_hif.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 #endif /* MIP6 */
@@ -504,7 +504,7 @@ ip6_input(m)
 		goto bad;
 	}
 
-#if defined(__OpenBSD__) && NPF > 0 
+#if defined(__OpenBSD__) && NPF > 0
 	/*
 	 * Packet filter
 	 */
@@ -606,7 +606,7 @@ ip6_input(m)
 		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
 		goto bad;
 	}
-	     
+
 	/*
 	 * The following check is not documented in specs.  A malicious
 	 * party may be able to use IPv4 mapped addr to confuse tcp/udp stack
@@ -729,7 +729,7 @@ ip6_input(m)
 	 *  Unicast check
 	 */
 	if (ip6_forward_rt.ro_rt != NULL &&
-	    (ip6_forward_rt.ro_rt->rt_flags & RTF_UP) != 0 && 
+	    (ip6_forward_rt.ro_rt->rt_flags & RTF_UP) != 0 &&
 #ifdef SCOPEDROUTING
 	    SA6_ARE_ADDR_EQUAL(&sa6_dst,
 			       (struct sockaddr_in6 *)(&ip6_forward_rt.ro_dst))
@@ -956,7 +956,7 @@ ip6_input(m)
 			/*
 			 * Note that if a valid jumbo payload option is
 			 * contained, ip6_hoptops_input() must set a valid
-			 * (non-zero) payload length to the variable plen. 
+			 * (non-zero) payload length to the variable plen.
 			 */
 			ip6stat.ip6s_badoptions++;
 			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_discard);
@@ -1031,7 +1031,7 @@ ip6_input(m)
 	} else if (!ours) {
 		ip6_forward(m, 0);
 		return;
-	}	
+	}
 
 	ip6 = mtod(m, struct ip6_hdr *);
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.3 2002/06/08 19:52:07 itojun Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.4 2002/06/09 14:44:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -106,7 +106,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		return (EACCES);
 	}
 #endif
-	
+
 	/* check if this packet has a HAO. */
 	n = ip6_findaux(m);
 	if (n == NULL) {
@@ -188,7 +188,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		/* discard. */
 		return (EINVAL);
 	}
-	
+
 
  check_mobility_options:
 
@@ -285,7 +285,7 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen)
 		/* CN part XXX */
 	}
 
-	
+
 	return (0);
 }
 
@@ -417,7 +417,7 @@ mip6_ip6ma_process(m, ip6ma, ip6malen)
 	}
 
 	if (ip6ma->ip6ma_status >= IP6MA_STATUS_ERRORBASE) {
-                mip6log((LOG_NOTICE, 
+                mip6log((LOG_NOTICE,
                          "%s:%d: a binding update was rejected "
 			 "(error code %d).\n",
                          __FILE__, __LINE__, ip6ma->ip6ma_status));
@@ -846,7 +846,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 					IPPROTO_MOBILITY, (char *)ip6ma);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6ma;
-	
+
 	return (0);
 }
 
@@ -883,7 +883,7 @@ mip6_ip6me_create(pktopt_mobility, src, dst, status, addr)
 					IPPROTO_MOBILITY, (char *)ip6me);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6me;
-	
+
 	return (0);
 }
 

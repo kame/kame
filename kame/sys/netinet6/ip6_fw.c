@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.29 2001/12/18 02:23:44 itojun Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.30 2002/06/09 14:43:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -211,7 +211,7 @@ static int
 tcp6flg_match(struct tcphdr *tcp6, struct ip6_fw *f)
 {
 	u_char		flg_set, flg_clr;
-	
+
 	/*
 	 * If an established connection is required, reject packets that
 	 * have only SYN of RST|ACK|SYN set.  Otherwise, fall through to
@@ -457,7 +457,7 @@ ip6fw_report(struct ip6_fw *f, struct ip6_hdr *ip6,
 			snprintf(SNPARGS(action2, 0), "SkipTo %d",
 			    f->fw_skipto_rule);
 			break;
-		default:	
+		default:
 			action = "UNKNOWN";
 			break;
 		}
@@ -917,7 +917,7 @@ add_entry6(struct ip6_fw_head *chainptr, struct ip6_fw *frwl)
 	ftmp->fw_pcnt = 0L;
 	ftmp->fw_bcnt = 0L;
 	fwc->rule = ftmp;
-	
+
 	s = splnet();
 
 	if (!chainptr->lh_first) {

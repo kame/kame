@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.166 2002/06/08 21:42:39 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.167 2002/06/09 14:43:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -230,7 +230,7 @@ generate_tmp_ifid(seed0, seed1, ret)
 	const u_int8_t anycast_id[8] = {0xfd, 0xff, 0xff, 0xff,
 					0xff, 0xff, 0xff, 0x80};
 	const u_int8_t isatap_id[4] = {0x00, 0x00, 0x5e, 0xfe};
-	int badid, retry = 0; 
+	int badid, retry = 0;
 
 	/* If there's no hisotry, start with a random seed. */
 	bzero(nullbuf, sizeof(nullbuf));
@@ -340,7 +340,7 @@ generate_tmp_ifid(seed0, seed1, ret)
 	 * draft-ietf-ipngwg-temp-addresses-v2-00.txt 3.2.1. (6)
 	 * Take the rightmost 64-bits of the MD5 digest and save them in
 	 * stable storage as the history value to be used in the next
-	 * iteration of the algorithm. 
+	 * iteration of the algorithm.
 	 */
 	bcopy(&digest[8], seed0, 8);
 
@@ -927,7 +927,7 @@ in6_ifattach(ifp, altifp)
 	}
 
 	/*
-	 * assign a link-local address, if there's none. 
+	 * assign a link-local address, if there's none.
 	 */
 	if (ip6_auto_linklocal) {
 		ia = in6ifa_ifpforlinklocal(ifp, 0);
@@ -1052,7 +1052,7 @@ in6_ifdetach(ifp)
 			if (ia->ia_next)
 				ia->ia_next = oia->ia_next;
 			else {
-				nd6log((LOG_ERR, 
+				nd6log((LOG_ERR,
 				    "%s: didn't unlink in6ifaddr from list\n",
 				    if_name(ifp)));
 			}
@@ -1170,7 +1170,7 @@ in6_tmpaddrtimer(ignored_arg)
 	    ip6_temp_regen_advance) * hz, in6_tmpaddrtimer, NULL);
 #elif defined(__OpenBSD__)
 	timeout_set(&in6_tmpaddrtimer_ch, in6_tmpaddrtimer, NULL);
-	timeout_add(&in6_tmpaddrtimer_ch, 
+	timeout_add(&in6_tmpaddrtimer_ch,
 	    (ip6_temp_preferred_lifetime - ip6_desync_factor -
 	    ip6_temp_regen_advance) * hz);
 #else

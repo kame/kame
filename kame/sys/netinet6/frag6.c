@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.43 2002/06/08 21:42:39 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.44 2002/06/09 14:43:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -277,7 +277,7 @@ frag6_input(mp, offp, proto)
 
 	ip6stat.ip6s_fragments++;
 	in6_ifstat_inc(dstifp, ifs6_reass_reqd);
-	
+
 	/* offset now points to data portion */
 	offset += sizeof(struct ip6_frag);
 
@@ -630,7 +630,7 @@ insert:
 			plen += t->m_len;
 		m->m_pkthdr.len = plen;
 	}
-	
+
 	ip6stat.ip6s_reassembled++;
 	in6_ifstat_inc(dstifp, ifs6_reass_ok);
 

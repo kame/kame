@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.55 2002/04/22 12:03:02 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.56 2002/06/09 14:44:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -600,13 +600,13 @@ findpcb:
 
 /* found: */
 	/* We can modify IP6 header */
-	
+
 	NTOHL(th->th_seq);
 	NTOHL(th->th_ack);
 	NTOHS(th->th_win);
 	NTOHS(th->th_urp);
 /* 	t6i->t6i_len = len;   */ /* xxx reass*/
-	
+
 	/*
 	 * If the state is CLOSED (i.e., TCB6 does not exist) then
 	 * all data in the incoming segment is discarded.
@@ -632,7 +632,7 @@ findpcb:
 		goto dropwithreset;
 	if (t6p->t_state == TCP6S_CLOSED)
 		goto drop;
-	
+
 	/* Unscale the window into a 32-bit value. */
 	if ((thflags & TH_SYN) == 0)
 		thwin = th->th_win << t6p->snd_scale;
@@ -1305,7 +1305,7 @@ trimthenstep6:
 	 */
 	if ((thflags & TH_ACK) == 0)
 		goto drop;
-	
+
 	/*
 	 * Ack processing.
 	 */
@@ -1883,7 +1883,7 @@ tcp6_pulloutofband(so, th, m, off)
 	int off;
 {
 	int cnt = off + th->th_urp - 1;
-	
+
 	while (cnt >= 0) {
 		if (m->m_len > cnt) {
 			char *cp = mtod(m, caddr_t) + cnt;
@@ -1966,7 +1966,7 @@ tcp6_xmit_timer(t6p, rtt)
 	 */
 	TCP6T_RANGESET(t6p->t_rxtcur, TCP6_REXMTVAL(t6p),
 	    t6p->t_rttmin, TCP6TV_REXMTMAX);
-	
+
 	/*
 	 * We received an ack for a packet that wasn't retransmitted;
 	 * it is probably safe to discard any error indications we've
@@ -2641,7 +2641,7 @@ syn_cache_unreach6(th, src, dst)
 	struct tcp6hdr th2;
 
 	th2.th_sport = th->th_dport;
-	th2.th_dport = th->th_sport;	
+	th2.th_dport = th->th_sport;
 
 	if ((sc = syn_cache_lookup6(&th2, &sc_prev, &head, src, dst)) == NULL)
 		return;

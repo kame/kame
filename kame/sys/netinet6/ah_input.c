@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.73 2002/05/29 08:43:43 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.74 2002/06/09 14:43:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -299,7 +299,7 @@ ah4_input(m, va_alist)
 	 * alright, it seems sane.  now we are going to check the
 	 * cryptographic checksum.
 	 */
-	
+
 	/*
 	 * some of IP header fields are flipped to the host endian.
 	 * convert them back to network endian.  VERY stupid.
@@ -812,7 +812,7 @@ ah6_input(mp, offp, proto)
 	 * alright, it seems sane.  now we are going to check the
 	 * cryptographic checksum.
 	 */
-	
+
 	if (ah6_calccksum(m, (caddr_t)cksum, siz1, algo, sav)) {
 		ipsec6stat.in_inval++;
 		goto fail;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.32 2002/05/14 13:31:34 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.33 2002/06/09 14:44:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -102,7 +102,7 @@ struct mip6_subnet_ha {
 	struct mip6_ha              *msha_mha;
 };
 
-/* 
+/*
  * the subnet infomation.  this entry includes the routers and the
  * prefixes those have some relations each other.
  */

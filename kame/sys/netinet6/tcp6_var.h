@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_var.h,v 1.11 2002/02/08 09:56:03 jinmei Exp $	*/
+/*	$KAME: tcp6_var.h,v 1.12 2002/06/09 14:44:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -93,8 +93,8 @@ struct ip6tcpreass {
 	caddr_t	i6tr_next, i6tr_prev;
 	struct	tcp6hdr *i6tr_t;
 	struct	mbuf *i6tr_m;
-	u_char	i6tr_x1;			
-	u_char	i6tr_pr;			
+	u_char	i6tr_x1;
+	u_char	i6tr_pr;
 	short	i6tr_len;
 	u_long	i6tr_x2;
 	struct	in6_addr i6tr_dst;

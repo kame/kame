@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.127 2002/06/08 21:42:41 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.128 2002/06/09 14:44:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -777,7 +777,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 		in6p = sotoin6pcb(so);
 		in6p->in6p_ip6.ip6_nxt = (long)nam;
 		in6p->in6p_cksum = -1;
-		
+
 		MALLOC(in6p->in6p_icmp6filt, struct icmp6_filter *,
 		    sizeof(struct icmp6_filter), M_PCB, M_NOWAIT);
 		if (in6p->in6p_icmp6filt == NULL) {

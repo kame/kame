@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.43 2002/04/19 07:30:00 jinmei Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.44 2002/06/09 14:44:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -815,7 +815,7 @@ ipsec6_hdrsiz_tcp(t6p)
 
 	if (!ip6_setpktaddrs(m, &in6p->in6p_lsa, &in6p->in6p_fsa))
 		hdrsiz = 0; /* XXX */
-	else 
+	else
 		hdrsiz = ipsec6_hdrsiz(m, IPSEC_DIR_OUTBOUND, in6p);
 
 	m_free(m);
