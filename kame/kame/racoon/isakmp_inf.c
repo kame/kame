@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.65 2001/03/05 18:37:07 thorpej Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.66 2001/03/05 23:09:12 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -948,9 +948,13 @@ info_recv_initialcontact(iph1)
 	caddr_t mhp[SADB_EXT_MAX + 1];
 	int proto_id, i;
 	struct ph2handle *iph2;
+	char *loc, *rem;
 
 	if (f_local)
 		return;
+
+	loc = strdup(saddr2str(iph1->local));
+	rem = strdup(saddr2str(iph1->remote));
 
 	/*
 	 * Purge all IPSEC-SAs for the peer.  We can do this
@@ -962,14 +966,13 @@ info_recv_initialcontact(iph1)
 
 		plog(LLV_INFO, LOCATION, NULL,
 		    "purging %s SAs for %s -> %s\n",
-		    pfkey_satypes[i].ps_name,
-		    saddr2str(iph1->local), saddr2str(iph1->remote));
+		    pfkey_satypes[i].ps_name, loc, rem);
 		if (pfkey_send_delete_all(lcconf->sock_pfkey,
 		    pfkey_satypes[i].ps_satype, IPSEC_MODE_ANY,
 		    iph1->local, iph1->remote) == -1) {
 			plog(LLV_ERROR, LOCATION, NULL,
 			    "delete_all %s -> %s failed for %s (%s)\n",
-			    saddr2str(iph1->local), saddr2str(iph1->remote),
+			    loc, rem,
 			    pfkey_satypes[i].ps_name, ipsec_strerror());
 			goto the_hard_way;
 		}
@@ -978,14 +981,13 @@ info_recv_initialcontact(iph1)
 
 		plog(LLV_INFO, LOCATION, NULL,
 		    "purging %s SAs for %s -> %s\n",
-		    pfkey_satypes[i].ps_name,
-		    saddr2str(iph1->remote), saddr2str(iph1->local));
+		    pfkey_satypes[i].ps_name, rem, loc);
 		if (pfkey_send_delete_all(lcconf->sock_pfkey,
 		    pfkey_satypes[i].ps_satype, IPSEC_MODE_ANY,
 		    iph1->remote, iph1->local) == -1) {
 			plog(LLV_ERROR, LOCATION, NULL,
 			    "delete_all %s -> %s failed for %s (%s)\n",
-			    saddr2str(iph1->remote), saddr2str(iph1->local),
+			    rem, loc,
 			    pfkey_satypes[i].ps_name, ipsec_strerror());
 			goto the_hard_way;
 		}
@@ -993,7 +995,14 @@ info_recv_initialcontact(iph1)
 		deleteallph2(iph1->remote, iph1->local, proto_id);
 	}
 
+	free(loc);
+	free(rem);
+	return;
+
  the_hard_way:
+	free(loc);
+	free(rem);
+
 	buf = pfkey_dump_sadb(SADB_SATYPE_UNSPEC);
 	if (buf == NULL) {
 		plog(LLV_DEBUG, LOCATION, NULL,
