@@ -1,4 +1,4 @@
-/*	$KAME: rijndaeltest.c,v 1.5 2000/11/08 05:07:50 itojun Exp $	*/
+/*	$KAME: rijndaeltest.c,v 1.6 2000/11/08 05:58:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -109,9 +109,17 @@ main(argc, argv)
 	int error;
 	const char *test;
 	u_int8_t input[16], output[16], answer[16];
+	int nrounds, rounds;
+
+	if (argc > 1)
+		nrounds = atoi(argv[1]);
+	else
+		nrounds = 1;
 
 	error = 0;
 
+	rounds = nrounds;
+again1:
 	test = "decrypt test";
 	for (i = 0; dvector[i].key; i++) {
 		hex2key(input, dvector[i].ct);
@@ -148,10 +156,15 @@ main(argc, argv)
 			error++;
 		}
 
-		printf("%s %d successful\n", test, i);
+		if (nrounds == 1)
+			printf("%s %d successful\n", test, i);
 next1:;
 	}
+	if (--rounds)
+		goto again1;
 
+	rounds = nrounds;
+again2:
 	test = "encrypt test";
 	for (i = 0; evector[i].key; i++) {
 		hex2key(input, evector[i].pt);
@@ -189,9 +202,12 @@ next1:;
 			continue;
 		}
 
-		printf("%s %d successful\n", test, i);
+		if (nrounds == 1)
+			printf("%s %d successful\n", test, i);
 next2:;
 	}
+	if (--rounds)
+		goto again2;
 
 	exit(error);
 }

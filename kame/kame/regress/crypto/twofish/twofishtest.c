@@ -1,4 +1,4 @@
-/*	$KAME: twofishtest.c,v 1.2 2000/11/08 05:07:50 itojun Exp $	*/
+/*	$KAME: twofishtest.c,v 1.3 2000/11/08 05:58:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -93,9 +93,17 @@ main(argc, argv)
 	int error;
 	const char *test;
 	u_int8_t ct[16], pt[16], ct0[16], pt0[16];
+	int nrounds, rounds;
+
+	if (argc > 1)
+		nrounds = atoi(argv[1]);
+	else
+		nrounds = 1;
 
 	error = 0;
 
+	rounds = nrounds;
+again:
 	for (i = 0; vector[i].key; i++) {
 		hex2key(pt0, vector[i].pt);
 		hex2key(ct0, vector[i].ct);
@@ -130,7 +138,8 @@ main(argc, argv)
 			continue;
 		}
 
-		printf("%s %d successful\n", test, i);
+		if (nrounds == 1)
+			printf("%s %d successful\n", test, i);
 
 		memset(pt, 0, sizeof(pt));
 
@@ -162,8 +171,11 @@ main(argc, argv)
 			continue;
 		}
 
-		printf("%s %d successful\n", test, i);
+		if (nrounds == 1)
+			printf("%s %d successful\n", test, i);
 	}
+	if (--rounds > 0)
+		goto again;
 
 	exit(error);
 }
