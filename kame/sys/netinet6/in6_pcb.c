@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.60 2000/07/12 13:27:26 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.61 2000/07/12 13:28:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -552,7 +552,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 			 *
 			 * XXX: we assume in6_rtchange does not free the PCB.
 			 */
-			dst6 = &in6p->in6p_route.ro_dst;
+			dst6 = (struct sockaddr_in6 *)&in6p->in6p_route.ro_dst;
 			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr, &faddr6))
 				in6_rtchange(in6p, errno);
 
