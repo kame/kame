@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.93 2001/06/04 12:55:26 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.94 2001/06/21 09:06:29 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -505,7 +505,11 @@ int	ip6_sendredirects = IPV6_SENDREDIRECTS;
 int	ip6_defhlim = IPV6_DEFHLIM;
 int	ip6_defmcasthlim = IPV6_DEFAULT_MULTICAST_HOPS;
 int	ip6_accept_rtadv = 0;	/* "IPV6FORWARDING ? 0 : 1" is dangerous */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+int	ip6_maxfragpackets;	/* initialized in frag6.c:frag6_init() */
+#else
 int	ip6_maxfragpackets = 200;
+#endif
 int	ip6_log_interval = 5;
 int	ip6_hdrnestlimit = 50;	/* appropriate? */
 int	ip6_dad_count = 1;	/* DupAddrDetectionTransmits */

@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.31 2001/05/17 13:45:34 jinmei Exp $	*/
+/*	$KAME: frag6.c,v 1.32 2001/06/21 09:06:29 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -94,6 +94,10 @@ frag6_init()
 {
 #ifndef __OpenBSD__
 	struct timeval tv;
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+	ip6_maxfragpackets = nmbclusters / 4;
+#endif
 
 	/*
 	 * in many cases, random() here does NOT return random number
