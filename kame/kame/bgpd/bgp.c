@@ -1184,7 +1184,7 @@ bgp_process_update(struct rpcb *bnp)
 	   */
 	  syslog(LOG_NOTICE,
 		 "<%s>: link-local next hop (%s) from an off-link peer(%s) "
-		 "(ignored)",
+		 "(ignored)", __FUNCTION__,
 		 ip6str((struct in6_addr *)&bnp->rp_inpkt[i], 0),
 		 bgp_peerstr(bnp)); 
 	}
