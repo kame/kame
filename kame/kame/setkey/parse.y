@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.58 2001/08/17 06:09:47 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.59 2001/08/17 06:15:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -70,7 +70,7 @@ void free_buffer __P((void));
 
 int setkeymsg0 __P((struct sadb_msg *, unsigned int, unsigned int, size_t));
 static int setkeymsg_spdaddr __P((unsigned int, unsigned int, vchar_t *,
-	struct addrinfo *, unsigned int, struct addrinfo *, unsigned int));
+	struct addrinfo *, int, struct addrinfo *, int));
 static int setkeymsg_addr __P((unsigned int, unsigned int,
 	struct addrinfo *, struct addrinfo *, int));
 static int setkeymsg_add __P((unsigned int, unsigned int,
@@ -84,9 +84,9 @@ extern void yyerror __P((const char *));
 %}
 
 %union {
-	int s;
-	unsigned long num;
-	unsigned int intnum;
+	int num;
+	unsigned long ulnum;
+	unsigned int unum;
 	vchar_t val;
 	struct addrinfo *res;
 }
@@ -105,11 +105,12 @@ extern void yyerror __P((const char *));
 %token F_POLICY PL_REQUESTS
 %token F_AIFLAGS
 
-%type <num> EXTENSION MODE
-%type <num> PR_ESP PR_AH PR_IPCOMP
+%type <num> prefix
 %type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
-%type <num> DECSTRING
-%type <intnum> prefix protocol_spec upper_spec
+%type <ulnum> EXTENSION MODE
+%type <ulnum> PR_ESP PR_AH PR_IPCOMP
+%type <ulnum> DECSTRING
+%type <unum> protocol_spec upper_spec
 %type <val> PL_REQUESTS portstr key_string
 %type <val> policy_requests
 %type <val> QUOTEDSTRING HEXSTRING STRING
@@ -284,14 +285,28 @@ ah_spec
 	;
 
 ipcomp_spec
-	:	F_COMP ALG_COMP { p_alg_enc = $2; }
-	|	F_COMP ALG_COMP { p_alg_enc = $2; }
-		F_RAWCPI { p_ext |= SADB_X_EXT_RAWCPI; }
+	:	F_COMP ALG_COMP
+		{
+			if ($2 < 0) {
+				yyerror("unsupported algorithm");
+				return -1;
+			}
+			p_alg_enc = $2;
+		}
+	|	F_COMP ALG_COMP F_RAWCPI
+		{
+			if ($2 < 0) {
+				yyerror("unsupported algorithm");
+				return -1;
+			}
+			p_alg_enc = $2;
+			p_ext |= SADB_X_EXT_RAWCPI;
+		}
 	;
 
 enc_alg
 	:	ALG_ENC {
-			if ($1 == ~0) {
+			if ($1 < 0) {
 				yyerror("unsupported algorithm");
 				return -1;
 			}
@@ -299,6 +314,10 @@ enc_alg
 		}
 	|	ALG_ENC_DESDERIV
 		{
+			if ($1 < 0) {
+				yyerror("unsupported algorithm");
+				return -1;
+			}
 			p_alg_enc = $1;
 			if (p_ext & SADB_X_EXT_OLD) {
 				yyerror("algorithm mismatched.");
@@ -308,6 +327,10 @@ enc_alg
 		}
 	|	ALG_ENC_DES32IV
 		{
+			if ($1 < 0) {
+				yyerror("unsupported algorithm");
+				return -1;
+			}
 			p_alg_enc = $1;
 			if (!(p_ext & SADB_X_EXT_OLD)) {
 				yyerror("algorithm mismatched.");
@@ -341,7 +364,7 @@ enc_key
 
 auth_alg
 	:	ALG_AUTH {
-			if ($1 == ~0) {
+			if ($1 < 0) {
 				yyerror("unsupported algorithm");
 				return -1;
 			}
@@ -538,7 +561,7 @@ ipaddr
 	;
 
 prefix
-	:	/*NOTHING*/ { $$ = ~0; }
+	:	/*NOTHING*/ { $$ = -1; }
 	|	SLASH DECSTRING { $$ = $2; }
 	;
 
@@ -637,9 +660,9 @@ setkeymsg_spdaddr(type, upper, policy, srcs, splen, dsts, dplen)
 	unsigned int upper;
 	vchar_t *policy;
 	struct addrinfo *srcs;
-	unsigned int splen;
+	int splen;
 	struct addrinfo *dsts;
-	unsigned int dplen;
+	int dplen;
 {
 	struct sadb_msg *msg;
 	char buf[BUFSIZ];
@@ -695,7 +718,7 @@ setkeymsg_spdaddr(type, upper, policy, srcs, splen, dsts, dplen)
 			m_addr.sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
 			m_addr.sadb_address_proto = upper;
 			m_addr.sadb_address_prefixlen =
-			    (splen != ~0 ? splen : plen);
+			    (splen >= 0 ? splen : plen);
 			m_addr.sadb_address_reserved = 0;
 
 			setvarbuf(buf, &l, (struct sadb_ext *)&m_addr,
@@ -709,7 +732,7 @@ setkeymsg_spdaddr(type, upper, policy, srcs, splen, dsts, dplen)
 			m_addr.sadb_address_exttype = SADB_EXT_ADDRESS_DST;
 			m_addr.sadb_address_proto = upper;
 			m_addr.sadb_address_prefixlen =
-			    (dplen != ~0 ? dplen : plen);
+			    (dplen >= 0 ? dplen : plen);
 			m_addr.sadb_address_reserved = 0;
 
 			setvarbuf(buf, &l, (struct sadb_ext *)&m_addr,
