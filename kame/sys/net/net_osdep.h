@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.45 2001/06/14 04:24:49 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.46 2001/06/14 05:46:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -229,9 +229,9 @@
  *		ifa_refcnt goes negative.
  *
  * - ifnet.if_lastchange
- *	freebsd, bsdi: updated only when IFF_UP changes.
- *		(RFC1573 ifLastChange interpretation)
- *	netbsd, openbsd: updated whenever packet goes through the interface
+ *	freebsd, bsdi, netbsd-current after jun 14 2001: updated only when
+ *		IFF_UP changes. (RFC1573 ifLastChange interpretation)
+ *	netbsd, openbsd: updated whenever packet goes through the interface.
  *		(4.4BSD interpretation)
  */
 
