@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.91 2001/10/18 07:11:49 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.92 2001/10/19 04:56:09 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -407,6 +407,9 @@ will choice the first proposal in the
 SA payload from the initiator, and generate policy entries from the proposal.
 It is useful to negotiate with the client which is allocated IP address
 dynamically.
+Note that inappropriate policy might be installed by the initiator
+because the responder just installs policies as the initiator proposes.
+So that other communication might fail if such policies installed.
 This directive is ignored in the initiator case.
 The default value is
 .Ic off .
