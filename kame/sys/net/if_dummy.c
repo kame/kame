@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.17 2002/09/25 11:41:21 itojun Exp $	*/
+/*	$KAME: if_dummy.c,v 1.18 2002/09/27 09:31:12 k-sugyou Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -180,7 +180,13 @@ dummyattach(dummy)
 #endif
 		ifp->if_hdrlen = 0;
 		ifp->if_addrlen = 0;
+#ifdef __NetBSD__
+		ifp->if_dlt = DLT_NULL;
+#endif
 		if_attach(ifp);
+#ifdef __NetBSD__
+		if_alloc_sadl(ifp);
+#endif
 #if NBPFILTER > 0
 #ifdef HAVE_NEW_BPFATTACH
 		bpfattach(ifp, DLT_NULL, sizeof(u_int));

@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.85 2002/09/25 11:41:21 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.86 2002/09/27 09:31:12 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -285,7 +285,13 @@ stf_clone_create(ifc, unit)
 	sc->sc_if.if_output = stf_output;
 	sc->sc_if.if_type   = IFT_STF;
 	sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
+#ifdef __NetBSD__
+	sc->sc_if.if_dlt = DLT_NULL;
+#endif
 	if_attach(&sc->sc_if);
+#ifdef __NetBSD__
+	if_alloc_sadl(&sc->sc_if);
+#endif
 #if NBPFILTER > 0
 #ifdef HAVE_NEW_BPFATTACH
 	bpfattach(&sc->sc_if, DLT_NULL, sizeof(u_int));

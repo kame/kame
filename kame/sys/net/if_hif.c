@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.33 2002/09/25 11:41:21 itojun Exp $	*/
+/*	$KAME: if_hif.c,v 1.34 2002/09/27 09:31:12 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -203,11 +203,17 @@ hifattach(dummy)
 		sc->hif_if.if_ioctl = hif_ioctl;
 		sc->hif_if.if_output = hif_output;
 		sc->hif_if.if_type = IFT_HIF;
+#ifdef __NetBSD__
+		sc->sc_if.if_dlt = DLT_NULL;
+#endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 		IFQ_SET_MAXLEN(&sc->hif_if.if_snd, ifqmaxlen);
 		IFQ_SET_READY(&sc->hif_if.if_snd);
 #endif
 		if_attach(&sc->hif_if);
+#ifdef __NetBSD__
+		if_alloc_sadl(&sc->hif_if);
+#endif
 #if NBPFILTER > 0
 #ifdef HAVE_NEW_BPFATTACH
 		bpfattach(&sc->hif_if, DLT_NULL, sizeof(u_int));

@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.28 2002/09/25 11:41:21 itojun Exp $	*/
+/*	$KAME: if_faith.c,v 1.29 2002/09/27 09:31:12 k-sugyou Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -274,7 +274,13 @@ faith_clone_create(ifc, unit)
 	sc->sc_if.if_hdrlen = 0;
 	sc->sc_if.if_addrlen = 0;
 	sc->sc_if.if_snd.ifq_maxlen = ifqmaxlen;
+#ifdef __NetBSD__
+	sc->sc_if.if_dlt = DLT_NULL;
+#endif
 	if_attach(&sc->sc_if);
+#ifdef __NetBSD__
+	if_alloc_sadl(&sc->sc_if);
+#endif
 	bpfattach(&sc->sc_if, DLT_NULL, sizeof(u_int));
 	LIST_INSERT_HEAD(&faith_softc_list, sc, sc_list);
 	return (0);
