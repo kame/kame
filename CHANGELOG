@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.209 1999/10/24 00:14:31 itojun Exp $
+$Id: CHANGELOG,v 1.210 1999/10/25 13:25:32 jinmei Exp $
 
 <199910>
 Sat Oct 23 17:11:39 PDT 1999  itojun@iijlab.net
@@ -67,7 +67,7 @@ Wed Oct 20 20:13:50 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
         fe80::210:4bff:fe32:93d1@ef0  0:10:4b:32:93:d1
         fe80::210:5aff:fe5c:6b5c@ef0  0:10:5a:5c:6b:5c
         fe80::2a0:24ff:fe66:1350@ef0  0:a0:24:66:13:50
-	(some fileds were ommited in the example.)
+	(some fields were ommited in the example.)
 
 1999-10-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_ioctl): in the case of
