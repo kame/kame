@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1810 2001/07/24 13:55:48 jinmei Exp $
+$KAME: CHANGELOG,v 1.1811 2001/07/24 18:55:54 itojun Exp $
 
 <200107>
+Wed Jul 25 03:51:34 JST 2001  itojun@iijlab.net
+	* sys/netinet/ip_encap.c: use radix table lookup for entries registered
+	  through encap_attach() API (address pairs).  still not sure if it
+	  gives us any performance improvement, but should be much better
+	  when you have thoudsands of gif interfaces.
+	  
+	  should be used with gif interface code prior to Mar 2000, otherwise
+	  there's no effect (in Mar 2000 we have transitioned gif code to
+	  encap_attach_func(), for more security validations).
+
 2001-07-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_control): in the SIOCDIFADDR_IN6
 	case, if the corresponding prefix can be removed, just call
