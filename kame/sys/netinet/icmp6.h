@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.52 2001/06/14 11:24:12 sumikawa Exp $	*/
+/*	$KAME: icmp6.h,v 1.53 2001/06/19 09:54:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -321,9 +321,6 @@ struct nd_opt_prefix_info {	/* prefix information */
 
 #define ND_OPT_PI_FLAG_ONLINK		0x80
 #define ND_OPT_PI_FLAG_AUTO		0x40
-#if 0
-#define ND_OPT_PI_FLAG_RTADDR		0x20	/* KAME local - compat*/
-#endif
 #define ND_OPT_PI_FLAG_ROUTER		0x20	/* 2292bis-02 */
 
 struct nd_opt_rd_hdr {		/* redirected header */
@@ -628,9 +625,6 @@ struct icmp6stat {
 #define ICMPV6CTL_STATS		1
 #define ICMPV6CTL_REDIRACCEPT	2	/* accept/process redirects */
 #define ICMPV6CTL_REDIRTIMEOUT	3	/* redirect cache time */
-#if 0	/*obsoleted*/
-#define ICMPV6CTL_ERRRATELIMIT	5	/* ICMPv6 error rate limitation */
-#endif
 #define ICMPV6CTL_ND6_PRUNE	6
 #define ICMPV6CTL_ND6_DELAY	8
 #define ICMPV6CTL_ND6_UMAXTRIES	9
