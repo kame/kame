@@ -102,7 +102,7 @@ intpr(interval, ifnetaddr, pfunc)
 	char name[IFNAMSIZ];
 #ifdef INET6
 	char hbuf[NI_MAXHOST];		/* for getnameinfo() */
-#ifdef KAME_SCOPEID
+#ifdef NI_WITHSCOPEID
 	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
 #else
 	const int niflag = NI_NUMERICHOST;
@@ -244,7 +244,7 @@ intpr(interval, ifnetaddr, pfunc)
 #ifdef INET6
 			case AF_INET6:
 				sin6 = (struct sockaddr_in6 *)sa;
-#ifdef KAME_SCOPEID
+#ifdef __KAME__
 				if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
 					sin6->sin6_scope_id =
 						ntohs(*(u_int16_t *)

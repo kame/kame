@@ -443,7 +443,7 @@ p_sockaddr(sa, mask, flags, width)
 	case AF_INET6:
 	    {
 		struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
-#ifdef KAME_SCOPEID
+#ifdef __KAME__
 		struct in6_addr *in6 = &sa6->sin6_addr;
 
 		/*
@@ -808,7 +808,7 @@ netname6(sa6, mask)
 	u_char *p, *q;
 	u_char *lim;
 	int masklen, final = 0, illegal = 0;
-#ifdef KAME_SCOPEID
+#ifdef NI_WITHSCOPEID
 	int flag = NI_WITHSCOPEID;
 #else
 	int flag = 0;
@@ -899,7 +899,7 @@ routename6(sa6)
 	struct sockaddr_in6 *sa6;
 {
 	static char line[NI_MAXHOST];
-#ifdef KAME_SCOPEID
+#ifdef NI_WITHSCOPEID
 	int flag = NI_WITHSCOPEID;
 #else
 	int flag = 0;
