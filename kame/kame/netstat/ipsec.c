@@ -89,6 +89,8 @@ __RCSID("$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $");
 #include <unistd.h>
 #include "netstat.h"
 
+static void print_ipsecstats __P((void));
+
 /*
  * portability issues:
  * - bsdi[34] uses PLURAL(), not plural().
@@ -185,7 +187,7 @@ ipsec_hist(hist, histmax, name, namemax, title)
 	}
 }
 
-void
+static void
 print_ipsecstats()
 {
 #define	p(f, m) if (ipsecstat.f || sflag <= 1) \
