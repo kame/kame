@@ -67,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.32 2000/06/11 15:14:15 jinmei Exp $");
+__RCSID("$Id: inet6.c,v 1.33 2000/06/11 17:29:33 jinmei Exp $");
 #endif
 #endif /* not lint */
 
@@ -1135,6 +1135,7 @@ icmp6_stats(off, name)
 
 #define	p(f, m) if (icmp6stat.f || sflag <= 1) \
     printf(m, (unsigned long long)icmp6stat.f, plural(icmp6stat.f))
+#define p_5(f, m) printf(m, (unsigned long long)icmp6stat.f)
 
 	p(icp6s_error, "\t%llu call%s to icmp6_error\n");
 	p(icp6s_canterror,
@@ -1161,9 +1162,25 @@ icmp6_stats(off, name)
 			printf("\t\t%s: %llu\n", icmp6names[i],
 				(unsigned long long)icmp6stat.icp6s_inhist[i]);
 		}
+	printf("\tHistgram of error messages to be generated:\n");
+	p_5(icp6s_odst_unreach_noroute, "\t\t%llu no route\n");
+	p_5(icp6s_odst_unreach_admin, "\t\t%llu administratively prohibited\n");
+	p_5(icp6s_odst_unreach_beyondscope, "\t\t%llu beyond scope\n");
+	p_5(icp6s_odst_unreach_addr, "\t\t%llu address unreachable\n");
+	p_5(icp6s_odst_unreach_noport, "\t\t%llu port unreachable\n");
+	p_5(icp6s_opacket_too_big, "\t\t%llu packet too big\n");
+	p_5(icp6s_otime_exceed_transit, "\t\t%llu time exceed transit\n");
+	p_5(icp6s_otime_exceed_reassembly, "\t\t%llu time exceed reassembly\n");
+	p_5(icp6s_oparamprob_header, "\t\t%llu erroneous header field\n");
+	p_5(icp6s_oparamprob_nextheader, "\t\t%llu unrecognized next header\n");
+	p_5(icp6s_oparamprob_option, "\t\t%llu unrecognized option\n");
+	p_5(icp6s_oredirect, "\t\t%llu redirect\n");
+	p_5(icp6s_ounknown, "\t\t%llu unknown\n");
+
 	p(icp6s_reflect, "\t%llu message response%s generated\n");
 	p(icp6s_nd_toomanyopt, "\t%llu message%s with too many ND options\n");
 #undef p
+#undef p_5
 }
 
 /*
