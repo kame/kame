@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.16 2000/06/04 13:08:24 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.17 2000/06/11 17:23:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -543,6 +543,22 @@ do {								\
  * Variables related to this implementation
  * of the internet control message protocol version 6.
  */
+struct icmp6errstat {
+	u_quad_t icp6errs_dst_unreach_noroute;
+	u_quad_t icp6errs_dst_unreach_admin;
+	u_quad_t icp6errs_dst_unreach_beyondscope;
+	u_quad_t icp6errs_dst_unreach_addr;
+	u_quad_t icp6errs_dst_unreach_noport;
+	u_quad_t icp6errs_packet_too_big;
+	u_quad_t icp6errs_time_exceed_transit;
+	u_quad_t icp6errs_time_exceed_reassembly;
+	u_quad_t icp6errs_paramprob_header;
+	u_quad_t icp6errs_paramprob_nextheader;
+	u_quad_t icp6errs_paramprob_option;
+	u_quad_t icp6errs_redirect; /* we regard redirect as an error here */
+	u_quad_t icp6errs_unknown;
+};
+
 struct icmp6stat {
 /* statistics related to icmp6 packets generated */
 	u_quad_t icp6s_error;		/* # of calls to icmp6_error */
@@ -557,6 +573,25 @@ struct icmp6stat {
 	u_quad_t icp6s_reflect;		/* number of responses */
 	u_quad_t icp6s_inhist[256];	
 	u_quad_t icp6s_nd_toomanyopt;	/* too many ND options */
+	struct icmp6errstat icp6s_outerrhist;
+#define icp6s_odst_unreach_noroute \
+	icp6s_outerrhist.icp6errs_dst_unreach_noroute
+#define icp6s_odst_unreach_admin icp6s_outerrhist.icp6errs_dst_unreach_admin
+#define icp6s_odst_unreach_beyondscope \
+	icp6s_outerrhist.icp6errs_dst_unreach_beyondscope
+#define icp6s_odst_unreach_addr icp6s_outerrhist.icp6errs_dst_unreach_addr
+#define icp6s_odst_unreach_noport icp6s_outerrhist.icp6errs_dst_unreach_noport
+#define icp6s_opacket_too_big icp6s_outerrhist.icp6errs_packet_too_big
+#define icp6s_otime_exceed_transit \
+	icp6s_outerrhist.icp6errs_time_exceed_transit
+#define icp6s_otime_exceed_reassembly \
+	icp6s_outerrhist.icp6errs_time_exceed_reassembly
+#define icp6s_oparamprob_header icp6s_outerrhist.icp6errs_paramprob_header
+#define icp6s_oparamprob_nextheader \
+	icp6s_outerrhist.icp6errs_paramprob_nextheader
+#define icp6s_oparamprob_option icp6s_outerrhist.icp6errs_paramprob_option
+#define icp6s_oredirect icp6s_outerrhist.icp6errs_redirect
+#define icp6s_ounknown icp6s_outerrhist.icp6errs_unknown
 };
 
 /*
