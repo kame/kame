@@ -49,7 +49,6 @@
 
 void usage();
 
-/* ARGSUSED */
 int
 main(argc, argv)
     int argc;
