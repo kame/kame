@@ -445,7 +445,8 @@ server6_react_informreq(buf, siz, from, fromlen)
 	 */
 	/* DNS server */
 	opt = (struct dhcp6opt *)ext;
-	if (ext + sizeof(*opt) + sizeof(struct in6_addr) <= ep) {
+	if (ext + sizeof(*opt) + sizeof(struct in6_addr) <= ep &&
+	    TAILQ_FIRST(&dnslist)) {
 		struct dnslist *d;
 
 		opt->dh6opt_type = htons(DH6OPT_DNS);
