@@ -292,7 +292,7 @@ enter(inp, so, state, proto)
 			if (p->nif_lport != inp->inp_lport ||
 			    !IN6_ARE_ADDR_EQUAL(&p->nif_laddr6, &inp->inp_laddr6))
 				continue;
-			if (IN6_ARE_ADDR_EQUAL(&p->nif_faddr, &inp->inp_faddr) &&
+			if (IN6_ARE_ADDR_EQUAL(&p->nif_faddr6, &inp->inp_faddr6) &&
 			    p->nif_fport == inp->inp_fport)
 				break;
 		}
