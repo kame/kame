@@ -1,7 +1,8 @@
 PROG=	route6d
 MAN=	route6d.8
 
-CPPFLAGS+=	-Dss_len=__ss_len -Dss_family=__ss_family -DADVAPI -DINET6
+CPPFLAGS+=	-Dss_len=__ss_len -Dss_family=__ss_family -DADVAPI -DINET6 \
+	-DHAVE_GETIFADDRS
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
