@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.53 2001/08/16 11:54:19 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.54 2001/08/16 12:18:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -120,7 +120,7 @@
 extern struct ifnet loif[NLOOP];
 #endif
 
-int ip6_prefer_tempaddr = 0;	/* TODO: should be configurable */
+int ip6_prefer_tempaddr = 0;
 
 /*
  * Return an IPv6 address, which is the most appropriate for a given
