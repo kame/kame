@@ -941,8 +941,10 @@ add_optatr(optatr, optdata, len)
 
 	/* allocate memory */
 	MALLOC(newoptatr, struct optatr);
-	if ((newoptatr->data = malloc(len)) == NULL)
+	if ((newoptatr->data = malloc(len)) == NULL) {
+		syslog(LOG_ERR, "<%s> malloc failed(size %d)", __FUNCTION__, len);
 		fatalx("malloc");
+	}
 
 	/* set values */
 	newoptatr->len = len;
