@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.42 2004/04/13 15:19:59 jinmei Exp $	*/
+/*	$KAME: name6.c,v 1.43 2004/04/14 00:51:28 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -447,7 +447,11 @@ getipnodebyname(const char *name, int af, int flags, int *errp)
 
 #ifdef INET6
 	if (af == AF_INET6
-	&&  ((flags & AI_ALL) || hp == NULL)
+	&&  (
+#ifdef AI_ALL
+	     (flags & AI_ALL) ||
+#endif
+	     hp == NULL)
 	&&  (MAPADDRENABLED(flags))) {
 		struct hostent *hp2 = _ghbyname(name, AF_INET, flags, errp);
 		if (hp == NULL)
