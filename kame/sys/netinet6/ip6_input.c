@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.163 2001/02/05 08:28:25 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.164 2001/02/05 08:34:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1264,6 +1264,10 @@ ip6_hopopts_input(plenp, rtalertp, mp, offp)
  * This function is separate from ip6_hopopts_input() in order to
  * handle a case where the sending node itself process its hop-by-hop
  * options header. In such a case, the function is called from ip6_output().
+ *
+ * The function assumes that hbh header is located right after the IPv6 header
+ * (RFC2460 p7), opthead is pointer into data content in m, and opthead to
+ * opthead + hbhlen is located in continuous memory region.
  */
 int
 ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
