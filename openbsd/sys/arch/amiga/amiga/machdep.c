@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.31 1999/01/20 12:06:52 niklas Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.28 1999/05/24 23:08:55 jason Exp $	*/
 /*	$NetBSD: machdep.c,v 1.95 1997/08/27 18:31:17 is Exp $	*/
 
 /*
@@ -328,7 +328,8 @@ cpu_startup()
 	/* avail_end was pre-decremented in pmap_bootstrap to compensate */
 	for (i = 0; i < btoc(sizeof (struct msgbuf)); i++)
 		pmap_enter(pmap_kernel(), (vm_offset_t)msgbufp, 
-		    avail_end + i * NBPG, VM_PROT_ALL, TRUE);
+		    avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE, TRUE,
+		    VM_PROT_READ|VM_PROT_WRITE);
 	msgbufmapped = 1;
 
 	/*
@@ -363,7 +364,6 @@ again:
 	    (name) = (type *)v; v = (caddr_t)((lim) = ((name)+(num)))
 /*	valloc(cfree, struct cblock, nclist); */
 	valloc(callout, struct callout, ncallout);
-	valloc(swapmap, struct map, nswapmap = maxproc * 2);
 #ifdef SYSVSHM
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
@@ -1229,6 +1229,12 @@ netintr()
 	if (netisr & (1 << NETISR_PPP)) {
 		netisr &= ~(1 << NETISR_PPP);
 		pppintr();
+	}
+#endif
+#if NBRIDGE > 0
+	if (netisr & (1 << NETISR_BRIDGE)) {
+		netisr &= ~(1 << NETISR_BRIDGE);
+		bridgeintr();
 	}
 #endif
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.26 1999/03/24 22:56:13 alex Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.28 1999/05/24 23:08:55 jason Exp $	*/
 /*	$NetBSD: machdep.c,v 1.61 1996/12/07 01:54:49 cgd Exp $	*/
 
 /*
@@ -105,6 +105,7 @@
 #endif
 
 #include "ppp.h"
+#include "bridge.h"
 
 #include "le_ioasic.h"			/* for le_iomem creation */
 
@@ -454,7 +455,6 @@ unknown_cputype:
 	valloc(cfree, struct cblock, nclist);
 #endif
 	valloc(callout, struct callout, ncallout);
-	valloc(swapmap, struct map, nswapmap = maxproc * 2);
 #ifdef SYSVSHM
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
@@ -1502,6 +1502,9 @@ netintr()
 #endif
 #if NPPP > 0
 	DONETISR(NETISR_PPP, pppintr());
+#endif
+#if NBRIDGE > 0
+	DONETISR(NETISR_BRIDGE, bridgeintr());
 #endif
 
 #undef DONETISR
