@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.87 2001/08/16 06:33:39 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.88 2001/08/16 06:34:59 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -546,7 +546,8 @@ Therefore you have to define all of the potential algorithms
 in the phase 2 proposals even if there is a algorithm which will not be used.
 These algorithms are define by using the following three directives,
 and they are lined with single comma as the separator.
-Variable-length algorithms can be followed by the key length, like
+For algorithms that can take variable-length keys, algorithm names
+can be followed by a key length, like
 .Dq Li blowfish 448 .
 .Xr racoon 8
 will compute the actual phase 2 proposals by computing
@@ -571,16 +572,16 @@ Note that the kernel may not support the algorithm you have specified.
 .Ic rc5 , rc4 , idea , 3idea ,
 .Ic cast128 , blowfish , null_enc ,
 .Ic twofish , rijndael
-.Pq used with esp
+.Pq used with ESP
 .\"
 .It Ic authentication_algorithm Ar algorithms ;
 .Ic des , 3des , des_iv64 , des_iv32 ,
 .Ic hmac_md5 , hmac_sha1 , non_auth
-.Pq used with esp authentication and AH
+.Pq used with ESP authentication and AH
 .\"
 .It Ic compression_algorithm Ar algorithms ;
 .Ic deflate
-.Pq used with ipcomp
+.Pq used with IPComp
 .El
 .El
 .\"
