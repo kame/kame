@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.259 2001/08/16 06:40:55 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.260 2001/08/16 12:49:32 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -224,6 +224,11 @@ draft-ietf-dnsext-mdns-00.txt: Multicast DNS
       near future, so don't rely upon it.
 draft-ietf-ipngwg-p2p-pingpong-00.txt:
 	Avoiding ping-pong packets on point-to-point links
+draft-ietf-ipngwg-default-addr-select-05.txt:
+	Default Address Selection for IPv6
+	the selection algorithm for both source and destination addresses
+	is implemented based on the draft, though some rules are still
+	omitted.
 draft-itojun-ipv6-tcp-to-anycast-01.txt:
 	Disconnecting TCP connection toward IPv6 anycast address
 draft-itojun-ipv6-transition-abuse-01.txt:
@@ -2254,10 +2259,11 @@ to make the distributed develoment smooth.
 	    (function
 	     (lambda ()
 	       (c-set-style "bsd")
-	       (setq c-basic-offset 8)  ; for Emacs 20 only
+	       (setq c-basic-offset 8)  ; XXX for Emacs 20 only
 	       )))
-  The "bsd" style in GNU Emacs 21 sets the variable to 8 by default, so this
-  configuration is not necessary if you only use GNU Emacs 21.
+  The "bsd" style in GNU Emacs 21 sets the variable to 8 by default,
+  so the line marked by "XXX" is not necessary if you only use GNU
+  Emacs 21.
 - each line should be within 80 characters.
 - keep a single open/close bracket in a comment such as in the following
   line:
