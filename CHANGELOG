@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1756 2001/07/03 08:22:39 jinmei Exp $
+$KAME: CHANGELOG,v 1.1757 2001/07/04 07:06:05 itojun Exp $
 
 <200107>
+Wed Jul  4 16:02:26 JST 2001  itojun@iijlab.net
+	* openbsd/usr.sbin/inetd/inetd.c: correct UDP source address checks.
+	  2.9 code did not check it for IPv6 traffic.  sync with openbsd.
+
 2001-07-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c: when the GAI_USE_ORDERING
 	environment variable is set, reorder the chain that getaddrinfo(3)
