@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.4 2003/10/18 07:58:34 itojun Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.5 2003/10/18 08:16:17 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -684,7 +684,7 @@ int _cwndvector_size(struct tcplike_send_ccb *cb)
 		if (t >= (cb->cwndvector + (cb->cv_size/8)))
 			t -= (cb->cv_size / 8); /* wrapped */
 	
-		if(((*t & (0x01 << offset)) >> offset) == 0x01)
+		if (((*t & (0x01 << offset)) >> offset) == 0x01)
 			cnt++;
 	}
 	return cnt;

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.4 2003/10/18 07:52:01 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.5 2003/10/18 08:16:17 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * * $Id: dccp_usrreq.c,v 1.4 2003/10/18 07:52:01 itojun Exp $
+ * Id: dccp_usrreq.c,v 1.47 2003/07/31 11:23:08 joahag-9 Exp
  */
 
 /*
@@ -202,7 +202,7 @@ u_char dccp_ackvector_state(struct dccpcb *dp, u_int32_t seqnr);
 /*
  * DCCP initialization
  *
-*/
+ */
 void
 dccp_init()
 {
@@ -229,7 +229,9 @@ dccp6_input(struct mbuf **mp, int *offp, int proto)
 {
 	register struct mbuf *m = *mp;
 	DCCP_DEBUG((LOG_INFO, "In dccp6_input!\n"));
+#ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, *offp, sizeof(struct dccphdr), IPPROTO_DONE);
+#endif
 
 	dccp_input(m, *offp);
 	return IPPROTO_DONE;
@@ -276,45 +278,60 @@ dccp_input(register struct mbuf *m, int off)
 
 
 #ifdef INET6
-	if ( isipv6 ) {
+	if (isipv6) {
 		DCCP_DEBUG((LOG_INFO, "Got DCCP ipv6 packet, iphlen = %u!\n", iphlen));
 		ip6 = mtod(m, struct ip6_hdr *);
-		dh = (struct dccphdr *)((caddr_t)ip6 + iphlen );
+#ifndef PULLDOWN_TEST
+		dh = (struct dccphdr *)((caddr_t)ip6 + iphlen);
+#else
+		IP6_EXTHDR_GET(dh, struct dccphdr *, m, iphlen, sizeof(*dh));
+		if (dh == NULL) {
+			dccpstat.dccps_badlen++;
+			return;
+		}
+#endif
 	} else
 #endif
 	{
-	/*
-	 * Strip IP options, if any; should skip this,
-	 * make available to user, and use on returned packets,
-	 * but we don't yet have a way to check the checksum
-	 * with options still present.
-	 */
-	if (iphlen > sizeof (struct ip)) {
-		ip_stripoptions(m, (struct mbuf *)0);
-		iphlen = sizeof(struct ip);
-	}
+		/*
+		 * Strip IP options, if any; should skip this,
+		 * make available to user, and use on returned packets,
+		 * but we don't yet have a way to check the checksum
+		 * with options still present.
+		 */
+		if (iphlen > sizeof (struct ip)) {
+			ip_stripoptions(m, (struct mbuf *)0);
+			iphlen = sizeof(struct ip);
+		}
 
-	/*
-	 * Get IP and DCCP header together in first mbuf.
-	 */
-	ip = mtod(m, struct ip *);
-	if (m->m_len < iphlen + sizeof(struct dccphdr)) {
-		if ((m = m_pullup(m, iphlen + sizeof(struct dccphdr))) == 0) {
-			DCCP_DEBUG((LOG_INFO, "Dropping packet, to short?\n"));
-			dccpstat.dccps_drops++;
+		/*
+		 * Get IP and DCCP header together in first mbuf.
+		 */
+		ip = mtod(m, struct ip *);
+		if (m->m_len < iphlen + sizeof(struct dccphdr)) {
+			if ((m = m_pullup(m, iphlen + sizeof(struct dccphdr))) == 0) {
+				DCCP_DEBUG((LOG_INFO, "Dropping packet, to short?\n"));
+				dccpstat.dccps_drops++;
+				return;
+			}
+			ip = mtod(m, struct ip *);
+		}
+#ifndef PULLDOWN_TEST
+		dh = (struct dccphdr *)((caddr_t)ip + iphlen);
+#else
+		IP6_EXTHDR_GET(dh, struct dccphdr *, m, iphlen, sizeof(*dh));
+		if (dh == NULL) {
+			dccpstat.dccps_badlen++;
 			return;
 		}
-		ip = mtod(m, struct ip *);
-	}
-	dh = (struct dccphdr *)((caddr_t)ip + iphlen);
+#endif
 
-	/*
-	 * Construct sockaddr format source address.
-	 * Stuff source address and datagram in user buffer.
-	 */
-	dccp_in.sin_port = dh->dh_sport;
-	dccp_in.sin_addr = ip->ip_src;
-
+		/*
+		 * Construct sockaddr format source address.
+		 * Stuff source address and datagram in user buffer.
+		 */
+		dccp_in.sin_port = dh->dh_sport;
+		dccp_in.sin_addr = ip->ip_src;
 	}
 
 	DCCP_DEBUG((LOG_INFO, "Header info: cslen = %u ndp = %u, off = %u, type = %u, reserved = %u, seq = %u\n", dh->dh_cslen, dh->dh_ndp, dh->dh_off, dh->dh_type, dh->dh_res, ntohl(dh->dh_seq << 8)));
@@ -327,12 +344,14 @@ dccp_input(register struct mbuf *m, int off)
 
 #ifdef INET6
 	if (isipv6)
-		len = ntohs(ip6->ip6_plen) -off + sizeof(*ip6);
+		len = m->m_pkthdr.len - off;
 	else
-#endif
 		len = ip->ip_len;
+#else
+	len = ip->ip_len;
+#endif
 
-	if ( len < sizeof(struct dccphdr)) {
+	if (len < sizeof(struct dccphdr)) {
 			DCCP_DEBUG((LOG_INFO, "Dropping DCCP packet!\n"));
 			dccpstat.dccps_badlen++;
 			goto badunlocked;
@@ -341,16 +360,16 @@ dccp_input(register struct mbuf *m, int off)
 	 * Save a copy of the IP header in case we want restore it
 	 * for sending a DCCP reset packet in response.
 	 */
-	if ( !isipv6 ) {
+	if (!isipv6) {
 		save_ip = *ip;
 		ipov = (struct ipovly *)ip;
 	}
 
-	if ( dh->dh_cslen == 15 ) {
+	if (dh->dh_cslen == 15) {
 		cslen = len;
 	} else {
 		cslen = dh->dh_off * 4 + dh->dh_cslen * 4;
-		if ( cslen > len )
+		if (cslen > len)
 			cslen = len;
 	}
 	
@@ -391,7 +410,7 @@ dccp_input(register struct mbuf *m, int off)
 	 * Locate pcb for datagram.
 	 */
 #ifdef INET6
-	if ( isipv6 ) {
+	if (isipv6) {
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		inp = in6_pcblookup_hash(&dccpbinfo, &ip6->ip6_src, dh->dh_sport,
 		    &ip6->ip6_dst, dh->dh_dport, 1, m->m_pkthdr.rcvif);
@@ -404,8 +423,8 @@ dccp_input(register struct mbuf *m, int off)
 	} else
 #endif
 	{
-	inp = in_pcblookup_hash(&dccpbinfo, ip->ip_src, dh->dh_sport,
-	    ip->ip_dst, dh->dh_dport, 1, m->m_pkthdr.rcvif);
+		inp = in_pcblookup_hash(&dccpbinfo, ip->ip_src, dh->dh_sport,
+		    ip->ip_dst, dh->dh_dport, 1, m->m_pkthdr.rcvif);
 	}
 
 	if (inp == NULL) {
@@ -417,7 +436,7 @@ dccp_input(register struct mbuf *m, int off)
 #endif
 
 #ifdef INET6
-			if (isipv6 ) {
+			if (isipv6) {
 				strcpy(dbuf, "[");
 				strcpy(sbuf, "[");
 				strcat(dbuf, ip6_sprintf(&ip6->ip6_dst));
@@ -438,15 +457,15 @@ dccp_input(register struct mbuf *m, int off)
 		dccpstat.dccps_noport++;
 
 	/*
-	* We should send DCCP reset here but we can't call dccp_output since we
-	* have no dccpcb. A icmp unreachable works great but the specs says DCCP reset :(
-	*
-	* if ( !isipv6) {
-	*	*ip = save_ip;
-	*	ip->ip_len += iphlen;
-	*	icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT, 0, 0); 
-	*} 
-	*/
+	 * We should send DCCP reset here but we can't call dccp_output since we
+	 * have no dccpcb. A icmp unreachable works great but the specs says DCCP reset :(
+	 *
+	 * if (!isipv6) {
+	 *	*ip = save_ip;
+	 *	ip->ip_len += iphlen;
+	 *	icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT, 0, 0); 
+	 * } 
+	 */
 
 		INP_INFO_WUNLOCK(&dccpbinfo);
 		return;
@@ -455,15 +474,15 @@ dccp_input(register struct mbuf *m, int off)
 
 	dp = (struct dccpcb *)inp->inp_ppcb;
 
-	if ( dp == 0 ) {
+	if (dp == 0) {
 		INP_UNLOCK(inp);
 		INP_INFO_WUNLOCK(&dccpbinfo);
 		goto badunlocked;
 	}
 
-	if ( dp->state == DCCPS_CLOSED ) {
+	if (dp->state == DCCPS_CLOSED) {
 		DCCP_DEBUG((LOG_INFO, "We are in closed state, dropping packet and sending reset!\n"));
-		if ( dh->dh_type != DCCP_TYPE_RESET )
+		if (dh->dh_type != DCCP_TYPE_RESET)
 			dccp_output(dp, DCCP_TYPE_RESET + 2);
 		INP_UNLOCK(inp);
 		INP_INFO_WUNLOCK(&dccpbinfo);
@@ -519,19 +538,19 @@ dccp_input(register struct mbuf *m, int off)
 	INP_INFO_WUNLOCK(&dccpbinfo);
 
 	/*
-	* Check if sequence number is inside the loss window 
-	*/
+	 * Check if sequence number is inside the loss window 
+	 */
 
 	seqnr = ntohl(dh->dh_seq << 8);
 	
-	if ( dp->gsn_rcv == 1073741824 )  {
+	if (dp->gsn_rcv == 1073741824)  {
 		dp->gsn_rcv = seqnr;
 	}
 
 	low_seqnr = (dp->gsn_rcv - (dp->loss_window / 3)) % 16777216;
 	high_seqnr = (dp->gsn_rcv + (dp->loss_window / 3 * 2)) % 16777216;
 
-	if (! (SEQ_GT(seqnr, low_seqnr) && SEQ_LT(seqnr, high_seqnr)) ) {
+	if (! (SEQ_GT(seqnr, low_seqnr) && SEQ_LT(seqnr, high_seqnr))) {
 		dccpstat.dccps_badseq++;
 		DCCP_DEBUG((LOG_INFO, "Recieved DCCP packet with bad sequence number = %u (low_seqnr = %u, high_seqnr = %u)\n", seqnr, low_seqnr, high_seqnr));
 		INP_UNLOCK(inp);
@@ -543,14 +562,14 @@ dccp_input(register struct mbuf *m, int off)
 		dp->gsn_rcv = seqnr;
 
 	/* Just ignore DCCP-Move for now */
-	if ( dh->dh_type == DCCP_TYPE_DATA ) {
+	if (dh->dh_type == DCCP_TYPE_DATA) {
 		extrah_len = 0;
 		optp = (u_char *)(dh + 1);
-	} else if ( dh->dh_type == DCCP_TYPE_REQUEST ) {
+	} else if (dh->dh_type == DCCP_TYPE_REQUEST) {
 		drqh = (struct dccp_requesthdr *)(dh + 1);
 		optp = (u_char *)(drqh + 1);
 		extrah_len = 4;
-	} else if ( dh->dh_type == DCCP_TYPE_RESET ) {
+	} else if (dh->dh_type == DCCP_TYPE_RESET) {
 		extrah_len = 8 ;
 		drth = (struct dccp_resethdr *)(dh + 1);
 		optp = (u_char *)(drth + 1);
@@ -571,14 +590,14 @@ dccp_input(register struct mbuf *m, int off)
 	
 	optlen = data_off - (sizeof(struct dccphdr) + extrah_len);
 
-	if ( optlen < 0 ) {
+	if (optlen < 0) {
 		DCCP_DEBUG((LOG_INFO, "Data offset is smaller then it could be, optlen = %i data_off = %i, m_len = %i, iphlen = %i extrah_len = %i !\n", optlen, data_off, m->m_len, iphlen, extrah_len));
 		INP_UNLOCK(inp);
 		goto badunlocked;
 	}
 
-	if ( optlen > 0 ) {
-		if ( optlen > DCCP_MAX_OPTIONS ) {
+	if (optlen > 0) {
+		if (optlen > DCCP_MAX_OPTIONS) {
 			DCCP_DEBUG((LOG_INFO, "Error, more options (%i) then DCCP_MAX_OPTIONS options!\n", optlen));
 			INP_UNLOCK(inp);
 			goto badunlocked;
@@ -591,23 +610,23 @@ dccp_input(register struct mbuf *m, int off)
 
 	DCCP_DEBUG((LOG_INFO, "BEFORE state check, Got a %u packet while in %u state, who = %u!\n", dh->dh_type, dp->state, dp->who));
 
-	if ( dp->state == DCCPS_LISTEN ) {
+	if (dp->state == DCCPS_LISTEN) {
 		switch(dh->dh_type) {
 
 		case DCCP_TYPE_REQUEST:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP REQUEST\n"));
 			dp->state = DCCPS_REQUEST;
-			if ( dp->cc_in_use[1] < 0 ) {
+			if (dp->cc_in_use[1] < 0) {
 				/* To be compatible with Linux implementation */
 				test[0] = DEFAULT_CCID;
-				if ( test[0] == 2 ) {
+				if (test[0] == 2) {
 					test[1] = 3;
 				} else {
 					test[1] = 2;
 				}	
 				dccp_add_feature(dp, DCCP_OPT_CHANGE, DCCP_FEATURE_CC, test, 2);
 			}
-			if ( len > data_off ) {
+			if (len > data_off) {
 				dccp_add_option(dp, DCCP_OPT_DATA_DISCARD, test, 0);
 			}
 			dp->connect_timer = timeout(dccp_connect_t, dp, DCCP_CONNECT_TIMER);
@@ -636,7 +655,7 @@ dccp_input(register struct mbuf *m, int off)
 		}
 
 
-	} else if ( dp->state == DCCPS_REQUEST  ) {
+	} else if (dp->state == DCCPS_REQUEST) {
 		switch(dh->dh_type) {
 		case DCCP_TYPE_RESPONSE:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP REPSONSE\n"));
@@ -647,7 +666,7 @@ dccp_input(register struct mbuf *m, int off)
 			untimeout(dccp_connect_t, dp, dp->connect_timer);
 
 			/* First check if we have negotiated a cc */
-			if ( dp->cc_in_use[0] > 0 && dp->cc_in_use[1] > 0 ) {
+			if (dp->cc_in_use[0] > 0 && dp->cc_in_use[1] > 0) {
 				DCCP_DEBUG((LOG_INFO, "Setting DCCPS_ESTAB & soisconnected\n"));
 				dp->state = DCCPS_ESTAB;
 				dccpstat.dccps_connects++;
@@ -670,7 +689,7 @@ dccp_input(register struct mbuf *m, int off)
 			DCCP_DEBUG((LOG_INFO, "Got a %u packet while in REQUEST stage!\n", dh->dh_type));
 			/* Force send reset. */
 			dccp_output(dp, DCCP_TYPE_RESET + 2);
-			if ( dh->dh_type == DCCP_TYPE_CLOSE ) {
+			if (dh->dh_type == DCCP_TYPE_CLOSE) {
 				dp = dccp_close(dp);
 				return;
 			} else {
@@ -678,8 +697,7 @@ dccp_input(register struct mbuf *m, int off)
 				dp->state = DCCPS_TIME_WAIT;
 			}
 		}
-
-	} else if ( dp->state == DCCPS_RESPOND ) {
+	} else if (dp->state == DCCPS_RESPOND) {
 		switch(dh->dh_type) {
 
 		case DCCP_TYPE_REQUEST:
@@ -692,7 +710,7 @@ dccp_input(register struct mbuf *m, int off)
 
 			dp->ack_rcv = ntohl(dah->dah_ack << 8); /* Ack num */
 
-			if ( dp->cc_in_use[0] > 0 && dp->cc_in_use[1] > 0 ) {
+			if (dp->cc_in_use[0] > 0 && dp->cc_in_use[1] > 0) {
 				DCCP_DEBUG((LOG_INFO, "Setting DCCPS_ESTAB & soisconnected\n"));
 				dp->state = DCCPS_ESTAB;
 				dccpstat.dccps_connects++;
@@ -704,7 +722,7 @@ dccp_input(register struct mbuf *m, int off)
 				dccp_output(dp, 0);
 			}
 
-			if ( dh->dh_type == DCCP_TYPE_DATAACK && dp->cc_in_use[1] > 0 ) {
+			if (dh->dh_type == DCCP_TYPE_DATAACK && dp->cc_in_use[1] > 0) {
 				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv!\n", dp->cc_in_use[1]));
 				(*cc_sw[dp->cc_in_use[1]].cc_recv_packet_recv)(dp->cc_state[1], options, optlen); 
 			}
@@ -723,14 +741,13 @@ dccp_input(register struct mbuf *m, int off)
 			/* Force send reset. */
 			dccp_output(dp, DCCP_TYPE_RESET + 2);
 		}
-
-	} else if ( dp->state == DCCPS_ESTAB ) {
+	} else if (dp->state == DCCPS_ESTAB) {
 		switch(dh->dh_type) {
 
 		case DCCP_TYPE_DATA:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP DATA, state = %i, cc_in_use[1] = %u\n", dp->state, dp->cc_in_use[1]));
 			
-			if ( dp->cc_in_use[1] > 0 ) {
+			if (dp->cc_in_use[1] > 0) {
 				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv!\n", dp->cc_in_use[1]));
 				(*cc_sw[dp->cc_in_use[1]].cc_recv_packet_recv)(dp->cc_state[1], options, optlen);
 			}
@@ -739,7 +756,7 @@ dccp_input(register struct mbuf *m, int off)
 		case DCCP_TYPE_ACK:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP ACK\n"));
 			dp->ack_rcv = ntohl(dah->dah_ack << 8); /* Ack num */
-			if ( dp->cc_in_use[1] > 0 ) {
+			if (dp->cc_in_use[1] > 0) {
 				/* This is called so Acks on Acks can be handled */
 				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv!\n", dp->cc_in_use[1]));
 				(*cc_sw[dp->cc_in_use[1]].cc_recv_packet_recv)(dp->cc_state[1], options, optlen); 
@@ -749,7 +766,7 @@ dccp_input(register struct mbuf *m, int off)
 		case DCCP_TYPE_DATAACK:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP DATAACK\n"));
 			dp->ack_rcv = ntohl(dah->dah_ack << 8); /* Ack num */
-			if ( dp->cc_in_use[1] > 0 ) {
+			if (dp->cc_in_use[1] > 0) {
 				DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_recv_packet_recv!\n", dp->cc_in_use[1]));
 				(*cc_sw[dp->cc_in_use[1]].cc_recv_packet_recv)(dp->cc_state[1], options, optlen); 
 			}
@@ -757,7 +774,7 @@ dccp_input(register struct mbuf *m, int off)
 	
 		case DCCP_TYPE_CLOSEREQ:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP CLOSEREQ, state = estab\n"));
-			if ( dp->who == DCCP_CLIENT ) {
+			if (dp->who == DCCP_CLIENT) {
 				dccp_disconnect2(dp);
 			} else {
 				dccp_output(dp, DCCP_TYPE_RESET + 2);
@@ -788,7 +805,7 @@ dccp_input(register struct mbuf *m, int off)
 			DCCP_DEBUG((LOG_INFO, "Got a %u packet while in established stage!\n", dh->dh_type));
 		}
 
-	} else if ( dp->state == DCCPS_SERVER_CLOSE ) {
+	} else if (dp->state == DCCPS_SERVER_CLOSE) {
 		/* Server */
 		switch(dh->dh_type) {
 		case DCCP_TYPE_CLOSE:
@@ -807,7 +824,7 @@ dccp_input(register struct mbuf *m, int off)
 			DCCP_DEBUG((LOG_INFO, "Got a %u packet while in server_close stage!\n", dh->dh_type));
 		}
 
-	} else if ( dp->state == DCCPS_CLIENT_CLOSE ) {
+	} else if (dp->state == DCCPS_CLIENT_CLOSE) {
 		/* Client */
 		switch(dh->dh_type) {
 		case DCCP_TYPE_CLOSE:
@@ -830,24 +847,24 @@ dccp_input(register struct mbuf *m, int off)
 		}
 	} else {
 		DCCP_DEBUG((LOG_INFO, "Got a %u packet while in %u state!\n", dh->dh_type, dp->state));
-		if ( dh->dh_type != DCCP_TYPE_RESET ) {
+		if (dh->dh_type != DCCP_TYPE_RESET) {
 			/* Force send reset. */
 			DCCP_DEBUG((LOG_INFO, "Force sending a request!\n"));
 			dccp_output(dp, DCCP_TYPE_RESET + 2);
 		}
 	}
 
-	if ( dh->dh_type == DCCP_TYPE_DATA ||
-	     dh->dh_type == DCCP_TYPE_ACK  ||
-	     dh->dh_type == DCCP_TYPE_DATAACK) {
+	if (dh->dh_type == DCCP_TYPE_DATA ||
+	    dh->dh_type == DCCP_TYPE_ACK  ||
+	    dh->dh_type == DCCP_TYPE_DATAACK) {
 		DCCP_DEBUG((LOG_INFO, "ACK = %u\n", dp->ack_rcv));
-		if ( dp->cc_in_use[0] > 0 ) {
+		if (dp->cc_in_use[0] > 0) {
 			(*cc_sw[dp->cc_in_use[0]].cc_send_packet_recv)(dp->cc_state[0],options, optlen);
 		}
 		
 	}
 
-	if ( dh->dh_type == DCCP_TYPE_DATA || dh->dh_type == DCCP_TYPE_DATAACK ) {
+	if (dh->dh_type == DCCP_TYPE_DATA || dh->dh_type == DCCP_TYPE_DATAACK) {
 		if (so->so_state & SS_CANTRCVMORE) {
 			DCCP_DEBUG((LOG_INFO, "state & SS_CANTRCVMORE...!\n"));
 			m_freem(m);
@@ -901,7 +918,7 @@ dccp_notify(register struct inpcb *inp, int errno)
 /*
  * Called when we get ICMP errors (destination unrechable,
  * parameter problem, source quench, time exceeded and redirects)
-*/
+ */
 void
 dccp_ctlinput(int cmd, struct sockaddr *sa, void *vip)
 {
@@ -935,7 +952,7 @@ dccp_ctlinput(int cmd, struct sockaddr *sa, void *vip)
                     ip->ip_src, dh->dh_sport, 0, NULL);
 		if (inp != NULL) {
 			INP_LOCK(inp);
-			if(inp->inp_socket != NULL) {
+			if (inp->inp_socket != NULL) {
 				(*notify)(inp, inetctlerrmap[cmd]);
 			}
 			INP_UNLOCK(inp);
@@ -964,7 +981,7 @@ dccp6_ctlinput(int cmd, struct sockaddr *sa, void *d)
 /* 
  * Called by getsockopt and setsockopt.
  *
-*/
+ */
 int
 dccp_ctloutput(struct socket *so, struct sockopt *sopt)
 {
@@ -976,7 +993,7 @@ dccp_ctloutput(struct socket *so, struct sockopt *sopt)
 	s = splnet();
 	INP_INFO_RLOCK(&dccpbinfo);
 	inp = sotoinpcb(so);
-	if ( inp == NULL ) {
+	if (inp == NULL) {
 		INP_INFO_RUNLOCK(&dccpbinfo);
 		splx(s);
 		return (ECONNRESET);
@@ -1013,28 +1030,28 @@ dccp_ctloutput(struct socket *so, struct sockopt *sopt)
 			switch (sopt->sopt_name) {
 			case DCCP_CCID:
 				/* Add check that optval is a CCID we support!!! */
-				if ( optval == 2 || optval == 3 || optval == 0 ) {
+				if (optval == 2 || optval == 3 || optval == 0) {
 					dp->pref_cc = optval;
 				} else {
 					error = EINVAL;
 				}
 				break;
 			case DCCP_CSLEN:
-				if ( optval > 15 || optval < 0 ) {
+				if (optval > 15 || optval < 0) {
 					error = EINVAL;
 				} else {
 					dp->cslen = optval;
 				}
 				break;
 			case DCCP_TFRC_AVGPSIZE:
-				if ( optval > 65536 || optval < 0 ) {
+				if (optval > 65536 || optval < 0) {
 					error = EINVAL;
 				} else {
 					dp->avgpsize = optval;
 				}
 				break;
 			case DCCP_MAXSEG:
-				if ( optval > 0 && optval <= dp->d_maxseg ) {
+				if (optval > 0 && optval <= dp->d_maxseg) {
 					dp->d_maxseg = optval;
 				} else {
 					error = EINVAL;
@@ -1068,7 +1085,7 @@ dccp_ctloutput(struct socket *so, struct sockopt *sopt)
 			error = ENOPROTOOPT;
 		}
 
-		if ( error == 0 ) {
+		if (error == 0) {
 			error = sooptcopyout(sopt, &optval, sizeof optval);
 		}
 		break;
@@ -1080,7 +1097,7 @@ dccp_ctloutput(struct socket *so, struct sockopt *sopt)
 }
 
 int
-dccp_output(register struct dccpcb *dp, u_int8_t extra )
+dccp_output(register struct dccpcb *dp, u_int8_t extra)
 {
 	struct inpcb *inp = dp->d_inpcb;
 	struct socket *so = inp->inp_socket;
@@ -1110,7 +1127,7 @@ dccp_output(register struct dccpcb *dp, u_int8_t extra )
 	mtx_assert(&dp->d_inpcb->inp_mtx, MA_OWNED);
 #endif
 
-	if ( dp->state != DCCPS_ESTAB && extra == 1 ) {
+	if (dp->state != DCCPS_ESTAB && extra == 1) {
 		/* Only let cc decide when to resend if we are in establised state */
 		return 0;
 	}
@@ -1125,44 +1142,44 @@ again:
 	optlen = 0;
 
 	/* Check with CC if we can send... */
-	if ( dp->cc_in_use[0] > 0 && dp->state == DCCPS_ESTAB ) {
+	if (dp->cc_in_use[0] > 0 && dp->state == DCCPS_ESTAB) {
 		DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_send_packet!\n", dp->cc_in_use[0]));
-		if(!(*cc_sw[dp->cc_in_use[0]].cc_send_packet)(dp->cc_state[0], len)) {
+		if (!(*cc_sw[dp->cc_in_use[0]].cc_send_packet)(dp->cc_state[0], len)) {
 			DCCP_DEBUG((LOG_INFO, "Not allowed to send right now\n"));
 			return 0;
 		}
 	}
 
-	if (len > dp->d_maxseg ) {
+	if (len > dp->d_maxseg) {
 		len = dp->d_maxseg;
 		sendalot = 1;
 	}
 
-	if ( extra == DCCP_TYPE_RESET + 2 ) {
+	if (extra == DCCP_TYPE_RESET + 2) {
 		DCCP_DEBUG((LOG_INFO, "Force sending of DCCP TYPE_RESET!\n"));
 		type = DCCP_TYPE_RESET;
 		extrah_len = 8;
-	} else if ( dp->state <= DCCPS_REQUEST && dp->who == DCCP_CLIENT ) {
+	} else if (dp->state <= DCCPS_REQUEST && dp->who == DCCP_CLIENT) {
 		DCCP_DEBUG((LOG_INFO, "Sending DCCP TYPE_REQUEST!\n"));
 		type = DCCP_TYPE_REQUEST;
 		dp->state = DCCPS_REQUEST;
 		extrah_len = 4;
-	} else if ( dp->state == DCCPS_REQUEST && dp->who == DCCP_SERVER ) {
+	} else if (dp->state == DCCPS_REQUEST && dp->who == DCCP_SERVER) {
 		DCCP_DEBUG((LOG_INFO, "Sending DCCP TYPE_RESPONSE!\n"));
 		type = DCCP_TYPE_RESPONSE;
 		dp->state = DCCPS_RESPOND;
 		extrah_len = 4;
-	} else if ( dp->state == DCCPS_RESPOND ) {
+	} else if (dp->state == DCCPS_RESPOND) {
 		DCCP_DEBUG((LOG_INFO, "Still in feature neg, sending DCCP TYPE_ACK!\n"));
 		type = DCCP_TYPE_ACK;
 		extrah_len = 4;
-	} else if ( dp->state == DCCPS_ESTAB ) {
-		if ( dp->ack_snd && len ) {
+	} else if (dp->state == DCCPS_ESTAB) {
+		if (dp->ack_snd && len) {
 			DCCP_DEBUG((LOG_INFO, "Sending DCCP TYPE_DATAACK!\n"));
 			type = DCCP_TYPE_DATAACK;
 			/*(u_int32_t *)&extrah = dp->seq_rcv; */
 			extrah_len = 4;
-		} else if ( dp->ack_snd ) {
+		} else if (dp->ack_snd) {
 			DCCP_DEBUG((LOG_INFO, "Sending DCCP TYPE_ACK!\n"));
 			type = DCCP_TYPE_ACK;
 			extrah_len = 4;
@@ -1174,11 +1191,11 @@ again:
 		  DCCP_DEBUG((LOG_INFO, "No ack or data to send!\n"));
 		  return 0;
 		}
-	} else if ( dp->state == DCCPS_CLIENT_CLOSE ) {
+	} else if (dp->state == DCCPS_CLIENT_CLOSE) {
 		DCCP_DEBUG((LOG_INFO, "Sending DCCP TYPE_CLOSE!\n"));
 		type = DCCP_TYPE_CLOSE;
 		extrah_len = 4;
-	} else if ( dp->state == DCCPS_SERVER_CLOSE ) {
+	} else if (dp->state == DCCPS_SERVER_CLOSE) {
 		DCCP_DEBUG((LOG_INFO, "Sending DCCP TYPE_CLOSEREQ!\n"));
 		type = DCCP_TYPE_CLOSEREQ;
 		extrah_len = 4;
@@ -1188,38 +1205,38 @@ again:
 	}
 
 	/* Adding options. */
-	if ( dp->optlen ) {
+	if (dp->optlen) {
 		DCCP_DEBUG((LOG_INFO, "Copying options from dp->options!\n"));
 		bcopy(dp->options, options , dp->optlen);
 		optlen = dp->optlen;
 		dp->optlen = 0;
 	}
 
-	if ( dp->featlen && (optlen + dp->featlen < DCCP_MAX_OPTIONS )) {
+	if (dp->featlen && (optlen + dp->featlen < DCCP_MAX_OPTIONS)) {
 		DCCP_DEBUG((LOG_INFO, "Copying options from dp->features!\n"));
 		bcopy(dp->features, options + optlen, dp->featlen);
 		optlen += dp->featlen;
 	}
 
-	t = optlen %4;
+	t = optlen % 4;
 
-	if ( t ) {
+	if (t) {
 		t = 4 - t;
-		for(i = 0 ; i<t; i++ ) {
+		for (i = 0 ; i<t; i++) {
 			options[optlen] = 0;
 			optlen++;
 		}
 	}
 
 #ifdef INET6
-	if ( isipv6 ) {
+	if (isipv6) {
 		DCCP_DEBUG((LOG_INFO, "Sending ipv6 packet...\n"));
 		hdrlen = sizeof(struct dccpip6hdr) + extrah_len + optlen;
 	} else
 #endif
 		hdrlen = sizeof(struct dccpiphdr) + extrah_len + optlen;
 
-	if ( len > (dp->d_maxseg - extrah_len - optlen) ) {
+	if (len > (dp->d_maxseg - extrah_len - optlen)) {
 		len = dp->d_maxseg - extrah_len - optlen;
 		sendalot = 1;
 	}
@@ -1272,11 +1289,11 @@ again:
 	 * and addresses and length put into network format.
 	 */
 #ifdef INET6
-	if ( isipv6) {
+	if (isipv6) {
 		di6 = mtod(m, struct dccpip6hdr *);
 		di6->di6_flow = (di6->di6_flow & ~IPV6_FLOWINFO_MASK) |
 			(inp->in6p_flowinfo & IPV6_FLOWINFO_MASK);
-		di6->di6_vfc = ( di6->di6_vfc & ~IPV6_VERSION_MASK) |
+		di6->di6_vfc = (di6->di6_vfc & ~IPV6_VERSION_MASK) |
 			 (IPV6_VERSION & IPV6_VERSION_MASK);
 		di6->di6_nxt = IPPROTO_DCCP;
 		di6->di6_src = inp->in6p_laddr;
@@ -1307,7 +1324,7 @@ again:
 
 	DCCP_DEBUG((LOG_INFO, "Sending with seq %u, (dp->seq_snd = %u)\n\n", dh->dh_seq, dp->seq_snd));
 
-	if ( dh->dh_type == DCCP_TYPE_REQUEST ) {
+	if (dh->dh_type == DCCP_TYPE_REQUEST) {
 #ifdef INET6
 		if (isipv6)
 			drqh = (struct dccp_requesthdr *)(di6 +1);
@@ -1317,7 +1334,7 @@ again:
 		drqh->drqh_sname = 0; /* Service name must be 0 if not used */
 		optp = (u_char *)(drqh +1);
 
-	} else if ( dh->dh_type == DCCP_TYPE_RESET ) {
+	} else if (dh->dh_type == DCCP_TYPE_RESET) {
 #ifdef INET6
 		if (isipv6)
 			drth = (struct dccp_resethdr *)(di6 +1);
@@ -1332,7 +1349,7 @@ again:
 		drth->drth_data3 = 0;
 		optp = (u_char *)(drth +1);
 
-	} else if ( extrah_len ) {
+	} else if (extrah_len) {
 #ifdef INET6
 		if (isipv6)
 			dah = (struct dccp_ackhdr *)(di6 +1);
@@ -1364,11 +1381,11 @@ again:
 
 	m->m_pkthdr.len = hdrlen + len;
 
-	if ( dh->dh_cslen == 15 ) {
+	if (dh->dh_cslen == 15) {
 		cslen = len;
 	} else {
 		cslen = 4 * dh->dh_cslen;
-		if ( cslen > len )
+		if (cslen > len)
 			cslen = len;
 	}
 
@@ -1378,14 +1395,14 @@ again:
 	m->m_pkthdr.csum_flags = CSUM_IP; /* Do not allow the network card to calculate the checksum */
 
 #ifdef INET6
-	if ( isipv6) {
+	if (isipv6) {
 		dh->dh_sum = in6_cksum(m, IPPROTO_DCCP, sizeof(struct ip6_hdr), sizeof(struct dccphdr) + extrah_len + optlen + cslen);
 	} else
 #endif
 	{
 	      	dh->dh_sum = in_pseudo(di->di_src.s_addr, di->di_dst.s_addr,
 		    htons((u_short)len + sizeof(struct dccphdr) + extrah_len + optlen + IPPROTO_DCCP)); 
-		dh->dh_sum = in_cksum_skip(m, hdrlen + cslen, 20 );
+		dh->dh_sum = in_cksum_skip(m, hdrlen + cslen, 20);
 		m->m_pkthdr.csum_data = offsetof(struct dccphdr, dh_sum);
 
 		((struct ip *)di)->ip_len = hdrlen + len;
@@ -1399,7 +1416,7 @@ again:
 	dccpstat.dccps_obytes += m->m_pkthdr.len;
 
 #ifdef INET6
-	if ( isipv6) {
+	if (isipv6) {
 		DCCP_DEBUG((LOG_INFO, "Calling ip_output6, mbuf->m_len = %u, mbuf->m_pkthdr.len = %u\n", m->m_len, m->m_pkthdr.len));
 		error = ip6_output(m, inp->in6p_outputopts, &inp->in6p_route,
 		    (inp->inp_socket->so_options & SO_DONTROUTE), NULL, NULL, inp);
@@ -1411,14 +1428,14 @@ again:
 		    (inp->inp_socket->so_options & SO_DONTROUTE), 0, inp);
 	}
 
-	if ( error ) {
+	if (error) {
 		DCCP_DEBUG((LOG_INFO, "IP output failed!\n"));
 		return(error);
 	}
 
 	sbdrop(&inp->inp_socket->so_snd, len);
 	sowwakeup(inp->inp_socket);
-	if ( dp->cc_in_use[0] > 0  && dp->state == DCCPS_ESTAB ) {
+	if (dp->cc_in_use[0] > 0  && dp->state == DCCPS_ESTAB) {
 		DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_send_packet_sent!\n", dp->cc_in_use[0]));
 		if (sendalot) {
 			(*cc_sw[dp->cc_in_use[0]].cc_send_packet_sent)(dp->cc_state[0], 1,len);
@@ -1476,9 +1493,9 @@ dccp_close(struct dccpcb *dp)
 	untimeout(dccp_close_t, dp, dp->close_timer);
 	untimeout(dccp_timewait_t, dp, dp->timewait_timer);
 
-	if ( dp->cc_in_use[0] > 0 )
+	if (dp->cc_in_use[0] > 0)
 		(*cc_sw[dp->cc_in_use[0]].cc_send_free)(dp->cc_state[0]);
-	if ( dp->cc_in_use[1] > 0 )
+	if (dp->cc_in_use[1] > 0)
 		(*cc_sw[dp->cc_in_use[1]].cc_recv_free)(dp->cc_state[1]);
 
 	inp->inp_ppcb = NULL;
@@ -1491,7 +1508,7 @@ dccp_close(struct dccpcb *dp)
 /*
  * Runs when a new socket is created with the
  * socket system call or sonewconn.
-*/
+ */
 static int
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 dccp_attach(struct socket *so, int proto, struct thread *td)
@@ -1521,7 +1538,7 @@ dccp_attach(struct socket *so, int proto, struct proc *td)
 	inp = sotoinpcb(so);
 
 #ifdef INET6
-	if ( INP_CHECK_SOCKAF(so, AF_INET6) ) {
+	if (INP_CHECK_SOCKAF(so, AF_INET6)) {
 		DCCP_DEBUG((LOG_INFO, "We are a ipv6 socket!!!\n"));
 		inp->inp_vflag |= INP_IPV6;
 	} else
@@ -1530,11 +1547,11 @@ dccp_attach(struct socket *so, int proto, struct proc *td)
 	inp->inp_ip_ttl = ip_defttl;
 
 	dp = dccp_newdccpcb(inp);
-	if ( dp == 0 ) {
+	if (dp == 0) {
 		int nofd = so->so_state & SS_NOFDREF;
 		so->so_state &= ~SS_NOFDREF;
 #ifdef INET6
-		if ( INP_CHECK_SOCKAF(so, AF_INET6) ) {
+		if (INP_CHECK_SOCKAF(so, AF_INET6)) {
 			in6_pcbdetach(inp);
 		} else
 #endif
@@ -1632,7 +1649,7 @@ dccp6_bind(struct socket *so, struct sockaddr *nam, struct proc *td)
 /*
  * Initiates a connection to a server
  * Called by the connect system call.
-*/
+ */
 static int
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 dccp_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
@@ -1665,7 +1682,7 @@ dccp_connect(struct socket *so, struct sockaddr *nam, struct proc *td)
 
 	dp = (struct dccpcb *)inp->inp_ppcb;
 
-	if ( dp->state == DCCPS_ESTAB ) {
+	if (dp->state == DCCPS_ESTAB) {
 		DCCP_DEBUG((LOG_INFO, "Why are we in connect when we already have a established connection?\n"));
 	}
 
@@ -1692,7 +1709,7 @@ dccp_connect(struct socket *so, struct sockaddr *nam, struct proc *td)
 
 	test[0] = dp->pref_cc;
 	/* FIX THIS LATER */
-	if ( dp->pref_cc == 2 ) {
+	if (dp->pref_cc == 2) {
 		test[1] = 3;
 	} else {
 		test[1] = 2;
@@ -1742,7 +1759,7 @@ dccp6_connect(struct socket *so, struct sockaddr *nam, struct proc *td)
 
 	dp = (struct dccpcb *)inp->inp_ppcb;
 
-	if ( dp->state == DCCPS_ESTAB ) {
+	if (dp->state == DCCPS_ESTAB) {
 		DCCP_DEBUG((LOG_INFO, "Why are we in connect when we already have a established connection?\n"));
 	}
 
@@ -1771,7 +1788,7 @@ dccp6_connect(struct socket *so, struct sockaddr *nam, struct proc *td)
 
 	test[0] = dp->pref_cc;
 	/* FIX THIS LATER */
-	if ( dp->pref_cc == 2 ) {
+	if (dp->pref_cc == 2) {
 		test[1] = 3;
 	} else {
 		test[1] = 2;
@@ -1792,7 +1809,7 @@ bad:
 /*
  *
  *
-*/
+ */
 static int
 dccp_doconnect(struct dccpcb *dp, struct sockaddr *nam,
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
@@ -1827,7 +1844,7 @@ dccp_doconnect(struct dccpcb *dp, struct sockaddr *nam,
 
 	if (inp->inp_lport == 0) {
 #ifdef INET6
-		if ( isipv6 ) {
+		if (isipv6) {
 			DCCP_DEBUG((LOG_INFO, "Running in6_pcbbind!\n"));
 			error = in6_pcbbind(inp, (struct sockaddr *)0, td);
 		} else
@@ -1843,7 +1860,7 @@ dccp_doconnect(struct dccpcb *dp, struct sockaddr *nam,
 #endif
 
 #ifdef INET6
-	if ( isipv6 )
+	if (isipv6)
 		error = in6_pcbladdr(inp, nam, &addr6);
 	else
 #endif
@@ -1873,7 +1890,7 @@ dccp_doconnect(struct dccpcb *dp, struct sockaddr *nam,
 		return error;
 
 #ifdef INET6
-	if ( isipv6 ) {
+	if (isipv6) {
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
 			inp->in6p_laddr = *addr6;
@@ -1902,7 +1919,7 @@ dccp_doconnect(struct dccpcb *dp, struct sockaddr *nam,
 /*
  * Detaches the DCCP protocol from the socket.
  *
-*/
+ */
 static int
 dccp_detach(struct socket *so)
 {
@@ -1930,7 +1947,7 @@ dccp_detach(struct socket *so)
 /*
  * 
  *
-*/
+ */
 static int
 dccp_disconnect(struct socket *so)
 {
@@ -1954,7 +1971,7 @@ dccp_disconnect(struct socket *so)
 
 	dp = (struct dccpcb *)inp->inp_ppcb;
 
-	if ( ! dccp_disconnect2(dp))
+	if (!dccp_disconnect2(dp))
 		INP_UNLOCK(inp);
 	INP_INFO_WUNLOCK(&dccpbinfo);
 	splx(s);
@@ -1965,7 +1982,7 @@ dccp_disconnect(struct socket *so)
  * If we have don't have a established connection
  * we can call dccp_close, otherwise we can just
  * set SS_ISDISCONNECTED and flush the receive queue.
-*/
+ */
 static int
 dccp_disconnect2(struct dccpcb *dp)
 {
@@ -1973,17 +1990,17 @@ dccp_disconnect2(struct dccpcb *dp)
 
 	DCCP_DEBUG((LOG_INFO, "Entering dccp_disconnect2!\n"));
 
-	if (dp->state < DCCPS_ESTAB ) {
+	if (dp->state < DCCPS_ESTAB) {
 		dccp_close(dp);
 		return 1;
 	} else {
 		soisdisconnecting(so);
 		sbflush(&so->so_rcv);
-		if ( dp->state == DCCPS_ESTAB ) {
+		if (dp->state == DCCPS_ESTAB) {
 			dp->retrans = 100;
 			dp->retrans_timer = timeout(dccp_retrans_t, dp, dp->retrans);
 			dp->close_timer = timeout(dccp_close_t, dp, DCCP_CLOSE_TIMER);
-			if ( dp->who == DCCP_CLIENT ) {
+			if (dp->who == DCCP_CLIENT) {
 				dp->state = DCCPS_CLIENT_CLOSE;
 			} else {
 				dp->state = DCCPS_SERVER_CLOSE;
@@ -2024,7 +2041,7 @@ dccp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 #endif
 
 	dp = (struct dccpcb *)inp->inp_ppcb;
-	if ( dp->state != DCCPS_ESTAB ) {
+	if (dp->state != DCCPS_ESTAB) {
 		DCCP_DEBUG((LOG_INFO, "We have no established connection!\n"));
 	}
 
@@ -2045,7 +2062,7 @@ dccp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 
 	sbappend(&so->so_snd, m);
 
-	if ( addr && dp->state == DCCPS_CLOSED ) {
+	if (addr && dp->state == DCCPS_CLOSED) {
 		error = dccp_doconnect(dp, addr, td, isipv6);
 		if (error)
 			goto out;
@@ -2061,7 +2078,7 @@ out:
 
 /*
  * Sets socket to SS_CANTSENDMORE 
-*/
+ */
 int
 dccp_shutdown(struct socket *so)
 {
@@ -2097,7 +2114,7 @@ dccp_listen(struct socket *so, struct proc *td)
 
 	INP_INFO_RLOCK(&dccpbinfo);
 	inp = sotoinpcb(so);
-	if ( inp == 0 ) {
+	if (inp == 0) {
 		INP_INFO_RUNLOCK(&dccpbinfo);
 		splx(s);
 		return EINVAL;
@@ -2105,7 +2122,7 @@ dccp_listen(struct socket *so, struct proc *td)
 	INP_LOCK(inp);
 	INP_INFO_RUNLOCK(&dccpbinfo);
 	dp = (struct dccpcb *)inp->inp_ppcb;
-	if (inp->inp_lport == 0 )
+	if (inp->inp_lport == 0)
 		error = in_pcbbind(inp, (struct sockaddr *)0, td);
 	if (error == 0) {
 		dp->state = DCCPS_LISTEN;
@@ -2133,7 +2150,7 @@ dccp6_listen(struct socket *so, struct proc *td)
 
 	INP_INFO_RLOCK(&dccpbinfo);
 	inp = sotoinpcb(so);
-	if ( inp == 0 ) {
+	if (inp == 0) {
 		INP_INFO_RUNLOCK(&dccpbinfo);
 		splx(s);
 		return EINVAL;
@@ -2142,7 +2159,7 @@ dccp6_listen(struct socket *so, struct proc *td)
 	INP_INFO_RUNLOCK(&dccpbinfo);
 	dp = (struct dccpcb *)inp->inp_ppcb;
 	DCCP_DEBUG((LOG_INFO, "Checking inp->inp_lport!\n"));
-	if (inp->inp_lport == 0 ) {
+	if (inp->inp_lport == 0) {
 		inp->inp_vflag &= ~INP_IPV4;
 		if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0)
 			inp->inp_vflag |= INP_IPV4;
@@ -2161,7 +2178,7 @@ dccp6_listen(struct socket *so, struct proc *td)
 
 /*
  * Accepts a connection (accept system call)
-*/
+ */
 static int
 dccp_accept(struct socket *so, struct sockaddr **nam)
 {
@@ -2185,7 +2202,7 @@ dccp_accept(struct socket *so, struct sockaddr **nam)
 
 	INP_INFO_RLOCK(&dccpbinfo);
 	inp = sotoinpcb(so);
-	if ( inp == 0 ) {
+	if (inp == 0) {
 		INP_INFO_RUNLOCK(&dccpbinfo);
 		splx(s);
 		return EINVAL;
@@ -2203,7 +2220,7 @@ dccp_accept(struct socket *so, struct sockaddr **nam)
 	INP_UNLOCK(inp);
 	splx(s);
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	if ( error == 0)
+	if (error == 0)
 		*nam = in_sockaddr(port, &addr);
 #endif
 	return error;
@@ -2234,7 +2251,7 @@ dccp6_accept(struct socket *so, struct sockaddr **nam)
 
 	INP_INFO_RLOCK(&dccpbinfo);
 	inp = sotoinpcb(so);
-	if ( inp == 0 ) {
+	if (inp == 0) {
 		INP_INFO_RUNLOCK(&dccpbinfo);
 		splx(s);
 		return EINVAL;
@@ -2258,7 +2275,7 @@ dccp6_accept(struct socket *so, struct sockaddr **nam)
 	INP_UNLOCK(inp);
 	splx(s);
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	if ( error == 0) {
+	if (error == 0) {
 		if (v4)
 			*nam = in6_v4mapsin6_sockaddr(port, &addr);
 		else
@@ -2271,7 +2288,7 @@ dccp6_accept(struct socket *so, struct sockaddr **nam)
 /*
  * Initializes a new DCCP control block
  * (in_pcballoc in attach has already allocated memory for it)
-*/
+ */
 struct dccpcb *
 dccp_newdccpcb(struct inpcb *inp)
 {
@@ -2322,12 +2339,12 @@ dccp_add_feature_option(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, char 
 	int i;
 	DCCP_DEBUG((LOG_INFO, "Entering dccp_add_option, opt = %u, val_len = %u\n", opt, val_len));
 
-	if ( DCCP_MAX_OPTIONS > (dp->optlen + val_len + 2) ) {
+	if (DCCP_MAX_OPTIONS > (dp->optlen + val_len + 2)) {
 		dp->options[dp->optlen] = opt;
-		if ( opt < 32 ) {
+		if (opt < 32) {
 			dp->optlen++;
 		} else {
-			if ( opt == DCCP_OPT_CONFIRM ) {
+			if (opt == DCCP_OPT_CONFIRM) {
 				dp->options[dp->optlen +1] = val_len + 3;
 				dp->options[dp->optlen +2] = feature;
 				dp->optlen += 3;
@@ -2336,7 +2353,7 @@ dccp_add_feature_option(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, char 
 				dp->optlen += 2;
 			}
 	
-			for(i = 0; i<val_len; i++) {
+			for (i = 0; i<val_len; i++) {
 				dp->options[dp->optlen] = val[i];
 				dp->optlen++;
 			}
@@ -2360,18 +2377,18 @@ dccp_get_option(char *options, int optlen, int type, char *buffer, int buflen)
 	int i, j, size;
 	u_int8_t t;
 	
-	for (i=0; i < optlen; ) {
+	for (i=0; i < optlen;) {
 		t = options[i++];
-		if(t >= 32){		  
-		  size = options[i++] - 2;
-		  if (t == type) {
-		    if(size > buflen)
-		      return 0;
-		    for (j=0; j<size; j++)
-		      buffer[j] = options[i++];
-		    return size;
-		  }
-		  i += size;
+		if (t >= 32){		  
+			size = options[i++] - 2;
+			if (t == type) {
+				if (size > buflen)
+					return 0;
+				for (j = 0; j < size; j++)
+					buffer[j] = options[i++];
+				return size;
+			}
+			i += size;
 		}
 	}
 	/* If we get here the options was not found */
@@ -2384,12 +2401,12 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 	u_int8_t opt, size, i, j;
 	char val[8];
 
-	for(i = 0; i < optlen; i++) {
+	for (i = 0; i < optlen; i++) {
 		opt = options[i];
 
 		DCCP_DEBUG((LOG_INFO, "Parsing opt: 0x%02x\n", opt));
 
-		if ( opt < 32 ) {
+		if (opt < 32) {
 			switch(opt) {
 			    case DCCP_OPT_PADDING:
 				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_PADDING!\n"));
@@ -2406,9 +2423,9 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 			    default:
 				DCCP_DEBUG((LOG_INFO, "Got an unknown option, option = %u!\n", opt));
 			}
-		} else if ( opt > 32 && opt < 36 ) {
+		} else if (opt > 32 && opt < 36) {
 			size = options[i+1];
-			if ( size < 3 || size > 10 ) {
+			if (size < 3 || size > 10) {
 				DCCP_DEBUG((LOG_INFO, "Error, option size = %u\n", size));
 				return;
 			}
@@ -2419,9 +2436,9 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 			dccp_feature_neg(dp, opt, options[i+2], (size -3) , val);
 			i += size - 1;
 
-		} else if ( opt < 128 ) {
+		} else if (opt < 128) {
 			size = options[i+1];
-			if ( size < 3 || size > 10 ) {
+			if (size < 3 || size > 10) {
 				DCCP_DEBUG((LOG_INFO, "Error, option size = %u\n", size));
 				return;
 			}
@@ -2429,11 +2446,11 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 			switch(opt) {
 			    case DCCP_OPT_IGNORED:
 				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_IGNORED!\n"));
-				if ( size != 4 ) {
+				if (size != 4) {
 					DCCP_DEBUG((LOG_INFO, "Error, got a DCCP_OPT_IGNORED but size = %u (should be 4)\n", size));
 					return;
 				}
-				if ( options[2] > 32 && options[2] < 36 ) {
+				if (options[2] > 32 && options[2] < 36) {
 					/* Feature negotiations */
 					DCCP_DEBUG((LOG_INFO, "Remote DCCP did not understand feature %u, running dccp_remove_feature(dp, %u, %u)\n", options[3], options[2], options[3]));
 					dccp_remove_feature(dp, options[2], options[3]);
@@ -2442,7 +2459,7 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 
 			    case DCCP_OPT_RECV_BUF_DROPS:
 				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_RECV_BUF_DROPS, size = %u!\n", size));
-				for(j=2; j < size; j++) {
+				for (j=2; j < size; j++) {
 					DCCP_DEBUG((LOG_INFO, "val[%u] = %u ", j-1, options[i+j]));
 				}
 				DCCP_DEBUG((LOG_INFO, "\n"));
@@ -2459,7 +2476,7 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 				
 			    case DCCP_OPT_TIMESTAMP_ECHO:
 				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_TIMESTAMP_ECHO, size = %u\n",size));
-				for(j=2; j < size; j++) {
+				for (j=2; j < size; j++) {
 					DCCP_DEBUG((LOG_INFO, "val[%u] = %u ", j-1, options[i+j]));
 				}
 				DCCP_DEBUG((LOG_INFO, "\n"));
@@ -2488,7 +2505,7 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 		} else {
 			DCCP_DEBUG((LOG_INFO, "Got a CCID option, do nothing!"));
 			size = options[i+1];
-			if ( size < 3 || size > 10 ) {
+			if (size < 3 || size > 10) {
 				DCCP_DEBUG((LOG_INFO, "Error, option size = %u\n", size));
 				return;
 			}
@@ -2504,12 +2521,12 @@ dccp_add_feature(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, char *val, u
 	int i;
 	DCCP_DEBUG((LOG_INFO, "Entering dccp_add_feature, opt = %u, feature = %u, val_len = %u\n", opt, feature, val_len));
 
-	if ( DCCP_MAX_OPTIONS > (dp->featlen + val_len + 3) ) {
+	if (DCCP_MAX_OPTIONS > (dp->featlen + val_len + 3)) {
 		dp->features[dp->featlen] = opt;
 		dp->features[dp->featlen +1] = val_len + 3;
 		dp->features[dp->featlen +2] = feature;
 		dp->featlen += 3;
-		for(i = 0; i<val_len; i++) {
+		for (i = 0; i<val_len; i++) {
 			dp->features[dp->featlen] = val[i];
 			dp->featlen++;
 		}
@@ -2528,21 +2545,21 @@ dccp_remove_feature(struct dccpcb *dp, u_int8_t opt, u_int8_t feature)
 	u_int8_t t_opt, t_feature, len;
 	DCCP_DEBUG((LOG_INFO, "Entering dccp_remove_feature, featlen = %u, opt = %u, feature = %u\n", dp->featlen, opt, feature));
 
-	while( i < dp->featlen ) {
+	while (i < dp->featlen) {
 		t_opt = dp->features[i];
 		len = dp->features[i+1];
 
-		if ( i + len > dp->featlen ) {
+		if (i + len > dp->featlen) {
 			DCCP_DEBUG((LOG_INFO, "Error, len = %u and i(%u) + len > dp->featlen (%u)\n", len, i, dp->featlen));
 			return 1;
 		}
 		t_feature = dp->features[i+2];
 
-		if ( t_opt == opt && t_feature == feature ) {
+		if (t_opt == opt && t_feature == feature) {
 			i += len;
 		} else {
-			if ( i != j ) {
-				for(k = 0; k < len; k++) {
+			if (i != j) {
+				for (k = 0; k < len; k++) {
 					dp->features[j+k] = dp->features[i+k];
 				}
 			}
@@ -2564,34 +2581,34 @@ dccp_feature_neg(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, u_int8_t val
 	switch(feature) {
 		case DCCP_FEATURE_CC:
 			DCCP_DEBUG((LOG_INFO, "Got CCID negotiation, opt = %u, val[0] = %u\n", opt, val[0]));
-			if ( opt == DCCP_OPT_CHANGE ) {
-				if ( val[0] == 2 || val[0] == 3 || val[0] == 0 ) {
+			if (opt == DCCP_OPT_CHANGE) {
+				if (val[0] == 2 || val[0] == 3 || val[0] == 0) {
 					DCCP_DEBUG((LOG_INFO, "Sending DCCP_OPT_CONFIRM on CCID %u\n", val[0]));
 					dccp_remove_feature(dp, DCCP_OPT_PREFER, DCCP_FEATURE_CC);
 					dccp_remove_feature(dp, DCCP_OPT_CONFIRM, DCCP_FEATURE_CC);
 					dccp_add_feature_option(dp, DCCP_OPT_CONFIRM, DCCP_FEATURE_CC , val, 1);
-					if ( dp->cc_in_use[0] < 1 ) {
+					if (dp->cc_in_use[0] < 1) {
 						dp->cc_state[0] = (*cc_sw[val[0] + 1].cc_send_init)(dp);
 						dp->cc_in_use[0] = val[0] + 1;
 					} else {
 						DCCP_DEBUG((LOG_INFO, "We already have negotiated a CC!!!\n"));
 					}
 				}
-			} else if ( opt == DCCP_OPT_PREFER ) {
-				if ( val[0] == 2 || val[0] == 3 || val[0] == 0 ) {
+			} else if (opt == DCCP_OPT_PREFER) {
+				if (val[0] == 2 || val[0] == 3 || val[0] == 0) {
 					DCCP_DEBUG((LOG_INFO, "Sending DCCP_OPT_CHANGE on CCID %u\n", val[0]));
 					dccp_remove_feature(dp, DCCP_OPT_CHANGE, DCCP_FEATURE_CC);
 					dccp_add_feature(dp, DCCP_OPT_CHANGE, DCCP_FEATURE_CC, val, 1);
-					if ( dp->cc_in_use[1] < 1 ) {
+					if (dp->cc_in_use[1] < 1) {
 						dp->cc_in_use[1] = 0;
 					} else {
 						DCCP_DEBUG((LOG_INFO, "We already have negotiated a CC!!!\n"));
 					}
 				}
-			} else if ( opt == DCCP_OPT_CONFIRM ) {
+			} else if (opt == DCCP_OPT_CONFIRM) {
 				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_CONFIRM on CCID %u\n", val[0]));
 				dccp_remove_feature(dp, DCCP_OPT_CHANGE, DCCP_FEATURE_CC);
-				if ( dp->cc_in_use[1] < 1 ) {
+				if (dp->cc_in_use[1] < 1) {
 					dp->cc_state[1] = (*cc_sw[val[0] +1].cc_recv_init)(dp);
 					dp->cc_in_use[1] = val[0] +1;
 				} else {
@@ -2723,7 +2740,7 @@ INP_LOCK(inp);
 			/* XXX should avoid extra copy */
 			bcopy(inp, &xd.xd_inp, sizeof *inp);
 			inp_ppcb = inp->inp_ppcb;
-			if ( inp_ppcb != NULL )
+			if (inp_ppcb != NULL)
 				bcopy(inp_ppcb, &xd.xd_dp, sizeof xd.xd_dp);
 			else
 				bzero((char *) &xd.xd_dp, sizeof xd.xd_dp);
@@ -2797,7 +2814,7 @@ void dccp_close_t(void *dcb)
 	s = splnet();
 	INP_INFO_WLOCK(&dccpbinfo);
 	dp->state = DCCPS_TIME_WAIT; /* HMM */
-	if ( dp->who == DCCP_SERVER ) {
+	if (dp->who == DCCP_SERVER) {
 		INP_LOCK(dp->d_inpcb);
 		dccp_output(dp, DCCP_TYPE_RESET + 2);
 		dccp_close(dp);

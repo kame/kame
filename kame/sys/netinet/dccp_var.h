@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.3 2003/10/18 07:52:01 itojun Exp $	*/
+/*	$KAME: dccp_var.h,v 1.4 2003/10/18 08:16:18 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: dccp_var.h,v 1.3 2003/10/18 07:52:01 itojun Exp $
+ * Id: dccp_var.h,v 1.25 2003/07/31 11:17:15 joahag-9 Exp
  */
 
 #ifndef _NETINET_DCCP_VAR_H_
@@ -181,8 +181,8 @@ const char *dccpstates[] = {
 #define DCCP_SERVER	2
 #define DCCP_CLIENT	3
 
-#define SEQ_LT(a,b)     ((int)((a << 8)-(b << 8)) < 0)
-#define SEQ_GT(a,b)     ((int)((a << 8)-(b << 8)) > 0)
+#define SEQ_LT(a, b)	((int)(((a) << 8) - ((b) << 8)) < 0)
+#define SEQ_GT(a, b)	((int)(((a) << 8) - ((b) << 8)) > 0)
 
 /*
  * Names for DCCP sysctl objects
@@ -213,18 +213,18 @@ extern int	dccp_log_in_vain; /* if we should log connections to
 void	dccp_ctlinput(int, struct sockaddr *, void *);
 void	dccp_init(void);
 void	dccp_input(struct mbuf *, int);
-int	dccp_ctloutput(struct socket *so, struct sockopt *sopt);
+int	dccp_ctloutput(struct socket *, struct sockopt *);
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 struct inpcb *
 #else
 void
 #endif
-	dccp_notify(struct inpcb *inp, int errno);
+	dccp_notify(struct inpcb *, int);
 struct dccpcb *
-	dccp_newdccpcb(struct inpcb *inp);
+	dccp_newdccpcb(struct inpcb *);
 
-int	dccp_shutdown(struct socket *so);
+int	dccp_shutdown(struct socket *);
 
 int     dccp_output(struct dccpcb *, u_int8_t);
 
@@ -232,10 +232,10 @@ int     dccp_add_option(struct dccpcb *, u_int8_t, char *, u_int8_t);
 
 /* No cc functions */
 void* dccp_nocc_init(struct dccpcb *);
-void  dccp_nocc_free(void*);
-int   dccp_nocc_send_packet(void*,long);
-void  dccp_nocc_send_packet_sent(void*,int,long);
-void  dccp_nocc_packet_recv(void*,char*,int);
+void  dccp_nocc_free(void *);
+int   dccp_nocc_send_packet(void*, long);
+void  dccp_nocc_send_packet_sent(void *, int, long);
+void  dccp_nocc_packet_recv(void*, char *, int);
 
 #endif
 

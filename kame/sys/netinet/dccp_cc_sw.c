@@ -1,4 +1,4 @@
-/*	$KAME: dccp_cc_sw.c,v 1.3 2003/10/18 07:52:00 itojun Exp $	*/
+/*	$KAME: dccp_cc_sw.c,v 1.4 2003/10/18 08:16:17 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: dccp_cc_sw.c,v 1.3 2003/10/18 07:52:00 itojun Exp $
+ * Id: dccp_cc_sw.c,v 1.10 2003/05/14 08:14:46 nilmat-8 Exp
  */
 
 #include "opt_dccp.h"

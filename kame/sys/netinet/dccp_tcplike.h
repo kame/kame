@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.h,v 1.4 2003/10/18 07:58:34 itojun Exp $	*/
+/*	$KAME: dccp_tcplike.h,v 1.5 2003/10/18 08:16:17 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -41,8 +41,8 @@
 /* Parameter to decide when a packet is considered lost */
 #define TCPLIKE_NUMDUPACK 3
 /* Upperbound timeout value */
-#define TIMEOUT_UBOUND 30*hz
-#define TCPLIKE_MIN_RTT (hz >> 3)
+#define TIMEOUT_UBOUND	(30 * hz)
+#define TCPLIKE_MIN_RTT	(hz >> 3)
 #define TCPLIKE_INITIAL_CWND 3
 #define TCPLIKE_INITIAL_CWNDVECTOR 512
 
@@ -87,28 +87,32 @@ struct tcplike_send_ccb
 
 /* Functions declared in struct dccp_cc_sw */
 
-/* Initialises the sender side
+/*
+ * Initialises the sender side
  * args: pcb  - pointer to dccpcb of associated connection
  * returns: pointer to a tcplike_send_ccb struct on success, otherwise 0
  */ 
-void *tcplike_send_init(struct dccpcb *pcb); 
+void *tcplike_send_init(struct dccpcb *); 
 
-/* Free the sender side
+/*
+ * Free the sender side
  * args: ccb - ccb of sender
  */
-void tcplike_send_free(void *ccb);
+void tcplike_send_free(void *);
 
-/* Ask TCPlike wheter one can send a packet or not 
+/*
+ * Ask TCPlike wheter one can send a packet or not 
  * args: ccb  -  ccb block for current connection
  * returns: 0 if ok, else <> 0.
  */ 
-int tcplike_send_packet(void *ccb, long datasize);
-void tcplike_send_packet_sent(void *ccb, int moreToSend, long datasize);
+int tcplike_send_packet(void *, long);
+void tcplike_send_packet_sent(void *, int, long);
 
-/* Notify that an ack package was received
+/*
+ * Notify that an ack package was received
  * args: ccb  -  ccb block for current connection
  */
-void tcplike_send_packet_recv(void *ccb, char *, int);
+void tcplike_send_packet_recv(void *, char *, int);
 
 #endif
 
@@ -137,22 +141,24 @@ struct tcplike_recv_ccb {
 
 /* Functions declared in struct dccp_cc_sw */
 
-/* Initialises the receiver side
+/*
+ * Initialises the receiver side
  * args: pcb  -  pointer to dccpcb of associated connection
  * returns: pointer to a tcplike_recv_ccb struct on success, otherwise 0
  */ 
-void *tcplike_recv_init(struct dccpcb *pcb); 
+void *tcplike_recv_init(struct dccpcb *); 
 
-/* Free the receiver side
+/*
+ * Free the receiver side
  * args: ccb - ccb of recevier
  */
-void tcplike_recv_free(void *ccb);
+void tcplike_recv_free(void *);
 
 /*
  * Tell TCPlike that a packet has been received
  * args: ccb  -  ccb block for current connection 
  */
-void tcplike_recv_packet_recv(void *ccb, char *, int);
+void tcplike_recv_packet_recv(void *, char *, int);
 
 /*
 int tcplike_option_recv();

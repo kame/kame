@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc_lookup.h,v 1.2 2003/10/18 07:52:01 itojun Exp $	*/
+/*	$KAME: dccp_tfrc_lookup.h,v 1.3 2003/10/18 08:16:17 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: dccp_tfrc_lookup.h,v 1.2 2003/10/18 07:52:01 itojun Exp $
+ * Id: dccp_tfrc_lookup.h,v 1.5 2003/05/28 17:37:43 nilmat-8 Exp
  */
 
 #ifndef _NETINET_DCCP_TFRC_LOOKUP_H_
