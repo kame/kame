@@ -634,6 +634,7 @@ int	in6_control __P((struct socket *,
 #else
 int	in6_control __P((struct socket *, u_long, caddr_t, struct ifnet *));
 #endif
+void	in6_purgeaddr __P((struct ifaddr *, struct ifnet *));
 void	in6_savemkludge __P((struct in6_ifaddr *));
 void	in6_setmaxmtu   __P((void));
 void	in6_restoremkludge __P((struct in6_ifaddr *, struct ifnet *));
