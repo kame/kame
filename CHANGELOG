@@ -1,9 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2582 2004/04/02 11:16:18 suz Exp $
+$KAME: CHANGELOG,v 1.2583 2004/04/03 17:15:56 suz Exp $
 
 <200404>
 
 <200403>
+2004-04-04  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/freebsd5: makes it compilable.
+
 Fri Apr  2 17:35:45 JST 2004 sakane@kame.net
 	* kame/sys/netkey/key.c:
 	fixed that a memory leak happend in the case that the compile
@@ -16,14 +19,10 @@ Fri Apr  2 16:27:00 JST 2004 sakane@kame.net
 	when the debug option was used.
 
 2004-04-02  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
-	* netbsd/sys/netinet/udp_usrreq.c
-	code cleanup: uses a per-socket/interface MSF-check function
-	implemented at Feb 6 2004.
-
-	* {freebsd4,netbsd}/sys/netinet/udp_usrreq.c,
-	  kame/sys/netinet/in_msf.[ch]
-	code cleanup: implemented a per-socket/interface MSF-check 
-	function for IPv4, like the above one
+	* *bsd*/sys/netinet/udp_usrreq.c, kame/sys/netinet/in_msf.[ch]
+	code cleanup: uses a per-socket/interface MSF-check 
+	function for IPv4 and IPv6 (essentially same as my patch committed 
+	on Feb 6 2004)
 
 2004-04-02  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* freebsd[45]/sys/netinet/igmp.c
