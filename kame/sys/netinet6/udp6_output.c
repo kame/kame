@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.64 2002/08/26 12:44:43 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.65 2002/08/30 22:26:56 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -180,8 +180,10 @@ udp6_output(in6p, m, addr6, control)
 #endif
 	int flags = 0;
 	struct sockaddr_in6 tmp;
-#if defined(__OpenBSD__) || defined(__bsdi__)
+#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION < 199802)
 	struct proc *p = curproc;	/* XXX */
+#elif defined(__bsdi__) && _BSDI_VERSION >= 199802
+	struct proc *p = PCPU(curproc);
 #endif
 
 	priv = 0;
