@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.71 2000/07/11 02:31:15 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.72 2000/07/11 03:34:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -538,9 +538,6 @@ nd6_timer(ignored_arg)
 				nd6_free(rt);
 			}
 			break;
-		case ND6_LLINFO_WAITDELETE:
-			nd6_free(rt);
-			break;
 		}
 		ln = next;
 	}
@@ -683,6 +680,7 @@ nd6_purge(ifp)
 	/*
 	 * Neighbor cache entry for interface route will be retained
 	 * with ND6_LLINFO_WAITDELETE state, by nd6_free().  Nuke it.
+	 * XXX: can it still happen? (20000711) 
 	 */
 	ln = llinfo_nd6.ln_next;
 	while (ln && ln != &llinfo_nd6) {
@@ -1074,8 +1072,7 @@ nd6_resolve(ifp, rt, m, dst, desten)
 	 * XXX Does the code conform to rate-limiting rule?
 	 * (RFC 2461 7.2.2)
 	 */
-	if (ln->ln_state == ND6_LLINFO_WAITDELETE ||
-	    ln->ln_state == ND6_LLINFO_NOSTATE)
+	if (ln->ln_state == ND6_LLINFO_NOSTATE)
 		ln->ln_state = ND6_LLINFO_INCOMPLETE;
 	if (ln->ln_hold)
 		m_freem(ln->ln_hold);
@@ -2067,8 +2064,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	 * XXX Does the code conform to rate-limiting rule?
 	 * (RFC 2461 7.2.2)
 	 */
-	if (ln->ln_state == ND6_LLINFO_WAITDELETE ||
-	    ln->ln_state == ND6_LLINFO_NOSTATE)
+	if (ln->ln_state == ND6_LLINFO_NOSTATE)
 		ln->ln_state = ND6_LLINFO_INCOMPLETE;
 	if (ln->ln_hold)
 		m_freem(ln->ln_hold);

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.20 2000/06/13 02:38:11 jinmei Exp $	*/
+/*	$KAME: mip6_md.c,v 1.21 2000/07/11 03:34:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -1109,7 +1109,6 @@ mip6_probe_defrouter(struct nd_defrouter *dr)
 	ln = (struct llinfo_nd6 *)rt->rt_llinfo;
 	if ((ln->ln_state == ND6_LLINFO_INCOMPLETE)
 	    || (ln->ln_state == ND6_LLINFO_PROBE)
-	    || (ln->ln_state == ND6_LLINFO_WAITDELETE)
 	    || (ln->ln_state == ND6_LLINFO_NOSTATE))
 		return;
 
