@@ -70,8 +70,6 @@ struct full_tcpiphdr {
 #define	ti_sum		ti_t.th_sum
 #define	ti_urp		ti_t.th_urp
 
-#endif
-
 #ifndef INET6
 /*
  * Same for templates.
@@ -155,4 +153,6 @@ struct tcptemp {
 #define	tt_len6		tt_i6.ip6_plen
 #define tt_src6		tt_i6.ip6_src
 #define tt_dst6		tt_i6.ip6_dst
+#endif
+
 #endif
