@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.2 2000/07/15 07:14:38 kris Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.15 2000/08/05 13:06:03 sumikawa Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.16 2000/08/05 18:10:05 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,6 +103,7 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
+#include <netinet6/ipsec6.h>
 #endif /*IPSEC*/
 
 #include "faith.h"
@@ -163,7 +164,7 @@ udp6_input(mp, offp, proto)
 	ip6 = mtod(m, struct ip6_hdr *);
 
 #if defined(NFAITH) && 0 < NFAITH
-	if (faithprefix(&ip6->ip6_dst) {
+	if (faithprefix(&ip6->ip6_dst)) {
 		/* XXX send icmp6 host/port unreach? */
 		m_freem(m);
 		return IPPROTO_DONE;
