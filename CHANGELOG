@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1527 2001/02/04 05:30:05 jinmei Exp $
+$KAME: CHANGELOG,v 1.1528 2001/02/04 05:32:25 jinmei Exp $
 
 <200102>
+2001-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd/rtadvd.c (main): the -R (router renumbering)
+	option is currently ignored (with a warning message).  We will
+	re-enable the option after clarifying the address/prefix
+	manipulation in the kernel, and implementing missing stuff within
+	rtadvd (hopefully soon).
+
 2001-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/prefix/prefix.sh (prefix): added as a tiny replacement
 	of original prefix(8), based on recent clarification on the kernel
