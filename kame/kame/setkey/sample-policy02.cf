@@ -6,33 +6,33 @@ spdflush;
 # connection to 9999 encrypted, reverse no encrypted.
 spdadd ::1 ::1[9999] tcp
 	-P out ipsec
-	esp/transport/::1-::1/unique:2 ;
+	esp/transport//unique:2 ;
 
 # Session encrypted.  Inbound policy check takes place non-strictly.
 spdadd ::1 ::1[9998] tcp
 	-P out ipsec
-	esp/transport/::1-::1/unique:1 ;
+	esp/transport//unique:1 ;
 spdadd ::1[9998] ::1 tcp
 	-P in ipsec
-	esp/transport/::1-::1/unique:2 ;
+	esp/transport//unique:2 ;
 spdadd ::1[9998] ::1 tcp
 	-P out ipsec
-	esp/transport/::1-::1/unique:1 ;
+	esp/transport//unique:1 ;
 
 # Cause new SA to be acquired.
 spdadd ::1 ::1[9997] tcp
 	-P out ipsec
-	esp/transport/::1-::1/unique ;
+	esp/transport//unique ;
 
 # Used proper SA.
 spdadd ::1 ::1[9996] tcp
 	-P out ipsec
-	esp/transport/::1-::1/require ;
+	esp/transport//require ;
 
 # reqid will be updated by kernel.
 spdadd ::1 ::1[9995] tcp
 	-P out ipsec
-	esp/transport/::1-::1/unique:28000 ;
+	esp/transport//unique:28000 ;
 
 flush;
 add ::1 ::1 esp 0x1001
