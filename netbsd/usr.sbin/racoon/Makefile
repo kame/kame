@@ -1,4 +1,4 @@
-.if exists(/usr/pkg/lib/libcrypto.a)
+.if exists(/usr/pkg/lib/libcrypto.a) || exists(/usr/pkg/lib/libcrypto.so)
 SUBDIR+=racoon kmpstat eaytest
 .else
 SUBDIR=
