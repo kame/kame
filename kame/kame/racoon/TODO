@@ -1,4 +1,4 @@
-$Id: TODO,v 1.8 2000/04/29 20:11:20 sakane Exp $
+$Id: TODO,v 1.9 2000/07/04 17:01:21 sakane Exp $
 
 Sorry that `racoon' is not stable yet.  But she can exchange the key
 in limited environment.  Try to run with racoon.conf in the case
@@ -22,11 +22,10 @@ o Support scoped (link-local and site-local) IPv6 addresses.
   related mods in racoon itself.
 o kmstat should be improved.
 o aggressive mode DH group checks/handling on responder side.
+o Informational Exchange processing properly.
 
 SHOULD
 o To be supported bytes lifetimes for ISAKMP-SA.
-o Sending and to receive and process Delete payload of Informational Exchange.
-o Informational Exchange processing properly.
 o fix flag for logging
 o more acceptable check.
 o New group mode should be considered.
@@ -64,8 +63,6 @@ o fix the structure of ph2handle.
                             A=C
 
 o mandatory configuration check.
-o when either internal error and outernal error occur, to be consider to
-  delete each handler.
 o consistency of function name.
 o deep copy configuration entry to hander.  It's easy to reload configuration.
 o don't keep to hold keymat values, do it ?
