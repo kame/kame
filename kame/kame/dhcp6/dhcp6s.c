@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.128 2004/06/17 06:41:38 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.129 2004/06/17 13:11:28 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -75,6 +75,10 @@
 
 #define DUID_FILE "/etc/dhcp6s_duid"
 #define DHCP6S_CONF "/usr/local/v6/etc/dhcp6s.conf"
+#define MD5_DIGESTLENGTH 16
+#define DEFAULT_KEYFILE "/etc/dhcp6sctlkey"
+
+#define CTLSKEW 300
 
 typedef enum { DHCP6_BINDING_IA } dhcp6_bindingtype_t;
 
@@ -123,8 +127,7 @@ int insock;			/* inbound UDP port */
 int outsock;			/* outbound UDP port */
 int ctlsock = -1;		/* control TCP port */
 char *ctladdr = DEFAULT_CONTROL_ADDR;
-/*char *ctlport = DEFAULT_CONTROL_PORT;*/
-char *ctlport = "none";	/* disable by default until implementing auth */
+char *ctlport = DEFAULT_CONTROL_PORT;
 
 static const struct sockaddr_in6 *sa6_any_downstream, *sa6_any_relay;
 static struct msghdr rmh;
@@ -134,12 +137,16 @@ static char *conffile = DHCP6S_CONF;
 static char *rmsgctlbuf;
 static struct duid server_duid;
 static struct dhcp6_list arg_dnslist;
+static char *ctlkeyfile = DEFAULT_KEYFILE;
+static struct keyinfo *ctlkey = NULL;
+static int ctldigestlen;
 
 static inline int get_val32 __P((char **, int *, u_int32_t *));
 static inline int get_val __P((char **, int *, void *, size_t));
 
 static void usage __P((void));
 static void server6_init __P((void));
+static int ctlauthinit __P((void));
 static void server6_mainloop __P((void));
 static int server6_do_command __P((char *, ssize_t));
 static void server6_reload __P((void));
@@ -217,7 +224,7 @@ main(argc, argv)
 	TAILQ_INIT(&ntplist);
 
 	srandom(time(NULL) & getpid());
-	while ((ch = getopt(argc, argv, "c:dDfn:p:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:dDfk:n:p:")) != -1) {
 		switch (ch) {
 		case 'c':
 			conffile = optarg;
@@ -230,6 +237,9 @@ main(argc, argv)
 			break;
 		case 'f':
 			foreground++;
+			break;
+		case 'k':
+			ctlkeyfile = optarg;
 			break;
 		case 'n':
 			warnx("-n dnsserv option was obsoleted.  "
@@ -299,7 +309,8 @@ static void
 usage()
 {
 	fprintf(stderr,
-		"usage: dhcp6s [-c configfile] [-dDf] [-p ctlport] intface\n");
+	    "usage: dhcp6s [-c configfile] [-dDf] [-k ctlkeyfile] "
+	    "[-p ctlport] intface\n");
 	exit(0);
 }
 
@@ -330,6 +341,12 @@ server6_init()
 	if (get_duid(DUID_FILE, &server_duid)) {
 		dprintf(LOG_ERR, FNAME, "failed to get a DUID");
 		exit(1);
+	}
+
+	if (ctlauthinit() != 0) {
+		dprintf(LOG_NOTICE, FNAME,
+		    "failed initialize control message authentication");
+		/* run the server anyway */
 	}
 
 	/* initialize send/receive buffer */
@@ -505,7 +522,7 @@ server6_init()
 	freeaddrinfo(res);
 
 	/* open control socket */
-	if (strcmp(ctlport, "none") == 0) {
+	if (ctlkey == NULL) {
 		dprintf(LOG_NOTICE, FNAME, "skip opening control port");
 		return;
 	}
@@ -550,6 +567,58 @@ server6_init()
 		    "failed to initialize control channel");
 		exit(1);
 	}
+}
+
+static int
+ctlauthinit()
+{
+	FILE *fp = NULL;
+	char line[1024], secret[1024];
+	int secretlen;
+
+	/* Currently, we only support HMAC-MD5 for authentication. */
+	ctldigestlen = MD5_DIGESTLENGTH;
+
+	if ((fp = fopen(ctlkeyfile, "r")) == NULL) {
+		dprintf(LOG_ERR, FNAME, "failed to open %s: %s",
+		    ctlkeyfile, strerror(errno));
+		return (-1);
+	}
+	if (fgets(line, sizeof(line), fp) == NULL && ferror(fp)) {
+		dprintf(LOG_ERR, FNAME, "failed to read key file: %s",
+		    strerror(errno));
+		goto fail;
+	}
+	if ((secretlen = base64_decodestring(line, secret, sizeof(secret)))
+	    < 0) {
+		dprintf(LOG_ERR, FNAME, "failed to decode base64 string");
+		goto fail;
+	}
+	if ((ctlkey = malloc(sizeof(*ctlkey))) == NULL) {
+		dprintf(LOG_WARNING, FNAME, "failed to allocate control key");
+		return (-1);
+	}
+	memset(ctlkey, 0, sizeof(*ctlkey));
+	if ((ctlkey->secret = malloc(secretlen)) == NULL) {
+		dprintf(LOG_WARNING, FNAME, "failed to allocate secret key");
+		goto fail;
+	}
+	ctlkey->secretlen = (size_t)secretlen;
+	memcpy(ctlkey->secret, secret, secretlen);
+
+	fclose(fp);
+
+	return (0);
+
+  fail:
+	if (fp != NULL)
+		fclose(fp);
+	if (ctlkey->secret != NULL)
+		free(ctlkey->secret);
+	if (ctlkey != NULL)
+		free(ctlkey);
+	ctlkey = NULL;
+	return (-1);
 }
 
 static void
@@ -648,22 +717,49 @@ server6_do_command(buf, len)
 	struct dhcp6ctl *ctlhead;
 	struct dhcp6ctl_iaspec iaspec;
 	u_int16_t command, version;
-	u_int32_t p32, iaid, duidlen;
+	u_int32_t p32, iaid, duidlen, ts, ts0;
 	struct duid duid;
 	struct dhcp6_binding *binding;
 	int commandlen;
 	char *bp;
+	time_t now;
 
 	ctlhead = (struct dhcp6ctl *)buf;
 
 	command = ntohs(ctlhead->command);
 	commandlen = (int)(ntohs(ctlhead->len));
 	version = ntohs(ctlhead->version);
-	if (len != commandlen + sizeof(struct dhcp6ctl)) {
+	if (len != sizeof(struct dhcp6ctl) + commandlen) {
 		dprintf(LOG_ERR, FNAME,
 		    "assumption failure: command length mismatch");
 		return (DHCP6CTL_R_FAILURE);
 	}
+
+	/* replay protection and message authentication */
+	if ((now = time(NULL)) < 0) {
+		dprintf(LOG_ERR, FNAME, "failed to get current time: %s",
+		    strerror(errno));
+		return (DHCP6CTL_R_FAILURE);
+	}
+	ts0 = (u_int32_t)now;
+	ts = ntohl(ctlhead->timestamp);
+	if (ts + CTLSKEW < ts0 || (ts - CTLSKEW) > ts0) {
+		dprintf(LOG_INFO, FNAME, "timestamp is out of range");
+		return (DHCP6CTL_R_FAILURE);
+	}
+
+	if (ctlkey == NULL) {	/* should not happen!! */
+		dprintf(LOG_ERR, FNAME, "no secret key for control channel");
+		return (DHCP6CTL_R_FAILURE);
+	}
+	if (dhcp6_verify_mac(buf, len, DHCP6CTL_AUTHPROTO_UNDEF,
+	    DHCP6CTL_AUTHALG_HMACMD5, sizeof(*ctlhead), ctlkey) != 0) {
+		dprintf(LOG_INFO, FNAME, "authentication failure");
+		return (DHCP6CTL_R_FAILURE);
+	}
+
+	bp = buf + sizeof(*ctlhead) + ctldigestlen;
+	commandlen -= ctldigestlen;
 
 	if (version > DHCP6CTL_VERSION) {
 		dprintf(LOG_INFO, FNAME, "unsupported version: %d", version);
@@ -680,8 +776,6 @@ server6_do_command(buf, len)
 		server6_reload();
 		break;
 	case DHCP6CTL_COMMAND_REMOVE:
-		bp = buf + sizeof(*ctlhead);
-
 		if (get_val32(&bp, &commandlen, &p32))
 			return (DHCP6CTL_R_FAILURE);
 		if (p32 != DHCP6CTL_BINDING) {

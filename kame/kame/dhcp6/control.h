@@ -1,4 +1,4 @@
-/*	$KAME: control.h,v 1.4 2004/06/17 06:23:39 jinmei Exp $	*/
+/*	$KAME: control.h,v 1.5 2004/06/17 13:11:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -44,6 +44,13 @@
 #define DHCP6CTL_IA_PD 1
 
 /*
+ * Hash protocol/algorithm types.  Use same values for DHCPv6 protocol
+ * authentication for code sharing.
+ */
+enum { DHCP6CTL_AUTHPROTO_UNDEF = -1 };
+enum { DHCP6CTL_AUTHALG_UNDEF = -1, DHCP6CTL_AUTHALG_HMACMD5 = 1 };
+
+/*
  * Packet formats of command protocol
  */
 struct dhcp6ctl {
@@ -51,6 +58,7 @@ struct dhcp6ctl {
 	u_int16_t len;
 	u_int16_t version;
 	u_int16_t reserved;
+	u_int32_t timestamp;
 } __attribute__ ((__packed__));
 
 struct dhcp6ctl_iaspec {

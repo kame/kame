@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6sctl.c,v 1.6 2004/06/17 06:23:40 jinmei Exp $	*/
+/*	$KAME: dhcp6sctl.c,v 1.7 2004/06/17 13:11:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -30,6 +30,16 @@
  */
 #include <sys/types.h>
 #include <sys/socket.h>
+#if TIME_WITH_SYS_TIME
+# include <sys/time.h>
+# include <time.h>
+#else
+# if HAVE_SYS_TIME_H
+#  include <sys/time.h>
+# else
+#  include <time.h>
+# endif
+#endif
 
 #include <netinet/in.h>
 
@@ -40,6 +50,11 @@
 #include <err.h>
 
 #include <control.h>
+#include <auth.h>
+#include <base64.h>
+
+#define MD5_DIGESTLENGTH 16
+#define DEFAULT_KEYFILE "/etc/dhcp6sctlkey"
 
 static char *ctladdr = DEFAULT_CONTROL_ADDR;
 static char *ctlport = DEFAULT_CONTROL_PORT;
@@ -48,7 +63,9 @@ static inline int put16 __P((char **, int *, u_int16_t));
 static inline int put32 __P((char **, int *, u_int32_t));
 static inline int putval __P((char **, int *, void *, size_t));
 
-static int make_command __P((int, char **, char **, size_t *));
+static int setup_auth __P((char *, struct keyinfo *, int *));
+static int make_command __P((int, char **, char **, size_t *,
+    struct keyinfo *, int));
 static int make_remove_command __P((int, char **, char **, int *));
 static int make_binding_object __P((int, char **, char **, int *));
 static int make_ia_object __P((int, char **, char **, int *));
@@ -64,9 +81,15 @@ main(argc, argv)
 	char *cbuf;
 	size_t clen;
 	struct addrinfo hints, *res0, *res;
+	int digestlen;
+	char *keyfile = DEFAULT_KEYFILE;
+	struct keyinfo key;
 
-	while ((ch = getopt(argc, argv, "p:s:")) != -1) {
+	while ((ch = getopt(argc, argv, "k:p:s:")) != -1) {
 		switch (ch) {
+		case 'k':
+			keyfile = optarg;
+			break;
 		case 'p':
 			ctlport = optarg;
 			break;
@@ -79,9 +102,16 @@ main(argc, argv)
 	}
 	argc -= optind;
 	argv += optind;
-	
-	if ((passed = make_command(argc, argv, &cbuf, &clen)) < 0)
+
+	memset(&key, 0, sizeof(key));
+	digestlen = 0;
+	if (setup_auth(keyfile, &key, &digestlen) != 0)
+		errx(1, "failed to setup message authentication");
+
+	if ((passed = make_command(argc, argv, &cbuf, &clen,
+	    &key, digestlen)) < 0) {
 		errx(1, "failed to make command buffer");
+	}
 	argc -= passed;
 	argv += passed;
 	if (argc != 0)
@@ -124,6 +154,53 @@ main(argc, argv)
 	free(cbuf);
 
 	exit(0);
+}
+
+static int
+setup_auth(keyfile, key, digestlenp)
+	char *keyfile;
+	struct keyinfo *key;
+	int *digestlenp;
+{
+	FILE *fp = NULL;
+	char line[1024], secret[1024];
+	int secretlen;
+
+	key->secret = NULL;
+
+	/* Currently, we only support HMAC-MD5 for authentication. */
+	*digestlenp = MD5_DIGESTLENGTH;
+
+	if ((fp = fopen(keyfile, "r")) == NULL) {
+		warn("fopen: %s", keyfile);
+		return (-1);
+	}
+	if (fgets(line, sizeof(line), fp) == NULL && ferror(fp)) {
+		warn("fgets failed");
+		goto fail;
+	}
+	if ((secretlen = base64_decodestring(line, secret, sizeof(secret)))
+	    < 0) {
+		warnx("failed to decode base64 string");
+		goto fail;
+	}
+	if ((key->secret = malloc(secretlen)) == NULL) {
+		warn("setup_auth: malloc failed");
+		goto fail;
+	}
+	key->secretlen = (size_t)secretlen;
+	memcpy(key->secret, secret, secretlen);
+
+	fclose(fp);
+
+	return (0);
+
+  fail:
+	if (fp != NULL)
+		fclose(fp);
+	if (key->secret != NULL)
+		free(key->secret);
+	return (-1);
 }
 
 static inline int
@@ -196,24 +273,31 @@ putval(bpp, lenp, val, valsize)
 }
 
 static int
-make_command(argc, argv, bufp, lenp)
+make_command(argc, argv, bufp, lenp, key, authlen)
 	int argc;
 	char **argv, **bufp;
 	size_t *lenp;
+	struct keyinfo *key;
+	int authlen;
 {
 	struct dhcp6ctl ctl;
 	char commandbuf[4096];	/* XXX: ad-hoc value */
-	char *bp, *buf;
+	char *bp, *buf, *mac;
 	int buflen, len, duidlen;
 	int argc_passed = 0, passed;
 	u_int32_t p32;
+	time_t now;
 
 	if (argc == 0) {
 		warnx("command is too short");
 		return (-1);
 	}
 
-	bp = commandbuf + sizeof(ctl);
+	bp = commandbuf + sizeof(ctl) + authlen;
+	if (bp >= commandbuf + sizeof(commandbuf)) {
+		warnx("make_command: local buffer is too short");
+		return (-1);
+	}
 	buflen = sizeof(commandbuf) - sizeof(ctl);
 
 	memset(&ctl, 0, sizeof(ctl));
@@ -235,7 +319,22 @@ make_command(argc, argv, bufp, lenp)
 
 	len = bp - commandbuf;
 	ctl.len = htons(len - sizeof(ctl));
+
+	if ((now = time(NULL)) < 0) {
+		warn("failed to get current time");
+		return (-1);
+	}
+	ctl.timestamp = htonl((u_int32_t)now);
+
 	memcpy(commandbuf, &ctl, sizeof(ctl));
+
+	mac = commandbuf + sizeof(ctl);
+	memset(mac, 0, authlen);
+	if (dhcp6_calc_mac(commandbuf, len, DHCP6CTL_AUTHPROTO_UNDEF,
+	    DHCP6CTL_AUTHALG_HMACMD5, sizeof(ctl), key) != 0) {
+		warnx("failed to calculate MAC");
+		return (-1);
+	}
 
 	if ((buf = malloc(len)) == NULL) {
 		warn("memory allocation failed");
@@ -348,7 +447,7 @@ make_ia_object(argc, argv, bpp, lenp)
 		return (-1);
 	}
 
-	iaspec.id = htonl((u_int32_t)atoi(argv[1]));
+	iaspec.id = htonl((u_int32_t)strtol(argv[1], NULL, 10));
 
 	if (parse_duid(argv[2], &duidlen, &dummy, &dummylen))
 		goto fail;
@@ -431,8 +530,8 @@ parse_duid(str, lenp, bufp, buflenp)
 static void
 usage()
 {
-	fprintf(stderr, "usage: dhcp6sctl [-p port] [-s server_address] "
-	    "commands...\n");
+	fprintf(stderr, "usage: dhcp6sctl [-k keyfile] [-p port] "
+	    "[-s server_address] commands...\n");
 
 	exit(1);
 }
