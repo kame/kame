@@ -87,6 +87,25 @@
 
 #ifdef __FreeBSD__
 #define splsoftnet()	splnet()
+PSEUDO_SET(pfattach, pf);
+
+#define CDEV_MAJOR 200
+static struct cdevsw pf_cdevsw = {
+	/* open */	pfopen,
+	/* close */	pfclose,
+	/* read */	noread,
+	/* write */	nowrite,
+	/* ioctl */	tunioctl,
+	/* poll */	nopoll,
+	/* mmap */	nommap,
+	/* strategy */	nostrategy,
+	/* name */	"pf",
+	/* maj */	CDEV_MAJOR,
+	/* dump */	nodump,
+	/* psize */	nopsize,
+	/* flags */	0,
+	/* bmaj */	-1
+};
 #endif
 
 void			 pfattach(int);
@@ -183,6 +202,10 @@ pfattach(int num)
 
 	pf_normalize_init();
 	pf_status.debug = PF_DEBUG_URGENT;
+
+#ifdef __FreeBSD__
+	cdevsw_add(&pf_cdevsw);
+#endif
 }
 
 int

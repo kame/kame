@@ -124,6 +124,7 @@
 #define splsoftnet()	splnet()
 #define UID_MAX	-1
 #define GID_MAX	-1
+#define ip_mtudisc	0
 
 MALLOC_DEFINE(M_PF, "pf", "PF packet filter");
 #endif
