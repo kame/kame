@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.887 2000/05/17 05:11:33 jinmei Exp $
+$Id: CHANGELOG,v 1.888 2000/05/17 09:06:45 itojun Exp $
 
 <200005>
 2000-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -39,9 +39,10 @@ Tue May 16 23:05:56 JST 2000  itojun@iijlab.net
 	* kame/route6d/route6d.c: correct interface address handling
 	  for global address on p2p interface.  there seem to be two major
 	  models in this arena: cisco (use addr/plen) and gated (advert
-	  dest/128 only, not addr/128).  the code supports both behavior,
-	  switchable at compilation time.  we may need to revisit the code
-	  later.  Comments from suz on p2p routing model.
+	  dest/128 and addr/128).  the code supports both behavior,
+	  switchable at compilation time.  default behavior is "gated".
+	  we may need to revisit the code later.  Comments from suz on p2p
+	  routing model.
 
 Tue May 16 09:44:50 JST 2000  itojun@iijlab.net
 	* netbsd/usr.bin/ftp/fetch.c: parse RFC2372 ftp URL correctly.
