@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.248 2002/01/11 06:15:02 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.249 2002/01/11 08:36:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -946,6 +946,7 @@ ip6_input(m)
 #ifdef RTF_CLONED
 	    !(ip6_forward_rt.ro_rt->rt_flags & RTF_CLONED) &&
 #endif
+	    !(ip6_forward_rt.ro_rt->rt_flags & (RTF_REJECT|RTF_BLACKHOLE)) &&
 #if 0
 	    /*
 	     * The check below is redundant since the comparison of
