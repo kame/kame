@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.200 2001/03/30 19:58:42 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.201 2001/04/04 11:12:31 jinmei Exp $
 
 1. IPv6
 
@@ -554,11 +554,11 @@ later are not considered at all.
      Otherwise, and if tmp(samescope(D)) is not empty, 
      then choose an address that is on the interface I.  If every
      address is on I, or every address is on a different interface
-     from I, choose arbitrary one provided that an address longest
+     from I, choose an arbitrary one provided that an address longest
      matching against D is always preferred.
   2. If tmp(largerscope(D)) is not empty,
      then choose an address that has the smallest scope. If more than one
-     address has the smallest scope, choose arbitrary one provided
+     address has the smallest scope, choose an arbitrary one provided
      that addresses on I are always preferred.
   3. If nonDEP(samescope(D)) is not empty,
      then apply the same logic as of 1.
@@ -568,11 +568,11 @@ later are not considered at all.
      Otherwise, and if tmp(DEP(samescope(D))) is not empty,
      then choose an address that is on the interface I.  If every
      address is on I, or every address is on a different interface
-     from I, choose arbitrary one provided that an address longest
+     from I, choose an arbitrary one provided that an address longest
      matching against D is always preferred.
   6. If tmp(DEP(largerscope(D))) is not empty,
      then choose an address that has the smallest scope. If more than
-     one address has the smallest scope, choose arbitrary one provided
+     one address has the smallest scope, choose an arbitrary one provided
      that an address on I is always preferred.
   7. If DEP(samescope(D)) is not empty,
      then apply the same logic as of 5.
@@ -581,11 +581,11 @@ later are not considered at all.
   9. If we do not prefer temporary addresses, go to 11.
      Otherwise, and if tmp(nonDEP(smallerscope(D))) is not empty,
      then choose an address that has the largest scope. If more than
-     one address has the largest scope, choose arbitrary one provided
+     one address has the largest scope, choose an arbitrary one provided
      that an address on I is always preferred.
  10. If tmp(DEP(smallerscope(D))) is not empty,
      then choose an address that has the largest scope. If more than
-     one address has the largest scope, choose arbitrary one provided
+     one address has the largest scope, choose an arbitrary one provided
      that an address on I is always preferred.
  11. If nonDEP(smallerscope(D)) is not empty,
      then apply the same logic as of 9.
