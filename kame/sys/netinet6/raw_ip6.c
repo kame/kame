@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.135 2003/02/07 09:34:40 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.136 2003/02/07 10:19:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -241,7 +241,7 @@ rip6_input(mp, offp, proto)
 		    in6p->in6p_ip6.ip6_nxt != proto)
 			continue;
 		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa) &&
-		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
+		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &dst))
 			continue;
 		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa) &&
 		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, &src))

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.18 2003/02/07 09:34:37 jinmei Exp $	*/
+/*	$KAME: sctp_output.c,v 1.19 2003/02/07 10:16:40 jinmei Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c, v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -3005,7 +3005,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 			stc.local_scope = 0;
 			stc.site_scope = 1;
 			/* pull out the scope_id from the incoming packet */
-			if (ip6_getpktaddrs(in_initpkt, src, NULL)) {
+			if (ip6_getpktaddrs(in_initpkt, &src, NULL)) {
 				/* hmm... this is bad- can't get the scope! */
 #ifdef SCTP_DEBUG
 				if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
