@@ -221,10 +221,13 @@ looutput(ifp, m, dst, rt)
 	 */
 	if (m && m->m_next != NULL) {
 		struct mbuf *n;
+		int maxlen;
 
 		MGETHDR(n, M_DONTWAIT, MT_HEADER);
-		if (n) {
+		maxlen = MHLEN;
+		if (n && m->m_pkthdr.len > maxlen) {
 			MCLGET(n, M_DONTWAIT);
+			maxlen = MCLBYTES;
 			if ((n->m_flags & M_EXT) == 0) {
 				m_free(n);
 				n = NULL;
@@ -238,14 +241,15 @@ looutput(ifp, m, dst, rt)
 
 		n->m_pkthdr.rcvif = m->m_pkthdr.rcvif;
 		n->m_pkthdr.len = m->m_pkthdr.len;
-		if (m->m_pkthdr.len <= MCLBYTES) {
+		if (m->m_pkthdr.len <= maxlen) {
 			m_copydata(m, 0, m->m_pkthdr.len, mtod(n, caddr_t));
 			n->m_len = m->m_pkthdr.len;
+			n->m_next = NULL;
 			m_freem(m);
 		} else {
-			m_copydata(m, 0, MCLBYTES, mtod(n, caddr_t));
-			m_adj(m, MCLBYTES);
-			n->m_len = MCLBYTES;
+			m_copydata(m, 0, maxlen, mtod(n, caddr_t));
+			m_adj(m, maxlen);
+			n->m_len = maxlen;
 			n->m_next = m;
 			m->m_flags &= ~M_PKTHDR;
 		}
