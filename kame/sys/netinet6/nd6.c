@@ -772,6 +772,7 @@ nd6_nud_hint(rt, dst6)
 			nd_ifinfo[rt->rt_ifp->if_index].reachable;
 }
 
+#ifdef OLDIP6OUTPUT
 /*
  * Resolve an IP6 address into an ethernet address. If success,
  * desten is filled in. If there is no entry in ndptab,
@@ -863,6 +864,7 @@ nd6_resolve(ifp, rt, m, dst, desten)
 	}
 	return(0);
 }
+#endif /* OLDIP6OUTPUT */
 
 void
 #if defined(__bsdi__) && __bsdi__ >= 4
@@ -1543,8 +1545,6 @@ nd6_slowtimo(ignored_arg)
 	splx(s);
 }
 
-#ifdef NEWIP6OUTPUT
-/* for experimental */
 #define senderr(e) { error = (e); goto bad;}
 int
 nd6_output(ifp, m0, dst, rt0)
@@ -1729,4 +1729,3 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 
 	return(1);
 }
-#endif /* NEWIP6OUTPUT */

@@ -853,11 +853,11 @@ skip_ipsec2:;
 #endif
 	    )
 	{
-#ifdef NEWIP6OUTPUT
-		error = nd6_output(ifp, m, dst, ro->ro_rt);
-#else
+#ifdef OLDIP6OUTPUT
 		error = (*ifp->if_output)(ifp, m, (struct sockaddr *)dst,
 					  ro->ro_rt);
+#else
+		error = nd6_output(ifp, m, dst, ro->ro_rt);
 #endif
 		goto done;
 	} else if (mtu < IPV6_MMTU) {
@@ -977,12 +977,12 @@ sendorfree:
 		m0 = m->m_nextpkt;
 		m->m_nextpkt = 0;
 		if (error == 0) {
-#ifdef NEWIP6OUTPUT
-			error = nd6_output(ifp, m, dst, ro->ro_rt);
-#else
+#ifdef OLDIP6OUTPUT
 			error = (*ifp->if_output)(ifp, m,
 						  (struct sockaddr *)dst,
 						  ro->ro_rt);
+#else
+			error = nd6_output(ifp, m, dst, ro->ro_rt);
 #endif
 		}
 		else
