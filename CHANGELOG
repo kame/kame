@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.256 1999/11/04 16:23:30 itojun Exp $
+$Id: CHANGELOG,v 1.257 1999/11/05 00:45:18 itojun Exp $
 
 <199911>
 Fri Nov  5 01:22:42 JST 1999  itojun@iijlab.net
@@ -24,8 +24,8 @@ Thu Nov  4 18:08:00 JST 1999  itojun@iijlab.net
 	  "ping6 fe80::1" (this is invalid since there's no scope identifier).
 
 Thu Nov  4 17:22:05 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
-	* netbsd/pkgsrc/net/pchar, freebsd[23]/ports/pchar: pathchar
-	reimplementation.
+	* netbsd/pkgsrc/net/pchar, freebsd[23]/ports/pchar,
+	  openbsd/ports/net/pchar: pathchar reimplementation.
 
 Thu Nov  4 09:40:08 JST 1999 sakane@ydc.co.jp
 	* kame/sys/{netkey,netinet6}:
