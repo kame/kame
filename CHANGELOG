@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2359 2003/03/14 11:42:33 jinmei Exp $
+$KAME: CHANGELOG,v 1.2360 2003/03/19 08:21:09 keiichi Exp $
 
 <200303>
+Wed Mar 19 17:17:55 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/netinet6/icmp6.c
+	fixed a mbuf leak when generating an ICMPv6 redirect message.
+
 2003-03-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: C99 compliance; avoid using __func__ with
 	concatenating other strings since it is a const char variable.
