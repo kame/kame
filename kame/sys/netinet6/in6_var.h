@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.42 2000/09/06 15:03:36 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.43 2000/11/09 01:46:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -693,6 +693,8 @@ int	in6_prefix_ioctl __P((struct socket *so, u_long cmd, caddr_t data,
 int	in6_prefix_add_ifid __P((int iilen, struct in6_ifaddr *ia));
 void	in6_prefix_remove_ifid __P((int iilen, struct in6_ifaddr *ia));
 void	in6_purgeprefix __P((struct ifnet *));
+
+int	in6_is_addr_deprecated __P((struct sockaddr_in6 *));
 
 #ifdef MEASURE_PERFORMANCE
 void in6h_hashinit __P((void));

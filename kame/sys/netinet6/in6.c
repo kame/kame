@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.110 2000/11/05 16:53:46 onoe Exp $	*/
+/*	$KAME: in6.c,v 1.111 2000/11/09 01:46:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2047,6 +2047,27 @@ in6_localaddr(in6)
 			return 1;
 
 	return (0);
+}
+
+int
+in6_is_addr_deprecated(sa6)
+	struct sockaddr_in6 *sa6;
+{
+	struct in6_ifaddr *ia;
+
+	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
+		if (IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
+				       &sa6->sin6_addr) &&
+#ifdef SCOPEDROUTING
+		    ia->ia_addr.sin6_scope_id == sa6->sin6_scope_id &&
+#endif
+		    (ia->ia6_flags & IN6_IFF_DEPRECATED) != 0)
+			return(1); /* true */
+
+		/* XXX: do we still have to go thru the rest of the list? */
+	}
+
+	return(0);		/* false */
 }
 
 /*
