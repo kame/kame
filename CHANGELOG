@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1932 2001/10/23 12:44:03 jinmei Exp $
+$KAME: CHANGELOG,v 1.1933 2001/10/23 12:46:38 jinmei Exp $
 
 <200110>
+2001-10-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	added a per-gif timer to refresh a (possibly) stale cached route
+	towards the tunnel end.  Based on a comment from kato@wide.ad.jp.
+	* kame/sys/net/if_gif.h: added a new member "rtcache_expire" to
+	introduce per-gif timer (see below).
+	* kame/sys/netinet/in6_gif.c (in6_gif_output):
+	* kame/sys/netinet/in_gif.c (in_gif_output):
+	purged the cached route after in[6]_gif_rtcachetime seconds.
+
 2001-10-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_gif.c (in6_gif_output):
 	* kame/sys/netinet/in_gif.c (in_gif_output):
