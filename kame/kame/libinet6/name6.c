@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.14 2000/01/21 03:59:45 itojun Exp $ */
+/* $Id: name6.c,v 1.15 2000/03/13 12:29:43 itojun Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -8,6 +8,8 @@
  *	use mutex for _hostconf, _hostconf_init if HOSTCONF is defined.
  *	rewrite resolvers to be thread safe
  */
+
+#define FILTER_V4MAPPED
 
 #ifdef __KAME__
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -914,6 +916,12 @@ _files_ghbyname(const char *name, int af, int *errp)
 			*errp = NO_DATA;	/* name found */
 			continue;
 		}
+#ifdef FILTER_V4MAPPED
+		if (af == AF_INET6 &&
+		    IN6_IS_ADDR_V4MAPPED((struct in6_addr *)&addrbuf)) {
+			continue;
+		}
+#endif
 		hp = &hpbuf;
 		hp->h_name = cname;
 		hp->h_aliases = aliases;
@@ -1160,6 +1168,13 @@ _dns_ghbyname(const char *name, int af, int *errp)
 			bp = (char *)ALIGN(bp);
 			DNS_ASSERT(n == hbuf.h_length);
 			DNS_ASSERT(n < buflen);
+#ifdef FILTER_V4MAPPED
+			if (type == T_AAAA &&
+			    IN6_IS_ADDR_V4MAPPED((struct in6_addr *)bp)) {
+				cp += n;
+				break;
+			}
+#endif
 			if (nh < MAXADDRS-1) {
 				hlist[nh++] = bp;
 				memcpy(bp, cp, n);

@@ -76,6 +76,8 @@
  *	  friends.
  */
 
+#define FILTER_V4MAPPED
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -1169,6 +1171,13 @@ getanswer(answer, anslen, qname, qtype, pai)
 				cp += n;
 				continue;
 			}
+#ifdef FILTER_V4MAPPED
+			if (type == T_AAAA &&
+			    IN6_IS_ADDR_V4MAPPED((struct in6_addr *)cp)) {
+				cp += n;
+				continue;
+			}
+#endif
 			if (!haveanswer) {
 				int nn;
 
@@ -1353,6 +1362,14 @@ found:
 	error = getaddrinfo(addr, NULL, &hints, &res0);
 	if (error)
 		goto again;
+#ifdef FILTER_V4MAPPED
+	/* XXX should check all items in the chain */
+	if (res0->ai_family == AF_INET6 &&
+	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)res0->ai_addr)->sin6_addr)) {
+		freeaddrinfo(res0);
+		goto again;
+	}
+#endif
 	for (res = res0; res; res = res->ai_next) {
 		/* cover it up */
 		res->ai_flags = pai->ai_flags;
@@ -1456,6 +1473,14 @@ nextline:
 	hints.ai_flags = AI_NUMERICHOST;
 	error = getaddrinfo(addr, NULL, &hints, &res0);
 	if (error == 0) {
+#ifdef FILTER_V4MAPPED
+		/* XXX should check all items in the chain */
+		if (res0->ai_family == AF_INET6 &&
+		    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)res0->ai_addr)->sin6_addr)) {
+			freeaddrinfo(res0);
+			res0 = NULL;
+		}
+#endif
 		for (res = res0; res; res = res->ai_next) {
 			/* cover it up */
 			res->ai_flags = pai->ai_flags;
