@@ -26,9 +26,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.11 2000/02/09 05:18:06 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.12 2000/02/09 05:39:03 sakane Exp $ */
 
 #include <sys/types.h>
+#include <sys/param.h>
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <limits.h>
@@ -126,7 +128,7 @@ eay_get_x509cert(path)
 	fp = fopen (path, "r");
 	if (fp == NULL)
 		return NULL;
-#if (defined(SSLVER) && SSLVER >= 94)
+#if (defined(SSLVER) && SSLVER >= 0x0940)
 	x509 = PEM_read_X509(fp, NULL, NULL, NULL);
 #else
 	x509 = PEM_read_X509(fp, NULL, NULL);
@@ -268,7 +270,7 @@ eay_get_asn1privkey(path)
 	if (fp == NULL)
 		return NULL;
 
-#if (defined(SSLVER) && SSLVER >= 94)
+#if (defined(SSLVER) && SSLVER >= 0x0940)
 	evp = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
 #else
 	evp = PEM_read_PrivateKey(fp, NULL, NULL);
@@ -319,7 +321,7 @@ eay_get_asn1pubkey(path)
 	if (fp == NULL)
 		return NULL;
 
-#if (defined(SSLVER) && SSLVER >= 94)
+#if (defined(SSLVER) && SSLVER >= 0x0940)
 	x509 = PEM_read_X509(fp, NULL, NULL, NULL);
 #else
 	x509 = PEM_read_X509(fp, NULL, NULL);
