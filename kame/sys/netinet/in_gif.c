@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.73 2001/10/23 12:24:15 jinmei Exp $	*/
+/*	$KAME: in_gif.c,v 1.74 2001/10/23 12:42:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,6 +101,9 @@ static int gif_validate4 __P((const struct ip *, struct gif_softc *,
 int ip_gif_ttl = GIF_TTL;
 #else
 int ip_gif_ttl = 0;
+#endif
+#ifndef __OpenBSD__
+static int in_gif_rtcachetime = 300; /* XXX appropriate value? configurable? */
 #endif
 #ifdef __FreeBSD__
 SYSCTL_INT(_net_inet_ip, IPCTL_GIF_TTL, gifttl, CTLFLAG_RW,
@@ -226,7 +229,7 @@ in_gif_output(ifp, family, m)
 	    (caddr_t) &plen);
 
 	return ip_output(m, NULL, NULL, 0, NULL, NULL);
-#else
+#else  /* !OpenBSD */
 	struct gif_softc *sc = (struct gif_softc*)ifp;
 	struct sockaddr_in *dst = (struct sockaddr_in *)&sc->gif_ro.ro_dst;
 	struct sockaddr_in *sin_src = (struct sockaddr_in *)sc->gif_psrc;
@@ -234,6 +237,9 @@ in_gif_output(ifp, family, m)
 	struct ip iphdr;	/* capsule IP header, host byte ordered */
 	int proto, error;
 	u_int8_t tos;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second;
+#endif
 
 	if (sin_src == NULL || sin_dst == NULL ||
 	    sin_src->sin_family != AF_INET ||
@@ -315,9 +321,13 @@ in_gif_output(ifp, family, m)
 		return ENOBUFS;
 	bcopy(&iphdr, mtod(m, struct ip *), sizeof(struct ip));
 
-	if (dst->sin_family != sin_dst->sin_family ||
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	time_second = time.tv_sec;
+#endif
+	if (sc->rtcache_expire == 0 || time_second >= sc->rtcache_expire ||
+	    dst->sin_family != sin_dst->sin_family ||
 	    dst->sin_addr.s_addr != sin_dst->sin_addr.s_addr) {
-		/* cache route doesn't match */
+		/* cache route doesn't match or it has expired */
 		dst->sin_family = sin_dst->sin_family;
 		dst->sin_len = sizeof(struct sockaddr_in);
 		dst->sin_addr = sin_dst->sin_addr;
@@ -345,6 +355,8 @@ in_gif_output(ifp, family, m)
 			m_freem(m);
 			return ENETUNREACH;	/*XXX*/
 		}
+
+		sc->rtcache_expire = time_second + in_gif_rtcachetime;
 	}
 
 	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL);
