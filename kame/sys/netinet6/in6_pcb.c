@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.38 2000/03/11 13:49:03 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.39 2000/03/13 08:40:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -291,81 +291,6 @@ in6_pcbbind(in6p, nam)
 
 	in6p->in6p_flowinfo = sin6 ? sin6->sin6_flowinfo : 0;	/*XXX*/
 	return(0);
-}
-
-/*
- * Find an empty port and set it to the specified PCB.
- */
-int
-in6_pcbsetport(laddr, in6p)
-	struct in6_addr *laddr;
-	struct in6pcb *in6p;
-{
-	struct socket *so = in6p->in6p_socket;
-	struct in6pcb *head = in6p->in6p_head;
-	u_int16_t last_port, lport = 0;
-	int wild = 0;
-	void *t;
-	u_int16_t min, max;
-#ifdef __NetBSD__
-	struct proc *p = curproc;		/* XXX */
-#endif
-
-	/* XXX: this is redundant when called from in6_pcbbind */
-	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
-	   ((so->so_proto->pr_flags & PR_CONNREQUIRED) == 0 ||
-	    (so->so_options & SO_ACCEPTCONN) == 0))
-		wild = IN6PLOOKUP_WILDCARD;
-
-	if (in6p->in6p_flags & IN6P_LOWPORT) {
-#ifdef __NetBSD__
-		if (p == 0 || (suser(p->p_ucred, &p->p_acflag) != 0))
-			return (EACCES);
-#else
-		if ((so->so_state & SS_PRIV) == 0)
-			return (EACCES);
-#endif
-		min = IPV6PORT_RESERVEDMIN;
-		max = IPV6PORT_RESERVEDMAX;
-	} else {
-		min = IPV6PORT_ANONMIN;
-		max = IPV6PORT_ANONMAX;
-	}
-
-	/* value out of range */
-	if (head->in6p_lport < min)
-		head->in6p_lport = min;
-	else if (head->in6p_lport > max)
-		head->in6p_lport = min;
-	last_port = head->in6p_lport;
-	goto startover;	/*to randomize*/
-	for (;;) {
-		lport = htons(head->in6p_lport);
-		if (IN6_IS_ADDR_V4MAPPED(laddr)) {
-#if 0
-			t = in_pcblookup_bind(&tcbtable,
-					      (struct in_addr *)&in6p->in6p_laddr.s6_addr32[3],
-					      lport);
-#else
-			t = NULL;
-#endif
-		} else {
-			t = in6_pcblookup(head, &zeroin6_addr, 0, laddr,
-					  lport, wild);
-		}
-		if (t == 0)
-			break;
-	  startover:
-		if (head->in6p_lport >= max)
-			head->in6p_lport = min;
-		else
-			head->in6p_lport++;
-		if (head->in6p_lport == last_port)
-			return (EADDRINUSE);
-	}
-
-	in6p->in6p_lport = lport;
-	return(0);		/* success */
 }
 
 /*

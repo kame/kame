@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.6 2000/03/18 03:05:37 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.7 2000/03/22 16:02:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -390,4 +390,102 @@ in6_selecthlim(in6p, ifp)
 #ifdef HAVE_NRL_INPCB
 #undef in6pcb
 #undef in6p_hops
+#endif
+
+/*
+ * Find an empty port and set it to the specified PCB.
+ */
+#ifdef HAVE_NRL_INPCB	/* XXX: I really hate such ugly macros...(jinmei) */
+#define in6pcb		inpcb
+#define in6p_socket	inp_socket
+#define in6p_lport	inp_lport
+#define in6p_head	inp_head
+#define in6p_flags	inp_flags
+#define IN6PLOOKUP_WILDCARD INPLOOKUP_WILDCARD
+#endif
+int
+in6_pcbsetport(laddr, in6p)
+	struct in6_addr *laddr;
+	struct in6pcb *in6p;
+{
+	struct socket *so = in6p->in6p_socket;
+	struct in6pcb *head = in6p->in6p_head;
+	u_int16_t last_port, lport = 0;
+	int wild = 0;
+	void *t;
+	u_int16_t min, max;
+#ifdef __NetBSD__
+	struct proc *p = curproc;		/* XXX */
+#endif
+
+	/* XXX: this is redundant when called from in6_pcbbind */
+	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
+	   ((so->so_proto->pr_flags & PR_CONNREQUIRED) == 0 ||
+	    (so->so_options & SO_ACCEPTCONN) == 0))
+		wild = IN6PLOOKUP_WILDCARD;
+
+	if (in6p->in6p_flags & IN6P_LOWPORT) {
+#ifdef __NetBSD__
+		if (p == 0 || (suser(p->p_ucred, &p->p_acflag) != 0))
+			return (EACCES);
+#else
+		if ((so->so_state & SS_PRIV) == 0)
+			return (EACCES);
+#endif
+		min = IPV6PORT_RESERVEDMIN;
+		max = IPV6PORT_RESERVEDMAX;
+	} else {
+		min = IPV6PORT_ANONMIN;
+		max = IPV6PORT_ANONMAX;
+	}
+
+	/* value out of range */
+	if (head->in6p_lport < min)
+		head->in6p_lport = min;
+	else if (head->in6p_lport > max)
+		head->in6p_lport = min;
+	last_port = head->in6p_lport;
+	goto startover;	/*to randomize*/
+	for (;;) {
+		lport = htons(head->in6p_lport);
+		if (IN6_IS_ADDR_V4MAPPED(laddr)) {
+#if 0
+			t = in_pcblookup_bind(&tcbtable,
+					      (struct in_addr *)&in6p->in6p_laddr.s6_addr32[3],
+					      lport);
+#else
+			t = NULL;
+#endif
+		} else {
+#ifdef HAVE_NRL_INPCB
+			/* XXX: ugly cast... */
+			t = in_pcblookup(head, (struct in_addr *)&zeroin6_addr,
+					 0, (struct in_addr *)laddr,
+					 lport, wild | INPLOOKUP_IPV6);
+#else
+			t = in6_pcblookup(head, &zeroin6_addr, 0, laddr,
+					  lport, wild);
+#endif 
+		}
+		if (t == 0)
+			break;
+	  startover:
+		if (head->in6p_lport >= max)
+			head->in6p_lport = min;
+		else
+			head->in6p_lport++;
+		if (head->in6p_lport == last_port)
+			return (EADDRINUSE);
+	}
+
+	in6p->in6p_lport = lport;
+	return(0);		/* success */
+}
+#ifdef HAVE_NRL_INPCB
+#undef in6pcb
+#undef in6p_socket
+#undef in6p_lport
+#undef in6p_head
+#undef in6p_flags
+#undef IN6PLOOKUP_WILDCARD
 #endif
