@@ -1125,7 +1125,7 @@ in6_pcblookup_bind(head, laddr6, lport_arg, faith)
 			continue;
 		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
 			if (IN6_IS_ADDR_V4MAPPED(laddr6)) {
-#if !defined(TCP6) && !defined(INET6_BINDV6ONLY)
+#ifndef INET6_BINDV6ONLY
 				if (in6p->in6p_flags & IN6P_BINDV6ONLY)
 					continue;
 				else
@@ -1134,6 +1134,12 @@ in6_pcblookup_bind(head, laddr6, lport_arg, faith)
 				continue;
 #endif
 			} else
+				match = in6p;
+		}
+		else if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr) &&
+			 in6p->in6p_laddr.s6_addr32[3] == 0) {
+			if (IN6_IS_ADDR_V4MAPPED(laddr6) &&
+			    laddr6->s6_addr32[3] != 0)
 				match = in6p;
 		}
 		else if (IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, laddr6))

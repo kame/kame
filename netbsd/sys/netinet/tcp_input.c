@@ -784,7 +784,7 @@ findpcb:
 			++tcpstat.tcps_pcbhashmiss;
 			inp = in_pcblookup_bind(&tcbtable, ip->ip_dst, th->th_dport);
 		}
-#if defined(INET6) && !defined(TCP6) && !defined(INET6_BINDV6ONLY)
+#if defined(INET6) && !defined(TCP6)
 		if (inp == 0) {
 			struct in6_addr s, d;
 
