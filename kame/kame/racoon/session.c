@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: session.c,v 1.7 2000/07/05 06:14:35 sakane Exp $ */
+/* YIPS @(#)$Id: session.c,v 1.8 2000/08/02 15:47:33 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -76,7 +76,10 @@
 #include "localconf.h"
 #include "remoteconf.h"
 
+static void init_signal __P((void));
 static int set_signal __P((int sig, RETSIGTYPE (*func)()));
+static void check_sigreq __P((void));
+static void check_flushsa __P((void));
 static int close_sockets __P((void));
 
 static int sigreq = 0;
@@ -91,7 +94,7 @@ session(void)
 	int error;
 	struct myaddrs *p;
 
-	signal_handler(0);
+	init_signal();
 
 	if (admin_init() < 0)
 		exit(1);
@@ -132,16 +135,7 @@ session(void)
 		 * asynchronous requests via signal.
 		 * make sure to reset sigreq to 0.
 		 */
-		switch (sigreq) {
-		case SIGHUP:
-			if (cfreparse()) {
-				plog(logp, LOCATION, NULL,
-					"ERROR: configuration read failed\n");
-				exit(1);
-			}
-			sigreq = 0;
-			break;
-		}
+		check_sigreq();
 
 		/* scheduling */
 		timeout = schedular();
@@ -219,31 +213,15 @@ static int signals[] = {
 	0
 };
 
+/*
+ * asynchronous requests will actually dispatched in the
+ * main loop in session().
+ */
 RETSIGTYPE
 signal_handler(sig)
 	int sig;
 {
-	int i;
-
 	switch (sig) {
-	case 0:
-		for (i = 0; signals[i] != 0; i++)
-			if (set_signal(signals[i], signal_handler) < 0) {
-				plog(logp, LOCATION, NULL,
-					"failed to set_signal (%s)\n",
-					strerror(errno));
-				exit(1);
-			}
-		break;
-
-	case SIGHUP:
-		/*
-		 * asynchronous requests will actually dispatched in the
-		 * main loop in session().
-		 */
-		sigreq = sig;
-		break;
-
 	case SIGCHLD:
 	    {
 		pid_t pid;
@@ -254,12 +232,109 @@ signal_handler(sig)
 		break;
 
 	default:
-		plog(logp, LOCATION, NULL,
-			"caught signal %d\n", sig);
-		close_sockets();
-		exit(1);
+		/* XXX should be blocked any signal ? */
+		sigreq = sig;
 		break;
 	}
+}
+
+static void
+check_sigreq()
+{
+	switch (sigreq) {
+	case 0:
+		return;
+
+	case SIGHUP:
+		if (cfreparse()) {
+			plog(logp, LOCATION, NULL,
+				"ERROR: configuration read failed\n");
+			exit(1);
+		}
+		sigreq = 0;
+		break;
+
+	default:
+		plog(logp, LOCATION, NULL, "caught signal %d\n", sigreq);
+		pfkey_send_flush(lcconf->sock_pfkey, SADB_SATYPE_UNSPEC);
+		sched_new(1, check_flushsa, NULL);
+		sigreq = 0;
+		break;
+	}
+}
+
+/*
+ * waiting the termination of processing until sending DELETE message
+ * for all inbound SA will complete.
+ */
+static void
+check_flushsa()
+{
+	vchar_t *buf;
+	struct sadb_msg *msg, *end, *next;
+	struct sadb_sa *sa;
+	caddr_t mhp[SADB_EXT_MAX + 1];
+	int n;
+
+	buf = pfkey_dump_sadb(SADB_SATYPE_UNSPEC);
+
+	msg = (struct sadb_msg *)buf->v;
+	end = (struct sadb_msg *)(buf->v + buf->l);
+
+	/* counting SA except of dead one. */
+	n = 0;
+	while (msg < end) {
+		if (PFKEY_UNUNIT64(msg->sadb_msg_len) < sizeof(*msg))
+			break;
+		next = (struct sadb_msg *)((caddr_t)msg + PFKEY_UNUNIT64(msg->sadb_msg_len));
+		if (msg->sadb_msg_type != SADB_DUMP) {
+			msg = next;
+			continue;
+		}
+
+		if (pfkey_align(msg, mhp) || pfkey_check(mhp)) {
+			plog(logp, LOCATION, NULL, "pfkey_check (%s)\n", ipsec_strerror());
+			msg = next;
+			continue;
+		}
+
+		sa = (struct sadb_sa *)(mhp[SADB_EXT_SA]);
+		if (!sa) {
+			msg = next;
+			continue;
+		}
+
+		if (sa->sadb_sa_state != SADB_SASTATE_DEAD) {
+			n++;
+			msg = next;
+			continue;
+		}
+
+		msg = next;
+	}
+
+	if (n) {
+		sched_new(1, check_flushsa, NULL);
+		return;
+	}
+
+	flushph1();
+	close_sockets();
+	exit(1);
+}
+
+static void
+init_signal()
+{
+	int i;
+
+	for (i = 0; signals[i] != 0; i++)
+		if (set_signal(signals[i], signal_handler) < 0) {
+			plog(logp, LOCATION, NULL,
+				"failed to set_signal (%s)\n",
+				strerror(errno));
+			exit(1);
+		}
 }
 
 static int
