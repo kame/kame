@@ -25,6 +25,11 @@ grammar.c: grammar.y
 	mv y.tab.c grammar.c
 	mv y.tab.h tokdefs.h
 
+grammar.o: grammar.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -Dyylval=pcap_lval -c $>
+grammar.po: grammar.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -Dyylval=pcap_lval -c -pg -o $@ $>
+
 version.c: VERSION
 	@rm -f $@
 	sed -e 's/.*/char pcap_version[] = "&";/' $> > $@
