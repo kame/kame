@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.87 2001/05/25 01:08:00 sakane Exp $	*/
+/*	$KAME: in6.h,v 1.88 2001/05/25 01:32:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -786,8 +786,8 @@ struct ip6_mtuinfo {
 	0, \
 	&ip6_v6only, \
 	__IPV6CTL_VARS_RTEXPIRE, \
-	__IPV6CTL_VARS_MINEXPIRE, \
-	__IPV6CTL_VARS_MAXCACHE, \
+	__IPV6CTL_VARS_RTMINEXPIRE, \
+	__IPV6CTL_VARS_RTMAXCACHE, \
 	__IPV6CTL_VARS_ANONPORTMIN, \
 	__IPV6CTL_VARS_ANONPORTMAX, \
 	__IPV6CTL_VARS_LOWPORTMIN, \
